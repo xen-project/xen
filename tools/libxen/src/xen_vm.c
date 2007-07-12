@@ -162,7 +162,10 @@ static const struct_member xen_vm_record_struct_members[] =
           .offset = offsetof(xen_vm_record, metrics) },
         { .key = "guest_metrics",
           .type = &abstract_type_ref,
-          .offset = offsetof(xen_vm_record, guest_metrics) }
+          .offset = offsetof(xen_vm_record, guest_metrics) },
+        { .key = "security_label",
+          .type = &abstract_type_string,
+          .offset = offsetof(xen_vm_record, security_label) }
     };
 
 const abstract_type xen_vm_record_abstract_type_ =
@@ -206,6 +209,7 @@ xen_vm_record_free(xen_vm_record *record)
     xen_string_string_map_free(record->other_config);
     xen_vm_metrics_record_opt_free(record->metrics);
     xen_vm_guest_metrics_record_opt_free(record->guest_metrics);
+    free(record->security_label);
     free(record);
 }
 
@@ -1736,5 +1740,44 @@ xen_vm_get_uuid(xen_session *session, char **result, xen_vm vm)
 
     *result = NULL;
     XEN_CALL_("VM.get_uuid");
+    return session->ok;
+}
+
+
+bool
+xen_vm_set_security_label(xen_session *session, int64_t *result, xen_vm vm,
+                          char *label, char *oldlabel)
+{
+    abstract_value param_values[] =
+        {
+            { .type = &abstract_type_string,
+              .u.string_val = vm },
+            { .type = &abstract_type_string,
+              .u.string_val = label },
+            { .type = &abstract_type_string,
+              .u.string_val = oldlabel },
+        };
+
+    abstract_type result_type = abstract_type_int;
+
+    *result = 0;
+    XEN_CALL_("VM.set_security_label");
+    return session->ok;
+}
+
+
+bool
+xen_vm_get_security_label(xen_session *session, char **result, xen_vm vm)
+{
+    abstract_value param_values[] =
+        {
+            { .type = &abstract_type_string,
+              .u.string_val = vm },
+        };
+
+    abstract_type result_type = abstract_type_string;
+
+    *result = NULL;
+    XEN_CALL_("VM.get_security_label");
     return session->ok;
 }

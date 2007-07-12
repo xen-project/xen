@@ -225,7 +225,7 @@ hashtable_iterator_search(struct hashtable_itr *itr,
     
 egress:
 #ifdef HASHTABLE_THREADED
-    pthread_mutex_lock(&h->mutex);
+    pthread_mutex_unlock(&h->mutex);
 #endif 
     return ret;
 }

@@ -24,6 +24,10 @@ import string
 from xen.util.security import ACMError, err, list_labels, active_policy
 from xen.util.security import vm_label_re, res_label_re, all_label_re
 from xen.xm.opts import OptionError
+from xen.util.acmpolicy import ACMPolicy
+from xen.util import xsconstants
+from xen.xm.main import server
+from xen.xm import main as xm_main
 
 
 def help():
@@ -48,6 +52,12 @@ def main(argv):
         else:
             raise OptionError('Unrecognised option: %s' % arg)
 
+    if xm_main.serverType != xm_main.SERVER_XEN_API:
+        labels(policy, ptype)
+    else:
+        labels_xapi(policy, ptype)
+
+def labels(policy, ptype):
     if not policy:
         policy = active_policy
         if active_policy in ['NULL', 'INACTIVE', 'DEFAULT']:
@@ -73,7 +83,30 @@ def main(argv):
     except:
         traceback.print_exc(limit = 1)
 
+def labels_xapi(policy, ptype):
+    policystate = server.xenapi.XSPolicy.get_xspolicy()
+    if int(policystate['type']) == xsconstants.XS_POLICY_ACM:
+        acmpol = ACMPolicy(xml=policystate['repr'])
+        if policy and policy != acmpol.get_name():
+            print "Warning: '%s' is not the currently loaded policy." % policy
+            return labels(policy, ptype)
+        names1 = []
+        names2 = []
+        if not ptype or ptype == 'dom' or ptype == 'any':
+            names1 = acmpol.policy_get_virtualmachinelabel_names()
+        if ptype == 'res' or ptype == 'any':
+            names2 = acmpol.policy_get_resourcelabel_names()
+        if len(names1) > 0:
+            names = set(names1)
+            names.union(names2)
+        else:
+            names = set(names2)
+        for n in names:
+            print n
+    elif int(policystate['type']) == 0:
+        print "No policy installed on the system."
+    else:
+        print "Unsupported type of policy installed on the system."
+
 if __name__ == '__main__':
     main(sys.argv)
-
-

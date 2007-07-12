@@ -23,7 +23,6 @@
 #ifndef __ASM_X86_XENOPROF_H__
 #define __ASM_X86_XENOPROF_H__
 
-int nmi_init(int *num_events, int *is_primary, char *cpu_type);
 int nmi_reserve_counters(void);
 int nmi_setup_events(void);
 int nmi_enable_virq(void);
@@ -32,8 +31,7 @@ void nmi_stop(void);
 void nmi_disable_virq(void);
 void nmi_release_counters(void);
 
-#define xenoprof_arch_init(num_events, is_primary, cpu_type)    \
-    nmi_init(num_events, is_primary, cpu_type)
+int xenoprof_arch_init(int *num_events, char *cpu_type);
 #define xenoprof_arch_reserve_counters()        nmi_reserve_counters()
 #define xenoprof_arch_setup_events()            nmi_setup_events()
 #define xenoprof_arch_enable_virq()             nmi_enable_virq()

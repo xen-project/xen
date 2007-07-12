@@ -313,6 +313,8 @@ static always_inline unsigned long long __cmpxchg8b(
 #define __sti()			__asm__ __volatile__("sti": : :"memory")
 /* used in the idle loop; sti takes one instruction cycle to complete */
 #define safe_halt()		__asm__ __volatile__("sti; hlt": : :"memory")
+/* used when interrupts are already enabled or to shutdown the processor */
+#define halt()			__asm__ __volatile__("hlt": : :"memory")
 
 /* For spinlocks etc */
 #if defined(__i386__)

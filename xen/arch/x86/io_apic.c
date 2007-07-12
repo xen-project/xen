@@ -35,9 +35,6 @@
 #include <mach_apic.h>
 #include <io_ports.h>
 
-#define set_irq_info(irq, mask) ((void)0)
-#define set_native_irq_info(irq, mask) ((void)0)
-
 /* Different to Linux: our implementation can be simpler. */
 #define make_8259A_irq(irq) (io_apic_irqs &= ~(1<<(irq)))
 

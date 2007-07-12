@@ -175,9 +175,11 @@ __start:
 
 #include "cmdline.S"
 
+        .align 16
         .globl trampoline_start, trampoline_end
 trampoline_start:
 #include "trampoline.S"
+#include "wakeup.S"
 trampoline_end:
 
         .text

@@ -28,6 +28,8 @@ extern int start_vmx(void);
 extern void vmcs_dump_vcpu(void);
 extern void vmx_init_vmcs_config(void);
 extern void setup_vmcs_dump(void);
+extern void vmx_suspend_cpu(void);
+extern void vmx_resume_cpu(void);
 
 struct vmcs_struct {
     u32 vmcs_revision_id;
@@ -59,6 +61,7 @@ struct arch_vmx_struct {
      *  - Activated on a CPU by VMPTRLD. Deactivated by VMCLEAR.
      *  - Launched on active CPU by VMLAUNCH when current VMCS.
      */
+    struct list_head     active_list;
     int                  active_cpu;
     int                  launched;
 

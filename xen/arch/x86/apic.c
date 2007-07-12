@@ -957,7 +957,7 @@ void __setup_APIC_LVTT(unsigned int clocks)
     apic_write_around(APIC_TMICT, clocks/APIC_DIVISOR);
 }
 
-static void __init setup_APIC_timer(unsigned int clocks)
+static void __devinit setup_APIC_timer(unsigned int clocks)
 {
     unsigned long flags;
     local_irq_save(flags);

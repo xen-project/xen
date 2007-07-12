@@ -285,7 +285,7 @@ static int write_stack_trampoline(
     return 34;
 }
 
-void __init percpu_traps_init(void)
+void __devinit percpu_traps_init(void)
 {
     char *stack_bottom, *stack;
     int   cpu = smp_processor_id();

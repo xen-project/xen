@@ -184,7 +184,6 @@ static __init int broken_toshiba_keyboard(struct dmi_blacklist *d)
 static __init int reset_videomode_after_s3(struct dmi_blacklist *d)
 {
 	/* See acpi_wakeup.S */
-	extern long acpi_video_flags;
 	acpi_video_flags |= 2;
 	return 0;
 }

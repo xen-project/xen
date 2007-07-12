@@ -915,10 +915,17 @@ HVM_REGISTER_SAVE_RESTORE(LAPIC_REGS, lapic_save_regs, lapic_load_regs,
 int vlapic_init(struct vcpu *v)
 {
     struct vlapic *vlapic = vcpu_vlapic(v);
+    unsigned int memflags = 0;
 
     HVM_DBG_LOG(DBG_LEVEL_VLAPIC, "%d", v->vcpu_id);
 
-    vlapic->regs_page = alloc_domheap_page(NULL);
+#ifdef __i386__
+    /* 32-bit VMX may be limited to 32-bit physical addresses. */
+    if ( boot_cpu_data.x86_vendor == X86_VENDOR_INTEL )
+        memflags = MEMF_bits(32);
+#endif
+
+    vlapic->regs_page = alloc_domheap_pages(NULL, 0, memflags);
     if ( vlapic->regs_page == NULL )
     {
         dprintk(XENLOG_ERR, "alloc vlapic regs error: %d/%d\n",

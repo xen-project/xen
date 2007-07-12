@@ -21,14 +21,19 @@
 import sys, os, re
 from xen.util import dictio
 from xen.util import security
+from xen.util import xsconstants
 from xen.xm.opts import OptionError
+from xen.xm import main as xm_main
+from xen.xm.main import server
 
 def help():
     return """
     Usage: xm getlabel dom <configfile>
+           xm getlabel mgt <domain name>
            xm getlabel res <resource>
            
-    This program shows the label for a domain or resource."""
+    This program shows the label for a domain, resource or virtual network
+    interface of a Xend-managed domain."""
 
 def get_resource_label(resource):
     """Gets the resource label
@@ -37,17 +42,24 @@ def get_resource_label(resource):
     resource = security.unify_resname(resource)
 
     # read in the resource file
-    file = security.res_label_filename
+    fil = security.res_label_filename
     try:
-        access_control = dictio.dict_read("resources", file)
+        access_control = dictio.dict_read("resources", fil)
     except:
         raise OptionError("Resource label file not found")
 
     # get the entry and print label
     if access_control.has_key(resource):
-        policy = access_control[resource][0]
-        label = access_control[resource][1]
-        print "policy="+policy+",label="+label
+        tmp = access_control[resource]
+        if len(tmp) == 2:
+            policy, label = tmp
+            policytype = xsconstants.ACM_POLICY_ID
+        elif len(tmp) == 3:
+            policytype, policy, label = tmp
+        else:
+            raise security.ACMError("Resource not properly labeled. "
+                                    "Please relabel the resource.")
+        print policytype+":"+policy+":"+label
     else:
         raise security.ACMError("Resource not labeled")
 
@@ -89,8 +101,19 @@ def get_domain_label(configfile):
     data = data.strip()
     data = data.lstrip("[\'")
     data = data.rstrip("\']")
-    print data
+    print "policytype=%s," % xsconstants.ACM_POLICY_ID + data
 
+def get_domain_label_xapi(domainname):
+    if xm_main.serverType != xm_main.SERVER_XEN_API:
+        raise OptionError('xm needs to be configure to use the xen-api.')
+    uuids = server.xenapi.VM.get_by_name_label(domainname)
+    if len(uuids) == 0:
+        raise OptionError('A VM with that name does not exist.')
+    if len(uuids) != 1:
+        raise OptionError('There are multiple domains with the same name.')
+    uuid = uuids[0]
+    sec_lab = server.xenapi.VM.get_security_label(uuid)
+    print "%s" %sec_lab
 
 def main(argv):
     if len(argv) != 3:
@@ -99,11 +122,15 @@ def main(argv):
     if argv[1].lower() == "dom":
         configfile = argv[2]
         get_domain_label(configfile)
+    elif argv[1].lower() == "mgt":
+        domainname = argv[2]
+        get_domain_label_xapi(domainname)
     elif argv[1].lower() == "res":
         resource = argv[2]
         get_resource_label(resource)
     else:
-        raise OptionError('First subcommand argument must be "dom" or "res"')
+        raise OptionError('First subcommand argument must be "dom"'
+                          ', "mgt" or "res"')
 
 if __name__ == '__main__':
     try:
@@ -111,6 +138,4 @@ if __name__ == '__main__':
     except Exception, e:
         sys.stderr.write('Error: %s\n' % str(e))
         sys.exit(-1)
-        
-
 
