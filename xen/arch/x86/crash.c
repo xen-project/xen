@@ -43,7 +43,7 @@ static int crash_nmi_callback(struct cpu_user_regs *regs, int cpu)
     kexec_crash_save_cpu();
     disable_local_APIC();
     atomic_dec(&waiting_for_crash_ipi);
-    hvm_disable();
+    hvm_cpu_down();
 
     for ( ; ; )
         __asm__ __volatile__ ( "hlt" );
@@ -99,7 +99,7 @@ void machine_crash_shutdown(void)
 
     disable_IO_APIC();
 
-    hvm_disable();
+    hvm_cpu_down();
 
     info = kexec_crash_save_info();
     info->dom0_pfn_to_mfn_frame_list_list =

@@ -118,7 +118,7 @@ int enter_state(u32 state)
     
     freeze_domains();
 
-    hvm_suspend_cpu();
+    hvm_cpu_down();
 
     pmprintk(XENLOG_INFO, "PM: Preparing system for %s sleep\n",
         acpi_states[state]);
@@ -152,7 +152,8 @@ int enter_state(u32 state)
  Done:
     local_irq_restore(flags);
 
-    hvm_resume_cpu();
+    if ( !hvm_cpu_up() )
+        BUG();
 
     thaw_domains();
     spin_unlock(&pm_lock);

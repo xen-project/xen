@@ -557,9 +557,6 @@ void __devinit cpu_init(void)
 	}
 	printk(KERN_INFO "Initializing CPU#%d\n", cpu);
 
-	if (cpu_has_vme || cpu_has_tsc || cpu_has_de)
-		clear_in_cr4(X86_CR4_VME|X86_CR4_PVI|X86_CR4_TSD|X86_CR4_DE);
-
 	*(unsigned short *)(&gdt_load[0]) = LAST_RESERVED_GDT_BYTE;
 	*(unsigned long  *)(&gdt_load[2]) = GDT_VIRT_START(current);
 	__asm__ __volatile__ ( "lgdt %0" : "=m" (gdt_load) );

@@ -397,7 +397,8 @@ void __init init_IRQ(void)
         irq_desc[i].depth   = 1;
         spin_lock_init(&irq_desc[i].lock);
         cpus_setall(irq_desc[i].affinity);
-        set_intr_gate(i, interrupt[i]);
+        if ( i >= 0x20 )
+            set_intr_gate(i, interrupt[i]);
     }
 
     for ( i = 0; i < 16; i++ )

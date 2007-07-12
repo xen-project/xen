@@ -43,6 +43,7 @@
 #include <asm/hvm/hvm.h>
 #include <asm/hvm/support.h>
 #include <asm/msr.h>
+#include <asm/nmi.h>
 #ifdef CONFIG_COMPAT
 #include <compat/vcpu.h>
 #endif
@@ -76,10 +77,7 @@ static void default_idle(void)
         local_irq_enable();
 }
 
-#ifdef CONFIG_HOTPLUG_CPU
-#include <asm/nmi.h>
-/* We don't actually take CPU down, just spin without interrupts. */
-static inline void play_dead(void)
+static void play_dead(void)
 {
     __cpu_disable();
     /* This must be done before dead CPU ack */
@@ -94,12 +92,6 @@ static inline void play_dead(void)
     for ( ; ; )
         halt();
 }
-#else
-static inline void play_dead(void)
-{
-    BUG();
-}
-#endif /* CONFIG_HOTPLUG_CPU */
 
 void idle_loop(void)
 {

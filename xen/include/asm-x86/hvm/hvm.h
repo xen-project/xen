@@ -156,8 +156,8 @@ struct hvm_function_table {
 
     int  (*event_injection_faulted)(struct vcpu *v);
 
-    void (*suspend_cpu)(void);
-    void (*resume_cpu)(void);
+    int  (*cpu_up)(void);
+    void (*cpu_down)(void);
 };
 
 extern struct hvm_function_table hvm_funcs;
@@ -314,16 +314,17 @@ static inline int hvm_event_injection_faulted(struct vcpu *v)
 /* These exceptions must always be intercepted. */
 #define HVM_TRAP_MASK (1U << TRAP_machine_check)
 
-static inline void hvm_suspend_cpu(void)
+static inline int hvm_cpu_up(void)
 {
-    if ( hvm_funcs.suspend_cpu )
-        hvm_funcs.suspend_cpu();
+    if ( hvm_funcs.cpu_up )
+        return hvm_funcs.cpu_up();
+    return 1;
 }
 
-static inline void hvm_resume_cpu(void)
+static inline void hvm_cpu_down(void)
 {
-    if ( hvm_funcs.resume_cpu )
-        hvm_funcs.resume_cpu();
+    if ( hvm_funcs.cpu_down )
+        hvm_funcs.cpu_down();
 }
 
 #endif /* __ASM_X86_HVM_HVM_H__ */

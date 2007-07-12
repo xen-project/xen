@@ -94,7 +94,7 @@ static void svm_inject_exception(struct vcpu *v, int trap,
     vmcb->eventinj = event;
 }
 
-static void svm_suspend_cpu(void)
+static void svm_cpu_down(void)
 {
     write_efer(read_efer() & ~EFER_SVME);
 }
@@ -973,7 +973,7 @@ static int svm_event_injection_faulted(struct vcpu *v)
 
 static struct hvm_function_table svm_function_table = {
     .name                 = "SVM",
-    .suspend_cpu          = svm_suspend_cpu,
+    .cpu_down             = svm_cpu_down,
     .domain_initialise    = svm_domain_initialise,
     .domain_destroy       = svm_domain_destroy,
     .vcpu_initialise      = svm_vcpu_initialise,

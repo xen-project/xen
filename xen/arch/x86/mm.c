@@ -3642,8 +3642,6 @@ static void __memguard_change_range(void *p, unsigned long l, int guard)
     unsigned long flags = __PAGE_HYPERVISOR | MAP_SMALL_PAGES;
 
     /* Ensure we are dealing with a page-aligned whole number of pages. */
-    ASSERT((_p&PAGE_MASK) != 0);
-    ASSERT((_l&PAGE_MASK) != 0);
     ASSERT((_p&~PAGE_MASK) == 0);
     ASSERT((_l&~PAGE_MASK) == 0);
 

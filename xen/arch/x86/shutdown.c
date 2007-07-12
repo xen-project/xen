@@ -222,7 +222,7 @@ void machine_restart(char *cmd)
      */
     smp_send_stop();
     disable_IO_APIC();
-    hvm_disable();
+    hvm_cpu_down();
 
     /* Rebooting needs to touch the page at absolute address 0. */
     *((unsigned short *)__va(0x472)) = reboot_mode;

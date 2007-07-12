@@ -66,7 +66,7 @@ static u32 adjust_vmx_controls(u32 ctl_min, u32 ctl_opt, u32 msr)
     return ctl;
 }
 
-void vmx_init_vmcs_config(void)
+static void vmx_init_vmcs_config(void)
 {
     u32 vmx_msr_low, vmx_msr_high, min, opt;
     u32 _vmx_pin_based_exec_control;
@@ -130,8 +130,9 @@ void vmx_init_vmcs_config(void)
 
     rdmsr(MSR_IA32_VMX_BASIC, vmx_msr_low, vmx_msr_high);
 
-    if ( smp_processor_id() == 0 )
+    if ( !vmx_pin_based_exec_control )
     {
+        /* First time through. */
         vmcs_revision_id = vmx_msr_low;
         vmx_pin_based_exec_control = _vmx_pin_based_exec_control;
         vmx_cpu_based_exec_control = _vmx_cpu_based_exec_control;
@@ -142,6 +143,7 @@ void vmx_init_vmcs_config(void)
     }
     else
     {
+        /* Globals are already initialised: re-check them. */
         BUG_ON(vmcs_revision_id != vmx_msr_low);
         BUG_ON(vmx_pin_based_exec_control != _vmx_pin_based_exec_control);
         BUG_ON(vmx_cpu_based_exec_control != _vmx_cpu_based_exec_control);
@@ -189,7 +191,7 @@ static void __vmx_clear_vmcs(void *info)
     struct vcpu *v = info;
     struct arch_vmx_struct *arch_vmx = &v->arch.hvm_vmx;
 
-    /* Otherwise we can nest (vmx_suspend_cpu() vs. vmx_clear_vmcs()). */
+    /* Otherwise we can nest (vmx_cpu_down() vs. vmx_clear_vmcs()). */
     ASSERT(!local_irq_is_enabled());
 
     if ( arch_vmx->active_cpu == smp_processor_id() )
@@ -234,7 +236,54 @@ static void vmx_load_vmcs(struct vcpu *v)
     local_irq_restore(flags);
 }
 
-void vmx_suspend_cpu(void)
+int vmx_cpu_up(void)
+{
+    u32 eax, edx;
+    int cpu = smp_processor_id();
+
+    BUG_ON(!(read_cr4() & X86_CR4_VMXE));
+
+    rdmsr(IA32_FEATURE_CONTROL_MSR, eax, edx);
+
+    if ( eax & IA32_FEATURE_CONTROL_MSR_LOCK )
+    {
+        if ( !(eax & IA32_FEATURE_CONTROL_MSR_ENABLE_VMXON) )
+        {
+            printk("CPU%d: VMX disabled\n", cpu);
+            return 0;
+        }
+    }
+    else
+    {
+        wrmsr(IA32_FEATURE_CONTROL_MSR,
+              IA32_FEATURE_CONTROL_MSR_LOCK |
+              IA32_FEATURE_CONTROL_MSR_ENABLE_VMXON, 0);
+    }
+
+    vmx_init_vmcs_config();
+
+    INIT_LIST_HEAD(&this_cpu(active_vmcs_list));
+
+    if ( this_cpu(host_vmcs) == NULL )
+    {
+        this_cpu(host_vmcs) = vmx_alloc_vmcs();
+        if ( this_cpu(host_vmcs) == NULL )
+        {
+            printk("CPU%d: Could not allocate host VMCS\n", cpu);
+            return 0;
+        }
+    }
+
+    if ( __vmxon(virt_to_maddr(this_cpu(host_vmcs))) )
+    {
+        printk("CPU%d: VMXON failed\n", cpu);
+        return 0;
+    }
+
+    return 1;
+}
+
+void vmx_cpu_down(void)
 {
     struct list_head *active_vmcs_list = &this_cpu(active_vmcs_list);
     unsigned long flags;
@@ -245,23 +294,10 @@ void vmx_suspend_cpu(void)
         __vmx_clear_vmcs(list_entry(active_vmcs_list->next,
                                     struct vcpu, arch.hvm_vmx.active_list));
 
-    if ( read_cr4() & X86_CR4_VMXE )
-    {
-        __vmxoff();
-        clear_in_cr4(X86_CR4_VMXE);
-    }
+    BUG_ON(!(read_cr4() & X86_CR4_VMXE));
+    __vmxoff();
 
     local_irq_restore(flags);
-}
-
-void vmx_resume_cpu(void)
-{
-    if ( !read_cr4() & X86_CR4_VMXE )
-    {
-        set_in_cr4(X86_CR4_VMXE);
-        if ( __vmxon(virt_to_maddr(this_cpu(host_vmcs))) )
-            BUG();
-    }
 }
 
 void vmx_vmcs_enter(struct vcpu *v)
@@ -292,21 +328,6 @@ void vmx_vmcs_exit(struct vcpu *v)
 
     spin_unlock(&v->arch.hvm_vmx.vmcs_lock);
     vcpu_unpause(v);
-}
-
-struct vmcs_struct *vmx_alloc_host_vmcs(void)
-{
-    ASSERT(this_cpu(host_vmcs) == NULL);
-    this_cpu(host_vmcs) = vmx_alloc_vmcs();
-    INIT_LIST_HEAD(&this_cpu(active_vmcs_list));
-    return this_cpu(host_vmcs);
-}
-
-void vmx_free_host_vmcs(struct vmcs_struct *vmcs)
-{
-    ASSERT(vmcs == this_cpu(host_vmcs));
-    vmx_free_vmcs(vmcs);
-    this_cpu(host_vmcs) = NULL;
 }
 
 struct xgt_desc {
