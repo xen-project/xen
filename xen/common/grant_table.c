@@ -533,9 +533,9 @@ __gnttab_unmap_grant_ref(
     struct gnttab_unmap_grant_ref *op)
 {
     struct gnttab_unmap_common common = {
-	.host_addr = op->host_addr,
-	.dev_bus_addr = op->dev_bus_addr,
-	.handle = op->handle,
+        .host_addr = op->host_addr,
+        .dev_bus_addr = op->dev_bus_addr,
+        .handle = op->handle,
     };
 
     __gnttab_unmap_common(&common);
@@ -571,9 +571,9 @@ __gnttab_unmap_and_replace(
     struct gnttab_unmap_and_replace *op)
 {
     struct gnttab_unmap_common common = {
-	.host_addr = op->host_addr,
-	.new_addr = op->new_addr,
-	.handle = op->handle,
+        .host_addr = op->host_addr,
+        .new_addr = op->new_addr,
+        .handle = op->handle,
     };
 
     __gnttab_unmap_common(&common);
