@@ -13,9 +13,10 @@
  * along with this program; if not, write to the Free Software
  * Foundation, 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  *
- * Copyright (C) IBM Corp. 2005
+ * Copyright IBM Corp. 2005, 2007
  *
  * Authors: Jimi Xenidis <jimix@watson.ibm.com>
+ *          Christian Ehrhardt <ehrhardt@linux.vnet.ibm.com>
  */
 
 #ifndef _ASM_REG_DEFS_H_
@@ -166,8 +167,32 @@
 #define SPRN_LPCR   318
 #define SPRN_LPIDR  319
 
+/* Performance monitor spr encodings */
+#define SPRN_MMCRA  786
+#define   MMCRA_SAMPHV    UL(0x10000000) /* state of MSR HV when SIAR set */
+#define   MMCRA_SAMPPR    UL(0x08000000) /* state of MSR PR when SIAR set */
+#define   MMCRA_SAMPLE_ENABLE UL(0x00000001) /* enable sampling */
+#define NUM_PMCS 8
+#define SPRN_PMC1   787
+#define SPRN_PMC2   788
+#define SPRN_PMC3   789
+#define SPRN_PMC4   790
+#define SPRN_PMC5   791
+#define SPRN_PMC6   792
+#define SPRN_PMC7   793
+#define SPRN_PMC8   794
+#define SPRN_MMCR0  795
+#define   MMCR0_FC      UL(0x80000000) /* freeze counters */
+#define   MMCR0_FCS     UL(0x40000000) /* freeze in supervisor state */
+#define   MMCR0_FCP     UL(0x20000000) /* freeze in problem state */
+#define   MMCR0_FCM1    UL(0x10000000) /* freeze counters while MSR mark = 1 */
+#define   MMCR0_FCM0    UL(0x08000000) /* freeze counters while MSR mark = 0 */
+#define   MMCR0_PMAE    UL(0x04000000) /* performance monitor alert enabled */
+#define   MMCR0_PMAO    UL(0x00000080) /* performance monitor alert occurred */
+#define   MMCR0_FCH     UL(0x00000001) /* freeze conditions in hypervisor */
 #define SPRN_SIAR   796
 #define SPRN_SDAR   797
+#define SPRN_MMCR1  798
 
 /* As defined for PU G4 */
 #define SPRN_HID0   1008

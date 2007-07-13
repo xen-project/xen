@@ -13,9 +13,10 @@
  * along with this program; if not, write to the Free Software
  * Foundation, 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  *
- * Copyright (C) IBM Corp. 2005, 2006
+ * Copyright IBM Corp. 2005, 2006, 2007
  *
  * Authors: Hollis Blanchard <hollisb@us.ibm.com>
+ *          Christian Ehrhardt <ehrhardt@linux.vnet.ibm.com>
  */
 
 #ifndef _ASM_PROCESSOR_H_
@@ -198,6 +199,141 @@ static inline ulong mfr1(void)
     ulong r1;
     asm volatile("mr %0, 1" : "=&r" (r1));
     return r1;
+}
+
+static inline void mtmmcr0(ulong val)
+{
+    asm volatile ("mtspr %0, %1" : : "i"(SPRN_MMCR0), "r"(val));
+}
+static inline ulong mfmmcr0(void)
+{
+    ulong rval;
+    asm volatile ("mfspr %0, %1" : "=r"(rval) : "i"(SPRN_MMCR0));
+    return rval;
+}
+
+static inline void mtmmcr1(ulong val)
+{
+    asm volatile ("mtspr %0, %1" : : "i"(SPRN_MMCR1), "r"(val));
+}
+static inline ulong mfmmcr1(void)
+{
+    ulong rval;
+    asm volatile ("mfspr %0, %1" : "=r"(rval) : "i"(SPRN_MMCR1));
+    return rval;
+}
+
+static inline void mtmmcra(ulong val)
+{
+    asm volatile ("mtspr %0, %1" : : "i"(SPRN_MMCRA), "r"(val));
+}
+static inline ulong mfmmcra(void)
+{
+    ulong rval;
+    asm volatile ("mfspr %0, %1" : "=r"(rval) : "i"(SPRN_MMCRA));
+    return rval;
+}
+
+static inline void mtpmc1(ulong val)
+{
+    asm volatile ("mtspr %0, %1" : : "i"(SPRN_PMC1), "r"(val));
+}
+static inline ulong mfpmc1(void)
+{
+    ulong rval;
+    asm volatile ("mfspr %0, %1" : "=r"(rval) : "i"(SPRN_PMC1));
+    return rval;
+}
+
+static inline void mtpmc2(ulong val)
+{
+    asm volatile ("mtspr %0, %1" : : "i"(SPRN_PMC2), "r"(val));
+}
+static inline ulong mfpmc2(void)
+{
+    ulong rval;
+    asm volatile ("mfspr %0, %1" : "=r"(rval) : "i"(SPRN_PMC2));
+    return rval;
+}
+
+static inline void mtpmc3(ulong val)
+{
+    asm volatile ("mtspr %0, %1" : : "i"(SPRN_PMC3), "r"(val));
+}
+static inline ulong mfpmc3(void)
+{
+    ulong rval;
+    asm volatile ("mfspr %0, %1" : "=r"(rval) : "i"(SPRN_PMC3));
+    return rval;
+}
+
+static inline void mtpmc4(ulong val)
+{
+    asm volatile ("mtspr %0, %1" : : "i"(SPRN_PMC4), "r"(val));
+}
+static inline ulong mfpmc4(void)
+{
+    ulong rval;
+    asm volatile ("mfspr %0, %1" : "=r"(rval) : "i"(SPRN_PMC4));
+    return rval;
+}
+
+static inline void mtpmc5(ulong val)
+{
+    asm volatile ("mtspr %0, %1" : : "i"(SPRN_PMC5), "r"(val));
+}
+static inline ulong mfpmc5(void)
+{
+    ulong rval;
+    asm volatile ("mfspr %0, %1" : "=r"(rval) : "i"(SPRN_PMC5));
+    return rval;
+}
+
+static inline void mtpmc6(ulong val)
+{
+    asm volatile ("mtspr %0, %1" : : "i"(SPRN_PMC6), "r"(val));
+}
+static inline ulong mfpmc6(void)
+{
+    ulong rval;
+    asm volatile ("mfspr %0, %1" : "=r"(rval) : "i"(SPRN_PMC6));
+    return rval;
+}
+
+static inline void mtpmc7(ulong val)
+{
+    asm volatile ("mtspr %0, %1" : : "i"(SPRN_PMC7), "r"(val));
+}
+static inline ulong mfpmc7(void)
+{
+    ulong rval;
+    asm volatile ("mfspr %0, %1" : "=r"(rval) : "i"(SPRN_PMC7));
+    return rval;
+}
+
+static inline void mtpmc8(ulong val)
+{
+    asm volatile ("mtspr %0, %1" : : "i"(SPRN_PMC8), "r"(val));
+}
+static inline ulong mfpmc8(void)
+{
+    ulong rval;
+    asm volatile ("mfspr %0, %1" : "=r"(rval) : "i"(SPRN_PMC8));
+    return rval;
+}
+
+static inline ulong mfsdar(void)
+{
+    ulong rval;
+    asm volatile ("mfspr %0, %1" : "=r"(rval) : "i"(SPRN_SDAR));
+    return rval;
+}
+
+static inline ulong mfsiar(void)
+{
+    ulong rval;
+    asm volatile ("mfspr %0, %1" : "=r"(rval) : "i"(SPRN_SIAR));
+    return rval;
 }
 
 static inline void mtsprg0(ulong val)

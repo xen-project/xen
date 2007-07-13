@@ -13,7 +13,7 @@
  * along with this program; if not, write to the Free Software
  * Foundation, 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  *
- * Copyright (C) IBM Corp. 2005
+ * Copyright IBM Corp. 2005, 2007
  *
  * Authors: Hollis Blanchard <hollisb@us.ibm.com>
  */
@@ -39,6 +39,7 @@ extern  multiboot_info_t *boot_of_init(ulong r3, ulong r4, ulong vec, ulong r6, 
 
 extern void do_timer(struct cpu_user_regs *regs);
 extern void do_dec(struct cpu_user_regs *regs);
+extern void do_perfmon(struct cpu_user_regs *regs);
 extern void program_exception(
     struct cpu_user_regs *regs, unsigned long cookie);
 

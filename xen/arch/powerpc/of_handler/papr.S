@@ -67,7 +67,7 @@ PAPR(5, 1,papr_real_to_logical, H_REAL_TO_LOGICAL)
 PAPR(5, 1,papr_pci_config_read, H_PCI_CONFIG_READ)
 PAPR(5, 0,papr_pci_config_write, H_PCI_CONFIG_WRITE)
 
-	PAPR(5, 1,papr_grant_logical, H_GRANT_LOGICAL)
+PAPR(5, 1,papr_grant_logical, H_GRANT_LOGICAL)
 PAPR(1, 1,papr_accept_logical, H_ACCEPT_LOGICAL)
 PAPR(0, 2,papr_rescind_logical, H_RESCIND_LOGICAL)
 PAPR(3, 0,papr_register_vterm, H_REGISTER_VTERM)

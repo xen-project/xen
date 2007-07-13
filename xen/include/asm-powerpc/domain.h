@@ -16,6 +16,7 @@
  * Copyright IBM Corp. 2005, 2007
  *
  * Authors: Hollis Blanchard <hollisb@us.ibm.com>
+ *          Christian Ehrhardt <ehrhardt@linux.vnet.ibm.com>
  */
 
 #ifndef _ASM_DOMAIN_H_
@@ -29,6 +30,17 @@
 #include <public/arch-powerpc.h>
 #include <asm/htab.h>
 #include <asm/powerpc64/ppc970.h>
+
+
+typedef struct {
+    ulong mmcr0;
+    ulong mmcr1;
+    ulong mmcra;
+    ulong pmc[NUM_PMCS];
+} perf_sprs_t;
+
+extern atomic_t perf_count_active;
+extern perf_sprs_t perf_clear_sprs;
 
 struct arch_domain {
     struct domain_htab htab;
@@ -84,7 +96,12 @@ struct arch_vcpu {
     ulong timebase;
     ulong dar;
     ulong dsisr;
-    
+
+    /* performance monitor sprs per vcpu */
+    int pmu_enabled;
+    int perf_sprs_stored;
+    perf_sprs_t perf_sprs;
+
     /* Segment Lookaside Buffer */
     struct slb_entry slb_entries[NUM_SLB_ENTRIES];
 
@@ -102,6 +119,8 @@ extern void full_resume(void);
 
 extern void save_sprs(struct vcpu *);
 extern void load_sprs(struct vcpu *);
+extern void save_pmc_sprs(perf_sprs_t *p_sprs);
+extern void load_pmc_sprs(perf_sprs_t *p_sprs);
 extern void save_segments(struct vcpu *);
 extern void load_segments(struct vcpu *);
 extern void save_float(struct vcpu *);

@@ -13,16 +13,48 @@
  * along with this program; if not, write to the Free Software
  * Foundation, 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  *
- * Copyright (C) IBM Corp. 2005
+ * Copyright IBM Corp. 2005, 2007
  *
  * Authors: Jimi Xenidis <jimix@watson.ibm.com>
+ *          Christian Ehrhardt <ehrhardt@linux.vnet.ibm.com>
  */
 
 #include <xen/config.h>
 #include <xen/lib.h>
 #include <xen/sched.h>
 #include <xen/mm.h>
+#include <xen/domain.h>
 #include <asm/current.h>
+
+void save_pmc_sprs(perf_sprs_t *p_sprs)
+{
+    p_sprs->mmcr0 = mfmmcr0();
+    p_sprs->mmcr1 = mfmmcr1();
+    p_sprs->mmcra = mfmmcra();
+    p_sprs->pmc[0] = mfpmc1();
+    p_sprs->pmc[1] = mfpmc2();
+    p_sprs->pmc[2] = mfpmc3();
+    p_sprs->pmc[3] = mfpmc4();
+    p_sprs->pmc[4] = mfpmc5();
+    p_sprs->pmc[5] = mfpmc6();
+    p_sprs->pmc[6] = mfpmc7();
+    p_sprs->pmc[7] = mfpmc8();
+}
+
+void load_pmc_sprs(perf_sprs_t *p_sprs)
+{
+    mtpmc1(p_sprs->pmc[0]);
+    mtpmc2(p_sprs->pmc[1]);
+    mtpmc3(p_sprs->pmc[2]);
+    mtpmc4(p_sprs->pmc[3]);
+    mtpmc5(p_sprs->pmc[4]);
+    mtpmc6(p_sprs->pmc[5]);
+    mtpmc7(p_sprs->pmc[6]);
+    mtpmc8(p_sprs->pmc[7]);
+    mtmmcra(p_sprs->mmcra);
+    mtmmcr1(p_sprs->mmcr1);
+    mtmmcr0(p_sprs->mmcr0);
+}
 
 void save_sprs(struct vcpu *v)
 {
@@ -35,6 +67,11 @@ void save_sprs(struct vcpu *v)
 
     v->arch.dar = mfdar();
     v->arch.dsisr = mfdsisr();
+
+    if (v->arch.pmu_enabled) {
+        save_pmc_sprs(&(v->arch.perf_sprs));
+        v->arch.perf_sprs_stored = 1;
+    }
 
     save_cpu_sprs(v);
 }
@@ -49,6 +86,13 @@ void load_sprs(struct vcpu *v)
     mtsprg3(v->arch.sprg[3]);
     mtdar(v->arch.dar);
     mtdsisr(v->arch.dsisr);
+
+    if (v->arch.pmu_enabled) {
+        if (v->arch.perf_sprs_stored)
+            load_pmc_sprs(&(v->arch.perf_sprs));
+        else
+            load_pmc_sprs(&perf_clear_sprs);
+    }
 
     load_cpu_sprs(v);
 
