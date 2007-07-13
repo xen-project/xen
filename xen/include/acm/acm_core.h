@@ -22,9 +22,11 @@
 #include <xen/spinlock.h>
 #include <xen/list.h>
 #include <public/acm.h>
-#include <xen/acm_policy.h>
 #include <public/acm_ops.h>
 #include <acm/acm_endian.h>
+
+#define ACM_DEFAULT_SECURITY_POLICY \
+        ACM_CHINESE_WALL_AND_SIMPLE_TYPE_ENFORCEMENT_POLICY
 
 /* Xen-internal representation of the binary policy */
 struct acm_binary_policy {
