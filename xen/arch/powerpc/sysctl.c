@@ -21,6 +21,7 @@
 #include <xen/config.h>
 #include <xen/types.h>
 #include <xen/lib.h>
+#include <xen/nodemask.h>
 #include <xen/sched.h>
 #include <xen/guest_access.h>
 #include <xen/shadow.h>
