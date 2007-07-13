@@ -2328,9 +2328,6 @@ static int svm_reset_to_realmode(struct vcpu *v,
     /* clear the vmcb and user regs */
     memset(regs, 0, sizeof(struct cpu_user_regs));
    
-    /* VMCB Control */
-    vmcb->tsc_offset = 0;
-
     /* VMCB State */
     vmcb->cr0 = X86_CR0_ET | X86_CR0_PG | X86_CR0_WP;
     v->arch.hvm_svm.cpu_shadow_cr0 = X86_CR0_ET;
