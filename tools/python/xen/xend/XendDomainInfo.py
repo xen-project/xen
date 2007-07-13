@@ -1594,6 +1594,7 @@ class XendDomainInfo:
                 log.exception("Removing domain path failed.")
 
             self._stateSet(DOM_STATE_HALTED)
+            self.domid = None  # Do not push into _stateSet()!
         finally:
             self.refresh_shutdown_lock.release()
 
