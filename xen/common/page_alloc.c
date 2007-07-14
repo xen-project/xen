@@ -249,44 +249,6 @@ void __init init_boot_pages(paddr_t ps, paddr_t pe)
     }
 }
 
-int __init reserve_boot_pages(unsigned long first_pfn, unsigned long nr_pfns)
-{
-    unsigned long i;
-
-    for ( i = 0; i < nr_pfns; i++ )
-        if ( allocated_in_map(first_pfn + i) )
-             break;
-
-    if ( i != nr_pfns )
-        return 0;
-
-    map_alloc(first_pfn, nr_pfns);
-    return 1;
-}
-
-unsigned long __init alloc_boot_low_pages(
-    unsigned long nr_pfns, unsigned long pfn_align)
-{
-    unsigned long pg, i;
-
-    /* Search forwards to obtain lowest available range. */
-    for ( pg = first_valid_mfn & ~(pfn_align - 1);
-          (pg + nr_pfns) <= max_page;
-          pg = (pg + i + pfn_align) & ~(pfn_align - 1) )
-    {
-        for ( i = 0; i < nr_pfns; i++ )
-            if ( allocated_in_map(pg+i) )
-                break;
-        if ( i == nr_pfns )
-        {
-            map_alloc(pg, nr_pfns);
-            return pg;
-        }
-    }
-
-    return 0;
-}
-
 unsigned long __init alloc_boot_pages(
     unsigned long nr_pfns, unsigned long pfn_align)
 {

@@ -41,9 +41,6 @@ paddr_t init_boot_allocator(paddr_t bitmap_start);
 void init_boot_pages(paddr_t ps, paddr_t pe);
 unsigned long alloc_boot_pages(
     unsigned long nr_pfns, unsigned long pfn_align);
-unsigned long alloc_boot_low_pages(
-    unsigned long nr_pfns, unsigned long pfn_align);
-int reserve_boot_pages(unsigned long first_pfn, unsigned long nr_pfns);
 void end_boot_allocator(void);
 
 /* Xen suballocator. These functions are interrupt-safe. */

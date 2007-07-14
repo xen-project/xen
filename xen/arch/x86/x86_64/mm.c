@@ -64,8 +64,7 @@ void *alloc_xen_pagetable(void)
         return page_to_virt(pg);
     }
 
-    /* Early pagetables must come from low 1GB of memory. */
-    mfn = alloc_boot_low_pages(1, 1); /* 0x0 - 0x40000000 */
+    mfn = alloc_boot_pages(1, 1);
     BUG_ON(mfn == 0);
     return mfn_to_virt(mfn);
 }
