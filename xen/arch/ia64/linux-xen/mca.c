@@ -184,7 +184,7 @@ static ia64_state_log_t ia64_state_log[IA64_MAX_LOG_TYPES];
 #define IA64_LOG_ALLOCATE(it, size) \
 	do { \
 		unsigned int pageorder; \
-		pageorder  = get_order_from_bytes(sizeof(struct ia64_mca_cpu)); \
+		pageorder = get_order_from_bytes(size); \
 		ia64_state_log[it].isl_log[IA64_LOG_CURR_INDEX(it)] = \
 		  (ia64_err_rec_t *)alloc_xenheap_pages(pageorder); \
 		ia64_state_log[it].isl_log[IA64_LOG_NEXT_INDEX(it)] = \
