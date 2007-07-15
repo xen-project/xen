@@ -196,8 +196,8 @@ typedef struct thash_cb {
     u64     hash_sz;        // size of above data.
     void    *cch_buf;       // base address of collision chain.
     u64     cch_sz;         // size of above data.
+    u64     cch_free_idx;   // index of free entry.
     thash_data_t *cch_freelist;
-    thash_data_t *cch_rec_head;  // cch recycle header
     PTA     pta;
 } thash_cb_t;
 
