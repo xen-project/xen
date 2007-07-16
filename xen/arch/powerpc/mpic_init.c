@@ -153,13 +153,15 @@ static unsigned long find_ranges_addr_from_node(void *oft_p, ofdn_t c)
     u32 addr_c = 2;
     u32 ranges[64];
     int p_len;
+    int i;
 
     parent = ofd_node_parent(oft_p, c);
     parent = ofd_node_parent(oft_p, parent);
 
     p_len = ofd_getprop(oft_p, parent, "ranges", &ranges, sizeof(ranges));
     DBG("%s: ranges\n", __func__);
-    int i; for (i=0; i<p_len; i++) {DBG("%08x ", ranges[i]);}
+    for (i=0; i<p_len; i++)
+        DBG("%08x ", ranges[i]);
     DBG("\n");
 
     p_len = ofd_getprop(oft_p, parent, "#address-cells",

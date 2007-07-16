@@ -32,13 +32,13 @@ void ofd_prop_print(
     const char *prop,
     size_t sz)
 {
+#define DEBUG_PROP
+#ifndef DEBUG_PROP
     if ( path[0] == '/' && path[1] == '\0' ) {
         path = "";
     }
     printk("%s: %s/%s: 0x%lx\n", head, path,  name, sz);
-
-#define DEBUG_PROP
-#ifdef DEBUG_PROP
+#else
     int i;
     int isstr = sz;
     const char *b = prop;
@@ -75,8 +75,6 @@ void ofd_prop_print(
         }
         printk("\n");
     }
-#else
-    (void)prop;
 #endif
 }
 

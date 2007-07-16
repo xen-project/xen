@@ -9,8 +9,8 @@ C_WARNINGS := -Wredundant-decls
 # _no_ common code can have packed data structures or we are in touble.
 C_WARNINGS += -Wpacked
 
-CFLAGS := -m64 -ffreestanding -fno-builtin -fno-common
-CFLAGS += -iwithprefix include -Wall -Werror -pipe
+CFLAGS += -m64 -ffreestanding -fno-builtin -fno-common
+CFLAGS += -iwithprefix include -Werror -pipe
 CFLAGS += -I$(BASEDIR)/include
 CFLAGS += -I$(BASEDIR)/include/asm-powerpc/mach-generic
 CFLAGS += -I$(BASEDIR)/include/asm-powerpc/mach-default

@@ -83,7 +83,7 @@ static inline void ctr_write(unsigned int i, unsigned int val)
     }
 }
 
-static inline void print_perf_status()
+static inline void print_perf_status(void)
 {
     ulong mmcr0 = mfmmcr0();
     ulong mmcr1 = mfmmcr1();
