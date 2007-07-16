@@ -754,7 +754,7 @@ static void rtl8139_write_buffer(RTL8139State *s, const void *buf, int size)
         int wrapped = MOD2(s->RxBufAddr + size, s->RxBufferSize);
 
         /* write packet data */
-        if (wrapped && s->RxBufferSize < 65536 && !rtl8139_RxWrap(s))
+        if (wrapped && !(s->RxBufferSize < 65536 && rtl8139_RxWrap(s)))
         {
             DEBUG_PRINT((">>> RTL8139: rx packet wrapped in buffer at %d\n", size-wrapped));
 
