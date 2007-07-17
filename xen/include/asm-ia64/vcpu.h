@@ -13,7 +13,8 @@
 #include <linux/acpi.h>
 struct vcpu;
 typedef struct vcpu VCPU;
-typedef cpu_user_regs_t REGS;
+typedef struct cpu_user_regs REGS;
+
 extern u64 cycle_to_ns(u64 cycle);
 
 /* Note: PSCB stands for Privilegied State Communication Block.  */
@@ -201,6 +202,16 @@ static inline s64 vcpu_get_next_timer_ns(VCPU * vcpu)
 		    cycle_to_ns(local_cpu_data->itm_delta) + NOW();
 
 	return vcpu_get_next_timer_ns;
+}
+
+static inline u64 vcpu_pl_adjust(u64 reg, u64 shift)
+{
+	u64 pl;
+
+	pl = reg & (3UL << shift);
+	if (pl < ((u64)CONFIG_CPL0_EMUL << shift))
+		pl = (u64)CONFIG_CPL0_EMUL << shift;
+	return (reg & ~(3UL << shift)) | pl;
 }
 
 #define verbose(a...) do {if (vcpu_verbose) printk(a);} while(0)

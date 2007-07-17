@@ -1164,6 +1164,10 @@ class XendDomain:
 
         if dominfo.getDomid() == DOM0_ID:
             raise XendError("Cannot dump core for privileged domain %s" % domid)
+        if dominfo._stateGet() not in (DOM_STATE_PAUSED, DOM_STATE_RUNNING):
+            raise VMBadState("Domain '%s' is not started" % domid,
+                             POWER_STATE_NAMES[DOM_STATE_PAUSED],
+                             POWER_STATE_NAMES[dominfo._stateGet()])
 
         try:
             log.info("Domain core dump requested for domain %s (%d) "
@@ -1537,6 +1541,10 @@ class XendDomain:
         dominfo = self.domain_lookup_nr(domid)
         if not dominfo:
             raise XendInvalidDomain(str(domid))
+        if dominfo._stateGet() not in (DOM_STATE_RUNNING, DOM_STATE_PAUSED):
+            raise VMBadState("Domain '%s' is not started" % domid,
+                             POWER_STATE_NAMES[DOM_STATE_RUNNING],
+                             POWER_STATE_NAMES[dominfo._stateGet()])
         if trigger_name.lower() in TRIGGER_TYPE: 
             trigger = TRIGGER_TYPE[trigger_name.lower()]
         else:

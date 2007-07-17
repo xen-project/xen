@@ -623,6 +623,21 @@ copy_from_nvram_to_GFW(int xc_handle, uint32_t dom, int nvram_fd)
 
 
 /*
+ *Check is the address where NVRAM data located valid
+ */
+static int is_valid_address(void *addr)
+{
+    struct nvram_save_addr *p = (struct nvram_save_addr *)addr;	
+
+    if ( p->signature == NVRAM_VALID_SIG )
+        return 1;
+    else {
+        PERROR("Invalid nvram signature. Nvram save failed!\n");
+        return 0;
+    }
+}
+
+/*
  * GFW use 4k page. when doing foreign map, we should 16k align
  * the address and map one more page to guarantee all 64k nvram data 
  * can be got.
@@ -667,7 +682,11 @@ copy_from_GFW_to_nvram(int xc_handle, uint32_t dom, int nvram_fd)
         return -1;
     }
 
-    addr_from_GFW_4k_align = *((uint64_t *)tmp_ptr);
+    /* Check is NVRAM data vaild */
+    if ( !is_valid_address(tmp_ptr) )
+        return -1;
+
+    addr_from_GFW_4k_align = ((struct nvram_save_addr *)tmp_ptr)->addr;
     munmap(tmp_ptr, PAGE_SIZE);
 
     // align address to 16k

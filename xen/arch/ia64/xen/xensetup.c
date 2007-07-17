@@ -7,7 +7,6 @@
 #include <xen/config.h>
 #include <xen/lib.h>
 #include <xen/errno.h>
-//#include <xen/spinlock.h>
 #include <xen/multiboot.h>
 #include <xen/sched.h>
 #include <xen/mm.h>
@@ -43,7 +42,6 @@ extern unsigned long domain0_ready;
 int find_max_pfn (unsigned long, unsigned long, void *);
 
 /* FIXME: which header these declarations should be there ? */
-extern long is_platform_hp_ski(void);
 extern void early_setup_arch(char **);
 extern void late_setup_arch(char **);
 extern void hpsim_serial_init(void);
@@ -84,7 +82,6 @@ boolean_param("xencons_poll", opt_xencons_poll);
  */
 unsigned int opt_xenheap_megabytes = XENHEAP_DEFAULT_MB;
 unsigned long xenheap_size = XENHEAP_DEFAULT_SIZE;
-extern long running_on_sim;
 unsigned long xen_pstart;
 void *xen_pickle_offset __read_mostly;
 
@@ -255,6 +252,31 @@ static void noinline init_done(void)
     startup_cpu_idle_loop();
 }
 
+int running_on_sim;
+
+static int __init
+is_platform_hp_ski(void)
+{
+    int i;
+    long cpuid[6];
+
+    for (i = 0; i < 5; ++i)
+        cpuid[i] = ia64_get_cpuid(i);
+
+    if ((cpuid[0] & 0xff) != 'H')
+        return 0;
+    if ((cpuid[3] & 0xff) != 0x4)
+        return 0;
+    if (((cpuid[3] >> 8) & 0xff) != 0x0)
+        return 0;
+    if (((cpuid[3] >> 16) & 0xff) != 0x0)
+        return 0;
+    if (((cpuid[3] >> 24) & 0x7) != 0x7)
+        return 0;
+
+    return 1;
+}
+
 void __init start_kernel(void)
 {
     char *cmdline;
@@ -273,9 +295,10 @@ void __init start_kernel(void)
     /* Be sure the struct shared_info size is <= XSI_SIZE.  */
     BUILD_BUG_ON(sizeof(struct shared_info) > XSI_SIZE);
 
-    running_on_sim = is_platform_hp_ski();
     /* Kernel may be relocated by EFI loader */
     xen_pstart = ia64_tpa(KERNEL_START);
+
+    running_on_sim = is_platform_hp_ski();
 
     early_setup_arch(&cmdline);
 

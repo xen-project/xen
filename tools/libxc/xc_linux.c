@@ -456,7 +456,7 @@ void *xc_gnttab_map_grant_refs(int xcg_handle,
 
     map->count = count;
     
-    if ( ioctl(xcg_handle, IOCTL_GNTDEV_MAP_GRANT_REF, &map) )
+    if ( ioctl(xcg_handle, IOCTL_GNTDEV_MAP_GRANT_REF, map) )
         goto out;
 
     addr = mmap(NULL, PAGE_SIZE * count, prot, MAP_SHARED, xcg_handle,

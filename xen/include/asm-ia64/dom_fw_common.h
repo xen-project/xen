@@ -51,7 +51,6 @@ typedef struct xc_dom_image domain_t;
 
 #define NFUNCPTRS               16
 #define NUM_EFI_SYS_TABLES      6
-#define NUM_MEM_DESCS           64 //large enough
 
 struct fw_tables {
     efi_system_table_t                  efi_systab;

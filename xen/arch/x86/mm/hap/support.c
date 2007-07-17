@@ -43,7 +43,6 @@
  */
 unsigned long hap_gva_to_gfn_real_mode(struct vcpu *v, unsigned long gva)
 {
-    HERE_I_AM;
     return ((paddr_t)gva >> PAGE_SHIFT);
 }
 
@@ -61,12 +60,12 @@ unsigned long hap_gva_to_gfn_protected_mode(struct vcpu *v, unsigned long gva)
     l2_pgentry_32_t *l2e; /* guest page entry size is 32-bit */
     l1_pgentry_32_t *l1e;
 
-    HERE_I_AM;
-
     gpfn = (gcr3 >> PAGE_SHIFT);
-    for ( lev = mode; lev >= 1; lev-- ) {
-        mfn = get_mfn_from_gpfn( gpfn );
-        if ( mfn == INVALID_MFN ) {
+    for ( lev = mode; lev >= 1; lev-- )
+    {
+        mfn = get_mfn_from_gpfn(gpfn);
+        if ( mfn == INVALID_MFN )
+        {
             HAP_PRINTK("bad pfn=0x%lx from gva=0x%lx at lev%d\n", gpfn, gva, 
                        lev);
             success = 0;
@@ -74,18 +73,22 @@ unsigned long hap_gva_to_gfn_protected_mode(struct vcpu *v, unsigned long gva)
         }
         index = (gva >> PT_SHIFT[mode][lev]) & (PT_ENTRIES[mode][lev]-1);
 
-        if ( lev == 2 ) {
-            l2e = map_domain_page( mfn );
+        if ( lev == 2 )
+        {
+            l2e = map_domain_page(mfn);
             HAP_PRINTK("l2 page table entry is %ulx at index = %d\n", 
                        l2e[index].l2, index);
-            if ( !(l2e_get_flags_32(l2e[index]) & _PAGE_PRESENT) ) {
+            if ( !(l2e_get_flags_32(l2e[index]) & _PAGE_PRESENT) )
+            {
                 HAP_PRINTK("Level 2 entry not present at index = %d\n", index);
                 success = 0;
             }
 
-            if ( l2e_get_flags_32(l2e[index]) & _PAGE_PSE ) { /* handle PSE */
+            if ( l2e_get_flags_32(l2e[index]) & _PAGE_PSE )
+            {
                 HAP_PRINTK("guest page table is PSE\n");
-                if ( l2e_get_intpte(l2e[index]) & 0x001FE000UL ) { /*[13:20] */
+                if ( l2e_get_intpte(l2e[index]) & 0x001FE000UL ) /*[13:20] */
+                {
                     printk("guest physical memory size is too large!\n");
                     domain_crash(v->domain);
                 }
@@ -94,23 +97,24 @@ unsigned long hap_gva_to_gfn_protected_mode(struct vcpu *v, unsigned long gva)
                 unmap_domain_page(l2e);
                 break; /* last level page table, return from here */
             }
-            else {
-                gpfn = l2e_get_pfn( l2e[index] );
-            }
+
+            gpfn = l2e_get_pfn(l2e[index]);
             unmap_domain_page(l2e);
         }
 
-        if ( lev == 1 ) {
-            l1e = map_domain_page( mfn );
+        if ( lev == 1 )
+        {
+            l1e = map_domain_page(mfn);
             HAP_PRINTK("l1 page table entry is %ulx at index = %d\n", 
                        l1e[index].l1, index);
-            if ( !(l1e_get_flags_32(l1e[index]) & _PAGE_PRESENT) ) {
+            if ( !(l1e_get_flags_32(l1e[index]) & _PAGE_PRESENT) )
+            {
                 HAP_PRINTK("Level 1 entry not present at index = %d\n", index);
                 success = 0;
             }
-            gpfn = l1e_get_pfn( l1e[index] );
+            gpfn = l1e_get_pfn(l1e[index]);
             gpa = (l1e_get_intpte(l1e[index]) & PHYSICAL_PAGE_4K_MASK) + 
-                (gva & ~PHYSICAL_PAGE_4K_MASK);	    
+                (gva & ~PHYSICAL_PAGE_4K_MASK);    
             unmap_domain_page(l1e);
         }
 
@@ -120,10 +124,7 @@ unsigned long hap_gva_to_gfn_protected_mode(struct vcpu *v, unsigned long gva)
 
     HAP_PRINTK("success = %d, gva = %lx, gpa = %lx\n", success, gva, gpa);
 
-    if ( !success ) /* error happened */
-        return INVALID_GFN;
-    else
-        return ((paddr_t)gpa >> PAGE_SHIFT);
+    return (!success ? INVALID_GFN : ((paddr_t)gpa >> PAGE_SHIFT));
 }
 
 
@@ -144,12 +145,12 @@ unsigned long hap_gva_to_gfn_pae_mode(struct vcpu *v, unsigned long gva)
     l2_pgentry_t *l2e;
     l3_pgentry_t *l3e;
     
-    HERE_I_AM;
-
     gpfn = (gcr3 >> PAGE_SHIFT);
-    for ( lev = mode; lev >= 1; lev-- ) {
-        mfn = get_mfn_from_gpfn( gpfn );
-        if ( mfn == INVALID_MFN ) {
+    for ( lev = mode; lev >= 1; lev-- )
+    {
+        mfn = get_mfn_from_gpfn(gpfn);
+        if ( mfn == INVALID_MFN )
+        {
             HAP_PRINTK("bad pfn=0x%lx from gva=0x%lx at lev%d\n", gpfn, gva, 
                        lev);
             success = 0;
@@ -157,44 +158,50 @@ unsigned long hap_gva_to_gfn_pae_mode(struct vcpu *v, unsigned long gva)
         }
         index = (gva >> PT_SHIFT[mode][lev]) & (PT_ENTRIES[mode][lev]-1);
 
-        if ( lev == 3 ) {
-            l3e = map_domain_page( mfn );
-            index += ( ((gcr3 >> 5 ) & 127 ) * 4 );
-            if ( !(l3e_get_flags(l3e[index]) & _PAGE_PRESENT) ) {
+        if ( lev == 3 )
+        {
+            l3e = map_domain_page(mfn);
+            index += ((gcr3 >> 5) & 127) * 4;
+            if ( !(l3e_get_flags(l3e[index]) & _PAGE_PRESENT) )
+            {
                 HAP_PRINTK("Level 3 entry not present at index = %d\n", index);
                 success = 0;
             }
-            gpfn = l3e_get_pfn( l3e[index] );
+            gpfn = l3e_get_pfn(l3e[index]);
             unmap_domain_page(l3e);
         }
 
-        if ( lev == 2 ) {
-            l2e = map_domain_page( mfn );
-            if ( !(l2e_get_flags(l2e[index]) & _PAGE_PRESENT) ) {
+        if ( lev == 2 )
+        {
+            l2e = map_domain_page(mfn);
+            if ( !(l2e_get_flags(l2e[index]) & _PAGE_PRESENT) )
+            {
                 HAP_PRINTK("Level 2 entry not present at index = %d\n", index);
                 success = 0;
             }
 
-            if ( l2e_get_flags(l2e[index]) & _PAGE_PSE ) { /* handle PSE */
+            if ( l2e_get_flags(l2e[index]) & _PAGE_PSE )
+            {
                 HAP_PRINTK("guest page table is PSE\n");
                 gpa = (l2e_get_intpte(l2e[index]) & PHYSICAL_PAGE_2M_MASK) + 
                     (gva & ~PHYSICAL_PAGE_2M_MASK);
                 unmap_domain_page(l2e);
                 break; /* last level page table, jump out from here */
             }
-            else { 
-                gpfn = l2e_get_pfn(l2e[index]);
-            }
+
+            gpfn = l2e_get_pfn(l2e[index]);
             unmap_domain_page(l2e);
         }
 
-        if ( lev == 1 ) {
-            l1e = map_domain_page( mfn );
-            if ( !(l1e_get_flags(l1e[index]) & _PAGE_PRESENT) ) {
+        if ( lev == 1 )
+        {
+            l1e = map_domain_page(mfn);
+            if ( !(l1e_get_flags(l1e[index]) & _PAGE_PRESENT) )
+            {
                 HAP_PRINTK("Level 1 entry not present at index = %d\n", index);
                 success = 0;
             }
-            gpfn = l1e_get_pfn( l1e[index] );
+            gpfn = l1e_get_pfn(l1e[index]);
             gpa = (l1e_get_intpte(l1e[index]) & PHYSICAL_PAGE_4K_MASK) + 
                 (gva & ~PHYSICAL_PAGE_4K_MASK);
             unmap_domain_page(l1e);
@@ -207,18 +214,13 @@ unsigned long hap_gva_to_gfn_pae_mode(struct vcpu *v, unsigned long gva)
     gpa &= ~PAGE_NX_BIT; /* clear NX bit of guest physical address */
     HAP_PRINTK("success = %d, gva = %lx, gpa = %lx\n", success, gva, gpa);
 
-    if ( !success )
-        return INVALID_GFN;
-    else
-        return ((paddr_t)gpa >> PAGE_SHIFT);
+    return (!success ? INVALID_GFN : ((paddr_t)gpa >> PAGE_SHIFT));
 #else
-    HERE_I_AM;
     printk("guest paging level (3) is greater than host paging level!\n");
     domain_crash(v->domain);
     return INVALID_GFN;
 #endif
 }
-
 
 
 /* Translate guest virtual address to guest physical address. Specifically
@@ -238,12 +240,12 @@ unsigned long hap_gva_to_gfn_long_mode(struct vcpu *v, unsigned long gva)
     l2_pgentry_t *l2e;
     l1_pgentry_t *l1e;
 
-    HERE_I_AM;
-
     gpfn = (gcr3 >> PAGE_SHIFT);
-    for ( lev = mode; lev >= 1; lev-- ) {
-        mfn = get_mfn_from_gpfn( gpfn );
-        if ( mfn == INVALID_MFN ) {
+    for ( lev = mode; lev >= 1; lev-- )
+    {
+        mfn = get_mfn_from_gpfn(gpfn);
+        if ( mfn == INVALID_MFN )
+        {
             HAP_PRINTK("bad pfn=0x%lx from gva=0x%lx at lev%d\n", gpfn, gva, 
                        lev);
             success = 0;
@@ -251,53 +253,61 @@ unsigned long hap_gva_to_gfn_long_mode(struct vcpu *v, unsigned long gva)
         }
         index = (gva >> PT_SHIFT[mode][lev]) & (PT_ENTRIES[mode][lev]-1);
 
-        if ( lev == 4 ) {
-            l4e = map_domain_page( mfn );
-            if ( !(l4e_get_flags(l4e[index]) & _PAGE_PRESENT) ) {
+        if ( lev == 4 )
+        {
+            l4e = map_domain_page(mfn);
+            if ( !(l4e_get_flags(l4e[index]) & _PAGE_PRESENT) )
+            {
                 HAP_PRINTK("Level 4 entry not present at index = %d\n", index);
                 success = 0;
             }
-            gpfn = l4e_get_pfn( l4e[index] );
+            gpfn = l4e_get_pfn(l4e[index]);
             unmap_domain_page(l4e);
         }
 
-        if ( lev == 3 ) {
-            l3e = map_domain_page( mfn );
-            if ( !(l3e_get_flags(l3e[index]) & _PAGE_PRESENT) ) {
+        if ( lev == 3 )
+        {
+            l3e = map_domain_page(mfn);
+            if ( !(l3e_get_flags(l3e[index]) & _PAGE_PRESENT) )
+            {
                 HAP_PRINTK("Level 3 entry not present at index = %d\n", index);
                 success = 0;
             }
-            gpfn = l3e_get_pfn( l3e[index] );
+            gpfn = l3e_get_pfn(l3e[index]);
             unmap_domain_page(l3e);
         }
 
-        if ( lev == 2 ) {
-            l2e = map_domain_page( mfn );
-            if ( !(l2e_get_flags(l2e[index]) & _PAGE_PRESENT) ) {
+        if ( lev == 2 )
+        {
+            l2e = map_domain_page(mfn);
+            if ( !(l2e_get_flags(l2e[index]) & _PAGE_PRESENT) )
+            {
                 HAP_PRINTK("Level 2 entry not present at index = %d\n", index);
                 success = 0;
             }
 
-            if ( l2e_get_flags(l2e[index]) & _PAGE_PSE ) { /* handle PSE */
+            if ( l2e_get_flags(l2e[index]) & _PAGE_PSE )
+            {
                 HAP_PRINTK("guest page table is PSE\n");
                 gpa = (l2e_get_intpte(l2e[index]) & PHYSICAL_ADDR_2M_MASK_LM) 
                     + (gva & ~PHYSICAL_PAGE_2M_MASK);
                 unmap_domain_page(l2e);
                 break; /* last level page table, jump out from here */
             }
-            else { 
-                gpfn = l2e_get_pfn(l2e[index]);
-            }
+
+            gpfn = l2e_get_pfn(l2e[index]);
             unmap_domain_page(l2e);
         }
 
-        if ( lev == 1 ) {
-            l1e = map_domain_page( mfn );
-            if ( !(l1e_get_flags(l1e[index]) & _PAGE_PRESENT) ) {
+        if ( lev == 1 )
+        {
+            l1e = map_domain_page(mfn);
+            if ( !(l1e_get_flags(l1e[index]) & _PAGE_PRESENT) )
+            {
                 HAP_PRINTK("Level 1 entry not present at index = %d\n", index);
                 success = 0;
             }
-            gpfn = l1e_get_pfn( l1e[index] );
+            gpfn = l1e_get_pfn(l1e[index]);
             gpa = (l1e_get_intpte(l1e[index]) & PHYSICAL_ADDR_4K_MASK_LM) + 
                 (gva & ~PHYSICAL_PAGE_4K_MASK);
             unmap_domain_page(l1e);
@@ -310,12 +320,8 @@ unsigned long hap_gva_to_gfn_long_mode(struct vcpu *v, unsigned long gva)
     gpa &= ~PAGE_NX_BIT; /* clear NX bit of guest physical address */
     HAP_PRINTK("success = %d, gva = %lx, gpa = %lx\n", success, gva, gpa);
 
-    if ( !success )
-        return INVALID_GFN;
-    else
-        return ((paddr_t)gpa >> PAGE_SHIFT);
+    return (!success ? INVALID_GFN : ((paddr_t)gpa >> PAGE_SHIFT));
 #else
-    HERE_I_AM;
     printk("guest paging level (4) is greater than host paging level!\n");
     domain_crash(v->domain);
     return INVALID_GFN;

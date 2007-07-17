@@ -52,7 +52,6 @@ int xen_ia64_is_vcpu_allocated(struct domain *d, uint32_t vcpu)
 
 int xen_ia64_is_running_on_sim(struct domain *unused)
 {
-	extern unsigned long running_on_sim;
 	return running_on_sim;
 }
 
@@ -251,10 +250,28 @@ int dom_fw_setup(domain_t * d, unsigned long bp_mpa, unsigned long maxmem)
 		imva_hypercall_base = (unsigned long)domain_mpa_to_imva
 		    (d, FW_HYPERCALL_BASE_PADDR);
 
+		/*
+		 * dom_fw_init()
+		 *   - [FW_HYPERCALL_BASE_PADDR, FW_HYPERCALL_END_PADDR)
+		 *   - [FW_ACPI_BASE_PADDR, FW_ACPI_END_PADDR)
+		 *   - [FW_TABLES_BASE_PADDR, tables->fw_tables_end_paddr)
+		 *
+		 * complete_dom0_memmap() for dom0
+		 *   - real machine memory map
+		 *   - memmap_info by setup_dom0_memmap_info()
+		 *
+		 * complete_domu_memmap() for old domu builder
+		 *   - I/O port
+		 *   - conventional memory
+		 *   - memmap_info
+		 */
+#define NUM_EXTRA_MEM_DESCS     4
+
 		/* Estimate necessary efi memmap size and allocate memory */
 		fw_tables_size = sizeof(*fw_tables) +
 			(ia64_boot_param->efi_memmap_size /
-			 ia64_boot_param->efi_memdesc_size + NUM_MEM_DESCS) *
+			 ia64_boot_param->efi_memdesc_size +
+			 NUM_EXTRA_MEM_DESCS) *
 			sizeof(fw_tables->efi_memmap[0]);
 		if (fw_tables_size <
 		    FW_TABLES_END_PADDR_MIN - FW_TABLES_BASE_PADDR)
@@ -292,14 +309,22 @@ int dom_fw_setup(domain_t * d, unsigned long bp_mpa, unsigned long maxmem)
 			xfree(fw_tables);
 			return ret;
 		}
+
+		ret = platform_fw_init(d, bp, fw_tables);
+		if (ret < 0) {
+			xfree(fw_tables);
+			return ret;
+		}
+
 		if (sizeof(*fw_tables) +
 		    fw_tables->num_mds * sizeof(fw_tables->efi_memmap[0]) >
 		    fw_tables_size) {
-			panic("EFI memmap too large. Increase NUM_MEM_DESCS.\n"
+			panic("EFI memmap too large. "
+			      "Increase NUM_EXTRA_MEM_DESCS.\n"
 			      "fw_table_size %ld > %ld num_mds %ld "
-			      "NUM_MEM_DESCS %d.\n",
+			      "NUM_EXTRA_MEM_DESCS %d.\n",
 			      fw_tables_size, fw_tables->fw_tables_size,
-			      fw_tables->num_mds, NUM_MEM_DESCS);
+			      fw_tables->num_mds, NUM_EXTRA_MEM_DESCS);
 		}
 		fw_tables_size = sizeof(*fw_tables) +
 			fw_tables->num_mds * sizeof(fw_tables->efi_memmap[0]);

@@ -55,6 +55,9 @@
 
 #define NR_hypercalls 64
 
+/* PV domains use this value for priv. level 0 emulation */
+#define CONFIG_CPL0_EMUL	1
+
 #ifndef __ASSEMBLY__
 
 // can't find where this typedef was before?!?
@@ -81,8 +84,11 @@ typedef unsigned long paddr_t;
 #define LOCK_PREFIX
 
 extern unsigned long xenheap_phys_end;
+extern unsigned long total_pages;
 extern unsigned long xen_pstart;
 extern unsigned long xenheap_size;
+
+extern int running_on_sim;
 
 // from linux/include/linux/mm.h
 extern struct page_info *mem_map;

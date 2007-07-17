@@ -41,9 +41,6 @@ paddr_t init_boot_allocator(paddr_t bitmap_start);
 void init_boot_pages(paddr_t ps, paddr_t pe);
 unsigned long alloc_boot_pages(
     unsigned long nr_pfns, unsigned long pfn_align);
-unsigned long alloc_boot_low_pages(
-    unsigned long nr_pfns, unsigned long pfn_align);
-int reserve_boot_pages(unsigned long first_pfn, unsigned long nr_pfns);
 void end_boot_allocator(void);
 
 /* Xen suballocator. These functions are interrupt-safe. */
@@ -61,6 +58,8 @@ struct page_info *__alloc_domheap_pages(
     struct domain *d, unsigned int cpu, unsigned int order, 
     unsigned int memflags);
 void free_domheap_pages(struct page_info *pg, unsigned int order);
+unsigned long avail_domheap_pages_region(
+    unsigned int node, unsigned int min_width, unsigned int max_width);
 unsigned long avail_domheap_pages(void);
 #define alloc_domheap_page(d) (alloc_domheap_pages(d,0,0))
 #define free_domheap_page(p)  (free_domheap_pages(p,0))

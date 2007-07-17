@@ -427,6 +427,46 @@ long arch_do_domctl(
     }
     break;
 
+    case XEN_DOMCTL_sendtrigger:
+    {
+        struct domain *d;
+        struct vcpu *v;
+
+        ret = -ESRCH;
+        if ( (d = rcu_lock_domain_by_id(domctl->domain)) == NULL )
+            break;
+
+        ret = -EINVAL;
+        if ( domctl->u.sendtrigger.vcpu >= MAX_VIRT_CPUS )
+            goto sendtrigger_out;
+
+        ret = -ESRCH;
+        if ( (v = d->vcpu[domctl->u.sendtrigger.vcpu]) == NULL )
+            goto sendtrigger_out;
+
+        switch ( domctl->u.sendtrigger.trigger )
+        {
+        case XEN_DOMCTL_SENDTRIGGER_NMI:
+        {
+            ret = -ENOSYS;
+            if ( !is_hvm_domain(d) )
+                break;
+
+            ret = 0;
+            if ( !test_and_set_bool(v->arch.hvm_vcpu.nmi_pending) )
+                vcpu_kick(v);
+        }
+        break;
+
+        default:
+            ret = -ENOSYS;
+        }
+
+    sendtrigger_out:
+        rcu_unlock_domain(d);
+    }
+    break;
+
     default:
         ret = -ENOSYS;
         break;

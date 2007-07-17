@@ -37,10 +37,10 @@
 #include <asm/edd.h>
 
 #if defined(CONFIG_X86_64)
-#define BOOTSTRAP_DIRECTMAP_END (1UL << 32)
+#define BOOTSTRAP_DIRECTMAP_END (1UL << 32) /* 4GB */
 #define maddr_to_bootstrap_virt(m) maddr_to_virt(m)
 #else
-#define BOOTSTRAP_DIRECTMAP_END HYPERVISOR_VIRT_START
+#define BOOTSTRAP_DIRECTMAP_END (1UL << 30) /* 1GB */
 #define maddr_to_bootstrap_virt(m) ((void *)(long)(m))
 #endif
 

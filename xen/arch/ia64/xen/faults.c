@@ -38,10 +38,9 @@ extern void die_if_kernel(char *str, struct pt_regs *regs, long err);
 extern int ia64_hyperprivop(unsigned long, REGS *);
 extern IA64FAULT ia64_hypercall(struct pt_regs *regs);
 
-#define IA64_PSR_CPL1	(__IA64_UL(1) << IA64_PSR_CPL1_BIT)
 // note IA64_PSR_PK removed from following, why is this necessary?
 #define	DELIVER_PSR_SET	(IA64_PSR_IC | IA64_PSR_I | \
-			IA64_PSR_DT | IA64_PSR_RT | IA64_PSR_CPL1 | \
+			IA64_PSR_DT | IA64_PSR_RT | \
 			IA64_PSR_IT | IA64_PSR_BN)
 
 #define	DELIVER_PSR_CLR	(IA64_PSR_AC | IA64_PSR_DFL | IA64_PSR_DFH |	\
@@ -92,6 +91,7 @@ static void reflect_interruption(unsigned long isr, struct pt_regs *regs,
 
 	regs->cr_iip = ((unsigned long)PSCBX(v, iva) + vector) & ~0xffUL;
 	regs->cr_ipsr = (regs->cr_ipsr & ~DELIVER_PSR_CLR) | DELIVER_PSR_SET;
+	regs->cr_ipsr = vcpu_pl_adjust(regs->cr_ipsr, IA64_PSR_CPL0_BIT);
 	if (PSCB(v, dcr) & IA64_DCR_BE)
 		regs->cr_ipsr |= IA64_PSR_BE;
 
@@ -137,6 +137,7 @@ void reflect_event(void)
 
 	regs->cr_iip = v->arch.event_callback_ip;
 	regs->cr_ipsr = (regs->cr_ipsr & ~DELIVER_PSR_CLR) | DELIVER_PSR_SET;
+	regs->cr_ipsr = vcpu_pl_adjust(regs->cr_ipsr, IA64_PSR_CPL0_BIT);
 	if (PSCB(v, dcr) & IA64_DCR_BE)
 		regs->cr_ipsr |= IA64_PSR_BE;
 
@@ -236,6 +237,8 @@ void ia64_do_page_fault(unsigned long address, unsigned long isr,
 		    ((unsigned long)PSCBX(current, iva) + fault) & ~0xffUL;
 		regs->cr_ipsr =
 		    (regs->cr_ipsr & ~DELIVER_PSR_CLR) | DELIVER_PSR_SET;
+		regs->cr_ipsr = vcpu_pl_adjust(regs->cr_ipsr,
+					       IA64_PSR_CPL0_BIT);
 
 		if (PSCB(current, hpsr_dfh))
 			regs->cr_ipsr |= IA64_PSR_DFH;  
@@ -488,8 +491,6 @@ ia64_fault(unsigned long vector, unsigned long isr, unsigned long ifa,
 	panic("Fault in Xen.\n");
 }
 
-unsigned long running_on_sim = 0;
-
 /* Also read in hyperprivop.S  */
 int first_break = 0;
 
@@ -503,7 +504,7 @@ ia64_handle_break(unsigned long ifa, struct pt_regs *regs, unsigned long isr,
 
 	/* FIXME: don't hardcode constant */
 	if ((iim == 0x80001 || iim == 0x80002)
-	    && ia64_get_cpl(regs->cr_ipsr) == 2) {
+	    && ia64_get_cpl(regs->cr_ipsr) == CONFIG_CPL0_EMUL) {
 		do_ssc(vcpu_get_gr(current, 36), regs);
 	}
 #ifdef CRASH_DEBUG
@@ -513,7 +514,8 @@ ia64_handle_break(unsigned long ifa, struct pt_regs *regs, unsigned long isr,
 		debugger_trap_fatal(0 /* don't care */ , regs);
 	}
 #endif
-	else if (iim == d->arch.breakimm && ia64_get_cpl(regs->cr_ipsr) == 2) {
+	else if (iim == d->arch.breakimm &&
+	         ia64_get_cpl(regs->cr_ipsr) == CONFIG_CPL0_EMUL) {
 		/* by default, do not continue */
 		v->arch.hypercall_continuation = 0;
 
@@ -523,7 +525,7 @@ ia64_handle_break(unsigned long ifa, struct pt_regs *regs, unsigned long isr,
 		} else
 			reflect_interruption(isr, regs, vector);
 	} else if ((iim - HYPERPRIVOP_START) < HYPERPRIVOP_MAX
-		   && ia64_get_cpl(regs->cr_ipsr) == 2) {
+		   && ia64_get_cpl(regs->cr_ipsr) == CONFIG_CPL0_EMUL) {
 		if (ia64_hyperprivop(iim, regs))
 			vcpu_increment_iip(current);
 	} else {
@@ -544,6 +546,14 @@ ia64_handle_privop(unsigned long ifa, struct pt_regs *regs, unsigned long isr,
 	if (vector != IA64_NO_FAULT && vector != IA64_RFI_IN_PROGRESS) {
 		// Note: if a path results in a vector to reflect that requires
 		// iha/itir (e.g. vcpu_force_data_miss), they must be set there
+		/*
+		 * IA64_GENEX_VECTOR may contain in the lowest byte an ISR.code
+		 * see IA64_ILLOP_FAULT, ...
+		 */
+		if ((vector & ~0xffUL) == IA64_GENEX_VECTOR) {
+			isr = vector & 0xffUL;
+			vector = IA64_GENEX_VECTOR;
+		}
 		reflect_interruption(isr, regs, vector);
 	}
 }
@@ -639,6 +649,11 @@ ia64_handle_reflection(unsigned long ifa, struct pt_regs *regs,
 		PSCB(current, iim) = iim;
 		vector = IA64_SPECULATION_VECTOR;
 		break;
+	case 29:
+		vector = IA64_DEBUG_VECTOR;
+		if (debugger_trap_entry(vector,regs))
+			return;
+		break;
 	case 30:
 		// FIXME: Should we handle unaligned refs in Xen??
 		vector = IA64_UNALIGNED_REF_VECTOR;
@@ -673,19 +688,19 @@ ia64_handle_reflection(unsigned long ifa, struct pt_regs *regs,
 		vector = IA64_LOWERPRIV_TRANSFER_TRAP_VECTOR;
 		break;
 	case 35:
-		printk("ia64_handle_reflection: handling taken branch trap\n");
 		vector = IA64_TAKEN_BRANCH_TRAP_VECTOR;
+		if (debugger_trap_entry(vector,regs))
+			return;
 		break;
 	case 36:
-		printk("ia64_handle_reflection: handling single step trap\n");
 		vector = IA64_SINGLE_STEP_TRAP_VECTOR;
+		if (debugger_trap_entry(vector,regs))
+			return;
 		break;
 
 	default:
-		printk("ia64_handle_reflection: unhandled vector=0x%lx\n",
-		       vector);
-		while (vector)
-			/* spin */;
+		panic_domain(regs, "ia64_handle_reflection: "
+			     "unhandled vector=0x%lx\n", vector);
 		return;
 	}
 	if (check_lazy_cover && (isr & IA64_ISR_IR) &&

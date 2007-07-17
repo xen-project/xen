@@ -98,22 +98,10 @@
 #ifdef XEN
 #include <xen/types.h>
 #include <public/xen.h>
+
 #define pt_regs cpu_user_regs
+#endif
 
-/*  User regs at placed at the end of the vcpu area.
-    Convert a vcpu pointer to a regs pointer.
-    Note: this is the same as ia64_task_regs, but it uses a Xen-friendly name.
-*/
-struct vcpu;
-static inline struct cpu_user_regs *
-vcpu_regs (struct vcpu *v)
-{
-  return (struct cpu_user_regs *) ((unsigned long) v + IA64_STK_OFFSET) - 1;
-}
-
-struct pt_regs *guest_cpu_user_regs(void);
-
-#else
 struct pt_regs {
 	/* The following registers are saved by SAVE_MIN: */
 	unsigned long b6;		/* scratch */
@@ -188,7 +176,29 @@ struct pt_regs {
 	struct ia64_fpreg f9;		/* scratch */
 	struct ia64_fpreg f10;		/* scratch */
 	struct ia64_fpreg f11;		/* scratch */
+#ifdef XEN
+	unsigned long r4;		/* preserved */
+	unsigned long r5;		/* preserved */
+	unsigned long r6;		/* preserved */
+	unsigned long r7;		/* preserved */
+	unsigned long eml_unat;		/* used for emulating instruction */
+	unsigned long pad0;		/* alignment pad */
+#endif
 };
+
+#ifdef XEN
+/*
+ * User regs are placed at the end of the vcpu area.
+ * Convert a vcpu pointer to a regs pointer.
+ * Note: this is the same as ia64_task_regs, but it uses a Xen-friendly name.
+ */
+struct vcpu;
+static inline struct cpu_user_regs *vcpu_regs(struct vcpu *v)
+{
+	return (struct cpu_user_regs *)((unsigned long)v + IA64_STK_OFFSET) - 1;
+}
+
+struct cpu_user_regs *guest_cpu_user_regs(void);
 #endif
 
 /*
@@ -267,6 +277,8 @@ struct switch_stack {
 # define ia64_psr(regs)			((struct ia64_psr *) &(regs)->cr_ipsr)
 #ifdef XEN
 # define guest_mode(regs)		(ia64_psr(regs)->cpl != 0)
+# define guest_kernel_mode(regs)	(ia64_psr(regs)->cpl == CONFIG_CPL0_EMUL)
+# define vmx_guest_kernel_mode(regs)	(ia64_psr(regs)->cpl == 0)
 #else
 # define user_mode(regs)		(((struct ia64_psr *) &(regs)->cr_ipsr)->cpl != 0)
 #endif

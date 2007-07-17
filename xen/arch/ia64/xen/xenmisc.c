@@ -35,25 +35,6 @@ void hpsim_setup(char **x)
 #endif
 }
 
-// called from mem_init... don't think s/w I/O tlb is needed in Xen
-//void swiotlb_init(void) { }  ...looks like it IS needed
-
-long
-is_platform_hp_ski(void)
-{
-	int i;
-	long cpuid[6];
-
-	for (i = 0; i < 5; ++i)
-		cpuid[i] = ia64_get_cpuid(i);
-	if ((cpuid[0] & 0xff) != 'H') return 0;
-	if ((cpuid[3] & 0xff) != 0x4) return 0;
-	if (((cpuid[3] >> 8) & 0xff) != 0x0) return 0;
-	if (((cpuid[3] >> 16) & 0xff) != 0x0) return 0;
-	if (((cpuid[3] >> 24) & 0x7) != 0x7) return 0;
-	return 1;
-}
-
 struct pt_regs *guest_cpu_user_regs(void) { return vcpu_regs(current); }
 
 ///////////////////////////////

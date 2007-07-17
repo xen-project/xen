@@ -18,9 +18,8 @@
 
 
 #define	_PAGE_PPN_MASK	0x0003fffffffff000 //asm/pgtable.h doesn't do assembly
-#define PAGE_PHYS	0x0010000000000761 //__pgprot(__DIRTY_BITS|
-					   //         _PAGE_PL_2|_PAGE_AR_RWX)
-#define _PAGE_PL_2	(2<<7)
+#define PAGE_PHYS	(0x0010000000000661 | _PAGE_PL_PRIV)
+			//__pgprot(__DIRTY_BITS|_PAGE_PL_PRIV|_PAGE_AR_RWX)
 
 #if 1	 // change to 0 to turn off all fast paths
 # define FAST_HYPERPRIVOPS
@@ -62,7 +61,7 @@
 #define IA64_PSR_CPL0	(__IA64_UL(1) << IA64_PSR_CPL0_BIT)
 // note IA64_PSR_PK removed from following, why is this necessary?
 #define	DELIVER_PSR_SET	(IA64_PSR_IC | IA64_PSR_I | \
-			IA64_PSR_DT | IA64_PSR_RT | IA64_PSR_CPL1 | \
+			IA64_PSR_DT | IA64_PSR_RT | \
 			IA64_PSR_IT | IA64_PSR_BN)
 
 #define	DELIVER_PSR_CLR	(IA64_PSR_AC | IA64_PSR_DFL | IA64_PSR_DFH | \
@@ -249,8 +248,8 @@ ENTRY(hyper_ssm_i)
 	mov r29=r30 ;;
 	movl r28=DELIVER_PSR_SET;;
 	movl r27=~DELIVER_PSR_CLR;;
-	or r29=r29,r28;;
 	and r29=r29,r27;;
+	or r29=r29,r28;;
 	// set hpsr_dfh to ipsr
 	adds r28=XSI_HPSR_DFH_OFS-XSI_PSR_IC_OFS,r18;;
 	ld1 r28=[r28];;
@@ -258,8 +257,7 @@ ENTRY(hyper_ssm_i)
 	mov cr.ipsr=r29;;
 	// set shared_mem ipsr (from ipsr in r30 with ipsr.ri already set)
 	extr.u r29=r30,IA64_PSR_CPL0_BIT,2;;
-	cmp.eq p6,p7=3,r29;;
-(p6)	dep r30=-1,r30,IA64_PSR_CPL0_BIT,2
+	cmp.eq p7,p0=CONFIG_CPL0_EMUL,r29;;
 (p7)	dep r30=0,r30,IA64_PSR_CPL0_BIT,2
 	;;
 	// FOR SSM_I ONLY, also turn on psr.i and psr.ic
@@ -441,20 +439,18 @@ GLOBAL_ENTRY(fast_tick_reflect)
 	st8 [r21]=r16 ;;
 	// set cr.ipsr (make sure cpl==2!)
 	mov r29=r17 ;;
-	movl r28=DELIVER_PSR_SET;;
-	movl r27=~(DELIVER_PSR_CLR|IA64_PSR_CPL0);;
-	or r29=r29,r28;;
+	movl r28=DELIVER_PSR_SET | (CONFIG_CPL0_EMUL << IA64_PSR_CPL0_BIT);;
+	movl r27=~(DELIVER_PSR_CLR|IA64_PSR_CPL0|IA64_PSR_CPL1);;
 	and r29=r29,r27;;
+	or r29=r29,r28;;
 	mov cr.ipsr=r29;;
 	// set shared_mem ipsr (from ipsr in r17 with ipsr.ri already set)
 	extr.u r29=r17,IA64_PSR_CPL0_BIT,2;;
-	cmp.eq p6,p7=3,r29;;
-(p6)	dep r17=-1,r17,IA64_PSR_CPL0_BIT,2
+	cmp.eq p7,p0=CONFIG_CPL0_EMUL,r29;;
 (p7)	dep r17=0,r17,IA64_PSR_CPL0_BIT,2
 	;;
 	movl r28=(IA64_PSR_DT|IA64_PSR_IT|IA64_PSR_RT);;
 	movl r27=~(IA64_PSR_BE|IA64_PSR_PP|IA64_PSR_BN|IA64_PSR_I|IA64_PSR_IC);;
-	dep r21=-1,r21,IA64_PSR_CPL1_BIT,1 ;;
 	or r17=r17,r28;;
 	and r17=r17,r27;;
 	ld4 r16=[r18];;
@@ -620,10 +616,10 @@ ENTRY(fast_reflect)
 	movl r21=THIS_CPU(current_psr_i_addr)
 	mov r29=r30 ;;
 	ld8 r21=[r21]
-	movl r28=DELIVER_PSR_SET;;
-	movl r27=~(DELIVER_PSR_CLR|IA64_PSR_CPL0);;
-	or r29=r29,r28;;
+	movl r28=DELIVER_PSR_SET | (CONFIG_CPL0_EMUL << IA64_PSR_CPL0_BIT);;
+	movl r27=~(DELIVER_PSR_CLR|IA64_PSR_CPL0|IA64_PSR_CPL1);;
 	and r29=r29,r27;;
+	or r29=r29,r28;;
 	// set hpsr_dfh to ipsr
 	adds r28=XSI_HPSR_DFH_OFS-XSI_PSR_IC_OFS,r18;;
 	ld1 r28=[r28];;
@@ -631,8 +627,7 @@ ENTRY(fast_reflect)
 	mov cr.ipsr=r29;;
 	// set shared_mem ipsr (from ipsr in r30 with ipsr.ri already set)
 	extr.u r29=r30,IA64_PSR_CPL0_BIT,2;;
-	cmp.eq p6,p7=3,r29;;
-(p6)	dep r30=-1,r30,IA64_PSR_CPL0_BIT,2
+	cmp.eq p7,p0=CONFIG_CPL0_EMUL,r29;;
 (p7)	dep r30=0,r30,IA64_PSR_CPL0_BIT,2
 	;;
 	movl r28=(IA64_PSR_DT|IA64_PSR_IT|IA64_PSR_RT);;
@@ -1112,14 +1107,17 @@ ENTRY(hyper_rfi)
 
 just_do_rfi:
 	// r18=&vpsr.i|vpsr.ic, r21==vpsr, r22=vcr.iip
-	mov cr.iip=r22;;
+	mov cr.iip=r22
+	extr.u r19=r21,IA64_PSR_CPL0_BIT,2
 	adds r20=XSI_IFS_OFS-XSI_PSR_IC_OFS,r18 ;;
+	cmp.gtu p7,p0=CONFIG_CPL0_EMUL,r19
 	ld8 r20=[r20];;
+(p7)	mov r19=CONFIG_CPL0_EMUL
 	dep r20=0,r20,38,25;; // ensure ifs has no reserved bits set
 	mov cr.ifs=r20 ;;
-	// ipsr.cpl == (vcr.ipsr.cpl == 0) 2 : 3;
+	// ipsr.cpl = max(vcr.ipsr.cpl, IA64_PSR_CPL0_BIT);
 	movl r20=THIS_CPU(current_psr_i_addr)
-	dep r21=-1,r21,IA64_PSR_CPL1_BIT,1 ;;
+	dep r21=r19,r21,IA64_PSR_CPL0_BIT,2;;
 	// vpsr.i = vcr.ipsr.i; vpsr.ic = vcr.ipsr.ic
 	ld8 r20=[r20]
 	mov r19=1 
@@ -1287,12 +1285,12 @@ ENTRY(rfi_with_interrupt)
 	movl r22=THIS_CPU(current_psr_i_addr)
 	// set cr.ipsr (make sure cpl==2!)
 	mov r29=r17
-	movl r28=DELIVER_PSR_SET;;
+	movl r27=~(DELIVER_PSR_CLR|IA64_PSR_CPL0|IA64_PSR_CPL1)
+	movl r28=DELIVER_PSR_SET | (CONFIG_CPL0_EMUL << IA64_PSR_CPL0_BIT);;
 	mov r20=1;;
 	ld8 r22=[r22]
-	movl r27=~(DELIVER_PSR_CLR|IA64_PSR_CPL0)
-	or r29=r29,r28;;
 	and r29=r29,r27;;
+	or r29=r29,r28;;
 	mov cr.ipsr=r29;;
 	// v.ipsr and v.iip are already set (and v.iip validated) as rfi target
 	// set shared_mem interrupt_delivery_enabled to 0
@@ -1935,7 +1933,7 @@ ENTRY(fast_insert)
 	or r20=r20,r21 ;;	// r20==return value from lookup_domain_mpa
 	// r16=pteval,r20=pteval2
 	movl r19=_PAGE_PPN_MASK
-	movl r21=_PAGE_PL_2;;
+	movl r21=_PAGE_PL_PRIV;;
 	andcm r25=r16,r19;;	// r25==pteval & ~_PAGE_PPN_MASK
 	and r22=r20,r19;;
 	or r22=r22,r21;;

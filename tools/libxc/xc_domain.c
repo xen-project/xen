@@ -588,6 +588,27 @@ int xc_domain_ioport_permission(int xc_handle,
     return do_domctl(xc_handle, &domctl);
 }
 
+int xc_availheap(int xc_handle,
+                 int min_width,
+                 int max_width,
+                 int node,
+                 uint64_t *bytes)
+{
+    DECLARE_SYSCTL;
+    int rc;
+
+    sysctl.cmd = XEN_SYSCTL_availheap;
+    sysctl.u.availheap.min_bitwidth = min_width;
+    sysctl.u.availheap.max_bitwidth = max_width;
+    sysctl.u.availheap.node = node;
+
+    rc = xc_sysctl(xc_handle, &sysctl);
+
+    *bytes = sysctl.u.availheap.avail_bytes;
+
+    return rc;
+}
+
 int xc_vcpu_setcontext(int xc_handle,
                        uint32_t domid,
                        uint32_t vcpu,
@@ -695,6 +716,18 @@ int xc_get_hvm_param(int handle, domid_t dom, int param, unsigned long *value)
     unlock_pages(&arg, sizeof(arg));
     *value = arg.value;
     return rc;
+}
+
+int xc_domain_setdebugging(int xc_handle,
+                           uint32_t domid,
+                           unsigned int enable)
+{
+    DECLARE_DOMCTL;
+
+    domctl.cmd = XEN_DOMCTL_setdebugging;
+    domctl.domain = domid;
+    domctl.u.setdebugging.enable = enable;
+    return do_domctl(xc_handle, &domctl);
 }
 
 /*

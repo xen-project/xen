@@ -26,8 +26,6 @@
 #ifndef _XEN_HAP_H
 #define _XEN_HAP_H
 
-#define HERE_I_AM                                                     \
-    debugtrace_printk("HERE I AM: %s %s %d\n", __func__, __FILE__, __LINE__)
 #define HAP_PRINTK(_f, _a...)                                         \
     debugtrace_printk("hap: %s(): " _f, __func__, ##_a)
 #define HAP_ERROR(_f, _a...)                                          \
@@ -98,6 +96,7 @@ extern struct paging_mode hap_paging_real_mode;
 extern struct paging_mode hap_paging_protected_mode;
 extern struct paging_mode hap_paging_pae_mode;
 extern struct paging_mode hap_paging_long_mode;
+
 #endif /* XEN_HAP_H */
 
 /*

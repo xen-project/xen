@@ -170,7 +170,7 @@ static int ns16550_getc(struct serial_port *port, char *pc)
     return 1;
 }
 
-static void __init ns16550_init_preirq(struct serial_port *port)
+static void __devinit ns16550_init_preirq(struct serial_port *port)
 {
     struct ns16550 *uart = port->uart;
     unsigned char lcr;
@@ -214,7 +214,7 @@ static void __init ns16550_init_preirq(struct serial_port *port)
         port->tx_fifo_size = 16;
 }
 
-static void __init ns16550_init_postirq(struct serial_port *port)
+static void __devinit ns16550_init_postirq(struct serial_port *port)
 {
     struct ns16550 *uart = port->uart;
     int rc, bits;

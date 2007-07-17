@@ -8,6 +8,7 @@
 #include <sys/ioctl.h>
 #include <termios.h>
 
+#define STRING_MAX PATH_MAX
 static int max_width = 80;
 static int desired_width = 60;
 
@@ -19,7 +20,8 @@ static int desired_width = 60;
 void print_dir(struct xs_handle *h, char *path, int cur_depth, int show_perms)
 {
     char **e;
-    char newpath[512], *val;
+    char newpath[STRING_MAX], *val;
+    int newpath_len;
     int i;
     unsigned int num, len;
 
@@ -33,13 +35,26 @@ void print_dir(struct xs_handle *h, char *path, int cur_depth, int show_perms)
         unsigned int nperms;
         int linewid;
 
-        for (linewid=0; linewid<cur_depth; linewid++) putchar(' ');
+        /* Print indent and path basename */
+        for (linewid=0; linewid<cur_depth; linewid++) {
+            putchar(' ');
+        }
         linewid += printf("%.*s",
                           (int) (max_width - TAG_LEN - linewid), e[i]);
-        sprintf(newpath, "%s%s%s", path, 
+
+        /* Compose fullpath and fetch value */
+        newpath_len = snprintf(newpath, sizeof(newpath), "%s%s%s", path, 
                 path[strlen(path)-1] == '/' ? "" : "/", 
                 e[i]);
-        val = xs_read(h, XBT_NULL, newpath, &len);
+        if ( newpath_len < sizeof(newpath) ) {
+            val = xs_read(h, XBT_NULL, newpath, &len);
+        }
+        else {
+            /* Path was truncated and thus invalid */
+            val = NULL;
+        }
+
+        /* Print value */
         if (val == NULL) {
             printf(":\n");
         }
@@ -88,7 +103,7 @@ void print_dir(struct xs_handle *h, char *path, int cur_depth, int show_perms)
 
 void usage(int argc, char *argv[])
 {
-    fprintf(stderr, "Usage: %s [-p] [path]\n", argv[0]);
+    fprintf(stderr, "Usage: %s [-w] [-p] [path]\n", argv[0]);
 }
 
 int main(int argc, char *argv[])
@@ -104,11 +119,14 @@ int main(int argc, char *argv[])
     if (!ret)
         max_width = ws.ws_col - PAD;
 
-    while (0 < (c = getopt(argc, argv, "ps"))) {
+    while (0 < (c = getopt(argc, argv, "psw"))) {
         switch (c) {
+        case 'w':
+            max_width= STRING_MAX - PAD;
+            desired_width = 0;
+            break;
         case 'p':
             show_perm = 1;
-            max_width -= 16;
             break;
         case 's':
             socket = 1;
@@ -119,6 +137,11 @@ int main(int argc, char *argv[])
             usage(argc, argv);
             return 0;
         }
+    }
+
+    /* Adjust the width here to avoid argument order dependency */
+    if ( show_perm ) {
+        max_width -= 16;
     }
 
     xsh = socket ? xs_daemon_open() : xs_domain_open();

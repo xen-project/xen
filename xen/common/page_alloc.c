@@ -249,44 +249,6 @@ void __init init_boot_pages(paddr_t ps, paddr_t pe)
     }
 }
 
-int __init reserve_boot_pages(unsigned long first_pfn, unsigned long nr_pfns)
-{
-    unsigned long i;
-
-    for ( i = 0; i < nr_pfns; i++ )
-        if ( allocated_in_map(first_pfn + i) )
-             break;
-
-    if ( i != nr_pfns )
-        return 0;
-
-    map_alloc(first_pfn, nr_pfns);
-    return 1;
-}
-
-unsigned long __init alloc_boot_low_pages(
-    unsigned long nr_pfns, unsigned long pfn_align)
-{
-    unsigned long pg, i;
-
-    /* Search forwards to obtain lowest available range. */
-    for ( pg = first_valid_mfn & ~(pfn_align - 1);
-          (pg + nr_pfns) <= max_page;
-          pg = (pg + i + pfn_align) & ~(pfn_align - 1) )
-    {
-        for ( i = 0; i < nr_pfns; i++ )
-            if ( allocated_in_map(pg+i) )
-                break;
-        if ( i == nr_pfns )
-        {
-            map_alloc(pg, nr_pfns);
-            return pg;
-        }
-    }
-
-    return 0;
-}
-
 unsigned long __init alloc_boot_pages(
     unsigned long nr_pfns, unsigned long pfn_align)
 {
@@ -936,6 +898,21 @@ void free_domheap_pages(struct page_info *pg, unsigned int order)
         put_domain(d);
 }
 
+unsigned long avail_domheap_pages_region(
+    unsigned int node, unsigned int min_width, unsigned int max_width)
+{
+    int zone_lo, zone_hi;
+
+    zone_lo = min_width ? (min_width - (PAGE_SHIFT + 1)) : (MEMZONE_XEN + 1);
+    zone_lo = max_t(int, MEMZONE_XEN + 1, zone_lo);
+    zone_lo = min_t(int, NR_ZONES - 1, zone_lo);
+
+    zone_hi = max_width ? (max_width - (PAGE_SHIFT + 1)) : (NR_ZONES - 1);
+    zone_hi = max_t(int, MEMZONE_XEN + 1, zone_hi);
+    zone_hi = min_t(int, NR_ZONES - 1, zone_hi);
+
+    return avail_heap_pages(zone_lo, zone_hi, node);
+}
 
 unsigned long avail_domheap_pages(void)
 {
@@ -955,11 +932,6 @@ unsigned long avail_domheap_pages(void)
         avail_dma = 0;
 
     return avail_nrm + avail_dma;
-}
-
-unsigned long avail_nodeheap_pages(int node)
-{
-    return avail_heap_pages(0, NR_ZONES - 1, node);
 }
 
 static void pagealloc_keyhandler(unsigned char key)

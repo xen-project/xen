@@ -23,6 +23,7 @@
 #include <asm/pal.h>
 #include <asm/sal.h>
 #include <asm/sn/sn_sal.h>
+#include <asm/sn/hubdev.h>
 #include <asm/xenmca.h>
 
 #include <public/sched.h>
@@ -37,8 +38,6 @@
 #include <xen/time.h>
 
 static DEFINE_SPINLOCK(efi_time_services_lock);
-
-extern unsigned long running_on_sim;
 
 struct sal_mc_params {
 	u64 param_type;
@@ -141,7 +140,7 @@ sal_emulator (long index, unsigned long in1, unsigned long in2,
 	status = 0;
 	switch (index) {
 	    case SAL_FREQ_BASE:
-		if (!running_on_sim)
+		if (likely(!running_on_sim))
 			status = ia64_sal_freq_base(in1,&r9,&r10);
 		else switch (in1) {
 		      case SAL_FREQ_BASE_PLATFORM:
@@ -380,7 +379,7 @@ sal_emulator (long index, unsigned long in1, unsigned long in2,
 	    case SN_SAL_GET_MASTER_NASID:
 		status = -1;
 		if (current->domain == dom0) {
-			printk("*** Emulating SN_SAL_GET_MASTER_NASID ***\n");
+			/* printk("*** Emulating SN_SAL_GET_MASTER_NASID ***\n"); */
 			SAL_CALL_NOLOCK(ret_stuff, SN_SAL_GET_MASTER_NASID,
 					0, 0, 0, 0, 0, 0, 0);
 			status = ret_stuff.status;
@@ -392,7 +391,7 @@ sal_emulator (long index, unsigned long in1, unsigned long in2,
 	    case SN_SAL_GET_KLCONFIG_ADDR:
 		status = -1;
 		if (current->domain == dom0) {
-			printk("*** Emulating SN_SAL_GET_KLCONFIG_ADDR ***\n");
+			/* printk("*** Emulating SN_SAL_GET_KLCONFIG_ADDR ***\n"); */
 			SAL_CALL_NOLOCK(ret_stuff, SN_SAL_GET_KLCONFIG_ADDR,
 					in1, 0, 0, 0, 0, 0, 0);
 			status = ret_stuff.status;
@@ -404,9 +403,9 @@ sal_emulator (long index, unsigned long in1, unsigned long in2,
 	    case SN_SAL_GET_SAPIC_INFO:
 		status = -1;
 		if (current->domain == dom0) {
-			printk("*** Emulating SN_SAL_GET_SAPIC_INFO ***\n");
-			SAL_CALL_NOLOCK(ret_stuff, SN_SAL_GET_SAPIC_INFO, in1,
-					0, 0, 0, 0, 0, 0);
+			/* printk("*** Emulating SN_SAL_GET_SAPIC_INFO ***\n"); */
+			SAL_CALL_NOLOCK(ret_stuff, SN_SAL_GET_SAPIC_INFO,
+					in1, 0, 0, 0, 0, 0, 0);
 			status = ret_stuff.status;
 			r9 = ret_stuff.v0;
 			r10 = ret_stuff.v1;
@@ -416,9 +415,9 @@ sal_emulator (long index, unsigned long in1, unsigned long in2,
 	    case SN_SAL_GET_SN_INFO:
 		status = -1;
 		if (current->domain == dom0) {
-			printk("*** Emulating SN_SAL_GET_SN_INFO ***\n");
-			SAL_CALL_NOLOCK(ret_stuff, SN_SAL_GET_SN_INFO, in1,
-					0, 0, 0, 0, 0, 0);
+			/* printk("*** Emulating SN_SAL_GET_SN_INFO ***\n"); */
+			SAL_CALL_NOLOCK(ret_stuff, SN_SAL_GET_SN_INFO,
+					in1, 0, 0, 0, 0, 0, 0);
 			status = ret_stuff.status;
 			r9 = ret_stuff.v0;
 			r10 = ret_stuff.v1;
@@ -428,9 +427,124 @@ sal_emulator (long index, unsigned long in1, unsigned long in2,
 	    case SN_SAL_IOIF_GET_HUBDEV_INFO:
 		status = -1;
 		if (current->domain == dom0) {
-			printk("*** Emulating SN_SAL_IOIF_GET_HUBDEV_INFO ***\n");
+			/* printk("*** Emulating SN_SAL_IOIF_GET_HUBDEV_INFO ***\n"); */
 			SAL_CALL_NOLOCK(ret_stuff, SN_SAL_IOIF_GET_HUBDEV_INFO,
 					in1, in2, 0, 0, 0, 0, 0);
+			status = ret_stuff.status;
+			r9 = ret_stuff.v0;
+			r10 = ret_stuff.v1;
+			r11 = ret_stuff.v2;
+		}
+		break;
+	    case SN_SAL_IOIF_INIT:
+		status = -1;
+		if (current->domain == dom0) {
+			/* printk("*** Emulating SN_SAL_IOIF_INIT ***\n"); */
+			SAL_CALL_NOLOCK(ret_stuff, SN_SAL_IOIF_INIT,
+					0, 0, 0, 0, 0, 0, 0);
+			status = ret_stuff.status;
+			r9 = ret_stuff.v0;
+			r10 = ret_stuff.v1;
+			r11 = ret_stuff.v2;
+		}
+		break;
+	    case SN_SAL_GET_PROM_FEATURE_SET:
+		status = -1;
+		if (current->domain == dom0) {
+			/* printk("*** Emulating SN_SAL_GET_PROM_FEATURE_SET ***\n"); */
+			SAL_CALL_NOLOCK(ret_stuff, SN_SAL_GET_PROM_FEATURE_SET,
+					in1, 0, 0, 0, 0, 0, 0);
+			status = ret_stuff.status;
+			r9 = ret_stuff.v0;
+			r10 = ret_stuff.v1;
+			r11 = ret_stuff.v2;
+		}
+		break;
+	    case SN_SAL_SET_OS_FEATURE_SET:
+		status = -1;
+		if (current->domain == dom0) {
+			/* printk("*** Emulating SN_SAL_SET_OS_FEATURE_SET ***\n"); */
+			SAL_CALL_NOLOCK(ret_stuff, SN_SAL_SET_OS_FEATURE_SET,
+					in1, 0, 0, 0, 0, 0, 0);
+			status = ret_stuff.status;
+			r9 = ret_stuff.v0;
+			r10 = ret_stuff.v1;
+			r11 = ret_stuff.v2;
+		}
+		break;
+	    case SN_SAL_SET_ERROR_HANDLING_FEATURES:
+		status = -1;
+		if (current->domain == dom0) {
+			/* printk("*** Emulating SN_SAL_SET_ERROR_HANDLING_FEATURES ***\n"); */
+			SAL_CALL_NOLOCK(ret_stuff,
+					SN_SAL_SET_ERROR_HANDLING_FEATURES,
+					in1, 0, 0, 0, 0, 0, 0);
+			status = ret_stuff.status;
+			r9 = ret_stuff.v0;
+			r10 = ret_stuff.v1;
+			r11 = ret_stuff.v2;
+		}
+		break;
+#if 0
+/*
+ * Somehow ACPI breaks if allowing this one
+ */
+	    case SN_SAL_SET_CPU_NUMBER:
+		status = -1;
+		if (current->domain == dom0) {
+			printk("*** Emulating SN_SAL_SET_CPU_NUMBER ***\n");
+			SAL_CALL_NOLOCK(ret_stuff, SN_SAL_SET_CPU_NUMBER,
+					in1, 0, 0, 0, 0, 0, 0);
+			status = ret_stuff.status;
+			r9 = ret_stuff.v0;
+			r10 = ret_stuff.v1;
+			r11 = ret_stuff.v2;
+		}
+		break;
+#endif
+	    case SN_SAL_LOG_CE:
+		status = -1;
+		if (current->domain == dom0) {
+			static int log_ce = 0;
+			if (!log_ce) {
+				printk("*** Emulating SN_SAL_LOG_CE *** "
+				       " this will only be printed once\n");
+				log_ce = 1;
+			}
+			SAL_CALL_NOLOCK(ret_stuff, SN_SAL_LOG_CE,
+					0, 0, 0, 0, 0, 0, 0);
+			status = ret_stuff.status;
+			r9 = ret_stuff.v0;
+			r10 = ret_stuff.v1;
+			r11 = ret_stuff.v2;
+		}
+		break;
+	    case SN_SAL_IOIF_GET_DEVICE_DMAFLUSH_LIST:
+		status = -1;
+		if (current->domain == dom0) {
+			struct sn_flush_device_common flush;
+			int flush_size;
+
+			flush_size = sizeof(struct sn_flush_device_common);
+			memset(&flush, 0, flush_size);
+			SAL_CALL_NOLOCK(ret_stuff,
+					SN_SAL_IOIF_GET_DEVICE_DMAFLUSH_LIST,
+					in1, in2, in3, &flush, 0, 0, 0);
+#if 0
+			printk("*** Emulating "
+			       "SN_SAL_IOIF_GET_DEVICE_DMAFLUSH_LIST ***\n");
+#endif
+			if (ret_stuff.status == SALRET_OK) {
+				XEN_GUEST_HANDLE(void) handle =
+					*(XEN_GUEST_HANDLE(void)*)&in4;
+				if (copy_to_guest(handle, &flush, 1)) {
+					printk("SN_SAL_IOIF_GET_DEVICE_"
+					       "DMAFLUSH_LIST can't copy "
+					       "to user!\n");
+					ret_stuff.status = SALRET_ERROR;
+				}
+			}
+
 			status = ret_stuff.status;
 			r9 = ret_stuff.v0;
 			r10 = ret_stuff.v1;
@@ -478,7 +592,7 @@ xen_pal_emulator(unsigned long index, u64 in1, u64 in2, u64 in3)
 	unsigned long flags;
 	int processor;
 
-	if (running_on_sim)
+	if (unlikely(running_on_sim))
 		return pal_emulator_static(index);
 
 	// pal code must be mapped by a TR when pal is called, however
@@ -1259,7 +1373,10 @@ do_ssc(unsigned long ssc, struct pt_regs *regs)
 		break;
 	    case SSC_OPEN:
 		arg1 = vcpu_get_gr(current,33);	// access rights
-if (!running_on_sim) { printk("SSC_OPEN, not implemented on hardware.  (ignoring...)\n"); arg0 = 0; }
+		if (!running_on_sim) { 
+		    printk("SSC_OPEN, not implemented on hardware.  (ignoring...)\n"); 
+		    arg0 = 0; 
+		}
 		if (arg0) {	// metaphysical address
 			arg0 = translate_domain_mpaddr(arg0, NULL);
 			retval = ia64_ssc(arg0,arg1,0,0,ssc);
@@ -1320,7 +1437,10 @@ if (!running_on_sim) { printk("SSC_OPEN, not implemented on hardware.  (ignoring
 		arg1 = vcpu_get_gr(current,33);
 		arg2 = vcpu_get_gr(current,34);
 		arg3 = vcpu_get_gr(current,35);
-		if (!running_on_sim) { printk("SSC_CONNECT_INTERRUPT, not implemented on hardware.  (ignoring...)\n"); break; }
+		if (!running_on_sim) { 
+		    printk("SSC_CONNECT_INTERRUPT, not implemented on hardware.  (ignoring...)\n"); 
+		    break; 
+		}
 		(void)ia64_ssc(arg0,arg1,arg2,arg3,ssc);
 		break;
 	    case SSC_NETDEV_PROBE:

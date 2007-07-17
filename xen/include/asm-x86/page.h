@@ -294,19 +294,8 @@ void paging_init(void);
 void setup_idle_pagetable(void);
 #endif /* !defined(__ASSEMBLY__) */
 
-#define __pge_off()                                                     \
-    do {                                                                \
-        __asm__ __volatile__(                                           \
-            "mov %0, %%cr4;  # turn off PGE     "                       \
-            : : "r" (mmu_cr4_features & ~X86_CR4_PGE) );                \
-        } while ( 0 )
-
-#define __pge_on()                                                      \
-    do {                                                                \
-        __asm__ __volatile__(                                           \
-            "mov %0, %%cr4;  # turn off PGE     "                       \
-            : : "r" (mmu_cr4_features) );                               \
-    } while ( 0 )
+#define __pge_off() write_cr4(mmu_cr4_features & ~X86_CR4_PGE)
+#define __pge_on()  write_cr4(mmu_cr4_features)
 
 #define _PAGE_PRESENT  0x001U
 #define _PAGE_RW       0x002U

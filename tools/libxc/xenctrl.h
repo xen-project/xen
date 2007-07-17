@@ -433,6 +433,18 @@ int xc_domain_send_trigger(int xc_handle,
                            uint32_t trigger,
                            uint32_t vcpu);
 
+/**
+ * This function enables or disable debugging of a domain.
+ *
+ * @parm xc_handle a handle to an open hypervisor interface
+ * @parm domid the domain id to send trigger
+ * @parm enable true to enable debugging
+ * return 0 on success, -1 on failure
+ */
+int xc_domain_setdebugging(int xc_handle,
+                           uint32_t domid,
+                           unsigned int enable);
+
 /*
  * EVENT CHANNEL FUNCTIONS
  */
@@ -616,6 +628,20 @@ int xc_get_pfn_type_batch(int xc_handle, uint32_t dom,
 /* Get current total pages allocated to a domain. */
 long xc_get_tot_pages(int xc_handle, uint32_t domid);
 
+/**
+ * This function retrieves the the number of bytes available
+ * in the heap in a specific range of address-widths and nodes.
+ * 
+ * @parm xc_handle a handle to an open hypervisor interface
+ * @parm domid the domain to query
+ * @parm min_width the smallest address width to query (0 if don't care)
+ * @parm max_width the largest address width to query (0 if don't care)
+ * @parm node the node to query (-1 for all)
+ * @parm *bytes caller variable to put total bytes counted
+ * @return 0 on success, <0 on failure.
+ */
+int xc_availheap(int xc_handle, int min_width, int max_width, int node,
+                 uint64_t *bytes);
 
 /*
  * Trace Buffer Operations

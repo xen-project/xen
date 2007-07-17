@@ -636,7 +636,7 @@ static IA64FAULT priv_handle_op(VCPU * vcpu, REGS * regs, int privlvl)
 	}
 	if (slot_type == B && inst.generic.major == 0 && inst.B8.x6 == 0x0) {
 		// break instr for privified cover
-	} else if (privlvl != 2)
+	} else if (privlvl > CONFIG_CPL0_EMUL)
 		return IA64_ILLOP_FAULT;
 	switch (slot_type) {
 	case M:

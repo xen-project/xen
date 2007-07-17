@@ -21,7 +21,10 @@
 import sys
 from xen.util import dictio
 from xen.util import security
+from xen.util import xsconstants
 from xen.xm.opts import OptionError
+from xen.xm import main as xm_main
+from xen.xm.main import server
 
 def help():
     return """
@@ -32,20 +35,32 @@ def print_resource_data(access_control):
     """Prints out a resource dictionary to stdout
     """
     for resource in access_control:
-        (policy, label) = access_control[resource]
+        tmp = access_control[resource]
+        if len(tmp) == 2:
+            policytype = xsconstants.ACM_POLICY_ID
+            (policy, label) = access_control[resource]
+        elif len(tmp) == 3:
+            policytype, policy, label = access_control[resource]
         print resource
-        print "    policy: "+policy
-        print "    label:  "+label
+        print "      type: "+ policytype
+        print "    policy: "+ policy
+        print "    label:  "+ label
 
 def main (argv):
     if len(argv) > 1:
         raise OptionError("No arguments required")
-    
-    try:
-        filename = security.res_label_filename
-        access_control = dictio.dict_read("resources", filename)
-    except:
-        raise OptionError("Resource file not found")
+
+    if xm_main.serverType == xm_main.SERVER_XEN_API:
+        access_control = server.xenapi.XSPolicy.get_labeled_resources()
+        for key, value in access_control.items():
+            access_control[key] = tuple(value.split(':'))
+    else:
+        try:
+            filename = security.res_label_filename
+            access_control = dictio.dict_read("resources", filename)
+            print access_control
+        except:
+            raise OptionError("Resource file not found")
 
     print_resource_data(access_control)
 

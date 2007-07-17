@@ -57,6 +57,7 @@ typedef struct {
     struct irqaction *action;	/* IRQ action list */
     unsigned int depth;		/* nested irq disables */
     spinlock_t lock;
+    cpumask_t affinity;
 } __cacheline_aligned irq_desc_t;
 
 extern irq_desc_t irq_desc[NR_IRQS];
@@ -74,4 +75,13 @@ extern int pirq_guest_unmask(struct domain *d);
 extern int pirq_guest_bind(struct vcpu *v, int irq, int will_share);
 extern int pirq_guest_unbind(struct domain *d, int irq);
 
+static inline void set_native_irq_info(int irq, cpumask_t mask)
+{
+	irq_desc[irq].affinity = mask;
+}
+
+static inline void set_irq_info(int irq, cpumask_t mask)
+{
+	set_native_irq_info(irq, mask);
+}
 #endif /* __XEN_IRQ_H__ */

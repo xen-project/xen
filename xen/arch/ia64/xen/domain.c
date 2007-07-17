@@ -58,8 +58,6 @@ static unsigned long __initdata dom0_size = 512*1024*1024;
 static unsigned int __initdata dom0_max_vcpus = 1;
 integer_param("dom0_max_vcpus", dom0_max_vcpus); 
 
-extern unsigned long running_on_sim;
-
 extern char dom0_command_line[];
 
 /* forward declaration */
@@ -237,6 +235,14 @@ void context_switch(struct vcpu *prev, struct vcpu *next)
     ia64_disable_vhpt_walker();
     lazy_fp_switch(prev, current);
 
+    if (prev->arch.dbg_used || next->arch.dbg_used) {
+        /*
+         * Load debug registers either because they are valid or to clear
+         * the previous one.
+         */
+        ia64_load_debug_regs(next->arch.dbr);
+    }
+    
     prev = ia64_switch_to(next);
 
     /* Note: ia64_switch_to does not return here at vcpu initialization.  */
@@ -359,10 +365,6 @@ void startup_cpu_idle_loop(void)
 #if !(((1 << (XMAPPEDREGS_SHIFT - 1)) < MAPPED_REGS_T_SIZE) && \
       (MAPPED_REGS_T_SIZE < (1 << (XMAPPEDREGS_SHIFT + 1))))
 # error "XMAPPEDREGS_SHIFT doesn't match sizeof(mapped_regs_t)."
-#endif
-
-#if (IA64_RBS_OFFSET % 512) != IA64_GUEST_CONTEXT_RBS_OFFSET
-# error "arch-ia64.h: IA64_GUEST_CONTEXT_RBS_OFFSET must be adjusted."
 #endif
 
 void hlt_timer_fn(void *data)
@@ -608,6 +610,8 @@ int arch_vcpu_reset(struct vcpu *v)
 	return 0;
 }
 
+#define COPY_FPREG(dst, src) memcpy(dst, src, sizeof(struct ia64_fpreg))
+
 void arch_get_info_guest(struct vcpu *v, vcpu_guest_context_u c)
 {
 	int i;
@@ -674,12 +678,12 @@ void arch_get_info_guest(struct vcpu *v, vcpu_guest_context_u c)
 
 	c.nat->regs.ar.ccv = uregs->ar_ccv;
 
-	c.nat->regs.f[6] = uregs->f6;
-	c.nat->regs.f[7] = uregs->f7;
-	c.nat->regs.f[8] = uregs->f8;
-	c.nat->regs.f[9] = uregs->f9;
-	c.nat->regs.f[10] = uregs->f10;
-	c.nat->regs.f[11] = uregs->f11;
+	COPY_FPREG(&c.nat->regs.f[6], &uregs->f6);
+	COPY_FPREG(&c.nat->regs.f[7], &uregs->f7);
+	COPY_FPREG(&c.nat->regs.f[8], &uregs->f8);
+	COPY_FPREG(&c.nat->regs.f[9], &uregs->f9);
+	COPY_FPREG(&c.nat->regs.f[10], &uregs->f10);
+	COPY_FPREG(&c.nat->regs.f[11], &uregs->f11);
 
 	c.nat->regs.r[4] = uregs->r4;
 	c.nat->regs.r[5] = uregs->r5;
@@ -689,11 +693,20 @@ void arch_get_info_guest(struct vcpu *v, vcpu_guest_context_u c)
 	/* FIXME: to be reordered.  */
 	c.nat->regs.nats = uregs->eml_unat;
 
+	c.nat->regs.rbs_voff = (IA64_RBS_OFFSET / 8) % 64;
 	if (rbs_size < sizeof (c.nat->regs.rbs))
-		memcpy (c.nat->regs.rbs, (char *)v + IA64_RBS_OFFSET, rbs_size);
+		memcpy(c.nat->regs.rbs, (char *)v + IA64_RBS_OFFSET, rbs_size);
 
  	c.nat->privregs_pfn = get_gpfn_from_mfn
 		(virt_to_maddr(v->arch.privregs) >> PAGE_SHIFT);
+
+	for (i = 0; i < IA64_NUM_DBG_REGS; i++) {
+		vcpu_get_dbr(v, i, &c.nat->regs.dbr[i]);
+		vcpu_get_ibr(v, i, &c.nat->regs.ibr[i]);
+	}
+
+	for (i = 0; i < 7; i++)
+		vcpu_get_rr(v, (unsigned long)i << 61, &c.nat->regs.rr[i]);
 
 	/* Fill extra regs.  */
 	for (i = 0; i < 8; i++) {
@@ -724,7 +737,7 @@ int arch_set_info_guest(struct vcpu *v, vcpu_guest_context_u c)
 	struct domain *d = v->domain;
 	int was_initialised = v->is_initialised;
 	unsigned int rbs_size;
-	int rc;
+	int rc, i;
 
 	/* Finish vcpu initialization.  */
 	if (!was_initialised) {
@@ -777,7 +790,7 @@ int arch_set_info_guest(struct vcpu *v, vcpu_guest_context_u c)
 	if (!was_initialised)
 		uregs->loadrs = (rbs_size) << 16;
 	if (rbs_size == (uregs->loadrs >> 16))
-		memcpy ((char *)v + IA64_RBS_OFFSET, c.nat->regs.rbs, rbs_size);
+		memcpy((char *)v + IA64_RBS_OFFSET, c.nat->regs.rbs, rbs_size);
 
 	uregs->r1 = c.nat->regs.r[1];
 	uregs->r12 = c.nat->regs.r[12];
@@ -807,12 +820,12 @@ int arch_set_info_guest(struct vcpu *v, vcpu_guest_context_u c)
 	
 	uregs->ar_ccv = c.nat->regs.ar.ccv;
 	
-	uregs->f6 = c.nat->regs.f[6];
-	uregs->f7 = c.nat->regs.f[7];
-	uregs->f8 = c.nat->regs.f[8];
-	uregs->f9 = c.nat->regs.f[9];
-	uregs->f10 = c.nat->regs.f[10];
-	uregs->f11 = c.nat->regs.f[11];
+	COPY_FPREG(&uregs->f6, &c.nat->regs.f[6]);
+	COPY_FPREG(&uregs->f7, &c.nat->regs.f[7]);
+	COPY_FPREG(&uregs->f8, &c.nat->regs.f[8]);
+	COPY_FPREG(&uregs->f9, &c.nat->regs.f[9]);
+	COPY_FPREG(&uregs->f10, &c.nat->regs.f[10]);
+	COPY_FPREG(&uregs->f11, &c.nat->regs.f[11]);
 	
 	uregs->r4 = c.nat->regs.r[4];
 	uregs->r5 = c.nat->regs.r[5];
@@ -825,12 +838,17 @@ int arch_set_info_guest(struct vcpu *v, vcpu_guest_context_u c)
 	
  	if (!d->arch.is_vti) {
  		/* domain runs at PL2/3 */
- 		uregs->cr_ipsr |= 2UL << IA64_PSR_CPL0_BIT;
- 		uregs->ar_rsc |= (2 << 2); /* force PL2/3 */
+ 		uregs->cr_ipsr = vcpu_pl_adjust(uregs->cr_ipsr,
+		                                IA64_PSR_CPL0_BIT);
+ 		uregs->ar_rsc = vcpu_pl_adjust(uregs->ar_rsc, 2);
  	}
 
+	for (i = 0; i < IA64_NUM_DBG_REGS; i++) {
+		vcpu_set_dbr(v, i, c.nat->regs.dbr[i]);
+		vcpu_set_ibr(v, i, c.nat->regs.ibr[i]);
+	}
+
 	if (c.nat->flags & VGCF_EXTRA_REGS) {
-		int i;
 		struct vcpu_tr_regs *tr = &c.nat->regs.tr;
 
 		for (i = 0; i < 8; i++) {
@@ -1497,3 +1515,48 @@ static void __init parse_dom0_mem(char *s)
 	dom0_size = parse_size_and_unit(s, NULL);
 }
 custom_param("dom0_mem", parse_dom0_mem);
+
+/*
+ * Helper function for the optimization stuff handling the identity mapping
+ * feature.
+ */
+static inline void
+optf_set_identity_mapping(unsigned long* mask, struct identity_mapping* im,
+			  struct xen_ia64_opt_feature* f)
+{
+	if (f->on) {
+		*mask |= f->cmd;
+		im->pgprot = f->pgprot;
+		im->key = f->key;
+	} else {
+		*mask &= ~(f->cmd);
+		im->pgprot = 0;
+		im->key = 0;
+	}
+}
+
+/* Switch a optimization feature on/off. */
+int
+domain_opt_feature(struct xen_ia64_opt_feature* f)
+{
+	struct opt_feature* optf = &(current->domain->arch.opt_feature);
+	long rc = 0;
+
+	switch (f->cmd) {
+	case XEN_IA64_OPTF_IDENT_MAP_REG4:
+		optf_set_identity_mapping(&optf->mask, &optf->im_reg4, f);
+		break;
+	case XEN_IA64_OPTF_IDENT_MAP_REG5:
+		optf_set_identity_mapping(&optf->mask, &optf->im_reg5, f);
+		break;
+	case XEN_IA64_OPTF_IDENT_MAP_REG7:
+		optf_set_identity_mapping(&optf->mask, &optf->im_reg7, f);
+		break;
+	default:
+		printk("%s: unknown opt_feature: %ld\n", __func__, f->cmd);
+		rc = -ENOSYS;
+		break;
+	}
+	return rc;
+}
+

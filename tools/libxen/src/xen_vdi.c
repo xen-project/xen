@@ -534,3 +534,42 @@ xen_vdi_get_uuid(xen_session *session, char **result, xen_vdi vdi)
     XEN_CALL_("VDI.get_uuid");
     return session->ok;
 }
+
+
+bool
+xen_vdi_set_security_label(xen_session *session, int64_t *result, xen_vdi vdi,
+                           char *label, char *oldlabel)
+{
+    abstract_value param_values[] =
+        {
+            { .type = &abstract_type_string,
+              .u.string_val = vdi },
+            { .type = &abstract_type_string,
+              .u.string_val = label },
+            { .type = &abstract_type_string,
+              .u.string_val = oldlabel },
+        };
+
+    abstract_type result_type = abstract_type_int;
+
+    *result = 0;
+    XEN_CALL_("VDI.set_security_label");
+    return session->ok;
+}
+
+
+bool
+xen_vdi_get_security_label(xen_session *session, char **result, xen_vdi vdi)
+{
+    abstract_value param_values[] =
+        {
+            { .type = &abstract_type_string,
+              .u.string_val = vdi },
+        };
+
+    abstract_type result_type = abstract_type_string;
+
+    *result = NULL;
+    XEN_CALL_("VDI.get_security_label");
+    return session->ok;
+}

@@ -310,7 +310,7 @@ static void stop_this_cpu (void *dummy)
 
     local_irq_disable();
     disable_local_APIC();
-    hvm_disable();
+    hvm_cpu_down();
 
     for ( ; ; )
         __asm__ __volatile__ ( "hlt" );

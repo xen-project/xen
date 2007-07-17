@@ -53,9 +53,8 @@
 /* debug RTL8139 card C+ mode only */
 //#define DEBUG_RTL8139CP 1
 
-/* RTL8139 provides frame CRC with received packet, this feature seems to be
-   ignored by most drivers, disabled by default */
-//#define RTL8139_CALCULATE_RXCRC 1
+/* Calculate CRCs propoerly on Rx packets */
+#define RTL8139_CALCULATE_RXCRC 1
 
 /* Uncomment to enable on-board timer interrupts */
 //#define RTL8139_ONBOARD_TIMER 1
@@ -754,7 +753,7 @@ static void rtl8139_write_buffer(RTL8139State *s, const void *buf, int size)
         int wrapped = MOD2(s->RxBufAddr + size, s->RxBufferSize);
 
         /* write packet data */
-        if (wrapped && s->RxBufferSize < 65536 && !rtl8139_RxWrap(s))
+        if (wrapped && !(s->RxBufferSize < 65536 && rtl8139_RxWrap(s)))
         {
             DEBUG_PRINT((">>> RTL8139: rx packet wrapped in buffer at %d\n", size-wrapped));
 
@@ -1030,7 +1029,7 @@ static void rtl8139_do_receive(void *opaque, const uint8_t *buf, int size, int d
 
         /* write checksum */
 #if defined (RTL8139_CALCULATE_RXCRC)
-        val = cpu_to_le32(crc32(~0, buf, size));
+        val = cpu_to_le32(crc32(0, buf, size));
 #else
         val = 0;
 #endif
@@ -1136,7 +1135,7 @@ static void rtl8139_do_receive(void *opaque, const uint8_t *buf, int size, int d
 
         /* write checksum */
 #if defined (RTL8139_CALCULATE_RXCRC)
-        val = cpu_to_le32(crc32(~0, buf, size));
+        val = cpu_to_le32(crc32(0, buf, size));
 #else
         val = 0;
 #endif

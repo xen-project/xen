@@ -43,6 +43,7 @@
 #include <asm/hvm/hvm.h>
 #include <asm/hvm/support.h>
 #include <asm/msr.h>
+#include <asm/nmi.h>
 #ifdef CONFIG_COMPAT
 #include <compat/vcpu.h>
 #endif
@@ -76,10 +77,28 @@ static void default_idle(void)
         local_irq_enable();
 }
 
+static void play_dead(void)
+{
+    __cpu_disable();
+    /* This must be done before dead CPU ack */
+    cpu_exit_clear();
+    wbinvd();
+    mb();
+    /* Ack it */
+    __get_cpu_var(cpu_state) = CPU_DEAD;
+
+    /* With physical CPU hotplug, we should halt the cpu. */
+    local_irq_disable();
+    for ( ; ; )
+        halt();
+}
+
 void idle_loop(void)
 {
     for ( ; ; )
     {
+        if (cpu_is_offline(smp_processor_id()))
+            play_dead();
         page_scrub_schedule_work();
         default_idle();
         do_softirq();

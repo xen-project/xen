@@ -133,21 +133,21 @@ struct page_info * hap_alloc_p2m_page(struct domain *d)
     */
     if ( d->arch.paging.hap.p2m_pages == 0 ) 
     {
-	pg = alloc_domheap_pages(NULL, 0, MEMF_bits(32));
-	d->arch.paging.hap.p2m_pages += 1;
+        pg = alloc_domheap_pages(NULL, 0, MEMF_bits(32));
+        d->arch.paging.hap.p2m_pages += 1;
     }
     else
 #endif
     {
-	pg = mfn_to_page(hap_alloc(d));
-	
-	d->arch.paging.hap.p2m_pages += 1;
-	d->arch.paging.hap.total_pages -= 1;
-    }	
+        pg = mfn_to_page(hap_alloc(d));
+        d->arch.paging.hap.p2m_pages += 1;
+        d->arch.paging.hap.total_pages -= 1;
+    }
 
-    if ( pg == NULL ) {
-	hap_unlock(d);
-	return NULL;
+    if ( pg == NULL )
+    {
+        hap_unlock(d);
+        return NULL;
     }   
 
     hap_unlock(d);
@@ -166,17 +166,16 @@ void hap_free_p2m_page(struct domain *d, struct page_info *pg)
 {
     ASSERT(page_get_owner(pg) == d);
     /* Should have just the one ref we gave it in alloc_p2m_page() */
-    if ( (pg->count_info & PGC_count_mask) != 1 ) {
+    if ( (pg->count_info & PGC_count_mask) != 1 )
         HAP_ERROR("Odd p2m page count c=%#x t=%"PRtype_info"\n",
                   pg->count_info, pg->u.inuse.type_info);
-    }
     pg->count_info = 0;
     /* Free should not decrement domain's total allocation, since 
      * these pages were allocated without an owner. */
     page_set_owner(pg, NULL); 
     free_domheap_pages(pg, 0);
     d->arch.paging.hap.p2m_pages--;
-    ASSERT( d->arch.paging.hap.p2m_pages >= 0 );
+    ASSERT(d->arch.paging.hap.p2m_pages >= 0);
 }
 
 /* Return the size of the pool, rounded up to the nearest MB */
@@ -185,7 +184,6 @@ hap_get_allocation(struct domain *d)
 {
     unsigned int pg = d->arch.paging.hap.total_pages;
 
-    HERE_I_AM;
     return ((pg >> (20 - PAGE_SHIFT))
             + ((pg & ((1 << (20 - PAGE_SHIFT)) - 1)) ? 1 : 0));
 }
@@ -199,11 +197,14 @@ hap_set_allocation(struct domain *d, unsigned int pages, int *preempted)
 
     ASSERT(hap_locked_by_me(d));
 
-    while ( d->arch.paging.hap.total_pages != pages ) {
-        if ( d->arch.paging.hap.total_pages < pages ) {
+    while ( d->arch.paging.hap.total_pages != pages )
+    {
+        if ( d->arch.paging.hap.total_pages < pages )
+        {
             /* Need to allocate more memory from domheap */
             sp = alloc_domheap_pages(NULL, 0, 0);
-            if ( sp == NULL ) {
+            if ( sp == NULL )
+            {
                 HAP_PRINTK("failed to allocate hap pages.\n");
                 return -ENOMEM;
             }
@@ -211,7 +212,8 @@ hap_set_allocation(struct domain *d, unsigned int pages, int *preempted)
             d->arch.paging.hap.total_pages += 1;
             list_add_tail(&sp->list, &d->arch.paging.hap.freelists);
         }
-        else if ( d->arch.paging.hap.total_pages > pages ) {
+        else if ( d->arch.paging.hap.total_pages > pages )
+        {
             /* Need to return memory to domheap */
             ASSERT(!list_empty(&d->arch.paging.hap.freelists));
             sp = list_entry(d->arch.paging.hap.freelists.next,
@@ -224,7 +226,8 @@ hap_set_allocation(struct domain *d, unsigned int pages, int *preempted)
         }
         
         /* Check to see if we need to yield and try again */
-        if ( preempted && hypercall_preempt_check() ) {
+        if ( preempted && hypercall_preempt_check() )
+        {
             *preempted = 1;
             return 0;
         }
@@ -285,8 +288,8 @@ void hap_install_xen_entries_in_l2h(struct vcpu *v, mfn_t sl2hmfn)
     for ( i = 0; i < PDPT_L2_ENTRIES; i++ )
         sl2e[l2_table_offset(PERDOMAIN_VIRT_START) + i] =
             l2e_from_pfn(
-                         mfn_x(page_to_mfn(virt_to_page(d->arch.mm_perdomain_pt) + i)),
-                         __PAGE_HYPERVISOR);
+                mfn_x(page_to_mfn(virt_to_page(d->arch.mm_perdomain_pt) + i)),
+                __PAGE_HYPERVISOR);
     
     for ( i = 0; i < HAP_L3_PAGETABLE_ENTRIES; i++ )
         sl2e[l2_table_offset(LINEAR_PT_VIRT_START) + i] =
@@ -434,22 +437,23 @@ int hap_enable(struct domain *d, u32 mode)
     unsigned int old_pages;
     int rv = 0;
 
-    HERE_I_AM;
-
     domain_pause(d);
     /* error check */
-    if ( (d == current->domain) ) {
+    if ( (d == current->domain) )
+    {
         rv = -EINVAL;
         goto out;
     }
 
     old_pages = d->arch.paging.hap.total_pages;
-    if ( old_pages == 0 ) {
+    if ( old_pages == 0 )
+    {
         unsigned int r;
         hap_lock(d);
         r = hap_set_allocation(d, 256, NULL);
         hap_unlock(d);
-        if ( r != 0 ) {
+        if ( r != 0 )
+        {
             hap_set_allocation(d, 0, NULL);
             rv = -ENOMEM;
             goto out;
@@ -457,7 +461,8 @@ int hap_enable(struct domain *d, u32 mode)
     }
 
     /* allocate P2m table */
-    if ( mode & PG_translate ) {
+    if ( mode & PG_translate )
+    {
         rv = p2m_alloc_table(d, hap_alloc_p2m_page, hap_free_p2m_page);
         if ( rv != 0 )
             goto out;
@@ -472,20 +477,17 @@ int hap_enable(struct domain *d, u32 mode)
 
 void hap_final_teardown(struct domain *d)
 {
-    HERE_I_AM;
-
     if ( d->arch.paging.hap.total_pages != 0 )
         hap_teardown(d);
 
     p2m_teardown(d);
-    ASSERT( d->arch.paging.hap.p2m_pages == 0 );
+    ASSERT(d->arch.paging.hap.p2m_pages == 0);
 }
 
 void hap_teardown(struct domain *d)
 {
     struct vcpu *v;
     mfn_t mfn;
-    HERE_I_AM;
 
     ASSERT(d->is_dying);
     ASSERT(d != current->domain);
@@ -493,10 +495,13 @@ void hap_teardown(struct domain *d)
     if ( !hap_locked_by_me(d) )
         hap_lock(d); /* Keep various asserts happy */
 
-    if ( paging_mode_enabled(d) ) {
+    if ( paging_mode_enabled(d) )
+    {
         /* release the monitor table held by each vcpu */
-        for_each_vcpu(d, v) {
-            if ( v->arch.paging.mode && paging_mode_external(d) ) {
+        for_each_vcpu ( d, v )
+        {
+            if ( v->arch.paging.mode && paging_mode_external(d) )
+            {
                 mfn = pagetable_get_mfn(v->arch.monitor_table);
                 if ( mfn_valid(mfn) && (mfn_x(mfn) != 0) )
                     hap_destroy_monitor_table(v, mfn);
@@ -505,7 +510,8 @@ void hap_teardown(struct domain *d)
         }
     }
 
-    if ( d->arch.paging.hap.total_pages != 0 ) {
+    if ( d->arch.paging.hap.total_pages != 0 )
+    {
         HAP_PRINTK("teardown of domain %u starts."
                       "  pages total = %u, free = %u, p2m=%u\n",
                       d->domain_id,
@@ -531,9 +537,8 @@ int hap_domctl(struct domain *d, xen_domctl_shadow_op_t *sc,
 {
     int rc, preempted = 0;
 
-    HERE_I_AM;
-
-    switch ( sc->op ) {
+    switch ( sc->op )
+    {
     case XEN_DOMCTL_SHADOW_OP_SET_ALLOCATION:
         hap_lock(d);
         rc = hap_set_allocation(d, sc->mb << (20 - PAGE_SHIFT), &preempted);
@@ -599,8 +604,6 @@ void hap_update_paging_modes(struct vcpu *v)
 {
     struct domain *d;
 
-    HERE_I_AM;
-
     d = v->domain;
     hap_lock(d);
 
@@ -608,7 +611,8 @@ void hap_update_paging_modes(struct vcpu *v)
      * guest's paging mode. So, make sure the shadow registers (CR0, CR4, EFER)
      * reflect guest's status correctly.
      */
-    if ( hvm_paging_enabled(v) ) {
+    if ( hvm_paging_enabled(v) )
+    {
         if ( hvm_long_mode_enabled(v) )
             v->arch.paging.mode = &hap_paging_long_mode;
         else if ( hvm_pae_enabled(v) )
@@ -616,13 +620,15 @@ void hap_update_paging_modes(struct vcpu *v)
         else
             v->arch.paging.mode = &hap_paging_protected_mode;
     }
-    else {
+    else
+    {
         v->arch.paging.mode = &hap_paging_real_mode;
     }
 
     v->arch.paging.translate_enabled = !!hvm_paging_enabled(v);
 
-    if ( pagetable_is_null(v->arch.monitor_table) ) {
+    if ( pagetable_is_null(v->arch.monitor_table) )
+    {
         mfn_t mmfn = hap_make_monitor_table(v);
         v->arch.monitor_table = pagetable_from_mfn(mmfn);
         make_cr3(v, mfn_x(mmfn));
@@ -647,23 +653,25 @@ static void p2m_install_entry_in_monitors(struct domain *d, l3_pgentry_t *l3e)
     index = ((unsigned long)l3e & ~PAGE_MASK) / sizeof(l3_pgentry_t);
     ASSERT(index < MACHPHYS_MBYTES>>1);
     
-    for_each_vcpu(d, v) {
-	if ( pagetable_get_pfn(v->arch.monitor_table) == 0 ) 
-	    continue;
+    for_each_vcpu ( d, v )
+    {
+        if ( pagetable_get_pfn(v->arch.monitor_table) == 0 ) 
+            continue;
 
-	ASSERT(paging_mode_external(v->domain));
+        ASSERT(paging_mode_external(v->domain));
 
         if ( v == current ) /* OK to use linear map of monitor_table */
-	    ml2e = __linear_l2_table + l2_linear_offset(RO_MPT_VIRT_START);
+            ml2e = __linear_l2_table + l2_linear_offset(RO_MPT_VIRT_START);
         else {
-	    l3_pgentry_t *ml3e;
-            ml3e = hap_map_domain_page(pagetable_get_mfn(v->arch.monitor_table));
-	    ASSERT(l3e_get_flags(ml3e[3]) & _PAGE_PRESENT);
+            l3_pgentry_t *ml3e;
+            ml3e = hap_map_domain_page(
+                pagetable_get_mfn(v->arch.monitor_table));
+            ASSERT(l3e_get_flags(ml3e[3]) & _PAGE_PRESENT);
             ml2e = hap_map_domain_page(_mfn(l3e_get_pfn(ml3e[3])));
             ml2e += l2_table_offset(RO_MPT_VIRT_START);
-	    hap_unmap_domain_page(ml3e);
+            hap_unmap_domain_page(ml3e);
         }
-	ml2e[index] = l2e_from_pfn(l3e_get_pfn(*l3e), __PAGE_HYPERVISOR);
+        ml2e[index] = l2e_from_pfn(l3e_get_pfn(*l3e), __PAGE_HYPERVISOR);
         if ( v != current )
             hap_unmap_domain_page(ml2e);
     }
@@ -680,9 +688,9 @@ hap_write_p2m_entry(struct vcpu *v, unsigned long gfn, l1_pgentry_t *p,
 #if CONFIG_PAGING_LEVELS == 3
     /* install P2M in monitor table for PAE Xen */
     if ( level == 3 ) 
-	/* We have written to the p2m l3: need to sync the per-vcpu
+        /* We have written to the p2m l3: need to sync the per-vcpu
          * copies of it in the monitor tables */
-	p2m_install_entry_in_monitors(v->domain, (l3_pgentry_t *)p);
+        p2m_install_entry_in_monitors(v->domain, (l3_pgentry_t *)p);
 #endif
     
     hap_unlock(v->domain);

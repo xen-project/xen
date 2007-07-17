@@ -566,10 +566,7 @@ xc_ptrace(
         }
         if ( request == PTRACE_DETACH )
         {
-            domctl.cmd = XEN_DOMCTL_setdebugging;
-            domctl.domain = current_domid;
-            domctl.u.setdebugging.enable = 0;
-            if ((retval = do_domctl(xc_handle, &domctl)))
+            if ((retval = xc_domain_setdebugging(xc_handle, current_domid, 0)))
                 goto out_error_domctl;
         }
         regs_valid = 0;
@@ -593,10 +590,7 @@ xc_ptrace(
         else if ((retval = xc_domain_pause(xc_handle, current_domid)))
             goto out_error_domctl;
         current_is_hvm = !!(domctl.u.getdomaininfo.flags&XEN_DOMINF_hvm_guest);
-        domctl.cmd = XEN_DOMCTL_setdebugging;
-        domctl.domain = current_domid;
-        domctl.u.setdebugging.enable = 1;
-        if ((retval = do_domctl(xc_handle, &domctl)))
+        if ((retval = xc_domain_setdebugging(xc_handle, current_domid, 1)))
             goto out_error_domctl;
 
         if (get_online_cpumap(xc_handle, &domctl.u.getdomaininfo, &cpumap))

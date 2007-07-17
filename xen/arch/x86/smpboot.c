@@ -87,11 +87,7 @@ EXPORT_SYMBOL(cpu_online_map);
 cpumask_t cpu_callin_map;
 cpumask_t cpu_callout_map;
 EXPORT_SYMBOL(cpu_callout_map);
-#ifdef CONFIG_HOTPLUG_CPU
-cpumask_t cpu_possible_map = CPU_MASK_ALL;
-#else
 cpumask_t cpu_possible_map;
-#endif
 EXPORT_SYMBOL(cpu_possible_map);
 static cpumask_t smp_commenced_mask;
 
@@ -110,6 +106,11 @@ u8 x86_cpu_to_apicid[NR_CPUS] __read_mostly =
 EXPORT_SYMBOL(x86_cpu_to_apicid);
 
 static void map_cpu_to_logical_apicid(void);
+/* State of each CPU. */
+DEFINE_PER_CPU(int, cpu_state) = { 0 };
+
+static void *stack_base[NR_CPUS] __cacheline_aligned;
+spinlock_t cpu_add_remove_lock;
 
 /*
  * The bootstrap kernel entry code has set these up. Save them for
@@ -396,9 +397,11 @@ void __devinit smp_callin(void)
 	/*
 	 *      Synchronize the TSC with the BP
 	 */
-	if (cpu_has_tsc && cpu_khz && !tsc_sync_disabled)
+	if (cpu_has_tsc && cpu_khz && !tsc_sync_disabled) {
 		synchronize_tsc_ap();
-	calibrate_tsc_ap();
+		/* No sync for same reason as above */
+		calibrate_tsc_ap();
+	}
 }
 
 static int cpucount, booting_cpu;
@@ -464,8 +467,12 @@ static void construct_percpu_idt(unsigned int cpu)
 {
 	unsigned char idt_load[10];
 
-	idt_tables[cpu] = xmalloc_array(idt_entry_t, IDT_ENTRIES);
-	memcpy(idt_tables[cpu], idt_table, IDT_ENTRIES*sizeof(idt_entry_t));
+	/* If IDT table exists since last hotplug, reuse it */
+	if (!idt_tables[cpu]) {
+		idt_tables[cpu] = xmalloc_array(idt_entry_t, IDT_ENTRIES);
+		memcpy(idt_tables[cpu], idt_table,
+				IDT_ENTRIES*sizeof(idt_entry_t));
+	}
 
 	*(unsigned short *)(&idt_load[0]) = (IDT_ENTRIES*sizeof(idt_entry_t))-1;
 	*(unsigned long  *)(&idt_load[2]) = (unsigned long)idt_tables[cpu];
@@ -488,7 +495,7 @@ void __devinit start_secondary(void *unused)
 
 	set_processor_id(cpu);
 	set_current(idle_vcpu[cpu]);
-        this_cpu(curr_vcpu) = idle_vcpu[cpu];
+	this_cpu(curr_vcpu) = idle_vcpu[cpu];
 
 	percpu_traps_init();
 
@@ -516,23 +523,13 @@ void __devinit start_secondary(void *unused)
 	set_cpu_sibling_map(raw_smp_processor_id());
 	wmb();
 
-	/*
-	 * We need to hold call_lock, so there is no inconsistency
-	 * between the time smp_call_function() determines number of
-	 * IPI receipients, and the time when the determination is made
-	 * for which cpus receive the IPI. Holding this
-	 * lock helps us to not include this cpu in a currently in progress
-	 * smp_call_function().
-	 */
-	/*lock_ipi_call_lock();*/
 	cpu_set(smp_processor_id(), cpu_online_map);
-	/*unlock_ipi_call_lock();*/
-	/*per_cpu(cpu_state, smp_processor_id()) = CPU_ONLINE;*/
+	per_cpu(cpu_state, smp_processor_id()) = CPU_ONLINE;
+
+	init_percpu_time();
 
 	/* We can take interrupts now: we're officially "up". */
 	local_irq_enable();
-
-        init_percpu_time();
 
 	wmb();
 	startup_cpu_idle_loop();
@@ -794,6 +791,22 @@ static inline int alloc_cpu_id(void)
 	return cpu;
 }
 
+static struct vcpu *prepare_idle_vcpu(unsigned int cpu)
+{
+	if (idle_vcpu[cpu])
+		return idle_vcpu[cpu];
+
+	return alloc_idle_vcpu(cpu);
+}
+
+static void *prepare_idle_stack(unsigned int cpu)
+{
+	if (!stack_base[cpu])
+		stack_base[cpu] = alloc_xenheap_pages(STACK_ORDER);
+
+	return stack_base[cpu];
+}
+
 static int __devinit do_boot_cpu(int apicid, int cpu)
 /*
  * NOTE - on most systems this is a PHYSICAL apic ID, but on multiquad
@@ -811,7 +824,7 @@ static int __devinit do_boot_cpu(int apicid, int cpu)
 
 	booting_cpu = cpu;
 
-	v = alloc_idle_vcpu(cpu);
+	v = prepare_idle_vcpu(cpu);
 	BUG_ON(v == NULL);
 
 	/* start_eip had better be page-aligned! */
@@ -820,7 +833,7 @@ static int __devinit do_boot_cpu(int apicid, int cpu)
 	/* So we see what's up   */
 	printk("Booting processor %d/%d eip %lx\n", cpu, apicid, start_eip);
 
-	stack_start.esp = alloc_xenheap_pages(STACK_ORDER);
+	stack_start.esp = prepare_idle_stack(cpu);
 
 	/* Debug build: detect stack overflow by setting up a guard page. */
 	memguard_guard_stack(stack_start.esp);
@@ -897,6 +910,51 @@ static int __devinit do_boot_cpu(int apicid, int cpu)
 	return boot_error;
 }
 
+#ifdef CONFIG_HOTPLUG_CPU
+static void idle_task_exit(void)
+{
+	/* Give up lazy state borrowed by this idle vcpu */
+	__sync_lazy_execstate();
+}
+
+void cpu_exit_clear(void)
+{
+	int cpu = raw_smp_processor_id();
+
+	idle_task_exit();
+
+	cpucount --;
+	cpu_uninit();
+
+	cpu_clear(cpu, cpu_callout_map);
+	cpu_clear(cpu, cpu_callin_map);
+
+	cpu_clear(cpu, smp_commenced_mask);
+	unmap_cpu_to_logical_apicid(cpu);
+}
+
+static int __cpuinit __smp_prepare_cpu(int cpu)
+{
+	int	apicid, ret;
+
+	apicid = x86_cpu_to_apicid[cpu];
+	if (apicid == BAD_APICID) {
+		ret = -ENODEV;
+		goto exit;
+	}
+
+	tsc_sync_disabled = 1;
+
+	do_boot_cpu(apicid, cpu);
+
+	tsc_sync_disabled = 0;
+
+	ret = 0;
+exit:
+	return ret;
+}
+#endif
+
 /*
  * Cycle through the processors sending APIC IPIs to boot each.
  */
@@ -923,6 +981,8 @@ static void __init smp_boot_cpus(unsigned int max_cpus)
 
 	boot_cpu_physical_apicid = GET_APIC_ID(apic_read(APIC_ID));
 	x86_cpu_to_apicid[0] = boot_cpu_physical_apicid;
+
+	stack_base[0] = stack_start.esp;
 
 	/*current_thread_info()->cpu = 0;*/
 	/*smp_tune_scheduling();*/
@@ -1094,11 +1154,238 @@ void __devinit smp_prepare_boot_cpu(void)
 	cpu_set(smp_processor_id(), cpu_callout_map);
 	cpu_set(smp_processor_id(), cpu_present_map);
 	cpu_set(smp_processor_id(), cpu_possible_map);
-	/*per_cpu(cpu_state, smp_processor_id()) = CPU_ONLINE;*/
+	per_cpu(cpu_state, smp_processor_id()) = CPU_ONLINE;
+	spin_lock_init(&cpu_add_remove_lock);
 }
+
+#ifdef CONFIG_HOTPLUG_CPU
+static void
+remove_siblinginfo(int cpu)
+{
+	int sibling;
+	struct cpuinfo_x86 *c = cpu_data;
+
+	for_each_cpu_mask(sibling, cpu_core_map[cpu]) {
+		cpu_clear(cpu, cpu_core_map[sibling]);
+		/*
+		 * last thread sibling in this cpu core going down
+		 */
+		if (cpus_weight(cpu_sibling_map[cpu]) == 1)
+			c[sibling].booted_cores--;
+	}
+			
+	for_each_cpu_mask(sibling, cpu_sibling_map[cpu])
+		cpu_clear(cpu, cpu_sibling_map[sibling]);
+	cpus_clear(cpu_sibling_map[cpu]);
+	cpus_clear(cpu_core_map[cpu]);
+	phys_proc_id[cpu] = BAD_APICID;
+	cpu_core_id[cpu] = BAD_APICID;
+	cpu_clear(cpu, cpu_sibling_setup_map);
+}
+
+extern void fixup_irqs(cpumask_t map);
+int __cpu_disable(void)
+{
+	cpumask_t map = cpu_online_map;
+	int cpu = smp_processor_id();
+
+	/*
+	 * Perhaps use cpufreq to drop frequency, but that could go
+	 * into generic code.
+ 	 *
+	 * We won't take down the boot processor on i386 due to some
+	 * interrupts only being able to be serviced by the BSP.
+	 * Especially so if we're not using an IOAPIC	-zwane
+	 */
+	if (cpu == 0)
+		return -EBUSY;
+
+	local_irq_disable();
+	clear_local_APIC();
+	/* Allow any queued timer interrupts to get serviced */
+	local_irq_enable();
+	mdelay(1);
+	local_irq_disable();
+
+	time_suspend();
+
+	remove_siblinginfo(cpu);
+
+	cpu_clear(cpu, map);
+	fixup_irqs(map);
+	/* It's now safe to remove this processor from the online map */
+	cpu_clear(cpu, cpu_online_map);
+	return 0;
+}
+
+void __cpu_die(unsigned int cpu)
+{
+	/* We don't do anything here: idle task is faking death itself. */
+	unsigned int i;
+
+	for (i = 0; i < 10; i++) {
+		/* They ack this in play_dead by setting CPU_DEAD */
+		if (per_cpu(cpu_state, cpu) == CPU_DEAD) {
+			printk ("CPU %d is now offline\n", cpu);
+			return;
+		}
+		mdelay(100);
+		mb();
+		process_pending_timers();
+	}
+ 	printk(KERN_ERR "CPU %u didn't die...\n", cpu);
+}
+
+/* 
+ * XXX: One important thing missed here is to migrate vcpus
+ * from dead cpu to other online ones and then put whole
+ * system into a stop state. It assures a safe environment
+ * for a cpu hotplug/remove at normal running state.
+ *
+ * However for xen PM case, at this point:
+ * 	-> All other domains should be notified with PM event,
+ *	   and then in following states:
+ *		* Suspend state, or
+ *		* Paused state, which is a force step to all
+ *		  domains if they do nothing to suspend
+ *	-> All vcpus of dom0 (except vcpu0) have already beem
+ *	   hot removed
+ * with the net effect that all other cpus only have idle vcpu
+ * running. In this special case, we can avoid vcpu migration
+ * then and system can be considered in a stop state.
+ *
+ * So current cpu hotplug is a special version for PM specific
+ * usage, and need more effort later for full cpu hotplug.
+ * (ktian1)
+ */
+int cpu_down(unsigned int cpu)
+{
+	int err = 0;
+	cpumask_t mask;
+
+	spin_lock(&cpu_add_remove_lock);
+	if (num_online_cpus() == 1) {
+		err = -EBUSY;
+		goto out;
+	}
+
+	if (!cpu_online(cpu)) {
+		err = -EINVAL;
+		goto out;
+	}
+
+	printk("Prepare to bring CPU%d down...\n", cpu);
+	/* Send notification to remote idle vcpu */
+	cpus_clear(mask);
+	cpu_set(cpu, mask);
+	per_cpu(cpu_state, cpu) = CPU_DYING;
+	smp_send_event_check_mask(mask);
+
+	__cpu_die(cpu);
+
+	if (cpu_online(cpu)) {
+		printk("Bad state (DEAD, but in online map) on CPU%d\n", cpu);
+		err = -EBUSY;
+	}
+out:
+	spin_unlock(&cpu_add_remove_lock);
+	return err;
+}
+
+int cpu_up(unsigned int cpu)
+{
+	int err = 0;
+
+	spin_lock(&cpu_add_remove_lock);
+	if (cpu_online(cpu)) {
+		printk("Bring up a online cpu. Bogus!\n");
+		err = -EBUSY;
+		goto out;
+	}
+
+	err = __cpu_up(cpu);
+	if (err < 0)
+		goto out;
+
+out:
+	spin_unlock(&cpu_add_remove_lock);
+	return err;
+}
+
+/* From kernel/power/main.c */
+/* This is protected by pm_sem semaphore */
+static cpumask_t frozen_cpus;
+
+void disable_nonboot_cpus(void)
+{
+	int cpu, error;
+
+	error = 0;
+	cpus_clear(frozen_cpus);
+	printk("Freezing cpus ...\n");
+	for_each_online_cpu(cpu) {
+		if (cpu == 0)
+			continue;
+		error = cpu_down(cpu);
+		if (!error) {
+			cpu_set(cpu, frozen_cpus);
+			printk("CPU%d is down\n", cpu);
+			continue;
+		}
+		printk("Error taking cpu %d down: %d\n", cpu, error);
+	}
+	BUG_ON(raw_smp_processor_id() != 0);
+	if (error)
+		panic("cpus not sleeping");
+}
+
+void enable_nonboot_cpus(void)
+{
+	int cpu, error;
+
+	printk("Thawing cpus ...\n");
+	for_each_cpu_mask(cpu, frozen_cpus) {
+		error = cpu_up(cpu);
+		if (!error) {
+			printk("CPU%d is up\n", cpu);
+			continue;
+		}
+		printk("Error taking cpu %d up: %d\n", cpu, error);
+		panic("Not enough cpus");
+	}
+	cpus_clear(frozen_cpus);
+}
+#else /* ... !CONFIG_HOTPLUG_CPU */
+int __cpu_disable(void)
+{
+	return -ENOSYS;
+}
+
+void __cpu_die(unsigned int cpu)
+{
+	/* We said "no" in __cpu_disable */
+	BUG();
+}
+#endif /* CONFIG_HOTPLUG_CPU */
 
 int __devinit __cpu_up(unsigned int cpu)
 {
+#ifdef CONFIG_HOTPLUG_CPU
+	int ret=0;
+
+	/*
+	 * We do warm boot only on cpus that had booted earlier
+	 * Otherwise cold boot is all handled from smp_boot_cpus().
+	 * cpu_callin_map is set during AP kickstart process. Its reset
+	 * when a cpu is taken offline from cpu_exit_clear().
+	 */
+	if (!cpu_isset(cpu, cpu_callin_map))
+		ret = __smp_prepare_cpu(cpu);
+
+	if (ret)
+		return -EIO;
+#endif
+
 	/* In case one didn't come up */
 	if (!cpu_isset(cpu, cpu_callin_map)) {
 		printk(KERN_DEBUG "skipping cpu%d, didn't come online\n", cpu);
@@ -1116,6 +1403,7 @@ int __devinit __cpu_up(unsigned int cpu)
 	}
 	return 0;
 }
+
 
 void __init smp_cpus_done(unsigned int max_cpus)
 {

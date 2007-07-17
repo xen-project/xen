@@ -50,6 +50,8 @@ extern void set_ifa_itir_iha (struct vcpu *vcpu, u64 vadr,
 extern void inject_guest_interruption(struct vcpu *vcpu, u64 vec);
 extern void set_illegal_op_isr (struct vcpu *vcpu);
 extern void illegal_op (struct vcpu *vcpu);
+extern void set_rsv_reg_field_isr (struct vcpu *vcpu);
+extern void rsv_reg_field (struct vcpu *vcpu);
 extern void vmx_relinquish_guest_resources(struct domain *d);
 extern void vmx_relinquish_vcpu_resources(struct vcpu *v);
 extern void vmx_die_if_kernel(char *str, struct pt_regs *regs, long err);

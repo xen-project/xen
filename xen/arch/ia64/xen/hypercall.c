@@ -224,6 +224,16 @@ ia64_hypercall(struct pt_regs *regs)
 		regs->r10 = fpswa_ret.err1;
 		regs->r11 = fpswa_ret.err2;
 		break;
+	case __HYPERVISOR_opt_feature: {
+		XEN_GUEST_HANDLE(void) arg;
+		struct xen_ia64_opt_feature optf;
+		set_xen_guest_handle(arg, (void*)(vcpu_get_gr(v, 32)));
+		if (copy_from_guest(&optf, arg, 1) == 0)
+			regs->r8 = domain_opt_feature(&optf);
+		else
+			regs->r8 = -EFAULT;
+		break;
+	}
 	default:
 		printk("unknown ia64 fw hypercall %lx\n", regs->r2);
 		regs->r8 = do_ni_hypercall();

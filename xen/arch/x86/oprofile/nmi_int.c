@@ -27,20 +27,15 @@
 #include "op_counter.h"
 #include "op_x86_model.h"
  
+struct op_counter_config counter_config[OP_MAX_COUNTER];
+
 static struct op_x86_model_spec const * model;
 static struct op_msrs cpu_msrs[NR_CPUS];
 static unsigned long saved_lvtpc[NR_CPUS];
 
-#define VIRQ_BITMASK_SIZE (MAX_OPROF_DOMAINS/32 + 1)
-extern int active_domains[MAX_OPROF_DOMAINS];
-extern unsigned int adomains;
-extern struct domain *adomain_ptrs[MAX_OPROF_DOMAINS];
-extern unsigned long virq_ovf_pending[VIRQ_BITMASK_SIZE];
+static char *cpu_type;
+
 extern int is_active(struct domain *d);
-extern int active_id(struct domain *d);
-extern int is_profiled(struct domain *d);
-
-
 
 static int nmi_callback(struct cpu_user_regs *regs, int cpu)
 {
@@ -262,9 +257,7 @@ void nmi_stop(void)
 }
 
 
-struct op_counter_config counter_config[OP_MAX_COUNTER];
-
-static int __init p4_init(char * cpu_type)
+static int __init p4_init(char ** cpu_type)
 { 
 	__u8 cpu_model = current_cpu_data.x86_model;
 
@@ -276,20 +269,18 @@ static int __init p4_init(char * cpu_type)
 	}
 
 #ifndef CONFIG_SMP
-	strlcpy (cpu_type, "i386/p4", XENOPROF_CPU_TYPE_SIZE);
+	*cpu_type = "i386/p4", XENOPROF_CPU_TYPE_SIZE);
 	model = &op_p4_spec;
 	return 1;
 #else
 	switch (smp_num_siblings) {
 		case 1:
-			strlcpy (cpu_type, "i386/p4", 
-				 XENOPROF_CPU_TYPE_SIZE);
+			*cpu_type = "i386/p4";
 			model = &op_p4_spec;
 			return 1;
 
 		case 2:
-			strlcpy (cpu_type, "i386/p4-ht", 
-				 XENOPROF_CPU_TYPE_SIZE);
+			*cpu_type = "i386/p4-ht";
 			model = &op_p4_ht2_spec;
 			return 1;
 	}
@@ -300,7 +291,7 @@ static int __init p4_init(char * cpu_type)
 }
 
 
-static int __init ppro_init(char *cpu_type)
+static int __init ppro_init(char ** cpu_type)
 {
 	__u8 cpu_model = current_cpu_data.x86_model;
 
@@ -311,41 +302,32 @@ static int __init ppro_init(char *cpu_type)
 		return 0;
 	}
 	else if (cpu_model == 15)
-		strlcpy (cpu_type, "i386/core_2", XENOPROF_CPU_TYPE_SIZE);
+		*cpu_type = "i386/core_2";
 	else if (cpu_model == 14)
-		strlcpy (cpu_type, "i386/core", XENOPROF_CPU_TYPE_SIZE);
+		*cpu_type = "i386/core";
 	else if (cpu_model == 9)
-		strlcpy (cpu_type, "i386/p6_mobile", XENOPROF_CPU_TYPE_SIZE);
+		*cpu_type = "i386/p6_mobile";
 	else if (cpu_model > 5)
-		strlcpy (cpu_type, "i386/piii", XENOPROF_CPU_TYPE_SIZE);
+		*cpu_type = "i386/piii";
 	else if (cpu_model > 2)
-		strlcpy (cpu_type, "i386/pii", XENOPROF_CPU_TYPE_SIZE);
+		*cpu_type = "i386/pii";
 	else
-		strlcpy (cpu_type, "i386/ppro", XENOPROF_CPU_TYPE_SIZE);
+		*cpu_type = "i386/ppro";
 
 	model = &op_ppro_spec;
 	return 1;
 }
 
-int nmi_init(int *num_events, int *is_primary, char *cpu_type)
+static int __init nmi_init(void)
 {
 	__u8 vendor = current_cpu_data.x86_vendor;
 	__u8 family = current_cpu_data.x86;
-	int prim = 0;
  
 	if (!cpu_has_apic) {
-		printk("xenoprof: Initialization failed. No apic.\n");
+		printk("xenoprof: Initialization failed. No APIC\n");
 		return -ENODEV;
 	}
 
-	if (xenoprof_primary_profiler == NULL) {
-		/* For now, only dom0 can be the primary profiler */
-		if (current->domain->domain_id == 0) {
-			xenoprof_primary_profiler = current->domain;
-			prim = 1;
-		}
-	}
- 
 	switch (vendor) {
 		case X86_VENDOR_AMD:
 			/* Needs to be at least an Athlon (or hammer in 32bit mode) */
@@ -358,15 +340,13 @@ int nmi_init(int *num_events, int *is_primary, char *cpu_type)
 				return -ENODEV;
 			case 6:
 				model = &op_athlon_spec;
-				strlcpy (cpu_type, "i386/athlon", 
-					 XENOPROF_CPU_TYPE_SIZE);
+				cpu_type = "i386/athlon";
 				break;
 			case 0xf:
 				model = &op_athlon_spec;
-				/* Actually it could be i386/hammer too, but give
-				   user space an consistent name. */
-				strlcpy (cpu_type, "x86-64/hammer", 
-					 XENOPROF_CPU_TYPE_SIZE);
+				/* Actually it could be i386/hammer too, but
+				   give user space an consistent name. */
+				cpu_type = "x86-64/hammer";
 				break;
 			}
 			break;
@@ -375,13 +355,13 @@ int nmi_init(int *num_events, int *is_primary, char *cpu_type)
 			switch (family) {
 				/* Pentium IV */
 				case 0xf:
-					if (!p4_init(cpu_type))
+					if (!p4_init(&cpu_type))
 						return -ENODEV;
 					break;
 
 				/* A P6-class processor */
 				case 6:
-					if (!ppro_init(cpu_type))
+					if (!ppro_init(&cpu_type))
 						return -ENODEV;
 					break;
 
@@ -400,9 +380,16 @@ int nmi_init(int *num_events, int *is_primary, char *cpu_type)
 			return -ENODEV;
 	}
 
-	*num_events = model->num_counters;
-	*is_primary = prim;
-
 	return 0;
 }
 
+__initcall(nmi_init);
+
+int xenoprof_arch_init(int *num_events, char *_cpu_type)
+{
+	if (cpu_type == NULL)
+		return -ENODEV;
+	*num_events = model->num_counters;
+	strlcpy(_cpu_type, cpu_type, XENOPROF_CPU_TYPE_SIZE);
+	return 0;
+}

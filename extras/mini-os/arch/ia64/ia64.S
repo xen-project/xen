@@ -105,7 +105,7 @@ ENTRY(_start)
 	/*
 	 * Now pin mappings into the TLB for kernel text and data
 	 */
-	mov	r18=KERNEL_TR_PAGE_SIZE<<2
+	mov	r18=KERNEL_TR_PAGE_SIZE<<IA64_ITIR_PS
 	movl	r17=KERNEL_START
 	;;
 	mov	cr.itir=r18
@@ -204,7 +204,10 @@ ENTRY(_start)
 	;;
 	or	out0=r16, r15			// make a region 7 address
 	;;
-
+	ssm	psr.i | psr.ic
+	;;
+	srlz.i
+	;;
 	br.call.sptk.many rp=start_kernel
 	;;
 	add	r2=3,r0

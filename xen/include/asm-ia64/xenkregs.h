@@ -21,6 +21,9 @@
 #define IA64_IFS_V_BIT		63
 #define IA64_IFS_V	(__IA64_UL(1) << IA64_IFS_V_BIT)
 
+/* Interruption Status Register.  */
+#define IA64_ISR_NI_BIT	39	/* Nested interrupt.  */
+
 /* Page Table Address */
 #define IA64_PTA_VE_BIT 0
 #define IA64_PTA_SIZE_BIT 2
@@ -31,5 +34,17 @@
 #define IA64_PTA_SIZE   (__IA64_UL(0x3f) << IA64_PTA_SIZE_BIT)
 #define IA64_PTA_VF     (__IA64_UL(1) << IA64_PTA_VF_BIT)
 #define IA64_PTA_BASE   (__IA64_UL(0) - ((__IA64_UL(1) << IA64_PTA_BASE_BIT)))
+
+/* Some cr.itir declarations. */
+#define	IA64_ITIR_PS		2
+#define	IA64_ITIR_PS_LEN	6
+#define IA64_ITIR_PS_MASK	(((__IA64_UL(1) << IA64_ITIR_PS_LEN) - 1) \
+							<< IA64_ITIR_PS)
+#define	IA64_ITIR_KEY		8
+#define	IA64_ITIR_KEY_LEN	24
+#define	IA64_ITIR_KEY_MASK	(((__IA64_UL(1) << IA64_ITIR_KEY_LEN) - 1) \
+							<< IA64_ITIR_KEY)
+#define IA64_ITIR_PS_KEY(_ps, _key)	(((_ps) << IA64_ITIR_PS) | \
+					(((_key) << IA64_ITIR_KEY)))
 
 #endif /* _ASM_IA64_XENKREGS_H */

@@ -21,8 +21,6 @@
 #include <asm/vcpumask.h>
 #include <asm/vmmu.h>
 
-extern long running_on_sim;
-
 DEFINE_PER_CPU (unsigned long, vhpt_paddr);
 DEFINE_PER_CPU (unsigned long, vhpt_pend);
 #ifdef CONFIG_XEN_IA64_TLBFLUSH_CLOCK

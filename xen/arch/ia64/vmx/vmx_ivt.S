@@ -1001,7 +1001,7 @@ END(vmx_speculation_vector)
 // 0x5900 Entry 29 (size 16 bundles) Debug (16,28,56)
 ENTRY(vmx_debug_vector)
     VMX_DBG_FAULT(29)
-    VMX_FAULT(29)
+    VMX_REFLECT(29)
 END(vmx_debug_vector)
 
     .org vmx_ia64_ivt+0x5a00

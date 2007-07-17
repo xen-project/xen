@@ -27,7 +27,6 @@ $(TARGET): $(TARGET)-syms
 		> $(BASEDIR)/System.map
 
 # Headers do not depend on auto-generated header, but object files do.
-HDRS    := $(subst $(BASEDIR)/include/asm-ia64/asm-xsi-offsets.h,,$(HDRS))
 $(ALL_OBJS): $(BASEDIR)/include/asm-ia64/asm-xsi-offsets.h
 
 asm-offsets.s: asm-offsets.c $(BASEDIR)/include/asm-ia64/.offsets.h.stamp
@@ -58,6 +57,7 @@ $(BASEDIR)/include/asm-ia64/.offsets.h.stamp:
 	 || ln -sf $(BASEDIR)/include/xen $(BASEDIR)/include/linux
 	[ -e $(BASEDIR)/include/asm-ia64/xen ] \
 	 || ln -sf $(BASEDIR)/include/asm-ia64/linux $(BASEDIR)/include/asm-ia64/xen
+	touch $@
 
 # I'm sure a Makefile wizard would know a better way to do this
 xen.lds.s: xen/xen.lds.S $(HDRS)

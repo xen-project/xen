@@ -540,8 +540,7 @@ IA64FAULT vmx_vcpu_ptc_e(VCPU *vcpu, u64 va)
 
 IA64FAULT vmx_vcpu_ptc_g(VCPU *vcpu, u64 va, u64 ps)
 {
-    vmx_vcpu_ptc_ga(vcpu, va, ps);
-    return IA64_ILLOP_FAULT;
+    return vmx_vcpu_ptc_ga(vcpu, va, ps);
 }
 /*
 IA64FAULT vmx_vcpu_ptc_ga(VCPU *vcpu, u64 va, u64 ps)

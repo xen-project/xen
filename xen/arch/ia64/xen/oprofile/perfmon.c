@@ -119,19 +119,10 @@ __exitcall(xenoprof_perfmon_exit);
 ///////////////////////////////////////////////////////////////////////////
 // glue methods for xenoprof and perfmon.
 int
-xenoprof_arch_init(int *num_events, int *is_primary, char *cpu_type)
+xenoprof_arch_init(int *num_events, char *cpu_type)
 {
     *num_events = 0;
     strlcpy(cpu_type, get_cpu_type(), XENOPROF_CPU_TYPE_SIZE);
-
-    *is_primary = 0;
-    if (xenoprof_primary_profiler == NULL) {
-        /* For now, only dom0 can be the primary profiler */
-        if (current->domain->domain_id == 0) {
-            *is_primary = 1;
-        }
-    } else if (xenoprof_primary_profiler == current->domain)
-        *is_primary = 1;
     return 0;
 }
 

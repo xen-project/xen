@@ -336,7 +336,7 @@ int i8259A_suspend(void)
     return 0;
 }
 
-void __init init_8259A(int auto_eoi)
+void __devinit init_8259A(int auto_eoi)
 {
     unsigned long flags;
 
@@ -396,7 +396,9 @@ void __init init_IRQ(void)
         irq_desc[i].action  = NULL;
         irq_desc[i].depth   = 1;
         spin_lock_init(&irq_desc[i].lock);
-        set_intr_gate(i, interrupt[i]);
+        cpus_setall(irq_desc[i].affinity);
+        if ( i >= 0x20 )
+            set_intr_gate(i, interrupt[i]);
     }
 
     for ( i = 0; i < 16; i++ )

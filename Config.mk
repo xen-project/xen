@@ -81,14 +81,6 @@ CFLAGS += $(foreach i, $(EXTRA_INCLUDES), -I$(i))
 #        n - Do not build the Xen ACM framework
 ACM_SECURITY ?= n
 
-# If ACM_SECURITY = y and no boot policy file is installed,
-# then the ACM defaults to the security policy set by
-# ACM_DEFAULT_SECURITY_POLICY
-# Supported models are:
-#	ACM_NULL_POLICY
-#	ACM_CHINESE_WALL_AND_SIMPLE_TYPE_ENFORCEMENT_POLICY
-ACM_DEFAULT_SECURITY_POLICY ?= ACM_NULL_POLICY
-
 # Optional components
 XENSTAT_XENTOP     ?= y
 VTPM_TOOLS         ?= n

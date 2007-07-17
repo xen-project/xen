@@ -446,18 +446,16 @@ extern unsigned long logdirty_bitmap_size;
 #if defined(__x86_64__) || defined(__i386__)
 static void memcpy_words(void *dst, void *src, size_t n)
 {
-    asm (
+    asm volatile (
         "   movl %%edx,%%ecx \n"
 #ifdef __x86_64__
         "   shrl $3,%%ecx    \n"
-        "   andl $7,%%edx    \n"
         "   rep  movsq       \n"
         "   test $4,%%edx    \n"
         "   jz   1f          \n"
         "   movsl            \n"
 #else /* __i386__ */
         "   shrl $2,%%ecx    \n"
-        "   andl $3,%%edx    \n"
         "   rep  movsl       \n"
 #endif
         "1: test $2,%%edx    \n"
@@ -467,7 +465,7 @@ static void memcpy_words(void *dst, void *src, size_t n)
         "   jz   1f          \n"
         "   movsb            \n"
         "1:                  \n"
-        : : "S" (src), "D" (dst), "d" (n) : "ecx" );
+        : "+S" (src), "+D" (dst) : "d" (n) : "ecx", "memory" );
 }
 #else
 static void memcpy_words(void *dst, void *src, size_t n)

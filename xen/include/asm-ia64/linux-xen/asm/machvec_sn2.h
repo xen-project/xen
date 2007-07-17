@@ -71,6 +71,9 @@ extern ia64_mv_migrate_t		sn_migrate;
 extern ia64_mv_setup_msi_irq_t		sn_setup_msi_irq;
 extern ia64_mv_teardown_msi_irq_t	sn_teardown_msi_irq;
 #endif
+#ifdef XEN
+extern ia64_mv_fw_init_t		sn2_dom_fw_init;
+#endif
 
 
 /*
@@ -159,6 +162,10 @@ extern ia64_mv_teardown_msi_irq_t	sn_teardown_msi_irq;
 #define platform_setup_msi_irq		((ia64_mv_setup_msi_irq_t*)NULL)
 #define platform_teardown_msi_irq	((ia64_mv_teardown_msi_irq_t*)NULL)
 #endif
+#endif
+
+#ifdef XEN
+#define platform_fw_init		sn2_dom_fw_init
 #endif
 
 #include <asm/sn/io.h>

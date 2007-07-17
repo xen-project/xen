@@ -124,9 +124,9 @@
     ;;                                          \
     tbit.z p6,p0=r29,IA64_PSR_VM_BIT;       \
     ;;      \
-    tbit.nz.or p6,p0 = r18,39; \
+    tbit.nz.or p6,p0 = r18,IA64_ISR_NI_BIT; \
     ;;        \
-(p6) br.sptk.few vmx_panic;        \
+(p6) br.spnt.few vmx_panic;        \
     tbit.z p0,p15=r29,IA64_PSR_I_BIT;   \
     mov r1=r16;                     \
 /*    mov r21=r16;	*/		\

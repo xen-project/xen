@@ -1498,4 +1498,13 @@ void destroy_hvm_domain(void);
 /* VNC Authentication */
 #define AUTHCHALLENGESIZE 16
 
+#ifdef __ia64__
+static inline void xc_domain_shutdown_hook(int xc_handle, uint32_t domid)
+{
+	xc_ia64_save_to_nvram(xc_handle, domid);
+}
+#else
+#define xc_domain_shutdown_hook(xc_handle, domid)	do {} while (0)
+#endif
+
 #endif /* VL_H */

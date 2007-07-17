@@ -112,6 +112,7 @@ typedef struct xen_vm_record
     bool is_control_domain;
     struct xen_vm_metrics_record_opt *metrics;
     struct xen_vm_guest_metrics_record_opt *guest_metrics;
+    char *security_label;
 } xen_vm_record;
 
 /**
@@ -890,5 +891,18 @@ xen_vm_migrate(xen_session *session, xen_vm vm, char *dest, bool live, xen_strin
 extern bool
 xen_vm_get_all(xen_session *session, struct xen_vm_set **result);
 
+
+/**
+ * Set the security label of a domain.
+ */
+extern bool
+xen_vm_set_security_label(xen_session *session, int64_t *result, xen_vm vm,
+                          char *label, char *oldlabel);
+
+/**
+ * Get the security label of a domain.
+ */
+extern bool
+xen_vm_get_security_label(xen_session *session, char **result, xen_vm vm);
 
 #endif

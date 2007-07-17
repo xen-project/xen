@@ -117,89 +117,18 @@ typedef unsigned long xen_ulong_t;
 #define NVRAM_SIZE       (MEM_K * 64)
 #define NVRAM_START      (GFW_START + 10 * MEM_M)
 
+#define NVRAM_VALID_SIG 0x4650494e45584948 		// "HIXENIPF"
+struct nvram_save_addr {
+    unsigned long addr;
+    unsigned long signature;
+};
+
 struct pt_fpreg {
     union {
         unsigned long bits[2];
         long double __dummy;    /* force 16-byte alignment */
     } u;
 };
-
-struct cpu_user_regs {
-    /* The following registers are saved by SAVE_MIN: */
-    unsigned long b6;  /* scratch */
-    unsigned long b7;  /* scratch */
-
-    unsigned long ar_csd; /* used by cmp8xchg16 (scratch) */
-    unsigned long ar_ssd; /* reserved for future use (scratch) */
-
-    unsigned long r8;  /* scratch (return value register 0) */
-    unsigned long r9;  /* scratch (return value register 1) */
-    unsigned long r10; /* scratch (return value register 2) */
-    unsigned long r11; /* scratch (return value register 3) */
-
-    unsigned long cr_ipsr; /* interrupted task's psr */
-    unsigned long cr_iip;  /* interrupted task's instruction pointer */
-    unsigned long cr_ifs;  /* interrupted task's function state */
-
-    unsigned long ar_unat; /* interrupted task's NaT register (preserved) */
-    unsigned long ar_pfs;  /* prev function state  */
-    unsigned long ar_rsc;  /* RSE configuration */
-    /* The following two are valid only if cr_ipsr.cpl > 0: */
-    unsigned long ar_rnat;  /* RSE NaT */
-    unsigned long ar_bspstore; /* RSE bspstore */
-
-    unsigned long pr;  /* 64 predicate registers (1 bit each) */
-    unsigned long b0;  /* return pointer (bp) */
-    unsigned long loadrs;  /* size of dirty partition << 16 */
-
-    unsigned long r1;  /* the gp pointer */
-    unsigned long r12; /* interrupted task's memory stack pointer */
-    unsigned long r13; /* thread pointer */
-
-    unsigned long ar_fpsr;  /* floating point status (preserved) */
-    unsigned long r15;  /* scratch */
-
- /* The remaining registers are NOT saved for system calls.  */
-
-    unsigned long r14;  /* scratch */
-    unsigned long r2;  /* scratch */
-    unsigned long r3;  /* scratch */
-    unsigned long r16;  /* scratch */
-    unsigned long r17;  /* scratch */
-    unsigned long r18;  /* scratch */
-    unsigned long r19;  /* scratch */
-    unsigned long r20;  /* scratch */
-    unsigned long r21;  /* scratch */
-    unsigned long r22;  /* scratch */
-    unsigned long r23;  /* scratch */
-    unsigned long r24;  /* scratch */
-    unsigned long r25;  /* scratch */
-    unsigned long r26;  /* scratch */
-    unsigned long r27;  /* scratch */
-    unsigned long r28;  /* scratch */
-    unsigned long r29;  /* scratch */
-    unsigned long r30;  /* scratch */
-    unsigned long r31;  /* scratch */
-    unsigned long ar_ccv;  /* compare/exchange value (scratch) */
-
-    /*
-     * Floating point registers that the kernel considers scratch:
-     */
-    struct pt_fpreg f6;  /* scratch */
-    struct pt_fpreg f7;  /* scratch */
-    struct pt_fpreg f8;  /* scratch */
-    struct pt_fpreg f9;  /* scratch */
-    struct pt_fpreg f10;  /* scratch */
-    struct pt_fpreg f11;  /* scratch */
-    unsigned long r4;  /* preserved */
-    unsigned long r5;  /* preserved */
-    unsigned long r6;  /* preserved */
-    unsigned long r7;  /* preserved */
-    unsigned long eml_unat;    /* used for emulating instruction */
-    unsigned long pad0;     /* alignment pad */
-
-};
-typedef struct cpu_user_regs cpu_user_regs_t;
 
 union vac {
     unsigned long value;
@@ -470,17 +399,24 @@ struct vcpu_guest_context_regs {
 
         struct vcpu_tr_regs tr;
 
+        /* Physical registers in case of debug event.  */
+        unsigned long excp_iipa;
+        unsigned long excp_isr;
+        unsigned int excp_vector;
+
         /*
          * The rbs is intended to be the image of the stacked registers still
          * in the cpu (not yet stored in memory).  It is laid out as if it
-         * were written in memory at an 512 (64*8) * aligned address + offset.
-         * The offset is IA64_RBS_OFFSET % 512.
-         * rbs_nat contains NaT bits for the remaining rbs registers.
+         * were written in memory at a 512 (64*8) aligned address + offset.
+         * rbs_voff is (offset / 8).  rbs_nat contains NaT bits for the
+         * remaining rbs registers.  rbs_rnat contains NaT bits for in memory
+         * rbs registers.
+         * Note: loadrs is 2**14 bytes == 2**11 slots.
          */
-        /* Note: loadrs is 2**14 bytes == 2**11 slots.  */
-#define IA64_GUEST_CONTEXT_RBS_OFFSET 448
+        unsigned int rbs_voff;
         unsigned long rbs[2048];
         unsigned long rbs_nat;
+        unsigned long rbs_rnat;
 };
 
 struct vcpu_guest_context {
@@ -621,6 +557,41 @@ struct xen_ia64_boot_param {
   (((unsigned long)(addr) & XENCOMM_INLINE_MASK) == XENCOMM_INLINE_FLAG)
 #define XENCOMM_INLINE_ADDR(addr) \
   ((unsigned long)(addr) & ~XENCOMM_INLINE_MASK)
+
+#ifndef __ASSEMBLY__
+
+/*
+ * Optimization features.
+ * The hypervisor may do some special optimizations for guests. This hypercall
+ * can be used to switch on/of these special optimizations.
+ */
+#define __HYPERVISOR_opt_feature	0x700UL
+
+#define XEN_IA64_OPTF_OFF	0x0
+#define XEN_IA64_OPTF_ON	0x1
+
+/*
+ * If this feature is switched on, the hypervisor inserts the
+ * tlb entries without calling the guests traphandler.
+ * This is useful in guests using region 7 for identity mapping
+ * like the linux kernel does.
+ */
+#define XEN_IA64_OPTF_IDENT_MAP_REG7	0x1UL
+
+struct xen_ia64_opt_feature {
+	unsigned long cmd;		/* Which feature */
+	unsigned char on;		/* Switch feature on/off */
+	union {
+		struct {
+				/* The page protection bit mask of the pte.
+			 	 * This will be or'ed with the pte. */
+			unsigned long pgprot;
+			unsigned long key;	/* A protection key for itir. */
+		};
+	};
+};
+
+#endif /* __ASSEMBLY__ */
 
 /* xen perfmon */
 #ifdef XEN

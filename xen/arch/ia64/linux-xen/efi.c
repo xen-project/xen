@@ -1013,12 +1013,9 @@ efi_memmap_init(unsigned long *s, unsigned long *e)
 			continue;
 		}
 #ifdef XEN
-// this works around a problem in the ski bootloader
-{
-		extern long running_on_sim;
+		/* this works around a problem in the ski bootloader */
 		if (running_on_sim && md->type != EFI_CONVENTIONAL_MEMORY)
 			continue;
-}
 #endif
 		if (pmd == NULL || !efi_wb(pmd) || efi_md_end(pmd) != md->phys_addr) {
 			contig_low = GRANULEROUNDUP(md->phys_addr);

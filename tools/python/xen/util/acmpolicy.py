@@ -57,12 +57,20 @@ class ACMPolicy(XSPolicy):
     def __init__(self, name=None, dom=None, ref=None, xml=None):
         if name:
             self.name = name
-            self.dom = minidom.parse(self.path_from_policy_name(name))
+            try:
+                self.dom = minidom.parse(self.path_from_policy_name(name))
+            except Exception, e:
+                raise SecurityError(-xsconstants.XSERR_XML_PROCESSING,
+                                    str(e))
         elif dom:
             self.dom = dom
             self.name = self.get_name()
         elif xml:
-            self.dom = minidom.parseString(xml)
+            try:
+                self.dom = minidom.parseString(xml)
+            except Exception, e:
+                raise SecurityError(-xsconstants.XSERR_XML_PROCESSING,
+                                    str(e))
             self.name = self.get_name()
         rc = self.validate()
         if rc != xsconstants.XSERR_SUCCESS:
@@ -481,7 +489,8 @@ class ACMPolicy(XSPolicy):
         strings = []
         i = 0
         while i < len(node.childNodes):
-            if node.childNodes[i].nodeName == "Type":
+            if node.childNodes[i].nodeName == "Type" and \
+               len(node.childNodes[i].childNodes) > 0:
                 strings.append(node.childNodes[i].childNodes[0].nodeValue)
             i += 1
         return strings
@@ -564,7 +573,8 @@ class ACMPolicy(XSPolicy):
             while i < len(node.childNodes):
                 if node.childNodes[i].nodeName == "VirtualMachineLabel":
                     name = self.policy_dom_get(node.childNodes[i], "Name")
-                    strings.append(name.childNodes[0].nodeValue)
+                    if len(name.childNodes) > 0:
+                        strings.append(name.childNodes[0].nodeValue)
                 i += 1
         return strings
 
@@ -592,23 +602,24 @@ class ACMPolicy(XSPolicy):
             i = 0
             while i < len(node.childNodes):
                 if node.childNodes[i].nodeName == "VirtualMachineLabel":
-                    _res = {}
-                    _res['type'] = xsconstants.ACM_LABEL_VM
                     name = self.policy_dom_get(node.childNodes[i], "Name")
-                    _res['name'] = name.childNodes[0].nodeValue
-                    stes = self.policy_dom_get(node.childNodes[i],
-                                               "SimpleTypeEnforcementTypes")
-                    if stes:
-                        _res['stes'] = self.policy_get_types(stes)
-                    else:
-                        _res['stes'] = []
-                    chws = self.policy_dom_get(node.childNodes[i],
-                                               "ChineseWallTypes")
-                    if chws:
-                        _res['chws'] = self.policy_get_types(chws)
-                    else:
-                        _res['chws'] = []
-                    res.append(_res)
+                    if len(name.childNodes) > 0:
+                        _res = {}
+                        _res['type'] = xsconstants.ACM_LABEL_VM
+                        _res['name'] = name.childNodes[0].nodeValue
+                        stes = self.policy_dom_get(node.childNodes[i],
+                                                 "SimpleTypeEnforcementTypes")
+                        if stes:
+                           _res['stes'] = self.policy_get_types(stes)
+                        else:
+                            _res['stes'] = []
+                        chws = self.policy_dom_get(node.childNodes[i],
+                                                   "ChineseWallTypes")
+                        if chws:
+                            _res['chws'] = self.policy_get_types(chws)
+                        else:
+                            _res['chws'] = []
+                        res.append(_res)
                 i += 1
         return res
 
@@ -628,7 +639,8 @@ class ACMPolicy(XSPolicy):
             while i < len(node.childNodes):
                 if node.childNodes[i].nodeName == labeltype:
                     name = self.policy_dom_get(node.childNodes[i], "Name")
-                    if name.childNodes[0].nodeValue == label:
+                    if len(name.childNodes) > 0 and \
+                       name.childNodes[0].nodeValue == label:
                         stes = self.policy_dom_get(node.childNodes[i],
                                             "SimpleTypeEnforcementTypes")
                         if not stes:
@@ -662,7 +674,7 @@ class ACMPolicy(XSPolicy):
                 if node.childNodes[i].nodeName == labeltype:
                     name = self.policy_dom_get(node.childNodes[i], "Name")
                     from_name = name.getAttribute("from")
-                    if from_name:
+                    if from_name and len(name.childNodes) > 0:
                         res.update({from_name : name.childNodes[0].nodeValue})
                 i += 1
         return res
@@ -700,7 +712,7 @@ class ACMPolicy(XSPolicy):
                     name = self.policy_dom_get(node.childNodes[i], "Name")
                     stes = self.policy_dom_get(node.childNodes[i],
                                           "SimpleTypeEnforcementTypes")
-                    if stes:
+                    if stes and len(name.childNodes) > 0:
                         strings.append(name.childNodes[0].nodeValue)
                 i += 1
         return strings
@@ -715,18 +727,19 @@ class ACMPolicy(XSPolicy):
             i = 0
             while i < len(node.childNodes):
                 if node.childNodes[i].nodeName == "ResourceLabel":
-                    _res = {}
-                    _res['type'] = xsconstants.ACM_LABEL_RES
                     name = self.policy_dom_get(node.childNodes[i], "Name")
-                    _res['name'] = name.childNodes[0].nodeValue
-                    stes = self.policy_dom_get(node.childNodes[i],
-                                               "SimpleTypeEnforcementTypes")
-                    if stes:
-                        _res['stes'] = self.policy_get_types(stes)
-                    else:
-                        _res['stes'] = []
-                    _res['chws'] = []
-                    res.append(_res)
+                    if len(name.childNodes) > 0:
+                        _res = {}
+                        _res['type'] = xsconstants.ACM_LABEL_RES
+                        _res['name'] = name.childNodes[0].nodeValue
+                        stes = self.policy_dom_get(node.childNodes[i],
+                                                   "SimpleTypeEnforcementTypes")
+                        if stes:
+                            _res['stes'] = self.policy_get_types(stes)
+                        else:
+                            _res['stes'] = []
+                        _res['chws'] = []
+                        res.append(_res)
                 i += 1
         return res
 
