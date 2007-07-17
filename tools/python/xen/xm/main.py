@@ -1729,14 +1729,16 @@ def xm_uptime(args):
         if k in ['-s', '--short']:
             short_mode = 1
 
-    doms = getDomains(params, 'running')
+    doms = getDomains(params, 'all')
 
     if short_mode == 0:
         print '%-33s %4s %s ' % ('Name','ID','Uptime')
 
     for dom in doms:
         d = parse_doms_info(dom)
-        if int(d['domid']) > 0:
+        if d['domid'] == '':
+            uptime = 0
+        elif int(d['domid']) > 0:
             uptime = int(round(d['up_time']))
         else:
             f=open('/proc/uptime', 'r')
