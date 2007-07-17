@@ -290,8 +290,8 @@ void hap_install_xen_entries_in_l2h(struct vcpu *v, mfn_t sl2hmfn)
             l2e_from_pfn(
                 mfn_x(page_to_mfn(virt_to_page(d->arch.mm_perdomain_pt) + i)),
                 __PAGE_HYPERVISOR);
-    
-    for ( i = 0; i < HAP_L3_PAGETABLE_ENTRIES; i++ )
+
+    for ( i = 0; i < 4; i++ )
         sl2e[l2_table_offset(LINEAR_PT_VIRT_START) + i] =
             l2e_empty();
 
@@ -564,6 +564,7 @@ void hap_vcpu_init(struct vcpu *v)
 {
     v->arch.paging.mode = &hap_paging_real_mode;
 }
+
 /************************************************/
 /*          HAP PAGING MODE FUNCTIONS           */
 /************************************************/
@@ -571,8 +572,8 @@ void hap_vcpu_init(struct vcpu *v)
  * HAP guests can handle page faults (in the guest page tables) without
  * needing any action from Xen, so we should not be intercepting them.
  */
-int hap_page_fault(struct vcpu *v, unsigned long va, 
-                   struct cpu_user_regs *regs)
+static int hap_page_fault(struct vcpu *v, unsigned long va, 
+                          struct cpu_user_regs *regs)
 {
     HAP_ERROR("Intercepted a guest #PF (%u:%u) with HAP enabled.\n",
               v->domain->domain_id, v->vcpu_id);
@@ -584,7 +585,7 @@ int hap_page_fault(struct vcpu *v, unsigned long va,
  * HAP guests can handle invlpg without needing any action from Xen, so
  * should not be intercepting it. 
  */
-int hap_invlpg(struct vcpu *v, unsigned long va)
+static int hap_invlpg(struct vcpu *v, unsigned long va)
 {
     HAP_ERROR("Intercepted a guest INVLPG (%u:%u) with HAP enabled.\n",
               v->domain->domain_id, v->vcpu_id);
@@ -596,11 +597,11 @@ int hap_invlpg(struct vcpu *v, unsigned long va)
  * HAP guests do not need to take any action on CR3 writes (they are still
  * intercepted, so that Xen's copy of the guest's CR3 can be kept in sync.)
  */
-void hap_update_cr3(struct vcpu *v, int do_locking)
+static void hap_update_cr3(struct vcpu *v, int do_locking)
 {
 }
 
-void hap_update_paging_modes(struct vcpu *v)
+static void hap_update_paging_modes(struct vcpu *v)
 {
     struct domain *d;
 
@@ -678,7 +679,7 @@ static void p2m_install_entry_in_monitors(struct domain *d, l3_pgentry_t *l3e)
 }
 #endif
 
-void 
+static void 
 hap_write_p2m_entry(struct vcpu *v, unsigned long gfn, l1_pgentry_t *p,
                     mfn_t table_mfn, l1_pgentry_t new, unsigned int level)
 {
@@ -696,6 +697,12 @@ hap_write_p2m_entry(struct vcpu *v, unsigned long gfn, l1_pgentry_t *p,
     hap_unlock(v->domain);
 }
 
+static unsigned long hap_gva_to_gfn_real_mode(
+    struct vcpu *v, unsigned long gva)
+{
+    return ((paddr_t)gva >> PAGE_SHIFT);
+}
+
 /* Entry points into this mode of the hap code. */
 struct paging_mode hap_paging_real_mode = {
     .page_fault             = hap_page_fault, 
@@ -710,7 +717,7 @@ struct paging_mode hap_paging_real_mode = {
 struct paging_mode hap_paging_protected_mode = {
     .page_fault             = hap_page_fault, 
     .invlpg                 = hap_invlpg,
-    .gva_to_gfn             = hap_gva_to_gfn_protected_mode,
+    .gva_to_gfn             = hap_gva_to_gfn_2level,
     .update_cr3             = hap_update_cr3,
     .update_paging_modes    = hap_update_paging_modes,
     .write_p2m_entry        = hap_write_p2m_entry,
@@ -720,7 +727,7 @@ struct paging_mode hap_paging_protected_mode = {
 struct paging_mode hap_paging_pae_mode = {
     .page_fault             = hap_page_fault, 
     .invlpg                 = hap_invlpg,
-    .gva_to_gfn             = hap_gva_to_gfn_pae_mode,
+    .gva_to_gfn             = hap_gva_to_gfn_3level,
     .update_cr3             = hap_update_cr3,
     .update_paging_modes    = hap_update_paging_modes,
     .write_p2m_entry        = hap_write_p2m_entry,
@@ -730,7 +737,7 @@ struct paging_mode hap_paging_pae_mode = {
 struct paging_mode hap_paging_long_mode = {
     .page_fault             = hap_page_fault, 
     .invlpg                 = hap_invlpg,
-    .gva_to_gfn             = hap_gva_to_gfn_long_mode,
+    .gva_to_gfn             = hap_gva_to_gfn_4level,
     .update_cr3             = hap_update_cr3,
     .update_paging_modes    = hap_update_paging_modes,
     .write_p2m_entry        = hap_write_p2m_entry,
