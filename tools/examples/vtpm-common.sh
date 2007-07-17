@@ -20,7 +20,7 @@ dir=$(dirname "$0")
 . "$dir/logging.sh"
 . "$dir/locking.sh"
 
-VTPMDB="/etc/xen/vtpm.db"
+VTPMDB="/var/vtpm/vtpm.db"
 
 #In the vtpm-impl file some commands should be defined:
 #      vtpm_create, vtpm_setup, vtpm_start, etc. (see below)
@@ -241,12 +241,21 @@ function vtpm_get_create_reason () {
 # If no entry in the TPM database is found, the instance is
 # created and an entry added to the database.
 function vtpm_create_instance () {
-	local res instance domname reason
-	domname=$(xenstore_read "$XENBUS_PATH"/domain)
+	local res instance domname reason uuid
+	uuid=$(xenstore_read "$XENBUS_PATH"/uuid)
 	reason=$(vtpm_get_create_reason)
 
 	claim_lock vtpmdb
-	instance=$(vtpmdb_find_instance $domname)
+
+	instance="0"
+
+	if [ "$uuid" != "" ]; then
+		instance=$(vtpmdb_find_instance $uuid)
+	fi
+	if [ "$instance" == "0" ]; then
+		domname=$(xenstore_read "$XENBUS_PATH"/domain)
+		instance=$(vtpmdb_find_instance $domname)
+	fi
 
 	if [ "$instance" == "0" -a "$reason" != "create" ]; then
 		release_lock vtpmdb
@@ -268,7 +277,11 @@ function vtpm_create_instance () {
 		vtpm_create $instance
 
 		if [ $vtpm_fatal_error -eq 0 ]; then
-			vtpmdb_add_instance $domname $instance
+			if [ "$uuid" != "" ]; then
+				vtpmdb_add_instance $uuid $instance
+			else
+				vtpmdb_add_instance $domname $instance
+			fi
 		fi
 	else
 		if [ "$reason" == "resume" ]; then
@@ -288,22 +301,29 @@ function vtpm_create_instance () {
 #Since it is assumed that the VM will appear again, the
 #entry is kept in the VTPMDB file.
 function vtpm_remove_instance () {
-	local instance reason domname
+	local instance reason domname uuid
 	#Stop script execution quietly if path does not exist (anymore)
 	xenstore-exists "$XENBUS_PATH"/domain
-	domname=$(xenstore_read "$XENBUS_PATH"/domain)
+	uuid=$(xenstore_read "$XENBUS_PATH"/uuid)
 
-	if [ "$domname" != "" ]; then
-		claim_lock vtpmdb
+	claim_lock vtpmdb
 
-		instance=$(vtpmdb_find_instance $domname)
+	instance="0"
 
-		if [ "$instance" != "0" ]; then
-			vtpm_suspend $instance
-		fi
-
-		release_lock vtpmdb
+	if [ "$uuid != "" ]; then
+		instance=$(vtpmdb_find_instance $uuid)
 	fi
+
+	if [ "$instance == "0" ]; then
+		domname=$(xenstore_read "$XENBUS_PATH"/domain)
+		instance=$(vtpmdb_find_instance $domname)
+	fi
+
+	if [ "$instance" != "0" ]; then
+		vtpm_suspend $instance
+	fi
+
+	release_lock vtpmdb
 }
 
 
