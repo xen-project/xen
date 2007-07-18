@@ -2154,6 +2154,11 @@ static void svm_do_msr_access(
             svm_inject_exception(v, TRAP_gp_fault, 1, 0);
             break;
 
+        case MSR_IA32_MCG_STATUS:
+            /* No point in letting the guest see real MCEs */
+            msr_content = 0;
+            break;
+
         default:
             if ( rdmsr_hypervisor_regs(ecx, &eax, &edx) ||
                  rdmsr_safe(ecx, eax, edx) == 0 )
