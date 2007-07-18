@@ -1410,22 +1410,22 @@ class XendAPI(object):
     def VM_set_memory_dynamic_max(self, session, vm_ref, mem):
         dom = XendDomain.instance().get_vm_by_uuid(vm_ref)
         dom.set_memory_dynamic_max(int(mem))
-        return xen_api_success_void()
+        return self._VM_save(dom)
 
     def VM_set_memory_dynamic_min(self, session, vm_ref, mem):
         dom = XendDomain.instance().get_vm_by_uuid(vm_ref)
         dom.set_memory_dynamic_min(int(mem))
-        return xen_api_success_void()
+        return self._VM_save(dom)
 
     def VM_set_memory_static_max(self, session, vm_ref, mem):
         dom = XendDomain.instance().get_vm_by_uuid(vm_ref)
         dom.set_memory_static_max(int(mem))
-        return xen_api_success_void()
+        return self._VM_save(dom)
     
     def VM_set_memory_static_min(self, session, vm_ref, mem):
         dom = XendDomain.instance().get_vm_by_uuid(vm_ref)
         dom.set_memory_static_min(int(mem))
-        return xen_api_success_void()
+        return self._VM_save(dom)
 
     def VM_set_memory_dynamic_max_live(self, session, vm_ref, mem):
         dom = XendDomain.instance().get_vm_by_uuid(vm_ref)
