@@ -2623,6 +2623,11 @@ static int vmx_do_msr_read(struct cpu_user_regs *regs)
     case MSR_IA32_VMX_BASIC...MSR_IA32_VMX_PROCBASED_CTLS2:
         goto gp_fault;
     case MSR_IA32_MCG_STATUS:
+    case MSR_IA32_MC0_STATUS:
+    case MSR_K8_MC1_STATUS:
+    case MSR_K8_MC2_STATUS:
+    case MSR_K8_MC3_STATUS:
+    case MSR_K8_MC4_STATUS:
         /* No point in letting the guest see real MCEs */
         msr_content = 0;
         break;
