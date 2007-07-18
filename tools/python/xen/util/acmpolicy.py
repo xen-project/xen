@@ -122,7 +122,8 @@ class ACMPolicy(XSPolicy):
             rc = -xsconstants.XSERR_GENERAL_FAILURE
         if rc != xsconstants.XSERR_SUCCESS:
             log.warn("XML did not validate against schema")
-        rc = self.__validate_name_and_labels()
+        if rc == xsconstants.XSERR_SUCCESS:
+            rc = self.__validate_name_and_labels()
         return rc
 
     def __validate_name_and_labels(self):
@@ -626,14 +627,15 @@ class ACMPolicy(XSPolicy):
     def policy_get_stes_of_vmlabel(self, vmlabel):
         """ Get a list of all STEs of a given VMlabel """
         return self.__policy_get_stes_of_labeltype(vmlabel,
-                                                   "VirtualMachineLabel")
+                                        "/SubjectLabels", "VirtualMachineLabel")
 
     def policy_get_stes_of_resource(self, reslabel):
         """ Get a list of all resources of a given VMlabel """
-        return self.__policy_get_stes_of_labeltype(reslabel, "ResourceLabel")
+        return self.__policy_get_stes_of_labeltype(reslabel,
+                                        "/ObjectLabels", "ResourceLabel")
 
-    def __policy_get_stes_of_labeltype(self, label, labeltype):
-        node = self.dom_get_node("SecurityLabelTemplate/SubjectLabels")
+    def __policy_get_stes_of_labeltype(self, label, path, labeltype):
+        node = self.dom_get_node("SecurityLabelTemplate" + path)
         if node:
             i = 0
             while i < len(node.childNodes):
@@ -661,7 +663,8 @@ class ACMPolicy(XSPolicy):
             return False
         for res in resources:
             res_stes = self.policy_get_stes_of_resource(res)
-            if len( set(res_stes).union( set(vm_stes) ) ) == 0:
+            if len(res_stes) == 0 or \
+               len( set(res_stes).intersection( set(vm_stes) ) ) == 0:
                 return False
         return True
 

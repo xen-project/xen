@@ -799,9 +799,10 @@ def is_resource_in_use(resource):
             lst.append(dominfo)
     return lst
 
-def devices_equal(res1, res2):
+def devices_equal(res1, res2, mustexist=True):
     """ Determine whether two devices are equal """
-    return (unify_resname(res1) == unify_resname(res2))
+    return (unify_resname(res1, mustexist) ==
+            unify_resname(res2, mustexist))
 
 def is_resource_in_use_by_dom(dominfo, resource):
     """ Determine whether a resources is in use by a given domain
@@ -817,7 +818,7 @@ def is_resource_in_use_by_dom(dominfo, resource):
         dev = devs[uuid]
         if len(dev) >= 2 and dev[1].has_key('uname'):
             # dev[0] is type, i.e. 'vbd'
-            if devices_equal(dev[1]['uname'], resource):
+            if devices_equal(dev[1]['uname'], resource, mustexist=False):
                 log.info("RESOURCE IN USE: Domain %d uses %s." %
                          (dominfo.domid, resource))
                 return True

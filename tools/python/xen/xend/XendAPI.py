@@ -1620,7 +1620,8 @@ class XendAPI(object):
         (rc, errors, oldlabel, new_ssidref) = \
                                  dom.set_security_label(sec_label, old_label)
         if rc != xsconstants.XSERR_SUCCESS:
-            return xen_api_error(['SECURITY_ERROR', rc])
+            return xen_api_error(['SECURITY_ERROR', rc,
+                                 xsconstants.xserr2string(-rc)])
         if rc == 0:
             rc = new_ssidref
         return xen_api_success(rc)
@@ -2239,7 +2240,8 @@ class XendAPI(object):
         vdi = XendNode.instance().get_vdi_by_uuid(vdi_ref)
         rc = vdi.set_security_label(sec_lab, old_lab)
         if rc < 0:
-            return xen_api_error(['SECURITY_ERROR', rc])
+            return xen_api_error(['SECURITY_ERROR', rc,
+                                 xsconstants.xserr2string(-rc)])
         return xen_api_success(rc)
 
     def VDI_get_security_label(self, session, vdi_ref):
