@@ -15,6 +15,7 @@
 
 from XmTestLib import *
 from xen.util import security
+from xen.util import xsconstants
 import commands
 import os
 import re
@@ -28,7 +29,7 @@ if not isACMEnabled():
     SKIP("Not running this test since ACM not enabled.")
 
 status, output = traceCommand("xm makepolicy %s" % (testpolicy))
-if status != 0 or output != "":
+if status != 0:
     FAIL("'xm makepolicy' failed with status %d and output\n%s" %
          (status,output));
 
@@ -47,7 +48,7 @@ status, output = traceCommand("xm rmlabel dom %s" %
 status, output = traceCommand("xm addlabel %s dom %s %s" %
                               (testlabel, vmconfigfile, testpolicy))
 if status != 0:
-    FAIL("'xm addlabel' failed with status %d.\n" % status)
+    FAIL("(1) 'xm addlabel' failed with status %d.\n" % status)
 
 status, output = traceCommand("xm getlabel dom %s" %
                               (vmconfigfile))
@@ -55,8 +56,9 @@ status, output = traceCommand("xm getlabel dom %s" %
 if status != 0:
     FAIL("'xm getlabel' failed with status %d, output:\n%s" %
          (status, output))
-if output != "policy=%s,label=%s" % (testpolicy,testlabel):
-    FAIL("Received unexpected output from 'xm getlabel': \n%s" %
+if output != "policytype=%s,policy=%s,label=%s" % \
+             (xsconstants.ACM_POLICY_ID, testpolicy, testlabel):
+    FAIL("(1) Received unexpected output from 'xm getlabel dom': \n%s" %
          (output))
 
 
@@ -74,30 +76,34 @@ status, output = traceCommand("xm getlabel dom %s" %
                               (vmconfigfile))
 
 if output != "Error: 'Domain not labeled'":
-    FAIL("Received unexpected output from 'xm getlabel': \n%s" %
+    FAIL("(2) Received unexpected output from 'xm getlabel dom': \n%s" %
          (output))
 
 #Whatever label the resource might have, remove it
 status, output = traceCommand("xm rmlabel res %s" %
                               (testresource))
+if status != 0:
+    FAIL("'xm rmlabel' on resource failed with status %d.\n" % status)
 
 status, output = traceCommand("xm addlabel %s res %s %s" %
                               (testlabel, testresource, testpolicy))
 if status != 0:
-    FAIL("'xm addlabel' on resource failed with status %d.\n" % status)
+    FAIL("(2) 'xm addlabel' on resource failed with status %d.\n" % status)
 
 status, output = traceCommand("xm getlabel res %s" % (testresource))
 
 if status != 0:
     FAIL("'xm getlabel' on resource failed with status %d, output:\n%s" %
          (status, output))
-if output != "policy=%s,label=%s" % (testpolicy,testlabel):
-    FAIL("Received unexpected output from 'xm getlabel': \n%s" %
+if output != "%s:%s:%s" % (xsconstants.ACM_POLICY_ID,\
+                           testpolicy,testlabel):
+    FAIL("Received unexpected output from 'xm getlabel res': \n%s" %
          (output))
 
 status, output = traceCommand("xm resources")
 
 if status != 0:
+    print "status = %s" % str(status)
     FAIL("'xm resources' did not run properly")
 if not re.search(security.unify_resname(testresource), output):
     FAIL("'xm resources' did not show the tested resource '%s'." %
@@ -117,5 +123,5 @@ status, output = traceCommand("xm getlabel res %s" %
                               (testresource))
 
 if output != "Error: 'Resource not labeled'":
-    FAIL("Received unexpected output from 'xm getlabel': \n%s" %
+    FAIL("Received unexpected output from 'xm getlabel res': \n%s" %
          (output))

@@ -5,7 +5,10 @@ TESTS = 01_security-acm_basic.test \
         03_security-acm_dom_conflict.test \
         04_security-acm_dom_res.test \
         05_security-acm_dom_res_conf.test \
-        06_security-acm_dom_block_attach.test
+        06_security-acm_dom_block_attach.test \
+        07_security-acm_pol_update.test \
+        08_security-acm_xapi.test \
+        09_security-acm_pol_update.test
 
 XFAIL_TESTS =
 
