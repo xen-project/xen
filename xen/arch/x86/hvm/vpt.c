@@ -261,13 +261,15 @@ void create_periodic_time(
     pt->enabled = 1;
     pt->pending_intr_nr = 0;
 
-    if ( period < 900000 ) /* < 0.9 ms */
+    /* Periodic timer must be at least 0.9ms. */
+    if ( (period < 900000) && !one_shot )
     {
         gdprintk(XENLOG_WARNING,
                  "HVM_PlatformTime: program too small period %"PRIu64"\n",
                  period);
-        period = 900000; /* force to 0.9ms */
+        period = 900000;
     }
+
     pt->period = period;
     pt->vcpu = v;
     pt->last_plt_gtime = hvm_get_guest_time(pt->vcpu);

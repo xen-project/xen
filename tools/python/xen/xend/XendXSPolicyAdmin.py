@@ -56,7 +56,10 @@ class XSPolicyAdmin:
             typ = data[1]
             try:
                 if typ == xsconstants.ACM_POLICY_ID:
-                    self.xsobjs[ref] = ACMPolicy(name=name, ref=ref)
+                    try:
+                        self.xsobjs[ref] = ACMPolicy(name=name, ref=ref)
+                    except Exception, e:
+                        del self.policies[ref]
                 else:
                     del self.policies[ref]
             except Exception, e:
@@ -270,6 +273,10 @@ class XSPolicyAdmin:
             if pol.isloaded():
                 return pol
         return None
+
+    def get_hv_loaded_policy_name(self):
+        security.refresh_security_policy()
+        return security.active_policy
 
     def get_policy_by_name(self, name):
         for pol in self.xsobjs.values():

@@ -1410,22 +1410,22 @@ class XendAPI(object):
     def VM_set_memory_dynamic_max(self, session, vm_ref, mem):
         dom = XendDomain.instance().get_vm_by_uuid(vm_ref)
         dom.set_memory_dynamic_max(int(mem))
-        return xen_api_success_void()
+        return self._VM_save(dom)
 
     def VM_set_memory_dynamic_min(self, session, vm_ref, mem):
         dom = XendDomain.instance().get_vm_by_uuid(vm_ref)
         dom.set_memory_dynamic_min(int(mem))
-        return xen_api_success_void()
+        return self._VM_save(dom)
 
     def VM_set_memory_static_max(self, session, vm_ref, mem):
         dom = XendDomain.instance().get_vm_by_uuid(vm_ref)
         dom.set_memory_static_max(int(mem))
-        return xen_api_success_void()
+        return self._VM_save(dom)
     
     def VM_set_memory_static_min(self, session, vm_ref, mem):
         dom = XendDomain.instance().get_vm_by_uuid(vm_ref)
         dom.set_memory_static_min(int(mem))
-        return xen_api_success_void()
+        return self._VM_save(dom)
 
     def VM_set_memory_dynamic_max_live(self, session, vm_ref, mem):
         dom = XendDomain.instance().get_vm_by_uuid(vm_ref)
@@ -1620,7 +1620,8 @@ class XendAPI(object):
         (rc, errors, oldlabel, new_ssidref) = \
                                  dom.set_security_label(sec_label, old_label)
         if rc != xsconstants.XSERR_SUCCESS:
-            return xen_api_error(['SECURITY_ERROR', rc])
+            return xen_api_error(['SECURITY_ERROR', rc,
+                                 xsconstants.xserr2string(-rc)])
         if rc == 0:
             rc = new_ssidref
         return xen_api_success(rc)
@@ -2239,7 +2240,8 @@ class XendAPI(object):
         vdi = XendNode.instance().get_vdi_by_uuid(vdi_ref)
         rc = vdi.set_security_label(sec_lab, old_lab)
         if rc < 0:
-            return xen_api_error(['SECURITY_ERROR', rc])
+            return xen_api_error(['SECURITY_ERROR', rc,
+                                 xsconstants.xserr2string(-rc)])
         return xen_api_success(rc)
 
     def VDI_get_security_label(self, session, vdi_ref):

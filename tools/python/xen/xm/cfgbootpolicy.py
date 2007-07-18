@@ -170,8 +170,9 @@ def cfgbootpolicy_xapi(policy, user_title=None):
             OptionError("No policy installed on system?")
         acmpol = ACMPolicy(xml=xml)
         if acmpol.get_name() != policy:
-            OptionError("Policy installed on system '%s' does not match the "
-                        "request policy '%s'" % (acmpol.get_name(), policy))
+            raise OptionError("Policy installed on system '%s' does not "
+                              "match the requested policy '%s'" %
+                              (acmpol.get_name(), policy))
         flags = int(policystate['flags']) | xsconstants.XS_INST_BOOT
         rc = int(server.xenapi.XSPolicy.activate_xspolicy(xs_ref, flags))
         if rc == flags:
