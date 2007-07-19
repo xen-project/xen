@@ -1,6 +1,5 @@
 /******************************************************************************
  * platform_hypercall.c
- *
  */
 
 #include <xen/config.h>
@@ -11,6 +10,8 @@ DEFINE_XEN_GUEST_HANDLE(compat_platform_op_t);
 #define xen_platform_op     compat_platform_op
 #define xen_platform_op_t   compat_platform_op_t
 #define do_platform_op(x)   compat_platform_op(_##x)
+
+#define xenpf_enter_acpi_sleep compat_pf_enter_acpi_sleep
 
 #define COMPAT
 #define _XEN_GUEST_HANDLE(t) XEN_GUEST_HANDLE(t)
