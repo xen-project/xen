@@ -8977,6 +8977,79 @@ value of the field
 \vspace{0.3cm}
 \vspace{0.3cm}
 \vspace{0.3cm}
+\subsubsection{RPC name:~set\_security\_label}
+
+{\bf Overview:}
+Set the security label of the given VIF. Refer to the XSPolicy class
+for the format of the security label.
+
+ \noindent {\bf Signature:}
+\begin{verbatim} void set_security_label (session_id s, VIF ref self, string
+security_label, string old_label)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt VIF ref } & self & reference to the object \\ \hline
+
+{\tt string } & security\_label & New value of the security label \\ \hline
+{\tt string } & old\_label & Optional label value that the security label \\
+& & must currently have for the change to succeed.\\ \hline
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:}
+{\tt
+void
+}
+
+
+\vspace{0.3cm}
+
+\noindent{\bf Possible Error Codes:} {\tt SECURITY\_ERROR}
+
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~get\_security\_label}
+
+{\bf Overview:}
+Get the security label of the given VIF.
+
+ \noindent {\bf Signature:}
+\begin{verbatim} string get_security_label (session_id s, VIF ref self)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+
+
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt VIF ref } & self & reference to the object \\ \hline
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:}
+{\tt
+string
+}
+
+
+value of the given field
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
 \subsubsection{RPC name:~create}
 
 {\bf Overview:} 
@@ -10725,6 +10798,7 @@ $\mathit{RO}_\mathit{ins}$ &  {\tt type} & vdi\_type & type of the VDI \\
 $\mathit{RW}$ &  {\tt sharable} & bool & true if this disk may be shared \\
 $\mathit{RW}$ &  {\tt read\_only} & bool & true if this disk may ONLY be mounted read-only \\
 $\mathit{RW}$ &  {\tt other\_config} & (string $\rightarrow$ string) Map & additional configuration \\
+$\mathit{RO}_\mathit{run}$ &  {\tt security/label} & string & the VM's security label \\
 \hline
 \end{longtable}
 \subsection{RPCs associated with class: VDI}
