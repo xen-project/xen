@@ -1270,6 +1270,8 @@ void start_vmx(void)
 {
     static int bootstrapped;
 
+    vmx_save_host_msrs();
+
     if ( bootstrapped )
     {
         if ( hvm_enabled && !vmx_cpu_up() )
@@ -1298,8 +1300,6 @@ void start_vmx(void)
     }
 
     setup_vmcs_dump();
-
-    vmx_save_host_msrs();
 
     hvm_enable(&vmx_function_table);
 
