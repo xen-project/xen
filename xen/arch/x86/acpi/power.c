@@ -119,19 +119,25 @@ static int enter_state(u32 state)
     if (state <= ACPI_STATE_S0 || state > ACPI_S_STATES_MAX)
         return -EINVAL;
 
-    /* Sync lazy state on ths cpu */
     __sync_lazy_execstate();
     pmprintk(XENLOG_INFO, "Flush lazy state\n");
 
     if (!spin_trylock(&pm_lock))
         return -EBUSY;
     
-    freeze_domains();
-
-    hvm_cpu_down();
-
     pmprintk(XENLOG_INFO, "PM: Preparing system for %s sleep\n",
         acpi_states[state]);
+
+    freeze_domains();
+
+    disable_nonboot_cpus();
+    if (num_online_cpus() != 1)
+    {
+        error = -EBUSY;
+        goto Enable_cpu;
+    }
+
+    hvm_cpu_down();
 
     acpi_sleep_prepare(state);
 
@@ -169,16 +175,31 @@ static int enter_state(u32 state)
     if ( !hvm_cpu_up() )
         BUG();
 
+ Enable_cpu:
+    enable_nonboot_cpus();
+
     thaw_domains();
     spin_unlock(&pm_lock);
     return error;
 }
 
+static void acpi_power_off(void)
+{
+    pmprintk(XENLOG_INFO, "%s called\n", __FUNCTION__);
+    local_irq_disable();
+    /* Some SMP machines only can poweroff in boot CPU */
+    acpi_enter_sleep_state(ACPI_STATE_S5);
+}
+
+static long enter_state_helper(void *data)
+{
+    struct acpi_sleep_info *sinfo = (struct acpi_sleep_info *)data;
+    return enter_state(sinfo->sleep_state);
+}
+
 /*
  * Dom0 issues this hypercall in place of writing pm1a_cnt. Xen then
  * takes over the control and put the system into sleep state really.
- * Also video flags and mode are passed here, in case user may use
- * "acpi_sleep=***" for video resume.
  *
  * Guest may issue a two-phases write to PM1x_CNT, to work
  * around poorly implemented hardware. It's better to keep
@@ -216,7 +237,14 @@ int acpi_enter_sleep(struct xenpf_enter_acpi_sleep *sleep)
     acpi_sinfo.pm1b_cnt_val = sleep->pm1b_cnt_val;
     acpi_sinfo.sleep_state = sleep->sleep_state;
 
-    return enter_state(acpi_sinfo.sleep_state);
+    /* ACPI power-off method. */
+    if ( acpi_sinfo.sleep_state == ACPI_STATE_S5 )
+    {
+        for ( ; ; )
+            acpi_power_off();
+    }
+
+    return continue_hypercall_on_cpu(0, enter_state_helper, &acpi_sinfo);
 }
 
 static int acpi_get_wake_status(void)

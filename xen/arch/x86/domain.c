@@ -82,6 +82,7 @@ static void play_dead(void)
     __cpu_disable();
     /* This must be done before dead CPU ack */
     cpu_exit_clear();
+    hvm_cpu_down();
     wbinvd();
     mb();
     /* Ack it */
@@ -1361,6 +1362,54 @@ void sync_vcpu_execstate(struct vcpu *v)
 
     /* Other cpus call __sync_lazy_execstate from flush ipi handler. */
     flush_tlb_mask(v->vcpu_dirty_cpumask);
+}
+
+struct migrate_info {
+    long (*func)(void *data);
+    void *data;
+    void (*saved_schedule_tail)(struct vcpu *);
+    cpumask_t saved_affinity;
+};
+
+static void continue_hypercall_on_cpu_helper(struct vcpu *v)
+{
+    struct cpu_user_regs *regs = guest_cpu_user_regs();
+    struct migrate_info *info = v->arch.continue_info;
+
+    regs->eax = info->func(info->data);
+
+    v->arch.schedule_tail = info->saved_schedule_tail;
+    v->cpu_affinity = info->saved_affinity;
+
+    xfree(info);
+    v->arch.continue_info = NULL;
+
+    vcpu_set_affinity(v, &v->cpu_affinity);
+    schedule_tail(v);
+}
+
+int continue_hypercall_on_cpu(int cpu, long (*func)(void *data), void *data)
+{
+    struct vcpu *v = current;
+    struct migrate_info *info;
+    cpumask_t mask = cpumask_of_cpu(cpu);
+
+    info = xmalloc(struct migrate_info);
+    if ( info == NULL )
+        return -ENOMEM;
+
+    info->func = func;
+    info->data = data;
+    info->saved_schedule_tail = v->arch.schedule_tail;
+    v->arch.schedule_tail = continue_hypercall_on_cpu_helper;
+
+    info->saved_affinity = v->cpu_affinity;
+    v->arch.continue_info = info;
+
+    vcpu_set_affinity(v, &mask);
+    schedule_tail(v);
+
+    return 0;
 }
 
 #define next_arg(fmt, args) ({                                              \

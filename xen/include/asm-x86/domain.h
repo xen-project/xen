@@ -268,6 +268,9 @@ struct arch_vcpu
     void (*ctxt_switch_from) (struct vcpu *);
     void (*ctxt_switch_to) (struct vcpu *);
 
+    /* Record information required to continue execution after migration */
+    void *continue_info;
+
     /* Bounce information for propagating an exception to guest OS. */
     struct trap_bounce trap_bounce;
 
@@ -311,9 +314,12 @@ struct arch_vcpu
     unsigned long vcpu_info_mfn;
 } __cacheline_aligned;
 
-/* shorthands to improve code legibility */
+/* Shorthands to improve code legibility. */
 #define hvm_vmx         hvm_vcpu.u.vmx
 #define hvm_svm         hvm_vcpu.u.svm
+
+/* Continue the current hypercall via func(data) on specified cpu. */
+int continue_hypercall_on_cpu(int cpu, long (*func)(void *data), void *data);
 
 #endif /* __ASM_DOMAIN_H__ */
 

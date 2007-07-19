@@ -66,6 +66,8 @@ extern void disable_nonboot_cpus(void);
 extern void enable_nonboot_cpus(void);
 #else
 static inline int cpu_is_offline(int cpu) {return 0;}
+static inline void disable_nonboot_cpus(void) {}
+static inline void enable_nonboot_cpus(void) {}
 #endif
 
 /*
