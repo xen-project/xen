@@ -632,16 +632,27 @@ class XendDomainInfo:
                     ['vcpu_count', self.info['VCPUs_max']]]
 
             for i in range(0, self.info['VCPUs_max']):
-                info = xc.vcpu_getinfo(self.domid, i)
+                if self.domid is not None:
+                    info = xc.vcpu_getinfo(self.domid, i)
 
-                sxpr.append(['vcpu',
-                             ['number',   i],
-                             ['online',   info['online']],
-                             ['blocked',  info['blocked']],
-                             ['running',  info['running']],
-                             ['cpu_time', info['cpu_time'] / 1e9],
-                             ['cpu',      info['cpu']],
-                             ['cpumap',   info['cpumap']]])
+                    sxpr.append(['vcpu',
+                                 ['number',   i],
+                                 ['online',   info['online']],
+                                 ['blocked',  info['blocked']],
+                                 ['running',  info['running']],
+                                 ['cpu_time', info['cpu_time'] / 1e9],
+                                 ['cpu',      info['cpu']],
+                                 ['cpumap',   info['cpumap']]])
+                else:
+                    sxpr.append(['vcpu',
+                                 ['number',   i],
+                                 ['online',   0],
+                                 ['blocked',  0],
+                                 ['running',  0],
+                                 ['cpu_time', 0.0],
+                                 ['cpu',      -1],
+                                 ['cpumap',   self.info['cpus'] and \
+                                              self.info['cpus'] or range(64)]])
 
             return sxpr
 

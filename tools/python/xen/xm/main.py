@@ -1023,13 +1023,13 @@ def xm_vcpu_list(args):
         if args:
             dominfo = map(server.xend.domain.getVCPUInfo, args)
         else:
-            doms = server.xend.domains(False)
+            doms = server.xend.domains_with_state(False, 'all', False)
             dominfo = map(server.xend.domain.getVCPUInfo, doms)
 
     print '%-32s %5s %5s %5s %5s %9s %s' % \
           ('Name', 'ID', 'VCPU', 'CPU', 'State', 'Time(s)', 'CPU Affinity')
 
-    format = '%(name)-32s %(domid)5d %(number)5d %(c)5s %(s)5s ' \
+    format = '%(name)-32s %(domid)5s %(number)5d %(c)5s %(s)5s ' \
              ' %(cpu_time)8.1f %(cpumap)s'
 
     for dom in dominfo:
@@ -1098,8 +1098,12 @@ def xm_vcpu_list(args):
 
             return format_pairs(list_to_rangepairs(cpumap))
 
-        name  =     get_info('name')
-        domid = int(get_info('domid'))
+        name  = get_info('name')
+        domid = get_info('domid')
+        if domid is not None:
+            domid = str(domid)
+        else:
+            domid = ''
 
         for vcpu in sxp.children(dom, 'vcpu'):
             def vinfo(n, t):
@@ -1113,7 +1117,10 @@ def xm_vcpu_list(args):
             running  = vinfo('running',  int)
             blocked  = vinfo('blocked',  int)
 
-            if online:
+            if cpu < 0:
+                c = ''
+                s = ''
+            elif online:
                 c = str(cpu)
                 if running:
                     s = 'r'
@@ -1125,8 +1132,8 @@ def xm_vcpu_list(args):
                     s += '-'
                 s += '-'
             else:
-                c = "-"
-                s = "--p"
+                c = '-'
+                s = '--p'
 
             print format % locals()
 
