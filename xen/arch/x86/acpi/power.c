@@ -77,8 +77,8 @@ static void freeze_domains(void)
 {
     struct domain *d;
 
-    for_each_domain(d)
-        if (d->domain_id != 0)
+    for_each_domain ( d )
+        if ( d->domain_id != 0 )
             domain_pause(d);
 }
 
@@ -86,8 +86,8 @@ static void thaw_domains(void)
 {
     struct domain *d;
 
-    for_each_domain(d)
-        if (d->domain_id != 0)
+    for_each_domain ( d )
+        if ( d->domain_id != 0 )
             domain_unpause(d);
 }
 
@@ -100,7 +100,7 @@ static void acpi_sleep_prepare(u32 state)
 
     wakeup_vector_va = __acpi_map_table(
         acpi_sinfo.wakeup_vector, sizeof(uint64_t));
-    if (acpi_sinfo.vector_width == 32)
+    if ( acpi_sinfo.vector_width == 32 )
         *(uint32_t *)wakeup_vector_va =
             (uint32_t)bootsym_phys(wakeup_start);
     else
@@ -116,13 +116,13 @@ static int enter_state(u32 state)
     unsigned long flags;
     int error;
 
-    if (state <= ACPI_STATE_S0 || state > ACPI_S_STATES_MAX)
+    if ( (state <= ACPI_STATE_S0) || (state > ACPI_S_STATES_MAX) )
         return -EINVAL;
 
     __sync_lazy_execstate();
     pmprintk(XENLOG_INFO, "Flush lazy state\n");
 
-    if (!spin_trylock(&pm_lock))
+    if ( !spin_trylock(&pm_lock) )
         return -EBUSY;
     
     pmprintk(XENLOG_INFO, "PM: Preparing system for %s sleep\n",
@@ -131,7 +131,7 @@ static int enter_state(u32 state)
     freeze_domains();
 
     disable_nonboot_cpus();
-    if (num_online_cpus() != 1)
+    if ( num_online_cpus() != 1 )
     {
         error = -EBUSY;
         goto Enable_cpu;
@@ -143,7 +143,7 @@ static int enter_state(u32 state)
 
     local_irq_save(flags);
 
-    if ((error = device_power_down()))
+    if ( (error = device_power_down()) )
     {
         printk(XENLOG_ERR "Some devices failed to power down\n");
         goto Done;
@@ -151,7 +151,7 @@ static int enter_state(u32 state)
 
     ACPI_FLUSH_CPU_CACHE();
 
-    switch (state)
+    switch ( state )
     {
         case ACPI_STATE_S3:
             do_suspend_lowlevel();
@@ -264,11 +264,13 @@ acpi_status asmlinkage acpi_enter_sleep_state(u8 sleep_state)
     ACPI_FLUSH_CPU_CACHE();
 
     outw((u16)acpi_sinfo.pm1a_cnt_val, acpi_sinfo.pm1a_cnt);
-    if (acpi_sinfo.pm1b_cnt)
+    if ( acpi_sinfo.pm1b_cnt )
         outw((u16)acpi_sinfo.pm1b_cnt_val, acpi_sinfo.pm1b_cnt);
 
     /* Wait until we enter sleep state, and spin until we wake */
-    while (!acpi_get_wake_status());
+    while ( !acpi_get_wake_status() )
+        continue;
+
     return_ACPI_STATUS(AE_OK);
 }
 
