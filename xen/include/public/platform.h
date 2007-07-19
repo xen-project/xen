@@ -153,27 +153,13 @@ struct xenpf_firmware_info {
 typedef struct xenpf_firmware_info xenpf_firmware_info_t;
 DEFINE_XEN_GUEST_HANDLE(xenpf_firmware_info_t);
 
-#define XENPF_set_acpi_sleep      51
-struct xenpf_set_acpi_sleep {
-    /* IN variables. */
-    uint16_t pm1a_cnt_port;
-    uint16_t pm1b_cnt_port;
-    uint16_t pm1a_evt_port;
-    uint16_t pm1b_evt_port;
-    /* OUT variables */
-    uint64_t xen_waking_vec;   /* Tell dom0 to set FACS waking vector */
-};
-typedef struct xenpf_set_acpi_sleep xenpf_set_acpi_sleep_t;
-DEFINE_XEN_GUEST_HANDLE(xenpf_set_acpi_sleep_t);
-
-#define XENPF_enter_acpi_sleep    52
+#define XENPF_enter_acpi_sleep    51
 struct xenpf_enter_acpi_sleep {
     /* IN variables */
-    uint16_t pm1a_cnt_val;
-    uint16_t pm1b_cnt_val;
-    uint32_t sleep_state;       /* Which state to enter */
-    uint32_t video_flags;       /* S3_bios or s3_mode */
-    uint32_t video_mode;        /* Mode setting for s3_mode */
+    uint16_t pm1a_cnt_val;      /* PM1a control value. */
+    uint16_t pm1b_cnt_val;      /* PM1b control value. */
+    uint32_t sleep_state;       /* Which state to enter (Sn). */
+    uint32_t flags;             /* Must be zero. */
 };
 typedef struct xenpf_enter_acpi_sleep xenpf_enter_acpi_sleep_t;
 DEFINE_XEN_GUEST_HANDLE(xenpf_enter_acpi_sleep_t);
@@ -189,7 +175,6 @@ struct xen_platform_op {
         struct xenpf_microcode_update  microcode;
         struct xenpf_platform_quirk    platform_quirk;
         struct xenpf_firmware_info     firmware_info;
-        struct xenpf_set_acpi_sleep    set_acpi_sleep;
         struct xenpf_enter_acpi_sleep  enter_acpi_sleep;
         uint8_t                        pad[128];
     } u;

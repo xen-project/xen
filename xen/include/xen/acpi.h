@@ -534,5 +534,6 @@ static inline int acpi_get_pxm(acpi_handle handle)
 #endif
 
 extern int pnpacpi_disabled;
+extern unsigned char acpi_rsdp_rev;
 
 #endif /*_LINUX_ACPI_H*/

@@ -35,9 +35,6 @@ void save_rest_processor_state(void)
     rdmsrl(MSR_CSTAR, saved_cstar);
     rdmsrl(MSR_LSTAR, saved_lstar);
 #endif
-
-    bootsym(video_flags) = acpi_video_flags;
-    bootsym(video_mode) = saved_videomode;
 }
 
 #define loaddebug(_v,_reg) \

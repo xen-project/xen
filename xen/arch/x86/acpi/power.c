@@ -28,20 +28,15 @@
 
 #define pmprintk(_l, _f, _a...) printk(_l "<PM>" _f, ## _a )
 
-u8 sleep_states[ACPI_S_STATE_COUNT];
-DEFINE_SPINLOCK(pm_lock);
+static char opt_acpi_sleep[20];
+string_param("acpi_sleep", opt_acpi_sleep);
 
-struct acpi_sleep_info {
-    uint16_t pm1a_cnt;
-    uint16_t pm1b_cnt;
-    uint16_t pm1a_evt;
-    uint16_t pm1b_evt;
-    uint16_t pm1a_cnt_val;
-    uint16_t pm1b_cnt_val;
-    uint32_t sleep_state;
-} acpi_sinfo;
+static u8 sleep_states[ACPI_S_STATE_COUNT];
+static DEFINE_SPINLOCK(pm_lock);
 
-extern void do_suspend_lowlevel(void);
+struct acpi_sleep_info acpi_sinfo;
+
+void do_suspend_lowlevel(void);
 
 static char *acpi_states[ACPI_S_STATE_COUNT] =
 {
@@ -50,10 +45,6 @@ static char *acpi_states[ACPI_S_STATE_COUNT] =
     [ACPI_STATE_S4] = "disk",
 };
 
-unsigned long acpi_video_flags;
-unsigned long saved_videomode;
-
-/* XXX: Add suspend failure recover later */
 static int device_power_down(void)
 {
     console_suspend();
@@ -100,8 +91,27 @@ static void thaw_domains(void)
             domain_unpause(d);
 }
 
+static void acpi_sleep_prepare(u32 state)
+{
+    void *wakeup_vector_va;
+
+    if ( state != ACPI_STATE_S3 )
+        return;
+
+    wakeup_vector_va = __acpi_map_table(
+        acpi_sinfo.wakeup_vector, sizeof(uint64_t));
+    if (acpi_sinfo.vector_width == 32)
+        *(uint32_t *)wakeup_vector_va =
+            (uint32_t)bootsym_phys(wakeup_start);
+    else
+        *(uint64_t *)wakeup_vector_va =
+            (uint64_t)bootsym_phys(wakeup_start);
+}
+
+static void acpi_sleep_post(u32 state) {}
+
 /* Main interface to do xen specific suspend/resume */
-int enter_state(u32 state)
+static int enter_state(u32 state)
 {
     unsigned long flags;
     int error;
@@ -122,6 +132,8 @@ int enter_state(u32 state)
 
     pmprintk(XENLOG_INFO, "PM: Preparing system for %s sleep\n",
         acpi_states[state]);
+
+    acpi_sleep_prepare(state);
 
     local_irq_save(flags);
 
@@ -152,36 +164,14 @@ int enter_state(u32 state)
  Done:
     local_irq_restore(flags);
 
+    acpi_sleep_post(state);
+
     if ( !hvm_cpu_up() )
         BUG();
 
     thaw_domains();
     spin_unlock(&pm_lock);
     return error;
-}
-
-/*
- * Xen just requires address of pm1x_cnt, and ACPI interpreter
- * is still kept in dom0. Address of xen wakeup stub will be
- * returned, and then dom0 writes that address to FACS.
- */
-int set_acpi_sleep_info(struct xenpf_set_acpi_sleep *info)
-{
-    if (acpi_sinfo.pm1a_cnt)
-        pmprintk(XENLOG_WARNING, "Multiple setting on acpi sleep info\n");
-
-    acpi_sinfo.pm1a_cnt = info->pm1a_cnt_port;
-    acpi_sinfo.pm1b_cnt = info->pm1b_cnt_port;
-    acpi_sinfo.pm1a_evt = info->pm1a_evt_port;
-    acpi_sinfo.pm1b_evt = info->pm1b_evt_port;
-    info->xen_waking_vec = (uint64_t)bootsym_phys(wakeup_start);
-
-    pmprintk(XENLOG_INFO, "pm1a[%x],pm1b[%x],pm1a_e[%x],pm1b_e[%x]"
-                       "wake[%"PRIx64"]",
-                       acpi_sinfo.pm1a_cnt, acpi_sinfo.pm1b_cnt,
-                       acpi_sinfo.pm1a_evt, acpi_sinfo.pm1b_evt,
-                       info->xen_waking_vec);
-    return 0;
 }
 
 /*
@@ -197,20 +187,23 @@ int set_acpi_sleep_info(struct xenpf_set_acpi_sleep *info)
  */
 int acpi_enter_sleep(struct xenpf_enter_acpi_sleep *sleep)
 {
-    if (!IS_PRIV(current->domain) || !acpi_sinfo.pm1a_cnt)
+    if ( !IS_PRIV(current->domain) || !acpi_sinfo.pm1a_cnt )
         return -EPERM;
 
     /* Sanity check */
-    if (acpi_sinfo.pm1b_cnt_val &&
-        ((sleep->pm1a_cnt_val ^ sleep->pm1b_cnt_val) &
-        ACPI_BITMASK_SLEEP_ENABLE))
+    if ( acpi_sinfo.pm1b_cnt_val &&
+         ((sleep->pm1a_cnt_val ^ sleep->pm1b_cnt_val) &
+          ACPI_BITMASK_SLEEP_ENABLE) )
     {
         pmprintk(XENLOG_ERR, "Mismatched pm1a/pm1b setting\n");
         return -EINVAL;
     }
 
+    if ( sleep->flags )
+        return -EINVAL;
+
     /* Write #1 */
-    if (!(sleep->pm1a_cnt_val & ACPI_BITMASK_SLEEP_ENABLE))
+    if ( !(sleep->pm1a_cnt_val & ACPI_BITMASK_SLEEP_ENABLE) )
     {
         outw((u16)sleep->pm1a_cnt_val, acpi_sinfo.pm1a_cnt);
         if (acpi_sinfo.pm1b_cnt)
@@ -222,8 +215,6 @@ int acpi_enter_sleep(struct xenpf_enter_acpi_sleep *sleep)
     acpi_sinfo.pm1a_cnt_val = sleep->pm1a_cnt_val;
     acpi_sinfo.pm1b_cnt_val = sleep->pm1b_cnt_val;
     acpi_sinfo.sleep_state = sleep->sleep_state;
-    acpi_video_flags = sleep->video_flags;
-    saved_videomode = sleep->video_mode;
 
     return enter_state(acpi_sinfo.sleep_state);
 }
@@ -247,7 +238,7 @@ acpi_status asmlinkage acpi_enter_sleep_state(u8 sleep_state)
     outw((u16)acpi_sinfo.pm1a_cnt_val, acpi_sinfo.pm1a_cnt);
     if (acpi_sinfo.pm1b_cnt)
         outw((u16)acpi_sinfo.pm1b_cnt_val, acpi_sinfo.pm1b_cnt);
-    
+
     /* Wait until we enter sleep state, and spin until we wake */
     while (!acpi_get_wake_status());
     return_ACPI_STATUS(AE_OK);
@@ -255,12 +246,24 @@ acpi_status asmlinkage acpi_enter_sleep_state(u8 sleep_state)
 
 static int __init acpi_sleep_init(void)
 {
-    int i = 0; 
+    int i;
+    char *p = opt_acpi_sleep;
+
+    while ( (p != NULL) && (*p != '\0') )
+    {
+        if ( !strncmp(p, "s3_bios", 7) )
+            acpi_video_flags |= 1;
+        if ( !strncmp(p, "s3_mode", 7) )
+            acpi_video_flags |= 2;
+        p = strchr(p, ',');
+        if ( p != NULL )
+            p += strspn(p, ", \t");
+    }
 
     pmprintk(XENLOG_INFO, "ACPI (supports");
-    for (i = 0; i < ACPI_S_STATE_COUNT; i++)
+    for ( i = 0; i < ACPI_S_STATE_COUNT; i++ )
     {
-        if (i == ACPI_STATE_S3)
+        if ( i == ACPI_STATE_S3 )
         {
             sleep_states[i] = 1;
             printk(" S%d", i);
@@ -269,6 +272,7 @@ static int __init acpi_sleep_init(void)
             sleep_states[i] = 0;
     }
     printk(")\n");
+
     return 0;
 }
 __initcall(acpi_sleep_init);
