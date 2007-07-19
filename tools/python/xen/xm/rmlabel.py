@@ -30,6 +30,7 @@ def help():
     Example: xm rmlabel dom <configfile>
              xm rmlabel res <resource>
              xm rmlabel mgt <domain name>
+             xm rmlabel vif-<idx> <domain name>
 
     This program removes an acm_label entry from the 'configfile'
     for a domain, from a Xend-managed domain, from the global resource label
@@ -129,24 +130,55 @@ def rm_domain_label_xapi(domainname):
     except Exception, e:
         print('Could not remove label from domain: %s' % e)
 
+def rm_vif_label(vmname, idx):
+    if xm_main.serverType != xm_main.SERVER_XEN_API:
+        raise OptionError('Need to be configure for using xen-api.')
+    vm_refs = server.xenapi.VM.get_by_name_label(vmname)
+    if len(vm_refs) == 0:
+        raise OptionError('A VM with the name %s does not exist.' %
+                          vmname)
+    vif_refs = server.xenapi.VM.get_VIFs(vm_refs[0])
+    if len(vif_refs) <= idx:
+        raise OptionError("Bad VIF index.")
+    vif_ref = server.xenapi.VIF.get_by_uuid(vif_refs[idx])
+    if not vif_ref:
+        print "A VIF with this UUID does not exist."
+    try:
+        old_lab = server.xenapi.VIF.get_security_label(vif_ref)
+        rc = server.xenapi.VIF.set_security_label(vif_ref, "", old_lab)
+        if int(rc) != 0:
+            print "Could not remove the label from the VIF."
+        else:
+            print "Successfully removed the label from the VIF."
+    except Exception, e:
+        print "Could not remove the label the VIF: %s" % str(e)
+
 
 def main (argv):
 
     if len(argv) != 3:
         raise OptionError('Requires 2 arguments')
     
-    if argv[1].lower() not in ('dom', 'mgt', 'res'):
-        raise OptionError('Unrecognised type argument: %s' % argv[1])
-
     if argv[1].lower() == "dom":
         configfile = argv[2]
         rm_domain_label(configfile)
     elif argv[1].lower() == "mgt":
         domain = argv[2]
         rm_domain_label_xapi(domain)
+    elif argv[1].lower().startswith("vif-"):
+        try:
+            idx = int(argv[1][4:])
+            if idx < 0:
+                raise
+        except:
+            raise OptionError("Bad VIF device index.")
+        vmname = argv[2]
+        rm_vif_label(vmname, idx)
     elif argv[1].lower() == "res":
         resource = argv[2]
         rm_resource_label(resource)
+    else:
+        raise OptionError('Unrecognised type argument: %s' % argv[1])
 
 if __name__ == '__main__':
     try:

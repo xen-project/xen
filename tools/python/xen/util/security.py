@@ -831,7 +831,7 @@ def get_domain_resources(dominfo):
         Entries are strored in the following formats:
           tap:qcow:/path/xyz.qcow
     """
-    resources = { 'vbd' : [], 'tap' : []}
+    resources = { 'vbd' : [], 'tap' : [], 'vif' : []}
     devs = dominfo.info['devices']
     uuids = devs.keys()
     for uuid in uuids:
@@ -839,6 +839,15 @@ def get_domain_resources(dominfo):
         typ = dev[0]
         if typ in [ 'vbd', 'tap' ]:
             resources[typ].append(dev[1]['uname'])
+        if typ in [ 'vif' ]:
+            sec_lab = dev[1].get('security_label')
+            if sec_lab:
+                resources[typ].append(sec_lab)
+            else:
+                resources[typ].append("%s:%s:%s" %
+                                      (xsconstants.ACM_POLICY_ID,
+                                       active_policy,
+                                       "unlabeled"))
 
     return resources
 
@@ -874,23 +883,36 @@ def __resources_compatible_with_vmlabel(xspol, dominfo, vmlabel,
         dictionary of the resource name to resource label mappings
         under which the evaluation should be done.
     """
+    def collect_labels(reslabels, s_label, polname):
+        if len(s_label) != 3 or polname != s_label[1]:
+            return False
+        label = s_label[2]
+        if not label in reslabels:
+            reslabels.append(label)
+        return True
+
     resources = get_domain_resources(dominfo)
     reslabels = []  # all resource labels
-    polname = xspol.get_name()
-    for key in resources.keys():
-        for res in resources[key]:
-            try:
-                tmp = access_control[res]
-                if len(tmp) != 3:
-                    return False
 
-                if polname != tmp[1]:
+    polname = xspol.get_name()
+    for key, value in resources.items():
+        if key in [ 'vbd', 'tap' ]:
+            for res in resources[key]:
+                try:
+                    label = access_control[res]
+                    if not collect_labels(reslabels, label, polname):
+                        return False
+                except:
                     return False
-                label = tmp[2]
-                if not label in reslabels:
-                    reslabels.append(label)
-            except:
-                return False
+        elif key in [ 'vif' ]:
+            for xapi_label in value:
+                label = xapi_label.split(":")
+                if not collect_labels(reslabels, label, polname):
+                    return False
+        else:
+            log.error("Unhandled device type: %s" % key)
+            return False
+
     # Check that all resource labes have a common STE type with the
     # vmlabel
     rc = xspol.policy_check_vmlabel_against_reslabels(vmlabel, reslabels)

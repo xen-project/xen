@@ -688,6 +688,29 @@ class XendDomain:
         
         return value
 
+    def set_dev_property_by_uuid(self, klass, dev_uuid, field, value,
+                                 old_val = None):
+        rc = True
+        self.domains_lock.acquire()
+
+        try:
+            try:
+                dom = self.get_vm_with_dev_uuid(klass, dev_uuid)
+                if dom:
+                    o_val = dom.get_dev_property(klass, dev_uuid, field)
+                    log.info("o_val=%s, old_val=%s" % (o_val, old_val))
+                    if old_val and old_val != o_val:
+                        return False
+
+                    dom.set_dev_property(klass, dev_uuid, field, value)
+                    self.managed_config_save(dom)
+            except ValueError, e:
+                pass
+        finally:
+            self.domains_lock.release()
+
+        return rc
+
     def is_valid_vm(self, vm_ref):
         return (self.get_vm_by_uuid(vm_ref) != None)
 

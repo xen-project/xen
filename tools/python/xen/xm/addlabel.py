@@ -34,6 +34,7 @@ def help():
     Format: xm addlabel <label> dom <configfile> [<policy>]
             xm addlabel <label> mgt <domain name> [<policy type>:<policy>]
             xm addlabel <label> res <resource> [[<policy type>:]<policy>]
+            xm addlabel <label> vif-<idx> <domain name> [<policy type>:<policy>]
     
     This program adds an acm_label entry into the 'configfile'
     for a domain or allows to label a xend-managed domain.
@@ -162,6 +163,32 @@ def add_domain_label_xapi(label, domainname, policyref, policy_type):
             print "Set the label of dormant domain '%s' to '%s'." % \
                   (domainname,label)
 
+def add_vif_label(label, vmname, idx, policyref, policy_type):
+    if xm_main.serverType != xm_main.SERVER_XEN_API:
+        raise OptionError('Need to be configure for using xen-api.')
+    vm_refs = server.xenapi.VM.get_by_name_label(vmname)
+    if len(vm_refs) == 0:
+        raise OptionError('A VM with the name %s does not exist.' %
+                          vmname)
+    vif_refs = server.xenapi.VM.get_VIFs(vm_refs[0])
+    if len(vif_refs) <= idx:
+        raise OptionError("Bad VIF index.")
+    vif_ref = server.xenapi.VIF.get_by_uuid(vif_refs[idx])
+    if not vif_ref:
+        print "Internal error: VIF does not exist."
+    sec_lab = "%s:%s:%s" % (policy_type, policyref, label)
+    try:
+        old_lab = server.xenapi.VIF.get_security_label(vif_ref)
+        rc = server.xenapi.VIF.set_security_label(vif_ref,
+                                                  sec_lab, old_lab)
+        if int(rc) != 0:
+            print "Could not label the VIF."
+        else:
+            print "Successfully labeled the VIF."
+    except Exception, e:
+        print "Could not label the VIF: %s" % str(e)
+
+
 def main(argv):
     policyref = None
     policy_type = ""
@@ -209,6 +236,20 @@ def main(argv):
             else:
                 raise OptionError("Policy name in wrong format.")
         add_resource_label(label, resource, policyref, policy_type)
+    elif argv[2].lower().startswith("vif-"):
+        try:
+            idx = int(argv[2][4:])
+            if idx < 0:
+                raise
+        except:
+            raise OptionError("Bad VIF device index.")
+        vmname = argv[3]
+        if policy_type == "":
+            tmp = policyref.split(":")
+            if len(tmp) != 2:
+                raise OptionError("Policy name in wrong format.")
+            policy_type, policyref = tmp
+        add_vif_label(label, vmname, idx, policyref, policy_type)
     else:
         raise OptionError('Need to specify either "dom", "mgt" or "res" as '
                           'object to add label to.')

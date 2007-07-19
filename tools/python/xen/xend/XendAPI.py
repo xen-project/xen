@@ -2084,6 +2084,25 @@ class XendAPI(object):
     def VIF_get_security_label(self, session, vif_ref):
         return self._VIF_get(vif_ref, 'security_label')
 
+    def _VIF_set(self, ref, prop, val, old_val):
+        return XendDomain.instance().set_dev_property_by_uuid(
+                       'vif', ref, prop, val, old_val)
+
+    def VIF_set_security_label(self, session, vif_ref, sec_lab, old_lab):
+        xendom = XendDomain.instance()
+        dom = xendom.get_vm_with_dev_uuid('vif', vif_ref)
+        if not dom:
+            return xen_api_error(['HANDLE_INVALID', 'VIF', vif_ref])
+
+        if dom._stateGet() == XEN_API_VM_POWER_STATE_RUNNING:
+            raise SecurityError(-xsconstants.XSERR_RESOURCE_IN_USE)
+
+        rc = self._VIF_set(vif_ref, 'security_label', sec_lab, old_lab)
+        if rc == False:
+            raise SecurityError(-xsconstants.XSERR_BAD_LABEL)
+        return xen_api_success(xsconstants.XSERR_SUCCESS)
+
+
     # Xen API: Class VIF_metrics
     # ----------------------------------------------------------------
 

@@ -2420,6 +2420,8 @@ class XendDomainInfo:
                 config['io_read_kbs'] = 0.0
                 config['io_write_kbs'] = 0.0                
 
+            config['security_label'] = config.get('security_label', '')
+
         if dev_class == 'vbd':
 
             if self._stateGet() not in (XEN_API_VM_POWER_STATE_HALTED,):

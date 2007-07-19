@@ -31,6 +31,7 @@ def help():
     Usage: xm getlabel dom <configfile>
            xm getlabel mgt <domain name>
            xm getlabel res <resource>
+           xm getlabel vif-<idx> <vmname>
            
     This program shows the label for a domain, resource or virtual network
     interface of a Xend-managed domain."""
@@ -103,6 +104,22 @@ def get_domain_label(configfile):
     data = data.rstrip("\']")
     print "policytype=%s," % xsconstants.ACM_POLICY_ID + data
 
+def get_vif_label(vmname, idx):
+    if xm_main.serverType != xm_main.SERVER_XEN_API:
+        raise OptionError('xm needs to be configure to use the xen-api.')
+    vm_refs = server.xenapi.VM.get_by_name_label(vmname)
+    if len(vm_refs) == 0:
+        raise OptionError('A VM with the name %s does not exist.' %
+                          vmname)
+    vif_refs = server.xenapi.VM.get_VIFs(vm_refs[0])
+    if len(vif_refs) <= idx:
+        raise OptionError("Bad VIF index.")
+    vif_ref = server.xenapi.VIF.get_by_uuid(vif_refs[idx])
+    if not vif_ref:
+        print "No VIF with this UUID."
+    sec_lab = server.xenapi.VIF.get_security_label(vif_ref)
+    print "%s" % sec_lab
+
 def get_domain_label_xapi(domainname):
     if xm_main.serverType != xm_main.SERVER_XEN_API:
         raise OptionError('xm needs to be configure to use the xen-api.')
@@ -128,6 +145,15 @@ def main(argv):
     elif argv[1].lower() == "res":
         resource = argv[2]
         get_resource_label(resource)
+    elif argv[1].lower().startswith("vif-"):
+        try:
+            idx = int(argv[1][4:])
+            if idx < 0:
+                raise
+        except:
+            raise OptionError("Bad VIF device index.")
+        vmname = argv[2]
+        get_vif_label(vmname, idx)
     else:
         raise OptionError('First subcommand argument must be "dom"'
                           ', "mgt" or "res"')

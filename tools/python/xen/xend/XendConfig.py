@@ -1085,6 +1085,12 @@ class XendConfig(dict):
 
             self.device_duplicate_check(dev_type, dev_info, target)
 
+            if dev_type == 'vif':
+                if dev_info.get('policy') and dev_info.get('label'):
+                    dev_info['security_label'] = "%s:%s:%s" % \
+                        (xsconstants.ACM_POLICY_ID,
+                         dev_info['policy'],dev_info['label'])
+
             # create uuid if it doesn't exist
             dev_uuid = dev_info.get('uuid', None)
             if not dev_uuid:
@@ -1159,6 +1165,10 @@ class XendConfig(dict):
                     network = XendAPIStore.get(
                         cfg_xenapi.get('network'), 'network')
                     dev_info['bridge'] = network.get_name_label()
+
+                if cfg_xenapi.get('security_label'):
+                    dev_info['security_label'] = \
+                         cfg_xenapi.get('security_label')
                 
                 dev_uuid = cfg_xenapi.get('uuid', None)
                 if not dev_uuid:

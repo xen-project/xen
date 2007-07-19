@@ -440,7 +440,9 @@ class xenapi_create:
                 vif.attributes["qos_algorithm_type"].value,
             "qos_algorithm_params":
                 get_child_nodes_as_dict(vif,
-                    "qos_algorithm_param", "key", "value")
+                    "qos_algorithm_param", "key", "value"),
+            "security_label":
+                vif.attributes["security_label"].value
         }
 
         return server.xenapi.VIF.create(vif_record)
@@ -747,6 +749,15 @@ class sxp2xml:
             = get_child_by_name(vif_sxp, "mtu", "")  
         vif.attributes["device"] = dev
         vif.attributes["qos_algorithm_type"] = ""
+
+        policy = get_child_by_name(vif_sxp, "policy")
+        label = get_child_by_name(vif_sxp, "label")
+
+        if label and policy:
+            vif.attributes["security_label"] \
+                 = "%s:%s:%s" % (xsconstants.ACM_POLICY_ID, policy, label)
+        else:
+            vif.attributes["security_label"] = ""
 
         if get_child_by_name(vif_sxp, "bridge") is not None:
             vif.attributes["network"] \
