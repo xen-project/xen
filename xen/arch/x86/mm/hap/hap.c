@@ -478,7 +478,7 @@ int hap_enable(struct domain *d, u32 mode)
             goto out;
     }
 
-    d->arch.paging.mode = mode | PG_SH_enable;
+    d->arch.paging.mode = mode | PG_HAP_enable;
 
  out:
     domain_unpause(d);
