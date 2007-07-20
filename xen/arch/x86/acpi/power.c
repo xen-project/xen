@@ -119,9 +119,6 @@ static int enter_state(u32 state)
     if ( (state <= ACPI_STATE_S0) || (state > ACPI_S_STATES_MAX) )
         return -EINVAL;
 
-    __sync_lazy_execstate();
-    pmprintk(XENLOG_INFO, "Flush lazy state\n");
-
     if ( !spin_trylock(&pm_lock) )
         return -EBUSY;
 

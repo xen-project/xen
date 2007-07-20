@@ -38,6 +38,7 @@ void restore_rest_processor_state(void)
     struct tss_struct *t = &init_tss[cpu];
     struct vcpu *v = current;
 
+    /* Rewriting the TSS desc is necessary to clear the Busy flag. */
     set_tss_desc(cpu, t);
     load_TR(cpu);
 
