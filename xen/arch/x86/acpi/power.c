@@ -26,7 +26,7 @@
 #include <xen/console.h>
 #include <public/platform.h>
 
-#define pmprintk(_l, _f, _a...) printk(_l "<PM>" _f, ## _a )
+#define pmprintk(_l, _f, _a...) printk(_l "<PM> " _f "\n", ## _a )
 
 static char opt_acpi_sleep[20];
 string_param("acpi_sleep", opt_acpi_sleep);
@@ -37,13 +37,6 @@ static DEFINE_SPINLOCK(pm_lock);
 struct acpi_sleep_info acpi_sinfo;
 
 void do_suspend_lowlevel(void);
-
-static char *acpi_states[ACPI_S_STATE_COUNT] =
-{
-    [ACPI_STATE_S1] = "standby",
-    [ACPI_STATE_S3] = "mem",
-    [ACPI_STATE_S4] = "disk",
-};
 
 static int device_power_down(void)
 {
@@ -122,8 +115,7 @@ static int enter_state(u32 state)
     if ( !spin_trylock(&pm_lock) )
         return -EBUSY;
 
-    pmprintk(XENLOG_INFO, "PM: Preparing system for %s sleep\n",
-        acpi_states[state]);
+    pmprintk(XENLOG_INFO, "Preparing system for ACPI S%d state.", state);
 
     freeze_domains();
 
@@ -131,7 +123,7 @@ static int enter_state(u32 state)
     if ( num_online_cpus() != 1 )
     {
         error = -EBUSY;
-        goto Enable_cpu;
+        goto enable_cpu;
     }
 
     hvm_cpu_down();
@@ -142,8 +134,8 @@ static int enter_state(u32 state)
 
     if ( (error = device_power_down()) )
     {
-        printk(XENLOG_ERR "Some devices failed to power down\n");
-        goto Done;
+        pmprintk(XENLOG_ERR, "Some devices failed to power down.");
+        goto done;
     }
 
     ACPI_FLUSH_CPU_CACHE();
@@ -161,23 +153,20 @@ static int enter_state(u32 state)
         break;
     }
 
-    pmprintk(XENLOG_INFO, "Back to C!\n");
+    pmprintk(XENLOG_DEBUG, "Back to C.");
 
     device_power_up();
 
-    pmprintk(XENLOG_INFO, "PM: Finishing wakeup.\n");
+    pmprintk(XENLOG_INFO, "Finishing wakeup from ACPI S%d state.", state);
 
- Done:
+ done:
     local_irq_restore(flags);
-
     acpi_sleep_post(state);
-
     if ( !hvm_cpu_up() )
         BUG();
 
- Enable_cpu:
+ enable_cpu:
     enable_nonboot_cpus();
-
     thaw_domains();
     spin_unlock(&pm_lock);
     return error;
@@ -208,7 +197,7 @@ int acpi_enter_sleep(struct xenpf_enter_acpi_sleep *sleep)
          ((sleep->pm1a_cnt_val ^ sleep->pm1b_cnt_val) &
           ACPI_BITMASK_SLEEP_ENABLE) )
     {
-        pmprintk(XENLOG_ERR, "Mismatched pm1a/pm1b setting\n");
+        pmprintk(XENLOG_ERR, "Mismatched pm1a/pm1b setting.");
         return -EINVAL;
     }
 
@@ -275,7 +264,7 @@ static int __init acpi_sleep_init(void)
             p += strspn(p, ", \t");
     }
 
-    pmprintk(XENLOG_INFO, "ACPI (supports");
+    printk(XENLOG_INFO "<PM> ACPI (supports");
     for ( i = 0; i < ACPI_S_STATE_COUNT; i++ )
     {
         if ( i == ACPI_STATE_S3 )
