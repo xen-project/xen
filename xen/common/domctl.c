@@ -20,7 +20,6 @@
 #include <xen/rcupdate.h>
 #include <xen/guest_access.h>
 #include <xen/bitmap.h>
-#include <xen/shadow.h>
 #include <asm/current.h>
 #include <public/domctl.h>
 #include <acm/acm_hooks.h>

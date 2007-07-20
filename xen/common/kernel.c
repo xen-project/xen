@@ -10,7 +10,7 @@
 #include <xen/errno.h>
 #include <xen/version.h>
 #include <xen/sched.h>
-#include <xen/shadow.h>
+#include <xen/paging.h>
 #include <xen/nmi.h>
 #include <xen/guest_access.h>
 #include <asm/current.h>
@@ -217,7 +217,7 @@ DO(xen_version)(int cmd, XEN_GUEST_HANDLE(void) arg)
             fi.submap = 0;
             if ( VM_ASSIST(d, VMASST_TYPE_pae_extended_cr3) )
                 fi.submap |= (1U << XENFEAT_pae_pgdir_above_4gb);
-            if ( shadow_mode_translate(current->domain) )
+            if ( paging_mode_translate(current->domain) )
                 fi.submap |= 
                     (1U << XENFEAT_writable_page_tables) |
                     (1U << XENFEAT_auto_translated_physmap);

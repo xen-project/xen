@@ -28,7 +28,6 @@
 #include <xen/iocap.h>
 #include <xen/lib.h>
 #include <xen/sched.h>
-#include <xen/shadow.h>
 #include <xen/mm.h>
 #include <xen/trace.h>
 #include <xen/guest_access.h>

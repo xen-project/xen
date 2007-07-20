@@ -30,13 +30,13 @@
 #include <xen/mm.h>
 #include <xen/irq.h>
 #include <xen/softirq.h>
-#include <xen/shadow.h>
 #include <xen/domain_page.h>
 #include <xen/keyhandler.h>
 #include <xen/perfc.h>
 #include <xen/numa.h>
 #include <xen/nodemask.h>
 #include <asm/page.h>
+#include <asm/flushtlb.h>
 
 /*
  * Comma-separated list of hexadecimal page numbers containing bad bytes.

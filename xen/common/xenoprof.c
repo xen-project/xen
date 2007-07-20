@@ -13,7 +13,7 @@
 #include <xen/guest_access.h>
 #include <xen/sched.h>
 #include <public/xenoprof.h>
-#include <asm/shadow.h>
+#include <xen/paging.h>
 
 /* Limit amount of pages used for shared buffer (per domain) */
 #define MAX_OPROF_SHARED_PAGES 32
@@ -397,7 +397,7 @@ static int add_passive_list(XEN_GUEST_HANDLE(void) arg)
     d->xenoprof->domain_type = XENOPROF_DOMAIN_PASSIVE;
     passive.nbuf = d->xenoprof->nbuf;
     passive.bufsize = d->xenoprof->bufsize;
-    if ( !shadow_mode_translate(current->domain) )
+    if ( !paging_mode_translate(current->domain) )
         passive.buf_gmaddr = __pa(d->xenoprof->rawbuf);
     else
         xenoprof_shared_gmfn_with_guest(
@@ -598,7 +598,7 @@ static int xenoprof_op_get_buffer(XEN_GUEST_HANDLE(void) arg)
         
     xenoprof_get_buffer.nbuf = d->xenoprof->nbuf;
     xenoprof_get_buffer.bufsize = d->xenoprof->bufsize;
-    if ( !shadow_mode_translate(d) )
+    if ( !paging_mode_translate(d) )
         xenoprof_get_buffer.buf_gmaddr = __pa(d->xenoprof->rawbuf);
     else
         xenoprof_shared_gmfn_with_guest(
