@@ -124,7 +124,7 @@ static int enter_state(u32 state)
 
     if ( !spin_trylock(&pm_lock) )
         return -EBUSY;
-    
+
     pmprintk(XENLOG_INFO, "PM: Preparing system for %s sleep\n",
         acpi_states[state]);
 
@@ -153,12 +153,15 @@ static int enter_state(u32 state)
 
     switch ( state )
     {
-        case ACPI_STATE_S3:
-            do_suspend_lowlevel();
-            break;
-        default:
-            error = -EINVAL;
-            break;
+    case ACPI_STATE_S3:
+        do_suspend_lowlevel();
+        break;
+    case ACPI_STATE_S5:
+        acpi_enter_sleep_state(ACPI_STATE_S5);
+        break;
+    default:
+        error = -EINVAL;
+        break;
     }
 
     pmprintk(XENLOG_INFO, "Back to C!\n");
@@ -181,14 +184,6 @@ static int enter_state(u32 state)
     thaw_domains();
     spin_unlock(&pm_lock);
     return error;
-}
-
-static void acpi_power_off(void)
-{
-    pmprintk(XENLOG_INFO, "%s called\n", __FUNCTION__);
-    local_irq_disable();
-    /* Some SMP machines only can poweroff in boot CPU */
-    acpi_enter_sleep_state(ACPI_STATE_S5);
 }
 
 static long enter_state_helper(void *data)
@@ -227,7 +222,7 @@ int acpi_enter_sleep(struct xenpf_enter_acpi_sleep *sleep)
     if ( !(sleep->pm1a_cnt_val & ACPI_BITMASK_SLEEP_ENABLE) )
     {
         outw((u16)sleep->pm1a_cnt_val, acpi_sinfo.pm1a_cnt);
-        if (acpi_sinfo.pm1b_cnt)
+        if ( acpi_sinfo.pm1b_cnt )
             outw((u16)sleep->pm1b_cnt_val, acpi_sinfo.pm1b_cnt);
         return 0;
     }
@@ -236,13 +231,6 @@ int acpi_enter_sleep(struct xenpf_enter_acpi_sleep *sleep)
     acpi_sinfo.pm1a_cnt_val = sleep->pm1a_cnt_val;
     acpi_sinfo.pm1b_cnt_val = sleep->pm1b_cnt_val;
     acpi_sinfo.sleep_state = sleep->sleep_state;
-
-    /* ACPI power-off method. */
-    if ( acpi_sinfo.sleep_state == ACPI_STATE_S5 )
-    {
-        for ( ; ; )
-            acpi_power_off();
-    }
 
     return continue_hypercall_on_cpu(0, enter_state_helper, &acpi_sinfo);
 }
