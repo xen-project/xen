@@ -1394,6 +1394,9 @@ int continue_hypercall_on_cpu(int cpu, long (*func)(void *data), void *data)
     struct migrate_info *info;
     cpumask_t mask = cpumask_of_cpu(cpu);
 
+    if ( cpu == smp_processor_id() )
+        return func(data);
+
     info = xmalloc(struct migrate_info);
     if ( info == NULL )
         return -ENOMEM;
@@ -1407,8 +1410,9 @@ int continue_hypercall_on_cpu(int cpu, long (*func)(void *data), void *data)
     v->arch.continue_info = info;
 
     vcpu_set_affinity(v, &mask);
-    schedule_tail(v);
 
+    /* Dummy return value will be overwritten by new schedule_tail. */
+    BUG_ON(!test_bit(SCHEDULE_SOFTIRQ, &softirq_pending(smp_processor_id())));
     return 0;
 }
 
