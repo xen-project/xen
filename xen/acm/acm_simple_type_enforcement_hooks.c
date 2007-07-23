@@ -40,13 +40,18 @@ struct ste_binary_policy ste_bin_pol;
 
 static inline int have_common_type (ssidref_t ref1, ssidref_t ref2) {
     int i;
-    for( i = 0; i< ste_bin_pol.max_types; i++ )
-        if ( ste_bin_pol.ssidrefs[ref1*ste_bin_pol.max_types + i] && 
-             ste_bin_pol.ssidrefs[ref2*ste_bin_pol.max_types + i])
-        {
-            printkd("%s: common type #%02x.\n", __func__, i);
-            return 1;
-        }
+
+    if ( ref1 >= 0 && ref1 < ste_bin_pol.max_ssidrefs &&
+         ref2 >= 0 && ref2 < ste_bin_pol.max_ssidrefs )
+    {
+        for( i = 0; i< ste_bin_pol.max_types; i++ )
+            if ( ste_bin_pol.ssidrefs[ref1*ste_bin_pol.max_types + i] &&
+                 ste_bin_pol.ssidrefs[ref2*ste_bin_pol.max_types + i])
+            {
+                printkd("%s: common type #%02x.\n", __func__, i);
+                return 1;
+            }
+    }
     return 0;
 }
 
