@@ -113,6 +113,8 @@ struct acm_operations {
     void (*fail_grant_setup)           (domid_t id);
     /* generic domain-requested decision hooks (can be NULL) */
     int (*sharing)                     (ssidref_t ssidref1, ssidref_t ssidref2);
+    /* determine whether the default policy is installed */
+    int (*is_default_policy)           (void);
 };
 
 /* global variables */

@@ -87,9 +87,16 @@ _acm_update_policy(void *buf, u32 buf_size, int is_bootpolicy,
                    struct acm_sized_buffer *errors)
 {
     uint32_t offset, length;
+    static int require_update = 0;
 
     write_lock(&acm_bin_pol_rwlock);
 
+    if (  require_update != 0 &&
+        ( deletions == NULL || ssidchanges == NULL ) )
+    {
+        goto error_lock_free;
+    }
+    require_update = 1;
     /*
        first some tests to check compatibility of new policy with
        current state of system/domains
@@ -153,7 +160,13 @@ _acm_update_policy(void *buf, u32 buf_size, int is_bootpolicy,
            &pol->xml_pol_version,
            sizeof(acm_bin_pol.xml_pol_version));
 
+    if ( acm_primary_ops->is_default_policy() &&
+         acm_secondary_ops->is_default_policy() ) {
+        require_update = 0;
+    }
+
     write_unlock(&acm_bin_pol_rwlock);
+
     return ACM_OK;
 
 error_lock_free:

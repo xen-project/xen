@@ -650,6 +650,13 @@ static void chwall_domain_destroy(void *object_ssid, struct domain *d)
     return;
 }
 
+
+static int chwall_is_default_policy(void)
+{
+    return ( (chwall_bin_pol.max_types    == 1 ) &&
+             (chwall_bin_pol.max_ssidrefs == 2 ) );
+}
+
 struct acm_operations acm_chinesewall_ops = {
     /* policy management services */
     .init_domain_ssid = chwall_init_domain_ssid,
@@ -674,6 +681,8 @@ struct acm_operations acm_chinesewall_ops = {
     .fail_grant_setup = NULL,
     /* generic domain-requested decision hooks */
     .sharing = NULL,
+
+    .is_default_policy = chwall_is_default_policy,
 };
 
 /*

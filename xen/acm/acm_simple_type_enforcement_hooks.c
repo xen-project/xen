@@ -739,6 +739,14 @@ ste_sharing(ssidref_t ssidref1, ssidref_t ssidref2) {
         return ACM_ACCESS_DENIED;
 }
 
+/* */
+
+static int
+ste_is_default_policy(void)
+{
+    return ( (ste_bin_pol.max_types    == 1) &&
+             (ste_bin_pol.max_ssidrefs == 2) );
+}
 
 /* now define the hook structure similarly to LSM */
 struct acm_operations acm_simple_type_enforcement_ops = {
@@ -768,6 +776,8 @@ struct acm_operations acm_simple_type_enforcement_ops = {
     .pre_grant_setup        = ste_pre_grant_setup,
     .fail_grant_setup       = NULL,
     .sharing                = ste_sharing,
+
+    .is_default_policy      = ste_is_default_policy,
 };
 
 /*
