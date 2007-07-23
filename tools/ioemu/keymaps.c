@@ -49,6 +49,7 @@ typedef struct {
     int extra_count;
     struct key_range *keypad_range;
     struct key_range *numlock_range;
+    struct key_range *shift_range;
 } kbd_layout_t;
 
 static void add_to_key_range(struct key_range **krp, int code) {
@@ -127,6 +128,10 @@ static kbd_layout_t *parse_keyboard_layout(const char *language,
 			add_to_key_range(&k->numlock_range, keysym);
 			fprintf(stderr, "keypad keysym %04x keycode %d\n", keysym, keycode);
 		    }
+		    if (rest && strstr(rest, "shift")) {
+			add_to_key_range(&k->shift_range, keysym);
+			fprintf(stderr, "shift keysym %04x keycode %d\n", keysym, keycode);
+		    }
 
 		    /* if(keycode&0x80)
 		       keycode=(keycode<<8)^0x80e0; */
@@ -201,6 +206,17 @@ static int keysymIsNumlock(void *kbd_layout, int keysym)
     struct key_range *kr;
 
     for (kr = k->numlock_range; kr; kr = kr->next)
+	if (keysym >= kr->start && keysym <= kr->end)
+	    return 1;
+    return 0;
+}
+
+static int keysymIsShift(void *kbd_layout, int keysym)
+{
+    kbd_layout_t *k = kbd_layout;
+    struct key_range *kr;
+
+    for (kr = k->shift_range; kr; kr = kr->next)
 	if (keysym >= kr->start && keysym <= kr->end)
 	    return 1;
     return 0;

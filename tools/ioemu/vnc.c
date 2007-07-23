@@ -915,12 +915,69 @@ static void press_key(VncState *vs, int keysym)
     kbd_put_keycode(keysym2scancode(vs->kbd_layout, keysym) | 0x80);
 }
 
+static void press_key_shift_down(VncState *vs, int down, int keycode)
+{
+    if (down)
+        kbd_put_keycode(0x2a & 0x7f);
+
+    if (keycode & 0x80)
+        kbd_put_keycode(0xe0);
+    if (down)
+        kbd_put_keycode(keycode & 0x7f);
+    else
+        kbd_put_keycode(keycode | 0x80);
+
+    if (!down)
+        kbd_put_keycode(0x2a | 0x80);
+}
+
+static void press_key_shift_up(VncState *vs, int down, int keycode)
+{
+    if (down) {
+        if (vs->modifiers_state[0x2a])
+            kbd_put_keycode(0x2a | 0x80);
+        if (vs->modifiers_state[0x36]) 
+            kbd_put_keycode(0x36 | 0x80);
+    }
+
+    if (keycode & 0x80)
+        kbd_put_keycode(0xe0);
+    if (down)
+        kbd_put_keycode(keycode & 0x7f);
+    else
+        kbd_put_keycode(keycode | 0x80);
+
+    if (!down) {
+        if (vs->modifiers_state[0x2a])
+            kbd_put_keycode(0x2a & 0x7f);
+        if (vs->modifiers_state[0x36]) 
+            kbd_put_keycode(0x36 & 0x7f);
+    }
+}
+
 static void do_key_event(VncState *vs, int down, uint32_t sym)
 {
     int keycode;
+    int shift_keys = 0;
+    int shift = 0;
+
+    if (is_graphic_console()) {
+        if (sym >= 'A' && sym <= 'Z') {
+            sym = sym - 'A' + 'a';
+            shift = 1;
+        }
+        else {
+            shift = keysymIsShift(vs->kbd_layout, sym & 0xFFFF);
+        }
+    }
+    shift_keys = vs->modifiers_state[0x2a] | vs->modifiers_state[0x36];
 
     keycode = keysym2scancode(vs->kbd_layout, sym & 0xFFFF);
-    
+    if (keycode == 0) {
+        fprintf(stderr, "Key lost : keysym=0x%x(%d)\n", sym, sym);
+        return;
+    }
+
     /* QEMU console switch */
     switch(keycode) {
     case 0x2a:                          /* Left Shift */
@@ -929,11 +986,15 @@ static void do_key_event(VncState *vs, int down, uint32_t sym)
     case 0x9d:                          /* Right CTRL */
     case 0x38:                          /* Left ALT */
     case 0xb8:                          /* Right ALT */
-        if (down)
+        if (down) {
             vs->modifiers_state[keycode] = 1;
-        else
+            kbd_put_keycode(keycode & 0x7f);
+        }
+        else {
             vs->modifiers_state[keycode] = 0;
-        break;
+            kbd_put_keycode(keycode | 0x80);
+        }
+        return;
     case 0x02 ... 0x0a: /* '1' to '9' keys */ 
         if (down && vs->modifiers_state[0x1d] && vs->modifiers_state[0x38]) {
             /* Reset the modifiers sent to the current console */
@@ -943,9 +1004,14 @@ static void do_key_event(VncState *vs, int down, uint32_t sym)
         }
         break;
     case 0x45:			/* NumLock */
-	if (!down)
+	if (down) {
+            kbd_put_keycode(keycode & 0x7f);
+        }
+        else {	
 	    vs->modifiers_state[keycode] ^= 1;
-	break;
+            kbd_put_keycode(keycode | 0x80);
+        }
+	return;
     }
 
     if (keycodeIsKeypad(vs->kbd_layout, keycode)) {
@@ -967,6 +1033,18 @@ static void do_key_event(VncState *vs, int down, uint32_t sym)
     }
 
     if (is_graphic_console()) {
+        /*  If the shift state needs to change then simulate an additional
+            keypress before sending this one.
+        */
+        if (shift && !shift_keys) {
+            press_key_shift_down(vs, down, keycode);
+            return;
+        }
+        else if (!shift && shift_keys) {
+            press_key_shift_up(vs, down, keycode);
+            return;
+        }
+
         if (keycode & 0x80)
             kbd_put_keycode(0xe0);
         if (down)
@@ -1021,8 +1099,6 @@ static void do_key_event(VncState *vs, int down, uint32_t sym)
 
 static void key_event(VncState *vs, int down, uint32_t sym)
 {
-    if (sym >= 'A' && sym <= 'Z' && is_graphic_console())
-	sym = sym - 'A' + 'a';
     do_key_event(vs, down, sym);
 }
 
