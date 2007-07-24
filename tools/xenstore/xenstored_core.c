@@ -299,10 +299,14 @@ static void set_fd(int fd, fd_set *set, int *max)
 }
 
 
-static int initialize_set(fd_set *inset, fd_set *outset, int sock, int ro_sock)
+static int initialize_set(fd_set *inset, fd_set *outset, int sock, int ro_sock,
+			  struct timeval **ptimeout)
 {
-	struct connection *i;
+	static struct timeval zero_timeout = { 0 };
+	struct connection *conn;
 	int max = -1;
+
+	*ptimeout = NULL;
 
 	FD_ZERO(inset);
 	FD_ZERO(outset);
@@ -314,13 +318,19 @@ static int initialize_set(fd_set *inset, fd_set *outset, int sock, int ro_sock)
 	if (xce_handle != -1)
 		set_fd(xc_evtchn_fd(xce_handle), inset, &max);
 
-	list_for_each_entry(i, &connections, list) {
-		if (i->domain)
-			continue;
-		set_fd(i->fd, inset, &max);
-		if (!list_empty(&i->out_list))
-			FD_SET(i->fd, outset);
+	list_for_each_entry(conn, &connections, list) {
+		if (conn->domain) {
+			if (domain_can_read(conn) ||
+			    (domain_can_write(conn) &&
+			     !list_empty(&conn->out_list)))
+				*ptimeout = &zero_timeout;
+		} else {
+			set_fd(conn->fd, inset, &max);
+			if (!list_empty(&conn->out_list))
+				FD_SET(conn->fd, outset);
+		}
 	}
+
 	return max;
 }
 
@@ -1709,6 +1719,7 @@ int main(int argc, char *argv[])
 	bool no_domain_init = false;
 	const char *pidfile = NULL;
 	int evtchn_fd = -1;
+	struct timeval *timeout;
 
 	while ((opt = getopt_long(argc, argv, "DE:F:HNPS:t:T:RLVW:", options,
 				  NULL)) != -1) {
@@ -1850,17 +1861,16 @@ int main(int argc, char *argv[])
 		evtchn_fd = xc_evtchn_fd(xce_handle);
 
 	/* Get ready to listen to the tools. */
-	max = initialize_set(&inset, &outset, *sock, *ro_sock);
+	max = initialize_set(&inset, &outset, *sock, *ro_sock, &timeout);
 
 	/* Tell the kernel we're up and running. */
 	xenbus_notify_running();
 
 	/* Main loop. */
-	/* FIXME: Rewrite so noone can starve. */
 	for (;;) {
-		struct connection *i;
+		struct connection *conn, *old_conn;
 
-		if (select(max+1, &inset, &outset, NULL, NULL) < 0) {
+		if (select(max+1, &inset, &outset, NULL, timeout) < 0) {
 			if (errno == EINTR)
 				continue;
 			barf_perror("Select failed");
@@ -1882,41 +1892,31 @@ int main(int argc, char *argv[])
 		if (evtchn_fd != -1 && FD_ISSET(evtchn_fd, &inset))
 			handle_event();
 
-		list_for_each_entry(i, &connections, list) {
-			if (i->domain)
-				continue;
+		conn = list_entry(connections.next, typeof(*conn), list);
+		while (&conn->list != &connections) {
+			talloc_increase_ref_count(conn);
 
-			/* Operations can delete themselves or others
-			 * (xs_release): list is not safe after input,
-			 * so break. */
-			if (FD_ISSET(i->fd, &inset)) {
-				handle_input(i);
-				break;
+			if (conn->domain) {
+				if (domain_can_read(conn))
+					handle_input(conn);
+				if (domain_can_write(conn) &&
+				    !list_empty(&conn->out_list))
+					handle_output(conn);
+			} else {
+				if (FD_ISSET(conn->fd, &inset))
+					handle_input(conn);
+				if (FD_ISSET(conn->fd, &outset))
+					handle_output(conn);
 			}
-			if (FD_ISSET(i->fd, &outset)) {
-				handle_output(i);
-				break;
-			}
+
+			old_conn = conn;
+			conn = list_entry(old_conn->list.next,
+					  typeof(*conn), list);
+			talloc_free(old_conn);
 		}
 
-		/* Handle all possible I/O for domain connections. */
-	more:
-		list_for_each_entry(i, &connections, list) {
-			if (!i->domain)
-				continue;
-
-			if (domain_can_read(i)) {
-				handle_input(i);
-				goto more;
-			}
-
-			if (domain_can_write(i) && !list_empty(&i->out_list)) {
-				handle_output(i);
-				goto more;
-			}
-		}
-
-		max = initialize_set(&inset, &outset, *sock, *ro_sock);
+		max = initialize_set(&inset, &outset, *sock, *ro_sock,
+				     &timeout);
 	}
 }
 
