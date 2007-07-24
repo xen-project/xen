@@ -632,7 +632,6 @@ int main_loop(void)
             /* Wait up to 10 msec. */
             main_loop_wait(10);
 
-        xenstore_record_dm_state("paused");
         fprintf(logfile, "device model saving state\n");
 
         /* Pull all outstanding ioreqs through the system */
@@ -643,6 +642,8 @@ int main_loop(void)
         snprintf(qemu_file, sizeof(qemu_file), 
                  "/var/lib/xen/qemu-save.%d", domid);
         do_savevm(qemu_file);
+
+        xenstore_record_dm_state("paused");
 
         /* Wait to be allowed to continue */
         while (suspend_requested) {

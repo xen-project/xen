@@ -123,11 +123,13 @@ static void * init_qemu_maps(int domid, unsigned int bitmap_size)
     /* Tell qemu about it */
     if ((xs = xs_daemon_open()) == NULL)
         errx(1, "Couldn't contact xenstore");
-    if (!(path = xs_get_domain_path(xs, domid)))
+    if (!(path = strdup("/local/domain/0/device-model/")))
         errx(1, "can't get domain path in store");
     if (!(path = realloc(path, strlen(path) 
+                         + 10 
                          + strlen("/logdirty/next-active") + 1))) 
         errx(1, "no memory for constructing xenstore path");
+    snprintf(path + strlen(path), 11, "%i", domid);
     strcat(path, "/logdirty/");
     p = path + strlen(path);
 

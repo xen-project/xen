@@ -181,7 +181,8 @@ void xenstore_parse_domain_config(int domid)
     }
 
     /* Set a watch for log-dirty requests from the migration tools */
-    if (pasprintf(&buf, "%s/logdirty/next-active", path) != -1) {
+    if (pasprintf(&buf, "/local/domain/0/device-model/%u/logdirty/next-active",
+                  domid) != -1) {
         xs_watch(xsh, buf, "logdirty");
         fprintf(logfile, "Watching %s\n", buf);
     }
@@ -224,33 +225,26 @@ void xenstore_process_logdirty_event(void)
     unsigned int len;
     int i;
 
-    fprintf(logfile, "Triggered log-dirty buffer switch\n");
-
     if (!seg) {
-        char *path, *p, *key_ascii, key_terminated[17] = {0,};
+        char *path = NULL, *key_ascii, key_terminated[17] = {0,};
         key_t key;
         int shmid;
 
         /* Find and map the shared memory segment for log-dirty bitmaps */
-        if (!(path = xs_get_domain_path(xsh, domid))) {            
-            fprintf(logfile, "Log-dirty: can't get domain path in store\n");
-            exit(1);
-        }
-        if (!(path = realloc(path, strlen(path) 
-                             + strlen("/logdirty/next-active") + 1))) {
+        if (pasprintf(&path, 
+                      "/local/domain/0/device-model/%u/logdirty/key", 
+                      domid) == -1) {
             fprintf(logfile, "Log-dirty: out of memory\n");
             exit(1);
         }
-        strcat(path, "/logdirty/");
-        p = path + strlen(path);
-        strcpy(p, "key");
         
         key_ascii = xs_read(xsh, XBT_NULL, path, &len);
-        if (!key_ascii) {
+        free(path);
+
+        if (!key_ascii) 
             /* No key yet: wait for the next watch */
-            free(path);
             return;
-        }
+
         strncpy(key_terminated, key_ascii, 16);
         free(key_ascii);
         key = (key_t) strtoull(key_terminated, NULL, 16);
@@ -282,18 +276,21 @@ void xenstore_process_logdirty_event(void)
         }
 
         /* Remember the paths for the next-active and active entries */
-        strcpy(p, "active");
-        if (!(active_path = strdup(path))) {
+        if (pasprintf(&active_path, 
+                      "/local/domain/0/device-model/%u/logdirty/active",
+                      domid) == -1) {
             fprintf(logfile, "Log-dirty: out of memory\n");
             exit(1);
         }
-        strcpy(p, "next-active");
-        if (!(next_active_path = strdup(path))) {
+        if (pasprintf(&next_active_path, 
+                      "/local/domain/0/device-model/%u/logdirty/next-active",
+                      domid) == -1) {
             fprintf(logfile, "Log-dirty: out of memory\n");
             exit(1);
         }
-        free(path);
     }
+
+    fprintf(logfile, "Triggered log-dirty buffer switch\n");
     
     /* Read the required active buffer from the store */
     act = xs_read(xsh, XBT_NULL, next_active_path, &len);
