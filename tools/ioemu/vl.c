@@ -6856,15 +6856,6 @@ int set_mm_mapping(int xc_handle, uint32_t domid,
     return 0;
 }
 
-void suspend(int sig)
-{
-    fprintf(logfile, "suspend sig handler called with requested=%d!\n",
-            suspend_requested);
-    if (sig != SIGUSR1)
-        fprintf(logfile, "suspend signal dismatch, get sig=%d!\n", sig);
-    suspend_requested = 1;
-}
-
 #if defined(MAPCACHE)
 
 #if defined(__i386__) 
@@ -7057,6 +7048,7 @@ int main(int argc, char **argv)
     xen_pfn_t *page_array;
     extern void *buffered_pio_page;
 #endif
+    sigset_t set;
 
     char qemu_dm_logfilename[128];
     
@@ -7982,24 +7974,11 @@ int main(int argc, char **argv)
 	close(fd);
     }
 
-    /* register signal for the suspend request when save */
-    {
-        struct sigaction act;
-        sigset_t set;
-        act.sa_handler = suspend;
-        act.sa_flags = SA_RESTART;
-        sigemptyset(&act.sa_mask);
-
-        sigaction(SIGUSR1, &act, NULL);
-
-        /* control panel mask some signals when spawn qemu, need unmask here*/
-        sigemptyset(&set);
-        sigaddset(&set, SIGUSR1);
-        sigaddset(&set, SIGTERM);
-        if (sigprocmask(SIG_UNBLOCK, &set, NULL) == -1)
-            fprintf(stderr, "unblock signal fail, possible issue for HVM save!\n");
-
-    }
+    /* Unblock SIGTERM, which may have been blocked by the caller */
+    sigemptyset(&set);
+    sigaddset(&set, SIGTERM);
+    if (sigprocmask(SIG_UNBLOCK, &set, NULL) == -1)
+        fprintf(stderr, "Failed to unblock SIGTERM\n");
 
     main_loop();
     quit_timers();

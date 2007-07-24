@@ -1456,6 +1456,7 @@ void readline_start(const char *prompt, int is_password,
 void xenstore_parse_domain_config(int domid);
 int xenstore_fd(void);
 void xenstore_process_event(void *opaque);
+void xenstore_record_dm_state(char *state);
 void xenstore_check_new_media_present(int timeout);
 void xenstore_write_vncport(int vnc_display);
 int xenstore_read_vncpasswd(int domid);

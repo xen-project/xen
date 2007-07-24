@@ -20,6 +20,7 @@
 import os, string
 import re
 import math
+import time
 import signal
 
 import xen.lowlevel.xc
@@ -27,6 +28,7 @@ from xen.xend.XendConstants import REVERSE_DOMAIN_SHUTDOWN_REASONS
 from xen.xend.XendError import VmError, XendError, HVMRequired
 from xen.xend.XendLogging import log
 from xen.xend.XendOptions import instance as xenopts
+from xen.xend.xenstore.xstransact import xstransact
 from xen.xend.xenstore.xswatch import xswatch
 from xen.xend import arch
 
@@ -175,6 +177,14 @@ class ImageHandler:
         """Create device model for the domain (define in subclass if needed)."""
         pass
     
+    def saveDeviceModel(self):
+        """Save device model for the domain (define in subclass if needed)."""
+        pass
+
+    def resumeDeviceModel(self):
+        """Unpause device model for the domain (define in subclass if needed)."""
+        pass
+
     def destroy(self):
         """Extra cleanup on domain destroy (define in subclass if needed)."""
         pass
@@ -443,17 +453,34 @@ class HVMImageHandler(ImageHandler):
         self.vm.storeDom("image/device-model-pid", self.pid)
         log.info("device model pid: %d", self.pid)
 
+    def saveDeviceModel(self):
+        # Signal the device model to pause itself and save its state
+        xstransact.Store("/local/domain/0/device-model/%i"
+                         % self.vm.getDomid(), ('command', 'save'))
+        # Wait for confirmation.  Could do this with a watch but we'd
+        # still end up spinning here waiting for the watch to fire. 
+        state = ''
+        count = 0
+        while state != 'paused':
+            state = xstransact.Read("/local/domain/0/device-model/%i/state"
+                                    % self.vm.getDomid())
+            time.sleep(0.1)
+            count += 1
+            if count > 100:
+                raise VmError('Timed out waiting for device model to save')
+
+    def resumeDeviceModel(self):
+        # Signal the device model to resume activity after pausing to save.
+        xstransact.Store("/local/domain/0/device-model/%i"
+                         % self.vm.getDomid(), ('command', 'continue'))
+
     def recreate(self):
         self.pid = self.vm.gatherDom(('image/device-model-pid', int))
 
     def destroy(self, suspend = False):
-        if self.pid:
+        if self.pid and not suspend:
             try:
-                sig = signal.SIGKILL
-                if suspend:
-                    log.info("use sigusr1 to signal qemu %d", self.pid)
-                    sig = signal.SIGUSR1
-                os.kill(self.pid, sig)
+                os.kill(self.pid, signal.SIGKILL)
             except OSError, exn:
                 log.exception(exn)
             try:
@@ -464,6 +491,8 @@ class HVMImageHandler(ImageHandler):
                 # but we can't wait for it because it's not our child.
                 pass
             self.pid = None
+            state = xstransact.Remove("/local/domain/0/device-model/%i"
+                                      % self.vm.getDomid())
 
 
 class IA64_HVM_ImageHandler(HVMImageHandler):
@@ -506,6 +535,7 @@ class X86_HVM_ImageHandler(HVMImageHandler):
         # were given (but the Xen minimum is for safety, not performance).
         return max(4 * (256 * self.vm.getVCpuCount() + 2 * (maxmem_kb / 1024)),
                    shadow_mem_kb)
+
 
 class X86_Linux_ImageHandler(LinuxImageHandler):
 

@@ -1122,6 +1122,8 @@ class XendDomainInfo:
                     self._clearRestart()
 
                     if reason == 'suspend':
+                        if self._stateGet() != DOM_STATE_SUSPENDED:
+                            self.image.saveDeviceModel()
                         self._stateSet(DOM_STATE_SUSPENDED)
                         # Don't destroy the domain.  XendCheckpoint will do
                         # this once it has finished.  However, stop watching
@@ -1764,6 +1766,9 @@ class XendDomainInfo:
             ResumeDomain(self.domid)
         except:
             log.exception("XendDomainInfo.resume: xc.domain_resume failed on domain %s." % (str(self.domid)))
+        if self.is_hvm():
+            self.image.resumeDeviceModel()
+
 
     #
     # Channels for xenstore and console

@@ -186,6 +186,12 @@ void xenstore_parse_domain_config(int domid)
         fprintf(logfile, "Watching %s\n", buf);
     }
 
+    /* Set a watch for suspend requests from the migration tools */
+    if (pasprintf(&buf, 
+                  "/local/domain/0/device-model/%u/command", domid) != -1) {
+        xs_watch(xsh, buf, "dm-command");
+        fprintf(logfile, "Watching %s\n", buf);
+    }
 
  out:
     free(type);
@@ -310,6 +316,52 @@ void xenstore_process_logdirty_event(void)
 }
 
 
+/* Accept state change commands from the control tools */
+static void xenstore_process_dm_command_event(void)
+{
+    char *path = NULL, *command = NULL;
+    unsigned int len;
+    extern int suspend_requested;
+
+    if (pasprintf(&path, 
+                  "/local/domain/0/device-model/%u/command", domid) == -1) {
+        fprintf(logfile, "out of memory reading dm command\n");
+        goto out;
+    }
+    command = xs_read(xsh, XBT_NULL, path, &len);
+    if (!command)
+        goto out;
+    
+    if (!strncmp(command, "save", len)) {
+        fprintf(logfile, "dm-command: pause and save state\n");
+        suspend_requested = 1;
+    } else if (!strncmp(command, "continue", len)) {
+        fprintf(logfile, "dm-command: continue after state save\n");
+        suspend_requested = 0;
+    } else {
+        fprintf(logfile, "dm-command: unknown command\"%*s\"\n", len, command);
+    }
+
+ out:
+    free(path);
+    free(command);
+}
+
+void xenstore_record_dm_state(char *state)
+{
+    char *path = NULL;
+
+    if (pasprintf(&path, 
+                  "/local/domain/0/device-model/%u/state", domid) == -1) {
+        fprintf(logfile, "out of memory recording dm state\n");
+        goto out;
+    }
+    if (!xs_write(xsh, XBT_NULL, path, state, strlen(state)))
+        fprintf(logfile, "error recording dm state\n");
+
+ out:
+    free(path);
+}
 
 void xenstore_process_event(void *opaque)
 {
@@ -322,6 +374,11 @@ void xenstore_process_event(void *opaque)
 
     if (!strcmp(vec[XS_WATCH_TOKEN], "logdirty")) {
         xenstore_process_logdirty_event();
+        goto out;
+    }
+
+    if (!strcmp(vec[XS_WATCH_TOKEN], "dm-command")) {
+        xenstore_process_dm_command_event();
         goto out;
     }
 
