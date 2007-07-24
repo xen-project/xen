@@ -175,6 +175,8 @@ static int destroy_domain(void *_domain)
 	if (domain->interface)
 		munmap(domain->interface, getpagesize());
 
+	fire_watches(NULL, "@releaseDomain", false);
+
 	return 0;
 }
 
@@ -197,7 +199,7 @@ static void domain_cleanup(void)
 				continue;
 		}
 		talloc_free(domain->conn);
-		notify = 1;
+		notify = 0; /* destroy_domain() fires the watch */
 	}
 
 	if (notify)
@@ -246,7 +248,6 @@ static struct domain *new_domain(void *context, unsigned int domid,
 {
 	struct domain *domain;
 	int rc;
-
 
 	domain = talloc(context, struct domain);
 	domain->port = 0;
@@ -361,7 +362,7 @@ void do_introduce(struct connection *conn, struct buffered_data *in)
 		/* Now domain belongs to its connection. */
 		talloc_steal(domain->conn, domain);
 
-		fire_watches(conn, "@introduceDomain", false);
+		fire_watches(NULL, "@introduceDomain", false);
 	} else if ((domain->mfn == mfn) && (domain->conn != conn)) {
 		/* Use XS_INTRODUCE for recreating the xenbus event-channel. */
 		if (domain->port)
@@ -413,8 +414,6 @@ void do_release(struct connection *conn, const char *domid_str)
 	}
 
 	talloc_free(domain->conn);
-
-	fire_watches(conn, "@releaseDomain", false);
 
 	send_ack(conn, XS_RELEASE);
 }
