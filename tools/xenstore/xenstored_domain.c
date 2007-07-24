@@ -76,7 +76,6 @@ struct domain
 
 static LIST_HEAD(domains);
 
-/* FIXME: Mark connection as broken (close it?) when this happens. */
 static bool check_indexes(XENSTORE_RING_IDX cons, XENSTORE_RING_IDX prod)
 {
 	return ((prod - cons) <= XENSTORE_RING_SIZE);
@@ -102,7 +101,8 @@ static const void *get_input_chunk(XENSTORE_RING_IDX cons,
 	return buf + MASK_XENSTORE_IDX(cons);
 }
 
-static int writechn(struct connection *conn, const void *data, unsigned int len)
+static int writechn(struct connection *conn,
+		    const void *data, unsigned int len)
 {
 	uint32_t avail;
 	void *dest;
@@ -113,6 +113,7 @@ static int writechn(struct connection *conn, const void *data, unsigned int len)
 	cons = intf->rsp_cons;
 	prod = intf->rsp_prod;
 	mb();
+
 	if (!check_indexes(cons, prod)) {
 		errno = EIO;
 		return -1;

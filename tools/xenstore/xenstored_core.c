@@ -1266,7 +1266,7 @@ static void handle_input(struct connection *conn)
 	if (in->inhdr) {
 		bytes = conn->read(conn, in->hdr.raw + in->used,
 				   sizeof(in->hdr) - in->used);
-		if (bytes <= 0)
+		if (bytes < 0)
 			goto bad_client;
 		in->used += bytes;
 		if (in->used != sizeof(in->hdr))
@@ -1288,7 +1288,7 @@ static void handle_input(struct connection *conn)
 
 	bytes = conn->read(conn, in->buffer + in->used,
 			   in->hdr.msg.len - in->used);
-	if (bytes <= 0)
+	if (bytes < 0)
 		goto bad_client;
 
 	in->used += bytes;
@@ -1341,12 +1341,34 @@ struct connection *new_connection(connwritefn_t *write, connreadfn_t *read)
 
 static int writefd(struct connection *conn, const void *data, unsigned int len)
 {
-	return write(conn->fd, data, len);
+	int rc;
+
+	while ((rc = write(conn->fd, data, len)) < 0) {
+		if (errno == EAGAIN) {
+			rc = 0;
+			break;
+		}
+		if (errno != EINTR)
+			break;
+	}
+
+	return rc;
 }
 
 static int readfd(struct connection *conn, void *data, unsigned int len)
 {
-	return read(conn->fd, data, len);
+	int rc;
+
+	while ((rc = read(conn->fd, data, len)) < 0) {
+		if (errno == EAGAIN) {
+			rc = 0;
+			break;
+		}
+		if (errno != EINTR)
+			break;
+	}
+
+	return rc;
 }
 
 static void accept_connection(int sock, bool canwrite)
@@ -1439,13 +1461,13 @@ static void setup_structure(void)
 static unsigned int hash_from_key_fn(void *k)
 {
 	char *str = k;
-        unsigned int hash = 5381;
-        char c;
+	unsigned int hash = 5381;
+	char c;
 
-        while ((c = *str++))
+	while ((c = *str++))
 		hash = ((hash << 5) + hash) + (unsigned int)c;
 
-        return hash;
+	return hash;
 }
 
 
