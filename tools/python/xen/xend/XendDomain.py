@@ -51,6 +51,7 @@ from xen.xend.xenstore.xstransact import xstransact
 from xen.xend.xenstore.xswatch import xswatch
 from xen.util import mkdir
 from xen.xend import uuid
+from xen.xend import sxp
 
 xc = xen.lowlevel.xc.xc()
 xoptions = XendOptions.instance() 
@@ -968,6 +969,31 @@ class XendDomain:
         try:
             try:
                 domconfig = XendConfig.XendConfig(sxp_obj = config)
+                
+                domains = self.list('all')
+                domains = map(lambda dom: dom.sxpr(), domains)
+                for dom in domains:
+                    if sxp.child_value(config, 'uuid', None):
+                        if domconfig['uuid'] == sxp.child_value(dom, 'uuid'):
+                            if domconfig['name_label'] != sxp.child_value(dom, 'name'):
+                                raise XendError("Domain UUID '%s' is already used." % \
+                                                domconfig['uuid'])
+                            else:
+                                # Update the config for that existing domain
+                                # because it is same name and same UUID.
+                                break
+                        else:
+                            if domconfig['name_label'] == sxp.child_value(dom, 'name'):
+                                raise XendError("Domain name '%s' is already used." % \
+                                                domconfig['name_label'])
+                    else:
+                        if domconfig['name_label'] == sxp.child_value(dom, 'name'):
+                            # Overwrite the auto-generated UUID by the UUID
+                            # of the existing domain. And update the config
+                            # for that existing domain.
+                            domconfig['uuid'] = sxp.child_value(dom, 'uuid')
+                            break
+                
                 dominfo = XendDomainInfo.createDormant(domconfig)
                 log.debug("Creating new managed domain: %s" %
                           dominfo.getName())
