@@ -97,6 +97,7 @@ struct talloc_chunk {
 	struct talloc_chunk *next, *prev;
 	struct talloc_chunk *parent, *child;
 	struct talloc_reference_handle *refs;
+	unsigned int null_refs; /* references from null_context */
 	talloc_destructor_t destructor;
 	const char *name;
 	size_t size;
@@ -189,6 +190,7 @@ void *_talloc(const void *context, size_t size)
 	tc->child = NULL;
 	tc->name = NULL;
 	tc->refs = NULL;
+	tc->null_refs = 0;
 
 	if (context) {
 		struct talloc_chunk *parent = talloc_chunk_from_ptr(context);
@@ -225,7 +227,11 @@ void talloc_set_destructor(const void *ptr, int (*destructor)(void *))
 */
 void talloc_increase_ref_count(const void *ptr)
 {
-	talloc_reference(null_context, ptr);
+	struct talloc_chunk *tc;
+	if (ptr == NULL) return;
+
+	tc = talloc_chunk_from_ptr(ptr);
+	tc->null_refs++;
 }
 
 /*
@@ -285,6 +291,11 @@ static int talloc_unreference(const void *context, const void *ptr)
 
 	if (context == NULL) {
 		context = null_context;
+	}
+
+	if ((context == null_context) && tc->null_refs) {
+		tc->null_refs--;
+		return 0;
 	}
 
 	for (h=tc->refs;h;h=h->next) {
@@ -538,6 +549,11 @@ int talloc_free(void *ptr)
 	}
 
 	tc = talloc_chunk_from_ptr(ptr);
+
+	if (tc->null_refs) {
+		tc->null_refs--;
+		return -1;
+	}
 
 	if (tc->refs) {
 		talloc_reference_destructor(tc->refs);
