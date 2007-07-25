@@ -561,9 +561,6 @@ printk("num_online_cpus=%d, max_cpus=%d\n",num_online_cpus(),max_cpus);
             }
         }
         serial_init_postirq();
-
-        /* Hide the HCDP table from dom0 */
-        efi.hcdp = NULL;
     }
 
     expose_p2m_init();

@@ -137,7 +137,7 @@ setup_pcdp_irq(struct pcdp *pcdp, struct pcdp_uart *uart)
 }
 
 static int __init
-setup_serial_console(struct pcdp *pcdp, struct pcdp_uart *uart)
+setup_serial_console(struct pcdp_uart *uart)
 {
 
 	ns16550_com1.baud = uart->baud ? uart->baud : BAUD_AUTO;
@@ -145,11 +145,43 @@ setup_serial_console(struct pcdp *pcdp, struct pcdp_uart *uart)
 	if (uart->bits)
 		ns16550_com1.data_bits = uart->bits;
 
-	setup_pcdp_irq(pcdp, uart);
+	setup_pcdp_irq(efi.hcdp, uart);
+
+	/* Hide the HCDP table from dom0, xencons will be the console */
+	efi.hcdp = NULL;
 
 	return 0;
 }
+
+static int __init
+setup_vga_console(struct pcdp_vga *vga)
+{
+#ifdef CONFIG_VGA
+	/*
+	 * There was no console= in the original cmdline, and the PCDP
+	 * is telling us VGA is the primary console.  We can call
+	 * cmdline_parse() manually to make things appear automagic.
+	 *
+	 * NB - cmdline_parse() expects the first part of the cmdline
+	 * to be the image name.  So "pcdp" below is just filler.
+	 */
+	char *console_cmdline = "pcdp console=vga";
+
+	cmdline_parse(console_cmdline);
+
+	/*
+	 * Leave efi.hcdp intact since dom0 will take ownership.
+	 * vga=keep is handled in start_kernel().
+	 */
+
+	return 0;
 #else
+	return -ENODEV;
+#endif
+}
+
+#else /* XEN */
+
 static int __init
 setup_serial_console(struct pcdp_uart *uart)
 {
@@ -184,33 +216,27 @@ setup_vga_console(struct pcdp_vga *vga)
 	return -ENODEV;
 #endif
 }
-#endif
+#endif /* XEN */
 
 int __init
 efi_setup_pcdp_console(char *cmdline)
 {
 	struct pcdp *pcdp;
 	struct pcdp_uart *uart;
-#ifndef XEN
 	struct pcdp_device *dev, *end;
-#endif
 	int i, serial = 0;
 
 	pcdp = efi.hcdp;
 	if (!pcdp)
 		return -ENODEV;
 
-#ifndef XEN
 	printk(KERN_INFO "PCDP: v%d at 0x%lx\n", pcdp->rev, __pa(pcdp));
-#endif
 
 	if (strstr(cmdline, "console=hcdp")) {
 		if (pcdp->rev < 3)
 			serial = 1;
 	} else if (strstr(cmdline, "console=")) {
-#ifndef XEN
 		printk(KERN_INFO "Explicit \"console=\"; ignoring PCDP\n");
-#endif
 		return -ENODEV;
 	}
 
@@ -220,17 +246,12 @@ efi_setup_pcdp_console(char *cmdline)
 	for (i = 0, uart = pcdp->uart; i < pcdp->num_uarts; i++, uart++) {
 		if (uart->flags & PCDP_UART_PRIMARY_CONSOLE || serial) {
 			if (uart->type == PCDP_CONSOLE_UART) {
-#ifndef XEN
 				return setup_serial_console(uart);
-#else
-				return setup_serial_console(pcdp, uart);
-#endif
 				
 			}
 		}
 	}
 
-#ifndef XEN
 	end = (struct pcdp_device *) ((u8 *) pcdp + pcdp->length);
 	for (dev = (struct pcdp_device *) (pcdp->uart + pcdp->num_uarts);
 	     dev < end;
@@ -241,7 +262,6 @@ efi_setup_pcdp_console(char *cmdline)
 			}
 		}
 	}
-#endif
 
 	return -ENODEV;
 }
