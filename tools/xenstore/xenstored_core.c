@@ -1368,6 +1368,12 @@ static int readfd(struct connection *conn, void *data, unsigned int len)
 			break;
 	}
 
+	/* Reading zero length means we're done with this connection. */
+	if ((rc == 0) && (len != 0)) {
+		errno = EBADF;
+		rc = -1;
+	}
+
 	return rc;
 }
 
