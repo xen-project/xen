@@ -530,10 +530,10 @@ int thash_purge_and_insert(VCPU *v, u64 pte, u64 itir, u64 ifa, int type)
 {
     u64 ps;//, va;
     u64 phy_pte;
-    ia64_rr vrr, mrr;
+    ia64_rr mrr;
     int ret = 0;
+
     ps = itir_ps(itir);
-    vcpu_get_rr(current, ifa, &vrr.rrval);
     mrr.rrval = ia64_get_rr(ifa);
     if(VMX_DOMAIN(v)){
         phy_pte = translate_phy_pte(v, &pte, itir, ifa);
