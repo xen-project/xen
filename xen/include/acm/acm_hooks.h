@@ -112,7 +112,10 @@ struct acm_operations {
     int  (*pre_grant_setup)            (domid_t id);
     void (*fail_grant_setup)           (domid_t id);
     /* generic domain-requested decision hooks (can be NULL) */
-    int (*sharing)                     (ssidref_t ssidref1, ssidref_t ssidref2);
+    int (*sharing)                     (ssidref_t ssidref1,
+                                        ssidref_t ssidref2);
+    int (*authorization)               (ssidref_t ssidref1,
+                                        ssidref_t ssidref2);
     /* determine whether the default policy is installed */
     int (*is_default_policy)           (void);
 };
@@ -148,6 +151,8 @@ static inline int acm_is_policy(char *buf, unsigned long len)
 { return 0; }
 static inline int acm_sharing(ssidref_t ssidref1, ssidref_t ssidref2)
 { return 0; }
+static inline int acm_authorization(ssidref_t ssidref1, ssidref_t ssidref2)
+{ return 0; }
 static inline int acm_domain_create(struct domain *d, ssidref_t ssidref)
 { return 0; }
 static inline void acm_domain_destroy(struct domain *d)
@@ -157,6 +162,19 @@ static inline void acm_domain_destroy(struct domain *d)
 
 #else
 
+static inline void acm_domain_ssid_onto_list(struct acm_ssid_domain *ssid)
+{
+    write_lock(&ssid_list_rwlock);
+    list_add(&ssid->node, &ssid_list);
+    write_unlock(&ssid_list_rwlock);
+}
+
+static inline void acm_domain_ssid_off_list(struct acm_ssid_domain *ssid)
+{
+    write_lock(&ssid_list_rwlock);
+    list_del(&ssid->node);
+    write_unlock(&ssid_list_rwlock);
+}
 
 static inline int acm_pre_eventchannel_unbound(domid_t id1, domid_t id2)
 {
@@ -241,6 +259,7 @@ static inline void acm_domain_destroy(struct domain *d)
         if (acm_secondary_ops->domain_destroy != NULL)
             acm_secondary_ops->domain_destroy(ssid, d);
         /* free security ssid for the destroyed domain (also if null policy */
+        acm_domain_ssid_off_list(ssid);
         acm_free_domain_ssid((struct acm_ssid_domain *)(ssid));
     }
 }
@@ -250,13 +269,16 @@ static inline int acm_domain_create(struct domain *d, ssidref_t ssidref)
 {
     void *subject_ssid = current->domain->ssid;
     domid_t domid = d->domain_id;
-    int rc = 0;
+    int rc;
 
     read_lock(&acm_bin_pol_rwlock);
     /*
        To be called when a domain is created; returns '0' if the
        domain is allowed to be created, != '0' if not.
      */
+    rc = acm_init_domain_ssid(d, ssidref);
+    if (rc != ACM_OK)
+        goto error_out;
 
     if ((acm_primary_ops->domain_create != NULL) &&
         acm_primary_ops->domain_create(subject_ssid, ssidref, domid)) {
@@ -267,18 +289,17 @@ static inline int acm_domain_create(struct domain *d, ssidref_t ssidref)
         /* roll-back primary */
         if (acm_primary_ops->domain_destroy != NULL)
             acm_primary_ops->domain_destroy(d->ssid, d);
-        acm_free_domain_ssid(d->ssid);
         rc = ACM_ACCESS_DENIED;
     }
 
-    if (rc == 0) {
-        rc = acm_init_domain_ssid_new(d, ssidref);
-
-        if (rc != ACM_OK) {
-            acm_domain_destroy(d);
-        }
+    if ( rc == ACM_OK )
+    {
+        acm_domain_ssid_onto_list(d->ssid);
+    } else {
+        acm_free_domain_ssid(d->ssid);
     }
 
+error_out:
     read_unlock(&acm_bin_pol_rwlock);
     return rc;
 }
@@ -291,6 +312,19 @@ static inline int acm_sharing(ssidref_t ssidref1, ssidref_t ssidref2)
         return ACM_ACCESS_DENIED;
     else if ((acm_secondary_ops->sharing != NULL) &&
              acm_secondary_ops->sharing(ssidref1, ssidref2)) {
+        return ACM_ACCESS_DENIED;
+    } else
+        return ACM_ACCESS_PERMITTED;
+}
+
+
+static inline int acm_authorization(ssidref_t ssidref1, ssidref_t ssidref2)
+{
+    if ((acm_primary_ops->authorization != NULL) &&
+        acm_primary_ops->authorization(ssidref1, ssidref2))
+        return ACM_ACCESS_DENIED;
+    else if ((acm_secondary_ops->authorization != NULL) &&
+             acm_secondary_ops->authorization(ssidref1, ssidref2)) {
         return ACM_ACCESS_DENIED;
     } else
         return ACM_ACCESS_PERMITTED;

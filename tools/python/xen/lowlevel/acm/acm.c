@@ -148,9 +148,10 @@ static PyObject *getdecision(PyObject * self, PyObject * args)
     char *arg1_name, *arg1, *arg2_name, *arg2, *decision = NULL;
     struct acm_getdecision getdecision;
     int xc_handle, rc;
+    uint32_t hooktype;
 
-    if (!PyArg_ParseTuple(args, "ssss", &arg1_name,
-                          &arg1, &arg2_name, &arg2)) {
+    if (!PyArg_ParseTuple(args, "ssssi", &arg1_name,
+                          &arg1, &arg2_name, &arg2, &hooktype)) {
         return NULL;
     }
 
@@ -163,7 +164,7 @@ static PyObject *getdecision(PyObject * self, PyObject * args)
     (strcmp(arg2_name, "domid") && strcmp(arg2_name, "ssidref")))
         return NULL;
 
-    getdecision.hook = ACMHOOK_sharing;
+    getdecision.hook = hooktype;
     if (!strcmp(arg1_name, "domid")) {
         getdecision.get_decision_by1 = ACM_GETBY_domainid;
         getdecision.id1.domainid = atoi(arg1);

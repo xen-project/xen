@@ -1460,9 +1460,13 @@ class XendDomainInfo:
         # allocation of 1MB. We free up 2MB here to be on the safe side.
         balloon.free(2*1024) # 2MB should be plenty
 
-        ssidref = security.calc_dom_ssidref_from_info(self.info)
-        if ssidref == 0 and security.on():
-            raise VmError('VM is not properly labeled.')
+        ssidref = 0
+        if security.on():
+            ssidref = security.calc_dom_ssidref_from_info(self.info)
+            if ssidref == 0:
+                raise VmError('VM is not properly labeled.')
+            if security.has_authorization(ssidref) == False:
+                raise VmError("VM is not authorized to run.")
 
         try:
             self.domid = xc.domain_create(

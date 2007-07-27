@@ -314,26 +314,7 @@ acm_init(char *policy_start,
     return ret;
 }
 
-int
-acm_init_domain_ssid(domid_t id, ssidref_t ssidref)
-{
-    struct domain *subj = rcu_lock_domain_by_id(id);
-    int ret;
- 
-    if (subj == NULL)
-    {
-        printk("%s: ACM_NULL_POINTER ERROR (id=%x).\n", __func__, id);
-        return ACM_NULL_POINTER_ERROR;
-    }
-
-    ret = acm_init_domain_ssid_new(subj, ssidref);
-
-    rcu_unlock_domain(subj);
-
-    return ret;
-}
-
-int acm_init_domain_ssid_new(struct domain *subj, ssidref_t ssidref)
+int acm_init_domain_ssid(struct domain *subj, ssidref_t ssidref)
 {
     struct acm_ssid_domain *ssid;
     int ret1, ret2;
@@ -374,10 +355,6 @@ int acm_init_domain_ssid_new(struct domain *subj, ssidref_t ssidref)
         return ACM_INIT_SSID_ERROR;
     }
 
-    write_lock(&ssid_list_rwlock);
-    list_add(&ssid->node, &ssid_list);
-    write_unlock(&ssid_list_rwlock);
-
     printkd("%s: assigned domain %x the ssidref=%x.\n",
            __func__, subj->domain_id, ssid->ssidref);
     return ACM_OK;
@@ -398,10 +375,6 @@ acm_free_domain_ssid(struct acm_ssid_domain *ssid)
     if (acm_secondary_ops->free_domain_ssid != NULL)
         acm_secondary_ops->free_domain_ssid(ssid->secondary_ssid);
     ssid->secondary_ssid = NULL;
-
-    write_lock(&ssid_list_rwlock);
-    list_del(&ssid->node);
-    write_unlock(&ssid_list_rwlock);
 
     xfree(ssid);
     printkd("%s: Freed individual domain ssid (domain=%02x).\n",

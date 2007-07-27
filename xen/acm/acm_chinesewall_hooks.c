@@ -685,6 +685,7 @@ struct acm_operations acm_chinesewall_ops = {
     .fail_grant_setup = NULL,
     /* generic domain-requested decision hooks */
     .sharing = NULL,
+    .authorization = NULL,
 
     .is_default_policy = chwall_is_default_policy,
 };

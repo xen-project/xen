@@ -62,6 +62,10 @@ empty_line_re = re.compile("^\s*$")
 binary_name_re = re.compile(".*[chwall|ste|chwall_ste].*\.bin", re.IGNORECASE)
 policy_name_re = re.compile(".*[chwall|ste|chwall_ste].*", re.IGNORECASE)
 
+#decision hooks known to the hypervisor
+ACMHOOK_sharing = 1
+ACMHOOK_authorization = 2
+
 #other global variables
 NULL_SSIDREF = 0
 
@@ -453,7 +457,8 @@ def get_decision(arg1, arg2):
         err("Invalid id or ssidref type, string or int required")
 
     try:
-        decision = acm.getdecision(arg1[0], arg1[1], arg2[0], arg2[1])
+        decision = acm.getdecision(arg1[0], arg1[1], arg2[0], arg2[1],
+                                   ACMHOOK_sharing)
     except:
         err("Cannot determine decision.")
 
@@ -461,6 +466,21 @@ def get_decision(arg1, arg2):
         return decision
     else:
         err("Cannot determine decision (Invalid parameter).")
+
+
+def has_authorization(ssidref):
+    """ Check if the domain with the given ssidref has authorization to
+        run on this system. To have authoriztion dom0's STE types must
+        be a superset of that of the domain's given through its ssidref.
+    """
+    rc = True
+    dom0_ssidref = int(acm.getssid(0)['ssidref'])
+    decision = acm.getdecision('ssidref', str(dom0_ssidref),
+                               'ssidref', str(ssidref),
+                               ACMHOOK_authorization)
+    if decision == "DENIED":
+        rc = False
+    return rc
 
 
 def hv_chg_policy(bin_pol, del_array, chg_array):

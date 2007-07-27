@@ -38,15 +38,16 @@ ssidref_t dom0_ste_ssidref = 0x0001;
 /* local cache structures for STE policy */
 struct ste_binary_policy ste_bin_pol;
 
-static inline int have_common_type (ssidref_t ref1, ssidref_t ref2) {
+static inline int have_common_type (ssidref_t ref1, ssidref_t ref2)
+{
     int i;
 
     if ( ref1 >= 0 && ref1 < ste_bin_pol.max_ssidrefs &&
          ref2 >= 0 && ref2 < ste_bin_pol.max_ssidrefs )
     {
         for( i = 0; i< ste_bin_pol.max_types; i++ )
-            if ( ste_bin_pol.ssidrefs[ref1*ste_bin_pol.max_types + i] &&
-                 ste_bin_pol.ssidrefs[ref2*ste_bin_pol.max_types + i])
+            if ( ste_bin_pol.ssidrefs[ref1 * ste_bin_pol.max_types + i] &&
+                 ste_bin_pol.ssidrefs[ref2 * ste_bin_pol.max_types + i])
             {
                 printkd("%s: common type #%02x.\n", __func__, i);
                 return 1;
@@ -54,6 +55,26 @@ static inline int have_common_type (ssidref_t ref1, ssidref_t ref2) {
     }
     return 0;
 }
+
+static inline int is_superset(ssidref_t ref1, ssidref_t ref2)
+{
+    int i;
+
+    if ( ref1 >= 0 && ref1 < ste_bin_pol.max_ssidrefs &&
+         ref2 >= 0 && ref2 < ste_bin_pol.max_ssidrefs )
+    {
+        for( i = 0; i< ste_bin_pol.max_types; i++ )
+            if (!ste_bin_pol.ssidrefs[ref1 * ste_bin_pol.max_types + i] &&
+                 ste_bin_pol.ssidrefs[ref2 * ste_bin_pol.max_types + i])
+            {
+                return 0;
+            }
+    } else {
+        return 0;
+    }
+    return 1;
+}
+
 
 /* Helper function: return = (subj and obj share a common type) */
 static int share_common_type(struct domain *subj, struct domain *obj)
@@ -609,6 +630,7 @@ ste_pre_domain_create(void *subject_ssid, ssidref_t ssidref)
 {      
     /* check for ssidref in range for policy */
     ssidref_t ste_ssidref;
+
     traceprintk("%s.\n", __func__);
 
     read_lock(&acm_bin_pol_rwlock);
@@ -833,6 +855,15 @@ ste_sharing(ssidref_t ssidref1, ssidref_t ssidref2)
 }
 
 static int
+ste_authorization(ssidref_t ssidref1, ssidref_t ssidref2)
+{
+    int iss = is_superset(
+        GET_SSIDREF(ACM_SIMPLE_TYPE_ENFORCEMENT_POLICY, ssidref1),
+        GET_SSIDREF(ACM_SIMPLE_TYPE_ENFORCEMENT_POLICY, ssidref2));
+    return (iss ? ACM_ACCESS_PERMITTED : ACM_ACCESS_DENIED);
+}
+
+static int
 ste_is_default_policy(void)
 {
     return ((ste_bin_pol.max_types    == 1) &&
@@ -867,6 +898,7 @@ struct acm_operations acm_simple_type_enforcement_ops = {
     .pre_grant_setup        = ste_pre_grant_setup,
     .fail_grant_setup       = NULL,
     .sharing                = ste_sharing,
+    .authorization          = ste_authorization,
 
     .is_default_policy      = ste_is_default_policy,
 };
