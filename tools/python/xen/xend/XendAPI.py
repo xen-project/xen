@@ -2438,6 +2438,13 @@ class XendAPI(object):
         except XendError, exn:
             return xen_api_error(['INTERNAL_ERROR', str(exn)])
 
+    def console_set_other_config(self, session, console_ref, other_config):
+        xd = XendDomain.instance()
+        vm = xd.get_vm_with_dev_uuid('console', console_ref)
+        vm.set_console_other_config(console_ref, other_config)
+        xd.managed_config_save(vm)
+        return xen_api_success_void()
+
     # Xen API: Class SR
     # ----------------------------------------------------------------
     SR_attr_ro = ['VDIs',

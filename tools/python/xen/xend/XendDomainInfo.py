@@ -2633,6 +2633,9 @@ class XendDomainInfo:
 
         return dev_uuid
 
+    def set_console_other_config(self, console_uuid, other_config):
+        self.info.console_update(console_uuid, 'other_config', other_config)
+
     def destroy_device_by_uuid(self, dev_type, dev_uuid):
         if dev_uuid not in self.info['devices']:
             raise XendError('Device does not exist')

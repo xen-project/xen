@@ -129,6 +129,11 @@ XENAPI_PLATFORM_CFG = [ 'acpi', 'apic', 'boot', 'device_model', 'display',
                         'vncconsole', 'vncdisplay', 'vnclisten',
                         'vncpasswd', 'vncunused', 'xauthority']
 
+# Xen API console 'other_config' keys.
+XENAPI_CONSOLE_OTHER_CFG = ['vncunused', 'vncdisplay', 'vnclisten',
+                            'vncpasswd', 'type', 'display', 'xauthority',
+                            'keymap']
+
 # List of XendConfig configuration keys that have no direct equivalent
 # in the old world.
 
@@ -1121,9 +1126,7 @@ class XendConfig(dict):
                 # with vfb
 
                 other_config = {}
-                for key in ['vncunused', 'vncdisplay', 'vnclisten',
-                            'vncpasswd', 'type', 'display', 'xauthority',
-                            'keymap']:
+                for key in XENAPI_CONSOLE_OTHER_CFG:
                     if key in dev_info:
                         other_config[key] = dev_info[key]
                 target['devices'][dev_uuid][1]['other_config'] =  other_config
@@ -1311,6 +1314,13 @@ class XendConfig(dict):
         for dev_uuid, (dev_type, dev_info) in self['devices'].items():
             if dev_uuid == console_uuid:
                 dev_info[key] = value
+                # collapse other_config into dev_info for things
+                # such as vncpasswd, vncunused, etc.
+                if key == 'other_config':
+                    for k in XENAPI_CONSOLE_OTHER_CFG:
+                        if k in dev_info and k not in value:
+                            del dev_info[k]
+                    dev_info.update(value)
                 break
 
     def console_get_all(self, protocol):
