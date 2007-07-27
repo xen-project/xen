@@ -49,7 +49,6 @@ from threading import Thread
 from xen.web.httpserver import HttpServer, UnixHttpServer
 
 from xen.xend import XendNode, XendOptions, XendAPI
-from xen.xend import Vifctl
 from xen.xend.XendLogging import log
 from xen.xend.XendClient import XEN_API_SOCKET
 from xen.xend.XendDomain import instance as xenddomain
@@ -101,8 +100,6 @@ class XendServers:
         if status:
             fcntl.fcntl(status, fcntl.F_SETFD, fcntl.FD_CLOEXEC)
         
-        Vifctl.network('start')
-
         # Prepare to catch SIGTERM (received when 'xend stop' is executed)
         # and call each server's cleanup if possible
         signal.signal(signal.SIGTERM, self.cleanup)

@@ -24,12 +24,16 @@ from xen.xend import XendAPIStore
 from xen.xend.XendBase import XendBase
 from xen.xend.XendPIFMetrics import XendPIFMetrics
 from xen.xend.XendError import *
+from xen.xend import Vifctl
 
 log = logging.getLogger("xend.XendPIF")
 log.setLevel(logging.TRACE)
 
 MAC_RE = re.compile(':'.join(['[0-9a-f]{2}'] * 6))
 IP_IFACE_RE = re.compile(r'^\d+: (\w+):.*mtu (\d+) .* link/\w+ ([0-9a-f:]+)')
+
+
+Vifctl.network('start')
 
 def linux_phy_to_virt(pif_name):
     return 'eth' + re.sub(r'^[a-z]+', '', pif_name)
