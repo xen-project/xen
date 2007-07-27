@@ -2378,11 +2378,13 @@ class XendAPI(object):
         return xen_api_success(cons)
 
     def console_get_location(self, session, console_ref):
+        xendom = XendDomain.instance()
         return xen_api_success(xendom.get_dev_property_by_uuid('console',
                                                                console_ref,
                                                                'location'))
 
     def console_get_protocol(self, session, console_ref):
+        xendom = XendDomain.instance()
         return xen_api_success(xendom.get_dev_property_by_uuid('console',
                                                                console_ref,
                                                                'protocol'))
