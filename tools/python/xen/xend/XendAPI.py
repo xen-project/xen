@@ -2394,6 +2394,12 @@ class XendAPI(object):
         vm = xendom.get_vm_with_dev_uuid('console', console_ref)
         return xen_api_success(vm.get_uuid())
     
+    def console_get_other_config(self, session, console_ref):
+        xendom = XendDomain.instance()        
+        return xen_api_success(xendom.get_dev_property_by_uuid('console',
+                                                               console_ref,
+                                                               'other_config'))
+    
     # object methods
     def console_get_record(self, session, console_ref):
         xendom = XendDomain.instance()
