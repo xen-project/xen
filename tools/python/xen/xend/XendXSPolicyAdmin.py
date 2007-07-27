@@ -56,7 +56,10 @@ class XSPolicyAdmin:
             typ = data[1]
             try:
                 if typ == xsconstants.ACM_POLICY_ID:
-                    self.xsobjs[ref] = ACMPolicy(name=name, ref=ref)
+                    try:
+                        self.xsobjs[ref] = ACMPolicy(name=name, ref=ref)
+                    except Exception, e:
+                        del self.policies[ref]
                 else:
                     del self.policies[ref]
             except Exception, e:
@@ -271,6 +274,10 @@ class XSPolicyAdmin:
                 return pol
         return None
 
+    def get_hv_loaded_policy_name(self):
+        security.refresh_security_policy()
+        return security.active_policy
+
     def get_policy_by_name(self, name):
         for pol in self.xsobjs.values():
             if pol.get_name() == name:
@@ -304,6 +311,18 @@ class XSPolicyAdmin:
         if pol:
             vmlabel = pol.policy_get_domain_label_by_ssidref_formatted(ssidref)
         return vmlabel
+
+    def get_stes_of_vmlabel(self, vmlabel_xapi):
+        """ Get the list of STEs given a VM label in XenAPI format """
+        stes = []
+        loadedpol = self.get_loaded_policy()
+        if loadedpol:
+            tmp = vmlabel_xapi.split(":")
+            if len(tmp) != 3:
+                return []
+            stes = loadedpol.policy_get_stes_of_vmlabel(tmp[2])
+        return stes
+
 
 poladmin = None
 

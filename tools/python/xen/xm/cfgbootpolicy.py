@@ -31,7 +31,11 @@ from xen.util.security import policy_dir_prefix, xen_title_re
 from xen.util.security import boot_filename, altboot_filename
 from xen.util.security import any_title_re, xen_kernel_re, any_module_re
 from xen.util.security import empty_line_re, binary_name_re, policy_name_re
+from xen.util import xsconstants
 from xen.xm.opts import OptionError
+from xen.xm import main as xm_main
+from xen.xm.main import server
+from xen.util.acmpolicy import ACMPolicy
 
 def help():
     return """
@@ -144,6 +148,40 @@ def insert_policy(boot_file, alt_boot_file, user_title, policy_name):
         pass
     return extended_titles[0]
 
+def cfgbootpolicy_xapi(policy, user_title=None):
+    xstype = int(server.xenapi.XSPolicy.get_xstype())
+    if xstype & xsconstants.XS_POLICY_ACM == 0:
+        raise OptionError("ACM policy not supported on system.")
+    if user_title:
+        raise OptionError("Only the default title is supported with Xen-API.")
+
+    policystate = server.xenapi.XSPolicy.get_xspolicy()
+    if int(policystate['type']) == 0:
+        print "No policy is installed."
+        return
+
+    if int(policystate['type']) != xsconstants.XS_POLICY_ACM:
+        print "Unknown policy type '%s'." % policystate['type']
+        return
+    else:
+        xml = policystate['repr']
+        xs_ref = policystate['xs_ref']
+        if not xml:
+            OptionError("No policy installed on system?")
+        acmpol = ACMPolicy(xml=xml)
+        if acmpol.get_name() != policy:
+            raise OptionError("Policy installed on system '%s' does not "
+                              "match the requested policy '%s'" %
+                              (acmpol.get_name(), policy))
+        flags = int(policystate['flags']) | xsconstants.XS_INST_BOOT
+        rc = int(server.xenapi.XSPolicy.activate_xspolicy(xs_ref, flags))
+        if rc == flags:
+            print "Successfully enabled the policy for having the system" \
+                  " booted with."
+        else:
+            print "An error occurred during the operation: %s" % \
+                  xsconstants.xserr2string(rc)
+
 
 def main(argv):
     user_kver = None
@@ -159,24 +197,27 @@ def main(argv):
     if not policy_name_re.match(policy):
         raise OptionError("Illegal policy name: '%s'" % policy)
 
-    policy_file = '/'.join([policy_dir_prefix] + policy.split('.'))
-    src_binary_policy_file = policy_file + ".bin"
-    #check if .bin exists or if policy file exists
-    if not os.path.isfile(src_binary_policy_file):
-        if not os.path.isfile(policy_file + "-security_policy.xml"):
-            raise OptionError("Unknown policy '%s'" % policy)
-        else:
-            err_msg = "Cannot find binary file for policy '%s'." % policy
-            err_msg += " Please use makepolicy to create binary file."
-            raise OptionError(err_msg)
+    if xm_main.serverType == xm_main.SERVER_XEN_API:
+        cfgbootpolicy_xapi(policy)
+    else:
+        policy_file = '/'.join([policy_dir_prefix] + policy.split('.'))
+        src_binary_policy_file = policy_file + ".bin"
+        #check if .bin exists or if policy file exists
+        if not os.path.isfile(src_binary_policy_file):
+            if not os.path.isfile(policy_file + "-security_policy.xml"):
+                raise OptionError("Unknown policy '%s'" % policy)
+            else:
+                err_msg = "Cannot find binary file for policy '%s'." % policy
+                err_msg += " Please use makepolicy to create binary file."
+                raise OptionError(err_msg)
     
-    dst_binary_policy_file = "/boot/" + policy + ".bin"
-    shutil.copyfile(src_binary_policy_file, dst_binary_policy_file)
+        dst_binary_policy_file = "/boot/" + policy + ".bin"
+        shutil.copyfile(src_binary_policy_file, dst_binary_policy_file)
     
-    entryname = insert_policy(boot_filename, altboot_filename,
-                              user_title, policy)
-    print "Boot entry '%s' extended and \'%s\' copied to /boot" \
-          % (entryname, policy + ".bin")
+        entryname = insert_policy(boot_filename, altboot_filename,
+                                  user_title, policy)
+        print "Boot entry '%s' extended and \'%s\' copied to /boot" \
+              % (entryname, policy + ".bin")
 
 if __name__ == '__main__':
     try:

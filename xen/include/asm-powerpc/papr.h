@@ -66,6 +66,7 @@
 #define H_IPOLL                 0x0070  /* Crit Yes             int     */
 #define H_XIRR                  0x0074  /* Crit Yes             int     */
 #define H_MIGRATE_PCI_TCE       0x0078  /* Norm Yes-if LRDR     migrate */
+#define H_PERFMON               0x007c  /* Norm Yes-if PMU      perfmon */
 #define H_CEDE                  0x00e0  /* Crit Yes             splpar  */
 #define H_CONFER                0x00e4
 #define H_PROD                  0x00e8

@@ -575,3 +575,42 @@ xen_vif_get_uuid(xen_session *session, char **result, xen_vif vif)
     XEN_CALL_("VIF.get_uuid");
     return session->ok;
 }
+
+
+bool
+xen_vif_set_security_label(xen_session *session, int64_t *result, xen_vif vif,
+                           char *label, char *oldlabel)
+{
+    abstract_value param_values[] =
+        {
+            { .type = &abstract_type_string,
+              .u.string_val = vif },
+            { .type = &abstract_type_string,
+              .u.string_val = label },
+            { .type = &abstract_type_string,
+              .u.string_val = oldlabel },
+        };
+
+    abstract_type result_type = abstract_type_int;
+
+    *result = 0;
+    XEN_CALL_("VIF.set_security_label");
+    return session->ok;
+}
+
+
+bool
+xen_vif_get_security_label(xen_session *session, char **result, xen_vif vif)
+{
+    abstract_value param_values[] =
+        {
+            { .type = &abstract_type_string,
+              .u.string_val = vif },
+        };
+
+    abstract_type result_type = abstract_type_string;
+
+    *result = NULL;
+    XEN_CALL_("VIF.get_security_label");
+    return session->ok;
+}

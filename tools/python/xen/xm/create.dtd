@@ -38,6 +38,7 @@
                  memory,
                  vbd*,
                  vif*,
+                 vtpm*,
                  console*,
                  platform*,
                  vcpu_param*,
@@ -49,7 +50,8 @@
                  actions_after_shutdown %NORMAL_EXIT; #REQUIRED 
                  actions_after_reboot   %NORMAL_EXIT; #REQUIRED
                  actions_after_crash    %CRASH_BEHAVIOUR; #REQUIRED
-                 PCI_bus                CDATA #REQUIRED> 
+                 PCI_bus                CDATA #REQUIRED
+                 security_label         CDATA #IMPLIED>
 
 <!ELEMENT memory EMPTY> 
 <!ATTLIST memory static_min      CDATA #REQUIRED
@@ -72,7 +74,11 @@
                  mtu             CDATA       #REQUIRED
                  device          CDATA       #REQUIRED
                  qos_algorithm_type CDATA    #REQUIRED
-                 network         CDATA       #IMPLIED> 
+                 network         CDATA       #IMPLIED
+                 security_label  CDATA       #IMPLIED>
+
+<!ELEMENT vtpm   (name*)>
+<!ATTLIST vtpm   backend         CDATA #REQUIRED>
 
 <!ELEMENT console (other_config*)>
 <!ATTLIST console protocol       (vt100|rfb|rdp) #REQUIRED>

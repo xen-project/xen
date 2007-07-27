@@ -173,7 +173,25 @@ extern unsigned long acpi_wakeup_address;
 /* early initialization routine */
 extern void acpi_reserve_bootmem(void);
 
-#endif /*CONFIG_ACPI_SLEEP*/
+extern struct acpi_sleep_info acpi_sinfo;
+#define acpi_video_flags bootsym(video_flags)
+struct xenpf_enter_acpi_sleep;
+extern int acpi_enter_sleep(struct xenpf_enter_acpi_sleep *sleep);
+extern int acpi_enter_state(u32 state);
+
+struct acpi_sleep_info {
+    uint16_t pm1a_cnt;
+    uint16_t pm1b_cnt;
+    uint16_t pm1a_evt;
+    uint16_t pm1b_evt;
+    uint16_t pm1a_cnt_val;
+    uint16_t pm1b_cnt_val;
+    uint32_t sleep_state;
+    uint64_t wakeup_vector;
+    uint32_t vector_width;
+};
+
+#endif /* CONFIG_ACPI_SLEEP */
 
 extern u8 x86_acpiid_to_apicid[];
 #define MAX_LOCAL_APIC 256

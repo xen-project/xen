@@ -98,10 +98,6 @@ def save(fd, dominfo, network, live, dst, checkpoint=False):
                 log.info("Domain %d suspended.", dominfo.getDomid())
                 dominfo.migrateDevices(network, dst, DEV_MIGRATE_STEP3,
                                        domain_name)
-                #send signal to device model for save
-                if hvm:
-                    log.info("release_devices for hvm domain")
-                    dominfo._releaseDevices(True)
                 tochild.write("done\n")
                 tochild.flush()
                 log.debug('Written done')
@@ -139,7 +135,7 @@ def save(fd, dominfo, network, live, dst, checkpoint=False):
     except Exception, exn:
         log.exception("Save failed on domain %s (%s).", domain_name,
                       dominfo.getDomid())
-
+        
         dominfo.resumeDomain()
         log.debug("XendCheckpoint.save: resumeDomain")
 

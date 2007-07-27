@@ -14,7 +14,7 @@
 #include <xen/perfc.h>
 #include <xen/sched.h>
 #include <xen/event.h>
-#include <xen/shadow.h>
+#include <xen/paging.h>
 #include <xen/iocap.h>
 #include <xen/guest_access.h>
 #include <xen/hypercall.h>
@@ -127,7 +127,7 @@ static void populate_physmap(struct memop_args *a)
 
         mfn = page_to_mfn(page);
 
-        if ( unlikely(shadow_mode_translate(d)) )
+        if ( unlikely(paging_mode_translate(d)) )
         {
             for ( j = 0; j < (1 << a->extent_order); j++ )
                 guest_physmap_add_page(d, gpfn + j, mfn + j);
@@ -236,7 +236,7 @@ static long translate_gpfn_list(
     if ( (d = rcu_lock_domain_by_id(op.domid)) == NULL )
         return -ESRCH;
 
-    if ( !shadow_mode_translate(d) )
+    if ( !paging_mode_translate(d) )
     {
         rcu_unlock_domain(d);
         return -EINVAL;
@@ -434,7 +434,7 @@ static long memory_exchange(XEN_GUEST_HANDLE(xen_memory_exchange_t) arg)
                 &gpfn, exch.out.extent_start, (i<<out_chunk_order)+j, 1);
 
             mfn = page_to_mfn(page);
-            if ( unlikely(shadow_mode_translate(d)) )
+            if ( unlikely(paging_mode_translate(d)) )
             {
                 for ( k = 0; k < (1UL << exch.out.extent_order); k++ )
                     guest_physmap_add_page(d, gpfn + k, mfn + k);

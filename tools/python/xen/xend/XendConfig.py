@@ -129,6 +129,11 @@ XENAPI_PLATFORM_CFG = [ 'acpi', 'apic', 'boot', 'device_model', 'display',
                         'vncconsole', 'vncdisplay', 'vnclisten',
                         'vncpasswd', 'vncunused', 'xauthority']
 
+# Xen API console 'other_config' keys.
+XENAPI_CONSOLE_OTHER_CFG = ['vncunused', 'vncdisplay', 'vnclisten',
+                            'vncpasswd', 'type', 'display', 'xauthority',
+                            'keymap']
+
 # List of XendConfig configuration keys that have no direct equivalent
 # in the old world.
 
@@ -636,6 +641,8 @@ class XendConfig(dict):
                 except ValueError, e:
                     raise XendConfigError('cpus = %s: %s' % (cfg['cpus'], e))
 
+        if not 'security' in cfg and sxp.child_value(sxp_cfg, 'security'):
+            cfg['security'] = sxp.child_value(sxp_cfg, 'security')
         if 'security' in cfg and not cfg.get('security_label'):
             secinfo = cfg['security']
             if isinstance(secinfo, list):
@@ -1083,6 +1090,12 @@ class XendConfig(dict):
 
             self.device_duplicate_check(dev_type, dev_info, target)
 
+            if dev_type == 'vif':
+                if dev_info.get('policy') and dev_info.get('label'):
+                    dev_info['security_label'] = "%s:%s:%s" % \
+                        (xsconstants.ACM_POLICY_ID,
+                         dev_info['policy'],dev_info['label'])
+
             # create uuid if it doesn't exist
             dev_uuid = dev_info.get('uuid', None)
             if not dev_uuid:
@@ -1113,9 +1126,7 @@ class XendConfig(dict):
                 # with vfb
 
                 other_config = {}
-                for key in ['vncunused', 'vncdisplay', 'vnclisten',
-                            'vncpasswd', 'type', 'display', 'xauthority',
-                            'keymap']:
+                for key in XENAPI_CONSOLE_OTHER_CFG:
                     if key in dev_info:
                         other_config[key] = dev_info[key]
                 target['devices'][dev_uuid][1]['other_config'] =  other_config
@@ -1157,6 +1168,10 @@ class XendConfig(dict):
                     network = XendAPIStore.get(
                         cfg_xenapi.get('network'), 'network')
                     dev_info['bridge'] = network.get_name_label()
+
+                if cfg_xenapi.get('security_label'):
+                    dev_info['security_label'] = \
+                         cfg_xenapi.get('security_label')
                 
                 dev_uuid = cfg_xenapi.get('uuid', None)
                 if not dev_uuid:
@@ -1299,6 +1314,13 @@ class XendConfig(dict):
         for dev_uuid, (dev_type, dev_info) in self['devices'].items():
             if dev_uuid == console_uuid:
                 dev_info[key] = value
+                # collapse other_config into dev_info for things
+                # such as vncpasswd, vncunused, etc.
+                if key == 'other_config':
+                    for k in XENAPI_CONSOLE_OTHER_CFG:
+                        if k in dev_info and k not in value:
+                            del dev_info[k]
+                    dev_info.update(value)
                 break
 
     def console_get_all(self, protocol):

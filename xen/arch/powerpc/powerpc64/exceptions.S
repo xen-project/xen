@@ -105,6 +105,12 @@ LOAD_GPRS "(\from+1)", \to, \uregs
     nop
 .endm
 
+.macro PMU_SAVE_STATE scratch
+    mfspr \scratch,SPRN_MMCR0             /* ensure MMCR0[FCH] is 1 */
+    ori \scratch,\scratch,MMCR0_FCH
+    mtspr SPRN_MMCR0, \scratch
+.endm
+
 .macro EXCEPTION_HEAD parea continue
     /* make room for cpu_user_regs */
     subi r1, r1, STACK_VOLATILE_AREA + UREGS_sizeof
@@ -156,7 +162,7 @@ LOAD_GPRS "(\from+1)", \to, \uregs
     ori r0, r0, MSR_RI@l
     mtmsrd r0
 
-
+    PMU_SAVE_STATE r0
 .endm
 
 /* For exceptions that use HSRR0/1 (preserving the OS's SRR0/1). */
@@ -183,6 +189,7 @@ LOAD_GPRS "(\from+1)", \to, \uregs
     ori r0, r0, MSR_RI@l
     mtmsrd r0
 
+    PMU_SAVE_STATE r0
 .endm
 
 /* Hypervisor exception handling code; copied to physical address zero. */
@@ -328,6 +335,12 @@ ex_fp:
     li r0, 0xe00 /* exception vector for GDB stub */
     bctr
 
+    . = 0xf00
+ex_perfmon:
+    GET_STACK r13 SPRN_SRR1
+    EXCEPTION_HEAD r13 ex_perfmon_continued
+    bctr
+
     .align 3
     .globl exception_vectors_end
 
@@ -445,6 +458,16 @@ hcall_out:
 ex_dec_continued:
     EXCEPTION_SAVE_STATE r1
     LOADADDR r12, do_dec
+    mr r3, r1                           /* pass pointer to cpu_user_regs */
+    subi r1, r1, STACK_FRAME_OVERHEAD   /* make a "caller" stack frame */
+    CALL_CFUNC r12
+
+    addi r1, r1, STACK_FRAME_OVERHEAD   /* restore stack to cpu_user_regs */
+    b fast_resume
+
+ex_perfmon_continued:
+    EXCEPTION_SAVE_STATE r1
+    LOADADDR r12, do_perfmon
     mr r3, r1                           /* pass pointer to cpu_user_regs */
     subi r1, r1, STACK_FRAME_OVERHEAD   /* make a "caller" stack frame */
     CALL_CFUNC r12

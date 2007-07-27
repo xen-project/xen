@@ -1410,22 +1410,22 @@ class XendAPI(object):
     def VM_set_memory_dynamic_max(self, session, vm_ref, mem):
         dom = XendDomain.instance().get_vm_by_uuid(vm_ref)
         dom.set_memory_dynamic_max(int(mem))
-        return xen_api_success_void()
+        return self._VM_save(dom)
 
     def VM_set_memory_dynamic_min(self, session, vm_ref, mem):
         dom = XendDomain.instance().get_vm_by_uuid(vm_ref)
         dom.set_memory_dynamic_min(int(mem))
-        return xen_api_success_void()
+        return self._VM_save(dom)
 
     def VM_set_memory_static_max(self, session, vm_ref, mem):
         dom = XendDomain.instance().get_vm_by_uuid(vm_ref)
         dom.set_memory_static_max(int(mem))
-        return xen_api_success_void()
+        return self._VM_save(dom)
     
     def VM_set_memory_static_min(self, session, vm_ref, mem):
         dom = XendDomain.instance().get_vm_by_uuid(vm_ref)
         dom.set_memory_static_min(int(mem))
-        return xen_api_success_void()
+        return self._VM_save(dom)
 
     def VM_set_memory_dynamic_max_live(self, session, vm_ref, mem):
         dom = XendDomain.instance().get_vm_by_uuid(vm_ref)
@@ -1620,7 +1620,8 @@ class XendAPI(object):
         (rc, errors, oldlabel, new_ssidref) = \
                                  dom.set_security_label(sec_label, old_label)
         if rc != xsconstants.XSERR_SUCCESS:
-            return xen_api_error(['SECURITY_ERROR', rc])
+            return xen_api_error(['SECURITY_ERROR', rc,
+                                 xsconstants.xserr2string(-rc)])
         if rc == 0:
             rc = new_ssidref
         return xen_api_success(rc)
@@ -2083,6 +2084,25 @@ class XendAPI(object):
     def VIF_get_security_label(self, session, vif_ref):
         return self._VIF_get(vif_ref, 'security_label')
 
+    def _VIF_set(self, ref, prop, val, old_val):
+        return XendDomain.instance().set_dev_property_by_uuid(
+                       'vif', ref, prop, val, old_val)
+
+    def VIF_set_security_label(self, session, vif_ref, sec_lab, old_lab):
+        xendom = XendDomain.instance()
+        dom = xendom.get_vm_with_dev_uuid('vif', vif_ref)
+        if not dom:
+            return xen_api_error(['HANDLE_INVALID', 'VIF', vif_ref])
+
+        if dom._stateGet() == XEN_API_VM_POWER_STATE_RUNNING:
+            raise SecurityError(-xsconstants.XSERR_RESOURCE_IN_USE)
+
+        rc = self._VIF_set(vif_ref, 'security_label', sec_lab, old_lab)
+        if rc == False:
+            raise SecurityError(-xsconstants.XSERR_BAD_LABEL)
+        return xen_api_success(xsconstants.XSERR_SUCCESS)
+
+
     # Xen API: Class VIF_metrics
     # ----------------------------------------------------------------
 
@@ -2239,7 +2259,8 @@ class XendAPI(object):
         vdi = XendNode.instance().get_vdi_by_uuid(vdi_ref)
         rc = vdi.set_security_label(sec_lab, old_lab)
         if rc < 0:
-            return xen_api_error(['SECURITY_ERROR', rc])
+            return xen_api_error(['SECURITY_ERROR', rc,
+                                 xsconstants.xserr2string(-rc)])
         return xen_api_success(rc)
 
     def VDI_get_security_label(self, session, vdi_ref):
@@ -2357,11 +2378,13 @@ class XendAPI(object):
         return xen_api_success(cons)
 
     def console_get_location(self, session, console_ref):
+        xendom = XendDomain.instance()
         return xen_api_success(xendom.get_dev_property_by_uuid('console',
                                                                console_ref,
                                                                'location'))
 
     def console_get_protocol(self, session, console_ref):
+        xendom = XendDomain.instance()
         return xen_api_success(xendom.get_dev_property_by_uuid('console',
                                                                console_ref,
                                                                'protocol'))
@@ -2370,6 +2393,12 @@ class XendAPI(object):
         xendom = XendDomain.instance()        
         vm = xendom.get_vm_with_dev_uuid('console', console_ref)
         return xen_api_success(vm.get_uuid())
+    
+    def console_get_other_config(self, session, console_ref):
+        xendom = XendDomain.instance()        
+        return xen_api_success(xendom.get_dev_property_by_uuid('console',
+                                                               console_ref,
+                                                               'other_config'))
     
     # object methods
     def console_get_record(self, session, console_ref):
@@ -2408,6 +2437,13 @@ class XendAPI(object):
             return xen_api_success(console_ref)
         except XendError, exn:
             return xen_api_error(['INTERNAL_ERROR', str(exn)])
+
+    def console_set_other_config(self, session, console_ref, other_config):
+        xd = XendDomain.instance()
+        vm = xd.get_vm_with_dev_uuid('console', console_ref)
+        vm.set_console_other_config(console_ref, other_config)
+        xd.managed_config_save(vm)
+        return xen_api_success_void()
 
     # Xen API: Class SR
     # ----------------------------------------------------------------

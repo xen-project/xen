@@ -2920,6 +2920,15 @@ static int sh_page_fault(struct vcpu *v,
     SHADOW_PRINTK("emulate: eip=%#lx esp=%#lx\n", 
                   (unsigned long)regs->eip, (unsigned long)regs->esp);
 
+    /*
+     * We don't need to hold the lock for the whole emulation; we will
+     * take it again when we write to the pagetables.
+     */
+    sh_audit_gw(v, &gw);
+    unmap_walk(v, &gw);
+    shadow_audit_tables(v);
+    shadow_unlock(d);
+
     emul_ops = shadow_init_emulation(&emul_ctxt, regs);
 
     r = x86_emulate(&emul_ctxt.ctxt, emul_ops);
@@ -2937,7 +2946,7 @@ static int sh_page_fault(struct vcpu *v,
         /* If this is actually a page table, then we have a bug, and need 
          * to support more operations in the emulator.  More likely, 
          * though, this is a hint that this page should not be shadowed. */
-        sh_remove_shadows(v, gmfn, 0 /* thorough */, 1 /* must succeed */);
+        shadow_remove_all_shadows(v, gmfn);
     }
 
 #if GUEST_PAGING_LEVELS == 3 /* PAE guest */
@@ -2972,7 +2981,9 @@ static int sh_page_fault(struct vcpu *v,
     /* Emulator has changed the user registers: write back */
     if ( is_hvm_domain(d) )
         hvm_load_cpu_guest_regs(v, regs);
-    goto done;
+
+    SHADOW_PRINTK("emulated\n");
+    return EXCRET_fault_fixed;
 
  mmio:
     if ( !guest_mode(regs) )
@@ -4053,11 +4064,15 @@ sh_x86_emulate_write(struct vcpu *v, unsigned long vaddr, void *src,
     if ( vaddr & (bytes-1) )
         return X86EMUL_UNHANDLEABLE;
 
-    ASSERT(shadow_locked_by_me(v->domain));
     ASSERT(((vaddr & ~PAGE_MASK) + bytes) <= PAGE_SIZE);
+    shadow_lock(v->domain);
 
-    if ( (addr = emulate_map_dest(v, vaddr, sh_ctxt, &mfn)) == NULL )
+    addr = emulate_map_dest(v, vaddr, sh_ctxt, &mfn);
+    if ( addr == NULL )
+    {
+        shadow_unlock(v->domain);
         return X86EMUL_EXCEPTION;
+    }
 
     skip = safe_not_to_verify_write(mfn, addr, src, bytes);
     memcpy(addr, src, bytes);
@@ -4073,6 +4088,7 @@ sh_x86_emulate_write(struct vcpu *v, unsigned long vaddr, void *src,
 
     sh_unmap_domain_page(addr);
     shadow_audit_tables(v);
+    shadow_unlock(v->domain);
     return X86EMUL_OKAY;
 }
 
@@ -4086,14 +4102,18 @@ sh_x86_emulate_cmpxchg(struct vcpu *v, unsigned long vaddr,
     unsigned long prev;
     int rv = X86EMUL_OKAY, skip;
 
-    ASSERT(shadow_locked_by_me(v->domain));
     ASSERT(bytes <= sizeof(unsigned long));
+    shadow_lock(v->domain);
 
     if ( vaddr & (bytes-1) )
         return X86EMUL_UNHANDLEABLE;
 
-    if ( (addr = emulate_map_dest(v, vaddr, sh_ctxt, &mfn)) == NULL )
+    addr = emulate_map_dest(v, vaddr, sh_ctxt, &mfn);
+    if ( addr == NULL )
+    {
+        shadow_unlock(v->domain);
         return X86EMUL_EXCEPTION;
+    }
 
     skip = safe_not_to_verify_write(mfn, &new, &old, bytes);
 
@@ -4129,6 +4149,7 @@ sh_x86_emulate_cmpxchg(struct vcpu *v, unsigned long vaddr,
 
     sh_unmap_domain_page(addr);
     shadow_audit_tables(v);
+    shadow_unlock(v->domain);
     return rv;
 }
 
@@ -4143,13 +4164,17 @@ sh_x86_emulate_cmpxchg8b(struct vcpu *v, unsigned long vaddr,
     u64 old, new, prev;
     int rv = X86EMUL_OKAY, skip;
 
-    ASSERT(shadow_locked_by_me(v->domain));
-
     if ( vaddr & 7 )
         return X86EMUL_UNHANDLEABLE;
 
-    if ( (addr = emulate_map_dest(v, vaddr, sh_ctxt, &mfn)) == NULL )
+    shadow_lock(v->domain);
+
+    addr = emulate_map_dest(v, vaddr, sh_ctxt, &mfn);
+    if ( addr == NULL )
+    {
+        shadow_unlock(v->domain);
         return X86EMUL_EXCEPTION;
+    }
 
     old = (((u64) old_hi) << 32) | (u64) old_lo;
     new = (((u64) new_hi) << 32) | (u64) new_lo;
@@ -4173,6 +4198,7 @@ sh_x86_emulate_cmpxchg8b(struct vcpu *v, unsigned long vaddr,
 
     sh_unmap_domain_page(addr);
     shadow_audit_tables(v);
+    shadow_unlock(v->domain);
     return rv;
 }
 

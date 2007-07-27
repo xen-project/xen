@@ -3096,8 +3096,6 @@ static void cirrus_vga_save(QEMUFile *f, void *opaque)
     qemu_put_be64s(f, (uint64_t*)&s->cirrus_lfb_addr);
     qemu_put_be64s(f, (uint64_t*)&s->cirrus_lfb_end);
     qemu_put_buffer(f, s->vram_ptr, VGA_RAM_SIZE); 
-    if (vga_acc)
-        cirrus_stop_acc(s);
 }
 
 static int cirrus_vga_load(QEMUFile *f, void *opaque, int version_id)

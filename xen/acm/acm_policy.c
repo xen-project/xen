@@ -37,9 +37,9 @@
 static int acm_check_deleted_ssidrefs(struct acm_sized_buffer *dels,
                                       struct acm_sized_buffer *errors);
 static void acm_doms_change_ssidref(ssidref_t (*translator)
-                                     (const struct acm_ssid_domain *,
-                                      const struct acm_sized_buffer *),
-                                      struct acm_sized_buffer *translation_map);
+                                   (const struct acm_ssid_domain *,
+                                    const struct acm_sized_buffer *),
+                                    struct acm_sized_buffer *translation_map);
 static void acm_doms_restore_ssidref(void);
 static ssidref_t oldssid_to_newssid(const struct acm_ssid_domain *,
                                     const struct acm_sized_buffer *map);
@@ -50,15 +50,15 @@ acm_set_policy(XEN_GUEST_HANDLE_64(void) buf, u32 buf_size)
 {
     u8 *policy_buffer = NULL;
     int ret = -EFAULT;
- 
-    if (buf_size < sizeof(struct acm_policy_buffer))
+
+    if ( buf_size < sizeof(struct acm_policy_buffer) )
         return -EFAULT;
 
     /* copy buffer from guest domain */
-    if ((policy_buffer = xmalloc_array(u8, buf_size)) == NULL)
+    if ( (policy_buffer = xmalloc_array(u8, buf_size)) == NULL )
         return -ENOMEM;
 
-    if (copy_from_guest(policy_buffer, buf, buf_size))
+    if ( copy_from_guest(policy_buffer, buf, buf_size) )
     {
         printk("%s: Error copying!\n",__func__);
         goto error_free;
@@ -87,24 +87,28 @@ _acm_update_policy(void *buf, u32 buf_size, int is_bootpolicy,
                    struct acm_sized_buffer *errors)
 {
     uint32_t offset, length;
+    static int require_update = 0;
 
     write_lock(&acm_bin_pol_rwlock);
 
+    if (  require_update != 0 &&
+        ( deletions == NULL || ssidchanges == NULL ) )
+        goto error_lock_free;
+
+    require_update = 1;
     /*
        first some tests to check compatibility of new policy with
        current state of system/domains
      */
 
     /* if ssidrefs are to be deleted, make sure no domain is using them */
-    if (deletions != NULL) {
-        if (acm_check_deleted_ssidrefs(deletions, errors))
+    if ( deletions != NULL )
+        if ( acm_check_deleted_ssidrefs(deletions, errors) )
             goto error_lock_free;
-    }
 
-    if ((ssidchanges != NULL) && (ssidchanges->num_items > 0)) {
+    if ( (ssidchanges != NULL) && (ssidchanges->num_items > 0) )
         /* assign all running domains new ssidrefs as requested */
         acm_doms_change_ssidref(oldssid_to_newssid, ssidchanges);
-    }
 
     /* test primary policy data with the new ssidrefs */
     offset = be32_to_cpu(pol->primary_buffer_offset);
@@ -122,9 +126,8 @@ _acm_update_policy(void *buf, u32 buf_size, int is_bootpolicy,
     if ( (offset + length) > buf_size ||
          acm_secondary_ops->test_binary_policy(buf + offset, length,
                                                is_bootpolicy,
-                                               errors)) {
+                                               errors))
         goto error_lock_free;
-    }
 
     /* end of testing --- now real updates */
 
@@ -133,7 +136,7 @@ _acm_update_policy(void *buf, u32 buf_size, int is_bootpolicy,
 
     /* set label reference name */
     if ( (offset + length) > buf_size ||
-        acm_set_policy_reference(buf + offset, length) )
+         acm_set_policy_reference(buf + offset, length) )
         goto error_lock_free;
 
     /* set primary policy data */
@@ -153,11 +156,17 @@ _acm_update_policy(void *buf, u32 buf_size, int is_bootpolicy,
            &pol->xml_pol_version,
            sizeof(acm_bin_pol.xml_pol_version));
 
+    if ( acm_primary_ops->is_default_policy() &&
+         acm_secondary_ops->is_default_policy() )
+        require_update = 0;
+
     write_unlock(&acm_bin_pol_rwlock);
+
     return ACM_OK;
 
 error_lock_free:
-    if ((ssidchanges != NULL) && (ssidchanges->num_items > 0)) {
+    if ( (ssidchanges != NULL) && (ssidchanges->num_items > 0) )
+    {
         acm_doms_restore_ssidref();
     }
     do_chwall_init_state_curr(NULL);
@@ -176,18 +185,21 @@ do_acm_set_policy(void *buf, u32 buf_size, int is_bootpolicy,
     struct acm_policy_buffer *pol = (struct acm_policy_buffer *)buf;
 
     /* some sanity checking */
-    if ((be32_to_cpu(pol->magic) != ACM_MAGIC) ||
-        (buf_size != be32_to_cpu(pol->len)) ||
-        (be32_to_cpu(pol->policy_version) != ACM_POLICY_VERSION))
+    if ( (be32_to_cpu(pol->magic) != ACM_MAGIC) ||
+         (buf_size != be32_to_cpu(pol->len)) ||
+         (be32_to_cpu(pol->policy_version) != ACM_POLICY_VERSION) )
     {
         printk("%s: ERROR in Magic, Version, or buf size.\n", __func__);
         goto error_free;
     }
 
-    if (acm_active_security_policy == ACM_POLICY_UNDEFINED) {
+    if ( acm_active_security_policy == ACM_POLICY_UNDEFINED )
+    {
         /* setup the policy with the boot policy */
-        if (acm_init_binary_policy((be32_to_cpu(pol->secondary_policy_code) << 4) |
-                                   be32_to_cpu(pol->primary_policy_code))) {
+        if ( acm_init_binary_policy(
+                             (be32_to_cpu(pol->secondary_policy_code) << 4) |
+                              be32_to_cpu(pol->primary_policy_code)) )
+        {
             goto error_free;
         }
         acm_active_security_policy = (acm_bin_pol.secondary_policy_code << 4) |
@@ -195,8 +207,10 @@ do_acm_set_policy(void *buf, u32 buf_size, int is_bootpolicy,
     }
 
     /* once acm_active_security_policy is set, it cannot be changed */
-    if ((be32_to_cpu(pol->primary_policy_code) != acm_bin_pol.primary_policy_code) ||
-        (be32_to_cpu(pol->secondary_policy_code) != acm_bin_pol.secondary_policy_code))
+    if ( (be32_to_cpu(pol->primary_policy_code) !=
+                                        acm_bin_pol.primary_policy_code) ||
+         (be32_to_cpu(pol->secondary_policy_code) !=
+                                        acm_bin_pol.secondary_policy_code) )
     {
         printkd("%s: Wrong policy type in boot policy!\n", __func__);
         goto error_free;
@@ -219,18 +233,20 @@ acm_get_policy(XEN_GUEST_HANDLE_64(void) buf, u32 buf_size)
     int ret;
     struct acm_policy_buffer *bin_pol;
 
-    if (buf_size < sizeof(struct acm_policy_buffer))
+    if ( buf_size < sizeof(struct acm_policy_buffer) )
         return -EFAULT;
 
-    if ((policy_buffer = xmalloc_array(u8, buf_size)) == NULL)
+    if ( (policy_buffer = xmalloc_array(u8, buf_size)) == NULL )
         return -ENOMEM;
 
     read_lock(&acm_bin_pol_rwlock);
 
     bin_pol = (struct acm_policy_buffer *)policy_buffer;
     bin_pol->magic = cpu_to_be32(ACM_MAGIC);
-    bin_pol->primary_policy_code = cpu_to_be32(acm_bin_pol.primary_policy_code);
-    bin_pol->secondary_policy_code = cpu_to_be32(acm_bin_pol.secondary_policy_code);
+    bin_pol->primary_policy_code =
+                                cpu_to_be32(acm_bin_pol.primary_policy_code);
+    bin_pol->secondary_policy_code =
+                                cpu_to_be32(acm_bin_pol.secondary_policy_code);
 
     bin_pol->len = cpu_to_be32(sizeof(struct acm_policy_buffer));
     bin_pol->policy_reference_offset = cpu_to_be32(be32_to_cpu(bin_pol->len));
@@ -241,39 +257,47 @@ acm_get_policy(XEN_GUEST_HANDLE_64(void) buf, u32 buf_size)
            &acm_bin_pol.xml_pol_version,
            sizeof(struct acm_policy_version));
 
-    ret = acm_dump_policy_reference(policy_buffer + be32_to_cpu(bin_pol->policy_reference_offset),
-                                    buf_size - be32_to_cpu(bin_pol->policy_reference_offset));
-    if (ret < 0)
+    ret = acm_dump_policy_reference(
+               policy_buffer + be32_to_cpu(bin_pol->policy_reference_offset),
+               buf_size - be32_to_cpu(bin_pol->policy_reference_offset));
+
+    if ( ret < 0 )
         goto error_free_unlock;
 
     bin_pol->len = cpu_to_be32(be32_to_cpu(bin_pol->len) + ret);
     bin_pol->primary_buffer_offset = cpu_to_be32(be32_to_cpu(bin_pol->len));
 
-    ret = acm_primary_ops->dump_binary_policy (policy_buffer + be32_to_cpu(bin_pol->primary_buffer_offset),
-                                               buf_size - be32_to_cpu(bin_pol->primary_buffer_offset));
-    if (ret < 0)
+    ret = acm_primary_ops->dump_binary_policy(
+                 policy_buffer + be32_to_cpu(bin_pol->primary_buffer_offset),
+                 buf_size - be32_to_cpu(bin_pol->primary_buffer_offset));
+
+    if ( ret < 0 )
         goto error_free_unlock;
 
     bin_pol->len = cpu_to_be32(be32_to_cpu(bin_pol->len) + ret);
     bin_pol->secondary_buffer_offset = cpu_to_be32(be32_to_cpu(bin_pol->len));
 
-    ret = acm_secondary_ops->dump_binary_policy(policy_buffer + be32_to_cpu(bin_pol->secondary_buffer_offset),
-                                                buf_size - be32_to_cpu(bin_pol->secondary_buffer_offset));
-    if (ret < 0)
+    ret = acm_secondary_ops->dump_binary_policy(
+               policy_buffer + be32_to_cpu(bin_pol->secondary_buffer_offset),
+               buf_size - be32_to_cpu(bin_pol->secondary_buffer_offset));
+
+    if ( ret < 0 )
         goto error_free_unlock;
 
     bin_pol->len = cpu_to_be32(be32_to_cpu(bin_pol->len) + ret);
-    if (copy_to_guest(buf, policy_buffer, be32_to_cpu(bin_pol->len)))
+    if ( copy_to_guest(buf, policy_buffer, be32_to_cpu(bin_pol->len)) )
         goto error_free_unlock;
 
     read_unlock(&acm_bin_pol_rwlock);
     xfree(policy_buffer);
+
     return ACM_OK;
 
  error_free_unlock:
     read_unlock(&acm_bin_pol_rwlock);
     printk("%s: Error getting policy.\n", __func__);
     xfree(policy_buffer);
+
     return -EFAULT;
 }
 
@@ -285,40 +309,50 @@ acm_dump_statistics(XEN_GUEST_HANDLE_64(void) buf, u16 buf_size)
     int len1, len2;
     struct acm_stats_buffer acm_stats;
 
-    if ((stats_buffer = xmalloc_array(u8, buf_size)) == NULL)
+    if ( (stats_buffer = xmalloc_array(u8, buf_size)) == NULL )
         return -ENOMEM;
 
     read_lock(&acm_bin_pol_rwlock);
      
-    len1 = acm_primary_ops->dump_statistics(stats_buffer + sizeof(struct acm_stats_buffer),
-                                            buf_size - sizeof(struct acm_stats_buffer));
-    if (len1 < 0)
+    len1 = acm_primary_ops->dump_statistics(
+                             stats_buffer + sizeof(struct acm_stats_buffer),
+                             buf_size - sizeof(struct acm_stats_buffer));
+    if ( len1 < 0 )
         goto error_lock_free;
       
-    len2 = acm_secondary_ops->dump_statistics(stats_buffer + sizeof(struct acm_stats_buffer) + len1,
-                                              buf_size - sizeof(struct acm_stats_buffer) - len1);
-    if (len2 < 0)
+    len2 = acm_secondary_ops->dump_statistics(
+                      stats_buffer + sizeof(struct acm_stats_buffer) + len1,
+                      buf_size - sizeof(struct acm_stats_buffer) - len1);
+    if ( len2 < 0 )
         goto error_lock_free;
 
     acm_stats.magic = cpu_to_be32(ACM_MAGIC);
-    acm_stats.primary_policy_code = cpu_to_be32(acm_bin_pol.primary_policy_code);
-    acm_stats.secondary_policy_code = cpu_to_be32(acm_bin_pol.secondary_policy_code);
-    acm_stats.primary_stats_offset = cpu_to_be32(sizeof(struct acm_stats_buffer));
-    acm_stats.secondary_stats_offset = cpu_to_be32(sizeof(struct acm_stats_buffer) + len1);
+    acm_stats.primary_policy_code =
+                           cpu_to_be32(acm_bin_pol.primary_policy_code);
+    acm_stats.secondary_policy_code =
+                           cpu_to_be32(acm_bin_pol.secondary_policy_code);
+    acm_stats.primary_stats_offset =
+                           cpu_to_be32(sizeof(struct acm_stats_buffer));
+    acm_stats.secondary_stats_offset =
+                           cpu_to_be32(sizeof(struct acm_stats_buffer) + len1);
     acm_stats.len = cpu_to_be32(sizeof(struct acm_stats_buffer) + len1 + len2);
 
     memcpy(stats_buffer, &acm_stats, sizeof(struct acm_stats_buffer));
 
-    if (copy_to_guest(buf, stats_buffer, sizeof(struct acm_stats_buffer) + len1 + len2))
+    if ( copy_to_guest(buf,
+                       stats_buffer,
+                       sizeof(struct acm_stats_buffer) + len1 + len2) )
         goto error_lock_free;
 
     read_unlock(&acm_bin_pol_rwlock);
     xfree(stats_buffer);
+
     return ACM_OK;
 
  error_lock_free:
     read_unlock(&acm_bin_pol_rwlock);
     xfree(stats_buffer);
+
     return -EFAULT;
 }
 
@@ -330,10 +364,10 @@ acm_get_ssid(ssidref_t ssidref, XEN_GUEST_HANDLE_64(void) buf, u16 buf_size)
     u8 *ssid_buffer;
     int ret;
     struct acm_ssid_buffer *acm_ssid;
-    if (buf_size < sizeof(struct acm_ssid_buffer))
+    if ( buf_size < sizeof(struct acm_ssid_buffer) )
         return -EFAULT;
 
-    if ((ssid_buffer = xmalloc_array(u8, buf_size)) == NULL)
+    if ( (ssid_buffer = xmalloc_array(u8, buf_size)) == NULL )
         return -ENOMEM;
 
     read_lock(&acm_bin_pol_rwlock);
@@ -345,45 +379,50 @@ acm_get_ssid(ssidref_t ssidref, XEN_GUEST_HANDLE_64(void) buf, u16 buf_size)
     acm_ssid->secondary_policy_code = acm_bin_pol.secondary_policy_code;
 
     acm_ssid->policy_reference_offset = acm_ssid->len;
-    ret = acm_dump_policy_reference(ssid_buffer + acm_ssid->policy_reference_offset,
-                                    buf_size - acm_ssid->policy_reference_offset);
-    if (ret < 0)
+    ret = acm_dump_policy_reference(
+                          ssid_buffer + acm_ssid->policy_reference_offset,
+                          buf_size - acm_ssid->policy_reference_offset);
+    if ( ret < 0 )
         goto error_free_unlock;
 
     acm_ssid->len += ret;
     acm_ssid->primary_types_offset = acm_ssid->len;
 
     /* ret >= 0 --> ret == max_types */
-    ret = acm_primary_ops->dump_ssid_types(ACM_PRIMARY(ssidref),
-                                           ssid_buffer + acm_ssid->primary_types_offset,
-                                           buf_size - acm_ssid->primary_types_offset);
-    if (ret < 0)
+    ret = acm_primary_ops->dump_ssid_types(
+                                 ACM_PRIMARY(ssidref),
+                                 ssid_buffer + acm_ssid->primary_types_offset,
+                                 buf_size - acm_ssid->primary_types_offset);
+    if ( ret < 0 )
         goto error_free_unlock;
 
     acm_ssid->len += ret;
     acm_ssid->primary_max_types = ret;
     acm_ssid->secondary_types_offset = acm_ssid->len;
 
-    ret = acm_secondary_ops->dump_ssid_types(ACM_SECONDARY(ssidref),
-                                             ssid_buffer + acm_ssid->secondary_types_offset,
-                                             buf_size - acm_ssid->secondary_types_offset);
-    if (ret < 0)
+    ret = acm_secondary_ops->dump_ssid_types(
+                             ACM_SECONDARY(ssidref),
+                             ssid_buffer + acm_ssid->secondary_types_offset,
+                             buf_size - acm_ssid->secondary_types_offset);
+    if ( ret < 0 )
         goto error_free_unlock;
 
     acm_ssid->len += ret;
     acm_ssid->secondary_max_types = ret;
 
-    if (copy_to_guest(buf, ssid_buffer, acm_ssid->len))
+    if ( copy_to_guest(buf, ssid_buffer, acm_ssid->len) )
         goto error_free_unlock;
 
     read_unlock(&acm_bin_pol_rwlock);
     xfree(ssid_buffer);
+
     return ACM_OK;
 
  error_free_unlock:
     read_unlock(&acm_bin_pol_rwlock);
     printk("%s: Error getting ssid.\n", __func__);
     xfree(ssid_buffer);
+
     return -ENOMEM;
 }
 
@@ -391,11 +430,16 @@ int
 acm_get_decision(ssidref_t ssidref1, ssidref_t ssidref2, u32 hook)
 {
     int ret = ACM_ACCESS_DENIED;
-    switch (hook) {
+    switch ( hook )
+    {
 
     case ACMHOOK_sharing:
         /* Sharing hook restricts access in STE policy only */
         ret = acm_sharing(ssidref1, ssidref2);
+        break;
+
+    case ACMHOOK_authorization:
+        ret = acm_authorization(ssidref1, ssidref2);
         break;
 
     default:
@@ -425,18 +469,21 @@ acm_check_used_ssidref(uint32_t policy_type, uint32_t search_ssidref,
 
     read_lock(&ssid_list_rwlock);
 
-    for_each_acmssid( rawssid ) {
+    for_each_acmssid( rawssid )
+    {
         ssidref_t ssidref;
         void *s = GET_SSIDP(policy_type, rawssid);
 
-        if (policy_type == ACM_CHINESE_WALL_POLICY) {
+        if ( policy_type == ACM_CHINESE_WALL_POLICY )
+        {
             ssidref = ((struct chwall_ssid *)s)->chwall_ssidref;
         } else {
             ssidref = ((struct ste_ssid *)s)->ste_ssidref;
         }
         gdprintk(XENLOG_INFO,"domid=%d: search ssidref=%d, ssidref=%d\n",
                  rawssid->domainid,search_ssidref,ssidref);
-        if (ssidref == search_ssidref) {
+        if ( ssidref == search_ssidref )
+        {
             /* one is enough */
             acm_array_append_tuple(errors, ACM_SSIDREF_IN_USE, search_ssidref);
             rc = 1;
@@ -462,10 +509,13 @@ oldssid_to_newssid(const struct acm_ssid_domain *rawssid,
 {
     uint i;
 
-    if (rawssid != NULL) {
+    if ( rawssid != NULL )
+    {
         ssidref_t ssid = rawssid->ssidref & 0xffff;
-        for (i = 0; i+1 < map->num_items; i += 2) {
-            if (map->array[i] == ssid) {
+        for ( i = 0; i + 1 < map->num_items; i += 2 )
+        {
+            if ( map->array[i] == ssid )
+            {
                 return (map->array[i+1] << 16 | map->array[i+1]);
             }
         }
@@ -478,7 +528,8 @@ oldssid_to_newssid(const struct acm_ssid_domain *rawssid,
  * Assign an ssidref to the CHWALL policy component of the domain
  */
 static void
-acm_pri_policy_assign_ssidref(struct acm_ssid_domain *rawssid, ssidref_t new_ssid)
+acm_pri_policy_assign_ssidref(struct acm_ssid_domain *rawssid,
+                              ssidref_t new_ssid)
 {
     struct chwall_ssid *chwall = (struct chwall_ssid *)rawssid->primary_ssid;
     chwall->chwall_ssidref = new_ssid;
@@ -489,7 +540,8 @@ acm_pri_policy_assign_ssidref(struct acm_ssid_domain *rawssid, ssidref_t new_ssi
  * Assign an ssidref to the STE policy component of the domain
  */
 static void
-acm_sec_policy_assign_ssidref(struct acm_ssid_domain *rawssid, ssidref_t new_ssid)
+acm_sec_policy_assign_ssidref(struct acm_ssid_domain *rawssid,
+                              ssidref_t new_ssid)
 {
     struct ste_ssid *ste = (struct ste_ssid *)rawssid->secondary_ssid;
     ste->ste_ssidref = new_ssid;
@@ -508,13 +560,15 @@ acm_doms_change_ssidref(ssidref_t (*translator_fn)
 
     write_lock(&ssid_list_rwlock);
 
-    for_each_acmssid( rawssid ) {
+    for_each_acmssid( rawssid )
+    {
         ssidref_t new_ssid;
 
         rawssid->old_ssidref = rawssid->ssidref;
 
         new_ssid = translator_fn(rawssid, translation_map);
-        if (new_ssid == ACM_INVALID_SSIDREF) {
+        if ( new_ssid == ACM_INVALID_SSIDREF )
+        {
             /* means no mapping found, so no change -- old = new */
             continue;
         }
@@ -538,10 +592,11 @@ acm_doms_restore_ssidref(void)
 
     write_lock(&ssid_list_rwlock);
 
-    for_each_acmssid( rawssid ) {
+    for_each_acmssid( rawssid )
+    {
         ssidref_t old_ssid;
 
-        if (rawssid->old_ssidref == rawssid->ssidref)
+        if ( rawssid->old_ssidref == rawssid->ssidref )
             continue;
 
         old_ssid = rawssid->old_ssidref & 0xffff;
@@ -566,13 +621,15 @@ acm_check_deleted_ssidrefs(struct acm_sized_buffer *dels,
     int rc = 0;
     uint idx;
     /* check for running domains that should not be there anymore */
-    for (idx = 0; idx < dels->num_items; idx++) {
-        if (acm_check_used_ssidref(ACM_SIMPLE_TYPE_ENFORCEMENT_POLICY,
-                                   dels->array[idx],
-                                   errors) > 0 ||
-            acm_check_used_ssidref(ACM_CHINESE_WALL_POLICY,
-                                   dels->array[idx],
-                                   errors) > 0) {
+    for ( idx = 0; idx < dels->num_items; idx++ )
+    {
+        if ( acm_check_used_ssidref(ACM_SIMPLE_TYPE_ENFORCEMENT_POLICY,
+                                    dels->array[idx],
+                                    errors) > 0 ||
+             acm_check_used_ssidref(ACM_CHINESE_WALL_POLICY,
+                                    dels->array[idx],
+                                    errors) > 0)
+        {
             rc = ACM_ERROR;
             break;
         }
@@ -589,46 +646,56 @@ acm_change_policy(struct acm_change_policy *chgpolicy)
 {
     int rc = 0;
     u8 *binpolicy = NULL;
-    struct acm_sized_buffer dels = {
+    struct acm_sized_buffer dels =
+    {
         .array = NULL,
     };
-    struct acm_sized_buffer ssidmap = {
+    struct acm_sized_buffer ssidmap =
+    {
         .array = NULL,
     };
-    struct acm_sized_buffer errors = {
+    struct acm_sized_buffer errors =
+    {
         .array = NULL,
     };
 
     gdprintk(XENLOG_INFO, "change policy operation\n");
 
-    if ((chgpolicy->delarray_size > 4096) ||
-        (chgpolicy->chgarray_size > 4096) ||
-        (chgpolicy->errarray_size > 4096)) {
+    if ( (chgpolicy->delarray_size > 4096) ||
+         (chgpolicy->chgarray_size > 4096) ||
+         (chgpolicy->errarray_size > 4096))
+    {
         return ACM_ERROR;
     }
 
     dels.num_items = chgpolicy->delarray_size / sizeof(uint32_t);
-    if (dels.num_items > 0) {
+    if ( dels.num_items > 0 )
+    {
         dels.array = xmalloc_array(uint32_t, dels.num_items);
-        if (dels.array == NULL) {
+        if ( dels.array == NULL )
+        {
             rc = -ENOMEM;
             goto acm_chg_policy_exit;
         }
     }
 
     ssidmap.num_items = chgpolicy->chgarray_size / sizeof(uint32_t);
-    if (ssidmap.num_items > 0) {
+    if ( ssidmap.num_items > 0 )
+    {
         ssidmap.array = xmalloc_array(uint32_t, ssidmap.num_items);
-        if (ssidmap.array == NULL) {
+        if ( ssidmap.array == NULL )
+        {
             rc = -ENOMEM;
             goto acm_chg_policy_exit;
         }
     }
 
     errors.num_items = chgpolicy->errarray_size / sizeof(uint32_t);
-    if (errors.num_items > 0) {
+    if ( errors.num_items > 0 )
+    {
         errors.array = xmalloc_array(uint32_t, errors.num_items);
-        if (errors.array == NULL) {
+        if ( errors.array == NULL )
+        {
             rc = -ENOMEM;
             goto acm_chg_policy_exit;
         }
@@ -637,7 +704,8 @@ acm_change_policy(struct acm_change_policy *chgpolicy)
 
     binpolicy = xmalloc_array(u8,
                               chgpolicy->policy_pushcache_size);
-    if (binpolicy == NULL) {
+    if ( binpolicy == NULL )
+    {
         rc = -ENOMEM;
         goto acm_chg_policy_exit;
     }
@@ -650,7 +718,8 @@ acm_change_policy(struct acm_change_policy *chgpolicy)
                          chgpolicy->chgarray_size) ||
          copy_from_guest(binpolicy,
                          chgpolicy->policy_pushcache,
-                         chgpolicy->policy_pushcache_size )) {
+                         chgpolicy->policy_pushcache_size ))
+    {
         rc = -EFAULT;
         goto acm_chg_policy_exit;
     }
@@ -663,7 +732,8 @@ acm_change_policy(struct acm_change_policy *chgpolicy)
     if ( (errors.num_items > 0) &&
          copy_to_guest(chgpolicy->err_array,
                        errors.array,
-                       errors.num_items ) ) {
+                       errors.num_items ) )
+    {
         rc = -EFAULT;
         goto acm_chg_policy_exit;
     }
@@ -690,10 +760,10 @@ domid_to_newssid(const struct acm_ssid_domain *rawssid,
 {
     domid_t domid = rawssid->domainid;
     uint i;
-    for (i = 0; (i+1) < map->num_items; i += 2) {
-        if (map->array[i] == domid) {
+    for ( i = 0; (i+1) < map->num_items; i += 2 )
+    {
+        if ( map->array[i] == domid )
             return (ssidref_t)map->array[i+1];
-        }
     }
     return ACM_INVALID_SSIDREF;
 }
@@ -712,7 +782,8 @@ do_acm_relabel_doms(struct acm_sized_buffer *relabel_map,
     /* run tests; collect as much error info as possible */
     irc =  do_chwall_init_state_curr(errors);
     irc += do_ste_init_state_curr(errors);
-    if (irc != 0) {
+    if ( irc != 0 )
+    {
         rc = -EFAULT;
         goto acm_relabel_doms_lock_err_exit;
     }
@@ -736,30 +807,37 @@ int
 acm_relabel_domains(struct acm_relabel_doms *relabel)
 {
     int rc = ACM_OK;
-    struct acm_sized_buffer relabels = {
+    struct acm_sized_buffer relabels =
+    {
         .array = NULL,
     };
-    struct acm_sized_buffer errors = {
+    struct acm_sized_buffer errors =
+    {
         .array = NULL,
     };
 
-    if (relabel->relabel_map_size > 4096) {
+    if ( relabel->relabel_map_size > 4096 )
+    {
         return ACM_ERROR;
     }
 
     relabels.num_items = relabel->relabel_map_size / sizeof(uint32_t);
-    if (relabels.num_items > 0) {
+    if ( relabels.num_items > 0 )
+    {
         relabels.array = xmalloc_array(uint32_t, relabels.num_items);
-        if (relabels.array == NULL) {
+        if ( relabels.array == NULL )
+        {
             rc = -ENOMEM;
             goto acm_relabel_doms_exit;
         }
     }
 
     errors.num_items = relabel->errarray_size / sizeof(uint32_t);
-    if (errors.num_items > 0) {
+    if ( errors.num_items > 0 )
+    {
         errors.array = xmalloc_array(uint32_t, errors.num_items);
-        if (errors.array == NULL) {
+        if ( errors.array == NULL )
+        {
             rc = -ENOMEM;
             goto acm_relabel_doms_exit;
         }
@@ -768,7 +846,8 @@ acm_relabel_domains(struct acm_relabel_doms *relabel)
 
     if ( copy_from_guest(relabels.array,
                          relabel->relabel_map,
-                         relabel->relabel_map_size) ) {
+                         relabel->relabel_map_size) )
+    {
         rc = -EFAULT;
         goto acm_relabel_doms_exit;
     }
@@ -777,10 +856,8 @@ acm_relabel_domains(struct acm_relabel_doms *relabel)
 
     if ( copy_to_guest(relabel->err_array,
                        errors.array,
-                       errors.num_items ) ) {
+                       errors.num_items ) )
         rc = -EFAULT;
-        goto acm_relabel_doms_exit;
-    }
 
 acm_relabel_doms_exit:
     xfree(relabels.array);

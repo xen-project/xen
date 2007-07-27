@@ -73,11 +73,10 @@ static void add_event(struct connection *conn,
 	data = talloc_array(watch, char, len);
 	strcpy(data, name);
 	strcpy(data + strlen(name) + 1, watch->token);
-        send_reply(conn, XS_WATCH_EVENT, data, len);
+	send_reply(conn, XS_WATCH_EVENT, data, len);
 	talloc_free(data);
 }
 
-/* FIXME: we fail to fire on out of memory.  Should drop connections. */
 void fire_watches(struct connection *conn, const char *name, bool recurse)
 {
 	struct connection *i;
@@ -130,7 +129,7 @@ void do_watch(struct connection *conn, struct buffered_data *in)
 	/* Check for duplicates. */
 	list_for_each_entry(watch, &conn->watches, list) {
 		if (streq(watch->node, vec[0]) &&
-                    streq(watch->token, vec[1])) {
+		    streq(watch->token, vec[1])) {
 			send_error(conn, EEXIST);
 			return;
 		}

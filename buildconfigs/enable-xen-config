@@ -28,9 +28,13 @@ setopt()
 setopt CONFIG_PARAVIRT y
 setopt CONFIG_XEN y
 setopt CONFIG_VMI y
+setopt CONFIG_KVM y
+setopt CONFIG_KVM_INTEL y
+setopt CONFIG_KVM_AMD y
 setopt CONFIG_LGUEST n
 setopt CONFIG_XEN_BLKDEV_FRONTEND y
 setopt CONFIG_XEN_NETDEV_FRONTEND y
 setopt CONFIG_HVC_XEN y
+setopt CONFIG_NUMA n
 
 exit 0

@@ -76,7 +76,6 @@ struct domain
 
 static LIST_HEAD(domains);
 
-/* FIXME: Mark connection as broken (close it?) when this happens. */
 static bool check_indexes(XENSTORE_RING_IDX cons, XENSTORE_RING_IDX prod)
 {
 	return ((prod - cons) <= XENSTORE_RING_SIZE);
@@ -102,7 +101,8 @@ static const void *get_input_chunk(XENSTORE_RING_IDX cons,
 	return buf + MASK_XENSTORE_IDX(cons);
 }
 
-static int writechn(struct connection *conn, const void *data, unsigned int len)
+static int writechn(struct connection *conn,
+		    const void *data, unsigned int len)
 {
 	uint32_t avail;
 	void *dest;
@@ -113,6 +113,7 @@ static int writechn(struct connection *conn, const void *data, unsigned int len)
 	cons = intf->rsp_cons;
 	prod = intf->rsp_prod;
 	mb();
+
 	if (!check_indexes(cons, prod)) {
 		errno = EIO;
 		return -1;
@@ -175,6 +176,8 @@ static int destroy_domain(void *_domain)
 	if (domain->interface)
 		munmap(domain->interface, getpagesize());
 
+	fire_watches(NULL, "@releaseDomain", false);
+
 	return 0;
 }
 
@@ -197,7 +200,7 @@ static void domain_cleanup(void)
 				continue;
 		}
 		talloc_free(domain->conn);
-		notify = 1;
+		notify = 0; /* destroy_domain() fires the watch */
 	}
 
 	if (notify)
@@ -246,7 +249,6 @@ static struct domain *new_domain(void *context, unsigned int domid,
 {
 	struct domain *domain;
 	int rc;
-
 
 	domain = talloc(context, struct domain);
 	domain->port = 0;
@@ -361,7 +363,7 @@ void do_introduce(struct connection *conn, struct buffered_data *in)
 		/* Now domain belongs to its connection. */
 		talloc_steal(domain->conn, domain);
 
-		fire_watches(conn, "@introduceDomain", false);
+		fire_watches(NULL, "@introduceDomain", false);
 	} else if ((domain->mfn == mfn) && (domain->conn != conn)) {
 		/* Use XS_INTRODUCE for recreating the xenbus event-channel. */
 		if (domain->port)
@@ -413,8 +415,6 @@ void do_release(struct connection *conn, const char *domid_str)
 	}
 
 	talloc_free(domain->conn);
-
-	fire_watches(conn, "@releaseDomain", false);
 
 	send_ack(conn, XS_RELEASE);
 }

@@ -24,6 +24,7 @@ from xen.xend import XendAPIStore
 from xen.xend.XendBase import XendBase
 from xen.xend.XendPIFMetrics import XendPIFMetrics
 from xen.xend.XendError import *
+from xen.xend import Vifctl
 
 log = logging.getLogger("xend.XendPIF")
 log.setLevel(logging.TRACE)
@@ -31,14 +32,17 @@ log.setLevel(logging.TRACE)
 MAC_RE = re.compile(':'.join(['[0-9a-f]{2}'] * 6))
 IP_IFACE_RE = re.compile(r'^\d+: (\w+):.*mtu (\d+) .* link/\w+ ([0-9a-f:]+)')
 
+
+Vifctl.network('start')
+
 def linux_phy_to_virt(pif_name):
     return 'eth' + re.sub(r'^[a-z]+', '', pif_name)
 
 def linux_get_phy_ifaces():
     """Returns a list of physical interfaces.
 
-    Identifies PIFs as those that have a interface name starting with 'p'
-    and have the fake 'fe:ff:ff:ff:ff:ff' MAC address.
+    Identifies PIFs as those that have a interface name starting with
+    'peth'.
 
     See /etc/xen/scripts/network-bridge for how the devices are renamed.
 
@@ -58,7 +62,7 @@ def linux_get_phy_ifaces():
                 
         # resolve pifs' mac addresses
         for name, mtu, mac in ifaces.values():
-            if name[0] == 'p' and mac == 'fe:ff:ff:ff:ff:ff':
+            if name.startswith('peth'):
                 bridged_ifname = linux_phy_to_virt(name)
                 bridged_if = ifaces.get(bridged_ifname)
                 if bridged_if:

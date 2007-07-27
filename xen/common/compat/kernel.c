@@ -8,7 +8,6 @@
 #include <xen/errno.h>
 #include <xen/version.h>
 #include <xen/sched.h>
-#include <xen/shadow.h>
 #include <xen/nmi.h>
 #include <xen/guest_access.h>
 #include <asm/current.h>

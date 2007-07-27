@@ -18,6 +18,7 @@
 #include <xen/console.h>
 #include <xen/iocap.h>
 #include <xen/guest_access.h>
+#include <xen/acpi.h>
 #include <asm/current.h>
 #include <public/platform.h>
 #include <asm/edd.h>
@@ -245,6 +246,10 @@ ret_t do_platform_op(XEN_GUEST_HANDLE(xen_platform_op_t) u_xenpf_op)
             ret = -EINVAL;
             break;
         }
+        break;
+
+    case XENPF_enter_acpi_sleep:
+        ret = acpi_enter_sleep(&op->u.enter_acpi_sleep);
         break;
 
     default:

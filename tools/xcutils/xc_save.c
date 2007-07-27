@@ -54,7 +54,17 @@ static int suspend(int domid)
 
 static char *qemu_active_path;
 static char *qemu_next_active_path;
+static int qemu_shmid = -1;
 static struct xs_handle *xs;
+
+
+/* Mark the shared-memory segment for destruction */
+static void qemu_destroy_buffer(void)
+{
+    if (qemu_shmid != -1)
+        shmctl(qemu_shmid, IPC_RMID, NULL);
+    qemu_shmid = -1;
+}
 
 /* Get qemu to change buffers. */
 static void qemu_flip_buffer(int domid, int next_active)
@@ -97,22 +107,23 @@ static void * init_qemu_maps(int domid, unsigned int bitmap_size)
 {
     key_t key;
     char key_ascii[17] = {0,};
-    int shmid = -1;
     void *seg; 
     char *path, *p;
 
     /* Make a shared-memory segment */
-    while (shmid == -1)
-    {
+    do {
         key = rand(); /* No security, just a sequence of numbers */
-        shmid = shmget(key, 2 * bitmap_size, 
+        qemu_shmid = shmget(key, 2 * bitmap_size, 
                        IPC_CREAT|IPC_EXCL|S_IRUSR|S_IWUSR);
-        if (shmid == -1 && errno != EEXIST)
+        if (qemu_shmid == -1 && errno != EEXIST)
             errx(1, "can't get shmem to talk to qemu-dm");
-    }
+    } while (qemu_shmid == -1);
+
+    /* Remember to tidy up after ourselves */
+    atexit(qemu_destroy_buffer);
 
     /* Map it into our address space */
-    seg = shmat(shmid, NULL, 0);
+    seg = shmat(qemu_shmid, NULL, 0);
     if (seg == (void *) -1) 
         errx(1, "can't map shmem to talk to qemu-dm");
     memset(seg, 0, 2 * bitmap_size);
@@ -123,11 +134,13 @@ static void * init_qemu_maps(int domid, unsigned int bitmap_size)
     /* Tell qemu about it */
     if ((xs = xs_daemon_open()) == NULL)
         errx(1, "Couldn't contact xenstore");
-    if (!(path = xs_get_domain_path(xs, domid)))
+    if (!(path = strdup("/local/domain/0/device-model/")))
         errx(1, "can't get domain path in store");
     if (!(path = realloc(path, strlen(path) 
+                         + 10 
                          + strlen("/logdirty/next-active") + 1))) 
         errx(1, "no memory for constructing xenstore path");
+    snprintf(path + strlen(path), 11, "%i", domid);
     strcat(path, "/logdirty/");
     p = path + strlen(path);
 

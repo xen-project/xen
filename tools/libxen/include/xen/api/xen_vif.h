@@ -362,4 +362,18 @@ extern bool
 xen_vif_get_all(xen_session *session, struct xen_vif_set **result);
 
 
+/**
+ * Set the security label of a VIF.
+ */
+extern bool
+xen_vif_set_security_label(xen_session *session, int64_t *result, xen_vif vif,
+                           char *label, char *oldlabel);
+
+
+/**
+ * Get the security label of a VIF.
+ */
+extern bool
+xen_vif_get_security_label(xen_session *session, char **result, xen_vif vif);
+
 #endif

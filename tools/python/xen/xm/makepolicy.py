@@ -20,7 +20,10 @@
 import sys
 import traceback
 from xen.util.security import ACMError, err, make_policy
+from xen.util import xsconstants
 from xen.xm.opts import OptionError
+from xen.xm import main as xm_main
+from xen.xm.setpolicy import setpolicy
 
 def usage():
     print "\nUsage: xm makepolicy <policy>\n"
@@ -32,8 +35,13 @@ def usage():
 def main(argv):
     if len(argv) != 2:
         raise OptionError('No XML policy file specified')
-
-    make_policy(argv[1])
+    if xm_main.serverType == xm_main.SERVER_XEN_API:
+        print "This command is deprecated for use with Xen-API " \
+              "configuration. Consider using\n'xm setpolicy'."
+        setpolicy(xsconstants.ACM_POLICY_ID, argv[1],
+                  xsconstants.XS_INST_LOAD, True)
+    else:
+        make_policy(argv[1])
 
 if __name__ == '__main__':
     try:
@@ -41,5 +49,3 @@ if __name__ == '__main__':
     except Exception, e:
         sys.stderr.write('Error: %s\n' % str(e))
         sys.exit(-1)
-
-

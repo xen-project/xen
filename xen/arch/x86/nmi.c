@@ -202,7 +202,7 @@ void release_lapic_nmi(void)
         enable_lapic_nmi_watchdog();
 }
 
-#define __pminit __init
+#define __pminit __devinit
 
 /*
  * Activate the NMI watchdog via the local APIC.

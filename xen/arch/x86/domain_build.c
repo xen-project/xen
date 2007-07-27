@@ -434,8 +434,7 @@ int __init construct_dom0(
 
 #ifdef __i386__
     /* Ensure that our low-memory 1:1 mapping covers the allocation. */
-    page = alloc_domheap_pages(d, order,
-                               MEMF_bits(30 + (v_start >> 31)));
+    page = alloc_domheap_pages(d, order, MEMF_bits(30));
 #else
     page = alloc_domheap_pages(d, order, 0);
 #endif

@@ -618,6 +618,7 @@ int main_loop(void)
     CPUState *env = cpu_single_env;
     int evtchn_fd = xc_evtchn_fd(xce_handle);
     char qemu_file[PATH_MAX];
+    fd_set fds;
 
     buffered_io_timer = qemu_new_timer(rt_clock, handle_buffered_io,
 				       cpu_single_env);
@@ -625,19 +626,35 @@ int main_loop(void)
 
     qemu_set_fd_handler(evtchn_fd, cpu_handle_ioreq, NULL, env);
 
-    while (!(vm_running && suspend_requested))
-        /* Wait up to 10 msec. */
-        main_loop_wait(10);
+    xenstore_record_dm_state("running");
+    while (1) {
+        while (!(vm_running && suspend_requested))
+            /* Wait up to 10 msec. */
+            main_loop_wait(10);
 
-    fprintf(logfile, "device model received suspend signal!\n");
+        fprintf(logfile, "device model saving state\n");
 
-    /* Pull all outstanding ioreqs through the system */
-    handle_buffered_io(env);
-    main_loop_wait(1); /* For the select() on events */
+        /* Pull all outstanding ioreqs through the system */
+        handle_buffered_io(env);
+        main_loop_wait(1); /* For the select() on events */
 
-    /* Save the device state */
-    snprintf(qemu_file, sizeof(qemu_file), "/var/lib/xen/qemu-save.%d", domid);
-    do_savevm(qemu_file);
+        /* Save the device state */
+        snprintf(qemu_file, sizeof(qemu_file), 
+                 "/var/lib/xen/qemu-save.%d", domid);
+        do_savevm(qemu_file);
+
+        xenstore_record_dm_state("paused");
+
+        /* Wait to be allowed to continue */
+        while (suspend_requested) {
+            FD_ZERO(&fds);
+            FD_SET(xenstore_fd(), &fds);
+            if (select(xenstore_fd() + 1, &fds, NULL, NULL, NULL) > 0)
+                xenstore_process_event(NULL);
+        }
+
+        xenstore_record_dm_state("running");
+    }
 
     return 0;
 }

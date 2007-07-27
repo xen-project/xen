@@ -2701,15 +2701,15 @@ int replace_grant_host_mapping(
     
     if ( flags & GNTMAP_contains_pte )
     {
-	if (!new_addr)
-	    return destroy_grant_pte_mapping(addr, frame, current->domain);
-
-	MEM_LOG("Unsupported grant table operation");
-	return GNTST_general_error;
+        if ( !new_addr )
+            return destroy_grant_pte_mapping(addr, frame, current->domain);
+        
+        MEM_LOG("Unsupported grant table operation");
+        return GNTST_general_error;
     }
 
-    if (!new_addr)
-	return destroy_grant_va_mapping(addr, frame, current);
+    if ( !new_addr )
+        return destroy_grant_va_mapping(addr, frame, current);
 
     pl1e = guest_map_l1e(current, new_addr, &gl1mfn);
     if ( !pl1e )
@@ -2720,7 +2720,8 @@ int replace_grant_host_mapping(
     }
     ol1e = *pl1e;
 
-    if ( unlikely(!UPDATE_ENTRY(l1, pl1e, ol1e, l1e_empty(), gl1mfn, current)) )
+    if ( unlikely(!UPDATE_ENTRY(l1, pl1e, ol1e, l1e_empty(),
+                                gl1mfn, current)) )
     {
         MEM_LOG("Cannot delete PTE entry at %p", (unsigned long *)pl1e);
         guest_unmap_l1e(current, pl1e);
@@ -3642,8 +3643,6 @@ static void __memguard_change_range(void *p, unsigned long l, int guard)
     unsigned long flags = __PAGE_HYPERVISOR | MAP_SMALL_PAGES;
 
     /* Ensure we are dealing with a page-aligned whole number of pages. */
-    ASSERT((_p&PAGE_MASK) != 0);
-    ASSERT((_l&PAGE_MASK) != 0);
     ASSERT((_p&~PAGE_MASK) == 0);
     ASSERT((_l&~PAGE_MASK) == 0);
 

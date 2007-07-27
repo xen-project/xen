@@ -72,11 +72,6 @@ struct hvm_function_table {
     char *name;
 
     /*
-     *  Disable HVM functionality
-     */
-    void (*disable)(void);
-
-    /*
      * Initialise/destroy HVM domain/vcpu resources
      */
     int  (*domain_initialise)(struct domain *d);
@@ -160,6 +155,9 @@ struct hvm_function_table {
     void (*init_hypercall_page)(struct domain *d, void *hypercall_page);
 
     int  (*event_injection_faulted)(struct vcpu *v);
+
+    int  (*cpu_up)(void);
+    void (*cpu_down)(void);
 };
 
 extern struct hvm_function_table hvm_funcs;
@@ -315,5 +313,18 @@ static inline int hvm_event_injection_faulted(struct vcpu *v)
 
 /* These exceptions must always be intercepted. */
 #define HVM_TRAP_MASK (1U << TRAP_machine_check)
+
+static inline int hvm_cpu_up(void)
+{
+    if ( hvm_funcs.cpu_up )
+        return hvm_funcs.cpu_up();
+    return 1;
+}
+
+static inline void hvm_cpu_down(void)
+{
+    if ( hvm_funcs.cpu_down )
+        hvm_funcs.cpu_down();
+}
 
 #endif /* __ASM_X86_HVM_HVM_H__ */

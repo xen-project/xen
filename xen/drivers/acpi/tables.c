@@ -73,6 +73,7 @@ struct acpi_table_sdt {
 
 static unsigned long sdt_pa;	/* Physical Address */
 static unsigned long sdt_count;	/* Table count */
+unsigned char acpi_rsdp_rev;
 
 static struct acpi_table_sdt sdt_entry[ACPI_MAX_TABLES] __initdata;
 
@@ -597,6 +598,8 @@ int __init acpi_table_init(void)
 	printk(KERN_DEBUG PREFIX
 	       "RSDP (v%3.3d %6.6s                                ) @ 0x%p\n",
 	       rsdp->revision, rsdp->oem_id, (void *)rsdp_phys);
+
+	acpi_rsdp_rev = rsdp->revision;
 
 	if (rsdp->revision < 2)
 		result =

@@ -94,9 +94,8 @@ static void svm_inject_exception(struct vcpu *v, int trap,
     vmcb->eventinj = event;
 }
 
-static void stop_svm(void)
+static void svm_cpu_down(void)
 {
-    /* We turn off the EFER_SVME bit. */
     write_efer(read_efer() & ~EFER_SVME);
 }
 
@@ -974,7 +973,7 @@ static int svm_event_injection_faulted(struct vcpu *v)
 
 static struct hvm_function_table svm_function_table = {
     .name                 = "SVM",
-    .disable              = stop_svm,
+    .cpu_down             = svm_cpu_down,
     .domain_initialise    = svm_domain_initialise,
     .domain_destroy       = svm_domain_destroy,
     .vcpu_initialise      = svm_vcpu_initialise,
@@ -2155,6 +2154,16 @@ static void svm_do_msr_access(
             svm_inject_exception(v, TRAP_gp_fault, 1, 0);
             break;
 
+        case MSR_IA32_MCG_STATUS:
+        case MSR_IA32_MC0_STATUS:
+        case MSR_K8_MC1_STATUS:
+        case MSR_K8_MC2_STATUS:
+        case MSR_K8_MC3_STATUS:
+        case MSR_K8_MC4_STATUS:
+            /* No point in letting the guest see real MCEs */
+            msr_content = 0;
+            break;
+
         default:
             if ( rdmsr_hypervisor_regs(ecx, &eax, &edx) ||
                  rdmsr_safe(ecx, eax, edx) == 0 )
@@ -2329,9 +2338,6 @@ static int svm_reset_to_realmode(struct vcpu *v,
     /* clear the vmcb and user regs */
     memset(regs, 0, sizeof(struct cpu_user_regs));
    
-    /* VMCB Control */
-    vmcb->tsc_offset = 0;
-
     /* VMCB State */
     vmcb->cr0 = X86_CR0_ET | X86_CR0_PG | X86_CR0_WP;
     v->arch.hvm_svm.cpu_shadow_cr0 = X86_CR0_ET;

@@ -180,15 +180,13 @@ static void pci_setup(void)
     unsigned int bar, pin, link, isa_irq;
 
     /* Program PCI-ISA bridge with appropriate link routes. */
-    link = 0;
-    for ( isa_irq = 0; isa_irq < 15; isa_irq++ )
+    isa_irq = 0;
+    for ( link = 0; link < 4; link++ )
     {
-        if ( !(PCI_ISA_IRQ_MASK & (1U << isa_irq)) )
-            continue;
+        do { isa_irq = (isa_irq + 1) & 15;
+        } while ( !(PCI_ISA_IRQ_MASK & (1U << isa_irq)) );
         pci_writeb(PCI_ISA_DEVFN, 0x60 + link, isa_irq);
         printf("PCI-ISA link %u routed to IRQ%u\n", link, isa_irq);
-        if ( link++ == 4 )
-            break;
     }
 
     /* Program ELCR to match PCI-wired IRQs. */

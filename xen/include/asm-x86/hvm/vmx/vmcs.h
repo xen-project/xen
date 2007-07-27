@@ -24,10 +24,11 @@
 #include <asm/hvm/vmx/cpu.h>
 #include <public/hvm/vmx_assist.h>
 
-extern int start_vmx(void);
+extern void start_vmx(void);
 extern void vmcs_dump_vcpu(void);
-extern void vmx_init_vmcs_config(void);
 extern void setup_vmcs_dump(void);
+extern int  vmx_cpu_up(void);
+extern void vmx_cpu_down(void);
 
 struct vmcs_struct {
     u32 vmcs_revision_id;
@@ -59,6 +60,7 @@ struct arch_vmx_struct {
      *  - Activated on a CPU by VMPTRLD. Deactivated by VMCLEAR.
      *  - Launched on active CPU by VMLAUNCH when current VMCS.
      */
+    struct list_head     active_list;
     int                  active_cpu;
     int                  launched;
 
@@ -85,9 +87,6 @@ struct arch_vmx_struct {
     unsigned long        irqbase_mode:1;
     unsigned char        pm_irqbase[2];
 };
-
-struct vmcs_struct *vmx_alloc_host_vmcs(void);
-void vmx_free_host_vmcs(struct vmcs_struct *vmcs);
 
 int vmx_create_vmcs(struct vcpu *v);
 void vmx_destroy_vmcs(struct vcpu *v);

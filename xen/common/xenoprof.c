@@ -13,7 +13,7 @@
 #include <xen/guest_access.h>
 #include <xen/sched.h>
 #include <public/xenoprof.h>
-#include <asm/shadow.h>
+#include <xen/paging.h>
 
 /* Limit amount of pages used for shared buffer (per domain) */
 #define MAX_OPROF_SHARED_PAGES 32
@@ -21,26 +21,26 @@
 /* Lock protecting the following global state */
 static DEFINE_SPINLOCK(xenoprof_lock);
 
-struct domain *active_domains[MAX_OPROF_DOMAINS];
-int active_ready[MAX_OPROF_DOMAINS];
-unsigned int adomains;
+static struct domain *active_domains[MAX_OPROF_DOMAINS];
+static int active_ready[MAX_OPROF_DOMAINS];
+static unsigned int adomains;
 
-struct domain *passive_domains[MAX_OPROF_DOMAINS];
-unsigned int pdomains;
+static struct domain *passive_domains[MAX_OPROF_DOMAINS];
+static unsigned int pdomains;
 
-unsigned int activated;
-struct domain *xenoprof_primary_profiler;
-int xenoprof_state = XENOPROF_IDLE;
+static unsigned int activated;
+static struct domain *xenoprof_primary_profiler;
+static int xenoprof_state = XENOPROF_IDLE;
 static unsigned long backtrace_depth;
 
-u64 total_samples;
-u64 invalid_buffer_samples;
-u64 corrupted_buffer_samples;
-u64 lost_samples;
-u64 active_samples;
-u64 passive_samples;
-u64 idle_samples;
-u64 others_samples;
+static u64 total_samples;
+static u64 invalid_buffer_samples;
+static u64 corrupted_buffer_samples;
+static u64 lost_samples;
+static u64 active_samples;
+static u64 passive_samples;
+static u64 idle_samples;
+static u64 others_samples;
 
 int is_active(struct domain *d)
 {
@@ -48,13 +48,13 @@ int is_active(struct domain *d)
     return ((x != NULL) && (x->domain_type == XENOPROF_DOMAIN_ACTIVE));
 }
 
-int is_passive(struct domain *d)
+static int is_passive(struct domain *d)
 {
     struct xenoprof *x = d->xenoprof;
     return ((x != NULL) && (x->domain_type == XENOPROF_DOMAIN_PASSIVE));
 }
 
-int is_profiled(struct domain *d)
+static int is_profiled(struct domain *d)
 {
     return (is_active(d) || is_passive(d));
 }
@@ -397,7 +397,7 @@ static int add_passive_list(XEN_GUEST_HANDLE(void) arg)
     d->xenoprof->domain_type = XENOPROF_DOMAIN_PASSIVE;
     passive.nbuf = d->xenoprof->nbuf;
     passive.bufsize = d->xenoprof->bufsize;
-    if ( !shadow_mode_translate(current->domain) )
+    if ( !paging_mode_translate(current->domain) )
         passive.buf_gmaddr = __pa(d->xenoprof->rawbuf);
     else
         xenoprof_shared_gmfn_with_guest(
@@ -543,24 +543,24 @@ void xenoprof_log_event(struct vcpu *vcpu,
 
 static int xenoprof_op_init(XEN_GUEST_HANDLE(void) arg)
 {
+    struct domain *d = current->domain;
     struct xenoprof_init xenoprof_init;
     int ret;
 
     if ( copy_from_guest(&xenoprof_init, arg, 1) )
         return -EFAULT;
 
-    if ( (ret = xenoprof_arch_init(&xenoprof_init.num_events, 
-                                   &xenoprof_init.is_primary, 
+    if ( (ret = xenoprof_arch_init(&xenoprof_init.num_events,
                                    xenoprof_init.cpu_type)) )
         return ret;
 
-    if ( copy_to_guest(arg, &xenoprof_init, 1) )
-        return -EFAULT;
-
+    xenoprof_init.is_primary = 
+        ((xenoprof_primary_profiler == d) ||
+         ((xenoprof_primary_profiler == NULL) && (d->domain_id == 0)));
     if ( xenoprof_init.is_primary )
         xenoprof_primary_profiler = current->domain;
 
-    return 0;
+    return (copy_to_guest(arg, &xenoprof_init, 1) ? -EFAULT : 0);
 }
 
 #endif /* !COMPAT */
@@ -598,7 +598,7 @@ static int xenoprof_op_get_buffer(XEN_GUEST_HANDLE(void) arg)
         
     xenoprof_get_buffer.nbuf = d->xenoprof->nbuf;
     xenoprof_get_buffer.bufsize = d->xenoprof->bufsize;
-    if ( !shadow_mode_translate(d) )
+    if ( !paging_mode_translate(d) )
         xenoprof_get_buffer.buf_gmaddr = __pa(d->xenoprof->rawbuf);
     else
         xenoprof_shared_gmfn_with_guest(

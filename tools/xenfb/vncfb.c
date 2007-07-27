@@ -55,11 +55,46 @@ static unsigned char atkbd_unxlate_table[128] = {
 unsigned char keycode_table[512];
 
 static void *kbd_layout;
+uint8_t modifiers_state[256];
 
 static int btnmap[] = {
 	BTN_LEFT, BTN_MIDDLE, BTN_RIGHT, BTN_SIDE,
 	BTN_EXTRA, BTN_FORWARD, BTN_BACK, BTN_TASK
 };
+
+static void press_key_shift_down(struct xenfb* xenfb, int down, int scancode)
+{
+	if (down)
+		xenfb_send_key(xenfb, 1, keycode_table[0x2a]);
+
+	if (xenfb_send_key(xenfb, down, keycode_table[scancode]) < 0)
+		fprintf(stderr, "Key %d %s lost (%s)\n",
+			scancode, "down", strerror(errno));
+
+	if (!down)
+		xenfb_send_key(xenfb, 0, keycode_table[0x2a]);
+}
+
+static void press_key_shift_up(struct xenfb* xenfb, int down, int scancode)
+{
+	if (down) {
+		if (modifiers_state[0x2a])
+			xenfb_send_key(xenfb, 0, keycode_table[0x2a]);
+		if (modifiers_state[0x36])
+			xenfb_send_key(xenfb, 0, keycode_table[0x36]);
+	}
+
+	if (xenfb_send_key(xenfb, down, keycode_table[scancode]) < 0)
+		fprintf(stderr, "Key %d %s lost (%s)\n",
+			scancode, "down", strerror(errno));
+
+	if (!down) {
+		if (modifiers_state[0x2a])
+			xenfb_send_key(xenfb, 1, keycode_table[0x2a]);
+		if (modifiers_state[0x36])
+			xenfb_send_key(xenfb, 1, keycode_table[0x36]);
+	}
+}
 
 static void on_kbd_event(rfbBool down, rfbKeySym keycode, rfbClientPtr cl)
 {
@@ -75,14 +110,75 @@ static void on_kbd_event(rfbBool down, rfbKeySym keycode, rfbClientPtr cl)
 	rfbScreenInfoPtr server = cl->screen;
 	struct xenfb *xenfb = server->screenData;
 	int scancode;
+	int shift = 0;
+	int shift_keys = 0;
 
-	if (keycode >= 'A' && keycode <= 'Z')
+	if (keycode >= 'A' && keycode <= 'Z') {
 		keycode += 'a' - 'A';
+		shift = 1;
+	}
+	else {
+		shift = keysymIsShift(kbd_layout, keycode);
+	}
+	shift_keys = modifiers_state[0x2a] | modifiers_state[0x36];	
 
-	scancode = keycode_table[keysym2scancode(kbd_layout, keycode)];
+	scancode = keysym2scancode(kbd_layout, keycode);
 	if (scancode == 0)
 		return;
-	if (xenfb_send_key(xenfb, down, scancode) < 0)
+
+	switch(scancode) {
+	case 0x2a:			/* Left Shift */
+	case 0x36:			/* Right Shift */
+	case 0x1d:			/* Left CTRL */
+	case 0x9d:			/* Right CTRL */
+	case 0x38:			/* Left ALT */
+	case 0xb8:			/* Right ALT */
+		if (down)
+			modifiers_state[scancode] = 1;
+		else
+			modifiers_state[scancode] = 0;
+		xenfb_send_key(xenfb, down, keycode_table[scancode]); 
+		return;
+	case 0x45:			/* NumLock */
+		if (!down)
+			modifiers_state[scancode] ^= 1;
+		xenfb_send_key(xenfb, down, keycode_table[scancode]);
+		return;
+	}
+
+	if (keycodeIsKeypad(kbd_layout, scancode)) {
+	/* If the numlock state needs to change then simulate an additional
+	   keypress before sending this one.  This will happen if the user
+	   toggles numlock away from the VNC window.
+	*/
+		if (keysymIsNumlock(kbd_layout, keycode)) {
+			if (!modifiers_state[0x45]) {
+				modifiers_state[0x45] = 1;
+				xenfb_send_key(xenfb, 1, keycode_table[0x45]);
+				xenfb_send_key(xenfb, 0, keycode_table[0x45]);
+			}
+		} else {
+			if (modifiers_state[0x45]) {
+				modifiers_state[0x45] = 0;
+				xenfb_send_key(xenfb, 1, keycode_table[0x45]);
+				xenfb_send_key(xenfb, 0, keycode_table[0x45]);
+			}
+		}
+	}
+
+	/* If the shift state needs to change then simulate an additional
+	   keypress before sending this one.
+	*/
+	if (shift && !shift_keys) {
+		press_key_shift_down(xenfb, down, scancode);
+		return;
+	}
+	else if (!shift && shift_keys) {
+		press_key_shift_up(xenfb, down, scancode);
+		return;
+	}
+
+	if (xenfb_send_key(xenfb, down, keycode_table[scancode]) < 0)
 		fprintf(stderr, "Key %d %s lost (%s)\n",
 			scancode, down ? "down" : "up",
 			strerror(errno));
@@ -312,6 +408,10 @@ int main(int argc, char **argv)
 		keycode_table[i] = atkbd_set2_keycode[atkbd_unxlate_table[i]];
 		keycode_table[i | 0x80] = 
 			atkbd_set2_keycode[atkbd_unxlate_table[i] | 0x80];
+	}
+
+	for (i = 0; i < 256; i++ ) {
+		modifiers_state[i] = 0;
 	}
 
 	fake_argv[2] = portstr;

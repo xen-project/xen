@@ -8,3 +8,4 @@ obj-y += tce.o
 obj-y += vtce.o
 obj-$(papr_vterm) += vterm.o
 obj-y += xlate.o
+obj-y += h_perfmon.o

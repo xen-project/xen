@@ -17,7 +17,7 @@
 
 #define CONFIG_X86 1
 #define CONFIG_X86_HT 1
-#define CONFIG_SHADOW 1
+#define CONFIG_PAGING_ASSISTANCE 1
 #define CONFIG_SMP 1
 #define CONFIG_X86_LOCAL_APIC 1
 #define CONFIG_X86_GOOD_APIC 1
@@ -25,9 +25,7 @@
 #define CONFIG_X86_PM_TIMER 1
 #define CONFIG_HPET_TIMER 1
 #define CONFIG_X86_MCE_P4THERMAL 1
-#define CONFIG_ACPI_NUMA 1
 #define CONFIG_NUMA 1
-#define CONFIG_ACPI_SRAT 1
 #define CONFIG_DISCONTIGMEM 1
 #define CONFIG_NUMA_EMU 1
 
@@ -36,8 +34,14 @@
 
 #define CONFIG_ACPI 1
 #define CONFIG_ACPI_BOOT 1
+#define CONFIG_ACPI_SLEEP 1
+#define CONFIG_ACPI_NUMA 1
+#define CONFIG_ACPI_SRAT 1
 
 #define CONFIG_VGA 1
+
+#define CONFIG_HOTPLUG 1
+#define CONFIG_HOTPLUG_CPU 1
 
 #define HZ 100
 
@@ -100,6 +104,8 @@ extern char trampoline_start[], trampoline_end[];
 extern char trampoline_realmode_entry[];
 extern unsigned int trampoline_xen_phys_start;
 extern unsigned char trampoline_cpu_started;
+extern char wakeup_start[];
+extern unsigned int video_mode, video_flags;
 #endif
 
 #if defined(__x86_64__)

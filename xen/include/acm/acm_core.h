@@ -22,9 +22,11 @@
 #include <xen/spinlock.h>
 #include <xen/list.h>
 #include <public/acm.h>
-#include <xen/acm_policy.h>
 #include <public/acm_ops.h>
 #include <acm/acm_endian.h>
+
+#define ACM_DEFAULT_SECURITY_POLICY \
+        ACM_CHINESE_WALL_AND_SIMPLE_TYPE_ENFORCEMENT_POLICY
 
 /* Xen-internal representation of the binary policy */
 struct acm_binary_policy {
@@ -151,8 +153,7 @@ static inline int acm_array_append_tuple(struct acm_sized_buffer *buf,
 }
 
 /* protos */
-int acm_init_domain_ssid(domid_t id, ssidref_t ssidref);
-int acm_init_domain_ssid_new(struct domain *, ssidref_t ssidref);
+int acm_init_domain_ssid(struct domain *, ssidref_t ssidref);
 void acm_free_domain_ssid(struct acm_ssid_domain *ssid);
 int acm_init_binary_policy(u32 policy_code);
 int acm_set_policy(XEN_GUEST_HANDLE_64(void) buf, u32 buf_size);

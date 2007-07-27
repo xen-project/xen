@@ -14,7 +14,6 @@
 #include <xen/rangeset.h>
 #include <xen/compat.h>
 #include <asm/debugger.h>
-#include <asm/shadow.h>
 #include <asm/div64.h>
 
 #define KEY_MAX 256

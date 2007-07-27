@@ -26,6 +26,11 @@ import re
 
 from xen.xend import XendOptions
 from xen.xend.server.DevController import DevController
+from xen.xend.XendError import VmError
+from xen.util import security
+from xen.xend.XendXSPolicyAdmin import XSPolicyAdminInstance
+
+from xen.xend.XendLogging import log
 
 xoptions = XendOptions.instance()
 
@@ -108,6 +113,7 @@ class NetifController(DevController):
         ipaddr  = config.get('ip')
         model   = config.get('model')
         accel   = config.get('accel')
+        sec_lab = config.get('security_label')
 
         if not typ:
             typ = xoptions.netback_type
@@ -134,6 +140,8 @@ class NetifController(DevController):
             back['model'] = model
         if accel:
             back['accel'] = accel
+        if sec_lab:
+            back['security_label'] = sec_lab
 
         config_path = "device/%s/%d/" % (self.deviceClass, devid)
         for x in back:
@@ -149,7 +157,32 @@ class NetifController(DevController):
             front = { 'handle' : "%i" % devid,
                       'mac'    : mac }
 
+        if security.on():
+            self.do_access_control(config)
+
         return (devid, back, front)
+
+
+    def do_access_control(self, config):
+        """ do access control checking. Throws a VMError if access is denied """
+        domain_label = self.vm.get_security_label()
+        stes = XSPolicyAdminInstance().get_stes_of_vmlabel(domain_label)
+        res_label = config.get('security_label')
+        if len(stes) > 1 or res_label:
+            if not res_label:
+                raise VmError("'VIF' must be labeled")
+            (label, ssidref, policy) = \
+                              security.security_label_to_details(res_label)
+            if domain_label:
+                rc = security.res_security_check_xapi(label, ssidref,
+                                                      policy,
+                                                      domain_label)
+                if rc == 0:
+                    raise VmError("VM's access to network device denied. "
+                                  "Check labeling")
+            else:
+                raise VmError("VM must have a security label to access "
+                              "network device")
 
 
     def getDeviceConfiguration(self, devid):
@@ -160,10 +193,12 @@ class NetifController(DevController):
         config_path = "device/%s/%d/" % (self.deviceClass, devid)
         devinfo = ()
         for x in ( 'script', 'ip', 'bridge', 'mac',
-                   'type', 'vifname', 'rate', 'uuid', 'model', 'accel'):
+                   'type', 'vifname', 'rate', 'uuid', 'model', 'accel',
+                   'security_label'):
             y = self.vm._readVm(config_path + x)
             devinfo += (y,)
-        (script, ip, bridge, mac, typ, vifname, rate, uuid, model, accel) = devinfo
+        (script, ip, bridge, mac, typ, vifname, rate, uuid,
+         model, accel, security_label) = devinfo
 
         if script:
             result['script'] = script
@@ -185,5 +220,7 @@ class NetifController(DevController):
             result['model'] = model
         if accel:
             result['accel'] = accel
-            
+        if security_label:
+            result['security_label'] = security_label
+
         return result

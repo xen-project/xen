@@ -369,6 +369,95 @@ static int __init acpi_parse_hpet(unsigned long phys, unsigned long size)
 extern u32 pmtmr_ioport;
 #endif
 
+#ifdef CONFIG_ACPI_SLEEP
+/* Get pm1x_cnt and pm1x_evt information for ACPI sleep */
+static int __init
+acpi_fadt_parse_sleep_info(struct fadt_descriptor_rev2 *fadt)
+{
+	struct facs_descriptor_rev2 *facs = NULL;
+	uint64_t facs_pa;
+
+	if (fadt->revision >= FADT2_REVISION_ID) {
+		/* Sanity check on FADT Rev. 2 */
+		if ((fadt->xpm1a_cnt_blk.address_space_id !=
+		     ACPI_ADR_SPACE_SYSTEM_IO) ||
+		    (fadt->xpm1b_cnt_blk.address_space_id !=
+		     ACPI_ADR_SPACE_SYSTEM_IO) ||
+		    (fadt->xpm1a_evt_blk.address_space_id !=
+		     ACPI_ADR_SPACE_SYSTEM_IO) ||
+		    (fadt->xpm1b_evt_blk.address_space_id !=
+		     ACPI_ADR_SPACE_SYSTEM_IO))
+			goto bad; 
+
+		acpi_sinfo.pm1a_cnt = (uint16_t)fadt->xpm1a_cnt_blk.address;
+		acpi_sinfo.pm1b_cnt = (uint16_t)fadt->xpm1b_cnt_blk.address;
+		acpi_sinfo.pm1a_evt = (uint16_t)fadt->xpm1a_evt_blk.address;
+		acpi_sinfo.pm1b_evt = (uint16_t)fadt->xpm1b_evt_blk.address;
+	}
+
+	if (!acpi_sinfo.pm1a_cnt)
+		acpi_sinfo.pm1a_cnt = (uint16_t)fadt->V1_pm1a_cnt_blk;
+	if (!acpi_sinfo.pm1b_cnt)
+		acpi_sinfo.pm1b_cnt = (uint16_t)fadt->V1_pm1b_cnt_blk;
+	if (!acpi_sinfo.pm1a_evt)
+		acpi_sinfo.pm1a_evt = (uint16_t)fadt->V1_pm1a_evt_blk;
+	if (!acpi_sinfo.pm1b_evt)
+		acpi_sinfo.pm1b_evt = (uint16_t)fadt->V1_pm1b_evt_blk;
+
+	/* Now FACS... */
+	if (fadt->revision >= FADT2_REVISION_ID)
+		facs_pa = fadt->xfirmware_ctrl;
+	else
+		facs_pa = (uint64_t)fadt->V1_firmware_ctrl;
+
+	facs = (struct facs_descriptor_rev2 *)
+		__acpi_map_table(facs_pa, sizeof(struct facs_descriptor_rev2));
+	if (!facs)
+		goto bad;
+
+	if (strncmp(facs->signature, "FACS", 4)) {
+		printk(KERN_ERR PREFIX "Invalid FACS signature %s\n",
+			facs->signature);
+		goto bad;
+	}
+
+	if (facs->length < 24) {
+		printk(KERN_ERR PREFIX "Invalid FACS table length: 0x%x",
+			facs->length);
+		goto bad;
+	}
+
+	if (facs->length < 64)
+		printk(KERN_WARNING PREFIX
+			"FACS is shorter than ACPI spec allow: 0x%x",
+			facs->length);
+
+	if ((acpi_rsdp_rev < 2) ||
+	    (facs->length < 32)) {
+		acpi_sinfo.wakeup_vector = facs_pa + 
+			offsetof(struct facs_descriptor_rev2,
+				 firmware_waking_vector);
+		acpi_sinfo.vector_width = 32;
+	} else {
+		acpi_sinfo.wakeup_vector = facs_pa +
+			offsetof(struct facs_descriptor_rev2,
+				 xfirmware_waking_vector);
+		acpi_sinfo.vector_width = 64;
+	}
+
+	printk (KERN_INFO PREFIX
+		"ACPI SLEEP INFO: pm1x_cnt[%x,%x], pm1x_evt[%x,%x]\n"
+		"                 wakeup_vec[%"PRIx64"], vec_size[%x]\n",
+		acpi_sinfo.pm1a_cnt, acpi_sinfo.pm1b_cnt,
+		acpi_sinfo.pm1a_evt, acpi_sinfo.pm1b_cnt,
+		acpi_sinfo.wakeup_vector, acpi_sinfo.vector_width);
+	return 0;
+bad:
+	memset(&acpi_sinfo, 0, sizeof(acpi_sinfo));
+	return 0;
+}
+#endif
+
 static int __init acpi_parse_fadt(unsigned long phys, unsigned long size)
 {
 	struct fadt_descriptor_rev2 *fadt = NULL;
@@ -412,6 +501,10 @@ static int __init acpi_parse_fadt(unsigned long phys, unsigned long size)
 	if (pmtmr_ioport)
 		printk(KERN_INFO PREFIX "PM-Timer IO Port: %#x\n",
 		       pmtmr_ioport);
+#endif
+
+#ifdef CONFIG_ACPI_SLEEP
+	acpi_fadt_parse_sleep_info(fadt);
 #endif
 	return 0;
 }

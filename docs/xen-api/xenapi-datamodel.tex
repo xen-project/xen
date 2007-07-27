@@ -46,6 +46,8 @@ Name & Description \\
 {\tt console} & A console \\
 {\tt user} & A user of the system \\
 {\tt debug} & A basic class for testing \\
+{\tt XSPolicy} & A class for handling Xen Security Policies \\
+{\tt ACMPolicy} & A class for handling ACM-type policies \\
 \hline
 \end{tabular}\end{center}
 \section{Relationships Between Classes}
@@ -225,6 +227,261 @@ The following enumeration types are used:
 \end{longtable}
 
 \vspace{1cm}
+\newpage
+
+\section{Error Handling}
+When a low-level transport error occurs, or a request is malformed at the HTTP
+or XML-RPC level, the server may send an XML-RPC Fault response, or the client
+may simulate the same.  The client must be prepared to handle these errors,
+though they may be treated as fatal.  On the wire, these are transmitted in a
+form similar to this:
+
+\begin{verbatim}
+    <methodResponse>
+      <fault>
+        <value>
+          <struct>
+            <member>
+                <name>faultCode</name>
+                <value><int>-1</int></value>
+              </member>
+              <member>
+                <name>faultString</name>
+                <value><string>Malformed request</string></value>
+            </member>
+          </struct>
+        </value>
+      </fault>
+    </methodResponse>
+\end{verbatim}
+
+All other failures are reported with a more structured error response, to
+allow better automatic response to failures, proper internationalisation of
+any error message, and easier debugging.  On the wire, these are transmitted
+like this:
+
+\begin{verbatim}
+    <struct>
+      <member>
+        <name>Status</name>
+        <value>Failure</value>
+      </member>
+      <member>
+        <name>ErrorDescription</name>
+        <value>
+          <array>
+            <data>
+              <value>MAP_DUPLICATE_KEY</value>
+              <value>Customer</value>
+              <value>eSpeil Inc.</value>
+              <value>eSpeil Incorporated</value>
+            </data>
+          </array>
+        </value>
+      </member>
+    </struct>
+\end{verbatim}
+
+Note that {\tt ErrorDescription} value is an array of string values. The
+first element of the array is an error code; the remainder of the array are
+strings representing error parameters relating to that code.  In this case,
+the client has attempted to add the mapping {\tt Customer $\rightarrow$
+eSpiel Incorporated} to a Map, but it already contains the mapping
+{\tt Customer $\rightarrow$ eSpiel Inc.}, and so the request has failed.
+
+The reference below lists each possible error returned by each method.
+As well as the errors explicitly listed, any method may return low-level
+errors as described above, or any of the following generic errors:
+
+\begin{itemize}
+\item HANDLE\_INVALID
+\item INTERNAL\_ERROR
+\item MAP\_DUPLICATE\_KEY
+\item MESSAGE\_METHOD\_UNKNOWN
+\item MESSAGE\_PARAMETER\_COUNT\_MISMATCH
+\item OPERATION\_NOT\_ALLOWED
+\item PERMISSION\_DENIED
+\item SESSION\_INVALID
+\end{itemize}
+
+Each possible error code is documented in the following section.
+
+\subsection{Error Codes}
+
+\subsubsection{HANDLE\_INVALID}
+
+You gave an invalid handle.  The object may have recently been deleted. 
+The class parameter gives the type of reference given, and the handle
+parameter echoes the bad value given.
+
+\vspace{0.3cm}
+{\bf Signature:}
+\begin{verbatim}HANDLE_INVALID(class, handle)\end{verbatim}
+\begin{center}\rule{10em}{0.1pt}\end{center}
+
+\subsubsection{INTERNAL\_ERROR}
+
+The server failed to handle your request, due to an internal error.  The
+given message may give details useful for debugging the problem.
+
+\vspace{0.3cm}
+{\bf Signature:}
+\begin{verbatim}INTERNAL_ERROR(message)\end{verbatim}
+\begin{center}\rule{10em}{0.1pt}\end{center}
+
+\subsubsection{MAP\_DUPLICATE\_KEY}
+
+You tried to add a key-value pair to a map, but that key is already there. 
+The key, current value, and the new value that you tried to set are all
+echoed.
+
+\vspace{0.3cm}
+{\bf Signature:}
+\begin{verbatim}MAP_DUPLICATE_KEY(key, current value, new value)\end{verbatim}
+\begin{center}\rule{10em}{0.1pt}\end{center}
+
+\subsubsection{MESSAGE\_METHOD\_UNKNOWN}
+
+You tried to call a method that does not exist.  The method name that you
+used is echoed.
+
+\vspace{0.3cm}
+{\bf Signature:}
+\begin{verbatim}MESSAGE_METHOD_UNKNOWN(method)\end{verbatim}
+\begin{center}\rule{10em}{0.1pt}\end{center}
+
+\subsubsection{MESSAGE\_PARAMETER\_COUNT\_MISMATCH}
+
+You tried to call a method with the incorrect number of parameters.  The
+fully-qualified method name that you used, and the number of received and
+expected parameters are returned.
+
+\vspace{0.3cm}
+{\bf Signature:}
+\begin{verbatim}MESSAGE_PARAMETER_COUNT_MISMATCH(method, expected, received)\end{verbatim}
+\begin{center}\rule{10em}{0.1pt}\end{center}
+
+\subsubsection{NETWORK\_ALREADY\_CONNECTED}
+
+You tried to create a PIF, but the network you tried to attach it to is
+already attached to some other PIF, and so the creation failed.
+
+\vspace{0.3cm}
+{\bf Signature:}
+\begin{verbatim}NETWORK_ALREADY_CONNECTED(network, connected PIF)\end{verbatim}
+\begin{center}\rule{10em}{0.1pt}\end{center}
+
+\subsubsection{OPERATION\_NOT\_ALLOWED}
+
+You attempted an operation that was not allowed.
+
+\vspace{0.3cm}
+No parameters.
+\begin{center}\rule{10em}{0.1pt}\end{center}
+
+\subsubsection{PERMISSION\_DENIED}
+
+You do not have the required permissions to perform the operation.
+
+\vspace{0.3cm}
+No parameters.
+\begin{center}\rule{10em}{0.1pt}\end{center}
+
+\subsubsection{PIF\_IS\_PHYSICAL}
+
+You tried to destroy a PIF, but it represents an aspect of the physical
+host configuration, and so cannot be destroyed.  The parameter echoes the
+PIF handle you gave.
+
+\vspace{0.3cm}
+{\bf Signature:}
+\begin{verbatim}PIF_IS_PHYSICAL(PIF)\end{verbatim}
+\begin{center}\rule{10em}{0.1pt}\end{center}
+
+\subsubsection{SESSION\_AUTHENTICATION\_FAILED}
+
+The credentials given by the user are incorrect, so access has been denied,
+and you have not been issued a session handle.
+
+\vspace{0.3cm}
+No parameters.
+\begin{center}\rule{10em}{0.1pt}\end{center}
+
+\subsubsection{SESSION\_INVALID}
+
+You gave an invalid session handle.  It may have been invalidated by a
+server restart, or timed out.  You should get a new session handle, using
+one of the session.login\_ calls.  This error does not invalidate the
+current connection.  The handle parameter echoes the bad value given.
+
+\vspace{0.3cm}
+{\bf Signature:}
+\begin{verbatim}SESSION_INVALID(handle)\end{verbatim}
+\begin{center}\rule{10em}{0.1pt}\end{center}
+
+\subsubsection{SESSION\_NOT\_REGISTERED}
+
+This session is not registered to receive events.  You must call
+event.register before event.next.  The session handle you are using is
+echoed.
+
+\vspace{0.3cm}
+{\bf Signature:}
+\begin{verbatim}SESSION_NOT_REGISTERED(handle)\end{verbatim}
+\begin{center}\rule{10em}{0.1pt}\end{center}
+
+\subsubsection{VALUE\_NOT\_SUPPORTED}
+
+You attempted to set a value that is not supported by this implementation. 
+The fully-qualified field name and the value that you tried to set are
+returned.  Also returned is a developer-only diagnostic reason.
+
+\vspace{0.3cm}
+{\bf Signature:}
+\begin{verbatim}VALUE_NOT_SUPPORTED(field, value, reason)\end{verbatim}
+\begin{center}\rule{10em}{0.1pt}\end{center}
+
+\subsubsection{VLAN\_TAG\_INVALID}
+
+You tried to create a VLAN, but the tag you gave was invalid -- it mmust be
+between 0 and 4095.  The parameter echoes the VLAN tag you gave.
+
+\vspace{0.3cm}
+{\bf Signature:}
+\begin{verbatim}VLAN_TAG_INVALID(VLAN)\end{verbatim}
+\begin{center}\rule{10em}{0.1pt}\end{center}
+
+\subsubsection{VM\_BAD\_POWER\_STATE}
+
+You attempted an operation on a VM that was not in an appropriate power
+state at the time; for example, you attempted to start a VM that was
+already running.  The parameters returned are the VM's handle, and the
+expected and actual VM state at the time of the call.
+
+\vspace{0.3cm}
+{\bf Signature:}
+\begin{verbatim}VM_BAD_POWER_STATE(vm, expected, actual)\end{verbatim}
+\begin{center}\rule{10em}{0.1pt}\end{center}
+
+\subsubsection{VM\_HVM\_REQUIRED}
+
+HVM is required for this operation
+
+\vspace{0.3cm}
+{\bf Signature:}
+\begin{verbatim}VM_HVM_REQUIRED(vm)\end{verbatim}
+\begin{center}\rule{10em}{0.1pt}\end{center}
+
+\subsubsection{SECURITY\_ERROR}
+
+A security error occurred. The parameter provides the xen security
+error code and a message describing the error.
+
+\vspace{0.3cm}
+{\bf Signature:}
+\begin{verbatim}SECURITY_ERROR(xserr, message)\end{verbatim}
+\begin{center}\rule{10em}{0.1pt}\end{center}
+
 
 \newpage
 \section{Class: session}
@@ -275,6 +532,11 @@ session ref
 
 
 ID of newly created session
+
+\vspace{0.3cm}
+
+\noindent{\bf Possible Error Codes:} {\tt SESSION\_AUTHENTICATION\_FAILED}
+
 \vspace{0.3cm}
 \vspace{0.3cm}
 \vspace{0.3cm}
@@ -1153,6 +1415,7 @@ $\mathit{RO}_\mathit{run}$ &  {\tt domid} & int & domain ID (if available, -1 ot
 $\mathit{RO}_\mathit{run}$ &  {\tt is\_control\_domain} & bool & true if this is a control domain (domain 0 or a driver domain) \\
 $\mathit{RO}_\mathit{run}$ &  {\tt metrics} & VM\_metrics ref & metrics associated with this VM \\
 $\mathit{RO}_\mathit{run}$ &  {\tt guest\_metrics} & VM\_guest\_metrics ref & metrics associated with the running guest \\
+$\mathit{RO}_\mathit{run}$ &  {\tt security/label} & string & the VM's security label \\
 \hline
 \end{longtable}
 \subsection{RPCs associated with class: VM}
@@ -4150,6 +4413,82 @@ value of the field
 \vspace{0.3cm}
 \vspace{0.3cm}
 \vspace{0.3cm}
+\subsubsection{RPC name:~get\_security\_label}
+
+{\bf Overview:}
+Get the security label field of the given VM. Refer to the XSPolicy class
+for the format of the security label.
+
+ \noindent {\bf Signature:}
+\begin{verbatim} string get_security_label (session_id s, VM ref self)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt VM ref } & self & reference to the object \\ \hline
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:}
+{\tt
+string
+}
+
+
+value of the field
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~set\_security\_label}
+
+{\bf Overview:}
+Set the security label field of the given VM. Refer to the XSPolicy class
+for the format of the security label.
+
+ \noindent {\bf Signature:}
+\begin{verbatim} int set_security_label (session_id s, VM ref self, string
+security_label, string old_label)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt VM ref } & self & reference to the object \\ \hline
+{\tt string } & security\_label & security label for the VM \\ \hline
+{\tt string } & old\_label & Optional label value that the security label \\
+& & must currently have for the change to succeed.\\ \hline
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:}
+{\tt
+int
+}
+
+
+Returns the ssidref in case of an VM that is currently running or
+paused, zero in case of a dormant VM (halted, suspended).
+
+\vspace{0.3cm}
+
+\noindent{\bf Possible Error Codes:} {\tt SECURITY\_ERROR}
+
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
 \subsubsection{RPC name:~create}
 
 {\bf Overview:} 
@@ -7100,7 +7439,9 @@ value of the field
 \subsubsection{RPC name:~get\_flags}
 
 {\bf Overview:} 
-Get the flags field of the given host\_cpu.
+Get the flags field of the given host\_cpu.  As of this version of the
+API, the semantics of the returned string are explicitly unspecified,
+and may change in the future.
 
  \noindent {\bf Signature:} 
 \begin{verbatim} string get_flags (session_id s, host_cpu ref self)\end{verbatim}
@@ -7132,7 +7473,9 @@ value of the field
 \subsubsection{RPC name:~get\_features}
 
 {\bf Overview:} 
-Get the features field of the given host\_cpu.
+Get the features field of the given host\_cpu. As of this version of the
+API, the semantics of the returned string are explicitly unspecified,
+and may change in the future.
 
  \noindent {\bf Signature:} 
 \begin{verbatim} string get_features (session_id s, host_cpu ref self)\end{verbatim}
@@ -8631,6 +8974,79 @@ VIF\_metrics ref
 
 
 value of the field
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~set\_security\_label}
+
+{\bf Overview:}
+Set the security label of the given VIF. Refer to the XSPolicy class
+for the format of the security label.
+
+ \noindent {\bf Signature:}
+\begin{verbatim} void set_security_label (session_id s, VIF ref self, string
+security_label, string old_label)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt VIF ref } & self & reference to the object \\ \hline
+
+{\tt string } & security\_label & New value of the security label \\ \hline
+{\tt string } & old\_label & Optional label value that the security label \\
+& & must currently have for the change to succeed.\\ \hline
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:}
+{\tt
+void
+}
+
+
+\vspace{0.3cm}
+
+\noindent{\bf Possible Error Codes:} {\tt SECURITY\_ERROR}
+
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~get\_security\_label}
+
+{\bf Overview:}
+Get the security label of the given VIF.
+
+ \noindent {\bf Signature:}
+\begin{verbatim} string get_security_label (session_id s, VIF ref self)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+
+
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt VIF ref } & self & reference to the object \\ \hline
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:}
+{\tt
+string
+}
+
+
+value of the given field
 \vspace{0.3cm}
 \vspace{0.3cm}
 \vspace{0.3cm}
@@ -10382,6 +10798,7 @@ $\mathit{RO}_\mathit{ins}$ &  {\tt type} & vdi\_type & type of the VDI \\
 $\mathit{RW}$ &  {\tt sharable} & bool & true if this disk may be shared \\
 $\mathit{RW}$ &  {\tt read\_only} & bool & true if this disk may ONLY be mounted read-only \\
 $\mathit{RW}$ &  {\tt other\_config} & (string $\rightarrow$ string) Map & additional configuration \\
+$\mathit{RO}_\mathit{run}$ &  {\tt security/label} & string & the VM's security label \\
 \hline
 \end{longtable}
 \subsection{RPCs associated with class: VDI}
@@ -11062,6 +11479,79 @@ void
 
 
 
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~set\_security\_label}
+
+{\bf Overview:}
+Set the security label of the given VDI. Refer to the XSPolicy class
+for the format of the security label.
+
+ \noindent {\bf Signature:}
+\begin{verbatim} void set_security_label (session_id s, VDI ref self, string
+security_label, string old_label)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt VDI ref } & self & reference to the object \\ \hline
+
+{\tt string } & security\_label & New value of the security label \\ \hline
+{\tt string } & old\_label & Optional label value that the security label \\
+& & must currently have for the change to succeed.\\ \hline
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:}
+{\tt
+void
+}
+
+
+\vspace{0.3cm}
+
+\noindent{\bf Possible Error Codes:} {\tt SECURITY\_ERROR}
+
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~get\_security\_label}
+
+{\bf Overview:}
+Get the security label of the given VDI.
+
+ \noindent {\bf Signature:}
+\begin{verbatim} string get_security_label (session_id s, VDI ref self)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+
+
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt VDI ref } & self & reference to the object \\ \hline
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:}
+{\tt
+string
+}
+
+
+value of the given field
 \vspace{0.3cm}
 \vspace{0.3cm}
 \vspace{0.3cm}
@@ -13172,6 +13662,38 @@ value of the field
 \vspace{0.3cm}
 \vspace{0.3cm}
 \vspace{0.3cm}
+\subsubsection{RPC name:~get\_runtime\_properties}
+
+{\bf Overview:}
+Get the runtime\_properties field of the given VTPM.
+
+\noindent {\bf Signature:}
+\begin{verbatim} ((string -> string) Map) get_runtime_properties (session_id s, VTPM ref self)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt VTPM ref } & self & reference to the object \\ \hline
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:}
+{\tt
+(string $\rightarrow$ string) Map
+}
+
+
+value of the field
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
 \subsubsection{RPC name:~create}
 
 {\bf Overview:} 
@@ -14017,6 +14539,634 @@ all fields from the object
 
 \vspace{1cm}
 \newpage
+\section{Class: XSPolicy}
+\subsection{Fields for class: XSPolicy}
+\begin{longtable}{|lllp{0.38\textwidth}|}
+\hline
+\multicolumn{1}{|l}{Name} & \multicolumn{3}{l|}{\bf XSPolicy} \\
+\multicolumn{1}{|l}{Description} & \multicolumn{3}{l|}{\parbox{11cm}{\em A Xen Security Policy}} \\
+\hline
+Quals & Field & Type & Description \\
+\hline
+$\mathit{RO}_\mathit{run}$ &  {\tt uuid} & string  & unique identifier / object reference \\
+$\mathit{RW}$              &  {\tt repr} & string  & representation of policy, i.e., XML \\
+$\mathit{RO}_\mathit{run}$ &  {\tt type} & xs\_type & type of the policy \\
+$\mathit{RO}_\mathit{run}$ & {\tt flags} & xs\_instantiationflags & policy
+status flags \\
+\hline
+\end{longtable}
+\subsection{Semantics of the class: XSPolicy}
+
+The XSPolicy class is used for administering Xen Security policies. Through
+this class a new policy can be uploaded to the system, loaded into the
+Xen hypervisor for enforcement and be set as the policy that the
+system is automatically loading when the machine is started.
+
+This class returns information about the currently administered policy,
+including a reference to the policy. This reference can then be used with
+policy-specific classes, i.e., the ACMPolicy class, to allow retrieval of
+information or changes to be made to a particular policy.
+
+\subsection{Structure and datatypes of class: XSPolicy}
+
+Format of the security label:
+
+A security label consist of the three different parts {\it policy type},
+{\it policy name} and {\it label} separated with colons. To specify
+the virtual machine label for an ACM-type policy {\it xm-test}, the
+security label string would be {\it ACM:xm-test:blue}, where blue
+denotes the virtual machine's label. The format of resource labels is
+the same.\\[0.5cm]
+The following flags are used by this class:
+
+\begin{longtable}{|l|l|l|}
+\hline
+{\tt xs\_type} & value & meaning \\
+\hline
+\hspace{0.5cm}{\tt XS\_POLICY\_ACM} & (1 $<<$ 0) & ACM-type policy \\
+\hline
+\end{longtable}
+
+\begin{longtable}{|l|l|l|}
+\hline
+{\tt xs\_instantiationflags} & value & meaning \\
+\hline
+\hspace{0.5cm}{\tt XS\_INST\_NONE} & 0 & do nothing \\
+\hspace{0.5cm}{\tt XS\_INST\_BOOT} & (1 $<<$ 0) & make system boot with this policy \\
+\hspace{0.5cm}{\tt XS\_INST\_LOAD} & (1 $<<$ 1) & load policy immediately \\
+\hline
+\end{longtable}
+
+\begin{longtable}{|l|l|l|}
+\hline
+{\tt xs\_policystate} & type & meaning \\
+\hline
+\hspace{0.5cm}{\tt xserr} & int & Error code from operation (if applicable) \\
+\hspace{0.5cm}{\tt xs\_ref}  & XSPolicy ref & reference to the XS policy as returned by the API \\
+\hspace{0.5cm}{\tt repr} & string & representation of the policy, i.e., XML \\
+\hspace{0.5cm}{\tt type} & xs\_type & the type of the policy \\
+\hspace{0.5cm}{\tt flags } & xs\_instantiationflags  & instantiation flags of the policy \\
+\hspace{0.5cm}{\tt version} & string & version of the policy \\
+\hspace{0.5cm}{\tt errors} & string & Base64-encoded sequence of integer tuples consisting \\
+& & of (error code, detail); will be returned as part  \\
+& & of the xs\_setpolicy function. \\
+\hline
+\end{longtable}
+
+\subsection{Additional RPCs associated with class: XSPolicy}
+\subsubsection{RPC name:~get\_xstype}
+
+{\bf Overview:}
+Return the Xen Security Policy types supported by this system
+
+ \noindent {\bf Signature:}
+\begin{verbatim} xs_type get_xstype (session_id s)\end{verbatim}
+
+ \noindent {\bf Return Type:}
+{\tt
+xs\_type
+}
+
+flags representing the supported Xen security policy types
+ \vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~set\_xspolicy}
+
+{\bf Overview:}
+Set the current XSPolicy. This function can also be be used for updating of
+an existing policy whose name must be equivalent to the one of the
+currently running policy.
+
+\noindent {\bf Signature:}
+\begin{verbatim} xs_policystate set_xspolicy (session_id s, xs_type type, string repr,
+xs_instantiationflags flags, bool overwrite)\end{verbatim}
+
+\noindent{\bf Arguments:}
+
+\vspace{0.3cm}
+
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt xs\_type } & type & the type of policy \\ \hline
+{\tt string} & repr & representation of the policy, i.e., XML \\ \hline
+{\tt xs\_instantiationflags}    & flags & flags for the setting of the policy \\ \hline
+{\tt bool}   & overwrite & whether to overwrite an existing policy \\ \hline
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+
+ \noindent {\bf Return Type:}
+{\tt
+xs\_policystate
+}
+
+
+State information about the policy. In case an error occurred, the 'xs\_err'
+field contains the error code. The 'errors' may contain further information
+about the error.
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~get\_xspolicy}
+
+{\bf Overview:}
+Get information regarding the currently set Xen Security Policy
+
+ \noindent {\bf Signature:}
+\begin{verbatim} xs_policystate get_xspolicy (session_id s)\end{verbatim}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:}
+{\tt
+xs\_policystate
+}
+
+
+Policy state information.
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~rm\_xsbootpolicy}
+
+{\bf Overview:}
+Remove any policy from the default boot configuration.
+
+ \noindent {\bf Signature:}
+\begin{verbatim} void rm_xsbootpolicy (session_id s)\end{verbatim}
+
+\vspace{0.3cm}
+
+\noindent{\bf Possible Error Codes:} {\tt SECURITY\_ERROR}
+
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~get\_labeled\_resources}
+
+{\bf Overview:}
+Get a list of resources that have been labeled.
+
+ \noindent {\bf Signature:}
+\begin{verbatim} ((string -> string) Map) get_labeled_resources (session_id s)\end{verbatim}
+
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:}
+{\tt
+(string $\rightarrow$ string) Map
+}
+
+
+A map of resources with their labels.
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~set\_resource\_label}
+
+{\bf Overview:}
+Label the given resource with the given label. An empty label removes any label
+from the resource.
+
+ \noindent {\bf Signature:}
+\begin{verbatim} void set_resource_label (session_id s, string resource, string
+label, string old_label)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt string } & resource & resource to label \\ \hline
+{\tt string } & label & label for the resource \\ \hline
+{\tt string } & old\_label & Optional label value that the security label \\
+& & must currently have for the change to succeed. \\ \hline
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+\noindent{\bf Possible Error Codes:} {\tt SECURITY\_ERROR}
+
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~get\_resource\_label}
+
+{\bf Overview:}
+Get the label of the given resource.
+
+ \noindent {\bf Signature:}
+\begin{verbatim} string get_resource_label (session_id s, string resource)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt string } & resource & resource to label \\ \hline
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:}
+{\tt
+string
+}
+
+
+The label of the given resource.
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~activate\_xspolicy}
+
+{\bf Overview:}
+Load the referenced policy into the hypervisor.
+
+ \noindent {\bf Signature:}
+\begin{verbatim} xs_instantiationflags activate_xspolicy (session_id s, xs_ref xspolicy,
+xs_instantiationflags flags)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt xs ref } & self & reference to the object \\ \hline
+{\tt xs\_instantiationflags } & flags & flags to activate on a policy; flags
+  can only be set \\ \hline
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+
+ \noindent {\bf Return Type:}
+{\tt
+xs\_instantiationflags
+}
+
+
+Currently active instantiation flags.
+\vspace{0.3cm}
+
+\noindent{\bf Possible Error Codes:} {\tt SECURITY\_ERROR}
+
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~get\_all}
+
+{\bf Overview:}
+Return a list of all the XSPolicies known to the system.
+
+ \noindent {\bf Signature:}
+\begin{verbatim} ((XSPolicy ref) Set) get_all (session_id s)\end{verbatim}
+
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:}
+{\tt
+(XSPolicy ref) Set
+}
+
+
+A list of all the IDs of all the XSPolicies
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~get\_uuid}
+
+{\bf Overview:}
+Get the uuid field of the given XSPolicy.
+
+ \noindent {\bf Signature:}
+\begin{verbatim} string get_uuid (session_id s, XSPolicy ref self)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt XSPolicy ref } & self & reference to the object \\ \hline
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:}
+{\tt
+string
+}
+
+
+value of the field
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~get\_record}
+
+{\bf Overview:}
+Get a record of the referenced XSPolicy.
+
+ \noindent {\bf Signature:}
+\begin{verbatim} (XSPolicy record) get_record (session_id s, xs_ref xspolicy)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt xs ref } & self & reference to the object \\ \hline
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:}
+{\tt
+XSPolicy record
+}
+
+
+all fields from the object
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\newpage
+\section{Class: ACMPolicy}
+\subsection{Fields for class: ACMPolicy}
+\begin{longtable}{|lllp{0.38\textwidth}|}
+\hline
+\multicolumn{1}{|l}{Name} & \multicolumn{3}{l|}{\bf ACMPolicy} \\
+\multicolumn{1}{|l}{Description} & \multicolumn{3}{l|}{\parbox{11cm}{\em An ACM Security Policy}} \\
+\hline
+Quals & Field & Type & Description \\
+\hline
+$\mathit{RO}_\mathit{run}$ &  {\tt uuid} & string & unique identifier / object reference \\
+$\mathit{RW}$              &  {\tt repr} & string & representation of policy, in XML \\
+$\mathit{RO}_\mathit{run}$ &  {\tt type} & xs\_type & type of the policy \\
+$\mathit{RO}_\mathit{run}$ & {\tt flags} & xs\_instantiationflags & policy
+status flags \\
+\hline
+\end{longtable}
+
+\subsection{Structure and datatypes of class: ACMPolicy}
+
+\vspace{0.5cm}
+The following data structures are used:
+
+\begin{longtable}{|l|l|l|}
+\hline
+{\tt RIP acm\_policyheader} & type & meaning \\
+\hline
+\hspace{0.5cm}{\tt policyname}   & string & name of the policy \\
+\hspace{0.5cm}{\tt policyurl }   & string & URL of the policy \\
+\hspace{0.5cm}{\tt date}         & string & data of the policy \\
+\hspace{0.5cm}{\tt reference}    & string & reference of the policy \\
+\hspace{0.5cm}{\tt namespaceurl} & string & namespaceurl of the policy \\
+\hspace{0.5cm}{\tt version}      & string & version of the policy \\
+\hline
+\end{longtable}
+
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~get\_header}
+
+{\bf Overview:}
+Get the referenced policy's header information.
+
+ \noindent {\bf Signature:}
+\begin{verbatim} acm_policyheader get_header (session_id s, xs ref self)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt xs ref } & self & reference to the object \\ \hline
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:}
+{\tt
+acm\_policyheader
+}
+
+
+The policy's header information.
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~get\_xml}
+
+{\bf Overview:}
+Get the XML representation of the given policy.
+
+ \noindent {\bf Signature:}
+\begin{verbatim} string get_XML (session_id s, xs ref self)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt xs ref } & self & reference to the object \\ \hline
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:}
+{\tt
+string
+}
+
+
+XML representation of the referenced policy
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~get\_map}
+
+{\bf Overview:}
+Get the mapping information of the given policy.
+
+ \noindent {\bf Signature:}
+\begin{verbatim} string get_map (session_id s, xs ref self)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt xs ref } & self & reference to the object \\ \hline
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:}
+{\tt
+string
+}
+
+
+Mapping information of the referenced policy.
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~get\_binary}
+
+{\bf Overview:}
+Get the binary policy representation of the referenced policy.
+
+ \noindent {\bf Signature:}
+\begin{verbatim} string get_map (session_id s, xs ref self)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt xs ref } & self & reference to the object \\ \hline
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:}
+{\tt
+string
+}
+
+
+Base64-encoded representation of the binary policy.
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~get\_all}
+
+{\bf Overview:}
+Return a list of all the ACMPolicies known to the system.
+
+ \noindent {\bf Signature:}
+\begin{verbatim} ((ACMPolicy ref) Set) get_all (session_id s)\end{verbatim}
+
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:}
+{\tt
+(ACMPolicy ref) Set
+}
+
+
+A list of all the IDs of all the ACMPolicies
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~get\_uuid}
+
+{\bf Overview:}
+Get the uuid field of the given ACMPolicy.
+
+ \noindent {\bf Signature:}
+\begin{verbatim} string get_uuid (session_id s, ACMPolicy ref self)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt ACMPolicy ref } & self & reference to the object \\ \hline
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:}
+{\tt
+string
+}
+
+
+value of the field
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~get\_record}
+
+{\bf Overview:}
+Get a record of the referenced ACMPolicy.
+
+ \noindent {\bf Signature:}
+\begin{verbatim} (XSPolicy record) get_record (session_id s, xs_ref xspolicy)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt xs ref } & self & reference to the object \\ \hline
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:}
+{\tt
+XSPolicy record
+}
+
+
+all fields from the object
+
+\newpage
 \section{Class: debug}
 \subsection{Fields for class: debug}
 {\bf Class debug has no fields.}
@@ -14192,224 +15342,3 @@ all fields from the object
 \vspace{0.3cm}
 \vspace{0.3cm}
 
-\vspace{1cm}
-\newpage
-\section{Error Handling}
-When a low-level transport error occurs, or a request is malformed at the HTTP
-or XML-RPC level, the server may send an XML-RPC Fault response, or the client
-may simulate the same.  The client must be prepared to handle these errors,
-though they may be treated as fatal.  On the wire, these are transmitted in a
-form similar to this:
-
-\begin{verbatim}
-    <methodResponse>
-      <fault>
-        <value>
-          <struct>
-            <member>
-                <name>faultCode</name>
-                <value><int>-1</int></value>
-              </member>
-              <member>
-                <name>faultString</name>
-                <value><string>Malformed request</string></value>
-            </member>
-          </struct>
-        </value>
-      </fault>
-    </methodResponse>
-\end{verbatim}
-
-All other failures are reported with a more structured error response, to
-allow better automatic response to failures, proper internationalisation of
-any error message, and easier debugging.  On the wire, these are transmitted
-like this:
-
-\begin{verbatim}
-    <struct>
-      <member>
-        <name>Status</name>
-        <value>Failure</value>
-      </member>
-      <member>
-        <name>ErrorDescription</name>
-        <value>
-          <array>
-            <data>
-              <value>MAP_DUPLICATE_KEY</value>
-              <value>Customer</value>
-              <value>eSpeil Inc.</value>
-              <value>eSpeil Incorporated</value>
-            </data>
-          </array>
-        </value>
-      </member>
-    </struct>
-\end{verbatim}
-
-Note that {\tt ErrorDescription} value is an array of string values. The
-first element of the array is an error code; the remainder of the array are
-strings representing error parameters relating to that code.  In this case,
-the client has attempted to add the mapping {\tt Customer $\rightarrow$
-eSpiel Incorporated} to a Map, but it already contains the mapping
-{\tt Customer $\rightarrow$ eSpiel Inc.}, and so the request has failed.
-
-Each possible error code is documented in the following section.
-
-\subsection{Error Codes}
-
-\subsubsection{HANDLE\_INVALID}
-
-You gave an invalid handle.  The object may have recently been deleted. 
-The class parameter gives the type of reference given, and the handle
-parameter echoes the bad value given.
-
-\vspace{0.3cm}
-{\bf Signature:}
-\begin{verbatim}HANDLE_INVALID(class, handle)\end{verbatim}
-\begin{center}\rule{10em}{0.1pt}\end{center}
-
-\subsubsection{INTERNAL\_ERROR}
-
-The server failed to handle your request, due to an internal error.  The
-given message may give details useful for debugging the problem.
-
-\vspace{0.3cm}
-{\bf Signature:}
-\begin{verbatim}INTERNAL_ERROR(message)\end{verbatim}
-\begin{center}\rule{10em}{0.1pt}\end{center}
-
-\subsubsection{MAP\_DUPLICATE\_KEY}
-
-You tried to add a key-value pair to a map, but that key is already there. 
-The key, current value, and the new value that you tried to set are all
-echoed.
-
-\vspace{0.3cm}
-{\bf Signature:}
-\begin{verbatim}MAP_DUPLICATE_KEY(key, current value, new value)\end{verbatim}
-\begin{center}\rule{10em}{0.1pt}\end{center}
-
-\subsubsection{MESSAGE\_METHOD\_UNKNOWN}
-
-You tried to call a method that does not exist.  The method name that you
-used is echoed.
-
-\vspace{0.3cm}
-{\bf Signature:}
-\begin{verbatim}MESSAGE_METHOD_UNKNOWN(method)\end{verbatim}
-\begin{center}\rule{10em}{0.1pt}\end{center}
-
-\subsubsection{MESSAGE\_PARAMETER\_COUNT\_MISMATCH}
-
-You tried to call a method with the incorrect number of parameters.  The
-fully-qualified method name that you used, and the number of received and
-expected parameters are returned.
-
-\vspace{0.3cm}
-{\bf Signature:}
-\begin{verbatim}MESSAGE_PARAMETER_COUNT_MISMATCH(method, expected, received)\end{verbatim}
-\begin{center}\rule{10em}{0.1pt}\end{center}
-
-\subsubsection{NETWORK\_ALREADY\_CONNECTED}
-
-You tried to create a PIF, but the network you tried to attach it to is
-already attached to some other PIF, and so the creation failed.
-
-\vspace{0.3cm}
-{\bf Signature:}
-\begin{verbatim}NETWORK_ALREADY_CONNECTED(network, connected PIF)\end{verbatim}
-\begin{center}\rule{10em}{0.1pt}\end{center}
-
-\subsubsection{OPERATION\_NOT\_ALLOWED}
-
-You attempted an operation that was not allowed.
-
-\vspace{0.3cm}
-No parameters.
-\begin{center}\rule{10em}{0.1pt}\end{center}
-
-\subsubsection{PIF\_IS\_PHYSICAL}
-
-You tried to destroy a PIF, but it represents an aspect of the physical
-host configuration, and so cannot be destroyed.  The parameter echoes the
-PIF handle you gave.
-
-\vspace{0.3cm}
-{\bf Signature:}
-\begin{verbatim}PIF_IS_PHYSICAL(PIF)\end{verbatim}
-\begin{center}\rule{10em}{0.1pt}\end{center}
-
-\subsubsection{SESSION\_AUTHENTICATION\_FAILED}
-
-The credentials given by the user are incorrect, so access has been denied,
-and you have not been issued a session handle.
-
-\vspace{0.3cm}
-No parameters.
-\begin{center}\rule{10em}{0.1pt}\end{center}
-
-\subsubsection{SESSION\_INVALID}
-
-You gave an invalid session handle.  It may have been invalidated by a
-server restart, or timed out.  You should get a new session handle, using
-one of the session.login\_ calls.  This error does not invalidate the
-current connection.  The handle parameter echoes the bad value given.
-
-\vspace{0.3cm}
-{\bf Signature:}
-\begin{verbatim}SESSION_INVALID(handle)\end{verbatim}
-\begin{center}\rule{10em}{0.1pt}\end{center}
-
-\subsubsection{SESSION\_NOT\_REGISTERED}
-
-This session is not registered to receive events.  You must call
-event.register before event.next.  The session handle you are using is
-echoed.
-
-\vspace{0.3cm}
-{\bf Signature:}
-\begin{verbatim}SESSION_NOT_REGISTERED(handle)\end{verbatim}
-\begin{center}\rule{10em}{0.1pt}\end{center}
-
-\subsubsection{VALUE\_NOT\_SUPPORTED}
-
-You attempted to set a value that is not supported by this implementation. 
-The fully-qualified field name and the value that you tried to set are
-returned.  Also returned is a developer-only diagnostic reason.
-
-\vspace{0.3cm}
-{\bf Signature:}
-\begin{verbatim}VALUE_NOT_SUPPORTED(field, value, reason)\end{verbatim}
-\begin{center}\rule{10em}{0.1pt}\end{center}
-
-\subsubsection{VLAN\_TAG\_INVALID}
-
-You tried to create a VLAN, but the tag you gave was invalid -- it mmust be
-between 0 and 4095.  The parameter echoes the VLAN tag you gave.
-
-\vspace{0.3cm}
-{\bf Signature:}
-\begin{verbatim}VLAN_TAG_INVALID(VLAN)\end{verbatim}
-\begin{center}\rule{10em}{0.1pt}\end{center}
-
-\subsubsection{VM\_BAD\_POWER\_STATE}
-
-You attempted an operation on a VM that was not in an appropriate power
-state at the time; for example, you attempted to start a VM that was
-already running.  The parameters returned are the VM's handle, and the
-expected and actual VM state at the time of the call.
-
-\vspace{0.3cm}
-{\bf Signature:}
-\begin{verbatim}VM_BAD_POWER_STATE(vm, expected, actual)\end{verbatim}
-\begin{center}\rule{10em}{0.1pt}\end{center}
-
-\subsubsection{VM\_HVM\_REQUIRED}
-
-HVM is required for this operation
-
-\vspace{0.3cm}
-{\bf Signature:}
-\begin{verbatim}VM_HVM_REQUIRED(vm)\end{verbatim}
-\begin{center}\rule{10em}{0.1pt}\end{center}

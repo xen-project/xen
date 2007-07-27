@@ -50,6 +50,7 @@ from xen.xend.XendConstants import *
 from xen.xm.opts import OptionError, Opts, wrap, set_true
 from xen.xm import console
 from xen.util.xmlrpcclient import ServerProxy
+from xen.util.security import ACMError
 
 import XenAPI
 
@@ -171,11 +172,12 @@ SUBCOMMAND_HELP = {
 
     # security
 
-    'addlabel'      :  ('<label> {dom <ConfigFile>|res <resource>} [<policy>]',
+    'addlabel'      :  ('<label> {dom <ConfigFile>|res <resource>|mgt <managed domain>}\n'
+                        '                   [<policy>]',
                         'Add security label to domain.'),
-    'rmlabel'       :  ('{dom <ConfigFile>|res <Resource>}',
+    'rmlabel'       :  ('{dom <ConfigFile>|res <Resource>|mgt<managed domain>}',
                         'Remove a security label from domain.'),
-    'getlabel'      :  ('{dom <ConfigFile>|res <Resource>}',
+    'getlabel'      :  ('{dom <ConfigFile>|res <Resource>|mgt <managed domain>}',
                         'Show security label for domain or resource.'),
     'dry-run'       :  ('<ConfigFile>',
                         'Test if a domain can access its resources.'),
@@ -186,6 +188,10 @@ SUBCOMMAND_HELP = {
     'loadpolicy'    :  ('<policy.bin>', 'Load binary policy into hypervisor.'),
     'makepolicy'    :  ('<policy>', 'Build policy and create .bin/.map '
                         'files.'),
+    'setpolicy'     :  ('<policytype> <policyfile> [options]',
+                        'Set the policy of the system.'),
+    'getpolicy'     :  ('[options]', 'Get the policy of the system.'),
+    'activatepolicy':  ('[options]', 'Activate the xend-managed policy.'),
     'labels'        :  ('[policy] [type=dom|res|any]',
                         'List <type> labels for (active) policy.'),
     'serve'         :  ('', 'Proxy Xend XMLRPC over stdio.'),
@@ -343,6 +349,9 @@ acm_commands = [
     "loadpolicy",
     "cfgbootpolicy",
     "dumppolicy",
+    "activatepolicy",
+    "setpolicy",
+    "getpolicy",
     ]
 
 all_commands = (domain_commands + host_commands + scheduler_commands +
@@ -861,13 +870,13 @@ def parse_doms_info(info):
         'up_time'  : up_time
         }
 
-    # We're not supporting security stuff just yet via XenAPI
-
-    if serverType != SERVER_XEN_API:
-        from xen.util import security
-        parsed_info['seclabel'] = security.get_security_printlabel(info)
+    security_label = get_info('security_label', str, '')
+    tmp = security_label.split(":")
+    if len(tmp) != 3:
+        seclabel = ""
     else:
-        parsed_info['seclabel'] = ""
+        seclabel = tmp[2]
+    parsed_info['seclabel'] = seclabel
 
     if serverType == SERVER_XEN_API:
         parsed_info['mem'] = get_info('memory_actual', int, 0) / 1024
@@ -925,28 +934,26 @@ def xm_brief_list(doms):
         print format % d
 
 def xm_label_list(doms):
-    print '%-32s %5s %5s %5s %5s %9s %-8s' % \
+    print '%-32s %5s %5s %5s %10s %9s %-8s' % \
           ('Name', 'ID', 'Mem', 'VCPUs', 'State', 'Time(s)', 'Label')
     
     output = []
     format = '%(name)-32s %(domid)5s %(mem)5d %(vcpus)5d %(state)10s ' \
              '%(cpu_time)8.1f %(seclabel)9s'
 
-    if serverType != SERVER_XEN_API:
-        from xen.util import security
+    from xen.util import security
         
-        for dom in doms:
-            d = parse_doms_info(dom)
+    for dom in doms:
+        d = parse_doms_info(dom)
+        if security.active_policy not in ['INACTIVE', 'NULL', 'DEFAULT']:
+            if not d['seclabel']:
+                d['seclabel'] = 'ERROR'
+        elif security.active_policy in ['DEFAULT']:
+            d['seclabel'] = 'DEFAULT'
+        else:
+            d['seclabel'] = 'INACTIVE'
 
-            if security.active_policy not in ['INACTIVE', 'NULL', 'DEFAULT']:
-                if not d['seclabel']:
-                    d['seclabel'] = 'ERROR'
-            elif security.active_policy in ['DEFAULT']:
-                d['seclabel'] = 'DEFAULT'
-            else:
-                d['seclabel'] = 'INACTIVE'
-
-            output.append((format % d, d['seclabel']))
+        output.append((format % d, d['seclabel']))
         
     #sort by labels
     output.sort(lambda x,y: cmp( x[1].lower(), y[1].lower()))
@@ -1016,13 +1023,13 @@ def xm_vcpu_list(args):
         if args:
             dominfo = map(server.xend.domain.getVCPUInfo, args)
         else:
-            doms = server.xend.domains(False)
+            doms = server.xend.domains_with_state(False, 'all', False)
             dominfo = map(server.xend.domain.getVCPUInfo, doms)
 
     print '%-32s %5s %5s %5s %5s %9s %s' % \
           ('Name', 'ID', 'VCPU', 'CPU', 'State', 'Time(s)', 'CPU Affinity')
 
-    format = '%(name)-32s %(domid)5d %(number)5d %(c)5s %(s)5s ' \
+    format = '%(name)-32s %(domid)5s %(number)5d %(c)5s %(s)5s ' \
              ' %(cpu_time)8.1f %(cpumap)s'
 
     for dom in dominfo:
@@ -1091,8 +1098,12 @@ def xm_vcpu_list(args):
 
             return format_pairs(list_to_rangepairs(cpumap))
 
-        name  =     get_info('name')
-        domid = int(get_info('domid'))
+        name  = get_info('name')
+        domid = get_info('domid')
+        if domid is not None:
+            domid = str(domid)
+        else:
+            domid = ''
 
         for vcpu in sxp.children(dom, 'vcpu'):
             def vinfo(n, t):
@@ -1106,7 +1117,10 @@ def xm_vcpu_list(args):
             running  = vinfo('running',  int)
             blocked  = vinfo('blocked',  int)
 
-            if online:
+            if cpu < 0:
+                c = ''
+                s = ''
+            elif online:
                 c = str(cpu)
                 if running:
                     s = 'r'
@@ -1118,8 +1132,8 @@ def xm_vcpu_list(args):
                     s += '-'
                 s += '-'
             else:
-                c = "-"
-                s = "--p"
+                c = '-'
+                s = '--p'
 
             print format % locals()
 
@@ -1722,14 +1736,16 @@ def xm_uptime(args):
         if k in ['-s', '--short']:
             short_mode = 1
 
-    doms = getDomains(params, 'running')
+    doms = getDomains(params, 'all')
 
     if short_mode == 0:
         print '%-33s %4s %s ' % ('Name','ID','Uptime')
 
     for dom in doms:
         d = parse_doms_info(dom)
-        if int(d['domid']) > 0:
+        if d['domid'] == '':
+            uptime = 0
+        elif int(d['domid']) > 0:
             uptime = int(round(d['up_time']))
         else:
             f=open('/proc/uptime', 'r')
@@ -1989,16 +2005,24 @@ def xm_block_list(args):
                    % ni)
 
 def xm_vtpm_list(args):
-    xenapi_unsupported()
     (use_long, params) = arg_check_for_resource_list(args, "vtpm-list")
 
     dom = params[0]
-    if use_long:
+
+    if serverType == SERVER_XEN_API:
+        vtpm_refs = server.xenapi.VM.get_VTPMs(get_single_vm(dom))
+        vtpm_properties = \
+            map(server.xenapi.VTPM.get_runtime_properties, vtpm_refs)
+        devs = map(lambda (handle, properties): [handle, map2sxp(properties)],
+                   zip(range(len(vtpm_properties)), vtpm_properties))
+    else:
         devs = server.xend.domain.getDeviceSxprs(dom, 'vtpm')
+
+    if use_long:
         map(PrettyPrint.prettyprint, devs)
     else:
         hdr = 0
-        for x in server.xend.domain.getDeviceSxprs(dom, 'vtpm'):
+        for x in devs:
             if hdr == 0:
                 print 'Idx  BE handle state evt-ch ring-ref BE-path'
                 hdr = 1
@@ -2028,18 +2052,6 @@ def parse_block_configuration(args):
            ['mode',  args[3]]]
     if len(args) == 5:
         vbd.append(['backend', args[4]])
-
-    if serverType != SERVER_XEN_API:
-        # verify that policy permits attaching this resource
-        from xen.util import security
-    
-        if security.on():
-            dominfo = server.xend.domain(dom)
-            label = security.get_security_printlabel(dominfo)
-        else:
-            label = None
-
-        security.res_security_check(args[1], label)
 
     return (dom, vbd)
 
@@ -2440,6 +2452,9 @@ IMPORTED_COMMANDS = [
     'getlabel',
     'dry-run',
     'resources',
+    'getpolicy',
+    'setpolicy',
+    'activatepolicy',
     ]
 
 for c in IMPORTED_COMMANDS:
@@ -2562,6 +2577,8 @@ def _run_cmd(cmd, cmd_name, args):
         _usage(cmd_name)
         print e.usage
     except XenAPIUnsupportedException, e:
+        err(str(e))
+    except ACMError, e:
         err(str(e))
     except Exception, e:
         if serverType != SERVER_XEN_API:

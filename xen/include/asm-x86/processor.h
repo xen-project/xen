@@ -331,24 +331,8 @@ extern unsigned long mmu_cr4_features;
 
 static always_inline void set_in_cr4 (unsigned long mask)
 {
-    unsigned long dummy;
     mmu_cr4_features |= mask;
-    __asm__ __volatile__ (
-        "mov %%cr4,%0\n\t"
-        "or %1,%0\n\t"
-        "mov %0,%%cr4\n"
-        : "=&r" (dummy) : "irg" (mask) );
-}
-
-static always_inline void clear_in_cr4 (unsigned long mask)
-{
-    unsigned long dummy;
-    mmu_cr4_features &= ~mask;
-    __asm__ __volatile__ (
-        "mov %%cr4,%0\n\t"
-        "and %1,%0\n\t"
-        "mov %0,%%cr4\n"
-        : "=&r" (dummy) : "irg" (~mask) );
+    write_cr4(mmu_cr4_features);
 }
 
 /*

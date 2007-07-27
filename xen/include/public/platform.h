@@ -153,6 +153,17 @@ struct xenpf_firmware_info {
 typedef struct xenpf_firmware_info xenpf_firmware_info_t;
 DEFINE_XEN_GUEST_HANDLE(xenpf_firmware_info_t);
 
+#define XENPF_enter_acpi_sleep    51
+struct xenpf_enter_acpi_sleep {
+    /* IN variables */
+    uint16_t pm1a_cnt_val;      /* PM1a control value. */
+    uint16_t pm1b_cnt_val;      /* PM1b control value. */
+    uint32_t sleep_state;       /* Which state to enter (Sn). */
+    uint32_t flags;             /* Must be zero. */
+};
+typedef struct xenpf_enter_acpi_sleep xenpf_enter_acpi_sleep_t;
+DEFINE_XEN_GUEST_HANDLE(xenpf_enter_acpi_sleep_t);
+
 struct xen_platform_op {
     uint32_t cmd;
     uint32_t interface_version; /* XENPF_INTERFACE_VERSION */
@@ -164,6 +175,7 @@ struct xen_platform_op {
         struct xenpf_microcode_update  microcode;
         struct xenpf_platform_quirk    platform_quirk;
         struct xenpf_firmware_info     firmware_info;
+        struct xenpf_enter_acpi_sleep  enter_acpi_sleep;
         uint8_t                        pad[128];
     } u;
 };

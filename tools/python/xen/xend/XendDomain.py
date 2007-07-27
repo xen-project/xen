@@ -51,6 +51,7 @@ from xen.xend.xenstore.xstransact import xstransact
 from xen.xend.xenstore.xswatch import xswatch
 from xen.util import mkdir
 from xen.xend import uuid
+from xen.xend import sxp
 
 xc = xen.lowlevel.xc.xc()
 xoptions = XendOptions.instance() 
@@ -688,6 +689,29 @@ class XendDomain:
         
         return value
 
+    def set_dev_property_by_uuid(self, klass, dev_uuid, field, value,
+                                 old_val = None):
+        rc = True
+        self.domains_lock.acquire()
+
+        try:
+            try:
+                dom = self.get_vm_with_dev_uuid(klass, dev_uuid)
+                if dom:
+                    o_val = dom.get_dev_property(klass, dev_uuid, field)
+                    log.info("o_val=%s, old_val=%s" % (o_val, old_val))
+                    if old_val and old_val != o_val:
+                        return False
+
+                    dom.set_dev_property(klass, dev_uuid, field, value)
+                    self.managed_config_save(dom)
+            except ValueError, e:
+                pass
+        finally:
+            self.domains_lock.release()
+
+        return rc
+
     def is_valid_vm(self, vm_ref):
         return (self.get_vm_by_uuid(vm_ref) != None)
 
@@ -945,6 +969,31 @@ class XendDomain:
         try:
             try:
                 domconfig = XendConfig.XendConfig(sxp_obj = config)
+                
+                domains = self.list('all')
+                domains = map(lambda dom: dom.sxpr(), domains)
+                for dom in domains:
+                    if sxp.child_value(config, 'uuid', None):
+                        if domconfig['uuid'] == sxp.child_value(dom, 'uuid'):
+                            if domconfig['name_label'] != sxp.child_value(dom, 'name'):
+                                raise XendError("Domain UUID '%s' is already used." % \
+                                                domconfig['uuid'])
+                            else:
+                                # Update the config for that existing domain
+                                # because it is same name and same UUID.
+                                break
+                        else:
+                            if domconfig['name_label'] == sxp.child_value(dom, 'name'):
+                                raise XendError("Domain name '%s' is already used." % \
+                                                domconfig['name_label'])
+                    else:
+                        if domconfig['name_label'] == sxp.child_value(dom, 'name'):
+                            # Overwrite the auto-generated UUID by the UUID
+                            # of the existing domain. And update the config
+                            # for that existing domain.
+                            domconfig['uuid'] = sxp.child_value(dom, 'uuid')
+                            break
+                
                 dominfo = XendDomainInfo.createDormant(domconfig)
                 log.debug("Creating new managed domain: %s" %
                           dominfo.getName())
@@ -1164,6 +1213,10 @@ class XendDomain:
 
         if dominfo.getDomid() == DOM0_ID:
             raise XendError("Cannot dump core for privileged domain %s" % domid)
+        if dominfo._stateGet() not in (DOM_STATE_PAUSED, DOM_STATE_RUNNING):
+            raise VMBadState("Domain '%s' is not started" % domid,
+                             POWER_STATE_NAMES[DOM_STATE_PAUSED],
+                             POWER_STATE_NAMES[dominfo._stateGet()])
 
         try:
             log.info("Domain core dump requested for domain %s (%d) "
@@ -1537,6 +1590,10 @@ class XendDomain:
         dominfo = self.domain_lookup_nr(domid)
         if not dominfo:
             raise XendInvalidDomain(str(domid))
+        if dominfo._stateGet() not in (DOM_STATE_RUNNING, DOM_STATE_PAUSED):
+            raise VMBadState("Domain '%s' is not started" % domid,
+                             POWER_STATE_NAMES[DOM_STATE_RUNNING],
+                             POWER_STATE_NAMES[dominfo._stateGet()])
         if trigger_name.lower() in TRIGGER_TYPE: 
             trigger = TRIGGER_TYPE[trigger_name.lower()]
         else:

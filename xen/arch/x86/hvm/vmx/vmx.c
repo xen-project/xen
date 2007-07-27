@@ -907,15 +907,6 @@ static void vmx_ctxt_switch_to(struct vcpu *v)
     vmx_restore_dr(v);
 }
 
-static void stop_vmx(void)
-{
-    if ( !(read_cr4() & X86_CR4_VMXE) )
-        return;
-
-    __vmxoff();
-    clear_in_cr4(X86_CR4_VMXE);
-}
-
 static void vmx_store_cpu_guest_regs(
     struct vcpu *v, struct cpu_user_regs *regs, unsigned long *crs)
 {
@@ -1244,7 +1235,6 @@ static void disable_intercept_for_msr(u32 msr)
 
 static struct hvm_function_table vmx_function_table = {
     .name                 = "VMX",
-    .disable              = stop_vmx,
     .domain_initialise    = vmx_domain_initialise,
     .domain_destroy       = vmx_domain_destroy,
     .vcpu_initialise      = vmx_vcpu_initialise,
@@ -1271,65 +1261,45 @@ static struct hvm_function_table vmx_function_table = {
     .inject_exception     = vmx_inject_exception,
     .init_ap_context      = vmx_init_ap_context,
     .init_hypercall_page  = vmx_init_hypercall_page,
-    .event_injection_faulted = vmx_event_injection_faulted
+    .event_injection_faulted = vmx_event_injection_faulted,
+    .cpu_up               = vmx_cpu_up,
+    .cpu_down             = vmx_cpu_down,
 };
 
-int start_vmx(void)
+void start_vmx(void)
 {
-    u32 eax, edx;
-    struct vmcs_struct *vmcs;
-
-    /*
-     * Xen does not fill x86_capability words except 0.
-     */
-    boot_cpu_data.x86_capability[4] = cpuid_ecx(1);
-
-    if ( !test_bit(X86_FEATURE_VMXE, &boot_cpu_data.x86_capability) )
-        return 0;
-
-    rdmsr(IA32_FEATURE_CONTROL_MSR, eax, edx);
-
-    if ( eax & IA32_FEATURE_CONTROL_MSR_LOCK )
-    {
-        if ( (eax & IA32_FEATURE_CONTROL_MSR_ENABLE_VMXON) == 0x0 )
-        {
-            printk("VMX disabled by Feature Control MSR.\n");
-            return 0;
-        }
-    }
-    else
-    {
-        wrmsr(IA32_FEATURE_CONTROL_MSR,
-              IA32_FEATURE_CONTROL_MSR_LOCK |
-              IA32_FEATURE_CONTROL_MSR_ENABLE_VMXON, 0);
-    }
-
-    set_in_cr4(X86_CR4_VMXE);
-
-    vmx_init_vmcs_config();
-
-    if ( smp_processor_id() == 0 )
-        setup_vmcs_dump();
-
-    if ( (vmcs = vmx_alloc_host_vmcs()) == NULL )
-    {
-        clear_in_cr4(X86_CR4_VMXE);
-        printk("Failed to allocate host VMCS\n");
-        return 0;
-    }
-
-    if ( __vmxon(virt_to_maddr(vmcs)) )
-    {
-        clear_in_cr4(X86_CR4_VMXE);
-        printk("VMXON failed\n");
-        vmx_free_host_vmcs(vmcs);
-        return 0;
-    }
+    static int bootstrapped;
 
     vmx_save_host_msrs();
 
-    if ( smp_processor_id() != 0 )
-        return 1;
+    if ( bootstrapped )
+    {
+        if ( hvm_enabled && !vmx_cpu_up() )
+        {
+            printk("VMX: FATAL: failed to initialise CPU%d!\n",
+                   smp_processor_id());
+            BUG();
+        }
+        return;
+    }
+
+    bootstrapped = 1;
+
+    /* Xen does not fill x86_capability words except 0. */
+    boot_cpu_data.x86_capability[4] = cpuid_ecx(1);
+
+    if ( !test_bit(X86_FEATURE_VMXE, &boot_cpu_data.x86_capability) )
+        return;
+
+    set_in_cr4(X86_CR4_VMXE);
+
+    if ( !vmx_cpu_up() )
+    {
+        printk("VMX: failed to initialise.\n");
+        return;
+    }
+
+    setup_vmcs_dump();
 
     hvm_enable(&vmx_function_table);
 
@@ -1347,8 +1317,6 @@ int start_vmx(void)
         disable_intercept_for_msr(MSR_IA32_SYSENTER_ESP);
         disable_intercept_for_msr(MSR_IA32_SYSENTER_EIP);
     }
-
-    return 1;
 }
 
 /*
@@ -2654,6 +2622,15 @@ static int vmx_do_msr_read(struct cpu_user_regs *regs)
         break;
     case MSR_IA32_VMX_BASIC...MSR_IA32_VMX_PROCBASED_CTLS2:
         goto gp_fault;
+    case MSR_IA32_MCG_STATUS:
+    case MSR_IA32_MC0_STATUS:
+    case MSR_K8_MC1_STATUS:
+    case MSR_K8_MC2_STATUS:
+    case MSR_K8_MC3_STATUS:
+    case MSR_K8_MC4_STATUS:
+        /* No point in letting the guest see real MCEs */
+        msr_content = 0;
+        break;
     default:
         switch ( long_mode_do_msr_read(regs) )
         {
@@ -2718,7 +2695,7 @@ static void vmx_free_vlapic_mapping(struct domain *d)
 
 static void vmx_install_vlapic_mapping(struct vcpu *v)
 {
-    paddr_t virt_page_ma, apic_page_ma;
+    unsigned long virt_page_ma, apic_page_ma;
 
     if ( !cpu_has_vmx_virtualize_apic_accesses )
         return;
@@ -2730,10 +2707,6 @@ static void vmx_install_vlapic_mapping(struct vcpu *v)
     vmx_vmcs_enter(v);
     __vmwrite(VIRTUAL_APIC_PAGE_ADDR, virt_page_ma);
     __vmwrite(APIC_ACCESS_ADDR, apic_page_ma);
-#if defined (CONFIG_X86_PAE)
-    __vmwrite(VIRTUAL_APIC_PAGE_ADDR_HIGH, virt_page_ma >> 32);
-    __vmwrite(APIC_ACCESS_ADDR_HIGH, apic_page_ma >> 32);
-#endif
     vmx_vmcs_exit(v);
 }
 

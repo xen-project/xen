@@ -25,6 +25,7 @@ from xen.xend import sxp
 from xen.xend.XendAPIConstants import XEN_API_ON_NORMAL_EXIT, \
      XEN_API_ON_CRASH_BEHAVIOUR
 from xen.xm.opts import OptionError
+from xen.util import xsconstants
 
 import sys
 import os
@@ -308,6 +309,12 @@ class xenapi_create:
                ""
             }
 
+        if vm.attributes.has_key("security_label"):
+            vm_record.update({
+                "security_label":
+                    vm.attributes["security_label"].value
+                })
+
         if len(vm.getElementsByTagName("pv")) > 0:
             vm_record.update({
                 "PV_bootloader":
@@ -347,6 +354,12 @@ class xenapi_create:
             vifs = vm.getElementsByTagName("vif")
 
             self.create_vifs(vm_ref, vifs, networks)
+
+            # Now create vtpms
+
+            vtpms = vm.getElementsByTagName("vtpm")
+
+            self.create_vtpms(vm_ref, vtpms)
 
             # Now create consoles
 
@@ -427,7 +440,9 @@ class xenapi_create:
                 vif.attributes["qos_algorithm_type"].value,
             "qos_algorithm_params":
                 get_child_nodes_as_dict(vif,
-                    "qos_algorithm_param", "key", "value")
+                    "qos_algorithm_param", "key", "value"),
+            "security_label":
+                vif.attributes["security_label"].value
         }
 
         return server.xenapi.VIF.create(vif_record)
@@ -440,6 +455,21 @@ class xenapi_create:
         except IndexError:
             self._network_refs = server.xenapi.network.get_all()
             return self._network_refs.pop(0)
+
+    def create_vtpms(self, vm_ref, vtpms):
+        if len(vtpms) > 1:
+            vtpms = [ vtpms[0] ]
+        log(DEBUG, "create_vtpms")
+        return map(lambda vtpm: self.create_vtpm(vm_ref, vtpm), vtpms)
+
+    def create_vtpm(self, vm_ref, vtpm):
+        vtpm_record = {
+            "VM":
+                vm_ref,
+            "backend":
+                vtpm.attributes["backend"].value
+        }
+        return server.xenapi.VTPM.create(vtpm_record)
 
     def create_consoles(self, vm_ref, consoles):
         log(DEBUG, "create_consoles")
@@ -482,6 +512,10 @@ class sxp2xml:
 
         vifs_sxp = map(lambda x: x[1], [device for device in devices
                                         if device[1][0] == "vif"])
+
+        vtpms_sxp = map(lambda x: x[1], [device for device in devices
+                                         if device[1][0] == "vtpm"])
+
         # Create XML Document
         
         impl = getDOMImplementation()
@@ -530,6 +564,14 @@ class sxp2xml:
             = str(get_child_by_name(config, "vcpus", 1))
         vm.attributes["vcpus_at_startup"] \
             = str(get_child_by_name(config, "vcpus", 1))
+
+        sec_data = get_child_by_name(config, "security")
+        if sec_data:
+            try :
+                vm.attributes['security_label'] = \
+                      "%s:%s:%s" % (xsconstants.ACM_POLICY_ID, sec_data[0][1][1],sec_data[0][2][1])
+            except Exception, e:
+                raise "Invalid security data format: %s" % str(sec_data)
 
         # Make the name tag
 
@@ -600,6 +642,12 @@ class sxp2xml:
         vifs = map(lambda vif: self.extract_vif(vif, document), vifs_sxp)
 
         map(vm.appendChild, vifs)
+
+        # And now the vTPMs
+
+        vtpms = map(lambda vtpm: self.extract_vtpm(vtpm, document), vtpms_sxp)
+
+        map(vm.appendChild, vtpms)
 
         # Last but not least the consoles...
 
@@ -702,11 +750,29 @@ class sxp2xml:
         vif.attributes["device"] = dev
         vif.attributes["qos_algorithm_type"] = ""
 
+        policy = get_child_by_name(vif_sxp, "policy")
+        label = get_child_by_name(vif_sxp, "label")
+
+        if label and policy:
+            vif.attributes["security_label"] \
+                 = "%s:%s:%s" % (xsconstants.ACM_POLICY_ID, policy, label)
+        else:
+            vif.attributes["security_label"] = ""
+
         if get_child_by_name(vif_sxp, "bridge") is not None:
             vif.attributes["network"] \
                 = get_child_by_name(vif_sxp, "bridge")
         
         return vif
+
+    def extract_vtpm(self, vtpm_sxp, document):
+
+        vtpm = document.createElement("vtpm")
+
+        vtpm.attributes["backend"] \
+             = get_child_by_name(vtpm_sxp, "backend", "0")
+
+        return vtpm
 
     _eths = -1
 

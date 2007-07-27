@@ -45,7 +45,9 @@ u32 vmx_vmexit_control __read_mostly;
 u32 vmx_vmentry_control __read_mostly;
 bool_t cpu_has_vmx_ins_outs_instr_info __read_mostly;
 
+static DEFINE_PER_CPU(struct vmcs_struct *, host_vmcs);
 static DEFINE_PER_CPU(struct vmcs_struct *, current_vmcs);
+static DEFINE_PER_CPU(struct list_head, active_vmcs_list);
 
 static u32 vmcs_revision_id __read_mostly;
 
@@ -64,7 +66,7 @@ static u32 adjust_vmx_controls(u32 ctl_min, u32 ctl_opt, u32 msr)
     return ctl;
 }
 
-void vmx_init_vmcs_config(void)
+static void vmx_init_vmcs_config(void)
 {
     u32 vmx_msr_low, vmx_msr_high, min, opt;
     u32 _vmx_pin_based_exec_control;
@@ -128,8 +130,9 @@ void vmx_init_vmcs_config(void)
 
     rdmsr(MSR_IA32_VMX_BASIC, vmx_msr_low, vmx_msr_high);
 
-    if ( smp_processor_id() == 0 )
+    if ( !vmx_pin_based_exec_control )
     {
+        /* First time through. */
         vmcs_revision_id = vmx_msr_low;
         vmx_pin_based_exec_control = _vmx_pin_based_exec_control;
         vmx_cpu_based_exec_control = _vmx_cpu_based_exec_control;
@@ -140,6 +143,7 @@ void vmx_init_vmcs_config(void)
     }
     else
     {
+        /* Globals are already initialised: re-check them. */
         BUG_ON(vmcs_revision_id != vmx_msr_low);
         BUG_ON(vmx_pin_based_exec_control != _vmx_pin_based_exec_control);
         BUG_ON(vmx_cpu_based_exec_control != _vmx_cpu_based_exec_control);
@@ -151,6 +155,14 @@ void vmx_init_vmcs_config(void)
 
     /* IA-32 SDM Vol 3B: VMCS size is never greater than 4kB. */
     BUG_ON((vmx_msr_high & 0x1fff) > PAGE_SIZE);
+
+#ifdef __x86_64__
+    /* IA-32 SDM Vol 3B: 64-bit CPUs always have VMX_BASIC_MSR[48]==0. */
+    BUG_ON(vmx_msr_high & (1u<<16));
+#endif
+
+    /* Require Write-Back (WB) memory type for VMCS accesses. */
+    BUG_ON(((vmx_msr_high >> 18) & 15) != 6);
 }
 
 static struct vmcs_struct *vmx_alloc_vmcs(void)
@@ -177,34 +189,115 @@ static void vmx_free_vmcs(struct vmcs_struct *vmcs)
 static void __vmx_clear_vmcs(void *info)
 {
     struct vcpu *v = info;
+    struct arch_vmx_struct *arch_vmx = &v->arch.hvm_vmx;
 
-    __vmpclear(virt_to_maddr(v->arch.hvm_vmx.vmcs));
+    /* Otherwise we can nest (vmx_cpu_down() vs. vmx_clear_vmcs()). */
+    ASSERT(!local_irq_is_enabled());
 
-    v->arch.hvm_vmx.active_cpu = -1;
-    v->arch.hvm_vmx.launched   = 0;
+    if ( arch_vmx->active_cpu == smp_processor_id() )
+    {
+        __vmpclear(virt_to_maddr(arch_vmx->vmcs));
 
-    if ( v->arch.hvm_vmx.vmcs == this_cpu(current_vmcs) )
-        this_cpu(current_vmcs) = NULL;
+        arch_vmx->active_cpu = -1;
+        arch_vmx->launched   = 0;
+
+        list_del(&arch_vmx->active_list);
+
+        if ( arch_vmx->vmcs == this_cpu(current_vmcs) )
+            this_cpu(current_vmcs) = NULL;
+    }
 }
 
 static void vmx_clear_vmcs(struct vcpu *v)
 {
     int cpu = v->arch.hvm_vmx.active_cpu;
 
-    if ( cpu == -1 )
-        return;
-
-    if ( cpu == smp_processor_id() )
-        return __vmx_clear_vmcs(v);
-
-    on_selected_cpus(cpumask_of_cpu(cpu), __vmx_clear_vmcs, v, 1, 1);
+    if ( cpu != -1 )
+        on_selected_cpus(cpumask_of_cpu(cpu), __vmx_clear_vmcs, v, 1, 1);
 }
 
 static void vmx_load_vmcs(struct vcpu *v)
 {
+    unsigned long flags;
+
+    local_irq_save(flags);
+
+    if ( v->arch.hvm_vmx.active_cpu == -1 )
+    {
+        list_add(&v->arch.hvm_vmx.active_list, &this_cpu(active_vmcs_list));
+        v->arch.hvm_vmx.active_cpu = smp_processor_id();
+    }
+
+    ASSERT(v->arch.hvm_vmx.active_cpu == smp_processor_id());
+
     __vmptrld(virt_to_maddr(v->arch.hvm_vmx.vmcs));
-    v->arch.hvm_vmx.active_cpu = smp_processor_id();
     this_cpu(current_vmcs) = v->arch.hvm_vmx.vmcs;
+
+    local_irq_restore(flags);
+}
+
+int vmx_cpu_up(void)
+{
+    u32 eax, edx;
+    int cpu = smp_processor_id();
+
+    BUG_ON(!(read_cr4() & X86_CR4_VMXE));
+
+    rdmsr(IA32_FEATURE_CONTROL_MSR, eax, edx);
+
+    if ( eax & IA32_FEATURE_CONTROL_MSR_LOCK )
+    {
+        if ( !(eax & IA32_FEATURE_CONTROL_MSR_ENABLE_VMXON) )
+        {
+            printk("CPU%d: VMX disabled\n", cpu);
+            return 0;
+        }
+    }
+    else
+    {
+        wrmsr(IA32_FEATURE_CONTROL_MSR,
+              IA32_FEATURE_CONTROL_MSR_LOCK |
+              IA32_FEATURE_CONTROL_MSR_ENABLE_VMXON, 0);
+    }
+
+    vmx_init_vmcs_config();
+
+    INIT_LIST_HEAD(&this_cpu(active_vmcs_list));
+
+    if ( this_cpu(host_vmcs) == NULL )
+    {
+        this_cpu(host_vmcs) = vmx_alloc_vmcs();
+        if ( this_cpu(host_vmcs) == NULL )
+        {
+            printk("CPU%d: Could not allocate host VMCS\n", cpu);
+            return 0;
+        }
+    }
+
+    if ( __vmxon(virt_to_maddr(this_cpu(host_vmcs))) )
+    {
+        printk("CPU%d: VMXON failed\n", cpu);
+        return 0;
+    }
+
+    return 1;
+}
+
+void vmx_cpu_down(void)
+{
+    struct list_head *active_vmcs_list = &this_cpu(active_vmcs_list);
+    unsigned long flags;
+
+    local_irq_save(flags);
+
+    while ( !list_empty(active_vmcs_list) )
+        __vmx_clear_vmcs(list_entry(active_vmcs_list->next,
+                                    struct vcpu, arch.hvm_vmx.active_list));
+
+    BUG_ON(!(read_cr4() & X86_CR4_VMXE));
+    __vmxoff();
+
+    local_irq_restore(flags);
 }
 
 void vmx_vmcs_enter(struct vcpu *v)
@@ -237,65 +330,27 @@ void vmx_vmcs_exit(struct vcpu *v)
     vcpu_unpause(v);
 }
 
-struct vmcs_struct *vmx_alloc_host_vmcs(void)
-{
-    return vmx_alloc_vmcs();
-}
-
-void vmx_free_host_vmcs(struct vmcs_struct *vmcs)
-{
-    vmx_free_vmcs(vmcs);
-}
-
-#define GUEST_SEGMENT_LIMIT     0xffffffff
-
-struct host_execution_env {
-    /* selectors */
-    unsigned short ldtr_selector;
-    unsigned short tr_selector;
-    unsigned short ds_selector;
-    unsigned short cs_selector;
-    /* limits */
-    unsigned short gdtr_limit;
-    unsigned short ldtr_limit;
-    unsigned short idtr_limit;
-    unsigned short tr_limit;
-    /* base */
-    unsigned long gdtr_base;
-    unsigned long ldtr_base;
-    unsigned long idtr_base;
-    unsigned long tr_base;
-    unsigned long ds_base;
-    unsigned long cs_base;
-#ifdef __x86_64__
-    unsigned long fs_base;
-    unsigned long gs_base;
-#endif
+struct xgt_desc {
+    unsigned short size;
+    unsigned long address __attribute__((packed));
 };
 
 static void vmx_set_host_env(struct vcpu *v)
 {
     unsigned int tr, cpu;
-    struct host_execution_env host_env;
-    struct Xgt_desc_struct desc;
+    struct xgt_desc desc;
 
     cpu = smp_processor_id();
-    __asm__ __volatile__ ("sidt  (%0) \n" :: "a"(&desc) : "memory");
-    host_env.idtr_limit = desc.size;
-    host_env.idtr_base = desc.address;
-    __vmwrite(HOST_IDTR_BASE, host_env.idtr_base);
 
-    __asm__ __volatile__ ("sgdt  (%0) \n" :: "a"(&desc) : "memory");
-    host_env.gdtr_limit = desc.size;
-    host_env.gdtr_base = desc.address;
-    __vmwrite(HOST_GDTR_BASE, host_env.gdtr_base);
+    __asm__ __volatile__ ( "sidt (%0) \n" : : "a" (&desc) : "memory" );
+    __vmwrite(HOST_IDTR_BASE, desc.address);
 
-    __asm__ __volatile__ ("str  (%0) \n" :: "a"(&tr) : "memory");
-    host_env.tr_selector = tr;
-    host_env.tr_limit = sizeof(struct tss_struct);
-    host_env.tr_base = (unsigned long) &init_tss[cpu];
-    __vmwrite(HOST_TR_SELECTOR, host_env.tr_selector);
-    __vmwrite(HOST_TR_BASE, host_env.tr_base);
+    __asm__ __volatile__ ( "sgdt (%0) \n" : : "a" (&desc) : "memory" );
+    __vmwrite(HOST_GDTR_BASE, desc.address);
+
+    __asm__ __volatile__ ( "str (%0) \n" : : "a" (&tr) : "memory" );
+    __vmwrite(HOST_TR_SELECTOR, tr);
+    __vmwrite(HOST_TR_BASE, (unsigned long)&init_tss[cpu]);
 
     /*
      * Skip end of cpu_user_regs when entering the hypervisor because the
@@ -305,6 +360,8 @@ static void vmx_set_host_env(struct vcpu *v)
     __vmwrite(HOST_RSP,
               (unsigned long)&get_cpu_info()->guest_cpu_user_regs.error_code);
 }
+
+#define GUEST_SEGMENT_LIMIT     0xffffffff
 
 static void construct_vmcs(struct vcpu *v)
 {
@@ -448,11 +505,8 @@ static void construct_vmcs(struct vcpu *v)
 
     if ( cpu_has_vmx_tpr_shadow )
     {
-        paddr_t virt_page_ma = page_to_maddr(vcpu_vlapic(v)->regs_page);
-        __vmwrite(VIRTUAL_APIC_PAGE_ADDR, virt_page_ma);
-#if defined (CONFIG_X86_PAE)
-        __vmwrite(VIRTUAL_APIC_PAGE_ADDR_HIGH, virt_page_ma >> 32);
-#endif
+        __vmwrite(VIRTUAL_APIC_PAGE_ADDR,
+                  page_to_maddr(vcpu_vlapic(v)->regs_page));
         __vmwrite(TPR_THRESHOLD, 0);
     }
 
@@ -472,12 +526,17 @@ static void construct_vmcs(struct vcpu *v)
 
 int vmx_create_vmcs(struct vcpu *v)
 {
-    if ( v->arch.hvm_vmx.vmcs == NULL )
+    struct arch_vmx_struct *arch_vmx = &v->arch.hvm_vmx;
+
+    if ( arch_vmx->vmcs == NULL )
     {
-        if ( (v->arch.hvm_vmx.vmcs = vmx_alloc_vmcs()) == NULL )
+        if ( (arch_vmx->vmcs = vmx_alloc_vmcs()) == NULL )
             return -ENOMEM;
 
-        __vmx_clear_vmcs(v);
+        INIT_LIST_HEAD(&arch_vmx->active_list);
+        __vmpclear(virt_to_maddr(arch_vmx->vmcs));
+        arch_vmx->active_cpu = -1;
+        arch_vmx->launched   = 0;
     }
 
     construct_vmcs(v);

@@ -348,7 +348,7 @@ int serial_tx_space(int handle)
     return SERIAL_TXBUFSZ - (port->txbufp - port->txbufc);
 }
 
-void __init serial_init_preirq(void)
+void __devinit serial_init_preirq(void)
 {
     int i;
     for ( i = 0; i < ARRAY_SIZE(com); i++ )
@@ -356,7 +356,7 @@ void __init serial_init_preirq(void)
             com[i].driver->init_preirq(&com[i]);
 }
 
-void __init serial_init_postirq(void)
+void __devinit serial_init_postirq(void)
 {
     int i;
     for ( i = 0; i < ARRAY_SIZE(com); i++ )

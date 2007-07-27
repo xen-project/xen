@@ -31,9 +31,10 @@ import re
 
 xoptions = XendOptions.instance()
 
-def destroy_vtpmstate(name):
+def destroy_vtpmstate(uuids):
     if os.path.exists(VTPM_DELETE_SCRIPT):
-        os.system(VTPM_DELETE_SCRIPT + " " + name)
+        for uuid in uuids:
+            os.system(VTPM_DELETE_SCRIPT + " " + uuid)
 
 class TPMifController(DevController):
     """TPM interface controller. Handles all TPM devices for a domain.

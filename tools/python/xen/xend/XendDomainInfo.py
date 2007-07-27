@@ -632,16 +632,27 @@ class XendDomainInfo:
                     ['vcpu_count', self.info['VCPUs_max']]]
 
             for i in range(0, self.info['VCPUs_max']):
-                info = xc.vcpu_getinfo(self.domid, i)
+                if self.domid is not None:
+                    info = xc.vcpu_getinfo(self.domid, i)
 
-                sxpr.append(['vcpu',
-                             ['number',   i],
-                             ['online',   info['online']],
-                             ['blocked',  info['blocked']],
-                             ['running',  info['running']],
-                             ['cpu_time', info['cpu_time'] / 1e9],
-                             ['cpu',      info['cpu']],
-                             ['cpumap',   info['cpumap']]])
+                    sxpr.append(['vcpu',
+                                 ['number',   i],
+                                 ['online',   info['online']],
+                                 ['blocked',  info['blocked']],
+                                 ['running',  info['running']],
+                                 ['cpu_time', info['cpu_time'] / 1e9],
+                                 ['cpu',      info['cpu']],
+                                 ['cpumap',   info['cpumap']]])
+                else:
+                    sxpr.append(['vcpu',
+                                 ['number',   i],
+                                 ['online',   0],
+                                 ['blocked',  0],
+                                 ['running',  0],
+                                 ['cpu_time', 0.0],
+                                 ['cpu',      -1],
+                                 ['cpumap',   self.info['cpus'] and \
+                                              self.info['cpus'] or range(64)]])
 
             return sxpr
 
@@ -1111,6 +1122,8 @@ class XendDomainInfo:
                     self._clearRestart()
 
                     if reason == 'suspend':
+                        if self._stateGet() != DOM_STATE_SUSPENDED:
+                            self.image.saveDeviceModel()
                         self._stateSet(DOM_STATE_SUSPENDED)
                         # Don't destroy the domain.  XendCheckpoint will do
                         # this once it has finished.  However, stop watching
@@ -1447,9 +1460,13 @@ class XendDomainInfo:
         # allocation of 1MB. We free up 2MB here to be on the safe side.
         balloon.free(2*1024) # 2MB should be plenty
 
-        ssidref = security.calc_dom_ssidref_from_info(self.info)
-        if ssidref == 0 and security.on():
-            raise VmError('VM is not properly labeled.')
+        ssidref = 0
+        if security.on():
+            ssidref = security.calc_dom_ssidref_from_info(self.info)
+            if ssidref == 0:
+                raise VmError('VM is not properly labeled.')
+            if security.has_authorization(ssidref) == False:
+                raise VmError("VM is not authorized to run.")
 
         try:
             self.domid = xc.domain_create(
@@ -1594,6 +1611,7 @@ class XendDomainInfo:
                 log.exception("Removing domain path failed.")
 
             self._stateSet(DOM_STATE_HALTED)
+            self.domid = None  # Do not push into _stateSet()!
         finally:
             self.refresh_shutdown_lock.release()
 
@@ -1752,6 +1770,9 @@ class XendDomainInfo:
             ResumeDomain(self.domid)
         except:
             log.exception("XendDomainInfo.resume: xc.domain_resume failed on domain %s." % (str(self.domid)))
+        if self.is_hvm():
+            self.image.resumeDeviceModel()
+
 
     #
     # Channels for xenstore and console
@@ -2419,6 +2440,8 @@ class XendDomainInfo:
                 config['io_read_kbs'] = 0.0
                 config['io_write_kbs'] = 0.0                
 
+            config['security_label'] = config.get('security_label', '')
+
         if dev_class == 'vbd':
 
             if self._stateGet() not in (XEN_API_VM_POWER_STATE_HALTED,):
@@ -2609,6 +2632,9 @@ class XendDomainInfo:
             raise XendError('Failed to create device')
 
         return dev_uuid
+
+    def set_console_other_config(self, console_uuid, other_config):
+        self.info.console_update(console_uuid, 'other_config', other_config)
 
     def destroy_device_by_uuid(self, dev_type, dev_uuid):
         if dev_uuid not in self.info['devices']:

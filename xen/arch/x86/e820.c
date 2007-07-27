@@ -310,23 +310,22 @@ static unsigned long __init find_max_pfn(void)
     return max_pfn;
 }
 
-#ifdef __i386__
-static void __init clip_4gb(void)
+static void __init clip_to_limit(uint64_t limit, char *warnmsg)
 {
-    unsigned long long limit = (1ULL << 30) * MACHPHYS_MBYTES;
     int i;
+    char _warnmsg[160];
 
-    /* 32-bit systems restricted to a 4GB physical memory map,
-     * with PAE to 16 GB (with current memory layout) */
     for ( i = 0; i < e820.nr_map; i++ )
     {
         if ( (e820.map[i].addr + e820.map[i].size) <= limit )
             continue;
-        printk("WARNING: Only the first %d GB of the physical memory map "
-               "can be accessed\n"
-               "         by Xen in 32-bit mode. "
-               "Truncating the memory map...\n",
-	       MACHPHYS_MBYTES);
+        if ( warnmsg )
+        {
+            snprintf(_warnmsg, sizeof(_warnmsg), warnmsg, (int)(limit>>30));
+            printk("WARNING: %s\n", _warnmsg);
+        }
+        printk("Truncating memory map to %lukB\n",
+               (unsigned long)(limit >> 10));
         if ( e820.map[i].addr >= limit )
         {
             e820.nr_map = i;
@@ -338,34 +337,6 @@ static void __init clip_4gb(void)
         }            
     }
 }
-#else
-#define clip_4gb() ((void)0)
-#endif
-
-static void __init clip_mem(void)
-{
-    int i;
-
-    if ( !opt_mem )
-        return;
-
-    for ( i = 0; i < e820.nr_map; i++ )
-    {
-        if ( (e820.map[i].addr + e820.map[i].size) <= opt_mem )
-            continue;
-        printk("Truncating memory map to %lukB\n",
-               (unsigned long)(opt_mem >> 10));
-        if ( e820.map[i].addr >= opt_mem )
-        {
-            e820.nr_map = i;
-        }
-        else
-        {
-            e820.map[i].size = opt_mem - e820.map[i].addr;
-            e820.nr_map = i + 1;          
-        }
-    }
-}
 
 static void __init machine_specific_memory_setup(
     struct e820entry *raw, int *raw_nr)
@@ -374,8 +345,22 @@ static void __init machine_specific_memory_setup(
     sanitize_e820_map(raw, &nr);
     *raw_nr = nr;
     (void)copy_e820_map(raw, nr);
-    clip_4gb();
-    clip_mem();
+
+    if ( opt_mem )
+        clip_to_limit(opt_mem, NULL);
+
+#ifdef __i386__
+    clip_to_limit((1ULL << 30) * MACHPHYS_MBYTES,
+                  "Only the first %u GB of the physical memory map "
+                  "can be accessed by Xen in 32-bit mode.");
+#endif
+
+#ifdef __x86_64__
+    clip_to_limit((uint64_t)(MACH2PHYS_COMPAT_VIRT_END -
+                             __HYPERVISOR_COMPAT_VIRT_START) << 10,
+                  "Only the first %u GB of the physical memory map "
+                  "can be accessed by 32-on-64 guests.");
+#endif
 }
 
 unsigned long __init init_e820(

@@ -363,9 +363,12 @@ static ofdn_t ofd_xen_props(void *m, struct domain *d, ulong shared_info)
 ulong ofd_dom0_fixup(struct domain *d, ulong mem, const char *cmdline,
                      ulong shared_info)
 {
+    const char compat[] = "Hypervisor,Maple";
+    const char d0[] = "dom0";
     void *m;
     const ofdn_t n = OFD_ROOT;
     ofdn_t r;
+    u32 did;
 
     m = (void *)mem;
 
@@ -404,16 +407,16 @@ ulong ofd_dom0_fixup(struct domain *d, ulong mem, const char *cmdline,
     rtas_proxy_init(m);
 
 #ifdef FIX_COMPAT 
-    const char compat[] = "Hypervisor,Maple";
     r = ofd_prop_add(m, n, "compatible", compat, sizeof (compat));
     ASSERT( r > 0 );
+#else
+    (void)compat;
 #endif
 
-    u32 did = d->domain_id;
+    did = d->domain_id;
     r = ofd_prop_add(m, n, "ibm,partition-no", &did, sizeof(did));
     ASSERT( r > 0 );
 
-    const char d0[] = "dom0";
     r = ofd_prop_add(m, n, "ibm,partition-name", d0, sizeof (d0));
     ASSERT( r > 0 );
 

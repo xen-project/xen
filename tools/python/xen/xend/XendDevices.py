@@ -78,6 +78,7 @@ class XendDevices:
         @param domain: domain this controller is handling devices for.
         @type domain: XendDomainInfo
         """
-        tpmif.destroy_vtpmstate(domain.getName())
+        from xen.xend.XendLogging import log
+        tpmif.destroy_vtpmstate(domain.info.get('vtpm_refs'))
 
     destroy_device_state = classmethod(destroy_device_state)

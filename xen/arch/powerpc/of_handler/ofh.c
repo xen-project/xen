@@ -50,29 +50,13 @@ s32 debug(const char *fmt, ...)
 void
 assprint(const char *expr, const char *file, int line, const char *fmt, ...)
 {
-    char a[15];
-
-    a[0]  = '\n';
-    a[1]  = '\n';
-    a[2]  = 'O';
-    a[3]  = 'F';
-    a[4]  = 'H';
-    a[5]  = ':';
-    a[6]  = 'A';
-    a[7]  = 'S';
-    a[8]  = 'S';
-    a[9]  = 'E';
-    a[10] = 'R';
-    a[11] = 'T';
-    a[12] = '!';
-    a[13] = '\n';
-    a[14] = '\n';
-
+    char a[15] = {
+       '\n', '\n', 'O', 'F', 'H', ':', 'A', 'S', 'S', 'E', 'R', 'T', '!',
+       '\n', '\n',
+    };
     s32 actual;
     u32 t = 1;
     volatile u32 *tp = &t;
-
-    (void)expr; (void)file; (void)line; (void)fmt;
 
     ofh_cons_write(a, sizeof (a), &actual);
 

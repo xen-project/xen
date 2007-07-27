@@ -822,13 +822,15 @@ security in Xen, you must compile Xen with ACM support enabled as
 described under "Configuring Security" below. There, you will find
 also examples of each subcommand described here.
 
-=item B<makepolicy> I<policy>
+=item B<setpolicy> ACM I<policy> I<[--load|--boot]>
 
-Compiles the XML source representation of the security I<policy>. It
-creates a mapping (.map) as well as a binary (.bin) version of the
-policy. The compiled policy can be loaded into Xen with the
-B<loadpolicy> subcommand or can be configured to be loaded at boot
-time with the B<cfgbootpolicy> subcommand.
+Makes the given ACM policy available to xend as a I<xend-managed policy>.
+The policy is compiled and a mapping (.map) as well as a binary (.bin)
+version of the policy is created. If the option I<--load> is provided
+the policy is loaded into Xen. If the option I<--boot> is provided the
+system is configure to be loaded with the policy at boot time. If these
+options are not provided with the B<setpolicy> subcommand, the
+B<activatepolicy> subcommand provides this functionality.
 
 =over 4
 
@@ -843,18 +845,26 @@ global policy root directory.
 
 =back
 
-=item B<loadpolicy> I<policy>
+=item B<activatepolicy> I<[--load|--boot]>
 
-Loads the binary representation of the I<policy> into Xen. The binary
-representation can be created with the B<makepolicy> subcommand.
+Activates the xend-managed policy by loading it into Xen using the
+I<--load> option or configures the system to boot with the
+xend-managed policy during the next reboot as a result of the
+I<--boot> option. The latter is only supported if the system is booted
+with the grub boot loader and the default boot title is modified.
+It copies the binary policy representation into the /boot directory and
+adds a module line specifying the binary policy to the /boot/grub/menu.lst
+or /boot/grub/grub.conf file.
 
-=item B<cfgbootpolicy> I<policy> [I<boot title>]
+=item B<getpolicy> [--dumpxml]
 
-Configures I<policy> as the boot policy for Xen. It copies the binary
-policy representation into the /boot directory and adds a module line
-specifying the binary policy to the /boot/grub/menu.lst file. If your
-boot configuration includes multiple Xen boot titles, then use the
-I<boot title> parameter to specify a unique part of the proper title.
+Displays information about the current xend-managed policy, such as
+name and type of the policy, the uuid xend has assigned to it on the
+local system, the version of the XML representation and the status
+of the policy, such as whether it is currently loaded into Xen or
+whether the policy is automatically loaded during system boot. With
+the I<--dumpxml> option, the XML representation of the policy is
+displayed.
 
 =item B<dumppolicy>
 
@@ -869,28 +879,47 @@ is 'dom'. The labels are arranged in alphabetical order.
 
 =item B<addlabel> I<label> B<dom> I<configfile> [I<policy>]
 
+=item B<addlabel> I<label> B<mgt> I<domain name> [I<policy type>:I<policy>]
+
 =item B<addlabel> I<label> B<res> I<resource> [I<policy>]
 
+=item B<addlabel> I<label> B<vif-idx> I<domain name> [I<policy type>:I<policy>]
+
+
 Adds the security label with name I<label> to a domain
-I<configfile> (dom) or to the global resource label file for the
-given I<resource> (res). Unless specified, the default I<policy> is the
-currently enforced access control policy. This subcommand also
-verifies that the I<policy> definition supports the specified I<label>
-name.
+I<configfile> (dom), a Xend-managed domain (mgt), to the global resource label
+file for the given I<resource> (res), or to a managed domain's virtual network
+interface (vif) that is specified by its index. Unless specified,
+the default I<policy> is the currently enforced access control policy.
+This subcommand also verifies that the I<policy> definition supports the
+specified I<label> name.
+
+The only I<policy type> that is currently supported is I<ACM>.
 
 =item B<rmlabel> B<dom> I<configfile>
 
+=item B<rmlabel> B<mgt> I<domain name>
+
 =item B<rmlabel> B<res> I<resource>
 
+=item B<rmlabel> B<vif-idx> I<domain name>
+
 Works the same as the B<addlabel> command (above), except that this
-command will remove the label from the domain I<configfile> (dom) or
-the global resource label file (res).
+command will remove the label from the domain I<configfile> (dom),
+a Xend-managed domain (mgt), the global resource label file (res),
+or a managed domain's network interface (vif).
 
 =item B<getlabel> B<dom> I<configfile>
 
+=item B<getlabel> B<mgt> I<domain name>
+
 =item B<getlabel> B<res> I<resource>
 
-Shows the label for the given I<configfile> or I<resource>
+=item B<getlabel> B<vif-idx> I<domain name>
+
+Shows the label for a domain's configuration in the given I<configfile>,
+a xend-managed domain (mgt), a resource, or a managed domain's network
+interface (vif).
 
 =item B<resources>
 
@@ -908,12 +937,9 @@ B<CONFIGURING SECURITY>
 
 =over 4
 
-In xen_source_dir/Config.mk set the following parameters:
+In xen_source_dir/Config.mk set the following parameter:
 
     ACM_SECURITY ?= y
-    ACM_DEFAULT_SECURITY_POLICY ?= \
-        ACM_CHINESE_WALL_AND_SIMPLE_TYPE_ENFORCEMENT_POLICY
-
 Then recompile and install xen and the security tools and then reboot:
 
     cd xen_source_dir/xen; make clean; make; cp xen.gz /boot;
@@ -922,26 +948,26 @@ Then recompile and install xen and the security tools and then reboot:
 
 =back
 
-B<COMPILING A SECURITY POLICY>
+B<SETTING A SECURITY POLICY>
 
 =over 4
 
-This step creates client_v1.map and client_v1.bin files in
-/etc/xen/acm-security/policies/example/chwall_ste.
+This step makes the policy available to xend and creates the client_v1.map and
+client_v1.bin files in /etc/xen/acm-security/policies/example/chwall_ste.
 
-    xm makepolicy example.chwall_ste.client_v1
+    xm setpolicy ACM example.client_v1
 
 =back
 
-B<LOADING A SECURITY POLICY>
+B<ACTIVATING THE XEND-MANAGED SECURITY POLICY>
 
 =over 4
 
-This step activates client_v1.bin as new security policy in Xen. You
-can use the dumppolicy subcommand before and afterwards to see the
+This step activates the xend-manged policy as new security policy in Xen.
+You can use the dumppolicy subcommand before and afterwards to see the
 change in the Xen policy state.
 
-    xm loadpolicy example.chwall_ste.client_v1
+    xm activatpolicy --load
 
 =back
 
@@ -949,11 +975,11 @@ B<CONFIGURING A BOOT SECURITY POLICY>
 
 =over 4
 
-This configures the boot loader to load client_v1.bin at boot
-time. During system start, the ACM configures Xen with this policy and
+This configures the boot loader to load the current xend-managed policy at
+boot time. During system start, the ACM configures Xen with this policy and
 Xen enforces this policy from then on.
 
-    xm cfgbootpolicy example.chwall_ste.client_v1
+    xm activatepolicy --boot
 
 =back
 
@@ -964,7 +990,7 @@ B<LISTING SECURITY LABELS>
 This subcommand shows all labels that are defined and which can be
 attached to domains.
 
-    xm labels example.chwall_ste.client_v1 type=dom
+    xm labels example.client_v1 type=dom
 
 will print for our example policy:
 
@@ -1016,6 +1042,28 @@ start domains that have a security label configured and whose security
 label is consistent with the currently enforced policy. Otherwise,
 starting the domain will fail with the error condition "operation not
 permitted".
+
+=back
+
+B<ATTACHING A SECURITY LABEL TO A XEND-MANAGED DOMAIN>
+
+=over 4
+
+The addlabel subcommand supports labeling of domains that are managed
+by xend. This includes domains that are currently running, such as for
+example Domain-0, or those that are in a dormant state.
+Depending on the state of the system, it is possible that the new label
+is rejected. An example for a reason for the rejection of the relabeling
+of a domain would be if a domain is currently allowed to
+access its labeled resources but due to the new label would be prevented
+from accessing one or more of them.
+
+    xm addlabel dom_Fun mgt Domain-0
+
+This changes the label of Domain-0 to dom_Fun under the condition that
+this new label of Domain-0 would not prevent any other domain from
+accessing its resources that are provided through Domain-0, such as for
+example network or block device access.
 
 =back
 
@@ -1072,9 +1120,11 @@ B<LISTING LABELED RESOURCES>
     xm resources
 
       phy:hda6
+            type: ACM
           policy: example.chwall_ste.client_v1
           label:  res_LogicalDiskPartition1(hda1)
       file:/xen/disk_image/disk.img
+            type: ACM
           policy: example.chwall_ste.client_v1
           label:  res_LogicalDiskPartition2(hda2)
 
@@ -1094,19 +1144,19 @@ consistent to achieve predictable security guarantees.
 The XML version is the version that users are supposed to create or
 change, either by manually editing the XML file or by using the Xen
 policy generation tool (B<xensec_gen>). After changing the XML file,
-run the B<makepolicy> subcommand to ensure that these changes are
-reflected in the other versions. Use, for example, the subcommand
-B<cfgbootpolicy> to activate the changes during the next system
+run the B<setpolicy> subcommand to ensure that the new policy is
+available to xend. Use, for example, the subcommand
+B<activatepolicy> to activate the changes during the next system
 reboot.
 
 The binary version of the policy is derived from the XML policy by
 tokenizing the specified labels and is used inside Xen only. It is
-created with the B<makepolicy> subcommand. Essentially, the binary
+created with the B<setpolicy> subcommand. Essentially, the binary
 version is much more compact than the XML version and is easier to
 evaluate during access control decisions.
 
 The mapping version of the policy is created during the XML-to-binary
-policy translation (B<makepolicy>) and is used by the Xen management
+policy translation (B<setpolicy>) and is used by xend and the management
 tools to translate between label names used as input to the tools and
 their binary identifiers (ssidrefs) used inside Xen.
 
@@ -1121,5 +1171,6 @@ B<xmdomain.cfg>(5), B<xentop>(1)
   Sean Dague <sean at dague dot net>
   Daniel Stekloff <dsteklof at us dot ibm dot com>
   Reiner Sailer <sailer at us dot ibm dot com>
+  Stefan Berger <stefanb at us dot ibm dot com>
 
 =head1 BUGS

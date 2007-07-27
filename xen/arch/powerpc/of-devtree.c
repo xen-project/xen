@@ -939,12 +939,12 @@ ofdn_t ofd_node_find_by_prop(
     size_t sz)
 {
     struct ofd_mem *m = (struct ofd_mem *)mem;
+    ofdn_t prev = -1;
 
     if ( n <= 0 ) {
         n = OFD_ROOT;
     }
 
-    ofdn_t prev = -1;
     return ofd_find_by_prop(m, -1, &prev, n, name, val, sz);
 }
 

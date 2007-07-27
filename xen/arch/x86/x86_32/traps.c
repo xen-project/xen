@@ -232,7 +232,7 @@ unsigned long do_iret(void)
     return 0;
 }
 
-void __init percpu_traps_init(void)
+void __devinit percpu_traps_init(void)
 {
     struct tss_struct *tss = &doublefault_tss;
     asmlinkage int hypercall(void);

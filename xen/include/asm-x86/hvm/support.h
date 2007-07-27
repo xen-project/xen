@@ -217,7 +217,6 @@ int hvm_load(struct domain *d, hvm_domain_context_t *h);
 extern char hvm_io_bitmap[];
 
 void hvm_enable(struct hvm_function_table *);
-void hvm_disable(void);
 
 int hvm_copy_to_guest_phys(paddr_t paddr, void *buf, int size);
 int hvm_copy_from_guest_phys(void *buf, paddr_t paddr, int size);

@@ -62,6 +62,10 @@ empty_line_re = re.compile("^\s*$")
 binary_name_re = re.compile(".*[chwall|ste|chwall_ste].*\.bin", re.IGNORECASE)
 policy_name_re = re.compile(".*[chwall|ste|chwall_ste].*", re.IGNORECASE)
 
+#decision hooks known to the hypervisor
+ACMHOOK_sharing = 1
+ACMHOOK_authorization = 2
+
 #other global variables
 NULL_SSIDREF = 0
 
@@ -154,75 +158,6 @@ def calc_dom_ssidref_from_info(info):
             return 0
     raise VmError("security.calc_dom_ssidref_from_info: info of type '%s'"
                   "not supported." % type(info))
-
-# Assumes a 'security' info  [security access_control ...] [ssidref ...]
-def get_security_info(info, field):
-    """retrieves security field from self.info['security'])
-    allowed search fields: ssidref, label, policy
-    """
-    if isinstance(info, dict):
-        security = info['security']
-    elif isinstance(info, list):
-        security = sxp.child_value(info, 'security')
-    if not security:
-        if field == 'ssidref':
-            #return default ssid
-            return 0
-        else:
-            err("Security information not found in info struct.")
-
-    if field == 'ssidref':
-        search = 'ssidref'
-    elif field in ['policy', 'label']:
-            search = 'access_control'
-    else:
-        err("Illegal field in get_security_info.")
-
-    for idx in range(0, len(security)):
-        if search != security[idx][0]:
-            continue
-        if search == 'ssidref':
-            return int(security[idx][1])
-        else:
-            for aidx in range(0, len(security[idx])):
-                if security[idx][aidx][0] == field:
-                    return str(security[idx][aidx][1])
-
-    if search == 'ssidref':
-        return 0
-    else:
-        return None
-
-
-def get_security_printlabel(info):
-    """retrieves printable security label from self.info['security']),
-    preferably the label name and otherwise (if label is not specified
-    in config and cannot be found in mapping file) a hex string of the
-    ssidref or none if both not available
-    """
-    try:
-        if not on():
-            return "INACTIVE"
-        if active_policy in ["DEFAULT"]:
-            return "DEFAULT"
-
-        printlabel = get_security_info(info, 'label')
-        if printlabel:
-            return printlabel
-        ssidref = get_security_info(info, 'ssidref')
-        if not ssidref:
-            return None
-        #try to translate ssidref to a label
-        result = ssidref2label(ssidref)
-        if not result:
-            printlabel = "0x%08x" % ssidref
-        else:
-            printlabel = result
-        return printlabel
-    except ACMError:
-        #don't throw an exception in xm list
-        return "ERROR"
-
 
 
 def getmapfile(policyname):
@@ -522,7 +457,8 @@ def get_decision(arg1, arg2):
         err("Invalid id or ssidref type, string or int required")
 
     try:
-        decision = acm.getdecision(arg1[0], arg1[1], arg2[0], arg2[1])
+        decision = acm.getdecision(arg1[0], arg1[1], arg2[0], arg2[1],
+                                   ACMHOOK_sharing)
     except:
         err("Cannot determine decision.")
 
@@ -530,6 +466,21 @@ def get_decision(arg1, arg2):
         return decision
     else:
         err("Cannot determine decision (Invalid parameter).")
+
+
+def has_authorization(ssidref):
+    """ Check if the domain with the given ssidref has authorization to
+        run on this system. To have authoriztion dom0's STE types must
+        be a superset of that of the domain's given through its ssidref.
+    """
+    rc = True
+    dom0_ssidref = int(acm.getssid(0)['ssidref'])
+    decision = acm.getdecision('ssidref', str(dom0_ssidref),
+                               'ssidref', str(ssidref),
+                               ACMHOOK_authorization)
+    if decision == "DENIED":
+        rc = False
+    return rc
 
 
 def hv_chg_policy(bin_pol, del_array, chg_array):
@@ -868,9 +819,10 @@ def is_resource_in_use(resource):
             lst.append(dominfo)
     return lst
 
-def devices_equal(res1, res2):
+def devices_equal(res1, res2, mustexist=True):
     """ Determine whether two devices are equal """
-    return (unify_resname(res1) == unify_resname(res2))
+    return (unify_resname(res1, mustexist) ==
+            unify_resname(res2, mustexist))
 
 def is_resource_in_use_by_dom(dominfo, resource):
     """ Determine whether a resources is in use by a given domain
@@ -886,7 +838,7 @@ def is_resource_in_use_by_dom(dominfo, resource):
         dev = devs[uuid]
         if len(dev) >= 2 and dev[1].has_key('uname'):
             # dev[0] is type, i.e. 'vbd'
-            if devices_equal(dev[1]['uname'], resource):
+            if devices_equal(dev[1]['uname'], resource, mustexist=False):
                 log.info("RESOURCE IN USE: Domain %d uses %s." %
                          (dominfo.domid, resource))
                 return True
@@ -899,7 +851,7 @@ def get_domain_resources(dominfo):
         Entries are strored in the following formats:
           tap:qcow:/path/xyz.qcow
     """
-    resources = { 'vbd' : [], 'tap' : []}
+    resources = { 'vbd' : [], 'tap' : [], 'vif' : []}
     devs = dominfo.info['devices']
     uuids = devs.keys()
     for uuid in uuids:
@@ -907,6 +859,15 @@ def get_domain_resources(dominfo):
         typ = dev[0]
         if typ in [ 'vbd', 'tap' ]:
             resources[typ].append(dev[1]['uname'])
+        if typ in [ 'vif' ]:
+            sec_lab = dev[1].get('security_label')
+            if sec_lab:
+                resources[typ].append(sec_lab)
+            else:
+                resources[typ].append("%s:%s:%s" %
+                                      (xsconstants.ACM_POLICY_ID,
+                                       active_policy,
+                                       "unlabeled"))
 
     return resources
 
@@ -942,23 +903,36 @@ def __resources_compatible_with_vmlabel(xspol, dominfo, vmlabel,
         dictionary of the resource name to resource label mappings
         under which the evaluation should be done.
     """
+    def collect_labels(reslabels, s_label, polname):
+        if len(s_label) != 3 or polname != s_label[1]:
+            return False
+        label = s_label[2]
+        if not label in reslabels:
+            reslabels.append(label)
+        return True
+
     resources = get_domain_resources(dominfo)
     reslabels = []  # all resource labels
-    polname = xspol.get_name()
-    for key in resources.keys():
-        for res in resources[key]:
-            try:
-                tmp = access_control[res]
-                if len(tmp) != 3:
-                    return False
 
-                if polname != tmp[1]:
+    polname = xspol.get_name()
+    for key, value in resources.items():
+        if key in [ 'vbd', 'tap' ]:
+            for res in resources[key]:
+                try:
+                    label = access_control[res]
+                    if not collect_labels(reslabels, label, polname):
+                        return False
+                except:
                     return False
-                label = tmp[2]
-                if not label in reslabels:
-                    reslabels.append(label)
-            except:
-                return False
+        elif key in [ 'vif' ]:
+            for xapi_label in value:
+                label = xapi_label.split(":")
+                if not collect_labels(reslabels, label, polname):
+                    return False
+        else:
+            log.error("Unhandled device type: %s" % key)
+            return False
+
     # Check that all resource labes have a common STE type with the
     # vmlabel
     rc = xspol.policy_check_vmlabel_against_reslabels(vmlabel, reslabels)

@@ -344,4 +344,17 @@ extern bool
 xen_vdi_get_all(xen_session *session, struct xen_vdi_set **result);
 
 
+/**
+ * Set the security label of a VDI.
+ */
+extern bool
+xen_vdi_set_security_label(xen_session *session, int64_t *result, xen_vdi vdi,
+                           char *label, char *oldlabel);
+
+/**
+ * Get the security label of a VDI.
+ */
+extern bool
+xen_vdi_get_security_label(xen_session *session, char **result, xen_vdi vdi);
+
 #endif

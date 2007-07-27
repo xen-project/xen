@@ -22,35 +22,53 @@ import sys, os, re
 from xen.util import dictio
 from xen.util import security
 from xen.xm.opts import OptionError
+from xen.xm import main as xm_main
+from xen.xm.main import server
 
 def help():
     return """
     Example: xm rmlabel dom <configfile>
              xm rmlabel res <resource>
+             xm rmlabel mgt <domain name>
+             xm rmlabel vif-<idx> <domain name>
 
     This program removes an acm_label entry from the 'configfile'
-    for a domain or from the global resource label file for a
-    resource. If the label does not exist for the given domain or
-    resource, then rmlabel fails."""
+    for a domain, from a Xend-managed domain, from the global resource label
+    file for a resource or from the virtual network interface of a Xend-managed
+    domain. If the label does not exist for the given domain or resource, then
+    rmlabel fails."""
 
 
 def rm_resource_label(resource):
     """Removes a resource label from the global resource label file.
     """
+    # Try Xen-API first if configured to use it
+    if xm_main.serverType == xm_main.SERVER_XEN_API:
+        try:
+            oldlabel = server.xenapi.XSPolicy.get_resource_label(resource)
+            if oldlabel != "":
+                server.xenapi.XSPolicy.set_resource_label(resource,"",
+                                                          oldlabel)
+            else:
+                raise security.ACMError("Resource not labeled")
+        except Exception, e:
+            print "Could not remove label from resource: %s" % e
+        return
+
     #build canonical resource name
     resource = security.unify_resname(resource)
 
     # read in the resource file
-    file = security.res_label_filename
+    fil = security.res_label_filename
     try:
-        access_control = dictio.dict_read("resources", file)
+        access_control = dictio.dict_read("resources", fil)
     except:
         raise security.ACMError("Resource file not found, cannot remove label!")
 
     # remove the entry and update file
     if access_control.has_key(resource):
         del access_control[resource]
-        dictio.dict_write(access_control, "resources", file)
+        dictio.dict_write(access_control, "resources", fil)
     else:
         raise security.ACMError("Resource not labeled")
 
@@ -58,15 +76,15 @@ def rm_resource_label(resource):
 def rm_domain_label(configfile):
     # open the domain config file
     fd = None
-    file = None
+    fil = None
     if configfile[0] == '/':
-        file = configfile
-        fd = open(file, "rb")
+        fil = configfile
+        fd = open(fil, "rb")
     else:
         for prefix in [".", "/etc/xen"]:
-            file = prefix + "/" + configfile
-            if os.path.isfile(file):
-                fd = open(file, "rb")
+            fil = prefix + "/" + configfile
+            if os.path.isfile(fil):
+                fd = open(fil, "rb")
                 break
     if not fd:
         raise OptionError("Configuration file '%s' not found." % configfile)
@@ -93,9 +111,47 @@ def rm_domain_label(configfile):
         raise security.ACMError('Domain not labeled')
 
     # write the data back out to the file
-    fd = open(file, "wb")
+    fd = open(fil, "wb")
     fd.writelines(file_contents)
     fd.close()
+
+def rm_domain_label_xapi(domainname):
+    if xm_main.serverType != xm_main.SERVER_XEN_API:
+        raise OptionError('Need to be configure for using xen-api.')
+    uuids = server.xenapi.VM.get_by_name_label(domainname)
+    if len(uuids) == 0:
+        raise OptionError('A VM with that name does not exist.')
+    if len(uuids) != 1:
+        raise OptionError('Too many domains with the same name.')
+    uuid = uuids[0]
+    try:
+        old_lab = server.xenapi.VM.get_security_label(uuid)
+        server.xenapi.VM.set_security_label(uuid, "", old_lab)
+    except Exception, e:
+        print('Could not remove label from domain: %s' % e)
+
+def rm_vif_label(vmname, idx):
+    if xm_main.serverType != xm_main.SERVER_XEN_API:
+        raise OptionError('Need to be configure for using xen-api.')
+    vm_refs = server.xenapi.VM.get_by_name_label(vmname)
+    if len(vm_refs) == 0:
+        raise OptionError('A VM with the name %s does not exist.' %
+                          vmname)
+    vif_refs = server.xenapi.VM.get_VIFs(vm_refs[0])
+    if len(vif_refs) <= idx:
+        raise OptionError("Bad VIF index.")
+    vif_ref = server.xenapi.VIF.get_by_uuid(vif_refs[idx])
+    if not vif_ref:
+        print "A VIF with this UUID does not exist."
+    try:
+        old_lab = server.xenapi.VIF.get_security_label(vif_ref)
+        rc = server.xenapi.VIF.set_security_label(vif_ref, "", old_lab)
+        if int(rc) != 0:
+            print "Could not remove the label from the VIF."
+        else:
+            print "Successfully removed the label from the VIF."
+    except Exception, e:
+        print "Could not remove the label the VIF: %s" % str(e)
 
 
 def main (argv):
@@ -103,15 +159,26 @@ def main (argv):
     if len(argv) != 3:
         raise OptionError('Requires 2 arguments')
     
-    if argv[1].lower() not in ('dom', 'res'):
-        raise OptionError('Unrecognised type argument: %s' % argv[1])
-
     if argv[1].lower() == "dom":
         configfile = argv[2]
         rm_domain_label(configfile)
+    elif argv[1].lower() == "mgt":
+        domain = argv[2]
+        rm_domain_label_xapi(domain)
+    elif argv[1].lower().startswith("vif-"):
+        try:
+            idx = int(argv[1][4:])
+            if idx < 0:
+                raise
+        except:
+            raise OptionError("Bad VIF device index.")
+        vmname = argv[2]
+        rm_vif_label(vmname, idx)
     elif argv[1].lower() == "res":
         resource = argv[2]
         rm_resource_label(resource)
+    else:
+        raise OptionError('Unrecognised type argument: %s' % argv[1])
 
 if __name__ == '__main__':
     try:
@@ -119,5 +186,3 @@ if __name__ == '__main__':
     except Exception, e:
         sys.stderr.write('Error: %s\n' % str(e))
         sys.exit(-1)    
-
-

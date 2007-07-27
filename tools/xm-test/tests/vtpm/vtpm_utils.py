@@ -15,4 +15,16 @@ if output == "":
          "need /dev/tpm0")
 
 def vtpm_cleanup(domName):
-    traceCommand("/etc/xen/scripts/vtpm-delete %s" % domName)
+    traceCommand("/etc/xen/scripts/vtpm-delete "
+                 "`xenstore-read /local/domain/0/backend/vtpm/%s/0/uuid`" %
+                 str(domid(domName)))
+
+def vtpm_cleanup(uuid):
+    from xen.xm import main
+    if main.serverType != main.SERVER_XEN_API:
+        traceCommand("/etc/xen/scripts/vtpm-delete %s" % uuid)
+
+def vtpm_get_uuid(domainid):
+    s, o = traceCommand("xenstore-read "
+                        "/local/domain/0/backend/vtpm/%s/0/uuid" % domainid)
+    return o

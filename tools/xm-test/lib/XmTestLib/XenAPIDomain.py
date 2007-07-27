@@ -23,6 +23,7 @@ import os
 import sys
 from XmTestLib import *
 from types import DictType
+from acm import *
 
 
 class XenAPIConfig:
@@ -38,6 +39,9 @@ class XenAPIConfig:
                            'kernel' : 'PV_kernel',
                            'ramdisk': 'PV_ramdisk',
                            'root'   : 'PV_args'}
+        if isACMEnabled():
+            #A default so every VM can start with ACM enabled
+            self.opts["security_label"] = "ACM:xm-test:red"
 
     def setOpt(self, name, value):
         """Set an option in the config"""
