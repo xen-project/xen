@@ -37,8 +37,8 @@ def linux_phy_to_virt(pif_name):
 def linux_get_phy_ifaces():
     """Returns a list of physical interfaces.
 
-    Identifies PIFs as those that have a interface name starting with 'p'
-    and have the fake 'fe:ff:ff:ff:ff:ff' MAC address.
+    Identifies PIFs as those that have a interface name starting with
+    'peth'.
 
     See /etc/xen/scripts/network-bridge for how the devices are renamed.
 
@@ -58,7 +58,7 @@ def linux_get_phy_ifaces():
                 
         # resolve pifs' mac addresses
         for name, mtu, mac in ifaces.values():
-            if name[0] == 'p' and mac == 'fe:ff:ff:ff:ff:ff':
+            if name.startswith('peth'):
                 bridged_ifname = linux_phy_to_virt(name)
                 bridged_if = ifaces.get(bridged_ifname)
                 if bridged_if:
