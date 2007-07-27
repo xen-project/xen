@@ -1668,6 +1668,17 @@ static int svm_set_cr0(unsigned long value)
   
     HVM_DBG_LOG(DBG_LEVEL_VMMU, "Update CR0 value = %lx", value);
 
+    if ( (u32)value != value )
+    {
+        HVM_DBG_LOG(DBG_LEVEL_1,
+                    "Guest attempts to set upper 32 bits in CR0: %lx",
+                    value);
+        svm_inject_exception(v, TRAP_gp_fault, 1, 0);
+        return 0;
+    }
+
+    value &= HVM_CR0_GUEST_RESERVED_BITS;
+
     /* ET is reserved and should be always be 1. */
     value |= X86_CR0_ET;
 

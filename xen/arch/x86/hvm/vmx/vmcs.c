@@ -240,8 +240,23 @@ int vmx_cpu_up(void)
 {
     u32 eax, edx;
     int cpu = smp_processor_id();
+    u64 cr0, vmx_cr0_fixed0, vmx_cr0_fixed1;
 
     BUG_ON(!(read_cr4() & X86_CR4_VMXE));
+
+    /* 
+     * Ensure the current processor operating mode meets 
+     * the requred CRO fixed bits in VMX operation. 
+     */
+    cr0 = read_cr0();
+    rdmsrl(MSR_IA32_VMX_CR0_FIXED0, vmx_cr0_fixed0);
+    rdmsrl(MSR_IA32_VMX_CR0_FIXED1, vmx_cr0_fixed1);
+    if ( (~cr0 & vmx_cr0_fixed0) || (cr0 & ~vmx_cr0_fixed1) )
+    {
+        printk("CPU%d: some settings of host CR0 are " 
+               "not allowed in VMX operation.\n", cpu);
+        return 0;
+    }
 
     rdmsr(IA32_FEATURE_CONTROL_MSR, eax, edx);
 
