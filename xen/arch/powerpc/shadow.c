@@ -20,7 +20,7 @@
 
 #include <xen/config.h>
 #include <xen/types.h>
-#include <xen/shadow.h>
+#include <xen/paging.h>
 
 static ulong htab_calc_sdr1(ulong htab_addr, ulong log_htab_size)
 {

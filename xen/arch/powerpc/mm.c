@@ -22,7 +22,7 @@
 
 #include <xen/config.h>
 #include <xen/mm.h>
-#include <xen/shadow.h>
+#include <xen/paging.h>
 #include <xen/kernel.h>
 #include <xen/sched.h>
 #include <xen/perfc.h>

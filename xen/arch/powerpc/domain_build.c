@@ -26,10 +26,9 @@
 #include <xen/init.h>
 #include <xen/ctype.h>
 #include <xen/iocap.h>
-#include <xen/shadow.h>
 #include <xen/domain.h>
 #include <xen/version.h>
-#include <xen/shadow.h>
+#include <xen/paging.h>
 #include <asm/processor.h>
 #include <asm/platform.h>
 #include <asm/papr.h>

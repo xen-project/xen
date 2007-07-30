@@ -275,4 +275,12 @@ extern int steal_page(struct domain *d, struct page_info *page,
 
 #define domain_get_maximum_gpfn(d) (-ENOSYS)
 
+extern int guest_physmap_max_mem_pages(struct domain *d, unsigned long new_max);
+
+extern void guest_physmap_add_page(
+    struct domain *d, unsigned long gpfn, unsigned long mfn);
+
+extern void guest_physmap_remove_page(
+    struct domain *d, unsigned long gpfn, unsigned long mfn);
+
 #endif
