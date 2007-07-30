@@ -33,9 +33,6 @@ extern void init_IRQ(void);
 extern void ack_APIC_irq(void);
 extern int ioapic_guest_read(unsigned long physbase, unsigned int reg, u32 *pval);
 extern int ioapic_guest_write(unsigned long physbase, unsigned int reg, u32 val);
-extern void __start_xen_ppc(
-    ulong r3, ulong r4, ulong r5, ulong r6, ulong r7, ulong orig_msr);
-extern  multiboot_info_t *boot_of_init(ulong r3, ulong r4, ulong vec, ulong r6, ulong r7, ulong orig_msr);
 
 extern void do_timer(struct cpu_user_regs *regs);
 extern void do_dec(struct cpu_user_regs *regs);

@@ -21,6 +21,7 @@
 #include <xen/sched.h>
 #include <xen/mm.h>
 #include <xen/numa.h>
+#include <asm/boot.h>
 #include "of-devtree.h"
 #include "oftree.h"
 #include "rtas.h"
@@ -116,7 +117,7 @@ static void ofd_walk_mem(void *m, walk_mem_fn fn)
     }
 }
 
-void memory_init(module_t *mod, int mcount)
+void memory_init(void)
 {
     ulong eomem;
     ulong bitmap_start = ~0UL;

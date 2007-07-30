@@ -27,6 +27,7 @@ obj-y += memory.o
 obj-y += mm.o
 obj-y += mpic.o
 obj-y += mpic_init.o
+obj-y += multiboot2.o
 obj-y += numa.o
 obj-y += of-devtree.o
 obj-y += of-devwalk.o

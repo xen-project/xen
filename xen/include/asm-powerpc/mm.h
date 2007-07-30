@@ -35,7 +35,6 @@
 #define memguard_unguard_range(_p,_l)    ((void)0)
 
 extern unsigned long xenheap_phys_end;
-extern int boot_of_mem_avail(int pos, ulong *start, ulong *end);
 
 /*
  * Per-page-frame information.
