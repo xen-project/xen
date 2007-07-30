@@ -572,6 +572,12 @@ ia64_handle_reflection(unsigned long ifa, struct pt_regs *regs,
 	BUG_ON(!(psr & IA64_PSR_CPL));
 
 	switch (vector) {
+	case 6:
+		vector = IA64_INST_KEY_MISS_VECTOR;
+		break;
+	case 7:
+		vector = IA64_DATA_KEY_MISS_VECTOR;
+		break;
 	case 8:
 		vector = IA64_DIRTY_BIT_VECTOR;
 		break;

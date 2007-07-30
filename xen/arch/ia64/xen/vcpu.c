@@ -1623,7 +1623,7 @@ IA64FAULT vcpu_translate(VCPU * vcpu, u64 address, BOOLEAN is_data,
 			 u64 * pteval, u64 * itir, u64 * iha)
 {
 	unsigned long region = address >> 61;
-	unsigned long pta, rid, rr;
+	unsigned long pta, rid, rr, key = 0;
 	union pte_flags pte;
 	TR_ENTRY *trp;
 
@@ -1716,6 +1716,7 @@ IA64FAULT vcpu_translate(VCPU * vcpu, u64 address, BOOLEAN is_data,
 		    region == 7 && ia64_psr(regs)->cpl == CONFIG_CPL0_EMUL) {
 			pte.val = address & _PAGE_PPN_MASK;
 			pte.val = pte.val | optf->im_reg7.pgprot;
+			key = optf->im_reg7.key;
 			goto out;
 		}
 		return is_data ? IA64_ALT_DATA_TLB_VECTOR :
@@ -1741,7 +1742,7 @@ IA64FAULT vcpu_translate(VCPU * vcpu, u64 address, BOOLEAN is_data,
 
 	/* found mapping in guest VHPT! */
 out:
-	*itir = rr & RR_PS_MASK;
+	*itir = (rr & RR_PS_MASK) | (key << IA64_ITIR_KEY);
 	*pteval = pte.val;
 	perfc_incr(vhpt_translate);
 	return IA64_NO_FAULT;
