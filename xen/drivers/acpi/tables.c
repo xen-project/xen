@@ -227,6 +227,17 @@ void acpi_table_print_madt_entry(acpi_table_entry_header * header)
 	}
 }
 
+uint8_t
+generate_acpi_checksum(void *tbl, unsigned long len)
+{
+	uint8_t *ptr, sum = 0;
+
+	for (ptr = tbl; len > 0 ; len--, ptr++)
+		sum += *ptr;
+
+	return 0 - sum;
+}
+
 static int
 acpi_table_compute_checksum(void *table_pointer, unsigned long length)
 {

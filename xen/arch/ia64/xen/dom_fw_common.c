@@ -207,17 +207,6 @@ print_md(efi_memory_desc_t *md)
 		printk("(%luKB)\n", size >> 10);
 }
 
-uint8_t
-generate_acpi_checksum(void *tbl, unsigned long len)
-{
-	uint8_t *ptr, sum = 0;
-
-	for (ptr = tbl; len > 0 ; len--, ptr++)
-		sum += *ptr;
-
-	return 0 - sum;
-}
-
 struct fake_acpi_tables {
 	struct acpi20_table_rsdp rsdp;
 	struct xsdt_descriptor_rev2 xsdt;
