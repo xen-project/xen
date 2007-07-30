@@ -103,6 +103,7 @@ acpi_update_madt_checksum(unsigned long phys_addr, unsigned long size)
 /* base is physical address of acpi table */
 static void __init touch_acpi_table(void)
 {
+	int result;
 	lsapic_nbr = 0;
 
 	if (acpi_table_parse_madt(ACPI_MADT_LSAPIC, acpi_update_lsapic, 0) < 0)
@@ -110,6 +111,18 @@ static void __init touch_acpi_table(void)
 	if (acpi_table_parse_madt(ACPI_MADT_PLAT_INT_SRC,
 				  acpi_patch_plat_int_src, 0) < 0)
 		printk("Error parsing MADT - no PLAT_INT_SRC entries\n");
+
+	result = acpi_table_disable(ACPI_SRAT);
+	if ( result == 0 )
+		printk("Success Disabling SRAT\n");
+	else if ( result != -ENOENT )
+		printk("ERROR: Failed Disabling SRAT\n");
+
+	result = acpi_table_disable(ACPI_SLIT);
+	if ( result == 0 )
+		printk("Success Disabling SLIT\n");
+	else if ( result != -ENOENT )
+		printk("ERROR: Failed Disabling SLIT\n");
 
 	acpi_table_parse(ACPI_APIC, acpi_update_madt_checksum);
 
