@@ -669,7 +669,7 @@ xen_pal_emulator(unsigned long index, u64 in1, u64 in2, u64 in3)
 				 { .vw = 1,
 				   .phys_add_size = 44,
 				   .key_size = 16,
-				   .max_pkr = 15,
+				   .max_pkr = XEN_IA64_NPKRS,
 				   .hash_tag_id = 0x30,
 				   .max_dtr_entry = NDTRS - 1,
 				   .max_itr_entry = NITRS - 1,

@@ -237,6 +237,19 @@ typedef union {
     u64 itir;
 } ia64_itir_t;
 
+typedef union {
+	u64 val;
+	struct {
+		u64 v  : 1;
+		u64 wd : 1;
+		u64 rd : 1;
+		u64 xd : 1;
+		u64 reserved1 : 4;
+		u64 key : 24;
+		u64 reserved2 : 32;
+	};
+} ia64_pkr_t;
+
 #define dump_execution_state() printk("FIXME: implement ia64 dump_execution_state()\n");
 
 #endif // _ASM_IA64_XENPROCESSOR_H

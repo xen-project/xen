@@ -38,13 +38,29 @@
 /* Some cr.itir declarations. */
 #define	IA64_ITIR_PS		2
 #define	IA64_ITIR_PS_LEN	6
-#define IA64_ITIR_PS_MASK	(((__IA64_UL(1) << IA64_ITIR_PS_LEN) - 1) \
-							<< IA64_ITIR_PS)
+#define	IA64_ITIR_PS_MASK	(((__IA64_UL(1) << IA64_ITIR_PS_LEN) - 1) \
+ 							<< IA64_ITIR_PS)
 #define	IA64_ITIR_KEY		8
 #define	IA64_ITIR_KEY_LEN	24
 #define	IA64_ITIR_KEY_MASK	(((__IA64_UL(1) << IA64_ITIR_KEY_LEN) - 1) \
 							<< IA64_ITIR_KEY)
-#define IA64_ITIR_PS_KEY(_ps, _key)	(((_ps) << IA64_ITIR_PS) | \
-					(((_key) << IA64_ITIR_KEY)))
+#define	IA64_ITIR_PS_KEY(_ps, _key)	(((_ps) << IA64_ITIR_PS) | \
+					 (((_key) << IA64_ITIR_KEY)))
+
+/* Define Protection Key Register (PKR) */
+#define	IA64_PKR_V		0
+#define	IA64_PKR_WD		1
+#define	IA64_PKR_RD		2
+#define	IA64_PKR_XD		3
+#define	IA64_PKR_MBZ0		4
+#define	IA64_PKR_KEY		8
+#define	IA64_PKR_KEY_LEN	24
+#define	IA64_PKR_MBZ1		32
+
+#define	IA64_PKR_VALID		(1 << IA64_PKR_V)
+#define	IA64_PKR_KEY_MASK	(((__IA64_UL(1) << IA64_PKR_KEY_LEN) - 1) \
+							<< IA64_PKR_KEY)
+
+#define	XEN_IA64_NPKRS		15	/* Number of pkr's in PV */
 
 #endif /* _ASM_IA64_XENKREGS_H */
