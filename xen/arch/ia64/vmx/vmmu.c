@@ -232,10 +232,10 @@ void machine_tlb_insert(struct vcpu *v, thash_data_t *tlb)
 
     psr = ia64_clear_ic();
     if ( cl == ISIDE_TLB ) {
-        ia64_itc(1, mtlb.ifa, mtlb.page_flags, mtlb.ps);
+        ia64_itc(1, mtlb.ifa, mtlb.page_flags, IA64_ITIR_PS_KEY(mtlb.ps, 0));
     }
     else {
-        ia64_itc(2, mtlb.ifa, mtlb.page_flags, mtlb.ps);
+        ia64_itc(2, mtlb.ifa, mtlb.page_flags, IA64_ITIR_PS_KEY(mtlb.ps, 0));
     }
     ia64_set_psr(psr);
     ia64_srlz_i();

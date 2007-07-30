@@ -448,11 +448,11 @@ gmfn_to_mfn_foreign(struct domain *d, unsigned long gpfn)
 // address, convert the pte for a physical address for (possibly different)
 // Xen PAGE_SIZE and return modified pte.  (NOTE: TLB insert should use
 // PAGE_SIZE!)
-u64 translate_domain_pte(u64 pteval, u64 address, u64 itir__, u64* logps,
+u64 translate_domain_pte(u64 pteval, u64 address, u64 itir__, u64* itir,
                          struct p2m_entry* entry)
 {
 	struct domain *d = current->domain;
-	ia64_itir_t itir = {.itir = itir__};
+	ia64_itir_t _itir = {.itir = itir__};
 	u64 mask, mpaddr, pteval2;
 	u64 arflags;
 	u64 arflags2;
@@ -461,13 +461,14 @@ u64 translate_domain_pte(u64 pteval, u64 address, u64 itir__, u64* logps,
 	pteval &= ((1UL << 53) - 1);// ignore [63:53] bits
 
 	// FIXME address had better be pre-validated on insert
-	mask = ~itir_mask(itir.itir);
+	mask = ~itir_mask(_itir.itir);
 	mpaddr = ((pteval & _PAGE_PPN_MASK) & ~mask) | (address & mask);
 
-	if (itir.ps > PAGE_SHIFT)
-		itir.ps = PAGE_SHIFT;
+	if (_itir.ps > PAGE_SHIFT)
+		_itir.ps = PAGE_SHIFT;
 
-	*logps = itir.ps;
+	((ia64_itir_t*)itir)->itir = _itir.itir;/* Copy the whole register. */
+	((ia64_itir_t*)itir)->ps = _itir.ps;	/* Overwrite ps part! */
 
 	pteval2 = lookup_domain_mpa(d, mpaddr, entry);
 

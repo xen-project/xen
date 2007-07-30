@@ -199,7 +199,7 @@ void thash_vhpt_insert(VCPU *v, u64 pte, u64 itir, u64 va, int type)
     } else {
         phy_pte  &= ~PAGE_FLAGS_RV_MASK;
         psr = ia64_clear_ic();
-        ia64_itc(type + 1, va, phy_pte, itir_ps(itir));
+        ia64_itc(type + 1, va, phy_pte, itir);
         ia64_set_psr(psr);
         ia64_srlz_i();
     }
@@ -562,7 +562,7 @@ int thash_purge_and_insert(VCPU *v, u64 pte, u64 itir, u64 ifa, int type)
             u64 psr;
             phy_pte  &= ~PAGE_FLAGS_RV_MASK;
             psr = ia64_clear_ic();
-            ia64_itc(type + 1, ifa, phy_pte, ps);
+            ia64_itc(type + 1, ifa, phy_pte, IA64_ITIR_PS_KEY(ps, 0));
             ia64_set_psr(psr);
             ia64_srlz_i();
             // ps < mrr.ps, this is not supported

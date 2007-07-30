@@ -447,7 +447,8 @@ extern unsigned long dom0vp_expose_p2m(struct domain* d, unsigned long conv_star
 
 extern volatile unsigned long *mpt_table;
 extern unsigned long gmfn_to_mfn_foreign(struct domain *d, unsigned long gpfn);
-extern u64 translate_domain_pte(u64 pteval, u64 address, u64 itir__, u64* logps, struct p2m_entry* entry);
+extern u64 translate_domain_pte(u64 pteval, u64 address, u64 itir__,
+				u64* itir, struct p2m_entry* entry);
 #define machine_to_phys_mapping	mpt_table
 
 #define INVALID_M2P_ENTRY        (~0UL)

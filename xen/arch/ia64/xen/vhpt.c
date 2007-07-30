@@ -71,7 +71,7 @@ vhpt_erase(unsigned long vhpt_maddr)
 	// initialize cache too???
 }
 
-void vhpt_insert (unsigned long vadr, unsigned long pte, unsigned long logps)
+void vhpt_insert (unsigned long vadr, unsigned long pte, unsigned long itir)
 {
 	struct vhpt_lf_entry *vlfe = (struct vhpt_lf_entry *)ia64_thash(vadr);
 	unsigned long tag = ia64_ttag (vadr);
@@ -80,21 +80,23 @@ void vhpt_insert (unsigned long vadr, unsigned long pte, unsigned long logps)
 	 * because the processor may support speculative VHPT walk.  */
 	vlfe->ti_tag = INVALID_TI_TAG;
 	wmb();
-	vlfe->itir = logps;
+	vlfe->itir = itir;
 	vlfe->page_flags = pte | _PAGE_P;
 	*(volatile unsigned long*)&vlfe->ti_tag = tag;
 }
 
-void vhpt_multiple_insert(unsigned long vaddr, unsigned long pte, unsigned long logps)
+void vhpt_multiple_insert(unsigned long vaddr, unsigned long pte,
+			   unsigned long itir)
 {
-	unsigned long mask = (1L << logps) - 1;
+	ia64_itir_t _itir = {.itir = itir};
+	unsigned long mask = (1L << _itir.ps) - 1;
 	int i;
 
-	if (logps-PAGE_SHIFT > 10 && !running_on_sim) {
+	if (_itir.ps-PAGE_SHIFT > 10 && !running_on_sim) {
 		// if this happens, we may want to revisit this algorithm
 		panic("vhpt_multiple_insert:logps-PAGE_SHIFT>10,spinning..\n");
 	}
-	if (logps-PAGE_SHIFT > 2) {
+	if (_itir.ps-PAGE_SHIFT > 2) {
 		// FIXME: Should add counter here to see how often this
 		//  happens (e.g. for 16MB pages!) and determine if it
 		//  is a performance problem.  On a quick look, it takes
@@ -109,8 +111,8 @@ void vhpt_multiple_insert(unsigned long vaddr, unsigned long pte, unsigned long 
 	}
 	vaddr &= ~mask;
 	pte = ((pte & _PFN_MASK) & ~mask) | (pte & ~_PFN_MASK);
-	for (i = 1L << (logps-PAGE_SHIFT); i > 0; i--) {
-		vhpt_insert(vaddr,pte,logps<<2);
+	for (i = 1L << (_itir.ps-PAGE_SHIFT); i > 0; i--) {
+		vhpt_insert(vaddr, pte, _itir.itir);
 		vaddr += PAGE_SIZE;
 	}
 }

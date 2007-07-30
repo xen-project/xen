@@ -168,7 +168,7 @@ void ia64_do_page_fault(unsigned long address, unsigned long isr,
 	unsigned long is_data = !((isr >> IA64_ISR_X_BIT) & 1UL);
 	IA64FAULT fault;
 	int is_ptc_l_needed = 0;
-	u64 logps;
+	ia64_itir_t _itir = {.itir = itir};
 
 	if ((isr & IA64_ISR_SP)
 	    || ((isr & IA64_ISR_NA)
@@ -190,14 +190,14 @@ void ia64_do_page_fault(unsigned long address, unsigned long isr,
 		struct p2m_entry entry;
 		unsigned long m_pteval;
 		m_pteval = translate_domain_pte(pteval, address, itir,
-		                                &logps, &entry);
+		                                &(_itir.itir), &entry);
 		vcpu_itc_no_srlz(current, is_data ? 2 : 1, address,
-		                 m_pteval, pteval, logps, &entry);
+		                 m_pteval, pteval, _itir.itir, &entry);
 		if ((fault == IA64_USE_TLB && !current->arch.dtlb.pte.p) ||
 		    p2m_entry_retry(&entry)) {
 			/* dtlb has been purged in-between.  This dtlb was
 			   matching.  Undo the work.  */
-			vcpu_flush_tlb_vhpt_range(address, logps);
+			vcpu_flush_tlb_vhpt_range(address, _itir.ps);
 
 			// the stale entry which we inserted above
 			// may remains in tlb cache.
@@ -209,7 +209,7 @@ void ia64_do_page_fault(unsigned long address, unsigned long isr,
 	}
 
 	if (is_ptc_l_needed)
-		vcpu_ptc_l(current, address, logps);
+		vcpu_ptc_l(current, address, _itir.ps);
 	if (!guest_mode(regs)) {
 		/* The fault occurs inside Xen.  */
 		if (!ia64_done_with_exception(regs)) {

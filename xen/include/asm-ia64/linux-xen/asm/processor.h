@@ -533,6 +533,20 @@ ia64_itr (__u64 target_mask, __u64 tr_num,
  * Insert a translation into the instruction and/or data translation
  * cache.
  */
+#ifdef XEN
+static inline void
+ia64_itc (__u64 target_mask, __u64 vmaddr, __u64 pte, __u64 itir)
+{
+	ia64_setreg(_IA64_REG_CR_ITIR, itir);
+	ia64_setreg(_IA64_REG_CR_IFA, vmaddr);
+	ia64_stop();
+	/* as per EAS2.6, itc must be the last instruction in an instruction group */
+	if (target_mask & 0x1)
+		ia64_itci(pte);
+	if (target_mask & 0x2)
+		ia64_itcd(pte);
+}
+#else
 static inline void
 ia64_itc (__u64 target_mask, __u64 vmaddr, __u64 pte,
 	  __u64 log_page_size)
@@ -546,6 +560,7 @@ ia64_itc (__u64 target_mask, __u64 vmaddr, __u64 pte,
 	if (target_mask & 0x2)
 		ia64_itcd(pte);
 }
+#endif
 
 /*
  * Purge a range of addresses from instruction and/or data translation

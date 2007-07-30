@@ -2200,23 +2200,25 @@ IA64FAULT vcpu_set_dtr(VCPU * vcpu, u64 slot, u64 pte,
 
 void
 vcpu_itc_no_srlz(VCPU * vcpu, u64 IorD, u64 vaddr, u64 pte,
-                 u64 mp_pte, u64 logps, struct p2m_entry *entry)
+                 u64 mp_pte, u64 itir, struct p2m_entry *entry)
 {
+	ia64_itir_t _itir = {.itir = itir};
 	unsigned long psr;
-	unsigned long ps = (vcpu->domain == dom0) ? logps : PAGE_SHIFT;
+	unsigned long ps = (vcpu->domain == dom0) ? _itir.ps : PAGE_SHIFT;
 
-	check_xen_space_overlap("itc", vaddr, 1UL << logps);
+	check_xen_space_overlap("itc", vaddr, 1UL << _itir.ps);
 
 	// FIXME, must be inlined or potential for nested fault here!
-	if ((vcpu->domain == dom0) && (logps < PAGE_SHIFT))
+	if ((vcpu->domain == dom0) && (_itir.ps < PAGE_SHIFT))
 		panic_domain(NULL, "vcpu_itc_no_srlz: domain trying to use "
 		             "smaller page size!\n");
 
-	BUG_ON(logps > PAGE_SHIFT);
+	BUG_ON(_itir.ps > PAGE_SHIFT);
 	vcpu_tlb_track_insert_or_dirty(vcpu, vaddr, entry);
 	psr = ia64_clear_ic();
 	pte &= ~(_PAGE_RV2 | _PAGE_RV1);	// Mask out the reserved bits.
-	ia64_itc(IorD, vaddr, pte, ps);	// FIXME: look for bigger mappings
+					// FIXME: look for bigger mappings
+	ia64_itc(IorD, vaddr, pte, IA64_ITIR_PS_KEY(ps, _itir.key));
 	ia64_set_psr(psr);
 	// ia64_srlz_i(); // no srls req'd, will rfi later
 	if (vcpu->domain == dom0 && ((vaddr >> 61) == 7)) {
@@ -2224,39 +2226,42 @@ vcpu_itc_no_srlz(VCPU * vcpu, u64 IorD, u64 vaddr, u64 pte,
 		// addresses never get flushed.  More work needed if this
 		// ever happens.
 //printk("vhpt_insert(%p,%p,%p)\n",vaddr,pte,1L<<logps);
-		if (logps > PAGE_SHIFT)
-			vhpt_multiple_insert(vaddr, pte, logps);
+		if (_itir.ps > PAGE_SHIFT)
+			vhpt_multiple_insert(vaddr, pte, _itir.itir);
 		else
-			vhpt_insert(vaddr, pte, logps << 2);
+			vhpt_insert(vaddr, pte, _itir.itir);
 	}
 	// even if domain pagesize is larger than PAGE_SIZE, just put
 	// PAGE_SIZE mapping in the vhpt for now, else purging is complicated
-	else
-		vhpt_insert(vaddr, pte, PAGE_SHIFT << 2);
+	else {
+		_itir.ps = PAGE_SHIFT;
+		vhpt_insert(vaddr, pte, _itir.itir);
+	}
 }
 
 IA64FAULT vcpu_itc_d(VCPU * vcpu, u64 pte, u64 itir, u64 ifa)
 {
-	unsigned long pteval, logps = itir_ps(itir);
+	unsigned long pteval;
 	BOOLEAN swap_rr0 = (!(ifa >> 61) && PSCB(vcpu, metaphysical_mode));
 	struct p2m_entry entry;
+	ia64_itir_t _itir = {.itir = itir};
 
-	if (logps < PAGE_SHIFT)
+	if (_itir.ps < PAGE_SHIFT)
 		panic_domain(NULL, "vcpu_itc_d: domain trying to use "
 		             "smaller page size!\n");
 
  again:
 	//itir = (itir & ~0xfc) | (PAGE_SHIFT<<2); // ignore domain's pagesize
-	pteval = translate_domain_pte(pte, ifa, itir, &logps, &entry);
+	pteval = translate_domain_pte(pte, ifa, itir, &(_itir.itir), &entry);
 	if (!pteval)
 		return IA64_ILLOP_FAULT;
 	if (swap_rr0)
 		set_one_rr(0x0, PSCB(vcpu, rrs[0]));
-	vcpu_itc_no_srlz(vcpu, 2, ifa, pteval, pte, logps, &entry);
+	vcpu_itc_no_srlz(vcpu, 2, ifa, pteval, pte, _itir.itir, &entry);
 	if (swap_rr0)
 		set_metaphysical_rr0();
 	if (p2m_entry_retry(&entry)) {
-		vcpu_flush_tlb_vhpt_range(ifa, logps);
+		vcpu_flush_tlb_vhpt_range(ifa, _itir.ps);
 		goto again;
 	}
 	vcpu_set_tr_entry(&PSCBX(vcpu, dtlb), pte, itir, ifa);
@@ -2265,25 +2270,26 @@ IA64FAULT vcpu_itc_d(VCPU * vcpu, u64 pte, u64 itir, u64 ifa)
 
 IA64FAULT vcpu_itc_i(VCPU * vcpu, u64 pte, u64 itir, u64 ifa)
 {
-	unsigned long pteval, logps = itir_ps(itir);
+	unsigned long pteval;
 	BOOLEAN swap_rr0 = (!(ifa >> 61) && PSCB(vcpu, metaphysical_mode));
 	struct p2m_entry entry;
+	ia64_itir_t _itir = {.itir = itir};
 
-	if (logps < PAGE_SHIFT)
+	if (_itir.ps < PAGE_SHIFT)
 		panic_domain(NULL, "vcpu_itc_i: domain trying to use "
 		             "smaller page size!\n");
       again:
 	//itir = (itir & ~0xfc) | (PAGE_SHIFT<<2); // ignore domain's pagesize
-	pteval = translate_domain_pte(pte, ifa, itir, &logps, &entry);
+	pteval = translate_domain_pte(pte, ifa, itir, &(_itir.itir), &entry);
 	if (!pteval)
 		return IA64_ILLOP_FAULT;
 	if (swap_rr0)
 		set_one_rr(0x0, PSCB(vcpu, rrs[0]));
-	vcpu_itc_no_srlz(vcpu, 1, ifa, pteval, pte, logps, &entry);
+	vcpu_itc_no_srlz(vcpu, 1, ifa, pteval, pte, _itir.itir, &entry);
 	if (swap_rr0)
 		set_metaphysical_rr0();
 	if (p2m_entry_retry(&entry)) {
-		vcpu_flush_tlb_vhpt_range(ifa, logps);
+		vcpu_flush_tlb_vhpt_range(ifa, _itir.ps);
 		goto again;
 	}
 	vcpu_set_tr_entry(&PSCBX(vcpu, itlb), pte, itir, ifa);

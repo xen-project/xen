@@ -38,9 +38,9 @@ struct vhpt_lf_entry {
 extern void vhpt_init (void);
 extern void gather_vhpt_stats(void);
 extern void vhpt_multiple_insert(unsigned long vaddr, unsigned long pte,
-				 unsigned long logps);
+				 unsigned long itir);
 extern void vhpt_insert (unsigned long vadr, unsigned long pte,
-			 unsigned long logps);
+			 unsigned long itir);
 void local_vhpt_flush(void);
 extern void vcpu_vhpt_flush(struct vcpu* v);
 
