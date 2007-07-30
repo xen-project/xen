@@ -242,6 +242,42 @@ IA64FAULT vcpu_get_ar(VCPU * vcpu, u64 reg, u64 * val)
 }
 
 /**************************************************************************
+ VCPU protection key emulating for PV
+ This first implementation reserves 1 pkr for the hypervisor key.
+ On setting psr.pk the hypervisor key is loaded in pkr[15], therewith the
+ hypervisor may run with psr.pk==1. The key for the hypervisor is 0.
+ Furthermore the VCPU is flagged to use the protection keys.
+ Currently the domU has to take care of the used keys, because on setting
+ a pkr there is no check against other pkr's whether this key is already
+ used.
+**************************************************************************/
+
+/* The function loads the protection key registers from the struct arch_vcpu
+ * into the processor pkr's! Called in context_switch().
+ * TODO: take care of the order of writing pkr's!
+ */
+void vcpu_pkr_load_regs(VCPU * vcpu)
+{
+	int i;
+
+	for (i = 0; i <= XEN_IA64_NPKRS; i++)
+		ia64_set_pkr(i, PSCBX(vcpu, pkrs[i]));
+}
+
+/* The function activates the pkr handling. */
+static void vcpu_pkr_set_psr_handling(VCPU * vcpu)
+{
+	if (PSCBX(vcpu, pkr_flags) & XEN_IA64_PKR_IN_USE)
+		return;
+
+	vcpu_pkr_use_set(vcpu);
+	PSCBX(vcpu, pkrs[XEN_IA64_NPKRS]) = XEN_IA64_PKR_VAL;
+
+	/* Write the special key for the hypervisor into pkr[15]. */
+	ia64_set_pkr(XEN_IA64_NPKRS, XEN_IA64_PKR_VAL);
+}
+
+/**************************************************************************
  VCPU processor status register access routines
 **************************************************************************/
 
@@ -284,7 +320,7 @@ IA64FAULT vcpu_reset_psr_sm(VCPU * vcpu, u64 imm24)
 	// just handle psr.up and psr.pp for now
 	if (imm24 & ~(IA64_PSR_BE | IA64_PSR_PP | IA64_PSR_UP | IA64_PSR_SP |
 		      IA64_PSR_I | IA64_PSR_IC | IA64_PSR_DT |
-		      IA64_PSR_DFL | IA64_PSR_DFH))
+		      IA64_PSR_DFL | IA64_PSR_DFH | IA64_PSR_PK))
 		return IA64_ILLOP_FAULT;
 	if (imm.dfh) {
 		ipsr->dfh = PSCB(vcpu, hpsr_dfh);
@@ -309,6 +345,10 @@ IA64FAULT vcpu_reset_psr_sm(VCPU * vcpu, u64 imm24)
 		ipsr->be = 0;
 	if (imm.dt)
 		vcpu_set_metaphysical_mode(vcpu, TRUE);
+	if (imm.pk) {
+		ipsr->pk = 0;
+		vcpu_pkr_use_unset(vcpu);
+	}
 	__asm__ __volatile(";; mov psr.l=%0;; srlz.d"::"r"(psr):"memory");
 	return IA64_NO_FAULT;
 }
@@ -340,7 +380,8 @@ IA64FAULT vcpu_set_psr_sm(VCPU * vcpu, u64 imm24)
 	// just handle psr.sp,pp and psr.i,ic (and user mask) for now
 	mask =
 	    IA64_PSR_PP | IA64_PSR_SP | IA64_PSR_I | IA64_PSR_IC | IA64_PSR_UM |
-	    IA64_PSR_DT | IA64_PSR_DFL | IA64_PSR_DFH | IA64_PSR_BE;
+	    IA64_PSR_DT | IA64_PSR_DFL | IA64_PSR_DFH | IA64_PSR_BE |
+	    IA64_PSR_PK;
 	if (imm24 & ~mask)
 		return IA64_ILLOP_FAULT;
 	if (imm.dfh) {
@@ -388,6 +429,10 @@ IA64FAULT vcpu_set_psr_sm(VCPU * vcpu, u64 imm24)
 		ipsr->be = 1;
 	if (imm.dt)
 		vcpu_set_metaphysical_mode(vcpu, FALSE);
+	if (imm.pk) {
+		vcpu_pkr_set_psr_handling(vcpu);
+		ipsr->pk = 1;
+	}
 	__asm__ __volatile(";; mov psr.l=%0;; srlz.d"::"r"(psr):"memory");
 	if (enabling_interrupts &&
 	    vcpu_check_pending_interrupts(vcpu) != SPURIOUS_VECTOR)
@@ -448,6 +493,11 @@ IA64FAULT vcpu_set_psr_l(VCPU * vcpu, u64 val)
 		vcpu_set_metaphysical_mode(vcpu, TRUE);
 	if (newpsr.be)
 		ipsr->be = 1;
+	if (newpsr.pk) {
+		vcpu_pkr_set_psr_handling(vcpu);
+		ipsr->pk = 1;
+	} else
+		vcpu_pkr_use_unset(vcpu);
 	if (enabling_interrupts &&
 	    vcpu_check_pending_interrupts(vcpu) != SPURIOUS_VECTOR)
 		PSCB(vcpu, pending_interruption) = 1;
@@ -504,6 +554,11 @@ IA64FAULT vcpu_set_psr(VCPU * vcpu, u64 val)
 		else
 			vcpu_bsw0(vcpu);
 	}
+	if (vpsr.pk) {
+		vcpu_pkr_set_psr_handling(vcpu);
+		newpsr.pk = 1;
+	} else
+		vcpu_pkr_use_unset(vcpu);
 
 	regs->cr_ipsr = newpsr.val;
 
@@ -2058,14 +2113,31 @@ IA64FAULT vcpu_get_rr(VCPU * vcpu, u64 reg, u64 * pval)
 
 IA64FAULT vcpu_get_pkr(VCPU * vcpu, u64 reg, u64 * pval)
 {
-	printk("vcpu_get_pkr: called, not implemented yet\n");
-	return IA64_ILLOP_FAULT;
+	if (reg > XEN_IA64_NPKRS)
+		return IA64_RSVDREG_FAULT;	/* register index to large */
+
+	*pval = (u64) PSCBX(vcpu, pkrs[reg]);
+	return IA64_NO_FAULT;
 }
 
 IA64FAULT vcpu_set_pkr(VCPU * vcpu, u64 reg, u64 val)
 {
-	printk("vcpu_set_pkr: called, not implemented yet\n");
-	return IA64_ILLOP_FAULT;
+	ia64_pkr_t pkr_new;
+
+	if (reg >= XEN_IA64_NPKRS)
+		return IA64_RSVDREG_FAULT;	/* index to large */
+
+	pkr_new.val = val;
+	if (pkr_new.reserved1)
+		return IA64_RSVDREG_FAULT;	/* reserved field */
+
+	if (pkr_new.reserved2)
+		return IA64_RSVDREG_FAULT;	/* reserved field */
+
+	PSCBX(vcpu, pkrs[reg]) = pkr_new.val;
+	ia64_set_pkr(reg, pkr_new.val);
+
+	return IA64_NO_FAULT;
 }
 
 /**************************************************************************

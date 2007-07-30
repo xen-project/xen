@@ -63,4 +63,7 @@
 
 #define	XEN_IA64_NPKRS		15	/* Number of pkr's in PV */
 
+  	/* A pkr val for the hypervisor: key = 0, valid = 1. */
+#define XEN_IA64_PKR_VAL	((0 << IA64_PKR_KEY) | IA64_PKR_VALID)
+
 #endif /* _ASM_IA64_XENKREGS_H */

@@ -262,6 +262,8 @@ void context_switch(struct vcpu *prev, struct vcpu *next)
             load_region_regs(current);
             ia64_set_pta(vcpu_pta(current));
             vcpu_load_kernel_regs(current);
+            if (vcpu_pkr_in_use(current))
+                vcpu_pkr_load_regs(current);
             vcpu_set_next_timer(current);
             if (vcpu_timer_expired(current))
                 vcpu_pend_timer(current);

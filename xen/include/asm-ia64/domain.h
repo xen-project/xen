@@ -239,6 +239,13 @@ struct arch_vcpu {
     struct timer hlt_timer;
     struct arch_vmx_struct arch_vmx; /* Virtual Machine Extensions */
 
+    /* This vector hosts the protection keys for pkr emulation of PV domains.
+     * Currently only 15 registers are usable by domU's. pkr[15] is
+     * reserved for the hypervisor. */
+    unsigned long pkrs[XEN_IA64_NPKRS+1];	/* protection key registers */
+#define XEN_IA64_PKR_IN_USE	0x1		/* If psr.pk = 1 was set. */
+    unsigned char pkr_flags;
+
 #ifdef CONFIG_XEN_IA64_PERVCPU_VHPT
     PTA                 pta;
     unsigned long       vhpt_maddr;

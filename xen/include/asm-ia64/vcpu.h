@@ -125,6 +125,19 @@ extern IA64FAULT vcpu_set_rr(VCPU * vcpu, u64 reg, u64 val);
 extern IA64FAULT vcpu_get_rr(VCPU * vcpu, u64 reg, u64 * pval);
 extern IA64FAULT vcpu_get_rr_ve(VCPU * vcpu, u64 vadr);
 /* protection key registers */
+extern void vcpu_pkr_load_regs(VCPU * vcpu);
+static inline int vcpu_pkr_in_use(VCPU * vcpu)
+{
+	return (PSCBX(vcpu, pkr_flags) & XEN_IA64_PKR_IN_USE);
+}
+static inline void vcpu_pkr_use_set(VCPU * vcpu)
+{
+	PSCBX(vcpu, pkr_flags) |= XEN_IA64_PKR_IN_USE;
+}
+static inline void vcpu_pkr_use_unset(VCPU * vcpu)
+{
+	PSCBX(vcpu, pkr_flags) &= ~XEN_IA64_PKR_IN_USE;
+}
 extern IA64FAULT vcpu_get_pkr(VCPU * vcpu, u64 reg, u64 * pval);
 extern IA64FAULT vcpu_set_pkr(VCPU * vcpu, u64 reg, u64 val);
 extern IA64FAULT vcpu_tak(VCPU * vcpu, u64 vadr, u64 * key);
