@@ -2057,28 +2057,14 @@ IA64FAULT vcpu_get_rr(VCPU * vcpu, u64 reg, u64 * pval)
 
 IA64FAULT vcpu_get_pkr(VCPU * vcpu, u64 reg, u64 * pval)
 {
-#ifndef PKR_USE_FIXED
 	printk("vcpu_get_pkr: called, not implemented yet\n");
 	return IA64_ILLOP_FAULT;
-#else
-	u64 val = (u64) ia64_get_pkr(reg);
-	*pval = val;
-	return IA64_NO_FAULT;
-#endif
 }
 
 IA64FAULT vcpu_set_pkr(VCPU * vcpu, u64 reg, u64 val)
 {
-#ifndef PKR_USE_FIXED
 	printk("vcpu_set_pkr: called, not implemented yet\n");
 	return IA64_ILLOP_FAULT;
-#else
-//      if (reg >= NPKRS)
-//		return IA64_ILLOP_FAULT;
-	vcpu->pkrs[reg] = val;
-	ia64_set_pkr(reg, val);
-	return IA64_NO_FAULT;
-#endif
 }
 
 /**************************************************************************

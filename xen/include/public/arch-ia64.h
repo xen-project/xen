@@ -236,8 +236,7 @@ struct mapped_regs {
             int banknum; // 0 or 1, which virtual register bank is active
             unsigned long rrs[8]; // region registers
             unsigned long krs[8]; // kernel registers
-            unsigned long pkrs[8]; // protection key registers
-            unsigned long tmp[8]; // temp registers (e.g. for hyperprivops)
+            unsigned long tmp[16]; // temp registers (e.g. for hyperprivops)
         };
     };
 };
