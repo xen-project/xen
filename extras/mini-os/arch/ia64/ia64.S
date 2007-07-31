@@ -101,11 +101,21 @@ ENTRY(_start)
 	;;
 	mov	rr[r3]=r2
 	;;
-
+	/*
+	 * Setup protection keys for region 5 and 7.
+	 */
+	mov	r2=(IA64_KEY_REG5 << IA64_PKR_KEY) | IA64_PKR_VALID
+	mov	r3=(IA64_KEY_REG7 << IA64_PKR_KEY) | IA64_PKR_VALID
+	mov	r14=0x1
+	;;
+	mov	pkr[r0]=r2	/* Region 5 */
+	mov	pkr[r14]=r3	/* Region 7 */
+	;;
 	/*
 	 * Now pin mappings into the TLB for kernel text and data
 	 */
-	mov	r18=KERNEL_TR_PAGE_SIZE<<IA64_ITIR_PS
+	mov	r18=(KERNEL_TR_PAGE_SIZE<<IA64_ITIR_PS)| \
+			(IA64_KEY_REG5<<IA64_ITIR_KEY)
 	movl	r17=KERNEL_START
 	;;
 	mov	cr.itir=r18

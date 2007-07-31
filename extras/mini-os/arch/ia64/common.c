@@ -103,7 +103,8 @@ map_pal_code(void)
 	 */
 	ia64_ptc_l(machineFwG.ia64_pal_base, PTE_PS_16K);
 	ia64_write_itr_i(&pte, IA64_TR_PAL,
-			 (uint64_t) machineFwG.ia64_pal_base, PTE_PS_16K, 0);
+			 (uint64_t)machineFwG.ia64_pal_base,
+			 PTE_PS_16K, IA64_KEY_REG7);
 	xen_set_virtual_psr_ic(1);
 }
 
@@ -180,6 +181,21 @@ init_boot_params(void)
 		bootverbose = 1;
 }
 
+static void
+set_opt_feature(void)
+{
+	struct xen_ia64_opt_feature optf;
+
+	optf.cmd = XEN_IA64_OPTF_IDENT_MAP_REG7;
+	optf.on = XEN_IA64_OPTF_ON;
+	optf.pgprot = ((1 << PTE_OFF_P) | (1 << PTE_OFF_A) | (1 << PTE_OFF_D) |
+		       (PTE_MA_WB << PTE_OFF_MA) |
+		       (PTE_PL_KERN << PTE_OFF_PL) |
+		       (PTE_AR_RW << PTE_OFF_AR));
+	optf.key = IA64_KEY_REG7;
+	HYPERVISOR_opt_feature(&optf);
+}
+
 void
 arch_init(start_info_t *si)
 {
@@ -213,6 +229,9 @@ arch_init(start_info_t *si)
 		printk("efi_get_time() failed\n");
 
 	registerCallback();
+
+	set_opt_feature();
+
 	initialized = 1;
 }
 

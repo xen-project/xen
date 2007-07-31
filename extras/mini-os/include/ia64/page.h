@@ -99,6 +99,10 @@ extern paddr_t phys_avail[];
 #define KERN_VIRT_2_PHYS(x) (((x) - KERNEL_START) + \
 				(1 << KERNEL_PHYS_START_SHIFT))
 
+/* Some protection keys for region 5 and 7 addresses. */
+#define IA64_KEY_REG7	0x234	/* Region 7 - identity mapped addresses */
+#define IA64_KEY_REG5	0x89a	/* Region 5 - kernel addresses */
+
 // This is xen specific !
 #define PAGE_SHIFT_XEN_16K	14	// For 16KB page size
 #define mfn_to_virt(mfn)	((void*)__va((mfn) << PAGE_SHIFT_XEN_16K))

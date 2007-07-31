@@ -141,7 +141,7 @@
 #define MOS_IA64_PSR_BE	0
 #endif
 
-#define STARTUP_PSR (IA64_PSR_IT | \
+#define STARTUP_PSR (IA64_PSR_IT | IA64_PSR_PK | \
             	     IA64_PSR_DT | IA64_PSR_RT | MOS_IA64_PSR_BE | \
 		     IA64_PSR_BN | IA64_PSR_CPL_KERN | IA64_PSR_AC)
 

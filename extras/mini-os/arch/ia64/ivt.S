@@ -249,7 +249,7 @@ ENTRY(save_tf_rse_switch)
 		/* xen special handling for possibly lazy cover */
 	movl	r8=XSI_PRECOVER_IFS;
 	;;
-	ld8	r21=[r8];
+	ld8	r21=[r8]
 	;;
 #if defined(BIG_ENDIAN)			// swap because mini-os is in BE
 	mux1	r21=r21,@rev
@@ -771,7 +771,7 @@ adt_reg7_addr:
 	 * addresses. Currently I don't do a check.
 	 */
 	movl	r20=~((7 << IA64_RR_IDX_POS) | 0xfff)
-	movl	r18=((PTE_PS_16K<<IA64_ITIR_PS)|(0<<IA64_ITIR_KEY))
+	movl	r18=((PTE_PS_16K<<IA64_ITIR_PS)|(IA64_KEY_REG7<<IA64_ITIR_KEY))
 	;;
 	movl	r19=	((1<<PTE_OFF_P) | (PTE_MA_WB<<PTE_OFF_MA) | \
 			 (1<<PTE_OFF_A) | (1<<PTE_OFF_D) | \

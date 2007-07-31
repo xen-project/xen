@@ -223,4 +223,14 @@ xencomm_arch_hypercall_grant_table_op(unsigned int cmd,
 
 int HYPERVISOR_grant_table_op(unsigned int cmd, void *uop, unsigned int count);
 
+static inline int
+HYPERVISOR_opt_feature(void *arg)
+{
+	struct xencomm_handle *new_arg;
+
+	new_arg = xencomm_create_inline(arg);
+
+	return _hypercall1(int, opt_feature, new_arg);
+}
+
 #endif /* __HYPERCALL_H__ */
