@@ -777,7 +777,7 @@ int vmx_vmcs_restore(struct vcpu *v, struct hvm_hw_cpu *c)
             else
                 addrbytes = 2;
 
-            ilen = hvm_instruction_length(c->rip, addrbytes);
+            ilen = hvm_instruction_fetch(c->rip, addrbytes, NULL);
             __vmwrite(VM_ENTRY_INSTRUCTION_LEN, ilen);
         }
 

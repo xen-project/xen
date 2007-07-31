@@ -229,7 +229,8 @@ hvm_guest_x86_mode(struct vcpu *v)
     return hvm_funcs.guest_x86_mode(v);
 }
 
-int hvm_instruction_length(unsigned long pc, int address_bytes);
+int hvm_instruction_fetch(unsigned long pc, int address_bytes,
+                          unsigned char *buf);
 
 static inline void
 hvm_update_host_cr3(struct vcpu *v)
