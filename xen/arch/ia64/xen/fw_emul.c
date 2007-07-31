@@ -819,15 +819,9 @@ xen_pal_emulator(unsigned long index, u64 in1, u64 in2, u64 in3)
 	        }
 		break;
 	    case PAL_HALT:
-		if (current->domain == dom0) {
-			printk ("Domain0 halts the machine\n");
-			console_start_sync();
-			(*efi.reset_system)(EFI_RESET_SHUTDOWN,0,0,NULL);
-		} else {
-			set_bit(_VPF_down, &current->pause_flags);
-			vcpu_sleep_nosync(current);
-			status = PAL_STATUS_SUCCESS;
-		}
+		set_bit(_VPF_down, &current->pause_flags);
+		vcpu_sleep_nosync(current);
+		status = PAL_STATUS_SUCCESS;
 		break;
 	    case PAL_HALT_LIGHT:
 		if (VMX_DOMAIN(current)) {
