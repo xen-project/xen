@@ -433,7 +433,7 @@ static void construct_vmcs(struct vcpu *v)
     __vmwrite(VM_EXIT_MSR_LOAD_COUNT, 0);
     __vmwrite(VM_ENTRY_MSR_LOAD_COUNT, 0);
 
-    __vmwrite(VM_ENTRY_INTR_INFO_FIELD, 0);
+    __vmwrite(VM_ENTRY_INTR_INFO, 0);
 
     __vmwrite(CR0_GUEST_HOST_MASK, ~0UL);
     __vmwrite(CR4_GUEST_HOST_MASK, ~0UL);

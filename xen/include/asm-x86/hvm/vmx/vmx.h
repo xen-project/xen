@@ -277,7 +277,7 @@ static inline void __vmx_inject_exception(
         intr_fields |= INTR_INFO_DELIVER_CODE_MASK;
     }
 
-    __vmwrite(VM_ENTRY_INTR_INFO_FIELD, intr_fields);
+    __vmwrite(VM_ENTRY_INTR_INFO, intr_fields);
 
     if (trap == TRAP_page_fault)
         HVMTRACE_2D(PF_INJECT, v, v->arch.hvm_vmx.cpu_cr2, error_code);
@@ -288,7 +288,6 @@ static inline void __vmx_inject_exception(
 static inline void vmx_inject_hw_exception(
     struct vcpu *v, int trap, int error_code)
 {
-    v->arch.hvm_vmx.vector_injected = 1;
     __vmx_inject_exception(v, trap, X86_EVENTTYPE_HW_EXCEPTION, error_code);
 }
 

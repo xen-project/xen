@@ -76,10 +76,9 @@ static void enable_intr_window(struct vcpu *v, enum hvm_intack intr_source)
     u32 *cpu_exec_control = &v->arch.hvm_vmx.exec_control;
     u32 ctl = CPU_BASED_VIRTUAL_INTR_PENDING;
 
-    if ( unlikely(intr_source == hvm_intack_none) )
-        return;
+    ASSERT(intr_source != hvm_intack_none);
 
-    if ( unlikely(intr_source == hvm_intack_nmi) && cpu_has_vmx_vnmi )
+    if ( (intr_source == hvm_intack_nmi) && cpu_has_vmx_vnmi )
     {
         /*
          * We set MOV-SS blocking in lieu of STI blocking when delivering an
@@ -131,69 +130,27 @@ asmlinkage void vmx_intr_assist(void)
     int intr_vector;
     enum hvm_intack intr_source;
     struct vcpu *v = current;
-    unsigned int idtv_info_field;
-    unsigned long inst_len;
+    unsigned int intr_info;
 
+    /* Crank the handle on interrupt state. */
     pt_update_irq(v);
-
     hvm_set_callback_irq_level();
-
-    update_tpr_threshold(vcpu_vlapic(v));
 
     do {
         intr_source = hvm_vcpu_has_pending_irq(v);
-
-        if ( unlikely(v->arch.hvm_vmx.vector_injected) )
-        {
-            v->arch.hvm_vmx.vector_injected = 0;
-            enable_intr_window(v, intr_source);
-            return;
-        }
-
-        /* This could be moved earlier in the VMX resume sequence. */
-        idtv_info_field = __vmread(IDT_VECTORING_INFO_FIELD);
-        if ( unlikely(idtv_info_field & INTR_INFO_VALID_MASK) )
-        {
-            /* See SDM 3B 25.7.1.1 and .2 for info about masking resvd bits. */
-            __vmwrite(VM_ENTRY_INTR_INFO_FIELD,
-                      idtv_info_field & ~INTR_INFO_RESVD_BITS_MASK);
-
-            /*
-             * Safe: the length will only be interpreted for software
-             * exceptions and interrupts. If we get here then delivery of some
-             * event caused a fault, and this always results in defined
-             * VM_EXIT_INSTRUCTION_LEN.
-             */
-            inst_len = __vmread(VM_EXIT_INSTRUCTION_LEN); /* Safe */
-            __vmwrite(VM_ENTRY_INSTRUCTION_LEN, inst_len);
-
-            if ( unlikely(idtv_info_field & 0x800) ) /* valid error code */
-                __vmwrite(VM_ENTRY_EXCEPTION_ERROR_CODE,
-                          __vmread(IDT_VECTORING_ERROR_CODE));
-
-            /*
-             * Clear NMI-blocking interruptibility info if an NMI delivery
-             * faulted. Re-delivery will re-set it (see SDM 3B 25.7.1.2).
-             */
-            if ( (idtv_info_field&INTR_INFO_INTR_TYPE_MASK) ==
-                 (X86_EVENTTYPE_NMI << 8) )
-                __vmwrite(GUEST_INTERRUPTIBILITY_INFO,
-                          __vmread(GUEST_INTERRUPTIBILITY_INFO) &
-                          ~VMX_INTR_SHADOW_NMI);
-
-            enable_intr_window(v, intr_source);
-
-            HVM_DBG_LOG(DBG_LEVEL_1, "idtv_info_field=%x", idtv_info_field);
-            return;
-        }
-
         if ( likely(intr_source == hvm_intack_none) )
-            return;
+            goto out;
 
-        if ( !hvm_interrupts_enabled(v, intr_source) )
+        /*
+         * An event is already pending or the pending interrupt is masked?
+         * Then the pending interrupt must be delayed.
+         */
+        intr_info = __vmread(VM_ENTRY_INTR_INFO);
+        if ( unlikely(intr_info & INTR_INFO_VALID_MASK) ||
+             !hvm_interrupts_enabled(v, intr_source) )
         {
             enable_intr_window(v, intr_source);
-            return;
+            goto out;
         }
     } while ( !hvm_vcpu_ack_pending_irq(v, intr_source, &intr_vector) );
 
@@ -207,6 +164,14 @@ asmlinkage void vmx_intr_assist(void)
         vmx_inject_extint(v, intr_vector);
         pt_intr_post(v, intr_vector, intr_source);
     }
+
+    /* Is there another IRQ to queue up behind this one? */
+    intr_source = hvm_vcpu_has_pending_irq(v);
+    if ( unlikely(intr_source != hvm_intack_none) )
+        enable_intr_window(v, intr_source);
+
+ out:
+    update_tpr_threshold(vcpu_vlapic(v));
 }
 
 /*

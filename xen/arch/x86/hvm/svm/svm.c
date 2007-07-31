@@ -89,8 +89,6 @@ static void svm_inject_exception(
     event.fields.ev = ev;
     event.fields.errorcode = error_code;
 
-    ASSERT(vmcb->eventinj.fields.v == 0);
-    
     vmcb->eventinj = event;
 }
 
@@ -362,21 +360,14 @@ int svm_vmcb_save(struct vcpu *v, struct hvm_hw_cpu *c)
     c->sysenter_esp = vmcb->sysenter_esp;
     c->sysenter_eip = vmcb->sysenter_eip;
 
-    /* Save any event/interrupt that was being injected when we last exited. */
-    if ( vmcb->exitintinfo.fields.v )
+    c->pending_event = 0;
+    c->error_code = 0;
+    if ( vmcb->eventinj.fields.v &&
+         hvm_event_needs_reinjection(vmcb->eventinj.fields.type,
+                                     vmcb->eventinj.fields.vector) )
     {
-        c->pending_event = vmcb->exitintinfo.bytes & 0xffffffff;
-        c->error_code = vmcb->exitintinfo.fields.errorcode;
-    }
-    else if ( vmcb->eventinj.fields.v ) 
-    {
-        c->pending_event = vmcb->eventinj.bytes & 0xffffffff;
+        c->pending_event = (uint32_t)vmcb->eventinj.bytes;
         c->error_code = vmcb->eventinj.fields.errorcode;
-    }
-    else 
-    {
-        c->pending_event = 0;
-        c->error_code = 0;
     }
 
     return 1;
@@ -495,11 +486,11 @@ int svm_vmcb_restore(struct vcpu *v, struct hvm_hw_cpu *c)
     vmcb->sysenter_esp = c->sysenter_esp;
     vmcb->sysenter_eip = c->sysenter_eip;
 
-    /* update VMCB for nested paging restore */
-    if ( paging_mode_hap(v->domain) ) {
+    if ( paging_mode_hap(v->domain) )
+    {
         vmcb->cr0 = v->arch.hvm_svm.cpu_shadow_cr0;
-        vmcb->cr4 = v->arch.hvm_svm.cpu_shadow_cr4 |
-                    (HVM_CR4_HOST_MASK & ~X86_CR4_PAE);
+        vmcb->cr4 = (v->arch.hvm_svm.cpu_shadow_cr4 |
+                     (HVM_CR4_HOST_MASK & ~X86_CR4_PAE));
         vmcb->cr3 = c->cr3;
         vmcb->np_enable = 1;
         vmcb->g_pat = 0x0007040600070406ULL; /* guest PAT */
@@ -514,26 +505,23 @@ int svm_vmcb_restore(struct vcpu *v, struct hvm_hw_cpu *c)
         gdprintk(XENLOG_INFO, "Re-injecting 0x%"PRIx32", 0x%"PRIx32"\n",
                  c->pending_event, c->error_code);
 
-        /* VMX uses a different type for #OF and #BP; fold into "Exception"  */
-        if ( c->pending_type == 6 ) 
-            c->pending_type = 3;
-        /* Sanity check */
-        if ( c->pending_type == 1 || c->pending_type > 4 
-             || c->pending_reserved != 0 )
+        if ( (c->pending_type == 1) || (c->pending_type > 6) ||
+             (c->pending_reserved != 0) )
         {
             gdprintk(XENLOG_ERR, "Invalid pending event 0x%"PRIx32"\n", 
                      c->pending_event);
             return -EINVAL;
         }
-        /* Put this pending event in exitintinfo and svm_intr_assist()
-         * will reinject it when we return to the guest. */
-        vmcb->exitintinfo.bytes = c->pending_event;
-        vmcb->exitintinfo.fields.errorcode = c->error_code;
+
+        if ( hvm_event_needs_reinjection(c->pending_type, c->pending_vector) )
+        {
+            vmcb->eventinj.bytes = c->pending_event;
+            vmcb->eventinj.fields.errorcode = c->error_code;
+        }
     }
 
     paging_update_paging_modes(v);
-    /* signal paging update to ASID handler */
-    svm_asid_g_update_paging (v);
+    svm_asid_g_update_paging(v);
 
     return 0;
  
@@ -965,10 +953,10 @@ static void svm_hvm_inject_exception(
     svm_inject_exception(v, trapnr, (errcode != -1), errcode);
 }
 
-static int svm_event_injection_faulted(struct vcpu *v)
+static int svm_event_pending(struct vcpu *v)
 {
     struct vmcb_struct *vmcb = v->arch.hvm_svm.vmcb;
-    return vmcb->exitintinfo.fields.v;
+    return vmcb->eventinj.fields.v;
 }
 
 static struct hvm_function_table svm_function_table = {
@@ -1000,7 +988,7 @@ static struct hvm_function_table svm_function_table = {
     .inject_exception     = svm_hvm_inject_exception,
     .init_ap_context      = svm_init_ap_context,
     .init_hypercall_page  = svm_init_hypercall_page,
-    .event_injection_faulted = svm_event_injection_faulted
+    .event_pending        = svm_event_pending
 };
 
 static void svm_npt_detect(void)
@@ -2431,6 +2419,7 @@ asmlinkage void svm_vmexit_handler(struct cpu_user_regs *regs)
     unsigned long eip;
     struct vcpu *v = current;
     struct vmcb_struct *vmcb = v->arch.hvm_svm.vmcb;
+    eventinj_t eventinj;
     int inst_len, rc;
 
     exit_reason = vmcb->exitcode;
@@ -2445,6 +2434,13 @@ asmlinkage void svm_vmexit_handler(struct cpu_user_regs *regs)
 
     perfc_incra(svmexits, exit_reason);
     eip = vmcb->rip;
+
+    /* Event delivery caused this intercept? Queue for redelivery. */
+    eventinj = vmcb->exitintinfo;
+    if ( unlikely(eventinj.fields.v) &&
+         hvm_event_needs_reinjection(eventinj.fields.type,
+                                     eventinj.fields.vector) )
+        vmcb->eventinj = eventinj;
 
     switch ( exit_reason )
     {
