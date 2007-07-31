@@ -71,8 +71,8 @@ static void *root_vmcb[NR_CPUS] __read_mostly;
 /* hardware assisted paging bits */
 extern int opt_hap_enabled;
 
-static void svm_inject_exception(struct vcpu *v, int trap, 
-                                        int ev, int error_code)
+static void svm_inject_exception(
+    struct vcpu *v, int trap, int ev, int error_code)
 {
     eventinj_t event;
     struct vmcb_struct *vmcb = v->arch.hvm_svm.vmcb;
@@ -84,7 +84,7 @@ static void svm_inject_exception(struct vcpu *v, int trap,
 
     event.bytes = 0;            
     event.fields.v = 1;
-    event.fields.type = EVENTTYPE_EXCEPTION;
+    event.fields.type = X86_EVENTTYPE_HW_EXCEPTION;
     event.fields.vector = trap;
     event.fields.ev = ev;
     event.fields.errorcode = error_code;

@@ -320,14 +320,6 @@ typedef union
     } fields;
 } __attribute__ ((packed)) eventinj_t;
 
-enum EVENTTYPES
-{
-    EVENTTYPE_INTR = 0,
-    EVENTTYPE_NMI = 2,
-    EVENTTYPE_EXCEPTION = 3,
-    EVENTTYPE_SWINT = 4,
-};
-
 typedef union 
 {
     u64 bytes;

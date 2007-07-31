@@ -2965,7 +2965,8 @@ asmlinkage void vmx_vmexit_handler(struct cpu_user_regs *regs)
             vmx_inject_hw_exception(v, TRAP_page_fault, regs->error_code);
             break;
         case TRAP_nmi:
-            if ( (intr_info & INTR_INFO_INTR_TYPE_MASK) != INTR_TYPE_NMI )
+            if ( (intr_info & INTR_INFO_INTR_TYPE_MASK) !=
+                 (X86_EVENTTYPE_NMI << 8) )
                 goto exit_and_crash;
             HVMTRACE_0D(NMI, v);
             vmx_store_cpu_guest_regs(v, regs, NULL);

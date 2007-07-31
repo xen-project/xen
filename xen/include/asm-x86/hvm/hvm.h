@@ -323,6 +323,17 @@ static inline int hvm_event_injection_faulted(struct vcpu *v)
 /* These exceptions must always be intercepted. */
 #define HVM_TRAP_MASK (1U << TRAP_machine_check)
 
+/*
+ * x86 event types. This enumeration is valid for:
+ *  Intel VMX: {VM_ENTRY,VM_EXIT,IDT_VECTORING}_INTR_INFO[10:8]
+ *  AMD SVM: eventinj[10:8] and exitintinfo[10:8] (types 0-4 only)
+ */
+#define X86_EVENTTYPE_EXT_INTR              0    /* external interrupt */
+#define X86_EVENTTYPE_NMI                   2    /* NMI                */
+#define X86_EVENTTYPE_HW_EXCEPTION          3    /* hardware exception */
+#define X86_EVENTTYPE_SW_INTERRUPT          4    /* software interrupt */
+#define X86_EVENTTYPE_SW_EXCEPTION          6    /* software exception */
+
 static inline int hvm_cpu_up(void)
 {
     if ( hvm_funcs.cpu_up )

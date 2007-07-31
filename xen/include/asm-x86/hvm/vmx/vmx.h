@@ -94,11 +94,6 @@ void vmx_vlapic_msr_changed(struct vcpu *v);
 #define INTR_INFO_VALID_MASK            0x80000000      /* 31 */
 #define INTR_INFO_RESVD_BITS_MASK       0x7ffff000
 
-#define INTR_TYPE_EXT_INTR              (0 << 8)    /* external interrupt */
-#define INTR_TYPE_NMI                   (2 << 8)    /* NMI                */
-#define INTR_TYPE_HW_EXCEPTION          (3 << 8)    /* hardware exception */
-#define INTR_TYPE_SW_EXCEPTION          (6 << 8)    /* software exception */
-
 /*
  * Exit Qualifications for MOV for Control Register Access
  */
@@ -276,7 +271,7 @@ static inline void __vmx_inject_exception(
      *   VM entry]", PRM Vol. 3, 22.6.1 (Interruptibility State).
      */
 
-    intr_fields = (INTR_INFO_VALID_MASK | type | trap);
+    intr_fields = (INTR_INFO_VALID_MASK | (type<<8) | trap);
     if ( error_code != VMX_DELIVER_NO_ERROR_CODE ) {
         __vmwrite(VM_ENTRY_EXCEPTION_ERROR_CODE, error_code);
         intr_fields |= INTR_INFO_DELIVER_CODE_MASK;
@@ -294,18 +289,18 @@ static inline void vmx_inject_hw_exception(
     struct vcpu *v, int trap, int error_code)
 {
     v->arch.hvm_vmx.vector_injected = 1;
-    __vmx_inject_exception(v, trap, INTR_TYPE_HW_EXCEPTION, error_code);
+    __vmx_inject_exception(v, trap, X86_EVENTTYPE_HW_EXCEPTION, error_code);
 }
 
 static inline void vmx_inject_extint(struct vcpu *v, int trap)
 {
-    __vmx_inject_exception(v, trap, INTR_TYPE_EXT_INTR,
+    __vmx_inject_exception(v, trap, X86_EVENTTYPE_EXT_INTR,
                            VMX_DELIVER_NO_ERROR_CODE);
 }
 
 static inline void vmx_inject_nmi(struct vcpu *v)
 {
-    __vmx_inject_exception(v, 2, INTR_TYPE_NMI,
+    __vmx_inject_exception(v, 2, X86_EVENTTYPE_NMI,
                            VMX_DELIVER_NO_ERROR_CODE);
 }
 

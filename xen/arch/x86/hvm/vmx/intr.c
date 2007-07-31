@@ -175,7 +175,8 @@ asmlinkage void vmx_intr_assist(void)
              * Clear NMI-blocking interruptibility info if an NMI delivery
              * faulted. Re-delivery will re-set it (see SDM 3B 25.7.1.2).
              */
-            if ( (idtv_info_field&INTR_INFO_INTR_TYPE_MASK) == INTR_TYPE_NMI )
+            if ( (idtv_info_field&INTR_INFO_INTR_TYPE_MASK) ==
+                 (X86_EVENTTYPE_NMI << 8) )
                 __vmwrite(GUEST_INTERRUPTIBILITY_INFO,
                           __vmread(GUEST_INTERRUPTIBILITY_INFO) &
                           ~VMX_INTR_SHADOW_NMI);
