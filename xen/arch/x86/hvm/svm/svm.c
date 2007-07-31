@@ -1677,7 +1677,7 @@ static int svm_set_cr0(unsigned long value)
         return 0;
     }
 
-    value &= HVM_CR0_GUEST_RESERVED_BITS;
+    value &= ~HVM_CR0_GUEST_RESERVED_BITS;
 
     /* ET is reserved and should be always be 1. */
     value |= X86_CR0_ET;

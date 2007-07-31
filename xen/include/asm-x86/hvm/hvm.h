@@ -301,22 +301,24 @@ static inline int hvm_event_injection_faulted(struct vcpu *v)
 }
 
 /* These reserved bits in lower 32 remain 0 after any load of CR0 */
-#define HVM_CR0_GUEST_RESERVED_BITS \
-    ~(X86_CR0_PE | X86_CR0_MP | X86_CR0_EM | \
-      X86_CR0_TS | X86_CR0_ET | X86_CR0_NE | \
-      X86_CR0_WP | X86_CR0_AM | X86_CR0_NW | \
-      X86_CR0_CD | X86_CR0_PG)
+#define HVM_CR0_GUEST_RESERVED_BITS             \
+    (~((unsigned long)                          \
+       (X86_CR0_PE | X86_CR0_MP | X86_CR0_EM |  \
+        X86_CR0_TS | X86_CR0_ET | X86_CR0_NE |  \
+        X86_CR0_WP | X86_CR0_AM | X86_CR0_NW |  \
+        X86_CR0_CD | X86_CR0_PG)))
 
 /* These bits in CR4 are owned by the host. */
 #define HVM_CR4_HOST_MASK (mmu_cr4_features & \
     (X86_CR4_VMXE | X86_CR4_PAE | X86_CR4_MCE))
 
 /* These bits in CR4 cannot be set by the guest. */
-#define HVM_CR4_GUEST_RESERVED_BITS \
-    ~(X86_CR4_VME | X86_CR4_PVI | X86_CR4_TSD | \
-      X86_CR4_DE  | X86_CR4_PSE | X86_CR4_PAE | \
-      X86_CR4_MCE | X86_CR4_PGE | X86_CR4_PCE | \
-      X86_CR4_OSFXSR | X86_CR4_OSXMMEXCPT)
+#define HVM_CR4_GUEST_RESERVED_BITS                     \
+    (~((unsigned long)                                  \
+       (X86_CR4_VME | X86_CR4_PVI | X86_CR4_TSD |       \
+        X86_CR4_DE  | X86_CR4_PSE | X86_CR4_PAE |       \
+        X86_CR4_MCE | X86_CR4_PGE | X86_CR4_PCE |       \
+        X86_CR4_OSFXSR | X86_CR4_OSXMMEXCPT)))
 
 /* These exceptions must always be intercepted. */
 #define HVM_TRAP_MASK (1U << TRAP_machine_check)
