@@ -263,8 +263,8 @@ static inline int __vmxon (u64 addr)
     return rc;
 }
 
-static inline void __vmx_inject_exception(struct vcpu *v, int trap, int type,
-                                         int error_code, int ilen)
+static inline void __vmx_inject_exception(
+    struct vcpu *v, int trap, int type, int error_code)
 {
     unsigned long intr_fields;
 
@@ -282,9 +282,6 @@ static inline void __vmx_inject_exception(struct vcpu *v, int trap, int type,
         intr_fields |= INTR_INFO_DELIVER_CODE_MASK;
     }
 
-    if ( ilen )
-      __vmwrite(VM_ENTRY_INSTRUCTION_LEN, ilen);
-
     __vmwrite(VM_ENTRY_INTR_INFO_FIELD, intr_fields);
 
     if (trap == TRAP_page_fault)
@@ -297,28 +294,19 @@ static inline void vmx_inject_hw_exception(
     struct vcpu *v, int trap, int error_code)
 {
     v->arch.hvm_vmx.vector_injected = 1;
-    __vmx_inject_exception(v, trap, INTR_TYPE_HW_EXCEPTION, error_code, 0);
-}
-
-static inline void vmx_inject_sw_exception(
-    struct vcpu *v, int trap, int instruction_len)
-{
-    v->arch.hvm_vmx.vector_injected = 1;
-    __vmx_inject_exception(v, trap, INTR_TYPE_SW_EXCEPTION,
-                           VMX_DELIVER_NO_ERROR_CODE,
-                           instruction_len);
+    __vmx_inject_exception(v, trap, INTR_TYPE_HW_EXCEPTION, error_code);
 }
 
 static inline void vmx_inject_extint(struct vcpu *v, int trap)
 {
     __vmx_inject_exception(v, trap, INTR_TYPE_EXT_INTR,
-                           VMX_DELIVER_NO_ERROR_CODE, 0);
+                           VMX_DELIVER_NO_ERROR_CODE);
 }
 
 static inline void vmx_inject_nmi(struct vcpu *v)
 {
     __vmx_inject_exception(v, 2, INTR_TYPE_NMI,
-                           VMX_DELIVER_NO_ERROR_CODE, 0);
+                           VMX_DELIVER_NO_ERROR_CODE);
 }
 
 #endif /* __ASM_X86_HVM_VMX_VMX_H__ */

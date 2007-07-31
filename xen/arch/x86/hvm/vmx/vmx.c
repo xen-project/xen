@@ -2853,47 +2853,6 @@ static void vmx_do_extint(struct cpu_user_regs *regs)
     }
 }
 
-static void vmx_reflect_exception(struct vcpu *v)
-{
-    int error_code, intr_info, vector;
-
-    intr_info = __vmread(VM_EXIT_INTR_INFO);
-    vector = intr_info & 0xff;
-    if ( intr_info & INTR_INFO_DELIVER_CODE_MASK )
-        error_code = __vmread(VM_EXIT_INTR_ERROR_CODE);
-    else
-        error_code = VMX_DELIVER_NO_ERROR_CODE;
-
-#ifndef NDEBUG
-    {
-        unsigned long rip;
-
-        rip = __vmread(GUEST_RIP);
-        HVM_DBG_LOG(DBG_LEVEL_1, "rip = %lx, error_code = %x",
-                    rip, error_code);
-    }
-#endif /* NDEBUG */
-
-    /*
-     * According to Intel Virtualization Technology Specification for
-     * the IA-32 Intel Architecture (C97063-002 April 2005), section
-     * 2.8.3, SW_EXCEPTION should be used for #BP and #OV, and
-     * HW_EXCEPTION used for everything else.  The main difference
-     * appears to be that for SW_EXCEPTION, the EIP/RIP is incremented
-     * by VM_ENTER_INSTRUCTION_LEN bytes, whereas for HW_EXCEPTION,
-     * it is not.
-     */
-    if ( (intr_info & INTR_INFO_INTR_TYPE_MASK) == INTR_TYPE_SW_EXCEPTION )
-    {
-        int ilen = __get_instruction_length(); /* Safe: software exception */
-        vmx_inject_sw_exception(v, vector, ilen);
-    }
-    else
-    {
-        vmx_inject_hw_exception(v, vector, error_code);
-    }
-}
-
 static void vmx_failed_vmentry(unsigned int exit_reason,
                                struct cpu_user_regs *regs)
 {
@@ -3006,14 +2965,11 @@ asmlinkage void vmx_vmexit_handler(struct cpu_user_regs *regs)
             vmx_inject_hw_exception(v, TRAP_page_fault, regs->error_code);
             break;
         case TRAP_nmi:
-            if ( (intr_info & INTR_INFO_INTR_TYPE_MASK) == INTR_TYPE_NMI )
-            {
-                HVMTRACE_0D(NMI, v);
-                vmx_store_cpu_guest_regs(v, regs, NULL);
-                do_nmi(regs); /* Real NMI, vector 2: normal processing. */
-            }
-            else
-                vmx_reflect_exception(v);
+            if ( (intr_info & INTR_INFO_INTR_TYPE_MASK) != INTR_TYPE_NMI )
+                goto exit_and_crash;
+            HVMTRACE_0D(NMI, v);
+            vmx_store_cpu_guest_regs(v, regs, NULL);
+            do_nmi(regs); /* Real NMI, vector 2: normal processing. */
             break;
         case TRAP_machine_check:
             HVMTRACE_0D(MCE, v);
