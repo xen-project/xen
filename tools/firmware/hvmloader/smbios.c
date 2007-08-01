@@ -169,7 +169,7 @@ hvm_write_smbios_tables(void)
     /* temporary variables used to build up Xen version string */
     char *p = NULL; /* points to next point of insertion */
     unsigned len = 0; /* length of string already composed */
-    char *tmp = NULL; /* holds result of itoa() */
+    char tmp[16]; /* holds result of itoa() */
     unsigned tmp_len; /* length of next string to add */
 
     hypercall_xen_version(XENVER_guest_handle, uuid);

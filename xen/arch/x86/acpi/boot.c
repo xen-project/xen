@@ -371,11 +371,18 @@ extern u32 pmtmr_ioport;
 
 #ifdef CONFIG_ACPI_SLEEP
 /* Get pm1x_cnt and pm1x_evt information for ACPI sleep */
-static int __init
+static void __init
 acpi_fadt_parse_sleep_info(struct fadt_descriptor_rev2 *fadt)
 {
+	struct acpi_table_rsdp *rsdp;
+	unsigned long rsdp_phys;
 	struct facs_descriptor_rev2 *facs = NULL;
 	uint64_t facs_pa;
+
+	rsdp_phys = acpi_find_rsdp();
+	if (!rsdp_phys || acpi_disabled)
+		goto bad;
+	rsdp = __va(rsdp_phys);
 
 	if (fadt->revision >= FADT2_REVISION_ID) {
 		/* Sanity check on FADT Rev. 2 */
@@ -432,8 +439,7 @@ acpi_fadt_parse_sleep_info(struct fadt_descriptor_rev2 *fadt)
 			"FACS is shorter than ACPI spec allow: 0x%x",
 			facs->length);
 
-	if ((acpi_rsdp_rev < 2) ||
-	    (facs->length < 32)) {
+	if ((rsdp->revision < 2) || (facs->length < 32)) {
 		acpi_sinfo.wakeup_vector = facs_pa + 
 			offsetof(struct facs_descriptor_rev2,
 				 firmware_waking_vector);
@@ -451,10 +457,9 @@ acpi_fadt_parse_sleep_info(struct fadt_descriptor_rev2 *fadt)
 		acpi_sinfo.pm1a_cnt, acpi_sinfo.pm1b_cnt,
 		acpi_sinfo.pm1a_evt, acpi_sinfo.pm1b_cnt,
 		acpi_sinfo.wakeup_vector, acpi_sinfo.vector_width);
-	return 0;
+	return;
 bad:
 	memset(&acpi_sinfo, 0, sizeof(acpi_sinfo));
-	return 0;
 }
 #endif
 

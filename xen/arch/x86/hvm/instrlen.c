@@ -9,14 +9,6 @@
  * x86_emulate.c.  Used for MMIO.
  */
 
-/*
- * TODO: The way in which we use hvm_instruction_length is very inefficient as
- * it now stands. It will be worthwhile to return the actual instruction buffer
- * along with the instruction length since one of the reasons we are getting
- * the instruction length is to know how many instruction bytes we need to
- * fetch.
- */
-
 #include <xen/config.h>
 #include <xen/sched.h>
 #include <xen/mm.h>
@@ -194,31 +186,51 @@ static uint8_t twobyte_table[256] = {
 /* 
  * insn_fetch - fetch the next byte from instruction stream
  */
-#define insn_fetch()                                                    \
-({ uint8_t _x;                                                          \
-   if ( length >= 15 )                                                  \
-       return -1;                                                       \
-   if ( inst_copy_from_guest(&_x, pc, 1) != 1 ) {                       \
-       gdprintk(XENLOG_WARNING,                                         \
-                "Cannot read from address %lx (eip %lx, mode %d)\n",    \
-                pc, org_pc, address_bytes);                             \
-       return -1;                                                       \
-   }                                                                    \
-   pc += 1;                                                             \
-   length += 1;                                                         \
-   _x;                                                                  \
+#define insn_fetch()                                                      \
+({ uint8_t _x;                                                            \
+   if ( length >= 15 )                                                    \
+       return -1;                                                         \
+   if ( inst_copy_from_guest(&_x, pc, 1) != 1 ) {                         \
+       unsigned long err;                                                 \
+       struct segment_register cs;                                        \
+       gdprintk(XENLOG_WARNING,                                           \
+                "Cannot read from address %lx (eip %lx, mode %d)\n",      \
+                pc, org_pc, address_bytes);                               \
+       err = 0; /* Must be not-present: we don't enforce reserved bits */ \
+       if ( hvm_nx_enabled(current) )                                     \
+           err |= PFEC_insn_fetch;                                        \
+       hvm_get_segment_register(current, x86_seg_cs, &cs);                \
+       if ( cs.attr.fields.dpl != 0 )                                     \
+           err |= PFEC_user_mode;                                         \
+       hvm_inject_exception(TRAP_page_fault, err, pc);                    \
+       return -1;                                                         \
+   }                                                                      \
+   if ( buf )                                                             \
+       buf[length] = _x;                                                  \
+   length += 1;                                                           \
+   pc += 1;                                                               \
+   _x;                                                                    \
 })
 
+#define insn_skip(_n) do {                      \
+    int _i;                                     \
+    for ( _i = 0; _i < (_n); _i++) {            \
+        (void) insn_fetch();                    \
+    }                                           \
+} while (0)
+
 /**
- * hvm_instruction_length - returns the current instructions length
+ * hvm_instruction_fetch - read the current instruction and return its length
  *
  * @org_pc: guest instruction pointer
- * @mode: guest operating mode
+ * @address_bytes: guest address width
+ * @buf: (optional) buffer to load actual instruction bytes into
  *
- * EXTERNAL this routine calculates the length of the current instruction
- * pointed to by org_pc.  The guest state is _not_ changed by this routine.
+ * Doesn't increment the guest's instruction pointer, but may
+ * issue faults to the guest.  Returns -1 on failure.
  */
-int hvm_instruction_length(unsigned long org_pc, int address_bytes)
+int hvm_instruction_fetch(unsigned long org_pc, int address_bytes,
+                          unsigned char *buf)
 {
     uint8_t b, d, twobyte = 0, rex_prefix = 0, modrm_reg = 0;
     unsigned int op_default, op_bytes, ad_default, ad_bytes, tmp;
@@ -317,18 +329,13 @@ done_prefixes:
             {
             case 0:
                 if ( modrm_rm == 6 ) 
-                {
-                    length += 2;
-                    pc += 2; /* skip disp16 */
-                }
+                    insn_skip(2); /* skip disp16 */
                 break;
             case 1:
-                length += 1;
-                pc += 1; /* skip disp8 */
+                insn_skip(1); /* skip disp8 */
                 break;
             case 2:
-                length += 2;
-                pc += 2; /* skip disp16 */
+                insn_skip(2); /* skip disp16 */
                 break;
             }
         }
@@ -340,33 +347,19 @@ done_prefixes:
             case 0:
                 if ( (modrm_rm == 4) && 
                      ((insn_fetch() & 7) == 5) )
-                {
-                    length += 4;
-                    pc += 4; /* skip disp32 specified by SIB.base */
-                }
+                    insn_skip(4); /* skip disp32 specified by SIB.base */
                 else if ( modrm_rm == 5 )
-                {
-                    length += 4;
-                    pc += 4; /* skip disp32 */
-                }
+                    insn_skip(4); /* skip disp32 */
                 break;
             case 1:
                 if ( modrm_rm == 4 )
-                {
-                    length += 1;
-                    pc += 1;
-                }
-                length += 1;
-                pc += 1; /* skip disp8 */
+                    insn_skip(1);
+                insn_skip(1); /* skip disp8 */
                 break;
             case 2:
                 if ( modrm_rm == 4 )
-                {
-                    length += 1;
-                    pc += 1;
-                }
-                length += 4;
-                pc += 4; /* skip disp32 */
+                    insn_skip(1);
+                insn_skip(4); /* skip disp32 */
                 break;
             }
         }
@@ -387,12 +380,10 @@ done_prefixes:
         tmp = (d & ByteOp) ? 1 : op_bytes;
         if ( tmp == 8 ) tmp = 4;
         /* NB. Immediates are sign-extended as necessary. */
-        length += tmp;
-        pc += tmp;
+        insn_skip(tmp);
         break;
     case SrcImmByte:
-        length += 1;
-        pc += 1;
+        insn_skip(1);
         break;
     }
 
@@ -402,8 +393,7 @@ done_prefixes:
     switch ( b )
     {
     case 0xa0 ... 0xa3: /* mov */
-        length += ad_bytes;
-        pc += ad_bytes; /* skip src/dst displacement */
+        insn_skip(ad_bytes); /* skip src/dst displacement */
         break;
     case 0xf6 ... 0xf7: /* Grp3 */
         switch ( modrm_reg )
@@ -412,8 +402,7 @@ done_prefixes:
             /* Special case in Grp3: test has an immediate source operand. */
             tmp = (d & ByteOp) ? 1 : op_bytes;
             if ( tmp == 8 ) tmp = 4;
-            length += tmp;
-            pc += tmp;
+            insn_skip(tmp);
             break;
         }
         break;
