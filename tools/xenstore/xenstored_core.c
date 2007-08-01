@@ -1883,11 +1883,7 @@ int main(int argc, char *argv[])
 		close(STDIN_FILENO);
 		close(STDOUT_FILENO);
 		close(STDERR_FILENO);
-
-		/* Get ourselves a nice xenstored crash if these are used. */
-		stdin = NULL;
-		stdout = NULL;
-		stderr = NULL;
+		xprintf = trace; /* xprintf() must not use stderr */
 	}
 
 	signal(SIGHUP, trigger_reopen_log);
