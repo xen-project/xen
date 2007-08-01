@@ -4,7 +4,7 @@
 #include <fcntl.h>
 #include <stdio.h>
 #include <stdarg.h>
-
+#include <string.h>
 #include "xs_lib.h"
 #include "tdb.h"
 #include "talloc.h"

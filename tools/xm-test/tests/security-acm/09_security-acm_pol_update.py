@@ -7,6 +7,7 @@
 
 from XmTestLib import xapi
 from XmTestLib.XenAPIDomain import XmTestAPIDomain
+from XmTestLib.acm import *
 from XmTestLib import *
 from xen.xend import XendAPIConstants
 from xen.util import security, xsconstants
@@ -15,6 +16,14 @@ from xen.xend.XendDomain import DOM0_UUID
 import base64
 import struct
 import time
+
+if not isACMEnabled():
+    SKIP("Not running this test since ACM not enabled.")
+
+try:
+    session = xapi.connect()
+except:
+    SKIP("Skipping this test since xm is not using the Xen-API.")
 
 def typestoxml(types):
     res = ""

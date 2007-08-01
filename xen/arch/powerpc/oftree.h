@@ -13,7 +13,7 @@
  * along with this program; if not, write to the Free Software
  * Foundation, 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  *
- * Copyright (C) IBM Corp. 2005
+ * Copyright IBM Corp. 2005
  *
  * Authors: Jimi Xenidis <jimix@watson.ibm.com>
  */
@@ -34,7 +34,5 @@ extern void ofd_memory_props(void *m, struct domain *d);
 
 extern int firmware_image_start[0];
 extern int firmware_image_size[0];
-
-extern void memory_init(module_t *mod, int mcount);
 
 #endif  /* #ifndef _OFTREE_H */

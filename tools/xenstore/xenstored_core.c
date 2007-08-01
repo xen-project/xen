@@ -1820,7 +1820,9 @@ int main(int argc, char *argv[])
 	if (pidfile)
 		write_pidfile(pidfile);
 
-	talloc_enable_leak_report_full();
+	/* Talloc leak reports go to stderr, which is closed if we fork. */
+	if (!dofork)
+		talloc_enable_leak_report_full();
 
 	/* Create sockets for them to listen to. */
 	sock = talloc(talloc_autofree_context(), int);
@@ -1881,6 +1883,11 @@ int main(int argc, char *argv[])
 		close(STDIN_FILENO);
 		close(STDOUT_FILENO);
 		close(STDERR_FILENO);
+
+		/* Get ourselves a nice xenstored crash if these are used. */
+		stdin = NULL;
+		stdout = NULL;
+		stderr = NULL;
 	}
 
 	signal(SIGHUP, trigger_reopen_log);

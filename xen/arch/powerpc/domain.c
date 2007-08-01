@@ -29,7 +29,7 @@
 #include <xen/domain.h>
 #include <xen/console.h>
 #include <xen/shutdown.h>
-#include <xen/shadow.h>
+#include <xen/paging.h>
 #include <xen/mm.h>
 #include <xen/softirq.h>
 #include <asm/htab.h>

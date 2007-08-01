@@ -22,7 +22,6 @@
 #include <xen/config.h>
 #include <xen/init.h>
 #include <xen/lib.h>
-#include <xen/multiboot.h>
 #include <xen/version.h>
 #include <xen/spinlock.h>
 #include <xen/serial.h>
@@ -30,6 +29,7 @@
 #include <xen/sched.h>
 #include <asm/page.h>
 #include <asm/io.h>
+#include <asm/boot.h>
 #include "exceptions.h"
 #include "of-devtree.h"
 #include "oftree.h"
@@ -54,7 +54,6 @@ static ulong eomem;
 #define MEM_AVAILABLE_PAGES ((32 << 20) >> PAGE_SHIFT)
 static DECLARE_BITMAP(mem_available_pages, MEM_AVAILABLE_PAGES);
 
-extern char builtin_cmdline[];
 extern struct ns16550_defaults ns16550;
 
 #undef OF_DEBUG
@@ -648,23 +647,6 @@ static ulong boot_of_mem_init(void)
     return 0;
 }
 
-static void boot_of_bootargs(multiboot_info_t *mbi)
-{
-    int rc;
-
-    if (builtin_cmdline[0] == '\0') {
-        rc = of_getprop(bof_chosen, "bootargs", builtin_cmdline,
-                CONFIG_CMDLINE_SIZE);
-        if (rc > CONFIG_CMDLINE_SIZE)
-            of_panic("bootargs[] not big enough for /chosen/bootargs\n");
-    }
-
-    mbi->flags |= MBI_CMDLINE;
-    mbi->cmdline = (ulong)builtin_cmdline;
-
-    of_printf("bootargs = %s\n", builtin_cmdline);
-}
-
 static int save_props(void *m, ofdn_t n, int pkg)
 {
     int ret;
@@ -933,8 +915,8 @@ static void __init boot_of_fix_maple(void)
         }
     }
 }
-    
-static int __init boot_of_serial(void *oft)
+
+void __init boot_of_serial(void *oft)
 {
     int n;
     int p;
@@ -1014,11 +996,9 @@ static int __init boot_of_serial(void *oft)
                   __func__, ns16550.irq);
         ns16550.irq = 0;
     }
-
-    return 1;
 }
 
-static int __init boot_of_rtas(module_t *mod, multiboot_info_t *mbi)
+static int __init boot_of_rtas(void)
 {
     int rtas_node;
     int rtas_instance;
@@ -1065,14 +1045,13 @@ static int __init boot_of_rtas(module_t *mod, multiboot_info_t *mbi)
     rtas_end = mem + size;
     rtas_msr = of_msr;
 
-    mod->mod_start = rtas_base;
-    mod->mod_end = rtas_end;
     return 1;
 }
 
-static void * __init boot_of_devtree(module_t *mod, multiboot_info_t *mbi)
+void __init *boot_of_devtree(void)
 {
     void *oft;
+    ulong oft_sz = 48 * PAGE_SIZE;
     ulong alloc_sz = 32 << 10;    /* 32KiB should be plenty */
     ulong sz;
 
@@ -1100,108 +1079,9 @@ static void * __init boot_of_devtree(module_t *mod, multiboot_info_t *mbi)
 
     ofd_walk(oft, __func__, OFD_ROOT, /* add_hype_props */ NULL, 2);
 
-    mod->mod_start = (ulong)oft;
-    mod->mod_end = ALIGN_UP(mod->mod_start + sz, PAGE_SIZE);
-
-    if (mod->mod_end -mod->mod_start > alloc_sz)
-        of_panic("Could not fit all devtree module in 0x%lx of memory\n",
-            alloc_sz);
-
-    of_printf("%s: devtree mod @ 0x%016x - 0x%016x\n", __func__,
-              mod->mod_start, mod->mod_end);
-
-    return oft;
-}
-
-static void * __init boot_of_module(ulong r3, ulong r4, multiboot_info_t *mbi)
-{
-    static module_t mods[4];
-    ulong mod0_start;
-    ulong mod0_size;
-    static const char * sepr[] = {" -- ", " || "};
-    int sepr_index;
-    extern char dom0_start[] __attribute__ ((weak));
-    extern char dom0_size[] __attribute__ ((weak));
-    const char *p = NULL;
-    int mod;
-    void *oft;
-
-    if ((r3 > 0) && (r4 > 0)) {
-        /* was it handed to us in registers ? */
-        mod0_start = r3;
-        mod0_size = r4;
-            of_printf("%s: Dom0 was loaded and found using r3/r4:"
-                      "0x%lx[size 0x%lx]\n",
-                      __func__, mod0_start, mod0_size);
-    } else {
-        /* see if it is in the boot params */
-        p = strstr((char *)((ulong)mbi->cmdline), "dom0_start=");
-        if ( p != NULL) {
-            p += 11;
-            mod0_start = simple_strtoul(p, NULL, 0);
-
-            p = strstr((char *)((ulong)mbi->cmdline), "dom0_size=");
-            p += 10;
-            mod0_size = simple_strtoul(p, NULL, 0);
-            of_printf("%s: Dom0 was loaded and found using cmdline:"
-                      "0x%lx[size 0x%lx]\n",
-                      __func__, mod0_start, mod0_size);
-        } else if ( ((ulong)dom0_start != 0) && ((ulong)dom0_size != 0) ) {
-            /* was it linked in ? */
-        
-            mod0_start = (ulong)dom0_start;
-            mod0_size = (ulong)dom0_size;
-            of_printf("%s: Dom0 is linked in: 0x%lx[size 0x%lx]\n",
-                      __func__, mod0_start, mod0_size);
-        } else {
-            mod0_start = (ulong)_end;
-            mod0_size = 0;
-            of_printf("%s: FYI Dom0 is unknown, will be caught later\n",
-                      __func__);
-        }
-    }
-
-    if (mod0_size > 0) {
-        const char *c = (const char *)mod0_start;
-
-        of_printf("mod0: %o %c %c %c\n", c[0], c[1], c[2], c[3]);
-    }
-
-    mod = 0;
-    mods[mod].mod_start = mod0_start;
-    mods[mod].mod_end = mod0_start + mod0_size;
-
-    of_printf("%s: dom0 mod @ 0x%016x[0x%x]\n", __func__,
-              mods[mod].mod_start, mods[mod].mod_end);
-
-    /* look for delimiter: "--" or "||" */
-    for (sepr_index = 0; sepr_index < ARRAY_SIZE(sepr); sepr_index++){
-        p = strstr((char *)(ulong)mbi->cmdline, sepr[sepr_index]);
-        if (p != NULL)
-            break;
-    }
-
-    if (p != NULL) {
-        /* Xen proper should never know about the dom0 args.  */
-        *(char *)p = '\0';
-        p += strlen(sepr[sepr_index]);
-        mods[mod].string = (u32)(ulong)p;
-        of_printf("%s: dom0 mod string: %s\n", __func__, p);
-    }
-
-    ++mod;
-    if (boot_of_rtas(&mods[mod], mbi))
-        ++mod;
-
-    oft = boot_of_devtree(&mods[mod], mbi);
-    if (oft == NULL)
-        of_panic("%s: boot_of_devtree failed\n", __func__);
-
-    ++mod;
-
-    mbi->flags |= MBI_MODULES;
-    mbi->mods_count = mod;
-    mbi->mods_addr = (u32)mods;
+    oftree = (ulong)oft;
+    oftree = (ulong)oft + oft_sz;
+    oftree_len = oft_sz; 
 
     return oft;
 }
@@ -1327,15 +1207,19 @@ static int __init boot_of_cpus(void)
     return 1;
 }
 
-multiboot_info_t __init *boot_of_init(
-        ulong r3, ulong r4, ulong vec, ulong r6, ulong r7, ulong orig_msr)
+void __init boot_of_init(ulong vec, ulong orig_msr)
 {
-    static multiboot_info_t mbi;
-    void *oft;
     int r;
 
     of_vec = vec;
     of_msr = orig_msr;
+
+    if (is_kernel(vec)) {
+        of_panic("Hmm.. OF[0x%lx] seems to have stepped on our image "
+                "that ranges: %p .. %p.\n",
+                vec, _start, _end);
+    }
+    of_printf("%s: _start %p _end %p\n", __func__, _start, _end);
 
     bof_chosen = of_finddevice("/chosen");
     of_getprop(bof_chosen, "stdout", &of_out, sizeof (of_out));
@@ -1346,32 +1230,20 @@ multiboot_info_t __init *boot_of_init(
               xen_compile_by(), xen_compile_domain(),
               xen_compiler(), xen_compile_date());
 
-    of_printf("%s args: 0x%lx 0x%lx 0x%lx 0x%lx 0x%lx\n"
-            "boot msr: 0x%lx\n",
-            __func__,
-            r3, r4, vec, r6, r7, orig_msr);
-
-    if (is_kernel(vec)) {
-        of_panic("Hmm.. OF[0x%lx] seems to have stepped on our image "
-                "that ranges: %p .. %p.\n",
-                vec, _start, _end);
-    }
-    of_printf("%s: _start %p _end %p 0x%lx\n", __func__, _start, _end, r6);
-
     boot_of_fix_maple();
     r = boot_of_mem_init();
     if (r == 0)
         of_panic("failure to initialize memory allocator");
-    boot_of_bootargs(&mbi);
-    oft = boot_of_module(r3, r4, &mbi);
-    boot_of_cpus();
-    boot_of_serial(oft);
 
+    boot_of_rtas();
+    boot_of_cpus();
+}
+
+void __init boot_of_finish(void)
+{
     /* end of OF */
     of_printf("Quiescing Open Firmware ...\n");
     of_call("quiesce", 0, 0, NULL);
-
-    return &mbi;
 }
 
 /*

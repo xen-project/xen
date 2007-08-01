@@ -25,7 +25,7 @@
 #include <xen/lib.h>
 #include <xen/cpumask.h>
 #include <xen/sched.h>
-#include <xen/multiboot.h>
+#include <xen/multiboot2.h>
 #include <xen/serial.h>
 #include <xen/softirq.h>
 #include <xen/console.h>
@@ -48,6 +48,7 @@
 #include <asm/delay.h>
 #include <asm/percpu.h>
 #include <asm/io.h>
+#include <asm/boot.h>
 #include "exceptions.h"
 #include "of-devtree.h"
 #include "oftree.h"
@@ -78,6 +79,17 @@ unsigned long wait_init_idle;
 ulong oftree;
 ulong oftree_len;
 ulong oftree_end;
+
+/* linked-in dom0: */
+extern char dom0_start[] __attribute__ ((weak));
+extern char dom0_size[] __attribute__ ((weak));
+
+char *xen_cmdline;
+char *dom0_cmdline;
+ulong dom0_addr;
+ulong dom0_len;
+ulong initrd_start;
+ulong initrd_len;
 
 uint cpu_hard_id[NR_CPUS] __initdata;
 cpumask_t cpu_present_map;
@@ -286,21 +298,15 @@ void secondary_cpu_init(int cpuid, unsigned long r4)
     panic("should never get here\n");
 }
 
-static void __init __start_xen(multiboot_info_t *mbi)
+static void __init __start_xen(void)
 {
-    char *cmdline;
-    module_t *mod = (module_t *)((ulong)mbi->mods_addr);
-    ulong dom0_start, dom0_len;
-    ulong initrd_start, initrd_len;
-
     memcpy(0, exception_vectors, exception_vectors_end - exception_vectors);
     synchronize_caches(0, exception_vectors_end - exception_vectors);
 
     ticks_per_usec = timebase_freq / 1000000ULL;
 
     /* Parse the command-line options. */
-    if ((mbi->flags & MBI_CMDLINE) && (mbi->cmdline != 0))
-        cmdline_parse(__va((ulong)mbi->cmdline));
+    cmdline_parse(xen_cmdline);
 
     /* we need to be able to identify this CPU early on */
     init_boot_cpu();
@@ -313,32 +319,20 @@ static void __init __start_xen(multiboot_info_t *mbi)
     serial_init_preirq();
 
     init_console();
-    /* let synchronize until we really get going */
-    console_start_sync();
+    console_start_sync(); /* Stay synchronous for early debugging. */
 
-    /* Check that we have at least one Multiboot module. */
-    if (!(mbi->flags & MBI_MODULES) || (mbi->mods_count == 0)) {
-        panic("FATAL ERROR: Require at least one Multiboot module.\n");
-    }
+    rtas_init((void *)oftree);
 
-    /* OF dev tree is the last module */
-    oftree = mod[mbi->mods_count-1].mod_start;
-    oftree_end = mod[mbi->mods_count-1].mod_end;
-    oftree_len = oftree_end - oftree;
+    memory_init();
 
-    /* remove it from consideration */
-    mod[mbi->mods_count-1].mod_start = 0;
-    mod[mbi->mods_count-1].mod_end = 0;
-    --mbi->mods_count;
+    printk("xen_cmdline:  %016lx\n", (ulong)xen_cmdline);
+    printk("dom0_cmdline: %016lx\n", (ulong)dom0_cmdline);
+    printk("dom0_addr:    %016lx\n", (ulong)dom0_addr);
+    printk("dom0_len:     %016lx\n", (ulong)dom0_len);
+    printk("initrd_start: %016lx\n", (ulong)initrd_start);
+    printk("initrd_len:   %016lx\n", (ulong)initrd_len);
 
-    if (rtas_entry) {
-        rtas_init((void *)oftree);
-        /* remove rtas module from consideration */
-        mod[mbi->mods_count-1].mod_start = 0;
-        mod[mbi->mods_count-1].mod_end = 0;
-        --mbi->mods_count;
-    }
-    memory_init(mod, mbi->mods_count);
+    printk("dom0: %016llx\n", *(unsigned long long *)dom0_addr);
 
 #ifdef OF_DEBUG
     key_ofdump(0);
@@ -382,30 +376,22 @@ static void __init __start_xen(multiboot_info_t *mbi)
 
     dom0->is_privileged = 1;
 
-    cmdline = (char *)(mod[0].string ? __va((ulong)mod[0].string) : NULL);
-
     /* scrub_heap_pages() requires IRQs enabled, and we're post IRQ setup... */
     local_irq_enable();
     /* Scrub RAM that is still free and so may go to an unprivileged domain. */
     scrub_heap_pages();
 
-    dom0_start = mod[0].mod_start;
-    dom0_len = mod[0].mod_end - mod[0].mod_start;
-    if (mbi->mods_count > 1) {
-        initrd_start = mod[1].mod_start;
-        initrd_len = mod[1].mod_end - mod[1].mod_start;
-    } else {
-        initrd_start = 0;
-        initrd_len = 0;
-    }
-    if (construct_dom0(dom0, dom0_start, dom0_len,
+    if ((dom0_addr == 0) || (dom0_len == 0))
+        panic("No domain 0 found.\n");
+
+    if (construct_dom0(dom0, dom0_addr, dom0_len,
                        initrd_start, initrd_len,
-                       cmdline) != 0) {
+                       dom0_cmdline) != 0) {
         panic("Could not set up DOM0 guest OS\n");
     }
 
-    init_xenheap_pages(ALIGN_UP(dom0_start, PAGE_SIZE),
-                       ALIGN_DOWN(dom0_start + dom0_len, PAGE_SIZE));
+    init_xenheap_pages(ALIGN_UP(dom0_addr, PAGE_SIZE),
+                       ALIGN_DOWN(dom0_addr + dom0_len, PAGE_SIZE));
     if (initrd_start)
         init_xenheap_pages(ALIGN_UP(initrd_start, PAGE_SIZE),
                            ALIGN_DOWN(initrd_start + initrd_len, PAGE_SIZE));
@@ -426,25 +412,74 @@ static void __init __start_xen(multiboot_info_t *mbi)
     startup_cpu_idle_loop();
 }
 
+static void ofd_bootargs(void)
+{
+    static const char *sepr[] = {" -- ", " || "};
+    char *p;
+    ofdn_t chosen;
+    int sepr_index;
+    int rc;
+
+    if (builtin_cmdline[0] == '\0') {
+        chosen = ofd_node_find((void *)oftree, "/chosen");
+        rc = ofd_getprop((void *)oftree, chosen, "bootargs", builtin_cmdline,
+                         CONFIG_CMDLINE_SIZE);
+    }
+
+    /* look for delimiter: "--" or "||" */
+    for (sepr_index = 0; sepr_index < ARRAY_SIZE(sepr); sepr_index++){
+        p = strstr(builtin_cmdline, sepr[sepr_index]);
+        if (p != NULL) {
+            /* Xen proper should never know about the dom0 args.  */
+            *p = '\0';
+            p += strlen(sepr[sepr_index]);
+            dom0_cmdline = p;
+            break;
+        }
+    }
+
+    xen_cmdline = builtin_cmdline;
+}
+
+void __init __start_xen_ppc(ulong, ulong, ulong, ulong, ulong, ulong);
 void __init __start_xen_ppc(
     ulong r3, ulong r4, ulong r5, ulong r6, ulong r7, ulong orig_msr)
 {
-    multiboot_info_t *mbi = NULL;
-
     /* clear bss */
     memset(__bss_start, 0, (ulong)_end - (ulong)__bss_start);
 
-    if (r5 > 0) {
-        /* we were booted by OpenFirmware */
-        mbi = boot_of_init(r3, r4, r5, r6, r7, orig_msr);
-
+    if (r5) {
+        /* We came from Open Firmware. */
+        boot_of_init(r5, orig_msr);
+        oftree = (ulong)boot_of_devtree(); /* Copy the device tree. */
+        /* Use the device tree to find the Xen console. */
+        boot_of_serial((void *)oftree);
+        boot_of_finish(); /* End firmware. */
     } else {
-        /* booted by someone else that hopefully has a trap handler */
+        /* XXX handle flat device tree here */
         __builtin_trap();
     }
 
-    __start_xen(mbi);
+    ofd_bootargs();
 
+    if (r3 == MB2_BOOTLOADER_MAGIC) {
+        /* Get dom0 info from multiboot structures. */
+        parse_multiboot(r4);
+    }
+
+    if ((dom0_len == 0) && r3 && r4) {
+        /* Maybe dom0's location handed to us in registers. */
+        dom0_addr = r3;
+        dom0_len = r4;
+    }
+
+    if (dom0_len == 0) {
+        /* Dom0 had better be built in. */
+        dom0_addr = (ulong)dom0_start;
+        dom0_len = (ulong)dom0_size;
+    }
+
+    __start_xen();
 }
 
 extern void arch_get_xen_caps(xen_capabilities_info_t *info);

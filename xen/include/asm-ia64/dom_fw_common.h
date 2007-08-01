@@ -85,7 +85,6 @@ void
 xen_ia64_efi_make_md(efi_memory_desc_t *md,
                      uint32_t type, uint64_t attr, 
                      uint64_t start, uint64_t end);
-uint8_t generate_acpi_checksum(void *tbl, unsigned long len);
 struct fake_acpi_tables;
 void dom_fw_fake_acpi(domain_t *d, struct fake_acpi_tables *tables);
 int efi_mdt_cmp(const void *a, const void *b); 

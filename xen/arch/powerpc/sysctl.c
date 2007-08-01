@@ -24,7 +24,6 @@
 #include <xen/nodemask.h>
 #include <xen/sched.h>
 #include <xen/guest_access.h>
-#include <xen/shadow.h>
 #include <public/xen.h>
 #include <public/domctl.h>
 #include <public/sysctl.h>

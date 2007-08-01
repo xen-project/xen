@@ -25,7 +25,7 @@
 #include <xen/sched.h>
 #include <xen/domain.h>
 #include <xen/guest_access.h>
-#include <xen/shadow.h>
+#include <xen/paging.h>
 #include <public/xen.h>
 #include <public/domctl.h>
 #include <public/sysctl.h>

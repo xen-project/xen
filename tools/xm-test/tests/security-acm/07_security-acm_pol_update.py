@@ -12,10 +12,19 @@ from xen.xend import XendAPIConstants
 from xen.util import acmpolicy, security, xsconstants
 from xen.util.acmpolicy import ACMPolicy
 from xen.xend.XendDomain import DOM0_UUID
+from XmTestLib.acm import *
 
 import commands
 import os
 import base64
+
+if not isACMEnabled():
+    SKIP("Not running this test since ACM not enabled.")
+
+try:
+    session = xapi.connect()
+except:
+    SKIP("Skipping this test since xm is not using the Xen-API.")
 
 xm_test = {}
 xm_test['policyname'] = "xm-test"

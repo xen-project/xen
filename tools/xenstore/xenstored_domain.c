@@ -621,13 +621,8 @@ void domain_entry_fix(unsigned int domid, int num)
 	struct domain *d;
 
 	d = find_domain_by_domid(domid);
-	if (d) {
-		if ((d->nbentry += num) < 0) {
-			eprintf("invalid domain entry number %d",
-				d->nbentry);
-			d->nbentry = 0;
-		}
-	}
+	if (d && ((d->nbentry += num) < 0))
+		d->nbentry = 0;
 }
 
 int domain_entry(struct connection *conn)

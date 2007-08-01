@@ -35,7 +35,6 @@
 #define memguard_unguard_range(_p,_l)    ((void)0)
 
 extern unsigned long xenheap_phys_end;
-extern int boot_of_mem_avail(int pos, ulong *start, ulong *end);
 
 /*
  * Per-page-frame information.
@@ -274,5 +273,13 @@ extern int steal_page(struct domain *d, struct page_info *page,
 #define domain_clamp_alloc_bitsize(d, b) (b)
 
 #define domain_get_maximum_gpfn(d) (-ENOSYS)
+
+extern int guest_physmap_max_mem_pages(struct domain *d, unsigned long new_max);
+
+extern void guest_physmap_add_page(
+    struct domain *d, unsigned long gpfn, unsigned long mfn);
+
+extern void guest_physmap_remove_page(
+    struct domain *d, unsigned long gpfn, unsigned long mfn);
 
 #endif

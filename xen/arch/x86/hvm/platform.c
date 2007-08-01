@@ -1041,17 +1041,13 @@ void handle_mmio(unsigned long gpa)
         /* real or vm86 modes */
         address_bytes = 2;
     inst_addr = hvm_get_segment_base(v, x86_seg_cs) + regs->eip;
-    inst_len = hvm_instruction_length(inst_addr, address_bytes);
+    memset(inst, 0, MAX_INST_LEN);
+    inst_len = hvm_instruction_fetch(inst_addr, address_bytes, inst);
     if ( inst_len <= 0 )
     {
-        printk("handle_mmio: failed to get instruction length\n");
-        domain_crash_synchronous();
-    }
-
-    memset(inst, 0, MAX_INST_LEN);
-    if ( inst_copy_from_guest(inst, inst_addr, inst_len) != inst_len ) {
-        printk("handle_mmio: failed to copy instruction\n");
-        domain_crash_synchronous();
+        gdprintk(XENLOG_DEBUG, "handle_mmio: failed to get instruction\n");
+        /* hvm_instruction_fetch() will have injected a #PF; get out now */
+        return;
     }
 
     if ( mmio_decode(address_bytes, inst, mmio_op, &ad_size,

@@ -32,22 +32,8 @@
       ? machine_to_phys_mapping[(mfn)]                 \
       : (mfn) )
 
-extern int guest_physmap_max_mem_pages(struct domain *d, unsigned long new_max);
-
-extern void guest_physmap_add_page(
-    struct domain *d, unsigned long gpfn, unsigned long mfn);
-
-extern void guest_physmap_remove_page(
-    struct domain *d, unsigned long gpfn, unsigned long mfn);
-
 extern void shadow_drop_references(
     struct domain *d, struct page_info *page);
-
-static inline void mark_dirty(struct domain *d, unsigned int mfn)
-{
-    return;
-}
-#define gnttab_mark_dirty(d, f) mark_dirty((d), (f))
 
 extern int shadow_domctl(struct domain *d, 
                    xen_domctl_shadow_op_t *sc,

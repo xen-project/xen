@@ -169,12 +169,14 @@ typedef struct image {
 	unsigned int info;
 } image_t;
 
+/* 16-byte message header, immediately followed by message payload. */
 typedef struct msg_hdr {
-	uint16_t    type;
+	uint16_t   type;
 	uint16_t   len;
 	uint16_t   drivertype;
 	uint16_t   cookie;
 	uint8_t    readonly;
+	uint8_t    pad[7];
 } msg_hdr_t;
 
 typedef struct msg_newdev {
