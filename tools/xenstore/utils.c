@@ -8,20 +8,19 @@
 #include <fcntl.h>
 #include <sys/types.h>
 #include <signal.h>
-
 #include "utils.h"
 
 void xprintf(const char *fmt, ...)
 {
-	static FILE *out = NULL;
 	va_list args;
-	if (!out)
-		out = stderr;
+
+	if (!stderr)
+		return; /* could trace()? */
 
 	va_start(args, fmt);
-	vfprintf(out, fmt, args);
+	vfprintf(stderr, fmt, args);
 	va_end(args);
-	fflush(out);
+	fflush(stderr);
 }
 
 void barf(const char *fmt, ...)
