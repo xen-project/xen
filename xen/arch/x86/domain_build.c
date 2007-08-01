@@ -316,6 +316,9 @@ int __init construct_dom0(
            parms.pae       ? ", PAE"  : "",
            elf_msb(&elf)   ? "msb"    : "lsb",
            elf.pstart, elf.pend);
+    if ( parms.bsd_symtab )
+        printk(" Dom0 symbol map 0x%" PRIx64 " -> 0x%" PRIx64 "\n",
+               elf.sstart, elf.send);
 
     if ( !compatible )
     {
@@ -385,7 +388,7 @@ int __init construct_dom0(
     v_start          = parms.virt_base;
     vkern_start      = parms.virt_kstart;
     vkern_end        = parms.virt_kend;
-    vinitrd_start    = round_pgup(vkern_end);
+    vinitrd_start    = round_pgup(parms.virt_end);
     vinitrd_end      = vinitrd_start + initrd_len;
     vphysmap_start   = round_pgup(vinitrd_end);
     vphysmap_end     = vphysmap_start + (nr_pages * (!is_pv_32on64_domain(d) ?
@@ -795,7 +798,7 @@ int __init construct_dom0(
 
     /* Copy the OS image and free temporary buffer. */
     elf.dest = (void*)vkern_start;
-    elf_load_binary(&elf);
+    elf_xen_dom_load_binary(&elf, &parms);
 
     if ( UNSET_ADDR != parms.virt_hypercall )
     {
