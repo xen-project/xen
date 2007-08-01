@@ -895,6 +895,10 @@ int ia64_hyperprivop(unsigned long iim, REGS * regs)
 		vcpu_get_psr_masked(v, &val);
 		regs->r8 = val;
 		return 1;
+	case HYPERPRIVOP_SET_RR0_TO_RR4:
+		vcpu_set_rr0_to_rr4(v, regs->r8, regs->r9, regs->r10,
+				    regs->r11, regs->r14);
+		return 1;
 	}
 	return 0;
 }

@@ -543,7 +543,8 @@ struct xen_ia64_boot_param {
 #define HYPERPRIVOP_SET_EFLAG		(HYPERPRIVOP_START + 0x16)
 #define HYPERPRIVOP_RSM_BE		(HYPERPRIVOP_START + 0x17)
 #define HYPERPRIVOP_GET_PSR		(HYPERPRIVOP_START + 0x18)
-#define HYPERPRIVOP_MAX			(0x19)
+#define HYPERPRIVOP_SET_RR0_TO_RR4	(HYPERPRIVOP_START + 0x19)
+#define HYPERPRIVOP_MAX			(0x1a)
 
 /* Fast and light hypercalls.  */
 #define __HYPERVISOR_ia64_fast_eoi	__HYPERVISOR_arch_1

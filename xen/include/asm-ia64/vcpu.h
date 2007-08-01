@@ -124,6 +124,8 @@ extern IA64FAULT vcpu_bsw1(VCPU * vcpu);
 extern IA64FAULT vcpu_set_rr(VCPU * vcpu, u64 reg, u64 val);
 extern IA64FAULT vcpu_get_rr(VCPU * vcpu, u64 reg, u64 * pval);
 extern IA64FAULT vcpu_get_rr_ve(VCPU * vcpu, u64 vadr);
+extern IA64FAULT vcpu_set_rr0_to_rr4(VCPU * vcpu, u64 val0, u64 val1,
+				     u64 val2, u64 val3, u64 val4);
 /* protection key registers */
 extern void vcpu_pkr_load_regs(VCPU * vcpu);
 static inline int vcpu_pkr_in_use(VCPU * vcpu)

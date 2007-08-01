@@ -41,6 +41,7 @@
 # define FAST_SSM_I
 # define FAST_PTC_GA
 # undef RFI_TO_INTERRUPT // not working yet
+# define FAST_SET_RR0_TO_RR4
 #endif
 
 #ifdef CONFIG_SMP
@@ -76,7 +77,7 @@
 //	r16 == cr.isr
 //	r17 == cr.iim
 //	r18 == XSI_PSR_IC_OFS
-//	r19 == vpsr.ic
+//	r19 == ipsr.cpl
 //	r31 == pr
 GLOBAL_ENTRY(fast_hyperprivop)
 	// HYPERPRIVOP_SSM_I?
@@ -108,62 +109,67 @@ GLOBAL_ENTRY(fast_hyperprivop)
 	;;
 
 	// HYPERPRIVOP_COVER?
-	cmp.eq p7,p6=HYPERPRIVOP_COVER,r17
+	cmp.eq p7,p0=HYPERPRIVOP_COVER,r17
 (p7)	br.sptk.many hyper_cover
 	;;
 
 	// HYPERPRIVOP_SSM_DT?
-	cmp.eq p7,p6=HYPERPRIVOP_SSM_DT,r17
+	cmp.eq p7,p0=HYPERPRIVOP_SSM_DT,r17
 (p7)	br.sptk.many hyper_ssm_dt
 	;;
 
 	// HYPERPRIVOP_RSM_DT?
-	cmp.eq p7,p6=HYPERPRIVOP_RSM_DT,r17
+	cmp.eq p7,p0=HYPERPRIVOP_RSM_DT,r17
 (p7)	br.sptk.many hyper_rsm_dt
 	;;
 
 	// HYPERPRIVOP_SET_ITM?
-	cmp.eq p7,p6=HYPERPRIVOP_SET_ITM,r17
+	cmp.eq p7,p0=HYPERPRIVOP_SET_ITM,r17
 (p7)	br.sptk.many hyper_set_itm
 	;;
 
+	// HYPERPRIVOP_SET_RR0_TO_RR4?
+	cmp.eq p7,p0=HYPERPRIVOP_SET_RR0_TO_RR4,r17
+(p7)	br.sptk.many hyper_set_rr0_to_rr4
+	;;
+
 	// HYPERPRIVOP_SET_RR?
-	cmp.eq p7,p6=HYPERPRIVOP_SET_RR,r17
+	cmp.eq p7,p0=HYPERPRIVOP_SET_RR,r17
 (p7)	br.sptk.many hyper_set_rr
 	;;
 
 	// HYPERPRIVOP_GET_RR?
-	cmp.eq p7,p6=HYPERPRIVOP_GET_RR,r17
+	cmp.eq p7,p0=HYPERPRIVOP_GET_RR,r17
 (p7)	br.sptk.many hyper_get_rr
 	;;
 
 	// HYPERPRIVOP_GET_PSR?
-	cmp.eq p7,p6=HYPERPRIVOP_GET_PSR,r17
+	cmp.eq p7,p0=HYPERPRIVOP_GET_PSR,r17
 (p7)	br.sptk.many hyper_get_psr
 	;;
 
 	// HYPERPRIVOP_PTC_GA?
-	cmp.eq p7,p6=HYPERPRIVOP_PTC_GA,r17
+	cmp.eq p7,p0=HYPERPRIVOP_PTC_GA,r17
 (p7)	br.sptk.many hyper_ptc_ga
 	;;
 
 	// HYPERPRIVOP_ITC_D?
-	cmp.eq p7,p6=HYPERPRIVOP_ITC_D,r17
+	cmp.eq p7,p0=HYPERPRIVOP_ITC_D,r17
 (p7)	br.sptk.many hyper_itc_d
 	;;
 
 	// HYPERPRIVOP_ITC_I?
-	cmp.eq p7,p6=HYPERPRIVOP_ITC_I,r17
+	cmp.eq p7,p0=HYPERPRIVOP_ITC_I,r17
 (p7)	br.sptk.many hyper_itc_i
 	;;
 
 	// HYPERPRIVOP_THASH?
-	cmp.eq p7,p6=HYPERPRIVOP_THASH,r17
+	cmp.eq p7,p0=HYPERPRIVOP_THASH,r17
 (p7)	br.sptk.many hyper_thash
 	;;
 
 	// HYPERPRIVOP_SET_KR?
-	cmp.eq p7,p6=HYPERPRIVOP_SET_KR,r17
+	cmp.eq p7,p0=HYPERPRIVOP_SET_KR,r17
 (p7)	br.sptk.many hyper_set_kr
 	;;
 
@@ -208,7 +214,7 @@ END(fast_hyperprivop)
 //	r16 == cr.isr
 //	r17 == cr.iim
 //	r18 == XSI_PSR_IC
-//	r19 == vpsr.ic 
+//	r19 == ipsr.cpl 
 //	r31 == pr
 ENTRY(hyper_ssm_i)
 #ifndef FAST_SSM_I
@@ -545,7 +551,7 @@ END(fast_tick_reflect)
 //	r16 == cr.isr
 //	r17 == cr.iim
 //	r18 == XSI_PSR_IC
-//	r19 == vpsr.ic
+//	r19 == ipsr.cpl
 //	r31 == pr
 GLOBAL_ENTRY(fast_break_reflect)
 #ifndef FAST_BREAK // see beginning of file
@@ -1643,6 +1649,244 @@ ENTRY(hyper_set_rr)
 	rfi
 	;;
 END(hyper_set_rr)
+
+// r8  = val0
+// r9  = val1
+// r10 = val2
+// r11 = val3
+// r14 = val4
+// mov  rr[0x0000000000000000UL] = r8
+// mov  rr[0x2000000000000000UL] = r9
+// mov  rr[0x4000000000000000UL] = r10
+// mov  rr[0x6000000000000000UL] = r11
+// mov  rr[0x8000000000000000UL] = r14
+ENTRY(hyper_set_rr0_to_rr4)
+#ifndef FAST_SET_RR0_TO_RR4
+	br.spnt.few dispatch_break_fault ;;
+#endif
+#ifdef FAST_HYPERPRIVOP_CNT
+	movl r20=FAST_HYPERPRIVOP_PERFC(HYPERPRIVOP_SET_RR0_TO_RR4);;
+	ld4 r21=[r20];;
+	adds r21=1,r21;;
+	st4 [r20]=r21;;
+#endif
+	movl r17=THIS_CPU(cpu_kr)+IA64_KR_CURRENT_OFFSET;;
+	ld8 r17=[r17];;
+
+	adds r21=IA64_VCPU_STARTING_RID_OFFSET,r17
+	adds r25=IA64_VCPU_ENDING_RID_OFFSET,r17
+	;; 
+	ld4 r22=[r21] // r22 = current->starting_rid
+	extr.u r26=r8,8,24	// r26 = r8.rid
+	extr.u r27=r9,8,24	// r27 = r9.rid
+	ld4 r23=[r25] // r23 = current->ending_rid
+	extr.u r28=r10,8,24	// r28 = r10.rid
+	extr.u r29=r11,8,24	// r29 = r11.rid
+	adds r24=IA64_VCPU_META_SAVED_RR0_OFFSET,r17
+	extr.u r30=r14,8,24	// r30 = r14.rid
+	;; 
+	add r16=r26,r22
+	add r17=r27,r22
+	add r19=r28,r22
+	add r20=r29,r22
+	add r21=r30,r22	
+	;; 
+	cmp.geu p6,p0=r16,r23	// if r8.rid + starting_rid >= ending_rid
+	cmp.geu p7,p0=r17,r23	// if r9.rid + starting_rid >= ending_rid
+	cmp.geu p8,p0=r19,r23	// if r10.rid + starting_rid >= ending_rid
+(p6)	br.cond.spnt.few 1f	// this is an error, but just ignore/return
+(p7)	br.cond.spnt.few 1f	// this is an error, but just ignore/return
+	cmp.geu p9,p0=r20,r23	// if r11.rid + starting_rid >= ending_rid
+(p8)	br.cond.spnt.few 1f	// this is an error, but just ignore/return
+(p9)	br.cond.spnt.few 1f	// this is an error, but just ignore/return
+	cmp.geu p10,p0=r21,r23	// if r14.rid + starting_rid >= ending_rid
+(p10)	br.cond.spnt.few 1f	// this is an error, but just ignore/return
+	
+	mov r25=1
+	adds r22=XSI_RR0_OFS-XSI_PSR_IC_OFS,r18
+	;;
+	shl r30=r25,61	// r30 = 0x2000000000000000
+
+#if 0
+	// simple plain version
+	// rr0
+	st8 [r22]=r8, 8 // current->rrs[0] = r8
+
+	mov r26=0	// r26=0x0000000000000000
+	extr.u r27=r16,0,8
+	extr.u r28=r16,8,8
+	extr.u r29=r16,16,8;;
+	dep.z r23=PAGE_SHIFT,2,6;;
+	dep r23=-1,r23,0,1;;	// mangling is swapping bytes 1 & 3
+	dep r23=r27,r23,24,8;;
+	dep r23=r28,r23,16,8;;
+	dep r23=r29,r23,8,8;; 
+	st8 [r24]=r23		// save for metaphysical
+	mov rr[r26]=r23
+	dv_serialize_data
+
+	// rr1
+	st8 [r22]=r9, 8 // current->rrs[1] = r9
+	add r26=r26,r30	// r26 = 0x2000000000000000
+	extr.u r27=r17,0,8
+	extr.u r28=r17,8,8
+	extr.u r29=r17,16,8;;
+	dep.z r23=PAGE_SHIFT,2,6;;
+	dep r23=-1,r23,0,1;;	// mangling is swapping bytes 1 & 3
+	dep r23=r27,r23,24,8;;
+	dep r23=r28,r23,16,8;;
+	dep r23=r29,r23,8,8;; 
+	mov rr[r26]=r23
+	dv_serialize_data
+
+	// rr2
+	st8 [r22]=r10, 8 // current->rrs[2] = r10
+	add r26=r26,r30	// r26 = 0x4000000000000000
+	extr.u r27=r19,0,8
+	extr.u r28=r19,8,8
+	extr.u r29=r19,16,8;;
+	dep.z r23=PAGE_SHIFT,2,6;;
+	dep r23=-1,r23,0,1;;	// mangling is swapping bytes 1 & 3
+	dep r23=r27,r23,24,8;;
+	dep r23=r28,r23,16,8;;
+	dep r23=r29,r23,8,8;; 
+	mov rr[r26]=r23
+	dv_serialize_data
+
+	// rr3
+	st8 [r22]=r11, 8 // current->rrs[3] = r11
+
+	add r26=r26,r30	// r26 = 0x6000000000000000
+	extr.u r27=r20,0,8
+	extr.u r28=r20,8,8
+	extr.u r29=r20,16,8;;
+	dep.z r23=PAGE_SHIFT,2,6;;
+	dep r23=-1,r23,0,1;;	// mangling is swapping bytes 1 & 3
+	dep r23=r27,r23,24,8;;
+	dep r23=r28,r23,16,8;;
+	dep r23=r29,r23,8,8;; 
+	mov rr[r26]=r23
+	dv_serialize_data
+	
+	// rr4
+	st8 [r22]=r14 // current->rrs[4] = r14
+
+	add r26=r26,r30	// r26 = 0x8000000000000000
+	extr.u r27=r21,0,8
+	extr.u r28=r21,8,8
+	extr.u r29=r21,16,8;;
+	dep.z r23=PAGE_SHIFT,2,6;;
+	dep r23=-1,r23,0,1;;	// mangling is swapping bytes 1 & 3
+	dep r23=r27,r23,24,8;;
+	dep r23=r28,r23,16,8;;
+	dep r23=r29,r23,8,8;; 
+	mov rr[r26]=r23
+	dv_serialize_data
+#else
+	// shuffled version
+	// rr0
+	// uses r27, r28, r29 for mangling
+	//      r23           for mangled value
+	st8 [r22]=r8, 8 // current->rrs[0] = r8
+	mov r26=0	// r26=0x0000000000000000
+	extr.u r27=r16,0,8
+	extr.u r28=r16,8,8
+	extr.u r29=r16,16,8
+	dep.z r23=PAGE_SHIFT,2,6;;
+	dep r23=-1,r23,0,1;;	// mangling is swapping bytes 1 & 3
+	extr.u r25=r17,0,8
+	dep r23=r27,r23,24,8;;
+	dep r23=r28,r23,16,8;;
+	dep r23=r29,r23,8,8;; 
+	st8 [r24]=r23		// save for metaphysical
+	mov rr[r26]=r23
+	dv_serialize_data
+
+	// r16, r24, r25 is usable.
+	// rr1
+	// uses r25, r28, r29 for mangling
+	//      r23           for mangled value
+	extr.u r28=r17,8,8
+	st8 [r22]=r9, 8 // current->rrs[1] = r9
+	extr.u r29=r17,16,8 ;; 
+	dep.z r23=PAGE_SHIFT,2,6;;
+	add r26=r26,r30	// r26 = 0x2000000000000000
+	dep r23=-1,r23,0,1;;	// mangling is swapping bytes 1 & 3
+	extr.u r24=r19,8,8
+	extr.u r16=r19,0,8
+	dep r23=r25,r23,24,8;;
+	dep r23=r28,r23,16,8;;
+	dep r23=r29,r23,8,8;; 
+	mov rr[r26]=r23
+	dv_serialize_data
+
+	// r16, r17, r24, r25 is usable
+	// rr2
+	// uses r16, r24, r29 for mangling
+	//      r17           for mangled value
+	extr.u r29=r19,16,8
+	extr.u r27=r20,0,8
+	st8 [r22]=r10, 8 // current->rrs[2] = r10
+	dep.z r17=PAGE_SHIFT,2,6;;
+	add r26=r26,r30	// r26 = 0x4000000000000000	
+	dep r17=-1,r17,0,1;;	// mangling is swapping bytes 1 & 3
+	dep r17=r16,r17,24,8;;
+	dep r17=r24,r17,16,8;;
+	dep r17=r29,r17,8,8;; 
+	mov rr[r26]=r17
+	dv_serialize_data
+
+	// r16, r17, r19, r24, r25 is usable
+	// rr3
+	// uses r27, r28, r29 for mangling
+	//      r23           for mangled value
+	extr.u r28=r20,8,8
+	extr.u r29=r20,16,8
+	st8 [r22]=r11, 8 // current->rrs[3] = r11
+	extr.u r16=r21,0,8
+	dep.z r23=PAGE_SHIFT,2,6;;
+	add r26=r26,r30	// r26 = 0x6000000000000000
+	dep r23=-1,r23,0,1;;	// mangling is swapping bytes 1 & 3
+	dep r23=r27,r23,24,8;;
+	dep r23=r28,r23,16,8;;
+	dep r23=r29,r23,8,8;; 
+	mov rr[r26]=r23
+	dv_serialize_data
+	
+	// r16, r17, r19, r20, r24, r25
+	// rr4
+	// uses r16, r17, r24 for mangling
+	//      r25           for mangled value
+	extr.u r17=r21,8,8
+	extr.u r24=r21,16,8
+	st8 [r22]=r14 // current->rrs[4] = r14
+	dep.z r25=PAGE_SHIFT,2,6;;
+	add r26=r26,r30	// r26 = 0x8000000000000000
+	dep r25=-1,r25,0,1;;	// mangling is swapping bytes 1 & 3
+	dep r25=r16,r25,24,8;;
+	dep r25=r17,r25,16,8;;
+	dep r25=r24,r25,8,8;; 
+	mov rr[r26]=r25
+	dv_serialize_data
+#endif
+
+	// done, mosey on back
+1:	mov r24=cr.ipsr
+	mov r25=cr.iip;;
+	extr.u r26=r24,41,2 ;;
+	cmp.eq p6,p7=2,r26 ;;
+(p6)	mov r26=0
+(p6)	adds r25=16,r25
+(p7)	adds r26=1,r26
+	;;
+	dep r24=r26,r24,41,2
+	;;
+	mov cr.ipsr=r24
+	mov cr.iip=r25
+	mov pr=r31,-1 ;;
+	rfi
+	;;
+END(hyper_set_rr0_to_rr4)
 
 ENTRY(hyper_set_kr)
 	extr.u r25=r8,3,61;;
