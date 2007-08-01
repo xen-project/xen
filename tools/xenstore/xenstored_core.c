@@ -1880,10 +1880,14 @@ int main(int argc, char *argv[])
 
 	/* close stdin/stdout now we're ready to accept connections */
 	if (dofork) {
-		close(STDIN_FILENO);
-		close(STDOUT_FILENO);
-		close(STDERR_FILENO);
-		xprintf = trace; /* xprintf() must not use stderr */
+		int devnull = open("/dev/null", O_RDWR);
+		if (devnull == -1)
+			barf_perror("Could not open /dev/null\n");
+		close(STDIN_FILENO);  dup2(STDIN_FILENO, devnull);
+		close(STDOUT_FILENO); dup2(STDOUT_FILENO, devnull);
+		close(STDERR_FILENO); dup2(STDERR_FILENO, devnull);
+		close(devnull);
+		xprintf = trace;
 	}
 
 	signal(SIGHUP, trigger_reopen_log);
