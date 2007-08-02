@@ -2905,7 +2905,7 @@ static int sh_page_fault(struct vcpu *v,
          * stack is currently considered to be a page table, so we should
          * unshadow the faulting page before exiting.
          */
-        if ( unlikely(hvm_event_injection_faulted(v)) )
+        if ( unlikely(hvm_event_pending(v)) )
         {
             gdprintk(XENLOG_DEBUG, "write to pagetable during event "
                      "injection: cr2=%#lx, mfn=%#lx\n", 

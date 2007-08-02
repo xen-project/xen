@@ -67,6 +67,10 @@ def ACMLoadPolicy(policy='xm-test'):
     if main.serverType == main.SERVER_XEN_API:
         ACMLoadPolicy_XenAPI()
     else:
+        cmd='xm dumppolicy | grep -E "^POLICY REFERENCE = ' + policy + '.$"'
+        s, o = traceCommand(cmd)
+        if o != "":
+            return
         s, o = traceCommand("xm makepolicy %s" % (policy))
         if s != 0:
             FAIL("Need to be able to do 'xm makepolicy %s' but could not" %

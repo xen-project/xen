@@ -613,28 +613,13 @@ void vmx_vmcs_save(struct vcpu *v, struct hvm_hw_cpu *c)
     c->sysenter_esp = __vmread(GUEST_SYSENTER_ESP);
     c->sysenter_eip = __vmread(GUEST_SYSENTER_EIP);
 
-    /*
-     * Save any event/interrupt that was being injected when we last
-     * exited. IDT_VECTORING_INFO_FIELD has priority, as anything in
-     * VM_ENTRY_INTR_INFO_FIELD is either a fault caused by the first
-     * event, which will happen the next time, or an interrupt, which we
-     * never inject when IDT_VECTORING_INFO_FIELD is valid.
-     */
-    if ( (ev = __vmread(IDT_VECTORING_INFO_FIELD)) & INTR_INFO_VALID_MASK )
-    {
-        c->pending_event = ev;
-        c->error_code = __vmread(IDT_VECTORING_ERROR_CODE);
-    }
-    else if ( (ev = __vmread(VM_ENTRY_INTR_INFO_FIELD)) &
-              INTR_INFO_VALID_MASK )
+    c->pending_event = 0;
+    c->error_code = 0;
+    if ( ((ev = __vmread(VM_ENTRY_INTR_INFO)) & INTR_INFO_VALID_MASK) &&
+         hvm_event_needs_reinjection((ev >> 8) & 7, ev & 0xff) )
     {
         c->pending_event = ev;
         c->error_code = __vmread(VM_ENTRY_EXCEPTION_ERROR_CODE);
-    }
-    else
-    {
-        c->pending_event = 0;
-        c->error_code = 0;
     }
 
     vmx_vmcs_exit(v);
@@ -754,34 +739,9 @@ int vmx_vmcs_restore(struct vcpu *v, struct hvm_hw_cpu *c)
 
     if ( c->pending_valid )
     {
-        vmx_vmcs_enter(v);
-
         gdprintk(XENLOG_INFO, "Re-injecting 0x%"PRIx32", 0x%"PRIx32"\n",
                  c->pending_event, c->error_code);
 
-        /* SVM uses type 3 ("Exception") for #OF and #BP; VMX uses type 6 */
-        if ( (c->pending_type == 3) &&
-             ((c->pending_vector == 3) || (c->pending_vector == 4)) )
-            c->pending_type = 6;
-
-        /* For software exceptions, we need to tell the hardware the
-         * instruction length as well (hmmm). */
-        if ( c->pending_type > 4 )
-        {
-            int addrbytes, ilen;
-            if ( (c->cs_arbytes & X86_SEG_AR_CS_LM_ACTIVE) &&
-                 (c->msr_efer & EFER_LMA) )
-                addrbytes = 8;
-            else if ( c->cs_arbytes & X86_SEG_AR_DEF_OP_SIZE )
-                addrbytes = 4;
-            else
-                addrbytes = 2;
-
-            ilen = hvm_instruction_length(c->rip, addrbytes);
-            __vmwrite(VM_ENTRY_INSTRUCTION_LEN, ilen);
-        }
-
-        /* Sanity check */
         if ( (c->pending_type == 1) || (c->pending_type > 6) ||
              (c->pending_reserved != 0) )
         {
@@ -790,12 +750,13 @@ int vmx_vmcs_restore(struct vcpu *v, struct hvm_hw_cpu *c)
             return -EINVAL;
         }
 
-        /* Re-inject the exception */
-        __vmwrite(VM_ENTRY_INTR_INFO_FIELD, c->pending_event);
-        __vmwrite(VM_ENTRY_EXCEPTION_ERROR_CODE, c->error_code);
-        v->arch.hvm_vmx.vector_injected = 1;
-
-        vmx_vmcs_exit(v);
+        if ( hvm_event_needs_reinjection(c->pending_type, c->pending_vector) )
+        {
+            vmx_vmcs_enter(v);
+            __vmwrite(VM_ENTRY_INTR_INFO, c->pending_event);
+            __vmwrite(VM_ENTRY_EXCEPTION_ERROR_CODE, c->error_code);
+            vmx_vmcs_exit(v);
+        }
     }
 
     return 0;
@@ -1203,14 +1164,10 @@ static void vmx_update_vtpr(struct vcpu *v, unsigned long value)
     /* VMX doesn't have a V_TPR field */
 }
 
-static int vmx_event_injection_faulted(struct vcpu *v)
+static int vmx_event_pending(struct vcpu *v)
 {
-    unsigned int idtv_info_field;
-
     ASSERT(v == current);
-
-    idtv_info_field = __vmread(IDT_VECTORING_INFO_FIELD);
-    return (idtv_info_field & INTR_INFO_VALID_MASK);
+    return (__vmread(VM_ENTRY_INTR_INFO) & INTR_INFO_VALID_MASK);
 }
 
 static void disable_intercept_for_msr(u32 msr)
@@ -1261,7 +1218,7 @@ static struct hvm_function_table vmx_function_table = {
     .inject_exception     = vmx_inject_exception,
     .init_ap_context      = vmx_init_ap_context,
     .init_hypercall_page  = vmx_init_hypercall_page,
-    .event_injection_faulted = vmx_event_injection_faulted,
+    .event_pending        = vmx_event_pending,
     .cpu_up               = vmx_cpu_up,
     .cpu_down             = vmx_cpu_down,
 };
@@ -2200,6 +2157,17 @@ static int vmx_set_cr0(unsigned long value)
 
     HVM_DBG_LOG(DBG_LEVEL_VMMU, "Update CR0 value = %lx", value);
 
+    if ( (u32)value != value )
+    {
+        HVM_DBG_LOG(DBG_LEVEL_1,
+                    "Guest attempts to set upper 32 bits in CR0: %lx",
+                    value);
+        vmx_inject_hw_exception(v, TRAP_gp_fault, 0);
+        return 0;
+    }
+
+    value &= ~HVM_CR0_GUEST_RESERVED_BITS;
+
     /* ET is reserved and should be always be 1. */
     value |= X86_CR0_ET;
 
@@ -2842,47 +2810,6 @@ static void vmx_do_extint(struct cpu_user_regs *regs)
     }
 }
 
-static void vmx_reflect_exception(struct vcpu *v)
-{
-    int error_code, intr_info, vector;
-
-    intr_info = __vmread(VM_EXIT_INTR_INFO);
-    vector = intr_info & 0xff;
-    if ( intr_info & INTR_INFO_DELIVER_CODE_MASK )
-        error_code = __vmread(VM_EXIT_INTR_ERROR_CODE);
-    else
-        error_code = VMX_DELIVER_NO_ERROR_CODE;
-
-#ifndef NDEBUG
-    {
-        unsigned long rip;
-
-        rip = __vmread(GUEST_RIP);
-        HVM_DBG_LOG(DBG_LEVEL_1, "rip = %lx, error_code = %x",
-                    rip, error_code);
-    }
-#endif /* NDEBUG */
-
-    /*
-     * According to Intel Virtualization Technology Specification for
-     * the IA-32 Intel Architecture (C97063-002 April 2005), section
-     * 2.8.3, SW_EXCEPTION should be used for #BP and #OV, and
-     * HW_EXCEPTION used for everything else.  The main difference
-     * appears to be that for SW_EXCEPTION, the EIP/RIP is incremented
-     * by VM_ENTER_INSTRUCTION_LEN bytes, whereas for HW_EXCEPTION,
-     * it is not.
-     */
-    if ( (intr_info & INTR_INFO_INTR_TYPE_MASK) == INTR_TYPE_SW_EXCEPTION )
-    {
-        int ilen = __get_instruction_length(); /* Safe: software exception */
-        vmx_inject_sw_exception(v, vector, ilen);
-    }
-    else
-    {
-        vmx_inject_hw_exception(v, vector, error_code);
-    }
-}
-
 static void vmx_failed_vmentry(unsigned int exit_reason,
                                struct cpu_user_regs *regs)
 {
@@ -2919,7 +2846,7 @@ static void vmx_failed_vmentry(unsigned int exit_reason,
 
 asmlinkage void vmx_vmexit_handler(struct cpu_user_regs *regs)
 {
-    unsigned int exit_reason;
+    unsigned int exit_reason, idtv_info;
     unsigned long exit_qualification, inst_len = 0;
     struct vcpu *v = current;
 
@@ -2934,6 +2861,30 @@ asmlinkage void vmx_vmexit_handler(struct cpu_user_regs *regs)
 
     if ( unlikely(exit_reason & VMX_EXIT_REASONS_FAILED_VMENTRY) )
         return vmx_failed_vmentry(exit_reason, regs);
+
+    /* Event delivery caused this intercept? Queue for redelivery. */
+    idtv_info = __vmread(IDT_VECTORING_INFO);
+    if ( unlikely(idtv_info & INTR_INFO_VALID_MASK) )
+    {
+        if ( hvm_event_needs_reinjection((idtv_info>>8)&7, idtv_info&0xff) )
+        {
+            /* See SDM 3B 25.7.1.1 and .2 for info about masking resvd bits. */
+            __vmwrite(VM_ENTRY_INTR_INFO,
+                      idtv_info & ~INTR_INFO_RESVD_BITS_MASK);
+            if ( idtv_info & INTR_INFO_DELIVER_CODE_MASK )
+                __vmwrite(VM_ENTRY_EXCEPTION_ERROR_CODE,
+                          __vmread(IDT_VECTORING_ERROR_CODE));
+        }
+
+        /*
+         * Clear NMI-blocking interruptibility info if an NMI delivery faulted.
+         * Re-delivery will re-set it (see SDM 3B 25.7.1.2).
+         */
+        if ( (idtv_info & INTR_INFO_INTR_TYPE_MASK) == (X86_EVENTTYPE_NMI<<8) )
+            __vmwrite(GUEST_INTERRUPTIBILITY_INFO,
+                      __vmread(GUEST_INTERRUPTIBILITY_INFO) &
+                      ~VMX_INTR_SHADOW_NMI);
+    }
 
     switch ( exit_reason )
     {
@@ -2957,7 +2908,7 @@ asmlinkage void vmx_vmexit_handler(struct cpu_user_regs *regs)
          * (NB. If we emulate this IRET for any reason, we should re-clear!)
          */
         if ( unlikely(intr_info & INTR_INFO_NMI_UNBLOCKED_BY_IRET) &&
-             !(__vmread(IDT_VECTORING_INFO_FIELD) & INTR_INFO_VALID_MASK) &&
+             !(__vmread(IDT_VECTORING_INFO) & INTR_INFO_VALID_MASK) &&
              (vector != TRAP_double_fault) )
             __vmwrite(GUEST_INTERRUPTIBILITY_INFO,
                     __vmread(GUEST_INTERRUPTIBILITY_INFO)|VMX_INTR_SHADOW_NMI);
@@ -2995,14 +2946,12 @@ asmlinkage void vmx_vmexit_handler(struct cpu_user_regs *regs)
             vmx_inject_hw_exception(v, TRAP_page_fault, regs->error_code);
             break;
         case TRAP_nmi:
-            if ( (intr_info & INTR_INFO_INTR_TYPE_MASK) == INTR_TYPE_NMI )
-            {
-                HVMTRACE_0D(NMI, v);
-                vmx_store_cpu_guest_regs(v, regs, NULL);
-                do_nmi(regs); /* Real NMI, vector 2: normal processing. */
-            }
-            else
-                vmx_reflect_exception(v);
+            if ( (intr_info & INTR_INFO_INTR_TYPE_MASK) !=
+                 (X86_EVENTTYPE_NMI << 8) )
+                goto exit_and_crash;
+            HVMTRACE_0D(NMI, v);
+            vmx_store_cpu_guest_regs(v, regs, NULL);
+            do_nmi(regs); /* Real NMI, vector 2: normal processing. */
             break;
         case TRAP_machine_check:
             HVMTRACE_0D(MCE, v);

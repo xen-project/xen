@@ -73,7 +73,6 @@ struct acpi_table_sdt {
 
 static unsigned long sdt_pa;	/* Physical Address */
 static unsigned long sdt_count;	/* Table count */
-unsigned char acpi_rsdp_rev;
 
 static struct acpi_table_sdt sdt_entry[ACPI_MAX_TABLES] __initdata;
 
@@ -225,6 +224,17 @@ void acpi_table_print_madt_entry(acpi_table_entry_header * header)
 		       header->type);
 		break;
 	}
+}
+
+uint8_t
+generate_acpi_checksum(void *tbl, unsigned long len)
+{
+	uint8_t *ptr, sum = 0;
+
+	for (ptr = tbl; len > 0 ; len--, ptr++)
+		sum += *ptr;
+
+	return 0 - sum;
 }
 
 static int
@@ -599,8 +609,6 @@ int __init acpi_table_init(void)
 	       "RSDP (v%3.3d %6.6s                                ) @ 0x%p\n",
 	       rsdp->revision, rsdp->oem_id, (void *)rsdp_phys);
 
-	acpi_rsdp_rev = rsdp->revision;
-
 	if (rsdp->revision < 2)
 		result =
 		    acpi_table_compute_checksum(rsdp,
@@ -620,6 +628,146 @@ int __init acpi_table_init(void)
 
 	if (acpi_table_get_sdt(rsdp))
 		return -ENODEV;
+
+	return 0;
+}
+
+int __init
+acpi_table_disable(enum acpi_table_id table_id)
+{
+	struct acpi_table_header *header = NULL;
+	struct acpi_table_rsdp *rsdp;
+	unsigned long rsdp_phys;
+	char *table_name;
+	int id;
+
+	rsdp_phys = acpi_find_rsdp();
+	if (!rsdp_phys)
+		return -ENODEV;
+
+	rsdp = (struct acpi_table_rsdp *)__acpi_map_table(rsdp_phys,
+		sizeof(struct acpi_table_rsdp));
+	if (!rsdp)
+		return -ENODEV;
+
+	for (id = 0; id < sdt_count; id++)
+		if (sdt_entry[id].id == table_id)
+			break;
+
+	if (id == sdt_count)
+		return -ENOENT;
+
+	table_name = acpi_table_signatures[table_id];
+
+	/* First check XSDT (but only on ACPI 2.0-compatible systems) */
+
+	if ((rsdp->revision >= 2) &&
+	    (((struct acpi20_table_rsdp *)rsdp)->xsdt_address)) {
+
+		struct acpi_table_xsdt *mapped_xsdt = NULL;
+
+		sdt_pa = ((struct acpi20_table_rsdp *)rsdp)->xsdt_address;
+
+		/* map in just the header */
+		header = (struct acpi_table_header *)
+		    __acpi_map_table(sdt_pa, sizeof(struct acpi_table_header));
+
+		if (!header) {
+			printk(KERN_WARNING PREFIX
+			       "Unable to map XSDT header\n");
+			return -ENODEV;
+		}
+
+		/* remap in the entire table before processing */
+		mapped_xsdt = (struct acpi_table_xsdt *)
+		    __acpi_map_table(sdt_pa, header->length);
+		if (!mapped_xsdt) {
+			printk(KERN_WARNING PREFIX "Unable to map XSDT\n");
+			return -ENODEV;
+		}
+		header = &mapped_xsdt->header;
+
+		if (strncmp(header->signature, "XSDT", 4)) {
+			printk(KERN_WARNING PREFIX
+			       "XSDT signature incorrect\n");
+			return -ENODEV;
+		}
+
+		if (acpi_table_compute_checksum(header, header->length)) {
+			printk(KERN_WARNING PREFIX "Invalid XSDT checksum\n");
+			return -ENODEV;
+		}
+
+		if (id < sdt_count) {
+			header = (struct acpi_table_header *)
+			   __acpi_map_table(mapped_xsdt->entry[id], sizeof(struct acpi_table_header));
+		} else {
+			printk(KERN_WARNING PREFIX
+			       "Unable to disable entry %d\n",
+			       id);
+			return -ENODEV;
+		}
+	}
+
+	/* Then check RSDT */
+
+	else if (rsdp->rsdt_address) {
+
+		struct acpi_table_rsdt *mapped_rsdt = NULL;
+
+		sdt_pa = rsdp->rsdt_address;
+
+		/* map in just the header */
+		header = (struct acpi_table_header *)
+		    __acpi_map_table(sdt_pa, sizeof(struct acpi_table_header));
+		if (!header) {
+			printk(KERN_WARNING PREFIX
+			       "Unable to map RSDT header\n");
+			return -ENODEV;
+		}
+
+		/* remap in the entire table before processing */
+		mapped_rsdt = (struct acpi_table_rsdt *)
+		    __acpi_map_table(sdt_pa, header->length);
+		if (!mapped_rsdt) {
+			printk(KERN_WARNING PREFIX "Unable to map RSDT\n");
+			return -ENODEV;
+		}
+		header = &mapped_rsdt->header;
+
+		if (strncmp(header->signature, "RSDT", 4)) {
+			printk(KERN_WARNING PREFIX
+			       "RSDT signature incorrect\n");
+			return -ENODEV;
+		}
+
+		if (acpi_table_compute_checksum(header, header->length)) {
+			printk(KERN_WARNING PREFIX "Invalid RSDT checksum\n");
+			return -ENODEV;
+		}
+		if (id < sdt_count) {
+			header = (struct acpi_table_header *)
+			   __acpi_map_table(mapped_rsdt->entry[id], sizeof(struct acpi_table_header));
+		} else {
+			printk(KERN_WARNING PREFIX
+			       "Unable to disable entry %d\n",
+			       id);
+			return -ENODEV;
+		}
+	}
+
+	else {
+		printk(KERN_WARNING PREFIX
+		       "No System Description Table (RSDT/XSDT) specified in RSDP\n");
+		return -ENODEV;
+	}
+
+	memcpy(header->signature, "OEMx", 4);
+	memcpy(header->oem_id, "xxxxxx", 6);
+	memcpy(header->oem_id+1, table_name, 4);
+	memcpy(header->oem_table_id, "Xen     ", 8);
+	header->checksum = 0;
+	header->checksum = generate_acpi_checksum(header, header->length);
 
 	return 0;
 }

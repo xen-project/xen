@@ -5,6 +5,8 @@ GUEST_SRCS-y += ia64/xc_ia64_linux_save.c
 GUEST_SRCS-y += ia64/xc_ia64_linux_restore.c
 
 GUEST_SRCS-y += ia64/xc_dom_ia64_util.c
+GUEST_SRCS-y += ia64/dom_fw_acpi.c
+
 DOMFW_SRCS_BASE := dom_fw_common.c dom_fw_domu.c dom_fw_asm.S
 DOMFW_SRCS := $(addprefix ia64/, $(DOMFW_SRCS_BASE))
 $(DOMFW_SRCS):

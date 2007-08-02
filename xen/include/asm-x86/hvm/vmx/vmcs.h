@@ -67,9 +67,6 @@ struct arch_vmx_struct {
     /* Cache of cpu execution control. */
     u32                  exec_control;
 
-    /* If there is vector installed in the INTR_INFO_FIELD. */
-    u32                  vector_injected;
-
     unsigned long        cpu_cr0; /* copy of guest CR0 */
     unsigned long        cpu_shadow_cr0; /* copy of guest read shadow CR0 */
     unsigned long        cpu_shadow_cr4; /* copy of guest read shadow CR4 */
@@ -198,7 +195,7 @@ enum vmcs_field {
     VM_EXIT_MSR_LOAD_COUNT          = 0x00004010,
     VM_ENTRY_CONTROLS               = 0x00004012,
     VM_ENTRY_MSR_LOAD_COUNT         = 0x00004014,
-    VM_ENTRY_INTR_INFO_FIELD        = 0x00004016,
+    VM_ENTRY_INTR_INFO              = 0x00004016,
     VM_ENTRY_EXCEPTION_ERROR_CODE   = 0x00004018,
     VM_ENTRY_INSTRUCTION_LEN        = 0x0000401a,
     TPR_THRESHOLD                   = 0x0000401c,
@@ -207,7 +204,7 @@ enum vmcs_field {
     VM_EXIT_REASON                  = 0x00004402,
     VM_EXIT_INTR_INFO               = 0x00004404,
     VM_EXIT_INTR_ERROR_CODE         = 0x00004406,
-    IDT_VECTORING_INFO_FIELD        = 0x00004408,
+    IDT_VECTORING_INFO              = 0x00004408,
     IDT_VECTORING_ERROR_CODE        = 0x0000440a,
     VM_EXIT_INSTRUCTION_LEN         = 0x0000440c,
     VMX_INSTRUCTION_INFO            = 0x0000440e,

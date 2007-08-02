@@ -383,6 +383,7 @@ int acpi_boot_table_init (void);
 int acpi_numa_init (void);
 
 int acpi_table_init (void);
+int acpi_table_disable(enum acpi_table_id table_id);
 int acpi_table_parse (enum acpi_table_id id, acpi_table_handler handler);
 int acpi_get_table_header_early (enum acpi_table_id id, struct acpi_table_header **header);
 int acpi_table_parse_madt (enum acpi_madt_entry_id id, acpi_madt_entry_handler handler, unsigned int max_entries);
@@ -390,6 +391,7 @@ int acpi_table_parse_srat (enum acpi_srat_entry_id id, acpi_madt_entry_handler h
 void acpi_table_print (struct acpi_table_header *header, unsigned long phys_addr);
 void acpi_table_print_madt_entry (acpi_table_entry_header *madt);
 void acpi_table_print_srat_entry (acpi_table_entry_header *srat);
+uint8_t generate_acpi_checksum(void *tbl, unsigned long len);
 
 /* the following four functions are architecture-dependent */
 void acpi_numa_slit_init (struct acpi_table_slit *slit);
@@ -534,6 +536,5 @@ static inline int acpi_get_pxm(acpi_handle handle)
 #endif
 
 extern int pnpacpi_disabled;
-extern unsigned char acpi_rsdp_rev;
 
 #endif /*_LINUX_ACPI_H*/

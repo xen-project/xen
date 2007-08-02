@@ -818,12 +818,13 @@ class ACMPolicy(XSPolicy):
             if successful,the policy's flags will indicate that the
             policy is the one loaded into the hypervisor
         """
-        (ret, output) = commands.getstatusoutput(
+        if not self.isloaded():
+            (ret, output) = commands.getstatusoutput(
                                    security.xensec_tool +
                                    " loadpolicy " +
                                    self.get_filename(".bin"))
-        if ret != 0:
-            return -xsconstants.XSERR_POLICY_LOAD_FAILED
+            if ret != 0:
+                return -xsconstants.XSERR_POLICY_LOAD_FAILED
         return xsconstants.XSERR_SUCCESS
 
     def isloaded(self):

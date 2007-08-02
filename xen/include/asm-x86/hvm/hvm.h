@@ -154,7 +154,7 @@ struct hvm_function_table {
 
     void (*init_hypercall_page)(struct domain *d, void *hypercall_page);
 
-    int  (*event_injection_faulted)(struct vcpu *v);
+    int  (*event_pending)(struct vcpu *v);
 
     int  (*cpu_up)(void);
     void (*cpu_down)(void);
@@ -229,7 +229,8 @@ hvm_guest_x86_mode(struct vcpu *v)
     return hvm_funcs.guest_x86_mode(v);
 }
 
-int hvm_instruction_length(unsigned long pc, int address_bytes);
+int hvm_instruction_fetch(unsigned long pc, int address_bytes,
+                          unsigned char *buf);
 
 static inline void
 hvm_update_host_cr3(struct vcpu *v)
@@ -295,24 +296,71 @@ hvm_inject_exception(unsigned int trapnr, int errcode, unsigned long cr2)
 
 int hvm_bringup_ap(int vcpuid, int trampoline_vector);
 
-static inline int hvm_event_injection_faulted(struct vcpu *v)
+static inline int hvm_event_pending(struct vcpu *v)
 {
-    return hvm_funcs.event_injection_faulted(v);
+    return hvm_funcs.event_pending(v);
 }
+
+/* These reserved bits in lower 32 remain 0 after any load of CR0 */
+#define HVM_CR0_GUEST_RESERVED_BITS             \
+    (~((unsigned long)                          \
+       (X86_CR0_PE | X86_CR0_MP | X86_CR0_EM |  \
+        X86_CR0_TS | X86_CR0_ET | X86_CR0_NE |  \
+        X86_CR0_WP | X86_CR0_AM | X86_CR0_NW |  \
+        X86_CR0_CD | X86_CR0_PG)))
 
 /* These bits in CR4 are owned by the host. */
 #define HVM_CR4_HOST_MASK (mmu_cr4_features & \
     (X86_CR4_VMXE | X86_CR4_PAE | X86_CR4_MCE))
 
 /* These bits in CR4 cannot be set by the guest. */
-#define HVM_CR4_GUEST_RESERVED_BITS \
-    ~(X86_CR4_VME | X86_CR4_PVI | X86_CR4_TSD | \
-      X86_CR4_DE  | X86_CR4_PSE | X86_CR4_PAE | \
-      X86_CR4_MCE | X86_CR4_PGE | X86_CR4_PCE | \
-      X86_CR4_OSFXSR | X86_CR4_OSXMMEXCPT)
+#define HVM_CR4_GUEST_RESERVED_BITS                     \
+    (~((unsigned long)                                  \
+       (X86_CR4_VME | X86_CR4_PVI | X86_CR4_TSD |       \
+        X86_CR4_DE  | X86_CR4_PSE | X86_CR4_PAE |       \
+        X86_CR4_MCE | X86_CR4_PGE | X86_CR4_PCE |       \
+        X86_CR4_OSFXSR | X86_CR4_OSXMMEXCPT)))
 
 /* These exceptions must always be intercepted. */
 #define HVM_TRAP_MASK (1U << TRAP_machine_check)
+
+/*
+ * x86 event types. This enumeration is valid for:
+ *  Intel VMX: {VM_ENTRY,VM_EXIT,IDT_VECTORING}_INTR_INFO[10:8]
+ *  AMD SVM: eventinj[10:8] and exitintinfo[10:8] (types 0-4 only)
+ */
+#define X86_EVENTTYPE_EXT_INTR              0    /* external interrupt */
+#define X86_EVENTTYPE_NMI                   2    /* NMI                */
+#define X86_EVENTTYPE_HW_EXCEPTION          3    /* hardware exception */
+#define X86_EVENTTYPE_SW_INTERRUPT          4    /* software interrupt */
+#define X86_EVENTTYPE_SW_EXCEPTION          6    /* software exception */
+
+/*
+ * Need to re-inject a given event? We avoid re-injecting software exceptions
+ * and interrupts because the faulting/trapping instruction can simply be
+ * re-executed (neither VMX nor SVM update RIP when they VMEXIT during
+ * INT3/INTO/INTn).
+ */
+static inline int hvm_event_needs_reinjection(uint8_t type, uint8_t vector)
+{
+    switch ( type )
+    {
+    case X86_EVENTTYPE_EXT_INTR:
+    case X86_EVENTTYPE_NMI:
+        return 1;
+    case X86_EVENTTYPE_HW_EXCEPTION:
+        /*
+         * SVM uses type 3 ("HW Exception") for #OF and #BP. We explicitly
+         * check for these vectors, as they are really SW Exceptions. SVM has
+         * not updated RIP to point after the trapping instruction (INT3/INTO).
+         */
+        return (vector != 3) && (vector != 4);
+    default:
+        /* Software exceptions/interrupts can be re-executed (e.g., INT n). */
+        break;
+    }
+    return 0;
+}
 
 static inline int hvm_cpu_up(void)
 {

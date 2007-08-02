@@ -58,7 +58,7 @@ static void svm_inject_nmi(struct vcpu *v)
 
     event.bytes = 0;
     event.fields.v = 1;
-    event.fields.type = EVENTTYPE_NMI;
+    event.fields.type = X86_EVENTTYPE_NMI;
     event.fields.vector = 2;
 
     ASSERT(vmcb->eventinj.fields.v == 0);
@@ -72,34 +72,39 @@ static void svm_inject_extint(struct vcpu *v, int vector)
 
     event.bytes = 0;
     event.fields.v = 1;
-    event.fields.type = EVENTTYPE_INTR;
+    event.fields.type = X86_EVENTTYPE_EXT_INTR;
     event.fields.vector = vector;
 
     ASSERT(vmcb->eventinj.fields.v == 0);
     vmcb->eventinj = event;
 }
     
+static void enable_intr_window(struct vcpu *v, enum hvm_intack intr_source)
+{
+    struct vmcb_struct *vmcb = v->arch.hvm_svm.vmcb;
+
+    ASSERT(intr_source != hvm_intack_none);
+
+    /*
+     * Create a dummy virtual interrupt to intercept as soon as the
+     * guest can accept the real interrupt.
+     *
+     * TODO: Better NMI handling. We need a way to skip a MOV SS interrupt
+     * shadow. This is hard to do without hardware support. We should also
+     * track 'NMI blocking' from NMI injection until IRET. This can be done
+     * quite easily in software by intercepting the unblocking IRET.
+     */
+    vmcb->general1_intercepts |= GENERAL1_INTERCEPT_VINTR;
+    HVMTRACE_2D(INJ_VIRQ, v, 0x0, /*fake=*/ 1);
+    svm_inject_dummy_vintr(v);
+}
+
 asmlinkage void svm_intr_assist(void) 
 {
     struct vcpu *v = current;
     struct vmcb_struct *vmcb = v->arch.hvm_svm.vmcb;
     enum hvm_intack intr_source;
     int intr_vector;
-
-    /*
-     * Previous event delivery caused this intercept?
-     * This will happen if the injection is latched by the processor (hence
-     * clearing vintr.fields.irq or eventinj.v) but then subsequently a fault
-     * occurs (e.g., due to lack of shadow mapping of guest IDT or guest-kernel
-     * stack).
-     */
-    if ( vmcb->exitintinfo.fields.v )
-    {
-        vmcb->eventinj = vmcb->exitintinfo;
-        vmcb->exitintinfo.bytes = 0;
-        HVMTRACE_1D(REINJ_VIRQ, v, intr_vector);
-        return;
-    }
 
     /* Crank the handle on interrupt state. */
     pt_update_irq(v);
@@ -111,32 +116,23 @@ asmlinkage void svm_intr_assist(void)
             return;
 
         /*
-         * If the guest can't take an interrupt right now, create a 'fake'
-         * virtual interrupt on to intercept as soon as the guest _can_ take
-         * interrupts.  Do not obtain the next interrupt from the vlapic/pic
-         * if unable to inject.
-         *
-         * Also do this if there is an injection already pending. This is
-         * because the event delivery can arbitrarily delay the injection
-         * of the vintr (for example, if the exception is handled via an
-         * interrupt gate, hence zeroing RFLAGS.IF). In the meantime:
-         * - the vTPR could be modified upwards, so we need to wait until the
-         *   exception is delivered before we can safely decide that an
-         *   interrupt is deliverable; and
-         * - the guest might look at the APIC/PIC state, so we ought not to
-         *   have cleared the interrupt out of the IRR.
-         *
-         * TODO: Better NMI handling. We need a way to skip a MOV SS interrupt
-         * shadow. This is hard to do without hardware support. We should also
-         * track 'NMI blocking' from NMI injection until IRET. This can be done
-         * quite easily in software by intercepting the unblocking IRET.
+         * Pending IRQs must be delayed if:
+         * 1. An event is already pending. This is despite the fact that SVM
+         *    provides a VINTR delivery method quite separate from the EVENTINJ
+         *    mechanism. The event delivery can arbitrarily delay the injection
+         *    of the vintr (for example, if the exception is handled via an
+         *    interrupt gate, hence zeroing RFLAGS.IF). In the meantime:
+         *    - the vTPR could be modified upwards, so we need to wait until
+         *      the exception is delivered before we can safely decide that an
+         *      interrupt is deliverable; and
+         *    - the guest might look at the APIC/PIC state, so we ought not to
+         *      have cleared the interrupt out of the IRR.
+         * 2. The IRQ is masked.
          */
-        if ( !hvm_interrupts_enabled(v, intr_source) ||
-             vmcb->eventinj.fields.v )
+        if ( unlikely(vmcb->eventinj.fields.v) ||
+             !hvm_interrupts_enabled(v, intr_source) )
         {
-            vmcb->general1_intercepts |= GENERAL1_INTERCEPT_VINTR;
-            HVMTRACE_2D(INJ_VIRQ, v, 0x0, /*fake=*/ 1);
-            svm_inject_dummy_vintr(v);
+            enable_intr_window(v, intr_source);
             return;
         }
     } while ( !hvm_vcpu_ack_pending_irq(v, intr_source, &intr_vector) );
@@ -151,6 +147,11 @@ asmlinkage void svm_intr_assist(void)
         svm_inject_extint(v, intr_vector);
         pt_intr_post(v, intr_vector, intr_source);
     }
+
+    /* Is there another IRQ to queue up behind this one? */
+    intr_source = hvm_vcpu_has_pending_irq(v);
+    if ( unlikely(intr_source != hvm_intack_none) )
+        enable_intr_window(v, intr_source);
 }
 
 /*
