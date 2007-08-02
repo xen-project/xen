@@ -93,6 +93,8 @@ int elf_init(struct elf_binary *elf, const char *image, size_t size)
         elf->send = high;
         elf_msg(elf, "%s: symbol map: 0x%" PRIx64 " -> 0x%" PRIx64 "\n",
                 __FUNCTION__, elf->sstart, elf->send);
+
+        break;
     }
 
     return 0;
