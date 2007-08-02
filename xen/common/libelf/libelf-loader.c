@@ -10,8 +10,6 @@ int elf_init(struct elf_binary *elf, const char *image, size_t size)
 {
     const elf_shdr *shdr;
     uint64_t i, count, section, offset;
-    uint64_t low = -1;
-    uint64_t high = 0;
 
     if ( !elf_is_elfbinary(image) )
     {
@@ -22,13 +20,9 @@ int elf_init(struct elf_binary *elf, const char *image, size_t size)
     memset(elf, 0, sizeof(*elf));
     elf->image = image;
     elf->size = size;
-    elf->ehdr = (elf_ehdr *) image;
+    elf->ehdr = (elf_ehdr *)image;
     elf->class = elf->ehdr->e32.e_ident[EI_CLASS];
     elf->data = elf->ehdr->e32.e_ident[EI_DATA];
-
-#ifdef VERBOSE
-    elf_set_verbose(elf);
-#endif
 
     /* Sanity check phdr. */
     offset = elf_uval(elf, elf->ehdr, e_phoff) +
@@ -60,43 +54,18 @@ int elf_init(struct elf_binary *elf, const char *image, size_t size)
     count = elf_shdr_count(elf);
     for ( i = 0; i < count; i++ )
     {
-        const char *sh_symend, *sh_strend;
-
         shdr = elf_shdr_by_index(elf, i);
         if ( elf_uval(elf, shdr, sh_type) != SHT_SYMTAB )
             continue;
         elf->sym_tab = shdr;
-        sh_symend = (const char *)elf_section_end(elf, shdr);
         shdr = elf_shdr_by_index(elf, elf_uval(elf, shdr, sh_link));
         if ( shdr == NULL )
         {
             elf->sym_tab = NULL;
-            sh_symend = 0;
             continue;
         }
         elf->sym_strtab = elf_section_start(elf, shdr);
-        sh_strend = (const char *)elf_section_end(elf, shdr);
-
-        if ( low > (unsigned long)elf->sym_tab )
-            low = (unsigned long)elf->sym_tab;
-        if ( low > (unsigned long)shdr )
-            low = (unsigned long)shdr;
-
-        if ( high < ((unsigned long)sh_symend) )
-            high = (unsigned long)sh_symend;
-        if ( high < ((unsigned long)sh_strend) )
-            high = (unsigned long)sh_strend;
-
-        elf_msg(elf, "%s: shdr: sym_tab=%p size=0x%" PRIx64 "\n",
-                __FUNCTION__, elf->sym_tab,
-                elf_uval(elf, elf->sym_tab, sh_size));
-        elf_msg(elf, "%s: shdr: str_tab=%p size=0x%" PRIx64 "\n",
-                __FUNCTION__, elf->sym_strtab, elf_uval(elf, shdr, sh_size));
-
-        elf->sstart = low;
-        elf->send = high;
-        elf_msg(elf, "%s: symbol map: 0x%" PRIx64 " -> 0x%" PRIx64 "\n",
-                __FUNCTION__, elf->sstart, elf->send);
+        break;
     }
 
     return 0;
@@ -114,6 +83,101 @@ void elf_set_verbose(struct elf_binary *elf)
     elf->verbose = 1;
 }
 #endif
+
+/* Calculate the required additional kernel space for the elf image */
+void elf_parse_bsdsyms(struct elf_binary *elf, uint64_t pstart)
+{
+    uint64_t sz;
+    const elf_shdr *shdr;
+    int i, type;
+
+    if ( !elf->sym_tab )
+        return;
+
+    pstart = elf_round_up(elf, pstart);
+
+    /* Space to store the size of the elf image */
+    sz = sizeof(uint32_t);
+
+    /* Space for the elf and elf section headers */
+    sz += (elf_uval(elf, elf->ehdr, e_ehsize) +
+           elf_shdr_count(elf) * elf_uval(elf, elf->ehdr, e_shentsize));
+    sz = elf_round_up(elf, sz);
+
+    /* Space for the symbol and string tables. */
+    for ( i = 0; i < elf_shdr_count(elf); i++ )
+    {
+        shdr = elf_shdr_by_index(elf, i);
+        type = elf_uval(elf, (elf_shdr *)shdr, sh_type);
+        if ( (type == SHT_STRTAB) || (type == SHT_SYMTAB) )
+            sz = elf_round_up(elf, sz + elf_uval(elf, shdr, sh_size));
+    }
+
+    elf->bsd_symtab_pstart = pstart;
+    elf->bsd_symtab_pend   = pstart + sz;
+}
+
+static void elf_load_bsdsyms(struct elf_binary *elf)
+{
+    elf_ehdr *sym_ehdr;
+    unsigned long sz;
+    char *maxva, *symbase, *symtab_addr;
+    elf_shdr *shdr;
+    int i, type;
+
+    if ( !elf->bsd_symtab_pstart )
+        return;
+
+#define elf_hdr_elm(_elf, _hdr, _elm, _val)     \
+do {                                            \
+    if ( elf_64bit(_elf) )                      \
+        (_hdr)->e64._elm = _val;                \
+    else                                        \
+        (_hdr)->e32._elm = _val;                \
+} while ( 0 )
+
+    symbase = elf_get_ptr(elf, elf->bsd_symtab_pstart);
+    symtab_addr = maxva = symbase + sizeof(uint32_t);
+
+    /* Set up Elf header. */
+    sym_ehdr = (elf_ehdr *)symtab_addr;
+    sz = elf_uval(elf, elf->ehdr, e_ehsize);
+    memcpy(sym_ehdr, elf->ehdr, sz);
+    maxva += sz; /* no round up */
+
+    elf_hdr_elm(elf, sym_ehdr, e_phoff, 0);
+    elf_hdr_elm(elf, sym_ehdr, e_shoff, elf_uval(elf, elf->ehdr, e_ehsize));
+    elf_hdr_elm(elf, sym_ehdr, e_phentsize, 0);
+    elf_hdr_elm(elf, sym_ehdr, e_phnum, 0);
+
+    /* Copy Elf section headers. */
+    shdr = (elf_shdr *)maxva;
+    sz = elf_shdr_count(elf) * elf_uval(elf, elf->ehdr, e_shentsize);
+    memcpy(shdr, elf->image + elf_uval(elf, elf->ehdr, e_shoff), sz);
+    maxva = (char *)(long)elf_round_up(elf, (long)maxva + sz);
+
+    for ( i = 0; i < elf_shdr_count(elf); i++ )
+    {
+        type = elf_uval(elf, shdr, sh_type);
+        if ( (type == SHT_STRTAB) || (type == SHT_SYMTAB) )
+        {
+             elf_msg(elf, "%s: shdr %i at 0x%p -> 0x%p\n", __func__, i,
+                     elf_section_start(elf, shdr), maxva);
+             sz = elf_uval(elf, shdr, sh_size);
+             memcpy(maxva, elf_section_start(elf, shdr), sz);
+             /* Mangled to be based on ELF header location. */
+             elf_hdr_elm(elf, shdr, sh_offset, maxva - symtab_addr);
+             maxva = (char *)(long)elf_round_up(elf, (long)maxva + sz);
+        }
+        shdr = (elf_shdr *)((long)shdr +
+                            (long)elf_uval(elf, elf->ehdr, e_shentsize));
+    }
+
+    /* Write down the actual sym size. */
+    *(uint32_t *)symbase = maxva - symtab_addr;
+
+#undef elf_ehdr_elm
+}
 
 void elf_parse_binary(struct elf_binary *elf)
 {
@@ -165,6 +229,8 @@ void elf_load_binary(struct elf_binary *elf)
         memcpy(dest, elf->image + offset, filesz);
         memset(dest + filesz, 0, memsz - filesz);
     }
+
+    elf_load_bsdsyms(elf);
 }
 
 void *elf_get_ptr(struct elf_binary *elf, unsigned long addr)

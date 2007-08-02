@@ -65,11 +65,12 @@ struct elf_binary {
 
     /* loaded to */
     char *dest;
-    uint64_t sstart;
-    uint64_t send;
     uint64_t pstart;
     uint64_t pend;
     uint64_t reloc_offset;
+
+    uint64_t bsd_symtab_pstart;
+    uint64_t bsd_symtab_pend;
 
 #ifndef __XEN__
     /* misc */
@@ -150,11 +151,6 @@ const elf_note *elf_note_next(struct elf_binary *elf, const elf_note * note);
 int elf_is_elfbinary(const void *image);
 int elf_phdr_is_loadable(struct elf_binary *elf, const elf_phdr * phdr);
 
-unsigned long elf_copy_ehdr(struct elf_binary *elf, void *dest);
-unsigned long elf_copy_shdr(struct elf_binary *elf, void *dest);
-unsigned long elf_copy_section(struct elf_binary *elf,
-                               const elf_shdr *shdr, void *dest);
-
 /* ------------------------------------------------------------------------ */
 /* xc_libelf_loader.c                                                       */
 
@@ -170,6 +166,8 @@ void elf_load_binary(struct elf_binary *elf);
 
 void *elf_get_ptr(struct elf_binary *elf, unsigned long addr);
 uint64_t elf_lookup_addr(struct elf_binary *elf, const char *symbol);
+
+void elf_parse_bsdsyms(struct elf_binary *elf, uint64_t pstart); /* private */
 
 /* ------------------------------------------------------------------------ */
 /* xc_libelf_relocate.c                                                     */
@@ -221,8 +219,7 @@ struct elf_dom_parms {
     /* calculated */
     uint64_t virt_offset;
     uint64_t virt_kstart;
-    uint64_t virt_kend; /* end of kernel image */
-    uint64_t virt_end;  /* end of kernel symtab (== virt_kend if none) */
+    uint64_t virt_kend;
 };
 
 static inline void elf_xen_feature_set(int nr, uint32_t * addr)
@@ -244,8 +241,5 @@ int elf_xen_parse_guest_info(struct elf_binary *elf,
                              struct elf_dom_parms *parms);
 int elf_xen_parse(struct elf_binary *elf,
                   struct elf_dom_parms *parms);
-
-int elf_xen_dom_load_binary(struct elf_binary *elf,
-                            struct elf_dom_parms *parms);
 
 #endif /* __XC_LIBELF__ */

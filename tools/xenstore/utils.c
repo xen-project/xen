@@ -10,18 +10,17 @@
 #include <signal.h>
 #include "utils.h"
 
-void xprintf(const char *fmt, ...)
+static void default_xprintf(const char *fmt, ...)
 {
 	va_list args;
-
-	if (!stderr)
-		return; /* could trace()? */
 
 	va_start(args, fmt);
 	vfprintf(stderr, fmt, args);
 	va_end(args);
 	fflush(stderr);
 }
+
+void (*xprintf)(const char *fmt, ...) = default_xprintf;
 
 void barf(const char *fmt, ...)
 {
