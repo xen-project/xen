@@ -123,3 +123,7 @@ cscope:
 tags:
 	$(all_sources) | xargs ctags
 
+.PHONY: TAGS
+TAGS:
+	$(all_sources) | xargs etags
+
