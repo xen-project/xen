@@ -26,10 +26,6 @@ int elf_init(struct elf_binary *elf, const char *image, size_t size)
     elf->class = elf->ehdr->e32.e_ident[EI_CLASS];
     elf->data = elf->ehdr->e32.e_ident[EI_DATA];
 
-#ifdef VERBOSE
-    elf_set_verbose(elf);
-#endif
-
     /* Sanity check phdr. */
     offset = elf_uval(elf, elf->ehdr, e_phoff) +
         elf_uval(elf, elf->ehdr, e_phentsize) * elf_phdr_count(elf);
