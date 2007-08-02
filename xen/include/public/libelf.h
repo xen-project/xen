@@ -65,6 +65,8 @@ struct elf_binary {
 
     /* loaded to */
     char *dest;
+    uint64_t sstart;
+    uint64_t send;
     uint64_t pstart;
     uint64_t pend;
     uint64_t reloc_offset;
@@ -91,33 +93,32 @@ struct elf_binary {
 #define elf_lsb(elf)   (ELFDATA2LSB == (elf)->data)
 #define elf_swap(elf)  (NATIVE_ELFDATA != (elf)->data)
 
-#define elf_uval(elf, str, elem)			\
-	((ELFCLASS64 == (elf)->class)			\
-	? elf_access_unsigned((elf), (str),		\
-		offsetof(typeof(*(str)),e64.elem),	\
-		sizeof((str)->e64.elem))		\
-	: elf_access_unsigned((elf), (str),		\
-		offsetof(typeof(*(str)),e32.elem),	\
-		sizeof((str)->e32.elem)))
+#define elf_uval(elf, str, elem)                                        \
+    ((ELFCLASS64 == (elf)->class)                                       \
+     ? elf_access_unsigned((elf), (str),                                \
+                           offsetof(typeof(*(str)),e64.elem),           \
+                           sizeof((str)->e64.elem))                     \
+     : elf_access_unsigned((elf), (str),                                \
+                           offsetof(typeof(*(str)),e32.elem),           \
+                           sizeof((str)->e32.elem)))
 
-#define elf_sval(elf, str, elem)			\
-	((ELFCLASS64 == (elf)->class)			\
-	? elf_access_signed((elf), (str),		\
-		offsetof(typeof(*(str)),e64.elem),	\
-		sizeof((str)->e64.elem))		\
-	: elf_access_signed((elf), (str),		\
-		offsetof(typeof(*(str)),e32.elem),	\
-		sizeof((str)->e32.elem)))
+#define elf_sval(elf, str, elem)                                        \
+    ((ELFCLASS64 == (elf)->class)                                       \
+     ? elf_access_signed((elf), (str),                                  \
+                         offsetof(typeof(*(str)),e64.elem),             \
+                         sizeof((str)->e64.elem))                       \
+     : elf_access_signed((elf), (str),                                  \
+                         offsetof(typeof(*(str)),e32.elem),             \
+                         sizeof((str)->e32.elem)))
 
-#define elf_size(elf, str)		\
-	((ELFCLASS64 == (elf)->class)	\
-	? sizeof((str)->e64)		\
-	: sizeof((str)->e32))
+#define elf_size(elf, str)                              \
+    ((ELFCLASS64 == (elf)->class)                       \
+     ? sizeof((str)->e64) : sizeof((str)->e32))
 
 uint64_t elf_access_unsigned(struct elf_binary *elf, const void *ptr,
-			     uint64_t offset, size_t size);
+                             uint64_t offset, size_t size);
 int64_t elf_access_signed(struct elf_binary *elf, const void *ptr,
-			  uint64_t offset, size_t size);
+                          uint64_t offset, size_t size);
 
 uint64_t elf_round_up(struct elf_binary *elf, uint64_t addr);
 
@@ -148,6 +149,11 @@ const elf_note *elf_note_next(struct elf_binary *elf, const elf_note * note);
 
 int elf_is_elfbinary(const void *image);
 int elf_phdr_is_loadable(struct elf_binary *elf, const elf_phdr * phdr);
+
+unsigned long elf_copy_ehdr(struct elf_binary *elf, void *dest);
+unsigned long elf_copy_shdr(struct elf_binary *elf, void *dest);
+unsigned long elf_copy_section(struct elf_binary *elf,
+                               const elf_shdr *shdr, void *dest);
 
 /* ------------------------------------------------------------------------ */
 /* xc_libelf_loader.c                                                       */
@@ -185,8 +191,8 @@ struct xen_elfnote {
     enum xen_elfnote_type type;
     const char *name;
     union {
-	const char *str;
-	uint64_t num;
+        const char *str;
+        uint64_t num;
     } data;
 };
 
@@ -215,7 +221,8 @@ struct elf_dom_parms {
     /* calculated */
     uint64_t virt_offset;
     uint64_t virt_kstart;
-    uint64_t virt_kend;
+    uint64_t virt_kend; /* end of kernel image */
+    uint64_t virt_end;  /* end of kernel symtab (== virt_kend if none) */
 };
 
 static inline void elf_xen_feature_set(int nr, uint32_t * addr)
@@ -228,14 +235,17 @@ static inline int elf_xen_feature_get(int nr, uint32_t * addr)
 }
 
 int elf_xen_parse_features(const char *features,
-			   uint32_t *supported,
-			   uint32_t *required);
+                           uint32_t *supported,
+                           uint32_t *required);
 int elf_xen_parse_note(struct elf_binary *elf,
-		       struct elf_dom_parms *parms,
-		       const elf_note *note);
+                       struct elf_dom_parms *parms,
+                       const elf_note *note);
 int elf_xen_parse_guest_info(struct elf_binary *elf,
-			     struct elf_dom_parms *parms);
+                             struct elf_dom_parms *parms);
 int elf_xen_parse(struct elf_binary *elf,
-		  struct elf_dom_parms *parms);
+                  struct elf_dom_parms *parms);
+
+int elf_xen_dom_load_binary(struct elf_binary *elf,
+                            struct elf_dom_parms *parms);
 
 #endif /* __XC_LIBELF__ */

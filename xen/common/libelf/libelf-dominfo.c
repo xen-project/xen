@@ -333,6 +333,99 @@ static int elf_xen_note_check(struct elf_binary *elf,
     return 0;
 }
 
+
+static void elf_xen_loadsymtab(struct elf_binary *elf,
+                               struct elf_dom_parms *parms)
+{
+    unsigned long maxva, len;
+
+    if ( !parms->bsd_symtab )
+        return;
+
+    /* Calculate the required additional kernel space for the elf image */
+
+    /* The absolute base address of the elf image */
+    maxva = elf_round_up(elf, parms->virt_kend);
+    maxva += sizeof(long); /* Space to store the size of the elf image */
+    /* Space for the elf and elf section headers */
+    maxva += (elf_uval(elf, elf->ehdr, e_ehsize) +
+              elf_shdr_count(elf) * elf_uval(elf, elf->ehdr, e_shentsize));
+    maxva = elf_round_up(elf, maxva);
+
+    /* Space for the symbol and string tabs */
+    len = (unsigned long)elf->send - (unsigned long)elf->sstart;
+    maxva = elf_round_up(elf, maxva + len);
+
+    /* The address the kernel must expanded to */
+    parms->virt_end = maxva;
+}
+
+int elf_xen_dom_load_binary(struct elf_binary *elf,
+                            struct elf_dom_parms *parms)
+{
+    elf_ehdr *sym_ehdr;
+    unsigned long shdr, symtab_addr;
+    unsigned long maxva, symbase;
+    uint8_t i;
+    char *p;
+
+    elf_load_binary(elf);
+
+    if ( !parms->bsd_symtab )
+        return 0;
+
+#define elf_hdr_elm(_elf, _hdr, _elm, _val)     \
+do {                                            \
+    if ( elf_64bit(_elf) )                      \
+        (_hdr)->e64._elm = _val;                \
+    else                                        \
+        (_hdr)->e32._elm = _val;                \
+} while ( 0 )
+
+    /* ehdr right after the kernel image (4 byte aligned) */
+    symbase = elf_round_up(elf, parms->virt_kend);
+    symtab_addr = maxva = symbase + sizeof(long);
+
+    /* Set up Elf header. */
+    sym_ehdr = (elf_ehdr *)symtab_addr;
+    maxva = elf_copy_ehdr(elf, sym_ehdr);
+
+    elf_hdr_elm(elf, sym_ehdr, e_phoff, 0);
+    elf_hdr_elm(elf, sym_ehdr, e_shoff, elf_uval(elf, elf->ehdr, e_ehsize));
+    elf_hdr_elm(elf, sym_ehdr, e_phentsize, 0);
+    elf_hdr_elm(elf, sym_ehdr, e_phnum, 0);
+
+    /* Copy Elf section headers. */
+    shdr = maxva;
+    maxva = elf_copy_shdr(elf, (elf_shdr *)shdr);
+
+    for ( i = 0; i < elf_shdr_count(elf); i++ )
+    {
+        uint8_t type;
+        unsigned long tmp;
+        type = elf_uval(elf, (elf_shdr *)shdr, sh_type);
+        if ( (type == SHT_STRTAB) || (type == SHT_SYMTAB) )
+        {
+             elf_msg(elf, "%s: shdr %i at 0x%p -> 0x%p\n", __func__, i,
+                     elf_section_start(elf, (elf_shdr *)shdr), (void *)maxva);
+             tmp = elf_copy_section(elf, (elf_shdr *)shdr, (void *)maxva);
+             /* Mangled to be based on ELF header location. */
+             elf_hdr_elm(elf, (elf_shdr *)shdr, sh_offset,
+                         maxva - symtab_addr);
+             maxva = tmp;
+        }
+        shdr += elf_uval(elf, elf->ehdr, e_shentsize);
+    }
+
+    /* Write down the actual sym size. */
+    p = (char *)symbase;
+    *(long *)p = maxva - symtab_addr; /* sym size */
+
+#undef elf_ehdr_elm
+
+    return 0;
+}
+
 static int elf_xen_addr_calc_check(struct elf_binary *elf,
                                    struct elf_dom_parms *parms)
 {
@@ -374,9 +467,13 @@ static int elf_xen_addr_calc_check(struct elf_binary *elf,
     parms->virt_offset = parms->virt_base - parms->elf_paddr_offset;
     parms->virt_kstart = elf->pstart + parms->virt_offset;
     parms->virt_kend   = elf->pend   + parms->virt_offset;
+    parms->virt_end    = parms->virt_kend;
 
     if ( parms->virt_entry == UNSET_ADDR )
         parms->virt_entry = elf_uval(elf, elf->ehdr, e_entry);
+
+    if ( parms->bsd_symtab )
+        elf_xen_loadsymtab(elf, parms);
 
     elf_msg(elf, "%s: addresses:\n", __FUNCTION__);
     elf_msg(elf, "    virt_base        = 0x%" PRIx64 "\n", parms->virt_base);
@@ -384,12 +481,14 @@ static int elf_xen_addr_calc_check(struct elf_binary *elf,
     elf_msg(elf, "    virt_offset      = 0x%" PRIx64 "\n", parms->virt_offset);
     elf_msg(elf, "    virt_kstart      = 0x%" PRIx64 "\n", parms->virt_kstart);
     elf_msg(elf, "    virt_kend        = 0x%" PRIx64 "\n", parms->virt_kend);
+    elf_msg(elf, "    virt_end         = 0x%" PRIx64 "\n", parms->virt_end);
     elf_msg(elf, "    virt_entry       = 0x%" PRIx64 "\n", parms->virt_entry);
 
     if ( (parms->virt_kstart > parms->virt_kend) ||
          (parms->virt_entry < parms->virt_kstart) ||
          (parms->virt_entry > parms->virt_kend) ||
-         (parms->virt_base > parms->virt_kstart) )
+         (parms->virt_base > parms->virt_kstart) ||
+         (parms->virt_kend > parms->virt_end) )
     {
         elf_err(elf, "%s: ERROR: ELF start or entries are out of bounds.\n",
                 __FUNCTION__);

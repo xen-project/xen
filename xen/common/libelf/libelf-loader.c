@@ -10,6 +10,8 @@ int elf_init(struct elf_binary *elf, const char *image, size_t size)
 {
     const elf_shdr *shdr;
     uint64_t i, count, section, offset;
+    uint64_t low = -1;
+    uint64_t high = 0;
 
     if ( !elf_is_elfbinary(image) )
     {
@@ -24,7 +26,11 @@ int elf_init(struct elf_binary *elf, const char *image, size_t size)
     elf->class = elf->ehdr->e32.e_ident[EI_CLASS];
     elf->data = elf->ehdr->e32.e_ident[EI_DATA];
 
-    /* sanity check phdr */
+#ifdef VERBOSE
+    elf_set_verbose(elf);
+#endif
+
+    /* Sanity check phdr. */
     offset = elf_uval(elf, elf->ehdr, e_phoff) +
         elf_uval(elf, elf->ehdr, e_phentsize) * elf_phdr_count(elf);
     if ( offset > elf->size )
@@ -34,7 +40,7 @@ int elf_init(struct elf_binary *elf, const char *image, size_t size)
         return -1;
     }
 
-    /* sanity check shdr */
+    /* Sanity check shdr. */
     offset = elf_uval(elf, elf->ehdr, e_shoff) +
         elf_uval(elf, elf->ehdr, e_shentsize) * elf_shdr_count(elf);
     if ( offset > elf->size )
@@ -44,29 +50,55 @@ int elf_init(struct elf_binary *elf, const char *image, size_t size)
         return -1;
     }
 
-    /* find section string table */
+    /* Find section string table. */
     section = elf_uval(elf, elf->ehdr, e_shstrndx);
     shdr = elf_shdr_by_index(elf, section);
     if ( shdr != NULL )
         elf->sec_strtab = elf_section_start(elf, shdr);
 
-    /* find symbol table, symbol string table */
+    /* Find symbol table and symbol string table. */
     count = elf_shdr_count(elf);
     for ( i = 0; i < count; i++ )
     {
+        const char *sh_symend, *sh_strend;
+
         shdr = elf_shdr_by_index(elf, i);
         if ( elf_uval(elf, shdr, sh_type) != SHT_SYMTAB )
             continue;
         elf->sym_tab = shdr;
+        sh_symend = (const char *)elf_section_end(elf, shdr);
         shdr = elf_shdr_by_index(elf, elf_uval(elf, shdr, sh_link));
         if ( shdr == NULL )
         {
             elf->sym_tab = NULL;
+            sh_symend = 0;
             continue;
         }
         elf->sym_strtab = elf_section_start(elf, shdr);
-        break;
+        sh_strend = (const char *)elf_section_end(elf, shdr);
+
+        if ( low > (unsigned long)elf->sym_tab )
+            low = (unsigned long)elf->sym_tab;
+        if ( low > (unsigned long)shdr )
+            low = (unsigned long)shdr;
+
+        if ( high < ((unsigned long)sh_symend) )
+            high = (unsigned long)sh_symend;
+        if ( high < ((unsigned long)sh_strend) )
+            high = (unsigned long)sh_strend;
+
+        elf_msg(elf, "%s: shdr: sym_tab=%p size=0x%" PRIx64 "\n",
+                __FUNCTION__, elf->sym_tab,
+                elf_uval(elf, elf->sym_tab, sh_size));
+        elf_msg(elf, "%s: shdr: str_tab=%p size=0x%" PRIx64 "\n",
+                __FUNCTION__, elf->sym_strtab, elf_uval(elf, shdr, sh_size));
+
+        elf->sstart = low;
+        elf->send = high;
+        elf_msg(elf, "%s: symbol map: 0x%" PRIx64 " -> 0x%" PRIx64 "\n",
+                __FUNCTION__, elf->sstart, elf->send);
     }
+
     return 0;
 }
 

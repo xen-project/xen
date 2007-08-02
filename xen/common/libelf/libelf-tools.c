@@ -238,6 +238,36 @@ int elf_phdr_is_loadable(struct elf_binary *elf, const elf_phdr * phdr)
     return ((p_type == PT_LOAD) && (p_flags & (PF_W | PF_X)) != 0);
 }
 
+unsigned long
+elf_copy_ehdr(struct elf_binary *elf, void *dest)
+{
+    uint64_t size;
+
+    size = elf_uval(elf, elf->ehdr, e_ehsize);
+    memcpy(dest, elf->ehdr, size);
+    return elf_round_up(elf, (unsigned long)(dest) + size);
+}
+
+unsigned long
+elf_copy_shdr(struct elf_binary *elf, void *dest)
+{
+    uint64_t size;
+
+    size = elf_shdr_count(elf) * elf_uval(elf, elf->ehdr, e_shentsize);
+    memcpy(dest, elf->image + elf_uval(elf, elf->ehdr, e_shoff), size);
+    return elf_round_up(elf, (unsigned long)(dest) + size);
+}
+
+unsigned long
+elf_copy_section(struct elf_binary *elf, const elf_shdr *shdr, void *dest)
+{
+    uint64_t size;
+
+    size = elf_uval(elf, shdr, sh_size);
+    memcpy(dest, elf_section_start(elf, shdr), size);
+    return elf_round_up(elf, (unsigned long)(dest) + size);
+}
+
 /*
  * Local variables:
  * mode: C
