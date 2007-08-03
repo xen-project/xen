@@ -270,11 +270,9 @@ static void legacy_io_access(VCPU *vcpu, u64 pa, u64 *val, size_t s, int dir)
 
 static void mmio_access(VCPU *vcpu, u64 src_pa, u64 *dest, size_t s, int ma, int dir)
 {
-    struct virtual_platform_def *v_plat;
     //mmio_type_t iot;
     unsigned long iot;
     iot=__gpfn_is_io(vcpu->domain, src_pa>>PAGE_SHIFT);
-    v_plat = vmx_vcpu_get_plat(vcpu);
 
     perfc_incra(vmx_mmio_access, iot >> 56);
     switch (iot) {

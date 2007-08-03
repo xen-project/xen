@@ -43,7 +43,6 @@
  * it is not used on ia64 */
 #define OS_TYPE_PORT    0xB2
 
-struct mmio_list;
 typedef struct virtual_platform_def {
     unsigned long       gos_type;
     unsigned long       buffered_io_va;
@@ -52,7 +51,6 @@ typedef struct virtual_platform_def {
     unsigned long       shared_page_va;
     unsigned long       pib_base;
     unsigned long       params[HVM_NR_PARAMS];
-    struct mmio_list    *mmio;
     /* One IOSAPIC now... */
     struct viosapic     viosapic;
     struct vacpi        vacpi;

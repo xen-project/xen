@@ -120,22 +120,6 @@ typedef enum { INSTRUCTION, DATA, REGISTER } miss_type;
 //typedef enum { MVHPT, STLB } vtlb_loc_type_t;
 typedef enum { DATA_REF, NA_REF, INST_REF, RSE_REF } vhpt_ref_t;
 
-typedef enum {
-	PIB_MMIO=0,
-	VGA_BUFF,
-	CHIPSET_IO,
-	LOW_MMIO,
-	LEGACY_IO,
-	IO_SAPIC,
-	NOT_IO
-} mmio_type_t;
-
-typedef struct mmio_list {
-	mmio_type_t  iot;
-	u64		start;	// start address of this memory IO block
-	u64		end;	// end address (include this one)
-} mmio_list_t;
-
 static __inline__ uint64_t
 bits_v(uint64_t v, uint32_t bs, uint32_t be)
 {

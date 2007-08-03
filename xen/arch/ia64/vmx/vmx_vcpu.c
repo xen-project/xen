@@ -151,12 +151,6 @@ IA64FAULT vmx_vcpu_cover(VCPU *vcpu)
     return (IA64_NO_FAULT);
 }
 
-struct virtual_platform_def *
-vmx_vcpu_get_plat(VCPU *vcpu)
-{
-    return &(vcpu->domain->arch.vmx_platform);
-}
-
 IA64FAULT vmx_vcpu_set_rr(VCPU *vcpu, u64 reg, u64 val)
 {
     ia64_rr oldrr,newrr;
