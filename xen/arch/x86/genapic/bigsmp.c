@@ -13,7 +13,7 @@
 
 static int dmi_bigsmp; /* can be set by dmi scanners */
 
-static __init int hp_ht_bigsmp(struct dmi_system_id *d)
+static __init int force_bigsmp(struct dmi_system_id *d)
 {
 	printk(KERN_NOTICE "%s detected: force use of apic=bigsmp\n", d->ident);
 	dmi_bigsmp = 1;
@@ -22,15 +22,19 @@ static __init int hp_ht_bigsmp(struct dmi_system_id *d)
 
 
 static struct dmi_system_id __initdata bigsmp_dmi_table[] = {
-	{ hp_ht_bigsmp, "HP ProLiant DL760 G2", {
+	{ force_bigsmp, "HP ProLiant DL760 G2", {
 		DMI_MATCH(DMI_BIOS_VENDOR, "HP"),
 		DMI_MATCH(DMI_BIOS_VERSION, "P44-"),
 	}},
 
-	{ hp_ht_bigsmp, "HP ProLiant DL740", {
+	{ force_bigsmp, "HP ProLiant DL740", {
 		DMI_MATCH(DMI_BIOS_VENDOR, "HP"),
 		DMI_MATCH(DMI_BIOS_VERSION, "P47-"),
 	 }},
+	{ force_bigsmp, "UNISYS ES7000-ONE", {
+		DMI_MATCH(DMI_PRODUCT_NAME, "ES7000-ONE")
+	 }},
+	
 	 { }
 };
 
