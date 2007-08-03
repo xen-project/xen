@@ -240,6 +240,11 @@ static inline void write_efer(__u64 val)
 #define MSR_K8_MC4_ADDR			0x412
 #define MSR_K8_MC4_MISC			0x413
 
+#define MSR_K8_MC5_CTL			0x414
+#define MSR_K8_MC5_STATUS		0x415
+#define MSR_K8_MC5_ADDR			0x416
+#define MSR_K8_MC5_MISC			0x417
+
 /* Pentium IV performance counter MSRs */
 #define MSR_P4_BPU_PERFCTR0 		0x300
 #define MSR_P4_BPU_PERFCTR1 		0x301
