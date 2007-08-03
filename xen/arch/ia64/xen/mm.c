@@ -814,7 +814,7 @@ assign_new_domain0_page(struct domain *d, unsigned long mpaddr)
     if (pte_none(*pte)) {
         struct page_info *p = __assign_new_domain_page(d, mpaddr, pte);
         if (p == NULL) {
-            panic("%s: can't allocate page for dom0", __func__);
+            panic("%s: can't allocate page for dom0\n", __func__);
         }
     }
 }
