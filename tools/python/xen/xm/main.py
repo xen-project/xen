@@ -25,7 +25,6 @@ import atexit
 import cmd
 import os
 import pprint
-import readline
 import shlex
 import sys
 import re
@@ -616,6 +615,7 @@ class Shell(cmd.Cmd):
 
     def preloop(self):
         cmd.Cmd.preloop(self)
+        import readline
         readline.set_completer_delims(' ')
 
     def default(self, line):
