@@ -18,12 +18,13 @@ class LiloImage(object):
                 "  initrd: %s\n" %(self.title, self.root, self.kernel,
                                    self.args, self.initrd))
     def reset(self, lines, path):
-        self._root = self._initrd = self._kernel = self._args = None
+        self._initrd = self._kernel = self._readonly = None
+        self._args = ""
         self.title = ""
         self.lines = []
         self.path = path
+        self.root = ""
         map(self.set_from_line, lines)
-        self.root = "" # dummy
 
     def set_from_line(self, line, replace = None):
         (com, arg) = GrubConf.grub_exact_split(line, 2)
@@ -55,6 +56,23 @@ class LiloImage(object):
         return self._initrd
     initrd = property(get_initrd, set_initrd)
 
+    def set_args(self, val):
+        self._args = val
+    def get_args(self):
+        args = self._args
+        if self.root:
+            args += " root=" + self.root
+        if self.readonly:
+            args += " ro"
+        return args
+    args = property(get_args, set_args)
+
+    def set_readonly(self, val):
+        self._readonly = 1
+    def get_readonly(self):
+        return self._readonly
+    readonly = property(get_readonly, set_readonly)
+
     # set up command handlers
     commands = { "label": "self.title",
                  "root": "self.root",
@@ -62,7 +80,7 @@ class LiloImage(object):
                  "image": "self.kernel",
                  "initrd": "self.initrd",
                  "append": "self.args",
-                 "read-only": None,
+                 "read-only": "self.readonly",
                  "chainloader": None,
                  "module": None}
 
