@@ -142,6 +142,21 @@ class ACMPolicy(XSPolicy):
         return xsconstants.XSERR_SUCCESS
 
 
+    def is_default_policy(self):
+        """
+           Determine whether this is the default policy
+        """
+        default = ['SystemManagement']
+        if self.policy_get_virtualmachinelabel_names() == default and \
+           self.policy_get_bootstrap_vmlabel() == default[0] and \
+           self.policy_get_stetypes_types() == default and \
+           self.policy_get_stes_of_vmlabel(default[0]) == default and \
+           self.policy_get_resourcelabel_names() == [] and \
+           self.policy_get_chwall_types() == default and \
+           self.get_name() == "DEFAULT":
+            return True
+        return False
+
     def update(self, xml_new):
         """
             Update the policy with the new XML. The hypervisor decides
@@ -156,27 +171,18 @@ class ACMPolicy(XSPolicy):
             return -xsconstants.XSERR_XML_PROCESSING, errors
 
         vmlabel_map = acmpol_new.policy_get_vmlabel_translation_map()
+
         # An update requires version information in the current
         # and new policy. The version number of the current policy
         # must be the same as what is in the FromPolicy/Version node
         # in the new one and the current policy's name must be the
         # same as in FromPolicy/PolicyName
-
-        now_vers    = acmpol_old.policy_dom_get_hdr_item("Version")
-        now_name    = acmpol_old.policy_dom_get_hdr_item("PolicyName")
-        req_oldvers = acmpol_new.policy_dom_get_frompol_item("Version")
-        req_oldname = acmpol_new.policy_dom_get_frompol_item("PolicyName")
-
-        if now_vers == "" or \
-           now_vers != req_oldvers or \
-           now_name != req_oldname:
-            log.info("Policy rejected: %s != %s or %s != %s" % \
-                     (now_vers,req_oldvers,now_name,req_oldname))
-            return -xsconstants.XSERR_VERSION_PREVENTS_UPDATE, errors
-
-        if not self.isVersionUpdate(acmpol_new):
-            log.info("Policy rejected since new version is not an update.")
-            return -xsconstants.XSERR_VERSION_PREVENTS_UPDATE, errors
+        # The default policy when it is set skips this step.
+        if not acmpol_new.is_default_policy() and \
+           not acmpol_old.is_default_policy():
+            irc = self.__do_update_version_check(acmpol_new)
+            if irc != xsconstants.XSERR_SUCCESS:
+                return irc, errors
 
         if self.isloaded():
             newvmnames = \
@@ -257,6 +263,29 @@ class ACMPolicy(XSPolicy):
             self.dom = acmpol_new.dom
             self.compile()
         return rc, errors
+
+
+    def __do_update_version_check(self, acmpol_new):
+        acmpol_old = self
+
+        now_vers    = acmpol_old.policy_dom_get_hdr_item("Version")
+        now_name    = acmpol_old.policy_dom_get_hdr_item("PolicyName")
+        req_oldvers = acmpol_new.policy_dom_get_frompol_item("Version")
+        req_oldname = acmpol_new.policy_dom_get_frompol_item("PolicyName")
+
+        if now_vers == "" or \
+           now_vers != req_oldvers or \
+           now_name != req_oldname:
+            log.info("Policy rejected: %s != %s or %s != %s" % \
+                     (now_vers,req_oldvers,now_name,req_oldname))
+            return -xsconstants.XSERR_VERSION_PREVENTS_UPDATE
+
+        if not self.isVersionUpdate(acmpol_new):
+            log.info("Policy rejected since new version is not an update.")
+            return -xsconstants.XSERR_VERSION_PREVENTS_UPDATE
+
+        return xsconstants.XSERR_SUCCESS
+
 
     def compareVersions(self, v1, v2):
         """
@@ -848,8 +877,7 @@ class ACMPolicy(XSPolicy):
         if self.isloaded():
             return -xsconstants.XSERR_POLICY_LOADED
         files = [ self.get_filename(".map",""),
-                  self.get_filename(".bin",""),
-                  self.path_from_policy_name(self.get_name())]
+                  self.get_filename(".bin","") ]
         for f in files:
             try:
                 os.unlink(f)

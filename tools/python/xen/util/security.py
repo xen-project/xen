@@ -146,7 +146,7 @@ def calc_dom_ssidref_from_info(info):
                 raise VmError("VM label '%s' in wrong format." % seclab)
             typ, policyname, vmlabel = seclab.split(":")
             if typ != xsconstants.ACM_POLICY_ID:
-                raise VmError("Policy type '%s' not supported." % typ)
+                raise VmError("Policy type '%s' must be changed." % typ)
             refresh_security_policy()
             if active_policy != policyname:
                 raise VmError("Active policy '%s' different than "
@@ -502,7 +502,7 @@ def hv_chg_policy(bin_pol, del_array, chg_array):
         rc, errors = acm.chgpolicy(bin_pol, del_array, chg_array)
     except Exception, e:
         pass
-    if (len(errors) > 0):
+    if len(errors) > 0:
         rc = -xsconstants.XSERR_HV_OP_FAILED
     return rc, errors
 
@@ -785,6 +785,24 @@ def res_security_check_xapi(rlabel, rssidref, rpolicy, xapi_dom_label):
     return rtnval
 
 
+def validate_label(label, policyref):
+    """
+       Make sure that this label is part of the currently enforced policy
+       and that it reference the current policy.
+    """
+    rc = xsconstants.XSERR_SUCCESS
+    from xen.xend.XendXSPolicyAdmin import XSPolicyAdminInstance
+    curpol = XSPolicyAdminInstance().get_loaded_policy()
+    if not curpol or curpol.get_name() != policyref:
+        rc = -xsconstants.XSERR_BAD_LABEL
+    else:
+        try:
+            label2ssidref(label, curpol.get_name() , 'res')
+        except:
+            rc = -xsconstants.XSERR_BAD_LABEL
+    return rc
+
+
 def set_resource_label_xapi(resource, reslabel_xapi, oldlabel_xapi):
     """Assign a resource label to a resource
     @param resource: The name of a resource, i.e., "phy:/dev/hda", or
@@ -809,9 +827,15 @@ def set_resource_label_xapi(resource, reslabel_xapi, oldlabel_xapi):
             return -xsconstants.XSERR_BAD_LABEL_FORMAT
         otyp, opolicyref, olabel = tmp
         # Only ACM is supported
-        if otyp != xsconstants.ACM_POLICY_ID:
+        if otyp != xsconstants.ACM_POLICY_ID  and \
+           otyp != xsconstants.INVALID_POLICY_PREFIX + \
+                   xsconstants.ACM_POLICY_ID:
             return -xsconstants.XSERR_WRONG_POLICY_TYPE
+    rc = validate_label(label, policyref)
+    if rc != xsconstants.XSERR_SUCCESS:
+        return rc
     return set_resource_label(resource, typ, policyref, label, olabel)
+
 
 def is_resource_in_use(resource):
     """ Investigate all running domains whether they use this device """
@@ -1228,7 +1252,7 @@ def change_acm_policy(bin_pol, del_array, chg_array,
                 sec_lab, new_seclab = labels
                 if sec_lab != new_seclab:
                     log.info("Updating domain %s to new label '%s'." % \
-                             (new_seclab, sec_lab))
+                             (sec_lab, new_seclab))
                     # This better be working!
                     dominfo.set_security_label(new_seclab,
                                                sec_lab,

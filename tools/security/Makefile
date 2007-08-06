@@ -13,13 +13,6 @@ CFLAGS     += $(shell xml2-config --cflags )
 CFLAGS     += $(shell if [[ $(XML2VERSION) < 2.6.20 ]]; then echo ""; else echo "-DVALIDATE_SCHEMA"; fi )
 LDFLAGS    += $(shell xml2-config --libs ) # if this does not work, try -L/usr/lib -lxml2 -lz -lpthread -lm
 
-ifeq ($(ACM_DEFAULT_SECURITY_POLICY),ACM_NULL_POLICY)
-POLICY=null
-endif
-ifeq ($(ACM_DEFAULT_SECURITY_POLICY),ACM_CHINESE_WALL_AND_SIMPLE_TYPE_ENFORCEMENT_POLICY)
-POLICY=chwall_ste
-endif
-
 SRCS_TOOL     = secpol_tool.c
 OBJS_TOOL    := $(patsubst %.c,%.o,$(filter %.c,$(SRCS_TOOL)))
 SRCS_XML2BIN  = secpol_xml2bin.c secpol_xml2bin.h
@@ -41,6 +34,7 @@ ACM_SECGEN_CGIDIR = $(ACM_SECGEN_HTMLDIR)/cgi-bin
 
 ACM_SCHEMA        = security_policy.xsd
 ACM_EXAMPLES      = client_v1 test
+ACM_DEF_POLICIES  = default default-ul
 ACM_POLICY_SUFFIX = security_policy.xml
 
 ifeq ($(ACM_SECURITY),y)
@@ -61,6 +55,9 @@ install: all $(ACM_CONFIG_FILE)
 	$(INSTALL_DIR) $(DESTDIR)$(ACM_POLICY_DIR)/example
 	for i in $(ACM_EXAMPLES); do \
 		$(INSTALL_DATA) policies/example/$$i-$(ACM_POLICY_SUFFIX) $(DESTDIR)$(ACM_POLICY_DIR)/example/; \
+	done
+	for i in $(ACM_DEF_POLICIES); do \
+		$(INSTALL_DATA) policies/$$i-$(ACM_POLICY_SUFFIX) $(DESTDIR)$(ACM_POLICY_DIR); \
 	done
 	$(INSTALL_DIR) $(DESTDIR)$(ACM_SCRIPT_DIR)
 	$(INSTALL_PROG) $(ACM_SCRIPTS) $(DESTDIR)$(ACM_SCRIPT_DIR)
