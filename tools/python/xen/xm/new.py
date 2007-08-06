@@ -75,7 +75,8 @@ def main(argv):
         doc = sxp2xml_inst.convert_sxp_to_xml(config) 
         
         xenapi_create_inst = xenapi_create()
-        vm_refs = xenapi_create_inst.create(document = doc)
+        vm_refs = xenapi_create_inst.create(document = doc,
+                                            skipdtd=opts.vals.skipdtd)
     else:       
         make_unstarted_domain(opts, config)
         
