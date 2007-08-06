@@ -395,9 +395,33 @@ static void irq_dump(struct domain *d)
 static int irq_save_pci(struct domain *d, hvm_domain_context_t *h)
 {
     struct hvm_irq *hvm_irq = &d->arch.hvm_domain.irq;
+    unsigned int asserted, pdev, pintx;
+    int rc;
+
+    spin_lock(&d->arch.hvm_domain.irq_lock);
+
+    pdev  = hvm_irq->callback_via.pci.dev;
+    pintx = hvm_irq->callback_via.pci.intx;
+    asserted = (hvm_irq->callback_via_asserted &&
+                (hvm_irq->callback_via_type == HVMIRQ_callback_pci_intx));
+
+    /*
+     * Deassert virtual interrupt via PCI INTx line. The virtual interrupt
+     * status is not save/restored, so the INTx line must be deasserted in
+     * the restore context.
+     */
+    if ( asserted )
+        __hvm_pci_intx_deassert(d, pdev, pintx);
 
     /* Save PCI IRQ lines */
-    return ( hvm_save_entry(PCI_IRQ, 0, h, &hvm_irq->pci_intx) );
+    rc = hvm_save_entry(PCI_IRQ, 0, h, &hvm_irq->pci_intx);
+
+    if ( asserted )
+        __hvm_pci_intx_assert(d, pdev, pintx);    
+
+    spin_unlock(&d->arch.hvm_domain.irq_lock);
+
+    return rc;
 }
 
 static int irq_save_isa(struct domain *d, hvm_domain_context_t *h)
