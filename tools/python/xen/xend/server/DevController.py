@@ -203,27 +203,32 @@ class DevController:
 
         The implementation here simply deletes the appropriate paths from the
         store.  This may be overridden by subclasses who need to perform other
-        tasks on destruction.  Further, the implementation here can only
-        accept integer device IDs, or values that can be converted to
-        integers.  Subclasses may accept other values and convert them to
-        integers before passing them here.
+        tasks on destruction. The implementation here accepts integer device
+        IDs or paths containg integer deviceIDs, e.g. vfb/0.  Subclasses may
+        accept other values and convert them to integers before passing them
+        here.
         """
 
-        devid = int(devid)
+        try:
+            dev = int(devid)
+        except ValueError:
+            # Does devid contain devicetype/deviceid?
+            # Propogate exception if unable to find an integer devid
+            dev = int(type(devid) is str and devid.split('/')[-1] or None)
 
         # Modify online status /before/ updating state (latter is watched by
         # drivers, so this ordering avoids a race).
-        self.writeBackend(devid, 'online', "0")
-        self.writeBackend(devid, 'state', str(xenbusState['Closing']))
+        self.writeBackend(dev, 'online', "0")
+        self.writeBackend(dev, 'state', str(xenbusState['Closing']))
 
         if force:
-            frontpath = self.frontendPath(devid)
+            frontpath = self.frontendPath(dev)
             backpath = xstransact.Read(frontpath, "backend")
             if backpath:
                 xstransact.Remove(backpath)
             xstransact.Remove(frontpath)
 
-        self.vm._removeVm("device/%s/%d" % (self.deviceClass, devid))
+        self.vm._removeVm("device/%s/%d" % (self.deviceClass, dev))
 
     def configurations(self):
         return map(self.configuration, self.deviceIDs())

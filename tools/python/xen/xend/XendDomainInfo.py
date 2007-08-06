@@ -559,18 +559,8 @@ class XendDomainInfo:
             self.getDeviceController(devclass).waitForDevices()
 
     def destroyDevice(self, deviceClass, devid, force = False):
-        try:
-            dev = int(devid)
-        except ValueError:
-            # devid is not a number but a string containing either device
-            # name (e.g. xvda) or device_type/device_id (e.g. vbd/51728)
-            dev = type(devid) is str and devid.split('/')[-1] or None
-            if dev == None:
-                log.debug("Could not find the device %s", devid)
-                return None
-
-        log.debug("dev = %s", dev)
-        return self.getDeviceController(deviceClass).destroyDevice(dev, force)
+        log.debug("dev = %s", devid)
+        return self.getDeviceController(deviceClass).destroyDevice(devid, force)
 
     def getDeviceSxprs(self, deviceClass):
         if self._stateGet() in (DOM_STATE_RUNNING, DOM_STATE_PAUSED):

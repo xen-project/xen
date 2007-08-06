@@ -154,13 +154,16 @@ class BlkifController(DevController):
     def destroyDevice(self, devid, force):
         """@see DevController.destroyDevice"""
 
-        # If we are given a device name, then look up the device ID from it,
-        # and destroy that ID instead.  If what we are given is an integer,
-        # then assume it's a device ID and pass it straight through to our
-        # superclass's method.
-
+        # vbd device IDs can be either string or integer.  Further, the
+        # following string values are possible:
+        #    - devicetype/deviceid (vbd/51728)
+        #    - devicetype/devicename (/dev/xvdb)
+        #    - devicename (xvdb)
+        # Let our superclass handle integer or devicetype/deviceid forms.
+        # If we are given a device name form, then look up the device ID
+        # from it, and destroy that ID instead.
         try:
-            DevController.destroyDevice(self, int(devid), force)
+            DevController.destroyDevice(self, devid, force)
         except ValueError:
             devid_end = type(devid) is str and devid.split('/')[-1] or None
 
