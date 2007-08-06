@@ -51,6 +51,7 @@ from xen.xm.opts import OptionError, Opts, wrap, set_true
 from xen.xm import console
 from xen.util.xmlrpcclient import ServerProxy
 from xen.util.security import ACMError
+from xen.util.acmpolicy import ACM_LABEL_UNLABELED_DISPLAY
 
 import XenAPI
 
@@ -947,7 +948,7 @@ def xm_label_list(doms):
         d = parse_doms_info(dom)
         if security.active_policy not in ['INACTIVE', 'NULL', 'DEFAULT']:
             if not d['seclabel']:
-                d['seclabel'] = 'ERROR'
+                d['seclabel'] = ACM_LABEL_UNLABELED_DISPLAY
         elif security.active_policy in ['DEFAULT']:
             d['seclabel'] = 'DEFAULT'
         else:

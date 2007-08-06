@@ -73,17 +73,7 @@ class BlkifController(DevController):
             back['uuid'] = uuid
 
         if security.on():
-            (label, ssidref, policy) = \
-                                 security.get_res_security_details(uname)
-            domain_label = self.vm.get_security_label()
-            if domain_label:
-                rc = security.res_security_check_xapi(label, ssidref, policy,
-                                                      domain_label)
-                if rc == 0:
-                    raise VmError("VM's access to block device '%s' denied." %
-                                  uname)
-            else:
-                raise VmError("VM must have a security label.")
+            self.do_access_control(config, uname)
 
         devid = blkif.blkdev_name_to_number(dev)
         if devid is None:
@@ -95,6 +85,21 @@ class BlkifController(DevController):
 
         return (devid, back, front)
 
+    def do_access_control(self, config, uname):
+        (label, ssidref, policy) = \
+                             security.get_res_security_details(uname)
+        domain_label = self.vm.get_security_label()
+        if domain_label:
+            rc = security.res_security_check_xapi(label, ssidref, policy,
+                                                  domain_label)
+            if rc == 0:
+                raise VmError("VM's access to block device '%s' denied" %
+                              uname)
+        else:
+            from xen.util.acmpolicy import ACM_LABEL_UNLABELED
+            if label != ACM_LABEL_UNLABELED:
+                raise VmError("VM must have a security label to access "
+                              "block device '%s'" % uname)
 
     def reconfigureDevice(self, _, config):
         """@see DevController.reconfigureDevice"""

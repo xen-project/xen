@@ -1463,8 +1463,6 @@ class XendDomainInfo:
         ssidref = 0
         if security.on():
             ssidref = security.calc_dom_ssidref_from_info(self.info)
-            if ssidref == 0:
-                raise VmError('VM is not properly labeled.')
             if security.has_authorization(ssidref) == False:
                 raise VmError("VM is not authorized to run.")
 

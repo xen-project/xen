@@ -47,6 +47,9 @@ ACM_POLICY_UNDEFINED = 15
 
 ACM_SCHEMA_FILE = "/etc/xen/acm-security/policies/security_policy.xsd"
 
+ACM_LABEL_UNLABELED = "__UNLABELED__"
+ACM_LABEL_UNLABELED_DISPLAY = "unlabeled"
+
 class ACMPolicy(XSPolicy):
     """
      ACMPolicy class. Implements methods for getting information from
@@ -925,11 +928,13 @@ class ACMPolicy(XSPolicy):
             return -xsconstants.XSERR_POLICY_INCONSISTENT, "", ""
 
         vms_with_chws = []
-        chws_by_vm = {}
+        chws_by_vm = { ACM_LABEL_UNLABELED : [] }
         for v in vms:
             if v.has_key("chws"):
                 vms_with_chws.append(v["name"])
                 chws_by_vm[v["name"]] = v["chws"]
+
+
         if bootstrap in vms_with_chws:
             vms_with_chws.remove(bootstrap)
             vms_with_chws.sort()
@@ -937,18 +942,25 @@ class ACMPolicy(XSPolicy):
         else:
             vms_with_chws.sort()
 
+        if ACM_LABEL_UNLABELED in vms_with_chws:
+            vms_with_chws.remove(ACM_LABEL_UNLABELED) ; # @1
+
         vms_with_stes = []
-        stes_by_vm = {}
+        stes_by_vm = { ACM_LABEL_UNLABELED : [] }
         for v in vms:
             if v.has_key("stes"):
                 vms_with_stes.append(v["name"])
                 stes_by_vm[v["name"]] = v["stes"]
+
         if bootstrap in vms_with_stes:
             vms_with_stes.remove(bootstrap)
             vms_with_stes.sort()
             vms_with_stes.insert(0, bootstrap)
         else:
             vms_with_stes.sort()
+
+        if ACM_LABEL_UNLABELED in vms_with_stes:
+            vms_with_stes.remove(ACM_LABEL_UNLABELED) ; # @2
 
         resnames = self.policy_get_resourcelabel_names()
         resnames.sort()
@@ -957,6 +969,9 @@ class ACMPolicy(XSPolicy):
         for r in res:
             if r.has_key("stes"):
                 stes_by_res[r["name"]] = r["stes"]
+
+        if ACM_LABEL_UNLABELED in resnames:
+            resnames.remove(ACM_LABEL_UNLABELED)
 
         max_chw_ssids = 1 + len(vms_with_chws)
         max_chw_types = 1 + len(vms_with_chws)
@@ -1083,6 +1098,8 @@ class ACMPolicy(XSPolicy):
              pr_bin += "\x00"
 
         # Build chinese wall part
+        vms_with_chws.insert(0, ACM_LABEL_UNLABELED)
+
         cfses_names = self.policy_get_chwall_cfses_names_sorted()
         cfses = self.policy_get_chwall_cfses()
 
@@ -1105,9 +1122,7 @@ class ACMPolicy(XSPolicy):
                               chw_running_types_offset,
                               chw_conf_agg_offset)
         chw_bin_body = ""
-        # simulate __NULL_LABEL__
-        for c in chws:
-            chw_bin_body += struct.pack("!h",0)
+
         # VMs that are listed and their chinese walls
         for v in vms_with_chws:
             for c in chws:
@@ -1143,6 +1158,8 @@ class ACMPolicy(XSPolicy):
             chw_bin += "\x00"
 
         # Build STE part
+        vms_with_stes.insert(0, ACM_LABEL_UNLABELED) # Took out in @2
+
         steformat="!iiiii"
         ste_bin = struct.pack(steformat,
                               ACM_STE_VERSION,
@@ -1152,10 +1169,7 @@ class ACMPolicy(XSPolicy):
                               struct.calcsize(steformat))
         ste_bin_body = ""
         if stes:
-            # Simulate __NULL_LABEL__
-            for s in stes:
-                ste_bin_body += struct.pack("!h",0)
-            # VMs that are listed and their chinese walls
+            # VMs that are listed and their STE types
             for v in vms_with_stes:
                 unknown_ste |= (set(stes_by_vm[v]) - set(stes))
                 for s in stes:

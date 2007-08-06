@@ -93,6 +93,7 @@ int acm_init_chwall_policy(void)
     return ACM_OK;
 }
 
+
 static int chwall_init_domain_ssid(void **chwall_ssid, ssidref_t ssidref)
 {
     struct chwall_ssid *chwall_ssidp = xmalloc(struct chwall_ssid);
@@ -104,10 +105,10 @@ static int chwall_init_domain_ssid(void **chwall_ssid, ssidref_t ssidref)
     chwall_ssidp->chwall_ssidref =
         GET_SSIDREF(ACM_CHINESE_WALL_POLICY, ssidref);
 
-    if ( (chwall_ssidp->chwall_ssidref >= chwall_bin_pol.max_ssidrefs)
-        || (chwall_ssidp->chwall_ssidref == ACM_DEFAULT_LOCAL_SSID) )
+    if ( chwall_ssidp->chwall_ssidref >= chwall_bin_pol.max_ssidrefs )
     {
-        printkd("%s: ERROR chwall_ssidref(%x) undefined (>max) or unset (0).\n",
+        printkd("%s: ERROR chwall_ssidref(%x) undefined (>max) or unset "
+                "(0).\n",
                 __func__, chwall_ssidp->chwall_ssidref);
         xfree(chwall_ssidp);
         return ACM_INIT_SSID_ERROR;
@@ -117,6 +118,7 @@ static int chwall_init_domain_ssid(void **chwall_ssid, ssidref_t ssidref)
             __func__, chwall_ssidp->chwall_ssidref);
     return ACM_OK;
 }
+
 
 static void chwall_free_domain_ssid(void *chwall_ssid)
 {
@@ -205,7 +207,9 @@ chwall_init_state(struct acm_chwall_policy_buffer *chwall_buf,
 
     read_lock(&ssid_list_rwlock);
 
-    /* go through all domains and adjust policy as if this domain was started now */
+    /* go through all domains and adjust policy as if this domain was
+     * started now
+     */
     for_each_acmssid( rawssid )
     {
         chwall_ssid =
@@ -220,8 +224,8 @@ chwall_init_state(struct acm_chwall_policy_buffer *chwall_buf,
 
         /* b) check for conflict */
         for ( i = 0; i < chwall_buf->chwall_max_types; i++ )
-            if (conflict_aggregate_set[i] &&
-                ssidrefs[chwall_ssidref * chwall_buf->chwall_max_types + i])
+            if ( conflict_aggregate_set[i] &&
+                 ssidrefs[chwall_ssidref * chwall_buf->chwall_max_types + i] )
             {
                 printk("%s: CHINESE WALL CONFLICT in type %02x.\n",
                        __func__, i);
@@ -231,37 +235,46 @@ chwall_init_state(struct acm_chwall_policy_buffer *chwall_buf,
 
                 goto out;
             }
+
         /* set violation and break out of the loop */
-        /* c) adapt conflict aggregate set for this domain (notice conflicts) */
+        /* c) adapt conflict aggregate set for this domain
+         *    (notice conflicts)
+         */
         for ( i = 0; i < chwall_buf->chwall_max_conflictsets; i++ )
         {
             int common = 0;
             /* check if conflict_set_i and ssidref have common types */
             for ( j = 0; j < chwall_buf->chwall_max_types; j++ )
-                if (conflict_sets[i * chwall_buf->chwall_max_types + j] &&
-                    ssidrefs[chwall_ssidref *
-                            chwall_buf->chwall_max_types + j])
+                if ( conflict_sets[i * chwall_buf->chwall_max_types + j] &&
+                     ssidrefs[chwall_ssidref *
+                              chwall_buf->chwall_max_types + j] )
                 {
                     common = 1;
                     break;
                 }
-            if (common == 0)
+
+            if ( common == 0 )
                 continue;       /* try next conflict set */
-            /* now add types of the conflict set to conflict_aggregate_set (except types in chwall_ssidref) */
+
+            /* now add types of the conflict set to conflict_aggregate_set
+             * (except types in chwall_ssidref)
+             */
             for ( j = 0; j < chwall_buf->chwall_max_types; j++ )
-                if (conflict_sets[i * chwall_buf->chwall_max_types + j] &&
-                    !ssidrefs[chwall_ssidref *
-                             chwall_buf->chwall_max_types + j])
+                if ( conflict_sets[i * chwall_buf->chwall_max_types + j] &&
+                     !ssidrefs[chwall_ssidref *
+                               chwall_buf->chwall_max_types + j] )
                     conflict_aggregate_set[j]++;
         }
     }
  out:
     read_unlock(&ssid_list_rwlock);
     return violation;
-    /* returning "violation != 0" means that the currently running set of domains would
-     * not be possible if the new policy had been enforced before starting them; for chinese
-     * wall, this means that the new policy includes at least one conflict set of which
-     * more than one type is currently running */
+    /* returning "violation != 0" means that the currently running set of
+     * domains would not be possible if the new policy had been enforced
+     * before starting them; for chinese wall, this means that the new
+     * policy includes at least one conflict set of which more than one
+     * type is currently running
+     */
 }
 
 
@@ -348,8 +361,10 @@ static int _chwall_update_policy(u8 *buf, u32 buf_size, int test_only,
     memset(conflict_aggregate_set, 0,
            sizeof(domaintype_t) * chwall_buf->chwall_max_types);
 
-    /* 3. now re-calculate the state for the new policy based on running domains;
-     *    this can fail if new policy is conflicting with running domains */
+    /* 3. now re-calculate the state for the new policy based on
+     *    running domains; this can fail if new policy is conflicting
+     *    with running domains
+     */
     if ( chwall_init_state(chwall_buf, ssids,
                            conflict_sets, running_types,
                            conflict_aggregate_set,
@@ -483,31 +498,27 @@ static int _chwall_pre_domain_create(void *subject_ssid, ssidref_t ssidref)
 
     chwall_ssidref = GET_SSIDREF(ACM_CHINESE_WALL_POLICY, ssidref);
 
-    if (chwall_ssidref == ACM_DEFAULT_LOCAL_SSID)
-    {
-        printk("%s: ERROR CHWALL SSID is NOT SET but policy enforced.\n",
-               __func__);
-        return ACM_ACCESS_DENIED;       /* catching and indicating config error */
-    }
-
-    if (chwall_ssidref >= chwall_bin_pol.max_ssidrefs)
+    if ( chwall_ssidref >= chwall_bin_pol.max_ssidrefs )
     {
         printk("%s: ERROR chwall_ssidref > max(%x).\n",
                __func__, chwall_bin_pol.max_ssidrefs - 1);
         return ACM_ACCESS_DENIED;
     }
+
     /* A: chinese wall check for conflicts */
-    for (i = 0; i < chwall_bin_pol.max_types; i++)
-        if (chwall_bin_pol.conflict_aggregate_set[i] &&
-            chwall_bin_pol.ssidrefs[chwall_ssidref *
-                                   chwall_bin_pol.max_types + i])
+    for ( i = 0; i < chwall_bin_pol.max_types; i++ )
+        if ( chwall_bin_pol.conflict_aggregate_set[i] &&
+             chwall_bin_pol.ssidrefs[chwall_ssidref *
+                                     chwall_bin_pol.max_types + i] )
         {
             printk("%s: CHINESE WALL CONFLICT in type %02x.\n", __func__, i);
             return ACM_ACCESS_DENIED;
         }
 
     /* B: chinese wall conflict set adjustment (so that other
-     *      other domains simultaneously created are evaluated against this new set)*/
+     *    other domains simultaneously created are evaluated against
+     *    this new set)
+     */
     for ( i = 0; i < chwall_bin_pol.max_conflictsets; i++ )
     {
         int common = 0;
@@ -521,7 +532,7 @@ static int _chwall_pre_domain_create(void *subject_ssid, ssidref_t ssidref)
                 common = 1;
                 break;
             }
-        if (common == 0)
+        if ( common == 0 )
             continue;           /* try next conflict set */
         /* now add types of the conflict set to conflict_aggregate_set (except types in chwall_ssidref) */
         for ( j = 0; j < chwall_bin_pol.max_types; j++ )
@@ -571,9 +582,15 @@ static void _chwall_post_domain_create(domid_t domid, ssidref_t ssidref)
                 common = 1;
                 break;
             }
+
         if ( common == 0 )
-            continue;           /* try next conflict set */
-        /* now add types of the conflict set to conflict_aggregate_set (except types in chwall_ssidref) */
+        {
+            /* try next conflict set */
+            continue;
+        }
+
+        /* now add types of the conflict set to conflict_aggregate_set
+           (except types in chwall_ssidref) */
         for ( j = 0; j < chwall_bin_pol.max_types; j++ )
             if ( chwall_bin_pol.
                  conflict_sets[i * chwall_bin_pol.max_types + j]
@@ -638,9 +655,15 @@ static void chwall_domain_destroy(void *object_ssid, struct domain *d)
                 common = 1;
                 break;
             }
-        if (common == 0)
-            continue;           /* try next conflict set, this one does not include any type of chwall_ssidref */
-        /* now add types of the conflict set to conflict_aggregate_set (except types in chwall_ssidref) */
+        if ( common == 0 )
+        {
+            /* try next conflict set, this one does not include
+               any type of chwall_ssidref */
+            continue;
+        }
+
+        /* now add types of the conflict set to conflict_aggregate_set
+           (except types in chwall_ssidref) */
         for ( j = 0; j < chwall_bin_pol.max_types; j++ )
             if ( chwall_bin_pol.
                  conflict_sets[i * chwall_bin_pol.max_types + j]

@@ -155,7 +155,7 @@ def calc_dom_ssidref_from_info(info):
             ssidref = label2ssidref(vmlabel, policyname, "dom")
             return ssidref
         else:
-            return 0
+            return 0x0
     raise VmError("security.calc_dom_ssidref_from_info: info of type '%s'"
                   "not supported." % type(info))
 
@@ -231,6 +231,10 @@ def ssidref2label(ssidref_var):
         ssidref = ssidref_var
     else:
         err("Instance type of ssidref not supported (must be of type 'str' or 'int')")
+
+    if ssidref == 0:
+        from xen.util.acmpolicy import ACM_LABEL_UNLABELED
+        return ACM_LABEL_UNLABELED
 
     try:
         mapfile_lock()
@@ -867,7 +871,7 @@ def get_domain_resources(dominfo):
                 resources[typ].append("%s:%s:%s" %
                                       (xsconstants.ACM_POLICY_ID,
                                        active_policy,
-                                       "unlabeled"))
+                                       ACM_LABEL_UNLABELED))
 
     return resources
 
