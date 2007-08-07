@@ -118,7 +118,7 @@ do_hvm_op(unsigned long op, XEN_GUEST_HANDLE(void) arg)
         if (copy_from_guest(&a, arg, 1))
             return -EFAULT;
 
-        if (a.index > HVM_NR_PARAMS)
+        if (a.index >= HVM_NR_PARAMS)
             return -EINVAL;
 
         if (a.domid == DOMID_SELF) {
