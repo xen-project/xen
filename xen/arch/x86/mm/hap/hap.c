@@ -636,7 +636,7 @@ static void hap_update_paging_modes(struct vcpu *v)
         v->arch.paging.mode = &hap_paging_real_mode;
     }
 
-    v->arch.paging.translate_enabled = !!hvm_paging_enabled(v);
+    v->arch.paging.translate_enabled = hvm_paging_enabled(v);
 
     if ( pagetable_is_null(v->arch.monitor_table) )
     {

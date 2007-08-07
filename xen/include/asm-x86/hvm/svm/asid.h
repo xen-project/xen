@@ -32,16 +32,7 @@ void svm_asid_init_vcpu(struct vcpu *v);
 void svm_asid_inv_asid(struct vcpu *v);
 void svm_asid_inc_generation(void);
 
-/*
- * ASID related, guest triggered events.
- */
-
 static inline void svm_asid_g_update_paging(struct vcpu *v)
-{
-    svm_asid_inv_asid(v);
-}
-
-static inline void svm_asid_g_mov_to_cr3(struct vcpu *v)
 {
     svm_asid_inv_asid(v);
 }

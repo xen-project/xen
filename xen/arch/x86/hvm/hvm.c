@@ -520,6 +520,63 @@ void hvm_triple_fault(void)
     domain_shutdown(v->domain, SHUTDOWN_reboot);
 }
 
+int hvm_set_cr3(unsigned long value)
+{
+    unsigned long old_base_mfn, mfn;
+    struct vcpu *v = current;
+
+    if ( paging_mode_hap(v->domain) )
+    {
+        v->arch.hvm_vcpu.guest_cr[3] = value;
+        hvm_update_guest_cr3(v, value);
+        goto success;
+    }
+
+    if ( !hvm_paging_enabled(v) )
+    {
+        v->arch.hvm_vcpu.guest_cr[3] = value;
+        goto success;
+    }
+
+    if ( value == v->arch.hvm_vcpu.guest_cr[3] )
+    {
+        /* 
+         * This is simple TLB flush, implying the guest has removed some
+         * translation or changed page attributes. Invalidate the shadow.
+         */
+        mfn = get_mfn_from_gpfn(value >> PAGE_SHIFT);
+        if ( mfn != pagetable_get_pfn(v->arch.guest_table) )
+            goto bad_cr3;
+    }
+    else 
+    {
+        /* Make a shadow. Check that the PDBR is valid first. */
+        HVM_DBG_LOG(DBG_LEVEL_VMMU, "CR3 value = %lx", value);
+        mfn = get_mfn_from_gpfn(value >> PAGE_SHIFT);
+        if ( !mfn_valid(mfn) || !get_page(mfn_to_page(mfn), v->domain) )
+            goto bad_cr3;
+
+        old_base_mfn = pagetable_get_pfn(v->arch.guest_table);
+        v->arch.guest_table = pagetable_from_pfn(mfn);
+
+        if ( old_base_mfn )
+            put_page(mfn_to_page(old_base_mfn));
+
+        v->arch.hvm_vcpu.guest_cr[3] = value;
+        HVM_DBG_LOG(DBG_LEVEL_VMMU, "Update CR3 value = %lx", value);
+    }
+
+    paging_update_cr3(v);
+
+ success:
+    return 1;
+
+ bad_cr3:
+    gdprintk(XENLOG_ERR, "Invalid CR3\n");
+    domain_crash(v->domain);
+    return 0;
+}
+
 /*
  * __hvm_copy():
  *  @buf  = hypervisor buffer
@@ -668,7 +725,6 @@ typedef unsigned long hvm_hypercall_t(
 static hvm_hypercall_t *hvm_hypercall32_table[NR_hypercalls] = {
     HYPERCALL(memory_op),
     [ __HYPERVISOR_grant_table_op ] = (hvm_hypercall_t *)hvm_grant_table_op,
-    HYPERCALL(multicall),
     HYPERCALL(xen_version),
     HYPERCALL(grant_table_op),
     HYPERCALL(event_channel_op),
@@ -815,7 +871,7 @@ int hvm_do_hypercall(struct cpu_user_regs *regs)
 
 void hvm_update_guest_cr3(struct vcpu *v, unsigned long guest_cr3)
 {
-    v->arch.hvm_vcpu.hw_cr3 = guest_cr3;
+    v->arch.hvm_vcpu.hw_cr[3] = guest_cr3;
     hvm_funcs.update_guest_cr3(v);
 }
 

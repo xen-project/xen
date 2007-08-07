@@ -67,17 +67,11 @@ struct arch_vmx_struct {
     /* Cache of cpu execution control. */
     u32                  exec_control;
 
-    unsigned long        cpu_cr0; /* copy of guest CR0 */
-    unsigned long        cpu_shadow_cr0; /* copy of guest read shadow CR0 */
-    unsigned long        cpu_shadow_cr4; /* copy of guest read shadow CR4 */
-    unsigned long        cpu_cr2; /* save CR2 */
-    unsigned long        cpu_cr3;
 #ifdef __x86_64__
     struct vmx_msr_state msr_state;
     unsigned long        shadow_gs;
     unsigned long        cstar;
 #endif
-    unsigned long        efer;
 
     /* Following fields are all specific to vmxassist. */
     unsigned long        vmxassist_enabled:1;

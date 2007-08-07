@@ -88,7 +88,7 @@ ENTRY(vmx_asm_do_vmentry)
         jnz   vmx_process_softirqs
 
         call vmx_intr_assist
-        movq VCPU_vmx_cr2(%rbx),%rax
+        movq VCPU_hvm_guest_cr2(%rbx),%rax
         movq %rax,%cr2
         call vmx_trace_vmentry
 

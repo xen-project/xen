@@ -506,17 +506,17 @@ static void construct_vmcs(struct vcpu *v)
 
     /* Guest CR0. */
     cr0 = read_cr0();
-    v->arch.hvm_vmx.cpu_cr0 = cr0;
-    __vmwrite(GUEST_CR0, v->arch.hvm_vmx.cpu_cr0);
-    v->arch.hvm_vmx.cpu_shadow_cr0 = cr0 & ~(X86_CR0_PG | X86_CR0_TS);
-    __vmwrite(CR0_READ_SHADOW, v->arch.hvm_vmx.cpu_shadow_cr0);
+    v->arch.hvm_vcpu.hw_cr[0] = cr0;
+    __vmwrite(GUEST_CR0, v->arch.hvm_vcpu.hw_cr[0]);
+    v->arch.hvm_vcpu.guest_cr[0] = cr0 & ~(X86_CR0_PG | X86_CR0_TS);
+    __vmwrite(CR0_READ_SHADOW, v->arch.hvm_vcpu.guest_cr[0]);
 
     /* Guest CR4. */
     cr4 = read_cr4();
     __vmwrite(GUEST_CR4, cr4 & ~X86_CR4_PSE);
-    v->arch.hvm_vmx.cpu_shadow_cr4 =
+    v->arch.hvm_vcpu.guest_cr[4] =
         cr4 & ~(X86_CR4_PGE | X86_CR4_VMXE | X86_CR4_PAE);
-    __vmwrite(CR4_READ_SHADOW, v->arch.hvm_vmx.cpu_shadow_cr4);
+    __vmwrite(CR4_READ_SHADOW, v->arch.hvm_vcpu.guest_cr[4]);
 
     if ( cpu_has_vmx_tpr_shadow )
     {
