@@ -84,7 +84,7 @@ unsigned long hap_gva_to_gfn(GUEST_PAGING_LEVELS)(
         mfn = get_mfn_from_gpfn(gpfn);
         if ( mfn == INVALID_MFN )
         {
-            HAP_PRINTK("bad pfn=0x%lx from gva=0x%lx at lev%d\n", gpfn, gva, 
+            HAP_PRINTK("bad pfn=0x%lx from gva=0x%lx at lev%d\n", gpfn, gva,
                        lev);
             success = 0;
             break;

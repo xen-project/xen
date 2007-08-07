@@ -73,7 +73,7 @@ int hap_disable_log_dirty(struct domain *d)
     hap_unlock(d);
 
     /* set l1e entries of P2M table with normal mode */
-    p2m_set_flags_global(d, __PAGE_HYPERVISOR|_PAGE_USER);    
+    p2m_set_flags_global(d, __PAGE_HYPERVISOR|_PAGE_USER);
     return 0;
 }
 
@@ -111,7 +111,7 @@ static struct page_info *hap_alloc(struct domain *d)
 
 static void hap_free(struct domain *d, mfn_t mfn)
 {
-    struct page_info *pg = mfn_to_page(mfn); 
+    struct page_info *pg = mfn_to_page(mfn);
 
     ASSERT(hap_locked_by_me(d));
 
@@ -128,7 +128,7 @@ static struct page_info *hap_alloc_p2m_page(struct domain *d)
 
 #if CONFIG_PAGING_LEVELS == 3
     /* Under PAE mode, top-level P2M table should be allocated below 4GB space
-     * because the size of h_cr3 is only 32-bit. We use alloc_domheap_pages to 
+     * because the size of h_cr3 is only 32-bit. We use alloc_domheap_pages to
      * force this requirement, and exchange the guaranteed 32-bit-clean
      * page for the one we just hap_alloc()ed. */
     if ( d->arch.paging.hap.p2m_pages == 0
@@ -166,9 +166,9 @@ void hap_free_p2m_page(struct domain *d, struct page_info *pg)
         HAP_ERROR("Odd p2m page count c=%#x t=%"PRtype_info"\n",
                   pg->count_info, pg->u.inuse.type_info);
     pg->count_info = 0;
-    /* Free should not decrement domain's total allocation, since 
+    /* Free should not decrement domain's total allocation, since
      * these pages were allocated without an owner. */
-    page_set_owner(pg, NULL); 
+    page_set_owner(pg, NULL);
     free_domheap_page(pg);
     d->arch.paging.hap.p2m_pages--;
     ASSERT(d->arch.paging.hap.p2m_pages >= 0);
@@ -221,7 +221,7 @@ hap_set_allocation(struct domain *d, unsigned int pages, int *preempted)
             pg->count_info = 0;
             free_domheap_page(pg);
         }
-        
+
         /* Check to see if we need to yield and try again */
         if ( preempted && hypercall_preempt_check() )
         {
@@ -275,7 +275,7 @@ static void hap_install_xen_entries_in_l2h(struct vcpu *v, mfn_t l2hmfn)
 
     l2e = hap_map_domain_page(l2hmfn);
     ASSERT(l2e != NULL);
-    
+
     /* Copy the common Xen mappings from the idle domain */
     memcpy(&l2e[L2_PAGETABLE_FIRST_XEN_SLOT & (L2_PAGETABLE_ENTRIES-1)],
            &idle_pg_table_l2[L2_PAGETABLE_FIRST_XEN_SLOT],
@@ -318,7 +318,7 @@ static void hap_install_xen_entries_in_l2(struct vcpu *v, mfn_t l2mfn)
 
     l2e = hap_map_domain_page(l2mfn);
     ASSERT(l2e != NULL);
-    
+
     /* Copy the common Xen mappings from the idle domain */
     memcpy(&l2e[L2_PAGETABLE_FIRST_XEN_SLOT],
            &idle_pg_table[L2_PAGETABLE_FIRST_XEN_SLOT],
@@ -362,7 +362,7 @@ static mfn_t hap_make_monitor_table(struct vcpu *v)
     }
 #elif CONFIG_PAGING_LEVELS == 3
     {
-        mfn_t m3mfn, m2mfn; 
+        mfn_t m3mfn, m2mfn;
         l3_pgentry_t *l3e;
         l2_pgentry_t *l2e;
         int i;
@@ -384,8 +384,8 @@ static mfn_t hap_make_monitor_table(struct vcpu *v)
         l2e = hap_map_domain_page(m2mfn);
         for ( i = 0; i < L3_PAGETABLE_ENTRIES; i++ )
             l2e[l2_table_offset(LINEAR_PT_VIRT_START) + i] =
-                (l3e_get_flags(l3e[i]) & _PAGE_PRESENT) 
-                ? l2e_from_pfn(l3e_get_pfn(l3e[i]), __PAGE_HYPERVISOR) 
+                (l3e_get_flags(l3e[i]) & _PAGE_PRESENT)
+                ? l2e_from_pfn(l3e_get_pfn(l3e[i]), __PAGE_HYPERVISOR)
                 : l2e_empty();
         hap_unmap_domain_page(l2e);
         hap_unmap_domain_page(l3e);
@@ -536,7 +536,7 @@ void hap_teardown(struct domain *d)
                       d->arch.paging.hap.p2m_pages);
         ASSERT(d->arch.paging.hap.total_pages == 0);
     }
-    
+
     d->arch.paging.mode &= ~PG_log_dirty;
 
     hap_unlock(d);
@@ -555,7 +555,7 @@ int hap_domctl(struct domain *d, xen_domctl_shadow_op_t *sc,
         hap_unlock(d);
         if ( preempted )
             /* Not finished.  Set up to re-run the call. */
-            rc = hypercall_create_continuation(__HYPERVISOR_domctl, "h", 
+            rc = hypercall_create_continuation(__HYPERVISOR_domctl, "h",
                                                u_domctl);
         else
             /* Finished.  Return the new allocation */
@@ -578,11 +578,11 @@ void hap_vcpu_init(struct vcpu *v)
 /************************************************/
 /*          HAP PAGING MODE FUNCTIONS           */
 /************************************************/
-/* 
+/*
  * HAP guests can handle page faults (in the guest page tables) without
  * needing any action from Xen, so we should not be intercepting them.
  */
-static int hap_page_fault(struct vcpu *v, unsigned long va, 
+static int hap_page_fault(struct vcpu *v, unsigned long va,
                           struct cpu_user_regs *regs)
 {
     HAP_ERROR("Intercepted a guest #PF (%u:%u) with HAP enabled.\n",
@@ -591,9 +591,9 @@ static int hap_page_fault(struct vcpu *v, unsigned long va,
     return 0;
 }
 
-/* 
+/*
  * HAP guests can handle invlpg without needing any action from Xen, so
- * should not be intercepting it. 
+ * should not be intercepting it.
  */
 static int hap_invlpg(struct vcpu *v, unsigned long va)
 {
@@ -649,7 +649,7 @@ static void hap_update_paging_modes(struct vcpu *v)
 }
 
 #if CONFIG_PAGING_LEVELS == 3
-static void p2m_install_entry_in_monitors(struct domain *d, l3_pgentry_t *l3e) 
+static void p2m_install_entry_in_monitors(struct domain *d, l3_pgentry_t *l3e)
 /* Special case, only used for PAE hosts: update the mapping of the p2m
  * table.  This is trivial in other paging modes (one top-level entry
  * points to the top-level p2m, no maintenance needed), but PAE makes
@@ -660,13 +660,13 @@ static void p2m_install_entry_in_monitors(struct domain *d, l3_pgentry_t *l3e)
     l2_pgentry_t *ml2e;
     struct vcpu *v;
     unsigned int index;
-    
+
     index = ((unsigned long)l3e & ~PAGE_MASK) / sizeof(l3_pgentry_t);
     ASSERT(index < MACHPHYS_MBYTES>>1);
-    
+
     for_each_vcpu ( d, v )
     {
-        if ( pagetable_get_pfn(v->arch.monitor_table) == 0 ) 
+        if ( pagetable_get_pfn(v->arch.monitor_table) == 0 )
             continue;
 
         ASSERT(paging_mode_external(v->domain));
@@ -689,7 +689,7 @@ static void p2m_install_entry_in_monitors(struct domain *d, l3_pgentry_t *l3e)
 }
 #endif
 
-static void 
+static void
 hap_write_p2m_entry(struct vcpu *v, unsigned long gfn, l1_pgentry_t *p,
                     mfn_t table_mfn, l1_pgentry_t new, unsigned int level)
 {
@@ -698,12 +698,12 @@ hap_write_p2m_entry(struct vcpu *v, unsigned long gfn, l1_pgentry_t *p,
     safe_write_pte(p, new);
 #if CONFIG_PAGING_LEVELS == 3
     /* install P2M in monitor table for PAE Xen */
-    if ( level == 3 ) 
+    if ( level == 3 )
         /* We have written to the p2m l3: need to sync the per-vcpu
          * copies of it in the monitor tables */
         p2m_install_entry_in_monitors(v->domain, (l3_pgentry_t *)p);
 #endif
-    
+
     hap_unlock(v->domain);
 }
 
@@ -715,7 +715,7 @@ static unsigned long hap_gva_to_gfn_real_mode(
 
 /* Entry points into this mode of the hap code. */
 struct paging_mode hap_paging_real_mode = {
-    .page_fault             = hap_page_fault, 
+    .page_fault             = hap_page_fault,
     .invlpg                 = hap_invlpg,
     .gva_to_gfn             = hap_gva_to_gfn_real_mode,
     .update_cr3             = hap_update_cr3,
@@ -725,7 +725,7 @@ struct paging_mode hap_paging_real_mode = {
 };
 
 struct paging_mode hap_paging_protected_mode = {
-    .page_fault             = hap_page_fault, 
+    .page_fault             = hap_page_fault,
     .invlpg                 = hap_invlpg,
     .gva_to_gfn             = hap_gva_to_gfn_2level,
     .update_cr3             = hap_update_cr3,
@@ -735,7 +735,7 @@ struct paging_mode hap_paging_protected_mode = {
 };
 
 struct paging_mode hap_paging_pae_mode = {
-    .page_fault             = hap_page_fault, 
+    .page_fault             = hap_page_fault,
     .invlpg                 = hap_invlpg,
     .gva_to_gfn             = hap_gva_to_gfn_3level,
     .update_cr3             = hap_update_cr3,
@@ -745,7 +745,7 @@ struct paging_mode hap_paging_pae_mode = {
 };
 
 struct paging_mode hap_paging_long_mode = {
-    .page_fault             = hap_page_fault, 
+    .page_fault             = hap_page_fault,
     .invlpg                 = hap_invlpg,
     .gva_to_gfn             = hap_gva_to_gfn_4level,
     .update_cr3             = hap_update_cr3,

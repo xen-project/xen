@@ -3,7 +3,7 @@
  *
  * hardware-assisted paging
  * Copyright (c) 2007 Advanced Micro Devices (Wei Huang)
- * 
+ *
  * Parts of this code are Copyright (c) 2006 by XenSource Inc.
  * Parts of this code are Copyright (c) 2006 by Michael A Fetterman
  * Parts based on earlier work by Michael A Fetterman, Ian Pratt et al.
