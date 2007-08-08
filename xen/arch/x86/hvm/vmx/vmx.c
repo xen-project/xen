@@ -1087,11 +1087,25 @@ static void vmx_update_host_cr3(struct vcpu *v)
     vmx_vmcs_exit(v);
 }
 
-static void vmx_update_guest_cr3(struct vcpu *v)
+static void vmx_update_guest_cr(struct vcpu *v, unsigned int cr)
 {
     ASSERT((v == current) || !vcpu_runnable(v));
+
     vmx_vmcs_enter(v);
-    __vmwrite(GUEST_CR3, v->arch.hvm_vcpu.hw_cr[3]);
+
+    switch ( cr )
+    {
+    case 3:
+        __vmwrite(GUEST_CR3, v->arch.hvm_vcpu.hw_cr[3]);
+        break;
+    case 4:
+        __vmwrite(GUEST_CR4, v->arch.hvm_vcpu.hw_cr[4]);
+        __vmwrite(CR4_READ_SHADOW, v->arch.hvm_vcpu.guest_cr[4]);
+        break;
+    default:
+        BUG();
+    }
+
     vmx_vmcs_exit(v);
 }
 
@@ -1157,7 +1171,7 @@ static struct hvm_function_table vmx_function_table = {
     .get_segment_base     = vmx_get_segment_base,
     .get_segment_register = vmx_get_segment_register,
     .update_host_cr3      = vmx_update_host_cr3,
-    .update_guest_cr3     = vmx_update_guest_cr3,
+    .update_guest_cr      = vmx_update_guest_cr,
     .flush_guest_tlbs     = vmx_flush_guest_tlbs,
     .update_vtpr          = vmx_update_vtpr,
     .stts                 = vmx_stts,
@@ -2263,12 +2277,9 @@ static int vmx_set_cr0(unsigned long value)
     CASE_ ## T ## ET_REG(R15, r15)
 #endif
 
-/*
- * Write to control registers
- */
 static int mov_to_cr(int gp, int cr, struct cpu_user_regs *regs)
 {
-    unsigned long value, old_cr;
+    unsigned long value;
     struct vcpu *v = current;
     struct vlapic *vlapic = vcpu_vlapic(v);
 
@@ -2303,66 +2314,7 @@ static int mov_to_cr(int gp, int cr, struct cpu_user_regs *regs)
         return hvm_set_cr3(value);
 
     case 4:
-        old_cr = v->arch.hvm_vcpu.guest_cr[4];
-
-        if ( value & HVM_CR4_GUEST_RESERVED_BITS )
-        {
-            HVM_DBG_LOG(DBG_LEVEL_1,
-                        "Guest attempts to set reserved bit in CR4: %lx",
-                        value);
-            vmx_inject_hw_exception(v, TRAP_gp_fault, 0);
-            return 0;
-        }
-
-        if ( (value & X86_CR4_PAE) && !(old_cr & X86_CR4_PAE) )
-        {
-            if ( hvm_paging_enabled(v) )
-            {
-#if CONFIG_PAGING_LEVELS >= 3
-                /* The guest is a 32-bit PAE guest. */
-                unsigned long mfn, old_base_mfn;
-                mfn = get_mfn_from_gpfn(v->arch.hvm_vcpu.guest_cr[3] >> PAGE_SHIFT);
-                if ( !mfn_valid(mfn) ||
-                     !get_page(mfn_to_page(mfn), v->domain) )
-                    goto bad_cr3;
-
-                /*
-                 * Now arch.guest_table points to machine physical.
-                 */
-                old_base_mfn = pagetable_get_pfn(v->arch.guest_table);
-                v->arch.guest_table = pagetable_from_pfn(mfn);
-                if ( old_base_mfn )
-                    put_page(mfn_to_page(old_base_mfn));
-
-                HVM_DBG_LOG(DBG_LEVEL_VMMU,
-                            "Update CR3 value = %lx, mfn = %lx",
-                            v->arch.hvm_vcpu.guest_cr[3], mfn);
-#endif
-            }
-        }
-        else if ( !(value & X86_CR4_PAE) )
-        {
-            if ( unlikely(hvm_long_mode_enabled(v)) )
-            {
-                HVM_DBG_LOG(DBG_LEVEL_1, "Guest cleared CR4.PAE while "
-                            "EFER.LMA is set");
-                vmx_inject_hw_exception(v, TRAP_gp_fault, 0);
-                return 0;
-            }
-        }
-
-        __vmwrite(GUEST_CR4, value | HVM_CR4_HOST_MASK);
-        v->arch.hvm_vcpu.guest_cr[4] = value;
-        __vmwrite(CR4_READ_SHADOW, v->arch.hvm_vcpu.guest_cr[4]);
-
-        /*
-         * Writing to CR4 to modify the PSE, PGE, or PAE flag invalidates
-         * all TLB entries except global entries.
-         */
-        if ( (old_cr ^ value) & (X86_CR4_PSE | X86_CR4_PGE | X86_CR4_PAE) )
-            paging_update_paging_modes(v);
-
-        break;
+        return hvm_set_cr4(value);
 
     case 8:
         vlapic_set_reg(vlapic, APIC_TASKPRI, ((value & 0x0F) << 4));
@@ -2370,14 +2322,11 @@ static int mov_to_cr(int gp, int cr, struct cpu_user_regs *regs)
 
     default:
         gdprintk(XENLOG_ERR, "invalid cr: %d\n", cr);
-        domain_crash(v->domain);
-        return 0;
+        goto exit_and_crash;
     }
 
     return 1;
 
- bad_cr3:
-    gdprintk(XENLOG_ERR, "Invalid CR3\n");
  exit_and_crash:
     domain_crash(v->domain);
     return 0;
@@ -2438,7 +2387,8 @@ static int vmx_cr_access(unsigned long exit_qualification,
     unsigned long value;
     struct vcpu *v = current;
 
-    switch ( exit_qualification & CONTROL_REG_ACCESS_TYPE ) {
+    switch ( exit_qualification & CONTROL_REG_ACCESS_TYPE )
+    {
     case TYPE_MOV_TO_CR:
         gp = exit_qualification & CONTROL_REG_ACCESS_REG;
         cr = exit_qualification & CONTROL_REG_ACCESS_NUM;

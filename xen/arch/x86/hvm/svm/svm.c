@@ -578,10 +578,20 @@ static void svm_update_host_cr3(struct vcpu *v)
     /* SVM doesn't have a HOST_CR3 equivalent to update. */
 }
 
-static void svm_update_guest_cr3(struct vcpu *v)
+static void svm_update_guest_cr(struct vcpu *v, unsigned int cr)
 {
-    v->arch.hvm_svm.vmcb->cr3 = v->arch.hvm_vcpu.hw_cr[3];
-    svm_asid_inv_asid(v);
+    switch ( cr )
+    {
+    case 3:
+        v->arch.hvm_svm.vmcb->cr3 = v->arch.hvm_vcpu.hw_cr[3];
+        svm_asid_inv_asid(v);
+        break;
+    case 4:
+        v->arch.hvm_svm.vmcb->cr4 = v->arch.hvm_vcpu.hw_cr[4];
+        break;
+    default:
+        BUG();
+    }
 }
 
 static void svm_flush_guest_tlbs(void)
@@ -917,7 +927,7 @@ static struct hvm_function_table svm_function_table = {
     .get_segment_base     = svm_get_segment_base,
     .get_segment_register = svm_get_segment_register,
     .update_host_cr3      = svm_update_host_cr3,
-    .update_guest_cr3     = svm_update_guest_cr3,
+    .update_guest_cr      = svm_update_guest_cr,
     .flush_guest_tlbs     = svm_flush_guest_tlbs,
     .update_vtpr          = svm_update_vtpr,
     .stts                 = svm_stts,
@@ -1684,9 +1694,6 @@ static int svm_set_cr0(unsigned long value)
     return 1;
 }
 
-/*
- * Read from control registers. CR0 and CR4 are read from the shadow.
- */
 static void mov_from_cr(int cr, int gp, struct cpu_user_regs *regs)
 {
     unsigned long value = 0;
@@ -1725,13 +1732,9 @@ static void mov_from_cr(int cr, int gp, struct cpu_user_regs *regs)
     HVM_DBG_LOG(DBG_LEVEL_VMMU, "mov_from_cr: CR%d, value = %lx", cr, value);
 }
 
-
-/*
- * Write to control registers
- */
 static int mov_to_cr(int gpreg, int cr, struct cpu_user_regs *regs)
 {
-    unsigned long value, old_cr;
+    unsigned long value;
     struct vcpu *v = current;
     struct vlapic *vlapic = vcpu_vlapic(v);
     struct vmcb_struct *vmcb = v->arch.hvm_svm.vmcb;
@@ -1752,69 +1755,7 @@ static int mov_to_cr(int gpreg, int cr, struct cpu_user_regs *regs)
         return hvm_set_cr3(value);
 
     case 4:
-        if ( value & HVM_CR4_GUEST_RESERVED_BITS )
-        {
-            HVM_DBG_LOG(DBG_LEVEL_1,
-                        "Guest attempts to set reserved bit in CR4: %lx",
-                        value);
-            svm_inject_exception(v, TRAP_gp_fault, 1, 0);
-            break;
-        }
-
-        if ( paging_mode_hap(v->domain) )
-        {
-            v->arch.hvm_vcpu.guest_cr[4] = value;
-            vmcb->cr4 = value | (HVM_CR4_HOST_MASK & ~X86_CR4_PAE);
-            paging_update_paging_modes(v);
-            break;
-        }
-
-        old_cr = v->arch.hvm_vcpu.guest_cr[4];
-        if ( value & X86_CR4_PAE && !(old_cr & X86_CR4_PAE) )
-        {
-            if ( hvm_paging_enabled(v) )
-            {
-#if CONFIG_PAGING_LEVELS >= 3
-                /* The guest is a 32-bit PAE guest. */
-                unsigned long mfn, old_base_mfn;
-                mfn = get_mfn_from_gpfn(v->arch.hvm_vcpu.guest_cr[3] >> PAGE_SHIFT);
-                if ( !mfn_valid(mfn) || 
-                     !get_page(mfn_to_page(mfn), v->domain) )
-                    goto bad_cr3;
-
-                /*
-                 * Now arch.guest_table points to machine physical.
-                 */
-                old_base_mfn = pagetable_get_pfn(v->arch.guest_table);
-                v->arch.guest_table = pagetable_from_pfn(mfn);
-                if ( old_base_mfn )
-                    put_page(mfn_to_page(old_base_mfn));
-                paging_update_paging_modes(v);
-
-                HVM_DBG_LOG(DBG_LEVEL_VMMU, 
-                            "Update CR3 value = %lx, mfn = %lx",
-                            v->arch.hvm_vcpu.guest_cr[3], mfn);
-#endif
-            }
-        } 
-        else if ( !(value & X86_CR4_PAE) )
-        {
-            if ( hvm_long_mode_enabled(v) )
-            {
-                svm_inject_exception(v, TRAP_gp_fault, 1, 0);
-            }
-        }
-
-        v->arch.hvm_vcpu.guest_cr[4] = value;
-        vmcb->cr4 = value | HVM_CR4_HOST_MASK;
-  
-        /*
-         * Writing to CR4 to modify the PSE, PGE, or PAE flag invalidates
-         * all TLB entries except global entries.
-         */
-        if ((old_cr ^ value) & (X86_CR4_PSE | X86_CR4_PGE | X86_CR4_PAE))
-            paging_update_paging_modes(v);
-        break;
+        return hvm_set_cr4(value);
 
     case 8:
         vlapic_set_reg(vlapic, APIC_TASKPRI, ((value & 0x0F) << 4));
@@ -1828,19 +1769,11 @@ static int mov_to_cr(int gpreg, int cr, struct cpu_user_regs *regs)
     }
 
     return 1;
-
- bad_cr3:
-    gdprintk(XENLOG_ERR, "Invalid CR3\n");
-    domain_crash(v->domain);
-    return 0;
 }
 
-
-#define ARR_SIZE(x) (sizeof(x) / sizeof(x[0]))
-
-
-static int svm_cr_access(struct vcpu *v, unsigned int cr, unsigned int type,
-                         struct cpu_user_regs *regs)
+static void svm_cr_access(
+    struct vcpu *v, unsigned int cr, unsigned int type,
+    struct cpu_user_regs *regs)
 {
     struct vmcb_struct *vmcb = v->arch.hvm_svm.vmcb;
     int inst_len = 0;
@@ -1865,12 +1798,12 @@ static int svm_cr_access(struct vcpu *v, unsigned int cr, unsigned int type,
     if ( type == TYPE_MOV_TO_CR )
     {
         inst_len = __get_instruction_length_from_list(
-            v, list_a, ARR_SIZE(list_a), &buffer[index], &match);
+            v, list_a, ARRAY_SIZE(list_a), &buffer[index], &match);
     }
     else /* type == TYPE_MOV_FROM_CR */
     {
         inst_len = __get_instruction_length_from_list(
-            v, list_b, ARR_SIZE(list_b), &buffer[index], &match);
+            v, list_b, ARRAY_SIZE(list_b), &buffer[index], &match);
     }
 
     ASSERT(inst_len > 0);
@@ -1883,7 +1816,8 @@ static int svm_cr_access(struct vcpu *v, unsigned int cr, unsigned int type,
 
     HVM_DBG_LOG(DBG_LEVEL_1, "eip = %lx", (unsigned long) vmcb->rip);
 
-    switch (match) 
+    switch ( match )
+
     {
     case INSTR_MOV2CR:
         gpreg = decode_src_reg(prefix, buffer[index+2]);
@@ -1974,9 +1908,8 @@ static int svm_cr_access(struct vcpu *v, unsigned int cr, unsigned int type,
 
     ASSERT(inst_len);
 
-    __update_guest_eip(vmcb, inst_len);
-    
-    return result;
+    if ( result )
+        __update_guest_eip(vmcb, inst_len);
 }
 
 static void svm_do_msr_access(

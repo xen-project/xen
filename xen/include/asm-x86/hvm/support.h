@@ -235,5 +235,6 @@ void hvm_hlt(unsigned long rflags);
 void hvm_triple_fault(void);
 
 int hvm_set_cr3(unsigned long value);
+int hvm_set_cr4(unsigned long value);
 
 #endif /* __ASM_X86_HVM_SUPPORT_H__ */

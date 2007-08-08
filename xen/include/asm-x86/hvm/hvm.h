@@ -107,14 +107,14 @@ struct hvm_function_table {
                                  struct segment_register *reg);
 
     /* 
-     * Re-set the value of CR3 that Xen runs on when handling VM exits
+     * Re-set the value of CR3 that Xen runs on when handling VM exits.
      */
     void (*update_host_cr3)(struct vcpu *v);
 
     /*
-     * Called to inform HVM layer that a guest cr3 has changed
+     * Called to inform HVM layer that a guest control register has changed.
      */
-    void (*update_guest_cr3)(struct vcpu *v);
+    void (*update_guest_cr)(struct vcpu *v, unsigned int cr);
 
     /*
      * Called to ensure than all guest-specific mappings in a tagged TLB
@@ -220,7 +220,10 @@ hvm_update_vtpr(struct vcpu *v, unsigned long value)
     hvm_funcs.update_vtpr(v, value);
 }
 
-void hvm_update_guest_cr3(struct vcpu *v, unsigned long guest_cr3);
+static inline void hvm_update_guest_cr(struct vcpu *v, unsigned int cr)
+{
+    hvm_funcs.update_guest_cr(v, cr);
+}
 
 static inline void 
 hvm_flush_guest_tlbs(void)

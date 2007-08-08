@@ -3483,7 +3483,7 @@ sh_update_cr3(struct vcpu *v, int do_locking)
  * Paravirtual guests should set v->arch.guest_table (and guest_table_user,
  * if appropriate).
  * HVM guests should also make sure hvm_get_guest_cntl_reg(v, 3) works;
- * this function will call hvm_update_guest_cr3() to tell them where the 
+ * this function will call hvm_update_guest_cr(v, 3) to tell them where the 
  * shadow tables are.
  * If do_locking != 0, assume we are being called from outside the 
  * shadow code, and must take and release the shadow lock; otherwise 
@@ -3725,11 +3725,14 @@ sh_update_cr3(struct vcpu *v, int do_locking)
         ASSERT(is_hvm_domain(d));
 #if SHADOW_PAGING_LEVELS == 3
         /* 2-on-3 or 3-on-3: Use the PAE shadow l3 table we just fabricated */
-        hvm_update_guest_cr3(v, virt_to_maddr(&v->arch.paging.shadow.l3table));
+        v->arch.hvm_vcpu.hw_cr[3] =
+            virt_to_maddr(&v->arch.paging.shadow.l3table);
 #else
         /* 2-on-2 or 4-on-4: Just use the shadow top-level directly */
-        hvm_update_guest_cr3(v, pagetable_get_paddr(v->arch.shadow_table[0]));
+        v->arch.hvm_vcpu.hw_cr[3] =
+            pagetable_get_paddr(v->arch.shadow_table[0]);
 #endif
+        hvm_update_guest_cr(v, 3);
     }
 
     /* Fix up the linear pagetable mappings */
