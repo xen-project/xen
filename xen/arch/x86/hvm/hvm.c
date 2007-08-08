@@ -596,9 +596,6 @@ int hvm_set_cr0(unsigned long value)
     }
 
     v->arch.hvm_vcpu.guest_cr[0] = value;
-    v->arch.hvm_vcpu.hw_cr[0] = value;
-    if ( !paging_mode_hap(v->domain) )
-        v->arch.hvm_vcpu.hw_cr[0] |= X86_CR0_PG | X86_CR0_WP;
     hvm_update_guest_cr(v, 0);
 
     if ( (value ^ old_value) & X86_CR0_PG )
@@ -672,10 +669,6 @@ int hvm_set_cr4(unsigned long value)
 
     old_cr = v->arch.hvm_vcpu.guest_cr[4];
     v->arch.hvm_vcpu.guest_cr[4] = value;
-    v->arch.hvm_vcpu.hw_cr[4] = HVM_CR4_HOST_MASK;
-    if ( paging_mode_hap(v->domain) )
-        v->arch.hvm_vcpu.hw_cr[4] &= ~X86_CR4_PAE;
-    v->arch.hvm_vcpu.hw_cr[4] |= value;
     hvm_update_guest_cr(v, 4);
   
     /* Modifying CR4.{PSE,PAE,PGE} invalidates all TLB entries, inc. Global. */

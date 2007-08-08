@@ -315,34 +315,69 @@ void vmx_cpu_down(void)
     local_irq_restore(flags);
 }
 
+struct foreign_vmcs {
+    struct vcpu *v;
+    unsigned int count;
+};
+static DEFINE_PER_CPU(struct foreign_vmcs, foreign_vmcs);
+
 void vmx_vmcs_enter(struct vcpu *v)
 {
+    struct foreign_vmcs *fv;
+
     /*
      * NB. We must *always* run an HVM VCPU on its own VMCS, except for
      * vmx_vmcs_enter/exit critical regions.
      */
-    if ( v == current )
+    if ( likely(v == current) )
         return;
 
-    vcpu_pause(v);
-    spin_lock(&v->arch.hvm_vmx.vmcs_lock);
+    fv = &this_cpu(foreign_vmcs);
 
-    vmx_clear_vmcs(v);
-    vmx_load_vmcs(v);
+    if ( fv->v == v )
+    {
+        BUG_ON(fv->count == 0);
+    }
+    else
+    {
+        BUG_ON(fv->v != NULL);
+        BUG_ON(fv->count != 0);
+
+        vcpu_pause(v);
+        spin_lock(&v->arch.hvm_vmx.vmcs_lock);
+
+        vmx_clear_vmcs(v);
+        vmx_load_vmcs(v);
+
+        fv->v = v;
+    }
+
+    fv->count++;
 }
 
 void vmx_vmcs_exit(struct vcpu *v)
 {
-    if ( v == current )
+    struct foreign_vmcs *fv;
+
+    if ( likely(v == current) )
         return;
 
-    /* Don't confuse vmx_do_resume (for @v or @current!) */
-    vmx_clear_vmcs(v);
-    if ( is_hvm_vcpu(current) )
-        vmx_load_vmcs(current);
+    fv = &this_cpu(foreign_vmcs);
+    BUG_ON(fv->v != v);
+    BUG_ON(fv->count == 0);
 
-    spin_unlock(&v->arch.hvm_vmx.vmcs_lock);
-    vcpu_unpause(v);
+    if ( --fv->count == 0 )
+    {
+        /* Don't confuse vmx_do_resume (for @v or @current!) */
+        vmx_clear_vmcs(v);
+        if ( is_hvm_vcpu(current) )
+            vmx_load_vmcs(current);
+
+        spin_unlock(&v->arch.hvm_vmx.vmcs_lock);
+        vcpu_unpause(v);
+
+        fv->v = NULL;
+    }
 }
 
 struct xgt_desc {
@@ -380,7 +415,6 @@ static void vmx_set_host_env(struct vcpu *v)
 
 static void construct_vmcs(struct vcpu *v)
 {
-    unsigned long cr0, cr4;
     union vmcs_arbytes arbytes;
 
     vmx_vmcs_enter(v);
@@ -504,19 +538,11 @@ static void construct_vmcs(struct vcpu *v)
 
     __vmwrite(EXCEPTION_BITMAP, HVM_TRAP_MASK | (1U << TRAP_page_fault));
 
-    /* Guest CR0. */
-    cr0 = read_cr0();
-    v->arch.hvm_vcpu.hw_cr[0] = cr0;
-    __vmwrite(GUEST_CR0, v->arch.hvm_vcpu.hw_cr[0]);
-    v->arch.hvm_vcpu.guest_cr[0] = cr0 & ~(X86_CR0_PG | X86_CR0_TS);
-    __vmwrite(CR0_READ_SHADOW, v->arch.hvm_vcpu.guest_cr[0]);
+    v->arch.hvm_vcpu.guest_cr[0] = X86_CR0_PE | X86_CR0_ET;
+    hvm_update_guest_cr(v, 0);
 
-    /* Guest CR4. */
-    cr4 = read_cr4();
-    __vmwrite(GUEST_CR4, cr4 & ~X86_CR4_PSE);
-    v->arch.hvm_vcpu.guest_cr[4] =
-        cr4 & ~(X86_CR4_PGE | X86_CR4_VMXE | X86_CR4_PAE);
-    __vmwrite(CR4_READ_SHADOW, v->arch.hvm_vcpu.guest_cr[4]);
+    v->arch.hvm_vcpu.guest_cr[4] = 0;
+    hvm_update_guest_cr(v, 4);
 
     if ( cpu_has_vmx_tpr_shadow )
     {

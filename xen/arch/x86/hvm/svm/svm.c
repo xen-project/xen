@@ -59,8 +59,9 @@ int inst_copy_from_guest(unsigned char *buf, unsigned long guest_eip,
                          int inst_len);
 asmlinkage void do_IRQ(struct cpu_user_regs *);
 
-static int svm_reset_to_realmode(struct vcpu *v,
-                                 struct cpu_user_regs *regs);
+static int svm_reset_to_realmode(
+    struct vcpu *v, struct cpu_user_regs *regs);
+static void svm_update_guest_cr(struct vcpu *v, unsigned int cr);
 
 /* va of hardware host save area     */
 static void *hsa[NR_CPUS] __read_mostly;
@@ -343,48 +344,26 @@ int svm_vmcb_restore(struct vcpu *v, struct hvm_hw_cpu *c)
     vmcb->rsp    = c->rsp;
     vmcb->rflags = c->rflags;
 
-    v->arch.hvm_vcpu.guest_cr[0] = c->cr0;
-    vmcb->cr0 = v->arch.hvm_vcpu.hw_cr[0] = 
-        c->cr0 | X86_CR0_WP | X86_CR0_ET | X86_CR0_PG;
+    v->arch.hvm_vcpu.guest_cr[0] = c->cr0 | X86_CR0_ET;
+    svm_update_guest_cr(v, 0);
 
     v->arch.hvm_vcpu.guest_cr[2] = c->cr2;
+    svm_update_guest_cr(v, 2);
 
+    v->arch.hvm_vcpu.guest_cr[4] = c->cr4;
+    svm_update_guest_cr(v, 4);
+    
 #ifdef HVM_DEBUG_SUSPEND
     printk("%s: cr3=0x%"PRIx64", cr0=0x%"PRIx64", cr4=0x%"PRIx64".\n",
-           __func__,
-            c->cr3,
-            c->cr0,
-            c->cr4);
+           __func__, c->cr3, c->cr0, c->cr4);
 #endif
 
-    if ( !hvm_paging_enabled(v) ) 
+    if ( hvm_paging_enabled(v) && !paging_mode_hap(v->domain) )
     {
-        printk("%s: paging not enabled.\n", __func__);
-        goto skip_cr3;
-    }
-
-    if ( c->cr3 == v->arch.hvm_vcpu.guest_cr[3] ) 
-    {
-        /*
-         * This is simple TLB flush, implying the guest has
-         * removed some translation or changed page attributes.
-         * We simply invalidate the shadow.
-         */
-        mfn = gmfn_to_mfn(v->domain, c->cr3 >> PAGE_SHIFT);
-        if ( mfn != pagetable_get_pfn(v->arch.guest_table) ) 
-            goto bad_cr3;
-    } 
-    else 
-    {
-        /*
-         * If different, make a shadow. Check if the PDBR is valid
-         * first.
-         */
         HVM_DBG_LOG(DBG_LEVEL_VMMU, "CR3 c->cr3 = %"PRIx64, c->cr3);
         mfn = gmfn_to_mfn(v->domain, c->cr3 >> PAGE_SHIFT);
         if( !mfn_valid(mfn) || !get_page(mfn_to_page(mfn), v->domain) ) 
             goto bad_cr3;
-
         old_base_mfn = pagetable_get_pfn(v->arch.guest_table);
         v->arch.guest_table = pagetable_from_pfn(mfn);
         if (old_base_mfn)
@@ -392,10 +371,6 @@ int svm_vmcb_restore(struct vcpu *v, struct hvm_hw_cpu *c)
         v->arch.hvm_vcpu.guest_cr[3] = c->cr3;
     }
 
- skip_cr3:
-    vmcb->cr4 = v->arch.hvm_vcpu.hw_cr[4] = c->cr4 | HVM_CR4_HOST_MASK;
-    v->arch.hvm_vcpu.guest_cr[4] = c->cr4;
-    
     vmcb->idtr.limit = c->idtr_limit;
     vmcb->idtr.base  = c->idtr_base;
 
@@ -449,10 +424,6 @@ int svm_vmcb_restore(struct vcpu *v, struct hvm_hw_cpu *c)
 
     if ( paging_mode_hap(v->domain) )
     {
-        vmcb->cr0 = v->arch.hvm_vcpu.hw_cr[0] = v->arch.hvm_vcpu.guest_cr[0];
-        vmcb->cr4 = v->arch.hvm_vcpu.hw_cr[4] =
-            v->arch.hvm_vcpu.guest_cr[4] | (HVM_CR4_HOST_MASK & ~X86_CR4_PAE);
-        vmcb->cr3 = v->arch.hvm_vcpu.hw_cr[3] = c->cr3;
         vmcb->np_enable = 1;
         vmcb->g_pat = 0x0007040600070406ULL; /* guest PAT */
         vmcb->h_cr3 = pagetable_get_paddr(v->domain->arch.phys_table);
@@ -586,17 +557,22 @@ static void svm_update_guest_cr(struct vcpu *v, unsigned int cr)
     switch ( cr )
     {
     case 0:
-        vmcb->cr0 = v->arch.hvm_vcpu.hw_cr[0];
+        vmcb->cr0 = v->arch.hvm_vcpu.guest_cr[0];
+        if ( !paging_mode_hap(v->domain) )
+            vmcb->cr0 |= X86_CR0_PG | X86_CR0_WP;
         break;
     case 2:
-        vmcb->cr2 = v->arch.hvm_vcpu.hw_cr[2];
+        vmcb->cr2 = v->arch.hvm_vcpu.guest_cr[2];
         break;
     case 3:
         vmcb->cr3 = v->arch.hvm_vcpu.hw_cr[3];
         svm_asid_inv_asid(v);
         break;
     case 4:
-        vmcb->cr4 = v->arch.hvm_vcpu.hw_cr[4];
+        vmcb->cr4 = HVM_CR4_HOST_MASK;
+        if ( paging_mode_hap(v->domain) )
+            vmcb->cr4 &= ~X86_CR4_PAE;
+        vmcb->cr4 |= v->arch.hvm_vcpu.guest_cr[4];
         break;
     default:
         BUG();
@@ -724,7 +700,7 @@ static void svm_stts(struct vcpu *v)
     if ( !(v->arch.hvm_vcpu.guest_cr[0] & X86_CR0_TS) )
     {
         v->arch.hvm_svm.vmcb->exception_intercepts |= 1U << TRAP_no_device;
-        vmcb->cr0 = v->arch.hvm_vcpu.hw_cr[0] |= X86_CR0_TS;
+        vmcb->cr0 |= X86_CR0_TS;
     }
 }
 
@@ -1045,7 +1021,7 @@ static void svm_do_no_device_fault(struct vmcb_struct *vmcb)
     vmcb->exception_intercepts &= ~(1U << TRAP_no_device);
 
     if ( !(v->arch.hvm_vcpu.guest_cr[0] & X86_CR0_TS) )
-        vmcb->cr0 = v->arch.hvm_vcpu.hw_cr[0] &= ~X86_CR0_TS;
+        vmcb->cr0 &= ~X86_CR0_TS;
 }
 
 /* Reserved bits ECX: [31:14], [12:4], [2:1]*/
@@ -1774,7 +1750,7 @@ static void svm_cr_access(
         /* TS being cleared means that it's time to restore fpu state. */
         setup_fpu(current);
         vmcb->exception_intercepts &= ~(1U << TRAP_no_device);
-        vmcb->cr0 = v->arch.hvm_vcpu.hw_cr[0] &= ~X86_CR0_TS; /* clear TS */
+        vmcb->cr0 &= ~X86_CR0_TS; /* clear TS */
         v->arch.hvm_vcpu.guest_cr[0] &= ~X86_CR0_TS; /* clear TS */
         break;
 
@@ -2085,22 +2061,16 @@ static int svm_reset_to_realmode(struct vcpu *v,
 
     memset(regs, 0, sizeof(struct cpu_user_regs));
 
-    vmcb->cr0 = v->arch.hvm_vcpu.hw_cr[0] =
-        X86_CR0_ET | X86_CR0_PG | X86_CR0_WP;
     v->arch.hvm_vcpu.guest_cr[0] = X86_CR0_ET;
+    svm_update_guest_cr(v, 0);
 
-    vmcb->cr2 = 0;
-    vmcb->efer = EFER_SVME;
+    v->arch.hvm_vcpu.guest_cr[2] = 0;
+    svm_update_guest_cr(v, 2);
 
-    vmcb->cr4 = v->arch.hvm_vcpu.hw_cr[4] = HVM_CR4_HOST_MASK;
     v->arch.hvm_vcpu.guest_cr[4] = 0;
+    svm_update_guest_cr(v, 4);
 
-    if ( paging_mode_hap(v->domain) )
-    {
-        vmcb->cr0 = v->arch.hvm_vcpu.hw_cr[0] = v->arch.hvm_vcpu.guest_cr[0];
-        vmcb->cr4 = v->arch.hvm_vcpu.hw_cr[4] =
-            v->arch.hvm_vcpu.guest_cr[4] | (HVM_CR4_HOST_MASK & ~X86_CR4_PAE);
-    }
+    vmcb->efer = EFER_SVME;
 
     /* This will jump to ROMBIOS */
     vmcb->rip = 0xFFF0;
@@ -2231,7 +2201,7 @@ asmlinkage void svm_vmexit_handler(struct cpu_user_regs *regs)
         unsigned long va;
         va = vmcb->exitinfo2;
         regs->error_code = vmcb->exitinfo1;
-        HVM_DBG_LOG(DBG_LEVEL_VMMU, 
+        HVM_DBG_LOG(DBG_LEVEL_VMMU,
                     "eax=%lx, ebx=%lx, ecx=%lx, edx=%lx, esi=%lx, edi=%lx",
                     (unsigned long)regs->eax, (unsigned long)regs->ebx,
                     (unsigned long)regs->ecx, (unsigned long)regs->edx,

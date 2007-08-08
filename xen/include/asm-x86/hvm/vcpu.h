@@ -33,7 +33,12 @@ struct hvm_vcpu {
     unsigned long       guest_cr[5];
     unsigned long       guest_efer;
 
-    /* Processor-visible control-register values, while guest executes. */
+    /*
+     * Processor-visible control-register values, while guest executes.
+     *  CR0, CR4: Used as a cache of VMCS contents by VMX only.
+     *  CR1, CR2: Never used (guest_cr[2] is always processor-visible CR2).
+     *  CR3:      Always used and kept up to date by paging subsystem.
+     */
     unsigned long       hw_cr[5];
 
     struct hvm_io_op    io_op;

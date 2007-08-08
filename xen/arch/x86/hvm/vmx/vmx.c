@@ -963,6 +963,9 @@ static void vmx_get_segment_register(struct vcpu *v, enum x86_segment seg,
     }
 
     reg->attr.bytes = (attr & 0xff) | ((attr >> 4) & 0xf00);
+    /* Unusable flag is folded into Present flag. */
+    if ( attr & (1u<<16) )
+        reg->attr.fields.p = 0;
 }
 
 /* Make sure that xen intercepts any FP accesses from current */
@@ -1062,7 +1065,9 @@ static void vmx_update_guest_cr(struct vcpu *v, unsigned int cr)
     switch ( cr )
     {
     case 0:
-        v->arch.hvm_vcpu.hw_cr[0] |= X86_CR0_PE | X86_CR0_NE;
+        v->arch.hvm_vcpu.hw_cr[0] =
+            v->arch.hvm_vcpu.guest_cr[0] |
+            X86_CR0_PE | X86_CR0_NE | X86_CR0_PG | X86_CR0_WP;
         __vmwrite(GUEST_CR0, v->arch.hvm_vcpu.hw_cr[0]);
         __vmwrite(CR0_READ_SHADOW, v->arch.hvm_vcpu.guest_cr[0]);
         break;
@@ -1073,6 +1078,8 @@ static void vmx_update_guest_cr(struct vcpu *v, unsigned int cr)
         __vmwrite(GUEST_CR3, v->arch.hvm_vcpu.hw_cr[3]);
         break;
     case 4:
+        v->arch.hvm_vcpu.hw_cr[4] =
+            v->arch.hvm_vcpu.guest_cr[4] | HVM_CR4_HOST_MASK;
         __vmwrite(GUEST_CR4, v->arch.hvm_vcpu.hw_cr[4]);
         __vmwrite(CR4_READ_SHADOW, v->arch.hvm_vcpu.guest_cr[4]);
         break;
