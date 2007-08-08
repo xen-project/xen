@@ -112,9 +112,10 @@ struct hvm_function_table {
     void (*update_host_cr3)(struct vcpu *v);
 
     /*
-     * Called to inform HVM layer that a guest control register has changed.
+     * Called to inform HVM layer that a guest CRn or EFER has changed.
      */
     void (*update_guest_cr)(struct vcpu *v, unsigned int cr);
+    void (*update_guest_efer)(struct vcpu *v);
 
     /*
      * Called to ensure than all guest-specific mappings in a tagged TLB
@@ -225,6 +226,11 @@ static inline void hvm_update_guest_cr(struct vcpu *v, unsigned int cr)
     hvm_funcs.update_guest_cr(v, cr);
 }
 
+static inline void hvm_update_guest_efer(struct vcpu *v)
+{
+    hvm_funcs.update_guest_efer(v);
+}
+
 static inline void 
 hvm_flush_guest_tlbs(void)
 {
@@ -250,7 +256,6 @@ hvm_get_segment_register(struct vcpu *v, enum x86_segment seg,
 
 void hvm_cpuid(unsigned int input, unsigned int *eax, unsigned int *ebx,
                                    unsigned int *ecx, unsigned int *edx);
-void hvm_stts(struct vcpu *v);
 void hvm_migrate_timers(struct vcpu *v);
 void hvm_do_resume(struct vcpu *v);
 

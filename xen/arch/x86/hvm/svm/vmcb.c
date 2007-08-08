@@ -217,24 +217,26 @@ static int construct_vmcb(struct vcpu *v)
     vmcb->tr.limit = 0xff;
 
     /* Guest CR0. */
-    vmcb->cr0 = read_cr0();
-    v->arch.hvm_vcpu.guest_cr[0] = vmcb->cr0 & ~(X86_CR0_PG | X86_CR0_TS);
+    vmcb->cr0 = v->arch.hvm_vcpu.hw_cr[0] = read_cr0();
+    v->arch.hvm_vcpu.guest_cr[0] =
+        v->arch.hvm_vcpu.hw_cr[0] & ~(X86_CR0_PG | X86_CR0_TS);
 
     /* Guest CR4. */
     v->arch.hvm_vcpu.guest_cr[4] =
         read_cr4() & ~(X86_CR4_PGE | X86_CR4_PSE | X86_CR4_PAE);
-    vmcb->cr4 = v->arch.hvm_vcpu.guest_cr[4] | HVM_CR4_HOST_MASK;
+    vmcb->cr4 = v->arch.hvm_vcpu.hw_cr[4] =
+        v->arch.hvm_vcpu.guest_cr[4] | HVM_CR4_HOST_MASK;
 
     paging_update_paging_modes(v);
     vmcb->cr3 = v->arch.hvm_vcpu.hw_cr[3]; 
 
     if ( paging_mode_hap(v->domain) )
     {
-        vmcb->cr0 = v->arch.hvm_vcpu.guest_cr[0];
+        vmcb->cr0 = v->arch.hvm_vcpu.hw_cr[0] = v->arch.hvm_vcpu.guest_cr[0];
         vmcb->np_enable = 1; /* enable nested paging */
         vmcb->g_pat = 0x0007040600070406ULL; /* guest PAT */
         vmcb->h_cr3 = pagetable_get_paddr(v->domain->arch.phys_table);
-        vmcb->cr4 = v->arch.hvm_vcpu.guest_cr[4] =
+        vmcb->cr4 = v->arch.hvm_vcpu.hw_cr[4] = v->arch.hvm_vcpu.guest_cr[4] =
             HVM_CR4_HOST_MASK & ~X86_CR4_PAE;
         vmcb->exception_intercepts = HVM_TRAP_MASK;
 

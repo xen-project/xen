@@ -61,6 +61,7 @@ static void vmx_ctxt_switch_to(struct vcpu *v);
 static int  vmx_alloc_vlapic_mapping(struct domain *d);
 static void vmx_free_vlapic_mapping(struct domain *d);
 static void vmx_install_vlapic_mapping(struct vcpu *v);
+static void vmx_update_guest_efer(struct vcpu *v);
 
 static int vmx_domain_initialise(struct domain *d)
 {
@@ -101,33 +102,6 @@ static void vmx_vcpu_destroy(struct vcpu *v)
 }
 
 #ifdef __x86_64__
-
-static int vmx_lme_is_set(struct vcpu *v)
-{
-    return v->arch.hvm_vcpu.guest_efer & EFER_LME;
-}
-
-static void vmx_enable_long_mode(struct vcpu *v)
-{
-    unsigned long vm_entry_value;
-
-    vm_entry_value = __vmread(VM_ENTRY_CONTROLS);
-    vm_entry_value |= VM_ENTRY_IA32E_MODE;
-    __vmwrite(VM_ENTRY_CONTROLS, vm_entry_value);
-
-    v->arch.hvm_vcpu.guest_efer |= EFER_LMA;
-}
-
-static void vmx_disable_long_mode(struct vcpu *v)
-{
-    unsigned long vm_entry_value;
-
-    vm_entry_value = __vmread(VM_ENTRY_CONTROLS);
-    vm_entry_value &= ~VM_ENTRY_IA32E_MODE;
-    __vmwrite(VM_ENTRY_CONTROLS, vm_entry_value);
-
-    v->arch.hvm_vcpu.guest_efer &= ~EFER_LMA;
-}
 
 static DEFINE_PER_CPU(struct vmx_msr_state, host_msr_state);
 
@@ -377,13 +351,6 @@ static void vmx_restore_guest_msrs(struct vcpu *v)
 }
 
 #else  /* __i386__ */
-
-static int vmx_lme_is_set(struct vcpu *v)
-{ return 0; }
-static void vmx_enable_long_mode(struct vcpu *v)
-{ BUG(); }
-static void vmx_disable_long_mode(struct vcpu *v)
-{ BUG(); }
 
 #define vmx_save_host_msrs()        ((void)0)
 
@@ -644,8 +611,7 @@ int vmx_vmcs_restore(struct vcpu *v, struct hvm_hw_cpu *c)
  skip_cr3:
     v->arch.hvm_vcpu.guest_cr[3] = c->cr3;
 
-    if ( hvm_long_mode_enabled(v) )
-        vmx_enable_long_mode(v);
+    vmx_update_guest_efer(v);
 
     __vmwrite(GUEST_CR4, (c->cr4 | HVM_CR4_HOST_MASK));
     v->arch.hvm_vcpu.guest_cr[4] = c->cr4;
@@ -1095,6 +1061,14 @@ static void vmx_update_guest_cr(struct vcpu *v, unsigned int cr)
 
     switch ( cr )
     {
+    case 0:
+        v->arch.hvm_vcpu.hw_cr[0] |= X86_CR0_PE | X86_CR0_NE;
+        __vmwrite(GUEST_CR0, v->arch.hvm_vcpu.hw_cr[0]);
+        __vmwrite(CR0_READ_SHADOW, v->arch.hvm_vcpu.guest_cr[0]);
+        break;
+    case 2:
+        /* CR2 is updated in exit stub. */
+        break;
     case 3:
         __vmwrite(GUEST_CR3, v->arch.hvm_vcpu.hw_cr[3]);
         break;
@@ -1107,6 +1081,26 @@ static void vmx_update_guest_cr(struct vcpu *v, unsigned int cr)
     }
 
     vmx_vmcs_exit(v);
+}
+
+static void vmx_update_guest_efer(struct vcpu *v)
+{
+#ifdef __x86_64__
+    unsigned long vm_entry_value;
+
+    ASSERT((v == current) || !vcpu_runnable(v));
+
+    vmx_vmcs_enter(v);
+
+    vm_entry_value = __vmread(VM_ENTRY_CONTROLS);
+    if ( v->arch.hvm_vcpu.guest_efer & EFER_LMA )
+        vm_entry_value |= VM_ENTRY_IA32E_MODE;
+    else
+        vm_entry_value &= ~VM_ENTRY_IA32E_MODE;
+    __vmwrite(VM_ENTRY_CONTROLS, vm_entry_value);
+
+    vmx_vmcs_exit(v);
+#endif
 }
 
 static void vmx_flush_guest_tlbs(void)
@@ -1172,6 +1166,7 @@ static struct hvm_function_table vmx_function_table = {
     .get_segment_register = vmx_get_segment_register,
     .update_host_cr3      = vmx_update_host_cr3,
     .update_guest_cr      = vmx_update_guest_cr,
+    .update_guest_efer    = vmx_update_guest_efer,
     .flush_guest_tlbs     = vmx_flush_guest_tlbs,
     .update_vtpr          = vmx_update_vtpr,
     .stts                 = vmx_stts,
@@ -2110,33 +2105,11 @@ static int vmx_assist(struct vcpu *v, int mode)
 static int vmx_set_cr0(unsigned long value)
 {
     struct vcpu *v = current;
-    unsigned long mfn;
     unsigned long eip;
-    int paging_enabled;
-    unsigned long old_cr0;
-    unsigned long old_base_mfn;
+    int rc = hvm_set_cr0(value);
 
-    HVM_DBG_LOG(DBG_LEVEL_VMMU, "Update CR0 value = %lx", value);
-
-    if ( (u32)value != value )
-    {
-        HVM_DBG_LOG(DBG_LEVEL_1,
-                    "Guest attempts to set upper 32 bits in CR0: %lx",
-                    value);
-        vmx_inject_hw_exception(v, TRAP_gp_fault, 0);
+    if ( rc == 0 )
         return 0;
-    }
-
-    value &= ~HVM_CR0_GUEST_RESERVED_BITS;
-
-    /* ET is reserved and should be always be 1. */
-    value |= X86_CR0_ET;
-
-    if ( (value & (X86_CR0_PE | X86_CR0_PG)) == X86_CR0_PG )
-    {
-        vmx_inject_hw_exception(v, TRAP_gp_fault, 0);
-        return 0;
-    }
 
     /* TS cleared? Then initialise FPU now. */
     if ( !(value & X86_CR0_TS) )
@@ -2145,88 +2118,13 @@ static int vmx_set_cr0(unsigned long value)
         __vm_clear_bit(EXCEPTION_BITMAP, TRAP_no_device);
     }
 
-    old_cr0 = v->arch.hvm_vcpu.guest_cr[0];
-    paging_enabled = old_cr0 & X86_CR0_PG;
-
-    v->arch.hvm_vcpu.hw_cr[0] = (value | X86_CR0_PE | X86_CR0_PG |
-                                 X86_CR0_NE | X86_CR0_WP);
-    __vmwrite(GUEST_CR0, v->arch.hvm_vcpu.hw_cr[0]);
-
-    v->arch.hvm_vcpu.guest_cr[0] = value;
-    __vmwrite(CR0_READ_SHADOW, v->arch.hvm_vcpu.guest_cr[0]);
-
-    /* Trying to enable paging. */
-    if ( (value & X86_CR0_PE) && (value & X86_CR0_PG) && !paging_enabled )
-    {
-        if ( vmx_lme_is_set(v) && !hvm_long_mode_enabled(v) )
-        {
-            if ( !(v->arch.hvm_vcpu.guest_cr[4] & X86_CR4_PAE) )
-            {
-                HVM_DBG_LOG(DBG_LEVEL_1, "Guest enabled paging "
-                            "with EFER.LME set but not CR4.PAE");
-                vmx_inject_hw_exception(v, TRAP_gp_fault, 0);
-                return 0;
-            }
-
-            HVM_DBG_LOG(DBG_LEVEL_1, "Enabling long mode");
-            vmx_enable_long_mode(v);
-        }
-
-        /*
-         * The guest CR3 must be pointing to the guest physical.
-         */
-        mfn = get_mfn_from_gpfn(v->arch.hvm_vcpu.guest_cr[3] >> PAGE_SHIFT);
-        if ( !mfn_valid(mfn) || !get_page(mfn_to_page(mfn), v->domain) )
-        {
-            gdprintk(XENLOG_ERR, "Invalid CR3 value = %lx (mfn=%lx)\n",
-                     v->arch.hvm_vcpu.guest_cr[3], mfn);
-            domain_crash(v->domain);
-            return 0;
-        }
-
-        /*
-         * Now arch.guest_table points to machine physical.
-         */
-        old_base_mfn = pagetable_get_pfn(v->arch.guest_table);
-        v->arch.guest_table = pagetable_from_pfn(mfn);
-        if ( old_base_mfn )
-            put_page(mfn_to_page(old_base_mfn));
-
-        HVM_DBG_LOG(DBG_LEVEL_VMMU, "Update CR3 value = %lx, mfn = %lx",
-                    v->arch.hvm_vcpu.guest_cr[3], mfn);
-
-        paging_update_paging_modes(v);
-    }
-
-    /* Trying to disable paging. */
-    if ( ((value & (X86_CR0_PE | X86_CR0_PG)) != (X86_CR0_PE | X86_CR0_PG)) &&
-         paging_enabled )
-    {
-        /* When CR0.PG is cleared, LMA is cleared immediately. */
-        if ( hvm_long_mode_enabled(v) )
-            vmx_disable_long_mode(v);
-
-        if ( v->arch.hvm_vcpu.guest_cr[3] )
-        {
-            put_page(mfn_to_page(get_mfn_from_gpfn(
-                      v->arch.hvm_vcpu.guest_cr[3] >> PAGE_SHIFT)));
-            v->arch.guest_table = pagetable_null();
-        }
-    }
-
     /*
      * VMX does not implement real-mode virtualization. We emulate
      * real-mode by performing a world switch to VMXAssist whenever
      * a partition disables the CR0.PE bit.
      */
-    if ( (value & X86_CR0_PE) == 0 )
+    if ( !(value & X86_CR0_PE) )
     {
-        if ( value & X86_CR0_PG )
-        {
-            vmx_inject_hw_exception(v, TRAP_gp_fault, 0);
-            return 0;
-        }
-
         if ( vmx_assist(v, VMX_ASSIST_INVOKE) )
         {
             eip = __vmread(GUEST_RIP);
@@ -2247,8 +2145,6 @@ static int vmx_set_cr0(unsigned long value)
             return 0; /* do not update eip! */
         }
     }
-    else if ( (value & (X86_CR0_PE | X86_CR0_PG)) == X86_CR0_PE )
-        paging_update_paging_modes(v);
 
     return 1;
 }

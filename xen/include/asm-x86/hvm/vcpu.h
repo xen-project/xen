@@ -33,11 +33,7 @@ struct hvm_vcpu {
     unsigned long       guest_cr[5];
     unsigned long       guest_efer;
 
-    /*
-     * Processor-visible CR0-4 while guest executes.
-     * Only CR3 is guaranteed to be valid: all other array entries are private
-     * to the specific HVM implementation (e.g., VMX, SVM).
-     */
+    /* Processor-visible control-register values, while guest executes. */
     unsigned long       hw_cr[5];
 
     struct hvm_io_op    io_op;
