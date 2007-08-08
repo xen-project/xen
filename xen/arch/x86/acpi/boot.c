@@ -423,7 +423,7 @@ acpi_fadt_parse_sleep_info(struct fadt_descriptor_rev2 *fadt)
 		goto bad;
 
 	if (strncmp(facs->signature, "FACS", 4)) {
-		printk(KERN_ERR PREFIX "Invalid FACS signature %s\n",
+		printk(KERN_ERR PREFIX "Invalid FACS signature %.4s\n",
 			facs->signature);
 		goto bad;
 	}
