@@ -527,30 +527,26 @@ int hvm_set_cr3(unsigned long value)
 
     if ( paging_mode_hap(v->domain) )
     {
+        /* HAP mode. HAP-specific code does all the hard work. */
         v->arch.hvm_vcpu.guest_cr[3] = value;
-        hvm_update_guest_cr3(v, value);
-        goto success;
+        paging_update_cr3(v);
     }
-
-    if ( !hvm_paging_enabled(v) )
+    else if ( !hvm_paging_enabled(v) )
     {
+        /* Shadow-mode, paging disabled. Just update guest CR3 value. */
         v->arch.hvm_vcpu.guest_cr[3] = value;
-        goto success;
     }
-
-    if ( value == v->arch.hvm_vcpu.guest_cr[3] )
+    else if ( value == v->arch.hvm_vcpu.guest_cr[3] )
     {
-        /* 
-         * This is simple TLB flush, implying the guest has removed some
-         * translation or changed page attributes. Invalidate the shadow.
-         */
+        /* Shadow-mode TLB flush. Invalidate the shadow. */
         mfn = get_mfn_from_gpfn(value >> PAGE_SHIFT);
         if ( mfn != pagetable_get_pfn(v->arch.guest_table) )
             goto bad_cr3;
+        paging_update_cr3(v);
     }
     else 
     {
-        /* Make a shadow. Check that the PDBR is valid first. */
+        /* Shadow-mode CR3 change. Check PDBR and then make a new shadow. */
         HVM_DBG_LOG(DBG_LEVEL_VMMU, "CR3 value = %lx", value);
         mfn = get_mfn_from_gpfn(value >> PAGE_SHIFT);
         if ( !mfn_valid(mfn) || !get_page(mfn_to_page(mfn), v->domain) )
@@ -564,11 +560,9 @@ int hvm_set_cr3(unsigned long value)
 
         v->arch.hvm_vcpu.guest_cr[3] = value;
         HVM_DBG_LOG(DBG_LEVEL_VMMU, "Update CR3 value = %lx", value);
+        paging_update_cr3(v);
     }
 
-    paging_update_cr3(v);
-
- success:
     return 1;
 
  bad_cr3:

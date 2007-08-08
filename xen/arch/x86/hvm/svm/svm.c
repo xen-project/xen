@@ -481,7 +481,6 @@ int svm_vmcb_restore(struct vcpu *v, struct hvm_hw_cpu *c)
     }
 
     paging_update_paging_modes(v);
-    svm_asid_g_update_paging(v);
 
     return 0;
  
@@ -1680,10 +1679,7 @@ static int svm_set_cr0(unsigned long value)
         vmcb->cr0 |= X86_CR0_PG | X86_CR0_WP;
 
     if ( (value ^ old_value) & X86_CR0_PG )
-    {
         paging_update_paging_modes(v);
-        svm_asid_g_update_paging(v);
-    }
 
     return 1;
 }
@@ -1770,8 +1766,6 @@ static int mov_to_cr(int gpreg, int cr, struct cpu_user_regs *regs)
             v->arch.hvm_vcpu.guest_cr[4] = value;
             vmcb->cr4 = value | (HVM_CR4_HOST_MASK & ~X86_CR4_PAE);
             paging_update_paging_modes(v);
-            /* signal paging update to ASID handler */
-            svm_asid_g_update_paging (v);
             break;
         }
 
@@ -1796,8 +1790,6 @@ static int mov_to_cr(int gpreg, int cr, struct cpu_user_regs *regs)
                 if ( old_base_mfn )
                     put_page(mfn_to_page(old_base_mfn));
                 paging_update_paging_modes(v);
-                /* signal paging update to ASID handler */
-                svm_asid_g_update_paging (v);
 
                 HVM_DBG_LOG(DBG_LEVEL_VMMU, 
                             "Update CR3 value = %lx, mfn = %lx",
@@ -1821,11 +1813,7 @@ static int mov_to_cr(int gpreg, int cr, struct cpu_user_regs *regs)
          * all TLB entries except global entries.
          */
         if ((old_cr ^ value) & (X86_CR4_PSE | X86_CR4_PGE | X86_CR4_PAE))
-        {
             paging_update_paging_modes(v);
-            /* signal paging update to ASID handler */
-            svm_asid_g_update_paging (v);
-        }
         break;
 
     case 8:
@@ -2206,8 +2194,7 @@ void svm_handle_invlpg(const short invlpga, struct cpu_user_regs *regs)
     HVMTRACE_3D(INVLPG, v, (invlpga?1:0), g_vaddr, (invlpga?regs->ecx:0));
 
     paging_invlpg(v, g_vaddr);
-    /* signal invplg to ASID handler */
-    svm_asid_g_invlpg (v, g_vaddr);
+    svm_asid_g_invlpg(v, g_vaddr);
 }
 
 

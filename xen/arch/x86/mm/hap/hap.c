@@ -603,38 +603,22 @@ static int hap_invlpg(struct vcpu *v, unsigned long va)
     return 0;
 }
 
-/*
- * HAP guests do not need to take any action on CR3 writes (they are still
- * intercepted, so that Xen's copy of the guest's CR3 can be kept in sync.)
- */
 static void hap_update_cr3(struct vcpu *v, int do_locking)
 {
+    hvm_update_guest_cr3(v, v->arch.hvm_vcpu.guest_cr[3]);
 }
 
 static void hap_update_paging_modes(struct vcpu *v)
 {
-    struct domain *d;
+    struct domain *d = v->domain;
 
-    d = v->domain;
     hap_lock(d);
 
-    /* update guest paging mode. Note that we rely on hvm functions to detect
-     * guest's paging mode. So, make sure the shadow registers (CR0, CR4, EFER)
-     * reflect guest's status correctly.
-     */
-    if ( hvm_paging_enabled(v) )
-    {
-        if ( hvm_long_mode_enabled(v) )
-            v->arch.paging.mode = &hap_paging_long_mode;
-        else if ( hvm_pae_enabled(v) )
-            v->arch.paging.mode = &hap_paging_pae_mode;
-        else
-            v->arch.paging.mode = &hap_paging_protected_mode;
-    }
-    else
-    {
-        v->arch.paging.mode = &hap_paging_real_mode;
-    }
+    v->arch.paging.mode =
+        !hvm_paging_enabled(v)   ? &hap_paging_real_mode :
+        hvm_long_mode_enabled(v) ? &hap_paging_long_mode :
+        hvm_pae_enabled(v)       ? &hap_paging_pae_mode  :
+                                   &hap_paging_protected_mode;
 
     v->arch.paging.translate_enabled = hvm_paging_enabled(v);
 
@@ -643,7 +627,11 @@ static void hap_update_paging_modes(struct vcpu *v)
         mfn_t mmfn = hap_make_monitor_table(v);
         v->arch.monitor_table = pagetable_from_mfn(mmfn);
         make_cr3(v, mfn_x(mmfn));
+        hvm_update_host_cr3(v);
     }
+
+    /* CR3 is effectively updated by a mode change. Flush ASIDs, etc. */
+    hvm_update_guest_cr3(v, v->arch.hvm_vcpu.guest_cr[3]);
 
     hap_unlock(d);
 }
