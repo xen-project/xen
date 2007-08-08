@@ -440,11 +440,6 @@ struct arch_svm_struct {
     u32                *msrpm;
     int                 launch_core;
     bool_t              vmcb_in_sync;     /* VMCB sync'ed with VMSAVE? */
-    unsigned long       cpu_shadow_cr0;   /* Guest value for CR0 */
-    unsigned long       cpu_shadow_cr4;   /* Guest value for CR4 */
-    unsigned long       cpu_shadow_efer;  /* Guest value for EFER */
-    unsigned long       cpu_cr2;
-    unsigned long       cpu_cr3;
 };
 
 struct vmcb_struct *alloc_vmcb(void);

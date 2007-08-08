@@ -2266,7 +2266,7 @@ static void sh_update_paging_modes(struct vcpu *v)
         ASSERT(shadow_mode_translate(d));
         ASSERT(shadow_mode_external(d));
 
-        v->arch.paging.translate_enabled = !!hvm_paging_enabled(v);
+        v->arch.paging.translate_enabled = hvm_paging_enabled(v);
         if ( !v->arch.paging.translate_enabled )
         {
             /* Set v->arch.guest_table to use the p2m map, and choose
@@ -2347,7 +2347,7 @@ static void sh_update_paging_modes(struct vcpu *v)
             SHADOW_PRINTK("new paging mode: d=%u v=%u pe=%d g=%u s=%u "
                           "(was g=%u s=%u)\n",
                           d->domain_id, v->vcpu_id,
-                          is_hvm_domain(d) ? !!hvm_paging_enabled(v) : 1,
+                          is_hvm_domain(d) ? hvm_paging_enabled(v) : 1,
                           v->arch.paging.mode->guest_levels,
                           v->arch.paging.mode->shadow.shadow_levels,
                           old_mode ? old_mode->guest_levels : 0,

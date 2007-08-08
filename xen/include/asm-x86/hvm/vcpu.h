@@ -29,7 +29,17 @@
 #define HVM_VCPU_INIT_SIPI_SIPI_STATE_WAIT_SIPI     1
 
 struct hvm_vcpu {
-    unsigned long       hw_cr3;     /* value we give to HW to use */
+    /* Guest control-register and EFER values, just as the guest sees them. */
+    unsigned long       guest_cr[5];
+    unsigned long       guest_efer;
+
+    /*
+     * Processor-visible CR0-4 while guest executes.
+     * Only CR3 is guaranteed to be valid: all other array entries are private
+     * to the specific HVM implementation (e.g., VMX, SVM).
+     */
+    unsigned long       hw_cr[5];
+
     struct hvm_io_op    io_op;
     struct vlapic       vlapic;
     s64                 cache_tsc_offset;

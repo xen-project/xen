@@ -62,7 +62,7 @@ unsigned long hap_gva_to_gfn(GUEST_PAGING_LEVELS)(
 unsigned long hap_gva_to_gfn(GUEST_PAGING_LEVELS)(
     struct vcpu *v, unsigned long gva)
 {
-    unsigned long gcr3 = hvm_get_guest_ctrl_reg(v, 3);
+    unsigned long gcr3 = v->arch.hvm_vcpu.guest_cr[3];
     int mode = GUEST_PAGING_LEVELS;
     int lev, index;
     paddr_t gpa = 0;

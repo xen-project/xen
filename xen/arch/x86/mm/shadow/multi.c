@@ -175,7 +175,7 @@ guest_supports_superpages(struct vcpu *v)
     /* The _PAGE_PSE bit must be honoured in HVM guests, whenever
      * CR4.PSE is set or the guest is in PAE or long mode */
     return (is_hvm_vcpu(v) && (GUEST_PAGING_LEVELS != 2 
-                             || (hvm_get_guest_ctrl_reg(v, 4) & X86_CR4_PSE)));
+                             || (v->arch.hvm_vcpu.guest_cr[4] & X86_CR4_PSE)));
 }
 
 static inline int
@@ -3483,7 +3483,7 @@ sh_update_cr3(struct vcpu *v, int do_locking)
  * Paravirtual guests should set v->arch.guest_table (and guest_table_user,
  * if appropriate).
  * HVM guests should also make sure hvm_get_guest_cntl_reg(v, 3) works;
- * this function will call hvm_update_guest_cr3() to tell them where the 
+ * this function will call hvm_update_guest_cr(v, 3) to tell them where the 
  * shadow tables are.
  * If do_locking != 0, assume we are being called from outside the 
  * shadow code, and must take and release the shadow lock; otherwise 
@@ -3525,7 +3525,7 @@ sh_update_cr3(struct vcpu *v, int do_locking)
         // Is paging enabled on this vcpu?
         if ( paging_vcpu_mode_translate(v) )
         {
-            gfn = _gfn(paddr_to_pfn(hvm_get_guest_ctrl_reg(v, 3)));
+            gfn = _gfn(paddr_to_pfn(v->arch.hvm_vcpu.guest_cr[3]));
             gmfn = vcpu_gfn_to_mfn(v, gfn);
             ASSERT(mfn_valid(gmfn));
             ASSERT(pagetable_get_pfn(v->arch.guest_table) == mfn_x(gmfn));
@@ -3576,11 +3576,11 @@ sh_update_cr3(struct vcpu *v, int do_locking)
  
      if ( shadow_mode_external(d) && paging_vcpu_mode_translate(v) ) 
          /* Paging enabled: find where in the page the l3 table is */
-         guest_idx = guest_index((void *)hvm_get_guest_ctrl_reg(v, 3));
-    else
-        /* Paging disabled or PV: l3 is at the start of a page */ 
-        guest_idx = 0; 
-     
+         guest_idx = guest_index((void *)v->arch.hvm_vcpu.guest_cr[3]);
+     else
+         /* Paging disabled or PV: l3 is at the start of a page */ 
+         guest_idx = 0; 
+
      // Ignore the low 2 bits of guest_idx -- they are really just
      // cache control.
      guest_idx &= ~3;
@@ -3718,18 +3718,21 @@ sh_update_cr3(struct vcpu *v, int do_locking)
 
 
     ///
-    /// v->arch.hvm_vcpu.hw_cr3
+    /// v->arch.hvm_vcpu.hw_cr[3]
     ///
     if ( shadow_mode_external(d) )
     {
         ASSERT(is_hvm_domain(d));
 #if SHADOW_PAGING_LEVELS == 3
         /* 2-on-3 or 3-on-3: Use the PAE shadow l3 table we just fabricated */
-        hvm_update_guest_cr3(v, virt_to_maddr(&v->arch.paging.shadow.l3table));
+        v->arch.hvm_vcpu.hw_cr[3] =
+            virt_to_maddr(&v->arch.paging.shadow.l3table);
 #else
         /* 2-on-2 or 4-on-4: Just use the shadow top-level directly */
-        hvm_update_guest_cr3(v, pagetable_get_paddr(v->arch.shadow_table[0]));
+        v->arch.hvm_vcpu.hw_cr[3] =
+            pagetable_get_paddr(v->arch.shadow_table[0]);
 #endif
+        hvm_update_guest_cr(v, 3);
     }
 
     /* Fix up the linear pagetable mappings */
