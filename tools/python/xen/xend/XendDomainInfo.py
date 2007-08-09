@@ -2187,11 +2187,18 @@ class XendDomainInfo:
         return self.metrics.get_uuid();
 
 
-    def get_security_label(self):
+    def get_security_label(self, xspol=None):
+        """
+           Get the security label of a domain
+           @param xspol   The policy to use when converting the ssid into
+                          a label; only to be passed during the updating
+                          of the policy
+        """
         domid = self.getDomid()
 
-        from xen.xend.XendXSPolicyAdmin import XSPolicyAdminInstance
-        xspol = XSPolicyAdminInstance().get_loaded_policy()
+        if not xspol:
+            from xen.xend.XendXSPolicyAdmin import XSPolicyAdminInstance
+            xspol = XSPolicyAdminInstance().get_loaded_policy()
 
         if domid == 0:
             if xspol:
@@ -2202,7 +2209,8 @@ class XendDomainInfo:
             label = self.info.get('security_label', '')
         return label
 
-    def set_security_label(self, seclab, old_seclab, xspol=None):
+    def set_security_label(self, seclab, old_seclab, xspol=None,
+                           xspol_old=None):
         """
            Set the security label of a domain from its old to
            a new value.
@@ -2213,6 +2221,8 @@ class XendDomainInfo:
            @param xspol   An optional policy under which this
                           update should be done. If not given,
                           then the current active policy is used.
+           @param xspol_old The old policy; only to be passed during
+                           the updating of a policy
            @return Returns return code, a string with errors from
                    the hypervisor's operation, old label of the
                    domain
@@ -2223,6 +2233,7 @@ class XendDomainInfo:
         new_ssidref = 0
         domid = self.getDomid()
         res_labels = None
+        is_policy_update = (xspol_old != None)
 
         from xen.xend.XendXSPolicyAdmin import XSPolicyAdminInstance
         from xen.util import xsconstants
@@ -2276,13 +2287,16 @@ class XendDomainInfo:
 
                 # Check that all used resources are accessible under the
                 # new label
-                if not security.resources_compatible_with_vmlabel(xspol,
+                if not is_policy_update and \
+                   not security.resources_compatible_with_vmlabel(xspol,
                           self, label):
                     return (-xsconstants.XSERR_BAD_LABEL, "", "", 0)
 
                 #Check label against expected one.
-                old_label = self.get_security_label()
+                old_label = self.get_security_label(xspol_old)
                 if old_label != old_seclab:
+                    log.info("old_label != old_seclab: %s != %s" %
+                             (old_label, old_seclab))
                     return (-xsconstants.XSERR_BAD_LABEL, "", "", 0)
 
                 # relabel domain in the hypervisor

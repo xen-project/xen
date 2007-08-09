@@ -876,7 +876,7 @@ def parse_doms_info(info):
     if len(tmp) != 3:
         seclabel = ""
     else:
-        seclabel = tmp[2]
+        seclabel = security_label
     parsed_info['seclabel'] = seclabel
 
     if serverType == SERVER_XEN_API:
