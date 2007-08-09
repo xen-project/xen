@@ -46,7 +46,6 @@ int find_max_pfn (unsigned long, unsigned long, void *);
 extern void early_setup_arch(char **);
 extern void late_setup_arch(char **);
 extern void hpsim_serial_init(void);
-extern void alloc_dom0(void);
 extern void setup_per_cpu_areas(void);
 extern void mem_init(void);
 extern void init_IRQ(void);
@@ -468,8 +467,6 @@ void __init start_kernel(void)
     init_frametable();
 
     trap_init();
-
-    alloc_dom0();
 
     init_xenheap_pages(__pa(xen_heap_start), xenheap_phys_end);
     printk("Xen heap: %luMB (%lukB)\n",

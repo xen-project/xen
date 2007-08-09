@@ -52,10 +52,11 @@
 #include <asm/perfmon.h>
 #include <public/vcpu.h>
 
-static unsigned long __initdata dom0_size = 512*1024*1024;
+/* dom0_size: default memory allocation for dom0 (~4GB) */
+static unsigned long __initdata dom0_size = 4096UL*1024UL*1024UL;
 
 /* dom0_max_vcpus: maximum number of VCPUs to create for dom0.  */
-static unsigned int __initdata dom0_max_vcpus = 1;
+static unsigned int __initdata dom0_max_vcpus = 4;
 integer_param("dom0_max_vcpus", dom0_max_vcpus); 
 
 extern char dom0_command_line[];
@@ -1195,8 +1196,41 @@ static void __init loaddomainelfimage(struct domain *d, struct elf_binary *elf,
 	}
 }
 
-void __init alloc_dom0(void)
+static void __init calc_dom0_size(void)
 {
+	unsigned long domheap_pages;
+	unsigned long p2m_pages;
+	unsigned long spare_hv_pages;
+	unsigned long max_dom0_size;
+
+	/* Estimate maximum memory we can safely allocate for dom0
+	 * by subtracting the p2m table allocation and a chunk of memory
+	 * for DMA and PCI mapping from the available domheap pages. The
+	 * chunk for DMA, PCI, etc., is a guestimate, as xen doesn't seem
+	 * to have a good idea of what those requirements might be ahead
+	 * of time, calculated at 1MB per 4GB of system memory */
+	domheap_pages = avail_domheap_pages();
+	p2m_pages = domheap_pages / PTRS_PER_PTE;
+	spare_hv_pages = domheap_pages / 4096;
+	max_dom0_size = (domheap_pages - (p2m_pages + spare_hv_pages))
+			 * PAGE_SIZE;
+	printk("Maximum permitted dom0 size: %luMB\n",
+	       max_dom0_size / (1024*1024));
+
+	/* validate proposed dom0_size, fix up as needed */
+	if (dom0_size > max_dom0_size) {
+		printk("Reducing dom0 memory allocation from %luK to %luK "
+		       "to fit available memory\n",
+		       dom0_size / 1024, max_dom0_size / 1024);
+		dom0_size = max_dom0_size;
+	}
+
+	/* dom0_mem=0 can be passed in to give all available mem to dom0 */
+	if (dom0_size == 0) {
+		printk("Allocating all available memory to dom0\n");
+		dom0_size = max_dom0_size;
+	}
+
 	/* Check dom0 size.  */
 	if (dom0_size < 4 * 1024 * 1024) {
 		panic("dom0_mem is too small, boot aborted"
@@ -1261,6 +1295,8 @@ int __init construct_dom0(struct domain *d,
 	BUG_ON(v->is_initialised);
 
 	printk("*** LOADING DOMAIN 0 ***\n");
+
+	calc_dom0_size();
 
 	max_pages = dom0_size / PAGE_SIZE;
 	d->max_pages = max_pages;
