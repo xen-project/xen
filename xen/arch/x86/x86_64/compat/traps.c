@@ -37,6 +37,7 @@ void compat_show_guest_stack(struct cpu_user_regs *regs, int debug_stack_lines)
 unsigned int compat_iret(void)
 {
     struct cpu_user_regs *regs = guest_cpu_user_regs();
+    struct vcpu *v = current;
     u32 eflags;
 
     /* Trim stack pointer to 32 bits. */
@@ -70,7 +71,7 @@ unsigned int compat_iret(void)
          * mode frames).
          */
         const struct trap_info *ti;
-        u32 x, ksp = current->arch.guest_context.kernel_sp - 40;
+        u32 x, ksp = v->arch.guest_context.kernel_sp - 40;
         unsigned int i;
         int rc = 0;
 
@@ -95,9 +96,9 @@ unsigned int compat_iret(void)
         if ( rc )
             goto exit_and_crash;
         regs->_esp = ksp;
-        regs->ss = current->arch.guest_context.kernel_ss;
+        regs->ss = v->arch.guest_context.kernel_ss;
 
-        ti = &current->arch.guest_context.trap_ctxt[13];
+        ti = &v->arch.guest_context.trap_ctxt[13];
         if ( TI_GET_IF(ti) )
             eflags &= ~X86_EFLAGS_IF;
         regs->_eflags = eflags & ~(X86_EFLAGS_VM|X86_EFLAGS_RF|
@@ -121,10 +122,10 @@ unsigned int compat_iret(void)
         regs->_esp += 16;
 
     /* No longer in NMI context. */
-    current->nmi_masked = 0;
+    v->nmi_masked = 0;
 
     /* Restore upcall mask from supplied EFLAGS.IF. */
-    vcpu_info(current, evtchn_upcall_mask) = !(eflags & X86_EFLAGS_IF);
+    vcpu_info(v, evtchn_upcall_mask) = !(eflags & X86_EFLAGS_IF);
 
     /*
      * The hypercall exit path will overwrite EAX with this return
@@ -134,11 +135,12 @@ unsigned int compat_iret(void)
 
  exit_and_crash:
     gdprintk(XENLOG_ERR, "Fatal error\n");
-    domain_crash(current->domain);
+    domain_crash(v->domain);
     return 0;
 }
 
-static long compat_register_guest_callback(struct compat_callback_register *reg)
+static long compat_register_guest_callback(
+    struct compat_callback_register *reg)
 {
     long ret = 0;
     struct vcpu *v = current;
@@ -175,7 +177,8 @@ static long compat_register_guest_callback(struct compat_callback_register *reg)
     return ret;
 }
 
-static long compat_unregister_guest_callback(struct compat_callback_unregister *unreg)
+static long compat_unregister_guest_callback(
+    struct compat_callback_unregister *unreg)
 {
     long ret;
 

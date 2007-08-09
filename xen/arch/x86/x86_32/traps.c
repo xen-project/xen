@@ -172,6 +172,7 @@ asmlinkage void do_double_fault(void)
 unsigned long do_iret(void)
 {
     struct cpu_user_regs *regs = guest_cpu_user_regs();
+    struct vcpu *v = current;
     u32 eflags;
 
     /* Check worst-case stack frame for overlap with Xen protected area. */
@@ -215,10 +216,10 @@ unsigned long do_iret(void)
     }
 
     /* No longer in NMI context. */
-    current->nmi_masked = 0;
+    v->nmi_masked = 0;
 
     /* Restore upcall mask from supplied EFLAGS.IF. */
-    current->vcpu_info->evtchn_upcall_mask = !(eflags & X86_EFLAGS_IF);
+    vcpu_info(v, evtchn_upcall_mask) = !(eflags & X86_EFLAGS_IF);
 
     /*
      * The hypercall exit path will overwrite EAX with this return
@@ -228,7 +229,7 @@ unsigned long do_iret(void)
 
  exit_and_crash:
     gdprintk(XENLOG_ERR, "Fatal error\n");
-    domain_crash(current->domain);
+    domain_crash(v->domain);
     return 0;
 }
 
