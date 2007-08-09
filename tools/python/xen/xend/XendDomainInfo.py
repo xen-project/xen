@@ -558,9 +558,64 @@ class XendDomainInfo:
         for devclass in XendDevices.valid_devices():
             self.getDeviceController(devclass).waitForDevices()
 
-    def destroyDevice(self, deviceClass, devid, force = False):
-        log.debug("dev = %s", devid)
-        return self.getDeviceController(deviceClass).destroyDevice(devid, force)
+    def destroyDevice(self, deviceClass, devid, force = False, rm_cfg = False):
+        log.debug("XendDomainInfo.destroyDevice: deviceClass = %s, device = %s",
+                  deviceClass, devid)
+
+        if rm_cfg:
+            # Convert devid to device number.  A device number is
+            # needed to remove its configuration.
+            dev = self.getDeviceController(deviceClass).convertToDeviceNumber(devid)
+            
+            # Save current sxprs.  A device number and a backend
+            # path are needed to remove its configuration but sxprs
+            # do not have those after calling destroyDevice.
+            sxprs = self.getDeviceSxprs(deviceClass)
+
+        rc = None
+        if self.domid is not None:
+            rc = self.getDeviceController(deviceClass).destroyDevice(devid, force)
+            if not force and rm_cfg:
+                # The backend path, other than the device itself,
+                # has to be passed because its accompanied frontend
+                # path may be void until its removal is actually
+                # issued.  It is probable because destroyDevice is
+                # issued first.
+                for dev_num, dev_info in sxprs:
+                    dev_num = int(dev_num)
+                    if dev_num == dev:
+                        for x in dev_info:
+                            if x[0] == 'backend':
+                                backend = x[1]
+                                break
+                        break
+                self._waitForDevice_destroy(deviceClass, devid, backend)
+
+        if rm_cfg:
+            if deviceClass == 'vif':
+                if self.domid is not None:
+                    for dev_num, dev_info in sxprs:
+                        dev_num = int(dev_num)
+                        if dev_num == dev:
+                            for x in dev_info:
+                                if x[0] == 'mac':
+                                    mac = x[1]
+                                    break
+                            break
+                    dev_info = self.getDeviceInfo_vif(mac)
+                else:
+                    _, dev_info = sxprs[dev]
+            else:  # 'vbd' or 'tap'
+                dev_info = self.getDeviceInfo_vbd(dev)
+            if dev_info is None:
+                return rc
+
+            dev_uuid = sxp.child_value(dev_info, 'uuid')
+            del self.info['devices'][dev_uuid]
+            self.info['%s_refs' % deviceClass].remove(dev_uuid)
+            xen.xend.XendDomain.instance().managed_config_save(self)
+
+        return rc
 
     def getDeviceSxprs(self, deviceClass):
         if self._stateGet() in (DOM_STATE_RUNNING, DOM_STATE_PAUSED):
@@ -573,6 +628,23 @@ class XendDomainInfo:
                     sxprs.append([dev_num, dev_info])
                     dev_num += 1
             return sxprs
+
+    def getDeviceInfo_vif(self, mac):
+        for dev_type, dev_info in self.info.all_devices_sxpr():
+            if dev_type != 'vif':
+                continue
+            if mac == sxp.child_value(dev_info, 'mac'):
+                return dev_info
+
+    def getDeviceInfo_vbd(self, devid):
+        for dev_type, dev_info in self.info.all_devices_sxpr():
+            if dev_type != 'vbd' and dev_type != 'tap':
+                continue
+            dev = sxp.child_value(dev_info, 'dev')
+            dev = dev.split(':')[0]
+            dev = self.getDeviceController(dev_type).convertToDeviceNumber(dev)
+            if devid == dev:
+                return dev_info
 
 
     def setMemoryTarget(self, target):
@@ -1320,6 +1392,10 @@ class XendDomainInfo:
     def _waitForDeviceUUID(self, dev_uuid):
         deviceClass, config = self.info['devices'].get(dev_uuid)
         self._waitForDevice(deviceClass, config['devid'])
+
+    def _waitForDevice_destroy(self, deviceClass, devid, backpath):
+        return self.getDeviceController(deviceClass).waitForDevice_destroy(
+            devid, backpath)
 
     def _reconfigureDevice(self, deviceClass, devid, devconfig):
         return self.getDeviceController(deviceClass).reconfigureDevice(

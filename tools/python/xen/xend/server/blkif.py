@@ -165,11 +165,23 @@ class BlkifController(DevController):
         try:
             DevController.destroyDevice(self, devid, force)
         except ValueError:
-            devid_end = type(devid) is str and devid.split('/')[-1] or None
+            dev = self.convertToDeviceNumber(devid)
 
             for i in self.deviceIDs():
-                d = self.readBackend(i, 'dev')
-                if d == devid or (devid_end and d == devid_end):
+                if i == dev:
                     DevController.destroyDevice(self, i, force)
                     return
             raise VmError("Device %s not connected" % devid)
+
+    def convertToDeviceNumber(self, devid):
+        try:
+            dev = int(devid)
+        except ValueError:
+            if type(devid) is not str:
+                raise VmError("devid %s is wrong type" % str(devid))
+            try:
+                dev = devid.split('/')[-1]
+                dev = int(dev)
+            except ValueError:
+                dev = blkif.blkdev_name_to_number(dev)
+        return dev
