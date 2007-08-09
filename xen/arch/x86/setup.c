@@ -282,9 +282,28 @@ static void __init srat_detect_node(int cpu)
         printk(KERN_INFO "CPU %d APIC %d -> Node %d\n", cpu, apicid, node);
 }
 
+/*
+ * Ensure a given physical memory range is present in the bootstrap mappings.
+ * Use superpage mappings to ensure that pagetable memory needn't be allocated.
+ */
+static void __init bootstrap_map(unsigned long start, unsigned long end)
+{
+    unsigned long mask = (1UL << L2_PAGETABLE_SHIFT) - 1;
+    start = start & ~mask;
+    end   = (end + mask) & ~mask;
+    if ( end > BOOTSTRAP_DIRECTMAP_END )
+        panic("Cannot access memory beyond end of "
+              "bootstrap direct-map area\n");
+    map_pages_to_xen(
+        (unsigned long)maddr_to_bootstrap_virt(start),
+        start >> PAGE_SHIFT, (end-start) >> PAGE_SHIFT, PAGE_HYPERVISOR);
+}
+
 static void __init move_memory(
     unsigned long dst, unsigned long src_start, unsigned long src_end)
 {
+    bootstrap_map(src_start, src_end);
+    bootstrap_map(dst, dst + src_end - src_start);
     memmove(maddr_to_bootstrap_virt(dst),
             maddr_to_bootstrap_virt(src_start),
             src_end - src_start);
