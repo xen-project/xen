@@ -11,10 +11,18 @@
 #undef memcpy
 void *memcpy(void *dest, const void *src, size_t n)
 {
-    int d0, d1, d2;
+    long d0, d1, d2;
 
     __asm__ __volatile__ (
-        "   rep ; movsl      ; "
+#ifdef __i386__
+        "   rep movsl        ; "
+#else
+        "   rep movsq        ; "
+        "   testb $4,%b4     ; "
+        "   je 0f            ; "
+        "   movsl            ; "
+        "0:                  ; "
+#endif
         "   testb $2,%b4     ; "
         "   je 1f            ; "
         "   movsw            ; "
@@ -23,7 +31,7 @@ void *memcpy(void *dest, const void *src, size_t n)
         "   movsb            ; "
         "2:                    "
         : "=&c" (d0), "=&D" (d1), "=&S" (d2)
-        : "0" (n/4), "q" (n), "1" (dest), "2" (src)
+        : "0" (n/sizeof(long)), "q" (n), "1" (dest), "2" (src)
         : "memory");
 
     return dest;
@@ -32,10 +40,10 @@ void *memcpy(void *dest, const void *src, size_t n)
 #undef memset
 void *memset(void *s, int c, size_t n)
 {
-    int d0, d1;
+    long d0, d1;
 
     __asm__ __volatile__ (
-        "rep ; stosb"
+        "rep stosb"
         : "=&c" (d0), "=&D" (d1)
         : "a" (c), "1" (s), "0" (n)
         : "memory");
@@ -46,14 +54,14 @@ void *memset(void *s, int c, size_t n)
 #undef memmove
 void *memmove(void *dest, const void *src, size_t n)
 {
-    int d0, d1, d2;
+    long d0, d1, d2;
  
     if ( dest < src )
         return memcpy(dest, src, n);
 
     __asm__ __volatile__ (
         "   std         ; "
-        "   rep ; movsb ; "
+        "   rep movsb   ; "
         "   cld           "
         : "=&c" (d0), "=&S" (d1), "=&D" (d2)
         : "0" (n), "1" (n-1+(const char *)src), "2" (n-1+(char *)dest)
