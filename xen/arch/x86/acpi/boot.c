@@ -451,12 +451,13 @@ acpi_fadt_parse_sleep_info(struct fadt_descriptor_rev2 *fadt)
 		acpi_sinfo.vector_width = 64;
 	}
 
-	printk (KERN_INFO PREFIX
-		"ACPI SLEEP INFO: pm1x_cnt[%x,%x], pm1x_evt[%x,%x]\n"
-		"                 wakeup_vec[%"PRIx64"], vec_size[%x]\n",
-		acpi_sinfo.pm1a_cnt, acpi_sinfo.pm1b_cnt,
-		acpi_sinfo.pm1a_evt, acpi_sinfo.pm1b_cnt,
-		acpi_sinfo.wakeup_vector, acpi_sinfo.vector_width);
+	printk(KERN_INFO PREFIX
+	       "ACPI SLEEP INFO: pm1x_cnt[%x,%x], pm1x_evt[%x,%x]\n",
+	       acpi_sinfo.pm1a_cnt, acpi_sinfo.pm1b_cnt,
+	       acpi_sinfo.pm1a_evt, acpi_sinfo.pm1b_cnt);
+	printk(KERN_INFO PREFIX
+	       "                 wakeup_vec[%"PRIx64"], vec_size[%x]\n",
+	       acpi_sinfo.wakeup_vector, acpi_sinfo.vector_width);
 	return;
 bad:
 	memset(&acpi_sinfo, 0, sizeof(acpi_sinfo));
