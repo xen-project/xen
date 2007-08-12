@@ -49,7 +49,6 @@ typedef union {
 #define	IA64_PTA_SZ_BIT		2
 #define	IA64_PTA_VF_BIT		8
 #define	IA64_PTA_BASE_BIT	15
-#define	IA64_PTA_LFMT		(1UL << IA64_PTA_VF_BIT)
 #define	IA64_PTA_SZ(x)		(x##UL << IA64_PTA_SZ_BIT)
 
 #define IA64_PSR_NON_VIRT_BITS				\
@@ -755,10 +754,6 @@ IA64FAULT vcpu_set_iva(VCPU * vcpu, u64 val)
 
 IA64FAULT vcpu_set_pta(VCPU * vcpu, u64 val)
 {
-	if (val & IA64_PTA_LFMT) {
-		printk("*** No support for VHPT long format yet!!\n");
-		return IA64_ILLOP_FAULT;
-	}
 	if (val & (0x3f << 9))	/* reserved fields */
 		return IA64_RSVDREG_FAULT;
 	if (val & 2)		/* reserved fields */
@@ -1753,10 +1748,6 @@ IA64FAULT vcpu_translate(VCPU * vcpu, u64 address, BOOLEAN is_data,
 
 	/* check guest VHPT */
 	pta = PSCB(vcpu, pta);
-	if (pta & IA64_PTA_VF) { /* long format VHPT - not implemented */
-		panic_domain(vcpu_regs(vcpu), "can't do long format VHPT\n");
-		//return is_data ? IA64_DATA_TLB_VECTOR:IA64_INST_TLB_VECTOR;
-	}
 
 	*itir = rr & (RR_RID_MASK | RR_PS_MASK);
 	// note: architecturally, iha is optionally set for alt faults but
@@ -1778,6 +1769,13 @@ IA64FAULT vcpu_translate(VCPU * vcpu, u64 address, BOOLEAN is_data,
 			IA64_ALT_INST_TLB_VECTOR;
 	}
 
+	if (pta & IA64_PTA_VF) { /* long format VHPT - not implemented */
+		/*
+		 * minimal support: vhpt walker is really dumb and won't find
+		 * anything
+		 */
+		return is_data ? IA64_DATA_TLB_VECTOR : IA64_INST_TLB_VECTOR;
+	}
 	/* avoid recursively walking (short format) VHPT */
 	if (((address ^ pta) & ((itir_mask(pta) << 3) >> 3)) == 0)
 		return is_data ? IA64_DATA_TLB_VECTOR : IA64_INST_TLB_VECTOR;

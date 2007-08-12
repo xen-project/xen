@@ -844,19 +844,19 @@ fast_tlb_no_tr_match:
 	
 1:	// check the guest VHPT
 	adds r19 = XSI_PTA_OFS-XSI_PSR_IC_OFS, r18;;
-	ld8 r19=[r19];;
-	tbit.nz p7,p0=r19,IA64_PTA_VF_BIT;;	// long format VHPT
-(p7)	br.cond.spnt.few page_fault;;
+	ld8 r19=[r19]
 	// if (!rr.ve || !(pta & IA64_PTA_VE)) take slow way for now
 	// FIXME: later, we deliver an alt_d/i vector after thash and itir
-	tbit.z p7,p0=r19,IA64_PTA_VE_BIT
-(p7)	br.cond.spnt.few page_fault;;
 	extr.u r25=r17,61,3
 	adds r21=XSI_RR0_OFS-XSI_PSR_IC_OFS,r18 ;;
 	shl r25=r25,3;;
 	add r21=r21,r25;;
 	ld8 r22=[r21];;
 	tbit.z p7,p0=r22,0
+(p7)	br.cond.spnt.few page_fault;;
+	tbit.z p7,p0=r19,IA64_PTA_VE_BIT
+(p7)	br.cond.spnt.few page_fault;;
+	tbit.nz p7,p0=r19,IA64_PTA_VF_BIT	// long format VHPT
 (p7)	br.cond.spnt.few page_fault;;
 
 	// compute and save away itir (r22 & RR_PS_MASK)
