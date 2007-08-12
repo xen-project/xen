@@ -20,21 +20,9 @@
  *  Kun Tian (Kevin Tian) (kevin.tian@intel.com)
  */
 
-#ifndef VCPU_TLB_SHIFT
-#define VCPU_TLB_SHIFT	22
-#endif
 #include <linux/config.h>
 #include <asm/asmmacro.h>
-#include <asm/cache.h>
-#include <asm/kregs.h>
 #include <asm/offsets.h>
-#include <asm/pgtable.h>
-#include <asm/percpu.h>
-#include <asm/processor.h>
-#include <asm/thread_info.h>
-#include <asm/unistd.h>
-#include <asm/vhpt.h>
-#include <asm/vmmu.h>
 #include "vmx_minstate.h"
 
 GLOBAL_ENTRY(ia64_leave_nested)
@@ -719,7 +707,7 @@ GLOBAL_ENTRY(vmx_switch_rr7)
    movl r25=PAGE_KERNEL
    ;;
    or loc5 = r25,loc5          // construct PA | page properties
-   mov r23 = VCPU_VHPT_SHIFT <<2
+   mov r23 = IA64_GRANULE_SHIFT <<2
    ;;
    ptr.d   in3,r23
    ;;

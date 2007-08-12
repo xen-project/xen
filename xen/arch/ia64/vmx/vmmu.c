@@ -19,22 +19,47 @@
  *  Xuefei Xu (Anthony Xu) (Anthony.xu@intel.com)
  *  Yaozu Dong (Eddie Dong) (Eddie.dong@intel.com)
  */
-#include <linux/sched.h>
-#include <linux/mm.h>
-#include <asm/tlb.h>
-#include <asm/gcc_intrin.h>
-#include <asm/vcpu.h>
-#include <linux/interrupt.h>
 #include <asm/vmx_vcpu.h>
-#include <asm/vmx_mm_def.h>
-#include <asm/vmx.h>
-#include <asm/hw_irq.h>
 #include <asm/vmx_pal_vsa.h>
-#include <asm/kregs.h>
-#include <asm/vcpu.h>
-#include <xen/irq.h>
-#include <xen/errno.h>
 #include <xen/sched-if.h>
+
+static int default_vtlb_sz = DEFAULT_VTLB_SZ;
+static int default_vhpt_sz = DEFAULT_VHPT_SZ;
+
+static void __init parse_vtlb_size(char *s)
+{
+    int sz = parse_size_and_unit(s, NULL);
+
+    if (sz > 0) {
+        default_vtlb_sz = fls(sz - 1);
+        /* minimum 256KB (since calculated tag might be broken) */
+        if (default_vtlb_sz < 18)
+            default_vtlb_sz = 18;
+    }
+}
+
+static int canonicalize_vhpt_size(int sz)
+{
+    /* minimum 32KB */
+    if (sz < 15)
+        return 15;
+    /* maximum 8MB (since purging TR is hard coded) */
+    if (sz > IA64_GRANULE_SHIFT - 1)
+        return IA64_GRANULE_SHIFT - 1;
+    return sz;
+}
+
+static void __init parse_vhpt_size(char *s)
+{
+    int sz = parse_size_and_unit(s, NULL);
+    if (sz > 0) {
+        default_vhpt_sz = fls(sz - 1);
+        default_vhpt_sz = canonicalize_vhpt_size(default_vhpt_sz);
+    }
+}
+
+custom_param("vti_vtlb_size", parse_vtlb_size);
+custom_param("vti_vhpt_size", parse_vhpt_size);
 
 /*
  * Get the machine page frame number in 16KB unit
@@ -132,66 +157,33 @@ purge_machine_tc_by_domid(domid_t domid)
 
 static int init_domain_vhpt(struct vcpu *v)
 {
-    struct page_info *page;
-    void * vbase;
-    page = alloc_domheap_pages (NULL, VCPU_VHPT_ORDER, 0);
-    if ( page == NULL ) {
-        printk("No enough contiguous memory for init_domain_vhpt\n");
-        return -ENOMEM;
-    }
-    vbase = page_to_virt(page);
-    memset(vbase, 0, VCPU_VHPT_SIZE);
-    printk(XENLOG_DEBUG "Allocate domain vhpt at 0x%p\n", vbase);
-    
-    VHPT(v,hash) = vbase;
-    VHPT(v,hash_sz) = VCPU_VHPT_SIZE/2;
-    VHPT(v,cch_buf) = (void *)((u64)vbase + VHPT(v,hash_sz));
-    VHPT(v,cch_sz) = VCPU_VHPT_SIZE - VHPT(v,hash_sz);
-    thash_init(&(v->arch.vhpt),VCPU_VHPT_SHIFT-1);
-    v->arch.arch_vmx.mpta = v->arch.vhpt.pta.val;
+    int rc;
 
-    return 0;
+    rc = thash_alloc(&(v->arch.vhpt), default_vhpt_sz, "vhpt");
+    v->arch.arch_vmx.mpta = v->arch.vhpt.pta.val;
+    return rc;
 }
 
 
 static void free_domain_vhpt(struct vcpu *v)
 {
-    struct page_info *page;
-
-    if (v->arch.vhpt.hash) {
-        page = virt_to_page(v->arch.vhpt.hash);
-        free_domheap_pages(page, VCPU_VHPT_ORDER);
-        v->arch.vhpt.hash = 0;
-    }
-
-    return;
+    if (v->arch.vhpt.hash)
+        thash_free(&(v->arch.vhpt));
 }
 
 int init_domain_tlb(struct vcpu *v)
 {
-    struct page_info *page;
-    void * vbase;
     int rc;
 
     rc = init_domain_vhpt(v);
     if (rc)
         return rc;
 
-    page = alloc_domheap_pages (NULL, VCPU_VTLB_ORDER, 0);
-    if ( page == NULL ) {
-        printk("No enough contiguous memory for init_domain_tlb\n");
+    rc = thash_alloc(&(v->arch.vtlb), default_vtlb_sz, "vtlb");
+    if (rc) {
         free_domain_vhpt(v);
-        return -ENOMEM;
+        return rc;
     }
-    vbase = page_to_virt(page);
-    memset(vbase, 0, VCPU_VTLB_SIZE);
-    printk(XENLOG_DEBUG "Allocate domain vtlb at 0x%p\n", vbase);
-    
-    VTLB(v,hash) = vbase;
-    VTLB(v,hash_sz) = VCPU_VTLB_SIZE/2;
-    VTLB(v,cch_buf) = (void *)((u64)vbase + VTLB(v,hash_sz));
-    VTLB(v,cch_sz) = VCPU_VTLB_SIZE - VTLB(v,hash_sz);
-    thash_init(&(v->arch.vtlb),VCPU_VTLB_SHIFT-1);
     
     return 0;
 }
@@ -199,12 +191,8 @@ int init_domain_tlb(struct vcpu *v)
 
 void free_domain_tlb(struct vcpu *v)
 {
-    struct page_info *page;
-
-    if ( v->arch.vtlb.hash) {
-        page = virt_to_page(v->arch.vtlb.hash);
-        free_domheap_pages(page, VCPU_VTLB_ORDER);
-    }
+    if (v->arch.vtlb.hash)
+        thash_free(&(v->arch.vtlb));
 
     free_domain_vhpt(v);
 }

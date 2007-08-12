@@ -21,18 +21,7 @@
  *  XiaoYan Feng (Fleming Feng) (Fleming.feng@intel.com)
  */
 
-#include <linux/sched.h>
-#include <asm/tlb.h>
-#include <xen/mm.h>
-#include <asm/vmx_mm_def.h>
-#include <asm/gcc_intrin.h>
-#include <linux/interrupt.h>
 #include <asm/vmx_vcpu.h>
-#include <asm/vmx_phy_mode.h>
-#include <asm/vmmu.h>
-#include <asm/tlbflush.h>
-#include <asm/regionreg.h>
-#define  MAX_CCH_LENGTH     40
 
 thash_data_t *__alloc_chain(thash_cb_t *);
 
@@ -664,7 +653,7 @@ thash_data_t *vtlb_lookup(VCPU *v, u64 va,int is_data)
 /*
  * Initialize internal control data before service.
  */
-void thash_init(thash_cb_t *hcb, u64 sz)
+static void thash_init(thash_cb_t *hcb, u64 sz)
 {
     int num;
     thash_data_t *head;
@@ -687,4 +676,44 @@ void thash_init(thash_cb_t *hcb, u64 sz)
 
     hcb->cch_free_idx = 0;
     hcb->cch_freelist = NULL;
+}
+
+int thash_alloc(thash_cb_t *hcb, u64 sz_log2, char *what)
+{
+    struct page_info *page;
+    void * vbase;
+    u64 sz = 1UL << sz_log2;
+
+    page = alloc_domheap_pages(NULL, (sz_log2 + 1 - PAGE_SHIFT), 0);
+    if (page == NULL) {
+        printk("No enough contiguous memory(%ldKB) for init_domain_%s\n", 
+               sz >> (10 - 1), what);
+        return -ENOMEM;
+    }
+    vbase = page_to_virt(page);
+    memset(vbase, 0, sz + sz); // hash + collisions chain
+    if (sz_log2 >= 20 - 1)
+        printk(XENLOG_DEBUG "Allocate domain %s at 0x%p(%ldMB)\n", 
+               what, vbase, sz >> (20 - 1));
+    else
+        printk(XENLOG_DEBUG "Allocate domain %s at 0x%p(%ldKB)\n",
+               what, vbase, sz >> (10 - 1));
+    
+    hcb->hash = vbase;
+    hcb->hash_sz = sz;
+    hcb->cch_buf = (void *)((u64)vbase + hcb->hash_sz);
+    hcb->cch_sz = sz;
+    thash_init(hcb, sz_log2);
+    return 0;
+}
+
+void thash_free(thash_cb_t *hcb)
+{
+    struct page_info *page;
+
+    if (hcb->hash) {
+        page = virt_to_page(hcb->hash);
+        free_domheap_pages(page, hcb->pta.size + 1 - PAGE_SHIFT);
+        hcb->hash = 0;
+    }
 }
