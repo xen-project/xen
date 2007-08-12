@@ -33,6 +33,7 @@
 #define     VTLB(v,_x)          (v->arch.vtlb._x)
 #define     VHPT(v,_x)          (v->arch.vhpt._x)
 #define     _PAGE_PL_PRIV       (CONFIG_CPL0_EMUL << 7)
+
 #ifndef __ASSEMBLY__
 
 #include <xen/config.h>
@@ -75,10 +76,14 @@ enum {
     ISIDE_TLB=0,
     DSIDE_TLB=1
 };
+#endif /* __ASSEMBLY__ */
+
 #define VTLB_PTE_P_BIT      0
 #define VTLB_PTE_IO_BIT     60
 #define VTLB_PTE_IO         (1UL<<VTLB_PTE_IO_BIT)
 #define VTLB_PTE_P         (1UL<<VTLB_PTE_P_BIT)
+
+#ifndef __ASSEMBLY__
 typedef struct thash_data {
     union {
         struct {
