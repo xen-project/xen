@@ -58,7 +58,6 @@ def main (argv):
         try:
             filename = security.res_label_filename
             access_control = dictio.dict_read("resources", filename)
-            print access_control
         except:
             raise OptionError("Resource file not found")
 

@@ -77,10 +77,10 @@ struct shadow_domain {
     int               locker; /* processor which holds the lock */
     const char       *locker_function; /* Func that took it */
     unsigned int      opt_flags;    /* runtime tunable optimizations on/off */
-    struct list_head  pinned_shadows; 
+    struct list_head  pinned_shadows;
 
     /* Memory allocation */
-    struct list_head  freelists[SHADOW_MAX_ORDER + 1]; 
+    struct list_head  freelists[SHADOW_MAX_ORDER + 1];
     struct list_head  p2m_freelist;
     unsigned int      total_pages;  /* number of pages allocated */
     unsigned int      free_pages;   /* number of pages on freelists */
@@ -116,7 +116,7 @@ struct hap_domain {
     spinlock_t        lock;
     int               locker;
     const char       *locker_function;
-    
+
     struct list_head  freelist;
     unsigned int      total_pages;  /* number of pages allocated */
     unsigned int      free_pages;   /* number of pages on freelists */
@@ -131,13 +131,13 @@ struct p2m_domain {
     spinlock_t         lock;
     int                locker;   /* processor which holds the lock */
     const char        *locker_function; /* Func that took it */
-    
+
     /* Pages used to construct the p2m */
     struct list_head   pages;
 
     /* Functions to call to get or free pages for the p2m */
     struct page_info * (*alloc_page  )(struct domain *d);
-    void               (*free_page   )(struct domain *d, 
+    void               (*free_page   )(struct domain *d,
                                        struct page_info *pg);
 
     /* Highest guest frame that's ever been mapped in the p2m */
@@ -177,6 +177,7 @@ struct paging_domain {
     /* log dirty support */
     struct log_dirty_domain log_dirty;
 };
+
 struct paging_vcpu {
     /* Pointers to mode-specific entry points. */
     struct paging_mode *mode;
@@ -184,9 +185,9 @@ struct paging_vcpu {
     unsigned int translate_enabled:1;
     /* HVM guest: last emulate was to a pagetable */
     unsigned int last_write_was_pt:1;
-    /* Translated guest: virtual TLB */    
+    /* Translated guest: virtual TLB */
     struct shadow_vtlb *vtlb;
-    spinlock_t          vtlb_lock; 
+    spinlock_t          vtlb_lock;
 
     /* paging support extension */
     struct shadow_vcpu shadow;
@@ -303,7 +304,7 @@ struct arch_vcpu
      * shadow refcounts are in use */
     pagetable_t shadow_table[4];        /* (MFN) shadow(s) of guest */
     pagetable_t monitor_table;          /* (MFN) hypervisor PT (for HVM) */
-    unsigned long cr3;           	    /* (MA) value to install in HW CR3 */
+    unsigned long cr3;                  /* (MA) value to install in HW CR3 */
 
     /* Current LDT details. */
     unsigned long shadow_ldt_mapcnt;

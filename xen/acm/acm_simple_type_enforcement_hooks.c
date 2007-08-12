@@ -408,7 +408,7 @@ _ste_update_policy(u8 *buf, u32 buf_size, int test_only,
         ste_bin_pol.max_ssidrefs = ste_buf->ste_max_ssidrefs;
         ste_bin_pol.ssidrefs = (domaintype_t *)ssidrefsbuf;
 
-        if ( ste_init_state(NULL) )
+        if ( ste_init_state(errors) )
         {
             /* new policy conflicts with sharing of running domains */
             printk("%s: New policy conflicts with running domains. "

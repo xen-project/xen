@@ -559,18 +559,8 @@ class XendDomainInfo:
             self.getDeviceController(devclass).waitForDevices()
 
     def destroyDevice(self, deviceClass, devid, force = False):
-        try:
-            dev = int(devid)
-        except ValueError:
-            # devid is not a number but a string containing either device
-            # name (e.g. xvda) or device_type/device_id (e.g. vbd/51728)
-            dev = type(devid) is str and devid.split('/')[-1] or None
-            if dev == None:
-                log.debug("Could not find the device %s", devid)
-                return None
-
-        log.debug("dev = %s", dev)
-        return self.getDeviceController(deviceClass).destroyDevice(dev, force)
+        log.debug("dev = %s", devid)
+        return self.getDeviceController(deviceClass).destroyDevice(devid, force)
 
     def getDeviceSxprs(self, deviceClass):
         if self._stateGet() in (DOM_STATE_RUNNING, DOM_STATE_PAUSED):
@@ -1463,8 +1453,6 @@ class XendDomainInfo:
         ssidref = 0
         if security.on():
             ssidref = security.calc_dom_ssidref_from_info(self.info)
-            if ssidref == 0:
-                raise VmError('VM is not properly labeled.')
             if security.has_authorization(ssidref) == False:
                 raise VmError("VM is not authorized to run.")
 

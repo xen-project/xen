@@ -3,6 +3,9 @@
 # It's is used for x86_32, x86_32y and x86_64
 #
 
+XEN_ROOT = ../../../..
+include $(XEN_ROOT)/Config.mk
+
 # include arch.mk has to be before mini-os.mk!
 
 include arch.mk

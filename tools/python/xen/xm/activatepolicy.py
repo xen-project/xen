@@ -23,7 +23,7 @@ import sys
 from xen.util import xsconstants
 from xml.dom import minidom
 from xen.xm.opts import OptionError
-from xen.xm import getpolicy
+from xen.xm import getpolicy, setpolicy
 from xen.xm import main as xm_main
 from xen.xm.main import server
 
@@ -38,6 +38,9 @@ def help():
       --boot     Have the system boot with the policy. Changes the default
                  title in grub.conf.
       --noboot   Remove the policy from the default entry in grub.conf.
+      --remove   Attempt to remove the current policy by installing the
+                 default policy; this works only if no domains are
+                 running.
     """
 
 def activate_policy(flags):
@@ -56,6 +59,25 @@ def activate_policy(flags):
 def remove_bootpolicy():
     server.xenapi.XSPolicy.rm_xsbootpolicy()
 
+def install_default_policy():
+    if xm_main.serverType != xm_main.SERVER_XEN_API:
+        raise OptionError('xm needs to be configured to use the xen-api.')
+    xs_type = int(server.xenapi.XSPolicy.get_xstype())
+    if xs_type & xsconstants.XS_POLICY_ACM == 0:
+        raise OptionError('ACM policy type not supported on system.')
+    policystate = server.xenapi.XSPolicy.get_xspolicy()
+    if int(policystate['type']) == 0:
+        print 'No policy is installed.'
+        return
+    if int(policystate['type']) != xsconstants.XS_POLICY_ACM:
+        print "Unknown policy type '%s'." % policystate['type']
+    flags = int(policystate['flags'])
+    if flags & xsconstants.XS_INST_LOAD == 0:
+        print "Default policy is already loaded."
+        return
+    setpolicy.setpolicy(xsconstants.ACM_POLICY_ID, 'default', flags, True,
+                        False)
+
 def main(argv):
     if xm_main.serverType != xm_main.SERVER_XEN_API:
         raise OptionError('xm needs to be configured to use the xen-api.')
@@ -69,6 +91,9 @@ def main(argv):
             flags |= xsconstants.XS_INST_LOAD
         elif '--noboot' == argv[c]:
             remove_bootpolicy()
+        elif '--remove' == argv[c]:
+            install_default_policy()
+            return
         else:
             raise OptionError("Unknown command line option '%s'" % argv[c])
         c += 1

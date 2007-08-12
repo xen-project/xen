@@ -677,7 +677,7 @@ static void xenstat_prune_domain(xenstat_node *node, unsigned int entry)
 	/* shift entries following specified entry up by one */
 	if (entry < node->num_domains) {
 		xenstat_domain *domain = &node->domains[entry];
-		memmove(domain,domain+1,node->num_domains-entry);
+		memmove(domain,domain+1,(node->num_domains - entry) * sizeof(xenstat_domain) );
 	}
 
 	/* zero out original last entry from node -- not

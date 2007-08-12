@@ -91,6 +91,14 @@ custom_param("dma_emergency_pool", parse_dma_emergency_pool);
 #define round_pgdown(_p)  ((_p)&PAGE_MASK)
 #define round_pgup(_p)    (((_p)+(PAGE_SIZE-1))&PAGE_MASK)
 
+#ifndef NDEBUG
+/* Avoid callers relying on allocations returning zeroed pages. */
+#define scrub_page(p) memset((p), 0xc2, PAGE_SIZE)
+#else
+/* For a production build, clear_page() is the fastest way to scrub. */
+#define scrub_page(p) clear_page(p)
+#endif
+
 static DEFINE_SPINLOCK(page_scrub_lock);
 LIST_HEAD(page_scrub_list);
 static unsigned long scrub_pages;
@@ -618,13 +626,13 @@ void __init scrub_heap_pages(void)
             {
                 p = page_to_virt(mfn_to_page(mfn));
                 memguard_unguard_range(p, PAGE_SIZE);
-                clear_page(p);
+                scrub_page(p);
                 memguard_guard_range(p, PAGE_SIZE);
             }
             else
             {
                 p = map_domain_page(mfn);
-                clear_page(p);
+                scrub_page(p);
                 unmap_domain_page(p);
             }
         }
@@ -1018,7 +1026,7 @@ static void page_scrub_softirq(void)
             pg = list_entry(ent, struct page_info, list);
             ent = ent->prev;
             p = map_domain_page(page_to_mfn(pg));
-            clear_page(p);
+            scrub_page(p);
             unmap_domain_page(p);
             free_heap_pages(pfn_dom_zone_type(page_to_mfn(pg)), pg, 0);
         }

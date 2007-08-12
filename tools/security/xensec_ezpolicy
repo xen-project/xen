@@ -36,6 +36,8 @@ conflict_bmp = None
 realm_icon = None
 workload_icon = None
 
+ACM_LABEL_UNLABELED = '__UNLABELED__'
+
 class orgTreeCtrl(wx.TreeCtrl):
 
     event = None
@@ -870,7 +872,8 @@ class ezFrame(wx.Frame):
             self.realm_menu.Enable(self.ID_ORGDEL, True)
             self.realm_menu.Enable(self.ID_ORGEDT, True)
             self.realm_menu.Enable(self.ID_ORGADD, True)
-            if len(self.orgs.GetSelections()) > 1:
+            if len(self.orgs.GetSelections()) > 1 or \
+               ACM_LABEL_UNLABELED == self.orgs.GetItemText(item):
                 self.realm_menu.Enable(self.ID_ORGEDT, False)
                 self.realm_menu.Enable(self.ID_ORGADD, False)
             self.PopupMenu(self.realm_menu)
@@ -1622,6 +1625,8 @@ def main():
     app = ezApp(0)
     if len(sys.argv) in [2]:
         app.Load(sys.argv[1])
+    else:
+        dict2org({'orgs' : [[ACM_LABEL_UNLABELED,[]]], 'cons': []})
     app.MainLoop()
     print "Goodbye"
 

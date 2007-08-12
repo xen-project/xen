@@ -161,7 +161,7 @@ int compat_grant_table_op(unsigned int cmd,
                 while ( n-- )
                 {
                     guest_handle_add_offset(xfer, -1);
-                    if ( __copy_field_to_guest(xfer, nat.xfer, status) )
+                    if ( __copy_field_to_guest(xfer, nat.xfer + n, status) )
                         rc = -EFAULT;
                 }
             }
@@ -199,7 +199,7 @@ int compat_grant_table_op(unsigned int cmd,
                 while ( n-- )
                 {
                     guest_handle_add_offset(copy, -1);
-                    if ( __copy_field_to_guest(copy, nat.copy, status) )
+                    if ( __copy_field_to_guest(copy, nat.copy + n, status) )
                         rc = -EFAULT;
                 }
             }

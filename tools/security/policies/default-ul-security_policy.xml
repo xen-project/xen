@@ -1,0 +1,41 @@
+<?xml version="1.0" ?>
+<SecurityPolicyDefinition xmlns="http://www.ibm.com" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.ibm.com ../../security_policy.xsd">
+  <PolicyHeader>
+    <PolicyName>DEFAULT-UL</PolicyName>
+    <Version>1.0</Version>
+  </PolicyHeader>
+  <SimpleTypeEnforcement>
+    <SimpleTypeEnforcementTypes>
+      <Type>SystemManagement</Type>
+      <Type>__UNLABELED__</Type>
+    </SimpleTypeEnforcementTypes>
+  </SimpleTypeEnforcement>
+  <ChineseWall>
+    <ChineseWallTypes>
+      <Type>SystemManagement</Type>
+    </ChineseWallTypes>
+  </ChineseWall>
+  <SecurityLabelTemplate>
+    <SubjectLabels bootstrap="SystemManagement">
+      <VirtualMachineLabel>
+        <Name>SystemManagement</Name>
+        <SimpleTypeEnforcementTypes>
+          <Type>SystemManagement</Type>
+          <Type>__UNLABELED__</Type>
+        </SimpleTypeEnforcementTypes>
+        <ChineseWallTypes>
+          <Type/>
+        </ChineseWallTypes>
+      </VirtualMachineLabel>
+      <VirtualMachineLabel>
+        <Name>__UNLABELED__</Name>
+        <SimpleTypeEnforcementTypes>
+          <Type>__UNLABELED__</Type>
+        </SimpleTypeEnforcementTypes>
+        <ChineseWallTypes>
+          <Type/>
+        </ChineseWallTypes>
+      </VirtualMachineLabel>
+    </SubjectLabels>
+  </SecurityLabelTemplate>
+</SecurityPolicyDefinition>

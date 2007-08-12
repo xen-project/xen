@@ -12,6 +12,12 @@ struct ap_suspend_info {
 };
 
 /*
+ * Use a rwlock to protect the hypercall page from being executed in AP context
+ * while the BSP is re-initializing it after restore.
+ */
+static DEFINE_RWLOCK(suspend_lock);
+
+/*
  * Spinning prevents, for example, APs touching grant table entries while
  * the shared grant table is not mapped into the address space imemdiately
  * after resume.
@@ -27,7 +33,9 @@ static void ap_suspend(void *_info)
 
 	while (info->do_spin) {
 		cpu_relax();
+		read_lock(&suspend_lock);
 		HYPERVISOR_yield();
+		read_unlock(&suspend_lock);
 	}
 
 	mb();
@@ -43,7 +51,9 @@ static int bp_suspend(void)
 	suspend_cancelled = HYPERVISOR_shutdown(SHUTDOWN_suspend);
 
 	if (!suspend_cancelled) {
+		write_lock(&suspend_lock);
 		platform_pci_resume();
+		write_unlock(&suspend_lock);
 		gnttab_resume();
 		irq_resume();
 	}

@@ -2596,6 +2596,7 @@ static int vmx_do_msr_read(struct cpu_user_regs *regs)
     case MSR_K8_MC2_STATUS:
     case MSR_K8_MC3_STATUS:
     case MSR_K8_MC4_STATUS:
+    case MSR_K8_MC5_STATUS:
         /* No point in letting the guest see real MCEs */
         msr_content = 0;
         break;
