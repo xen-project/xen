@@ -1,5 +1,6 @@
 #include <linux/config.h>
-#include <linux/stop_machine.h>
+#include <linux/cpumask.h>
+#include <linux/preempt.h>
 #include <xen/evtchn.h>
 #include <xen/gnttab.h>
 #include <xen/xenbus.h>
