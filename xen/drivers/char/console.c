@@ -331,13 +331,11 @@ static long guest_console_write(XEN_GUEST_HANDLE(char) buffer, int count)
         kbuf[kcount] = '\0';
 
         sercon_puts(kbuf);
+        vga_puts(kbuf);
 
-        for ( kptr = kbuf; *kptr != '\0'; kptr++ )
-        {
-            vga_putchar(*kptr);
-            if ( opt_console_to_ring )
+        if ( opt_console_to_ring )
+            for ( kptr = kbuf; *kptr != '\0'; kptr++ )
                 putchar_console_ring(*kptr);
-        }
 
         if ( opt_console_to_ring )
             send_guest_global_virq(dom0, VIRQ_CON_RING);
@@ -404,12 +402,10 @@ static void __putstr(const char *str)
     int c;
 
     sercon_puts(str);
+    vga_puts(str);
 
     while ( (c = *str++) != '\0' )
-    {
-        vga_putchar(c);
         putchar_console_ring(c);
-    }
 
     send_guest_global_virq(dom0, VIRQ_CON_RING);
 }

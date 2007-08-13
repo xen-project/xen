@@ -106,6 +106,8 @@ extern void init_IRQ(void);
 extern void trap_init(void);
 extern void early_time_init(void);
 extern void early_cpu_init(void);
+extern void vesa_init(void);
+extern void vesa_mtrr_init(void);
 
 struct tss_struct init_tss[NR_CPUS];
 
@@ -901,6 +903,7 @@ void __init __start_xen(unsigned long mbi_p)
 #ifdef __x86_64__
     init_xenheap_pages(xen_phys_start, __pa(&_start));
     nr_pages += (__pa(&_start) - xen_phys_start) >> PAGE_SHIFT;
+    vesa_init();
 #endif
     xenheap_phys_start = xen_phys_start;
     printk("Xen heap: %luMB (%lukB)\n", 
@@ -966,6 +969,9 @@ void __init __start_xen(unsigned long mbi_p)
         set_in_cr4(X86_CR4_OSFXSR);
     if ( cpu_has_xmm )
         set_in_cr4(X86_CR4_OSXMMEXCPT);
+#ifdef CONFIG_X86_64
+    vesa_mtrr_init();
+#endif
 
     if ( opt_nosmp )
         max_cpus = 0;
