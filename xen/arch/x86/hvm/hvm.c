@@ -587,7 +587,7 @@ int hvm_set_cr0(unsigned long value)
             hvm_update_guest_efer(v);
         }
 
-        if ( !paging_mode_hap(v->domain) && v->arch.hvm_vcpu.guest_cr[3] )
+        if ( !paging_mode_hap(v->domain) )
         {
             put_page(mfn_to_page(get_mfn_from_gpfn(
                 v->arch.hvm_vcpu.guest_cr[3] >> PAGE_SHIFT)));

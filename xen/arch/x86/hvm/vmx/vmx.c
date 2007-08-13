@@ -61,6 +61,7 @@ static void vmx_ctxt_switch_to(struct vcpu *v);
 static int  vmx_alloc_vlapic_mapping(struct domain *d);
 static void vmx_free_vlapic_mapping(struct domain *d);
 static void vmx_install_vlapic_mapping(struct vcpu *v);
+static void vmx_update_guest_cr(struct vcpu *v, unsigned int cr);
 static void vmx_update_guest_efer(struct vcpu *v);
 
 static int vmx_domain_initialise(struct domain *d)
@@ -572,50 +573,33 @@ int vmx_vmcs_restore(struct vcpu *v, struct hvm_hw_cpu *c)
     __vmwrite(GUEST_RSP, c->rsp);
     __vmwrite(GUEST_RFLAGS, c->rflags);
 
-    v->arch.hvm_vcpu.hw_cr[0] = (c->cr0 | X86_CR0_PE | X86_CR0_PG |
-                                 X86_CR0_NE | X86_CR0_WP | X86_CR0_ET);
-    __vmwrite(GUEST_CR0, v->arch.hvm_vcpu.hw_cr[0]);
-    v->arch.hvm_vcpu.guest_cr[0] = c->cr0;
-    __vmwrite(CR0_READ_SHADOW, v->arch.hvm_vcpu.guest_cr[0]);
-
+    v->arch.hvm_vcpu.guest_cr[0] = c->cr0 | X86_CR0_ET;
     v->arch.hvm_vcpu.guest_cr[2] = c->cr2;
-
-    v->arch.hvm_vcpu.guest_efer = c->msr_efer;
+    v->arch.hvm_vcpu.guest_cr[3] = c->cr3;
+    v->arch.hvm_vcpu.guest_cr[4] = c->cr4;
+    vmx_update_guest_cr(v, 0);
+    vmx_update_guest_cr(v, 2);
+    vmx_update_guest_cr(v, 4);
 
 #ifdef HVM_DEBUG_SUSPEND
     printk("%s: cr3=0x%"PRIx64", cr0=0x%"PRIx64", cr4=0x%"PRIx64".\n",
            __func__, c->cr3, c->cr0, c->cr4);
 #endif
 
-    if ( !hvm_paging_enabled(v) )
+    if ( hvm_paging_enabled(v) )
     {
-        HVM_DBG_LOG(DBG_LEVEL_VMMU, "%s: paging not enabled.", __func__);
-        goto skip_cr3;
+        HVM_DBG_LOG(DBG_LEVEL_VMMU, "CR3 = %"PRIx64, c->cr3);
+        mfn = gmfn_to_mfn(v->domain, c->cr3 >> PAGE_SHIFT);
+        if ( !mfn_valid(mfn) || !get_page(mfn_to_page(mfn), v->domain) )
+            goto bad_cr3;
+        old_base_mfn = pagetable_get_pfn(v->arch.guest_table);
+        v->arch.guest_table = pagetable_from_pfn(mfn);
+        if ( old_base_mfn )
+            put_page(mfn_to_page(old_base_mfn));
     }
 
-    HVM_DBG_LOG(DBG_LEVEL_VMMU, "CR3 = %"PRIx64, c->cr3);
-    /* current!=vcpu as not called by arch_vmx_do_launch */
-    mfn = gmfn_to_mfn(v->domain, c->cr3 >> PAGE_SHIFT);
-    if ( !mfn_valid(mfn) || !get_page(mfn_to_page(mfn), v->domain) )
-    {
-        gdprintk(XENLOG_ERR, "Invalid CR3 value=0x%"PRIx64".\n", c->cr3);
-        vmx_vmcs_exit(v);
-        return -EINVAL;
-    }
-
-    old_base_mfn = pagetable_get_pfn(v->arch.guest_table);
-    v->arch.guest_table = pagetable_from_pfn(mfn);
-    if ( old_base_mfn )
-        put_page(mfn_to_page(old_base_mfn));
-
- skip_cr3:
-    v->arch.hvm_vcpu.guest_cr[3] = c->cr3;
-
+    v->arch.hvm_vcpu.guest_efer = c->msr_efer;
     vmx_update_guest_efer(v);
-
-    __vmwrite(GUEST_CR4, (c->cr4 | HVM_CR4_HOST_MASK));
-    v->arch.hvm_vcpu.guest_cr[4] = c->cr4;
-    __vmwrite(CR4_READ_SHADOW, v->arch.hvm_vcpu.guest_cr[4]);
 
     __vmwrite(GUEST_IDTR_LIMIT, c->idtr_limit);
     __vmwrite(GUEST_IDTR_BASE, c->idtr_base);
@@ -696,6 +680,11 @@ int vmx_vmcs_restore(struct vcpu *v, struct hvm_hw_cpu *c)
     }
 
     return 0;
+
+ bad_cr3:
+    gdprintk(XENLOG_ERR, "Invalid CR3 value=0x%"PRIx64"\n", c->cr3);
+    vmx_vmcs_exit(v);
+    return -EINVAL;
 }
 
 #if defined(__x86_64__) && defined(HVM_DEBUG_SUSPEND)
@@ -1923,29 +1912,14 @@ static int vmx_world_restore(struct vcpu *v, struct vmx_assist_context *c)
     __vmwrite(GUEST_RFLAGS, c->eflags);
 
     v->arch.hvm_vcpu.guest_cr[0] = c->cr0;
-    __vmwrite(CR0_READ_SHADOW, v->arch.hvm_vcpu.guest_cr[0]);
+    v->arch.hvm_vcpu.guest_cr[3] = c->cr3;
+    v->arch.hvm_vcpu.guest_cr[4] = c->cr4;
+    vmx_update_guest_cr(v, 0);
+    vmx_update_guest_cr(v, 4);
 
-    if ( !hvm_paging_enabled(v) )
-        goto skip_cr3;
-
-    if ( c->cr3 == v->arch.hvm_vcpu.guest_cr[3] )
+    if ( hvm_paging_enabled(v) )
     {
-        /*
-         * This is simple TLB flush, implying the guest has
-         * removed some translation or changed page attributes.
-         * We simply invalidate the shadow.
-         */
-        mfn = get_mfn_from_gpfn(c->cr3 >> PAGE_SHIFT);
-        if ( mfn != pagetable_get_pfn(v->arch.guest_table) )
-            goto bad_cr3;
-    }
-    else
-    {
-        /*
-         * If different, make a shadow. Check if the PDBR is valid
-         * first.
-         */
-        HVM_DBG_LOG(DBG_LEVEL_VMMU, "CR3 c->cr3 = %x", c->cr3);
+        HVM_DBG_LOG(DBG_LEVEL_VMMU, "CR3 = %x", c->cr3);
         mfn = get_mfn_from_gpfn(c->cr3 >> PAGE_SHIFT);
         if ( !mfn_valid(mfn) || !get_page(mfn_to_page(mfn), v->domain) )
             goto bad_cr3;
@@ -1953,18 +1927,7 @@ static int vmx_world_restore(struct vcpu *v, struct vmx_assist_context *c)
         v->arch.guest_table = pagetable_from_pfn(mfn);
         if ( old_base_mfn )
              put_page(mfn_to_page(old_base_mfn));
-        v->arch.hvm_vcpu.guest_cr[3] = c->cr3;
     }
-
- skip_cr3:
-    if ( !hvm_paging_enabled(v) )
-        HVM_DBG_LOG(DBG_LEVEL_VMMU, "switching to vmxassist. use phys table");
-    else
-        HVM_DBG_LOG(DBG_LEVEL_VMMU, "Update CR3 value = %x", c->cr3);
-
-    __vmwrite(GUEST_CR4, (c->cr4 | HVM_CR4_HOST_MASK));
-    v->arch.hvm_vcpu.guest_cr[4] = c->cr4;
-    __vmwrite(CR4_READ_SHADOW, v->arch.hvm_vcpu.guest_cr[4]);
 
     __vmwrite(GUEST_IDTR_LIMIT, c->idtr_limit);
     __vmwrite(GUEST_IDTR_BASE, c->idtr_base);

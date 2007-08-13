@@ -345,14 +345,13 @@ int svm_vmcb_restore(struct vcpu *v, struct hvm_hw_cpu *c)
     vmcb->rflags = c->rflags;
 
     v->arch.hvm_vcpu.guest_cr[0] = c->cr0 | X86_CR0_ET;
-    svm_update_guest_cr(v, 0);
-
     v->arch.hvm_vcpu.guest_cr[2] = c->cr2;
-    svm_update_guest_cr(v, 2);
-
+    v->arch.hvm_vcpu.guest_cr[3] = c->cr3;
     v->arch.hvm_vcpu.guest_cr[4] = c->cr4;
+    svm_update_guest_cr(v, 0);
+    svm_update_guest_cr(v, 2);
     svm_update_guest_cr(v, 4);
-    
+
 #ifdef HVM_DEBUG_SUSPEND
     printk("%s: cr3=0x%"PRIx64", cr0=0x%"PRIx64", cr4=0x%"PRIx64".\n",
            __func__, c->cr3, c->cr0, c->cr4);
@@ -360,15 +359,14 @@ int svm_vmcb_restore(struct vcpu *v, struct hvm_hw_cpu *c)
 
     if ( hvm_paging_enabled(v) && !paging_mode_hap(v->domain) )
     {
-        HVM_DBG_LOG(DBG_LEVEL_VMMU, "CR3 c->cr3 = %"PRIx64, c->cr3);
+        HVM_DBG_LOG(DBG_LEVEL_VMMU, "CR3 = %"PRIx64, c->cr3);
         mfn = gmfn_to_mfn(v->domain, c->cr3 >> PAGE_SHIFT);
         if( !mfn_valid(mfn) || !get_page(mfn_to_page(mfn), v->domain) ) 
             goto bad_cr3;
         old_base_mfn = pagetable_get_pfn(v->arch.guest_table);
         v->arch.guest_table = pagetable_from_pfn(mfn);
-        if (old_base_mfn)
+        if ( old_base_mfn )
              put_page(mfn_to_page(old_base_mfn));
-        v->arch.hvm_vcpu.guest_cr[3] = c->cr3;
     }
 
     vmcb->idtr.limit = c->idtr_limit;
