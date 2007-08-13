@@ -98,6 +98,9 @@ def save(fd, dominfo, network, live, dst, checkpoint=False):
                 log.info("Domain %d suspended.", dominfo.getDomid())
                 dominfo.migrateDevices(network, dst, DEV_MIGRATE_STEP3,
                                        domain_name)
+                if hvm:
+                    dominfo.image.saveDeviceModel()
+
                 tochild.write("done\n")
                 tochild.flush()
                 log.debug('Written done')

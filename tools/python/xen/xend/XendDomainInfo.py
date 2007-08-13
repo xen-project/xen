@@ -1184,8 +1184,6 @@ class XendDomainInfo:
                     self._clearRestart()
 
                     if reason == 'suspend':
-                        if self._stateGet() != DOM_STATE_SUSPENDED:
-                            self.image.saveDeviceModel()
                         self._stateSet(DOM_STATE_SUSPENDED)
                         # Don't destroy the domain.  XendCheckpoint will do
                         # this once it has finished.  However, stop watching
