@@ -34,6 +34,15 @@ static int xencomm_debug = 1; /* extremely verbose */
 #define xencomm_debug 0
 #endif
 
+static void*
+xencomm_maddr_to_vaddr(unsigned long maddr)
+{
+    if (maddr == 0)
+        return NULL;
+    
+    return maddr_to_virt(maddr);
+}
+
 static unsigned long
 xencomm_inline_from_guest(void *to, const void *from, unsigned int n,
         unsigned int skip)
@@ -54,7 +63,7 @@ xencomm_inline_from_guest(void *to, const void *from, unsigned int n,
         src_maddr = paddr_to_maddr(src_paddr);
         if (xencomm_debug)
             printk("%lx[%d] -> %lx\n", src_maddr, bytes, (unsigned long)to);
-        memcpy(to, (void *)src_maddr, bytes);
+        memcpy(to, maddr_to_virt(src_maddr), bytes);
         src_paddr += bytes;
         to += bytes;
         n -= bytes;
@@ -89,7 +98,8 @@ xencomm_copy_from_guest(void *to, const void *from, unsigned int n,
         return xencomm_inline_from_guest(to, from, n, skip);
 
     /* first we need to access the descriptor */
-    desc = (struct xencomm_desc *)paddr_to_maddr((unsigned long)from);
+    desc = (struct xencomm_desc *)
+        xencomm_maddr_to_vaddr(paddr_to_maddr((unsigned long)from));
     if (desc == NULL)
         return n;
 
@@ -130,7 +140,7 @@ xencomm_copy_from_guest(void *to, const void *from, unsigned int n,
 
             if (xencomm_debug)
                 printk("%lx[%d] -> %lx\n", src_maddr, bytes, dest);
-            memcpy((void *)dest, (void *)src_maddr, bytes);
+            memcpy((void *)dest, maddr_to_virt(src_maddr), bytes);
             from_pos += bytes;
             to_pos += bytes;
         }
@@ -161,7 +171,7 @@ xencomm_inline_to_guest(void *to, const void *from, unsigned int n,
         dest_maddr = paddr_to_maddr(dest_paddr);
         if (xencomm_debug)
             printk("%lx[%d] -> %lx\n", (unsigned long)from, bytes, dest_maddr);
-        memcpy((void *)dest_maddr, (void *)from, bytes);
+        memcpy(maddr_to_virt(dest_maddr), (void *)from, bytes);
         dest_paddr += bytes;
         from += bytes;
         n -= bytes;
@@ -196,7 +206,8 @@ xencomm_copy_to_guest(void *to, const void *from, unsigned int n,
         return xencomm_inline_to_guest(to, from, n, skip);
 
     /* first we need to access the descriptor */
-    desc = (struct xencomm_desc *)paddr_to_maddr((unsigned long)to);
+    desc = (struct xencomm_desc *)
+        xencomm_maddr_to_vaddr(paddr_to_maddr((unsigned long)to));
     if (desc == NULL)
         return n;
 
@@ -236,7 +247,7 @@ xencomm_copy_to_guest(void *to, const void *from, unsigned int n,
 
             if (xencomm_debug)
                 printk("%lx[%d] -> %lx\n", source, bytes, dest_maddr);
-            memcpy((void *)dest_maddr, (void *)source, bytes);
+            memcpy(maddr_to_virt(dest_maddr), (void *)source, bytes);
             from_pos += bytes;
             to_pos += bytes;
         }
@@ -264,7 +275,8 @@ int xencomm_add_offset(void **handle, unsigned int bytes)
         return xencomm_inline_add_offset(handle, bytes);
 
     /* first we need to access the descriptor */
-    desc = (struct xencomm_desc *)paddr_to_maddr((unsigned long)*handle);
+    desc = (struct xencomm_desc *)
+        xencomm_maddr_to_vaddr(paddr_to_maddr((unsigned long)*handle));
     if (desc == NULL)
         return -1;
 
@@ -310,7 +322,8 @@ int xencomm_handle_is_null(void *handle)
     if (xencomm_is_inline(handle))
         return xencomm_inline_addr(handle) == 0;
 
-    desc = (struct xencomm_desc *)paddr_to_maddr((unsigned long)handle);
+    desc = (struct xencomm_desc *)
+        xencomm_maddr_to_vaddr(paddr_to_maddr((unsigned long)handle));
     if (desc == NULL)
         return 1;
 
