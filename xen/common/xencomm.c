@@ -232,7 +232,7 @@ xencomm_copy_to_guest(void *to, const void *from, unsigned int n,
 
             dest_maddr = paddr_to_maddr(dest_paddr + chunk_skip);
             if (dest_maddr == 0)
-                return -1;
+                return n - from_pos;
 
             if (xencomm_debug)
                 printk("%lx[%d] -> %lx\n", source, bytes, dest_maddr);
@@ -280,6 +280,11 @@ int xencomm_add_offset(void **handle, unsigned int bytes)
         unsigned int chunksz;
         unsigned int chunk_skip;
 
+        if (dest_paddr == XENCOMM_INVALID) {
+            i++;
+            continue;
+        }
+
         pgoffset = dest_paddr % PAGE_SIZE;
         chunksz = PAGE_SIZE - pgoffset;
 
@@ -291,6 +296,8 @@ int xencomm_add_offset(void **handle, unsigned int bytes)
             desc->address[i] += chunk_skip;
         }
         bytes -= chunk_skip;
+
+        i++;
     }
     return 0;
 }
