@@ -33,9 +33,10 @@ static int do_evtchn_op(int xc_handle, int cmd, void *arg, size_t arg_size)
 }
 
 
-int xc_evtchn_alloc_unbound(int xc_handle,
-                            uint32_t dom,
-                            uint32_t remote_dom)
+evtchn_port_or_error_t
+xc_evtchn_alloc_unbound(int xc_handle,
+                        uint32_t dom,
+                        uint32_t remote_dom)
 {
     int rc;
     struct evtchn_alloc_unbound arg = {
