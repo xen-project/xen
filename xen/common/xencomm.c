@@ -26,43 +26,35 @@
 #include <public/xen.h>
 #include <public/xencomm.h>
 
-
 #undef DEBUG
 #ifdef DEBUG
-static int xencomm_debug = 1; /* extremely verbose */
+#define xc_dprintk(f, a...) printk("[xencomm]" f , ## a)
 #else
-#define xencomm_debug 0
+#define xc_dprintk(f, a...) ((void)0)
 #endif
 
 static void*
 xencomm_maddr_to_vaddr(unsigned long maddr)
 {
-    if (maddr == 0)
-        return NULL;
-    
-    return maddr_to_virt(maddr);
+    return maddr ? maddr_to_virt(maddr) : NULL;
 }
 
 static unsigned long
-xencomm_inline_from_guest(void *to, const void *from, unsigned int n,
-        unsigned int skip)
+xencomm_inline_from_guest(
+    void *to, const void *from, unsigned int n, unsigned int skip)
 {
-    unsigned long src_paddr = xencomm_inline_addr(from);
+    unsigned long src_paddr = xencomm_inline_addr(from) + skip;
 
-    src_paddr += skip;
-
-    while (n > 0) {
-        unsigned int chunksz;
+    while ( n > 0 )
+    {
+        unsigned int chunksz, bytes;
         unsigned long src_maddr;
-        unsigned int bytes;
 
         chunksz = PAGE_SIZE - (src_paddr % PAGE_SIZE);
-
-        bytes = min(chunksz, n);
+        bytes   = min(chunksz, n);
 
         src_maddr = paddr_to_maddr(src_paddr);
-        if (xencomm_debug)
-            printk("%lx[%d] -> %lx\n", src_maddr, bytes, (unsigned long)to);
+        xc_dprintk("%lx[%d] -> %lx\n", src_maddr, bytes, (unsigned long)to);
         memcpy(to, maddr_to_virt(src_maddr), bytes);
         src_paddr += bytes;
         to += bytes;
@@ -86,37 +78,40 @@ xencomm_inline_from_guest(void *to, const void *from, unsigned int n,
  * On success, this will be zero.
  */
 unsigned long
-xencomm_copy_from_guest(void *to, const void *from, unsigned int n,
-        unsigned int skip)
+xencomm_copy_from_guest(
+    void *to, const void *from, unsigned int n, unsigned int skip)
 {
     struct xencomm_desc *desc;
     unsigned int from_pos = 0;
     unsigned int to_pos = 0;
     unsigned int i = 0;
 
-    if (xencomm_is_inline(from))
+    if ( xencomm_is_inline(from) )
         return xencomm_inline_from_guest(to, from, n, skip);
 
-    /* first we need to access the descriptor */
+    /* First we need to access the descriptor. */
     desc = (struct xencomm_desc *)
         xencomm_maddr_to_vaddr(paddr_to_maddr((unsigned long)from));
-    if (desc == NULL)
+    if ( desc == NULL )
         return n;
 
-    if (desc->magic != XENCOMM_MAGIC) {
+    if ( desc->magic != XENCOMM_MAGIC )
+    {
         printk("%s: error: %p magic was 0x%x\n",
                __func__, desc, desc->magic);
         return n;
     }
 
-    /* iterate through the descriptor, copying up to a page at a time */
-    while ((to_pos < n) && (i < desc->nr_addrs)) {
+    /* Iterate through the descriptor, copying up to a page at a time. */
+    while ( (to_pos < n) && (i < desc->nr_addrs) )
+    {
         unsigned long src_paddr = desc->address[i];
         unsigned int pgoffset;
         unsigned int chunksz;
         unsigned int chunk_skip;
 
-        if (src_paddr == XENCOMM_INVALID) {
+        if ( src_paddr == XENCOMM_INVALID )
+        {
             i++;
             continue;
         }
@@ -129,17 +124,17 @@ xencomm_copy_from_guest(void *to, const void *from, unsigned int n,
         chunksz -= chunk_skip;
         skip -= chunk_skip;
 
-        if (skip == 0 && chunksz > 0) {
+        if ( (skip == 0) && (chunksz > 0) )
+        {
             unsigned long src_maddr;
             unsigned long dest = (unsigned long)to + to_pos;
             unsigned int bytes = min(chunksz, n - to_pos);
 
             src_maddr = paddr_to_maddr(src_paddr + chunk_skip);
-            if (src_maddr == 0)
+            if ( src_maddr == 0 )
                 return n - to_pos;
 
-            if (xencomm_debug)
-                printk("%lx[%d] -> %lx\n", src_maddr, bytes, dest);
+            xc_dprintk("%lx[%d] -> %lx\n", src_maddr, bytes, dest);
             memcpy((void *)dest, maddr_to_virt(src_maddr), bytes);
             from_pos += bytes;
             to_pos += bytes;
@@ -152,32 +147,28 @@ xencomm_copy_from_guest(void *to, const void *from, unsigned int n,
 }
 
 static unsigned long
-xencomm_inline_to_guest(void *to, const void *from, unsigned int n,
-        unsigned int skip)
+xencomm_inline_to_guest(
+    void *to, const void *from, unsigned int n, unsigned int skip)
 {
-    unsigned long dest_paddr = xencomm_inline_addr(to);
+    unsigned long dest_paddr = xencomm_inline_addr(to) + skip;
 
-    dest_paddr += skip;
-
-    while (n > 0) {
-        unsigned int chunksz;
+    while ( n > 0 )
+    {
+        unsigned int chunksz, bytes;
         unsigned long dest_maddr;
-        unsigned int bytes;
 
         chunksz = PAGE_SIZE - (dest_paddr % PAGE_SIZE);
-
-        bytes = min(chunksz, n);
+        bytes   = min(chunksz, n);
 
         dest_maddr = paddr_to_maddr(dest_paddr);
-        if (xencomm_debug)
-            printk("%lx[%d] -> %lx\n", (unsigned long)from, bytes, dest_maddr);
+        xc_dprintk("%lx[%d] -> %lx\n", (unsigned long)from, bytes, dest_maddr);
         memcpy(maddr_to_virt(dest_maddr), (void *)from, bytes);
         dest_paddr += bytes;
         from += bytes;
         n -= bytes;
     }
 
-    /* Always successful.  */
+    /* Always successful. */
     return 0;
 }
 
@@ -194,36 +185,37 @@ xencomm_inline_to_guest(void *to, const void *from, unsigned int n,
  * On success, this will be zero.
  */
 unsigned long
-xencomm_copy_to_guest(void *to, const void *from, unsigned int n,
-        unsigned int skip)
+xencomm_copy_to_guest(
+    void *to, const void *from, unsigned int n, unsigned int skip)
 {
     struct xencomm_desc *desc;
     unsigned int from_pos = 0;
     unsigned int to_pos = 0;
     unsigned int i = 0;
 
-    if (xencomm_is_inline(to))
+    if ( xencomm_is_inline(to) )
         return xencomm_inline_to_guest(to, from, n, skip);
 
-    /* first we need to access the descriptor */
+    /* First we need to access the descriptor. */
     desc = (struct xencomm_desc *)
         xencomm_maddr_to_vaddr(paddr_to_maddr((unsigned long)to));
-    if (desc == NULL)
+    if ( desc == NULL )
         return n;
 
-    if (desc->magic != XENCOMM_MAGIC) {
+    if ( desc->magic != XENCOMM_MAGIC )
+    {
         printk("%s error: %p magic was 0x%x\n", __func__, desc, desc->magic);
         return n;
     }
 
-    /* iterate through the descriptor, copying up to a page at a time */
-    while ((from_pos < n) && (i < desc->nr_addrs)) {
+    /* Iterate through the descriptor, copying up to a page at a time. */
+    while ( (from_pos < n) && (i < desc->nr_addrs) )
+    {
         unsigned long dest_paddr = desc->address[i];
-        unsigned int pgoffset;
-        unsigned int chunksz;
-        unsigned int chunk_skip;
+        unsigned int pgoffset, chunksz, chunk_skip;
 
-        if (dest_paddr == XENCOMM_INVALID) {
+        if ( dest_paddr == XENCOMM_INVALID )
+        {
             i++;
             continue;
         }
@@ -236,17 +228,17 @@ xencomm_copy_to_guest(void *to, const void *from, unsigned int n,
         chunksz -= chunk_skip;
         skip -= chunk_skip;
 
-        if (skip == 0 && chunksz > 0) {
+        if ( (skip == 0) && (chunksz > 0) )
+        {
             unsigned long dest_maddr;
             unsigned long source = (unsigned long)from + from_pos;
             unsigned int bytes = min(chunksz, n - from_pos);
 
             dest_maddr = paddr_to_maddr(dest_paddr + chunk_skip);
-            if (dest_maddr == 0)
+            if ( dest_maddr == 0 )
                 return n - from_pos;
 
-            if (xencomm_debug)
-                printk("%lx[%d] -> %lx\n", source, bytes, dest_maddr);
+            xc_dprintk("%lx[%d] -> %lx\n", source, bytes, dest_maddr);
             memcpy(maddr_to_virt(dest_maddr), (void *)source, bytes);
             from_pos += bytes;
             to_pos += bytes;
@@ -271,28 +263,29 @@ int xencomm_add_offset(void **handle, unsigned int bytes)
     struct xencomm_desc *desc;
     int i = 0;
 
-    if (xencomm_is_inline(*handle))
+    if ( xencomm_is_inline(*handle) )
         return xencomm_inline_add_offset(handle, bytes);
 
-    /* first we need to access the descriptor */
+    /* First we need to access the descriptor. */
     desc = (struct xencomm_desc *)
         xencomm_maddr_to_vaddr(paddr_to_maddr((unsigned long)*handle));
-    if (desc == NULL)
+    if ( desc == NULL )
         return -1;
 
-    if (desc->magic != XENCOMM_MAGIC) {
+    if ( desc->magic != XENCOMM_MAGIC )
+    {
         printk("%s error: %p magic was 0x%x\n", __func__, desc, desc->magic);
         return -1;
     }
 
-    /* iterate through the descriptor incrementing addresses */
-    while ((bytes > 0) && (i < desc->nr_addrs)) {
+    /* Iterate through the descriptor incrementing addresses. */
+    while ( (bytes > 0) && (i < desc->nr_addrs) )
+    {
         unsigned long dest_paddr = desc->address[i];
-        unsigned int pgoffset;
-        unsigned int chunksz;
-        unsigned int chunk_skip;
+        unsigned int pgoffset, chunksz, chunk_skip;
 
-        if (dest_paddr == XENCOMM_INVALID) {
+        if ( dest_paddr == XENCOMM_INVALID )
+        {
             i++;
             continue;
         }
@@ -301,16 +294,15 @@ int xencomm_add_offset(void **handle, unsigned int bytes)
         chunksz = PAGE_SIZE - pgoffset;
 
         chunk_skip = min(chunksz, bytes);
-        if (chunk_skip == chunksz) {
-            /* exhausted this page */
-            desc->address[i] = XENCOMM_INVALID;
-        } else {
+        if ( chunk_skip == chunksz )
+            desc->address[i] = XENCOMM_INVALID; /* exchausted this page */
+        else
             desc->address[i] += chunk_skip;
-        }
         bytes -= chunk_skip;
 
         i++;
     }
+
     return 0;
 }
 
@@ -319,18 +311,17 @@ int xencomm_handle_is_null(void *handle)
     struct xencomm_desc *desc;
     int i;
 
-    if (xencomm_is_inline(handle))
+    if ( xencomm_is_inline(handle) )
         return xencomm_inline_addr(handle) == 0;
 
     desc = (struct xencomm_desc *)
         xencomm_maddr_to_vaddr(paddr_to_maddr((unsigned long)handle));
-    if (desc == NULL)
+    if ( desc == NULL )
         return 1;
 
-    for (i = 0; i < desc->nr_addrs; i++)
-        if (desc->address[i] != XENCOMM_INVALID)
+    for ( i = 0; i < desc->nr_addrs; i++ )
+        if ( desc->address[i] != XENCOMM_INVALID )
             return 0;
 
     return 1;
 }
-
