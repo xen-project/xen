@@ -28,6 +28,7 @@ ret_t do_physdev_op(int cmd, XEN_GUEST_HANDLE(void) arg)
 {
     int irq;
     ret_t ret;
+    struct vcpu *v = current;
 
     switch ( cmd )
     {
@@ -36,13 +37,13 @@ ret_t do_physdev_op(int cmd, XEN_GUEST_HANDLE(void) arg)
         ret = -EFAULT;
         if ( copy_from_guest(&eoi, arg, 1) != 0 )
             break;
-        ret = pirq_guest_eoi(current->domain, eoi.irq);
+        ret = pirq_guest_eoi(v->domain, eoi.irq);
         break;
     }
 
     /* Legacy since 0x00030202. */
     case PHYSDEVOP_IRQ_UNMASK_NOTIFY: {
-        ret = pirq_guest_unmask(current->domain);
+        ret = pirq_guest_unmask(v->domain);
         break;
     }
 
@@ -70,7 +71,7 @@ ret_t do_physdev_op(int cmd, XEN_GUEST_HANDLE(void) arg)
         if ( copy_from_guest(&apic, arg, 1) != 0 )
             break;
         ret = -EPERM;
-        if ( !IS_PRIV(current->domain) )
+        if ( !IS_PRIV(v->domain) )
             break;
         ret = ioapic_guest_read(apic.apic_physbase, apic.reg, &apic.value);
         if ( copy_to_guest(arg, &apic, 1) != 0 )
@@ -84,7 +85,7 @@ ret_t do_physdev_op(int cmd, XEN_GUEST_HANDLE(void) arg)
         if ( copy_from_guest(&apic, arg, 1) != 0 )
             break;
         ret = -EPERM;
-        if ( !IS_PRIV(current->domain) )
+        if ( !IS_PRIV(v->domain) )
             break;
         ret = ioapic_guest_write(apic.apic_physbase, apic.reg, apic.value);
         break;
@@ -98,7 +99,7 @@ ret_t do_physdev_op(int cmd, XEN_GUEST_HANDLE(void) arg)
             break;
 
         ret = -EPERM;
-        if ( !IS_PRIV(current->domain) )
+        if ( !IS_PRIV(v->domain) )
             break;
 
         irq = irq_op.irq;
@@ -120,7 +121,7 @@ ret_t do_physdev_op(int cmd, XEN_GUEST_HANDLE(void) arg)
         if ( set_iopl.iopl > 3 )
             break;
         ret = 0;
-        current->arch.iopl = set_iopl.iopl;
+        v->arch.iopl = set_iopl.iopl;
         break;
     }
 
@@ -135,11 +136,11 @@ ret_t do_physdev_op(int cmd, XEN_GUEST_HANDLE(void) arg)
             break;
         ret = 0;
 #ifndef COMPAT
-        current->arch.iobmp       = set_iobitmap.bitmap;
+        v->arch.iobmp       = set_iobitmap.bitmap;
 #else
-        guest_from_compat_handle(current->arch.iobmp, set_iobitmap.bitmap);
+        guest_from_compat_handle(v->arch.iobmp, set_iobitmap.bitmap);
 #endif
-        current->arch.iobmp_limit = set_iobitmap.nr_ports;
+        v->arch.iobmp_limit = set_iobitmap.nr_ports;
         break;
     }
 
