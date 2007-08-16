@@ -43,10 +43,6 @@
 /* HACK: Route IRQ0 only to VCPU0 to prevent time jumps. */
 #define IRQ0_SPECIAL_ROUTING 1
 
-#if defined(__ia64__)
-#define opt_hvm_debug_level opt_vmx_debug_level
-#endif
-
 static void vioapic_deliver(struct hvm_hw_vioapic *vioapic, int irq);
 
 static unsigned long vioapic_read_indirect(struct hvm_hw_vioapic *vioapic,

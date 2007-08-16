@@ -876,7 +876,7 @@ def parse_doms_info(info):
     if len(tmp) != 3:
         seclabel = ""
     else:
-        seclabel = tmp[2]
+        seclabel = security_label
     parsed_info['seclabel'] = seclabel
 
     if serverType == SERVER_XEN_API:
@@ -2186,6 +2186,7 @@ def xm_network_attach(args):
 
 
 def detach(args, deviceClass):
+    rm_cfg = True
     dom = args[0]
     dev = args[1]
     try:
@@ -2196,7 +2197,7 @@ def detach(args, deviceClass):
     except IndexError:
         force = None
 
-    server.xend.domain.destroyDevice(dom, deviceClass, dev, force)
+    server.xend.domain.destroyDevice(dom, deviceClass, dev, force, rm_cfg)
 
 
 def xm_block_detach(args):

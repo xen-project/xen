@@ -106,6 +106,8 @@ extern void init_IRQ(void);
 extern void trap_init(void);
 extern void early_time_init(void);
 extern void early_cpu_init(void);
+extern void vesa_init(void);
+extern void vesa_mtrr_init(void);
 
 struct tss_struct init_tss[NR_CPUS];
 
@@ -282,9 +284,28 @@ static void __init srat_detect_node(int cpu)
         printk(KERN_INFO "CPU %d APIC %d -> Node %d\n", cpu, apicid, node);
 }
 
+/*
+ * Ensure a given physical memory range is present in the bootstrap mappings.
+ * Use superpage mappings to ensure that pagetable memory needn't be allocated.
+ */
+static void __init bootstrap_map(unsigned long start, unsigned long end)
+{
+    unsigned long mask = (1UL << L2_PAGETABLE_SHIFT) - 1;
+    start = start & ~mask;
+    end   = (end + mask) & ~mask;
+    if ( end > BOOTSTRAP_DIRECTMAP_END )
+        panic("Cannot access memory beyond end of "
+              "bootstrap direct-map area\n");
+    map_pages_to_xen(
+        (unsigned long)maddr_to_bootstrap_virt(start),
+        start >> PAGE_SHIFT, (end-start) >> PAGE_SHIFT, PAGE_HYPERVISOR);
+}
+
 static void __init move_memory(
     unsigned long dst, unsigned long src_start, unsigned long src_end)
 {
+    bootstrap_map(src_start, src_end);
+    bootstrap_map(dst, dst + src_end - src_start);
     memmove(maddr_to_bootstrap_virt(dst),
             maddr_to_bootstrap_virt(src_start),
             src_end - src_start);
@@ -882,6 +903,7 @@ void __init __start_xen(unsigned long mbi_p)
 #ifdef __x86_64__
     init_xenheap_pages(xen_phys_start, __pa(&_start));
     nr_pages += (__pa(&_start) - xen_phys_start) >> PAGE_SHIFT;
+    vesa_init();
 #endif
     xenheap_phys_start = xen_phys_start;
     printk("Xen heap: %luMB (%lukB)\n", 
@@ -947,6 +969,9 @@ void __init __start_xen(unsigned long mbi_p)
         set_in_cr4(X86_CR4_OSFXSR);
     if ( cpu_has_xmm )
         set_in_cr4(X86_CR4_OSXMMEXCPT);
+#ifdef CONFIG_X86_64
+    vesa_mtrr_init();
+#endif
 
     if ( opt_nosmp )
         max_cpus = 0;

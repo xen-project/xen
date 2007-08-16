@@ -710,12 +710,12 @@ acm_change_policy(struct acm_change_policy *chgpolicy)
         goto acm_chg_policy_exit;
     }
 
-    if ( copy_from_guest((u8 *)dels.array,
+    if ( copy_from_guest(dels.array,
                          chgpolicy->del_array,
-                         chgpolicy->delarray_size) ||
-         copy_from_guest((u8 *)ssidmap.array,
+                         dels.num_items) ||
+         copy_from_guest(ssidmap.array,
                          chgpolicy->chg_array,
-                         chgpolicy->chgarray_size) ||
+                         ssidmap.num_items) ||
          copy_from_guest(binpolicy,
                          chgpolicy->policy_pushcache,
                          chgpolicy->policy_pushcache_size ))
@@ -844,9 +844,9 @@ acm_relabel_domains(struct acm_relabel_doms *relabel)
         memset(errors.array, 0x0, sizeof(uint32_t) * errors.num_items);
     }
 
-    if ( copy_from_guest((u8 *)relabels.array,
+    if ( copy_from_guest(relabels.array,
                          relabel->relabel_map,
-                         relabel->relabel_map_size) )
+                         relabels.num_items) )
     {
         rc = -EFAULT;
         goto acm_relabel_doms_exit;

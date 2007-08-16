@@ -558,9 +558,64 @@ class XendDomainInfo:
         for devclass in XendDevices.valid_devices():
             self.getDeviceController(devclass).waitForDevices()
 
-    def destroyDevice(self, deviceClass, devid, force = False):
-        log.debug("dev = %s", devid)
-        return self.getDeviceController(deviceClass).destroyDevice(devid, force)
+    def destroyDevice(self, deviceClass, devid, force = False, rm_cfg = False):
+        log.debug("XendDomainInfo.destroyDevice: deviceClass = %s, device = %s",
+                  deviceClass, devid)
+
+        if rm_cfg:
+            # Convert devid to device number.  A device number is
+            # needed to remove its configuration.
+            dev = self.getDeviceController(deviceClass).convertToDeviceNumber(devid)
+            
+            # Save current sxprs.  A device number and a backend
+            # path are needed to remove its configuration but sxprs
+            # do not have those after calling destroyDevice.
+            sxprs = self.getDeviceSxprs(deviceClass)
+
+        rc = None
+        if self.domid is not None:
+            rc = self.getDeviceController(deviceClass).destroyDevice(devid, force)
+            if not force and rm_cfg:
+                # The backend path, other than the device itself,
+                # has to be passed because its accompanied frontend
+                # path may be void until its removal is actually
+                # issued.  It is probable because destroyDevice is
+                # issued first.
+                for dev_num, dev_info in sxprs:
+                    dev_num = int(dev_num)
+                    if dev_num == dev:
+                        for x in dev_info:
+                            if x[0] == 'backend':
+                                backend = x[1]
+                                break
+                        break
+                self._waitForDevice_destroy(deviceClass, devid, backend)
+
+        if rm_cfg:
+            if deviceClass == 'vif':
+                if self.domid is not None:
+                    for dev_num, dev_info in sxprs:
+                        dev_num = int(dev_num)
+                        if dev_num == dev:
+                            for x in dev_info:
+                                if x[0] == 'mac':
+                                    mac = x[1]
+                                    break
+                            break
+                    dev_info = self.getDeviceInfo_vif(mac)
+                else:
+                    _, dev_info = sxprs[dev]
+            else:  # 'vbd' or 'tap'
+                dev_info = self.getDeviceInfo_vbd(dev)
+            if dev_info is None:
+                return rc
+
+            dev_uuid = sxp.child_value(dev_info, 'uuid')
+            del self.info['devices'][dev_uuid]
+            self.info['%s_refs' % deviceClass].remove(dev_uuid)
+            xen.xend.XendDomain.instance().managed_config_save(self)
+
+        return rc
 
     def getDeviceSxprs(self, deviceClass):
         if self._stateGet() in (DOM_STATE_RUNNING, DOM_STATE_PAUSED):
@@ -573,6 +628,23 @@ class XendDomainInfo:
                     sxprs.append([dev_num, dev_info])
                     dev_num += 1
             return sxprs
+
+    def getDeviceInfo_vif(self, mac):
+        for dev_type, dev_info in self.info.all_devices_sxpr():
+            if dev_type != 'vif':
+                continue
+            if mac == sxp.child_value(dev_info, 'mac'):
+                return dev_info
+
+    def getDeviceInfo_vbd(self, devid):
+        for dev_type, dev_info in self.info.all_devices_sxpr():
+            if dev_type != 'vbd' and dev_type != 'tap':
+                continue
+            dev = sxp.child_value(dev_info, 'dev')
+            dev = dev.split(':')[0]
+            dev = self.getDeviceController(dev_type).convertToDeviceNumber(dev)
+            if devid == dev:
+                return dev_info
 
 
     def setMemoryTarget(self, target):
@@ -1112,8 +1184,6 @@ class XendDomainInfo:
                     self._clearRestart()
 
                     if reason == 'suspend':
-                        if self._stateGet() != DOM_STATE_SUSPENDED:
-                            self.image.saveDeviceModel()
                         self._stateSet(DOM_STATE_SUSPENDED)
                         # Don't destroy the domain.  XendCheckpoint will do
                         # this once it has finished.  However, stop watching
@@ -1320,6 +1390,10 @@ class XendDomainInfo:
     def _waitForDeviceUUID(self, dev_uuid):
         deviceClass, config = self.info['devices'].get(dev_uuid)
         self._waitForDevice(deviceClass, config['devid'])
+
+    def _waitForDevice_destroy(self, deviceClass, devid, backpath):
+        return self.getDeviceController(deviceClass).waitForDevice_destroy(
+            devid, backpath)
 
     def _reconfigureDevice(self, deviceClass, devid, devconfig):
         return self.getDeviceController(deviceClass).reconfigureDevice(
@@ -2187,11 +2261,18 @@ class XendDomainInfo:
         return self.metrics.get_uuid();
 
 
-    def get_security_label(self):
+    def get_security_label(self, xspol=None):
+        """
+           Get the security label of a domain
+           @param xspol   The policy to use when converting the ssid into
+                          a label; only to be passed during the updating
+                          of the policy
+        """
         domid = self.getDomid()
 
-        from xen.xend.XendXSPolicyAdmin import XSPolicyAdminInstance
-        xspol = XSPolicyAdminInstance().get_loaded_policy()
+        if not xspol:
+            from xen.xend.XendXSPolicyAdmin import XSPolicyAdminInstance
+            xspol = XSPolicyAdminInstance().get_loaded_policy()
 
         if domid == 0:
             if xspol:
@@ -2202,7 +2283,8 @@ class XendDomainInfo:
             label = self.info.get('security_label', '')
         return label
 
-    def set_security_label(self, seclab, old_seclab, xspol=None):
+    def set_security_label(self, seclab, old_seclab, xspol=None,
+                           xspol_old=None):
         """
            Set the security label of a domain from its old to
            a new value.
@@ -2213,6 +2295,8 @@ class XendDomainInfo:
            @param xspol   An optional policy under which this
                           update should be done. If not given,
                           then the current active policy is used.
+           @param xspol_old The old policy; only to be passed during
+                           the updating of a policy
            @return Returns return code, a string with errors from
                    the hypervisor's operation, old label of the
                    domain
@@ -2223,6 +2307,7 @@ class XendDomainInfo:
         new_ssidref = 0
         domid = self.getDomid()
         res_labels = None
+        is_policy_update = (xspol_old != None)
 
         from xen.xend.XendXSPolicyAdmin import XSPolicyAdminInstance
         from xen.util import xsconstants
@@ -2276,13 +2361,16 @@ class XendDomainInfo:
 
                 # Check that all used resources are accessible under the
                 # new label
-                if not security.resources_compatible_with_vmlabel(xspol,
+                if not is_policy_update and \
+                   not security.resources_compatible_with_vmlabel(xspol,
                           self, label):
                     return (-xsconstants.XSERR_BAD_LABEL, "", "", 0)
 
                 #Check label against expected one.
-                old_label = self.get_security_label()
+                old_label = self.get_security_label(xspol_old)
                 if old_label != old_seclab:
+                    log.info("old_label != old_seclab: %s != %s" %
+                             (old_label, old_seclab))
                     return (-xsconstants.XSERR_BAD_LABEL, "", "", 0)
 
                 # relabel domain in the hypervisor

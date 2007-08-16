@@ -76,13 +76,6 @@ void hvm_enable(struct hvm_function_table *fns)
     hvm_enabled = 1;
 }
 
-void hvm_stts(struct vcpu *v)
-{
-    /* FPU state already dirty? Then no need to setup_fpu() lazily. */
-    if ( !v->fpu_dirtied )
-        hvm_funcs.stts(v);
-}
-
 void hvm_set_guest_time(struct vcpu *v, u64 gtime)
 {
     u64 host_tsc;
@@ -112,7 +105,8 @@ void hvm_do_resume(struct vcpu *v)
 {
     ioreq_t *p;
 
-    hvm_stts(v);
+    if ( !v->fpu_dirtied )
+        hvm_funcs.stts(v);
 
     pt_thaw_time(v);
 
@@ -520,6 +514,174 @@ void hvm_triple_fault(void)
     domain_shutdown(v->domain, SHUTDOWN_reboot);
 }
 
+int hvm_set_cr0(unsigned long value)
+{
+    struct vcpu *v = current;
+    unsigned long mfn, old_base_mfn, old_value = v->arch.hvm_vcpu.guest_cr[0];
+  
+    HVM_DBG_LOG(DBG_LEVEL_VMMU, "Update CR0 value = %lx", value);
+
+    if ( (u32)value != value )
+    {
+        HVM_DBG_LOG(DBG_LEVEL_1,
+                    "Guest attempts to set upper 32 bits in CR0: %lx",
+                    value);
+        hvm_inject_exception(TRAP_gp_fault, 0, 0);
+        return 0;
+    }
+
+    value &= ~HVM_CR0_GUEST_RESERVED_BITS;
+
+    /* ET is reserved and should be always be 1. */
+    value |= X86_CR0_ET;
+
+    if ( (value & (X86_CR0_PE|X86_CR0_PG)) == X86_CR0_PG )
+    {
+        hvm_inject_exception(TRAP_gp_fault, 0, 0);
+        return 0;
+    }
+
+    if ( (value & X86_CR0_PG) && !(old_value & X86_CR0_PG) )
+    {
+        if ( v->arch.hvm_vcpu.guest_efer & EFER_LME )
+        {
+            if ( !(v->arch.hvm_vcpu.guest_cr[4] & X86_CR4_PAE) )
+            {
+                HVM_DBG_LOG(DBG_LEVEL_1, "Enable paging before PAE enable");
+                hvm_inject_exception(TRAP_gp_fault, 0, 0);
+                return 0;
+            }
+            HVM_DBG_LOG(DBG_LEVEL_1, "Enabling long mode");
+            v->arch.hvm_vcpu.guest_efer |= EFER_LMA;
+            hvm_update_guest_efer(v);
+        }
+
+        if ( !paging_mode_hap(v->domain) )
+        {
+            /* The guest CR3 must be pointing to the guest physical. */
+            mfn = get_mfn_from_gpfn(v->arch.hvm_vcpu.guest_cr[3]>>PAGE_SHIFT);
+            if ( !mfn_valid(mfn) || !get_page(mfn_to_page(mfn), v->domain))
+            {
+                gdprintk(XENLOG_ERR, "Invalid CR3 value = %lx (mfn=%lx)\n", 
+                         v->arch.hvm_vcpu.guest_cr[3], mfn);
+                domain_crash(v->domain);
+                return 0;
+            }
+
+            /* Now arch.guest_table points to machine physical. */
+            old_base_mfn = pagetable_get_pfn(v->arch.guest_table);
+            v->arch.guest_table = pagetable_from_pfn(mfn);
+            if ( old_base_mfn )
+                put_page(mfn_to_page(old_base_mfn));
+
+            HVM_DBG_LOG(DBG_LEVEL_VMMU, "Update CR3 value = %lx, mfn = %lx",
+                        v->arch.hvm_vcpu.guest_cr[3], mfn);
+        }
+    }
+    else if ( !(value & X86_CR0_PG) && (old_value & X86_CR0_PG) )
+    {
+        /* When CR0.PG is cleared, LMA is cleared immediately. */
+        if ( hvm_long_mode_enabled(v) )
+        {
+            v->arch.hvm_vcpu.guest_efer &= ~EFER_LMA;
+            hvm_update_guest_efer(v);
+        }
+
+        if ( !paging_mode_hap(v->domain) )
+        {
+            put_page(mfn_to_page(get_mfn_from_gpfn(
+                v->arch.hvm_vcpu.guest_cr[3] >> PAGE_SHIFT)));
+            v->arch.guest_table = pagetable_null();
+        }
+    }
+
+    v->arch.hvm_vcpu.guest_cr[0] = value;
+    hvm_update_guest_cr(v, 0);
+
+    if ( (value ^ old_value) & X86_CR0_PG )
+        paging_update_paging_modes(v);
+
+    return 1;
+}
+
+int hvm_set_cr3(unsigned long value)
+{
+    unsigned long old_base_mfn, mfn;
+    struct vcpu *v = current;
+
+    if ( paging_mode_hap(v->domain) || !hvm_paging_enabled(v) )
+    {
+        /* Nothing to do. */
+    }
+    else if ( value == v->arch.hvm_vcpu.guest_cr[3] )
+    {
+        /* Shadow-mode TLB flush. Invalidate the shadow. */
+        mfn = get_mfn_from_gpfn(value >> PAGE_SHIFT);
+        if ( mfn != pagetable_get_pfn(v->arch.guest_table) )
+            goto bad_cr3;
+    }
+    else 
+    {
+        /* Shadow-mode CR3 change. Check PDBR and then make a new shadow. */
+        HVM_DBG_LOG(DBG_LEVEL_VMMU, "CR3 value = %lx", value);
+        mfn = get_mfn_from_gpfn(value >> PAGE_SHIFT);
+        if ( !mfn_valid(mfn) || !get_page(mfn_to_page(mfn), v->domain) )
+            goto bad_cr3;
+
+        old_base_mfn = pagetable_get_pfn(v->arch.guest_table);
+        v->arch.guest_table = pagetable_from_pfn(mfn);
+
+        if ( old_base_mfn )
+            put_page(mfn_to_page(old_base_mfn));
+
+        HVM_DBG_LOG(DBG_LEVEL_VMMU, "Update CR3 value = %lx", value);
+    }
+
+    v->arch.hvm_vcpu.guest_cr[3] = value;
+    paging_update_cr3(v);
+    return 1;
+
+ bad_cr3:
+    gdprintk(XENLOG_ERR, "Invalid CR3\n");
+    domain_crash(v->domain);
+    return 0;
+}
+
+int hvm_set_cr4(unsigned long value)
+{
+    struct vcpu *v = current;
+    unsigned long old_cr;
+
+    if ( value & HVM_CR4_GUEST_RESERVED_BITS )
+    {
+        HVM_DBG_LOG(DBG_LEVEL_1,
+                    "Guest attempts to set reserved bit in CR4: %lx",
+                    value);
+        goto gpf;
+    }
+
+    if ( !(value & X86_CR4_PAE) && hvm_long_mode_enabled(v) )
+    {
+        HVM_DBG_LOG(DBG_LEVEL_1, "Guest cleared CR4.PAE while "
+                    "EFER.LMA is set");
+        goto gpf;
+    }
+
+    old_cr = v->arch.hvm_vcpu.guest_cr[4];
+    v->arch.hvm_vcpu.guest_cr[4] = value;
+    hvm_update_guest_cr(v, 4);
+  
+    /* Modifying CR4.{PSE,PAE,PGE} invalidates all TLB entries, inc. Global. */
+    if ( (old_cr ^ value) & (X86_CR4_PSE | X86_CR4_PGE | X86_CR4_PAE) )
+        paging_update_paging_modes(v);
+
+    return 1;
+
+ gpf:
+    hvm_inject_exception(TRAP_gp_fault, 0, 0);
+    return 0;
+}
+
 /*
  * __hvm_copy():
  *  @buf  = hypervisor buffer
@@ -668,7 +830,6 @@ typedef unsigned long hvm_hypercall_t(
 static hvm_hypercall_t *hvm_hypercall32_table[NR_hypercalls] = {
     HYPERCALL(memory_op),
     [ __HYPERVISOR_grant_table_op ] = (hvm_hypercall_t *)hvm_grant_table_op,
-    HYPERCALL(multicall),
     HYPERCALL(xen_version),
     HYPERCALL(grant_table_op),
     HYPERCALL(event_channel_op),
@@ -811,12 +972,6 @@ int hvm_do_hypercall(struct cpu_user_regs *regs)
 
     return (this_cpu(hc_preempted) ? HVM_HCALL_preempted :
             flush ? HVM_HCALL_invalidate : HVM_HCALL_completed);
-}
-
-void hvm_update_guest_cr3(struct vcpu *v, unsigned long guest_cr3)
-{
-    v->arch.hvm_vcpu.hw_cr3 = guest_cr3;
-    hvm_funcs.update_guest_cr3(v);
 }
 
 static void hvm_latch_shinfo_size(struct domain *d)

@@ -235,10 +235,10 @@ unsigned long do_iret(void)
     }
 
     /* No longer in NMI context. */
-    current->nmi_masked = 0;
+    v->nmi_masked = 0;
 
     /* Restore upcall mask from supplied EFLAGS.IF. */
-    vcpu_info(current, evtchn_upcall_mask) = !(iret_saved.rflags & EF_IE);
+    vcpu_info(v, evtchn_upcall_mask) = !(iret_saved.rflags & EF_IE);
 
     /* Saved %rax gets written back to regs->rax in entry.S. */
     return iret_saved.rax;

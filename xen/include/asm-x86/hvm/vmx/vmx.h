@@ -279,8 +279,8 @@ static inline void __vmx_inject_exception(
 
     __vmwrite(VM_ENTRY_INTR_INFO, intr_fields);
 
-    if (trap == TRAP_page_fault)
-        HVMTRACE_2D(PF_INJECT, v, v->arch.hvm_vmx.cpu_cr2, error_code);
+    if ( trap == TRAP_page_fault )
+        HVMTRACE_2D(PF_INJECT, v, v->arch.hvm_vcpu.guest_cr[2], error_code);
     else
         HVMTRACE_2D(INJ_EXC, v, trap, error_code);
 }

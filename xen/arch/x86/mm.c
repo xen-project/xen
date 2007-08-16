@@ -394,8 +394,8 @@ void write_ptbase(struct vcpu *v)
     write_cr3(v->arch.cr3);
 }
 
-/* Should be called after CR3 is updated.
- * Updates vcpu->arch.cr3 and, for HVM guests, vcpu->arch.hvm_vcpu.cpu_cr3.
+/*
+ * Should be called after CR3 is updated.
  * 
  * Uses values found in vcpu->arch.(guest_table and guest_table_user), and
  * for HVM guests, arch.monitor_table and hvm's guest CR3.

@@ -104,8 +104,8 @@ class NetConfig:
             if self.network == "169.254.0.0":
                 checkZeroconfAddresses()
 
-            # Clean out any aliases in the network range for vif0.0. If
-            # an alias exists, a test xendevice add command could fail.
+            # Clean out any aliases in the network range for dom0's interface.
+            # If an alias exists, a test xendevice add command could fail.
             if NETWORK_IP_RANGE != "dhcp":
                 self.__cleanDom0Aliases()
 
@@ -139,20 +139,22 @@ class NetConfig:
 
     def __cleanDom0Aliases(self):
         # Remove any aliases within the supplied network IP range on dom0
-        scmd = 'ip addr show dev vif0.0'
+        scmd = 'ip addr show dev %s' % (DOM0_INTF)
 
         status, output = traceCommand(scmd)
         if status:
-            raise NetworkError("Failed to show vif0.0 aliases: %d" % status)
+            raise NetworkError("Failed to show %s aliases: %d" %
+                               (DOM0_INTF, status))
 
         lines = output.split("\n")
         for line in lines:
             ip = re.search('(\d+\.\d+\.\d+\.\d+)', line)
             if ip and self.isIPInRange(ip.group(1)) == True:
-                dcmd = 'ip addr del %s dev vif0.0' % ip.group(1)
+                dcmd = 'ip addr del %s dev %s' % (ip.group(1), DOM0_INTF)
                 dstatus, doutput = traceCommand(dcmd)
                 if dstatus:
-                    raise NetworkError("Failed to remove vif0.0 aliases: %d" % status)
+                    raise NetworkError("Failed to remove %s aliases: %d" %
+                                       (DOM0_INTF, status))
                 
     def getNetEnv(self):
         return self.netenv

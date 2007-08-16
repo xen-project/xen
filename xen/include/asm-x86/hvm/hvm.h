@@ -95,36 +95,27 @@ struct hvm_function_table {
 
     /*
      * Examine specifics of the guest state:
-     * 1) determine whether paging is enabled,
-     * 2) determine whether long mode is enabled,
-     * 3) determine whether PAE paging is enabled,
-     * 4) determine whether NX is enabled,
-     * 5) determine whether interrupts are enabled or not,
-     * 6) determine the mode the guest is running in,
-     * 7) return the current guest control-register value
-     * 8) return the current guest segment descriptor base
-     * 9) return the current guest segment descriptor
+     * 1) determine whether interrupts are enabled or not
+     * 2) determine the mode the guest is running in
+     * 3) return the current guest segment descriptor base
+     * 4) return the current guest segment descriptor
      */
-    int (*paging_enabled)(struct vcpu *v);
-    int (*long_mode_enabled)(struct vcpu *v);
-    int (*pae_enabled)(struct vcpu *v);
-    int (*nx_enabled)(struct vcpu *v);
     int (*interrupts_enabled)(struct vcpu *v, enum hvm_intack);
     int (*guest_x86_mode)(struct vcpu *v);
-    unsigned long (*get_guest_ctrl_reg)(struct vcpu *v, unsigned int num);
     unsigned long (*get_segment_base)(struct vcpu *v, enum x86_segment seg);
     void (*get_segment_register)(struct vcpu *v, enum x86_segment seg,
                                  struct segment_register *reg);
 
     /* 
-     * Re-set the value of CR3 that Xen runs on when handling VM exits
+     * Re-set the value of CR3 that Xen runs on when handling VM exits.
      */
     void (*update_host_cr3)(struct vcpu *v);
 
     /*
-     * Called to inform HVM layer that a guest cr3 has changed
+     * Called to inform HVM layer that a guest CRn or EFER has changed.
      */
-    void (*update_guest_cr3)(struct vcpu *v);
+    void (*update_guest_cr)(struct vcpu *v, unsigned int cr);
+    void (*update_guest_efer)(struct vcpu *v);
 
     /*
      * Called to ensure than all guest-specific mappings in a tagged TLB
@@ -189,38 +180,24 @@ hvm_load_cpu_guest_regs(struct vcpu *v, struct cpu_user_regs *r)
 void hvm_set_guest_time(struct vcpu *v, u64 gtime);
 u64 hvm_get_guest_time(struct vcpu *v);
 
-static inline int
-hvm_paging_enabled(struct vcpu *v)
-{
-    return hvm_funcs.paging_enabled(v);
-}
+#define hvm_paging_enabled(v) \
+    (!!((v)->arch.hvm_vcpu.guest_cr[0] & X86_CR0_PG))
+#define hvm_pae_enabled(v) \
+    (hvm_paging_enabled(v) && ((v)->arch.hvm_vcpu.guest_cr[4] & X86_CR4_PAE))
+#define hvm_nx_enabled(v) \
+    (!!((v)->arch.hvm_vcpu.guest_efer & EFER_NX))
 
 #ifdef __x86_64__
-static inline int
-hvm_long_mode_enabled(struct vcpu *v)
-{
-    return hvm_funcs.long_mode_enabled(v);
-}
+#define hvm_long_mode_enabled(v) \
+    ((v)->arch.hvm_vcpu.guest_efer & EFER_LMA)
 #else
 #define hvm_long_mode_enabled(v) (v,0)
 #endif
 
 static inline int
-hvm_pae_enabled(struct vcpu *v)
-{
-    return hvm_funcs.pae_enabled(v);
-}
-
-static inline int
 hvm_interrupts_enabled(struct vcpu *v, enum hvm_intack type)
 {
     return hvm_funcs.interrupts_enabled(v, type);
-}
-
-static inline int
-hvm_nx_enabled(struct vcpu *v)
-{
-    return hvm_funcs.nx_enabled(v);
 }
 
 static inline int
@@ -244,7 +221,15 @@ hvm_update_vtpr(struct vcpu *v, unsigned long value)
     hvm_funcs.update_vtpr(v, value);
 }
 
-void hvm_update_guest_cr3(struct vcpu *v, unsigned long guest_cr3);
+static inline void hvm_update_guest_cr(struct vcpu *v, unsigned int cr)
+{
+    hvm_funcs.update_guest_cr(v, cr);
+}
+
+static inline void hvm_update_guest_efer(struct vcpu *v)
+{
+    hvm_funcs.update_guest_efer(v);
+}
 
 static inline void 
 hvm_flush_guest_tlbs(void)
@@ -255,12 +240,6 @@ hvm_flush_guest_tlbs(void)
 
 void hvm_hypercall_page_initialise(struct domain *d,
                                    void *hypercall_page);
-
-static inline unsigned long
-hvm_get_guest_ctrl_reg(struct vcpu *v, unsigned int num)
-{
-    return hvm_funcs.get_guest_ctrl_reg(v, num);
-}
 
 static inline unsigned long
 hvm_get_segment_base(struct vcpu *v, enum x86_segment seg)
@@ -277,7 +256,6 @@ hvm_get_segment_register(struct vcpu *v, enum x86_segment seg,
 
 void hvm_cpuid(unsigned int input, unsigned int *eax, unsigned int *ebx,
                                    unsigned int *ecx, unsigned int *edx);
-void hvm_stts(struct vcpu *v);
 void hvm_migrate_timers(struct vcpu *v);
 void hvm_do_resume(struct vcpu *v);
 

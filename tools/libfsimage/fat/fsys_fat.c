@@ -228,15 +228,15 @@ fat_read (fsi_file_t *ffi, char *buf, int len)
 	      if (!devread (ffi, sector, 0, FAT_CACHE_SIZE, (char*) FAT_BUF))
 		return 0;
 	    }
-	  next_cluster = * (unsigned long *) (FAT_BUF + (cached_pos >> 1));
+	  next_cluster = ((__u16 *) (FAT_BUF + (cached_pos >> 1)))[0];
 	  if (FAT_SUPER->fat_size == 3)
 	    {
 	      if (cached_pos & 1)
 		next_cluster >>= 4;
 	      next_cluster &= 0xFFF;
 	    }
-	  else if (FAT_SUPER->fat_size == 4)
-	    next_cluster &= 0xFFFF;
+	  else if (FAT_SUPER->fat_size > 4)
+	    next_cluster |= ((__u16 *) (FAT_BUF + (cached_pos >> 1)))[1] << 16;
 	  
 	  if (next_cluster >= FAT_SUPER->clust_eof_marker)
 	    return ret;

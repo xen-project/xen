@@ -1219,7 +1219,7 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
     unsigned long code_base, code_limit;
     char io_emul_stub[16];
     void (*io_emul)(struct cpu_user_regs *) __attribute__((__regparm__(1)));
-    u32 l, h;
+    u32 l, h, eax, edx;
 
     if ( !read_descriptor(regs->cs, v, regs,
                           &code_base, &code_limit, &ar,
@@ -1696,43 +1696,43 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
         break;
 
     case 0x30: /* WRMSR */
+        eax = regs->eax;
+        edx = regs->edx;
+        res = ((u64)edx << 32) | eax;
         switch ( regs->ecx )
         {
 #ifdef CONFIG_X86_64
         case MSR_FS_BASE:
             if ( is_pv_32on64_vcpu(v) )
                 goto fail;
-            if ( wrmsr_safe(MSR_FS_BASE, regs->eax, regs->edx) )
+            if ( wrmsr_safe(MSR_FS_BASE, eax, edx) )
                 goto fail;
-            v->arch.guest_context.fs_base =
-                ((u64)regs->edx << 32) | regs->eax;
+            v->arch.guest_context.fs_base = res;
             break;
         case MSR_GS_BASE:
             if ( is_pv_32on64_vcpu(v) )
                 goto fail;
-            if ( wrmsr_safe(MSR_GS_BASE, regs->eax, regs->edx) )
+            if ( wrmsr_safe(MSR_GS_BASE, eax, edx) )
                 goto fail;
-            v->arch.guest_context.gs_base_kernel =
-                ((u64)regs->edx << 32) | regs->eax;
+            v->arch.guest_context.gs_base_kernel = res;
             break;
         case MSR_SHADOW_GS_BASE:
             if ( is_pv_32on64_vcpu(v) )
                 goto fail;
-            if ( wrmsr_safe(MSR_SHADOW_GS_BASE, regs->eax, regs->edx) )
+            if ( wrmsr_safe(MSR_SHADOW_GS_BASE, eax, edx) )
                 goto fail;
-            v->arch.guest_context.gs_base_user =
-                ((u64)regs->edx << 32) | regs->eax;
+            v->arch.guest_context.gs_base_user = res;
             break;
 #endif
         default:
-            if ( wrmsr_hypervisor_regs(regs->ecx, regs->eax, regs->edx) )
+            if ( wrmsr_hypervisor_regs(regs->ecx, eax, edx) )
                 break;
 
             if ( (rdmsr_safe(regs->ecx, l, h) != 0) ||
-                 (regs->eax != l) || (regs->edx != h) )
+                 (eax != l) || (edx != h) )
                 gdprintk(XENLOG_WARNING, "Domain attempted WRMSR %p from "
-                        "%08x:%08x to %08lx:%08lx.\n",
-                        _p(regs->ecx), h, l, (long)regs->edx, (long)regs->eax);
+                        "%08x:%08x to %08x:%08x.\n",
+                        _p(regs->ecx), h, l, edx, eax);
             break;
         }
         break;

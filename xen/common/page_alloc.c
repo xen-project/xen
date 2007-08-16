@@ -54,21 +54,14 @@ boolean_param("bootscrub", opt_bootscrub);
 /*
  * Bit width of the DMA heap.
  */
-static unsigned int  dma_bitsize = CONFIG_DMA_BITSIZE;
-static unsigned long max_dma_mfn = (1UL<<(CONFIG_DMA_BITSIZE-PAGE_SHIFT))-1;
+static unsigned int dma_bitsize = CONFIG_DMA_BITSIZE;
 static void __init parse_dma_bits(char *s)
 {
     unsigned int v = simple_strtol(s, NULL, 0);
     if ( v >= (BITS_PER_LONG + PAGE_SHIFT) )
-    {
         dma_bitsize = BITS_PER_LONG + PAGE_SHIFT;
-        max_dma_mfn = ~0UL;
-    }
     else if ( v > PAGE_SHIFT + 1 )
-    {
         dma_bitsize = v;
-        max_dma_mfn = (1UL << (dma_bitsize - PAGE_SHIFT)) - 1;
-    }
     else
         printk("Invalid dma_bits value of %u ignored.\n", v);
 }

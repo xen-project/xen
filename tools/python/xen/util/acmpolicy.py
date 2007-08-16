@@ -191,20 +191,21 @@ class ACMPolicy(XSPolicy):
                  acmpol_old.policy_get_virtualmachinelabel_names_sorted()
             del_array = ""
             chg_array = ""
+
             for o in oldvmnames:
                 if o not in newvmnames:
-                    old_idx = oldvmnames.index(o) + 1 # for _NULL_LABEL_
+                    old_idx = oldvmnames.index(o)
                     if vmlabel_map.has_key(o):
                         #not a deletion, but a renaming
                         new = vmlabel_map[o]
-                        new_idx = newvmnames.index(new) + 1 # for _NULL_LABEL_
+                        new_idx = newvmnames.index(new)
                         chg_array += struct.pack("ii", old_idx, new_idx)
                     else:
                         del_array += struct.pack("i", old_idx)
             for v in newvmnames:
                 if v in oldvmnames:
-                    old_idx = oldvmnames.index(v) + 1 # for _NULL_LABEL_
-                    new_idx = newvmnames.index(v) + 1 # for _NULL_LABEL_
+                    old_idx = oldvmnames.index(v)
+                    new_idx = newvmnames.index(v)
                     if old_idx != new_idx:
                         chg_array += struct.pack("ii", old_idx, new_idx)
 
@@ -348,7 +349,7 @@ class ACMPolicy(XSPolicy):
         ssidref = xsconstants.INVALID_SSIDREF
         names = self.policy_get_virtualmachinelabel_names_sorted()
         try:
-            vmidx = names.index(vm_label) + 1 # for _NULL_LABEL_
+            vmidx = names.index(vm_label)
             ssidref = (vmidx << 16) | vmidx
         except:
             pass
@@ -618,6 +619,9 @@ class ACMPolicy(XSPolicy):
         vmnames.remove(bootstrap)
         vmnames.sort()
         vmnames.insert(0, bootstrap)
+        if ACM_LABEL_UNLABELED in vmnames:
+            vmnames.remove(ACM_LABEL_UNLABELED)
+            vmnames.insert(0, ACM_LABEL_UNLABELED)
         return vmnames
 
     def policy_get_virtualmachinelabel_names_sorted(self):
@@ -625,7 +629,10 @@ class ACMPolicy(XSPolicy):
             label will be the first one in that list, followed
             by an alphabetically sorted list of VM label names """
         vmnames = self.policy_get_virtualmachinelabel_names()
-        return self.policy_sort_virtualmachinelabel_names(vmnames)
+        res = self.policy_sort_virtualmachinelabel_names(vmnames)
+        if res[0] != ACM_LABEL_UNLABELED:
+            res.insert(0, ACM_LABEL_UNLABELED)
+        return res
 
     def policy_get_virtualmachinelabels(self):
         """ Get a list of all virtual machine labels in this policy """
@@ -906,7 +913,7 @@ class ACMPolicy(XSPolicy):
             allvmtypes = self.policy_get_virtualmachinelabel_names_sorted()
         except:
             return None
-        return allvmtypes[chwall_ref-1] # skip _NULL_LABEL_
+        return allvmtypes[chwall_ref]
 
     def policy_get_domain_label_formatted(self, domid):
         label = self.policy_get_domain_label(domid)

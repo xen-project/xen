@@ -449,6 +449,9 @@ int xc_domain_setdebugging(int xc_handle,
  * EVENT CHANNEL FUNCTIONS
  */
 
+/* A port identifier is guaranteed to fit in 31 bits. */
+typedef int evtchn_port_or_error_t;
+
 /**
  * This function allocates an unbound port.  Ports are named endpoints used for
  * interdomain communication.  This function is most useful in opening a
@@ -463,12 +466,77 @@ int xc_domain_setdebugging(int xc_handle,
  * @parm remote_dom the ID of the domain who will later bind
  * @return allocated port (in @dom) on success, -1 on failure
  */
-int xc_evtchn_alloc_unbound(int xc_handle,
-                            uint32_t dom,
-                            uint32_t remote_dom);
+evtchn_port_or_error_t
+xc_evtchn_alloc_unbound(int xc_handle,
+                        uint32_t dom,
+                        uint32_t remote_dom);
 
 int xc_evtchn_reset(int xc_handle,
                     uint32_t dom);
+
+/*
+ * Return a handle to the event channel driver, or -1 on failure, in which case
+ * errno will be set appropriately.
+ */
+int xc_evtchn_open(void);
+
+/*
+ * Close a handle previously allocated with xc_evtchn_open().
+ */
+int xc_evtchn_close(int xce_handle);
+
+/*
+ * Return an fd that can be select()ed on for further calls to
+ * xc_evtchn_pending().
+ */
+int xc_evtchn_fd(int xce_handle);
+
+/*
+ * Notify the given event channel. Returns -1 on failure, in which case
+ * errno will be set appropriately.
+ */
+int xc_evtchn_notify(int xce_handle, evtchn_port_t port);
+
+/*
+ * Returns a new event port awaiting interdomain connection from the given
+ * domain ID, or -1 on failure, in which case errno will be set appropriately.
+ */
+evtchn_port_or_error_t
+xc_evtchn_bind_unbound_port(int xce_handle, int domid);
+
+/*
+ * Returns a new event port bound to the remote port for the given domain ID,
+ * or -1 on failure, in which case errno will be set appropriately.
+ */
+evtchn_port_or_error_t
+xc_evtchn_bind_interdomain(int xce_handle, int domid,
+                           evtchn_port_t remote_port);
+
+/*
+ * Bind an event channel to the given VIRQ. Returns the event channel bound to
+ * the VIRQ, or -1 on failure, in which case errno will be set appropriately.
+ */
+evtchn_port_or_error_t
+xc_evtchn_bind_virq(int xce_handle, unsigned int virq);
+
+/*
+ * Unbind the given event channel. Returns -1 on failure, in which case errno
+ * will be set appropriately.
+ */
+int xc_evtchn_unbind(int xce_handle, evtchn_port_t port);
+
+/*
+ * Return the next event channel to become pending, or -1 on failure, in which
+ * case errno will be set appropriately.  
+ */
+evtchn_port_or_error_t
+xc_evtchn_pending(int xce_handle);
+
+/*
+ * Unmask the given event channel. Returns -1 on failure, in which case errno
+ * will be set appropriately.
+ */
+int xc_evtchn_unmask(int xce_handle, evtchn_port_t port);
 
 int xc_physdev_pci_access_modify(int xc_handle,
                                  uint32_t domid,
@@ -698,66 +766,6 @@ int xc_sysctl(int xc_handle, struct xen_sysctl *sysctl);
 int xc_version(int xc_handle, int cmd, void *arg);
 
 int xc_acm_op(int xc_handle, int cmd, void *arg, unsigned long arg_size);
-
-/*
- * Return a handle to the event channel driver, or -1 on failure, in which case
- * errno will be set appropriately.
- */
-int xc_evtchn_open(void);
-
-/*
- * Close a handle previously allocated with xc_evtchn_open().
- */
-int xc_evtchn_close(int xce_handle);
-
-/*
- * Return an fd that can be select()ed on for further calls to
- * xc_evtchn_pending().
- */
-int xc_evtchn_fd(int xce_handle);
-
-/*
- * Notify the given event channel. Returns -1 on failure, in which case
- * errno will be set appropriately.
- */
-int xc_evtchn_notify(int xce_handle, evtchn_port_t port);
-
-/*
- * Returns a new event port awaiting interdomain connection from the given
- * domain ID, or -1 on failure, in which case errno will be set appropriately.
- */
-evtchn_port_t xc_evtchn_bind_unbound_port(int xce_handle, int domid);
-
-/*
- * Returns a new event port bound to the remote port for the given domain ID,
- * or -1 on failure, in which case errno will be set appropriately.
- */
-evtchn_port_t xc_evtchn_bind_interdomain(int xce_handle, int domid,
-    evtchn_port_t remote_port);
-
-/*
- * Unbind the given event channel. Returns -1 on failure, in which case errno
- * will be set appropriately.
- */
-int xc_evtchn_unbind(int xce_handle, evtchn_port_t port);
-
-/*
- * Bind an event channel to the given VIRQ. Returns the event channel bound to
- * the VIRQ, or -1 on failure, in which case errno will be set appropriately.
- */
-evtchn_port_t xc_evtchn_bind_virq(int xce_handle, unsigned int virq);
-
-/*
- * Return the next event channel to become pending, or -1 on failure, in which
- * case errno will be set appropriately.  
- */
-evtchn_port_t xc_evtchn_pending(int xce_handle);
-
-/*
- * Unmask the given event channel. Returns -1 on failure, in which case errno
- * will be set appropriately.
- */
-int xc_evtchn_unmask(int xce_handle, evtchn_port_t port);
 
 /**************************
  * GRANT TABLE OPERATIONS *

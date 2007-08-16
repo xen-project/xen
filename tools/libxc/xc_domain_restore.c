@@ -272,7 +272,8 @@ int xc_domain_restore(int xc_handle, int io_fd, uint32_t dom,
     /* The new domain's shared-info frame number. */
     unsigned long shared_info_frame;
     unsigned char shared_info_page[PAGE_SIZE]; /* saved contents from file */
-    shared_info_t *shared_info = (shared_info_t *)shared_info_page;
+    shared_info_t *old_shared_info = (shared_info_t *)shared_info_page;
+    shared_info_t *new_shared_info;
 
     /* A copy of the CPU context of the guest. */
     vcpu_guest_context_t ctxt;
@@ -285,9 +286,6 @@ int xc_domain_restore(int xc_handle, int io_fd, uint32_t dom,
 
     /* Types of the pfns in the current region */
     unsigned long region_pfn_type[MAX_BATCH_SIZE];
-
-    /* A temporary mapping, and a copy, of one frame of guest memory. */
-    unsigned long *page = NULL;
 
     /* A copy of the pfn-to-mfn table frame list. */
     xen_pfn_t *p2m_frame_list = NULL;
@@ -1084,17 +1082,30 @@ int xc_domain_restore(int xc_handle, int io_fd, uint32_t dom,
         goto out;
     }
 
-    /* clear any pending events and the selector */
-    memset(&(shared_info->evtchn_pending[0]), 0,
-           sizeof (shared_info->evtchn_pending));
-    for ( i = 0; i < MAX_VIRT_CPUS; i++ )
-        shared_info->vcpu_info[i].evtchn_pending_sel = 0;
-
-    /* Copy saved contents of shared-info page. No checking needed. */
-    page = xc_map_foreign_range(
+    /* Restore contents of shared-info page. No checking needed. */
+    new_shared_info = xc_map_foreign_range(
         xc_handle, dom, PAGE_SIZE, PROT_WRITE, shared_info_frame);
-    memcpy(page, shared_info, PAGE_SIZE);
-    munmap(page, PAGE_SIZE);
+
+    /* restore saved vcpu_info and arch specific info */
+    memcpy(&new_shared_info->vcpu_info,
+	   &old_shared_info->vcpu_info,
+	   sizeof(new_shared_info->vcpu_info));
+    memcpy(&new_shared_info->arch,
+	   &old_shared_info->arch,
+	   sizeof(new_shared_info->arch));
+
+    /* clear any pending events and the selector */
+    memset(&(new_shared_info->evtchn_pending[0]), 0,
+           sizeof (new_shared_info->evtchn_pending));
+    for ( i = 0; i < MAX_VIRT_CPUS; i++ )
+        new_shared_info->vcpu_info[i].evtchn_pending_sel = 0;
+
+    /* mask event channels */
+    memset(&(new_shared_info->evtchn_mask[0]), 0xff,
+           sizeof (new_shared_info->evtchn_mask));
+
+    /* leave wallclock time. set by hypervisor */
+    munmap(new_shared_info, PAGE_SIZE);
 
     /* Uncanonicalise the pfn-to-mfn table frame-number list. */
     for ( i = 0; i < P2M_FL_ENTRIES; i++ )

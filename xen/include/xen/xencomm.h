@@ -23,13 +23,12 @@
 
 #include <public/xen.h>
 
-extern unsigned long xencomm_copy_to_guest(void *to, const void *from,
-        unsigned int len, unsigned int skip); 
-extern unsigned long xencomm_copy_from_guest(void *to, const void *from,
-        unsigned int len, unsigned int skip); 
-extern int xencomm_add_offset(void **handle, unsigned int bytes);
-extern int xencomm_handle_is_null(void *ptr);
-
+unsigned long xencomm_copy_to_guest(
+    void *to, const void *from, unsigned int len, unsigned int skip); 
+unsigned long xencomm_copy_from_guest(
+    void *to, const void *from, unsigned int len, unsigned int skip); 
+int xencomm_add_offset(void **handle, unsigned int bytes);
+int xencomm_handle_is_null(void *ptr);
 
 static inline int xencomm_is_inline(const void *handle)
 {
@@ -39,7 +38,7 @@ static inline int xencomm_is_inline(const void *handle)
 
 static inline unsigned long xencomm_inline_addr(const void *handle)
 {
-	return (unsigned long)handle & ~XENCOMM_INLINE_FLAG;
+    return (unsigned long)handle & ~XENCOMM_INLINE_FLAG;
 }
 
 /* Is the guest handle a NULL reference? */

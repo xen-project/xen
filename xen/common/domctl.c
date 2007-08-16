@@ -463,19 +463,13 @@ long do_domctl(XEN_GUEST_HANDLE(xen_domctl_t) u_domctl)
     case XEN_DOMCTL_getdomaininfo:
     { 
         struct domain *d;
-        domid_t dom;
-
-        dom = op->domain;
-        if ( dom == DOMID_SELF )
-            dom = current->domain->domain_id;
+        domid_t dom = op->domain;
 
         rcu_read_lock(&domlist_read_lock);
 
         for_each_domain ( d )
-        {
             if ( d->domain_id >= dom )
                 break;
-        }
 
         if ( d == NULL )
         {

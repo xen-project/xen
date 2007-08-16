@@ -28,17 +28,19 @@ from xen.xend.xenstore.xswatch import xswatch
 
 import os
 
-DEVICE_CREATE_TIMEOUT = 100
+DEVICE_CREATE_TIMEOUT  = 100
+DEVICE_DESTROY_TIMEOUT = 100
 HOTPLUG_STATUS_NODE = "hotplug-status"
 HOTPLUG_ERROR_NODE  = "hotplug-error"
 HOTPLUG_STATUS_ERROR = "error"
 HOTPLUG_STATUS_BUSY  = "busy"
 
-Connected = 1
-Error     = 2
-Missing   = 3
-Timeout   = 4
-Busy      = 5
+Connected    = 1
+Error        = 2
+Missing      = 3
+Timeout      = 4
+Busy         = 5
+Disconnected = 6
 
 xenbusState = {
     'Unknown'      : 0,
@@ -185,6 +187,18 @@ class DevController:
                           (devid, self.deviceClass, err))
 
 
+    def waitForDevice_destroy(self, devid, backpath):
+        log.debug("Waiting for %s - destroyDevice.", devid)
+
+        if not self.hotplug:
+            return
+
+        status = self.waitForBackend_destroy(backpath)
+
+        if status == Timeout:
+            raise VmError("Device %s (%s) could not be disconnected. " %
+                          (devid, self.deviceClass))
+
 
     def reconfigureDevice(self, devid, config):
         """Reconfigure the specified device.
@@ -209,12 +223,7 @@ class DevController:
         here.
         """
 
-        try:
-            dev = int(devid)
-        except ValueError:
-            # Does devid contain devicetype/deviceid?
-            # Propogate exception if unable to find an integer devid
-            dev = int(type(devid) is str and devid.split('/')[-1] or None)
+        dev = self.convertToDeviceNumber(devid)
 
         # Modify online status /before/ updating state (latter is watched by
         # drivers, so this ordering avoids a race).
@@ -282,6 +291,15 @@ class DevController:
             config_dict = self.getDeviceConfiguration(devid)
             all_configs[devid] = config_dict
         return all_configs
+
+
+    def convertToDeviceNumber(self, devid):
+        try:
+            return int(devid)
+        except ValueError:
+            # Does devid contain devicetype/deviceid?
+            # Propogate exception if unable to find an integer devid
+            return int(type(devid) is str and devid.split('/')[-1] or None)
 
     ## protected:
 
@@ -513,6 +531,19 @@ class DevController:
             return (Missing, None)
 
 
+    def waitForBackend_destroy(self, backpath):
+
+        statusPath = backpath + '/' + HOTPLUG_STATUS_NODE
+        ev = Event()
+        result = { 'status': Timeout }
+
+        xswatch(statusPath, deviceDestroyCallback, ev, result)
+
+        ev.wait(DEVICE_DESTROY_TIMEOUT)
+
+        return result['status']
+
+
     def backendPath(self, backdom, devid):
         """Construct backend path given the backend domain and device id.
 
@@ -558,6 +589,22 @@ def hotplugStatusCallback(statusPath, ev, result):
         return 1
 
     log.debug("hotplugStatusCallback %d.", result['status'])
+
+    ev.set()
+    return 0
+
+
+def deviceDestroyCallback(statusPath, ev, result):
+    log.debug("deviceDestroyCallback %s.", statusPath)
+
+    status = xstransact.Read(statusPath)
+
+    if status is None:
+        result['status'] = Disconnected
+    else:
+        return 1
+
+    log.debug("deviceDestroyCallback %d.", result['status'])
 
     ev.set()
     return 0

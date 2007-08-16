@@ -111,7 +111,7 @@ static int construct_vmcb(struct vcpu *v)
     svm_segment_attributes_t attrib;
 
     /* TLB control, and ASID assigment. */
-    svm_asid_init_vcpu (v);
+    svm_asid_init_vcpu(v);
 
     vmcb->general1_intercepts = 
         GENERAL1_INTERCEPT_INTR         | GENERAL1_INTERCEPT_NMI         |
@@ -216,27 +216,19 @@ static int construct_vmcb(struct vcpu *v)
     vmcb->tr.base = 0;
     vmcb->tr.limit = 0xff;
 
-    /* Guest CR0. */
-    vmcb->cr0 = read_cr0();
-    arch_svm->cpu_shadow_cr0 = vmcb->cr0 & ~(X86_CR0_PG | X86_CR0_TS);
-    vmcb->cr0 |= X86_CR0_WP;
+    v->arch.hvm_vcpu.guest_cr[0] = X86_CR0_PE | X86_CR0_TS;
+    hvm_update_guest_cr(v, 0);
 
-    /* Guest CR4. */
-    arch_svm->cpu_shadow_cr4 =
-        read_cr4() & ~(X86_CR4_PGE | X86_CR4_PSE | X86_CR4_PAE);
-    vmcb->cr4 = arch_svm->cpu_shadow_cr4 | HVM_CR4_HOST_MASK;
+    v->arch.hvm_vcpu.guest_cr[4] = 0;
+    hvm_update_guest_cr(v, 4);
 
     paging_update_paging_modes(v);
-    vmcb->cr3 = v->arch.hvm_vcpu.hw_cr3; 
 
     if ( paging_mode_hap(v->domain) )
     {
-        vmcb->cr0 = arch_svm->cpu_shadow_cr0;
         vmcb->np_enable = 1; /* enable nested paging */
         vmcb->g_pat = 0x0007040600070406ULL; /* guest PAT */
         vmcb->h_cr3 = pagetable_get_paddr(v->domain->arch.phys_table);
-        vmcb->cr4 = arch_svm->cpu_shadow_cr4 =
-                    (HVM_CR4_HOST_MASK & ~X86_CR4_PAE);
         vmcb->exception_intercepts = HVM_TRAP_MASK;
 
         /* No point in intercepting CR3/4 reads, because the hardware 
