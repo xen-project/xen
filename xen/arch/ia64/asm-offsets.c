@@ -72,6 +72,7 @@ void foo(void)
 	DEFINE(IA64_VCPU_DOMAIN_ITM_LAST_OFFSET, offsetof (struct vcpu, arch.domain_itm_last));
 	DEFINE(IA64_VCPU_ITLB_OFFSET, offsetof (struct vcpu, arch.itlb));
 	DEFINE(IA64_VCPU_DTLB_OFFSET, offsetof (struct vcpu, arch.dtlb));
+	DEFINE(IA64_VCPU_VHPT_PG_SHIFT_OFFSET, offsetof (struct vcpu, arch.vhpt_pg_shift));
 
 	BLANK();
 

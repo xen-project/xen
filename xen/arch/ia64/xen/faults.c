@@ -239,6 +239,8 @@ void ia64_do_page_fault(unsigned long address, unsigned long isr,
 		    (regs->cr_ipsr & ~DELIVER_PSR_CLR) | DELIVER_PSR_SET;
 		regs->cr_ipsr = vcpu_pl_adjust(regs->cr_ipsr,
 					       IA64_PSR_CPL0_BIT);
+		if (PSCB(current, dcr) & IA64_DCR_BE)
+			regs->cr_ipsr |= IA64_PSR_BE;
 
 		if (PSCB(current, hpsr_dfh))
 			regs->cr_ipsr |= IA64_PSR_DFH;  
@@ -741,7 +743,8 @@ ia64_shadow_fault(unsigned long ifa, unsigned long itir,
 	pte = vlfe->page_flags;
 	if (vlfe->ti_tag == ia64_ttag(ifa)) {
 		/* The VHPT entry is valid.  */
-		gpfn = get_gpfn_from_mfn((pte & _PAGE_PPN_MASK) >> PAGE_SHIFT);
+		gpfn = get_gpfn_from_mfn((pte & _PAGE_PPN_MASK) >>
+					 v->arch.vhpt_pg_shift);
 		BUG_ON(gpfn == INVALID_M2P_ENTRY);
 	} else {
 		unsigned long itir, iha;
@@ -757,10 +760,10 @@ ia64_shadow_fault(unsigned long ifa, unsigned long itir,
 		/* Try again!  */
 		if (fault != IA64_NO_FAULT) {
 			/* This will trigger a dtlb miss.  */
-			ia64_ptcl(ifa, PAGE_SHIFT << 2);
+			ia64_ptcl(ifa, v->arch.vhpt_pg_shift << 2);
 			return;
 		}
-		gpfn = ((pte & _PAGE_PPN_MASK) >> PAGE_SHIFT);
+		gpfn = ((pte & _PAGE_PPN_MASK) >> v->arch.vhpt_pg_shift);
 		if (pte & _PAGE_D)
 			pte |= _PAGE_VIRT_D;
 	}
@@ -788,7 +791,7 @@ ia64_shadow_fault(unsigned long ifa, unsigned long itir,
 			/* Purge the TC locally.
 			   It will be reloaded from the VHPT iff the
 			   VHPT entry is still valid.  */
-			ia64_ptcl(ifa, PAGE_SHIFT << 2);
+			ia64_ptcl(ifa, v->arch.vhpt_pg_shift << 2);
 
 			atomic64_inc(&d->arch.shadow_fault_count);
 		} else {
@@ -800,6 +803,6 @@ ia64_shadow_fault(unsigned long ifa, unsigned long itir,
 		/* We don't know wether or not the fault must be
 		   reflected.  The VHPT entry is not valid.  */
 		/* FIXME: in metaphysical mode, we could do an ITC now.  */
-		ia64_ptcl(ifa, PAGE_SHIFT << 2);
+		ia64_ptcl(ifa, v->arch.vhpt_pg_shift << 2);
 	}
 }

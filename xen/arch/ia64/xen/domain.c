@@ -446,6 +446,7 @@ int vcpu_initialise(struct vcpu *v)
 	    v->arch.ending_rid = d->arch.ending_rid;
 	    v->arch.breakimm = d->arch.breakimm;
 	    v->arch.last_processor = INVALID_PROCESSOR;
+	    v->arch.vhpt_pg_shift = PAGE_SHIFT;
 	}
 
 	if (!VMX_DOMAIN(v))

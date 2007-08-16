@@ -72,7 +72,7 @@ static unsigned long allocate_metaphysical_rr(struct domain *d, int n)
 
 	rrv.rrval = 0;	// Or else may see reserved bit fault
 	rrv.rid = d->arch.starting_mp_rid + n;
-	rrv.ps = PAGE_SHIFT;
+	rrv.ps = PAGE_SHIFT;	// only used at domain creation
 	rrv.ve = 0;
 	/* Mangle metaphysical rid */
 	rrv.rrval = vmMangleRID(rrv.rrval);
@@ -254,7 +254,7 @@ int set_one_rr(unsigned long rr, unsigned long val)
 	memrrv.rrval = rrv.rrval;
 	newrrv.rid = newrid;
 	newrrv.ve = 1;  // VHPT now enabled for region 7!!
-	newrrv.ps = PAGE_SHIFT;
+	newrrv.ps = v->arch.vhpt_pg_shift;
 
 	if (rreg == 0) {
 		v->arch.metaphysical_saved_rr0 = vmMangleRID(newrrv.rrval);
@@ -288,7 +288,7 @@ void init_all_rr(struct vcpu *v)
 
 	rrv.rrval = 0;
 	//rrv.rrval = v->domain->arch.metaphysical_rr0;
-	rrv.ps = PAGE_SHIFT;
+	rrv.ps = v->arch.vhpt_pg_shift;
 	rrv.ve = 1;
 if (!v->vcpu_info) { panic("Stopping in init_all_rr\n"); }
 	VCPU(v,rrs[0]) = -1;

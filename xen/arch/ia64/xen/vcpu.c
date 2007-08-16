@@ -1697,7 +1697,7 @@ IA64FAULT vcpu_translate(VCPU * vcpu, u64 address, BOOLEAN is_data,
 		} else {
 			*pteval = (address & _PAGE_PPN_MASK) |
 				__DIRTY_BITS | _PAGE_PL_PRIV | _PAGE_AR_RWX;
-			*itir = PAGE_SHIFT << 2;
+			*itir = vcpu->arch.vhpt_pg_shift << 2;
 			perfc_incr(phys_translate);
 			return IA64_NO_FAULT;
 		}
@@ -2292,13 +2292,29 @@ IA64FAULT vcpu_set_dtr(VCPU * vcpu, u64 slot, u64 pte,
  VCPU translation cache access routines
 **************************************************************************/
 
+static void
+vcpu_rebuild_vhpt(VCPU * vcpu, u64 ps)
+{
+#ifdef CONFIG_XEN_IA64_PERVCPU_VHPT
+	printk("vhpt rebuild: using page_shift %d\n", (int)ps);
+	vcpu->arch.vhpt_pg_shift = ps;
+	vcpu_purge_tr_entry(&PSCBX(vcpu, dtlb));
+	vcpu_purge_tr_entry(&PSCBX(vcpu, itlb));
+	local_vhpt_flush();
+	load_region_regs(vcpu);
+#else
+	panic_domain(NULL, "domain trying to use smaller page size!\n");
+#endif
+}
+
 void
 vcpu_itc_no_srlz(VCPU * vcpu, u64 IorD, u64 vaddr, u64 pte,
                  u64 mp_pte, u64 itir, struct p2m_entry *entry)
 {
 	ia64_itir_t _itir = {.itir = itir};
 	unsigned long psr;
-	unsigned long ps = (vcpu->domain == dom0) ? _itir.ps : PAGE_SHIFT;
+	unsigned long ps = (vcpu->domain == dom0) ? _itir.ps :
+						    vcpu->arch.vhpt_pg_shift;
 
 	check_xen_space_overlap("itc", vaddr, 1UL << _itir.ps);
 
@@ -2307,7 +2323,7 @@ vcpu_itc_no_srlz(VCPU * vcpu, u64 IorD, u64 vaddr, u64 pte,
 		panic_domain(NULL, "vcpu_itc_no_srlz: domain trying to use "
 		             "smaller page size!\n");
 
-	BUG_ON(_itir.ps > PAGE_SHIFT);
+	BUG_ON(_itir.ps > vcpu->arch.vhpt_pg_shift);
 	vcpu_tlb_track_insert_or_dirty(vcpu, vaddr, entry);
 	psr = ia64_clear_ic();
 	pte &= ~(_PAGE_RV2 | _PAGE_RV1);	// Mask out the reserved bits.
@@ -2320,7 +2336,7 @@ vcpu_itc_no_srlz(VCPU * vcpu, u64 IorD, u64 vaddr, u64 pte,
 		// addresses never get flushed.  More work needed if this
 		// ever happens.
 //printk("vhpt_insert(%p,%p,%p)\n",vaddr,pte,1L<<logps);
-		if (_itir.ps > PAGE_SHIFT)
+		if (_itir.ps > vcpu->arch.vhpt_pg_shift)
 			vhpt_multiple_insert(vaddr, pte, _itir.itir);
 		else
 			vhpt_insert(vaddr, pte, _itir.itir);
@@ -2328,7 +2344,7 @@ vcpu_itc_no_srlz(VCPU * vcpu, u64 IorD, u64 vaddr, u64 pte,
 	// even if domain pagesize is larger than PAGE_SIZE, just put
 	// PAGE_SIZE mapping in the vhpt for now, else purging is complicated
 	else {
-		_itir.ps = PAGE_SHIFT;
+		_itir.ps = vcpu->arch.vhpt_pg_shift;
 		vhpt_insert(vaddr, pte, _itir.itir);
 	}
 }
@@ -2340,12 +2356,11 @@ IA64FAULT vcpu_itc_d(VCPU * vcpu, u64 pte, u64 itir, u64 ifa)
 	struct p2m_entry entry;
 	ia64_itir_t _itir = {.itir = itir};
 
-	if (_itir.ps < PAGE_SHIFT)
-		panic_domain(NULL, "vcpu_itc_d: domain trying to use "
-		             "smaller page size!\n");
+	if (_itir.ps < vcpu->arch.vhpt_pg_shift)
+		vcpu_rebuild_vhpt(vcpu, _itir.ps);
 
  again:
-	//itir = (itir & ~0xfc) | (PAGE_SHIFT<<2); // ignore domain's pagesize
+	//itir = (itir & ~0xfc) | (vcpu->arch.vhpt_pg_shift<<2); // ign dom pgsz
 	pteval = translate_domain_pte(pte, ifa, itir, &(_itir.itir), &entry);
 	if (!pteval)
 		return IA64_ILLOP_FAULT;
@@ -2369,11 +2384,11 @@ IA64FAULT vcpu_itc_i(VCPU * vcpu, u64 pte, u64 itir, u64 ifa)
 	struct p2m_entry entry;
 	ia64_itir_t _itir = {.itir = itir};
 
-	if (_itir.ps < PAGE_SHIFT)
-		panic_domain(NULL, "vcpu_itc_i: domain trying to use "
-		             "smaller page size!\n");
+	if (_itir.ps < vcpu->arch.vhpt_pg_shift)
+		vcpu_rebuild_vhpt(vcpu, _itir.ps);
+
       again:
-	//itir = (itir & ~0xfc) | (PAGE_SHIFT<<2); // ignore domain's pagesize
+	//itir = (itir & ~0xfc) | (vcpu->arch.vhpt_pg_shift<<2); // ign dom pgsz
 	pteval = translate_domain_pte(pte, ifa, itir, &(_itir.itir), &entry);
 	if (!pteval)
 		return IA64_ILLOP_FAULT;

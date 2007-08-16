@@ -1604,26 +1604,27 @@ ENTRY(hyper_set_rr)
 	extr.u r26=r9,IA64_RR_RID,IA64_RR_RID_LEN	// r26 = r9.rid
 	movl r20=THIS_CPU(cpu_kr)+IA64_KR_CURRENT_OFFSET;;
 	ld8 r20=[r20];;
-	adds r21=IA64_VCPU_STARTING_RID_OFFSET,r20;;
-	ld4 r22=[r21];;
-	adds r21=IA64_VCPU_ENDING_RID_OFFSET,r20;;
-	ld4 r23=[r21];;
-	adds r24=IA64_VCPU_META_SAVED_RR0_OFFSET,r20;;
+	adds r22=IA64_VCPU_STARTING_RID_OFFSET,r20
+	adds r23=IA64_VCPU_ENDING_RID_OFFSET,r20
+	adds r24=IA64_VCPU_META_SAVED_RR0_OFFSET,r20
+	adds r21=IA64_VCPU_VHPT_PG_SHIFT_OFFSET,r20;;
+	ld4 r22=[r22]
+	ld4 r23=[r23]
+	ld1 r21=[r21];;
 	add r22=r26,r22;;
 	cmp.geu p6,p0=r22,r23	// if r9.rid + starting_rid >= ending_rid
 (p6)	br.cond.spnt.few 1f;	// this is an error, but just ignore/return
-	// r21=starting_rid
 	adds r20=XSI_RR0_OFS-XSI_PSR_IC_OFS,r18
 	shl r25=r25,3;;
 	add r20=r20,r25;;
 	st8 [r20]=r9;;		// store away exactly what was passed
 	// but adjust value actually placed in rr[r8]
 	// r22 contains adjusted rid, "mangle" it (see regionreg.c)
-	// and set ps to PAGE_SHIFT and ve to 1
+	// and set ps to v->arch.vhpt_pg_shift and ve to 1
 	extr.u r27=r22,0,8
 	extr.u r28=r22,8,8
-	extr.u r29=r22,16,8;;
-	dep.z r23=PAGE_SHIFT,IA64_RR_PS,IA64_RR_PS_LEN;;
+	extr.u r29=r22,16,8
+	dep.z r23=r21,IA64_RR_PS,IA64_RR_PS_LEN;;
 	dep r23=-1,r23,0,1;;	// mangling is swapping bytes 1 & 3
 	dep r23=r27,r23,24,8;;
 	dep r23=r28,r23,16,8;;
@@ -1673,34 +1674,38 @@ ENTRY(hyper_set_rr0_to_rr4)
 	ld8 r17=[r17];;
 
 	adds r21=IA64_VCPU_STARTING_RID_OFFSET,r17
-	adds r25=IA64_VCPU_ENDING_RID_OFFSET,r17
+	adds r22=IA64_VCPU_ENDING_RID_OFFSET,r17
+	adds r23=IA64_VCPU_VHPT_PG_SHIFT_OFFSET,r17
 	;; 
-	ld4 r22=[r21] // r22 = current->starting_rid
+	ld4 r21=[r21] // r21 = current->starting_rid
 	extr.u r26=r8,IA64_RR_RID,IA64_RR_RID_LEN	// r26 = r8.rid
 	extr.u r27=r9,IA64_RR_RID,IA64_RR_RID_LEN	// r27 = r9.rid
-	ld4 r23=[r25] // r23 = current->ending_rid
+	ld4 r22=[r22] // r22 = current->ending_rid
 	extr.u r28=r10,IA64_RR_RID,IA64_RR_RID_LEN	// r28 = r10.rid
 	extr.u r29=r11,IA64_RR_RID,IA64_RR_RID_LEN	// r29 = r11.rid
 	adds r24=IA64_VCPU_META_SAVED_RR0_OFFSET,r17
 	extr.u r30=r14,IA64_RR_RID,IA64_RR_RID_LEN	// r30 = r14.rid
+	ld1 r23=[r23] // r23 = current->vhpt_pg_shift
 	;; 
-	add r16=r26,r22
-	add r17=r27,r22
-	add r19=r28,r22
-	add r20=r29,r22
-	add r21=r30,r22	
+	add r16=r26,r21
+	add r17=r27,r21
+	add r19=r28,r21
+	add r20=r29,r21
+	add r21=r30,r21	
+	dep.z r23=r23,IA64_RR_PS,IA64_RR_PS_LEN		// r23 = rr.ps
 	;; 
-	cmp.geu p6,p0=r16,r23	// if r8.rid + starting_rid >= ending_rid
-	cmp.geu p7,p0=r17,r23	// if r9.rid + starting_rid >= ending_rid
-	cmp.geu p8,p0=r19,r23	// if r10.rid + starting_rid >= ending_rid
+	cmp.geu p6,p0=r16,r22	// if r8.rid + starting_rid >= ending_rid
+	cmp.geu p7,p0=r17,r22	// if r9.rid + starting_rid >= ending_rid
+	cmp.geu p8,p0=r19,r22	// if r10.rid + starting_rid >= ending_rid
 (p6)	br.cond.spnt.few 1f	// this is an error, but just ignore/return
 (p7)	br.cond.spnt.few 1f	// this is an error, but just ignore/return
-	cmp.geu p9,p0=r20,r23	// if r11.rid + starting_rid >= ending_rid
+	cmp.geu p9,p0=r20,r22	// if r11.rid + starting_rid >= ending_rid
 (p8)	br.cond.spnt.few 1f	// this is an error, but just ignore/return
 (p9)	br.cond.spnt.few 1f	// this is an error, but just ignore/return
-	cmp.geu p10,p0=r21,r23	// if r14.rid + starting_rid >= ending_rid
+	cmp.geu p10,p0=r21,r22	// if r14.rid + starting_rid >= ending_rid
 (p10)	br.cond.spnt.few 1f	// this is an error, but just ignore/return
-	
+	dep r23=-1,r23,0,1	// add rr.ve
+	;;
 	mov r25=1
 	adds r22=XSI_RR0_OFS-XSI_PSR_IC_OFS,r18
 	;;
@@ -1715,13 +1720,11 @@ ENTRY(hyper_set_rr0_to_rr4)
 	extr.u r27=r16,0,8
 	extr.u r28=r16,8,8
 	extr.u r29=r16,16,8;;
-	dep.z r23=PAGE_SHIFT,2,6;;
-	dep r23=-1,r23,0,1;;	// mangling is swapping bytes 1 & 3
-	dep r23=r27,r23,24,8;;
-	dep r23=r28,r23,16,8;;
-	dep r23=r29,r23,8,8;; 
-	st8 [r24]=r23		// save for metaphysical
-	mov rr[r26]=r23
+	dep r25=r27,r23,24,8;;	// mangling is swapping bytes 1 & 3
+	dep r25=r28,r25,16,8;;
+	dep r25=r29,r25,8,8;; 
+	st8 [r24]=r25		// save for metaphysical
+	mov rr[r26]=r25
 	dv_serialize_data
 
 	// rr1
@@ -1730,12 +1733,10 @@ ENTRY(hyper_set_rr0_to_rr4)
 	extr.u r27=r17,0,8
 	extr.u r28=r17,8,8
 	extr.u r29=r17,16,8;;
-	dep.z r23=PAGE_SHIFT,2,6;;
-	dep r23=-1,r23,0,1;;	// mangling is swapping bytes 1 & 3
-	dep r23=r27,r23,24,8;;
-	dep r23=r28,r23,16,8;;
-	dep r23=r29,r23,8,8;; 
-	mov rr[r26]=r23
+	dep r25=r27,r23,24,8;;	// mangling is swapping bytes 1 & 3
+	dep r25=r28,r25,16,8;;
+	dep r25=r29,r25,8,8;; 
+	mov rr[r26]=r25
 	dv_serialize_data
 
 	// rr2
@@ -1744,12 +1745,10 @@ ENTRY(hyper_set_rr0_to_rr4)
 	extr.u r27=r19,0,8
 	extr.u r28=r19,8,8
 	extr.u r29=r19,16,8;;
-	dep.z r23=PAGE_SHIFT,2,6;;
-	dep r23=-1,r23,0,1;;	// mangling is swapping bytes 1 & 3
-	dep r23=r27,r23,24,8;;
-	dep r23=r28,r23,16,8;;
-	dep r23=r29,r23,8,8;; 
-	mov rr[r26]=r23
+	dep r25=r27,r23,24,8;;	// mangling is swapping bytes 1 & 3
+	dep r25=r28,r25,16,8;;
+	dep r25=r29,r25,8,8;; 
+	mov rr[r26]=r25
 	dv_serialize_data
 
 	// rr3
@@ -1759,12 +1758,10 @@ ENTRY(hyper_set_rr0_to_rr4)
 	extr.u r27=r20,0,8
 	extr.u r28=r20,8,8
 	extr.u r29=r20,16,8;;
-	dep.z r23=PAGE_SHIFT,2,6;;
-	dep r23=-1,r23,0,1;;	// mangling is swapping bytes 1 & 3
-	dep r23=r27,r23,24,8;;
-	dep r23=r28,r23,16,8;;
-	dep r23=r29,r23,8,8;; 
-	mov rr[r26]=r23
+	dep r25=r27,r23,24,8;;	// mangling is swapping bytes 1 & 3
+	dep r25=r28,r25,16,8;;
+	dep r25=r29,r25,8,8;; 
+	mov rr[r26]=r25
 	dv_serialize_data
 	
 	// rr4
@@ -1774,49 +1771,43 @@ ENTRY(hyper_set_rr0_to_rr4)
 	extr.u r27=r21,0,8
 	extr.u r28=r21,8,8
 	extr.u r29=r21,16,8;;
-	dep.z r23=PAGE_SHIFT,2,6;;
-	dep r23=-1,r23,0,1;;	// mangling is swapping bytes 1 & 3
-	dep r23=r27,r23,24,8;;
-	dep r23=r28,r23,16,8;;
-	dep r23=r29,r23,8,8;; 
-	mov rr[r26]=r23
+	dep r25=r27,r23,24,8;;	// mangling is swapping bytes 1 & 3
+	dep r25=r28,r25,16,8;;
+	dep r25=r29,r25,8,8;; 
+	mov rr[r26]=r25
 	dv_serialize_data
 #else
 	// shuffled version
 	// rr0
 	// uses r27, r28, r29 for mangling
-	//      r23           for mangled value
+	//      r25           for mangled value
 	st8 [r22]=r8, 8 // current->rrs[0] = r8
 	mov r26=0	// r26=0x0000000000000000
 	extr.u r27=r16,0,8
 	extr.u r28=r16,8,8
-	extr.u r29=r16,16,8
-	dep.z r23=PAGE_SHIFT,2,6;;
-	dep r23=-1,r23,0,1;;	// mangling is swapping bytes 1 & 3
-	extr.u r25=r17,0,8
-	dep r23=r27,r23,24,8;;
-	dep r23=r28,r23,16,8;;
-	dep r23=r29,r23,8,8;; 
-	st8 [r24]=r23		// save for metaphysical
-	mov rr[r26]=r23
+	extr.u r29=r16,16,8;;
+	dep r25=r27,r23,24,8;;	// mangling is swapping bytes 1 & 3
+	dep r25=r28,r25,16,8;;
+	dep r25=r29,r25,8,8;; 
+	st8 [r24]=r25		// save for metaphysical
+	mov rr[r26]=r25
 	dv_serialize_data
 
 	// r16, r24, r25 is usable.
 	// rr1
 	// uses r25, r28, r29 for mangling
-	//      r23           for mangled value
+	//      r25           for mangled value
+	extr.u r25=r17,0,8
 	extr.u r28=r17,8,8
 	st8 [r22]=r9, 8 // current->rrs[1] = r9
 	extr.u r29=r17,16,8 ;; 
-	dep.z r23=PAGE_SHIFT,2,6;;
 	add r26=r26,r30	// r26 = 0x2000000000000000
-	dep r23=-1,r23,0,1;;	// mangling is swapping bytes 1 & 3
 	extr.u r24=r19,8,8
 	extr.u r16=r19,0,8
-	dep r23=r25,r23,24,8;;
-	dep r23=r28,r23,16,8;;
-	dep r23=r29,r23,8,8;; 
-	mov rr[r26]=r23
+	dep r25=r25,r23,24,8;;	// mangling is swapping bytes 1 & 3
+	dep r25=r28,r25,16,8;;
+	dep r25=r29,r25,8,8;; 
+	mov rr[r26]=r25
 	dv_serialize_data
 
 	// r16, r17, r24, r25 is usable
@@ -1826,10 +1817,8 @@ ENTRY(hyper_set_rr0_to_rr4)
 	extr.u r29=r19,16,8
 	extr.u r27=r20,0,8
 	st8 [r22]=r10, 8 // current->rrs[2] = r10
-	dep.z r17=PAGE_SHIFT,2,6;;
 	add r26=r26,r30	// r26 = 0x4000000000000000	
-	dep r17=-1,r17,0,1;;	// mangling is swapping bytes 1 & 3
-	dep r17=r16,r17,24,8;;
+	dep r17=r16,r23,24,8;;	// mangling is swapping bytes 1 & 3
 	dep r17=r24,r17,16,8;;
 	dep r17=r29,r17,8,8;; 
 	mov rr[r26]=r17
@@ -1838,18 +1827,16 @@ ENTRY(hyper_set_rr0_to_rr4)
 	// r16, r17, r19, r24, r25 is usable
 	// rr3
 	// uses r27, r28, r29 for mangling
-	//      r23           for mangled value
+	//      r25           for mangled value
 	extr.u r28=r20,8,8
 	extr.u r29=r20,16,8
 	st8 [r22]=r11, 8 // current->rrs[3] = r11
 	extr.u r16=r21,0,8
-	dep.z r23=PAGE_SHIFT,2,6;;
 	add r26=r26,r30	// r26 = 0x6000000000000000
-	dep r23=-1,r23,0,1;;	// mangling is swapping bytes 1 & 3
-	dep r23=r27,r23,24,8;;
-	dep r23=r28,r23,16,8;;
-	dep r23=r29,r23,8,8;; 
-	mov rr[r26]=r23
+	dep r25=r27,r23,24,8;;	// mangling is swapping bytes 1 & 3
+	dep r25=r28,r25,16,8;;
+	dep r25=r29,r25,8,8;; 
+	mov rr[r26]=r25
 	dv_serialize_data
 	
 	// r16, r17, r19, r20, r24, r25
@@ -1859,10 +1846,8 @@ ENTRY(hyper_set_rr0_to_rr4)
 	extr.u r17=r21,8,8
 	extr.u r24=r21,16,8
 	st8 [r22]=r14 // current->rrs[4] = r14
-	dep.z r25=PAGE_SHIFT,2,6;;
 	add r26=r26,r30	// r26 = 0x8000000000000000
-	dep r25=-1,r25,0,1;;	// mangling is swapping bytes 1 & 3
-	dep r25=r16,r25,24,8;;
+	dep r25=r16,r23,24,8;;	// mangling is swapping bytes 1 & 3
 	dep r25=r17,r25,16,8;;
 	dep r25=r24,r25,8,8;; 
 	mov rr[r26]=r25
@@ -2024,26 +2009,30 @@ ENTRY(hyper_ptc_ga)
 	adds r21=1,r21;;
 	st4 [r20]=r21;;
 #endif
+	movl r21=THIS_CPU(cpu_kr)+IA64_KR_CURRENT_OFFSET;;
+	ld8 r21=[r21];;
+	adds r22=IA64_VCPU_VHPT_PG_SHIFT_OFFSET,r21
 	mov r28=r8
 	extr.u r19=r9,2,6		// addr_range=1<<((r9&0xfc)>>2)
 	mov r20=1
 	shr.u r24=r8,61
-	addl r27=56,r0			// PAGE_SHIFT<<2 (for ptc.ga)
 	movl r26=0x8000000000000000	// INVALID_TI_TAG
 	mov r30=ar.lc
 	;;
+	ld1 r22=[r22]			// current->arch.vhpt_pg_shift
 	shl r19=r20,r19
 	cmp.eq p7,p0=7,r24
 (p7)	br.spnt.many dispatch_break_fault ;;	// slow way for rr7
 	;;
+	shl r27=r22,2			// vhpt_pg_shift<<2 (for ptc.ga)
+	shr.u r23=r19,r22		// repeat loop for n pages
 	cmp.le p7,p0=r19,r0		// skip flush if size<=0
 (p7)	br.cond.dpnt 2f ;;
-	extr.u r24=r19,0,PAGE_SHIFT
-	shr.u r23=r19,PAGE_SHIFT ;;	// repeat loop for n pages
-	cmp.ne p7,p0=r24,r0 ;;
+	shl r24=r23,r22;;
+	cmp.ne p7,p0=r24,r23 ;;
 (p7)	adds r23=1,r23 ;;		// n_pages<size<n_pages+1? extra iter
 	mov ar.lc=r23
-	movl r29=PAGE_SIZE;;
+	shl r29=r20,r22;;		// page_size
 1:
 	thash r25=r28 ;;
 	adds r25=16,r25 ;;
@@ -2060,10 +2049,8 @@ ENTRY(hyper_ptc_ga)
 	mov ar.lc=r30 ;;
 	mov r29=cr.ipsr
 	mov r30=cr.iip;;
-	movl r27=THIS_CPU(cpu_kr)+IA64_KR_CURRENT_OFFSET;;
-	ld8 r27=[r27];;
-	adds r25=IA64_VCPU_DTLB_OFFSET,r27
-	adds r26=IA64_VCPU_ITLB_OFFSET,r27;;
+	adds r25=IA64_VCPU_DTLB_OFFSET,r21
+	adds r26=IA64_VCPU_ITLB_OFFSET,r21;;
 	ld8 r24=[r25]
 	ld8 r27=[r26] ;;
 	and r24=-2,r24
@@ -2110,10 +2097,14 @@ hyper_itc_d:
 	br.sptk.many dispatch_break_fault ;;
 #else
 	// ensure itir.ps >= xen's pagesize
+	movl r27=THIS_CPU(cpu_kr)+IA64_KR_CURRENT_OFFSET;;
+	ld8 r27=[r27];;
+	adds r22=IA64_VCPU_VHPT_PG_SHIFT_OFFSET,r27
 	adds r23=XSI_ITIR_OFS-XSI_PSR_IC_OFS,r18 ;;
+	ld1 r22=[r22]
 	ld8 r23=[r23];;
 	extr.u r24=r23,IA64_ITIR_PS,IA64_ITIR_PS_LEN;;		// r24==logps
-	cmp.gt p7,p0=PAGE_SHIFT,r24
+	cmp.gt p7,p0=r22,r24
 (p7)	br.spnt.many dispatch_break_fault ;;
 	adds r21=XSI_IFA_OFS-XSI_PSR_IC_OFS,r18 ;;
 	ld8 r21=[r21];;
@@ -2121,8 +2112,6 @@ hyper_itc_d:
 	extr.u r21=r21,61,3;;
 	cmp.eq p7,p0=r21,r0
 (p7)	br.spnt.many dispatch_break_fault ;;
-	movl r27=THIS_CPU(cpu_kr)+IA64_KR_CURRENT_OFFSET;;
-	ld8 r27=[r27];;
 	adds r27=IA64_VCPU_DOMAIN_OFFSET,r27;;
 	ld8 r27=[r27]
 // FIXME: is the global var dom0 always pinned? assume so for now
@@ -2160,18 +2149,24 @@ END(hyper_itc)
 //	r31 == pr
 ENTRY(fast_insert)
 	// translate_domain_pte(r16=pteval,PSCB(ifa)=address,r24=itir)
-	mov r19=1;;
-	shl r20=r19,r24;;
+	mov r19=1
+	movl r27=THIS_CPU(cpu_kr)+IA64_KR_CURRENT_OFFSET;;
+	shl r20=r19,r24
+	ld8 r27=[r27];;
+	adds r23=IA64_VCPU_VHPT_PG_SHIFT_OFFSET,r27
 	adds r20=-1,r20		// r20 == mask
 	movl r19=_PAGE_PPN_MASK;;
+	ld1 r23=[r23]
+	mov r25=-1
 	and r22=r16,r19;;	// r22 == pteval & _PAGE_PPN_MASK
 	andcm r19=r22,r20
+	shl r25=r25,r23		// -1 << current->arch.vhpt_pg_shift
 	adds r21=XSI_IFA_OFS-XSI_PSR_IC_OFS,r18 ;;
 	ld8 r21=[r21];;
 	and r20=r21,r20;;
 	or r19=r19,r20;;	// r19 == mpaddr
 // FIXME: for now, just do domain0 and skip mpaddr range checks
-	dep r20=r0,r19,0,PAGE_SHIFT
+	and r20=r25,r19
 	movl r21=PAGE_PHYS ;;
 	or r20=r20,r21 ;;	// r20==return value from lookup_domain_mpa
 	// r16=pteval,r20=pteval2
@@ -2208,8 +2203,6 @@ ENTRY(fast_insert)
 	// vcpu_set_tr_entry(trp,r22=pte|1,r24=itir,r23=ifa)
 	// TR_ENTRY = {page_flags,itir,addr,rid}
 	tbit.z p6,p7=r17,0
-	movl r27=THIS_CPU(cpu_kr)+IA64_KR_CURRENT_OFFSET;;
-	ld8 r27=[r27];;
 	adds r28=IA64_VCPU_STARTING_RID_OFFSET,r27
 (p6)	adds r27=IA64_VCPU_DTLB_OFFSET,r27
 (p7)	adds r27=IA64_VCPU_ITLB_OFFSET,r27;;

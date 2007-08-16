@@ -246,6 +246,7 @@ struct arch_vcpu {
 #define XEN_IA64_PKR_IN_USE	0x1		/* If psr.pk = 1 was set. */
     unsigned char pkr_flags;
 
+    unsigned char       vhpt_pg_shift;		/* PAGE_SHIFT or less */
 #ifdef CONFIG_XEN_IA64_PERVCPU_VHPT
     PTA                 pta;
     unsigned long       vhpt_maddr;
