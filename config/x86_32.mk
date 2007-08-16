@@ -13,6 +13,8 @@ LIBDIR := lib
 # Use only if calling $(LD) directly.
 ifeq ($(XEN_OS),OpenBSD)
 LDFLAGS_DIRECT += -melf_i386_obsd
+else ifeq ($(XEN_OS),FreeBSD)
+LDFLAGS_DIRECT += -melf_i386_fbsd
 else
 LDFLAGS_DIRECT += -melf_i386
 endif
