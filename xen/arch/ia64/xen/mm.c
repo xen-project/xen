@@ -744,7 +744,7 @@ void *domain_mpa_to_imva(struct domain *d, unsigned long mpaddr)
 #endif
 
 unsigned long
-xencomm_paddr_to_maddr(unsigned long paddr)
+paddr_to_maddr(unsigned long paddr)
 {
     struct vcpu *v = current;
     struct domain *d = v->domain;
@@ -756,7 +756,7 @@ xencomm_paddr_to_maddr(unsigned long paddr)
                __func__, paddr, vcpu_regs(v)->cr_iip);
         return 0;
     }
-    return __va_ul((pa & _PFN_MASK) | (paddr & ~PAGE_MASK));
+    return (pa & _PFN_MASK) | (paddr & ~PAGE_MASK);
 }
 
 /* Allocate a new page for domain and map it to the specified metaphysical

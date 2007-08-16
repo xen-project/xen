@@ -499,6 +499,9 @@ extern u64 translate_domain_pte(u64 pteval, u64 address, u64 itir__,
     ((get_gpfn_from_mfn((madr) >> PAGE_SHIFT) << PAGE_SHIFT) | \
     ((madr) & ~PAGE_MASK))
 
+/* Internal use only: returns 0 in case of bad address.  */
+extern unsigned long paddr_to_maddr(unsigned long paddr);
+
 /* Arch-specific portion of memory_op hypercall. */
 long arch_memory_op(int op, XEN_GUEST_HANDLE(void) arg);
 
