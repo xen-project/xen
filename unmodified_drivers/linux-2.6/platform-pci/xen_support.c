@@ -48,7 +48,7 @@ EXPORT_SYMBOL(__hypercall);
 
 int HYPERVISOR_grant_table_op(unsigned int cmd, void *uop, unsigned int count)
 {
-	return xencomm_mini_hypercall_grant_table_op(cmd, uop, count);
+	return xencomm_hypercall_grant_table_op(cmd, uop, count);
 }
 EXPORT_SYMBOL(HYPERVISOR_grant_table_op);
 

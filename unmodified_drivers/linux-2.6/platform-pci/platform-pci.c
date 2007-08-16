@@ -73,7 +73,7 @@ static int __devinit init_xen_info(void)
 	extern void *shared_info_area;
 
 #ifdef __ia64__
-	xencomm_init();
+	xencomm_initialize();
 #endif
 
 	setup_xen_features();
