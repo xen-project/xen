@@ -24,7 +24,7 @@
 #define XEN_TLBthash_H
 
 #define     MAX_CCN_DEPTH       (15)       // collision chain depth
-#define     DEFAULT_VTLB_SZ     (19) // 512K hash + 512K c-chain for VTLB
+#define     DEFAULT_VTLB_SZ     (14) // 16K hash + 16K c-chain for VTLB
 #define     DEFAULT_VHPT_SZ     (23) // 8M hash + 8M c-chain for VHPT
 #define     VTLB(v,_x)          (v->arch.vtlb._x)
 #define     VHPT(v,_x)          (v->arch.vhpt._x)

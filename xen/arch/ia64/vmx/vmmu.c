@@ -32,9 +32,9 @@ static void __init parse_vtlb_size(char *s)
 
     if (sz > 0) {
         default_vtlb_sz = fls(sz - 1);
-        /* minimum 256KB (since calculated tag might be broken) */
-        if (default_vtlb_sz < 18)
-            default_vtlb_sz = 18;
+        /* minimum 16KB (for tag uniqueness) */
+        if (default_vtlb_sz < 14)
+            default_vtlb_sz = 14;
     }
 }
 
@@ -240,40 +240,8 @@ void machine_tlb_insert(struct vcpu *v, thash_data_t *tlb)
  */
 void machine_tlb_purge(u64 va, u64 ps)
 {
-//    u64       psr;
-//    psr = ia64_clear_ic();
     ia64_ptcl(va, ps << 2);
-//    ia64_set_psr(psr);
-//    ia64_srlz_i();
-//    return;
 }
-/*
-u64 machine_thash(u64 va)
-{
-    return ia64_thash(va);
-}
-
-u64 machine_ttag(u64 va)
-{
-    return ia64_ttag(va);
-}
-*/
-thash_data_t * vsa_thash(PTA vpta, u64 va, u64 vrr, u64 *tag)
-{
-    u64 index,pfn,rid,pfn_bits;
-    pfn_bits = vpta.size-5-8;
-    pfn = REGION_OFFSET(va)>>_REGION_PAGE_SIZE(vrr);
-    rid = _REGION_ID(vrr);
-    index = ((rid&0xff)<<pfn_bits)|(pfn&((1UL<<pfn_bits)-1));
-    *tag = ((rid>>8)&0xffff) | ((pfn >>pfn_bits)<<16);
-    return (thash_data_t *)((vpta.base<<PTA_BASE_SHIFT)+(index<<5));
-//    return ia64_call_vsa(PAL_VPS_THASH,va,vrr,vpta,0,0,0,0);
-}
-
-//u64 vsa_ttag(u64 va, u64 vrr)
-//{
-//    return ia64_call_vsa(PAL_VPS_TTAG,va,vrr,0,0,0,0,0);
-//}
 
 int vhpt_enabled(VCPU *vcpu, uint64_t vadr, vhpt_ref_t ref)
 {

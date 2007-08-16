@@ -286,6 +286,17 @@ u64 guest_vhpt_lookup(u64 iha, u64 *pte)
     return ret;
 }
 
+static thash_data_t * vtlb_thash(PTA vpta, u64 va, u64 vrr, u64 *tag)
+{
+    u64 index, pfn, rid;
+
+    pfn = REGION_OFFSET(va) >> _REGION_PAGE_SIZE(vrr);
+    rid = _REGION_ID(vrr);
+    index = (pfn ^ rid) & ((1UL << (vpta.size - 5)) - 1);
+    *tag = pfn ^ (rid << 39);
+    return (thash_data_t *)((vpta.base << PTA_BASE_SHIFT) + (index << 5));
+}
+
 /*
  *  purge software guest tlb
  */
@@ -308,7 +319,7 @@ static void vtlb_purge(VCPU *v, u64 va, u64 ps)
         size = PSIZE(rr_ps);
         vrr.ps = rr_ps;
         while (num) {
-            cur = vsa_thash(hcb->pta, curadr, vrr.rrval, &tag);
+            cur = vtlb_thash(hcb->pta, curadr, vrr.rrval, &tag);
             while (cur) {
                 if (cur->etag == tag && cur->ps == rr_ps)
                     cur->etag = 1UL << 63;
@@ -401,7 +412,7 @@ void vtlb_insert(VCPU *v, u64 pte, u64 itir, u64 va)
     vcpu_get_rr(v, va, &vrr.rrval);
     vrr.ps = itir_ps(itir);
     VMX(v, psbits[va >> 61]) |= (1UL << vrr.ps);
-    hash_table = vsa_thash(hcb->pta, va, vrr.rrval, &tag);
+    hash_table = vtlb_thash(hcb->pta, va, vrr.rrval, &tag);
     cch = hash_table;
     while (cch) {
         if (INVALID_TLB(cch)) {
@@ -639,7 +650,7 @@ thash_data_t *vtlb_lookup(VCPU *v, u64 va,int is_data)
         ps = __ffs(psbits);
         psbits &= ~(1UL << ps);
         vrr.ps = ps;
-        cch = vsa_thash(hcb->pta, va, vrr.rrval, &tag);
+        cch = vtlb_thash(hcb->pta, va, vrr.rrval, &tag);
         do {
             if (cch->etag == tag && cch->ps == ps)
                 return cch;
