@@ -71,3 +71,46 @@ write_dev() {
 
   success
 }
+
+
+##
+# canonicalise_mode mode
+#
+# Takes the given mode, which may be r, w, ro, rw, w!, or rw!, or variations
+# thereof, and canonicalises them to one of
+#
+#   'r': perform checks for a new read-only mount;
+#   'w': perform checks for a read-write mount; or
+#   '!': perform no checks at all.
+#
+canonicalise_mode()
+{
+  local mode="$1"
+
+  if ! expr index "$mode" 'w' >/dev/null
+  then
+    echo 'r'
+  elif ! expr index "$mode" '!' >/dev/null
+  then
+    echo 'w'
+  else
+    echo '!'
+  fi
+}
+
+
+same_vm()
+{
+  local otherdom="$1"
+  # Note that othervm can be MISSING here, because Xend will be racing with
+  # the hotplug scripts -- the entries in /local/domain can be removed by
+  # Xend before the hotplug scripts have removed the entry in
+  # /local/domain/0/backend/.  In this case, we want to pretend that the
+  # VM is the same as FRONTEND_UUID, because that way the 'sharing' will be
+  # allowed.
+  local othervm=$(xenstore_read_default "/local/domain/$otherdom/vm"         \
+                  "$FRONTEND_UUID")
+
+  [ "$FRONTEND_UUID" = "$othervm" ]
+}
+
