@@ -8,6 +8,57 @@ dir=$(dirname "$0")
 
 findCommand "$@"
 
+##
+# check_blktap_sharing file mode
+#
+# Perform the sharing check for the given blktap and mode.
+#
+check_blktap_sharing()
+{
+    local file="$1"
+    local mode="$2"
+
+    local base_path="$XENBUS_BASE_PATH/$XENBUS_TYPE"
+    for dom in $(xenstore-list "$base_path")
+    do
+        for dev in $(xenstore-list "$base_path/$dom")
+        do
+            params=$(xenstore_read "$base_path/$dom/$dev/params" | cut -d: -f2)
+            if [ "$file" = "$params" ]
+            then
+
+                if [ "$mode" = 'w' ]
+                then
+                    if ! same_vm "$dom" 
+                    then
+                        echo 'guest'
+                        return
+                    fi
+                else 
+                    local m=$(xenstore_read "$base_path/$dom/$dev/mode")
+                    m=$(canonicalise_mode "$m")
+
+                    if [ "$m" = 'w' ] 
+                    then
+                        if ! same_vm "$dom"
+                        then
+                            echo 'guest'
+                            return
+                        fi
+                    fi
+                fi
+            fi
+        done
+    done
+
+    echo 'ok'
+}
+
+FRONTEND_ID=$(xenstore_read "$XENBUS_PATH/frontend-id")
+FRONTEND_UUID=$(xenstore_read "/local/domain/$FRONTEND_ID/vm")
+mode=$(xenstore_read "$XENBUS_PATH/mode")
+mode=$(canonicalise_mode "$mode")
+
 t=$(xenstore_read_default "$XENBUS_PATH/type" 'MISSING')
 if [ -n "$t" ]
 then
@@ -19,6 +70,12 @@ then
     fi
 fi
 file=$(readlink -f "$p") || ebusy "$p does not exist."
+
+if [ "$mode" != '!' ] 
+then
+    result=$(check_blktap_sharing "$file" "$mode")
+    [ "$result" = 'ok' ] || ebusy "$file already in use by other domain"
+fi
 
 if [ "$command" = 'add' ]
 then

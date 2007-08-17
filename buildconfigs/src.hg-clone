@@ -6,16 +6,6 @@ LINUX_SRCDIR ?= linux-$(LINUX_VER)-xen.hg
 # Repository to clone.
 XEN_LINUX_HGREPO ?= $$(sh buildconfigs/select-repository $(LINUX_SRCDIR) $(LINUX_SRC_PATH))
 
-# The source directory is not automatically updated to avoid blowing
-# away developer's changes. If you want to automatically pull a new
-# version of the Linux tree then add `XEN_LINUX_UPDATE=y' to your make
-# command line.
-ifeq ($(XEN_LINUX_UPDATE),y)
-__XEN_LINUX_UPDATE = $(LINUX_SRCDIR)/.force-update
-else
-__XEN_LINUX_UPDATE =
-endif
-
 # Set XEN_LINUX_HGREV to update to a particlar revision.
 XEN_LINUX_HGREV  ?= tip
 
@@ -40,7 +30,3 @@ $(LINUX_SRCDIR)/.valid-src: $(__XEN_LINUX_UPDATE)
 	    ( cd $(LINUX_SRCDIR) && $(HG) update $(XEN_LINUX_HGREV) ); \
 	fi
 	touch $@
-
-.PHONY: $(LINUX_SRCDIR)/.force-update
-$(LINUX_SRCDIR)/.force-update:
-	@ :

@@ -181,7 +181,8 @@ def restore(xd, fd, dominfo = None, paused = False):
     assert store_port
     assert console_port
 
-    nr_pfns = (dominfo.getMemoryTarget() + 3) / 4 
+    page_size_kib = xc.pages_to_kib(1)
+    nr_pfns = (dominfo.getMemoryTarget() + page_size_kib - 1) / page_size_kib 
 
     # if hvm, pass mem size to calculate the store_mfn
     image_cfg = dominfo.info.get('image', {})

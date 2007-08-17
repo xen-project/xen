@@ -607,6 +607,9 @@ class XendDomainInfo:
                     _, dev_info = sxprs[dev]
             else:  # 'vbd' or 'tap'
                 dev_info = self.getDeviceInfo_vbd(dev)
+                # To remove the UUID of the device from refs,
+                # deviceClass must be always 'vbd'.
+                deviceClass = 'vbd'
             if dev_info is None:
                 return rc
 
@@ -981,7 +984,7 @@ class XendDomainInfo:
             changed = True
 
         # Check if the rtc offset has changes
-        if vm_details.get("rtc/timeoffset", 0) != self.info["platform"].get("rtc_timeoffset", 0):
+        if vm_details.get("rtc/timeoffset", "0") != self.info["platform"].get("rtc_timeoffset", "0"):
             self.info["platform"]["rtc_timeoffset"] = vm_details.get("rtc/timeoffset", 0)
             changed = True
  
