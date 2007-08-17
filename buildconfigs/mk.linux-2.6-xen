@@ -98,12 +98,12 @@ endif
 ifneq ($(EXTRAVERSION),)
 	echo "$(EXTRAVERSION)" >$(LINUX_DIR)/localversion-xen
 endif
-	$(MAKE) -C $(LINUX_SRCDIR) ARCH=$(LINUX_ARCH) oldconfig O=$$(/bin/pwd)/$(LINUX_DIR)
+	$(MAKE) -C $(LINUX_SRCDIR) ARCH=$(LINUX_ARCH) silentoldconfig O=$$(/bin/pwd)/$(LINUX_DIR)
 	@if [ ! -f $(LINUX_DIR)/Makefile ] ; then \
-	    echo "***********************************"; \
-	    echo "oldconfig did not create a Makefile"; \
+	    echo "*****************************************"; \
+	    echo "silentoldconfig did not create a Makefile"; \
 	    echo "Generating $(LINUX_DIR)/Makefile   "; \
-	    echo "***********************************"; \
+	    echo "*****************************************"; \
 	    ( echo "# Automatically generated: don't edit"; \
 	      echo ""; \
 	      echo "VERSION = 2"; \
