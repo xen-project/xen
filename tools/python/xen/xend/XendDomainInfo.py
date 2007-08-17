@@ -981,7 +981,7 @@ class XendDomainInfo:
             changed = True
 
         # Check if the rtc offset has changes
-        if vm_details.get("rtc/timeoffset", 0) != self.info["platform"].get("rtc_timeoffset", 0):
+        if vm_details.get("rtc/timeoffset", "0") != self.info["platform"].get("rtc_timeoffset", "0"):
             self.info["platform"]["rtc_timeoffset"] = vm_details.get("rtc/timeoffset", 0)
             changed = True
  
