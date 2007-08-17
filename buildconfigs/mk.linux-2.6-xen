@@ -98,12 +98,12 @@ endif
 ifneq ($(EXTRAVERSION),)
 	echo "$(EXTRAVERSION)" >$(LINUX_DIR)/localversion-xen
 endif
-	$(MAKE) -C $(LINUX_SRCDIR) ARCH=$(LINUX_ARCH) silentoldconfig O=$$(/bin/pwd)/$(LINUX_DIR)
+	$(MAKE) -C $(LINUX_SRCDIR) ARCH=$(LINUX_ARCH) oldconfig O=$$(/bin/pwd)/$(LINUX_DIR)
 	@if [ ! -f $(LINUX_DIR)/Makefile ] ; then \
-	    echo "*****************************************"; \
-	    echo "silentoldconfig did not create a Makefile"; \
+	    echo "***********************************"; \
+	    echo "oldconfig did not create a Makefile"; \
 	    echo "Generating $(LINUX_DIR)/Makefile   "; \
-	    echo "*****************************************"; \
+	    echo "***********************************"; \
 	    ( echo "# Automatically generated: don't edit"; \
 	      echo ""; \
 	      echo "VERSION = 2"; \
@@ -125,6 +125,7 @@ endif
 	      echo "	\$$(MAKE) -C \$$(KERNELSRC) O=\$$(KERNELOUTPUT) \$$@"; \
 	    ) > $(LINUX_DIR)/Makefile ; \
 	fi
+	$(MAKE) -C $(LINUX_DIR) ARCH=$(LINUX_ARCH) prepare
 
 .PHONY: prep
 prep: $(LINUX_DIR)/include/linux/autoconf.h
