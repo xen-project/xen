@@ -68,7 +68,6 @@ l2_pgentry_t *virt_to_xen_l2e(unsigned long v)
 
 void __init paging_init(void)
 {
-    void *ioremap_pt;
     unsigned long v;
     struct page_info *pg;
     int i;
@@ -115,13 +114,17 @@ void __init paging_init(void)
     for ( i = 0; i < (mpt_size / BYTES_PER_LONG); i++)
         set_gpfn_from_mfn(i, 0x55555555);
 
-    /* Create page tables for ioremap(). */
+    /* Create page tables for ioremap()/map_domain_page_global(). */
     for ( i = 0; i < (IOREMAP_MBYTES >> (L2_PAGETABLE_SHIFT - 20)); i++ )
     {
-        ioremap_pt = alloc_xenheap_page();
-        clear_page(ioremap_pt);
-        l2e_write(&idle_pg_table_l2[l2_linear_offset(IOREMAP_VIRT_START) + i],
-                  l2e_from_page(virt_to_page(ioremap_pt), __PAGE_HYPERVISOR));
+        void *p;
+        l2_pgentry_t *pl2e;
+        pl2e = &idle_pg_table_l2[l2_linear_offset(IOREMAP_VIRT_START) + i];
+        if ( l2e_get_flags(*pl2e) & _PAGE_PRESENT )
+            continue;
+        p = alloc_xenheap_page();
+        clear_page(p);
+        l2e_write(pl2e, l2e_from_page(virt_to_page(p), __PAGE_HYPERVISOR));
     }
 }
 
