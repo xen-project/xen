@@ -939,7 +939,7 @@ static void relinquish_memory(struct domain *d, struct list_head *list)
 void domain_relinquish_resources(struct domain *d)
 {
     /* Relinquish guest resources for VT-i domain. */
-    if (d->vcpu[0] && VMX_DOMAIN(d->vcpu[0]))
+    if (d->arch.is_vti)
 	    vmx_relinquish_guest_resources(d);
 
     /* Tear down shadow mode stuff. */
