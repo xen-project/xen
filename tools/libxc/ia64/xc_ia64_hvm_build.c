@@ -684,7 +684,12 @@ copy_from_GFW_to_nvram(int xc_handle, uint32_t dom, int nvram_fd)
 
     /* Check is NVRAM data vaild */
     if ( !is_valid_address(tmp_ptr) )
+    {
+        free(pfn_list);
+        munmap(tmp_ptr, PAGE_SIZE);
+        close(nvram_fd);
         return -1;
+    }
 
     addr_from_GFW_4k_align = ((struct nvram_save_addr *)tmp_ptr)->addr;
     munmap(tmp_ptr, PAGE_SIZE);
