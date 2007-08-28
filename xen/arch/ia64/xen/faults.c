@@ -729,6 +729,17 @@ ia64_shadow_fault(unsigned long ifa, unsigned long itir,
 	unsigned long pte = 0;
 	struct vhpt_lf_entry *vlfe;
 
+	/*
+	 * v->arch.vhpt_pg_shift shouldn't be used here.
+	 * Currently dirty page logging bitmap is allocated based
+	 * on PAGE_SIZE. This is part of xen_domctl_shadow_op ABI.
+	 * If we want to log dirty pages in finer grained when
+	 * v->arch.vhpt_pg_shift < PAGE_SHIFT, we have to
+	 * revise the ABI and update this function and the related
+	 * tool stack (live relocation).
+	 */
+	unsigned long vhpt_pg_shift = PAGE_SHIFT;
+
 	/* There are 2 jobs to do:
 	   -  marking the page as dirty (the metaphysical address must be
 	      extracted to do that).
@@ -744,7 +755,7 @@ ia64_shadow_fault(unsigned long ifa, unsigned long itir,
 	if (vlfe->ti_tag == ia64_ttag(ifa)) {
 		/* The VHPT entry is valid.  */
 		gpfn = get_gpfn_from_mfn((pte & _PAGE_PPN_MASK) >>
-					 v->arch.vhpt_pg_shift);
+					 vhpt_pg_shift);
 		BUG_ON(gpfn == INVALID_M2P_ENTRY);
 	} else {
 		unsigned long itir, iha;
@@ -760,10 +771,10 @@ ia64_shadow_fault(unsigned long ifa, unsigned long itir,
 		/* Try again!  */
 		if (fault != IA64_NO_FAULT) {
 			/* This will trigger a dtlb miss.  */
-			ia64_ptcl(ifa, v->arch.vhpt_pg_shift << 2);
+			ia64_ptcl(ifa, vhpt_pg_shift << 2);
 			return;
 		}
-		gpfn = ((pte & _PAGE_PPN_MASK) >> v->arch.vhpt_pg_shift);
+		gpfn = ((pte & _PAGE_PPN_MASK) >> vhpt_pg_shift);
 		if (pte & _PAGE_D)
 			pte |= _PAGE_VIRT_D;
 	}
@@ -791,7 +802,7 @@ ia64_shadow_fault(unsigned long ifa, unsigned long itir,
 			/* Purge the TC locally.
 			   It will be reloaded from the VHPT iff the
 			   VHPT entry is still valid.  */
-			ia64_ptcl(ifa, v->arch.vhpt_pg_shift << 2);
+			ia64_ptcl(ifa, vhpt_pg_shift << 2);
 
 			atomic64_inc(&d->arch.shadow_fault_count);
 		} else {
@@ -803,6 +814,6 @@ ia64_shadow_fault(unsigned long ifa, unsigned long itir,
 		/* We don't know wether or not the fault must be
 		   reflected.  The VHPT entry is not valid.  */
 		/* FIXME: in metaphysical mode, we could do an ITC now.  */
-		ia64_ptcl(ifa, v->arch.vhpt_pg_shift << 2);
+		ia64_ptcl(ifa, vhpt_pg_shift << 2);
 	}
 }

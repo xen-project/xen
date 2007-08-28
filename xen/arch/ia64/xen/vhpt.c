@@ -384,7 +384,12 @@ __domain_flush_vtlb_track_entry(struct domain* d,
 	int cpu;
 	int vcpu;
 	int local_purge = 1;
-	unsigned char ps = current->arch.vhpt_pg_shift;
+
+	/* tlb inert tracking is done in PAGE_SIZE uint. */
+	unsigned char ps = max_t(unsigned char,
+				 current->arch.vhpt_pg_shift, PAGE_SHIFT);
+	/* This case isn't supported (yet). */
+	BUG_ON(current->arch.vhpt_pg_shift > PAGE_SHIFT);
 	
 	BUG_ON((vaddr >> VRN_SHIFT) != VRN7);
 	/*
