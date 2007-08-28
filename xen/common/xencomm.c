@@ -1,4 +1,6 @@
-/*
+/******************************************************************************
+ * xencomm.c
+ *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation; either version 2 of the License, or
@@ -34,13 +36,13 @@
 #define xc_dprintk(f, a...) ((void)0)
 #endif
 
-static void*
+static void *
 xencomm_vaddr(unsigned long paddr, struct page_info *page)
 {
     return (void*)((paddr & ~PAGE_MASK) | (unsigned long)page_to_virt(page));
 }
 
-/* get_page() to prevent from another vcpu freeing the page */
+/* get_page() to prevent another vcpu freeing the page. */
 static int
 xencomm_get_page(unsigned long paddr, struct page_info **page)
 {
@@ -103,19 +105,19 @@ xencomm_ctxt_address(struct xencomm_ctxt *ctxt)
 }
 
 static int
-xencomm_ctxt_init(const void* handle, struct xencomm_ctxt *ctxt)
+xencomm_ctxt_init(const void *handle, struct xencomm_ctxt *ctxt)
 {
     struct page_info *page;
     struct xencomm_desc *desc;
     int ret;
 
-    /* avoid unaligned access */
-    if ( (unsigned long)handle % __alignof__(*desc) != 0 )
+    /* Avoid unaligned access. */
+    if ( ((unsigned long)handle % __alignof__(*desc)) != 0 )
         return -EINVAL;
     if ( xencomm_desc_cross_page_boundary((unsigned long)handle) )
         return -EINVAL;
 
-    /* first we need to access the descriptor */
+    /* First we need to access the descriptor. */
     ret = xencomm_get_page((unsigned long)handle, &page);
     if ( ret )
         return ret;
@@ -128,10 +130,8 @@ xencomm_ctxt_init(const void* handle, struct xencomm_ctxt *ctxt)
         return -EINVAL;
     }
 
-    ctxt->nr_addrs = desc->nr_addrs; /* copy before use.
-                                      * It is possible for a guest domain to
-                                      * modify concurrently.
-                                      */
+    /* Copy before use: It is possible for a guest to modify concurrently. */
+    ctxt->nr_addrs = desc->nr_addrs;
     ctxt->desc_in_paddr = (struct xencomm_desc*)handle;
     ctxt->page = page;
     ctxt->address = &desc->address[0];
@@ -141,28 +141,29 @@ xencomm_ctxt_init(const void* handle, struct xencomm_ctxt *ctxt)
 static int
 xencomm_ctxt_next(struct xencomm_ctxt *ctxt, int i)
 {
+    unsigned long paddr;
+    struct page_info *page;
+    int ret;
+
     BUG_ON(i >= ctxt->nr_addrs);
-    /* in i == 0 case, we already calculated in xecomm_addr_init() */
+
+    /* In i == 0 case, we already calculated in xecomm_addr_init(). */
     if ( i != 0 )
         ctxt->address++;
-    
-    /* When crossing page boundary, machine address must be calculated. */
-    if ( ((unsigned long)ctxt->address & ~PAGE_MASK) == 0 )
-    {
-        unsigned long paddr =
-            (unsigned long)&(ctxt->desc_in_paddr->address[i]);
-        struct page_info *page;
-        int ret;
 
-        ret = xencomm_get_page(paddr, &page);
-        if ( ret == 0 )
-        {
-            put_page(ctxt->page);
-            ctxt->page = page;
-            ctxt->address = xencomm_vaddr(paddr, page);
-        }
+    if ( ((unsigned long)ctxt->address & ~PAGE_MASK) != 0 )
+        return 0;
+
+    /* Crossing page boundary: machine address must be calculated. */
+    paddr = (unsigned long)&ctxt->desc_in_paddr->address[i];
+    ret = xencomm_get_page(paddr, &page);
+    if ( ret )
         return ret;
-    }
+
+    put_page(ctxt->page);
+    ctxt->page = page;
+    ctxt->address = xencomm_vaddr(paddr, page);
+
     return 0;
 }
 
@@ -177,25 +178,22 @@ xencomm_copy_chunk_from(
     unsigned long to, unsigned long paddr, unsigned int  len)
 {
     struct page_info *page;
+    int res;
 
-    while (1)
-    {
-        int res;
+    do {
         res = xencomm_get_page(paddr, &page);
-        if ( res != 0 )
-        {
-            if ( res == -EAGAIN )
-                continue; /* Try again. */
-            return res;
-        }
-        xc_dprintk("%lx[%d] -> %lx\n",
-                   (unsigned long)xencomm_vaddr(paddr, page), len, to);
+    } while ( res == -EAGAIN );
 
-        memcpy((void *)to, xencomm_vaddr(paddr, page), len);
-        put_page(page);
-        return 0;
-    }
-    /* NOTREACHED */
+    if ( res )
+        return res;
+
+    xc_dprintk("%lx[%d] -> %lx\n",
+               (unsigned long)xencomm_vaddr(paddr, page), len, to);
+
+    memcpy((void *)to, xencomm_vaddr(paddr, page), len);
+    put_page(page);
+
+    return 0;
 }
 
 static unsigned long
@@ -296,25 +294,22 @@ xencomm_copy_chunk_to(
     unsigned long paddr, unsigned long from, unsigned int  len)
 {
     struct page_info *page;
+    int res;
 
-    while (1)
-    {
-        int res;
+    do {
         res = xencomm_get_page(paddr, &page);
-        if ( res != 0 )
-        {
-            if ( res == -EAGAIN )
-                continue; /* Try again.  */
-            return res;
-        }
-        xc_dprintk("%lx[%d] -> %lx\n", from, len,
-                   (unsigned long)xencomm_vaddr(paddr, page));
+    } while ( res == -EAGAIN );
 
-        memcpy(xencomm_vaddr(paddr, page), (void *)from, len);
-        put_page(page);
-        return 0;
-    }
-    /* NOTREACHED */
+    if ( res )
+        return res;
+
+    xc_dprintk("%lx[%d] -> %lx\n", from, len,
+               (unsigned long)xencomm_vaddr(paddr, page));
+
+    memcpy(xencomm_vaddr(paddr, page), (void *)from, len);
+    put_page(page);
+
+    return 0;
 }
 
 static unsigned long
@@ -494,3 +489,13 @@ out:
     xencomm_ctxt_done(&ctxt);
     return res;
 }
+
+/*
+ * Local variables:
+ * mode: C
+ * c-set-style: "BSD"
+ * c-basic-offset: 4
+ * tab-width: 4
+ * indent-tabs-mode: nil
+ * End:
+ */
