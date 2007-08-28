@@ -16,7 +16,7 @@ from xen.util.xpopen import xPopen3
 import xen.util.auxbin
 import xen.lowlevel.xc
 
-from xen.xend import balloon, sxp
+from xen.xend import balloon, sxp, image
 from xen.xend.XendError import XendError, VmError
 from xen.xend.XendLogging import log
 from xen.xend.XendConfig import XendConfig
@@ -181,9 +181,6 @@ def restore(xd, fd, dominfo = None, paused = False):
     assert store_port
     assert console_port
 
-    page_size_kib = xc.pages_to_kib(1)
-    nr_pfns = (dominfo.getMemoryTarget() + page_size_kib - 1) / page_size_kib 
-
     # if hvm, pass mem size to calculate the store_mfn
     image_cfg = dominfo.info.get('image', {})
     is_hvm = dominfo.info.is_hvm()
@@ -197,18 +194,32 @@ def restore(xd, fd, dominfo = None, paused = False):
         pae  = 0
 
     try:
-        shadow = dominfo.info['shadow_memory']
+        restore_image = image.create(dominfo, dominfo.info['image'],
+                                     dominfo.info['device'])
+        memory = restore_image.getRequiredAvailableMemory(
+            dominfo.info['memory'] * 1024)
+        maxmem = restore_image.getRequiredAvailableMemory(
+            dominfo.info['maxmem'] * 1024)
+        shadow = restore_image.getRequiredShadowMemory(
+            dominfo.info['shadow_memory'] * 1024,
+            dominfo.info['maxmem'] * 1024)
+
         log.debug("restore:shadow=0x%x, _static_max=0x%x, _static_min=0x%x, ",
                   dominfo.info['shadow_memory'],
                   dominfo.info['memory_static_max'],
                   dominfo.info['memory_static_min'])
 
-        balloon.free(xc.pages_to_kib(nr_pfns) + shadow * 1024)
+        # Round shadow up to a multiple of a MiB, as shadow_mem_control
+        # takes MiB and we must not round down and end up under-providing.
+        shadow = ((shadow + 1023) / 1024) * 1024
 
-        shadow_cur = xc.shadow_mem_control(dominfo.getDomid(), shadow)
+        # set memory limit
+        xc.domain_setmaxmem(dominfo.getDomid(), maxmem)
+
+        balloon.free(memory + shadow)
+
+        shadow_cur = xc.shadow_mem_control(dominfo.getDomid(), shadow / 1024)
         dominfo.info['shadow_memory'] = shadow_cur
-
-        xc.domain_setmaxmem(dominfo.getDomid(), dominfo.getMemoryMaximum())
 
         cmd = map(str, [xen.util.auxbin.pathTo(XC_RESTORE),
                         fd, dominfo.getDomid(),
@@ -220,7 +231,7 @@ def restore(xd, fd, dominfo = None, paused = False):
         forkHelper(cmd, fd, handler.handler, True)
 
         # We don't want to pass this fd to any other children -- we 
-        # might need to recover ths disk space that backs it.
+        # might need to recover the disk space that backs it.
         try:
             flags = fcntl.fcntl(fd, fcntl.F_GETFD)
             flags |= fcntl.FD_CLOEXEC
