@@ -5,6 +5,7 @@
 #include "xc_elf.h"
 #include "xc_efi.h"
 #include <stdlib.h>
+#include <unistd.h>
 #include <assert.h>
 #include <zlib.h>
 #include "xen/arch-ia64.h"
@@ -596,7 +597,7 @@ copy_from_nvram_to_GFW(int xc_handle, uint32_t dom, int nvram_fd)
     unsigned int nr_pages = NVRAM_SIZE >> PAGE_SHIFT;
     struct stat file_stat;
     char buf[NVRAM_SIZE] = {0};
-	
+
     if ( fstat(nvram_fd, &file_stat) < 0 )
     {
         PERROR("Cannot get Nvram file info! Guest will boot without "
@@ -751,7 +752,7 @@ int xc_ia64_save_to_nvram(int xc_handle, uint32_t dom)
         PERROR("Nvram not initialized. Nvram save failed!\n");
     else
         copy_from_GFW_to_nvram(xc_handle, dom, (int)nvram_fd);	
-	
+
     // although save to nvram maybe fail, we don't return any error number
     // to Xend. This is quite logical because damage of NVRAM on native would 
     // not block OS's executive path. Return error number will cause an
@@ -759,43 +760,41 @@ int xc_ia64_save_to_nvram(int xc_handle, uint32_t dom)
     return 0;
 }
 
-#define NVRAM_DIR       "/usr/lib/xen/boot/"
-#define NVRAM_FILE_PATH "/usr/lib/xen/boot/nvram_"
+#define NVRAM_DIR         "/var/lib/xen/nvram/"
+#define NVRAM_FILE_PREFIX "nvram_"
 
 int xc_ia64_nvram_init(int xc_handle, char *dom_name, uint32_t dom)
 {
-    int file_path_len = strlen(NVRAM_FILE_PATH);
-    uint64_t nvram_fd = 0;
-    char nvram_path[100] = {0};
-    struct stat stat_buf;
+    uint64_t nvram_fd;
+    char nvram_path[PATH_MAX] = NVRAM_DIR;
 
-    if ( stat(NVRAM_DIR, &stat_buf) == -1 ) {
+    if ( access(nvram_path, R_OK|W_OK|X_OK) == -1 ) {
         if ( errno != ENOENT )
         {
-            PERROR("Error stat'ing NVRAM dir %s.", NVRAM_DIR);
+            PERROR("Error stat'ing NVRAM dir %s.", nvram_path);
             return -1;
         }
-        if ( mkdir(NVRAM_DIR, 0755) == -1 )
+        if ( mkdir(nvram_path, 0755) == -1 )
         {
-            PERROR("Unable to create NVRAM store directory %s.", NVRAM_DIR);
+            PERROR("Unable to create NVRAM store directory %s.", nvram_path);
             return -1;
         }
     }
 
-    if ( !(stat_buf.st_mode & S_IRUSR) || !(stat_buf.st_mode & S_IWUSR) )
-    {
+    if ( access(nvram_path, R_OK|W_OK|X_OK) == -1 ) {
         errno = EACCES;
-        PERROR("No R/W permission to NVRAM store directory %s.", NVRAM_DIR);
+        PERROR("No RWX permission to NVRAM store directory %s.", nvram_path);
         return -1;
     }
 
-    strncpy(nvram_path, NVRAM_FILE_PATH, file_path_len);
-    if ( file_path_len + strlen(dom_name) + 1 > sizeof(nvram_path) )
+    if ( strlen(nvram_path) + strlen(NVRAM_FILE_PREFIX) +
+         strlen(dom_name) + 1 > sizeof(nvram_path) )
     {
         PERROR("Nvram file path is too long!\n");
         return -1;
     }
-    strcpy(nvram_path + file_path_len, dom_name);
+    strcat(nvram_path, NVRAM_FILE_PREFIX);
+    strcat(nvram_path, dom_name);
 
     nvram_fd = nvram_init(nvram_path);
     if ( nvram_fd == (uint64_t)(-1) )
