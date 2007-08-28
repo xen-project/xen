@@ -52,35 +52,24 @@ extern void init_IRQ(void);
 extern void trap_init(void);
 extern void xen_patch_kernel(void);
 
-/* opt_nosmp: If true, secondary processors are ignored. */
-static int opt_nosmp;
+/* nosmp: ignore secondary processors */
+static int __initdata opt_nosmp;
 boolean_param("nosmp", opt_nosmp);
 
-/* maxcpus: maximum number of CPUs to activate. */
+/* maxcpus: maximum number of CPUs to activate */
 static unsigned int __initdata max_cpus = NR_CPUS;
 integer_param("maxcpus", max_cpus); 
 
-/* xencons: if true enable xenconsole input (and irq).
+/* xencons: toggle xenconsole input (and irq).
    Note: you have to disable 8250 serials in domains (to avoid use of the
    same resource).  */
 static int __initdata opt_xencons = 1;
 integer_param("xencons", opt_xencons);
 
-/* Toggle to allow non-legacy xencons UARTs to run in polling mode */
+/* xencons_poll: toggle non-legacy xencons UARTs to run in polling mode */
 static int __initdata opt_xencons_poll;
 boolean_param("xencons_poll", opt_xencons_poll);
 
-/*
- * opt_xenheap_megabytes: Size of Xen heap in megabytes, including:
- *	xen image
- *	bootmap bits
- *	xen heap
- * Note: To allow xenheap size configurable, the prerequisite is
- * to configure elilo allowing relocation defaultly. Then since
- * elilo chooses 256M as alignment when relocating, alignment issue
- * on IPF can be addressed.
- */
-unsigned int opt_xenheap_megabytes = XENHEAP_DEFAULT_MB;
 unsigned long xenheap_size = XENHEAP_DEFAULT_SIZE;
 unsigned long xen_pstart;
 void *xen_pickle_offset __read_mostly;
@@ -105,7 +94,7 @@ static void __init do_initcalls(void)
 }
 
 /*
- * IPF loader only supports one commaind line currently, for
+ * IPF loader only supports one command line currently, for
  * both xen and guest kernel. This function provides pre-parse
  * to mixed command line, to split it into two parts.
  *
@@ -196,7 +185,7 @@ efi_print(void)
  * These functions are utility functions for getting and
  * testing memory descriptors for allocating the xenheap area.
  */
-static efi_memory_desc_t *
+static efi_memory_desc_t * __init
 efi_get_md (unsigned long phys_addr)
 {
     void *efi_map_start, *efi_map_end, *p;
@@ -215,7 +204,7 @@ efi_get_md (unsigned long phys_addr)
     return 0;
 }
 
-static int
+static int __init
 is_xenheap_usable_memory(efi_memory_desc_t *md)
 {
     if (!(md->attribute & EFI_MEMORY_WB))
@@ -232,7 +221,7 @@ is_xenheap_usable_memory(efi_memory_desc_t *md)
     return 0;
 }
 
-static inline int
+static inline int __init
 md_overlaps(efi_memory_desc_t *md, unsigned long phys_addr)
 {
     return (phys_addr - md->phys_addr < (md->num_pages << EFI_PAGE_SHIFT));
