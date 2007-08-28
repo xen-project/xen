@@ -154,16 +154,16 @@ static int has_channel_local_socket(tpmState *s);
 #define NUM_TRANSPORTS 1
 
 struct vTPM_transmit {
-    int (*open) (tpmState *s, uint32_t vtpm_instance);
-    int (*write) (tpmState *s, const tpmBuffer *);
-    int (*read) (tpmState *s, tpmBuffer *);
-    int (*close) (tpmState *s, int);
+    int (*open_fn) (tpmState *s, uint32_t vtpm_instance);
+    int (*write_fn) (tpmState *s, const tpmBuffer *);
+    int (*read_fn) (tpmState *s, tpmBuffer *);
+    int (*close_fn) (tpmState *s, int);
     int (*has_channel) (tpmState *s);
 } vTPMTransmit[NUM_TRANSPORTS] = {
-    { .open = create_local_socket,
-      .write = write_local_socket,
-      .read = read_local_socket,
-      .close = close_local_socket,
+    { .open_fn = create_local_socket,
+      .write_fn = write_local_socket,
+      .read_fn = read_local_socket,
+      .close_fn = close_local_socket,
       .has_channel = has_channel_local_socket,
     }
 };
@@ -200,7 +200,7 @@ static void open_vtpm_channel(tpmState *s)
     int idx;
     /* search a usable transmit layer */
     for (idx = 0; idx < NUM_TRANSPORTS; idx++) {
-        if (1 == vTPMTransmit[idx].open(s, s->vtpm_instance)) {
+        if (1 == vTPMTransmit[idx].open_fn(s, s->vtpm_instance)) {
             /* found one */
             s->Transmitlayer = idx;
             break;
@@ -213,7 +213,7 @@ static void open_vtpm_channel(tpmState *s)
  */
 static inline void close_vtpm_channel(tpmState *s, int force)
 {
-    if (1 == vTPMTransmit[s->Transmitlayer].close(s, force)) {
+    if (1 == vTPMTransmit[s->Transmitlayer].close_fn(s, force)) {
         s->Transmitlayer = -1;
     }
 }
@@ -974,7 +974,7 @@ static int TPM_Send(tpmState *s, tpmBuffer *buffer, uint8_t locty, char *msg)
     buffer->instance[0] &= 0x1f;
     buffer->instance[0] |= (locty << 5);
 
-    len = vTPMTransmit[s->Transmitlayer].write(s, buffer);
+    len = vTPMTransmit[s->Transmitlayer].write_fn(s, buffer);
     if (len < 0) {
         s->Transmitlayer = -1;
     }
@@ -990,7 +990,7 @@ static int TPM_Receive(tpmState *s, tpmBuffer *buffer)
 {
     int off;
 
-    off = vTPMTransmit[s->Transmitlayer].read(s, buffer);
+    off = vTPMTransmit[s->Transmitlayer].read_fn(s, buffer);
 
     if (off < 0) {
         /* EAGAIN is set in errno due to non-blocking mode */
