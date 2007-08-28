@@ -725,7 +725,8 @@ def configure_hvm(config_image, vals):
     for a in args:
         if a in vals.__dict__ and vals.__dict__[a] is not None:
             config_image.append([a, vals.__dict__[a]])
-    config_image.append(['vncpasswd', vals.vncpasswd])
+    if vals.vncpasswd is not None:
+        config_image.append(['vncpasswd', vals.vncpasswd])
 
 
 def make_config(vals):
