@@ -17,6 +17,7 @@
  *
  * Authors: Hollis Blanchard <hollisb@us.ibm.com>
  *          Tristan Gingold <tristan.gingold@bull.net>
+ *          Isaku Yamahata <yamahata@valinux.co.jp> multiple page support
  */
 
 #include <xen/config.h>
@@ -82,10 +83,11 @@ xencomm_desc_cross_page_boundary(unsigned long paddr)
 }
 
 struct xencomm_ctxt {
-    struct xencomm_desc *desc;
-
+    struct xencomm_desc __user *desc_in_paddr;
     uint32_t nr_addrs;
+
     struct page_info *page;
+    unsigned long *address;
 };
 
 static uint32_t
@@ -95,21 +97,9 @@ xencomm_ctxt_nr_addrs(const struct xencomm_ctxt *ctxt)
 }
 
 static unsigned long*
-xencomm_ctxt_address(struct xencomm_ctxt *ctxt, int i)
+xencomm_ctxt_address(struct xencomm_ctxt *ctxt)
 {
-    return &ctxt->desc->address[i];
-}
-
-/* check if struct xencomm_desc and address array cross page boundary */
-static int
-xencomm_ctxt_cross_page_boundary(struct xencomm_ctxt *ctxt)
-{
-    unsigned long saddr = (unsigned long)ctxt->desc;
-    unsigned long eaddr =
-        (unsigned long)&ctxt->desc->address[ctxt->nr_addrs] - 1;
-    if ( (saddr >> PAGE_SHIFT) != (eaddr >> PAGE_SHIFT) )
-        return 1;
-    return 0;
+    return ctxt->address;
 }
 
 static int
@@ -138,16 +128,40 @@ xencomm_ctxt_init(const void* handle, struct xencomm_ctxt *ctxt)
         return -EINVAL;
     }
 
-    ctxt->desc = desc;
     ctxt->nr_addrs = desc->nr_addrs; /* copy before use.
                                       * It is possible for a guest domain to
                                       * modify concurrently.
                                       */
+    ctxt->desc_in_paddr = (struct xencomm_desc*)handle;
     ctxt->page = page;
-    if ( xencomm_ctxt_cross_page_boundary(ctxt) )
+    ctxt->address = &desc->address[0];
+    return 0;
+}
+
+static int
+xencomm_ctxt_next(struct xencomm_ctxt *ctxt, int i)
+{
+    BUG_ON(i >= ctxt->nr_addrs);
+    /* in i == 0 case, we already calculated in xecomm_addr_init() */
+    if ( i != 0 )
+        ctxt->address++;
+    
+    /* When crossing page boundary, machine address must be calculated. */
+    if ( ((unsigned long)ctxt->address & ~PAGE_MASK) == 0 )
     {
-        put_page(page);
-        return -EINVAL;
+        unsigned long paddr =
+            (unsigned long)&(ctxt->desc_in_paddr->address[i]);
+        struct page_info *page;
+        int ret;
+
+        ret = xencomm_get_page(paddr, &page);
+        if ( ret == 0 )
+        {
+            put_page(ctxt->page);
+            ctxt->page = page;
+            ctxt->address = xencomm_vaddr(paddr, page);
+        }
+        return ret;
     }
     return 0;
 }
@@ -238,9 +252,12 @@ xencomm_copy_from_guest(
     /* Iterate through the descriptor, copying up to a page at a time */
     while ( (to_pos < n) && (i < xencomm_ctxt_nr_addrs(&ctxt)) )
     {
-        unsigned long src_paddr = *xencomm_ctxt_address(&ctxt, i);
+        unsigned long src_paddr;
         unsigned int pgoffset, chunksz, chunk_skip;
 
+        if ( xencomm_ctxt_next(&ctxt, i) )
+            goto out;
+        src_paddr = *xencomm_ctxt_address(&ctxt);
         if ( src_paddr == XENCOMM_INVALID )
         {
             i++;
@@ -354,9 +371,12 @@ xencomm_copy_to_guest(
     /* Iterate through the descriptor, copying up to a page at a time */
     while ( (from_pos < n) && (i < xencomm_ctxt_nr_addrs(&ctxt)) )
     {
-        unsigned long dest_paddr = *xencomm_ctxt_address(&ctxt, i);
+        unsigned long dest_paddr;
         unsigned int pgoffset, chunksz, chunk_skip;
 
+        if ( xencomm_ctxt_next(&ctxt, i) )
+            goto out;
+        dest_paddr = *xencomm_ctxt_address(&ctxt);
         if ( dest_paddr == XENCOMM_INVALID )
         {
             i++;
@@ -402,22 +422,27 @@ int xencomm_add_offset(void **handle, unsigned int bytes)
 {
     struct xencomm_ctxt ctxt;
     int i = 0;
+    int res = 0;
 
     if ( xencomm_is_inline(*handle) )
         return xencomm_inline_add_offset(handle, bytes);
 
-    if ( xencomm_ctxt_init(handle, &ctxt) )
-        return -1;
+    res = xencomm_ctxt_init(handle, &ctxt);
+    if ( res != 0 )
+        return res;
 
     /* Iterate through the descriptor incrementing addresses */
     while ( (bytes > 0) && (i < xencomm_ctxt_nr_addrs(&ctxt)) )
     {
-        unsigned long *address = xencomm_ctxt_address(&ctxt, i);
-        unsigned long dest_paddr = *address;
-        unsigned int pgoffset;
-        unsigned int chunksz;
-        unsigned int chunk_skip;
+        unsigned long *address;
+        unsigned long dest_paddr;
+        unsigned int pgoffset, chunksz, chunk_skip;
 
+        res = xencomm_ctxt_next(&ctxt, i);
+        if ( res )
+            goto out;
+        address = xencomm_ctxt_address(&ctxt);
+        dest_paddr = *address;
         if ( dest_paddr == XENCOMM_INVALID )
         {
             i++;
@@ -436,8 +461,10 @@ int xencomm_add_offset(void **handle, unsigned int bytes)
 
         i++;
     }
+
+out:
     xencomm_ctxt_done(&ctxt);
-    return 0;
+    return res;
 }
 
 int xencomm_handle_is_null(void *handle)
@@ -454,7 +481,9 @@ int xencomm_handle_is_null(void *handle)
 
     for ( i = 0; i < xencomm_ctxt_nr_addrs(&ctxt); i++ )
     {
-        if ( *xencomm_ctxt_address(&ctxt, i) != XENCOMM_INVALID )
+        if ( xencomm_ctxt_next(&ctxt, i) )
+            goto out;
+        if ( *xencomm_ctxt_address(&ctxt) != XENCOMM_INVALID )
         {
             res = 0;
             goto out;
