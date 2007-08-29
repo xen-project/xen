@@ -2314,6 +2314,7 @@ static int vmx_do_msr_read(struct cpu_user_regs *regs)
         break;
     case MSR_IA32_VMX_BASIC...MSR_IA32_VMX_PROCBASED_CTLS2:
         goto gp_fault;
+    case MSR_IA32_MCG_CAP:
     case MSR_IA32_MCG_STATUS:
     case MSR_IA32_MC0_STATUS:
     case MSR_K8_MC1_STATUS:
