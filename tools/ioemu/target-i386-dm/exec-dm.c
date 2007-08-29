@@ -470,6 +470,12 @@ static void memcpy_words(void *dst, void *src, size_t n)
 #else
 static void memcpy_words(void *dst, void *src, size_t n)
 {
+    /* Some architectures do not like unaligned accesses. */
+    if (((unsigned long)dst | (unsigned long)src) & 3) {
+        memcpy(dst, src, n);
+        return;
+    }
+
     while (n >= sizeof(uint32_t)) {
         *((uint32_t *)dst) = *((uint32_t *)src);
         dst = ((uint32_t *)dst) + 1;
