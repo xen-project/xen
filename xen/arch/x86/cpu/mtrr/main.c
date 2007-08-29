@@ -539,14 +539,12 @@ EXPORT_SYMBOL(mtrr_del);
  */
 extern void amd_init_mtrr(void);
 extern void cyrix_init_mtrr(void);
-extern void centaur_init_mtrr(void);
 
 static void __init init_ifs(void)
 {
 #ifndef CONFIG_X86_64
 	amd_init_mtrr();
 	cyrix_init_mtrr();
-	centaur_init_mtrr();
 #endif
 }
 
@@ -605,13 +603,6 @@ void __init mtrr_bp_init(void)
 			if (cpu_has_k6_mtrr) {
 				/* Pre-Athlon (K6) AMD CPU MTRRs */
 				mtrr_if = mtrr_ops[X86_VENDOR_AMD];
-				size_or_mask = 0xfff00000;	/* 32 bits */
-				size_and_mask = 0;
-			}
-			break;
-		case X86_VENDOR_CENTAUR:
-			if (cpu_has_centaur_mcr) {
-				mtrr_if = mtrr_ops[X86_VENDOR_CENTAUR];
 				size_or_mask = 0xfff00000;	/* 32 bits */
 				size_and_mask = 0;
 			}

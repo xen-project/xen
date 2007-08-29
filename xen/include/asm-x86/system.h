@@ -253,40 +253,14 @@ static always_inline unsigned long long __cmpxchg8b(
 })
 #endif
 
-/*
- * Force strict CPU ordering.
- * And yes, this is required on UP too when we're talking
- * to devices.
- *
- * For now, "wmb()" doesn't actually do anything, as all
- * Intel CPU's follow what Intel calls a *Processor Order*,
- * in which all writes are seen in the program order even
- * outside the CPU.
- *
- * I expect future Intel CPU's to have a weaker ordering,
- * but I'd also expect them to finally get their act together
- * and add some real memory barriers if so.
- *
- * Some non intel clones support out of order store. wmb() ceases to be a
- * nop for these.
- */
 #if defined(__i386__)
 #define mb() 	__asm__ __volatile__ ("lock; addl $0,0(%%esp)": : :"memory")
 #define rmb()	__asm__ __volatile__ ("lock; addl $0,0(%%esp)": : :"memory")
-#ifdef CONFIG_X86_OOSTORE
-#define wmb() 	__asm__ __volatile__ ("lock; addl $0,0(%%esp)": : :"memory")
-#endif
 #elif defined(__x86_64__)
 #define mb()    __asm__ __volatile__ ("mfence":::"memory")
 #define rmb()   __asm__ __volatile__ ("lfence":::"memory")
-#ifdef CONFIG_X86_OOSTORE
-#define wmb()   __asm__ __volatile__ ("sfence":::"memory")
 #endif
-#endif
-
-#ifndef CONFIG_X86_OOSTORE
 #define wmb()	__asm__ __volatile__ ("": : :"memory")
-#endif
 
 #ifdef CONFIG_SMP
 #define smp_mb()	mb()
