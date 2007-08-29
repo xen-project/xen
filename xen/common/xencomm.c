@@ -138,6 +138,22 @@ xencomm_ctxt_init(const void *handle, struct xencomm_ctxt *ctxt)
     return 0;
 }
 
+/*
+ * Calculate the vaddr of &ctxt->desc_in_paddr->address[i] and get_page().
+ * And put the results in ctxt->page and ctxt->address.
+ * If there is the previous page, put_page().
+ *
+ * A guest domain passes the array, ctxt->desc_in_paddr->address[].
+ * It is gpaddr-contiguous, but not maddr-contiguous so that
+ * we can't obtain the vaddr by simple offsetting.
+ * We need to convert gpaddr, &ctxt->desc_in_paddr->address[i],
+ * into maddr and then convert it to the xen virtual address in order
+ * to access there.
+ * The conversion can be optimized out by using the last result of
+ * ctxt->address because we access the array sequentially.
+ * The conversion, gpaddr -> maddr -> vaddr, is necessary only when
+ * crossing page boundary.
+ */
 static int
 xencomm_ctxt_next(struct xencomm_ctxt *ctxt, int i)
 {
@@ -147,7 +163,7 @@ xencomm_ctxt_next(struct xencomm_ctxt *ctxt, int i)
 
     BUG_ON(i >= ctxt->nr_addrs);
 
-    /* In i == 0 case, we already calculated in xecomm_addr_init(). */
+    /* For i == 0 case we already calculated it in xencomm_ctxt_init(). */
     if ( i != 0 )
         ctxt->address++;
 
