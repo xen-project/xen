@@ -34,12 +34,6 @@ void cmdline_parse(char *cmdline)
     if ( p == NULL )
         return;
 
-    /* Skip whitespace and the image name. */
-    while ( *p == ' ' )
-        p++;
-    if ( (p = strchr(p, ' ')) == NULL )
-        return;
-
     for ( ; ; )
     {
         /* Skip whitespace. */

@@ -429,10 +429,22 @@ void init_done(void)
     startup_cpu_idle_loop();
 }
 
+static char * __init cmdline_cook(char *p)
+{
+    p = p ? : "";
+    while ( *p == ' ' )
+        p++;
+    while ( (*p != ' ') && (*p != '\0') )
+        p++;
+    while ( *p == ' ' )
+        p++;
+    return p;
+}
+
 void __init __start_xen(unsigned long mbi_p)
 {
     char *memmap_type = NULL;
-    char __cmdline[] = "", *cmdline = __cmdline, *kextra;
+    char *cmdline, *kextra;
     unsigned long _initrd_start = 0, _initrd_len = 0;
     unsigned int initrdidx = 1;
     char *_policy_start = NULL;
@@ -451,8 +463,8 @@ void __init __start_xen(unsigned long mbi_p)
     set_intr_gate(TRAP_page_fault, &early_page_fault);
 
     /* Parse the command-line options. */
-    if ( (mbi->flags & MBI_CMDLINE) && (mbi->cmdline != 0) )
-        cmdline = __va(mbi->cmdline);
+    cmdline = cmdline_cook((mbi->flags & MBI_CMDLINE) ?
+                           __va(mbi->cmdline) : NULL);
     if ( (kextra = strstr(cmdline, " -- ")) != NULL )
     {
         /*
@@ -1037,18 +1049,8 @@ void __init __start_xen(unsigned long mbi_p)
     {
         static char dom0_cmdline[MAX_GUEST_CMDLINE];
 
-        dom0_cmdline[0] = '\0';
-
-        if ( cmdline != NULL )
-        {
-            /* Skip past the image name and copy to a local buffer. */
-            while ( *cmdline == ' ' ) cmdline++;
-            if ( (cmdline = strchr(cmdline, ' ')) != NULL )
-            {
-                while ( *cmdline == ' ' ) cmdline++;
-                safe_strcpy(dom0_cmdline, cmdline);
-            }
-        }
+        cmdline = cmdline_cook(cmdline);
+        safe_strcpy(dom0_cmdline, cmdline);
 
         if ( kextra != NULL )
             /* kextra always includes exactly one leading space. */
