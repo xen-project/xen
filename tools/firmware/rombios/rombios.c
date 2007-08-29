@@ -1057,7 +1057,7 @@ static char CVSID[] = "$Id: rombios.c,v 1.138 2005/05/07 15:55:26 vruppert Exp $
 #define UNSUPPORTED_FUNCTION 0x86
 
 #define none 0
-#define MAX_SCAN_CODE 0x53
+#define MAX_SCAN_CODE 0x58
 
 static struct {
   Bit16u normal;
@@ -1149,7 +1149,12 @@ static struct {
       { 0x5000, 0x5032,   none,   none, 0x20 }, /* 2 Down */
       { 0x5100, 0x5133, 0x7600,   none, 0x20 }, /* 3 PgDn */
       { 0x5200, 0x5230,   none,   none, 0x20 }, /* 0 Ins */
-      { 0x5300, 0x532e,   none,   none, 0x20 }  /* Del */
+      { 0x5300, 0x532e,   none,   none, 0x20 }, /* Del */
+      {   none,   none,   none,   none, none }, /* ??? */
+      {   none,   none,   none,   none, none }, /* ??? */
+      {   none,   none,   none,   none, none }, /* ??? */
+      { 0x8500, 0x8700, 0x8900, 0x8b00, none }, /* F11 */
+      { 0x8600, 0x8800, 0x8a00, 0x8c00, none }, /* F12 */
       };
 
   Bit8u
@@ -4682,7 +4687,7 @@ int09_function(DI, SI, BP, SP, BX, DX, CX, AX)
     default:
       if (scancode & 0x80) return; /* toss key releases ... */
       if (scancode > MAX_SCAN_CODE) {
-        BX_INFO("KBD: int09h_handler(): unknown scancode read!\n");
+        BX_INFO("KBD: int09h_handler(): unknown scancode (%x) read!\n", scancode);
         return;
         }
       if (shift_flags & 0x08) { /* ALT */
