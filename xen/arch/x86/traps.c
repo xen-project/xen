@@ -1673,12 +1673,11 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
                 goto fail;
             break;
 
-        case 4:
+        case 4: /* Write CR4 */
             if ( *reg != (read_cr4() & ~(X86_CR4_PGE|X86_CR4_PSE)) )
-            {
-                gdprintk(XENLOG_WARNING, "Attempt to change CR4 flags.\n");
-                goto fail;
-            }
+                gdprintk(XENLOG_WARNING,
+                         "Attempt to change CR4 flags %08lx -> %08lx\n",
+                         read_cr4() & ~(X86_CR4_PGE|X86_CR4_PSE), *reg);
             break;
 
         default:
