@@ -1876,6 +1876,9 @@ static void ide_ioport_write(void *opaque, uint32_t addr, uint32_t val)
                 break;
             case 0xaa: /* read look-ahead enable */
             case 0x55: /* read look-ahead disable */
+            case 0x42: /* EN_AAM: enable Automatic Acoustic Mode */
+            case 0xc2: /* DIS_AAM: disable Automatic Acoustic Mode */
+            case 0x85: /* DIS_APM: disable APM */
                 s->status = READY_STAT | SEEK_STAT;
                 ide_set_irq(s);
                 break;
@@ -1914,8 +1917,15 @@ static void ide_ioport_write(void *opaque, uint32_t addr, uint32_t val)
 	    s->status = READY_STAT;
             ide_set_irq(s);
             break;
-	case WIN_STANDBYNOW1:
         case WIN_IDLEIMMEDIATE:
+        case WIN_STANDBY:
+        case WIN_SETIDLE1:
+        case WIN_STANDBYNOW1:
+        case WIN_SLEEPNOW1:
+        case WIN_STANDBY2:
+        case WIN_SETIDLE2:
+        case WIN_STANDBYNOW2:
+        case WIN_SLEEPNOW2:
 	    s->status = READY_STAT;
             ide_set_irq(s);
             break;
