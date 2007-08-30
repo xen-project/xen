@@ -41,7 +41,8 @@ static void __init print_e820_memory_map(struct e820entry *map, int entries)
                (unsigned long long)(map[i].addr),
                (unsigned long long)(map[i].addr + map[i].size));
         switch (map[i].type) {
-        case E820_RAM:	printk("(usable)\n");
+        case E820_RAM:
+            printk("(usable)\n");
             break;
         case E820_RESERVED:
             printk("(reserved)\n");
@@ -52,7 +53,11 @@ static void __init print_e820_memory_map(struct e820entry *map, int entries)
         case E820_NVS:
             printk("(ACPI NVS)\n");
             break;
-        default:	printk("type %u\n", map[i].type);
+        case E820_UNUSABLE:
+            printk("(unusable)\n");
+            break;
+        default:
+            printk("type %u\n", map[i].type);
             break;
         }
     }

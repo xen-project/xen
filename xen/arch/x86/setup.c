@@ -610,8 +610,7 @@ void __init __start_xen(unsigned long mbi_p)
                 ((u64)map->base_addr_high << 32) | (u64)map->base_addr_low;
             e820_raw[e820_raw_nr].size = 
                 ((u64)map->length_high << 32) | (u64)map->length_low;
-            e820_raw[e820_raw_nr].type = 
-                (map->type > E820_NVS) ? E820_RESERVED : map->type;
+            e820_raw[e820_raw_nr].type = map->type;
             e820_raw_nr++;
 
             bytes += map->size + 4;

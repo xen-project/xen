@@ -213,7 +213,9 @@ void __init arch_init_memory(void)
     /* Any areas not specified as RAM by the e820 map are considered I/O. */
     for ( i = 0, pfn = 0; pfn < max_page; i++ )
     {
-        while ( (i < e820.nr_map) && (e820.map[i].type != E820_RAM) )
+        while ( (i < e820.nr_map) &&
+                (e820.map[i].type != E820_RAM) &&
+                (e820.map[i].type != E820_UNUSABLE) )
             i++;
 
         if ( i >= e820.nr_map )
