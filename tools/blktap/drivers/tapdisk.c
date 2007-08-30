@@ -863,11 +863,7 @@ int main(int argc, char *argv[])
 	ptr = fd_start;
 	while (ptr != NULL) {
 		s = ptr->s;
-
 		unmap_disk(s);
-		free(s->blkif);
-		free(s->ring_info);
-		free(s);
 		close(ptr->tap_fd);
 		ptr = ptr->next;
 	}
