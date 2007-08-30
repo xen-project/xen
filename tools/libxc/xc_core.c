@@ -231,6 +231,35 @@ xc_core_shdr_set(Elf64_Shdr *shdr,
     return 0;
 }
 
+static void
+xc_core_ehdr_init(Elf64_Ehdr *ehdr)
+{
+    memset(ehdr, 0, sizeof(*ehdr));
+    ehdr->e_ident[EI_MAG0] = ELFMAG0;
+    ehdr->e_ident[EI_MAG1] = ELFMAG1;
+    ehdr->e_ident[EI_MAG2] = ELFMAG2;
+    ehdr->e_ident[EI_MAG3] = ELFMAG3;
+    ehdr->e_ident[EI_CLASS] = ELFCLASS64;
+    ehdr->e_ident[EI_DATA] = ELF_ARCH_DATA;
+    ehdr->e_ident[EI_VERSION] = EV_CURRENT;
+    ehdr->e_ident[EI_OSABI] = ELFOSABI_SYSV;
+    ehdr->e_ident[EI_ABIVERSION] = EV_CURRENT;
+
+    ehdr->e_type = ET_CORE;
+    ehdr->e_machine = ELF_ARCH_MACHINE;
+    ehdr->e_version = EV_CURRENT;
+    ehdr->e_entry = 0;
+    ehdr->e_phoff = 0;
+    ehdr->e_shoff = sizeof(*ehdr);
+    ehdr->e_flags = ELF_CORE_EFLAGS;
+    ehdr->e_ehsize = sizeof(*ehdr);
+    ehdr->e_phentsize = sizeof(Elf64_Phdr);
+    ehdr->e_phnum = 0;
+    ehdr->e_shentsize = sizeof(Elf64_Shdr);
+    /* ehdr->e_shnum and ehdr->e_shstrndx aren't known here yet.
+     * fill it later */
+}
+
 static int
 elfnote_fill_xen_version(int xc_handle,
                          struct xen_dumpcore_elfnote_xen_version_desc
@@ -277,12 +306,100 @@ elfnote_fill_xen_version(int xc_handle,
     return 0;
 }
 
-static int
+static void
 elfnote_fill_format_version(struct xen_dumpcore_elfnote_format_version_desc
                             *format_version)
 {
     format_version->version = XEN_DUMPCORE_FORMAT_VERSION_CURRENT;
-    return 0;
+}
+
+static void
+elfnote_init(struct elfnote *elfnote)
+{
+    /* elf note section */
+    memset(elfnote, 0, sizeof(*elfnote));
+    elfnote->namesz = strlen(XEN_DUMPCORE_ELFNOTE_NAME) + 1;
+    strncpy(elfnote->name, XEN_DUMPCORE_ELFNOTE_NAME, sizeof(elfnote->name));
+}
+
+static int
+elfnote_dump_none(void *args, dumpcore_rtn_t dump_rtn)
+{
+    int sts;
+    struct elfnote elfnote;
+    struct xen_dumpcore_elfnote_none_desc none;
+
+    elfnote_init(&elfnote);
+    memset(&none, 0, sizeof(none));
+
+    elfnote.descsz = sizeof(none);
+    elfnote.type = XEN_ELFNOTE_DUMPCORE_NONE;
+    sts = dump_rtn(args, (char*)&elfnote, sizeof(elfnote));
+    if ( sts != 0 )
+        return sts;
+    return dump_rtn(args, (char*)&none, sizeof(none));
+}
+
+static int
+elfnote_dump_core_header(
+    void *args, dumpcore_rtn_t dump_rtn, const xc_dominfo_t *info,
+    int nr_vcpus, unsigned long nr_pages)
+{
+    int sts;
+    struct elfnote elfnote;
+    struct xen_dumpcore_elfnote_header_desc header;
+    
+    elfnote_init(&elfnote);
+    memset(&header, 0, sizeof(header));
+    
+    elfnote.descsz = sizeof(header);
+    elfnote.type = XEN_ELFNOTE_DUMPCORE_HEADER;
+    header.xch_magic = info->hvm ? XC_CORE_MAGIC_HVM : XC_CORE_MAGIC;
+    header.xch_nr_vcpus = nr_vcpus;
+    header.xch_nr_pages = nr_pages;
+    header.xch_page_size = PAGE_SIZE;
+    sts = dump_rtn(args, (char*)&elfnote, sizeof(elfnote));
+    if ( sts != 0 )
+        return sts;
+    return dump_rtn(args, (char*)&header, sizeof(header));
+}
+
+static int
+elfnote_dump_xen_version(void *args, dumpcore_rtn_t dump_rtn, int xc_handle)
+{
+    int sts;
+    struct elfnote elfnote;
+    struct xen_dumpcore_elfnote_xen_version_desc xen_version;
+
+    elfnote_init(&elfnote);
+    memset(&xen_version, 0, sizeof(xen_version));
+
+    elfnote.descsz = sizeof(xen_version);
+    elfnote.type = XEN_ELFNOTE_DUMPCORE_XEN_VERSION;
+    elfnote_fill_xen_version(xc_handle, &xen_version);
+    sts = dump_rtn(args, (char*)&elfnote, sizeof(elfnote));
+    if ( sts != 0 )
+        return sts;
+    return dump_rtn(args, (char*)&xen_version, sizeof(xen_version));
+}
+
+static int
+elfnote_dump_format_version(void *args, dumpcore_rtn_t dump_rtn)
+{
+    int sts;
+    struct elfnote elfnote;
+    struct xen_dumpcore_elfnote_format_version_desc format_version;
+
+    elfnote_init(&elfnote);
+    memset(&format_version, 0, sizeof(format_version));
+    
+    elfnote.descsz = sizeof(format_version);
+    elfnote.type = XEN_ELFNOTE_DUMPCORE_FORMAT_VERSION;
+    elfnote_fill_format_version(&format_version);
+    sts = dump_rtn(args, (char*)&elfnote, sizeof(elfnote));
+    if ( sts != 0 )
+        return sts;
+    return dump_rtn(args, (char*)&format_version, sizeof(format_version));
 }
 
 int
@@ -326,13 +443,6 @@ xc_domain_dumpcore_via_callback(int xc_handle,
     uint16_t strtab_idx;
     struct xc_core_section_headers *sheaders = NULL;
     Elf64_Shdr *shdr;
-
-    /* elf notes */
-    struct elfnote elfnote;
-    struct xen_dumpcore_elfnote_none_desc none;
-    struct xen_dumpcore_elfnote_header_desc header;
-    struct xen_dumpcore_elfnote_xen_version_desc xen_version;
-    struct xen_dumpcore_elfnote_format_version_desc format_version;
 
     xc_core_arch_context_init(&arch_ctxt);
     if ( (dump_mem_start = malloc(DUMP_INCREMENT*PAGE_SIZE)) == NULL )
@@ -451,29 +561,8 @@ xc_domain_dumpcore_via_callback(int xc_handle,
         nr_pages = j;
     }
 
-    memset(&ehdr, 0, sizeof(ehdr));
-    ehdr.e_ident[EI_MAG0] = ELFMAG0;
-    ehdr.e_ident[EI_MAG1] = ELFMAG1;
-    ehdr.e_ident[EI_MAG2] = ELFMAG2;
-    ehdr.e_ident[EI_MAG3] = ELFMAG3;
-    ehdr.e_ident[EI_CLASS] = ELFCLASS64;
-    ehdr.e_ident[EI_DATA] = ELF_ARCH_DATA;
-    ehdr.e_ident[EI_VERSION] = EV_CURRENT;
-    ehdr.e_ident[EI_OSABI] = ELFOSABI_SYSV;
-    ehdr.e_ident[EI_ABIVERSION] = EV_CURRENT;
-
-    ehdr.e_type = ET_CORE;
-    ehdr.e_machine = ELF_ARCH_MACHINE;
-    ehdr.e_version = EV_CURRENT;
-    ehdr.e_entry = 0;
-    ehdr.e_phoff = 0;
-    ehdr.e_shoff = sizeof(ehdr);
-    ehdr.e_flags = ELF_CORE_EFLAGS;
-    ehdr.e_ehsize = sizeof(ehdr);
-    ehdr.e_phentsize = sizeof(Elf64_Phdr);
-    ehdr.e_phnum = 0;
-    ehdr.e_shentsize = sizeof(Elf64_Shdr);
     /* ehdr.e_shnum and ehdr.e_shstrndx aren't known here yet. fill it later*/
+    xc_core_ehdr_init(&ehdr);
 
     /* create section header */
     strtab = xc_core_strtab_init();
@@ -549,7 +638,7 @@ xc_domain_dumpcore_via_callback(int xc_handle,
     /* arch context */
     sts = xc_core_arch_context_get_shdr(&arch_ctxt, sheaders, strtab,
                                         &filesz, offset);
-    if ( sts != 0)
+    if ( sts != 0 )
         goto out;
     offset += filesz;
 
@@ -645,54 +734,23 @@ xc_domain_dumpcore_via_callback(int xc_handle,
     if ( sts != 0 )
         goto out;
 
-    /* elf note section */
-    memset(&elfnote, 0, sizeof(elfnote));
-    elfnote.namesz = strlen(XEN_DUMPCORE_ELFNOTE_NAME) + 1;
-    strncpy(elfnote.name, XEN_DUMPCORE_ELFNOTE_NAME, sizeof(elfnote.name));
-
-    /* elf note section:xen core header */
-    elfnote.descsz = sizeof(none);
-    elfnote.type = XEN_ELFNOTE_DUMPCORE_NONE;
-    sts = dump_rtn(args, (char*)&elfnote, sizeof(elfnote));
-    if ( sts != 0 )
-        goto out;
-    sts = dump_rtn(args, (char*)&none, sizeof(none));
-    if ( sts != 0 )
+    /* elf note section: xen core header */
+    sts = elfnote_dump_none(args, dump_rtn);
+    if ( sts != 0)
         goto out;
 
-    /* elf note section:xen core header */
-    elfnote.descsz = sizeof(header);
-    elfnote.type = XEN_ELFNOTE_DUMPCORE_HEADER;
-    header.xch_magic = info.hvm ? XC_CORE_MAGIC_HVM : XC_CORE_MAGIC;
-    header.xch_nr_vcpus = nr_vcpus;
-    header.xch_nr_pages = nr_pages;
-    header.xch_page_size = PAGE_SIZE;
-    sts = dump_rtn(args, (char*)&elfnote, sizeof(elfnote));
-    if ( sts != 0 )
-        goto out;
-    sts = dump_rtn(args, (char*)&header, sizeof(header));
+    /* elf note section: xen core header */
+    sts = elfnote_dump_core_header(args, dump_rtn, &info, nr_vcpus, nr_pages);
     if ( sts != 0 )
         goto out;
 
     /* elf note section: xen version */
-    elfnote.descsz = sizeof(xen_version);
-    elfnote.type = XEN_ELFNOTE_DUMPCORE_XEN_VERSION;
-    elfnote_fill_xen_version(xc_handle, &xen_version);
-    sts = dump_rtn(args, (char*)&elfnote, sizeof(elfnote));
-    if ( sts != 0 )
-        goto out;
-    sts = dump_rtn(args, (char*)&xen_version, sizeof(xen_version));
+    sts = elfnote_dump_xen_version(args, dump_rtn, xc_handle);
     if ( sts != 0 )
         goto out;
 
     /* elf note section: format version */
-    elfnote.descsz = sizeof(format_version);
-    elfnote.type = XEN_ELFNOTE_DUMPCORE_FORMAT_VERSION;
-    elfnote_fill_format_version(&format_version);
-    sts = dump_rtn(args, (char*)&elfnote, sizeof(elfnote));
-    if ( sts != 0 )
-        goto out;
-    sts = dump_rtn(args, (char*)&format_version, sizeof(format_version));
+    sts = elfnote_dump_format_version(args, dump_rtn);
     if ( sts != 0 )
         goto out;
 
