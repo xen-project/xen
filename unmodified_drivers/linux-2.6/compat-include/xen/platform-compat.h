@@ -108,8 +108,8 @@ extern char *kasprintf(gfp_t gfp, const char *fmt, ...)
 #endif
 
 #if defined(_LINUX_NETDEVICE_H) && LINUX_VERSION_CODE < KERNEL_VERSION(2,6,18)
-#define netif_tx_lock_bh(dev) (spin_lock_bh(&(dev)->xmit_lock))
-#define netif_tx_unlock_bh(dev) (spin_unlock_bh(&(dev)->xmit_lock))
+#define netif_tx_lock_bh(dev) spin_lock_bh(&(dev)->xmit_lock)
+#define netif_tx_unlock_bh(dev) spin_unlock_bh(&(dev)->xmit_lock)
 #endif
 
 #if defined(__LINUX_SEQLOCK_H) && !defined(DEFINE_SEQLOCK)
