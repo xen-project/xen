@@ -122,8 +122,11 @@ static inline void wrmsrl(unsigned int msr, __u64 val)
 #define MSR_IA32_VMX_CR4_FIXED1                 0x489
 #define MSR_IA32_VMX_PROCBASED_CTLS2            0x48b
 #define IA32_FEATURE_CONTROL_MSR                0x3a
-#define IA32_FEATURE_CONTROL_MSR_LOCK           0x1
-#define IA32_FEATURE_CONTROL_MSR_ENABLE_VMXON   0x4
+#define IA32_FEATURE_CONTROL_MSR_LOCK                     0x0001
+#define IA32_FEATURE_CONTROL_MSR_ENABLE_VMXON_INSIDE_SMX  0x0002
+#define IA32_FEATURE_CONTROL_MSR_ENABLE_VMXON_OUTSIDE_SMX 0x0004
+#define IA32_FEATURE_CONTROL_MSR_SENTER_PARAM_CTL         0x7f00
+#define IA32_FEATURE_CONTROL_MSR_ENABLE_SENTER            0x8000
 
 /* AMD/K8 specific MSRs */ 
 #define MSR_EFER 0xc0000080		/* extended feature register */

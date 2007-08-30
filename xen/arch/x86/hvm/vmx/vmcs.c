@@ -262,17 +262,19 @@ int vmx_cpu_up(void)
 
     if ( eax & IA32_FEATURE_CONTROL_MSR_LOCK )
     {
-        if ( !(eax & IA32_FEATURE_CONTROL_MSR_ENABLE_VMXON) )
+        if ( !(eax & (IA32_FEATURE_CONTROL_MSR_ENABLE_VMXON_OUTSIDE_SMX |
+                      IA32_FEATURE_CONTROL_MSR_ENABLE_VMXON_INSIDE_SMX)) )
         {
-            printk("CPU%d: VMX disabled\n", cpu);
+            printk("CPU%d: VMX disabled by BIOS.\n", cpu);
             return 0;
         }
     }
     else
     {
-        wrmsr(IA32_FEATURE_CONTROL_MSR,
-              IA32_FEATURE_CONTROL_MSR_LOCK |
-              IA32_FEATURE_CONTROL_MSR_ENABLE_VMXON, 0);
+        eax = (IA32_FEATURE_CONTROL_MSR_LOCK |
+               IA32_FEATURE_CONTROL_MSR_ENABLE_VMXON_OUTSIDE_SMX |
+               IA32_FEATURE_CONTROL_MSR_ENABLE_VMXON_INSIDE_SMX);
+        wrmsr(IA32_FEATURE_CONTROL_MSR, eax, 0);
     }
 
     vmx_init_vmcs_config();

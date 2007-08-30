@@ -26,6 +26,7 @@
 #include <asm/desc.h>
 #include <asm/i387.h>
 #include <asm/paging.h>
+#include <asm/e820.h>
 
 #include <public/version.h>
 #include <public/libelf.h>

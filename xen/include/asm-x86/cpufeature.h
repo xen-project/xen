@@ -77,6 +77,7 @@
 #define X86_FEATURE_MWAIT	(4*32+ 3) /* Monitor/Mwait support */
 #define X86_FEATURE_DSCPL	(4*32+ 4) /* CPL Qualified Debug Store */
 #define X86_FEATURE_VMXE	(4*32+ 5) /* Virtual Machine Extensions */
+#define X86_FEATURE_SMXE	(4*32+ 6) /* Safer Mode Extensions */
 #define X86_FEATURE_EST		(4*32+ 7) /* Enhanced SpeedStep */
 #define X86_FEATURE_TM2		(4*32+ 8) /* Thermal Monitor 2 */
 #define X86_FEATURE_CID		(4*32+10) /* Context ID */
