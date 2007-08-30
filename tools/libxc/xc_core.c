@@ -474,8 +474,9 @@ xc_domain_dumpcore_via_callback(int xc_handle,
     }
 
     /* obtain memory map */
-    sts = xc_core_arch_memory_map_get(xc_handle, &info, live_shinfo,
-                                      &memory_map, &nr_memory_map);
+    sts = xc_core_arch_memory_map_get(xc_handle, &arch_ctxt, &info,
+                                      live_shinfo, &memory_map,
+                                      &nr_memory_map);
     if ( sts != 0 )
         goto out;
 
@@ -756,6 +757,9 @@ xc_domain_dumpcore_via_callback(int xc_handle,
             }
             else
             {
+                if ( !xc_core_arch_gpfn_may_present(&arch_ctxt, i) )
+                    continue;
+
                 gmfn = i;
                 pfn_array[j] = i;
             }
