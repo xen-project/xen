@@ -934,7 +934,8 @@ def resources_compatible_with_vmlabel(xspol, dominfo, vmlabel):
             access_control = dictio.dict_read("resources",
                                               res_label_filename)
         except:
-            return False
+            # No labeled resources -> must be compatible
+            return True
         return __resources_compatible_with_vmlabel(xspol, dominfo, vmlabel,
                                                    access_control)
     finally:
@@ -950,6 +951,7 @@ def __resources_compatible_with_vmlabel(xspol, dominfo, vmlabel,
         given VM label. The access_control parameter provides a
         dictionary of the resource name to resource label mappings
         under which the evaluation should be done.
+        Call this only for a paused or running domain.
     """
     def collect_labels(reslabels, s_label, polname):
         if len(s_label) != 3 or polname != s_label[1]:
@@ -1204,7 +1206,7 @@ def change_acm_policy(bin_pol, del_array, chg_array,
         access_control = {}
         try:
             access_control = dictio.dict_read("resources", res_label_filename)
-        finally:
+        except:
             pass
         for key, labeldata in access_control.items():
             if len(labeldata) == 2:
