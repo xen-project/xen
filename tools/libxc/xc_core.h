@@ -107,6 +107,8 @@ struct xen_dumpcore_elfnote_format_version {
     struct xen_dumpcore_elfnote_format_version_desc     format_version;
 };
 
+#define XC_CORE_INVALID_PFN     (~(uint64_t)0)
+#define XC_CORE_INVALID_GMFN    (~(uint64_t)0)
 struct xen_dumpcore_p2m {
     uint64_t    pfn;
     uint64_t    gmfn;
