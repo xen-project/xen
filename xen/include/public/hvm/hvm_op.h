@@ -70,4 +70,7 @@ struct xen_hvm_set_pci_link_route {
 typedef struct xen_hvm_set_pci_link_route xen_hvm_set_pci_link_route_t;
 DEFINE_XEN_GUEST_HANDLE(xen_hvm_set_pci_link_route_t);
 
+/* Flushes all VCPU TLBs: @arg must be NULL. */
+#define HVMOP_flush_tlbs          5
+
 #endif /* __XEN_PUBLIC_HVM_HVM_OP_H__ */

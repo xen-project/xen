@@ -1166,6 +1166,12 @@ static int hvmop_set_pci_link_route(
     return rc;
 }
 
+static int hvmop_flush_tlb_all(void)
+{
+    flush_tlb_mask(current->domain->domain_dirty_cpumask);
+    return 0;
+}
+
 long do_hvm_op(unsigned long op, XEN_GUEST_HANDLE(void) arg)
 
 {
@@ -1255,6 +1261,10 @@ long do_hvm_op(unsigned long op, XEN_GUEST_HANDLE(void) arg)
     case HVMOP_set_pci_link_route:
         rc = hvmop_set_pci_link_route(
             guest_handle_cast(arg, xen_hvm_set_pci_link_route_t));
+        break;
+
+    case HVMOP_flush_tlbs:
+        rc = guest_handle_is_null(arg) ? hvmop_flush_tlb_all() : -ENOSYS;
         break;
 
     default:
