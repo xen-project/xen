@@ -116,4 +116,13 @@ extern char *kasprintf(gfp_t gfp, const char *fmt, ...)
 #define DEFINE_SEQLOCK(x) seqlock_t x = SEQLOCK_UNLOCKED
 #endif
 
+/* Bug in RHEL4-U3: rw_lock_t is mistakenly defined in DEFINE_RWLOCK() macro */
+#if defined(__LINUX_SPINLOCK_H) && defined(DEFINE_RWLOCK)
+#define rw_lock_t rwlock_t
+#endif
+
+#if defined(__LINUX_SPINLOCK_H) && !defined(DEFINE_RWLOCK)
+#define DEFINE_RWLOCK(x) rwlock_t x = RW_LOCK_UNLOCKED
+#endif
+
 #endif
