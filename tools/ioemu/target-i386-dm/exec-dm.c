@@ -125,17 +125,10 @@ static int io_mem_nb = 1;
 FILE *logfile;
 int loglevel;
 
-#ifdef MAPCACHE
-pthread_mutex_t mapcache_mutex;
-#endif
-
 void cpu_exec_init(CPUState *env)
 {
     CPUState **penv;
     int cpu_index;
-#ifdef MAPCACHE
-    pthread_mutexattr_t mxattr; 
-#endif
 
     env->next_cpu = NULL;
     penv = &first_cpu;
@@ -149,14 +142,6 @@ void cpu_exec_init(CPUState *env)
 
     /* alloc dirty bits array */
     phys_ram_dirty = qemu_malloc(phys_ram_size >> TARGET_PAGE_BITS);
-
-#ifdef MAPCACHE
-    /* setup memory access mutex to protect mapcache */
-    pthread_mutexattr_init(&mxattr); 
-    pthread_mutexattr_settype(&mxattr, PTHREAD_MUTEX_RECURSIVE);
-    pthread_mutex_init(&mapcache_mutex, &mxattr); 
-    pthread_mutexattr_destroy(&mxattr); 
-#endif
 }
 
 /* enable or disable low levels log */
