@@ -18,7 +18,6 @@ struct p2m_entry;
 struct tlb_track;
 #endif
 
-extern void domain_relinquish_resources(struct domain *);
 struct vcpu;
 extern void relinquish_vcpu_resources(struct vcpu *v);
 extern void vcpu_share_privregs_with_guest(struct vcpu *v);

@@ -114,10 +114,10 @@ void getdomaininfo(struct domain *d, struct xen_domctl_getdomaininfo *info)
     info->cpu_time = cpu_time;
 
     info->flags = flags |
-        (d->is_dying                ? XEN_DOMINF_dying    : 0) |
-        (d->is_shut_down            ? XEN_DOMINF_shutdown : 0) |
-        (d->is_paused_by_controller ? XEN_DOMINF_paused   : 0) |
-        (d->debugger_attached       ? XEN_DOMINF_debugged : 0) |
+        ((d->is_dying == DOMDYING_dead) ? XEN_DOMINF_dying    : 0) |
+        (d->is_shut_down                ? XEN_DOMINF_shutdown : 0) |
+        (d->is_paused_by_controller     ? XEN_DOMINF_paused   : 0) |
+        (d->debugger_attached           ? XEN_DOMINF_debugged : 0) |
         d->shutdown_code << XEN_DOMINF_shutdownshift;
 
     if ( is_hvm_domain(d) )
@@ -422,18 +422,7 @@ long do_domctl(XEN_GUEST_HANDLE(xen_domctl_t) u_domctl)
         ret = -ESRCH;
         if ( d != NULL )
         {
-            ret = xsm_destroydomain(d);
-            if ( ret )
-                goto destroydomain_out;
-
-            ret = -EINVAL;
-            if ( d != current->domain )
-            {
-                domain_kill(d);
-                ret = 0;
-            }
-
-        destroydomain_out:
+            ret = xsm_destroydomain(d) ? : domain_kill(d);
             rcu_unlock_domain(d);
         }
     }

@@ -194,7 +194,7 @@ struct domain
     /* Are any VCPUs polling event channels (SCHEDOP_poll)? */
     bool_t           is_polling;
     /* Is this guest dying (i.e., a zombie)? */
-    bool_t           is_dying;
+    enum { DOMDYING_alive, DOMDYING_dying, DOMDYING_dead } is_dying;
     /* Domain is paused by controller software? */
     bool_t           is_paused_by_controller;
 
@@ -338,7 +338,7 @@ static inline struct domain *rcu_lock_current_domain(void)
 
 struct domain *get_domain_by_id(domid_t dom);
 void domain_destroy(struct domain *d);
-void domain_kill(struct domain *d);
+int domain_kill(struct domain *d);
 void domain_shutdown(struct domain *d, u8 reason);
 void domain_resume(struct domain *d);
 void domain_pause_for_debugger(void);

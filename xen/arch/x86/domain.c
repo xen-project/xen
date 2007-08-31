@@ -1717,7 +1717,7 @@ static void vcpu_destroy_pagetables(struct vcpu *v)
     v->arch.cr3 = 0;
 }
 
-void domain_relinquish_resources(struct domain *d)
+int domain_relinquish_resources(struct domain *d)
 {
     struct vcpu *v;
 
@@ -1754,6 +1754,8 @@ void domain_relinquish_resources(struct domain *d)
 
     if ( is_hvm_domain(d) )
         hvm_domain_relinquish_resources(d);
+
+    return 0;
 }
 
 void arch_dump_domain_info(struct domain *d)

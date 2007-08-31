@@ -936,7 +936,7 @@ static void relinquish_memory(struct domain *d, struct list_head *list)
     spin_unlock_recursive(&d->page_alloc_lock);
 }
 
-void domain_relinquish_resources(struct domain *d)
+int domain_relinquish_resources(struct domain *d)
 {
     /* Relinquish guest resources for VT-i domain. */
     if (d->vcpu[0] && VMX_DOMAIN(d->vcpu[0]))
@@ -954,6 +954,8 @@ void domain_relinquish_resources(struct domain *d)
 
     /* Free page used by xen oprofile buffer */
     free_xenoprof_pages(d);
+
+    return 0;
 }
 
 unsigned long

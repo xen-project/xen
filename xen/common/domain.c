@@ -245,7 +245,7 @@ struct domain *domain_create(
     return d;
 
  fail:
-    d->is_dying = 1;
+    d->is_dying = DOMDYING_dead;
     atomic_set(&d->refcnt, DOMAIN_DESTROYED);
     if ( init_status & INIT_arch )
         arch_domain_destroy(d);
@@ -303,26 +303,37 @@ struct domain *rcu_lock_domain_by_id(domid_t dom)
 }
 
 
-void domain_kill(struct domain *d)
+int domain_kill(struct domain *d)
 {
-    domain_pause(d);
+    int rc = 0;
 
-    /* Already dying? Then bail. */
-    if ( test_and_set_bool(d->is_dying) )
+    if ( d == current->domain )
+        return -EINVAL;
+
+    /* Protected by domctl_lock. */
+    switch ( d->is_dying )
     {
-        domain_unpause(d);
-        return;
+    case DOMDYING_alive:
+        domain_pause(d);
+        d->is_dying = DOMDYING_dying;
+        evtchn_destroy(d);
+        gnttab_release_mappings(d);
+    case DOMDYING_dying:
+        rc = domain_relinquish_resources(d);
+        page_scrub_kick();
+        if ( rc != 0 )
+        {
+            BUG_ON(rc != -EAGAIN);
+            break;
+        }
+        d->is_dying = DOMDYING_dead;
+        put_domain(d);
+        send_guest_global_virq(dom0, VIRQ_DOM_EXC);
+    case DOMDYING_dead:
+        break;
     }
 
-    evtchn_destroy(d);
-    gnttab_release_mappings(d);
-    domain_relinquish_resources(d);
-    put_domain(d);
-
-    /* Kick page scrubbing after domain_relinquish_resources(). */
-    page_scrub_kick();
-
-    send_guest_global_virq(dom0, VIRQ_DOM_EXC);
+    return rc;
 }
 
 
