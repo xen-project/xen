@@ -234,6 +234,19 @@ struct arch_domain
     bool_t is_32bit_pv;
     /* Is shared-info page in 32-bit format? */
     bool_t has_32bit_shinfo;
+
+    /* Continuable domain_relinquish_resources(). */
+    enum {
+        RELMEM_not_started,
+        RELMEM_xen_l4,
+        RELMEM_dom_l4,
+        RELMEM_xen_l3,
+        RELMEM_dom_l3,
+        RELMEM_xen_l2,
+        RELMEM_dom_l2,
+        RELMEM_done,
+    } relmem;
+    struct list_head relmem_list;
 } __cacheline_aligned;
 
 #ifdef CONFIG_X86_PAE

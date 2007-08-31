@@ -257,10 +257,14 @@ long arch_do_domctl(
                 break;
             }
 
-            ret = 0;
-
             spin_lock(&d->page_alloc_lock);
 
+            if ( unlikely(d->is_dying) ) {
+                spin_unlock(&d->page_alloc_lock);
+                goto getmemlist_out;
+            }
+
+            ret = 0;
             list_ent = d->page_list.next;
             for ( i = 0; (i < max_pfns) && (list_ent != &d->page_list); i++ )
             {
@@ -279,7 +283,7 @@ long arch_do_domctl(
 
             domctl->u.getmemlist.num_pfns = i;
             copy_to_guest(u_domctl, domctl, 1);
-
+        getmemlist_out:
             rcu_unlock_domain(d);
         }
     }

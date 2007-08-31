@@ -437,6 +437,9 @@ int arch_domain_create(struct domain *d)
     int vcpuid, pdpt_order, paging_initialised = 0;
     int rc = -ENOMEM;
 
+    d->arch.relmem = RELMEM_not_started;
+    INIT_LIST_HEAD(&d->arch.relmem_list);
+
     pdpt_order = get_order_from_bytes(PDPT_L1_ENTRIES * sizeof(l1_pgentry_t));
     d->arch.mm_perdomain_pt = alloc_xenheap_pages(pdpt_order);
     if ( d->arch.mm_perdomain_pt == NULL )
@@ -1599,12 +1602,13 @@ int hypercall_xlat_continuation(unsigned int *id, unsigned int mask, ...)
 }
 #endif
 
-static void relinquish_memory(struct domain *d, struct list_head *list,
-                              unsigned long type)
+static int relinquish_memory(
+    struct domain *d, struct list_head *list, unsigned long type)
 {
     struct list_head *ent;
     struct page_info  *page;
     unsigned long     x, y;
+    int               ret = 0;
 
     /* Use a recursive lock, as we may enter 'free_domheap_page'. */
     spin_lock_recursive(&d->page_alloc_lock);
@@ -1619,6 +1623,7 @@ static void relinquish_memory(struct domain *d, struct list_head *list,
         {
             /* Couldn't get a reference -- someone is freeing this page. */
             ent = ent->next;
+            list_move_tail(&page->list, &d->arch.relmem_list);
             continue;
         }
 
@@ -1653,10 +1658,21 @@ static void relinquish_memory(struct domain *d, struct list_head *list,
 
         /* Follow the list chain and /then/ potentially free the page. */
         ent = ent->next;
+        list_move_tail(&page->list, &d->arch.relmem_list);
         put_page(page);
+
+        if ( hypercall_preempt_check() )
+        {
+            ret = -EAGAIN;
+            goto out;
+        }
     }
 
+    list_splice_init(&d->arch.relmem_list, list);
+
+ out:
     spin_unlock_recursive(&d->page_alloc_lock);
+    return ret;
 }
 
 static void vcpu_destroy_pagetables(struct vcpu *v)
@@ -1719,35 +1735,81 @@ static void vcpu_destroy_pagetables(struct vcpu *v)
 
 int domain_relinquish_resources(struct domain *d)
 {
+    int ret;
     struct vcpu *v;
 
     BUG_ON(!cpus_empty(d->domain_dirty_cpumask));
 
-    /* Tear down paging-assistance stuff. */
-    paging_teardown(d);
+    switch ( d->arch.relmem )
+    {
+    case RELMEM_not_started:
+        /* Tear down paging-assistance stuff. */
+        paging_teardown(d);
 
-    /* Drop the in-use references to page-table bases. */
-    for_each_vcpu ( d, v )
-        vcpu_destroy_pagetables(v);
+        /* Drop the in-use references to page-table bases. */
+        for_each_vcpu ( d, v )
+            vcpu_destroy_pagetables(v);
 
-    /*
-     * Relinquish GDT mappings. No need for explicit unmapping of the LDT as
-     * it automatically gets squashed when the guest's mappings go away.
-     */
-    for_each_vcpu(d, v)
-        destroy_gdt(v);
+        /*
+         * Relinquish GDT mappings. No need for explicit unmapping of the LDT
+         * as it automatically gets squashed when the guest's mappings go away.
+         */
+        for_each_vcpu(d, v)
+            destroy_gdt(v);
 
-    /* Relinquish every page of memory. */
+        d->arch.relmem = RELMEM_xen_l4;
+        /* fallthrough */
+
+        /* Relinquish every page of memory. */
 #if CONFIG_PAGING_LEVELS >= 4
-    relinquish_memory(d, &d->xenpage_list, PGT_l4_page_table);
-    relinquish_memory(d, &d->page_list, PGT_l4_page_table);
+    case RELMEM_xen_l4:
+        ret = relinquish_memory(d, &d->xenpage_list, PGT_l4_page_table);
+        if ( ret )
+            return ret;
+        d->arch.relmem = RELMEM_dom_l4;
+        /* fallthrough */
+	case RELMEM_dom_l4:
+        ret = relinquish_memory(d, &d->page_list, PGT_l4_page_table);
+        if ( ret )
+            return ret;
+        d->arch.relmem = RELMEM_xen_l3;
+        /* fallthrough */
 #endif
+
 #if CONFIG_PAGING_LEVELS >= 3
-    relinquish_memory(d, &d->xenpage_list, PGT_l3_page_table);
-    relinquish_memory(d, &d->page_list, PGT_l3_page_table);
+	case RELMEM_xen_l3:
+        ret = relinquish_memory(d, &d->xenpage_list, PGT_l3_page_table);
+        if ( ret )
+            return ret;
+        d->arch.relmem = RELMEM_dom_l3;
+        /* fallthrough */
+	case RELMEM_dom_l3:
+        ret = relinquish_memory(d, &d->page_list, PGT_l3_page_table);
+        if ( ret )
+            return ret;
+        d->arch.relmem = RELMEM_xen_l2;
+        /* fallthrough */
 #endif
-    relinquish_memory(d, &d->xenpage_list, PGT_l2_page_table);
-    relinquish_memory(d, &d->page_list, PGT_l2_page_table);
+
+	case RELMEM_xen_l2:
+        ret = relinquish_memory(d, &d->xenpage_list, PGT_l2_page_table);
+        if ( ret )
+            return ret;
+        d->arch.relmem = RELMEM_dom_l2;
+        /* fallthrough */
+	case RELMEM_dom_l2:
+        ret = relinquish_memory(d, &d->page_list, PGT_l2_page_table);
+        if ( ret )
+            return ret;
+        d->arch.relmem = RELMEM_done;
+        /* fallthrough */
+
+	case RELMEM_done:
+        break;
+
+    default:
+        BUG();
+    }
 
     /* Free page used by xen oprofile buffer. */
     free_xenoprof_pages(d);

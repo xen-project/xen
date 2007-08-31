@@ -318,6 +318,7 @@ int domain_kill(struct domain *d)
         d->is_dying = DOMDYING_dying;
         evtchn_destroy(d);
         gnttab_release_mappings(d);
+        /* fallthrough */
     case DOMDYING_dying:
         rc = domain_relinquish_resources(d);
         page_scrub_kick();
@@ -329,6 +330,7 @@ int domain_kill(struct domain *d)
         d->is_dying = DOMDYING_dead;
         put_domain(d);
         send_guest_global_virq(dom0, VIRQ_DOM_EXC);
+        /* fallthrough */
     case DOMDYING_dead:
         break;
     }
