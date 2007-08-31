@@ -360,9 +360,6 @@ mfn_t shadow_alloc(struct domain *d,
                     unsigned long backpointer);
 void  shadow_free(struct domain *d, mfn_t smfn);
 
-/* Function to convert a shadow to log-dirty */
-void shadow_convert_to_log_dirty(struct vcpu *v, mfn_t smfn);
-
 /* Dispatcher function: call the per-mode function that will unhook the
  * non-Xen mappings in this top-level shadow mfn */
 void shadow_unhook_mappings(struct vcpu *v, mfn_t smfn);

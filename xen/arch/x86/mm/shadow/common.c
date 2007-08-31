@@ -2798,12 +2798,6 @@ shadow_write_p2m_entry(struct vcpu *v, unsigned long gfn,
 /**************************************************************************/
 /* Log-dirty mode support */
 
-/* Convert a shadow to log-dirty mode. */
-void shadow_convert_to_log_dirty(struct vcpu *v, mfn_t smfn)
-{
-    BUG();
-}
-
 /* Shadow specific code which is called in paging_log_dirty_enable().
  * Return 0 if no problem found.
  */
