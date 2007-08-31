@@ -81,6 +81,14 @@ CFLAGS += $(foreach i, $(EXTRA_INCLUDES), -I$(i))
 # Enable XSM security module.  Enabling XSM requires selection of an 
 # XSM security module.
 XSM_ENABLE ?= n
+ifeq ($(XSM_ENABLE),y)
+FLASK_ENABLE ?= n
+ifeq ($(FLASK_ENABLE),y)
+FLASK_DEVELOP ?= y
+FLASK_BOOTPARAM ?= y
+FLASK_AVC_STATS ?= y
+endif
+endif
 
 # If ACM_SECURITY = y, then the access control module is compiled
 # into Xen and the policy type can be set by the boot policy file
