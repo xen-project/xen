@@ -27,8 +27,8 @@ import re
 from xen.xend import XendOptions
 from xen.xend.server.DevController import DevController
 from xen.xend.XendError import VmError
-from xen.util import security
 from xen.xend.XendXSPolicyAdmin import XSPolicyAdminInstance
+import xen.util.xsm.xsm as security
 
 from xen.xend.XendLogging import log
 

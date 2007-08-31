@@ -30,7 +30,6 @@ from xen.xend.PrettyPrint import prettyprintstring
 from xen.xend.XendConstants import DOM_STATE_HALTED
 from xen.xend.server.netif import randomMAC
 from xen.util.blkif import blkdev_name_to_number
-from xen.xend.XendXSPolicyAdmin import XSPolicyAdminInstance
 from xen.util import xsconstants
 
 log = logging.getLogger("xend.XendConfig")
@@ -433,7 +432,8 @@ class XendConfig(dict):
         self['cpu_time'] = dominfo['cpu_time']/1e9
         if dominfo.get('ssidref'):
             ssidref = int(dominfo.get('ssidref'))
-            self['security_label'] = XSPolicyAdminInstance().ssidref_to_vmlabel(ssidref)
+            import xen.util.xsm.xsm as security
+            self['security_label'] = security.ssidref2security_label(ssidref)
 
         self['shutdown_reason'] = dominfo['shutdown_reason']
 
@@ -651,7 +651,6 @@ class XendConfig(dict):
                 #                     ['ssidref', 196611]]
                 policy = ""
                 label = ""
-                policytype = xsconstants.ACM_POLICY_ID
                 for idx in range(0, len(secinfo)):
                     if secinfo[idx][0] == "access_control":
                         for aidx in range(1, len(secinfo[idx])):
@@ -659,9 +658,10 @@ class XendConfig(dict):
                                 policy = secinfo[idx][aidx][1]
                             if secinfo[idx][aidx][0] == "label":
                                 label  = secinfo[idx][aidx][1]
-                if label != "" and policy != "":
-                    cfg['security_label'] = "%s:%s:%s" % \
-                            (policytype, policy, label)
+                import xen.util.xsm.xsm as security
+                cfg['security_label'] = \
+                    security.set_security_label(policy, label)
+                if not sxp.child_value(sxp_cfg, 'security_label'):
                     del cfg['security']
 
         old_state = sxp.child_value(sxp_cfg, 'state')

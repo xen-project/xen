@@ -20,7 +20,7 @@
 """
 import sys
 import traceback
-from xen.util.security import ACMError, err, load_policy
+from xen.util.xsm.xsm import XSMError, err, load_policy
 from xen.xm.opts import OptionError
 from xen.xm import main as xm_main
 from xen.util import xsconstants

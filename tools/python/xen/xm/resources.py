@@ -20,7 +20,7 @@
 """
 import sys
 from xen.util import dictio
-from xen.util import security
+import xen.util.xsm.xsm as security
 from xen.util import xsconstants
 from xen.xm.opts import OptionError
 from xen.xm import main as xm_main

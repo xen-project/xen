@@ -20,7 +20,7 @@ import re
 import string
 
 from xen.util import blkif
-from xen.util import security
+import xen.util.xsm.xsm as security
 from xen.xend.XendError import VmError
 from xen.xend.server.DevController import DevController
 

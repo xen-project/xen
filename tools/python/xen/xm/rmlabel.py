@@ -20,7 +20,7 @@
 """
 import sys, os, re
 from xen.util import dictio
-from xen.util import security
+import xen.util.xsm.xsm as security
 from xen.xm.opts import OptionError
 from xen.xm import main as xm_main
 from xen.xm.main import server
@@ -108,7 +108,7 @@ def rm_domain_label(configfile):
 
     # send error message if we didn't find anything to remove
     if not removed:
-        raise security.ACMError('Domain not labeled')
+        raise security.XSMError('Domain not labeled')
 
     # write the data back out to the file
     fd = open(fil, "wb")

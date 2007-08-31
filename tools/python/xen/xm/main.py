@@ -49,7 +49,8 @@ from xen.xend.XendConstants import *
 from xen.xm.opts import OptionError, Opts, wrap, set_true
 from xen.xm import console
 from xen.util.xmlrpcclient import ServerProxy
-from xen.util.security import ACMError
+import xen.util.xsm.xsm as security
+from xen.util.xsm.xsm import XSMError
 from xen.util.acmpolicy import ACM_LABEL_UNLABELED_DISPLAY
 
 import XenAPI
@@ -872,12 +873,7 @@ def parse_doms_info(info):
         }
 
     security_label = get_info('security_label', str, '')
-    tmp = security_label.split(":")
-    if len(tmp) != 3:
-        seclabel = ""
-    else:
-        seclabel = security_label
-    parsed_info['seclabel'] = seclabel
+    parsed_info['seclabel'] = security.parse_security_label(security_label)
 
     if serverType == SERVER_XEN_API:
         parsed_info['mem'] = get_info('memory_actual', int, 0) / 1024
@@ -935,14 +931,14 @@ def xm_brief_list(doms):
         print format % d
 
 def xm_label_list(doms):
-    print '%-32s %5s %5s %5s %10s %9s %-8s' % \
+    print '%-40s %3s %5s %5s %10s %9s %-10s' % \
           ('Name', 'ID', 'Mem', 'VCPUs', 'State', 'Time(s)', 'Label')
-    
-    output = []
-    format = '%(name)-32s %(domid)5s %(mem)5d %(vcpus)5d %(state)10s ' \
-             '%(cpu_time)8.1f %(seclabel)9s'
 
-    from xen.util import security
+    output = []
+    format = '%(name)-40s %(domid)3s %(mem)5d %(vcpus)5d %(state)10s ' \
+             '%(cpu_time)8.1f %(seclabel)10s'
+
+    import xen.util.xsm.xsm as security
         
     for dom in doms:
         d = parse_doms_info(dom)
@@ -2580,12 +2576,12 @@ def _run_cmd(cmd, cmd_name, args):
         print e.usage
     except XenAPIUnsupportedException, e:
         err(str(e))
-    except ACMError, e:
+    except XSMError, e:
         err(str(e))
     except Exception, e:
         if serverType != SERVER_XEN_API:
-           from xen.util import security
-           if isinstance(e, security.ACMError):
+           import xen.util.xsm.xsm as security
+           if isinstance(e, security.XSMError):
                err(str(e))
                return False, 1
         print "Unexpected error:", sys.exc_info()[0]

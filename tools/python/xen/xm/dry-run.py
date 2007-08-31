@@ -19,7 +19,7 @@
 """Tests the security settings for a domain and its resources.
 """
 import sys
-from xen.util import security
+import xen.util.xsm.xsm as security
 from xen.xm import create
 from xen.xend import sxp
 from xen.xm.opts import OptionError

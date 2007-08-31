@@ -26,7 +26,7 @@ import string
 from xen.util import xsconstants
 from xen.util.acmpolicy import ACMPolicy
 from xen.xm.opts import OptionError
-from xen.util.security import policy_dir_prefix
+from xen.util.xsm.acm.acm import policy_dir_prefix
 from xen.xm import main as xm_main
 from xen.xm.main import server
 

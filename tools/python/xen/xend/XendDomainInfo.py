@@ -36,7 +36,7 @@ from types import StringTypes
 import xen.lowlevel.xc
 from xen.util import asserts
 from xen.util.blkif import blkdev_uname_to_file, blkdev_uname_to_taptype
-from xen.util import security
+import xen.util.xsm.xsm as security
 
 from xen.xend import balloon, sxp, uuid, image, arch, osdep
 from xen.xend import XendOptions, XendNode, XendConfig

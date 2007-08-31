@@ -20,7 +20,7 @@
 """
 import sys, os, re
 from xen.util import dictio
-from xen.util import security
+import xen.util.xsm.xsm as security
 from xen.util import xsconstants
 from xen.xm.opts import OptionError
 from xen.xm import main as xm_main
@@ -62,7 +62,7 @@ def get_resource_label(resource):
                                     "Please relabel the resource.")
         print policytype+":"+policy+":"+label
     else:
-        raise security.ACMError("Resource not labeled")
+        raise security.XSMError("Resource not labeled")
 
 
 def get_domain_label(configfile):
@@ -95,7 +95,7 @@ def get_domain_label(configfile):
 
     # send error message if we didn't find anything
     if acline == "":
-        raise security.ACMError("Domain not labeled")
+        raise security.XSMError("Domain not labeled")
 
     # print out the label
     (title, data) = acline.split("=", 1)

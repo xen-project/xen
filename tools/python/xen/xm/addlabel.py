@@ -23,7 +23,7 @@ import os
 import sys
 
 from xen.util import dictio
-from xen.util import security
+import xen.util.xsm.xsm as security
 from xen.xm.opts import OptionError
 from xen.util import xsconstants
 from xen.xm import main as xm_main

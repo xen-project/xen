@@ -21,8 +21,8 @@
 import sys
 import traceback
 import string
-from xen.util.security import ACMError, err, list_labels, active_policy
-from xen.util.security import vm_label_re, res_label_re, all_label_re
+from xen.util.xsm.xsm import XSMError, err, list_labels, active_policy
+from xen.util.xsm.xsm import vm_label_re, res_label_re, all_label_re
 from xen.xm.opts import OptionError
 from xen.util.acmpolicy import ACMPolicy
 from xen.util import xsconstants
@@ -78,7 +78,7 @@ def labels(policy, ptype):
         for label in labels:
             print label
 
-    except ACMError:
+    except XSMError:
         sys.exit(-1)
     except:
         traceback.print_exc(limit = 1)

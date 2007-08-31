@@ -33,7 +33,7 @@ from xen.xend import osdep
 import xen.xend.XendClient
 from xen.xend.XendBootloader import bootloader
 from xen.util import blkif
-from xen.util import security
+import xen.util.xsm.xsm as security
 from xen.xm.main import serverType, SERVER_XEN_API, get_single_vm
 
 from xen.xm.opts import *
@@ -1221,7 +1221,7 @@ def config_security_check(config, verbose):
             if verbose:
                 print "   %s: PERMITTED" % (resource)
 
-        except security.ACMError:
+        except security.XSMError:
             print "   %s: DENIED" % (resource)
             (poltype, res_label, res_policy) = security.get_res_label(resource)
             if not res_label:
@@ -1243,7 +1243,7 @@ def create_security_check(config):
                 passed = 1
         else:
             print "Checking resources: (skipped)"
-    except security.ACMError:
+    except security.XSMError:
         sys.exit(-1)
 
     return passed
@@ -1300,7 +1300,7 @@ def main(argv):
         map(lambda vm_ref: server.xenapi.VM.start(vm_ref, 0), vm_refs)
     elif not opts.is_xml:
         if not create_security_check(config):
-            raise security.ACMError(
+            raise security.XSMError(
                 'Security Configuration prevents domain from starting')
         dom = make_domain(opts, config)
         
