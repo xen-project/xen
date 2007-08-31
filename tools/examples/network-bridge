@@ -259,7 +259,8 @@ add_to_bridge2() {
 	fi
     done
 
-    if [ ${i} -eq ${maxtries} ] ; then echo '(link isnt in running state)' ; fi
+    if [ ${i} -eq ${maxtries} ] ; then echo -n '(link isnt in running state)' ; fi
+    echo
 
     add_to_bridge ${bridge} ${dev}
 }
