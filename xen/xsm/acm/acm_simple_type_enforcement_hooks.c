@@ -28,10 +28,10 @@
 #include <xen/lib.h>
 #include <asm/types.h>
 #include <asm/current.h>
-#include <acm/acm_hooks.h>
 #include <asm/atomic.h>
-#include <acm/acm_endian.h>
-#include <acm/acm_core.h>
+#include <xsm/acm/acm_hooks.h>
+#include <xsm/acm/acm_endian.h>
+#include <xsm/acm/acm_core.h>
 
 ssidref_t dom0_ste_ssidref = 0x0001;
 

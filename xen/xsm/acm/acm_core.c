@@ -1,4 +1,4 @@
-/****************************************************************
+#/****************************************************************
  * acm_core.c
  * 
  * Copyright (C) 2005 IBM Corporation
@@ -29,16 +29,16 @@
 #include <xen/delay.h>
 #include <xen/sched.h>
 #include <xen/multiboot.h>
-#include <acm/acm_hooks.h>
-#include <acm/acm_endian.h>
+#include <xsm/acm/acm_hooks.h>
+#include <xsm/acm/acm_endian.h>
 #include <xsm/xsm.h>
 
 /* debug: 
- *   include/acm/acm_hooks.h defines a constant ACM_TRACE_MODE;
+ *   include/xsm/acm/acm_hooks.h defines a constant ACM_TRACE_MODE;
  *   define/undefine this constant to receive / suppress any
  *   security hook debug output of sHype
  *
- *   include/public/acm.h defines a constant ACM_DEBUG
+ *   include/public/xsm/acm.h defines a constant ACM_DEBUG
  *   define/undefine this constant to receive non-hook-related
  *   debug output.
  */

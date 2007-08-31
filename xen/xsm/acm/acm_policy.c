@@ -28,10 +28,10 @@
 #include <xen/sched.h>
 #include <xen/guest_access.h>
 #include <public/xen.h>
-#include <acm/acm_core.h>
-#include <public/acm_ops.h>
-#include <acm/acm_hooks.h>
-#include <acm/acm_endian.h>
+#include <xsm/acm/acm_core.h>
+#include <public/xsm/acm_ops.h>
+#include <xsm/acm/acm_hooks.h>
+#include <xsm/acm/acm_endian.h>
 #include <asm/current.h>
 
 static int acm_check_deleted_ssidrefs(struct acm_sized_buffer *dels,

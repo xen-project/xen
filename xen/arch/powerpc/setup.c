@@ -38,7 +38,7 @@
 #include <xen/numa.h>
 #include <xen/rcupdate.h>
 #include <xen/version.h>
-#include <acm/acm_hooks.h>
+#include <xsm/acm/acm_hooks.h>
 #include <public/version.h>
 #include <asm/mpic.h>
 #include <asm/processor.h>

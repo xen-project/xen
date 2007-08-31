@@ -34,8 +34,8 @@
 #include <string.h>
 #include <netinet/in.h>
 #include <stdint.h>
-#include <xen/acm.h>
-#include <xen/acm_ops.h>
+#include <xen/xsm/acm.h>
+#include <xen/xsm/acm_ops.h>
 
 #include <xenctrl.h>
 

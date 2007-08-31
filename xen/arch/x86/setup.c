@@ -32,7 +32,7 @@
 #include <asm/desc.h>
 #include <asm/paging.h>
 #include <asm/e820.h>
-#include <acm/acm_hooks.h>
+#include <xsm/acm/acm_hooks.h>
 #include <xen/kexec.h>
 #include <asm/edd.h>
 #include <xsm/xsm.h>

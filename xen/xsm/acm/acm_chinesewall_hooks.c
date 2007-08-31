@@ -36,12 +36,11 @@
 #include <xen/lib.h>
 #include <xen/delay.h>
 #include <xen/sched.h>
-#include <public/acm.h>
+#include <public/xsm/acm.h>
 #include <asm/atomic.h>
-#include <acm/acm_core.h>
-#include <acm/acm_hooks.h>
-#include <acm/acm_endian.h>
-#include <acm/acm_core.h>
+#include <xsm/acm/acm_core.h>
+#include <xsm/acm/acm_hooks.h>
+#include <xsm/acm/acm_endian.h>
 
 ssidref_t dom0_chwall_ssidref = 0x0001;
 

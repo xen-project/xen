@@ -26,8 +26,8 @@
 #include <xen/delay.h>
 #include <xen/sched.h>
 #include <xen/multiboot.h>
-#include <public/acm.h>
-#include <acm/acm_core.h>
+#include <public/xsm/acm.h>
+#include <xsm/acm/acm_core.h>
 #include <public/domctl.h>
 #include <public/event_channel.h>
 #include <asm/current.h>

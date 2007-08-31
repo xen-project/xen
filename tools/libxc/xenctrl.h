@@ -26,8 +26,8 @@
 #include <xen/event_channel.h>
 #include <xen/sched.h>
 #include <xen/memory.h>
-#include <xen/acm.h>
-#include <xen/acm_ops.h>
+#include <xen/xsm/acm.h>
+#include <xen/xsm/acm_ops.h>
 
 #ifdef __ia64__
 #define XC_PAGE_SHIFT           14

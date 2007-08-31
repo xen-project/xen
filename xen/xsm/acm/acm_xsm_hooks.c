@@ -20,34 +20,36 @@
  */
 
 #include <xsm/xsm.h>
-#include <acm/acm_hooks.h>
-#include <public/acm.h>
+#include <xsm/acm/acm_hooks.h>
+#include <public/xsm/acm.h>
 
-static int acm_grant_mapref (struct domain *ld, struct domain *rd,
-                                                                 uint32_t flags) 
+static int acm_grant_mapref(
+    struct domain *ld, struct domain *rd, uint32_t flags) 
 {
     domid_t id = rd->domain_id;
 
     return acm_pre_grant_map_ref(id);
 }
 
-static int acm_evtchn_unbound (struct domain *d1, struct evtchn *chn1, domid_t id2) 
+static int acm_evtchn_unbound(
+    struct domain *d1, struct evtchn *chn1, domid_t id2) 
 {
     domid_t id1 = d1->domain_id;
     
     return acm_pre_eventchannel_unbound(id1, id2);
 }
 
-static int acm_evtchn_interdomain (struct domain *d1, struct evtchn *chn1, 
-                                        struct domain *d2, struct evtchn *chn2) 
+static int acm_evtchn_interdomain(
+    struct domain *d1, struct evtchn *chn1, 
+    struct domain *d2, struct evtchn *chn2) 
 {
     domid_t id2 = d2->domain_id;
 
     return acm_pre_eventchannel_interdomain(id2);
 }
 
-static void acm_security_domaininfo (struct domain *d, 
-                                        struct xen_domctl_getdomaininfo *info)
+static void acm_security_domaininfo(
+    struct domain *d, struct xen_domctl_getdomaininfo *info)
 {
     if ( d->ssid != NULL )
         info->ssidref = ((struct acm_ssid_domain *)d->ssid)->ssidref;

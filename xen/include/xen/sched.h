@@ -10,7 +10,7 @@
 #include <public/xen.h>
 #include <public/domctl.h>
 #include <public/vcpu.h>
-#include <public/acm.h>
+#include <public/xsm/acm.h>
 #include <xen/time.h>
 #include <xen/timer.h>
 #include <xen/grant_table.h>
@@ -63,6 +63,9 @@ struct evtchn
         u16 pirq;      /* state == ECS_PIRQ */
         u16 virq;      /* state == ECS_VIRQ */
     } u;
+#ifdef FLASK_ENABLE
+    void *ssid;
+#endif
 };
 
 int  evtchn_init(struct domain *d);

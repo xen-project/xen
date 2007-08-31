@@ -21,9 +21,9 @@
 
 #include <xen/spinlock.h>
 #include <xen/list.h>
-#include <public/acm.h>
-#include <public/acm_ops.h>
-#include <acm/acm_endian.h>
+#include <public/xsm/acm.h>
+#include <public/xsm/acm_ops.h>
+#include <xsm/acm/acm_endian.h>
 
 #define ACM_DEFAULT_SECURITY_POLICY \
         ACM_CHINESE_WALL_AND_SIMPLE_TYPE_ENFORCEMENT_POLICY

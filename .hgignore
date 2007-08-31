@@ -151,6 +151,7 @@
 ^tools/python/build/.*$
 ^tools/security/secpol_tool$
 ^tools/security/xen/.*$
+^tools/security/xensec_tool$
 ^tools/tests/blowfish\.bin$
 ^tools/tests/blowfish\.h$
 ^tools/tests/test_x86_emulator$

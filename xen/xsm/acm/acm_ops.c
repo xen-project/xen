@@ -18,14 +18,14 @@
 #include <xen/types.h>
 #include <xen/lib.h>
 #include <xen/mm.h>
-#include <public/acm.h>
-#include <public/acm_ops.h>
+#include <public/xsm/acm.h>
+#include <public/xsm/acm_ops.h>
 #include <xen/sched.h>
 #include <xen/event.h>
 #include <xen/trace.h>
 #include <xen/console.h>
 #include <xen/guest_access.h>
-#include <acm/acm_hooks.h>
+#include <xsm/acm/acm_hooks.h>
 
 #ifndef ACM_SECURITY
 

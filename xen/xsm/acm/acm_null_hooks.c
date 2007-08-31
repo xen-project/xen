@@ -12,7 +12,7 @@
  * License.
  */
 
-#include <acm/acm_hooks.h>
+#include <xsm/acm/acm_hooks.h>
 
 static int
 null_init_domain_ssid(void **ssid, ssidref_t ssidref)
