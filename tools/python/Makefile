@@ -23,10 +23,10 @@ CATALOGS = $(patsubst %,xen/xm/messages/%.mo,$(LINGUAS))
 NLSDIR = /usr/share/locale
 
 .PHONY: build buildpy
-buildpy:
+buildpy: xsm.py
 	CC="$(CC)" CFLAGS="$(CFLAGS)" XEN_SECURITY_MODULE="$(XEN_SECURITY_MODULE)" python setup.py build
 
-build: xsm.py buildpy refresh-pot refresh-po $(CATALOGS)
+build: buildpy refresh-pot refresh-po $(CATALOGS)
 
 # NB we take care to only update the .pot file it strings have
 # actually changed. This is complicated by the embedded date
