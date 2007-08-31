@@ -32,7 +32,6 @@
 #include <xen/trace.h>
 #include <xen/guest_access.h>
 #include <xen/domain_page.h>
-#include <acm/acm_hooks.h>
 #include <xsm/xsm.h>
 
 #ifndef max_nr_grant_frames
@@ -209,12 +208,6 @@ __gnttab_map_grant_ref(
     {
         gdprintk(XENLOG_INFO, "Bad flags in grant map op (%x).\n", op->flags);
         op->status = GNTST_bad_gntref;
-        return;
-    }
-
-    if ( acm_pre_grant_map_ref(op->dom) )
-    {
-        op->status = GNTST_permission_denied;
         return;
     }
 

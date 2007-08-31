@@ -150,8 +150,8 @@ struct acm_policy_version
  * tools that assume packed representations (e.g. the java tool)
  */
 struct acm_policy_buffer {
-    uint32_t policy_version; /* ACM_POLICY_VERSION */
     uint32_t magic;
+    uint32_t policy_version; /* ACM_POLICY_VERSION */
     uint32_t len;
     uint32_t policy_reference_offset;
     uint32_t primary_policy_code;

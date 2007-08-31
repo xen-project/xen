@@ -28,7 +28,6 @@
 #include <asm/debugger.h>
 #include <public/sched.h>
 #include <public/vcpu.h>
-#include <acm/acm_hooks.h>
 #include <xsm/xsm.h>
 
 /* Protect updates/reads (resp.) of domain_list and domain_hash. */
@@ -189,7 +188,7 @@ struct domain *domain_create(
     domid_t domid, unsigned int domcr_flags, ssidref_t ssidref)
 {
     struct domain *d, **pd;
-    enum { INIT_evtchn = 1, INIT_gnttab = 2, INIT_acm = 4, INIT_arch = 8 }; 
+    enum { INIT_evtchn = 1, INIT_gnttab = 2, INIT_arch = 8 }; 
     int init_status = 0;
 
     if ( (d = alloc_domain(domid)) == NULL )
@@ -215,10 +214,6 @@ struct domain *domain_create(
         if ( grant_table_create(d) != 0 )
             goto fail;
         init_status |= INIT_gnttab;
-
-        if ( acm_domain_create(d, ssidref) != 0 )
-            goto fail;
-        init_status |= INIT_acm;
     }
 
     if ( arch_domain_create(d) != 0 )
@@ -254,8 +249,6 @@ struct domain *domain_create(
     atomic_set(&d->refcnt, DOMAIN_DESTROYED);
     if ( init_status & INIT_arch )
         arch_domain_destroy(d);
-    if ( init_status & INIT_acm )
-        acm_domain_destroy(d);
     if ( init_status & INIT_gnttab )
         grant_table_destroy(d);
     if ( init_status & INIT_evtchn )
@@ -482,8 +475,6 @@ static void complete_domain_destroy(struct rcu_head *head)
         vcpu_destroy(v);
         sched_destroy_vcpu(v);
     }
-
-    acm_domain_destroy(d);
 
     rangeset_domain_destroy(d);
 

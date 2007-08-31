@@ -665,7 +665,7 @@ ENTRY(hypercall_table)
         .long do_vcpu_op
         .long do_ni_hypercall       /* 25 */
         .long do_mmuext_op
-        .long do_acm_op
+        .long do_xsm_op
         .long do_nmi_op
         .long do_sched_op
         .long do_callback_op        /* 30 */
@@ -676,7 +676,6 @@ ENTRY(hypercall_table)
         .long do_sysctl             /* 35 */
         .long do_domctl
         .long do_kexec_op
-        .long do_xsm_op
         .rept NR_hypercalls-((.-hypercall_table)/4)
         .long do_ni_hypercall
         .endr
@@ -709,7 +708,7 @@ ENTRY(hypercall_args_table)
         .byte 3 /* do_vcpu_op           */
         .byte 0 /* do_ni_hypercall      */  /* 25 */
         .byte 4 /* do_mmuext_op         */
-        .byte 1 /* do_acm_op            */
+        .byte 1 /* do_xsm_op            */
         .byte 2 /* do_nmi_op            */
         .byte 2 /* do_sched_op          */
         .byte 2 /* do_callback_op       */  /* 30 */
@@ -720,7 +719,6 @@ ENTRY(hypercall_args_table)
         .byte 1 /* do_sysctl            */  /* 35 */
         .byte 1 /* do_domctl            */
         .byte 2 /* do_kexec_op          */
-        .byte 1 /* do_xsm_op            */
         .rept NR_hypercalls-(.-hypercall_args_table)
         .byte 0 /* do_ni_hypercall      */
         .endr

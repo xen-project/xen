@@ -5,3 +5,4 @@ obj-y += dummy.o
 endif
 
 subdir-$(FLASK_ENABLE) += flask
+subdir-$(ACM_SECURITY) += acm

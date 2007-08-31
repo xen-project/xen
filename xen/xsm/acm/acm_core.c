@@ -31,6 +31,7 @@
 #include <xen/multiboot.h>
 #include <acm/acm_hooks.h>
 #include <acm/acm_endian.h>
+#include <xsm/xsm.h>
 
 /* debug: 
  *   include/acm/acm_hooks.h defines a constant ACM_TRACE_MODE;
@@ -48,6 +49,8 @@ void acm_init_ste_policy(void);
 
 extern struct acm_operations acm_chinesewall_ops, 
     acm_simple_type_enforcement_ops, acm_null_ops;
+
+extern struct xsm_operations acm_xsm_ops;
 
 /* global ACM policy  (now dynamically determined at boot time) */
 u16 acm_active_security_policy = ACM_POLICY_UNDEFINED;
@@ -269,14 +272,15 @@ acm_setup(char *policy_start,
 }
 
 
-int __init
-acm_init(char *policy_start,
-         unsigned long policy_len)
+int
+acm_init(void)
 {
     int ret = ACM_OK;
 
+    printk("ACM-XSM:  Initializing.\n");
+
     /* first try to load the boot policy (uses its own locks) */
-    acm_setup(policy_start, policy_len, 1);
+    acm_setup(policy_buffer, policy_size, 1);
 
     /* a user-provided policy may have any name; only matched during boot */
     acm_accepted_boot_policy_name = NULL;
@@ -311,8 +315,14 @@ acm_init(char *policy_start,
         /* here one could imagine a clean panic */
         return -EINVAL;
     }
+
+    if (register_xsm(&acm_xsm_ops))
+        panic("ACM-XSM: Unable to register with XSM.\n");
+
     return ret;
 }
+
+xsm_initcall(acm_init);
 
 int acm_init_domain_ssid(struct domain *subj, ssidref_t ssidref)
 {

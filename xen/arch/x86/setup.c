@@ -220,40 +220,6 @@ static void __init percpu_init_areas(void)
 #endif
 }
 
-/* Fetch acm policy module from multiboot modules. */
-static void __init extract_acm_policy(
-    multiboot_info_t *mbi,
-    unsigned int *initrdidx,
-    char **_policy_start,
-    unsigned long *_policy_len)
-{
-    int i;
-    module_t *mod = (module_t *)__va(mbi->mods_addr);
-    unsigned long start, policy_len;
-    char *policy_start;
-
-    /*
-     * Try all modules and see whichever could be the binary policy.
-     * Adjust the initrdidx if module[1] is the binary policy.
-     */
-    for ( i = mbi->mods_count-1; i >= 1; i-- )
-    {
-        start = initial_images_start + (mod[i].mod_start-mod[0].mod_start);
-        policy_start = maddr_to_bootstrap_virt(start);
-        policy_len   = mod[i].mod_end - mod[i].mod_start;
-        if ( acm_is_policy(policy_start, policy_len) )
-        {
-            printk("Policy len  0x%lx, start at %p - module %d.\n",
-                   policy_len, policy_start, i);
-            *_policy_start = policy_start;
-            *_policy_len = policy_len;
-            if ( i == 1 )
-                *initrdidx = (mbi->mods_count > 2) ? 2 : 0;
-            break;
-        }
-    }
-}
-
 static void __init init_idle_domain(void)
 {
     struct domain *idle_domain;
@@ -448,8 +414,6 @@ void __init __start_xen(unsigned long mbi_p)
     char *cmdline, *kextra;
     unsigned long _initrd_start = 0, _initrd_len = 0;
     unsigned int initrdidx = 1;
-    char *_policy_start = NULL;
-    unsigned long _policy_len = 0;
     multiboot_info_t *mbi = __va(mbi_p);
     module_t *mod = (module_t *)__va(mbi->mods_addr);
     unsigned long nr_pages, modules_length;
@@ -1031,12 +995,6 @@ void __init __start_xen(unsigned long mbi_p)
 
     if ( opt_watchdog ) 
         watchdog_enable();
-
-    /* Extract policy from multiboot.  */
-    extract_acm_policy(mbi, &initrdidx, &_policy_start, &_policy_len);
-
-    /* initialize access control security module */
-    acm_init(_policy_start, _policy_len);
 
     /* Create initial domain 0. */
     dom0 = domain_create(0, 0, DOM0_SSIDREF);

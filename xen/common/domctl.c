@@ -23,7 +23,6 @@
 #include <xen/paging.h>
 #include <asm/current.h>
 #include <public/domctl.h>
-#include <acm/acm_hooks.h>
 #include <xsm/xsm.h>
 
 extern long arch_do_domctl(
@@ -123,11 +122,6 @@ void getdomaininfo(struct domain *d, struct xen_domctl_getdomaininfo *info)
 
     if ( is_hvm_domain(d) )
         info->flags |= XEN_DOMINF_hvm_guest;
-
-    if ( d->ssid != NULL )
-        info->ssidref = ((struct acm_ssid_domain *)d->ssid)->ssidref;
-    else    
-        info->ssidref = ACM_DEFAULT_SSID;
 
     xsm_security_domaininfo(d, info);
 

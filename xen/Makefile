@@ -55,7 +55,6 @@ _clean: delete-unfresh-files
 	$(MAKE) -f $(BASEDIR)/Rules.mk -C include clean
 	$(MAKE) -f $(BASEDIR)/Rules.mk -C common clean
 	$(MAKE) -f $(BASEDIR)/Rules.mk -C drivers clean
-	$(MAKE) -f $(BASEDIR)/Rules.mk -C acm clean
 	$(MAKE) -f $(BASEDIR)/Rules.mk -C xsm clean
 	$(MAKE) -f $(BASEDIR)/Rules.mk -C arch/$(TARGET_ARCH) clean
 	rm -f include/asm *.o $(TARGET)* *~ core
@@ -123,7 +122,7 @@ include/asm-$(TARGET_ARCH)/asm-offsets.h: arch/$(TARGET_ARCH)/asm-offsets.s
 build-headers:
 	$(MAKE) -C include/public/foreign
 
-SUBDIRS = xsm acm arch/$(TARGET_ARCH) common drivers
+SUBDIRS = xsm arch/$(TARGET_ARCH) common drivers
 define all_sources
     ( find include/asm-$(TARGET_ARCH) -name '*.h' -print; \
       find include -name 'asm-*' -prune -o -name '*.h' -print; \

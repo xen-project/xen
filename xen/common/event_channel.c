@@ -29,7 +29,6 @@
 
 #include <public/xen.h>
 #include <public/event_channel.h>
-#include <acm/acm_hooks.h>
 #include <xsm/xsm.h>
 
 #define bucket_from_port(d,p) \
@@ -122,9 +121,6 @@ static long evtchn_alloc_unbound(evtchn_alloc_unbound_t *alloc)
     domid_t        dom = alloc->dom;
     long           rc;
 
-    if ( (rc = acm_pre_eventchannel_unbound(dom, alloc->remote_dom)) != 0 )
-        return rc;
-
     if ( dom == DOMID_SELF )
         dom = current->domain->domain_id;
     else if ( !IS_PRIV(current->domain) )
@@ -165,9 +161,6 @@ static long evtchn_bind_interdomain(evtchn_bind_interdomain_t *bind)
     int            lport, rport = bind->remote_port;
     domid_t        rdom = bind->remote_dom;
     long           rc;
-
-    if ( (rc = acm_pre_eventchannel_interdomain(rdom)) != 0 )
-        return rc;
 
     if ( rdom == DOMID_SELF )
         rdom = current->domain->domain_id;

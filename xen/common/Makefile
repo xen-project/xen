@@ -1,4 +1,3 @@
-obj-y += acm_ops.o
 obj-y += bitmap.o
 obj-y += domctl.o
 obj-y += domain.o
