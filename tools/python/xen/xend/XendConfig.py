@@ -28,6 +28,7 @@ from xen.xend.XendError import VmError
 from xen.xend.XendDevices import XendDevices
 from xen.xend.PrettyPrint import prettyprintstring
 from xen.xend.XendConstants import DOM_STATE_HALTED
+from xen.xend.server.BlktapController import blktap_disk_types
 from xen.xend.server.netif import randomMAC
 from xen.util.blkif import blkdev_name_to_number
 from xen.util import xsconstants
@@ -1083,6 +1084,11 @@ class XendConfig(dict):
                     dev_info['driver'] = 'ioemu'
                 else:
                     dev_info['driver'] = 'paravirtualised'
+
+            if dev_type == 'tap':
+                if dev_info['uname'].split(':')[1] not in blktap_disk_types:
+                    raise XendConfigError("tap:%s not a valid disk type" %
+                                    dev_info['uname'].split(':')[1])
 
             if dev_type == 'vif':
                 if not dev_info.get('mac'):
