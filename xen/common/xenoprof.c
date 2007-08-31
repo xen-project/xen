@@ -14,6 +14,7 @@
 #include <xen/sched.h>
 #include <public/xenoprof.h>
 #include <xen/paging.h>
+#include <xsm/xsm.h>
 
 /* Limit amount of pages used for shared buffer (per domain) */
 #define MAX_OPROF_SHARED_PAGES 32
@@ -633,6 +634,10 @@ int do_xenoprof_op(int op, XEN_GUEST_HANDLE(void) arg)
                current->domain->domain_id, op);
         return -EPERM;
     }
+
+    ret = xsm_profile(current->domain, op);
+    if ( ret )
+        return ret;
 
     spin_lock(&xenoprof_lock);
     

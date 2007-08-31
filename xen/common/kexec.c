@@ -21,6 +21,7 @@
 #include <xen/version.h>
 #include <xen/console.h>
 #include <public/elfnote.h>
+#include <xsm/xsm.h>
 
 #ifndef COMPAT
 
@@ -366,6 +367,10 @@ ret_t do_kexec_op(unsigned long op, XEN_GUEST_HANDLE(void) uarg)
 
     if ( !IS_PRIV(current->domain) )
         return -EPERM;
+
+    ret = xsm_kexec();
+    if ( ret )
+        return ret;
 
     switch ( op )
     {

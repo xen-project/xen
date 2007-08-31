@@ -23,6 +23,7 @@
 #include <public/sysctl.h>
 #include <asm/numa.h>
 #include <xen/nodemask.h>
+#include <xsm/xsm.h>
 
 extern long arch_do_sysctl(
     struct xen_sysctl *op, XEN_GUEST_HANDLE(xen_sysctl_t) u_sysctl);
@@ -48,6 +49,10 @@ long do_sysctl(XEN_GUEST_HANDLE(xen_sysctl_t) u_sysctl)
     {
     case XEN_SYSCTL_readconsole:
     {
+        ret = xsm_readconsole(op->u.readconsole.clear);
+        if ( ret )
+            break;
+
         ret = read_console_ring(
             guest_handle_cast(op->u.readconsole.buffer, char),
             &op->u.readconsole.count,
@@ -59,6 +64,10 @@ long do_sysctl(XEN_GUEST_HANDLE(xen_sysctl_t) u_sysctl)
 
     case XEN_SYSCTL_tbuf_op:
     {
+        ret = xsm_tbufcontrol();
+        if ( ret )
+            break;
+
         ret = tb_control(&op->u.tbuf_op);
         if ( copy_to_guest(u_sysctl, op, 1) )
             ret = -EFAULT;
@@ -67,6 +76,10 @@ long do_sysctl(XEN_GUEST_HANDLE(xen_sysctl_t) u_sysctl)
     
     case XEN_SYSCTL_sched_id:
     {
+        ret = xsm_sched_id();
+        if ( ret )
+            break;
+
         op->u.sched_id.sched_id = sched_id();
         if ( copy_to_guest(u_sysctl, op, 1) )
             ret = -EFAULT;
@@ -89,6 +102,10 @@ long do_sysctl(XEN_GUEST_HANDLE(xen_sysctl_t) u_sysctl)
                 continue;
             if ( num_domains == op->u.getdomaininfolist.max_domains )
                 break;
+
+            ret = xsm_getdomaininfo(d);
+            if ( ret )
+                continue;
 
             getdomaininfo(d, &info);
 
@@ -117,6 +134,10 @@ long do_sysctl(XEN_GUEST_HANDLE(xen_sysctl_t) u_sysctl)
 #ifdef PERF_COUNTERS
     case XEN_SYSCTL_perfc_op:
     {
+        ret = xsm_perfcontrol();
+        if ( ret )
+            break;
+
         ret = perfc_control(&op->u.perfc_op);
         if ( copy_to_guest(u_sysctl, op, 1) )
             ret = -EFAULT;

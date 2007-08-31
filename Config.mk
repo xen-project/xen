@@ -78,10 +78,12 @@ CFLAGS     += $(call cc-option,$(CC),-Wdeclaration-after-statement,)
 LDFLAGS += $(foreach i, $(EXTRA_LIB), -L$(i)) 
 CFLAGS += $(foreach i, $(EXTRA_INCLUDES), -I$(i))
 
+# Enable XSM security module.  Enabling XSM requires selection of an 
+# XSM security module.
+XSM_ENABLE ?= n
+
 # If ACM_SECURITY = y, then the access control module is compiled
 # into Xen and the policy type can be set by the boot policy file
-#        y - Build the Xen ACM framework
-#        n - Do not build the Xen ACM framework
 ACM_SECURITY ?= n
 
 # Optional components

@@ -32,6 +32,7 @@
 #include <asm/debugger.h>
 #include <asm/io.h>
 #include <asm/div64.h>
+#include <xsm/xsm.h>
 
 /* console: comma-separated list of console outputs. */
 static char opt_console[30] = OPT_CONSOLE_STR;
@@ -357,6 +358,10 @@ long do_console_io(int cmd, int count, XEN_GUEST_HANDLE(char) buffer)
     if ( current->domain->domain_id != 0 )
         return -EPERM;
 #endif
+
+    rc = xsm_console_io(current->domain, cmd);
+    if ( rc )
+        return rc;
 
     switch ( cmd )
     {

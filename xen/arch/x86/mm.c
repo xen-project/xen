@@ -110,6 +110,7 @@
 #include <asm/hypercall.h>
 #include <asm/shared.h>
 #include <public/memory.h>
+#include <xsm/xsm.h>
 
 #define MEM_LOG(_f, _a...) gdprintk(XENLOG_WARNING , _f "\n" , ## _a)
 
@@ -2048,6 +2049,10 @@ int do_mmuext_op(
             type = PGT_l4_page_table;
 
         pin_page:
+            rc = xsm_memory_pin_page(current->domain, page);
+            if ( rc )
+                break;
+
             /* Ignore pinning of invalid paging levels. */
             if ( (op.cmd - MMUEXT_PIN_L1_TABLE) > (CONFIG_PAGING_LEVELS - 1) )
                 break;
@@ -2334,6 +2339,10 @@ int do_mmu_update(
              */
         case MMU_NORMAL_PT_UPDATE:
 
+            rc = xsm_mmu_normal_update(current->domain, req.val);
+            if ( rc )
+                break;
+
             gmfn = req.ptr >> PAGE_SHIFT;
             mfn = gmfn_to_mfn(d, gmfn);
 
@@ -2423,6 +2432,10 @@ int do_mmu_update(
 
             mfn = req.ptr >> PAGE_SHIFT;
             gpfn = req.val;
+
+            rc = xsm_mmu_machphys_update(current->domain, mfn);
+            if ( rc )
+                break;
 
             if ( unlikely(!get_page_from_pagenr(mfn, FOREIGNDOM)) )
             {
@@ -2802,6 +2815,10 @@ int do_update_va_mapping(unsigned long va, u64 val64,
     if ( unlikely(!__addr_ok(va) && !paging_mode_external(d)) )
         return -EINVAL;
 
+    rc = xsm_update_va_mapping(current->domain, val);
+    if ( rc )
+        return rc;
+
     LOCK_BIGLOCK(d);
 
     pl1e = guest_map_l1e(v, va, &gl1mfn);
@@ -3063,6 +3080,12 @@ long arch_memory_op(int op, XEN_GUEST_HANDLE(void) arg)
         else if ( (d = rcu_lock_domain_by_id(xatp.domid)) == NULL )
             return -ESRCH;
 
+        if ( xsm_add_to_physmap(current->domain, d) )
+        {
+            rcu_unlock_domain(d);
+            return -EPERM;
+        }
+
         switch ( xatp.space )
         {
         case XENMAPSPACE_shared_info:
@@ -3139,6 +3162,13 @@ long arch_memory_op(int op, XEN_GUEST_HANDLE(void) arg)
         else if ( (d = rcu_lock_domain_by_id(fmap.domid)) == NULL )
             return -ESRCH;
 
+        rc = xsm_domain_memory_map(d);
+        if ( rc )
+        {
+            rcu_unlock_domain(d);
+            return rc;
+        }
+
         rc = copy_from_guest(d->arch.e820, fmap.map.buffer,
                              fmap.map.nr_entries) ? -EFAULT : 0;
         d->arch.nr_e820 = fmap.map.nr_entries;
@@ -3172,9 +3202,14 @@ long arch_memory_op(int op, XEN_GUEST_HANDLE(void) arg)
         struct xen_memory_map memmap;
         XEN_GUEST_HANDLE(e820entry_t) buffer;
         int count;
+        int rc;
 
         if ( !IS_PRIV(current->domain) )
             return -EINVAL;
+
+        rc = xsm_machine_memory_map();
+        if ( rc )
+            return rc;
 
         if ( copy_from_guest(&memmap, arg, 1) )
             return -EFAULT;

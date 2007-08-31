@@ -1069,6 +1069,10 @@ static int hvmop_set_pci_intx_level(
     if ( !is_hvm_domain(d) )
         goto out;
 
+    rc = xsm_hvm_set_pci_intx_level(d);
+    if ( rc )
+        goto out;
+
     rc = 0;
     switch ( op.level )
     {
@@ -1112,6 +1116,10 @@ static int hvmop_set_isa_irq_level(
     if ( !is_hvm_domain(d) )
         goto out;
 
+    rc = xsm_hvm_set_isa_irq_level(d);
+    if ( rc )
+        goto out;
+
     rc = 0;
     switch ( op.level )
     {
@@ -1153,6 +1161,10 @@ static int hvmop_set_pci_link_route(
 
     rc = -EINVAL;
     if ( !is_hvm_domain(d) )
+        goto out;
+
+    rc = xsm_hvm_set_pci_link_route(d);
+    if ( rc )
         goto out;
 
     rc = 0;
@@ -1202,6 +1214,10 @@ long do_hvm_op(unsigned long op, XEN_GUEST_HANDLE(void) arg)
 
         rc = -EINVAL;
         if ( !is_hvm_domain(d) )
+            goto param_fail;
+
+        rc = xsm_hvm_param(d, op);
+        if ( rc )
             goto param_fail;
 
         if ( op == HVMOP_set_param )

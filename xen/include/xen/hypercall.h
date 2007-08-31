@@ -15,6 +15,7 @@
 #include <public/acm_ops.h>
 #include <public/event_channel.h>
 #include <asm/hypercall.h>
+#include <xsm/xsm.h>
 
 extern long
 do_ni_hypercall(
@@ -124,5 +125,9 @@ compat_memory_op(
     XEN_GUEST_HANDLE(void) arg);
 
 #endif
+
+extern long
+do_xsm_op(
+    XEN_GUEST_HANDLE(xsm_op_t) u_xsm_op);
 
 #endif /* __XEN_HYPERCALL_H__ */

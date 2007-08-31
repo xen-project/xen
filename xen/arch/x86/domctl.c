@@ -24,6 +24,7 @@
 #include <asm/hvm/hvm.h>
 #include <asm/hvm/support.h>
 #include <asm/processor.h>
+#include <xsm/xsm.h>
 
 long arch_do_domctl(
     struct xen_domctl *domctl,
@@ -64,6 +65,14 @@ long arch_do_domctl(
         if ( unlikely((d = rcu_lock_domain_by_id(domctl->domain)) == NULL) )
             break;
 
+        ret = xsm_ioport_permission(d, fp, 
+                                    domctl->u.ioport_permission.allow_access);
+        if ( ret )
+        {
+            rcu_unlock_domain(d);
+            break;
+        }
+
         if ( np == 0 )
             ret = 0;
         else if ( domctl->u.ioport_permission.allow_access )
@@ -89,6 +98,13 @@ long arch_do_domctl(
             break;
 
         page = mfn_to_page(mfn);
+
+        ret = xsm_getpageframeinfo(page);
+        if ( ret )
+        {
+            rcu_unlock_domain(d);
+            break;
+        }
 
         if ( likely(get_page(page, d)) )
         {
@@ -173,6 +189,10 @@ long arch_do_domctl(
 
                 page = mfn_to_page(mfn);
 
+                ret = xsm_getpageframeinfo(page);
+                if ( ret )
+                    continue;
+
                 if ( likely(mfn_valid(mfn) && get_page(page, d)) ) 
                 {
                     unsigned long type = 0;
@@ -230,6 +250,13 @@ long arch_do_domctl(
         ret = -EINVAL;
         if ( d != NULL )
         {
+            ret = xsm_getmemlist(d);
+            if ( ret )
+            {
+                rcu_unlock_domain(d);
+                break;
+            }
+
             ret = 0;
 
             spin_lock(&d->page_alloc_lock);
@@ -269,6 +296,13 @@ long arch_do_domctl(
         if ( unlikely(d == NULL) )
             break;
 
+        ret = xsm_hypercall_init(d);
+        if ( ret )
+        {
+            rcu_unlock_domain(d);
+            break;
+        }
+
         mfn = gmfn_to_mfn(d, gmfn);
 
         ret = -EACCES;
@@ -304,6 +338,10 @@ long arch_do_domctl(
         if ( (d = rcu_lock_domain_by_id(domctl->domain)) == NULL )
             break;
 
+        ret = xsm_hvmcontext(d, domctl->cmd);
+        if ( ret )
+            goto sethvmcontext_out;
+
         ret = -EINVAL;
         if ( !is_hvm_domain(d) ) 
             goto sethvmcontext_out;
@@ -336,6 +374,10 @@ long arch_do_domctl(
         ret = -ESRCH;
         if ( (d = rcu_lock_domain_by_id(domctl->domain)) == NULL )
             break;
+
+        ret = xsm_hvmcontext(d, domctl->cmd);
+        if ( ret )
+            goto gethvmcontext_out;
 
         ret = -EINVAL;
         if ( !is_hvm_domain(d) ) 
@@ -390,6 +432,13 @@ long arch_do_domctl(
         if ( (d = rcu_lock_domain_by_id(domctl->domain)) == NULL )
             break;
 
+        ret = xsm_address_size(d, domctl->cmd);
+        if ( ret )
+        {
+            rcu_unlock_domain(d);
+            break;
+        }
+
         switch ( domctl->u.address_size.size )
         {
 #ifdef CONFIG_COMPAT
@@ -416,6 +465,13 @@ long arch_do_domctl(
         ret = -ESRCH;
         if ( (d = rcu_lock_domain_by_id(domctl->domain)) == NULL )
             break;
+
+        ret = xsm_address_size(d, domctl->cmd);
+        if ( ret )
+        {
+            rcu_unlock_domain(d);
+            break;
+        }
 
         domctl->u.address_size.size = BITS_PER_GUEST_LONG(d);
 

@@ -32,6 +32,7 @@
 #include <xen/guest_access.h>
 #include <xen/multicall.h>
 #include <public/sched.h>
+#include <xsm/xsm.h>
 
 /* opt_sched: scheduler - default to credit */
 static char opt_sched[10] = "credit";
@@ -460,6 +461,13 @@ ret_t do_sched_op(int cmd, XEN_GUEST_HANDLE(void) arg)
         d = rcu_lock_domain_by_id(sched_remote_shutdown.domain_id);
         if ( d == NULL )
             break;
+
+        ret = xsm_schedop_shutdown(current->domain, d);
+        if ( ret )
+        {
+            rcu_unlock_domain(d);
+            return ret;
+        }
 
         /* domain_pause() prevens any further execution in guest context. */
         domain_pause(d);

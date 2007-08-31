@@ -29,6 +29,7 @@
 #include <public/sched.h>
 #include <public/vcpu.h>
 #include <acm/acm_hooks.h>
+#include <xsm/xsm.h>
 
 /* Protect updates/reads (resp.) of domain_list and domain_hash. */
 DEFINE_SPINLOCK(domlist_update_lock);
@@ -57,6 +58,13 @@ struct domain *alloc_domain(domid_t domid)
 
     memset(d, 0, sizeof(*d));
     d->domain_id = domid;
+
+    if ( xsm_alloc_security_domain(d) != 0 )
+    {
+        free_domain(d);
+        return NULL;
+    }
+
     atomic_set(&d->refcnt, 1);
     spin_lock_init(&d->big_lock);
     spin_lock_init(&d->page_alloc_lock);
@@ -69,6 +77,7 @@ struct domain *alloc_domain(domid_t domid)
 
 void free_domain(struct domain *d)
 {
+    xsm_free_security_domain(d);
     xfree(d);
 }
 
@@ -193,6 +202,9 @@ struct domain *domain_create(
 
     if ( !is_idle_domain(d) )
     {
+        if ( xsm_domain_create(d, ssidref) != 0 )
+            goto fail;
+
         d->is_paused_by_controller = 1;
         atomic_inc(&d->pause_count);
 

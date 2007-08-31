@@ -35,6 +35,7 @@
 #include <acm/acm_hooks.h>
 #include <xen/kexec.h>
 #include <asm/edd.h>
+#include <xsm/xsm.h>
 
 #if defined(CONFIG_X86_64)
 #define BOOTSTRAP_DIRECTMAP_END (1UL << 32) /* 4GB */
@@ -962,6 +963,8 @@ void __init __start_xen(unsigned long mbi_p)
     init_IRQ();
 
     percpu_init_areas();
+
+    xsm_init(&initrdidx, mbi, initial_images_start);
 
     init_idle_domain();
 

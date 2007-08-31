@@ -12,6 +12,7 @@
 #include <asm/hypercall.h>
 #include <public/xen.h>
 #include <public/physdev.h>
+#include <xsm/xsm.h>
 
 #ifndef COMPAT
 typedef long ret_t;
@@ -73,6 +74,9 @@ ret_t do_physdev_op(int cmd, XEN_GUEST_HANDLE(void) arg)
         ret = -EPERM;
         if ( !IS_PRIV(v->domain) )
             break;
+        ret = xsm_apic(v->domain, cmd);
+        if ( ret )
+            break;
         ret = ioapic_guest_read(apic.apic_physbase, apic.reg, &apic.value);
         if ( copy_to_guest(arg, &apic, 1) != 0 )
             ret = -EFAULT;
@@ -87,6 +91,9 @@ ret_t do_physdev_op(int cmd, XEN_GUEST_HANDLE(void) arg)
         ret = -EPERM;
         if ( !IS_PRIV(v->domain) )
             break;
+        ret = xsm_apic(v->domain, cmd);
+        if ( ret )
+            break;
         ret = ioapic_guest_write(apic.apic_physbase, apic.reg, apic.value);
         break;
     }
@@ -100,6 +107,10 @@ ret_t do_physdev_op(int cmd, XEN_GUEST_HANDLE(void) arg)
 
         ret = -EPERM;
         if ( !IS_PRIV(v->domain) )
+            break;
+
+        ret = xsm_assign_vector(v->domain, irq_op.irq);
+        if ( ret )
             break;
 
         irq = irq_op.irq;

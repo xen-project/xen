@@ -52,10 +52,12 @@ HDRS  := $(filter-out %/asm-offsets.h,$(AHDRS))
 # Note that link order matters!
 ALL_OBJS-y               += $(BASEDIR)/common/built_in.o
 ALL_OBJS-y               += $(BASEDIR)/drivers/built_in.o
+ALL_OBJS-y               += $(BASEDIR)/xsm/built_in.o
 ALL_OBJS-$(ACM_SECURITY) += $(BASEDIR)/acm/built_in.o
 ALL_OBJS-y               += $(BASEDIR)/arch/$(TARGET_ARCH)/built_in.o
 
 CFLAGS-y                += -g -D__XEN__
+CFLAGS-$(XSM_ENABLE)    += -DXSM_ENABLE
 CFLAGS-$(ACM_SECURITY)  += -DACM_SECURITY
 CFLAGS-$(verbose)       += -DVERBOSE
 CFLAGS-$(crash_debug)   += -DCRASH_DEBUG

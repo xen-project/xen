@@ -33,6 +33,7 @@
 #include <xen/guest_access.h>
 #include <xen/domain_page.h>
 #include <acm/acm_hooks.h>
+#include <xsm/xsm.h>
 
 #ifndef max_nr_grant_frames
 unsigned int max_nr_grant_frames = DEFAULT_MAX_NR_GRANT_FRAMES;
@@ -221,6 +222,14 @@ __gnttab_map_grant_ref(
     {
         gdprintk(XENLOG_INFO, "Could not find domain %d\n", op->dom);
         op->status = GNTST_bad_domain;
+        return;
+    }
+
+    rc = xsm_grant_mapref(ld, rd, op->flags);
+    if ( rc )
+    {
+        rcu_unlock_domain(rd);
+        op->status = GNTST_permission_denied;
         return;
     }
 
@@ -448,6 +457,14 @@ __gnttab_unmap_common(
         /* This can happen when a grant is implicitly unmapped. */
         gdprintk(XENLOG_INFO, "Could not find domain %d\n", dom);
         domain_crash(ld); /* naughty... */
+        return;
+    }
+
+    rc = xsm_grant_unmapref(ld, rd);
+    if ( rc )
+    {
+        rcu_unlock_domain(rd);
+        op->status = GNTST_permission_denied;
         return;
     }
 
@@ -705,6 +722,13 @@ gnttab_setup_table(
         goto out;
     }
 
+    if ( xsm_grant_setup(current->domain, d) )
+    {
+        rcu_unlock_domain(d);
+        op.status = GNTST_permission_denied;
+        goto out;
+    }
+
     spin_lock(&d->grant_table->lock);
 
     if ( (op.nr_frames > nr_grant_frames(d->grant_table)) &&
@@ -745,6 +769,7 @@ gnttab_query_size(
     struct gnttab_query_size op;
     struct domain *d;
     domid_t        dom;
+    int rc;
 
     if ( count != 1 )
         return -EINVAL;
@@ -770,6 +795,14 @@ gnttab_query_size(
     {
         gdprintk(XENLOG_INFO, "Bad domid %d.\n", dom);
         op.status = GNTST_bad_domain;
+        goto query_out;
+    }
+
+    rc = xsm_grant_query_size(current->domain, d);
+    if ( rc )
+    {
+        rcu_unlock_domain(d);
+        op.status = GNTST_permission_denied;
         goto query_out;
     }
 
@@ -916,6 +949,13 @@ gnttab_transfer(
             page->count_info &= ~(PGC_count_mask|PGC_allocated);
             free_domheap_page(page);
             gop.status = GNTST_bad_domain;
+            goto copyback;
+        }
+
+        if ( xsm_grant_transfer(d, e) )
+        {
+            rcu_unlock_domain(e);
+            gop.status = GNTST_permission_denied;
             goto copyback;
         }
 
@@ -1138,6 +1178,13 @@ __gnttab_copy(
     else if ( (dd = rcu_lock_domain_by_id(op->dest.domid)) == NULL )
         PIN_FAIL(error_out, GNTST_bad_domain,
                  "couldn't find %d\n", op->dest.domid);
+
+    rc = xsm_grant_copy(sd, dd);
+    if ( rc )
+    {
+        rc = GNTST_permission_denied;
+        goto error_out;
+    }
 
     if ( src_is_gref )
     {

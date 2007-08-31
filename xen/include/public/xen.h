@@ -80,6 +80,7 @@
 #define __HYPERVISOR_sysctl               35
 #define __HYPERVISOR_domctl               36
 #define __HYPERVISOR_kexec_op             37
+#define __HYPERVISOR_xsm_op               38
 
 /* Architecture-specific hypercall definitions. */
 #define __HYPERVISOR_arch_0               48
