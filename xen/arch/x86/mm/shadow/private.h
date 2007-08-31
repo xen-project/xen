@@ -431,6 +431,13 @@ int shadow_cmpxchg_guest_entry(struct vcpu *v, intpte_t *p,
 #undef mfn_valid
 #define mfn_valid(_mfn) (mfn_x(_mfn) < max_page)
 
+/* Override pagetable_t <-> struct page_info conversions to work with mfn_t */
+#undef pagetable_get_page
+#define pagetable_get_page(x)   mfn_to_page(pagetable_get_mfn(x))
+#undef pagetable_from_page
+#define pagetable_from_page(pg) pagetable_from_mfn(page_to_mfn(pg))
+
+
 #if GUEST_PAGING_LEVELS >= 3
 # define is_lo_pte(_vaddr) (((_vaddr)&0x4)==0)
 #else

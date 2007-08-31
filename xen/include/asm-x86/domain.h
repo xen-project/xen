@@ -86,6 +86,9 @@ struct shadow_domain {
     unsigned int      free_pages;   /* number of pages on freelists */
     unsigned int      p2m_pages;    /* number of pages allocates to p2m */
 
+    /* 1-to-1 map for use when HVM vcpus have paging disabled */
+    pagetable_t unpaged_pagetable;
+
     /* Shadow hashtable */
     struct shadow_page_info **hash_table;
     int hash_walking;  /* Some function is walking the hash table */
@@ -181,8 +184,6 @@ struct paging_domain {
 struct paging_vcpu {
     /* Pointers to mode-specific entry points. */
     struct paging_mode *mode;
-    /* HVM guest: paging enabled (CR0.PG)?  */
-    unsigned int translate_enabled:1;
     /* HVM guest: last emulate was to a pagetable */
     unsigned int last_write_was_pt:1;
     /* Translated guest: virtual TLB */

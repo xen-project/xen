@@ -496,10 +496,9 @@ void paging_dump_vcpu_info(struct vcpu *v)
         if ( paging_mode_shadow(v->domain) )
         {
             if ( v->arch.paging.mode )
-                printk("shadowed %u-on-%u, %stranslated\n",
+                printk("shadowed %u-on-%u\n",
                        v->arch.paging.mode->guest_levels,
-                       v->arch.paging.mode->shadow.shadow_levels,
-                       paging_vcpu_mode_translate(v) ? "" : "not ");
+                       v->arch.paging.mode->shadow.shadow_levels);
             else
                 printk("not shadowed\n");
         }

@@ -621,8 +621,6 @@ static void hap_update_paging_modes(struct vcpu *v)
         hvm_pae_enabled(v)       ? &hap_paging_pae_mode  :
                                    &hap_paging_protected_mode;
 
-    v->arch.paging.translate_enabled = hvm_paging_enabled(v);
-
     if ( pagetable_is_null(v->arch.monitor_table) )
     {
         mfn_t mmfn = hap_make_monitor_table(v);

@@ -517,7 +517,7 @@ void hvm_triple_fault(void)
 int hvm_set_cr0(unsigned long value)
 {
     struct vcpu *v = current;
-    unsigned long mfn, old_base_mfn, old_value = v->arch.hvm_vcpu.guest_cr[0];
+    unsigned long mfn, old_value = v->arch.hvm_vcpu.guest_cr[0];
   
     HVM_DBG_LOG(DBG_LEVEL_VMMU, "Update CR0 value = %lx", value);
 
@@ -569,10 +569,7 @@ int hvm_set_cr0(unsigned long value)
             }
 
             /* Now arch.guest_table points to machine physical. */
-            old_base_mfn = pagetable_get_pfn(v->arch.guest_table);
             v->arch.guest_table = pagetable_from_pfn(mfn);
-            if ( old_base_mfn )
-                put_page(mfn_to_page(old_base_mfn));
 
             HVM_DBG_LOG(DBG_LEVEL_VMMU, "Update CR3 value = %lx, mfn = %lx",
                         v->arch.hvm_vcpu.guest_cr[3], mfn);

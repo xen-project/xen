@@ -61,7 +61,8 @@ static inline mfn_t gfn_to_mfn_current(unsigned long gfn)
 mfn_t gfn_to_mfn_foreign(struct domain *d, unsigned long gpfn);
 
 /* General conversion function from gfn to mfn */
-static inline mfn_t gfn_to_mfn(struct domain *d, unsigned long gfn)
+#define gfn_to_mfn(d, g) _gfn_to_mfn((d), (g))
+static inline mfn_t _gfn_to_mfn(struct domain *d, unsigned long gfn)
 {
     if ( !paging_mode_translate(d) )
         return _mfn(gfn);

@@ -173,9 +173,12 @@ static inline int
 guest_supports_superpages(struct vcpu *v)
 {
     /* The _PAGE_PSE bit must be honoured in HVM guests, whenever
-     * CR4.PSE is set or the guest is in PAE or long mode */
-    return (is_hvm_vcpu(v) && (GUEST_PAGING_LEVELS != 2 
-                             || (v->arch.hvm_vcpu.guest_cr[4] & X86_CR4_PSE)));
+     * CR4.PSE is set or the guest is in PAE or long mode. 
+     * It's also used in the dummy PT for vcpus with CR4.PG cleared. */
+    return (is_hvm_vcpu(v) && 
+            (GUEST_PAGING_LEVELS != 2 
+             || !hvm_paging_enabled(v)
+             || (v->arch.hvm_vcpu.guest_cr[4] & X86_CR4_PSE)));
 }
 
 static inline int
@@ -205,8 +208,9 @@ guest_supports_nx(struct vcpu *v)
 static inline int 
 guest_walk_tables(struct vcpu *v, unsigned long va, walk_t *gw, int guest_op)
 {
-    ASSERT(!guest_op || shadow_locked_by_me(v->domain));
-
+    struct domain *d = v->domain;
+    ASSERT(!guest_op || shadow_locked_by_me(d));
+    
     perfc_incr(shadow_guest_walk);
     memset(gw, 0, sizeof(*gw));
     gw->va = va;
@@ -219,11 +223,11 @@ guest_walk_tables(struct vcpu *v, unsigned long va, walk_t *gw, int guest_op)
         + guest_l4_table_offset(va);
     /* Walk down to the l3e */
     if ( !(guest_l4e_get_flags(*gw->l4e) & _PAGE_PRESENT) ) return 0;
-    gw->l3mfn = vcpu_gfn_to_mfn(v, guest_l4e_get_gfn(*gw->l4e));
+    gw->l3mfn = gfn_to_mfn(d, guest_l4e_get_gfn(*gw->l4e));
     if ( !mfn_valid(gw->l3mfn) ) return 1;
     /* This mfn is a pagetable: make sure the guest can't write to it. */
     if ( guest_op && sh_remove_write_access(v, gw->l3mfn, 3, va) != 0 )
-        flush_tlb_mask(v->domain->domain_dirty_cpumask); 
+        flush_tlb_mask(d->domain_dirty_cpumask); 
     gw->l3e = ((guest_l3e_t *)sh_map_domain_page(gw->l3mfn))
         + guest_l3_table_offset(va);
 #else /* PAE only... */
@@ -232,11 +236,11 @@ guest_walk_tables(struct vcpu *v, unsigned long va, walk_t *gw, int guest_op)
 #endif /* PAE or 64... */
     /* Walk down to the l2e */
     if ( !(guest_l3e_get_flags(*gw->l3e) & _PAGE_PRESENT) ) return 0;
-    gw->l2mfn = vcpu_gfn_to_mfn(v, guest_l3e_get_gfn(*gw->l3e));
+    gw->l2mfn = gfn_to_mfn(d, guest_l3e_get_gfn(*gw->l3e));
     if ( !mfn_valid(gw->l2mfn) ) return 1;
     /* This mfn is a pagetable: make sure the guest can't write to it. */
     if ( guest_op && sh_remove_write_access(v, gw->l2mfn, 2, va) != 0 )
-        flush_tlb_mask(v->domain->domain_dirty_cpumask); 
+        flush_tlb_mask(d->domain_dirty_cpumask); 
     gw->l2e = ((guest_l2e_t *)sh_map_domain_page(gw->l2mfn))
         + guest_l2_table_offset(va);
 #else /* 32-bit only... */
@@ -274,12 +278,12 @@ guest_walk_tables(struct vcpu *v, unsigned long va, walk_t *gw, int guest_op)
     else 
     {
         /* Not a superpage: carry on and find the l1e. */
-        gw->l1mfn = vcpu_gfn_to_mfn(v, guest_l2e_get_gfn(*gw->l2e));
+        gw->l1mfn = gfn_to_mfn(d, guest_l2e_get_gfn(*gw->l2e));
         if ( !mfn_valid(gw->l1mfn) ) return 1;
         /* This mfn is a pagetable: make sure the guest can't write to it. */
         if ( guest_op 
              && sh_remove_write_access(v, gw->l1mfn, 1, va) != 0 )
-            flush_tlb_mask(v->domain->domain_dirty_cpumask); 
+            flush_tlb_mask(d->domain_dirty_cpumask); 
         gw->l1e = ((guest_l1e_t *)sh_map_domain_page(gw->l1mfn))
             + guest_l1_table_offset(va);
         gw->eff_l1e = *gw->l1e;
@@ -2191,6 +2195,7 @@ static int validate_gl4e(struct vcpu *v, void *new_ge, mfn_t sl4mfn, void *se)
     guest_l4e_t *new_gl4e = new_ge;
     shadow_l4e_t *sl4p = se;
     mfn_t sl3mfn = _mfn(INVALID_MFN);
+    struct domain *d = v->domain;
     int result = 0;
 
     perfc_incr(shadow_validate_gl4e_calls);
@@ -2198,7 +2203,7 @@ static int validate_gl4e(struct vcpu *v, void *new_ge, mfn_t sl4mfn, void *se)
     if ( guest_l4e_get_flags(*new_gl4e) & _PAGE_PRESENT )
     {
         gfn_t gl3gfn = guest_l4e_get_gfn(*new_gl4e);
-        mfn_t gl3mfn = vcpu_gfn_to_mfn(v, gl3gfn);
+        mfn_t gl3mfn = gfn_to_mfn(d, gl3gfn);
         if ( mfn_valid(gl3mfn) )
             sl3mfn = get_shadow_status(v, gl3mfn, SH_type_l3_shadow);
         else
@@ -2208,11 +2213,11 @@ static int validate_gl4e(struct vcpu *v, void *new_ge, mfn_t sl4mfn, void *se)
                              sl3mfn, &new_sl4e, ft_prefetch);
 
     // check for updates to xen reserved slots
-    if ( !shadow_mode_external(v->domain) )
+    if ( !shadow_mode_external(d) )
     {
         int shadow_index = (((unsigned long)sl4p & ~PAGE_MASK) /
                             sizeof(shadow_l4e_t));
-        int reserved_xen_slot = !is_guest_l4_slot(v->domain, shadow_index);
+        int reserved_xen_slot = !is_guest_l4_slot(d, shadow_index);
 
         if ( unlikely(reserved_xen_slot) )
         {
@@ -2250,7 +2255,7 @@ static int validate_gl3e(struct vcpu *v, void *new_ge, mfn_t sl3mfn, void *se)
     if ( guest_l3e_get_flags(*new_gl3e) & _PAGE_PRESENT )
     {
         gfn_t gl2gfn = guest_l3e_get_gfn(*new_gl3e);
-        mfn_t gl2mfn = vcpu_gfn_to_mfn(v, gl2gfn);
+        mfn_t gl2mfn = gfn_to_mfn(v->domain, gl2gfn);
         if ( mfn_valid(gl2mfn) )
             sl2mfn = get_shadow_status(v, gl2mfn, SH_type_l2_shadow);
         else
@@ -2294,7 +2299,7 @@ static int validate_gl2e(struct vcpu *v, void *new_ge, mfn_t sl2mfn, void *se)
         }
         else
         {
-            mfn_t gl1mfn = vcpu_gfn_to_mfn(v, gl1gfn);
+            mfn_t gl1mfn = gfn_to_mfn(v->domain, gl1gfn);
             if ( mfn_valid(gl1mfn) )
                 sl1mfn = get_shadow_status(v, gl1mfn, SH_type_l1_shadow);
             else
@@ -2361,10 +2366,9 @@ static int validate_gl1e(struct vcpu *v, void *new_ge, mfn_t sl1mfn, void *se)
     perfc_incr(shadow_validate_gl1e_calls);
 
     gfn = guest_l1e_get_gfn(*new_gl1e);
-    gmfn = vcpu_gfn_to_mfn(v, gfn);
+    gmfn = gfn_to_mfn(v->domain, gfn);
 
-    mmio = (is_hvm_vcpu(v) && paging_vcpu_mode_translate(v) && 
-            mmio_space(gfn_to_paddr(gfn)));
+    mmio = (is_hvm_vcpu(v) && mmio_space(gfn_to_paddr(gfn)));
     l1e_propagate_from_guest(v, new_gl1e, _mfn(INVALID_MFN), gmfn, &new_sl1e, 
                              ft_prefetch, mmio);
     
@@ -2593,10 +2597,8 @@ static void sh_prefetch(struct vcpu *v, walk_t *gw,
 
         /* Look at the gfn that the l1e is pointing at */
         gfn = guest_l1e_get_gfn(gl1e);
-        gmfn = vcpu_gfn_to_mfn(v, gfn);
-        mmio = ( is_hvm_vcpu(v) 
-                 && paging_vcpu_mode_translate(v) 
-                 && mmio_space(gfn_to_paddr(gfn)) );
+        gmfn = gfn_to_mfn(v->domain, gfn);
+        mmio = ( is_hvm_vcpu(v) && mmio_space(gfn_to_paddr(gfn)) );
 
         /* Propagate the entry.  Safe to use a pointer to our local 
          * gl1e, since this is not a demand-fetch so there will be no 
@@ -2657,23 +2659,14 @@ static int sh_page_fault(struct vcpu *v,
         {
             if ( sh_l1e_is_gnp(sl1e) )
             {
-                if ( likely(!is_hvm_domain(d) ||
-                            paging_vcpu_mode_translate(v)) )
-                { 
-                    /* Not-present in a guest PT: pass to the guest as
-                     * a not-present fault (by flipping two bits). */
-                    ASSERT(regs->error_code & PFEC_page_present);
-                    regs->error_code ^= (PFEC_reserved_bit|PFEC_page_present);
-                    reset_early_unshadow(v);
-                    perfc_incr(shadow_fault_fast_gnp);
-                    SHADOW_PRINTK("fast path not-present\n");
-                    return 0;
-                }
-                else 
-                {
-                    /* Not-present in the P2M: MMIO */
-                    gpa = va;
-                }
+                /* Not-present in a guest PT: pass to the guest as
+                 * a not-present fault (by flipping two bits). */
+                ASSERT(regs->error_code & PFEC_page_present);
+                regs->error_code ^= (PFEC_reserved_bit|PFEC_page_present);
+                reset_early_unshadow(v);
+                perfc_incr(shadow_fault_fast_gnp);
+                SHADOW_PRINTK("fast path not-present\n");
+                return 0;
             }
             else
             {
@@ -2745,13 +2738,6 @@ static int sh_page_fault(struct vcpu *v,
     //
     if ( unlikely(!(guest_l1e_get_flags(gw.eff_l1e) & _PAGE_PRESENT)) )
     {
-        if ( is_hvm_domain(d) && !paging_vcpu_mode_translate(v) )
-        {
-            /* Not present in p2m map, means this is mmio */
-            gpa = va;
-            goto mmio;
-        }
-
         perfc_incr(shadow_fault_bail_not_present);
         goto not_a_shadow_fault;
     }
@@ -2801,10 +2787,8 @@ static int sh_page_fault(struct vcpu *v,
 
     /* What mfn is the guest trying to access? */
     gfn = guest_l1e_get_gfn(gw.eff_l1e);
-    gmfn = vcpu_gfn_to_mfn(v, gfn);
-    mmio = (is_hvm_domain(d)
-            && paging_vcpu_mode_translate(v) 
-            && mmio_space(gfn_to_paddr(gfn)));
+    gmfn = gfn_to_mfn(d, gfn);
+    mmio = (is_hvm_domain(d) && mmio_space(gfn_to_paddr(gfn)));
 
     if ( !mmio && !mfn_valid(gmfn) )
     {
@@ -3523,20 +3507,18 @@ sh_update_cr3(struct vcpu *v, int do_locking)
         ASSERT(shadow_mode_external(d));
 
         // Is paging enabled on this vcpu?
-        if ( paging_vcpu_mode_translate(v) )
+        if ( hvm_paging_enabled(v) )
         {
             gfn = _gfn(paddr_to_pfn(v->arch.hvm_vcpu.guest_cr[3]));
-            gmfn = vcpu_gfn_to_mfn(v, gfn);
+            gmfn = gfn_to_mfn(d, gfn);
             ASSERT(mfn_valid(gmfn));
             ASSERT(pagetable_get_pfn(v->arch.guest_table) == mfn_x(gmfn));
         } 
         else 
         {
-            /* Paging disabled: guest_table points at (part of) p2m */
-#if SHADOW_PAGING_LEVELS != 3 /* in 3-on-4, guest-table is in slot 0 of p2m */
-            /* For everything else, they sould be the same */
-            ASSERT(v->arch.guest_table.pfn == d->arch.phys_table.pfn);
-#endif
+            /* Paging disabled: guest_table points at a 32-bit 1-to-1 map */
+            ASSERT(v->arch.guest_table.pfn
+                   == d->arch.paging.shadow.unpaged_pagetable.pfn);
         }
     }
 #endif
@@ -3574,11 +3556,11 @@ sh_update_cr3(struct vcpu *v, int do_locking)
       * until the next CR3 write makes us refresh our cache. */
      ASSERT(v->arch.paging.shadow.guest_vtable == NULL);
  
-     if ( shadow_mode_external(d) && paging_vcpu_mode_translate(v) ) 
-         /* Paging enabled: find where in the page the l3 table is */
+     if ( shadow_mode_external(d) ) 
+         /* Find where in the page the l3 table is */
          guest_idx = guest_index((void *)v->arch.hvm_vcpu.guest_cr[3]);
      else
-         /* Paging disabled or PV: l3 is at the start of a page */ 
+         /* PV guest: l3 is at the start of a page */ 
          guest_idx = 0; 
 
      // Ignore the low 2 bits of guest_idx -- they are really just
@@ -3635,7 +3617,7 @@ sh_update_cr3(struct vcpu *v, int do_locking)
             if ( guest_l3e_get_flags(gl3e[i]) & _PAGE_PRESENT )
             {
                 gl2gfn = guest_l3e_get_gfn(gl3e[i]);
-                gl2mfn = vcpu_gfn_to_mfn(v, gl2gfn);
+                gl2mfn = gfn_to_mfn(d, gl2gfn);
                 flush |= sh_remove_write_access(v, gl2mfn, 2, 0); 
             }
         }
@@ -3647,7 +3629,7 @@ sh_update_cr3(struct vcpu *v, int do_locking)
             if ( guest_l3e_get_flags(gl3e[i]) & _PAGE_PRESENT )
             {
                 gl2gfn = guest_l3e_get_gfn(gl3e[i]);
-                gl2mfn = vcpu_gfn_to_mfn(v, gl2gfn);
+                gl2mfn = gfn_to_mfn(d, gl2gfn);
                 sh_set_toplevel_shadow(v, i, gl2mfn, (i == 3) 
                                        ? SH_type_l2h_shadow 
                                        : SH_type_l2_shadow);
@@ -4001,7 +3983,7 @@ static inline void * emulate_map_dest(struct vcpu *v,
         }
     }
 #endif
-    mfn = vcpu_gfn_to_mfn(v, gfn);
+    mfn = gfn_to_mfn(v->domain, gfn);
 
     errcode = PFEC_write_access;
     if ( !(flags & _PAGE_PRESENT) ) 
@@ -4268,7 +4250,7 @@ audit_gfn_to_mfn(struct vcpu *v, gfn_t gfn, mfn_t gmfn)
          != PGT_writable_page ) 
         return _mfn(gfn_x(gfn)); /* This is a paging-disabled shadow */
     else 
-        return gfn_to_mfn(v->domain, gfn_x(gfn));
+        return gfn_to_mfn(v->domain, gfn);
 } 
 
 
