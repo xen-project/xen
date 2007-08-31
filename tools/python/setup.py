@@ -59,14 +59,9 @@ ptsname = Extension("ptsname",
                libraries          = libraries,
                sources            = [ "ptsname/ptsname.c" ])
 
-modules = [ xc, xs, ptsname ]
+modules = [ xc, xs, ptsname, acm, flask ]
 if os.uname()[0] == 'SunOS':
     modules.append(scf)
-
-if os.environ.get('XEN_SECURITY_MODULE') == 'acm':
-    modules.append(acm)
-if os.environ.get('XEN_SECURITY_MODULE') == 'flask':
-    modules.append(flask)
 
 setup(name            = 'xen',
       version         = '3.0',
