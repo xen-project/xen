@@ -69,7 +69,13 @@ then
         p=${p#*:}
     fi
 fi
-file=$(readlink -f "$p") || ebusy "$p does not exist."
+# some versions of readlink cannot be passed a regular file
+if [ -L "$p" ]; then
+    file=$(readlink -f "$p") || ebusy "$p link does not exist."
+else
+    [ -f "$p" ] || { ebusy "$p file does not exist." }
+    file="$p"
+fi
 
 if [ "$mode" != '!' ] 
 then
