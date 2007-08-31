@@ -171,6 +171,9 @@ struct arch_domain {
 #ifdef CONFIG_XEN_IA64_TLB_TRACK
     struct tlb_track*   tlb_track;
 #endif
+
+    /* for domctl_destroy_domain continuation */
+    unsigned long mm_teardown_offset;
 };
 #define INT_ENABLE_OFFSET(v) 		  \
     (sizeof(vcpu_info_t) * (v)->vcpu_id + \

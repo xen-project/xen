@@ -215,6 +215,18 @@ alloc_dom_xen_and_dom_io(void)
     BUG_ON(dom_io == NULL);
 }
 
+static int
+mm_teardown_can_skip(struct domain* d, unsigned long offset)
+{
+    return d->arch.mm_teardown_offset > offset;
+}
+
+static void
+mm_teardown_update_offset(struct domain* d, unsigned long offset)
+{
+    d->arch.mm_teardown_offset = offset;
+}
+
 static void
 mm_teardown_pte(struct domain* d, volatile pte_t* pte, unsigned long offset)
 {
@@ -252,46 +264,73 @@ mm_teardown_pte(struct domain* d, volatile pte_t* pte, unsigned long offset)
     }
 }
 
-static void
+static int
 mm_teardown_pmd(struct domain* d, volatile pmd_t* pmd, unsigned long offset)
 {
     unsigned long i;
     volatile pte_t* pte = pte_offset_map(pmd, offset);
 
     for (i = 0; i < PTRS_PER_PTE; i++, pte++) {
-        if (!pte_present(*pte)) // acquire semantics
+        unsigned long cur_offset = offset + (i << PAGE_SHIFT);
+        if (mm_teardown_can_skip(d, cur_offset + PAGE_SIZE))
             continue;
-        mm_teardown_pte(d, pte, offset + (i << PAGE_SHIFT));
+        if (!pte_present(*pte)) { // acquire semantics
+            mm_teardown_update_offset(d, cur_offset);
+            continue;
+        }
+        mm_teardown_update_offset(d, cur_offset);
+        mm_teardown_pte(d, pte, cur_offset);
+        if (hypercall_preempt_check())
+            return -EAGAIN;
     }
+    return 0;
 }
 
-static void
+static int
 mm_teardown_pud(struct domain* d, volatile pud_t *pud, unsigned long offset)
 {
     unsigned long i;
     volatile pmd_t *pmd = pmd_offset(pud, offset);
 
     for (i = 0; i < PTRS_PER_PMD; i++, pmd++) {
-        if (!pmd_present(*pmd)) // acquire semantics
+        unsigned long cur_offset = offset + (i << PMD_SHIFT);
+        if (mm_teardown_can_skip(d, cur_offset + PMD_SIZE))
             continue;
-        mm_teardown_pmd(d, pmd, offset + (i << PMD_SHIFT));
+        if (!pmd_present(*pmd)) { // acquire semantics
+            mm_teardown_update_offset(d, cur_offset);
+            continue;
+        }
+        if (mm_teardown_pmd(d, pmd, cur_offset))
+            return -EAGAIN;
     }
+    return 0;
 }
 
-static void
+static int
 mm_teardown_pgd(struct domain* d, volatile pgd_t *pgd, unsigned long offset)
 {
     unsigned long i;
     volatile pud_t *pud = pud_offset(pgd, offset);
 
     for (i = 0; i < PTRS_PER_PUD; i++, pud++) {
-        if (!pud_present(*pud)) // acquire semantics
+        unsigned long cur_offset = offset + (i << PUD_SHIFT);
+#ifndef __PAGETABLE_PUD_FOLDED
+        if (mm_teardown_can_skip(d, cur_offset + PUD_SIZE))
             continue;
-        mm_teardown_pud(d, pud, offset + (i << PUD_SHIFT));
+#endif
+        if (!pud_present(*pud)) { // acquire semantics
+#ifndef __PAGETABLE_PUD_FOLDED
+            mm_teardown_update_offset(d, cur_offset);
+#endif
+            continue;
+        }
+        if (mm_teardown_pud(d, pud, cur_offset))
+            return -EAGAIN;
     }
+    return 0;
 }
 
-void
+int
 mm_teardown(struct domain* d)
 {
     struct mm_struct* mm = &d->arch.mm;

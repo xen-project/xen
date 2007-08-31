@@ -417,7 +417,7 @@ extern unsigned long totalram_pages;
 extern int nr_swap_pages;
 
 extern void alloc_dom_xen_and_dom_io(void);
-extern void mm_teardown(struct domain* d);
+extern int mm_teardown(struct domain* d);
 extern void mm_final_teardown(struct domain* d);
 extern struct page_info * assign_new_domain_page(struct domain *d, unsigned long mpaddr);
 extern void assign_new_domain0_page(struct domain *d, unsigned long mpaddr);

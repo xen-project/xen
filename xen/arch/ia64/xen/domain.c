@@ -563,6 +563,7 @@ int arch_domain_create(struct domain *d)
 		goto fail_nomem;
 
 	memset(&d->arch.mm, 0, sizeof(d->arch.mm));
+	d->arch.mm_teardown_offset = 0;
 
 	if ((d->arch.mm.pgd = pgd_alloc(&d->arch.mm)) == NULL)
 	    goto fail_nomem;
@@ -938,12 +939,15 @@ static void relinquish_memory(struct domain *d, struct list_head *list)
 
 int domain_relinquish_resources(struct domain *d)
 {
+    int ret;
     /* Relinquish guest resources for VT-i domain. */
     if (d->vcpu[0] && VMX_DOMAIN(d->vcpu[0]))
 	    vmx_relinquish_guest_resources(d);
 
     /* Tear down shadow mode stuff. */
-    mm_teardown(d);
+    ret = mm_teardown(d);
+    if (ret != 0)
+        return ret;
 
     /* Relinquish every page of memory. */
     relinquish_memory(d, &d->xenpage_list);
