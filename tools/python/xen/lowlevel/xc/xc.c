@@ -685,7 +685,7 @@ static PyObject *pyxc_physinfo(XcObject *self)
     char cpu_cap[128], *p=cpu_cap, *q=cpu_cap;
     int i, j, max_cpu_id;
     PyObject *ret_obj, *node_to_cpu_obj;
-    xc_cpu_to_node_t map[MAX_CPU_ID];
+    xc_cpu_to_node_t map[MAX_CPU_ID + 1];
 
     set_xen_guest_handle(info.cpu_to_node, map);
     info.max_cpu_id = MAX_CPU_ID;
