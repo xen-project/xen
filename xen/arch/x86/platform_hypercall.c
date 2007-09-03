@@ -137,6 +137,9 @@ ret_t do_platform_op(XEN_GUEST_HANDLE(xen_platform_op_t) u_xenpf_op)
     case XENPF_microcode_update:
     {
         extern int microcode_update(XEN_GUEST_HANDLE(void), unsigned long len);
+#ifdef COMPAT
+        XEN_GUEST_HANDLE(void) data;
+#endif
 
         ret = xsm_microcode();
         if ( ret )
@@ -146,8 +149,6 @@ ret_t do_platform_op(XEN_GUEST_HANDLE(xen_platform_op_t) u_xenpf_op)
         ret = microcode_update(op->u.microcode.data,
                                op->u.microcode.length);
 #else
-        XEN_GUEST_HANDLE(void) data;
-
         guest_from_compat_handle(data, op->u.microcode.data);
         ret = microcode_update(data, op->u.microcode.length);
 #endif
