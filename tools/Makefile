@@ -3,9 +3,7 @@ include $(XEN_ROOT)/tools/Rules.mk
 
 SUBDIRS-y :=
 SUBDIRS-y += libxc
-ifeq ($(FLASK_ENABLE),y)
 SUBDIRS-y += flask
-endif
 SUBDIRS-y += xenstore
 SUBDIRS-y += misc
 SUBDIRS-y += examples
