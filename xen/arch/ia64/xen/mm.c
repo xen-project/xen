@@ -868,15 +868,43 @@ __assign_domain_page(struct domain *d,
     // dom0 tries to map real machine's I/O region, but failed.
     // It is very likely that dom0 doesn't boot correctly because
     // it can't access I/O. So complain here.
-    if ((flags & ASSIGN_nocache) &&
-        (pte_pfn(ret_pte) != (physaddr >> PAGE_SHIFT) ||
-         !(pte_val(ret_pte) & _PAGE_MA_UC)))
-        printk("%s:%d WARNING can't assign page domain 0x%p id %d\n"
-               "\talready assigned pte_val 0x%016lx\n"
-               "\tmpaddr 0x%016lx physaddr 0x%016lx flags 0x%lx\n",
-               __func__, __LINE__,
-               d, d->domain_id, pte_val(ret_pte),
-               mpaddr, physaddr, flags);
+    if (flags & ASSIGN_nocache) {
+        int warn = 0;
+
+        if (pte_pfn(ret_pte) != (physaddr >> PAGE_SHIFT))
+            warn = 1;
+        else if (!(pte_val(ret_pte) & _PAGE_MA_UC)) {
+            u32 type;
+            u64 attr;
+
+            warn = 1;
+
+            /*
+             * See
+             * complete_dom0_memmap()
+             * case EFI_RUNTIME_SERVICES_CODE:
+             * case EFI_RUNTIME_SERVICES_DATA:
+             * case EFI_ACPI_RECLAIM_MEMORY:
+             * case EFI_ACPI_MEMORY_NVS:
+             * case EFI_RESERVED_TYPE:
+             * 
+             * Currently only EFI_RUNTIME_SERVICES_CODE is found
+             * so that we suppress only EFI_RUNTIME_SERVICES_CODE case.
+             */
+            type = efi_mem_type(physaddr);
+            attr = efi_mem_attributes(physaddr);
+            if (type == EFI_RUNTIME_SERVICES_CODE &&
+                (attr & EFI_MEMORY_UC) && (attr & EFI_MEMORY_WB))
+                warn = 0;
+        }
+        if (warn)
+            printk("%s:%d WARNING can't assign page domain 0x%p id %d\n"
+                   "\talready assigned pte_val 0x%016lx\n"
+                   "\tmpaddr 0x%016lx physaddr 0x%016lx flags 0x%lx\n",
+                   __func__, __LINE__,
+                   d, d->domain_id, pte_val(ret_pte),
+                   mpaddr, physaddr, flags);
+    }
 
     return -EAGAIN;
 }
