@@ -187,11 +187,6 @@ static int dummy_memory_stat_reservation (struct domain *d1, struct domain *d2)
     return 0;
 }
 
-static int dummy_update_va_mapping (struct domain *d, l1_pgentry_t pte)
-{
-    return 0;
-}
-
 static int dummy_console_io (struct domain *d, int cmd)
 {
     return 0;
@@ -381,6 +376,11 @@ static int dummy_mmu_machphys_update (struct domain *d, unsigned long mfn)
     return 0;
 }
 
+static int dummy_update_va_mapping (struct domain *d, l1_pgentry_t pte)
+{
+    return 0;
+}
+
 static int dummy_add_to_physmap (struct domain *d1, struct domain *d2)
 {
     return 0;
@@ -448,7 +448,6 @@ void xsm_fixup_ops (struct xsm_operations *ops)
     set_to_dummy_if_null(ops, memory_adjust_reservation);
     set_to_dummy_if_null(ops, memory_stat_reservation);
     set_to_dummy_if_null(ops, memory_pin_page);
-    set_to_dummy_if_null(ops, update_va_mapping);
 
     set_to_dummy_if_null(ops, console_io);
 
@@ -483,6 +482,7 @@ void xsm_fixup_ops (struct xsm_operations *ops)
     set_to_dummy_if_null(ops, domain_memory_map);
     set_to_dummy_if_null(ops, mmu_normal_update);
     set_to_dummy_if_null(ops, mmu_machphys_update);
+    set_to_dummy_if_null(ops, update_va_mapping);
     set_to_dummy_if_null(ops, add_to_physmap);
 #endif
 }

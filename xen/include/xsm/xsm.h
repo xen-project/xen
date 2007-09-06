@@ -99,7 +99,6 @@ struct xsm_operations {
     int (*memory_adjust_reservation) (struct domain *d1, struct domain *d2);
     int (*memory_stat_reservation) (struct domain *d1, struct domain *d2);
     int (*memory_pin_page) (struct domain *d, struct page_info *page);
-    int (*update_va_mapping) (struct domain *d, l1_pgentry_t pte);
 
     int (*console_io) (struct domain *d, int cmd);
 
@@ -135,6 +134,7 @@ struct xsm_operations {
     int (*domain_memory_map) (struct domain *d);
     int (*mmu_normal_update) (struct domain *d, intpte_t fpte);
     int (*mmu_machphys_update) (struct domain *d, unsigned long mfn);
+    int (*update_va_mapping) (struct domain *d, l1_pgentry_t pte);
     int (*add_to_physmap) (struct domain *d1, struct domain *d2);
 #endif
 };
@@ -366,11 +366,6 @@ static inline int xsm_memory_pin_page(struct domain *d, struct page_info *page)
     return xsm_call(memory_pin_page(d, page));
 }
 
-static inline int xsm_update_va_mapping(struct domain *d, l1_pgentry_t pte)
-{
-    return xsm_call(update_va_mapping(d, pte));
-}
-
 static inline int xsm_console_io (struct domain *d, int cmd)
 {
     return xsm_call(console_io(d, cmd));
@@ -526,6 +521,11 @@ static inline int xsm_mmu_normal_update (struct domain *d, intpte_t fpte)
 static inline int xsm_mmu_machphys_update (struct domain *d, unsigned long mfn)
 {
     return xsm_call(mmu_machphys_update(d, mfn));
+}
+
+static inline int xsm_update_va_mapping(struct domain *d, l1_pgentry_t pte)
+{
+    return xsm_call(update_va_mapping(d, pte));
 }
 
 static inline int xsm_add_to_physmap(struct domain *d1, struct domain *d2)

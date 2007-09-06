@@ -407,27 +407,6 @@ static DEFINE_PER_CPU(struct percpu_mm_info, percpu_mm_info);
  */
 #define FOREIGNDOM (this_cpu(percpu_mm_info).foreign ?: current->domain)
 
-static int flask_update_va_mapping(struct domain *d, l1_pgentry_t pte)
-{
-    int rc = 0;
-    u32 psid;
-    u32 map_perms = MMU__MAP_READ;
-    unsigned long mfn;
-    struct domain_security_struct *dsec;
-
-    dsec = d->ssid;
-
-    mfn = gmfn_to_mfn(FOREIGNDOM, l1e_get_pfn(pte));        
-    rc = get_mfn_sid(mfn, &psid);
-    if ( rc )
-        return rc;
-
-    if ( l1e_get_flags(pte) & _PAGE_RW )
-        map_perms |= MMU__MAP_WRITE;
-
-    return avc_has_perm(dsec->sid, psid, SECCLASS_MMU, map_perms, NULL);
-}
-
 static int flask_console_io(struct domain *d, int cmd)
 {
     u32 perm;
@@ -1036,6 +1015,27 @@ static int flask_mmu_machphys_update(struct domain *d, unsigned long mfn)
     return avc_has_perm(dsec->sid, psid, SECCLASS_MMU, MMU__UPDATEMP, NULL);
 }
 
+static int flask_update_va_mapping(struct domain *d, l1_pgentry_t pte)
+{
+    int rc = 0;
+    u32 psid;
+    u32 map_perms = MMU__MAP_READ;
+    unsigned long mfn;
+    struct domain_security_struct *dsec;
+
+    dsec = d->ssid;
+
+    mfn = gmfn_to_mfn(FOREIGNDOM, l1e_get_pfn(pte));        
+    rc = get_mfn_sid(mfn, &psid);
+    if ( rc )
+        return rc;
+
+    if ( l1e_get_flags(pte) & _PAGE_RW )
+        map_perms |= MMU__MAP_WRITE;
+
+    return avc_has_perm(dsec->sid, psid, SECCLASS_MMU, map_perms, NULL);
+}
+
 static int flask_add_to_physmap(struct domain *d1, struct domain *d2)
 {
     return domain_has_perm(d1, d2, SECCLASS_MMU, MMU__PHYSMAP);
@@ -1090,7 +1090,6 @@ static struct xsm_operations flask_ops = {
     .memory_adjust_reservation = flask_memory_adjust_reservation,
     .memory_stat_reservation = flask_memory_stat_reservation,
     .memory_pin_page = flask_memory_pin_page,
-    .update_va_mapping = flask_update_va_mapping,
 
     .console_io = flask_console_io,
 
@@ -1125,6 +1124,7 @@ static struct xsm_operations flask_ops = {
     .domain_memory_map = flask_domain_memory_map,
     .mmu_normal_update = flask_mmu_normal_update,
     .mmu_machphys_update = flask_mmu_machphys_update,
+    .update_va_mapping = flask_update_va_mapping,
     .add_to_physmap = flask_add_to_physmap,
 #endif
 };
