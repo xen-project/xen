@@ -14,7 +14,7 @@
 # - resources
 
 from XmTestLib import *
-from xen.util import security
+import xen.util.xsm.xsm as security
 from xen.util import xsconstants
 import commands
 import os
