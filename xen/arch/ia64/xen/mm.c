@@ -178,6 +178,7 @@
 #include <xen/guest_access.h>
 #include <asm/page.h>
 #include <public/memory.h>
+#include <asm/event.h>
 
 static void domain_page_flush_and_put(struct domain* d, unsigned long mpaddr,
                                       volatile pte_t* ptep, pte_t old_pte, 
