@@ -194,15 +194,14 @@ def restore(xd, fd, dominfo = None, paused = False):
         pae  = 0
 
     try:
-        restore_image = image.create(dominfo, dominfo.info['image'],
-                                     dominfo.info['device'])
+        restore_image = image.create(dominfo, dominfo.info)
         memory = restore_image.getRequiredAvailableMemory(
-            dominfo.info['memory'] * 1024)
+            dominfo.info['memory_dynamic_max'] / 1024)
         maxmem = restore_image.getRequiredAvailableMemory(
-            dominfo.info['maxmem'] * 1024)
+            dominfo.info['memory_static_max'] / 1024)
         shadow = restore_image.getRequiredShadowMemory(
-            dominfo.info['shadow_memory'] * 1024,
-            dominfo.info['maxmem'] * 1024)
+            dominfo.info['shadow_memory'] / 1024,
+            dominfo.info['memory_static_max'] / 1024)
 
         log.debug("restore:shadow=0x%x, _static_max=0x%x, _static_min=0x%x, ",
                   dominfo.info['shadow_memory'],
