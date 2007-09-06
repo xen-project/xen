@@ -17,7 +17,7 @@ xc_ia64_fpsr_default(void)
     return FPSR_DEFAULT;
 }
 
-int
+static int
 xc_ia64_get_pfn_list(int xc_handle, uint32_t domid, xen_pfn_t *pfn_buf,
                      unsigned int start_page, unsigned int nr_pages)
 {

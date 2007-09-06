@@ -672,10 +672,6 @@ int xc_get_pfn_list(int xc_handle, uint32_t domid, uint64_t *pfn_buf,
 
 unsigned long xc_ia64_fpsr_default(void);
 
-int xc_ia64_get_pfn_list(int xc_handle, uint32_t domid,
-                         xen_pfn_t *pfn_buf,
-                         unsigned int start_page, unsigned int nr_pages);
-
 int xc_copy_to_domain_page(int xc_handle, uint32_t domid,
                            unsigned long dst_pfn, const char *src_page);
 
