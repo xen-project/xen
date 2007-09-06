@@ -838,13 +838,28 @@ def set_resource_label_xapi(resource, reslabel_xapi, oldlabel_xapi):
 
 
 def is_resource_in_use(resource):
-    """ Investigate all running domains whether they use this device """
+    """
+       Domain-0 'owns' resources of type 'VLAN', the rest are owned by
+       the guests.
+    """
     from xen.xend import XendDomain
-    dominfos = XendDomain.instance().list('all')
     lst = []
-    for dominfo in dominfos:
-        if is_resource_in_use_by_dom(dominfo, resource):
-            lst.append(dominfo)
+    if resource.startswith('vlan'):
+        from xen.xend.XendXSPolicyAdmin import XSPolicyAdminInstance
+        curpol = XSPolicyAdminInstance().get_loaded_policy()
+        policytype, label, policy = get_res_label(resource)
+        if curpol and \
+           policytype == xsconstants.ACM_POLICY_ID and \
+           policy == curpol.get_name() and \
+           label in curpol.policy_get_resourcelabel_names():
+            # VLAN is in use.
+            lst.append(XendDomain.instance().
+                         get_vm_by_uuid(XendDomain.DOM0_UUID))
+    else:
+        dominfos = XendDomain.instance().list('all')
+        for dominfo in dominfos:
+            if is_resource_in_use_by_dom(dominfo, resource):
+                lst.append(dominfo)
     return lst
 
 def devices_equal(res1, res2, mustexist=True):
@@ -892,6 +907,10 @@ def get_domain_resources(dominfo):
             if sec_lab:
                 resources[typ].append(sec_lab)
             else:
+                # !!! This should really get the label of the domain
+                # or at least a resource label that has the same STE type
+                # as the domain has
+                from xen.util.acmpolicy import ACM_LABEL_UNLABELED
                 resources[typ].append("%s:%s:%s" %
                                       (xsconstants.ACM_POLICY_ID,
                                        active_policy,
@@ -915,7 +934,8 @@ def resources_compatible_with_vmlabel(xspol, dominfo, vmlabel):
             access_control = dictio.dict_read("resources",
                                               res_label_filename)
         except:
-            return False
+            # No labeled resources -> must be compatible
+            return True
         return __resources_compatible_with_vmlabel(xspol, dominfo, vmlabel,
                                                    access_control)
     finally:
@@ -924,12 +944,14 @@ def resources_compatible_with_vmlabel(xspol, dominfo, vmlabel):
 
 
 def __resources_compatible_with_vmlabel(xspol, dominfo, vmlabel,
-                                        access_control):
+                                        access_control,
+                                        is_policy_update=False):
     """
         Check whether the resources' labels are compatible with the
         given VM label. The access_control parameter provides a
         dictionary of the resource name to resource label mappings
         under which the evaluation should be done.
+        Call this only for a paused or running domain.
     """
     def collect_labels(reslabels, s_label, polname):
         if len(s_label) != 3 or polname != s_label[1]:
@@ -955,15 +977,23 @@ def __resources_compatible_with_vmlabel(xspol, dominfo, vmlabel,
         elif key in [ 'vif' ]:
             for xapi_label in value:
                 label = xapi_label.split(":")
-                if not collect_labels(reslabels, label, polname):
-                    return False
+                from xen.util.acmpolicy import ACM_LABEL_UNLABELED
+                if not (is_policy_update and \
+                        label[2] == ACM_LABEL_UNLABELED):
+                    if not collect_labels(reslabels, label, polname):
+                        return False
         else:
             log.error("Unhandled device type: %s" % key)
             return False
 
     # Check that all resource labes have a common STE type with the
     # vmlabel
-    rc = xspol.policy_check_vmlabel_against_reslabels(vmlabel, reslabels)
+    if len(reslabels) > 0:
+        rc = xspol.policy_check_vmlabel_against_reslabels(vmlabel, reslabels)
+    else:
+        rc = True
+    log.info("vmlabel=%s, reslabels=%s, rc=%s" %
+             (vmlabel, reslabels, str(rc)))
     return rc;
 
 def set_resource_label(resource, policytype, policyref, reslabel, \
@@ -1176,7 +1206,7 @@ def change_acm_policy(bin_pol, del_array, chg_array,
         access_control = {}
         try:
             access_control = dictio.dict_read("resources", res_label_filename)
-        finally:
+        except:
             pass
         for key, labeldata in access_control.items():
             if len(labeldata) == 2:
@@ -1234,11 +1264,12 @@ def change_acm_policy(bin_pol, del_array, chg_array,
                 compatible = __resources_compatible_with_vmlabel(new_acmpol,
                                                       dominfo,
                                                       new_vmlabel,
-                                                      access_control)
+                                                      access_control,
+                                                      is_policy_update=True)
                 log.info("Domain %s with new label '%s' can access its "
                          "resources? : %s" %
                          (name, new_vmlabel, str(compatible)))
-                log.info("VM labels in new domain: %s" %
+                log.info("VM labels in new policy: %s" %
                          new_acmpol.policy_get_virtualmachinelabel_names())
                 if not compatible:
                     return (-xsconstants.XSERR_RESOURCE_ACCESS, "")
@@ -1252,11 +1283,16 @@ def change_acm_policy(bin_pol, del_array, chg_array,
                 sec_lab, new_seclab = labels
                 if sec_lab != new_seclab:
                     log.info("Updating domain %s to new label '%s'." % \
-                             (sec_lab, new_seclab))
+                             (dominfo.getName(), new_seclab))
                     # This better be working!
-                    dominfo.set_security_label(new_seclab,
-                                               sec_lab,
-                                               new_acmpol)
+                    res = dominfo.set_security_label(new_seclab,
+                                                     sec_lab,
+                                                     new_acmpol,
+                                                     cur_acmpol)
+                    if res[0] != xsconstants.XSERR_SUCCESS:
+                        log.info("ERROR: Could not chg label on domain %s: %s" %
+                                 (dominfo.getName(),
+                                  xsconstants.xserr2string(-int(res[0]))))
     finally:
         log.info("----------------------------------------------")
         mapfile_unlock()
