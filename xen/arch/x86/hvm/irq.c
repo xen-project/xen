@@ -306,7 +306,14 @@ int hvm_vcpu_ack_pending_irq(struct vcpu *v, enum hvm_intack type, int *vector)
     switch ( type )
     {
     case hvm_intack_nmi:
+#if 0
         return test_and_clear_bool(v->nmi_pending);
+#else
+        if ( test_and_clear_bool(v->nmi_pending) )
+            gdprintk(XENLOG_WARNING, "Dropping NMI delivery to %d:%d\n",
+                     v->domain->domain_id, v->vcpu_id);
+        break;
+#endif
     case hvm_intack_lapic:
         return ((*vector = cpu_get_apic_interrupt(v)) != -1);
     case hvm_intack_pic:
