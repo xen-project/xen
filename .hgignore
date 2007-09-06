@@ -114,6 +114,7 @@
 ^tools/firmware/vmxassist/gen$
 ^tools/firmware/vmxassist/offsets\.h$
 ^tools/firmware/vmxassist/vmxassist$
+^tools/flask/loadpolicy/flask-loadpolicy$
 ^tools/ioemu/\.pc/.*$
 ^tools/ioemu/config-host\.h$
 ^tools/ioemu/config-host\.mak$
