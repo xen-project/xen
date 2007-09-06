@@ -18,7 +18,7 @@
 """Display currently enforced policy (low-level hypervisor representation).
 """
 import sys
-from xen.util.security import ACMError, err, dump_policy
+from xen.util.xsm.xsm import XSMError, err, dump_policy
 from xen.xm.opts import OptionError
 
 def help():

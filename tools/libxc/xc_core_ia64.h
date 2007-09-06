@@ -46,6 +46,7 @@ xc_core_arch_context_get_shdr(struct xc_core_arch_context* arch_ctxt,
 int
 xc_core_arch_context_dump(struct xc_core_arch_context* arch_ctxt,
                           void* args, dumpcore_rtn_t dump_rtn);
+#define xc_core_arch_gpfn_may_present(arch_ctxt, i)             (1)
 
 #endif /* XC_CORE_IA64_H */
 

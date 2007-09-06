@@ -23,7 +23,8 @@ import os
 
 from xen.util.xmlrpclib2 import stringify
 from xmlrpclib import dumps, loads
-from xen.util import security, xsconstants
+from xen.util import xsconstants
+import xen.util.xsm.xsm as security
 from xen.xend.XendError import SecurityError
 
 KB = 1024

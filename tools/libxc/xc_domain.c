@@ -55,10 +55,14 @@ int xc_domain_unpause(int xc_handle,
 int xc_domain_destroy(int xc_handle,
                       uint32_t domid)
 {
+    int ret;
     DECLARE_DOMCTL;
     domctl.cmd = XEN_DOMCTL_destroydomain;
     domctl.domain = (domid_t)domid;
-    return do_domctl(xc_handle, &domctl);
+    do {
+        ret = do_domctl(xc_handle, &domctl);
+    } while ( ret && (errno == EAGAIN) );
+    return ret;
 }
 
 int xc_domain_shutdown(int xc_handle,

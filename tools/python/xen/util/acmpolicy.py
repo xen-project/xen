@@ -1,4 +1,4 @@
-#============================================================================
+ #============================================================================
 # This library is free software; you can redistribute it and/or
 # modify it under the terms of version 2.1 of the GNU Lesser General Public
 # License as published by the Free Software Foundation.
@@ -23,10 +23,11 @@ import stat
 import array
 from xml.dom import minidom, Node
 from xen.xend.XendLogging import log
-from xen.util import security, xsconstants, bootloader, mkdir
+from xen.util import xsconstants, bootloader, mkdir
 from xen.util.xspolicy import XSPolicy
-from xen.util.security import ACMError
 from xen.xend.XendError import SecurityError
+import xen.util.xsm.acm.acm as security
+from xen.util.xsm.xsm import XSMError
 
 ACM_POLICIES_DIR = security.policy_dir_prefix + "/"
 
@@ -1240,8 +1241,8 @@ class ACMPolicy(XSPolicy):
 
         (major, minor) = self.getVersionTuple()
         hdr_bin = struct.pack(headerformat,
-                              ACM_POLICY_VERSION,
                               ACM_MAGIC,
+                              ACM_POLICY_VERSION,
                               totallen_bin,
                               polref_offset,
                               primpolcode,

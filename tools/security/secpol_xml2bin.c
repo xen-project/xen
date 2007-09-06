@@ -22,6 +22,7 @@
  *
  * indent -i4 -kr -nut
  */
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -38,7 +39,7 @@
 #include <libxml/tree.h>
 #include <libxml/xmlreader.h>
 #include <stdint.h>
-#include <xen/acm.h>
+#include <xen/xsm/acm.h>
 
 #include "secpol_xml2bin.h"
 

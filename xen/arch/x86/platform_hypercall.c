@@ -24,6 +24,7 @@
 #include <asm/edd.h>
 #include <asm/mtrr.h>
 #include "cpu/mtrr/mtrr.h"
+#include <xsm/xsm.h>
 
 extern uint16_t boot_edid_caps;
 extern uint8_t boot_edid_info[];
@@ -59,6 +60,10 @@ ret_t do_platform_op(XEN_GUEST_HANDLE(xen_platform_op_t) u_xenpf_op)
     {
     case XENPF_settime:
     {
+        ret = xsm_xen_settime();
+        if ( ret )
+            break;
+
         do_settime(op->u.settime.secs, 
                    op->u.settime.nsecs, 
                    op->u.settime.system_time);
@@ -68,6 +73,10 @@ ret_t do_platform_op(XEN_GUEST_HANDLE(xen_platform_op_t) u_xenpf_op)
 
     case XENPF_add_memtype:
     {
+        ret = xsm_memtype(op->cmd);
+        if ( ret )
+            break;
+
         ret = mtrr_add_page(
             op->u.add_memtype.mfn,
             op->u.add_memtype.nr_mfns,
@@ -86,6 +95,10 @@ ret_t do_platform_op(XEN_GUEST_HANDLE(xen_platform_op_t) u_xenpf_op)
 
     case XENPF_del_memtype:
     {
+        ret = xsm_memtype(op->cmd);
+        if ( ret )
+            break;
+
         if (op->u.del_memtype.handle == 0
             /* mtrr/main.c otherwise does a lookup */
             && (int)op->u.del_memtype.reg >= 0)
@@ -105,6 +118,10 @@ ret_t do_platform_op(XEN_GUEST_HANDLE(xen_platform_op_t) u_xenpf_op)
         unsigned int  nr_mfns;
         mtrr_type     type;
 
+        ret = xsm_memtype(op->cmd);
+        if ( ret )
+            break;
+
         ret = -EINVAL;
         if ( op->u.read_memtype.reg < num_var_ranges )
         {
@@ -120,12 +137,18 @@ ret_t do_platform_op(XEN_GUEST_HANDLE(xen_platform_op_t) u_xenpf_op)
     case XENPF_microcode_update:
     {
         extern int microcode_update(XEN_GUEST_HANDLE(void), unsigned long len);
+#ifdef COMPAT
+        XEN_GUEST_HANDLE(void) data;
+#endif
+
+        ret = xsm_microcode();
+        if ( ret )
+            break;
+
 #ifndef COMPAT
         ret = microcode_update(op->u.microcode.data,
                                op->u.microcode.length);
 #else
-        XEN_GUEST_HANDLE(void) data;
-
         guest_from_compat_handle(data, op->u.microcode.data);
         ret = microcode_update(data, op->u.microcode.length);
 #endif
@@ -136,6 +159,11 @@ ret_t do_platform_op(XEN_GUEST_HANDLE(xen_platform_op_t) u_xenpf_op)
     {
         extern int opt_noirqbalance;
         int quirk_id = op->u.platform_quirk.quirk_id;
+
+        ret = xsm_platform_quirk(quirk_id);
+        if ( ret )
+            break;
+
         switch ( quirk_id )
         {
         case QUIRK_NOIRQBALANCING:

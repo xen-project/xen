@@ -1876,6 +1876,7 @@ static void svm_do_msr_access(
             svm_inject_exception(v, TRAP_gp_fault, 1, 0);
             break;
 
+        case MSR_IA32_MCG_CAP:
         case MSR_IA32_MCG_STATUS:
         case MSR_IA32_MC0_STATUS:
         case MSR_K8_MC1_STATUS:

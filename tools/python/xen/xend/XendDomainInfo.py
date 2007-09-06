@@ -36,7 +36,7 @@ from types import StringTypes
 import xen.lowlevel.xc
 from xen.util import asserts
 from xen.util.blkif import blkdev_uname_to_file, blkdev_uname_to_taptype
-from xen.util import security
+import xen.util.xsm.xsm as security
 
 from xen.xend import balloon, sxp, uuid, image, arch, osdep
 from xen.xend import XendOptions, XendNode, XendConfig
@@ -607,6 +607,9 @@ class XendDomainInfo:
                     _, dev_info = sxprs[dev]
             else:  # 'vbd' or 'tap'
                 dev_info = self.getDeviceInfo_vbd(dev)
+                # To remove the UUID of the device from refs,
+                # deviceClass must be always 'vbd'.
+                deviceClass = 'vbd'
             if dev_info is None:
                 return rc
 
@@ -981,7 +984,7 @@ class XendDomainInfo:
             changed = True
 
         # Check if the rtc offset has changes
-        if vm_details.get("rtc/timeoffset", 0) != self.info["platform"].get("rtc_timeoffset", 0):
+        if vm_details.get("rtc/timeoffset", "0") != self.info["platform"].get("rtc_timeoffset", "0"):
             self.info["platform"]["rtc_timeoffset"] = vm_details.get("rtc/timeoffset", 0)
             changed = True
  
@@ -1770,7 +1773,8 @@ class XendDomainInfo:
 
         self._cleanupVm()
         if self.dompath is not None:
-            xc.domain_destroy_hook(self.domid)
+            if self.domid is not None:
+                xc.domain_destroy_hook(self.domid)
             self.destroyDomain()
 
         self._cleanup_phantom_devs(paths)

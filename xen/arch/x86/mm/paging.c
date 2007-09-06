@@ -26,6 +26,7 @@
 #include <asm/p2m.h>
 #include <asm/hap.h>
 #include <asm/guest_access.h>
+#include <xsm/xsm.h>
 
 /* Xen command-line option to enable hardware-assisted paging */
 int opt_hap_enabled;
@@ -402,6 +403,10 @@ int paging_domctl(struct domain *d, xen_domctl_shadow_op_t *sc,
         return -EINVAL;
     }
 
+    rc = xsm_shadow_control(d, sc->op);
+    if ( rc )
+        return rc;
+
     /* Code to handle log-dirty. Note that some log dirty operations
      * piggy-back on shadow operations. For example, when
      * XEN_DOMCTL_SHADOW_OP_OFF is called, it first checks whether log dirty
@@ -496,10 +501,9 @@ void paging_dump_vcpu_info(struct vcpu *v)
         if ( paging_mode_shadow(v->domain) )
         {
             if ( v->arch.paging.mode )
-                printk("shadowed %u-on-%u, %stranslated\n",
+                printk("shadowed %u-on-%u\n",
                        v->arch.paging.mode->guest_levels,
-                       v->arch.paging.mode->shadow.shadow_levels,
-                       paging_vcpu_mode_translate(v) ? "" : "not ");
+                       v->arch.paging.mode->shadow.shadow_levels);
             else
                 printk("not shadowed\n");
         }

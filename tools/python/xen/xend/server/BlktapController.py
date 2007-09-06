@@ -7,6 +7,14 @@ from xen.xend.XendLogging import log
 phantomDev = 0;
 phantomId = 0;
 
+blktap_disk_types = [
+    'aio',
+    'sync',
+    'vmdk',
+    'ram',
+    'qcow'
+    ]
+
 class BlktapController(BlkifController):
     def __init__(self, vm):
         BlkifController.__init__(self, vm)

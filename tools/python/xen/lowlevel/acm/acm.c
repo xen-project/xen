@@ -18,6 +18,7 @@
  *
  * indent -i4 -kr -nut
  */
+
 #include <Python.h>
 
 #include <stdio.h>
@@ -27,8 +28,8 @@
 #include <stdlib.h>
 #include <sys/ioctl.h>
 #include <netinet/in.h>
-#include <xen/acm.h>
-#include <xen/acm_ops.h>
+#include <xen/xsm/acm.h>
+#include <xen/xsm/acm_ops.h>
 
 #include <xenctrl.h>
 

@@ -517,7 +517,7 @@ void hvm_triple_fault(void)
 int hvm_set_cr0(unsigned long value)
 {
     struct vcpu *v = current;
-    unsigned long mfn, old_base_mfn, old_value = v->arch.hvm_vcpu.guest_cr[0];
+    unsigned long mfn, old_value = v->arch.hvm_vcpu.guest_cr[0];
   
     HVM_DBG_LOG(DBG_LEVEL_VMMU, "Update CR0 value = %lx", value);
 
@@ -569,10 +569,7 @@ int hvm_set_cr0(unsigned long value)
             }
 
             /* Now arch.guest_table points to machine physical. */
-            old_base_mfn = pagetable_get_pfn(v->arch.guest_table);
             v->arch.guest_table = pagetable_from_pfn(mfn);
-            if ( old_base_mfn )
-                put_page(mfn_to_page(old_base_mfn));
 
             HVM_DBG_LOG(DBG_LEVEL_VMMU, "Update CR3 value = %lx, mfn = %lx",
                         v->arch.hvm_vcpu.guest_cr[3], mfn);
@@ -1072,6 +1069,10 @@ static int hvmop_set_pci_intx_level(
     if ( !is_hvm_domain(d) )
         goto out;
 
+    rc = xsm_hvm_set_pci_intx_level(d);
+    if ( rc )
+        goto out;
+
     rc = 0;
     switch ( op.level )
     {
@@ -1113,6 +1114,10 @@ static int hvmop_set_isa_irq_level(
 
     rc = -EINVAL;
     if ( !is_hvm_domain(d) )
+        goto out;
+
+    rc = xsm_hvm_set_isa_irq_level(d);
+    if ( rc )
         goto out;
 
     rc = 0;
@@ -1158,12 +1163,22 @@ static int hvmop_set_pci_link_route(
     if ( !is_hvm_domain(d) )
         goto out;
 
+    rc = xsm_hvm_set_pci_link_route(d);
+    if ( rc )
+        goto out;
+
     rc = 0;
     hvm_set_pci_link_route(d, op.link, op.isa_irq);
 
  out:
     rcu_unlock_domain(d);
     return rc;
+}
+
+static int hvmop_flush_tlb_all(void)
+{
+    flush_tlb_mask(current->domain->domain_dirty_cpumask);
+    return 0;
 }
 
 long do_hvm_op(unsigned long op, XEN_GUEST_HANDLE(void) arg)
@@ -1199,6 +1214,10 @@ long do_hvm_op(unsigned long op, XEN_GUEST_HANDLE(void) arg)
 
         rc = -EINVAL;
         if ( !is_hvm_domain(d) )
+            goto param_fail;
+
+        rc = xsm_hvm_param(d, op);
+        if ( rc )
             goto param_fail;
 
         if ( op == HVMOP_set_param )
@@ -1255,6 +1274,10 @@ long do_hvm_op(unsigned long op, XEN_GUEST_HANDLE(void) arg)
     case HVMOP_set_pci_link_route:
         rc = hvmop_set_pci_link_route(
             guest_handle_cast(arg, xen_hvm_set_pci_link_route_t));
+        break;
+
+    case HVMOP_flush_tlbs:
+        rc = guest_handle_is_null(arg) ? hvmop_flush_tlb_all() : -ENOSYS;
         break;
 
     default:

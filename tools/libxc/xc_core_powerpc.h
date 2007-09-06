@@ -33,6 +33,7 @@ struct xc_core_arch_context {
 #define xc_core_arch_context_get(arch_ctxt, ctxt, xc_handle, domid) \
                                                                 (0)
 #define xc_core_arch_context_dump(arch_ctxt, args, dump_rtn)    (0)
+#define xc_core_arch_gpfn_may_present(arch_ctxt, i)             (1)
 
 static inline int
 xc_core_arch_context_get_shdr(struct xc_core_arch_context *arch_ctxt, 

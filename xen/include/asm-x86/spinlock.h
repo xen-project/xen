@@ -33,18 +33,10 @@ static inline void _raw_spin_lock(spinlock_t *lock)
 
 static inline void _raw_spin_unlock(spinlock_t *lock)
 {
-#if !defined(CONFIG_X86_OOSTORE)
     ASSERT(spin_is_locked(lock));
     __asm__ __volatile__ (
 	"movb $1,%0" 
         : "=m" (lock->lock) : : "memory" );
-#else
-    char oldval = 1;
-    ASSERT(spin_is_locked(lock));
-    __asm__ __volatile__ (
-	"xchgb %b0, %1"
-        : "=q" (oldval), "=m" (lock->lock) : "0" (oldval) : "memory" );
-#endif
 }
 
 static inline int _raw_spin_trylock(spinlock_t *lock)

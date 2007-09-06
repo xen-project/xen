@@ -26,11 +26,11 @@ import os, stat
 import shutil
 import string
 import re
-from xen.util.security import err
-from xen.util.security import policy_dir_prefix, xen_title_re
-from xen.util.security import boot_filename, altboot_filename
-from xen.util.security import any_title_re, xen_kernel_re, any_module_re
-from xen.util.security import empty_line_re, binary_name_re, policy_name_re
+from xen.util.xsm.xsm import err
+from xen.util.xsm.xsm import policy_dir_prefix, xen_title_re
+from xen.util.xsm.xsm import boot_filename, altboot_filename
+from xen.util.xsm.xsm import any_title_re, xen_kernel_re, any_module_re
+from xen.util.xsm.xsm import empty_line_re, binary_name_re, policy_name_re
 from xen.util import xsconstants
 from xen.xm.opts import OptionError
 from xen.xm import main as xm_main

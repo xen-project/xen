@@ -289,7 +289,7 @@ enum hvm_intack hvm_vcpu_has_pending_irq(struct vcpu *v)
 {
     struct hvm_domain *plat = &v->domain->arch.hvm_domain;
 
-    if ( unlikely(v->arch.hvm_vcpu.nmi_pending) )
+    if ( unlikely(v->nmi_pending) )
         return hvm_intack_nmi;
 
     if ( vlapic_has_interrupt(v) != -1 )
@@ -306,7 +306,14 @@ int hvm_vcpu_ack_pending_irq(struct vcpu *v, enum hvm_intack type, int *vector)
     switch ( type )
     {
     case hvm_intack_nmi:
-        return test_and_clear_bool(v->arch.hvm_vcpu.nmi_pending);
+#if 0
+        return test_and_clear_bool(v->nmi_pending);
+#else
+        if ( test_and_clear_bool(v->nmi_pending) )
+            gdprintk(XENLOG_WARNING, "Dropping NMI delivery to %d:%d\n",
+                     v->domain->domain_id, v->vcpu_id);
+        break;
+#endif
     case hvm_intack_lapic:
         return ((*vector = cpu_get_apic_interrupt(v)) != -1);
     case hvm_intack_pic:

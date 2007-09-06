@@ -108,12 +108,21 @@ extern char *kasprintf(gfp_t gfp, const char *fmt, ...)
 #endif
 
 #if defined(_LINUX_NETDEVICE_H) && LINUX_VERSION_CODE < KERNEL_VERSION(2,6,18)
-#define netif_tx_lock_bh(dev) (spin_lock_bh(&(dev)->xmit_lock))
-#define netif_tx_unlock_bh(dev) (spin_unlock_bh(&(dev)->xmit_lock))
+#define netif_tx_lock_bh(dev) spin_lock_bh(&(dev)->xmit_lock)
+#define netif_tx_unlock_bh(dev) spin_unlock_bh(&(dev)->xmit_lock)
 #endif
 
 #if defined(__LINUX_SEQLOCK_H) && !defined(DEFINE_SEQLOCK)
 #define DEFINE_SEQLOCK(x) seqlock_t x = SEQLOCK_UNLOCKED
+#endif
+
+/* Bug in RHEL4-U3: rw_lock_t is mistakenly defined in DEFINE_RWLOCK() macro */
+#if defined(__LINUX_SPINLOCK_H) && defined(DEFINE_RWLOCK)
+#define rw_lock_t rwlock_t
+#endif
+
+#if defined(__LINUX_SPINLOCK_H) && !defined(DEFINE_RWLOCK)
+#define DEFINE_RWLOCK(x) rwlock_t x = RW_LOCK_UNLOCKED
 #endif
 
 #endif

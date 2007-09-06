@@ -20,7 +20,8 @@ import logging
 from xen.xend.XendBase import XendBase
 from xen.xend.XendError import *
 from xen.xend.XendXSPolicyAdmin import XSPolicyAdminInstance
-from xen.util import xsconstants, security
+from xen.util import xsconstants
+import xen.util.xsm.xsm as security
 import base64
 
 log = logging.getLogger("xend.XendXSPolicy")

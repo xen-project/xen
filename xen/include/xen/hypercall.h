@@ -12,9 +12,9 @@
 #include <public/domctl.h>
 #include <public/sysctl.h>
 #include <public/platform.h>
-#include <public/acm_ops.h>
 #include <public/event_channel.h>
 #include <asm/hypercall.h>
+#include <xsm/xsm.h>
 
 extern long
 do_ni_hypercall(
@@ -97,10 +97,6 @@ do_vcpu_op(
     XEN_GUEST_HANDLE(void) arg);
 
 extern long
-do_acm_op(
-    XEN_GUEST_HANDLE(xen_acmctl_t) arg);
-
-extern long
 do_nmi_op(
     unsigned int cmd,
     XEN_GUEST_HANDLE(void) arg);
@@ -115,6 +111,10 @@ do_kexec_op(
     unsigned long op,
     int arg1,
     XEN_GUEST_HANDLE(void) arg);
+
+extern long
+do_xsm_op(
+    XEN_GUEST_HANDLE(xsm_op_t) u_xsm_op);
 
 #ifdef CONFIG_COMPAT
 

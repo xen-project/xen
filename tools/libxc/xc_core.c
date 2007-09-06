@@ -17,8 +17,8 @@
  *  |    .xen_prstatus                                       |
  *  |    .xen_ia64_mmapped_regs if ia64                      |
  *  |    .xen_shared_info if present                         |
- *  |    .xen_p2m or .xen_pfn                                |
  *  |    .xen_pages                                          |
+ *  |    .xen_p2m or .xen_pfn                                |
  *  +--------------------------------------------------------+
  *  |.note.Xen:note section                                  |
  *  |    "Xen" is used as note name,                         |
@@ -37,12 +37,12 @@
  *  +--------------------------------------------------------+
  *  |.xen_shared_info if possible                            |
  *  +--------------------------------------------------------+
+ *  |.xen_pages                                              |
+ *  |    page * nr_pages                                     |
+ *  +--------------------------------------------------------+
  *  |.xen_p2m or .xen_pfn                                    |
  *  |    .xen_p2m: struct xen_dumpcore_p2m[nr_pages]         |
  *  |    .xen_pfn: uint64_t[nr_pages]                        |
- *  +--------------------------------------------------------+
- *  |.xen_pages                                              |
- *  |    page * nr_pages                                     |
  *  +--------------------------------------------------------+
  *  |.shstrtab: section header string table                  |
  *  +--------------------------------------------------------+
@@ -57,21 +57,6 @@
 
 /* number of pages to write at a time */
 #define DUMP_INCREMENT (4 * 1024)
-
-static int
-copy_from_domain_page(int xc_handle,
-                      uint32_t domid,
-                      unsigned long mfn,
-                      void *dst_page)
-{
-    void *vaddr = xc_map_foreign_range(
-        xc_handle, domid, PAGE_SIZE, PROT_READ, mfn);
-    if ( vaddr == NULL )
-        return -1;
-    memcpy(dst_page, vaddr, PAGE_SIZE);
-    munmap(vaddr, PAGE_SIZE);
-    return 0;
-}
 
 /* string table */
 struct xc_core_strtab {
@@ -231,6 +216,35 @@ xc_core_shdr_set(Elf64_Shdr *shdr,
     return 0;
 }
 
+static void
+xc_core_ehdr_init(Elf64_Ehdr *ehdr)
+{
+    memset(ehdr, 0, sizeof(*ehdr));
+    ehdr->e_ident[EI_MAG0] = ELFMAG0;
+    ehdr->e_ident[EI_MAG1] = ELFMAG1;
+    ehdr->e_ident[EI_MAG2] = ELFMAG2;
+    ehdr->e_ident[EI_MAG3] = ELFMAG3;
+    ehdr->e_ident[EI_CLASS] = ELFCLASS64;
+    ehdr->e_ident[EI_DATA] = ELF_ARCH_DATA;
+    ehdr->e_ident[EI_VERSION] = EV_CURRENT;
+    ehdr->e_ident[EI_OSABI] = ELFOSABI_SYSV;
+    ehdr->e_ident[EI_ABIVERSION] = EV_CURRENT;
+
+    ehdr->e_type = ET_CORE;
+    ehdr->e_machine = ELF_ARCH_MACHINE;
+    ehdr->e_version = EV_CURRENT;
+    ehdr->e_entry = 0;
+    ehdr->e_phoff = 0;
+    ehdr->e_shoff = sizeof(*ehdr);
+    ehdr->e_flags = ELF_CORE_EFLAGS;
+    ehdr->e_ehsize = sizeof(*ehdr);
+    ehdr->e_phentsize = sizeof(Elf64_Phdr);
+    ehdr->e_phnum = 0;
+    ehdr->e_shentsize = sizeof(Elf64_Shdr);
+    /* ehdr->e_shnum and ehdr->e_shstrndx aren't known here yet.
+     * fill it later */
+}
+
 static int
 elfnote_fill_xen_version(int xc_handle,
                          struct xen_dumpcore_elfnote_xen_version_desc
@@ -277,12 +291,100 @@ elfnote_fill_xen_version(int xc_handle,
     return 0;
 }
 
-static int
+static void
 elfnote_fill_format_version(struct xen_dumpcore_elfnote_format_version_desc
                             *format_version)
 {
     format_version->version = XEN_DUMPCORE_FORMAT_VERSION_CURRENT;
-    return 0;
+}
+
+static void
+elfnote_init(struct elfnote *elfnote)
+{
+    /* elf note section */
+    memset(elfnote, 0, sizeof(*elfnote));
+    elfnote->namesz = strlen(XEN_DUMPCORE_ELFNOTE_NAME) + 1;
+    strncpy(elfnote->name, XEN_DUMPCORE_ELFNOTE_NAME, sizeof(elfnote->name));
+}
+
+static int
+elfnote_dump_none(void *args, dumpcore_rtn_t dump_rtn)
+{
+    int sts;
+    struct elfnote elfnote;
+    struct xen_dumpcore_elfnote_none_desc none;
+
+    elfnote_init(&elfnote);
+    memset(&none, 0, sizeof(none));
+
+    elfnote.descsz = sizeof(none);
+    elfnote.type = XEN_ELFNOTE_DUMPCORE_NONE;
+    sts = dump_rtn(args, (char*)&elfnote, sizeof(elfnote));
+    if ( sts != 0 )
+        return sts;
+    return dump_rtn(args, (char*)&none, sizeof(none));
+}
+
+static int
+elfnote_dump_core_header(
+    void *args, dumpcore_rtn_t dump_rtn, const xc_dominfo_t *info,
+    int nr_vcpus, unsigned long nr_pages)
+{
+    int sts;
+    struct elfnote elfnote;
+    struct xen_dumpcore_elfnote_header_desc header;
+    
+    elfnote_init(&elfnote);
+    memset(&header, 0, sizeof(header));
+    
+    elfnote.descsz = sizeof(header);
+    elfnote.type = XEN_ELFNOTE_DUMPCORE_HEADER;
+    header.xch_magic = info->hvm ? XC_CORE_MAGIC_HVM : XC_CORE_MAGIC;
+    header.xch_nr_vcpus = nr_vcpus;
+    header.xch_nr_pages = nr_pages;
+    header.xch_page_size = PAGE_SIZE;
+    sts = dump_rtn(args, (char*)&elfnote, sizeof(elfnote));
+    if ( sts != 0 )
+        return sts;
+    return dump_rtn(args, (char*)&header, sizeof(header));
+}
+
+static int
+elfnote_dump_xen_version(void *args, dumpcore_rtn_t dump_rtn, int xc_handle)
+{
+    int sts;
+    struct elfnote elfnote;
+    struct xen_dumpcore_elfnote_xen_version_desc xen_version;
+
+    elfnote_init(&elfnote);
+    memset(&xen_version, 0, sizeof(xen_version));
+
+    elfnote.descsz = sizeof(xen_version);
+    elfnote.type = XEN_ELFNOTE_DUMPCORE_XEN_VERSION;
+    elfnote_fill_xen_version(xc_handle, &xen_version);
+    sts = dump_rtn(args, (char*)&elfnote, sizeof(elfnote));
+    if ( sts != 0 )
+        return sts;
+    return dump_rtn(args, (char*)&xen_version, sizeof(xen_version));
+}
+
+static int
+elfnote_dump_format_version(void *args, dumpcore_rtn_t dump_rtn)
+{
+    int sts;
+    struct elfnote elfnote;
+    struct xen_dumpcore_elfnote_format_version_desc format_version;
+
+    elfnote_init(&elfnote);
+    memset(&format_version, 0, sizeof(format_version));
+    
+    elfnote.descsz = sizeof(format_version);
+    elfnote.type = XEN_ELFNOTE_DUMPCORE_FORMAT_VERSION;
+    elfnote_fill_format_version(&format_version);
+    sts = dump_rtn(args, (char*)&elfnote, sizeof(elfnote));
+    if ( sts != 0 )
+        return sts;
+    return dump_rtn(args, (char*)&format_version, sizeof(format_version));
 }
 
 int
@@ -326,13 +428,6 @@ xc_domain_dumpcore_via_callback(int xc_handle,
     uint16_t strtab_idx;
     struct xc_core_section_headers *sheaders = NULL;
     Elf64_Shdr *shdr;
-
-    /* elf notes */
-    struct elfnote elfnote;
-    struct xen_dumpcore_elfnote_none_desc none;
-    struct xen_dumpcore_elfnote_header_desc header;
-    struct xen_dumpcore_elfnote_xen_version_desc xen_version;
-    struct xen_dumpcore_elfnote_format_version_desc format_version;
 
     xc_core_arch_context_init(&arch_ctxt);
     if ( (dump_mem_start = malloc(DUMP_INCREMENT*PAGE_SIZE)) == NULL )
@@ -379,8 +474,9 @@ xc_domain_dumpcore_via_callback(int xc_handle,
     }
 
     /* obtain memory map */
-    sts = xc_core_arch_memory_map_get(xc_handle, &info, live_shinfo,
-                                      &memory_map, &nr_memory_map);
+    sts = xc_core_arch_memory_map_get(xc_handle, &arch_ctxt, &info,
+                                      live_shinfo, &memory_map,
+                                      &nr_memory_map);
     if ( sts != 0 )
         goto out;
 
@@ -410,70 +506,8 @@ xc_domain_dumpcore_via_callback(int xc_handle,
         }
     }
 
-    /* create .xen_p2m or .xen_pfn */
-    j = 0;
-    for ( map_idx = 0; map_idx < nr_memory_map; map_idx++ )
-    {
-        uint64_t pfn_start;
-        uint64_t pfn_end;
-
-        pfn_start = memory_map[map_idx].addr >> PAGE_SHIFT;
-        pfn_end = pfn_start + (memory_map[map_idx].size >> PAGE_SHIFT);
-        for ( i = pfn_start; i < pfn_end; i++ )
-        {
-            if ( !auto_translated_physmap )
-            {
-                if ( p2m[i] == INVALID_P2M_ENTRY )
-                    continue;
-                p2m_array[j].pfn = i;
-                p2m_array[j].gmfn = p2m[i];
-            }
-            else
-            {
-                /* try to map page to determin wheter it has underlying page */
-                void *vaddr = xc_map_foreign_range(xc_handle, domid,
-                                                   PAGE_SIZE, PROT_READ, i);
-                if ( vaddr == NULL )
-                    continue;
-                munmap(vaddr, PAGE_SIZE);
-                pfn_array[j] = i;
-            }
-
-            j++;
-        }
-    }
-    if ( j != nr_pages )
-    {
-        PERROR("j (%ld) != nr_pages (%ld)", j , nr_pages);
-        /* When live dump-mode (-L option) is specified,
-         * guest domain may change its mapping.
-         */
-        nr_pages = j;
-    }
-
-    memset(&ehdr, 0, sizeof(ehdr));
-    ehdr.e_ident[EI_MAG0] = ELFMAG0;
-    ehdr.e_ident[EI_MAG1] = ELFMAG1;
-    ehdr.e_ident[EI_MAG2] = ELFMAG2;
-    ehdr.e_ident[EI_MAG3] = ELFMAG3;
-    ehdr.e_ident[EI_CLASS] = ELFCLASS64;
-    ehdr.e_ident[EI_DATA] = ELF_ARCH_DATA;
-    ehdr.e_ident[EI_VERSION] = EV_CURRENT;
-    ehdr.e_ident[EI_OSABI] = ELFOSABI_SYSV;
-    ehdr.e_ident[EI_ABIVERSION] = EV_CURRENT;
-
-    ehdr.e_type = ET_CORE;
-    ehdr.e_machine = ELF_ARCH_MACHINE;
-    ehdr.e_version = EV_CURRENT;
-    ehdr.e_entry = 0;
-    ehdr.e_phoff = 0;
-    ehdr.e_shoff = sizeof(ehdr);
-    ehdr.e_flags = ELF_CORE_EFLAGS;
-    ehdr.e_ehsize = sizeof(ehdr);
-    ehdr.e_phentsize = sizeof(Elf64_Phdr);
-    ehdr.e_phnum = 0;
-    ehdr.e_shentsize = sizeof(Elf64_Shdr);
     /* ehdr.e_shnum and ehdr.e_shstrndx aren't known here yet. fill it later*/
+    xc_core_ehdr_init(&ehdr);
 
     /* create section header */
     strtab = xc_core_strtab_init();
@@ -549,7 +583,7 @@ xc_domain_dumpcore_via_callback(int xc_handle,
     /* arch context */
     sts = xc_core_arch_context_get_shdr(&arch_ctxt, sheaders, strtab,
                                         &filesz, offset);
-    if ( sts != 0)
+    if ( sts != 0 )
         goto out;
     offset += filesz;
 
@@ -571,6 +605,33 @@ xc_domain_dumpcore_via_callback(int xc_handle,
         offset += filesz;
     }
 
+    /*
+     * pages and p2m/pfn are the last section to allocate section headers
+     * so that we know the number of section headers here.
+     * 2 = pages section and p2m/pfn table section
+     */
+    fixup = (sheaders->num + 2) * sizeof(*shdr);
+    /* zeroth section should have zero offset */
+    for ( i = 1; i < sheaders->num; i++ )
+        sheaders->shdrs[i].sh_offset += fixup;
+    offset += fixup;
+    dummy_len = ROUNDUP(offset, PAGE_SHIFT) - offset; /* padding length */
+    offset += dummy_len;
+
+    /* pages */
+    shdr = xc_core_shdr_get(sheaders);
+    if ( shdr == NULL )
+    {
+        PERROR("could not get section headers for .xen_pages");
+        goto out;
+    }
+    filesz = nr_pages * PAGE_SIZE;
+    sts = xc_core_shdr_set(shdr, strtab, XEN_DUMPCORE_SEC_PAGES, SHT_PROGBITS,
+                           offset, filesz, PAGE_SIZE, PAGE_SIZE);
+    if ( sts != 0 )
+        goto out;
+    offset += filesz;
+
     /* p2m/pfn table */
     shdr = xc_core_shdr_get(sheaders);
     if ( shdr == NULL )
@@ -585,8 +646,6 @@ xc_domain_dumpcore_via_callback(int xc_handle,
                                SHT_PROGBITS,
                                offset, filesz, __alignof__(p2m_array[0]),
                                sizeof(p2m_array[0]));
-        if ( sts != 0 )
-            goto out;
     }
     else
     {
@@ -595,34 +654,7 @@ xc_domain_dumpcore_via_callback(int xc_handle,
                                SHT_PROGBITS,
                                offset, filesz, __alignof__(pfn_array[0]),
                                sizeof(pfn_array[0]));
-        if ( sts != 0 )
-            goto out;
     }
-    offset += filesz;
-
-    /* pages */
-    shdr = xc_core_shdr_get(sheaders);
-    if ( shdr == NULL )
-    {
-        PERROR("could not get section headers for .xen_pages");
-        goto out;
-    }
-
-    /*
-     * pages are the last section to allocate section headers
-     * so that we know the number of section headers here.
-     */
-    fixup = sheaders->num * sizeof(*shdr);
-    /* zeroth section should have zero offset */
-    for ( i = 1; i < sheaders->num; i++ )
-        sheaders->shdrs[i].sh_offset += fixup;
-    offset += fixup;
-    dummy_len = ROUNDUP(offset, PAGE_SHIFT) - offset; /* padding length */
-    offset += dummy_len;
-
-    filesz = nr_pages * PAGE_SIZE;
-    sts = xc_core_shdr_set(shdr, strtab, XEN_DUMPCORE_SEC_PAGES, SHT_PROGBITS,
-                           offset, filesz, PAGE_SIZE, PAGE_SIZE);
     if ( sts != 0 )
         goto out;
     offset += filesz;
@@ -645,54 +677,23 @@ xc_domain_dumpcore_via_callback(int xc_handle,
     if ( sts != 0 )
         goto out;
 
-    /* elf note section */
-    memset(&elfnote, 0, sizeof(elfnote));
-    elfnote.namesz = strlen(XEN_DUMPCORE_ELFNOTE_NAME) + 1;
-    strncpy(elfnote.name, XEN_DUMPCORE_ELFNOTE_NAME, sizeof(elfnote.name));
-
-    /* elf note section:xen core header */
-    elfnote.descsz = sizeof(none);
-    elfnote.type = XEN_ELFNOTE_DUMPCORE_NONE;
-    sts = dump_rtn(args, (char*)&elfnote, sizeof(elfnote));
-    if ( sts != 0 )
-        goto out;
-    sts = dump_rtn(args, (char*)&none, sizeof(none));
+    /* elf note section: xen core header */
+    sts = elfnote_dump_none(args, dump_rtn);
     if ( sts != 0 )
         goto out;
 
-    /* elf note section:xen core header */
-    elfnote.descsz = sizeof(header);
-    elfnote.type = XEN_ELFNOTE_DUMPCORE_HEADER;
-    header.xch_magic = info.hvm ? XC_CORE_MAGIC_HVM : XC_CORE_MAGIC;
-    header.xch_nr_vcpus = nr_vcpus;
-    header.xch_nr_pages = nr_pages;
-    header.xch_page_size = PAGE_SIZE;
-    sts = dump_rtn(args, (char*)&elfnote, sizeof(elfnote));
-    if ( sts != 0 )
-        goto out;
-    sts = dump_rtn(args, (char*)&header, sizeof(header));
+    /* elf note section: xen core header */
+    sts = elfnote_dump_core_header(args, dump_rtn, &info, nr_vcpus, nr_pages);
     if ( sts != 0 )
         goto out;
 
     /* elf note section: xen version */
-    elfnote.descsz = sizeof(xen_version);
-    elfnote.type = XEN_ELFNOTE_DUMPCORE_XEN_VERSION;
-    elfnote_fill_xen_version(xc_handle, &xen_version);
-    sts = dump_rtn(args, (char*)&elfnote, sizeof(elfnote));
-    if ( sts != 0 )
-        goto out;
-    sts = dump_rtn(args, (char*)&xen_version, sizeof(xen_version));
+    sts = elfnote_dump_xen_version(args, dump_rtn, xc_handle);
     if ( sts != 0 )
         goto out;
 
     /* elf note section: format version */
-    elfnote.descsz = sizeof(format_version);
-    elfnote.type = XEN_ELFNOTE_DUMPCORE_FORMAT_VERSION;
-    elfnote_fill_format_version(&format_version);
-    sts = dump_rtn(args, (char*)&elfnote, sizeof(elfnote));
-    if ( sts != 0 )
-        goto out;
-    sts = dump_rtn(args, (char*)&format_version, sizeof(format_version));
+    sts = elfnote_dump_format_version(args, dump_rtn);
     if ( sts != 0 )
         goto out;
 
@@ -714,16 +715,6 @@ xc_domain_dumpcore_via_callback(int xc_handle,
     if ( sts != 0 )
         goto out;
 
-    /* p2m/pfn table: .xen_p2m/.xen_pfn */
-    if ( !auto_translated_physmap )
-        sts = dump_rtn(args, (char *)p2m_array,
-                       sizeof(p2m_array[0]) * nr_pages);
-    else
-        sts = dump_rtn(args, (char *)pfn_array,
-                       sizeof(pfn_array[0]) * nr_pages);
-    if ( sts != 0 )
-        goto out;
-
     /* Pad the output data to page alignment. */
     memset(dummy, 0, PAGE_SIZE);
     sts = dump_rtn(args, dummy, dummy_len);
@@ -731,24 +722,102 @@ xc_domain_dumpcore_via_callback(int xc_handle,
         goto out;
 
     /* dump pages: .xen_pages */
-    for ( dump_mem = dump_mem_start, i = 0; i < nr_pages; i++ )
+    j = 0;
+    dump_mem = dump_mem_start;
+    for ( map_idx = 0; map_idx < nr_memory_map; map_idx++ )
     {
-        uint64_t gmfn;
-        if ( !auto_translated_physmap )
-            gmfn = p2m_array[i].gmfn;
-        else
-            gmfn = pfn_array[i];
+        uint64_t pfn_start;
+        uint64_t pfn_end;
 
-        copy_from_domain_page(xc_handle, domid, gmfn, dump_mem);
-        dump_mem += PAGE_SIZE;
-        if ( ((i + 1) % DUMP_INCREMENT == 0) || ((i + 1) == nr_pages) )
+        pfn_start = memory_map[map_idx].addr >> PAGE_SHIFT;
+        pfn_end = pfn_start + (memory_map[map_idx].size >> PAGE_SHIFT);
+        for ( i = pfn_start; i < pfn_end; i++ )
         {
-            sts = dump_rtn(args, dump_mem_start, dump_mem - dump_mem_start);
-            if ( sts != 0 )
-                goto out;
-            dump_mem = dump_mem_start;
+            uint64_t gmfn;
+            void *vaddr;
+            
+            if ( j >= nr_pages )
+            {
+                /*
+                 * When live dump-mode (-L option) is specified,
+                 * guest domain may increase memory.
+                 */
+                IPRINTF("exceeded nr_pages (%ld) losing pages", nr_pages);
+                goto copy_done;
+            }
+
+            if ( !auto_translated_physmap )
+            {
+                gmfn = p2m[i];
+                if ( gmfn == INVALID_P2M_ENTRY )
+                    continue;
+
+                p2m_array[j].pfn = i;
+                p2m_array[j].gmfn = gmfn;
+            }
+            else
+            {
+                if ( !xc_core_arch_gpfn_may_present(&arch_ctxt, i) )
+                    continue;
+
+                gmfn = i;
+                pfn_array[j] = i;
+            }
+
+            vaddr = xc_map_foreign_range(
+                xc_handle, domid, PAGE_SIZE, PROT_READ, gmfn);
+            if ( vaddr == NULL )
+                continue;
+            memcpy(dump_mem, vaddr, PAGE_SIZE);
+            munmap(vaddr, PAGE_SIZE);
+            dump_mem += PAGE_SIZE;
+            if ( (j + 1) % DUMP_INCREMENT == 0 )
+            {
+                sts = dump_rtn(
+                    args, dump_mem_start, dump_mem - dump_mem_start);
+                if ( sts != 0 )
+                    goto out;
+                dump_mem = dump_mem_start;
+            }
+
+            j++;
         }
     }
+
+copy_done:
+    sts = dump_rtn(args, dump_mem_start, dump_mem - dump_mem_start);
+    if ( sts != 0 )
+        goto out;
+    if ( j < nr_pages )
+    {
+        /* When live dump-mode (-L option) is specified,
+         * guest domain may reduce memory. pad with zero pages.
+         */
+        IPRINTF("j (%ld) != nr_pages (%ld)", j , nr_pages);
+        memset(dump_mem_start, 0, PAGE_SIZE);
+        for (; j < nr_pages; j++) {
+            sts = dump_rtn(args, dump_mem_start, PAGE_SIZE);
+            if ( sts != 0 )
+                goto out;
+            if ( !auto_translated_physmap )
+            {
+                p2m_array[j].pfn = XC_CORE_INVALID_PFN;
+                p2m_array[j].gmfn = XC_CORE_INVALID_GMFN;
+            }
+            else
+                pfn_array[j] = XC_CORE_INVALID_PFN;
+        }
+    }
+
+    /* p2m/pfn table: .xen_p2m/.xen_pfn */
+    if ( !auto_translated_physmap )
+        sts = dump_rtn(
+            args, (char *)p2m_array, sizeof(p2m_array[0]) * nr_pages);
+    else
+        sts = dump_rtn(
+            args, (char *)pfn_array, sizeof(pfn_array[0]) * nr_pages);
+    if ( sts != 0 )
+        goto out;
 
     /* elf section header string table: .shstrtab */
     sts = dump_rtn(args, strtab->strings, strtab->current);
@@ -758,6 +827,8 @@ xc_domain_dumpcore_via_callback(int xc_handle,
     sts = 0;
 
 out:
+    if ( memory_map != NULL )
+        free(memory_map);
     if ( p2m != NULL )
         munmap(p2m, PAGE_SIZE * P2M_FL_ENTRIES);
     if ( p2m_array != NULL )

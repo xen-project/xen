@@ -19,7 +19,7 @@
 """
 import sys
 import traceback
-from xen.util.security import ACMError, err, make_policy
+from xen.util.xsm.xsm import ACMError, err, make_policy
 from xen.util import xsconstants
 from xen.xm.opts import OptionError
 from xen.xm import main as xm_main

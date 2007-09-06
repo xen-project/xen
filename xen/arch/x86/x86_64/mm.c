@@ -100,15 +100,15 @@ void __init paging_init(void)
     unsigned long i, mpt_size, va;
     l3_pgentry_t *l3_ro_mpt;
     l2_pgentry_t *l2_ro_mpt = NULL;
-    struct page_info *l1_pg, *l2_pg;
+    struct page_info *l1_pg, *l2_pg, *l3_pg;
 
     /* Create user-accessible L2 directory to map the MPT for guests. */
-    if ( (l2_pg = alloc_domheap_page(NULL)) == NULL )
+    if ( (l3_pg = alloc_domheap_page(NULL)) == NULL )
         goto nomem;
-    l3_ro_mpt = page_to_virt(l2_pg);
+    l3_ro_mpt = page_to_virt(l3_pg);
     clear_page(l3_ro_mpt);
     l4e_write(&idle_pg_table[l4_table_offset(RO_MPT_VIRT_START)],
-              l4e_from_page(l2_pg, __PAGE_HYPERVISOR | _PAGE_USER));
+              l4e_from_page(l3_pg, __PAGE_HYPERVISOR | _PAGE_USER));
 
     /*
      * Allocate and map the machine-to-phys table.

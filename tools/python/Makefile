@@ -1,6 +1,14 @@
 XEN_ROOT = ../..
 include $(XEN_ROOT)/tools/Rules.mk
 
+XEN_SECURITY_MODULE = dummy
+ifeq ($(FLASK_ENABLE),y)
+XEN_SECURITY_MODULE = flask
+endif
+ifeq ($(ACM_SECURITY),y)
+XEN_SECURITY_MODULE = acm
+endif
+
 .PHONY: all
 all: build
 
@@ -15,8 +23,8 @@ CATALOGS = $(patsubst %,xen/xm/messages/%.mo,$(LINGUAS))
 NLSDIR = /usr/share/locale
 
 .PHONY: build buildpy
-buildpy:
-	CC="$(CC)" CFLAGS="$(CFLAGS)" python setup.py build
+buildpy: xsm.py
+	CC="$(CC)" CFLAGS="$(CFLAGS)" XEN_SECURITY_MODULE="$(XEN_SECURITY_MODULE)" python setup.py build
 
 build: buildpy refresh-pot refresh-po $(CATALOGS)
 
@@ -53,6 +61,18 @@ refresh-po: $(POTFILE)
 %.mo: %.po
 	$(MSGFMT) -c -o $@ $<
 
+xsm.py:
+	@(set -e; \
+	  echo "XEN_SECURITY_MODULE = \""$(XEN_SECURITY_MODULE)"\""; \
+	  echo "from xsm_core import *"; \
+	  echo ""; \
+	  echo "import xen.util.xsm."$(XEN_SECURITY_MODULE)"."$(XEN_SECURITY_MODULE)" as xsm_module"; \
+	  echo ""; \
+	  echo "xsm_init(xsm_module)"; \
+	  echo "from xen.util.xsm."$(XEN_SECURITY_MODULE)"."$(XEN_SECURITY_MODULE)" import *"; \
+	  echo "del xsm_module"; \
+	  echo "") >xen/util/xsm/$@
+
 .PHONY: install
 ifndef XEN_PYTHON_NATIVE_INSTALL
 install: LIBPATH=$(shell PYTHONPATH=xen/util python -c "import auxbin; print auxbin.libpath()")
@@ -84,4 +104,4 @@ test:
 
 .PHONY: clean
 clean:
-	rm -rf build *.pyc *.pyo *.o *.a *~ $(CATALOGS)
+	rm -rf build *.pyc *.pyo *.o *.a *~ $(CATALOGS) xen/util/xsm/xsm.py

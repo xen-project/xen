@@ -29,7 +29,7 @@
 
 #include <public/xen.h>
 #include <public/event_channel.h>
-#include <acm/acm_hooks.h>
+#include <xsm/xsm.h>
 
 #define bucket_from_port(d,p) \
     ((d)->evtchn[(p)/EVTCHNS_PER_BUCKET])
@@ -78,6 +78,7 @@ static int get_free_port(struct domain *d)
 {
     struct evtchn *chn;
     int            port;
+    int            i, j;
 
     if ( d->is_dying )
         return -EINVAL;
@@ -95,6 +96,19 @@ static int get_free_port(struct domain *d)
     memset(chn, 0, EVTCHNS_PER_BUCKET * sizeof(*chn));
     bucket_from_port(d, port) = chn;
 
+    for ( i = 0; i < EVTCHNS_PER_BUCKET; i++ )
+    {
+        if ( xsm_alloc_security_evtchn(&chn[i]) )
+        {
+            for ( j = 0; j < i; j++ )
+            {
+                xsm_free_security_evtchn(&chn[j]);
+            }        
+            xfree(chn);
+            return -ENOMEM;
+        }
+    }
+
     return port;
 }
 
@@ -106,9 +120,6 @@ static long evtchn_alloc_unbound(evtchn_alloc_unbound_t *alloc)
     int            port;
     domid_t        dom = alloc->dom;
     long           rc;
-
-    if ( (rc = acm_pre_eventchannel_unbound(dom, alloc->remote_dom)) != 0 )
-        return rc;
 
     if ( dom == DOMID_SELF )
         dom = current->domain->domain_id;
@@ -123,6 +134,10 @@ static long evtchn_alloc_unbound(evtchn_alloc_unbound_t *alloc)
     if ( (port = get_free_port(d)) < 0 )
         ERROR_EXIT(port);
     chn = evtchn_from_port(d, port);
+
+    rc = xsm_evtchn_unbound(d, chn, alloc->remote_dom);
+    if ( rc )
+        goto out;
 
     chn->state = ECS_UNBOUND;
     if ( (chn->u.unbound.remote_domid = alloc->remote_dom) == DOMID_SELF )
@@ -146,9 +161,6 @@ static long evtchn_bind_interdomain(evtchn_bind_interdomain_t *bind)
     int            lport, rport = bind->remote_port;
     domid_t        rdom = bind->remote_dom;
     long           rc;
-
-    if ( (rc = acm_pre_eventchannel_interdomain(rdom)) != 0 )
-        return rc;
 
     if ( rdom == DOMID_SELF )
         rdom = current->domain->domain_id;
@@ -179,6 +191,10 @@ static long evtchn_bind_interdomain(evtchn_bind_interdomain_t *bind)
     if ( (rchn->state != ECS_UNBOUND) ||
          (rchn->u.unbound.remote_domid != ld->domain_id) )
         ERROR_EXIT(-EINVAL);
+
+    rc = xsm_evtchn_interdomain(ld, lchn, rd, rchn);
+    if ( rc )
+        goto out;
 
     lchn->u.interdomain.remote_dom  = rd;
     lchn->u.interdomain.remote_port = (u16)rport;
@@ -422,6 +438,8 @@ static long __evtchn_close(struct domain *d1, int port1)
     chn1->state          = ECS_FREE;
     chn1->notify_vcpu_id = 0;
 
+    xsm_evtchn_close_post(chn1);
+
  out:
     if ( d2 != NULL )
     {
@@ -466,6 +484,10 @@ long evtchn_send(unsigned int lport)
         return -EINVAL;
     }
 
+    ret = xsm_evtchn_send(ld, lchn);
+    if ( ret )
+        goto out;
+
     switch ( lchn->state )
     {
     case ECS_INTERDOMAIN:
@@ -495,6 +517,7 @@ long evtchn_send(unsigned int lport)
         ret = -EINVAL;
     }
 
+out:
     spin_unlock(&ld->evtchn_lock);
 
     return ret;
@@ -613,6 +636,11 @@ static long evtchn_status(evtchn_status_t *status)
     }
 
     chn = evtchn_from_port(d, port);
+
+    rc = xsm_evtchn_status(d, chn);
+    if ( rc )
+        goto out;
+
     switch ( chn->state )
     {
     case ECS_FREE:
@@ -743,6 +771,7 @@ static long evtchn_reset(evtchn_reset_t *r)
     domid_t dom = r->dom;
     struct domain *d;
     int i;
+    int rc;
 
     if ( dom == DOMID_SELF )
         dom = current->domain->domain_id;
@@ -751,6 +780,13 @@ static long evtchn_reset(evtchn_reset_t *r)
 
     if ( (d = rcu_lock_domain_by_id(dom)) == NULL )
         return -ESRCH;
+
+    rc = xsm_evtchn_reset(current->domain, d);
+    if ( rc )
+    {
+        rcu_unlock_domain(d);
+        return rc;
+    }
 
     for ( i = 0; port_is_valid(d, i); i++ )
         (void)__evtchn_close(d, i);
@@ -969,7 +1005,10 @@ void evtchn_destroy(struct domain *d)
     /* Free all event-channel buckets. */
     spin_lock(&d->evtchn_lock);
     for ( i = 0; i < NR_EVTCHN_BUCKETS; i++ )
+    {
+        xsm_free_security_evtchn(d->evtchn[i]);
         xfree(d->evtchn[i]);
+    }
     spin_unlock(&d->evtchn_lock);
 }
 

@@ -46,7 +46,7 @@ const char *hypercall_name_table[64] =
     X(vcpu_op),
     X(set_segment_base),
     X(mmuext_op),
-    X(acm_op),
+    X(xsm_op),
     X(nmi_op),
     X(sched_op),
     X(callback_op),

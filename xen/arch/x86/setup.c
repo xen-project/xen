@@ -32,9 +32,10 @@
 #include <asm/desc.h>
 #include <asm/paging.h>
 #include <asm/e820.h>
-#include <acm/acm_hooks.h>
+#include <xsm/acm/acm_hooks.h>
 #include <xen/kexec.h>
 #include <asm/edd.h>
+#include <xsm/xsm.h>
 
 #if defined(CONFIG_X86_64)
 #define BOOTSTRAP_DIRECTMAP_END (1UL << 32) /* 4GB */
@@ -219,40 +220,6 @@ static void __init percpu_init_areas(void)
 #endif
 }
 
-/* Fetch acm policy module from multiboot modules. */
-static void __init extract_acm_policy(
-    multiboot_info_t *mbi,
-    unsigned int *initrdidx,
-    char **_policy_start,
-    unsigned long *_policy_len)
-{
-    int i;
-    module_t *mod = (module_t *)__va(mbi->mods_addr);
-    unsigned long start, policy_len;
-    char *policy_start;
-
-    /*
-     * Try all modules and see whichever could be the binary policy.
-     * Adjust the initrdidx if module[1] is the binary policy.
-     */
-    for ( i = mbi->mods_count-1; i >= 1; i-- )
-    {
-        start = initial_images_start + (mod[i].mod_start-mod[0].mod_start);
-        policy_start = maddr_to_bootstrap_virt(start);
-        policy_len   = mod[i].mod_end - mod[i].mod_start;
-        if ( acm_is_policy(policy_start, policy_len) )
-        {
-            printk("Policy len  0x%lx, start at %p - module %d.\n",
-                   policy_len, policy_start, i);
-            *_policy_start = policy_start;
-            *_policy_len = policy_len;
-            if ( i == 1 )
-                *initrdidx = (mbi->mods_count > 2) ? 2 : 0;
-            break;
-        }
-    }
-}
-
 static void __init init_idle_domain(void)
 {
     struct domain *idle_domain;
@@ -429,14 +396,24 @@ void init_done(void)
     startup_cpu_idle_loop();
 }
 
+static char * __init cmdline_cook(char *p)
+{
+    p = p ? : "";
+    while ( *p == ' ' )
+        p++;
+    while ( (*p != ' ') && (*p != '\0') )
+        p++;
+    while ( *p == ' ' )
+        p++;
+    return p;
+}
+
 void __init __start_xen(unsigned long mbi_p)
 {
     char *memmap_type = NULL;
-    char __cmdline[] = "", *cmdline = __cmdline, *kextra;
+    char *cmdline, *kextra;
     unsigned long _initrd_start = 0, _initrd_len = 0;
     unsigned int initrdidx = 1;
-    char *_policy_start = NULL;
-    unsigned long _policy_len = 0;
     multiboot_info_t *mbi = __va(mbi_p);
     module_t *mod = (module_t *)__va(mbi->mods_addr);
     unsigned long nr_pages, modules_length;
@@ -451,8 +428,8 @@ void __init __start_xen(unsigned long mbi_p)
     set_intr_gate(TRAP_page_fault, &early_page_fault);
 
     /* Parse the command-line options. */
-    if ( (mbi->flags & MBI_CMDLINE) && (mbi->cmdline != 0) )
-        cmdline = __va(mbi->cmdline);
+    cmdline = cmdline_cook((mbi->flags & MBI_CMDLINE) ?
+                           __va(mbi->cmdline) : NULL);
     if ( (kextra = strstr(cmdline, " -- ")) != NULL )
     {
         /*
@@ -598,8 +575,7 @@ void __init __start_xen(unsigned long mbi_p)
                 ((u64)map->base_addr_high << 32) | (u64)map->base_addr_low;
             e820_raw[e820_raw_nr].size = 
                 ((u64)map->length_high << 32) | (u64)map->length_low;
-            e820_raw[e820_raw_nr].type = 
-                (map->type > E820_NVS) ? E820_RESERVED : map->type;
+            e820_raw[e820_raw_nr].type = map->type;
             e820_raw_nr++;
 
             bytes += map->size + 4;
@@ -952,6 +928,8 @@ void __init __start_xen(unsigned long mbi_p)
 
     percpu_init_areas();
 
+    xsm_init(&initrdidx, mbi, initial_images_start);
+
     init_idle_domain();
 
     trap_init();
@@ -1018,12 +996,6 @@ void __init __start_xen(unsigned long mbi_p)
     if ( opt_watchdog ) 
         watchdog_enable();
 
-    /* Extract policy from multiboot.  */
-    extract_acm_policy(mbi, &initrdidx, &_policy_start, &_policy_len);
-
-    /* initialize access control security module */
-    acm_init(_policy_start, _policy_len);
-
     /* Create initial domain 0. */
     dom0 = domain_create(0, 0, DOM0_SSIDREF);
     if ( (dom0 == NULL) || (alloc_vcpu(dom0, 0, 0) == NULL) )
@@ -1037,18 +1009,8 @@ void __init __start_xen(unsigned long mbi_p)
     {
         static char dom0_cmdline[MAX_GUEST_CMDLINE];
 
-        dom0_cmdline[0] = '\0';
-
-        if ( cmdline != NULL )
-        {
-            /* Skip past the image name and copy to a local buffer. */
-            while ( *cmdline == ' ' ) cmdline++;
-            if ( (cmdline = strchr(cmdline, ' ')) != NULL )
-            {
-                while ( *cmdline == ' ' ) cmdline++;
-                safe_strcpy(dom0_cmdline, cmdline);
-            }
-        }
+        cmdline = cmdline_cook(cmdline);
+        safe_strcpy(dom0_cmdline, cmdline);
 
         if ( kextra != NULL )
             /* kextra always includes exactly one leading space. */

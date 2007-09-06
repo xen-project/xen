@@ -563,6 +563,7 @@ int arch_domain_create(struct domain *d)
 		goto fail_nomem;
 
 	memset(&d->arch.mm, 0, sizeof(d->arch.mm));
+	d->arch.mm_teardown_offset = 0;
 
 	if ((d->arch.mm.pgd = pgd_alloc(&d->arch.mm)) == NULL)
 	    goto fail_nomem;
@@ -936,14 +937,17 @@ static void relinquish_memory(struct domain *d, struct list_head *list)
     spin_unlock_recursive(&d->page_alloc_lock);
 }
 
-void domain_relinquish_resources(struct domain *d)
+int domain_relinquish_resources(struct domain *d)
 {
+    int ret;
     /* Relinquish guest resources for VT-i domain. */
     if (d->arch.is_vti)
 	    vmx_relinquish_guest_resources(d);
 
     /* Tear down shadow mode stuff. */
-    mm_teardown(d);
+    ret = mm_teardown(d);
+    if (ret != 0)
+        return ret;
 
     /* Relinquish every page of memory. */
     relinquish_memory(d, &d->xenpage_list);
@@ -954,6 +958,8 @@ void domain_relinquish_resources(struct domain *d)
 
     /* Free page used by xen oprofile buffer */
     free_xenoprof_pages(d);
+
+    return 0;
 }
 
 unsigned long

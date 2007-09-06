@@ -43,8 +43,8 @@ xc_core_arch_map_p2m(int xc_handle, xc_dominfo_t *info,
 }
 
 int
-xc_core_arch_memory_map_get(int xc_handle, xc_dominfo_t *info,
-                            shared_info_t *live_shinfo,
+xc_core_arch_memory_map_get(int xc_handle, struct xc_core_arch_context *unused,
+                            xc_dominfo_t *info, shared_info_t *live_shinfo,
                             xc_core_memory_map_t **mapp,
                             unsigned int *nr_entries)
 {

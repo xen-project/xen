@@ -20,6 +20,9 @@ SHELL     ?= /bin/sh
 HOSTCC      = gcc
 HOSTCFLAGS  = -Wall -Werror -Wstrict-prototypes -O2 -fomit-frame-pointer
 HOSTCFLAGS += -fno-strict-aliasing
+HOSTCFLAGS_x86_32 = -m32
+HOSTCFLAGS_x86_64 = -m64
+HOSTCFLAGS += $(HOSTCFLAGS_$(XEN_COMPILE_ARCH))
 
 DISTDIR     ?= $(XEN_ROOT)/dist
 DESTDIR     ?= /
@@ -75,10 +78,10 @@ CFLAGS     += $(call cc-option,$(CC),-Wdeclaration-after-statement,)
 LDFLAGS += $(foreach i, $(EXTRA_LIB), -L$(i)) 
 CFLAGS += $(foreach i, $(EXTRA_INCLUDES), -I$(i))
 
-# If ACM_SECURITY = y, then the access control module is compiled
-# into Xen and the policy type can be set by the boot policy file
-#        y - Build the Xen ACM framework
-#        n - Do not build the Xen ACM framework
+# Enable XSM security module.  Enabling XSM requires selection of an 
+# XSM security module (FLASK_ENABLE or ACM_SECURITY).
+XSM_ENABLE ?= n
+FLASK_ENABLE ?= n
 ACM_SECURITY ?= n
 
 # Optional components

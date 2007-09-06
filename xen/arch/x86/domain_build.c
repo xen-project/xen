@@ -26,6 +26,7 @@
 #include <asm/desc.h>
 #include <asm/i387.h>
 #include <asm/paging.h>
+#include <asm/e820.h>
 
 #include <public/version.h>
 #include <public/libelf.h>
@@ -987,6 +988,16 @@ int __init construct_dom0(
         mfn = paddr_to_pfn(mp_ioapics[i].mpc_apicaddr);
         if ( smp_found_config )
             rc |= iomem_deny_access(dom0, mfn, mfn);
+    }
+
+    /* Remove access to E820_UNUSABLE I/O regions. */
+    for ( i = 0; i < e820.nr_map; i++ )
+    {
+        if ( e820.map[i].type != E820_UNUSABLE)
+            continue;
+        mfn = paddr_to_pfn(e820.map[i].addr);
+        nr_pages = (e820.map[i].size + PAGE_SIZE - 1) >> PAGE_SHIFT;
+        rc |= iomem_deny_access(dom0, mfn, mfn + nr_pages - 1);
     }
 
     BUG_ON(rc != 0);

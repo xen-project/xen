@@ -9,7 +9,8 @@ from XmTestLib import xapi
 from XmTestLib.XenAPIDomain import XmTestAPIDomain
 from XmTestLib import *
 from xen.xend import XendAPIConstants
-from xen.util import acmpolicy, security, xsconstants
+import xen.util.xsm.xsm as security
+from xen.util import acmpolicy, xsconstants
 import commands
 import os
 

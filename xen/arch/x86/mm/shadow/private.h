@@ -360,9 +360,6 @@ mfn_t shadow_alloc(struct domain *d,
                     unsigned long backpointer);
 void  shadow_free(struct domain *d, mfn_t smfn);
 
-/* Function to convert a shadow to log-dirty */
-void shadow_convert_to_log_dirty(struct vcpu *v, mfn_t smfn);
-
 /* Dispatcher function: call the per-mode function that will unhook the
  * non-Xen mappings in this top-level shadow mfn */
 void shadow_unhook_mappings(struct vcpu *v, mfn_t smfn);
@@ -433,6 +430,13 @@ int shadow_cmpxchg_guest_entry(struct vcpu *v, intpte_t *p,
 // in order to make it work with our mfn type.
 #undef mfn_valid
 #define mfn_valid(_mfn) (mfn_x(_mfn) < max_page)
+
+/* Override pagetable_t <-> struct page_info conversions to work with mfn_t */
+#undef pagetable_get_page
+#define pagetable_get_page(x)   mfn_to_page(pagetable_get_mfn(x))
+#undef pagetable_from_page
+#define pagetable_from_page(pg) pagetable_from_mfn(page_to_mfn(pg))
+
 
 #if GUEST_PAGING_LEVELS >= 3
 # define is_lo_pte(_vaddr) (((_vaddr)&0x4)==0)

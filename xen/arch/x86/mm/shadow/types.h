@@ -406,27 +406,16 @@ valid_gfn(gfn_t m)
     return VALID_GFN(gfn_x(m));
 }
 
-/* Translation between mfns and gfns */
-
-// vcpu-specific version of gfn_to_mfn().  This is where we hide the dirty
-// little secret that, for hvm guests with paging disabled, nearly all of the
-// shadow code actually think that the guest is running on *untranslated* page
-// tables (which is actually domain->phys_table).
-//
-
-static inline mfn_t
-vcpu_gfn_to_mfn(struct vcpu *v, gfn_t gfn)
-{
-    if ( !paging_vcpu_mode_translate(v) )
-        return _mfn(gfn_x(gfn));
-    return gfn_to_mfn(v->domain, gfn_x(gfn));
-}
-
 static inline paddr_t
 gfn_to_paddr(gfn_t gfn)
 {
     return ((paddr_t)gfn_x(gfn)) << PAGE_SHIFT;
 }
+
+/* Override gfn_to_mfn to work with gfn_t */
+#undef gfn_to_mfn
+#define gfn_to_mfn(d, g) _gfn_to_mfn((d), gfn_x(g))
+
 
 /* Type used for recording a walk through guest pagetables.  It is
  * filled in by the pagetable walk function, and also used as a cache

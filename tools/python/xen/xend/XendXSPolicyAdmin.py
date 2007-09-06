@@ -22,7 +22,8 @@ from xml.dom import minidom, Node
 
 from xen.xend.XendLogging import log
 from xen.xend import uuid
-from xen.util import security, xsconstants, dictio, bootloader
+from xen.util import xsconstants, dictio, bootloader
+import xen.util.xsm.acm.acm as security
 from xen.util.xspolicy import XSPolicy
 from xen.util.acmpolicy import ACMPolicy
 from xen.xend.XendError import SecurityError

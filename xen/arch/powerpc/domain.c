@@ -313,13 +313,13 @@ static void relinquish_memory(struct domain *d, struct list_head *list)
     spin_unlock_recursive(&d->page_alloc_lock);
 }
 
-void domain_relinquish_resources(struct domain *d)
+int domain_relinquish_resources(struct domain *d)
 {
     relinquish_memory(d, &d->xenpage_list);
     relinquish_memory(d, &d->page_list);
     xfree(d->arch.foreign_mfns);
     xfree(d->arch.p2m);
-    return;
+    return 0;
 }
 
 void arch_dump_domain_info(struct domain *d)

@@ -81,7 +81,7 @@ int xc_acm_op(int xc_handle, int cmd, void *arg, unsigned long arg_size)
     acmctl.cmd = cmd;
     acmctl.interface_version = ACM_INTERFACE_VERSION;
 
-    hypercall.op = __HYPERVISOR_acm_op;
+    hypercall.op = __HYPERVISOR_xsm_op;
     hypercall.arg[0] = (unsigned long)&acmctl;
     if ( lock_pages(&acmctl, sizeof(acmctl)) != 0)
     {

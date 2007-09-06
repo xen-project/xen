@@ -18,11 +18,11 @@ linux-%.tar.bz2:
 # XXX create a pristine tree for diff -Nurp convenience
 
 ifeq ($(XEN_LINUX_TARBALL_KETCHUP),y)
-%/.valid-src:
+%/.valid-src: $(__XEN_LINUX_UPDATE)
 	$(KETCHUP) -d $(@D) $(LINUX_VER)
 	touch $@ # update timestamp to avoid rebuild
 else
-%/.valid-src: %.tar.bz2
+%/.valid-src: $(__XEN_LINUX_UPDATE) %.tar.bz2
 	rm -rf tmp-linux-$* $(@D)
 	mkdir -p tmp-linux-$*
 	tar -C tmp-linux-$* -jxf $<

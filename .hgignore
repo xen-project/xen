@@ -114,6 +114,7 @@
 ^tools/firmware/vmxassist/gen$
 ^tools/firmware/vmxassist/offsets\.h$
 ^tools/firmware/vmxassist/vmxassist$
+^tools/flask/loadpolicy/flask-loadpolicy$
 ^tools/ioemu/\.pc/.*$
 ^tools/ioemu/config-host\.h$
 ^tools/ioemu/config-host\.mak$
@@ -149,8 +150,10 @@
 ^tools/misc/xenperf$
 ^tools/pygrub/build/.*$
 ^tools/python/build/.*$
+^tools/python/xen/util/xsm/xsm\.py$
 ^tools/security/secpol_tool$
 ^tools/security/xen/.*$
+^tools/security/xensec_tool$
 ^tools/tests/blowfish\.bin$
 ^tools/tests/blowfish\.h$
 ^tools/tests/test_x86_emulator$

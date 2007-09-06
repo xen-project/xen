@@ -159,8 +159,7 @@ get_memsize(void)
 int
 hvm_write_smbios_tables(void)
 {
-    uint8_t uuid[16]; /* ** This will break if xen_domain_handle_t is
-                         not uint8_t[16]. ** */
+    xen_domain_handle_t uuid;
     uint16_t xen_major_version, xen_minor_version;
     uint32_t xen_version;
     char xen_extra_version[XEN_EXTRAVERSION_LEN];
@@ -173,6 +172,7 @@ hvm_write_smbios_tables(void)
     unsigned tmp_len; /* length of next string to add */
 
     hypercall_xen_version(XENVER_guest_handle, uuid);
+    BUILD_BUG_ON(sizeof(xen_domain_handle_t) != 16);
 
     /* xen_version major and minor */
     xen_version = hypercall_xen_version(XENVER_version, NULL);

@@ -17,6 +17,7 @@ extern void __assert_failed(char *assertion, char *file, int line)
 extern void __bug(char *file, int line) __attribute__((noreturn));
 #define BUG() __bug(__FILE__, __LINE__)
 #define BUG_ON(p) do { if (p) BUG(); } while (0)
+#define BUILD_BUG_ON(p) ((void)sizeof(char[1 - 2 * !!(p)]))
 
 /* I/O output */
 void outb(uint16_t addr, uint8_t  val);

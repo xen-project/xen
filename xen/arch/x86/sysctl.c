@@ -25,6 +25,7 @@
 #include <asm/processor.h>
 #include <asm/numa.h>
 #include <xen/nodemask.h>
+#include <xsm/xsm.h>
 
 #define get_xen_guest_handle(val, hnd)  do { val = (hnd).p; } while (0)
 
@@ -41,6 +42,10 @@ long arch_do_sysctl(
         uint32_t i, max_array_ent;
 
         xen_sysctl_physinfo_t *pi = &sysctl->u.physinfo;
+
+        ret = xsm_physinfo();
+        if ( ret )
+            break;
 
         pi->threads_per_core =
             cpus_weight(cpu_sibling_map[0]);

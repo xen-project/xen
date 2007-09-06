@@ -18,7 +18,7 @@
 
 """
 from Test import *
-from xen.util import security
+import xen.util.xsm.xsm as security
 from xen.xm.main import server
 from xen.util import xsconstants
 import re

@@ -52,11 +52,14 @@ HDRS  := $(filter-out %/asm-offsets.h,$(AHDRS))
 # Note that link order matters!
 ALL_OBJS-y               += $(BASEDIR)/common/built_in.o
 ALL_OBJS-y               += $(BASEDIR)/drivers/built_in.o
-ALL_OBJS-$(ACM_SECURITY) += $(BASEDIR)/acm/built_in.o
+ALL_OBJS-y               += $(BASEDIR)/xsm/built_in.o
 ALL_OBJS-y               += $(BASEDIR)/arch/$(TARGET_ARCH)/built_in.o
 
 CFLAGS-y                += -g -D__XEN__
-CFLAGS-$(ACM_SECURITY)  += -DACM_SECURITY
+CFLAGS-$(XSM_ENABLE)    += -DXSM_ENABLE
+CFLAGS-$(FLASK_ENABLE)  += -DFLASK_ENABLE -DXSM_MAGIC=0xf97cff8c
+CFLAGS-$(FLASK_ENABLE)  += -DFLASK_DEVELOP -DFLASK_BOOTPARAM -DFLASK_AVC_STATS
+CFLAGS-$(ACM_SECURITY)  += -DACM_SECURITY -DXSM_MAGIC=0xbcde0100
 CFLAGS-$(verbose)       += -DVERBOSE
 CFLAGS-$(crash_debug)   += -DCRASH_DEBUG
 CFLAGS-$(perfc)         += -DPERF_COUNTERS

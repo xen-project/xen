@@ -2559,7 +2559,11 @@ static void *set_vram_mapping(unsigned long begin, unsigned long end)
     for (i = 0; i < nr_extents; i++)
         extent_start[i] = (begin + i * TARGET_PAGE_SIZE) >> TARGET_PAGE_BITS;
 
-    set_mm_mapping(xc_handle, domid, nr_extents, 0, extent_start);
+    if (set_mm_mapping(xc_handle, domid, nr_extents, 0, extent_start) < 0) {
+        fprintf(logfile, "Failed set_mm_mapping\n");
+        free(extent_start);
+        return NULL;
+    }
 
     vram_pointer = xc_map_foreign_batch(xc_handle, domid,
                                         PROT_READ|PROT_WRITE,
@@ -2567,6 +2571,7 @@ static void *set_vram_mapping(unsigned long begin, unsigned long end)
     if (vram_pointer == NULL) {
         fprintf(logfile, "xc_map_foreign_batch vgaram returned error %d\n",
                 errno);
+        free(extent_start);
         return NULL;
     }
 

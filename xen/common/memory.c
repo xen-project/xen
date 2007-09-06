@@ -22,6 +22,7 @@
 #include <asm/current.h>
 #include <asm/hardirq.h>
 #include <public/memory.h>
+#include <xsm/xsm.h>
 
 struct memop_args {
     /* INPUT */
@@ -216,6 +217,7 @@ static long translate_gpfn_list(
     xen_pfn_t gpfn;
     xen_pfn_t mfn;
     struct domain *d;
+    int rc;
 
     if ( copy_from_guest(&op, uop, 1) )
         return -EFAULT;
@@ -258,6 +260,13 @@ static long translate_gpfn_list(
         }
 
         mfn = gmfn_to_mfn(d, gpfn);
+
+        rc = xsm_translate_gpfn_list(current->domain, mfn);
+        if ( rc )
+        {
+            rcu_unlock_domain(d);
+            return rc;
+        }
 
         if ( unlikely(__copy_to_guest_offset(op.mfn_list, i, &mfn, 1)) )
         {
@@ -538,6 +547,14 @@ long do_memory_op(unsigned long cmd, XEN_GUEST_HANDLE(void) arg)
             return start_extent;
         args.domain = d;
 
+        rc = xsm_memory_adjust_reservation(current->domain, d);
+        if ( rc )
+        {
+            if ( reservation.domid != DOMID_SELF )
+                rcu_unlock_domain(d);
+            return rc;
+        }
+
         switch ( op )
         {
         case XENMEM_increase_reservation:
@@ -583,6 +600,14 @@ long do_memory_op(unsigned long cmd, XEN_GUEST_HANDLE(void) arg)
             return -EPERM;
         else if ( (d = rcu_lock_domain_by_id(domid)) == NULL )
             return -ESRCH;
+
+        rc = xsm_memory_stat_reservation(current->domain, d);
+        if ( rc )
+        {
+            if ( domid != DOMID_SELF )
+                rcu_unlock_domain(d);
+            return rc;
+        }
 
         switch ( op )
         {

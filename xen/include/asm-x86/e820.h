@@ -8,6 +8,7 @@
 #define E820_RESERVED     2
 #define E820_ACPI         3
 #define E820_NVS          4
+#define E820_UNUSABLE     5
 
 struct e820entry {
     uint64_t addr;

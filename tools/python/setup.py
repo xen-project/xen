@@ -44,6 +44,14 @@ acm = Extension("acm",
                libraries          = libraries,
                sources            = [ "xen/lowlevel/acm/acm.c" ])
 
+flask = Extension("flask",
+               extra_compile_args = extra_compile_args,
+               include_dirs       = include_dirs + [ "xen/lowlevel/flask" ] + 
+                                        [ "../flask/libflask/include" ],
+               library_dirs       = library_dirs + [ "../flask/libflask" ],
+               libraries          = libraries + [ "flask" ],
+               sources            = [ "xen/lowlevel/flask/flask.c" ])
+
 ptsname = Extension("ptsname",
                extra_compile_args = extra_compile_args,
                include_dirs       = include_dirs + [ "ptsname" ],
@@ -51,7 +59,7 @@ ptsname = Extension("ptsname",
                libraries          = libraries,
                sources            = [ "ptsname/ptsname.c" ])
 
-modules = [ xc, xs, acm, ptsname ]
+modules = [ xc, xs, ptsname, acm, flask ]
 if os.uname()[0] == 'SunOS':
     modules.append(scf)
 
@@ -61,6 +69,10 @@ setup(name            = 'xen',
       packages        = ['xen',
                          'xen.lowlevel',
                          'xen.util',
+                         'xen.util.xsm',
+                         'xen.util.xsm.dummy',
+                         'xen.util.xsm.flask',
+                         'xen.util.xsm.acm',
                          'xen.xend',
                          'xen.xend.server',
                          'xen.xend.xenstore',

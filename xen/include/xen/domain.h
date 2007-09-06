@@ -45,7 +45,7 @@ void arch_domain_destroy(struct domain *d);
 int arch_set_info_guest(struct vcpu *, vcpu_guest_context_u);
 void arch_get_info_guest(struct vcpu *, vcpu_guest_context_u);
 
-void domain_relinquish_resources(struct domain *d);
+int domain_relinquish_resources(struct domain *d);
 
 void dump_pageframe_info(struct domain *d);
 

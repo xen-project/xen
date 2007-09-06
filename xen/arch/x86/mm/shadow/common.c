@@ -2207,7 +2207,6 @@ static void sh_update_paging_modes(struct vcpu *v)
 {
     struct domain *d = v->domain;
     struct paging_mode *old_mode = v->arch.paging.mode;
-    mfn_t old_guest_table;
 
     ASSERT(shadow_locked_by_me(d));
 
@@ -2256,7 +2255,6 @@ static void sh_update_paging_modes(struct vcpu *v)
 #else
 #error unexpected paging mode
 #endif
-        v->arch.paging.translate_enabled = !!shadow_mode_translate(d);
     }
     else
     {
@@ -2266,37 +2264,17 @@ static void sh_update_paging_modes(struct vcpu *v)
         ASSERT(shadow_mode_translate(d));
         ASSERT(shadow_mode_external(d));
 
-        v->arch.paging.translate_enabled = hvm_paging_enabled(v);
-        if ( !v->arch.paging.translate_enabled )
+        if ( !hvm_paging_enabled(v) )
         {
-            /* Set v->arch.guest_table to use the p2m map, and choose
-             * the appropriate shadow mode */
-            old_guest_table = pagetable_get_mfn(v->arch.guest_table);
-#if CONFIG_PAGING_LEVELS == 2
-            v->arch.guest_table =
-                pagetable_from_pfn(pagetable_get_pfn(d->arch.phys_table));
-            v->arch.paging.mode = &SHADOW_INTERNAL_NAME(sh_paging_mode,2,2);
-#elif CONFIG_PAGING_LEVELS == 3 
-            v->arch.guest_table =
-                pagetable_from_pfn(pagetable_get_pfn(d->arch.phys_table));
-            v->arch.paging.mode = &SHADOW_INTERNAL_NAME(sh_paging_mode,3,3);
-#else /* CONFIG_PAGING_LEVELS == 4 */
-            { 
-                l4_pgentry_t *l4e; 
-                /* Use the start of the first l3 table as a PAE l3 */
-                ASSERT(pagetable_get_pfn(d->arch.phys_table) != 0);
-                l4e = sh_map_domain_page(pagetable_get_mfn(d->arch.phys_table));
-                ASSERT(l4e_get_flags(l4e[0]) & _PAGE_PRESENT);
-                v->arch.guest_table =
-                    pagetable_from_pfn(l4e_get_pfn(l4e[0]));
-                sh_unmap_domain_page(l4e);
-            }
-            v->arch.paging.mode = &SHADOW_INTERNAL_NAME(sh_paging_mode,3,3);
+            /* When the guest has CR0.PG clear, we provide a 32-bit, non-PAE
+             * pagetable for it, mapping 4 GB one-to-one using a single l2
+             * page of 1024 superpage mappings */
+            v->arch.guest_table = d->arch.paging.shadow.unpaged_pagetable;
+#if CONFIG_PAGING_LEVELS >= 3
+            v->arch.paging.mode = &SHADOW_INTERNAL_NAME(sh_paging_mode, 3, 2);
+#else
+            v->arch.paging.mode = &SHADOW_INTERNAL_NAME(sh_paging_mode, 2, 2);
 #endif
-            /* Fix up refcounts on guest_table */
-            get_page(mfn_to_page(pagetable_get_mfn(v->arch.guest_table)), d);
-            if ( mfn_x(old_guest_table) != 0 )
-                put_page(mfn_to_page(old_guest_table));
         }
         else
         {
@@ -2428,7 +2406,9 @@ int shadow_enable(struct domain *d, u32 mode)
  * Returns 0 for success, -errno for failure. */
 {    
     unsigned int old_pages;
-    int rv = 0;
+    struct page_info *pg = NULL;
+    uint32_t *e;
+    int i, rv = 0;
 
     mode |= PG_SH_enable;
 
@@ -2469,6 +2449,28 @@ int shadow_enable(struct domain *d, u32 mode)
             goto out_unlocked;
     }
 
+    /* HVM domains need an extra pagetable for vcpus that think they
+     * have paging disabled */
+    if ( is_hvm_domain(d) )
+    {
+        /* Get a single page from the shadow pool.  Take it via the 
+         * P2M interface to make freeing it simpler afterwards. */
+        pg = shadow_alloc_p2m_page(d);
+        if ( pg == NULL )
+        {
+            rv = -ENOMEM;
+            goto out_unlocked;
+        }
+        /* Fill it with 32-bit, non-PAE superpage entries, each mapping 4MB
+         * of virtual address space onto the same physical address range */ 
+        e = sh_map_domain_page(page_to_mfn(pg));
+        for ( i = 0; i < PAGE_SIZE / sizeof(*e); i++ )
+            e[i] = ((0x400000U * i)
+                    | _PAGE_PRESENT | _PAGE_RW | _PAGE_USER 
+                    | _PAGE_ACCESSED | _PAGE_DIRTY | _PAGE_PSE);
+        sh_unmap_domain_page(e);
+        pg->u.inuse.type_info = PGT_l2_page_table | 1 | PGT_validated;
+    }
 
     shadow_lock(d);
 
@@ -2492,6 +2494,10 @@ int shadow_enable(struct domain *d, u32 mode)
     d->arch.paging.shadow.opt_flags = SHOPT_LINUX_L3_TOPLEVEL;
 #endif
 
+    /* Record the 1-to-1 pagetable we just made */
+    if ( is_hvm_domain(d) )
+        d->arch.paging.shadow.unpaged_pagetable = pagetable_from_page(pg);
+
     /* Update the bits */
     sh_new_mode(d, mode);
 
@@ -2500,6 +2506,8 @@ int shadow_enable(struct domain *d, u32 mode)
  out_unlocked:
     if ( rv != 0 && !pagetable_is_null(d->arch.phys_table) )
         p2m_teardown(d);
+    if ( rv != 0 && pg != NULL )
+        shadow_free_p2m_page(d, pg);
     domain_unpause(d);
     return rv;
 }
@@ -2577,6 +2585,21 @@ void shadow_teardown(struct domain *d)
                        d->arch.paging.shadow.free_pages, 
                        d->arch.paging.shadow.p2m_pages);
         ASSERT(d->arch.paging.shadow.total_pages == 0);
+    }
+
+    /* Free the non-paged-vcpus pagetable; must happen after we've 
+     * destroyed any shadows of it or sh_destroy_shadow will get confused. */
+    if ( !pagetable_is_null(d->arch.paging.shadow.unpaged_pagetable) )
+    {
+        for_each_vcpu(d, v)
+        {
+            ASSERT(is_hvm_vcpu(v));
+            if ( !hvm_paging_enabled(v) )
+                v->arch.guest_table = pagetable_null();
+        }
+        shadow_free_p2m_page(d, 
+            pagetable_get_page(d->arch.paging.shadow.unpaged_pagetable));
+        d->arch.paging.shadow.unpaged_pagetable = pagetable_null();
     }
 
     /* We leave the "permanent" shadow modes enabled, but clear the
@@ -2756,10 +2779,6 @@ shadow_write_p2m_entry(struct vcpu *v, unsigned long gfn,
     /* update the entry with new content */
     safe_write_pte(p, new);
 
-    /* The P2M can be shadowed: keep the shadows synced */
-    if ( d->vcpu[0] != NULL )
-        (void)sh_validate_guest_entry(d->vcpu[0], table_mfn, p, sizeof(*p));
-
     /* install P2M in monitors for PAE Xen */
 #if CONFIG_PAGING_LEVELS == 3
     if ( level == 3 ) {
@@ -2797,12 +2816,6 @@ shadow_write_p2m_entry(struct vcpu *v, unsigned long gfn,
 
 /**************************************************************************/
 /* Log-dirty mode support */
-
-/* Convert a shadow to log-dirty mode. */
-void shadow_convert_to_log_dirty(struct vcpu *v, mfn_t smfn)
-{
-    BUG();
-}
 
 /* Shadow specific code which is called in paging_log_dirty_enable().
  * Return 0 if no problem found.

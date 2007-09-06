@@ -28,7 +28,7 @@
 #include <asm/debugger.h>
 #include <public/sched.h>
 #include <public/vcpu.h>
-#include <acm/acm_hooks.h>
+#include <xsm/xsm.h>
 
 /* Protect updates/reads (resp.) of domain_list and domain_hash. */
 DEFINE_SPINLOCK(domlist_update_lock);
@@ -57,6 +57,13 @@ struct domain *alloc_domain(domid_t domid)
 
     memset(d, 0, sizeof(*d));
     d->domain_id = domid;
+
+    if ( xsm_alloc_security_domain(d) != 0 )
+    {
+        free_domain(d);
+        return NULL;
+    }
+
     atomic_set(&d->refcnt, 1);
     spin_lock_init(&d->big_lock);
     spin_lock_init(&d->page_alloc_lock);
@@ -69,6 +76,7 @@ struct domain *alloc_domain(domid_t domid)
 
 void free_domain(struct domain *d)
 {
+    xsm_free_security_domain(d);
     xfree(d);
 }
 
@@ -180,7 +188,7 @@ struct domain *domain_create(
     domid_t domid, unsigned int domcr_flags, ssidref_t ssidref)
 {
     struct domain *d, **pd;
-    enum { INIT_evtchn = 1, INIT_gnttab = 2, INIT_acm = 4, INIT_arch = 8 }; 
+    enum { INIT_evtchn = 1, INIT_gnttab = 2, INIT_arch = 8 }; 
     int init_status = 0;
 
     if ( (d = alloc_domain(domid)) == NULL )
@@ -193,6 +201,9 @@ struct domain *domain_create(
 
     if ( !is_idle_domain(d) )
     {
+        if ( xsm_domain_create(d, ssidref) != 0 )
+            goto fail;
+
         d->is_paused_by_controller = 1;
         atomic_inc(&d->pause_count);
 
@@ -203,10 +214,6 @@ struct domain *domain_create(
         if ( grant_table_create(d) != 0 )
             goto fail;
         init_status |= INIT_gnttab;
-
-        if ( acm_domain_create(d, ssidref) != 0 )
-            goto fail;
-        init_status |= INIT_acm;
     }
 
     if ( arch_domain_create(d) != 0 )
@@ -238,12 +245,10 @@ struct domain *domain_create(
     return d;
 
  fail:
-    d->is_dying = 1;
+    d->is_dying = DOMDYING_dead;
     atomic_set(&d->refcnt, DOMAIN_DESTROYED);
     if ( init_status & INIT_arch )
         arch_domain_destroy(d);
-    if ( init_status & INIT_acm )
-        acm_domain_destroy(d);
     if ( init_status & INIT_gnttab )
         grant_table_destroy(d);
     if ( init_status & INIT_evtchn )
@@ -298,26 +303,39 @@ struct domain *rcu_lock_domain_by_id(domid_t dom)
 }
 
 
-void domain_kill(struct domain *d)
+int domain_kill(struct domain *d)
 {
-    domain_pause(d);
+    int rc = 0;
 
-    /* Already dying? Then bail. */
-    if ( test_and_set_bool(d->is_dying) )
+    if ( d == current->domain )
+        return -EINVAL;
+
+    /* Protected by domctl_lock. */
+    switch ( d->is_dying )
     {
-        domain_unpause(d);
-        return;
+    case DOMDYING_alive:
+        domain_pause(d);
+        d->is_dying = DOMDYING_dying;
+        evtchn_destroy(d);
+        gnttab_release_mappings(d);
+        /* fallthrough */
+    case DOMDYING_dying:
+        rc = domain_relinquish_resources(d);
+        page_scrub_kick();
+        if ( rc != 0 )
+        {
+            BUG_ON(rc != -EAGAIN);
+            break;
+        }
+        d->is_dying = DOMDYING_dead;
+        put_domain(d);
+        send_guest_global_virq(dom0, VIRQ_DOM_EXC);
+        /* fallthrough */
+    case DOMDYING_dead:
+        break;
     }
 
-    evtchn_destroy(d);
-    gnttab_release_mappings(d);
-    domain_relinquish_resources(d);
-    put_domain(d);
-
-    /* Kick page scrubbing after domain_relinquish_resources(). */
-    page_scrub_kick();
-
-    send_guest_global_virq(dom0, VIRQ_DOM_EXC);
+    return rc;
 }
 
 
@@ -470,8 +488,6 @@ static void complete_domain_destroy(struct rcu_head *head)
         vcpu_destroy(v);
         sched_destroy_vcpu(v);
     }
-
-    acm_domain_destroy(d);
 
     rangeset_domain_destroy(d);
 

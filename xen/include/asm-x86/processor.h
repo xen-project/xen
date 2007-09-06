@@ -80,6 +80,7 @@
 #define X86_CR4_OSFXSR		0x0200	/* enable fast FPU save and restore */
 #define X86_CR4_OSXMMEXCPT	0x0400	/* enable unmasked SSE exceptions */
 #define X86_CR4_VMXE		0x2000  /* enable VMX */
+#define X86_CR4_SMXE		0x4000  /* enable SMX */
 
 /*
  * Trap/fault mnemonics.

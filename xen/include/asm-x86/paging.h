@@ -66,19 +66,6 @@
 /* flags used for paging debug */
 #define PAGING_DEBUG_LOGDIRTY 0
 
-/******************************************************************************
- * The equivalent for a particular vcpu of a shadowed domain. */
-
-/* Is this vcpu using the P2M table to translate between GFNs and MFNs?
- *
- * This is true of translated HVM domains on a vcpu which has paging
- * enabled.  (HVM vcpus with paging disabled are using the p2m table as
- * its paging table, so no translation occurs in this case.)
- * It is also true for all vcpus of translated PV domains. */
-#define paging_vcpu_mode_translate(_v) ((_v)->arch.paging.translate_enabled)
-
-
-
 /*****************************************************************************
  * Mode-specific entry points into the shadow code.  
  *
@@ -222,9 +209,6 @@ static inline int paging_invlpg(struct vcpu *v, unsigned long va)
 #define INVALID_GFN (-1UL)
 static inline unsigned long paging_gva_to_gfn(struct vcpu *v, unsigned long va)
 {
-    if ( unlikely(!paging_vcpu_mode_translate(v)) )
-        return va >> PAGE_SHIFT;
-
     return v->arch.paging.mode->gva_to_gfn(v, va);
 }
 

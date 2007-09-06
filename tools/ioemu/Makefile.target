@@ -197,7 +197,6 @@ CPPFLAGS+=-D_GNU_SOURCE
 LIBS+=-lm
 LIBS+=-L../../libxc -lxenctrl -lxenguest
 LIBS+=-L../../xenstore -lxenstore
-LIBS+=-lpthread
 ifndef CONFIG_USER_ONLY
 LIBS+=-lz
 endif
