@@ -339,14 +339,22 @@ mm_teardown(struct domain* d)
     volatile pgd_t* pgd;
 
     if (mm->pgd == NULL)
-        return;
+        return 0;
 
     pgd = pgd_offset(mm, 0);
     for (i = 0; i < PTRS_PER_PGD; i++, pgd++) {
-        if (!pgd_present(*pgd)) // acquire semantics
+        unsigned long cur_offset = i << PGDIR_SHIFT;
+
+        if (mm_teardown_can_skip(d, cur_offset + PGDIR_SIZE))
             continue;
-        mm_teardown_pgd(d, pgd, i << PGDIR_SHIFT);
+        if (!pgd_present(*pgd)) { // acquire semantics
+            mm_teardown_update_offset(d, cur_offset);
+            continue;
+        }
+        if (mm_teardown_pgd(d, pgd, cur_offset))
+            return -EAGAIN;
     }
+    return 0;
 }
 
 static void
