@@ -21,6 +21,8 @@
 #ifndef XC_CORE_IA64_H
 #define XC_CORE_IA64_H
 
+#include "ia64/xc_ia64.h"
+
 #define ELF_ARCH_DATA           ELFDATA2LSB
 #define ELF_ARCH_MACHINE        EM_IA_64
 
@@ -28,6 +30,8 @@ struct xc_core_arch_context {
     size_t mapped_regs_size;
     int nr_vcpus;
     mapped_regs_t* mapped_regs[MAX_VIRT_CPUS];
+
+    struct xen_ia64_p2m_table p2m_table;
 };
 
 void
@@ -46,7 +50,10 @@ xc_core_arch_context_get_shdr(struct xc_core_arch_context* arch_ctxt,
 int
 xc_core_arch_context_dump(struct xc_core_arch_context* arch_ctxt,
                           void* args, dumpcore_rtn_t dump_rtn);
-#define xc_core_arch_gpfn_may_present(arch_ctxt, i)             (1)
+
+int
+xc_core_arch_gpfn_may_present(struct xc_core_arch_context *arch_ctxt,
+                              unsigned long pfn);
 
 #endif /* XC_CORE_IA64_H */
 

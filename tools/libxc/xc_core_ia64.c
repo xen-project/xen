@@ -24,6 +24,16 @@
 #include "xc_dom.h"
 #include <inttypes.h>
 
+int
+xc_core_arch_gpfn_may_present(struct xc_core_arch_context *arch_ctxt,
+                              unsigned long pfn)
+{
+    if (arch_ctxt->p2m_table.p2m == NULL)
+        return 1; /* default to trying to map the page */
+
+    return xc_ia64_p2m_present(&arch_ctxt->p2m_table, pfn);
+}
+
 static int
 xc_memory_map_cmp(const void *lhs__, const void *rhs__)
 {
@@ -158,13 +168,18 @@ memory_map_get_old(int xc_handle, xc_dominfo_t *info,
 }
 
 int
-xc_core_arch_memory_map_get(int xc_handle, struct xc_core_arch_context *unused,
+xc_core_arch_memory_map_get(int xc_handle,
+                            struct xc_core_arch_context *arch_ctxt,
                             xc_dominfo_t *info, shared_info_t *live_shinfo,
                             xc_core_memory_map_t **mapp,
                             unsigned int *nr_entries)
 {
     int ret = -1;
-    xen_ia64_memmap_info_t *memmap_info;
+    unsigned int memmap_info_num_pages;
+    unsigned long memmap_info_pfn;
+
+    xen_ia64_memmap_info_t *memmap_info_live;
+    xen_ia64_memmap_info_t *memmap_info = NULL;
     unsigned long map_size;
     xc_core_memory_map_t *map;
     char *start;
@@ -172,27 +187,46 @@ xc_core_arch_memory_map_get(int xc_handle, struct xc_core_arch_context *unused,
     char *p;
     efi_memory_desc_t *md;
 
-    if  ( live_shinfo == NULL ||
-          live_shinfo->arch.memmap_info_num_pages == 0 ||
-          live_shinfo->arch.memmap_info_pfn == 0 )
+    if ( live_shinfo == NULL )
+    {
+        ERROR("can't access shared info");
         goto old;
+    }
 
-    map_size = PAGE_SIZE * live_shinfo->arch.memmap_info_num_pages;
-    memmap_info = xc_map_foreign_range(xc_handle, info->domid,
-                                       map_size, PROT_READ,
-                                       live_shinfo->arch.memmap_info_pfn);
-    if ( memmap_info == NULL )
+    /* copy before use in case someone updating them */
+    memmap_info_num_pages = live_shinfo->arch.memmap_info_num_pages;
+    memmap_info_pfn = live_shinfo->arch.memmap_info_pfn;
+    if ( memmap_info_num_pages == 0 || memmap_info_pfn == 0 )
+    {
+        ERROR("memmap_info_num_pages 0x%x memmap_info_pfn 0x%lx",
+              memmap_info_num_pages, memmap_info_pfn);
+        goto old;
+    }
+
+    map_size = PAGE_SIZE * memmap_info_num_pages;
+    memmap_info_live = xc_map_foreign_range(xc_handle, info->domid,
+                                       map_size, PROT_READ, memmap_info_pfn);
+    if ( memmap_info_live == NULL )
     {
         PERROR("Could not map memmap info.");
         return -1;
     }
+    memmap_info = malloc(map_size);
+    if ( memmap_info == NULL )
+    {
+        munmap(memmap_info_live, map_size);
+        return -1;
+    }
+    memcpy(memmap_info, memmap_info_live, map_size);    /* copy before use */
+    munmap(memmap_info_live, map_size);
+    
     if ( memmap_info->efi_memdesc_size != sizeof(*md) ||
          (memmap_info->efi_memmap_size / memmap_info->efi_memdesc_size) == 0 ||
          memmap_info->efi_memmap_size > map_size - sizeof(memmap_info) ||
          memmap_info->efi_memdesc_version != EFI_MEMORY_DESCRIPTOR_VERSION )
     {
         PERROR("unknown memmap header. defaulting to compat mode.");
-        munmap(memmap_info, PAGE_SIZE);
+        free(memmap_info);
         goto old;
     }
 
@@ -201,7 +235,8 @@ xc_core_arch_memory_map_get(int xc_handle, struct xc_core_arch_context *unused,
     if ( map == NULL )
     {
         PERROR("Could not allocate memory for memmap.");
-        goto out;
+        free(memmap_info);
+        return -1;
     }
     *mapp = map;
 
@@ -221,12 +256,16 @@ xc_core_arch_memory_map_get(int xc_handle, struct xc_core_arch_context *unused,
         (*nr_entries)++;
     }
     ret = 0;
-out:
-    munmap(memmap_info, map_size);
+
+    xc_ia64_p2m_map(&arch_ctxt->p2m_table, xc_handle, info->domid,
+                    memmap_info, 0);
+    if ( memmap_info != NULL )
+        free(memmap_info);
     qsort(map, *nr_entries, sizeof(map[0]), &xc_memory_map_cmp);
     return ret;
     
 old:
+    DPRINTF("Falling back old method.\n");
     return memory_map_get_old(xc_handle, info, live_shinfo, mapp, nr_entries);
 }
 
@@ -253,6 +292,8 @@ xc_core_arch_context_init(struct xc_core_arch_context* arch_ctxt)
     arch_ctxt->nr_vcpus = 0;
     for ( i = 0; i < MAX_VIRT_CPUS; i++ )
         arch_ctxt->mapped_regs[i] = NULL;
+
+    xc_ia64_p2m_init(&arch_ctxt->p2m_table);
 }
 
 void
@@ -262,6 +303,7 @@ xc_core_arch_context_free(struct xc_core_arch_context* arch_ctxt)
     for ( i = 0; i < arch_ctxt->nr_vcpus; i++ )
         if ( arch_ctxt->mapped_regs[i] != NULL )
             munmap(arch_ctxt->mapped_regs[i], arch_ctxt->mapped_regs_size);
+    xc_ia64_p2m_unmap(&arch_ctxt->p2m_table);
 }
 
 int
