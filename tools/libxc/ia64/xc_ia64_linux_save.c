@@ -5,6 +5,9 @@
  *
  * Copyright (c) 2003, K A Fraser.
  *  Rewritten for ia64 by Tristan Gingold <tristan.gingold@bull.net>
+ *
+ * Copyright (c) 2007 Isaku Yamahata <yamahata@valinux.co.jp>
+ *   Use foreign p2m exposure.
  */
 
 #include <inttypes.h>
@@ -14,6 +17,9 @@
 #include <sys/time.h>
 
 #include "xg_private.h"
+#include "xc_ia64.h"
+#include "xc_ia64_save_restore.h"
+#include "xc_efi.h"
 
 /*
 ** Default values for important tuning parameters. Can override by passing
@@ -151,8 +157,6 @@ xc_domain_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
     /* A copy of the CPU context of the guest. */
     vcpu_guest_context_t ctxt;
 
-    unsigned long *page_array = NULL;
-
     /* Live mapping of shared info structure */
     shared_info_t *live_shinfo = NULL;
 
@@ -180,6 +184,17 @@ xc_domain_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
     unsigned long *to_skip = NULL;
 
     char *mem;
+
+    unsigned int memmap_info_num_pages;
+    unsigned long memmap_size = 0;
+    xen_ia64_memmap_info_t *memmap_info_live = NULL;
+    xen_ia64_memmap_info_t *memmap_info = NULL;
+    void *memmap_desc_start;
+    void *memmap_desc_end;
+    void *p;
+    efi_memory_desc_t *md;
+    struct xen_ia64_p2m_table p2m_table;
+    xc_ia64_p2m_init(&p2m_table);
 
     if (debug)
         fprintf(stderr, "xc_linux_save (ia64): started dom=%d\n", dom);
@@ -218,12 +233,6 @@ xc_domain_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
 
     p2m_size = xc_memory_op(xc_handle, XENMEM_maximum_gpfn, &dom);
 
-    page_array = malloc(p2m_size * sizeof(unsigned long));
-    if (page_array == NULL) {
-        ERROR("Could not allocate memory");
-        goto out;
-    }
-
     /* This is expected by xm restore.  */
     if (!write_exact(io_fd, &p2m_size, sizeof(unsigned long))) {
         ERROR("write: p2m_size");
@@ -236,7 +245,7 @@ xc_domain_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
        The version is hard-coded, don't forget to change the restore code
        too!  */
     {
-        unsigned long version = 1;
+        unsigned long version = XC_IA64_SR_FORMAT_VER_CURRENT;
 
         if (!write_exact(io_fd, &version, sizeof(unsigned long))) {
             ERROR("write: version");
@@ -304,6 +313,38 @@ xc_domain_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
 
     }
 
+    memmap_info_num_pages = live_shinfo->arch.memmap_info_num_pages;
+    memmap_size = PAGE_SIZE * memmap_info_num_pages;
+    memmap_info_live = xc_map_foreign_range(xc_handle, info.domid,
+                                       memmap_size, PROT_READ,
+                                            live_shinfo->arch.memmap_info_pfn);
+    if (memmap_info_live == NULL) {
+        PERROR("Could not map memmap info.");
+        goto out;
+    }
+    memmap_info = malloc(memmap_size);
+    if (memmap_info == NULL) {
+        PERROR("Could not allocate memmap info memory");
+        goto out;
+    }
+    memcpy(memmap_info, memmap_info_live, memmap_size);
+    munmap(memmap_info_live, memmap_size);
+    memmap_info_live = NULL;
+    
+    if (xc_ia64_p2m_map(&p2m_table, xc_handle, dom, memmap_info, 0) < 0) {
+        PERROR("xc_ia64_p2m_map");
+        goto out;
+    }
+    if (!write_exact(io_fd,
+                     &memmap_info_num_pages, sizeof(memmap_info_num_pages))) {
+        PERROR("write: arch.memmap_info_num_pages");
+        goto out;
+    }
+    if (!write_exact(io_fd, memmap_info, memmap_size)) {
+        PERROR("write: memmap_info");
+        goto out;
+    }
+
     sent_last_iter = p2m_size;
     total_sent = 0;
 
@@ -313,13 +354,6 @@ xc_domain_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
 
         sent_this_iter = 0;
         skip_this_iter = 0;
-
-        /* Get the pfn list, as it may change.  */
-        if (xc_ia64_get_pfn_list(xc_handle, dom, page_array,
-                                 0, p2m_size) != p2m_size) {
-            ERROR("Could not get the page frame list");
-            goto out;
-        }
 
         /* Dirtied pages won't be saved.
            slightly wasteful to peek the whole array evey time,
@@ -334,45 +368,64 @@ xc_domain_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
         }
 
         /* Start writing out the saved-domain record. */
-        for (N = 0; N < p2m_size; N++) {
-            if (page_array[N] == INVALID_MFN)
+        memmap_desc_start = &memmap_info->memdesc;
+        memmap_desc_end = memmap_desc_start + memmap_info->efi_memmap_size;
+        for (p = memmap_desc_start;
+             p < memmap_desc_end;
+             p += memmap_info->efi_memdesc_size) {
+            md = p;
+            if (md->type != EFI_CONVENTIONAL_MEMORY ||
+                md->attribute != EFI_MEMORY_WB ||
+                md->num_pages == 0)
                 continue;
-            if (!last_iter) {
-                if (test_bit(N, to_skip) && test_bit(N, to_send))
-                    skip_this_iter++;
-                if (test_bit(N, to_skip) || !test_bit(N, to_send))
+            
+            for (N = md->phys_addr >> PAGE_SHIFT;
+                 N < (md->phys_addr + (md->num_pages << EFI_PAGE_SHIFT)) >>
+                     PAGE_SHIFT;
+                 N++) {
+
+                if (!xc_ia64_p2m_allocated(&p2m_table, N))
                     continue;
-            }
 
-            if (debug)
-                fprintf(stderr, "xc_linux_save: page %lx (%lu/%lu)\n",
-                        page_array[N], N, p2m_size);
+                if (!last_iter) {
+                    if (test_bit(N, to_skip) && test_bit(N, to_send))
+                        skip_this_iter++;
+                    if (test_bit(N, to_skip) || !test_bit(N, to_send))
+                        continue;
+                }
 
-            mem = xc_map_foreign_range(xc_handle, dom, PAGE_SIZE,
-                                       PROT_READ|PROT_WRITE, N);
-            if (mem == NULL) {
-                /* The page may have move.
-                   It will be remarked dirty.
-                   FIXME: to be tracked.  */
-                fprintf(stderr, "cannot map mfn page %lx gpfn %lx: %s\n",
-                        page_array[N], N, safe_strerror(errno));
-                continue;
-            }
+                if (debug)
+                    fprintf(stderr, "xc_linux_save: page %lx (%lu/%lu)\n",
+                            xc_ia64_p2m_mfn(&p2m_table, N),
+                            N, p2m_size);
 
-            if (!write_exact(io_fd, &N, sizeof(N))) {
-                ERROR("write: p2m_size");
+                mem = xc_map_foreign_range(xc_handle, dom, PAGE_SIZE,
+                                           PROT_READ|PROT_WRITE, N);
+                if (mem == NULL) {
+                    /* The page may have move.
+                       It will be remarked dirty.
+                       FIXME: to be tracked.  */
+                    fprintf(stderr, "cannot map mfn page %lx gpfn %lx: %s\n",
+                            xc_ia64_p2m_mfn(&p2m_table, N),
+                            N, safe_strerror(errno));
+                    continue;
+                }
+
+                if (!write_exact(io_fd, &N, sizeof(N))) {
+                    ERROR("write: p2m_size");
+                    munmap(mem, PAGE_SIZE);
+                    goto out;
+                }
+
+                if (write(io_fd, mem, PAGE_SIZE) != PAGE_SIZE) {
+                    ERROR("Error when writing to state file (5)");
+                    munmap(mem, PAGE_SIZE);
+                    goto out;
+                }
                 munmap(mem, PAGE_SIZE);
-                goto out;
+                sent_this_iter++;
+                total_sent++;
             }
-
-            if (write(io_fd, mem, PAGE_SIZE) != PAGE_SIZE) {
-                ERROR("Error when writing to state file (5)");
-                munmap(mem, PAGE_SIZE);
-                goto out;
-            }
-            munmap(mem, PAGE_SIZE);
-            sent_this_iter++;
-            total_sent++;
         }
 
         if (last_iter)
@@ -420,36 +473,69 @@ xc_domain_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
         }
     }
 
-    /* Send through a list of all the PFNs that were not in map at the close */
+    /*
+     * Send through a list of all the PFNs that were not in map at the close.
+     * We send pages which was allocated. However balloon driver may 
+     * decreased after sending page. So we have to check the freed
+     * page after pausing the domain.
+     */
     {
-        unsigned int i,j;
+        unsigned long N;
         unsigned long pfntab[1024];
+        unsigned int j;
 
-        for (i = 0, j = 0; i < p2m_size; i++) {
-            if (page_array[i] == INVALID_MFN)
-                j++;
+        j = 0;
+        for (p = memmap_desc_start;
+             p < memmap_desc_end;
+             p += memmap_info->efi_memdesc_size) {
+            md = p;
+            if (md->type != EFI_CONVENTIONAL_MEMORY ||
+                md->attribute != EFI_MEMORY_WB ||
+                md->num_pages == 0)
+                continue;
+            for (N = md->phys_addr >> PAGE_SHIFT;
+                 N < (md->phys_addr + (md->num_pages << EFI_PAGE_SHIFT)) >>
+                     PAGE_SHIFT;
+                 N++) {
+                if (!xc_ia64_p2m_allocated(&p2m_table, N))
+                    j++;
+            }
         }
-
         if (!write_exact(io_fd, &j, sizeof(unsigned int))) {
             ERROR("Error when writing to state file (6a)");
             goto out;
         }
-
-        for (i = 0, j = 0; i < p2m_size; ) {
-
-            if (page_array[i] == INVALID_MFN)
-                pfntab[j++] = i;
-
-            i++;
-            if (j == 1024 || i == p2m_size) {
-                if (!write_exact(io_fd, &pfntab, sizeof(unsigned long)*j)) {
-                    ERROR("Error when writing to state file (6b)");
-                    goto out;
+        
+        j = 0;
+        for (p = memmap_desc_start;
+             p < memmap_desc_end;
+             p += memmap_info->efi_memdesc_size) {
+            md = p;
+            if (md->type != EFI_CONVENTIONAL_MEMORY ||
+                md->attribute != EFI_MEMORY_WB ||
+                md->num_pages == 0)
+                continue;
+            for (N = md->phys_addr >> PAGE_SHIFT;
+                 N < (md->phys_addr + (md->num_pages << EFI_PAGE_SHIFT)) >>
+                     PAGE_SHIFT;
+                 N++) {
+                if (!xc_ia64_p2m_allocated(&p2m_table, N))
+                    pfntab[j++] = N;
+                if (j == sizeof(pfntab)/sizeof(pfntab[0])) {
+                    if (!write_exact(io_fd, &pfntab, sizeof(pfntab[0]) * j)) {
+                        ERROR("Error when writing to state file (6b)");
+                        goto out;
+                    }
+                    j = 0;
                 }
-                j = 0;
             }
         }
-
+        if (j > 0) {
+            if (!write_exact(io_fd, &pfntab, sizeof(pfntab[0]) * j)) {
+                ERROR("Error when writing to state file (6b)");
+                goto out;
+            }
+        }
     }
 
     if (xc_vcpu_getcontext(xc_handle, dom, 0, &ctxt)) {
@@ -494,13 +580,17 @@ xc_domain_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
         }
     }
 
-    free(page_array);
     unlock_pages(to_send, bitmap_size);
     free(to_send);
     unlock_pages(to_skip, bitmap_size);
     free(to_skip);
     if (live_shinfo)
         munmap(live_shinfo, PAGE_SIZE);
+    if (memmap_info_live)
+        munmap(memmap_info_live, memmap_size);
+    if (memmap_info)
+        free(memmap_info);
+    xc_ia64_p2m_unmap(&p2m_table);
 
     fprintf(stderr,"Save exit rc=%d\n",rc);
 

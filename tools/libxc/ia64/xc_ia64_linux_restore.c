@@ -5,12 +5,18 @@
  *
  * Copyright (c) 2003, K A Fraser.
  *  Rewritten for ia64 by Tristan Gingold <tristan.gingold@bull.net>
+ *
+ * Copyright (c) 2007 Isaku Yamahata <yamahata@valinux.co.jp>
+ *   Use foreign p2m exposure.
  */
 
 #include <stdlib.h>
 #include <unistd.h>
 
 #include "xg_private.h"
+#include "xc_ia64_save_restore.h"
+#include "xc_ia64.h"
+#include "xc_efi.h"
 
 #define PFN_TO_KB(_pfn) ((_pfn) << (PAGE_SHIFT - 10))
 
@@ -40,6 +46,16 @@ read_exact(int fd, void *buf, size_t count)
 }
 
 static int
+populate_page_if_necessary(int xc_handle, uint32_t dom, unsigned long gmfn,
+                           struct xen_ia64_p2m_table *p2m_table)
+{
+    if (xc_ia64_p2m_present(p2m_table, gmfn))
+        return 0;
+
+    return xc_domain_memory_populate_physmap(xc_handle, dom, 1, 0, 0, &gmfn);
+}
+
+static int
 read_page(int xc_handle, int io_fd, uint32_t dom, unsigned long pfn)
 {
     void *mem;
@@ -66,7 +82,8 @@ xc_domain_restore(int xc_handle, int io_fd, uint32_t dom,
                  unsigned int hvm, unsigned int pae)
 {
     DECLARE_DOMCTL;
-    int rc = 1, i;
+    int rc = 1;
+    unsigned int i;
     unsigned long gmfn;
     unsigned long ver;
 
@@ -78,10 +95,11 @@ xc_domain_restore(int xc_handle, int io_fd, uint32_t dom,
     /* A copy of the CPU context of the guest. */
     vcpu_guest_context_t ctxt;
 
-    unsigned long *page_array = NULL;
-
     /* A temporary mapping of the guest's start_info page. */
     start_info_t *start_info;
+
+    struct xen_ia64_p2m_table p2m_table;
+    xc_ia64_p2m_init(&p2m_table);
 
     if (hvm) {
         ERROR("HVM Restore is unsupported");
@@ -102,7 +120,7 @@ xc_domain_restore(int xc_handle, int io_fd, uint32_t dom,
         ERROR("Error when reading version");
         goto out;
     }
-    if (ver != 1) {
+    if (ver != XC_IA64_SR_FORMAT_VER_ONE && ver != XC_IA64_SR_FORMAT_VER_TWO) {
         ERROR("version of save doesn't match");
         goto out;
     }
@@ -112,25 +130,6 @@ xc_domain_restore(int xc_handle, int io_fd, uint32_t dom,
         ERROR("Unable to lock_pages ctxt");
         return 1;
     }
-
-    /* Get pages.  */
-    page_array = malloc(p2m_size * sizeof(unsigned long));
-    if (page_array == NULL) {
-        ERROR("Could not allocate memory");
-        goto out;
-    }
-
-    for ( i = 0; i < p2m_size; i++ )
-        page_array[i] = i;
-
-    if ( xc_domain_memory_populate_physmap(xc_handle, dom, p2m_size,
-                                           0, 0, page_array) )
-    {
-        ERROR("Failed to allocate memory for %ld KB to dom %d.\n",
-              PFN_TO_KB(p2m_size), dom);
-        goto out;
-    }
-    DPRINTF("Allocated memory by %ld KB\n", PFN_TO_KB(p2m_size));
 
     if (!read_exact(io_fd, &domctl.u.arch_setup, sizeof(domctl.u.arch_setup))) {
         ERROR("read: domain setup");
@@ -155,6 +154,61 @@ xc_domain_restore(int xc_handle, int io_fd, uint32_t dom,
     }
     shared_info_frame = domctl.u.getdomaininfo.shared_info_frame;
 
+    if (ver == XC_IA64_SR_FORMAT_VER_TWO) {
+        unsigned int memmap_info_num_pages;
+        unsigned long memmap_size;
+        xen_ia64_memmap_info_t *memmap_info;
+
+        if (!read_exact(io_fd, &memmap_info_num_pages,
+                        sizeof(memmap_info_num_pages))) {
+            ERROR("read: memmap_info_num_pages");
+            goto out;
+        }
+        memmap_size = memmap_info_num_pages * PAGE_SIZE;
+        memmap_info = malloc(memmap_size);
+        if (memmap_info == NULL) {
+            ERROR("Could not allocate memory for memmap_info");
+            goto out;
+        }
+        if (!read_exact(io_fd, memmap_info, memmap_size)) {
+            ERROR("read: memmap_info");
+            goto out;
+        }
+        if (xc_ia64_p2m_map(&p2m_table, xc_handle,
+                            dom, memmap_info, IA64_DOM0VP_EFP_ALLOC_PTE)) {
+            ERROR("p2m mapping");
+            goto out;
+        }
+        free(memmap_info);
+    } else if (ver == XC_IA64_SR_FORMAT_VER_ONE) {
+        xen_ia64_memmap_info_t *memmap_info;
+        efi_memory_desc_t *memdesc;
+        uint64_t buffer[(sizeof(*memmap_info) + sizeof(*memdesc) +
+                         sizeof(uint64_t) - 1) / sizeof(uint64_t)];
+
+        memset(buffer, 0, sizeof(buffer));
+        memmap_info = (xen_ia64_memmap_info_t *)buffer;
+        memdesc = (efi_memory_desc_t*)&memmap_info->memdesc[0];
+        memmap_info->efi_memmap_size = sizeof(*memmap_info) + sizeof(*memdesc);
+        memmap_info->efi_memdesc_size = sizeof(*memdesc);
+        memmap_info->efi_memdesc_version = EFI_MEMORY_DESCRIPTOR_VERSION;
+
+        memdesc->type = EFI_MEMORY_DESCRIPTOR_VERSION;
+        memdesc->phys_addr = 0;
+        memdesc->virt_addr = 0;
+        memdesc->num_pages = nr_pfns << (PAGE_SHIFT - EFI_PAGE_SHIFT);
+        memdesc->attribute = EFI_MEMORY_WB;
+
+        if (xc_ia64_p2m_map(&p2m_table, xc_handle,
+                            dom, memmap_info, IA64_DOM0VP_EFP_ALLOC_PTE)) {
+            ERROR("p2m mapping");
+            goto out;
+        }
+    } else {
+        ERROR("unknown version");
+        goto out;
+    }
+
     DPRINTF("Reloading memory pages:   0%%\n");
 
     while (1) {
@@ -165,17 +219,26 @@ xc_domain_restore(int xc_handle, int io_fd, uint32_t dom,
         if (gmfn == INVALID_MFN)
             break;
 
+        if (populate_page_if_necessary(xc_handle, dom, gmfn, &p2m_table) < 0) {
+            ERROR("can not populate page 0x%lx", gmfn);
+            goto out;
+        }
         if (read_page(xc_handle, io_fd, dom, gmfn) < 0)
             goto out;
     }
 
     DPRINTF("Received all pages\n");
 
-    /* Get the list of PFNs that are not in the psuedo-phys map */
+    /*
+     * Get the list of PFNs that are not in the psuedo-phys map.
+     * Although we allocate pages on demand, balloon driver may 
+     * decreased simaltenously. So we have to free the freed
+     * pages here.
+     */
     {
         unsigned int count;
         unsigned long *pfntab;
-        int rc;
+        unsigned int nr_frees;
 
         if (!read_exact(io_fd, &count, sizeof(count))) {
             ERROR("Error when reading pfn count");
@@ -190,35 +253,30 @@ xc_domain_restore(int xc_handle, int io_fd, uint32_t dom,
 
         if (!read_exact(io_fd, pfntab, sizeof(unsigned long)*count)) {
             ERROR("Error when reading pfntab");
+            free(pfntab);
             goto out;
         }
 
-        DPRINTF ("Try to free %u pages\n", count);
-
+        nr_frees = 0;
         for (i = 0; i < count; i++) {
-
-            volatile unsigned long pfn;
-
-            struct xen_memory_reservation reservation = {
-                .nr_extents   = 1,
-                .extent_order = 0,
-                .domid        = dom
-            };
-            set_xen_guest_handle(reservation.extent_start,
-                                 (unsigned long *)&pfn);
-
-            pfn = pfntab[i];
-            rc = xc_memory_op(xc_handle, XENMEM_decrease_reservation,
-                              &reservation);
-            if (rc != 1) {
-                ERROR("Could not decrease reservation : %d", rc);
-                goto out;
+            if (xc_ia64_p2m_allocated(&p2m_table, pfntab[i])) {
+                pfntab[nr_frees] = pfntab[i];
+                nr_frees++;
             }
         }
-
-        DPRINTF("Decreased reservation by %d pages\n", count);
+        if (nr_frees > 0) {
+            if (xc_domain_memory_decrease_reservation(xc_handle, dom, nr_frees,
+                                                      0, pfntab) < 0) {
+                ERROR("Could not decrease reservation : %d", rc);
+                free(pfntab);
+                goto out;
+            }
+            else
+                DPRINTF("Decreased reservation by %d / %d pages\n",
+                        nr_frees, count);
+        }
+        free(pfntab);
     }
-
 
     if (!read_exact(io_fd, &ctxt, sizeof(ctxt))) {
         ERROR("Error when reading ctxt");
@@ -274,6 +332,10 @@ xc_domain_restore(int xc_handle, int io_fd, uint32_t dom,
     munmap (shared_info, PAGE_SIZE);
 
     /* Uncanonicalise the suspend-record frame number and poke resume rec. */
+    if (populate_page_if_necessary(xc_handle, dom, gmfn, &p2m_table)) {
+        ERROR("cannot populate page 0x%lx", gmfn);
+        goto out;
+    }
     start_info = xc_map_foreign_range(xc_handle, dom, PAGE_SIZE,
                                       PROT_READ | PROT_WRITE, gmfn);
     if (start_info == NULL) {
@@ -309,8 +371,7 @@ xc_domain_restore(int xc_handle, int io_fd, uint32_t dom,
     if ((rc != 0) && (dom != 0))
         xc_domain_destroy(xc_handle, dom);
 
-    if (page_array != NULL)
-        free(page_array);
+    xc_ia64_p2m_unmap(&p2m_table);
 
     unlock_pages(&ctxt, sizeof(ctxt));
 
