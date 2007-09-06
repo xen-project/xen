@@ -469,6 +469,13 @@ DEFINE_XEN_GUEST_HANDLE(vcpu_guest_context_t);
 /* Add an I/O port space range */
 #define IA64_DOM0VP_add_io_space        11
 
+/* expose the foreign domain's p2m table into privileged domain */
+#define IA64_DOM0VP_expose_foreign_p2m  12
+#define         IA64_DOM0VP_EFP_ALLOC_PTE       0x1 /* allocate p2m table */
+
+/* unexpose the foreign domain's p2m table into privileged domain */
+#define IA64_DOM0VP_unexpose_foreign_p2m        13
+
 // flags for page assignement to pseudo physical address space
 #define _ASSIGN_readonly                0
 #define ASSIGN_readonly                 (1UL << _ASSIGN_readonly)

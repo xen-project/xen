@@ -175,8 +175,10 @@
 #include <asm/p2m_entry.h>
 #include <asm/tlb_track.h>
 #include <linux/efi.h>
+#include <linux/sort.h>
 #include <xen/guest_access.h>
 #include <asm/page.h>
+#include <asm/dom_fw_common.h>
 #include <public/memory.h>
 #include <asm/event.h>
 
@@ -354,6 +356,8 @@ mm_teardown(struct domain* d)
         if (mm_teardown_pgd(d, pgd, cur_offset))
             return -EAGAIN;
     }
+
+    foreign_p2m_destroy(d);
     return 0;
 }
 
@@ -1528,6 +1532,12 @@ dom0vp_add_physmap_with_gmfn(struct domain* d, unsigned long gpfn,
 }
 
 #ifdef CONFIG_XEN_IA64_EXPOSE_P2M
+#define P2M_PFN_ROUNDUP(x)      (((x) + PTRS_PER_PTE - 1) & \
+                                 ~(PTRS_PER_PTE - 1))
+#define P2M_PFN_ROUNDDOWN(x)    ((x) & ~(PTRS_PER_PTE - 1))
+#define P2M_NUM_PFN(x)          (((x) + PTRS_PER_PTE - 1) / PTRS_PER_PTE)
+#define MD_END(md)              ((md)->phys_addr + \
+                                 ((md)->num_pages << EFI_PAGE_SHIFT))
 static struct page_info* p2m_pte_zero_page = NULL;
 
 /* This must called before dom0 p2m table allocation */
@@ -1550,6 +1560,43 @@ expose_p2m_init(void)
     p2m_pte_zero_page = virt_to_page(pte);
 }
 
+// allocate pgd, pmd of dest_dom if necessary
+static int
+allocate_pgd_pmd(struct domain* dest_dom, unsigned long dest_gpfn,
+                 struct domain* src_dom,
+                 unsigned long src_gpfn, unsigned long num_src_gpfn)
+{
+    unsigned long i = 0;
+
+    BUG_ON((src_gpfn % PTRS_PER_PTE) != 0);
+    BUG_ON((num_src_gpfn % PTRS_PER_PTE) != 0);
+
+    while (i < num_src_gpfn) {
+        volatile pte_t* src_pte;
+        volatile pte_t* dest_pte;
+
+        src_pte = lookup_noalloc_domain_pte(src_dom,
+                                            (src_gpfn + i) << PAGE_SHIFT);
+        if (src_pte == NULL) {
+            i++;
+            continue;
+        }
+        
+        dest_pte = lookup_alloc_domain_pte(dest_dom,
+                                           (dest_gpfn << PAGE_SHIFT) +
+                                           i * sizeof(pte_t));
+        if (dest_pte == NULL) {
+            gdprintk(XENLOG_INFO, "%s failed to allocate pte page\n",
+                     __func__);
+            return -ENOMEM;
+        }
+
+        // skip to next pte page
+        i = P2M_PFN_ROUNDDOWN(i + PTRS_PER_PTE);
+    }
+    return 0;
+}
+
 static int
 expose_p2m_page(struct domain* d, unsigned long mpaddr, struct page_info* page)
 {
@@ -1559,6 +1606,94 @@ expose_p2m_page(struct domain* d, unsigned long mpaddr, struct page_info* page)
                                 ASSIGN_readonly);
 }
 
+// expose pte page
+static int
+expose_p2m_range(struct domain* dest_dom, unsigned long dest_gpfn,
+                 struct domain* src_dom,
+                 unsigned long src_gpfn, unsigned long num_src_gpfn)
+{
+    unsigned long i = 0;
+
+    BUG_ON((src_gpfn % PTRS_PER_PTE) != 0);
+    BUG_ON((num_src_gpfn % PTRS_PER_PTE) != 0);
+
+    while (i < num_src_gpfn) {
+        volatile pte_t* pte;
+
+        pte = lookup_noalloc_domain_pte(src_dom, (src_gpfn + i) << PAGE_SHIFT);
+        if (pte == NULL) {
+            i++;
+            continue;
+        }
+
+        if (expose_p2m_page(dest_dom,
+                            (dest_gpfn << PAGE_SHIFT) + i * sizeof(pte_t),
+                            virt_to_page(pte)) < 0) {
+            gdprintk(XENLOG_INFO, "%s failed to assign page\n", __func__);
+            return -EAGAIN;
+        }
+
+        // skip to next pte page
+        i = P2M_PFN_ROUNDDOWN(i + PTRS_PER_PTE);
+    }
+    return 0;
+}
+
+// expose p2m_pte_zero_page 
+static int
+expose_zero_page(struct domain* dest_dom, unsigned long dest_gpfn,
+                 unsigned long num_src_gpfn)
+{
+    unsigned long i;
+    
+    for (i = 0; i < P2M_NUM_PFN(num_src_gpfn); i++) {
+        volatile pte_t* pte;
+        pte = lookup_noalloc_domain_pte(dest_dom,
+                                        (dest_gpfn + i) << PAGE_SHIFT);
+        if (pte == NULL || pte_present(*pte))
+            continue;
+
+        if (expose_p2m_page(dest_dom, (dest_gpfn + i) << PAGE_SHIFT,
+                            p2m_pte_zero_page) < 0) {
+            gdprintk(XENLOG_INFO, "%s failed to assign zero-pte page\n",
+                     __func__);
+            return -EAGAIN;
+        }
+    }
+    return 0;
+}
+
+static int
+expose_p2m(struct domain* dest_dom, unsigned long dest_gpfn,
+           struct domain* src_dom,
+           unsigned long src_gpfn, unsigned long num_src_gpfn)
+{
+    if (allocate_pgd_pmd(dest_dom, dest_gpfn,
+                         src_dom, src_gpfn, num_src_gpfn))
+        return -ENOMEM;
+
+    if (expose_p2m_range(dest_dom, dest_gpfn,
+                         src_dom, src_gpfn, num_src_gpfn))
+        return -EAGAIN;
+
+    if (expose_zero_page(dest_dom, dest_gpfn, num_src_gpfn))
+        return -EAGAIN;
+    
+    return 0;
+}
+
+static void
+unexpose_p2m(struct domain* dest_dom,
+             unsigned long dest_gpfn, unsigned long num_dest_gpfn)
+{
+    unsigned long i;
+
+    for (i = 0; i < num_dest_gpfn; i++) {
+        zap_domain_page_one(dest_dom, (dest_gpfn + i) << PAGE_SHIFT,
+                            0, INVALID_MFN);
+    }
+}
+
 // It is possible to optimize loop, But this isn't performance critical.
 unsigned long
 dom0vp_expose_p2m(struct domain* d,
@@ -1566,10 +1701,8 @@ dom0vp_expose_p2m(struct domain* d,
                   unsigned long assign_start_gpfn,
                   unsigned long expose_size, unsigned long granule_pfn)
 {
+    unsigned long ret;
     unsigned long expose_num_pfn = expose_size >> PAGE_SHIFT;
-    unsigned long i;
-    volatile pte_t* conv_pte;
-    volatile pte_t* assign_pte;
 
     if ((expose_size % PAGE_SIZE) != 0 ||
         (granule_pfn % PTRS_PER_PTE) != 0 ||
@@ -1590,65 +1723,419 @@ dom0vp_expose_p2m(struct domain* d,
                 __func__, granule_pfn, PTRS_PER_PTE);
         return -ENOSYS;
     }
+    ret = expose_p2m(d, assign_start_gpfn,
+                     d, conv_start_gpfn, expose_num_pfn);
+    return ret;
+}
 
-    // allocate pgd, pmd.
-    i = conv_start_gpfn;
-    while (i < expose_num_pfn) {
-        conv_pte = lookup_noalloc_domain_pte(d, (conv_start_gpfn + i) <<
-                                             PAGE_SHIFT);
-        if (conv_pte == NULL) {
-            i++;
-            continue;
-        }
+static int
+memmap_info_copy_from_guest(struct xen_ia64_memmap_info* memmap_info,
+                            char** memmap_p,
+                            XEN_GUEST_HANDLE(char) buffer)
+{
+    char *memmap;
+    char *p;
+    char *memmap_end;
+    efi_memory_desc_t *md;
+    unsigned long start;
+    unsigned long end;
+    efi_memory_desc_t *prev_md;
+
+    if (copy_from_guest((char*)memmap_info, buffer, sizeof(*memmap_info)))
+        return -EFAULT;
+    if (memmap_info->efi_memdesc_size < sizeof(efi_memory_desc_t) ||
+        memmap_info->efi_memmap_size < memmap_info->efi_memdesc_size ||
+        (memmap_info->efi_memmap_size % memmap_info->efi_memdesc_size) != 0)
+        return -EINVAL;
+    
+    memmap = _xmalloc(memmap_info->efi_memmap_size,
+                      __alignof__(efi_memory_desc_t));
+    if (memmap == NULL)
+        return -ENOMEM;
+    if (copy_from_guest_offset(memmap, buffer, sizeof(*memmap_info),
+                               memmap_info->efi_memmap_size)) {
+        xfree(memmap);
+        return -EFAULT;
+    }
+
+    /* intergirty check & simplify */
+    sort(memmap, memmap_info->efi_memmap_size / memmap_info->efi_memdesc_size,
+         memmap_info->efi_memdesc_size, efi_mdt_cmp, NULL);
+
+    /* alignement & overlap check */
+    prev_md = NULL;
+    p = memmap;
+    memmap_end = memmap + memmap_info->efi_memmap_size;
+    for (p = memmap; p < memmap_end; p += memmap_info->efi_memmap_size) {
+        md = (efi_memory_desc_t*)p;
+        start = md->phys_addr;
         
-        assign_pte = lookup_alloc_domain_pte(d, (assign_start_gpfn <<
-                                             PAGE_SHIFT) + i * sizeof(pte_t));
-        if (assign_pte == NULL) {
-            gdprintk(XENLOG_INFO, "%s failed to allocate pte page\n", __func__);
-            return -ENOMEM;
+        if (start & ((1UL << EFI_PAGE_SHIFT) - 1) || md->num_pages == 0) {
+            xfree(memmap);
+            return -EINVAL;
         }
 
-        // skip to next pte page
-        i += PTRS_PER_PTE;
-        i &= ~(PTRS_PER_PTE - 1);
+        if (prev_md != NULL) {
+            unsigned long prev_end = MD_END(prev_md);
+            if (prev_end > start) {
+                xfree(memmap);
+                return -EINVAL;
+            }
+        }
+
+        prev_md = (efi_memory_desc_t *)p;
     }
 
-    // expose pte page
-    i = 0;
-    while (i < expose_num_pfn) {
-        conv_pte = lookup_noalloc_domain_pte(d, (conv_start_gpfn + i) <<
-                                             PAGE_SHIFT);
-        if (conv_pte == NULL) {
-            i++;
-            continue;
+    /* coalease */
+    prev_md = NULL;
+    p = memmap;
+    while (p < memmap_end) {
+        md = (efi_memory_desc_t*)p;
+        start = md->phys_addr;
+        end = MD_END(md);
+
+        start = P2M_PFN_ROUNDDOWN(start >> PAGE_SHIFT) << PAGE_SHIFT;
+        end = P2M_PFN_ROUNDUP(end >> PAGE_SHIFT) << PAGE_SHIFT;
+        md->phys_addr = start;
+        md->num_pages = (end - start) >> EFI_PAGE_SHIFT;
+
+        if (prev_md != NULL) {
+            unsigned long prev_end = MD_END(prev_md);
+            if (prev_end >= start) {
+                size_t left;
+                end = max(prev_end, end);
+                prev_md->num_pages = (end - prev_md->phys_addr) >> EFI_PAGE_SHIFT;
+
+                left = memmap_end - p;
+                if (left > memmap_info->efi_memdesc_size) {
+                    left -= memmap_info->efi_memdesc_size;
+                    memmove(p, p + memmap_info->efi_memdesc_size, left);
+                }
+
+                memmap_info->efi_memmap_size -= memmap_info->efi_memdesc_size;
+                memmap_end -= memmap_info->efi_memdesc_size;
+                continue;
+            }
         }
 
-        if (expose_p2m_page(d, (assign_start_gpfn << PAGE_SHIFT) +
-                            i * sizeof(pte_t), virt_to_page(conv_pte)) < 0) {
-            gdprintk(XENLOG_INFO, "%s failed to assign page\n", __func__);
-            return -EAGAIN;
-        }
-
-        // skip to next pte page
-        i += PTRS_PER_PTE;
-        i &= ~(PTRS_PER_PTE - 1);
+        prev_md = md;
+        p += memmap_info->efi_memdesc_size;
     }
 
-    // expose p2m_pte_zero_page 
-    for (i = 0; i < (expose_num_pfn + PTRS_PER_PTE - 1) / PTRS_PER_PTE; i++) {
-        assign_pte = lookup_noalloc_domain_pte(d, (assign_start_gpfn + i) <<
-                                               PAGE_SHIFT);
-        if (assign_pte == NULL || pte_present(*assign_pte))
-            continue;
-
-        if (expose_p2m_page(d, (assign_start_gpfn + i) << PAGE_SHIFT,
-                            p2m_pte_zero_page) < 0) {
-            gdprintk(XENLOG_INFO, "%s failed to assign zero-pte page\n", __func__);
-            return -EAGAIN;
-        }
+    if (copy_to_guest(buffer, (char*)memmap_info, sizeof(*memmap_info)) ||
+        copy_to_guest_offset(buffer, sizeof(*memmap_info),
+                             (char*)memmap, memmap_info->efi_memmap_size)) {
+        xfree(memmap);
+        return -EFAULT;
     }
     
+    *memmap_p = memmap;
     return 0;
+}
+
+static int
+foreign_p2m_allocate_pte(struct domain* d,
+                         const struct xen_ia64_memmap_info* memmap_info,
+                         const void* memmap)
+{
+    const void* memmap_end = memmap + memmap_info->efi_memmap_size;
+    const void* p;
+
+    for (p = memmap; p < memmap_end; p += memmap_info->efi_memdesc_size) {
+        const efi_memory_desc_t* md = p;
+        unsigned long start = md->phys_addr;
+        unsigned long end = MD_END(md);
+        unsigned long gpaddr;
+
+        for (gpaddr = start; gpaddr < end; gpaddr += PAGE_SIZE) {
+            if (lookup_alloc_domain_pte(d, gpaddr) == NULL) {
+                return -ENOMEM;
+            }
+        }
+    }
+
+    return 0;
+}
+
+struct foreign_p2m_region {
+    unsigned long       gpfn;
+    unsigned long       num_gpfn;
+};
+
+struct foreign_p2m_entry {
+    struct list_head            list;
+    int                         busy;
+
+    /* src domain  */
+    struct domain*              src_dom;
+
+    /* region into which foreign p2m table is mapped */
+    unsigned long               gpfn;
+    unsigned long               num_gpfn;
+    unsigned int                num_region;
+    struct foreign_p2m_region   region[0];
+};
+
+/* caller must increment the reference count of src_dom */
+static int
+foreign_p2m_alloc(struct foreign_p2m* foreign_p2m,
+                  unsigned long dest_gpfn, struct domain* src_dom,
+                  struct xen_ia64_memmap_info* memmap_info, void* memmap,
+                  struct foreign_p2m_entry** entryp)
+{
+    void* memmap_end = memmap + memmap_info->efi_memmap_size;
+    efi_memory_desc_t* md;
+    unsigned long dest_gpfn_end;
+    unsigned long src_gpfn;
+    unsigned long src_gpfn_end;
+
+    unsigned int num_region;
+    struct foreign_p2m_entry* entry;
+    struct foreign_p2m_entry* prev;
+    struct foreign_p2m_entry* pos;
+
+    num_region = (memmap_end - memmap) / memmap_info->efi_memdesc_size;
+
+    md = memmap;
+    src_gpfn = P2M_PFN_ROUNDDOWN(md->phys_addr >> PAGE_SHIFT);
+
+    md = memmap + (num_region - 1) * memmap_info->efi_memdesc_size;
+    src_gpfn_end = MD_END(md) >> PAGE_SHIFT;
+    if (src_gpfn_end >
+        P2M_PFN_ROUNDUP(src_dom->arch.convmem_end >> PAGE_SHIFT))
+        return -EINVAL;
+
+    src_gpfn_end = P2M_PFN_ROUNDUP(src_gpfn_end);
+    dest_gpfn_end = dest_gpfn + P2M_NUM_PFN(src_gpfn_end - src_gpfn);
+    entry = _xmalloc(sizeof(*entry) + num_region * sizeof(entry->region[0]),
+                     __alignof__(*entry));
+    if (entry == NULL)
+        return -ENOMEM;
+
+    entry->busy = 1;
+    entry->gpfn = dest_gpfn;
+    entry->num_gpfn = dest_gpfn_end - dest_gpfn;
+    entry->src_dom = src_dom;
+    entry->num_region = 0;
+    memset(entry->region, 0, sizeof(entry->region[0]) * num_region);
+    prev = NULL;
+
+    spin_lock(&foreign_p2m->lock);
+    if (list_empty(&foreign_p2m->head))
+        prev = (struct foreign_p2m_entry*)&foreign_p2m->head;
+
+    list_for_each_entry(pos, &foreign_p2m->head, list) {
+        if (pos->gpfn + pos->num_gpfn < dest_gpfn) {
+            prev = pos;
+            continue;
+        }
+
+        if (dest_gpfn_end < pos->gpfn) {
+            if (prev != NULL && prev->gpfn + prev->num_gpfn > dest_gpfn)
+                prev = NULL;/* overlap */
+            break;
+        }
+
+        /* overlap */
+        prev = NULL;
+        break;
+    }
+    if (prev != NULL) {
+            list_add(&entry->list, &prev->list);
+            spin_unlock(&foreign_p2m->lock);
+            *entryp = entry;
+            return 0;
+    }
+    spin_unlock(&foreign_p2m->lock);
+    xfree(entry);
+    return -EBUSY;
+}
+
+static void
+foreign_p2m_unexpose(struct domain* dest_dom, struct foreign_p2m_entry* entry)
+{
+    unsigned int i;
+
+    BUG_ON(!entry->busy);
+    for (i = 0; i < entry->num_region; i++)
+        unexpose_p2m(dest_dom,
+                     entry->region[i].gpfn, entry->region[i].num_gpfn);
+}
+
+static void
+foreign_p2m_unbusy(struct foreign_p2m* foreign_p2m,
+                   struct foreign_p2m_entry* entry)
+{
+    spin_lock(&foreign_p2m->lock);
+    BUG_ON(!entry->busy);
+    entry->busy = 0;
+    spin_unlock(&foreign_p2m->lock);
+}
+
+static void
+foreign_p2m_free(struct foreign_p2m* foreign_p2m, 
+                 struct foreign_p2m_entry* entry)
+{
+    spin_lock(&foreign_p2m->lock);
+    BUG_ON(!entry->busy);
+    list_del(&entry->list);
+    spin_unlock(&foreign_p2m->lock);
+
+    put_domain(entry->src_dom);
+    xfree(entry);
+}
+
+void
+foreign_p2m_init(struct domain* d)
+{
+    struct foreign_p2m* foreign_p2m = &d->arch.foreign_p2m;
+    INIT_LIST_HEAD(&foreign_p2m->head);
+    spin_lock_init(&foreign_p2m->lock);
+}
+
+void
+foreign_p2m_destroy(struct domain* d)
+{
+    struct foreign_p2m* foreign_p2m = &d->arch.foreign_p2m;
+    struct foreign_p2m_entry* entry;
+    struct foreign_p2m_entry* n;
+
+    spin_lock(&foreign_p2m->lock);
+    list_for_each_entry_safe(entry, n, &foreign_p2m->head, list) {
+        /* mm_teardown() cleared p2m table already */
+        /* foreign_p2m_unexpose(d, entry);*/
+        list_del(&entry->list);
+        put_domain(entry->src_dom);
+        xfree(entry);
+    }
+    spin_unlock(&foreign_p2m->lock);
+}
+
+unsigned long
+dom0vp_expose_foreign_p2m(struct domain* dest_dom,
+                          unsigned long dest_gpfn,
+                          domid_t domid,
+                          XEN_GUEST_HANDLE(char) buffer,
+                          unsigned long flags)
+{
+    unsigned long ret = 0;
+    struct domain* src_dom;
+    struct xen_ia64_memmap_info memmap_info;
+    char* memmap;
+    void* memmap_end;
+    void* p;
+
+    struct foreign_p2m_entry* entry;
+
+    ret = memmap_info_copy_from_guest(&memmap_info, &memmap, buffer);
+    if (ret != 0)
+        return ret;
+
+    dest_dom = rcu_lock_domain(dest_dom);
+    if (dest_dom == NULL) {
+        ret = -EINVAL;
+        goto out;
+    }
+#if 1
+    // Self foreign domain p2m exposure isn't allowed.
+    // Otherwise the domain can't be destroyed because
+    // no one decrements the domain reference count.
+    if (domid == dest_dom->domain_id) {
+        ret = -EINVAL;
+        goto out;
+    }
+#endif    
+
+    src_dom = get_domain_by_id(domid);
+    if (src_dom == NULL) {
+        ret = -EINVAL;
+        goto out_unlock;
+    }
+
+    if (flags & IA64_DOM0VP_EFP_ALLOC_PTE) {
+        ret = foreign_p2m_allocate_pte(src_dom, &memmap_info, memmap);
+        if (ret != 0)
+            goto out_unlock;
+    }
+
+    ret = foreign_p2m_alloc(&dest_dom->arch.foreign_p2m, dest_gpfn,
+                            src_dom, &memmap_info, memmap, &entry);
+    if (ret != 0)
+        goto out_unlock;
+
+    memmap_end = memmap + memmap_info.efi_memmap_size;
+    for (p = memmap; p < memmap_end; p += memmap_info.efi_memdesc_size) {
+        efi_memory_desc_t* md = p;
+        unsigned long src_gpfn =
+            P2M_PFN_ROUNDDOWN(md->phys_addr >> PAGE_SHIFT);
+        unsigned long src_gpfn_end =
+            P2M_PFN_ROUNDUP(MD_END(md) >> PAGE_SHIFT);
+        unsigned long num_src_gpfn = src_gpfn_end - src_gpfn;
+        
+        ret = expose_p2m(dest_dom, dest_gpfn + src_gpfn / PTRS_PER_PTE,
+                         src_dom, src_gpfn, num_src_gpfn);
+        if (ret != 0)
+            break;
+
+        entry->region[entry->num_region].gpfn =
+            dest_gpfn + src_gpfn / PTRS_PER_PTE;
+        entry->region[entry->num_region].num_gpfn = P2M_NUM_PFN(num_src_gpfn);
+        entry->num_region++;
+    }
+
+    if (ret == 0) {
+        foreign_p2m_unbusy(&dest_dom->arch.foreign_p2m, entry);
+    } else {
+        foreign_p2m_unexpose(dest_dom, entry);
+        foreign_p2m_free(&dest_dom->arch.foreign_p2m, entry);
+    }
+
+ out_unlock:
+    rcu_unlock_domain(dest_dom);
+ out:
+    xfree(memmap);
+    return ret;
+}
+
+unsigned long
+dom0vp_unexpose_foreign_p2m(struct domain* dest_dom,
+                            unsigned long dest_gpfn,
+                            domid_t domid)
+{
+    int ret = -ENOENT;
+    struct foreign_p2m* foreign_p2m = &dest_dom->arch.foreign_p2m;
+    struct foreign_p2m_entry* entry;
+
+    dest_dom = rcu_lock_domain(dest_dom);
+    if (dest_dom == NULL)
+        return ret;
+    spin_lock(&foreign_p2m->lock);
+    list_for_each_entry(entry, &foreign_p2m->head, list) {
+        if (entry->gpfn < dest_gpfn)
+              continue;
+        if (dest_gpfn < entry->gpfn)
+            break;
+
+        if (domid == entry->src_dom->domain_id)
+            ret = 0;
+        else
+            ret = -EINVAL;
+        break;
+    }
+    if (ret == 0) {
+        if (entry->busy == 0)
+            entry->busy = 1;
+        else
+            ret = -EBUSY;
+    }
+    spin_unlock(&foreign_p2m->lock);
+
+    if (ret == 0) {
+        foreign_p2m_unexpose(dest_dom, entry);
+        foreign_p2m_free(&dest_dom->arch.foreign_p2m, entry);
+    }
+    rcu_unlock_domain(dest_dom);
+    return ret;
 }
 #endif
 

@@ -415,6 +415,15 @@ do_dom0vp_op(unsigned long cmd,
     case IA64_DOM0VP_add_io_space:
         ret = dom0vp_add_io_space(d, arg0, arg1, arg2);
         break;
+    case IA64_DOM0VP_expose_foreign_p2m: {
+        XEN_GUEST_HANDLE(char) hnd;
+        set_xen_guest_handle(hnd, (char*)arg2);
+        ret = dom0vp_expose_foreign_p2m(d, arg0, (domid_t)arg1, hnd, arg3);
+        break;
+    }
+    case IA64_DOM0VP_unexpose_foreign_p2m:
+        ret = dom0vp_unexpose_foreign_p2m(d, arg0, arg1);
+        break;
     default:
         ret = -1;
 		printk("unknown dom0_vp_op 0x%lx\n", cmd);

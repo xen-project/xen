@@ -440,9 +440,17 @@ extern unsigned long dom0vp_add_physmap_with_gmfn(struct domain* d, unsigned lon
 #ifdef CONFIG_XEN_IA64_EXPOSE_P2M
 extern void expose_p2m_init(void);
 extern unsigned long dom0vp_expose_p2m(struct domain* d, unsigned long conv_start_gpfn, unsigned long assign_start_gpfn, unsigned long expose_size, unsigned long granule_pfn);
+extern void foreign_p2m_init(struct domain* d);
+extern void foreign_p2m_destroy(struct domain* d);
+extern unsigned long dom0vp_expose_foreign_p2m(struct domain* dest_dom, unsigned long dest_gpfn, domid_t domid, XEN_GUEST_HANDLE(char) buffer, unsigned long flags);
+extern unsigned long dom0vp_unexpose_foreign_p2m(struct domain* dest_dom, unsigned long dest_gpfn, domid_t domid);
 #else
 #define expose_p2m_init()       do { } while (0)
 #define dom0vp_expose_p2m(d, conv_start_gpfn, assign_start_gpfn, expose_size, granule_pfn)	(-ENOSYS)
+#define foreign_p2m_init(d)	do { } while (0)
+#define foreign_p2m_destroy(d)	do { } while (0)
+#define dom0vp_expose_foreign_p2m(dest_dom, dest_gpfn, domid, buffer, flags)	(-ENOSYS)
+#define dom0vp_unexpose_foreign_p2m(dest_dom, dest_gpfn, domid)	(-ENOSYS)
 #endif
 
 extern volatile unsigned long *mpt_table;

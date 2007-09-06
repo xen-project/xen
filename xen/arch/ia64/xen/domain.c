@@ -540,6 +540,7 @@ int arch_domain_create(struct domain *d)
 	if (is_idle_domain(d))
 	    return 0;
 
+	foreign_p2m_init(d);
 #ifdef CONFIG_XEN_IA64_PERVCPU_VHPT
 	d->arch.has_pervcpu_vhpt = opt_pervcpu_vhpt;
 	dprintk(XENLOG_INFO, "%s:%d domain %d pervcpu_vhpt %d\n",

@@ -47,6 +47,16 @@ struct mm_struct {
     //	atomic_t mm_users;			/* How many users with user space? */
 };
 
+struct foreign_p2m {
+    spinlock_t          lock;
+    /*
+     * sorted list with entry->gpfn.
+     * It is expected that only small number of foreign domain p2m
+     * mapping happens at the same time.
+     */
+    struct list_head    head;
+};
+
 struct last_vcpu {
 #define INVALID_VCPU_ID INT_MAX
     int vcpu_id;
@@ -163,6 +173,9 @@ struct arch_domain {
     atomic64_t shadow_dirty_count;
     /* Number of faults.  */
     atomic64_t shadow_fault_count;
+
+    /* for foreign domain p2m table mapping */
+    struct foreign_p2m foreign_p2m;
 
     struct last_vcpu last_vcpu[NR_CPUS];
 
