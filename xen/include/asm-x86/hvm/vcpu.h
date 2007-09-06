@@ -46,9 +46,6 @@ struct hvm_vcpu {
     s64                 cache_tsc_offset;
     u64                 guest_time;
 
-    /* Is an NMI pending for delivery to this VCPU core? */
-    bool_t              nmi_pending; /* NB. integrate flag with save/restore */
-
     /* Lock and list for virtual platform timers. */
     spinlock_t          tm_lock;
     struct list_head    tm_list;

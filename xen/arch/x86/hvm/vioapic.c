@@ -391,7 +391,7 @@ static void vioapic_deliver(struct hvm_hw_vioapic *vioapic, int irq)
                 continue;
             deliver_bitmask &= ~(1 << bit);
             if ( ((v = vioapic_domain(vioapic)->vcpu[bit]) != NULL) &&
-                 !test_and_set_bool(v->arch.hvm_vcpu.nmi_pending) )
+                 !test_and_set_bool(v->nmi_pending) )
                 vcpu_kick(v);
         }
         break;

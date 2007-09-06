@@ -508,12 +508,8 @@ long arch_do_domctl(
         {
         case XEN_DOMCTL_SENDTRIGGER_NMI:
         {
-            ret = -ENOSYS;
-            if ( !is_hvm_domain(d) )
-                break;
-
             ret = 0;
-            if ( !test_and_set_bool(v->arch.hvm_vcpu.nmi_pending) )
+            if ( !test_and_set_bool(v->nmi_pending) )
                 vcpu_kick(v);
         }
         break;

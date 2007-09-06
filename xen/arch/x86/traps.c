@@ -1890,7 +1890,7 @@ static void nmi_dom0_report(unsigned int reason_idx)
 
     set_bit(reason_idx, nmi_reason(d));
 
-    if ( !xchg(&v->nmi_pending, 1) )
+    if ( !test_and_set_bool(v->nmi_pending) )
         raise_softirq(NMI_SOFTIRQ); /* not safe to wake up a vcpu here */
 }
 
