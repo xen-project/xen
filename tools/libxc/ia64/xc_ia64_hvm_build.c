@@ -1028,7 +1028,9 @@ setup_guest(int xc_handle, uint32_t dom, unsigned long memsize,
 
     domctl.u.arch_setup.flags = XEN_DOMAINSETUP_hvm_guest;
     domctl.u.arch_setup.bp = 0;
-    domctl.u.arch_setup.maxmem = 0;
+    domctl.u.arch_setup.maxmem = GFW_START + GFW_SIZE;
+    if (dom_memsize > MMIO_START)
+        domctl.u.arch_setup.maxmem = dom_memsize + 1 * MEM_G;
     domctl.cmd = XEN_DOMCTL_arch_setup;
     domctl.domain = (domid_t)dom;
     if (xc_domctl(xc_handle, &domctl))

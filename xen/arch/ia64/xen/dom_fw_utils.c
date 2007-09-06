@@ -60,6 +60,11 @@ int xen_ia64_is_dom0(struct domain *d)
 	return d == dom0;
 }
 
+void xen_ia64_set_convmem_end(struct domain *d, uint64_t convmem_end)
+{
+	d->arch.convmem_end = convmem_end;
+}
+
 static void dom_fw_domain_init(struct domain *d, struct fw_tables *tables)
 {
 	/* Initialise for EFI_SET_VIRTUAL_ADDRESS_MAP emulation */
@@ -107,7 +112,7 @@ static int dom_fw_set_convmem_end(struct domain *d)
 	     memmap_info->efi_memdesc_size, efi_mdt_cmp, NULL);
 
 	if (d->arch.convmem_end == 0)
-		d->arch.convmem_end = d->max_pages << PAGE_SHIFT;
+		xen_ia64_set_convmem_end(d, d->max_pages << PAGE_SHIFT);
 
 	for (p = memmap_start; p < memmap_end;
 	     p += memmap_info->efi_memdesc_size) {
@@ -119,7 +124,7 @@ static int dom_fw_set_convmem_end(struct domain *d)
 		if (md->attribute == EFI_MEMORY_WB &&
 		    md->type == EFI_CONVENTIONAL_MEMORY &&
 		    md->num_pages > 0 && d->arch.convmem_end < end)
-			d->arch.convmem_end = end;
+			xen_ia64_set_convmem_end(d, end);
 	}
 
 	dom_fw_copy_to(d, gpaddr, memmap_info, size);
@@ -141,7 +146,7 @@ static void dom_fw_setup_for_domain_restore(domain_t * d, unsigned long maxmem)
 {
 	assign_new_domain_page(d, FW_HYPERCALL_BASE_PADDR);
 	dom_fw_domain_init(d, domain_mpa_to_imva(d, FW_TABLES_BASE_PADDR));
-	d->arch.convmem_end = maxmem;
+	xen_ia64_set_convmem_end(d, maxmem);
 }
 
 /* copy memory range to domain pseudo physical address space */

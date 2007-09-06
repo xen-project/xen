@@ -23,6 +23,7 @@
 #include <xen/iocap.h>
 #include <xen/errno.h>
 #include <xen/nodemask.h>
+#include <asm/dom_fw_utils.h>
 
 #define get_xen_guest_handle(val, hnd)  do { val = (hnd).p; } while (0)
 
@@ -104,6 +105,7 @@ long arch_do_domctl(xen_domctl_t *op, XEN_GUEST_HANDLE(xen_domctl_t) u_domctl)
                 } else {
                     d->arch.is_vti = 1;
                     vmx_setup_platform(d);
+                    xen_ia64_set_convmem_end(d, ds->maxmem);
                 }
             }
             else {

@@ -26,6 +26,7 @@ int xen_ia64_fpswa_revision(struct domain *d, unsigned int *revision);
 int xen_ia64_is_vcpu_allocated(struct domain *d, uint32_t vcpu); 
 int xen_ia64_is_running_on_sim(struct domain *unused);
 int xen_ia64_is_dom0(struct domain *d);
+void xen_ia64_set_convmem_end(struct domain *d, uint64_t convmem_end);
 void dom_fw_copy_to(struct domain *d, unsigned long dest_gpaddr,
                     void *src, size_t size); 
 void dom_fw_copy_from(void* dest, struct domain *d, unsigned long src_gpaddr,
