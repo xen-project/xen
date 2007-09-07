@@ -2565,7 +2565,7 @@ static void *set_vram_mapping(unsigned long begin, unsigned long end)
         return NULL;
     }
 
-    vram_pointer = xc_map_foreign_batch(xc_handle, domid,
+    vram_pointer = xc_map_foreign_pages(xc_handle, domid,
                                         PROT_READ|PROT_WRITE,
                                         extent_start, nr_extents);
     if (vram_pointer == NULL) {

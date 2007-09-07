@@ -398,21 +398,15 @@ static int xenfb_map_fb(struct xenfb_private *xenfb, int domid)
 	if (!pgmfns || !fbmfns)
 		goto out;
 
-	/*
-	 * Bug alert: xc_map_foreign_batch() can fail partly and
-	 * return a non-null value.  This is a design flaw.  When it
-	 * happens, we happily continue here, and later crash on
-	 * access.
-	 */
 	xenfb_copy_mfns(mode, n_fbdirs, pgmfns, pd);
-	map = xc_map_foreign_batch(xenfb->xc, domid,
+	map = xc_map_foreign_pages(xenfb->xc, domid,
 				   PROT_READ, pgmfns, n_fbdirs);
 	if (map == NULL)
 		goto out;
 	xenfb_copy_mfns(mode, n_fbmfns, fbmfns, map);
 	munmap(map, n_fbdirs * XC_PAGE_SIZE);
 
-	xenfb->pub.pixels = xc_map_foreign_batch(xenfb->xc, domid,
+	xenfb->pub.pixels = xc_map_foreign_pages(xenfb->xc, domid,
 				PROT_READ | PROT_WRITE, fbmfns, n_fbmfns);
 	if (xenfb->pub.pixels == NULL)
 		goto out;

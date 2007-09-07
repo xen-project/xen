@@ -226,6 +226,39 @@ int xc_hvm_set_pci_link_route(
     return rc;
 }
 
+void *xc_map_foreign_pages(int xc_handle, uint32_t dom, int prot,
+                           const xen_pfn_t *arr, int num)
+{
+    xen_pfn_t *pfn;
+    void *res;
+    int i;
+
+    pfn = malloc(num * sizeof(*pfn));
+    if (!pfn)
+        return NULL;
+    memcpy(pfn, arr, num * sizeof(*pfn));
+
+    res = xc_map_foreign_batch(xc_handle, dom, prot, pfn, num);
+    if (res) {
+        for (i = 0; i < num; i++) {
+            if ((pfn[i] & 0xF0000000UL) == 0xF0000000UL) {
+                /*
+                 * xc_map_foreign_batch() doesn't give us an error
+                 * code, so we have to make one up.  May not be the
+                 * appropriate one.
+                 */
+                errno = EINVAL;
+                munmap(res, num * PAGE_SIZE);
+                res = NULL;
+                break;
+            }
+        }
+    }
+
+    free(pfn);
+    return res;
+}
+
 /*
  * Local variables:
  * mode: C
