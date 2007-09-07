@@ -1761,8 +1761,8 @@ int domain_relinquish_resources(struct domain *d)
         /* fallthrough */
 
         /* Relinquish every page of memory. */
-#if CONFIG_PAGING_LEVELS >= 4
     case RELMEM_xen_l4:
+#if CONFIG_PAGING_LEVELS >= 4
         ret = relinquish_memory(d, &d->xenpage_list, PGT_l4_page_table);
         if ( ret )
             return ret;
@@ -1776,8 +1776,8 @@ int domain_relinquish_resources(struct domain *d)
         /* fallthrough */
 #endif
 
-#if CONFIG_PAGING_LEVELS >= 3
 	case RELMEM_xen_l3:
+#if CONFIG_PAGING_LEVELS >= 3
         ret = relinquish_memory(d, &d->xenpage_list, PGT_l3_page_table);
         if ( ret )
             return ret;

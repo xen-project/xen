@@ -3502,24 +3502,12 @@ sh_update_cr3(struct vcpu *v, int do_locking)
     /* Double-check that the HVM code has sent us a sane guest_table */
     if ( is_hvm_domain(d) )
     {
-        gfn_t gfn;
-
         ASSERT(shadow_mode_external(d));
-
-        // Is paging enabled on this vcpu?
         if ( hvm_paging_enabled(v) )
-        {
-            gfn = _gfn(paddr_to_pfn(v->arch.hvm_vcpu.guest_cr[3]));
-            gmfn = gfn_to_mfn(d, gfn);
-            ASSERT(mfn_valid(gmfn));
-            ASSERT(pagetable_get_pfn(v->arch.guest_table) == mfn_x(gmfn));
-        } 
+            ASSERT(pagetable_get_pfn(v->arch.guest_table));
         else 
-        {
-            /* Paging disabled: guest_table points at a 32-bit 1-to-1 map */
             ASSERT(v->arch.guest_table.pfn
                    == d->arch.paging.shadow.unpaged_pagetable.pfn);
-        }
     }
 #endif
 

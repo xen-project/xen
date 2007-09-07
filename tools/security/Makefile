@@ -66,7 +66,7 @@ install: all $(ACM_CONFIG_FILE)
 	$(INSTALL_DIR) $(DESTDIR)$(ACM_SECGEN_CGIDIR)
 	$(INSTALL_PROG) $(ACM_INST_CGI) $(DESTDIR)$(ACM_SECGEN_CGIDIR)
 ifndef XEN_PYTHON_NATIVE_INSTALL
-	python python/setup.py install --home="$(DESTDIR)/usr" --install-lib="$(DESTDIR)$(LIBPATH)/python"
+	python python/setup.py install --install-lib="$(DESTDIR)$(LIBPATH)/python"
 else
 	python python/setup.py install --root="$(DESTDIR)"
 endif

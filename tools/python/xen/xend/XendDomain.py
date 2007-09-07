@@ -1594,10 +1594,10 @@ class XendDomain:
             raise VMBadState("Domain '%s' is not started" % domid,
                              POWER_STATE_NAMES[DOM_STATE_RUNNING],
                              POWER_STATE_NAMES[dominfo._stateGet()])
-        if trigger_name.lower() in TRIGGER_TYPE: 
+        if trigger_name.lower() in TRIGGER_TYPE.keys(): 
             trigger = TRIGGER_TYPE[trigger_name.lower()]
         else:
-            raise XendError("Invalid trigger: %s", trigger_name)
+            raise XendError("Invalid trigger: %s" % trigger_name)
         try:
             return xc.domain_send_trigger(dominfo.getDomid(),
                                           trigger,

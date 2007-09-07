@@ -2217,12 +2217,13 @@ def xm_block_detach(args):
                               % (dev,dom))
     else:
         arg_check(args, 'block-detach', 2, 3)
-        try:
+        dom = args[0]
+        dev = args[1]
+        dc = server.xend.domain.getBlockDeviceClass(dom, dev)
+        if dc == "tap":
+            detach(args, 'tap')
+        else:
             detach(args, 'vbd')
-            return
-        except:
-            pass
-        detach(args, 'tap')
 
 def xm_network_detach(args):
     if serverType == SERVER_XEN_API:

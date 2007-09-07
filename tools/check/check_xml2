@@ -1,7 +1,7 @@
 #!/bin/sh
 # CHECK-BUILD CHECK-INSTALL
 
-if [ ! "$LIBXENAPI_BINDINGS" = "y" ]
+if [ ! "$LIBXENAPI_BINDINGS" = "y" -a ! "$ACM_SECURITY" = "y" ]
 then
     echo -n "unused, "
     exit 0

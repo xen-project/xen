@@ -6948,7 +6948,7 @@ static void qemu_remap_bucket(struct map_cache *entry,
         j = ((i + BITS_PER_LONG) > (MCACHE_BUCKET_SIZE >> PAGE_SHIFT)) ?
             (MCACHE_BUCKET_SIZE >> PAGE_SHIFT) % BITS_PER_LONG : BITS_PER_LONG;
         while (j > 0)
-            word = (word << 1) | !(pfns[i + --j] & 0xF0000000UL);
+            word = (word << 1) | (((pfns[i + --j] >> 28) & 0xf) != 0xf);
         entry->valid_mapping[i / BITS_PER_LONG] = word;
     }
 }
