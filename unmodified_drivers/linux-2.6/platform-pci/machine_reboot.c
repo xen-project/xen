@@ -18,6 +18,8 @@ struct ap_suspend_info {
  */
 static DEFINE_RWLOCK(suspend_lock);
 
+#ifdef CONFIG_SMP
+
 /*
  * Spinning prevents, for example, APs touching grant table entries while
  * the shared grant table is not mapped into the address space imemdiately
@@ -42,6 +44,14 @@ static void ap_suspend(void *_info)
 	mb();
 	atomic_dec(&info->nr_spinning);
 }
+
+#define initiate_ap_suspend(i)	smp_call_function(ap_suspend, i, 0, 0)
+
+#else /* !defined(CONFIG_SMP) */
+
+#define initiate_ap_suspend(i)	0
+
+#endif
 
 static int bp_suspend(void)
 {
@@ -80,7 +90,7 @@ int __xen_suspend(int fast_suspend)
 
 	nr_cpus = num_online_cpus() - 1;
 
-	err = smp_call_function(ap_suspend, &info, 0, 0);
+	err = initiate_ap_suspend(&info);
 	if (err < 0) {
 		preempt_enable();
 		xenbus_suspend_cancel();
