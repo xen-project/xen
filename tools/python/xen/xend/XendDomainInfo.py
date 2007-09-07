@@ -1309,6 +1309,7 @@ class XendDomainInfo:
             try:
                 new_dom = XendDomain.instance().domain_create_from_dict(
                     self.info)
+                new_dom.waitForDevices()
                 new_dom.unpause()
                 rst_cnt = self._readVm('xend/restart_count')
                 rst_cnt = int(rst_cnt) + 1
