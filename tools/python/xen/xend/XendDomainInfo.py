@@ -602,16 +602,16 @@ class XendDomainInfo:
                                     mac = x[1]
                                     break
                             break
-                    dev_info = self.getDeviceInfo_vif(mac)
+                    dev_info = self._getDeviceInfo_vif(mac)
                 else:
                     _, dev_info = sxprs[dev]
             else:  # 'vbd' or 'tap'
-                dev_info = self.getDeviceInfo_vbd(dev)
+                dev_info = self._getDeviceInfo_vbd(dev)
                 # To remove the UUID of the device from refs,
                 # deviceClass must be always 'vbd'.
                 deviceClass = 'vbd'
             if dev_info is None:
-                return rc
+                raise XendError("Device %s is not defined" % devid)
 
             dev_uuid = sxp.child_value(dev_info, 'uuid')
             del self.info['devices'][dev_uuid]
@@ -632,14 +632,22 @@ class XendDomainInfo:
                     dev_num += 1
             return sxprs
 
-    def getDeviceInfo_vif(self, mac):
+    def getBlockDeviceClass(self, devid):
+        # To get a device number from the devid,
+        # we temporarily use the device controller of VBD.
+        dev = self.getDeviceController('vbd').convertToDeviceNumber(devid)
+        dev_info = self._getDeviceInfo_vbd(dev)
+        if dev_info:
+            return dev_info[0]
+
+    def _getDeviceInfo_vif(self, mac):
         for dev_type, dev_info in self.info.all_devices_sxpr():
             if dev_type != 'vif':
                 continue
             if mac == sxp.child_value(dev_info, 'mac'):
                 return dev_info
 
-    def getDeviceInfo_vbd(self, devid):
+    def _getDeviceInfo_vbd(self, devid):
         for dev_type, dev_info in self.info.all_devices_sxpr():
             if dev_type != 'vbd' and dev_type != 'tap':
                 continue
