@@ -586,8 +586,7 @@ int hvm_set_cr0(unsigned long value)
 
         if ( !paging_mode_hap(v->domain) )
         {
-            put_page(mfn_to_page(get_mfn_from_gpfn(
-                v->arch.hvm_vcpu.guest_cr[3] >> PAGE_SHIFT)));
+            put_page(pagetable_get_page(v->arch.guest_table));
             v->arch.guest_table = pagetable_null();
         }
     }
@@ -603,21 +602,11 @@ int hvm_set_cr0(unsigned long value)
 
 int hvm_set_cr3(unsigned long value)
 {
-    unsigned long old_base_mfn, mfn;
+    unsigned long mfn;
     struct vcpu *v = current;
 
-    if ( paging_mode_hap(v->domain) || !hvm_paging_enabled(v) )
-    {
-        /* Nothing to do. */
-    }
-    else if ( value == v->arch.hvm_vcpu.guest_cr[3] )
-    {
-        /* Shadow-mode TLB flush. Invalidate the shadow. */
-        mfn = get_mfn_from_gpfn(value >> PAGE_SHIFT);
-        if ( mfn != pagetable_get_pfn(v->arch.guest_table) )
-            goto bad_cr3;
-    }
-    else 
+    if ( hvm_paging_enabled(v) && !paging_mode_hap(v->domain) &&
+         (value != v->arch.hvm_vcpu.guest_cr[3]) )
     {
         /* Shadow-mode CR3 change. Check PDBR and then make a new shadow. */
         HVM_DBG_LOG(DBG_LEVEL_VMMU, "CR3 value = %lx", value);
@@ -625,11 +614,8 @@ int hvm_set_cr3(unsigned long value)
         if ( !mfn_valid(mfn) || !get_page(mfn_to_page(mfn), v->domain) )
             goto bad_cr3;
 
-        old_base_mfn = pagetable_get_pfn(v->arch.guest_table);
+        put_page(pagetable_get_page(v->arch.guest_table));
         v->arch.guest_table = pagetable_from_pfn(mfn);
-
-        if ( old_base_mfn )
-            put_page(mfn_to_page(old_base_mfn));
 
         HVM_DBG_LOG(DBG_LEVEL_VMMU, "Update CR3 value = %lx", value);
     }

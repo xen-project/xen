@@ -565,7 +565,31 @@ void vmx_vmcs_save(struct vcpu *v, struct hvm_hw_cpu *c)
 
 int vmx_vmcs_restore(struct vcpu *v, struct hvm_hw_cpu *c)
 {
-    unsigned long mfn, old_base_mfn;
+    unsigned long mfn = 0;
+
+    if ( c->pending_valid &&
+         ((c->pending_type == 1) || (c->pending_type > 6) ||
+          (c->pending_reserved != 0)) )
+    {
+        gdprintk(XENLOG_ERR, "Invalid pending event 0x%"PRIx32".\n",
+                 c->pending_event);
+        return -EINVAL;
+    }
+
+    if ( c->cr0 & X86_CR0_PG )
+    {
+        mfn = gmfn_to_mfn(v->domain, c->cr3 >> PAGE_SHIFT);
+        if ( !mfn_valid(mfn) || !get_page(mfn_to_page(mfn), v->domain) )
+        {
+            gdprintk(XENLOG_ERR, "Invalid CR3 value=0x%"PRIx64"\n", c->cr3);
+            return -EINVAL;
+        }
+    }
+
+    if ( v->arch.hvm_vcpu.guest_cr[0] & X86_CR0_PG )
+        put_page(pagetable_get_page(v->arch.guest_table));
+
+    v->arch.guest_table = pagetable_from_pfn(mfn);
 
     vmx_vmcs_enter(v);
 
@@ -585,18 +609,6 @@ int vmx_vmcs_restore(struct vcpu *v, struct hvm_hw_cpu *c)
     printk("%s: cr3=0x%"PRIx64", cr0=0x%"PRIx64", cr4=0x%"PRIx64".\n",
            __func__, c->cr3, c->cr0, c->cr4);
 #endif
-
-    if ( hvm_paging_enabled(v) )
-    {
-        HVM_DBG_LOG(DBG_LEVEL_VMMU, "CR3 = %"PRIx64, c->cr3);
-        mfn = gmfn_to_mfn(v->domain, c->cr3 >> PAGE_SHIFT);
-        if ( !mfn_valid(mfn) || !get_page(mfn_to_page(mfn), v->domain) )
-            goto bad_cr3;
-        old_base_mfn = pagetable_get_pfn(v->arch.guest_table);
-        v->arch.guest_table = pagetable_from_pfn(mfn);
-        if ( old_base_mfn )
-            put_page(mfn_to_page(old_base_mfn));
-    }
 
     v->arch.hvm_vcpu.guest_efer = c->msr_efer;
     vmx_update_guest_efer(v);
@@ -662,14 +674,6 @@ int vmx_vmcs_restore(struct vcpu *v, struct hvm_hw_cpu *c)
         gdprintk(XENLOG_INFO, "Re-injecting 0x%"PRIx32", 0x%"PRIx32"\n",
                  c->pending_event, c->error_code);
 
-        if ( (c->pending_type == 1) || (c->pending_type > 6) ||
-             (c->pending_reserved != 0) )
-        {
-            gdprintk(XENLOG_ERR, "Invalid pending event 0x%"PRIx32".\n",
-                     c->pending_event);
-            return -EINVAL;
-        }
-
         if ( hvm_event_needs_reinjection(c->pending_type, c->pending_vector) )
         {
             vmx_vmcs_enter(v);
@@ -680,11 +684,6 @@ int vmx_vmcs_restore(struct vcpu *v, struct hvm_hw_cpu *c)
     }
 
     return 0;
-
- bad_cr3:
-    gdprintk(XENLOG_ERR, "Invalid CR3 value=0x%"PRIx64"\n", c->cr3);
-    vmx_vmcs_exit(v);
-    return -EINVAL;
 }
 
 #if defined(__x86_64__) && defined(HVM_DEBUG_SUSPEND)
@@ -1905,7 +1904,22 @@ static void vmx_world_save(struct vcpu *v, struct vmx_assist_context *c)
 
 static int vmx_world_restore(struct vcpu *v, struct vmx_assist_context *c)
 {
-    unsigned long mfn, old_base_mfn;
+    unsigned long mfn = 0;
+
+    if ( c->cr0 & X86_CR0_PG )
+    {
+        mfn = gmfn_to_mfn(v->domain, c->cr3 >> PAGE_SHIFT);
+        if ( !mfn_valid(mfn) || !get_page(mfn_to_page(mfn), v->domain) )
+        {
+            gdprintk(XENLOG_ERR, "Invalid CR3 value=%x", c->cr3);
+            return -EINVAL;
+        }
+    }
+
+    if ( v->arch.hvm_vcpu.guest_cr[0] & X86_CR0_PG )
+        put_page(pagetable_get_page(v->arch.guest_table));
+
+    v->arch.guest_table = pagetable_from_pfn(mfn);
 
     __vmwrite(GUEST_RIP, c->eip);
     __vmwrite(GUEST_RSP, c->esp);
@@ -1916,18 +1930,6 @@ static int vmx_world_restore(struct vcpu *v, struct vmx_assist_context *c)
     v->arch.hvm_vcpu.guest_cr[4] = c->cr4;
     vmx_update_guest_cr(v, 0);
     vmx_update_guest_cr(v, 4);
-
-    if ( hvm_paging_enabled(v) )
-    {
-        HVM_DBG_LOG(DBG_LEVEL_VMMU, "CR3 = %x", c->cr3);
-        mfn = get_mfn_from_gpfn(c->cr3 >> PAGE_SHIFT);
-        if ( !mfn_valid(mfn) || !get_page(mfn_to_page(mfn), v->domain) )
-            goto bad_cr3;
-        old_base_mfn = pagetable_get_pfn(v->arch.guest_table);
-        v->arch.guest_table = pagetable_from_pfn(mfn);
-        if ( old_base_mfn )
-             put_page(mfn_to_page(old_base_mfn));
-    }
 
     __vmwrite(GUEST_IDTR_LIMIT, c->idtr_limit);
     __vmwrite(GUEST_IDTR_BASE, c->idtr_base);
@@ -1977,10 +1979,6 @@ static int vmx_world_restore(struct vcpu *v, struct vmx_assist_context *c)
 
     paging_update_paging_modes(v);
     return 0;
-
- bad_cr3:
-    gdprintk(XENLOG_ERR, "Invalid CR3 value=%x", c->cr3);
-    return -EINVAL;
 }
 
 enum { VMX_ASSIST_INVOKE = 0, VMX_ASSIST_RESTORE };

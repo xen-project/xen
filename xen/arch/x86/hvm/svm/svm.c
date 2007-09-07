@@ -337,8 +337,36 @@ int svm_vmcb_save(struct vcpu *v, struct hvm_hw_cpu *c)
 
 int svm_vmcb_restore(struct vcpu *v, struct hvm_hw_cpu *c)
 {
-    unsigned long mfn, old_base_mfn;
+    unsigned long mfn = 0;
     struct vmcb_struct *vmcb = v->arch.hvm_svm.vmcb;
+
+    if ( c->pending_valid &&
+         ((c->pending_type == 1) || (c->pending_type > 6) ||
+          (c->pending_reserved != 0)) )
+    {
+        gdprintk(XENLOG_ERR, "Invalid pending event 0x%"PRIx32".\n",
+                 c->pending_event);
+        return -EINVAL;
+    }
+
+    if ( !paging_mode_hap(v->domain) )
+    {
+        if ( c->cr0 & X86_CR0_PG )
+        {
+            mfn = gmfn_to_mfn(v->domain, c->cr3 >> PAGE_SHIFT);
+            if ( !mfn_valid(mfn) || !get_page(mfn_to_page(mfn), v->domain) )
+            {
+                gdprintk(XENLOG_ERR, "Invalid CR3 value=0x%"PRIx64"\n",
+                         c->cr3);
+                return -EINVAL;
+            }
+        }
+
+        if ( v->arch.hvm_vcpu.guest_cr[0] & X86_CR0_PG )
+            put_page(pagetable_get_page(v->arch.guest_table));
+
+        v->arch.guest_table = pagetable_from_pfn(mfn);
+    }
 
     vmcb->rip    = c->rip;
     vmcb->rsp    = c->rsp;
@@ -356,18 +384,6 @@ int svm_vmcb_restore(struct vcpu *v, struct hvm_hw_cpu *c)
     printk("%s: cr3=0x%"PRIx64", cr0=0x%"PRIx64", cr4=0x%"PRIx64".\n",
            __func__, c->cr3, c->cr0, c->cr4);
 #endif
-
-    if ( hvm_paging_enabled(v) && !paging_mode_hap(v->domain) )
-    {
-        HVM_DBG_LOG(DBG_LEVEL_VMMU, "CR3 = %"PRIx64, c->cr3);
-        mfn = gmfn_to_mfn(v->domain, c->cr3 >> PAGE_SHIFT);
-        if( !mfn_valid(mfn) || !get_page(mfn_to_page(mfn), v->domain) ) 
-            goto bad_cr3;
-        old_base_mfn = pagetable_get_pfn(v->arch.guest_table);
-        v->arch.guest_table = pagetable_from_pfn(mfn);
-        if ( old_base_mfn )
-             put_page(mfn_to_page(old_base_mfn));
-    }
 
     vmcb->idtr.limit = c->idtr_limit;
     vmcb->idtr.base  = c->idtr_base;
@@ -435,14 +451,6 @@ int svm_vmcb_restore(struct vcpu *v, struct hvm_hw_cpu *c)
         gdprintk(XENLOG_INFO, "Re-injecting 0x%"PRIx32", 0x%"PRIx32"\n",
                  c->pending_event, c->error_code);
 
-        if ( (c->pending_type == 1) || (c->pending_type > 6) ||
-             (c->pending_reserved != 0) )
-        {
-            gdprintk(XENLOG_ERR, "Invalid pending event 0x%"PRIx32"\n", 
-                     c->pending_event);
-            return -EINVAL;
-        }
-
         if ( hvm_event_needs_reinjection(c->pending_type, c->pending_vector) )
         {
             vmcb->eventinj.bytes = c->pending_event;
@@ -453,10 +461,6 @@ int svm_vmcb_restore(struct vcpu *v, struct hvm_hw_cpu *c)
     paging_update_paging_modes(v);
 
     return 0;
- 
- bad_cr3:
-    gdprintk(XENLOG_ERR, "Invalid CR3 value=0x%"PRIx64"\n", c->cr3);
-    return -EINVAL;
 }
 
         
