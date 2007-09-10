@@ -107,22 +107,35 @@ static void enable_intr_window(struct vcpu *v, enum hvm_intack intr_source)
     }
 }
 
-static void update_tpr_threshold(struct vlapic *vlapic)
+static void update_tpr_threshold(
+    struct vcpu *v, enum hvm_intack masked_intr_source)
 {
-    int max_irr, tpr;
+    struct vlapic *vlapic = vcpu_vlapic(v);
+    int max_irr, tpr, threshold = 0;
 
     if ( !cpu_has_vmx_tpr_shadow )
         return;
 
+    /*
+     * If ExtInts are masked then that dominates the TPR --- the 'interrupt
+     * window' has already been enabled in this case.
+     */
+    if ( (masked_intr_source == hvm_intack_lapic) ||
+         (masked_intr_source == hvm_intack_pic) )
+        goto out;
+
+    /* Is there an interrupt pending at the LAPIC? Nothing to do if not. */
     if ( !vlapic_enabled(vlapic) || 
          ((max_irr = vlapic_find_highest_irr(vlapic)) == -1) )
-    {
-        __vmwrite(TPR_THRESHOLD, 0);
-        return;
-    }
+        goto out;
 
+    /* Highest-priority pending interrupt is masked by the TPR? */
     tpr = vlapic_get_reg(vlapic, APIC_TASKPRI) & 0xF0;
-    __vmwrite(TPR_THRESHOLD, (max_irr > tpr) ? (tpr >> 4) : (max_irr >> 4));
+    if ( (tpr >> 4) >= (max_irr >> 4) )
+        threshold = max_irr >> 4;
+
+ out:
+    __vmwrite(TPR_THRESHOLD, threshold);
 }
 
 asmlinkage void vmx_intr_assist(void)
@@ -171,7 +184,7 @@ asmlinkage void vmx_intr_assist(void)
         enable_intr_window(v, intr_source);
 
  out:
-    update_tpr_threshold(vcpu_vlapic(v));
+    update_tpr_threshold(v, intr_source);
 }
 
 /*
