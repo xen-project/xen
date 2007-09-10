@@ -161,12 +161,14 @@ static int hvm_set_ioreq_page(
     struct domain *d, struct hvm_ioreq_page *iorp, unsigned long gmfn)
 {
     struct page_info *page;
+    p2m_type_t p2mt;
     unsigned long mfn;
     void *va;
 
-    mfn = gmfn_to_mfn(d, gmfn);
-    if ( !mfn_valid(mfn) )
+    mfn = mfn_x(gfn_to_mfn(d, gmfn, &p2mt));
+    if ( !p2m_is_ram(p2mt) )
         return -EINVAL;
+    ASSERT(mfn_valid(mfn));
 
     page = mfn_to_page(mfn);
     if ( !get_page_and_type(page, d, PGT_writable_page) )
@@ -517,7 +519,8 @@ void hvm_triple_fault(void)
 int hvm_set_cr0(unsigned long value)
 {
     struct vcpu *v = current;
-    unsigned long mfn, old_value = v->arch.hvm_vcpu.guest_cr[0];
+    p2m_type_t p2mt;
+    unsigned long gfn, mfn, old_value = v->arch.hvm_vcpu.guest_cr[0];
   
     HVM_DBG_LOG(DBG_LEVEL_VMMU, "Update CR0 value = %lx", value);
 
@@ -559,8 +562,10 @@ int hvm_set_cr0(unsigned long value)
         if ( !paging_mode_hap(v->domain) )
         {
             /* The guest CR3 must be pointing to the guest physical. */
-            mfn = get_mfn_from_gpfn(v->arch.hvm_vcpu.guest_cr[3]>>PAGE_SHIFT);
-            if ( !mfn_valid(mfn) || !get_page(mfn_to_page(mfn), v->domain))
+            gfn = v->arch.hvm_vcpu.guest_cr[3]>>PAGE_SHIFT;
+            mfn = mfn_x(gfn_to_mfn_current(gfn, &p2mt));
+            if ( !p2m_is_ram(p2mt) || !mfn_valid(mfn) || 
+                 !get_page(mfn_to_page(mfn), v->domain))
             {
                 gdprintk(XENLOG_ERR, "Invalid CR3 value = %lx (mfn=%lx)\n", 
                          v->arch.hvm_vcpu.guest_cr[3], mfn);
@@ -603,16 +608,18 @@ int hvm_set_cr0(unsigned long value)
 int hvm_set_cr3(unsigned long value)
 {
     unsigned long mfn;
+    p2m_type_t p2mt;
     struct vcpu *v = current;
 
     if ( hvm_paging_enabled(v) && !paging_mode_hap(v->domain) &&
          (value != v->arch.hvm_vcpu.guest_cr[3]) )
     {
-        /* Shadow-mode CR3 change. Check PDBR and then make a new shadow. */
+        /* Shadow-mode CR3 change. Check PDBR and update refcounts. */
         HVM_DBG_LOG(DBG_LEVEL_VMMU, "CR3 value = %lx", value);
-        mfn = get_mfn_from_gpfn(value >> PAGE_SHIFT);
-        if ( !mfn_valid(mfn) || !get_page(mfn_to_page(mfn), v->domain) )
-            goto bad_cr3;
+        mfn = mfn_x(gfn_to_mfn_current(value >> PAGE_SHIFT, &p2mt));
+        if ( !p2m_is_ram(p2mt) || !mfn_valid(mfn) ||
+             !get_page(mfn_to_page(mfn), v->domain) )
+              goto bad_cr3;
 
         put_page(pagetable_get_page(v->arch.guest_table));
         v->arch.guest_table = pagetable_from_pfn(mfn);
@@ -677,6 +684,7 @@ int hvm_set_cr4(unsigned long value)
 static int __hvm_copy(void *buf, paddr_t addr, int size, int dir, int virt)
 {
     unsigned long gfn, mfn;
+    p2m_type_t p2mt;
     char *p;
     int count, todo;
 
@@ -690,10 +698,11 @@ static int __hvm_copy(void *buf, paddr_t addr, int size, int dir, int virt)
         else
             gfn = addr >> PAGE_SHIFT;
         
-        mfn = get_mfn_from_gpfn(gfn);
+        mfn = mfn_x(gfn_to_mfn_current(gfn, &p2mt));
 
-        if ( mfn == INVALID_MFN )
+        if ( !p2m_is_ram(p2mt) )
             return todo;
+        ASSERT(mfn_valid(mfn));
 
         p = (char *)map_domain_page(mfn) + (addr & ~PAGE_MASK);
 

@@ -414,7 +414,7 @@ gfn_to_paddr(gfn_t gfn)
 
 /* Override gfn_to_mfn to work with gfn_t */
 #undef gfn_to_mfn
-#define gfn_to_mfn(d, g) _gfn_to_mfn((d), gfn_x(g))
+#define gfn_to_mfn(d, g, t) _gfn_to_mfn((d), gfn_x(g), (t))
 
 
 /* Type used for recording a walk through guest pagetables.  It is

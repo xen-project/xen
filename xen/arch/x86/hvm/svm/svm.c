@@ -338,6 +338,7 @@ int svm_vmcb_save(struct vcpu *v, struct hvm_hw_cpu *c)
 int svm_vmcb_restore(struct vcpu *v, struct hvm_hw_cpu *c)
 {
     unsigned long mfn = 0;
+    p2m_type_t p2mt;
     struct vmcb_struct *vmcb = v->arch.hvm_svm.vmcb;
 
     if ( c->pending_valid &&
@@ -353,8 +354,8 @@ int svm_vmcb_restore(struct vcpu *v, struct hvm_hw_cpu *c)
     {
         if ( c->cr0 & X86_CR0_PG )
         {
-            mfn = gmfn_to_mfn(v->domain, c->cr3 >> PAGE_SHIFT);
-            if ( !mfn_valid(mfn) || !get_page(mfn_to_page(mfn), v->domain) )
+            mfn = mfn_x(gfn_to_mfn(v->domain, c->cr3 >> PAGE_SHIFT, &p2mt));
+            if ( !p2m_is_ram(p2mt) || !get_page(mfn_to_page(mfn), v->domain) )
             {
                 gdprintk(XENLOG_ERR, "Invalid CR3 value=0x%"PRIx64"\n",
                          c->cr3);
@@ -1004,15 +1005,23 @@ int start_svm(struct cpuinfo_x86 *c)
     return 1;
 }
 
-static int svm_do_nested_pgfault(paddr_t gpa, struct cpu_user_regs *regs)
+static void svm_do_nested_pgfault(paddr_t gpa, struct cpu_user_regs *regs)
 {
-    if (mmio_space(gpa)) {
+    p2m_type_t p2mt;
+    mfn_t mfn;
+    unsigned long gfn = gpa >> PAGE_SHIFT;
+
+    /* If this GFN is emulated MMIO, pass the fault to the mmio handler */
+    mfn = gfn_to_mfn_current(gfn, &p2mt);
+    if ( p2mt == p2m_mmio_dm )
+    {
         handle_mmio(gpa);
-        return 1;
+        return;
     }
 
-    paging_mark_dirty(current->domain, get_mfn_from_gpfn(gpa >> PAGE_SHIFT));
-    return p2m_set_flags(current->domain, gpa, __PAGE_HYPERVISOR|_PAGE_USER);
+    /* Log-dirty: mark the page dirty and let the guest write it again */
+    paging_mark_dirty(current->domain, mfn_x(mfn));
+    p2m_change_type(current->domain, gfn, p2m_ram_logdirty, p2m_ram_rw);
 }
 
 static void svm_do_no_device_fault(struct vmcb_struct *vmcb)
@@ -2341,8 +2350,7 @@ asmlinkage void svm_vmexit_handler(struct cpu_user_regs *regs)
 
     case VMEXIT_NPF:
         regs->error_code = vmcb->exitinfo1;
-        if ( !svm_do_nested_pgfault(vmcb->exitinfo2, regs) )
-            domain_crash(v->domain);
+        svm_do_nested_pgfault(vmcb->exitinfo2, regs);
         break;
 
     default:

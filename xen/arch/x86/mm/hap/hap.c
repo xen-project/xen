@@ -60,8 +60,8 @@ int hap_enable_log_dirty(struct domain *d)
     d->arch.paging.mode |= PG_log_dirty;
     hap_unlock(d);
 
-    /* set l1e entries of P2M table to NOT_WRITABLE. */
-    p2m_set_flags_global(d, (_PAGE_PRESENT|_PAGE_USER));
+    /* set l1e entries of P2M table to be read-only. */
+    p2m_change_type_global(d, p2m_ram_rw, p2m_ram_logdirty);
     flush_tlb_mask(d->domain_dirty_cpumask);
     return 0;
 }
@@ -73,14 +73,14 @@ int hap_disable_log_dirty(struct domain *d)
     hap_unlock(d);
 
     /* set l1e entries of P2M table with normal mode */
-    p2m_set_flags_global(d, __PAGE_HYPERVISOR|_PAGE_USER);
+    p2m_change_type_global(d, p2m_ram_logdirty, p2m_ram_rw);
     return 0;
 }
 
 void hap_clean_dirty_bitmap(struct domain *d)
 {
-    /* mark physical memory as NOT_WRITEABLE and flush the TLB */
-    p2m_set_flags_global(d, (_PAGE_PRESENT|_PAGE_USER));
+    /* set l1e entries of P2M table to be read-only. */
+    p2m_change_type_global(d, p2m_ram_rw, p2m_ram_logdirty);
     flush_tlb_mask(d->domain_dirty_cpumask);
 }
 

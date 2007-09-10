@@ -328,8 +328,6 @@ TYPE_SAFE(unsigned long,mfn);
       ? get_gpfn_from_mfn(mfn)                          \
       : (mfn) )
 
-#define gmfn_to_mfn(_d, gpfn)  mfn_x(gfn_to_mfn(_d, gpfn))
-
 #define INVALID_MFN             (~0UL)
 
 #ifdef CONFIG_COMPAT

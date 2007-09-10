@@ -826,9 +826,7 @@ void hvm_io_assist(void)
     ioreq_t *p;
     struct cpu_user_regs *regs;
     struct hvm_io_op *io_opp;
-    unsigned long gmfn;
     struct vcpu *v = current;
-    struct domain *d = v->domain;
 
     io_opp = &v->arch.hvm_vcpu.io_op;
     regs   = &io_opp->io_context;
@@ -861,13 +859,6 @@ void hvm_io_assist(void)
     regs->eflags &= ~X86_EFLAGS_RF;
     hvm_load_cpu_guest_regs(v, regs);
     memcpy(guest_cpu_user_regs(), regs, HVM_CONTEXT_STACK_BYTES);
-
-    /* Has memory been dirtied? */
-    if ( (p->dir == IOREQ_READ) && p->data_is_ptr )
-    {
-        gmfn = get_mfn_from_gpfn(paging_gva_to_gfn(v, p->data));
-        paging_mark_dirty(d, gmfn);
-    }
 
  out:
     vcpu_end_shutdown_deferral(v);
