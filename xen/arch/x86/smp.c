@@ -319,23 +319,33 @@ int on_selected_cpus(
 
 static void stop_this_cpu (void *dummy)
 {
-    cpu_clear(smp_processor_id(), cpu_online_map);
-
-    local_irq_disable();
     disable_local_APIC();
     hvm_cpu_down();
+
+    cpu_clear(smp_processor_id(), cpu_online_map);
 
     for ( ; ; )
         __asm__ __volatile__ ( "hlt" );
 }
 
+/*
+ * Stop all CPUs and turn off local APICs and the IO-APIC, so other OSs see a 
+ * clean IRQ state.
+ */
 void smp_send_stop(void)
 {
-    /* Stop all other CPUs in the system. */
+    int timeout = 10;
+
     smp_call_function(stop_this_cpu, NULL, 1, 0);
+
+    /* Wait 10ms for all other CPUs to go offline. */
+    while ( (num_online_cpus() > 1) && (timeout-- > 0) )
+        mdelay(1);
 
     local_irq_disable();
     disable_local_APIC();
+    disable_IO_APIC();
+    hvm_cpu_down();
     local_irq_enable();
 }
 
