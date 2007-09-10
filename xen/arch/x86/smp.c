@@ -279,6 +279,19 @@ int on_selected_cpus(
 
     ASSERT(local_irq_is_enabled());
 
+    /* Legacy UP system with no APIC to deliver IPIs? */
+    if ( unlikely(!cpu_has_apic) )
+    {
+        ASSERT(num_online_cpus() == 1);
+        if ( cpu_isset(0, selected) )
+        {
+            local_irq_disable();
+            func(info);
+            local_irq_enable();
+        }
+        return 0;
+    }
+
     if ( nr_cpus == 0 )
         return 0;
 
