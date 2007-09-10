@@ -2153,6 +2153,16 @@ asmlinkage void svm_vmexit_handler(struct cpu_user_regs *regs)
     eventinj_t eventinj;
     int inst_len, rc;
 
+    /*
+     * Before doing anything else, we need to sync up the VLAPIC's TPR with
+     * SVM's vTPR if CR8 writes are currently disabled.  It's OK if the 
+     * guest doesn't touch the CR8 (e.g. 32-bit Windows) because we update
+     * the vTPR on MMIO writes to the TPR
+     */
+    if ( !(vmcb->cr_intercepts & CR_INTERCEPT_CR8_WRITE) )
+        vlapic_set_reg(vcpu_vlapic(v), APIC_TASKPRI,
+                       (vmcb->vintr.fields.tpr & 0x0F) << 4);
+
     exit_reason = vmcb->exitcode;
 
     HVMTRACE_2D(VMEXIT, v, vmcb->rip, exit_reason);

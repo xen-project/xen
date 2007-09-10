@@ -30,6 +30,7 @@
 #include <asm/hvm/hvm.h>
 #include <asm/hvm/io.h>
 #include <asm/hvm/support.h>
+#include <asm/hvm/vlapic.h>
 #include <asm/hvm/svm/svm.h>
 #include <asm/hvm/svm/intr.h>
 #include <xen/event.h>
@@ -99,6 +100,33 @@ static void enable_intr_window(struct vcpu *v, enum hvm_intack intr_source)
     svm_inject_dummy_vintr(v);
 }
 
+static void update_cr8_intercept(
+    struct vcpu *v, enum hvm_intack masked_intr_source)
+{
+    struct vmcb_struct *vmcb = v->arch.hvm_svm.vmcb;
+    struct vlapic *vlapic = vcpu_vlapic(v);
+    int max_irr;
+
+    vmcb->cr_intercepts &= ~CR_INTERCEPT_CR8_WRITE;
+
+    /*
+     * If ExtInts are masked then that dominates the TPR --- the 'interrupt
+     * window' has already been enabled in this case.
+     */
+    if ( (masked_intr_source == hvm_intack_lapic) ||
+         (masked_intr_source == hvm_intack_pic) )
+        return;
+
+    /* Is there an interrupt pending at the LAPIC? Nothing to do if not. */
+    if ( !vlapic_enabled(vlapic) || 
+         ((max_irr = vlapic_find_highest_irr(vlapic)) == -1) )
+        return;
+
+    /* Highest-priority pending interrupt is masked by the TPR? */
+    if ( (vmcb->vintr.fields.tpr & 0xf) >= (max_irr >> 4) )
+        vmcb->cr_intercepts |= CR_INTERCEPT_CR8_WRITE;
+}
+
 asmlinkage void svm_intr_assist(void) 
 {
     struct vcpu *v = current;
@@ -113,7 +141,7 @@ asmlinkage void svm_intr_assist(void)
     do {
         intr_source = hvm_vcpu_has_pending_irq(v);
         if ( likely(intr_source == hvm_intack_none) )
-            return;
+            goto out;
 
         /*
          * Pending IRQs must be delayed if:
@@ -133,7 +161,7 @@ asmlinkage void svm_intr_assist(void)
              !hvm_interrupts_enabled(v, intr_source) )
         {
             enable_intr_window(v, intr_source);
-            return;
+            goto out;
         }
     } while ( !hvm_vcpu_ack_pending_irq(v, intr_source, &intr_vector) );
 
@@ -152,6 +180,9 @@ asmlinkage void svm_intr_assist(void)
     intr_source = hvm_vcpu_has_pending_irq(v);
     if ( unlikely(intr_source != hvm_intack_none) )
         enable_intr_window(v, intr_source);
+
+ out:
+    update_cr8_intercept(v, intr_source);
 }
 
 /*

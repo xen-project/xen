@@ -114,23 +114,29 @@ static int construct_vmcb(struct vcpu *v)
     svm_asid_init_vcpu(v);
 
     vmcb->general1_intercepts = 
-        GENERAL1_INTERCEPT_INTR         | GENERAL1_INTERCEPT_NMI         |
-        GENERAL1_INTERCEPT_SMI          | GENERAL1_INTERCEPT_INIT        |
-        GENERAL1_INTERCEPT_CPUID        | GENERAL1_INTERCEPT_INVD        |
-        GENERAL1_INTERCEPT_HLT          | GENERAL1_INTERCEPT_INVLPG      | 
-        GENERAL1_INTERCEPT_INVLPGA      | GENERAL1_INTERCEPT_IOIO_PROT   |
-        GENERAL1_INTERCEPT_MSR_PROT     | GENERAL1_INTERCEPT_SHUTDOWN_EVT;
+        GENERAL1_INTERCEPT_INTR        | GENERAL1_INTERCEPT_NMI         |
+        GENERAL1_INTERCEPT_SMI         | GENERAL1_INTERCEPT_INIT        |
+        GENERAL1_INTERCEPT_CPUID       | GENERAL1_INTERCEPT_INVD        |
+        GENERAL1_INTERCEPT_HLT         | GENERAL1_INTERCEPT_INVLPG      | 
+        GENERAL1_INTERCEPT_INVLPGA     | GENERAL1_INTERCEPT_IOIO_PROT   |
+        GENERAL1_INTERCEPT_MSR_PROT    | GENERAL1_INTERCEPT_SHUTDOWN_EVT;
     vmcb->general2_intercepts = 
-        GENERAL2_INTERCEPT_VMRUN  | GENERAL2_INTERCEPT_VMMCALL | 
-        GENERAL2_INTERCEPT_VMLOAD | GENERAL2_INTERCEPT_VMSAVE  |
-        GENERAL2_INTERCEPT_STGI   | GENERAL2_INTERCEPT_CLGI    |
-        GENERAL2_INTERCEPT_SKINIT | GENERAL2_INTERCEPT_RDTSCP;
+        GENERAL2_INTERCEPT_VMRUN       | GENERAL2_INTERCEPT_VMMCALL     |
+        GENERAL2_INTERCEPT_VMLOAD      | GENERAL2_INTERCEPT_VMSAVE      |
+        GENERAL2_INTERCEPT_STGI        | GENERAL2_INTERCEPT_CLGI        |
+        GENERAL2_INTERCEPT_SKINIT      | GENERAL2_INTERCEPT_RDTSCP;
 
     /* Intercept all debug-register writes. */
     vmcb->dr_intercepts = DR_INTERCEPT_ALL_WRITES;
 
-    /* Intercept all control-register accesses, except to CR2. */
-    vmcb->cr_intercepts = ~(CR_INTERCEPT_CR2_READ | CR_INTERCEPT_CR2_WRITE);
+    /*
+     * Intercept all control-register accesses except for CR2 reads/writes
+     * and CR8 reads (and actually CR8 writes, but that's a special case
+     * that's handled in svm/intr.c). 
+     */
+    vmcb->cr_intercepts = ~(CR_INTERCEPT_CR2_READ |
+                            CR_INTERCEPT_CR2_WRITE |
+                            CR_INTERCEPT_CR8_READ);
 
     /* I/O and MSR permission bitmaps. */
     arch_svm->msrpm = alloc_xenheap_pages(get_order_from_bytes(MSRPM_SIZE));
