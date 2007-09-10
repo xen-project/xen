@@ -123,7 +123,7 @@ static void dump_registers(unsigned char key, struct cpu_user_regs *regs)
 static void halt_machine(unsigned char key, struct cpu_user_regs *regs)
 {
     printk("'%c' pressed -> rebooting machine\n", key);
-    machine_restart(NULL);
+    machine_restart();
 }
 
 static void cpuset_print(char *set, int size, cpumask_t mask)
