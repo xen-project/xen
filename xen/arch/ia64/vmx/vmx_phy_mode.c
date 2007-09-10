@@ -28,7 +28,8 @@
 #include <xen/sched.h>
 #include <asm/pgtable.h>
 #include <asm/vmmu.h>
-int valid_mm_mode[8] = {
+
+static const int valid_mm_mode[8] = {
     GUEST_PHYS, /* (it, dt, rt) -> (0, 0, 0) */
     INV_MODE,
     INV_MODE,
@@ -47,7 +48,7 @@ int valid_mm_mode[8] = {
  * - If gva happens to be rr0 and rr4, only allowed case is identity
  *   mapping (gva=gpa), or panic! (How?)
  */
-int mm_switch_table[8][8] = {
+static const int mm_switch_table[8][8] = {
     /*  2004/09/12(Kevin): Allow switch to self */
         /*
          *  (it,dt,rt): (0,0,0) -> (1,1,1)
@@ -329,7 +330,7 @@ void
 prepare_if_physical_mode(VCPU *vcpu)
 {
     if (is_physical_mode(vcpu)) {
-	vcpu->arch.mode_flags |= GUEST_PHY_EMUL;
+        vcpu->arch.mode_flags |= GUEST_PHY_EMUL;
         switch_to_virtual_rid(vcpu);
     }
     return;

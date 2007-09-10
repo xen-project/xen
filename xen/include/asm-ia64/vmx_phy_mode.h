@@ -84,8 +84,6 @@
 #define XEN_RR7_RID    (0xf00010)
 #define GUEST_IN_PHY    0x1
 #define GUEST_PHY_EMUL	0x2
-extern int valid_mm_mode[];
-extern int mm_switch_table[][8];
 extern void physical_mode_init(VCPU *);
 extern void switch_to_physical_rid(VCPU *);
 extern void switch_to_virtual_rid(VCPU *vcpu);

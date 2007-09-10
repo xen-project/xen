@@ -1,4 +1,3 @@
-
 /* -*-  Mode:C; c-basic-offset:4; tab-width:4; indent-tabs-mode:nil -*- */
 /*
  * mmio.c: MMIO emulation components.
@@ -53,7 +52,7 @@ static struct hvm_buffered_io_range
     &buffered_stdvga_range
 };
 
-int hvm_buffered_io_intercept(ioreq_t *p)
+static int hvm_buffered_io_intercept(ioreq_t *p)
 {
     struct vcpu *v = current;
     spinlock_t  *buffered_io_lock;
@@ -119,26 +118,26 @@ static void low_mmio_access(VCPU *vcpu, u64 pa, u64 *val, size_t s, int dir)
     p->size = s;
     p->count = 1;
     p->dir = dir;
-    if(dir==IOREQ_WRITE)     //write;
+    if (dir==IOREQ_WRITE)     // write;
         p->data = *val;
     p->data_is_ptr = 0;
     p->type = 1;
     p->df = 0;
 
     p->io_count++;
-    if(hvm_buffered_io_intercept(p)){
+    if (hvm_buffered_io_intercept(p)) {
         p->state = STATE_IORESP_READY;
         vmx_io_assist(v);
-        return ;
-    }else 
-    vmx_send_assist_req(v);
-    if(dir==IOREQ_READ){ //read
-        *val=p->data;
+        return;
+    } else 
+        vmx_send_assist_req(v);
+    if (dir == IOREQ_READ) { // read
+        *val = p->data;
     }
     return;
 }
 
-int vmx_ide_pio_intercept(ioreq_t *p, u64 *val)
+static int vmx_ide_pio_intercept(ioreq_t *p, u64 *val)
 {
     struct buffered_piopage *pio_page =
         (void *)(current->domain->arch.hvm_domain.buffered_pio_va);
@@ -146,11 +145,11 @@ int vmx_ide_pio_intercept(ioreq_t *p, u64 *val)
     uint32_t pointer, page_offset;
 
     if (p->addr == 0x1F0)
-	piobuf = &pio_page->pio[PIO_BUFFER_IDE_PRIMARY];
+        piobuf = &pio_page->pio[PIO_BUFFER_IDE_PRIMARY];
     else if (p->addr == 0x170)
-	piobuf = &pio_page->pio[PIO_BUFFER_IDE_SECONDARY];
+        piobuf = &pio_page->pio[PIO_BUFFER_IDE_SECONDARY];
     else
-	return 0;
+        return 0;
 
     if (p->size != 2 && p->size != 4)
         return 0;
@@ -160,9 +159,9 @@ int vmx_ide_pio_intercept(ioreq_t *p, u64 *val)
 
     /* sanity check */
     if (page_offset + pointer < offsetof(struct buffered_piopage, buffer))
-	return 0;
+        return 0;
     if (page_offset + piobuf->data_end > PAGE_SIZE)
-	return 0;
+        return 0;
 
     if (pointer + p->size < piobuf->data_end) {
         uint8_t *bufp = (uint8_t *)pio_page + page_offset + pointer;
@@ -189,7 +188,7 @@ int vmx_ide_pio_intercept(ioreq_t *p, u64 *val)
 
 #define TO_LEGACY_IO(pa)  (((pa)>>12<<2)|((pa)&0x3))
 
-const char * guest_os_name[] = {
+static const char * const guest_os_name[] = {
     "Unknown",
     "Windows 2003 server",
     "Linux",
@@ -204,7 +203,7 @@ static inline void set_os_type(VCPU *v, u64 type)
         if (GOS_WINDOWS(v)) {
             struct xen_ia64_opt_feature optf;
 
-	    /* Windows identity maps regions 4 & 5 */
+            /* Windows identity maps regions 4 & 5 */
             optf.cmd = XEN_IA64_OPTF_IDENT_MAP_REG4;
             optf.on = XEN_IA64_OPTF_ON;
             optf.pgprot = (_PAGE_P|_PAGE_A|_PAGE_D|_PAGE_MA_WB|_PAGE_AR_RW);
@@ -234,7 +233,7 @@ static void legacy_io_access(VCPU *vcpu, u64 pa, u64 *val, size_t s, int dir)
     p->size = s;
     p->count = 1;
     p->dir = dir;
-    if(dir==IOREQ_WRITE)     //write;
+    if (dir == IOREQ_WRITE)     // write;
         p->data = *val;
     p->data_is_ptr = 0;
     p->type = 0;
@@ -251,18 +250,18 @@ static void legacy_io_access(VCPU *vcpu, u64 pa, u64 *val, size_t s, int dir)
         return;
 
     if (IS_ACPI_ADDR(p->addr) && vacpi_intercept(p, val))
-	return;
+        return;
 
     vmx_send_assist_req(v);
-    if(dir==IOREQ_READ){ //read
+    if (dir == IOREQ_READ) { // read
         *val=p->data;
     }
 #ifdef DEBUG_PCI
-    if(dir==IOREQ_WRITE)
-        if(p->addr == 0xcf8UL)
+    if (dir == IOREQ_WRITE)
+        if (p->addr == 0xcf8UL)
             printk("Write 0xcf8, with val [0x%lx]\n", p->data);
     else
-        if(p->addr == 0xcfcUL)
+        if (p->addr == 0xcfcUL)
             printk("Read 0xcfc, with val [0x%lx]\n", p->data);
 #endif //DEBUG_PCI
     return;
@@ -270,9 +269,8 @@ static void legacy_io_access(VCPU *vcpu, u64 pa, u64 *val, size_t s, int dir)
 
 static void mmio_access(VCPU *vcpu, u64 src_pa, u64 *dest, size_t s, int ma, int dir)
 {
-    //mmio_type_t iot;
     unsigned long iot;
-    iot=__gpfn_is_io(vcpu->domain, src_pa>>PAGE_SHIFT);
+    iot = __gpfn_is_io(vcpu->domain, src_pa >> PAGE_SHIFT);
 
     perfc_incra(vmx_mmio_access, iot >> 56);
     switch (iot) {
@@ -288,11 +286,11 @@ static void mmio_access(VCPU *vcpu, u64 src_pa, u64 *dest, size_t s, int ma, int
     case GPFN_GFW:
         break;
     case GPFN_IOSAPIC:
-	if (!dir)
-	    viosapic_write(vcpu, src_pa, s, *dest);
-	else
-	    *dest = viosapic_read(vcpu, src_pa, s);
-	break;
+        if (!dir)
+            viosapic_write(vcpu, src_pa, s, *dest);
+        else
+            *dest = viosapic_read(vcpu, src_pa, s);
+        break;
     case GPFN_FRAME_BUFFER:
     case GPFN_LOW_MMIO:
         low_mmio_access(vcpu, src_pa, dest, s, dir);
@@ -322,67 +320,68 @@ void emulate_io_inst(VCPU *vcpu, u64 padr, u64 ma)
     size_t size;
     u64 data, post_update, slot1a, slot1b, temp;
     INST64 inst;
-    regs=vcpu_regs(vcpu);
+
+    regs = vcpu_regs(vcpu);
     if (IA64_RETRY == __vmx_get_domain_bundle(regs->cr_iip, &bundle)) {
         /* if fetch code fail, return and try again */
         return;
     }
     slot = ((struct ia64_psr *)&(regs->cr_ipsr))->ri;
-    if (!slot) inst.inst = bundle.slot0;
+    if (!slot)
+        inst.inst = bundle.slot0;
     else if (slot == 1){
-        slot1a=bundle.slot1a;
-        slot1b=bundle.slot1b;
-        inst.inst =slot1a + (slot1b<<18);
+        slot1a = bundle.slot1a;
+        slot1b = bundle.slot1b;
+        inst.inst = slot1a + (slot1b << 18);
     }
-    else if (slot == 2) inst.inst = bundle.slot2;
+    else if (slot == 2)
+        inst.inst = bundle.slot2;
 
 
     // Integer Load/Store
-    if(inst.M1.major==4&&inst.M1.m==0&&inst.M1.x==0){
+    if (inst.M1.major == 4 && inst.M1.m == 0 && inst.M1.x == 0) {
         inst_type = SL_INTEGER;  //
-        size=(inst.M1.x6&0x3);
-        if((inst.M1.x6>>2)>0xb){      // write
-            dir=IOREQ_WRITE;     //write
-            vcpu_get_gr_nat(vcpu,inst.M4.r2,&data);
-        }else if((inst.M1.x6>>2)<0xb){   //  read
-            dir=IOREQ_READ;
+        size = (inst.M1.x6 & 0x3);
+        if ((inst.M1.x6 >> 2) > 0xb) {
+            dir = IOREQ_WRITE;     // write
+            vcpu_get_gr_nat(vcpu, inst.M4.r2, &data);
+        } else if ((inst.M1.x6 >> 2) < 0xb) {   // read
+            dir = IOREQ_READ;
         }
     }
     // Integer Load + Reg update
-    else if(inst.M2.major==4&&inst.M2.m==1&&inst.M2.x==0){
+    else if (inst.M2.major == 4 && inst.M2.m == 1 && inst.M2.x == 0) {
         inst_type = SL_INTEGER;
         dir = IOREQ_READ;     //write
-        size = (inst.M2.x6&0x3);
-        vcpu_get_gr_nat(vcpu,inst.M2.r3,&temp);
-        vcpu_get_gr_nat(vcpu,inst.M2.r2,&post_update);
+        size = (inst.M2.x6 & 0x3);
+        vcpu_get_gr_nat(vcpu, inst.M2.r3, &temp);
+        vcpu_get_gr_nat(vcpu, inst.M2.r2, &post_update);
         temp += post_update;
-        vcpu_set_gr(vcpu,inst.M2.r3,temp,0);
+        vcpu_set_gr(vcpu, inst.M2.r3, temp, 0);
     }
     // Integer Load/Store + Imm update
-    else if(inst.M3.major==5){
+    else if (inst.M3.major == 5) {
         inst_type = SL_INTEGER;  //
-        size=(inst.M3.x6&0x3);
-        if((inst.M5.x6>>2)>0xb){      // write
-            dir=IOREQ_WRITE;     //write
-            vcpu_get_gr_nat(vcpu,inst.M5.r2,&data);
-            vcpu_get_gr_nat(vcpu,inst.M5.r3,&temp);
-            post_update = (inst.M5.i<<7)+inst.M5.imm7;
-            if(inst.M5.s)
+        size = (inst.M3.x6 & 0x3);
+        if ((inst.M5.x6 >> 2) > 0xb) {      // write
+            dir = IOREQ_WRITE;     // write
+            vcpu_get_gr_nat(vcpu, inst.M5.r2, &data);
+            vcpu_get_gr_nat(vcpu, inst.M5.r3, &temp);
+            post_update = (inst.M5.i << 7) + inst.M5.imm7;
+            if (inst.M5.s)
                 temp -= post_update;
             else
                 temp += post_update;
-            vcpu_set_gr(vcpu,inst.M5.r3,temp,0);
-
-        }else if((inst.M3.x6>>2)<0xb){   //  read
-            dir=IOREQ_READ;
-            vcpu_get_gr_nat(vcpu,inst.M3.r3,&temp);
-            post_update = (inst.M3.i<<7)+inst.M3.imm7;
-            if(inst.M3.s)
+            vcpu_set_gr(vcpu, inst.M5.r3, temp, 0);
+        } else if ((inst.M3.x6 >> 2) < 0xb) {   // read
+            dir = IOREQ_READ;
+            vcpu_get_gr_nat(vcpu, inst.M3.r3, &temp);
+            post_update = (inst.M3.i << 7) + inst.M3.imm7;
+            if (inst.M3.s)
                 temp -= post_update;
             else
                 temp += post_update;
-            vcpu_set_gr(vcpu,inst.M3.r3,temp,0);
-
+            vcpu_set_gr(vcpu, inst.M3.r3, temp, 0);
         }
     }
     // Floating-point spill
@@ -401,41 +400,43 @@ void emulate_io_inst(VCPU *vcpu, u64 padr, u64 ma)
         size = 3;
     }
     // Floating-point spill + Imm update
-    else if(inst.M10.major==7&&inst.M10.x6==0x3B){
+    else if (inst.M10.major == 7 && inst.M10.x6 == 0x3B) {
         struct ia64_fpreg v;
-	inst_type=SL_FLOATING;
-	dir=IOREQ_WRITE;
-	vcpu_get_fpreg(vcpu,inst.M10.f2,&v);
-	vcpu_get_gr_nat(vcpu,inst.M10.r3,&temp);
-	post_update = (inst.M10.i<<7)+inst.M10.imm7;
-	if(inst.M10.s)
-            temp -= post_update;
-	else
-            temp += post_update;
-	vcpu_set_gr(vcpu,inst.M10.r3,temp,0);
 
-	/* Write high word.
-	   FIXME: this is a kludge!  */
-	v.u.bits[1] &= 0x3ffff;
-	mmio_access(vcpu, padr + 8, &v.u.bits[1], 8, ma, IOREQ_WRITE);
-	data = v.u.bits[0];
-	size = 3;
+        inst_type = SL_FLOATING;
+        dir = IOREQ_WRITE;
+        vcpu_get_fpreg(vcpu, inst.M10.f2, &v);
+        vcpu_get_gr_nat(vcpu, inst.M10.r3, &temp);
+        post_update = (inst.M10.i << 7) + inst.M10.imm7;
+        if (inst.M10.s)
+            temp -= post_update;
+        else
+            temp += post_update;
+        vcpu_set_gr(vcpu, inst.M10.r3, temp, 0);
+
+        /* Write high word.
+           FIXME: this is a kludge!  */
+        v.u.bits[1] &= 0x3ffff;
+        mmio_access(vcpu, padr + 8, &v.u.bits[1], 8, ma, IOREQ_WRITE);
+        data = v.u.bits[0];
+        size = 3;
     }
     // Floating-point stf8 + Imm update
-    else if(inst.M10.major==7&&inst.M10.x6==0x31){
+    else if (inst.M10.major == 7 && inst.M10.x6 == 0x31) {
         struct ia64_fpreg v;
-	inst_type=SL_FLOATING;
-	dir=IOREQ_WRITE;
-	size=3;
-	vcpu_get_fpreg(vcpu,inst.M10.f2,&v);
-	data = v.u.bits[0]; /* Significand.  */
-	vcpu_get_gr_nat(vcpu,inst.M10.r3,&temp);
-	post_update = (inst.M10.i<<7)+inst.M10.imm7;
-	if(inst.M10.s)
+
+        inst_type = SL_FLOATING;
+        dir = IOREQ_WRITE;
+        size = 3;
+        vcpu_get_fpreg(vcpu, inst.M10.f2, &v);
+        data = v.u.bits[0]; /* Significand.  */
+        vcpu_get_gr_nat(vcpu, inst.M10.r3, &temp);
+        post_update = (inst.M10.i << 7) + inst.M10.imm7;
+        if (inst.M10.s)
             temp -= post_update;
-	else
+        else
             temp += post_update;
-	vcpu_set_gr(vcpu,inst.M10.r3,temp,0);
+        vcpu_set_gr(vcpu, inst.M10.r3, temp, 0);
     }
 //    else if(inst.M6.major==6&&inst.M6.m==0&&inst.M6.x==0&&inst.M6.x6==3){
 //        inst_type=SL_FLOATING;  //fp
@@ -443,71 +444,53 @@ void emulate_io_inst(VCPU *vcpu, u64 padr, u64 ma)
 //        size=3;     //ldfd
 //    }
     //  lfetch - do not perform accesses.
-    else if(inst.M15.major==7&&inst.M15.x6>=0x2c&&inst.M15.x6<=0x2f){
-	vcpu_get_gr_nat(vcpu,inst.M15.r3,&temp);
-	post_update = (inst.M15.i<<7)+inst.M15.imm7;
-	if(inst.M15.s)
+    else if (inst.M15.major== 7 && inst.M15.x6 >=0x2c && inst.M15.x6 <= 0x2f) {
+        vcpu_get_gr_nat(vcpu, inst.M15.r3, &temp);
+        post_update = (inst.M15.i << 7) + inst.M15.imm7;
+        if (inst.M15.s)
             temp -= post_update;
-	else
+        else
             temp += post_update;
-	vcpu_set_gr(vcpu,inst.M15.r3,temp,0);
+        vcpu_set_gr(vcpu, inst.M15.r3, temp, 0);
 
-	vcpu_increment_iip(vcpu);
-	return;
-    }
-    // Floating-point Load Pair + Imm ldfp8 M12
-    else if(inst.M12.major==6&&inst.M12.m==1&&inst.M12.x==1&&inst.M12.x6==1){
-        struct ia64_fpreg v;
-        inst_type=SL_FLOATING;
-        dir = IOREQ_READ;
-        size = 8;     //ldfd
-        mmio_access(vcpu, padr, &data, size, ma, dir);
-        v.u.bits[0]=data;
-        v.u.bits[1]=0x1003E;
-        vcpu_set_fpreg(vcpu,inst.M12.f1,&v);
-        padr += 8;
-        mmio_access(vcpu, padr, &data, size, ma, dir);
-        v.u.bits[0]=data;
-        v.u.bits[1]=0x1003E;
-        vcpu_set_fpreg(vcpu,inst.M12.f2,&v);
-        padr += 8;
-        vcpu_set_gr(vcpu,inst.M12.r3,padr,0);
         vcpu_increment_iip(vcpu);
         return;
     }
-    else{
+    // Floating-point Load Pair + Imm ldfp8 M12
+    else if (inst.M12.major == 6 && inst.M12.m == 1
+             && inst.M12.x == 1 && inst.M12.x6 == 1) {
+        struct ia64_fpreg v;
+
+        inst_type = SL_FLOATING;
+        dir = IOREQ_READ;
+        size = 8;     //ldfd
+        mmio_access(vcpu, padr, &data, size, ma, dir);
+        v.u.bits[0] = data;
+        v.u.bits[1] = 0x1003E;
+        vcpu_set_fpreg(vcpu, inst.M12.f1, &v);
+        padr += 8;
+        mmio_access(vcpu, padr, &data, size, ma, dir);
+        v.u.bits[0] = data;
+        v.u.bits[1] = 0x1003E;
+        vcpu_set_fpreg(vcpu, inst.M12.f2, &v);
+        padr += 8;
+        vcpu_set_gr(vcpu,inst.M12.r3,padr, 0);
+        vcpu_increment_iip(vcpu);
+        return;
+    }
+    else {
         panic_domain
-	  (NULL,"This memory access instr can't be emulated: %lx pc=%lx\n ",
-	   inst.inst, regs->cr_iip);
+            (NULL, "This memory access instr can't be emulated: %lx pc=%lx\n",
+             inst.inst, regs->cr_iip);
     }
 
     size = 1 << size;
-    if(dir==IOREQ_WRITE){
-        mmio_access(vcpu, padr, &data, size, ma, dir);
-    }else{
-        mmio_access(vcpu, padr, &data, size, ma, dir);
-        if(inst_type==SL_INTEGER){       //gp
-            vcpu_set_gr(vcpu,inst.M1.r1,data,0);
-        }else{
+    mmio_access(vcpu, padr, &data, size, ma, dir);
+    if (dir == IOREQ_READ) {
+        if (inst_type == SL_INTEGER) {
+            vcpu_set_gr(vcpu, inst.M1.r1, data, 0);
+        } else {
             panic_domain(NULL, "Don't support ldfd now !");
-/*            switch(inst.M6.f1){
-
-            case 6:
-                regs->f6=(struct ia64_fpreg)data;
-            case 7:
-                regs->f7=(struct ia64_fpreg)data;
-            case 8:
-                regs->f8=(struct ia64_fpreg)data;
-            case 9:
-                regs->f9=(struct ia64_fpreg)data;
-            case 10:
-                regs->f10=(struct ia64_fpreg)data;
-            case 11:
-                regs->f11=(struct ia64_fpreg)data;
-            default :
-                ia64_ldfs(inst.M6.f1,&data);
-            }
-*/
         }
     }
     vcpu_increment_iip(vcpu);
