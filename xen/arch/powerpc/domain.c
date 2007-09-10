@@ -119,7 +119,7 @@ void machine_halt(void)
     machine_fail(__func__);
 }
 
-void machine_restart(char * __unused)
+void machine_restart(void)
 {
     console_start_sync();
     printk("%s called\n", __func__);

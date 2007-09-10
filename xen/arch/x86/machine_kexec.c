@@ -82,9 +82,6 @@ static void __machine_reboot_kexec(void *data)
 
     smp_send_stop();
 
-    disable_IO_APIC();
-    hvm_cpu_down();
-
     machine_kexec(image);
 }
 

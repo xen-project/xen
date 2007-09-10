@@ -566,6 +566,7 @@ void vmx_vmcs_save(struct vcpu *v, struct hvm_hw_cpu *c)
 int vmx_vmcs_restore(struct vcpu *v, struct hvm_hw_cpu *c)
 {
     unsigned long mfn = 0;
+    p2m_type_t p2mt;
 
     if ( c->pending_valid &&
          ((c->pending_type == 1) || (c->pending_type > 6) ||
@@ -578,8 +579,8 @@ int vmx_vmcs_restore(struct vcpu *v, struct hvm_hw_cpu *c)
 
     if ( c->cr0 & X86_CR0_PG )
     {
-        mfn = gmfn_to_mfn(v->domain, c->cr3 >> PAGE_SHIFT);
-        if ( !mfn_valid(mfn) || !get_page(mfn_to_page(mfn), v->domain) )
+        mfn = mfn_x(gfn_to_mfn(v->domain, c->cr3 >> PAGE_SHIFT, &p2mt));
+        if ( !p2m_is_ram(p2mt) || !get_page(mfn_to_page(mfn), v->domain) )
         {
             gdprintk(XENLOG_ERR, "Invalid CR3 value=0x%"PRIx64"\n", c->cr3);
             return -EINVAL;
@@ -1292,19 +1293,23 @@ static void vmx_do_cpuid(struct cpu_user_regs *regs)
          * Note that this leaf lives at <max-hypervisor-leaf> + 1.
          */
         u64 value = ((u64)regs->edx << 32) | (u32)regs->ecx;
-        unsigned long mfn = get_mfn_from_gpfn(value >> PAGE_SHIFT);
+        p2m_type_t p2mt;
+        unsigned long mfn;
         struct vcpu *v = current;
         char *p;
+
+        mfn = mfn_x(gfn_to_mfn_current(value >> PAGE_SHIFT, &p2mt));
 
         gdprintk(XENLOG_INFO, "Input address is 0x%"PRIx64".\n", value);
 
         /* 8-byte aligned valid pseudophys address from vmxassist, please. */
-        if ( (value & 7) || (mfn == INVALID_MFN) ||
+        if ( (value & 7) || !p2m_is_ram(p2mt) ||
              !v->arch.hvm_vmx.vmxassist_enabled )
         {
             domain_crash(v->domain);
             return;
         }
+        ASSERT(mfn_valid(mfn));
 
         p = map_domain_page(mfn);
         value = *((uint64_t *)(p + (value & (PAGE_SIZE - 1))));
@@ -1905,11 +1910,12 @@ static void vmx_world_save(struct vcpu *v, struct vmx_assist_context *c)
 static int vmx_world_restore(struct vcpu *v, struct vmx_assist_context *c)
 {
     unsigned long mfn = 0;
+    p2m_type_t p2mt;
 
     if ( c->cr0 & X86_CR0_PG )
     {
-        mfn = gmfn_to_mfn(v->domain, c->cr3 >> PAGE_SHIFT);
-        if ( !mfn_valid(mfn) || !get_page(mfn_to_page(mfn), v->domain) )
+        mfn = mfn_x(gfn_to_mfn(v->domain, c->cr3 >> PAGE_SHIFT, &p2mt));
+        if ( !p2m_is_ram(p2mt) || !get_page(mfn_to_page(mfn), v->domain) )
         {
             gdprintk(XENLOG_ERR, "Invalid CR3 value=%x", c->cr3);
             return -EINVAL;

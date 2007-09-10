@@ -181,11 +181,6 @@ static long enter_state_helper(void *data)
 /*
  * Dom0 issues this hypercall in place of writing pm1a_cnt. Xen then
  * takes over the control and put the system into sleep state really.
- *
- * Guest may issue a two-phases write to PM1x_CNT, to work
- * around poorly implemented hardware. It's better to keep
- * this logic here. Two writes can be differentiated by 
- * enable bit setting.
  */
 int acpi_enter_sleep(struct xenpf_enter_acpi_sleep *sleep)
 {
@@ -204,16 +199,6 @@ int acpi_enter_sleep(struct xenpf_enter_acpi_sleep *sleep)
     if ( sleep->flags )
         return -EINVAL;
 
-    /* Write #1 */
-    if ( !(sleep->pm1a_cnt_val & ACPI_BITMASK_SLEEP_ENABLE) )
-    {
-        outw((u16)sleep->pm1a_cnt_val, acpi_sinfo.pm1a_cnt);
-        if ( acpi_sinfo.pm1b_cnt )
-            outw((u16)sleep->pm1b_cnt_val, acpi_sinfo.pm1b_cnt);
-        return 0;
-    }
-
-    /* Write #2 */
     acpi_sinfo.pm1a_cnt_val = sleep->pm1a_cnt_val;
     acpi_sinfo.pm1b_cnt_val = sleep->pm1b_cnt_val;
     acpi_sinfo.sleep_state = sleep->sleep_state;

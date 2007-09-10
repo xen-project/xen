@@ -2764,19 +2764,23 @@ shadow_write_p2m_entry(struct vcpu *v, unsigned long gfn,
                        l1_pgentry_t new, unsigned int level)
 {
     struct domain *d = v->domain;
-    mfn_t mfn;
     
     shadow_lock(d);
 
-    /* handle physmap_add and physmap_remove */
-    mfn = gfn_to_mfn(d, gfn);
-    if ( v != NULL && level == 1 && mfn_valid(mfn) ) {
-        sh_remove_all_shadows_and_parents(v, mfn);
-        if ( sh_remove_all_mappings(v, mfn) )
-            flush_tlb_mask(d->domain_dirty_cpumask);    
+    /* If we're removing an MFN from the p2m, remove it from the shadows too */
+    if ( level == 1 )
+    {
+        mfn_t mfn = _mfn(l1e_get_pfn(*p));
+        p2m_type_t p2mt = p2m_flags_to_type(l1e_get_flags(*p));
+        if ( p2m_is_valid(p2mt) && mfn_valid(mfn) ) 
+        {
+            sh_remove_all_shadows_and_parents(v, mfn);
+            if ( sh_remove_all_mappings(v, mfn) )
+                flush_tlb_mask(d->domain_dirty_cpumask);    
+        }
     }
-    
-    /* update the entry with new content */
+
+    /* Update the entry with new content */
     safe_write_pte(p, new);
 
     /* install P2M in monitors for PAE Xen */

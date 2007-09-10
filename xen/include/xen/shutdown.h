@@ -6,7 +6,7 @@ extern int opt_noreboot;
 
 void dom0_shutdown(u8 reason);
 
-void machine_restart(char *cmd);
+void machine_restart(void);
 void machine_halt(void);
 void machine_power_off(void);
 

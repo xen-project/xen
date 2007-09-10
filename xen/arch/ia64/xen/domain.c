@@ -1487,7 +1487,7 @@ int __init construct_dom0(struct domain *d,
 	return 0;
 }
 
-void machine_restart(char * __unused)
+void machine_restart(void)
 {
 	console_start_sync();
 	if (running_on_sim)

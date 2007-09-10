@@ -197,7 +197,7 @@ static void machine_real_restart(const unsigned char *code, unsigned length)
 
 #endif
 
-void machine_restart(char *cmd)
+void machine_restart(void)
 {
     int i;
 
@@ -216,18 +216,12 @@ void machine_restart(char *cmd)
             safe_halt();
     }
 
-    /*
-     * Stop all CPUs and turn off local APICs and the IO-APIC, so
-     * other OSs see a clean IRQ state.
-     */
     smp_send_stop();
-    disable_IO_APIC();
-    hvm_cpu_down();
 
     /* Rebooting needs to touch the page at absolute address 0. */
     *((unsigned short *)__va(0x472)) = reboot_mode;
 
-    if (reboot_thru_bios <= 0)
+    if ( reboot_thru_bios <= 0 )
     {
         for ( ; ; )
         {

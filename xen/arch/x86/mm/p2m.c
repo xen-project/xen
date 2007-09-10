@@ -4,7 +4,7 @@
  * physical-to-machine mappings for automatically-translated domains.
  *
  * Parts of this code are Copyright (c) 2007 by Advanced Micro Devices.
- * Parts of this code are Copyright (c) 2006 by XenSource Inc.
+ * Parts of this code are Copyright (c) 2006-2007 by XenSource Inc.
  * Parts of this code are Copyright (c) 2006 by Michael A Fetterman
  * Parts based on earlier work by Michael A Fetterman, Ian Pratt et al.
  *
@@ -92,6 +92,31 @@
 #undef page_to_mfn
 #define page_to_mfn(_pg) (_mfn((_pg) - frame_table))
 
+
+/* PTE flags for the various types of p2m entry */
+#define P2M_BASE_FLAGS \
+        (_PAGE_PRESENT | _PAGE_USER | _PAGE_DIRTY | _PAGE_ACCESSED)
+
+static unsigned long p2m_type_to_flags(p2m_type_t t) 
+{
+    unsigned long flags = (t & 0x7UL) << 9;
+    switch(t)
+    {
+    case p2m_invalid:
+    default:
+        return flags;
+    case p2m_ram_rw:
+        return flags | P2M_BASE_FLAGS | _PAGE_RW;
+    case p2m_ram_logdirty:
+        return flags | P2M_BASE_FLAGS;
+    case p2m_ram_ro:
+        return flags | P2M_BASE_FLAGS;
+    case p2m_mmio_dm:
+        return flags;
+    case p2m_mmio_direct:
+        return flags | P2M_BASE_FLAGS | _PAGE_RW | _PAGE_PCD;
+    }
+}
 
 
 // Find the next level's P2M entry, checking for out-of-range gfn's...
@@ -358,19 +383,25 @@ void p2m_teardown(struct domain *d)
 }
 
 mfn_t
-gfn_to_mfn_foreign(struct domain *d, unsigned long gpfn)
+gfn_to_mfn_foreign(struct domain *d, unsigned long gfn, p2m_type_t *t)
 /* Read another domain's p2m entries */
 {
     mfn_t mfn;
-    paddr_t addr = ((paddr_t)gpfn) << PAGE_SHIFT;
+    paddr_t addr = ((paddr_t)gfn) << PAGE_SHIFT;
     l2_pgentry_t *l2e;
     l1_pgentry_t *l1e;
 
     ASSERT(paging_mode_translate(d));
+
+    /* XXX This is for compatibility with the old model, where anything not 
+     * XXX marked as RAM was considered to be emulated MMIO space.
+     * XXX Once we start explicitly registering MMIO regions in the p2m 
+     * XXX we will return p2m_invalid for unmapped gfns */
+    *t = p2m_mmio_dm;
+
     mfn = pagetable_get_mfn(d->arch.phys_table);
 
-
-    if ( gpfn > d->arch.p2m.max_mapped_pfn )
+    if ( gfn > d->arch.p2m.max_mapped_pfn )
         /* This pfn is higher than the highest the p2m map currently holds */
         return _mfn(INVALID_MFN);
 
@@ -428,9 +459,11 @@ gfn_to_mfn_foreign(struct domain *d, unsigned long gpfn)
         return _mfn(INVALID_MFN);
     }
     mfn = _mfn(l1e_get_pfn(*l1e));
+    *t = p2m_flags_to_type(l1e_get_flags(*l1e));
     unmap_domain_page(l1e);
 
-    return mfn;
+    ASSERT(mfn_valid(mfn) || !p2m_is_ram(*t));
+    return (p2m_is_valid(*t)) ? mfn : _mfn(INVALID_MFN);
 }
 
 #if P2M_AUDIT
@@ -630,10 +663,7 @@ p2m_remove_page(struct domain *d, unsigned long gfn, unsigned long mfn)
         return;
     P2M_DEBUG("removing gfn=%#lx mfn=%#lx\n", gfn, mfn);
 
-    ASSERT(mfn_x(gfn_to_mfn(d, gfn)) == mfn);
-    //ASSERT(mfn_to_gfn(d, mfn) == gfn);
-
-    set_p2m_entry(d, gfn, _mfn(INVALID_MFN), __PAGE_HYPERVISOR|_PAGE_USER);
+    set_p2m_entry(d, gfn, _mfn(INVALID_MFN), 0);
     set_gpfn_from_mfn(mfn, INVALID_M2P_ENTRY);
 }
 
@@ -653,6 +683,7 @@ guest_physmap_add_page(struct domain *d, unsigned long gfn,
                        unsigned long mfn)
 {
     unsigned long ogfn;
+    p2m_type_t ot;
     mfn_t omfn;
 
     if ( !paging_mode_translate(d) )
@@ -663,10 +694,10 @@ guest_physmap_add_page(struct domain *d, unsigned long gfn,
 
     P2M_DEBUG("adding gfn=%#lx mfn=%#lx\n", gfn, mfn);
 
-    omfn = gfn_to_mfn(d, gfn);
-    if ( mfn_valid(omfn) )
+    omfn = gfn_to_mfn(d, gfn, &ot);
+    if ( p2m_is_ram(ot) )
     {
-        set_p2m_entry(d, gfn, _mfn(INVALID_MFN), __PAGE_HYPERVISOR|_PAGE_USER);
+        ASSERT(mfn_valid(omfn));
         set_gpfn_from_mfn(mfn_x(omfn), INVALID_M2P_ENTRY);
     }
 
@@ -683,8 +714,10 @@ guest_physmap_add_page(struct domain *d, unsigned long gfn,
         /* This machine frame is already mapped at another physical address */
         P2M_DEBUG("aliased! mfn=%#lx, old gfn=%#lx, new gfn=%#lx\n",
                   mfn, ogfn, gfn);
-        if ( mfn_valid(omfn = gfn_to_mfn(d, ogfn)) )
+        omfn = gfn_to_mfn(d, ogfn, &ot);
+        if ( p2m_is_ram(ot) )
         {
+            ASSERT(mfn_valid(omfn));
             P2M_DEBUG("old gfn=%#lx -> mfn %#lx\n",
                       ogfn , mfn_x(omfn));
             if ( mfn_x(omfn) == mfn )
@@ -692,21 +725,29 @@ guest_physmap_add_page(struct domain *d, unsigned long gfn,
         }
     }
 
-    set_p2m_entry(d, gfn, _mfn(mfn), __PAGE_HYPERVISOR|_PAGE_USER);
-    set_gpfn_from_mfn(mfn, gfn);
+    if ( mfn_valid(_mfn(mfn)) ) 
+    {
+        set_p2m_entry(d, gfn, _mfn(mfn),
+                  p2m_type_to_flags(p2m_ram_rw)|__PAGE_HYPERVISOR|_PAGE_USER);
+        set_gpfn_from_mfn(mfn, gfn);
+    }
+    else
+    {
+        gdprintk(XENLOG_WARNING, "Adding bad mfn to p2m map (%#lx -> %#lx)\n",
+                 gfn, mfn);
+        set_p2m_entry(d, gfn, _mfn(INVALID_MFN), 0);
+    }
 
     audit_p2m(d);
     p2m_unlock(d);
 }
 
-/* This function goes through P2M table and modify l1e flags of all pages. Note
- * that physical base address of l1e is intact. This function can be used for
- * special purpose, such as marking physical memory as NOT WRITABLE for
- * tracking dirty pages during live migration.
- */
-void p2m_set_flags_global(struct domain *d, u32 l1e_flags)
+/* Walk the whole p2m table, changing any entries of the old type
+ * to the new type.  This is used in hardware-assisted paging to 
+ * quickly enable or diable log-dirty tracking */
+void p2m_change_type_global(struct domain *d, p2m_type_t ot, p2m_type_t nt)
 {
-    unsigned long mfn, gfn;
+    unsigned long mfn, gfn, flags;
     l1_pgentry_t l1e_content;
     l1_pgentry_t *l1e;
     l2_pgentry_t *l2e;
@@ -769,12 +810,14 @@ void p2m_set_flags_global(struct domain *d, u32 l1e_flags)
 
                 for ( i1 = 0; i1 < L1_PAGETABLE_ENTRIES; i1++, gfn++ )
                 {
-                    if ( !(l1e_get_flags(l1e[i1]) & _PAGE_PRESENT) )
+                    flags = l1e_get_flags(l1e[i1]);
+                    if ( p2m_flags_to_type(flags) != ot )
                         continue;
                     mfn = l1e_get_pfn(l1e[i1]);
                     gfn = get_gpfn_from_mfn(mfn);
-                    /* create a new 1le entry using l1e_flags */
-                    l1e_content = l1e_from_pfn(mfn, l1e_flags);
+                    /* create a new 1le entry with the new type */
+                    flags = p2m_flags_to_type(nt);
+                    l1e_content = l1e_from_pfn(mfn, flags);
                     paging_write_p2m_entry(d, gfn, &l1e[i1],
                                            l1mfn, l1e_content, 1);
                 }
@@ -800,24 +843,23 @@ void p2m_set_flags_global(struct domain *d, u32 l1e_flags)
     p2m_unlock(d);
 }
 
-/* This function traces through P2M table and modifies l1e flags of a specific
- * gpa.
- */
-int p2m_set_flags(struct domain *d, paddr_t gpa, u32 l1e_flags)
+/* Modify the p2m type of a single gfn from ot to nt, returning the 
+ * entry's previous type */
+p2m_type_t p2m_change_type(struct domain *d, unsigned long gfn, 
+                           p2m_type_t ot, p2m_type_t nt)
 {
-    unsigned long gfn;
+    p2m_type_t pt;
     mfn_t mfn;
 
     p2m_lock(d);
 
-    gfn = gpa >> PAGE_SHIFT;
-    mfn = gfn_to_mfn(d, gfn);
-    if ( mfn_valid(mfn) )
-        set_p2m_entry(d, gfn, mfn, l1e_flags);
+    mfn = gfn_to_mfn(d, gfn, &pt);
+    if ( pt == ot )
+        set_p2m_entry(d, gfn, mfn, p2m_type_to_flags(nt));
 
     p2m_unlock(d);
 
-    return 1;
+    return pt;
 }
 
 /*

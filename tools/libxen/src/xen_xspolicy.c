@@ -21,8 +21,8 @@
 #include <stddef.h>
 #include <stdlib.h>
 
+#include "xen_internal.h"
 #include "xen/api/xen_common.h"
-#include "xen/api/xen_internal.h"
 #include "xen/api/xen_xspolicy.h"
 
 

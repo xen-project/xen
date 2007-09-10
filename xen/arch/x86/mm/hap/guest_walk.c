@@ -28,7 +28,8 @@
 #include <xen/sched.h>
 #include <asm/hvm/svm/vmcb.h>
 #include <asm/domain.h>
-#include <asm/shadow.h>
+#include <asm/paging.h>
+#include <asm/p2m.h>
 #include <asm/hap.h>
 
 #include "private.h"
@@ -67,6 +68,7 @@ unsigned long hap_gva_to_gfn(GUEST_PAGING_LEVELS)(
     int lev, index;
     paddr_t gpa = 0;
     unsigned long gpfn, mfn;
+    p2m_type_t p2mt;
     int success = 1;
 
     l1_pgentry_t *l1e;
@@ -81,14 +83,16 @@ unsigned long hap_gva_to_gfn(GUEST_PAGING_LEVELS)(
     gpfn = (gcr3 >> PAGE_SHIFT);
     for ( lev = mode; lev >= 1; lev-- )
     {
-        mfn = get_mfn_from_gpfn(gpfn);
-        if ( mfn == INVALID_MFN )
+        mfn = mfn_x(gfn_to_mfn_current(gpfn, &p2mt));
+        if ( !p2m_is_ram(p2mt) )
         {
             HAP_PRINTK("bad pfn=0x%lx from gva=0x%lx at lev%d\n", gpfn, gva,
                        lev);
             success = 0;
             break;
         }
+        ASSERT(mfn_valid(mfn));
+
         index = (gva >> PT_SHIFT[mode][lev]) & (PT_ENTRIES[mode][lev]-1);
 
 #if GUEST_PAGING_LEVELS >= 4
