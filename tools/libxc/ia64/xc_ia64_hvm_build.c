@@ -701,8 +701,9 @@ copy_from_GFW_to_nvram(int xc_handle, uint32_t dom, int nvram_fd)
     for ( i=0; i<nr_pages; i++ )
         pfn_list[i] = (addr_from_GFW_4k_align >> PAGE_SHIFT) + i;
 
-    tmp_ptr = (char *)xc_map_foreign_batch(xc_handle, dom,
-    PROT_READ | PROT_WRITE, pfn_list, nr_pages);
+    tmp_ptr = (char *)xc_map_foreign_pages(xc_handle, dom,
+                                           PROT_READ | PROT_WRITE,
+                                           pfn_list, nr_pages);
     if ( NULL == tmp_ptr )
     {
         PERROR("Cannot get nvram data from GFW!\n");
