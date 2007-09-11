@@ -752,6 +752,7 @@ class XendConfig(dict):
 
             if not has_rfb:
                 dev_config = ['vfb']
+                dev_config.append(['type', 'vnc'])
                 # copy VNC related params from platform config to vfb dev conf
                 for key in ['vncpasswd', 'vncunused', 'vncdisplay',
                             'vnclisten']:
