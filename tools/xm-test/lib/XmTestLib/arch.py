@@ -70,6 +70,7 @@ ia_ParavirtDefaults = {"memory"       : 64,
                        "kernel"       : ia_getDefaultKernel(),
                        "root"         : "/dev/ram0",
                        "ramdisk"      : getRdPath() + "/initrd.img",
+                       "extra"        : "console=xvc0",
 }
 ia_HVMDefaults =      {"memory"       : 64,
                        "vcpus"        : 1,
@@ -147,7 +148,11 @@ if _arch == "x86" or _arch == "x86_64" or _arch == "ia64":
     # expects one.  This will fail with a gzip-ed image. 
     if configDefaults['ramdisk']:
         rd_size = os.stat(configDefaults['ramdisk']).st_size
-        configDefaults['extra'] = 'ramdisk_size=' + str((rd_size / 1024)+1)
+        clause = 'ramdisk_size=' + str((rd_size / 1024)+1)
+        if configDefaults.has_key('extra'):
+            configDefaults['extra'] = configDefaults['extra'] + " " + clause
+        else:
+            configDefaults['extra'] = clause
 
     if _arch == "ia64":
         minSafeMem = ia64_minSafeMem
