@@ -1088,6 +1088,7 @@ class XendDomain:
         log.info("Domain %s (%s) deleted." %
                  (dominfo.getName(), dominfo.info.get('uuid')))
                 
+        dominfo.metrics.destroy()
         self._managed_domain_unregister(dominfo)
         self._remove_domain(dominfo)
         XendDevices.destroy_device_state(dominfo)
