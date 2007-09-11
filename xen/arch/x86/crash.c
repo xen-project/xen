@@ -46,7 +46,7 @@ static int crash_nmi_callback(struct cpu_user_regs *regs, int cpu)
     hvm_cpu_down();
 
     for ( ; ; )
-        __asm__ __volatile__ ( "hlt" );
+        halt();
 
     return 1;
 }

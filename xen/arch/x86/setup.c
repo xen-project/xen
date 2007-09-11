@@ -168,7 +168,7 @@ static void __init do_initcalls(void)
 
 #define EARLY_FAIL(f, a...) do {                \
     printk( f , ## a );                         \
-    for ( ; ; ) __asm__ __volatile__ ( "hlt" ); \
+    for ( ; ; ) halt();                         \
 } while (0)
 
 static unsigned long __initdata initial_images_start, initial_images_end;

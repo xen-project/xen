@@ -38,10 +38,11 @@ static inline void kb_wait(void)
             break;
 }
 
-static void  __attribute__((noreturn)) __machine_halt(void *unused)
+static void __attribute__((noreturn)) __machine_halt(void *unused)
 {
+    local_irq_disable();
     for ( ; ; )
-        __asm__ __volatile__ ( "hlt" );
+        halt();
 }
 
 void machine_halt(void)
@@ -213,7 +214,7 @@ void machine_restart(void)
         on_selected_cpus(cpumask_of_cpu(0), (void *)machine_restart,
                          NULL, 1, 0);
         for ( ; ; )
-            safe_halt();
+            halt();
     }
 
     smp_send_stop();

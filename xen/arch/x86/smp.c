@@ -319,13 +319,15 @@ int on_selected_cpus(
 
 static void stop_this_cpu (void *dummy)
 {
+    ASSERT(!local_irq_is_enabled());
+
     disable_local_APIC();
     hvm_cpu_down();
 
     cpu_clear(smp_processor_id(), cpu_online_map);
 
     for ( ; ; )
-        __asm__ __volatile__ ( "hlt" );
+        halt();
 }
 
 /*
