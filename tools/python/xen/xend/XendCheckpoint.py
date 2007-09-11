@@ -200,7 +200,7 @@ def restore(xd, fd, dominfo = None, paused = False):
         maxmem = restore_image.getRequiredAvailableMemory(
             dominfo.info['memory_static_max'] / 1024)
         shadow = restore_image.getRequiredShadowMemory(
-            dominfo.info['shadow_memory'] / 1024,
+            dominfo.info['shadow_memory'] * 1024,
             dominfo.info['memory_static_max'] / 1024)
 
         log.debug("restore:shadow=0x%x, _static_max=0x%x, _static_min=0x%x, ",

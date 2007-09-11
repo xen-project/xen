@@ -1610,7 +1610,7 @@ class XendDomainInfo:
             maxmem = self.image.getRequiredAvailableMemory(
                 self.info['memory_static_max'] / 1024)
             shadow = self.image.getRequiredShadowMemory(
-                self.info['shadow_memory'] / 1024,
+                self.info['shadow_memory'] * 1024,
                 self.info['memory_static_max'] / 1024)
 
             log.debug("_initDomain:shadow_memory=0x%x, memory_static_max=0x%x, memory_static_min=0x%x.", self.info['shadow_memory'], self.info['memory_static_max'], self.info['memory_static_min'],)
