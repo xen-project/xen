@@ -603,10 +603,8 @@ END(ia64_leave_hypercall)
 
 /*
  * in0: new rr7
- * in1: virtual address of shared_info
- * in2: virtual address of shared_arch_info (VPD)
- * in3: virtual address of guest_vhpt
- * in4: virtual address of pal code segment
+ * in1: virtual address of guest_vhpt
+ * in2: virtual address of pal code segment
  * r8: will contain old rid value
  */
 
@@ -622,7 +620,7 @@ END(ia64_leave_hypercall)
 GLOBAL_ENTRY(vmx_switch_rr7)
    // not sure this unwind statement is correct...
    .prologue ASM_UNW_PRLG_RP|ASM_UNW_PRLG_PFS, ASM_UNW_PRLG_GRSAVE(1)
-   alloc loc1 = ar.pfs, 5, 9, 0, 0
+   alloc loc1 = ar.pfs, 3, 7, 0, 0
 1: {
      mov r28  = in0        // copy procedure index
      mov r8   = ip         // save ip to compute branch
@@ -633,22 +631,20 @@ GLOBAL_ENTRY(vmx_switch_rr7)
     ;;
     tpa loc2 = loc2         // get physical address of per cpu date
     ;;
-    dep loc3 = 0,in1,60,4          // get physical address of shared_info
-    dep loc4 = 0,in2,60,4          // get physical address of shared_arch_info
-    dep loc5 = 0,in3,60,4          // get physical address of guest_vhpt
-    dep loc6 = 0,in4,60,4          // get physical address of pal code
+    dep loc5 = 0,in1,60,4          // get physical address of guest_vhpt
+    dep loc6 = 0,in2,60,4          // get physical address of pal code
     ;;
-    mov loc7 = psr          // save psr
+    mov loc4 = psr          // save psr
     ;;
-    mov loc8 = ar.rsc           // save RSE configuration
+    mov loc3 = ar.rsc           // save RSE configuration
     ;;
     mov ar.rsc = 0          // put RSE in enforced lazy, LE mode
     movl r16=PSR_BITS_TO_CLEAR
     movl r17=PSR_BITS_TO_SET
     ;;
-    or loc7 = loc7,r17      // add in psr the bits to set
+    or loc4 = loc4,r17      // add in psr the bits to set
     ;;
-    andcm r16=loc7,r16      // removes bits to clear from psr
+    andcm r16=loc4,r16      // removes bits to clear from psr
     br.call.sptk.many rp=ia64_switch_mode_phys
 1:
    // now in physical mode with psr.i/ic off so do rr7 switch
@@ -709,10 +705,10 @@ GLOBAL_ENTRY(vmx_switch_rr7)
    or loc5 = r25,loc5          // construct PA | page properties
    mov r23 = IA64_GRANULE_SHIFT <<2
    ;;
-   ptr.d   in3,r23
+   ptr.d   in1,r23
    ;;
    mov cr.itir=r23
-   mov cr.ifa=in3
+   mov cr.ifa=in1
    ;;
    itr.d dtr[r24]=loc5     // wire in new mapping...
    ;;
@@ -723,21 +719,21 @@ GLOBAL_ENTRY(vmx_switch_rr7)
    or loc6 = r25,loc6          // construct PA | page properties
    mov r23 = IA64_GRANULE_SHIFT<<2
    ;;
-   ptr.i   in4,r23
+   ptr.i   in2,r23
    ;;
    mov cr.itir=r23
-   mov cr.ifa=in4
+   mov cr.ifa=in2
    ;;
    itr.i itr[r24]=loc6     // wire in new mapping...
    ;;
 
    // done, switch back to virtual and return
-   mov r16=loc7            // r16= original psr
+   mov r16=loc4            // r16= original psr
    br.call.sptk.many rp=ia64_switch_mode_virt // return to virtual mode
    mov ar.pfs = loc1
    mov rp = loc0
    ;;
-   mov ar.rsc=loc8         // restore RSE configuration
+   mov ar.rsc=loc3         // restore RSE configuration
    srlz.d              // seralize restoration of psr.l
    br.ret.sptk.many rp
 END(vmx_switch_rr7)

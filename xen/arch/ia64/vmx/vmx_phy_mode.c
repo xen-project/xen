@@ -104,8 +104,6 @@ physical_mode_init(VCPU *vcpu)
     vcpu->arch.mode_flags = GUEST_IN_PHY;
 }
 
-extern void vmx_switch_rr7(unsigned long ,shared_info_t*,void *,void *,void *);
-
 void
 physical_tlb_miss(VCPU *vcpu, u64 vadr, int type)
 {
@@ -185,8 +183,6 @@ vmx_load_all_rr(VCPU *vcpu)
 		     vrrtomrr(vcpu, VMX(vcpu, vrr[VRN6])));
 	ia64_dv_serialize_data();
 	vmx_switch_rr7(vrrtomrr(vcpu,VMX(vcpu, vrr[VRN7])),
-			(void *)vcpu->domain->shared_info,
-			(void *)vcpu->arch.privregs,
 			(void *)vcpu->arch.vhpt.hash, pal_vaddr );
 	ia64_set_pta(VMX(vcpu, mpta));
 	vmx_ia64_set_dcr(vcpu);

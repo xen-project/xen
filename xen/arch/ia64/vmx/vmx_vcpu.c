@@ -165,9 +165,8 @@ IA64FAULT vmx_vcpu_set_rr(VCPU *vcpu, u64 reg, u64 val)
     VMX(vcpu,vrr[reg>>VRN_SHIFT]) = val;
     switch((u64)(reg>>VRN_SHIFT)) {
     case VRN7:
-        vmx_switch_rr7(vrrtomrr(vcpu,val),vcpu->domain->shared_info,
-        (void *)vcpu->arch.privregs,
-        (void *)vcpu->arch.vhpt.hash, pal_vaddr );
+        vmx_switch_rr7(vrrtomrr(vcpu,val),
+                       (void *)vcpu->arch.vhpt.hash, pal_vaddr );
        break;
     case VRN4:
         rrval = vrrtomrr(vcpu,val);
