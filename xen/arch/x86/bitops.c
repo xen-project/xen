@@ -7,7 +7,7 @@ unsigned int __find_first_bit(
 {
     unsigned long d0, d1, res;
 
-    __asm__ __volatile__ (
+    asm volatile (
         "   xor %%eax,%%eax\n\t" /* also ensures ZF==1 if size==0 */
         "   repe; scas"__OS"\n\t"
         "   je 1f\n\t"
@@ -34,8 +34,8 @@ unsigned int __find_next_bit(
     if ( bit != 0 )
     {
         /* Look for a bit in the first word. */
-        __asm__ ( "bsf %1,%%"__OP"ax"
-                  : "=a" (set) : "r" (*p >> bit), "0" (BITS_PER_LONG) );
+        asm ( "bsf %1,%%"__OP"ax"
+              : "=a" (set) : "r" (*p >> bit), "0" (BITS_PER_LONG) );
         if ( set < (BITS_PER_LONG - bit) )
             return (offset + set);
         offset += BITS_PER_LONG - bit;
@@ -55,7 +55,7 @@ unsigned int __find_first_zero_bit(
 {
     unsigned long d0, d1, d2, res;
 
-    __asm__ (
+    asm volatile (
         "   xor %%edx,%%edx\n\t" /* also ensures ZF==1 if size==0 */
         "   repe; scas"__OS"\n\t"
         "   je 1f\n\t"
@@ -83,7 +83,7 @@ unsigned int __find_next_zero_bit(
     if ( bit != 0 )
     {
         /* Look for zero in the first word. */
-        __asm__ ( "bsf %1,%%"__OP"ax" : "=a" (set) : "r" (~(*p >> bit)) );
+        asm ( "bsf %1,%%"__OP"ax" : "=a" (set) : "r" (~(*p >> bit)) );
         if ( set < (BITS_PER_LONG - bit) )
             return (offset + set);
         offset += BITS_PER_LONG - bit;

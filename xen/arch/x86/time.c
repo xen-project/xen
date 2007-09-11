@@ -89,7 +89,7 @@ static inline u32 div_frac(u32 dividend, u32 divisor)
 {
     u32 quotient, remainder;
     ASSERT(dividend < divisor);
-    __asm__ ( 
+    asm ( 
         "divl %4"
         : "=a" (quotient), "=d" (remainder)
         : "0" (0), "1" (dividend), "r" (divisor) );
@@ -103,7 +103,7 @@ static inline u32 div_frac(u32 dividend, u32 divisor)
 static inline u32 mul_frac(u32 multiplicand, u32 multiplier)
 {
     u32 product_int, product_frac;
-    __asm__ (
+    asm (
         "mul %3"
         : "=a" (product_frac), "=d" (product_int)
         : "0" (multiplicand), "r" (multiplier) );
@@ -127,7 +127,7 @@ static inline u64 scale_delta(u64 delta, struct time_scale *scale)
         delta <<= scale->shift;
 
 #ifdef CONFIG_X86_32
-    __asm__ (
+    asm (
         "mul  %5       ; "
         "mov  %4,%%eax ; "
         "mov  %%edx,%4 ; "
@@ -138,7 +138,7 @@ static inline u64 scale_delta(u64 delta, struct time_scale *scale)
         : "=A" (product), "=r" (tmp1), "=r" (tmp2)
         : "a" ((u32)delta), "1" ((u32)(delta >> 32)), "2" (scale->mul_frac) );
 #else
-    __asm__ (
+    asm (
         "mul %%rdx ; shrd $32,%%rdx,%%rax"
         : "=a" (product) : "0" (delta), "d" ((u64)scale->mul_frac) );
 #endif

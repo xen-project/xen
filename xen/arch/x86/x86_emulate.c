@@ -329,7 +329,7 @@ do{ unsigned long _tmp;                                                    \
     switch ( (_dst).bytes )                                                \
     {                                                                      \
     case 2:                                                                \
-        __asm__ __volatile__ (                                             \
+        asm volatile (                                                     \
             _PRE_EFLAGS("0","4","2")                                       \
             _op"w %"_wx"3,%1; "                                            \
             _POST_EFLAGS("0","4","2")                                      \
@@ -338,7 +338,7 @@ do{ unsigned long _tmp;                                                    \
               "m" (_eflags), "m" ((_dst).val) );                           \
         break;                                                             \
     case 4:                                                                \
-        __asm__ __volatile__ (                                             \
+        asm volatile (                                                     \
             _PRE_EFLAGS("0","4","2")                                       \
             _op"l %"_lx"3,%1; "                                            \
             _POST_EFLAGS("0","4","2")                                      \
@@ -356,7 +356,7 @@ do{ unsigned long _tmp;                                                    \
     switch ( (_dst).bytes )                                                \
     {                                                                      \
     case 1:                                                                \
-        __asm__ __volatile__ (                                             \
+        asm volatile (                                                     \
             _PRE_EFLAGS("0","4","2")                                       \
             _op"b %"_bx"3,%1; "                                            \
             _POST_EFLAGS("0","4","2")                                      \
@@ -388,7 +388,7 @@ do{ unsigned long _tmp;                                                    \
     switch ( (_dst).bytes )                                                \
     {                                                                      \
     case 1:                                                                \
-        __asm__ __volatile__ (                                             \
+        asm volatile (                                                     \
             _PRE_EFLAGS("0","3","2")                                       \
             _op"b %1; "                                                    \
             _POST_EFLAGS("0","3","2")                                      \
@@ -396,7 +396,7 @@ do{ unsigned long _tmp;                                                    \
             : "i" (EFLAGS_MASK), "m" (_eflags), "m" ((_dst).val) );        \
         break;                                                             \
     case 2:                                                                \
-        __asm__ __volatile__ (                                             \
+        asm volatile (                                                     \
             _PRE_EFLAGS("0","3","2")                                       \
             _op"w %1; "                                                    \
             _POST_EFLAGS("0","3","2")                                      \
@@ -404,7 +404,7 @@ do{ unsigned long _tmp;                                                    \
             : "i" (EFLAGS_MASK), "m" (_eflags), "m" ((_dst).val) );        \
         break;                                                             \
     case 4:                                                                \
-        __asm__ __volatile__ (                                             \
+        asm volatile (                                                     \
             _PRE_EFLAGS("0","3","2")                                       \
             _op"l %1; "                                                    \
             _POST_EFLAGS("0","3","2")                                      \
@@ -420,7 +420,7 @@ do{ unsigned long _tmp;                                                    \
 /* Emulate an instruction with quadword operands (x86/64 only). */
 #if defined(__x86_64__)
 #define __emulate_2op_8byte(_op, _src, _dst, _eflags, _qx, _qy)         \
-do{ __asm__ __volatile__ (                                              \
+do{ asm volatile (                                                      \
         _PRE_EFLAGS("0","4","2")                                        \
         _op"q %"_qx"3,%1; "                                             \
         _POST_EFLAGS("0","4","2")                                       \
@@ -429,7 +429,7 @@ do{ __asm__ __volatile__ (                                              \
           "m" (_eflags), "m" ((_dst).val) );                            \
 } while (0)
 #define __emulate_1op_8byte(_op, _dst, _eflags)                         \
-do{ __asm__ __volatile__ (                                              \
+do{ asm volatile (                                                      \
         _PRE_EFLAGS("0","3","2")                                        \
         _op"q %1; "                                                     \
         _POST_EFLAGS("0","3","2")                                       \
@@ -480,7 +480,7 @@ do {                                                    \
 /* Given byte has even parity (even number of 1s)? */
 static int even_parity(uint8_t v)
 {
-    __asm__ ( "test %%al,%%al; setp %%al"
+    asm ( "test %%al,%%al; setp %%al"
               : "=a" (v) : "0" (v) );
     return v;
 }
@@ -2402,11 +2402,11 @@ x86_emulate(
             break;
         case 4:
 #ifdef __x86_64__
-            __asm__ ( "bswap %k0" : "=r" (dst.val) : "0" (*dst.reg) );
+            asm ( "bswap %k0" : "=r" (dst.val) : "0" (*dst.reg) );
             break;
         case 8:
 #endif
-            __asm__ ( "bswap %0" : "=r" (dst.val) : "0" (*dst.reg) );
+            asm ( "bswap %0" : "=r" (dst.val) : "0" (*dst.reg) );
             break;
         }
         break;

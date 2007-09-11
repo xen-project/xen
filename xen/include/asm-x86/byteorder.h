@@ -20,7 +20,7 @@ static inline __attribute_const__ __u64 ___arch__swab64(__u64 val)
     asm("bswapl %0 ; bswapl %1 ; xchgl %0,%1" 
         : "=r" (v.s.a), "=r" (v.s.b) 
         : "0" (v.s.a), "1" (v.s.b)); 
-    return v.u;	
+    return v.u;
 } 
 
 /* Do not define swab16.  Gcc is smart enough to recognize "C" version and

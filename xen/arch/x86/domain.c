@@ -930,7 +930,7 @@ arch_do_vcpu_op(
 
 #define loadsegment(seg,value) ({               \
     int __r = 1;                                \
-    __asm__ __volatile__ (                      \
+    asm volatile (                              \
         "1: movl %k1,%%" #seg "\n2:\n"          \
         ".section .fixup,\"ax\"\n"              \
         "3: xorl %k0,%k0\n"                     \
@@ -1017,7 +1017,7 @@ static void load_segments(struct vcpu *n)
 
         /* If in kernel mode then switch the GS bases around. */
         if ( (n->arch.flags & TF_kernel_mode) )
-            __asm__ __volatile__ ( "swapgs" );
+            asm volatile ( "swapgs" );
     }
 
     if ( unlikely(!all_segs_okay) )
@@ -1190,7 +1190,7 @@ static void paravirt_ctxt_switch_to(struct vcpu *v)
 }
 
 #define loaddebug(_v,_reg) \
-    __asm__ __volatile__ ("mov %0,%%db" #_reg : : "r" ((_v)->debugreg[_reg]))
+    asm volatile ( "mov %0,%%db" #_reg : : "r" ((_v)->debugreg[_reg]) )
 
 static void __context_switch(void)
 {
@@ -1242,7 +1242,7 @@ static void __context_switch(void)
         char gdt_load[10];
         *(unsigned short *)(&gdt_load[0]) = LAST_RESERVED_GDT_BYTE;
         *(unsigned long  *)(&gdt_load[2]) = GDT_VIRT_START(n);
-        __asm__ __volatile__ ( "lgdt %0" : "=m" (gdt_load) );
+        asm volatile ( "lgdt %0" : "=m" (gdt_load) );
     }
 
     if ( p->domain != n->domain )

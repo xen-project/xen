@@ -597,7 +597,7 @@ static int emulate_forced_invalid_op(struct cpu_user_regs *regs)
         return 0;
     eip += sizeof(instr);
 
-    __asm__ ( 
+    asm ( 
         "cpuid"
         : "=a" (a), "=b" (b), "=c" (c), "=d" (d)
         : "0" (a), "1" (b), "2" (c), "3" (d) );
@@ -1090,20 +1090,25 @@ static int read_descriptor(unsigned int sel,
     *ar = desc.b & 0x00f0ff00;
     if ( !(desc.b & _SEGMENT_L) )
     {
-        *base = (desc.a >> 16) + ((desc.b & 0xff) << 16) + (desc.b & 0xff000000);
+        *base = ((desc.a >> 16) + ((desc.b & 0xff) << 16) +
+                 (desc.b & 0xff000000));
         *limit = (desc.a & 0xffff) | (desc.b & 0x000f0000);
         if ( desc.b & _SEGMENT_G )
             *limit = ((*limit + 1) << 12) - 1;
 #ifndef NDEBUG
-        if ( !vm86_mode(regs) && sel > 3 )
+        if ( !vm86_mode(regs) && (sel > 3) )
         {
             unsigned int a, l;
             unsigned char valid;
 
-            __asm__("larl %2, %0\n\tsetz %1" : "=r" (a), "=rm" (valid) : "rm" (sel));
-            BUG_ON(valid && (a & 0x00f0ff00) != *ar);
-            __asm__("lsll %2, %0\n\tsetz %1" : "=r" (l), "=rm" (valid) : "rm" (sel));
-            BUG_ON(valid && l != *limit);
+            asm volatile (
+                "larl %2,%0 ; setz %1"
+                : "=r" (a), "=rm" (valid) : "rm" (sel));
+            BUG_ON(valid && ((a & 0x00f0ff00) != *ar));
+            asm volatile (
+                "lsll %2,%0 ; setz %1"
+                : "=r" (l), "=rm" (valid) : "rm" (sel));
+            BUG_ON(valid && (l != *limit));
         }
 #endif
     }
@@ -2011,13 +2016,13 @@ asmlinkage int do_debug(struct cpu_user_regs *regs)
     unsigned long condition;
     struct vcpu *v = current;
 
-    __asm__ __volatile__("mov %%db6,%0" : "=r" (condition));
+    asm volatile ( "mov %%db6,%0" : "=r" (condition) );
 
     /* Mask out spurious debug traps due to lazy DR7 setting */
     if ( (condition & (DR_TRAP0|DR_TRAP1|DR_TRAP2|DR_TRAP3)) &&
          (v->arch.guest_context.debugreg[7] == 0) )
     {
-        __asm__("mov %0,%%db7" : : "r" (0UL));
+        asm volatile ( "mov %0,%%db7" : : "r" (0UL) );
         goto out;
     }
 
@@ -2186,25 +2191,25 @@ long set_debugreg(struct vcpu *p, int reg, unsigned long value)
         if ( !access_ok(value, sizeof(long)) )
             return -EPERM;
         if ( p == current ) 
-            __asm__ ( "mov %0, %%db0" : : "r" (value) );
+            asm volatile ( "mov %0, %%db0" : : "r" (value) );
         break;
     case 1: 
         if ( !access_ok(value, sizeof(long)) )
             return -EPERM;
         if ( p == current ) 
-            __asm__ ( "mov %0, %%db1" : : "r" (value) );
+            asm volatile ( "mov %0, %%db1" : : "r" (value) );
         break;
     case 2: 
         if ( !access_ok(value, sizeof(long)) )
             return -EPERM;
         if ( p == current ) 
-            __asm__ ( "mov %0, %%db2" : : "r" (value) );
+            asm volatile ( "mov %0, %%db2" : : "r" (value) );
         break;
     case 3:
         if ( !access_ok(value, sizeof(long)) )
             return -EPERM;
         if ( p == current ) 
-            __asm__ ( "mov %0, %%db3" : : "r" (value) );
+            asm volatile ( "mov %0, %%db3" : : "r" (value) );
         break;
     case 6:
         /*
@@ -2214,7 +2219,7 @@ long set_debugreg(struct vcpu *p, int reg, unsigned long value)
         value &= 0xffffefff; /* reserved bits => 0 */
         value |= 0xffff0ff0; /* reserved bits => 1 */
         if ( p == current ) 
-            __asm__ ( "mov %0, %%db6" : : "r" (value) );
+            asm volatile ( "mov %0, %%db6" : : "r" (value) );
         break;
     case 7:
         /*
@@ -2235,7 +2240,7 @@ long set_debugreg(struct vcpu *p, int reg, unsigned long value)
                 if ( ((value >> (i+16)) & 3) == 2 ) return -EPERM;
         }
         if ( p == current ) 
-            __asm__ ( "mov %0, %%db7" : : "r" (value) );
+            asm volatile ( "mov %0, %%db7" : : "r" (value) );
         break;
     default:
         return -EINVAL;

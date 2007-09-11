@@ -149,7 +149,7 @@ asmlinkage void do_double_fault(struct cpu_user_regs *regs)
 {
     unsigned int cpu, tr;
 
-    asm ( "str %0" : "=r" (tr) );
+    asm volatile ( "str %0" : "=r" (tr) );
     cpu = ((tr >> 3) - __FIRST_TSS_ENTRY) >> 2;
 
     watchdog_disable();
@@ -185,11 +185,11 @@ void toggle_guest_mode(struct vcpu *v)
     if ( is_pv_32bit_vcpu(v) )
         return;
     v->arch.flags ^= TF_kernel_mode;
-    __asm__ __volatile__ ( "swapgs" );
+    asm volatile ( "swapgs" );
     update_cr3(v);
 #ifdef USER_MAPPINGS_ARE_GLOBAL
     /* Don't flush user global mappings from the TLB. Don't tick TLB clock. */
-    __asm__ __volatile__ ( "mov %0, %%cr3" : : "r" (v->arch.cr3) : "memory" );
+    asm volatile ( "mov %0, %%cr3" : : "r" (v->arch.cr3) : "memory" );
 #else
     write_ptbase(v);
 #endif

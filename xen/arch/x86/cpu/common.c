@@ -557,10 +557,10 @@ void __devinit cpu_init(void)
 
 	*(unsigned short *)(&gdt_load[0]) = LAST_RESERVED_GDT_BYTE;
 	*(unsigned long  *)(&gdt_load[2]) = GDT_VIRT_START(current);
-	__asm__ __volatile__ ( "lgdt %0" : "=m" (gdt_load) );
+	asm volatile ( "lgdt %0" : "=m" (gdt_load) );
 
 	/* No nested task. */
-	__asm__("pushf ; andw $0xbfff,(%"__OP"sp) ; popf");
+	asm volatile ("pushf ; andw $0xbfff,(%"__OP"sp) ; popf" );
 
 	/* Ensure FPU gets initialised for each domain. */
 	stts();
@@ -579,10 +579,10 @@ void __devinit cpu_init(void)
 #endif
 	set_tss_desc(cpu,t);
 	load_TR(cpu);
-	__asm__ __volatile__ ( "lldt %%ax" : : "a" (0) );
+	asm volatile ( "lldt %%ax" : : "a" (0) );
 
 	/* Clear all 6 debug registers: */
-#define CD(register) __asm__("mov %0,%%db" #register ::"r"(0UL) );
+#define CD(register) asm volatile ( "mov %0,%%db" #register : : "r"(0UL) );
 	CD(0); CD(1); CD(2); CD(3); /* no db4 and db5 */; CD(6); CD(7);
 #undef CD
 

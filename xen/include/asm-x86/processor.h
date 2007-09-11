@@ -146,10 +146,17 @@ struct vcpu;
  * instruction pointer ("program counter").
  */
 #ifdef __x86_64__
-#define current_text_addr() ({ void *pc; asm volatile("leaq 1f(%%rip),%0\n1:":"=r"(pc)); pc; })
+#define current_text_addr() ({                      \
+    void *pc;                                       \
+    asm ( "leaq 1f(%%rip),%0\n1:" : "=r" (pc) );    \
+    pc;                                             \
+})
 #else
-#define current_text_addr() \
-  ({ void *pc; __asm__("movl $1f,%0\n1:":"=g" (pc)); pc; })
+#define current_text_addr() ({                  \
+    void *pc;                                   \
+    asm ( "movl $1f,%0\n1:" : "=g" (pc) );      \
+    pc;                                         \
+})
 #endif
 
 struct cpuinfo_x86 {
@@ -211,12 +218,12 @@ static always_inline void detect_ht(struct cpuinfo_x86 *c) {}
  * resulting in stale register contents being returned.
  */
 #define cpuid(_op,_eax,_ebx,_ecx,_edx)          \
-    __asm__("cpuid"                             \
-            : "=a" (*(int *)(_eax)),            \
-              "=b" (*(int *)(_ebx)),            \
-              "=c" (*(int *)(_ecx)),            \
-              "=d" (*(int *)(_edx))             \
-            : "0" (_op), "2" (0))
+    asm ( "cpuid"                               \
+          : "=a" (*(int *)(_eax)),              \
+            "=b" (*(int *)(_ebx)),              \
+            "=c" (*(int *)(_ecx)),              \
+            "=d" (*(int *)(_edx))               \
+          : "0" (_op), "2" (0) )
 
 /* Some CPUID calls want 'count' to be placed in ecx */
 static inline void cpuid_count(
@@ -227,9 +234,9 @@ static inline void cpuid_count(
     unsigned int *ecx,
     unsigned int *edx)
 {
-    __asm__("cpuid"
-            : "=a" (*eax), "=b" (*ebx), "=c" (*ecx), "=d" (*edx)
-            : "0" (op), "c" (count));
+    asm ( "cpuid"
+          : "=a" (*eax), "=b" (*ebx), "=c" (*ecx), "=d" (*edx)
+          : "0" (op), "c" (count) );
 }
 
 /*
@@ -239,88 +246,87 @@ static always_inline unsigned int cpuid_eax(unsigned int op)
 {
     unsigned int eax;
 
-    __asm__("cpuid"
-            : "=a" (eax)
-            : "0" (op)
-            : "bx", "cx", "dx");
+    asm ( "cpuid"
+          : "=a" (eax)
+          : "0" (op)
+          : "bx", "cx", "dx" );
     return eax;
 }
+
 static always_inline unsigned int cpuid_ebx(unsigned int op)
 {
     unsigned int eax, ebx;
 
-    __asm__("cpuid"
-            : "=a" (eax), "=b" (ebx)
-            : "0" (op)
-            : "cx", "dx" );
+    asm ( "cpuid"
+          : "=a" (eax), "=b" (ebx)
+          : "0" (op)
+          : "cx", "dx" );
     return ebx;
 }
+
 static always_inline unsigned int cpuid_ecx(unsigned int op)
 {
     unsigned int eax, ecx;
 
-    __asm__("cpuid"
-            : "=a" (eax), "=c" (ecx)
-            : "0" (op)
-            : "bx", "dx" );
+    asm ( "cpuid"
+          : "=a" (eax), "=c" (ecx)
+          : "0" (op)
+          : "bx", "dx" );
     return ecx;
 }
+
 static always_inline unsigned int cpuid_edx(unsigned int op)
 {
     unsigned int eax, edx;
 
-    __asm__("cpuid"
-            : "=a" (eax), "=d" (edx)
-            : "0" (op)
-            : "bx", "cx");
+    asm ( "cpuid"
+          : "=a" (eax), "=d" (edx)
+          : "0" (op)
+          : "bx", "cx" );
     return edx;
 }
 
-
-
 static inline unsigned long read_cr0(void)
 {
-    unsigned long __cr0;
-    __asm__("mov %%cr0,%0\n\t" :"=r" (__cr0));
-    return __cr0;
+    unsigned long cr0;
+    asm volatile ( "mov %%cr0,%0\n\t" : "=r" (cr0) );
+    return cr0;
 } 
 
 static inline void write_cr0(unsigned long val)
 {
-	__asm__("mov %0,%%cr0": :"r" ((unsigned long)val));
+    asm volatile ( "mov %0,%%cr0" : : "r" ((unsigned long)val) );
 }
 
 static inline unsigned long read_cr2(void)
 {
-    unsigned long __cr2;
-    __asm__("mov %%cr2,%0\n\t" :"=r" (__cr2));
-    return __cr2;
+    unsigned long cr2;
+    asm volatile ( "mov %%cr2,%0\n\t" : "=r" (cr2) );
+    return cr2;
 }
 
 static inline unsigned long read_cr4(void)
 {
-    unsigned long __cr4;
-    __asm__("mov %%cr4,%0\n\t" :"=r" (__cr4));
-    return __cr4;
+    unsigned long cr4;
+    asm volatile ( "mov %%cr4,%0\n\t" : "=r" (cr4) );
+    return cr4;
 } 
     
 static inline void write_cr4(unsigned long val)
 {
-	__asm__("mov %0,%%cr4": :"r" ((unsigned long)val));
+    asm volatile ( "mov %0,%%cr4" : : "r" ((unsigned long)val) );
 }
-
 
 /* Clear and set 'TS' bit respectively */
 static inline void clts(void) 
 {
-    __asm__ __volatile__ ("clts");
+    asm volatile ( "clts" );
 }
 
 static inline void stts(void) 
 {
     write_cr0(X86_CR0_TS|read_cr0());
 }
-
 
 /*
  * Save the cr4 feature set we're using (ie
@@ -363,32 +369,36 @@ static always_inline void set_in_cr4 (unsigned long mask)
 #define getCx86(reg) ({ outb((reg), 0x22); inb(0x23); })
 
 #define setCx86(reg, data) do { \
-	outb((reg), 0x22); \
-	outb((data), 0x23); \
+    outb((reg), 0x22); \
+    outb((data), 0x23); \
 } while (0)
 
 /* Stop speculative execution */
 static inline void sync_core(void)
 {
     int tmp;
-    asm volatile("cpuid" : "=a" (tmp) : "0" (1) : "ebx","ecx","edx","memory");
+    asm volatile (
+        "cpuid"
+        : "=a" (tmp)
+        : "0" (1)
+        : "ebx","ecx","edx","memory" );
 }
 
 static always_inline void __monitor(const void *eax, unsigned long ecx,
-		unsigned long edx)
+                                    unsigned long edx)
 {
-	/* "monitor %eax,%ecx,%edx;" */
-	asm volatile(
-		".byte 0x0f,0x01,0xc8;"
-		: :"a" (eax), "c" (ecx), "d"(edx));
+    /* "monitor %eax,%ecx,%edx;" */
+    asm volatile (
+        ".byte 0x0f,0x01,0xc8;"
+        : : "a" (eax), "c" (ecx), "d"(edx) );
 }
 
 static always_inline void __mwait(unsigned long eax, unsigned long ecx)
 {
-	/* "mwait %eax,%ecx;" */
-	asm volatile(
-		".byte 0x0f,0x01,0xc9;"
-		: :"a" (eax), "c" (ecx));
+    /* "mwait %eax,%ecx;" */
+    asm volatile (
+        ".byte 0x0f,0x01,0xc9;"
+        : : "a" (eax), "c" (ecx) );
 }
 
 #define IOBMP_BYTES             8192
@@ -509,7 +519,7 @@ struct extended_sigtable {
 /* REP NOP (PAUSE) is a good thing to insert into busy-wait loops. */
 static always_inline void rep_nop(void)
 {
-    __asm__ __volatile__ ( "rep;nop" : : : "memory" );
+    asm volatile ( "rep;nop" : : : "memory" );
 }
 
 #define cpu_relax() rep_nop()
@@ -520,7 +530,7 @@ static always_inline void rep_nop(void)
 #define ARCH_HAS_PREFETCH
 extern always_inline void prefetch(const void *x)
 {
-    __asm__ __volatile__ ("prefetchnta (%0)" : : "r"(x));
+    asm volatile ( "prefetchnta (%0)" : : "r"(x) );
 }
 
 #elif CONFIG_X86_USE_3DNOW
@@ -531,12 +541,12 @@ extern always_inline void prefetch(const void *x)
 
 extern always_inline void prefetch(const void *x)
 {
-    __asm__ __volatile__ ("prefetch (%0)" : : "r"(x));
+    asm volatile ( "prefetch (%0)" : : "r"(x) );
 }
 
 extern always_inline void prefetchw(const void *x)
 {
-    __asm__ __volatile__ ("prefetchw (%0)" : : "r"(x));
+    asm volatile ( "prefetchw (%0)" : : "r"(x) );
 }
 #define spin_lock_prefetch(x)	prefetchw(x)
 
