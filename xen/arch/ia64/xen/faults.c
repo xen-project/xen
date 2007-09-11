@@ -94,7 +94,9 @@ static void reflect_interruption(unsigned long isr, struct pt_regs *regs,
 	regs->cr_ipsr = vcpu_pl_adjust(regs->cr_ipsr, IA64_PSR_CPL0_BIT);
 	if (PSCB(v, dcr) & IA64_DCR_BE)
 		regs->cr_ipsr |= IA64_PSR_BE;
-
+	else
+		regs->cr_ipsr &= ~IA64_PSR_BE;
+    
 	if (PSCB(v, hpsr_dfh))
 		regs->cr_ipsr |= IA64_PSR_DFH;  
 	PSCB(v, vpsr_dfh) = 0;
@@ -140,6 +142,9 @@ void reflect_event(void)
 	regs->cr_ipsr = vcpu_pl_adjust(regs->cr_ipsr, IA64_PSR_CPL0_BIT);
 	if (PSCB(v, dcr) & IA64_DCR_BE)
 		regs->cr_ipsr |= IA64_PSR_BE;
+	else
+		regs->cr_ipsr &= ~IA64_PSR_BE;
+
 
 	if (PSCB(v, hpsr_dfh))
 		regs->cr_ipsr |= IA64_PSR_DFH;
@@ -241,6 +246,9 @@ void ia64_do_page_fault(unsigned long address, unsigned long isr,
 					       IA64_PSR_CPL0_BIT);
 		if (PSCB(current, dcr) & IA64_DCR_BE)
 			regs->cr_ipsr |= IA64_PSR_BE;
+		else
+			regs->cr_ipsr &= ~IA64_PSR_BE;
+
 
 		if (PSCB(current, hpsr_dfh))
 			regs->cr_ipsr |= IA64_PSR_DFH;  
