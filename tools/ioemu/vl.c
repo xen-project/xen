@@ -4312,6 +4312,7 @@ typedef struct IOHandlerRecord {
     IOCanRWHandler *fd_read_poll;
     IOHandler *fd_read;
     IOHandler *fd_write;
+    int deleted;
     void *opaque;
     /* temporary data */
     struct pollfd *ufd;
@@ -4337,8 +4338,7 @@ int qemu_set_fd_handler2(int fd,
             if (ioh == NULL)
                 break;
             if (ioh->fd == fd) {
-                *pioh = ioh->next;
-                qemu_free(ioh);
+                ioh->deleted = 1;
                 break;
             }
             pioh = &ioh->next;
@@ -4359,6 +4359,7 @@ int qemu_set_fd_handler2(int fd,
         ioh->fd_read = fd_read;
         ioh->fd_write = fd_write;
         ioh->opaque = opaque;
+        ioh->deleted = 0;
     }
     return 0;
 }
@@ -6105,7 +6106,7 @@ void qemu_system_powerdown_request(void)
 
 void main_loop_wait(int timeout)
 {
-    IOHandlerRecord *ioh, *ioh_next;
+    IOHandlerRecord *ioh;
     fd_set rfds, wfds, xfds;
     int ret, nfds;
     struct timeval tv;
@@ -6140,6 +6141,8 @@ void main_loop_wait(int timeout)
     FD_ZERO(&wfds);
     FD_ZERO(&xfds);
     for(ioh = first_io_handler; ioh != NULL; ioh = ioh->next) {
+        if (ioh->deleted)
+            continue;
         if (ioh->fd_read &&
             (!ioh->fd_read_poll ||
              ioh->fd_read_poll(ioh->opaque) != 0)) {
@@ -6167,15 +6170,28 @@ void main_loop_wait(int timeout)
 #endif
     ret = select(nfds + 1, &rfds, &wfds, &xfds, &tv);
     if (ret > 0) {
-        /* XXX: better handling of removal */
-        for(ioh = first_io_handler; ioh != NULL; ioh = ioh_next) {
-            ioh_next = ioh->next;
+        IOHandlerRecord **pioh;
+
+        for(ioh = first_io_handler; ioh != NULL; ioh = ioh->next) {
+            if (ioh->deleted)
+                continue;
             if (ioh->fd_read && FD_ISSET(ioh->fd, &rfds)) {
                 ioh->fd_read(ioh->opaque);
             }
             if (ioh->fd_write && FD_ISSET(ioh->fd, &wfds)) {
                 ioh->fd_write(ioh->opaque);
             }
+        }
+
+	/* remove deleted IO handlers */
+	pioh = &first_io_handler;
+	while (*pioh) {
+            ioh = *pioh;
+            if (ioh->deleted) {
+                *pioh = ioh->next;
+                qemu_free(ioh);
+            } else 
+                pioh = &ioh->next;
         }
     }
 #if defined(CONFIG_SLIRP)
