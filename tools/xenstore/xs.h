@@ -112,7 +112,6 @@ bool xs_unwatch(struct xs_handle *h, const char *path, const char *token);
 
 /* Start a transaction: changes by others will not be seen during this
  * transaction, and changes will not be visible to others until end.
- * You can only have one transaction at any time.
  * Returns NULL on failure.
  */
 xs_transaction_t xs_transaction_start(struct xs_handle *h);
