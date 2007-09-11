@@ -527,7 +527,7 @@ u64 translate_domain_pte(u64 pteval, u64 address, u64 itir__, u64* itir,
 
 	pteval2 = lookup_domain_mpa(d, mpaddr, entry);
 	if (ps < PAGE_SHIFT)
-		pteval2 |= address & (PAGE_SIZE - 1) & ~((1L << ps) - 1);
+		pteval2 |= mpaddr & (PAGE_SIZE - 1) & ~((1L << ps) - 1);
 
 	/* Check access rights.  */
 	arflags  = pteval  & _PAGE_AR_MASK;

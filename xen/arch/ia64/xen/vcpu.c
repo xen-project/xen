@@ -1817,10 +1817,16 @@ IA64FAULT vcpu_tpa(VCPU * vcpu, u64 vadr, u64 * padr)
 
 IA64FAULT vcpu_tak(VCPU * vcpu, u64 vadr, u64 * key)
 {
-	printk("vcpu_tak: tak instruction unsupported\n");
-	return IA64_ILLOP_FAULT;
-	// HACK ALERT: tak does a thash for now
-	//return vcpu_thash(vcpu,vadr,key);
+	u64 pteval, itir, mask, iha;
+	IA64FAULT fault;
+
+	fault = vcpu_translate(vcpu, vadr, TRUE, &pteval, &itir, &iha);
+	if (fault == IA64_NO_FAULT || fault == IA64_USE_TLB)
+		*key = itir & IA64_ITIR_KEY_MASK;
+	else
+		*key = 1;
+
+	return IA64_NO_FAULT;
 }
 
 /**************************************************************************
