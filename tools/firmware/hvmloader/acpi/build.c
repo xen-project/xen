@@ -47,7 +47,37 @@ static void set_checksum(
     p[checksum_offset] = -sum;
 }
 
-int construct_madt(struct acpi_20_madt *madt)
+static int uart_exists(uint16_t uart_base)
+{
+    uint16_t ier = uart_base + 1;
+    uint8_t a, b, c;
+
+    a = inb(ier);
+    outb(ier, 0);
+    b = inb(ier);
+    outb(ier, 0xf);
+    c = inb(ier);
+    outb(ier, a);
+
+    return ((b == 0) && (c == 0xf));
+}
+
+static int construct_bios_info_table(uint8_t *buf)
+{
+    struct bios_info {
+        uint8_t com1_present:1;
+        uint8_t com2_present:1;
+    } *bios_info = (struct bios_info *)buf;
+
+    memset(bios_info, 0, sizeof(*bios_info));
+
+    bios_info->com1_present = uart_exists(0x3f8);
+    bios_info->com2_present = uart_exists(0x2f8);
+
+    return align16(sizeof(*bios_info));
+}
+
+static int construct_madt(struct acpi_20_madt *madt)
 {
     struct acpi_20_madt_intsrcovr *intsrcovr;
     struct acpi_20_madt_ioapic    *io_apic;
@@ -124,7 +154,7 @@ int construct_madt(struct acpi_20_madt *madt)
     return align16(offset);
 }
 
-int construct_hpet(struct acpi_20_hpet *hpet)
+static int construct_hpet(struct acpi_20_hpet *hpet)
 {
     int offset;
 
@@ -146,7 +176,7 @@ int construct_hpet(struct acpi_20_hpet *hpet)
     return offset;
 }
 
-int construct_processor_objects(uint8_t *buf)
+static int construct_processor_objects(uint8_t *buf)
 {
     static const char pdat[13] = { 0x5b, 0x83, 0x0b, 0x50, 0x52 };
     static const char hex[] = "0123456789ABCDEF";
@@ -220,7 +250,7 @@ int construct_processor_objects(uint8_t *buf)
     return hdr->length;
 }
 
-int construct_secondary_tables(uint8_t *buf, unsigned long *table_ptrs)
+static int construct_secondary_tables(uint8_t *buf, unsigned long *table_ptrs)
 {
     int offset = 0, nr_tables = 0;
     struct acpi_20_madt *madt;
@@ -296,6 +326,8 @@ int acpi_build_tables(uint8_t *buf)
     unsigned char       *dsdt;
     unsigned long        secondary_tables[16];
     int                  offset = 0, i;
+
+    offset += construct_bios_info_table(&buf[offset]);
 
     facs = (struct acpi_20_facs *)&buf[offset];
     memcpy(facs, &Facs, sizeof(struct acpi_20_facs));

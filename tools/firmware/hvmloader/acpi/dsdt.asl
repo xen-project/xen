@@ -44,10 +44,16 @@ DefinitionBlock ("DSDT.aml", "DSDT", 2, "Xen", "HVM", 0)
 
     Scope (\_SB)
     {
+       /* ACPI_PHYSICAL_ADDRESS == 0xEA000 */
+       OperationRegion(BIOS, SystemMemory, 0xEA000, 16)
+       Field(BIOS, ByteAcc, NoLock, Preserve) {
+           UAR1, 1,
+           UAR2, 1
+       }
+
         /* Fix HCT test for 0x400 pci memory:
          * - need to report low 640 MB mem as motherboard resource
          */
-
        Device(MEM0)
        {
            Name(_HID, EISAID("PNP0C02"))
@@ -635,13 +641,37 @@ DefinitionBlock ("DSDT.aml", "DSDT", 2, "Xen", "HVM", 0)
                     Name (_UID, 0x01)
                     Method (_STA, 0, NotSerialized)
                     {
-                        Return (0x0F)
+                        If(LEqual(\_SB.UAR1, 0)) {
+                            Return(0x00)
+                        } Else {
+                            Return(0x0F)
+                        }
                     }
 
                     Name (_CRS, ResourceTemplate()
                     {
-                        IO (Decode16, 0x03F8, 0x03F8, 0x01, 0x08)
+                        IO (Decode16, 0x03F8, 0x03F8, 8, 8)
                         IRQNoFlags () {4}
+                    })
+                }
+
+                Device (UAR2)
+                {
+                    Name (_HID, EisaId ("PNP0501"))
+                    Name (_UID, 0x02)
+                    Method (_STA, 0, NotSerialized)
+                    {
+                        If(LEqual(\_SB.UAR2, 0)) {
+                            Return(0x00)
+                        } Else {
+                            Return(0x0F)
+                        }
+                    }
+
+                    Name (_CRS, ResourceTemplate()
+                    {
+                        IO (Decode16, 0x02F8, 0x02F8, 8, 8)
+                        IRQNoFlags () {3}
                     })
                 }
 
