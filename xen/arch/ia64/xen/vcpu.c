@@ -1817,7 +1817,7 @@ IA64FAULT vcpu_tpa(VCPU * vcpu, u64 vadr, u64 * padr)
 
 IA64FAULT vcpu_tak(VCPU * vcpu, u64 vadr, u64 * key)
 {
-	u64 pteval, itir, mask, iha;
+	u64 pteval, itir, iha;
 	IA64FAULT fault;
 
 	fault = vcpu_translate(vcpu, vadr, TRUE, &pteval, &itir, &iha);
