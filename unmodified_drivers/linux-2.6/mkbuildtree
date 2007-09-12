@@ -71,6 +71,7 @@ i[34567]86)
     mkdir -p include/asm/xen
     ln -sf ${XL}/include/asm-ia64/xen/xcom_hcall.h include/asm/xen
     ln -sf ${XL}/include/asm-ia64/xen/xencomm.h include/asm/xen
+    ln -sf ${XL}/arch/ia64/xen/xcom_hcall.c platform-pci/
     ln -sf ${XL}/arch/ia64/xen/xencomm.c platform-pci/xencomm_arch.c
     ln -sf ${XL}/drivers/xen/core/xencomm.c platform-pci
   ;;
