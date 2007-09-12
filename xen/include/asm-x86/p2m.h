@@ -119,7 +119,7 @@ static inline mfn_t gfn_to_mfn_current(unsigned long gfn, p2m_type_t *t)
 
         if ( ret == 0 ) {
             p2mt = p2m_flags_to_type(l1e_get_flags(l1e));
-            ASSERT(l1e_get_pfn(l1e) != INVALID_MFN || !p2m_is_ram(*t));
+            ASSERT(l1e_get_pfn(l1e) != INVALID_MFN || !p2m_is_ram(p2mt));
             if ( p2m_is_valid(p2mt) )
                 mfn = _mfn(l1e_get_pfn(l1e));
             else 
