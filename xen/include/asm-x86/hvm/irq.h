@@ -29,6 +29,16 @@
 #include <asm/hvm/vioapic.h>
 #include <public/hvm/save.h>
 
+struct hvm_irq_mapping {
+    uint8_t valid;
+    uint8_t device;
+    uint8_t intx;
+    union {
+        uint8_t guest_gsi;
+        uint8_t machine_gsi;
+    };
+};
+
 struct hvm_irq {
     /*
      * Virtual interrupt wires for a single PCI bus.
@@ -88,6 +98,12 @@ struct hvm_irq {
 
     /* Last VCPU that was delivered a LowestPrio interrupt. */
     u8 round_robin_prev_vcpu;
+
+    /* machine irq to guest device/intx mapping */
+    struct hvm_irq_mapping mirq[NR_IRQS];
+    /* guest irq to guest device/intx mapping */
+    struct hvm_irq_mapping girq[NR_IRQS];
+    DECLARE_BITMAP(dirq_mask, NR_IRQS);
 };
 
 #define hvm_pci_intx_gsi(dev, intx)  \

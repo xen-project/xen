@@ -151,6 +151,7 @@ void send_invalidate_req(void);
 extern void handle_mmio(unsigned long gpa);
 extern void hvm_interrupt_post(struct vcpu *v, int vector, int type);
 extern void hvm_io_assist(void);
+extern void hvm_dpci_eoi(unsigned int guest_irq, union vioapic_redir_entry *ent);
 
 #endif /* __ASM_X86_HVM_IO_H__ */
 

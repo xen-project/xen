@@ -21,10 +21,12 @@
 #ifndef __ASM_X86_HVM_DOMAIN_H__
 #define __ASM_X86_HVM_DOMAIN_H__
 
+#include <asm/iommu.h>
 #include <asm/hvm/irq.h>
 #include <asm/hvm/vpt.h>
 #include <asm/hvm/vlapic.h>
 #include <asm/hvm/io.h>
+#include <asm/hvm/iommu.h>
 #include <public/hvm/params.h>
 #include <public/hvm/save.h>
 
@@ -57,6 +59,9 @@ struct hvm_domain {
     uint64_t               params[HVM_NR_PARAMS];
 
     unsigned long          vmx_apic_access_mfn;
+
+    /* Pass-through */
+    struct hvm_iommu       hvm_iommu;
 };
 
 #endif /* __ASM_X86_HVM_DOMAIN_H__ */

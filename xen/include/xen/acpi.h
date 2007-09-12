@@ -367,8 +367,78 @@ enum acpi_table_id {
 	ACPI_SPMI,
 	ACPI_HPET,
 	ACPI_MCFG,
+	ACPI_DMAR,
 	ACPI_TABLE_COUNT
 };
+
+/* DMA Remapping Reporting Table (DMAR) */
+
+#define DMAR_FLAGS_INTR_REMAP 0x1       /* intr remap supported */
+struct acpi_table_dmar {
+	struct acpi_table_header	header;
+	u8				haw;	/* Host address Width */
+	u8				flags;
+	u8				reserved[10];
+} __attribute__ ((packed));
+
+struct acpi_dmar_entry_header {
+	u16	type;
+	u16	length;
+} __attribute__((packed));
+
+enum acpi_dmar_entry_type {
+	ACPI_DMAR_DRHD = 0,
+	ACPI_DMAR_RMRR,
+	ACPI_DMAR_ATSR,
+	ACPI_DMAR_ENTRY_COUNT
+};
+
+#define DRHD_FLAGS_INCLUDE_ALL	0x1       /* drhd remaps remaining devices */
+struct acpi_table_drhd {
+	struct	acpi_dmar_entry_header header;
+	u8	flags;
+	u8	reserved;
+	u16	segment;
+	u64	address; /* register base address for this drhd */
+} __attribute__ ((packed));
+
+struct acpi_table_rmrr {
+	struct	acpi_dmar_entry_header header;
+	u16	reserved;
+       u16     segment;
+	u64	base_address;
+	u64	end_address;
+} __attribute__ ((packed));
+
+struct acpi_table_atsr {
+        struct  acpi_dmar_entry_header header;
+        u8      flags;
+        u8      reserved;
+        u16     segment;
+} __attribute__ ((packed));
+
+enum acpi_dev_scope_type {
+	ACPI_DEV_ENDPOINT=0x01,	/* PCI Endpoing device */
+	ACPI_DEV_P2PBRIDGE,	/* PCI-PCI Bridge */
+	ACPI_DEV_IOAPIC,	/* IOAPIC device*/
+	ACPI_DEV_MSI_HPET,	/* MSI capable HPET*/
+	ACPI_DEV_ENTRY_COUNT
+};
+
+struct acpi_dev_scope {
+	u8	dev_type;
+	u8	length;
+	u8	reserved[2];
+	u8	enum_id;
+	u8	start_bus;
+} __attribute__((packed));
+
+struct acpi_pci_path {
+	u8	dev;
+	u8	fn;
+} __attribute__((packed));
+
+typedef int (*acpi_dmar_entry_handler) (struct acpi_dmar_entry_header *header, const unsigned long end);
 
 typedef int (*acpi_table_handler) (unsigned long phys_addr, unsigned long size);
 

@@ -17,6 +17,7 @@
 #include <asm/acpi.h>
 #include <asm/page.h>
 #include <xen/kexec.h>
+#include <asm/iommu.h>
 
 /*
  * Here we define all the compile-time 'special' virtual
@@ -40,6 +41,8 @@ enum fixed_addresses {
     FIX_KEXEC_BASE_0,
     FIX_KEXEC_BASE_END = FIX_KEXEC_BASE_0 \
       + ((KEXEC_XEN_NO_PAGES >> 1) * KEXEC_IMAGE_NR) - 1,
+    FIX_IOMMU_REGS_BASE_0,
+    FIX_IOMMU_REGS_END = FIX_IOMMU_REGS_BASE_0 + MAX_IOMMUS-1,
     __end_of_fixed_addresses
 };
 
