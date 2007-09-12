@@ -598,11 +598,13 @@ int pv_pit_handler(int port, int data, int write)
         .size = 1,
         .type = IOREQ_TYPE_PIO,
         .addr = port,
-        .dir  = write ? 0 : 1,
-        .data = write ? data : 0,
+        .dir  = write ? IOREQ_WRITE : IOREQ_READ,
+        .data = data
     };
 
-    if ( port == 0x61 )
+    if ( (current->domain->domain_id == 0) && dom0_pit_access(&ioreq) )
+        /* nothing to do */;
+    else if ( port == 0x61 )
         handle_speaker_io(&ioreq);
     else
         handle_pit_io(&ioreq);

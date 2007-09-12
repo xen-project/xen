@@ -177,7 +177,6 @@ static u64 init_pit_and_calibrate_tsc(void)
     unsigned long count;
 
     /* Set PIT channel 0 to HZ Hz. */
-#define CLOCK_TICK_RATE 1193180 /* crystal freq (Hz) */
 #define LATCH (((CLOCK_TICK_RATE)+(HZ/2))/HZ)
     outb_p(0x34, PIT_MODE);        /* binary, mode 2, LSB/MSB, ch 0 */
     outb_p(LATCH & 0xff, PIT_CH0); /* LSB */
@@ -968,6 +967,50 @@ int time_resume(void)
 
     if ( !is_idle_vcpu(current) )
         update_vcpu_system_time(current);
+
+    return 0;
+}
+
+int dom0_pit_access(struct ioreq *ioreq)
+{
+    /* Is Xen using Channel 2? Then disallow direct dom0 access. */
+    if ( plt_src.read_counter == read_pit_count )
+        return 0;
+
+    switch ( ioreq->addr )
+    {
+    case PIT_CH2:
+        if ( ioreq->dir == IOREQ_READ )
+            ioreq->data = inb(PIT_CH2);
+        else
+            outb(ioreq->data, PIT_CH2);
+        return 1;
+
+    case PIT_MODE:
+        if ( ioreq->dir == IOREQ_READ )
+            return 0; /* urk! */
+        switch ( ioreq->data & 0xc0 )
+        {
+        case 0xc0: /* Read Back */
+            if ( ioreq->data & 0x08 )    /* Select Channel 2? */
+                outb(ioreq->data & 0xf8, PIT_MODE);
+            if ( !(ioreq->data & 0x06) ) /* Select Channel 0/1? */
+                return 1; /* no - we're done */
+            /* Filter Channel 2 and reserved bit 0. */
+            ioreq->data &= ~0x09;
+            return 0; /* emulate ch0/1 readback */
+        case 0x80: /* Select Counter 2 */
+            outb(ioreq->data, PIT_MODE);
+            return 1;
+        }
+
+    case 0x61:
+        if ( ioreq->dir == IOREQ_READ )
+            ioreq->data = inb(0x61);
+        else
+            outb((inb(0x61) & ~3) | (ioreq->data & 3), 0x61);
+        return 1;
+    }
 
     return 0;
 }
