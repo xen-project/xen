@@ -201,8 +201,15 @@ int p2m_alloc_table(struct domain *d,
 void p2m_teardown(struct domain *d);
 
 /* Add a page to a domain's p2m table */
-void guest_physmap_add_page(struct domain *d, unsigned long gfn,
-                            unsigned long mfn);
+void guest_physmap_add_entry(struct domain *d, unsigned long gfn,
+                             unsigned long mfn, p2m_type_t t);
+
+/* Untyped version for RAM only, for compatibility */
+static inline void guest_physmap_add_page(struct domain *d, unsigned long gfn,
+                                          unsigned long mfn)
+{
+    guest_physmap_add_entry(d, gfn, mfn, p2m_ram_rw);
+}
 
 /* Remove a page from a domain's p2m table */
 void guest_physmap_remove_page(struct domain *d, unsigned long gfn,

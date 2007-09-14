@@ -679,8 +679,8 @@ guest_physmap_remove_page(struct domain *d, unsigned long gfn,
 }
 
 void
-guest_physmap_add_page(struct domain *d, unsigned long gfn,
-                       unsigned long mfn)
+guest_physmap_add_entry(struct domain *d, unsigned long gfn,
+                        unsigned long mfn, p2m_type_t t)
 {
     unsigned long ogfn;
     p2m_type_t ot;
@@ -727,8 +727,7 @@ guest_physmap_add_page(struct domain *d, unsigned long gfn,
 
     if ( mfn_valid(_mfn(mfn)) ) 
     {
-        set_p2m_entry(d, gfn, _mfn(mfn),
-                  p2m_type_to_flags(p2m_ram_rw)|__PAGE_HYPERVISOR|_PAGE_USER);
+        set_p2m_entry(d, gfn, _mfn(mfn), p2m_type_to_flags(t));
         set_gpfn_from_mfn(mfn, gfn);
     }
     else
