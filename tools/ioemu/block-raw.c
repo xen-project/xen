@@ -150,7 +150,7 @@ static int raw_pread(BlockDriverState *bs, int64_t offset,
     if (lseek(s->fd, offset, SEEK_SET) == (off_t)-1) {
         ++(s->lseek_err_cnt);
         if(s->lseek_err_cnt <= 10) {
-                DEBUG_BLOCK_PRINT("raw_pread(%d:%s, %ld, %p, %d) [%ld] lseek failed : %d = %s\n", 
+                DEBUG_BLOCK_PRINT("raw_pread(%d:%s, %" PRId64 ", %p, %d) [%" PRId64 "] lseek failed : %d = %s\n", 
                         s->fd, 
                         bs->filename, 
                         offset, 
@@ -166,7 +166,7 @@ static int raw_pread(BlockDriverState *bs, int64_t offset,
     if (ret == count) 
         goto label__raw_read__success;
     
-    DEBUG_BLOCK_PRINT("raw_read(%d:%s, %ld, %p, %d) [%ld] read failed %d : %d = %s\n", 
+    DEBUG_BLOCK_PRINT("raw_read(%d:%s, %" PRId64 ", %p, %d) [%" PRId64 "] read failed %d : %d = %s\n", 
         s->fd, 
         bs->filename, 
         offset, 
@@ -185,7 +185,7 @@ static int raw_pread(BlockDriverState *bs, int64_t offset,
         if (ret == count)
             goto label__raw_read__success;
         
-        DEBUG_BLOCK_PRINT("raw_read(%d:%s, %ld, %p, %d) [%ld] retry read failed %d : %d = %s\n", 
+        DEBUG_BLOCK_PRINT("raw_read(%d:%s, %" PRId64 ", %p, %d) [%" PRId64 "] retry read failed %d : %d = %s\n", 
             s->fd, 
             bs->filename, 
             offset, 
@@ -215,7 +215,7 @@ static int raw_pwrite(BlockDriverState *bs, int64_t offset,
     if (lseek(s->fd, offset, SEEK_SET) == (off_t)-1) {
         ++(s->lseek_err_cnt);
         if(s->lseek_err_cnt) {
-                DEBUG_BLOCK_PRINT("raw_write(%d:%s, %ld, %p, %d) [%ld] lseek failed : %d = %s\n", 
+                DEBUG_BLOCK_PRINT("raw_write(%d:%s, %" PRId64 ", %p, %d) [%" PRId64 "] lseek failed : %d = %s\n", 
                         s->fd, 
                         bs->filename, 
                         offset, 
@@ -231,7 +231,7 @@ static int raw_pwrite(BlockDriverState *bs, int64_t offset,
     if (ret == count) 
         goto label__raw_write__success;
     
-    DEBUG_BLOCK_PRINT("raw_write(%d:%s, %ld, %p, %d) [%ld] write failed %d : %d = %s\n", 
+    DEBUG_BLOCK_PRINT("raw_write(%d:%s, %" PRId64 ", %p, %d) [%" PRId64 "] write failed %d : %d = %s\n", 
         s->fd, 
         bs->filename, 
         offset, 
