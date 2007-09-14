@@ -1287,13 +1287,13 @@ def xm_dump_core(args):
         filename = None
 
     if not live:
-        server.xend.domain.pause(dom)
+        ds = server.xend.domain.pause(dom, True)
 
     try:
         print "Dumping core of domain: %s ..." % str(dom)
         server.xend.domain.dump(dom, filename, live, crash)
     finally:
-        if not live:
+        if not live and ds == DOM_STATE_RUNNING:
             server.xend.domain.unpause(dom)
 
     if crash:
