@@ -127,7 +127,7 @@ XENAPI_PLATFORM_CFG = [ 'acpi', 'apic', 'boot', 'device_model', 'display',
                         'nographic', 'pae', 'rtc_timeoffset', 'serial', 'sdl',
                         'soundhw','stdvga', 'usb', 'usbdevice', 'vnc',
                         'vncconsole', 'vncdisplay', 'vnclisten',
-                        'vncpasswd', 'vncunused', 'xauthority']
+                        'vncpasswd', 'vncunused', 'xauthority', 'pci']
 
 # Xen API console 'other_config' keys.
 XENAPI_CONSOLE_OTHER_CFG = ['vncunused', 'vncdisplay', 'vnclisten',
@@ -168,6 +168,7 @@ XENAPI_CFG_TYPES = {
     'tools_version': dict,
     'other_config': dict,
     'security_label': str,
+    'pci': str,
 }
 
 # List of legacy configuration keys that have no equivalent in the

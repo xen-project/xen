@@ -197,6 +197,9 @@ CPPFLAGS+=-D_GNU_SOURCE
 LIBS+=-lm
 LIBS+=-L../../libxc -lxenctrl -lxenguest
 LIBS+=-L../../xenstore -lxenstore
+ifdef CONFIG_PASSTHROUGH
+LIBS+=-lpci
+endif
 ifndef CONFIG_USER_ONLY
 LIBS+=-lz
 endif
@@ -400,6 +403,9 @@ VL_OBJS+= piix4acpi.o
 VL_OBJS+= xenstore.o
 VL_OBJS+= xen_platform.o
 VL_OBJS+= tpm_tis.o
+ifdef CONFIG_PASSTHROUGH
+VL_OBJS+= pass-through.o
+endif
 CPPFLAGS += -DHAS_AUDIO
 endif
 ifeq ($(TARGET_BASE_ARCH), ppc)

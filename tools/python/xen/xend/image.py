@@ -309,7 +309,7 @@ class HVMImageHandler(ImageHandler):
     def parseDeviceModelArgs(self, vmConfig):
         dmargs = [ 'boot', 'fda', 'fdb', 'soundhw',
                    'localtime', 'serial', 'stdvga', 'isa',
-                   'acpi', 'usb', 'usbdevice', 'keymap' ]
+                   'acpi', 'usb', 'usbdevice', 'keymap', 'pci' ]
         
         ret = ['-vcpus', str(self.vm.getVCpuCount())]
 

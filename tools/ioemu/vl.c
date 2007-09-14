@@ -6513,6 +6513,7 @@ enum {
     QEMU_OPTION_acpi,
     QEMU_OPTION_vncviewer,
     QEMU_OPTION_vncunused,
+    QEMU_OPTION_pci,
 };
 
 typedef struct QEMUOption {
@@ -6610,6 +6611,7 @@ const QEMUOption qemu_options[] = {
     { "d", HAS_ARG, QEMU_OPTION_d },
     { "vcpus", 1, QEMU_OPTION_vcpus },
     { "acpi", 0, QEMU_OPTION_acpi },
+    { "pci", HAS_ARG, QEMU_OPTION_pci},
     { NULL },
 };
 
@@ -7065,9 +7067,9 @@ int main(int argc, char **argv)
     extern void *buffered_pio_page;
 #endif
     sigset_t set;
-
     char qemu_dm_logfilename[128];
-    
+    const char *direct_pci = NULL;
+
     /* Ensure that SIGUSR2 is blocked by default when a new thread is created,
        then only the threads that use the signal unblock it -- this fixes a
        race condition in Qcow support where the AIO signal is misdelivered.  */
@@ -7560,6 +7562,9 @@ int main(int argc, char **argv)
             case QEMU_OPTION_vncunused:
                 vncunused++;
                 break;
+            case QEMU_OPTION_pci:
+                direct_pci = optarg;
+                break;
             }
         }
     }
@@ -7926,7 +7931,8 @@ int main(int argc, char **argv)
 
     machine->init(ram_size, vga_ram_size, boot_device,
                   ds, fd_filename, snapshot,
-                  kernel_filename, kernel_cmdline, initrd_filename);
+                  kernel_filename, kernel_cmdline, initrd_filename,
+                  direct_pci);
     free(boot_device);
 
     /* init USB devices */

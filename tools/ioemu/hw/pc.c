@@ -465,7 +465,7 @@ static void pc_init1(uint64_t ram_size, int vga_ram_size, char *boot_device,
                      DisplayState *ds, const char **fd_filename, int snapshot,
                      const char *kernel_filename, const char *kernel_cmdline,
                      const char *initrd_filename,
-                     int pci_enabled)
+                     int pci_enabled, const char *direct_pci)
 {
 #ifndef NOBIOS
     char buf[1024];
@@ -480,6 +480,7 @@ static void pc_init1(uint64_t ram_size, int vga_ram_size, char *boot_device,
     int piix3_devfn = -1;
     CPUState *env;
     NICInfo *nd;
+    int rc;
 
     linux_boot = (kernel_filename != NULL);
 
@@ -665,6 +666,19 @@ static void pc_init1(uint64_t ram_size, int vga_ram_size, char *boot_device,
         }
     }
 
+#ifdef CONFIG_PASSTHROUGH
+    /* Pass-through Initialization */
+    if ( pci_enabled && direct_pci )
+    {
+        rc = pt_init(pci_bus, direct_pci); 
+        if ( rc < 0 )
+        {
+            fprintf(logfile, "Error: Initialization failed for pass-through devices\n");
+            exit(1);
+        }
+    }
+#endif
+
     rtc_state = rtc_init(0x70, 8);
 
     register_ioport_read(0x92, 1, 1, ioport92_read, NULL);
@@ -801,12 +815,14 @@ static void pc_init_pci(uint64_t ram_size, int vga_ram_size, char *boot_device,
                         int snapshot, 
                         const char *kernel_filename, 
                         const char *kernel_cmdline,
-                        const char *initrd_filename)
+                        const char *initrd_filename,
+                        const char *direct_pci)
 {
     pc_init1(ram_size, vga_ram_size, boot_device,
              ds, fd_filename, snapshot,
              kernel_filename, kernel_cmdline,
-             initrd_filename, 1);
+             initrd_filename, 1,
+             direct_pci);
 }
 
 static void pc_init_isa(uint64_t ram_size, int vga_ram_size, char *boot_device,
@@ -814,12 +830,13 @@ static void pc_init_isa(uint64_t ram_size, int vga_ram_size, char *boot_device,
                         int snapshot, 
                         const char *kernel_filename, 
                         const char *kernel_cmdline,
-                        const char *initrd_filename)
+                        const char *initrd_filename,
+                        const char *unused)
 {
     pc_init1(ram_size, vga_ram_size, boot_device,
              ds, fd_filename, snapshot,
              kernel_filename, kernel_cmdline,
-             initrd_filename, 0);
+             initrd_filename, 0, NULL);
 }
 
 QEMUMachine pc_machine = {
