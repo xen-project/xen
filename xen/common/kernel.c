@@ -80,7 +80,10 @@ void cmdline_parse(char *cmdline)
                 break;
             case OPT_BOOL:
             case OPT_INVBOOL:
-                if ( !strcmp("no", optval) || !strcmp("off", optval) )
+                if ( !strcmp("no", optval) ||
+                     !strcmp("off", optval) ||
+                     !strcmp("false", optval) ||
+                     !strcmp("0", optval) )
                     bool_assert = !bool_assert;
                 if ( param->type == OPT_INVBOOL )
                     bool_assert = !bool_assert;
