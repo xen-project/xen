@@ -293,10 +293,10 @@ __flush_vhpt_range(unsigned long vhpt_maddr, u64 vadr, u64 addr_range)
 {
 	void *vhpt_base = __va(vhpt_maddr);
 	u64 pgsz = 1L << current->arch.vhpt_pg_shift;
-	u64 purge_addr = vadr & ~(PAGE_SIZE - 1);
+	u64 purge_addr = vadr & PAGE_MASK;
 
 	addr_range += vadr - purge_addr;
-	addr_range = (addr_range + PAGE_SIZE - 1) & ~(PAGE_SIZE - 1);
+	addr_range = PAGE_ALIGN(addr_range);
 	while ((long)addr_range > 0) {
 		/* Get the VHPT entry.  */
 		unsigned int off = ia64_thash(purge_addr) -
