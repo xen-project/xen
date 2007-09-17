@@ -223,9 +223,6 @@ ENTRY(hyper_ssm_i)
 	// give up for now if: ipsr.be==1, ipsr.pp==1
 	mov r30=cr.ipsr
 	mov r29=cr.iip;;
-	extr.u r21=r30,IA64_PSR_BE_BIT,1 ;;
-	cmp.ne p7,p0=r21,r0
-(p7)	br.sptk.many dispatch_break_fault ;;
 	extr.u r21=r30,IA64_PSR_PP_BIT,1 ;;
 	cmp.ne p7,p0=r21,r0
 (p7)	br.sptk.many dispatch_break_fault ;;
@@ -268,7 +265,7 @@ ENTRY(hyper_ssm_i)
 	// FOR SSM_I ONLY, also turn on psr.i and psr.ic
 	movl r28=(IA64_PSR_DT|IA64_PSR_IT|IA64_PSR_RT|IA64_PSR_I|IA64_PSR_IC)
 //	movl r27=~(IA64_PSR_BE|IA64_PSR_PP|IA64_PSR_BN);;
-	movl r27=~(IA64_PSR_BE|IA64_PSR_BN);;
+	movl r27=~IA64_PSR_BN;;
 	or r30=r30,r28;;
 	and r30=r30,r27;;
 	mov r20=1
@@ -361,10 +358,7 @@ GLOBAL_ENTRY(fast_tick_reflect)
 	cmp.ltu p6,p0=r26,r27
 (p6)	br.cond.spnt.few rp;;
 	mov r17=cr.ipsr;;
-	// slow path if: ipsr.be==1, ipsr.pp==1
-	extr.u r21=r17,IA64_PSR_BE_BIT,1 ;;
-	cmp.ne p6,p0=r21,r0
-(p6)	br.cond.spnt.few rp;;
+	// slow path if: ipsr.pp==1
 	extr.u r21=r17,IA64_PSR_PP_BIT,1 ;;
 	cmp.ne p6,p0=r21,r0
 (p6)	br.cond.spnt.few rp;;
@@ -453,7 +447,7 @@ GLOBAL_ENTRY(fast_tick_reflect)
 	cmp.eq p7,p0=CONFIG_CPL0_EMUL,r29;;
 (p7)	dep r17=0,r17,IA64_PSR_CPL0_BIT,2
 	movl r28=(IA64_PSR_DT|IA64_PSR_IT|IA64_PSR_RT)
-	movl r27=~(IA64_PSR_BE|IA64_PSR_PP|IA64_PSR_BN|IA64_PSR_I|IA64_PSR_IC);;
+	movl r27=~(IA64_PSR_PP|IA64_PSR_BN|IA64_PSR_I|IA64_PSR_IC);;
 	or r17=r17,r28;;
 	and r17=r17,r27
 	ld4 r16=[r18];;
@@ -556,9 +550,6 @@ GLOBAL_ENTRY(fast_break_reflect)
 #endif
 	mov r30=cr.ipsr
 	mov r29=cr.iip;;
-	extr.u r21=r30,IA64_PSR_BE_BIT,1 ;;
-	cmp.ne p7,p0=r21,r0
-(p7)	br.spnt.few dispatch_break_fault ;;
 	extr.u r21=r30,IA64_PSR_PP_BIT,1 ;;
 	cmp.ne p7,p0=r21,r0
 (p7)	br.spnt.few dispatch_break_fault ;;
@@ -633,7 +624,7 @@ ENTRY(fast_reflect)
 	cmp.eq p7,p0=CONFIG_CPL0_EMUL,r29;;
 (p7)	dep r30=0,r30,IA64_PSR_CPL0_BIT,2
 	movl r28=(IA64_PSR_DT|IA64_PSR_IT|IA64_PSR_RT)
-	movl r27=~(IA64_PSR_BE|IA64_PSR_PP|IA64_PSR_BN);;
+	movl r27=~(IA64_PSR_PP|IA64_PSR_BN);;
 	or r30=r30,r28;;
 	and r30=r30,r27
 	// also set shared_mem ipsr.i and ipsr.ic appropriately
@@ -744,9 +735,6 @@ GLOBAL_ENTRY(fast_access_reflect)
 #endif
 	mov r30=cr.ipsr
 	mov r29=cr.iip;;
-	extr.u r21=r30,IA64_PSR_BE_BIT,1 ;;
-	cmp.ne p7,p0=r21,r0
-(p7)	br.spnt.few dispatch_reflection ;;
 	extr.u r21=r30,IA64_PSR_PP_BIT,1 ;;
 	cmp.ne p7,p0=r21,r0
 (p7)	br.spnt.few dispatch_reflection ;;
@@ -794,9 +782,6 @@ GLOBAL_ENTRY(fast_tlb_miss_reflect)
 	cmp.eq p7,p0=r21,r0
 (p7)	br.spnt.few page_fault ;;
 	// slow path if strange ipsr or isr bits set
-	extr.u r21=r30,IA64_PSR_BE_BIT,1 ;;
-	cmp.ne p7,p0=r21,r0
-(p7)	br.spnt.few page_fault ;;
 	extr.u r21=r30,IA64_PSR_PP_BIT,1 ;;
 	cmp.ne p7,p0=r21,r0
 (p7)	br.spnt.few page_fault ;;
@@ -1068,10 +1053,6 @@ ENTRY(hyper_rfi)
 1:
 	adds r20=XSI_IPSR_OFS-XSI_PSR_IC_OFS,r18 ;;
 	ld8 r21=[r20];;		// r21 = vcr.ipsr
-	extr.u r22=r21,IA64_PSR_BE_BIT,1 ;;
-	// if turning on psr.be, give up for now and do it the slow way
-	cmp.ne p7,p0=r22,r0
-(p7)	br.spnt.few slow_vcpu_rfi ;;
 	// if (!(vpsr.dt && vpsr.rt && vpsr.it)), do it the slow way
 	movl r20=(IA64_PSR_DT|IA64_PSR_RT|IA64_PSR_IT);;
 	and r22=r20,r21

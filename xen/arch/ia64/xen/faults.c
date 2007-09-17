@@ -602,6 +602,9 @@ ia64_handle_reflection(unsigned long ifa, struct pt_regs *regs,
 		check_lazy_cover = 1;
 		vector = IA64_PAGE_NOT_PRESENT_VECTOR;
 		break;
+	case 21:
+		vector = IA64_KEY_PERMISSION_VECTOR;
+		break;
 	case 22:
 		vector = IA64_INST_ACCESS_RIGHTS_VECTOR;
 		break;

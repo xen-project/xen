@@ -293,15 +293,18 @@ __flush_vhpt_range(unsigned long vhpt_maddr, u64 vadr, u64 addr_range)
 {
 	void *vhpt_base = __va(vhpt_maddr);
 	u64 pgsz = 1L << current->arch.vhpt_pg_shift;
+	u64 purge_addr = vadr & ~(PAGE_SIZE - 1);
 
+	addr_range += vadr - purge_addr;
+	addr_range = (addr_range + PAGE_SIZE - 1) & ~(PAGE_SIZE - 1);
 	while ((long)addr_range > 0) {
 		/* Get the VHPT entry.  */
-		unsigned int off = ia64_thash(vadr) -
+		unsigned int off = ia64_thash(purge_addr) -
 			__va_ul(vcpu_vhpt_maddr(current));
 		struct vhpt_lf_entry *v = vhpt_base + off;
 		v->ti_tag = INVALID_TI_TAG;
 		addr_range -= pgsz;
-		vadr += pgsz;
+		purge_addr += pgsz;
 	}
 }
 

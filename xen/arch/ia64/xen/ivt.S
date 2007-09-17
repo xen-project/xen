@@ -313,7 +313,6 @@ GLOBAL_ENTRY(dispatch_reflection)
 	adds out1=16,sp
 	mov out2=cr.isr
 	mov out3=cr.iim
-//	mov out3=cr.itir		// TODO: why commented out?
 
 	ssm psr.ic | PSR_DEFAULT_BITS
 	;;

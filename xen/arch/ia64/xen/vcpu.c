@@ -2319,8 +2319,6 @@ vcpu_itc_no_srlz(VCPU * vcpu, u64 IorD, u64 vaddr, u64 pte,
 {
 	ia64_itir_t _itir = {.itir = itir};
 	unsigned long psr;
-	unsigned long ps = (vcpu->domain == dom0) ? _itir.ps :
-						    vcpu->arch.vhpt_pg_shift;
 
 	check_xen_space_overlap("itc", vaddr, 1UL << _itir.ps);
 
@@ -2329,12 +2327,12 @@ vcpu_itc_no_srlz(VCPU * vcpu, u64 IorD, u64 vaddr, u64 pte,
 		panic_domain(NULL, "vcpu_itc_no_srlz: domain trying to use "
 		             "smaller page size!\n");
 
-	BUG_ON(_itir.ps > vcpu->arch.vhpt_pg_shift);
+	BUG_ON(_itir.ps > PAGE_SHIFT);
 	vcpu_tlb_track_insert_or_dirty(vcpu, vaddr, entry);
 	psr = ia64_clear_ic();
 	pte &= ~(_PAGE_RV2 | _PAGE_RV1);	// Mask out the reserved bits.
 					// FIXME: look for bigger mappings
-	ia64_itc(IorD, vaddr, pte, IA64_ITIR_PS_KEY(ps, _itir.key));
+	ia64_itc(IorD, vaddr, pte, _itir.itir);
 	ia64_set_psr(psr);
 	// ia64_srlz_i(); // no srls req'd, will rfi later
 	if (vcpu->domain == dom0 && ((vaddr >> 61) == 7)) {
@@ -2350,7 +2348,6 @@ vcpu_itc_no_srlz(VCPU * vcpu, u64 IorD, u64 vaddr, u64 pte,
 	// even if domain pagesize is larger than PAGE_SIZE, just put
 	// PAGE_SIZE mapping in the vhpt for now, else purging is complicated
 	else {
-		_itir.ps = vcpu->arch.vhpt_pg_shift;
 		vhpt_insert(vaddr, pte, _itir.itir);
 	}
 }
