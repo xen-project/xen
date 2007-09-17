@@ -23,7 +23,7 @@
 
 #include <asm/vmx_vcpu.h>
 
-thash_data_t *__alloc_chain(thash_cb_t *);
+static thash_data_t *__alloc_chain(thash_cb_t *);
 
 static inline void cch_mem_init(thash_cb_t *hcb)
 {
@@ -54,7 +54,7 @@ static thash_data_t *cch_alloc(thash_cb_t *hcb)
 
 static inline int __is_tr_translated(thash_data_t *trp, u64 rid, u64 va)
 {
-    return ((trp->p) && (trp->rid == rid) && ((va-trp->vadr)<PSIZE(trp->ps)));
+    return (trp->p) && (trp->rid == rid) && ((va-trp->vadr) < PSIZE(trp->ps));
 }
 
 /*
@@ -78,14 +78,14 @@ __is_tr_overlap(thash_data_t *trp, u64 rid, u64 sva, u64 eva)
 
 }
 
-thash_data_t *__vtr_lookup(VCPU *vcpu, u64 va, int is_data)
+static thash_data_t *__vtr_lookup(VCPU *vcpu, u64 va, int is_data)
 {
 
     thash_data_t  *trp;
     int  i;
     u64 rid;
     vcpu_get_rr(vcpu, va, &rid);
-    rid = rid&RR_RID_MASK;;
+    rid = rid & RR_RID_MASK;;
     if (is_data) {
         if (vcpu_quick_region_check(vcpu->arch.dtr_regions,va)) {
             for (trp =(thash_data_t *) vcpu->arch.dtrs,i=0; i<NDTRS; i++, trp++) {
@@ -380,12 +380,12 @@ void thash_recycle_cch_all(thash_cb_t *hcb)
 }
 
 
-thash_data_t *__alloc_chain(thash_cb_t *hcb)
+static thash_data_t *__alloc_chain(thash_cb_t *hcb)
 {
     thash_data_t *cch;
 
     cch = cch_alloc(hcb);
-    if(cch == NULL){
+    if (cch == NULL) {
         thash_recycle_cch_all(hcb);
         cch = cch_alloc(hcb);
     }
@@ -448,8 +448,9 @@ int vtr_find_overlap(VCPU *vcpu, u64 va, u64 ps, int is_data)
     thash_data_t  *trp;
     int  i;
     u64 end, rid;
+
     vcpu_get_rr(vcpu, va, &rid);
-    rid = rid&RR_RID_MASK;;
+    rid = rid & RR_RID_MASK;;
     end = va + PSIZE(ps);
     if (is_data) {
         if (vcpu_quick_region_check(vcpu->arch.dtr_regions,va)) {
@@ -640,9 +641,10 @@ thash_data_t *vtlb_lookup(VCPU *v, u64 va,int is_data)
     thash_cb_t * hcb= &v->arch.vtlb;
 
     cch = __vtr_lookup(v, va, is_data);;
-    if ( cch ) return cch;
+    if (cch)
+	return cch;
 
-    if(vcpu_quick_region_check(v->arch.tc_regions,va)==0)
+    if (vcpu_quick_region_check(v->arch.tc_regions,va) == 0)
         return NULL;
     psbits = VMX(v, psbits[(va >> 61)]);
     vcpu_get_rr(v,va,&vrr.rrval);
