@@ -567,6 +567,7 @@ static IA64FAULT vmx_emul_tak(VCPU *vcpu, INST64 inst)
 static IA64FAULT vmx_emul_itr_d(VCPU *vcpu, INST64 inst)
 {
     u64 itir, ifa, pte, slot;
+    ISR isr;
 #ifdef  VMAL_NO_FAULT_CHECK
     IA64_PSR  vpsr;
     vpsr.val=vmx_vcpu_get_psr(vcpu);
@@ -575,7 +576,6 @@ static IA64FAULT vmx_emul_itr_d(VCPU *vcpu, INST64 inst)
         illegal_op(vcpu);
         return IA64_FAULT;
     }
-    ISR isr;
     if ( vpsr.cpl != 0) {
         /* Inject Privileged Operation fault into guest */
         set_privileged_operation_isr (vcpu, 0);
@@ -617,6 +617,14 @@ static IA64FAULT vmx_emul_itr_d(VCPU *vcpu, INST64 inst)
         return IA64_FAULT;
    }
 #endif // VMAL_NO_FAULT_CHECK
+
+    if (slot >= NDTRS) {
+        isr.val = set_isr_ei_ni(vcpu);
+        isr.code = IA64_RESERVED_REG_FAULT;
+        vcpu_set_isr(vcpu, isr.val);
+        rsv_reg_field(vcpu);
+        return IA64_FAULT;
+    }
 
     return (vmx_vcpu_itr_d(vcpu,slot,pte,itir,ifa));
 }
@@ -624,8 +632,8 @@ static IA64FAULT vmx_emul_itr_d(VCPU *vcpu, INST64 inst)
 static IA64FAULT vmx_emul_itr_i(VCPU *vcpu, INST64 inst)
 {
     u64 itir, ifa, pte, slot;
-#ifdef  VMAL_NO_FAULT_CHECK
     ISR isr;
+#ifdef  VMAL_NO_FAULT_CHECK
     IA64_PSR  vpsr;
     vpsr.val=vmx_vcpu_get_psr(vcpu);
     if ( vpsr.ic ) {
@@ -675,6 +683,14 @@ static IA64FAULT vmx_emul_itr_i(VCPU *vcpu, INST64 inst)
    }
 #endif // VMAL_NO_FAULT_CHECK
 
+    if (slot >= NITRS) {
+        isr.val = set_isr_ei_ni(vcpu);
+        isr.code = IA64_RESERVED_REG_FAULT;
+        vcpu_set_isr(vcpu, isr.val);
+        rsv_reg_field(vcpu);
+        return IA64_FAULT;
+    }
+ 
    return (vmx_vcpu_itr_i(vcpu,slot,pte,itir,ifa));
 }
 

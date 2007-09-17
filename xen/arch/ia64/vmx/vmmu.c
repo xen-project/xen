@@ -403,6 +403,12 @@ IA64FAULT vmx_vcpu_itr_i(VCPU *vcpu, u64 slot, u64 pte, u64 itir, u64 ifa)
     }
     thash_purge_entries(vcpu, va, ps);
 #endif
+
+    if (slot >= NITRS) {
+        panic_domain(NULL, "bad itr.i slot (%ld)", slot);
+        return IA64_FAULT;
+    }
+        
     pte &= ~PAGE_FLAGS_RV_MASK;
     vcpu_get_rr(vcpu, va, &rid);
     rid = rid& RR_RID_MASK;
@@ -431,6 +437,12 @@ IA64FAULT vmx_vcpu_itr_d(VCPU *vcpu, u64 slot, u64 pte, u64 itir, u64 ifa)
         return IA64_FAULT;
     }
 #endif   
+
+    if (slot >= NDTRS) {
+        panic_domain(NULL, "bad itr.d slot (%ld)", slot);
+        return IA64_FAULT;
+    }
+
     pte &= ~PAGE_FLAGS_RV_MASK;
 
     /* This is a bad workaround
