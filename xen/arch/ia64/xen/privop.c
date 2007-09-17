@@ -13,10 +13,10 @@
 #include <asm/dom_fw.h>
 #include <asm/vhpt.h>
 #include <asm/bundle.h>
+#include <asm/debugger.h>
 #include <xen/perfc.h>
 
-long priv_verbose = 0;
-unsigned long privop_trace = 0;
+static const long priv_verbose = 0;
 
 /* Set to 1 to handle privified instructions from the privify tool. */
 #ifndef CONFIG_PRIVIFY
@@ -583,7 +583,7 @@ static const PPEFCN Mpriv_funcs[64] = {
 	0, 0, 0, 0, 0, 0, 0, 0
 };
 
-static IA64FAULT priv_handle_op(VCPU * vcpu, REGS * regs, int privlvl)
+static IA64FAULT priv_handle_op(VCPU * vcpu, REGS * regs)
 {
 	IA64_BUNDLE bundle;
 	int slot;
@@ -599,26 +599,8 @@ static IA64FAULT priv_handle_op(VCPU * vcpu, REGS * regs, int privlvl)
 		//return vcpu_force_data_miss(vcpu, regs->cr_iip);
 		return vcpu_force_inst_miss(vcpu, regs->cr_iip);
 	}
-#if 0
-	if (iip == 0xa000000100001820) {
-		static int firstpagefault = 1;
-		if (firstpagefault) {
-			printk("*** First time to domain page fault!\n");
-			firstpagefault = 0;
-		}
-	}
-#endif
-	if (privop_trace) {
-		static long i = 400;
-		//if (i > 0) printk("priv_handle_op: at 0x%lx\n",iip);
-		if (i > 0)
-			printk("priv_handle_op: privop trace at 0x%lx, "
-			       "itc=%lx, itm=%lx\n",
-			       iip, ia64_get_itc(), ia64_get_itm());
-		i--;
-	}
 	slot = ((struct ia64_psr *)&ipsr)->ri;
-	if (!slot)
+	if (slot == 0)
 		inst.inst = (bundle.i64[0] >> 5) & MASK_41;
 	else if (slot == 1)
 		inst.inst =
@@ -626,7 +608,8 @@ static IA64FAULT priv_handle_op(VCPU * vcpu, REGS * regs, int privlvl)
 	else if (slot == 2)
 		inst.inst = (bundle.i64[1] >> 23) & MASK_41;
 	else
-		printk("priv_handle_op: illegal slot: %d\n", slot);
+		panic_domain(regs,
+			     "priv_handle_op: illegal slot: %d\n", slot);
 
 	slot_type = slot_types[bundle.template][slot];
 	if (priv_verbose) {
@@ -636,8 +619,9 @@ static IA64FAULT priv_handle_op(VCPU * vcpu, REGS * regs, int privlvl)
 	}
 	if (slot_type == B && inst.generic.major == 0 && inst.B8.x6 == 0x0) {
 		// break instr for privified cover
-	} else if (privlvl > CONFIG_CPL0_EMUL)
+	} else if (ia64_get_cpl(ipsr) > CONFIG_CPL0_EMUL)
 		return IA64_ILLOP_FAULT;
+
 	switch (slot_type) {
 	case M:
 		if (inst.generic.major == 0) {
@@ -765,9 +749,7 @@ static IA64FAULT priv_handle_op(VCPU * vcpu, REGS * regs, int privlvl)
 IA64FAULT priv_emulate(VCPU * vcpu, REGS * regs, u64 isr)
 {
 	IA64FAULT fault;
-	u64 ipsr = regs->cr_ipsr;
 	u64 isrcode = (isr >> 4) & 0xf;
-	int privlvl;
 
 	// handle privops masked as illops? and breaks (6)
 	if (isrcode != 1 && isrcode != 2 && isrcode != 0 && isrcode != 6) {
@@ -776,10 +758,8 @@ IA64FAULT priv_emulate(VCPU * vcpu, REGS * regs, u64 isr)
 		while (1) ;
 		return IA64_ILLOP_FAULT;
 	}
-	//if (isrcode != 1 && isrcode != 2) return 0;
-	privlvl = ia64_get_cpl(ipsr);
 	// its OK for a privified-cover to be executed in user-land
-	fault = priv_handle_op(vcpu, regs, privlvl);
+	fault = priv_handle_op(vcpu, regs);
 	if ((fault == IA64_NO_FAULT) || (fault == IA64_EXTINT_VECTOR)) {
 		// success!!
 		// update iip/ipsr to point to the next instruction
