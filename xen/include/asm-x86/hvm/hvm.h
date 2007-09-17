@@ -105,6 +105,8 @@ struct hvm_function_table {
     unsigned long (*get_segment_base)(struct vcpu *v, enum x86_segment seg);
     void (*get_segment_register)(struct vcpu *v, enum x86_segment seg,
                                  struct segment_register *reg);
+    void (*set_segment_register)(struct vcpu *v, enum x86_segment seg,
+                                 struct segment_register *reg);
 
     /* 
      * Re-set the value of CR3 that Xen runs on when handling VM exits.
@@ -252,6 +254,13 @@ hvm_get_segment_register(struct vcpu *v, enum x86_segment seg,
                          struct segment_register *reg)
 {
     hvm_funcs.get_segment_register(v, seg, reg);
+}
+
+static inline void
+hvm_set_segment_register(struct vcpu *v, enum x86_segment seg,
+                         struct segment_register *reg)
+{
+    hvm_funcs.set_segment_register(v, seg, reg);
 }
 
 void hvm_cpuid(unsigned int input, unsigned int *eax, unsigned int *ebx,

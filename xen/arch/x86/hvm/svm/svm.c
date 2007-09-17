@@ -618,9 +618,7 @@ static void svm_sync_vmcb(struct vcpu *v)
 
     arch_svm->vmcb_in_sync = 1;
 
-    asm volatile (
-        ".byte 0x0f,0x01,0xdb" /* vmsave */
-        : : "a" (__pa(arch_svm->vmcb)) );
+    svm_vmsave(arch_svm->vmcb);
 }
 
 static unsigned long svm_get_segment_base(struct vcpu *v, enum x86_segment seg)
@@ -649,6 +647,7 @@ static void svm_get_segment_register(struct vcpu *v, enum x86_segment seg,
                                      struct segment_register *reg)
 {
     struct vmcb_struct *vmcb = v->arch.hvm_svm.vmcb;
+
     switch ( seg )
     {
     case x86_seg_cs:
@@ -685,7 +684,58 @@ static void svm_get_segment_register(struct vcpu *v, enum x86_segment seg,
         svm_sync_vmcb(v);
         memcpy(reg, &vmcb->ldtr, sizeof(*reg));
         break;
-    default: BUG();
+    default:
+        BUG();
+    }
+}
+
+static void svm_set_segment_register(struct vcpu *v, enum x86_segment seg,
+                                     struct segment_register *reg)
+{
+    struct vmcb_struct *vmcb = v->arch.hvm_svm.vmcb;
+
+    switch ( seg )
+    {
+    case x86_seg_cs:
+        memcpy(&vmcb->cs, reg, sizeof(*reg));
+        break;
+    case x86_seg_ds:
+        memcpy(&vmcb->ds, reg, sizeof(*reg));
+        break;
+    case x86_seg_es:
+        memcpy(&vmcb->es, reg, sizeof(*reg));
+        break;
+    case x86_seg_fs:
+        svm_sync_vmcb(v);
+        memcpy(&vmcb->fs, reg, sizeof(*reg));
+        svm_vmload(vmcb);
+        break;
+    case x86_seg_gs:
+        svm_sync_vmcb(v);
+        memcpy(&vmcb->gs, reg, sizeof(*reg));
+        svm_vmload(vmcb);
+        break;
+    case x86_seg_ss:
+        memcpy(&vmcb->ss, reg, sizeof(*reg));
+        break;
+    case x86_seg_tr:
+        svm_sync_vmcb(v);
+        memcpy(&vmcb->tr, reg, sizeof(*reg));
+        svm_vmload(vmcb);
+        break;
+    case x86_seg_gdtr:
+        memcpy(&vmcb->gdtr, reg, sizeof(*reg));
+        break;
+    case x86_seg_idtr:
+        memcpy(&vmcb->idtr, reg, sizeof(*reg));
+        break;
+    case x86_seg_ldtr:
+        svm_sync_vmcb(v);
+        memcpy(&vmcb->ldtr, reg, sizeof(*reg));
+        svm_vmload(vmcb);
+        break;
+    default:
+        BUG();
     }
 }
 
@@ -787,10 +837,7 @@ static void svm_ctxt_switch_from(struct vcpu *v)
     svm_save_dr(v);
 
     svm_sync_vmcb(v);
-
-    asm volatile (
-        ".byte 0x0f,0x01,0xda" /* vmload */
-        : : "a" (__pa(root_vmcb[cpu])) );
+    svm_vmload(root_vmcb[cpu]);
 
 #ifdef __x86_64__
     /* Resume use of ISTs now that the host TR is reinstated. */
@@ -826,12 +873,8 @@ static void svm_ctxt_switch_to(struct vcpu *v)
 
     svm_restore_dr(v);
 
-    asm volatile (
-        ".byte 0x0f,0x01,0xdb" /* vmsave */
-        : : "a" (__pa(root_vmcb[cpu])) );
-    asm volatile (
-        ".byte 0x0f,0x01,0xda" /* vmload */
-        : : "a" (__pa(v->arch.hvm_svm.vmcb)) );
+    svm_vmsave(root_vmcb[cpu]);
+    svm_vmload(v->arch.hvm_svm.vmcb);
 }
 
 static void svm_do_resume(struct vcpu *v) 
@@ -926,6 +969,7 @@ static struct hvm_function_table svm_function_table = {
     .guest_x86_mode       = svm_guest_x86_mode,
     .get_segment_base     = svm_get_segment_base,
     .get_segment_register = svm_get_segment_register,
+    .set_segment_register = svm_set_segment_register,
     .update_host_cr3      = svm_update_host_cr3,
     .update_guest_cr      = svm_update_guest_cr,
     .update_guest_efer    = svm_update_guest_efer,

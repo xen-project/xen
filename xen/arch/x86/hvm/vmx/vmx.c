@@ -957,6 +957,79 @@ static void vmx_get_segment_register(struct vcpu *v, enum x86_segment seg,
         reg->attr.fields.p = 0;
 }
 
+static void vmx_set_segment_register(struct vcpu *v, enum x86_segment seg,
+                                     struct segment_register *reg)
+{
+    u16 attr;
+
+    ASSERT(v == current);
+
+    attr = reg->attr.bytes;
+    attr = ((attr & 0xf00) << 4) | (attr & 0xff);
+
+    switch ( seg )
+    {
+    case x86_seg_cs:
+        __vmwrite(GUEST_CS_SELECTOR, reg->sel);
+        __vmwrite(GUEST_CS_LIMIT, reg->limit);
+        __vmwrite(GUEST_CS_BASE, reg->base);
+        __vmwrite(GUEST_CS_AR_BYTES, attr);
+        break;
+    case x86_seg_ds:
+        __vmwrite(GUEST_DS_SELECTOR, reg->sel);
+        __vmwrite(GUEST_DS_LIMIT, reg->limit);
+        __vmwrite(GUEST_DS_BASE, reg->base);
+        __vmwrite(GUEST_DS_AR_BYTES, attr);
+        break;
+    case x86_seg_es:
+        __vmwrite(GUEST_ES_SELECTOR, reg->sel);
+        __vmwrite(GUEST_ES_LIMIT, reg->limit);
+        __vmwrite(GUEST_ES_BASE, reg->base);
+        __vmwrite(GUEST_ES_AR_BYTES, attr);
+        break;
+    case x86_seg_fs:
+        __vmwrite(GUEST_FS_SELECTOR, reg->sel);
+        __vmwrite(GUEST_FS_LIMIT, reg->limit);
+        __vmwrite(GUEST_FS_BASE, reg->base);
+        __vmwrite(GUEST_FS_AR_BYTES, attr);
+        break;
+    case x86_seg_gs:
+        __vmwrite(GUEST_GS_SELECTOR, reg->sel);
+        __vmwrite(GUEST_GS_LIMIT, reg->limit);
+        __vmwrite(GUEST_GS_BASE, reg->base);
+        __vmwrite(GUEST_GS_AR_BYTES, attr);
+        break;
+    case x86_seg_ss:
+        __vmwrite(GUEST_SS_SELECTOR, reg->sel);
+        __vmwrite(GUEST_SS_LIMIT, reg->limit);
+        __vmwrite(GUEST_SS_BASE, reg->base);
+        __vmwrite(GUEST_SS_AR_BYTES, attr);
+        break;
+    case x86_seg_tr:
+        __vmwrite(GUEST_TR_SELECTOR, reg->sel);
+        __vmwrite(GUEST_TR_LIMIT, reg->limit);
+        __vmwrite(GUEST_TR_BASE, reg->base);
+        __vmwrite(GUEST_TR_AR_BYTES, attr);
+        break;
+    case x86_seg_gdtr:
+        __vmwrite(GUEST_GDTR_LIMIT, reg->limit);
+        __vmwrite(GUEST_GDTR_BASE, reg->base);
+        break;
+    case x86_seg_idtr:
+        __vmwrite(GUEST_IDTR_LIMIT, reg->limit);
+        __vmwrite(GUEST_IDTR_BASE, reg->base);
+        break;
+    case x86_seg_ldtr:
+        __vmwrite(GUEST_LDTR_SELECTOR, reg->sel);
+        __vmwrite(GUEST_LDTR_LIMIT, reg->limit);
+        __vmwrite(GUEST_LDTR_BASE, reg->base);
+        __vmwrite(GUEST_LDTR_AR_BYTES, attr);
+        break;
+    default:
+        BUG();
+    }
+}
+
 /* Make sure that xen intercepts any FP accesses from current */
 static void vmx_stts(struct vcpu *v)
 {
@@ -1160,6 +1233,7 @@ static struct hvm_function_table vmx_function_table = {
     .guest_x86_mode       = vmx_guest_x86_mode,
     .get_segment_base     = vmx_get_segment_base,
     .get_segment_register = vmx_get_segment_register,
+    .set_segment_register = vmx_set_segment_register,
     .update_host_cr3      = vmx_update_host_cr3,
     .update_guest_cr      = vmx_update_guest_cr,
     .update_guest_efer    = vmx_update_guest_efer,
