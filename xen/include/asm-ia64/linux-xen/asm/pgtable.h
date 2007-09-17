@@ -73,6 +73,7 @@
 #ifdef XEN
 #define _PAGE_VIRT_D		(__IA64_UL(1) << 53)	/* Virtual dirty bit */
 #define _PAGE_PROTNONE		0
+#define _PAGE_PL_PRIV		(CONFIG_CPL0_EMUL << 7)
 
 #ifdef CONFIG_XEN_IA64_TLB_TRACK
 #define _PAGE_TLB_TRACKING_BIT          54

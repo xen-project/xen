@@ -28,7 +28,6 @@
 #define     DEFAULT_VHPT_SZ     (23) // 8M hash + 8M c-chain for VHPT
 #define     VTLB(v,_x)          (v->arch.vtlb._x)
 #define     VHPT(v,_x)          (v->arch.vhpt._x)
-#define     _PAGE_PL_PRIV       (CONFIG_CPL0_EMUL << 7)
 
 #ifndef __ASSEMBLY__
 
@@ -39,34 +38,6 @@
 #include <asm/regionreg.h>
 #include <asm/vmx_mm_def.h>
 #include <asm/bundle.h>
-//#define         THASH_TLB_TR            0
-//#define         THASH_TLB_TC            1
-
-
-// bit definition of TR, TC search cmobination
-//#define         THASH_SECTION_TR        (1<<0)
-//#define         THASH_SECTION_TC        (1<<1)
-
-/*
- * Next bit definition must be same with THASH_TLB_XX
-#define         PTA_BASE_SHIFT          (15)
- */
-
-
-
-
-#define HIGH_32BITS(x)  bits(x,32,63)
-#define LOW_32BITS(x)   bits(x,0,31)
-
-typedef union search_section {
-    struct {
-        u32 tr : 1;
-        u32 tc : 1;
-        u32 rsv: 30;
-    };
-    u32     v;
-} search_section_t;
-
 
 enum {
     ISIDE_TLB=0,
@@ -169,28 +140,6 @@ static inline u64 xen_to_arch_ppn(u64 xppn)
     return (xppn <<(PAGE_SHIFT- ARCH_PAGE_SHIFT));
 }
 
-typedef enum {
-    THASH_TLB=0,
-    THASH_VHPT
-} THASH_TYPE;
-
-struct thash_cb;
-/*
- * Use to calculate the HASH index of thash_data_t.
- */
-typedef u64 *(THASH_FN)(PTA pta, u64 va);
-typedef u64 *(TTAG_FN)(PTA pta, u64 va);
-typedef u64 *(GET_MFN_FN)(domid_t d, u64 gpfn, u64 pages);
-typedef void *(REM_NOTIFIER_FN)(struct thash_cb *hcb, thash_data_t *entry);
-typedef void (RECYCLE_FN)(struct thash_cb *hc, u64 para);
-typedef ia64_rr (GET_RR_FN)(struct vcpu *vcpu, u64 reg);
-typedef thash_data_t *(FIND_OVERLAP_FN)(struct thash_cb *hcb, 
-        u64 va, u64 ps, int rid, char cl, search_section_t s_sect);
-typedef thash_data_t *(FIND_NEXT_OVL_FN)(struct thash_cb *hcb);
-typedef void (REM_THASH_FN)(struct thash_cb *hcb, thash_data_t *entry);
-typedef void (INS_THASH_FN)(struct thash_cb *hcb, thash_data_t *entry, u64 va);
-
-
 typedef struct thash_cb {
     /* THASH base information */
     thash_data_t    *hash; // hash table pointer, aligned at thash_sz.
@@ -224,45 +173,6 @@ extern void thash_free(thash_cb_t *hcb);
 //extern void thash_insert(thash_cb_t *hcb, thash_data_t *entry, u64 va);
 //extern void thash_tr_insert(thash_cb_t *hcb, thash_data_t *entry, u64 va, int idx);
 extern int vtr_find_overlap(struct vcpu *vcpu, u64 va, u64 ps, int is_data);
-extern u64 get_mfn(struct domain *d, u64 gpfn);
-/*
- * Force to delete a found entry no matter TR or foreign map for TLB.
- *    NOTES:
- *      1: TLB entry may be TR, TC or Foreign Map. For TR entry,
- *         itr[]/dtr[] need to be updated too.
- *      2: This API must be called after thash_find_overlap() or
- *         thash_find_next_overlap().
- *      3: Return TRUE or FALSE
- *
- */
-extern void thash_remove(thash_cb_t *hcb, thash_data_t *entry);
-extern void thash_tr_remove(thash_cb_t *hcb, thash_data_t *entry/*, int idx*/);
-
-/*
- * Find an overlap entry in hash table and its collision chain.
- * Refer to SDM2 4.1.1.4 for overlap definition.
- *    PARAS:
- *      1: in: TLB format entry, rid:ps must be same with vrr[].
- *             va & ps identify the address space for overlap lookup
- *      2: section can be combination of TR, TC and FM. (THASH_SECTION_XX)
- *      3: cl means I side or D side.
- *    RETURNS:
- *      NULL to indicate the end of findings.
- *    NOTES:
- *
- */
-extern thash_data_t *thash_find_overlap(thash_cb_t *hcb, 
-                        thash_data_t *in, search_section_t s_sect);
-extern thash_data_t *thash_find_overlap_ex(thash_cb_t *hcb, 
-                u64 va, u64 ps, int rid, char cl, search_section_t s_sect);
-
-
-/*
- * Similar with thash_find_overlap but find next entry.
- *    NOTES:
- *      Intermediate position information is stored in hcb->priv.
- */
-extern thash_data_t *thash_find_next_overlap(thash_cb_t *hcb);
 
 /*
  * Find and purge overlap entries in hash table and its collision chain.
@@ -290,7 +200,6 @@ extern void thash_purge_all(struct vcpu *v);
  *
  */
 extern thash_data_t *vtlb_lookup(struct vcpu *v,u64 va,int is_data);
-extern int thash_lock_tc(thash_cb_t *hcb, u64 va, u64 size, int rid, char cl, int lock);
 
 
 #define   ITIR_RV_MASK      (((1UL<<32)-1)<<32 | 0x3)
@@ -298,12 +207,10 @@ extern int thash_lock_tc(thash_cb_t *hcb, u64 va, u64 size, int rid, char cl, in
 #define   PAGE_FLAGS_AR_PL_MASK ((0x7UL<<9)|(0x3UL<<7))
 extern u64 machine_ttag(PTA pta, u64 va);
 extern u64 machine_thash(PTA pta, u64 va);
-extern void purge_machine_tc_by_domid(domid_t domid);
 extern void machine_tlb_insert(struct vcpu *v, thash_data_t *tlb);
 extern ia64_rr vmmu_get_rr(struct vcpu *vcpu, u64 va);
 extern int init_domain_tlb(struct vcpu *v);
 extern void free_domain_tlb(struct vcpu *v);
-extern thash_data_t * vsa_thash(PTA vpta, u64 va, u64 vrr, u64 *tag);
 extern thash_data_t * vhpt_lookup(u64 va);
 extern void machine_tlb_purge(u64 va, u64 ps);
 extern unsigned long fetch_code(struct vcpu *vcpu, u64 gip, IA64_BUNDLE *pbundle);
