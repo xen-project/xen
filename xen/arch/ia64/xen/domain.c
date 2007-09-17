@@ -733,8 +733,27 @@ void arch_get_info_guest(struct vcpu *v, vcpu_guest_context_u c)
  	if (!v->domain->arch.is_vti && v->arch.privregs == NULL)
 		return;
 
-	vcpu_get_dcr (v, &c.nat->regs.cr.dcr);
-	vcpu_get_iva (v, &c.nat->regs.cr.iva);
+	vcpu_get_dcr(v, &c.nat->regs.cr.dcr);
+
+	c.nat->regs.cr.itm = v->domain->arch.is_vti ?
+		vmx_vcpu_get_itm(v) : PSCBX(v, domain_itm);
+	vcpu_get_iva(v, &c.nat->regs.cr.iva);
+	vcpu_get_pta(v, &c.nat->regs.cr.pta);
+
+	vcpu_get_ipsr(v, &c.nat->regs.cr.ipsr);
+	vcpu_get_isr(v, &c.nat->regs.cr.isr);
+	vcpu_get_iip(v, &c.nat->regs.cr.iip);
+	vcpu_get_ifa(v, &c.nat->regs.cr.ifa);
+	vcpu_get_ivr(v, &c.nat->regs.cr.ivr);
+
+	vcpu_get_tpr(v, &c.nat->regs.cr.tpr);
+	vcpu_get_irr0(v, &c.nat->regs.cr.irr[0]);
+	vcpu_get_irr1(v, &c.nat->regs.cr.irr[1]);
+	vcpu_get_irr2(v, &c.nat->regs.cr.irr[2]);
+	vcpu_get_irr3(v, &c.nat->regs.cr.irr[3]);
+	vcpu_get_itv(v, &c.nat->regs.cr.itv);
+	vcpu_get_pmv(v, &c.nat->regs.cr.pmv);
+	vcpu_get_cmcv(v, &c.nat->regs.cr.cmcv);
 }
 
 int arch_set_info_guest(struct vcpu *v, vcpu_guest_context_u c)
