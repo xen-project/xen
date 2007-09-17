@@ -201,7 +201,7 @@ p2m_next_level(struct domain *d, mfn_t *table_mfn, void **table,
 
 // Returns 0 on error (out of memory)
 static int
-set_p2m_entry(struct domain *d, unsigned long gfn, mfn_t mfn, u32 l1e_flags)
+set_p2m_entry(struct domain *d, unsigned long gfn, mfn_t mfn, p2m_type_t p2mt)
 {
     // XXX -- this might be able to be faster iff current->domain == d
     mfn_t table_mfn = pagetable_get_mfn(d->arch.phys_table);
@@ -245,7 +245,7 @@ set_p2m_entry(struct domain *d, unsigned long gfn, mfn_t mfn, u32 l1e_flags)
         d->arch.p2m.max_mapped_pfn = gfn;
 
     if ( mfn_valid(mfn) )
-        entry_content = l1e_from_pfn(mfn_x(mfn), l1e_flags);
+        entry_content = l1e_from_pfn(mfn_x(mfn), p2m_type_to_flags(p2mt));
     else
         entry_content = l1e_empty();
 
@@ -328,11 +328,10 @@ int p2m_alloc_table(struct domain *d,
     P2M_PRINTK("populating p2m table\n");
 
     /* Initialise physmap tables for slot zero. Other code assumes this. */
-    gfn = 0;
-    mfn = _mfn(INVALID_MFN);
-    if ( !set_p2m_entry(d, gfn, mfn, __PAGE_HYPERVISOR|_PAGE_USER) )
+    if ( !set_p2m_entry(d, 0, _mfn(INVALID_MFN), p2m_invalid) )
         goto error;
 
+    /* Copy all existing mappings from the page list and m2p */
     for ( entry = d->page_list.next;
           entry != &d->page_list;
           entry = entry->next )
@@ -348,7 +347,7 @@ int p2m_alloc_table(struct domain *d,
             (gfn != 0x55555555L)
 #endif
              && gfn != INVALID_M2P_ENTRY
-             && !set_p2m_entry(d, gfn, mfn, __PAGE_HYPERVISOR|_PAGE_USER) )
+            && !set_p2m_entry(d, gfn, mfn, p2m_ram_rw) )
             goto error;
     }
 
@@ -663,7 +662,7 @@ p2m_remove_page(struct domain *d, unsigned long gfn, unsigned long mfn)
         return;
     P2M_DEBUG("removing gfn=%#lx mfn=%#lx\n", gfn, mfn);
 
-    set_p2m_entry(d, gfn, _mfn(INVALID_MFN), 0);
+    set_p2m_entry(d, gfn, _mfn(INVALID_MFN), p2m_invalid);
     set_gpfn_from_mfn(mfn, INVALID_M2P_ENTRY);
 }
 
@@ -727,14 +726,14 @@ guest_physmap_add_entry(struct domain *d, unsigned long gfn,
 
     if ( mfn_valid(_mfn(mfn)) ) 
     {
-        set_p2m_entry(d, gfn, _mfn(mfn), p2m_type_to_flags(t));
+        set_p2m_entry(d, gfn, _mfn(mfn), t);
         set_gpfn_from_mfn(mfn, gfn);
     }
     else
     {
         gdprintk(XENLOG_WARNING, "Adding bad mfn to p2m map (%#lx -> %#lx)\n",
                  gfn, mfn);
-        set_p2m_entry(d, gfn, _mfn(INVALID_MFN), 0);
+        set_p2m_entry(d, gfn, _mfn(INVALID_MFN), p2m_invalid);
     }
 
     audit_p2m(d);
@@ -854,7 +853,7 @@ p2m_type_t p2m_change_type(struct domain *d, unsigned long gfn,
 
     mfn = gfn_to_mfn(d, gfn, &pt);
     if ( pt == ot )
-        set_p2m_entry(d, gfn, mfn, p2m_type_to_flags(nt));
+        set_p2m_entry(d, gfn, mfn, nt);
 
     p2m_unlock(d);
 
