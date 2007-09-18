@@ -789,7 +789,7 @@ int xc_domain_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
 {
     xc_dominfo_t info;
 
-    int rc = 1, i, j, last_iter, iter = 0;
+    int rc = 1, frc, i, j, last_iter, iter = 0;
     int live  = (flags & XCFLAGS_LIVE);
     int debug = (flags & XCFLAGS_DEBUG);
     int race = 0, sent_last_iter, skip_this_iter;
@@ -882,13 +882,18 @@ int xc_domain_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
         {
             /* log-dirty already enabled? There's no test op,
                so attempt to disable then reenable it */
-            if ( !(xc_shadow_control(xc_handle, dom, XEN_DOMCTL_SHADOW_OP_OFF,
-                                     NULL, 0, NULL, 0, NULL) >= 0 &&
-                   xc_shadow_control(xc_handle, dom,
-                                     XEN_DOMCTL_SHADOW_OP_ENABLE_LOGDIRTY,
-                                     NULL, 0, NULL, 0, NULL) >= 0) )
+            frc = xc_shadow_control(xc_handle, dom, XEN_DOMCTL_SHADOW_OP_OFF,
+                                    NULL, 0, NULL, 0, NULL);
+            if ( frc >= 0 )
             {
-                ERROR("Couldn't enable shadow mode");
+                frc = xc_shadow_control(xc_handle, dom,
+                                        XEN_DOMCTL_SHADOW_OP_ENABLE_LOGDIRTY,
+                                        NULL, 0, NULL, 0, NULL);
+            }
+            
+            if ( frc < 0 )
+            {
+                ERROR("Couldn't enable shadow mode (rc %d) (errno %d)", frc, errno );
                 goto out;
             }
         }
