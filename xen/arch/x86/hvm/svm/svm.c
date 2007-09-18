@@ -648,6 +648,8 @@ static void svm_get_segment_register(struct vcpu *v, enum x86_segment seg,
 {
     struct vmcb_struct *vmcb = v->arch.hvm_svm.vmcb;
 
+    ASSERT(v == current);
+
     switch ( seg )
     {
     case x86_seg_cs:
@@ -694,10 +696,13 @@ static void svm_set_segment_register(struct vcpu *v, enum x86_segment seg,
 {
     struct vmcb_struct *vmcb = v->arch.hvm_svm.vmcb;
 
+    ASSERT(v == current);
+
     switch ( seg )
     {
     case x86_seg_cs:
         memcpy(&vmcb->cs, reg, sizeof(*reg));
+        guest_cpu_user_regs()->cs = reg->sel;
         break;
     case x86_seg_ds:
         memcpy(&vmcb->ds, reg, sizeof(*reg));
@@ -717,6 +722,7 @@ static void svm_set_segment_register(struct vcpu *v, enum x86_segment seg,
         break;
     case x86_seg_ss:
         memcpy(&vmcb->ss, reg, sizeof(*reg));
+        guest_cpu_user_regs()->ss = reg->sel;
         break;
     case x86_seg_tr:
         svm_sync_vmcb(v);
@@ -2299,12 +2305,20 @@ asmlinkage void svm_vmexit_handler(struct cpu_user_regs *regs)
         svm_vmexit_do_invd(v);
         break;
 
-    case VMEXIT_GDTR_WRITE:
-        printk("WRITE to GDTR\n");
+    case VMEXIT_TASK_SWITCH: {
+        enum hvm_task_switch_reason reason;
+        int32_t errcode = -1;
+        if ( (vmcb->exitinfo2 >> 36) & 1 )
+            reason = TSW_iret;
+        else if ( (vmcb->exitinfo2 >> 38) & 1 )
+            reason = TSW_jmp;
+        else
+            reason = TSW_call_or_int;
+        if ( (vmcb->exitinfo2 >> 44) & 1 )
+            errcode = (uint32_t)vmcb->exitinfo2;
+        hvm_task_switch((uint16_t)vmcb->exitinfo1, reason, errcode);
         break;
-
-    case VMEXIT_TASK_SWITCH:
-        goto exit_and_crash;
+    }
 
     case VMEXIT_CPUID:
         svm_vmexit_do_cpuid(vmcb, regs);

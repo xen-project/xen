@@ -885,7 +885,7 @@ static unsigned long vmx_get_segment_base(struct vcpu *v, enum x86_segment seg)
 static void vmx_get_segment_register(struct vcpu *v, enum x86_segment seg,
                                      struct segment_register *reg)
 {
-    u16 attr = 0;
+    uint32_t attr = 0;
 
     ASSERT(v == current);
 
@@ -960,12 +960,16 @@ static void vmx_get_segment_register(struct vcpu *v, enum x86_segment seg,
 static void vmx_set_segment_register(struct vcpu *v, enum x86_segment seg,
                                      struct segment_register *reg)
 {
-    u16 attr;
+    uint32_t attr;
 
     ASSERT(v == current);
 
     attr = reg->attr.bytes;
     attr = ((attr & 0xf00) << 4) | (attr & 0xff);
+
+    /* Not-present must mean unusable. */
+    if ( !reg->attr.fields.p )
+        attr |= (1u << 16);
 
     switch ( seg )
     {
@@ -974,6 +978,7 @@ static void vmx_set_segment_register(struct vcpu *v, enum x86_segment seg,
         __vmwrite(GUEST_CS_LIMIT, reg->limit);
         __vmwrite(GUEST_CS_BASE, reg->base);
         __vmwrite(GUEST_CS_AR_BYTES, attr);
+        guest_cpu_user_regs()->cs = reg->sel;
         break;
     case x86_seg_ds:
         __vmwrite(GUEST_DS_SELECTOR, reg->sel);
@@ -1004,6 +1009,7 @@ static void vmx_set_segment_register(struct vcpu *v, enum x86_segment seg,
         __vmwrite(GUEST_SS_LIMIT, reg->limit);
         __vmwrite(GUEST_SS_BASE, reg->base);
         __vmwrite(GUEST_SS_AR_BYTES, attr);
+        guest_cpu_user_regs()->ss = reg->sel;
         break;
     case x86_seg_tr:
         __vmwrite(GUEST_TR_SELECTOR, reg->sel);
@@ -2668,7 +2674,8 @@ asmlinkage void vmx_vmexit_handler(struct cpu_user_regs *regs)
 
     /* Event delivery caused this intercept? Queue for redelivery. */
     idtv_info = __vmread(IDT_VECTORING_INFO);
-    if ( unlikely(idtv_info & INTR_INFO_VALID_MASK) )
+    if ( unlikely(idtv_info & INTR_INFO_VALID_MASK) &&
+         (exit_reason != EXIT_REASON_TASK_SWITCH) )
     {
         if ( hvm_event_needs_reinjection((idtv_info>>8)&7, idtv_info&0xff) )
         {
@@ -2785,8 +2792,19 @@ asmlinkage void vmx_vmexit_handler(struct cpu_user_regs *regs)
         __vmwrite(CPU_BASED_VM_EXEC_CONTROL,
                   v->arch.hvm_vmx.exec_control);
         break;
-    case EXIT_REASON_TASK_SWITCH:
-        goto exit_and_crash;
+    case EXIT_REASON_TASK_SWITCH: {
+        const enum hvm_task_switch_reason reasons[] = {
+            TSW_call_or_int, TSW_iret, TSW_jmp, TSW_call_or_int };
+        int32_t errcode = -1;
+        exit_qualification = __vmread(EXIT_QUALIFICATION);
+        if ( (idtv_info & INTR_INFO_VALID_MASK) &&
+             (idtv_info & INTR_INFO_DELIVER_CODE_MASK) )
+            errcode = __vmread(IDT_VECTORING_ERROR_CODE);
+        hvm_task_switch((uint16_t)exit_qualification,
+                        reasons[(exit_qualification >> 30) & 3],
+                        errcode);
+        break;
+    }
     case EXIT_REASON_CPUID:
         inst_len = __get_instruction_length(); /* Safe: CPUID */
         __update_guest_eip(inst_len);

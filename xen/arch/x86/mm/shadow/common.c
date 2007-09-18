@@ -101,7 +101,7 @@ int _shadow_mode_refcounts(struct domain *d)
 /* x86 emulator support for the shadow code
  */
 
-struct segment_register *hvm_get_seg_reg(
+static struct segment_register *hvm_get_seg_reg(
     enum x86_segment seg, struct sh_emulate_ctxt *sh_ctxt)
 {
     struct segment_register *seg_reg = &sh_ctxt->seg_reg[seg];
@@ -109,10 +109,6 @@ struct segment_register *hvm_get_seg_reg(
         hvm_get_segment_register(current, seg, seg_reg);
     return seg_reg;
 }
-
-enum hvm_access_type {
-    hvm_access_insn_fetch, hvm_access_read, hvm_access_write
-};
 
 static int hvm_translate_linear_addr(
     enum x86_segment seg,
@@ -123,76 +119,18 @@ static int hvm_translate_linear_addr(
     unsigned long *paddr)
 {
     struct segment_register *reg = hvm_get_seg_reg(seg, sh_ctxt);
-    unsigned long limit, addr = offset;
-    uint32_t last_byte;
+    int okay;
 
-    if ( sh_ctxt->ctxt.addr_size != 64 )
+    okay = hvm_virtual_to_linear_addr(
+        seg, reg, offset, bytes, access_type, sh_ctxt->ctxt.addr_size, paddr);
+
+    if ( !okay )
     {
-        /*
-         * COMPATIBILITY MODE: Apply segment checks and add base.
-         */
-
-        switch ( access_type )
-        {
-        case hvm_access_read:
-            if ( (reg->attr.fields.type & 0xa) == 0x8 )
-                goto gpf; /* execute-only code segment */
-            break;
-        case hvm_access_write:
-            if ( (reg->attr.fields.type & 0xa) != 0x2 )
-                goto gpf; /* not a writable data segment */
-            break;
-        default:
-            break;
-        }
-
-        /* Calculate the segment limit, including granularity flag. */
-        limit = reg->limit;
-        if ( reg->attr.fields.g )
-            limit = (limit << 12) | 0xfff;
-
-        last_byte = offset + bytes - 1;
-
-        /* Is this a grows-down data segment? Special limit check if so. */
-        if ( (reg->attr.fields.type & 0xc) == 0x4 )
-        {
-            /* Is upper limit 0xFFFF or 0xFFFFFFFF? */
-            if ( !reg->attr.fields.db )
-                last_byte = (uint16_t)last_byte;
-
-            /* Check first byte and last byte against respective bounds. */
-            if ( (offset <= limit) || (last_byte < offset) )
-                goto gpf;
-        }
-        else if ( (last_byte > limit) || (last_byte < offset) )
-            goto gpf; /* last byte is beyond limit or wraps 0xFFFFFFFF */
-
-        /*
-         * Hardware truncates to 32 bits in compatibility mode.
-         * It does not truncate to 16 bits in 16-bit address-size mode.
-         */
-        addr = (uint32_t)(addr + reg->base);
-    }
-    else
-    {
-        /*
-         * LONG MODE: FS and GS add segment base. Addresses must be canonical.
-         */
-
-        if ( (seg == x86_seg_fs) || (seg == x86_seg_gs) )
-            addr += reg->base;
-
-        if ( !is_canonical_address(addr) )
-            goto gpf;
+        hvm_inject_exception(TRAP_gp_fault, 0, 0);
+        return X86EMUL_EXCEPTION;
     }
 
-    *paddr = addr;
-    return 0;    
-
- gpf:
-    /* Inject #GP(0). */
-    hvm_inject_exception(TRAP_gp_fault, 0, 0);
-    return X86EMUL_EXCEPTION;
+    return 0;
 }
 
 static int

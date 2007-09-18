@@ -362,4 +362,21 @@ static inline void hvm_cpu_down(void)
         hvm_funcs.cpu_down();
 }
 
+enum hvm_task_switch_reason { TSW_jmp, TSW_iret, TSW_call_or_int };
+void hvm_task_switch(
+    uint16_t tss_sel, enum hvm_task_switch_reason taskswitch_reason,
+    int32_t errcode);
+
+enum hvm_access_type {
+    hvm_access_insn_fetch, hvm_access_read, hvm_access_write
+};
+int hvm_virtual_to_linear_addr(
+    enum x86_segment seg,
+    struct segment_register *reg,
+    unsigned long offset,
+    unsigned int bytes,
+    enum hvm_access_type access_type,
+    unsigned int addr_size,
+    unsigned long *linear_addr);
+
 #endif /* __ASM_X86_HVM_HVM_H__ */
