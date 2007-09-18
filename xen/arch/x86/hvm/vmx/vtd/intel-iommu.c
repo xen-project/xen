@@ -34,10 +34,16 @@
 #include "pci_regs.h"
 #include "msi.h"
 
+#define VTDPREFIX
+static inline int request_irq(int vector, void *func,
+                              int flags, char *name, void *data)
+{
+    return -ENOSYS;
+}
+
 extern void print_iommu_regs(struct acpi_drhd_unit *drhd);
 extern void print_vtd_entries(struct domain *d, int bus, int devfn,
                        unsigned long gmfn);
-extern void (*interrupt[])(void);
 
 #define DMAR_OPERATION_TIMEOUT (HZ*60) /* 1m */
 
@@ -831,7 +837,6 @@ static struct hw_interrupt_type dma_msi_type = {
 int iommu_set_interrupt(struct iommu *iommu)
 {
     int vector, ret;
-    unsigned long flags;
 
     vector = assign_irq_vector(AUTO_ASSIGN);
     vector_to_iommu[vector] = iommu;
@@ -845,10 +850,7 @@ int iommu_set_interrupt(struct iommu *iommu)
         return -EINVAL;
     }
 
-    spin_lock_irqsave(&irq_desc[vector].lock, flags);
     irq_desc[vector].handler = &dma_msi_type;
-    spin_unlock_irqrestore(&irq_desc[vector].lock, flags);
-    set_intr_gate(vector, interrupt[vector]);
     ret = request_irq(vector, iommu_page_fault, 0, "dmar", iommu);
     if (ret)
         gdprintk(XENLOG_ERR VTDPREFIX, "IOMMU: can't request irq\n");

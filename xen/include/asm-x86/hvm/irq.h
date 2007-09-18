@@ -114,7 +114,11 @@ struct hvm_irq {
 #define hvm_isa_irq_to_gsi(isa_irq) ((isa_irq) ? : 2)
 
 /* Modify state of a PCI INTx wire. */
+void __hvm_pci_intx_assert(
+    struct domain *d, unsigned int device, unsigned int intx);
 void hvm_pci_intx_assert(
+    struct domain *d, unsigned int device, unsigned int intx);
+void __hvm_pci_intx_deassert(
     struct domain *d, unsigned int device, unsigned int intx);
 void hvm_pci_intx_deassert(
     struct domain *d, unsigned int device, unsigned int intx);

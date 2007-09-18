@@ -182,8 +182,7 @@ static void vpic_ioport_write(
 
     vpic_lock(vpic);
 
-    addr &= 1;
-    if ( addr == 0 )
+    if ( (addr & 1) == 0 )
     {
         if ( val & 0x10 )
         {
@@ -250,6 +249,11 @@ static void vpic_ioport_write(
                 vpic->isr &= ~(1 << irq);
                 if ( cmd == 7 )
                     vpic->priority_add = (irq + 1) & 7;
+                if ( vtd_enabled )
+                {
+                    irq |= ((addr & 0xa0) == 0xa0) ? 8 : 0;
+                    hvm_dpci_eoi(hvm_isa_irq_to_gsi(irq), NULL);
+                }
                 break;
             case 6: /* Set Priority                */
                 vpic->priority_add = (val + 1) & 7;

@@ -50,33 +50,31 @@ int hvm_do_IRQ_dpci(struct domain *d, unsigned int mirq)
     uint32_t link, isa_irq;
     struct hvm_irq *hvm_irq;
 
-    if (!vtd_enabled || (d == dom0))
+    if ( !vtd_enabled || (d == dom0) ||
+         !d->arch.hvm_domain.irq.mirq[mirq].valid )
         return 0;
 
-    if (d->arch.hvm_domain.irq.mirq[mirq].valid)
+    device = d->arch.hvm_domain.irq.mirq[mirq].device;
+    intx = d->arch.hvm_domain.irq.mirq[mirq].intx;
+    link = hvm_pci_intx_link(device, intx);
+    hvm_irq = &d->arch.hvm_domain.irq;
+    isa_irq = hvm_irq->pci_link.route[link];
+
+    if ( !d->arch.hvm_domain.irq.girq[isa_irq].valid )
     {
-        device = d->arch.hvm_domain.irq.mirq[mirq].device;
-        intx = d->arch.hvm_domain.irq.mirq[mirq].intx;
-        link = hvm_pci_intx_link(device, intx);
-        hvm_irq = &d->arch.hvm_domain.irq;
-        isa_irq = hvm_irq->pci_link.route[link];
-
-        if ( !d->arch.hvm_domain.irq.girq[isa_irq].valid )
-        {
-            d->arch.hvm_domain.irq.girq[isa_irq].valid = 1;
-            d->arch.hvm_domain.irq.girq[isa_irq].device = device;
-            d->arch.hvm_domain.irq.girq[isa_irq].intx = intx;
-            d->arch.hvm_domain.irq.girq[isa_irq].machine_gsi = mirq;
-        }
-
-        if ( !test_and_set_bit(mirq, d->arch.hvm_domain.irq.dirq_mask) )
-        {
-            vcpu_kick(d->vcpu[0]);
-            return 1;
-        }
-        else
-            dprintk(XENLOG_INFO, "Want to pending mirq, but failed\n");
+        d->arch.hvm_domain.irq.girq[isa_irq].valid = 1;
+        d->arch.hvm_domain.irq.girq[isa_irq].device = device;
+        d->arch.hvm_domain.irq.girq[isa_irq].intx = intx;
+        d->arch.hvm_domain.irq.girq[isa_irq].machine_gsi = mirq;
     }
+
+    if ( !test_and_set_bit(mirq, d->arch.hvm_domain.irq.dirq_mask) )
+    {
+        vcpu_kick(d->vcpu[0]);
+        return 1;
+    }
+
+    dprintk(XENLOG_INFO, "mirq already pending\n");
     return 0;
 }
 
@@ -86,18 +84,21 @@ void hvm_dpci_eoi(unsigned int guest_gsi, union vioapic_redir_entry *ent)
     uint32_t device, intx, machine_gsi;
     irq_desc_t *desc;
 
-    if (d->arch.hvm_domain.irq.girq[guest_gsi].valid)
+    ASSERT(spin_is_locked(&d->arch.hvm_domain.irq_lock));
+
+    if ( !vtd_enabled || !d->arch.hvm_domain.irq.girq[guest_gsi].valid )
+        return;
+
+    device = d->arch.hvm_domain.irq.girq[guest_gsi].device;
+    intx = d->arch.hvm_domain.irq.girq[guest_gsi].intx;
+    machine_gsi = d->arch.hvm_domain.irq.girq[guest_gsi].machine_gsi;
+    gdprintk(XENLOG_INFO, "hvm_dpci_eoi:: device %x intx %x\n",
+             device, intx);
+    __hvm_pci_intx_deassert(d, device, intx);
+    if ( (ent == NULL) || (ent->fields.mask == 0) )
     {
-        device = d->arch.hvm_domain.irq.girq[guest_gsi].device;
-        intx = d->arch.hvm_domain.irq.girq[guest_gsi].intx;
-        machine_gsi = d->arch.hvm_domain.irq.girq[guest_gsi].machine_gsi;
-        gdprintk(XENLOG_INFO, "hvm_dpci_eoi:: device %x intx %x\n",
-            device, intx);
-        hvm_pci_intx_deassert(d, device, intx);
-        if ( (ent == NULL) || (ent && ent->fields.mask == 0) ) {
-            desc = &irq_desc[irq_to_vector(machine_gsi)];
-            desc->handler->end(irq_to_vector(machine_gsi));
-        }
+        desc = &irq_desc[irq_to_vector(machine_gsi)];
+        desc->handler->end(irq_to_vector(machine_gsi));
     }
 }
 
@@ -107,14 +108,13 @@ int release_devices(struct domain *d)
     uint32_t i;
     int ret = 0;
 
-    if (!vtd_enabled)
+    if ( !vtd_enabled )
         return ret;
 
-    /* unbind irq */
-    for (i = 0; i < NR_IRQS; i++) {
-        if (hd->irq.mirq[i].valid)
+    for ( i = 0; i < NR_IRQS; i++ )
+        if ( hd->irq.mirq[i].valid )
             ret = pirq_guest_unbind(d, i);
-    }
+
     iommu_domain_teardown(d);
     return ret;
 }

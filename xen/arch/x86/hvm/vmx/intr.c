@@ -138,6 +138,23 @@ static void update_tpr_threshold(
     __vmwrite(TPR_THRESHOLD, threshold);
 }
 
+static void vmx_dirq_assist(struct domain *d)
+{
+    unsigned int irq;
+    uint32_t device, intx;
+    struct hvm_irq *hvm_irq = &d->arch.hvm_domain.irq;
+
+    for ( irq = find_first_bit(hvm_irq->dirq_mask, NR_IRQS);
+          irq < NR_IRQS;
+          irq = find_next_bit(hvm_irq->dirq_mask, NR_IRQS, irq + 1) )
+    {
+        test_and_clear_bit(irq, &hvm_irq->dirq_mask);
+        device = hvm_irq->mirq[irq].device;
+        intx = hvm_irq->mirq[irq].intx;
+        hvm_pci_intx_assert(d, device, intx);
+    }
+}
+
 asmlinkage void vmx_intr_assist(void)
 {
     int intr_vector;
@@ -147,6 +164,10 @@ asmlinkage void vmx_intr_assist(void)
 
     /* Crank the handle on interrupt state. */
     pt_update_irq(v);
+
+    if ( vtd_enabled && (v->vcpu_id == 0) )
+        vmx_dirq_assist(v->domain);
+  
     hvm_set_callback_irq_level();
 
     do {

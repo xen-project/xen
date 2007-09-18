@@ -30,6 +30,10 @@
 #include "pci-direct.h"
 #include "pci_regs.h"
 
+#define VTDPREFIX
+int vtd_enabled;
+boolean_param("vtd", vtd_enabled);
+
 #undef PREFIX
 #define PREFIX VTDPREFIX "ACPI DMAR:"
 #define DEBUG
@@ -484,11 +488,19 @@ acpi_parse_dmar(unsigned long phys_addr, unsigned long size)
 
 int acpi_dmar_init(void)
 {
+    extern int ioapic_ack_new;
+
     acpi_table_parse(ACPI_DMAR, acpi_parse_dmar);
+
     if (list_empty(&acpi_drhd_units)) {
         printk(KERN_ERR PREFIX "No DMAR devices found\n");
+        vtd_enabled = 0;
         return -ENODEV;
-    } else
-        vtd_enabled = 1;
+    }
+
+    /* Use fake-vector style of IOAPIC acknowledgement. */
+    if (vtd_enabled)
+        ioapic_ack_new = 0;
+
     return 0;
 }

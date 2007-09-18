@@ -17,7 +17,6 @@
 #define NR_HP_RESERVED_VECTORS 	20
 
 extern int vector_irq[NR_VECTORS];
-extern void (*interrupt[NR_IRQS])(void);
 extern int pci_vector_resources(int last, int nr_released);
 
 /*

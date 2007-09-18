@@ -184,6 +184,68 @@ static void __modify_IO_APIC_irq (unsigned int irq, unsigned long enable, unsign
     }
 }
 
+static int real_vector[MAX_IRQ_SOURCES];
+static int fake_vector=-1;
+
+/*
+ * Following 2 functions are used to workaround spurious interrupt
+ * problem related to mask/unmask of interrupts.  Instead we program
+ * an unused vector in the IOAPIC before issueing EOI to LAPIC.
+ */
+static void write_fake_IO_APIC_vector (unsigned int irq)
+{
+    struct irq_pin_list *entry = irq_2_pin + irq;
+    unsigned int pin, reg;
+    unsigned long flags;
+
+    spin_lock_irqsave(&ioapic_lock, flags);
+    for (;;) {
+        pin = entry->pin;
+        if (pin == -1)
+            break;
+        reg = io_apic_read(entry->apic, 0x10 + pin*2);
+        real_vector[irq] = reg & 0xff;
+        reg &= ~0xff;
+
+        if (fake_vector == -1)
+            fake_vector = assign_irq_vector(MAX_IRQ_SOURCES-1);
+
+        reg |= fake_vector;
+        io_apic_write(entry->apic, 0x10 + pin*2, reg);
+
+        if (!entry->next)
+            break;
+        entry = irq_2_pin + entry->next;
+    }
+    spin_unlock_irqrestore(&ioapic_lock, flags);
+}
+
+static void restore_real_IO_APIC_vector (unsigned int irq)
+{
+    struct irq_pin_list *entry = irq_2_pin + irq;
+    unsigned int pin, reg;
+    unsigned long flags;
+
+    spin_lock_irqsave(&ioapic_lock, flags);
+    for (;;) {
+        pin = entry->pin;
+        if (pin == -1)
+            break;
+
+        reg = io_apic_read(entry->apic, 0x10 + pin*2);
+        reg &= ~0xff;
+        reg |= real_vector[irq];
+        io_apic_write(entry->apic, 0x10 + pin*2, reg);
+        mb();
+        *(IO_APIC_BASE(entry->apic) + 0x10) = reg & 0xff;
+
+        if (!entry->next)
+            break;
+        entry = irq_2_pin + entry->next;
+    }
+    spin_unlock_irqrestore(&ioapic_lock, flags);
+}
+
 /* mask = 1 */
 static void __mask_IO_APIC_irq (unsigned int irq)
 {
@@ -1356,7 +1418,11 @@ static void mask_and_ack_level_ioapic_irq (unsigned int irq)
     if ( ioapic_ack_new )
         return;
 
-    mask_IO_APIC_irq(irq);
+    if ( vtd_enabled )
+        write_fake_IO_APIC_vector(irq);
+    else
+        mask_IO_APIC_irq(irq);
+
 /*
  * It appears there is an erratum which affects at least version 0x11
  * of I/O APIC (that's the 82093AA and cores integrated into various
@@ -1398,8 +1464,12 @@ static void end_level_ioapic_irq (unsigned int irq)
 
     if ( !ioapic_ack_new )
     {
-        if ( !(irq_desc[IO_APIC_VECTOR(irq)].status & IRQ_DISABLED) )
-            unmask_IO_APIC_irq(irq);
+        if ( !(irq_desc[IO_APIC_VECTOR(irq)].status & IRQ_DISABLED) ) {
+            if ( vtd_enabled )
+                restore_real_IO_APIC_vector(irq);
+            else
+                unmask_IO_APIC_irq(irq);
+        }
         return;
     }
 

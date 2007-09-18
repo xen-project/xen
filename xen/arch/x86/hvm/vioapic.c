@@ -458,6 +458,10 @@ void vioapic_update_EOI(struct domain *d, int vector)
     ent = &vioapic->redirtbl[gsi];
 
     ent->fields.remote_irr = 0;
+
+    if ( vtd_enabled )
+        hvm_dpci_eoi(gsi, ent);
+
     if ( (ent->fields.trig_mode == VIOAPIC_LEVEL_TRIG) &&
          !ent->fields.mask &&
          hvm_irq->gsi_assert_count[gsi] )
