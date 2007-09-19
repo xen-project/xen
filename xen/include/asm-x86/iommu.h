@@ -28,6 +28,7 @@
 #include <xen/xmalloc.h>
 #include <asm/hvm/vmx/intel-iommu.h>
 #include <public/hvm/ioreq.h>
+#include <public/domctl.h>
 
 extern int vtd_enabled;
 
@@ -75,5 +76,9 @@ void iommu_flush(struct domain *d, dma_addr_t gfn, u64 *p2m_entry);
 void iommu_set_pgd(struct domain *d);
 void iommu_domain_teardown(struct domain *d);
 int hvm_do_IRQ_dpci(struct domain *d, unsigned int irq);
+int dpci_ioport_intercept(ioreq_t *p);
+int pt_irq_create_bind_vtd(struct domain *d,
+    xen_domctl_bind_pt_irq_t * pt_irq_bind);
+
 
 #endif // _IOMMU_H_

@@ -42,6 +42,7 @@
 #include <asm/hvm/vlapic.h>
 
 #include <public/sched.h>
+#include <xen/iocap.h>
 #include <public/hvm/ioreq.h>
 
 #if defined (__i386__)
@@ -862,6 +863,123 @@ void hvm_io_assist(void)
 
  out:
     vcpu_end_shutdown_deferral(v);
+}
+
+void dpci_ioport_read(uint32_t mport, ioreq_t *p)
+{
+    uint64_t i;
+    uint64_t z_data;
+    uint64_t length = (p->count * p->size);
+
+    for ( i = 0; i < length; i += p->size )
+    {
+        z_data = ~0ULL;
+        
+        switch ( p->size )
+        {
+        case BYTE:
+            z_data = (uint64_t)inb(mport);
+            break;
+        case WORD:
+            z_data = (uint64_t)inw(mport);
+            break;
+        case LONG:
+            z_data = (uint64_t)inl(mport);
+            break;
+        default:
+            gdprintk(XENLOG_ERR, "Error: unable to handle size: %"
+                     PRId64 "\n", p->size);
+            return;
+        }
+
+        p->data = z_data;
+        if ( p->data_is_ptr &&
+             hvm_copy_to_guest_phys(p->data + i, (void *)&z_data,
+                                    (int)p->size) )
+        {
+            gdprintk(XENLOG_ERR, "Error: couldn't copy to hvm phys\n");
+            return;
+        }
+    }
+}
+
+void dpci_ioport_write(uint32_t mport, ioreq_t *p)
+{
+    uint64_t i;
+    uint64_t z_data = 0;
+    uint64_t length = (p->count * p->size);
+
+    for ( i = 0; i < length; i += p->size )
+    {
+        z_data = p->data;
+        if ( p->data_is_ptr &&
+             hvm_copy_from_guest_phys((void *)&z_data,
+                                      p->data + i, (int)p->size) )
+        {
+            gdprintk(XENLOG_ERR, "Error: couldn't copy from hvm phys\n");
+            return;
+        }
+
+        switch ( p->size )
+        {
+        case BYTE:
+            outb((uint8_t) z_data, mport);
+            break;
+        case WORD:
+            outw((uint16_t) z_data, mport);
+            break;
+        case LONG:
+            outl((uint32_t) z_data, mport);
+            break;
+        default:
+            gdprintk(XENLOG_ERR, "Error: unable to handle size: %"
+                     PRId64 "\n", p->size);
+            break;
+        }
+    }
+}
+
+int dpci_ioport_intercept(ioreq_t *p)
+{
+    struct domain *d = current->domain;
+    struct hvm_iommu *hd = domain_hvm_iommu(d);
+    struct g2m_ioport *g2m_ioport;
+    unsigned int mport, gport = p->addr;
+    unsigned int s = 0, e = 0;
+
+    list_for_each_entry( g2m_ioport, &hd->g2m_ioport_list, list )
+    {
+        s = g2m_ioport->gport;
+        e = s + g2m_ioport->np;
+        if ( (gport >= s) && (gport < e) )
+            goto found;
+    }
+
+    return 0;
+
+ found:
+    mport = (gport - s) + g2m_ioport->mport;
+
+    if ( !ioports_access_permitted(d, mport, mport + p->size - 1) ) 
+    {
+        gdprintk(XENLOG_ERR, "Error: access to gport=0x%x denied!\n",
+                 (uint32_t)p->addr);
+        return 0;
+    }
+
+    switch ( p->dir )
+    {
+    case IOREQ_READ:
+        dpci_ioport_read(mport, p);
+        break;
+    case IOREQ_WRITE:
+        dpci_ioport_write(mport, p);
+        break;
+    default:
+        gdprintk(XENLOG_ERR, "Error: couldn't handle p->dir = %d", p->dir);
+    }
+
+    return 1;
 }
 
 /*

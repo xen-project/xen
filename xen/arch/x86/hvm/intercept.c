@@ -29,6 +29,7 @@
 #include <asm/current.h>
 #include <io_ports.h>
 #include <xen/event.h>
+#include <asm/iommu.h>
 
 
 extern struct hvm_mmio_handler hpet_mmio_handler;
@@ -242,6 +243,9 @@ int hvm_io_intercept(ioreq_t *p, int type)
                            &(v->domain->arch.hvm_domain.io_handler);
     int i;
     unsigned long addr, size;
+
+    if ( (type == HVM_PORTIO) && (dpci_ioport_intercept(p)) )
+        return 1;
 
     for (i = 0; i < handler->num_slot; i++) {
         if( type != handler->hdl_list[i].type)

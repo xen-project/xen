@@ -28,6 +28,13 @@
 #include <public/hvm/params.h>
 #include <public/hvm/save.h>
 
+struct g2m_ioport {
+    struct list_head list;
+    unsigned int gport;
+    unsigned int mport;
+    unsigned int np;
+};
+
 struct hvm_iommu {
     spinlock_t iommu_list_lock;    /* protect iommu specific lists */
     struct list_head pdev_list;    /* direct accessed pci devices */

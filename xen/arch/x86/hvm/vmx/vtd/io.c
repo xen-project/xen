@@ -43,7 +43,39 @@
 #include <public/sched.h>
 #include <xen/iocap.h>
 #include <public/hvm/ioreq.h>
+#include <public/domctl.h>
 
+int pt_irq_create_bind_vtd(
+    struct domain *d,
+    xen_domctl_bind_pt_irq_t * pt_irq_bind)
+{
+    struct hvm_domain *hd = &d->arch.hvm_domain;
+    uint32_t machine_gsi, guest_gsi;
+    uint32_t device, intx;
+
+    machine_gsi = pt_irq_bind->machine_irq;
+    device = pt_irq_bind->u.pci.device;
+    intx = pt_irq_bind->u.pci.intx;
+    guest_gsi = hvm_pci_intx_gsi(device, intx);
+
+    hd->irq.mirq[machine_gsi].valid = 1;
+    hd->irq.mirq[machine_gsi].device = device;
+    hd->irq.mirq[machine_gsi].intx = intx;
+    hd->irq.mirq[machine_gsi].guest_gsi = guest_gsi;
+
+    hd->irq.girq[guest_gsi].valid = 1;
+    hd->irq.girq[guest_gsi].device = device;
+    hd->irq.girq[guest_gsi].intx = intx;
+    hd->irq.girq[guest_gsi].machine_gsi = machine_gsi;
+
+    /* Deal with gsi for legacy devices */
+    pirq_guest_bind(d->vcpu[0], machine_gsi, BIND_PIRQ__WILL_SHARE);
+    gdprintk(XENLOG_ERR,
+        "XEN_DOMCTL_irq_mapping: m_irq = %x device = %x intx = %x\n",
+        machine_gsi, device, intx);
+
+    return 0;
+}
 int hvm_do_IRQ_dpci(struct domain *d, unsigned int mirq)
 {
     uint32_t device, intx;

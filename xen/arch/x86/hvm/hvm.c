@@ -48,6 +48,7 @@
 #include <public/hvm/ioreq.h>
 #include <public/version.h>
 #include <public/memory.h>
+#include <asm/iommu.h>
 
 int hvm_enabled __read_mostly;
 
@@ -214,6 +215,10 @@ int hvm_domain_initialise(struct domain *d)
 
     spin_lock_init(&d->arch.hvm_domain.pbuf_lock);
     spin_lock_init(&d->arch.hvm_domain.irq_lock);
+
+    rc = iommu_domain_init(d);
+    if ( rc != 0 )
+        return rc;
 
     rc = paging_enable(d, PG_refcounts|PG_translate|PG_external);
     if ( rc != 0 )

@@ -929,18 +929,16 @@ int iommu_domain_init(struct domain *domain)
     unsigned long sagaw;
     struct acpi_drhd_unit *drhd;
 
-    if (list_empty(&acpi_drhd_units))
-        return 0;
     spin_lock_init(&hd->mapping_lock);
     spin_lock_init(&hd->iommu_list_lock);
     INIT_LIST_HEAD(&hd->pdev_list);
+    INIT_LIST_HEAD(&hd->g2m_ioport_list);
 
-    for_each_drhd_unit(drhd) {
-        if (drhd->iommu)
-            iommu = drhd->iommu;
-        else
-            iommu = iommu_alloc(drhd);
-    }
+    if ( !vtd_enabled || list_empty(&acpi_drhd_units) )
+        return 0;
+
+    for_each_drhd_unit ( drhd )
+        iommu = drhd->iommu ? : iommu_alloc(drhd);
 
     /* calculate AGAW */
     if (guest_width > cap_mgaw(iommu->cap))
@@ -949,7 +947,8 @@ int iommu_domain_init(struct domain *domain)
     agaw = width_to_agaw(adjust_width);
     /* FIXME: hardware doesn't support it, choose a bigger one? */
     sagaw = cap_sagaw(iommu->cap);
-    if (!test_bit(agaw, &sagaw)) {
+    if ( !test_bit(agaw, &sagaw) )
+    {
         gdprintk(XENLOG_ERR VTDPREFIX,
             "IOMMU: hardware doesn't support the agaw\n");
         agaw = find_next_bit(&sagaw, 5, agaw);
