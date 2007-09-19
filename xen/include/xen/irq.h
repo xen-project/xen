@@ -64,6 +64,9 @@ extern irq_desc_t irq_desc[NR_IRQS];
 
 extern int setup_irq(unsigned int, struct irqaction *);
 extern void free_irq(unsigned int);
+extern int request_irq(unsigned int irq,
+               void (*handler)(int, void *, struct cpu_user_regs *),
+               unsigned long irqflags, const char * devname, void *dev_id);
 
 extern hw_irq_controller no_irq_type;
 extern void no_action(int cpl, void *dev_id, struct cpu_user_regs *regs);

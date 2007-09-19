@@ -216,11 +216,11 @@ int hvm_domain_initialise(struct domain *d)
     spin_lock_init(&d->arch.hvm_domain.pbuf_lock);
     spin_lock_init(&d->arch.hvm_domain.irq_lock);
 
-    rc = iommu_domain_init(d);
+    rc = paging_enable(d, PG_refcounts|PG_translate|PG_external);
     if ( rc != 0 )
         return rc;
 
-    rc = paging_enable(d, PG_refcounts|PG_translate|PG_external);
+    rc = iommu_domain_init(d);
     if ( rc != 0 )
         return rc;
 
@@ -230,7 +230,11 @@ int hvm_domain_initialise(struct domain *d)
     hvm_init_ioreq_page(d, &d->arch.hvm_domain.ioreq);
     hvm_init_ioreq_page(d, &d->arch.hvm_domain.buf_ioreq);
 
-    return hvm_funcs.domain_initialise(d);
+    rc = hvm_funcs.domain_initialise(d);
+    if ( rc != 0 )
+        release_devices(d);
+
+    return rc;
 }
 
 void hvm_domain_relinquish_resources(struct domain *d)
@@ -246,6 +250,7 @@ void hvm_domain_relinquish_resources(struct domain *d)
 
 void hvm_domain_destroy(struct domain *d)
 {
+    release_devices(d);
     hvm_funcs.domain_destroy(d);
 }
 

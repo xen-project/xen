@@ -35,12 +35,6 @@
 #include "msi.h"
 
 #define VTDPREFIX
-static inline int request_irq(int vector, void *func,
-                              int flags, char *name, void *data)
-{
-    return -ENOSYS;
-}
-
 extern void print_iommu_regs(struct acpi_drhd_unit *drhd);
 extern void print_vtd_entries(struct domain *d, int bus, int devfn,
                        unsigned long gmfn);
@@ -1676,7 +1670,7 @@ int iommu_setup(void)
     struct acpi_drhd_unit *drhd;
     struct iommu *iommu;
 
-    if (list_empty(&acpi_drhd_units))
+    if (!vtd_enabled)
         return 0;
 
     INIT_LIST_HEAD(&hd->pdev_list);

@@ -1017,5 +1017,7 @@ int __init acpi_boot_init(void)
 
 	acpi_table_parse(ACPI_HPET, acpi_parse_hpet);
 
+	acpi_dmar_init();
+
 	return 0;
 }
