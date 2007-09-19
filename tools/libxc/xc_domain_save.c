@@ -54,9 +54,17 @@ static xen_pfn_t *live_p2m = NULL;
 static xen_pfn_t *live_m2p = NULL;
 static unsigned long m2p_mfn0;
 
+/* Address size of the guest */
+unsigned int guest_width;
+
 /* grep fodder: machine_to_phys */
 
-#define mfn_to_pfn(_mfn) live_m2p[(_mfn)]
+#define mfn_to_pfn(_mfn)  (live_m2p[(_mfn)])
+
+#define pfn_to_mfn(_pfn)                                \
+  ((xen_pfn_t) ((guest_width==8)                       \
+                ? (((uint64_t *)live_p2m)[(_pfn)])      \
+                : (((uint32_t *)live_p2m)[(_pfn)])))
 
 /*
  * Returns TRUE if the given machine frame number has a unique mapping
@@ -65,19 +73,7 @@ static unsigned long m2p_mfn0;
 #define MFN_IS_IN_PSEUDOPHYS_MAP(_mfn)          \
     (((_mfn) < (max_mfn)) &&                    \
      ((mfn_to_pfn(_mfn) < (p2m_size)) &&        \
-      (live_p2m[mfn_to_pfn(_mfn)] == (_mfn))))
-
-/* Returns TRUE if MFN is successfully converted to a PFN. */
-#define translate_mfn_to_pfn(_pmfn)                             \
-({                                                              \
-    unsigned long mfn = *(_pmfn);                               \
-    int _res = 1;                                               \
-    if ( !MFN_IS_IN_PSEUDOPHYS_MAP(mfn) )                       \
-        _res = 0;                                               \
-    else                                                        \
-        *(_pmfn) = mfn_to_pfn(mfn);                             \
-    _res;                                                       \
-})
+      (pfn_to_mfn(mfn_to_pfn(_mfn)) == (_mfn))))
 
 /*
 ** During (live) save/migrate, we maintain a number of bitmaps to track
@@ -451,22 +447,25 @@ static int suspend_and_state(int (*suspend)(int), int xc_handle, int io_fd,
 ** it to update the MFN to a reasonable value.
 */
 static void *map_frame_list_list(int xc_handle, uint32_t dom,
-                                 shared_info_t *shinfo)
+                                 shared_info_either_t *shinfo)
 {
     int count = 100;
     void *p;
+    uint64_t fll = GET_FIELD(shinfo, arch.pfn_to_mfn_frame_list_list);
 
-    while ( count-- && (shinfo->arch.pfn_to_mfn_frame_list_list == 0) )
+    while ( count-- && (fll == 0) )
+    {
         usleep(10000);
+        fll = GET_FIELD(shinfo, arch.pfn_to_mfn_frame_list_list);
+    }
 
-    if ( shinfo->arch.pfn_to_mfn_frame_list_list == 0 )
+    if ( fll == 0 )
     {
         ERROR("Timed out waiting for frame list updated.");
         return NULL;
     }
 
-    p = xc_map_foreign_range(xc_handle, dom, PAGE_SIZE, PROT_READ,
-                             shinfo->arch.pfn_to_mfn_frame_list_list);
+    p = xc_map_foreign_range(xc_handle, dom, PAGE_SIZE, PROT_READ, fll);
     if ( p == NULL )
         ERROR("Couldn't map p2m_frame_list_list (errno %d)", errno);
 
@@ -659,15 +658,16 @@ static xen_pfn_t *map_and_save_p2m_table(int xc_handle,
                                          int io_fd, 
                                          uint32_t dom,
                                          unsigned long p2m_size,
-                                         shared_info_t *live_shinfo)
+                                         shared_info_either_t *live_shinfo)
 {
-    vcpu_guest_context_t ctxt;
+    vcpu_guest_context_either_t ctxt;
 
     /* Double and single indirect references to the live P2M table */
-    xen_pfn_t *live_p2m_frame_list_list = NULL;
-    xen_pfn_t *live_p2m_frame_list = NULL;
+    void *live_p2m_frame_list_list = NULL;
+    void *live_p2m_frame_list = NULL;
 
-    /* A copy of the pfn-to-mfn table frame list. */
+    /* Copies of the above. */
+    xen_pfn_t *p2m_frame_list_list = NULL;
     xen_pfn_t *p2m_frame_list = NULL;
 
     /* The mapping of the live p2m table itself */
@@ -680,9 +680,28 @@ static xen_pfn_t *map_and_save_p2m_table(int xc_handle,
     if ( !live_p2m_frame_list_list )
         goto out;
 
+    /* Get a local copy of the live_P2M_frame_list_list */
+    if ( !(p2m_frame_list_list = malloc(PAGE_SIZE)) )
+    {
+        ERROR("Couldn't allocate p2m_frame_list_list array");
+        goto out;
+    }
+    memcpy(p2m_frame_list_list, live_p2m_frame_list_list, PAGE_SIZE);
+
+    /* Canonicalize guest's unsigned long vs ours */
+    if ( guest_width > sizeof(unsigned long) )
+        for ( i = 0; i < PAGE_SIZE/sizeof(unsigned long); i++ )
+            if ( i < PAGE_SIZE/guest_width )
+                p2m_frame_list_list[i] = ((uint64_t *)p2m_frame_list_list)[i];
+            else
+                p2m_frame_list_list[i] = 0;
+    else if ( guest_width < sizeof(unsigned long) )
+        for ( i = PAGE_SIZE/sizeof(unsigned long) - 1; i >= 0; i++ )
+            p2m_frame_list_list[i] = ((uint32_t *)p2m_frame_list_list)[i];
+
     live_p2m_frame_list =
         xc_map_foreign_batch(xc_handle, dom, PROT_READ,
-                             live_p2m_frame_list_list,
+                             p2m_frame_list_list,
                              P2M_FLL_ENTRIES);
     if ( !live_p2m_frame_list )
     {
@@ -690,22 +709,6 @@ static xen_pfn_t *map_and_save_p2m_table(int xc_handle,
         goto out;
     }
 
-
-    /* Map all the frames of the pfn->mfn table. For migrate to succeed,
-       the guest must not change which frames are used for this purpose.
-       (its not clear why it would want to change them, and we'll be OK
-       from a safety POV anyhow. */
-
-    p2m = xc_map_foreign_batch(xc_handle, dom, PROT_READ,
-                               live_p2m_frame_list,
-                               P2M_FL_ENTRIES);
-    if ( !p2m )
-    {
-        ERROR("Couldn't map p2m table");
-        goto out;
-    }
-    live_p2m = p2m; /* So that translation macros will work */
-    
     /* Get a local copy of the live_P2M_frame_list */
     if ( !(p2m_frame_list = malloc(P2M_FL_SIZE)) )
     {
@@ -714,19 +717,54 @@ static xen_pfn_t *map_and_save_p2m_table(int xc_handle,
     }
     memcpy(p2m_frame_list, live_p2m_frame_list, P2M_FL_SIZE);
 
-    /* Canonicalise the pfn-to-mfn table frame-number list. */
-    for ( i = 0; i < p2m_size; i += fpp )
+    /* Canonicalize guest's unsigned long vs ours */
+    if ( guest_width > sizeof(unsigned long) )
+        for ( i = 0; i < P2M_FL_ENTRIES; i++ )
+            p2m_frame_list[i] = ((uint64_t *)p2m_frame_list)[i];
+    else if ( guest_width < sizeof(unsigned long) )
+        for ( i = P2M_FL_ENTRIES - 1; i >= 0; i++ )
+            p2m_frame_list[i] = ((uint32_t *)p2m_frame_list)[i];
+
+
+    /* Map all the frames of the pfn->mfn table. For migrate to succeed,
+       the guest must not change which frames are used for this purpose.
+       (its not clear why it would want to change them, and we'll be OK
+       from a safety POV anyhow. */
+
+    p2m = xc_map_foreign_batch(xc_handle, dom, PROT_READ,
+                               p2m_frame_list,
+                               P2M_FL_ENTRIES);
+    if ( !p2m )
     {
-        if ( !translate_mfn_to_pfn(&p2m_frame_list[i/fpp]) )
+        ERROR("Couldn't map p2m table");
+        goto out;
+    }
+    live_p2m = p2m; /* So that translation macros will work */
+    
+    /* Canonicalise the pfn-to-mfn table frame-number list. */
+    for ( i = 0; i < p2m_size; i += FPP )
+    {
+        if ( !MFN_IS_IN_PSEUDOPHYS_MAP(p2m_frame_list[i/FPP]) )
         {
             ERROR("Frame# in pfn-to-mfn frame list is not in pseudophys");
-            ERROR("entry %d: p2m_frame_list[%ld] is 0x%"PRIx64, i, i/fpp,
-                  (uint64_t)p2m_frame_list[i/fpp]);
+            ERROR("entry %d: p2m_frame_list[%ld] is 0x%"PRIx64", max 0x%lx",
+                  i, i/FPP, (uint64_t)p2m_frame_list[i/FPP], max_mfn);
+            if ( p2m_frame_list[i/FPP] < max_mfn ) 
+            {
+                ERROR("m2p[0x%"PRIx64"] = 0x%"PRIx64, 
+                      (uint64_t)p2m_frame_list[i/FPP],
+                      (uint64_t)live_m2p[p2m_frame_list[i/FPP]]);
+                ERROR("p2m[0x%"PRIx64"] = 0x%"PRIx64, 
+                      (uint64_t)live_m2p[p2m_frame_list[i/FPP]],
+                      (uint64_t)p2m[live_m2p[p2m_frame_list[i/FPP]]]);
+
+            }
             goto out;
         }
+        p2m_frame_list[i/FPP] = mfn_to_pfn(p2m_frame_list[i/FPP]);
     }
 
-    if ( xc_vcpu_getcontext(xc_handle, dom, 0, &ctxt) )
+    if ( xc_vcpu_getcontext(xc_handle, dom, 0, &ctxt.c) )
     {
         ERROR("Could not get vcpu context");
         goto out;
@@ -737,25 +775,26 @@ static xen_pfn_t *map_and_save_p2m_table(int xc_handle,
      * a PAE guest understands extended CR3 (PDPTs above 4GB). Turns off
      * slow paths in the restore code.
      */
-    if ( (pt_levels == 3) &&
-         (ctxt.vm_assist & (1UL << VMASST_TYPE_pae_extended_cr3)) )
     {
         unsigned long signature = ~0UL;
-        uint32_t tot_sz   = sizeof(struct vcpu_guest_context) + 8;
-        uint32_t chunk_sz = sizeof(struct vcpu_guest_context);
+        uint32_t chunk_sz = ((guest_width==8) 
+                             ? sizeof(ctxt.x64) 
+                             : sizeof(ctxt.x32));
+        uint32_t tot_sz   = chunk_sz + 8;
         char chunk_sig[]  = "vcpu";
         if ( !write_exact(io_fd, &signature, sizeof(signature)) ||
              !write_exact(io_fd, &tot_sz,    sizeof(tot_sz)) ||
              !write_exact(io_fd, &chunk_sig, 4) ||
              !write_exact(io_fd, &chunk_sz,  sizeof(chunk_sz)) ||
-             !write_exact(io_fd, &ctxt,      sizeof(ctxt)) )
+             !write_exact(io_fd, &ctxt,      chunk_sz) )
         {
             ERROR("write: extended info");
             goto out;
         }
     }
 
-    if ( !write_exact(io_fd, p2m_frame_list, P2M_FL_SIZE) )
+    if ( !write_exact(io_fd, p2m_frame_list, 
+                      P2M_FL_ENTRIES * sizeof(xen_pfn_t)) )
     {
         ERROR("write: p2m_frame_list");
         goto out;
@@ -773,6 +812,9 @@ static xen_pfn_t *map_and_save_p2m_table(int xc_handle,
 
     if ( live_p2m_frame_list )
         munmap(live_p2m_frame_list, P2M_FLL_ENTRIES * PAGE_SIZE);
+
+    if ( p2m_frame_list_list ) 
+        free(p2m_frame_list_list);
 
     if ( p2m_frame_list ) 
         free(p2m_frame_list);
@@ -798,7 +840,7 @@ int xc_domain_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
     unsigned long shared_info_frame;
 
     /* A copy of the CPU context of the guest. */
-    vcpu_guest_context_t ctxt;
+    vcpu_guest_context_either_t ctxt;
 
     /* A table containing the type of each PFN (/not/ MFN!). */
     unsigned long *pfn_type = NULL;
@@ -808,7 +850,7 @@ int xc_domain_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
     char page[PAGE_SIZE];
 
     /* Live mapping of shared info structure */
-    shared_info_t *live_shinfo = NULL;
+    shared_info_either_t *live_shinfo = NULL;
 
     /* base of the region in which domain memory is mapped */
     unsigned char *region_base = NULL;
@@ -836,6 +878,8 @@ int xc_domain_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
     /* HVM: magic frames for ioreqs and xenstore comms. */
     uint64_t magic_pfns[3]; /* ioreq_pfn, bufioreq_pfn, store_pfn */
 
+    unsigned long mfn;
+
     /* If no explicit control parameters given, use defaults */
     max_iters  = max_iters  ? : DEF_MAX_ITERS;
     max_factor = max_factor ? : DEF_MAX_FACTOR;
@@ -843,7 +887,7 @@ int xc_domain_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
     initialize_mbit_rate();
 
     if ( !get_platform_info(xc_handle, dom,
-                            &max_mfn, &hvirt_start, &pt_levels) )
+                            &max_mfn, &hvirt_start, &pt_levels, &guest_width) )
     {
         ERROR("Unable to get platform info.");
         return 1;
@@ -1006,7 +1050,6 @@ int xc_domain_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
     if ( !hvm )
     {
         int err = 0;
-        unsigned long mfn;
 
         /* Map the P2M table, and write the list of P2M frames */
         live_p2m = map_and_save_p2m_table(xc_handle, io_fd, dom, 
@@ -1023,7 +1066,7 @@ int xc_domain_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
         
         for ( i = 0; i < p2m_size; i++ )
         {
-            mfn = live_p2m[i];
+            mfn = pfn_to_mfn(i);
             if( (mfn != INVALID_P2M_ENTRY) && (mfn_to_pfn(mfn) != i) )
             {
                 DPRINTF("i=0x%x mfn=%lx live_m2p=%lx\n", i,
@@ -1083,11 +1126,16 @@ int xc_domain_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
                 int n = permute(N, p2m_size, order_nr);
 
                 if ( debug )
-                    DPRINTF("%d pfn= %08lx mfn= %08lx %d  [mfn]= %08lx\n",
-                            iter, (unsigned long)n, hvm ? 0 : live_p2m[n],
-                            test_bit(n, to_send),
-                            hvm ? 0 : mfn_to_pfn(live_p2m[n]&0xFFFFF));
-
+                {
+                    DPRINTF("%d pfn= %08lx mfn= %08lx %d",
+                            iter, (unsigned long)n,
+                            hvm ? 0 : pfn_to_mfn(n),
+                            test_bit(n, to_send));
+                    if ( !hvm && is_mapped(pfn_to_mfn(n)) )
+                        DPRINTF("  [mfn]= %08lx",
+                                mfn_to_pfn(pfn_to_mfn(n)&0xFFFFF));
+                    DPRINTF("\n");
+                }
                 if ( !last_iter &&
                      test_bit(n, to_send) &&
                      test_bit(n, to_skip) )
@@ -1118,7 +1166,7 @@ int xc_domain_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
                 if ( hvm ) 
                     pfn_type[batch] = n;
                 else
-                    pfn_type[batch] = live_p2m[n];
+                    pfn_type[batch] = pfn_to_mfn(n);
                     
                 if ( !is_mapped(pfn_type[batch]) )
                 {
@@ -1451,7 +1499,7 @@ int xc_domain_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
 
         for ( i = 0, j = 0; i < p2m_size; i++ )
         {
-            if ( !is_mapped(live_p2m[i]) )
+            if ( !is_mapped(pfn_to_mfn(i)) )
                 j++;
         }
 
@@ -1463,7 +1511,7 @@ int xc_domain_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
 
         for ( i = 0, j = 0; i < p2m_size; )
         {
-            if ( !is_mapped(live_p2m[i]) )
+            if ( !is_mapped(pfn_to_mfn(i)) )
                 pfntab[j++] = i;
 
             i++;
@@ -1480,63 +1528,75 @@ int xc_domain_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
         }
     }
 
-    if ( xc_vcpu_getcontext(xc_handle, dom, 0, &ctxt) )
+    if ( xc_vcpu_getcontext(xc_handle, dom, 0, &ctxt.c) )
     {
         ERROR("Could not get vcpu context");
         goto out;
     }
 
     /* Canonicalise the suspend-record frame number. */
-    if ( !translate_mfn_to_pfn(&ctxt.user_regs.edx) )
+    mfn = GET_FIELD(&ctxt, user_regs.edx);
+    if ( !MFN_IS_IN_PSEUDOPHYS_MAP(mfn) )
     {
         ERROR("Suspend record is not in range of pseudophys map");
         goto out;
     }
+    SET_FIELD(&ctxt, user_regs.edx, mfn_to_pfn(mfn));
 
     for ( i = 0; i <= info.max_vcpu_id; i++ )
     {
         if ( !(vcpumap & (1ULL << i)) )
             continue;
 
-        if ( (i != 0) && xc_vcpu_getcontext(xc_handle, dom, i, &ctxt) )
+        if ( (i != 0) && xc_vcpu_getcontext(xc_handle, dom, i, &ctxt.c) )
         {
             ERROR("No context for VCPU%d", i);
             goto out;
         }
 
         /* Canonicalise each GDT frame number. */
-        for ( j = 0; (512*j) < ctxt.gdt_ents; j++ )
+        for ( j = 0; (512*j) < GET_FIELD(&ctxt, gdt_ents); j++ )
         {
-            if ( !translate_mfn_to_pfn(&ctxt.gdt_frames[j]) )
+            mfn = GET_FIELD(&ctxt, gdt_frames[j]);
+            if ( !MFN_IS_IN_PSEUDOPHYS_MAP(mfn) )
             {
                 ERROR("GDT frame is not in range of pseudophys map");
                 goto out;
             }
+            SET_FIELD(&ctxt, gdt_frames[j], mfn_to_pfn(mfn));
         }
 
         /* Canonicalise the page table base pointer. */
-        if ( !MFN_IS_IN_PSEUDOPHYS_MAP(xen_cr3_to_pfn(ctxt.ctrlreg[3])) )
+        if ( !MFN_IS_IN_PSEUDOPHYS_MAP(xen_cr3_to_pfn(
+                                          GET_FIELD(&ctxt, ctrlreg[3]))) )
         {
             ERROR("PT base is not in range of pseudophys map");
             goto out;
         }
-        ctxt.ctrlreg[3] = 
-            xen_pfn_to_cr3(mfn_to_pfn(xen_cr3_to_pfn(ctxt.ctrlreg[3])));
+        SET_FIELD(&ctxt, ctrlreg[3], 
+            xen_pfn_to_cr3(
+                mfn_to_pfn(
+                    xen_cr3_to_pfn(
+                        GET_FIELD(&ctxt, ctrlreg[3])))));
 
         /* Guest pagetable (x86/64) stored in otherwise-unused CR1. */
-        if ( (pt_levels == 4) && ctxt.ctrlreg[1] )
+        if ( (pt_levels == 4) && ctxt.x64.ctrlreg[1] )
         {
-            if ( !MFN_IS_IN_PSEUDOPHYS_MAP(xen_cr3_to_pfn(ctxt.ctrlreg[1])) )
+            if ( !MFN_IS_IN_PSEUDOPHYS_MAP(
+                     xen_cr3_to_pfn(ctxt.x64.ctrlreg[1])) )
             {
                 ERROR("PT base is not in range of pseudophys map");
                 goto out;
             }
             /* Least-significant bit means 'valid PFN'. */
-            ctxt.ctrlreg[1] = 1 |
-                xen_pfn_to_cr3(mfn_to_pfn(xen_cr3_to_pfn(ctxt.ctrlreg[1])));
+            ctxt.x64.ctrlreg[1] = 1 |
+                xen_pfn_to_cr3(
+                    mfn_to_pfn(xen_cr3_to_pfn(ctxt.x64.ctrlreg[1])));
         }
 
-        if ( !write_exact(io_fd, &ctxt, sizeof(ctxt)) )
+        if ( !write_exact(io_fd, &ctxt, ((guest_width==8) 
+                                         ? sizeof(ctxt.x64) 
+                                         : sizeof(ctxt.x32))) )
         {
             ERROR("Error when writing to state file (1) (errno %d)", errno);
             goto out;
@@ -1547,7 +1607,8 @@ int xc_domain_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
      * Reset the MFN to be a known-invalid value. See map_frame_list_list().
      */
     memcpy(page, live_shinfo, PAGE_SIZE);
-    ((shared_info_t *)page)->arch.pfn_to_mfn_frame_list_list = 0;
+    SET_FIELD(((shared_info_either_t *)page), 
+              arch.pfn_to_mfn_frame_list_list, 0);
     if ( !write_exact(io_fd, page, PAGE_SIZE) )
     {
         ERROR("Error when writing to state file (1) (errno %d)", errno);

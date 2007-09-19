@@ -133,13 +133,6 @@ typedef l4_pgentry_64_t l4_pgentry_t;
 #define PAGE_SHIFT_X86          12
 #define PAGE_SIZE_X86           (1UL << PAGE_SHIFT_X86)
 #define PAGE_MASK_X86           (~(PAGE_SIZE_X86-1))
-#if defined(__i386__)
-#define MADDR_BITS_X86          44
-#elif defined(__x86_64__)
-#define MADDR_BITS_X86          52
-#endif
-#define MFN_MASK_X86            ((1ULL << (MADDR_BITS_X86 - PAGE_SHIFT_X86)) - 1)
-#define MADDR_MASK_X86          (MFN_MASK_X86 << PAGE_SHIFT_X86)
 
 #define PAGE_SHIFT_IA64         14
 #define PAGE_SIZE_IA64          (1UL << PAGE_SHIFT_IA64)
@@ -147,19 +140,28 @@ typedef l4_pgentry_64_t l4_pgentry_t;
 
 #define ROUNDUP(_x,_w) (((unsigned long)(_x)+(1UL<<(_w))-1) & ~((1UL<<(_w))-1))
 
-/* Number of xen_pfn_t in a page */
-#define fpp             (PAGE_SIZE/sizeof(xen_pfn_t))
 
-/* XXX SMH: following 3 skanky macros rely on variable p2m_size being set */
+/* XXX SMH: following skanky macros rely on variable p2m_size being set */
+/* XXX TJD: also, "guest_width" should be the guest's sizeof(unsigned long) */
+
+/* Number of xen_pfn_t in a page */
+
+#define FPP             (PAGE_SIZE/(guest_width))
 
 /* Number of entries in the pfn_to_mfn_frame_list_list */
-#define P2M_FLL_ENTRIES (((p2m_size)+(fpp*fpp)-1)/(fpp*fpp))
+#define P2M_FLL_ENTRIES (((p2m_size)+(FPP*FPP)-1)/(FPP*FPP))
 
 /* Number of entries in the pfn_to_mfn_frame_list */
-#define P2M_FL_ENTRIES  (((p2m_size)+fpp-1)/fpp)
+#define P2M_FL_ENTRIES  (((p2m_size)+FPP-1)/FPP)
 
 /* Size in bytes of the pfn_to_mfn_frame_list     */
-#define P2M_FL_SIZE     ((P2M_FL_ENTRIES)*sizeof(unsigned long))
+#define P2M_FL_SIZE     ((P2M_FL_ENTRIES)*(guest_width))
+
+/* Masks for PTE<->PFN conversions */
+#define MADDR_BITS_X86  ((guest_width == 8) ? 52 : 44)
+#define MFN_MASK_X86    ((1ULL << (MADDR_BITS_X86 - PAGE_SHIFT_X86)) - 1)
+#define MADDR_MASK_X86  (MFN_MASK_X86 << PAGE_SHIFT_X86)
+
 
 #define PAEKERN_no           0
 #define PAEKERN_yes          1

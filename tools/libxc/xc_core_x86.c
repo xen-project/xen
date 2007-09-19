@@ -21,6 +21,9 @@
 #include "xg_private.h"
 #include "xc_core.h"
 
+/* Don't yet support cross-address-size core dump */
+#define guest_width (sizeof (unsigned long))
+
 static int nr_gpfns(int xc_handle, domid_t domid)
 {
     return xc_memory_op(xc_handle, XENMEM_maximum_gpfn, &domid) + 1;

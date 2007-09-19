@@ -56,6 +56,10 @@ static xen_pfn_t *p2m = NULL;
 /* A table of P2M mappings in the current region */
 static xen_pfn_t *p2m_batch = NULL;
 
+/* Address size of the guest, in bytes */
+unsigned int guest_width;
+
+
 static ssize_t
 read_exact(int fd, void *buf, size_t count)
 {
@@ -168,22 +172,17 @@ static int uncanonicalize_pagetable(int xc_handle, uint32_t dom,
 static xen_pfn_t *load_p2m_frame_list(int io_fd, int *pae_extended_cr3)
 {
     xen_pfn_t *p2m_frame_list;
-    vcpu_guest_context_t ctxt;
+    vcpu_guest_context_either_t ctxt;
+    xen_pfn_t p2m_fl_zero;
 
-    if ( (p2m_frame_list = malloc(P2M_FL_SIZE)) == NULL )
-    {
-        ERROR("Couldn't allocate p2m_frame_list array");
-        return NULL;
-    }
-    
     /* Read first entry of P2M list, or extended-info signature (~0UL). */
-    if ( !read_exact(io_fd, p2m_frame_list, sizeof(long)) )
+    if ( !read_exact(io_fd, &p2m_fl_zero, sizeof(long)) )
     {
         ERROR("read extended-info signature failed");
         return NULL;
     }
     
-    if ( p2m_frame_list[0] == ~0UL )
+    if ( p2m_fl_zero == ~0UL )
     {
         uint32_t tot_bytes;
         
@@ -211,25 +210,42 @@ static xen_pfn_t *load_p2m_frame_list(int io_fd, int *pae_extended_cr3)
             /* VCPU context structure? */
             if ( !strncmp(chunk_sig, "vcpu", 4) )
             {
-                if ( !read_exact(io_fd, &ctxt, sizeof(ctxt)) )
+                /* Pick a guest word-size and PT depth from the ctxt size */
+                if ( chunk_bytes == sizeof (ctxt.x32) )
+                {
+                    guest_width = 4;
+                    if ( pt_levels > 2 ) 
+                        pt_levels = 3; 
+                }
+                else if ( chunk_bytes == sizeof (ctxt.x64) )
+                {
+                    guest_width = 8;
+                    pt_levels = 4;
+                }
+                else 
+                {
+                    ERROR("bad extended-info context size %d", chunk_bytes);
+                    return NULL;
+                }
+
+                if ( !read_exact(io_fd, &ctxt, chunk_bytes) )
                 {
                     ERROR("read extended-info vcpu context failed");
                     return NULL;
                 }
-                tot_bytes   -= sizeof(struct vcpu_guest_context);
-                chunk_bytes -= sizeof(struct vcpu_guest_context);
-                
-                if ( ctxt.vm_assist & (1UL << VMASST_TYPE_pae_extended_cr3) )
+                tot_bytes -= chunk_bytes;
+                chunk_bytes = 0;
+
+                if ( GET_FIELD(&ctxt, vm_assist) 
+                     & (1UL << VMASST_TYPE_pae_extended_cr3) )
                     *pae_extended_cr3 = 1;
             }
             
             /* Any remaining bytes of this chunk: read and discard. */
             while ( chunk_bytes )
             {
-                unsigned long sz = chunk_bytes;
-                if ( sz > P2M_FL_SIZE )
-                    sz = P2M_FL_SIZE;
-                if ( !read_exact(io_fd, p2m_frame_list, sz) )
+                unsigned long sz = MIN(chunk_bytes, sizeof(xen_pfn_t));
+                if ( !read_exact(io_fd, &p2m_fl_zero, sz) )
                 {
                     ERROR("read-and-discard extended-info chunk bytes failed");
                     return NULL;
@@ -240,15 +256,25 @@ static xen_pfn_t *load_p2m_frame_list(int io_fd, int *pae_extended_cr3)
         }
 
         /* Now read the real first entry of P2M list. */
-        if ( !read_exact(io_fd, p2m_frame_list, sizeof(long)) )
+        if ( !read_exact(io_fd, &p2m_fl_zero, sizeof(xen_pfn_t)) )
         {
             ERROR("read first entry of p2m_frame_list failed");
             return NULL;
         }
     }
 
-    /* First entry is already read into the p2m array. */
-    if ( !read_exact(io_fd, &p2m_frame_list[1], P2M_FL_SIZE - sizeof(long)) )
+    /* Now that we know the guest's word-size, can safely allocate 
+     * the p2m frame list */
+    if ( (p2m_frame_list = malloc(P2M_FL_SIZE)) == NULL )
+    {
+        ERROR("Couldn't allocate p2m_frame_list array");
+        return NULL;
+    }
+
+    /* First entry has already been read. */
+    p2m_frame_list[0] = p2m_fl_zero;
+    if ( !read_exact(io_fd, &p2m_frame_list[1], 
+                     (P2M_FL_ENTRIES - 1) * sizeof(xen_pfn_t)) )
     {
         ERROR("read p2m_frame_list failed");
         return NULL;
@@ -272,11 +298,11 @@ int xc_domain_restore(int xc_handle, int io_fd, uint32_t dom,
     /* The new domain's shared-info frame number. */
     unsigned long shared_info_frame;
     unsigned char shared_info_page[PAGE_SIZE]; /* saved contents from file */
-    shared_info_t *old_shared_info = (shared_info_t *)shared_info_page;
-    shared_info_t *new_shared_info;
+    shared_info_either_t *old_shared_info = (shared_info_either_t *)shared_info_page;
+    shared_info_either_t *new_shared_info;
 
     /* A copy of the CPU context of the guest. */
-    vcpu_guest_context_t ctxt;
+    vcpu_guest_context_either_t ctxt;
 
     /* A table containing the type of each PFN (/not/ MFN!). */
     unsigned long *pfn_type = NULL;
@@ -291,7 +317,7 @@ int xc_domain_restore(int xc_handle, int io_fd, uint32_t dom,
     xen_pfn_t *p2m_frame_list = NULL;
     
     /* A temporary mapping of the guest's start_info page. */
-    start_info_t *start_info;
+    start_info_either_t *start_info;
 
     /* Our mapping of the current region (batch) */
     char *region_base;
@@ -324,16 +350,38 @@ int xc_domain_restore(int xc_handle, int io_fd, uint32_t dom,
     }
     DPRINTF("xc_domain_restore start: p2m_size = %lx\n", p2m_size);
 
-    if ( !hvm )
+    if ( !get_platform_info(xc_handle, dom,
+                            &max_mfn, &hvirt_start, &pt_levels, &guest_width) )
     {
-        /*
-         * XXX For now, 32bit dom0's can only save/restore 32bit domUs
-         * on 64bit hypervisors.
-         */
+        ERROR("Unable to get platform info.");
+        return 1;
+    }
+    
+    /* The *current* word size of the guest isn't very interesting; for now
+     * assume the guest will be the same as we are.  We'll fix that later
+     * if we discover otherwise. */
+    guest_width = sizeof(unsigned long);
+    pt_levels = (guest_width == 8) ? 4 : (pt_levels == 2) ? 2 : 3; 
+    
+    if ( lock_pages(&ctxt, sizeof(ctxt)) )
+    {
+        /* needed for build domctl, but might as well do early */
+        ERROR("Unable to lock ctxt");
+        return 1;
+    }
+
+    if ( !hvm ) 
+    {
+        /* Load the p2m frame list, plus potential extended info chunk */
+        p2m_frame_list = load_p2m_frame_list(io_fd, &pae_extended_cr3);
+        if ( !p2m_frame_list )
+            goto out;
+
+        /* Now that we know the word size, tell Xen about it */
         memset(&domctl, 0, sizeof(domctl));
         domctl.domain = dom;
         domctl.cmd    = XEN_DOMCTL_set_address_size;
-        domctl.u.address_size.size = sizeof(unsigned long) * 8;
+        domctl.u.address_size.size = guest_width * 8;
         rc = do_domctl(xc_handle, &domctl);
         if ( rc != 0 )
         {
@@ -343,30 +391,8 @@ int xc_domain_restore(int xc_handle, int io_fd, uint32_t dom,
         rc = 1;
     }
 
-    if ( !get_platform_info(xc_handle, dom,
-                            &max_mfn, &hvirt_start, &pt_levels) )
-    {
-        ERROR("Unable to get platform info.");
-        return 1;
-    }
-
-    if ( lock_pages(&ctxt, sizeof(ctxt)) )
-    {
-        /* needed for build domctl, but might as well do early */
-        ERROR("Unable to lock ctxt");
-        return 1;
-    }
-
-    /* Load the p2m frame list, plus potential extended info chunk */
-    if ( !hvm ) 
-    {
-        p2m_frame_list = load_p2m_frame_list(io_fd, &pae_extended_cr3);
-        if ( !p2m_frame_list )
-            goto out;
-    }
-
     /* We want zeroed memory so use calloc rather than malloc. */
-    p2m        = calloc(p2m_size, sizeof(xen_pfn_t));
+    p2m        = calloc(p2m_size, MAX(guest_width, sizeof (xen_pfn_t))); 
     pfn_type   = calloc(p2m_size, sizeof(unsigned long));
     region_mfn = calloc(MAX_BATCH_SIZE, sizeof(xen_pfn_t));
     p2m_batch  = calloc(MAX_BATCH_SIZE, sizeof(xen_pfn_t));
@@ -963,14 +989,16 @@ int xc_domain_restore(int xc_handle, int io_fd, uint32_t dom,
         if ( !(vcpumap & (1ULL << i)) )
             continue;
 
-        if ( !read_exact(io_fd, &ctxt, sizeof(ctxt)) )
+        if ( !read_exact(io_fd, &ctxt, ((guest_width == 8)
+                                        ? sizeof(ctxt.x64)
+                                        : sizeof(ctxt.x32))) )
         {
             ERROR("Error when reading ctxt %d", i);
             goto out;
         }
 
         if ( !new_ctxt_format )
-            ctxt.flags |= VGCF_online;
+            SET_FIELD(&ctxt, flags, GET_FIELD(&ctxt, flags) | VGCF_online);
 
         if ( i == 0 )
         {
@@ -978,48 +1006,49 @@ int xc_domain_restore(int xc_handle, int io_fd, uint32_t dom,
              * Uncanonicalise the suspend-record frame number and poke
              * resume record.
              */
-            pfn = ctxt.user_regs.edx;
+            pfn = GET_FIELD(&ctxt, user_regs.edx);
             if ( (pfn >= p2m_size) ||
                  (pfn_type[pfn] != XEN_DOMCTL_PFINFO_NOTAB) )
             {
                 ERROR("Suspend record frame number is bad");
                 goto out;
             }
-            ctxt.user_regs.edx = mfn = p2m[pfn];
+            mfn = p2m[pfn];
+            SET_FIELD(&ctxt, user_regs.edx, mfn);
             start_info = xc_map_foreign_range(
                 xc_handle, dom, PAGE_SIZE, PROT_READ | PROT_WRITE, mfn);
-            start_info->nr_pages = p2m_size;
-            start_info->shared_info = shared_info_frame << PAGE_SHIFT;
-            start_info->flags = 0;
-            *store_mfn = start_info->store_mfn = p2m[start_info->store_mfn];
-            start_info->store_evtchn = store_evtchn;
-            start_info->console.domU.mfn = p2m[start_info->console.domU.mfn];
-            start_info->console.domU.evtchn = console_evtchn;
-            *console_mfn = start_info->console.domU.mfn;
+            SET_FIELD(start_info, nr_pages, p2m_size);
+            SET_FIELD(start_info, shared_info, shared_info_frame<<PAGE_SHIFT);
+            SET_FIELD(start_info, flags, 0);
+            *store_mfn = p2m[GET_FIELD(start_info, store_mfn)];
+            SET_FIELD(start_info, store_mfn, *store_mfn);
+            SET_FIELD(start_info, store_evtchn, store_evtchn);
+            *console_mfn = p2m[GET_FIELD(start_info, console.domU.mfn)];
+            SET_FIELD(start_info, console.domU.mfn, *console_mfn);
+            SET_FIELD(start_info, console.domU.evtchn, console_evtchn);
             munmap(start_info, PAGE_SIZE);
         }
-
         /* Uncanonicalise each GDT frame number. */
-        if ( ctxt.gdt_ents > 8192 )
+        if ( GET_FIELD(&ctxt, gdt_ents) > 8192 )
         {
             ERROR("GDT entry count out of range");
             goto out;
         }
 
-        for ( j = 0; (512*j) < ctxt.gdt_ents; j++ )
+        for ( j = 0; (512*j) < GET_FIELD(&ctxt, gdt_ents); j++ )
         {
-            pfn = ctxt.gdt_frames[j];
+            pfn = GET_FIELD(&ctxt, gdt_frames[j]);
             if ( (pfn >= p2m_size) ||
                  (pfn_type[pfn] != XEN_DOMCTL_PFINFO_NOTAB) )
             {
-                ERROR("GDT frame number is bad");
+                ERROR("GDT frame number %i (0x%lx) is bad", 
+                      j, (unsigned long)pfn);
                 goto out;
             }
-            ctxt.gdt_frames[j] = p2m[pfn];
+            SET_FIELD(&ctxt, gdt_frames[j], p2m[pfn]);
         }
-
         /* Uncanonicalise the page table base pointer. */
-        pfn = xen_cr3_to_pfn(ctxt.ctrlreg[3]);
+        pfn = xen_cr3_to_pfn(GET_FIELD(&ctxt, ctrlreg[3]));
 
         if ( pfn >= p2m_size )
         {
@@ -1036,21 +1065,18 @@ int xc_domain_restore(int xc_handle, int io_fd, uint32_t dom,
                   (unsigned long)pt_levels<<XEN_DOMCTL_PFINFO_LTAB_SHIFT);
             goto out;
         }
-
-        ctxt.ctrlreg[3] = xen_pfn_to_cr3(p2m[pfn]);
+        SET_FIELD(&ctxt, ctrlreg[3], xen_pfn_to_cr3(p2m[pfn]));
 
         /* Guest pagetable (x86/64) stored in otherwise-unused CR1. */
-        if ( (pt_levels == 4) && ctxt.ctrlreg[1] )
+        if ( (pt_levels == 4) && (ctxt.x64.ctrlreg[1] & 1) )
         {
-            pfn = xen_cr3_to_pfn(ctxt.ctrlreg[1]);
-
+            pfn = xen_cr3_to_pfn(ctxt.x64.ctrlreg[1] & ~1);
             if ( pfn >= p2m_size )
             {
-                ERROR("User PT base is bad: pfn=%lu p2m_size=%lu type=%08lx",
-                      pfn, p2m_size, pfn_type[pfn]);
+                ERROR("User PT base is bad: pfn=%lu p2m_size=%lu",
+                      pfn, p2m_size);
                 goto out;
             }
-
             if ( (pfn_type[pfn] & XEN_DOMCTL_PFINFO_LTABTYPE_MASK) !=
                  ((unsigned long)pt_levels<<XEN_DOMCTL_PFINFO_LTAB_SHIFT) )
             {
@@ -1059,14 +1085,12 @@ int xc_domain_restore(int xc_handle, int io_fd, uint32_t dom,
                       (unsigned long)pt_levels<<XEN_DOMCTL_PFINFO_LTAB_SHIFT);
                 goto out;
             }
-
-            ctxt.ctrlreg[1] = xen_pfn_to_cr3(p2m[pfn]);
+            ctxt.x64.ctrlreg[1] = xen_pfn_to_cr3(p2m[pfn]);
         }
-
         domctl.cmd = XEN_DOMCTL_setvcpucontext;
         domctl.domain = (domid_t)dom;
         domctl.u.vcpucontext.vcpu = i;
-        set_xen_guest_handle(domctl.u.vcpucontext.ctxt, &ctxt);
+        set_xen_guest_handle(domctl.u.vcpucontext.ctxt, &ctxt.c);
         rc = xc_domctl(xc_handle, &domctl);
         if ( rc != 0 )
         {
@@ -1087,22 +1111,16 @@ int xc_domain_restore(int xc_handle, int io_fd, uint32_t dom,
         xc_handle, dom, PAGE_SIZE, PROT_WRITE, shared_info_frame);
 
     /* restore saved vcpu_info and arch specific info */
-    memcpy(&new_shared_info->vcpu_info,
-	   &old_shared_info->vcpu_info,
-	   sizeof(new_shared_info->vcpu_info));
-    memcpy(&new_shared_info->arch,
-	   &old_shared_info->arch,
-	   sizeof(new_shared_info->arch));
+    MEMCPY_FIELD(new_shared_info, old_shared_info, vcpu_info);
+    MEMCPY_FIELD(new_shared_info, old_shared_info, arch);
 
     /* clear any pending events and the selector */
-    memset(&(new_shared_info->evtchn_pending[0]), 0,
-           sizeof (new_shared_info->evtchn_pending));
+    MEMSET_ARRAY_FIELD(new_shared_info, evtchn_pending, 0);
     for ( i = 0; i < MAX_VIRT_CPUS; i++ )
-        new_shared_info->vcpu_info[i].evtchn_pending_sel = 0;
+	    SET_FIELD(new_shared_info, vcpu_info[i].evtchn_pending_sel, 0);
 
     /* mask event channels */
-    memset(&(new_shared_info->evtchn_mask[0]), 0xff,
-           sizeof (new_shared_info->evtchn_mask));
+    MEMSET_ARRAY_FIELD(new_shared_info, evtchn_mask, 0xff);
 
     /* leave wallclock time. set by hypervisor */
     munmap(new_shared_info, PAGE_SIZE);
@@ -1113,10 +1131,9 @@ int xc_domain_restore(int xc_handle, int io_fd, uint32_t dom,
         pfn = p2m_frame_list[i];
         if ( (pfn >= p2m_size) || (pfn_type[pfn] != XEN_DOMCTL_PFINFO_NOTAB) )
         {
-            ERROR("PFN-to-MFN frame number is bad");
+            ERROR("PFN-to-MFN frame number %i (%#lx) is bad", i, pfn);
             goto out;
         }
-
         p2m_frame_list[i] = p2m[pfn];
     }
 
@@ -1128,8 +1145,17 @@ int xc_domain_restore(int xc_handle, int io_fd, uint32_t dom,
         goto out;
     }
 
-    memcpy(live_p2m, p2m, ROUNDUP(p2m_size * sizeof(xen_pfn_t), PAGE_SHIFT));
-    munmap(live_p2m, ROUNDUP(p2m_size * sizeof(xen_pfn_t), PAGE_SHIFT));
+    /* If the domain we're restoring has a different word size to ours,
+     * we need to repack the p2m appropriately */
+    if ( guest_width > sizeof (xen_pfn_t) )
+        for ( i = p2m_size - 1; i >= 0; i-- )
+            ((uint64_t *)p2m)[i] = p2m[i];
+    else if ( guest_width > sizeof (xen_pfn_t) )
+        for ( i = 0; i < p2m_size; i++ )   
+            ((uint32_t *)p2m)[i] = p2m[i];
+
+    memcpy(live_p2m, p2m, ROUNDUP(p2m_size * guest_width, PAGE_SHIFT));
+    munmap(live_p2m, ROUNDUP(p2m_size * guest_width, PAGE_SHIFT));
 
     DPRINTF("Domain ready to be built.\n");
     rc = 0;
