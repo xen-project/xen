@@ -648,55 +648,131 @@ void vmx_do_resume(struct vcpu *v)
     reset_stack_and_jump(vmx_asm_do_vmentry);
 }
 
-/* Dump a section of VMCS */
-static void print_section(char *header, uint32_t start, 
-                          uint32_t end, int incr)
+static void vmx_dump_sel(char *name, enum x86_segment seg)
 {
-    uint32_t addr, j;
-    unsigned long val;
-    int code, rc;
-    char *fmt[4] = {"0x%04lx ", "0x%016lx ", "0x%08lx ", "0x%016lx "};
-    char *err[4] = {"------ ", "------------------ ", 
-                    "---------- ", "------------------ "};
-
-    /* Find width of the field (encoded in bits 14:13 of address) */
-    code = (start>>13)&3;
-
-    if (header)
-        printk("\t %s", header);
-
-    for (addr=start, j=0; addr<=end; addr+=incr, j++) {
-
-        if (!(j&3))
-            printk("\n\t\t0x%08x: ", addr);
-
-        val = __vmread_safe(addr, &rc);
-        if (rc == 0)
-            printk(fmt[code], val);
-        else
-            printk("%s", err[code]);
-    }
-
-    printk("\n");
+    struct segment_register sreg;
+    hvm_get_segment_register(current, seg, &sreg);
+    printk("%s: sel=0x%04x, attr=0x%04x, limit=0x%08x, base=0x%016llx\n", 
+           name, sreg.sel, sreg.attr.bytes, sreg.limit,
+           (unsigned long long)sreg.base);
 }
 
-/* Dump current VMCS */
+static unsigned long vmr(unsigned long field)
+{
+    int rc;
+    unsigned long val;
+    val = __vmread_safe(field, &rc);
+    return rc ? 0 : val;
+}
+
 void vmcs_dump_vcpu(void)
 {
-    print_section("16-bit Guest-State Fields", 0x800, 0x80e, 2);
-    print_section("16-bit Host-State Fields", 0xc00, 0xc0c, 2);
-    print_section("64-bit Control Fields", 0x2000, 0x2013, 1);
-    print_section("64-bit Guest-State Fields", 0x2800, 0x2803, 1);
-    print_section("32-bit Control Fields", 0x4000, 0x401c, 2);
-    print_section("32-bit RO Data Fields", 0x4400, 0x440e, 2);
-    print_section("32-bit Guest-State Fields", 0x4800, 0x482a, 2);
-    print_section("32-bit Host-State Fields", 0x4c00, 0x4c00, 2);
-    print_section("Natural 64-bit Control Fields", 0x6000, 0x600e, 2);
-    print_section("64-bit RO Data Fields", 0x6400, 0x640A, 2);
-    print_section("Natural 64-bit Guest-State Fields", 0x6800, 0x6826, 2);
-    print_section("Natural 64-bit Host-State Fields", 0x6c00, 0x6c16, 2);
-}
+    unsigned long long x;
 
+    printk("*** Guest State ***\n");
+    printk("CR0: actual=0x%016llx, shadow=0x%016llx, gh_mask=%016llx\n",
+           (unsigned long long)vmr(GUEST_CR0),
+           (unsigned long long)vmr(CR0_READ_SHADOW), 
+           (unsigned long long)vmr(CR0_GUEST_HOST_MASK));
+    printk("CR4: actual=0x%016llx, shadow=0x%016llx, gh_mask=%016llx\n",
+           (unsigned long long)vmr(GUEST_CR4),
+           (unsigned long long)vmr(CR4_READ_SHADOW), 
+           (unsigned long long)vmr(CR4_GUEST_HOST_MASK));
+    printk("CR3: actual=0x%016llx, target_count=%d\n",
+           (unsigned long long)vmr(GUEST_CR3),
+           (int)vmr(CR3_TARGET_COUNT));
+    printk("     target0=%016llx, target1=%016llx\n",
+           (unsigned long long)vmr(CR3_TARGET_VALUE0),
+           (unsigned long long)vmr(CR3_TARGET_VALUE1));
+    printk("     target2=%016llx, target3=%016llx\n",
+           (unsigned long long)vmr(CR3_TARGET_VALUE2),
+           (unsigned long long)vmr(CR3_TARGET_VALUE3));
+    printk("RSP = 0x%016llx  RIP = 0x%016llx\n", 
+           (unsigned long long)vmr(GUEST_RSP),
+           (unsigned long long)vmr(GUEST_RIP));
+    printk("RFLAGS=0x%016llx  DR7 = 0x%016llx\n", 
+           (unsigned long long)vmr(GUEST_DR7),
+           (unsigned long long)vmr(GUEST_RFLAGS));
+    printk("Sysenter RSP=%016llx CS:RIP=%04x:%016llx\n",
+           (unsigned long long)vmr(GUEST_SYSENTER_ESP),
+           (int)vmr(GUEST_SYSENTER_CS),
+           (unsigned long long)vmr(GUEST_SYSENTER_EIP));
+    vmx_dump_sel("CS", x86_seg_cs);
+    vmx_dump_sel("DS", x86_seg_ds);
+    vmx_dump_sel("SS", x86_seg_ss);
+    vmx_dump_sel("ES", x86_seg_es);
+    vmx_dump_sel("FS", x86_seg_fs);
+    vmx_dump_sel("GS", x86_seg_gs);
+    vmx_dump_sel("GDTR", x86_seg_gdtr);
+    vmx_dump_sel("LDTR", x86_seg_ldtr);
+    vmx_dump_sel("IDTR", x86_seg_idtr);
+    vmx_dump_sel("TR", x86_seg_tr);
+    x  = (unsigned long long)vmr(TSC_OFFSET_HIGH) << 32;
+    x |= (uint32_t)vmr(TSC_OFFSET);
+    printk("TSC Offset = %016llx\n", x);
+    x  = (unsigned long long)vmr(GUEST_IA32_DEBUGCTL) << 32;
+    x |= (uint32_t)vmr(GUEST_IA32_DEBUGCTL);
+    printk("DebugCtl=%016llx DebugExceptions=%016llx\n", x,
+           (unsigned long long)vmr(GUEST_PENDING_DBG_EXCEPTIONS));
+    printk("Interruptibility=%04x ActivityState=%04x\n",
+           (int)vmr(GUEST_INTERRUPTIBILITY_INFO),
+           (int)vmr(GUEST_ACTIVITY_STATE));
+
+    printk("*** Host State ***\n");
+    printk("RSP = 0x%016llx  RIP = 0x%016llx\n", 
+           (unsigned long long)vmr(HOST_RSP),
+           (unsigned long long)vmr(HOST_RIP));
+    printk("CS=%04x DS=%04x ES=%04x FS=%04x GS=%04x SS=%04x TR=%04x\n",
+           (uint16_t)vmr(HOST_CS_SELECTOR),
+           (uint16_t)vmr(HOST_DS_SELECTOR),
+           (uint16_t)vmr(HOST_ES_SELECTOR),
+           (uint16_t)vmr(HOST_FS_SELECTOR),
+           (uint16_t)vmr(HOST_GS_SELECTOR),
+           (uint16_t)vmr(HOST_SS_SELECTOR),
+           (uint16_t)vmr(HOST_TR_SELECTOR));
+    printk("FSBase=%016llx GSBase=%016llx TRBase=%016llx\n",
+           (unsigned long long)vmr(HOST_FS_BASE),
+           (unsigned long long)vmr(HOST_GS_BASE),
+           (unsigned long long)vmr(HOST_TR_BASE));
+    printk("GDTBase=%016llx IDTBase=%016llx\n",
+           (unsigned long long)vmr(HOST_GDTR_BASE),
+           (unsigned long long)vmr(HOST_IDTR_BASE));
+    printk("CR0=%016llx CR3=%016llx CR4=%016llx\n",
+           (unsigned long long)vmr(HOST_CR0),
+           (unsigned long long)vmr(HOST_CR3),
+           (unsigned long long)vmr(HOST_CR4));
+    printk("Sysenter RSP=%016llx CS:RIP=%04x:%016llx\n",
+           (unsigned long long)vmr(HOST_IA32_SYSENTER_ESP),
+           (int)vmr(HOST_IA32_SYSENTER_CS),
+           (unsigned long long)vmr(HOST_IA32_SYSENTER_EIP));
+
+    printk("*** Control State ***\n");
+    printk("PinBased=%08x CPUBased=%08x SecondaryExec=%08x\n",
+           (uint32_t)vmr(PIN_BASED_VM_EXEC_CONTROL),
+           (uint32_t)vmr(CPU_BASED_VM_EXEC_CONTROL),
+           (uint32_t)vmr(SECONDARY_VM_EXEC_CONTROL));
+    printk("EntryControls=%08x ExitControls=%08x\n",
+           (uint32_t)vmr(VM_ENTRY_CONTROLS),
+           (uint32_t)vmr(VM_EXIT_CONTROLS));
+    printk("ExceptionBitmap=%08x\n",
+           (uint32_t)vmr(EXCEPTION_BITMAP));
+    printk("VMEntry: intr_info=%08x errcode=%08x ilen=%08x\n",
+           (uint32_t)vmr(VM_ENTRY_INTR_INFO),
+           (uint32_t)vmr(VM_ENTRY_EXCEPTION_ERROR_CODE),
+           (uint32_t)vmr(VM_ENTRY_INSTRUCTION_LEN));
+    printk("VMExit: intr_info=%08x errcode=%08x ilen=%08x\n",
+           (uint32_t)vmr(VM_EXIT_INTR_INFO),
+           (uint32_t)vmr(VM_EXIT_INTR_ERROR_CODE),
+           (uint32_t)vmr(VM_ENTRY_INSTRUCTION_LEN));
+    printk("        reason=%08x qualification=%08x\n",
+           (uint32_t)vmr(VM_EXIT_REASON),
+           (uint32_t)vmr(EXIT_QUALIFICATION));
+    printk("IDTVectoring: info=%08x errcode=%08x\n",
+           (uint32_t)vmr(IDT_VECTORING_INFO),
+           (uint32_t)vmr(IDT_VECTORING_ERROR_CODE));
+    printk("TPR Threshold = 0x%02x\n",
+           (uint32_t)vmr(TPR_THRESHOLD));
+}
 
 static void vmcs_dump(unsigned char ch)
 {
