@@ -29,7 +29,11 @@ endif
 LINUX_DIR     = build-linux-$(LINUX_VER)$(EXTRAVERSION)_$(XEN_TARGET_ARCH)
 
 IMAGE_TARGET ?= vmlinuz
+ifneq ($(XEN_TARGET_ARCH),ia64)
 IMAGE_PATH ?= arch/$(LINUX_ARCH)/boot/$(firstword $(IMAGE_TARGET))
+else
+IMAGE_PATH ?= arch/ia64/hp/sim/boot/vmlinux.gz
+endif
 INSTALL_BOOT_PATH := $(DESTDIR)/boot
 
 LINUX_VER3  := $(LINUX_SERIES).$(word 3, $(subst ., ,$(LINUX_VER)))
