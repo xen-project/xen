@@ -23,6 +23,16 @@
 #include <asm/page.h>
 #include <public/xen.h>
 
+#define VMRESUME     .byte 0x0f,0x01,0xc3
+#define VMLAUNCH     .byte 0x0f,0x01,0xc2
+#define VMREAD(off)  .byte 0x0f,0x78,0x44,0x24,off
+#define VMWRITE(off) .byte 0x0f,0x79,0x44,0x24,off
+
+/* VMCS field encodings */
+#define GUEST_RSP    0x681c
+#define GUEST_RIP    0x681e
+#define GUEST_RFLAGS 0x6820
+
 #define GET_CURRENT(reg)         \
         movl $STACK_SIZE-4, reg; \
         orl  %esp, reg;          \
@@ -51,6 +61,14 @@
         ALIGN
 ENTRY(vmx_asm_vmexit_handler)
         HVM_SAVE_ALL_NOSEGREGS
+
+        movl $GUEST_RIP,%eax
+        VMREAD(UREGS_eip)
+        movl $GUEST_RSP,%eax
+        VMREAD(UREGS_esp)
+        movl $GUEST_RFLAGS,%eax
+        VMREAD(UREGS_eflags)
+
         movl %esp,%eax
         push %eax
         call vmx_vmexit_handler
@@ -78,13 +96,19 @@ ENTRY(vmx_asm_do_vmentry)
         movl %eax,%cr2
         call vmx_trace_vmentry
 
+        movl $GUEST_RIP,%eax
+        VMWRITE(UREGS_eip)
+        movl $GUEST_RSP,%eax
+        VMWRITE(UREGS_esp)
+        movl $GUEST_RFLAGS,%eax
+        VMWRITE(UREGS_eflags)
+
         cmpl $0,VCPU_vmx_launched(%ebx)
         je   vmx_launch
 
 /*vmx_resume:*/
         HVM_RESTORE_ALL_NOSEGREGS
-        /* VMRESUME */
-        .byte 0x0f,0x01,0xc3
+        VMRESUME
         pushf
         call vm_resume_fail
         ud2
@@ -92,8 +116,7 @@ ENTRY(vmx_asm_do_vmentry)
 vmx_launch:
         movl $1,VCPU_vmx_launched(%ebx)
         HVM_RESTORE_ALL_NOSEGREGS
-        /* VMLAUNCH */
-        .byte 0x0f,0x01,0xc2
+        VMLAUNCH
         pushf
         call vm_launch_fail
         ud2

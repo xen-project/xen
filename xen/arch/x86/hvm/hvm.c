@@ -283,8 +283,10 @@ static int hvm_save_cpu_ctxt(struct domain *d, hvm_domain_context_t *h)
         ctxt.rbp = vc->user_regs.ebp;
         ctxt.rsi = vc->user_regs.esi;
         ctxt.rdi = vc->user_regs.edi;
-        /* %rsp handled by arch-specific call above */
-#ifdef __x86_64__        
+        ctxt.rsp = vc->user_regs.esp;
+        ctxt.rip = vc->user_regs.eip;
+        ctxt.rflags = vc->user_regs.eflags;
+#ifdef __x86_64__
         ctxt.r8  = vc->user_regs.r8;
         ctxt.r9  = vc->user_regs.r9;
         ctxt.r10 = vc->user_regs.r10;
@@ -347,6 +349,8 @@ static int hvm_load_cpu_ctxt(struct domain *d, hvm_domain_context_t *h)
     vc->user_regs.esi = ctxt.rsi;
     vc->user_regs.edi = ctxt.rdi;
     vc->user_regs.esp = ctxt.rsp;
+    vc->user_regs.eip = ctxt.rip;
+    vc->user_regs.eflags = ctxt.rflags | 2;
 #ifdef __x86_64__
     vc->user_regs.r8  = ctxt.r8; 
     vc->user_regs.r9  = ctxt.r9; 
@@ -973,8 +977,6 @@ void hvm_task_switch(
         goto out;
     }
 
-    hvm_store_cpu_guest_regs(v, regs);
-
     ptss = hvm_map(prev_tr.base, sizeof(tss));
     if ( ptss == NULL )
         goto out;
@@ -1080,8 +1082,6 @@ void hvm_task_switch(
                                         &linear_addr) )
             hvm_copy_to_guest_virt(linear_addr, &errcode, 4);
     }
-
-    hvm_load_cpu_guest_regs(v, regs);
 
  out:
     hvm_unmap(optss_desc);
@@ -1322,7 +1322,6 @@ int hvm_do_hypercall(struct cpu_user_regs *regs)
 #endif
     case 4:
     case 2:
-        hvm_store_cpu_guest_regs(current, regs);
         if ( unlikely(ring_3(regs)) )
         {
     default:

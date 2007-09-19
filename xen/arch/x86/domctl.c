@@ -556,7 +556,6 @@ void arch_get_info_guest(struct vcpu *v, vcpu_guest_context_u c)
     {
         if ( !is_pv_32on64_domain(v->domain) )
         {
-            hvm_store_cpu_guest_regs(v, &c.nat->user_regs);
             memset(c.nat->ctrlreg, 0, sizeof(c.nat->ctrlreg));
             c.nat->ctrlreg[0] = v->arch.hvm_vcpu.guest_cr[0];
             c.nat->ctrlreg[2] = v->arch.hvm_vcpu.guest_cr[2];
@@ -566,11 +565,6 @@ void arch_get_info_guest(struct vcpu *v, vcpu_guest_context_u c)
 #ifdef CONFIG_COMPAT
         else
         {
-            struct cpu_user_regs user_regs;
-            unsigned i;
-
-            hvm_store_cpu_guest_regs(v, &user_regs);
-            XLAT_cpu_user_regs(&c.cmp->user_regs, &user_regs);
             memset(c.cmp->ctrlreg, 0, sizeof(c.cmp->ctrlreg));
             c.cmp->ctrlreg[0] = v->arch.hvm_vcpu.guest_cr[0];
             c.cmp->ctrlreg[2] = v->arch.hvm_vcpu.guest_cr[2];

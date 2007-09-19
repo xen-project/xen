@@ -58,6 +58,12 @@ svm_trace_done:
         movl VCPU_svm_vmcb(%ebx),%ecx
         movl UREGS_eax(%esp),%eax
         movl %eax,VMCB_rax(%ecx)
+        movl UREGS_eip(%esp),%eax
+        movl %eax,VMCB_rip(%ecx)
+        movl UREGS_esp(%esp),%eax
+        movl %eax,VMCB_rsp(%ecx)
+        movl UREGS_eflags(%esp),%eax
+        movl %eax,VMCB_rflags(%ecx)
 
         movl VCPU_svm_vmcb_pa(%ebx),%eax
         popl %ebx
@@ -81,6 +87,12 @@ svm_trace_done:
         movl VCPU_svm_vmcb(%ebx),%ecx
         movl VMCB_rax(%ecx),%eax
         movl %eax,UREGS_eax(%esp)
+        movl VMCB_rip(%ecx),%eax
+        movl %eax,UREGS_eip(%esp)
+        movl VMCB_rsp(%ecx),%eax
+        movl %eax,UREGS_esp(%esp)
+        movl VMCB_rflags(%ecx),%eax
+        movl %eax,UREGS_eflags(%esp)
 
         STGI
 .globl svm_stgi_label;

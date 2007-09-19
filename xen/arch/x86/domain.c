@@ -631,10 +631,10 @@ int arch_set_info_guest(
         memcpy(&v->arch.guest_context, c.nat, sizeof(*c.nat));
 #ifdef CONFIG_COMPAT
     else
-    {
         XLAT_vcpu_guest_context(&v->arch.guest_context, c.cmp);
-    }
 #endif
+
+    v->arch.guest_context.user_regs.eflags |= 2;
 
     /* Only CR0.TS is modifiable by guest or admin. */
     v->arch.guest_context.ctrlreg[0] &= X86_CR0_TS;
@@ -650,10 +650,6 @@ int arch_set_info_guest(
 
         /* Ensure real hardware interrupts are enabled. */
         v->arch.guest_context.user_regs.eflags |= EF_IE;
-    }
-    else
-    {
-        hvm_load_cpu_guest_regs(v, &v->arch.guest_context.user_regs);
     }
 
     if ( v->is_initialised )

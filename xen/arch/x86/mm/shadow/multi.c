@@ -2928,8 +2928,6 @@ static int sh_page_fault(struct vcpu *v,
             sh_remove_shadows(v, gmfn, 0 /* thorough */, 1 /* must succeed */);
             goto done;
         }
-
-        hvm_store_cpu_guest_regs(v, regs);
     }
 
     SHADOW_PRINTK("emulate: eip=%#lx esp=%#lx\n", 
@@ -2992,10 +2990,6 @@ static int sh_page_fault(struct vcpu *v,
         }
     }
 #endif /* PAE guest */
-
-    /* Emulator has changed the user registers: write back */
-    if ( is_hvm_domain(d) )
-        hvm_load_cpu_guest_regs(v, regs);
 
     SHADOW_PRINTK("emulated\n");
     return EXCRET_fault_fixed;

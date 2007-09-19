@@ -50,7 +50,6 @@ void show_registers(struct cpu_user_regs *regs)
     {
         struct segment_register sreg;
         context = "hvm";
-        hvm_store_cpu_guest_regs(v, &fault_regs);
         fault_crs[0] = v->arch.hvm_vcpu.guest_cr[0];
         fault_crs[2] = v->arch.hvm_vcpu.guest_cr[2];
         fault_crs[3] = v->arch.hvm_vcpu.guest_cr[3];

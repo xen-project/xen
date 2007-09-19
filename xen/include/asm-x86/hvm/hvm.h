@@ -21,6 +21,7 @@
 #ifndef __ASM_X86_HVM_HVM_H__
 #define __ASM_X86_HVM_HVM_H__
 
+#include <asm/current.h>
 #include <asm/x86_emulate.h>
 #include <public/domctl.h>
 #include <public/hvm/save.h>
@@ -78,16 +79,6 @@ struct hvm_function_table {
     void (*domain_destroy)(struct domain *d);
     int  (*vcpu_initialise)(struct vcpu *v);
     void (*vcpu_destroy)(struct vcpu *v);
-
-    /*
-     * Store and load guest state:
-     * 1) load/store guest register state,
-     * 2) modify guest state (e.g., set debug flags).
-     */
-    void (*store_cpu_guest_regs)(
-        struct vcpu *v, struct cpu_user_regs *r);
-    void (*load_cpu_guest_regs)(
-        struct vcpu *v, struct cpu_user_regs *r);
 
     /* save and load hvm guest cpu context for save/restore */
     void (*save_cpu_ctxt)(struct vcpu *v, struct hvm_hw_cpu *ctxt);
@@ -166,19 +157,6 @@ void hvm_vcpu_reset(struct vcpu *vcpu);
 
 void hvm_send_assist_req(struct vcpu *v);
 
-static inline void
-hvm_store_cpu_guest_regs(
-    struct vcpu *v, struct cpu_user_regs *r)
-{
-    hvm_funcs.store_cpu_guest_regs(v, r);
-}
-
-static inline void
-hvm_load_cpu_guest_regs(struct vcpu *v, struct cpu_user_regs *r)
-{
-    hvm_funcs.load_cpu_guest_regs(v, r);
-}
-
 void hvm_set_guest_time(struct vcpu *v, u64 gtime);
 u64 hvm_get_guest_time(struct vcpu *v);
 
@@ -199,12 +177,14 @@ u64 hvm_get_guest_time(struct vcpu *v);
 static inline int
 hvm_interrupts_enabled(struct vcpu *v, enum hvm_intack type)
 {
+    ASSERT(v == current);
     return hvm_funcs.interrupts_enabled(v, type);
 }
 
 static inline int
 hvm_guest_x86_mode(struct vcpu *v)
 {
+    ASSERT(v == current);
     return hvm_funcs.guest_x86_mode(v);
 }
 

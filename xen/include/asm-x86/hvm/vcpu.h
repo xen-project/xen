@@ -66,7 +66,7 @@ struct hvm_vcpu {
 
 #define ARCH_HVM_IO_WAIT         1   /* Waiting for I/O completion */
 
-#define HVM_CONTEXT_STACK_BYTES  (offsetof(struct cpu_user_regs, error_code))
+#define HVM_CONTEXT_STACK_BYTES  (offsetof(struct cpu_user_regs, ss))
 
 #endif /* __ASM_X86_HVM_VCPU_H__ */
 
