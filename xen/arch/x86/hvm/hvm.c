@@ -973,7 +973,7 @@ void hvm_task_switch(
         goto out;
     }
 
-    hvm_store_cpu_guest_regs(v, regs, NULL);
+    hvm_store_cpu_guest_regs(v, regs);
 
     ptss = hvm_map(prev_tr.base, sizeof(tss));
     if ( ptss == NULL )
@@ -1322,7 +1322,7 @@ int hvm_do_hypercall(struct cpu_user_regs *regs)
 #endif
     case 4:
     case 2:
-        hvm_store_cpu_guest_regs(current, regs, NULL);
+        hvm_store_cpu_guest_regs(current, regs);
         if ( unlikely(ring_3(regs)) )
         {
     default:

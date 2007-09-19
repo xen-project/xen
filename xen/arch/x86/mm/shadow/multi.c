@@ -2929,7 +2929,7 @@ static int sh_page_fault(struct vcpu *v,
             goto done;
         }
 
-        hvm_store_cpu_guest_regs(v, regs, NULL);
+        hvm_store_cpu_guest_regs(v, regs);
     }
 
     SHADOW_PRINTK("emulate: eip=%#lx esp=%#lx\n", 

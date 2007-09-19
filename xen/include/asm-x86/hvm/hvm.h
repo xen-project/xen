@@ -85,7 +85,7 @@ struct hvm_function_table {
      * 2) modify guest state (e.g., set debug flags).
      */
     void (*store_cpu_guest_regs)(
-        struct vcpu *v, struct cpu_user_regs *r, unsigned long *crs);
+        struct vcpu *v, struct cpu_user_regs *r);
     void (*load_cpu_guest_regs)(
         struct vcpu *v, struct cpu_user_regs *r);
 
@@ -168,9 +168,9 @@ void hvm_send_assist_req(struct vcpu *v);
 
 static inline void
 hvm_store_cpu_guest_regs(
-    struct vcpu *v, struct cpu_user_regs *r, unsigned long *crs)
+    struct vcpu *v, struct cpu_user_regs *r)
 {
-    hvm_funcs.store_cpu_guest_regs(v, r, crs);
+    hvm_funcs.store_cpu_guest_regs(v, r);
 }
 
 static inline void

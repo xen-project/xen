@@ -109,27 +109,13 @@ static int svm_lme_is_set(struct vcpu *v)
 }
 
 static void svm_store_cpu_guest_regs(
-    struct vcpu *v, struct cpu_user_regs *regs, unsigned long *crs)
+    struct vcpu *v, struct cpu_user_regs *regs)
 {
     struct vmcb_struct *vmcb = v->arch.hvm_svm.vmcb;
 
-    if ( regs != NULL )
-    {
-        regs->ss     = vmcb->ss.sel;
-        regs->esp    = vmcb->rsp;
-        regs->eflags = vmcb->rflags;
-        regs->cs     = vmcb->cs.sel;
-        regs->eip    = vmcb->rip;
-    }
-
-    if ( crs != NULL )
-    {
-        /* Returning the guest's regs */
-        crs[0] = v->arch.hvm_vcpu.guest_cr[0];
-        crs[2] = v->arch.hvm_vcpu.guest_cr[2];
-        crs[3] = v->arch.hvm_vcpu.guest_cr[3];
-        crs[4] = v->arch.hvm_vcpu.guest_cr[4];
-    }
+    regs->esp    = vmcb->rsp;
+    regs->eflags = vmcb->rflags;
+    regs->eip    = vmcb->rip;
 }
 
 static enum handler_return long_mode_do_msr_write(struct cpu_user_regs *regs)
@@ -702,7 +688,6 @@ static void svm_set_segment_register(struct vcpu *v, enum x86_segment seg,
     {
     case x86_seg_cs:
         memcpy(&vmcb->cs, reg, sizeof(*reg));
-        guest_cpu_user_regs()->cs = reg->sel;
         break;
     case x86_seg_ds:
         memcpy(&vmcb->ds, reg, sizeof(*reg));
@@ -722,7 +707,7 @@ static void svm_set_segment_register(struct vcpu *v, enum x86_segment seg,
         break;
     case x86_seg_ss:
         memcpy(&vmcb->ss, reg, sizeof(*reg));
-        guest_cpu_user_regs()->ss = reg->sel;
+        vmcb->cpl = vmcb->ss.attr.fields.dpl;
         break;
     case x86_seg_tr:
         svm_sync_vmcb(v);
@@ -829,10 +814,8 @@ static void svm_load_cpu_guest_regs(struct vcpu *v, struct cpu_user_regs *regs)
 {
     struct vmcb_struct *vmcb = v->arch.hvm_svm.vmcb;
 
-    vmcb->ss.sel   = regs->ss;
     vmcb->rsp      = regs->esp;   
     vmcb->rflags   = regs->eflags | 2UL;
-    vmcb->cs.sel   = regs->cs;
     vmcb->rip      = regs->eip;
 }
 
@@ -1518,7 +1501,7 @@ static void svm_io_instruction(struct vcpu *v)
 
     /* Copy current guest state into io instruction state structure. */
     memcpy(regs, guest_cpu_user_regs(), HVM_CONTEXT_STACK_BYTES);
-    svm_store_cpu_guest_regs(v, regs, NULL);
+    svm_store_cpu_guest_regs(v, regs);
 
     info.bytes = vmcb->exitinfo1;
 
@@ -2292,7 +2275,7 @@ asmlinkage void svm_vmexit_handler(struct cpu_user_regs *regs)
 
     case VMEXIT_EXCEPTION_MC:
         HVMTRACE_0D(MCE, v);
-        svm_store_cpu_guest_regs(v, regs, NULL);
+        svm_store_cpu_guest_regs(v, regs);
         do_machine_check(regs);
         break;
 

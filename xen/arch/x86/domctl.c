@@ -555,18 +555,27 @@ void arch_get_info_guest(struct vcpu *v, vcpu_guest_context_u c)
     if ( is_hvm_vcpu(v) )
     {
         if ( !is_pv_32on64_domain(v->domain) )
-            hvm_store_cpu_guest_regs(v, &c.nat->user_regs, c.nat->ctrlreg);
+        {
+            hvm_store_cpu_guest_regs(v, &c.nat->user_regs);
+            memset(c.nat->ctrlreg, 0, sizeof(c.nat->ctrlreg));
+            c.nat->ctrlreg[0] = v->arch.hvm_vcpu.guest_cr[0];
+            c.nat->ctrlreg[2] = v->arch.hvm_vcpu.guest_cr[2];
+            c.nat->ctrlreg[3] = v->arch.hvm_vcpu.guest_cr[3];
+            c.nat->ctrlreg[4] = v->arch.hvm_vcpu.guest_cr[4];
+        }
 #ifdef CONFIG_COMPAT
         else
         {
             struct cpu_user_regs user_regs;
-            typeof(c.nat->ctrlreg) ctrlreg;
             unsigned i;
 
-            hvm_store_cpu_guest_regs(v, &user_regs, ctrlreg);
+            hvm_store_cpu_guest_regs(v, &user_regs);
             XLAT_cpu_user_regs(&c.cmp->user_regs, &user_regs);
-            for ( i = 0; i < ARRAY_SIZE(c.cmp->ctrlreg); ++i )
-                c.cmp->ctrlreg[i] = ctrlreg[i];
+            memset(c.cmp->ctrlreg, 0, sizeof(c.cmp->ctrlreg));
+            c.cmp->ctrlreg[0] = v->arch.hvm_vcpu.guest_cr[0];
+            c.cmp->ctrlreg[2] = v->arch.hvm_vcpu.guest_cr[2];
+            c.cmp->ctrlreg[3] = v->arch.hvm_vcpu.guest_cr[3];
+            c.cmp->ctrlreg[4] = v->arch.hvm_vcpu.guest_cr[4];
         }
 #endif
     }

@@ -794,61 +794,25 @@ static void vmx_ctxt_switch_to(struct vcpu *v)
 }
 
 static void vmx_store_cpu_guest_regs(
-    struct vcpu *v, struct cpu_user_regs *regs, unsigned long *crs)
+    struct vcpu *v, struct cpu_user_regs *regs)
 {
     vmx_vmcs_enter(v);
 
-    if ( regs != NULL )
-    {
-        regs->eflags = __vmread(GUEST_RFLAGS);
-        regs->ss = __vmread(GUEST_SS_SELECTOR);
-        regs->cs = __vmread(GUEST_CS_SELECTOR);
-        regs->eip = __vmread(GUEST_RIP);
-        regs->esp = __vmread(GUEST_RSP);
-    }
-
-    if ( crs != NULL )
-    {
-        crs[0] = v->arch.hvm_vcpu.guest_cr[0];
-        crs[2] = v->arch.hvm_vcpu.guest_cr[2];
-        crs[3] = v->arch.hvm_vcpu.guest_cr[3];
-        crs[4] = v->arch.hvm_vcpu.guest_cr[4];
-    }
+    regs->eflags = __vmread(GUEST_RFLAGS);
+    regs->eip = __vmread(GUEST_RIP);
+    regs->esp = __vmread(GUEST_RSP);
 
     vmx_vmcs_exit(v);
 }
 
 static void vmx_load_cpu_guest_regs(struct vcpu *v, struct cpu_user_regs *regs)
 {
-    unsigned long base;
-
     vmx_vmcs_enter(v);
-
-    __vmwrite(GUEST_SS_SELECTOR, regs->ss);
-    __vmwrite(GUEST_RSP, regs->esp);
 
     /* NB. Bit 1 of RFLAGS must be set for VMENTRY to succeed. */
     __vmwrite(GUEST_RFLAGS, regs->eflags | 2UL);
-
-    if ( regs->eflags & EF_VM )
-    {
-        /*
-         * The VMX spec (section 4.3.1.2, Checks on Guest Segment
-         * Registers) says that virtual-8086 mode guests' segment
-         * base-address fields in the VMCS must be equal to their
-         * corresponding segment selector field shifted right by
-         * four bits upon vmentry.
-         */
-        base = __vmread(GUEST_CS_BASE);
-        if ( (regs->cs << 4) != base )
-            __vmwrite(GUEST_CS_BASE, regs->cs << 4);
-        base = __vmread(GUEST_SS_BASE);
-        if ( (regs->ss << 4) != base )
-            __vmwrite(GUEST_SS_BASE, regs->ss << 4);
-    }
-
-    __vmwrite(GUEST_CS_SELECTOR, regs->cs);
     __vmwrite(GUEST_RIP, regs->eip);
+    __vmwrite(GUEST_RSP, regs->esp);
 
     vmx_vmcs_exit(v);
 }
@@ -978,7 +942,6 @@ static void vmx_set_segment_register(struct vcpu *v, enum x86_segment seg,
         __vmwrite(GUEST_CS_LIMIT, reg->limit);
         __vmwrite(GUEST_CS_BASE, reg->base);
         __vmwrite(GUEST_CS_AR_BYTES, attr);
-        guest_cpu_user_regs()->cs = reg->sel;
         break;
     case x86_seg_ds:
         __vmwrite(GUEST_DS_SELECTOR, reg->sel);
@@ -1009,7 +972,6 @@ static void vmx_set_segment_register(struct vcpu *v, enum x86_segment seg,
         __vmwrite(GUEST_SS_LIMIT, reg->limit);
         __vmwrite(GUEST_SS_BASE, reg->base);
         __vmwrite(GUEST_SS_AR_BYTES, attr);
-        guest_cpu_user_regs()->ss = reg->sel;
         break;
     case x86_seg_tr:
         __vmwrite(GUEST_TR_SELECTOR, reg->sel);
@@ -1890,7 +1852,7 @@ static void vmx_io_instruction(unsigned long exit_qualification,
 
     /* Copy current guest state into io instruction state structure. */
     memcpy(regs, guest_cpu_user_regs(), HVM_CONTEXT_STACK_BYTES);
-    vmx_store_cpu_guest_regs(current, regs, NULL);
+    vmx_store_cpu_guest_regs(current, regs);
 
     HVM_DBG_LOG(DBG_LEVEL_IO, "vm86 %d, eip=%x:%lx, "
                 "exit_qualification = %lx",
@@ -2639,7 +2601,7 @@ static void vmx_failed_vmentry(unsigned int exit_reason,
     case EXIT_REASON_MACHINE_CHECK:
         printk("caused by machine check.\n");
         HVMTRACE_0D(MCE, current);
-        vmx_store_cpu_guest_regs(current, regs, NULL);
+        vmx_store_cpu_guest_regs(current, regs);
         do_machine_check(regs);
         break;
     default:
@@ -2761,12 +2723,12 @@ asmlinkage void vmx_vmexit_handler(struct cpu_user_regs *regs)
                  (X86_EVENTTYPE_NMI << 8) )
                 goto exit_and_crash;
             HVMTRACE_0D(NMI, v);
-            vmx_store_cpu_guest_regs(v, regs, NULL);
+            vmx_store_cpu_guest_regs(v, regs);
             do_nmi(regs); /* Real NMI, vector 2: normal processing. */
             break;
         case TRAP_machine_check:
             HVMTRACE_0D(MCE, v);
-            vmx_store_cpu_guest_regs(v, regs, NULL);
+            vmx_store_cpu_guest_regs(v, regs);
             do_machine_check(regs);
             break;
         default:
