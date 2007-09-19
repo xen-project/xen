@@ -122,7 +122,7 @@ void *xc_dom_malloc_page_aligned(struct xc_dom_image *dom, size_t size)
     memset(block, 0, sizeof(*block));
     block->mmap_len = size;
     block->mmap_ptr = mmap(NULL, block->mmap_len,
-                           PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS,
+                           PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANON,
                            -1, 0);
     if ( block->mmap_ptr == MAP_FAILED )
     {
@@ -354,7 +354,7 @@ void *xc_dom_pfn_to_ptr(struct xc_dom_image *dom, xen_pfn_t pfn,
     {
         mode = "anonymous memory";
         phys->ptr = mmap(NULL, phys->count << page_shift,
-                         PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS,
+                         PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANON,
                          -1, 0);
         if ( phys->ptr == MAP_FAILED )
         {

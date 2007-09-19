@@ -10,7 +10,12 @@
 #include <stdarg.h>
 #include <pthread.h>
 
-static __thread xc_error last_error = { XC_ERROR_NONE, ""};
+static pthread_key_t last_error_pkey;
+static pthread_once_t last_error_pkey_once = PTHREAD_ONCE_INIT;
+
+static pthread_key_t errbuf_pkey;
+static pthread_once_t errbuf_pkey_once = PTHREAD_ONCE_INIT;
+
 #if DEBUG
 static xc_error_handler error_handler = xc_default_error_handler;
 #else
@@ -23,15 +28,45 @@ void xc_default_error_handler(const xc_error *err)
     fprintf(stderr, "ERROR %s: %s\n", desc, err->message);
 }
 
+static void
+_xc_clean_last_error(void *m)
+{
+    free(m);
+    pthread_setspecific(last_error_pkey, NULL);
+}
+
+static void
+_xc_init_last_error(void)
+{
+    pthread_key_create(&last_error_pkey, _xc_clean_last_error);
+}
+
+static xc_error *
+_xc_get_last_error(void)
+{
+    xc_error *last_error;
+
+    pthread_once(&last_error_pkey_once, _xc_init_last_error);
+
+    last_error = pthread_getspecific(last_error_pkey);
+    if (last_error == NULL) {
+        last_error = malloc(sizeof(xc_error));
+        pthread_setspecific(last_error_pkey, last_error);
+    }
+
+    return last_error;
+}
+
 const xc_error *xc_get_last_error(void)
 {
-    return &last_error;
+    return _xc_get_last_error();
 }
 
 void xc_clear_last_error(void)
 {
-    last_error.code = XC_ERROR_NONE;
-    last_error.message[0] = '\0';
+    xc_error *last_error = _xc_get_last_error();
+    last_error->code = XC_ERROR_NONE;
+    last_error->message[0] = '\0';
 }
 
 const char *xc_error_code_to_desc(int code)
@@ -61,12 +96,12 @@ xc_error_handler xc_set_error_handler(xc_error_handler handler)
     return old;
 }
 
-
 static void _xc_set_error(int code, const char *msg)
 {
-    last_error.code = code;
-    strncpy(last_error.message, msg, XC_MAX_ERROR_MSG_LEN - 1);
-    last_error.message[XC_MAX_ERROR_MSG_LEN-1] = '\0';
+    xc_error *last_error = _xc_get_last_error();
+    last_error->code = code;
+    strncpy(last_error->message, msg, XC_MAX_ERROR_MSG_LEN - 1);
+    last_error->message[XC_MAX_ERROR_MSG_LEN-1] = '\0';
 }
 
 void xc_set_error(int code, const char *fmt, ...)
@@ -84,23 +119,29 @@ void xc_set_error(int code, const char *fmt, ...)
 
     errno = saved_errno;
 
-    if ( error_handler != NULL )
-        error_handler(&last_error);
+    if ( error_handler != NULL ) {
+        xc_error *last_error = _xc_get_last_error();
+        error_handler(last_error);
+    }
 }
 
 int lock_pages(void *addr, size_t len)
 {
       int e = 0;
 #ifndef __sun__
-      e = mlock(addr, len);
+      void *laddr = (void *)((unsigned long)addr & PAGE_MASK);
+      size_t llen = (len + PAGE_SIZE - 1) & PAGE_MASK;
+      e = mlock(laddr, llen);
 #endif
-      return (e);
+      return e;
 }
 
 void unlock_pages(void *addr, size_t len)
 {
 #ifndef __sun__
-    safe_munlock(addr, len);
+    void *laddr = (void *)((unsigned long)addr & PAGE_MASK);
+    size_t llen = (len + PAGE_SIZE - 1) & PAGE_MASK;
+    safe_munlock(laddr, llen);
 #endif
 }
 
@@ -466,11 +507,33 @@ unsigned long xc_make_page_below_4G(
     return new_mfn;
 }
 
+static void
+_xc_clean_errbuf(void * m)
+{
+    free(m);
+    pthread_setspecific(errbuf_pkey, NULL);
+}
+
+static void
+_xc_init_errbuf(void)
+{
+    pthread_key_create(&errbuf_pkey, _xc_clean_errbuf);
+}
+
 char *safe_strerror(int errcode)
 {
-    static __thread char errbuf[32];
+#define XS_BUFSIZE 32
+    char *errbuf;
     static pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
     char *strerror_str;
+
+    pthread_once(&errbuf_pkey_once, _xc_init_errbuf);
+
+    errbuf = pthread_getspecific(errbuf_pkey);
+    if (errbuf == NULL) {
+        errbuf = malloc(XS_BUFSIZE);
+        pthread_setspecific(errbuf_pkey, errbuf);
+    }
 
     /*
      * Thread-unsafe strerror() is protected by a local mutex. We copy
@@ -478,8 +541,8 @@ char *safe_strerror(int errcode)
      */
     pthread_mutex_lock(&mutex);
     strerror_str = strerror(errcode);
-    strncpy(errbuf, strerror_str, sizeof(errbuf));
-    errbuf[sizeof(errbuf)-1] = '\0';
+    strncpy(errbuf, strerror_str, XS_BUFSIZE);
+    errbuf[XS_BUFSIZE-1] = '\0';
     pthread_mutex_unlock(&mutex);
 
     return errbuf;

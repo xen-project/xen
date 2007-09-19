@@ -15,7 +15,6 @@
 #include "xenguest.h"
 #include "xc_private.h"
 
-#include <xen/sys/privcmd.h>
 #include <xen/memory.h>
 #include <xen/elfnote.h>
 
