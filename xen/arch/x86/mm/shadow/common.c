@@ -1981,7 +1981,6 @@ void sh_remove_shadows(struct vcpu *v, mfn_t gmfn, int fast, int all)
 {
     struct page_info *pg = mfn_to_page(gmfn);
     mfn_t smfn;
-    u32 sh_flags;
     int do_locking;
     unsigned char t;
     
@@ -2065,42 +2064,46 @@ void sh_remove_shadows(struct vcpu *v, mfn_t gmfn, int fast, int all)
 
     /* Search for this shadow in all appropriate shadows */
     perfc_incr(shadow_unshadow);
-    sh_flags = pg->shadow_flags;
 
     /* Lower-level shadows need to be excised from upper-level shadows.
      * This call to hash_foreach() looks dangerous but is in fact OK: each
      * call will remove at most one shadow, and terminate immediately when
      * it does remove it, so we never walk the hash after doing a deletion.  */
-#define DO_UNSHADOW(_type) do {                                 \
-    t = (_type);                                                \
-    smfn = shadow_hash_lookup(v, mfn_x(gmfn), t);               \
-    if ( unlikely(!mfn_valid(smfn)) )                           \
-    {                                                           \
-        SHADOW_ERROR(": gmfn %#lx has flags 0x%"PRIx32          \
-                     " but no type-0x%"PRIx32" shadow\n",       \
-                     mfn_x(gmfn), sh_flags, t);                 \
-        break;                                                  \
-    }                                                           \
-    if ( sh_type_is_pinnable(v, t) )                            \
-        sh_unpin(v, smfn);                                      \
-    else                                                        \
-        sh_remove_shadow_via_pointer(v, smfn);                  \
-    if ( (pg->count_info & PGC_page_table) && !fast )           \
-        hash_foreach(v, masks[t], callbacks, smfn);             \
+#define DO_UNSHADOW(_type) do {                                         \
+    t = (_type);                                                        \
+    if( !(pg->count_info & PGC_page_table)                              \
+        || !(pg->shadow_flags & (1 << t)) )                             \
+        break;                                                          \
+    smfn = shadow_hash_lookup(v, mfn_x(gmfn), t);                       \
+    if ( unlikely(!mfn_valid(smfn)) )                                   \
+    {                                                                   \
+        SHADOW_ERROR(": gmfn %#lx has flags 0x%"PRIx32                  \
+                     " but no type-0x%"PRIx32" shadow\n",               \
+                     mfn_x(gmfn), (uint32_t)pg->shadow_flags, t);       \
+        break;                                                          \
+    }                                                                   \
+    if ( sh_type_is_pinnable(v, t) )                                    \
+        sh_unpin(v, smfn);                                              \
+    else                                                                \
+        sh_remove_shadow_via_pointer(v, smfn);                          \
+    if( !fast                                                           \
+        && (pg->count_info & PGC_page_table)                            \
+        && (pg->shadow_flags & (1 << t)) )                              \
+        hash_foreach(v, masks[t], callbacks, smfn);                     \
 } while (0)
 
-    if ( sh_flags & SHF_L1_32 )   DO_UNSHADOW(SH_type_l1_32_shadow);
-    if ( sh_flags & SHF_L2_32 )   DO_UNSHADOW(SH_type_l2_32_shadow);
+    DO_UNSHADOW(SH_type_l2_32_shadow);
+    DO_UNSHADOW(SH_type_l1_32_shadow);
 #if CONFIG_PAGING_LEVELS >= 3
-    if ( sh_flags & SHF_L1_PAE )  DO_UNSHADOW(SH_type_l1_pae_shadow);
-    if ( sh_flags & SHF_L2_PAE )  DO_UNSHADOW(SH_type_l2_pae_shadow);
-    if ( sh_flags & SHF_L2H_PAE ) DO_UNSHADOW(SH_type_l2h_pae_shadow);
+    DO_UNSHADOW(SH_type_l2h_pae_shadow);
+    DO_UNSHADOW(SH_type_l2_pae_shadow);
+    DO_UNSHADOW(SH_type_l1_pae_shadow);
 #if CONFIG_PAGING_LEVELS >= 4
-    if ( sh_flags & SHF_L1_64 )   DO_UNSHADOW(SH_type_l1_64_shadow);
-    if ( sh_flags & SHF_L2_64 )   DO_UNSHADOW(SH_type_l2_64_shadow);
-    if ( sh_flags & SHF_L2H_64 )  DO_UNSHADOW(SH_type_l2h_64_shadow);
-    if ( sh_flags & SHF_L3_64 )   DO_UNSHADOW(SH_type_l3_64_shadow);
-    if ( sh_flags & SHF_L4_64 )   DO_UNSHADOW(SH_type_l4_64_shadow);
+    DO_UNSHADOW(SH_type_l4_64_shadow);
+    DO_UNSHADOW(SH_type_l3_64_shadow);
+    DO_UNSHADOW(SH_type_l2h_64_shadow);
+    DO_UNSHADOW(SH_type_l2_64_shadow);
+    DO_UNSHADOW(SH_type_l1_64_shadow);
 #endif
 #endif
 
