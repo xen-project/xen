@@ -73,7 +73,7 @@ fi
 if [ -L "$p" ]; then
     file=$(readlink -f "$p") || ebusy "$p link does not exist."
 else
-    [ -f "$p" ] || { ebusy "$p file does not exist." }
+    [ -f "$p" ] || { ebusy "$p file does not exist."; }
     file="$p"
 fi
 
