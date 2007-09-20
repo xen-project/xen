@@ -222,6 +222,10 @@ void p2m_change_type_global(struct domain *d, p2m_type_t ot, p2m_type_t nt);
 p2m_type_t p2m_change_type(struct domain *d, unsigned long gfn,
                            p2m_type_t ot, p2m_type_t nt);
 
+/* Set mmio addresses in the p2m table (for pass-through) */
+int set_mmio_p2m_entry(struct domain *d, unsigned long gfn, mfn_t mfn);
+int clear_mmio_p2m_entry(struct domain *d, unsigned long gfn);
+
 #endif /* _XEN_P2M_H */
 
 /*

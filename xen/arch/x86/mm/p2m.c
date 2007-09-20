@@ -27,6 +27,7 @@
 #include <asm/page.h>
 #include <asm/paging.h>
 #include <asm/p2m.h>
+#include <asm/iommu.h>
 
 /* Debugging and auditing of the P2M code? */
 #define P2M_AUDIT     0
@@ -244,13 +245,16 @@ set_p2m_entry(struct domain *d, unsigned long gfn, mfn_t mfn, p2m_type_t p2mt)
     if ( mfn_valid(mfn) && (gfn > d->arch.p2m.max_mapped_pfn) )
         d->arch.p2m.max_mapped_pfn = gfn;
 
-    if ( mfn_valid(mfn) )
+    if ( mfn_valid(mfn) || (p2mt == p2m_mmio_direct) )
         entry_content = l1e_from_pfn(mfn_x(mfn), p2m_type_to_flags(p2mt));
     else
         entry_content = l1e_empty();
 
     /* level 1 entry */
     paging_write_p2m_entry(d, gfn, p2m_entry, table_mfn, entry_content, 1);
+
+    if ( vtd_enabled && (p2mt == p2m_mmio_direct) && is_hvm_domain(d) )
+        iommu_flush(d, gfn, (u64*)p2m_entry);
 
     /* Success */
     rv = 1;
@@ -350,6 +354,11 @@ int p2m_alloc_table(struct domain *d,
             && !set_p2m_entry(d, gfn, mfn, p2m_ram_rw) )
             goto error;
     }
+
+#if CONFIG_PAGING_LEVELS >= 3
+    if (vtd_enabled && is_hvm_domain(d))
+        iommu_set_pgd(d);
+#endif
 
     P2M_PRINTK("p2m table initialised (%u pages)\n", page_count);
     p2m_unlock(d);
@@ -858,6 +867,42 @@ p2m_type_t p2m_change_type(struct domain *d, unsigned long gfn,
     p2m_unlock(d);
 
     return pt;
+}
+
+int
+set_mmio_p2m_entry(struct domain *d, unsigned long gfn, mfn_t mfn)
+{
+    int rc = 0;
+
+    rc = set_p2m_entry(d, gfn, mfn, p2m_mmio_direct);
+    if ( 0 == rc )
+        gdprintk(XENLOG_ERR,
+            "set_mmio_p2m_entry: set_p2m_entry failed! mfn=%08lx\n",
+            gmfn_to_mfn(d, gfn));
+    return rc;
+}
+
+int
+clear_mmio_p2m_entry(struct domain *d, unsigned long gfn)
+{
+    int rc = 0;
+
+    unsigned long mfn;
+    mfn = gmfn_to_mfn(d, gfn);
+    if ( INVALID_MFN == mfn )
+    {
+        gdprintk(XENLOG_ERR,
+            "clear_mmio_p2m_entry: gfn_to_mfn failed! gfn=%08lx\n", gfn);
+        return 0;
+    }
+    rc = set_p2m_entry(d, gfn, _mfn(INVALID_MFN), 0);
+
+#if !defined(__x86_64__)
+    /* x86_64 xen does not map mmio entries in machine_to_phys_mapp[] */
+    set_gpfn_from_mfn(mfn, INVALID_M2P_ENTRY);
+#endif
+
+    return rc;
 }
 
 /*
