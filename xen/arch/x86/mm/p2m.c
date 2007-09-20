@@ -873,6 +873,18 @@ int
 set_mmio_p2m_entry(struct domain *d, unsigned long gfn, mfn_t mfn)
 {
     int rc = 0;
+    p2m_type_t ot;
+    mfn_t omfn;
+
+    if ( !paging_mode_translate(d) )
+        return 0;
+
+    omfn = gfn_to_mfn(d, gfn, &ot);
+    if ( p2m_is_ram(ot) )
+    {
+        ASSERT(mfn_valid(omfn));
+        set_gpfn_from_mfn(mfn_x(omfn), INVALID_M2P_ENTRY);
+    }
 
     rc = set_p2m_entry(d, gfn, mfn, p2m_mmio_direct);
     if ( 0 == rc )
@@ -886,8 +898,11 @@ int
 clear_mmio_p2m_entry(struct domain *d, unsigned long gfn)
 {
     int rc = 0;
-
     unsigned long mfn;
+
+    if ( !paging_mode_translate(d) )
+        return 0;
+
     mfn = gmfn_to_mfn(d, gfn);
     if ( INVALID_MFN == mfn )
     {
