@@ -25,8 +25,8 @@
 
 #define VMRESUME     .byte 0x0f,0x01,0xc3
 #define VMLAUNCH     .byte 0x0f,0x01,0xc2
-#define VMREAD(off)  .byte 0x0f,0x78,0x44,0x24,off
-#define VMWRITE(off) .byte 0x0f,0x79,0x44,0x24,off
+#define VMREAD(off)  .byte 0x0f,0x78,0x47,((off)-UREGS_rip)
+#define VMWRITE(off) .byte 0x0f,0x79,0x47,((off)-UREGS_rip)
 
 /* VMCS field encodings */
 #define GUEST_RSP    0x681c
@@ -77,8 +77,10 @@
 ENTRY(vmx_asm_vmexit_handler)
         HVM_SAVE_ALL_NOSEGREGS
 
+        leaq UREGS_rip(%rsp),%rdi
         movl $GUEST_RIP,%eax
-        VMREAD(UREGS_rip)
+        /*VMREAD(UREGS_rip)*/
+        .byte 0x0f,0x78,0x07  /* vmread %rax,(%rdi) */
         movl $GUEST_RSP,%eax
         VMREAD(UREGS_rsp)
         movl $GUEST_RFLAGS,%eax
@@ -110,8 +112,10 @@ ENTRY(vmx_asm_do_vmentry)
         movq %rax,%cr2
         call vmx_trace_vmentry
 
+        leaq UREGS_rip(%rsp),%rdi
         movl $GUEST_RIP,%eax
-        VMWRITE(UREGS_rip)
+        /*VMWRITE(UREGS_rip)*/
+        .byte 0x0f,0x79,0x07  /* vmwrite (%rdi),%rax */
         movl $GUEST_RSP,%eax
         VMWRITE(UREGS_rsp)
         movl $GUEST_RFLAGS,%eax
