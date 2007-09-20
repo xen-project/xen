@@ -40,6 +40,11 @@ DEFINE_SPINLOCK(xenpf_lock);
 extern spinlock_t xenpf_lock;
 #endif
 
+static long cpu_frequency_change_helper(void *data)
+{
+    return cpu_frequency_change(*(uint64_t *)data);
+}
+
 ret_t do_platform_op(XEN_GUEST_HANDLE(xen_platform_op_t) u_xenpf_op)
 {
     ret_t ret = 0;
@@ -278,6 +283,15 @@ ret_t do_platform_op(XEN_GUEST_HANDLE(xen_platform_op_t) u_xenpf_op)
 
     case XENPF_enter_acpi_sleep:
         ret = acpi_enter_sleep(&op->u.enter_acpi_sleep);
+        break;
+
+    case XENPF_change_freq:
+        ret = -EINVAL;
+        if ( op->u.change_freq.flags != 0 )
+            break;
+        ret = continue_hypercall_on_cpu(op->u.change_freq.cpu,
+                                        cpu_frequency_change_helper,
+                                        &op->u.change_freq.freq);
         break;
 
     default:

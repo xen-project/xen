@@ -1378,10 +1378,9 @@ static void continue_hypercall_on_cpu_helper(struct vcpu *v)
     regs->eax = info->func(info->data);
 
     v->arch.schedule_tail = info->saved_schedule_tail;
-    v->cpu_affinity = info->saved_affinity;
+    v->arch.continue_info = NULL;
 
     xfree(info);
-    v->arch.continue_info = NULL;
 
     vcpu_set_affinity(v, &v->cpu_affinity);
     schedule_tail(v);
@@ -1392,6 +1391,7 @@ int continue_hypercall_on_cpu(int cpu, long (*func)(void *data), void *data)
     struct vcpu *v = current;
     struct migrate_info *info;
     cpumask_t mask = cpumask_of_cpu(cpu);
+    int rc;
 
     if ( cpu == smp_processor_id() )
         return func(data);
@@ -1403,12 +1403,19 @@ int continue_hypercall_on_cpu(int cpu, long (*func)(void *data), void *data)
     info->func = func;
     info->data = data;
     info->saved_schedule_tail = v->arch.schedule_tail;
-    v->arch.schedule_tail = continue_hypercall_on_cpu_helper;
-
     info->saved_affinity = v->cpu_affinity;
+
+    v->arch.schedule_tail = continue_hypercall_on_cpu_helper;
     v->arch.continue_info = info;
 
-    vcpu_set_affinity(v, &mask);
+    rc = vcpu_set_affinity(v, &mask);
+    if ( rc )
+    {
+        v->arch.schedule_tail = info->saved_schedule_tail;
+        v->arch.continue_info = NULL;
+        xfree(info);
+        return rc;
+    }
 
     /* Dummy return value will be overwritten by new schedule_tail. */
     BUG_ON(!test_bit(SCHEDULE_SOFTIRQ, &softirq_pending(smp_processor_id())));

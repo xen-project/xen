@@ -42,6 +42,17 @@ string_param("sched", opt_sched);
 static unsigned int opt_dom0_vcpus_pin;
 boolean_param("dom0_vcpus_pin", opt_dom0_vcpus_pin);
 
+enum cpufreq_controller cpufreq_controller;
+static void __init setup_cpufreq_option(char *str)
+{
+    if ( !strcmp(str, "dom0-kernel") )
+    {
+        cpufreq_controller = FREQCTL_dom0_kernel;
+        opt_dom0_vcpus_pin = 1;
+    }
+}
+custom_param("cpufreq", setup_cpufreq_option);
+
 #define TIME_SLOP      (s32)MICROSECS(50)     /* allow time to slip a bit */
 
 /* Various timer handlers. */

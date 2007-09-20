@@ -1,27 +1,9 @@
-/****************************************************************************
- * (C) 2002 - Rolf Neugebauer - Intel Research Cambridge
- ****************************************************************************
- *
- *        File: time.h
- *      Author: Rolf Neugebauer (neugebar@dcs.gla.ac.uk)
- *     Changes: 
- *              
- *        Date: Nov 2002
+/******************************************************************************
+ * time.h
  * 
- * Environment: Xen Hypervisor
- * Description: This file provides a one stop shop for all time related
- *              issues within the hypervisor. 
- * 
- *              The Hypervisor provides the following notions of time:
- *              Cycle Counter Time, System Time, Wall Clock Time, and 
- *              Domain Virtual Time.
- *
- ****************************************************************************
- * $Id: h-insert.h,v 1.4 2002/11/08 16:03:55 rn Exp $
- ****************************************************************************
+ * Copyright (c) 2002-2003 Rolf Neugebauer
+ * Copyright (c) 2002-2005 K A Fraser
  */
-
-
 
 #ifndef __XEN_TIME_H__
 #define __XEN_TIME_H__

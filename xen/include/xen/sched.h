@@ -499,6 +499,10 @@ static inline void vcpu_unblock(struct vcpu *v)
 #define is_hvm_domain(d) ((d)->is_hvm)
 #define is_hvm_vcpu(v)   (is_hvm_domain(v->domain))
 
+extern enum cpufreq_controller {
+    FREQCTL_none, FREQCTL_dom0_kernel
+} cpufreq_controller;
+
 #endif /* __SCHED_H__ */
 
 /*

@@ -29,4 +29,6 @@ void init_percpu_time(void);
 struct ioreq;
 int dom0_pit_access(struct ioreq *ioreq);
 
+int cpu_frequency_change(u64 freq);
+
 #endif /* __X86_TIME_H__ */

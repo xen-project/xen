@@ -722,6 +722,27 @@ void update_domain_wallclock_time(struct domain *d)
     spin_unlock(&wc_lock);
 }
 
+int cpu_frequency_change(u64 freq)
+{
+    struct cpu_time *t = &this_cpu(cpu_time);
+    u64 curr_tsc;
+
+    local_irq_disable();
+    set_time_scale(&t->tsc_scale, freq);
+    rdtscll(curr_tsc);
+    t->local_tsc_stamp = curr_tsc;
+    t->stime_local_stamp = get_s_time();
+    t->stime_master_stamp = read_platform_stime();
+    local_irq_enable();
+
+    /* A full epoch should pass before we check for deviation. */
+    set_timer(&t->calibration_timer, NOW() + EPOCH);
+    if ( smp_processor_id() == 0 )
+        platform_time_calibration();
+
+    return 0;
+}
+
 /* Set clock to <secs,usecs> after 00:00:00 UTC, 1 January, 1970. */
 void do_settime(unsigned long secs, unsigned long nsecs, u64 system_time_base)
 {
@@ -866,12 +887,14 @@ static void local_time_calibration(void *unused)
            error_factor, calibration_mul_frac, tsc_shift);
 #endif
 
-    /* Record new timestamp information. */
+    /* Record new timestamp information, atomically w.r.t. interrupts. */
+    local_irq_disable();
     t->tsc_scale.mul_frac = calibration_mul_frac;
     t->tsc_scale.shift    = tsc_shift;
     t->local_tsc_stamp    = curr_tsc;
     t->stime_local_stamp  = curr_local_stime;
     t->stime_master_stamp = curr_master_stime;
+    local_irq_enable();
 
     update_vcpu_system_time(current);
 
