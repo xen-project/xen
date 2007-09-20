@@ -49,7 +49,7 @@ def ACMLoadPolicy_XenAPI(policy='xm-test'):
     if polname != policy:
         # Try it, maybe it's not activated
         traceCommand("xm setpolicy %s %s" %
-                     (xsconstants.XS_POLICY_ACM, policy))
+                     (xsconstants.ACM_POLICY_ID, policy))
         polname = getSystemPolicyName()
         if polname != policy:
             FAIL("Need to have a system with no or policy '%s' active, "
