@@ -48,7 +48,6 @@
 #include <public/hvm/ioreq.h>
 #include <public/version.h>
 #include <public/memory.h>
-#include <asm/iommu.h>
 
 int hvm_enabled __read_mostly;
 
@@ -220,21 +219,13 @@ int hvm_domain_initialise(struct domain *d)
     if ( rc != 0 )
         return rc;
 
-    rc = iommu_domain_init(d);
-    if ( rc != 0 )
-        return rc;
-
     vpic_init(d);
     vioapic_init(d);
 
     hvm_init_ioreq_page(d, &d->arch.hvm_domain.ioreq);
     hvm_init_ioreq_page(d, &d->arch.hvm_domain.buf_ioreq);
 
-    rc = hvm_funcs.domain_initialise(d);
-    if ( rc != 0 )
-        release_devices(d);
-
-    return rc;
+    return hvm_funcs.domain_initialise(d);
 }
 
 void hvm_domain_relinquish_resources(struct domain *d)
@@ -250,7 +241,6 @@ void hvm_domain_relinquish_resources(struct domain *d)
 
 void hvm_domain_destroy(struct domain *d)
 {
-    release_devices(d);
     hvm_funcs.domain_destroy(d);
 }
 

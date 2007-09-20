@@ -972,7 +972,7 @@ int iommu_domain_init(struct domain *domain)
         gdprintk(XENLOG_ERR VTDPREFIX,
                  "IOMMU: hardware doesn't support the agaw\n");
         agaw = find_next_bit(&sagaw, 5, agaw);
-        if (agaw >= 5)
+        if ( agaw >= 5 )
             return -ENODEV;
     }
     hd->agaw = agaw;

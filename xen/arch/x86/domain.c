@@ -44,6 +44,7 @@
 #include <asm/hvm/support.h>
 #include <asm/msr.h>
 #include <asm/nmi.h>
+#include <asm/iommu.h>
 #ifdef CONFIG_COMPAT
 #include <compat/vcpu.h>
 #endif
@@ -505,10 +506,16 @@ int arch_domain_create(struct domain *d)
             virt_to_page(d->shared_info), d, XENSHARE_writable);
     }
 
+    if ( (rc = iommu_domain_init(d)) != 0 )
+        goto fail;
+
     if ( is_hvm_domain(d) )
     {
         if ( (rc = hvm_domain_initialise(d)) != 0 )
+        {
+            iommu_domain_destroy(d);
             goto fail;
+        }
     }
     else
     {
@@ -537,6 +544,8 @@ void arch_domain_destroy(struct domain *d)
 {
     if ( is_hvm_domain(d) )
         hvm_domain_destroy(d);
+
+    iommu_domain_destroy(d);
 
     paging_final_teardown(d);
 

@@ -68,8 +68,8 @@ struct iommu {
 
 int iommu_setup(void);
 int iommu_domain_init(struct domain *d);
+void iommu_domain_destroy(struct domain *d);
 int assign_device(struct domain *d, u8 bus, u8 devfn);
-int release_devices(struct domain *d);
 int iommu_map_page(struct domain *d, dma_addr_t gfn, dma_addr_t mfn);
 int iommu_unmap_page(struct domain *d, dma_addr_t gfn);
 void iommu_flush(struct domain *d, dma_addr_t gfn, u64 *p2m_entry);

@@ -134,19 +134,17 @@ void hvm_dpci_eoi(unsigned int guest_gsi, union vioapic_redir_entry *ent)
     }
 }
 
-int release_devices(struct domain *d)
+void iommu_domain_destroy(struct domain *d)
 {
     struct hvm_domain *hd = &d->arch.hvm_domain;
     uint32_t i;
-    int ret = 0;
 
     if ( !vtd_enabled )
-        return ret;
+        return;
 
     for ( i = 0; i < NR_IRQS; i++ )
         if ( hd->irq.mirq[i].valid )
-            ret = pirq_guest_unbind(d, i);
+            pirq_guest_unbind(d, i);
 
     iommu_domain_teardown(d);
-    return ret;
 }
