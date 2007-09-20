@@ -33,8 +33,20 @@
 #define bswap_16(x) BSWAP_16(x)
 #define bswap_32(x) BSWAP_32(x)
 #define bswap_64(x) BSWAP_64(x)
-#else
+#elif defined(__NetBSD__)
+#include <sys/bswap.h>
+#define bswap_16(x) bswap16(x)
+#define bswap_32(x) bswap32(x)
+#define bswap_64(x) bswap64(x)
+#elif defined(__OpenBSD__)
+#include <machine/endian.h>
+#define bswap_16(x) swap16(x)
+#define bswap_32(x) swap32(x)
+#define bswap_64(x) swap64(x)
+#elif defined(__linux__) || defined(__Linux__)
 #include <byteswap.h>
+#else
+#error Unsupported OS
 #endif
 #include <xen/elfnote.h>
 #include <xen/libelf.h>
