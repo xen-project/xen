@@ -27,6 +27,7 @@
 #include <xen/domain_page.h>
 #include <asm/delay.h>
 #include <asm/string.h>
+#include <asm/mm.h>
 #include <asm/iommu.h>
 #include <asm/hvm/vmx/intel-iommu.h>
 #include "dmar.h"
@@ -1669,6 +1670,7 @@ int iommu_setup(void)
     struct hvm_iommu *hd  = domain_hvm_iommu(dom0);
     struct acpi_drhd_unit *drhd;
     struct iommu *iommu;
+    unsigned long i;
 
     if (!vtd_enabled)
         return 0;
@@ -1687,8 +1689,9 @@ int iommu_setup(void)
     drhd = list_entry(acpi_drhd_units.next, typeof(*drhd), list);
     iommu = drhd->iommu;
 
-    hd->pgd = (struct dma_pte *)alloc_xenheap_page();
-    memset((u8*)hd->pgd, 0, PAGE_SIZE);
+    /* setup 1:1 page table for dom0 */
+    for (i = 0; i < max_page; i++)
+        iommu_map_page(dom0, i, i);
 
     if (init_vtd_hw())
         goto error;

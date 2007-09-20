@@ -685,7 +685,7 @@ _sh_propagate(struct vcpu *v,
     /* N.B. For pass-through MMIO, either this test needs to be relaxed,
      * and shadow_set_l1e() trained to handle non-valid MFNs (ugh), or the
      * MMIO areas need to be added to the frame-table to make them "valid". */
-    if ( !mfn_valid(target_mfn) )
+    if ( !mfn_valid(target_mfn) && (p2mt != p2m_mmio_direct) )
     {
         ASSERT((ft == ft_prefetch));
         *sp = shadow_l1e_empty();
