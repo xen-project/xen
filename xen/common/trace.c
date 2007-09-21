@@ -43,19 +43,14 @@ CHECK_t_buf;
 #define TB_COMPAT 0
 #endif
 
-typedef union {
-	struct t_rec *nat;
-	struct compat_t_rec *cmp;
-} t_rec_u;
-
 /* opt_tbuf_size: trace buffer size (in pages) */
 static unsigned int opt_tbuf_size = 0;
 integer_param("tbuf_size", opt_tbuf_size);
 
 /* Pointers to the meta-data objects for all system trace buffers */
 static DEFINE_PER_CPU(struct t_buf *, t_bufs);
-static DEFINE_PER_CPU(t_rec_u, t_recs);
-static int nr_recs;
+static DEFINE_PER_CPU(unsigned char *, t_data);
+static int data_size;
 
 /* High water mark for trace buffers; */
 /* Send virtual interrupt when buffer level reaches this point */
@@ -102,8 +97,7 @@ static int alloc_trace_bufs(void)
 
     nr_pages = num_online_cpus() * opt_tbuf_size;
     order    = get_order_from_pages(nr_pages);
-    nr_recs  = (opt_tbuf_size * PAGE_SIZE - sizeof(struct t_buf)) /
-        (!TB_COMPAT ? sizeof(struct t_rec) : sizeof(struct compat_t_rec));
+    data_size  = (opt_tbuf_size * PAGE_SIZE - sizeof(struct t_buf));
     
     if ( (rawbuf = alloc_xenheap_pages(order)) == NULL )
     {
@@ -122,10 +116,10 @@ static int alloc_trace_bufs(void)
         buf = per_cpu(t_bufs, i) = (struct t_buf *)
             &rawbuf[i*opt_tbuf_size*PAGE_SIZE];
         buf->cons = buf->prod = 0;
-        per_cpu(t_recs, i).nat = (struct t_rec *)(buf + 1);
+        per_cpu(t_data, i) = (unsigned char *)(buf + 1);
     }
 
-    t_buf_highwater = nr_recs >> 1; /* 50% high water */
+    t_buf_highwater = data_size >> 1; /* 50% high water */
     open_softirq(TRACE_SOFTIRQ, trace_notify_guest);
 
     return 0;
@@ -235,6 +229,129 @@ int tb_control(xen_sysctl_tbuf_op_t *tbc)
     return rc;
 }
 
+static inline int calc_rec_size(int cycles, int extra) 
+{
+    int rec_size;
+    rec_size = 4;
+    if(cycles)
+        rec_size += 8;
+    rec_size += extra;
+    return rec_size;
+}
+
+static inline int calc_bytes_to_wrap(struct t_buf *buf)
+{
+    return data_size - (buf->prod % data_size);
+}
+
+static inline unsigned calc_bytes_avail(struct t_buf *buf)
+{
+    return data_size - (buf->prod - buf->cons);
+}
+
+static inline int __insert_record(struct t_buf *buf,
+                                  unsigned long event,
+                                  int extra,
+                                  int cycles,
+                                  int rec_size,
+                                  unsigned char * extra_data) 
+{
+    struct t_rec *rec;
+    unsigned char * dst;
+    unsigned long extra_word = extra/sizeof(u32);
+    int local_rec_size = calc_rec_size(cycles, extra);
+
+    BUG_ON(local_rec_size != rec_size);
+
+    /* Double-check once more that we have enough space.
+     * Don't bugcheck here, in case the userland tool is doing
+     * something stupid. */
+    if(calc_bytes_avail(buf) < rec_size )
+    {
+        printk("%s: %u bytes left (%u - (%u - %u)) recsize %u.\n",
+               __func__,
+               data_size - (buf->prod - buf->cons),
+               data_size,
+               buf->prod, buf->cons, rec_size);
+        return 0;
+    }
+    rmb();
+
+    rec = (struct t_rec *)&this_cpu(t_data)[buf->prod % data_size];
+    rec->header = event;
+    rec->header |= extra_word << TRACE_EXTRA_SHIFT;
+    if(cycles) 
+    {
+        u64 tsc = (u64)get_cycles();
+
+        rec->header |= TRC_HD_CYCLE_FLAG;
+        rec->u.cycles.cycles_lo = tsc & ((((u64)1)<<32)-1);
+        rec->u.cycles.cycles_hi = tsc >> 32;
+        dst = rec->u.cycles.data;
+    } 
+    else
+        dst = rec->u.nocycles.data;
+
+    if(extra_data && extra)
+        memcpy(dst, extra_data, extra);
+
+    wmb();
+    buf->prod+=rec_size;
+
+    return rec_size;
+}
+
+static inline int insert_wrap_record(struct t_buf *buf, int size)
+{
+    int space_left = calc_bytes_to_wrap(buf);
+    unsigned long extra_space = space_left - sizeof(u32);
+    int cycles=0;
+
+    if(space_left > size)
+        printk("%s: space_left %d, size %d!\n",
+               __func__, space_left, size);
+
+    BUG_ON(space_left > size);
+
+    /* We may need to add cycles to take up enough space... */
+    if((extra_space/sizeof(u32)) > TRACE_EXTRA_MAX)
+    {
+        cycles = 1;
+        extra_space -= sizeof(u64);
+        
+        ASSERT((extra_space/sizeof(u32)) <= TRACE_EXTRA_MAX);
+    }
+
+
+    return __insert_record(buf,
+                    TRC_TRACE_WRAP_BUFFER,
+                    extra_space,
+                    cycles,
+                    space_left,
+                    NULL);
+}
+
+#define LOST_REC_SIZE 8
+
+static inline int insert_lost_records(struct t_buf *buf)
+{
+    struct {
+        u32 lost_records;
+    } ed;
+
+    ed.lost_records = this_cpu(lost_records);
+
+    this_cpu(lost_records) = 0;
+
+    return __insert_record(buf,
+                           TRC_LOST_RECORDS,
+                           sizeof(ed),
+                           0 /* !cycles */,
+                           LOST_REC_SIZE,
+                           (unsigned char *)&ed);
+}
+
+
 /**
  * trace - Enters a trace tuple into the trace buffer for the current CPU.
  * @event: the event type being logged
@@ -244,14 +361,32 @@ int tb_control(xen_sysctl_tbuf_op_t *tbc)
  * failure, otherwise 0.  Failure occurs only if the trace buffers are not yet
  * initialised.
  */
-void trace(u32 event, unsigned long d1, unsigned long d2,
-           unsigned long d3, unsigned long d4, unsigned long d5)
+void __trace_var(u32 event, int cycles, int extra, unsigned char *extra_data)
 {
     struct t_buf *buf;
-    t_rec_u rec;
-    unsigned long flags;
+    unsigned long flags, bytes_to_tail, bytes_to_wrap;
+    int rec_size, total_size;
+    int extra_word;
+    int started_below_highwater;
+
+    if(!tb_init_done)
+        return;
+
+    /* Convert byte count into word count, rounding up */
+    extra_word = (extra / sizeof(u32));
+    if((extra % sizeof(u32)) != 0)
+        extra_word++;
     
-    BUG_ON(!tb_init_done);
+#if !NDEBUG
+    ASSERT(extra_word<=TRACE_EXTRA_MAX);
+#else
+    /* Not worth crashing a production system over */
+    if(extra_word > TRACE_EXTRA_MAX)
+        extra_word = TRACE_EXTRA_MAX;
+#endif
+
+    /* Round size up to nearest word */
+    extra = extra_word * sizeof(u32);
 
     if ( (tb_event_mask & event) == 0 )
         return;
@@ -275,73 +410,125 @@ void trace(u32 event, unsigned long d1, unsigned long d2,
 
     local_irq_save(flags);
 
-    /* Check if space for two records (we write two if there are lost recs). */
-    if ( (buf->prod - buf->cons) >= (nr_recs - 1) )
+    started_below_highwater = ( (buf->prod - buf->cons) < t_buf_highwater );
+
+    /* Calculate the record size */
+    rec_size = calc_rec_size(cycles, extra);
+ 
+    /* How many bytes are available in the buffer? */
+    bytes_to_tail = calc_bytes_avail(buf);
+    
+    /* How many bytes until the next wrap-around? */
+    bytes_to_wrap = calc_bytes_to_wrap(buf);
+    
+    /* 
+     * Calculate expected total size to commit this record by
+     * doing a dry-run.
+     */
+    total_size = 0;
+
+    /* First, check to see if we need to include a lost_record.
+     *
+     * calc_bytes_to_wrap() involves integer division, which we'd like to
+     * avoid if we can.  So do the math, check it in debug versions, and
+     * do a final check always if we happen to write a record.
+     */
+    if(this_cpu(lost_records))
+    {
+        if(LOST_REC_SIZE > bytes_to_wrap)
+        {
+            total_size += bytes_to_wrap;
+            bytes_to_wrap = data_size;
+        } 
+        else
+        {
+            bytes_to_wrap -= LOST_REC_SIZE;
+            if(bytes_to_wrap == 0)
+                bytes_to_wrap == data_size;
+        }
+        total_size += LOST_REC_SIZE;
+    }
+
+    ASSERT(bytes_to_wrap == calc_bytes_to_wrap(buf));
+
+    if(rec_size > bytes_to_wrap)
+    {
+        total_size += bytes_to_wrap;
+        bytes_to_wrap = data_size;
+    } 
+    else
+    {
+        bytes_to_wrap -= rec_size;
+    }
+
+    total_size += rec_size;
+
+    /* Do we have enough space for everything? */
+    if(total_size > bytes_to_tail) 
     {
         this_cpu(lost_records)++;
         local_irq_restore(flags);
         return;
     }
 
-    if ( unlikely(this_cpu(lost_records) != 0) )
+    /*
+     * Now, actually write information 
+     */
+    bytes_to_wrap = calc_bytes_to_wrap(buf);
+
+    if(this_cpu(lost_records))
     {
-        if ( !TB_COMPAT )
+        if(LOST_REC_SIZE > bytes_to_wrap)
         {
-            rec.nat = &this_cpu(t_recs).nat[buf->prod % nr_recs];
-            memset(rec.nat, 0, sizeof(*rec.nat));
-            rec.nat->cycles  = (u64)get_cycles();
-            rec.nat->event   = TRC_LOST_RECORDS;
-            rec.nat->data[0] = this_cpu(lost_records);
-            this_cpu(lost_records) = 0;
-        }
+            insert_wrap_record(buf, LOST_REC_SIZE);
+            bytes_to_wrap = data_size;
+        } 
         else
         {
-            rec.cmp = &this_cpu(t_recs).cmp[buf->prod % nr_recs];
-            memset(rec.cmp, 0, sizeof(*rec.cmp));
-            rec.cmp->cycles  = (u64)get_cycles();
-            rec.cmp->event   = TRC_LOST_RECORDS;
-            rec.cmp->data[0] = this_cpu(lost_records);
-            this_cpu(lost_records) = 0;
+            bytes_to_wrap -= LOST_REC_SIZE;
+            /* LOST_REC might line up perfectly with the buffer wrap */
+            if(bytes_to_wrap == 0)
+                bytes_to_wrap = data_size;
         }
-
-        wmb();
-        buf->prod++;
+        insert_lost_records(buf);
     }
 
-    if ( !TB_COMPAT )
+    ASSERT(bytes_to_wrap == calc_bytes_to_wrap(buf));
+
+    if(rec_size > bytes_to_wrap)
     {
-        rec.nat = &this_cpu(t_recs).nat[buf->prod % nr_recs];
-        rec.nat->cycles  = (u64)get_cycles();
-        rec.nat->event   = event;
-        rec.nat->data[0] = d1;
-        rec.nat->data[1] = d2;
-        rec.nat->data[2] = d3;
-        rec.nat->data[3] = d4;
-        rec.nat->data[4] = d5;
-    }
-    else
-    {
-        rec.cmp = &this_cpu(t_recs).cmp[buf->prod % nr_recs];
-        rec.cmp->cycles  = (u64)get_cycles();
-        rec.cmp->event   = event;
-        rec.cmp->data[0] = d1;
-        rec.cmp->data[1] = d2;
-        rec.cmp->data[2] = d3;
-        rec.cmp->data[3] = d4;
-        rec.cmp->data[4] = d5;
-    }
+        insert_wrap_record(buf, rec_size);
+    } 
 
-    wmb();
-    buf->prod++;
+    /* Write the original record */
+    __insert_record(buf, event, extra, cycles, rec_size, extra_data);
 
     local_irq_restore(flags);
 
     /*
-     * Notify trace buffer consumer that we've reached the high water mark.
+     * Notify trace buffer consumer that we've crossed the high water mark.
      *
      */
-    if ( (buf->prod - buf->cons) == t_buf_highwater )
+    if ( started_below_highwater
+         && ( (buf->prod - buf->cons) > t_buf_highwater ) )
         raise_softirq(TRACE_SOFTIRQ);
+}
+
+
+void __trace_fixed(u32 event, unsigned long d1, unsigned long d2,
+           unsigned long d3, unsigned long d4, unsigned long d5)
+{
+    u32 extra_data[5];
+    
+    /* In a 64-bit hypervisor, this will truncate to 32 bits. */
+    extra_data[0]=d1;
+    extra_data[1]=d2;
+    extra_data[2]=d3;
+    extra_data[3]=d4;
+    extra_data[4]=d5;
+
+    __trace_var(event, 1/* include cycles */, sizeof(*extra_data)*5,
+              (unsigned char *)extra_data);
 }
 
 /*

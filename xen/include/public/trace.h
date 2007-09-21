@@ -26,14 +26,21 @@
 #ifndef __XEN_PUBLIC_TRACE_H__
 #define __XEN_PUBLIC_TRACE_H__
 
+#define TRACE_EXTRA_MAX    7
+#define TRACE_EXTRA_SHIFT 28
+
 /* Trace classes */
 #define TRC_CLS_SHIFT 16
-#define TRC_GEN     0x0001f000    /* General trace            */
-#define TRC_SCHED   0x0002f000    /* Xen Scheduler trace      */
-#define TRC_DOM0OP  0x0004f000    /* Xen DOM0 operation trace */
-#define TRC_HVM     0x0008f000    /* Xen HVM trace            */
-#define TRC_MEM     0x0010f000    /* Xen memory trace         */
-#define TRC_ALL     0xfffff000
+#define TRC_GEN      0x0001f000    /* General trace            */
+#define TRC_SCHED    0x0002f000    /* Xen Scheduler trace      */
+#define TRC_DOM0OP   0x0004f000    /* Xen DOM0 operation trace */
+#define TRC_HVM      0x0008f000    /* Xen HVM trace            */
+#define TRC_MEM      0x0010f000    /* Xen memory trace         */
+#define TRC_ALL      0x0ffff000
+#define TRC_HD_TO_EVENT(x) ((x)&0x0fffffff)
+#define TRC_HD_CYCLE_FLAG (1UL<<31)
+#define TRC_HD_INCLUDES_CYCLE_COUNT(x) ( !!( (x) & TRC_HD_CYCLE_FLAG ) )
+#define TRC_HD_EXTRA(x)    (((x)>>TRACE_EXTRA_SHIFT)&TRACE_EXTRA_MAX)
 
 /* Trace subclasses */
 #define TRC_SUBCLS_SHIFT 12
@@ -44,6 +51,8 @@
 
 /* Trace events per class */
 #define TRC_LOST_RECORDS        (TRC_GEN + 1)
+#define TRC_TRACE_WRAP_BUFFER  (TRC_GEN + 2)
+#define TRC_TRACE_CPU_CHANGE    (TRC_GEN + 3)
 
 #define TRC_SCHED_DOM_ADD       (TRC_SCHED +  1)
 #define TRC_SCHED_DOM_REM       (TRC_SCHED +  2)
@@ -92,9 +101,19 @@
 
 /* This structure represents a single trace buffer record. */
 struct t_rec {
-    uint64_t cycles;          /* cycle counter timestamp */
-    uint32_t event;           /* event ID                */
-    unsigned long data[5];    /* event data items        */
+    uint32_t header;           /* 31   : Cycles included?
+                                  30-28: # of extra words
+                                  27- 0: event ID                */
+    union {
+        struct {
+            uint32_t cycles_lo, cycles_hi; /* cycle counter timestamp */
+            unsigned char data[28];        /* event data items        */
+        } cycles;
+        struct {
+            unsigned char data[28];        /* event data items        */
+        } nocycles;
+    }u;
+        
 };
 
 /*
@@ -102,9 +121,9 @@ struct t_rec {
  * field, indexes into an array of struct t_rec's.
  */
 struct t_buf {
-    uint32_t cons;      /* Next item to be consumed by control tools. */
-    uint32_t prod;      /* Next item to be produced by Xen.           */
-    /* 'nr_recs' records follow immediately after the meta-data header.    */
+    uint32_t cons;   /* Offset of next item to be consumed by control tools. */
+    uint32_t prod;   /* Offset of next item to be produced by Xen.           */
+    /*  Records follow immediately after the meta-data header.    */
 };
 
 #endif /* __XEN_PUBLIC_TRACE_H__ */

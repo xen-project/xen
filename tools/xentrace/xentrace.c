@@ -22,6 +22,7 @@
 #include <signal.h>
 #include <inttypes.h>
 #include <string.h>
+#include <assert.h>
 
 #include <xen/xen.h>
 #include <xen/trace.h>
@@ -83,24 +84,58 @@ struct timespec millis_to_timespec(unsigned long millis)
 }
 
 /**
- * write_rec - output a trace record in binary format
+ * write_buffer - write a section of the trace buffer
  * @cpu      - source buffer CPU ID
- * @rec      - trace record to output
+ * @start
+ * @size     - size of write (may be less than total window size)
+ * @total_size - total size of the window (0 on 2nd write of wrapped windows)
  * @out      - output stream
  *
- * Outputs the trace record to a filestream, prepending the CPU ID of the
- * source trace buffer.
+ * Outputs the trace buffer to a filestream, prepending the CPU and size
+ * of the buffer write.
  */
-void write_rec(unsigned int cpu, struct t_rec *rec, FILE *out)
+void write_buffer(unsigned int cpu, unsigned char *start, int size,
+               int total_size, int outfd)
 {
     size_t written = 0;
-    written += fwrite(&cpu, sizeof(cpu), 1, out);
-    written += fwrite(rec, sizeof(*rec), 1, out);
-    if ( written != 2 )
+    
+    /* Write a CPU_BUF record on each buffer "window" written.  Wrapped
+     * windows may involve two writes, so only write the record on the
+     * first write. */
+    if(total_size)
     {
-        PERROR("Failed to write trace record");
-        exit(EXIT_FAILURE);
+        struct {
+            uint32_t header;
+            struct {
+                unsigned cpu;
+                unsigned byte_count;
+            } extra;
+        } rec;
+
+        rec.header = TRC_TRACE_CPU_CHANGE
+            | ((sizeof(rec.extra)/sizeof(uint32_t)) << TRACE_EXTRA_SHIFT);
+        rec.extra.cpu = cpu;
+        rec.extra.byte_count = total_size;
+
+        written = write(outfd, &rec, sizeof(rec));
+
+        if(written!=sizeof(rec)) {
+            fprintf(stderr, "Cannot write cpu change (write returned %d)\n",
+                    written);
+            goto fail;
+        }
     }
+
+    written = write(outfd, start, size);
+    if ( written != size ) {
+        fprintf(stderr, "Write failed! (size %d, returned %d)\n",
+                size, written);
+        goto fail;
+    }
+    return;
+ fail:
+    PERROR("Failed to write trace data");
+    exit(EXIT_FAILURE);
 }
 
 static void get_tbufs(unsigned long *mfn, unsigned long *size)
@@ -233,12 +268,12 @@ struct t_buf **init_bufs_ptrs(void *bufs_mapped, unsigned int num,
  * mapped in user space.  Note that the trace buffer metadata contains machine
  * pointers - the array returned allows more convenient access to them.
  */
-struct t_rec **init_rec_ptrs(struct t_buf **meta, unsigned int num)
+unsigned char **init_rec_ptrs(struct t_buf **meta, unsigned int num)
 {
     int i;
-    struct t_rec **data;
+    unsigned char **data;
     
-    data = calloc(num, sizeof(struct t_rec *));
+    data = calloc(num, sizeof(unsigned char *));
     if ( data == NULL )
     {
         PERROR("Failed to allocate memory for data pointers\n");
@@ -246,7 +281,7 @@ struct t_rec **init_rec_ptrs(struct t_buf **meta, unsigned int num)
     }
 
     for ( i = 0; i < num; i++ )
-        data[i] = (struct t_rec *)(meta[i] + 1);
+        data[i] = (unsigned char *)(meta[i] + 1);
 
     return data;
 }
@@ -281,19 +316,19 @@ unsigned int get_num_cpus(void)
  * monitor_tbufs - monitor the contents of tbufs and output to a file
  * @logfile:       the FILE * representing the file to log to
  */
-int monitor_tbufs(FILE *logfile)
+int monitor_tbufs(int outfd)
 {
     int i;
 
     void *tbufs_mapped;          /* pointer to where the tbufs are mapped    */
     struct t_buf **meta;         /* pointers to the trace buffer metadata    */
-    struct t_rec **data;         /* pointers to the trace buffer data areas
+    unsigned char **data;        /* pointers to the trace buffer data areas
                                   * where they are mapped into user space.   */
     unsigned long tbufs_mfn;     /* mfn of the tbufs                         */
     unsigned int  num;           /* number of trace buffers / logical CPUS   */
     unsigned long size;          /* size of a single trace buffer            */
 
-    int size_in_recs;
+    unsigned long data_size;
 
     /* get number of logical CPUs (and therefore number of trace buffers) */
     num = get_num_cpus();
@@ -302,7 +337,7 @@ int monitor_tbufs(FILE *logfile)
     get_tbufs(&tbufs_mfn, &size);
     tbufs_mapped = map_tbufs(tbufs_mfn, num, size);
 
-    size_in_recs = (size - sizeof(struct t_buf)) / sizeof(struct t_rec);
+    data_size = (size - sizeof(struct t_buf));
 
     /* build arrays of convenience ptrs */
     meta  = init_bufs_ptrs(tbufs_mapped, num, size);
@@ -317,13 +352,48 @@ int monitor_tbufs(FILE *logfile)
     {
         for ( i = 0; (i < num) && !interrupted; i++ )
         {
-            while ( meta[i]->cons != meta[i]->prod )
+            unsigned long start_offset, end_offset, window_size, cons, prod;
+            rmb(); /* read prod, then read item. */
+                
+            /* Read window information only once. */
+            cons = meta[i]->cons;
+            prod = meta[i]->prod;
+            
+            if(cons == prod)
+                continue;
+           
+            assert(prod > cons);
+
+            window_size = prod - cons;
+            start_offset = cons % data_size;
+            end_offset = prod % data_size;
+
+            if(end_offset > start_offset)
             {
-                rmb(); /* read prod, then read item. */
-                write_rec(i, data[i] + meta[i]->cons % size_in_recs, logfile);
-                mb(); /* read item, then update cons. */
-                meta[i]->cons++;
+                /* If window does not wrap, write in one big chunk */
+                write_buffer(i, data[i]+start_offset,
+                             window_size,
+                             window_size,
+                             outfd);
             }
+            else
+            {
+                /* If wrapped, write in two chunks:
+                 * - first, start to the end of the buffer
+                 * - second, start of buffer to end of window
+                 */
+                write_buffer(i, data[i]+start_offset,
+                             data_size - start_offset,
+                             window_size,
+                             outfd);
+                write_buffer(i, data[i],
+                             end_offset,
+                             0,
+                             outfd);
+            }
+
+            mb(); /* read buffer, then update cons. */
+            meta[i]->cons = meta[i]->prod;
         }
 
         nanosleep(&opts.poll_sleep, NULL);
@@ -333,7 +403,7 @@ int monitor_tbufs(FILE *logfile)
     free(meta);
     free(data);
     /* don't need to munmap - cleanup is automatic */
-    fclose(logfile);
+    close(outfd);
 
     return 0;
 }
@@ -503,7 +573,6 @@ const char *argp_program_bug_address = "<mark.a.williamson@intel.com>";
 int main(int argc, char **argv)
 {
     int outfd = 1, ret;
-    FILE *logfile;
     struct sigaction act;
 
     opts.outfile = 0;
@@ -537,8 +606,6 @@ int main(int argc, char **argv)
         exit(EXIT_FAILURE);
     }
 
-    logfile = fdopen(outfd, "w");
-    
     /* ensure that if we get a signal, we'll do cleanup, then exit */
     act.sa_handler = close_handler;
     act.sa_flags = 0;
@@ -547,7 +614,16 @@ int main(int argc, char **argv)
     sigaction(SIGTERM, &act, NULL);
     sigaction(SIGINT,  &act, NULL);
 
-    ret = monitor_tbufs(logfile);
+    ret = monitor_tbufs(outfd);
 
     return ret;
 }
+/*
+ * Local variables:
+ * mode: C
+ * c-set-style: "BSD"
+ * c-basic-offset: 4
+ * tab-width: 4
+ * indent-tabs-mode: nil
+ * End:
+ */
