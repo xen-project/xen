@@ -671,18 +671,19 @@ IA64FAULT vmx_vcpu_tpa(VCPU *vcpu, u64 vadr, u64 *padr)
 u64 vmx_vcpu_tak(VCPU *vcpu, u64 vadr)
 {
     thash_data_t *data;
-    PTA vpta;
     u64 key;
-    vpta.val = vmx_vcpu_get_pta(vcpu);
-    if(vpta.vf==0 || unimplemented_gva(vcpu, vadr)){
-        key=1;
+
+    if (unimplemented_gva(vcpu, vadr)) {
+        key = 1;
         return key;
     }
+
+    /* FIXME: if psr.dt is set, look in the guest VHPT.  */
     data = vtlb_lookup(vcpu, vadr, DSIDE_TLB);
-    if(!data||!data->p){
+    if (!data || !data->p)
         key = 1;
-    }else{
-        key = data->key;
-    }
+    else
+        key = data->key << 8;
+
     return key;
 }
