@@ -652,7 +652,7 @@ static void vmx_dump_sel(char *name, enum x86_segment seg)
 {
     struct segment_register sreg;
     hvm_get_segment_register(current, seg, &sreg);
-    printk("%s: sel=0x%04x, attr=0x%04x, limit=0x%08x, base=0x%016llx\n", 
+    printk("%s: sel=0x%04x, attr=0x%05x, limit=0x%08x, base=0x%016llx\n", 
            name, sreg.sel, sreg.attr.bytes, sreg.limit,
            (unsigned long long)sreg.base);
 }
@@ -691,8 +691,8 @@ void vmcs_dump_vcpu(void)
            (unsigned long long)vmr(GUEST_RSP),
            (unsigned long long)vmr(GUEST_RIP));
     printk("RFLAGS=0x%016llx  DR7 = 0x%016llx\n", 
-           (unsigned long long)vmr(GUEST_DR7),
-           (unsigned long long)vmr(GUEST_RFLAGS));
+           (unsigned long long)vmr(GUEST_RFLAGS),
+           (unsigned long long)vmr(GUEST_DR7));
     printk("Sysenter RSP=%016llx CS:RIP=%04x:%016llx\n",
            (unsigned long long)vmr(GUEST_SYSENTER_ESP),
            (int)vmr(GUEST_SYSENTER_CS),
