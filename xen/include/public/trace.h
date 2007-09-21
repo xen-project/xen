@@ -77,6 +77,7 @@
 /* trace events per subclass */
 #define TRC_HVM_VMENTRY         (TRC_HVM_ENTRYEXIT + 0x01)
 #define TRC_HVM_VMEXIT          (TRC_HVM_ENTRYEXIT + 0x02)
+#define TRC_HVM_VMEXIT64        (TRC_HVM_ENTRYEXIT + 0x03)
 #define TRC_HVM_PF_XEN          (TRC_HVM_HANDLER + 0x01)
 #define TRC_HVM_PF_INJECT       (TRC_HVM_HANDLER + 0x02)
 #define TRC_HVM_INJ_EXC         (TRC_HVM_HANDLER + 0x03)
@@ -98,6 +99,11 @@
 #define TRC_HVM_HLT             (TRC_HVM_HANDLER + 0x13)
 #define TRC_HVM_INVLPG          (TRC_HVM_HANDLER + 0x14)
 #define TRC_HVM_MCE             (TRC_HVM_HANDLER + 0x15)
+#define TRC_HVM_IO_ASSIST       (TRC_HVM_HANDLER + 0x16)
+#define TRC_HVM_MMIO_ASSIST     (TRC_HVM_HANDLER + 0x17)
+#define TRC_HVM_CLTS            (TRC_HVM_HANDLER + 0x18)
+#define TRC_HVM_LMSW            (TRC_HVM_HANDLER + 0x19)
+#define TRC_HVM_PF_XEN64       (TRC_HVM_HANDLER + 0x20)
 
 /* This structure represents a single trace buffer record. */
 struct t_rec {

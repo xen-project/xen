@@ -40,6 +40,7 @@
 #include <asm/hvm/vpt.h>
 #include <asm/hvm/vpic.h>
 #include <asm/hvm/vlapic.h>
+#include <asm/hvm/trace.h>
 
 #include <public/sched.h>
 #include <xen/iocap.h>
@@ -476,6 +477,7 @@ static void hvm_pio_assist(struct cpu_user_regs *regs, ioreq_t *p,
             printk("Error: %s unknown port size\n", __FUNCTION__);
             domain_crash_synchronous();
         }
+        HVMTRACE_1D(IO_ASSIST, current, p->data);
     }
 }
 
@@ -491,6 +493,8 @@ static void hvm_mmio_assist(struct cpu_user_regs *regs, ioreq_t *p,
     dst = mmio_opp->operand[1];
     size = operand_size(src);
 
+    HVMTRACE_1D(MMIO_ASSIST, current, p->data);
+        
     switch (mmio_opp->instr) {
     case INSTR_MOV:
         if (dst & REGISTER) {

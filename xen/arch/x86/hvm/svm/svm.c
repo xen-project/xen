@@ -1482,7 +1482,7 @@ static void svm_io_instruction(struct vcpu *v)
     if (dir==IOREQ_READ)
         HVMTRACE_2D(IO_READ,  v, port, size);
     else
-        HVMTRACE_2D(IO_WRITE, v, port, size);
+        HVMTRACE_3D(IO_WRITE, v, port, size, regs->eax);
 
     HVM_DBG_LOG(DBG_LEVEL_IO, 
                 "svm_io_instruction: port 0x%x eip=%x:%"PRIx64", "
@@ -1759,6 +1759,7 @@ static void svm_cr_access(
         vmcb->exception_intercepts &= ~(1U << TRAP_no_device);
         vmcb->cr0 &= ~X86_CR0_TS; /* clear TS */
         v->arch.hvm_vcpu.guest_cr[0] &= ~X86_CR0_TS; /* clear TS */
+        HVMTRACE_0D(CLTS, current);
         break;
 
     case INSTR_LMSW:
@@ -1766,6 +1767,7 @@ static void svm_cr_access(
         value = get_reg(gpreg, regs, vmcb) & 0xF;
         value = (v->arch.hvm_vcpu.guest_cr[0] & ~0xF) | value;
         result = svm_set_cr0(value);
+        HVMTRACE_1D(LMSW, current, value);
         break;
 
     case INSTR_SMSW:
@@ -1912,7 +1914,7 @@ static void svm_do_msr_access(
         regs->edx = msr_content >> 32;
 
  done:
-        HVMTRACE_2D(MSR_READ, v, ecx, msr_content);
+        hvmtrace_msr_read(v, ecx, msr_content);
         HVM_DBG_LOG(DBG_LEVEL_1, "returns: ecx=%x, eax=%lx, edx=%lx",
                     ecx, (unsigned long)regs->eax, (unsigned long)regs->edx);
 
@@ -1922,7 +1924,7 @@ static void svm_do_msr_access(
     {
         msr_content = (u32)regs->eax | ((u64)regs->edx << 32);
 
-        HVMTRACE_2D(MSR_WRITE, v, ecx, msr_content);
+        hvmtrace_msr_write(v, ecx, msr_content);
 
         switch (ecx)
         {
@@ -2158,7 +2160,7 @@ asmlinkage void svm_vmexit_handler(struct cpu_user_regs *regs)
 
     exit_reason = vmcb->exitcode;
 
-    HVMTRACE_2D(VMEXIT, v, regs->eip, exit_reason);
+    hvmtrace_vmexit(v, regs->eip, exit_reason);
 
     if ( unlikely(exit_reason == VMEXIT_INVALID) )
     {
@@ -2378,7 +2380,7 @@ asmlinkage void svm_trace_vmentry(void)
     struct vcpu *v = current;
 
     /* This is the last C code before the VMRUN instruction. */
-    HVMTRACE_0D(VMENTRY, v);
+    hvmtrace_vmentry(v);
 }
   
 /*

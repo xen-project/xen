@@ -1825,7 +1825,7 @@ static void vmx_io_instruction(unsigned long exit_qualification,
         if ( dir == IOREQ_READ )
             HVMTRACE_2D(IO_READ,  current, port, size);
         else
-            HVMTRACE_2D(IO_WRITE, current, port, size);
+            HVMTRACE_3D(IO_WRITE, current, port, size, regs->eax);
 
         if ( port == 0xe9 && dir == IOREQ_WRITE && size == 1 )
             hvm_print_line(current, regs->eax); /* guest debug output */
@@ -2249,11 +2249,13 @@ static int vmx_cr_access(unsigned long exit_qualification,
 
         v->arch.hvm_vcpu.guest_cr[0] &= ~X86_CR0_TS; /* clear TS */
         __vmwrite(CR0_READ_SHADOW, v->arch.hvm_vcpu.guest_cr[0]);
+        HVMTRACE_0D(CLTS, current);
         break;
     case TYPE_LMSW:
         value = v->arch.hvm_vcpu.guest_cr[0];
         value = (value & ~0xF) |
             (((exit_qualification & LMSW_SOURCE_DATA) >> 16) & 0xF);
+        HVMTRACE_1D(LMSW, current, value);
         return vmx_set_cr0(value);
     default:
         BUG();
@@ -2326,7 +2328,7 @@ static int vmx_do_msr_read(struct cpu_user_regs *regs)
     regs->edx = msr_content >> 32;
 
 done:
-    HVMTRACE_2D(MSR_READ, v, ecx, msr_content);
+    hvmtrace_msr_read(v, ecx, msr_content);
     HVM_DBG_LOG(DBG_LEVEL_1, "returns: ecx=%x, eax=%lx, edx=%lx",
                 ecx, (unsigned long)regs->eax,
                 (unsigned long)regs->edx);
@@ -2407,7 +2409,8 @@ static int vmx_do_msr_write(struct cpu_user_regs *regs)
                 ecx, (u32)regs->eax, (u32)regs->edx);
 
     msr_content = (u32)regs->eax | ((u64)regs->edx << 32);
-    HVMTRACE_2D(MSR_WRITE, v, ecx, msr_content);
+
+    hvmtrace_msr_write(v, ecx, msr_content);
 
     switch ( ecx )
     {
@@ -2550,7 +2553,7 @@ asmlinkage void vmx_vmexit_handler(struct cpu_user_regs *regs)
 
     exit_reason = __vmread(VM_EXIT_REASON);
 
-    HVMTRACE_2D(VMEXIT, v, regs->eip, exit_reason);
+    hvmtrace_vmexit(VMEXIT, v, regs->eip, exit_reason);
 
     perfc_incra(vmexits, exit_reason);
 
@@ -2637,7 +2640,7 @@ asmlinkage void vmx_vmexit_handler(struct cpu_user_regs *regs)
 
             if ( paging_fault(exit_qualification, regs) )
             {
-                HVMTRACE_2D(PF_XEN, v, exit_qualification, regs->error_code);
+                hvmtrace_pf_xen(v, exit_qualification, regs->error_code);
                 break;
             }
 
@@ -2791,7 +2794,8 @@ asmlinkage void vmx_vmexit_handler(struct cpu_user_regs *regs)
 asmlinkage void vmx_trace_vmentry(void)
 {
     struct vcpu *v = current;
-    HVMTRACE_0D(VMENTRY, v);
+    
+    hvmtrace_vmentry(v);
 }
 
 /*
