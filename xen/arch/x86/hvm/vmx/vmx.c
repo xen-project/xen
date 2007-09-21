@@ -2553,7 +2553,7 @@ asmlinkage void vmx_vmexit_handler(struct cpu_user_regs *regs)
 
     exit_reason = __vmread(VM_EXIT_REASON);
 
-    hvmtrace_vmexit(VMEXIT, v, regs->eip, exit_reason);
+    hvmtrace_vmexit(v, regs->eip, exit_reason);
 
     perfc_incra(vmexits, exit_reason);
 
