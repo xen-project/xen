@@ -135,6 +135,13 @@ vmx_vcpu_set_psr(VCPU *vcpu, unsigned long value)
     if (FP_PSR(vcpu) & IA64_PSR_DFH)
         regs->cr_ipsr |= IA64_PSR_DFH;
 
+    if (unlikely(vcpu->domain->debugger_attached)) {
+        if (vcpu->domain->arch.debug_flags & XEN_IA64_DEBUG_FORCE_SS)
+            regs->cr_ipsr |= IA64_PSR_SS;
+        if (vcpu->domain->arch.debug_flags & XEN_IA64_DEBUG_FORCE_DB)
+            regs->cr_ipsr |= IA64_PSR_DB;
+    }
+
     check_mm_mode_switch(vcpu, old_psr, new_psr);
     return ;
 }

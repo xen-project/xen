@@ -181,6 +181,7 @@
 #include <asm/dom_fw_common.h>
 #include <public/memory.h>
 #include <asm/event.h>
+#include <asm/debugger.h>
 
 static void domain_page_flush_and_put(struct domain* d, unsigned long mpaddr,
                                       volatile pte_t* ptep, pte_t old_pte, 
@@ -762,6 +763,8 @@ unsigned long lookup_domain_mpa(struct domain *d, unsigned long mpaddr,
                  current->vcpu_id, PSCB(current, iip),
                  d->domain_id, mpaddr, d->arch.convmem_end);
     }
+
+    debugger_event (XEN_IA64_DEBUG_ON_BAD_MPA);
 
     if (entry != NULL)
         p2m_entry_set(entry, NULL, __pte(0));

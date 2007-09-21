@@ -83,16 +83,31 @@ static inline int debugger_trap_fatal(
 #define debugger_trap_immediate()		((void)0)
 #endif
 
-static inline int debugger_trap_entry(
-    unsigned int vector, struct cpu_user_regs *regs)
+static inline int debugger_event(unsigned long event)
 {
     struct vcpu *v = current;
+    struct domain *d = v->domain;
 
-    if (guest_kernel_mode(regs) && v->domain->debugger_attached) {
+    if (unlikely (d->debugger_attached && (d->arch.debug_flags & event))) {
+        d->arch.debug_event = event;
         domain_pause_for_debugger();
         return 1;
     }
+    return 0;
+}
 
+static inline int debugger_kernel_event(
+    struct cpu_user_regs *regs, unsigned long event)
+{
+    struct vcpu *v = current;
+    struct domain *d = v->domain;
+
+    if (unlikely(d->debugger_attached && (d->arch.debug_flags & event)
+                 && guest_kernel_mode(regs))) {
+        d->arch.debug_event = event;
+        domain_pause_for_debugger();
+        return 1;
+    }
     return 0;
 }
 

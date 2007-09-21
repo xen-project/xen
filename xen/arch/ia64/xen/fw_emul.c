@@ -36,6 +36,7 @@
 #include <xen/hypercall.h>
 #include <xen/softirq.h>
 #include <xen/time.h>
+#include <asm/debugger.h>
 
 static DEFINE_SPINLOCK(efi_time_services_lock);
 
@@ -136,6 +137,8 @@ sal_emulator (long index, unsigned long in1, unsigned long in2,
 	unsigned long r10 = 0;
 	long r11 = 0;
 	long status;
+
+	debugger_event(XEN_IA64_DEBUG_ON_SAL);
 
 	status = 0;
 	switch (index) {
@@ -594,6 +597,8 @@ xen_pal_emulator(unsigned long index, u64 in1, u64 in2, u64 in3)
 
 	if (unlikely(running_on_sim))
 		return pal_emulator_static(index);
+
+	debugger_event(XEN_IA64_DEBUG_ON_PAL);
 
 	// pal code must be mapped by a TR when pal is called, however
 	// calls are rare enough that we will map it lazily rather than
@@ -1240,6 +1245,8 @@ efi_emulator (struct pt_regs *regs, IA64FAULT *fault)
 {
 	struct vcpu *v = current;
 	efi_status_t status;
+
+	debugger_event(XEN_IA64_DEBUG_ON_EFI);
 
 	*fault = IA64_NO_FAULT;
 

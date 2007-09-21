@@ -104,6 +104,9 @@ static void reflect_interruption(unsigned long isr, struct pt_regs *regs,
 	PSCB(v, interrupt_collection_enabled) = 0;
 
 	perfc_incra(slow_reflect, vector >> 8);
+
+	debugger_event(vector == IA64_EXTINT_VECTOR ?
+		       XEN_IA64_DEBUG_ON_EXTINT : XEN_IA64_DEBUG_ON_EXCEPT);
 }
 
 void reflect_event(void)
@@ -151,6 +154,8 @@ void reflect_event(void)
 	PSCB(v, vpsr_dfh) = 0;
 	v->vcpu_info->evtchn_upcall_mask = 1;
 	PSCB(v, interrupt_collection_enabled) = 0;
+
+	debugger_event(XEN_IA64_DEBUG_ON_EVENT);
 }
 
 static int handle_lazy_cover(struct vcpu *v, struct pt_regs *regs)
@@ -670,7 +675,7 @@ ia64_handle_reflection(unsigned long ifa, struct pt_regs *regs,
 		break;
 	case 29:
 		vector = IA64_DEBUG_VECTOR;
-		if (debugger_trap_entry(vector,regs))
+		if (debugger_kernel_event(regs, XEN_IA64_DEBUG_ON_KERN_DEBUG))
 			return;
 		break;
 	case 30:
@@ -708,12 +713,12 @@ ia64_handle_reflection(unsigned long ifa, struct pt_regs *regs,
 		break;
 	case 35:
 		vector = IA64_TAKEN_BRANCH_TRAP_VECTOR;
-		if (debugger_trap_entry(vector,regs))
+		if (debugger_kernel_event(regs, XEN_IA64_DEBUG_ON_KERN_TBRANCH))
 			return;
 		break;
 	case 36:
 		vector = IA64_SINGLE_STEP_TRAP_VECTOR;
-		if (debugger_trap_entry(vector,regs))
+		if (debugger_kernel_event(regs, XEN_IA64_DEBUG_ON_KERN_SSTEP))
 			return;
 		break;
 

@@ -622,6 +622,8 @@ static IA64FAULT priv_handle_op(VCPU * vcpu, REGS * regs)
 	} else if (ia64_get_cpl(ipsr) > CONFIG_CPL0_EMUL)
 		return IA64_ILLOP_FAULT;
 
+	debugger_event(XEN_IA64_DEBUG_ON_PRIVOP);
+
 	switch (slot_type) {
 	case M:
 		if (inst.generic.major == 0) {
@@ -785,6 +787,9 @@ int ia64_hyperprivop(unsigned long iim, REGS * regs)
 		return 1;
 	}
 	perfc_incra(slow_hyperprivop, iim);
+
+	debugger_event(XEN_IA64_DEBUG_ON_PRIVOP);
+
 	switch (iim) {
 	case HYPERPRIVOP_RFI:
 		vcpu_rfi(v);

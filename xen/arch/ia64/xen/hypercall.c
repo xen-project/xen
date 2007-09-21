@@ -493,3 +493,35 @@ long do_callback_op(int cmd, XEN_GUEST_HANDLE(void) arg)
 
     return ret;
 }
+
+unsigned long
+do_ia64_debug_op(unsigned long cmd, unsigned long domain,
+		 XEN_GUEST_HANDLE(xen_ia64_debug_op_t) u_debug_op)
+{
+    xen_ia64_debug_op_t curop, *op = &curop;
+    struct domain *d;
+    long ret = 0;
+
+    if (!IS_PRIV(current->domain))
+        return -EPERM;
+    if (copy_from_guest(op, u_debug_op, 1))
+        return -EFAULT;
+    d = rcu_lock_domain_by_id(domain);
+    if (d == NULL)
+        return -ESRCH;
+
+    switch (cmd) {
+    case XEN_IA64_DEBUG_OP_SET_FLAGS:
+        d->arch.debug_flags = op->flags;
+        break;
+    case XEN_IA64_DEBUG_OP_GET_FLAGS:
+        op->flags = d->arch.debug_flags;
+        if (copy_to_guest(u_debug_op, op, 1))
+            ret = -EFAULT;
+        break;
+    default:
+        ret = -ENOSYS;
+    }
+    rcu_unlock_domain(d);
+    return ret;
+}

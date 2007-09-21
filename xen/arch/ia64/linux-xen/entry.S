@@ -1535,7 +1535,7 @@ ia64_hypercall_table:
 	data8 do_ni_hypercall		/*  */
 	data8 do_dom0vp_op              /* dom0vp_op */
 	data8 do_pirq_guest_eoi		/* arch_1 */
-	data8 do_ni_hypercall		/* arch_2 */           /* 50 */
+	data8 do_ia64_debug_op		/* arch_2 */           /* 50 */
 	data8 do_ni_hypercall		/* arch_3 */
 	data8 do_ni_hypercall		/* arch_4 */
 	data8 do_ni_hypercall		/* arch_5 */

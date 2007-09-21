@@ -39,8 +39,6 @@ extern void vmx_io_assist(struct vcpu *v);
 extern int ia64_hypercall (struct pt_regs *regs);
 extern void vmx_save_state(struct vcpu *v);
 extern void vmx_load_state(struct vcpu *v);
-extern void show_registers(struct pt_regs *regs);
-#define show_execution_state show_registers
 extern unsigned long __gpfn_to_mfn_foreign(struct domain *d, unsigned long gpfn);
 extern void sync_split_caches(void);
 extern void set_privileged_operation_isr (struct vcpu *vcpu,int inst);

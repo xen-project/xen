@@ -28,6 +28,7 @@
 #include <xen/sched.h>
 #include <asm/pgtable.h>
 #include <asm/vmmu.h>
+#include <asm/debugger.h>
 
 static const int valid_mm_mode[8] = {
     GUEST_PHYS, /* (it, dt, rt) -> (0, 0, 0) */
@@ -300,6 +301,7 @@ check_mm_mode_switch (VCPU *vcpu,  IA64_PSR old_psr, IA64_PSR new_psr)
          (old_psr.rt != new_psr.rt )
          ) {
         switch_mm_mode (vcpu, old_psr, new_psr);
+        debugger_event(XEN_IA64_DEBUG_ON_MMU);
     }
 
     return;

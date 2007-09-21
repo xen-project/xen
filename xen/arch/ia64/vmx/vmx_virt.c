@@ -30,6 +30,7 @@
 #include <asm/vmx.h>
 #include <asm/virt_event.h>
 #include <asm/vmx_phy_mode.h>
+#include <asm/debugger.h>
 
 #ifdef BYPASS_VMAL_OPCODE
 static void
@@ -203,6 +204,11 @@ static IA64FAULT vmx_emul_rfi(VCPU *vcpu, INST64 inst)
     }
 #endif // CHECK_FAULT
 
+    if (debugger_event(XEN_IA64_DEBUG_ON_RFI)) {
+        raise_softirq(SCHEDULE_SOFTIRQ);
+        do_softirq();
+    }
+
     regs=vcpu_regs(vcpu);
     vpsr.val=regs->cr_ipsr;
     if ( vpsr.is == 1 ) {
@@ -279,6 +285,8 @@ static IA64FAULT vmx_emul_ptc_l(VCPU *vcpu, INST64 inst)
     }
 #endif // VMAL_NO_FAULT_CHECK
 
+    debugger_event(XEN_IA64_DEBUG_ON_TC);
+
     return vmx_vcpu_ptc_l(vcpu,r3,bits(r2,2,7));
 }
 
@@ -338,6 +346,8 @@ static IA64FAULT vmx_emul_ptc_g(VCPU *vcpu, INST64 inst)
     }
 #endif // VMAL_NO_FAULT_CHECK
 
+    debugger_event(XEN_IA64_DEBUG_ON_TC);
+
     return vmx_vcpu_ptc_g(vcpu,r3,bits(r2,2,7));
 }
 
@@ -371,6 +381,8 @@ static IA64FAULT vmx_emul_ptc_ga(VCPU *vcpu, INST64 inst)
         return IA64_FAULT;
     }
 #endif // VMAL_NO_FAULT_CHECK
+
+    debugger_event(XEN_IA64_DEBUG_ON_TC);
 
     return vmx_vcpu_ptc_ga(vcpu,r3,bits(r2,2,7));
 }
@@ -414,6 +426,9 @@ static IA64FAULT vmx_emul_ptr_d(VCPU *vcpu, INST64 inst)
     u64 r2,r3;
     if ( ptr_fault_check(vcpu, inst, &r2, &r3 ) == IA64_FAULT )
     	return IA64_FAULT;
+
+    debugger_event(XEN_IA64_DEBUG_ON_TR);
+
     return vmx_vcpu_ptr_d(vcpu,r3,bits(r2,2,7));
 }
 
@@ -422,6 +437,9 @@ static IA64FAULT vmx_emul_ptr_i(VCPU *vcpu, INST64 inst)
     u64 r2,r3;
     if ( ptr_fault_check(vcpu, inst, &r2, &r3 ) == IA64_FAULT )
     	return IA64_FAULT;
+
+    debugger_event(XEN_IA64_DEBUG_ON_TR);
+
     return vmx_vcpu_ptr_i(vcpu,r3,bits(r2,2,7));
 }
 
@@ -633,6 +651,8 @@ static IA64FAULT vmx_emul_itr_d(VCPU *vcpu, INST64 inst)
         return IA64_FAULT;
     }
 
+    debugger_event(XEN_IA64_DEBUG_ON_TR);
+
     return (vmx_vcpu_itr_d(vcpu, slot, pte, itir, ifa));
 }
 
@@ -699,6 +719,8 @@ static IA64FAULT vmx_emul_itr_i(VCPU *vcpu, INST64 inst)
         return IA64_FAULT;
     }
 
+    debugger_event(XEN_IA64_DEBUG_ON_TR);
+
     return vmx_vcpu_itr_i(vcpu, slot, pte, itir, ifa);
 }
 
@@ -760,6 +782,8 @@ static IA64FAULT vmx_emul_itc_d(VCPU *vcpu, INST64 inst)
     	return IA64_FAULT;
     }
 
+    debugger_event(XEN_IA64_DEBUG_ON_TC);
+    
     return vmx_vcpu_itc_d(vcpu, pte, itir, ifa);
 }
 
@@ -770,6 +794,8 @@ static IA64FAULT vmx_emul_itc_i(VCPU *vcpu, INST64 inst)
     if ( itc_fault_check(vcpu, inst, &itir, &ifa, &pte) == IA64_FAULT ) {
     	return IA64_FAULT;
     }
+
+    debugger_event(XEN_IA64_DEBUG_ON_TC);
 
     return vmx_vcpu_itc_i(vcpu, pte, itir, ifa);
 }
@@ -1425,6 +1451,9 @@ if ( (cause == 0xff && opcode == 0x1e000000000) || cause == 0 ) {
 #else
     inst.inst=opcode;
 #endif /* BYPASS_VMAL_OPCODE */
+
+    debugger_event(XEN_IA64_DEBUG_ON_PRIVOP);
+
     /*
      * Switch to actual virtual rid in rr0 and rr4,
      * which is required by some tlb related instructions.

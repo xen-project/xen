@@ -181,6 +181,12 @@ struct arch_domain {
 
     struct opt_feature opt_feature;
 
+    /* Debugging flags.  See arch-ia64.h for bits definition.  */
+    unsigned int debug_flags;
+
+    /* Reason of debugging break.  */
+    unsigned int debug_event;
+
 #ifdef CONFIG_XEN_IA64_TLB_TRACK
     struct tlb_track*   tlb_track;
 #endif
