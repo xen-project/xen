@@ -1622,6 +1622,11 @@ opcode(struct regs *regs)
 			TRACE((regs, regs->eip - eip, "lock"));
 			continue;
 
+		case 0xF4: /* hlt */
+			TRACE((regs, regs->eip - eip, "hlt"));
+			/* Do something power-saving here! */
+			return OPC_EMULATED;
+
 		case 0xF6: /* addr32 testb $imm, r/m8 */
 			if (!(prefix & ADDR32))
 				goto invalid;
