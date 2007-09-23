@@ -51,3 +51,6 @@ def ssidref2security_label(ssidref):
 
 def has_authorization(ssidref):
     return True
+
+def get_security_label(self, xspol=None):
+    return ""

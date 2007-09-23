@@ -35,3 +35,7 @@ def set_security_label(policy, label):
 
 def ssidref2security_label(ssidref):
     return ssidref2label(ssidref)
+
+def get_security_label(self, xspol=None):
+    label = self.info.get('security_label', '')
+    return label
