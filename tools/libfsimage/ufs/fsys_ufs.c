@@ -72,13 +72,13 @@ ufs_dir(fsi_file_t *ffi, char *dirname)
 	while (*dirname == '/')
 		dirname++;
 
-	while (inode && *dirname && !isspace(*dirname)) {
+	while (inode && *dirname && !isspace((uint8_t)*dirname)) {
 		if (!openi(ffi, inode))
 			return 0;
 
 		/* parse for next path component */
 		fname = dirname;
-		while (*dirname && !isspace(*dirname) && *dirname != '/')
+		while (*dirname && !isspace((uint8_t)*dirname) && *dirname != '/')
 			dirname++;
 		ch = *dirname;
 		*dirname = 0;	/* ensure null termination */

@@ -164,7 +164,7 @@ iso9660_dir (fsi_file_t *ffi, char *dirname)
       /* pathlen = strcspn(dirname, "/\n\t "); */
       for (pathlen = 0 ;
 	   dirname[pathlen]
-	     && !isspace(dirname[pathlen]) && dirname[pathlen] != '/' ;
+	     && !isspace((uint8_t)dirname[pathlen]) && dirname[pathlen] != '/' ;
 	   pathlen++)
 	;
 

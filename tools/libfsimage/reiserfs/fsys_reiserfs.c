@@ -1029,7 +1029,7 @@ reiserfs_dir (fsi_file_t *ffi, char *dirname)
 
 	  /* Find out how long our remaining name is. */
 	  len = 0;
-	  while (dirname[len] && !isspace (dirname[len]))
+	  while (dirname[len] && !isspace ((uint8_t)dirname[len]))
 	    len++;
 
 	  if (filemax + len > sizeof (linkbuf) - 1)
@@ -1078,7 +1078,7 @@ reiserfs_dir (fsi_file_t *ffi, char *dirname)
       /* if we have a real file (and we're not just printing possibilities),
 	 then this is where we want to exit */
       
-      if (! *dirname || isspace (*dirname))
+      if (! *dirname || isspace ((uint8_t)*dirname))
 	{
 	  if (! S_ISREG (mode))
 	    {
@@ -1109,7 +1109,7 @@ reiserfs_dir (fsi_file_t *ffi, char *dirname)
 	  errnum = ERR_BAD_FILETYPE;
 	  return 0;
 	}
-      for (rest = dirname; (ch = *rest) && ! isspace (ch) && ch != '/'; rest++);
+      for (rest = dirname; (ch = *rest) && ! isspace ((uint8_t)ch) && ch != '/'; rest++);
       *rest = 0;
       
 # ifndef STAGE1_5
