@@ -103,7 +103,7 @@ int __init get_iommu_capabilities(u8 bus, u8 dev, u8 func, u8 cap_ptr,
 
     if ( (mmio_bar == 0) || ( (mmio_bar & 0x3FFF) != 0 ) ) {
         dprintk(XENLOG_ERR ,
-            "AMD IOMMU: Invalid MMIO_BAR = 0x%lx\n", mmio_bar);
+                "AMD IOMMU: Invalid MMIO_BAR = 0x%"PRIx64"\n", mmio_bar);
         return -ENODEV;
     }
 

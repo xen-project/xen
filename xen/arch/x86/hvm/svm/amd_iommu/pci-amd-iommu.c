@@ -224,8 +224,8 @@ struct amd_iommu *find_iommu_for_device(int bus, int devfn)
     return NULL;
 }
 
-void amd_iommu_setup_domain_device(struct domain *domain,
-        struct amd_iommu *iommu, int requestor_id)
+void amd_iommu_setup_domain_device(
+    struct domain *domain, struct amd_iommu *iommu, int requestor_id)
 {
     void *dte;
     u64 root_ptr;
@@ -244,8 +244,8 @@ void amd_iommu_setup_domain_device(struct domain *domain,
         root_ptr, hd->domain_id, hd->paging_mode);
 
     dprintk(XENLOG_INFO, "AMD IOMMU: Set DTE req_id:%x, "
-        "root_ptr:%lx, domain_id:%d, paging_mode:%d\n",
-        requestor_id, root_ptr, hd->domain_id, hd->paging_mode);
+            "root_ptr:%"PRIx64", domain_id:%d, paging_mode:%d\n",
+            requestor_id, root_ptr, hd->domain_id, hd->paging_mode);
 
     spin_unlock_irqrestore(&iommu->lock, flags);
 }
