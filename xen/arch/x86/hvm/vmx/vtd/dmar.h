@@ -87,4 +87,6 @@ struct acpi_ioapic_unit {
     }ioapic;
 };
 
+int vtd_hw_check(void);
+
 #endif // _DMAR_H_

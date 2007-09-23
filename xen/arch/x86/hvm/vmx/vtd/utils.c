@@ -33,6 +33,37 @@
 #include <xen/mm.h>
 #include <xen/xmalloc.h>
 
+#define VTDPREFIX "[VT-D]" 
+#define INTEL   0x8086
+#define SEABURG 0x4000
+#define C_STEP  2
+
+int vtd_hw_check(void)
+{
+    u16 vendor, device;
+    u8 revision, stepping;
+
+    vendor   = read_pci_config_16(0, 0, 0, PCI_VENDOR_ID);
+    device   = read_pci_config_16(0, 0, 0, PCI_DEVICE_ID);
+    revision = read_pci_config_byte(0, 0, 0, PCI_REVISION_ID);
+    stepping = revision & 0xf;
+
+    if ( (vendor == INTEL) && (device == SEABURG) )
+    {
+        if ( stepping < C_STEP )
+        {
+            dprintk(XENLOG_WARNING VTDPREFIX,
+                    "*** VT-d disabled - pre C0-step Seaburg found\n");
+            dprintk(XENLOG_WARNING VTDPREFIX,
+                    "***  vendor = %x device = %x revision = %x\n",
+                    vendor, device, revision);
+            vtd_enabled = 0;
+            return -ENODEV;
+        }
+    }
+    return 0;
+}
+
 #if defined(__x86_64__)
 void print_iommu_regs(struct acpi_drhd_unit *drhd)
 {
