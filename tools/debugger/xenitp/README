@@ -1,0 +1,36 @@
+xenitp README
+*************
+
+
+Xenitp is a low-level, non-symbolic debugger.  It only works on ia64.
+
+* Building xenitp
+First do 'make tools' at the top level to build libxc and includes.  Then
+cd to tools/debugger/xenitp and do make.
+
+* Using xenitp
+Usage is: xenitp DOM
+DOM is a domain number.
+'help' shows all the command available.
+When the domain is running, C-c stops it.
+
+* Source origin
+All these files come from binutils:
+cpu-ia64-opc.c
+dis-asm.h
+ia64-asmtab.c
+ia64-asmtab.h
+ia64-dis.c
+ia64-gen.c
+ia64.h
+ia64-opc-a.c
+ia64-opc-b.c
+ia64-opc.c
+ia64-opc-d.c
+ia64-opc-f.c
+ia64-opc.h
+ia64-opc-i.c
+ia64-opc-m.c
+ia64-opc-x.c
+
+xenitp.c is based on xenctxt.c
