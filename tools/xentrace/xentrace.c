@@ -102,7 +102,7 @@ void write_buffer(unsigned int cpu, unsigned char *start, int size,
     /* Write a CPU_BUF record on each buffer "window" written.  Wrapped
      * windows may involve two writes, so only write the record on the
      * first write. */
-    if(total_size)
+    if ( total_size != 0 )
     {
         struct {
             uint32_t header;
@@ -119,7 +119,8 @@ void write_buffer(unsigned int cpu, unsigned char *start, int size,
 
         written = write(outfd, &rec, sizeof(rec));
 
-        if(written!=sizeof(rec)) {
+        if ( written != sizeof(rec) )
+        {
             fprintf(stderr, "Cannot write cpu change (write returned %d)\n",
                     written);
             goto fail;
@@ -127,12 +128,15 @@ void write_buffer(unsigned int cpu, unsigned char *start, int size,
     }
 
     written = write(outfd, start, size);
-    if ( written != size ) {
+    if ( written != size )
+    {
         fprintf(stderr, "Write failed! (size %d, returned %d)\n",
                 size, written);
         goto fail;
     }
+
     return;
+
  fail:
     PERROR("Failed to write trace data");
     exit(EXIT_FAILURE);
@@ -337,7 +341,7 @@ int monitor_tbufs(int outfd)
     get_tbufs(&tbufs_mfn, &size);
     tbufs_mapped = map_tbufs(tbufs_mfn, num, size);
 
-    data_size = (size - sizeof(struct t_buf));
+    data_size = size - sizeof(struct t_buf);
 
     /* build arrays of convenience ptrs */
     meta  = init_bufs_ptrs(tbufs_mapped, num, size);
@@ -353,13 +357,13 @@ int monitor_tbufs(int outfd)
         for ( i = 0; (i < num) && !interrupted; i++ )
         {
             unsigned long start_offset, end_offset, window_size, cons, prod;
-            rmb(); /* read prod, then read item. */
                 
             /* Read window information only once. */
             cons = meta[i]->cons;
             prod = meta[i]->prod;
+            rmb(); /* read prod, then read item. */
             
-            if(cons == prod)
+            if ( cons == prod )
                 continue;
            
             assert(prod > cons);
@@ -368,7 +372,7 @@ int monitor_tbufs(int outfd)
             start_offset = cons % data_size;
             end_offset = prod % data_size;
 
-            if(end_offset > start_offset)
+            if ( end_offset > start_offset )
             {
                 /* If window does not wrap, write in one big chunk */
                 write_buffer(i, data[i]+start_offset,
@@ -382,7 +386,7 @@ int monitor_tbufs(int outfd)
                  * - first, start to the end of the buffer
                  * - second, start of buffer to end of window
                  */
-                write_buffer(i, data[i]+start_offset,
+                write_buffer(i, data[i] + start_offset,
                              data_size - start_offset,
                              window_size,
                              outfd);

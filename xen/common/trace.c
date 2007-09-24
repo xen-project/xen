@@ -233,7 +233,7 @@ static inline int calc_rec_size(int cycles, int extra)
 {
     int rec_size;
     rec_size = 4;
-    if(cycles)
+    if ( cycles )
         rec_size += 8;
     rec_size += extra;
     return rec_size;
@@ -254,10 +254,10 @@ static inline int __insert_record(struct t_buf *buf,
                                   int extra,
                                   int cycles,
                                   int rec_size,
-                                  unsigned char * extra_data) 
+                                  unsigned char *extra_data)
 {
     struct t_rec *rec;
-    unsigned char * dst;
+    unsigned char *dst;
     unsigned long extra_word = extra/sizeof(u32);
     int local_rec_size = calc_rec_size(cycles, extra);
 
@@ -266,7 +266,7 @@ static inline int __insert_record(struct t_buf *buf,
     /* Double-check once more that we have enough space.
      * Don't bugcheck here, in case the userland tool is doing
      * something stupid. */
-    if(calc_bytes_avail(buf) < rec_size )
+    if ( calc_bytes_avail(buf) < rec_size )
     {
         printk("%s: %u bytes left (%u - (%u - %u)) recsize %u.\n",
                __func__,
@@ -278,25 +278,22 @@ static inline int __insert_record(struct t_buf *buf,
     rmb();
 
     rec = (struct t_rec *)&this_cpu(t_data)[buf->prod % data_size];
-    rec->header = event;
-    rec->header |= extra_word << TRACE_EXTRA_SHIFT;
-    if(cycles) 
+    rec->event = event;
+    rec->extra_u32 = extra_word;
+    dst = (unsigned char *)rec->u.nocycles.extra_u32;
+    if ( (rec->cycles_included = cycles) != 0 )
     {
         u64 tsc = (u64)get_cycles();
-
-        rec->header |= TRC_HD_CYCLE_FLAG;
-        rec->u.cycles.cycles_lo = tsc & ((((u64)1)<<32)-1);
-        rec->u.cycles.cycles_hi = tsc >> 32;
-        dst = rec->u.cycles.data;
+        rec->u.cycles.cycles_lo = (uint32_t)tsc;
+        rec->u.cycles.cycles_hi = (uint32_t)(tsc >> 32);
+        dst = (unsigned char *)rec->u.cycles.extra_u32;
     } 
-    else
-        dst = rec->u.nocycles.data;
 
-    if(extra_data && extra)
+    if ( extra_data && extra )
         memcpy(dst, extra_data, extra);
 
     wmb();
-    buf->prod+=rec_size;
+    buf->prod += rec_size;
 
     return rec_size;
 }
@@ -305,23 +302,17 @@ static inline int insert_wrap_record(struct t_buf *buf, int size)
 {
     int space_left = calc_bytes_to_wrap(buf);
     unsigned long extra_space = space_left - sizeof(u32);
-    int cycles=0;
-
-    if(space_left > size)
-        printk("%s: space_left %d, size %d!\n",
-               __func__, space_left, size);
+    int cycles = 0;
 
     BUG_ON(space_left > size);
 
     /* We may need to add cycles to take up enough space... */
-    if((extra_space/sizeof(u32)) > TRACE_EXTRA_MAX)
+    if ( (extra_space/sizeof(u32)) > TRACE_EXTRA_MAX )
     {
         cycles = 1;
         extra_space -= sizeof(u64);
-        
         ASSERT((extra_space/sizeof(u32)) <= TRACE_EXTRA_MAX);
     }
-
 
     return __insert_record(buf,
                     TRC_TRACE_WRAP_BUFFER,
@@ -433,9 +424,9 @@ void __trace_var(u32 event, int cycles, int extra, unsigned char *extra_data)
      * avoid if we can.  So do the math, check it in debug versions, and
      * do a final check always if we happen to write a record.
      */
-    if(this_cpu(lost_records))
+    if ( this_cpu(lost_records) )
     {
-        if(LOST_REC_SIZE > bytes_to_wrap)
+        if ( LOST_REC_SIZE > bytes_to_wrap )
         {
             total_size += bytes_to_wrap;
             bytes_to_wrap = data_size;
@@ -443,7 +434,7 @@ void __trace_var(u32 event, int cycles, int extra, unsigned char *extra_data)
         else
         {
             bytes_to_wrap -= LOST_REC_SIZE;
-            if(bytes_to_wrap == 0)
+            if ( bytes_to_wrap == 0 )
                 bytes_to_wrap == data_size;
         }
         total_size += LOST_REC_SIZE;
@@ -451,7 +442,7 @@ void __trace_var(u32 event, int cycles, int extra, unsigned char *extra_data)
 
     ASSERT(bytes_to_wrap == calc_bytes_to_wrap(buf));
 
-    if(rec_size > bytes_to_wrap)
+    if ( rec_size > bytes_to_wrap )
     {
         total_size += bytes_to_wrap;
         bytes_to_wrap = data_size;
@@ -464,7 +455,7 @@ void __trace_var(u32 event, int cycles, int extra, unsigned char *extra_data)
     total_size += rec_size;
 
     /* Do we have enough space for everything? */
-    if(total_size > bytes_to_tail) 
+    if ( total_size > bytes_to_tail )
     {
         this_cpu(lost_records)++;
         local_irq_restore(flags);
@@ -476,9 +467,9 @@ void __trace_var(u32 event, int cycles, int extra, unsigned char *extra_data)
      */
     bytes_to_wrap = calc_bytes_to_wrap(buf);
 
-    if(this_cpu(lost_records))
+    if ( this_cpu(lost_records) )
     {
-        if(LOST_REC_SIZE > bytes_to_wrap)
+        if ( LOST_REC_SIZE > bytes_to_wrap )
         {
             insert_wrap_record(buf, LOST_REC_SIZE);
             bytes_to_wrap = data_size;
@@ -487,7 +478,7 @@ void __trace_var(u32 event, int cycles, int extra, unsigned char *extra_data)
         {
             bytes_to_wrap -= LOST_REC_SIZE;
             /* LOST_REC might line up perfectly with the buffer wrap */
-            if(bytes_to_wrap == 0)
+            if ( bytes_to_wrap == 0 )
                 bytes_to_wrap = data_size;
         }
         insert_lost_records(buf);
@@ -495,40 +486,18 @@ void __trace_var(u32 event, int cycles, int extra, unsigned char *extra_data)
 
     ASSERT(bytes_to_wrap == calc_bytes_to_wrap(buf));
 
-    if(rec_size > bytes_to_wrap)
-    {
+    if ( rec_size > bytes_to_wrap )
         insert_wrap_record(buf, rec_size);
-    } 
 
     /* Write the original record */
     __insert_record(buf, event, extra, cycles, rec_size, extra_data);
 
     local_irq_restore(flags);
 
-    /*
-     * Notify trace buffer consumer that we've crossed the high water mark.
-     *
-     */
+    /* Notify trace buffer consumer that we've crossed the high water mark. */
     if ( started_below_highwater
-         && ( (buf->prod - buf->cons) > t_buf_highwater ) )
+         && ((buf->prod - buf->cons) > t_buf_highwater) )
         raise_softirq(TRACE_SOFTIRQ);
-}
-
-
-void __trace_fixed(u32 event, unsigned long d1, unsigned long d2,
-           unsigned long d3, unsigned long d4, unsigned long d5)
-{
-    u32 extra_data[5];
-    
-    /* In a 64-bit hypervisor, this will truncate to 32 bits. */
-    extra_data[0]=d1;
-    extra_data[1]=d2;
-    extra_data[2]=d3;
-    extra_data[3]=d4;
-    extra_data[4]=d5;
-
-    __trace_var(event, 1/* include cycles */, sizeof(*extra_data)*5,
-              (unsigned char *)extra_data);
 }
 
 /*

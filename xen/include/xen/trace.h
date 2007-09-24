@@ -33,17 +33,7 @@ void init_trace_bufs(void);
 /* used to retrieve the physical address of the trace buffers */
 int tb_control(struct xen_sysctl_tbuf_op *tbc);
 
-void __trace_fixed(u32 event, unsigned long d1, unsigned long d2,
-           unsigned long d3, unsigned long d4, unsigned long d5);
 void __trace_var(u32 event, int cycles, int extra, unsigned char *extra_data);
-
-static inline void trace_fixed(u32 event, unsigned long d1,
-                               unsigned long d2, unsigned long d3,
-                               unsigned long d4, unsigned long d5)
-{
-    if( unlikely(tb_init_done) )
-        __trace_fixed(event, d1, d2, d3, d4, d5);
-}
 
 static inline void trace_var(u32 event, int cycles, int extra,
                                unsigned char *extra_data)
