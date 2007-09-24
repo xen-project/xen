@@ -121,7 +121,7 @@ void write_buffer(unsigned int cpu, unsigned char *start, int size,
 
         if ( written != sizeof(rec) )
         {
-            fprintf(stderr, "Cannot write cpu change (write returned %d)\n",
+            fprintf(stderr, "Cannot write cpu change (write returned %zd)\n",
                     written);
             goto fail;
         }
@@ -130,7 +130,7 @@ void write_buffer(unsigned int cpu, unsigned char *start, int size,
     written = write(outfd, start, size);
     if ( written != size )
     {
-        fprintf(stderr, "Write failed! (size %d, returned %d)\n",
+        fprintf(stderr, "Write failed! (size %d, returned %zd)\n",
                 size, written);
         goto fail;
     }
