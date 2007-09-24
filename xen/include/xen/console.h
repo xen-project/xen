@@ -17,6 +17,7 @@ long read_console_ring(XEN_GUEST_HANDLE(char), u32 *, int);
 
 void init_console(void);
 void console_endboot(void);
+int console_has(const char *device);
 
 int fill_console_start_info(struct dom0_vga_console_info *);
 
