@@ -100,6 +100,7 @@
 ^tools/debugger/pdb/linux-[0-9.]*-module/.tmp_versions/.*$
 ^tools/debugger/pdb/linux-[0-9.]*-module/\..*\.cmd$
 ^tools/debugger/pdb/pdb$
+^tools/debugger/xenitp/xenitp$
 ^tools/firmware/.*/biossums$
 ^tools/firmware/.*\.bin$
 ^tools/firmware/.*\.sym$
