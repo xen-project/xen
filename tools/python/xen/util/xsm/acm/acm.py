@@ -33,7 +33,8 @@ from xen.util import dictio, xsconstants
 from xen.xend.XendConstants import *
 
 #global directories and tools for security management
-policy_dir_prefix = "/etc/xen/acm-security/policies"
+security_dir_prefix = "/etc/xen/acm-security"
+policy_dir_prefix = security_dir_prefix + "/policies"
 res_label_filename = policy_dir_prefix + "/resource_labels"
 boot_filename = "/boot/grub/menu.lst"
 altboot_filename = "/boot/grub/grub.conf"
