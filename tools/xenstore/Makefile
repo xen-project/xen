@@ -25,6 +25,7 @@ XENSTORED_OBJS = xenstored_core.o xenstored_watch.o xenstored_domain.o xenstored
 
 XENSTORED_OBJS_$(CONFIG_Linux) = xenstored_linux.o
 XENSTORED_OBJS_$(CONFIG_SunOS) = xenstored_solaris.o
+XENSTORED_OBJS_$(CONFIG_NetBSD) = xenstored_netbsd.o
 
 XENSTORED_OBJS += $(XENSTORED_OBJS_y)
 

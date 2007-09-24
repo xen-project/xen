@@ -28,7 +28,9 @@
 #include <sys/time.h>
 #include <time.h>
 #include <unistd.h>
+#if defined(__linux__)
 #include <linux/kdev_t.h>
+#endif
 
 #include <xenstat.h>
 
@@ -938,11 +940,12 @@ void do_vbd(xenstat_domain *domain)
 
 		vbd = xenstat_domain_vbd(domain,i);
 
-#ifdef __sun__
+#if !defined(__linux__)
 		details[0] = '\0';
 #else
-		snprintf(details, 20, "[%2x:%2x] ", MAJOR(xenstat_vbd_dev(vbd)),
-		         MINOR(xenstat_vbd_dev(vbd)));
+		snprintf(details, 20, "[%2x:%2x] ",
+			 MAJOR(xenstat_vbd_dev(vbd)),
+			 MINOR(xenstat_vbd_dev(vbd)));
 #endif
 
 		print("VBD %s %4d %s OO: %8llu   RD: %8llu   WR: %8llu\n",
