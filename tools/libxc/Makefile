@@ -23,6 +23,7 @@ CTRL_SRCS-$(CONFIG_X86) += xc_pagetab.c
 CTRL_SRCS-$(CONFIG_Linux) += xc_linux.c
 CTRL_SRCS-$(CONFIG_SunOS) += xc_solaris.c
 CTRL_SRCS-$(CONFIG_X86_Linux) += xc_ptrace.c xc_ptrace_core.c
+CTRL_SRCS-$(CONFIG_NetBSD) += xc_netbsd.c
 
 GUEST_SRCS-y :=
 GUEST_SRCS-y += xg_private.c
