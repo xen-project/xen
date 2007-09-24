@@ -103,23 +103,22 @@
 #define TRC_HVM_MMIO_ASSIST     (TRC_HVM_HANDLER + 0x17)
 #define TRC_HVM_CLTS            (TRC_HVM_HANDLER + 0x18)
 #define TRC_HVM_LMSW            (TRC_HVM_HANDLER + 0x19)
-#define TRC_HVM_PF_XEN64       (TRC_HVM_HANDLER + 0x20)
+#define TRC_HVM_PF_XEN64        (TRC_HVM_HANDLER + 0x20)
 
 /* This structure represents a single trace buffer record. */
 struct t_rec {
-    uint32_t header;           /* 31   : Cycles included?
-                                  30-28: # of extra words
-                                  27- 0: event ID                */
+    uint32_t event:28;
+    uint32_t extra_u32:3;         /* # entries in trailing extra_u32[] array */
+    uint32_t cycles_included:1;   /* u.cycles or u.no_cycles? */
     union {
         struct {
             uint32_t cycles_lo, cycles_hi; /* cycle counter timestamp */
-            unsigned char data[28];        /* event data items        */
+            uint32_t extra_u32[7];         /* event data items */
         } cycles;
         struct {
-            unsigned char data[28];        /* event data items        */
+            uint32_t extra_u32[7];         /* event data items */
         } nocycles;
-    }u;
-        
+    } u;
 };
 
 /*
