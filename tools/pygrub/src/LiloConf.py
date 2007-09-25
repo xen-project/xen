@@ -31,7 +31,7 @@ class LiloImage(object):
 
         if self.commands.has_key(com):
             if self.commands[com] is not None:
-                exec("%s = r\'%s\'" %(self.commands[com], re.sub('^"(.+)"$', r"\1", arg.strip())))
+                setattr(self, self.commands[com], re.sub('^"(.+)"$', r"\1", arg.strip()))
             else:
                 logging.info("Ignored image directive %s" %(com,))
         else:
@@ -74,13 +74,13 @@ class LiloImage(object):
     readonly = property(get_readonly, set_readonly)
 
     # set up command handlers
-    commands = { "label": "self.title",
-                 "root": "self.root",
-                 "rootnoverify": "self.root",
-                 "image": "self.kernel",
-                 "initrd": "self.initrd",
-                 "append": "self.args",
-                 "read-only": "self.readonly",
+    commands = { "label": "title",
+                 "root": "root",
+                 "rootnoverify": "root",
+                 "image": "kernel",
+                 "initrd": "initrd",
+                 "append": "args",
+                 "read-only": "readonly",
                  "chainloader": None,
                  "module": None}
 
@@ -129,7 +129,7 @@ class LiloConfigFile(object):
             (com, arg) = GrubConf.grub_exact_split(l, 2)
             if self.commands.has_key(com):
                 if self.commands[com] is not None:
-                    exec("%s = r\"%s\"" %(self.commands[com], arg.strip()))
+                    setattr(self, self.commands[com], arg.strip())
                 else:
                     logging.info("Ignored directive %s" %(com,))
             else:

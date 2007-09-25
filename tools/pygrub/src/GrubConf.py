@@ -101,7 +101,7 @@ class GrubImage(object):
 
         if self.commands.has_key(com):
             if self.commands[com] is not None:
-                exec("%s = r\"%s\"" %(self.commands[com], arg.strip()))
+                setattr(self, self.commands[com], arg.strip())
             else:
                 logging.info("Ignored image directive %s" %(com,))
         else:
@@ -142,11 +142,11 @@ class GrubImage(object):
     initrd = property(get_initrd, set_initrd)
 
     # set up command handlers
-    commands = { "title": "self.title",
-                 "root": "self.root",
-                 "rootnoverify": "self.root",
-                 "kernel": "self.kernel",
-                 "initrd": "self.initrd",
+    commands = { "title": "title",
+                 "root": "root",
+                 "rootnoverify": "root",
+                 "kernel": "kernel",
+                 "initrd": "initrd",
                  "chainloader": None,
                  "module": None}
         
@@ -195,7 +195,7 @@ class GrubConfigFile(object):
             (com, arg) = grub_exact_split(l, 2)
             if self.commands.has_key(com):
                 if self.commands[com] is not None:
-                    exec("%s = r\"%s\"" %(self.commands[com], arg.strip()))
+                    setattr(self, self.commands[com], arg.strip())
                 else:
                     logging.info("Ignored directive %s" %(com,))
             else:
@@ -208,7 +208,7 @@ class GrubConfigFile(object):
         (com, arg) = grub_exact_split(line, 2)
         if self.commands.has_key(com):
             if self.commands[com] is not None:
-                exec("%s = r\"%s\"" %(self.commands[com], arg.strip()))
+                setattr(self, self.commands[com], arg.strip())
             else:
                 logging.info("Ignored directive %s" %(com,))
         else:
@@ -236,12 +236,12 @@ class GrubConfigFile(object):
     splash = property(get_splash, set_splash)
 
     # set up command handlers
-    commands = { "default": "self.default",
-                 "timeout": "self.timeout",
-                 "fallback": "self.fallback",
-                 "hiddenmenu": "self.hiddenmenu",
-                 "splashimage": "self.splash",
-                 "password": "self.password" }
+    commands = { "default": "default",
+                 "timeout": "timeout",
+                 "fallback": "fallback",
+                 "hiddenmenu": "hiddenmenu",
+                 "splashimage": "splash",
+                 "password": "password" }
     for c in ("bootp", "color", "device", "dhcp", "hide", "ifconfig",
               "pager", "partnew", "parttype", "rarp", "serial",
               "setkey", "terminal", "terminfo", "tftpserver", "unhide"):
