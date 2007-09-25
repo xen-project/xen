@@ -1015,7 +1015,7 @@ void hvm_task_switch(
     }
 
     regs->eip    = ptss->eip;
-    regs->eflags = ptss->eflags;
+    regs->eflags = ptss->eflags | 2;
     regs->eax    = ptss->eax;
     regs->ecx    = ptss->ecx;
     regs->edx    = ptss->edx;
