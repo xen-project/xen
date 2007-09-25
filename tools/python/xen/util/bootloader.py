@@ -23,7 +23,8 @@ import shutil
 import threading
 
 from xen.xend.XendLogging import log
-from xen.util import mkdir, security
+from xen.util import mkdir
+import xen.util.xsm.xsm as security
 
 __bootloader = None
 
