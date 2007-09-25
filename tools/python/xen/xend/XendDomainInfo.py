@@ -174,7 +174,8 @@ def recreate(info, priv):
     except XendError:
         pass # our best shot at 'goto' in python :)
 
-    vm = XendDomainInfo(xeninfo, domid, dompath, augment = True, priv = priv)
+    vm = XendDomainInfo(xeninfo, domid, dompath, augment = True, priv = priv,
+                        vmpath = vmpath)
     
     if needs_reinitialising:
         vm._recreateDom()
@@ -321,7 +322,7 @@ class XendDomainInfo:
     """
     
     def __init__(self, info, domid = None, dompath = None, augment = False,
-                 priv = False, resume = False):
+                 priv = False, resume = False, vmpath = None):
         """Constructor for a domain
 
         @param   info: parsed configuration
@@ -348,7 +349,20 @@ class XendDomainInfo:
         #if not self._infoIsSet('uuid'):
         #    self.info['uuid'] = uuid.toString(uuid.create())
 
-        self.vmpath  = XS_VMROOT + self.info['uuid']
+        # Find a unique /vm/<uuid>/<integer> path if not specified.
+        # This avoids conflict between pre-/post-migrate domains when doing
+        # localhost relocation.
+        self.vmpath = vmpath
+        i = 0
+        while self.vmpath == None:
+            self.vmpath = XS_VMROOT + self.info['uuid'] + '/' + str(i)
+            try:
+                if self._readVm("uuid"):
+                    self.vmpath = None
+                    i = i + 1
+            except:
+                pass
+
         self.dompath = dompath
 
         self.image = None
