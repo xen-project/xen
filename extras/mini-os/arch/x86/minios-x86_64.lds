@@ -21,15 +21,6 @@ SECTIONS
 
   _edata = .;			/* End of data section */
 
-  . = ALIGN(8192);		/* init_task */
-  .data.init_task : { *(.data.init_task) }
-
-  . = ALIGN(4096);
-  .data.page_aligned : { *(.data.idt) }
-
-  . = ALIGN(32);
-  .data.cacheline_aligned : { *(.data.cacheline_aligned) }
-
   __bss_start = .;		/* BSS */
   .bss : {
 	*(.bss)
