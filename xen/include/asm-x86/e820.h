@@ -23,6 +23,7 @@ struct e820map {
     struct e820entry map[E820MAX];
 };
 
+extern int reserve_e820_ram(struct e820map *e820, uint64_t s, uint64_t e);
 extern unsigned long init_e820(const char *, struct e820entry *, int *);
 extern struct e820map e820;
 
