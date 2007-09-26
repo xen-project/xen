@@ -790,12 +790,12 @@ int parse_unary (unsigned char **buf, unsigned long *res)
     case '0' ... '9':
         {
             char *e;
-            *res = strtoul (*buf, &e, 0);
+            *res = strtoul ((char *)*buf, &e, 0);
             if (e == (char *)*buf) {
                 printf ("bad literal\n");
                 return -1;
             }
-            *buf = e;
+            *buf = (unsigned char *)e;
         }
         break;
     case '+':
@@ -828,13 +828,13 @@ int parse_unary (unsigned char **buf, unsigned long *res)
 
             c = b[len];
             b[len] = 0;
-            reg = get_reg_addr (b);
+            reg = get_reg_addr ((char *)b);
             b[len] = c;
 
             if (reg != NULL)
                 *res = *reg;
-            else if (strncmp (b, "d2p", len) == 0 ||
-                     strncmp (b, "i2p", len) == 0) {
+            else if (strncmp ((char *)b, "d2p", len) == 0 ||
+                     strncmp ((char *)b, "i2p", len) == 0) {
                 unsigned long vaddr;
 
                 *buf = e;
@@ -1205,31 +1205,31 @@ static const struct bit_xlat debug_flags[] = {
 static int
 cmd_disp (unsigned char *arg)
 {
-    if (strcmp (arg, "br") == 0)
+    if (strcmp ((char *)arg, "br") == 0)
         print_br (cur_ctx);
-    else if (strcmp (arg, "regs") == 0)
+    else if (strcmp ((char *)arg, "regs") == 0)
         print_regs (cur_ctx);
-    else if (strcmp (arg, "cr") == 0)
+    else if (strcmp ((char *)arg, "cr") == 0)
         print_cr (cur_ctx);
-    else if (strcmp (arg, "ar") == 0)
+    else if (strcmp ((char *)arg, "ar") == 0)
         print_ar (cur_ctx);
-    else if (strcmp (arg, "tr") == 0)
+    else if (strcmp ((char *)arg, "tr") == 0)
         print_tr (cur_ctx);
-    else if (strcmp (arg, "rr") == 0)
+    else if (strcmp ((char *)arg, "rr") == 0)
         print_rr (cur_ctx);
-    else if (strcmp (arg, "db") == 0)
+    else if (strcmp ((char *)arg, "db") == 0)
         print_db (cur_ctx);
-    else if (strcmp (arg, "psr") == 0) {
+    else if (strcmp ((char *)arg, "psr") == 0) {
         printf ("psr:");
         print_bits (psr_bits, cur_ctx->regs.psr);
         printf ("\n");
     }
-    else if (strcmp (arg, "ipsr") == 0) {
+    else if (strcmp ((char *)arg, "ipsr") == 0) {
         printf ("ipsr:");
         print_bits (psr_bits, cur_ctx->regs.cr.ipsr);
         printf ("\n");
     }
-    else if (strcmp (arg, "break") == 0) {
+    else if (strcmp ((char *)arg, "break") == 0) {
         int i;
 
         for (i = 0; i < 4; i++)
@@ -1238,7 +1238,7 @@ cmd_disp (unsigned char *arg)
                         (cur_ctx->regs.ibr[2 * i + 1] & (1UL << 63)) ?
                         "enabled" : "disabled");
     }
-    else if (strcmp (arg, "domain") == 0) {
+    else if (strcmp ((char *)arg, "domain") == 0) {
         xc_dominfo_t dominfo;
 #ifdef HAVE_DEBUG_OP
         xen_ia64_debug_op_t debug_op;
@@ -1311,7 +1311,7 @@ cmd_bev (unsigned char *arg)
         return 0;
     }
     else {
-        char *p = strtok (arg, " ");
+        char *p = strtok ((char *)arg, " ");
 
         while (p != NULL) {
             unsigned int flag = 0;
@@ -1353,7 +1353,7 @@ cmd_set (unsigned char *line)
 
     reg = parse_arg (&line);
 
-    addr = get_reg_addr (reg);
+    addr = get_reg_addr ((char *)reg);
     if (addr == NULL) {
         printf ("unknown register %s\n", reg);
         return -1;
@@ -1499,10 +1499,10 @@ void xenitp (int vcpu)
 
         printf ("XenITP> ");
 
-        if (fgets (buf, sizeof (buf), stdin) == NULL)
+        if (fgets ((char *)buf, sizeof (buf), stdin) == NULL)
             break;
 
-        len = strlen (buf);
+        len = strlen ((char *)buf);
         if (len > 1 && buf[len - 1] == '\n')
             buf[len - 1] = 0;
 
