@@ -39,4 +39,4 @@ $(TARGET): subdirs 32bitbios.o util.o
 	    nm -u 32bitbios_all.o;                           \
 	    exit 11;                                         \
 	  } || :
-	bash mkhex highbios_array 32bitbios_all.o > $@
+	sh mkhex highbios_array 32bitbios_all.o > $@
