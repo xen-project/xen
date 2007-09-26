@@ -912,11 +912,6 @@ clear_mmio_p2m_entry(struct domain *d, unsigned long gfn)
     }
     rc = set_p2m_entry(d, gfn, _mfn(INVALID_MFN), 0);
 
-#if !defined(__x86_64__)
-    /* x86_64 xen does not map mmio entries in machine_to_phys_mapp[] */
-    set_gpfn_from_mfn(mfn, INVALID_M2P_ENTRY);
-#endif
-
     return rc;
 }
 
