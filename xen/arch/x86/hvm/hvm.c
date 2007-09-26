@@ -943,9 +943,11 @@ void hvm_task_switch(
     tr.base = (((tss_desc.b <<  0) & 0xff000000u) |
                ((tss_desc.b << 16) & 0x00ff0000u) |
                ((tss_desc.a >> 16) & 0x0000ffffu));
-    tr.limit = (tss_desc.b & 0x000f0000u) | (tss_desc.a & 0x0000ffffu);
     tr.attr.bytes = (((tss_desc.b >>  8) & 0x00ffu) |
-                     ((tss_desc.b >> 20) & 0x0f00u));
+                     ((tss_desc.b >> 12) & 0x0f00u));
+    tr.limit = (tss_desc.b & 0x000f0000u) | (tss_desc.a & 0x0000ffffu);
+    if ( tr.attr.fields.g )
+        tr.limit = (tr.limit << 12) | 0xfffu;
 
     if ( !tr.attr.fields.p )
     {
@@ -1048,7 +1050,6 @@ void hvm_task_switch(
 
     tr.attr.fields.type = 0xb; /* busy 32-bit tss */
     hvm_set_segment_register(v, x86_seg_tr, &tr);
-    paging_update_cr3(v);
 
     v->arch.hvm_vcpu.guest_cr[0] |= X86_CR0_TS;
     hvm_update_guest_cr(v, 0);
