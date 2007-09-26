@@ -178,8 +178,6 @@ LEGACY_UNSUPPORTED_BY_XENAPI_CFG = [
     # roundtripped (dynamic, unmodified)
     'shadow_memory',
     'vcpu_avail',
-    'cpu_weight',
-    'cpu_cap',
     'features',
     # read/write
     'on_xend_start',
@@ -203,8 +201,6 @@ LEGACY_CFG_TYPES = {
     'shadow_memory': int,
     'maxmem':        int,
     'start_time':    float,
-    'cpu_cap':       int,
-    'cpu_weight':    int,
     'cpu_time':      float,
     'features':      str,
     'localtime':     int,
@@ -330,8 +326,6 @@ class XendConfig(dict):
             'on_xend_start': 'ignore',
             'on_xend_stop': 'ignore',
             'cpus': [],
-            'cpu_weight': 256,
-            'cpu_cap': 0,
             'VCPUs_max': 1,
             'VCPUs_live': 1,
             'VCPUs_at_startup': 1,
@@ -496,6 +490,14 @@ class XendConfig(dict):
         if sxp.child_value(sxp_cfg, "maxmem") != None:
             cfg["maxmem"] = int(sxp.child_value(sxp_cfg, "maxmem"))
             
+        # Convert scheduling parameters to vcpus_params
+        if 'vcpus_params' not in cfg:
+            cfg['vcpus_params'] = {}
+        cfg["vcpus_params"]["weight"] = \
+            int(sxp.child_value(sxp_cfg, "cpu_weight", 256))
+        cfg["vcpus_params"]["cap"] = \
+            int(sxp.child_value(sxp_cfg, "cpu_cap", 0))
+
         # Only extract options we know about.
         extract_keys = LEGACY_UNSUPPORTED_BY_XENAPI_CFG
         extract_keys += XENAPI_CFG_TO_LEGACY_CFG.values()
@@ -812,8 +814,6 @@ class XendConfig(dict):
         _set_cfg_if_exists('on_xend_stop')
         _set_cfg_if_exists('on_xend_start')
         _set_cfg_if_exists('vcpu_avail')
-        _set_cfg_if_exists('cpu_weight')
-        _set_cfg_if_exists('cpu_cap')
         
         # Parse and store runtime configuration 
         _set_cfg_if_exists('start_time')
@@ -865,6 +865,10 @@ class XendConfig(dict):
                 self[key] = type_conv(val)
             else:
                 self[key] = val
+                
+        self['vcpus_params']['weight'] = \
+            int(self['vcpus_params'].get('weight', 256))
+        self['vcpus_params']['cap'] = int(self['vcpus_params'].get('cap', 0))
 
     def to_sxp(self, domain = None, ignore_devices = False, ignore = [],
                legacy_only = True):

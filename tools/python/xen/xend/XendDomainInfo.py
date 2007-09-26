@@ -1115,16 +1115,16 @@ class XendDomainInfo:
         return str(self._resume)
 
     def getCap(self):
-        return self.info.get('cpu_cap', 0)
+        return self.info['vcpus_params']['cap']
 
     def setCap(self, cpu_cap):
-        self.info['cpu_cap'] = cpu_cap
+        self.info['vcpus_params']['cap'] = cpu_cap
 
     def getWeight(self):
-        return self.info.get('cpu_weight', 256)
+        return self.info['vcpus_params']['weight']
 
     def setWeight(self, cpu_weight):
-        self.info['cpu_weight'] = cpu_weight
+        self.info['vcpus_params']['weight'] = cpu_weight
 
     def setResume(self, state):
         self._resume = state
@@ -1596,7 +1596,7 @@ class XendDomainInfo:
     def _initDomain(self):
         log.debug('XendDomainInfo.initDomain: %s %s',
                   self.domid,
-                  self.info['cpu_weight'])
+                  self.info['vcpus_params']['weight'])
 
         self._configureBootloader()
 
@@ -1606,7 +1606,8 @@ class XendDomainInfo:
             if self.info['platform'].get('localtime', 0):
                 xc.domain_set_time_offset(self.domid)
 
-            xc.domain_setcpuweight(self.domid, self.info['cpu_weight'])
+            xc.domain_setcpuweight(self.domid, \
+                                   self.info['vcpus_params']['weight'])
 
             # repin domain vcpus if a restricted cpus list is provided
             # this is done prior to memory allocation to aide in memory
