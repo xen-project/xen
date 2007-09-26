@@ -1100,8 +1100,13 @@ static uint32_t fdctrl_read_data (fdctrl_t *fdctrl)
             len = fdctrl->data_len - fdctrl->data_pos;
             if (len > FD_SECTOR_LEN)
                 len = FD_SECTOR_LEN;
-            bdrv_read(cur_drv->bs, fd_sector(cur_drv),
-                      fdctrl->fifo, len);
+            if (cur_drv->bs) {
+                bdrv_read(cur_drv->bs, fd_sector(cur_drv),
+                          fdctrl->fifo, len);
+            } else {
+                FLOPPY_ERROR("can't read data from drive\n");
+                return 0;
+            }
         }
     }
     retval = fdctrl->fifo[pos];

@@ -1235,8 +1235,10 @@ static int SB_read_DMA (void *opaque, int nchan, int dma_pos, int dma_len)
             s->block_size);
 #endif
 
-    while (s->left_till_irq <= 0) {
-        s->left_till_irq = s->block_size + s->left_till_irq;
+    if (s->block_size) {
+        while (s->left_till_irq <= 0) {
+            s->left_till_irq = s->block_size + s->left_till_irq;
+        }
     }
 
     return dma_pos;
