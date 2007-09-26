@@ -355,7 +355,9 @@ class XendDomainInfo:
         self.vmpath = vmpath
         i = 0
         while self.vmpath == None:
-            self.vmpath = XS_VMROOT + self.info['uuid'] + '/' + str(i)
+            self.vmpath = XS_VMROOT + self.info['uuid']
+            if i != 0:
+                self.vmpath = self.vmpath + '-' + str(i)
             try:
                 if self._readVm("uuid"):
                     self.vmpath = None
