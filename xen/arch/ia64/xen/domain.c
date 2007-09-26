@@ -426,10 +426,11 @@ int vcpu_initialise(struct vcpu *v)
 	struct domain *d = v->domain;
 
 	if (!is_idle_domain(d)) {
-	    v->arch.metaphysical_rr0 = d->arch.metaphysical_rr0;
-	    v->arch.metaphysical_rr4 = d->arch.metaphysical_rr4;
-	    v->arch.metaphysical_saved_rr0 = d->arch.metaphysical_rr0;
-	    v->arch.metaphysical_saved_rr4 = d->arch.metaphysical_rr4;
+	    v->arch.metaphysical_rid_dt = d->arch.metaphysical_rid_dt;
+	    v->arch.metaphysical_rid_d = d->arch.metaphysical_rid_d;
+	    /* Set default values to saved_rr.  */
+	    v->arch.metaphysical_saved_rr0 = d->arch.metaphysical_rid_dt;
+	    v->arch.metaphysical_saved_rr4 = d->arch.metaphysical_rid_dt;
 
 	    /* Is it correct ?
 	       It depends on the domain rid usage.

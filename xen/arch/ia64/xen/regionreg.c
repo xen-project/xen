@@ -185,8 +185,8 @@ int allocate_rid_range(struct domain *d, unsigned long ridbits)
 	d->arch.starting_mp_rid = i << mp_rid_shift;
 	d->arch.ending_mp_rid = (i + 1) << mp_rid_shift;
 
-	d->arch.metaphysical_rr0 = allocate_metaphysical_rr(d, 0);
-	d->arch.metaphysical_rr4 = allocate_metaphysical_rr(d, 1);
+	d->arch.metaphysical_rid_dt = allocate_metaphysical_rr(d, 0);
+	d->arch.metaphysical_rid_d = allocate_metaphysical_rr(d, 1);
 
 	dprintk(XENLOG_DEBUG, "### domain %p: rid=%x-%x mp_rid=%x\n",
 		d, d->arch.starting_rid, d->arch.ending_rid,
@@ -238,7 +238,8 @@ int set_one_rr(unsigned long rr, unsigned long val)
 	ia64_rr rrv, newrrv, memrrv;
 	unsigned long newrid;
 
-	if (val == -1) return 1;
+	if (val == -1)
+		return 1;
 
 	rrv.rrval = val;
 	newrrv.rrval = 0;
@@ -277,7 +278,7 @@ int set_metaphysical_rr0(void)
 //	ia64_rr rrv;
 	
 //	rrv.ve = 1; 	FIXME: TURN ME BACK ON WHEN VHPT IS WORKING
-	ia64_set_rr(0,v->arch.metaphysical_rr0);
+	ia64_set_rr(0, v->arch.metaphysical_rid_dt);
 	ia64_srlz_d();
 	return 1;
 }
@@ -290,7 +291,8 @@ void init_all_rr(struct vcpu *v)
 	//rrv.rrval = v->domain->arch.metaphysical_rr0;
 	rrv.ps = v->arch.vhpt_pg_shift;
 	rrv.ve = 1;
-if (!v->vcpu_info) { panic("Stopping in init_all_rr\n"); }
+	if (!v->vcpu_info)
+		panic("Stopping in init_all_rr\n");
 	VCPU(v,rrs[0]) = -1;
 	VCPU(v,rrs[1]) = rrv.rrval;
 	VCPU(v,rrs[2]) = rrv.rrval;
@@ -319,7 +321,7 @@ void load_region_regs(struct vcpu *v)
 	unsigned long bad = 0;
 
 	if (VCPU(v,metaphysical_mode)) {
-		rr0 = v->domain->arch.metaphysical_rr0;
+		rr0 = v->domain->arch.metaphysical_rid_dt;
 		ia64_set_rr(0x0000000000000000L, rr0);
 		ia64_srlz_d();
 	}

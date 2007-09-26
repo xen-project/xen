@@ -187,7 +187,7 @@ void thash_vhpt_insert(VCPU *v, u64 pte, u64 itir, u64 va, int type)
     if (itir_ps(itir) >= mrr.ps) {
         vmx_vhpt_insert(vcpu_get_vhpt(v), phy_pte, itir, va);
     } else {
-        phy_pte  &= ~PAGE_FLAGS_RV_MASK;
+        phy_pte &= ~PAGE_FLAGS_RV_MASK;
         psr = ia64_clear_ic();
         ia64_itc(type + 1, va, phy_pte, itir);
         ia64_set_psr(psr);

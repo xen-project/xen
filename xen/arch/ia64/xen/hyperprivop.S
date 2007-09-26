@@ -1423,7 +1423,7 @@ ENTRY(hyper_rsm_dt)
 (p7)	br.spnt.many	1f ;;	// already in metaphysical mode
 	movl r22=THIS_CPU(cpu_kr)+IA64_KR_CURRENT_OFFSET;;
 	ld8 r22=[r22];;
-	adds r22=IA64_VCPU_META_RR0_OFFSET,r22;;
+	adds r22=IA64_VCPU_META_RID_DT_OFFSET,r22;;
 	ld8 r23=[r22];;
 	mov rr[r0]=r23;;
 	srlz.i;;

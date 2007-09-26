@@ -308,9 +308,9 @@ END(vmx_dtlb_miss)
 ENTRY(vmx_alt_itlb_miss)
     VMX_DBG_FAULT(3)
     mov r31 = pr
-    mov r29=cr.ipsr;
+    mov r29=cr.ipsr
     ;;
-    tbit.z p6,p7=r29,IA64_PSR_VM_BIT;
+    tbit.z p6,p7=r29,IA64_PSR_VM_BIT
 (p7)br.spnt vmx_fault_3
 vmx_alt_itlb_miss_1:
     mov r16=cr.ifa    // get address that caused the TLB miss

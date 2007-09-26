@@ -143,8 +143,8 @@ struct arch_domain {
     int starting_mp_rid;
     int ending_mp_rid;
     /* RID for metaphysical mode.  */
-    unsigned long metaphysical_rr0;
-    unsigned long metaphysical_rr4;
+    unsigned long metaphysical_rid_dt;	/* dt=it=0  */
+    unsigned long metaphysical_rid_d;  /* dt=0, it=1  */
     
     int rid_bits;		/* number of virtual rid bits (default: 18) */
     int breakimm;     /* The imm value for hypercalls.  */
@@ -232,8 +232,8 @@ struct arch_vcpu {
 
     /* These fields are copied from arch_domain to make access easier/faster
        in assembly code.  */
-    unsigned long metaphysical_rr0;		// from arch_domain (so is pinned)
-    unsigned long metaphysical_rr4;		// from arch_domain (so is pinned)
+    unsigned long metaphysical_rid_dt;	// from arch_domain (so is pinned)
+    unsigned long metaphysical_rid_d;	// from arch_domain (so is pinned)
     unsigned long metaphysical_saved_rr0;	// from arch_domain (so is pinned)
     unsigned long metaphysical_saved_rr4;	// from arch_domain (so is pinned)
     unsigned long fp_psr;       // used for lazy float register
@@ -254,7 +254,7 @@ struct arch_vcpu {
     char irq_new_condition;    // vpsr.i/vtpr change, check for pending VHPI
     char hypercall_continuation;
 
-    //for phycial  emulation
+    // for physical emulation
     int mode_flags;
     fpswa_ret_t fpswa_ret;	/* save return values of FPSWA emulation */
     struct timer hlt_timer;
