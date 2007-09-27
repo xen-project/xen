@@ -1176,12 +1176,16 @@ class XendDomain:
             log.exception("domain_unpause")
             raise XendError(str(ex))
 
-    def domain_pause(self, domid):
+    def domain_pause(self, domid, state=False):
         """Pause domain execution.
 
         @param domid: Domain ID or Name
         @type domid: int or string.
-        @rtype: None
+        @keyword state: If True, will return the domain state before pause
+        @type state: bool
+        @rtype: int if state is True
+        @return: Domain state (DOM_STATE_*)
+        @rtype: None if state is False
         @raise XendError: Failed to pause
         @raise XendInvalidDomain: Domain is not valid
         """        
@@ -1191,13 +1195,16 @@ class XendDomain:
                 raise XendInvalidDomain(str(domid))
             if dominfo.getDomid() == DOM0_ID:
                 raise XendError("Cannot pause privileged domain %s" % domid)
-            if dominfo._stateGet() not in (DOM_STATE_RUNNING, DOM_STATE_PAUSED):
+            ds = dominfo._stateGet()
+            if ds not in (DOM_STATE_RUNNING, DOM_STATE_PAUSED):
                 raise VMBadState("Domain '%s' is not started" % domid,
                                  POWER_STATE_NAMES[DOM_STATE_RUNNING],
-                                 POWER_STATE_NAMES[dominfo._stateGet()])
+                                 POWER_STATE_NAMES[ds])
             log.info("Domain %s (%d) paused.", dominfo.getName(),
                      int(dominfo.getDomid()))
             dominfo.pause()
+            if state:
+                return ds
         except XendInvalidDomain:
             log.exception("domain_pause")
             raise

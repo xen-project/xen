@@ -26,6 +26,7 @@ from xen.xend.XendAPIConstants import XEN_API_ON_NORMAL_EXIT, \
      XEN_API_ON_CRASH_BEHAVIOUR
 from xen.xm.opts import OptionError
 from xen.util import xsconstants
+import xen.util.xsm.xsm as security
 
 import sys
 import os
@@ -569,7 +570,7 @@ class sxp2xml:
         if sec_data:
             try :
                 vm.attributes['security_label'] = \
-                      "%s:%s:%s" % (xsconstants.ACM_POLICY_ID, sec_data[0][1][1],sec_data[0][2][1])
+                                    security.set_security_label(sec_data[0][1][1],sec_data[0][2][1])
             except Exception, e:
                 raise "Invalid security data format: %s" % str(sec_data)
 
@@ -753,11 +754,7 @@ class sxp2xml:
         policy = get_child_by_name(vif_sxp, "policy")
         label = get_child_by_name(vif_sxp, "label")
 
-        if label and policy:
-            vif.attributes["security_label"] \
-                 = "%s:%s:%s" % (xsconstants.ACM_POLICY_ID, policy, label)
-        else:
-            vif.attributes["security_label"] = ""
+        vif.attributes["security_label"] = security.set_security_label(policy, label)
 
         if get_child_by_name(vif_sxp, "bridge") is not None:
             vif.attributes["network"] \

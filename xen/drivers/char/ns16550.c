@@ -9,6 +9,7 @@
  */
 
 #include <xen/config.h>
+#include <xen/console.h>
 #include <xen/init.h>
 #include <xen/irq.h>
 #include <xen/sched.h>
@@ -368,15 +369,14 @@ void __init ns16550_init(int index, struct ns16550_defaults *defaults)
     if ( (index < 0) || (index > 1) )
         return;
 
-    if ( defaults != NULL )
-    {
-        uart->baud      = defaults->baud;
-        uart->data_bits = defaults->data_bits;
-        uart->parity    = parse_parity_char(defaults->parity);
-        uart->stop_bits = defaults->stop_bits;
-        uart->irq       = defaults->irq;
-        uart->io_base   = defaults->io_base;
-    }
+    uart->baud      = (defaults->baud ? :
+                       console_has((index == 0) ? "com1" : "com2")
+                       ? BAUD_AUTO : 0);
+    uart->data_bits = defaults->data_bits;
+    uart->parity    = parse_parity_char(defaults->parity);
+    uart->stop_bits = defaults->stop_bits;
+    uart->irq       = defaults->irq;
+    uart->io_base   = defaults->io_base;
 
     ns16550_parse_port_config(uart, (index == 0) ? opt_com1 : opt_com2);
 }

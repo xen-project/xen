@@ -897,4 +897,43 @@ int xc_ia64_save_to_nvram(int xc_handle, uint32_t dom);
 /* IA64 specific, nvram init */
 int xc_ia64_nvram_init(int xc_handle, char *dom_name, uint32_t dom);
 
+/* HVM guest pass-through */
+int xc_assign_device(int xc_handle,
+                     uint32_t domid,
+                     uint32_t machine_bdf);
+
+int xc_domain_memory_mapping(int xc_handle,
+                             uint32_t domid,
+                             unsigned long first_gfn,
+                             unsigned long first_mfn,
+                             unsigned long nr_mfns,
+                             uint32_t add_mapping);
+
+int xc_domain_ioport_mapping(int xc_handle,
+                             uint32_t domid,
+                             uint32_t first_gport,
+                             uint32_t first_mport,
+                             uint32_t nr_ports,
+                             uint32_t add_mapping);
+
+int xc_domain_bind_pt_irq(int xc_handle,
+                          uint32_t domid,
+                          uint8_t machine_irq,
+                          uint8_t irq_type,
+                          uint8_t bus,
+                          uint8_t device,
+                          uint8_t intx,
+                          uint8_t isa_irq);
+
+int xc_domain_bind_pt_pci_irq(int xc_handle,
+                              uint32_t domid,
+                              uint8_t machine_irq,
+                              uint8_t bus,
+                              uint8_t device,
+                              uint8_t intx);
+
+int xc_domain_bind_pt_isa_irq(int xc_handle,
+                              uint32_t domid,
+                              uint8_t machine_irq);
+
 #endif /* XENCTRL_H */

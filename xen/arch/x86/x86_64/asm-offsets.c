@@ -95,6 +95,9 @@ void __dummy__(void)
     BLANK();
 
     OFFSET(VMCB_rax, struct vmcb_struct, rax);
+    OFFSET(VMCB_rip, struct vmcb_struct, rip);
+    OFFSET(VMCB_rsp, struct vmcb_struct, rsp);
+    OFFSET(VMCB_rflags, struct vmcb_struct, rflags);
     BLANK();
 
     OFFSET(VCPUINFO_upcall_pending, struct vcpu_info, evtchn_upcall_pending);

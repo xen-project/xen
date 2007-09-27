@@ -4,8 +4,8 @@
 
 #include <asm/msr.h>
 
-extern void calibrate_tsc_bp(void);
-extern void calibrate_tsc_ap(void);
+void calibrate_tsc_bp(void);
+void calibrate_tsc_ap(void);
 
 typedef u64 cycles_t;
 
@@ -21,9 +21,14 @@ mktime (unsigned int year, unsigned int mon,
         unsigned int day, unsigned int hour,
         unsigned int min, unsigned int sec);
 
-extern int time_suspend(void);
-extern int time_resume(void);
+int time_suspend(void);
+int time_resume(void);
 
-extern void init_percpu_time(void);
+void init_percpu_time(void);
+
+struct ioreq;
+int dom0_pit_access(struct ioreq *ioreq);
+
+int cpu_frequency_change(u64 freq);
 
 #endif /* __X86_TIME_H__ */

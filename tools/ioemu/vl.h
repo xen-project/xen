@@ -103,8 +103,8 @@ static inline char *realpath(const char *path, char *resolved_path)
 #endif
 
 /* cutils.c */
-void pstrcpy(char *buf, int buf_size, const char *str);
-char *pstrcat(char *buf, int buf_size, const char *s);
+void pstrcpy(char *buf, size_t buf_size, const char *str);
+char *pstrcat(char *buf, size_t buf_size, const char *s);
 int strstart(const char *str, const char *val, const char **ptr);
 int stristart(const char *str, const char *val, const char **ptr);
 
@@ -717,7 +717,7 @@ typedef void QEMUMachineInitFunc(uint64_t ram_size, int vga_ram_size,
                                  char *boot_device,
              DisplayState *ds, const char **fd_filename, int snapshot,
              const char *kernel_filename, const char *kernel_cmdline,
-             const char *initrd_filename);
+             const char *initrd_filename, const char *direct_pci);
 
 typedef struct QEMUMachine {
     const char *name;

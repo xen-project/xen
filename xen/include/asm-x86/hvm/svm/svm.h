@@ -28,7 +28,7 @@
 #include <asm/hvm/svm/vmcb.h>
 #include <asm/i387.h>
 
-extern void svm_dump_vmcb(const char *from, struct vmcb_struct *vmcb);
+void svm_dump_vmcb(const char *from, struct vmcb_struct *vmcb);
 
 #define SVM_REG_EAX (0) 
 #define SVM_REG_ECX (1) 
@@ -46,5 +46,19 @@ extern void svm_dump_vmcb(const char *from, struct vmcb_struct *vmcb);
 #define SVM_REG_R13 (13)
 #define SVM_REG_R14 (14)
 #define SVM_REG_R15 (15)
+
+static inline void svm_vmload(void *vmcb)
+{
+    asm volatile (
+        ".byte 0x0f,0x01,0xda" /* vmload */
+        : : "a" (__pa(vmcb)) : "memory" );
+}
+
+static inline void svm_vmsave(void *vmcb)
+{
+    asm volatile (
+        ".byte 0x0f,0x01,0xdb" /* vmsave */
+        : : "a" (__pa(vmcb)) : "memory" );
+}
 
 #endif /* __ASM_X86_HVM_SVM_H__ */

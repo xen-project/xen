@@ -59,8 +59,8 @@ extern int inst_copy_from_guest(unsigned char *buf, unsigned long guest_eip,
 #define DECODE_SIB_BASE(prefix, sib) DECODE_MODRM_RM(prefix, sib)
 
 
-static inline unsigned long DECODE_GPR_VALUE(struct vmcb_struct *vmcb, 
-        struct cpu_user_regs *regs, u8 gpr_rm)
+static inline unsigned long DECODE_GPR_VALUE(
+    struct cpu_user_regs *regs, u8 gpr_rm)
 {
     unsigned long value;
     switch (gpr_rm) 
@@ -78,7 +78,7 @@ static inline unsigned long DECODE_GPR_VALUE(struct vmcb_struct *vmcb,
         value = regs->ebx;
         break;
     case 0x4:
-        value = (unsigned long)vmcb->rsp;
+        value = regs->esp;
     case 0x5:
         value = regs->ebp;
         break;
@@ -172,7 +172,7 @@ unsigned long get_effective_addr_modrm64(struct cpu_user_regs *regs,
         }
         else
         {
-            effective_addr = DECODE_GPR_VALUE(vmcb, regs, modrm_rm);
+            effective_addr = DECODE_GPR_VALUE(regs, modrm_rm);
         }
         break;
 
@@ -202,12 +202,12 @@ unsigned long get_effective_addr_modrm64(struct cpu_user_regs *regs,
 #if __x86_64__
         /* 64-bit mode */
         if (vmcb->cs.attr.fields.l && hvm_long_mode_enabled(v))
-            return vmcb->rip + inst_len + *size + disp;
+            return regs->eip + inst_len + *size + disp;
 #endif
         return disp;
 
     default:
-        effective_addr = DECODE_GPR_VALUE(vmcb, regs, modrm_rm);
+        effective_addr = DECODE_GPR_VALUE(regs, modrm_rm);
 
     }
 
@@ -251,7 +251,7 @@ unsigned long get_effective_addr_sib(struct vmcb_struct *vmcb,
     sib_idx = DECODE_SIB_INDEX(prefix, sib);
     sib_base = DECODE_SIB_BASE(prefix, sib);
 
-    base = DECODE_GPR_VALUE(vmcb, regs, sib_base);
+    base = DECODE_GPR_VALUE(regs, sib_base);
 
     if ((unsigned long)-1 == base)
     {
@@ -293,7 +293,7 @@ unsigned long get_effective_addr_sib(struct vmcb_struct *vmcb,
     if (4 == sib_idx)
         return base;
 
-    effective_addr = DECODE_GPR_VALUE(vmcb, regs, sib_idx);
+    effective_addr = DECODE_GPR_VALUE(regs, sib_idx);
 
     effective_addr <<= sib_scale;
 
@@ -326,7 +326,8 @@ unsigned long svm_rip2pointer(struct vcpu *v)
      * no matter what kind of addressing is used.
      */
     struct vmcb_struct *vmcb = v->arch.hvm_svm.vmcb;
-    unsigned long p = vmcb->cs.base + vmcb->rip;
+    unsigned long p = vmcb->cs.base + guest_cpu_user_regs()->eip;
+    ASSERT(v == current);
     if (!(vmcb->cs.attr.fields.l && hvm_long_mode_enabled(v)))
         return (u32)p; /* mask to 32 bits */
     /* NB. Should mask to 16 bits if in real mode or 16-bit protected mode. */

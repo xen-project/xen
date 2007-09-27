@@ -21,6 +21,7 @@
 #ifndef __ASM_X86_HVM_HVM_H__
 #define __ASM_X86_HVM_HVM_H__
 
+#include <asm/current.h>
 #include <asm/x86_emulate.h>
 #include <public/domctl.h>
 #include <public/hvm/save.h>
@@ -79,16 +80,6 @@ struct hvm_function_table {
     int  (*vcpu_initialise)(struct vcpu *v);
     void (*vcpu_destroy)(struct vcpu *v);
 
-    /*
-     * Store and load guest state:
-     * 1) load/store guest register state,
-     * 2) modify guest state (e.g., set debug flags).
-     */
-    void (*store_cpu_guest_regs)(
-        struct vcpu *v, struct cpu_user_regs *r, unsigned long *crs);
-    void (*load_cpu_guest_regs)(
-        struct vcpu *v, struct cpu_user_regs *r);
-
     /* save and load hvm guest cpu context for save/restore */
     void (*save_cpu_ctxt)(struct vcpu *v, struct hvm_hw_cpu *ctxt);
     int (*load_cpu_ctxt)(struct vcpu *v, struct hvm_hw_cpu *ctxt);
@@ -104,6 +95,8 @@ struct hvm_function_table {
     int (*guest_x86_mode)(struct vcpu *v);
     unsigned long (*get_segment_base)(struct vcpu *v, enum x86_segment seg);
     void (*get_segment_register)(struct vcpu *v, enum x86_segment seg,
+                                 struct segment_register *reg);
+    void (*set_segment_register)(struct vcpu *v, enum x86_segment seg,
                                  struct segment_register *reg);
 
     /* 
@@ -164,19 +157,6 @@ void hvm_vcpu_reset(struct vcpu *vcpu);
 
 void hvm_send_assist_req(struct vcpu *v);
 
-static inline void
-hvm_store_cpu_guest_regs(
-    struct vcpu *v, struct cpu_user_regs *r, unsigned long *crs)
-{
-    hvm_funcs.store_cpu_guest_regs(v, r, crs);
-}
-
-static inline void
-hvm_load_cpu_guest_regs(struct vcpu *v, struct cpu_user_regs *r)
-{
-    hvm_funcs.load_cpu_guest_regs(v, r);
-}
-
 void hvm_set_guest_time(struct vcpu *v, u64 gtime);
 u64 hvm_get_guest_time(struct vcpu *v);
 
@@ -197,12 +177,14 @@ u64 hvm_get_guest_time(struct vcpu *v);
 static inline int
 hvm_interrupts_enabled(struct vcpu *v, enum hvm_intack type)
 {
+    ASSERT(v == current);
     return hvm_funcs.interrupts_enabled(v, type);
 }
 
 static inline int
 hvm_guest_x86_mode(struct vcpu *v)
 {
+    ASSERT(v == current);
     return hvm_funcs.guest_x86_mode(v);
 }
 
@@ -252,6 +234,13 @@ hvm_get_segment_register(struct vcpu *v, enum x86_segment seg,
                          struct segment_register *reg)
 {
     hvm_funcs.get_segment_register(v, seg, reg);
+}
+
+static inline void
+hvm_set_segment_register(struct vcpu *v, enum x86_segment seg,
+                         struct segment_register *reg)
+{
+    hvm_funcs.set_segment_register(v, seg, reg);
 }
 
 void hvm_cpuid(unsigned int input, unsigned int *eax, unsigned int *ebx,
@@ -352,5 +341,22 @@ static inline void hvm_cpu_down(void)
     if ( hvm_funcs.cpu_down )
         hvm_funcs.cpu_down();
 }
+
+enum hvm_task_switch_reason { TSW_jmp, TSW_iret, TSW_call_or_int };
+void hvm_task_switch(
+    uint16_t tss_sel, enum hvm_task_switch_reason taskswitch_reason,
+    int32_t errcode);
+
+enum hvm_access_type {
+    hvm_access_insn_fetch, hvm_access_read, hvm_access_write
+};
+int hvm_virtual_to_linear_addr(
+    enum x86_segment seg,
+    struct segment_register *reg,
+    unsigned long offset,
+    unsigned int bytes,
+    enum hvm_access_type access_type,
+    unsigned int addr_size,
+    unsigned long *linear_addr);
 
 #endif /* __ASM_X86_HVM_HVM_H__ */

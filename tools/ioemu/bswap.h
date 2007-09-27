@@ -5,6 +5,11 @@
 
 #include <inttypes.h>
 
+#ifdef _BSD
+#include <sys/endian.h>
+#include <sys/types.h>
+#else
+
 #ifdef HAVE_BYTESWAP_H
 #include <byteswap.h>
 #else
@@ -72,6 +77,8 @@ static inline void bswap64s(uint64_t *s)
 {
     *s = bswap64(*s);
 }
+
+#endif /* _BSD */
 
 #if defined(WORDS_BIGENDIAN)
 #define be_bswap(v, size) (v)

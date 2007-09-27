@@ -273,8 +273,10 @@ static int hvm_save_cpu_ctxt(struct domain *d, hvm_domain_context_t *h)
         ctxt.rbp = vc->user_regs.ebp;
         ctxt.rsi = vc->user_regs.esi;
         ctxt.rdi = vc->user_regs.edi;
-        /* %rsp handled by arch-specific call above */
-#ifdef __x86_64__        
+        ctxt.rsp = vc->user_regs.esp;
+        ctxt.rip = vc->user_regs.eip;
+        ctxt.rflags = vc->user_regs.eflags;
+#ifdef __x86_64__
         ctxt.r8  = vc->user_regs.r8;
         ctxt.r9  = vc->user_regs.r9;
         ctxt.r10 = vc->user_regs.r10;
@@ -337,6 +339,8 @@ static int hvm_load_cpu_ctxt(struct domain *d, hvm_domain_context_t *h)
     vc->user_regs.esi = ctxt.rsi;
     vc->user_regs.edi = ctxt.rdi;
     vc->user_regs.esp = ctxt.rsp;
+    vc->user_regs.eip = ctxt.rip;
+    vc->user_regs.eflags = ctxt.rflags | 2;
 #ifdef __x86_64__
     vc->user_regs.r8  = ctxt.r8; 
     vc->user_regs.r9  = ctxt.r9; 
@@ -672,6 +676,409 @@ int hvm_set_cr4(unsigned long value)
     return 0;
 }
 
+int hvm_virtual_to_linear_addr(
+    enum x86_segment seg,
+    struct segment_register *reg,
+    unsigned long offset,
+    unsigned int bytes,
+    enum hvm_access_type access_type,
+    unsigned int addr_size,
+    unsigned long *linear_addr)
+{
+    unsigned long addr = offset;
+    uint32_t last_byte;
+
+    if ( addr_size != 64 )
+    {
+        /*
+         * COMPATIBILITY MODE: Apply segment checks and add base.
+         */
+
+        switch ( access_type )
+        {
+        case hvm_access_read:
+            if ( (reg->attr.fields.type & 0xa) == 0x8 )
+                goto gpf; /* execute-only code segment */
+            break;
+        case hvm_access_write:
+            if ( (reg->attr.fields.type & 0xa) != 0x2 )
+                goto gpf; /* not a writable data segment */
+            break;
+        default:
+            break;
+        }
+
+        last_byte = offset + bytes - 1;
+
+        /* Is this a grows-down data segment? Special limit check if so. */
+        if ( (reg->attr.fields.type & 0xc) == 0x4 )
+        {
+            /* Is upper limit 0xFFFF or 0xFFFFFFFF? */
+            if ( !reg->attr.fields.db )
+                last_byte = (uint16_t)last_byte;
+
+            /* Check first byte and last byte against respective bounds. */
+            if ( (offset <= reg->limit) || (last_byte < offset) )
+                goto gpf;
+        }
+        else if ( (last_byte > reg->limit) || (last_byte < offset) )
+            goto gpf; /* last byte is beyond limit or wraps 0xFFFFFFFF */
+
+        /*
+         * Hardware truncates to 32 bits in compatibility mode.
+         * It does not truncate to 16 bits in 16-bit address-size mode.
+         */
+        addr = (uint32_t)(addr + reg->base);
+    }
+    else
+    {
+        /*
+         * LONG MODE: FS and GS add segment base. Addresses must be canonical.
+         */
+
+        if ( (seg == x86_seg_fs) || (seg == x86_seg_gs) )
+            addr += reg->base;
+
+        if ( !is_canonical_address(addr) )
+            goto gpf;
+    }
+
+    *linear_addr = addr;
+    return 1;
+
+ gpf:
+    return 0;
+}
+
+static void *hvm_map(unsigned long va, int size)
+{
+    unsigned long gfn, mfn;
+    p2m_type_t p2mt;
+
+    if ( ((va & ~PAGE_MASK) + size) > PAGE_SIZE )
+    {
+        hvm_inject_exception(TRAP_page_fault, PFEC_write_access,
+                             (va + PAGE_SIZE - 1) & PAGE_MASK);
+        return NULL;
+    }
+
+    gfn = paging_gva_to_gfn(current, va);
+    mfn = mfn_x(gfn_to_mfn_current(gfn, &p2mt));
+    if ( !p2m_is_ram(p2mt) )
+    {
+        hvm_inject_exception(TRAP_page_fault, PFEC_write_access, va);
+        return NULL;
+    }
+
+    ASSERT(mfn_valid(mfn));
+
+    paging_mark_dirty(current->domain, mfn);
+
+    return (char *)map_domain_page(mfn) + (va & ~PAGE_MASK);
+}
+
+static void hvm_unmap(void *p)
+{
+    if ( p )
+        unmap_domain_page(p);
+}
+
+static int hvm_load_segment_selector(
+    struct vcpu *v, enum x86_segment seg, uint16_t sel)
+{
+    struct segment_register desctab, cs, segr;
+    struct desc_struct *pdesc, desc;
+    u8 dpl, rpl, cpl;
+    int fault_type = TRAP_invalid_tss;
+
+    /* NULL selector? */
+    if ( (sel & 0xfffc) == 0 )
+    {
+        if ( (seg == x86_seg_cs) || (seg == x86_seg_ss) )
+            goto fail;
+        memset(&segr, 0, sizeof(segr));
+        hvm_set_segment_register(v, seg, &segr);
+        return 0;
+    }
+
+    /* LDT descriptor must be in the GDT. */
+    if ( (seg == x86_seg_ldtr) && (sel & 4) )
+        goto fail;
+
+    hvm_get_segment_register(v, x86_seg_cs, &cs);
+    hvm_get_segment_register(
+        v, (sel & 4) ? x86_seg_ldtr : x86_seg_gdtr, &desctab);
+
+    /* Check against descriptor table limit. */
+    if ( ((sel & 0xfff8) + 7) > desctab.limit )
+        goto fail;
+
+    pdesc = hvm_map(desctab.base + (sel & 0xfff8), 8);
+    if ( pdesc == NULL )
+        goto hvm_map_fail;
+
+    do {
+        desc = *pdesc;
+
+        /* Segment present in memory? */
+        if ( !(desc.b & (1u<<15)) )
+        {
+            fault_type = TRAP_no_segment;
+            goto unmap_and_fail;
+        }
+
+        /* LDT descriptor is a system segment. All others are code/data. */
+        if ( (desc.b & (1u<<12)) == ((seg == x86_seg_ldtr) << 12) )
+            goto unmap_and_fail;
+
+        dpl = (desc.b >> 13) & 3;
+        rpl = sel & 3;
+        cpl = cs.sel & 3;
+
+        switch ( seg )
+        {
+        case x86_seg_cs:
+            /* Code segment? */
+            if ( !(desc.b & (1u<<11)) )
+                goto unmap_and_fail;
+            /* Non-conforming segment: check DPL against RPL. */
+            if ( ((desc.b & (6u<<9)) != 6) && (dpl != rpl) )
+                goto unmap_and_fail;
+            break;
+        case x86_seg_ss:
+            /* Writable data segment? */
+            if ( (desc.b & (5u<<9)) != (1u<<9) )
+                goto unmap_and_fail;
+            if ( (dpl != cpl) || (dpl != rpl) )
+                goto unmap_and_fail;
+            break;
+        case x86_seg_ldtr:
+            /* LDT system segment? */
+            if ( (desc.b & (15u<<8)) != (2u<<8) )
+                goto unmap_and_fail;
+            goto skip_accessed_flag;
+        default:
+            /* Readable code or data segment? */
+            if ( (desc.b & (5u<<9)) == (4u<<9) )
+                goto unmap_and_fail;
+            /* Non-conforming segment: check DPL against RPL and CPL. */
+            if ( ((desc.b & (6u<<9)) != 6) && ((dpl < cpl) || (dpl < rpl)) )
+                goto unmap_and_fail;
+            break;
+        }
+    } while ( !(desc.b & 0x100) && /* Ensure Accessed flag is set */
+              (cmpxchg(&pdesc->b, desc.b, desc.b | 0x100) != desc.b) );
+
+    /* Force the Accessed flag in our local copy. */
+    desc.b |= 0x100;
+
+ skip_accessed_flag:
+    hvm_unmap(pdesc);
+
+    segr.base = (((desc.b <<  0) & 0xff000000u) |
+                 ((desc.b << 16) & 0x00ff0000u) |
+                 ((desc.a >> 16) & 0x0000ffffu));
+    segr.attr.bytes = (((desc.b >>  8) & 0x00ffu) |
+                       ((desc.b >> 12) & 0x0f00u));
+    segr.limit = (desc.b & 0x000f0000u) | (desc.a & 0x0000ffffu);
+    if ( segr.attr.fields.g )
+        segr.limit = (segr.limit << 12) | 0xfffu;
+    segr.sel = sel;
+    hvm_set_segment_register(v, seg, &segr);
+
+    return 0;
+
+ unmap_and_fail:
+    hvm_unmap(pdesc);
+ fail:
+    hvm_inject_exception(fault_type, sel & 0xfffc, 0);
+ hvm_map_fail:
+    return 1;
+}
+
+void hvm_task_switch(
+    uint16_t tss_sel, enum hvm_task_switch_reason taskswitch_reason,
+    int32_t errcode)
+{
+    struct vcpu *v = current;
+    struct cpu_user_regs *regs = guest_cpu_user_regs();
+    struct segment_register gdt, tr, prev_tr, segr;
+    struct desc_struct *optss_desc = NULL, *nptss_desc = NULL, tss_desc;
+    unsigned long eflags;
+    int exn_raised;
+    struct {
+        u16 back_link,__blh;
+        u32 esp0;
+        u16 ss0, _0;
+        u32 esp1;
+        u16 ss1, _1;
+        u32 esp2;
+        u16 ss2, _2;
+        u32 cr3, eip, eflags, eax, ecx, edx, ebx, esp, ebp, esi, edi;
+        u16 es, _3, cs, _4, ss, _5, ds, _6, fs, _7, gs, _8, ldt, _9;
+        u16 trace, iomap;
+    } *ptss, tss;
+
+    hvm_get_segment_register(v, x86_seg_gdtr, &gdt);
+    hvm_get_segment_register(v, x86_seg_tr, &prev_tr);
+
+    if ( ((tss_sel & 0xfff8) + 7) > gdt.limit )
+    {
+        hvm_inject_exception((taskswitch_reason == TSW_iret) ?
+                             TRAP_invalid_tss : TRAP_gp_fault,
+                             tss_sel & 0xfff8, 0);
+        goto out;
+    }
+
+    optss_desc = hvm_map(gdt.base + (prev_tr.sel & 0xfff8), 8);
+    if ( optss_desc == NULL )
+        goto out;
+
+    nptss_desc = hvm_map(gdt.base + (tss_sel & 0xfff8), 8);
+    if ( nptss_desc == NULL )
+        goto out;
+
+    tss_desc = *nptss_desc;
+    tr.sel = tss_sel;
+    tr.base = (((tss_desc.b <<  0) & 0xff000000u) |
+               ((tss_desc.b << 16) & 0x00ff0000u) |
+               ((tss_desc.a >> 16) & 0x0000ffffu));
+    tr.attr.bytes = (((tss_desc.b >>  8) & 0x00ffu) |
+                     ((tss_desc.b >> 12) & 0x0f00u));
+    tr.limit = (tss_desc.b & 0x000f0000u) | (tss_desc.a & 0x0000ffffu);
+    if ( tr.attr.fields.g )
+        tr.limit = (tr.limit << 12) | 0xfffu;
+
+    if ( !tr.attr.fields.p )
+    {
+        hvm_inject_exception(TRAP_no_segment, tss_sel & 0xfff8, 0);
+        goto out;
+    }
+
+    if ( tr.attr.fields.type != ((taskswitch_reason == TSW_iret) ? 0xb : 0x9) )
+    {
+        hvm_inject_exception(
+            (taskswitch_reason == TSW_iret) ? TRAP_invalid_tss : TRAP_gp_fault,
+            tss_sel & 0xfff8, 0);
+        goto out;
+    }
+
+    if ( !tr.attr.fields.g && (tr.limit < (sizeof(tss)-1)) )
+    {
+        hvm_inject_exception(TRAP_invalid_tss, tss_sel & 0xfff8, 0);
+        goto out;
+    }
+
+    ptss = hvm_map(prev_tr.base, sizeof(tss));
+    if ( ptss == NULL )
+        goto out;
+
+    eflags = regs->eflags;
+    if ( taskswitch_reason == TSW_iret )
+        eflags &= ~X86_EFLAGS_NT;
+
+    ptss->cr3    = v->arch.hvm_vcpu.guest_cr[3];
+    ptss->eip    = regs->eip;
+    ptss->eflags = eflags;
+    ptss->eax    = regs->eax;
+    ptss->ecx    = regs->ecx;
+    ptss->edx    = regs->edx;
+    ptss->ebx    = regs->ebx;
+    ptss->esp    = regs->esp;
+    ptss->ebp    = regs->ebp;
+    ptss->esi    = regs->esi;
+    ptss->edi    = regs->edi;
+
+    hvm_get_segment_register(v, x86_seg_es, &segr);
+    ptss->es = segr.sel;
+    hvm_get_segment_register(v, x86_seg_cs, &segr);
+    ptss->cs = segr.sel;
+    hvm_get_segment_register(v, x86_seg_ss, &segr);
+    ptss->ss = segr.sel;
+    hvm_get_segment_register(v, x86_seg_ds, &segr);
+    ptss->ds = segr.sel;
+    hvm_get_segment_register(v, x86_seg_fs, &segr);
+    ptss->fs = segr.sel;
+    hvm_get_segment_register(v, x86_seg_gs, &segr);
+    ptss->gs = segr.sel;
+    hvm_get_segment_register(v, x86_seg_ldtr, &segr);
+    ptss->ldt = segr.sel;
+
+    hvm_unmap(ptss);
+
+    ptss = hvm_map(tr.base, sizeof(tss));
+    if ( ptss == NULL )
+        goto out;
+
+    if ( !hvm_set_cr3(ptss->cr3) )
+    {
+        hvm_unmap(ptss);
+        goto out;
+    }
+
+    regs->eip    = ptss->eip;
+    regs->eflags = ptss->eflags | 2;
+    regs->eax    = ptss->eax;
+    regs->ecx    = ptss->ecx;
+    regs->edx    = ptss->edx;
+    regs->ebx    = ptss->ebx;
+    regs->esp    = ptss->esp;
+    regs->ebp    = ptss->ebp;
+    regs->esi    = ptss->esi;
+    regs->edi    = ptss->edi;
+
+    if ( (taskswitch_reason == TSW_call_or_int) )
+    {
+        regs->eflags |= X86_EFLAGS_NT;
+        ptss->back_link = prev_tr.sel;
+    }
+
+    exn_raised = 0;
+    if ( hvm_load_segment_selector(v, x86_seg_es, ptss->es) ||
+         hvm_load_segment_selector(v, x86_seg_cs, ptss->cs) ||
+         hvm_load_segment_selector(v, x86_seg_ss, ptss->ss) ||
+         hvm_load_segment_selector(v, x86_seg_ds, ptss->ds) ||
+         hvm_load_segment_selector(v, x86_seg_fs, ptss->fs) ||
+         hvm_load_segment_selector(v, x86_seg_gs, ptss->gs) ||
+         hvm_load_segment_selector(v, x86_seg_ldtr, ptss->ldt) )
+        exn_raised = 1;
+
+    if ( (ptss->trace & 1) && !exn_raised )
+        hvm_inject_exception(TRAP_debug, tss_sel & 0xfff8, 0);
+
+    hvm_unmap(ptss);
+
+    tr.attr.fields.type = 0xb; /* busy 32-bit tss */
+    hvm_set_segment_register(v, x86_seg_tr, &tr);
+
+    v->arch.hvm_vcpu.guest_cr[0] |= X86_CR0_TS;
+    hvm_update_guest_cr(v, 0);
+
+    if ( (taskswitch_reason == TSW_iret) ||
+         (taskswitch_reason == TSW_jmp) )
+        clear_bit(41, optss_desc); /* clear B flag of old task */
+
+    if ( taskswitch_reason != TSW_iret )
+        set_bit(41, nptss_desc); /* set B flag of new task */
+
+    if ( errcode >= 0 )
+    {
+        struct segment_register reg;
+        unsigned long linear_addr;
+        regs->esp -= 4;
+        hvm_get_segment_register(current, x86_seg_ss, &reg);
+        /* Todo: do not ignore access faults here. */
+        if ( hvm_virtual_to_linear_addr(x86_seg_ss, &reg, regs->esp,
+                                        4, hvm_access_write, 32,
+                                        &linear_addr) )
+            hvm_copy_to_guest_virt(linear_addr, &errcode, 4);
+    }
+
+ out:
+    hvm_unmap(optss_desc);
+    hvm_unmap(nptss_desc);
+}
+
 /*
  * __hvm_copy():
  *  @buf  = hypervisor buffer
@@ -906,7 +1313,6 @@ int hvm_do_hypercall(struct cpu_user_regs *regs)
 #endif
     case 4:
     case 2:
-        hvm_store_cpu_guest_regs(current, regs, NULL);
         if ( unlikely(ring_3(regs)) )
         {
     default:

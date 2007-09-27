@@ -6,6 +6,7 @@ class XSMError(Exception):
     def __str__(self):
         return repr(self.value)
 
+security_dir_prefix = "";
 policy_dir_prefix = "";
 active_policy = "";
 NULL_SSIDREF = 0;
@@ -51,3 +52,6 @@ def ssidref2security_label(ssidref):
 
 def has_authorization(ssidref):
     return True
+
+def get_security_label(self, xspol=None):
+    return ""

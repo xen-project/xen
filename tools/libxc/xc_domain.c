@@ -734,6 +734,114 @@ int xc_domain_setdebugging(int xc_handle,
     return do_domctl(xc_handle, &domctl);
 }
 
+int xc_assign_device(
+    int xc_handle,
+    uint32_t domid,
+    uint32_t machine_bdf)
+{
+    DECLARE_DOMCTL;
+
+    domctl.cmd = XEN_DOMCTL_assign_device;
+    domctl.domain = domid;
+    domctl.u.assign_device.machine_bdf = machine_bdf;
+ 
+    return do_domctl(xc_handle, &domctl);
+}
+
+/* Pass-through: binds machine irq to guests irq */
+int xc_domain_bind_pt_irq(
+    int xc_handle,
+    uint32_t domid,
+    uint8_t machine_irq,
+    uint8_t irq_type,
+    uint8_t bus,
+    uint8_t device,
+    uint8_t intx,
+                                                 uint8_t isa_irq)
+{
+    int rc;
+    xen_domctl_bind_pt_irq_t * bind;
+    DECLARE_DOMCTL;
+
+    domctl.cmd = XEN_DOMCTL_bind_pt_irq;
+    domctl.domain = (domid_t)domid;
+
+    bind = &(domctl.u.bind_pt_irq);
+    bind->hvm_domid = domid;
+    bind->irq_type = irq_type;
+    bind->machine_irq = machine_irq;
+    bind->u.pci.bus = bus;
+    bind->u.pci.device = device;    
+    bind->u.pci.intx = intx;
+    bind->u.isa.isa_irq = isa_irq;
+    
+    rc = do_domctl(xc_handle, &domctl);
+    return rc;
+}
+
+int xc_domain_bind_pt_pci_irq(
+    int xc_handle,
+    uint32_t domid,
+    uint8_t machine_irq,
+    uint8_t bus,
+    uint8_t device,
+    uint8_t intx)
+{
+
+    return (xc_domain_bind_pt_irq(xc_handle, domid, machine_irq,
+                                  PT_IRQ_TYPE_PCI, bus, device, intx, 0));
+}
+
+int xc_domain_bind_pt_isa_irq(
+    int xc_handle,
+    uint32_t domid,
+    uint8_t machine_irq)
+{
+
+    return (xc_domain_bind_pt_irq(xc_handle, domid, machine_irq,
+                                  PT_IRQ_TYPE_ISA, 0, 0, 0, machine_irq));
+}
+
+int xc_domain_memory_mapping(
+    int xc_handle,
+    uint32_t domid,
+    unsigned long first_gfn,
+    unsigned long first_mfn,
+    unsigned long nr_mfns,
+    uint32_t add_mapping)
+{
+    DECLARE_DOMCTL;
+
+    domctl.cmd = XEN_DOMCTL_memory_mapping;
+    domctl.domain = domid;
+    domctl.u.memory_mapping.first_gfn = first_gfn;
+    domctl.u.memory_mapping.first_mfn = first_mfn;
+    domctl.u.memory_mapping.nr_mfns = nr_mfns;
+    domctl.u.memory_mapping.add_mapping = add_mapping;
+
+    return do_domctl(xc_handle, &domctl);
+}
+
+int xc_domain_ioport_mapping(
+    int xc_handle,
+    uint32_t domid,
+    uint32_t first_gport,
+    uint32_t first_mport,
+    uint32_t nr_ports,
+    uint32_t add_mapping)
+{
+    DECLARE_DOMCTL;
+
+    domctl.cmd = XEN_DOMCTL_ioport_mapping;
+    domctl.domain = domid;
+    domctl.u.ioport_mapping.first_gport = first_gport;
+    domctl.u.ioport_mapping.first_mport = first_mport;
+    domctl.u.ioport_mapping.nr_ports = nr_ports;
+    domctl.u.ioport_mapping.add_mapping = add_mapping;
+
+    return do_domctl(xc_handle, &domctl);
+}
+
 /*
  * Local variables:
  * mode: C

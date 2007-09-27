@@ -16,6 +16,7 @@
 #include <xen/compat.h>
 #include <asm/current.h>
 #include <asm/smpboot.h>
+#include <asm/iommu.h>
 
 /* opt_noirqbalance: If true, software IRQ balancing/affinity is disabled. */
 int opt_noirqbalance = 0;
@@ -96,6 +97,39 @@ asmlinkage void do_IRQ(struct cpu_user_regs *regs)
  out:
     desc->handler->end(vector);
     spin_unlock(&desc->lock);
+}
+
+int request_irq(unsigned int irq,
+        void (*handler)(int, void *, struct cpu_user_regs *),
+        unsigned long irqflags, const char * devname, void *dev_id)
+{
+    struct irqaction * action;
+    int retval;
+
+    /*
+     * Sanity-check: shared interrupts must pass in a real dev-ID,
+     * otherwise we'll have trouble later trying to figure out
+     * which interrupt is which (messes up the interrupt freeing
+     * logic etc).
+     */
+    if (irq >= NR_IRQS)
+        return -EINVAL;
+    if (!handler)
+        return -EINVAL;
+
+    action = xmalloc(struct irqaction);
+    if (!action)
+        return -ENOMEM;
+
+    action->handler = handler;
+    action->name = devname;
+    action->dev_id = dev_id;
+
+    retval = setup_irq(irq, action);
+    if (retval)
+        xfree(action);
+
+    return retval;
 }
 
 void free_irq(unsigned int irq)
@@ -203,7 +237,9 @@ static void __do_IRQ_guest(int vector)
         if ( (action->ack_type != ACKTYPE_NONE) &&
              !test_and_set_bit(irq, d->pirq_mask) )
             action->in_flight++;
-        send_guest_pirq(d, irq);
+        if (!hvm_do_IRQ_dpci(d, irq))
+            send_guest_pirq(d, irq);
+
     }
 }
 

@@ -360,6 +360,9 @@ static inline void write_efer(__u64 val)
 #define MSR_K8_VM_CR			0xC0010114
 #define MSR_K8_VM_HSAVE_PA		0xC0010117
 
+#define MSR_K8_FIDVID_CTL		0xC0010041
+#define MSR_K8_FIDVID_STATUS		0xC0010042
+
 /* MSR_K8_VM_CR bits: */
 #define _K8_VMCR_SVME_DISABLE		4
 #define K8_VMCR_SVME_DISABLE		(1 << _K8_VMCR_SVME_DISABLE)

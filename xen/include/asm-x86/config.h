@@ -45,7 +45,7 @@
 
 #define HZ 100
 
-#define OPT_CONSOLE_STR "com1,vga"
+#define OPT_CONSOLE_STR "vga"
 
 #ifdef MAX_PHYS_CPUS
 #define NR_CPUS MAX_PHYS_CPUS

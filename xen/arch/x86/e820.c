@@ -2,6 +2,7 @@
 #include <xen/init.h>
 #include <xen/lib.h>
 #include <xen/compat.h>
+#include <xen/dmi.h>
 #include <asm/e820.h>
 #include <asm/page.h>
 
@@ -343,6 +344,15 @@ static void __init clip_to_limit(uint64_t limit, char *warnmsg)
     }
 }
 
+static void __init reserve_dmi_region(void)
+{
+    u32 base, len;
+    if ( (dmi_get_table(&base, &len) == 0) && ((base + len) > base) &&
+         reserve_e820_ram(&e820, base, base + len) )
+        printk("WARNING: DMI table located in E820 RAM %08x-%08x. Fixed.\n",
+               base, base+len);
+}
+
 static void __init machine_specific_memory_setup(
     struct e820entry *raw, int *raw_nr)
 {
@@ -366,6 +376,74 @@ static void __init machine_specific_memory_setup(
                   "Only the first %u GB of the physical memory map "
                   "can be accessed by 32-on-64 guests.");
 #endif
+
+    reserve_dmi_region();
+}
+
+/* Reserve RAM area (@s,@e) in the specified e820 map. */
+int __init reserve_e820_ram(struct e820map *e820, uint64_t s, uint64_t e)
+{
+    uint64_t rs = 0, re = 0;
+    int i;
+
+    for ( i = 0; i < e820->nr_map; i++ )
+    {
+        /* Have we found the e820 region that includes the specified range? */
+        rs = e820->map[i].addr;
+        re = rs + e820->map[i].size;
+        if ( (s >= rs) && (e <= re) )
+            break;
+    }
+
+    if ( (i == e820->nr_map) || (e820->map[i].type != E820_RAM) )
+        return 0;
+
+    if ( (s == rs) && (e == re) )
+    {
+        /* Complete excision. */
+        memmove(&e820->map[i], &e820->map[i+1],
+                (e820->nr_map-i-1) * sizeof(e820->map[0]));
+        e820->nr_map--;
+    }
+    else if ( s == rs )
+    {
+        /* Truncate start. */
+        e820->map[i].addr += e - s;
+        e820->map[i].size -= e - s;
+    }
+    else if ( e == re )
+    {
+        /* Truncate end. */
+        e820->map[i].size -= e - s;
+    }
+    else if ( e820->nr_map < ARRAY_SIZE(e820->map) )
+    {
+        /* Split in two. */
+        memmove(&e820->map[i+1], &e820->map[i],
+                (e820->nr_map-i) * sizeof(e820->map[0]));
+        e820->nr_map++;
+        e820->map[i].size = s - rs;
+        i++;
+        e820->map[i].addr = e;
+        e820->map[i].size = re - e;
+    }
+    else
+    {
+        /* e820map is at maximum size. We have to leak some space. */
+        if ( (s - rs) > (re - e) )
+        {
+            printk("e820 overflow: leaking RAM %"PRIx64"-%"PRIx64"\n", e, re);
+            e820->map[i].size = s - rs;
+        }
+        else
+        {
+            printk("e820 overflow: leaking RAM %"PRIx64"-%"PRIx64"\n", rs, s);
+            e820->map[i].addr = e;
+            e820->map[i].size = re - e;
+        }
+    }
+
+    return 1;
 }
 
 unsigned long __init init_e820(

@@ -174,7 +174,8 @@ def recreate(info, priv):
     except XendError:
         pass # our best shot at 'goto' in python :)
 
-    vm = XendDomainInfo(xeninfo, domid, dompath, augment = True, priv = priv)
+    vm = XendDomainInfo(xeninfo, domid, dompath, augment = True, priv = priv,
+                        vmpath = vmpath)
     
     if needs_reinitialising:
         vm._recreateDom()
@@ -321,7 +322,7 @@ class XendDomainInfo:
     """
     
     def __init__(self, info, domid = None, dompath = None, augment = False,
-                 priv = False, resume = False):
+                 priv = False, resume = False, vmpath = None):
         """Constructor for a domain
 
         @param   info: parsed configuration
@@ -348,7 +349,22 @@ class XendDomainInfo:
         #if not self._infoIsSet('uuid'):
         #    self.info['uuid'] = uuid.toString(uuid.create())
 
-        self.vmpath  = XS_VMROOT + self.info['uuid']
+        # Find a unique /vm/<uuid>/<integer> path if not specified.
+        # This avoids conflict between pre-/post-migrate domains when doing
+        # localhost relocation.
+        self.vmpath = vmpath
+        i = 0
+        while self.vmpath == None:
+            self.vmpath = XS_VMROOT + self.info['uuid']
+            if i != 0:
+                self.vmpath = self.vmpath + '-' + str(i)
+            try:
+                if self._readVm("uuid"):
+                    self.vmpath = None
+                    i = i + 1
+            except:
+                pass
+
         self.dompath = dompath
 
         self.image = None
@@ -1101,16 +1117,16 @@ class XendDomainInfo:
         return str(self._resume)
 
     def getCap(self):
-        return self.info.get('cpu_cap', 0)
+        return self.info['vcpus_params']['cap']
 
     def setCap(self, cpu_cap):
-        self.info['cpu_cap'] = cpu_cap
+        self.info['vcpus_params']['cap'] = cpu_cap
 
     def getWeight(self):
-        return self.info.get('cpu_weight', 256)
+        return self.info['vcpus_params']['weight']
 
     def setWeight(self, cpu_weight):
-        self.info['cpu_weight'] = cpu_weight
+        self.info['vcpus_params']['weight'] = cpu_weight
 
     def setResume(self, state):
         self._resume = state
@@ -1582,7 +1598,7 @@ class XendDomainInfo:
     def _initDomain(self):
         log.debug('XendDomainInfo.initDomain: %s %s',
                   self.domid,
-                  self.info['cpu_weight'])
+                  self.info['vcpus_params']['weight'])
 
         self._configureBootloader()
 
@@ -1592,7 +1608,8 @@ class XendDomainInfo:
             if self.info['platform'].get('localtime', 0):
                 xc.domain_set_time_offset(self.domid)
 
-            xc.domain_setcpuweight(self.domid, self.info['cpu_weight'])
+            xc.domain_setcpuweight(self.domid, \
+                                   self.info['vcpus_params']['weight'])
 
             # repin domain vcpus if a restricted cpus list is provided
             # this is done prior to memory allocation to aide in memory
@@ -2167,7 +2184,7 @@ class XendDomainInfo:
             raise VmError('Invalid VM Name')
 
         dom =  XendDomain.instance().domain_lookup_nr(name)
-        if dom and dom.domid != self.domid:
+        if dom and dom.info['uuid'] != self.info['uuid']:
             raise VmError("VM name '%s' already exists%s" %
                           (name,
                            dom.domid is not None and
@@ -2275,25 +2292,8 @@ class XendDomainInfo:
 
 
     def get_security_label(self, xspol=None):
-        """
-           Get the security label of a domain
-           @param xspol   The policy to use when converting the ssid into
-                          a label; only to be passed during the updating
-                          of the policy
-        """
-        domid = self.getDomid()
-
-        if not xspol:
-            from xen.xend.XendXSPolicyAdmin import XSPolicyAdminInstance
-            xspol = XSPolicyAdminInstance().get_loaded_policy()
-
-        if domid == 0:
-            if xspol:
-                label = xspol.policy_get_domain_label_formatted(domid)
-            else:
-                label = ""
-        else:
-            label = self.info.get('security_label', '')
+        import xen.util.xsm.xsm as security
+        label = security.get_security_label(self, xspol)
         return label
 
     def set_security_label(self, seclab, old_seclab, xspol=None,

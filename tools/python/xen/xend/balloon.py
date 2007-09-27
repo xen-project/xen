@@ -100,12 +100,28 @@ def free(need_mem):
 
     try:
         dom0_min_mem = xoptions.get_dom0_min_mem() * 1024
+        dom0_alloc = get_dom0_current_alloc()
 
         retries = 0
         sleep_time = SLEEP_TIME_GROWTH
+        new_alloc = 0
         last_new_alloc = None
         last_free = None
         rlimit = RETRY_LIMIT
+
+        # If unreasonable memory size is required, we give up waiting
+        # for ballooning or scrubbing, as if had retried.
+        physinfo = xc.physinfo()
+        free_mem = physinfo['free_memory']
+        scrub_mem = physinfo['scrub_memory']
+        total_mem = physinfo['total_memory']
+        if dom0_min_mem > 0:
+            max_free_mem = total_mem - dom0_min_mem
+        else:
+            max_free_mem = total_mem - dom0_alloc
+        if need_mem >= max_free_mem:
+            retries = rlimit
+
         while retries < rlimit:
             physinfo = xc.physinfo()
             free_mem = physinfo['free_memory']

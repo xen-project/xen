@@ -348,6 +348,16 @@ ifdef CONFIG_WIN32
 VL_OBJS+=tap-win32.o
 endif
 
+ifeq (,$(wildcard /usr/include/pci))
+$(warning *** pciutils-devl package not found - missing /usr/include/pci)
+$(warning *** PCI passthrough capability has been disabled)
+else
+LIBS+=-lpci
+VL_OBJS+= pass-through.o
+CFLAGS += -DCONFIG_PASSTHROUGH
+$(info *** PCI passthrough capability has been enabled ***)
+endif
+
 SOUND_HW = sb16.o es1370.o
 AUDIODRV = audio.o noaudio.o wavaudio.o
 ifdef CONFIG_SDL

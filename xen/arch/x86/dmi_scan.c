@@ -100,23 +100,32 @@ inline static int __init dmi_checksum(u8 *buf)
 	return (sum==0);
 }
 
+int __init dmi_get_table(u32 *base, u32 *len)
+{
+	u8 buf[15];
+	char __iomem *p, *q;
+
+	p = maddr_to_virt(0xF0000);
+	for (q = p; q < p + 0x10000; q += 16) {
+		memcpy_fromio(buf, q, 15);
+		if (memcmp(buf, "_DMI_", 5)==0 && dmi_checksum(buf)) {
+			*base=buf[11]<<24|buf[10]<<16|buf[9]<<8|buf[8];
+			*len=buf[7]<<8|buf[6];
+			return 0;
+		}
+	}
+	return -1;
+}
+
 static int __init dmi_iterate(void (*decode)(struct dmi_header *))
 {
 	u8 buf[15];
 	char __iomem *p, *q;
 
-	/*
-	 * no iounmap() for that ioremap(); it would be a no-op, but it's
-	 * so early in setup that sucker gets confused into doing what
-	 * it shouldn't if we actually call it.
-	 */
-	p = ioremap(0xF0000, 0x10000);
-	if (p == NULL)
-		return -1;
+	p = maddr_to_virt(0xF0000);
 	for (q = p; q < p + 0x10000; q += 16) {
 		memcpy_fromio(buf, q, 15);
-		if(memcmp(buf, "_DMI_", 5)==0 && dmi_checksum(buf))
-		{
+		if (memcmp(buf, "_DMI_", 5)==0 && dmi_checksum(buf)) {
 			u16 num=buf[13]<<8|buf[12];
 			u16 len=buf[7]<<8|buf[6];
 			u32 base=buf[11]<<24|buf[10]<<16|buf[9]<<8|buf[8];

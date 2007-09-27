@@ -21,10 +21,15 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
  * THE SOFTWARE.
  */
+#include <stdlib.h>
 #include <sys/mman.h>
 #include <sys/types.h>
 #include <sys/ioctl.h>
+#if defined(__OpenBSD__)
+#include <soundcard.h>
+#else
 #include <sys/soundcard.h>
+#endif
 #include "vl.h"
 
 #define AUDIO_CAP "oss"
@@ -231,7 +236,7 @@ static int oss_open (int in, struct oss_params *req,
         goto err;
     }
 
-    if (ioctl (fd, SNDCTL_DSP_NONBLOCK)) {
+    if (ioctl (fd, SNDCTL_DSP_NONBLOCK, NULL)) {
         oss_logerr2 (errno, typ, "Failed to set non-blocking mode\n");
         goto err;
     }

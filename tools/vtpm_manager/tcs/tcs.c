@@ -775,7 +775,7 @@ TPM_RESULT TCSP_UnBind(TCS_CONTEXT_HANDLE hContext,  // in
   TDDL_UINT32  OutLength = TCPA_MAX_BUFFER_LENGTH;
   
   // check input params
-  if (inData == NULL || privAuth == NULL || outDataSize == NULL || *outData == NULL)
+  if (inData == NULL || privAuth == NULL || outDataSize == NULL || outData == NULL)
     return TPM_BAD_PARAMETER;
   
   // Convert Byte Input parameter in the input byte stream InBuf

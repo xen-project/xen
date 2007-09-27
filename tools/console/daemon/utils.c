@@ -32,6 +32,7 @@
 #include <sys/socket.h>
 #include <sys/un.h>
 #include <string.h>
+#include <signal.h>
 
 #include "xenctrl.h"
 #include "utils.h"

@@ -27,6 +27,7 @@
 #include <asm/page.h>
 #include <asm/paging.h>
 #include <asm/p2m.h>
+#include <asm/iommu.h>
 
 /* Debugging and auditing of the P2M code? */
 #define P2M_AUDIT     0
@@ -201,7 +202,7 @@ p2m_next_level(struct domain *d, mfn_t *table_mfn, void **table,
 
 // Returns 0 on error (out of memory)
 static int
-set_p2m_entry(struct domain *d, unsigned long gfn, mfn_t mfn, u32 l1e_flags)
+set_p2m_entry(struct domain *d, unsigned long gfn, mfn_t mfn, p2m_type_t p2mt)
 {
     // XXX -- this might be able to be faster iff current->domain == d
     mfn_t table_mfn = pagetable_get_mfn(d->arch.phys_table);
@@ -244,13 +245,16 @@ set_p2m_entry(struct domain *d, unsigned long gfn, mfn_t mfn, u32 l1e_flags)
     if ( mfn_valid(mfn) && (gfn > d->arch.p2m.max_mapped_pfn) )
         d->arch.p2m.max_mapped_pfn = gfn;
 
-    if ( mfn_valid(mfn) )
-        entry_content = l1e_from_pfn(mfn_x(mfn), l1e_flags);
+    if ( mfn_valid(mfn) || (p2mt == p2m_mmio_direct) )
+        entry_content = l1e_from_pfn(mfn_x(mfn), p2m_type_to_flags(p2mt));
     else
         entry_content = l1e_empty();
 
     /* level 1 entry */
     paging_write_p2m_entry(d, gfn, p2m_entry, table_mfn, entry_content, 1);
+
+    if ( vtd_enabled && (p2mt == p2m_mmio_direct) && is_hvm_domain(d) )
+        iommu_flush(d, gfn, (u64*)p2m_entry);
 
     /* Success */
     rv = 1;
@@ -328,11 +332,10 @@ int p2m_alloc_table(struct domain *d,
     P2M_PRINTK("populating p2m table\n");
 
     /* Initialise physmap tables for slot zero. Other code assumes this. */
-    gfn = 0;
-    mfn = _mfn(INVALID_MFN);
-    if ( !set_p2m_entry(d, gfn, mfn, __PAGE_HYPERVISOR|_PAGE_USER) )
+    if ( !set_p2m_entry(d, 0, _mfn(INVALID_MFN), p2m_invalid) )
         goto error;
 
+    /* Copy all existing mappings from the page list and m2p */
     for ( entry = d->page_list.next;
           entry != &d->page_list;
           entry = entry->next )
@@ -348,9 +351,14 @@ int p2m_alloc_table(struct domain *d,
             (gfn != 0x55555555L)
 #endif
              && gfn != INVALID_M2P_ENTRY
-             && !set_p2m_entry(d, gfn, mfn, __PAGE_HYPERVISOR|_PAGE_USER) )
+            && !set_p2m_entry(d, gfn, mfn, p2m_ram_rw) )
             goto error;
     }
+
+#if CONFIG_PAGING_LEVELS >= 3
+    if (vtd_enabled && is_hvm_domain(d))
+        iommu_set_pgd(d);
+#endif
 
     P2M_PRINTK("p2m table initialised (%u pages)\n", page_count);
     p2m_unlock(d);
@@ -663,7 +671,7 @@ p2m_remove_page(struct domain *d, unsigned long gfn, unsigned long mfn)
         return;
     P2M_DEBUG("removing gfn=%#lx mfn=%#lx\n", gfn, mfn);
 
-    set_p2m_entry(d, gfn, _mfn(INVALID_MFN), 0);
+    set_p2m_entry(d, gfn, _mfn(INVALID_MFN), p2m_invalid);
     set_gpfn_from_mfn(mfn, INVALID_M2P_ENTRY);
 }
 
@@ -679,8 +687,8 @@ guest_physmap_remove_page(struct domain *d, unsigned long gfn,
 }
 
 void
-guest_physmap_add_page(struct domain *d, unsigned long gfn,
-                       unsigned long mfn)
+guest_physmap_add_entry(struct domain *d, unsigned long gfn,
+                        unsigned long mfn, p2m_type_t t)
 {
     unsigned long ogfn;
     p2m_type_t ot;
@@ -727,15 +735,14 @@ guest_physmap_add_page(struct domain *d, unsigned long gfn,
 
     if ( mfn_valid(_mfn(mfn)) ) 
     {
-        set_p2m_entry(d, gfn, _mfn(mfn),
-                  p2m_type_to_flags(p2m_ram_rw)|__PAGE_HYPERVISOR|_PAGE_USER);
+        set_p2m_entry(d, gfn, _mfn(mfn), t);
         set_gpfn_from_mfn(mfn, gfn);
     }
     else
     {
         gdprintk(XENLOG_WARNING, "Adding bad mfn to p2m map (%#lx -> %#lx)\n",
                  gfn, mfn);
-        set_p2m_entry(d, gfn, _mfn(INVALID_MFN), 0);
+        set_p2m_entry(d, gfn, _mfn(INVALID_MFN), p2m_invalid);
     }
 
     audit_p2m(d);
@@ -855,11 +862,57 @@ p2m_type_t p2m_change_type(struct domain *d, unsigned long gfn,
 
     mfn = gfn_to_mfn(d, gfn, &pt);
     if ( pt == ot )
-        set_p2m_entry(d, gfn, mfn, p2m_type_to_flags(nt));
+        set_p2m_entry(d, gfn, mfn, nt);
 
     p2m_unlock(d);
 
     return pt;
+}
+
+int
+set_mmio_p2m_entry(struct domain *d, unsigned long gfn, mfn_t mfn)
+{
+    int rc = 0;
+    p2m_type_t ot;
+    mfn_t omfn;
+
+    if ( !paging_mode_translate(d) )
+        return 0;
+
+    omfn = gfn_to_mfn(d, gfn, &ot);
+    if ( p2m_is_ram(ot) )
+    {
+        ASSERT(mfn_valid(omfn));
+        set_gpfn_from_mfn(mfn_x(omfn), INVALID_M2P_ENTRY);
+    }
+
+    rc = set_p2m_entry(d, gfn, mfn, p2m_mmio_direct);
+    if ( 0 == rc )
+        gdprintk(XENLOG_ERR,
+            "set_mmio_p2m_entry: set_p2m_entry failed! mfn=%08lx\n",
+            gmfn_to_mfn(d, gfn));
+    return rc;
+}
+
+int
+clear_mmio_p2m_entry(struct domain *d, unsigned long gfn)
+{
+    int rc = 0;
+    unsigned long mfn;
+
+    if ( !paging_mode_translate(d) )
+        return 0;
+
+    mfn = gmfn_to_mfn(d, gfn);
+    if ( INVALID_MFN == mfn )
+    {
+        gdprintk(XENLOG_ERR,
+            "clear_mmio_p2m_entry: gfn_to_mfn failed! gfn=%08lx\n", gfn);
+        return 0;
+    }
+    rc = set_p2m_entry(d, gfn, _mfn(INVALID_MFN), 0);
+
+    return rc;
 }
 
 /*

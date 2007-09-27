@@ -25,6 +25,8 @@
 #include <asm/hvm/support.h>
 #include <asm/processor.h>
 #include <xsm/xsm.h>
+#include <xen/list.h>
+#include <asm/iommu.h>
 
 long arch_do_domctl(
     struct xen_domctl *domctl,
@@ -523,6 +525,155 @@ long arch_do_domctl(
     }
     break;
 
+    case XEN_DOMCTL_assign_device:
+    {
+        struct domain *d;
+        struct hvm_iommu *hd;
+        u8 bus, devfn;
+
+        if (!vtd_enabled)
+            break;
+
+        ret = -EINVAL;
+        if ( unlikely((d = get_domain_by_id(domctl->domain)) == NULL) ) {
+            gdprintk(XENLOG_ERR,
+                "XEN_DOMCTL_assign_device: get_domain_by_id() failed\n"); 
+            break;
+        }
+        hd = domain_hvm_iommu(d);
+        bus = (domctl->u.assign_device.machine_bdf >> 16) & 0xff;
+        devfn = (domctl->u.assign_device.machine_bdf >> 8) & 0xff;
+        ret = assign_device(d, bus, devfn);
+        gdprintk(XENLOG_ERR, "XEN_DOMCTL_assign_device: bdf = %x:%x:%x\n",
+            bus, PCI_SLOT(devfn), PCI_FUNC(devfn));
+        put_domain(d);
+    }
+    break;
+
+    case XEN_DOMCTL_bind_pt_irq:
+    {
+        struct domain * d;
+        xen_domctl_bind_pt_irq_t * bind;
+
+        ret = -ESRCH;
+        if ( (d = rcu_lock_domain_by_id(domctl->domain)) == NULL )
+            break;
+        bind = &(domctl->u.bind_pt_irq);
+        if (vtd_enabled)
+            ret = pt_irq_create_bind_vtd(d, bind);
+        if (ret < 0)
+            gdprintk(XENLOG_ERR, "pt_irq_create_bind failed!\n");
+        rcu_unlock_domain(d);
+    }
+    break;    
+
+    case XEN_DOMCTL_memory_mapping:
+    {
+        struct domain *d;
+        unsigned long gfn = domctl->u.memory_mapping.first_gfn;
+        unsigned long mfn = domctl->u.memory_mapping.first_mfn;
+        unsigned long nr_mfns = domctl->u.memory_mapping.nr_mfns;
+        int i;
+
+        ret = -EINVAL;
+        if ( (mfn + nr_mfns - 1) < mfn ) /* wrap? */
+            break;
+
+        ret = -ESRCH;
+        if ( unlikely((d = rcu_lock_domain_by_id(domctl->domain)) == NULL) )
+            break;
+
+        ret=0;        
+        if ( domctl->u.memory_mapping.add_mapping ) 
+        {
+            gdprintk(XENLOG_INFO,
+                "memory_map:add: gfn=%lx mfn=%lx nr_mfns=%lx\n",
+                gfn, mfn, nr_mfns);   
+            
+            ret = iomem_permit_access(d, mfn, mfn + nr_mfns - 1);
+            for ( i = 0; i < nr_mfns; i++ )
+                set_mmio_p2m_entry(d, gfn+i, _mfn(mfn+i)); 
+        }
+        else 
+        {
+            gdprintk(XENLOG_INFO,
+                "memory_map:remove: gfn=%lx mfn=%lx nr_mfns=%lx\n",
+                 gfn, mfn, nr_mfns);
+
+            for ( i = 0; i < nr_mfns; i++ )
+                clear_mmio_p2m_entry(d, gfn+i); 
+            ret = iomem_deny_access(d, mfn, mfn + nr_mfns - 1);
+        }
+
+        rcu_unlock_domain(d);
+    }
+    break;
+
+    case XEN_DOMCTL_ioport_mapping:
+    {
+#define MAX_IOPORTS    0x10000
+        struct domain *d;
+        struct hvm_iommu *hd;
+        unsigned int fgp = domctl->u.ioport_mapping.first_gport;
+        unsigned int fmp = domctl->u.ioport_mapping.first_mport;
+        unsigned int np = domctl->u.ioport_mapping.nr_ports;
+        struct g2m_ioport *g2m_ioport;
+        int found = 0;
+
+        ret = -EINVAL;
+        if ( (np == 0) || (fgp > MAX_IOPORTS) || (fmp > MAX_IOPORTS) ||
+            ((fgp + np) > MAX_IOPORTS) || ((fmp + np) > MAX_IOPORTS) )
+        {
+            gdprintk(XENLOG_ERR,
+                "ioport_map:invalid:gport=%x mport=%x nr_ports=%x\n",
+                fgp, fmp, np);
+            break;
+        }
+
+        ret = -ESRCH;
+        if ( unlikely((d = rcu_lock_domain_by_id(domctl->domain)) == NULL) )
+            break;
+
+        hd = domain_hvm_iommu(d);
+        if ( domctl->u.ioport_mapping.add_mapping )
+        {
+            gdprintk(XENLOG_INFO,
+                "ioport_map:add f_gport=%x f_mport=%x np=%x\n",
+                fgp, fmp, np);
+                
+            list_for_each_entry(g2m_ioport, &hd->g2m_ioport_list, list)
+                if (g2m_ioport->mport == fmp ) {
+                    g2m_ioport->gport = fgp;
+                    g2m_ioport->np = np;                    
+                    found = 1;
+                    break;
+                }
+            if ( !found ) 
+            {                 
+                g2m_ioport = xmalloc(struct g2m_ioport);
+                g2m_ioport->gport = fgp;
+                g2m_ioport->mport = fmp;
+                g2m_ioport->np = np;
+                list_add_tail(&g2m_ioport->list, &hd->g2m_ioport_list);
+            } 
+            ret = ioports_permit_access(d, fmp, fmp + np - 1);
+            
+        }
+        else {
+            gdprintk(XENLOG_INFO,
+                "ioport_map:remove f_gport=%x f_mport=%x np=%x\n",
+                fgp, fmp, np);
+            list_for_each_entry(g2m_ioport, &hd->g2m_ioport_list, list)
+                if ( g2m_ioport->mport == fmp ) {
+                    list_del(&g2m_ioport->list);
+                    break;
+                }
+            ret = ioports_deny_access(d, fmp, fmp + np - 1);
+        }
+        rcu_unlock_domain(d);
+    }
+    break;    
+
     default:
         ret = -ENOSYS;
         break;
@@ -555,18 +706,21 @@ void arch_get_info_guest(struct vcpu *v, vcpu_guest_context_u c)
     if ( is_hvm_vcpu(v) )
     {
         if ( !is_pv_32on64_domain(v->domain) )
-            hvm_store_cpu_guest_regs(v, &c.nat->user_regs, c.nat->ctrlreg);
+        {
+            memset(c.nat->ctrlreg, 0, sizeof(c.nat->ctrlreg));
+            c.nat->ctrlreg[0] = v->arch.hvm_vcpu.guest_cr[0];
+            c.nat->ctrlreg[2] = v->arch.hvm_vcpu.guest_cr[2];
+            c.nat->ctrlreg[3] = v->arch.hvm_vcpu.guest_cr[3];
+            c.nat->ctrlreg[4] = v->arch.hvm_vcpu.guest_cr[4];
+        }
 #ifdef CONFIG_COMPAT
         else
         {
-            struct cpu_user_regs user_regs;
-            typeof(c.nat->ctrlreg) ctrlreg;
-            unsigned i;
-
-            hvm_store_cpu_guest_regs(v, &user_regs, ctrlreg);
-            XLAT_cpu_user_regs(&c.cmp->user_regs, &user_regs);
-            for ( i = 0; i < ARRAY_SIZE(c.cmp->ctrlreg); ++i )
-                c.cmp->ctrlreg[i] = ctrlreg[i];
+            memset(c.cmp->ctrlreg, 0, sizeof(c.cmp->ctrlreg));
+            c.cmp->ctrlreg[0] = v->arch.hvm_vcpu.guest_cr[0];
+            c.cmp->ctrlreg[2] = v->arch.hvm_vcpu.guest_cr[2];
+            c.cmp->ctrlreg[3] = v->arch.hvm_vcpu.guest_cr[3];
+            c.cmp->ctrlreg[4] = v->arch.hvm_vcpu.guest_cr[4];
         }
 #endif
     }

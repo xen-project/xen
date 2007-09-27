@@ -1017,7 +1017,7 @@ DLOG(if (stderr == NULL) {
 
     i = strrchr(dirname, ':') - dirname;
     assert(i >= 3);
-    if (dirname[i-2] == ':' && isalpha(dirname[i-1]))
+    if (dirname[i-2] == ':' && isalpha((uint8_t)dirname[i-1]))
 	/* workaround for DOS drive names */
 	dirname += i-1;
     else

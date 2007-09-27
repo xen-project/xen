@@ -1683,7 +1683,7 @@ to:
     section remains to detail a configuration that was used by older Xen
     versions.}}
 
-Raw image file-backed VBDs amy also be attached to VMs using the 
+Raw image file-backed VBDs may also be attached to VMs using the 
 Linux loopback driver.  The only required change to the raw file 
 instructions above are to specify the configuration entry as:
 \begin{quote}
@@ -1694,7 +1694,7 @@ instructions above are to specify the configuration entry as:
   I/O-intensive domains.}  This approach is known to experience
 substantial slowdowns under heavy I/O workloads, due to the I/O
 handling by the loopback block device used to support file-backed VBDs
-in dom0.  Loopbach support remains for old Xen installations, and users
+in dom0.  Loopback support remains for old Xen installations, and users
 are strongly encouraged to use the blktap-based file support (using 
 ``{\tt{tap:aio}}'' as described above).
 
@@ -4203,7 +4203,7 @@ on the vnet UDP port:
 # tcpdump udp port 1798
 \end{verbatim}
 
-If multicast is not being forwaded between machines you can configure
+If multicast is not being forwarded between machines you can configure
 multicast forwarding using vn. Suppose we have machines hostA on 10.10.0.100
 and hostB on 10.11.0.100 and that multicast is not forwarded between them.
 We use vn to configure each machine to forward to the other:
@@ -4256,7 +4256,7 @@ as it will forward multicasts received from other machines on the subnet.
   VMMs} to provide the illusion of contiguous physical memory, in
   Xen this is used during {\bf live migration}.
 
-\item[Virtual Block Device] Persistant storage available to a virtual
+\item[Virtual Block Device] Persistent storage available to a virtual
   machine, providing the abstraction of an actual block storage device.
   {\bf VBD}s may be actual block devices, filesystem images, or
   remote/network storage.

@@ -6,6 +6,9 @@
 
 #include "xc_private.h"
 
+#include <xen/foreign/x86_32.h>
+#include <xen/foreign/x86_64.h>
+
 /*
 ** We process save/restore/migrate in batches of pages; the below
 ** determines how many pages we (at maximum) deal with in each batch.
@@ -32,15 +35,19 @@
 **      be a property of the domain, but for the moment we just read it
 **      from the hypervisor.
 **
+**    - The width of a guest word (unsigned long), in bytes.
+**
 ** Returns 1 on success, 0 on failure.
 */
 static inline int get_platform_info(int xc_handle, uint32_t dom,
                                     /* OUT */ unsigned long *max_mfn,
                                     /* OUT */ unsigned long *hvirt_start,
-                                    /* OUT */ unsigned int *pt_levels)
+                                    /* OUT */ unsigned int *pt_levels,
+                                    /* OUT */ unsigned int *guest_width)
 {
     xen_capabilities_info_t xen_caps = "";
     xen_platform_parameters_t xen_params;
+    DECLARE_DOMCTL;
 
     if (xc_version(xc_handle, XENVER_platform_parameters, &xen_params) != 0)
         return 0;
@@ -52,17 +59,18 @@ static inline int get_platform_info(int xc_handle, uint32_t dom,
 
     *hvirt_start = xen_params.virt_start;
 
-    /*
-     * XXX For now, 32bit dom0's can only save/restore 32bit domUs
-     * on 64bit hypervisors, so no need to check which type of domain
-     * we're dealing with.
-     */
+    memset(&domctl, 0, sizeof(domctl));
+    domctl.domain = dom;
+    domctl.cmd = XEN_DOMCTL_get_address_size;
+
+    if ( do_domctl(xc_handle, &domctl) != 0 )
+        return 0; 
+
+    *guest_width = domctl.u.address_size.size / 8;
+
     if (strstr(xen_caps, "xen-3.0-x86_64"))
-#if defined(__i386__)
-        *pt_levels = 3;
-#else
-        *pt_levels = 4;
-#endif
+        /* Depends on whether it's a compat 32-on-64 guest */
+        *pt_levels = ( (*guest_width == 8) ? 4 : 3 );
     else if (strstr(xen_caps, "xen-3.0-x86_32p"))
         *pt_levels = 3;
     else if (strstr(xen_caps, "xen-3.0-x86_32"))
@@ -95,3 +103,56 @@ static inline int get_platform_info(int xc_handle, uint32_t dom,
 
 /* Returns TRUE if the PFN is currently mapped */
 #define is_mapped(pfn_type) (!((pfn_type) & 0x80000000UL))
+
+
+/* 32-on-64 support: saving 32bit guests from 64bit tools and vice versa */
+typedef union 
+{
+    vcpu_guest_context_x86_64_t x64;
+    vcpu_guest_context_x86_32_t x32;   
+    vcpu_guest_context_t c;
+} vcpu_guest_context_either_t;
+
+typedef union 
+{
+    shared_info_x86_64_t x64;
+    shared_info_x86_32_t x32;   
+    shared_info_t s;
+} shared_info_either_t;
+
+typedef union 
+{
+    start_info_x86_64_t x64;
+    start_info_x86_32_t x32;   
+    start_info_t s;
+} start_info_either_t;
+
+#define GET_FIELD(_p, _f) ((guest_width==8) ? ((_p)->x64._f) : ((_p)->x32._f))
+
+#define SET_FIELD(_p, _f, _v) do {              \
+    if (guest_width == 8)                       \
+        (_p)->x64._f = (_v);                    \
+    else                                        \
+        (_p)->x32._f = (_v);                    \
+} while (0)
+
+#define MEMCPY_FIELD(_d, _s, _f) do {                              \
+    if (guest_width == 8)                                          \
+        memcpy(&(_d)->x64._f, &(_s)->x64._f,sizeof((_d)->x64._f)); \
+    else                                                           \
+        memcpy(&(_d)->x32._f, &(_s)->x32._f,sizeof((_d)->x32._f)); \
+} while (0)
+
+#define MEMSET_ARRAY_FIELD(_p, _f, _v) do {                        \
+    if (guest_width == 8)                                          \
+        memset(&(_p)->x64._f[0], (_v), sizeof((_p)->x64._f));      \
+    else                                                           \
+        memset(&(_p)->x32._f[0], (_v), sizeof((_p)->x32._f));      \
+} while (0)
+
+#ifndef MAX
+#define MAX(_a, _b) ((_a) >= (_b) ? (_a) : (_b))
+#endif
+#ifndef MIN
+#define MIN(_a, _b) ((_a) <= (_b) ? (_a) : (_b))
+#endif

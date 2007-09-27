@@ -31,6 +31,7 @@ SHLIB_LINKS=src/libxenstat.so.$(MAJOR) src/libxenstat.so
 OBJECTS-y=src/xenstat.o
 OBJECTS-$(CONFIG_Linux) += src/xenstat_linux.o
 OBJECTS-$(CONFIG_SunOS) += src/xenstat_solaris.o
+OBJECTS-$(CONFIG_NetBSD) += src/xenstat_netbsd.o
 SONAME_FLAGS=-Wl,$(SONAME_LDFLAG) -Wl,libxenstat.so.$(MAJOR)
 
 WARN_FLAGS=-Wall -Werror

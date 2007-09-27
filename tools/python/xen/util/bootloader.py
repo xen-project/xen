@@ -21,7 +21,10 @@ import os, stat
 import tempfile
 import shutil
 import threading
+
 from xen.xend.XendLogging import log
+from xen.util import mkdir
+import xen.util.xsm.xsm as security
 
 __bootloader = None
 
@@ -70,8 +73,9 @@ def set_boot_policy(title_idx, filename):
 
 def loads_default_policy(filename):
     """ Determine whether the given policy is loaded by the default boot title """
-    polfile = get_default_policy()
-    if polfile != None:
+    policy = get_default_policy()
+    if policy:
+        polfile = policy + ".bin"
         if     polfile == filename or \
            "/"+polfile == filename:
             return True
@@ -220,28 +224,6 @@ class Grub(Bootloader):
         return boot_file
 
 
-    def __get_titles(self):
-        """ Get the names of all boot titles in the grub config file
-          @rtype: list
-          @return: list of names of available boot titles
-        """
-        titles = []
-        try:
-            boot_file = self.__get_bootfile()
-        except:
-            return []
-        try:
-            self.__bootfile_lock.acquire()
-            grub_fd = open(boot_file)
-            for line in grub_fd:
-                if self.title_re.match(line):
-                    line = line.rstrip().lstrip()
-                    titles.append(line.lstrip('title').lstrip())
-        finally:
-            self.__bootfile_lock.release()
-        return titles
-
-
     def get_default_title(self):
         """ Get the index (starting with 0) of the default boot title
             This number is read from the grub configuration file.
@@ -261,8 +243,8 @@ class Grub(Bootloader):
             for line in grub_fd:
                 line = line.rstrip()
                 if def_re.match(line):
-                    line = line.rstrip()
-                    line = line.lstrip("default=")
+                    #remove 'default='
+                    line = line.lstrip()[8:]
                     default = int(line)
                     break
         finally:
@@ -295,11 +277,13 @@ class Grub(Bootloader):
                     if self.policy_re.match(line):
                         start = line.find("module")
                         pol = line[start+6:]
-                        pol = pol.lstrip().rstrip()
+                        pol = pol.strip()
                         if pol[0] == '/':
                             pol = pol[1:]
                         if pol[0:5] == "boot/":
                             pol = pol[5:]
+                        if pol.endswith(".bin"):
+                            pol = pol[:-4]
                         policies[idx] = pol
         finally:
             self.__bootfile_lock.release()
@@ -399,7 +383,7 @@ class Grub(Bootloader):
                     if self.policy_re.match(line):
                         start = line.find("module")
                         pol = line[start+6:len(line)]
-                        pol = pol.lstrip().rstrip()
+                        pol = pol.strip()
                         if pol in namelist:
                             omit_line = True
                             found = True
@@ -499,7 +483,7 @@ class Grub(Bootloader):
                         within_title = 0
                     ctr = ctr + 1
                 if within_title and self.kernel_re.match(line):
-                    line = line.rstrip().lstrip()
+                    line = line.strip()
                     items = line.split(" ")
                     i = 0
                     while i < len(items):
@@ -513,9 +497,123 @@ class Grub(Bootloader):
             self.__bootfile_lock.release()
         return None # Not found
 
+class LatePolicyLoader(Bootloader):
+    """ A fake bootloader file that holds the policy to load automatically
+        once xend has started up and the Domain-0 label to set. """
+    def __init__(self):
+        self.__bootfile_lock = threading.RLock()
+        self.PATH = security.security_dir_prefix
+        self.FILENAME = self.PATH + "/xen_boot_policy"
+        self.DEFAULT_TITLE = "ANY"
+        self.POLICY_ATTR = "POLICY"
+        Bootloader.__init__(self)
+
+    def probe(self):
+        _dir=os.path.dirname(self.FILENAME)
+        mkdir.parents(_dir, stat.S_IRWXU)
+        return True
+
+    def get_default_title(self):
+        return self.DEFAULT_TITLE
+
+    def get_boot_policies(self):
+        policies = {}
+        try:
+            self.__bootfile_lock.acquire()
+
+            res = self.__loadcontent()
+
+            pol = res.get( self.POLICY_ATTR )
+            if pol:
+                policies.update({ self.DEFAULT_TITLE : pol })
+
+        finally:
+            self.__bootfile_lock.release()
+
+        return policies
+
+    def add_boot_policy(self, index, binpolname):
+        try:
+            self.__bootfile_lock.acquire()
+
+            res = self.__loadcontent()
+            if binpolname.endswith(".bin"):
+                binpolname = binpolname[0:-4]
+            res[ self.POLICY_ATTR ] = binpolname
+            self.__writecontent(res)
+        finally:
+            self.__bootfile_lock.release()
+
+        return True
+
+    def rm_policy_from_boottitle(self, index, unamelist):
+        try:
+            self.__bootfile_lock.acquire()
+
+            res = self.__loadcontent()
+            if self.POLICY_ATTR in res:
+                del(res[self.POLICY_ATTR])
+            self.__writecontent(res)
+        finally:
+            self.__bootfile_lock.release()
+
+        return True
+
+    def set_kernel_attval(self, index, att, val):
+        try:
+            self.__bootfile_lock.acquire()
+
+            res = self.__loadcontent()
+            res[att] = val
+            self.__writecontent(res)
+        finally:
+            self.__bootfile_lock.release()
+
+        return True
+
+    def get_kernel_val(self, index, att):
+        try:
+            self.__bootfile_lock.acquire()
+
+            res = self.__loadcontent()
+            return res.get(att)
+        finally:
+            self.__bootfile_lock.release()
+
+    def __loadcontent(self):
+        res={}
+        try:
+            file = open(self.FILENAME)
+            for line in file:
+                tmp = line.split("=",1)
+                if len(tmp) == 2:
+                   res[tmp[0]] = tmp[1].strip()
+            file.close()
+        except:
+            pass
+
+        return res
+
+    def __writecontent(self, items):
+        rc = True
+        try:
+            file = open(self.FILENAME,"w")
+            if file:
+                for key, value in items.items():
+                    file.write("%s=%s\n" % (str(key),str(value)))
+                file.close()
+        except:
+            rc = False
+
+        return rc
+
 
 __bootloader = Bootloader()
 
 grub = Grub()
 if grub.probe() == True:
     __bootloader = grub
+else:
+    late = LatePolicyLoader()
+    if late.probe() == True:
+        __bootloader = late

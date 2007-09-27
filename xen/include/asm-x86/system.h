@@ -14,6 +14,9 @@
 #define wbinvd() \
 	__asm__ __volatile__ ("wbinvd": : :"memory");
 
+#define clflush(a) \
+	__asm__ __volatile__ ("clflush (%0)": :"r"(a));
+
 #define nop() __asm__ __volatile__ ("nop")
 
 #define xchg(ptr,v) ((__typeof__(*(ptr)))__xchg((unsigned long)(v),(ptr),sizeof(*(ptr))))

@@ -547,10 +547,31 @@ diff -uprN orig/tpm_emulator-0.4/README tpm_emulator/README
  Installation
  --------------------------------------------------------------------------
  The compilation and installation process uses the build environment for 
+diff -uprN orig/tpm_emulator-0.4/tpm/tpm_cmd_handler.c tpm_emulator/tpm/tpm_cmd_handler.c
+--- orig/tpm_emulator-0.4/tpm/tpm_cmd_handler.c	2006-06-23 19:37:07.000000000 +0900
++++ tpm_emulator/tpm/tpm_cmd_handler.c	2007-09-12 20:23:00.000000000 +0900
+@@ -565,7 +565,7 @@ static TPM_RESULT execute_TPM_Seal(TPM_R
+   if (tpm_unmarshal_TPM_KEY_HANDLE(&ptr, &len, &keyHandle)
+       || tpm_unmarshal_TPM_ENCAUTH(&ptr, &len, &encAuth)
+       || tpm_unmarshal_UINT32(&ptr, &len, &pcrInfoSize)
+-      || tpm_unmarshal_TPM_PCR_INFO(&ptr, &len, &pcrInfo)
++      || (pcrInfoSize >0 && tpm_unmarshal_TPM_PCR_INFO(&ptr, &len, &pcrInfo))
+       || tpm_unmarshal_UINT32(&ptr, &len, &inDataSize)
+       || tpm_unmarshal_BLOB(&ptr, &len, &inData, inDataSize)
+       || len != 0) return TPM_BAD_PARAMETER;
+@@ -798,7 +798,7 @@ static TPM_RESULT execute_TPM_Sealx(TPM_
+   if (tpm_unmarshal_TPM_KEY_HANDLE(&ptr, &len, &keyHandle)
+       || tpm_unmarshal_TPM_ENCAUTH(&ptr, &len, &encAuth)
+       || tpm_unmarshal_UINT32(&ptr, &len, &pcrInfoSize)
+-      || tpm_unmarshal_TPM_PCR_INFO(&ptr, &len, &pcrInfo)
++      || (pcrInfoSize > 0 && tpm_unmarshal_TPM_PCR_INFO(&ptr, &len, &pcrInfo))
+       || tpm_unmarshal_UINT32(&ptr, &len, &inDataSize)
+       || tpm_unmarshal_BLOB(&ptr, &len, &inData, inDataSize)
+       || len != 0) return TPM_BAD_PARAMETER;
 diff -uprN orig/tpm_emulator-0.4/tpm/tpm_credentials.c tpm_emulator/tpm/tpm_credentials.c
---- orig/tpm_emulator-0.4/tpm/tpm_credentials.c	2006-06-23 03:37:07.000000000 -0700
-+++ tpm_emulator/tpm/tpm_credentials.c	2006-07-24 14:35:35.000000000 -0700
-@@ -47,16 +47,16 @@ int tpm_compute_pubkey_checksum(TPM_NONC
+--- orig/tpm_emulator-0.4/tpm/tpm_credentials.c	2006-06-23 19:37:07.000000000 +0900
++++ tpm_emulator/tpm/tpm_credentials.c	2007-09-12 20:23:30.000000000 +0900
+@@ -47,20 +47,20 @@ int tpm_compute_pubkey_checksum(TPM_NONC
  
  TPM_RESULT tpm_get_pubek(TPM_PUBKEY *pubEndorsementKey)
  {
@@ -572,6 +593,11 @@ diff -uprN orig/tpm_emulator-0.4/tpm/tpm_credentials.c tpm_emulator/tpm/tpm_cred
    pubEndorsementKey->algorithmParms.algorithmID = TPM_ALG_RSA;
    pubEndorsementKey->algorithmParms.encScheme = TPM_ES_RSAESOAEP_SHA1_MGF1;
    pubEndorsementKey->algorithmParms.sigScheme = TPM_SS_NONE;
+-  pubEndorsementKey->algorithmParms.parms.rsa.keyLength = key_length;
++  pubEndorsementKey->algorithmParms.parms.rsa.keyLength = key_length << 3;
+   pubEndorsementKey->algorithmParms.parms.rsa.numPrimes = 2;
+   pubEndorsementKey->algorithmParms.parms.rsa.exponentSize = 0;
+   pubEndorsementKey->algorithmParms.parms.rsa.exponent = NULL;
 @@ -175,6 +175,7 @@ TPM_RESULT TPM_OwnerReadInternalPub(TPM_
  {
    TPM_RESULT res;

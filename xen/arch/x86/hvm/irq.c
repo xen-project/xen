@@ -26,7 +26,7 @@
 #include <asm/hvm/domain.h>
 #include <asm/hvm/support.h>
 
-static void __hvm_pci_intx_assert(
+void __hvm_pci_intx_assert(
     struct domain *d, unsigned int device, unsigned int intx)
 {
     struct hvm_irq *hvm_irq = &d->arch.hvm_domain.irq;
@@ -59,7 +59,7 @@ void hvm_pci_intx_assert(
     spin_unlock(&d->arch.hvm_domain.irq_lock);
 }
 
-static void __hvm_pci_intx_deassert(
+void __hvm_pci_intx_deassert(
     struct domain *d, unsigned int device, unsigned int intx)
 {
     struct hvm_irq *hvm_irq = &d->arch.hvm_domain.irq;
@@ -306,14 +306,7 @@ int hvm_vcpu_ack_pending_irq(struct vcpu *v, enum hvm_intack type, int *vector)
     switch ( type )
     {
     case hvm_intack_nmi:
-#if 0
         return test_and_clear_bool(v->nmi_pending);
-#else
-        if ( test_and_clear_bool(v->nmi_pending) )
-            gdprintk(XENLOG_WARNING, "Dropping NMI delivery to %d:%d\n",
-                     v->domain->domain_id, v->vcpu_id);
-        break;
-#endif
     case hvm_intack_lapic:
         return ((*vector = cpu_get_apic_interrupt(v)) != -1);
     case hvm_intack_pic:

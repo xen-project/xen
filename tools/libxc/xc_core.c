@@ -58,6 +58,9 @@
 /* number of pages to write at a time */
 #define DUMP_INCREMENT (4 * 1024)
 
+/* Don't yet support cross-address-size core dump */
+#define guest_width (sizeof (unsigned long))
+
 /* string table */
 struct xc_core_strtab {
     char       *strings;

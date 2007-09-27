@@ -260,31 +260,44 @@ uint8_t acpi_validate_entry(struct acpi_header *hdr)
 }
 
 
+/*
+ * Search for the RSDP ACPI table in the memory starting at addr and
+ * ending at addr + len - 1.
+ */
+static struct acpi_20_rsdp *find_rsdp(const void *start, unsigned int len)
+{
+	char *rsdp = (char *)start;
+	char *end = rsdp + len;
+	/* scan memory in steps of 16 bytes */
+	while (rsdp < end) {
+		/* check for expected string */
+		if (!strncmp( rsdp, "RSD PTR ", 8))
+			return (struct acpi_20_rsdp *)rsdp;
+		rsdp += 0x10;
+	}
+	return 0;
+}
+
 void tcpa_acpi_init(void)
 {
 	struct acpi_20_rsdt *rsdt;
-	uint32_t length;
 	struct acpi_20_tcpa *tcpa = (void *)0;
-	uint16_t found = 0;
-	uint16_t rsdp_off;
+	struct acpi_20_rsdp *rsdp;
+	uint32_t length;
 	uint16_t off;
-	struct acpi_20_rsdp *rsdp = (void *)0;
+	int found = 0;
+	uint16_t ebda_seg;
 
 	if (MA_IsTPMPresent() == 0) {
 		return;
 	}
 
-	/* scan memory in steps of  16 bytes in the ACPI_SEGMENT segment */
-	found = 0;
-	for (rsdp_off = 0; rsdp_off < 0xfff0; rsdp_off += 0x10) {
-		char *_rsdp = (char *)(ACPI_SEGMENT << 4);
-		/* check for expected string */
-		if (!strncmp( &_rsdp[rsdp_off], "RSD PTR ", 8)) {
-			found = 1;
-			rsdp = (struct acpi_20_rsdp *)&_rsdp[rsdp_off];
-			break;
-		}
-	}
+	/* RSDP in EBDA? */
+	ebda_seg = *(uint16_t *)ADDR_FROM_SEG_OFF(0x40, 0xe);
+	rsdp = find_rsdp((void *)(ebda_seg << 16), 1024);
+
+	if (!rsdp)
+		rsdp = find_rsdp((void *)(ACPI_SEGMENT << 4), 0x20000);
 
 	if (rsdp) {
 		uint32_t ctr = 0;

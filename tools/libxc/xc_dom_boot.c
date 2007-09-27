@@ -152,6 +152,7 @@ void *xc_dom_boot_domU_map(struct xc_dom_image *dom, xen_pfn_t pfn,
     privcmd_mmap_entry_t *entries;
     void *ptr;
     int i, rc;
+    int err;
 
     entries = xc_dom_malloc(dom, count * sizeof(privcmd_mmap_entry_t));
     if ( entries == NULL )
@@ -166,9 +167,11 @@ void *xc_dom_boot_domU_map(struct xc_dom_image *dom, xen_pfn_t pfn,
                MAP_SHARED, dom->guest_xc, 0);
     if ( ptr == MAP_FAILED )
     {
+        err = errno;
         xc_dom_panic(XC_INTERNAL_ERROR,
                      "%s: failed to mmap domU pages 0x%" PRIpfn "+0x%" PRIpfn
-                     " [mmap]\n", __FUNCTION__, pfn, count);
+                     " [mmap, errno=%i (%s)]\n", __FUNCTION__, pfn, count,
+                     err, strerror(err));
         return NULL;
     }
 

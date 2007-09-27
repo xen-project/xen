@@ -164,6 +164,16 @@ struct xenpf_enter_acpi_sleep {
 typedef struct xenpf_enter_acpi_sleep xenpf_enter_acpi_sleep_t;
 DEFINE_XEN_GUEST_HANDLE(xenpf_enter_acpi_sleep_t);
 
+#define XENPF_change_freq       52
+struct xenpf_change_freq {
+    /* IN variables */
+    uint32_t flags; /* Must be zero. */
+    uint32_t cpu;   /* Physical cpu. */
+    uint64_t freq;  /* New frequency (Hz). */
+};
+typedef struct xenpf_change_freq xenpf_change_freq_t;
+DEFINE_XEN_GUEST_HANDLE(xenpf_change_freq_t);
+
 struct xen_platform_op {
     uint32_t cmd;
     uint32_t interface_version; /* XENPF_INTERFACE_VERSION */
@@ -176,6 +186,7 @@ struct xen_platform_op {
         struct xenpf_platform_quirk    platform_quirk;
         struct xenpf_firmware_info     firmware_info;
         struct xenpf_enter_acpi_sleep  enter_acpi_sleep;
+        struct xenpf_change_freq       change_freq;
         uint8_t                        pad[128];
     } u;
 };

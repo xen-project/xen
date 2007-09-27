@@ -34,7 +34,7 @@
 #include <sys/select.h>
 #include <err.h>
 #include <errno.h>
-#include <pty.h>
+#include <string.h>
 
 #include "xs.h"
 
@@ -113,9 +113,8 @@ static void init_term(int fd, struct termios *old)
 {
 	struct termios new_term;
 
-	if (tcgetattr(fd, old) == -1) {
+	if (tcgetattr(fd, old) == -1)
 		return;
-	}
 
 	new_term = *old;
 	cfmakeraw(&new_term);
@@ -289,6 +288,7 @@ int main(int argc, char **argv)
 		err(errno, "Could not read tty from store");
 	}
 
+	init_term(spty, &attr);
 	init_term(STDIN_FILENO, &attr);
 	console_loop(spty, xs, path);
 	restore_term(STDIN_FILENO, &attr);

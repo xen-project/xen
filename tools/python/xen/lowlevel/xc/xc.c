@@ -346,6 +346,7 @@ static PyObject *pyxc_domain_getinfo(XcObject *self,
             Py_DECREF(list);
             if ( pyhandle  != NULL ) { Py_DECREF(pyhandle);  }
             if ( info_dict != NULL ) { Py_DECREF(info_dict); }
+            free(info);
             return NULL;
         }
         for ( j = 0; j < sizeof(xen_domain_handle_t); j++ )

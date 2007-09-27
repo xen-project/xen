@@ -8,13 +8,8 @@
 #include <xen/foreign/x86_64.h>
 #include <xen/hvm/params.h>
 
-/* Need to provide the right flavour of vcpu context for Xen */
-typedef union
-{
-    vcpu_guest_context_x86_64_t c64;
-    vcpu_guest_context_x86_32_t c32;   
-    vcpu_guest_context_t c;
-} vcpu_guest_context_either_t;
+/* Don't yet support cross-address-size uncooperative resume */
+#define guest_width (sizeof (unsigned long))
 
 static int modify_returncode(int xc_handle, uint32_t domid)
 {
@@ -50,9 +45,9 @@ static int modify_returncode(int xc_handle, uint32_t domid)
     if ( !info.hvm )
         ctxt.c.user_regs.eax = 1;
     else if ( strstr(caps, "x86_64") )
-        ctxt.c64.user_regs.eax = 1;
+        ctxt.x64.user_regs.eax = 1;
     else
-        ctxt.c32.user_regs.eax = 1;
+        ctxt.x32.user_regs.eax = 1;
 
     if ( (rc = xc_vcpu_setcontext(xc_handle, domid, 0, &ctxt.c)) != 0 )
         return rc;

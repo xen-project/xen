@@ -432,7 +432,69 @@ struct xen_domctl_sendtrigger {
 typedef struct xen_domctl_sendtrigger xen_domctl_sendtrigger_t;
 DEFINE_XEN_GUEST_HANDLE(xen_domctl_sendtrigger_t);
 
- 
+
+/* Assign PCI device to HVM guest. Sets up IOMMU structures. */
+#define XEN_DOMCTL_assign_device     37
+#define DPCI_ADD_MAPPING         1
+#define DPCI_REMOVE_MAPPING      0 
+struct xen_domctl_assign_device {
+    uint32_t  machine_bdf;   /* machine PCI ID of assigned device */
+};
+typedef struct xen_domctl_assign_device xen_domctl_assign_device_t;
+DEFINE_XEN_GUEST_HANDLE(xen_domctl_assign_device_t);
+
+
+/* Pass-through interrupts: bind real irq -> hvm devfn. */
+#define XEN_DOMCTL_bind_pt_irq       38
+typedef enum pt_irq_type_e {
+    PT_IRQ_TYPE_PCI,
+    PT_IRQ_TYPE_ISA
+} pt_irq_type_t;
+struct xen_domctl_bind_pt_irq {
+    uint32_t machine_irq;
+    pt_irq_type_t irq_type;
+    uint32_t hvm_domid;
+
+    union {
+        struct {
+            uint8_t isa_irq;
+        } isa;
+        struct {
+            uint8_t bus;
+            uint8_t device;
+            uint8_t intx;
+        } pci;
+    } u;
+};
+typedef struct xen_domctl_bind_pt_irq xen_domctl_bind_pt_irq_t;
+DEFINE_XEN_GUEST_HANDLE(xen_domctl_bind_pt_irq_t);
+
+
+/* Bind machine I/O address range -> HVM address range. */
+#define XEN_DOMCTL_memory_mapping    39
+struct xen_domctl_memory_mapping {
+    uint64_t first_gfn;       /* first page (hvm guest phys page) in range */
+    uint64_t first_mfn;       /* first page (machine page) in range */
+    uint64_t nr_mfns;         /* number of pages in range (>0) */
+    uint32_t add_mapping;     /* add or remove mapping */
+    uint32_t padding;         /* padding for 64-bit aligned structure */
+};
+typedef struct xen_domctl_memory_mapping xen_domctl_memory_mapping_t;
+DEFINE_XEN_GUEST_HANDLE(xen_domctl_memory_mapping_t);
+
+
+/* Bind machine I/O port range -> HVM I/O port range. */
+#define XEN_DOMCTL_ioport_mapping    40
+struct xen_domctl_ioport_mapping {
+    uint32_t first_gport;     /* first guest IO port*/
+    uint32_t first_mport;     /* first machine IO port */
+    uint32_t nr_ports;        /* size of port range */
+    uint32_t add_mapping;     /* add or remove mapping */
+};
+typedef struct xen_domctl_ioport_mapping xen_domctl_ioport_mapping_t;
+DEFINE_XEN_GUEST_HANDLE(xen_domctl_ioport_mapping_t);
+
+
 struct xen_domctl {
     uint32_t cmd;
     uint32_t interface_version; /* XEN_DOMCTL_INTERFACE_VERSION */
@@ -462,6 +524,10 @@ struct xen_domctl {
         struct xen_domctl_hvmcontext        hvmcontext;
         struct xen_domctl_address_size      address_size;
         struct xen_domctl_sendtrigger       sendtrigger;
+        struct xen_domctl_assign_device     assign_device;
+        struct xen_domctl_bind_pt_irq       bind_pt_irq;
+        struct xen_domctl_memory_mapping    memory_mapping;
+        struct xen_domctl_ioport_mapping    ioport_mapping;
         uint8_t                             pad[128];
     } u;
 };

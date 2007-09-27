@@ -168,8 +168,8 @@ void cpu_set_log_filename(const char *filename)
 #else
     setvbuf(logfile, NULL, _IOLBF, 0);
 #endif
-    stdout = logfile;
-    stderr = logfile;
+    dup2(fileno(logfile), 1);
+    dup2(fileno(logfile), 2);
 }
 
 /* mask must never be zero, except for A20 change call */

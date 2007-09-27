@@ -41,11 +41,28 @@ void show_registers(struct cpu_user_regs *regs)
     struct cpu_user_regs fault_regs = *regs;
     unsigned long fault_crs[8];
     const char *context;
+    struct vcpu *v = current;
 
-    if ( is_hvm_vcpu(current) && guest_mode(regs) )
+    if ( is_hvm_vcpu(v) && guest_mode(regs) )
     {
+        struct segment_register sreg;
         context = "hvm";
-        hvm_store_cpu_guest_regs(current, &fault_regs, fault_crs);
+        fault_crs[0] = v->arch.hvm_vcpu.guest_cr[0];
+        fault_crs[2] = v->arch.hvm_vcpu.guest_cr[2];
+        fault_crs[3] = v->arch.hvm_vcpu.guest_cr[3];
+        fault_crs[4] = v->arch.hvm_vcpu.guest_cr[4];
+        hvm_get_segment_register(v, x86_seg_cs, &sreg);
+        fault_regs.cs = sreg.sel;
+        hvm_get_segment_register(v, x86_seg_ds, &sreg);
+        fault_regs.ds = sreg.sel;
+        hvm_get_segment_register(v, x86_seg_es, &sreg);
+        fault_regs.es = sreg.sel;
+        hvm_get_segment_register(v, x86_seg_fs, &sreg);
+        fault_regs.fs = sreg.sel;
+        hvm_get_segment_register(v, x86_seg_gs, &sreg);
+        fault_regs.gs = sreg.sel;
+        hvm_get_segment_register(v, x86_seg_ss, &sreg);
+        fault_regs.ss = sreg.sel;
     }
     else
     {
@@ -63,7 +80,7 @@ void show_registers(struct cpu_user_regs *regs)
         else
         {
             context = "guest";
-            fault_crs[2] = current->vcpu_info->arch.cr2;
+            fault_crs[2] = v->vcpu_info->arch.cr2;
         }
 
         fault_crs[0] = read_cr0();

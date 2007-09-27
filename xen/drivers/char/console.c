@@ -592,6 +592,21 @@ void __init console_endboot(void)
     switch_serial_input();
 }
 
+int console_has(const char *device)
+{
+    char *p;
+
+    for ( p = opt_console; p != NULL; p = strchr(p, ',') )
+    {
+        if ( *p == ',' )
+            p++;
+        if ( strncmp(p, device, strlen(device)) == 0 )
+            return 1;
+    }
+
+    return 0;
+}
+
 void console_start_log_everything(void)
 {
     atomic_inc(&print_everything);

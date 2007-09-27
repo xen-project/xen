@@ -23,7 +23,7 @@
  */
 #include "vl.h"
 
-void pstrcpy(char *buf, int buf_size, const char *str)
+void pstrcpy(char *buf, size_t buf_size, const char *str)
 {
     int c;
     char *q = buf;
@@ -41,7 +41,7 @@ void pstrcpy(char *buf, int buf_size, const char *str)
 }
 
 /* strcat and truncate. */
-char *pstrcat(char *buf, int buf_size, const char *s)
+char *pstrcat(char *buf, size_t buf_size, const char *s)
 {
     int len;
     len = strlen(buf);
@@ -72,7 +72,7 @@ int stristart(const char *str, const char *val, const char **ptr)
     p = str;
     q = val;
     while (*q != '\0') {
-        if (toupper(*p) != toupper(*q))
+        if (toupper((uint8_t)*p) != toupper((uint8_t)*q))
             return 0;
         p++;
         q++;

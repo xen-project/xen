@@ -119,7 +119,7 @@ static inline mfn_t gfn_to_mfn_current(unsigned long gfn, p2m_type_t *t)
 
         if ( ret == 0 ) {
             p2mt = p2m_flags_to_type(l1e_get_flags(l1e));
-            ASSERT(l1e_get_pfn(l1e) != INVALID_MFN || !p2m_is_ram(*t));
+            ASSERT(l1e_get_pfn(l1e) != INVALID_MFN || !p2m_is_ram(p2mt));
             if ( p2m_is_valid(p2mt) )
                 mfn = _mfn(l1e_get_pfn(l1e));
             else 
@@ -201,8 +201,15 @@ int p2m_alloc_table(struct domain *d,
 void p2m_teardown(struct domain *d);
 
 /* Add a page to a domain's p2m table */
-void guest_physmap_add_page(struct domain *d, unsigned long gfn,
-                            unsigned long mfn);
+void guest_physmap_add_entry(struct domain *d, unsigned long gfn,
+                             unsigned long mfn, p2m_type_t t);
+
+/* Untyped version for RAM only, for compatibility */
+static inline void guest_physmap_add_page(struct domain *d, unsigned long gfn,
+                                          unsigned long mfn)
+{
+    guest_physmap_add_entry(d, gfn, mfn, p2m_ram_rw);
+}
 
 /* Remove a page from a domain's p2m table */
 void guest_physmap_remove_page(struct domain *d, unsigned long gfn,
@@ -214,6 +221,10 @@ void p2m_change_type_global(struct domain *d, p2m_type_t ot, p2m_type_t nt);
 /* Compare-exchange the type of a single p2m entry */
 p2m_type_t p2m_change_type(struct domain *d, unsigned long gfn,
                            p2m_type_t ot, p2m_type_t nt);
+
+/* Set mmio addresses in the p2m table (for pass-through) */
+int set_mmio_p2m_entry(struct domain *d, unsigned long gfn, mfn_t mfn);
+int clear_mmio_p2m_entry(struct domain *d, unsigned long gfn);
 
 #endif /* _XEN_P2M_H */
 

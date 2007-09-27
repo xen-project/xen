@@ -19,6 +19,7 @@
 #include <xen/numa.h>
 #include <xen/rcupdate.h>
 #include <xen/vga.h>
+#include <xen/dmi.h>
 #include <public/version.h>
 #ifdef CONFIG_COMPAT
 #include <compat/platform.h>
@@ -45,7 +46,6 @@
 #define maddr_to_bootstrap_virt(m) ((void *)(long)(m))
 #endif
 
-extern void dmi_scan_machine(void);
 extern void generic_apic_probe(void);
 extern void numa_initmem_init(unsigned long start_pfn, unsigned long end_pfn);
 
@@ -281,41 +281,6 @@ static void __init move_memory(
 /* A temporary copy of the e820 map that we can mess with during bootstrap. */
 static struct e820map __initdata boot_e820;
 
-/* Reserve area (@s,@e) in the temporary bootstrap e820 map. */
-static int __init reserve_in_boot_e820(unsigned long s, unsigned long e)
-{
-    uint64_t rs, re;
-    int i;
-
-    for ( i = 0; i < boot_e820.nr_map; i++ )
-    {
-        /* Have we found the e820 region that includes the specified range? */
-        rs = boot_e820.map[i].addr;
-        re = rs + boot_e820.map[i].size;
-        if ( (s >= rs) && (e <= re) )
-            goto found;
-    }
-
-    return 0;
-
- found:
-    /* Start fragment. */
-    boot_e820.map[i].size = s - rs;
-
-    /* End fragment. */
-    if ( e < re )
-    {
-        memmove(&boot_e820.map[i+1], &boot_e820.map[i],
-                (boot_e820.nr_map-i) * sizeof(boot_e820.map[0]));
-        boot_e820.nr_map++;
-        i++;
-        boot_e820.map[i].addr = e;
-        boot_e820.map[i].size = re - e;
-    }
-
-    return 1;
-}
-
 struct boot_video_info {
     u8  orig_x;             /* 0x00 */
     u8  orig_y;             /* 0x01 */
@@ -547,7 +512,7 @@ void __init __start_xen(unsigned long mbi_p)
     else if ( mbi->flags & MBI_MEMMAP )
     {
         memmap_type = "Multiboot-e820";
-        while ( bytes < mbi->mmap_length )
+        while ( (bytes < mbi->mmap_length) && (e820_raw_nr < E820MAX) )
         {
             memory_map_t *map = __va(mbi->mmap_addr + bytes);
 
@@ -595,23 +560,6 @@ void __init __start_xen(unsigned long mbi_p)
     else
     {
         EARLY_FAIL("Bootloader provided no memory information.\n");
-    }
-
-    /* Ensure that all E820 RAM regions are page-aligned and -sized. */
-    for ( i = 0; i < e820_raw_nr; i++ )
-    {
-        uint64_t s, e;
-
-        if ( e820_raw[i].type != E820_RAM )
-            continue;
-        s = PFN_UP(e820_raw[i].addr);
-        e = PFN_DOWN(e820_raw[i].addr + e820_raw[i].size);
-        e820_raw[i].size = 0; /* discarded later */
-        if ( s < e )
-        {
-            e820_raw[i].addr = s << PAGE_SHIFT;
-            e820_raw[i].size = (e - s) << PAGE_SHIFT;
-        }
     }
 
     /* Sanitise the raw E820 map to produce a final clean version. */
@@ -760,7 +708,7 @@ void __init __start_xen(unsigned long mbi_p)
 
     if ( !initial_images_start )
         EARLY_FAIL("Not enough memory to relocate the dom0 kernel image.\n");
-    reserve_in_boot_e820(initial_images_start, initial_images_end);
+    reserve_e820_ram(&boot_e820, initial_images_start, initial_images_end);
 
     /*
      * With modules (and Xen itself, on x86/64) relocated out of the way, we
@@ -772,8 +720,8 @@ void __init __start_xen(unsigned long mbi_p)
     if ( !xen_phys_start )
         EARLY_FAIL("Not enough memory to relocate Xen.\n");
     xenheap_phys_end += xen_phys_start;
-    reserve_in_boot_e820(xen_phys_start,
-                         xen_phys_start + (opt_xenheap_megabytes<<20));
+    reserve_e820_ram(&boot_e820, xen_phys_start,
+                     xen_phys_start + (opt_xenheap_megabytes<<20));
     init_boot_pages(1<<20, 16<<20); /* Initial seed: 15MB */
 #else
     init_boot_pages(xenheap_phys_end, 16<<20); /* Initial seed: 4MB */
@@ -786,7 +734,7 @@ void __init __start_xen(unsigned long mbi_p)
 
         kdump_size = (kdump_size + PAGE_SIZE - 1) & PAGE_MASK;
 
-        if ( !reserve_in_boot_e820(kdump_start, kdump_size) )
+        if ( !reserve_e820_ram(&boot_e820, kdump_start, kdump_size) )
         {
             printk("Kdump: DISABLED (failed to reserve %luMB (%lukB) at 0x%lx)"
                    "\n", kdump_size >> 20, kdump_size >> 10, kdump_start);
@@ -1037,6 +985,10 @@ void __init __start_xen(unsigned long mbi_p)
             (mod[initrdidx].mod_start - mod[0].mod_start);
         _initrd_len   = mod[initrdidx].mod_end - mod[initrdidx].mod_start;
     }
+
+    iommu_setup();
+
+    amd_iommu_detect();
 
     /*
      * We're going to setup domain0 using the module(s) that we stashed safely

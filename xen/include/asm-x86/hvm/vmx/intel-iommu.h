@@ -1,0 +1,401 @@
+/*
+ * Copyright (c) 2006, Intel Corporation.
+ *
+ * This program is free software; you can redistribute it and/or modify it
+ * under the terms and conditions of the GNU General Public License,
+ * version 2, as published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+ * more details.
+ *
+ * You should have received a copy of the GNU General Public License along with
+ * this program; if not, write to the Free Software Foundation, Inc., 59 Temple
+ * Place - Suite 330, Boston, MA 02111-1307 USA.
+ *
+ * Copyright (C) Ashok Raj <ashok.raj@intel.com>
+ */
+
+#ifndef _INTEL_IOMMU_H_
+#define _INTEL_IOMMU_H_
+
+#include <xen/types.h>
+
+/*
+ * Intel IOMMU register specification per version 1.0 public spec.
+ */
+
+#define    DMAR_VER_REG    0x0    /* Arch version supported by this IOMMU */
+#define    DMAR_CAP_REG    0x8    /* Hardware supported capabilities */
+#define    DMAR_ECAP_REG    0x10    /* Extended capabilities supported */
+#define    DMAR_GCMD_REG    0x18    /* Global command register */
+#define    DMAR_GSTS_REG    0x1c    /* Global status register */
+#define    DMAR_RTADDR_REG    0x20    /* Root entry table */
+#define    DMAR_CCMD_REG    0x28    /* Context command reg */
+#define    DMAR_FSTS_REG    0x34    /* Fault Status register */
+#define    DMAR_FECTL_REG    0x38    /* Fault control register */
+#define    DMAR_FEDATA_REG    0x3c    /* Fault event interrupt data register */
+#define    DMAR_FEADDR_REG    0x40    /* Fault event interrupt addr register */
+#define    DMAR_FEUADDR_REG 0x44    /* Upper address register */
+#define    DMAR_AFLOG_REG    0x58    /* Advanced Fault control */
+#define    DMAR_PMEN_REG    0x64    /* Enable Protected Memory Region */
+#define    DMAR_PLMBASE_REG 0x68    /* PMRR Low addr */
+#define    DMAR_PLMLIMIT_REG 0x6c    /* PMRR low limit */
+#define    DMAR_PHMBASE_REG 0x70    /* pmrr high base addr */
+#define    DMAR_PHMLIMIT_REG 0x78    /* pmrr high limit */
+#define    DMAR_IQH_REG    0x80    /* invalidation queue head */
+#define    DMAR_IQT_REG    0x88    /* invalidation queue tail */
+#define    DMAR_IQA_REG    0x90    /* invalidation queue addr */
+#define    DMAR_IRTA_REG   0xB8    /* intr remap */
+
+#define OFFSET_STRIDE        (9)
+#define dmar_readl(dmar, reg) readl(dmar + reg)
+#define dmar_writel(dmar, reg, val) writel(val, dmar + reg)
+#define dmar_readq(dmar, reg) ({ \
+        u32 lo, hi; \
+        lo = dmar_readl(dmar, reg); \
+        hi = dmar_readl(dmar, reg + 4); \
+        (((u64) hi) << 32) + lo; })
+#define dmar_writeq(dmar, reg, val) do {\
+        dmar_writel(dmar, reg, (u32)val); \
+        dmar_writel(dmar, reg + 4, (u32)((u64) val >> 32)); \
+    } while (0)
+
+#define VER_MAJOR(v)        (((v) & 0xf0) >> 4)
+#define VER_MINOR(v)        ((v) & 0x0f)
+
+/*
+ * Decoding Capability Register
+ */
+#define cap_read_drain(c)    (((c) >> 55) & 1)
+#define cap_write_drain(c)    (((c) >> 54) & 1)
+#define cap_max_amask_val(c)    (((c) >> 48) & 0x3f)
+#define cap_num_fault_regs(c)    ((((c) >> 40) & 0xff) + 1)
+#define cap_pgsel_inv(c)       (((c) >> 39) & 1)
+
+#define cap_super_page_val(c)    (((c) >> 34) & 0xf)
+#define cap_super_offset(c)    (((find_first_bit(&cap_super_page_val(c), 4)) \
+                    * OFFSET_STRIDE) + 21)
+
+#define cap_fault_reg_offset(c)    ((((c) >> 24) & 0x3ff) * 16)
+
+#define cap_isoch(c)        (((c) >> 23) & 1)
+#define cap_qos(c)        (((c) >> 22) & 1)
+#define cap_mgaw(c)        ((((c) >> 16) & 0x3f) + 1)
+#define cap_sagaw(c)        (((c) >> 8) & 0x1f)
+#define cap_caching_mode(c)    (((c) >> 7) & 1)
+#define cap_phmr(c)        (((c) >> 6) & 1)
+#define cap_plmr(c)        (((c) >> 5) & 1)
+#define cap_rwbf(c)        (((c) >> 4) & 1)
+#define cap_afl(c)        (((c) >> 3) & 1)
+#define cap_ndoms(c)        (2 ^ (4 + 2 * ((c) & 0x7)))
+/*
+ * Extended Capability Register
+ */
+
+#define ecap_niotlb_iunits(e)    ((((e) >> 24) & 0xff) + 1)
+#define ecap_iotlb_offset(e)     ((((e) >> 8) & 0x3ff) * 16)
+#define ecap_coherent(e)         ((e >> 0) & 0x1)
+#define ecap_queued_inval(e)     ((e >> 1) & 0x1)
+#define ecap_dev_iotlb(e)        ((e >> 2) & 0x1)
+#define ecap_intr_remap(e)       ((e >> 3) & 0x1)
+#define ecap_ext_intr(e)         ((e >> 4) & 0x1)
+#define ecap_cache_hints(e)      ((e >> 5) & 0x1)
+#define ecap_pass_thru(e)        ((e >> 6) & 0x1)
+
+#define PAGE_SHIFT_4K        (12)
+#define PAGE_SIZE_4K        (1UL << PAGE_SHIFT_4K)
+#define PAGE_MASK_4K        (((u64)-1) << PAGE_SHIFT_4K)
+#define PAGE_ALIGN_4K(addr)    (((addr) + PAGE_SIZE_4K - 1) & PAGE_MASK_4K)
+
+/* IOTLB_REG */
+#define DMA_TLB_FLUSH_GRANU_OFFSET  60
+#define DMA_TLB_GLOBAL_FLUSH (((u64)1) << 60)
+#define DMA_TLB_DSI_FLUSH (((u64)2) << 60)
+#define DMA_TLB_PSI_FLUSH (((u64)3) << 60)
+#define DMA_TLB_IIRG(x) (((x) >> 60) & 7) 
+#define DMA_TLB_IAIG(val) (((val) >> 57) & 7)
+#define DMA_TLB_DID(x) (((u64)(x & 0xffff)) << 32)
+
+#define DMA_TLB_READ_DRAIN (((u64)1) << 49)
+#define DMA_TLB_WRITE_DRAIN (((u64)1) << 48)
+#define DMA_TLB_IVT (((u64)1) << 63)
+
+#define DMA_TLB_IVA_ADDR(x) ((((u64)x) >> 12) << 12)
+#define DMA_TLB_IVA_HINT(x) ((((u64)x) & 1) << 6)
+
+/* GCMD_REG */
+#define DMA_GCMD_TE (((u64)1) << 31)
+#define DMA_GCMD_SRTP (((u64)1) << 30)
+#define DMA_GCMD_SFL (((u64)1) << 29)
+#define DMA_GCMD_EAFL (((u64)1) << 28)
+#define DMA_GCMD_WBF (((u64)1) << 27)
+#define DMA_GCMD_QIE (((u64)1) << 26)
+#define DMA_GCMD_IRE (((u64)1) << 25)
+#define DMA_GCMD_SIRTP (((u64)1) << 24)
+
+/* GSTS_REG */
+#define DMA_GSTS_TES (((u64)1) << 31)
+#define DMA_GSTS_RTPS (((u64)1) << 30)
+#define DMA_GSTS_FLS (((u64)1) << 29)
+#define DMA_GSTS_AFLS (((u64)1) << 28)
+#define DMA_GSTS_WBFS (((u64)1) << 27)
+#define DMA_GSTS_IRTPS (((u64)1) << 24)
+#define DMA_GSTS_QIES   (((u64)1) <<26)
+#define DMA_GSTS_IRES   (((u64)1) <<25)
+
+/* CCMD_REG */
+#define DMA_CCMD_INVL_GRANU_OFFSET  61
+#define DMA_CCMD_ICC (((u64)1) << 63)
+#define DMA_CCMD_GLOBAL_INVL (((u64)1) << 61)
+#define DMA_CCMD_DOMAIN_INVL (((u64)2) << 61)
+#define DMA_CCMD_DEVICE_INVL (((u64)3) << 61)
+#define DMA_CCMD_FM(m) (((u64)((m) & 0x3)) << 32)
+#define DMA_CCMD_CIRG(x) ((((u64)3) << 61) & x)
+#define DMA_CCMD_MASK_NOBIT 0
+#define DMA_CCMD_MASK_1BIT 1
+#define DMA_CCMD_MASK_2BIT 2
+#define DMA_CCMD_MASK_3BIT 3
+#define DMA_CCMD_SID(s) (((u64)((s) & 0xffff)) << 16)
+#define DMA_CCMD_DID(d) ((u64)((d) & 0xffff))
+
+#define DMA_CCMD_CAIG_MASK(x) (((u64)x) & ((u64) 0x3 << 59))
+
+/* FECTL_REG */
+#define DMA_FECTL_IM (((u64)1) << 31)
+
+/* FSTS_REG */
+#define DMA_FSTS_PPF ((u64)2)
+#define DMA_FSTS_PFO ((u64)1)
+#define dma_fsts_fault_record_index(s) (((s) >> 8) & 0xff)
+
+/* FRCD_REG, 32 bits access */
+#define DMA_FRCD_F (((u64)1) << 31)
+#define dma_frcd_type(d) ((d >> 30) & 1)
+#define dma_frcd_fault_reason(c) (c & 0xff)
+#define dma_frcd_source_id(c) (c & 0xffff)
+#define dma_frcd_page_addr(d) (d & (((u64)-1) << 12)) /* low 64 bit */
+
+/*
+ * 0: Present
+ * 1-11: Reserved
+ * 12-63: Context Ptr (12 - (haw-1))
+ * 64-127: Reserved
+ */
+struct root_entry {
+    u64    val;
+    u64    rsvd1;
+};
+#define root_present(root)    ((root).val & 1)
+#define set_root_present(root) do {(root).val |= 1;} while(0)
+#define get_context_addr(root) ((root).val & PAGE_MASK_4K)
+#define set_root_value(root, value) \
+    do {(root).val |= ((value) & PAGE_MASK_4K);} while(0)
+
+struct context_entry {
+    u64 lo;
+    u64 hi;
+};
+#define ROOT_ENTRY_NR (PAGE_SIZE_4K/sizeof(struct root_entry))
+#define context_present(c) ((c).lo & 1)
+#define context_fault_disable(c) (((c).lo >> 1) & 1)
+#define context_translation_type(c) (((c).lo >> 2) & 3)
+#define context_address_root(c) ((c).lo & PAGE_MASK_4K)
+#define context_address_width(c) ((c).hi &  7)
+#define context_domain_id(c) (((c).hi >> 8) & ((1 << 16) - 1))
+
+#define context_set_present(c) do {(c).lo |= 1;} while(0)
+#define context_clear_present(c) do {(c).lo &= ~1;} while(0)
+#define context_set_fault_enable(c) \
+    do {(c).lo &= (((u64)-1) << 2) | 1;} while(0)
+
+#define context_set_translation_type(c, val) do { \
+        (c).lo &= (((u64)-1) << 4) | 3; \
+        (c).lo |= (val & 3) << 2; \
+    } while(0)
+#define CONTEXT_TT_MULTI_LEVEL 0
+#define CONTEXT_TT_DEV_IOTLB   1
+#define CONTEXT_TT_PASS_THRU   2
+
+#define context_set_address_root(c, val) \
+    do {(c).lo &= 0xfff; (c).lo |= (val) & PAGE_MASK_4K ;} while(0)
+#define context_set_address_width(c, val) \
+    do {(c).hi &= 0xfffffff8; (c).hi |= (val) & 7;} while(0)
+#define context_set_domain_id(c, val) \
+    do {(c).hi &= 0xff; (c).hi |= ((val + 1) & ((1 << 16) - 1)) << 8;} while(0)
+#define context_clear_entry(c) do {(c).lo = 0; (c).hi = 0;} while(0)
+
+/*
+ * 0: readable
+ * 1: writable
+ * 2-6: reserved
+ * 7: super page
+ * 8-11: available
+ * 12-63: Host physcial address
+ */
+struct dma_pte {
+    u64 val;
+};
+#define dma_clear_pte(p)    do {(p).val = 0;} while(0)
+#define dma_set_pte_readable(p) do {(p).val |= 1;} while(0)
+#define dma_set_pte_writable(p) do {(p).val |= 2;} while(0)
+#define dma_set_pte_superpage(p) do {(p).val |= 8;} while(0)
+#define dma_set_pte_prot(p, prot) do { (p).val = (((p).val >> 2) << 2) | ((prot) & 3);} while (0)
+#define dma_pte_addr(p) ((p).val & PAGE_MASK_4K)
+#define dma_set_pte_addr(p, addr) do {(p).val |= ((addr) >> PAGE_SHIFT_4K) << PAGE_SHIFT_4K;} while(0)
+#define DMA_PTE_READ (1)
+#define DMA_PTE_WRITE (2)
+#define dma_pte_present(p) (((p).val & 3) != 0)
+
+/* interrupt remap entry */
+struct iremap_entry {
+    struct {
+        u64 present : 1,
+            fpd     : 1,
+            dm      : 1,
+            rh      : 1,
+            tm      : 1,
+            dlm     : 3,
+            avail   : 4,
+            res_1   : 4,
+            vector  : 8,
+            res_2   : 8,
+            dst     : 32;
+    }lo;
+    struct {
+        u64 sid     : 16,
+            sq      : 2,
+            svt     : 2,
+            res_1   : 44;
+    }hi;
+};
+#define IREMAP_ENTRY_NR (PAGE_SIZE_4K/sizeof(struct iremap_entry))
+#define iremap_present(v) ((v).lo & 1)
+#define iremap_fault_disable(v) (((v).lo >> 1) & 1)
+
+#define iremap_set_present(v) do {(v).lo |= 1;} while(0)
+#define iremap_clear_present(v) do {(v).lo &= ~1;} while(0)
+
+/* queue invalidation entry */
+struct qinval_entry {
+    union {
+        struct {
+            struct {
+                u64 type    : 4,
+                    granu   : 2,
+                    res_1   : 10,
+                    did     : 16,
+                    sid     : 16,
+                    fm      : 2,
+                    res_2   : 14;
+            }lo;
+            struct {
+                u64 res;
+            }hi;
+        }cc_inv_dsc;
+        struct {
+            struct {
+                u64 type    : 4,
+                    granu   : 2,
+                    dw      : 1,
+                    dr      : 1,
+                    res_1   : 8,
+                    did     : 16,
+                    res_2   : 32;
+            }lo;
+            struct {
+                u64 am      : 6,
+                    ih      : 1,
+                    res_1   : 5,
+                    addr    : 52;
+            }hi;
+        }iotlb_inv_dsc;
+        struct {
+            struct {
+                u64 type    : 4,
+                    res_1   : 12,
+                    max_invs_pend: 5,
+                    res_2   : 11,
+                    sid     : 16,
+                    res_3   : 16;
+            }lo;
+            struct {
+                u64 size    : 1,
+                    res_1   : 11,
+                    addr    : 52;
+            }hi;
+        }dev_iotlb_inv_dsc;
+        struct {
+            struct {
+                u64 type    : 4,
+                    granu   : 1,
+                    res_1   : 22,
+                    im      : 5,
+                    iidx    : 16,
+                    res_2   : 16;
+            }lo;
+            struct {
+                u64 res;
+            }hi;
+        }iec_inv_dsc;
+        struct {
+            struct {
+                u64 type    : 4,
+                    iflag   : 1,
+                    sw      : 1,
+                    fn      : 1,
+                    res_1   : 25,
+                    sdata   : 32;
+            }lo;
+            struct {
+                u64 res_1   : 2,
+                    saddr   : 62;
+            }hi;
+        }inv_wait_dsc;
+    }q;
+};
+
+struct poll_info {
+    u64 saddr;
+    u32 udata;
+};
+
+#define QINVAL_ENTRY_NR (PAGE_SIZE_4K/sizeof(struct qinval_entry))
+#define qinval_present(v) ((v).lo & 1)
+#define qinval_fault_disable(v) (((v).lo >> 1) & 1)
+
+#define qinval_set_present(v) do {(v).lo |= 1;} while(0)
+#define qinval_clear_present(v) do {(v).lo &= ~1;} while(0)
+
+#define RESERVED_VAL        0
+
+#define TYPE_INVAL_CONTEXT  1
+#define TYPE_INVAL_IOTLB    2
+#define TYPE_INVAL_DEVICE_IOTLB 3
+#define TYPE_INVAL_IEC          4
+#define TYPE_INVAL_WAIT         5
+
+#define NOTIFY_TYPE_POLL        1
+#define NOTIFY_TYPE_INTR        1
+#define INTERRUTP_FLAG          1
+#define STATUS_WRITE            1
+#define FENCE_FLAG              1
+
+#define IEC_GLOBAL_INVL         0
+#define IEC_INDEX_INVL          1
+
+#define VTD_PAGE_TABLE_LEVEL_3  3
+#define VTD_PAGE_TABLE_LEVEL_4  4
+
+typedef paddr_t dma_addr_t;
+
+#define DEFAULT_DOMAIN_ADDRESS_WIDTH 48
+#define MAX_IOMMUS 32
+#define MAX_IOMMU_REGS 0xc0
+
+extern struct list_head acpi_drhd_units;
+extern struct list_head acpi_rmrr_units;
+extern struct list_head acpi_ioapic_units;
+
+#endif

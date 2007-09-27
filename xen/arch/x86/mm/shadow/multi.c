@@ -685,7 +685,7 @@ _sh_propagate(struct vcpu *v,
     /* N.B. For pass-through MMIO, either this test needs to be relaxed,
      * and shadow_set_l1e() trained to handle non-valid MFNs (ugh), or the
      * MMIO areas need to be added to the frame-table to make them "valid". */
-    if ( !mfn_valid(target_mfn) )
+    if ( !mfn_valid(target_mfn) && (p2mt != p2m_mmio_direct) )
     {
         ASSERT((ft == ft_prefetch));
         *sp = shadow_l1e_empty();
@@ -2551,7 +2551,7 @@ static inline void check_for_early_unshadow(struct vcpu *v, mfn_t gmfn)
         if ( !(flags & (SHF_L2_32|SHF_L2_PAE|SHF_L2H_PAE|SHF_L4_64)) )
         {
             perfc_incr(shadow_early_unshadow);
-            sh_remove_shadows(v, gmfn, 0, 0 /* Slow, can fail to unshadow */ );
+            sh_remove_shadows(v, gmfn, 1, 0 /* Fast, can fail to unshadow */ );
         } 
     }
     v->arch.paging.shadow.last_emulated_mfn = mfn_x(gmfn);
@@ -2928,8 +2928,6 @@ static int sh_page_fault(struct vcpu *v,
             sh_remove_shadows(v, gmfn, 0 /* thorough */, 1 /* must succeed */);
             goto done;
         }
-
-        hvm_store_cpu_guest_regs(v, regs, NULL);
     }
 
     SHADOW_PRINTK("emulate: eip=%#lx esp=%#lx\n", 
@@ -2992,10 +2990,6 @@ static int sh_page_fault(struct vcpu *v,
         }
     }
 #endif /* PAE guest */
-
-    /* Emulator has changed the user registers: write back */
-    if ( is_hvm_domain(d) )
-        hvm_load_cpu_guest_regs(v, regs);
 
     SHADOW_PRINTK("emulated\n");
     return EXCRET_fault_fixed;

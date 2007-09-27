@@ -931,11 +931,11 @@ def xm_brief_list(doms):
         print format % d
 
 def xm_label_list(doms):
-    print '%-40s %3s %5s %5s %10s %9s %-10s' % \
+    print '%-40s %5s %5s %5s %10s %9s %-10s' % \
           ('Name', 'ID', 'Mem', 'VCPUs', 'State', 'Time(s)', 'Label')
 
     output = []
-    format = '%(name)-40s %(domid)3s %(mem)5d %(vcpus)5d %(state)10s ' \
+    format = '%(name)-40s %(domid)5s %(mem)5d %(vcpus)5d %(state)10s ' \
              '%(cpu_time)8.1f %(seclabel)10s'
 
     import xen.util.xsm.xsm as security
@@ -1287,13 +1287,13 @@ def xm_dump_core(args):
         filename = None
 
     if not live:
-        server.xend.domain.pause(dom)
+        ds = server.xend.domain.pause(dom, True)
 
     try:
         print "Dumping core of domain: %s ..." % str(dom)
         server.xend.domain.dump(dom, filename, live, crash)
     finally:
-        if not live:
+        if not live and ds == DOM_STATE_RUNNING:
             server.xend.domain.unpause(dom)
 
     if crash:

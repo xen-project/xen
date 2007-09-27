@@ -3,6 +3,14 @@
 
 RC=0
 
+case $(uname -s) in
+FreeBSD|NetBSD|OpenBSD)
+	exit 0
+	;;
+*)
+	;;
+esac
+
 PATH=/sbin:$PATH
 
 set -e

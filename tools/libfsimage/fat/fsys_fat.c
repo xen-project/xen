@@ -301,7 +301,7 @@ fat_dir (fsi_file_t *ffi, char *dirname)
   /* if we have a real file (and we're not just printing possibilities),
      then this is where we want to exit */
   
-  if (!*dirname || isspace (*dirname))
+  if (!*dirname || isspace ((uint8_t)*dirname))
     {
       if (attrib & FAT_ATTRIB_DIR)
 	{
@@ -325,7 +325,7 @@ fat_dir (fsi_file_t *ffi, char *dirname)
   /* Directories don't have a file size */
   filemax = INT_MAX;
   
-  for (rest = dirname; (ch = *rest) && !isspace (ch) && ch != '/'; rest++);
+  for (rest = dirname; (ch = *rest) && !isspace ((uint8_t)ch) && ch != '/'; rest++);
   
   *rest = 0;
   
@@ -426,13 +426,13 @@ fat_dir (fsi_file_t *ffi, char *dirname)
       {
 	int i, j, c;
 	
-	for (i = 0; i < 8 && (c = filename[i] = tolower (dir_buf[i]))
-	       && !isspace (c); i++);
+	for (i = 0; i < 8 && (c = filename[i] = tolower ((uint8_t)dir_buf[i]))
+	       && !isspace ((uint8_t)c); i++);
 	
 	filename[i++] = '.';
 	
-	for (j = 0; j < 3 && (c = filename[i + j] = tolower (dir_buf[8 + j]))
-	       && !isspace (c); j++);
+	for (j = 0; j < 3 && (c = filename[i + j] = tolower ((uint8_t)dir_buf[8 + j]))
+	       && !isspace ((uint8_t)c); j++);
 	
 	if (j == 0)
 	  i--;

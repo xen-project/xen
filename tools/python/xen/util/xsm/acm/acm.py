@@ -33,7 +33,8 @@ from xen.util import dictio, xsconstants
 from xen.xend.XendConstants import *
 
 #global directories and tools for security management
-policy_dir_prefix = "/etc/xen/acm-security/policies"
+security_dir_prefix = "/etc/xen/acm-security"
+policy_dir_prefix = security_dir_prefix + "/policies"
 res_label_filename = policy_dir_prefix + "/resource_labels"
 boot_filename = "/boot/grub/menu.lst"
 altboot_filename = "/boot/grub/grub.conf"
@@ -1308,12 +1309,33 @@ def parse_security_label(security_label):
         return security_label
 
 def set_security_label(policy, label):
-    policytype = xsconstants.ACM_POLICY_ID
     if label != "" and policy != "":
-        return "%s:%s:%s" % (policytype, policy, label)
+        return "%s:%s:%s" % (xsconstants.ACM_POLICY_ID, policy, label)
     else:
         return ""
 
 def ssidref2security_label(ssidref):
     from xen.xend.XendXSPolicyAdmin import XSPolicyAdminInstance
     return XSPolicyAdminInstance().ssidref_to_vmlabel(ssidref)
+
+def get_security_label(self, xspol=None):
+    """
+       Get the security label of a domain
+       @param xspol   The policy to use when converting the ssid into
+                      a label; only to be passed during the updating
+                      of the policy
+    """
+    domid = self.getDomid()
+
+    if not xspol:
+        from xen.xend.XendXSPolicyAdmin import XSPolicyAdminInstance
+        xspol = XSPolicyAdminInstance().get_loaded_policy()
+
+    if domid == 0:
+        if xspol:
+            label = xspol.policy_get_domain_label_formatted(domid)
+        else:
+            label = ""
+    else:
+        label = self.info.get('security_label', '')
+    return label

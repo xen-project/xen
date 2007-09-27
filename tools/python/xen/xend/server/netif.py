@@ -115,17 +115,15 @@ class NetifController(DevController):
         accel   = config.get('accel')
         sec_lab = config.get('security_label')
 
-        if not typ:
-            typ = xoptions.netback_type
-
         if not mac:
             raise VmError("MAC address not specified or generated.")
 
         devid = self.allocateDeviceID()
 
         back = { 'script' : script,
-                 'mac'    : mac,
-                 'type'   : typ }
+                 'mac'    : mac }
+        if typ:
+            back['type'] = typ
         if ipaddr:
             back['ip'] = ipaddr
         if bridge:

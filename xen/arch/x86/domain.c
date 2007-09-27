@@ -44,6 +44,7 @@
 #include <asm/hvm/support.h>
 #include <asm/msr.h>
 #include <asm/nmi.h>
+#include <asm/iommu.h>
 #ifdef CONFIG_COMPAT
 #include <compat/vcpu.h>
 #endif
@@ -505,10 +506,16 @@ int arch_domain_create(struct domain *d)
             virt_to_page(d->shared_info), d, XENSHARE_writable);
     }
 
+    if ( (rc = iommu_domain_init(d)) != 0 )
+        goto fail;
+
     if ( is_hvm_domain(d) )
     {
         if ( (rc = hvm_domain_initialise(d)) != 0 )
+        {
+            iommu_domain_destroy(d);
             goto fail;
+        }
     }
     else
     {
@@ -537,6 +544,8 @@ void arch_domain_destroy(struct domain *d)
 {
     if ( is_hvm_domain(d) )
         hvm_domain_destroy(d);
+
+    iommu_domain_destroy(d);
 
     paging_final_teardown(d);
 
@@ -631,10 +640,10 @@ int arch_set_info_guest(
         memcpy(&v->arch.guest_context, c.nat, sizeof(*c.nat));
 #ifdef CONFIG_COMPAT
     else
-    {
         XLAT_vcpu_guest_context(&v->arch.guest_context, c.cmp);
-    }
 #endif
+
+    v->arch.guest_context.user_regs.eflags |= 2;
 
     /* Only CR0.TS is modifiable by guest or admin. */
     v->arch.guest_context.ctrlreg[0] &= X86_CR0_TS;
@@ -650,10 +659,6 @@ int arch_set_info_guest(
 
         /* Ensure real hardware interrupts are enabled. */
         v->arch.guest_context.user_regs.eflags |= EF_IE;
-    }
-    else
-    {
-        hvm_load_cpu_guest_regs(v, &v->arch.guest_context.user_regs);
     }
 
     if ( v->is_initialised )
@@ -1382,10 +1387,9 @@ static void continue_hypercall_on_cpu_helper(struct vcpu *v)
     regs->eax = info->func(info->data);
 
     v->arch.schedule_tail = info->saved_schedule_tail;
-    v->cpu_affinity = info->saved_affinity;
+    v->arch.continue_info = NULL;
 
     xfree(info);
-    v->arch.continue_info = NULL;
 
     vcpu_set_affinity(v, &v->cpu_affinity);
     schedule_tail(v);
@@ -1396,6 +1400,7 @@ int continue_hypercall_on_cpu(int cpu, long (*func)(void *data), void *data)
     struct vcpu *v = current;
     struct migrate_info *info;
     cpumask_t mask = cpumask_of_cpu(cpu);
+    int rc;
 
     if ( cpu == smp_processor_id() )
         return func(data);
@@ -1407,12 +1412,19 @@ int continue_hypercall_on_cpu(int cpu, long (*func)(void *data), void *data)
     info->func = func;
     info->data = data;
     info->saved_schedule_tail = v->arch.schedule_tail;
-    v->arch.schedule_tail = continue_hypercall_on_cpu_helper;
-
     info->saved_affinity = v->cpu_affinity;
+
+    v->arch.schedule_tail = continue_hypercall_on_cpu_helper;
     v->arch.continue_info = info;
 
-    vcpu_set_affinity(v, &mask);
+    rc = vcpu_set_affinity(v, &mask);
+    if ( rc )
+    {
+        v->arch.schedule_tail = info->saved_schedule_tail;
+        v->arch.continue_info = NULL;
+        xfree(info);
+        return rc;
+    }
 
     /* Dummy return value will be overwritten by new schedule_tail. */
     BUG_ON(!test_bit(SCHEDULE_SOFTIRQ, &softirq_pending(smp_processor_id())));

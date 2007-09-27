@@ -1728,10 +1728,16 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
             v->arch.guest_context.gs_base_user = res;
             break;
 #endif
+        case MSR_K8_FIDVID_STATUS:
+        case MSR_K8_FIDVID_CTL:
+            if ( (cpufreq_controller != FREQCTL_dom0_kernel) ||
+                 (boot_cpu_data.x86_vendor != X86_VENDOR_AMD) ||
+                 wrmsr_safe(regs->ecx, eax, edx) )
+                goto fail;
+            break;
         default:
             if ( wrmsr_hypervisor_regs(regs->ecx, eax, edx) )
                 break;
-
             if ( (rdmsr_safe(regs->ecx, l, h) != 0) ||
                  (eax != l) || (edx != h) )
                 gdprintk(XENLOG_WARNING, "Domain attempted WRMSR %p from "
@@ -1764,6 +1770,13 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
             regs->edx = v->arch.guest_context.gs_base_user >> 32;
             break;
 #endif
+        case MSR_K8_FIDVID_CTL:
+        case MSR_K8_FIDVID_STATUS:
+            if ( (cpufreq_controller != FREQCTL_dom0_kernel) ||
+                 (boot_cpu_data.x86_vendor != X86_VENDOR_AMD) ||
+                 rdmsr_safe(regs->ecx, regs->eax, regs->edx) )
+                goto fail;
+            break;
         case MSR_EFER:
             if ( rdmsr_safe(regs->ecx, regs->eax, regs->edx) )
                 goto fail;
