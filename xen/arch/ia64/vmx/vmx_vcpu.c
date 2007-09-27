@@ -42,6 +42,7 @@
 #include <asm/hw_irq.h>
 #include <asm/vmx_pal_vsa.h>
 #include <asm/kregs.h>
+#include <linux/efi.h>
 //unsigned long last_guest_rsm = 0x0;
 
 #ifdef	VTI_DEBUG
@@ -161,7 +162,6 @@ IA64FAULT vmx_vcpu_cover(VCPU *vcpu)
 IA64FAULT vmx_vcpu_set_rr(VCPU *vcpu, u64 reg, u64 val)
 {
     ia64_rr oldrr,newrr;
-    extern void * pal_vaddr;
     u64 rrval;
 
     vcpu_get_rr(vcpu, reg, &oldrr.rrval);

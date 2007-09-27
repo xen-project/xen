@@ -22,6 +22,10 @@
 #include <asm/page.h>
 #include <asm/system.h>
 
+#ifdef XEN
+extern void * pal_vaddr;
+#endif
+
 #define EFI_SUCCESS		0
 #define EFI_LOAD_ERROR          ( 1 | (1UL << (BITS_PER_LONG-1)))
 #define EFI_INVALID_PARAMETER	( 2 | (1UL << (BITS_PER_LONG-1)))

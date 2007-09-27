@@ -79,6 +79,9 @@ typedef struct xen_kexec_image {
 #if defined(__i386__) || defined(__x86_64__)
     unsigned long page_list[KEXEC_XEN_NO_PAGES];
 #endif
+#if defined(__ia64__)
+    unsigned long reboot_code_buffer;
+#endif
     unsigned long indirection_page;
     unsigned long start_address;
 } xen_kexec_image_t;

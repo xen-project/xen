@@ -207,6 +207,8 @@ void foo(void)
 
 	BLANK();
 	DEFINE(IA64_CPUINFO_NSEC_PER_CYC_OFFSET, offsetof (struct cpuinfo_ia64, nsec_per_cyc));
+	DEFINE(IA64_CPUINFO_PTCE_BASE_OFFSET, offsetof (struct cpuinfo_ia64, ptce_base));
+	DEFINE(IA64_CPUINFO_PTCE_COUNT_OFFSET, offsetof (struct cpuinfo_ia64, ptce_count));
 	DEFINE(IA64_TIMESPEC_TV_NSEC_OFFSET, offsetof (struct timespec, tv_nsec));
 
 

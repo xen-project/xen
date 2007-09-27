@@ -23,13 +23,14 @@
  * 	- initrd (optional)
 #endif
  * 	- Kernel memory map built from EFI memory map
+ * 	- Crash kernel for kdump
  *
  * More could be added if necessary
  */
 #ifndef XEN
-#define IA64_MAX_RSVD_REGIONS 6
-#else
 #define IA64_MAX_RSVD_REGIONS 7
+#else
+#define IA64_MAX_RSVD_REGIONS 8
 #endif
 
 struct rsvd_region {

@@ -333,8 +333,13 @@ efi_memmap_walk_uc (efi_freemem_callback_t callback, void *arg)
  * Abstraction Layer chapter 11 in ADAG
  */
 
+#ifdef XEN
+static void *
+__efi_get_pal_addr (void)
+#else
 void *
 efi_get_pal_addr (void)
+#endif
 {
 	void *efi_map_start, *efi_map_end, *p;
 	efi_memory_desc_t *md;
@@ -401,6 +406,14 @@ efi_get_pal_addr (void)
 
 #ifdef XEN
 void *pal_vaddr = 0;
+
+void *
+efi_get_pal_addr(void)
+{
+	if (!pal_vaddr)
+		pal_vaddr = __efi_get_pal_addr();
+	return pal_vaddr;
+}
 #endif
 
 void
@@ -408,9 +421,7 @@ efi_map_pal_code (void)
 {
 #ifdef XEN
 	u64 psr;
-	if (!pal_vaddr) {
-		pal_vaddr = efi_get_pal_addr ();
-	}
+	(void)efi_get_pal_addr();
 #else
 	void *pal_vaddr = efi_get_pal_addr ();
 	u64 psr;
@@ -1277,3 +1288,49 @@ vmcore_find_descriptor_size (unsigned long address)
 }
 #endif
 #endif /* XEN */
+
+#ifdef XEN
+/* find a block of memory aligned to 64M exclude reserved regions
+ * rsvd_regions are sorted
+ */
+unsigned long
+kdump_find_rsvd_region(unsigned long size, struct rsvd_region *r, int n)
+{
+	int i;
+	u64 start, end;
+	u64 alignment = 1UL << _PAGE_SIZE_64M;
+	void *efi_map_start, *efi_map_end, *p;
+	efi_memory_desc_t *md;
+	u64 efi_desc_size;
+
+	efi_map_start = __va(ia64_boot_param->efi_memmap);
+	efi_map_end   = efi_map_start + ia64_boot_param->efi_memmap_size;
+	efi_desc_size = ia64_boot_param->efi_memdesc_size;
+
+	for (p = efi_map_start; p < efi_map_end; p += efi_desc_size) {
+		md = p;
+		if (!efi_wb(md))
+			continue;
+		start = ALIGN(md->phys_addr, alignment);
+		end = efi_md_end(md);
+		for (i = 0; i < n; i++) {
+			if (__pa(r[i].start) >= start && __pa(r[i].end) < end) {
+				if (__pa(r[i].start) > start + size)
+					return start;
+				start = ALIGN(__pa(r[i].end), alignment);
+				if (i < n - 1
+				    && __pa(r[i + 1].start) < start + size)
+					continue;
+				else
+					break;
+			}
+		}
+		if (end > start + size)
+			return start;
+	}
+
+	printk(KERN_WARNING
+	       "Cannot reserve 0x%lx byte of memory for crashdump\n", size);
+	return ~0UL;
+}
+#endif

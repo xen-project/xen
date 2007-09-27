@@ -64,6 +64,9 @@
 #ifdef XEN
 #include <asm/vmx.h>
 #include <asm/io.h>
+#include <asm/kexec.h>
+#include <public/kexec.h>
+#include <xen/kexec.h>
 #endif
 
 #if defined(CONFIG_SMP) && (IA64_CPU_SIZE > PAGE_SIZE)
@@ -252,6 +255,39 @@ reserve_memory (void)
 
 	efi_memmap_init(&rsvd_region[n].start, &rsvd_region[n].end);
 	n++;
+
+#ifdef XEN
+	/* crashkernel=size@offset specifies the size to reserve for a crash
+	 * kernel. If offset is 0, then it is determined automatically.
+	 * By reserving this memory we guarantee that linux never set's it
+	 * up as a DMA target. Useful for holding code to do something
+	 * appropriate after a kernel panic.
+	 */
+	if (kexec_crash_area.size > 0) {
+		if (!kexec_crash_area.start) {
+			sort_regions(rsvd_region, n);
+			kexec_crash_area.start =
+				kdump_find_rsvd_region(kexec_crash_area.size,
+						       rsvd_region, n);
+		}
+		if (kexec_crash_area.start != ~0UL) {
+			printk("Kdump: %luMB (%lukB) at 0x%lx\n",
+			       kexec_crash_area.size >> 20,
+			       kexec_crash_area.size >> 10,
+			       kexec_crash_area.start);
+			rsvd_region[n].start =
+				(unsigned long)__va(kexec_crash_area.start);
+			rsvd_region[n].end =
+				(unsigned long)__va(kexec_crash_area.start +
+						    kexec_crash_area.size);
+			n++;
+		}
+		else {
+			kexec_crash_area.size = 0;
+			kexec_crash_area.start = 0;
+		}
+	}
+#endif
 
 	/* end of memory marker */
 	rsvd_region[n].start = ~0UL;
