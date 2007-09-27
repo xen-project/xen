@@ -13,6 +13,7 @@
 #include <xen/symbols.h>
 #include <xen/smp.h>
 #include <xen/sched.h>
+#include <asm/elf.h>
 #include <asm/uaccess.h>
 #include <asm/processor.h>
 #include <asm/ptrace.h>
@@ -542,6 +543,8 @@ copy_thread (int nr, unsigned long clone_flags,
 	return retval;
 }
 
+#endif /* !XEN */
+
 static void
 do_copy_task_regs (struct task_struct *task, struct unw_frame_info *info, void *arg)
 {
@@ -559,10 +562,14 @@ do_copy_task_regs (struct task_struct *task, struct unw_frame_info *info, void *
 	unw_get_sp(info, &sp);
 	pt = (struct pt_regs *) (sp + 16);
 
+#ifndef XEN
+	/* FIXME: Is this needed by XEN when it makes its crash notes
+	 * during kdump? */
 	urbs_end = ia64_get_user_rbs_end(task, pt, &cfm);
 
 	if (ia64_sync_user_rbs(task, info->sw, pt->ar_bspstore, urbs_end) < 0)
 		return;
+#endif /* !XEN */
 
 	ia64_peek(task, info->sw, urbs_end, (long) ia64_rse_rnat_addr((long *) urbs_end),
 		  &ar_rnat);
@@ -614,6 +621,8 @@ do_copy_task_regs (struct task_struct *task, struct unw_frame_info *info, void *
 	unw_get_ar(info, UNW_AR_SSD, &dst[56]);
 }
 
+#ifndef XEN
+
 void
 do_dump_task_fpu (struct task_struct *task, struct unw_frame_info *info, void *arg)
 {
@@ -635,11 +644,15 @@ do_dump_task_fpu (struct task_struct *task, struct unw_frame_info *info, void *a
 		memcpy(dst + 32, task->thread.fph, 96*16);
 }
 
+#endif /* !XEN */
+
 void
 do_copy_regs (struct unw_frame_info *info, void *arg)
 {
 	do_copy_task_regs(current, info, arg);
 }
+
+#ifndef XEN
 
 void
 do_dump_fpu (struct unw_frame_info *info, void *arg)
@@ -662,11 +675,15 @@ dump_task_regs(struct task_struct *task, elf_gregset_t *regs)
 	return 1;
 }
 
+#endif /* !XEN */
+
 void
 ia64_elf_core_copy_regs (struct pt_regs *pt, elf_gregset_t dst)
 {
 	unw_init_running(do_copy_regs, dst);
 }
+
+#ifndef XEN
 
 int
 dump_task_fpu (struct task_struct *task, elf_fpregset_t *dst)
