@@ -65,8 +65,11 @@ typedef struct {
     unsigned long xen_compile_date;
     unsigned long xen_compile_time;
     unsigned long tainted;
-#ifdef CONFIG_X86
+#if defined(__i386__) || defined(__x86_64__)
     unsigned long dom0_pfn_to_mfn_frame_list_list;
+#endif
+#if defined(__ia64__)
+    unsigned long dom0_mm_pgd_mfn;
 #endif
 } crash_xen_info_t;
 

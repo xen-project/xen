@@ -15,16 +15,21 @@
 #include <linux/hardirq.h>
 #include <linux/smp.h>
 #include <asm/processor.h>
+#include <xen/sched.h>
 
 void machine_crash_shutdown(void)
 {
-    //printk("machine_crash_shutdown: %d\n", smp_processor_id());
+    crash_xen_info_t *info;
+    unsigned long dom0_mm_pgd_mfn;
+
     if (in_interrupt())
         ia64_eoi();
     kexec_crash_save_info();
-    printk(__FILE__ ": %s: save the eqivalent of x86's "
-           "dom0->shared_info->arch.pfn_to_mfn_frame_list_list?\n",
-           __FUNCTION__);
+    info = kexec_crash_save_info();
+    /* Info is not word aligned on ia64 */
+    dom0_mm_pgd_mfn = __pa(dom0->arch.mm.pgd) >> PAGE_SHIFT;
+    memcpy((char *)info + offsetof(crash_xen_info_t, dom0_mm_pgd_mfn),
+	   &dom0_mm_pgd_mfn, sizeof(dom0_mm_pgd_mfn));
 #ifdef CONFIG_SMP
     smp_send_stop();
 #endif
