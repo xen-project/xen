@@ -6,6 +6,8 @@
  * 04/11/17 Ashok Raj	<ashok.raj@intel.com> Added CPU Hotplug Support
  */
 #ifdef XEN
+#include <linux/cpu.h>
+#include <linux/notifier.h>
 #include <xen/types.h>
 #include <xen/lib.h>
 #include <xen/symbols.h>
@@ -15,6 +17,7 @@
 #include <asm/processor.h>
 #include <asm/ptrace.h>
 #include <asm/unwind.h>
+#include <asm/sal.h>
 #else
 #define __KERNEL_SYSCALLS__	/* see <asm/unistd.h> */
 #include <linux/config.h>
@@ -236,10 +239,15 @@ default_idle (void)
 		else
 			cpu_relax();
 }
+#endif
 
 #ifdef CONFIG_HOTPLUG_CPU
 /* We don't actually take CPU down, just spin without interrupts. */
+#ifndef XEN
 static inline void play_dead(void)
+#else
+void play_dead(void)
+#endif
 {
 	extern void ia64_cpu_local_tick (void);
 	unsigned int this_cpu = smp_processor_id();
@@ -249,7 +257,6 @@ static inline void play_dead(void)
 
 	max_xtp();
 	local_irq_disable();
-	idle_domain_exit();
 	ia64_jump_to_sal(&sal_boot_rendez_state[this_cpu]);
 	/*
 	 * The above is a point of no-return, the processor is
@@ -258,12 +265,17 @@ static inline void play_dead(void)
 	BUG();
 }
 #else
+#ifndef XEN
 static inline void play_dead(void)
+#else
+void play_dead(void)
+#endif
 {
 	BUG();
 }
 #endif /* CONFIG_HOTPLUG_CPU */
 
+#ifndef XEN
 void cpu_idle_wait(void)
 {
 	unsigned int cpu, this_cpu = get_cpu();

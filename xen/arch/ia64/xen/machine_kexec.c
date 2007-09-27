@@ -18,6 +18,9 @@
 #include <asm/meminit.h>
 #include <asm/hw_irq.h>
 #include <asm/kexec.h>
+#include <linux/cpu.h>
+#include <linux/cpu.h>
+#include <linux/notifier.h>
 
 typedef asmlinkage NORET_TYPE void (*relocate_new_kernel_t)(
 					unsigned long indirection_page,
@@ -83,9 +86,68 @@ static void ia64_machine_kexec(struct unw_frame_info *info, void *arg)
 	BUG();
 }
 
+#if CONFIG_SMP
+/* Need to implement some subset of hotplug-cpu - enough to
+ * send a cpu into rendevouz */
+
+/* N.B: The tasks frozen parameter can probably be dropped
+ *      This can probably be rolled into cpu_down
+ */
+static int _cpu_down(unsigned int cpu, int tasks_frozen)
+{
+	if (num_online_cpus() == 1)
+		return -EBUSY;
+
+	if (!cpu_online(cpu))
+		return -EINVAL;
+
+#ifndef XEN
+	/* XXX: What, if anything, should Xen do here? */
+	/* Ensure that we are not runnable on dying cpu */
+	old_affinity = current->cpus_allowed;
+	tmp = CPU_MASK_ALL;
+	cpu_clear(cpu, tmp);
+       set_cpus_allowed(current, tmp);
+#endif
+
+	cpu_clear(cpu, cpu_online_map);
+
+	__cpu_die(cpu);
+
+	return 0;
+}
+
+static int cpu_down(unsigned int cpu)
+{
+	int err;
+
+	/* Unlike Linux there is no lock, as there are no other callers
+	 * and no other CPUS. */
+	err = _cpu_down(cpu, 0);
+
+	return 0;
+}
+#endif /* SMP */
+
+/* This should probably be an arch-hook called from kexec_exec()
+ * Its also likely that it should be in the xen equivalent of
+ * arch/ia64/kernel/process.c */
+static void machine_shutdown(void)
+{
+#ifdef CONFIG_SMP
+	unsigned int cpu;
+
+	for_each_online_cpu(cpu) {
+		if (cpu != smp_processor_id())
+			cpu_down(cpu);
+	}
+#endif
+	kexec_disable_iosapic();
+}
+
 void machine_kexec(xen_kexec_image_t *image)
 {
-	kexec_disable_iosapic();
+	machine_shutdown();
 	unw_init_running(ia64_machine_kexec, image);
 	for(;;);
 }

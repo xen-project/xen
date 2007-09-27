@@ -147,8 +147,8 @@
 #ifndef XEN
 	.global ia64_sal_to_os_handoff_state
 	.global	ia64_os_to_sal_handoff_state
-	.global ia64_do_tlb_purge
 #endif
+	.global ia64_do_tlb_purge
 
 	.text
 	.align 16

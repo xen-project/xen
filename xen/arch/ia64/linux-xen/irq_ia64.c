@@ -180,6 +180,7 @@ ia64_handle_irq (ia64_vector vector, struct pt_regs *regs)
 	irq_exit();
 }
 
+#ifndef XEN
 #ifdef CONFIG_HOTPLUG_CPU
 /*
  * This function emulates a interrupt processing when a cpu is about to be
@@ -225,6 +226,7 @@ void ia64_process_pending_intr(void)
 	}
 	irq_exit();
 }
+#endif
 #endif
 
 

@@ -18,4 +18,5 @@ kobject.h		-> linux/include/linux/kobject.h
 device.h		-> linux/include/linux/device.h
 
 # The files below are from Linux-2.6.21
+cpu.h			-> linux/include/linux/cpu.h
 efi.h			-> linux/include/linux/efi.h

@@ -129,7 +129,7 @@ sal_desc_entry_point (void *p)
 static void __init
 set_smp_redirect (int flag)
 {
-#ifndef CONFIG_HOTPLUG_CPU
+#if defined(CONFIG_HOTPLUG_CPU) && !defined(XEN)
 	if (no_int_routing)
 		smp_int_redirect &= ~flag;
 	else

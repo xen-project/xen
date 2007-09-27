@@ -172,6 +172,27 @@ nointroute (char *str)
 
 __setup("nointroute", nointroute);
 
+static void fix_b0_for_bsp(void)
+{
+#ifdef CONFIG_HOTPLUG_CPU
+	int cpuid;
+	static int fix_bsp_b0 = 1;
+
+	cpuid = smp_processor_id();
+
+	/*
+	 * Cache the b0 value on the first AP that comes up
+	 */
+	if (!(fix_bsp_b0 && cpuid))
+		return;
+
+	sal_boot_rendez_state[0].br[0] = sal_boot_rendez_state[cpuid].br[0];
+	printk ("Fixed BSP b0 value from CPU %d\n", cpuid);
+
+	fix_bsp_b0 = 0;
+#endif
+}
+
 void
 sync_master (void *arg)
 {
@@ -357,6 +378,8 @@ smp_callin (void)
 		       phys_id, cpuid);
 		BUG();
 	}
+
+	fix_b0_for_bsp();
 
 	lock_ipi_calllock();
 	cpu_set(cpuid, cpu_online_map);
@@ -544,8 +567,10 @@ smp_build_cpu_map (void)
 
 	for (cpu = 0; cpu < NR_CPUS; cpu++) {
 		ia64_cpu_to_sapicid[cpu] = -1;
+#ifndef XEN
 #ifdef CONFIG_HOTPLUG_CPU
 		cpu_set(cpu, cpu_possible_map);
+#endif
 #endif
 	}
 
@@ -626,7 +651,7 @@ static struct {
 	__u8    valid;
 } mt_info[NR_CPUS] __devinitdata;
 
-#ifdef CONFIG_HOTPLUG_CPU
+#if defined(XEN) && !defined(CONFIG_HOTPLUG_CPU)
 static inline void
 remove_from_mtinfo(int cpu)
 {
@@ -690,12 +715,21 @@ int __cpu_disable(void)
 
 	remove_siblinginfo(cpu);
 	cpu_clear(cpu, cpu_online_map);
+#ifndef XEN
 	fixup_irqs();
+#endif
 	local_flush_tlb_all();
 	cpu_clear(cpu, cpu_callin_map);
 	return 0;
 }
+#else /* !CONFIG_HOTPLUG_CPU */
+int __cpu_disable(void)
+{
+	return -ENOSYS;
+}
+#endif /* CONFIG_HOTPLUG_CPU */
 
+#ifdef CONFIG_HOTPLUG_CPU
 void __cpu_die(unsigned int cpu)
 {
 	unsigned int i;
@@ -707,16 +741,17 @@ void __cpu_die(unsigned int cpu)
 			printk ("CPU %d is now offline\n", cpu);
 			return;
 		}
+#ifdef XEN
+		/* XXX: There must be a better way to sleep */
+		for (int j = 0; j < 1000000; j++)
+			cpu_relax();
+#else
 		msleep(100);
+#endif
 	}
  	printk(KERN_ERR "CPU %u didn't die...\n", cpu);
 }
 #else /* !CONFIG_HOTPLUG_CPU */
-int __cpu_disable(void)
-{
-	return -ENOSYS;
-}
-
 void __cpu_die(unsigned int cpu)
 {
 	/* We said "no" in __cpu_disable */

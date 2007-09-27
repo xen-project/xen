@@ -50,7 +50,10 @@
 #include <xen/guest_access.h>
 #include <asm/tlb_track.h>
 #include <asm/perfmon.h>
+#include <asm/sal.h>
 #include <public/vcpu.h>
+#include <linux/cpu.h>
+#include <linux/notifier.h>
 
 /* dom0_size: default memory allocation for dom0 (~4GB) */
 static unsigned long __initdata dom0_size = 4096UL*1024UL*1024UL;
@@ -336,8 +339,12 @@ static void default_idle(void)
 	local_irq_enable();
 }
 
+extern void play_dead(void);
+
 static void continue_cpu_idle_loop(void)
 {
+	int cpu = smp_processor_id();
+
 	for ( ; ; )
 	{
 #ifdef IA64
@@ -346,10 +353,12 @@ static void continue_cpu_idle_loop(void)
 	    irq_stat[cpu].idle_timestamp = jiffies;
 #endif
 	    page_scrub_schedule_work();
-	    while ( !softirq_pending(smp_processor_id()) )
+	    while ( !softirq_pending(cpu) )
 	        default_idle();
 	    raise_softirq(SCHEDULE_SOFTIRQ);
 	    do_softirq();
+	    if (!cpu_online(cpu))
+	        play_dead();
 	}
 }
 
