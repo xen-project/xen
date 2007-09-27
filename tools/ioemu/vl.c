@@ -24,6 +24,7 @@
 #include "vl.h"
 
 #include <unistd.h>
+#include <stdlib.h>
 #include <fcntl.h>
 #include <signal.h>
 #include <time.h>
@@ -38,22 +39,29 @@
 #include <sys/poll.h>
 #include <sys/mman.h>
 #include <sys/ioctl.h>
+#include <sys/resource.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
+#include <net/if.h>
+#if defined(__NetBSD__)
+#include <net/if_tap.h>
+#endif
+#if defined(__linux__) || defined(__Linux__)
+#include <linux/if_tun.h>
+#endif
 #include <arpa/inet.h>
 #include <dirent.h>
 #include <netdb.h>
 #ifdef _BSD
 #include <sys/stat.h>
-#ifndef __APPLE__
+#ifndef _BSD
 #include <libutil.h>
+#else
+#include <util.h>
 #endif
 #else
 #ifndef __sun__
-#include <linux/if.h>
-#include <linux/if_tun.h>
 #include <pty.h>
-#include <malloc.h>
 #include <linux/rtc.h>
 #include <linux/ppdev.h>
 #endif
@@ -65,7 +73,6 @@
 #endif
 
 #ifdef _WIN32
-#include <malloc.h>
 #include <sys/timeb.h>
 #include <windows.h>
 #define getopt_long_only getopt_long
@@ -91,7 +98,11 @@
 
 #include <xen/hvm/params.h>
 #define DEFAULT_NETWORK_SCRIPT "/etc/xen/qemu-ifup"
+#ifdef _BSD
+#define DEFAULT_BRIDGE "bridge0"
+#else 
 #define DEFAULT_BRIDGE "xenbr0"
+#endif
 #ifdef __sun__
 #define SMBD_COMMAND "/usr/sfw/sbin/smbd"
 #else
@@ -1794,7 +1805,7 @@ static int store_dev_info(char *devName, int domid,
     return 0;
 }
 
-#if defined(__linux__)
+#if defined(__linux__) || defined(__NetBSD__) || defined(__OpenBSD__)
 static CharDriverState *qemu_chr_open_pty(void)
 {
     struct termios tty;
@@ -1949,6 +1960,7 @@ static CharDriverState *qemu_chr_open_tty(const char *filename)
     return chr;
 }
 
+#if defined(__linux__)
 static int pp_ioctl(CharDriverState *chr, int cmd, void *arg)
 {
     int fd = (int)chr->opaque;
@@ -2013,13 +2025,14 @@ static CharDriverState *qemu_chr_open_pp(const char *filename)
 
     return chr;
 }
+#endif /* __linux__ */
 
 #else
 static CharDriverState *qemu_chr_open_pty(void)
 {
     return NULL;
 }
-#endif
+#endif /* __linux__ || __NetBSD__ || __OpenBSD__ */
 
 #endif /* !defined(_WIN32) */
 
@@ -2958,7 +2971,7 @@ static int parse_macaddr(uint8_t *macaddr, const char *p)
     return 0;
 }
 
-static int get_str_sep(char *buf, int buf_size, const char **pp, int sep)
+static int get_str_sep(char *buf, size_t buf_size, const char **pp, int sep)
 {
     const char *p, *p1;
     int len;
@@ -3031,7 +3044,7 @@ int parse_host_port(struct sockaddr_in *saddr, const char *str)
     if (buf[0] == '\0') {
         saddr->sin_addr.s_addr = 0;
     } else {
-        if (isdigit(buf[0])) {
+        if (isdigit((uint8_t)buf[0])) {
             if (!inet_aton(buf, &saddr->sin_addr))
                 return -1;
         } else {
@@ -3373,18 +3386,30 @@ static TAPState *net_tap_fd_init(VLANState *vlan, int fd)
 static int tap_open(char *ifname, int ifname_size)
 {
     int fd;
+#ifndef TAPGIFNAME
     char *dev;
     struct stat s;
+#endif
+    struct ifreq ifr;
 
     fd = open("/dev/tap", O_RDWR);
     if (fd < 0) {
-        fprintf(stderr, "warning: could not open /dev/tap: no virtual network emulation\n");
+        fprintf(stderr, "warning: could not open /dev/tap: no virtual network emulation %s\n", strerror(errno));
         return -1;
     }
 
+#ifdef TAPGIFNAME
+    if (ioctl (fd, TAPGIFNAME, (void*)&ifr) < 0) {
+       fprintf(stderr, "warning: could not open get tap name: %s\n",
+           strerror(errno));
+       return -1;
+    }
+    pstrcpy(ifname, ifname_size, ifr.ifr_name);
+#else
     fstat(fd, &s);
     dev = devname(s.st_rdev, S_IFCHR);
     pstrcpy(ifname, ifname_size, dev);
+#endif
 
     fcntl(fd, F_SETFL, O_NONBLOCK);
     return fd;
@@ -3434,6 +3459,8 @@ static int net_tap_init(VLANState *vlan, const char *ifname1,
     char *args[4];
     char **parg;
     char ifname[128];
+
+    memset(ifname, 0, sizeof(ifname));
 
     if (ifname1 != NULL)
         pstrcpy(ifname, sizeof(ifname), ifname1);
@@ -3611,7 +3638,7 @@ static int net_socket_mcast_create(struct sockaddr_in *mcastaddr)
 
     val = 1;
     ret=setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, 
-                   (const char *)&val, sizeof(val));
+                   (const char *)&val, sizeof(char));
     if (ret < 0) {
 	perror("setsockopt(SOL_SOCKET, SO_REUSEADDR)");
 	goto fail;
@@ -3893,7 +3920,7 @@ static int net_socket_mcast_init(VLANState *vlan, const char *host_str)
 
 }
 
-static int get_param_value(char *buf, int buf_size,
+static int get_param_value(char *buf, size_t buf_size,
                            const char *tag, const char *str)
 {
     const char *p;
@@ -4019,6 +4046,10 @@ static int net_client_init(const char *str)
         char setup_script[1024];
         char bridge[16];
         int fd;
+
+	memset(ifname, 0, sizeof(ifname));
+	memset(setup_script, 0, sizeof(setup_script));
+
         if (get_param_value(buf, sizeof(buf), "fd", p) > 0) {
             fd = strtol(buf, NULL, 0);
             ret = -1;
@@ -6914,7 +6945,6 @@ static int qemu_map_cache_init(void)
     nr_buckets = (((MAX_MCACHE_SIZE >> PAGE_SHIFT) +
                    (1UL << (MCACHE_BUCKET_SHIFT - PAGE_SHIFT)) - 1) >>
                   (MCACHE_BUCKET_SHIFT - PAGE_SHIFT));
-    fprintf(logfile, "qemu_map_cache_init nr_buckets = %lx\n", nr_buckets);
 
     /*
      * Use mmap() directly: lets us allocate a big hash table with no up-front
@@ -6923,8 +6953,9 @@ static int qemu_map_cache_init(void)
      */
     size = nr_buckets * sizeof(struct map_cache);
     size = (size + PAGE_SIZE - 1) & ~(PAGE_SIZE - 1);
+    fprintf(logfile, "qemu_map_cache_init nr_buckets = %lx size %lu\n", nr_buckets, size);
     mapcache_entry = mmap(NULL, size, PROT_READ|PROT_WRITE,
-                          MAP_SHARED|MAP_ANONYMOUS, 0, 0);
+                          MAP_SHARED|MAP_ANON, -1, 0);
     if (mapcache_entry == MAP_FAILED) {
         errno = ENOMEM;
         return -1;
@@ -7061,6 +7092,7 @@ int main(int argc, char **argv)
     unsigned long ioreq_pfn;
     extern void *shared_page;
     extern void *buffered_io_page;
+    struct rlimit rl;
 #ifdef __ia64__
     unsigned long nr_pages;
     xen_pfn_t *page_array;
@@ -7069,6 +7101,30 @@ int main(int argc, char **argv)
     sigset_t set;
     char qemu_dm_logfilename[128];
     const char *direct_pci = NULL;
+
+    /* Maximise rlimits. Needed where default constraints are tight (*BSD). */
+    if (getrlimit(RLIMIT_STACK, &rl) != 0) {
+       perror("getrlimit(RLIMIT_STACK)");
+       exit(1);
+    }
+    rl.rlim_cur = rl.rlim_max;
+    if (setrlimit(RLIMIT_STACK, &rl) != 0)
+       perror("setrlimit(RLIMIT_STACK)");
+    if (getrlimit(RLIMIT_DATA, &rl) != 0) {
+       perror("getrlimit(RLIMIT_DATA)");
+       exit(1);
+    }
+    rl.rlim_cur = rl.rlim_max;
+    if (setrlimit(RLIMIT_DATA, &rl) != 0)
+       perror("setrlimit(RLIMIT_DATA)");
+    rl.rlim_cur = RLIM_INFINITY;
+    rl.rlim_max = RLIM_INFINITY;
+    if (setrlimit(RLIMIT_RSS, &rl) != 0)
+       perror("setrlimit(RLIMIT_RSS)");
+    rl.rlim_cur = RLIM_INFINITY;
+    rl.rlim_max = RLIM_INFINITY;
+    if (setrlimit(RLIMIT_MEMLOCK, &rl) != 0)
+       perror("setrlimit(RLIMIT_MEMLOCK)");
 
     /* Ensure that SIGUSR2 is blocked by default when a new thread is created,
        then only the threads that use the signal unblock it -- this fixes a

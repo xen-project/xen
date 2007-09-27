@@ -2,6 +2,10 @@
 #define QEMU_OSDEP_H
 
 #include <stdarg.h>
+#ifdef __OpenBSD__
+#include <sys/types.h>
+#include <sys/signal.h>
+#endif
 
 #define qemu_printf printf
 

@@ -24,6 +24,9 @@
  * THE SOFTWARE.
  */
 
+#include <sys/stat.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
 #include "vl.h"
 #include "qemu_socket.h"
 #include <assert.h>

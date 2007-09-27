@@ -268,7 +268,7 @@ static int get_tag_value(char *buf, int buf_size,
     if (!p)
         return -1;
     p += strlen(tag);
-    while (isspace(*p))
+    while (isspace((uint8_t)*p))
         p++;
     q = buf;
     while (*p != '\0' && !strchr(stopchars, *p)) {
