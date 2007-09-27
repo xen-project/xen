@@ -23,6 +23,10 @@
  *
  *  Yunhong Jiang <yunhong.jiang@intel.com>
  *  Ported to xen by using virtual IRQ line.
+ * 
+ *  Copyright (C) 2007 VA Linux Systems Japan K.K.
+ *  Isaku Yamahata <yamahata at valinux co jp>
+ *  SMP support
  */
 
 #include <xen/config.h>
@@ -44,6 +48,7 @@ static void viosapic_deliver(struct viosapic *viosapic, int irq)
     uint8_t vector = viosapic->redirtbl[irq].vector;
     struct vcpu *v;
 
+    ASSERT(spin_is_locked(&viosapic->lock));
     switch ( delivery_mode )
     {
     case SAPIC_FIXED:
@@ -90,6 +95,7 @@ static int get_redir_num(struct viosapic *viosapic, int vector)
 {
     int i;
 
+    ASSERT(spin_is_locked(&viosapic->lock));
     for ( i = 0; i < VIOSAPIC_NUM_PINS; i++ )
         if ( viosapic->redirtbl[i].vector == vector )
             return i;
@@ -118,19 +124,23 @@ static void viosapic_update_EOI(struct viosapic *viosapic, int vector)
 {
     int redir_num;
 
+    spin_lock(&viosapic->lock);
     if ( (redir_num = get_redir_num(viosapic, vector)) == -1 )
     {
+        spin_unlock(&viosapic->lock);
         gdprintk(XENLOG_WARNING, "Can't find redir item for %d EOI\n", vector);
         return;
     }
 
     if ( !test_and_clear_bit(redir_num, &viosapic->isr) )
     {
+        spin_unlock(&viosapic->lock);
         gdprintk(XENLOG_WARNING, "redir %d not set for %d EOI\n",
                  redir_num, vector);
         return;
     }
     service_iosapic(viosapic);
+    spin_unlock(&viosapic->lock);
 }
 
 
@@ -149,18 +159,21 @@ static unsigned long viosapic_read_indirect(struct viosapic *viosapic,
 
     default:
     {
-        uint32_t redir_index = (viosapic->ioregsel - 0x10) >> 1;
+        /* ioregsel might be written at the same time. copy it before use. */
+        uint32_t ioregsel = viosapic->ioregsel;
+        uint32_t redir_index;
         uint64_t redir_content;
 
+        redir_index = (ioregsel - 0x10) >> 1;
         if ( redir_index >= VIOSAPIC_NUM_PINS )
         {
             gdprintk(XENLOG_WARNING, "viosapic_read_indirect:undefined "
-                     "ioregsel %x\n", viosapic->ioregsel);
+                     "ioregsel %x\n", ioregsel);
             break;
         }
 
         redir_content = viosapic->redirtbl[redir_index].bits;
-        result = (viosapic->ioregsel & 0x1) ?
+        result = (ioregsel & 0x1) ?
                  (redir_content >> 32) & 0xffffffff :
                  redir_content & 0xffffffff;
         break;
@@ -212,9 +225,12 @@ static void viosapic_write_indirect(struct viosapic *viosapic,
 
     default:
     {
-        uint32_t redir_index = (viosapic->ioregsel - 0x10) >> 1;
+        /* ioregsel might be written at the same time. copy it before use. */
+        uint32_t ioregsel = viosapic->ioregsel;
+        uint32_t redir_index;
         uint64_t redir_content;
 
+        redir_index = (ioregsel - 0x10) >> 1;
         if ( redir_index >= VIOSAPIC_NUM_PINS )
         {
             gdprintk(XENLOG_WARNING, "viosapic_write_indirect "
@@ -222,9 +238,10 @@ static void viosapic_write_indirect(struct viosapic *viosapic,
             break;
         }
 
+        spin_lock(&viosapic->lock);
         redir_content = viosapic->redirtbl[redir_index].bits;
 
-        if ( viosapic->ioregsel & 0x1 )
+        if ( ioregsel & 0x1 )
         {
             redir_content = (((uint64_t)val & 0xffffffff) << 32) |
                             (redir_content & 0xffffffff);
@@ -235,6 +252,7 @@ static void viosapic_write_indirect(struct viosapic *viosapic,
                             (val & 0xffffffff);
         }
         viosapic->redirtbl[redir_index].bits = redir_content;
+        spin_unlock(&viosapic->lock);
         break;
     }
     } /* switch */

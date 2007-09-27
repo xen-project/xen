@@ -768,6 +768,8 @@ static void vlsapic_write_xtp(struct vcpu *v, uint8_t val)
     struct viosapic * viosapic;
     struct vcpu *lvcpu, *vcpu;
     viosapic = vcpu_viosapic(v); 
+
+    spin_lock(&viosapic->lock);
     lvcpu = viosapic->lowest_vcpu;
     VLSAPIC_XTP(v) = val;
     
@@ -780,6 +782,7 @@ static void vlsapic_write_xtp(struct vcpu *v, uint8_t val)
         lvcpu = NULL;
 
     viosapic->lowest_vcpu = lvcpu;
+    spin_unlock(&viosapic->lock);
 }
 
 void vlsapic_write(struct vcpu *v,
