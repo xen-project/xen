@@ -56,22 +56,6 @@
 // doesn't appear to be include'able from assembly?
 #define IA64_TIMER_VECTOR 0xef
 
-// Should be included from common header file (also in process.c)
-//  NO PSR_CLR IS DIFFERENT! (CPL)
-#define IA64_PSR_CPL1	(__IA64_UL(1) << IA64_PSR_CPL1_BIT)
-#define IA64_PSR_CPL0	(__IA64_UL(1) << IA64_PSR_CPL0_BIT)
-// note IA64_PSR_PK removed from following, why is this necessary?
-#define	DELIVER_PSR_SET	(IA64_PSR_IC | IA64_PSR_I | \
-			IA64_PSR_DT | IA64_PSR_RT | \
-			IA64_PSR_IT | IA64_PSR_BN)
-
-#define	DELIVER_PSR_CLR	(IA64_PSR_AC | IA64_PSR_DFL | IA64_PSR_DFH | \
-			IA64_PSR_SP | IA64_PSR_DI | IA64_PSR_SI |	\
-			IA64_PSR_DB | IA64_PSR_LP | IA64_PSR_TB | \
-			IA64_PSR_MC | IA64_PSR_IS | \
-			IA64_PSR_ID | IA64_PSR_DA | IA64_PSR_DD | \
-			IA64_PSR_SS | IA64_PSR_RI | IA64_PSR_ED | IA64_PSR_IA)
-
 // Note: not hand-scheduled for now
 //  Registers at entry
 //	r16 == cr.isr
@@ -250,7 +234,7 @@ ENTRY(hyper_ssm_i)
 	// set cr.ipsr
 	mov r29=r30
 	movl r28=DELIVER_PSR_SET
-	movl r27=~DELIVER_PSR_CLR;;
+	movl r27=~(DELIVER_PSR_CLR & (~IA64_PSR_CPL));;
 	and r29=r29,r27;;
 	or r29=r29,r28;;
 	// set hpsr_dfh to ipsr
@@ -438,7 +422,7 @@ GLOBAL_ENTRY(fast_tick_reflect)
 	// set cr.ipsr (make sure cpl==2!)
 	mov r29=r17
 	movl r28=DELIVER_PSR_SET | (CONFIG_CPL0_EMUL << IA64_PSR_CPL0_BIT)
-	movl r27=~(DELIVER_PSR_CLR|IA64_PSR_CPL0|IA64_PSR_CPL1);;
+	movl r27=~DELIVER_PSR_CLR;;
 	and r29=r29,r27;;
 	or r29=r29,r28;;
 	mov cr.ipsr=r29;;
@@ -611,7 +595,7 @@ ENTRY(fast_reflect)
 	mov r29=r30 ;;
 	ld8 r21=[r21]
 	movl r28=DELIVER_PSR_SET | (CONFIG_CPL0_EMUL << IA64_PSR_CPL0_BIT)
-	movl r27=~(DELIVER_PSR_CLR|IA64_PSR_CPL0|IA64_PSR_CPL1);;
+	movl r27=~DELIVER_PSR_CLR;;
 	and r29=r29,r27;;
 	or r29=r29,r28;;
 	// set hpsr_dfh to ipsr
@@ -1269,7 +1253,7 @@ ENTRY(rfi_with_interrupt)
 	movl r22=THIS_CPU(current_psr_i_addr)
 	// set cr.ipsr (make sure cpl==2!)
 	mov r29=r17
-	movl r27=~(DELIVER_PSR_CLR|IA64_PSR_CPL0|IA64_PSR_CPL1)
+	movl r27=~DELIVER_PSR_CLR
 	movl r28=DELIVER_PSR_SET | (CONFIG_CPL0_EMUL << IA64_PSR_CPL0_BIT)
 	mov r20=1;;
 	ld8 r22=[r22]

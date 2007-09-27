@@ -38,18 +38,6 @@ extern void die_if_kernel(char *str, struct pt_regs *regs, long err);
 extern int ia64_hyperprivop(unsigned long, REGS *);
 extern IA64FAULT ia64_hypercall(struct pt_regs *regs);
 
-// note IA64_PSR_PK removed from following, why is this necessary?
-#define	DELIVER_PSR_SET	(IA64_PSR_IC | IA64_PSR_I | \
-			IA64_PSR_DT | IA64_PSR_RT | \
-			IA64_PSR_IT | IA64_PSR_BN)
-
-#define	DELIVER_PSR_CLR	(IA64_PSR_AC | IA64_PSR_DFL | IA64_PSR_DFH |	\
-			 IA64_PSR_SP | IA64_PSR_DI | IA64_PSR_SI |	\
-			 IA64_PSR_DB | IA64_PSR_LP | IA64_PSR_TB |	\
-			 IA64_PSR_CPL| IA64_PSR_MC | IA64_PSR_IS |	\
-			 IA64_PSR_ID | IA64_PSR_DA | IA64_PSR_DD |	\
-			 IA64_PSR_SS | IA64_PSR_RI | IA64_PSR_ED | IA64_PSR_IA)
-
 extern void do_ssc(unsigned long ssc, struct pt_regs *regs);
 
 // should never panic domain... if it does, stack may have been overrun
