@@ -29,7 +29,8 @@ $(TARGET): $(TARGET)-syms
 # Headers do not depend on auto-generated header, but object files do.
 $(ALL_OBJS): $(BASEDIR)/include/asm-ia64/asm-xsi-offsets.h
 
-asm-offsets.s: asm-offsets.c $(BASEDIR)/include/asm-ia64/.offsets.h.stamp
+asm-offsets.s: asm-offsets.c $(HDRS) \
+    $(BASEDIR)/include/asm-ia64/.offsets.h.stamp 
 	$(CC) $(CFLAGS) -DGENERATE_ASM_OFFSETS -DIA64_TASK_SIZE=0 -S -o $@ $<
 
 asm-xsi-offsets.s: asm-xsi-offsets.c $(HDRS)
