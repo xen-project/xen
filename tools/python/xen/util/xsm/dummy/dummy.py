@@ -6,6 +6,7 @@ class XSMError(Exception):
     def __str__(self):
         return repr(self.value)
 
+security_dir_prefix = "";
 policy_dir_prefix = "";
 active_policy = "";
 NULL_SSIDREF = 0;
