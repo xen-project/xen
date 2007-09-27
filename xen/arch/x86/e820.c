@@ -416,11 +416,9 @@ int __init reserve_e820_ram(struct e820map *e820, uint64_t s, uint64_t e)
         /* Truncate end. */
         e820->map[i].size -= e - s;
     }
-    else
+    else if ( e820->nr_map < ARRAY_SIZE(e820->map) )
     {
         /* Split in two. */
-        if ( e820->nr_map >= ARRAY_SIZE(e820->map) )
-            return 0;
         memmove(&e820->map[i+1], &e820->map[i],
                 (e820->nr_map-i) * sizeof(e820->map[0]));
         e820->nr_map++;
@@ -428,6 +426,21 @@ int __init reserve_e820_ram(struct e820map *e820, uint64_t s, uint64_t e)
         i++;
         e820->map[i].addr = e;
         e820->map[i].size = re - e;
+    }
+    else
+    {
+        /* e820map is at maximum size. We have to leak some space. */
+        if ( (s - rs) > (re - e) )
+        {
+            printk("e820 overflow: leaking RAM %"PRIx64"-%"PRIx64"\n", e, re);
+            e820->map[i].size = s - rs;
+        }
+        else
+        {
+            printk("e820 overflow: leaking RAM %"PRIx64"-%"PRIx64"\n", rs, s);
+            e820->map[i].addr = e;
+            e820->map[i].size = re - e;
+        }
     }
 
     return 1;
