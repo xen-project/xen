@@ -195,6 +195,10 @@
  */
 
 ia64_do_tlb_purge:
+#ifdef XEN
+	// This needs to be called in order for GET_THIS_PADDR to work
+	SET_PER_CPU_DATA();;
+#endif
 #define O(member)	IA64_CPUINFO_##member##_OFFSET
 
 	GET_THIS_PADDR(r2, cpu_info)	// load phys addr of cpu_info into r2
@@ -263,7 +267,16 @@ ia64_do_tlb_purge:
 	srlz.i
 	;;
 	// 4. Purge DTR for stack.
+#ifdef XEN
+	// Kernel registers are saved in a per_cpu cpu_kr_ia64_t
+	// to allow the kernel registers themselves to be used by domains.
+	GET_THIS_PADDR(r2, cpu_kr);;
+	add r2=IA64_KR_CURRENT_STACK_OFFSET,r2
+	;;
+	ld8 r16=[r2]
+#else
 	mov r16=IA64_KR(CURRENT_STACK)
+#endif
 	;;
 	shl r16=r16,IA64_GRANULE_SHIFT
 	movl r19=PAGE_OFFSET
@@ -277,8 +290,8 @@ ia64_do_tlb_purge:
 	;;
 #ifdef XEN
 	// 5. VHPT
+	// r2 = __va_ul(vcpu_vhpt_maddr(v));
 #if VHPT_ENABLED
-	// r25 = __va_ul(vcpu_vhpt_maddr(v));
 	GET_THIS_PADDR(r2,cpu_kr);;
 	add r2=IA64_KR_CURRENT_OFFSET,r2;;
 	ld8 r2=[r2];;
@@ -296,18 +309,18 @@ ia64_do_tlb_purge:
 	add r2=IA64_VCPU_VHPT_MADDR_OFFSET,r2;;
 	dep r2=0,r2,60,4;;			// virtual to physical
 	ld8 r2=[r2];; 
-	dep r25=-1,r2,60,4;;			// physical to virtual
+	dep r2=-1,r2,60,4;;			// physical to virtual
 	br.sptk		.percpu_vhpt_done
 #endif
 .not_pervcpu_vhpt:
 	GET_THIS_PADDR(r2, vhpt_paddr);; 
 	ld8 r2=[r2];; 
-	dep r25=-1,r2,60,4;;			// physical to virtual
+	dep r2=-1,r2,60,4;;			// physical to virtual
 .percpu_vhpt_done:
-	dep r20=0,r25,0,IA64_GRANULE_SHIFT
-	mov r24=IA64_GRANULE_SHIFT<<2
+	dep r16=0,r2,0,IA64_GRANULE_SHIFT
+	mov r18=IA64_GRANULE_SHIFT<<2
 	;;
-	ptr.d r20,r24
+	ptr.d r16,r18
 	;;
 	srlz.d
 	;;
