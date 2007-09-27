@@ -4,6 +4,9 @@
  *
  * Copyright (c) 2007, FUJITSU LIMITED
  *      Kouya Shimura <kouya at jp fujitsu com>
+ * Copyright (c) 2007 VA Linux Systems Japan K.K
+ *      Isaku Yamahata <yamahata at valinux co jp>
+ *      SMP support
  *
  * Copyright (c) 2007, XenSource inc.
  * Copyright (c) 2006, Intel Corporation.
@@ -49,9 +52,14 @@
 #define TMR_VAL_MASK  (0xffffffff)
 #define TMR_VAL_MSB   (0x80000000)
 
+/*
+ * Locking order: vacpi->lock => viosapic->lock
+ * pmt_update_sci() => viosapic_set_irq() => viosapic->lock
+ */
 /* Dispatch SCIs based on the PM1a_STS and PM1a_EN registers */
 static void pmt_update_sci(struct domain *d, struct vacpi *s)
 {
+	ASSERT(spin_is_locked(&s->lock));
 	if (s->regs.pm1a_en & s->regs.pm1a_sts & SCI_MASK)
 		viosapic_set_irq(d, SCI_IRQ, 1);  /* Assert */
 	else
@@ -67,6 +75,8 @@ static void pmt_update_time(struct domain *d)
 	unsigned long delta;
 	uint32_t msb = s->regs.tmr_val & TMR_VAL_MSB;
 
+	ASSERT(spin_is_locked(&s->lock));
+	
 	/* Update the timer */
 	curr_gtime = NOW();
 	delta = curr_gtime - s->last_gtime;
@@ -91,6 +101,8 @@ static void pmt_timer_callback(void *opaque)
 	struct vacpi *s = &d->arch.hvm_domain.vacpi;
 	uint64_t cycles, time_flip;
 
+	spin_lock(&s->lock);
+
 	/* Recalculate the timer and make sure we get an SCI if we need one */
 	pmt_update_time(d);
 
@@ -102,6 +114,8 @@ static void pmt_timer_callback(void *opaque)
 
 	/* Wake up again near the next bit-flip */
 	set_timer(&s->timer, NOW() + time_flip + MILLISECS(1));
+
+	spin_unlock(&s->lock);
 }
 
 int vacpi_intercept(ioreq_t * iop, u64 * val)
@@ -113,6 +127,7 @@ int vacpi_intercept(ioreq_t * iop, u64 * val)
 	if (addr_off < 4) {	/* Access to PM1a_STS and PM1a_EN registers */
 		void *p = (void *)&s->regs.evt_blk + addr_off;
 
+		spin_lock(&s->lock);
 		if (iop->dir == 1) {	/* Read */
 			if (iop->size == 1)
 				*val = *(uint8_t *) p;
@@ -137,6 +152,7 @@ int vacpi_intercept(ioreq_t * iop, u64 * val)
 			/* Fix the SCI state to match the new register state */
 			pmt_update_sci(d, s);
 		}
+		spin_unlock(&s->lock);
 
 		iop->state = STATE_IORESP_READY;
 		vmx_io_assist(current);
@@ -147,8 +163,10 @@ int vacpi_intercept(ioreq_t * iop, u64 * val)
 		if (iop->size != 4)
 			panic_domain(NULL, "wrong ACPI PM timer access\n");
 		if (iop->dir == 1) {	/* Read */
+			spin_lock(&s->lock);
 			pmt_update_time(d);
 			*val = s->regs.tmr_val;
+			spin_unlock(&s->lock);
 		}
 		/* PM_TMR_BLK is read-only */
 		iop->state = STATE_IORESP_READY;
@@ -162,6 +180,8 @@ int vacpi_intercept(ioreq_t * iop, u64 * val)
 void vacpi_init(struct domain *d)
 {
 	struct vacpi *s = &d->arch.hvm_domain.vacpi;
+
+	spin_lock_init(&s->lock);
 
 	s->regs.tmr_val = 0;
 	s->regs.evt_blk = 0;

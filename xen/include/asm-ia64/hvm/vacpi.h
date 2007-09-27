@@ -46,6 +46,7 @@ struct vacpi {
 	struct vacpi_regs regs;
 	s_time_t last_gtime;
 	struct timer timer;
+	spinlock_t lock;
 };
 
 int vacpi_intercept(ioreq_t * p, u64 * val);
