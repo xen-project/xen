@@ -85,6 +85,7 @@ static void ia64_machine_kexec(struct unw_frame_info *info, void *arg)
 
 void machine_kexec(xen_kexec_image_t *image)
 {
+	kexec_disable_iosapic();
 	unw_init_running(ia64_machine_kexec, image);
 	for(;;);
 }

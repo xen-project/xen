@@ -30,6 +30,7 @@ void machine_crash_shutdown(void)
     dom0_mm_pgd_mfn = __pa(dom0->arch.mm.pgd) >> PAGE_SHIFT;
     memcpy((char *)info + offsetof(crash_xen_info_t, dom0_mm_pgd_mfn),
 	   &dom0_mm_pgd_mfn, sizeof(dom0_mm_pgd_mfn));
+    kexec_disable_iosapic();
 #ifdef CONFIG_SMP
     smp_send_stop();
 #endif
