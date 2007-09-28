@@ -72,6 +72,9 @@ enum hvm_intack {
 struct hvm_function_table {
     char *name;
 
+    /* Support Hardware-Assisted Paging? */
+    int hap_supported;
+
     /*
      * Initialise/destroy HVM domain/vcpu resources
      */

@@ -69,9 +69,6 @@ static void *hsa[NR_CPUS] __read_mostly;
 /* vmcb used for extended host state */
 static void *root_vmcb[NR_CPUS] __read_mostly;
 
-/* hardware assisted paging bits */
-extern int opt_hap_enabled;
-
 static void inline __update_guest_eip(
     struct cpu_user_regs *regs, int inst_len) 
 {
@@ -936,18 +933,14 @@ static struct hvm_function_table svm_function_table = {
     .event_pending        = svm_event_pending
 };
 
-static void svm_npt_detect(void)
+static int svm_npt_detect(void)
 {
     u32 eax, ebx, ecx, edx;
 
     /* Check CPUID for nested paging support. */
     cpuid(0x8000000A, &eax, &ebx, &ecx, &edx);
 
-    if ( !(edx & 1) && opt_hap_enabled )
-    {
-        printk("SVM: Nested paging is not supported by this CPU.\n");
-        opt_hap_enabled = 0;
-    }
+    return (edx & 1);
 }
 
 int start_svm(struct cpuinfo_x86 *c)
@@ -978,8 +971,6 @@ int start_svm(struct cpuinfo_x86 *c)
 
     write_efer(read_efer() | EFER_SVME);
 
-    svm_npt_detect();
-
     /* Initialize the HSA for this core. */
     phys_hsa = (u64) virt_to_maddr(hsa[cpu]);
     phys_hsa_lo = (u32) phys_hsa;
@@ -994,11 +985,10 @@ int start_svm(struct cpuinfo_x86 *c)
 
     setup_vmcb_dump();
 
+    svm_function_table.hap_supported = svm_npt_detect();
+
     hvm_enable(&svm_function_table);
 
-    if ( opt_hap_enabled )
-        printk("SVM: Nested paging enabled.\n");
-        
     return 1;
 }
 

@@ -49,6 +49,10 @@
 #include <public/version.h>
 #include <public/memory.h>
 
+/* Xen command-line option to disable hardware-assisted paging */
+static int opt_hap_disabled;
+invbool_param("hap", opt_hap_disabled);
+
 int hvm_enabled __read_mostly;
 
 unsigned int opt_hvm_debug_level __read_mostly;
@@ -74,6 +78,14 @@ void hvm_enable(struct hvm_function_table *fns)
 
     hvm_funcs   = *fns;
     hvm_enabled = 1;
+
+    if ( hvm_funcs.hap_supported )
+    {
+        if ( opt_hap_disabled )
+            hvm_funcs.hap_supported = 0;
+        printk("HVM: Hardware Assisted Paging %sabled\n",
+               hvm_funcs.hap_supported ? "en" : "dis");
+    }
 }
 
 void hvm_set_guest_time(struct vcpu *v, u64 gtime)
