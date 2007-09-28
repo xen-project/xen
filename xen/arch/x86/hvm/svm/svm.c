@@ -69,6 +69,8 @@ static void *hsa[NR_CPUS] __read_mostly;
 /* vmcb used for extended host state */
 static void *root_vmcb[NR_CPUS] __read_mostly;
 
+static void svm_update_guest_efer(struct vcpu *v);
+
 static void inline __update_guest_eip(
     struct cpu_user_regs *regs, int inst_len) 
 {
@@ -103,22 +105,10 @@ static void svm_cpu_down(void)
     write_efer(read_efer() & ~EFER_SVME);
 }
 
-static int svm_lme_is_set(struct vcpu *v)
-{
-#ifdef __x86_64__
-    u64 guest_efer = v->arch.hvm_vcpu.guest_efer;
-    return guest_efer & EFER_LME;
-#else
-    return 0;
-#endif
-}
-
 static enum handler_return long_mode_do_msr_write(struct cpu_user_regs *regs)
 {
     u64 msr_content = (u32)regs->eax | ((u64)regs->edx << 32);
     u32 ecx = regs->ecx;
-    struct vcpu *v = current;
-    struct vmcb_struct *vmcb = v->arch.hvm_svm.vmcb;
 
     HVM_DBG_LOG(DBG_LEVEL_0, "msr %x msr_content %"PRIx64,
                 ecx, msr_content);
@@ -126,47 +116,8 @@ static enum handler_return long_mode_do_msr_write(struct cpu_user_regs *regs)
     switch ( ecx )
     {
     case MSR_EFER:
-        /* Offending reserved bit will cause #GP. */
-#ifdef __x86_64__
-        if ( (msr_content & ~(EFER_LME | EFER_LMA | EFER_NX | EFER_SCE)) ||
-#else
-        if ( (msr_content & ~(EFER_NX | EFER_SCE)) ||
-#endif
-             (!cpu_has_nx && (msr_content & EFER_NX)) ||
-             (!cpu_has_syscall && (msr_content & EFER_SCE)) )
-        {
-            gdprintk(XENLOG_WARNING, "Trying to set reserved bit in "
-                     "EFER: %"PRIx64"\n", msr_content);
-            goto gp_fault;
-        }
-
-        if ( (msr_content & EFER_LME) && !svm_lme_is_set(v) )
-        {
-            /* EFER.LME transition from 0 to 1. */
-            if ( hvm_paging_enabled(v) ||
-                 !(v->arch.hvm_vcpu.guest_cr[4] & X86_CR4_PAE) )
-            {
-                gdprintk(XENLOG_WARNING, "Trying to set LME bit when "
-                         "in paging mode or PAE bit is not set\n");
-                goto gp_fault;
-            }
-        }
-        else if ( !(msr_content & EFER_LME) && svm_lme_is_set(v) )
-        {
-            /* EFER.LME transistion from 1 to 0. */
-            if ( hvm_paging_enabled(v) )
-            {
-                gdprintk(XENLOG_WARNING, 
-                         "Trying to clear EFER.LME while paging enabled\n");
-                goto gp_fault;
-            }
-        }
-
-        v->arch.hvm_vcpu.guest_efer = msr_content;
-        vmcb->efer = msr_content | EFER_SVME;
-        if ( !hvm_paging_enabled(v) )
-            vmcb->efer &= ~(EFER_LME | EFER_LMA);
-
+        if ( !hvm_set_efer(msr_content) )
+            return HNDL_exception_raised;
         break;
 
     case MSR_K8_MC4_MISC: /* Threshold register */
@@ -182,10 +133,6 @@ static enum handler_return long_mode_do_msr_write(struct cpu_user_regs *regs)
     }
 
     return HNDL_done;
-
- gp_fault:
-    svm_inject_exception(v, TRAP_gp_fault, 1, 0);
-    return HNDL_exception_raised;
 }
 
 
@@ -449,11 +396,7 @@ static void svm_load_cpu_state(struct vcpu *v, struct hvm_hw_cpu *data)
     vmcb->cstar      = data->msr_cstar;
     vmcb->sfmask     = data->msr_syscall_mask;
     v->arch.hvm_vcpu.guest_efer = data->msr_efer;
-    vmcb->efer       = data->msr_efer | EFER_SVME;
-    /* VMCB's EFER.LME isn't set unless we're actually in long mode
-     * (see long_mode_do_msr_write()) */
-    if ( !(vmcb->efer & EFER_LMA) )
-        vmcb->efer &= ~EFER_LME;
+    svm_update_guest_efer(v);
 
     hvm_set_guest_time(v, data->tsc);
 }
@@ -543,14 +486,11 @@ static void svm_update_guest_cr(struct vcpu *v, unsigned int cr)
 
 static void svm_update_guest_efer(struct vcpu *v)
 {
-#ifdef __x86_64__
     struct vmcb_struct *vmcb = v->arch.hvm_svm.vmcb;
 
-    if ( v->arch.hvm_vcpu.guest_efer & EFER_LMA )
-        vmcb->efer |= EFER_LME | EFER_LMA;
-    else
-        vmcb->efer &= ~(EFER_LME | EFER_LMA);
-#endif
+    vmcb->efer = (v->arch.hvm_vcpu.guest_efer | EFER_SVME) & ~EFER_LME;
+    if ( vmcb->efer & EFER_LMA )
+        vmcb->efer |= EFER_LME;
 }
 
 static void svm_flush_guest_tlbs(void)

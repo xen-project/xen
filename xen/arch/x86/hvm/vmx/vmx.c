@@ -199,42 +199,8 @@ static enum handler_return long_mode_do_msr_write(struct cpu_user_regs *regs)
     switch ( ecx )
     {
     case MSR_EFER:
-        /* offending reserved bit will cause #GP */
-        if ( (msr_content & ~(EFER_LME | EFER_LMA | EFER_NX | EFER_SCE)) ||
-             (!cpu_has_nx && (msr_content & EFER_NX)) ||
-             (!cpu_has_syscall && (msr_content & EFER_SCE)) )
-        {
-            gdprintk(XENLOG_WARNING, "Trying to set reserved bit in "
-                     "EFER: %"PRIx64"\n", msr_content);
-            goto gp_fault;
-        }
-
-        if ( (msr_content & EFER_LME)
-             &&  !(v->arch.hvm_vcpu.guest_efer & EFER_LME) )
-        {
-            if ( unlikely(hvm_paging_enabled(v)) )
-            {
-                gdprintk(XENLOG_WARNING,
-                         "Trying to set EFER.LME with paging enabled\n");
-                goto gp_fault;
-            }
-        }
-        else if ( !(msr_content & EFER_LME)
-                  && (v->arch.hvm_vcpu.guest_efer & EFER_LME) )
-        {
-            if ( unlikely(hvm_paging_enabled(v)) )
-            {
-                gdprintk(XENLOG_WARNING,
-                         "Trying to clear EFER.LME with paging enabled\n");
-                goto gp_fault;
-            }
-        }
-
-        if ( (msr_content ^ v->arch.hvm_vcpu.guest_efer) & (EFER_NX|EFER_SCE) )
-            write_efer((read_efer() & ~(EFER_NX|EFER_SCE)) |
-                       (msr_content & (EFER_NX|EFER_SCE)));
-
-        v->arch.hvm_vcpu.guest_efer = msr_content;
+        if ( !hvm_set_efer(msr_content) )
+            goto exception_raised;
         break;
 
     case MSR_FS_BASE:
@@ -285,6 +251,7 @@ static enum handler_return long_mode_do_msr_write(struct cpu_user_regs *regs)
     HVM_DBG_LOG(DBG_LEVEL_0, "Not cano address of msr write %x", ecx);
  gp_fault:
     vmx_inject_hw_exception(v, TRAP_gp_fault, 0);
+ exception_raised:
     return HNDL_exception_raised;
 }
 
@@ -380,7 +347,8 @@ static enum handler_return long_mode_do_msr_read(struct cpu_user_regs *regs)
     u64 msr_content = 0;
     struct vcpu *v = current;
 
-    switch ( regs->ecx ) {
+    switch ( regs->ecx )
+    {
     case MSR_EFER:
         msr_content = v->arch.hvm_vcpu.guest_efer;
         break;
@@ -398,25 +366,12 @@ static enum handler_return long_mode_do_msr_read(struct cpu_user_regs *regs)
 static enum handler_return long_mode_do_msr_write(struct cpu_user_regs *regs)
 {
     u64 msr_content = regs->eax | ((u64)regs->edx << 32);
-    struct vcpu *v = current;
 
     switch ( regs->ecx )
     {
     case MSR_EFER:
-        /* offending reserved bit will cause #GP */
-        if ( (msr_content & ~EFER_NX) ||
-             (!cpu_has_nx && (msr_content & EFER_NX)) )
-        {
-            gdprintk(XENLOG_WARNING, "Trying to set reserved bit in "
-                     "EFER: %"PRIx64"\n", msr_content);
-            vmx_inject_hw_exception(v, TRAP_gp_fault, 0);
+        if ( !hvm_set_efer(msr_content) )
             return HNDL_exception_raised;
-        }
-
-        if ( (msr_content ^ v->arch.hvm_vcpu.guest_efer) & EFER_NX )
-            write_efer((read_efer() & ~EFER_NX) | (msr_content & EFER_NX));
-
-        v->arch.hvm_vcpu.guest_efer = msr_content;
         break;
 
     default:
@@ -1096,6 +1051,10 @@ static void vmx_update_guest_efer(struct vcpu *v)
 
     vmx_vmcs_exit(v);
 #endif
+
+    if ( v == current )
+        write_efer((read_efer() & ~(EFER_NX|EFER_SCE)) |
+                   (v->arch.hvm_vcpu.guest_efer & (EFER_NX|EFER_SCE)));
 }
 
 static void vmx_flush_guest_tlbs(void)
