@@ -284,17 +284,12 @@ static inline int acm_domain_create(struct domain *d, ssidref_t ssidref)
     } else if ((acm_secondary_ops->domain_create != NULL) &&
                 acm_secondary_ops->domain_create(subject_ssid, ssidref,
                                                  domid)) {
-        /* roll-back primary */
-        if (acm_primary_ops->domain_destroy != NULL)
-            acm_primary_ops->domain_destroy(d->ssid, d);
         rc = ACM_ACCESS_DENIED;
     }
 
     if ( rc == ACM_OK )
     {
         acm_domain_ssid_onto_list(d->ssid);
-    } else {
-        acm_free_domain_ssid(d->ssid);
     }
 
 error_out:
