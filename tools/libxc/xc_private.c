@@ -130,7 +130,8 @@ int lock_pages(void *addr, size_t len)
       int e = 0;
 #ifndef __sun__
       void *laddr = (void *)((unsigned long)addr & PAGE_MASK);
-      size_t llen = (len + PAGE_SIZE - 1) & PAGE_MASK;
+      size_t llen = (len + ((unsigned long)addr - (unsigned long)laddr) +
+                     PAGE_SIZE - 1) & PAGE_MASK;
       e = mlock(laddr, llen);
 #endif
       return e;
@@ -140,7 +141,8 @@ void unlock_pages(void *addr, size_t len)
 {
 #ifndef __sun__
     void *laddr = (void *)((unsigned long)addr & PAGE_MASK);
-    size_t llen = (len + PAGE_SIZE - 1) & PAGE_MASK;
+    size_t llen = (len + ((unsigned long)addr - (unsigned long)laddr) +
+                   PAGE_SIZE - 1) & PAGE_MASK;
     safe_munlock(laddr, llen);
 #endif
 }
