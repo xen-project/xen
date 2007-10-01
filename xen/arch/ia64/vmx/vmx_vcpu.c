@@ -178,13 +178,13 @@ IA64FAULT vmx_vcpu_set_rr(VCPU *vcpu, u64 reg, u64 val)
     case VRN4:
         rrval = vrrtomrr(vcpu,val);
         vcpu->arch.metaphysical_saved_rr4 = rrval;
-        if (!is_physical_mode(vcpu))
+        if (is_virtual_mode(vcpu))
             ia64_set_rr(reg,rrval);
         break;
     case VRN0:
         rrval = vrrtomrr(vcpu,val);
         vcpu->arch.metaphysical_saved_rr0 = rrval;
-        if (!is_physical_mode(vcpu))
+        if (is_virtual_mode(vcpu))
             ia64_set_rr(reg,rrval);
         break;
     default:

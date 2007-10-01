@@ -335,7 +335,7 @@ vmx_hpw_miss(u64 vadr, u64 vec, REGS* regs)
         panic_domain(regs, "wrong vec:%lx\n", vec);
 
     /* Physical mode and region is 0 or 4.  */
-    if (is_physical_mode(v) && (!((vadr<<1)>>62))) {
+    if (!is_virtual_mode(v) && (!((vadr << 1) >> 62))) {
         if (vec == 2) {
             /* DTLB miss.  */
             if (misr.sp) /* Refer to SDM Vol2 Table 4-11,4-12 */
@@ -351,7 +351,10 @@ vmx_hpw_miss(u64 vadr, u64 vec, REGS* regs)
     }
     
 try_again:
-    if ((data=vtlb_lookup(v, vadr,type)) != 0) {
+    /* Search in VTLB.  */
+    data = vtlb_lookup(v, vadr, type);
+    if (data != 0) {
+        /* Found.  */
         if (v->domain != dom0 && type == DSIDE_TLB) {
             if (misr.sp) { /* Refer to SDM Vol2 Table 4-10,4-12 */
                 if ((data->ma == VA_MATTR_UC) || (data->ma == VA_MATTR_UCE))
@@ -373,8 +376,10 @@ try_again:
             }
         }
         thash_vhpt_insert(v, data->page_flags, data->itir, vadr, type);
+        return IA64_NO_FAULT;
+    }
 
-    } else if (type == DSIDE_TLB) {
+    if (type == DSIDE_TLB) {
         struct opt_feature* optf = &(v->domain->arch.opt_feature);
 
         if (misr.sp)
@@ -385,7 +390,7 @@ try_again:
 
         if (!vhpt_enabled(v, vadr, misr.rs ? RSE_REF : DATA_REF)) {
             /* windows use region 4 and 5 for identity mapping */
-            if (optf->mask & XEN_IA64_OPTF_IDENT_MAP_REG4 &&
+            if ((optf->mask & XEN_IA64_OPTF_IDENT_MAP_REG4) &&
                 REGION_NUMBER(vadr) == 4 && !(regs->cr_ipsr & IA64_PSR_CPL) &&
                 REGION_OFFSET(vadr) <= _PAGE_PPN_MASK) {
 
@@ -395,7 +400,7 @@ try_again:
                     goto try_again;
                 return IA64_NO_FAULT;
             }
-            if (optf->mask & XEN_IA64_OPTF_IDENT_MAP_REG5 &&
+            if ((optf->mask & XEN_IA64_OPTF_IDENT_MAP_REG5) &&
                 REGION_NUMBER(vadr) == 5 && !(regs->cr_ipsr & IA64_PSR_CPL) &&
                 REGION_OFFSET(vadr) <= _PAGE_PPN_MASK) {
 

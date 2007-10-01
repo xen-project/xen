@@ -85,22 +85,13 @@ extern void recover_if_physical_mode(VCPU *vcpu);
 extern void vmx_init_all_rr(VCPU *vcpu);
 extern void vmx_load_all_rr(VCPU *vcpu);
 extern void physical_tlb_miss(VCPU *vcpu, u64 vadr, int type);
-/*
- * No sanity check here, since all psr changes have been
- * checked in switch_mm_mode().
- */
-#define is_physical_mode(v) \
-    ((v->arch.mode_flags) & GUEST_IN_PHY)
 
-#define is_virtual_mode(v) \
-    (!is_physical_mode(v))
+#define is_virtual_mode(v)     ((v)->arch.arch_vmx.mmu_mode == VMX_MMU_VIRTUAL)
 
 #endif /* __ASSEMBLY__ */
 
-#define GUEST_IN_PHY_BIT   0
-#define GUEST_PHY_EMUL_BIT 1
-
-#define GUEST_IN_PHY   (1 << GUEST_IN_PHY_BIT)
-#define GUEST_PHY_EMUL (1 << GUEST_PHY_EMUL_BIT)
+#define VMX_MMU_VIRTUAL    0    /* Full virtual mode: it=dt=1  */
+#define VMX_MMU_PHY_D      1    /* Half physical: it=1,dt=0  */
+#define VMX_MMU_PHY_DT     3    /* Full physical mode: it=0,dt=0  */
 
 #endif /* _PHY_MODE_H_ */
