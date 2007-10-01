@@ -931,7 +931,7 @@ unsigned char *parse_arg (unsigned char **buf)
     return res;
 }
 
-vcpu_guest_context_t vcpu_ctx[1];
+vcpu_guest_context_t vcpu_ctx[MAX_VIRT_CPUS];
 
 int vcpu_setcontext (int vcpu)
 {
