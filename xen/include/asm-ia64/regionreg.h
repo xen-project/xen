@@ -80,7 +80,8 @@ extern int deallocate_rid_range(struct domain *d);
 struct vcpu;
 extern void init_all_rr(struct vcpu *v);
 
-extern int set_metaphysical_rr0(void);
+extern void set_virtual_rr0(void);
+extern void set_metaphysical_rr0(void);
 
 extern void load_region_regs(struct vcpu *v);
 

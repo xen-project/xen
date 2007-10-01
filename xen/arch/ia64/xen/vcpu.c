@@ -280,7 +280,7 @@ static void vcpu_pkr_set_psr_handling(VCPU * vcpu)
  VCPU processor status register access routines
 **************************************************************************/
 
-void vcpu_set_metaphysical_mode(VCPU * vcpu, BOOLEAN newmode)
+static void vcpu_set_metaphysical_mode(VCPU * vcpu, BOOLEAN newmode)
 {
 	/* only do something if mode changes */
 	if (!!newmode ^ !!PSCB(vcpu, metaphysical_mode)) {
@@ -288,7 +288,7 @@ void vcpu_set_metaphysical_mode(VCPU * vcpu, BOOLEAN newmode)
 		if (newmode)
 			set_metaphysical_rr0();
 		else if (PSCB(vcpu, rrs[0]) != -1)
-			set_one_rr(0, PSCB(vcpu, rrs[0]));
+			set_virtual_rr0();
 	}
 }
 
@@ -1635,7 +1635,7 @@ vcpu_get_domain_bundle(VCPU * vcpu, REGS * regs, u64 gip,
 		// This may cause tlb miss. see vcpu_translate(). Be careful!
 		swap_rr0 = (!region && PSCB(vcpu, metaphysical_mode));
 		if (swap_rr0) {
-			set_one_rr(0x0, PSCB(vcpu, rrs[0]));
+			set_virtual_rr0();
 		}
 		*bundle = __get_domain_bundle(gip);
 		if (swap_rr0) {
@@ -2368,7 +2368,7 @@ IA64FAULT vcpu_itc_d(VCPU * vcpu, u64 pte, u64 itir, u64 ifa)
 	if (!pteval)
 		return IA64_ILLOP_FAULT;
 	if (swap_rr0)
-		set_one_rr(0x0, PSCB(vcpu, rrs[0]));
+		set_virtual_rr0();
 	vcpu_itc_no_srlz(vcpu, 2, ifa, pteval, pte, _itir.itir, &entry);
 	if (swap_rr0)
 		set_metaphysical_rr0();
@@ -2396,7 +2396,7 @@ IA64FAULT vcpu_itc_i(VCPU * vcpu, u64 pte, u64 itir, u64 ifa)
 	if (!pteval)
 		return IA64_ILLOP_FAULT;
 	if (swap_rr0)
-		set_one_rr(0x0, PSCB(vcpu, rrs[0]));
+		set_virtual_rr0();
 	vcpu_itc_no_srlz(vcpu, 1, ifa, pteval, pte, _itir.itir, &entry);
 	if (swap_rr0)
 		set_metaphysical_rr0();

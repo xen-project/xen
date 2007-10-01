@@ -271,8 +271,16 @@ int set_one_rr(unsigned long rr, unsigned long val)
 	return 1;
 }
 
+void set_virtual_rr0(void)
+{
+	struct vcpu *v = current;
+
+	ia64_set_rr(0, v->arch.metaphysical_saved_rr0);
+	ia64_srlz_d();
+}
+
 // set rr0 to the passed rid (for metaphysical mode so don't use domain offset
-int set_metaphysical_rr0(void)
+void set_metaphysical_rr0(void)
 {
 	struct vcpu *v = current;
 //	ia64_rr rrv;
@@ -280,7 +288,6 @@ int set_metaphysical_rr0(void)
 //	rrv.ve = 1; 	FIXME: TURN ME BACK ON WHEN VHPT IS WORKING
 	ia64_set_rr(0, v->arch.metaphysical_rid_dt);
 	ia64_srlz_d();
-	return 1;
 }
 
 void init_all_rr(struct vcpu *v)
