@@ -361,7 +361,7 @@ int acm_init_domain_ssid(struct domain *subj, ssidref_t ssidref)
     {
         printk("%s: ERROR instantiating individual ssids for domain 0x%02x.\n",
                __func__, subj->domain_id);
-        acm_free_domain_ssid(ssid);
+        acm_free_domain_ssid(subj);
         return ACM_INIT_SSID_ERROR;
     }
 
@@ -372,8 +372,10 @@ int acm_init_domain_ssid(struct domain *subj, ssidref_t ssidref)
 
 
 void
-acm_free_domain_ssid(struct acm_ssid_domain *ssid)
+acm_free_domain_ssid(struct domain *d)
 {
+    struct acm_ssid_domain *ssid = d->ssid;
+    
     /* domain is already gone, just ssid is left */
     if (ssid == NULL)
         return;
@@ -387,6 +389,8 @@ acm_free_domain_ssid(struct acm_ssid_domain *ssid)
     ssid->secondary_ssid = NULL;
 
     xfree(ssid);
+    d->ssid = NULL;
+    
     printkd("%s: Freed individual domain ssid (domain=%02x).\n",
             __func__, id);
 }

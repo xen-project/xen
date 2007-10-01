@@ -258,7 +258,7 @@ static inline void acm_domain_destroy(struct domain *d)
             acm_secondary_ops->domain_destroy(ssid, d);
         /* free security ssid for the destroyed domain (also if null policy */
         acm_domain_ssid_off_list(ssid);
-        acm_free_domain_ssid((struct acm_ssid_domain *)(ssid));
+        acm_free_domain_ssid(d);
     }
 }
 
@@ -294,7 +294,7 @@ static inline int acm_domain_create(struct domain *d, ssidref_t ssidref)
     {
         acm_domain_ssid_onto_list(d->ssid);
     } else {
-        acm_free_domain_ssid(d->ssid);
+        acm_free_domain_ssid(d);
     }
 
 error_out:
