@@ -49,6 +49,10 @@
 #include <public/version.h>
 #include <public/memory.h>
 
+/* Xen command-line option to disable hardware-assisted paging */
+static int opt_hap_disabled;
+invbool_param("hap", opt_hap_disabled);
+
 int hvm_enabled __read_mostly;
 
 unsigned int opt_hvm_debug_level __read_mostly;
@@ -74,6 +78,14 @@ void hvm_enable(struct hvm_function_table *fns)
 
     hvm_funcs   = *fns;
     hvm_enabled = 1;
+
+    if ( hvm_funcs.hap_supported )
+    {
+        if ( opt_hap_disabled )
+            hvm_funcs.hap_supported = 0;
+        printk("HVM: Hardware Assisted Paging %sabled\n",
+               hvm_funcs.hap_supported ? "en" : "dis");
+    }
 }
 
 void hvm_set_guest_time(struct vcpu *v, u64 gtime)
@@ -325,6 +337,34 @@ static int hvm_load_cpu_ctxt(struct domain *d, hvm_domain_context_t *h)
     if ( hvm_load_entry(CPU, h, &ctxt) != 0 ) 
         return -EINVAL;
 
+    /* Sanity check some control registers. */
+    if ( (ctxt.cr0 & HVM_CR0_GUEST_RESERVED_BITS) ||
+         !(ctxt.cr0 & X86_CR0_ET) ||
+         ((ctxt.cr0 & (X86_CR0_PE|X86_CR0_PG)) == X86_CR0_PG) )
+    {
+        gdprintk(XENLOG_ERR, "HVM restore: bad CR0 0x%"PRIx64"\n",
+                 ctxt.msr_efer);
+        return -EINVAL;
+    }
+
+    if ( ctxt.cr4 & HVM_CR4_GUEST_RESERVED_BITS )
+    {
+        gdprintk(XENLOG_ERR, "HVM restore: bad CR4 0x%"PRIx64"\n",
+                 ctxt.msr_efer);
+        return -EINVAL;
+    }
+
+    if ( (ctxt.msr_efer & ~(EFER_LME | EFER_NX | EFER_SCE)) ||
+         ((sizeof(long) != 8) && (ctxt.msr_efer & EFER_LME)) ||
+         (!cpu_has_nx && (ctxt.msr_efer & EFER_NX)) ||
+         (!cpu_has_syscall && (ctxt.msr_efer & EFER_SCE)) ||
+         ((ctxt.msr_efer & (EFER_LME|EFER_LMA)) == EFER_LMA) )
+    {
+        gdprintk(XENLOG_ERR, "HVM restore: bad EFER 0x%"PRIx64"\n",
+                 ctxt.msr_efer);
+        return -EINVAL;
+    }
+
     /* Architecture-specific vmcs/vmcb bits */
     if ( hvm_funcs.load_cpu_ctxt(v, &ctxt) < 0 )
         return -EINVAL;
@@ -518,6 +558,39 @@ void hvm_triple_fault(void)
     gdprintk(XENLOG_INFO, "Triple fault on VCPU%d - "
              "invoking HVM system reset.\n", v->vcpu_id);
     domain_shutdown(v->domain, SHUTDOWN_reboot);
+}
+
+int hvm_set_efer(uint64_t value)
+{
+    struct vcpu *v = current;
+
+    value &= ~EFER_LMA;
+
+    if ( (value & ~(EFER_LME | EFER_NX | EFER_SCE)) ||
+         ((sizeof(long) != 8) && (value & EFER_LME)) ||
+         (!cpu_has_nx && (value & EFER_NX)) ||
+         (!cpu_has_syscall && (value & EFER_SCE)) )
+    {
+        gdprintk(XENLOG_WARNING, "Trying to set reserved bit in "
+                 "EFER: %"PRIx64"\n", value);
+        hvm_inject_exception(TRAP_gp_fault, 0, 0);
+        return 0;
+    }
+
+    if ( ((value ^ v->arch.hvm_vcpu.guest_efer) & EFER_LME) &&
+         hvm_paging_enabled(v) )
+    {
+        gdprintk(XENLOG_WARNING,
+                 "Trying to change EFER.LME with paging enabled\n");
+        hvm_inject_exception(TRAP_gp_fault, 0, 0);
+        return 0;
+    }
+
+    value |= v->arch.hvm_vcpu.guest_efer & EFER_LMA;
+    v->arch.hvm_vcpu.guest_efer = value;
+    hvm_update_guest_efer(v);
+
+    return 1;
 }
 
 int hvm_set_cr0(unsigned long value)

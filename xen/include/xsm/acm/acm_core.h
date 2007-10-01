@@ -154,7 +154,7 @@ static inline int acm_array_append_tuple(struct acm_sized_buffer *buf,
 
 /* protos */
 int acm_init_domain_ssid(struct domain *, ssidref_t ssidref);
-void acm_free_domain_ssid(struct acm_ssid_domain *ssid);
+void acm_free_domain_ssid(struct domain *);
 int acm_init_binary_policy(u32 policy_code);
 int acm_set_policy(XEN_GUEST_HANDLE_64(void) buf, u32 buf_size);
 int do_acm_set_policy(void *buf, u32 buf_size, int is_bootpolicy,

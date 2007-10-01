@@ -55,6 +55,9 @@ from xen.util.acmpolicy import ACM_LABEL_UNLABELED_DISPLAY
 
 import XenAPI
 
+import inspect
+from xen.xend import XendOptions
+xoptions = XendOptions.instance()
 
 # getopt.gnu_getopt is better, but only exists in Python 2.3+.  Use
 # getopt.getopt if gnu_getopt is not available.  This will mean that options
@@ -1595,7 +1598,31 @@ def xm_sched_credit(args):
                 err(str(result))
 
 def xm_info(args):
-    arg_check(args, "info", 0)
+    arg_check(args, "info", 0, 1)
+    
+    try:
+        (options, params) = getopt.gnu_getopt(args, 'c', ['config'])
+    except getopt.GetoptError, opterr:
+        err(opterr)
+        usage('info')
+    
+    show_xend_config = 0
+    for (k, v) in options:
+        if k in ['-c', '--config']:
+            show_xend_config = 1
+
+    if show_xend_config:
+        for name, obj in inspect.getmembers(xoptions):
+            if not inspect.ismethod(obj):
+                if name == "config":
+                    for x in obj[1:]:
+                        if len(x) < 2: 
+                            print "%-38s: (none)" % x[0]
+                        else: 
+                            print "%-38s:" % x[0], x[1]
+                else:
+                    print "%-38s:" % name, obj
+        return
 
     if serverType == SERVER_XEN_API:
 
