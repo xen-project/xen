@@ -489,7 +489,7 @@ void print_ctx(vcpu_guest_context_t *ctx)
     for (i = 0; i < cfm_sof; i++) {
         int off = cfm_sof - i;
         unsigned int rbs_off =
-            (((62 - ((rbs_size + regs->rbs_voff) % 64) + off)) / 63) + off;
+            (((62 - ((rbs_size + regs->rbs_voff) % 63) + off)) / 63) + off;
         if (rbs_off > rbs_size)
             break;
         printf(" r%02d: %016lx%s", 32 + i,
