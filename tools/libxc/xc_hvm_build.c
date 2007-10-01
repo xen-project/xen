@@ -21,14 +21,6 @@
 
 #define SCRATCH_PFN 0xFFFFF
 
-/* Need to provide the right flavour of vcpu context for Xen */
-typedef union
-{
-    vcpu_guest_context_x86_64_t c64;
-    vcpu_guest_context_x86_32_t c32;   
-    vcpu_guest_context_t c;
-} vcpu_guest_context_either_t;
-
 static void build_e820map(void *e820_page, unsigned long long mem_size)
 {
     struct e820entry *e820entry =
@@ -154,12 +146,11 @@ static int loadelfimage(
 
 static int setup_guest(int xc_handle,
                        uint32_t dom, int memsize,
-                       char *image, unsigned long image_size,
-                       vcpu_guest_context_either_t *ctxt)
+                       char *image, unsigned long image_size)
 {
     xen_pfn_t *page_array = NULL;
     unsigned long i, nr_pages = (unsigned long)memsize << (20 - PAGE_SHIFT);
-    unsigned long shared_page_nr;
+    unsigned long shared_page_nr, entry_eip;
     struct xen_add_to_physmap xatp;
     struct shared_info *shared_info;
     void *e820_page;
@@ -263,20 +254,20 @@ static int setup_guest(int xc_handle,
     xc_set_hvm_param(xc_handle, dom, HVM_PARAM_BUFIOREQ_PFN, shared_page_nr-2);
     xc_set_hvm_param(xc_handle, dom, HVM_PARAM_IOREQ_PFN, shared_page_nr);
 
+    /* Insert JMP <rel32> instruction at address 0x0 to reach entry point. */
+    entry_eip = elf_uval(&elf, elf.ehdr, e_entry);
+    if ( entry_eip != 0 )
+    {
+        char *page0 = xc_map_foreign_range(
+            xc_handle, dom, PAGE_SIZE, PROT_READ | PROT_WRITE, 0);
+        if ( page0 == NULL )
+            goto error_out;
+        page0[0] = 0xe9;
+        *(uint32_t *)&page0[1] = entry_eip - 5;
+        munmap(page0, PAGE_SIZE);
+    }
+
     free(page_array);
-
-    /* Set [er]ip in the way that's right for Xen */
-    if ( strstr(caps, "x86_64") )
-    {
-        ctxt->c64.user_regs.rip = elf_uval(&elf, elf.ehdr, e_entry); 
-        ctxt->c64.flags = VGCF_online;
-    }
-    else
-    {
-        ctxt->c32.user_regs.eip = elf_uval(&elf, elf.ehdr, e_entry);
-        ctxt->c32.flags = VGCF_online;
-    }
-
     return 0;
 
  error_out:
@@ -290,42 +281,13 @@ static int xc_hvm_build_internal(int xc_handle,
                                  char *image,
                                  unsigned long image_size)
 {
-    struct xen_domctl launch_domctl;
-    vcpu_guest_context_either_t ctxt;
-    int rc;
-
     if ( (image == NULL) || (image_size == 0) )
     {
         ERROR("Image required");
-        goto error_out;
+        return -1;
     }
 
-    memset(&ctxt, 0, sizeof(ctxt));
-
-    if ( setup_guest(xc_handle, domid, memsize, image, image_size, &ctxt) < 0 )
-    {
-        goto error_out;
-    }
-
-    if ( lock_pages(&ctxt, sizeof(ctxt) ) )
-    {
-        PERROR("%s: ctxt mlock failed", __func__);
-        goto error_out;
-    }
-
-    memset(&launch_domctl, 0, sizeof(launch_domctl));
-    launch_domctl.domain = (domid_t)domid;
-    launch_domctl.u.vcpucontext.vcpu = 0;
-    set_xen_guest_handle(launch_domctl.u.vcpucontext.ctxt, &ctxt.c);
-    launch_domctl.cmd = XEN_DOMCTL_setvcpucontext;
-    rc = xc_domctl(xc_handle, &launch_domctl);
-
-    unlock_pages(&ctxt, sizeof(ctxt));
-
-    return rc;
-
- error_out:
-    return -1;
+    return setup_guest(xc_handle, domid, memsize, image, image_size);
 }
 
 static inline int is_loadable_phdr(Elf32_Phdr *phdr)

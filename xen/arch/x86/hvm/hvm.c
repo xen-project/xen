@@ -443,6 +443,8 @@ int hvm_vcpu_initialise(struct vcpu *v)
     spin_lock_init(&v->arch.hvm_vcpu.tm_lock);
     INIT_LIST_HEAD(&v->arch.hvm_vcpu.tm_list);
 
+    v->arch.guest_context.user_regs.eflags = 2;
+
     if ( v->vcpu_id == 0 )
     {
         /* NB. All these really belong in hvm_domain_initialise(). */
@@ -453,6 +455,10 @@ int hvm_vcpu_initialise(struct vcpu *v)
  
         /* Init guest TSC to start from zero. */
         hvm_set_guest_time(v, 0);
+
+        /* Can start up without SIPI-SIPI or setvcpucontext domctl. */
+        v->is_initialised = 1;
+        clear_bit(_VPF_down, &v->pause_flags);
     }
 
     return 0;
