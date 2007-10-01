@@ -173,7 +173,7 @@ static struct page_info *addr_to_dma_page(struct domain *domain, u64 addr)
         if ( dma_pte_addr(*pte) == 0 )
         {
             pg = alloc_domheap_page(NULL);
-            vaddr = map_domain_page(mfn_x(page_to_mfn(pg)));
+            vaddr = map_domain_page(page_to_mfn(pg));
             if ( !vaddr )
             {
                 spin_unlock_irqrestore(&hd->mapping_lock, flags);
@@ -195,7 +195,7 @@ static struct page_info *addr_to_dma_page(struct domain *domain, u64 addr)
         else
         {
             pg = maddr_to_page(pte->val);
-            vaddr = map_domain_page(mfn_x(page_to_mfn(pg)));
+            vaddr = map_domain_page(page_to_mfn(pg));
             if ( !vaddr )
             {
                 spin_unlock_irqrestore(&hd->mapping_lock, flags);
@@ -250,7 +250,7 @@ static struct page_info *dma_addr_level_page(struct domain *domain,
         if ( level == total )
             return pg;
 
-        parent = map_domain_page(mfn_x(page_to_mfn(pg)));
+        parent = map_domain_page(page_to_mfn(pg));
         total--;
     }
 
@@ -542,7 +542,7 @@ static void dma_pte_clear_one(struct domain *domain, u64 addr)
     pg = dma_addr_level_page(domain, addr, 1);
     if ( !pg )
         return;
-    pte = (struct dma_pte *)map_domain_page(mfn_x(page_to_mfn(pg)));
+    pte = (struct dma_pte *)map_domain_page(page_to_mfn(pg));
     pte += address_level_offset(addr, 1);
     if ( pte )
     {
@@ -612,7 +612,7 @@ void dma_pte_free_pagetable(struct domain *domain, u64 start, u64 end)
             pg = dma_addr_level_page(domain, tmp, level);
             if ( !pg )
                 return;
-            pte = (struct dma_pte *)map_domain_page(mfn_x(page_to_mfn(pg)));
+            pte = (struct dma_pte *)map_domain_page(page_to_mfn(pg));
             pte += address_level_offset(tmp, level);
             dma_clear_pte(*pte);
             iommu_flush_cache_entry(iommu, pte);
@@ -1493,7 +1493,7 @@ int iommu_map_page(struct domain *d, paddr_t gfn, paddr_t mfn)
     pg = addr_to_dma_page(d, gfn << PAGE_SHIFT_4K);
     if ( !pg )
         return -ENOMEM;
-    pte = (struct dma_pte *)map_domain_page(mfn_x(page_to_mfn(pg)));
+    pte = (struct dma_pte *)map_domain_page(page_to_mfn(pg));
     pte += mfn & LEVEL_MASK;
     dma_set_pte_addr(*pte, mfn << PAGE_SHIFT_4K);
     dma_set_pte_prot(*pte, DMA_PTE_READ | DMA_PTE_WRITE);
@@ -1554,7 +1554,7 @@ int iommu_page_mapping(struct domain *domain, dma_addr_t iova,
         pg = addr_to_dma_page(domain, iova + PAGE_SIZE_4K * index);
         if ( !pg )
             return -ENOMEM;
-        pte = (struct dma_pte *)map_domain_page(mfn_x(page_to_mfn(pg)));
+        pte = (struct dma_pte *)map_domain_page(page_to_mfn(pg));
         pte += start_pfn & LEVEL_MASK;
         dma_set_pte_addr(*pte, start_pfn << PAGE_SHIFT_4K);
         dma_set_pte_prot(*pte, prot);
