@@ -285,49 +285,63 @@ void hvm_set_callback_via(struct domain *d, uint64_t via)
     }
 }
 
-enum hvm_intack hvm_vcpu_has_pending_irq(struct vcpu *v)
+struct hvm_intack hvm_vcpu_has_pending_irq(struct vcpu *v)
 {
     struct hvm_domain *plat = &v->domain->arch.hvm_domain;
+    int vector;
 
     if ( unlikely(v->nmi_pending) )
         return hvm_intack_nmi;
 
-    if ( vlapic_has_interrupt(v) != -1 )
-        return hvm_intack_lapic;
+    if ( vlapic_accept_pic_intr(v) && plat->vpic[0].int_output )
+        return hvm_intack_pic(0);
 
-    if ( !vlapic_accept_pic_intr(v) )
-        return hvm_intack_none;
+    vector = vlapic_has_pending_irq(v);
+    if ( vector != -1 )
+        return hvm_intack_lapic(vector);
 
-    return plat->vpic[0].int_output ? hvm_intack_pic : hvm_intack_none;
+    return hvm_intack_none;
 }
 
-int hvm_vcpu_ack_pending_irq(struct vcpu *v, enum hvm_intack type, int *vector)
+struct hvm_intack hvm_vcpu_ack_pending_irq(
+    struct vcpu *v, struct hvm_intack intack)
 {
-    switch ( type )
+    int vector;
+
+    switch ( intack.source )
     {
-    case hvm_intack_nmi:
-        return test_and_clear_bool(v->nmi_pending);
-    case hvm_intack_lapic:
-        return ((*vector = cpu_get_apic_interrupt(v)) != -1);
-    case hvm_intack_pic:
+    case hvm_intsrc_nmi:
+        if ( !test_and_clear_bool(v->nmi_pending) )
+            intack = hvm_intack_none;
+        break;
+    case hvm_intsrc_pic:
         ASSERT(v->vcpu_id == 0);
-        return ((*vector = cpu_get_pic_interrupt(v)) != -1);
+        if ( (vector = vpic_ack_pending_irq(v)) == -1 )
+            intack = hvm_intack_none;
+        else
+            intack.vector = (uint8_t)vector;
+        break;
+    case hvm_intsrc_lapic:
+        if ( !vlapic_ack_pending_irq(v, intack.vector) )
+            intack = hvm_intack_none;
+        break;
     default:
+        intack = hvm_intack_none;
         break;
     }
 
-    return 0;
+    return intack;
 }
 
-int get_isa_irq_vector(struct vcpu *v, int isa_irq, enum hvm_intack src)
+int get_isa_irq_vector(struct vcpu *v, int isa_irq, enum hvm_intsrc src)
 {
     unsigned int gsi = hvm_isa_irq_to_gsi(isa_irq);
 
-    if ( src == hvm_intack_pic )
+    if ( src == hvm_intsrc_pic )
         return (v->domain->arch.hvm_domain.vpic[isa_irq >> 3].irq_base
                 + (isa_irq & 7));
 
-    ASSERT(src == hvm_intack_lapic);
+    ASSERT(src == hvm_intsrc_lapic);
     return domain_vioapic(v->domain)->redirtbl[gsi].fields.vector;
 }
 
@@ -345,18 +359,18 @@ int is_isa_irq_masked(struct vcpu *v, int isa_irq)
 
 int hvm_local_events_need_delivery(struct vcpu *v)
 {
-    enum hvm_intack type;
+    struct hvm_intack intack;
 
     /* TODO: Get rid of event-channel special case. */
     if ( vcpu_info(v, evtchn_upcall_pending) )
-        type = hvm_intack_pic;
+        intack = hvm_intack_pic(0);
     else
-        type = hvm_vcpu_has_pending_irq(v);
+        intack = hvm_vcpu_has_pending_irq(v);
 
-    if ( likely(type == hvm_intack_none) )
+    if ( likely(intack.source == hvm_intsrc_none) )
         return 0;
 
-    return hvm_interrupts_enabled(v, type);
+    return !hvm_interrupt_blocked(v, intack);
 }
 
 #if 0 /* Keep for debugging */

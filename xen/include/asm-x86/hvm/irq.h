@@ -135,11 +135,11 @@ void hvm_set_callback_irq_level(void);
 void hvm_set_callback_via(struct domain *d, uint64_t via);
 
 /* Check/Acknowledge next pending interrupt. */
-enum hvm_intack hvm_vcpu_has_pending_irq(struct vcpu *v);
-int hvm_vcpu_ack_pending_irq(
-    struct vcpu *v, enum hvm_intack type, int *vector);
+struct hvm_intack hvm_vcpu_has_pending_irq(struct vcpu *v);
+struct hvm_intack hvm_vcpu_ack_pending_irq(struct vcpu *v,
+                                           struct hvm_intack intack);
 
-int get_isa_irq_vector(struct vcpu *vcpu, int irq, enum hvm_intack src);
+int get_isa_irq_vector(struct vcpu *vcpu, int irq, enum hvm_intsrc src);
 int is_isa_irq_masked(struct vcpu *v, int isa_irq);
 
 #endif /* __ASM_X86_HVM_IRQ_H__ */

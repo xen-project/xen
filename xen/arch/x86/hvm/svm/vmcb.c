@@ -130,14 +130,11 @@ static int construct_vmcb(struct vcpu *v)
     /* Intercept all debug-register writes. */
     vmcb->dr_intercepts = DR_INTERCEPT_ALL_WRITES;
 
-    /*
-     * Intercept all control-register accesses except for CR2 reads/writes
-     * and CR8 reads (and actually CR8 writes, but that's a special case
-     * that's handled in svm/intr.c). 
-     */
+    /* Intercept all control-register accesses except for CR2 and CR8. */
     vmcb->cr_intercepts = ~(CR_INTERCEPT_CR2_READ |
                             CR_INTERCEPT_CR2_WRITE |
-                            CR_INTERCEPT_CR8_READ);
+                            CR_INTERCEPT_CR8_READ |
+                            CR_INTERCEPT_CR8_WRITE);
 
     /* I/O and MSR permission bitmaps. */
     arch_svm->msrpm = alloc_xenheap_pages(get_order_from_bytes(MSRPM_SIZE));

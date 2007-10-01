@@ -737,7 +737,7 @@ int hvm_set_cr4(unsigned long value)
     old_cr = v->arch.hvm_vcpu.guest_cr[4];
     v->arch.hvm_vcpu.guest_cr[4] = value;
     hvm_update_guest_cr(v, 4);
-  
+
     /* Modifying CR4.{PSE,PAE,PGE} invalidates all TLB entries, inc. Global. */
     if ( (old_cr ^ value) & (X86_CR4_PSE | X86_CR4_PGE | X86_CR4_PAE) )
         paging_update_paging_modes(v);

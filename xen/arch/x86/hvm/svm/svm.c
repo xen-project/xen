@@ -425,16 +425,28 @@ static void svm_restore_dr(struct vcpu *v)
         __restore_debug_registers(v);
 }
 
-static int svm_interrupts_enabled(struct vcpu *v, enum hvm_intack type)
+static enum hvm_intblk svm_interrupt_blocked(
+    struct vcpu *v, struct hvm_intack intack)
 {
     struct vmcb_struct *vmcb = v->arch.hvm_svm.vmcb;
 
-    if ( type == hvm_intack_nmi )
-        return !vmcb->interrupt_shadow;
+    if ( vmcb->interrupt_shadow )
+        return hvm_intblk_shadow;
 
-    ASSERT((type == hvm_intack_pic) || (type == hvm_intack_lapic));
-    return (!irq_masked(guest_cpu_user_regs()->eflags) &&
-            !vmcb->interrupt_shadow);
+    if ( intack.source == hvm_intsrc_nmi )
+        return hvm_intblk_none;
+
+    ASSERT((intack.source == hvm_intsrc_pic) ||
+           (intack.source == hvm_intsrc_lapic));
+
+    if ( irq_masked(guest_cpu_user_regs()->eflags) )
+        return hvm_intblk_rflags_ie;
+
+    if ( (intack.source == hvm_intsrc_lapic) &&
+         ((vmcb->vintr.fields.tpr & 0xf) >= (intack.vector >> 4)) )
+        return hvm_intblk_tpr;
+
+    return hvm_intblk_none;
 }
 
 static int svm_guest_x86_mode(struct vcpu *v)
@@ -855,7 +867,7 @@ static struct hvm_function_table svm_function_table = {
     .vcpu_destroy         = svm_vcpu_destroy,
     .save_cpu_ctxt        = svm_save_vmcb_ctxt,
     .load_cpu_ctxt        = svm_load_vmcb_ctxt,
-    .interrupts_enabled   = svm_interrupts_enabled,
+    .interrupt_blocked    = svm_interrupt_blocked,
     .guest_x86_mode       = svm_guest_x86_mode,
     .get_segment_base     = svm_get_segment_base,
     .get_segment_register = svm_get_segment_register,
@@ -1552,7 +1564,6 @@ static void mov_from_cr(int cr, int gp, struct cpu_user_regs *regs)
 {
     unsigned long value = 0;
     struct vcpu *v = current;
-    struct vlapic *vlapic = vcpu_vlapic(v);
     struct vmcb_struct *vmcb = v->arch.hvm_svm.vmcb;
 
     switch ( cr )
@@ -1560,21 +1571,14 @@ static void mov_from_cr(int cr, int gp, struct cpu_user_regs *regs)
     case 0:
         value = v->arch.hvm_vcpu.guest_cr[0];
         break;
-    case 2:
-        value = vmcb->cr2;
-        break;
     case 3:
         value = (unsigned long)v->arch.hvm_vcpu.guest_cr[3];
         break;
     case 4:
         value = (unsigned long)v->arch.hvm_vcpu.guest_cr[4];
         break;
-    case 8:
-        value = (unsigned long)vlapic_get_reg(vlapic, APIC_TASKPRI);
-        value = (value & 0xF0) >> 4;
-        break;
-        
     default:
+        gdprintk(XENLOG_ERR, "invalid cr: %d\n", cr);
         domain_crash(v->domain);
         return;
     }
@@ -1590,7 +1594,6 @@ static int mov_to_cr(int gpreg, int cr, struct cpu_user_regs *regs)
 {
     unsigned long value;
     struct vcpu *v = current;
-    struct vlapic *vlapic = vcpu_vlapic(v);
     struct vmcb_struct *vmcb = v->arch.hvm_svm.vmcb;
 
     value = get_reg(gpreg, regs, vmcb);
@@ -1604,18 +1607,10 @@ static int mov_to_cr(int gpreg, int cr, struct cpu_user_regs *regs)
     {
     case 0: 
         return svm_set_cr0(value);
-
     case 3:
         return hvm_set_cr3(value);
-
     case 4:
         return hvm_set_cr4(value);
-
-    case 8:
-        vlapic_set_reg(vlapic, APIC_TASKPRI, ((value & 0x0F) << 4));
-        vmcb->vintr.fields.tpr = value & 0x0F;
-        break;
-
     default:
         gdprintk(XENLOG_ERR, "invalid cr: %d\n", cr);
         domain_crash(v->domain);
@@ -1894,13 +1889,14 @@ static void svm_do_msr_access(
 static void svm_vmexit_do_hlt(struct vmcb_struct *vmcb,
                               struct cpu_user_regs *regs)
 {
-    enum hvm_intack type = hvm_vcpu_has_pending_irq(current);
+    struct hvm_intack intack = hvm_vcpu_has_pending_irq(current);
 
     __update_guest_eip(regs, 1);
 
     /* Check for interrupt not handled or new interrupt. */
     if ( vmcb->eventinj.fields.v ||
-         ((type != hvm_intack_none) && svm_interrupts_enabled(current, type)) )
+         ((intack.source != hvm_intsrc_none) &&
+          !svm_interrupt_blocked(current, intack)) )
     {
         HVMTRACE_1D(HLT, current, /*int pending=*/ 1);
         return;
@@ -2080,13 +2076,11 @@ asmlinkage void svm_vmexit_handler(struct cpu_user_regs *regs)
 
     /*
      * Before doing anything else, we need to sync up the VLAPIC's TPR with
-     * SVM's vTPR if CR8 writes are currently disabled.  It's OK if the 
-     * guest doesn't touch the CR8 (e.g. 32-bit Windows) because we update
-     * the vTPR on MMIO writes to the TPR
+     * SVM's vTPR. It's OK if the guest doesn't touch CR8 (e.g. 32-bit Windows)
+     * because we update the vTPR on MMIO writes to the TPR.
      */
-    if ( !(vmcb->cr_intercepts & CR_INTERCEPT_CR8_WRITE) )
-        vlapic_set_reg(vcpu_vlapic(v), APIC_TASKPRI,
-                       (vmcb->vintr.fields.tpr & 0x0F) << 4);
+    vlapic_set_reg(vcpu_vlapic(v), APIC_TASKPRI,
+                   (vmcb->vintr.fields.tpr & 0x0F) << 4);
 
     exit_reason = vmcb->exitcode;
 
@@ -2222,45 +2216,14 @@ asmlinkage void svm_vmexit_handler(struct cpu_user_regs *regs)
         }
         break;
 
-    case VMEXIT_CR0_READ:
-        svm_cr_access(v, 0, TYPE_MOV_FROM_CR, regs);
+    case VMEXIT_CR0_READ ... VMEXIT_CR15_READ:
+        svm_cr_access(v, exit_reason - VMEXIT_CR0_READ,
+                      TYPE_MOV_FROM_CR, regs);
         break;
 
-    case VMEXIT_CR2_READ:
-        svm_cr_access(v, 2, TYPE_MOV_FROM_CR, regs);
-        break;
-
-    case VMEXIT_CR3_READ:
-        svm_cr_access(v, 3, TYPE_MOV_FROM_CR, regs);
-        break;
-
-    case VMEXIT_CR4_READ:
-        svm_cr_access(v, 4, TYPE_MOV_FROM_CR, regs);
-        break;
-
-    case VMEXIT_CR8_READ:
-        svm_cr_access(v, 8, TYPE_MOV_FROM_CR, regs);
-        break;
-
-    case VMEXIT_CR0_WRITE:
-        svm_cr_access(v, 0, TYPE_MOV_TO_CR, regs);
-        break;
-
-    case VMEXIT_CR2_WRITE:
-        svm_cr_access(v, 2, TYPE_MOV_TO_CR, regs);
-        break;
-
-    case VMEXIT_CR3_WRITE:
-        svm_cr_access(v, 3, TYPE_MOV_TO_CR, regs);
-        local_flush_tlb();
-        break;
-
-    case VMEXIT_CR4_WRITE:
-        svm_cr_access(v, 4, TYPE_MOV_TO_CR, regs);
-        break;
-
-    case VMEXIT_CR8_WRITE:
-        svm_cr_access(v, 8, TYPE_MOV_TO_CR, regs);
+    case VMEXIT_CR0_WRITE ... VMEXIT_CR15_WRITE:
+        svm_cr_access(v, exit_reason - VMEXIT_CR0_WRITE,
+                      TYPE_MOV_TO_CR, regs);
         break;
 
     case VMEXIT_DR0_WRITE ... VMEXIT_DR7_WRITE:

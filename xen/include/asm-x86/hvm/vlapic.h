@@ -75,8 +75,8 @@ int vlapic_set_irq(struct vlapic *vlapic, uint8_t vec, uint8_t trig);
 
 int vlapic_find_highest_irr(struct vlapic *vlapic);
 
-int vlapic_has_interrupt(struct vcpu *v);
-int cpu_get_apic_interrupt(struct vcpu *v);
+int vlapic_has_pending_irq(struct vcpu *v);
+int vlapic_ack_pending_irq(struct vcpu *v, int vector);
 
 int  vlapic_init(struct vcpu *v);
 void vlapic_destroy(struct vcpu *v);

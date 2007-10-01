@@ -39,19 +39,6 @@
 #include <xen/domain_page.h>
 #include <asm/hvm/trace.h>
 
-static void svm_inject_dummy_vintr(struct vcpu *v)
-{
-    struct vmcb_struct *vmcb = v->arch.hvm_svm.vmcb;
-    vintr_t intr = vmcb->vintr;
-
-    intr.fields.irq = 1;
-    intr.fields.intr_masking = 1;
-    intr.fields.vector = 0;
-    intr.fields.prio = 0xF;
-    intr.fields.ign_tpr = 1;
-    vmcb->vintr = intr;
-}
-    
 static void svm_inject_nmi(struct vcpu *v)
 {
     struct vmcb_struct *vmcb = v->arch.hvm_svm.vmcb;
@@ -80,11 +67,14 @@ static void svm_inject_extint(struct vcpu *v, int vector)
     vmcb->eventinj = event;
 }
     
-static void enable_intr_window(struct vcpu *v, enum hvm_intack intr_source)
+static void enable_intr_window(struct vcpu *v, struct hvm_intack intack)
 {
     struct vmcb_struct *vmcb = v->arch.hvm_svm.vmcb;
+    vintr_t intr;
 
-    ASSERT(intr_source != hvm_intack_none);
+    ASSERT(intack.source != hvm_intsrc_none);
+
+    HVMTRACE_2D(INJ_VIRQ, v, 0x0, /*fake=*/ 1);
 
     /*
      * Create a dummy virtual interrupt to intercept as soon as the
@@ -95,53 +85,29 @@ static void enable_intr_window(struct vcpu *v, enum hvm_intack intr_source)
      * track 'NMI blocking' from NMI injection until IRET. This can be done
      * quite easily in software by intercepting the unblocking IRET.
      */
+    intr = vmcb->vintr;
+    intr.fields.irq     = 1;
+    intr.fields.vector  = 0;
+    intr.fields.prio    = intack.vector >> 4;
+    intr.fields.ign_tpr = (intack.source != hvm_intsrc_lapic);
+    vmcb->vintr = intr;
     vmcb->general1_intercepts |= GENERAL1_INTERCEPT_VINTR;
-    HVMTRACE_2D(INJ_VIRQ, v, 0x0, /*fake=*/ 1);
-    svm_inject_dummy_vintr(v);
-}
-
-static void update_cr8_intercept(
-    struct vcpu *v, enum hvm_intack masked_intr_source)
-{
-    struct vmcb_struct *vmcb = v->arch.hvm_svm.vmcb;
-    struct vlapic *vlapic = vcpu_vlapic(v);
-    int max_irr;
-
-    vmcb->cr_intercepts &= ~CR_INTERCEPT_CR8_WRITE;
-
-    /*
-     * If ExtInts are masked then that dominates the TPR --- the 'interrupt
-     * window' has already been enabled in this case.
-     */
-    if ( (masked_intr_source == hvm_intack_lapic) ||
-         (masked_intr_source == hvm_intack_pic) )
-        return;
-
-    /* Is there an interrupt pending at the LAPIC? Nothing to do if not. */
-    if ( !vlapic_enabled(vlapic) || 
-         ((max_irr = vlapic_find_highest_irr(vlapic)) == -1) )
-        return;
-
-    /* Highest-priority pending interrupt is masked by the TPR? */
-    if ( (vmcb->vintr.fields.tpr & 0xf) >= (max_irr >> 4) )
-        vmcb->cr_intercepts |= CR_INTERCEPT_CR8_WRITE;
 }
 
 asmlinkage void svm_intr_assist(void) 
 {
     struct vcpu *v = current;
     struct vmcb_struct *vmcb = v->arch.hvm_svm.vmcb;
-    enum hvm_intack intr_source;
-    int intr_vector;
+    struct hvm_intack intack;
 
     /* Crank the handle on interrupt state. */
     pt_update_irq(v);
     hvm_set_callback_irq_level();
 
     do {
-        intr_source = hvm_vcpu_has_pending_irq(v);
-        if ( likely(intr_source == hvm_intack_none) )
-            goto out;
+        intack = hvm_vcpu_has_pending_irq(v);
+        if ( likely(intack.source == hvm_intsrc_none) )
+            return;
 
         /*
          * Pending IRQs must be delayed if:
@@ -158,31 +124,30 @@ asmlinkage void svm_intr_assist(void)
          * 2. The IRQ is masked.
          */
         if ( unlikely(vmcb->eventinj.fields.v) ||
-             !hvm_interrupts_enabled(v, intr_source) )
+             hvm_interrupt_blocked(v, intack) )
         {
-            enable_intr_window(v, intr_source);
-            goto out;
+            enable_intr_window(v, intack);
+            return;
         }
-    } while ( !hvm_vcpu_ack_pending_irq(v, intr_source, &intr_vector) );
 
-    if ( intr_source == hvm_intack_nmi )
+        intack = hvm_vcpu_ack_pending_irq(v, intack);
+    } while ( intack.source == hvm_intsrc_none );
+
+    if ( intack.source == hvm_intsrc_nmi )
     {
         svm_inject_nmi(v);
     }
     else
     {
-        HVMTRACE_2D(INJ_VIRQ, v, intr_vector, /*fake=*/ 0);
-        svm_inject_extint(v, intr_vector);
-        pt_intr_post(v, intr_vector, intr_source);
+        HVMTRACE_2D(INJ_VIRQ, v, intack.vector, /*fake=*/ 0);
+        svm_inject_extint(v, intack.vector);
+        pt_intr_post(v, intack);
     }
 
     /* Is there another IRQ to queue up behind this one? */
-    intr_source = hvm_vcpu_has_pending_irq(v);
-    if ( unlikely(intr_source != hvm_intack_none) )
-        enable_intr_window(v, intr_source);
-
- out:
-    update_cr8_intercept(v, intr_source);
+    intack = hvm_vcpu_has_pending_irq(v);
+    if ( unlikely(intack.source != hvm_intsrc_none) )
+        enable_intr_window(v, intack);
 }
 
 /*
