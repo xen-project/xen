@@ -2009,7 +2009,7 @@ void unset_nmi_callback(void)
     nmi_callback = dummy_nmi_callback;
 }
 
-asmlinkage int math_state_restore(struct cpu_user_regs *regs)
+asmlinkage int do_device_not_available(struct cpu_user_regs *regs)
 {
     BUG_ON(!guest_mode(regs));
 
