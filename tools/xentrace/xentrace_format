@@ -83,11 +83,24 @@ interrupted = 0
 
 defs = read_defs(arg[0])
 
-# structure of trace record + prepended CPU id (as output by xentrace):
-# CPU(I) TSC(Q) EVENT(L) D1(L) D2(L) D3(L) D4(L) D5(L)
-# read CPU id separately to avoid structure packing problems on 64-bit arch.
-CPUREC = "I"
-TRCREC = "QLLLLLL"
+# structure of trace record (as output by xentrace):
+# HDR(I) {TSC(Q)} D1(I) D2(I) D3(I) D4(I) D5(I)
+#
+# HDR consists of EVENT:28:, n_data:3:, tsc_in:1:
+# EVENT means Event ID
+# n_data means number of data (like D1, D2, ...)
+# tsc_in means TSC data exists(1) or not(0).
+# if tsc_in == 0, TSC(Q) does not exists.
+#
+# CPU ID exists on trace data of EVENT=0x0001f003
+#
+HDRREC = "I"
+TSCREC = "Q"
+D1REC  = "I"
+D2REC  = "II"
+D3REC  = "III"
+D4REC  = "IIII"
+D5REC  = "IIIII"
 
 last_tsc = [0]
 
@@ -96,19 +109,58 @@ i=0
 while not interrupted:
     try:
 	i=i+1
-        line = sys.stdin.read(struct.calcsize(CPUREC))
+        line = sys.stdin.read(struct.calcsize(HDRREC))
         if not line:
             break
-        cpu = struct.unpack(CPUREC, line)[0]
+        event = struct.unpack(HDRREC, line)[0]
+        n_data = event >> 28 & 0x7
+        tsc_in = event >> 31
 
-        line = sys.stdin.read(struct.calcsize(TRCREC))
-        if not line:
-            break
+        d1 = 0
+        d2 = 0
+        d3 = 0
+        d4 = 0
+        d5 = 0
+  
+        tsc = 0
 
-        (tsc, event, d1, d2, d3, d4, d5) = struct.unpack(TRCREC, line)
+        if tsc_in == 1:
+            line = sys.stdin.read(struct.calcsize(TSCREC))
+            if not line:
+                break
+            tsc = struct.unpack(TSCREC, line)[0]
 
-        # Event field is 'uint32_t', not 'long'.
-        event &= 0xffffffff
+        if n_data == 1:
+            line = sys.stdin.read(struct.calcsize(D1REC))
+            if not line:
+                break
+            (d1) = struct.unpack(D1REC, line)
+        if n_data == 2:
+            line = sys.stdin.read(struct.calcsize(D2REC))
+            if not line:
+                break
+            (d1, d2) = struct.unpack(D2REC, line)
+        if n_data == 3:
+            line = sys.stdin.read(struct.calcsize(D3REC))
+            if not line:
+                break
+            (d1, d2, d3) = struct.unpack(D3REC, line)
+        if n_data == 4:
+            line = sys.stdin.read(struct.calcsize(D4REC))
+            if not line:
+                break
+            (d1, d2, d3, d4) = struct.unpack(D4REC, line)
+        if n_data == 5:
+            line = sys.stdin.read(struct.calcsize(D5REC))
+            if not line:
+                break
+            (d1, d2, d3, d4, d5) = struct.unpack(D5REC, line)
+
+        # Event field is 28bit of 'uint32_t' in header, not 'long'.
+        event &= 0x0fffffff
+        if event == 0x1f003:
+            cpu = d1
+
 
 	#tsc = (tscH<<32) | tscL
 
@@ -116,16 +168,17 @@ while not interrupted:
 
         if cpu >= len(last_tsc):
             last_tsc += [0] * (cpu - len(last_tsc) + 1)
-	elif tsc < last_tsc[cpu]:
+	elif tsc < last_tsc[cpu] and tsc_in == 1:
 	    print "TSC stepped backward cpu %d !  %d %d" % (cpu,tsc,last_tsc[cpu])
 
 	# provide relative TSC
-	if last_tsc[cpu] > 0:
+	if last_tsc[cpu] > 0 and tsc_in == 1:
 		reltsc = tsc - last_tsc[cpu]
 	else:
 		reltsc = 0
 
-	last_tsc[cpu] = tsc
+	if tsc_in == 1:
+	    last_tsc[cpu] = tsc
 
 	if mhz:
 	    tsc = tsc / (mhz*1000000.0)
