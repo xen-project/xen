@@ -74,9 +74,15 @@ def create(config):
     @return: An up and running XendDomainInfo instance
     @raise VmError: Invalid configuration or failure to start.
     """
-
+    from xen.xend import XendDomain
+    domconfig = XendConfig.XendConfig(sxp_obj = config)
+    othervm = XendDomain.instance().domain_lookup_nr(domconfig["name_label"])
+    if othervm is None or othervm.domid is None:
+        othervm = XendDomain.instance().domain_lookup_nr(domconfig["uuid"])
+    if othervm is not None and othervm.domid is not None:
+        raise VmError("Domain '%s' already exists with ID '%d'" % (domconfig["name_label"], othervm.domid))
     log.debug("XendDomainInfo.create(%s)", scrub_password(config))
-    vm = XendDomainInfo(XendConfig.XendConfig(sxp_obj = config))
+    vm = XendDomainInfo(domconfig)
     try:
         vm.start()
     except:

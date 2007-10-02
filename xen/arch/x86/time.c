@@ -728,11 +728,11 @@ int cpu_frequency_change(u64 freq)
     u64 curr_tsc;
 
     local_irq_disable();
-    set_time_scale(&t->tsc_scale, freq);
     rdtscll(curr_tsc);
     t->local_tsc_stamp = curr_tsc;
     t->stime_local_stamp = get_s_time();
     t->stime_master_stamp = read_platform_stime();
+    set_time_scale(&t->tsc_scale, freq);
     local_irq_enable();
 
     /* A full epoch should pass before we check for deviation. */

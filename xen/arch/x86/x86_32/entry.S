@@ -623,7 +623,7 @@ ENTRY(exception_table)
         .long do_overflow
         .long do_bounds
         .long do_invalid_op
-        .long math_state_restore
+        .long do_device_not_available
         .long 0 # double fault
         .long do_coprocessor_segment_overrun
         .long do_invalid_TSS

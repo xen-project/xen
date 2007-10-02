@@ -177,18 +177,13 @@ long do_sysctl(XEN_GUEST_HANDLE(xen_sysctl_t) u_sysctl)
             if ( v->is_running )
                 cpuinfo.idletime += NOW() - v->runstate.state_entry_time;
 
+            ret = -EFAULT;
             if ( copy_to_guest_offset(op->u.getcpuinfo.info, i, &cpuinfo, 1) )
-            {
-                ret = -EFAULT;
-                break;
-            }
+                goto out;
         }
 
         op->u.getcpuinfo.nr_cpus = i;
-        ret = 0;
-
-        if ( copy_to_guest(u_sysctl, op, 1) )
-            ret = -EFAULT;
+        ret = copy_to_guest(u_sysctl, op, 1) ? -EFAULT : 0;
     }
     break;
 
@@ -209,6 +204,7 @@ long do_sysctl(XEN_GUEST_HANDLE(xen_sysctl_t) u_sysctl)
         break;
     }
 
+ out:
     spin_unlock(&sysctl_lock);
 
     return ret;

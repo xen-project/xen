@@ -28,17 +28,21 @@ struct trap_bounce {
 #define MAPHASH_ENTRIES 8
 #define MAPHASH_HASHFN(pfn) ((pfn) & (MAPHASH_ENTRIES-1))
 #define MAPHASHENT_NOTINUSE ((u16)~0U)
-struct vcpu_maphash {
+struct mapcache_vcpu {
+    /* Shadow of mapcache_domain.epoch. */
+    unsigned int shadow_epoch;
+
+    /* Lock-free per-VCPU hash of recently-used mappings. */
     struct vcpu_maphash_entry {
         unsigned long mfn;
         uint16_t      idx;
         uint16_t      refcnt;
     } hash[MAPHASH_ENTRIES];
-} __cacheline_aligned;
+};
 
 #define MAPCACHE_ORDER   10
 #define MAPCACHE_ENTRIES (1 << MAPCACHE_ORDER)
-struct mapcache {
+struct mapcache_domain {
     /* The PTEs that provide the mappings, and a cursor into the array. */
     l1_pgentry_t *l1tab;
     unsigned int cursor;
@@ -47,27 +51,25 @@ struct mapcache {
     spinlock_t lock;
 
     /* Garbage mappings are flushed from TLBs in batches called 'epochs'. */
-    unsigned int epoch, shadow_epoch[MAX_VIRT_CPUS];
+    unsigned int epoch;
     u32 tlbflush_timestamp;
 
     /* Which mappings are in use, and which are garbage to reap next epoch? */
     unsigned long inuse[BITS_TO_LONGS(MAPCACHE_ENTRIES)];
     unsigned long garbage[BITS_TO_LONGS(MAPCACHE_ENTRIES)];
-
-    /* Lock-free per-VCPU hash of recently-used mappings. */
-    struct vcpu_maphash vcpu_maphash[MAX_VIRT_CPUS];
 };
 
-extern void mapcache_init(struct domain *);
+void mapcache_domain_init(struct domain *);
+void mapcache_vcpu_init(struct vcpu *);
 
 /* x86/64: toggle guest between kernel and user modes. */
-extern void toggle_guest_mode(struct vcpu *);
+void toggle_guest_mode(struct vcpu *);
 
 /*
  * Initialise a hypercall-transfer page. The given pointer must be mapped
  * in Xen virtual address space (accesses are not validated or checked).
  */
-extern void hypercall_page_initialise(struct domain *d, void *);
+void hypercall_page_initialise(struct domain *d, void *);
 
 /************************************************/
 /*          shadow paging extension             */
@@ -204,7 +206,7 @@ struct arch_domain
 
 #ifdef CONFIG_X86_32
     /* map_domain_page() mapping cache. */
-    struct mapcache mapcache;
+    struct mapcache_domain mapcache;
 #endif
 
 #ifdef CONFIG_COMPAT
@@ -290,7 +292,7 @@ struct arch_vcpu
     struct trap_bounce trap_bounce;
 
     /* I/O-port access bitmap. */
-    XEN_GUEST_HANDLE(uint8_t) iobmp; /* Guest kernel virtual address of the bitmap. */
+    XEN_GUEST_HANDLE(uint8_t) iobmp; /* Guest kernel vaddr of the bitmap. */
     int iobmp_limit;  /* Number of ports represented in the bitmap.  */
     int iopl;         /* Current IOPL for this VCPU. */
 
@@ -327,6 +329,12 @@ struct arch_vcpu
 
     /* Guest-specified relocation of vcpu_info. */
     unsigned long vcpu_info_mfn;
+
+#ifdef CONFIG_X86_32
+    /* map_domain_page() mapping cache. */
+    struct mapcache_vcpu mapcache;
+#endif
+
 } __cacheline_aligned;
 
 /* Shorthands to improve code legibility. */

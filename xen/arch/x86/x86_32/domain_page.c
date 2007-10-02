@@ -43,9 +43,10 @@ static inline struct vcpu *mapcache_current_vcpu(void)
 void *map_domain_page(unsigned long mfn)
 {
     unsigned long va;
-    unsigned int idx, i, vcpu;
+    unsigned int idx, i;
     struct vcpu *v;
-    struct mapcache *cache;
+    struct mapcache_domain *dcache;
+    struct mapcache_vcpu *vcache;
     struct vcpu_maphash_entry *hashent;
 
     ASSERT(!in_irq());
@@ -54,59 +55,59 @@ void *map_domain_page(unsigned long mfn)
 
     v = mapcache_current_vcpu();
 
-    vcpu  = v->vcpu_id;
-    cache = &v->domain->arch.mapcache;
+    dcache = &v->domain->arch.mapcache;
+    vcache = &v->arch.mapcache;
 
-    hashent = &cache->vcpu_maphash[vcpu].hash[MAPHASH_HASHFN(mfn)];
+    hashent = &vcache->hash[MAPHASH_HASHFN(mfn)];
     if ( hashent->mfn == mfn )
     {
         idx = hashent->idx;
         hashent->refcnt++;
         ASSERT(idx < MAPCACHE_ENTRIES);
         ASSERT(hashent->refcnt != 0);
-        ASSERT(l1e_get_pfn(cache->l1tab[idx]) == mfn);
+        ASSERT(l1e_get_pfn(dcache->l1tab[idx]) == mfn);
         goto out;
     }
 
-    spin_lock(&cache->lock);
+    spin_lock(&dcache->lock);
 
     /* Has some other CPU caused a wrap? We must flush if so. */
-    if ( unlikely(cache->epoch != cache->shadow_epoch[vcpu]) )
+    if ( unlikely(dcache->epoch != vcache->shadow_epoch) )
     {
-        cache->shadow_epoch[vcpu] = cache->epoch;
-        if ( NEED_FLUSH(this_cpu(tlbflush_time), cache->tlbflush_timestamp) )
+        vcache->shadow_epoch = dcache->epoch;
+        if ( NEED_FLUSH(this_cpu(tlbflush_time), dcache->tlbflush_timestamp) )
         {
             perfc_incr(domain_page_tlb_flush);
             local_flush_tlb();
         }
     }
 
-    idx = find_next_zero_bit(cache->inuse, MAPCACHE_ENTRIES, cache->cursor);
+    idx = find_next_zero_bit(dcache->inuse, MAPCACHE_ENTRIES, dcache->cursor);
     if ( unlikely(idx >= MAPCACHE_ENTRIES) )
     {
         /* /First/, clean the garbage map and update the inuse list. */
-        for ( i = 0; i < ARRAY_SIZE(cache->garbage); i++ )
+        for ( i = 0; i < ARRAY_SIZE(dcache->garbage); i++ )
         {
-            unsigned long x = xchg(&cache->garbage[i], 0);
-            cache->inuse[i] &= ~x;
+            unsigned long x = xchg(&dcache->garbage[i], 0);
+            dcache->inuse[i] &= ~x;
         }
 
         /* /Second/, flush TLBs. */
         perfc_incr(domain_page_tlb_flush);
         local_flush_tlb();
-        cache->shadow_epoch[vcpu] = ++cache->epoch;
-        cache->tlbflush_timestamp = tlbflush_current_time();
+        vcache->shadow_epoch = ++dcache->epoch;
+        dcache->tlbflush_timestamp = tlbflush_current_time();
 
-        idx = find_first_zero_bit(cache->inuse, MAPCACHE_ENTRIES);
+        idx = find_first_zero_bit(dcache->inuse, MAPCACHE_ENTRIES);
         BUG_ON(idx >= MAPCACHE_ENTRIES);
     }
 
-    set_bit(idx, cache->inuse);
-    cache->cursor = idx + 1;
+    set_bit(idx, dcache->inuse);
+    dcache->cursor = idx + 1;
 
-    spin_unlock(&cache->lock);
+    spin_unlock(&dcache->lock);
 
-    l1e_write(&cache->l1tab[idx], l1e_from_pfn(mfn, __PAGE_HYPERVISOR));
+    l1e_write(&dcache->l1tab[idx], l1e_from_pfn(mfn, __PAGE_HYPERVISOR));
 
  out:
     va = MAPCACHE_VIRT_START + (idx << PAGE_SHIFT);
@@ -117,7 +118,7 @@ void unmap_domain_page(void *va)
 {
     unsigned int idx;
     struct vcpu *v;
-    struct mapcache *cache;
+    struct mapcache_domain *dcache;
     unsigned long mfn;
     struct vcpu_maphash_entry *hashent;
 
@@ -128,11 +129,11 @@ void unmap_domain_page(void *va)
 
     v = mapcache_current_vcpu();
 
-    cache = &v->domain->arch.mapcache;
+    dcache = &v->domain->arch.mapcache;
 
     idx = ((unsigned long)va - MAPCACHE_VIRT_START) >> PAGE_SHIFT;
-    mfn = l1e_get_pfn(cache->l1tab[idx]);
-    hashent = &cache->vcpu_maphash[v->vcpu_id].hash[MAPHASH_HASHFN(mfn)];
+    mfn = l1e_get_pfn(dcache->l1tab[idx]);
+    hashent = &v->arch.mapcache.hash[MAPHASH_HASHFN(mfn)];
 
     if ( hashent->idx == idx )
     {
@@ -145,10 +146,10 @@ void unmap_domain_page(void *va)
         if ( hashent->idx != MAPHASHENT_NOTINUSE )
         {
             /* /First/, zap the PTE. */
-            ASSERT(l1e_get_pfn(cache->l1tab[hashent->idx]) == hashent->mfn);
-            l1e_write(&cache->l1tab[hashent->idx], l1e_empty());
+            ASSERT(l1e_get_pfn(dcache->l1tab[hashent->idx]) == hashent->mfn);
+            l1e_write(&dcache->l1tab[hashent->idx], l1e_empty());
             /* /Second/, mark as garbage. */
-            set_bit(hashent->idx, cache->garbage);
+            set_bit(hashent->idx, dcache->garbage);
         }
 
         /* Add newly-freed mapping to the maphash. */
@@ -158,30 +159,30 @@ void unmap_domain_page(void *va)
     else
     {
         /* /First/, zap the PTE. */
-        l1e_write(&cache->l1tab[idx], l1e_empty());
+        l1e_write(&dcache->l1tab[idx], l1e_empty());
         /* /Second/, mark as garbage. */
-        set_bit(idx, cache->garbage);
+        set_bit(idx, dcache->garbage);
     }
 }
 
-void mapcache_init(struct domain *d)
+void mapcache_domain_init(struct domain *d)
 {
-    unsigned int i, j;
-    struct vcpu_maphash_entry *hashent;
-
     d->arch.mapcache.l1tab = d->arch.mm_perdomain_pt +
         (GDT_LDT_MBYTES << (20 - PAGE_SHIFT));
     spin_lock_init(&d->arch.mapcache.lock);
+}
+
+void mapcache_vcpu_init(struct vcpu *v)
+{
+    unsigned int i;
+    struct vcpu_maphash_entry *hashent;
 
     /* Mark all maphash entries as not in use. */
-    for ( i = 0; i < MAX_VIRT_CPUS; i++ )
+    for ( i = 0; i < MAPHASH_ENTRIES; i++ )
     {
-        for ( j = 0; j < MAPHASH_ENTRIES; j++ )
-        {
-            hashent = &d->arch.mapcache.vcpu_maphash[i].hash[j];
-            hashent->mfn = ~0UL; /* never valid to map */
-            hashent->idx = MAPHASHENT_NOTINUSE;
-        }
+        hashent = &v->arch.mapcache.hash[i];
+        hashent->mfn = ~0UL; /* never valid to map */
+        hashent->idx = MAPHASHENT_NOTINUSE;
     }
 }
 

@@ -732,33 +732,34 @@ int vlapic_accept_pic_intr(struct vcpu *v)
              vlapic_hw_disabled(vlapic)));
 }
 
-int vlapic_has_interrupt(struct vcpu *v)
+int vlapic_has_pending_irq(struct vcpu *v)
 {
     struct vlapic *vlapic = vcpu_vlapic(v);
-    int highest_irr;
+    int irr, isr;
 
     if ( !vlapic_enabled(vlapic) )
         return -1;
 
-    highest_irr = vlapic_find_highest_irr(vlapic);
-    if ( (highest_irr == -1) ||
-         ((highest_irr & 0xF0) <= vlapic_get_ppr(vlapic)) )
+    irr = vlapic_find_highest_irr(vlapic);
+    if ( irr == -1 )
         return -1;
 
-    return highest_irr;
+    isr = vlapic_find_highest_isr(vlapic);
+    isr = (isr != -1) ? isr : 0;
+    if ( (isr & 0xf0) >= (irr & 0xf0) )
+        return -1;
+
+    return irr;
 }
 
-int cpu_get_apic_interrupt(struct vcpu *v)
+int vlapic_ack_pending_irq(struct vcpu *v, int vector)
 {
-    int vector = vlapic_has_interrupt(v);
     struct vlapic *vlapic = vcpu_vlapic(v);
 
-    if ( vector == -1 )
-        return -1;
- 
     vlapic_set_vector(vector, &vlapic->regs->data[APIC_ISR]);
     vlapic_clear_irr(vector, vlapic);
-    return vector;
+
+    return 1;
 }
 
 /* Reset the VLPAIC back to its power-on/reset state. */

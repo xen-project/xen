@@ -57,11 +57,26 @@ typedef struct segment_register {
 } __attribute__ ((packed)) segment_register_t;
 
 /* Interrupt acknowledgement sources. */
-enum hvm_intack {
-    hvm_intack_none,
-    hvm_intack_pic,
-    hvm_intack_lapic,
-    hvm_intack_nmi
+enum hvm_intsrc {
+    hvm_intsrc_none,
+    hvm_intsrc_pic,
+    hvm_intsrc_lapic,
+    hvm_intsrc_nmi
+};
+struct hvm_intack {
+    uint8_t source; /* enum hvm_intsrc */
+    uint8_t vector;
+};
+#define hvm_intack_none       ( (struct hvm_intack) { hvm_intsrc_none,  0 } )
+#define hvm_intack_pic(vec)   ( (struct hvm_intack) { hvm_intsrc_pic,   vec } )
+#define hvm_intack_lapic(vec) ( (struct hvm_intack) { hvm_intsrc_lapic, vec } )
+#define hvm_intack_nmi        ( (struct hvm_intack) { hvm_intsrc_nmi,   2 } )
+enum hvm_intblk {
+    hvm_intblk_none,      /* not blocked (deliverable) */
+    hvm_intblk_shadow,    /* MOV-SS or STI shadow */
+    hvm_intblk_rflags_ie, /* RFLAGS.IE == 0 */
+    hvm_intblk_tpr,       /* LAPIC TPR too high */
+    hvm_intblk_nmi_iret   /* NMI blocked until IRET */
 };
 
 /*
@@ -94,7 +109,7 @@ struct hvm_function_table {
      * 3) return the current guest segment descriptor base
      * 4) return the current guest segment descriptor
      */
-    int (*interrupts_enabled)(struct vcpu *v, enum hvm_intack);
+    enum hvm_intblk (*interrupt_blocked)(struct vcpu *v, struct hvm_intack);
     int (*guest_x86_mode)(struct vcpu *v);
     unsigned long (*get_segment_base)(struct vcpu *v, enum x86_segment seg);
     void (*get_segment_register)(struct vcpu *v, enum x86_segment seg,
@@ -177,11 +192,11 @@ u64 hvm_get_guest_time(struct vcpu *v);
 #define hvm_long_mode_enabled(v) (v,0)
 #endif
 
-static inline int
-hvm_interrupts_enabled(struct vcpu *v, enum hvm_intack type)
+static inline enum hvm_intblk
+hvm_interrupt_blocked(struct vcpu *v, struct hvm_intack intack)
 {
     ASSERT(v == current);
-    return hvm_funcs.interrupts_enabled(v, type);
+    return hvm_funcs.interrupt_blocked(v, intack);
 }
 
 static inline int

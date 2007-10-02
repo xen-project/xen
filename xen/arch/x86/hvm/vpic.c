@@ -503,7 +503,7 @@ void vpic_irq_negative_edge(struct domain *d, int irq)
         vpic_update_int_output(vpic);
 }
 
-int cpu_get_pic_interrupt(struct vcpu *v)
+int vpic_ack_pending_irq(struct vcpu *v)
 {
     int irq, vector;
     struct hvm_hw_vpic *vpic = &v->domain->arch.hvm_domain.vpic[0];

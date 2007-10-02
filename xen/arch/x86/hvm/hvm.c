@@ -443,6 +443,8 @@ int hvm_vcpu_initialise(struct vcpu *v)
     spin_lock_init(&v->arch.hvm_vcpu.tm_lock);
     INIT_LIST_HEAD(&v->arch.hvm_vcpu.tm_list);
 
+    v->arch.guest_context.user_regs.eflags = 2;
+
     if ( v->vcpu_id == 0 )
     {
         /* NB. All these really belong in hvm_domain_initialise(). */
@@ -453,6 +455,10 @@ int hvm_vcpu_initialise(struct vcpu *v)
  
         /* Init guest TSC to start from zero. */
         hvm_set_guest_time(v, 0);
+
+        /* Can start up without SIPI-SIPI or setvcpucontext domctl. */
+        v->is_initialised = 1;
+        clear_bit(_VPF_down, &v->pause_flags);
     }
 
     return 0;
@@ -737,7 +743,7 @@ int hvm_set_cr4(unsigned long value)
     old_cr = v->arch.hvm_vcpu.guest_cr[4];
     v->arch.hvm_vcpu.guest_cr[4] = value;
     hvm_update_guest_cr(v, 4);
-  
+
     /* Modifying CR4.{PSE,PAE,PGE} invalidates all TLB entries, inc. Global. */
     if ( (old_cr ^ value) & (X86_CR4_PSE | X86_CR4_PGE | X86_CR4_PAE) )
         paging_update_paging_modes(v);
@@ -1651,7 +1657,15 @@ static int hvmop_set_pci_link_route(
 
 static int hvmop_flush_tlb_all(void)
 {
+    struct vcpu *v;
+
+    /* Flush paging-mode soft state (e.g., va->gfn cache; PAE PDPE cache). */
+    for_each_vcpu ( current->domain, v )
+        paging_update_cr3(v);
+
+    /* Flush all dirty TLBs. */
     flush_tlb_mask(current->domain->domain_dirty_cpumask);
+
     return 0;
 }
 

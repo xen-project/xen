@@ -975,20 +975,34 @@ static void vmx_init_hypercall_page(struct domain *d, void *hypercall_page)
     *(u16 *)(hypercall_page + (__HYPERVISOR_iret * 32)) = 0x0b0f; /* ud2 */
 }
 
-static int vmx_interrupts_enabled(struct vcpu *v, enum hvm_intack type)
+static enum hvm_intblk vmx_interrupt_blocked(
+    struct vcpu *v, struct hvm_intack intack)
 {
     unsigned long intr_shadow;
 
     intr_shadow = __vmread(GUEST_INTERRUPTIBILITY_INFO);
 
-    if ( type == hvm_intack_nmi )
-        return !(intr_shadow & (VMX_INTR_SHADOW_STI|
-                                VMX_INTR_SHADOW_MOV_SS|
-                                VMX_INTR_SHADOW_NMI));
+    if ( intr_shadow & (VMX_INTR_SHADOW_STI|VMX_INTR_SHADOW_MOV_SS) )
+        return hvm_intblk_shadow;
 
-    ASSERT((type == hvm_intack_pic) || (type == hvm_intack_lapic));
-    return (!irq_masked(guest_cpu_user_regs()->eflags) &&
-            !(intr_shadow & (VMX_INTR_SHADOW_STI|VMX_INTR_SHADOW_MOV_SS)));
+    if ( intack.source == hvm_intsrc_nmi )
+        return ((intr_shadow & VMX_INTR_SHADOW_NMI) ?
+                hvm_intblk_nmi_iret : hvm_intblk_none);
+
+    ASSERT((intack.source == hvm_intsrc_pic) ||
+           (intack.source == hvm_intsrc_lapic));
+
+    if ( irq_masked(guest_cpu_user_regs()->eflags) )
+        return hvm_intblk_rflags_ie;
+
+    if ( intack.source == hvm_intsrc_lapic )
+    {
+        uint32_t tpr = vlapic_get_reg(vcpu_vlapic(v), APIC_TASKPRI) & 0xF0;
+        if ( (tpr >> 4) >= (intack.vector >> 4) )
+            return hvm_intblk_tpr;
+    }
+
+    return hvm_intblk_none;
 }
 
 static void vmx_update_host_cr3(struct vcpu *v)
@@ -1112,7 +1126,7 @@ static struct hvm_function_table vmx_function_table = {
     .vcpu_destroy         = vmx_vcpu_destroy,
     .save_cpu_ctxt        = vmx_save_vmcs_ctxt,
     .load_cpu_ctxt        = vmx_load_vmcs_ctxt,
-    .interrupts_enabled   = vmx_interrupts_enabled,
+    .interrupt_blocked    = vmx_interrupt_blocked,
     .guest_x86_mode       = vmx_guest_x86_mode,
     .get_segment_base     = vmx_get_segment_base,
     .get_segment_register = vmx_get_segment_register,

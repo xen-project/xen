@@ -559,7 +559,7 @@ ENTRY(exception_table)
         .quad do_overflow
         .quad do_bounds
         .quad do_invalid_op
-        .quad math_state_restore
+        .quad do_device_not_available
         .quad 0 # double_fault
         .quad do_coprocessor_segment_overrun
         .quad do_invalid_TSS

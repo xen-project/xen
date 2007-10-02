@@ -165,12 +165,12 @@ void pt_update_irq(struct vcpu *v)
 }
 
 static struct periodic_time *is_pt_irq(
-    struct vcpu *v, int vector, enum hvm_intack src)
+    struct vcpu *v, struct hvm_intack intack)
 {
     struct list_head *head = &v->arch.hvm_vcpu.tm_list;
     struct periodic_time *pt;
     struct RTCState *rtc = &v->domain->arch.hvm_domain.pl_time.vrtc;
-    int vec;
+    int vector;
 
     list_for_each_entry ( pt, head, list )
     {
@@ -179,15 +179,16 @@ static struct periodic_time *is_pt_irq(
 
         if ( is_lvtt(v, pt->irq) )
         {
-            if ( pt->irq != vector )
+            if ( pt->irq != intack.vector )
                 continue;
             return pt;
         }
 
-        vec = get_isa_irq_vector(v, pt->irq, src);
+        vector = get_isa_irq_vector(v, pt->irq, intack.source);
 
         /* RTC irq need special care */
-        if ( (vector != vec) || (pt->irq == 8 && !is_rtc_periodic_irq(rtc)) )
+        if ( (intack.vector != vector) ||
+             ((pt->irq == 8) && !is_rtc_periodic_irq(rtc)) )
             continue;
 
         return pt;
@@ -196,7 +197,7 @@ static struct periodic_time *is_pt_irq(
     return NULL;
 }
 
-void pt_intr_post(struct vcpu *v, int vector, enum hvm_intack src)
+void pt_intr_post(struct vcpu *v, struct hvm_intack intack)
 {
     struct periodic_time *pt;
     time_cb *cb;
@@ -204,7 +205,7 @@ void pt_intr_post(struct vcpu *v, int vector, enum hvm_intack src)
 
     spin_lock(&v->arch.hvm_vcpu.tm_lock);
 
-    pt = is_pt_irq(v, vector, src);
+    pt = is_pt_irq(v, intack);
     if ( pt == NULL )
     {
         spin_unlock(&v->arch.hvm_vcpu.tm_lock);

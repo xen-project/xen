@@ -382,6 +382,10 @@ int vcpu_initialise(struct vcpu *v)
 
     v->arch.flags = TF_kernel_mode;
 
+#if defined(__i386__)
+    mapcache_vcpu_init(v);
+#endif
+
     pae_l3_cache_init(&v->arch.pae_l3_cache);
 
     paging_vcpu_init(v);
@@ -461,7 +465,7 @@ int arch_domain_create(struct domain *d)
 
 #if defined(__i386__)
 
-    mapcache_init(d);
+    mapcache_domain_init(d);
 
 #else /* __x86_64__ */
 
@@ -645,21 +649,21 @@ int arch_set_info_guest(
 
     v->arch.guest_context.user_regs.eflags |= 2;
 
+    if ( is_hvm_vcpu(v) )
+        goto out;
+
     /* Only CR0.TS is modifiable by guest or admin. */
     v->arch.guest_context.ctrlreg[0] &= X86_CR0_TS;
     v->arch.guest_context.ctrlreg[0] |= read_cr0() & ~X86_CR0_TS;
 
     init_int80_direct_trap(v);
 
-    if ( !is_hvm_vcpu(v) )
-    {
-        /* IOPL privileges are virtualised. */
-        v->arch.iopl = (v->arch.guest_context.user_regs.eflags >> 12) & 3;
-        v->arch.guest_context.user_regs.eflags &= ~EF_IOPL;
+    /* IOPL privileges are virtualised. */
+    v->arch.iopl = (v->arch.guest_context.user_regs.eflags >> 12) & 3;
+    v->arch.guest_context.user_regs.eflags &= ~EF_IOPL;
 
-        /* Ensure real hardware interrupts are enabled. */
-        v->arch.guest_context.user_regs.eflags |= EF_IE;
-    }
+    /* Ensure real hardware interrupts are enabled. */
+    v->arch.guest_context.user_regs.eflags |= EF_IE;
 
     if ( v->is_initialised )
         goto out;
@@ -672,29 +676,44 @@ int arch_set_info_guest(
     if ( v->vcpu_id == 0 )
         d->vm_assist = c(vm_assist);
 
-    if ( !is_hvm_vcpu(v) )
-    {
-        if ( !compat )
-            rc = (int)set_gdt(v, c.nat->gdt_frames, c.nat->gdt_ents);
+    if ( !compat )
+        rc = (int)set_gdt(v, c.nat->gdt_frames, c.nat->gdt_ents);
 #ifdef CONFIG_COMPAT
-        else
-        {
-            unsigned long gdt_frames[ARRAY_SIZE(c.cmp->gdt_frames)];
-            unsigned int i, n = (c.cmp->gdt_ents + 511) / 512;
+    else
+    {
+        unsigned long gdt_frames[ARRAY_SIZE(c.cmp->gdt_frames)];
+        unsigned int i, n = (c.cmp->gdt_ents + 511) / 512;
 
-            if ( n > ARRAY_SIZE(c.cmp->gdt_frames) )
-                return -EINVAL;
-            for ( i = 0; i < n; ++i )
-                gdt_frames[i] = c.cmp->gdt_frames[i];
-            rc = (int)set_gdt(v, gdt_frames, c.cmp->gdt_ents);
-        }
+        if ( n > ARRAY_SIZE(c.cmp->gdt_frames) )
+            return -EINVAL;
+        for ( i = 0; i < n; ++i )
+            gdt_frames[i] = c.cmp->gdt_frames[i];
+        rc = (int)set_gdt(v, gdt_frames, c.cmp->gdt_ents);
+    }
 #endif
-        if ( rc != 0 )
-            return rc;
+    if ( rc != 0 )
+        return rc;
 
-        if ( !compat )
+    if ( !compat )
+    {
+        cr3_pfn = gmfn_to_mfn(d, xen_cr3_to_pfn(c.nat->ctrlreg[3]));
+
+        if ( !mfn_valid(cr3_pfn) ||
+             (paging_mode_refcounts(d)
+              ? !get_page(mfn_to_page(cr3_pfn), d)
+              : !get_page_and_type(mfn_to_page(cr3_pfn), d,
+                                   PGT_base_page_table)) )
         {
-            cr3_pfn = gmfn_to_mfn(d, xen_cr3_to_pfn(c.nat->ctrlreg[3]));
+            destroy_gdt(v);
+            return -EINVAL;
+        }
+
+        v->arch.guest_table = pagetable_from_pfn(cr3_pfn);
+
+#ifdef __x86_64__
+        if ( c.nat->ctrlreg[1] )
+        {
+            cr3_pfn = gmfn_to_mfn(d, xen_cr3_to_pfn(c.nat->ctrlreg[1]));
 
             if ( !mfn_valid(cr3_pfn) ||
                  (paging_mode_refcounts(d)
@@ -702,59 +721,42 @@ int arch_set_info_guest(
                   : !get_page_and_type(mfn_to_page(cr3_pfn), d,
                                        PGT_base_page_table)) )
             {
+                cr3_pfn = pagetable_get_pfn(v->arch.guest_table);
+                v->arch.guest_table = pagetable_null();
+                if ( paging_mode_refcounts(d) )
+                    put_page(mfn_to_page(cr3_pfn));
+                else
+                    put_page_and_type(mfn_to_page(cr3_pfn));
                 destroy_gdt(v);
                 return -EINVAL;
             }
 
-            v->arch.guest_table = pagetable_from_pfn(cr3_pfn);
-
-#ifdef __x86_64__
-            if ( c.nat->ctrlreg[1] )
-            {
-                cr3_pfn = gmfn_to_mfn(d, xen_cr3_to_pfn(c.nat->ctrlreg[1]));
-
-                if ( !mfn_valid(cr3_pfn) ||
-                     (paging_mode_refcounts(d)
-                      ? !get_page(mfn_to_page(cr3_pfn), d)
-                      : !get_page_and_type(mfn_to_page(cr3_pfn), d,
-                                           PGT_base_page_table)) )
-                {
-                    cr3_pfn = pagetable_get_pfn(v->arch.guest_table);
-                    v->arch.guest_table = pagetable_null();
-                    if ( paging_mode_refcounts(d) )
-                        put_page(mfn_to_page(cr3_pfn));
-                    else
-                        put_page_and_type(mfn_to_page(cr3_pfn));
-                    destroy_gdt(v);
-                    return -EINVAL;
-                }
-
-                v->arch.guest_table_user = pagetable_from_pfn(cr3_pfn);
-            }
-#endif
+            v->arch.guest_table_user = pagetable_from_pfn(cr3_pfn);
         }
+#endif
+    }
 #ifdef CONFIG_COMPAT
-        else
+    else
+    {
+        l4_pgentry_t *l4tab;
+
+        cr3_pfn = gmfn_to_mfn(d, compat_cr3_to_pfn(c.cmp->ctrlreg[3]));
+
+        if ( !mfn_valid(cr3_pfn) ||
+             (paging_mode_refcounts(d)
+              ? !get_page(mfn_to_page(cr3_pfn), d)
+              : !get_page_and_type(mfn_to_page(cr3_pfn), d,
+                                   PGT_l3_page_table)) )
         {
-            l4_pgentry_t *l4tab;
-
-            cr3_pfn = gmfn_to_mfn(d, compat_cr3_to_pfn(c.cmp->ctrlreg[3]));
-
-            if ( !mfn_valid(cr3_pfn) ||
-                 (paging_mode_refcounts(d)
-                  ? !get_page(mfn_to_page(cr3_pfn), d)
-                  : !get_page_and_type(mfn_to_page(cr3_pfn), d,
-                                       PGT_l3_page_table)) )
-            {
-                destroy_gdt(v);
-                return -EINVAL;
-            }
-
-            l4tab = __va(pagetable_get_paddr(v->arch.guest_table));
-            *l4tab = l4e_from_pfn(cr3_pfn, _PAGE_PRESENT|_PAGE_RW|_PAGE_USER|_PAGE_ACCESSED);
+            destroy_gdt(v);
+            return -EINVAL;
         }
+
+        l4tab = __va(pagetable_get_paddr(v->arch.guest_table));
+        *l4tab = l4e_from_pfn(
+            cr3_pfn, _PAGE_PRESENT|_PAGE_RW|_PAGE_USER|_PAGE_ACCESSED);
+    }
 #endif
-    }    
 
     if ( v->vcpu_id == 0 )
         update_domain_wallclock_time(d);

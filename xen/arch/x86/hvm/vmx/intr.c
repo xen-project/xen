@@ -71,14 +71,14 @@
  * the effect is cleared. (i.e., MOV-SS-blocking 'dominates' STI-blocking).
  */
 
-static void enable_intr_window(struct vcpu *v, enum hvm_intack intr_source)
+static void enable_intr_window(struct vcpu *v, struct hvm_intack intack)
 {
     u32 *cpu_exec_control = &v->arch.hvm_vmx.exec_control;
     u32 ctl = CPU_BASED_VIRTUAL_INTR_PENDING;
 
-    ASSERT(intr_source != hvm_intack_none);
+    ASSERT(intack.source != hvm_intsrc_none);
 
-    if ( (intr_source == hvm_intack_nmi) && cpu_has_vmx_vnmi )
+    if ( (intack.source == hvm_intsrc_nmi) && cpu_has_vmx_vnmi )
     {
         /*
          * We set MOV-SS blocking in lieu of STI blocking when delivering an
@@ -107,105 +107,84 @@ static void enable_intr_window(struct vcpu *v, enum hvm_intack intr_source)
     }
 }
 
-static void update_tpr_threshold(
-    struct vcpu *v, enum hvm_intack masked_intr_source)
-{
-    struct vlapic *vlapic = vcpu_vlapic(v);
-    int max_irr, tpr, threshold = 0;
-
-    if ( !cpu_has_vmx_tpr_shadow )
-        return;
-
-    /*
-     * If ExtInts are masked then that dominates the TPR --- the 'interrupt
-     * window' has already been enabled in this case.
-     */
-    if ( (masked_intr_source == hvm_intack_lapic) ||
-         (masked_intr_source == hvm_intack_pic) )
-        goto out;
-
-    /* Is there an interrupt pending at the LAPIC? Nothing to do if not. */
-    if ( !vlapic_enabled(vlapic) || 
-         ((max_irr = vlapic_find_highest_irr(vlapic)) == -1) )
-        goto out;
-
-    /* Highest-priority pending interrupt is masked by the TPR? */
-    tpr = vlapic_get_reg(vlapic, APIC_TASKPRI) & 0xF0;
-    if ( (tpr >> 4) >= (max_irr >> 4) )
-        threshold = max_irr >> 4;
-
- out:
-    __vmwrite(TPR_THRESHOLD, threshold);
-}
-
-static void vmx_dirq_assist(struct domain *d)
+static void vmx_dirq_assist(struct vcpu *v)
 {
     unsigned int irq;
     uint32_t device, intx;
-    struct hvm_irq *hvm_irq = &d->arch.hvm_domain.irq;
+    struct domain *d = v->domain;
+    struct hvm_irq_dpci *hvm_irq_dpci = d->arch.hvm_domain.irq.dpci;
 
-    for ( irq = find_first_bit(hvm_irq->dirq_mask, NR_IRQS);
+    if ( !vtd_enabled || (v->vcpu_id != 0) || (hvm_irq_dpci == NULL) )
+        return;
+
+    for ( irq = find_first_bit(hvm_irq_dpci->dirq_mask, NR_IRQS);
           irq < NR_IRQS;
-          irq = find_next_bit(hvm_irq->dirq_mask, NR_IRQS, irq + 1) )
+          irq = find_next_bit(hvm_irq_dpci->dirq_mask, NR_IRQS, irq + 1) )
     {
-        test_and_clear_bit(irq, &hvm_irq->dirq_mask);
-        device = hvm_irq->mirq[irq].device;
-        intx = hvm_irq->mirq[irq].intx;
+        test_and_clear_bit(irq, &hvm_irq_dpci->dirq_mask);
+        device = hvm_irq_dpci->mirq[irq].device;
+        intx = hvm_irq_dpci->mirq[irq].intx;
         hvm_pci_intx_assert(d, device, intx);
     }
 }
 
 asmlinkage void vmx_intr_assist(void)
 {
-    int intr_vector;
-    enum hvm_intack intr_source;
+    struct hvm_intack intack;
     struct vcpu *v = current;
-    unsigned int intr_info;
+    unsigned int tpr_threshold = 0;
+    enum hvm_intblk intblk;
 
     /* Crank the handle on interrupt state. */
     pt_update_irq(v);
 
-    if ( vtd_enabled && (v->vcpu_id == 0) )
-        vmx_dirq_assist(v->domain);
+    vmx_dirq_assist(v);
   
     hvm_set_callback_irq_level();
 
     do {
-        intr_source = hvm_vcpu_has_pending_irq(v);
-        if ( likely(intr_source == hvm_intack_none) )
+        intack = hvm_vcpu_has_pending_irq(v);
+        if ( likely(intack.source == hvm_intsrc_none) )
             goto out;
 
-        /*
-         * An event is already pending or the pending interrupt is masked?
-         * Then the pending interrupt must be delayed.
-         */
-        intr_info = __vmread(VM_ENTRY_INTR_INFO);
-        if ( unlikely(intr_info & INTR_INFO_VALID_MASK) ||
-             !hvm_interrupts_enabled(v, intr_source) )
+        intblk = hvm_interrupt_blocked(v, intack);
+        if ( intblk == hvm_intblk_tpr )
         {
-            enable_intr_window(v, intr_source);
+            ASSERT(vlapic_enabled(vcpu_vlapic(v)));
+            ASSERT(intack.source == hvm_intsrc_lapic);
+            tpr_threshold = intack.vector >> 4;
             goto out;
         }
-    } while ( !hvm_vcpu_ack_pending_irq(v, intr_source, &intr_vector) );
 
-    if ( intr_source == hvm_intack_nmi )
+        if ( (intblk != hvm_intblk_none) ||
+             (__vmread(VM_ENTRY_INTR_INFO) & INTR_INFO_VALID_MASK) )
+        {
+            enable_intr_window(v, intack);
+            goto out;
+        }
+
+        intack = hvm_vcpu_ack_pending_irq(v, intack);
+    } while ( intack.source == hvm_intsrc_none );
+
+    if ( intack.source == hvm_intsrc_nmi )
     {
         vmx_inject_nmi(v);
     }
     else
     {
-        HVMTRACE_2D(INJ_VIRQ, v, intr_vector, /*fake=*/ 0);
-        vmx_inject_extint(v, intr_vector);
-        pt_intr_post(v, intr_vector, intr_source);
+        HVMTRACE_2D(INJ_VIRQ, v, intack.vector, /*fake=*/ 0);
+        vmx_inject_extint(v, intack.vector);
+        pt_intr_post(v, intack);
     }
 
     /* Is there another IRQ to queue up behind this one? */
-    intr_source = hvm_vcpu_has_pending_irq(v);
-    if ( unlikely(intr_source != hvm_intack_none) )
-        enable_intr_window(v, intr_source);
+    intack = hvm_vcpu_has_pending_irq(v);
+    if ( unlikely(intack.source != hvm_intsrc_none) )
+        enable_intr_window(v, intack);
 
  out:
-    update_tpr_threshold(v, intr_source);
+    if ( cpu_has_vmx_tpr_shadow )
+        __vmwrite(TPR_THRESHOLD, tpr_threshold);
 }
 
 /*
