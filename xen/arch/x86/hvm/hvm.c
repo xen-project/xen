@@ -1657,7 +1657,15 @@ static int hvmop_set_pci_link_route(
 
 static int hvmop_flush_tlb_all(void)
 {
+    struct vcpu *v;
+
+    /* Flush paging-mode soft state (e.g., va->gfn cache; PAE PDPE cache). */
+    for_each_vcpu ( current->domain, v )
+        paging_update_cr3(v);
+
+    /* Flush all dirty TLBs. */
     flush_tlb_mask(current->domain->domain_dirty_cpumask);
+
     return 0;
 }
 
