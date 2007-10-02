@@ -382,6 +382,8 @@ int vcpu_initialise(struct vcpu *v)
 
     v->arch.flags = TF_kernel_mode;
 
+    mapcache_vcpu_init(v);
+
     pae_l3_cache_init(&v->arch.pae_l3_cache);
 
     paging_vcpu_init(v);
@@ -461,7 +463,7 @@ int arch_domain_create(struct domain *d)
 
 #if defined(__i386__)
 
-    mapcache_init(d);
+    mapcache_domain_init(d);
 
 #else /* __x86_64__ */
 
