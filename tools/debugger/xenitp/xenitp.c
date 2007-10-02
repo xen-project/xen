@@ -57,7 +57,7 @@ static int cur_vcpu;
 
 int virt_to_phys (int is_inst, unsigned long vaddr, unsigned long *paddr);
 
-inline unsigned int ctx_slot (vcpu_guest_context_t *ctx)
+static inline unsigned int ctx_slot (vcpu_guest_context_t *ctx)
 {
     return (ctx->regs.psr >> PSR_RI_SHIFT) & 3;
 }
@@ -65,7 +65,7 @@ inline unsigned int ctx_slot (vcpu_guest_context_t *ctx)
 unsigned char *
 target_map_memory (unsigned long paddr)
 {
-    static unsigned long cur_page = -1;
+    static unsigned long cur_page = (unsigned long)-1;
     static unsigned char *cur_map = NULL;
 
     if ((paddr >> XC_PAGE_SHIFT) != cur_page) {
@@ -243,8 +243,6 @@ void target_disas (FILE *out, unsigned long code, unsigned long size)
     unsigned long pc;
     int count;
     struct disassemble_info disasm_info;
-    int slot;
-    int (*print_insn)(bfd_vma pc, disassemble_info *info);
 
     INIT_DISASSEMBLE_INFO(disasm_info, out, fprintf);
 
@@ -257,14 +255,15 @@ void target_disas (FILE *out, unsigned long code, unsigned long size)
 
     disasm_info.endian = BFD_ENDIAN_LITTLE;
     disasm_info.mach = 0; //bfd_mach_ia64;
-    print_insn = print_insn_ia64;
 
-    for (pc = code, slot = 0; pc < code + size; pc += count, slot++) {
-        fprintf (out, "0x%016lx+%d:%c ", code, slot,
+    for (pc = code; pc < code + size; pc += count) {
+        int slot = (pc & 0x0f) / 6;
+        fprintf (out, "0x%016lx+%d:%c ", pc & ~0x0fUL, slot,
                  ((pc & ~0x0fUL) == cur_ctx->regs.ip
                   && slot == ctx_slot (cur_ctx)) ? '*' : ' ');
 
-        count = print_insn (pc, &disasm_info);
+        count = print_insn_ia64 (pc, &disasm_info);
+
 #if 0
         {
             int i;
@@ -337,7 +336,7 @@ static void print_a_tr (int i, const struct ia64_tr_entry *tr)
     ma_val =  tr->pte  >> PTE_MA_SHIFT  & PTE_MA_MASK;
     pa     = (tr->pte  >> PTE_PPN_SHIFT & PTE_PPN_MASK) << PTE_PPN_SHIFT;
     pa     = (pa >> ps_val) << ps_val;
-    printf (" [%d]  %ld %06lx %016lx %013lx %02d %s %ld  %ld  %ld  %ld "
+    printf (" [%2d] %ld %06lx %016lx %013lx %02d %s %ld  %ld  %ld  %ld "
            "%ld %d %s %06lx\n", i,
            tr->pte >> PTE_P_SHIFT    & PTE_P_MASK,
            tr->rid >> RR_RID_SHIFT   & RR_RID_MASK,
@@ -638,13 +637,13 @@ void print_tr (vcpu_guest_context_t *ctx)
     printf ("\n itr: P rid    va               pa            ps      ed pl "
             "ar a d ma    key\n");
 
-    for (i = 0; i < 8; i++)
+    for (i = 0; i < sizeof (tr->itrs) / sizeof (tr->itrs[0]); i++)
         print_a_tr (i, &tr->itrs[i]);
 
     printf ("\n dtr: P rid    va               pa            ps      ed pl "
             "ar a d ma    key\n");
 
-    for (i = 0; i < 8; i++)
+    for (i = 0; i < sizeof (tr->dtrs) / sizeof (tr->dtrs[0]); i++)
         print_a_tr (i, &tr->dtrs[i]);
 }
 
@@ -734,15 +733,21 @@ int wait_domain (int vcpu, vcpu_guest_context_t *ctx)
 
 int virt_to_phys (int is_inst, unsigned long vaddr, unsigned long *paddr)
 {
+    struct vcpu_tr_regs *trs = &cur_ctx->regs.tr;
     struct ia64_tr_entry *tr;
     int i;
+    int num;
 
     /* Search in tr.  */
-    if (is_inst)
-        tr = cur_ctx->regs.tr.itrs;
-    else
-        tr = cur_ctx->regs.tr.dtrs;
-    for (i = 0; i < 8; i++, tr++) {
+    if (is_inst) {
+        tr = trs->itrs;
+        num = sizeof (trs->itrs) / sizeof (trs->itrs[0]);
+    }
+    else {
+        tr = trs->dtrs;
+        num = sizeof (trs->dtrs) / sizeof (trs->dtrs[0]);
+    }
+    for (i = 0; i < num; i++, tr++) {
         int ps_val = (tr->itir >> ITIR_PS_SHIFT) & ITIR_PS_MASK;
         unsigned long ps_mask = (-1L) << ps_val;
 
@@ -762,40 +767,44 @@ get_reg_addr (const char *name)
         return &cur_ctx->regs.ip;
     else if (strcmp (name, "psr") == 0)
         return &cur_ctx->regs.psr;
+    else if (strcmp (name, "iip") == 0)
+        return &cur_ctx->regs.cr.iip;
+    else if (strcmp (name, "b0") == 0)
+        return &cur_ctx->regs.b[0];
     else
         return 0;
 }
 
 enum prio_expr {EXPR_BASE, EXPR_SUM, EXPR_LOGIC, EXPR_PROD};
 
-int parse_expr (unsigned char **buf, unsigned long *res, enum prio_expr prio);
+int parse_expr (char **buf, unsigned long *res, enum prio_expr prio);
 
-int next_char (unsigned char **buf)
+int next_char (char **buf)
 {
-    unsigned char *b;
+    char *b;
 
     b = *buf;
-    while (isspace (*b))
+    while (isspace ((unsigned char)*b))
         b++;
     *buf = b;
     return *b;
 }
 
-int parse_unary (unsigned char **buf, unsigned long *res)
+int parse_unary (char **buf, unsigned long *res)
 {
-    unsigned char c;
+    char c;
 
     c = next_char (buf);
     switch (c) {
     case '0' ... '9':
         {
             char *e;
-            *res = strtoul ((char *)*buf, &e, 0);
-            if (e == (char *)*buf) {
+            *res = strtoul (*buf, &e, 0);
+            if (e == *buf) {
                 printf ("bad literal\n");
                 return -1;
             }
-            *buf = (unsigned char *)e;
+            *buf = e;
         }
         break;
     case '+':
@@ -803,9 +812,9 @@ int parse_unary (unsigned char **buf, unsigned long *res)
         return parse_unary (buf, res);
     case '$':
         {
-            unsigned char *b;
-            unsigned char *e;
-            unsigned char c;
+            char *b;
+            char *e;
+            char c;
             unsigned long *reg;
             int len;
 
@@ -828,13 +837,13 @@ int parse_unary (unsigned char **buf, unsigned long *res)
 
             c = b[len];
             b[len] = 0;
-            reg = get_reg_addr ((char *)b);
+            reg = get_reg_addr (b);
             b[len] = c;
 
             if (reg != NULL)
                 *res = *reg;
-            else if (strncmp ((char *)b, "d2p", len) == 0 ||
-                     strncmp ((char *)b, "i2p", len) == 0) {
+            else if (strncmp (b, "d2p", len) == 0 ||
+                     strncmp (b, "i2p", len) == 0) {
                 unsigned long vaddr;
 
                 *buf = e;
@@ -873,25 +882,29 @@ int parse_unary (unsigned char **buf, unsigned long *res)
     return 0;
 }
 
-int parse_expr (unsigned char **buf, unsigned long *res, enum prio_expr prio)
+int parse_expr (char **buf, unsigned long *res, enum prio_expr prio)
 {
     unsigned long val = 0;
     unsigned long val1;
+    char c;
 
     if (parse_unary (buf, &val) != 0)
         return -1;
 
     while (1) {
-        switch (next_char (buf)) {
+        c = next_char (buf);
+        switch (c) {
         case '+':
+        case '-':
             if (prio > EXPR_SUM)
                 return 0;
-
             (*buf)++;
             if (parse_expr (buf, &val1, EXPR_SUM) < 0)
                 return -1;
-
-            val += val1;
+            if (c == '+')
+                val += val1;
+            else
+                val -= val1;
             break;
         case '*':
             if (prio > EXPR_PROD)
@@ -910,17 +923,17 @@ int parse_expr (unsigned char **buf, unsigned long *res, enum prio_expr prio)
     }
 }
 
-unsigned char *parse_arg (unsigned char **buf)
+char *parse_arg (char **buf)
 {
-    unsigned char *res;
-    unsigned char *b = *buf;
+    char *res;
+    char *b = *buf;
 
     /* Eat leading spaces.  */
-    while (isspace (*b))
+    while (isspace ((unsigned char)*b))
         b++;
 
     res = b;
-    while (*b && !isspace (*b))
+    while (*b && !isspace ((unsigned char)*b))
         b++;
 
     /* Set the NUL terminator.  */
@@ -948,18 +961,18 @@ struct command_desc
 {
     const char *name;
     const char *help;
-    int (*cmd)(unsigned char *line);
+    int (*cmd)(char *line);
 };
 
 static int
-cmd_registers (unsigned char *line)
+cmd_registers (char *line)
 {
     print_ctx (cur_ctx);
     return 0;
 }
 
 static int
-cmd_sstep (unsigned char *line)
+cmd_sstep (char *line)
 {
     if ((cur_ctx->regs.psr & (PSR_SS | PSR_TB)) != PSR_SS) {
         cur_ctx->regs.psr |= PSR_SS;
@@ -979,27 +992,36 @@ cmd_sstep (unsigned char *line)
 }
 
 static int
-cmd_go (unsigned char *line)
+cmd_go (char *line)
 {
-    if ((cur_ctx->regs.psr & (PSR_SS | PSR_TB | PSR_DB)) != 0) {
-        cur_ctx->regs.psr &= ~(PSR_SS | PSR_TB);
-        cur_ctx->regs.psr |= PSR_DD | PSR_ID;
-        if (vcpu_setcontext (cur_vcpu) < 0)
+    unsigned long n = 1;
+
+    if (*line != 0) {
+        if (parse_expr (&line, &n, 0) < 0)
             return -1;
     }
+    while (n > 0) {
+        /* Set psr.dd and psr.id to skip over current breakpoint.  */
+        if ((cur_ctx->regs.psr & (PSR_SS | PSR_TB | PSR_DB)) != 0) {
+            cur_ctx->regs.psr &= ~(PSR_SS | PSR_TB);
+            cur_ctx->regs.psr |= PSR_DD | PSR_ID;
+            if (vcpu_setcontext (cur_vcpu) < 0)
+                return -1;
+        }
 
-    if (wait_domain (cur_vcpu, cur_ctx) < 0) {
-        perror ("wait_domain");
-        return -1;
+        if (wait_domain (cur_vcpu, cur_ctx) < 0) {
+            perror ("wait_domain");
+            return -1;
+        }
+        print_ctx (cur_ctx);
+        n--;
     }
-
-    print_ctx (cur_ctx);
 
     return 0;
 }
 
 static int
-cmd_cb (unsigned char *line)
+cmd_cb (char *line)
 {
     if ((cur_ctx->regs.psr & (PSR_SS | PSR_TB)) != PSR_TB) {
         cur_ctx->regs.psr &= ~PSR_SS;
@@ -1019,35 +1041,42 @@ cmd_cb (unsigned char *line)
 }
 
 static int
-cmd_quit (unsigned char *line)
+cmd_quit (char *line)
 {
     return -2;
 }
 
 static int
-cmd_echo (unsigned char *line)
+cmd_echo (char *line)
 {
     printf ("%s", line);
     return 0;
 }
 
 static int
-cmd_disassemble (unsigned char *args)
+cmd_disassemble (char *args)
 {
     static unsigned long addr;
+    unsigned long end_addr = addr + 16;
 
-    if (*args != 0)
+    if (*args != 0) {
         if (parse_expr (&args, &addr, 0) < 0)
             return -1;
-
-    target_disas (stdout, addr, 16);
-    addr += 16;
-
+        if (*args != 0) {
+            if (parse_expr (&args, &end_addr, 0) < 0)
+                return -1;
+        }
+        else 
+            end_addr = addr + 16;
+    }
+    target_disas (stdout, addr, end_addr - addr);
+    addr = end_addr;
     return 0;
+
 }
 
 static int
-cmd_break (unsigned char *args)
+cmd_break (char *args)
 {
     unsigned long addr;
     int i;
@@ -1072,7 +1101,7 @@ cmd_break (unsigned char *args)
 }
 
 static int
-cmd_watch (unsigned char *args)
+cmd_watch (char *args)
 {
     unsigned long addr;
     unsigned long mask;
@@ -1101,7 +1130,7 @@ cmd_watch (unsigned char *args)
 }
 
 static int
-cmd_delete (unsigned char *args)
+cmd_delete (char *args)
 {
     unsigned long num;
 
@@ -1128,7 +1157,7 @@ cmd_delete (unsigned char *args)
 }
 
 static int
-cmd_disable (unsigned char *args)
+cmd_disable (char *args)
 {
     unsigned long num;
 
@@ -1146,7 +1175,7 @@ cmd_disable (unsigned char *args)
 }
 
 static int
-cmd_enable (unsigned char *args)
+cmd_enable (char *args)
 {
     unsigned long num;
 
@@ -1164,7 +1193,7 @@ cmd_enable (unsigned char *args)
 }
 
 static int
-cmd_print (unsigned char *args)
+cmd_print (char *args)
 {
     unsigned long addr;
 
@@ -1199,37 +1228,38 @@ static const struct bit_xlat debug_flags[] = {
     { XEN_IA64_DEBUG_FORCE_DB, "db" },
     { XEN_IA64_DEBUG_ON_TR, "tr" },
     { XEN_IA64_DEBUG_ON_TC, "tc" },
+    /* { XEN_IA64_DEBUG_ON_KEYS, "keys" }, */
     { 0, NULL }
 };
 
 static int
-cmd_disp (unsigned char *arg)
+cmd_disp (char *arg)
 {
-    if (strcmp ((char *)arg, "br") == 0)
+    if (strcmp (arg, "br") == 0)
         print_br (cur_ctx);
-    else if (strcmp ((char *)arg, "regs") == 0)
+    else if (strcmp (arg, "regs") == 0)
         print_regs (cur_ctx);
-    else if (strcmp ((char *)arg, "cr") == 0)
+    else if (strcmp (arg, "cr") == 0)
         print_cr (cur_ctx);
-    else if (strcmp ((char *)arg, "ar") == 0)
+    else if (strcmp (arg, "ar") == 0)
         print_ar (cur_ctx);
-    else if (strcmp ((char *)arg, "tr") == 0)
+    else if (strcmp (arg, "tr") == 0)
         print_tr (cur_ctx);
-    else if (strcmp ((char *)arg, "rr") == 0)
+    else if (strcmp (arg, "rr") == 0)
         print_rr (cur_ctx);
-    else if (strcmp ((char *)arg, "db") == 0)
+    else if (strcmp (arg, "db") == 0)
         print_db (cur_ctx);
-    else if (strcmp ((char *)arg, "psr") == 0) {
+    else if (strcmp (arg, "psr") == 0) {
         printf ("psr:");
         print_bits (psr_bits, cur_ctx->regs.psr);
         printf ("\n");
     }
-    else if (strcmp ((char *)arg, "ipsr") == 0) {
+    else if (strcmp (arg, "ipsr") == 0) {
         printf ("ipsr:");
         print_bits (psr_bits, cur_ctx->regs.cr.ipsr);
         printf ("\n");
     }
-    else if (strcmp ((char *)arg, "break") == 0) {
+    else if (strcmp (arg, "break") == 0) {
         int i;
 
         for (i = 0; i < 4; i++)
@@ -1238,7 +1268,7 @@ cmd_disp (unsigned char *arg)
                         (cur_ctx->regs.ibr[2 * i + 1] & (1UL << 63)) ?
                         "enabled" : "disabled");
     }
-    else if (strcmp ((char *)arg, "domain") == 0) {
+    else if (strcmp (arg, "domain") == 0) {
         xc_dominfo_t dominfo;
 #ifdef HAVE_DEBUG_OP
         xen_ia64_debug_op_t debug_op;
@@ -1269,6 +1299,8 @@ cmd_disp (unsigned char *arg)
             printf (" running");
         if (dominfo.hvm)
             printf (" hvm");
+        if (dominfo.debugged)
+            printf (" debug");
         printf ("\n");
 
 #ifdef HAVE_DEBUG_OP
@@ -1292,7 +1324,7 @@ cmd_disp (unsigned char *arg)
 }
 
 static int
-cmd_bev (unsigned char *arg)
+cmd_bev (char *arg)
 {
     xen_ia64_debug_op_t debug_op;
     int i;
@@ -1345,15 +1377,15 @@ cmd_bev (unsigned char *arg)
 }
 
 static int
-cmd_set (unsigned char *line)
+cmd_set (char *line)
 {
-    unsigned char *reg;
+    char *reg;
     unsigned long *addr;
     unsigned long val;
 
     reg = parse_arg (&line);
 
-    addr = get_reg_addr ((char *)reg);
+    addr = get_reg_addr (reg);
     if (addr == NULL) {
         printf ("unknown register %s\n", reg);
         return -1;
@@ -1370,7 +1402,7 @@ cmd_set (unsigned char *line)
 const struct command_desc commands[];
 
 static int
-cmd_help (unsigned char *line)
+cmd_help (char *line)
 {
     int i;
 
@@ -1398,14 +1430,14 @@ const struct command_desc commands[] = {
     { "bev", "break on event", cmd_bev},
     { "set", "set reg val", cmd_set},
     { "help", "disp help", cmd_help },
-    { NULL, NULL }
+    { NULL, NULL, NULL }
 };
 
 
-int do_command (int vcpu, unsigned char *line)
+int do_command (int vcpu, char *line)
 {
-    unsigned char *cmd;
-    unsigned char *args;
+    char *cmd;
+    char *args;
     int i;
     const struct command_desc *desc;
     int flag_ambiguous;
@@ -1421,7 +1453,7 @@ int do_command (int vcpu, unsigned char *line)
 
     for (i = 0; commands[i].name; i++) {
         const char *n = commands[i].name;
-        unsigned char *c = cmd;
+        char *c = cmd;
 
         while (*n == *c && *n)
             n++, c++;
@@ -1494,12 +1526,12 @@ void xenitp (int vcpu)
         perror ("sigaction");
 
     while (1) {
-        unsigned char buf[128];
+        char buf[128];
         int len;
 
         printf ("XenITP> ");
 
-        if (fgets ((char *)buf, sizeof (buf), stdin) == NULL)
+        if (fgets (buf, sizeof (buf), stdin) == NULL)
             break;
 
         len = strlen ((char *)buf);
