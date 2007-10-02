@@ -85,9 +85,9 @@ AC_SUBST(NET_IP_RANGE)
 AC_SUBST(NETWORK_ADDRESS)
 AC_SUBST(NETMASK)
 
-DOM0_INTF="vif0.0"
+DOM0_INTF="eth0"
 AC_ARG_WITH(dom0-intf,
-        [ --with-dom0-intf=intf Set dom0 interface name [[default="vif0.0"]]],
+        [ --with-dom0-intf=intf Set dom0 interface name [[default="eth0"]]],
         [ DOM0_INTF="$withval" ])
 
 AC_SUBST(DOM0_INTF)

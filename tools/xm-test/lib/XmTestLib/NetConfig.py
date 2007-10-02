@@ -71,7 +71,7 @@ def getXendNetConfig():
 
 def checkZeroconfAddresses():
     # Make sure there aren't existing zeroconf addresses.
-    rc, out = traceCommand("ip addr show |grep \"inet 169.254\" | grep -v vif")
+    rc, out = traceCommand("ip addr show |grep \"inet 169.254\" | grep eth0")
     if rc == 0:
         raise NetworkError("Zeroconf addresses already used: %s" % out)
 
