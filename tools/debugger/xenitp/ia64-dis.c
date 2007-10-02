@@ -214,6 +214,42 @@ print_insn_ia64 (bfd_vma memaddr, struct disassemble_info *info)
 		  }
 		(*info->fprintf_func) (info->stream, "%s", regname);
 	      }
+	    else if (odesc->str[0] == 'c' && odesc->str[1] == 'r')
+	      {
+		switch (value)
+		  {
+		  case 0:	strcpy (regname, "cr.dcr"); break;
+		  case 1:	strcpy (regname, "cr.itm"); break;
+		  case 2:	strcpy (regname, "cr.iva"); break;
+		  case 8:	strcpy (regname, "cr.pta"); break;
+		  case 16:	strcpy (regname, "cr.ipsr"); break;
+		  case 17:	strcpy (regname, "cr.isr"); break;
+		  case 19:	strcpy (regname, "cr.iip"); break;
+		  case 20:	strcpy (regname, "cr.ifa"); break;
+		  case 21:	strcpy (regname, "cr.itir"); break;
+		  case 22:	strcpy (regname, "cr.iipa"); break;
+		  case 23:	strcpy (regname, "cr.ifa"); break;
+		  case 24:	strcpy (regname, "cr.iim"); break;
+		  case 25:	strcpy (regname, "cr.iha"); break;
+		  case 64:	strcpy (regname, "cr.lid"); break;
+		  case 65:	strcpy (regname, "cr.ivr"); break;
+		  case 66:	strcpy (regname, "cr.tpr"); break;
+		  case 67:	strcpy (regname, "cr.eoi"); break;
+		  case 68:	strcpy (regname, "cr.irr0"); break;
+		  case 69:	strcpy (regname, "cr.irr1"); break;
+		  case 70:	strcpy (regname, "cr.irr2"); break;
+		  case 71:	strcpy (regname, "cr.irr3"); break;
+		  case 72:	strcpy (regname, "cr.itv"); break;
+		  case 73:	strcpy (regname, "cr.pmv"); break;
+		  case 74:	strcpy (regname, "cr.cmcv"); break;
+		  case 80:	strcpy (regname, "cr.lrr0"); break;
+		  case 81:	strcpy (regname, "cr.lrr1"); break;
+		  default:
+		    sprintf (regname, "cr%u", (unsigned int) value);
+		    break;
+		  }
+		(*info->fprintf_func) (info->stream, "%s", regname);
+	      }
 	    else
 	      (*info->fprintf_func) (info->stream, "%s%d", odesc->str, (int)value);
 	    break;
