@@ -59,6 +59,7 @@
 #include <asm/unistd.h>
 #include <asm/vhpt.h>
 #include <asm/virt_event.h>
+#include <asm/vmx_phy_mode.h>
 #include <xen/errno.h>
 
 #if 1
@@ -103,7 +104,7 @@
 
 #define VMX_FAULT(n)    \
 vmx_fault_##n:;          \
-    mov r19=n;;          \
+    mov r19=n;           \
     br.sptk.many dispatch_to_fault_handler;         \
     ;;                  \
 
@@ -115,7 +116,7 @@ vmx_fault_##n:;          \
     ;;      \
     tbit.z p6,p7=r29,IA64_PSR_VM_BIT;       \
 (p7)br.sptk.many vmx_dispatch_reflection;        \
-    br.sptk.many dispatch_to_fault_handler;      \
+    br.sptk.many dispatch_to_fault_handler
 
 
 GLOBAL_ENTRY(vmx_panic)
@@ -144,12 +145,11 @@ END(vmx_vhpt_miss)
 // 0x0400 Entry 1 (size 64 bundles) ITLB (21)
 ENTRY(vmx_itlb_miss)
     VMX_DBG_FAULT(1)
+    mov r29=cr.ipsr
     mov r31 = pr
-    mov r29=cr.ipsr;
     ;;
-    tbit.z p6,p7=r29,IA64_PSR_VM_BIT;
-(p6) br.sptk vmx_alt_itlb_miss_1
-//(p6) br.sptk vmx_fault_1
+    tbit.z p6,p7=r29,IA64_PSR_VM_BIT
+(p6) br.sptk vmx_alt_itlb_miss_vmm
     mov r16 = cr.ifa
     ;;
     thash r17 = r16
@@ -159,47 +159,52 @@ ENTRY(vmx_itlb_miss)
     adds r28 = VLE_TITAG_OFFSET,r17
     adds r19 = VLE_CCHAIN_OFFSET, r17
     ;;
-    ld8 r17 = [r19]
+    ld8 r17 = [r19]	// Read chain
     ;;
 vmx_itlb_loop:
-    cmp.eq p6,p0 = r0, r17
+    cmp.eq p6,p0 = r0, r17 // End of chain ?
 (p6)br vmx_itlb_out
     ;;
     adds r16 = VLE_TITAG_OFFSET, r17
     adds r19 = VLE_CCHAIN_OFFSET, r17
     ;;
-    ld8 r24 = [r16]
-    ld8 r23 = [r19]
+    ld8 r24 = [r16] // Read tag
+    ld8 r23 = [r19] // Read chain
     ;;
     lfetch [r23]
-    cmp.eq  p6,p7 = r20, r24
+    cmp.eq  p6,p7 = r20, r24 // does tag match ?
     ;;
-(p7)mov r17 = r23;
-(p7)br.sptk vmx_itlb_loop
+(p7)mov r17 = r23; // No: entry = chain
+(p7)br.sptk vmx_itlb_loop // again
     ;;
-    ld8 r25 = [r17]
-    ld8 r27 = [r18]
-    ld8 r29 = [r28]
-    dep r22 = -1,r24,63,1    //set ti=1
+    // Swap the first entry with the entry found in the collision chain
+    // to speed up next hardware search (and keep LRU).
+    // In comments 1 stands for the first entry and 2 for the found entry.
+    ld8 r25 = [r17] // Read value of 2
+    ld8 r27 = [r18] // Read value of 1
+    ld8 r29 = [r28] // Read tag of 1
+    dep r22 = -1,r24,63,1    // set ti=1 of 2 (to disable it during the swap)
     ;;
-    st8 [r16] = r29, VLE_ITIR_OFFSET - VLE_TITAG_OFFSET
-    st8 [r28] = r22, VLE_ITIR_OFFSET - VLE_TITAG_OFFSET
-    extr.u r19 = r27, 56, 4
+    st8 [r16] = r29, VLE_ITIR_OFFSET - VLE_TITAG_OFFSET // Write tag of 2
+    st8 [r28] = r22, VLE_ITIR_OFFSET - VLE_TITAG_OFFSET // Write tag of 1
+    extr.u r19 = r27, 56, 4 // Extract collision chain length
     mf
     ;;
-    ld8 r29 = [r16]
-    ld8 r22 = [r28]
-    dep r27 = r0, r27, 56, 4
-    dep r25 = r19, r25, 56, 4
+    ld8 r29 = [r16] // read itir of 2
+    ld8 r22 = [r28] // read itir of 1
+    dep r27 = r0, r27, 56, 4 // Clear collision chain length for 2
+    dep r25 = r19, r25, 56, 4 // Write collision chain length for 1
     ;;
-    st8 [r16] = r22
-    st8 [r28] = r29, VLE_TITAG_OFFSET - VLE_ITIR_OFFSET
-    st8 [r18] = r25
-    st8 [r17] = r27
+    st8 [r16] = r22 // Write itir of 2
+    st8 [r28] = r29, VLE_TITAG_OFFSET - VLE_ITIR_OFFSET // write itir of 1
+    st8 [r18] = r25 // Write value of 1
+    st8 [r17] = r27 // Write value of 2
     ;;
-    st8.rel [r28] = r24
+    st8.rel [r28] = r24 // Write tag of 1 (with ti=0)
+    // Insert the translation entry
     itc.i r25
     dv_serialize_data
+    // Resume
     mov r17=cr.isr
     mov r23=r31
     mov r22=b0
@@ -226,11 +231,11 @@ END(vmx_itlb_miss)
 // 0x0800 Entry 2 (size 64 bundles) DTLB (9,48)
 ENTRY(vmx_dtlb_miss)
     VMX_DBG_FAULT(2)
+    mov r29=cr.ipsr	
     mov r31 = pr
-    mov r29=cr.ipsr;
     ;;
-    tbit.z p6,p7=r29,IA64_PSR_VM_BIT;
-(p6)br.sptk vmx_alt_dtlb_miss_1
+    tbit.z p6,p7=r29,IA64_PSR_VM_BIT
+(p6)br.sptk vmx_alt_dtlb_miss_vmm
     mov r16 = cr.ifa
     ;;
     thash r17 = r16
@@ -307,14 +312,14 @@ END(vmx_dtlb_miss)
 // 0x0c00 Entry 3 (size 64 bundles) Alt ITLB (19)
 ENTRY(vmx_alt_itlb_miss)
     VMX_DBG_FAULT(3)
-    mov r31 = pr
     mov r29=cr.ipsr
+    mov r31 = pr
+    adds r22=IA64_VCPU_MMU_MODE_OFFSET, r21
     ;;
-    tbit.z p6,p7=r29,IA64_PSR_VM_BIT
-(p7)br.spnt vmx_fault_3
-vmx_alt_itlb_miss_1:
+    tbit.nz p7,p0=r29,IA64_PSR_VM_BIT
+(p7)br.spnt vmx_alt_itlb_miss_dom
+vmx_alt_itlb_miss_vmm:
     mov r16=cr.ifa    // get address that caused the TLB miss
-    ;;
     movl r17=PAGE_KERNEL
     mov r24=cr.ipsr
     movl r19=(((1 << IA64_MAX_PHYS_BITS) - 1) & ~0xfff)
@@ -331,6 +336,15 @@ vmx_alt_itlb_miss_1:
     itc.i r19		// insert the TLB entry
     mov pr=r31,-1
     rfi
+    ;;
+vmx_alt_itlb_miss_dom:
+    ld1 r23=[r22]  // Load mmu_mode
+    ;;
+    cmp.eq p6,p7=VMX_MMU_PHY_D,r23
+(p7)br.sptk vmx_fault_3
+    ;;
+    mov r19=3
+    br.sptk vmx_dispatch_tlb_miss
     VMX_FAULT(3);
 END(vmx_alt_itlb_miss)
 
@@ -340,12 +354,13 @@ END(vmx_alt_itlb_miss)
 // 0x1000 Entry 4 (size 64 bundles) Alt DTLB (7,46)
 ENTRY(vmx_alt_dtlb_miss)
     VMX_DBG_FAULT(4)
+    mov r29=cr.ipsr
     mov r31=pr
-    mov r29=cr.ipsr;
+    adds r22=IA64_VCPU_MMU_MODE_OFFSET, r21
     ;;
-    tbit.z p6,p7=r29,IA64_PSR_VM_BIT;
-(p7)br.spnt vmx_fault_4
-vmx_alt_dtlb_miss_1:
+    tbit.nz p7,p0=r29,IA64_PSR_VM_BIT
+(p7)br.spnt vmx_alt_dtlb_miss_dom
+vmx_alt_dtlb_miss_vmm:
     mov r16=cr.ifa		// get address that caused the TLB miss
     ;;
 #ifdef CONFIG_VIRTUAL_FRAME_TABLE
@@ -377,6 +392,15 @@ vmx_alt_dtlb_miss_1:
 (p7)itc.d r19		// insert the TLB entry
     mov pr=r31,-1
     rfi
+    ;;
+vmx_alt_dtlb_miss_dom:
+    ld1 r23=[r22]  // Load mmu_mode
+    ;;
+    cmp.eq p6,p7=VMX_MMU_PHY_D,r23
+(p7)br.sptk vmx_fault_4
+    ;;
+    mov r19=4
+    br.sptk vmx_dispatch_tlb_miss
     VMX_FAULT(4);
 END(vmx_alt_dtlb_miss)
 
