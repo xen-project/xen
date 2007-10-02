@@ -220,8 +220,6 @@ _vhpt_fault(VCPU *vcpu, u64 vadr)
     /* If vPSR.ic, IFA, ITIR, IHA*/
     set_ifa_itir_iha (vcpu, vadr, 1, 1, 1);
     inject_guest_interruption(vcpu,IA64_VHPT_TRANS_VECTOR);
-
-
 }
 
 /*
@@ -425,4 +423,3 @@ data_access_rights(VCPU *vcpu, u64 vadr)
     set_ifa_itir_iha (vcpu, vadr, 1, 1, 0);
     inject_guest_interruption(vcpu, IA64_DATA_ACCESS_RIGHTS_VECTOR);
 }
-
