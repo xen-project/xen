@@ -7102,6 +7102,7 @@ int main(int argc, char **argv)
     char qemu_dm_logfilename[128];
     const char *direct_pci = NULL;
 
+#ifndef __sun__
     /* Maximise rlimits. Needed where default constraints are tight (*BSD). */
     if (getrlimit(RLIMIT_STACK, &rl) != 0) {
        perror("getrlimit(RLIMIT_STACK)");
@@ -7125,6 +7126,7 @@ int main(int argc, char **argv)
     rl.rlim_max = RLIM_INFINITY;
     if (setrlimit(RLIMIT_MEMLOCK, &rl) != 0)
        perror("setrlimit(RLIMIT_MEMLOCK)");
+#endif
 
     /* Ensure that SIGUSR2 is blocked by default when a new thread is created,
        then only the threads that use the signal unblock it -- this fixes a
