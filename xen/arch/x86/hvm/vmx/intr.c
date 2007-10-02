@@ -107,19 +107,23 @@ static void enable_intr_window(struct vcpu *v, struct hvm_intack intack)
     }
 }
 
-static void vmx_dirq_assist(struct domain *d)
+static void vmx_dirq_assist(struct vcpu *v)
 {
     unsigned int irq;
     uint32_t device, intx;
-    struct hvm_irq *hvm_irq = &d->arch.hvm_domain.irq;
+    struct domain *d = v->domain;
+    struct hvm_irq_dpci *hvm_irq_dpci = d->arch.hvm_domain.irq.dpci;
 
-    for ( irq = find_first_bit(hvm_irq->dirq_mask, NR_IRQS);
+    if ( !vtd_enabled || (v->vcpu_id != 0) || (hvm_irq_dpci == NULL) )
+        return;
+
+    for ( irq = find_first_bit(hvm_irq_dpci->dirq_mask, NR_IRQS);
           irq < NR_IRQS;
-          irq = find_next_bit(hvm_irq->dirq_mask, NR_IRQS, irq + 1) )
+          irq = find_next_bit(hvm_irq_dpci->dirq_mask, NR_IRQS, irq + 1) )
     {
-        test_and_clear_bit(irq, &hvm_irq->dirq_mask);
-        device = hvm_irq->mirq[irq].device;
-        intx = hvm_irq->mirq[irq].intx;
+        test_and_clear_bit(irq, &hvm_irq_dpci->dirq_mask);
+        device = hvm_irq_dpci->mirq[irq].device;
+        intx = hvm_irq_dpci->mirq[irq].intx;
         hvm_pci_intx_assert(d, device, intx);
     }
 }
@@ -134,8 +138,7 @@ asmlinkage void vmx_intr_assist(void)
     /* Crank the handle on interrupt state. */
     pt_update_irq(v);
 
-    if ( vtd_enabled && (v->vcpu_id == 0) )
-        vmx_dirq_assist(v->domain);
+    vmx_dirq_assist(v);
   
     hvm_set_callback_irq_level();
 
