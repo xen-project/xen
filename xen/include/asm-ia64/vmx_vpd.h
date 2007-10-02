@@ -55,8 +55,8 @@ struct arch_vmx_struct {
     unsigned long   cause;
     unsigned long   opcode;
     unsigned long   mpta;
-    unsigned long   flags;
     unsigned long   xen_port;
+    unsigned char   flags;
     unsigned char   xtp;
     unsigned char   pal_init_pending;
     unsigned char   mmu_mode; /* Current mmu mode.  See vmx_phy_mode.h  */
@@ -68,8 +68,7 @@ struct arch_vmx_struct {
 
 #define VMX_DOMAIN(v)   v->arch.arch_vmx.flags
 
-#define ARCH_VMX_IO_WAIT        3       /* Waiting for I/O completion */
-#define ARCH_VMX_DOMAIN         5       /* Need it to indicate VTi domain */
+#define ARCH_VMX_DOMAIN         0       /* Need it to indicate VTi domain */
 
 #endif //__ASSEMBLY__
 

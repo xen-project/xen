@@ -86,7 +86,8 @@ extern void vmx_init_all_rr(VCPU *vcpu);
 extern void vmx_load_all_rr(VCPU *vcpu);
 extern void physical_tlb_miss(VCPU *vcpu, u64 vadr, int type);
 
-#define is_virtual_mode(v)     ((v)->arch.arch_vmx.mmu_mode == VMX_MMU_VIRTUAL)
+#define VMX_MMU_MODE(v)     ((v)->arch.arch_vmx.mmu_mode)
+#define is_virtual_mode(v)  (VMX_MMU_MODE(v) == VMX_MMU_VIRTUAL)
 
 #endif /* __ASSEMBLY__ */
 
