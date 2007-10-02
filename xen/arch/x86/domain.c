@@ -382,7 +382,9 @@ int vcpu_initialise(struct vcpu *v)
 
     v->arch.flags = TF_kernel_mode;
 
+#if defined(__i386__)
     mapcache_vcpu_init(v);
+#endif
 
     pae_l3_cache_init(&v->arch.pae_l3_cache);
 
