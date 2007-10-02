@@ -16,6 +16,7 @@
 # Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 #
 
+set -x
 
 # This script is called by XenD for migration of external devices
 # It does not handle the migration of those devices itself, but
@@ -57,11 +58,11 @@ function evaluate_params()
 	stype=""
 	while [ $# -ge 1 ]; do
 		case "$1" in
-		-step)		step=$2; shift 2;;
-		-host)		host=$2; shift 2;;
-		-domname)	domname=$2; shift 2;;
-		-type)		typ=$2; shift 2;;
-		-subtype)	stype=$2; shift 2;;
+		-step)		step=$2; shift; shift;;
+		-host)		host=$2; shift; shift;;
+		-domname)	domname=$2; shift; shift;;
+		-type)		typ=$2; shift; shift;;
+		-subtype)	stype=$2; shift; shift;;
 		-recover)	recover=1; shift;;
 		-help)		ext_dev_migrate_usage; exit 0;;
 		*)		break;;
