@@ -36,6 +36,8 @@ DEFINE_SPINLOCK(xenpf_lock);
 # define copy_from_compat copy_from_guest
 # undef copy_to_compat
 # define copy_to_compat copy_to_guest
+# undef guest_from_compat_handle
+# define guest_from_compat_handle(x,y) ((x)=(y))
 #else
 extern spinlock_t xenpf_lock;
 #endif
@@ -142,21 +144,14 @@ ret_t do_platform_op(XEN_GUEST_HANDLE(xen_platform_op_t) u_xenpf_op)
     case XENPF_microcode_update:
     {
         extern int microcode_update(XEN_GUEST_HANDLE(void), unsigned long len);
-#ifdef COMPAT
         XEN_GUEST_HANDLE(void) data;
-#endif
 
         ret = xsm_microcode();
         if ( ret )
             break;
 
-#ifndef COMPAT
-        ret = microcode_update(op->u.microcode.data,
-                               op->u.microcode.length);
-#else
         guest_from_compat_handle(data, op->u.microcode.data);
         ret = microcode_update(data, op->u.microcode.length);
-#endif
     }
     break;
 
@@ -286,6 +281,9 @@ ret_t do_platform_op(XEN_GUEST_HANDLE(xen_platform_op_t) u_xenpf_op)
         break;
 
     case XENPF_change_freq:
+        ret = -ENOSYS;
+        if ( cpufreq_controller != FREQCTL_dom0_kernel )
+            break;
         ret = -EINVAL;
         if ( op->u.change_freq.flags != 0 )
             break;
@@ -294,11 +292,46 @@ ret_t do_platform_op(XEN_GUEST_HANDLE(xen_platform_op_t) u_xenpf_op)
                                         &op->u.change_freq.freq);
         break;
 
+    case XENPF_getidletime:
+    {
+        uint32_t i, nr_cpus;
+        uint64_t idletime;
+        struct vcpu *v;
+        XEN_GUEST_HANDLE(uint64_t) idletimes;
+
+        ret = -ENOSYS;
+        if ( cpufreq_controller != FREQCTL_dom0_kernel )
+            break;
+
+        guest_from_compat_handle(idletimes, op->u.getidletime.idletime);
+        nr_cpus = min_t(uint32_t, op->u.getidletime.max_cpus, NR_CPUS);
+
+        for ( i = 0; i < nr_cpus; i++ )
+        {
+            /* Assume no holes in idle-vcpu map. */
+            if ( (v = idle_vcpu[i]) == NULL )
+                break;
+
+            idletime = v->runstate.time[RUNSTATE_running];
+            if ( v->is_running )
+                idletime += NOW() - v->runstate.state_entry_time;
+
+            ret = -EFAULT;
+            if ( copy_to_guest_offset(idletimes, i, &idletime, 1) )
+                goto out;
+        }
+
+        op->u.getidletime.nr_cpus = i;
+        ret = copy_to_guest(u_xenpf_op, op, 1) ? -EFAULT : 0;
+    }
+    break;
+
     default:
         ret = -ENOSYS;
         break;
     }
 
+ out:
     spin_unlock(&xenpf_lock);
 
     return ret;
