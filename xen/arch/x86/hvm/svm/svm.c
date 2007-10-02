@@ -2158,9 +2158,9 @@ asmlinkage void svm_vmexit_handler(struct cpu_user_regs *regs)
         break;
     }
 
+    /* Asynchronous event, handled when we STGI'd after the VMEXIT. */
     case VMEXIT_EXCEPTION_MC:
         HVMTRACE_0D(MCE, v);
-        do_machine_check(regs);
         break;
 
     case VMEXIT_VINTR:
