@@ -1309,7 +1309,7 @@ def parse_security_label(security_label):
         return security_label
 
 def set_security_label(policy, label):
-    if label != "" and policy != "":
+    if label and policy and label != "" and policy != "":
         return "%s:%s:%s" % (xsconstants.ACM_POLICY_ID, policy, label)
     else:
         return ""
