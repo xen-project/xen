@@ -21,6 +21,7 @@
 #include <argp.h>
 #include <signal.h>
 #include <string.h>
+#include <inttypes.h>
 #include <getopt.h>
 
 #include "xenctrl.h"
@@ -152,9 +153,9 @@ void print_symbol(size_t addr)
         return;
 
     if (addr==s->address)
-        printf("%s", s->name);
+        printf("%s ", s->name);
     else
-        printf("%s+%#x", s->name, (unsigned int)(addr - s->address));
+        printf("%s+%#x ", s->name, (unsigned int)(addr - s->address));
 }
 
 void read_symbol_table(const char *symtab)
@@ -207,6 +208,46 @@ void read_symbol_table(const char *symtab)
     fclose(f);
 }
 
+#if defined(__i386__) || defined(__x86_64__)
+char *flag_values[22][2] =
+{/*  clear,     set,       bit# */
+    { NULL,     "c"    }, // 0        Carry
+    { NULL,     NULL   }, // 1
+    { NULL,     "p"    }, // 2        Parity
+    { NULL,     NULL   }, // 3
+    { NULL,     "a"    }, // 4        Adjust
+    { NULL,     NULL   }, // 5
+    { "nz",     "z"    }, // 6        Zero
+    { NULL,     "s"    }, // 7        Sign
+    { NULL,     "tf"   }, // 8        Trap
+    { NULL,     "i"    }, // 9        Interrupt (enabled)
+    { NULL,     "d=b"  }, // 10       Direction
+    { NULL,     "o"    }, // 11       Overflow
+    { NULL,     NULL   }, // 12       12+13 == IOPL
+    { NULL,     NULL   }, // 13
+    { NULL,     "nt"   }, // 14       Nested Task
+    { NULL,     NULL   }, // 15
+    { NULL,     "rf"   }, // 16       Resume Flag
+    { NULL,     "v86"  }, // 17       Virtual 8086 mode
+    { NULL,     "ac"   }, // 18       Alignment Check (enabled)
+    { NULL,     "vif"  }, // 19       Virtual Interrupt (enabled)
+    { NULL,     "vip"  }, // 20       Virtual Interrupt Pending
+    { NULL,     "cid"  }  // 21       Cpuid Identification Flag
+};
+
+void print_flags(uint64_t flags)
+{
+    int i;
+
+    printf("flags: %08" PRIx64, flags);
+    for (i = 21; i >= 0; i--) {
+        char *s = flag_values[i][(flags >> i) & 1];
+        if (s != NULL)
+            printf(" %s", s);
+    }
+}
+#endif
+
 #ifdef __i386__
 void print_ctx(vcpu_guest_context_t *ctx1)
 {
@@ -214,6 +255,7 @@ void print_ctx(vcpu_guest_context_t *ctx1)
 
     printf("eip: %08x ", regs->eip);
     print_symbol(regs->eip);
+    print_flags(regs->eflags);
     printf("\n");
 
     printf("esp: %08x\n", regs->esp);
@@ -240,6 +282,7 @@ void print_ctx(vcpu_guest_context_t *ctx1)
 
     printf("rip: %08lx ", regs->rip);
     print_symbol(regs->rip);
+    print_flags(regs->rflags);
     printf("\n");
     printf("rsp: %08lx\n", regs->rsp);
 
@@ -262,10 +305,10 @@ void print_ctx(vcpu_guest_context_t *ctx1)
     printf("r14: %08lx\t", regs->r14);
     printf("r15: %08lx\n", regs->r15);
 
-    printf(" cs: %08x\t", regs->cs);
-    printf(" ds: %08x\t", regs->ds);
-    printf(" fs: %08x\t", regs->fs);
-    printf(" gs: %08x\n", regs->gs);
+    printf(" cs:     %04x\t", regs->cs);
+    printf(" ds:     %04x\t", regs->ds);
+    printf(" fs:     %04x\t", regs->fs);
+    printf(" gs:     %04x\n", regs->gs);
 
 }
 #elif defined(__ia64__)
