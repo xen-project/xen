@@ -569,10 +569,14 @@ do_copy_task_regs (struct task_struct *task, struct unw_frame_info *info, void *
 
 	if (ia64_sync_user_rbs(task, info->sw, pt->ar_bspstore, urbs_end) < 0)
 		return;
-#endif /* !XEN */
 
 	ia64_peek(task, info->sw, urbs_end, (long) ia64_rse_rnat_addr((long *) urbs_end),
 		  &ar_rnat);
+#else
+
+	ia64_peek(task, info->sw, urbs_end, (long) ia64_rse_rnat_addr((u64 *) urbs_end),
+		  (long *)&ar_rnat);
+#endif
 
 	/*
 	 * coredump format:

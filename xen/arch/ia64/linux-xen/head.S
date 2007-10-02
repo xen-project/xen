@@ -1210,6 +1210,9 @@ tlb_purge_done:
 	RESTORE_REG(cr.dcr, r25, r17);;
 	RESTORE_REG(cr.iva, r25, r17);;
 	RESTORE_REG(cr.pta, r25, r17);;
+#ifdef XEN
+	dv_serialize_instruction
+#endif
 	RESTORE_REG(cr.itv, r25, r17);;
 	RESTORE_REG(cr.pmv, r25, r17);;
 	RESTORE_REG(cr.cmcv, r25, r17);;
