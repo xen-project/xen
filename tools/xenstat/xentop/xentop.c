@@ -28,6 +28,7 @@
 #include <sys/time.h>
 #include <time.h>
 #include <unistd.h>
+#include <signal.h>
 #if defined(__linux__)
 #include <linux/kdev_t.h>
 #endif
@@ -1011,6 +1012,13 @@ static void top(void)
 	free(domains);
 }
 
+static int signal_exit;
+
+void signal_exit_handler(int sig)
+{
+	signal_exit = 1;
+}
+
 int main(int argc, char **argv)
 {
 	int opt, optind = 0;
@@ -1102,14 +1110,22 @@ int main(int argc, char **argv)
 			ch = getch();
 		} while (handle_key(ch));
 	} else {
-			do {
-				gettimeofday(&curtime, NULL);
-				top();
-				oldtime = curtime;
-				if ((!loop) && !(--iterations))
-					break;
-				sleep(delay);
-			} while (1);
+		struct sigaction sa = {
+			.sa_handler = signal_exit_handler,
+			.sa_flags = 0
+		};
+		sigemptyset(&sa.sa_mask);
+		sigaction(SIGINT, &sa, NULL);
+		sigaction(SIGTERM, &sa, NULL);
+
+		do {
+			gettimeofday(&curtime, NULL);
+			top();
+			oldtime = curtime;
+			if ((!loop) && !(--iterations))
+				break;
+			sleep(delay);
+		} while (!signal_exit);
 	}
 
 	/* Cleanup occurs in cleanup(), so no work to do here. */
