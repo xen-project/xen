@@ -39,7 +39,7 @@ typedef struct flask_op {
 } flask_op_t;
 
 int flask_load(int xc_handle, char *buf, int size);
-int flask_context_to_sid(int xc_handle, char *buf, int size, u_int32_t *sid);
+int flask_context_to_sid(int xc_handle, char *buf, int size, uint32_t *sid);
 int flask_sid_to_context(int xc_handle, int sid, char *buf, int size);
 int do_flask_op(int xc_handle, flask_op_t *op);
 

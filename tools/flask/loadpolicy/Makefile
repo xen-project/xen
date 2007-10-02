@@ -2,11 +2,6 @@ XEN_ROOT=../../..
 include $(XEN_ROOT)/tools/Rules.mk
 XEN_LIBXC          = $(XEN_ROOT)/tools/libxc
 
-INSTALL         = install
-INSTALL_DATA    = $(INSTALL) -m0644
-INSTALL_PROG    = $(INSTALL) -m0755
-INSTALL_DIR     = $(INSTALL) -d -m0755
-
 LIBXC_ROOT = $(XEN_ROOT)/tools/libxc
 LIBFLASK_ROOT = $(XEN_ROOT)/tools/flask/libflask
 
@@ -28,13 +23,17 @@ TESTFLAGS= -DTESTING
 TESTENV  = XENSTORED_ROOTDIR=$(TESTDIR) XENSTORED_RUNDIR=$(TESTDIR)
 
 CLIENTS := flask-loadpolicy
+CLIENTS_SRCS := $(patsubst flask-%,%.c,$(CLIENTS))
 CLIENTS_OBJS := $(patsubst flask-%,%.o,$(CLIENTS))
 
 .PHONY: all
 all: $(CLIENTS)
 
 $(CLIENTS): flask-%: %.o
-	$(LINK.o) $< $(LOADLIBES) $(LDLIBS) -L. -lflask -lxenctrl -o $@
+	$(CC) $(CFLAGS) $(LDFLAGS) $< $(LOADLIBES) $(LDLIBS) -L. -lflask -lxenctrl -o $@
+
+$(CLIENTS_OBJS): $(CLIENTS_SRCS)
+	$(COMPILE.c) -o $@ $<
 
 .PHONY: clean
 clean: 
