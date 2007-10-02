@@ -721,17 +721,21 @@ void arch_get_info_guest(struct vcpu *v, vcpu_guest_context_u c)
 		vcpu_get_ibr(v, i, &c.nat->regs.ibr[i]);
 	}
 
-	for (i = 0; i < 7; i++)
+	for (i = 0; i < 8; i++)
 		vcpu_get_rr(v, (unsigned long)i << 61, &c.nat->regs.rr[i]);
 
 	/* Fill extra regs.  */
-	for (i = 0; i < 8; i++) {
+	for (i = 0;
+	     (i < sizeof(tr->itrs) / sizeof(tr->itrs[0])) && i < NITRS;
+	     i++) {
 		tr->itrs[i].pte = v->arch.itrs[i].pte.val;
 		tr->itrs[i].itir = v->arch.itrs[i].itir;
 		tr->itrs[i].vadr = v->arch.itrs[i].vadr;
 		tr->itrs[i].rid = v->arch.itrs[i].rid;
 	}
-	for (i = 0; i < 8; i++) {
+	for (i = 0;
+	     (i < sizeof(tr->dtrs) / sizeof(tr->dtrs[0])) && i < NDTRS;
+	     i++) {
 		tr->dtrs[i].pte = v->arch.dtrs[i].pte.val;
 		tr->dtrs[i].itir = v->arch.dtrs[i].itir;
 		tr->dtrs[i].vadr = v->arch.dtrs[i].vadr;
@@ -754,7 +758,10 @@ void arch_get_info_guest(struct vcpu *v, vcpu_guest_context_u c)
 	vcpu_get_isr(v, &c.nat->regs.cr.isr);
 	vcpu_get_iip(v, &c.nat->regs.cr.iip);
 	vcpu_get_ifa(v, &c.nat->regs.cr.ifa);
+	vcpu_get_itir(v, &c.nat->regs.cr.itir);
+	vcpu_get_iha(v, &c.nat->regs.cr.iha);
 	vcpu_get_ivr(v, &c.nat->regs.cr.ivr);
+	vcpu_get_iim(v, &c.nat->regs.cr.iim);
 
 	vcpu_get_tpr(v, &c.nat->regs.cr.tpr);
 	vcpu_get_irr0(v, &c.nat->regs.cr.irr[0]);
@@ -886,13 +893,17 @@ int arch_set_info_guest(struct vcpu *v, vcpu_guest_context_u c)
 	if (c.nat->flags & VGCF_EXTRA_REGS) {
 		struct vcpu_tr_regs *tr = &c.nat->regs.tr;
 
-		for (i = 0; i < 8; i++) {
+		for (i = 0;
+		     (i < sizeof(tr->itrs) / sizeof(tr->itrs[0])) && i < NITRS;
+		     i++) {
 			vcpu_set_itr(v, i, tr->itrs[i].pte,
 			             tr->itrs[i].itir,
 			             tr->itrs[i].vadr,
 			             tr->itrs[i].rid);
 		}
-		for (i = 0; i < 8; i++) {
+		for (i = 0;
+		     (i < sizeof(tr->dtrs) / sizeof(tr->dtrs[0])) && i < NDTRS;
+		     i++) {
 			vcpu_set_dtr(v, i,
 			             tr->dtrs[i].pte,
 			             tr->dtrs[i].itir,
