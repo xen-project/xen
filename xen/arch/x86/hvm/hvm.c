@@ -232,7 +232,10 @@ int hvm_domain_initialise(struct domain *d)
         return rc;
 
     vpic_init(d);
-    vioapic_init(d);
+
+    rc = vioapic_init(d);
+    if ( rc != 0 )
+        return rc;
 
     hvm_init_ioreq_page(d, &d->arch.hvm_domain.ioreq);
     hvm_init_ioreq_page(d, &d->arch.hvm_domain.buf_ioreq);
@@ -254,6 +257,7 @@ void hvm_domain_relinquish_resources(struct domain *d)
 void hvm_domain_destroy(struct domain *d)
 {
     hvm_funcs.domain_destroy(d);
+    vioapic_deinit(d);
 }
 
 static int hvm_save_cpu_ctxt(struct domain *d, hvm_domain_context_t *h)

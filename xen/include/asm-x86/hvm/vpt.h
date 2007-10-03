@@ -95,8 +95,8 @@ typedef struct PITState {
     struct hvm_hw_pit hw;
     /* Last time the counters read zero, for calcuating counter reads */
     int64_t count_load_time[3];
-    /* irq handling */
-    struct periodic_time pt[3];
+    /* Channel 0 IRQ handling. */
+    struct periodic_time pt0;
     spinlock_t lock;
 } PITState;
 

@@ -300,8 +300,7 @@ static uint32_t ioapic_get_delivery_bitmask(
 static inline int pit_channel0_enabled(void)
 {
     PITState *pit = &current->domain->arch.hvm_domain.pl_time.vpit;
-    struct periodic_time *pt = &pit->pt[0];
-    return pt->enabled;
+    return pit->pt0.enabled;
 }
 
 static void vioapic_deliver(struct hvm_hw_vioapic *vioapic, int irq)
@@ -517,13 +516,27 @@ static int ioapic_load(struct domain *d, hvm_domain_context_t *h)
 
 HVM_REGISTER_SAVE_RESTORE(IOAPIC, ioapic_save, ioapic_load, 1, HVMSR_PER_DOM);
 
-void vioapic_init(struct domain *d)
+int vioapic_init(struct domain *d)
 {
-    struct hvm_hw_vioapic *vioapic = domain_vioapic(d);
+    struct hvm_vioapic *vioapic;
     int i;
 
-    memset(vioapic, 0, sizeof(*vioapic));
+    vioapic = d->arch.hvm_domain.vioapic = xmalloc(struct hvm_vioapic);
+    if ( vioapic == NULL )
+        return -ENOMEM;
+
+    vioapic->domain = d;
+
+    memset(&vioapic->hvm_hw_vioapic, 0, sizeof(vioapic->hvm_hw_vioapic));
     for ( i = 0; i < VIOAPIC_NUM_PINS; i++ )
-        vioapic->redirtbl[i].fields.mask = 1;
-    vioapic->base_address = VIOAPIC_DEFAULT_BASE_ADDRESS;
+        vioapic->hvm_hw_vioapic.redirtbl[i].fields.mask = 1;
+    vioapic->hvm_hw_vioapic.base_address = VIOAPIC_DEFAULT_BASE_ADDRESS;
+
+    return 0;
+}
+
+void vioapic_deinit(struct domain *d)
+{
+    xfree(d->arch.hvm_domain.vioapic);
+    d->arch.hvm_domain.vioapic = NULL;
 }

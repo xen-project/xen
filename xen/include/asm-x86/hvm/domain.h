@@ -25,6 +25,7 @@
 #include <asm/hvm/irq.h>
 #include <asm/hvm/vpt.h>
 #include <asm/hvm/vlapic.h>
+#include <asm/hvm/vioapic.h>
 #include <asm/hvm/io.h>
 #include <asm/hvm/iommu.h>
 #include <public/hvm/params.h>
@@ -49,7 +50,7 @@ struct hvm_domain {
     spinlock_t             irq_lock;
     struct hvm_irq         irq;
     struct hvm_hw_vpic     vpic[2]; /* 0=master; 1=slave */
-    struct hvm_hw_vioapic  vioapic;
+    struct hvm_vioapic    *vioapic;
 
     /* hvm_print_line() logging. */
     char                   pbuf[80];

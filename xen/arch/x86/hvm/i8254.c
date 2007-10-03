@@ -185,7 +185,6 @@ static void pit_load_count(PITState *pit, int channel, int val)
 {
     u32 period;
     struct hvm_hw_pit_channel *s = &pit->hw.channels[channel];
-    struct periodic_time *pt = &pit->pt[channel];
     struct vcpu *v = vpit_vcpu(pit);
 
     ASSERT(spin_is_locked(&pit->lock));
@@ -207,16 +206,16 @@ static void pit_load_count(PITState *pit, int channel, int val)
     {
         case 2:
             /* Periodic timer. */
-            create_periodic_time(v, pt, period, 0, 0, pit_time_fired, 
+            create_periodic_time(v, &pit->pt0, period, 0, 0, pit_time_fired, 
                                  &pit->count_load_time[channel]);
             break;
         case 1:
             /* One-shot timer. */
-            create_periodic_time(v, pt, period, 0, 1, pit_time_fired,
+            create_periodic_time(v, &pit->pt0, period, 0, 1, pit_time_fired,
                                  &pit->count_load_time[channel]);
             break;
         default:
-            destroy_periodic_time(pt);
+            destroy_periodic_time(&pit->pt0);
             break;
     }
 }
@@ -396,7 +395,7 @@ static uint32_t pit_ioport_read(struct PITState *pit, uint32_t addr)
 void pit_stop_channel0_irq(PITState *pit)
 {
     spin_lock(&pit->lock);
-    destroy_periodic_time(&pit->pt[0]);
+    destroy_periodic_time(&pit->pt0);
     spin_unlock(&pit->lock);
 }
 
@@ -425,21 +424,18 @@ static void pit_info(PITState *pit)
         printk("pit 0x%x.\n", s->gate);
         printk("pit %"PRId64"\n", pit->count_load_time[i]);
 
-        pt = &pit->pt[i];
-        if ( pt )
-        {
-            printk("pit channel %d has a periodic timer:\n", i);
-            printk("pt %d.\n", pt->enabled);
-            printk("pt %d.\n", pt->one_shot);
-            printk("pt %d.\n", pt->irq);
-            printk("pt %d.\n", pt->first_injected);
-
-            printk("pt %d.\n", pt->pending_intr_nr);
-            printk("pt %d.\n", pt->period);
-            printk("pt %"PRId64"\n", pt->period_cycles);
-            printk("pt %"PRId64"\n", pt->last_plt_gtime);
-        }
     }
+
+    pt = &pit->pt0;
+    printk("pit channel 0 periodic timer:\n", i);
+    printk("pt %d.\n", pt->enabled);
+    printk("pt %d.\n", pt->one_shot);
+    printk("pt %d.\n", pt->irq);
+    printk("pt %d.\n", pt->first_injected);
+    printk("pt %d.\n", pt->pending_intr_nr);
+    printk("pt %d.\n", pt->period);
+    printk("pt %"PRId64"\n", pt->period_cycles);
+    printk("pt %"PRId64"\n", pt->last_plt_gtime);
 }
 #else
 static void pit_info(PITState *pit)
@@ -481,11 +477,9 @@ static int pit_load(struct domain *d, hvm_domain_context_t *h)
     /* Recreate platform timers from hardware state.  There will be some 
      * time jitter here, but the wall-clock will have jumped massively, so 
      * we hope the guest can handle it. */
+    pit->pt0.last_plt_gtime = hvm_get_guest_time(d->vcpu[0]);
     for ( i = 0; i < 3; i++ )
-    {
         pit_load_count(pit, i, pit->hw.channels[i].count);
-        pit->pt[i].last_plt_gtime = hvm_get_guest_time(d->vcpu[0]);
-    }
 
     pit_info(pit);
 
@@ -525,7 +519,7 @@ void pit_init(struct vcpu *v, unsigned long cpu_khz)
 void pit_deinit(struct domain *d)
 {
     PITState *pit = domain_vpit(d);
-    destroy_periodic_time(&pit->pt[0]);
+    destroy_periodic_time(&pit->pt0);
 }
 
 /* the intercept action for PIT DM retval:0--not handled; 1--handled */  

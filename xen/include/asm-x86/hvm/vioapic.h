@@ -52,11 +52,17 @@
 #define VIOAPIC_REG_VERSION 0x01
 #define VIOAPIC_REG_ARB_ID  0x02 /* x86 IOAPIC only */
 
-#define domain_vioapic(d) (&(d)->arch.hvm_domain.vioapic)
-#define vioapic_domain(v) (container_of((v), struct domain, \
-                                        arch.hvm_domain.vioapic))
+struct hvm_vioapic {
+    struct hvm_hw_vioapic hvm_hw_vioapic;
+    struct domain *domain;
+};
 
-void vioapic_init(struct domain *d);
+#define domain_vioapic(d) (&(d)->arch.hvm_domain.vioapic->hvm_hw_vioapic)
+#define vioapic_domain(v) (container_of((v), struct hvm_vioapic, \
+                                        hvm_hw_vioapic)->domain)
+
+int vioapic_init(struct domain *d);
+void vioapic_deinit(struct domain *d);
 void vioapic_irq_positive_edge(struct domain *d, unsigned int irq);
 void vioapic_update_EOI(struct domain *d, int vector);
 
