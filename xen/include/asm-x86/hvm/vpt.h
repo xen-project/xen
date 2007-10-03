@@ -34,12 +34,28 @@
 
 struct HPETState;
 struct HPET_timer_fn_info {
-    struct HPETState       *hs;
-    unsigned int    tn;
+    struct HPETState *hs;
+    unsigned int tn;
+};
+
+struct hpet_registers {
+    /* Memory-mapped, software visible registers */
+    uint64_t capability;        /* capabilities */
+    uint64_t config;            /* configuration */
+    uint64_t isr;               /* interrupt status reg */
+    uint64_t mc64;              /* main counter */
+    struct {                    /* timers */
+        uint64_t config;        /* configuration/cap */
+        uint64_t cmp;           /* comparator */
+        uint64_t fsb;           /* FSB route, not supported now */
+    } timers[HPET_TIMER_NUM];
+
+    /* Hidden register state */
+    uint64_t period[HPET_TIMER_NUM]; /* Last value written to comparator */
 };
 
 typedef struct HPETState {
-    struct hvm_hw_hpet hpet;
+    struct hpet_registers hpet;
     struct vcpu *vcpu;
     uint64_t tsc_freq;
     uint64_t mc_offset;
