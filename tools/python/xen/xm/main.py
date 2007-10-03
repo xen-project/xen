@@ -163,7 +163,8 @@ SUBCOMMAND_HELP = {
                         'List virtual block devices for a domain.'),
     'network-attach':  ('<Domain> [type=<type>] [mac=<mac>] [bridge=<bridge>] '
                         '[ip=<ip>] [script=<script>] [backend=<BackDomain>] '
-                        '[vifname=<name>] [rate=<rate>] [model=<model>]',
+                        '[vifname=<name>] [rate=<rate>] [model=<model>]'
+                        '[accel=<accel>]',
                         'Create a new virtual network device.'),
     'network-detach':  ('<Domain> <DevId> [-f|--force]',
                         'Destroy a domain\'s virtual network device.'),
@@ -2132,12 +2133,12 @@ def xm_block_configure(args):
 
 
 def xm_network_attach(args):
-    arg_check(args, 'network-attach', 1, 10)
+    arg_check(args, 'network-attach', 1, 11)
 
     dom = args[0]
     vif = ['vif']
     vif_params = ['type', 'mac', 'bridge', 'ip', 'script', \
-                  'backend', 'vifname', 'rate', 'model']
+                  'backend', 'vifname', 'rate', 'model', 'accel']
 
     if serverType == SERVER_XEN_API:     
         vif_record = {
@@ -2184,7 +2185,9 @@ def xm_network_attach(args):
             'rate':
                 lambda x: set(['qos_algorithm_params', 'rate'], x),
             'model':
-                lambda x: None
+                lambda x: None,
+            'accel':
+                lambda x: set(['other_config', 'accel'], x)
             }
             
         for a in args[1:]:
