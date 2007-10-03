@@ -26,6 +26,7 @@
 #include <sys/mman.h>
 #include <sys/types.h>
 #include <stdlib.h>
+#include <arpa/inet.h>
 #include <sys/ioctl.h>
 #include <netinet/in.h>
 #include <xen/xsm/acm.h>
@@ -258,6 +259,41 @@ static PyObject *chgpolicy(PyObject *self, PyObject *args)
 }
 
 
+static PyObject *getpolicy(PyObject *self, PyObject *args)
+{
+    struct acm_getpolicy getpolicy;
+    int xc_handle, rc;
+    uint8_t pull_buffer[8192];
+    PyObject *result;
+    uint32_t len = sizeof(pull_buffer);
+
+    memset(&getpolicy, 0x0, sizeof(getpolicy));
+    set_xen_guest_handle(getpolicy.pullcache, pull_buffer);
+    getpolicy.pullcache_size = sizeof(pull_buffer);
+
+    if ((xc_handle = xc_interface_open()) <= 0) {
+        PyErr_SetString(PyExc_IOError, ctrlif_op);
+        return NULL;
+    }
+
+    rc = xc_acm_op(xc_handle, ACMOP_getpolicy, &getpolicy, sizeof(getpolicy));
+
+    xc_interface_close(xc_handle);
+
+    if (rc == 0) {
+        struct acm_policy_buffer *header =
+                       (struct acm_policy_buffer *)pull_buffer;
+        if (ntohl(header->len) < sizeof(pull_buffer))
+            len = ntohl(header->len);
+    } else {
+        len = 0;
+    }
+
+    result = Py_BuildValue("is#", rc, pull_buffer, len);
+    return result;
+}
+
+
 static PyObject *relabel_domains(PyObject *self, PyObject *args)
 {
     struct acm_relabel_doms reldoms;
@@ -313,6 +349,7 @@ static PyMethodDef acmMethods[] = {
     {"getssid",     getssid,     METH_VARARGS, "Retrieve label information and ssidref for a domain"},
     {"getdecision", getdecision, METH_VARARGS, "Retrieve ACM access control decision"},
     {"chgpolicy",   chgpolicy,   METH_VARARGS, "Change the policy in one step"},
+    {"getpolicy",   getpolicy,   METH_NOARGS , "Get the binary policy from the hypervisor"},
     {"relabel_domains", relabel_domains, METH_VARARGS, "Relabel domains"},
     /* end of list (extend list above this line) */
     {NULL, NULL, 0, NULL}

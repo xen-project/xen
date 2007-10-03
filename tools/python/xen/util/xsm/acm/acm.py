@@ -507,6 +507,22 @@ def hv_chg_policy(bin_pol, del_array, chg_array):
         rc = -xsconstants.XSERR_HV_OP_FAILED
     return rc, errors
 
+def hv_get_policy():
+    """
+        Gte the binary policy enforced in the hypervisor
+    """
+    rc = -xsconstants.XSERR_GENERAL_FAILURE
+    bin_pol = ""
+    if not on():
+        err("No policy active.")
+    try:
+        rc, bin_pol = acm.getpolicy()
+    except Exception, e:
+        pass
+    if len(bin_pol) == 0:
+        bin_pol = None
+    return rc, bin_pol
+
 
 def make_policy(policy_name):
     policy_file = string.join(string.split(policy_name, "."), "/")
@@ -546,9 +562,21 @@ def dump_policy():
 
     (ret, output) = commands.getstatusoutput(xensec_tool + " getpolicy")
     if ret:
-       err("Dumping hypervisor policy failed:\n" + output)
+        err("Dumping hypervisor policy failed:\n" + output)
+
     print output
 
+
+def dump_policy_file(filename, ssidref=None):
+    ssid = ""
+    if ssidref:
+        ssid = " " + str(ssidref)
+    (ret, output) = commands.getstatusoutput(xensec_tool + " dumppolicy " +
+                                             filename + ssid)
+    if ret:
+        err("Dumping policy failed:\n" + output)
+
+    print output
 
 
 def list_labels(policy_name, condition):

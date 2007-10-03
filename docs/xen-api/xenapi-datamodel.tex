@@ -15057,7 +15057,7 @@ Mapping information of the referenced policy.
 Get the binary policy representation of the referenced policy.
 
  \noindent {\bf Signature:}
-\begin{verbatim} string get_map (session_id s, xs ref self)\end{verbatim}
+\begin{verbatim} string get_binary (session_id s, xs ref self)\end{verbatim}
 
 
 \noindent{\bf Arguments:}
@@ -15080,6 +15080,78 @@ string
 
 
 Base64-encoded representation of the binary policy.
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~get\_enforced\_binary}
+
+{\bf Overview:}
+Get the binary policy representation of the currently enforced ACM policy.
+In case the default policy is loaded in the hypervisor, a policy may be
+managed by xend that is not yet loaded into the hypervisor.
+
+ \noindent {\bf Signature:}
+\begin{verbatim} string get_enforced_binary (session_id s, xs ref self)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt xs ref } & self & reference to the object \\ \hline
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:}
+{\tt
+string
+}
+
+
+Base64-encoded representation of the binary policy.
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~get\_VM\_ssidref}
+
+{\bf Overview:}
+Get the ACM ssidref of the given virtual machine.
+
+ \noindent {\bf Signature:}
+\begin{verbatim} string get_VM_ssidref (session_id s, vm ref vm)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt vm ref } & vm & reference to a valid VM \\ \hline
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:}
+{\tt
+int
+}
+
+
+The ssidref of the given virtual machine.
+
+\vspace{0.3cm}
+
+\noindent{\bf Possible Error Codes:}
+  {\tt HANDLE\_INVALID, VM\_BAD\_POWER\_STATE, SECURITY\_ERROR}
+
 \vspace{0.3cm}
 \vspace{0.3cm}
 \vspace{0.3cm}

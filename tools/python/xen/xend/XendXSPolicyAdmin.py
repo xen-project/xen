@@ -324,6 +324,11 @@ class XSPolicyAdmin:
             stes = loadedpol.policy_get_stes_of_vmlabel(tmp[2])
         return stes
 
+    def get_enforced_binary(self, xstype):
+        res = None
+        if xstype == xsconstants.XS_POLICY_ACM:
+            res = ACMPolicy.get_enforced_binary()
+        return res
 
 poladmin = None
 

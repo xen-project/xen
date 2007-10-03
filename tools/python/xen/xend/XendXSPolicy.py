@@ -16,13 +16,15 @@
 # Copyright (c) 2006 Xensource
 #============================================================================
 
+import base64
 import logging
+from xen.xend import XendDomain
 from xen.xend.XendBase import XendBase
 from xen.xend.XendError import *
+from xen.xend.XendAPIConstants import *
 from xen.xend.XendXSPolicyAdmin import XSPolicyAdminInstance
 from xen.util import xsconstants
 import xen.util.xsm.xsm as security
-import base64
 
 log = logging.getLogger("xend.XendXSPolicy")
 log.setLevel(logging.TRACE)
@@ -184,8 +186,13 @@ class XendACMPolicy(XendXSPolicy):
                    'header' ]
         return XendXSPolicy.getAttrRO() + attrRO
 
+    def getFuncs(self):
+        funcs = [ 'get_enforced_binary', 'get_VM_ssidref' ]
+        return XendBase.getFuncs() + funcs
+
     getClass    = classmethod(getClass)
     getAttrRO   = classmethod(getAttrRO)
+    getFuncs    = classmethod(getFuncs)
 
     def __init__(self, acmpol, record, uuid):
         """ acmpol = actual ACMPolicy object """
@@ -221,3 +228,25 @@ class XendACMPolicy(XendXSPolicy):
     def get_binary(self):
         polbin = self.acmpol.get_bin()
         return base64.b64encode(polbin)
+
+    def get_VM_ssidref(self, vm_ref):
+        dom = XendDomain.instance().get_vm_by_uuid(vm_ref)
+        if not dom:
+            raise InvalidHandleError("VM", vm_ref)
+        if dom._stateGet() not in [ XEN_API_VM_POWER_STATE_RUNNING, \
+                                    XEN_API_VM_POWER_STATE_PAUSED ]:
+            raise VMBadState("Domain is not running or paused.")
+        ssid = security.get_ssid(dom.getDomid())
+        if not ssid:
+            raise SecurityError(-xsconstants.XSERR_GENERAL_FAILURE)
+        return ssid[3]
+
+    def get_enforced_binary(self):
+        polbin = XSPolicyAdminInstance(). \
+                   get_enforced_binary(xsconstants.XS_POLICY_ACM)
+        if polbin:
+            return base64.b64encode(polbin)
+        return None
+
+    get_enforced_binary = classmethod(get_enforced_binary)
+    get_VM_ssidref = classmethod(get_VM_ssidref)

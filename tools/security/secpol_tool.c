@@ -49,7 +49,9 @@ void usage(char *progname)
            "ACTION is one of:\n"
            "\t getpolicy\n"
            "\t dumpstats\n"
-           "\t loadpolicy <binary policy file>\n", progname);
+           "\t loadpolicy <binary policy file>\n"
+           "\t dumppolicy <binary policy file> [Dom-0 ssidref]\n",
+           progname);
     exit(-1);
 }
 
@@ -288,53 +290,93 @@ int acm_domain_getpolicy(int xc_handle)
     return ret;
 }
 
-/************************ load binary policy ******************************/
+/************************ dump binary policy ******************************/
 
-int acm_domain_loadpolicy(int xc_handle, const char *filename)
+static int load_file(const char *filename,
+                     uint8_t **buffer, off_t *len)
 {
     struct stat mystat;
-    int ret, fd;
-    off_t len;
-    uint8_t *buffer;
-    uint16_t chwall_ssidref, ste_ssidref;
+    int ret = 0;
+    int fd;
 
-    if ((ret = stat(filename, &mystat))) {
+    if ((ret = stat(filename, &mystat)) != 0) {
         printf("File %s not found.\n", filename);
+        ret = errno;
         goto out;
     }
 
-    len = mystat.st_size;
-    if ((buffer = malloc(len)) == NULL) {
+    *len = mystat.st_size;
+
+    if ((*buffer = malloc(*len)) == NULL) {
         ret = -ENOMEM;
         goto out;
     }
+
     if ((fd = open(filename, O_RDONLY)) <= 0) {
         ret = -ENOENT;
         printf("File %s not found.\n", filename);
         goto free_out;
     }
-    ret =acm_get_ssidref(xc_handle, 0, &chwall_ssidref, &ste_ssidref);
-    if (ret < 0) {
-        goto free_out;
-    }
-    if (len == read(fd, buffer, len)) {
-        struct acm_setpolicy setpolicy;
-        /* dump it and then push it down into xen/acm */
+
+    if (*len == read(fd, *buffer, *len))
+        return 0;
+
+free_out:
+    free(*buffer);
+    *buffer = NULL;
+    *len = 0;
+out:
+    return ret;
+}
+
+static int acm_domain_dumppolicy(const char *filename, uint32_t ssidref)
+{
+    uint8_t *buffer = NULL;
+    off_t len;
+    int ret = 0;
+    uint16_t chwall_ssidref, ste_ssidref;
+
+    chwall_ssidref = (ssidref      ) & 0xffff;
+    ste_ssidref    = (ssidref >> 16) & 0xffff;
+
+    if ((ret = load_file(filename, &buffer, &len)) == 0) {
         acm_dump_policy_buffer(buffer, len, chwall_ssidref, ste_ssidref);
-        set_xen_guest_handle(setpolicy.pushcache, buffer);
-        setpolicy.pushcache_size = len;
-        ret = xc_acm_op(xc_handle, ACMOP_setpolicy, &setpolicy, sizeof(setpolicy));
-
-        if (ret)
-            printf
-                ("ERROR setting policy.\n");
-        else
-            printf("Successfully changed policy.\n");
-
-    } else {
-        ret = -1;
+        free(buffer);
     }
-    close(fd);
+
+    return ret;
+}
+
+/************************ load binary policy ******************************/
+
+int acm_domain_loadpolicy(int xc_handle, const char *filename)
+{
+    int ret;
+    off_t len;
+    uint8_t *buffer;
+    uint16_t chwall_ssidref, ste_ssidref;
+    struct acm_setpolicy setpolicy;
+
+    ret = load_file(filename, &buffer, &len);
+    if (ret != 0)
+        goto out;
+
+    ret = acm_get_ssidref(xc_handle, 0, &chwall_ssidref, &ste_ssidref);
+    if (ret < 0)
+        goto free_out;
+
+    /* dump it and then push it down into xen/acm */
+    acm_dump_policy_buffer(buffer, len, chwall_ssidref, ste_ssidref);
+    set_xen_guest_handle(setpolicy.pushcache, buffer);
+    setpolicy.pushcache_size = len;
+    ret = xc_acm_op(xc_handle, ACMOP_setpolicy, &setpolicy, sizeof(setpolicy));
+
+    if (ret) {
+        printf("ERROR setting policy.\n");
+    } else {
+        printf("Successfully changed policy.\n");
+    }
+
   free_out:
     free(buffer);
   out:
@@ -435,26 +477,56 @@ int main(int argc, char **argv)
     if (argc < 2)
         usage(argv[0]);
 
-    if ((xc_handle = xc_interface_open()) <= 0) {
-        printf("ERROR: Could not open xen privcmd device!\n");
-        exit(-1);
-    }
 
     if (!strcmp(argv[1], "getpolicy")) {
         if (argc != 2)
             usage(argv[0]);
+
+        if ((xc_handle = xc_interface_open()) <= 0) {
+            printf("ERROR: Could not open xen privcmd device!\n");
+            exit(-1);
+        }
+
         ret = acm_domain_getpolicy(xc_handle);
+
+        xc_interface_close(xc_handle);
     } else if (!strcmp(argv[1], "loadpolicy")) {
         if (argc != 3)
             usage(argv[0]);
+
+        if ((xc_handle = xc_interface_open()) <= 0) {
+            printf("ERROR: Could not open xen privcmd device!\n");
+            exit(-1);
+        }
+
         ret = acm_domain_loadpolicy(xc_handle, argv[2]);
+
+        xc_interface_close(xc_handle);
     } else if (!strcmp(argv[1], "dumpstats")) {
         if (argc != 2)
             usage(argv[0]);
+
+        if ((xc_handle = xc_interface_open()) <= 0) {
+            printf("ERROR: Could not open xen privcmd device!\n");
+            exit(-1);
+        }
+
         ret = acm_domain_dumpstats(xc_handle);
+
+        xc_interface_close(xc_handle);
+    } else if (!strcmp(argv[1], "dumppolicy")) {
+        uint32_t ssidref = 0xffffffff;
+        if (argc < 3 || argc > 4)
+            usage(argv[0]);
+        if (argc == 4) {
+            if (!sscanf(argv[3], "%i", &ssidref)) {
+                printf("Error: Could not parse ssidref.\n");
+                exit(-1);
+            }
+        }
+        ret = acm_domain_dumppolicy(argv[2], ssidref);
     } else
         usage(argv[0]);
 
-    xc_interface_close(xc_handle);
     return ret;
 }
