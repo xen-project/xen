@@ -235,14 +235,16 @@ static int construct_vmcb(struct vcpu *v)
         vmcb->h_cr3 = pagetable_get_paddr(v->domain->arch.phys_table);
         vmcb->exception_intercepts = HVM_TRAP_MASK;
 
-        /* No point in intercepting CR3/4 reads, because the hardware 
-         * will return the guest versions anyway.  Still need to intercept 
-         * CR0 reads to hide the changes we make to CR0.TS in the lazy-fpu 
-         * code. */
+        /*
+         * No point in intercepting CR3 reads, because the hardware will return
+         * the guest version anyway.
+         */
         vmcb->cr_intercepts &= ~(CR_INTERCEPT_CR3_READ|CR_INTERCEPT_CR4_READ);
 
-        /* No point in intercepting INVLPG if we don't have shadow pagetables 
-         * that need to be fixed up. */
+        /*
+         * No point in intercepting INVLPG if we don't have shadow pagetables
+         * that need to be fixed up.
+         */
         vmcb->general1_intercepts &= ~GENERAL1_INTERCEPT_INVLPG;
     }
     else
