@@ -108,7 +108,22 @@ xen_acmpolicy_get_binary(xen_session *session, char **binary,
                          xen_xspolicy xspolicy);
 
 /**
- * Get the UUID filed of the given policy.
+ * Get the binary representation (base64-encoded) of the currently
+ * enforced policy.
+ */
+extern bool
+xen_acmpolicy_get_enforced_binary(xen_session *session, char **binary,
+                                  xen_xspolicy xspolicy);
+
+/**
+ * Get the ACM ssidref of the given VM.
+ */
+bool
+xen_acmpolicy_get_VM_ssidref(xen_session *session, int64_t *result,
+                             xen_vm vm);
+
+/**
+ * Get the UUID field of the given policy.
  */
 bool
 xen_acmpolicy_get_uuid(xen_session *session, char **result,

@@ -1264,3 +1264,11 @@ class ACMPolicy(XSPolicy):
             log.info("The following Ch. Wall types in labels were unknown:" \
                      " %s" % list(unknown_chw))
         return rc, mapfile, all_bin.tostring()
+
+    def get_enforced_binary(self):
+        rc, binpol = security.hv_get_policy()
+        if rc != 0:
+            raise SecurityError(-xsconstants.XSERR_HV_OP_FAILED)
+        return binpol
+
+    get_enforced_binary = classmethod(get_enforced_binary)

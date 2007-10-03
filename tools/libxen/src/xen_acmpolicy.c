@@ -217,6 +217,41 @@ xen_acmpolicy_get_binary(xen_session *session, char **result,
 
 
 bool
+xen_acmpolicy_get_enforced_binary(xen_session *session, char **result,
+                                  xen_xspolicy xspolicy)
+{
+    abstract_value param_values[] =
+        {
+            { .type = &abstract_type_string,
+              .u.string_val = xspolicy },
+        };
+
+    abstract_type result_type = abstract_type_string;
+
+    *result = NULL;
+    XEN_CALL_("ACMPolicy.get_enforced_binary");
+    return session->ok;
+}
+
+
+bool
+xen_acmpolicy_get_VM_ssidref(xen_session *session,
+                             int64_t *result, xen_vm vm)
+{
+    abstract_value param_values[] =
+        {
+            { .type = &abstract_type_string,
+              .u.string_val = vm }
+        };
+
+    abstract_type result_type = abstract_type_int;
+
+    XEN_CALL_("ACMPolicy.get_VM_ssidref");
+    return session->ok;
+}
+
+
+bool
 xen_acmpolicy_get_uuid(xen_session *session, char **result,
                        xen_xspolicy xspolicy)
 {

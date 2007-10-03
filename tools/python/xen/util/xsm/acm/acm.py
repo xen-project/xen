@@ -109,10 +109,12 @@ def refresh_security_policy():
     """
     global active_policy
 
-    try:
-        active_policy = acm.policy()
-    except:
-        active_policy = "INACTIVE"
+    active_policy = 'INACCESSIBLE'
+    if os.access("/proc/xen/privcmd", os.R_OK|os.W_OK):
+        try:
+            active_policy = acm.policy()
+        except:
+            active_policy = "INACTIVE"
 
 # now set active_policy
 refresh_security_policy()
@@ -295,7 +297,7 @@ def label2ssidref(labelname, policyname, typ):
     maps current policy to default directory
     to find mapping file    """
 
-    if policyname in ['NULL', 'INACTIVE', 'DEFAULT']:
+    if policyname in ['NULL', 'INACTIVE', 'DEFAULT', 'INACCESSIBLE' ]:
         err("Cannot translate labels for \'" + policyname + "\' policy.")
 
     allowed_types = ['ANY']
@@ -507,6 +509,22 @@ def hv_chg_policy(bin_pol, del_array, chg_array):
         rc = -xsconstants.XSERR_HV_OP_FAILED
     return rc, errors
 
+def hv_get_policy():
+    """
+        Gte the binary policy enforced in the hypervisor
+    """
+    rc = -xsconstants.XSERR_GENERAL_FAILURE
+    bin_pol = ""
+    if not on():
+        err("No policy active.")
+    try:
+        rc, bin_pol = acm.getpolicy()
+    except Exception, e:
+        pass
+    if len(bin_pol) == 0:
+        bin_pol = None
+    return rc, bin_pol
+
 
 def make_policy(policy_name):
     policy_file = string.join(string.split(policy_name, "."), "/")
@@ -541,18 +559,31 @@ def load_policy(policy_name):
 
 
 def dump_policy():
-    if active_policy in ['NULL', 'INACTIVE']:
+    if active_policy in ['NULL', 'INACTIVE', 'INACCESSIBLE' ]:
         err("\'" + active_policy + "\' policy. Nothing to dump.")
 
     (ret, output) = commands.getstatusoutput(xensec_tool + " getpolicy")
     if ret:
-       err("Dumping hypervisor policy failed:\n" + output)
+        err("Dumping hypervisor policy failed:\n" + output)
+
     print output
 
 
+def dump_policy_file(filename, ssidref=None):
+    ssid = ""
+    if ssidref:
+        ssid = " " + str(ssidref)
+    (ret, output) = commands.getstatusoutput(xensec_tool + " dumppolicy " +
+                                             filename + ssid)
+    if ret:
+        err("Dumping policy failed:\n" + output)
+
+    print output
+
 
 def list_labels(policy_name, condition):
-    if (not policy_name) and (active_policy) in ["NULL", "INACTIVE", "DEFAULT"]:
+    if (not policy_name) and active_policy in \
+              [ 'NULL', 'INACTIVE', 'DEFAULT', 'INACCESSIBLE' ]:
         err("Current policy \'" + active_policy + "\' has no labels defined.\n")
 
     (primary, secondary, f, pol_exists) = getmapfile(policy_name)
