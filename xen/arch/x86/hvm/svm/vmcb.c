@@ -239,7 +239,7 @@ static int construct_vmcb(struct vcpu *v)
          * No point in intercepting CR3 reads, because the hardware will return
          * the guest version anyway.
          */
-        vmcb->cr_intercepts &= ~(CR_INTERCEPT_CR3_READ|CR_INTERCEPT_CR4_READ);
+        vmcb->cr_intercepts &= ~CR_INTERCEPT_CR3_READ;
 
         /*
          * No point in intercepting INVLPG if we don't have shadow pagetables
