@@ -62,6 +62,8 @@ def labels(policy, ptype):
         policy = active_policy
         if active_policy in ['NULL', 'INACTIVE', 'DEFAULT']:
             raise OptionError('No policy active, you must specify a <policy>')
+        if active_policy in ['INACCESSIBLE']:
+            raise OptionError('Cannot access the policy. Try as root.')
 
     if not ptype or ptype == 'dom':
         condition = vm_label_re
@@ -104,9 +106,9 @@ def labels_xapi(policy, ptype):
         for n in names:
             print n
     elif int(policystate['type']) == 0:
-        print "No policy installed on the system."
+        err("No policy installed on the system.")
     else:
-        print "Unsupported type of policy installed on the system."
+        err("Unsupported type of policy installed on the system.")
 
 if __name__ == '__main__':
     main(sys.argv)

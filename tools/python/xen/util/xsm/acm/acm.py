@@ -109,10 +109,12 @@ def refresh_security_policy():
     """
     global active_policy
 
-    try:
-        active_policy = acm.policy()
-    except:
-        active_policy = "INACTIVE"
+    active_policy = 'INACCESSIBLE'
+    if os.access("/proc/xen/privcmd", os.R_OK|os.W_OK):
+        try:
+            active_policy = acm.policy()
+        except:
+            active_policy = "INACTIVE"
 
 # now set active_policy
 refresh_security_policy()
@@ -295,7 +297,7 @@ def label2ssidref(labelname, policyname, typ):
     maps current policy to default directory
     to find mapping file    """
 
-    if policyname in ['NULL', 'INACTIVE', 'DEFAULT']:
+    if policyname in ['NULL', 'INACTIVE', 'DEFAULT', 'INACCESSIBLE' ]:
         err("Cannot translate labels for \'" + policyname + "\' policy.")
 
     allowed_types = ['ANY']
@@ -557,7 +559,7 @@ def load_policy(policy_name):
 
 
 def dump_policy():
-    if active_policy in ['NULL', 'INACTIVE']:
+    if active_policy in ['NULL', 'INACTIVE', 'INACCESSIBLE' ]:
         err("\'" + active_policy + "\' policy. Nothing to dump.")
 
     (ret, output) = commands.getstatusoutput(xensec_tool + " getpolicy")
@@ -580,7 +582,8 @@ def dump_policy_file(filename, ssidref=None):
 
 
 def list_labels(policy_name, condition):
-    if (not policy_name) and (active_policy) in ["NULL", "INACTIVE", "DEFAULT"]:
+    if (not policy_name) and active_policy in \
+              [ 'NULL', 'INACTIVE', 'DEFAULT', 'INACCESSIBLE' ]:
         err("Current policy \'" + active_policy + "\' has no labels defined.\n")
 
     (primary, secondary, f, pol_exists) = getmapfile(policy_name)
