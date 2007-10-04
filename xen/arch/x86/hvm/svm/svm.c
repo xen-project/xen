@@ -885,16 +885,6 @@ static struct hvm_function_table svm_function_table = {
     .event_pending        = svm_event_pending
 };
 
-static int svm_npt_detect(void)
-{
-    u32 eax, ebx, ecx, edx;
-
-    /* Check CPUID for nested paging support. */
-    cpuid(0x8000000A, &eax, &ebx, &ecx, &edx);
-
-    return (edx & 1);
-}
-
 int start_svm(struct cpuinfo_x86 *c)
 {
     u32 eax, ecx, edx;
@@ -937,7 +927,14 @@ int start_svm(struct cpuinfo_x86 *c)
 
     setup_vmcb_dump();
 
-    svm_function_table.hap_supported = svm_npt_detect();
+#ifdef __x86_64__
+    /*
+     * Check CPUID for nested paging support. We support NPT only on 64-bit
+     * hosts since the phys-to-machine table is in host format. Hence 32-bit
+     * Xen could only support guests using NPT with up to a 4GB memory map.
+     */
+    svm_function_table.hap_supported = (cpuid_edx(0x8000000A) & 1);
+#endif
 
     hvm_enable(&svm_function_table);
 
