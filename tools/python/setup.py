@@ -79,6 +79,7 @@ setup(name            = 'xen',
                          'xen.xm',
                          'xen.web',
                          'xen.sv',
+                         'xen.xsview',
 
                          'xen.xend.tests',
                          'xen.xend.server.tests',

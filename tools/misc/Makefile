@@ -14,7 +14,7 @@ TARGETS-$(CONFIG_X86) += xen-detect
 TARGETS := $(TARGETS-y)
 
 INSTALL_BIN  = $(TARGETS) xencons
-INSTALL_SBIN = netfix xm xen-bugtool xen-python-path xend xenperf
+INSTALL_SBIN = netfix xm xen-bugtool xen-python-path xend xenperf xsview
 
 .PHONY: all
 all: build
