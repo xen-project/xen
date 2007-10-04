@@ -483,6 +483,10 @@ acpi_parse_dmar(unsigned long phys_addr, unsigned long size)
 
         entry_header = ((void *)entry_header + entry_header->length);
     }
+
+    /* Zap APCI DMAR signature to prevent dom0 using vt-d HW. */
+    dmar->header.signature[0] = '\0';
+
     return ret;
 }
 
