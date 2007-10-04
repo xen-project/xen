@@ -146,10 +146,6 @@ On Linux:
 
    in the make command line.
 
-   If you want to build an x86_32 PAE capable xen and kernel to work
-   on machines with >= 4GB of memory, use XEN_TARGET_X86_PAE=y on the
-   make command line.
-
 4. To rebuild an existing tree without modifying the config:
     # make dist
 
