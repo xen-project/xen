@@ -1,5 +1,5 @@
 LINUX_SERIES = 2.6
-LINUX_VER    ?= 2.6.18.8
+LINUX_VER    ?= 2.6.18
 
 EXTRAVERSION ?= -xen
 
@@ -48,6 +48,8 @@ ifndef XEN_LINUX_ALLOW_INTERFACE_MISMATCH
 XEN_LINUX_ALLOW_INTERFACE_MISMATCH := y
 endif
 
+KERNELRELEASE = $(shell $(MAKE) -s --no-print-directory -C $(LINUX_DIR) kernelrelease)
+
 # The real action starts here!
 .PHONY: build
 build: $(LINUX_DIR)/include/linux/autoconf.h
@@ -67,9 +69,9 @@ endif
 	fi
 	$(MAKE) -C $(LINUX_DIR) ARCH=$(LINUX_ARCH) INSTALL_PATH=$(DESTDIR) $(IMAGE_TARGET)
 	mkdir -p $(INSTALL_BOOT_PATH)
-	cp $(LINUX_DIR)/$(IMAGE_PATH) $(INSTALL_BOOT_PATH)/vmlinuz-$(LINUX_VER)$(EXTRAVERSION)
-	cp $(LINUX_DIR)/.config $(INSTALL_BOOT_PATH)/config-$(LINUX_VER)$(EXTRAVERSION)
-	cp $(LINUX_DIR)/System.map $(INSTALL_BOOT_PATH)/System.map-$(LINUX_VER)$(EXTRAVERSION)
+	cp $(LINUX_DIR)/$(IMAGE_PATH) $(INSTALL_BOOT_PATH)/vmlinuz-$(KERNELRELEASE)
+	cp $(LINUX_DIR)/.config $(INSTALL_BOOT_PATH)/config-$(KERNELRELEASE)
+	cp $(LINUX_DIR)/System.map $(INSTALL_BOOT_PATH)/System.map-$(KERNELRELEASE)
 
 $(LINUX_DIR)/include/linux/autoconf.h: CONFIG_FILE=$(CURDIR)/$(LINUX_DIR)/.config
 $(LINUX_DIR)/include/linux/autoconf.h: $(LINUX_SRCDIR)/.valid-src
