@@ -478,7 +478,7 @@ int monitor_tbufs(void)
 
     void *tbufs_mapped;          /* pointer to where the tbufs are mapped    */
     struct t_buf **meta;         /* pointers to the trace buffer metadata    */
-    struct t_rec **data;         /* pointers to the trace buffer data areas
+    char         **data;         /* pointers to the trace buffer data areas
                                   * where they are mapped into user space.   */
     unsigned long tbufs_mfn;     /* mfn of the tbufs                         */
     unsigned int  num;           /* number of trace buffers / logical CPUS   */
@@ -503,7 +503,7 @@ int monitor_tbufs(void)
 
     /* build arrays of convenience ptrs */
     meta  = init_bufs_ptrs (tbufs_mapped, num, size);
-    data  = init_rec_ptrs(meta, num);
+    data  = (char **)init_rec_ptrs(meta, num);
 
     if ( eventchn_init() < 0 )
         fprintf(stderr, "Failed to initialize event channel; "
@@ -518,7 +518,7 @@ int monitor_tbufs(void)
             {
                 rmb(); /* read prod, then read item. */
                 rec_size = process_record(
-                    i, data[i] + meta[i]->cons % data_size);
+                    i, (struct t_rec *)(data[i] + meta[i]->cons % data_size));
                 mb(); /* read item, then update cons. */
                 meta[i]->cons += rec_size;
             }
