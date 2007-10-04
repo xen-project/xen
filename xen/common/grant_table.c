@@ -332,19 +332,21 @@ __gnttab_map_grant_ref(
     if ( op->flags & GNTMAP_host_map ) 
     {
         /* Could be an iomem page for setting up permission */
-        if( iomem_page_test(frame, mfn_to_page(frame)) ) {
+        if ( iomem_page_test(frame, mfn_to_page(frame)) )
+        {
             is_iomem = 1;
-            if ( iomem_permit_access(ld, frame, frame) ) {
+            if ( iomem_permit_access(ld, frame, frame) )
+            {
                 gdprintk(XENLOG_WARNING, 
-                         "Could not permit access to grant frame %lx as iomem\n",
-                         frame);
+                         "Could not permit access to grant frame "
+                         "%lx as iomem\n", frame);
                 rc = GNTST_general_error;
                 goto undo_out;
             }
         }
     } 
 
-    if (!is_iomem ) 
+    if ( !is_iomem ) 
     {
         if ( unlikely(!mfn_valid(frame)) ||
              unlikely(!((op->flags & GNTMAP_readonly) ?
@@ -353,7 +355,8 @@ __gnttab_map_grant_ref(
                                           PGT_writable_page))))
         {
             if ( !rd->is_dying )
-                gdprintk(XENLOG_WARNING, "Could not pin grant frame %lx\n", frame);
+                gdprintk(XENLOG_WARNING,
+                         "Could not pin grant frame %lx\n", frame);
             rc = GNTST_general_error;
             goto undo_out;
         }
@@ -558,7 +561,8 @@ __gnttab_unmap_common_complete(struct gnttab_unmap_common *op)
 
     rd = op->rd;
 
-    if ( rd == NULL ) { 
+    if ( rd == NULL )
+    { 
         /*
          * Suggests that __gntab_unmap_common failed in
          * rcu_lock_domain_by_id() or earlier, and so we have nothing
@@ -653,7 +657,8 @@ gnttab_unmap_grant_ref(
     struct gnttab_unmap_grant_ref op;
     struct gnttab_unmap_common common[GNTTAB_UNMAP_BATCH_SIZE];
 
-    while (count != 0) {
+    while ( count != 0 )
+    {
         c = min(count, (unsigned int)GNTTAB_UNMAP_BATCH_SIZE);
         partial_done = 0;
 
@@ -670,9 +675,7 @@ gnttab_unmap_grant_ref(
         flush_tlb_mask(current->domain->domain_dirty_cpumask);
 
         for ( i = 0; i < partial_done; i++ )
-        {
             __gnttab_unmap_common_complete(&(common[i]));
-        }
 
         count -= c;
         done += c;
@@ -684,9 +687,7 @@ fault:
     flush_tlb_mask(current->domain->domain_dirty_cpumask);
 
     for ( i = 0; i < partial_done; i++ )
-    {
         __gnttab_unmap_common_complete(&(common[i]));
-    }
     return -EFAULT;
 }
 
@@ -715,7 +716,8 @@ gnttab_unmap_and_replace(
     struct gnttab_unmap_and_replace op;
     struct gnttab_unmap_common common[GNTTAB_UNMAP_BATCH_SIZE];
 
-    while (count != 0) {
+    while ( count != 0 )
+    {
         c = min(count, (unsigned int)GNTTAB_UNMAP_BATCH_SIZE);
         partial_done = 0;
         
@@ -732,9 +734,7 @@ gnttab_unmap_and_replace(
         flush_tlb_mask(current->domain->domain_dirty_cpumask);
         
         for ( i = 0; i < partial_done; i++ )
-        {
             __gnttab_unmap_common_complete(&(common[i]));
-        }
 
         count -= c;
         done += c;
@@ -746,9 +746,7 @@ fault:
     flush_tlb_mask(current->domain->domain_dirty_cpumask);
 
     for ( i = 0; i < partial_done; i++ )
-    {
         __gnttab_unmap_common_complete(&(common[i]));
-    }
     return -EFAULT;    
 }
 
@@ -1427,9 +1425,6 @@ do_grant_table_op(
             guest_handle_cast(uop, gnttab_map_grant_ref_t);
         if ( unlikely(!guest_handle_okay(map, count)) )
             goto out;
-        rc = -EPERM;
-        if ( unlikely(!grant_operation_permitted(d)) )
-            goto out;
         rc = gnttab_map_grant_ref(map, count);
         break;
     }
@@ -1439,9 +1434,6 @@ do_grant_table_op(
             guest_handle_cast(uop, gnttab_unmap_grant_ref_t);
         if ( unlikely(!guest_handle_okay(unmap, count)) )
             goto out;
-        rc = -EPERM;
-        if ( unlikely(!grant_operation_permitted(d)) )
-            goto out;
         rc = gnttab_unmap_grant_ref(unmap, count);
         break;
     }
@@ -1450,9 +1442,6 @@ do_grant_table_op(
         XEN_GUEST_HANDLE(gnttab_unmap_and_replace_t) unmap =
             guest_handle_cast(uop, gnttab_unmap_and_replace_t);
         if ( unlikely(!guest_handle_okay(unmap, count)) )
-            goto out;
-        rc = -EPERM;
-        if ( unlikely(!grant_operation_permitted(d)) )
             goto out;
         rc = -ENOSYS;
         if ( unlikely(!replace_grant_supported()) )
@@ -1471,9 +1460,6 @@ do_grant_table_op(
         XEN_GUEST_HANDLE(gnttab_transfer_t) transfer =
             guest_handle_cast(uop, gnttab_transfer_t);
         if ( unlikely(!guest_handle_okay(transfer, count)) )
-            goto out;
-        rc = -EPERM;
-        if ( unlikely(!grant_operation_permitted(d)) )
             goto out;
         rc = gnttab_transfer(transfer, count);
         break;
