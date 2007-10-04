@@ -1038,6 +1038,18 @@ int dom0_pit_access(struct ioreq *ioreq)
     return 0;
 }
 
+struct tm wallclock_time(void)
+{
+    uint64_t seconds;
+
+    if ( !wc_sec )
+        return (struct tm) { 0 };
+
+    seconds = NOW() + (wc_sec * 1000000000ull) + wc_nsec;
+    do_div(seconds, 1000000000);
+    return gmtime(seconds);
+}
+
 /*
  * Local variables:
  * mode: C

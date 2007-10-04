@@ -315,7 +315,6 @@ void __init start_kernel(void)
 #endif
 
     init_console();
-    set_printk_prefix("(XEN) ");
 
     if (running_on_sim || ia64_boot_param->domain_start == 0 ||
                           ia64_boot_param->domain_size == 0) {

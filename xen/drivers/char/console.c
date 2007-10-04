@@ -53,12 +53,14 @@ boolean_param("sync_console", opt_sync_console);
 static int opt_console_to_ring;
 boolean_param("console_to_ring", opt_console_to_ring);
 
+/* console_timestamps: include a timestamp prefix on every Xen console line. */
+static int opt_console_timestamps;
+boolean_param("console_timestamps", opt_console_timestamps);
+
 #define CONRING_SIZE 16384
 #define CONRING_IDX_MASK(i) ((i)&(CONRING_SIZE-1))
 static char conring[CONRING_SIZE];
 static unsigned int conringc, conringp;
-
-static char printk_prefix[16] = "";
 
 static int sercon_handle = -1;
 
@@ -448,6 +450,26 @@ static int printk_prefix_check(char *p, char **pp)
             ((loglvl < upper_thresh) && printk_ratelimit()));
 } 
 
+static void printk_start_of_line(void)
+{
+    struct tm tm;
+    char tstr[32];
+
+    __putstr("(XEN) ");
+
+    if ( !opt_console_timestamps )
+        return;
+
+    tm = wallclock_time();
+    if ( tm.tm_mday == 0 )
+        return;
+
+    snprintf(tstr, sizeof(tstr), "[%04u-%02u-%02u %02u:%02u:%02u] ",
+             1900 + tm.tm_year, tm.tm_mon, tm.tm_mday,
+             tm.tm_hour, tm.tm_min, tm.tm_sec);
+    __putstr(tstr);
+}
+
 void printk(const char *fmt, ...)
 {
     static char   buf[1024];
@@ -475,7 +497,7 @@ void printk(const char *fmt, ...)
         if ( do_print )
         {
             if ( start_of_line )
-                __putstr(printk_prefix);
+                printk_start_of_line();
             __putstr(p);
             __putstr("\n");
         }
@@ -490,7 +512,7 @@ void printk(const char *fmt, ...)
         if ( do_print )
         {
             if ( start_of_line )
-                __putstr(printk_prefix);
+                printk_start_of_line();
             __putstr(p);
         }
         start_of_line = 0;
@@ -498,11 +520,6 @@ void printk(const char *fmt, ...)
 
     spin_unlock_recursive(&console_lock);
     local_irq_restore(flags);
-}
-
-void set_printk_prefix(const char *prefix)
-{
-    safe_strcpy(printk_prefix, prefix);
 }
 
 void __init init_console(void)
@@ -523,15 +540,12 @@ void __init init_console(void)
     serial_set_rx_handler(sercon_handle, serial_rx);
 
     /* HELLO WORLD --- start-of-day banner text. */
-    printk(xen_banner());
-    printk(" http://www.cl.cam.ac.uk/netos/xen\n");
-    printk(" University of Cambridge Computer Laboratory\n\n");
-    printk(" Xen version %d.%d%s (%s@%s) (%s) %s\n",
+    __putstr(xen_banner());
+    printk("Xen version %d.%d%s (%s@%s) (%s) %s\n",
            xen_major_version(), xen_minor_version(), xen_extra_version(),
            xen_compile_by(), xen_compile_domain(),
            xen_compiler(), xen_compile_date());
-    printk(" Latest ChangeSet: %s\n\n", xen_changeset());
-    set_printk_prefix("(XEN) ");
+    printk("Latest ChangeSet: %s\n", xen_changeset());
 
     if ( opt_sync_console )
     {
@@ -687,7 +701,7 @@ int __printk_ratelimit(int ratelimit_ms, int ratelimit_burst)
             snprintf(lost_str, sizeof(lost_str), "%d", lost);
             /* console_lock may already be acquired by printk(). */
             spin_lock_recursive(&console_lock);
-            __putstr(printk_prefix);
+            printk_start_of_line();
             __putstr("printk: ");
             __putstr(lost_str);
             __putstr(" messages suppressed.\n");

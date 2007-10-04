@@ -11,8 +11,6 @@
 #include <xen/guest_access.h>
 #include <public/xen.h>
 
-void set_printk_prefix(const char *prefix);
-
 long read_console_ring(XEN_GUEST_HANDLE(char), u32 *, int);
 
 void init_console(void);

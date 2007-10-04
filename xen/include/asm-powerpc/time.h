@@ -80,4 +80,7 @@ static inline u64 tb_to_ns(u64 tb)
 {
     return tb * (__nano(1) / timebase_freq);
 }
+
+#define wallclock_time() ((struct tm) { 0 })
+
 #endif
