@@ -227,6 +227,12 @@ struct domain
     int32_t time_offset_seconds;
 
     struct rcu_head rcu;
+
+    /*
+     * Hypercall deadlock avoidance lock. Used if a hypercall might
+     * cause a deadlock. Acquirers don't spin waiting; they preempt.
+     */
+    spinlock_t hypercall_deadlock_mutex;
 };
 
 struct domain_setup_info

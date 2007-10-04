@@ -1661,14 +1661,38 @@ static int hvmop_set_pci_link_route(
 
 static int hvmop_flush_tlb_all(void)
 {
+    struct domain *d = current->domain;
     struct vcpu *v;
 
+    /* Avoid deadlock if more than one vcpu tries this at the same time. */
+    if ( !spin_trylock(&d->hypercall_deadlock_mutex) )
+        return -EAGAIN;
+
+    /* Pause all other vcpus. */
+    for_each_vcpu ( d, v )
+        if ( v != current )
+            vcpu_pause_nosync(v);
+
+    /* Now that all VCPUs are signalled to deschedule, we wait... */
+    for_each_vcpu ( d, v )
+        if ( v != current )
+            while ( !vcpu_runnable(v) && v->is_running )
+                cpu_relax();
+
+    /* All other vcpus are paused, safe to unlock now. */
+    spin_unlock(&d->hypercall_deadlock_mutex);
+
     /* Flush paging-mode soft state (e.g., va->gfn cache; PAE PDPE cache). */
-    for_each_vcpu ( current->domain, v )
+    for_each_vcpu ( d, v )
         paging_update_cr3(v);
 
     /* Flush all dirty TLBs. */
-    flush_tlb_mask(current->domain->domain_dirty_cpumask);
+    flush_tlb_mask(d->domain_dirty_cpumask);
+
+    /* Done. */
+    for_each_vcpu ( d, v )
+        if ( v != current )
+            vcpu_unpause(v);
 
     return 0;
 }
@@ -1779,6 +1803,10 @@ long do_hvm_op(unsigned long op, XEN_GUEST_HANDLE(void) arg)
         break;
     }
     }
+
+    if ( rc == -EAGAIN )
+        rc = hypercall_create_continuation(
+            __HYPERVISOR_hvm_op, "lh", op, arg);
 
     return rc;
 }
