@@ -198,6 +198,7 @@ __gnttab_map_grant_ref(
     int            handle;
     unsigned long  frame = 0;
     int            rc = GNTST_okay;
+    int            is_iomem = 0;
     struct active_grant_entry *act;
     struct grant_mapping *mt;
     grant_entry_t *sha;
@@ -328,34 +329,52 @@ __gnttab_map_grant_ref(
 
     spin_unlock(&rd->grant_table->lock);
 
-    if ( unlikely(!mfn_valid(frame)) ||
-         unlikely(!((op->flags & GNTMAP_readonly) ?
-                    get_page(mfn_to_page(frame), rd) :
-                    get_page_and_type(mfn_to_page(frame), rd,
-                                      PGT_writable_page))) )
+    if ( op->flags & GNTMAP_host_map ) 
     {
-        if ( !rd->is_dying )
-            gdprintk(XENLOG_WARNING, "Could not pin grant frame %lx\n", frame);
-        rc = GNTST_general_error;
-        goto undo_out;
-    }
+        /* Could be an iomem page for setting up permission */
+        if( iomem_page_test(frame, mfn_to_page(frame)) ) {
+            is_iomem = 1;
+            if ( iomem_permit_access(ld, frame, frame) ) {
+                gdprintk(XENLOG_WARNING, 
+                         "Could not permit access to grant frame %lx as iomem\n",
+                         frame);
+                rc = GNTST_general_error;
+                goto undo_out;
+            }
+        }
+    } 
 
-    if ( op->flags & GNTMAP_host_map )
+    if (!is_iomem ) 
     {
-        rc = create_grant_host_mapping(op->host_addr, frame, op->flags);
-        if ( rc != GNTST_okay )
+        if ( unlikely(!mfn_valid(frame)) ||
+             unlikely(!((op->flags & GNTMAP_readonly) ?
+                        get_page(mfn_to_page(frame), rd) :
+                        get_page_and_type(mfn_to_page(frame), rd,
+                                          PGT_writable_page))))
         {
-            if ( !(op->flags & GNTMAP_readonly) )
-                put_page_type(mfn_to_page(frame));
-            put_page(mfn_to_page(frame));
+            if ( !rd->is_dying )
+                gdprintk(XENLOG_WARNING, "Could not pin grant frame %lx\n", frame);
+            rc = GNTST_general_error;
             goto undo_out;
         }
-
-        if ( op->flags & GNTMAP_device_map )
+        
+        if ( op->flags & GNTMAP_host_map )
         {
-            (void)get_page(mfn_to_page(frame), rd);
-            if ( !(op->flags & GNTMAP_readonly) )
-                get_page_type(mfn_to_page(frame), PGT_writable_page);
+            rc = create_grant_host_mapping(op->host_addr, frame, op->flags);
+            if ( rc != GNTST_okay )
+            {
+                if ( !(op->flags & GNTMAP_readonly) )
+                    put_page_type(mfn_to_page(frame));
+                put_page(mfn_to_page(frame));
+                goto undo_out;
+            }
+
+            if ( op->flags & GNTMAP_device_map )
+            {
+                (void)get_page(mfn_to_page(frame), rd);
+                if ( !(op->flags & GNTMAP_readonly) )
+                    get_page_type(mfn_to_page(frame), PGT_writable_page);
+            }
         }
     }
 
@@ -483,7 +502,8 @@ __gnttab_unmap_common(
     {
         if ( unlikely(op->frame != act->frame) )
             PIN_FAIL(unmap_out, GNTST_general_error,
-                     "Bad frame number doesn't match gntref.\n");
+                     "Bad frame number doesn't match gntref. (%lx != %lx)\n",
+                     op->frame, act->frame);
         if ( op->flags & GNTMAP_device_map )
         {
             ASSERT(act->pin & (GNTPIN_devw_mask | GNTPIN_devr_mask));
@@ -495,12 +515,21 @@ __gnttab_unmap_common(
         }
     }
 
-    if ( (op->host_addr != 0) && (op->flags & GNTMAP_host_map) )
+    if ( op->flags & GNTMAP_host_map )
     {
-        if ( (rc = replace_grant_host_mapping(op->host_addr,
-                                              op->frame, op->new_addr, 
-                                              op->flags)) < 0 )
-            goto unmap_out;
+        if ( (op->host_addr != 0) )
+        {
+            if ( (rc = replace_grant_host_mapping(op->host_addr,
+                                                  op->frame, op->new_addr, 
+                                                  op->flags)) < 0 )
+                goto unmap_out;
+        }
+        else if ( iomem_page_test(op->frame, mfn_to_page(op->frame)) &&
+                  iomem_access_permitted(ld, op->frame, op->frame) )
+        {
+            if ( (rc = iomem_deny_access(ld, op->frame, op->frame)) < 0 )
+                goto unmap_out;
+        }
 
         ASSERT(act->pin & (GNTPIN_hstw_mask | GNTPIN_hstr_mask));
         op->map->flags &= ~GNTMAP_host_map;
@@ -508,7 +537,7 @@ __gnttab_unmap_common(
             act->pin -= GNTPIN_hstr_inc;
         else
             act->pin -= GNTPIN_hstw_inc;
-    }
+    } 
 
     /* If just unmapped a writable mapping, mark as dirtied */
     if ( !(op->flags & GNTMAP_readonly) )
@@ -1577,6 +1606,7 @@ gnttab_release_mappings(
     struct domain        *rd;
     struct active_grant_entry *act;
     struct grant_entry   *sha;
+    int rc;
 
     BUG_ON(!d->is_dying);
 
@@ -1634,7 +1664,12 @@ gnttab_release_mappings(
             {
                 BUG_ON(!(act->pin & GNTPIN_hstw_mask));
                 act->pin -= GNTPIN_hstw_inc;
-                gnttab_release_put_page_and_type(mfn_to_page(act->frame));
+
+                if ( iomem_page_test(act->frame, mfn_to_page(act->frame)) &&
+                     iomem_access_permitted(rd, act->frame, act->frame) )
+                    rc = iomem_deny_access(rd, act->frame, act->frame);
+                else 
+                    gnttab_release_put_page_and_type(mfn_to_page(act->frame));
             }
 
             if ( (act->pin & (GNTPIN_devw_mask|GNTPIN_hstw_mask)) == 0 )

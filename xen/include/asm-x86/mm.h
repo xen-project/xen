@@ -197,6 +197,9 @@ static inline int get_page(struct page_info *page,
     return 1;
 }
 
+/* Decide whether this page looks like iomem or real memory */
+int iomem_page_test(unsigned long mfn, struct page_info *page);
+
 void put_page_type(struct page_info *page);
 int  get_page_type(struct page_info *page, unsigned long type);
 int  get_page_from_l1e(l1_pgentry_t l1e, struct domain *d);

@@ -597,6 +597,14 @@ get_##level##_linear_pagetable(                                             \
     return 1;                                                               \
 }
 
+
+int iomem_page_test(unsigned long mfn, struct page_info *page)
+{
+    return unlikely(!mfn_valid(mfn)) ||
+        unlikely(page_get_owner(page) == dom_io);
+}
+
+
 int
 get_page_from_l1e(
     l1_pgentry_t l1e, struct domain *d)
@@ -614,8 +622,7 @@ get_page_from_l1e(
         return 0;
     }
 
-    if ( unlikely(!mfn_valid(mfn)) ||
-         unlikely(page_get_owner(page) == dom_io) )
+    if ( iomem_page_test(mfn, page) )
     {
         /* DOMID_IO reverts to caller for privilege checks. */
         if ( d == dom_io )
