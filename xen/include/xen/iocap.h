@@ -31,12 +31,6 @@
 #define multipage_allocation_permitted(d)               \
     (!rangeset_is_empty((d)->iomem_caps))
 
-/*
- * Until TLB flushing issues are sorted out we consider it unsafe for
- * domains with no hardware-access privileges to perform grant map/transfer
- * operations.
- */
-#define grant_operation_permitted(d)                    \
-    (!rangeset_is_empty((d)->iomem_caps))
+#define grant_operation_permitted(d) (1)
 
 #endif /* __XEN_IOCAP_H__ */
