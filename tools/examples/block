@@ -322,6 +322,7 @@ mount it read-write in a guest domain."
 
         if [ "$loopdev" = '' ]
         then
+          release_lock "block"
           fatal 'Failed to find an unused loop device'
         fi
 
