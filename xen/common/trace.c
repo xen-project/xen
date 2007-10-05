@@ -360,21 +360,15 @@ void __trace_var(u32 event, int cycles, int extra, unsigned char *extra_data)
     int extra_word;
     int started_below_highwater;
 
-    if(!tb_init_done)
-        return;
+    ASSERT(tb_init_done);
 
     /* Convert byte count into word count, rounding up */
     extra_word = (extra / sizeof(u32));
-    if((extra % sizeof(u32)) != 0)
+    if ( (extra % sizeof(u32)) != 0 )
         extra_word++;
     
-#if !NDEBUG
-    ASSERT(extra_word<=TRACE_EXTRA_MAX);
-#else
-    /* Not worth crashing a production system over */
-    if(extra_word > TRACE_EXTRA_MAX)
-        extra_word = TRACE_EXTRA_MAX;
-#endif
+    ASSERT(extra_word <= TRACE_EXTRA_MAX);
+    extra_word = min_t(int, extra_word, TRACE_EXTRA_MAX);
 
     /* Round size up to nearest word */
     extra = extra_word * sizeof(u32);
@@ -401,7 +395,7 @@ void __trace_var(u32 event, int cycles, int extra, unsigned char *extra_data)
 
     local_irq_save(flags);
 
-    started_below_highwater = ( (buf->prod - buf->cons) < t_buf_highwater );
+    started_below_highwater = ((buf->prod - buf->cons) < t_buf_highwater);
 
     /* Calculate the record size */
     rec_size = calc_rec_size(cycles, extra);
@@ -435,12 +429,10 @@ void __trace_var(u32 event, int cycles, int extra, unsigned char *extra_data)
         {
             bytes_to_wrap -= LOST_REC_SIZE;
             if ( bytes_to_wrap == 0 )
-                bytes_to_wrap == data_size;
+                bytes_to_wrap = data_size;
         }
         total_size += LOST_REC_SIZE;
     }
-
-    ASSERT(bytes_to_wrap == calc_bytes_to_wrap(buf));
 
     if ( rec_size > bytes_to_wrap )
     {
@@ -483,8 +475,6 @@ void __trace_var(u32 event, int cycles, int extra, unsigned char *extra_data)
         }
         insert_lost_records(buf);
     }
-
-    ASSERT(bytes_to_wrap == calc_bytes_to_wrap(buf));
 
     if ( rec_size > bytes_to_wrap )
         insert_wrap_record(buf, rec_size);
