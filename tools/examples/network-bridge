@@ -56,8 +56,32 @@ dir=$(dirname "$0")
 findCommand "$@"
 evalVariables "$@"
 
+is_network_root () {
+    local rootfs=$(awk '{ if ($1 !~ /^[ \t]*#/ && $2 == "/") { print $3; }}' /etc/mtab)
+    local rootopts=$(awk '{ if ($1 !~ /^[ \t]*#/ && $2 == "/") { print $4; }}' /etc/mtab)
+
+    [[ "$rootfs" =~ "^nfs" ]] || [[ "$rootopts" =~ "_netdev" ]] && return 0 || return 1
+}
+
+find_alt_device () {
+    local interf=$1
+    local prefix=${interf%[[:digit:]]}
+    local ifs=$(ip link show | grep " $prefix" |\
+                gawk '{ printf ("%s",substr($2,1,length($2)-1)) }' |\
+                sed s/$interf//)
+    echo "$ifs"
+}
+
 netdev=${netdev:-$(ip route list | awk '/^default / { print $NF }' |
 		   sed 's/.* dev //')}
+if is_network_root ; then
+    altdevs=$(find_alt_device $netdev)
+    for netdev in $altdevs; do break; done
+    if [ -z "$netdev" ]; then
+        [ -x /usr/bin/logger ] && /usr/bin/logger "network-bridge: bridging not supported on network root; not starting"
+        exit
+    fi
+fi
 netdev=${netdev:-eth0}
 bridge=${bridge:-${netdev}}
 antispoof=${antispoof:-no}
@@ -173,21 +197,9 @@ show_status () {
     echo '============================================================'
 }
 
-is_network_root () {
-    local rootfs=$(awk '{ if ($1 !~ /^[ \t]*#/ && $2 == "/") { print $3; }}' /etc/mtab)
-    local rootopts=$(awk '{ if ($1 !~ /^[ \t]*#/ && $2 == "/") { print $4; }}' /etc/mtab)
-
-    [[ "$rootfs" =~ "^nfs" ]] || [[ "$rootopts" =~ "_netdev" ]] && return 0 || return 1
-}
-
 op_start () {
     if [ "${bridge}" = "null" ] ; then
 	return
-    fi
-
-    if is_network_root ; then
-        [ -x /usr/bin/logger ] && /usr/bin/logger "network-bridge: bridging not supported on network root; not starting"
-        return
     fi
 
     if link_exists "$pdev"; then
