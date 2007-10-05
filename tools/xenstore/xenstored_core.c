@@ -685,7 +685,7 @@ static char *perms_to_strings(const void *ctx,
 	char buffer[MAX_STRLEN(unsigned int) + 1];
 
 	for (*len = 0, i = 0; i < num; i++) {
-		if (!xs_perm_to_string(&perms[i], buffer))
+		if (!xs_perm_to_string(&perms[i], buffer, sizeof(buffer)))
 			return NULL;
 
 		strings = talloc_realloc(ctx, strings, char,
@@ -1659,7 +1659,7 @@ static void write_pidfile(const char *pidfile)
 	if (lockf(fd, F_TLOCK, 0) == -1)
 		exit(0);
 
-	len = sprintf(buf, "%ld\n", (long)getpid());
+	len = snprintf(buf, sizeof(buf), "%ld\n", (long)getpid());
 	if (write(fd, buf, len) != len)
 		barf_perror("Writing pid file %s", pidfile);
 }

@@ -181,7 +181,7 @@ void do_transaction_start(struct connection *conn, struct buffered_data *in)
 	talloc_set_destructor(trans, destroy_transaction);
 	conn->transaction_started++;
 
-	sprintf(id_str, "%u", trans->id);
+	snprintf(id_str, sizeof(id_str), "%u", trans->id);
 	send_reply(conn, XS_TRANSACTION_START, id_str, strlen(id_str)+1);
 }
 

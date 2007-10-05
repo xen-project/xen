@@ -20,6 +20,7 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
+#include <sys/uio.h>
 #include <sys/socket.h>
 #include <sys/un.h>
 #include <string.h>
@@ -519,7 +520,7 @@ bool xs_set_permissions(struct xs_handle *h,
 	for (i = 0; i < num_perms; i++) {
 		char buffer[MAX_STRLEN(unsigned int)+1];
 
-		if (!xs_perm_to_string(&perms[i], buffer))
+		if (!xs_perm_to_string(&perms[i], buffer, sizeof(buffer)))
 			goto unwind;
 
 		iov[i+1].iov_base = strdup(buffer);
@@ -687,9 +688,9 @@ bool xs_introduce_domain(struct xs_handle *h,
 	char eventchn_str[MAX_STRLEN(eventchn)];
 	struct iovec iov[3];
 
-	sprintf(domid_str, "%u", domid);
-	sprintf(mfn_str, "%lu", mfn);
-	sprintf(eventchn_str, "%u", eventchn);
+	snprintf(domid_str, sizeof(domid_str), "%u", domid);
+	snprintf(mfn_str, sizeof(mfn_str), "%lu", mfn);
+	snprintf(eventchn_str, sizeof(eventchn_str), "%u", eventchn);
 
 	iov[0].iov_base = domid_str;
 	iov[0].iov_len = strlen(domid_str) + 1;
@@ -708,7 +709,7 @@ static void * single_with_domid(struct xs_handle *h,
 {
 	char domid_str[MAX_STRLEN(domid)];
 
-	sprintf(domid_str, "%u", domid);
+	snprintf(domid_str, sizeof(domid_str), "%u", domid);
 
 	return xs_single(h, XBT_NULL, type, domid_str, NULL);
 }
@@ -728,7 +729,7 @@ char *xs_get_domain_path(struct xs_handle *h, unsigned int domid)
 {
 	char domid_str[MAX_STRLEN(domid)];
 
-	sprintf(domid_str, "%u", domid);
+	snprintf(domid_str, sizeof(domid_str), "%u", domid);
 
 	return xs_single(h, XBT_NULL, XS_GET_DOMAIN_PATH, domid_str, NULL);
 }

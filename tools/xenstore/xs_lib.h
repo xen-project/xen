@@ -61,7 +61,8 @@ bool xs_strings_to_perms(struct xs_permissions *perms, unsigned int num,
 			 const char *strings);
 
 /* Convert permissions to a string (up to len MAX_STRLEN(unsigned int)+1). */
-bool xs_perm_to_string(const struct xs_permissions *perm, char *buffer);
+bool xs_perm_to_string(const struct xs_permissions *perm,
+                       char *buffer, size_t buf_len);
 
 /* Given a string and a length, count how many strings (nul terms). */
 unsigned int xs_count_strings(const char *strings, unsigned int len);

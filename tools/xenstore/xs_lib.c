@@ -17,12 +17,12 @@
     Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 */
 
-#include "xs_lib.h"
 #include <unistd.h>
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
 #include <errno.h>
+#include "xs_lib.h"
 
 /* Common routines for the Xen store daemon and client library. */
 
@@ -53,7 +53,7 @@ static const char *xs_daemon_path(void)
 const char *xs_daemon_tdb(void)
 {
 	static char buf[PATH_MAX];
-	sprintf(buf, "%s/tdb", xs_daemon_rootdir());
+	snprintf(buf, sizeof(buf), "%s/tdb", xs_daemon_rootdir());
 	return buf;
 }
 
@@ -143,7 +143,8 @@ bool xs_strings_to_perms(struct xs_permissions *perms, unsigned int num,
 }
 
 /* Convert permissions to a string (up to len MAX_STRLEN(unsigned int)+1). */
-bool xs_perm_to_string(const struct xs_permissions *perm, char *buffer)
+bool xs_perm_to_string(const struct xs_permissions *perm,
+                       char *buffer, size_t buf_len)
 {
 	switch (perm->perms) {
 	case XS_PERM_WRITE:
@@ -162,7 +163,7 @@ bool xs_perm_to_string(const struct xs_permissions *perm, char *buffer)
 		errno = EINVAL;
 		return false;
 	}
-	sprintf(buffer+1, "%i", (int)perm->id);
+	snprintf(buffer+1, buf_len-1, "%i", (int)perm->id);
 	return true;
 }
 

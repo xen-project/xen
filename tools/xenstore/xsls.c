@@ -87,7 +87,7 @@ void print_dir(struct xs_handle *h, char *path, int cur_depth, int show_perms)
                 for (i = 0; i < nperms; i++) {
                     if (i)
                         putchar(',');
-                    xs_perm_to_string(perms+i, buf);
+                    xs_perm_to_string(perms+i, buf, sizeof(buf));
                     fputs(buf, stdout);
                 }
                 putchar(')');
