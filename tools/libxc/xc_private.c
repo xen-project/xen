@@ -52,6 +52,7 @@ _xc_get_last_error(void)
     if (last_error == NULL) {
         last_error = malloc(sizeof(xc_error));
         pthread_setspecific(last_error_pkey, last_error);
+        xc_clear_last_error();
     }
 
     return last_error;
