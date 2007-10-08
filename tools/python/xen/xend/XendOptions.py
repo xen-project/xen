@@ -111,9 +111,6 @@ class XendOptions:
     """Default xend QCoW storage repository location."""
     xend_storage_path_default = '/var/lib/xend/storage'
 
-    """Default type of backend network interfaces"""
-    netback_type = osdep.netback_type
-
     """Default script to configure a backend network interface"""
     vif_script = osdep.vif_script
 
