@@ -2372,13 +2372,13 @@ int shadow_enable(struct domain *d, u32 mode)
         unsigned int r;
         shadow_lock(d);                
         r = sh_set_allocation(d, 256, NULL); /* Use at least 1MB */
-        shadow_unlock(d);
         if ( r != 0 )
         {
             sh_set_allocation(d, 0, NULL);
             rv = -ENOMEM;
-            goto out_unlocked;
+            goto out_locked;
         }        
+        shadow_unlock(d);
     }
 
     /* Init the P2M table.  Must be done before we take the shadow lock 
