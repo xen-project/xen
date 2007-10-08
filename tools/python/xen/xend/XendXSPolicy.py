@@ -130,9 +130,7 @@ class XendXSPolicy(XendBase):
         if refs and len(refs) > 0:
             ref = refs[0]
             xspol = XSPolicyAdminInstance().policy_from_ref(ref)
-            try:
-                xspol.grab_lock()
-
+            if xspol:
                 polstate = {
                   'xs_ref' : ref,
                   'repr'   : xspol.toxml(),
@@ -142,9 +140,6 @@ class XendXSPolicy(XendBase):
                   'errors' : "",
                   'xserr'  : 0,
                 }
-            finally:
-                if xspol:
-                    xspol.unlock()
         return polstate
 
     def rm_xsbootpolicy(self):

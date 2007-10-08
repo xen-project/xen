@@ -94,6 +94,15 @@ class XSPolicyAdmin:
           If flags is True, then any existing policy will be removed from
           the system and the new one will be installed
         """
+        from xen.xend import XendDomain
+        domains = XendDomain.instance()
+        try:
+            domains.domains_lock.acquire()
+            return self.__add_acmpolicy_to_system(xmltext, flags, overwrite)
+        finally:
+            domains.domains_lock.release()
+
+    def __add_acmpolicy_to_system(self, xmltext, flags, overwrite):
         errors = ""
         loadedpol = self.get_loaded_policy()
         if loadedpol:
@@ -182,6 +191,15 @@ class XSPolicyAdmin:
         return xsconstants.XSERR_SUCCESS
 
     def activate_xspolicy(self, xspol, flags):
+        from xen.xend import XendDomain
+        domains = XendDomain.instance()
+        try:
+            domains.domains_lock.acquire()
+            return self.__activate_xspolicy(xspol, flags)
+        finally:
+            domains.domains_lock.release()
+
+    def __activate_xspolicy(self, xspol, flags):
         rc = xsconstants.XSERR_SUCCESS
         if flags & xsconstants.XS_INST_LOAD:
             rc = xspol.loadintohv()

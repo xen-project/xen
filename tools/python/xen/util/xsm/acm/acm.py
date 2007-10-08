@@ -103,6 +103,13 @@ def mapfile_unlock():
     __mapfile_lock.release()
 
 
+def resfile_lock():
+    __resfile_lock.acquire()
+
+def resfile_unlock():
+    __resfile_lock.release()
+
+
 def refresh_security_policy():
     """
     retrieves security policy
@@ -961,7 +968,7 @@ def resources_compatible_with_vmlabel(xspol, dominfo, vmlabel):
         return False
 
     try:
-        __resfile_lock.acquire()
+        resfile_lock()
         try:
             access_control = dictio.dict_read("resources",
                                               res_label_filename)
@@ -971,7 +978,7 @@ def resources_compatible_with_vmlabel(xspol, dominfo, vmlabel):
         return __resources_compatible_with_vmlabel(xspol, dominfo, vmlabel,
                                                    access_control)
     finally:
-        __resfile_lock.release()
+        resfile_unlock()
     return False
 
 
@@ -1053,7 +1060,7 @@ def set_resource_label(resource, policytype, policyref, reslabel, \
         return -xsconstants.XSERR_RESOURCE_IN_USE
 
     try:
-        __resfile_lock.acquire()
+        resfile_lock()
         access_control = {}
         try:
              access_control = dictio.dict_read("resources", res_label_filename)
@@ -1075,7 +1082,7 @@ def set_resource_label(resource, policytype, policyref, reslabel, \
                 del access_control[resource]
         dictio.dict_write(access_control, "resources", res_label_filename)
     finally:
-        __resfile_lock.release()
+        resfile_unlock()
     return xsconstants.XSERR_SUCCESS
 
 def rm_resource_label(resource, oldlabel_xapi):
@@ -1158,13 +1165,13 @@ def get_labeled_resources():
     @return list of labeled resources
     """
     try:
-        __resfile_lock.acquire()
+        resfile_lock()
         try:
             access_control = dictio.dict_read("resources", res_label_filename)
         except:
             return {}
     finally:
-        __resfile_lock.release()
+        resfile_unlock()
     return access_control
 
 
@@ -1213,6 +1220,9 @@ def change_acm_policy(bin_pol, del_array, chg_array,
         - Attempt changes in the hypervisor; if this step fails,
           roll back the relabeling of resources and VMs
         - Make the relabeling of resources and VMs permanent
+
+       This function should be called with the lock to the domains
+       held (XendDomain.instance().domains_lock)
     """
     rc = xsconstants.XSERR_SUCCESS
 
@@ -1225,7 +1235,7 @@ def change_acm_policy(bin_pol, del_array, chg_array,
     errors=""
 
     try:
-        __resfile_lock.acquire()
+        resfile_lock()
         mapfile_lock()
 
         # Get all domains' dominfo.
@@ -1240,6 +1250,7 @@ def change_acm_policy(bin_pol, del_array, chg_array,
             access_control = dictio.dict_read("resources", res_label_filename)
         except:
             pass
+
         for key, labeldata in access_control.items():
             if len(labeldata) == 2:
                 policy, label = labeldata
@@ -1328,7 +1339,7 @@ def change_acm_policy(bin_pol, del_array, chg_array,
     finally:
         log.info("----------------------------------------------")
         mapfile_unlock()
-        __resfile_lock.release()
+        resfile_unlock()
 
     return rc, errors
 
