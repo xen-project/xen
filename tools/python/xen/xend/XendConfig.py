@@ -1461,7 +1461,7 @@ class XendConfig(dict):
         for dev_uuid in ordered_refs:
             dev_type, dev_info = target['devices'][dev_uuid]
             if dev_type == 'pci': # special case for pci devices
-                sxpr = [['uuid', dev_info['uuid']]]
+                sxpr = ['pci', ['uuid', dev_info['uuid']]]
                 for pci_dev_info in dev_info['devs']:
                     pci_dev_sxpr = ['dev']
                     for opt, val in pci_dev_info.items():
