@@ -22,6 +22,7 @@ LIB64DIR = lib/amd64
 
 SOCKET_LIBS = -lsocket
 CURSES_LIBS = -lcurses
+UTIL_LIBS =
 SONAME_LDFLAG = -h
 SHLIB_CFLAGS = -R /usr/sfw/$(LIBDIR) -shared
 

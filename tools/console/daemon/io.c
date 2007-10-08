@@ -26,7 +26,6 @@
 #include <xen/io/console.h>
 #include <xenctrl.h>
 
-#include <malloc.h>
 #include <stdlib.h>
 #include <errno.h>
 #include <string.h>
@@ -36,6 +35,11 @@
 #include <termios.h>
 #include <stdarg.h>
 #include <sys/mman.h>
+#if defined(__NetBSD__) || defined(__OpenBSD__)
+#include <util.h>
+#elif defined(__linux__) || defined(__Linux__)
+#include <pty.h>
+#endif
 
 #define MAX(a, b) (((a) > (b)) ? (a) : (b))
 #define MIN(a, b) (((a) < (b)) ? (a) : (b))
@@ -213,43 +217,81 @@ static int create_domain_log(struct domain *dom)
 	return fd;
 }
 
+#ifdef __sun__
+/* Once Solaris has openpty(), this is going to be removed. */
+int openpty(int *amaster, int *aslave, char *name,
+	    struct termios *termp, struct winsize *winp)
+{
+	int mfd, sfd;
+
+	*amaster = *aslave = -1;
+	mfd = sfd = -1;
+
+	mfd = open("/dev/ptmx", O_RDWR | O_NOCTTY);
+	if (mfd < 0)
+		goto err0;
+
+	if (grantpt(mfd) == -1 || unlockpt(mfd) == -1)
+		goto err1;
+
+	/* This does not match openpty specification,
+	 * but as long as this does not hurt, this is acceptable.
+	 */
+	mfd = sfd;
+
+	if (termp != NULL && tcgetattr(sfd, termp) < 0)
+		goto err1;	
+
+	if (amaster)
+		*amaster = mfd;
+	if (aslave)
+		*aslave = sfd;
+	if (name)
+		strlcpy(name, ptsname(mfd), sizeof(slave));
+	if (winp)
+		ioctl(sfd, TIOCSWINSZ, winp);
+
+	return 0;
+
+err1:
+	close(mfd);
+err0:
+	return -1;
+}
+#endif
+
 
 static int domain_create_tty(struct domain *dom)
 {
+	char slave[80];
+	struct termios term;
 	char *path;
-	int master;
+	int master, slavefd;
+	int err;
 	bool success;
+	char *data;
+	unsigned int len;
 
-	if ((master = open("/dev/ptmx",O_RDWR|O_NOCTTY)) == -1 ||
-	    grantpt(master) == -1 || unlockpt(master) == -1) {
-		dolog(LOG_ERR, "Failed to create tty for domain-%d",
-		      dom->domid);
+	if (openpty(&master, &slavefd, slave, &term, NULL) < 0) {
 		master = -1;
-	} else {
-		const char *slave = ptsname(master);
-		struct termios term;
-		char *data;
-		unsigned int len;
+		err = errno;
+		dolog(LOG_ERR, "Failed to create tty for domain-%d (errno = %i, %s)",
+		      dom->domid, err, strerror(err));
+		return master;
+	}
 
-		if (tcgetattr(master, &term) != -1) {
-			cfmakeraw(&term);
-			tcsetattr(master, TCSAFLUSH, &term);
-		}
+	cfmakeraw(&term);
+	if (tcsetattr(master, TCSAFLUSH, &term) < 0) {
+		err = errno;
+		dolog(LOG_ERR, "Failed to set tty attribute  for domain-%d (errno = %i, %s)",
+		      dom->domid, err, strerror(err));
+		goto out;
+	}
 
-		if (dom->use_consolepath) {
-			success = asprintf(&path, "%s/limit", dom->conspath) !=
-				-1;
-			if (!success)
-				goto out;
-			data = xs_read(xs, XBT_NULL, path, &len);
-			if (data) {
-				dom->buffer.max_capacity = strtoul(data, 0, 0);
-				free(data);
-			}
-			free(path);
-		}
 
-		success = asprintf(&path, "%s/limit", dom->serialpath) != -1;
+	if (dom->use_consolepath) {
+		success = asprintf(&path, "%s/limit", dom->conspath) !=
+			-1;
 		if (!success)
 			goto out;
 		data = xs_read(xs, XBT_NULL, path, &len);
@@ -258,30 +300,38 @@ static int domain_create_tty(struct domain *dom)
 			free(data);
 		}
 		free(path);
+	}
 
-		success = asprintf(&path, "%s/tty", dom->serialpath) != -1;
+	success = asprintf(&path, "%s/limit", dom->serialpath) != -1;
+	if (!success)
+		goto out;
+	data = xs_read(xs, XBT_NULL, path, &len);
+	if (data) {
+		dom->buffer.max_capacity = strtoul(data, 0, 0);
+		free(data);
+	}
+	free(path);
+
+	success = asprintf(&path, "%s/tty", dom->serialpath) != -1;
+	if (!success)
+		goto out;
+	success = xs_write(xs, XBT_NULL, path, slave, strlen(slave));
+	free(path);
+	if (!success)
+		goto out;
+
+	if (dom->use_consolepath) {
+		success = (asprintf(&path, "%s/tty", dom->conspath) != -1);
 		if (!success)
 			goto out;
 		success = xs_write(xs, XBT_NULL, path, slave, strlen(slave));
 		free(path);
 		if (!success)
 			goto out;
-
-		if (dom->use_consolepath) {
-			success = asprintf(&path, "%s/tty", dom->conspath) !=
-				-1;
-			if (!success)
-				goto out;
-			success = xs_write(xs, XBT_NULL, path, slave,
-					   strlen(slave));
-			free(path);
-			if (!success)
-				goto out;
-		}
-
-		if (fcntl(master, F_SETFL, O_NONBLOCK) == -1)
-			goto out;
 	}
+
+	if (fcntl(master, F_SETFL, O_NONBLOCK) == -1)
+		goto out;
 
 	return master;
  out:
@@ -410,7 +460,7 @@ static bool watch_domain(struct domain *dom, bool watch)
 	char domid_str[3 + MAX_STRLEN(dom->domid)];
 	bool success;
 
-	sprintf(domid_str, "dom%u", dom->domid);
+	snprintf(domid_str, sizeof(domid_str), "dom%u", dom->domid);
 	if (watch) {
 		success = xs_watch(xs, dom->serialpath, domid_str);
 		if (success) {

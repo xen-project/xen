@@ -21,6 +21,7 @@ LIB64DIR = lib64
 
 SOCKET_LIBS =
 CURSES_LIBS = -lncurses
+UTIL_LIBS = -lutil
 SONAME_LDFLAG = -soname
 SHLIB_CFLAGS = -shared
 
