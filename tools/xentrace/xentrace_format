@@ -43,14 +43,14 @@ def read_defs(defs_file):
         line = fd.readline()
         if not line:
             break
-	
-	if line[0] == '#' or line[0] == '\n':
-	    continue
-        
+
+        if line[0] == '#' or line[0] == '\n':
+            continue
+
         m = reg.match(line)
 
         if not m: print >> sys.stderr, "Bad format file" ; sys.exit(1)
-        
+
         defs[str(eval(m.group(1)))] = m.group(2)
 
     return defs
@@ -70,7 +70,7 @@ try:
     opts, arg = getopt.getopt(sys.argv[1:], "c:" )
 
     for opt in opts:
-	if opt[0] == '-c' : mhz = int(opt[1])
+        if opt[0] == '-c' : mhz = int(opt[1])
 
 except getopt.GetoptError:
     usage()
@@ -108,7 +108,7 @@ i=0
 
 while not interrupted:
     try:
-	i=i+1
+        i=i+1
         line = sys.stdin.read(struct.calcsize(HDRREC))
         if not line:
             break
@@ -121,7 +121,7 @@ while not interrupted:
         d3 = 0
         d4 = 0
         d5 = 0
-  
+
         tsc = 0
 
         if tsc_in == 1:
@@ -162,26 +162,26 @@ while not interrupted:
             cpu = d1
 
 
-	#tsc = (tscH<<32) | tscL
+        #tsc = (tscH<<32) | tscL
 
-	#print i, tsc
+        #print i, tsc
 
         if cpu >= len(last_tsc):
             last_tsc += [0] * (cpu - len(last_tsc) + 1)
-	elif tsc < last_tsc[cpu] and tsc_in == 1:
-	    print "TSC stepped backward cpu %d !  %d %d" % (cpu,tsc,last_tsc[cpu])
+        elif tsc < last_tsc[cpu] and tsc_in == 1:
+            print "TSC stepped backward cpu %d !  %d %d" % (cpu,tsc,last_tsc[cpu])
 
-	# provide relative TSC
-	if last_tsc[cpu] > 0 and tsc_in == 1:
-		reltsc = tsc - last_tsc[cpu]
-	else:
-		reltsc = 0
+        # provide relative TSC
+        if last_tsc[cpu] > 0 and tsc_in == 1:
+            reltsc = tsc - last_tsc[cpu]
+        else:
+            reltsc = 0
 
-	if tsc_in == 1:
-	    last_tsc[cpu] = tsc
+        if tsc_in == 1:
+            last_tsc[cpu] = tsc
 
-	if mhz:
-	    tsc = tsc / (mhz*1000000.0)
+        if mhz:
+            tsc = tsc / (mhz*1000000.0)
 
         args = {'cpu'   : cpu,
                 'tsc'   : tsc,
@@ -193,15 +193,15 @@ while not interrupted:
                 '4'     : d4,
                 '5'     : d5    }
 
-	try:
+        try:
 
-	    if defs.has_key(str(event)): 
-		print defs[str(event)] % args
-	    else: 
-		if defs.has_key(str(0)): print defs[str(0)] % args
-	except TypeError:
-	    print defs[str(event)]
-	    print args
-	    
+            if defs.has_key(str(event)): 
+                print defs[str(event)] % args
+            else:
+               if defs.has_key(str(0)): print defs[str(0)] % args
+        except TypeError:
+            print defs[str(event)]
+            print args
+
 
     except IOError, struct.error: sys.exit()

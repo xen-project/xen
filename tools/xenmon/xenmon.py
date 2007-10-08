@@ -310,10 +310,10 @@ def show_livestats(cpu):
                 len = struct.calcsize(ST_DOM_INFO)
                 dom = struct.unpack(ST_DOM_INFO, shm[idx:idx+len])
                 doms.append(dom)
-#		(last_update_time, start_time, runnable_start_time, blocked_start_time,
-#		 ns_since_boot, ns_oncpu_since_boot, runnable_at_last_update,
-#		 runnable, in_use, domid, junk, name) = dom
-#		dom_in_use.append(in_use)
+#               (last_update_time, start_time, runnable_start_time, blocked_start_time,
+#                ns_since_boot, ns_oncpu_since_boot, runnable_at_last_update,
+#                runnable, in_use, domid, junk, name) = dom
+#               dom_in_use.append(in_use)
                 dom_in_use.append(dom[8])
                 domid = dom[9]
                 if domid == 32767 :
@@ -599,9 +599,9 @@ def writelog():
                 len = struct.calcsize(ST_DOM_INFO)
                 dom = struct.unpack(ST_DOM_INFO, shm[idx:idx+len])
 #                doms.append(dom)
-#		(last_update_time, start_time, runnable_start_time, blocked_start_time,
-#		 ns_since_boot, ns_oncpu_since_boot, runnable_at_last_update,
-#		 runnable, in_use, domid, junk, name) = dom
+#               (last_update_time, start_time, runnable_start_time, blocked_start_time,
+#                ns_since_boot, ns_oncpu_since_boot, runnable_at_last_update,
+#                runnable, in_use, domid, junk, name) = dom
                 dom_in_use.append(dom[8])
                 domid = dom[9]
                 if domid == 32767:
