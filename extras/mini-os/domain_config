@@ -8,7 +8,7 @@
 
 #----------------------------------------------------------------------------
 # Kernel image file.
-kernel = "mini-os.elf"
+kernel = "mini-os.gz"
 
 # Initial memory allocation (in megabytes) for the new domain.
 memory = 32
