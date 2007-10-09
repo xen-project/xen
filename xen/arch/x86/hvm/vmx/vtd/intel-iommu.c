@@ -412,14 +412,8 @@ static int __iommu_flush_iotlb(struct iommu *iommu, u16 did,
         BUG();
     }
     /* Note: set drain read/write */
-#if 0
-    /*
-     * This is probably to be super secure.. Looks like we can
-     * ignore it without any impact.
-     */
     if ( cap_read_drain(iommu->cap) )
         val |= DMA_TLB_READ_DRAIN;
-#endif
     if ( cap_write_drain(iommu->cap) )
         val |= DMA_TLB_WRITE_DRAIN;
 
@@ -641,8 +635,11 @@ static int iommu_set_root_entry(struct iommu *iommu)
     unsigned long flags;
 
     if ( iommu == NULL )
+    {
         gdprintk(XENLOG_ERR VTDPREFIX,
                  "iommu_set_root_entry: iommu == NULL\n");
+        return -EINVAL;
+    }
 
     if ( unlikely(!iommu->root_entry) )
     {
@@ -1156,8 +1153,9 @@ static int domain_context_mapping(
     u32 type;
 
     type = pdev_type(pdev);
-    if ( type == DEV_TYPE_PCI_BRIDGE )
+    switch ( type )
     {
+    case DEV_TYPE_PCI_BRIDGE:
         sec_bus = read_pci_config_byte(
             pdev->bus, PCI_SLOT(pdev->devfn),
             PCI_FUNC(pdev->devfn), PCI_SECONDARY_BUS);
@@ -1181,20 +1179,15 @@ static int domain_context_mapping(
                     pdev->bus, PCI_SLOT(pdev->devfn), PCI_FUNC(pdev->devfn),
                     sec_bus, sub_bus);
         }
-    }
-
-    if ( type == DEV_TYPE_PCIe_ENDPOINT )
-    {
+        break;
+    case DEV_TYPE_PCIe_ENDPOINT:
         gdprintk(XENLOG_INFO VTDPREFIX,
                  "domain_context_mapping:PCIe : bdf = %x:%x:%x\n",
                  pdev->bus, PCI_SLOT(pdev->devfn), PCI_FUNC(pdev->devfn));
         ret = domain_context_mapping_one(domain, iommu,
-                                         (u8)(pdev->bus), (u8) (pdev->devfn));
-    }
-
-    /* PCI devices */
-    if ( type == DEV_TYPE_PCI )
-    {
+                                         (u8)(pdev->bus), (u8)(pdev->devfn));
+        break;
+    case DEV_TYPE_PCI:
         gdprintk(XENLOG_INFO VTDPREFIX,
                  "domain_context_mapping:PCI: bdf = %x:%x:%x\n",
                  pdev->bus, PCI_SLOT(pdev->devfn), PCI_FUNC(pdev->devfn));
@@ -1202,14 +1195,14 @@ static int domain_context_mapping(
         if ( pdev->bus == 0 )
         {
             ret = domain_context_mapping_one(
-                domain, iommu, (u8)(pdev->bus), (u8) (pdev->devfn));
+                domain, iommu, (u8)(pdev->bus), (u8)(pdev->devfn));
         }
         else
         {
             if ( bus2bridge[pdev->bus].bus != 0 )
                 gdprintk(XENLOG_ERR VTDPREFIX,
                          "domain_context_mapping:bus2bridge"
-                         "[pdev->bus].bus==0\n");
+                         "[pdev->bus].bus != 0\n");
 
             ret = domain_context_mapping_one(
                 domain, iommu,
@@ -1229,6 +1222,13 @@ static int domain_context_mapping(
                 }
             }
         }
+        break;
+    default:
+        gdprintk(XENLOG_ERR VTDPREFIX,
+                 "domain_context_mapping:unknown type : bdf = %x:%x:%x\n",
+                 pdev->bus, PCI_SLOT(pdev->devfn), PCI_FUNC(pdev->devfn));
+        ret = -EINVAL;
+        break;
     }
 
     return ret;
@@ -1290,8 +1290,9 @@ static int domain_context_unmap(
     u32 type;
 
     type = pdev_type(pdev);
-    if ( type == DEV_TYPE_PCI_BRIDGE )
+    switch ( type )
     {
+    case DEV_TYPE_PCI_BRIDGE:
         sec_bus = read_pci_config_byte(
             pdev->bus, PCI_SLOT(pdev->devfn),
             PCI_FUNC(pdev->devfn), PCI_SECONDARY_BUS);
@@ -1304,20 +1305,15 @@ static int domain_context_unmap(
                  "sec_bus=%x sub_bus=%x\n",
                  pdev->bus, PCI_SLOT(pdev->devfn),
                  PCI_FUNC(pdev->devfn), sec_bus, sub_bus);
-    }
-
-    if ( type == DEV_TYPE_PCIe_ENDPOINT )
-    {
+        break;
+    case DEV_TYPE_PCIe_ENDPOINT:
         gdprintk(XENLOG_INFO VTDPREFIX,
                  "domain_context_unmap:PCIe : bdf = %x:%x:%x\n",
                  pdev->bus, PCI_SLOT(pdev->devfn), PCI_FUNC(pdev->devfn));
         ret = domain_context_unmap_one(domain, iommu,
-                                       (u8)(pdev->bus), (u8) (pdev->devfn));
-    }
-
-    /* PCI devices */
-    if ( type == DEV_TYPE_PCI )
-    {
+                                       (u8)(pdev->bus), (u8)(pdev->devfn));
+        break;
+    case DEV_TYPE_PCI:
         gdprintk(XENLOG_INFO VTDPREFIX,
                  "domain_context_unmap:PCI: bdf = %x:%x:%x\n",
                  pdev->bus, PCI_SLOT(pdev->devfn), PCI_FUNC(pdev->devfn));
@@ -1325,14 +1321,14 @@ static int domain_context_unmap(
         {
             ret = domain_context_unmap_one(
                 domain, iommu,
-                (u8)(pdev->bus), (u8) (pdev->devfn));
+                (u8)(pdev->bus), (u8)(pdev->devfn));
         }
         else
         {
             if ( bus2bridge[pdev->bus].bus != 0 )
                 gdprintk(XENLOG_INFO VTDPREFIX,
                          "domain_context_mapping:"
-                         "bus2bridge[pdev->bus].bus==0\n");
+                         "bus2bridge[pdev->bus].bus != 0\n");
 
             ret = domain_context_unmap_one(domain, iommu,
                                            (u8)(bus2bridge[pdev->bus].bus),
@@ -1351,6 +1347,13 @@ static int domain_context_unmap(
                 }
             }
         }
+        break;
+    default:
+        gdprintk(XENLOG_ERR VTDPREFIX,
+                 "domain_context_unmap:unknown type: bdf = %x:%x:%x\n",
+                 pdev->bus, PCI_SLOT(pdev->devfn), PCI_FUNC(pdev->devfn));
+        ret = -EINVAL;
+        break;
     }
 
     return ret;
@@ -1447,6 +1450,8 @@ void iommu_domain_teardown(struct domain *d)
                 if ( pgd[0].val != 0 )
                     free_xenheap_page((void*)maddr_to_virt(
                         dma_pte_addr(pgd[0])));
+
+                free_xenheap_page((void *)hd->pgd);
             }
             break;
         default:
@@ -1600,11 +1605,6 @@ void iommu_flush(struct domain *d, dma_addr_t gfn, u64 *p2m_entry)
     }
 
     iommu_flush_cache_entry(iommu, pte);
-}
-
-int prepare_device(struct domain *domain, struct pci_dev dev)
-{
-    return 0;
 }
 
 static int iommu_prepare_rmrr_dev(
