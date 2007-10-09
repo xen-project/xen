@@ -185,6 +185,9 @@ static inline int get_page(struct page_info *page,
     return 1;
 }
 
+/* Decide whether this page looks like iomem or real memory */
+int iomem_page_test(unsigned long mfn, struct page_info *page);
+
 extern void put_page_type(struct page_info *page);
 extern int get_page_type(struct page_info *page, u32 type);
 

@@ -2893,6 +2893,13 @@ arch_memory_op(int op, XEN_GUEST_HANDLE(void) arg)
     return 0;
 }
 
+int
+iomem_page_test(unsigned long mfn, struct page_info *page)
+{
+	return unlikely(!mfn_valid(mfn)) ||
+	       unlikely(page_get_owner(page) == dom_io);
+}
+
 /*
  * Local variables:
  * mode: C
