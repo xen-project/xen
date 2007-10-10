@@ -1317,7 +1317,7 @@ cmd_disp (char *arg)
 #endif
     }
     else if (*arg == 0)
-        printf ("choose among br, regs, cr, ar, tr, rr, dbg\n");
+        printf ("choose among br, regs, cr, ar, tr, rr, db\n");
     else
         printf ("cannot disp '%s'\n", arg);
     return 0;
