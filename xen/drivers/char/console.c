@@ -465,7 +465,7 @@ static void printk_start_of_line(void)
         return;
 
     snprintf(tstr, sizeof(tstr), "[%04u-%02u-%02u %02u:%02u:%02u] ",
-             1900 + tm.tm_year, tm.tm_mon, tm.tm_mday,
+             1900 + tm.tm_year, tm.tm_mon + 1, tm.tm_mday,
              tm.tm_hour, tm.tm_min, tm.tm_sec);
     __putstr(tstr);
 }
