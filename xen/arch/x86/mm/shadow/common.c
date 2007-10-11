@@ -746,7 +746,7 @@ void shadow_unhook_mappings(struct vcpu *v, mfn_t smfn)
         break;
 #endif
     default:
-        SHADOW_PRINTK("top-level shadow has bad type %08x\n", sp->type);
+        SHADOW_ERROR("top-level shadow has bad type %08x\n", sp->type);
         BUG();
     }
 }
@@ -814,12 +814,12 @@ void shadow_prealloc(struct domain *d, unsigned int order)
     
     /* Nothing more we can do: all remaining shadows are of pages that
      * hold Xen mappings for some vcpu.  This can never happen. */
-    SHADOW_PRINTK("Can't pre-allocate %i shadow pages!\n"
-                   "  shadow pages total = %u, free = %u, p2m=%u\n",
-                   1 << order, 
-                   d->arch.paging.shadow.total_pages, 
-                   d->arch.paging.shadow.free_pages, 
-                   d->arch.paging.shadow.p2m_pages);
+    SHADOW_ERROR("Can't pre-allocate %i shadow pages!\n"
+                 "  shadow pages total = %u, free = %u, p2m=%u\n",
+                 1 << order,
+                 d->arch.paging.shadow.total_pages,
+                 d->arch.paging.shadow.free_pages,
+                 d->arch.paging.shadow.p2m_pages);
     BUG();
 }
 
@@ -912,7 +912,7 @@ mfn_t shadow_alloc(struct domain *d,
      * It means that we didn't call shadow_prealloc() correctly before
      * we allocated.  We can't recover by calling prealloc here, because
      * we might free up higher-level pages that the caller is working on. */
-    SHADOW_PRINTK("Can't allocate %i shadow pages!\n", 1 << order);
+    SHADOW_ERROR("Can't allocate %i shadow pages!\n", 1 << order);
     BUG();
 
  found:
@@ -1605,8 +1605,8 @@ void sh_destroy_shadow(struct vcpu *v, mfn_t smfn)
         break;
 #endif
     default:
-        SHADOW_PRINTK("tried to destroy shadow of bad type %08lx\n", 
-                       (unsigned long)t);
+        SHADOW_ERROR("tried to destroy shadow of bad type %08lx\n",
+                     (unsigned long)t);
         BUG();
     }    
 }

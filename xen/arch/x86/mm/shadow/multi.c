@@ -2472,7 +2472,7 @@ sh_map_and_validate_gl4e(struct vcpu *v, mfn_t gl4mfn,
                                 shadow_l4_index, 
                                 validate_gl4e);
 #else // ! GUEST_PAGING_LEVELS >= 4
-    SHADOW_PRINTK("called in wrong paging mode!\n");
+    SHADOW_ERROR("called in wrong paging mode!\n");
     BUG();
     return 0;
 #endif 
@@ -2488,7 +2488,7 @@ sh_map_and_validate_gl3e(struct vcpu *v, mfn_t gl3mfn,
                                 shadow_l3_index, 
                                 validate_gl3e);
 #else // ! GUEST_PAGING_LEVELS >= 4
-    SHADOW_PRINTK("called in wrong paging mode!\n");
+    SHADOW_ERROR("called in wrong paging mode!\n");
     BUG();
     return 0;
 #endif
@@ -2514,7 +2514,7 @@ sh_map_and_validate_gl2he(struct vcpu *v, mfn_t gl2mfn,
                                 shadow_l2_index, 
                                 validate_gl2e);
 #else /* Non-PAE guests don't have different kinds of l2 table */
-    SHADOW_PRINTK("called in wrong paging mode!\n");
+    SHADOW_ERROR("called in wrong paging mode!\n");
     BUG();
     return 0;
 #endif
