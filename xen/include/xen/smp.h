@@ -61,20 +61,6 @@ extern int on_selected_cpus(
     int wait);
 
 /*
- * Call a function on all processors
- */
-static inline int on_each_cpu(
-    void (*func) (void *info),
-    void *info,
-    int retry,
-    int wait)
-{
-    int ret = smp_call_function(func, info, retry, wait);
-    func(info);
-    return ret;
-}
-
-/*
  * Mark the boot cpu "online" so that it can call console drivers in
  * printk() and can access its per-cpu storage.
  */
@@ -91,7 +77,6 @@ void smp_prepare_boot_cpu(void);
 #define raw_smp_processor_id()			0
 #define hard_smp_processor_id()			0
 #define smp_call_function(func,info,retry,wait)	({ do {} while (0); 0; })
-#define on_each_cpu(func,info,retry,wait)	({ func(info); 0; })
 #define num_booting_cpus()			1
 #define smp_prepare_boot_cpu()			do {} while (0)
 
@@ -103,11 +88,27 @@ static inline int on_selected_cpus(
     int wait)
 {
     if ( cpu_isset(0, selected) )
+    {
+        local_irq_disable();
         func(info);
+        local_irq_enable();
+    }
     return 0;
 }
 
 #endif
+
+/*
+ * Call a function on all processors
+ */
+static inline int on_each_cpu(
+    void (*func) (void *info),
+    void *info,
+    int retry,
+    int wait)
+{
+    return on_selected_cpus(cpu_online_map, func, info, retry, wait);
+}
 
 #define smp_processor_id() raw_smp_processor_id()
 
