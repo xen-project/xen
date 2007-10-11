@@ -214,6 +214,8 @@ static void set_time_scale(struct time_scale *ts, u64 ticks_per_sec)
     u32 tps32;
     int shift = 0;
 
+    ASSERT(tps64 != 0);
+
     while ( tps64 > (MILLISECS(1000)*2) )
     {
         tps64 >>= 1;
@@ -221,7 +223,7 @@ static void set_time_scale(struct time_scale *ts, u64 ticks_per_sec)
     }
 
     tps32 = (u32)tps64;
-    while ( tps32 < (u32)MILLISECS(1000) )
+    while ( tps32 <= (u32)MILLISECS(1000) )
     {
         tps32 <<= 1;
         shift++;
