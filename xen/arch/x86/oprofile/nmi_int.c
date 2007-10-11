@@ -348,6 +348,14 @@ static int __init nmi_init(void)
 				   give user space an consistent name. */
 				cpu_type = "x86-64/hammer";
 				break;
+			case 0x10:
+				model = &op_athlon_spec;
+				cpu_type = "x86-64/family10";
+				break;
+			case 0x11:
+				model = &op_athlon_spec;
+				cpu_type = "x86-64/family11";
+				break;
 			}
 			break;
  

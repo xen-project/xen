@@ -100,6 +100,8 @@ static void disable_c1_ramping(void)
 	}
 }
 
+int force_mwait __cpuinitdata;
+
 static void __init init_amd(struct cpuinfo_x86 *c)
 {
 	u32 l, h;
@@ -182,10 +184,7 @@ static void __init init_amd(struct cpuinfo_x86 *c)
 					f_vide();
 				rdtscl(d2);
 				d = d2-d;
-				
-				/* Knock these two lines out if it debugs out ok */
-				printk(KERN_INFO "AMD K6 stepping B detected - ");
-				/* -- cut here -- */
+
 				if (d > 20*K6_BUG_LOOP) 
 					printk("system stability may be impaired when more than 32 MB are used.\n");
 				else 
@@ -279,6 +278,9 @@ static void __init init_amd(struct cpuinfo_x86 *c)
 
 	switch (c->x86) {
 	case 15:
+	/* Use K8 tuning for Fam10h and Fam11h */
+	case 0x10:
+	case 0x11:
 		set_bit(X86_FEATURE_K8, c->x86_capability);
 		break;
 	case 6:
@@ -305,8 +307,6 @@ static void __init init_amd(struct cpuinfo_x86 *c)
 
 	if (cpuid_eax(0x80000000) >= 0x80000008) {
 		c->x86_max_cores = (cpuid_ecx(0x80000008) & 0xff) + 1;
-		if (c->x86_max_cores & (c->x86_max_cores - 1))
-			c->x86_max_cores = 1;
 	}
 
 	if (cpuid_eax(0x80000000) >= 0x80000007) {
@@ -317,21 +317,30 @@ static void __init init_amd(struct cpuinfo_x86 *c)
 
 #ifdef CONFIG_X86_HT
 	/*
-	 * On a AMD dual core setup the lower bits of the APIC id
-	 * distingush the cores.  Assumes number of cores is a power
-	 * of two.
+	 * On a AMD multi core setup the lower bits of the APIC id
+	 * distingush the cores.
 	 */
 	if (c->x86_max_cores > 1) {
 		int cpu = smp_processor_id();
-		unsigned bits = 0;
-		while ((1 << bits) < c->x86_max_cores)
-			bits++;
+		unsigned bits = (cpuid_ecx(0x80000008) >> 12) & 0xf;
+
+		if (bits == 0) {
+			while ((1 << bits) < c->x86_max_cores)
+				bits++;
+		}
 		cpu_core_id[cpu] = phys_proc_id[cpu] & ((1<<bits)-1);
 		phys_proc_id[cpu] >>= bits;
 		printk(KERN_INFO "CPU %d(%d) -> Core %d\n",
 		       cpu, c->x86_max_cores, cpu_core_id[cpu]);
 	}
 #endif
+
+	if (c->x86 == 0x10 && !force_mwait)
+		clear_bit(X86_FEATURE_MWAIT, c->x86_capability);
+
+	/* K6s reports MCEs but don't actually have all the MSRs */
+	if (c->x86 < 6)
+		clear_bit(X86_FEATURE_MCE, c->x86_capability);
 
 	/* Prevent TSC drift in non single-processor, single-core platforms. */
 	if ((smp_processor_id() == 1) && c1_ramping_may_cause_clock_drift(c))
@@ -340,7 +349,7 @@ static void __init init_amd(struct cpuinfo_x86 *c)
 	start_svm(c);
 }
 
-static unsigned int amd_size_cache(struct cpuinfo_x86 * c, unsigned int size)
+static unsigned int __cpuinit amd_size_cache(struct cpuinfo_x86 * c, unsigned int size)
 {
 	/* AMD errata T13 (order #21922) */
 	if ((c->x86 == 6)) {
@@ -353,7 +362,7 @@ static unsigned int amd_size_cache(struct cpuinfo_x86 * c, unsigned int size)
 	return size;
 }
 
-static struct cpu_dev amd_cpu_dev __initdata = {
+static struct cpu_dev amd_cpu_dev __cpuinitdata = {
 	.c_vendor	= "AMD",
 	.c_ident 	= { "AuthenticAMD" },
 	.c_models = {
@@ -378,5 +387,3 @@ int __init amd_init_cpu(void)
 	cpu_devs[X86_VENDOR_AMD] = &amd_cpu_dev;
 	return 0;
 }
-
-//early_arch_initcall(amd_init_cpu);

@@ -10,6 +10,7 @@
 #include <asm/config.h>
 
 #define EXPORT_SYMBOL(var)
+#define EXPORT_SYMBOL_GPL(var)
 #define ARRAY_SIZE(x) (sizeof(x) / sizeof((x)[0]))
 
 /*

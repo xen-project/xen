@@ -11,6 +11,8 @@
 #define MTRR_TYPE_WRBACK     6
 #define MTRR_NUM_TYPES       7
 
+extern void mtrr_save_fixed_ranges(void *);
+extern void mtrr_save_state(void);
 extern int mtrr_add(unsigned long base, unsigned long size,
                     unsigned int type, char increment);
 extern int mtrr_add_page(unsigned long base, unsigned long size,

@@ -50,6 +50,7 @@
 #include <asm/div64.h>
 #include <asm/flushtlb.h>
 #include <asm/msr.h>
+#include <asm/mtrr.h>
 #include <mach_apic.h>
 #include <mach_wakecpu.h>
 #include <smpboot_hooks.h>
@@ -819,6 +820,12 @@ static int __devinit do_boot_cpu(int apicid, int cpu)
 	unsigned long start_eip;
 	unsigned short nmi_high = 0, nmi_low = 0;
 	struct vcpu *v;
+
+	/*
+	 * Save current MTRR state in case it was changed since early boot
+	 * (e.g. by the ACPI SMI) to initialize new CPUs with MTRRs in sync:
+	 */
+	mtrr_save_state();
 
 	++cpucount;
 

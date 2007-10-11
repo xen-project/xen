@@ -121,8 +121,7 @@ ret_t do_platform_op(XEN_GUEST_HANDLE(xen_platform_op_t) u_xenpf_op)
 
     case XENPF_read_memtype:
     {
-        unsigned long mfn;
-        unsigned int  nr_mfns;
+        unsigned long mfn, nr_mfns;
         mtrr_type     type;
 
         ret = xsm_memtype(op->cmd);

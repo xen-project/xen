@@ -1728,8 +1728,8 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
             v->arch.guest_context.gs_base_user = res;
             break;
 #endif
-        case MSR_K8_FIDVID_STATUS:
-        case MSR_K8_FIDVID_CTL:
+        case MSR_K7_FID_VID_STATUS:
+        case MSR_K7_FID_VID_CTL:
             if ( (cpufreq_controller != FREQCTL_dom0_kernel) ||
                  (boot_cpu_data.x86_vendor != X86_VENDOR_AMD) ||
                  wrmsr_safe(regs->ecx, eax, edx) )
@@ -1770,8 +1770,8 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
             regs->edx = v->arch.guest_context.gs_base_user >> 32;
             break;
 #endif
-        case MSR_K8_FIDVID_CTL:
-        case MSR_K8_FIDVID_STATUS:
+        case MSR_K7_FID_VID_CTL:
+        case MSR_K7_FID_VID_STATUS:
             if ( (cpufreq_controller != FREQCTL_dom0_kernel) ||
                  (boot_cpu_data.x86_vendor != X86_VENDOR_AMD) ||
                  rdmsr_safe(regs->ecx, regs->eax, regs->edx) )

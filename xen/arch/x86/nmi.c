@@ -314,9 +314,14 @@ void __pminit setup_apic_nmi_watchdog(void)
 
     switch (boot_cpu_data.x86_vendor) {
     case X86_VENDOR_AMD:
-        if (boot_cpu_data.x86 != 6 && boot_cpu_data.x86 != 15)
+        switch (boot_cpu_data.x86) {
+        case 6:
+        case 15 ... 17:
+            setup_k7_watchdog();
+            break;
+        default:
             return;
-        setup_k7_watchdog();
+        }
         break;
     case X86_VENDOR_INTEL:
         switch (boot_cpu_data.x86) {

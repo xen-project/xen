@@ -17,6 +17,8 @@
 int mce_disabled = 0;
 int nr_mce_banks;
 
+EXPORT_SYMBOL_GPL(nr_mce_banks);	/* non-fatal.o */
+
 /* Handle unconfigured int18 (should never happen) */
 static fastcall void unexpected_machine_check(struct cpu_user_regs * regs, long error_code)
 {	
@@ -34,8 +36,7 @@ void mcheck_init(struct cpuinfo_x86 *c)
 
 	switch (c->x86_vendor) {
 		case X86_VENDOR_AMD:
-			if (c->x86==6 || c->x86==15)
-				amd_mcheck_init(c);
+			amd_mcheck_init(c);
 			break;
 
 		case X86_VENDOR_INTEL:
@@ -61,16 +62,28 @@ void mcheck_init(struct cpuinfo_x86 *c)
 	}
 }
 
-static int __init mcheck_disable(char *str)
+static unsigned long old_cr4 __initdata;
+
+void __init stop_mce(void)
 {
-	mce_disabled = 1;
-	return 0;
+	old_cr4 = read_cr4();
+	clear_in_cr4(X86_CR4_MCE);
 }
 
-static int __init mcheck_enable(char *str)
+void __init restart_mce(void)
+{
+	if (old_cr4 & X86_CR4_MCE)
+		set_in_cr4(X86_CR4_MCE);
+}
+
+static void __init mcheck_disable(char *str)
+{
+	mce_disabled = 1;
+}
+
+static void __init mcheck_enable(char *str)
 {
 	mce_disabled = -1;
-	return 0;
 }
 
 custom_param("nomce", mcheck_disable);

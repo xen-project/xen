@@ -2247,7 +2247,7 @@ static int vmx_do_msr_read(struct cpu_user_regs *regs)
 
     switch ( ecx )
     {
-    case MSR_IA32_TIME_STAMP_COUNTER:
+    case MSR_IA32_TSC:
         msr_content = hvm_get_guest_time(v);
         break;
     case MSR_IA32_SYSENTER_CS:
@@ -2267,11 +2267,11 @@ static int vmx_do_msr_read(struct cpu_user_regs *regs)
     case MSR_IA32_MCG_CAP:
     case MSR_IA32_MCG_STATUS:
     case MSR_IA32_MC0_STATUS:
-    case MSR_K8_MC1_STATUS:
-    case MSR_K8_MC2_STATUS:
-    case MSR_K8_MC3_STATUS:
-    case MSR_K8_MC4_STATUS:
-    case MSR_K8_MC5_STATUS:
+    case MSR_IA32_MC1_STATUS:
+    case MSR_IA32_MC2_STATUS:
+    case MSR_IA32_MC3_STATUS:
+    case MSR_IA32_MC4_STATUS:
+    case MSR_IA32_MC5_STATUS:
         /* No point in letting the guest see real MCEs */
         msr_content = 0;
         break;
@@ -2387,7 +2387,7 @@ static int vmx_do_msr_write(struct cpu_user_regs *regs)
 
     switch ( ecx )
     {
-    case MSR_IA32_TIME_STAMP_COUNTER:
+    case MSR_IA32_TSC:
         hvm_set_guest_time(v, msr_content);
         pt_reset(v);
         break;

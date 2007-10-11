@@ -120,7 +120,7 @@ static enum handler_return long_mode_do_msr_write(struct cpu_user_regs *regs)
             return HNDL_exception_raised;
         break;
 
-    case MSR_K8_MC4_MISC: /* Threshold register */
+    case MSR_IA32_MC4_MISC: /* Threshold register */
         /*
          * MCA/MCE: Threshold register is reported to be locked, so we ignore
          * all write accesses. This behaviour matches real HW, so guests should
@@ -1776,7 +1776,7 @@ static void svm_do_msr_access(
     if (vmcb->exitinfo1 == 0)
     {
         switch (ecx) {
-        case MSR_IA32_TIME_STAMP_COUNTER:
+        case MSR_IA32_TSC:
             msr_content = hvm_get_guest_time(v);
             break;
 
@@ -1788,7 +1788,7 @@ static void svm_do_msr_access(
             msr_content = v->arch.hvm_vcpu.guest_efer;
             break;
 
-        case MSR_K8_MC4_MISC: /* Threshold register */
+        case MSR_IA32_MC4_MISC: /* Threshold register */
             /*
              * MCA/MCE: We report that the threshold register is unavailable
              * for OS use (locked by the BIOS).
@@ -1812,11 +1812,11 @@ static void svm_do_msr_access(
         case MSR_IA32_MCG_CAP:
         case MSR_IA32_MCG_STATUS:
         case MSR_IA32_MC0_STATUS:
-        case MSR_K8_MC1_STATUS:
-        case MSR_K8_MC2_STATUS:
-        case MSR_K8_MC3_STATUS:
-        case MSR_K8_MC4_STATUS:
-        case MSR_K8_MC5_STATUS:
+        case MSR_IA32_MC1_STATUS:
+        case MSR_IA32_MC2_STATUS:
+        case MSR_IA32_MC3_STATUS:
+        case MSR_IA32_MC4_STATUS:
+        case MSR_IA32_MC5_STATUS:
             /* No point in letting the guest see real MCEs */
             msr_content = 0;
             break;
@@ -1850,7 +1850,7 @@ static void svm_do_msr_access(
 
         switch (ecx)
         {
-        case MSR_IA32_TIME_STAMP_COUNTER:
+        case MSR_IA32_TSC:
             hvm_set_guest_time(v, msr_content);
             pt_reset(v);
             break;
