@@ -474,6 +474,14 @@ static void svm_update_guest_cr(struct vcpu *v, unsigned int cr)
     switch ( cr )
     {
     case 0:
+        /* TS cleared? Then initialise FPU now. */
+        if ( (v == current) && !(v->arch.hvm_vcpu.guest_cr[0] & X86_CR0_TS) &&
+             (vmcb->cr0 & X86_CR0_TS) )
+        {
+            setup_fpu(v);
+            vmcb->exception_intercepts &= ~(1U << TRAP_no_device);
+        }
+
         vmcb->cr0 = v->arch.hvm_vcpu.guest_cr[0];
         if ( !paging_mode_hap(v->domain) )
             vmcb->cr0 |= X86_CR0_PG | X86_CR0_WP;
@@ -1538,25 +1546,6 @@ static void svm_io_instruction(struct vcpu *v)
     }
 }
 
-static int svm_set_cr0(unsigned long value)
-{
-    struct vcpu *v = current;
-    struct vmcb_struct *vmcb = v->arch.hvm_svm.vmcb;
-    int rc = hvm_set_cr0(value);
-
-    if ( rc == 0 )
-        return 0;
-
-    /* TS cleared? Then initialise FPU now. */
-    if ( !(value & X86_CR0_TS) )
-    {
-        setup_fpu(v);
-        vmcb->exception_intercepts &= ~(1U << TRAP_no_device);
-    }
-
-    return 1;
-}
-
 static void mov_from_cr(int cr, int gp, struct cpu_user_regs *regs)
 {
     unsigned long value = 0;
@@ -1603,7 +1592,7 @@ static int mov_to_cr(int gpreg, int cr, struct cpu_user_regs *regs)
     switch ( cr )
     {
     case 0: 
-        return svm_set_cr0(value);
+        return hvm_set_cr0(value);
     case 3:
         return hvm_set_cr3(value);
     case 4:
@@ -1688,7 +1677,7 @@ static void svm_cr_access(
         gpreg = decode_src_reg(prefix, buffer[index+2]);
         value = get_reg(gpreg, regs, vmcb) & 0xF;
         value = (v->arch.hvm_vcpu.guest_cr[0] & ~0xF) | value;
-        result = svm_set_cr0(value);
+        result = hvm_set_cr0(value);
         HVMTRACE_1D(LMSW, current, value);
         break;
 

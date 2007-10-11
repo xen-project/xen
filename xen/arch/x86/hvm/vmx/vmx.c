@@ -1022,6 +1022,14 @@ static void vmx_update_guest_cr(struct vcpu *v, unsigned int cr)
     switch ( cr )
     {
     case 0:
+        /* TS cleared? Then initialise FPU now. */
+        if ( (v == current) && !(v->arch.hvm_vcpu.guest_cr[0] & X86_CR0_TS) &&
+             (v->arch.hvm_vcpu.hw_cr[0] & X86_CR0_TS) )
+        {
+            setup_fpu(v);
+            __vm_clear_bit(EXCEPTION_BITMAP, TRAP_no_device);
+        }
+
         v->arch.hvm_vcpu.hw_cr[0] =
             v->arch.hvm_vcpu.guest_cr[0] |
             X86_CR0_PE | X86_CR0_NE | X86_CR0_PG | X86_CR0_WP;
@@ -2045,13 +2053,6 @@ static int vmx_set_cr0(unsigned long value)
 
     if ( rc == 0 )
         return 0;
-
-    /* TS cleared? Then initialise FPU now. */
-    if ( !(value & X86_CR0_TS) )
-    {
-        setup_fpu(v);
-        __vm_clear_bit(EXCEPTION_BITMAP, TRAP_no_device);
-    }
 
     /*
      * VMX does not implement real-mode virtualization. We emulate
