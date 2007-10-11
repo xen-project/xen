@@ -358,7 +358,7 @@ static int hvm_load_cpu_ctxt(struct domain *d, hvm_domain_context_t *h)
         return -EINVAL;
     }
 
-    if ( (ctxt.msr_efer & ~(EFER_LME | EFER_NX | EFER_SCE)) ||
+    if ( (ctxt.msr_efer & ~(EFER_LME | EFER_LMA | EFER_NX | EFER_SCE)) ||
          ((sizeof(long) != 8) && (ctxt.msr_efer & EFER_LME)) ||
          (!cpu_has_nx && (ctxt.msr_efer & EFER_NX)) ||
          (!cpu_has_syscall && (ctxt.msr_efer & EFER_SCE)) ||
