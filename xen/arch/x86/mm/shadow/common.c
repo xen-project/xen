@@ -667,7 +667,7 @@ int shadow_cmpxchg_guest_entry(struct vcpu *v, intpte_t *p,
  * at the same time, which means that to guarantee progress, we must
  * allow for more than ninety allocated pages per vcpu.  We round that
  * up to 128 pages, or half a megabyte per vcpu. */
-unsigned int shadow_min_acceptable_pages(struct domain *d) 
+static unsigned int shadow_min_acceptable_pages(struct domain *d) 
 {
     u32 vcpu_count = 0;
     struct vcpu *v;
@@ -722,7 +722,7 @@ static inline int chunk_is_available(struct domain *d, int order)
 
 /* Dispatcher function: call the per-mode function that will unhook the
  * non-Xen mappings in this top-level shadow mfn */
-void shadow_unhook_mappings(struct vcpu *v, mfn_t smfn)
+static void shadow_unhook_mappings(struct vcpu *v, mfn_t smfn)
 {
     struct shadow_page_info *sp = mfn_to_shadow_page(smfn);
     switch ( sp->type )
@@ -1062,7 +1062,7 @@ sh_alloc_p2m_pages(struct domain *d)
 }
 
 // Returns 0 if no memory is available...
-struct page_info * 
+static struct page_info *
 shadow_alloc_p2m_page(struct domain *d)
 {
     struct list_head *entry;
@@ -1092,7 +1092,7 @@ shadow_alloc_p2m_page(struct domain *d)
     return pg;
 }
 
-void
+static void
 shadow_free_p2m_page(struct domain *d, struct page_info *pg)
 {
     ASSERT(page_get_owner(pg) == d);

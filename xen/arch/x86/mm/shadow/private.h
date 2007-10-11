@@ -360,10 +360,6 @@ mfn_t shadow_alloc(struct domain *d,
                     unsigned long backpointer);
 void  shadow_free(struct domain *d, mfn_t smfn);
 
-/* Dispatcher function: call the per-mode function that will unhook the
- * non-Xen mappings in this top-level shadow mfn */
-void shadow_unhook_mappings(struct vcpu *v, mfn_t smfn);
-
 /* Install the xen mappings in various flavours of shadow */
 void sh_install_xen_entries_in_l4(struct vcpu *v, mfn_t gl4mfn, mfn_t sl4mfn);
 void sh_install_xen_entries_in_l2(struct vcpu *v, mfn_t gl2mfn, mfn_t sl2mfn);
@@ -382,10 +378,6 @@ void sh_validate_guest_pt_write(struct vcpu *v, mfn_t gmfn,
 extern int sh_remove_write_access(struct vcpu *v, mfn_t readonly_mfn,
                                   unsigned int level,
                                   unsigned long fault_addr);
-
-/* Allocate/free functions for passing to the P2M code. */
-struct page_info *shadow_alloc_p2m_page(struct domain *d);
-void shadow_free_p2m_page(struct domain *d, struct page_info *pg);
 
 /* Functions that atomically write PT/P2M entries and update state */
 void shadow_write_p2m_entry(struct vcpu *v, unsigned long gfn, 
