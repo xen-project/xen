@@ -46,7 +46,10 @@ static const struct_member xen_vtpm_record_struct_members[] =
           .offset = offsetof(xen_vtpm_record, vm) },
         { .key = "backend",
           .type = &abstract_type_ref,
-          .offset = offsetof(xen_vtpm_record, backend) }
+          .offset = offsetof(xen_vtpm_record, backend) },
+        { .key = "other_config",
+          .type = &abstract_type_string_string_map,
+          .offset = offsetof(xen_vtpm_record, other_config) }
     };
 
 const abstract_type xen_vtpm_record_abstract_type_ =
@@ -70,6 +73,7 @@ xen_vtpm_record_free(xen_vtpm_record *record)
     free(record->uuid);
     xen_vm_record_opt_free(record->vm);
     xen_vm_record_opt_free(record->backend);
+    xen_string_string_map_free(record->other_config);
     free(record);
 }
 
@@ -192,5 +196,40 @@ xen_vtpm_get_uuid(xen_session *session, char **result, xen_vtpm vtpm)
 
     *result = NULL;
     XEN_CALL_("VTPM.get_uuid");
+    return session->ok;
+}
+
+
+bool
+xen_vtpm_get_other_config(xen_session *session, xen_string_string_map **result,
+                          xen_vtpm vtpm)
+{
+    abstract_value param_values[] =
+        {
+            { .type = &abstract_type_string,
+              .u.string_val = vtpm }
+        };
+
+    abstract_type result_type = abstract_type_string_string_map;
+
+    *result = NULL;
+    XEN_CALL_("VTPM.get_other_config");
+    return session->ok;
+}
+
+
+bool
+xen_vtpm_set_other_config(xen_session *session, xen_vtpm vtpm,
+                          xen_string_string_map *other_config)
+{
+    abstract_value param_values[] =
+        {
+            { .type = &abstract_type_string,
+              .u.string_val = vtpm },
+            { .type = &abstract_type_string_string_map,
+              .u.set_val = (arbitrary_set *)other_config }
+        };
+
+    xen_call_(session, "VTPM.set_other_config", param_values, 2, NULL, NULL);
     return session->ok;
 }

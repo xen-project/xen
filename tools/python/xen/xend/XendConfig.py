@@ -1226,6 +1226,7 @@ class XendConfig(dict):
                 if not dev_uuid:
                     dev_uuid = uuid.createString()
                 dev_info['uuid'] = dev_uuid
+                dev_info['other_config'] = cfg_xenapi.get('other_config', {})
                 target['devices'][dev_uuid] = (dev_type, dev_info)
                 target['vtpm_refs'].append(dev_uuid)
 

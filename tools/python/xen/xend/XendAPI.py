@@ -2270,7 +2270,7 @@ class XendAPI(object):
     # Xen API: Class VTPM
     # ----------------------------------------------------------------
 
-    VTPM_attr_rw = [ ]
+    VTPM_attr_rw = ['other_config']
     VTPM_attr_ro = ['VM',
                     'backend',
                     'runtime_properties' ]
@@ -2279,6 +2279,20 @@ class XendAPI(object):
 
     VTPM_methods = [('destroy', None)]
     VTPM_funcs = [('create', 'VTPM')]
+
+    def VTPM_get_other_config(self, session, vtpm_ref):
+        xendom = XendDomain.instance()
+        return xen_api_success(xendom.get_dev_property_by_uuid('vtpm',
+                                                               vtpm_ref,
+                                                               'other_config'))
+
+    def VTPM_set_other_config(self, session, vtpm_ref, other_config):
+        xendom = XendDomain.instance()
+        xendom.set_dev_property_by_uuid('vtpm',
+                                        vtpm_ref,
+                                        'other_config',
+                                        other_config)
+        return xen_api_success_void()
     
     # object methods
     def VTPM_get_record(self, session, vtpm_ref):

@@ -64,6 +64,13 @@ class TPMifController(DevController):
         if uuid:
             back['uuid'] = uuid
 
+            data = self.vm.info['devices'].get(uuid)
+            if data:
+                other = data[1].get('other_config')
+                if type(other) == dict:
+                    for key, item in other.items():
+                        back['oc_' + key] = item
+
         front = { 'handle' : "%i" % devid }
 
         return (devid, back, front)
@@ -83,6 +90,13 @@ class TPMifController(DevController):
             result['uuid'] = uuid
         if type:
             result['type'] = type
+
+        if uuid:
+            data = self.vm.info['devices'].get(uuid)
+            if data:
+                other = data[1].get('other_config')
+                if other:
+                    result['other_config'] = other
 
         return result
 

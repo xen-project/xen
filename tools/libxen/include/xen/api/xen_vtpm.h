@@ -66,6 +66,7 @@ typedef struct xen_vtpm_record
     char *uuid;
     struct xen_vm_record_opt *vm;
     struct xen_vm_record_opt *backend;
+    xen_string_string_map *other_config;
 } xen_vtpm_record;
 
 /**
@@ -194,6 +195,24 @@ xen_vtpm_get_vm(xen_session *session, xen_vm *result, xen_vtpm vtpm);
  */
 extern bool
 xen_vtpm_get_backend(xen_session *session, xen_vm *result, xen_vtpm vtpm);
+
+
+/**
+ * Get the other_config field of the given VTPM.
+ */
+extern bool
+xen_vtpm_get_other_config(xen_session *session,
+                          xen_string_string_map **result,
+                          xen_vtpm vtpm);
+
+
+/**
+ * Set the other_config field of the given VTPM.
+ */
+extern bool
+xen_vtpm_set_other_config(xen_session *session,
+                          xen_vtpm vtpm,
+                          xen_string_string_map *other_config);
 
 
 #endif

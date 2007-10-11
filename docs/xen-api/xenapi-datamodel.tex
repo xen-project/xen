@@ -13563,6 +13563,7 @@ Quals & Field & Type & Description \\
 $\mathit{RO}_\mathit{run}$ &  {\tt uuid} & string & unique identifier/object reference \\
 $\mathit{RO}_\mathit{ins}$ &  {\tt VM} & VM ref & the virtual machine \\
 $\mathit{RO}_\mathit{ins}$ &  {\tt backend} & VM ref & the domain where the backend is located \\
+$\mathit{RW}$ &  {\tt other\_config} & (string $\rightarrow$ string) Map & additional configuration \\
 \hline
 \end{longtable}
 \subsection{RPCs associated with class: VTPM}
@@ -13659,6 +13660,72 @@ VM ref
 
 
 value of the field
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~get\_other\_config}
+
+{\bf Overview:}
+Get the other\_config field of the given VTPM.
+
+ \noindent {\bf Signature:}
+\begin{verbatim} ((string -> string) Map) get_other_config (session_id s, VTPM ref self)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt VTPM ref } & self & reference to the object \\ \hline
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:}
+{\tt
+(string $\rightarrow$ string) Map
+}
+
+
+value of the field
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~set\_other\_config}
+
+{\bf Overview:}
+Set the other\_config field of the given VTPM.
+
+ \noindent {\bf Signature:}
+\begin{verbatim} void set_other_config (session_id s, VTPM ref self, (string -> string) Map value)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt VTPM ref } & self & reference to the object \\ \hline
+
+{\tt (string $\rightarrow$ string) Map } & value & New value to set \\ \hline
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:}
+{\tt
+void
+}
+
+
+
 \vspace{0.3cm}
 \vspace{0.3cm}
 \vspace{0.3cm}
