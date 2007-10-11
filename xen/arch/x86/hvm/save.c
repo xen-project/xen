@@ -19,16 +19,14 @@
  */
 
 #include <xen/config.h>
-#include <xen/compile.h>
 #include <xen/lib.h>
+#include <xen/version.h>
 #include <public/version.h>
 #include <xen/sched.h>
-
 #include <asm/hvm/hvm.h>
 #include <asm/hvm/support.h>
 #include <asm/hvm/domain.h>
 #include <asm/current.h>
-
 
 /* List of handlers for various HVM save and restore types */
 static struct { 
@@ -94,7 +92,7 @@ int hvm_save(struct domain *d, hvm_domain_context_t *h)
     hdr.cpuid = eax;
 
     /* Save xen changeset */
-    c = strrchr(XEN_CHANGESET, ':');
+    c = strrchr(xen_changeset(), ':');
     if ( c )
         hdr.changeset = simple_strtoll(c, NULL, 16);
     else 
@@ -170,7 +168,7 @@ int hvm_load(struct domain *d, hvm_domain_context_t *h)
                "does not match host (%#"PRIx32").\n", hdr.cpuid, eax);
 
 
-    c = strrchr(XEN_CHANGESET, ':');
+    c = strrchr(xen_changeset(), ':');
     if ( hdr.changeset == -1ULL )
         gdprintk(XENLOG_WARNING, 
                  "HVM restore: Xen changeset was not saved.\n");
