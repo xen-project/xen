@@ -70,6 +70,9 @@ int acpi_skip_timer_override __initdata;
 static u64 acpi_lapic_addr __initdata = APIC_DEFAULT_PHYS_BASE;
 #endif
 
+u32 acpi_smi_cmd;
+u8 acpi_enable_value, acpi_disable_value;
+
 #ifndef __HAVE_ARCH_CMPXCHG
 #warning ACPI uses CMPXCHG, i486 and later hardware
 #endif
@@ -509,9 +512,14 @@ static int __init acpi_parse_fadt(unsigned long phys, unsigned long size)
 		       pmtmr_ioport);
 #endif
 
+	acpi_smi_cmd       = fadt->smi_cmd;
+	acpi_enable_value  = fadt->acpi_enable;
+	acpi_disable_value = fadt->acpi_disable;
+
 #ifdef CONFIG_ACPI_SLEEP
 	acpi_fadt_parse_sleep_info(fadt);
 #endif
+
 	return 0;
 }
 

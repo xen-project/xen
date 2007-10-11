@@ -114,6 +114,8 @@ extern int acpi_strict;
 extern int acpi_disabled;
 extern int acpi_ht;
 extern int acpi_pci_disabled;
+extern u32 acpi_smi_cmd;
+extern u8 acpi_enable_value, acpi_disable_value;
 static inline void disable_acpi(void) 
 { 
 	acpi_disabled = 1;

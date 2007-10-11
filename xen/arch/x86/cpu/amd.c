@@ -102,6 +102,29 @@ static void disable_c1_ramping(void)
 
 int force_mwait __cpuinitdata;
 
+static void disable_c1e(void *unused)
+{
+	u32 lo, hi;
+
+	/*
+	 * Disable C1E mode, as the APIC timer stops in that mode.
+	 * The MSR does not exist in all FamilyF CPUs (only Rev F and above),
+	 * but we safely catch the #GP in that case.
+	 */
+	if ((rdmsr_safe(MSR_K8_ENABLE_C1E, lo, hi) == 0) &&
+	    (lo & (3u << 27)) &&
+	    (wrmsr_safe(MSR_K8_ENABLE_C1E, lo & ~(3u << 27), hi) != 0))
+		printk(KERN_ERR "Failed to disable C1E on CPU#%u (%08x)\n",
+		       smp_processor_id(), lo);
+}
+
+static void check_disable_c1e(unsigned int port, u8 value)
+{
+	/* C1E is sometimes enabled during entry to ACPI mode. */
+	if ((port == acpi_smi_cmd) && (value == acpi_enable_value))
+		on_each_cpu(disable_c1e, NULL, 1, 1);
+}
+
 static void __init init_amd(struct cpuinfo_x86 *c)
 {
 	u32 l, h;
@@ -282,6 +305,9 @@ static void __init init_amd(struct cpuinfo_x86 *c)
 	case 0x10:
 	case 0x11:
 		set_bit(X86_FEATURE_K8, c->x86_capability);
+		disable_c1e(NULL);
+		if (acpi_smi_cmd && (acpi_enable_value | acpi_disable_value))
+			pv_post_outb_hook = check_disable_c1e;
 		break;
 	case 6:
 		set_bit(X86_FEATURE_K7, c->x86_capability);
@@ -335,6 +361,7 @@ static void __init init_amd(struct cpuinfo_x86 *c)
 	}
 #endif
 
+	/* Pointless to use MWAIT on Family10 as it does not deep sleep. */
 	if (c->x86 == 0x10 && !force_mwait)
 		clear_bit(X86_FEATURE_MWAIT, c->x86_capability);
 

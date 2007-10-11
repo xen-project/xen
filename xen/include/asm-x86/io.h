@@ -50,4 +50,6 @@ __OUT(b,"b",char)
 __OUT(w,"w",short)
 __OUT(l,,int)
 
+extern void (*pv_post_outb_hook)(unsigned int port, u8 value);
+
 #endif

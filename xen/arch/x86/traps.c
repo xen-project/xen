@@ -1184,6 +1184,8 @@ void host_to_guest_gpr_switch(struct cpu_user_regs *)
 unsigned long guest_to_host_gpr_switch(unsigned long)
     __attribute__((__regparm__(1)));
 
+void (*pv_post_outb_hook)(unsigned int port, u8 value);
+
 /* Instruction fetch with error handling. */
 #define insn_fetch(type, base, eip, limit)                                  \
 ({  unsigned long _rc, _ptr = (base) + (eip);                               \
@@ -1412,7 +1414,11 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
             {
             case 1:
                 if ( guest_outb_okay(port, v, regs) )
+                {
                     outb((u8)data, port);
+                    if ( pv_post_outb_hook )
+                        pv_post_outb_hook(port, data);
+                }
                 else if ( port == 0x42 || port == 0x43 || port == 0x61 )
                     pv_pit_handler(port, data, 1);
                 break;
@@ -1530,7 +1536,11 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
         {
         case 1:
             if ( guest_outb_okay(port, v, regs) )
+            {
                 io_emul(regs);
+                if ( pv_post_outb_hook )
+                    pv_post_outb_hook(port, regs->eax);
+            }
             else if ( port == 0x42 || port == 0x43 || port == 0x61 )
                 pv_pit_handler(port, regs->eax, 1);
             break;
