@@ -88,8 +88,6 @@ irq.o: ../x86/irq.c
 physdev.o: ../x86/physdev.c
 numa.o: ../x86/numa.c
 
-HDRS += $(wildcard *.h)
-
 ifneq ($(CMDLINE),)
 # The first token in the arguments will be silently dropped.
 FULL_CMDLINE := xen $(CMDLINE)

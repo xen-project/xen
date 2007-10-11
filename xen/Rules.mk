@@ -37,7 +37,8 @@ override TARGET_ARCH     := $(shell echo $(XEN_TARGET_ARCH) | \
 
 TARGET := $(BASEDIR)/xen
 
-HDRS := $(wildcard $(BASEDIR)/include/xen/*.h)
+HDRS := $(wildcard *.h)
+HDRS += $(wildcard $(BASEDIR)/include/xen/*.h)
 HDRS += $(wildcard $(BASEDIR)/include/public/*.h)
 HDRS += $(wildcard $(BASEDIR)/include/compat/*.h)
 HDRS += $(wildcard $(BASEDIR)/include/asm-$(TARGET_ARCH)/*.h)
