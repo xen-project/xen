@@ -46,7 +46,7 @@ void __init vesa_early_init(void)
 {
     unsigned int vram_vmode;
 
-    vga_compat = !(vesa_lfb_info.capabilities & 2);
+    vga_compat = !(vga_console_info.u.vesa_lfb.gbl_caps & 2);
 
     if ( (vlfb_info.bits_per_pixel < 8) || (vlfb_info.bits_per_pixel > 32) )
         return;
