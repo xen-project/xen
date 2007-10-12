@@ -199,6 +199,8 @@ static inline struct cpu_user_regs *vcpu_regs(struct vcpu *v)
 }
 
 struct cpu_user_regs *guest_cpu_user_regs(void);
+
+extern void show_stack(struct task_struct *task, unsigned long *sp);
 #endif
 
 /*
