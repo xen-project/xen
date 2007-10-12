@@ -572,13 +572,16 @@ int thash_purge_and_insert(VCPU *v, u64 pte, u64 itir, u64 ifa, int type)
         }
         else {
             u64 psr;
-            phy_pte  &= ~PAGE_FLAGS_RV_MASK;
-            psr = ia64_clear_ic();
-            ia64_itc(type + 1, ifa, phy_pte, IA64_ITIR_PS_KEY(ps, 0));
-            ia64_set_psr(psr);
-            ia64_srlz_i();
-            // ps < mrr.ps, this is not supported
-            // panic_domain(NULL, "%s: ps (%lx) < mrr.ps \n", __func__, ps);
+
+            vtlb_insert(v, pte, itir, ifa);
+            vcpu_quick_region_set(PSCBX(v, tc_regions), ifa);
+            if (!(pte & VTLB_PTE_IO)) {
+                phy_pte  &= ~PAGE_FLAGS_RV_MASK;
+                psr = ia64_clear_ic();
+                ia64_itc(type + 1, ifa, phy_pte, IA64_ITIR_PS_KEY(ps, 0));
+                ia64_set_psr(psr);
+                ia64_srlz_i();
+            }
         }
     }
     else{
