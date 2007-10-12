@@ -1552,8 +1552,6 @@ void machine_halt(void)
 void sync_vcpu_execstate(struct vcpu *v)
 {
 //	__ia64_save_fpu(v->arch._thread.fph);
-//	if (VMX_DOMAIN(v))
-//		vmx_save_state(v);
 	// FIXME SMP: Anything else needed here for SMP?
 }
 
