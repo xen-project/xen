@@ -50,6 +50,8 @@
 #include <asm/hvm/trace.h>
 #include <asm/hap.h>
 
+u32 svm_feature_flags;
+
 #define set_segment_register(name, value)  \
     asm volatile ( "movw %%ax ,%%" STR(name) "" : : "a" (value) )
 
@@ -935,13 +937,16 @@ int start_svm(struct cpuinfo_x86 *c)
 
     setup_vmcb_dump();
 
+    svm_feature_flags = ((cpuid_eax(0x80000000) >= 0x8000000A) ?
+                         cpuid_edx(0x8000000A) : 0);
+
 #ifdef __x86_64__
     /*
      * Check CPUID for nested paging support. We support NPT only on 64-bit
      * hosts since the phys-to-machine table is in host format. Hence 32-bit
      * Xen could only support guests using NPT with up to a 4GB memory map.
      */
-    svm_function_table.hap_supported = (cpuid_edx(0x8000000A) & 1);
+    svm_function_table.hap_supported = cpu_has_svm_npt;
 #endif
 
     hvm_enable(&svm_function_table);
@@ -1810,6 +1815,26 @@ static void svm_do_msr_access(
             msr_content = 0;
             break;
 
+        case MSR_IA32_DEBUGCTLMSR:
+            msr_content = vmcb->debugctlmsr;
+            break;
+
+        case MSR_IA32_LASTBRANCHFROMIP:
+            msr_content = vmcb->lastbranchfromip;
+            break;
+
+        case MSR_IA32_LASTBRANCHTOIP:
+            msr_content = vmcb->lastbranchtoip;
+            break;
+
+        case MSR_IA32_LASTINTFROMIP:
+            msr_content = vmcb->lastintfromip;
+            break;
+
+        case MSR_IA32_LASTINTTOIP:
+            msr_content = vmcb->lastinttoip;
+            break;
+
         default:
             if ( rdmsr_hypervisor_regs(ecx, &eax, &edx) ||
                  rdmsr_safe(ecx, eax, edx) == 0 )
@@ -1850,6 +1875,34 @@ static void svm_do_msr_access(
 
         case MSR_K8_VM_HSAVE_PA:
             svm_inject_exception(v, TRAP_gp_fault, 1, 0);
+            break;
+
+        case MSR_IA32_DEBUGCTLMSR:
+            vmcb->debugctlmsr = msr_content;
+            if ( !msr_content || !cpu_has_svm_lbrv )
+                break;
+            vmcb->lbr_control.fields.enable = 1;
+            svm_disable_intercept_for_msr(v, MSR_IA32_DEBUGCTLMSR);
+            svm_disable_intercept_for_msr(v, MSR_IA32_LASTBRANCHFROMIP);
+            svm_disable_intercept_for_msr(v, MSR_IA32_LASTBRANCHTOIP);
+            svm_disable_intercept_for_msr(v, MSR_IA32_LASTINTFROMIP);
+            svm_disable_intercept_for_msr(v, MSR_IA32_LASTINTTOIP);
+            break;
+
+        case MSR_IA32_LASTBRANCHFROMIP:
+            vmcb->lastbranchfromip = msr_content;
+            break;
+
+        case MSR_IA32_LASTBRANCHTOIP:
+            vmcb->lastbranchtoip = msr_content;
+            break;
+
+        case MSR_IA32_LASTINTFROMIP:
+            vmcb->lastintfromip = msr_content;
+            break;
+
+        case MSR_IA32_LASTINTTOIP:
+            vmcb->lastinttoip = msr_content;
             break;
 
         default:

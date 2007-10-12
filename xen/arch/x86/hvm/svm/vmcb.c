@@ -80,8 +80,10 @@ struct host_save_area *alloc_host_save_area(void)
     return hsa;
 }
 
-static void disable_intercept_for_msr(char *msr_bitmap, u32 msr)
+void svm_disable_intercept_for_msr(struct vcpu *v, u32 msr)
 {
+    char *msr_bitmap = v->arch.hvm_svm.msrpm;
+
     /*
      * See AMD64 Programmers Manual, Vol 2, Section 15.10 (MSR-Bitmap Address).
      */
@@ -142,16 +144,16 @@ static int construct_vmcb(struct vcpu *v)
         return -ENOMEM;
     memset(arch_svm->msrpm, 0xff, MSRPM_SIZE);
 
-    disable_intercept_for_msr((char *)arch_svm->msrpm, MSR_FS_BASE);
-    disable_intercept_for_msr((char *)arch_svm->msrpm, MSR_GS_BASE);
-    disable_intercept_for_msr((char *)arch_svm->msrpm, MSR_SHADOW_GS_BASE);
-    disable_intercept_for_msr((char *)arch_svm->msrpm, MSR_CSTAR);
-    disable_intercept_for_msr((char *)arch_svm->msrpm, MSR_LSTAR);
-    disable_intercept_for_msr((char *)arch_svm->msrpm, MSR_STAR);
-    disable_intercept_for_msr((char *)arch_svm->msrpm, MSR_SYSCALL_MASK);
-    disable_intercept_for_msr((char *)arch_svm->msrpm, MSR_IA32_SYSENTER_CS);
-    disable_intercept_for_msr((char *)arch_svm->msrpm, MSR_IA32_SYSENTER_ESP);
-    disable_intercept_for_msr((char *)arch_svm->msrpm, MSR_IA32_SYSENTER_EIP);
+    svm_disable_intercept_for_msr(v, MSR_FS_BASE);
+    svm_disable_intercept_for_msr(v, MSR_GS_BASE);
+    svm_disable_intercept_for_msr(v, MSR_SHADOW_GS_BASE);
+    svm_disable_intercept_for_msr(v, MSR_CSTAR);
+    svm_disable_intercept_for_msr(v, MSR_LSTAR);
+    svm_disable_intercept_for_msr(v, MSR_STAR);
+    svm_disable_intercept_for_msr(v, MSR_SYSCALL_MASK);
+    svm_disable_intercept_for_msr(v, MSR_IA32_SYSENTER_CS);
+    svm_disable_intercept_for_msr(v, MSR_IA32_SYSENTER_ESP);
+    svm_disable_intercept_for_msr(v, MSR_IA32_SYSENTER_EIP);
 
     vmcb->msrpm_base_pa = (u64)virt_to_maddr(arch_svm->msrpm);
     vmcb->iopm_base_pa  = (u64)virt_to_maddr(hvm_io_bitmap);

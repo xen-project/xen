@@ -355,6 +355,15 @@ typedef union
     } fields;
 } __attribute__ ((packed)) ioio_info_t;
 
+typedef union
+{
+    u64 bytes;
+    struct
+    {
+        u64 enable:1;
+    } fields;
+} __attribute__ ((packed)) lbrctrl_t;
+
 struct vmcb_struct {
     u32 cr_intercepts;          /* offset 0x00 */
     u32 dr_intercepts;          /* offset 0x04 */
@@ -383,7 +392,8 @@ struct vmcb_struct {
     u64 res08[2];
     eventinj_t  eventinj;       /* offset 0xA8 */
     u64 h_cr3;                  /* offset 0xB0 */
-    u64 res09[105];             /* offset 0xB8 pad to save area */
+    lbrctrl_t lbr_control;      /* offset 0xB8 */
+    u64 res09[104];             /* offset 0xC0 pad to save area */
 
     svm_segment_register_t es;      /* offset 1024 */
     svm_segment_register_t cs;
@@ -426,20 +436,21 @@ struct vmcb_struct {
     u64 pdpe2;
     u64 pdpe3;
     u64 g_pat;
-    u64 res16[50];
-    u64 res17[128];
-    u64 res18[128];
+    u64 debugctlmsr;
+    u64 lastbranchfromip;
+    u64 lastbranchtoip;
+    u64 lastintfromip;
+    u64 lastinttoip;
+    u64 res16[301];
 } __attribute__ ((packed));
-
 
 struct arch_svm_struct {
     struct vmcb_struct *vmcb;
-    u64                 vmcb_pa;
-    u64                 asid_generation; /* ASID tracking, moved here to
-                                            prevent cacheline misses. */
-    u32                *msrpm;
-    int                 launch_core;
-    bool_t              vmcb_in_sync;     /* VMCB sync'ed with VMSAVE? */
+    u64    vmcb_pa;
+    u64    asid_generation; /* ASID tracking, moved here for cache locality. */
+    char  *msrpm;
+    int    launch_core;
+    bool_t vmcb_in_sync;    /* VMCB sync'ed with VMSAVE? */
 };
 
 struct vmcb_struct *alloc_vmcb(void);
@@ -450,6 +461,8 @@ int  svm_create_vmcb(struct vcpu *v);
 void svm_destroy_vmcb(struct vcpu *v);
 
 void setup_vmcb_dump(void);
+
+void svm_disable_intercept_for_msr(struct vcpu *v, u32 msr);
 
 #endif /* ASM_X86_HVM_SVM_VMCS_H__ */
 
