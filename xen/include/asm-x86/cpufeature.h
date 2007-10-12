@@ -49,6 +49,7 @@
 #define X86_FEATURE_MP		(1*32+19) /* MP Capable. */
 #define X86_FEATURE_NX		(1*32+20) /* Execute Disable */
 #define X86_FEATURE_MMXEXT	(1*32+22) /* AMD MMX extensions */
+#define X86_FEATURE_FFXSR       (1*32+25) /* FFXSR instruction optimizations */
 #define X86_FEATURE_RDTSCP	(1*32+27) /* RDTSCP */
 #define X86_FEATURE_LM		(1*32+29) /* Long Mode (x86-64) */
 #define X86_FEATURE_3DNOWEXT	(1*32+30) /* AMD 3DNow! extensions */
@@ -94,7 +95,6 @@
 #define X86_FEATURE_LAHF_LM	(6*32+ 0) /* LAHF/SAHF in long mode */
 #define X86_FEATURE_CMP_LEGACY	(6*32+ 1) /* If yes HyperThreading not valid */
 #define X86_FEATURE_SVME        (6*32+ 2) /* Secure Virtual Machine */
-#define X86_FEATURE_FFXSR       (6*32+25) /* FFXSR instruction optimizations */
 
 #define cpu_has(c, bit)		test_bit(bit, (c)->x86_capability)
 #define boot_cpu_has(bit)	test_bit(bit, boot_cpu_data.x86_capability)
@@ -146,6 +146,9 @@
 #define cpu_has_centaur_mcr	0
 #define cpu_has_clflush		boot_cpu_has(X86_FEATURE_CLFLSH)
 #endif
+
+#define cpu_has_ffxsr           ((boot_cpu_data.x86_vendor == X86_VENDOR_AMD) \
+                                 && boot_cpu_has(X86_FEATURE_FFXSR))
 
 #endif /* __ASM_I386_CPUFEATURE_H */
 

@@ -18,13 +18,17 @@
 #define _EFER_LME		8  /* Long mode enable */
 #define _EFER_LMA		10 /* Long mode active (read-only) */
 #define _EFER_NX		11 /* No execute enable */
-#define _EFER_SVME		12
+#define _EFER_SVME		12 /* AMD: SVM enable */
+#define _EFER_LMSLE		13 /* AMD: Long-mode segment limit enable */
+#define _EFER_FFXSE		14 /* AMD: Fast FXSAVE/FXRSTOR enable */
 
 #define EFER_SCE		(1<<_EFER_SCE)
 #define EFER_LME		(1<<_EFER_LME)
 #define EFER_LMA		(1<<_EFER_LMA)
 #define EFER_NX			(1<<_EFER_NX)
 #define EFER_SVME		(1<<_EFER_SVME)
+#define EFER_LMSLE		(1<<_EFER_LMSLE)
+#define EFER_FFXSE		(1<<_EFER_FFXSE)
 
 /* Intel MSRs. Some also available on other CPUs */
 #define MSR_IA32_PERFCTR0		0x000000c1

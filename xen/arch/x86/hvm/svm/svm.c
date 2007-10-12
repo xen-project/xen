@@ -1036,8 +1036,6 @@ static void svm_vmexit_do_cpuid(struct vmcb_struct *vmcb,
         /* So far, we do not support 3DNow for the guest. */
         clear_bit(X86_FEATURE_3DNOW & 31, &edx);
         clear_bit(X86_FEATURE_3DNOWEXT & 31, &edx);
-        /* no FFXSR instructions feature. */
-        clear_bit(X86_FEATURE_FFXSR & 31, &edx);
     }
     else if ( input == 0x80000007 || input == 0x8000000A )
     {
