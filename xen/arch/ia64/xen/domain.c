@@ -206,7 +206,8 @@ void schedule_tail(struct vcpu *prev)
 		migrate_timer(&current->arch.arch_vmx.vtm.vtm_timer,
 		              current->processor);
 	} else {
-		ia64_set_iva(&ia64_ivt);
+		if (VMX_DOMAIN(prev))
+			ia64_set_iva(&ia64_ivt);
 		load_region_regs(current);
 		ia64_set_pta(vcpu_pta(current));
 		vcpu_load_kernel_regs(current);
@@ -259,7 +260,8 @@ void context_switch(struct vcpu *prev, struct vcpu *next)
         struct domain *nd;
         extern char ia64_ivt;
 
-        ia64_set_iva(&ia64_ivt);
+        if (VMX_DOMAIN(prev))
+            ia64_set_iva(&ia64_ivt);
 
         nd = current->domain;
         if (!is_idle_domain(nd)) {
@@ -911,7 +913,7 @@ int arch_set_info_guest(struct vcpu *v, vcpu_guest_context_u c)
 			             tr->dtrs[i].rid);
 		}
 		v->arch.event_callback_ip = c.nat->event_callback_ip;
-		v->arch.iva = c.nat->regs.cr.iva;
+		vcpu_set_iva(v, c.nat->regs.cr.iva);
 	}
 
 	return 0;
