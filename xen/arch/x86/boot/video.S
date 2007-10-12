@@ -44,6 +44,7 @@
 #define PARAM_LFB_COLORS        0x1c
 #define PARAM_VESAPM_SEG        0x24
 #define PARAM_VESAPM_OFF        0x26
+#define PARAM_VESA_ATTRIB       0x28
 #define _param(param) bootsym(boot_vid_info)+(param)
 
 video:  xorw    %ax, %ax
@@ -129,6 +130,8 @@ mopar_gr:
         movl    %eax, _param(PARAM_LFB_COLORS)
         movl    35(%di), %eax
         movl    %eax, _param(PARAM_LFB_COLORS+4)
+        movw    0(%di), %ax
+        movw    %ax, _param(PARAM_VESA_ATTRIB)
 
 # get video mem size
         leaw    vesa_glob_info, %di

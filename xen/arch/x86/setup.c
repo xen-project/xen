@@ -308,6 +308,7 @@ struct boot_video_info {
     u8  rsvd_pos;           /* 0x23 */
     u16 vesapm_seg;         /* 0x24 */
     u16 vesapm_off;         /* 0x26 */
+    u16 vesa_attrib;        /* 0x28 */
 };
 
 static void __init parse_video_info(void)
@@ -340,6 +341,8 @@ static void __init parse_video_info(void)
         vga_console_info.u.vesa_lfb.blue_size = bvi->blue_size;
         vga_console_info.u.vesa_lfb.rsvd_pos = bvi->rsvd_pos;
         vga_console_info.u.vesa_lfb.rsvd_size = bvi->rsvd_size;
+        vga_console_info.u.vesa_lfb.gbl_caps = bvi->capabilities;
+        vga_console_info.u.vesa_lfb.mode_attrs = bvi->vesa_attrib;
     }
 }
 

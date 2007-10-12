@@ -565,6 +565,12 @@ typedef struct dom0_vga_console_info {
             uint8_t  green_pos, green_size;
             uint8_t  blue_pos, blue_size;
             uint8_t  rsvd_pos, rsvd_size;
+#if __XEN_INTERFACE_VERSION__ >= 0x00030206
+            /* VESA capabilities (offset 0xa, VESA command 0x4f00). */
+            uint32_t gbl_caps;
+            /* Mode attributes (offset 0x0, VESA command 0x4f01). */
+            uint16_t mode_attrs;
+#endif
         } vesa_lfb;
     } u;
 } dom0_vga_console_info_t;
