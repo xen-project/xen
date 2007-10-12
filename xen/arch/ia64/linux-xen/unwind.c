@@ -1847,6 +1847,16 @@ run_script (struct unw_script *script, struct unw_frame_info *state)
 	goto redo;
 }
 
+#ifdef XEN
+static inline int
+is_hypervisor_virt(unsigned long addr)
+{
+	return IS_VMM_ADDRESS(addr) &&
+		(HYPERVISOR_VIRT_START <= addr) &&
+		(addr < HYPERVISOR_VIRT_END);
+}
+#endif
+
 static int
 find_save_locs (struct unw_frame_info *info)
 {
@@ -1857,6 +1867,8 @@ find_save_locs (struct unw_frame_info *info)
 	if ((info->ip & (local_cpu_data->unimpl_va_mask | 0xf))
 #ifndef XEN
 	    || info->ip < TASK_SIZE
+#else
+	    || !is_hypervisor_virt(info->ip)
 #endif
 		) {
 		/* don't let obviously bad addresses pollute the cache */
@@ -1915,7 +1927,11 @@ unw_unwind (struct unw_frame_info *info)
 		return -1;
 	}
 	ip = info->ip = *info->rp_loc;
+#ifndef XEN
 	if (ip < GATE_ADDR) {
+#else
+	if (!is_hypervisor_virt(info->ip)) {
+#endif
 		UNW_DPRINT(2, "unwind.%s: reached user-space (ip=0x%lx)\n", __FUNCTION__, ip);
 		STAT(unw.stat.api.unwind_time += ia64_get_itc() - start; local_irq_restore(flags));
 		return -1;
@@ -1993,6 +2009,21 @@ unw_unwind_to_user (struct unw_frame_info *info)
 		if (unw_is_intr_frame(info) &&
 		    (pr & (1UL << PRED_USER_STACK)))
 			return 0;
+#ifdef XEN
+		/*
+		 * vmx fault handlers don't always update vcpu->on_stack
+		 * so that the above (pr & (1UL << PRED_USER_STACK)) condition
+		 * isn't always true.
+		 * hypercall path of break_fault does set pUStk=1,
+		 * other fault paths don't set.
+		 *
+		 * we need to stop unwinding somehow.
+		 */
+		if (unw_is_intr_frame(info) &&
+		    info->task->domain->arch.is_vti &&
+		    info->pr_loc == &vcpu_regs(info->task)->pr)
+			return 0;
+#endif
 		if (unw_get_pr (info, &pr) < 0) {
 			unw_get_rp(info, &ip);
 			UNW_DPRINT(0, "unwind.%s: failed to read "
