@@ -171,23 +171,25 @@ IA64FAULT vmx_vcpu_set_rr(VCPU *vcpu, u64 reg, u64 val)
     VMX(vcpu,vrr[reg>>VRN_SHIFT]) = val;
     switch((u64)(reg>>VRN_SHIFT)) {
     case VRN7:
-        vmx_switch_rr7(vrrtomrr(vcpu,val),
-                       (void *)vcpu->arch.vhpt.hash, pal_vaddr );
+        if (likely(vcpu == current))
+            vmx_switch_rr7(vrrtomrr(vcpu,val),
+                           (void *)vcpu->arch.vhpt.hash, pal_vaddr );
        break;
     case VRN4:
         rrval = vrrtomrr(vcpu,val);
         vcpu->arch.metaphysical_saved_rr4 = rrval;
-        if (is_virtual_mode(vcpu))
+        if (is_virtual_mode(vcpu) && likely(vcpu == current))
             ia64_set_rr(reg,rrval);
         break;
     case VRN0:
         rrval = vrrtomrr(vcpu,val);
         vcpu->arch.metaphysical_saved_rr0 = rrval;
-        if (is_virtual_mode(vcpu))
+        if (is_virtual_mode(vcpu) && likely(vcpu == current))
             ia64_set_rr(reg,rrval);
         break;
     default:
-        ia64_set_rr(reg,vrrtomrr(vcpu,val));
+        if (likely(vcpu == current))
+            ia64_set_rr(reg,vrrtomrr(vcpu,val));
         break;
     }
 
