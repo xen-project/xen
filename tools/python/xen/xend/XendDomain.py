@@ -886,6 +886,7 @@ class XendDomain:
         self.domains_lock.acquire()
         try:
             try:
+                fd = None
                 dominfo = self.domain_lookup_nr(domname)
 
                 if not dominfo:
@@ -908,8 +909,9 @@ class XendDomain:
                     oflags = os.O_RDONLY
                     if hasattr(os, "O_LARGEFILE"):
                         oflags |= os.O_LARGEFILE
+                    fd = os.open(chkpath, oflags)
                     XendCheckpoint.restore(self,
-                                           os.open(chkpath, oflags),
+                                           fd,
                                            dominfo,
                                            paused = start_paused)
                     os.unlink(chkpath)
@@ -921,6 +923,8 @@ class XendDomain:
                 log.exception("Exception occurred when resuming")
                 raise XendError("Error occurred when resuming: %s" % str(ex))
         finally:
+            if fd is not None:
+                os.close(fd)
             self.domains_lock.release()
 
 
