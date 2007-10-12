@@ -890,7 +890,7 @@ xc_ia64_setup_shared_info(int xc_handle, uint32_t dom,
  */
 static int
 setup_guest(int xc_handle, uint32_t dom, unsigned long memsize,
-            char *image, unsigned long image_size, vcpu_guest_context_t *ctxt)
+            char *image, unsigned long image_size)
 {
     xen_pfn_t *pfn_list;
     shared_iopage_t *sp;
@@ -1065,8 +1065,6 @@ error_out:
 int
 xc_hvm_build(int xc_handle, uint32_t domid, int memsize, const char *image_name)
 {
-    struct xen_domctl launch_domctl;
-    int rc;
     vcpu_guest_context_t st_ctxt, *ctxt = &st_ctxt;
     char *image = NULL;
     unsigned long image_size;
@@ -1086,42 +1084,25 @@ xc_hvm_build(int xc_handle, uint32_t domid, int memsize, const char *image_name)
 
     image_size = (image_size + PAGE_SIZE - 1) & PAGE_MASK;
 
-    if (lock_pages(&st_ctxt, sizeof(st_ctxt))) {
-        PERROR("Unable to lock_pages ctxt");
-        return 1;
-    }
-
-    memset(ctxt, 0, sizeof(*ctxt));
-
     if (setup_guest(xc_handle, domid, (unsigned long)memsize, image,
-                    image_size, ctxt) < 0) {
+                    image_size) < 0) {
         ERROR("Error constructing guest OS");
         goto error_out;
     }
 
     free(image);
 
+    memset(ctxt, 0, sizeof(*ctxt));
     ctxt->regs.ip = 0x80000000ffffffb0UL;
     ctxt->regs.ar.fpsr = xc_ia64_fpsr_default();
     ctxt->regs.cr.isr = 1UL << 63;
     ctxt->regs.psr = IA64_PSR_AC | IA64_PSR_BN;
     ctxt->regs.cr.dcr = 0;
     ctxt->regs.cr.pta = 15 << 2;
-
-    memset(&launch_domctl, 0, sizeof(launch_domctl));
-
-    launch_domctl.domain = (domid_t)domid;
-    launch_domctl.u.vcpucontext.vcpu = 0;
-    set_xen_guest_handle(launch_domctl.u.vcpucontext.ctxt, ctxt);
-
-    launch_domctl.cmd = XEN_DOMCTL_setvcpucontext;
-    rc = do_domctl(xc_handle, &launch_domctl);
-    unlock_pages(&st_ctxt, sizeof(st_ctxt));
-    return rc;
+    return xc_vcpu_setcontext(xc_handle, domid, 0, ctxt);
 
 error_out:
     free(image);
-    unlock_pages(&st_ctxt, sizeof(st_ctxt));
     return -1;
 }
 
