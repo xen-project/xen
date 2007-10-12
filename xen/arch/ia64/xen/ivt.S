@@ -458,6 +458,7 @@ END(daccess_bit)
 //////////////////////////////////////////////////////////////////////////
 // 0x2c00 Entry 11 (size 64 bundles) Break instruction (33)
 ENTRY(break_fault)
+	.body
 	/*
 	 * The streamlined system call entry/exit paths only save/restore 
 	 * the initial part of pt_regs.  This implies that the callers of
@@ -657,6 +658,7 @@ fast_hypercall:
 	bsw.1					// B (6 cyc) regs are saved, switch to bank 1
 	;;
 
+	PT_REGS_UNWIND_INFO(0)
 	ssm psr.ic | PSR_DEFAULT_BITS		// M2	now it's safe to re-enable intr.-collection
 //	movl r3=ia64_ret_from_syscall		// X
 	;;
