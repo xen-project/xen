@@ -394,24 +394,34 @@ static void vmx_build_io_physmap_table(struct domain *d)
 
 }
 
-void vmx_setup_platform(struct domain *d)
+int vmx_setup_platform(struct domain *d)
 {
+	unsigned long mpa;
 	ASSERT(d != dom0); /* only for non-privileged vti domain */
 
 	vmx_build_io_physmap_table(d);
 
-	d->arch.vmx_platform.shared_page_va =
-		(unsigned long)__va(__gpa_to_mpa(d, IO_PAGE_START));
+	mpa = __gpa_to_mpa(d, IO_PAGE_START);
+	if (mpa == 0)
+		return -EINVAL;
+	d->arch.vmx_platform.shared_page_va = (unsigned long)__va(mpa);
 	/* For buffered IO requests. */
 	spin_lock_init(&d->arch.hvm_domain.buffered_io_lock);
-	d->arch.hvm_domain.buffered_io_va =
-		(unsigned long)__va(__gpa_to_mpa(d, BUFFER_IO_PAGE_START));
-	d->arch.hvm_domain.buffered_pio_va =
-		(unsigned long)__va(__gpa_to_mpa(d, BUFFER_PIO_PAGE_START));
+
+	mpa = __gpa_to_mpa(d, BUFFER_IO_PAGE_START);
+	if (mpa == 0)
+		return -EINVAL;
+	d->arch.hvm_domain.buffered_io_va = (unsigned long)__va(mpa);
+	mpa = __gpa_to_mpa(d, BUFFER_PIO_PAGE_START);
+	if (mpa == 0)
+		return -EINVAL;
+	d->arch.hvm_domain.buffered_pio_va = (unsigned long)__va(mpa);
 	/* TEMP */
 	d->arch.vmx_platform.pib_base = 0xfee00000UL;
 
 	d->arch.sal_data = xmalloc(struct xen_sal_data);
+	if (d->arch.sal_data == NULL)
+		return -ENOMEM;
 
 	/* Only open one port for I/O and interrupt emulation */
 	memset(&d->shared_info->evtchn_mask[0], 0xff,
@@ -421,6 +431,8 @@ void vmx_setup_platform(struct domain *d)
 	viosapic_init(d);
 
 	vacpi_init(d);
+
+	return 0;
 }
 
 void vmx_do_launch(struct vcpu *v)

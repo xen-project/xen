@@ -104,8 +104,8 @@ long arch_do_domctl(xen_domctl_t *op, XEN_GUEST_HANDLE(xen_domctl_t) u_domctl)
                     ret = -EINVAL;
                 } else {
                     d->arch.is_vti = 1;
-                    vmx_setup_platform(d);
                     xen_ia64_set_convmem_end(d, ds->maxmem);
+                    ret = vmx_setup_platform(d);
                 }
             }
             else {
