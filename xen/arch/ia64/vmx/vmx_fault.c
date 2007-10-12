@@ -304,8 +304,6 @@ void leave_hypervisor_tail(void)
     }
 }
 
-extern ia64_rr vmx_vcpu_rr(VCPU *vcpu, u64 vadr);
-
 static int vmx_handle_lds(REGS* regs)
 {
     regs->cr_ipsr |=IA64_PSR_ED;
