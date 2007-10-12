@@ -1141,7 +1141,7 @@ static IA64FAULT vmx_emul_mov_from_dbr(VCPU *vcpu, INST64 inst)
         return IA64_FAULT;
     }
 #endif  //CHECK_FAULT
-    res = vmx_vcpu_get_ibr(vcpu, r3, &r1);
+    res = vmx_vcpu_get_dbr(vcpu, r3, &r1);
     if (res != IA64_NO_FAULT)
         return res;
     return vcpu_set_gr(vcpu, inst.M43.r1, r1,0);
@@ -1181,7 +1181,7 @@ static IA64FAULT vmx_emul_mov_from_ibr(VCPU *vcpu, INST64 inst)
         return IA64_FAULT;
     }
 #endif  //CHECK_FAULT
-    res = vmx_vcpu_get_dbr(vcpu, r3, &r1);
+    res = vmx_vcpu_get_ibr(vcpu, r3, &r1);
     if (res != IA64_NO_FAULT)
         return res;
     return vcpu_set_gr(vcpu, inst.M43.r1, r1,0);
