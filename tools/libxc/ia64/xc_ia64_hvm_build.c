@@ -28,54 +28,6 @@ xc_ia64_copy_to_domain_pages(int xc_handle, uint32_t domid, void* src_page,
     return 0;
 }
 
-int 
-xc_set_hvm_param(int handle, domid_t dom, int param, unsigned long value)
-{
-    DECLARE_HYPERCALL;
-    xen_hvm_param_t arg;
-    int rc;
-
-    hypercall.op = __HYPERVISOR_hvm_op;
-    hypercall.arg[0] = HVMOP_set_param;
-    hypercall.arg[1] = (unsigned long)&arg;
-
-    arg.domid = dom;
-    arg.index = param;
-    arg.value = value;
-
-    if (lock_pages(&arg, sizeof(arg)) != 0)
-        return -1;
-
-    rc = do_xen_hypercall(handle, &hypercall);
-    unlock_pages(&arg, sizeof(arg));
-
-    return rc;
-}
-
-int 
-xc_get_hvm_param(int handle, domid_t dom, int param, unsigned long *value)
-{
-    DECLARE_HYPERCALL;
-    xen_hvm_param_t arg;
-    int rc;
-
-    hypercall.op = __HYPERVISOR_hvm_op;
-    hypercall.arg[0] = HVMOP_get_param;
-    hypercall.arg[1] = (unsigned long)&arg;
-
-    arg.domid = dom;
-    arg.index = param;
-
-    if (lock_pages(&arg, sizeof(arg)) != 0)
-        return -1;
-
-    rc = do_xen_hypercall(handle, &hypercall);
-    unlock_pages(&arg, sizeof(arg));
-
-    *value = arg.value;
-    return rc;
-}
-
 #define HOB_SIGNATURE         0x3436474953424f48        // "HOBSIG64"
 #define GFW_HOB_START         ((4UL<<30)-(14UL<<20))    // 4G - 14M
 #define GFW_HOB_SIZE          (1UL<<20)                 // 1M
