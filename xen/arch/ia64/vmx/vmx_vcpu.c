@@ -161,10 +161,9 @@ IA64FAULT vmx_vcpu_cover(VCPU *vcpu)
 
 IA64FAULT vmx_vcpu_set_rr(VCPU *vcpu, u64 reg, u64 val)
 {
-    ia64_rr oldrr,newrr;
+    ia64_rr newrr;
     u64 rrval;
 
-    vcpu_get_rr(vcpu, reg, &oldrr.rrval);
     newrr.rrval=val;
     if (newrr.rid >= (1 << vcpu->domain->arch.rid_bits))
         panic_domain (NULL, "use of invalid rid %x\n", newrr.rid);
