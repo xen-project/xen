@@ -36,6 +36,7 @@
 #define TRC_DOM0OP   0x0004f000    /* Xen DOM0 operation trace */
 #define TRC_HVM      0x0008f000    /* Xen HVM trace            */
 #define TRC_MEM      0x0010f000    /* Xen memory trace         */
+#define TRC_PV       0x0020f000    /* Xen PV traces            */
 #define TRC_ALL      0x0ffff000
 #define TRC_HD_TO_EVENT(x) ((x)&0x0fffffff)
 #define TRC_HD_CYCLE_FLAG (1UL<<31)
@@ -73,6 +74,20 @@
 #define TRC_MEM_PAGE_GRANT_MAP      (TRC_MEM + 1)
 #define TRC_MEM_PAGE_GRANT_UNMAP    (TRC_MEM + 2)
 #define TRC_MEM_PAGE_GRANT_TRANSFER (TRC_MEM + 3)
+
+#define TRC_PV_HYPERCALL             (TRC_PV +  1)
+#define TRC_PV_TRAP                  (TRC_PV +  3)
+#define TRC_PV_PAGE_FAULT            (TRC_PV +  4)
+#define TRC_PV_FORCED_INVALID_OP     (TRC_PV +  5)
+#define TRC_PV_EMULATE_PRIVOP        (TRC_PV +  6)
+#define TRC_PV_EMULATE_4GB           (TRC_PV +  7)
+#define TRC_PV_MATH_STATE_RESTORE    (TRC_PV +  8)
+#define TRC_PV_PAGING_FIXUP          (TRC_PV +  9)
+#define TRC_PV_GDT_LDT_MAPPING_FAULT (TRC_PV + 10)
+#define TRC_PV_PTWR_EMULATION        (TRC_PV + 11)
+#define TRC_PV_PTWR_EMULATION_PAE    (TRC_PV + 12)
+  /* Indicates that addresses in trace record are 64 bits */
+#define TRC_PV_64_FLAG               (0x100) 
 
 /* trace events per subclass */
 #define TRC_HVM_VMENTRY         (TRC_HVM_ENTRYEXIT + 0x01)

@@ -194,6 +194,12 @@ ENTRY(hypercall)
         pushl 20(%esp) # ECX
         pushl 20(%esp) # EBX
 #endif
+        cmpb  $0,tb_init_done
+        je    tracing_off
+        call  trace_hypercall
+        /* Now restore all the registers that trace_hypercall clobbered */
+        movl  UREGS_eax+24(%esp),%eax /* Hypercall # */
+tracing_off:
         call *hypercall_table(,%eax,4)
         addl  $24,%esp     # Discard the shadow parameters
 #ifndef NDEBUG

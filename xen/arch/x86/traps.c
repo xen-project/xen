@@ -46,6 +46,7 @@
 #include <xen/nmi.h>
 #include <xen/version.h>
 #include <xen/kexec.h>
+#include <xen/trace.h>
 #include <asm/paging.h>
 #include <asm/system.h>
 #include <asm/io.h>
@@ -380,6 +381,8 @@ static int do_guest_trap(
     struct trap_bounce *tb;
     const struct trap_info *ti;
 
+    trace_pv_trap(trapnr, regs->eip, use_error_code, regs->error_code);
+
     tb = &v->arch.trap_bounce;
     ti = &v->arch.guest_context.trap_ctxt[trapnr];
 
@@ -633,6 +636,8 @@ static int emulate_forced_invalid_op(struct cpu_user_regs *regs)
     regs->eip = eip;
     regs->eflags &= ~X86_EFLAGS_RF;
 
+    trace_trap_one_addr(TRC_PV_FORCED_INVALID_OP, regs->eip);
+
     return EXCRET_fault_fixed;
 }
 
@@ -752,6 +757,8 @@ void propagate_page_fault(unsigned long addr, u16 error_code)
     if ( !guest_kernel_mode(v, guest_cpu_user_regs()) )
         error_code |= PFEC_user_mode;
 
+    trace_pv_page_fault(addr, error_code);
+
     ti = &v->arch.guest_context.trap_ctxt[TRAP_page_fault];
     tb->flags = TBF_EXCEPTION | TBF_EXCEPTION_ERRCODE;
     tb->error_code = error_code;
@@ -783,7 +790,13 @@ static int handle_gdt_ldt_mapping_fault(
     if ( likely(is_ldt_area) )
     {
         /* LDT fault: Copy a mapping from the guest's LDT, if it is valid. */
-        if ( unlikely(map_ldt_shadow_page(offset >> PAGE_SHIFT) == 0) )
+        if ( likely(map_ldt_shadow_page(offset >> PAGE_SHIFT)) )
+        {
+            if ( guest_mode(regs) )
+                trace_trap_two_addr(TRC_PV_GDT_LDT_MAPPING_FAULT,
+                                    regs->eip, offset);
+        }
+        else
         {
             /* In hypervisor mode? Leave it to the #PF handler to fix up. */
             if ( !guest_mode(regs) )
@@ -939,7 +952,12 @@ static int fixup_page_fault(unsigned long addr, struct cpu_user_regs *regs)
     if ( unlikely(IN_HYPERVISOR_RANGE(addr)) )
     {
         if ( paging_mode_external(d) && guest_mode(regs) )
-            return paging_fault(addr, regs);
+        {
+            int ret = paging_fault(addr, regs);
+            if ( ret == EXCRET_fault_fixed )
+                trace_trap_two_addr(TRC_PV_PAGING_FIXUP, regs->eip, addr);
+            return ret;
+        }
         if ( (addr >= GDT_LDT_VIRT_START) && (addr < GDT_LDT_VIRT_END) )
             return handle_gdt_ldt_mapping_fault(
                 addr - GDT_LDT_VIRT_START, regs);
@@ -955,7 +973,12 @@ static int fixup_page_fault(unsigned long addr, struct cpu_user_regs *regs)
         return EXCRET_fault_fixed;
 
     if ( paging_mode_enabled(d) )
-        return paging_fault(addr, regs);
+    {
+        int ret = paging_fault(addr, regs);
+        if ( ret == EXCRET_fault_fixed )
+            trace_trap_two_addr(TRC_PV_PAGING_FIXUP, regs->eip, addr);
+        return ret;
+    }
 
     return 0;
 }
@@ -1872,13 +1895,19 @@ asmlinkage int do_general_protection(struct cpu_user_regs *regs)
     /* Emulate some simple privileged and I/O instructions. */
     if ( (regs->error_code == 0) &&
          emulate_privileged_op(regs) )
+    {
+        trace_trap_one_addr(TRC_PV_EMULATE_PRIVOP, regs->eip);
         return 0;
+    }
 
 #if defined(__i386__)
     if ( VM_ASSIST(v->domain, VMASST_TYPE_4gb_segments) && 
          (regs->error_code == 0) && 
          gpf_emulate_4gb(regs) )
+    {
+        TRACE_1D(TRC_PV_EMULATE_4GB, regs->eip);
         return 0;
+    }
 #endif
 
     /* Pass on GPF as is. */
@@ -2030,6 +2059,8 @@ asmlinkage int do_device_not_available(struct cpu_user_regs *regs)
         do_guest_trap(TRAP_no_device, regs, 0);
         current->arch.guest_context.ctrlreg[0] &= ~X86_CR0_TS;
     }
+    else
+        TRACE_0D(TRC_PV_MATH_STATE_RESTORE);
 
     return EXCRET_fault_fixed;
 }

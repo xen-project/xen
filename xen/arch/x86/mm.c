@@ -111,6 +111,7 @@
 #include <asm/shared.h>
 #include <public/memory.h>
 #include <xsm/xsm.h>
+#include <xen/trace.h>
 
 #define MEM_LOG(_f, _a...) gdprintk(XENLOG_WARNING , _f "\n" , ## _a)
 
@@ -3401,6 +3402,8 @@ static int ptwr_emulated_update(
         if ( !UPDATE_ENTRY(l1, pl1e, ol1e, nl1e, mfn, v) )
             BUG();
     }
+
+    trace_ptwr_emulation(addr, nl1e);
 
     unmap_domain_page(pl1e);
 

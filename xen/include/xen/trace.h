@@ -21,11 +21,12 @@
 #ifndef __XEN_TRACE_H__
 #define __XEN_TRACE_H__
 
+extern int tb_init_done;
+
 #include <xen/config.h>
 #include <public/sysctl.h>
 #include <public/trace.h>
-
-extern int tb_init_done;
+#include <asm/trace.h>
 
 /* Used to initialise trace buffer functionality */
 void init_trace_bufs(void);
