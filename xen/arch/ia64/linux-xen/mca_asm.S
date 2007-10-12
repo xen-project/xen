@@ -185,6 +185,41 @@
 3:	add r4 = r6, r3;;					\
 	ld8 r4 = [r4];;						\
 	mov ar.k3=r4
+
+/*
+ * GET_VA_VCPU_VHPT_MADDR() emulates 'reg = __va_ul(vcpu_vhpt_maddr(v))'.
+ */
+#ifdef CONFIG_XEN_IA64_PERVCPU_VHPT
+#define HAS_PERVCPU_VHPT_MASK	0x2
+#define GET_VA_VCPU_VHPT_MADDR(reg,tmp)				\
+	GET_THIS_PADDR(reg,cpu_kr);;				\
+	add reg=IA64_KR_CURRENT_OFFSET,reg;;			\
+	ld8 reg=[reg];;						\
+	dep tmp=0,reg,60,4;;			/* V to P */	\
+	add tmp=IA64_VCPU_DOMAIN_OFFSET,tmp;;			\
+	ld8 tmp=[tmp];;						\
+	dep tmp=0,tmp,60,4;;			/* V to P */	\
+	add tmp=IA64_DOMAIN_FLAGS_OFFSET,tmp;;			\
+	ld8 tmp=[tmp];;						\
+	and tmp=HAS_PERVCPU_VHPT_MASK,tmp;;			\
+	cmp.eq p6,p0=tmp,r0;					\
+(p6)	br.cond.sptk 1f;					\
+	add reg=IA64_VCPU_VHPT_MADDR_OFFSET,reg;;		\
+	dep reg=0,reg,60,4;;			/* V to P */	\
+	ld8 reg=[reg];;						\
+	dep reg=-1,reg,60,4;			/* P to V */	\
+	br.sptk	2f;						\
+1:								\
+	GET_THIS_PADDR(reg, vhpt_paddr);;			\
+	ld8 reg=[reg];;						\
+	dep reg=-1,reg,60,4;			/* P to V */	\
+2:
+#else /* CONFIG_XEN_IA64_PERVCPU_VHPT */
+#define GET_VA_VCPU_VHPT_MADDR(reg,tmp)				\
+	GET_THIS_PADDR(reg, vhpt_paddr);;			\
+	ld8 reg=[reg];;						\
+	dep reg=-1,reg,60,4			/* P to V */
+#endif /* CONFIG_XEN_IA64_PERVCPU_VHPT */
 #endif	/* XEN */
 
 /*
@@ -290,33 +325,8 @@ ia64_do_tlb_purge:
 	;;
 #ifdef XEN
 	// 5. VHPT
-	// r2 = __va_ul(vcpu_vhpt_maddr(v));
 #if VHPT_ENABLED
-	GET_THIS_PADDR(r2,cpu_kr);;
-	add r2=IA64_KR_CURRENT_OFFSET,r2;;
-	ld8 r2=[r2];;
-#ifdef CONFIG_XEN_IA64_PERVCPU_VHPT
-#define HAS_PERVCPU_VHPT_MASK	0x2
-	dep r3=0,r2,60,4;;			// virtual to physical
-	add r3=IA64_VCPU_DOMAIN_OFFSET,r3;;
-	ld8 r3=[r3];; 
-	dep r3=0,r3,60,4;;			// virtual to physical
-	add r3=IA64_DOMAIN_FLAGS_OFFSET,r3;;
-	ld8 r3=[r3];; 
-	and r3=HAS_PERVCPU_VHPT_MASK,r3;;
-	cmp.eq p6,p0=r3,r0;;
-(p6)	br.cond.sptk	.not_pervcpu_vhpt
-	add r2=IA64_VCPU_VHPT_MADDR_OFFSET,r2;;
-	dep r2=0,r2,60,4;;			// virtual to physical
-	ld8 r2=[r2];; 
-	dep r2=-1,r2,60,4;;			// physical to virtual
-	br.sptk		.percpu_vhpt_done
-#endif
-.not_pervcpu_vhpt:
-	GET_THIS_PADDR(r2, vhpt_paddr);; 
-	ld8 r2=[r2];; 
-	dep r2=-1,r2,60,4;;			// physical to virtual
-.percpu_vhpt_done:
+	GET_VA_VCPU_VHPT_MADDR(r2,r3);;
 	dep r16=0,r2,0,IA64_GRANULE_SHIFT
 	mov r18=IA64_GRANULE_SHIFT<<2
 	;;
@@ -443,7 +453,27 @@ ia64_reload_tr:
 	srlz.i
 	;;
 	// 4. Reload DTR for stack.
+#ifdef XEN
+	// avoid overlapping with kernel TR
+	movl r17=KERNEL_START
+	GET_THIS_PADDR(r2,cpu_kr);;
+	add r2=IA64_KR_CURRENT_OFFSET,r2;;
+	ld8 r16=[r2];;
+	;;
+	dep  r16=0,r16,0,KERNEL_TR_PAGE_SHIFT
+	;;
+	cmp.eq p7,p0=r17,r16
+(p7)	br.cond.sptk	.reload_vhpt
+	
+	// Kernel registers are saved in a per_cpu cpu_kr_ia64_t
+	// to allow the kernel registers themselves to be used by domains.
+	GET_THIS_PADDR(r2, cpu_kr);;
+	add r2=IA64_KR_CURRENT_STACK_OFFSET,r2
+	;;
+	ld8 r16=[r2]
+#else
 	mov r16=IA64_KR(CURRENT_STACK)
+#endif
 	;;
 	shl r16=r16,IA64_GRANULE_SHIFT
 	movl r19=PAGE_OFFSET
@@ -463,22 +493,23 @@ ia64_reload_tr:
 	srlz.d
 	;;
 #ifdef XEN
+.reload_vhpt:
 	// 5. VHPT
 #if VHPT_ENABLED
-	// r25 = __va_ul(vcpu_vhpt_maddr(v));
-	dep r20=0,r25,0,IA64_GRANULE_SHIFT
-	movl r26=PAGE_KERNEL
+	GET_VA_VCPU_VHPT_MADDR(r2,r3);;
+	dep r16=0,r2,0,IA64_GRANULE_SHIFT
+	movl r20=PAGE_KERNEL
 	;;
-	mov r21=IA64_TR_VHPT
-	dep r22=0,r20,60,4		// physical address of
+	mov r18=IA64_TR_VHPT
+	dep r17=0,r16,60,4		// physical address of
 	                                // va_vhpt & ~(IA64_GRANULE_SIZE - 1)
-	mov r24=IA64_GRANULE_SHIFT<<2
+	mov r19=IA64_GRANULE_SHIFT<<2
 	;;
-	or r23=r22,r26			// construct PA | page properties
-	mov cr.itir=r24
-	mov cr.ifa=r20
+	or r17=r17,r20			// construct PA | page properties
+	mov cr.itir=r19
+	mov cr.ifa=r16
 	;;
-	itr.d dtr[r21]=r23		// wire in new mapping...
+	itr.d dtr[r18]=r17		// wire in new mapping...
 	;;
 	srlz.d
 	;;
