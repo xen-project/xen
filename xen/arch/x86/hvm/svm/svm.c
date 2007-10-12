@@ -999,8 +999,9 @@ static void svm_vmexit_do_cpuid(struct vmcb_struct *vmcb,
 
     hvm_cpuid(input, &eax, &ebx, &ecx, &edx);
 
-    if ( input == 0x00000001 )
+    switch ( input )
     {
+    case 0x00000001:
         /* Clear out reserved bits. */
         ecx &= ~SVM_VCPU_CPUID_L1_ECX_RESERVED;
         edx &= ~SVM_VCPU_CPUID_L1_EDX_RESERVED;
@@ -1008,50 +1009,56 @@ static void svm_vmexit_do_cpuid(struct vmcb_struct *vmcb,
         /* Guest should only see one logical processor.
          * See details on page 23 of AMD CPUID Specification.
          */
-        clear_bit(X86_FEATURE_HT & 31, &edx);  /* clear the hyperthread bit */
+        __clear_bit(X86_FEATURE_HT & 31, &edx);
         ebx &= 0xFF00FFFF;  /* clear the logical processor count when HTT=0 */
         ebx |= 0x00010000;  /* set to 1 just for precaution */
-    }
-    else if ( input == 0x80000001 )
-    {
+        break;
+
+    case 0x80000001:
         if ( vlapic_hw_disabled(vcpu_vlapic(v)) )
-            clear_bit(X86_FEATURE_APIC & 31, &edx);
+            __clear_bit(X86_FEATURE_APIC & 31, &edx);
 
 #if CONFIG_PAGING_LEVELS >= 3
         if ( !v->domain->arch.hvm_domain.params[HVM_PARAM_PAE_ENABLED] )
 #endif
-            clear_bit(X86_FEATURE_PAE & 31, &edx);
+            __clear_bit(X86_FEATURE_PAE & 31, &edx);
 
-        clear_bit(X86_FEATURE_PSE36 & 31, &edx);
+        __clear_bit(X86_FEATURE_PSE36 & 31, &edx);
 
         /* Clear the Cmp_Legacy bit
          * This bit is supposed to be zero when HTT = 0.
          * See details on page 23 of AMD CPUID Specification.
          */
-        clear_bit(X86_FEATURE_CMP_LEGACY & 31, &ecx);
+        __clear_bit(X86_FEATURE_CMP_LEGACY & 31, &ecx);
 
         /* Make SVM feature invisible to the guest. */
-        clear_bit(X86_FEATURE_SVME & 31, &ecx);
+        __clear_bit(X86_FEATURE_SVME & 31, &ecx);
+        __clear_bit(X86_FEATURE_SKINIT & 31, &ecx);
+
+        __clear_bit(X86_FEATURE_OSVW & 31, &ecx);
+        __clear_bit(X86_FEATURE_WDT & 31, &ecx);
 
         /* So far, we do not support 3DNow for the guest. */
-        clear_bit(X86_FEATURE_3DNOW & 31, &edx);
-        clear_bit(X86_FEATURE_3DNOWEXT & 31, &edx);
-    }
-    else if ( input == 0x80000007 || input == 0x8000000A )
-    {
+        __clear_bit(X86_FEATURE_3DNOW & 31, &edx);
+        __clear_bit(X86_FEATURE_3DNOWEXT & 31, &edx);
+        break;
+
+    case 0x80000007:
+    case 0x8000000A:
         /* Mask out features of power management and SVM extension. */
         eax = ebx = ecx = edx = 0;
-    }
-    else if ( input == 0x80000008 )
-    {
+        break;
+
+    case 0x80000008:
         /* Make sure Number of CPU core is 1 when HTT=0 */
         ecx &= 0xFFFFFF00;
+        break;
     }
 
-    regs->eax = (unsigned long)eax;
-    regs->ebx = (unsigned long)ebx;
-    regs->ecx = (unsigned long)ecx;
-    regs->edx = (unsigned long)edx;
+    regs->eax = eax;
+    regs->ebx = ebx;
+    regs->ecx = ecx;
+    regs->edx = edx;
 
     HVMTRACE_3D(CPUID, v, input,
                 ((uint64_t)eax << 32) | ebx, ((uint64_t)ecx << 32) | edx);

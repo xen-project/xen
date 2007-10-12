@@ -1253,16 +1253,10 @@ static void vmx_do_no_device_fault(void)
 #define bitmaskof(idx)  (1U << ((idx) & 31))
 static void vmx_do_cpuid(struct cpu_user_regs *regs)
 {
-    unsigned int input = (unsigned int)regs->eax;
-    unsigned int count = (unsigned int)regs->ecx;
+    unsigned int input = regs->eax;
     unsigned int eax, ebx, ecx, edx;
 
-    if ( input == 0x00000004 )
-    {
-        cpuid_count(input, count, &eax, &ebx, &ecx, &edx);
-        eax &= NUM_CORES_RESET_MASK;
-    }
-    else if ( input == 0x40000003 )
+    if ( input == 0x40000003 )
     {
         /*
          * NB. Unsupported interface for private use of VMXASSIST only.
@@ -1292,37 +1286,44 @@ static void vmx_do_cpuid(struct cpu_user_regs *regs)
         unmap_domain_page(p);
 
         gdprintk(XENLOG_INFO, "Output value is 0x%"PRIx64".\n", value);
-        ecx = (u32)value;
-        edx = (u32)(value >> 32);
-    } else {
-        hvm_cpuid(input, &eax, &ebx, &ecx, &edx);
-
-        if ( input == 0x00000001 )
-        {
-            /* Mask off reserved bits. */
-            ecx &= ~VMX_VCPU_CPUID_L1_ECX_RESERVED;
-
-            ebx &= NUM_THREADS_RESET_MASK;
-
-            /* Unsupportable for virtualised CPUs. */
-            ecx &= ~(bitmaskof(X86_FEATURE_VMXE) |
-                     bitmaskof(X86_FEATURE_EST)  |
-                     bitmaskof(X86_FEATURE_TM2)  |
-                     bitmaskof(X86_FEATURE_CID));
-
-            edx &= ~(bitmaskof(X86_FEATURE_HT)   |
-                     bitmaskof(X86_FEATURE_ACPI) |
-                     bitmaskof(X86_FEATURE_ACC));
-        }
-
-        if ( input == 0x00000006 || input == 0x00000009 || input == 0x0000000A )
-            eax = ebx = ecx = edx = 0x0;
+        regs->ecx = (u32)value;
+        regs->edx = (u32)(value >> 32);
+        return;
     }
 
-    regs->eax = (unsigned long)eax;
-    regs->ebx = (unsigned long)ebx;
-    regs->ecx = (unsigned long)ecx;
-    regs->edx = (unsigned long)edx;
+    hvm_cpuid(input, &eax, &ebx, &ecx, &edx);
+
+    switch ( input )
+    {
+    case 0x00000001:
+        ecx &= ~VMX_VCPU_CPUID_L1_ECX_RESERVED;
+        ebx &= NUM_THREADS_RESET_MASK;
+        ecx &= ~(bitmaskof(X86_FEATURE_VMXE) |
+                 bitmaskof(X86_FEATURE_EST)  |
+                 bitmaskof(X86_FEATURE_TM2)  |
+                 bitmaskof(X86_FEATURE_CID)  |
+                 bitmaskof(X86_FEATURE_PDCM));
+        edx &= ~(bitmaskof(X86_FEATURE_HT)   |
+                 bitmaskof(X86_FEATURE_ACPI) |
+                 bitmaskof(X86_FEATURE_ACC));
+        break;
+
+    case 0x00000004:
+        cpuid_count(input, regs->ecx, &eax, &ebx, &ecx, &edx);
+        eax &= NUM_CORES_RESET_MASK;
+        break;
+
+    case 0x00000006:
+    case 0x00000009:
+    case 0x0000000A:
+        eax = ebx = ecx = edx = 0;
+        break;
+    }
+
+    regs->eax = eax;
+    regs->ebx = ebx;
+    regs->ecx = ecx;
+    regs->edx = edx;
 
     HVMTRACE_3D(CPUID, current, input,
                 ((uint64_t)eax << 32) | ebx, ((uint64_t)ecx << 32) | edx);
