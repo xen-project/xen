@@ -31,7 +31,7 @@
 #define X86_FEATURE_PSE36	(0*32+17) /* 36-bit PSEs */
 #define X86_FEATURE_PN		(0*32+18) /* Processor serial number */
 #define X86_FEATURE_CLFLSH	(0*32+19) /* Supports the CLFLUSH instruction */
-#define X86_FEATURE_DTES	(0*32+21) /* Debug Trace Store */
+#define X86_FEATURE_DS		(0*32+21) /* Debug Store */
 #define X86_FEATURE_ACPI	(0*32+22) /* ACPI via MSR */
 #define X86_FEATURE_MMX		(0*32+23) /* Multimedia Extensions */
 #define X86_FEATURE_FXSR	(0*32+24) /* FXSAVE and FXRSTOR instructions (fast save and restore */
@@ -90,6 +90,12 @@
 #define X86_FEATURE_XSTORE_EN	(5*32+ 3) /* on-CPU RNG enabled */
 #define X86_FEATURE_XCRYPT	(5*32+ 6) /* on-CPU crypto (xcrypt insn) */
 #define X86_FEATURE_XCRYPT_EN	(5*32+ 7) /* on-CPU crypto enabled */
+#define X86_FEATURE_ACE2	(5*32+ 8) /* Advanced Cryptography Engine v2 */
+#define X86_FEATURE_ACE2_EN	(5*32+ 9) /* ACE v2 enabled */
+#define X86_FEATURE_PHE		(5*32+ 10) /* PadLock Hash Engine */
+#define X86_FEATURE_PHE_EN	(5*32+ 11) /* PHE enabled */
+#define X86_FEATURE_PMM		(5*32+ 12) /* PadLock Montgomery Multiplier */
+#define X86_FEATURE_PMM_EN	(5*32+ 13) /* PMM enabled */
 
 /* More extended AMD flags: CPUID level 0x80000001, ecx, word 6 */
 #define X86_FEATURE_LAHF_LM	(6*32+ 0) /* LAHF/SAHF in long mode */
