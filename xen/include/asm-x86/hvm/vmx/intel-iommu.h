@@ -145,6 +145,10 @@
 #define DMA_GSTS_QIES   (((u64)1) <<26)
 #define DMA_GSTS_IRES   (((u64)1) <<25)
 
+/* PMEN_REG */
+#define DMA_PMEN_EPM   (((u32)1) << 31)
+#define DMA_PMEN_PRS   (((u32)1) << 1)
+
 /* CCMD_REG */
 #define DMA_CCMD_INVL_GRANU_OFFSET  61
 #define DMA_CCMD_ICC (((u64)1) << 63)

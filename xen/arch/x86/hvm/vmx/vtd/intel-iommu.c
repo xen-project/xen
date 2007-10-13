@@ -40,13 +40,6 @@ extern void print_iommu_regs(struct acpi_drhd_unit *drhd);
 extern void print_vtd_entries(struct domain *d, int bus, int devfn,
                               unsigned long gmfn);
 
-#define DMAR_OPERATION_TIMEOUT (HZ*60) /* 1m */
-
-#define time_after(a,b)         \
-        (typecheck(unsigned long, a) && \
-         typecheck(unsigned long, b) && \
-         ((long)(b) - (long)(a) < 0))
-
 unsigned int x86_clflush_size;
 void clflush_cache_range(void *adr, int size)
 {
@@ -1774,7 +1767,7 @@ int iommu_setup(void)
     struct hvm_iommu *hd  = domain_hvm_iommu(dom0);
     struct acpi_drhd_unit *drhd;
     struct iommu *iommu;
-    unsigned long i;
+    unsigned long i, status;
 
     if ( !vtd_enabled )
         return 0;
@@ -1803,6 +1796,10 @@ int iommu_setup(void)
     setup_dom0_rmrr();
     if ( enable_vtd_translation() )
         goto error;
+
+    status = dmar_readl(iommu->reg, DMAR_PMEN_REG);
+    if (status & DMA_PMEN_PRS)
+        disable_pmr(iommu);
 
     return 0;
 
