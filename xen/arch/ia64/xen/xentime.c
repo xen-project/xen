@@ -42,6 +42,9 @@ static s_time_t        stime_irq = 0x0;       /* System time at last 'time updat
 unsigned long itc_scale __read_mostly, ns_scale __read_mostly;
 unsigned long itc_at_irq;
 
+static u32 wc_sec, wc_nsec; /* UTC time at last 'time update'. */
+static void ia64_wallclock_set(void);
+
 /* We don't expect an absolute cycle value here, since then no way
  * to prevent overflow for large norminator. Normally this conversion
  * is used for relative offset.
@@ -196,11 +199,35 @@ ia64_time_init (void)
 	ia64_init_itm();
 }
 
+/* wallclock set from efi.get_time */
+static void ia64_wallclock_set()
+{
+    efi_time_t tv;
+    efi_time_cap_t tc;
+    efi_status_t status = 0;
+
+    status = (*efi.get_time)(&tv, &tc);
+    if (status != 0) {
+        wc_sec = 0; wc_nsec = 0;
+        printk("EFIRTC Get Time failed\n");
+        return;
+    }
+
+    wc_sec  = mktime(tv.year, tv.month, tv.day, tv.hour, tv.minute, tv.second);
+    wc_nsec = tv.nanosecond;
+    if (tv.timezone != EFI_UNSPECIFIED_TIMEZONE) {
+        wc_sec -= tv.timezone * 60;
+        printk("Time Zone is %d minutes difference from UTC\n", tv.timezone);
+    } else {
+        printk("Time Zone is not specified on EFIRTC\n");
+    }
+}
 
 /* Late init function (after all CPUs are booted). */
 int __init init_xen_time()
 {
     ia64_time_init();
+    ia64_wallclock_set();
     itc_scale  = 1000000000UL << 32 ;
     itc_scale /= local_cpu_data->itc_freq;
     ns_scale = (local_cpu_data->itc_freq << 32) / 1000000000UL;
@@ -243,3 +270,18 @@ void send_timer_event(struct vcpu *v)
 	send_guest_vcpu_virq(v, VIRQ_TIMER);
 }
 
+/* This is taken from xen/arch/x86/time.c.
+ * and the value is replaced 
+ * from 1000000000ull to NSEC_PER_SEC.
+ */
+struct tm wallclock_time(void)
+{
+    uint64_t seconds;
+
+    if (!wc_sec)
+        return (struct tm) { 0 };
+
+    seconds = NOW() + (wc_sec * NSEC_PER_SEC) + wc_nsec;
+    do_div(seconds, NSEC_PER_SEC);
+    return gmtime(seconds);
+}
