@@ -106,7 +106,7 @@ restore_all_xen:
  * When entering SYSCALL from kernel mode:
  *  %rax                            = hypercall vector
  *  %rdi, %rsi, %rdx, %r10, %r8, %9 = hypercall arguments
- *  %r11, %rcx                      = SYSCALL-saved %rflags and %rip
+ *  %rcx                            = SYSCALL-saved %rip
  *  NB. We must move %r10 to %rcx for C function-calling ABI.
  *
  * When entering SYSCALL from user mode:
@@ -125,6 +125,7 @@ ENTRY(syscall_enter)
         pushq %rcx
         pushq $0
         movl  $TRAP_syscall,4(%rsp)
+        movq  24(%rsp),%r11 /* Re-load user RFLAGS into %r11 before SAVE_ALL */
         SAVE_ALL
         GET_CURRENT(%rbx)
         testb $TF_kernel_mode,VCPU_thread_flags(%rbx)
