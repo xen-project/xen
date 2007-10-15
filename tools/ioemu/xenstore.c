@@ -82,7 +82,7 @@ void xenstore_parse_domain_config(int domid)
     char **e = NULL;
     char *buf = NULL, *path;
     char *fpath = NULL, *bpath = NULL,
-        *dev = NULL, *params = NULL, *type = NULL;
+        *dev = NULL, *params = NULL, *type = NULL, *drv = NULL;
     int i, is_scsi;
     unsigned int len, num, hd_index;
 
@@ -123,6 +123,14 @@ void xenstore_parse_domain_config(int domid)
         dev = xs_read(xsh, XBT_NULL, buf, &len);
         if (dev == NULL)
             continue;
+        /* Change xvdN to look like hdN */
+        if (!strncmp(dev, "xvd", 3 )) {
+            fprintf(logfile, "Change xvd%c to look like hd%c\n",
+                    dev[3], dev[3]);
+            memmove(dev, dev+1, strlen(dev));
+            dev[0] = 'h';
+            dev[1] = 'd';
+        }
         is_scsi = !strncmp(dev, "sd", 2);
         if ((strncmp(dev, "hd", 2) && !is_scsi) || strlen(dev) != 3 )
             continue;
@@ -140,6 +148,22 @@ void xenstore_parse_domain_config(int domid)
         params = xs_read(xsh, XBT_NULL, buf, &len);
         if (params == NULL)
             continue;
+        /* read the name of the device */
+        if (pasprintf(&buf, "%s/type", bpath) == -1)
+            continue;
+        free(drv);
+        drv = xs_read(xsh, XBT_NULL, buf, &len);
+        if (drv == NULL)
+            continue;
+        /* Strip off blktap sub-type prefix aio: - QEMU can autodetect this */
+        if (!strcmp(drv, "tap") && params[0]) {
+            char *offset = strchr(params, ':'); 
+            if (!offset)
+                continue ;
+            memmove(params, offset+1, strlen(offset+1)+1 );
+            fprintf(logfile, "Strip off blktap sub-type prefix to %s\n", params); 
+        }
+
         /* 
          * check if device has a phantom vbd; the phantom is hooked
          * to the frontend device (for ease of cleanup), so lookup 
@@ -202,6 +226,7 @@ void xenstore_parse_domain_config(int domid)
     free(buf);
     free(path);
     free(e);
+    free(drv);
     return;
 }
 
