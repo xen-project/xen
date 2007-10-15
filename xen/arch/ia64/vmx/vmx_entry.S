@@ -112,7 +112,9 @@ GLOBAL_ENTRY(ia64_leave_nested)
 	;;
 	ld8 r26=[r16],16	// load ar.pfs
 	ld8 r27=[r17],16	// load ar.rsc
+#ifndef XEN
 	cmp.eq p9,p0=r0,r0	// set p9 to indicate that we should restore cr.ifs
+#endif
 	;;
 	ld8 r24=[r16],16	// load ar.rnat (may be garbage)
 	ld8 r23=[r17],16// load ar.bspstore (may be garbage)
@@ -530,7 +532,9 @@ GLOBAL_ENTRY(ia64_leave_hypercall)
     ;;
     invala			// M0|1 invalidate ALAT
     rsm psr.i | psr.ic	// M2   turn off interrupts and interruption collection
+#ifndef XEN
     cmp.eq p9,p0=r0,r0	// A    set p9 to indicate that we should restore cr.ifs
+#endif
 
     ld8 r31=[r2],32		// M0|1 load cr.ipsr
     ld8 r30=[r3],16		// M0|1 load cr.iip

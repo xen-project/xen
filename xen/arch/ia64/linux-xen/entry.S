@@ -787,7 +787,9 @@ ENTRY(ia64_leave_syscall)
 	;;
 	invala			// M0|1 invalidate ALAT
 	rsm psr.i | psr.ic	// M2   turn off interrupts and interruption collection
+#ifndef XEN
 	cmp.eq p9,p0=r0,r0	// A    set p9 to indicate that we should restore cr.ifs
+#endif
 
 	ld8 r29=[r2],16		// M0|1 load cr.ipsr
 	ld8 r28=[r3],16		// M0|1 load cr.iip
@@ -1041,7 +1043,9 @@ GLOBAL_ENTRY(ia64_leave_kernel)
 	;;
 	ld8 r26=[r16],16	// load ar.pfs
 	ld8 r27=[r17],16	// load ar.rsc
+#ifndef XEN	
 	cmp.eq p9,p0=r0,r0	// set p9 to indicate that we should restore cr.ifs
+#endif
 	;;
 	ld8 r24=[r16],16	// load ar.rnat (may be garbage)
 	ld8 r23=[r17],16	// load ar.bspstore (may be garbage)
@@ -1088,7 +1092,9 @@ GLOBAL_ENTRY(ia64_leave_kernel)
 	mov r19=ar.bsp			// get new backing store pointer
 rbs_switch:
 	sub r16=r16,r18			// krbs = old bsp - size of dirty partition
+#ifndef XEN
 	cmp.ne p9,p0=r0,r0		// clear p9 to skip restore of cr.ifs
+#endif
 	;;
 	sub r19=r19,r16			// calculate total byte size of dirty partition
 	add r18=64,r18			// don't force in0-in7 into memory...
