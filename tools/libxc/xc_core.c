@@ -628,7 +628,7 @@ xc_domain_dumpcore_via_callback(int xc_handle,
         PERROR("could not get section headers for .xen_pages");
         goto out;
     }
-    filesz = nr_pages * PAGE_SIZE;
+    filesz = (uint64_t)nr_pages * PAGE_SIZE;
     sts = xc_core_shdr_set(shdr, strtab, XEN_DUMPCORE_SEC_PAGES, SHT_PROGBITS,
                            offset, filesz, PAGE_SIZE, PAGE_SIZE);
     if ( sts != 0 )
@@ -644,7 +644,7 @@ xc_domain_dumpcore_via_callback(int xc_handle,
     }
     if ( !auto_translated_physmap )
     {
-        filesz = nr_pages * sizeof(p2m_array[0]);
+        filesz = (uint64_t)nr_pages * sizeof(p2m_array[0]);
         sts = xc_core_shdr_set(shdr, strtab, XEN_DUMPCORE_SEC_P2M,
                                SHT_PROGBITS,
                                offset, filesz, __alignof__(p2m_array[0]),
@@ -652,7 +652,7 @@ xc_domain_dumpcore_via_callback(int xc_handle,
     }
     else
     {
-        filesz = nr_pages * sizeof(pfn_array[0]);
+        filesz = (uint64_t)nr_pages * sizeof(pfn_array[0]);
         sts = xc_core_shdr_set(shdr, strtab, XEN_DUMPCORE_SEC_PFN,
                                SHT_PROGBITS,
                                offset, filesz, __alignof__(pfn_array[0]),
