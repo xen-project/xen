@@ -318,7 +318,8 @@ void emulate_io_inst(VCPU *vcpu, u64 padr, u64 ma)
     IA64_BUNDLE bundle;
     int slot, dir=0, inst_type;
     size_t size;
-    u64 data, post_update, slot1a, slot1b, temp;
+    u64 data, slot1a, slot1b, temp, update_reg;
+    s32 imm;
     INST64 inst;
 
     regs = vcpu_regs(vcpu);
@@ -355,8 +356,8 @@ void emulate_io_inst(VCPU *vcpu, u64 padr, u64 ma)
         dir = IOREQ_READ;     //write
         size = (inst.M2.x6 & 0x3);
         vcpu_get_gr_nat(vcpu, inst.M2.r3, &temp);
-        vcpu_get_gr_nat(vcpu, inst.M2.r2, &post_update);
-        temp += post_update;
+        vcpu_get_gr_nat(vcpu, inst.M2.r2, &update_reg);
+        temp += update_reg;
         vcpu_set_gr(vcpu, inst.M2.r3, temp, 0);
     }
     // Integer Load/Store + Imm update
@@ -367,20 +368,16 @@ void emulate_io_inst(VCPU *vcpu, u64 padr, u64 ma)
             dir = IOREQ_WRITE;     // write
             vcpu_get_gr_nat(vcpu, inst.M5.r2, &data);
             vcpu_get_gr_nat(vcpu, inst.M5.r3, &temp);
-            post_update = (inst.M5.i << 7) + inst.M5.imm7;
-            if (inst.M5.s)
-                temp -= post_update;
-            else
-                temp += post_update;
+            imm =
+                (inst.M5.s << 31) | (inst.M5.i << 30) | (inst.M5.imm7 << 23);
+            temp += imm >> 23;
             vcpu_set_gr(vcpu, inst.M5.r3, temp, 0);
         } else if ((inst.M3.x6 >> 2) < 0xb) {   // read
             dir = IOREQ_READ;
             vcpu_get_gr_nat(vcpu, inst.M3.r3, &temp);
-            post_update = (inst.M3.i << 7) + inst.M3.imm7;
-            if (inst.M3.s)
-                temp -= post_update;
-            else
-                temp += post_update;
+            imm =
+                (inst.M3.s << 31) | (inst.M3.i << 30) | (inst.M3.imm7 << 23);
+            temp += imm >> 23;
             vcpu_set_gr(vcpu, inst.M3.r3, temp, 0);
         }
     }
@@ -407,11 +404,9 @@ void emulate_io_inst(VCPU *vcpu, u64 padr, u64 ma)
         dir = IOREQ_WRITE;
         vcpu_get_fpreg(vcpu, inst.M10.f2, &v);
         vcpu_get_gr_nat(vcpu, inst.M10.r3, &temp);
-        post_update = (inst.M10.i << 7) + inst.M10.imm7;
-        if (inst.M10.s)
-            temp -= post_update;
-        else
-            temp += post_update;
+        imm =
+            (inst.M10.s << 31) | (inst.M10.i << 30) | (inst.M10.imm7 << 23);
+        temp += imm >> 23;
         vcpu_set_gr(vcpu, inst.M10.r3, temp, 0);
 
         /* Write high word.
@@ -431,11 +426,9 @@ void emulate_io_inst(VCPU *vcpu, u64 padr, u64 ma)
         vcpu_get_fpreg(vcpu, inst.M10.f2, &v);
         data = v.u.bits[0]; /* Significand.  */
         vcpu_get_gr_nat(vcpu, inst.M10.r3, &temp);
-        post_update = (inst.M10.i << 7) + inst.M10.imm7;
-        if (inst.M10.s)
-            temp -= post_update;
-        else
-            temp += post_update;
+        imm =
+            (inst.M10.s << 31) | (inst.M10.i << 30) | (inst.M10.imm7 << 23);
+        temp += imm >> 23;
         vcpu_set_gr(vcpu, inst.M10.r3, temp, 0);
     }
 //    else if(inst.M6.major==6&&inst.M6.m==0&&inst.M6.x==0&&inst.M6.x6==3){
@@ -446,11 +439,9 @@ void emulate_io_inst(VCPU *vcpu, u64 padr, u64 ma)
     //  lfetch - do not perform accesses.
     else if (inst.M15.major== 7 && inst.M15.x6 >=0x2c && inst.M15.x6 <= 0x2f) {
         vcpu_get_gr_nat(vcpu, inst.M15.r3, &temp);
-        post_update = (inst.M15.i << 7) + inst.M15.imm7;
-        if (inst.M15.s)
-            temp -= post_update;
-        else
-            temp += post_update;
+        imm =
+            (inst.M15.s << 31) | (inst.M15.i << 30) | (inst.M15.imm7 << 23);
+        temp += imm >> 23;
         vcpu_set_gr(vcpu, inst.M15.r3, temp, 0);
 
         vcpu_increment_iip(vcpu);
