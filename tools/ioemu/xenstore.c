@@ -83,7 +83,7 @@ void xenstore_parse_domain_config(int domid)
     char *buf = NULL, *path;
     char *fpath = NULL, *bpath = NULL,
         *dev = NULL, *params = NULL, *type = NULL, *drv = NULL;
-    int i, is_scsi;
+    int i, is_scsi, is_hdN = 0;
     unsigned int len, num, hd_index;
 
     for(i = 0; i < MAX_DISKS + MAX_SCSI_DISKS; i++)
@@ -123,8 +123,29 @@ void xenstore_parse_domain_config(int domid)
         dev = xs_read(xsh, XBT_NULL, buf, &len);
         if (dev == NULL)
             continue;
+        if (!strncmp(dev, "hd", 2)) {
+            is_hdN = 1;
+            break;
+        }
+    }
+        
+    for (i = 0; i < num; i++) {
+        /* read the backend path */
+        if (pasprintf(&buf, "%s/device/vbd/%s/backend", path, e[i]) == -1)
+            continue;
+        free(bpath);
+        bpath = xs_read(xsh, XBT_NULL, buf, &len);
+        if (bpath == NULL)
+            continue;
+        /* read the name of the device */
+        if (pasprintf(&buf, "%s/dev", bpath) == -1)
+            continue;
+        free(dev);
+        dev = xs_read(xsh, XBT_NULL, buf, &len);
+        if (dev == NULL)
+            continue;
         /* Change xvdN to look like hdN */
-        if (!strncmp(dev, "xvd", 3 )) {
+        if (!is_hdN && !strncmp(dev, "xvd", 3)) {
             fprintf(logfile, "Change xvd%c to look like hd%c\n",
                     dev[3], dev[3]);
             memmove(dev, dev+1, strlen(dev));
