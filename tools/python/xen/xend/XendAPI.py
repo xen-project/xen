@@ -555,7 +555,7 @@ class XendAPI(object):
                 return xen_api_success(ref)
 
             def unpack(v):
-                return v['Value']
+                return v.get('Value')
 
             def _get_all_records(_api_cls):
                 return lambda s, session: \
