@@ -24,7 +24,7 @@ import time
 import signal
 
 import xen.lowlevel.xc
-from xen.xend.XendConstants import REVERSE_DOMAIN_SHUTDOWN_REASONS
+from xen.xend.XendConstants import *
 from xen.xend.XendError import VmError, XendError, HVMRequired
 from xen.xend.XendLogging import log
 from xen.xend.XendOptions import instance as xenopts
@@ -274,7 +274,6 @@ class HVMImageHandler(ImageHandler):
 
         self.pid = None
 
-        self.pae  = int(vmConfig['platform'].get('pae',  0))
         self.apic = int(vmConfig['platform'].get('apic', 0))
         self.acpi = int(vmConfig['platform'].get('acpi', 0))
         
@@ -289,19 +288,23 @@ class HVMImageHandler(ImageHandler):
         log.debug("store_evtchn   = %d", store_evtchn)
         log.debug("memsize        = %d", mem_mb)
         log.debug("vcpus          = %d", self.vm.getVCpuCount())
-        log.debug("pae            = %d", self.pae)
         log.debug("acpi           = %d", self.acpi)
         log.debug("apic           = %d", self.apic)
 
         rc = xc.hvm_build(domid          = self.vm.getDomid(),
                           image          = self.kernel,
-                          store_evtchn   = store_evtchn,
                           memsize        = mem_mb,
                           vcpus          = self.vm.getVCpuCount(),
-                          pae            = self.pae,
                           acpi           = self.acpi,
                           apic           = self.apic)
+
         rc['notes'] = { 'SUSPEND_CANCEL': 1 }
+
+        rc['store_mfn'] = xc.hvm_get_param(self.vm.getDomid(),
+                                           HVM_PARAM_STORE_PFN)
+        xc.hvm_set_param(self.vm.getDomid(), HVM_PARAM_STORE_EVTCHN,
+                         store_evtchn)
+
         return rc
 
     # Return a list of cmd line args to the device models based on the
@@ -516,6 +519,14 @@ class IA64_HVM_ImageHandler(HVMImageHandler):
         return 0
 
 class X86_HVM_ImageHandler(HVMImageHandler):
+
+    def configure(self, vmConfig):
+        HVMImageHandler.configure(self, vmConfig)
+        self.pae = int(vmConfig['platform'].get('pae',  0))
+
+    def buildDomain(self):
+        xc.hvm_set_param(self.vm.getDomid(), HVM_PARAM_PAE_ENABLED, self.pae)
+        return HVMImageHandler.buildDomain(self)
 
     def getRequiredAvailableMemory(self, mem_kb):
         # Add 8 MiB overhead for QEMU's video RAM.

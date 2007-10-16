@@ -498,15 +498,35 @@ static PyObject *pyxc_get_hvm_param(XcObject *self,
     unsigned long value;
 
     static char *kwd_list[] = { "domid", "param", NULL }; 
-    if ( !PyArg_ParseTupleAndKeywords(args, kwds, "i|i", kwd_list,
+    if ( !PyArg_ParseTupleAndKeywords(args, kwds, "ii", kwd_list,
                                       &dom, &param) )
         return NULL;
 
     if ( xc_get_hvm_param(self->xc_handle, dom, param, &value) != 0 )
         return pyxc_error_to_exception();
 
-    return Py_BuildValue("i", value);
+    return PyLong_FromUnsignedLong(value);
 
+}
+
+static PyObject *pyxc_set_hvm_param(XcObject *self,
+                                    PyObject *args,
+                                    PyObject *kwds)
+{
+    uint32_t dom;
+    int param;
+    uint64_t value;
+
+    static char *kwd_list[] = { "domid", "param", "value", NULL }; 
+    if ( !PyArg_ParseTupleAndKeywords(args, kwds, "iiL", kwd_list,
+                                      &dom, &param, &value) )
+        return NULL;
+
+    if ( xc_set_hvm_param(self->xc_handle, dom, param, value) != 0 )
+        return pyxc_error_to_exception();
+
+    Py_INCREF(zero);
+    return zero;
 }
 
 #ifdef __ia64__
@@ -537,15 +557,14 @@ static PyObject *pyxc_hvm_build(XcObject *self,
     int i;
 #endif
     char *image;
-    int store_evtchn, memsize, vcpus = 1, pae = 0, acpi = 0, apic = 1;
-    unsigned long store_mfn;
+    int memsize, vcpus = 1, acpi = 0, apic = 1;
 
-    static char *kwd_list[] = { "domid", "store_evtchn",
-				"memsize", "image", "vcpus", "pae", "acpi",
+    static char *kwd_list[] = { "domid",
+				"memsize", "image", "vcpus", "acpi",
 				"apic", NULL };
-    if ( !PyArg_ParseTupleAndKeywords(args, kwds, "iiis|iiii", kwd_list,
-                                      &dom, &store_evtchn, &memsize,
-                                      &image, &vcpus, &pae, &acpi, &apic) )
+    if ( !PyArg_ParseTupleAndKeywords(args, kwds, "iis|iii", kwd_list,
+                                      &dom, &memsize,
+                                      &image, &vcpus, &acpi, &apic) )
         return NULL;
 
     if ( xc_hvm_build(self->xc_handle, dom, memsize, image) != 0 )
@@ -571,14 +590,7 @@ static PyObject *pyxc_hvm_build(XcObject *self,
     munmap(va_map, XC_PAGE_SIZE);
 #endif
 
-    xc_get_hvm_param(self->xc_handle, dom, HVM_PARAM_STORE_PFN, &store_mfn);
-#if !defined(__ia64__)
-    xc_set_hvm_param(self->xc_handle, dom, HVM_PARAM_PAE_ENABLED, pae);
-#endif
-    xc_set_hvm_param(self->xc_handle, dom, HVM_PARAM_STORE_EVTCHN,
-                     store_evtchn);
-
-    return Py_BuildValue("{s:i}", "store_mfn", store_mfn);
+    return Py_BuildValue("{}");
 }
 
 static PyObject *pyxc_evtchn_alloc_unbound(XcObject *self,
@@ -1326,7 +1338,16 @@ static PyMethodDef pyxc_methods[] = {
       "get a parameter of HVM guest OS.\n"
       " dom     [int]:      Identifier of domain to build into.\n"
       " param   [int]:      No. of HVM param.\n"
-      "Returns: [int] value of the param.\n" },
+      "Returns: [long] value of the param.\n" },
+
+    { "hvm_set_param", 
+      (PyCFunction)pyxc_set_hvm_param, 
+      METH_VARARGS | METH_KEYWORDS, "\n"
+      "set a parameter of HVM guest OS.\n"
+      " dom     [int]:      Identifier of domain to build into.\n"
+      " param   [int]:      No. of HVM param.\n"
+      " value   [long]:     Value of param.\n"
+      "Returns: [int] 0 on success.\n" },
 
     { "sched_id_get",
       (PyCFunction)pyxc_sched_id_get,
