@@ -104,13 +104,13 @@ void flush_area_mask(cpumask_t, const void *va, unsigned int flags);
 #define flush_tlb_local()                       \
     flush_local(FLUSH_TLB)
 #define flush_tlb_one_local(v)                  \
-    flush_area_local((const void *)(v), FLUSH_TLB|1)
+    flush_area_local((const void *)(v), FLUSH_TLB|FLUSH_LEVEL(1))
 
 /* Flush specified CPUs' TLBs */
 #define flush_tlb_mask(mask)                    \
     flush_mask(mask, FLUSH_TLB)
 #define flush_tlb_one_mask(mask,v)              \
-    flush_area_mask(mask, (const void *)(v), FLUSH_TLB|1)
+    flush_area_mask(mask, (const void *)(v), FLUSH_TLB|FLUSH_LEVEL(1))
 
 /* Flush all CPUs' TLBs */
 #define flush_tlb_all()                         \

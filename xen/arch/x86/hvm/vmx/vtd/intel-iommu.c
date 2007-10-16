@@ -499,7 +499,7 @@ static int inline iommu_flush_iotlb_psi(
                                DMA_TLB_PSI_FLUSH, non_present_entry_flush);
 }
 
-void flush_all(void)
+void iommu_flush_all(void)
 {
     struct acpi_drhd_unit *drhd;
     struct iommu *iommu;
@@ -1775,7 +1775,7 @@ int iommu_setup(void)
     INIT_LIST_HEAD(&hd->pdev_list);
 
     /* start from scratch */
-    flush_all();
+    iommu_flush_all();
 
     /* setup clflush size */
     x86_clflush_size = ((cpuid_ebx(1) >> 8) & 0xff) * 8;
@@ -1958,7 +1958,7 @@ int iommu_suspend(void)
     struct iommu *iommu;
     int i = 0;
 
-    flush_all();
+    iommu_flush_all();
 
     for_each_drhd_unit ( drhd )
     {
@@ -1993,7 +1993,7 @@ int iommu_resume(void)
     struct iommu *iommu;
     int i = 0;
 
-    flush_all();
+    iommu_flush_all();
 
     init_vtd_hw();
     for_each_drhd_unit ( drhd )
