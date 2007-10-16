@@ -229,7 +229,6 @@ static void __init early_cpu_detect(void)
 void __devinit generic_identify(struct cpuinfo_x86 * c)
 {
 	u32 tfms, xlvl;
-	int junk;
 
 	if (have_cpuid_p()) {
 		/* Get vendor name */
@@ -244,8 +243,8 @@ void __devinit generic_identify(struct cpuinfo_x86 * c)
 	
 		/* Intel-defined flags: level 0x00000001 */
 		if ( c->cpuid_level >= 0x00000001 ) {
-			u32 capability, excap;
-			cpuid(0x00000001, &tfms, &junk, &excap, &capability);
+			u32 capability, excap, ebx;
+			cpuid(0x00000001, &tfms, &ebx, &excap, &capability);
 			c->x86_capability[0] = capability;
 			c->x86_capability[4] = excap;
 			c->x86 = (tfms >> 8) & 15;
@@ -255,6 +254,8 @@ void __devinit generic_identify(struct cpuinfo_x86 * c)
 				c->x86_model += ((tfms >> 16) & 0xF) << 4;
 			} 
 			c->x86_mask = tfms & 15;
+			if ( cpu_has(c, X86_FEATURE_CLFLSH) )
+				c->x86_clflush_size = ((ebx >> 8) & 0xff) * 8;
 		} else {
 			/* Have CPUID level 0 only - unheard of */
 			c->x86 = 4;
@@ -313,6 +314,7 @@ void __devinit identify_cpu(struct cpuinfo_x86 *c)
 	c->x86_vendor_id[0] = '\0'; /* Unset */
 	c->x86_model_id[0] = '\0';  /* Unset */
 	c->x86_max_cores = 1;
+	c->x86_clflush_size = 0;
 	memset(&c->x86_capability, 0, sizeof c->x86_capability);
 
 	if (!have_cpuid_p()) {

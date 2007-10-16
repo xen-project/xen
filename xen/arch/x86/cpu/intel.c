@@ -123,6 +123,18 @@ static void __devinit init_intel(struct cpuinfo_x86 *c)
 	if ((c->x86<<8 | c->x86_model<<4 | c->x86_mask) < 0x633)
 		clear_bit(X86_FEATURE_SEP, c->x86_capability);
 
+	/* Supports INVLPG of superpages? */
+	__set_bit(2, &c->invlpg_works_ok);
+	if (/* PentiumPro erratum 30 */
+	    (c->x86 == 6 && c->x86_model == 1 && c->x86_mask < 9) ||
+	    /* Dual-Core Intel Xeon 3000/5100 series erratum 89/90 */
+	    /* Quad-Core Intel Xeon 3200/5300 series erratum 89/88 */
+	    /* Intel Core2 erratum 89 */
+	    (c->x86 == 6 && c->x86_model == 15 ) ||
+	    /* Dual-Core Intel Xeon LV/ULV erratum 75 */
+	    (c->x86 == 6 && c->x86_model == 14 ))
+		__clear_bit(2, &c->invlpg_works_ok);
+
 	/* Names for the Pentium II/Celeron processors 
 	   detectable only by also checking the cache size.
 	   Dixon is NOT a Celeron. */

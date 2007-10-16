@@ -78,7 +78,7 @@ void *map_domain_page(unsigned long mfn)
         if ( NEED_FLUSH(this_cpu(tlbflush_time), dcache->tlbflush_timestamp) )
         {
             perfc_incr(domain_page_tlb_flush);
-            local_flush_tlb();
+            flush_tlb_local();
         }
     }
 
@@ -94,7 +94,7 @@ void *map_domain_page(unsigned long mfn)
 
         /* /Second/, flush TLBs. */
         perfc_incr(domain_page_tlb_flush);
-        local_flush_tlb();
+        flush_tlb_local();
         vcache->shadow_epoch = ++dcache->epoch;
         dcache->tlbflush_timestamp = tlbflush_current_time();
 

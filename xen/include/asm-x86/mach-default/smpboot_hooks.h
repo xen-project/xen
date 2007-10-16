@@ -9,7 +9,7 @@ static inline void smpboot_clear_io_apic_irqs(void)
 static inline void smpboot_setup_warm_reset_vector(unsigned long start_eip)
 {
 	CMOS_WRITE(0xa, 0xf);
-	local_flush_tlb();
+	flush_tlb_local();
 	Dprintk("1.\n");
 	*((volatile unsigned short *) TRAMPOLINE_HIGH) = start_eip >> 4;
 	Dprintk("2.\n");
@@ -22,7 +22,7 @@ static inline void smpboot_restore_warm_reset_vector(void)
 	/*
 	 * Install writable page 0 entry to set BIOS data area.
 	 */
-	local_flush_tlb();
+	flush_tlb_local();
 
 	/*
 	 * Paranoid:  Set warm reset code and vector here back

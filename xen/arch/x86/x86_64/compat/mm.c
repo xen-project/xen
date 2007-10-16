@@ -31,7 +31,7 @@ int compat_set_gdt(XEN_GUEST_HANDLE(uint) frame_list, unsigned int entries)
     LOCK_BIGLOCK(current->domain);
 
     if ( (ret = set_gdt(current, frames, entries)) == 0 )
-        local_flush_tlb();
+        flush_tlb_local();
 
     UNLOCK_BIGLOCK(current->domain);
 

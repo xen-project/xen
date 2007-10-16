@@ -347,7 +347,7 @@ int __init construct_dom0(
         for ( i = 0; i < MAX_VIRT_CPUS; i++ )
             d->arch.mm_perdomain_pt[((i << GDT_LDT_VCPU_SHIFT) +
                                      FIRST_RESERVED_GDT_PAGE)] = gdt_l1e;
-        local_flush_tlb_one(GDT_LDT_VIRT_START + FIRST_RESERVED_GDT_BYTE);
+        flush_tlb_one_local(GDT_LDT_VIRT_START + FIRST_RESERVED_GDT_BYTE);
     }
 #endif
     if ( parms.pae == PAEKERN_extended_cr3 )

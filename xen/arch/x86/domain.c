@@ -1299,7 +1299,7 @@ void context_switch(struct vcpu *prev, struct vcpu *next)
         {
             uint64_t efer = read_efer();
 
-            local_flush_tlb_one(GDT_VIRT_START(next) +
+            flush_tlb_one_local(GDT_VIRT_START(next) +
                                 FIRST_RESERVED_GDT_BYTE);
 
             if ( !is_pv_32on64_vcpu(next) == !(efer & EFER_SCE) )

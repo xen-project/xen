@@ -313,7 +313,7 @@ static void prepare_set(void)
 	}
 
 	/* Flush all TLBs via a mov %cr3, %reg; mov %reg, %cr3 */
-	local_flush_tlb();
+	flush_tlb_local();
 
 	/*  Save MTRR state */
 	rdmsr(MTRRdefType_MSR, deftype_lo, deftype_hi);
@@ -325,7 +325,7 @@ static void prepare_set(void)
 static void post_set(void)
 {
 	/*  Flush TLBs (no need to flush caches - they are disabled)  */
-	local_flush_tlb();
+	flush_tlb_local();
 
 	/* Intel (P6) standard MTRRs */
 	mtrr_wrmsr(MTRRdefType_MSR, deftype_lo, deftype_hi);

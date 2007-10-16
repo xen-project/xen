@@ -518,7 +518,7 @@ void __devinit start_secondary(void *unused)
 	 * low-memory mappings have been cleared, flush them from
 	 * the local TLBs too.
 	 */
-	local_flush_tlb();
+	flush_tlb_local();
 
 	/* This must be done before setting cpu_online_map */
 	set_cpu_sibling_map(raw_smp_processor_id());

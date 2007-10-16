@@ -84,10 +84,10 @@ void write_cr3(unsigned long cr3)
 
 #ifdef USER_MAPPINGS_ARE_GLOBAL
     __pge_off();
-    __asm__ __volatile__ ( "mov %0, %%cr3" : : "r" (cr3) : "memory" );
+    asm volatile ( "mov %0, %%cr3" : : "r" (cr3) : "memory" );
     __pge_on();
 #else
-    __asm__ __volatile__ ( "mov %0, %%cr3" : : "r" (cr3) : "memory" );
+    asm volatile ( "mov %0, %%cr3" : : "r" (cr3) : "memory" );
 #endif
 
     post_flush(t);
@@ -95,26 +95,69 @@ void write_cr3(unsigned long cr3)
     local_irq_restore(flags);
 }
 
-void local_flush_tlb(void)
+void flush_area_local(const void *va, unsigned int flags)
 {
-    unsigned long flags;
-    u32 t;
+    const struct cpuinfo_x86 *c = &current_cpu_data;
+    unsigned int level = flags & FLUSH_LEVEL_MASK;
+    unsigned long irqfl;
+
+    ASSERT(level < CONFIG_PAGING_LEVELS);
 
     /* This non-reentrant function is sometimes called in interrupt context. */
-    local_irq_save(flags);
+    local_irq_save(irqfl);
 
-    t = pre_flush();
+    if ( flags & (FLUSH_TLB|FLUSH_TLB_GLOBAL) )
+    {
+        if ( (level != 0) && test_bit(level, &c->invlpg_works_ok) )
+        {
+            asm volatile ( "invlpg %0"
+                           : : "m" (*(const char *)(va)) : "memory" );
+        }
+        else
+        {
+            u32 t = pre_flush();
 
-    hvm_flush_guest_tlbs();
+            hvm_flush_guest_tlbs();
 
-#ifdef USER_MAPPINGS_ARE_GLOBAL
-    __pge_off();
-    __pge_on();
-#else
-    __asm__ __volatile__ ( "mov %0, %%cr3" : : "r" (read_cr3()) : "memory" );
+#ifndef USER_MAPPINGS_ARE_GLOBAL
+            if ( !(flags & FLUSH_TLB_GLOBAL) ||
+                 !(mmu_cr4_features & X86_CR4_PGE) )
+            {
+                asm volatile ( "mov %0, %%cr3"
+                               : : "r" (read_cr3()) : "memory" );
+            }
+            else
 #endif
+            {
+                __pge_off();
+                barrier();
+                __pge_on();
+            }
 
-    post_flush(t);
+            post_flush(t);
+        }
+    }
 
-    local_irq_restore(flags);
+    if ( flags & FLUSH_CACHE )
+    {
+        unsigned long i, sz;
+
+        sz = level ? (1UL << ((level - 1) * PAGETABLE_ORDER)) : ULONG_MAX;
+
+        if ( c->x86_clflush_size && c->x86_cache_size &&
+             (sz < (c->x86_cache_size >> (PAGE_SHIFT - 10))) )
+        {
+            sz <<= PAGE_SHIFT;
+            va = (const void *)((unsigned long)va & ~(sz - 1));
+            for ( i = 0; i < sz; i += c->x86_clflush_size )
+                 asm volatile ( "clflush %0"
+                                : : "m" (((const char *)va)[i]) );
+        }
+        else
+        {
+            wbinvd();
+        }
+    }
+
+    local_irq_restore(irqfl);
 }

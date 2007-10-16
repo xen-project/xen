@@ -50,6 +50,7 @@
 #define X86_FEATURE_NX		(1*32+20) /* Execute Disable */
 #define X86_FEATURE_MMXEXT	(1*32+22) /* AMD MMX extensions */
 #define X86_FEATURE_FFXSR       (1*32+25) /* FFXSR instruction optimizations */
+#define X86_FEATURE_PAGE1GB	(1*32+26) /* 1Gb large page support */
 #define X86_FEATURE_RDTSCP	(1*32+27) /* RDTSCP */
 #define X86_FEATURE_LM		(1*32+29) /* Long Mode (x86-64) */
 #define X86_FEATURE_3DNOWEXT	(1*32+30) /* AMD 3DNow! extensions */
@@ -143,6 +144,7 @@
 #define cpu_has_cyrix_arr	boot_cpu_has(X86_FEATURE_CYRIX_ARR)
 #define cpu_has_centaur_mcr	boot_cpu_has(X86_FEATURE_CENTAUR_MCR)
 #define cpu_has_clflush		boot_cpu_has(X86_FEATURE_CLFLSH)
+#define cpu_has_page1gb		0
 #else /* __x86_64__ */
 #define cpu_has_vme		0
 #define cpu_has_de		1
@@ -166,6 +168,7 @@
 #define cpu_has_cyrix_arr	0
 #define cpu_has_centaur_mcr	0
 #define cpu_has_clflush		boot_cpu_has(X86_FEATURE_CLFLSH)
+#define cpu_has_page1gb		boot_cpu_has(X86_FEATURE_PAGE1GB)
 #endif
 
 #define cpu_has_ffxsr           ((boot_cpu_data.x86_vendor == X86_VENDOR_AMD) \

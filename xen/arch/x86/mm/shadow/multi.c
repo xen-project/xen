@@ -3089,7 +3089,7 @@ sh_invlpg(struct vcpu *v, unsigned long va)
     if ( mfn_to_shadow_page(shadow_l2e_get_mfn(sl2e))->type
          == SH_type_fl1_shadow )
     {
-        local_flush_tlb();
+        flush_tlb_local();
         return 0;
     }
 

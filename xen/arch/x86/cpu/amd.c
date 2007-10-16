@@ -373,6 +373,11 @@ static void __init init_amd(struct cpuinfo_x86 *c)
 	if ((smp_processor_id() == 1) && c1_ramping_may_cause_clock_drift(c))
 		disable_c1_ramping();
 
+	/* Support INVLPG of superpages? */
+	__set_bit(2, &c->invlpg_works_ok);
+	if ( cpu_has(c, X86_FEATURE_PAGE1GB) )
+		__set_bit(3, &c->invlpg_works_ok);
+
 	start_svm(c);
 }
 
