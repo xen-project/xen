@@ -170,7 +170,7 @@ void do_unwatch(struct connection *conn, struct buffered_data *in)
 		return;
 	}
 
-	node = canonicalize(conn, vec[0]);
+	node = strstarts(vec[0], "@") ? vec[0] : canonicalize(conn, vec[0]);
 	list_for_each_entry(watch, &conn->watches, list) {
 		if (streq(watch->node, node) && streq(watch->token, vec[1])) {
 			list_del(&watch->list);
