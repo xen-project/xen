@@ -28,6 +28,7 @@
 #include <xen/acpi.h>
 #include <xen/errno.h>
 #include <xen/sched.h>
+#include <xen/list.h>
 
 #include <asm/dom_fw.h>
 #include <asm/dom_fw_common.h>
@@ -35,6 +36,15 @@
 #include <asm/dom_fw_utils.h>
 
 #include <linux/sort.h>
+
+struct acpi_backup_table_entry {
+	struct list_head list;
+	unsigned long pa;
+	unsigned long size;
+	unsigned char data[0];
+};
+
+static LIST_HEAD(acpi_backup_table_list);
 
 static u32 lsapic_nbr;
 
@@ -100,17 +110,84 @@ acpi_update_madt_checksum(unsigned long phys_addr, unsigned long size)
 	return 0;
 }
 
+static int __init
+acpi_backup_table(unsigned long phys_addr, unsigned long size)
+{
+	struct acpi_backup_table_entry *entry;
+	void *vaddr = __va(phys_addr);
+
+	if (!phys_addr || !size)
+		return -EINVAL;
+
+	entry = xmalloc_bytes(sizeof(*entry) + size);
+	if (!entry) {
+		dprintk(XENLOG_WARNING, "Failed to allocate memory for "
+		        "%.4s table backup\n",
+			((struct acpi_table_header *)vaddr)->signature);
+		return -ENOMEM;
+	}
+
+	entry->pa = phys_addr;
+	entry->size = size;
+
+	memcpy(entry->data, vaddr, size);
+
+	list_add(&entry->list, &acpi_backup_table_list);
+
+	printk(XENLOG_INFO "Backup %.4s table stored @0x%p\n",
+	       ((struct acpi_table_header *)entry->data)->signature,
+	       entry->data);
+
+	return 0;
+}
+
+void
+acpi_restore_tables()
+{
+	struct acpi_backup_table_entry *entry;
+
+	list_for_each_entry(entry, &acpi_backup_table_list, list) {
+		printk(XENLOG_INFO "Restoring backup %.4s table @0x%p\n",
+		       ((struct acpi_table_header *)entry->data)->signature,
+		       entry->data);
+
+		memcpy(__va(entry->pa), entry->data, entry->size);
+		/* Only called from kexec path, no need to free entries */
+	}
+}
+
 /* base is physical address of acpi table */
 static void __init touch_acpi_table(void)
 {
 	int result;
 	lsapic_nbr = 0;
 
+	/*
+	 * Modify dom0 MADT:
+	 *  - Disable CPUs that would exceed max vCPUs for the domain
+	 *  - Virtualize id/eid for indexing into domain vCPU array
+	 *  - Hide CPEI interrupt source
+	 *
+	 * ACPI tables must be backed-up before modification!
+	 */
+	acpi_table_parse(ACPI_APIC, acpi_backup_table);
+
 	if (acpi_table_parse_madt(ACPI_MADT_LSAPIC, acpi_update_lsapic, 0) < 0)
 		printk("Error parsing MADT - no LAPIC entries\n");
 	if (acpi_table_parse_madt(ACPI_MADT_PLAT_INT_SRC,
 				  acpi_patch_plat_int_src, 0) < 0)
 		printk("Error parsing MADT - no PLAT_INT_SRC entries\n");
+
+	acpi_table_parse(ACPI_APIC, acpi_update_madt_checksum);
+
+	/*
+	 * SRAT & SLIT tables aren't useful for Dom0 until
+	 * we support more NUMA configuration information in Xen.
+	 *
+	 * NB - backup ACPI tables first.
+	 */
+	acpi_table_parse(ACPI_SRAT, acpi_backup_table);
+	acpi_table_parse(ACPI_SLIT, acpi_backup_table);
 
 	result = acpi_table_disable(ACPI_SRAT);
 	if ( result == 0 )
@@ -124,8 +201,6 @@ static void __init touch_acpi_table(void)
 	else if ( result != -ENOENT )
 		printk("ERROR: Failed Disabling SLIT\n");
 
-	acpi_table_parse(ACPI_APIC, acpi_update_madt_checksum);
-
 	return;
 }
 
@@ -133,9 +208,9 @@ void __init efi_systable_init_dom0(struct fw_tables *tables)
 {
 	int i = 1;
 
-	/* Write messages to the console.  */
 	touch_acpi_table();
 
+	/* Write messages to the console.  */
 	printk("Domain0 EFI passthrough:");
 	if (efi.mps) {
 		tables->efi_tables[i].guid = MPS_TABLE_GUID;

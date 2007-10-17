@@ -23,6 +23,7 @@
 #include <linux/cpu.h>
 #include <linux/cpu.h>
 #include <linux/notifier.h>
+#include <asm/dom_fw_dom0.h>
 
 typedef asmlinkage NORET_TYPE void (*relocate_new_kernel_t)(
 					unsigned long indirection_page,
@@ -149,6 +150,7 @@ static void machine_shutdown(void)
 	}
 #endif
 	kexec_disable_iosapic();
+	acpi_restore_tables();
 }
 
 void machine_kexec(xen_kexec_image_t *image)
