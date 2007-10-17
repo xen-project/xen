@@ -104,7 +104,6 @@ unsigned long xenheap_phys_start, xenheap_phys_end;
 
 extern void arch_init_memory(void);
 extern void init_IRQ(void);
-extern void trap_init(void);
 extern void early_time_init(void);
 extern void early_cpu_init(void);
 extern void vesa_init(void);

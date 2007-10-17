@@ -76,6 +76,8 @@ char opt_nmi[10] = "fatal";
 #endif
 string_param("nmi", opt_nmi);
 
+DEFINE_PER_CPU(u32, ler_msr);
+
 /* Master table, used by CPU0. */
 idt_entry_t idt_table[IDT_ENTRIES];
 
@@ -111,6 +113,9 @@ unsigned long do_get_debugreg(int reg);
 
 static int debug_stack_lines = 20;
 integer_param("debug_stack_lines", debug_stack_lines);
+
+static int opt_ler;
+boolean_param("ler", opt_ler);
 
 #ifdef CONFIG_X86_32
 #define stack_words_per_line 8
@@ -2098,9 +2103,12 @@ asmlinkage int do_debug(struct cpu_user_regs *regs)
     /* Save debug status register where guest OS can peek at it */
     v->arch.guest_context.debugreg[6] = condition;
 
+    ler_enable();
+
     return do_guest_trap(TRAP_debug, regs, 0);
 
  out:
+    ler_enable();
     return EXCRET_not_a_fault;
 }
 
@@ -2146,10 +2154,43 @@ void set_tss_desc(unsigned int n, void *addr)
 #endif
 }
 
+void __devinit percpu_traps_init(void)
+{
+    subarch_percpu_traps_init();
+
+    if ( !opt_ler )
+        return;
+
+    switch ( boot_cpu_data.x86_vendor )
+    {
+    case X86_VENDOR_INTEL:
+        switch ( boot_cpu_data.x86 )
+        {
+        case 6:
+            this_cpu(ler_msr) = MSR_IA32_LASTINTFROMIP;
+            break;
+        case 15:
+            this_cpu(ler_msr) = MSR_P4_LER_FROM_LIP;
+            break;
+        }
+        break;
+    case X86_VENDOR_AMD:
+        switch ( boot_cpu_data.x86 )
+        {
+        case 6:
+        case 15:
+        case 16:
+            this_cpu(ler_msr) = MSR_IA32_LASTINTFROMIP;
+            break;
+        }
+        break;
+    }
+
+    ler_enable();
+}
+
 void __init trap_init(void)
 {
-    extern void percpu_traps_init(void);
-
     /*
      * Note that interrupt gates are always used, rather than trap gates. We 
      * must have interrupts disabled until DS/ES/FS/GS are saved because the 

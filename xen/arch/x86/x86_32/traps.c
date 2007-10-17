@@ -104,6 +104,14 @@ void show_registers(struct cpu_user_regs *regs)
            "ss: %04x   cs: %04x\n",
            fault_regs.ds, fault_regs.es, fault_regs.fs,
            fault_regs.gs, fault_regs.ss, fault_regs.cs);
+
+    if ( this_cpu(ler_msr) && !guest_mode(regs) )
+    {
+        u32 from, to, hi;
+        rdmsr(this_cpu(ler_msr), from, hi);
+        rdmsr(this_cpu(ler_msr) + 1, to, hi);
+        printk("ler: %08x -> %08x\n", from, to);
+    }
 }
 
 void show_page_walk(unsigned long addr)
@@ -250,7 +258,7 @@ unsigned long do_iret(void)
     return 0;
 }
 
-void __devinit percpu_traps_init(void)
+void __devinit subarch_percpu_traps_init(void)
 {
     struct tss_struct *tss = &doublefault_tss;
     asmlinkage int hypercall(void);

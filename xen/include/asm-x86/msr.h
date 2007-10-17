@@ -105,6 +105,19 @@ static inline void write_efer(__u64 val)
     wrmsrl(MSR_EFER, val);
 }
 
+DECLARE_PER_CPU(u32, ler_msr);
+
+static inline void ler_enable(void)
+{
+    u64 debugctl;
+    
+    if ( !this_cpu(ler_msr) )
+        return;
+
+    rdmsrl(MSR_IA32_DEBUGCTLMSR, debugctl);
+    wrmsrl(MSR_IA32_DEBUGCTLMSR, debugctl | 1);
+}
+
 #endif /* !__ASSEMBLY__ */
 
 #endif /* __ASM_MSR_H */
