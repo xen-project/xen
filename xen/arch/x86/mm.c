@@ -1771,13 +1771,20 @@ int get_page_type(struct page_info *page, unsigned long type)
         }
         else if ( unlikely((x & (PGT_type_mask|PGT_pae_xen_l2)) != type) )
         {
-            if ( ((x & PGT_type_mask) != PGT_l2_page_table) ||
-                 (type != PGT_l1_page_table) )
-                MEM_LOG("Bad type (saw %" PRtype_info
-                        " != exp %" PRtype_info ") "
-                        "for mfn %lx (pfn %lx)",
-                        x, type, page_to_mfn(page),
-                        get_gpfn_from_mfn(page_to_mfn(page)));
+            /* Don't log failure if it could be a recursive-mapping attempt. */
+            if ( ((x & PGT_type_mask) == PGT_l2_page_table) &&
+                 (type == PGT_l1_page_table) )
+                return 0;
+            if ( ((x & PGT_type_mask) == PGT_l3_page_table) &&
+                 (type == PGT_l2_page_table) )
+                return 0;
+            if ( ((x & PGT_type_mask) == PGT_l4_page_table) &&
+                 (type == PGT_l3_page_table) )
+                return 0;
+            MEM_LOG("Bad type (saw %" PRtype_info " != exp %" PRtype_info ") "
+                    "for mfn %lx (pfn %lx)",
+                    x, type, page_to_mfn(page),
+                    get_gpfn_from_mfn(page_to_mfn(page)));
             return 0;
         }
         else if ( unlikely(!(x & PGT_validated)) )
