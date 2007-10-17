@@ -123,14 +123,6 @@ struct hw_interrupt_type no_irq_type = {
 
 atomic_t irq_err_count;
 
-/* Some placeholder here, which are used by other files and we
- * don't want to change too much now. Later they should be cleaned.
- */
-#ifdef CONFIG_SMP
-inline void synchronize_irq(unsigned int irq) {}
-EXPORT_SYMBOL(synchronize_irq);
-#endif
-
 /*
  * Generic enable/disable code: this just calls
  * down into the PIC-specific version for the actual
