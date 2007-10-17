@@ -182,7 +182,7 @@ fastcall void smp_invalidate_interrupt(void)
 void flush_area_mask(cpumask_t mask, const void *va, unsigned int flags)
 {
     ASSERT(local_irq_is_enabled());
-    
+
     if ( cpu_isset(smp_processor_id(), mask) )
     {
         flush_area_local(va, flags);

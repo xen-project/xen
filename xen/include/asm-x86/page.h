@@ -355,13 +355,12 @@ void free_xen_pagetable(void *v);
 l2_pgentry_t *virt_to_xen_l2e(unsigned long v);
 
 /* Map machine page range in Xen virtual address space. */
-#define MAP_SMALL_PAGES (1UL<<16) /* don't use superpages for the mapping */
-int
-map_pages_to_xen(
+#define MAP_SMALL_PAGES _PAGE_AVAIL0 /* don't use superpages for the mapping */
+int map_pages_to_xen(
     unsigned long virt,
     unsigned long mfn,
     unsigned long nr_mfns,
-    unsigned long flags);
+    unsigned int flags);
 void destroy_xen_mappings(unsigned long v, unsigned long e);
 
 #endif /* !__ASSEMBLY__ */
