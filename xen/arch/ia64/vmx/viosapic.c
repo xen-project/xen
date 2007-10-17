@@ -135,8 +135,9 @@ static void viosapic_update_EOI(struct viosapic *viosapic, int vector)
     if ( !test_and_clear_bit(redir_num, &viosapic->isr) )
     {
         spin_unlock(&viosapic->lock);
-        gdprintk(XENLOG_WARNING, "redir %d not set for %d EOI\n",
-                 redir_num, vector);
+        if ( viosapic->redirtbl[redir_num].trig_mode == SAPIC_LEVEL )
+            gdprintk(XENLOG_WARNING, "redir %d not set for %d EOI\n",
+                     redir_num, vector);
         return;
     }
     service_iosapic(viosapic);
