@@ -108,8 +108,14 @@ void flush_area_local(const void *va, unsigned int flags)
 
     if ( flags & (FLUSH_TLB|FLUSH_TLB_GLOBAL) )
     {
-        if ( (level != 0) && test_bit(level, &c->invlpg_works_ok) )
+        if ( level == 1 )
         {
+            /*
+             * We don't INVLPG multi-page regions because the 2M/4M/1G
+             * region may not have been mapped with a superpage. Also there
+             * are various errata surrounding INVLPG usage on superpages, and
+             * a full flush is in any case not *that* expensive.
+             */
             asm volatile ( "invlpg %0"
                            : : "m" (*(const char *)(va)) : "memory" );
         }

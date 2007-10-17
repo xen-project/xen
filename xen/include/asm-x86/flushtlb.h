@@ -78,6 +78,7 @@ void write_cr3(unsigned long cr3);
   *  1 -> 4kB area containing specified virtual address
   *  2 -> 4MB/2MB area containing specified virtual address
   *  3 -> 1GB area containing specified virtual address (x86/64 only)
+  * NB. Multi-page areas do not need to have been mapped with a superpage.
   */
 #define FLUSH_LEVEL_MASK 0x0f
 #define FLUSH_LEVEL(x)   (x)

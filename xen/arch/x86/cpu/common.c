@@ -314,7 +314,6 @@ void __devinit identify_cpu(struct cpuinfo_x86 *c)
 	c->x86_vendor_id[0] = '\0'; /* Unset */
 	c->x86_model_id[0] = '\0';  /* Unset */
 	c->x86_max_cores = 1;
-	c->invlpg_works_ok = 1; /* no superpage INVLPG by default */
 	c->x86_clflush_size = 0;
 	memset(&c->x86_capability, 0, sizeof c->x86_capability);
 

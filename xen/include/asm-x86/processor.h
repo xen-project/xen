@@ -164,7 +164,6 @@ struct cpuinfo_x86 {
     __u8 x86_vendor;     /* CPU vendor */
     __u8 x86_model;
     __u8 x86_mask;
-    __u8 invlpg_works_ok;
     int  cpuid_level;    /* Maximum supported CPUID level, -1=no CPUID */
     unsigned int x86_capability[NCAPINTS];
     char x86_vendor_id[16];
