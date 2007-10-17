@@ -323,6 +323,27 @@
 #define MSR_P4_U2L_ESCR0		0x000003b0
 #define MSR_P4_U2L_ESCR1		0x000003b1
 
+/* Netburst (P4) last-branch recording */
+#define MSR_P4_LER_FROM_LIP 		0x000001d7
+#define MSR_P4_LER_TO_LIP 		0x000001d8
+#define MSR_P4_LASTBRANCH_TOS		0x000001da
+#define MSR_P4_LASTBRANCH_0		0x000001db
+#define NUM_MSR_P4_LASTBRANCH		4
+#define MSR_P4_LASTBRANCH_0_FROM_LIP	0x00000680
+#define MSR_P4_LASTBRANCH_0_TO_LIP	0x000006c0
+#define NUM_MSR_P4_LASTBRANCH_FROM_TO	16
+
+/* Pentium M (and Core) last-branch recording */
+#define MSR_PM_LASTBRANCH_TOS		0x000001c9
+#define MSR_PM_LASTBRANCH_0		0x00000040
+#define NUM_MSR_PM_LASTBRANCH		8
+
+/* Core 2 last-branch recording */
+#define MSR_C2_LASTBRANCH_TOS		0x000001c9
+#define MSR_C2_LASTBRANCH_0_FROM_IP	0x00000040
+#define MSR_C2_LASTBRANCH_0_TO_IP	0x00000060
+#define NUM_MSR_C2_LASTBRANCH_FROM_TO	4
+
 /* Intel Core-based CPU performance counters */
 #define MSR_CORE_PERF_FIXED_CTR0	0x00000309
 #define MSR_CORE_PERF_FIXED_CTR1	0x0000030a

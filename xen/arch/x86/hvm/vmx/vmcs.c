@@ -413,9 +413,35 @@ static void vmx_set_host_env(struct vcpu *v)
               (unsigned long)&get_cpu_info()->guest_cpu_user_regs.error_code);
 }
 
+void vmx_disable_intercept_for_msr(struct vcpu *v, u32 msr)
+{
+    char *msr_bitmap = v->arch.hvm_vmx.msr_bitmap;
+
+    /* VMX MSR bitmap supported? */
+    if ( msr_bitmap == NULL )
+        return;
+
+    /*
+     * See Intel PRM Vol. 3, 20.6.9 (MSR-Bitmap Address). Early manuals
+     * have the write-low and read-high bitmap offsets the wrong way round.
+     * We can control MSRs 0x00000000-0x00001fff and 0xc0000000-0xc0001fff.
+     */
+    if ( msr <= 0x1fff )
+    {
+        __clear_bit(msr, msr_bitmap + 0x000); /* read-low */
+        __clear_bit(msr, msr_bitmap + 0x800); /* write-low */
+    }
+    else if ( (msr >= 0xc0000000) && (msr <= 0xc0001fff) )
+    {
+        msr &= 0x1fff;
+        __clear_bit(msr, msr_bitmap + 0x400); /* read-high */
+        __clear_bit(msr, msr_bitmap + 0xc00); /* write-high */
+    }
+}
+
 #define GUEST_SEGMENT_LIMIT     0xffffffff
 
-static void construct_vmcs(struct vcpu *v)
+static int construct_vmcs(struct vcpu *v)
 {
     union vmcs_arbytes arbytes;
 
@@ -430,8 +456,24 @@ static void construct_vmcs(struct vcpu *v)
     if ( vmx_cpu_based_exec_control & CPU_BASED_ACTIVATE_SECONDARY_CONTROLS )
         __vmwrite(SECONDARY_VM_EXEC_CONTROL, vmx_secondary_exec_control);
 
+    /* MSR access bitmap. */
     if ( cpu_has_vmx_msr_bitmap )
-        __vmwrite(MSR_BITMAP, virt_to_maddr(vmx_msr_bitmap));
+    {
+        char *msr_bitmap = alloc_xenheap_page();
+
+        if ( msr_bitmap == NULL )
+            return -ENOMEM;
+
+        memset(msr_bitmap, ~0, PAGE_SIZE);
+        v->arch.hvm_vmx.msr_bitmap = msr_bitmap;
+        __vmwrite(MSR_BITMAP, virt_to_maddr(msr_bitmap));
+
+        vmx_disable_intercept_for_msr(v, MSR_FS_BASE);
+        vmx_disable_intercept_for_msr(v, MSR_GS_BASE);
+        vmx_disable_intercept_for_msr(v, MSR_IA32_SYSENTER_CS);
+        vmx_disable_intercept_for_msr(v, MSR_IA32_SYSENTER_ESP);
+        vmx_disable_intercept_for_msr(v, MSR_IA32_SYSENTER_EIP);
+    }
 
     /* I/O access bitmap. */
     __vmwrite(IO_BITMAP_A, virt_to_maddr(hvm_io_bitmap));
@@ -463,10 +505,8 @@ static void construct_vmcs(struct vcpu *v)
     __vmwrite(HOST_RIP, (unsigned long)vmx_asm_vmexit_handler);
 
     /* MSR intercepts. */
-    __vmwrite(VM_EXIT_MSR_LOAD_ADDR, 0);
-    __vmwrite(VM_EXIT_MSR_STORE_ADDR, 0);
-    __vmwrite(VM_EXIT_MSR_STORE_COUNT, 0);
     __vmwrite(VM_EXIT_MSR_LOAD_COUNT, 0);
+    __vmwrite(VM_EXIT_MSR_STORE_COUNT, 0);
     __vmwrite(VM_ENTRY_MSR_LOAD_COUNT, 0);
 
     __vmwrite(VM_ENTRY_INTR_INFO, 0);
@@ -565,11 +605,108 @@ static void construct_vmcs(struct vcpu *v)
     paging_update_paging_modes(v); /* will update HOST & GUEST_CR3 as reqd */
 
     vmx_vlapic_msr_changed(v);
+
+    return 0;
+}
+
+int vmx_read_guest_msr(struct vcpu *v, u32 msr, u64 *val)
+{
+    unsigned int i, msr_count = v->arch.hvm_vmx.msr_count;
+    const struct vmx_msr_entry *msr_area = v->arch.hvm_vmx.msr_area;
+
+    for ( i = 0; i < msr_count; i++ )
+    {
+        if ( msr_area[i].index == msr )
+        {
+            *val = msr_area[i].data;
+            return 0;
+        }
+    }
+
+    return -ESRCH;
+}
+
+int vmx_write_guest_msr(struct vcpu *v, u32 msr, u64 val)
+{
+    unsigned int i, msr_count = v->arch.hvm_vmx.msr_count;
+    struct vmx_msr_entry *msr_area = v->arch.hvm_vmx.msr_area;
+
+    for ( i = 0; i < msr_count; i++ )
+    {
+        if ( msr_area[i].index == msr )
+        {
+            msr_area[i].data = val;
+            return 0;
+        }
+    }
+
+    return -ESRCH;
+}
+
+int vmx_add_guest_msr(struct vcpu *v, u32 msr)
+{
+    unsigned int i, msr_count = v->arch.hvm_vmx.msr_count;
+    struct vmx_msr_entry *msr_area = v->arch.hvm_vmx.msr_area;
+
+    for ( i = 0; i < msr_count; i++ )
+        if ( msr_area[i].index == msr )
+            return 0;
+
+    if ( msr_count == (PAGE_SIZE / sizeof(struct vmx_msr_entry)) )
+        return -ENOSPC;
+
+    if ( msr_area == NULL )
+    {
+        if ( (msr_area = alloc_xenheap_page()) == NULL )
+            return -ENOMEM;
+        v->arch.hvm_vmx.msr_area = msr_area;
+        __vmwrite(VM_EXIT_MSR_STORE_ADDR, virt_to_maddr(msr_area));
+        __vmwrite(VM_ENTRY_MSR_LOAD_ADDR, virt_to_maddr(msr_area));
+    }
+
+    msr_area[msr_count].index = msr;
+    msr_area[msr_count].mbz   = 0;
+    msr_area[msr_count].data  = 0;
+    v->arch.hvm_vmx.msr_count = ++msr_count;
+    __vmwrite(VM_EXIT_MSR_STORE_COUNT, msr_count);
+    __vmwrite(VM_ENTRY_MSR_LOAD_COUNT, msr_count);
+
+    return 0;
+}
+
+int vmx_add_host_load_msr(struct vcpu *v, u32 msr)
+{
+    unsigned int i, msr_count = v->arch.hvm_vmx.host_msr_count;
+    struct vmx_msr_entry *msr_area = v->arch.hvm_vmx.host_msr_area;
+
+    for ( i = 0; i < msr_count; i++ )
+        if ( msr_area[i].index == msr )
+            return 0;
+
+    if ( msr_count == (PAGE_SIZE / sizeof(struct vmx_msr_entry)) )
+        return -ENOSPC;
+
+    if ( msr_area == NULL )
+    {
+        if ( (msr_area = alloc_xenheap_page()) == NULL )
+            return -ENOMEM;
+        v->arch.hvm_vmx.host_msr_area = msr_area;
+        __vmwrite(VM_EXIT_MSR_LOAD_ADDR, virt_to_maddr(msr_area));
+    }
+
+    msr_area[msr_count].index = msr;
+    msr_area[msr_count].mbz   = 0;
+    rdmsrl(msr, msr_area[msr_count].data);
+    v->arch.hvm_vmx.host_msr_count = ++msr_count;
+    __vmwrite(VM_EXIT_MSR_LOAD_COUNT, msr_count);
+
+    return 0;
 }
 
 int vmx_create_vmcs(struct vcpu *v)
 {
     struct arch_vmx_struct *arch_vmx = &v->arch.hvm_vmx;
+    int rc;
 
     if ( arch_vmx->vmcs == NULL )
     {
@@ -582,7 +719,12 @@ int vmx_create_vmcs(struct vcpu *v)
         arch_vmx->launched   = 0;
     }
 
-    construct_vmcs(v);
+    if ( (rc = construct_vmcs(v)) != 0 )
+    {
+        vmx_free_vmcs(arch_vmx->vmcs);
+        arch_vmx->vmcs = NULL;
+        return rc;
+    }
 
     return 0;
 }
