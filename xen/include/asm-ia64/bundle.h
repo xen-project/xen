@@ -55,7 +55,7 @@ typedef union U_INST64_I28 { // not privileged (mov from AR)
 
 typedef union U_INST64_M28 {
     IA64_INST inst;
-    struct { unsigned long qp:6, :14, r3:7, x6:6, x3:3, :1, major:4;};
+    struct { unsigned long qp:6, :14, r3:7, x6:6, x3:3, x:1, major:4;};
 } INST64_M28;
 
 typedef union U_INST64_M29 {
