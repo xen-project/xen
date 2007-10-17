@@ -150,8 +150,11 @@ void
  *  seg    : segment where the IPL data are located
  */
  void
-tcpa_ipl(seg)
+ tcpa_ipl(bootcd,seg,off,count)
+    Bit32u bootcd;
     Bit32u seg;
+    Bit32u off;
+    Bit32u count;
 {
 	ASM_START
 	DoUpcall(IDX_TCPA_IPL)

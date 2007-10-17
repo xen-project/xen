@@ -3378,6 +3378,13 @@ cdrom_boot()
   // Initial/Default Entry
   if(buffer[0x20]!=0x88)return 11; // Bootable
 
+#if BX_TCGBIOS
+  /* specs: 8.2.3 step 5 and 8.2.5.6, measure El Torito boot catalog */
+  /* measure 2048 bytes (one sector) */
+  tcpa_add_bootdevice((Bit32u)1L, (Bit32u)0L); /* bootcd = 1 */
+  tcpa_ipl((Bit32u)2L,(Bit32u)get_SS(),(Bit32u)buffer,(Bit32u)2048L);
+#endif
+
   write_byte(ebda_seg,&EbdaData->cdemu.media,buffer[0x21]);
   if(buffer[0x21]==0){
     // FIXME ElTorito Hardcoded. cdrom is hardcoded as device 0xE0. 
@@ -3415,6 +3422,13 @@ cdrom_boot()
   atacmd[5]=(lba & 0x000000ff);
   if((error = ata_cmd_packet(device, 12, get_SS(), atacmd, 0, nbsectors*512L, ATA_DATA_IN, boot_segment,0)) != 0)
     return 12;
+
+#if BX_TCGBIOS
+  /* specs: 8.2.3 step 4 and 8.2.5.6, measure El Torito boot image */
+  /* measure 1st 512 bytes  */
+  tcpa_ipl((Bit32u)1L,(Bit32u)boot_segment,(Bit32u)0L,(Bit32u)512L);
+#endif
+
 
   // Remember the media type
   switch(read_byte(ebda_seg,&EbdaData->cdemu.media)) {
@@ -7686,6 +7700,7 @@ ASM_END
 
 #if BX_TCGBIOS
     tcpa_add_bootdevice((Bit32u)0L, (Bit32u)bootdrv);
+    tcpa_ipl((Bit32u)0L,(Bit32u)bootseg,(Bit32u)0L,(Bit32u)512L); /* specs: 8.2.3 steps 4 and 5 */
 #endif
 
     /* Canonicalize bootseg:bootip */
@@ -7706,9 +7721,6 @@ ASM_END
 
     bootdrv = (Bit8u)(status>>8);
     bootseg = read_word(ebda_seg,&EbdaData->cdemu.load_segment);
-#if BX_TCGBIOS
-    tcpa_add_bootdevice((Bit32u)1L, (Bit32u)0L);
-#endif
 
     /* Canonicalize bootseg:bootip */
     bootip = (bootseg & 0x0fff) << 4;
@@ -7724,9 +7736,6 @@ ASM_END
   default: return;
   }
 
-#if BX_TCGBIOS
-  tcpa_ipl((Bit32u)bootseg);               /* specs: 8.2.3 steps 4 and 5 */
-#endif
   
   /* Jump to the boot vector */
 ASM_START
@@ -9795,15 +9804,13 @@ post_default_ints:
 #if BX_TCGBIOS
   call _tcpa_calling_int19h          /* specs: 8.2.3 step 1 */
   call _tcpa_add_event_separators    /* specs: 8.2.3 step 2 */
+  /* we do not call int 19h handler but keep following eventlog */
+  call _tcpa_returned_int19h         /* specs: 8.2.3 step 3/7 */
 #endif
 
   ;; Start the boot sequence.   See the comments in int19_relocated 
   ;; for why we use INT 18h instead of INT 19h here.
   int  #0x18
-
-#if BX_TCGBIOS
-  call _tcpa_returned_int19h         /* specs: 8.2.3 step 3/7 */
-#endif
 
 .org 0xe2c3 ; NMI Handler Entry Point
 nmi:
