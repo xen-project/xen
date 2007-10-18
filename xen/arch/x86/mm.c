@@ -3403,7 +3403,7 @@ static int ptwr_emulated_update(
         ol1e = l1e_from_intpte(old);
 
         okay = paging_cmpxchg_guest_entry(v, &l1e_get_intpte(*pl1e),
-                                          &t, val, _mfn(mfn));
+                                          &t, l1e_get_intpte(nl1e), _mfn(mfn));
         okay = (okay && t == old);
 
         if ( !okay )
