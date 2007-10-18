@@ -28,6 +28,7 @@
 #include <xen/memory.h>
 #include <xen/xsm/acm.h>
 #include <xen/xsm/acm_ops.h>
+#include <xen/xsm/flask_op.h>
 
 #ifdef __ia64__
 #define XC_PAGE_SHIFT           14
@@ -770,6 +771,8 @@ int xc_sysctl(int xc_handle, struct xen_sysctl *sysctl);
 int xc_version(int xc_handle, int cmd, void *arg);
 
 int xc_acm_op(int xc_handle, int cmd, void *arg, unsigned long arg_size);
+
+int xc_flask_op(int xc_handle, flask_op_t *op);
 
 /**************************
  * GRANT TABLE OPERATIONS *

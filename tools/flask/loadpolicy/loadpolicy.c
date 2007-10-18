@@ -17,8 +17,7 @@
 #include <sys/stat.h>
 #include <string.h>
 #include <unistd.h>
-
-#include <flask_op.h>
+#include <flask.h>
 
 #define USE_MMAP
 
