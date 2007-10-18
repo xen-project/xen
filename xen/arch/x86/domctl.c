@@ -531,10 +531,10 @@ long arch_do_domctl(
         struct hvm_iommu *hd;
         u8 bus, devfn;
 
-        if (!vtd_enabled)
+        ret = -EINVAL;
+        if ( !vtd_enabled )
             break;
 
-        ret = -EINVAL;
         if ( unlikely((d = get_domain_by_id(domctl->domain)) == NULL) ) {
             gdprintk(XENLOG_ERR,
                 "XEN_DOMCTL_assign_device: get_domain_by_id() failed\n"); 
@@ -543,6 +543,10 @@ long arch_do_domctl(
         hd = domain_hvm_iommu(d);
         bus = (domctl->u.assign_device.machine_bdf >> 16) & 0xff;
         devfn = (domctl->u.assign_device.machine_bdf >> 8) & 0xff;
+
+        if ( device_assigned(bus, devfn) )
+            break;
+
         ret = assign_device(d, bus, devfn);
         gdprintk(XENLOG_ERR, "XEN_DOMCTL_assign_device: bdf = %x:%x:%x\n",
             bus, PCI_SLOT(devfn), PCI_FUNC(devfn));

@@ -1813,6 +1813,21 @@ int iommu_setup(void)
     return -EIO;
 }
 
+/*
+ * If the device isn't owned by dom0, it means it already
+ * has been assigned to other domain, or it's not exist.
+ */
+int device_assigned(u8 bus, u8 devfn)
+{
+    struct pci_dev *pdev;
+
+    for_each_pdev( dom0, pdev )
+        if ( (pdev->bus == bus ) && (pdev->devfn == devfn) )
+            return 0;
+
+    return 1;
+}
+
 int assign_device(struct domain *d, u8 bus, u8 devfn)
 {
     struct hvm_iommu *hd  = domain_hvm_iommu(d);
