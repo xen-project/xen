@@ -972,6 +972,11 @@ void __init __start_xen(unsigned long mbi_p)
         if ( acpi_skip_timer_override &&
              !strstr(dom0_cmdline, "acpi_skip_timer_override") )
             safe_strcat(dom0_cmdline, " acpi_skip_timer_override");
+        if ( (strlen(acpi_param) == 0) && acpi_disabled )
+        {
+            printk("ACPI is disabled, notifying Domain 0 (acpi=off)\n");
+            safe_strcpy(acpi_param, "off");
+        }
         if ( (strlen(acpi_param) != 0) && !strstr(dom0_cmdline, "acpi=") )
         {
             safe_strcat(dom0_cmdline, " acpi=");
