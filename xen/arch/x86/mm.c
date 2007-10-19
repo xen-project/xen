@@ -152,7 +152,8 @@ unsigned long total_pages;
 #define PAGE_CACHE_ATTRS (_PAGE_PAT|_PAGE_PCD|_PAGE_PWT)
 
 #define l1_disallow_mask(d)                                     \
-    ((rangeset_is_empty((d)->iomem_caps) &&                     \
+    ((d != dom_io) &&                                           \
+     (rangeset_is_empty((d)->iomem_caps) &&                     \
       rangeset_is_empty((d)->arch.ioport_caps)) ?               \
      L1_DISALLOW_MASK : (L1_DISALLOW_MASK & ~PAGE_CACHE_ATTRS))
 
@@ -619,17 +620,15 @@ get_page_from_l1e(
 {
     unsigned long mfn = l1e_get_pfn(l1e);
     struct page_info *page = mfn_to_page(mfn);
-    unsigned int disallow_mask;
     int okay;
 
     if ( !(l1e_get_flags(l1e) & _PAGE_PRESENT) )
         return 1;
 
-    disallow_mask = l1_disallow_mask((d == dom_io) ? current->domain : d);
-    if ( unlikely(l1e_get_flags(l1e) & disallow_mask) )
+    if ( unlikely(l1e_get_flags(l1e) & l1_disallow_mask(d)) )
     {
         MEM_LOG("Bad L1 flags %x",
-                l1e_get_flags(l1e) & disallow_mask);
+                l1e_get_flags(l1e) & l1_disallow_mask(d));
         return 0;
     }
 
