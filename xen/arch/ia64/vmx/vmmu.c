@@ -22,6 +22,7 @@
 #include <asm/vmx_vcpu.h>
 #include <asm/vmx_pal_vsa.h>
 #include <xen/sched-if.h>
+#include <asm/vhpt.h>
 
 static int default_vtlb_sz = DEFAULT_VTLB_SZ;
 static int default_vhpt_sz = DEFAULT_VHPT_SZ;
@@ -36,17 +37,6 @@ static void __init parse_vtlb_size(char *s)
         if (default_vtlb_sz < 14)
             default_vtlb_sz = 14;
     }
-}
-
-static int canonicalize_vhpt_size(int sz)
-{
-    /* minimum 32KB */
-    if (sz < 15)
-        return 15;
-    /* maximum 8MB (since purging TR is hard coded) */
-    if (sz > IA64_GRANULE_SHIFT - 1)
-        return IA64_GRANULE_SHIFT - 1;
-    return sz;
 }
 
 static void __init parse_vhpt_size(char *s)
@@ -96,8 +86,14 @@ static u64 get_mfn(struct domain *d, u64 gpfn)
 static int init_domain_vhpt(struct vcpu *v)
 {
     int rc;
+    u64 size = v->domain->arch.hvm_domain.params[HVM_PARAM_VHPT_SIZE];
 
-    rc = thash_alloc(&(v->arch.vhpt), default_vhpt_sz, "vhpt");
+    if (size == 0)
+        size = default_vhpt_sz;
+    else
+        size = canonicalize_vhpt_size(size);
+
+    rc = thash_alloc(&(v->arch.vhpt), size, "vhpt");
     v->arch.arch_vmx.mpta = v->arch.vhpt.pta.val;
     return rc;
 }

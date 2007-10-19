@@ -84,5 +84,18 @@ vcpu_pta(struct vcpu* v)
         (VHPT_SIZE_LOG2 << 2) | VHPT_ENABLED;
 }
 
+static inline int
+canonicalize_vhpt_size(int sz)
+{
+    /* minimum 32KB */
+    if (sz < 15)
+        return 15;
+    /* maximum 8MB (since purging TR is hard coded) */
+    if (sz > IA64_GRANULE_SHIFT - 1)
+        return IA64_GRANULE_SHIFT - 1;
+    return sz;
+}
+
+
 #endif /* !__ASSEMBLY */
 #endif

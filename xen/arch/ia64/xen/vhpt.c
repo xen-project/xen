@@ -28,12 +28,13 @@ DEFINE_PER_CPU(volatile u32, vhpt_tlbflush_timestamp);
 #endif
 
 static void
-__vhpt_flush(unsigned long vhpt_maddr)
+__vhpt_flush(unsigned long vhpt_maddr, unsigned long vhpt_size_log2)
 {
 	struct vhpt_lf_entry *v = (struct vhpt_lf_entry*)__va(vhpt_maddr);
+	unsigned long num_entries = 1 << (vhpt_size_log2 - 5);
 	int i;
 
-	for (i = 0; i < VHPT_NUM_ENTRIES; i++, v++)
+	for (i = 0; i < num_entries; i++, v++)
 		v->ti_tag = INVALID_TI_TAG;
 }
 
@@ -42,7 +43,7 @@ local_vhpt_flush(void)
 {
 	/* increment flush clock before flush */
 	u32 flush_time = tlbflush_clock_inc_and_return();
-	__vhpt_flush(__ia64_per_cpu_var(vhpt_paddr));
+	__vhpt_flush(__ia64_per_cpu_var(vhpt_paddr), VHPT_SIZE_LOG2);
 	/* this must be after flush */
 	tlbflush_update_time(&__get_cpu_var(vhpt_tlbflush_timestamp),
 	                     flush_time);
@@ -52,17 +53,23 @@ local_vhpt_flush(void)
 void
 vcpu_vhpt_flush(struct vcpu* v)
 {
-	__vhpt_flush(vcpu_vhpt_maddr(v));
+	unsigned long vhpt_size_log2 = VHPT_SIZE_LOG2;
+#ifdef CONFIG_XEN_IA64_PERVCPU_VHPT
+	if (HAS_PERVCPU_VHPT(v->domain))
+		vhpt_size_log2 = v->arch.pta.size;
+#endif
+	__vhpt_flush(vcpu_vhpt_maddr(v), vhpt_size_log2);
 	perfc_incr(vcpu_vhpt_flush);
 }
 
 static void
-vhpt_erase(unsigned long vhpt_maddr)
+vhpt_erase(unsigned long vhpt_maddr, unsigned long vhpt_size_log2)
 {
 	struct vhpt_lf_entry *v = (struct vhpt_lf_entry*)__va(vhpt_maddr);
+	unsigned long num_entries = 1 << (vhpt_size_log2 - 5);
 	int i;
 
-	for (i = 0; i < VHPT_NUM_ENTRIES; i++, v++) {
+	for (i = 0; i < num_entries; i++, v++) {
 		v->itir = 0;
 		v->CChain = 0;
 		v->page_flags = 0;
@@ -140,7 +147,7 @@ void __init vhpt_init(void)
 	__get_cpu_var(vhpt_pend) = paddr + (1 << VHPT_SIZE_LOG2) - 1;
 	printk(XENLOG_DEBUG "vhpt_init: vhpt paddr=0x%lx, end=0x%lx\n",
 	       paddr, __get_cpu_var(vhpt_pend));
-	vhpt_erase(paddr);
+	vhpt_erase(paddr, VHPT_SIZE_LOG2);
 	// we don't enable VHPT here.
 	// context_switch() or schedule_tail() does it.
 }
@@ -151,6 +158,11 @@ pervcpu_vhpt_alloc(struct vcpu *v)
 {
 	unsigned long vhpt_size_log2 = VHPT_SIZE_LOG2;
 
+	if (v->domain->arch.vhpt_size_log2 > 0)
+	    vhpt_size_log2 =
+		canonicalize_vhpt_size(v->domain->arch.vhpt_size_log2);
+	printk(XENLOG_DEBUG "%s vhpt_size_log2=%ld\n",
+	       __func__, vhpt_size_log2);
 	v->arch.vhpt_entries =
 		(1UL << vhpt_size_log2) / sizeof(struct vhpt_lf_entry);
 	v->arch.vhpt_page =
@@ -164,11 +176,11 @@ pervcpu_vhpt_alloc(struct vcpu *v)
 
 	v->arch.pta.val = 0; // to zero reserved bits
 	v->arch.pta.ve = 1; // enable vhpt
-	v->arch.pta.size = VHPT_SIZE_LOG2;
+	v->arch.pta.size = vhpt_size_log2;
 	v->arch.pta.vf = 1; // long format
 	v->arch.pta.base = __va_ul(v->arch.vhpt_maddr) >> 15;
 
-	vhpt_erase(v->arch.vhpt_maddr);
+	vhpt_erase(v->arch.vhpt_maddr, vhpt_size_log2);
 	smp_mb(); // per vcpu vhpt may be used by another physical cpu.
 	return 0;
 }
@@ -178,7 +190,7 @@ pervcpu_vhpt_free(struct vcpu *v)
 {
 	if (likely(v->arch.vhpt_page != NULL))
 		free_domheap_pages(v->arch.vhpt_page,
-		                   VHPT_SIZE_LOG2 - PAGE_SHIFT);
+		                   v->arch.pta.size - PAGE_SHIFT);
 }
 #endif
 
