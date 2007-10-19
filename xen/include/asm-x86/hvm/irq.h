@@ -33,6 +33,7 @@ struct hvm_irq_dpci_mapping {
     uint8_t valid;
     uint8_t device;
     uint8_t intx;
+    struct domain *dom;
     union {
         uint8_t guest_gsi;
         uint8_t machine_gsi;
@@ -45,6 +46,7 @@ struct hvm_irq_dpci {
     /* Guest IRQ to guest device/intx mapping. */
     struct hvm_irq_dpci_mapping girq[NR_IRQS];
     DECLARE_BITMAP(dirq_mask, NR_IRQS);
+    struct timer hvm_timer[NR_IRQS];
 };
 
 struct hvm_irq {

@@ -492,7 +492,6 @@ acpi_parse_dmar(unsigned long phys_addr, unsigned long size)
 
 int acpi_dmar_init(void)
 {
-    extern int ioapic_ack_new;
     int rc;
 
     if (!vtd_enabled)
@@ -508,9 +507,6 @@ int acpi_dmar_init(void)
         vtd_enabled = 0;
         return -ENODEV;
     }
-
-    /* Use fake-vector style of IOAPIC acknowledgement. */
-    ioapic_ack_new = 0;
 
     return 0;
 }

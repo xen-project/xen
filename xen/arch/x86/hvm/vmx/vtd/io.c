@@ -45,6 +45,18 @@
 #include <public/hvm/ioreq.h>
 #include <public/domctl.h>
 
+static void pt_irq_time_out(void *data)
+{
+    struct hvm_irq_dpci_mapping *irq_map = data;
+    unsigned int guest_gsi, machine_gsi;
+    struct domain *d = irq_map->dom;
+
+    guest_gsi = irq_map->guest_gsi;
+    machine_gsi = d->arch.hvm_domain.irq.dpci->girq[guest_gsi].machine_gsi;
+    clear_bit(machine_gsi, d->arch.hvm_domain.irq.dpci->dirq_mask);
+    hvm_dpci_eoi(irq_map->dom, guest_gsi, NULL);
+}
+
 int pt_irq_create_bind_vtd(
     struct domain *d, xen_domctl_bind_pt_irq_t *pt_irq_bind)
 {
@@ -76,17 +88,22 @@ int pt_irq_create_bind_vtd(
     hvm_irq_dpci->mirq[machine_gsi].device = device;
     hvm_irq_dpci->mirq[machine_gsi].intx = intx;
     hvm_irq_dpci->mirq[machine_gsi].guest_gsi = guest_gsi;
+    hvm_irq_dpci->mirq[machine_gsi].dom = d;
 
     hvm_irq_dpci->girq[guest_gsi].valid = 1;
     hvm_irq_dpci->girq[guest_gsi].device = device;
     hvm_irq_dpci->girq[guest_gsi].intx = intx;
     hvm_irq_dpci->girq[guest_gsi].machine_gsi = machine_gsi;
+    hvm_irq_dpci->girq[guest_gsi].dom = d;
 
-    /* Deal with gsi for legacy devices */
+    init_timer(&hvm_irq_dpci->hvm_timer[irq_to_vector(machine_gsi)],
+               pt_irq_time_out, &hvm_irq_dpci->mirq[machine_gsi], 0);
+
+    /* Deal with GSI for legacy devices. */
     pirq_guest_bind(d->vcpu[0], machine_gsi, BIND_PIRQ__WILL_SHARE);
     gdprintk(XENLOG_ERR,
-        "XEN_DOMCTL_irq_mapping: m_irq = %x device = %x intx = %x\n",
-        machine_gsi, device, intx);
+             "XEN_DOMCTL_irq_mapping: m_irq = %x device = %x intx = %x\n",
+             machine_gsi, device, intx);
 
     return 0;
 }
@@ -114,22 +131,25 @@ int hvm_do_IRQ_dpci(struct domain *d, unsigned int mirq)
         hvm_irq->dpci->girq[isa_irq].machine_gsi = mirq;
     }
 
-    if ( !test_and_set_bit(mirq, hvm_irq->dpci->dirq_mask) )
-    {
-        vcpu_kick(d->vcpu[0]);
-        return 1;
-    }
+    /*
+     * Set a timer here to avoid situations where the IRQ line is shared, and
+     * the device belonging to the pass-through guest is not yet active. In
+     * this case the guest may not pick up the interrupt (e.g., masked at the
+     * PIC) and we need to detect that.
+     */
+    set_bit(mirq, hvm_irq->dpci->dirq_mask);
+    set_timer(&hvm_irq->dpci->hvm_timer[irq_to_vector(mirq)],
+              NOW() + PT_IRQ_TIME_OUT);
+    vcpu_kick(d->vcpu[0]);
 
-    dprintk(XENLOG_INFO, "mirq already pending\n");
-    return 0;
+    return 1;
 }
 
-void hvm_dpci_eoi(unsigned int guest_gsi, union vioapic_redir_entry *ent)
+void hvm_dpci_eoi(struct domain *d, unsigned int guest_gsi,
+                  union vioapic_redir_entry *ent)
 {
-    struct domain *d = current->domain;
     struct hvm_irq_dpci *hvm_irq_dpci = d->arch.hvm_domain.irq.dpci;
     uint32_t device, intx, machine_gsi;
-    irq_desc_t *desc;
 
     ASSERT(spin_is_locked(&d->arch.hvm_domain.irq_lock));
 
@@ -137,17 +157,15 @@ void hvm_dpci_eoi(unsigned int guest_gsi, union vioapic_redir_entry *ent)
          !hvm_irq_dpci->girq[guest_gsi].valid )
         return;
 
+    machine_gsi = hvm_irq_dpci->girq[guest_gsi].machine_gsi;
+    stop_timer(&hvm_irq_dpci->hvm_timer[irq_to_vector(machine_gsi)]);
     device = hvm_irq_dpci->girq[guest_gsi].device;
     intx = hvm_irq_dpci->girq[guest_gsi].intx;
-    machine_gsi = hvm_irq_dpci->girq[guest_gsi].machine_gsi;
     gdprintk(XENLOG_INFO, "hvm_dpci_eoi:: device %x intx %x\n",
              device, intx);
     __hvm_pci_intx_deassert(d, device, intx);
-    if ( (ent == NULL) || (ent->fields.mask == 0) )
-    {
-        desc = &irq_desc[irq_to_vector(machine_gsi)];
-        desc->handler->end(irq_to_vector(machine_gsi));
-    }
+    if ( (ent == NULL) || !ent->fields.mask )
+        pirq_guest_eoi(d, machine_gsi);
 }
 
 void iommu_domain_destroy(struct domain *d)

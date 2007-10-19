@@ -18,10 +18,10 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307 USA
  */
 
+#include <xen/sched.h>
 #include <asm/hvm/iommu.h>
 #include <asm/amd-iommu.h>
 #include <asm/hvm/svm/amd-iommu-proto.h>
-#include <xen/sched.h>
 
 extern long amd_iommu_poll_comp_wait;
 

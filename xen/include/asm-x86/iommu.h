@@ -79,7 +79,8 @@ void iommu_domain_teardown(struct domain *d);
 int hvm_do_IRQ_dpci(struct domain *d, unsigned int irq);
 int dpci_ioport_intercept(ioreq_t *p);
 int pt_irq_create_bind_vtd(struct domain *d,
-    xen_domctl_bind_pt_irq_t * pt_irq_bind);
+                           xen_domctl_bind_pt_irq_t *pt_irq_bind);
 
+#define PT_IRQ_TIME_OUT MILLISECS(8)
 
-#endif // _IOMMU_H_
+#endif /* _IOMMU_H_ */
