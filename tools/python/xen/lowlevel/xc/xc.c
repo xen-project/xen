@@ -529,6 +529,86 @@ static PyObject *pyxc_set_hvm_param(XcObject *self,
     return zero;
 }
 
+static int token_value(char *token)
+{
+    token = strchr(token, 'x');
+    token = token + 1;
+
+    return ((int) strtol(token, NULL, 16));
+}
+
+static int first_bdf(char *pci_str, char **last,
+                     int *seg, int *bus, int *dev, int *func)
+{
+    char *token;
+
+    token = strtok_r(pci_str, ",", last);
+    if ( !token )
+        return 0;
+
+    *seg  = token_value(token);
+    token = strtok_r(NULL, ",", last);
+    *bus  = token_value(token);
+    token = strtok_r(NULL, ",", last);
+    *dev  = token_value(token);
+    token = strtok_r(NULL, ",", last);
+    *func  = token_value(token);
+
+    return 1;
+}
+
+static int next_bdf(char **last, int *seg, int *bus, int *dev, int *func)
+{
+    char *token;
+
+    token = strtok_r(NULL, ",", last);
+    if ( !token )
+        return 0;
+
+    *seg  = token_value(token);
+    token = strtok_r(NULL, ",", last);
+    *bus  = token_value(token);
+    token = strtok_r(NULL, ",", last);
+    *dev  = token_value(token);
+    token = strtok_r(NULL, ",", last);
+    *func  = token_value(token);
+
+    return 1;
+}
+
+static PyObject *pyxc_assign_device(XcObject *self,
+                                    PyObject *args,
+                                    PyObject *kwds)
+{
+    uint32_t dom;
+    char *pci_str;
+    uint32_t bdf = 0;
+    int seg, bus, dev, func;
+    int get_bdf;
+    char *last = NULL;
+
+    static char *kwd_list[] = { "domid", "pci", NULL };
+    if ( !PyArg_ParseTupleAndKeywords(args, kwds, "i|s", kwd_list,
+                                      &dom, &pci_str) )
+        return NULL;
+
+    for ( get_bdf = first_bdf(pci_str, &last, &seg, &bus, &dev, &func);
+          get_bdf;
+          get_bdf = next_bdf(&last, &seg, &bus, &dev, &func) )
+    {
+        bdf |= (bus & 0xff) << 16;
+        bdf |= (dev & 0x1f) << 11;
+        bdf |= (func & 0x7) << 8;
+
+        if ( xc_assign_device(self->xc_handle, dom, bdf) != 0 )
+            break;
+
+        bdf = 0;
+    }
+
+    return Py_BuildValue("i", bdf);
+}
+
 #ifdef __ia64__
 static PyObject *pyxc_nvram_init(XcObject *self,
                                  PyObject *args)
@@ -1349,6 +1429,14 @@ static PyMethodDef pyxc_methods[] = {
       " value   [long]:     Value of param.\n"
       "Returns: [int] 0 on success.\n" },
 
+     { "assign_device",
+       (PyCFunction)pyxc_assign_device,
+       METH_VARARGS | METH_KEYWORDS, "\n"
+       "assign device with VT-d.\n"
+       " dom     [int]:      Identifier of domain to build into.\n"
+       " pci_str [str]:      PCI devices.\n"
+       "Returns: [int] 0 on success, or device bdf that can't be assigned.\n" },
+  
     { "sched_id_get",
       (PyCFunction)pyxc_sched_id_get,
       METH_NOARGS, "\n"
