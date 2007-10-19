@@ -92,7 +92,6 @@ class Machine:
 
         xenValues = {"nr_cpus"          : "Unknown",
                      "nr_nodes"         : "Unknown",
-                     "sockets_per_node" : "Unknown",
                      "cores_per_socket" : "Unknown",
                      "threads_per_core" : "Unknown",
                      "cpu_mhz"          : "Unknown",

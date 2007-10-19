@@ -251,7 +251,7 @@ long arch_do_sysctl(xen_sysctl_t *op, XEN_GUEST_HANDLE(xen_sysctl_t) u_sysctl)
     {
     case XEN_SYSCTL_physinfo:
     {
-        int i, node_cpus = 0;
+        int i;
         uint32_t max_array_ent;
 
         xen_sysctl_physinfo_t *pi = &op->u.physinfo;
@@ -259,18 +259,8 @@ long arch_do_sysctl(xen_sysctl_t *op, XEN_GUEST_HANDLE(xen_sysctl_t) u_sysctl)
         pi->threads_per_core = cpus_weight(cpu_sibling_map[0]);
         pi->cores_per_socket =
             cpus_weight(cpu_core_map[0]) / pi->threads_per_core;
+        pi->nr_cpus          = (u32)num_online_cpus();
         pi->nr_nodes         = num_online_nodes();
-
-        /*
-         * Guess at a sockets_per_node value.  Use the maximum number of
-         * CPUs per node to avoid deconfigured CPUs breaking the average.
-         */
-        for_each_online_node(i)
-            node_cpus = max(node_cpus, cpus_weight(node_to_cpumask(i)));
-
-        pi->sockets_per_node = node_cpus / 
-            (pi->cores_per_socket * pi->threads_per_core);
-
         pi->total_pages      = total_pages; 
         pi->free_pages       = avail_domheap_pages();
         pi->scrub_pages      = avail_scrub_pages();

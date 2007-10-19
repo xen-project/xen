@@ -460,10 +460,7 @@ unsigned int get_num_cpus(void)
     xc_interface_close(xc_handle);
     opts.cpu_freq = (double)physinfo.cpu_khz/1000.0;
 
-    return (physinfo.threads_per_core *
-            physinfo.cores_per_socket *
-            physinfo.sockets_per_node *
-            physinfo.nr_nodes);
+    return physinfo.nr_cpus;
 }
 
 

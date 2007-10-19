@@ -801,7 +801,7 @@ static PyObject *pyxc_physinfo(XcObject *self)
                             "max_cpu_id",       info.max_cpu_id,
                             "threads_per_core", info.threads_per_core,
                             "cores_per_socket", info.cores_per_socket,
-                            "sockets_per_node", info.sockets_per_node,
+                            "nr_cpus",          info.nr_cpus, 
                             "total_memory",     pages_to_kib(info.total_pages),
                             "free_memory",      pages_to_kib(info.free_pages),
                             "scrub_memory",     pages_to_kib(info.scrub_pages),

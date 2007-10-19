@@ -155,9 +155,7 @@ xenstat_node *xenstat_get_node(xenstat_handle * handle, unsigned int flags)
 	}
 
 	node->cpu_hz = ((unsigned long long)physinfo.cpu_khz) * 1000ULL;
-	node->num_cpus =
-	    (physinfo.threads_per_core * physinfo.cores_per_socket *
-	     physinfo.sockets_per_node * physinfo.nr_nodes);
+        node->num_cpus = physinfo.nr_cpus;
 	node->tot_mem = ((unsigned long long)physinfo.total_pages)
 	    * handle->page_size;
 	node->free_mem = ((unsigned long long)physinfo.free_pages)

@@ -51,10 +51,8 @@ long arch_do_sysctl(
             cpus_weight(cpu_sibling_map[0]);
         pi->cores_per_socket =
             cpus_weight(cpu_core_map[0]) / pi->threads_per_core;
+        pi->nr_cpus = (u32)num_online_cpus();
         pi->nr_nodes = num_online_nodes();
-        pi->sockets_per_node = num_online_cpus() / 
-            (pi->nr_nodes * pi->cores_per_socket * pi->threads_per_core);
-
         pi->total_pages      = total_pages;
         pi->free_pages       = avail_domheap_pages();
         pi->scrub_pages      = avail_scrub_pages();
