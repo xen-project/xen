@@ -210,6 +210,10 @@ gopts.var('vcpu_avail', val='VCPUS',
           fn=set_long, default=None,
           use="Bitmask for virtual CPUs to make available immediately.")
 
+gopts.var('vhpt', val='VHPT',
+          fn=set_int, default=0,
+          use="Log2 of domain VHPT size for IA64.")
+
 gopts.var('cpu_cap', val='CAP',
           fn=set_int, default=None,
           use="""Set the maximum amount of cpu.
@@ -555,7 +559,10 @@ def configure_image(vals):
 
     if vals.builder == 'hvm':
         configure_hvm(config_image, vals) 
-       
+
+    if vals.vhpt != 0:
+        config_image.append(['vhpt', vals.vhpt])
+
     return config_image
     
 def configure_disks(config_devs, vals):

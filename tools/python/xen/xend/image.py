@@ -197,6 +197,7 @@ class ImageHandler:
 class LinuxImageHandler(ImageHandler):
 
     ostype = "linux"
+    flags = 0
 
     def buildDomain(self):
         store_evtchn = self.vm.getStorePort()
@@ -213,6 +214,8 @@ class LinuxImageHandler(ImageHandler):
         log.debug("ramdisk        = %s", self.ramdisk)
         log.debug("vcpus          = %d", self.vm.getVCpuCount())
         log.debug("features       = %s", self.vm.getFeatures())
+        if arch.type == "ia64":
+            log.debug("vhpt          = %d", self.flags)
 
         return xc.linux_build(domid          = self.vm.getDomid(),
                               memsize        = mem_mb,
@@ -221,7 +224,8 @@ class LinuxImageHandler(ImageHandler):
                               console_evtchn = console_evtchn,
                               cmdline        = self.cmdline,
                               ramdisk        = self.ramdisk,
-                              features       = self.vm.getFeatures())
+                              features       = self.vm.getFeatures(),
+                              flags          = self.flags)
 
 class PPC_LinuxImageHandler(LinuxImageHandler):
 
@@ -500,8 +504,13 @@ class HVMImageHandler(ImageHandler):
 
 class IA64_HVM_ImageHandler(HVMImageHandler):
 
+    def configure(self, vmConfig):
+        HVMImageHandler.configure(self, vmConfig)
+        self.vhpt = int(vmConfig['platform'].get('vhpt',  0))
+
     def buildDomain(self):
         xc.nvram_init(self.vm.getName(), self.vm.getDomid())
+        xc.hvm_set_param(self.vm.getDomid(), HVM_PARAM_VHPT_SIZE, self.vhpt)
         return HVMImageHandler.buildDomain(self)
 
     def getRequiredAvailableMemory(self, mem_kb):
@@ -517,6 +526,16 @@ class IA64_HVM_ImageHandler(HVMImageHandler):
     def getRequiredShadowMemory(self, shadow_mem_kb, maxmem_kb):
         # Explicit shadow memory is not a concept 
         return 0
+
+class IA64_Linux_ImageHandler(LinuxImageHandler):
+
+    def configure(self, vmConfig):
+        LinuxImageHandler.configure(self, vmConfig)
+        self.vhpt = int(vmConfig['platform'].get('vhpt',  0))
+
+    def buildDomain(self):
+        self.flags = self.vhpt
+        return LinuxImageHandler.buildDomain(self)
 
 class X86_HVM_ImageHandler(HVMImageHandler):
 
@@ -562,7 +581,7 @@ _handlers = {
         "linux": PPC_LinuxImageHandler,
     },
     "ia64": {
-        "linux": LinuxImageHandler,
+        "linux": IA64_Linux_ImageHandler,
         "hvm": IA64_HVM_ImageHandler,
     },
     "x86": {
