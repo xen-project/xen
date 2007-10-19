@@ -61,7 +61,7 @@ compat/%.c: public/%.h xlat.lst Makefile
 compat/xlat.h: xlat.lst $(filter-out compat/xlat.h,$(headers-y)) $(BASEDIR)/tools/get-fields.sh Makefile
 	grep -v '^[	 ]*#' xlat.lst | \
 	while read what name hdr; do \
-		/bin/bash $(BASEDIR)/tools/get-fields.sh "$$what" compat_$$name $$(echo compat/$$hdr | sed 's,@arch@,$(compat-arch-y),g') || exit $$?; \
+		/bin/sh $(BASEDIR)/tools/get-fields.sh "$$what" compat_$$name $$(echo compat/$$hdr | sed 's,@arch@,$(compat-arch-y),g') || exit $$?; \
 	done >$@.new
 	mv -f $@.new $@
 
