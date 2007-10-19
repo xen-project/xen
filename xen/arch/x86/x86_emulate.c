@@ -299,21 +299,21 @@ struct operand {
 #define EFLAGS_MASK (EFLG_OF|EFLG_SF|EFLG_ZF|EFLG_AF|EFLG_PF|EFLG_CF)
 
 /* Before executing instruction: restore necessary bits in EFLAGS. */
-#define _PRE_EFLAGS(_sav, _msk, _tmp)           \
-/* EFLAGS = (_sav & _msk) | (EFLAGS & ~_msk); */\
-"push %"_sav"; "                                \
-"movl %"_msk",%"_LO32 _tmp"; "                  \
-"andl %"_LO32 _tmp",("_STK"); "                 \
-"pushf; "                                       \
-"notl %"_LO32 _tmp"; "                          \
-"andl %"_LO32 _tmp",("_STK"); "                 \
-"pop  %"_tmp"; "                                \
-"orl  %"_LO32 _tmp",("_STK"); "                 \
-"popf; "                                        \
-/* _sav &= ~msk; */                             \
-"movl %"_msk",%"_LO32 _tmp"; "                  \
-"notl %"_LO32 _tmp"; "                          \
-"andl %"_LO32 _tmp",%"_sav"; "
+#define _PRE_EFLAGS(_sav, _msk, _tmp)                           \
+/* EFLAGS = (_sav & _msk) | (EFLAGS & ~_msk); _sav &= ~_msk; */ \
+"movl %"_sav",%"_LO32 _tmp"; "                                  \
+"push %"_tmp"; "                                                \
+"push %"_tmp"; "                                                \
+"movl %"_msk",%"_LO32 _tmp"; "                                  \
+"andl %"_LO32 _tmp",("_STK"); "                                 \
+"pushf; "                                                       \
+"notl %"_LO32 _tmp"; "                                          \
+"andl %"_LO32 _tmp",("_STK"); "                                 \
+"andl %"_LO32 _tmp","STR(BITS_PER_LONG/4)"("_STK"); "           \
+"pop  %"_tmp"; "                                                \
+"orl  %"_LO32 _tmp",("_STK"); "                                 \
+"popf; "                                                        \
+"pop  %"_sav"; "
 
 /* After executing instruction: write-back necessary bits in EFLAGS. */
 #define _POST_EFLAGS(_sav, _msk, _tmp)          \
