@@ -31,48 +31,28 @@ extern FILE *logfile;
 
 static int token_value(char *token)
 {
-    token = strchr(token, 'x');
-    token = token + 1;
-
-    return ((int) strtol(token, NULL, 16));
+    token = strchr(token, 'x') + 1;
+    return strtol(token, NULL, 16);
 }
 
-static int first_bdf(char *pci_str, char **last,
-                     int *seg, int *bus, int *dev, int *func)
+static int next_bdf(char **str, int *seg, int *bus, int *dev, int *func)
 {
     char *token;
 
-    token = strtok_r(pci_str, ",", last);
+    token = strchr(*str, ',');
     if ( !token )
         return 0;
+    token++;
 
     *seg  = token_value(token);
-    token = strtok_r(NULL, ",", last);
+    token = strchr(token, ',') + 1;
     *bus  = token_value(token);
-    token = strtok_r(NULL, ",", last);
+    token = strchr(token, ',') + 1;
     *dev  = token_value(token);
-    token = strtok_r(NULL, ",", last);
+    token = strchr(token, ',') + 1;
     *func  = token_value(token);
 
-    return 1;
-}
-
-static int next_bdf(char **last, int *seg, int *bus, int *dev, int *func)
-{
-    char *token;
-
-    token = strtok_r(NULL, ",", last);
-    if ( !token )
-        return 0;
-
-    *seg  = token_value(token);
-    token = strtok_r(NULL, ",", last);
-    *bus  = token_value(token);
-    token = strtok_r(NULL, ",", last);
-    *dev  = token_value(token);
-    token = strtok_r(NULL, ",", last);
-    *func  = token_value(token);
-
+    *str = token;
     return 1;
 }
 
@@ -422,8 +402,6 @@ int pt_init(PCIBus *e_bus, char *direct_pci)
     int seg, b, d, f;
     struct pt_dev *pt_dev;
     struct pci_access *pci_access;
-    int get_bdf;
-    char *last = NULL;
 
     /* Initialize libpci */
     pci_access = pci_alloc();
@@ -436,9 +414,7 @@ int pt_init(PCIBus *e_bus, char *direct_pci)
     pci_scan_bus(pci_access);
 
     /* Assign given devices to guest */
-    for ( get_bdf = first_bdf(direct_pci, &last, &seg, &b, &d, &f);
-          get_bdf;
-          get_bdf = next_bdf(&last, &seg, &b, &d, &f) )
+    while ( next_bdf(&direct_pci, &seg, &b, &d, &f) )
     {
         /* Register real device with the emulated bus */
         pt_dev = register_real_device(e_bus, "DIRECT PCI", PT_VIRT_DEVFN_AUTO,
