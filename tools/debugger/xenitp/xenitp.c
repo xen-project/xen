@@ -687,7 +687,6 @@ static volatile int ctrl_c_hit;
 
 void ctrl_c_handler (int sig)
 {
-    fflush (stdout);
     ctrl_c_hit = 1;
 }
 
@@ -716,6 +715,7 @@ int wait_domain (int vcpu, vcpu_guest_context_t *ctx)
             break;
 
         if (ctrl_c_hit) {
+            fflush (stdout);
             /* Force pause.  */
             ret = xc_domain_pause (xc_handle, domid);
             if (ret < 0)
@@ -957,48 +957,49 @@ int vcpu_setcontext (int vcpu)
     return ret;
 }
 
+enum cmd_status { CMD_ERROR, CMD_OK, CMD_REPEAT, CMD_QUIT };
+
 struct command_desc
 {
     const char *name;
     const char *help;
-    int (*cmd)(char *line);
+    enum cmd_status (*cmd)(char *line);
 };
 
-static int
+static enum cmd_status
 cmd_registers (char *line)
 {
     print_ctx (cur_ctx);
-    return 0;
+    return CMD_OK;
 }
 
-static int
+static enum cmd_status
 cmd_sstep (char *line)
 {
-    if ((cur_ctx->regs.psr & (PSR_SS | PSR_TB)) != PSR_SS) {
-        cur_ctx->regs.psr |= PSR_SS;
-        cur_ctx->regs.psr &= ~PSR_TB;
-        if (vcpu_setcontext (cur_vcpu) < 0)
-            return -1;
-    }
+    /* Set psr.dd and psr.id to skip over current breakpoint.  */
+    cur_ctx->regs.psr |= PSR_SS | PSR_DD | PSR_ID;
+    cur_ctx->regs.psr &= ~PSR_TB;
+    if (vcpu_setcontext (cur_vcpu) < 0)
+        return CMD_ERROR;
 
     if (wait_domain (cur_vcpu, cur_ctx) < 0) {
         perror ("wait_domain");
-        return -1;
+        return CMD_ERROR;
     }
 
     print_ctx (cur_ctx);
 
-    return 0;
+    return CMD_REPEAT;
 }
 
-static int
+static enum cmd_status
 cmd_go (char *line)
 {
     unsigned long n = 1;
 
     if (*line != 0) {
         if (parse_expr (&line, &n, 0) < 0)
-            return -1;
+            return CMD_ERROR;
     }
     while (n > 0) {
         /* Set psr.dd and psr.id to skip over current breakpoint.  */
@@ -1006,54 +1007,58 @@ cmd_go (char *line)
             cur_ctx->regs.psr &= ~(PSR_SS | PSR_TB);
             cur_ctx->regs.psr |= PSR_DD | PSR_ID;
             if (vcpu_setcontext (cur_vcpu) < 0)
-                return -1;
+                return CMD_ERROR;
         }
 
         if (wait_domain (cur_vcpu, cur_ctx) < 0) {
             perror ("wait_domain");
-            return -1;
+            return CMD_ERROR;
         }
         print_ctx (cur_ctx);
         n--;
     }
 
-    return 0;
+    return CMD_REPEAT;
 }
 
-static int
+static enum cmd_status
 cmd_cb (char *line)
 {
     if ((cur_ctx->regs.psr & (PSR_SS | PSR_TB)) != PSR_TB) {
         cur_ctx->regs.psr &= ~PSR_SS;
         cur_ctx->regs.psr |= PSR_TB;
         if (vcpu_setcontext (cur_vcpu) < 0)
-            return -1;
+            return CMD_ERROR;
     }
 
     if (wait_domain (cur_vcpu, cur_ctx) < 0) {
         perror ("wait_domain");
-        return -1;
+        return CMD_ERROR;
     }
 
     print_ctx (cur_ctx);
 
-    return 0;
+    return CMD_REPEAT;
 }
 
-static int
+static int quit_paused;
+
+static enum cmd_status
 cmd_quit (char *line)
 {
-    return -2;
+    if (!strcmp (line, "paused"))
+        quit_paused = 1;
+    return CMD_QUIT;
 }
 
-static int
+static enum cmd_status
 cmd_echo (char *line)
 {
     printf ("%s", line);
-    return 0;
+    return CMD_OK;
 }
 
-static int
+static enum cmd_status
 cmd_disassemble (char *args)
 {
     static unsigned long addr;
@@ -1061,21 +1066,20 @@ cmd_disassemble (char *args)
 
     if (*args != 0) {
         if (parse_expr (&args, &addr, 0) < 0)
-            return -1;
+            return CMD_ERROR;
         if (*args != 0) {
             if (parse_expr (&args, &end_addr, 0) < 0)
-                return -1;
+                return CMD_ERROR;
         }
         else 
             end_addr = addr + 16;
     }
     target_disas (stdout, addr, end_addr - addr);
     addr = end_addr;
-    return 0;
-
+    return CMD_REPEAT;
 }
 
-static int
+static enum cmd_status
 cmd_break (char *args)
 {
     unsigned long addr;
@@ -1087,20 +1091,23 @@ cmd_break (char *args)
 
     if (i == 4) {
         printf ("no availabe break points\n");
-        return -1;
+        return CMD_ERROR;
     }
 
     if (parse_expr (&args, &addr, 0) < 0)
-        return -1;
+        return CMD_ERROR;
 
     cur_ctx->regs.ibr[2 * i] = addr;
     cur_ctx->regs.ibr[2 * i + 1] = 0x87fffffffffffff0UL;
     cur_ctx->regs.psr |= PSR_DB;
 
-    return vcpu_setcontext (cur_vcpu);
+    if (vcpu_setcontext (cur_vcpu) < 0)
+        return CMD_ERROR;
+    else
+        return CMD_OK;
 }
 
-static int
+static enum cmd_status
 cmd_watch (char *args)
 {
     unsigned long addr;
@@ -1113,29 +1120,36 @@ cmd_watch (char *args)
 
     if (i == 4) {
         printf ("no availabe watch points\n");
-        return -1;
+        return CMD_ERROR;
     }
 
     if (parse_expr (&args, &addr, 0) < 0)
-        return -1;
+        return CMD_ERROR;
 
-    if (parse_expr (&args, &mask, 0) < 0)
+    if (*args == 0)
         mask = 3;
+    else if (parse_expr (&args, &mask, 0) < 0)
+        return CMD_ERROR;
 
     cur_ctx->regs.dbr[2 * i] = addr;
     cur_ctx->regs.dbr[2 * i + 1] = ~((1UL << mask) - 1) | (0xc7UL << 56);
     cur_ctx->regs.psr |= PSR_DB;
 
-    return vcpu_setcontext (cur_vcpu);
+    if (vcpu_setcontext (cur_vcpu) < 0)
+        return CMD_ERROR;
+    else {
+        printf ("Watchpoint %d set\n", i);
+        return CMD_OK;
+    }
 }
 
-static int
+static enum cmd_status
 cmd_delete (char *args)
 {
     unsigned long num;
 
     if (parse_expr (&args, &num, 0) < 0)
-        return -1;
+        return CMD_ERROR;
 
     if (num < 4) {
         cur_ctx->regs.ibr[2 * num] = 0;
@@ -1148,61 +1162,70 @@ cmd_delete (char *args)
     }
     else {
         printf ("breakpoint out of range\n");
-        return -1;
+        return CMD_ERROR;
     }
 
     cur_ctx->regs.psr |= PSR_DB;
 
-    return vcpu_setcontext (cur_vcpu);   
+    if (vcpu_setcontext (cur_vcpu) < 0)
+        return CMD_ERROR;
+    else
+        return CMD_OK;
 }
 
-static int
+static enum cmd_status
 cmd_disable (char *args)
 {
     unsigned long num;
 
     if (parse_expr (&args, &num, 0) < 0)
-        return -1;
+        return CMD_ERROR;
 
     if (num >= 4) {
         printf ("breakpoint out of range\n");
-        return -1;
+        return CMD_ERROR;
     }
 
     cur_ctx->regs.ibr[2 * num + 1] &= ~(1UL << 63);
 
-    return vcpu_setcontext (cur_vcpu);
+    if (vcpu_setcontext (cur_vcpu) < 0)
+        return CMD_ERROR;
+    else
+        return CMD_OK;
 }
 
-static int
+static enum cmd_status
 cmd_enable (char *args)
 {
     unsigned long num;
 
     if (parse_expr (&args, &num, 0) < 0)
-        return -1;
+        return CMD_ERROR;
 
     if (num >= 4) {
         printf ("breakpoint out of range\n");
-        return -1;
+        return CMD_ERROR;
     }
 
     cur_ctx->regs.ibr[2 * num + 1] |= 1UL << 63;
 
-    return vcpu_setcontext (cur_vcpu);
+    if (vcpu_setcontext (cur_vcpu) < 0)
+        return CMD_ERROR;
+    else
+        return CMD_OK;
 }
 
-static int
+static enum cmd_status
 cmd_print (char *args)
 {
     unsigned long addr;
 
     if (parse_expr (&args, &addr, 0) < 0)
-        return -1;
+        return CMD_ERROR;
 
     printf ("res: 0x%016lx = %ld\n", addr, addr);
 
-    return 0;
+    return CMD_OK;
 }
 
 struct bit_xlat {
@@ -1228,11 +1251,16 @@ static const struct bit_xlat debug_flags[] = {
     { XEN_IA64_DEBUG_FORCE_DB, "db" },
     { XEN_IA64_DEBUG_ON_TR, "tr" },
     { XEN_IA64_DEBUG_ON_TC, "tc" },
-    /* { XEN_IA64_DEBUG_ON_KEYS, "keys" }, */
+#if 0
+    { XEN_IA64_DEBUG_ON_KEYS, "keys" },
+    { XEN_IA64_DEBUG_ON_MOV_TO_CR, "mov_to_cr" },
+    { XEN_IA64_DEBUG_ON_VHPT, "vhpt" },
+    { XEN_IA64_DEBUG_ON_IOSAPIC, "iosapic" },
+#endif
     { 0, NULL }
 };
 
-static int
+static enum cmd_status
 cmd_disp (char *arg)
 {
     if (strcmp (arg, "br") == 0)
@@ -1266,6 +1294,11 @@ cmd_disp (char *arg)
             if (cur_ctx->regs.ibr[2 * i + 1])
                 printf ("%d: 0x%016lx %s\n", i, cur_ctx->regs.ibr[2 * i],
                         (cur_ctx->regs.ibr[2 * i + 1] & (1UL << 63)) ?
+                        "enabled" : "disabled");
+        for (i = 0; i < 4; i++)
+            if (cur_ctx->regs.dbr[2 * i + 1])
+                printf ("%d: 0x%016lx %s\n", i, cur_ctx->regs.dbr[2 * i],
+                        (cur_ctx->regs.dbr[2 * i + 1] & (1UL << 63)) ?
                         "enabled" : "disabled");
     }
     else if (strcmp (arg, "domain") == 0) {
@@ -1318,12 +1351,14 @@ cmd_disp (char *arg)
     }
     else if (*arg == 0)
         printf ("choose among br, regs, cr, ar, tr, rr, db\n");
-    else
+    else {
         printf ("cannot disp '%s'\n", arg);
-    return 0;
+        return CMD_ERROR;
+    }
+    return CMD_OK;
 }
 
-static int
+static enum cmd_status
 cmd_bev (char *arg)
 {
     xen_ia64_debug_op_t debug_op;
@@ -1332,7 +1367,7 @@ cmd_bev (char *arg)
     if (do_ia64_debug_op (xc_handle, XEN_IA64_DEBUG_OP_GET_FLAGS,
                           domid, &debug_op) < 0) {
         perror ("get debug flags");
-        return 0;
+        return CMD_ERROR;
     }
     if (arg == NULL || arg[0] == 0) {
         printf ("debug flags: %08lx:\n", debug_op.flags);
@@ -1340,7 +1375,7 @@ cmd_bev (char *arg)
             printf (" %c%s\n",
                     (debug_flags[i].bit & debug_op.flags) ? '+' : '-',
                     debug_flags[i].name);
-        return 0;
+        return CMD_OK;
     }
     else {
         char *p = strtok ((char *)arg, " ");
@@ -1357,7 +1392,7 @@ cmd_bev (char *arg)
                 }
             if (flag == 0) {
                 printf ("unknown event %s\n", p);
-                return 0;
+                return CMD_ERROR;
             }
             if (p[0] == '-')
                 debug_op.flags &= ~flag;
@@ -1369,14 +1404,17 @@ cmd_bev (char *arg)
         if (do_ia64_debug_op (xc_handle, XEN_IA64_DEBUG_OP_SET_FLAGS,
                               domid, &debug_op) < 0) {
             perror ("set debug flags");
-            return -1;
+            return CMD_ERROR;
         }
         /* Disabling force_SS and force_DB requires setting psr.  */
-        return vcpu_setcontext (cur_vcpu);
+        if (vcpu_setcontext (cur_vcpu) < 0)
+            return CMD_ERROR;
+        else
+            return CMD_OK;
     }
 }
 
-static int
+static enum cmd_status
 cmd_set (char *line)
 {
     char *reg;
@@ -1388,20 +1426,23 @@ cmd_set (char *line)
     addr = get_reg_addr (reg);
     if (addr == NULL) {
         printf ("unknown register %s\n", reg);
-        return -1;
+        return CMD_ERROR;
     }
 
     if (parse_expr (&line, &val, 0) < 0)
-        return -1;
+        return CMD_ERROR;
 
     *addr = val;
 
-    return vcpu_setcontext (cur_vcpu);
+    if (vcpu_setcontext (cur_vcpu) < 0)
+        return CMD_ERROR;
+    else
+        return CMD_OK;
 }
 
 const struct command_desc commands[];
 
-static int
+static enum cmd_status
 cmd_help (char *line)
 {
     int i;
@@ -1409,7 +1450,7 @@ cmd_help (char *line)
     for (i = 0; commands[i].name; i++)
         printf ("%s -- %s\n", commands[i].name, commands[i].help);
 
-    return 0;
+    return CMD_OK;
 }
 
 const struct command_desc commands[] = {
@@ -1434,16 +1475,27 @@ const struct command_desc commands[] = {
 };
 
 
-int do_command (int vcpu, char *line)
+enum cmd_status do_command (int vcpu, char *line)
 {
     char *cmd;
     char *args;
     int i;
     const struct command_desc *desc;
+    static const struct command_desc *last_desc;
+    enum cmd_status status;
     int flag_ambiguous;
 
     cur_vcpu = vcpu;
     cur_ctx = &vcpu_ctx[vcpu];
+
+    /* Handle repeat last-command.  */
+    if (*line == 0) {
+        if (last_desc != NULL)
+            return (*last_desc->cmd)("");
+        else
+            return CMD_OK;
+    }
+    last_desc = NULL;
 
     cmd = parse_arg (&line);
     args = line;
@@ -1473,31 +1525,27 @@ int do_command (int vcpu, char *line)
 
     if (flag_ambiguous) {
         printf ("\n");
-        return -3;
+        return CMD_ERROR;
     }
     else if (!desc) {
         printf ("command not found, try help\n");
-        return -3;
+        return CMD_ERROR;
     }
 
-    return (*desc->cmd)(args);
+    status = (*desc->cmd)(args);
+    if (status == CMD_REPEAT)
+        last_desc = desc;
+    return status;
 }
 
 void xenitp (int vcpu)
 {
     int ret;
-    xc_dominfo_t dominfo;
     struct sigaction sa;
 
     cur_ctx = &vcpu_ctx[vcpu];
 
     xc_handle = xc_interface_open (); /* for accessing control interface */
-
-    ret = xc_domain_getinfo (xc_handle, domid, 1, &dominfo);
-    if (ret < 0) {
-        perror ("xc_domain_getinfo");
-        exit (-1);
-    }
 
     if (xc_domain_setdebugging (xc_handle, domid, 1) != 0)
         perror ("setdebugging");
@@ -1510,8 +1558,6 @@ void xenitp (int vcpu)
 
     ret = xc_vcpu_getcontext (xc_handle, domid, vcpu, cur_ctx);
     if (ret < 0) {
-        if (!dominfo.paused)
-            xc_domain_unpause (xc_handle, domid);
         perror ("xc_vcpu_getcontext");
         exit (-1);
     }
@@ -1535,11 +1581,11 @@ void xenitp (int vcpu)
             break;
 
         len = strlen ((char *)buf);
-        if (len > 1 && buf[len - 1] == '\n')
+        if (len >= 1 && buf[len - 1] == '\n')
             buf[len - 1] = 0;
 
         ret = do_command (vcpu, buf);
-        if (ret == -2)
+        if (ret == CMD_QUIT)
             break;
     }
 
@@ -1554,7 +1600,7 @@ void xenitp (int vcpu)
     if (xc_domain_setdebugging (xc_handle, domid, 0) != 0)
             perror ("setdebugging");
 
-    if (!dominfo.paused) {
+    if (!quit_paused) {
         ret = xc_domain_unpause (xc_handle, domid);
         if (ret < 0) {
             perror ("xc_domain_unpause");
