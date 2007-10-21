@@ -104,7 +104,6 @@ unsigned long xenheap_phys_start, xenheap_phys_end;
 
 extern void arch_init_memory(void);
 extern void init_IRQ(void);
-extern void trap_init(void);
 extern void early_time_init(void);
 extern void early_cpu_init(void);
 extern void vesa_init(void);
@@ -114,7 +113,7 @@ struct tss_struct init_tss[NR_CPUS];
 
 char __attribute__ ((__section__(".bss.stack_aligned"))) cpu0_stack[STACK_SIZE];
 
-struct cpuinfo_x86 boot_cpu_data = { 0, 0, 0, 0, -1, 1, 0, 0, -1 };
+struct cpuinfo_x86 boot_cpu_data = { 0, 0, 0, 0, -1 };
 
 #if CONFIG_PAGING_LEVELS > 2
 unsigned long mmu_cr4_features = X86_CR4_PSE | X86_CR4_PGE | X86_CR4_PAE;
@@ -308,6 +307,7 @@ struct boot_video_info {
     u8  rsvd_pos;           /* 0x23 */
     u16 vesapm_seg;         /* 0x24 */
     u16 vesapm_off;         /* 0x26 */
+    u16 vesa_attrib;        /* 0x28 */
 };
 
 static void __init parse_video_info(void)
@@ -340,6 +340,8 @@ static void __init parse_video_info(void)
         vga_console_info.u.vesa_lfb.blue_size = bvi->blue_size;
         vga_console_info.u.vesa_lfb.rsvd_pos = bvi->rsvd_pos;
         vga_console_info.u.vesa_lfb.rsvd_size = bvi->rsvd_size;
+        vga_console_info.u.vesa_lfb.gbl_caps = bvi->capabilities;
+        vga_console_info.u.vesa_lfb.mode_attrs = bvi->vesa_attrib;
     }
 }
 
@@ -970,6 +972,11 @@ void __init __start_xen(unsigned long mbi_p)
         if ( acpi_skip_timer_override &&
              !strstr(dom0_cmdline, "acpi_skip_timer_override") )
             safe_strcat(dom0_cmdline, " acpi_skip_timer_override");
+        if ( (strlen(acpi_param) == 0) && acpi_disabled )
+        {
+            printk("ACPI is disabled, notifying Domain 0 (acpi=off)\n");
+            safe_strcpy(acpi_param, "off");
+        }
         if ( (strlen(acpi_param) != 0) && !strstr(dom0_cmdline, "acpi=") )
         {
             safe_strcat(dom0_cmdline, " acpi=");

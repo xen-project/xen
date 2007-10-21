@@ -93,6 +93,9 @@ long arch_do_domctl(xen_domctl_t *op, XEN_GUEST_HANDLE(xen_domctl_t) u_domctl)
             ds->maxmem = d->arch.convmem_end;
             ds->xsi_va = d->arch.shared_info_va;
             ds->hypercall_imm = d->arch.breakimm;
+#ifdef CONFIG_XEN_IA64_PERVCPU_VHPT
+            ds->vhpt_size_log2 = d->arch.vhpt_size_log2;
+#endif
             /* Copy back.  */
             if ( copy_to_guest(u_domctl, op, 1) )
                 ret = -EFAULT;
@@ -116,6 +119,20 @@ long arch_do_domctl(xen_domctl_t *op, XEN_GUEST_HANDLE(xen_domctl_t) u_domctl)
                     for_each_vcpu (d, v)
                         v->arch.breakimm = d->arch.breakimm;
                 }
+#ifdef CONFIG_XEN_IA64_PERVCPU_VHPT
+                if (ds->vhpt_size_log2 == -1) {
+                    d->arch.has_pervcpu_vhpt = 0;
+                    ds->vhpt_size_log2 = -1;
+                    printk(XENLOG_INFO "XEN_DOMCTL_arch_setup: "
+                           "domain %d VHPT is global.\n", d->domain_id);
+                } else {
+                    d->arch.has_pervcpu_vhpt = 1;
+                    d->arch.vhpt_size_log2 = ds->vhpt_size_log2;
+                    printk(XENLOG_INFO "XEN_DOMCTL_arch_setup: "
+                           "domain %d VHPT is per vcpu. size=2**%d\n",
+                           d->domain_id, ds->vhpt_size_log2);
+                }
+#endif
                 if (ds->xsi_va)
                     d->arch.shared_info_va = ds->xsi_va;
                 ret = dom_fw_setup(d, ds->bp, ds->maxmem);
@@ -234,7 +251,7 @@ long arch_do_sysctl(xen_sysctl_t *op, XEN_GUEST_HANDLE(xen_sysctl_t) u_sysctl)
     {
     case XEN_SYSCTL_physinfo:
     {
-        int i, node_cpus = 0;
+        int i;
         uint32_t max_array_ent;
 
         xen_sysctl_physinfo_t *pi = &op->u.physinfo;
@@ -242,18 +259,8 @@ long arch_do_sysctl(xen_sysctl_t *op, XEN_GUEST_HANDLE(xen_sysctl_t) u_sysctl)
         pi->threads_per_core = cpus_weight(cpu_sibling_map[0]);
         pi->cores_per_socket =
             cpus_weight(cpu_core_map[0]) / pi->threads_per_core;
+        pi->nr_cpus          = (u32)num_online_cpus();
         pi->nr_nodes         = num_online_nodes();
-
-        /*
-         * Guess at a sockets_per_node value.  Use the maximum number of
-         * CPUs per node to avoid deconfigured CPUs breaking the average.
-         */
-        for_each_online_node(i)
-            node_cpus = max(node_cpus, cpus_weight(node_to_cpumask(i)));
-
-        pi->sockets_per_node = node_cpus / 
-            (pi->cores_per_socket * pi->threads_per_core);
-
         pi->total_pages      = total_pages; 
         pi->free_pages       = avail_domheap_pages();
         pi->scrub_pages      = avail_scrub_pages();

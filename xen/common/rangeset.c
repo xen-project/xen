@@ -263,7 +263,7 @@ int rangeset_contains_singleton(
 int rangeset_is_empty(
     struct rangeset *r)
 {
-    return list_empty(&r->range_list);
+    return ((r == NULL) || list_empty(&r->range_list));
 }
 
 struct rangeset *rangeset_new(

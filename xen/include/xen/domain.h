@@ -2,6 +2,8 @@
 #ifndef __XEN_DOMAIN_H__
 #define __XEN_DOMAIN_H__
 
+#include <public/xen.h>
+
 typedef union {
     struct vcpu_guest_context *nat;
     struct compat_vcpu_guest_context *cmp;

@@ -40,6 +40,4 @@ typedef struct flask_op {
 
 DEFINE_XEN_GUEST_HANDLE(flask_op_t);
 
-long do_flask_op (XEN_GUEST_HANDLE(xsm_op_t) u_flask_op);
-
 #endif

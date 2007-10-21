@@ -533,7 +533,8 @@ uint16_t tcpa_add_measurement_to_log_simple(uint32_t pcrIndex,
 	memset(&pcpes, 0x0, sizeof(pcpes));
 	pcpes.pcrindex = pcrIndex;
 	pcpes.eventtype = event_type;
-	pcpes.eventdatasize = length;
+	/* specs: 10.4.1, EV_IPL eventfield should not contain the code.*/
+	pcpes.eventdatasize = 0;
 
 	hleei.ipblength = 0x18;
 	hleei.reserved  = 0x0;
@@ -570,10 +571,8 @@ static const char ev_action[][23] = {
            "Start Option ROM Scan"
 };
 
-
-static char evt_separator[] = "---------------";
+static char evt_separator[] = {0xff,0xff,0xff,0xff}; 
 static char wake_event_1[]    = "Wake Event 1";
-
 
 /*
  * Add a measurement to the list of measurements
@@ -590,11 +589,10 @@ void tcpa_add_measurement(uint32_t pcrIndex,
 
 	switch (event_type) {
 	case EV_SEPARATOR:
-		tcpa_add_measurement_to_log(pcrIndex,
+		tcpa_add_measurement_to_log_simple(pcrIndex,
 		                            event_type,
-		                            0,
 		                            evt_separator,
-		                            strlen(evt_separator));
+		                            4);
 	break;
 	case EV_ACTION:
 		string = ev_action[data /* event_id */];
@@ -723,22 +721,44 @@ void tcpa_option_rom(uint32_t seg)
  * Creates two log entries
  *
  * Input parameter:
+ *  bootcd : 0: MBR of hdd, 1: boot image, 2: boot catalog of El Torito
  *  seg    : segment where the IPL data are located
+ *  off    : offset where the IPL data are located
+ *  count  : length in bytes
  */
-void tcpa_ipl(Bit32u seg)
+void tcpa_ipl(Bit32u bootcd,Bit32u seg,Bit32u off,Bit32u count)
 {
-	/* specs: 8.2.5.3 */
-	uint8_t *addr = (uint8_t *)ADDR_FROM_SEG_OFF(seg,0);
-	/* equivalent to: dd if=/dev/hda ibs=1 count=440 | sha1sum */
-	tcpa_add_measurement_to_log_simple(4,
-	                                   EV_IPL,
-	                                   addr,
-	                                   0x1b8);
-	/* equivalent to: dd if=/dev/hda ibs=1 count=72 skip=440 | sha1sum */
-	tcpa_add_measurement_to_log_simple(5,
-	                                   EV_IPL_PARTITION_DATA,
-	                                   addr + 0x1b8,
-	                                   0x48);
+	uint8_t *addr = (uint8_t *)ADDR_FROM_SEG_OFF(seg,off);
+	if (bootcd == 1) {
+		/* specs: 8.2.5.6 El Torito */
+		tcpa_add_measurement_to_log_simple(4,
+						   EV_IPL,
+						   addr,
+						   count);
+	}
+	else if (bootcd == 2) { /* Boot Catalog */
+
+		/* specs: 8.2.5.6 El Torito */
+		tcpa_add_measurement_to_log_simple(5,
+						   EV_IPL_PARTITION_DATA,
+						   addr,
+						   count);
+	}
+	else {
+		/* specs: 8.2.5.3 */
+		/* equivalent to: dd if=/dev/hda ibs=1 count=440 | sha1sum */
+		tcpa_add_measurement_to_log_simple(4,
+						   EV_IPL,
+						   addr,
+		                                   0x1b8);
+
+
+		/* equivalent to: dd if=/dev/hda ibs=1 count=72 skip=440 | sha1sum */
+		tcpa_add_measurement_to_log_simple(5,
+						   EV_IPL_PARTITION_DATA,
+						   addr + 0x1b8,
+						   0x48);
+	}
 }
 
 void tcpa_measure_post(Bit32u from, Bit32u to)

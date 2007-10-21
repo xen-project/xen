@@ -218,11 +218,9 @@ def restartXend():
         return status
 
 def smpConcurrencyLevel():
-    cores = int(getInfo("cores_per_socket"))
-    threads = int(getInfo("threads_per_core"))
-    sockets = int(getInfo("sockets_per_node"))
+    nr_cpus = int(getInfo("nr_cpus"))
 
-    return cores * sockets * threads
+    return nr_cpus
 
 if __name__ == "__main__":
     if isDomainRunning("0"):

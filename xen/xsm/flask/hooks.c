@@ -1042,6 +1042,8 @@ static int flask_add_to_physmap(struct domain *d1, struct domain *d2)
 }
 #endif
 
+long do_flask_op(XEN_GUEST_HANDLE(xsm_op_t) u_flask_op);
+
 static struct xsm_operations flask_ops = {
     .security_domaininfo = flask_security_domaininfo,
     .setvcpucontext = flask_setvcpucontext,

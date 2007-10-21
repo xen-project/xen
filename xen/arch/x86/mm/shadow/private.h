@@ -354,7 +354,7 @@ void shadow_promote(struct vcpu *v, mfn_t gmfn, u32 type);
 void shadow_demote(struct vcpu *v, mfn_t gmfn, u32 type);
 
 /* Shadow page allocation functions */
-void  shadow_prealloc(struct domain *d, unsigned int order);
+void  shadow_prealloc(struct domain *d, u32 shadow_type, unsigned int count);
 mfn_t shadow_alloc(struct domain *d, 
                     u32 shadow_type,
                     unsigned long backpointer);

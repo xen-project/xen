@@ -106,7 +106,7 @@ restore_all_xen:
  * When entering SYSCALL from kernel mode:
  *  %rax                            = hypercall vector
  *  %rdi, %rsi, %rdx, %r10, %r8, %9 = hypercall arguments
- *  %r11, %rcx                      = SYSCALL-saved %rflags and %rip
+ *  %rcx                            = SYSCALL-saved %rip
  *  NB. We must move %r10 to %rcx for C function-calling ABI.
  *
  * When entering SYSCALL from user mode:
@@ -125,6 +125,7 @@ ENTRY(syscall_enter)
         pushq %rcx
         pushq $0
         movl  $TRAP_syscall,4(%rsp)
+        movq  24(%rsp),%r11 /* Re-load user RFLAGS into %r11 before SAVE_ALL */
         SAVE_ALL
         GET_CURRENT(%rbx)
         testb $TF_kernel_mode,VCPU_thread_flags(%rbx)
@@ -148,6 +149,18 @@ ENTRY(syscall_enter)
         pushq %rax
         pushq UREGS_rip+8(%rsp)
 #endif
+        cmpb  $0,tb_init_done(%rip)
+        je    tracing_off
+        call  trace_hypercall
+        /* Now restore all the registers that trace_hypercall clobbered */
+        movq  UREGS_rax(%rsp),%rax   /* Hypercall #  */
+        movq  UREGS_rdi(%rsp),%rdi   /* Arg 1        */
+        movq  UREGS_rsi(%rsp),%rsi   /* Arg 2        */
+        movq  UREGS_rdx(%rsp),%rdx   /* Arg 3        */
+        movq  UREGS_r10(%rsp),%rcx   /* Arg 4        */
+        movq  UREGS_rdi(%rsp),%r8    /* Arg 5        */
+        movq  UREGS_rbp(%rsp),%r9    /* Arg 6        */
+tracing_off:
         leaq  hypercall_table(%rip),%r10
         PERFC_INCR(PERFC_hypercalls, %rax, %rbx)
         callq *(%r10,%rax,8)

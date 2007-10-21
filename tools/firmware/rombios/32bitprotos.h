@@ -38,7 +38,7 @@ void tcpa_wake_event( PARMS(void) );
 void tcpa_add_bootdevice( PARMS(Bit32u bootcd, Bit32u bootdrv) );
 void tcpa_start_option_rom_scan( PARMS(void) );
 void tcpa_option_rom( PARMS(Bit32u seg) );
-void tcpa_ipl( PARMS(Bit32u seg) );
+void tcpa_ipl( PARMS(Bit32u bootcd,Bit32u seg,Bit32u off,Bit32u count) );
 void tcpa_measure_post( PARMS(Bit32u from, Bit32u to) );
 Bit32u tcpa_initialize_tpm( PARMS(Bit32u physpres) );
 

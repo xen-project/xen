@@ -105,18 +105,18 @@ typedef l4_pgentry_t root_pgentry_t;
 #define _PAGE_NX     (cpu_has_nx ? _PAGE_NX_BIT : 0U)
 
 /*
- * Disallow unused flag bits plus PAT, PSE and GLOBAL.
+ * Disallow unused flag bits plus PAT/PSE, PCD, PWT and GLOBAL.
  * Permit the NX bit if the hardware supports it.
  * Note that range [62:52] is available for software use on x86/64.
  */
-#define BASE_DISALLOW_MASK (0xFF800180U & ~_PAGE_NX)
+#define BASE_DISALLOW_MASK (0xFF800198U & ~_PAGE_NX)
 
 #define L1_DISALLOW_MASK (BASE_DISALLOW_MASK | _PAGE_GNTTAB)
 #define L2_DISALLOW_MASK (BASE_DISALLOW_MASK)
 #define L3_DISALLOW_MASK (BASE_DISALLOW_MASK)
 #define L4_DISALLOW_MASK (BASE_DISALLOW_MASK)
 
-#define COMPAT_L3_DISALLOW_MASK 0xFFFFF1E6U
+#define COMPAT_L3_DISALLOW_MASK 0xFFFFF1FEU
 
 #define PAGE_HYPERVISOR         (__PAGE_HYPERVISOR         | _PAGE_GLOBAL)
 #define PAGE_HYPERVISOR_NOCACHE (__PAGE_HYPERVISOR_NOCACHE | _PAGE_GLOBAL)

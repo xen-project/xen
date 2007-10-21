@@ -123,6 +123,7 @@ struct arch_domain {
             unsigned int is_vti : 1;
 #ifdef CONFIG_XEN_IA64_PERVCPU_VHPT
             unsigned int has_pervcpu_vhpt : 1;
+            unsigned int vhpt_size_log2 : 6;
 #endif
         };
     };

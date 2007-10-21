@@ -35,6 +35,12 @@ struct vmcs_struct {
     unsigned char data [0]; /* vmcs size is read from MSR */
 };
 
+struct vmx_msr_entry {
+    u32 index;
+    u32 mbz;
+    u64 data;
+};
+
 enum {
     VMX_INDEX_MSR_LSTAR = 0,
     VMX_INDEX_MSR_STAR,
@@ -72,6 +78,12 @@ struct arch_vmx_struct {
     unsigned long        shadow_gs;
     unsigned long        cstar;
 #endif
+
+    char                *msr_bitmap;
+    unsigned int         msr_count;
+    struct vmx_msr_entry *msr_area;
+    unsigned int         host_msr_count;
+    struct vmx_msr_entry *host_msr_area;
 
     /* Following fields are all specific to vmxassist. */
     unsigned long        vmxassist_enabled:1;
@@ -131,7 +143,6 @@ extern bool_t cpu_has_vmx_ins_outs_instr_info;
     (vmx_pin_based_exec_control & PIN_BASED_VIRTUAL_NMIS)
 #define cpu_has_vmx_msr_bitmap \
     (vmx_cpu_based_exec_control & CPU_BASED_ACTIVATE_MSR_BITMAP)
-extern char *vmx_msr_bitmap;
 
 /* GUEST_INTERRUPTIBILITY_INFO flags. */
 #define VMX_INTR_SHADOW_STI             0x00000001
@@ -267,6 +278,12 @@ enum vmcs_field {
     HOST_RSP                        = 0x00006c14,
     HOST_RIP                        = 0x00006c16,
 };
+
+void vmx_disable_intercept_for_msr(struct vcpu *v, u32 msr);
+int vmx_read_guest_msr(struct vcpu *v, u32 msr, u64 *val);
+int vmx_write_guest_msr(struct vcpu *v, u32 msr, u64 val);
+int vmx_add_guest_msr(struct vcpu *v, u32 msr);
+int vmx_add_host_load_msr(struct vcpu *v, u32 msr);
 
 #endif /* ASM_X86_HVM_VMX_VMCS_H__ */
 

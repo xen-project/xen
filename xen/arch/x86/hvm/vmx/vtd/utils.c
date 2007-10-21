@@ -64,6 +64,26 @@ int vtd_hw_check(void)
     return 0;
 }
 
+/* disable vt-d protected memory registers */
+void disable_pmr(struct iommu *iommu)
+{
+    unsigned long start_time, status;
+
+    gdprintk(XENLOG_INFO VTDPREFIX,
+        "disabling protected memory registers\n");
+
+    dmar_writel(iommu->reg, DMAR_PMEN_REG, 0);
+    start_time = jiffies;
+    while (1) {
+        status = dmar_readl(iommu->reg, DMAR_PMEN_REG);
+        if ( (status & DMA_PMEN_PRS) == 0 )
+            break;
+        if (time_after(jiffies, start_time + DMAR_OPERATION_TIMEOUT))
+            panic("Cannot set QIE field for queue invalidation\n");
+        cpu_relax();
+    }
+}
+
 #if defined(__x86_64__)
 void print_iommu_regs(struct acpi_drhd_unit *drhd)
 {

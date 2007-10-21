@@ -252,7 +252,8 @@ static void vpic_ioport_write(
                 if ( vtd_enabled )
                 {
                     irq |= ((addr & 0xa0) == 0xa0) ? 8 : 0;
-                    hvm_dpci_eoi(hvm_isa_irq_to_gsi(irq), NULL);
+                    hvm_dpci_eoi(current->domain,
+                                 hvm_isa_irq_to_gsi(irq), NULL);
                 }
                 break;
             case 6: /* Set Priority                */

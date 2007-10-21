@@ -708,15 +708,29 @@ shadow_order(unsigned int shadow_type)
 #endif
 }
 
-
-/* Do we have a free chunk of at least this order? */
-static inline int chunk_is_available(struct domain *d, int order)
+static inline unsigned int
+shadow_max_order(struct domain *d)
 {
-    int i;
-    
-    for ( i = order; i <= SHADOW_MAX_ORDER; i++ )
-        if ( !list_empty(&d->arch.paging.shadow.freelists[i]) )
-            return 1;
+    return is_hvm_domain(d) ? SHADOW_MAX_ORDER : 0;
+}
+
+/* Do we have at total of count pages of the requested order free? */
+static inline int space_is_available(
+    struct domain *d,
+    unsigned int order,
+    unsigned int count)
+{
+    for ( ; order <= shadow_max_order(d); ++order )
+    {
+        unsigned int n = count;
+        const struct list_head *p;
+
+        list_for_each ( p, &d->arch.paging.shadow.freelists[order] )
+            if ( --n == 0 )
+                return 1;
+        count = (count + 1) >> 1;
+    }
+
     return 0;
 }
 
@@ -752,12 +766,12 @@ static void shadow_unhook_mappings(struct vcpu *v, mfn_t smfn)
 }
 
 
-/* Make sure there is at least one chunk of the required order available
- * in the shadow page pool. This must be called before any calls to
- * shadow_alloc().  Since this will free existing shadows to make room,
- * it must be called early enough to avoid freeing shadows that the
- * caller is currently working on. */
-void shadow_prealloc(struct domain *d, unsigned int order)
+/* Make sure there are at least count order-sized pages
+ * available in the shadow page pool. */
+static void _shadow_prealloc(
+    struct domain *d,
+    unsigned int order,
+    unsigned int count)
 {
     /* Need a vpcu for calling unpins; for now, since we don't have
      * per-vcpu shadows, any will do */
@@ -768,7 +782,8 @@ void shadow_prealloc(struct domain *d, unsigned int order)
     mfn_t smfn;
     int i;
 
-    if ( chunk_is_available(d, order) ) return; 
+    ASSERT(order <= shadow_max_order(d));
+    if ( space_is_available(d, order, count) ) return;
     
     v = current;
     if ( v->domain != d )
@@ -785,8 +800,8 @@ void shadow_prealloc(struct domain *d, unsigned int order)
         /* Unpin this top-level shadow */
         sh_unpin(v, smfn);
 
-        /* See if that freed up a chunk of appropriate size */
-        if ( chunk_is_available(d, order) ) return;
+        /* See if that freed up enough space */
+        if ( space_is_available(d, order, count) ) return;
     }
 
     /* Stage two: all shadow pages are in use in hierarchies that are
@@ -803,8 +818,8 @@ void shadow_prealloc(struct domain *d, unsigned int order)
                                pagetable_get_mfn(v2->arch.shadow_table[i]));
                 cpus_or(flushmask, v2->vcpu_dirty_cpumask, flushmask);
 
-                /* See if that freed up a chunk of appropriate size */
-                if ( chunk_is_available(d, order) ) 
+                /* See if that freed up enough space */
+                if ( space_is_available(d, order, count) )
                 {
                     flush_tlb_mask(flushmask);
                     return;
@@ -814,13 +829,24 @@ void shadow_prealloc(struct domain *d, unsigned int order)
     
     /* Nothing more we can do: all remaining shadows are of pages that
      * hold Xen mappings for some vcpu.  This can never happen. */
-    SHADOW_ERROR("Can't pre-allocate %i shadow pages!\n"
+    SHADOW_ERROR("Can't pre-allocate %u order-%u shadow pages!\n"
                  "  shadow pages total = %u, free = %u, p2m=%u\n",
-                 1 << order,
+                 count, order,
                  d->arch.paging.shadow.total_pages,
                  d->arch.paging.shadow.free_pages,
                  d->arch.paging.shadow.p2m_pages);
     BUG();
+}
+
+/* Make sure there are at least count pages of the order according to
+ * type available in the shadow page pool.
+ * This must be called before any calls to shadow_alloc().  Since this
+ * will free existing shadows to make room, it must be called early enough
+ * to avoid freeing shadows that the caller is currently working on. */
+void shadow_prealloc(struct domain *d, u32 type, unsigned int count)
+{
+    ASSERT(type != SH_type_p2m_table);
+    return _shadow_prealloc(d, shadow_order(type), count);
 }
 
 /* Deliberately free all the memory we can: this will tear down all of
@@ -899,7 +925,9 @@ mfn_t shadow_alloc(struct domain *d,
     int i;
 
     ASSERT(shadow_locked_by_me(d));
-    ASSERT(order <= SHADOW_MAX_ORDER);
+    if (shadow_type == SH_type_p2m_table && order > shadow_max_order(d))
+        order = shadow_max_order(d);
+    ASSERT(order <= shadow_max_order(d));
     ASSERT(shadow_type != SH_type_none);
     perfc_incr(shadow_alloc);
 
@@ -1000,7 +1028,7 @@ void shadow_free(struct domain *d, mfn_t smfn)
     }
 
     /* Merge chunks as far as possible. */
-    while ( order < SHADOW_MAX_ORDER )
+    for ( ; order < shadow_max_order(d); ++order )
     {
         mask = 1 << order;
         if ( (mfn_x(shadow_page_to_mfn(sp)) & mask) ) {
@@ -1015,7 +1043,6 @@ void shadow_free(struct domain *d, mfn_t smfn)
                 break;
             list_del(&(sp+mask)->list);
         }
-        order++;
     }
 
     sp->order = order;
@@ -1037,16 +1064,18 @@ sh_alloc_p2m_pages(struct domain *d)
 {
     struct page_info *pg;
     u32 i;
+    unsigned int order = shadow_max_order(d);
+
     ASSERT(shadow_locked_by_me(d));
     
     if ( d->arch.paging.shadow.total_pages 
-         < (shadow_min_acceptable_pages(d) + (1<<SHADOW_MAX_ORDER)) )
+         < (shadow_min_acceptable_pages(d) + (1 << order)) )
         return 0; /* Not enough shadow memory: need to increase it first */
     
     pg = mfn_to_page(shadow_alloc(d, SH_type_p2m_table, 0));
-    d->arch.paging.shadow.p2m_pages += (1<<SHADOW_MAX_ORDER);
-    d->arch.paging.shadow.total_pages -= (1<<SHADOW_MAX_ORDER);
-    for (i = 0; i < (1<<SHADOW_MAX_ORDER); i++)
+    d->arch.paging.shadow.p2m_pages += (1 << order);
+    d->arch.paging.shadow.total_pages -= (1 << order);
+    for (i = 0; i < (1U << order); i++)
     {
         /* Unlike shadow pages, mark p2m pages as owned by the domain.
          * Marking the domain as the owner would normally allow the guest to
@@ -1166,7 +1195,7 @@ static unsigned int sh_set_allocation(struct domain *d,
 {
     struct shadow_page_info *sp;
     unsigned int lower_bound;
-    int j;
+    unsigned int j, order = shadow_max_order(d);
 
     ASSERT(shadow_locked_by_me(d));
     
@@ -1187,15 +1216,15 @@ static unsigned int sh_set_allocation(struct domain *d,
         {
             /* Need to allocate more memory from domheap */
             sp = (struct shadow_page_info *)
-                alloc_domheap_pages(NULL, SHADOW_MAX_ORDER, 0); 
+                alloc_domheap_pages(NULL, order, 0);
             if ( sp == NULL ) 
             { 
                 SHADOW_PRINTK("failed to allocate shadow pages.\n");
                 return -ENOMEM;
             }
-            d->arch.paging.shadow.free_pages += 1<<SHADOW_MAX_ORDER;
-            d->arch.paging.shadow.total_pages += 1<<SHADOW_MAX_ORDER;
-            for ( j = 0; j < 1<<SHADOW_MAX_ORDER; j++ ) 
+            d->arch.paging.shadow.free_pages += 1 << order;
+            d->arch.paging.shadow.total_pages += 1 << order;
+            for ( j = 0; j < 1U << order; j++ )
             {
                 sp[j].type = 0;  
                 sp[j].pinned = 0;
@@ -1203,21 +1232,20 @@ static unsigned int sh_set_allocation(struct domain *d,
                 sp[j].mbz = 0;
                 sp[j].tlbflush_timestamp = 0; /* Not in any TLB */
             }
-            sp->order = SHADOW_MAX_ORDER;
-            list_add_tail(&sp->list, 
-                          &d->arch.paging.shadow.freelists[SHADOW_MAX_ORDER]);
+            sp->order = order;
+            list_add_tail(&sp->list, &d->arch.paging.shadow.freelists[order]);
         } 
         else if ( d->arch.paging.shadow.total_pages > pages ) 
         {
             /* Need to return memory to domheap */
-            shadow_prealloc(d, SHADOW_MAX_ORDER);
-            ASSERT(!list_empty(&d->arch.paging.shadow.freelists[SHADOW_MAX_ORDER]));
-            sp = list_entry(d->arch.paging.shadow.freelists[SHADOW_MAX_ORDER].next, 
+            _shadow_prealloc(d, order, 1);
+            ASSERT(!list_empty(&d->arch.paging.shadow.freelists[order]));
+            sp = list_entry(d->arch.paging.shadow.freelists[order].next,
                             struct shadow_page_info, list);
             list_del(&sp->list);
-            d->arch.paging.shadow.free_pages -= 1<<SHADOW_MAX_ORDER;
-            d->arch.paging.shadow.total_pages -= 1<<SHADOW_MAX_ORDER;
-            free_domheap_pages((struct page_info *)sp, SHADOW_MAX_ORDER);
+            d->arch.paging.shadow.free_pages -= 1 << order;
+            d->arch.paging.shadow.total_pages -= 1 << order;
+            free_domheap_pages((struct page_info *)sp, order);
         }
 
         /* Check to see if we need to yield and try again */

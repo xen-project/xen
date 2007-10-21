@@ -1586,6 +1586,20 @@ class XendDomainInfo:
         # Set maximum number of vcpus in domain
         xc.domain_max_vcpus(self.domid, int(self.info['VCPUs_max']))
 
+        # Assign devices with VT-d
+        pci_str = str(self.info["platform"].get("pci"))
+        if hvm and pci_str:
+            bdf = xc.assign_device(self.domid, pci_str)
+            if bdf != 0:
+                bus = (bdf >> 16) & 0xff
+                devfn = (bdf >> 8) & 0xff
+                dev = (devfn >> 3) & 0x1f
+                func = devfn & 0x7
+                raise VmError("Fail to assign device(%x:%x.%x): maybe VT-d is "
+                              "not enabled, or the device is not exist, or it "
+                              "has already been assigned to other domain"
+                              % (bus, dev, func))
+
         # register the domain in the list 
         from xen.xend import XendDomain
         XendDomain.instance().add_domain(self)

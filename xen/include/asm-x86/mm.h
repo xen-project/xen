@@ -144,7 +144,6 @@ extern unsigned long max_page;
 extern unsigned long total_pages;
 void init_frametable(void);
 
-int alloc_page_type(struct page_info *page, unsigned long type);
 void free_page_type(struct page_info *page, unsigned long type);
 int _shadow_mode_refcounts(struct domain *d);
 

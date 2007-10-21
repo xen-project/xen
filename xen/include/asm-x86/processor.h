@@ -160,28 +160,21 @@ struct vcpu;
 #endif
 
 struct cpuinfo_x86 {
-    __u8 x86;		/* CPU family */
-    __u8 x86_vendor;	/* CPU vendor */
+    __u8 x86;            /* CPU family */
+    __u8 x86_vendor;     /* CPU vendor */
     __u8 x86_model;
     __u8 x86_mask;
-    char wp_works_ok;	/* It doesn't on 386's */
-    char hlt_works_ok;	/* Problems on some 486Dx4's and old 386's */
-    char hard_math;
-    char rfu;
-    int  cpuid_level;	/* Maximum supported CPUID level, -1=no CPUID */
+    int  cpuid_level;    /* Maximum supported CPUID level, -1=no CPUID */
     unsigned int x86_capability[NCAPINTS];
     char x86_vendor_id[16];
     char x86_model_id[64];
-    int  x86_cache_size;  /* in KB - valid for CPUS which support this call  */
-    int  x86_cache_alignment;	/* In bytes */
-    char fdiv_bug;
-    char f00f_bug;
-    char coma_bug;
-    char pad0;
+    int  x86_cache_size; /* in KB - valid for CPUS which support this call  */
+    int  x86_cache_alignment;    /* In bytes */
     int  x86_power;
     unsigned char x86_max_cores; /* cpuid returned max cores value */
-    unsigned char booted_cores; /* number of cores as seen by OS */
+    unsigned char booted_cores;  /* number of cores as seen by OS */
     unsigned char apicid;
+    unsigned short x86_clflush_size;
 } __cacheline_aligned;
 
 /*

@@ -475,7 +475,7 @@ class XendNode:
 
         cpu_info = {
             "nr_nodes":         phys_info["nr_nodes"],
-            "sockets_per_node": phys_info["sockets_per_node"],
+            "nr_cpus":          phys_info["nr_cpus"],
             "cores_per_socket": phys_info["cores_per_socket"],
             "threads_per_core": phys_info["threads_per_core"]
             }
@@ -580,17 +580,9 @@ class XendNode:
             str='none\n'
         return str[:-1];
 
-    def count_cpus(self, pinfo):
-        count=0
-        node_to_cpu=pinfo['node_to_cpu']
-        for i in range(0, pinfo['nr_nodes']):
-            count+=len(node_to_cpu[i])
-        return count;
-
     def physinfo(self):
         info = self.xc.physinfo()
 
-        info['nr_cpus'] = self.count_cpus(info)
         info['cpu_mhz'] = info['cpu_khz'] / 1000
         
         # physinfo is in KiB, need it in MiB
@@ -600,7 +592,6 @@ class XendNode:
 
         ITEM_ORDER = ['nr_cpus',
                       'nr_nodes',
-                      'sockets_per_node',
                       'cores_per_socket',
                       'threads_per_core',
                       'cpu_mhz',

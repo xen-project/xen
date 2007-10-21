@@ -491,11 +491,9 @@ static int __init acpi_parse_fadt(unsigned long phys, unsigned long size)
 	/* detect the location of the ACPI PM Timer */
 	if (fadt->revision >= FADT2_REVISION_ID) {
 		/* FADT rev. 2 */
-		if (fadt->xpm_tmr_blk.address_space_id !=
+		if (fadt->xpm_tmr_blk.address_space_id ==
 		    ACPI_ADR_SPACE_SYSTEM_IO)
-			return 0;
-
-		pmtmr_ioport = fadt->xpm_tmr_blk.address;
+			pmtmr_ioport = fadt->xpm_tmr_blk.address;
 		/*
 		 * "X" fields are optional extensions to the original V1.0
 		 * fields, so we must selectively expand V1.0 fields if the

@@ -57,7 +57,7 @@ do {                                                                    \
             cpu_clear(cpu, mask);                                       \
 } while ( 0 )
 
-extern void new_tlbflush_clock_period(void);
+void new_tlbflush_clock_period(void);
 
 /* Read pagetable base. */
 static inline unsigned long read_cr3(void)
@@ -69,34 +69,54 @@ static inline unsigned long read_cr3(void)
 }
 
 /* Write pagetable base and implicitly tick the tlbflush clock. */
-extern void write_cr3(unsigned long cr3);
+void write_cr3(unsigned long cr3);
 
-/* Flush guest mappings from the TLB and implicitly tick the tlbflush clock. */
-extern void local_flush_tlb(void);
+/* flush_* flag fields: */
+ /*
+  * Area to flush:
+  *  0 -> flush entire address space
+  *  1 -> 4kB area containing specified virtual address
+  *  2 -> 4MB/2MB area containing specified virtual address
+  *  3 -> 1GB area containing specified virtual address (x86/64 only)
+  * NB. Multi-page areas do not need to have been mapped with a superpage.
+  */
+#define FLUSH_LEVEL_MASK 0x0f
+#define FLUSH_LEVEL(x)   (x)
+ /* Flush TLBs (or parts thereof) */
+#define FLUSH_TLB        0x10
+ /* Flush TLBs (or parts thereof) including global mappings */
+#define FLUSH_TLB_GLOBAL 0x20
+ /* Flush data caches */
+#define FLUSH_CACHE      0x40
 
-#define local_flush_tlb_pge()                                     \
-    do {                                                          \
-        __pge_off();                                              \
-        local_flush_tlb();                                        \
-        __pge_on();                                               \
-    } while ( 0 )
+/* Flush local TLBs/caches. */
+void flush_area_local(const void *va, unsigned int flags);
+#define flush_local(flags) flush_area_local(NULL, flags)
 
-#define local_flush_tlb_one(__addr) \
-    __asm__ __volatile__("invlpg %0": :"m" (*(char *) (__addr)))
+/* Flush specified CPUs' TLBs/caches */
+void flush_area_mask(cpumask_t, const void *va, unsigned int flags);
+#define flush_mask(mask, flags) flush_area_mask(mask, NULL, flags)
 
-#define flush_tlb_all()     flush_tlb_mask(cpu_online_map)
+/* Flush all CPUs' TLBs/caches */
+#define flush_area_all(va, flags) flush_area_mask(cpu_online_map, va, flags)
+#define flush_all(flags) flush_mask(cpu_online_map, flags)
 
-#ifndef CONFIG_SMP
-#define flush_tlb_all_pge()        local_flush_tlb_pge()
-#define flush_tlb_mask(mask)       local_flush_tlb()
-#define flush_tlb_one_mask(mask,v) local_flush_tlb_one(_v)
-#else
-#include <xen/smp.h>
-#define FLUSHVA_ALL (~0UL)
-extern void flush_tlb_all_pge(void);
-extern void __flush_tlb_mask(cpumask_t mask, unsigned long va);
-#define flush_tlb_mask(mask)       __flush_tlb_mask(mask,FLUSHVA_ALL)
-#define flush_tlb_one_mask(mask,v) __flush_tlb_mask(mask,(unsigned long)(v))
-#endif
+/* Flush local TLBs */
+#define flush_tlb_local()                       \
+    flush_local(FLUSH_TLB)
+#define flush_tlb_one_local(v)                  \
+    flush_area_local((const void *)(v), FLUSH_TLB|FLUSH_LEVEL(1))
+
+/* Flush specified CPUs' TLBs */
+#define flush_tlb_mask(mask)                    \
+    flush_mask(mask, FLUSH_TLB)
+#define flush_tlb_one_mask(mask,v)              \
+    flush_area_mask(mask, (const void *)(v), FLUSH_TLB|FLUSH_LEVEL(1))
+
+/* Flush all CPUs' TLBs */
+#define flush_tlb_all()                         \
+    flush_tlb_mask(cpu_online_map)
+#define flush_tlb_one_all(v)                    \
+    flush_tlb_one_mask(cpu_online_map, v)
 
 #endif /* __FLUSHTLB_H__ */

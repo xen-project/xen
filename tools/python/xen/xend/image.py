@@ -24,7 +24,7 @@ import time
 import signal
 
 import xen.lowlevel.xc
-from xen.xend.XendConstants import REVERSE_DOMAIN_SHUTDOWN_REASONS
+from xen.xend.XendConstants import *
 from xen.xend.XendError import VmError, XendError, HVMRequired
 from xen.xend.XendLogging import log
 from xen.xend.XendOptions import instance as xenopts
@@ -197,6 +197,7 @@ class ImageHandler:
 class LinuxImageHandler(ImageHandler):
 
     ostype = "linux"
+    flags = 0
 
     def buildDomain(self):
         store_evtchn = self.vm.getStorePort()
@@ -213,6 +214,8 @@ class LinuxImageHandler(ImageHandler):
         log.debug("ramdisk        = %s", self.ramdisk)
         log.debug("vcpus          = %d", self.vm.getVCpuCount())
         log.debug("features       = %s", self.vm.getFeatures())
+        if arch.type == "ia64":
+            log.debug("vhpt          = %d", self.flags)
 
         return xc.linux_build(domid          = self.vm.getDomid(),
                               memsize        = mem_mb,
@@ -221,7 +224,8 @@ class LinuxImageHandler(ImageHandler):
                               console_evtchn = console_evtchn,
                               cmdline        = self.cmdline,
                               ramdisk        = self.ramdisk,
-                              features       = self.vm.getFeatures())
+                              features       = self.vm.getFeatures(),
+                              flags          = self.flags)
 
 class PPC_LinuxImageHandler(LinuxImageHandler):
 
@@ -274,7 +278,6 @@ class HVMImageHandler(ImageHandler):
 
         self.pid = None
 
-        self.pae  = int(vmConfig['platform'].get('pae',  0))
         self.apic = int(vmConfig['platform'].get('apic', 0))
         self.acpi = int(vmConfig['platform'].get('acpi', 0))
         
@@ -289,19 +292,23 @@ class HVMImageHandler(ImageHandler):
         log.debug("store_evtchn   = %d", store_evtchn)
         log.debug("memsize        = %d", mem_mb)
         log.debug("vcpus          = %d", self.vm.getVCpuCount())
-        log.debug("pae            = %d", self.pae)
         log.debug("acpi           = %d", self.acpi)
         log.debug("apic           = %d", self.apic)
 
         rc = xc.hvm_build(domid          = self.vm.getDomid(),
                           image          = self.kernel,
-                          store_evtchn   = store_evtchn,
                           memsize        = mem_mb,
                           vcpus          = self.vm.getVCpuCount(),
-                          pae            = self.pae,
                           acpi           = self.acpi,
                           apic           = self.apic)
+
         rc['notes'] = { 'SUSPEND_CANCEL': 1 }
+
+        rc['store_mfn'] = xc.hvm_get_param(self.vm.getDomid(),
+                                           HVM_PARAM_STORE_PFN)
+        xc.hvm_set_param(self.vm.getDomid(), HVM_PARAM_STORE_EVTCHN,
+                         store_evtchn)
+
         return rc
 
     # Return a list of cmd line args to the device models based on the
@@ -497,8 +504,13 @@ class HVMImageHandler(ImageHandler):
 
 class IA64_HVM_ImageHandler(HVMImageHandler):
 
+    def configure(self, vmConfig):
+        HVMImageHandler.configure(self, vmConfig)
+        self.vhpt = int(vmConfig['platform'].get('vhpt',  0))
+
     def buildDomain(self):
         xc.nvram_init(self.vm.getName(), self.vm.getDomid())
+        xc.hvm_set_param(self.vm.getDomid(), HVM_PARAM_VHPT_SIZE, self.vhpt)
         return HVMImageHandler.buildDomain(self)
 
     def getRequiredAvailableMemory(self, mem_kb):
@@ -515,7 +527,25 @@ class IA64_HVM_ImageHandler(HVMImageHandler):
         # Explicit shadow memory is not a concept 
         return 0
 
+class IA64_Linux_ImageHandler(LinuxImageHandler):
+
+    def configure(self, vmConfig):
+        LinuxImageHandler.configure(self, vmConfig)
+        self.vhpt = int(vmConfig['platform'].get('vhpt',  0))
+
+    def buildDomain(self):
+        self.flags = self.vhpt
+        return LinuxImageHandler.buildDomain(self)
+
 class X86_HVM_ImageHandler(HVMImageHandler):
+
+    def configure(self, vmConfig):
+        HVMImageHandler.configure(self, vmConfig)
+        self.pae = int(vmConfig['platform'].get('pae',  0))
+
+    def buildDomain(self):
+        xc.hvm_set_param(self.vm.getDomid(), HVM_PARAM_PAE_ENABLED, self.pae)
+        return HVMImageHandler.buildDomain(self)
 
     def getRequiredAvailableMemory(self, mem_kb):
         # Add 8 MiB overhead for QEMU's video RAM.
@@ -551,7 +581,7 @@ _handlers = {
         "linux": PPC_LinuxImageHandler,
     },
     "ia64": {
-        "linux": LinuxImageHandler,
+        "linux": IA64_Linux_ImageHandler,
         "hvm": IA64_HVM_ImageHandler,
     },
     "x86": {

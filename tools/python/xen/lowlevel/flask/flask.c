@@ -12,8 +12,7 @@
 
 #include <Python.h>
 #include <xenctrl.h>
-
-#include <flask_op.h>
+#include <flask.h>
 
 #define PKG "xen.lowlevel.flask"
 #define CLS "flask"

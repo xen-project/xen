@@ -121,10 +121,22 @@ static void vmx_dirq_assist(struct vcpu *v)
           irq < NR_IRQS;
           irq = find_next_bit(hvm_irq_dpci->dirq_mask, NR_IRQS, irq + 1) )
     {
+        stop_timer(&hvm_irq_dpci->hvm_timer[irq_to_vector(irq)]);
+
         test_and_clear_bit(irq, &hvm_irq_dpci->dirq_mask);
         device = hvm_irq_dpci->mirq[irq].device;
         intx = hvm_irq_dpci->mirq[irq].intx;
         hvm_pci_intx_assert(d, device, intx);
+
+        /*
+         * Set a timer to see if the guest can finish the interrupt or not. For
+         * example, the guest OS may unmask the PIC during boot, before the
+         * guest driver is loaded. hvm_pci_intx_assert() may succeed, but the
+         * guest will never deal with the irq, then the physical interrupt line
+         * will never be deasserted.
+         */
+        set_timer(&hvm_irq_dpci->hvm_timer[irq_to_vector(irq)],
+                  NOW() + PT_IRQ_TIME_OUT);
     }
 }
 

@@ -1,11 +1,12 @@
-#!/bin/bash
+#!/bin/sh
 test -n "$1" -a -n "$2" -a -n "$3"
 set -ef
 
 SED=sed
-[ -x /usr/xpg4/bin/sed ] && SED=/usr/xpg4/bin/sed
+test -x /usr/xpg4/bin/sed && SED=/usr/xpg4/bin/sed
 
-get_fields() {
+get_fields ()
+{
 	local level=1 aggr=0 name= fields=
 	for token in $2
 	do
@@ -24,7 +25,7 @@ get_fields() {
 				return 0
 			fi
 			;;
-		[[:alpha:]_]*)
+		[a-zA-Z_]*)
 			test $aggr = 0 -o -n "$name" || name="$token"
 			;;
 		esac
@@ -32,7 +33,8 @@ get_fields() {
 	done
 }
 
-build_enums() {
+build_enums ()
+{
 	local level=1 kind= fields= members= named= id= token
 	for token in $2
 	do
@@ -64,7 +66,7 @@ build_enums() {
 				named='?'
 			fi
 			;;
-		[[:alpha:]]*)
+		[a-zA-Z]*)
 			id=$token
 			if [ -n "$named" -a -n "${kind#*;}" ]
 			then
@@ -85,7 +87,8 @@ build_enums() {
 	done
 }
 
-handle_field() {
+handle_field ()
+{
 	if [ -z "$5" ]
 	then
 		echo " \\"
@@ -161,7 +164,7 @@ for line in sys.stdin.readlines():
 					array_type=$token
 				fi
 				;;
-			[[:alpha:]]*)
+			[a-zA-Z]*)
 				id=$token
 				;;
 			[\,\;])
@@ -202,13 +205,15 @@ for line in sys.stdin.readlines():
 	fi
 }
 
-copy_array() {
+copy_array ()
+{
 	echo " \\"
 	echo "${1}if ((_d_)->$2 != (_s_)->$2) \\"
 	echo -n "$1    memcpy((_d_)->$2, (_s_)->$2, sizeof((_d_)->$2));"
 }
 
-handle_array() {
+handle_array ()
+{
 	local i="i$(echo $4 | $SED 's,[^;], ,g' | wc -w | $SED 's,[[:space:]]*,,g')"
 	echo " \\"
 	echo "$1{ \\"
@@ -225,7 +230,8 @@ handle_array() {
 	echo -n "$1}"
 }
 
-build_body() {
+build_body ()
+{
 	echo
 	echo -n "#define XLAT_$1(_d_, _s_) do {"
 	local level=1 fields= id= array= arrlvl=1 array_type= type= token
@@ -270,7 +276,7 @@ build_body() {
 				array_type=$token
 			fi
 			;;
-		[[:alpha:]_]*)
+		[a-zA-Z_]*)
 			if [ -n "$array" ]
 			then
 				array="$array $token"
@@ -308,7 +314,8 @@ build_body() {
 	echo ""
 }
 
-check_field() {
+check_field ()
+{
 	if [ -z "$(echo "$4" | $SED 's,[^{}],,g')" ]
 	then
 		echo "; \\"
@@ -320,7 +327,7 @@ check_field() {
 				case $n in
 				struct|union)
 					;;
-				[[:alpha:]_]*)
+				[a-zA-Z_]*)
 					echo -n "    CHECK_$n"
 					break
 					;;
@@ -350,7 +357,7 @@ check_field() {
 			"}")
 				level=$(expr $level - 1) id=
 				;;
-			[[:alpha:]]*)
+			[a-zA-Z]*)
 				id=$token
 				;;
 			[\,\;])
@@ -366,7 +373,8 @@ check_field() {
 	fi
 }
 
-build_check() {
+build_check ()
+{
 	echo
 	echo "#define CHECK_$1 \\"
 	local level=1 fields= kind= id= arrlvl=1 token
@@ -395,7 +403,7 @@ build_check() {
 		"]")
 			arrlvl=$(expr $arrlvl - 1)
 			;;
-		[[:alpha:]_]*)
+		[a-zA-Z_]*)
 			test $level != 2 -o $arrlvl != 1 || id=$token
 			;;
 		[\,\;])

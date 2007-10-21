@@ -53,8 +53,6 @@
 
 enum handler_return { HNDL_done, HNDL_unhandled, HNDL_exception_raised };
 
-char *vmx_msr_bitmap;
-
 static void vmx_ctxt_switch_from(struct vcpu *v);
 static void vmx_ctxt_switch_to(struct vcpu *v);
 
@@ -1106,26 +1104,6 @@ static int vmx_event_pending(struct vcpu *v)
     return (__vmread(VM_ENTRY_INTR_INFO) & INTR_INFO_VALID_MASK);
 }
 
-static void disable_intercept_for_msr(u32 msr)
-{
-    /*
-     * See Intel PRM Vol. 3, 20.6.9 (MSR-Bitmap Address). Early manuals
-     * have the write-low and read-high bitmap offsets the wrong way round.
-     * We can control MSRs 0x00000000-0x00001fff and 0xc0000000-0xc0001fff.
-     */
-    if ( msr <= 0x1fff )
-    {
-        __clear_bit(msr, vmx_msr_bitmap + 0x000); /* read-low */
-        __clear_bit(msr, vmx_msr_bitmap + 0x800); /* write-low */
-    }
-    else if ( (msr >= 0xc0000000) && (msr <= 0xc0001fff) )
-    {
-        msr &= 0x1fff;
-        __clear_bit(msr, vmx_msr_bitmap + 0x400); /* read-high */
-        __clear_bit(msr, vmx_msr_bitmap + 0xc00); /* write-high */
-    }
-}
-
 static struct hvm_function_table vmx_function_table = {
     .name                 = "VMX",
     .domain_initialise    = vmx_domain_initialise,
@@ -1190,21 +1168,6 @@ void start_vmx(void)
     setup_vmcs_dump();
 
     hvm_enable(&vmx_function_table);
-
-    if ( cpu_has_vmx_msr_bitmap )
-    {
-        printk("VMX: MSR intercept bitmap enabled\n");
-        vmx_msr_bitmap = alloc_xenheap_page();
-        BUG_ON(vmx_msr_bitmap == NULL);
-        memset(vmx_msr_bitmap, ~0, PAGE_SIZE);
-
-        disable_intercept_for_msr(MSR_FS_BASE);
-        disable_intercept_for_msr(MSR_GS_BASE);
-
-        disable_intercept_for_msr(MSR_IA32_SYSENTER_CS);
-        disable_intercept_for_msr(MSR_IA32_SYSENTER_ESP);
-        disable_intercept_for_msr(MSR_IA32_SYSENTER_EIP);
-    }
 }
 
 /*
@@ -1253,16 +1216,10 @@ static void vmx_do_no_device_fault(void)
 #define bitmaskof(idx)  (1U << ((idx) & 31))
 static void vmx_do_cpuid(struct cpu_user_regs *regs)
 {
-    unsigned int input = (unsigned int)regs->eax;
-    unsigned int count = (unsigned int)regs->ecx;
+    unsigned int input = regs->eax;
     unsigned int eax, ebx, ecx, edx;
 
-    if ( input == 0x00000004 )
-    {
-        cpuid_count(input, count, &eax, &ebx, &ecx, &edx);
-        eax &= NUM_CORES_RESET_MASK;
-    }
-    else if ( input == 0x40000003 )
+    if ( input == 0x40000003 )
     {
         /*
          * NB. Unsupported interface for private use of VMXASSIST only.
@@ -1292,37 +1249,46 @@ static void vmx_do_cpuid(struct cpu_user_regs *regs)
         unmap_domain_page(p);
 
         gdprintk(XENLOG_INFO, "Output value is 0x%"PRIx64".\n", value);
-        ecx = (u32)value;
-        edx = (u32)(value >> 32);
-    } else {
-        hvm_cpuid(input, &eax, &ebx, &ecx, &edx);
-
-        if ( input == 0x00000001 )
-        {
-            /* Mask off reserved bits. */
-            ecx &= ~VMX_VCPU_CPUID_L1_ECX_RESERVED;
-
-            ebx &= NUM_THREADS_RESET_MASK;
-
-            /* Unsupportable for virtualised CPUs. */
-            ecx &= ~(bitmaskof(X86_FEATURE_VMXE) |
-                     bitmaskof(X86_FEATURE_EST)  |
-                     bitmaskof(X86_FEATURE_TM2)  |
-                     bitmaskof(X86_FEATURE_CID));
-
-            edx &= ~(bitmaskof(X86_FEATURE_HT)   |
-                     bitmaskof(X86_FEATURE_ACPI) |
-                     bitmaskof(X86_FEATURE_ACC));
-        }
-
-        if ( input == 0x00000006 || input == 0x00000009 || input == 0x0000000A )
-            eax = ebx = ecx = edx = 0x0;
+        regs->ecx = (u32)value;
+        regs->edx = (u32)(value >> 32);
+        return;
     }
 
-    regs->eax = (unsigned long)eax;
-    regs->ebx = (unsigned long)ebx;
-    regs->ecx = (unsigned long)ecx;
-    regs->edx = (unsigned long)edx;
+    hvm_cpuid(input, &eax, &ebx, &ecx, &edx);
+
+    switch ( input )
+    {
+    case 0x00000001:
+        ecx &= ~VMX_VCPU_CPUID_L1_ECX_RESERVED;
+        ebx &= NUM_THREADS_RESET_MASK;
+        ecx &= ~(bitmaskof(X86_FEATURE_VMXE) |
+                 bitmaskof(X86_FEATURE_EST)  |
+                 bitmaskof(X86_FEATURE_TM2)  |
+                 bitmaskof(X86_FEATURE_CID)  |
+                 bitmaskof(X86_FEATURE_PDCM) |
+                 bitmaskof(X86_FEATURE_DSCPL));
+        edx &= ~(bitmaskof(X86_FEATURE_HT)   |
+                 bitmaskof(X86_FEATURE_ACPI) |
+                 bitmaskof(X86_FEATURE_ACC)  |
+                 bitmaskof(X86_FEATURE_DS));
+        break;
+
+    case 0x00000004:
+        cpuid_count(input, regs->ecx, &eax, &ebx, &ecx, &edx);
+        eax &= NUM_CORES_RESET_MASK;
+        break;
+
+    case 0x00000006:
+    case 0x00000009:
+    case 0x0000000A:
+        eax = ebx = ecx = edx = 0;
+        break;
+    }
+
+    regs->eax = eax;
+    regs->ebx = ebx;
+    regs->ecx = ecx;
+    regs->edx = edx;
 
     HVMTRACE_3D(CPUID, current, input,
                 ((uint64_t)eax << 32) | ebx, ((uint64_t)ecx << 32) | edx);
@@ -2238,6 +2204,82 @@ static int vmx_cr_access(unsigned long exit_qualification,
     return 1;
 }
 
+static const struct lbr_info {
+    u32 base, count;
+} p4_lbr[] = {
+    { MSR_P4_LER_FROM_LIP,          1 },
+    { MSR_P4_LER_TO_LIP,            1 },
+    { MSR_P4_LASTBRANCH_TOS,        1 },
+    { MSR_P4_LASTBRANCH_0_FROM_LIP, NUM_MSR_P4_LASTBRANCH_FROM_TO },
+    { MSR_P4_LASTBRANCH_0_TO_LIP,   NUM_MSR_P4_LASTBRANCH_FROM_TO },
+    { 0, 0 }
+}, c2_lbr[] = {
+    { MSR_IA32_LASTINTFROMIP,       1 },
+    { MSR_IA32_LASTINTTOIP,         1 },
+    { MSR_C2_LASTBRANCH_TOS,        1 },
+    { MSR_C2_LASTBRANCH_0_FROM_IP,  NUM_MSR_C2_LASTBRANCH_FROM_TO },
+    { MSR_C2_LASTBRANCH_0_TO_IP,    NUM_MSR_C2_LASTBRANCH_FROM_TO },
+    { 0, 0 }
+#ifdef __i386__
+}, pm_lbr[] = {
+    { MSR_IA32_LASTINTFROMIP,       1 },
+    { MSR_IA32_LASTINTTOIP,         1 },
+    { MSR_PM_LASTBRANCH_TOS,        1 },
+    { MSR_PM_LASTBRANCH_0,          NUM_MSR_PM_LASTBRANCH },
+    { 0, 0 }
+#endif
+};
+
+static const struct lbr_info *last_branch_msr_get(void)
+{
+    switch ( boot_cpu_data.x86 )
+    {
+    case 6:
+        switch ( boot_cpu_data.x86_model )
+        {
+#ifdef __i386__
+        /* PentiumM */
+        case 9: case 13:
+        /* Core Solo/Duo */
+        case 14:
+            return pm_lbr;
+            break;
+#endif
+        /* Core2 Duo */
+        case 15:
+            return c2_lbr;
+            break;
+        }
+        break;
+
+    case 15:
+        switch ( boot_cpu_data.x86_model )
+        {
+        /* Pentium4/Xeon with em64t */
+        case 3: case 4: case 6:
+            return p4_lbr;
+            break;
+        }
+        break;
+    }
+
+    return NULL;
+}
+
+static int is_last_branch_msr(u32 ecx)
+{
+    const struct lbr_info *lbr = last_branch_msr_get();
+
+    if ( lbr == NULL )
+        return 0;
+
+    for ( ; lbr->count; lbr++ )
+        if ( (ecx >= lbr->base) && (ecx < (lbr->base + lbr->count)) )
+            return 1;
+
+    return 0;
+}
+
 static int vmx_do_msr_read(struct cpu_user_regs *regs)
 {
     u64 msr_content = 0;
@@ -2263,6 +2305,10 @@ static int vmx_do_msr_read(struct cpu_user_regs *regs)
     case MSR_IA32_APICBASE:
         msr_content = vcpu_vlapic(v)->hw.apic_base_msr;
         break;
+    case MSR_IA32_DEBUGCTLMSR:
+        if ( vmx_read_guest_msr(v, ecx, &msr_content) != 0 )
+            msr_content = 0;
+        break;
     case MSR_IA32_VMX_BASIC...MSR_IA32_VMX_PROCBASED_CTLS2:
         goto gp_fault;
     case MSR_IA32_MCG_CAP:
@@ -2285,6 +2331,15 @@ static int vmx_do_msr_read(struct cpu_user_regs *regs)
                 return 0;
             case HNDL_done:
                 goto done;
+        }
+
+        if ( vmx_read_guest_msr(v, ecx, &msr_content) == 0 )
+            break;
+
+        if ( is_last_branch_msr(ecx) )
+        {
+            msr_content = 0;
+            break;
         }
 
         if ( rdmsr_hypervisor_regs(ecx, &eax, &edx) ||
@@ -2404,13 +2459,42 @@ static int vmx_do_msr_write(struct cpu_user_regs *regs)
     case MSR_IA32_APICBASE:
         vlapic_msr_set(vcpu_vlapic(v), msr_content);
         break;
+    case MSR_IA32_DEBUGCTLMSR: {
+        int i, rc = 0;
+
+        if ( !msr_content || (msr_content & ~3) )
+            break;
+
+        if ( msr_content & 1 )
+        {
+            const struct lbr_info *lbr = last_branch_msr_get();
+            if ( lbr == NULL )
+                break;
+
+            for ( ; (rc == 0) && lbr->count; lbr++ )
+                for ( i = 0; (rc == 0) && (i < lbr->count); i++ )
+                    if ( (rc = vmx_add_guest_msr(v, lbr->base + i)) == 0 )
+                        vmx_disable_intercept_for_msr(v, lbr->base + i);
+        }
+
+        if ( (rc < 0) ||
+             (vmx_add_guest_msr(v, ecx) < 0) ||
+             (vmx_add_host_load_msr(v, ecx) < 0) )
+            vmx_inject_hw_exception(v, TRAP_machine_check, 0);
+        else
+            vmx_write_guest_msr(v, ecx, msr_content);
+
+        break;
+    }
     case MSR_IA32_VMX_BASIC...MSR_IA32_VMX_PROCBASED_CTLS2:
         goto gp_fault;
     default:
         switch ( long_mode_do_msr_write(regs) )
         {
             case HNDL_unhandled:
-                wrmsr_hypervisor_regs(ecx, regs->eax, regs->edx);
+                if ( (vmx_write_guest_msr(v, ecx, msr_content) != 0) &&
+                     !is_last_branch_msr(ecx) )
+                    wrmsr_hypervisor_regs(ecx, regs->eax, regs->edx);
                 break;
             case HNDL_exception_raised:
                 return 0;

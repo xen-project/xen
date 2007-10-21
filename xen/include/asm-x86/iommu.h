@@ -69,6 +69,7 @@ struct iommu {
 int iommu_setup(void);
 int iommu_domain_init(struct domain *d);
 void iommu_domain_destroy(struct domain *d);
+int device_assigned(u8 bus, u8 devfn);
 int assign_device(struct domain *d, u8 bus, u8 devfn);
 int iommu_map_page(struct domain *d, dma_addr_t gfn, dma_addr_t mfn);
 int iommu_unmap_page(struct domain *d, dma_addr_t gfn);
@@ -78,7 +79,8 @@ void iommu_domain_teardown(struct domain *d);
 int hvm_do_IRQ_dpci(struct domain *d, unsigned int irq);
 int dpci_ioport_intercept(ioreq_t *p);
 int pt_irq_create_bind_vtd(struct domain *d,
-    xen_domctl_bind_pt_irq_t * pt_irq_bind);
+                           xen_domctl_bind_pt_irq_t *pt_irq_bind);
 
+#define PT_IRQ_TIME_OUT MILLISECS(8)
 
-#endif // _IOMMU_H_
+#endif /* _IOMMU_H_ */

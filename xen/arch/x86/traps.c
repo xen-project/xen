@@ -46,6 +46,7 @@
 #include <xen/nmi.h>
 #include <xen/version.h>
 #include <xen/kexec.h>
+#include <xen/trace.h>
 #include <asm/paging.h>
 #include <asm/system.h>
 #include <asm/io.h>
@@ -74,6 +75,8 @@ char opt_nmi[10] = "dom0";
 char opt_nmi[10] = "fatal";
 #endif
 string_param("nmi", opt_nmi);
+
+DEFINE_PER_CPU(u32, ler_msr);
 
 /* Master table, used by CPU0. */
 idt_entry_t idt_table[IDT_ENTRIES];
@@ -110,6 +113,9 @@ unsigned long do_get_debugreg(int reg);
 
 static int debug_stack_lines = 20;
 integer_param("debug_stack_lines", debug_stack_lines);
+
+static int opt_ler;
+boolean_param("ler", opt_ler);
 
 #ifdef CONFIG_X86_32
 #define stack_words_per_line 8
@@ -380,6 +386,8 @@ static int do_guest_trap(
     struct trap_bounce *tb;
     const struct trap_info *ti;
 
+    trace_pv_trap(trapnr, regs->eip, use_error_code, regs->error_code);
+
     tb = &v->arch.trap_bounce;
     ti = &v->arch.guest_context.trap_ctxt[trapnr];
 
@@ -633,6 +641,8 @@ static int emulate_forced_invalid_op(struct cpu_user_regs *regs)
     regs->eip = eip;
     regs->eflags &= ~X86_EFLAGS_RF;
 
+    trace_trap_one_addr(TRC_PV_FORCED_INVALID_OP, regs->eip);
+
     return EXCRET_fault_fixed;
 }
 
@@ -752,6 +762,8 @@ void propagate_page_fault(unsigned long addr, u16 error_code)
     if ( !guest_kernel_mode(v, guest_cpu_user_regs()) )
         error_code |= PFEC_user_mode;
 
+    trace_pv_page_fault(addr, error_code);
+
     ti = &v->arch.guest_context.trap_ctxt[TRAP_page_fault];
     tb->flags = TBF_EXCEPTION | TBF_EXCEPTION_ERRCODE;
     tb->error_code = error_code;
@@ -783,7 +795,13 @@ static int handle_gdt_ldt_mapping_fault(
     if ( likely(is_ldt_area) )
     {
         /* LDT fault: Copy a mapping from the guest's LDT, if it is valid. */
-        if ( unlikely(map_ldt_shadow_page(offset >> PAGE_SHIFT) == 0) )
+        if ( likely(map_ldt_shadow_page(offset >> PAGE_SHIFT)) )
+        {
+            if ( guest_mode(regs) )
+                trace_trap_two_addr(TRC_PV_GDT_LDT_MAPPING_FAULT,
+                                    regs->eip, offset);
+        }
+        else
         {
             /* In hypervisor mode? Leave it to the #PF handler to fix up. */
             if ( !guest_mode(regs) )
@@ -939,7 +957,12 @@ static int fixup_page_fault(unsigned long addr, struct cpu_user_regs *regs)
     if ( unlikely(IN_HYPERVISOR_RANGE(addr)) )
     {
         if ( paging_mode_external(d) && guest_mode(regs) )
-            return paging_fault(addr, regs);
+        {
+            int ret = paging_fault(addr, regs);
+            if ( ret == EXCRET_fault_fixed )
+                trace_trap_two_addr(TRC_PV_PAGING_FIXUP, regs->eip, addr);
+            return ret;
+        }
         if ( (addr >= GDT_LDT_VIRT_START) && (addr < GDT_LDT_VIRT_END) )
             return handle_gdt_ldt_mapping_fault(
                 addr - GDT_LDT_VIRT_START, regs);
@@ -955,7 +978,12 @@ static int fixup_page_fault(unsigned long addr, struct cpu_user_regs *regs)
         return EXCRET_fault_fixed;
 
     if ( paging_mode_enabled(d) )
-        return paging_fault(addr, regs);
+    {
+        int ret = paging_fault(addr, regs);
+        if ( ret == EXCRET_fault_fixed )
+            trace_trap_two_addr(TRC_PV_PAGING_FIXUP, regs->eip, addr);
+        return ret;
+    }
 
     return 0;
 }
@@ -1872,13 +1900,19 @@ asmlinkage int do_general_protection(struct cpu_user_regs *regs)
     /* Emulate some simple privileged and I/O instructions. */
     if ( (regs->error_code == 0) &&
          emulate_privileged_op(regs) )
+    {
+        trace_trap_one_addr(TRC_PV_EMULATE_PRIVOP, regs->eip);
         return 0;
+    }
 
 #if defined(__i386__)
     if ( VM_ASSIST(v->domain, VMASST_TYPE_4gb_segments) && 
          (regs->error_code == 0) && 
          gpf_emulate_4gb(regs) )
+    {
+        TRACE_1D(TRC_PV_EMULATE_4GB, regs->eip);
         return 0;
+    }
 #endif
 
     /* Pass on GPF as is. */
@@ -2030,6 +2064,8 @@ asmlinkage int do_device_not_available(struct cpu_user_regs *regs)
         do_guest_trap(TRAP_no_device, regs, 0);
         current->arch.guest_context.ctrlreg[0] &= ~X86_CR0_TS;
     }
+    else
+        TRACE_0D(TRC_PV_MATH_STATE_RESTORE);
 
     return EXCRET_fault_fixed;
 }
@@ -2067,9 +2103,12 @@ asmlinkage int do_debug(struct cpu_user_regs *regs)
     /* Save debug status register where guest OS can peek at it */
     v->arch.guest_context.debugreg[6] = condition;
 
+    ler_enable();
+
     return do_guest_trap(TRAP_debug, regs, 0);
 
  out:
+    ler_enable();
     return EXCRET_not_a_fault;
 }
 
@@ -2115,10 +2154,43 @@ void set_tss_desc(unsigned int n, void *addr)
 #endif
 }
 
+void __devinit percpu_traps_init(void)
+{
+    subarch_percpu_traps_init();
+
+    if ( !opt_ler )
+        return;
+
+    switch ( boot_cpu_data.x86_vendor )
+    {
+    case X86_VENDOR_INTEL:
+        switch ( boot_cpu_data.x86 )
+        {
+        case 6:
+            this_cpu(ler_msr) = MSR_IA32_LASTINTFROMIP;
+            break;
+        case 15:
+            this_cpu(ler_msr) = MSR_P4_LER_FROM_LIP;
+            break;
+        }
+        break;
+    case X86_VENDOR_AMD:
+        switch ( boot_cpu_data.x86 )
+        {
+        case 6:
+        case 15:
+        case 16:
+            this_cpu(ler_msr) = MSR_IA32_LASTINTFROMIP;
+            break;
+        }
+        break;
+    }
+
+    ler_enable();
+}
+
 void __init trap_init(void)
 {
-    extern void percpu_traps_init(void);
-
     /*
      * Note that interrupt gates are always used, rather than trap gates. We 
      * must have interrupts disabled until DS/ES/FS/GS are saved because the 

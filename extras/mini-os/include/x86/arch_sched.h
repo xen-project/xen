@@ -7,9 +7,9 @@ static inline struct thread* get_current(void)
 {
     struct thread **current;
 #ifdef __i386__    
-    __asm__("andl %%esp,%0; ":"=r" (current) : "r" (~8191UL));
+    __asm__("andl %%esp,%0; ":"=r" (current) : "0" (~8191UL));
 #else
-    __asm__("andq %%rsp,%0; ":"=r" (current) : "r" (~8191UL));
+    __asm__("andq %%rsp,%0; ":"=r" (current) : "0" (~8191UL));
 #endif 
     return *current;
 }

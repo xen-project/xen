@@ -380,6 +380,7 @@ typedef struct xen_domctl_arch_setup {
     uint64_aligned_t maxmem; /* Highest memory address for MDT.  */
     uint64_aligned_t xsi_va; /* Xen shared_info area virtual address.  */
     uint32_t hypercall_imm;  /* Break imm for Xen hypercalls.  */
+    int8_t vhpt_size_log2;   /* Log2 of VHPT size. */
 #endif
 } xen_domctl_arch_setup_t;
 DEFINE_XEN_GUEST_HANDLE(xen_domctl_arch_setup_t);

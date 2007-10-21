@@ -18,13 +18,17 @@
 #define _EFER_LME		8  /* Long mode enable */
 #define _EFER_LMA		10 /* Long mode active (read-only) */
 #define _EFER_NX		11 /* No execute enable */
-#define _EFER_SVME		12
+#define _EFER_SVME		12 /* AMD: SVM enable */
+#define _EFER_LMSLE		13 /* AMD: Long-mode segment limit enable */
+#define _EFER_FFXSE		14 /* AMD: Fast FXSAVE/FXRSTOR enable */
 
 #define EFER_SCE		(1<<_EFER_SCE)
 #define EFER_LME		(1<<_EFER_LME)
 #define EFER_LMA		(1<<_EFER_LMA)
 #define EFER_NX			(1<<_EFER_NX)
 #define EFER_SVME		(1<<_EFER_SVME)
+#define EFER_LMSLE		(1<<_EFER_LMSLE)
+#define EFER_FFXSE		(1<<_EFER_FFXSE)
 
 /* Intel MSRs. Some also available on other CPUs */
 #define MSR_IA32_PERFCTR0		0x000000c1
@@ -318,6 +322,27 @@
 #define MSR_P4_TC_ESCR1			0x000003c5
 #define MSR_P4_U2L_ESCR0		0x000003b0
 #define MSR_P4_U2L_ESCR1		0x000003b1
+
+/* Netburst (P4) last-branch recording */
+#define MSR_P4_LER_FROM_LIP 		0x000001d7
+#define MSR_P4_LER_TO_LIP 		0x000001d8
+#define MSR_P4_LASTBRANCH_TOS		0x000001da
+#define MSR_P4_LASTBRANCH_0		0x000001db
+#define NUM_MSR_P4_LASTBRANCH		4
+#define MSR_P4_LASTBRANCH_0_FROM_LIP	0x00000680
+#define MSR_P4_LASTBRANCH_0_TO_LIP	0x000006c0
+#define NUM_MSR_P4_LASTBRANCH_FROM_TO	16
+
+/* Pentium M (and Core) last-branch recording */
+#define MSR_PM_LASTBRANCH_TOS		0x000001c9
+#define MSR_PM_LASTBRANCH_0		0x00000040
+#define NUM_MSR_PM_LASTBRANCH		8
+
+/* Core 2 last-branch recording */
+#define MSR_C2_LASTBRANCH_TOS		0x000001c9
+#define MSR_C2_LASTBRANCH_0_FROM_IP	0x00000040
+#define MSR_C2_LASTBRANCH_0_TO_IP	0x00000060
+#define NUM_MSR_C2_LASTBRANCH_FROM_TO	4
 
 /* Intel Core-based CPU performance counters */
 #define MSR_CORE_PERF_FIXED_CTR0	0x00000309

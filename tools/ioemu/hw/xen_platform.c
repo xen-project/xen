@@ -25,7 +25,6 @@
 #include "vl.h"
 
 #include <xenguest.h>
-#include <xc_private.h>
 
 extern FILE *logfile;
 

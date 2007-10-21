@@ -152,7 +152,7 @@ void __init zap_low_mappings(l2_pgentry_t *dom0_l2)
     /* Now zap mappings in the idle pagetables. */
     destroy_xen_mappings(0, HYPERVISOR_VIRT_START);
 
-    flush_tlb_all_pge();
+    flush_all(FLUSH_TLB_GLOBAL);
 
     /* Replace with mapping of the boot trampoline only. */
     map_pages_to_xen(BOOT_TRAMPOLINE, BOOT_TRAMPOLINE >> PAGE_SHIFT,

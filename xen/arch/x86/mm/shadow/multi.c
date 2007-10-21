@@ -1690,7 +1690,7 @@ sh_make_monitor_table(struct vcpu *v)
     ASSERT(pagetable_get_pfn(v->arch.monitor_table) == 0);
     
     /* Guarantee we can get the memory we need */
-    shadow_prealloc(d, SHADOW_MAX_ORDER);
+    shadow_prealloc(d, SH_type_monitor_table, CONFIG_PAGING_LEVELS - 1);
 
 #if CONFIG_PAGING_LEVELS == 4    
     {
@@ -2827,10 +2827,13 @@ static int sh_page_fault(struct vcpu *v,
     }
 
     /* Make sure there is enough free shadow memory to build a chain of
-     * shadow tables: one SHADOW_MAX_ORDER chunk will always be enough
-     * to allocate all we need.  (We never allocate a top-level shadow
-     * on this path, only a 32b l1, pae l2+1 or 64b l3+2+1) */
-    shadow_prealloc(d, SHADOW_MAX_ORDER);
+     * shadow tables. (We never allocate a top-level shadow on this path,
+     * only a 32b l1, pae l1, or 64b l3+2+1. Note that while
+     * SH_type_l1_shadow isn't correct in the latter case, all page
+     * tables are the same size there.) */
+    shadow_prealloc(d,
+                    SH_type_l1_shadow,
+                    GUEST_PAGING_LEVELS < 4 ? 1 : GUEST_PAGING_LEVELS - 1);
 
     /* Acquire the shadow.  This must happen before we figure out the rights 
      * for the shadow entry, since we might promote a page here. */
@@ -3086,7 +3089,7 @@ sh_invlpg(struct vcpu *v, unsigned long va)
     if ( mfn_to_shadow_page(shadow_l2e_get_mfn(sl2e))->type
          == SH_type_fl1_shadow )
     {
-        local_flush_tlb();
+        flush_tlb_local();
         return 0;
     }
 
@@ -3444,7 +3447,7 @@ sh_set_toplevel_shadow(struct vcpu *v,
     if ( !mfn_valid(smfn) )
     {
         /* Make sure there's enough free shadow memory. */
-        shadow_prealloc(d, SHADOW_MAX_ORDER); 
+        shadow_prealloc(d, root_type, 1);
         /* Shadow the page. */
         smfn = sh_make_shadow(v, gmfn, root_type);
     }

@@ -28,40 +28,32 @@
 #include "pci/pci.h"
 
 extern FILE *logfile;
-char *token;
 
-int pci_devs(const char *direct_pci)
+static int token_value(char *token)
 {
-    int count = 0;
-    const char *c;
-
-    /* skip first "[" character */
-    c = direct_pci + 1;
-    while ((c = strchr(c, '[')) != NULL) {
-        c++;
-        count++;
-    }
-    return (count);
+    token = strchr(token, 'x') + 1;
+    return strtol(token, NULL, 16);
 }
 
-int next_token(char *direct_pci)
+static int next_bdf(char **str, int *seg, int *bus, int *dev, int *func)
 {
-    if (token == NULL)
-        token = strtok(direct_pci, ",");
-    else 
-        token = strtok(NULL, ",");
-    token = strchr(token, 'x');
-    token = token + 1;
-    return ((int) strtol(token, NULL, 16));
-}
+    char *token;
 
-void next_bdf(char *direct_pci, int *seg,
-              int *bus, int *dev, int *func)
-{
-    *seg  = next_token(direct_pci);
-    *bus  = next_token(direct_pci);
-    *dev  = next_token(direct_pci);
-    *func = next_token(direct_pci);
+    token = strchr(*str, ',');
+    if ( !token )
+        return 0;
+    token++;
+
+    *seg  = token_value(token);
+    token = strchr(token, ',') + 1;
+    *bus  = token_value(token);
+    token = strchr(token, ',') + 1;
+    *dev  = token_value(token);
+    token = strchr(token, ',') + 1;
+    *func  = token_value(token);
+
+    *str = token;
+    return 1;
 }
 
 uint8_t find_cap_offset(struct pci_dev *pci_dev, uint8_t cap)
@@ -333,7 +325,6 @@ struct pt_dev * register_real_device(PCIBus *e_bus,
     int rc, i;
     struct pt_dev *assigned_device = NULL;
     struct pci_dev *pci_dev;
-    struct pci_config_cf8 machine_bdf;
     uint8_t e_device, e_intx;
 
     PT_LOG("Assigning real physical device %02x:%02x.%x ...\n",
@@ -367,15 +358,6 @@ struct pt_dev * register_real_device(PCIBus *e_bus,
 
     /* Issue PCIe FLR */
     pdev_flr(pci_dev);
-
-    /* Tell XEN vmm to change iommu settings */
-    machine_bdf.reg = 0;
-    machine_bdf.bus = r_bus;
-    machine_bdf.dev = r_dev;
-    machine_bdf.func = r_func;
-    rc = xc_assign_device(xc_handle, domid, machine_bdf.value);
-    if ( rc < 0 )
-        PT_LOG("Error: xc_domain_assign_device error %d\n", rc);
 
     /* Initialize virtualized PCI configuration (Extended 256 Bytes) */
     for ( i = 0; i < PCI_CONFIG_SIZE; i++ )
@@ -417,11 +399,9 @@ struct pt_dev * register_real_device(PCIBus *e_bus,
 
 int pt_init(PCIBus *e_bus, char *direct_pci)
 {
-    int i;
     int seg, b, d, f;
     struct pt_dev *pt_dev;
     struct pci_access *pci_access;
-    int dev_count = pci_devs(direct_pci);
 
     /* Initialize libpci */
     pci_access = pci_alloc();
@@ -434,11 +414,8 @@ int pt_init(PCIBus *e_bus, char *direct_pci)
     pci_scan_bus(pci_access);
 
     /* Assign given devices to guest */
-    for ( i = 0; i < dev_count; i++ )
+    while ( next_bdf(&direct_pci, &seg, &b, &d, &f) )
     {
-        /* Get next device bdf (bus, device, function) */
-        next_bdf(direct_pci, &seg, &b, &d, &f);
-
         /* Register real device with the emulated bus */
         pt_dev = register_real_device(e_bus, "DIRECT PCI", PT_VIRT_DEVFN_AUTO,
             b, d, f, PT_MACHINE_IRQ_AUTO, pci_access);

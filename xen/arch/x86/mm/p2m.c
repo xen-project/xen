@@ -493,7 +493,7 @@ static void audit_p2m(struct domain *d)
     test_linear = ( (d == current->domain)
                     && !pagetable_is_null(current->arch.monitor_table) );
     if ( test_linear )
-        local_flush_tlb();
+        flush_tlb_local();
 
     /* Audit part one: walk the domain's page allocation list, checking
      * the m2p entries. */

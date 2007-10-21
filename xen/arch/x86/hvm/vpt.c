@@ -46,7 +46,7 @@ static void missed_ticks(struct periodic_time *pt)
 {
     s_time_t missed_ticks;
 
-    if ( unlikely(pt->one_shot) )
+    if ( pt->one_shot )
         return;
 
     missed_ticks = NOW() - pt->scheduled;
@@ -115,12 +115,7 @@ static void pt_timer_fn(void *data)
 
     pt->pending_intr_nr++;
 
-    if ( unlikely(pt->one_shot) )
-    {
-        pt->enabled = 0;
-        list_del(&pt->list);
-    }
-    else
+    if ( !pt->one_shot )
     {
         pt->scheduled += pt->period;
         missed_ticks(pt);
@@ -212,10 +207,16 @@ void pt_intr_post(struct vcpu *v, struct hvm_intack intack)
         return;
     }
 
-    ASSERT(pt->vcpu == v);
-
-    pt->pending_intr_nr--;
-    pt->last_plt_gtime += pt->period_cycles;
+    if ( pt->one_shot )
+    {
+        pt->enabled = 0;
+        list_del(&pt->list);
+    }
+    else
+    {
+        pt->pending_intr_nr--;
+        pt->last_plt_gtime += pt->period_cycles;
+    }
 
     if ( hvm_get_guest_time(v) < pt->last_plt_gtime )
         hvm_set_guest_time(v, pt->last_plt_gtime);

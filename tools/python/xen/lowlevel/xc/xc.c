@@ -498,15 +498,91 @@ static PyObject *pyxc_get_hvm_param(XcObject *self,
     unsigned long value;
 
     static char *kwd_list[] = { "domid", "param", NULL }; 
-    if ( !PyArg_ParseTupleAndKeywords(args, kwds, "i|i", kwd_list,
+    if ( !PyArg_ParseTupleAndKeywords(args, kwds, "ii", kwd_list,
                                       &dom, &param) )
         return NULL;
 
     if ( xc_get_hvm_param(self->xc_handle, dom, param, &value) != 0 )
         return pyxc_error_to_exception();
 
-    return Py_BuildValue("i", value);
+    return PyLong_FromUnsignedLong(value);
 
+}
+
+static PyObject *pyxc_set_hvm_param(XcObject *self,
+                                    PyObject *args,
+                                    PyObject *kwds)
+{
+    uint32_t dom;
+    int param;
+    uint64_t value;
+
+    static char *kwd_list[] = { "domid", "param", "value", NULL }; 
+    if ( !PyArg_ParseTupleAndKeywords(args, kwds, "iiL", kwd_list,
+                                      &dom, &param, &value) )
+        return NULL;
+
+    if ( xc_set_hvm_param(self->xc_handle, dom, param, value) != 0 )
+        return pyxc_error_to_exception();
+
+    Py_INCREF(zero);
+    return zero;
+}
+
+static int token_value(char *token)
+{
+    token = strchr(token, 'x') + 1;
+    return strtol(token, NULL, 16);
+}
+
+static int next_bdf(char **str, int *seg, int *bus, int *dev, int *func)
+{
+    char *token;
+
+    token = strchr(*str, ',');
+    if ( !token )
+        return 0;
+    token++;
+
+    *seg  = token_value(token);
+    token = strchr(token, ',') + 1;
+    *bus  = token_value(token);
+    token = strchr(token, ',') + 1;
+    *dev  = token_value(token);
+    token = strchr(token, ',') + 1;
+    *func  = token_value(token);
+
+    *str = token;
+    return 1;
+}
+
+static PyObject *pyxc_assign_device(XcObject *self,
+                                    PyObject *args,
+                                    PyObject *kwds)
+{
+    uint32_t dom;
+    char *pci_str;
+    uint32_t bdf = 0;
+    int seg, bus, dev, func;
+
+    static char *kwd_list[] = { "domid", "pci", NULL };
+    if ( !PyArg_ParseTupleAndKeywords(args, kwds, "is", kwd_list,
+                                      &dom, &pci_str) )
+        return NULL;
+
+    while ( next_bdf(&pci_str, &seg, &bus, &dev, &func) )
+    {
+        bdf |= (bus & 0xff) << 16;
+        bdf |= (dev & 0x1f) << 11;
+        bdf |= (func & 0x7) << 8;
+
+        if ( xc_assign_device(self->xc_handle, dom, bdf) != 0 )
+            break;
+
+        bdf = 0;
+    }
+
+    return Py_BuildValue("i", bdf);
 }
 
 #ifdef __ia64__
@@ -537,15 +613,14 @@ static PyObject *pyxc_hvm_build(XcObject *self,
     int i;
 #endif
     char *image;
-    int store_evtchn, memsize, vcpus = 1, pae = 0, acpi = 0, apic = 1;
-    unsigned long store_mfn;
+    int memsize, vcpus = 1, acpi = 0, apic = 1;
 
-    static char *kwd_list[] = { "domid", "store_evtchn",
-				"memsize", "image", "vcpus", "pae", "acpi",
+    static char *kwd_list[] = { "domid",
+				"memsize", "image", "vcpus", "acpi",
 				"apic", NULL };
-    if ( !PyArg_ParseTupleAndKeywords(args, kwds, "iiis|iiii", kwd_list,
-                                      &dom, &store_evtchn, &memsize,
-                                      &image, &vcpus, &pae, &acpi, &apic) )
+    if ( !PyArg_ParseTupleAndKeywords(args, kwds, "iis|iii", kwd_list,
+                                      &dom, &memsize,
+                                      &image, &vcpus, &acpi, &apic) )
         return NULL;
 
     if ( xc_hvm_build(self->xc_handle, dom, memsize, image) != 0 )
@@ -571,14 +646,7 @@ static PyObject *pyxc_hvm_build(XcObject *self,
     munmap(va_map, XC_PAGE_SIZE);
 #endif
 
-    xc_get_hvm_param(self->xc_handle, dom, HVM_PARAM_STORE_PFN, &store_mfn);
-#if !defined(__ia64__)
-    xc_set_hvm_param(self->xc_handle, dom, HVM_PARAM_PAE_ENABLED, pae);
-#endif
-    xc_set_hvm_param(self->xc_handle, dom, HVM_PARAM_STORE_EVTCHN,
-                     store_evtchn);
-
-    return Py_BuildValue("{s:i}", "store_mfn", store_mfn);
+    return Py_BuildValue("{}");
 }
 
 static PyObject *pyxc_evtchn_alloc_unbound(XcObject *self,
@@ -709,7 +777,7 @@ static PyObject *pyxc_physinfo(XcObject *self)
                             "max_cpu_id",       info.max_cpu_id,
                             "threads_per_core", info.threads_per_core,
                             "cores_per_socket", info.cores_per_socket,
-                            "sockets_per_node", info.sockets_per_node,
+                            "nr_cpus",          info.nr_cpus, 
                             "total_memory",     pages_to_kib(info.total_pages),
                             "free_memory",      pages_to_kib(info.free_pages),
                             "scrub_memory",     pages_to_kib(info.scrub_pages),
@@ -1326,8 +1394,25 @@ static PyMethodDef pyxc_methods[] = {
       "get a parameter of HVM guest OS.\n"
       " dom     [int]:      Identifier of domain to build into.\n"
       " param   [int]:      No. of HVM param.\n"
-      "Returns: [int] value of the param.\n" },
+      "Returns: [long] value of the param.\n" },
 
+    { "hvm_set_param", 
+      (PyCFunction)pyxc_set_hvm_param, 
+      METH_VARARGS | METH_KEYWORDS, "\n"
+      "set a parameter of HVM guest OS.\n"
+      " dom     [int]:      Identifier of domain to build into.\n"
+      " param   [int]:      No. of HVM param.\n"
+      " value   [long]:     Value of param.\n"
+      "Returns: [int] 0 on success.\n" },
+
+     { "assign_device",
+       (PyCFunction)pyxc_assign_device,
+       METH_VARARGS | METH_KEYWORDS, "\n"
+       "assign device with VT-d.\n"
+       " dom     [int]:      Identifier of domain to build into.\n"
+       " pci_str [str]:      PCI devices.\n"
+       "Returns: [int] 0 on success, or device bdf that can't be assigned.\n" },
+  
     { "sched_id_get",
       (PyCFunction)pyxc_sched_id_get,
       METH_NOARGS, "\n"

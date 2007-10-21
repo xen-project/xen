@@ -31,7 +31,7 @@
 #define X86_FEATURE_PSE36	(0*32+17) /* 36-bit PSEs */
 #define X86_FEATURE_PN		(0*32+18) /* Processor serial number */
 #define X86_FEATURE_CLFLSH	(0*32+19) /* Supports the CLFLUSH instruction */
-#define X86_FEATURE_DTES	(0*32+21) /* Debug Trace Store */
+#define X86_FEATURE_DS		(0*32+21) /* Debug Store */
 #define X86_FEATURE_ACPI	(0*32+22) /* ACPI via MSR */
 #define X86_FEATURE_MMX		(0*32+23) /* Multimedia Extensions */
 #define X86_FEATURE_FXSR	(0*32+24) /* FXSAVE and FXRSTOR instructions (fast save and restore */
@@ -49,6 +49,8 @@
 #define X86_FEATURE_MP		(1*32+19) /* MP Capable. */
 #define X86_FEATURE_NX		(1*32+20) /* Execute Disable */
 #define X86_FEATURE_MMXEXT	(1*32+22) /* AMD MMX extensions */
+#define X86_FEATURE_FFXSR       (1*32+25) /* FFXSR instruction optimizations */
+#define X86_FEATURE_PAGE1GB	(1*32+26) /* 1Gb large page support */
 #define X86_FEATURE_RDTSCP	(1*32+27) /* RDTSCP */
 #define X86_FEATURE_LM		(1*32+29) /* Long Mode (x86-64) */
 #define X86_FEATURE_3DNOWEXT	(1*32+30) /* AMD 3DNow! extensions */
@@ -80,21 +82,41 @@
 #define X86_FEATURE_SMXE	(4*32+ 6) /* Safer Mode Extensions */
 #define X86_FEATURE_EST		(4*32+ 7) /* Enhanced SpeedStep */
 #define X86_FEATURE_TM2		(4*32+ 8) /* Thermal Monitor 2 */
+#define X86_FEATURE_SSSE3	(4*32+ 9) /* Supplemental Streaming SIMD Extensions-3 */
 #define X86_FEATURE_CID		(4*32+10) /* Context ID */
 #define X86_FEATURE_CX16        (4*32+13) /* CMPXCHG16B */
 #define X86_FEATURE_XTPR	(4*32+14) /* Send Task Priority Messages */
+#define X86_FEATURE_PDCM	(4*32+15) /* Perf/Debug Capability MSR */
+#define X86_FEATURE_DCA		(4*32+18) /* Direct Cache Access */
+#define X86_FEATURE_SSE4_1	(4*32+19) /* Streaming SIMD Extensions 4.1 */
+#define X86_FEATURE_SSE4_2	(4*32+20) /* Streaming SIMD Extensions 4.2 */
+#define X86_FEATURE_POPCNT	(4*32+23) /* POPCNT instruction */
 
 /* VIA/Cyrix/Centaur-defined CPU features, CPUID level 0xC0000001, word 5 */
 #define X86_FEATURE_XSTORE	(5*32+ 2) /* on-CPU RNG present (xstore insn) */
 #define X86_FEATURE_XSTORE_EN	(5*32+ 3) /* on-CPU RNG enabled */
 #define X86_FEATURE_XCRYPT	(5*32+ 6) /* on-CPU crypto (xcrypt insn) */
 #define X86_FEATURE_XCRYPT_EN	(5*32+ 7) /* on-CPU crypto enabled */
+#define X86_FEATURE_ACE2	(5*32+ 8) /* Advanced Cryptography Engine v2 */
+#define X86_FEATURE_ACE2_EN	(5*32+ 9) /* ACE v2 enabled */
+#define X86_FEATURE_PHE		(5*32+ 10) /* PadLock Hash Engine */
+#define X86_FEATURE_PHE_EN	(5*32+ 11) /* PHE enabled */
+#define X86_FEATURE_PMM		(5*32+ 12) /* PadLock Montgomery Multiplier */
+#define X86_FEATURE_PMM_EN	(5*32+ 13) /* PMM enabled */
 
 /* More extended AMD flags: CPUID level 0x80000001, ecx, word 6 */
 #define X86_FEATURE_LAHF_LM	(6*32+ 0) /* LAHF/SAHF in long mode */
 #define X86_FEATURE_CMP_LEGACY	(6*32+ 1) /* If yes HyperThreading not valid */
 #define X86_FEATURE_SVME        (6*32+ 2) /* Secure Virtual Machine */
-#define X86_FEATURE_FFXSR       (6*32+25) /* FFXSR instruction optimizations */
+#define X86_FEATURE_EXTAPICSPACE (6*32+ 3) /* Extended APIC space */
+#define X86_FEATURE_ALTMOVCR	(6*32+ 4) /* LOCK MOV CR accesses CR+8 */
+#define X86_FEATURE_ABM		(6*32+ 5) /* Advanced Bit Manipulation */
+#define X86_FEATURE_SSE4A	(6*32+ 6) /* AMD Streaming SIMD Extensions-4a */
+#define X86_FEATURE_MISALIGNSSE	(6*32+ 7) /* Misaligned SSE Access */
+#define X86_FEATURE_3DNOWPF	(6*32+ 8) /* 3DNow! Prefetch */
+#define X86_FEATURE_OSVW	(6*32+ 9) /* OS Visible Workaround */
+#define X86_FEATURE_SKINIT	(6*32+ 12) /* SKINIT, STGI/CLGI, DEV */
+#define X86_FEATURE_WDT		(6*32+ 13) /* Watchdog Timer */
 
 #define cpu_has(c, bit)		test_bit(bit, (c)->x86_capability)
 #define boot_cpu_has(bit)	test_bit(bit, boot_cpu_data.x86_capability)
@@ -122,6 +144,7 @@
 #define cpu_has_cyrix_arr	boot_cpu_has(X86_FEATURE_CYRIX_ARR)
 #define cpu_has_centaur_mcr	boot_cpu_has(X86_FEATURE_CENTAUR_MCR)
 #define cpu_has_clflush		boot_cpu_has(X86_FEATURE_CLFLSH)
+#define cpu_has_page1gb		0
 #else /* __x86_64__ */
 #define cpu_has_vme		0
 #define cpu_has_de		1
@@ -145,7 +168,11 @@
 #define cpu_has_cyrix_arr	0
 #define cpu_has_centaur_mcr	0
 #define cpu_has_clflush		boot_cpu_has(X86_FEATURE_CLFLSH)
+#define cpu_has_page1gb		boot_cpu_has(X86_FEATURE_PAGE1GB)
 #endif
+
+#define cpu_has_ffxsr           ((boot_cpu_data.x86_vendor == X86_VENDOR_AMD) \
+                                 && boot_cpu_has(X86_FEATURE_FFXSR))
 
 #endif /* __ASM_I386_CPUFEATURE_H */
 

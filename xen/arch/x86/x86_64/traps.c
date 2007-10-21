@@ -112,6 +112,14 @@ void show_registers(struct cpu_user_regs *regs)
            "ss: %04x   cs: %04x\n",
            fault_regs.ds, fault_regs.es, fault_regs.fs,
            fault_regs.gs, fault_regs.ss, fault_regs.cs);
+
+    if ( this_cpu(ler_msr) && !guest_mode(regs) )
+    {
+        u64 from, to;
+        rdmsrl(this_cpu(ler_msr), from);
+        rdmsrl(this_cpu(ler_msr) + 1, to);
+        printk("ler: %016lx -> %016lx\n", from, to);
+    }
 }
 
 void show_page_walk(unsigned long addr)
@@ -302,7 +310,7 @@ static int write_stack_trampoline(
     return 34;
 }
 
-void __devinit percpu_traps_init(void)
+void __devinit subarch_percpu_traps_init(void)
 {
     char *stack_bottom, *stack;
     int   cpu = smp_processor_id();

@@ -164,34 +164,28 @@ void send_IPI_mask_phys(cpumask_t mask, int vector)
 
 static DEFINE_SPINLOCK(flush_lock);
 static cpumask_t flush_cpumask;
-static unsigned long flush_va;
+static const void *flush_va;
+static unsigned int flush_flags;
 
 fastcall void smp_invalidate_interrupt(void)
 {
     ack_APIC_irq();
     perfc_incr(ipis);
     irq_enter();
-    if ( !__sync_lazy_execstate() )
-    {
-        if ( flush_va == FLUSHVA_ALL )
-            local_flush_tlb();
-        else
-            local_flush_tlb_one(flush_va);
-    }
+    if ( !__sync_lazy_execstate() ||
+         (flush_flags & (FLUSH_TLB_GLOBAL | FLUSH_CACHE)) )
+        flush_area_local(flush_va, flush_flags);
     cpu_clear(smp_processor_id(), flush_cpumask);
     irq_exit();
 }
 
-void __flush_tlb_mask(cpumask_t mask, unsigned long va)
+void flush_area_mask(cpumask_t mask, const void *va, unsigned int flags)
 {
     ASSERT(local_irq_is_enabled());
-    
+
     if ( cpu_isset(smp_processor_id(), mask) )
     {
-        if ( va == FLUSHVA_ALL )
-            local_flush_tlb();
-        else
-            local_flush_tlb_one(va);
+        flush_area_local(va, flags);
         cpu_clear(smp_processor_id(), mask);
     }
 
@@ -200,6 +194,7 @@ void __flush_tlb_mask(cpumask_t mask, unsigned long va)
         spin_lock(&flush_lock);
         flush_cpumask = mask;
         flush_va      = va;
+        flush_flags   = flags;
         send_IPI_mask(mask, INVALIDATE_TLB_VECTOR);
         while ( !cpus_empty(flush_cpumask) )
             cpu_relax();
@@ -215,22 +210,11 @@ void new_tlbflush_clock_period(void)
     /* Flush everyone else. We definitely flushed just before entry. */
     allbutself = cpu_online_map;
     cpu_clear(smp_processor_id(), allbutself);
-    __flush_tlb_mask(allbutself, FLUSHVA_ALL);
+    flush_mask(allbutself, FLUSH_TLB);
 
     /* No need for atomicity: we are the only possible updater. */
     ASSERT(tlbflush_clock == 0);
     tlbflush_clock++;
-}
-
-static void flush_tlb_all_pge_ipi(void *info)
-{
-    local_flush_tlb_pge();
-}
-
-void flush_tlb_all_pge(void)
-{
-    smp_call_function(flush_tlb_all_pge_ipi, 0, 1, 1);
-    local_flush_tlb_pge();
 }
 
 void smp_send_event_check_mask(cpumask_t mask)

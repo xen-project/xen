@@ -87,6 +87,13 @@ struct acpi_ioapic_unit {
     }ioapic;
 };
 
+#define DMAR_OPERATION_TIMEOUT (HZ*60) /* 1m */
+#define time_after(a,b)         \
+        (typecheck(unsigned long, a) && \
+         typecheck(unsigned long, b) && \
+         ((long)(b) - (long)(a) < 0))
+
 int vtd_hw_check(void);
+void disable_pmr(struct iommu *iommu);
 
 #endif // _DMAR_H_

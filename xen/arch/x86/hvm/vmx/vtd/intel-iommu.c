@@ -40,13 +40,6 @@ extern void print_iommu_regs(struct acpi_drhd_unit *drhd);
 extern void print_vtd_entries(struct domain *d, int bus, int devfn,
                               unsigned long gmfn);
 
-#define DMAR_OPERATION_TIMEOUT (HZ*60) /* 1m */
-
-#define time_after(a,b)         \
-        (typecheck(unsigned long, a) && \
-         typecheck(unsigned long, b) && \
-         ((long)(b) - (long)(a) < 0))
-
 unsigned int x86_clflush_size;
 void clflush_cache_range(void *adr, int size)
 {
@@ -506,7 +499,7 @@ static int inline iommu_flush_iotlb_psi(
                                DMA_TLB_PSI_FLUSH, non_present_entry_flush);
 }
 
-void flush_all(void)
+void iommu_flush_all(void)
 {
     struct acpi_drhd_unit *drhd;
     struct iommu *iommu;
@@ -1774,7 +1767,7 @@ int iommu_setup(void)
     struct hvm_iommu *hd  = domain_hvm_iommu(dom0);
     struct acpi_drhd_unit *drhd;
     struct iommu *iommu;
-    unsigned long i;
+    unsigned long i, status;
 
     if ( !vtd_enabled )
         return 0;
@@ -1782,7 +1775,7 @@ int iommu_setup(void)
     INIT_LIST_HEAD(&hd->pdev_list);
 
     /* start from scratch */
-    flush_all();
+    iommu_flush_all();
 
     /* setup clflush size */
     x86_clflush_size = ((cpuid_ebx(1) >> 8) & 0xff) * 8;
@@ -1804,6 +1797,10 @@ int iommu_setup(void)
     if ( enable_vtd_translation() )
         goto error;
 
+    status = dmar_readl(iommu->reg, DMAR_PMEN_REG);
+    if (status & DMA_PMEN_PRS)
+        disable_pmr(iommu);
+
     return 0;
 
  error:
@@ -1814,6 +1811,21 @@ int iommu_setup(void)
         free_iommu(iommu);
     }
     return -EIO;
+}
+
+/*
+ * If the device isn't owned by dom0, it means it already
+ * has been assigned to other domain, or it's not exist.
+ */
+int device_assigned(u8 bus, u8 devfn)
+{
+    struct pci_dev *pdev;
+
+    for_each_pdev( dom0, pdev )
+        if ( (pdev->bus == bus ) && (pdev->devfn == devfn) )
+            return 0;
+
+    return 1;
 }
 
 int assign_device(struct domain *d, u8 bus, u8 devfn)
@@ -1961,7 +1973,7 @@ int iommu_suspend(void)
     struct iommu *iommu;
     int i = 0;
 
-    flush_all();
+    iommu_flush_all();
 
     for_each_drhd_unit ( drhd )
     {
@@ -1996,7 +2008,7 @@ int iommu_resume(void)
     struct iommu *iommu;
     int i = 0;
 
-    flush_all();
+    iommu_flush_all();
 
     init_vtd_hw();
     for_each_drhd_unit ( drhd )

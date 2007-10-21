@@ -205,7 +205,7 @@ void __init zap_low_mappings(void)
 
     /* Remove aliased mapping of first 1:1 PML4 entry. */
     l4e_write(&idle_pg_table[0], l4e_empty());
-    local_flush_tlb_pge();
+    flush_local(FLUSH_TLB_GLOBAL);
 
     /* Replace with mapping of the boot trampoline only. */
     map_pages_to_xen(BOOT_TRAMPOLINE, BOOT_TRAMPOLINE >> PAGE_SHIFT,
