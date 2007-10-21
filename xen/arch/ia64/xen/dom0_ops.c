@@ -24,6 +24,9 @@
 #include <xen/errno.h>
 #include <xen/nodemask.h>
 #include <asm/dom_fw_utils.h>
+#include <asm/hvm/support.h>
+#include <xsm/xsm.h>
+#include <public/hvm/save.h>
 
 #define get_xen_guest_handle(val, hnd)  do { val = (hnd).p; } while (0)
 
@@ -231,6 +234,112 @@ long arch_do_domctl(xen_domctl_t *op, XEN_GUEST_HANDLE(xen_domctl_t) u_domctl)
 
     sendtrigger_out:
         put_domain(d);
+    }
+    break;
+
+    case XEN_DOMCTL_sethvmcontext:
+    { 
+        struct hvm_domain_context c;
+        struct domain *d;
+
+        c.cur = 0;
+        c.size = op->u.hvmcontext.size;
+        c.data = NULL;
+        
+        ret = -ESRCH;
+        d = rcu_lock_domain_by_id(op->domain);
+        if (d == NULL)
+            break;
+
+#ifdef CONFIG_X86
+        ret = xsm_hvmcontext(d, op->cmd);
+        if (ret)
+            goto sethvmcontext_out;
+#endif /* CONFIG_X86 */
+
+        ret = -EINVAL;
+        if (!is_hvm_domain(d)) 
+            goto sethvmcontext_out;
+
+        ret = -ENOMEM;
+        c.data = xmalloc_bytes(c.size);
+        if (c.data == NULL)
+            goto sethvmcontext_out;
+
+        ret = -EFAULT;
+        if (copy_from_guest(c.data, op->u.hvmcontext.buffer, c.size) != 0)
+            goto sethvmcontext_out;
+
+        domain_pause(d);
+        ret = hvm_load(d, &c);
+        domain_unpause(d);
+
+    sethvmcontext_out:
+        if (c.data != NULL)
+            xfree(c.data);
+
+        rcu_unlock_domain(d);
+    }
+    break;
+
+    case XEN_DOMCTL_gethvmcontext:
+    { 
+        struct hvm_domain_context c;
+        struct domain *d;
+
+        ret = -ESRCH;
+        d = rcu_lock_domain_by_id(op->domain);
+        if (d == NULL)
+            break;
+
+#ifdef CONFIG_X86
+        ret = xsm_hvmcontext(d, op->cmd);
+        if (ret)
+            goto gethvmcontext_out;
+#endif /* CONFIG_X86 */
+
+        ret = -EINVAL;
+        if (!is_hvm_domain(d)) 
+            goto gethvmcontext_out;
+
+        c.cur = 0;
+        c.size = hvm_save_size(d);
+        c.data = NULL;
+
+        if (guest_handle_is_null(op->u.hvmcontext.buffer)) {
+            /* Client is querying for the correct buffer size */
+            op->u.hvmcontext.size = c.size;
+            ret = 0;
+            goto gethvmcontext_out;            
+        }
+
+        /* Check that the client has a big enough buffer */
+        ret = -ENOSPC;
+        if (op->u.hvmcontext.size < c.size) 
+            goto gethvmcontext_out;
+
+        /* Allocate our own marshalling buffer */
+        ret = -ENOMEM;
+        c.data = xmalloc_bytes(c.size);
+        if (c.data == NULL)
+            goto gethvmcontext_out;
+
+        domain_pause(d);
+        ret = hvm_save(d, &c);
+        domain_unpause(d);
+
+        op->u.hvmcontext.size = c.cur;
+        if (copy_to_guest(op->u.hvmcontext.buffer, c.data, c.size) != 0)
+            ret = -EFAULT;
+
+    gethvmcontext_out:
+        if (copy_to_guest(u_domctl, op, 1))
+            ret = -EFAULT;
+
+        if (c.data != NULL)
+            xfree(c.data);
+
+        rcu_unlock_domain(d);
     }
     break;
 
