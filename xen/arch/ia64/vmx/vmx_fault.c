@@ -66,7 +66,7 @@ extern unsigned long handle_fpu_swa (int fp_fault, struct pt_regs *regs, unsigne
 #define DOMN_PAL_REQUEST    0x110000
 #define DOMN_SAL_REQUEST    0x110001
 
-static u64 vec2off[68] = {0x0,0x400,0x800,0xc00,0x1000,0x1400,0x1800,
+static const u16 vec2off[68] = {0x0,0x400,0x800,0xc00,0x1000,0x1400,0x1800,
     0x1c00,0x2000,0x2400,0x2800,0x2c00,0x3000,0x3400,0x3800,0x3c00,0x4000,
     0x4400,0x4800,0x4c00,0x5000,0x5100,0x5200,0x5300,0x5400,0x5500,0x5600,
     0x5700,0x5800,0x5900,0x5a00,0x5b00,0x5c00,0x5d00,0x5e00,0x5f00,0x6000,
@@ -155,13 +155,12 @@ void vmx_reflect_interruption(u64 ifa, u64 isr, u64 iim,
             goto nested_fault;
         break;
     } 
-    VCPU(vcpu,isr)=isr;
+    VCPU(vcpu,isr) = isr;
     VCPU(vcpu,iipa) = regs->cr_iip;
     if (vector == IA64_BREAK_VECTOR || vector == IA64_SPECULATION_VECTOR)
         VCPU(vcpu,iim) = iim;
-    else {
-        set_ifa_itir_iha(vcpu,ifa,1,1,1);
-    }
+    else
+        set_ifa_itir_iha(vcpu, ifa, 1, 1, 1);
     inject_guest_interruption(vcpu, vector);
     return;
 
@@ -196,17 +195,17 @@ vmx_ia64_handle_break (unsigned long ifa, struct pt_regs *regs, unsigned long is
                 vcpu_increment_iip(v);
                 return IA64_NO_FAULT;
             }
-            else if(iim == DOMN_PAL_REQUEST){
+            else if (iim == DOMN_PAL_REQUEST) {
                 pal_emul(v);
                 vcpu_increment_iip(v);
                 return IA64_NO_FAULT;
-            }else if(iim == DOMN_SAL_REQUEST){
+            } else if (iim == DOMN_SAL_REQUEST) {
                 sal_emul(v);
                 vcpu_increment_iip(v);
                 return IA64_NO_FAULT;
             }
         }
-        vmx_reflect_interruption(ifa,isr,iim,11,regs);
+        vmx_reflect_interruption(ifa, isr, iim, 11, regs);
     }
     return IA64_NO_FAULT;
 }
@@ -306,7 +305,7 @@ void leave_hypervisor_tail(void)
 
 static int vmx_handle_lds(REGS* regs)
 {
-    regs->cr_ipsr |=IA64_PSR_ED;
+    regs->cr_ipsr |= IA64_PSR_ED;
     return IA64_FAULT;
 }
 
@@ -316,6 +315,7 @@ vmx_hpw_miss(u64 vadr, u64 vec, REGS* regs)
 {
     IA64_PSR vpsr;
     int type;
+    unsigned int mmu_mode;
     u64 vhpt_adr, gppa, pteval, rr, itir;
     ISR misr;
     PTA vpta;
@@ -325,22 +325,26 @@ vmx_hpw_miss(u64 vadr, u64 vec, REGS* regs)
     vpsr.val = VCPU(v, vpsr);
     misr.val = VMX(v,cr_isr);
     
-    if (vec == 1)
+    if (vec == 1 || vec == 3)
         type = ISIDE_TLB;
-    else if (vec == 2)
+    else if (vec == 2 || vec == 4)
         type = DSIDE_TLB;
     else
         panic_domain(regs, "wrong vec:%lx\n", vec);
 
     /* Physical mode and region is 0 or 4.  */
-    if (!is_virtual_mode(v) && (!((vadr << 1) >> 62))) {
-        if (vec == 2) {
+    mmu_mode = VMX_MMU_MODE(v);
+    if ((mmu_mode == VMX_MMU_PHY_DT
+         || (mmu_mode == VMX_MMU_PHY_D && type == DSIDE_TLB))
+        && !((vadr<<1)>>62)) {
+        if (type == DSIDE_TLB) {
             /* DTLB miss.  */
             if (misr.sp) /* Refer to SDM Vol2 Table 4-11,4-12 */
                 return vmx_handle_lds(regs);
+            /* Clear UC bit in vadr with the shifts.  */
             if (v->domain != dom0
                 && __gpfn_is_io(v->domain, (vadr << 1) >> (PAGE_SHIFT + 1))) {
-                emulate_io_inst(v, ((vadr<<1)>>1),4);   //  UC
+                emulate_io_inst(v, ((vadr << 1) >> 1), 4);
                 return IA64_FAULT;
             }
         }
@@ -411,64 +415,35 @@ try_again:
             if (vpsr.ic) {
                 vcpu_set_isr(v, misr.val);
                 alt_dtlb(v, vadr);
-                return IA64_FAULT;
             } else {
                 nested_dtlb(v);
-                return IA64_FAULT;
             }
+            return IA64_FAULT;
         }
 
         vpta.val = vmx_vcpu_get_pta(v);
         if (vpta.vf) {
             /* Long format is not yet supported.  */
-            if (vpsr.ic) {
-                vcpu_set_isr(v, misr.val);
-                dtlb_fault(v, vadr);
-                return IA64_FAULT;
-            } else {
-                nested_dtlb(v);
-                return IA64_FAULT;
-            }
+            goto inject_dtlb_fault;
         }
 
         /* avoid recursively walking (short format) VHPT */
         if (!(optf->mask & XEN_IA64_OPTF_IDENT_MAP_REG4) &&
             !(optf->mask & XEN_IA64_OPTF_IDENT_MAP_REG5) &&
             (((vadr ^ vpta.val) << 3) >> (vpta.size + 3)) == 0) {
-
-            if (vpsr.ic) {
-                vcpu_set_isr(v, misr.val);
-                dtlb_fault(v, vadr);
-                return IA64_FAULT;
-            } else {
-                nested_dtlb(v);
-                return IA64_FAULT;
-            }
+            goto inject_dtlb_fault;
         }
             
         vhpt_adr = vmx_vcpu_thash(v, vadr);
         if (!guest_vhpt_lookup(vhpt_adr, &pteval)) {
             /* VHPT successfully read.  */
             if (!(pteval & _PAGE_P)) {
-                if (vpsr.ic) {
-                    vcpu_set_isr(v, misr.val);
-                    dtlb_fault(v, vadr);
-                    return IA64_FAULT;
-                } else {
-                    nested_dtlb(v);
-                    return IA64_FAULT;
-                }
+                goto inject_dtlb_fault;
             } else if ((pteval & _PAGE_MA_MASK) != _PAGE_MA_ST) {
                 thash_purge_and_insert(v, pteval, itir, vadr, DSIDE_TLB);
-                return IA64_NO_FAULT;
-            } else if (vpsr.ic) {
-                vcpu_set_isr(v, misr.val);
-                dtlb_fault(v, vadr);
-                return IA64_FAULT;
-            } else {
-                nested_dtlb(v);
-                return IA64_FAULT;
+               return IA64_NO_FAULT;
             }
+            goto inject_dtlb_fault;
         } else {
             /* Can't read VHPT.  */
             if (vpsr.ic) {
@@ -484,6 +459,13 @@ try_again:
     
         if (!vpsr.ic)
             misr.ni = 1;
+
+        /* Don't bother with PHY_D mode (will require rr0+rr4 switches,
+           and certainly used only within nested TLB handler (hence TR mapped
+           and ic=0).  */
+        if (mmu_mode == VMX_MMU_PHY_D)
+            goto inject_itlb_fault;
+
         if (!vhpt_enabled(v, vadr, INST_REF)) {
             vcpu_set_isr(v, misr.val);
             alt_itlb(v, vadr);
@@ -493,9 +475,7 @@ try_again:
         vpta.val = vmx_vcpu_get_pta(v);
         if (vpta.vf) {
             /* Long format is not yet supported.  */
-            vcpu_set_isr(v, misr.val);
-            itlb_fault(v, vadr);
-            return IA64_FAULT;
+            goto inject_itlb_fault;
         }
 
 
@@ -504,9 +484,7 @@ try_again:
             /* VHPT successfully read.  */
             if (pteval & _PAGE_P) {
                 if ((pteval & _PAGE_MA_MASK) == _PAGE_MA_ST) {
-                    vcpu_set_isr(v, misr.val);
-                    itlb_fault(v, vadr);
-                    return IA64_FAULT;
+                    goto inject_itlb_fault;
                 }
                 vcpu_get_rr(v, vadr, &rr);
                 itir = rr & (RR_RID_MASK | RR_PS_MASK);
@@ -524,4 +502,18 @@ try_again:
         }
     }
     return IA64_NO_FAULT;
+
+ inject_dtlb_fault:
+    if (vpsr.ic) {
+        vcpu_set_isr(v, misr.val);
+        dtlb_fault(v, vadr);
+    } else
+        nested_dtlb(v);
+
+    return IA64_FAULT;
+
+ inject_itlb_fault:
+    vcpu_set_isr(v, misr.val);
+    itlb_fault(v, vadr);
+    return IA64_FAULT;
 }
