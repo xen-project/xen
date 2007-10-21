@@ -235,10 +235,13 @@ switch_mm_mode(VCPU *vcpu, IA64_PSR old_psr, IA64_PSR new_psr)
     perfc_incra(vmx_switch_mm_mode, act);
     switch (act) {
     case SW_V2P_DT:
-    case SW_V2P_D:
-//        printk("V -> P mode transition: (0x%lx -> 0x%lx)\n",
-//               old_psr.val, new_psr.val);
         vcpu->arch.arch_vmx.mmu_mode = VMX_MMU_PHY_DT;
+        switch_to_physical_rid(vcpu);
+        break;
+    case SW_V2P_D:
+//        printk("V -> P_D mode transition: (0x%lx -> 0x%lx)\n",
+//               old_psr.val, new_psr.val);
+        vcpu->arch.arch_vmx.mmu_mode = VMX_MMU_PHY_D;
         switch_to_physical_rid(vcpu);
         break;
     case SW_P2V:

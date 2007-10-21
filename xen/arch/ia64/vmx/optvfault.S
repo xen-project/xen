@@ -209,9 +209,9 @@ GLOBAL_ENTRY(vmx_asm_rsm)
     tbit.z.or p6,p0=r26,IA64_PSR_DT_BIT
     (p6) br.dptk vmx_resume_to_guest  // DT not cleared or already in phy mode
     ;;
-    // Switch to meta physical mode.
-    add r26=IA64_VCPU_META_RID_DT_OFFSET,r21
-    mov r23=VMX_MMU_PHY_DT
+    // Switch to meta physical mode D.
+    add r26=IA64_VCPU_META_RID_D_OFFSET,r21
+    mov r23=VMX_MMU_PHY_D
     ;;
     ld8 r26=[r26]
     st1 [r22]=r23 
@@ -338,10 +338,10 @@ vmx_asm_mov_to_psr_back:
     cmp.eq p6,p7=r28,r27 // (new_vpsr & (dt+rt+it)) == (dt+rt+it)
     (p5) br.many vmx_asm_mov_to_psr_1 // no change
     ;;
-    //virtual to physical
-    (p7) add r26=IA64_VCPU_META_RID_DT_OFFSET,r21
-    (p7) add r27=IA64_VCPU_META_RID_DT_OFFSET,r21
-    (p7) mov r23=VMX_MMU_PHY_DT
+    //virtual to physical D
+    (p7) add r26=IA64_VCPU_META_RID_D_OFFSET,r21
+    (p7) add r27=IA64_VCPU_META_RID_D_OFFSET,r21
+    (p7) mov r23=VMX_MMU_PHY_D
     ;;
     //physical to virtual
     (p6) add r26=IA64_VCPU_META_SAVED_RR0_OFFSET,r21
