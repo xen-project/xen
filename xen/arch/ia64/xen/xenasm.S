@@ -3,6 +3,10 @@
  *
  * Copyright (C) 2004 Hewlett-Packard Co
  *	Dan Magenheimer <dan.magenheimer@hp.com>
+ *
+ * Copyright (C) 2007 VA Linux Systems Japan K.K.
+ *      Isaku Yamahata <yamahata at valinux co jp>
+ *      ia64_copy_rbs()
  */
 
 #include <linux/config.h>
@@ -357,3 +361,145 @@ stacked:
 	br.ret.sptk.few rp
 END(pal_emulator_static)
 
+// void ia64_copy_rbs(unsigned long* dst_bspstore, unsigned long* dst_rbs_size,
+//                    unsigned long* dst_rnat_p,
+//                    unsigned long* src_bsp, unsigned long src_rbs_size,
+//                    unsigned long src_rnat);
+// Caller must mask interrupions.
+// Caller must ensure that src_rbs_size isn't larger than the number
+// of physical stacked registers. otherwise loadrs fault with Illegal
+// Operation fault resulting in panic.
+//
+// r14 = r32 = dst_bspstore
+// r15 = r33 = dst_rbs_size_p	
+// r16 = r34 = dst_rnat_p
+// r17 = r35 = src_bsp
+// r18 = r36 = src_rbs_size
+// r19 = r37 = src_rnat	
+//
+// r20 = saved ar.rsc
+// r21 = saved ar.bspstore
+//	
+// r22 = saved_ar_rnat
+// r23 = saved_ar_rp
+// r24 = saved_ar_pfs	
+//
+// we save the value in this register and store it into [dst_rbs_size_p] and
+// [dst_rnat_p] after rse opeation is done.
+// r30 = return value of __ia64_copy_rbs to ia64_copy_to_rbs = dst_rbs_size
+// r31 = return value of __ia64_copy_rbs to ia64_copy_to_rbs = dst_rnat
+//
+#define dst_bspstore		r14
+#define dst_rbs_size_p		r15
+#define dst_rnat_p		r16
+#define src_bsp			r17
+#define src_rbs_size		r18
+#define src_rnat		r19
+
+#define saved_ar_rsc		r20
+#define saved_ar_bspstore	r21
+#define saved_ar_rnat		r22
+#define saved_rp		r23
+#define saved_ar_pfs		r24
+
+#define dst_rbs_size		r30
+#define dst_rnat		r31
+ENTRY(__ia64_copy_rbs)
+	.prologue
+	.fframe 0
+
+	// Here cfm.{sof, sol, sor, rrb}=0 
+	//
+	// flush current register stack to backing store
+{
+	flushrs	// must be first isns in group
+	srlz.i
+}
+
+	// switch to enforced lazy mode	
+	mov saved_ar_rsc = ar.rsc
+	;; 
+	mov ar.rsc = 0
+	;; 
+
+	.save ar.bspstore, saved_ar_bspstore
+	mov saved_ar_bspstore = ar.bspstore
+	.save ar.rnat, saved_ar_rnat
+	mov saved_ar_rnat = ar.rnat
+	;;
+
+	.body
+	// load from src
+	mov ar.bspstore = src_bsp
+	;; 
+	mov ar.rnat = src_rnat
+	shl src_rbs_size = src_rbs_size,16
+	;; 
+	mov ar.rsc = src_rbs_size
+	;;
+{
+	loadrs // must be first isns in group
+	;;
+}
+
+	// flush to dst
+	mov ar.bspstore = dst_bspstore
+	;;
+{
+	flushrs	// must be first isns in group
+	srlz.i
+}
+	;;
+	mov dst_rbs_size = ar.bsp
+	mov dst_rnat = ar.rnat
+	;;
+	sub dst_rbs_size = dst_rbs_size, dst_bspstore
+
+	// switch back to the original backing store
+	.restorereg ar.bspstore
+	mov ar.bspstore = saved_ar_bspstore
+	;;
+	.restorereg ar.rnat
+	mov ar.rnat = saved_ar_rnat
+	;; 
+	// restore rsc		
+	mov ar.rsc = saved_ar_rsc
+
+	;; 
+	br.ret.sptk.many rp
+END(__ia64_copy_rbs)
+
+GLOBAL_ENTRY(ia64_copy_rbs)
+	.prologue
+	.fframe 0
+	.save ar.pfs, saved_ar_pfs
+	alloc saved_ar_pfs = ar.pfs, 6, 0, 0, 0
+	.save.b 0x1, saved_rp
+	mov saved_rp = rp
+
+	.body
+	// we play with register backing store so that we can't use
+	// stacked registers.
+	// save in0-in5 to static scratch registres
+	mov dst_bspstore   = r32
+	mov dst_rbs_size_p = r33
+	mov dst_rnat_p     = r34
+	mov src_bsp        = r35
+	mov src_rbs_size   = r36
+	mov src_rnat       = r37
+	;;
+	// set cfm.{sof, sol, sor, rrb}=0 to avoid nasty stacked register
+	// issues related to cover by calling void __ia64_copy_rbs(void).
+	// cfm.{sof, sol, sor, rrb}=0 makes things easy.
+	br.call.sptk.many rp = __ia64_copy_rbs
+
+	st8 [dst_rbs_size_p] = dst_rbs_size
+	st8 [dst_rnat_p]     = dst_rnat
+
+	.restorereg ar.pfs
+	mov ar.pfs = saved_ar_pfs
+	.restorereg rp
+	mov rp = saved_rp
+	;; 
+	br.ret.sptk.many rp
+END(ia64_copy_rbs)

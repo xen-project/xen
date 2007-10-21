@@ -41,6 +41,7 @@
 #include <asm/vmx_vcpu.h>
 #include <asm/vmx_vpd.h>
 #include <asm/vmx_phy_mode.h>
+#include <asm/vmx_vcpu_save.h>
 #include <asm/vhpt.h>
 #include <asm/vcpu.h>
 #include <asm/tlbflush.h>
@@ -54,6 +55,7 @@
 #include <public/vcpu.h>
 #include <linux/cpu.h>
 #include <linux/notifier.h>
+#include <asm/debugger.h>
 
 /* dom0_size: default memory allocation for dom0 (~4GB) */
 static unsigned long __initdata dom0_size = 4096UL*1024UL*1024UL;
@@ -516,6 +518,12 @@ void vcpu_destroy(struct vcpu *v)
 		relinquish_vcpu_resources(v);
 }
 
+static unsigned long*
+vcpu_to_rbs_bottom(struct vcpu *v)
+{
+	return (unsigned long*)((char *)v + IA64_RBS_OFFSET);
+}
+
 static void init_switch_stack(struct vcpu *v)
 {
 	struct pt_regs *regs = vcpu_regs (v);
@@ -523,7 +531,7 @@ static void init_switch_stack(struct vcpu *v)
 	extern void ia64_ret_from_clone;
 
 	memset(sw, 0, sizeof(struct switch_stack) + sizeof(struct pt_regs));
-	sw->ar_bspstore = (unsigned long)v + IA64_RBS_OFFSET;
+	sw->ar_bspstore = (unsigned long)vcpu_to_rbs_bottom(v);
 	sw->b0 = (unsigned long) &ia64_ret_from_clone;
 	sw->ar_fpsr = FPSR_DEFAULT;
 	v->arch._thread.ksp = (unsigned long) sw - 16;
@@ -628,19 +636,100 @@ int arch_vcpu_reset(struct vcpu *v)
 	return 0;
 }
 
+static unsigned long num_phys_stacked;
+static int __init
+init_num_phys_stacked(void)
+{
+	switch (ia64_pal_rse_info(&num_phys_stacked, NULL)) {
+	case 0L:
+		printk("the number of physical stacked general registers"
+		       "(RSE.N_STACKED_PHYS) = %ld\n", num_phys_stacked);
+		return 0;
+	case -2L:
+	case -3L:
+	default:
+		break;
+	}
+	printk("WARNING: PAL_RSE_INFO call failed. "
+	       "domain save/restore may NOT work!\n");
+	return -EINVAL;
+}
+__initcall(init_num_phys_stacked);
+
 #define COPY_FPREG(dst, src) memcpy(dst, src, sizeof(struct ia64_fpreg))
+
+#define AR_PFS_PEC_SHIFT	51
+#define AR_PFS_REC_SIZE		6
+#define AR_PFS_PEC_MASK		(((1UL << 6) - 1) << 51)
+
+/*
+ * See init_swtich_stack() and ptrace.h
+ */
+static struct switch_stack*
+vcpu_to_switch_stack(struct vcpu* v)
+{
+	return (struct switch_stack *)(v->arch._thread.ksp + 16);
+}
+
+static int
+vcpu_has_not_run(struct vcpu* v)
+{
+	extern void ia64_ret_from_clone;
+	struct switch_stack *sw = vcpu_to_switch_stack(v);
+
+	return (sw == (struct switch_stack *)(vcpu_regs(v)) - 1) &&
+		(sw->b0 == (unsigned long)&ia64_ret_from_clone);
+}
+
+static void
+nats_update(unsigned int* nats, unsigned int reg, char nat)
+{
+	BUG_ON(reg > 31);
+
+	if (nat)
+		*nats |= (1UL << reg);
+	else
+		*nats &= ~(1UL << reg);
+}
 
 void arch_get_info_guest(struct vcpu *v, vcpu_guest_context_u c)
 {
 	int i;
 	struct vcpu_tr_regs *tr = &c.nat->regs.tr;
 	struct cpu_user_regs *uregs = vcpu_regs(v);
+	struct switch_stack *sw = vcpu_to_switch_stack(v);
+	struct unw_frame_info info;
 	int is_hvm = VMX_DOMAIN(v);
 	unsigned int rbs_size;
+	unsigned long *const rbs_bottom = vcpu_to_rbs_bottom(v);
+	unsigned long *rbs_top;
+	unsigned long *rbs_rnat_addr;
+	unsigned int top_slot;
+	unsigned int num_regs;
 
+	memset(c.nat, 0, sizeof(*c.nat));
 	c.nat->regs.b[6] = uregs->b6;
 	c.nat->regs.b[7] = uregs->b7;
 
+	memset(&info, 0, sizeof(info));
+	unw_init_from_blocked_task(&info, v);
+	if (vcpu_has_not_run(v)) {
+		c.nat->regs.ar.lc = sw->ar_lc;
+		c.nat->regs.ar.ec =
+			(sw->ar_pfs & AR_PFS_PEC_MASK) >> AR_PFS_PEC_SHIFT;
+	} else if (unw_unwind_to_user(&info) < 0) {
+		/* warn: should panic? */
+		gdprintk(XENLOG_ERR, "vcpu=%d unw_unwind_to_user() failed.\n",
+			 v->vcpu_id);
+		show_stack(v, NULL);
+
+		/* can't return error */
+		c.nat->regs.ar.lc = 0;
+		c.nat->regs.ar.ec = 0;
+	} else {
+		unw_get_ar(&info, UNW_AR_LC, &c.nat->regs.ar.lc);
+		unw_get_ar(&info, UNW_AR_EC, &c.nat->regs.ar.ec);
+	}
 	c.nat->regs.ar.csd = uregs->ar_csd;
 	c.nat->regs.ar.ssd = uregs->ar_ssd;
 
@@ -666,7 +755,11 @@ void arch_get_info_guest(struct vcpu *v, vcpu_guest_context_u c)
 	c.nat->regs.pr = uregs->pr;
 	c.nat->regs.b[0] = uregs->b0;
 	rbs_size = uregs->loadrs >> 16;
-	c.nat->regs.ar.bsp = uregs->ar_bspstore + rbs_size;
+	num_regs = ia64_rse_num_regs(rbs_bottom,
+			(unsigned long*)((char*)rbs_bottom + rbs_size));
+	c.nat->regs.ar.bsp = (unsigned long)ia64_rse_skip_regs(
+		(unsigned long*)c.nat->regs.ar.bspstore, num_regs);
+	BUG_ON(num_regs > num_phys_stacked);
 
 	c.nat->regs.r[1] = uregs->r1;
 	c.nat->regs.r[12] = uregs->r12;
@@ -696,6 +789,11 @@ void arch_get_info_guest(struct vcpu *v, vcpu_guest_context_u c)
 
 	c.nat->regs.ar.ccv = uregs->ar_ccv;
 
+	COPY_FPREG(&c.nat->regs.f[2], &sw->f2);
+	COPY_FPREG(&c.nat->regs.f[3], &sw->f3);
+	COPY_FPREG(&c.nat->regs.f[4], &sw->f4);
+	COPY_FPREG(&c.nat->regs.f[5], &sw->f5);
+
 	COPY_FPREG(&c.nat->regs.f[6], &uregs->f6);
 	COPY_FPREG(&c.nat->regs.f[7], &uregs->f7);
 	COPY_FPREG(&c.nat->regs.f[8], &uregs->f8);
@@ -703,24 +801,155 @@ void arch_get_info_guest(struct vcpu *v, vcpu_guest_context_u c)
 	COPY_FPREG(&c.nat->regs.f[10], &uregs->f10);
 	COPY_FPREG(&c.nat->regs.f[11], &uregs->f11);
 
-	c.nat->regs.r[4] = uregs->r4;
-	c.nat->regs.r[5] = uregs->r5;
-	c.nat->regs.r[6] = uregs->r6;
-	c.nat->regs.r[7] = uregs->r7;
+	COPY_FPREG(&c.nat->regs.f[12], &sw->f12);
+	COPY_FPREG(&c.nat->regs.f[13], &sw->f13);
+	COPY_FPREG(&c.nat->regs.f[14], &sw->f14);
+	COPY_FPREG(&c.nat->regs.f[15], &sw->f15);
+	COPY_FPREG(&c.nat->regs.f[16], &sw->f16);
+	COPY_FPREG(&c.nat->regs.f[17], &sw->f17);
+	COPY_FPREG(&c.nat->regs.f[18], &sw->f18);
+	COPY_FPREG(&c.nat->regs.f[19], &sw->f19);
+	COPY_FPREG(&c.nat->regs.f[20], &sw->f20);
+	COPY_FPREG(&c.nat->regs.f[21], &sw->f21);
+	COPY_FPREG(&c.nat->regs.f[22], &sw->f22);
+	COPY_FPREG(&c.nat->regs.f[23], &sw->f23);
+	COPY_FPREG(&c.nat->regs.f[24], &sw->f24);
+	COPY_FPREG(&c.nat->regs.f[25], &sw->f25);
+	COPY_FPREG(&c.nat->regs.f[26], &sw->f26);
+	COPY_FPREG(&c.nat->regs.f[27], &sw->f27);
+	COPY_FPREG(&c.nat->regs.f[28], &sw->f28);
+	COPY_FPREG(&c.nat->regs.f[29], &sw->f29);
+	COPY_FPREG(&c.nat->regs.f[30], &sw->f30);
+	COPY_FPREG(&c.nat->regs.f[31], &sw->f31);
 
-	/* FIXME: to be reordered.  */
-	c.nat->regs.nats = uregs->eml_unat;
+	for (i = 0; i < 96; i++)
+		COPY_FPREG(&c.nat->regs.f[i + 32], &v->arch._thread.fph[i]);
+
+#define NATS_UPDATE(reg)						\
+	nats_update(&c.nat->regs.nats, (reg),				\
+		    !!(uregs->eml_unat &				\
+		       (1UL << ia64_unat_pos(&uregs->r ## reg))))
+
+	// corresponding bit in ar.unat is determined by
+	// (&uregs->rN){8:3}.
+	// r8: the lowest gr member of struct cpu_user_regs.
+	// r7: the highest gr member of struct cpu_user_regs.
+	BUILD_BUG_ON(offsetof(struct cpu_user_regs, r7) -
+		     offsetof(struct cpu_user_regs, r8) >
+		     64 * sizeof(unsigned long));
+
+	NATS_UPDATE(1);
+	NATS_UPDATE(2);
+	NATS_UPDATE(3);
+
+	NATS_UPDATE(8);
+	NATS_UPDATE(9);
+	NATS_UPDATE(10);
+	NATS_UPDATE(11);
+	NATS_UPDATE(12);
+	NATS_UPDATE(13);
+	NATS_UPDATE(14);
+	NATS_UPDATE(15);
+	NATS_UPDATE(16);
+	NATS_UPDATE(17);
+	NATS_UPDATE(18);
+	NATS_UPDATE(19);
+	NATS_UPDATE(20);
+	NATS_UPDATE(21);
+	NATS_UPDATE(22);
+	NATS_UPDATE(23);
+	NATS_UPDATE(24);
+	NATS_UPDATE(25);
+	NATS_UPDATE(26);
+	NATS_UPDATE(27);
+	NATS_UPDATE(28);
+	NATS_UPDATE(29);
+	NATS_UPDATE(30);
+	NATS_UPDATE(31);
+	
+	if (!is_hvm) {
+		c.nat->regs.r[4] = uregs->r4;
+		c.nat->regs.r[5] = uregs->r5;
+		c.nat->regs.r[6] = uregs->r6;
+		c.nat->regs.r[7] = uregs->r7;
+
+		NATS_UPDATE(4);
+		NATS_UPDATE(5);
+		NATS_UPDATE(6);
+		NATS_UPDATE(7);
+#undef NATS_UPDATE
+	} else {
+		/*
+		 * for VTi domain, r[4-7] are saved sometimes both in
+		 * uregs->r[4-7] and memory stack or only in memory stack.
+		 * So it is ok to get them from memory stack.
+		 */
+		c.nat->regs.nats = uregs->eml_unat;
+
+		if (vcpu_has_not_run(v)) {
+			c.nat->regs.r[4] = sw->r4;
+			c.nat->regs.r[5] = sw->r5;
+			c.nat->regs.r[6] = sw->r6;
+			c.nat->regs.r[7] = sw->r7;
+
+			nats_update(&c.nat->regs.nats, 4,
+				    !!(sw->ar_unat &
+				       (1UL << ia64_unat_pos(&sw->r4))));
+			nats_update(&c.nat->regs.nats, 5,
+				    !!(sw->ar_unat &
+				       (1UL << ia64_unat_pos(&sw->r5))));
+			nats_update(&c.nat->regs.nats, 6,
+				    !!(sw->ar_unat &
+				       (1UL << ia64_unat_pos(&sw->r6))));
+			nats_update(&c.nat->regs.nats, 7,
+				    !!(sw->ar_unat &
+				       (1UL << ia64_unat_pos(&sw->r7))));
+		} else {
+			char nat;
+
+			unw_get_gr(&info, 4, &c.nat->regs.r[4], &nat);
+			nats_update(&c.nat->regs.nats, 4, nat);
+			unw_get_gr(&info, 5, &c.nat->regs.r[5], &nat);
+			nats_update(&c.nat->regs.nats, 5, nat);
+			unw_get_gr(&info, 6, &c.nat->regs.r[6], &nat);
+			nats_update(&c.nat->regs.nats, 6, nat);
+			unw_get_gr(&info, 7, &c.nat->regs.r[7], &nat);
+			nats_update(&c.nat->regs.nats, 7, nat);
+		}
+	}
 
 	c.nat->regs.rbs_voff = (IA64_RBS_OFFSET / 8) % 64;
-	if (rbs_size < sizeof (c.nat->regs.rbs))
-		memcpy(c.nat->regs.rbs, (char *)v + IA64_RBS_OFFSET, rbs_size);
+	if (unlikely(rbs_size > sizeof(c.nat->regs.rbs)))
+		gdprintk(XENLOG_INFO,
+			 "rbs_size is too large 0x%x > 0x%lx\n",
+			 rbs_size, sizeof(c.nat->regs.rbs));
+	else
+		memcpy(c.nat->regs.rbs, rbs_bottom, rbs_size);
+
+	rbs_top = (unsigned long*)((char *)rbs_bottom + rbs_size) - 1;
+	rbs_rnat_addr = ia64_rse_rnat_addr(rbs_top);
+	if ((unsigned long)rbs_rnat_addr >= sw->ar_bspstore)
+		rbs_rnat_addr = &sw->ar_rnat;
+
+	top_slot = ia64_rse_slot_num(rbs_top);
+
+	c.nat->regs.rbs_rnat = (*rbs_rnat_addr) & ((1UL << top_slot) - 1);
+	if (ia64_rse_rnat_addr(rbs_bottom) == ia64_rse_rnat_addr(rbs_top)) {
+		unsigned int bottom_slot = ia64_rse_slot_num(rbs_bottom);
+		c.nat->regs.rbs_rnat &= ~((1UL << bottom_slot) - 1);
+	}
 
  	c.nat->privregs_pfn = get_gpfn_from_mfn
 		(virt_to_maddr(v->arch.privregs) >> PAGE_SHIFT);
 
 	for (i = 0; i < IA64_NUM_DBG_REGS; i++) {
-		vcpu_get_dbr(v, i, &c.nat->regs.dbr[i]);
-		vcpu_get_ibr(v, i, &c.nat->regs.ibr[i]);
+		if (VMX_DOMAIN(v)) {
+			vmx_vcpu_get_dbr(v, i, &c.nat->regs.dbr[i]);
+			vmx_vcpu_get_ibr(v, i, &c.nat->regs.ibr[i]);
+		} else {
+			vcpu_get_dbr(v, i, &c.nat->regs.dbr[i]);
+			vcpu_get_ibr(v, i, &c.nat->regs.ibr[i]);
+		}
 	}
 
 	for (i = 0; i < 8; i++)
@@ -762,7 +991,12 @@ void arch_get_info_guest(struct vcpu *v, vcpu_guest_context_u c)
 	vcpu_get_ifa(v, &c.nat->regs.cr.ifa);
 	vcpu_get_itir(v, &c.nat->regs.cr.itir);
 	vcpu_get_iha(v, &c.nat->regs.cr.iha);
-	vcpu_get_ivr(v, &c.nat->regs.cr.ivr);
+
+	//XXX change irr[] and arch.insvc[]
+	if (v->domain->arch.is_vti)
+		/* c.nat->regs.cr.ivr = vmx_vcpu_get_ivr(v)*/;//XXXnot SMP-safe
+	else
+		vcpu_get_ivr (v, &c.nat->regs.cr.ivr);
 	vcpu_get_iim(v, &c.nat->regs.cr.iim);
 
 	vcpu_get_tpr(v, &c.nat->regs.cr.tpr);
@@ -770,18 +1004,172 @@ void arch_get_info_guest(struct vcpu *v, vcpu_guest_context_u c)
 	vcpu_get_irr1(v, &c.nat->regs.cr.irr[1]);
 	vcpu_get_irr2(v, &c.nat->regs.cr.irr[2]);
 	vcpu_get_irr3(v, &c.nat->regs.cr.irr[3]);
-	vcpu_get_itv(v, &c.nat->regs.cr.itv);
+	vcpu_get_itv(v, &c.nat->regs.cr.itv);//XXX vlsapic
 	vcpu_get_pmv(v, &c.nat->regs.cr.pmv);
 	vcpu_get_cmcv(v, &c.nat->regs.cr.cmcv);
+
+	if (is_hvm)
+		vmx_arch_get_info_guest(v, c);
+}
+
+#if 0
+// for debug
+static void
+__rbs_print(const char* func, int line, const char* name,
+	    const unsigned long* rbs, unsigned int rbs_size)
+{
+	unsigned int i;
+	printk("%s:%d %s rbs %p\n", func, line, name, rbs);
+	printk("   rbs_size 0x%016x no 0x%lx\n",
+	       rbs_size, rbs_size / sizeof(unsigned long));
+
+	for (i = 0; i < rbs_size / sizeof(unsigned long); i++) {
+		const char* zero_or_n = "0x";
+		if (ia64_rse_is_rnat_slot((unsigned long*)&rbs[i]))
+			zero_or_n = "Nx";
+
+		if ((i % 3) == 0)
+			printk("0x%02x:", i);
+		printk(" %s%016lx", zero_or_n, rbs[i]);
+		if ((i % 3) == 2)
+			printk("\n");
+	}
+	printk("\n");		
+}
+
+#define rbs_print(rbs, rbs_size)				\
+	__rbs_print(__func__, __LINE__, (#rbs), (rbs), (rbs_size))
+#endif
+
+static int
+copy_rbs(struct vcpu* v, unsigned long* dst_rbs_size,
+	 const unsigned long* rbs, unsigned long rbs_size,
+	 unsigned long src_rnat, unsigned long rbs_voff)
+{
+	int rc = -EINVAL;
+	struct page_info* page;
+	unsigned char* vaddr;
+	unsigned long* src_bsp;
+	unsigned long* src_bspstore;
+
+	struct switch_stack* sw = vcpu_to_switch_stack(v);
+	unsigned long num_regs;
+	unsigned long* dst_bsp;
+	unsigned long* dst_bspstore;
+	unsigned long* dst_rnat;
+	unsigned long dst_rnat_tmp;
+	unsigned long dst_rnat_mask;
+	unsigned long flags;
+	extern void ia64_copy_rbs(unsigned long* dst_bspstore,
+				  unsigned long* dst_rbs_size,
+				  unsigned long* dst_rnat_p,
+				  unsigned long* src_bsp,
+				  unsigned long src_rbs_size,
+				  unsigned long src_rnat);
+
+	dst_bspstore = vcpu_to_rbs_bottom(v);
+	*dst_rbs_size = rbs_size;
+	if (rbs_size == 0)
+		return 0;
+	
+	// rbs offset depends on sizeof(struct vcpu) so that
+	// it's too unstable for hypercall ABI.
+	// we need to take rbs offset into acount.
+	//memcpy(dst_bspstore, c.nat->regs.rbs, rbs_size);
+
+	// It is assumed that rbs_size is small enough compared
+	// to KERNEL_STACK_SIZE.
+	page = alloc_domheap_pages(NULL, KERNEL_STACK_SIZE_ORDER, 0);
+	if (page == NULL)
+		return -ENOMEM;
+	vaddr = page_to_virt(page);
+
+	src_bspstore = (unsigned long*)(vaddr + rbs_voff * 8);
+	src_bsp = (unsigned long*)((unsigned char*)src_bspstore + rbs_size);
+	if ((unsigned long)src_bsp >= (unsigned long)vaddr + PAGE_SIZE)
+		goto out;
+	memcpy(src_bspstore, rbs, rbs_size);
+	
+	num_regs = ia64_rse_num_regs(src_bspstore, src_bsp);
+	dst_bsp = ia64_rse_skip_regs(dst_bspstore, num_regs);
+	*dst_rbs_size = (unsigned long)dst_bsp - (unsigned long)dst_bspstore;
+
+	// rough check.
+	if (((unsigned long)dst_bsp & ~PAGE_MASK) > KERNEL_STACK_SIZE / 2)
+		goto out;
+
+	//XXX TODO
+	// ia64_copy_rbs() uses real cpu's stack register.
+	// So it may fault with an Illigal Operation fault resulting
+	// in panic if rbs_size is too large to load compared to
+	// the number of physical stacked registers, RSE.N_STACKED_PHYS,
+	// which is cpu implementatin specific.
+	// See SDM vol. 2  Register Stack Engine 6, especially 6.5.5.
+	//
+	// For safe operation and cpu model independency, 
+	// we need to copy them by hand without loadrs and flushrs
+	// However even if we implement that, similar issue still occurs
+	// when running guest. CPU context restore routine issues loadrs
+	// resulting in Illegal Operation fault. For such a case,
+	// we need to emulate RSE store.
+	// So it would be better to implement only RSE store emulation
+	// and copy stacked registers directly into guest RBS.
+	if (num_regs > num_phys_stacked) {
+		rc = -ENOSYS;
+		gdprintk(XENLOG_WARNING,
+			 "%s:%d domain %d: can't load stacked registres\n"
+			 "requested size 0x%lx => 0x%lx, num regs %ld"
+			 "RSE.N_STACKED_PHYS %ld\n",
+			 __func__, __LINE__, v->domain->domain_id, 
+			 rbs_size, *dst_rbs_size, num_regs,
+			 num_phys_stacked);
+		goto out;
+	}
+
+	// we mask interrupts to avoid using register backing store.
+	local_irq_save(flags);
+	ia64_copy_rbs(dst_bspstore, dst_rbs_size, &dst_rnat_tmp,
+		      src_bsp, rbs_size, src_rnat);
+	local_irq_restore(flags);
+
+	dst_rnat_mask = (1UL << ia64_rse_slot_num(dst_bsp)) - 1;
+	dst_rnat = ia64_rse_rnat_addr(dst_bsp);
+	if ((unsigned long)dst_rnat > sw->ar_bspstore)
+		dst_rnat = &sw->ar_rnat;
+	// if ia64_rse_rnat_addr(dst_bsp) ==
+	// ia64_rse_rnat_addr(vcpu_to_rbs_bottom(v)), the lsb bit of rnat
+	// is just ignored. so we don't have to mask it out.
+	*dst_rnat =
+		(*dst_rnat & ~dst_rnat_mask) | (dst_rnat_tmp & dst_rnat_mask);
+	
+	rc = 0;
+out:
+	free_domheap_pages(page, KERNEL_STACK_SIZE_ORDER);
+	return rc;
+}
+
+static void
+unat_update(unsigned long *unat_eml, unsigned long *spill_addr, char nat)
+{
+	unsigned int pos = ia64_unat_pos(spill_addr);
+	if (nat)
+		*unat_eml |= (1UL << pos);
+	else
+		*unat_eml &= ~(1UL << pos);
 }
 
 int arch_set_info_guest(struct vcpu *v, vcpu_guest_context_u c)
 {
 	struct cpu_user_regs *uregs = vcpu_regs(v);
 	struct domain *d = v->domain;
+	struct switch_stack *sw = vcpu_to_switch_stack(v);
 	int was_initialised = v->is_initialised;
+	struct unw_frame_info info;
 	unsigned int rbs_size;
-	int rc, i;
+	unsigned int num_regs;
+	unsigned long * const rbs_bottom = vcpu_to_rbs_bottom(v);
+	int rc = 0;
+	int i;
 
 	/* Finish vcpu initialization.  */
 	if (!was_initialised) {
@@ -806,6 +1194,26 @@ int arch_set_info_guest(struct vcpu *v, vcpu_guest_context_u c)
 	uregs->b6 = c.nat->regs.b[6];
 	uregs->b7 = c.nat->regs.b[7];
 	
+	memset(&info, 0, sizeof(info));
+	unw_init_from_blocked_task(&info, v);
+	if (vcpu_has_not_run(v)) {
+		sw->ar_lc = c.nat->regs.ar.lc;
+		sw->ar_pfs =
+			(sw->ar_pfs & ~AR_PFS_PEC_MASK) |
+			((c.nat->regs.ar.ec << AR_PFS_PEC_SHIFT) &
+			 AR_PFS_PEC_MASK);
+	} else if (unw_unwind_to_user(&info) < 0) {
+		/* warn: should panic? */
+		gdprintk(XENLOG_ERR,
+			 "vcpu=%d unw_unwind_to_user() failed.\n",
+			 v->vcpu_id);
+		show_stack(v, NULL);
+
+		//return -ENOSYS;
+	} else {
+		unw_set_ar(&info, UNW_AR_LC, c.nat->regs.ar.lc);
+		unw_set_ar(&info, UNW_AR_EC, c.nat->regs.ar.ec);
+	}
 	uregs->ar_csd = c.nat->regs.ar.csd;
 	uregs->ar_ssd = c.nat->regs.ar.ssd;
 	
@@ -820,7 +1228,7 @@ int arch_set_info_guest(struct vcpu *v, vcpu_guest_context_u c)
 		vmx_vcpu_set_psr(v, c.nat->regs.psr);
 	uregs->cr_iip = c.nat->regs.ip;
 	uregs->cr_ifs = c.nat->regs.cfm;
-	
+
 	uregs->ar_unat = c.nat->regs.ar.unat;
 	uregs->ar_pfs = c.nat->regs.ar.pfs;
 	uregs->ar_rsc = c.nat->regs.ar.rsc;
@@ -829,12 +1237,46 @@ int arch_set_info_guest(struct vcpu *v, vcpu_guest_context_u c)
 	
 	uregs->pr = c.nat->regs.pr;
 	uregs->b0 = c.nat->regs.b[0];
-	rbs_size = c.nat->regs.ar.bsp - c.nat->regs.ar.bspstore;
+	if (((IA64_RBS_OFFSET / 8) % 64) != c.nat->regs.rbs_voff)
+		gdprintk(XENLOG_INFO,
+			 "rbs stack offset is different! xen 0x%x given 0x%x",
+			 (IA64_RBS_OFFSET / 8) % 64, c.nat->regs.rbs_voff);
+	num_regs = ia64_rse_num_regs((unsigned long*)c.nat->regs.ar.bspstore,
+				     (unsigned long*)c.nat->regs.ar.bsp);
+	rbs_size = (unsigned long)ia64_rse_skip_regs(rbs_bottom, num_regs) -
+		(unsigned long)rbs_bottom;
+	if (rbs_size > sizeof (c.nat->regs.rbs)) {
+		gdprintk(XENLOG_INFO,
+			 "rbs size is too large %x > %lx\n",
+			 rbs_size, sizeof (c.nat->regs.rbs));
+		return -EINVAL;
+	}
+	
 	/* Protection against crazy user code.  */
 	if (!was_initialised)
-		uregs->loadrs = (rbs_size) << 16;
-	if (rbs_size == (uregs->loadrs >> 16))
-		memcpy((char *)v + IA64_RBS_OFFSET, c.nat->regs.rbs, rbs_size);
+		uregs->loadrs = (rbs_size << 16);
+	if (rbs_size == (uregs->loadrs >> 16)) {
+		unsigned long dst_rbs_size = 0;
+		if (vcpu_has_not_run(v))
+			sw->ar_bspstore = (unsigned long)rbs_bottom;
+		
+		rc = copy_rbs(v, &dst_rbs_size,
+			      c.nat->regs.rbs, rbs_size,
+			      c.nat->regs.rbs_rnat,
+			      c.nat->regs.rbs_voff);
+		if (rc < 0)
+			return rc;
+
+		/* In case of newly created vcpu, ar_bspstore points to
+		 * the bottom of register stack. Move it up.
+		 * See also init_switch_stack().
+		 */
+		if (vcpu_has_not_run(v)) {
+			uregs->loadrs = (dst_rbs_size << 16);
+			sw->ar_bspstore = (unsigned long)((char*)rbs_bottom +
+							  dst_rbs_size);
+		}
+	}
 
 	uregs->r1 = c.nat->regs.r[1];
 	uregs->r12 = c.nat->regs.r[12];
@@ -863,22 +1305,117 @@ int arch_set_info_guest(struct vcpu *v, vcpu_guest_context_u c)
 	uregs->r31 = c.nat->regs.r[31];
 	
 	uregs->ar_ccv = c.nat->regs.ar.ccv;
-	
+
+	COPY_FPREG(&sw->f2, &c.nat->regs.f[2]);
+	COPY_FPREG(&sw->f3, &c.nat->regs.f[3]);
+	COPY_FPREG(&sw->f4, &c.nat->regs.f[4]);
+	COPY_FPREG(&sw->f5, &c.nat->regs.f[5]);
+
 	COPY_FPREG(&uregs->f6, &c.nat->regs.f[6]);
 	COPY_FPREG(&uregs->f7, &c.nat->regs.f[7]);
 	COPY_FPREG(&uregs->f8, &c.nat->regs.f[8]);
 	COPY_FPREG(&uregs->f9, &c.nat->regs.f[9]);
 	COPY_FPREG(&uregs->f10, &c.nat->regs.f[10]);
 	COPY_FPREG(&uregs->f11, &c.nat->regs.f[11]);
+
+	COPY_FPREG(&sw->f12, &c.nat->regs.f[12]);
+	COPY_FPREG(&sw->f13, &c.nat->regs.f[13]);
+	COPY_FPREG(&sw->f14, &c.nat->regs.f[14]);
+	COPY_FPREG(&sw->f15, &c.nat->regs.f[15]);
+	COPY_FPREG(&sw->f16, &c.nat->regs.f[16]);
+	COPY_FPREG(&sw->f17, &c.nat->regs.f[17]);
+	COPY_FPREG(&sw->f18, &c.nat->regs.f[18]);
+	COPY_FPREG(&sw->f19, &c.nat->regs.f[19]);
+	COPY_FPREG(&sw->f20, &c.nat->regs.f[20]);
+	COPY_FPREG(&sw->f21, &c.nat->regs.f[21]);
+	COPY_FPREG(&sw->f22, &c.nat->regs.f[22]);
+	COPY_FPREG(&sw->f23, &c.nat->regs.f[23]);
+	COPY_FPREG(&sw->f24, &c.nat->regs.f[24]);
+	COPY_FPREG(&sw->f25, &c.nat->regs.f[25]);
+	COPY_FPREG(&sw->f26, &c.nat->regs.f[26]);
+	COPY_FPREG(&sw->f27, &c.nat->regs.f[27]);
+	COPY_FPREG(&sw->f28, &c.nat->regs.f[28]);
+	COPY_FPREG(&sw->f29, &c.nat->regs.f[29]);
+	COPY_FPREG(&sw->f30, &c.nat->regs.f[30]);
+	COPY_FPREG(&sw->f31, &c.nat->regs.f[31]);
+
+	for (i = 0; i < 96; i++)
+		COPY_FPREG(&v->arch._thread.fph[i], &c.nat->regs.f[i + 32]);
+
+
+#define UNAT_UPDATE(reg)					\
+	unat_update(&uregs->eml_unat, &uregs->r ## reg,		\
+		    !!(c.nat->regs.nats & (1UL << (reg))));
+
+	uregs->eml_unat = 0;
+	UNAT_UPDATE(1);
+	UNAT_UPDATE(2);
+	UNAT_UPDATE(3);
+
+	UNAT_UPDATE(8);
+	UNAT_UPDATE(9);
+	UNAT_UPDATE(10);
+	UNAT_UPDATE(11);
+	UNAT_UPDATE(12);
+	UNAT_UPDATE(13);
+	UNAT_UPDATE(14);
+	UNAT_UPDATE(15);
+	UNAT_UPDATE(16);
+	UNAT_UPDATE(17);
+	UNAT_UPDATE(18);
+	UNAT_UPDATE(19);
+	UNAT_UPDATE(20);
+	UNAT_UPDATE(21);
+	UNAT_UPDATE(22);
+	UNAT_UPDATE(23);
+	UNAT_UPDATE(24);
+	UNAT_UPDATE(25);
+	UNAT_UPDATE(26);
+	UNAT_UPDATE(27);
+	UNAT_UPDATE(28);
+	UNAT_UPDATE(29);
+	UNAT_UPDATE(30);
+	UNAT_UPDATE(31);
 	
+	/*
+	 * r4-r7 is saved sometimes both in pt_regs->r[4-7] and memory stack or
+	 * only in memory stack.
+	 * for both cases, both memory stack and pt_regs->r[4-7] are updated.
+	 */
 	uregs->r4 = c.nat->regs.r[4];
 	uregs->r5 = c.nat->regs.r[5];
 	uregs->r6 = c.nat->regs.r[6];
 	uregs->r7 = c.nat->regs.r[7];
-	
-	/* FIXME: to be reordered and restored.  */
-	/* uregs->eml_unat = c.nat->regs.nat; */
-	uregs->eml_unat = 0;
+
+	UNAT_UPDATE(4);
+	UNAT_UPDATE(5);
+	UNAT_UPDATE(6);
+	UNAT_UPDATE(7);
+#undef UNAT_UPDATE
+	if (vcpu_has_not_run(v)) {
+		sw->r4 = c.nat->regs.r[4];
+		sw->r5 = c.nat->regs.r[5];
+		sw->r6 = c.nat->regs.r[6];
+		sw->r7 = c.nat->regs.r[7];
+
+		unat_update(&sw->ar_unat, &sw->r4,
+			    !!(c.nat->regs.nats & (1UL << 4)));
+		unat_update(&sw->ar_unat, &sw->r5,
+			    !!(c.nat->regs.nats & (1UL << 5)));
+		unat_update(&sw->ar_unat, &sw->r6,
+			    !!(c.nat->regs.nats & (1UL << 6)));
+		unat_update(&sw->ar_unat, &sw->r7,
+			    !!(c.nat->regs.nats & (1UL << 7)));
+	} else {
+		unw_set_gr(&info, 4, c.nat->regs.r[4],
+			   !!(c.nat->regs.nats & (1UL << 4)));
+		unw_set_gr(&info, 5, c.nat->regs.r[5],
+			   !!(c.nat->regs.nats & (1UL << 5)));
+		unw_set_gr(&info, 6, c.nat->regs.r[6],
+			   !!(c.nat->regs.nats & (1UL << 6)));
+		unw_set_gr(&info, 7, c.nat->regs.r[7],
+			   !!(c.nat->regs.nats & (1UL << 7)));
+	}
 	
  	if (!d->arch.is_vti) {
  		/* domain runs at PL2/3 */
@@ -888,8 +1425,31 @@ int arch_set_info_guest(struct vcpu *v, vcpu_guest_context_u c)
  	}
 
 	for (i = 0; i < IA64_NUM_DBG_REGS; i++) {
-		vcpu_set_dbr(v, i, c.nat->regs.dbr[i]);
-		vcpu_set_ibr(v, i, c.nat->regs.ibr[i]);
+		if (d->arch.is_vti) {
+			vmx_vcpu_set_dbr(v, i, c.nat->regs.dbr[i]);
+			vmx_vcpu_set_ibr(v, i, c.nat->regs.ibr[i]);
+		} else {
+			vcpu_set_dbr(v, i, c.nat->regs.dbr[i]);
+			vcpu_set_ibr(v, i, c.nat->regs.ibr[i]);
+		}
+	}
+
+	/* rr[] must be set before setting itrs[] dtrs[] */
+	for (i = 0; i < 8; i++) {
+		//XXX TODO integrity check.
+		//    if invalid value is given, 
+		//    vmx_load_all_rr() and load_region_regs()
+		//    result in General exception, reserved register/field
+		//    failt causing panicing xen.
+		if (d->arch.is_vti) {
+			//without VGCF_EXTRA_REGS check,
+			//VTi domain doesn't boot.
+			if (c.nat->flags & VGCF_EXTRA_REGS)
+				vmx_vcpu_set_rr(v, (unsigned long)i << 61,
+						c.nat->regs.rr[i]);
+		} else
+			vcpu_set_rr(v, (unsigned long)i << 61,
+				    c.nat->regs.rr[i]);
 	}
 
 	if (c.nat->flags & VGCF_EXTRA_REGS) {
@@ -898,25 +1458,38 @@ int arch_set_info_guest(struct vcpu *v, vcpu_guest_context_u c)
 		for (i = 0;
 		     (i < sizeof(tr->itrs) / sizeof(tr->itrs[0])) && i < NITRS;
 		     i++) {
-			vcpu_set_itr(v, i, tr->itrs[i].pte,
-			             tr->itrs[i].itir,
-			             tr->itrs[i].vadr,
-			             tr->itrs[i].rid);
+			if (d->arch.is_vti)
+				vmx_vcpu_itr_i(v, i, tr->itrs[i].pte,
+					       tr->itrs[i].itir,
+					       tr->itrs[i].vadr);
+			else
+				vcpu_set_itr(v, i, tr->itrs[i].pte,
+					     tr->itrs[i].itir,
+					     tr->itrs[i].vadr,
+					     tr->itrs[i].rid);
 		}
 		for (i = 0;
 		     (i < sizeof(tr->dtrs) / sizeof(tr->dtrs[0])) && i < NDTRS;
 		     i++) {
-			vcpu_set_dtr(v, i,
-			             tr->dtrs[i].pte,
-			             tr->dtrs[i].itir,
-			             tr->dtrs[i].vadr,
-			             tr->dtrs[i].rid);
+			if (d->arch.is_vti)
+				vmx_vcpu_itr_d(v, i, tr->dtrs[i].pte,
+					       tr->dtrs[i].itir,
+					       tr->dtrs[i].vadr);
+			else
+				vcpu_set_dtr(v, i,
+					     tr->dtrs[i].pte,
+					     tr->dtrs[i].itir,
+					     tr->dtrs[i].vadr,
+					     tr->dtrs[i].rid);
 		}
 		v->arch.event_callback_ip = c.nat->event_callback_ip;
 		vcpu_set_iva(v, c.nat->regs.cr.iva);
 	}
 
-	return 0;
+	if (d->arch.is_vti)
+		rc = vmx_arch_set_info_guest(v, c);
+
+	return rc;
 }
 
 static void relinquish_memory(struct domain *d, struct list_head *list)

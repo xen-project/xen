@@ -19,3 +19,4 @@ obj-y += vmx_vsa.o
 obj-y += vtlb.o
 obj-y += optvfault.o
 obj-y += vacpi.o
+obj-y += vmx_vcpu_save.o
