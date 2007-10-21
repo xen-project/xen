@@ -1,4 +1,3 @@
-
 /* -*-  Mode:C; c-basic-offset:4; tab-width:4; indent-tabs-mode:nil -*- */
 /*
  * vtlb.c: guest virtual tlb handling module.
@@ -22,6 +21,7 @@
  */
 
 #include <asm/vmx_vcpu.h>
+#include <asm/vmx_phy_mode.h>
 
 static thash_data_t *__alloc_chain(thash_cb_t *);
 
@@ -81,9 +81,10 @@ __is_tr_overlap(thash_data_t *trp, u64 rid, u64 sva, u64 eva)
 static thash_data_t *__vtr_lookup(VCPU *vcpu, u64 va, int is_data)
 {
 
-    thash_data_t  *trp;
-    int  i;
+    thash_data_t *trp;
+    int i;
     u64 rid;
+
     vcpu_get_rr(vcpu, va, &rid);
     rid &= RR_RID_MASK;
     if (is_data) {
@@ -181,13 +182,15 @@ void thash_vhpt_insert(VCPU *v, u64 pte, u64 itir, u64 va, int type)
     u64 phy_pte, psr;
     ia64_rr mrr;
 
-    mrr.rrval = ia64_get_rr(va);
     phy_pte = translate_phy_pte(v, &pte, itir, va);
+    mrr.rrval = ia64_get_rr(va);
 
-    if (itir_ps(itir) >= mrr.ps) {
+    if (itir_ps(itir) >= mrr.ps && VMX_MMU_MODE(v) != VMX_MMU_PHY_D) {
         vmx_vhpt_insert(vcpu_get_vhpt(v), phy_pte, itir, va);
     } else {
-        phy_pte &= ~PAGE_FLAGS_RV_MASK;
+        if (VMX_MMU_MODE(v) == VMX_MMU_PHY_D)
+            itir = (itir & ~RR_PS_MASK) | (mrr.rrval & RR_PS_MASK);
+        phy_pte &= ~PAGE_FLAGS_RV_MASK; /* Clear reserved fields.  */
         psr = ia64_clear_ic();
         ia64_itc(type + 1, va, phy_pte, itir);
         ia64_set_psr(psr);
@@ -195,6 +198,8 @@ void thash_vhpt_insert(VCPU *v, u64 pte, u64 itir, u64 va, int type)
     }
 }
 
+/* On itr.d, old entries are not purged (optimization for Linux - see
+   vmx_vcpu_itr_d).  Fixup possible mismatch.  */
 int vhpt_access_rights_fixup(VCPU *v, u64 ifa, int is_data)
 {
     thash_data_t *trp, *data;
@@ -656,7 +661,7 @@ thash_data_t *vtlb_lookup(VCPU *v, u64 va,int is_data)
 
     cch = __vtr_lookup(v, va, is_data);
     if (cch)
-	return cch;
+        return cch;
 
     if (vcpu_quick_region_check(v->arch.tc_regions, va) == 0)
         return NULL;
