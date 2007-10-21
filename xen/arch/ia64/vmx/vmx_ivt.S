@@ -577,12 +577,13 @@ ENTRY(vmx_break_fault)
 ///////////////////////////////////////////////////////////////////////
 //    st1 [r16]=r0				// M2|3 clear current->thread.on_ustack flag
     mov b6=r30				// I0   setup syscall handler branch reg early
-    cmp.ne pKStk,pUStk=r0,r0		// A    were we on kernel stacks already?
+//    cmp.ne pKStk,pUStk=r0,r0		// A    were we on kernel stacks already?
 
 //  and r9=_TIF_SYSCALL_TRACEAUDIT,r9	// A    mask trace or audit
     mov r18=ar.bsp				// M2 (12 cyc)
    ;;
-(pUStk) addl r1=IA64_STK_OFFSET-IA64_PT_REGS_SIZE,r1 // A    compute base of memory stack
+//(pUStk) addl r1=IA64_STK_OFFSET-IA64_PT_REGS_SIZE,r1 // A    compute base of memory stack
+    addl r1=IA64_STK_OFFSET-IA64_PT_REGS_SIZE,r1 // A    compute base of memory stack
 //  cmp.eq p14,p0=r9,r0			// A    are syscalls being traced/audited?
 //    br.call.sptk.many b7=ia64_syscall_setup	// B
     br.call.sptk.many b7=ia64_hypercall_setup	// B
@@ -839,7 +840,7 @@ GLOBAL_ENTRY(ia64_hypercall_setup)
 
     st8.spill [r17]=r11,PT(CR_IIP)-PT(R11)	// save r11
     tnat.nz p9,p0=in1
-(pKStk) mov r18=r0				// make sure r18 isn't NaT
+//(pKStk) mov r18=r0				// make sure r18 isn't NaT
     ;;
 
     st8 [r16]=r26,PT(CR_IFS)-PT(AR_PFS)	// save ar.pfs
@@ -861,20 +862,23 @@ GLOBAL_ENTRY(ia64_hypercall_setup)
 (p9)    mov in1=-1
     ;;
 
-(pUStk) sub r18=r18,r22				// r18=RSE.ndirty*8
+//(pUStk) sub r18=r18,r22				// r18=RSE.ndirty*8
+    sub r18=r18,r22				// r18=RSE.ndirty*8
     tnat.nz p10,p0=in2
     add r11=8,r11
     ;;
-(pKStk) adds r16=PT(PR)-PT(AR_RNAT),r16		// skip over ar_rnat field
-(pKStk) adds r17=PT(B0)-PT(AR_BSPSTORE),r17	// skip over ar_bspstore field
+//(pKStk) adds r16=PT(PR)-PT(AR_RNAT),r16		// skip over ar_rnat field
+//(pKStk) adds r17=PT(B0)-PT(AR_BSPSTORE),r17	// skip over ar_bspstore field
     tnat.nz p11,p0=in3
     ;;
 (p10)   mov in2=-1
     tnat.nz p12,p0=in4				// [I0]
 (p11)   mov in3=-1
     ;;
-(pUStk) st8 [r16]=r24,PT(PR)-PT(AR_RNAT)	// save ar.rnat
-(pUStk) st8 [r17]=r23,PT(B0)-PT(AR_BSPSTORE)	// save ar.bspstore
+//(pUStk) st8 [r16]=r24,PT(PR)-PT(AR_RNAT)	// save ar.rnat
+    st8 [r16]=r24,PT(PR)-PT(AR_RNAT)	// save ar.rnat
+//(pUStk) st8 [r17]=r23,PT(B0)-PT(AR_BSPSTORE)	// save ar.bspstore
+    st8 [r17]=r23,PT(B0)-PT(AR_BSPSTORE)	// save ar.bspstore	
     shl r18=r18,16				// compute ar.rsc to be used for "loadrs"
     ;;
     st8 [r16]=r31,PT(LOADRS)-PT(PR)		// save predicates

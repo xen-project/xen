@@ -472,9 +472,10 @@ GLOBAL_ENTRY(ia64_leave_hypercall)
     ;;
     st8 [r16]=r8
     ;;
-(pUStk) rsm psr.i
+//(pUStk) rsm psr.i
+    rsm psr.i
     cmp.eq pLvSys,p0=r0,r0		// pLvSys=1: leave from syscall
-(pUStk) cmp.eq.unc p6,p0=r0,r0		// p6 <- pUStk
+//(pUStk) cmp.eq.unc p6,p0=r0,r0		// p6 <- pUStk
     ;;
     br.call.sptk.many b0=leave_hypervisor_tail
 .work_processed_syscall:
@@ -544,7 +545,7 @@ GLOBAL_ENTRY(ia64_leave_hypercall)
 //(pUStk) add r14=IA64_TASK_THREAD_ON_USTACK_OFFSET,r13
     ;;
     ld8 r27=[r2],PT(B0)-PT(AR_PFS)	// M0|1 load ar.pfs
-(pKStk) mov r22=psr			// M2   read PSR now that interrupts are disabled
+//(pKStk) mov r22=psr			// M2   read PSR now that interrupts are disabled
     nop 0
     ;;
     ld8 r22=[r2],PT(AR_RNAT)-PT(B0) // M0|1 load b0

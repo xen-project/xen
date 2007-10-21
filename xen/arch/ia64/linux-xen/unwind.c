@@ -2006,17 +2006,18 @@ unw_unwind_to_user (struct unw_frame_info *info)
 				   __FUNCTION__);
 			break;
 		}
+#ifndef XEN
 		if (unw_is_intr_frame(info) &&
 		    (pr & (1UL << PRED_USER_STACK)))
 			return 0;
-#ifdef XEN
+#else
+		if (unw_is_intr_frame(info) &&
+		    !info->task->domain->arch.is_vti &&
+		    (pr & (1UL << PRED_USER_STACK)))
+			return 0;
 		/*
-		 * vmx fault handlers don't always update vcpu->on_stack
-		 * so that the above (pr & (1UL << PRED_USER_STACK)) condition
-		 * isn't always true.
-		 * hypercall path of break_fault does set pUStk=1,
-		 * other fault paths don't set.
-		 *
+		 * vmx fault handlers don't vcpu->on_stack and keep
+		 * (pr & (1UL << PRED_USER_STACK)) condition untouched.
 		 * we need to stop unwinding somehow.
 		 */
 		if (unw_is_intr_frame(info) &&
