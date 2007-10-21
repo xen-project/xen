@@ -8,6 +8,7 @@
  *
  * Copyright (c) 2007 Isaku Yamahata <yamahata@valinux.co.jp>
  *   Use foreign p2m exposure.
+ *   VTi domain support.
  */
 
 #include <inttypes.h>
@@ -20,6 +21,7 @@
 #include "xc_ia64.h"
 #include "xc_ia64_save_restore.h"
 #include "xc_efi.h"
+#include "xen/hvm/params.h"
 
 /*
 ** Default values for important tuning parameters. Can override by passing
@@ -35,14 +37,6 @@
 ** During (live) save/migrate, we maintain a number of bitmaps to track
 ** which pages we have to send, and to skip.
 */
-
-#define BITS_PER_LONG (sizeof(unsigned long) * 8)
-
-#define BITMAP_ENTRY(_nr,_bmap) \
-   ((unsigned long *)(_bmap))[(_nr)/BITS_PER_LONG]
-
-#define BITMAP_SHIFT(_nr) ((_nr) % BITS_PER_LONG)
-
 static inline int test_bit(int nr, volatile void * addr)
 {
     return (BITMAP_ENTRY(nr, addr) >> BITMAP_SHIFT(nr)) & 1;
@@ -136,6 +130,271 @@ retry:
     return -1;
 }
 
+static inline int
+md_is_not_ram(const efi_memory_desc_t *md)
+{
+    return ((md->type != EFI_CONVENTIONAL_MEMORY) ||
+            (md->attribute != EFI_MEMORY_WB) ||
+            (md->num_pages == 0));
+}
+
+/*
+ * Send through a list of all the PFNs that were not in map at the close.
+ * We send pages which was allocated. However balloon driver may 
+ * decreased after sending page. So we have to check the freed
+ * page after pausing the domain.
+ */
+static int
+xc_ia64_send_unallocated_list(int xc_handle, int io_fd, 
+                              struct xen_ia64_p2m_table *p2m_table,
+                              xen_ia64_memmap_info_t *memmap_info, 
+                              void *memmap_desc_start, void *memmap_desc_end)
+{
+    void *p;
+    efi_memory_desc_t *md;
+
+    unsigned long N;
+    unsigned long pfntab[1024];
+    unsigned int j;
+
+    j = 0;
+    for (p = memmap_desc_start;
+         p < memmap_desc_end;
+         p += memmap_info->efi_memdesc_size) {
+        md = p;
+
+        if (md_is_not_ram(md))
+            continue;
+
+        for (N = md->phys_addr >> PAGE_SHIFT;
+             N < (md->phys_addr + (md->num_pages << EFI_PAGE_SHIFT)) >>
+                 PAGE_SHIFT;
+             N++) {
+            if (!xc_ia64_p2m_allocated(p2m_table, N))
+                j++;
+        }
+    }
+    if (!write_exact(io_fd, &j, sizeof(unsigned int))) {
+        ERROR("Error when writing to state file (6a)");
+        return -1;
+    }
+        
+    j = 0;
+    for (p = memmap_desc_start;
+         p < memmap_desc_end;
+         p += memmap_info->efi_memdesc_size) {
+        md = p;
+
+        if (md_is_not_ram(md))
+            continue;
+
+        for (N = md->phys_addr >> PAGE_SHIFT;
+             N < (md->phys_addr + (md->num_pages << EFI_PAGE_SHIFT)) >>
+                 PAGE_SHIFT;
+             N++) {
+            if (!xc_ia64_p2m_allocated(p2m_table, N))
+                pfntab[j++] = N;
+            if (j == sizeof(pfntab)/sizeof(pfntab[0])) {
+                if (!write_exact(io_fd, &pfntab, sizeof(pfntab[0]) * j)) {
+                    ERROR("Error when writing to state file (6b)");
+                    return -1;
+                }
+                j = 0;
+            }
+        }
+    }
+    if (j > 0) {
+        if (!write_exact(io_fd, &pfntab, sizeof(pfntab[0]) * j)) {
+            ERROR("Error when writing to state file (6c)");
+            return -1;
+        }
+    }
+
+    return 0;
+}
+
+static int
+xc_ia64_send_vcpu_context(int xc_handle, int io_fd, uint32_t dom,
+                          uint32_t vcpu, vcpu_guest_context_t *ctxt)
+{
+    if (xc_vcpu_getcontext(xc_handle, dom, vcpu, ctxt)) {
+        ERROR("Could not get vcpu context");
+        return -1;
+    }
+
+    if (!write_exact(io_fd, ctxt, sizeof(*ctxt))) {
+        ERROR("Error when writing to state file (1)");
+        return -1;
+    }
+
+    fprintf(stderr, "ip=%016lx, b0=%016lx\n", ctxt->regs.ip, ctxt->regs.b[0]);
+    return 0;
+}
+
+static int
+xc_ia64_send_shared_info(int xc_handle, int io_fd, shared_info_t *live_shinfo)
+{
+    if (!write_exact(io_fd, live_shinfo, PAGE_SIZE)) {
+        ERROR("Error when writing to state file (1)");
+        return -1;
+    }
+    return 0;
+}
+
+static int
+xc_ia64_pv_send_context(int xc_handle, int io_fd, uint32_t dom,
+                        shared_info_t *live_shinfo)
+{
+    /* A copy of the CPU context of the guest. */
+    vcpu_guest_context_t ctxt;
+    char *mem;
+
+    if (xc_ia64_send_vcpu_context(xc_handle, io_fd, dom, 0, &ctxt))
+        return -1;
+
+    mem = xc_map_foreign_range(xc_handle, dom, PAGE_SIZE,
+                               PROT_READ|PROT_WRITE, ctxt.privregs_pfn);
+    if (mem == NULL) {
+        ERROR("cannot map privreg page");
+        return -1;
+    }
+    if (!write_exact(io_fd, mem, PAGE_SIZE)) {
+        ERROR("Error when writing privreg to state file (5)");
+        munmap(mem, PAGE_SIZE);
+        return -1;
+    }
+    munmap(mem, PAGE_SIZE);
+
+    if (xc_ia64_send_shared_info(xc_handle, io_fd, live_shinfo))
+        return -1;
+
+    return 0;
+}
+
+static int
+xc_ia64_hvm_send_context(int xc_handle, int io_fd, uint32_t dom,
+                         const xc_dominfo_t *info, shared_info_t *live_shinfo)
+{
+    int rc = -1;
+    unsigned int i;
+
+    /* vcpu map */
+    uint64_t max_virt_cpus;
+    unsigned long vcpumap_size;
+    uint64_t *vcpumap = NULL;
+
+    /* HVM: magic frames for ioreqs and xenstore comms */
+    const int hvm_params[] = {
+        HVM_PARAM_IOREQ_PFN,
+        HVM_PARAM_BUFIOREQ_PFN,
+        HVM_PARAM_STORE_PFN,
+    };
+    const int NR_PARAMS = sizeof(hvm_params) / sizeof(hvm_params[0]);
+    /* ioreq_pfn, bufioreq_pfn, store_pfn */
+    uint64_t magic_pfns[NR_PARAMS];
+
+    /* HVM: a buffer for holding HVM contxt */
+    uint64_t rec_size;
+    uint64_t hvm_buf_size = 0;
+    uint8_t *hvm_buf = NULL;
+
+    if (xc_ia64_send_shared_info(xc_handle, io_fd, live_shinfo))
+        return -1;
+
+    /* vcpu map */
+    max_virt_cpus = MAX_VIRT_CPUS;
+    vcpumap_size = (max_virt_cpus + 1 + sizeof(vcpumap[0]) - 1) /
+        sizeof(vcpumap[0]);
+    vcpumap = malloc(vcpumap_size);
+    if (vcpumap == NULL) {
+        ERROR("memory alloc for vcpumap");
+        goto out;
+    }
+    memset(vcpumap, 0, vcpumap_size);
+
+    for (i = 0; i <= info->max_vcpu_id; i++) {
+        xc_vcpuinfo_t vinfo;
+        if ((xc_vcpu_getinfo(xc_handle, dom, i, &vinfo) == 0) && vinfo.online)
+            __set_bit(i, vcpumap);
+    }
+
+    if (!write_exact(io_fd, &max_virt_cpus, sizeof(max_virt_cpus))) {
+        ERROR("write max_virt_cpus");
+        goto out;
+    }
+
+    if (!write_exact(io_fd, vcpumap, vcpumap_size)) {
+        ERROR("write vcpumap");
+        goto out;
+    }
+
+    /* vcpu context */
+    for (i = 0; i <= info->max_vcpu_id; i++) {
+        /* A copy of the CPU context of the guest. */
+        vcpu_guest_context_t ctxt;
+
+        if (!__test_bit(i, vcpumap))
+            continue;
+
+        if (xc_ia64_send_vcpu_context(xc_handle, io_fd, dom, i, &ctxt))
+            goto out;
+
+        // system context of vcpu is sent as hvm context.
+    }    
+
+    /* Save magic-page locations. */
+    memset(magic_pfns, 0, sizeof(magic_pfns));
+    for (i = 0; i < NR_PARAMS; i++) {
+        if (xc_get_hvm_param(xc_handle, dom, hvm_params[i], &magic_pfns[i])) {
+            PERROR("Error when xc_get_hvm_param");
+            goto out;
+        }
+    }
+
+    if (!write_exact(io_fd, magic_pfns, sizeof(magic_pfns))) {
+        ERROR("Error when writing to state file (7)");
+        goto out;
+    }
+
+    /* Need another buffer for HVM context */
+    hvm_buf_size = xc_domain_hvm_getcontext(xc_handle, dom, 0, 0);
+    if (hvm_buf_size == -1) {
+        ERROR("Couldn't get HVM context size from Xen");
+        goto out;
+    }
+
+    hvm_buf = malloc(hvm_buf_size);
+    if (!hvm_buf) {
+        ERROR("Couldn't allocate memory");
+        goto out;
+    }
+
+    /* Get HVM context from Xen and save it too */
+    rec_size = xc_domain_hvm_getcontext(xc_handle, dom, hvm_buf, hvm_buf_size);
+    if (rec_size == -1) {
+        ERROR("HVM:Could not get hvm buffer");
+        goto out;
+    }
+        
+    if (!write_exact(io_fd, &rec_size, sizeof(rec_size))) {
+        ERROR("error write hvm buffer size");
+        goto out;
+    }
+        
+    if (!write_exact(io_fd, hvm_buf, rec_size)) {
+        ERROR("write HVM info failed!\n");
+        goto out;
+    }
+
+    rc = 0;
+out:
+    if (hvm_buf != NULL)
+        free(hvm_buf);
+    if (vcpumap != NULL)
+        free(vcpumap);
+    return rc;
+}
+
 int
 xc_domain_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
                uint32_t max_factor, uint32_t flags, int (*suspend)(int),
@@ -147,15 +406,11 @@ xc_domain_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
 
     int rc = 1;
 
-    //int live  = (flags & XCFLAGS_LIVE);
     int debug = (flags & XCFLAGS_DEBUG);
     int live  = (flags & XCFLAGS_LIVE);
 
     /* The new domain's shared-info frame number. */
     unsigned long shared_info_frame;
-
-    /* A copy of the CPU context of the guest. */
-    vcpu_guest_context_t ctxt;
 
     /* Live mapping of shared info structure */
     shared_info_t *live_shinfo = NULL;
@@ -185,6 +440,12 @@ xc_domain_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
 
     char *mem;
 
+    /* HVM: shared-memory bitmaps for getting log-dirty bits from qemu-dm */
+    unsigned long *qemu_bitmaps[2];
+    int qemu_active = 0;
+    int qemu_non_active = 1;
+
+    /* for foreign p2m exposure */
     unsigned int memmap_info_num_pages;
     unsigned long memmap_size = 0;
     xen_ia64_memmap_info_t *memmap_info_live = NULL;
@@ -299,6 +560,14 @@ xc_domain_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
             goto out;
         }
 
+        if (hvm) {
+            /* Get qemu-dm logging dirty pages too */
+            void *seg = init_qemu_maps(dom, bitmap_size);
+            qemu_bitmaps[0] = seg;
+            qemu_bitmaps[1] = seg + bitmap_size;
+            qemu_active = 0;
+            qemu_non_active = 1;
+        }
     } else {
 
         /* This is a non-live suspend. Issue the call back to get the
@@ -374,9 +643,7 @@ xc_domain_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
              p < memmap_desc_end;
              p += memmap_info->efi_memdesc_size) {
             md = p;
-            if (md->type != EFI_CONVENTIONAL_MEMORY ||
-                md->attribute != EFI_MEMORY_WB ||
-                md->num_pages == 0)
+            if (md_is_not_ram(md))
                 continue;
             
             for (N = md->phys_addr >> PAGE_SHIFT;
@@ -455,11 +722,27 @@ xc_domain_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
                 goto out;
             }
 
+            if (hvm) {
+                unsigned int j;
+                /* Pull in the dirty bits from qemu-dm too */
+                if (!last_iter) {
+                    qemu_active = qemu_non_active;
+                    qemu_non_active = qemu_active ? 0 : 1;
+                    qemu_flip_buffer(dom, qemu_active);
+                    for (j = 0; j < bitmap_size / sizeof(unsigned long); j++) {
+                        to_send[j] |= qemu_bitmaps[qemu_non_active][j];
+                        qemu_bitmaps[qemu_non_active][j] = 0;
+                    }
+                } else {
+                    for (j = 0; j < bitmap_size / sizeof(unsigned long); j++)
+                        to_send[j] |= qemu_bitmaps[qemu_active][j];
+                }
+            }
+
             sent_last_iter = sent_this_iter;
 
             //print_stats(xc_handle, dom, sent_this_iter, &stats, 1);
         }
-
     }
 
     fprintf(stderr, "All memory is saved\n");
@@ -473,100 +756,18 @@ xc_domain_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
         }
     }
 
-    /*
-     * Send through a list of all the PFNs that were not in map at the close.
-     * We send pages which was allocated. However balloon driver may 
-     * decreased after sending page. So we have to check the freed
-     * page after pausing the domain.
-     */
-    {
-        unsigned long N;
-        unsigned long pfntab[1024];
-        unsigned int j;
-
-        j = 0;
-        for (p = memmap_desc_start;
-             p < memmap_desc_end;
-             p += memmap_info->efi_memdesc_size) {
-            md = p;
-            if (md->type != EFI_CONVENTIONAL_MEMORY ||
-                md->attribute != EFI_MEMORY_WB ||
-                md->num_pages == 0)
-                continue;
-            for (N = md->phys_addr >> PAGE_SHIFT;
-                 N < (md->phys_addr + (md->num_pages << EFI_PAGE_SHIFT)) >>
-                     PAGE_SHIFT;
-                 N++) {
-                if (!xc_ia64_p2m_allocated(&p2m_table, N))
-                    j++;
-            }
-        }
-        if (!write_exact(io_fd, &j, sizeof(unsigned int))) {
-            ERROR("Error when writing to state file (6a)");
-            goto out;
-        }
-        
-        j = 0;
-        for (p = memmap_desc_start;
-             p < memmap_desc_end;
-             p += memmap_info->efi_memdesc_size) {
-            md = p;
-            if (md->type != EFI_CONVENTIONAL_MEMORY ||
-                md->attribute != EFI_MEMORY_WB ||
-                md->num_pages == 0)
-                continue;
-            for (N = md->phys_addr >> PAGE_SHIFT;
-                 N < (md->phys_addr + (md->num_pages << EFI_PAGE_SHIFT)) >>
-                     PAGE_SHIFT;
-                 N++) {
-                if (!xc_ia64_p2m_allocated(&p2m_table, N))
-                    pfntab[j++] = N;
-                if (j == sizeof(pfntab)/sizeof(pfntab[0])) {
-                    if (!write_exact(io_fd, &pfntab, sizeof(pfntab[0]) * j)) {
-                        ERROR("Error when writing to state file (6b)");
-                        goto out;
-                    }
-                    j = 0;
-                }
-            }
-        }
-        if (j > 0) {
-            if (!write_exact(io_fd, &pfntab, sizeof(pfntab[0]) * j)) {
-                ERROR("Error when writing to state file (6b)");
-                goto out;
-            }
-        }
-    }
-
-    if (xc_vcpu_getcontext(xc_handle, dom, 0, &ctxt)) {
-        ERROR("Could not get vcpu context");
+    if (xc_ia64_send_unallocated_list(xc_handle, io_fd, &p2m_table,
+                                      memmap_info,
+                                      memmap_desc_start, memmap_desc_end))
         goto out;
-    }
 
-    if (!write_exact(io_fd, &ctxt, sizeof(ctxt))) {
-        ERROR("Error when writing to state file (1)");
+    if (!hvm)
+        rc = xc_ia64_pv_send_context(xc_handle, io_fd, dom, live_shinfo);
+    else
+        rc = xc_ia64_hvm_send_context(xc_handle, io_fd,
+                                      dom, &info, live_shinfo);
+    if (rc)
         goto out;
-    }
-
-    fprintf(stderr, "ip=%016lx, b0=%016lx\n", ctxt.regs.ip, ctxt.regs.b[0]);
-
-    mem = xc_map_foreign_range(xc_handle, dom, PAGE_SIZE,
-                               PROT_READ|PROT_WRITE, ctxt.privregs_pfn);
-    if (mem == NULL) {
-        ERROR("cannot map privreg page");
-        goto out;
-    }
-    if (write(io_fd, mem, PAGE_SIZE) != PAGE_SIZE) {
-        ERROR("Error when writing privreg to state file (5)");
-        munmap(mem, PAGE_SIZE);
-        goto out;
-    }
-    munmap(mem, PAGE_SIZE);
-
-    if (!write_exact(io_fd, live_shinfo, PAGE_SIZE)) {
-        ERROR("Error when writing to state file (1)");
-        goto out;
-    }
 
     /* Success! */
     rc = 0;
