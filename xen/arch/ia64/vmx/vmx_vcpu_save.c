@@ -22,6 +22,8 @@
 
 #include <asm/vmx_vcpu.h>
 #include <asm/vmx_vcpu_save.h>
+#include <asm/hvm/support.h>
+#include <public/hvm/save.h>
 
 void
 vmx_arch_get_info_guest(struct vcpu *v, vcpu_guest_context_u c)
@@ -191,6 +193,166 @@ vmx_arch_set_info_guest(struct vcpu *v, vcpu_guest_context_u c)
     v->arch.irq_new_condition = 1;
     return 0;
 }
+
+
+static int vmx_cpu_save(struct domain *d, hvm_domain_context_t *h)
+{
+    struct vcpu *v;
+
+    for_each_vcpu(d, v) {
+        struct pt_regs *regs = vcpu_regs(v);
+        struct hvm_hw_ia64_cpu ia64_cpu;
+
+        if (test_bit(_VPF_down, &v->pause_flags))
+            continue;
+
+        memset(&ia64_cpu, 0, sizeof(ia64_cpu));
+
+        ia64_cpu.ipsr = regs->cr_ipsr;
+
+        if (hvm_save_entry(CPU, v->vcpu_id, h, &ia64_cpu))
+            return -EINVAL;
+    }
+
+    return 0;
+}
+
+static int vmx_cpu_load(struct domain *d, hvm_domain_context_t *h)
+{
+    int rc = 0;
+    uint16_t vcpuid;
+    struct vcpu *v;
+    struct hvm_hw_ia64_cpu ia64_cpu;
+    struct pt_regs *regs;
+
+    vcpuid = hvm_load_instance(h);
+    if (vcpuid > MAX_VIRT_CPUS || (v = d->vcpu[vcpuid]) == NULL) {
+        gdprintk(XENLOG_ERR,
+                 "%s: domain has no vcpu %u\n", __func__, vcpuid);
+        rc = -EINVAL;
+        goto out;
+    }
+
+    if (hvm_load_entry(CPU, h, &ia64_cpu) != 0) {
+        rc = -EINVAL;
+        goto out;
+    }
+
+    regs = vcpu_regs(v);
+    regs->cr_ipsr = ia64_cpu.ipsr | IA64_PSR_VM;
+
+ out:
+    return rc;
+}
+
+HVM_REGISTER_SAVE_RESTORE(CPU, vmx_cpu_save, vmx_cpu_load, 1, HVMSR_PER_VCPU);
+
+static int vmx_vpd_save(struct domain *d, hvm_domain_context_t *h)
+{
+    struct vcpu *v;
+
+    for_each_vcpu(d, v) {
+        vpd_t *vpd = (void *)v->arch.privregs;
+
+        if (test_bit(_VPF_down, &v->pause_flags))
+            continue;
+        
+        // currently struct hvm_hw_ia64_vpd = struct vpd
+        // if it is changed, this must be revised.
+        if (hvm_save_entry(VPD, v->vcpu_id, h, (struct hvm_hw_ia64_vpd*)vpd))
+            return -EINVAL;
+    }
+
+    return 0;
+}
+
+static int vmx_vpd_load(struct domain *d, hvm_domain_context_t *h)
+{
+    int rc = 0;
+    uint16_t vcpuid;
+    struct vcpu *v;
+    vpd_t *vpd;
+    struct hvm_hw_ia64_vpd *ia64_vpd = NULL;
+    int i;
+
+    vcpuid = hvm_load_instance(h);
+    if (vcpuid > MAX_VIRT_CPUS || (v = d->vcpu[vcpuid]) == NULL) {
+        gdprintk(XENLOG_ERR,
+                 "%s: domain has no vcpu %u\n", __func__, vcpuid);
+        rc = -EINVAL;
+        goto out;
+    }
+
+    ia64_vpd = xmalloc(struct hvm_hw_ia64_vpd);
+    if (ia64_vpd == NULL) {
+        gdprintk(XENLOG_ERR,
+                 "%s: can't allocate memory %d\n", __func__, vcpuid);
+        rc = -ENOMEM;
+        goto out;
+    }
+
+    if (hvm_load_entry(VPD, h, ia64_vpd) != 0) {
+        rc = -EINVAL;
+        goto out;
+    }
+
+    vpd = (void *)v->arch.privregs;
+#define VPD_COPY(x)    vpd->vpd_low.x = ia64_vpd->vpd.vpd_low.x
+
+    for (i = 0; i < 16; i++)
+        VPD_COPY(vgr[i]);
+    for (i = 0; i < 16; i++)
+        VPD_COPY(vbgr[i]);
+    VPD_COPY(vnat);
+    VPD_COPY(vbnat);
+    for (i = 0; i < 5; i++)
+        VPD_COPY(vcpuid[i]);
+    VPD_COPY(vpsr);
+    VPD_COPY(vpr);
+
+    // cr
+#if 0
+    VPD_COPY(dcr);
+    VPD_COPY(itm);
+    VPD_COPY(iva);
+    VPD_COPY(pta);
+    VPD_COPY(ipsr);
+    VPD_COPY(isr);
+    VPD_COPY(iip);
+    VPD_COPY(ifa);
+    VPD_COPY(itir);
+    VPD_COPY(iipa);
+    VPD_COPY(ifs);
+    VPD_COPY(iim);
+    VPD_COPY(iha);
+    VPD_COPY(lid);
+    VPD_COPY(ivr);
+    VPD_COPY(tpr);
+    VPD_COPY(eoi);
+    VPD_COPY(irr[0]);
+    VPD_COPY(irr[1]);
+    VPD_COPY(irr[2]);
+    VPD_COPY(irr[3]);
+    VPD_COPY(itv);
+    VPD_COPY(pmv);
+    VPD_COPY(cmcv);
+    VPD_COPY(lrr0);
+    VPD_COPY(lrr1);
+#else
+    memcpy(&vpd->vpd_low.vcr[0], &ia64_vpd->vpd.vpd_low.vcr[0],
+           sizeof(vpd->vpd_low.vcr));
+#endif
+#undef VPD_COPY
+
+    v->arch.irq_new_condition = 1;
+
+ out:
+    if (ia64_vpd != NULL)
+        xfree(ia64_vpd);
+    return rc;
+}
+
+HVM_REGISTER_SAVE_RESTORE(VPD, vmx_vpd_save, vmx_vpd_load, 1, HVMSR_PER_VCPU);
 
 /*
  * Local variables:

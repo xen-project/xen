@@ -37,6 +37,7 @@ subdir-$(CONFIG_COMPAT) += compat
 
 subdir-$(x86_32) += hvm
 subdir-$(x86_64) += hvm
+subdir-$(ia64) += hvm
 
 subdir-y += libelf
 

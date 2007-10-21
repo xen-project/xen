@@ -27,6 +27,7 @@
  *  Copyright (C) 2007 VA Linux Systems Japan K.K.
  *  Isaku Yamahata <yamahata at valinux co jp>
  *  SMP support
+ *  xen save/restore support
  */
 
 #include <xen/config.h>
@@ -40,6 +41,8 @@
 #include <asm/viosapic.h>
 #include <asm/current.h>
 #include <asm/event.h>
+#include <asm/hvm/support.h>
+#include <public/hvm/save.h>
 
 static void viosapic_deliver(struct viosapic *viosapic, int irq)
 {
@@ -356,3 +359,69 @@ void viosapic_init(struct domain *d)
     
     viosapic->base_address = VIOSAPIC_DEFAULT_BASE_ADDRESS;
 }
+
+#define VIOSAPIC_INVALID_VCPU_ID (-1UL)
+static int viosapic_save(struct domain *d, hvm_domain_context_t *h)
+{
+    struct viosapic *viosapic = domain_viosapic(d);
+    struct hvm_hw_ia64_viosapic viosapic_save;
+    int i;
+
+    memset(&viosapic_save, 0, sizeof(viosapic_save));
+    
+    spin_lock(&viosapic->lock);
+    viosapic_save.irr = viosapic->irr;
+    viosapic_save.isr = viosapic->isr;
+    viosapic_save.ioregsel = viosapic->ioregsel;
+    if (viosapic->lowest_vcpu != NULL)
+        viosapic_save.lowest_vcpu_id = viosapic->lowest_vcpu->vcpu_id;
+    else
+        viosapic_save.lowest_vcpu_id = VIOSAPIC_INVALID_VCPU_ID;
+    viosapic_save.base_address = viosapic->base_address;
+
+    for (i = 0; i < VIOSAPIC_NUM_PINS; i++)
+        viosapic_save.redirtbl[i] = viosapic->redirtbl[i];
+    spin_unlock(&viosapic->lock);
+
+    return hvm_save_entry(VIOSAPIC, 0, h, &viosapic_save);
+}
+
+static int viosapic_load(struct domain *d, hvm_domain_context_t *h)
+{
+    struct viosapic *viosapic = domain_viosapic(d);
+    struct hvm_hw_ia64_viosapic viosapic_load;
+    struct vcpu *lowest_vcpu;
+    int i;
+
+    if (hvm_load_entry(VIOSAPIC, h, &viosapic_load))
+        return -EINVAL;
+
+    lowest_vcpu = NULL;
+    if (viosapic_load.lowest_vcpu_id < MAX_VIRT_CPUS)
+        lowest_vcpu = d->vcpu[viosapic_load.lowest_vcpu_id];
+    else if (viosapic_load.lowest_vcpu_id != VIOSAPIC_INVALID_VCPU_ID)
+        return -EINVAL;
+
+    if (viosapic_load.base_address != VIOSAPIC_DEFAULT_BASE_ADDRESS)
+        return -EINVAL;
+
+    spin_lock(&viosapic->lock);
+    viosapic->irr = viosapic_load.irr;
+    viosapic->isr = viosapic_load.isr;
+    viosapic->ioregsel = viosapic_load.ioregsel;
+
+    viosapic->lowest_vcpu = lowest_vcpu;
+
+    viosapic->base_address = viosapic_load.base_address;
+
+    for (i = 0; i < VIOSAPIC_NUM_PINS; i++)
+        viosapic->redirtbl[i] = viosapic_load.redirtbl[i];
+
+    service_iosapic(viosapic);//XXX
+    spin_unlock(&viosapic->lock);
+
+    return 0;
+}
+
+HVM_REGISTER_SAVE_RESTORE(VIOSAPIC, viosapic_save, viosapic_load,
+                          1, HVMSR_PER_DOM);

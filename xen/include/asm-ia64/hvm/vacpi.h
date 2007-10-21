@@ -21,6 +21,7 @@
 #ifndef __ASM_IA64_HVM_VACPI_H__
 #define __ASM_IA64_HVM_VACPI_H__
 
+#include <public/arch-ia64/hvm/save.h> /* for struct vacpi_regs */
 #include <public/hvm/ioreq.h>
 
 #define ACPI_PM1A_EVT_BLK_ADDRESS 0x0000000000001f40
@@ -30,17 +31,6 @@
 #define IS_ACPI_ADDR(X)  ((unsigned long)((X)-ACPI_PM1A_EVT_BLK_ADDRESS)<12)
 
 #define FREQUENCE_PMTIMER  3579545UL	/* Timer should run at 3.579545 MHz */
-
-struct vacpi_regs {
-	union {
-		struct {
-			uint32_t pm1a_sts:16;
-			uint32_t pm1a_en:16;
-		};
-		uint32_t evt_blk;
-	};
-	uint32_t tmr_val;
-};
 
 struct vacpi {
 	struct vacpi_regs regs;

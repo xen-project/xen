@@ -29,6 +29,8 @@
 #include <xen/config.h>
 #include <xen/types.h>
 #include <xen/smp.h>
+#include <public/arch-ia64/hvm/save.h> /* for VIOSAPIC_NUM_PINS and
+                                          union viosapic_rte */
 
 /* Direct registers. */
 #define VIOSAPIC_REG_SELECT   0x00
@@ -42,8 +44,6 @@
 
 #define VIOSAPIC_VERSION_ID   0x21 /* IOSAPIC version */
 
-#define VIOSAPIC_NUM_PINS     48
-
 #define VIOSAPIC_DEFAULT_BASE_ADDRESS  0xfec00000
 #define VIOSAPIC_MEM_LENGTH            0x100
 
@@ -51,27 +51,6 @@
 #define viosapic_domain(v) (container_of((v), struct domain, \
                                         arch.hvm_domain.viosapic))
 #define vcpu_viosapic(v) (&(v)->domain->arch.hvm_domain.viosapic)
-
-union viosapic_rte
-{
-    uint64_t bits;
-    struct {
-        uint8_t vector;
-
-        uint8_t delivery_mode  : 3;
-        uint8_t reserve1       : 1;
-        uint8_t delivery_status: 1;
-        uint8_t polarity       : 1;
-        uint8_t reserve2       : 1;
-        uint8_t trig_mode      : 1;
-
-        uint8_t mask           : 1;
-        uint8_t reserve3       : 7;
-
-        uint8_t reserved[3];
-        uint16_t dest_id;
-    }; 
-};
 
 struct viosapic {
     uint64_t irr;

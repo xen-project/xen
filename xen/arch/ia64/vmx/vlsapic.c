@@ -4,6 +4,10 @@
  * vlsapic.c: virtual lsapic model including ITC timer.
  * Copyright (c) 2005, Intel Corporation.
  *
+ * Copyright (c) 2007, Isaku Yamahata <yamahata at valinux co jp>
+ *                     VA Linux Systems Japan K.K.
+ *                     save/restore support
+ *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,
  * version 2, as published by the Free Software Foundation.
@@ -40,6 +44,8 @@
 #include <asm/vlsapic.h>
 #include <asm/linux/jiffies.h>
 #include <xen/domain.h>
+#include <asm/hvm/support.h>
+#include <public/hvm/save.h>
 
 #ifdef IPI_DEBUG
 #define IPI_DPRINTK(x...) printk(x)
@@ -820,3 +826,122 @@ void vlsapic_write(struct vcpu *v,
     }
 }
 
+static int vlsapic_save(struct domain *d, hvm_domain_context_t *h)
+{
+    struct vcpu *v;
+
+    for_each_vcpu(d, v) {
+        struct hvm_hw_ia64_vlsapic vlsapic;
+        int i;
+
+        if (test_bit(_VPF_down, &v->pause_flags))
+            continue;
+
+        memset(&vlsapic, 0, sizeof(vlsapic));
+        for (i = 0; i < 4; i++)
+            vlsapic.insvc[i] = VLSAPIC_INSVC(v,i);
+
+        vlsapic.vhpi = VCPU(v, vhpi);
+        vlsapic.xtp = VLSAPIC_XTP(v);
+        vlsapic.pal_init_pending = v->arch.arch_vmx.pal_init_pending;
+
+        if (hvm_save_entry(VLSAPIC, v->vcpu_id, h, &vlsapic))
+            return -EINVAL;
+    }
+
+    return 0;
+}
+
+static int vlsapic_load(struct domain *d, hvm_domain_context_t *h)
+{
+    uint16_t vcpuid;
+    struct vcpu *v;
+    struct hvm_hw_ia64_vlsapic vlsapic;
+    int i;
+
+    vcpuid = hvm_load_instance(h);
+    if (vcpuid > MAX_VIRT_CPUS || (v = d->vcpu[vcpuid]) == NULL) {
+        gdprintk(XENLOG_ERR,
+                 "%s: domain has no vlsapic %u\n", __func__, vcpuid);
+        return -EINVAL;
+    }
+
+    if (hvm_load_entry(VLSAPIC, h, &vlsapic) != 0) 
+        return -EINVAL;
+
+    for (i = 0; i < 4; i++)
+        VLSAPIC_INSVC(v,i) = vlsapic.insvc[i];
+
+    VCPU(v, vhpi) = vlsapic.vhpi;
+    VLSAPIC_XTP(v) = vlsapic.xtp;
+    v->arch.arch_vmx.pal_init_pending = vlsapic.pal_init_pending;
+    v->arch.irq_new_pending = 1; /* to force checking irq */
+
+    return 0;
+}
+
+HVM_REGISTER_SAVE_RESTORE(VLSAPIC, vlsapic_save, vlsapic_load,
+                          1, HVMSR_PER_VCPU);
+
+static int vtime_save(struct domain *d, hvm_domain_context_t *h)
+{
+    struct vcpu *v;
+
+    for_each_vcpu(d, v) {
+        vtime_t *vtm = &VMX(v, vtm);
+        struct hvm_hw_ia64_vtime vtime;
+
+        if (test_bit(_VPF_down, &v->pause_flags))
+            continue;
+
+        stop_timer(&vtm->vtm_timer);//XXX should wait for callback not running.
+
+        memset(&vtime, 0, sizeof(vtime));
+        vtime.itc = now_itc(vtm);
+        vtime.itm = VCPU(v, itm);
+        vtime.last_itc = vtm->last_itc;
+        vtime.pending = vtm->pending;
+
+        vtm_set_itm(v, vtime.itm);// this may start timer.
+
+        if (hvm_save_entry(VTIME, v->vcpu_id, h, &vtime))
+            return -EINVAL;
+    }
+
+    return 0;
+}
+
+static int vtime_load(struct domain *d, hvm_domain_context_t *h)
+{
+    uint16_t vcpuid;
+    struct vcpu *v;
+    struct hvm_hw_ia64_vtime vtime;
+    vtime_t *vtm;
+
+    vcpuid = hvm_load_instance(h);
+    if (vcpuid > MAX_VIRT_CPUS || (v = d->vcpu[vcpuid]) == NULL) {
+        gdprintk(XENLOG_ERR,
+                 "%s: domain has no vtime %u\n", __func__, vcpuid);
+        return -EINVAL;
+    }
+
+    if (hvm_load_entry(VTIME, h, &vtime) != 0)
+        return -EINVAL;
+
+    vtm = &VMX(v, vtm);
+    stop_timer(&vtm->vtm_timer); //XXX should wait for callback not running.
+
+    vtm->last_itc = vtime.last_itc;
+    vtm->pending = vtime.pending;
+
+    migrate_timer(&vtm->vtm_timer, v->processor);
+    vtm_set_itm(v, vtime.itm);
+    vtm_set_itc(v, vtime.itc); // This may start timer.
+
+    if (test_and_clear_bit(_VPF_down, &v->pause_flags))
+        vcpu_wake(v);
+
+    return 0;
+}
+
+HVM_REGISTER_SAVE_RESTORE(VTIME, vtime_save, vtime_load, 1, HVMSR_PER_VCPU);

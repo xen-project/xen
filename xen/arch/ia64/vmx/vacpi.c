@@ -7,6 +7,7 @@
  * Copyright (c) 2007 VA Linux Systems Japan K.K
  *      Isaku Yamahata <yamahata at valinux co jp>
  *      SMP support
+ *      save/restore support
  *
  * Copyright (c) 2007, XenSource inc.
  * Copyright (c) 2006, Intel Corporation.
@@ -28,6 +29,8 @@
 #include <asm/vmx_vcpu.h>
 #include <asm/vmx.h>
 #include <asm/hvm/vacpi.h>
+#include <asm/hvm/support.h>
+#include <public/hvm/save.h>
 
 /* The interesting bits of the PM1a_STS register */
 #define TMR_STS    (1 << 0)
@@ -197,3 +200,69 @@ void vacpi_relinquish_resources(struct domain *d)
 	struct vacpi *s = &d->arch.hvm_domain.vacpi;
 	kill_timer(&s->timer);
 }
+
+// stolen from xen/arch/x86/hvm/pmtimer.c
+static int vacpi_save(struct domain *d, hvm_domain_context_t *h)
+{
+	struct vacpi *s = &d->arch.hvm_domain.vacpi;
+	unsigned long delta;
+	uint32_t msb = s->regs.tmr_val & TMR_VAL_MSB;
+	struct hvm_hw_ia64_vacpi vacpi_save;
+	int rc;
+
+	stop_timer(&s->timer); //XXX
+	
+	spin_lock(&s->lock);
+
+	/* Update the counter to the guest's current time.  We always save
+	 * with the domain paused, so the saved time should be after the
+	 * last_gtime, but just in case, make sure we only go forwards */
+
+	//XXX NOW() should be the time that domais paused
+	delta = NOW() - s->last_gtime; 
+	delta = ((delta >> 8) * ((FREQUENCE_PMTIMER << 32) / SECONDS(1))) >> 24;
+	if ( delta < 1UL<<31 )
+		s->regs.tmr_val += delta;
+	if ( (s->regs.tmr_val & TMR_VAL_MSB) != msb )
+		s->regs.pm1a_sts |= TMR_STS;
+	/* No point in setting the SCI here because we'll already have saved the 
+	 * IRQ and *PIC state; we'll fix it up when we restore the domain */
+
+	vacpi_save.regs = s->regs;
+	rc = hvm_save_entry(VACPI, 0, h, &vacpi_save);
+	
+	spin_unlock(&s->lock);
+
+	pmt_timer_callback(d);//XXX This might change the domain state.
+	return 0;
+}
+
+static int vacpi_load(struct domain *d, hvm_domain_context_t *h)
+{
+	struct vacpi *s = &d->arch.hvm_domain.vacpi;
+	struct hvm_hw_ia64_vacpi vacpi_load;
+
+	/* Reload the registers */
+	if ( hvm_load_entry(VACPI, h, &vacpi_load) )
+		return -EINVAL;
+
+	stop_timer(&s->timer);//XXX
+
+	spin_lock(&s->lock);
+
+	s->regs = vacpi_load.regs;
+
+	/* Calculate future counter values from now. */
+	//XXX NOW(); last_gtime should be set when domain is unpaused
+	s->last_gtime = NOW(); 
+
+	/* Set the SCI state from the registers */ 
+	pmt_update_sci(d, s);
+
+	spin_unlock(&s->lock);
+
+	pmt_timer_callback(d);//XXX
+	return 0;
+}
+
+HVM_REGISTER_SAVE_RESTORE(VACPI, vacpi_save, vacpi_load, 1, HVMSR_PER_DOM);
