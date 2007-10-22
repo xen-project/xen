@@ -45,6 +45,7 @@ HVM_PARAM_IOREQ_PFN    = 5
 HVM_PARAM_BUFIOREQ_PFN = 6
 HVM_PARAM_NVRAM_FD     = 7
 HVM_PARAM_VHPT_SIZE    = 8
+HVM_PARAM_BUFPIOREQ_PFN = 9
 
 restart_modes = [
     "restart",
