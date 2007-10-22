@@ -120,6 +120,8 @@ static void low_mmio_access(VCPU *vcpu, u64 pa, u64 *val, size_t s, int dir)
     p->dir = dir;
     if (dir==IOREQ_WRITE)     // write;
         p->data = *val;
+    else if (dir == IOREQ_READ)
+        p->data = 0;          // clear all bits
     p->data_is_ptr = 0;
     p->type = 1;
     p->df = 0;
