@@ -32,7 +32,7 @@
  *  |.xen_prstatus                                           |
  *  |       vcpu_guest_context_t[nr_vcpus]                   |
  *  +--------------------------------------------------------+
- *  |.xen_ia64_mmapped_regs if ia64                          |
+ *  |.xen_ia64_mmapped_regs if ia64 pv                       |
  *  |       mmapped_regs_t[nr_vcpus]                         |
  *  +--------------------------------------------------------+
  *  |.xen_shared_info if possible                            |

@@ -20,7 +20,6 @@ struct tlb_track;
 
 struct vcpu;
 extern void relinquish_vcpu_resources(struct vcpu *v);
-extern void vcpu_share_privregs_with_guest(struct vcpu *v);
 extern int vcpu_late_initialise(struct vcpu *v);
 
 /* given a current domain metaphysical address, return the physical address */

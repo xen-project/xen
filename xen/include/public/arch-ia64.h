@@ -427,6 +427,11 @@ struct vcpu_guest_context {
     struct vcpu_guest_context_regs regs;
 
     unsigned long event_callback_ip;
+
+    /* xen doesn't share privregs pages with hvm domain so that this member
+     * doesn't make sense for hvm domain.
+     * ~0UL is already used for INVALID_P2M_ENTRY. */
+#define VGC_PRIVREGS_HVM       (~(-2UL))
     unsigned long privregs_pfn;
 };
 typedef struct vcpu_guest_context vcpu_guest_context_t;

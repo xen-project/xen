@@ -470,7 +470,7 @@ int vcpu_initialise(struct vcpu *v)
 	return 0;
 }
 
-void vcpu_share_privregs_with_guest(struct vcpu *v)
+static void vcpu_share_privregs_with_guest(struct vcpu *v)
 {
 	struct domain *d = v->domain;
 	int i, order = get_order_from_shift(XMAPPEDREGS_SHIFT); 
@@ -939,8 +939,11 @@ void arch_get_info_guest(struct vcpu *v, vcpu_guest_context_u c)
 		c.nat->regs.rbs_rnat &= ~((1UL << bottom_slot) - 1);
 	}
 
- 	c.nat->privregs_pfn = get_gpfn_from_mfn
-		(virt_to_maddr(v->arch.privregs) >> PAGE_SHIFT);
+	if (VMX_DOMAIN(v))
+		c.nat->privregs_pfn = VGC_PRIVREGS_HVM;
+	else
+		c.nat->privregs_pfn = get_gpfn_from_mfn(
+			virt_to_maddr(v->arch.privregs) >> PAGE_SHIFT);
 
 	for (i = 0; i < IA64_NUM_DBG_REGS; i++) {
 		if (VMX_DOMAIN(v)) {

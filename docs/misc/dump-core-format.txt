@@ -127,8 +127,10 @@ Currently the following sections are defined. Some sections are optional.
                 This section stores the array of mapped_regs_t.
                 The size of array is stored in xch_nr_vcpus member of header
                 note descriptor in .note.Xen note section.
-                This section is ia64 specific and must exist for ia64 domain.
-                This section must not exist for non-ia64 domain.
+                This section is ia64 specific and must exist for ia64 PV 
+                domain.
+                This section must not exist for non-ia64 domain or ia64 HVM
+                domain.
 
 
 note section
@@ -237,3 +239,5 @@ Currently only (major, minor) = (0, 1) is used.
 - EI_CLASS member of elf header was changed to ELFCLASS64 independent of
   architecture. This is mainly for x86_32pae.
   The format version isn't bumped because analysis tools can distinguish it.
+- .xen_ia64_mapped_regs section was made only for ia64 PV domain.
+  In case of IA64 HVM domain, this section doesn't exist.

@@ -312,6 +312,10 @@ xc_core_arch_context_get(struct xc_core_arch_context* arch_ctxt,
                          int xc_handle, uint32_t domid)
 {
     mapped_regs_t* mapped_regs;
+
+    if ( ctxt->privregs_pfn == VGC_PRIVREGS_HVM )
+        return 0;       /* VTi domain case */
+
     if ( ctxt->privregs_pfn == INVALID_P2M_ENTRY )
     {
         PERROR("Could not get mmapped privregs gmfn");
@@ -339,6 +343,13 @@ xc_core_arch_context_get_shdr(struct xc_core_arch_context *arch_ctxt,
 {
     int sts = -1;
     Elf64_Shdr *shdr;
+
+    if ( arch_ctxt->nr_vcpus == 0 )
+    {
+        /* VTi domain case */
+        *filesz = 0;
+        return 0;       
+    }
 
     /* mmapped priv regs */
     shdr = xc_core_shdr_get(sheaders);

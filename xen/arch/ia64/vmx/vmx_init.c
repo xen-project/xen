@@ -309,7 +309,6 @@ vmx_final_setup_guest(struct vcpu *v)
 		return -ENOMEM;
 
 	v->arch.privregs = (mapped_regs_t *)vpd;
-	vcpu_share_privregs_with_guest(v);
 	vpd->vpd_low.virt_env_vaddr = vm_buffer;
     
 	v->domain->arch.vmx_platform.gos_type = OS_UNKNOWN;
