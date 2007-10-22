@@ -59,6 +59,7 @@ int compat_vcpu_op(int cmd, int vcpuid, XEN_GUEST_HANDLE(void) arg)
     case VCPUOP_stop_periodic_timer:
     case VCPUOP_set_singleshot_timer:
     case VCPUOP_stop_singleshot_timer:
+    case VCPUOP_send_nmi:
         rc = do_vcpu_op(cmd, vcpuid, arg);
         break;
 

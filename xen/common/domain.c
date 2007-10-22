@@ -708,11 +708,9 @@ long do_vcpu_op(int cmd, int vcpuid, XEN_GUEST_HANDLE(void) arg)
     }
 
     case VCPUOP_stop_periodic_timer:
-    {
         v->periodic_period = 0;
         vcpu_force_reschedule(v);
         break;
-    }
 
     case VCPUOP_set_singleshot_timer:
     {
@@ -740,13 +738,21 @@ long do_vcpu_op(int cmd, int vcpuid, XEN_GUEST_HANDLE(void) arg)
     }
 
     case VCPUOP_stop_singleshot_timer:
-    {
         if ( v != current )
             return -EINVAL;
 
         stop_timer(&v->singleshot_timer);
+
         break;
-    }
+
+    case VCPUOP_send_nmi:
+        if ( !guest_handle_is_null(arg) )
+            return -EINVAL;
+
+        if ( !test_and_set_bool(v->nmi_pending) )
+            vcpu_kick(v);
+
+        break;
 
     default:
         rc = arch_do_vcpu_op(cmd, v, arg);
