@@ -39,11 +39,10 @@ static int next_bdf(char **str, int *seg, int *bus, int *dev, int *func)
 {
     char *token;
 
-    token = strchr(*str, ',');
-    if ( !token )
+    if ( !(*str) || !strchr(*str, ',') )
         return 0;
-    token++;
 
+    token = *str;
     *seg  = token_value(token);
     token = strchr(token, ',') + 1;
     *bus  = token_value(token);
@@ -51,8 +50,9 @@ static int next_bdf(char **str, int *seg, int *bus, int *dev, int *func)
     *dev  = token_value(token);
     token = strchr(token, ',') + 1;
     *func  = token_value(token);
+    token = strchr(token, ',');
+    *str = token ? token + 1 : NULL;
 
-    *str = token;
     return 1;
 }
 

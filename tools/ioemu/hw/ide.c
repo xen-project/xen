@@ -431,16 +431,21 @@ buffered_pio_init(void)
 }
 
 static inline void
+__buffered_pio_flush(struct pio_buffer *piobuf, IDEState *s, uint32_t pointer)
+{
+    uint8_t *buf = (uint8_t *)buffered_pio_page + piobuf->page_offset;
+    memcpy(s->data_ptr, buf, pointer);
+    s->data_ptr += pointer;
+}
+
+static inline void
 buffered_pio_flush(struct pio_buffer *piobuf)
 {
     IDEState *s = piobuf->opaque;
     uint32_t pointer = piobuf->pointer;
 
-    if (s != NULL && pointer > 0) {
-        uint8_t *buf = (uint8_t *)buffered_pio_page + piobuf->page_offset;
-        memcpy(s->data_ptr, buf, pointer);
-        s->data_ptr += pointer;
-    }
+    if (s != NULL && pointer > 0)
+        __buffered_pio_flush(piobuf, s, pointer);
 }
 
 static inline void
@@ -500,6 +505,54 @@ buffered_pio_read(IDEState *s, uint32_t addr, int size)
     piobuf->pointer = 0;
     piobuf->data_end = data_end;
     piobuf->opaque = NULL;
+}
+
+/*
+ * buffered pio reads are undone. It results in normal pio when the domain
+ * is restored.
+ * buffered pio writes are handled before saving domain.
+ * However currently pci_ide_save/load() just discards a pending transfer. XXX
+ */
+static void
+__handle_buffered_pio(struct pio_buffer *piobuf)
+{
+    IDEState *s = piobuf->opaque;
+    uint32_t pointer = piobuf->pointer;
+
+    
+    if (pointer == 0)
+        return;/* no buffered pio */
+
+    if (s != NULL) {
+        /* written data are pending in pio_buffer. process it */
+        __buffered_pio_flush(piobuf, s, pointer);
+    } else {
+        /* data are buffered for pio read in pio_buffer.
+         * undone buffering by buffered_pio_read()
+         */
+        if (pointer > s->data_ptr - s->io_buffer)
+            pointer = s->data_ptr - s->io_buffer;
+        s->data_ptr -= pointer;
+    }
+	
+    piobuf->pointer = 0;
+    piobuf->data_end = 0;
+    piobuf->opaque = NULL;
+}
+
+void
+handle_buffered_pio(void)
+{
+    struct pio_buffer *p1, *p2;
+
+    if (!buffered_pio_page)
+        return;
+
+    p1 = &buffered_pio_page->pio[PIO_BUFFER_IDE_PRIMARY];
+    p2 = &buffered_pio_page->pio[PIO_BUFFER_IDE_SECONDARY];
+
+    __handle_buffered_pio(p1);
+    __handle_buffered_pio(p2);
 }
 
 #else /* !__ia64__ */

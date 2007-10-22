@@ -11,14 +11,6 @@
 #include <asm/cpufeature.h>
 #include "mtrr.h"
 
-struct mtrr_state {
-	struct mtrr_var_range *var_ranges;
-	mtrr_type fixed_ranges[NUM_FIXED_RANGES];
-	unsigned char enabled;
-	unsigned char have_fixed;
-	mtrr_type def_type;
-};
-
 struct fixed_range_block {
 	int base_msr; /* start address of an MTRR block */
 	int ranges;   /* number of MTRRs in this block  */
@@ -32,7 +24,7 @@ static struct fixed_range_block fixed_range_blocks[] = {
 };
 
 static unsigned long smp_changes_mask;
-static struct mtrr_state mtrr_state = {};
+struct mtrr_state mtrr_state = {};
 
 /*  Get the MSR pair relating to a var range  */
 static void
@@ -88,6 +80,9 @@ void __init get_mtrr_state(void)
 	rdmsr(MTRRdefType_MSR, lo, dummy);
 	mtrr_state.def_type = (lo & 0xff);
 	mtrr_state.enabled = (lo & 0xc00) >> 10;
+
+	/* Store mtrr_cap for HVM MTRR virtualisation. */
+	rdmsrl(MTRRcap_MSR, mtrr_state.mtrr_cap);
 }
 
 /*  Some BIOS's are fucked and don't set all MTRRs the same!  */
@@ -107,6 +102,7 @@ void __init mtrr_state_warn(void)
 	printk(KERN_INFO "mtrr: corrected configuration.\n");
 }
 
+extern bool_t is_var_mtrr_overlapped(struct mtrr_state *m);
 /* Doesn't attempt to pass an error out to MTRR users
    because it's quite complicated in some cases and probably not
    worth it because the best error handling is to ignore it. */
@@ -116,6 +112,8 @@ void mtrr_wrmsr(unsigned msr, unsigned a, unsigned b)
 		printk(KERN_ERR
 			"MTRR: CPU %u: Writing MSR %x to %x:%x failed\n",
 			smp_processor_id(), msr, a, b);
+	/* Cache overlap status for efficient HVM MTRR virtualisation. */
+	mtrr_state.overlapped = is_var_mtrr_overlapped(&mtrr_state);
 }
 
 /**

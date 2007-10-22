@@ -53,7 +53,8 @@
 #ifdef __ia64__
 #define HVM_PARAM_NVRAM_FD     7
 #define HVM_PARAM_VHPT_SIZE    8
-#define HVM_NR_PARAMS          9
+#define HVM_PARAM_BUFPIOREQ_PFN	9
+#define HVM_NR_PARAMS          10
 #else
 #define HVM_NR_PARAMS          7
 #endif

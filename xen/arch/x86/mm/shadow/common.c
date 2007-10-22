@@ -880,6 +880,14 @@ static void shadow_blow_tables(struct domain *d)
     flush_tlb_mask(d->domain_dirty_cpumask);
 }
 
+void shadow_blow_tables_per_domain(struct domain *d)
+{
+    if ( shadow_mode_enabled(d) && d->vcpu[0] != NULL ) {
+        shadow_lock(d);
+        shadow_blow_tables(d);
+        shadow_unlock(d);
+    }
+}
 
 #ifndef NDEBUG
 /* Blow all shadows of all shadowed domains: this can be used to cause the

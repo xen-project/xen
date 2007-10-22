@@ -61,6 +61,12 @@ struct hvm_domain {
 
     unsigned long          vmx_apic_access_mfn;
 
+    /* If one of vcpus of this domain is in no_fill_mode or
+     * mtrr/pat between vcpus is not the same, set is_in_uc_mode
+     */
+    spinlock_t       uc_lock;
+    bool_t           is_in_uc_mode;
+
     /* Pass-through */
     struct hvm_iommu       hvm_iommu;
 };

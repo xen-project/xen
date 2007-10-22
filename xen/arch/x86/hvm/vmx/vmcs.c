@@ -756,6 +756,11 @@ void vm_resume_fail(unsigned long eflags)
     domain_crash_synchronous();
 }
 
+static void flush_cache(void *info)
+{
+    wbinvd();
+}
+
 void vmx_do_resume(struct vcpu *v)
 {
     bool_t debug_state;
@@ -767,6 +772,18 @@ void vmx_do_resume(struct vcpu *v)
     }
     else
     {
+        /* For pass-through domain, guest PCI-E device driver may leverage the
+         * "Non-Snoop" I/O, and explicitly "WBINVD" or "CFLUSH" to a RAM space.
+         * In that case, if migration occurs before "WBINVD" or "CFLUSH", need
+         * to maintain data consistency.
+         */
+        if ( !list_empty(&(domain_hvm_iommu(v->domain)->pdev_list)) )
+        {
+            int cpu = v->arch.hvm_vmx.active_cpu;
+            if ( cpu != -1 )
+                on_selected_cpus(cpumask_of_cpu(cpu), flush_cache, NULL, 1, 1);
+        }
+
         vmx_clear_vmcs(v);
         vmx_load_vmcs(v);
         hvm_migrate_timers(v);

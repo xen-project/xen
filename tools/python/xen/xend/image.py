@@ -198,6 +198,7 @@ class LinuxImageHandler(ImageHandler):
 
     ostype = "linux"
     flags = 0
+    vhpt = 0
 
     def buildDomain(self):
         store_evtchn = self.vm.getStorePort()
@@ -225,7 +226,8 @@ class LinuxImageHandler(ImageHandler):
                               cmdline        = self.cmdline,
                               ramdisk        = self.ramdisk,
                               features       = self.vm.getFeatures(),
-                              flags          = self.flags)
+                              flags          = self.flags,
+                              vhpt           = self.vhpt)
 
 class PPC_LinuxImageHandler(LinuxImageHandler):
 
@@ -533,9 +535,6 @@ class IA64_Linux_ImageHandler(LinuxImageHandler):
         LinuxImageHandler.configure(self, vmConfig)
         self.vhpt = int(vmConfig['platform'].get('vhpt',  0))
 
-    def buildDomain(self):
-        self.flags = self.vhpt
-        return LinuxImageHandler.buildDomain(self)
 
 class X86_HVM_ImageHandler(HVMImageHandler):
 

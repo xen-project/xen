@@ -95,6 +95,7 @@ struct xc_dom_image {
 
     int guest_xc;
     domid_t guest_domid;
+    int8_t vhpt_size_log2; /* for IA64 */
     int shadow_enabled;
 
     int xen_version;

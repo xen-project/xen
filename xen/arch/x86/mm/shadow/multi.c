@@ -33,6 +33,7 @@
 #include <asm/shadow.h>
 #include <asm/flushtlb.h>
 #include <asm/hvm/hvm.h>
+#include <asm/mtrr.h>
 #include "private.h"
 #include "types.h"
 
@@ -267,6 +268,11 @@ guest_walk_tables(struct vcpu *v, unsigned long va, walk_t *gw, int guest_op)
          * us reflect l2 changes later without touching the l1s. */
         int flags = (_PAGE_PRESENT|_PAGE_USER|_PAGE_RW|
                      _PAGE_ACCESSED|_PAGE_DIRTY);
+        /* propagate PWT PCD to level 1 for PSE */
+        if ( (guest_l2e_get_flags(*gw->l2e) & _PAGE_PWT) )
+            flags |= _PAGE_PWT;
+        if ( (guest_l2e_get_flags(*gw->l2e) & _PAGE_PCD) )
+            flags |= _PAGE_PCD;
         /* PSE level 2 entries use bit 12 for PAT; propagate it to bit 7
          * of the level 1 */
         if ( (guest_l2e_get_flags(*gw->l2e) & _PAGE_PSE_PAT) ) 
@@ -614,7 +620,12 @@ shadow_l4_index(mfn_t *smfn, u32 guest_index)
 
 #endif // GUEST_PAGING_LEVELS >= 4
 
+extern u32 get_pat_flags(struct vcpu *v,
+                  u32 gl1e_flags,
+                  paddr_t gpaddr,
+                  paddr_t spaddr);
 
+unsigned char pat_type_2_pte_flags(unsigned char pat_type);
 /**************************************************************************/
 /* Function which computes shadow entries from their corresponding guest
  * entries.  This is the "heart" of the shadow code. It operates using
@@ -703,6 +714,17 @@ _sh_propagate(struct vcpu *v,
         pass_thru_flags |= _PAGE_NX_BIT;
     sflags = gflags & pass_thru_flags;
 
+    /* Only change memory caching type for pass-through domain */
+    if ( (level == 1) && !list_empty(&(domain_hvm_iommu(d)->pdev_list)) ) {
+        if ( v->domain->arch.hvm_domain.is_in_uc_mode )
+            sflags |= pat_type_2_pte_flags(PAT_TYPE_UNCACHABLE);
+        else
+            sflags |= get_pat_flags(v,
+                                    gflags,
+                                    guest_l1e_get_paddr(*gp),
+                                    mfn_x(target_mfn) << PAGE_SHIFT);
+    }
+
     // Set the A&D bits for higher level shadows.
     // Higher level entries do not, strictly speaking, have dirty bits, but
     // since we use shadow linear tables, each of these entries may, at some
@@ -773,10 +795,6 @@ _sh_propagate(struct vcpu *v,
     {
         sflags |= _PAGE_USER;
     }
-
-    /* MMIO addresses should never be cached */
-    if ( p2m_is_mmio(p2mt) )
-        sflags |= _PAGE_PCD;
 
     *sp = shadow_l1e_from_mfn(target_mfn, sflags);
 

@@ -247,40 +247,6 @@ DO(xen_version)(int cmd, XEN_GUEST_HANDLE(void) arg)
     return -ENOSYS;
 }
 
-#ifndef COMPAT
-
-long register_guest_nmi_callback(unsigned long address)
-{
-    struct vcpu *v = current;
-    struct domain *d = current->domain;
-
-    if ( (d->domain_id != 0) || (v->vcpu_id != 0) )
-        return -EINVAL;
-
-    v->nmi_addr = address;
-#ifdef CONFIG_X86
-    /*
-     * If no handler was registered we can 'lose the NMI edge'. Re-assert it
-     * now.
-     */
-    if ( arch_get_nmi_reason(d) != 0 )
-        v->nmi_pending = 1;
-#endif
-
-    return 0;
-}
-
-long unregister_guest_nmi_callback(void)
-{
-    struct vcpu *v = current;
-
-    v->nmi_addr = 0;
-
-    return 0;
-}
-
-#endif
-
 DO(nmi_op)(unsigned int cmd, XEN_GUEST_HANDLE(void) arg)
 {
     struct xennmi_callback cb;

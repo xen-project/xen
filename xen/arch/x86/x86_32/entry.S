@@ -257,13 +257,15 @@ process_nmi:
         testb $1,VCPU_nmi_masked(%ebx)
         jnz  test_guest_events
         movb $0,VCPU_nmi_pending(%ebx)
-        movl VCPU_nmi_addr(%ebx),%eax
+        movzwl VCPU_nmi_cs(%ebx),%eax
+        movl VCPU_nmi_addr(%ebx),%ecx
         test %eax,%eax
         jz   test_guest_events
         movb $1,VCPU_nmi_masked(%ebx)
         sti
         leal VCPU_trap_bounce(%ebx),%edx
-        movl %eax,TRAPBOUNCE_eip(%edx)
+        movw %ax,TRAPBOUNCE_cs(%edx)
+        movl %ecx,TRAPBOUNCE_eip(%edx)
         movw $FLAT_KERNEL_CS,TRAPBOUNCE_cs(%edx)
         movb $TBF_INTERRUPT,TRAPBOUNCE_flags(%edx)
         call create_bounce_frame

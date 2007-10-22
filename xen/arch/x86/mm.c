@@ -3115,6 +3115,15 @@ long arch_memory_op(int op, XEN_GUEST_HANDLE(void) arg)
         case XENMAPSPACE_shared_info:
             if ( xatp.idx == 0 )
                 mfn = virt_to_mfn(d->shared_info);
+            /* XXX: assumption here, this is called after E820 table is build
+             * need the E820 to initialize MTRR.
+             */
+            if ( is_hvm_domain(d) ) {
+                extern void init_mtrr_in_hyper(struct vcpu *);
+                struct vcpu *vs;
+                for_each_vcpu(d, vs)
+                    init_mtrr_in_hyper(vs);
+            }
             break;
         case XENMAPSPACE_grant_table:
             spin_lock(&d->grant_table->lock);

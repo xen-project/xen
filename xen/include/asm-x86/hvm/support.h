@@ -64,6 +64,7 @@ static inline vcpu_iodata_t *get_ioreq(struct vcpu *v)
 #define DBG_LEVEL_VLAPIC_INTERRUPT  (1 << 8)
 #define DBG_LEVEL_IOAPIC            (1 << 9)
 #define DBG_LEVEL_HCALL             (1 << 10)
+#define DBG_LEVEL_MSR               (1 << 11)
 
 extern unsigned int opt_hvm_debug_level;
 #define HVM_DBG_LOG(level, _f, _a...)                                         \

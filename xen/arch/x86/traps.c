@@ -2229,6 +2229,37 @@ void __init trap_init(void)
     open_softirq(NMI_SOFTIRQ, nmi_softirq);
 }
 
+long register_guest_nmi_callback(unsigned long address)
+{
+    struct vcpu *v = current;
+    struct domain *d = current->domain;
+    struct trap_info *t = &v->arch.guest_context.trap_ctxt[TRAP_nmi];
+
+    t->vector  = TRAP_nmi;
+    t->flags   = 0;
+    t->cs      = !IS_COMPAT(d) ? FLAT_KERNEL_CS : FLAT_COMPAT_KERNEL_CS;
+    t->address = address;
+    TI_SET_IF(t, 1);
+
+    /*
+     * If no handler was registered we can 'lose the NMI edge'. Re-assert it
+     * now.
+     */
+    if ( (v->vcpu_id == 0) && (arch_get_nmi_reason(d) != 0) )
+        v->nmi_pending = 1;
+
+    return 0;
+}
+
+long unregister_guest_nmi_callback(void)
+{
+    struct vcpu *v = current;
+    struct trap_info *t = &v->arch.guest_context.trap_ctxt[TRAP_nmi];
+
+    memset(t, 0, sizeof(*t));
+
+    return 0;
+}
 
 long do_set_trap_table(XEN_GUEST_HANDLE(trap_info_t) traps)
 {
@@ -2261,6 +2292,12 @@ long do_set_trap_table(XEN_GUEST_HANDLE(trap_info_t) traps)
 
         if ( cur.address == 0 )
             break;
+
+        if ( (cur.vector == TRAP_nmi) && !TI_GET_IF(&cur) )
+        {
+            rc = -EINVAL;
+            break;
+        }
 
         fixup_guest_code_selector(current->domain, cur.cs);
 

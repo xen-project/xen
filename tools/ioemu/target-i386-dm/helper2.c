@@ -635,6 +635,7 @@ int main_loop(void)
         fprintf(logfile, "device model saving state\n");
 
         /* Pull all outstanding ioreqs through the system */
+        handle_buffered_pio();
         handle_buffered_io(env);
         main_loop_wait(1); /* For the select() on events */
 

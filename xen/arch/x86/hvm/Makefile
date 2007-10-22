@@ -7,6 +7,7 @@ obj-y += instrlen.o
 obj-y += intercept.o
 obj-y += io.o
 obj-y += irq.o
+obj-y += mtrr.o
 obj-y += platform.o
 obj-y += pmtimer.o
 obj-y += rtc.o

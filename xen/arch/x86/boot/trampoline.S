@@ -22,13 +22,22 @@ trampoline_realmode_entry:
 idt_48: .word   0, 0, 0 # base = limit = 0
 gdt_48: .word   6*8-1
         .long   bootsym_phys(trampoline_gdt)
+        .align  8
 trampoline_gdt:
-        .quad   0x0000000000000000     /* 0x0000: unused */
-        .quad   0x00cf9a000000ffff     /* 0x0008: ring 0 code, 32-bit mode */
-        .quad   0x00af9a000000ffff     /* 0x0010: ring 0 code, 64-bit mode */
-        .quad   0x00cf92000000ffff     /* 0x0018: ring 0 data */
-        .quad   0x00009a090000ffff     /* 0x0020: real-mode code @ 0x90000 */
-        .quad   0x000092090000ffff     /* 0x0028: real-mode data @ 0x90000 */
+        /* 0x0000: unused */
+        .quad   0x0000000000000000
+        /* 0x0008: ring 0 code, 32-bit mode */
+        .quad   0x00cf9a000000ffff
+        /* 0x0010: ring 0 code, 64-bit mode */
+        .quad   0x00af9a000000ffff
+        /* 0x0018: ring 0 data */
+        .quad   0x00cf92000000ffff
+        /* 0x0020: real-mode code @ BOOT_TRAMPOLINE */
+        .long   0x0000ffff | ((BOOT_TRAMPOLINE & 0x00ffff) << 16)
+        .long   0x00009a00 | ((BOOT_TRAMPOLINE & 0xff0000) >> 16)
+        /* 0x0028: real-mode data @ BOOT_TRAMPOLINE */
+        .long   0x0000ffff | ((BOOT_TRAMPOLINE & 0x00ffff) << 16)
+        .long   0x00009200 | ((BOOT_TRAMPOLINE & 0xff0000) >> 16)
 
 cpuid_ext_features:
         .long   0
@@ -142,7 +151,7 @@ trampoline_boot_cpu_entry:
         mov     %ax,%es
         mov     %ax,%ss
 
-        /* Stack grows down from 0x93000. Initialise IDT and enable irqs. */
+        /* Stack grows down from +0x3000. Initialise IDT and enable irqs. */
         mov     $0x3000,%sp
         lidt    bootsym(rm_idt)
         sti

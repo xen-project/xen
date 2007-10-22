@@ -179,6 +179,9 @@ struct vcpu_register_vcpu_info {
 typedef struct vcpu_register_vcpu_info vcpu_register_vcpu_info_t;
 DEFINE_XEN_GUEST_HANDLE(vcpu_register_vcpu_info_t);
 
+/* Send an NMI to the specified VCPU. @extra_arg == NULL. */
+#define VCPUOP_send_nmi             11
+
 #endif /* __XEN_PUBLIC_VCPU_H__ */
 
 /*

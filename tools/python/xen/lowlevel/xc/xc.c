@@ -413,6 +413,7 @@ static PyObject *pyxc_linux_build(XcObject *self,
     char *image, *ramdisk = NULL, *cmdline = "", *features = NULL;
     int flags = 0;
     int store_evtchn, console_evtchn;
+    int vhpt = 0;
     unsigned int mem_mb;
     unsigned long store_mfn = 0;
     unsigned long console_mfn = 0;
@@ -425,19 +426,22 @@ static PyObject *pyxc_linux_build(XcObject *self,
                                 "console_evtchn", "image",
                                 /* optional */
                                 "ramdisk", "cmdline", "flags",
-                                "features", NULL };
+                                "features", "vhpt", NULL };
 
-    if ( !PyArg_ParseTupleAndKeywords(args, kwds, "iiiis|ssis", kwd_list,
+    if ( !PyArg_ParseTupleAndKeywords(args, kwds, "iiiis|ssisi", kwd_list,
                                       &domid, &store_evtchn, &mem_mb,
                                       &console_evtchn, &image,
                                       /* optional */
                                       &ramdisk, &cmdline, &flags,
-                                      &features) )
+                                      &features, &vhpt) )
         return NULL;
 
     xc_dom_loginit();
     if (!(dom = xc_dom_allocate(cmdline, features)))
         return pyxc_error_to_exception();
+
+    /* for IA64 */
+    dom->vhpt_size_log2 = vhpt;
 
     if ( xc_dom_linux_build(self->xc_handle, dom, domid, mem_mb, image,
 			    ramdisk, flags, store_evtchn, &store_mfn,
@@ -539,11 +543,10 @@ static int next_bdf(char **str, int *seg, int *bus, int *dev, int *func)
 {
     char *token;
 
-    token = strchr(*str, ',');
-    if ( !token )
+    if ( !(*str) || !strchr(*str, ',') )
         return 0;
-    token++;
 
+    token = *str;
     *seg  = token_value(token);
     token = strchr(token, ',') + 1;
     *bus  = token_value(token);
@@ -551,8 +554,9 @@ static int next_bdf(char **str, int *seg, int *bus, int *dev, int *func)
     *dev  = token_value(token);
     token = strchr(token, ',') + 1;
     *func  = token_value(token);
+    token = strchr(token, ',');
+    *str = token ? token + 1 : NULL;
 
-    *str = token;
     return 1;
 }
 

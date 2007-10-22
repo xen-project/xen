@@ -1494,8 +1494,11 @@ static inline void xc_domain_shutdown_hook(int xc_handle, uint32_t domid)
 {
 	xc_ia64_save_to_nvram(xc_handle, domid);
 }
+
+void handle_buffered_pio(void);
 #else
 #define xc_domain_shutdown_hook(xc_handle, domid)	do {} while (0)
+#define handle_buffered_pio()				do {} while (0)
 #endif
 
 #endif /* VL_H */

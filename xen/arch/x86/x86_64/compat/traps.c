@@ -294,6 +294,12 @@ int compat_set_trap_table(XEN_GUEST_HANDLE(trap_info_compat_t) traps)
         if ( cur.address == 0 )
             break;
 
+        if ( (cur.vector == TRAP_nmi) && !TI_GET_IF(&cur) )
+        {
+            rc = -EINVAL;
+            break;
+        }
+
         fixup_guest_code_selector(current->domain, cur.cs);
 
         XLAT_trap_info(dst + cur.vector, &cur);
