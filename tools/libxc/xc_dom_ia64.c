@@ -260,7 +260,7 @@ int arch_setup_bootearly(struct xc_dom_image *dom)
     domctl.u.arch_setup.bp = (dom->start_info_pfn << PAGE_SHIFT)
         + sizeof(start_info_t);
     domctl.u.arch_setup.maxmem = dom->total_pages << PAGE_SHIFT;
-    domctl.u.arch_setup.vhpt_size_log2 = dom->flags;
+    domctl.u.arch_setup.vhpt_size_log2 = dom->vhpt_size_log2;
     rc = do_domctl(dom->guest_xc, &domctl);
     return rc;
 }
