@@ -31,6 +31,8 @@ typedef struct {
 #define ELF_NGREG	128 /* we really need just 72,
 			     * but let's leave some headroom */
 
+#define ALIGN_UP(addr, size) (((addr) + ((size) - 1)) & (~((size) - 1)))
+
 typedef unsigned long elf_greg_t;
 typedef elf_greg_t elf_gregset_t[ELF_NGREG];
 typedef elf_gregset_t crash_xen_core_t;
@@ -40,7 +42,17 @@ extern void ia64_elf_core_copy_regs (struct pt_regs *src, elf_gregset_t dst);
 static inline void elf_core_save_regs(ELF_Gregset *core_regs, 
                                       crash_xen_core_t *xen_core_regs)
 {
-    ia64_elf_core_copy_regs(NULL, *xen_core_regs);
+    elf_greg_t *aligned_xen_core_regs;
+
+    /*
+     * Re-align xen_core_regs to 64bit for access to avoid unaligned faults,
+     * then memmove back in place.
+     * xen_core_regs has headroom, so this is ok
+     */
+    aligned_xen_core_regs = (elf_greg_t *)ALIGN_UP((unsigned long)
+						   *xen_core_regs, 8);
+    ia64_elf_core_copy_regs(NULL, aligned_xen_core_regs);
+    memmove(*xen_core_regs, aligned_xen_core_regs, sizeof(crash_xen_core_t));
 }
 
 #endif /* __IA64_ELF_H__ */
