@@ -44,7 +44,7 @@ static const char *xs_daemon_path(void)
 	char *s = getenv("XENSTORED_PATH");
 	if (s)
 		return s;
-	if (snprintf(buf, PATH_MAX, "%s/socket",
+	if (snprintf(buf, sizeof(buf), "%s/socket",
 		     xs_daemon_rundir()) >= PATH_MAX)
 		return NULL;
 	return buf;
@@ -68,7 +68,7 @@ const char *xs_daemon_socket_ro(void)
 	const char *s = xs_daemon_path();
 	if (s == NULL)
 		return NULL;
-	if (snprintf(buf, PATH_MAX, "%s_ro", s) >= PATH_MAX)
+	if (snprintf(buf, sizeof(buf), "%s_ro", s) >= PATH_MAX)
 		return NULL;
 	return buf;
 }
@@ -79,8 +79,10 @@ const char *xs_domain_dev(void)
 	if (s)
 		return s;
 
-#ifdef __linux__
+#if defined(__linux__)
 	return "/proc/xen/xenbus";
+#elif defined(__NetBSD__)
+	return "/kern/xen/xenbus";
 #else
 	return "/dev/xen/xenbus";
 #endif
