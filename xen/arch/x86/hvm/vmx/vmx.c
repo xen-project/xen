@@ -50,6 +50,7 @@
 #include <asm/hvm/vpt.h>
 #include <public/hvm/save.h>
 #include <asm/hvm/trace.h>
+#include <stdbool.h>
 
 enum handler_return { HNDL_done, HNDL_unhandled, HNDL_exception_raised };
 
@@ -2285,6 +2286,9 @@ static int vmx_do_msr_read(struct cpu_user_regs *regs)
     u64 msr_content = 0;
     u32 ecx = regs->ecx, eax, edx;
     struct vcpu *v = current;
+    int index;
+    u64 *var_range_base = (u64*)v->arch.hvm_vcpu.mtrr.var_ranges;
+    u64 *fixed_range_base =  (u64*)v->arch.hvm_vcpu.mtrr.fixed_ranges;
 
     HVM_DBG_LOG(DBG_LEVEL_1, "ecx=%x", ecx);
 
@@ -2304,6 +2308,32 @@ static int vmx_do_msr_read(struct cpu_user_regs *regs)
         break;
     case MSR_IA32_APICBASE:
         msr_content = vcpu_vlapic(v)->hw.apic_base_msr;
+        break;
+    case MSR_IA32_CR_PAT:
+        msr_content = v->arch.hvm_vcpu.pat_cr;
+        break;
+    case MSR_MTRRcap:
+        msr_content = v->arch.hvm_vcpu.mtrr.mtrr_cap;
+        break;
+    case MSR_MTRRdefType:
+        msr_content = v->arch.hvm_vcpu.mtrr.def_type
+                        | (v->arch.hvm_vcpu.mtrr.enabled << 10);
+        break;
+    case MSR_MTRRfix64K_00000:
+        msr_content = fixed_range_base[0];
+        break;
+    case MSR_MTRRfix16K_80000:
+    case MSR_MTRRfix16K_A0000:
+        index = regs->ecx - MSR_MTRRfix16K_80000;
+        msr_content = fixed_range_base[index + 1];
+        break;
+    case MSR_MTRRfix4K_C0000...MSR_MTRRfix4K_F8000:
+        index = regs->ecx - MSR_MTRRfix4K_C0000;
+        msr_content = fixed_range_base[index + 3];
+        break;
+    case MSR_IA32_MTRR_PHYSBASE0...MSR_IA32_MTRR_PHYSMASK7:
+        index = regs->ecx - MSR_IA32_MTRR_PHYSBASE0;
+        msr_content = var_range_base[index];
         break;
     case MSR_IA32_DEBUGCTLMSR:
         if ( vmx_read_guest_msr(v, ecx, &msr_content) != 0 )
@@ -2428,11 +2458,19 @@ void vmx_vlapic_msr_changed(struct vcpu *v)
     vmx_vmcs_exit(v);
 }
 
+extern bool mtrr_var_range_msr_set(struct mtrr_state *v,
+        u32 msr, u64 msr_content);
+extern bool mtrr_fix_range_msr_set(struct mtrr_state *v,
+        int row, u64 msr_content);
+extern bool mtrr_def_type_msr_set(struct mtrr_state *v, u64 msr_content);
+extern bool pat_msr_set(u64 *pat, u64 msr);
+
 static int vmx_do_msr_write(struct cpu_user_regs *regs)
 {
     u32 ecx = regs->ecx;
     u64 msr_content;
     struct vcpu *v = current;
+    int index;
 
     HVM_DBG_LOG(DBG_LEVEL_1, "ecx=%x, eax=%x, edx=%x",
                 ecx, (u32)regs->eax, (u32)regs->edx);
@@ -2459,6 +2497,38 @@ static int vmx_do_msr_write(struct cpu_user_regs *regs)
     case MSR_IA32_APICBASE:
         vlapic_msr_set(vcpu_vlapic(v), msr_content);
         break;
+    case MSR_IA32_CR_PAT:
+        if ( !pat_msr_set(&v->arch.hvm_vcpu.pat_cr, msr_content) )
+           goto gp_fault;
+        break;
+    case MSR_MTRRdefType:
+        if ( !mtrr_def_type_msr_set(&v->arch.hvm_vcpu.mtrr, msr_content) )
+           goto gp_fault;
+        break;
+    case MSR_MTRRfix64K_00000:
+        if ( !mtrr_fix_range_msr_set(&v->arch.hvm_vcpu.mtrr, 0, msr_content) )
+            goto gp_fault;
+        break;
+    case MSR_MTRRfix16K_80000:
+    case MSR_MTRRfix16K_A0000:
+        index = regs->ecx - MSR_MTRRfix16K_80000 + 1;
+        if ( !mtrr_fix_range_msr_set(&v->arch.hvm_vcpu.mtrr,
+                                     index, msr_content) )
+            goto gp_fault;
+        break;
+    case MSR_MTRRfix4K_C0000...MSR_MTRRfix4K_F8000:
+        index = regs->ecx - MSR_MTRRfix4K_C0000 + 3;
+        if ( !mtrr_fix_range_msr_set(&v->arch.hvm_vcpu.mtrr,
+                                     index, msr_content) )
+            goto gp_fault;
+        break;
+    case MSR_IA32_MTRR_PHYSBASE0...MSR_IA32_MTRR_PHYSMASK7:
+        if ( !mtrr_var_range_msr_set(&v->arch.hvm_vcpu.mtrr,
+                                     regs->ecx, msr_content) )
+            goto gp_fault;
+        break;
+    case MSR_MTRRcap:
+        goto gp_fault;
     case MSR_IA32_DEBUGCTLMSR: {
         int i, rc = 0;
 

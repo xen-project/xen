@@ -23,6 +23,12 @@ static int disable_x86_serial_nr __devinitdata = 0;
 
 struct cpu_dev * cpu_devs[X86_VENDOR_NUM] = {};
 
+/*
+ * Default host IA32_CR_PAT value to cover all memory types.
+ * BIOS usually sets it to 0x07040600070406.
+ */
+u64 host_pat = 0x050100070406;
+
 static void default_init(struct cpuinfo_x86 * c)
 {
 	/* Not much we can do here... */
@@ -556,6 +562,9 @@ void __devinit cpu_init(void)
 		for (;;) local_irq_enable();
 	}
 	printk(KERN_INFO "Initializing CPU#%d\n", cpu);
+
+	if (cpu_has_pat)
+		wrmsrl(MSR_IA32_CR_PAT, host_pat);
 
 	*(unsigned short *)(&gdt_load[0]) = LAST_RESERVED_GDT_BYTE;
 	*(unsigned long  *)(&gdt_load[2]) = GDT_VIRT_START(current);

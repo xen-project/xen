@@ -24,6 +24,7 @@
 #include <asm/hvm/vlapic.h>
 #include <asm/hvm/vmx/vmcs.h>
 #include <asm/hvm/svm/vmcb.h>
+#include <asm/mtrr.h>
 
 #define HVM_VCPU_INIT_SIPI_SIPI_STATE_NORM          0
 #define HVM_VCPU_INIT_SIPI_SIPI_STATE_WAIT_SIPI     1
@@ -62,6 +63,12 @@ struct hvm_vcpu {
         struct arch_vmx_struct vmx;
         struct arch_svm_struct svm;
     } u;
+
+    struct mtrr_state   mtrr;
+    u64                 pat_cr;
+
+    /* Which cache mode is this VCPU in (CR0:CD/NW)? */
+    u8                  cache_mode;
 };
 
 #define ARCH_HVM_IO_WAIT         1   /* Waiting for I/O completion */

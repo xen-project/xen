@@ -226,6 +226,7 @@ int hvm_domain_initialise(struct domain *d)
 
     spin_lock_init(&d->arch.hvm_domain.pbuf_lock);
     spin_lock_init(&d->arch.hvm_domain.irq_lock);
+    spin_lock_init(&d->arch.hvm_domain.uc_lock);
 
     rc = paging_enable(d, PG_refcounts|PG_translate|PG_external);
     if ( rc != 0 )
@@ -417,27 +418,22 @@ static int hvm_load_cpu_ctxt(struct domain *d, hvm_domain_context_t *h)
 HVM_REGISTER_SAVE_RESTORE(CPU, hvm_save_cpu_ctxt, hvm_load_cpu_ctxt,
                           1, HVMSR_PER_VCPU);
 
+extern int reset_vmsr(struct mtrr_state *m, u64 *p);
+
 int hvm_vcpu_initialise(struct vcpu *v)
 {
     int rc;
 
     if ( (rc = vlapic_init(v)) != 0 )
-        return rc;
+        goto fail1;
 
     if ( (rc = hvm_funcs.vcpu_initialise(v)) != 0 )
-    {
-        vlapic_destroy(v);
-        return rc;
-    }
+        goto fail2;
 
     /* Create ioreq event channel. */
     rc = alloc_unbound_xen_event_channel(v, 0);
     if ( rc < 0 )
-    {
-        hvm_funcs.vcpu_destroy(v);
-        vlapic_destroy(v);
-        return rc;
-    }
+        goto fail3;
 
     /* Register ioreq event channel. */
     v->arch.hvm_vcpu.xen_port = rc;
@@ -448,6 +444,10 @@ int hvm_vcpu_initialise(struct vcpu *v)
 
     spin_lock_init(&v->arch.hvm_vcpu.tm_lock);
     INIT_LIST_HEAD(&v->arch.hvm_vcpu.tm_list);
+
+    rc = reset_vmsr(&v->arch.hvm_vcpu.mtrr, &v->arch.hvm_vcpu.pat_cr);
+    if ( rc != 0 )
+        goto fail3;
 
     v->arch.guest_context.user_regs.eflags = 2;
 
@@ -468,6 +468,13 @@ int hvm_vcpu_initialise(struct vcpu *v)
     }
 
     return 0;
+
+ fail3:
+    hvm_funcs.vcpu_destroy(v);
+ fail2:
+    vlapic_destroy(v);
+ fail1:
+    return rc;
 }
 
 void hvm_vcpu_destroy(struct vcpu *v)
@@ -606,6 +613,32 @@ int hvm_set_efer(uint64_t value)
     return 1;
 }
 
+extern void shadow_blow_tables_per_domain(struct domain *d);
+extern bool_t mtrr_pat_not_equal(struct vcpu *vd, struct vcpu *vs);
+
+/* Exit UC mode only if all VCPUs agree on MTRR/PAT and are not in no_fill. */
+static bool_t domain_exit_uc_mode(struct vcpu *v)
+{
+    struct domain *d = v->domain;
+    struct vcpu *vs;
+
+    for_each_vcpu ( d, vs )
+    {
+        if ( (vs == v) || !vs->is_initialised )
+            continue;
+        if ( (vs->arch.hvm_vcpu.cache_mode == NO_FILL_CACHE_MODE) ||
+             mtrr_pat_not_equal(vs, v) )
+            return 0;
+    }
+
+    return 1;
+}
+
+static void local_flush_cache(void *info)
+{
+    wbinvd();
+}
+
 int hvm_set_cr0(unsigned long value)
 {
     struct vcpu *v = current;
@@ -683,6 +716,41 @@ int hvm_set_cr0(unsigned long value)
         {
             put_page(pagetable_get_page(v->arch.guest_table));
             v->arch.guest_table = pagetable_null();
+        }
+    }
+
+    if ( !list_empty(&(domain_hvm_iommu(v->domain)->pdev_list)) )
+    {
+        if ( (value & X86_CR0_CD) && !(value & X86_CR0_NW) )
+        {
+            /* Entering no fill cache mode. */
+            spin_lock(&v->domain->arch.hvm_domain.uc_lock);
+            v->arch.hvm_vcpu.cache_mode = NO_FILL_CACHE_MODE;
+
+            if ( !v->domain->arch.hvm_domain.is_in_uc_mode )
+            {
+                /* Flush physical caches. */
+                on_each_cpu(local_flush_cache, NULL, 1, 1);
+                /* Shadow pagetables must recognise UC mode. */
+                v->domain->arch.hvm_domain.is_in_uc_mode = 1;
+                shadow_blow_tables_per_domain(v->domain);
+            }
+            spin_unlock(&v->domain->arch.hvm_domain.uc_lock);
+        }
+        else if ( !(value & (X86_CR0_CD | X86_CR0_NW)) &&
+                  (v->arch.hvm_vcpu.cache_mode == NO_FILL_CACHE_MODE) )
+        {
+            /* Exit from no fill cache mode. */
+            spin_lock(&v->domain->arch.hvm_domain.uc_lock);
+            v->arch.hvm_vcpu.cache_mode = NORMAL_CACHE_MODE;
+
+            if ( domain_exit_uc_mode(v) )
+            {
+                /* Shadow pagetables must recognise normal caching mode. */
+                v->domain->arch.hvm_domain.is_in_uc_mode = 0;
+                shadow_blow_tables_per_domain(v->domain);
+            }
+            spin_unlock(&v->domain->arch.hvm_domain.uc_lock);
         }
     }
 
