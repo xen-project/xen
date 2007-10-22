@@ -131,8 +131,6 @@ struct vcpu
     /* Bitmask of CPUs on which this VCPU may run. */
     cpumask_t        cpu_affinity;
 
-    unsigned long    nmi_addr;      /* NMI callback address. */
-
     /* Bitmask of CPUs which are holding onto this VCPU's state. */
     cpumask_t        vcpu_dirty_cpumask;
 

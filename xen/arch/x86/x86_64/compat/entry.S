@@ -131,13 +131,15 @@ compat_process_nmi:
         testb $1,VCPU_nmi_masked(%rbx)
         jnz   compat_test_guest_events
         movb  $0,VCPU_nmi_pending(%rbx)
-        movl  VCPU_nmi_addr(%rbx),%eax
+        movzwl VCPU_nmi_cs(%rbx),%eax
+        movl  VCPU_nmi_addr(%rbx),%ecx
         testl %eax,%eax
         jz    compat_test_guest_events
         movb  $1,VCPU_nmi_masked(%rbx)
         sti
         leaq  VCPU_trap_bounce(%rbx),%rdx
-        movl  %eax,TRAPBOUNCE_eip(%rdx)
+        movw  %ax,TRAPBOUNCE_cs(%rdx)
+        movl  %ecx,TRAPBOUNCE_eip(%rdx)
         movw  $FLAT_COMPAT_KERNEL_CS,TRAPBOUNCE_cs(%rdx)
         movb  $TBF_INTERRUPT,TRAPBOUNCE_flags(%rdx)
         call  compat_create_bounce_frame
