@@ -589,7 +589,7 @@ error_t cmd_parser(int key, char *arg, struct argp_state *state)
     return 0;
 }
 
-#define SHARED_MEM_FILE "/tmp/xenq-shm"
+#define SHARED_MEM_FILE "/var/run/xenq-shm"
 void alloc_qos_data(int ncpu)
 {
     int i, n, pgsize, off=0;
