@@ -147,7 +147,7 @@
 
 /* PMEN_REG */
 #define DMA_PMEN_EPM   (((u32)1) << 31)
-#define DMA_PMEN_PRS   (((u32)1) << 1)
+#define DMA_PMEN_PRS   (((u32)1) << 0)
 
 /* CCMD_REG */
 #define DMA_CCMD_INVL_GRANU_OFFSET  61
