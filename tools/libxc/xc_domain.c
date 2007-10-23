@@ -376,6 +376,21 @@ int xc_domain_setmaxmem(int xc_handle,
     return do_domctl(xc_handle, &domctl);
 }
 
+int xc_domain_pin_memory_cacheattr(int xc_handle,
+                                   uint32_t domid,
+                                   unsigned long start,
+                                   unsigned long end,
+                                   unsigned int type)
+{
+    DECLARE_DOMCTL;
+    domctl.cmd = XEN_DOMCTL_pin_mem_cacheattr;
+    domctl.domain = (domid_t)domid;
+    domctl.u.pin_mem_cacheattr.start = start;
+    domctl.u.pin_mem_cacheattr.end = end;
+    domctl.u.pin_mem_cacheattr.type = type;
+    return do_domctl(xc_handle, &domctl);
+}
+
 #if defined(__i386__) || defined(__x86_64__)
 #include "xc_e820.h"
 int xc_domain_set_memmap_limit(int xc_handle,

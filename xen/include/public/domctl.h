@@ -495,6 +495,23 @@ struct xen_domctl_ioport_mapping {
 typedef struct xen_domctl_ioport_mapping xen_domctl_ioport_mapping_t;
 DEFINE_XEN_GUEST_HANDLE(xen_domctl_ioport_mapping_t);
 
+/*
+ * Pin caching type of RAM space for x86 HVM domU.
+ */
+#define XEN_DOMCTL_pin_mem_cacheattr 41
+/* Caching types: these happen to be the same as x86 MTRR/PAT type codes. */
+#define XEN_DOMCTL_MEM_CACHEATTR_UC  0
+#define XEN_DOMCTL_MEM_CACHEATTR_WC  1
+#define XEN_DOMCTL_MEM_CACHEATTR_WT  4
+#define XEN_DOMCTL_MEM_CACHEATTR_WP  5
+#define XEN_DOMCTL_MEM_CACHEATTR_WB  6
+#define XEN_DOMCTL_MEM_CACHEATTR_UCM 7
+struct xen_domctl_pin_mem_cacheattr {
+    uint64_t start, end;
+    unsigned int type; /* XEN_DOMCTL_MEM_CACHEATTR_* */
+};
+typedef struct xen_domctl_pin_mem_cacheattr xen_domctl_pin_mem_cacheattr_t;
+DEFINE_XEN_GUEST_HANDLE(xen_domctl_pin_mem_cacheattr_t);
 
 struct xen_domctl {
     uint32_t cmd;
@@ -529,6 +546,7 @@ struct xen_domctl {
         struct xen_domctl_bind_pt_irq       bind_pt_irq;
         struct xen_domctl_memory_mapping    memory_mapping;
         struct xen_domctl_ioport_mapping    ioport_mapping;
+        struct xen_domctl_pin_mem_cacheattr pin_mem_cacheattr;
         uint8_t                             pad[128];
     } u;
 };

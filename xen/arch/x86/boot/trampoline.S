@@ -22,7 +22,6 @@ trampoline_realmode_entry:
 idt_48: .word   0, 0, 0 # base = limit = 0
 gdt_48: .word   6*8-1
         .long   bootsym_phys(trampoline_gdt)
-        .align  8
 trampoline_gdt:
         /* 0x0000: unused */
         .quad   0x0000000000000000

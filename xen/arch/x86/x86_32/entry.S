@@ -181,6 +181,7 @@ ENTRY(hypercall)
         movl  $0xDEADBEEF,%eax
         rep   stosl
         movl  %esi,%eax
+#define SHADOW_BYTES 32 /* 6 shadow parameters + EIP + hypercall # */
 #else
         /* 
          * We need shadow parameters even on non-debug builds. We depend on the
@@ -193,12 +194,14 @@ ENTRY(hypercall)
         pushl 20(%esp) # EDX
         pushl 20(%esp) # ECX
         pushl 20(%esp) # EBX
+#define SHADOW_BYTES 24 /* 6 shadow parameters */
 #endif
         cmpb  $0,tb_init_done
         je    tracing_off
         call  trace_hypercall
         /* Now restore all the registers that trace_hypercall clobbered */
-        movl  UREGS_eax+24(%esp),%eax /* Hypercall # */
+        movl  UREGS_eax+SHADOW_BYTES(%esp),%eax /* Hypercall # */
+#undef SHADOW_BYTES
 tracing_off:
         call *hypercall_table(,%eax,4)
         addl  $24,%esp     # Discard the shadow parameters

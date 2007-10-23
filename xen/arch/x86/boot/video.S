@@ -15,10 +15,10 @@
 
 #include "video.h"
 
-/* Scratch space layout. */
-#define modelist       (0x3000)
-#define vesa_glob_info (modelist + 1024)
-#define vesa_mode_info (vesa_glob_info + 1024)
+/* Scratch space layout: +0x3000 to +0x4000. */
+#define modelist       (0x3000)                  /* 2kB (256 entries) */
+#define vesa_glob_info (modelist + 0x800)        /* 1kB */
+#define vesa_mode_info (vesa_glob_info + 0x400)  /* 1kB */
 
 /* Retrieve Extended Display Identification Data. */
 #define CONFIG_FIRMWARE_EDID

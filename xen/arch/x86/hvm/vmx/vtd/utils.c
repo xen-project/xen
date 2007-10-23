@@ -64,24 +64,28 @@ int vtd_hw_check(void)
     return 0;
 }
 
-/* disable vt-d protected memory registers */
+/* Disable vt-d protected memory registers. */
 void disable_pmr(struct iommu *iommu)
 {
     unsigned long start_time, status;
+    unsigned int val;
 
-    gdprintk(XENLOG_INFO VTDPREFIX,
-        "disabling protected memory registers\n");
-
-    dmar_writel(iommu->reg, DMAR_PMEN_REG, 0);
+    val = dmar_readl(iommu->reg, DMAR_PMEN_REG);
+    dmar_writel(iommu->reg, DMAR_PMEN_REG, val & ~DMA_PMEN_EPM);
     start_time = jiffies;
-    while (1) {
+
+    for ( ; ; )
+    {
         status = dmar_readl(iommu->reg, DMAR_PMEN_REG);
         if ( (status & DMA_PMEN_PRS) == 0 )
             break;
-        if (time_after(jiffies, start_time + DMAR_OPERATION_TIMEOUT))
+        if ( time_after(jiffies, start_time + DMAR_OPERATION_TIMEOUT) )
             panic("Cannot set QIE field for queue invalidation\n");
         cpu_relax();
     }
+
+    dprintk(XENLOG_INFO VTDPREFIX,
+            "disabled protected memory registers\n");
 }
 
 #if defined(__x86_64__)

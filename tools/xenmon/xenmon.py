@@ -46,7 +46,7 @@ ST_QDATA = "%dQ" % (6*NDOMAINS + 4)
 QOS_DATA_SIZE = struct.calcsize(ST_QDATA)*NSAMPLES + struct.calcsize(ST_DOM_INFO)*NDOMAINS + struct.calcsize("4i")
 
 # location of mmaped file, hard coded right now
-SHM_FILE = "/tmp/xenq-shm"
+SHM_FILE = "/var/run/xenq-shm"
 
 # format strings
 TOTALS = 15*' ' + "%6.2f%%" + 35*' ' + "%6.2f%%"

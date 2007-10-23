@@ -758,7 +758,7 @@ void do_summary(void)
 
 	/* Print program name, current time, and number of domains */
 	strftime(time_str, TIME_STR_LEN, TIME_STR_FORMAT,
-	         localtime(&curtime.tv_sec));
+	         localtime((const time_t *)&curtime.tv_sec));
 	num_domains = xenstat_node_num_domains(cur_node);
 	ver_str = xenstat_node_xen_version(cur_node);
 	print("xentop - %s   Xen %s\n", time_str, ver_str);

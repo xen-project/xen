@@ -148,18 +148,22 @@ ENTRY(syscall_enter)
         movq  UREGS_rax(%rsp),%rax
         pushq %rax
         pushq UREGS_rip+8(%rsp)
+#define SHADOW_BYTES 16 /* Shadow EIP + shadow hypercall # */
+#else
+#define SHADOW_BYTES 0  /* No on-stack shadow state */
 #endif
         cmpb  $0,tb_init_done(%rip)
         je    tracing_off
         call  trace_hypercall
         /* Now restore all the registers that trace_hypercall clobbered */
-        movq  UREGS_rax(%rsp),%rax   /* Hypercall #  */
-        movq  UREGS_rdi(%rsp),%rdi   /* Arg 1        */
-        movq  UREGS_rsi(%rsp),%rsi   /* Arg 2        */
-        movq  UREGS_rdx(%rsp),%rdx   /* Arg 3        */
-        movq  UREGS_r10(%rsp),%rcx   /* Arg 4        */
-        movq  UREGS_rdi(%rsp),%r8    /* Arg 5        */
-        movq  UREGS_rbp(%rsp),%r9    /* Arg 6        */
+        movq  UREGS_rax+SHADOW_BYTES(%rsp),%rax   /* Hypercall #  */
+        movq  UREGS_rdi+SHADOW_BYTES(%rsp),%rdi   /* Arg 1        */
+        movq  UREGS_rsi+SHADOW_BYTES(%rsp),%rsi   /* Arg 2        */
+        movq  UREGS_rdx+SHADOW_BYTES(%rsp),%rdx   /* Arg 3        */
+        movq  UREGS_r10+SHADOW_BYTES(%rsp),%rcx   /* Arg 4        */
+        movq  UREGS_rdi+SHADOW_BYTES(%rsp),%r8    /* Arg 5        */
+        movq  UREGS_rbp+SHADOW_BYTES(%rsp),%r9    /* Arg 6        */
+#undef SHADOW_BYTES
 tracing_off:
         leaq  hypercall_table(%rip),%r10
         PERFC_INCR(PERFC_hypercalls, %rax, %rbx)

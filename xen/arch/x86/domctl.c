@@ -23,6 +23,7 @@
 #include <asm/irq.h>
 #include <asm/hvm/hvm.h>
 #include <asm/hvm/support.h>
+#include <asm/hvm/cacheattr.h>
 #include <asm/processor.h>
 #include <xsm/xsm.h>
 #include <xen/list.h>
@@ -677,6 +678,24 @@ long arch_do_domctl(
         rcu_unlock_domain(d);
     }
     break;    
+
+    case XEN_DOMCTL_pin_mem_cacheattr:
+    {
+        struct domain *d;
+
+        ret = -ESRCH;
+        d = rcu_lock_domain_by_id(domctl->domain);
+        if ( d == NULL )
+            break;
+
+        ret = hvm_set_mem_pinned_cacheattr(
+            d, domctl->u.pin_mem_cacheattr.start,
+            domctl->u.pin_mem_cacheattr.end,
+            domctl->u.pin_mem_cacheattr.type);
+
+        rcu_unlock_domain(d);
+    }
+    break;
 
     default:
         ret = -ENOSYS;

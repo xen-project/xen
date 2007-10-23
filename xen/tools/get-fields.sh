@@ -1,4 +1,3 @@
-#!/bin/sh
 test -n "$1" -a -n "$2" -a -n "$3"
 set -ef
 

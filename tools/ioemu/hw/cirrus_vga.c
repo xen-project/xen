@@ -2565,6 +2565,12 @@ static void *set_vram_mapping(unsigned long begin, unsigned long end)
         return NULL;
     }
 
+    (void)xc_domain_pin_memory_cacheattr(
+        xc_handle, domid,
+        begin >> TARGET_PAGE_BITS,
+        end >> TARGET_PAGE_BITS,
+        XEN_DOMCTL_MEM_CACHEATTR_WB);
+
     vram_pointer = xc_map_foreign_pages(xc_handle, domid,
                                         PROT_READ|PROT_WRITE,
                                         extent_start, nr_extents);

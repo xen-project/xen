@@ -44,6 +44,7 @@
 #include <asm/hvm/hvm.h>
 #include <asm/hvm/vpt.h>
 #include <asm/hvm/support.h>
+#include <asm/hvm/cacheattr.h>
 #include <public/sched.h>
 #include <public/hvm/ioreq.h>
 #include <public/version.h>
@@ -228,20 +229,32 @@ int hvm_domain_initialise(struct domain *d)
     spin_lock_init(&d->arch.hvm_domain.irq_lock);
     spin_lock_init(&d->arch.hvm_domain.uc_lock);
 
+    hvm_init_cacheattr_region_list(d);
+
     rc = paging_enable(d, PG_refcounts|PG_translate|PG_external);
     if ( rc != 0 )
-        return rc;
+        goto fail1;
 
     vpic_init(d);
 
     rc = vioapic_init(d);
     if ( rc != 0 )
-        return rc;
+        goto fail1;
 
     hvm_init_ioreq_page(d, &d->arch.hvm_domain.ioreq);
     hvm_init_ioreq_page(d, &d->arch.hvm_domain.buf_ioreq);
 
-    return hvm_funcs.domain_initialise(d);
+    rc = hvm_funcs.domain_initialise(d);
+    if ( rc != 0 )
+        goto fail2;
+
+    return 0;
+
+ fail2:
+    vioapic_deinit(d);
+ fail1:
+    hvm_destroy_cacheattr_region_list(d);
+    return rc;
 }
 
 void hvm_domain_relinquish_resources(struct domain *d)
@@ -259,6 +272,7 @@ void hvm_domain_destroy(struct domain *d)
 {
     hvm_funcs.domain_destroy(d);
     vioapic_deinit(d);
+    hvm_destroy_cacheattr_region_list(d);
 }
 
 static int hvm_save_cpu_ctxt(struct domain *d, hvm_domain_context_t *h)

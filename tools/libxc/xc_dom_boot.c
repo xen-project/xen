@@ -92,7 +92,9 @@ int xc_dom_compat_check(struct xc_dom_image *dom)
     char *item, *ptr;
     int match, found = 0;
 
-    strcpy(xen_caps, dom->xen_caps);
+    strncpy(xen_caps, dom->xen_caps, XEN_CAPABILITIES_INFO_LEN - 1);
+    xen_caps[XEN_CAPABILITIES_INFO_LEN - 1] = '\0';
+
     for ( item = strtok_r(xen_caps, " ", &ptr);
           item != NULL ; item = strtok_r(NULL, " ", &ptr) )
     {

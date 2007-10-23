@@ -93,7 +93,7 @@
 
 #define CONFIG_DMA_BITSIZE 32
 
-#define BOOT_TRAMPOLINE 0x94000
+#define BOOT_TRAMPOLINE 0x8c000
 #define bootsym_phys(sym)                                 \
     (((unsigned long)&(sym)-(unsigned long)&trampoline_start)+BOOT_TRAMPOLINE)
 #define bootsym(sym)                                      \

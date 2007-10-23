@@ -167,7 +167,7 @@ __start:
         mov     $trampoline_end - trampoline_start,%ecx
         rep     movsb
 
-        mov     $0x98000,%esp
+        mov     $0x90000,%esp
         call    cmdline_parse_early
 
         /* Jump into the relocated trampoline. */
