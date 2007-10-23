@@ -33,6 +33,7 @@
 #include <asm/shadow.h>
 #include <asm/flushtlb.h>
 #include <asm/hvm/hvm.h>
+#include <asm/hvm/cacheattr.h>
 #include <asm/mtrr.h>
 #include "private.h"
 #include "types.h"
@@ -715,8 +716,14 @@ _sh_propagate(struct vcpu *v,
     sflags = gflags & pass_thru_flags;
 
     /* Only change memory caching type for pass-through domain */
-    if ( (level == 1) && !list_empty(&(domain_hvm_iommu(d)->pdev_list)) ) {
-        if ( v->domain->arch.hvm_domain.is_in_uc_mode )
+    if ( (level == 1) && is_hvm_domain(d) &&
+         !list_empty(&(domain_hvm_iommu(d)->pdev_list)) )
+    {
+        unsigned int type;
+        if ( hvm_get_mem_pinned_cacheattr(d, gfn_x(guest_l1e_get_gfn(*gp)),
+                                          &type) )
+            sflags |= pat_type_2_pte_flags(type);
+        else if ( v->domain->arch.hvm_domain.is_in_uc_mode )
             sflags |= pat_type_2_pte_flags(PAT_TYPE_UNCACHABLE);
         else
             sflags |= get_pat_flags(v,

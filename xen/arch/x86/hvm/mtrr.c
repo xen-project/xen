@@ -26,6 +26,7 @@
 #include <stdbool.h>
 #include <asm/mtrr.h>
 #include <asm/hvm/support.h>
+#include <asm/hvm/cacheattr.h>
 
 /* Xen holds the native MTRR MSRs */
 extern struct mtrr_state mtrr_state;
@@ -682,6 +683,86 @@ bool_t mtrr_pat_not_equal(struct vcpu *vd, struct vcpu *vs)
     /* Test PAT. */
     if ( vd->arch.hvm_vcpu.pat_cr != vs->arch.hvm_vcpu.pat_cr )
         return 1;
+
+    return 0;
+}
+
+void hvm_init_cacheattr_region_list(
+    struct domain *d)
+{
+    INIT_LIST_HEAD(&d->arch.hvm_domain.pinned_cacheattr_ranges);
+}
+
+void hvm_destroy_cacheattr_region_list(
+    struct domain *d)
+{
+    struct list_head *head = &d->arch.hvm_domain.pinned_cacheattr_ranges;
+    struct hvm_mem_pinned_cacheattr_range *range;
+
+    while ( !list_empty(head) )
+    {
+        range = list_entry(head->next,
+                           struct hvm_mem_pinned_cacheattr_range,
+                           list);
+        list_del(&range->list);
+        xfree(range);
+    }
+}
+
+int hvm_get_mem_pinned_cacheattr(
+    struct domain *d,
+    unsigned long guest_fn,
+    unsigned int *type)
+{
+    struct hvm_mem_pinned_cacheattr_range *range;
+
+    *type = 0;
+
+    if ( !is_hvm_domain(d) )
+        return 0;
+
+    list_for_each_entry_rcu ( range,
+                              &d->arch.hvm_domain.pinned_cacheattr_ranges,
+                              list )
+    {
+        if ( (guest_fn >= range->start) && (guest_fn <= range->end) )
+        {
+            *type = range->type;
+            return 1;
+        }
+    }
+
+    return 0;
+}
+
+int hvm_set_mem_pinned_cacheattr(
+    struct domain *d,
+    unsigned long gfn_start,
+    unsigned long gfn_end,
+    unsigned int  type)
+{
+    struct hvm_mem_pinned_cacheattr_range *range;
+
+    if ( !((type == PAT_TYPE_UNCACHABLE) ||
+           (type == PAT_TYPE_WRCOMB) ||
+           (type == PAT_TYPE_WRTHROUGH) ||
+           (type == PAT_TYPE_WRPROT) ||
+           (type == PAT_TYPE_WRBACK) ||
+           (type == PAT_TYPE_UC_MINUS)) ||
+         !is_hvm_domain(d) )
+        return -EINVAL;
+
+    range = xmalloc(struct hvm_mem_pinned_cacheattr_range);
+    if ( range == NULL )
+        return -ENOMEM;
+
+    memset(range, 0, sizeof(*range));
+
+    range->start = gfn_start;
+    range->end = gfn_end;
+    range->type = type;
+
+    list_add_rcu(&range->list, &d->arch.hvm_domain.pinned_cacheattr_ranges);
 
     return 0;
 }
