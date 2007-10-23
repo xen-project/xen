@@ -584,7 +584,9 @@ int arch_domain_create(struct domain *d)
 		goto fail_nomem;
 
 	memset(&d->arch.mm, 0, sizeof(d->arch.mm));
+	d->arch.relres = RELRES_not_started;
 	d->arch.mm_teardown_offset = 0;
+	INIT_LIST_HEAD(&d->arch.relmem_list);
 
 	if ((d->arch.mm.pgd = pgd_alloc(&d->arch.mm)) == NULL)
 	    goto fail_nomem;
@@ -1495,13 +1497,14 @@ int arch_set_info_guest(struct vcpu *v, vcpu_guest_context_u c)
 	return rc;
 }
 
-static void relinquish_memory(struct domain *d, struct list_head *list)
+static int relinquish_memory(struct domain *d, struct list_head *list)
 {
     struct list_head *ent;
     struct page_info *page;
 #ifndef __ia64__
     unsigned long     x, y;
 #endif
+    int               ret = 0;
 
     /* Use a recursive lock, as we may enter 'free_domheap_page'. */
     spin_lock_recursive(&d->page_alloc_lock);
@@ -1514,6 +1517,7 @@ static void relinquish_memory(struct domain *d, struct list_head *list)
         {
             /* Couldn't get a reference -- someone is freeing this page. */
             ent = ent->next;
+            list_move_tail(&page->list, &d->arch.relmem_list);
             continue;
         }
 
@@ -1550,35 +1554,72 @@ static void relinquish_memory(struct domain *d, struct list_head *list)
         /* Follow the list chain and /then/ potentially free the page. */
         ent = ent->next;
         BUG_ON(get_gpfn_from_mfn(page_to_mfn(page)) != INVALID_M2P_ENTRY);
+        list_move_tail(&page->list, &d->arch.relmem_list);
         put_page(page);
+
+        if (hypercall_preempt_check()) {
+                ret = -EAGAIN;
+                goto out;
+        }
     }
 
+    list_splice_init(&d->arch.relmem_list, list);
+
+ out:
     spin_unlock_recursive(&d->page_alloc_lock);
+    return ret;
 }
 
 int domain_relinquish_resources(struct domain *d)
 {
-    int ret;
-    /* Relinquish guest resources for VT-i domain. */
-    if (d->arch.is_vti)
-	    vmx_relinquish_guest_resources(d);
+	int ret = 0;
 
-    /* Tear down shadow mode stuff. */
-    ret = mm_teardown(d);
-    if (ret != 0)
-        return ret;
+	switch (d->arch.relres) {
+	case RELRES_not_started:
+		/* Relinquish guest resources for VT-i domain. */
+		if (d->arch.is_vti)
+			vmx_relinquish_guest_resources(d);
+		d->arch.relres = RELRES_mm_teardown;
+		/*fallthrough*/
 
-    /* Relinquish every page of memory. */
-    relinquish_memory(d, &d->xenpage_list);
-    relinquish_memory(d, &d->page_list);
+	case RELRES_mm_teardown:
+		/* Tear down shadow mode stuff. */
+		ret = mm_teardown(d);
+		if (ret != 0)
+			return ret;
+		d->arch.relres = RELRES_xen;
+		/* fallthrough */
 
-    if (d->arch.is_vti && d->arch.sal_data)
-	    xfree(d->arch.sal_data);
+	case RELRES_xen:
+		/* Relinquish every xen page of memory. */
+		ret = relinquish_memory(d, &d->xenpage_list);
+		if (ret != 0)
+			return ret;
+		d->arch.relres = RELRES_dom;
+		/* fallthrough */
 
-    /* Free page used by xen oprofile buffer */
-    free_xenoprof_pages(d);
+	case RELRES_dom:
+		/* Relinquish every domain page of memory. */
+		ret = relinquish_memory(d, &d->page_list);
+		if (ret != 0)
+			return ret;
+		d->arch.relres = RELRES_done;
+		/* fallthrough */    
 
-    return 0;
+	case RELRES_done:
+		break;
+
+	default:
+		BUG();
+	}
+
+	if (d->arch.is_vti && d->arch.sal_data)
+		xfree(d->arch.sal_data);
+
+	/* Free page used by xen oprofile buffer */
+	free_xenoprof_pages(d);
+
+	return 0;
 }
 
 unsigned long

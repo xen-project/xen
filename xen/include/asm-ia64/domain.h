@@ -192,7 +192,17 @@ struct arch_domain {
 #endif
 
     /* for domctl_destroy_domain continuation */
+    enum {
+        RELRES_not_started,
+        RELRES_mm_teardown,
+        RELRES_xen,
+        RELRES_dom,
+        RELRES_done,
+    } relres;
+    /* Continuable mm_teardown() */
     unsigned long mm_teardown_offset;
+    /* Continuable domain_relinquish_resources() */
+    struct list_head relmem_list;
 };
 #define INT_ENABLE_OFFSET(v) 		  \
     (sizeof(vcpu_info_t) * (v)->vcpu_id + \
