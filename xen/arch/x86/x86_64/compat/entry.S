@@ -47,6 +47,7 @@ ENTRY(compat_hypercall)
         movl  UREGS_rax(%rsp),%eax
         pushq %rax
         pushq UREGS_rip+8(%rsp)
+#define SHADOW_BYTES 16 /* Shadow EIP + shadow hypercall # */
 #else
         /* Relocate argument registers and zero-extend to 64 bits. */
         movl  %eax,%eax              /* Hypercall #  */
@@ -55,18 +56,20 @@ ENTRY(compat_hypercall)
         movl  %edi,%r8d              /* Arg 5        */
         movl  %ebp,%r9d              /* Arg 6        */
         movl  UREGS_rbx(%rsp),%edi   /* Arg 1        */
+#define SHADOW_BYTES 0  /* No on-stack shadow state */
 #endif
         cmpb  $0,tb_init_done(%rip)
         je    compat_tracing_off
         call  trace_hypercall
         /* Now restore all the registers that trace_hypercall clobbered */
-        movl  UREGS_rax(%rsp),%eax   /* Hypercall #  */
-        movl  UREGS_rbx(%rsp),%edi   /* Arg 1        */
-        movl  UREGS_rcx(%rsp),%esi   /* Arg 2        */
-        movl  UREGS_rdx(%rsp),%edx   /* Arg 3        */
-        movl  UREGS_rsi(%rsp),%ecx   /* Arg 4        */
-        movl  UREGS_rdi(%rsp),%r8d   /* Arg 5        */
-        movl  UREGS_rbp(%rsp),%r9d   /* Arg 6        */
+        movl  UREGS_rax+SHADOW_BYTES(%rsp),%eax   /* Hypercall #  */
+        movl  UREGS_rbx+SHADOW_BYTES(%rsp),%edi   /* Arg 1        */
+        movl  UREGS_rcx+SHADOW_BYTES(%rsp),%esi   /* Arg 2        */
+        movl  UREGS_rdx+SHADOW_BYTES(%rsp),%edx   /* Arg 3        */
+        movl  UREGS_rsi+SHADOW_BYTES(%rsp),%ecx   /* Arg 4        */
+        movl  UREGS_rdi+SHADOW_BYTES(%rsp),%r8d   /* Arg 5        */
+        movl  UREGS_rbp+SHADOW_BYTES(%rsp),%r9d   /* Arg 6        */
+#undef SHADOW_BYTES
 compat_tracing_off:
         leaq  compat_hypercall_table(%rip),%r10
         PERFC_INCR(PERFC_hypercalls, %rax, %rbx)
