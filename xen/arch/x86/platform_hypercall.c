@@ -293,34 +293,44 @@ ret_t do_platform_op(XEN_GUEST_HANDLE(xen_platform_op_t) u_xenpf_op)
 
     case XENPF_getidletime:
     {
-        uint32_t i, nr_cpus;
-        uint64_t idletime;
+        uint32_t cpu;
+        uint64_t idletime, now = NOW();
         struct vcpu *v;
+        struct xenctl_cpumap ctlmap;
+        cpumask_t cpumap;
         XEN_GUEST_HANDLE(uint64_t) idletimes;
 
         ret = -ENOSYS;
         if ( cpufreq_controller != FREQCTL_dom0_kernel )
             break;
 
+        memset(&ctlmap, 0, sizeof(ctlmap));
+        ctlmap.nr_cpus  = op->u.getidletime.cpumap_nr_cpus;
+        ctlmap.bitmap.p = op->u.getidletime.cpumap_bitmap.p;
+        xenctl_cpumap_to_cpumask(&cpumap, &ctlmap);
         guest_from_compat_handle(idletimes, op->u.getidletime.idletime);
-        nr_cpus = min_t(uint32_t, op->u.getidletime.max_cpus, NR_CPUS);
 
-        for ( i = 0; i < nr_cpus; i++ )
+        for_each_cpu_mask ( cpu, cpumap )
         {
-            /* Assume no holes in idle-vcpu map. */
-            if ( (v = idle_vcpu[i]) == NULL )
-                break;
-
-            idletime = v->runstate.time[RUNSTATE_running];
-            if ( v->is_running )
-                idletime += NOW() - v->runstate.state_entry_time;
+            if ( (v = idle_vcpu[cpu]) != NULL )
+            {
+                idletime = v->runstate.time[RUNSTATE_running];
+                if ( v->is_running )
+                    idletime += now - v->runstate.state_entry_time;
+            }
+            else
+            {
+                idletime = 0;
+                cpu_clear(cpu, cpumap);
+            }
 
             ret = -EFAULT;
-            if ( copy_to_guest_offset(idletimes, i, &idletime, 1) )
+            if ( copy_to_guest_offset(idletimes, cpu, &idletime, 1) )
                 goto out;
         }
 
-        op->u.getidletime.nr_cpus = i;
+        op->u.getidletime.now = now;
+        cpumask_to_xenctl_cpumap(&ctlmap, &cpumap);
         ret = copy_to_guest(u_xenpf_op, op, 1) ? -EFAULT : 0;
     }
     break;

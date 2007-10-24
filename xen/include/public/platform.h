@@ -174,13 +174,27 @@ struct xenpf_change_freq {
 typedef struct xenpf_change_freq xenpf_change_freq_t;
 DEFINE_XEN_GUEST_HANDLE(xenpf_change_freq_t);
 
+/*
+ * Get idle times (nanoseconds since boot) for physical CPUs specified in the
+ * @cpumap_bitmap with range [0..@cpumap_nr_cpus-1]. The @idletime array is
+ * indexed by CPU number; only entries with the corresponding @cpumap_bitmap
+ * bit set are written to. On return, @cpumap_bitmap is modified so that any
+ * non-existent CPUs are cleared. Such CPUs have their @idletime array entry
+ * cleared.
+ */
 #define XENPF_getidletime         53
 struct xenpf_getidletime {
-    /* IN variables. */
-    uint32_t max_cpus;
+    /* IN/OUT variables */
+    /* IN: CPUs to interrogate; OUT: subset of IN which are present */
+    XEN_GUEST_HANDLE(uint8_t) cpumap_bitmap;
+    /* IN variables */
+    /* Size of cpumap bitmap. */
+    uint32_t cpumap_nr_cpus;
+    /* Must be indexable for every cpu in cpumap_bitmap. */
     XEN_GUEST_HANDLE(uint64_t) idletime;
-    /* OUT variables. */
-    uint32_t nr_cpus;
+    /* OUT variables */
+    /* System time when the idletime snapshots were taken. */
+    uint64_t now;
 };
 typedef struct xenpf_getidletime xenpf_getidletime_t;
 DEFINE_XEN_GUEST_HANDLE(xenpf_getidletime_t);
