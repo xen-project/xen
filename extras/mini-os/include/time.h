@@ -37,8 +37,8 @@ typedef s64 s_time_t;
 #define MICROSECS(_us)          (((s_time_t)(_us)) * 1000UL )
 #define Time_Max                ((s_time_t) 0x7fffffffffffffffLL)
 #define FOREVER                 Time_Max
-#define NSEC_TO_USEC(_nsec)     (_nsec / 1000UL)
-#define NSEC_TO_SEC(_nsec)      (_nsec / 1000000000ULL)
+#define NSEC_TO_USEC(_nsec)     ((_nsec) / 1000UL)
+#define NSEC_TO_SEC(_nsec)      ((_nsec) / 1000000000ULL)
 
 /* wall clock time  */
 typedef long time_t;
