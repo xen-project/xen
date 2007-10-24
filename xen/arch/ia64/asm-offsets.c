@@ -78,6 +78,7 @@ void foo(void)
 	BLANK();
 
 	DEFINE(IA64_DOMAIN_SHADOW_BITMAP_OFFSET, offsetof (struct domain, arch.shadow_bitmap));
+	DEFINE(IA64_DOMAIN_RID_BITS_OFFSET, offsetof (struct domain, arch.rid_bits));
 
 	BLANK();
 
