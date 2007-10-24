@@ -264,11 +264,9 @@ sysenter_eflags_saved:
         movl  $TRAP_syscall,4(%rsp)
         SAVE_ALL
         GET_CURRENT(%rbx)
-        movq  VCPU_sysexit_addr(%rbx),%rax
-        movzwl VCPU_sysexit_sel(%rbx),%edx
         cmpb  $0,VCPU_sysenter_disables_events(%rbx)
-        movq  %rax,UREGS_rip(%rsp)
-        movl  %edx,UREGS_cs(%rsp)
+        movq  $0,UREGS_rip(%rsp) /* null rip */
+        movl  $3,UREGS_cs(%rsp)  /* ring 3 null cs */
         movq  VCPU_sysenter_addr(%rbx),%rax
         setne %cl
         leaq  VCPU_trap_bounce(%rbx),%rdx

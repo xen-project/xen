@@ -65,13 +65,6 @@
 #define CALLBACKTYPE_sysenter              5
 
 /*
- * x86/64 hypervisor: used to fill a sysenter frame's return address, if the
- * guest desires to have a non-NULL value there. If the guest kernel is
- * 64-bit then the sysexit code selector is always set to FLAT_USER_CS32.
- */
-#define CALLBACKTYPE_sysexit               6
-
-/*
  * x86/64 hypervisor: Syscall by 32-bit guest app on AMD CPUs
  *                    ('32-on-32-on-64', '32-on-64-on-64')
  */

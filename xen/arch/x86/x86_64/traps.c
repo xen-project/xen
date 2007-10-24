@@ -431,11 +431,6 @@ static long register_guest_callback(struct callback_register *reg)
             !!(reg->flags & CALLBACKF_mask_events);
         break;
 
-    case CALLBACKTYPE_sysexit:
-        v->arch.sysexit_eip = reg->address;
-        v->arch.sysexit_cs = FLAT_USER_CS32;
-        break;
-
     case CALLBACKTYPE_nmi:
         ret = register_guest_nmi_callback(reg->address);
         break;
@@ -459,7 +454,6 @@ static long unregister_guest_callback(struct callback_unregister *unreg)
     case CALLBACKTYPE_syscall:
     case CALLBACKTYPE_syscall32:
     case CALLBACKTYPE_sysenter:
-    case CALLBACKTYPE_sysexit:
         ret = -EINVAL;
         break;
 

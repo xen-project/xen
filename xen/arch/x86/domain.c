@@ -418,10 +418,6 @@ int vcpu_initialise(struct vcpu *v)
     v->arch.perdomain_ptes =
         d->arch.mm_perdomain_pt + (v->vcpu_id << GDT_LDT_VCPU_SHIFT);
 
-#ifdef __x86_64__
-    v->arch.sysexit_cs = 3;
-#endif
-
     return (is_pv_32on64_vcpu(v) ? setup_compat_l4(v) : 0);
 }
 

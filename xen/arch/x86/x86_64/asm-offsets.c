@@ -79,8 +79,6 @@ void __dummy__(void)
     OFFSET(VCPU_sysenter_sel, struct vcpu, arch.sysenter_callback_cs);
     OFFSET(VCPU_sysenter_disables_events, struct vcpu,
            arch.sysenter_disables_events);
-    OFFSET(VCPU_sysexit_addr, struct vcpu, arch.sysexit_eip);
-    OFFSET(VCPU_sysexit_sel, struct vcpu, arch.sysexit_cs);
     OFFSET(VCPU_gp_fault_addr, struct vcpu,
            arch.guest_context.trap_ctxt[TRAP_gp_fault].address);
     OFFSET(VCPU_gp_fault_sel, struct vcpu,

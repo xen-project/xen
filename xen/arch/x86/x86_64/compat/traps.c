@@ -179,11 +179,6 @@ static long compat_register_guest_callback(
             (reg->flags & CALLBACKF_mask_events) != 0;
         break;
 
-    case CALLBACKTYPE_sysexit:
-        v->arch.sysexit_cs  = reg->address.cs | 3;
-        v->arch.sysexit_eip = reg->address.eip;
-        break;
-
     case CALLBACKTYPE_nmi:
         ret = register_guest_nmi_callback(reg->address.eip);
         break;
@@ -207,7 +202,6 @@ static long compat_unregister_guest_callback(
     case CALLBACKTYPE_failsafe:
     case CALLBACKTYPE_syscall32:
     case CALLBACKTYPE_sysenter:
-    case CALLBACKTYPE_sysexit:
         ret = -EINVAL;
         break;
 

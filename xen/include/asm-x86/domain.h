@@ -303,10 +303,8 @@ struct arch_vcpu
     struct trap_bounce int80_bounce;
     unsigned long      syscall32_callback_eip;
     unsigned long      sysenter_callback_eip;
-    unsigned long      sysexit_eip;
     unsigned short     syscall32_callback_cs;
     unsigned short     sysenter_callback_cs;
-    unsigned short     sysexit_cs;
     bool_t             syscall32_disables_events;
     bool_t             sysenter_disables_events;
 #endif
