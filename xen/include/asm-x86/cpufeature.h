@@ -155,7 +155,7 @@
 #define cpu_has_pge		1
 #define cpu_has_pat		1
 #define cpu_has_apic		boot_cpu_has(X86_FEATURE_APIC)
-#define cpu_has_sep		0
+#define cpu_has_sep		boot_cpu_has(X86_FEATURE_SEP)
 #define cpu_has_mtrr		1
 #define cpu_has_mmx		1
 #define cpu_has_fxsr		1

@@ -22,6 +22,7 @@
 #include <public/callback.h>
 
 asmlinkage void syscall_enter(void);
+asmlinkage void sysenter_entry(void);
 asmlinkage void compat_hypercall(void);
 asmlinkage void int80_direct_trap(void);
 
@@ -350,12 +351,21 @@ void __devinit subarch_percpu_traps_init(void)
 
     /* Trampoline for SYSCALL entry from long mode. */
     stack = &stack[IST_MAX * PAGE_SIZE]; /* Skip the IST stacks. */
-    wrmsr(MSR_LSTAR, (unsigned long)stack, ((unsigned long)stack>>32));
+    wrmsrl(MSR_LSTAR, (unsigned long)stack);
     stack += write_stack_trampoline(stack, stack_bottom, FLAT_KERNEL_CS64);
 
+    if ( boot_cpu_data.x86_vendor == X86_VENDOR_INTEL )
+    {
+        /* SYSENTER entry. */
+        wrmsrl(MSR_IA32_SYSENTER_ESP, (unsigned long)stack_bottom);
+        wrmsrl(MSR_IA32_SYSENTER_EIP, (unsigned long)sysenter_entry);
+        wrmsr(MSR_IA32_SYSENTER_CS, __HYPERVISOR_CS, 0);
+    }
+
     /* Trampoline for SYSCALL entry from compatibility mode. */
-    wrmsr(MSR_CSTAR, (unsigned long)stack, ((unsigned long)stack>>32));
-    stack += write_stack_trampoline(stack, stack_bottom, FLAT_KERNEL_CS32);
+    stack = (char *)L1_CACHE_ALIGN((unsigned long)stack);
+    wrmsrl(MSR_CSTAR, (unsigned long)stack);
+    stack += write_stack_trampoline(stack, stack_bottom, FLAT_USER_CS32);
 
     /* Common SYSCALL parameters. */
     wrmsr(MSR_STAR, 0, (FLAT_RING3_CS32<<16) | __HYPERVISOR_CS);
@@ -379,6 +389,9 @@ static long register_guest_callback(struct callback_register *reg)
 {
     long ret = 0;
     struct vcpu *v = current;
+
+    if ( !is_canonical_address(reg->address) )
+        return -EINVAL;
 
     switch ( reg->type )
     {
@@ -406,6 +419,23 @@ static long register_guest_callback(struct callback_register *reg)
                       &v->arch.guest_context.flags);
         break;
 
+    case CALLBACKTYPE_syscall32:
+        v->arch.syscall32_callback_eip = reg->address;
+        v->arch.syscall32_disables_events =
+            !!(reg->flags & CALLBACKF_mask_events);
+        break;
+
+    case CALLBACKTYPE_sysenter:
+        v->arch.sysenter_callback_eip = reg->address;
+        v->arch.sysenter_disables_events =
+            !!(reg->flags & CALLBACKF_mask_events);
+        break;
+
+    case CALLBACKTYPE_sysexit:
+        v->arch.sysexit_eip = reg->address;
+        v->arch.sysexit_cs = FLAT_USER_CS32;
+        break;
+
     case CALLBACKTYPE_nmi:
         ret = register_guest_nmi_callback(reg->address);
         break;
@@ -427,6 +457,9 @@ static long unregister_guest_callback(struct callback_unregister *unreg)
     case CALLBACKTYPE_event:
     case CALLBACKTYPE_failsafe:
     case CALLBACKTYPE_syscall:
+    case CALLBACKTYPE_syscall32:
+    case CALLBACKTYPE_sysenter:
+    case CALLBACKTYPE_sysexit:
         ret = -EINVAL;
         break;
 

@@ -418,6 +418,10 @@ int vcpu_initialise(struct vcpu *v)
     v->arch.perdomain_ptes =
         d->arch.mm_perdomain_pt + (v->vcpu_id << GDT_LDT_VCPU_SHIFT);
 
+#ifdef __x86_64__
+    v->arch.sysexit_cs = 3;
+#endif
+
     return (is_pv_32on64_vcpu(v) ? setup_compat_l4(v) : 0);
 }
 
@@ -1298,12 +1302,10 @@ void context_switch(struct vcpu *prev, struct vcpu *next)
               is_pv_32on64_vcpu(prev) != is_pv_32on64_vcpu(next)) )
         {
             uint64_t efer = read_efer();
-
+            if ( !(efer & EFER_SCE) )
+                write_efer(efer | EFER_SCE);
             flush_tlb_one_local(GDT_VIRT_START(next) +
                                 FIRST_RESERVED_GDT_BYTE);
-
-            if ( !is_pv_32on64_vcpu(next) == !(efer & EFER_SCE) )
-                write_efer(efer ^ EFER_SCE);
         }
 #endif
 

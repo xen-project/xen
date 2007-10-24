@@ -617,16 +617,21 @@ static int emulate_forced_invalid_op(struct cpu_user_regs *regs)
         clear_bit(X86_FEATURE_DE,  &d);
         clear_bit(X86_FEATURE_PSE, &d);
         clear_bit(X86_FEATURE_PGE, &d);
+        if ( !cpu_has_sep )
+            clear_bit(X86_FEATURE_SEP, &d);
+#ifdef __i386__
         if ( !supervisor_mode_kernel )
             clear_bit(X86_FEATURE_SEP, &d);
+#endif
         if ( !IS_PRIV(current->domain) )
             clear_bit(X86_FEATURE_MTRR, &d);
     }
     else if ( regs->eax == 0x80000001 )
     {
         /* Modify Feature Information. */
-        if ( is_pv_32bit_vcpu(current) )
-            clear_bit(X86_FEATURE_SYSCALL % 32, &d);
+#ifdef __i386__
+        clear_bit(X86_FEATURE_SYSCALL % 32, &d);
+#endif
         clear_bit(X86_FEATURE_RDTSCP % 32, &d);
     }
     else
@@ -2095,6 +2100,17 @@ asmlinkage int do_debug(struct cpu_user_regs *regs)
 
     if ( !guest_mode(regs) )
     {
+#ifdef __x86_64__
+        void sysenter_entry(void);
+        void sysenter_eflags_saved(void);
+        /* In SYSENTER entry path we cannot zap TF until EFLAGS is saved. */
+        if ( (regs->rip >= (unsigned long)sysenter_entry) &&
+             (regs->rip < (unsigned long)sysenter_eflags_saved) )
+            goto out;
+        WARN_ON(regs->rip != (unsigned long)sysenter_eflags_saved);
+#else
+        WARN_ON(1);
+#endif
         /* Clear TF just for absolute sanity. */
         regs->eflags &= ~EF_TF;
         /*

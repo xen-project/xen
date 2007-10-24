@@ -369,6 +369,11 @@ static void __init init_amd(struct cpuinfo_x86 *c)
 	if (c->x86 < 6)
 		clear_bit(X86_FEATURE_MCE, c->x86_capability);
 
+#ifdef __x86_64__
+	/* AMD CPUs do not support SYSENTER outside of legacy mode. */
+	clear_bit(X86_FEATURE_SEP, c->x86_capability);
+#endif
+
 	/* Prevent TSC drift in non single-processor, single-core platforms. */
 	if ((smp_processor_id() == 1) && c1_ramping_may_cause_clock_drift(c))
 		disable_c1_ramping();

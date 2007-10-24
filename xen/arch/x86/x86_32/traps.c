@@ -355,11 +355,18 @@ static long register_guest_callback(struct callback_register *reg)
         break;
 
 #ifdef CONFIG_X86_SUPERVISOR_MODE_KERNEL
-    case CALLBACKTYPE_sysenter:
-        if ( ! cpu_has_sep )
+    case CALLBACKTYPE_sysenter_deprecated:
+        if ( !cpu_has_sep )
             ret = -EINVAL;
         else if ( on_each_cpu(do_update_sysenter, &reg->address, 1, 1) != 0 )
             ret = -EIO;
+        break;
+
+    case CALLBACKTYPE_sysenter:
+        if ( !cpu_has_sep )
+            ret = -EINVAL;
+        else
+            do_update_sysenter(&reg->address);
         break;
 #endif
 
@@ -384,6 +391,7 @@ static long unregister_guest_callback(struct callback_unregister *unreg)
     case CALLBACKTYPE_event:
     case CALLBACKTYPE_failsafe:
 #ifdef CONFIG_X86_SUPERVISOR_MODE_KERNEL
+    case CALLBACKTYPE_sysenter_deprecated:
     case CALLBACKTYPE_sysenter:
 #endif
         ret = -EINVAL;

@@ -204,6 +204,39 @@ ENTRY(compat_post_handle_exception)
         movb  $0,TRAPBOUNCE_flags(%rdx)
         jmp   compat_test_all_events
 
+ENTRY(compat_syscall)
+        cmpb  $0,VCPU_syscall32_disables_events(%rbx)
+        movzwl VCPU_syscall32_sel(%rbx),%esi
+        movq  VCPU_syscall32_addr(%rbx),%rax
+        setne %cl
+        leaq  VCPU_trap_bounce(%rbx),%rdx
+        testl $~3,%esi
+        leal  (,%rcx,TBF_INTERRUPT),%ecx
+        jz    2f
+1:      movq  %rax,TRAPBOUNCE_eip(%rdx)
+        movw  %si,TRAPBOUNCE_cs(%rdx)
+        movb  %cl,TRAPBOUNCE_flags(%rdx)
+        call  compat_create_bounce_frame
+        jmp   compat_test_all_events
+2:      movl  $TRAP_gp_fault,UREGS_entry_vector(%rsp)
+        movq  VCPU_gp_fault_addr(%rbx),%rax
+        movzwl VCPU_gp_fault_sel(%rbx),%esi
+        movb  $(TBF_EXCEPTION|TBF_EXCEPTION_ERRCODE|TBF_INTERRUPT),%cl
+        movl  $0,TRAPBOUNCE_error_code(%rdx)
+        jmp   1b
+
+ENTRY(compat_sysenter)
+        cmpl  $TRAP_gp_fault,UREGS_entry_vector(%rsp)
+        movzwl VCPU_sysenter_sel(%rbx),%eax
+        movzwl VCPU_gp_fault_sel(%rbx),%ecx
+        cmovel %ecx,%eax
+        testl $~3,%eax
+        movl  $FLAT_COMPAT_USER_SS,UREGS_ss(%rsp)
+        cmovzl %ecx,%eax
+        movw  %ax,TRAPBOUNCE_cs(%rdx)
+        call  compat_create_bounce_frame
+        jmp   compat_test_all_events
+
 ENTRY(compat_int80_direct_trap)
         call  compat_create_bounce_frame
         jmp   compat_test_all_events
@@ -246,7 +279,7 @@ compat_create_bounce_frame:
         setz  %ch                       # %ch == !saved_upcall_mask
         movl  UREGS_eflags+8(%rsp),%eax
         andl  $~X86_EFLAGS_IF,%eax
-        shlb  $1,%ch                    # Bit 9 (EFLAGS.IF)
+        addb  %ch,%ch                   # Bit 9 (EFLAGS.IF)
         orb   %ch,%ah                   # Fold EFLAGS.IF into %eax
 .Lft6:  movl  %eax,%fs:2*4(%rsi)        # EFLAGS
         movl  UREGS_rip+8(%rsp),%eax

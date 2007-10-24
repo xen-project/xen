@@ -27,13 +27,20 @@
 /* %rbx: struct vcpu */
 switch_to_kernel:
         leaq  VCPU_trap_bounce(%rbx),%rdx
-        movq  VCPU_syscall_addr(%rbx),%rax
+        /* TB_eip = (32-bit syscall && syscall32_addr) ?
+         *          syscall32_addr : syscall_addr */
+        xor   %eax,%eax
+        cmpw  $FLAT_USER_CS32,UREGS_cs(%rsp)
+        cmoveq VCPU_syscall32_addr(%rbx),%rax
+        testq %rax,%rax
+        cmovzq VCPU_syscall_addr(%rbx),%rax
         movq  %rax,TRAPBOUNCE_eip(%rdx)
-        movb  $0,TRAPBOUNCE_flags(%rdx)
-        bt    $_VGCF_syscall_disables_events,VCPU_guest_context_flags(%rbx)
-        jnc   1f
-        movb  $TBF_INTERRUPT,TRAPBOUNCE_flags(%rdx)
-1:      call  create_bounce_frame
+        /* TB_flags = VGCF_syscall_disables_events ? TBF_INTERRUPT : 0 */
+        btl   $_VGCF_syscall_disables_events,VCPU_guest_context_flags(%rbx)
+        setc  %cl
+        leal  (,%rcx,TBF_INTERRUPT),%ecx
+        movb  %cl,TRAPBOUNCE_flags(%rdx)
+        call  create_bounce_frame
         andl  $~X86_EFLAGS_DF,UREGS_eflags(%rsp)
         jmp   test_all_events
 
@@ -47,7 +54,7 @@ restore_all_guest:
         addq  $8,%rsp
         popq  %rcx                    # RIP
         popq  %r11                    # CS
-        cmpw  $FLAT_KERNEL_CS32,%r11
+        cmpw  $FLAT_USER_CS32,%r11
         popq  %r11                    # RFLAGS
         popq  %rsp                    # RSP
         je    1f
@@ -128,6 +135,9 @@ ENTRY(syscall_enter)
         movq  24(%rsp),%r11 /* Re-load user RFLAGS into %r11 before SAVE_ALL */
         SAVE_ALL
         GET_CURRENT(%rbx)
+        movq  VCPU_domain(%rbx),%rcx
+        testb $1,DOMAIN_is_32bit_pv(%rcx)
+        jnz   compat_syscall
         testb $TF_kernel_mode,VCPU_thread_flags(%rbx)
         jz    switch_to_kernel
 
@@ -241,6 +251,43 @@ bad_hypercall:
         movq $-ENOSYS,UREGS_rax(%rsp)
         jmp  test_all_events
 
+ENTRY(sysenter_entry)
+        sti
+        pushq $FLAT_USER_SS
+        pushq $0
+        pushfq
+        .globl sysenter_eflags_saved
+sysenter_eflags_saved:
+        pushq $0
+        pushq $0
+        pushq $0
+        movl  $TRAP_syscall,4(%rsp)
+        SAVE_ALL
+        GET_CURRENT(%rbx)
+        movq  VCPU_sysexit_addr(%rbx),%rax
+        movzwl VCPU_sysexit_sel(%rbx),%edx
+        cmpb  $0,VCPU_sysenter_disables_events(%rbx)
+        movq  %rax,UREGS_rip(%rsp)
+        movl  %edx,UREGS_cs(%rsp)
+        movq  VCPU_sysenter_addr(%rbx),%rax
+        setne %cl
+        leaq  VCPU_trap_bounce(%rbx),%rdx
+        testq %rax,%rax
+        leal  (,%rcx,TBF_INTERRUPT),%ecx
+        jz    2f
+1:      movq  VCPU_domain(%rbx),%rdi
+        movq  %rax,TRAPBOUNCE_eip(%rdx)
+        movb  %cl,TRAPBOUNCE_flags(%rdx)
+        testb $1,DOMAIN_is_32bit_pv(%rdi)
+        jnz   compat_sysenter
+        call  create_bounce_frame
+        jmp   test_all_events
+2:      movl  %eax,TRAPBOUNCE_error_code(%rdx)
+        movq  VCPU_gp_fault_addr(%rbx),%rax
+        movb  $(TBF_EXCEPTION|TBF_EXCEPTION_ERRCODE|TBF_INTERRUPT),%cl
+        movl  $TRAP_gp_fault,UREGS_entry_vector(%rsp)
+        jmp   1b
+
 ENTRY(int80_direct_trap)
         pushq $0
         SAVE_ALL
@@ -313,9 +360,9 @@ create_bounce_frame:
         shrq  $32,%rax
         testb $0xFF,%al                 # Bits 0-7: saved_upcall_mask
         setz  %ch                       # %ch == !saved_upcall_mask
-        movq  UREGS_eflags+8(%rsp),%rax
-        andq  $~X86_EFLAGS_IF,%rax
-        shlb  $1,%ch                    # Bit 9 (EFLAGS.IF)
+        movl  UREGS_eflags+8(%rsp),%eax
+        andl  $~X86_EFLAGS_IF,%eax
+        addb  %ch,%ch                   # Bit 9 (EFLAGS.IF)
         orb   %ch,%ah                   # Fold EFLAGS.IF into %eax
 .Lft5:  movq  %rax,16(%rsi)             # RFLAGS
         movq  UREGS_rip+8(%rsp),%rax

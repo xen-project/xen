@@ -165,12 +165,31 @@ static long compat_register_guest_callback(
                       &v->arch.guest_context.flags);
         break;
 
+    case CALLBACKTYPE_syscall32:
+        v->arch.syscall32_callback_cs     = reg->address.cs;
+        v->arch.syscall32_callback_eip    = reg->address.eip;
+        v->arch.syscall32_disables_events =
+            (reg->flags & CALLBACKF_mask_events) != 0;
+        break;
+
+    case CALLBACKTYPE_sysenter:
+        v->arch.sysenter_callback_cs     = reg->address.cs;
+        v->arch.sysenter_callback_eip    = reg->address.eip;
+        v->arch.sysenter_disables_events =
+            (reg->flags & CALLBACKF_mask_events) != 0;
+        break;
+
+    case CALLBACKTYPE_sysexit:
+        v->arch.sysexit_cs  = reg->address.cs | 3;
+        v->arch.sysexit_eip = reg->address.eip;
+        break;
+
     case CALLBACKTYPE_nmi:
         ret = register_guest_nmi_callback(reg->address.eip);
         break;
 
     default:
-        ret = -EINVAL;
+        ret = -ENOSYS;
         break;
     }
 
@@ -184,12 +203,20 @@ static long compat_unregister_guest_callback(
 
     switch ( unreg->type )
     {
+    case CALLBACKTYPE_event:
+    case CALLBACKTYPE_failsafe:
+    case CALLBACKTYPE_syscall32:
+    case CALLBACKTYPE_sysenter:
+    case CALLBACKTYPE_sysexit:
+        ret = -EINVAL;
+        break;
+
     case CALLBACKTYPE_nmi:
         ret = unregister_guest_nmi_callback();
         break;
 
     default:
-        ret = -EINVAL;
+        ret = -ENOSYS;
         break;
     }
 
