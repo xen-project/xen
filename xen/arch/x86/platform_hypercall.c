@@ -298,15 +298,17 @@ ret_t do_platform_op(XEN_GUEST_HANDLE(xen_platform_op_t) u_xenpf_op)
         struct vcpu *v;
         struct xenctl_cpumap ctlmap;
         cpumask_t cpumap;
+        XEN_GUEST_HANDLE(uint8_t) cpumap_bitmap;
         XEN_GUEST_HANDLE(uint64_t) idletimes;
 
         ret = -ENOSYS;
         if ( cpufreq_controller != FREQCTL_dom0_kernel )
             break;
 
-        memset(&ctlmap, 0, sizeof(ctlmap));
         ctlmap.nr_cpus  = op->u.getidletime.cpumap_nr_cpus;
-        ctlmap.bitmap.p = op->u.getidletime.cpumap_bitmap.p;
+        guest_from_compat_handle(cpumap_bitmap,
+                                 op->u.getidletime.cpumap_bitmap);
+        ctlmap.bitmap.p = cpumap_bitmap.p; /* handle -> handle_64 conversion */
         xenctl_cpumap_to_cpumask(&cpumap, &ctlmap);
         guest_from_compat_handle(idletimes, op->u.getidletime.idletime);
 
