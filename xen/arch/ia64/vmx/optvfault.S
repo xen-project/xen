@@ -6,7 +6,9 @@
  *	Xuefei Xu (Anthony Xu) <anthony.xu@intel.com>
  */
 
-#include <linux/config.h>
+#include <linux/config.h>	
+#include <asm/config.h>
+#include <asm/pgtable.h>
 #include <asm/asmmacro.h>
 #include <asm/kregs.h>
 #include <asm/offsets.h>
@@ -25,6 +27,9 @@
 #define ACCE_SSM
 #define ACCE_MOV_TO_PSR
 #define ACCE_THASH
+
+// Inputs are: r21 (= current), r24 (= cause), r25 (= insn), r31 (=saved pr)
+
 
 //mov r1=ar3 (only itc is virtualized)
 GLOBAL_ENTRY(vmx_asm_mov_from_ar)
@@ -90,13 +95,16 @@ GLOBAL_ENTRY(vmx_asm_mov_to_rr)
 #ifndef ACCE_MOV_TO_RR
     br.many vmx_virtualization_fault_back
 #endif
-    extr.u r16=r25,20,7
-    extr.u r17=r25,13,7
+    add r22=IA64_VCPU_DOMAIN_OFFSET,r21
+    extr.u r16=r25,20,7		// r3
+    extr.u r17=r25,13,7		// r2
+    ;;
+    ld8 r22=[r22]		// Get domain
     movl r20=asm_mov_from_reg
     ;;
     adds r30=vmx_asm_mov_to_rr_back_1-asm_mov_from_reg,r20
-    shladd r16=r16,4,r20
-    mov r22=b0
+    shladd r16=r16,4,r20	// get r3
+    mov r18=b0			// save b0
     ;;
     add r27=VCPU_VRR0_OFS,r21
     mov b0=r16
@@ -104,47 +112,56 @@ GLOBAL_ENTRY(vmx_asm_mov_to_rr)
     ;;   
 vmx_asm_mov_to_rr_back_1:
     adds r30=vmx_asm_mov_to_rr_back_2-asm_mov_from_reg,r20
-    shr.u r23=r19,61
-    shladd r17=r17,4,r20
+    shr.u r23=r19,61		// get RR #
+    shladd r17=r17,4,r20	// get r2
     ;;
     //if rr7, go back
     cmp.eq p6,p0=7,r23
-    mov b0=r22
+    mov b0=r18			// restore b0
     (p6) br.cond.dpnt.many vmx_virtualization_fault_back
     ;;
-    mov r28=r19
+    mov r28=r19			// save r3
     mov b0=r17
     br.many b0
 vmx_asm_mov_to_rr_back_2: 
     adds r30=vmx_resume_to_guest-asm_mov_from_reg,r20
-    shladd r27=r23,3,r27
-    ;; // +starting_rid
-    st8 [r27]=r19
-    mov b0=r30
+    shladd r27=r23,3,r27	// address of VRR
+    add r22=IA64_DOMAIN_RID_BITS_OFFSET,r22
     ;;
+    ld1 r22=[r22]		// Load rid_bits from domain
+    mov b0=r18			// restore b0
     adds r16=IA64_VCPU_STARTING_RID_OFFSET,r21
     ;;
-    ld4 r16=[r16]
+    ld4 r16=[r16]		// load starting_rid
+    extr.u r17=r19,8,24		// Extract RID
     ;;
+    shr r17=r17,r22		// Shift out used bits
     shl r16=r16,8
     ;;
-    add r19=r19,r16
+    add r20=r19,r16
+    cmp.ne p6,p0=0,r17	// If reserved RID bits are set, use C fall back.
+    (p6) br.cond.dpnt.many vmx_virtualization_fault_back
     ;; //mangling rid 1 and 3
-    extr.u r16=r19,8,8
-    extr.u r17=r19,24,8
-    extr.u r18=r19,2,6 // page size
+    extr.u r16=r20,8,8
+    extr.u r17=r20,24,8
+    mov r24=r18		// saved b0 for resume
     ;;
-    dep r19=r16,r19,24,8
+    extr.u r18=r20,2,6 // page size
+    dep r20=r16,r20,24,8
+    mov b0=r30
     ;;
-    dep r19=r17,r19,8,8
+    dep r20=r17,r20,8,8
     ;; //set ve 1
-    dep r19=-1,r19,0,1  
-    cmp.lt p6,p0=14,r18
+    dep r20=-1,r20,0,1
+    // If ps > PAGE_SHIFT, use PAGE_SHIFT
+    cmp.lt p6,p0=PAGE_SHIFT,r18
     ;;
-    (p6) mov r18=14
+    (p6) mov r18=PAGE_SHIFT
     ;;
-    (p6) dep r19=r18,r19,2,6
-    ;;
+    (p6) dep r20=r18,r20,2,6
+    ;;	
+    st8 [r27]=r19	// Write to vrr.
+    // Write to save_rr if rr=0 or rr=4.
     cmp.eq p6,p0=0,r23
     ;;
     cmp.eq.or p6,p0=4,r23
@@ -156,11 +173,10 @@ vmx_asm_mov_to_rr_back_2:
     cmp.eq p7,p0=r0,r0
     (p6) shladd r17=r23,1,r17
     ;;
-    (p6) st8 [r17]=r19
+    (p6) st8 [r17]=r20
     (p6) cmp.eq p7,p0=VMX_MMU_VIRTUAL,r16 // Set physical rr if in virt mode
     ;;
-    (p7) mov rr[r28]=r19
-    mov r24=r22
+    (p7) mov rr[r28]=r20
     br.many b0
 END(vmx_asm_mov_to_rr)
 
@@ -420,7 +436,7 @@ ENTRY(vmx_asm_dispatch_vexirq)
     br.many vmx_dispatch_vexirq
 END(vmx_asm_dispatch_vexirq)
 
-// thash
+// thash r1=r3
 // TODO: add support when pta.vf = 1
 GLOBAL_ENTRY(vmx_asm_thash)
 #ifndef ACCE_THASH
@@ -433,8 +449,7 @@ GLOBAL_ENTRY(vmx_asm_thash)
     adds r30=vmx_asm_thash_back1-asm_mov_from_reg,r20
     shladd r17=r17,4,r20	// get addr of MOVE_FROM_REG(r17)
     adds r16=IA64_VPD_BASE_OFFSET,r21	// get vcpu.arch.priveregs
-    ;;
-    mov r24=b0
+    mov r24=b0			// save b0
     ;;
     ld8 r16=[r16]		// get VPD addr
     mov b0=r17
@@ -452,6 +467,10 @@ vmx_asm_thash_back1:
     extr.u r29=r17,2,6		// get pta.size
     ld8 r25=[r27]		// get vcpu->arch.arch_vmx.vrr[r23]'s value
     ;;
+    // Fall-back to C if VF (long format) is set
+    tbit.nz p7,p0=r17,8
+    mov b0=r24
+    (p6) br.cond.dpnt.many vmx_virtualization_fault_back
     extr.u r25=r25,2,6		// get rr.ps
     shl r22=r26,r29		// 1UL << pta.size
     ;;
@@ -595,6 +614,7 @@ MOV_FROM_BANK0_REG(31)
 
 // mov from reg table
 // r19:	value, r30: return address
+// r26 may be destroyed
 ENTRY(asm_mov_from_reg)
     MOV_FROM_REG(0)
     MOV_FROM_REG(1)
