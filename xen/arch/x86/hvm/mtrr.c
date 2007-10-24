@@ -23,7 +23,6 @@
 #include <asm/paging.h>
 #include <asm/p2m.h>
 #include <xen/domain_page.h>
-#include <stdbool.h>
 #include <asm/mtrr.h>
 #include <asm/hvm/support.h>
 #include <asm/hvm/cacheattr.h>
@@ -144,9 +143,9 @@ bool_t is_var_mtrr_overlapped(struct mtrr_state *m)
 #define RESERVED_MTRR 2
 #define MTRRphysBase_MSR(reg) (0x200 + 2 * (reg))
 #define MTRRphysMask_MSR(reg) (0x200 + 2 * (reg) + 1)
-bool mtrr_var_range_msr_set(struct mtrr_state *m, u32 msr, u64 msr_content);
-bool mtrr_def_type_msr_set(struct mtrr_state *m, u64 msr_content);
-bool mtrr_fix_range_msr_set(struct mtrr_state *m, int row, u64 msr_content);
+bool_t mtrr_var_range_msr_set(struct mtrr_state *m, u32 msr, u64 msr_content);
+bool_t mtrr_def_type_msr_set(struct mtrr_state *m, u64 msr_content);
+bool_t mtrr_fix_range_msr_set(struct mtrr_state *m, int row, u64 msr_content);
 static void set_var_mtrr(unsigned int reg, struct mtrr_state *m,
                     unsigned int base, unsigned int size,
                     unsigned int type)
@@ -556,7 +555,7 @@ u32 get_pat_flags(struct vcpu *v,
 }
 
 /* Helper funtions for seting mtrr/pat */
-bool pat_msr_set(u64 *pat, u64 msr_content)
+bool_t pat_msr_set(u64 *pat, u64 msr_content)
 {
     u8 *value = (u8*)&msr_content;
     int i;
@@ -575,7 +574,7 @@ bool pat_msr_set(u64 *pat, u64 msr_content)
     return 1;
 }
 
-bool mtrr_def_type_msr_set(struct mtrr_state *m, u64 msr_content)
+bool_t mtrr_def_type_msr_set(struct mtrr_state *m, u64 msr_content)
 {
     u8 def_type = msr_content & 0xff;
     u8 enabled = (msr_content >> 10) & 0x3;
@@ -600,7 +599,7 @@ bool mtrr_def_type_msr_set(struct mtrr_state *m, u64 msr_content)
     return 1;
 }
 
-bool mtrr_fix_range_msr_set(struct mtrr_state *m, int row, u64 msr_content)
+bool_t mtrr_fix_range_msr_set(struct mtrr_state *m, int row, u64 msr_content)
 {
     u64 *fixed_range_base = (u64 *)m->fixed_ranges;
 
@@ -623,7 +622,7 @@ bool mtrr_fix_range_msr_set(struct mtrr_state *m, int row, u64 msr_content)
     return 1;
 }
 
-bool mtrr_var_range_msr_set(struct mtrr_state *m, u32 msr, u64 msr_content)
+bool_t mtrr_var_range_msr_set(struct mtrr_state *m, u32 msr, u64 msr_content)
 {
     u32 index;
     u64 msr_mask;

@@ -50,7 +50,6 @@
 #include <asm/hvm/vpt.h>
 #include <public/hvm/save.h>
 #include <asm/hvm/trace.h>
-#include <stdbool.h>
 
 enum handler_return { HNDL_done, HNDL_unhandled, HNDL_exception_raised };
 
@@ -2458,12 +2457,12 @@ void vmx_vlapic_msr_changed(struct vcpu *v)
     vmx_vmcs_exit(v);
 }
 
-extern bool mtrr_var_range_msr_set(struct mtrr_state *v,
+extern bool_t mtrr_var_range_msr_set(struct mtrr_state *v,
         u32 msr, u64 msr_content);
-extern bool mtrr_fix_range_msr_set(struct mtrr_state *v,
+extern bool_t mtrr_fix_range_msr_set(struct mtrr_state *v,
         int row, u64 msr_content);
-extern bool mtrr_def_type_msr_set(struct mtrr_state *v, u64 msr_content);
-extern bool pat_msr_set(u64 *pat, u64 msr);
+extern bool_t mtrr_def_type_msr_set(struct mtrr_state *v, u64 msr_content);
+extern bool_t pat_msr_set(u64 *pat, u64 msr);
 
 static int vmx_do_msr_write(struct cpu_user_regs *regs)
 {
