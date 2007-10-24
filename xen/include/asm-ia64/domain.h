@@ -137,17 +137,17 @@ struct arch_domain {
        one big range, used to virtualize domain RID,
        one small range for internal Xen use (metaphysical).  */
     /* Big range.  */
-    int starting_rid;		/* first RID assigned to domain */
-    int ending_rid;		/* one beyond highest RID assigned to domain */
+    unsigned int starting_rid;	/* first RID assigned to domain */
+    unsigned int ending_rid;	/* one beyond highest RID assigned to domain */
     /* Metaphysical range.  */
-    int starting_mp_rid;
-    int ending_mp_rid;
+    unsigned int starting_mp_rid;
+    unsigned int ending_mp_rid;
     /* RID for metaphysical mode.  */
-    unsigned long metaphysical_rid_dt;	/* dt=it=0  */
-    unsigned long metaphysical_rid_d;  /* dt=0, it=1  */
+    unsigned int metaphysical_rid_dt;	/* dt=it=0  */
+    unsigned int metaphysical_rid_d;    /* dt=0, it=1  */
     
-    int rid_bits;		/* number of virtual rid bits (default: 18) */
-    int breakimm;     /* The imm value for hypercalls.  */
+    unsigned char rid_bits;		/* number of virtual rid bits (default: 18) */
+    int breakimm;               /* The imm value for hypercalls.  */
 
     struct virtual_platform_def     vmx_platform;
 #define	hvm_domain vmx_platform /* platform defs are not vmx specific */
