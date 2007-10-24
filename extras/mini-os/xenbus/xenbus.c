@@ -79,6 +79,7 @@ void wait_for_watch(void)
     schedule();
     remove_waiter(w);
     wake(current);
+    remove_wait_queue(&w);
 }
 
 char* xenbus_wait_for_value(const char* path,const char* value)
