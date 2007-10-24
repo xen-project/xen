@@ -1773,6 +1773,12 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
                  wrmsr_safe(regs->ecx, eax, edx) )
                 goto fail;
             break;
+        case MSR_IA32_PERF_CTL:
+            if ( (cpufreq_controller != FREQCTL_dom0_kernel) ||
+                 (boot_cpu_data.x86_vendor != X86_VENDOR_INTEL) ||
+                 wrmsr_safe(regs->ecx, eax, edx) )
+                goto fail;
+            break;
         default:
             if ( wrmsr_hypervisor_regs(regs->ecx, eax, edx) )
                 break;
