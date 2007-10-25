@@ -2762,20 +2762,10 @@ shadow_write_p2m_entry(struct vcpu *v, unsigned long gfn,
 
     /* install P2M in monitors for PAE Xen */
 #if CONFIG_PAGING_LEVELS == 3
-    if ( level == 3 ) {
-        struct vcpu *v;
+    if ( level == 3 )
         /* We have written to the p2m l3: need to sync the per-vcpu
          * copies of it in the monitor tables */
         p2m_install_entry_in_monitors(d, (l3_pgentry_t *)p);
-        /* Also, any vcpus running on shadows of the p2m need to 
-         * reload their CR3s so the change propagates to the shadow */
-        for_each_vcpu(d, v) {
-            if ( pagetable_get_pfn(v->arch.guest_table) 
-                 == pagetable_get_pfn(d->arch.phys_table) 
-                 && v->arch.paging.mode != NULL )
-                v->arch.paging.mode->update_cr3(v, 0);
-        }
-    }
 #endif
 
 #if (SHADOW_OPTIMIZATIONS & SHOPT_FAST_FAULT_PATH)
