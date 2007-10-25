@@ -6,6 +6,7 @@
 # this archive for more details.
 
 import os
+import os.path
 import re
 import string
 import threading
@@ -108,7 +109,7 @@ def save(fd, dominfo, network, live, dst, checkpoint=False):
         forkHelper(cmd, fd, saveInputHandler, False)
 
         # put qemu device model state
-        if hvm:
+        if os.path.exists("/var/lib/xen/qemu-save.%d" % dominfo.getDomid()):
             write_exact(fd, QEMU_SIGNATURE, "could not write qemu signature")
             qemu_fd = os.open("/var/lib/xen/qemu-save.%d" % dominfo.getDomid(),
                               os.O_RDONLY)
@@ -245,6 +246,8 @@ def restore(xd, fd, dominfo = None, paused = False):
             raise XendError('Could not read console MFN')        
 
         # get qemu state and create a tmp file for dm restore
+        # Even PV guests may have QEMU stat, but its not currently
+        # used so only bother with HVM currently.
         if is_hvm:
             qemu_signature = read_exact(fd, len(QEMU_SIGNATURE),
                                         "invalid device model signature read")

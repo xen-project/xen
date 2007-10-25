@@ -56,10 +56,9 @@ class ImageHandler:
     defining in a subclass.
 
     The method createDeviceModel() is called to create the domain device
-    model if it needs one.  The default is to do nothing.
+    model.
 
-    The method destroy() is called when the domain is destroyed.
-    The default is to do nothing.
+    The method destroyDeviceModel() is called to reap the device model
     """
 
     ostype = None
@@ -90,6 +89,15 @@ class ImageHandler:
                         ("image/kernel", self.kernel),
                         ("image/cmdline", self.cmdline),
                         ("image/ramdisk", self.ramdisk))
+
+        self.dmargs = self.parseDeviceModelArgs(vmConfig)
+        self.device_model = vmConfig['platform'].get('device_model')
+
+        self.display = vmConfig['platform'].get('display')
+        self.xauthority = vmConfig['platform'].get('xauthority')
+        self.vncconsole = vmConfig['platform'].get('vncconsole')
+        self.pid = None
+
 
 
     def cleanupBootloading(self):
@@ -173,216 +181,13 @@ class ImageHandler:
         """Build the domain. Define in subclass."""
         raise NotImplementedError()
 
-    def createDeviceModel(self, restore = False):
-        """Create device model for the domain (define in subclass if needed)."""
-        pass
-    
-    def saveDeviceModel(self):
-        """Save device model for the domain (define in subclass if needed)."""
-        pass
-
-    def resumeDeviceModel(self):
-        """Unpause device model for the domain (define in subclass if needed)."""
-        pass
-
-    def destroy(self):
-        """Extra cleanup on domain destroy (define in subclass if needed)."""
-        pass
-
-
-    def recreate(self):
-        pass
-
-
-class LinuxImageHandler(ImageHandler):
-
-    ostype = "linux"
-    flags = 0
-    vhpt = 0
-
-    def buildDomain(self):
-        store_evtchn = self.vm.getStorePort()
-        console_evtchn = self.vm.getConsolePort()
-
-        mem_mb = self.getRequiredInitialReservation() / 1024
-
-        log.debug("domid          = %d", self.vm.getDomid())
-        log.debug("memsize        = %d", mem_mb)
-        log.debug("image          = %s", self.kernel)
-        log.debug("store_evtchn   = %d", store_evtchn)
-        log.debug("console_evtchn = %d", console_evtchn)
-        log.debug("cmdline        = %s", self.cmdline)
-        log.debug("ramdisk        = %s", self.ramdisk)
-        log.debug("vcpus          = %d", self.vm.getVCpuCount())
-        log.debug("features       = %s", self.vm.getFeatures())
-        if arch.type == "ia64":
-            log.debug("vhpt          = %d", self.flags)
-
-        return xc.linux_build(domid          = self.vm.getDomid(),
-                              memsize        = mem_mb,
-                              image          = self.kernel,
-                              store_evtchn   = store_evtchn,
-                              console_evtchn = console_evtchn,
-                              cmdline        = self.cmdline,
-                              ramdisk        = self.ramdisk,
-                              features       = self.vm.getFeatures(),
-                              flags          = self.flags,
-                              vhpt           = self.vhpt)
-
-class PPC_LinuxImageHandler(LinuxImageHandler):
-
-    ostype = "linux"
-    
-    def getRequiredShadowMemory(self, shadow_mem_kb, maxmem_kb):
-        """@param shadow_mem_kb The configured shadow memory, in KiB.
-        @param maxmem_kb The configured maxmem, in KiB.
-        @return The corresponding required amount of shadow memory, also in
-        KiB.
-        PowerPC currently uses "shadow memory" to refer to the hash table."""
-        return max(maxmem_kb / 64, shadow_mem_kb)
-
-
-
-class HVMImageHandler(ImageHandler):
-
-    ostype = "hvm"
-
-    def __init__(self, vm, vmConfig):
-        ImageHandler.__init__(self, vm, vmConfig)
-        self.shutdownWatch = None
-        self.rebootFeatureWatch = None
-
-    def configure(self, vmConfig):
-        ImageHandler.configure(self, vmConfig)
-
-        if not self.kernel:
-            self.kernel = '/usr/lib/xen/boot/hvmloader'
-
-        info = xc.xeninfo()
-        if 'hvm' not in info['xen_caps']:
-            raise HVMRequired()
-
-        self.dmargs = self.parseDeviceModelArgs(vmConfig)
-        self.device_model = vmConfig['platform'].get('device_model')
-        if not self.device_model:
-            raise VmError("hvm: missing device model")
-        
-        self.display = vmConfig['platform'].get('display')
-        self.xauthority = vmConfig['platform'].get('xauthority')
-        self.vncconsole = vmConfig['platform'].get('vncconsole')
-
-        rtc_timeoffset = vmConfig['platform'].get('rtc_timeoffset')
-
-        self.vm.storeVm(("image/dmargs", " ".join(self.dmargs)),
-                        ("image/device-model", self.device_model),
-                        ("image/display", self.display))
-        self.vm.storeVm(("rtc/timeoffset", rtc_timeoffset))
-
-        self.pid = None
-
-        self.apic = int(vmConfig['platform'].get('apic', 0))
-        self.acpi = int(vmConfig['platform'].get('acpi', 0))
-        
-
-    def buildDomain(self):
-        store_evtchn = self.vm.getStorePort()
-
-        mem_mb = self.getRequiredInitialReservation() / 1024
-
-        log.debug("domid          = %d", self.vm.getDomid())
-        log.debug("image          = %s", self.kernel)
-        log.debug("store_evtchn   = %d", store_evtchn)
-        log.debug("memsize        = %d", mem_mb)
-        log.debug("vcpus          = %d", self.vm.getVCpuCount())
-        log.debug("acpi           = %d", self.acpi)
-        log.debug("apic           = %d", self.apic)
-
-        rc = xc.hvm_build(domid          = self.vm.getDomid(),
-                          image          = self.kernel,
-                          memsize        = mem_mb,
-                          vcpus          = self.vm.getVCpuCount(),
-                          acpi           = self.acpi,
-                          apic           = self.apic)
-
-        rc['notes'] = { 'SUSPEND_CANCEL': 1 }
-
-        rc['store_mfn'] = xc.hvm_get_param(self.vm.getDomid(),
-                                           HVM_PARAM_STORE_PFN)
-        xc.hvm_set_param(self.vm.getDomid(), HVM_PARAM_STORE_EVTCHN,
-                         store_evtchn)
-
-        return rc
-
     # Return a list of cmd line args to the device models based on the
     # xm config file
     def parseDeviceModelArgs(self, vmConfig):
-        dmargs = [ 'boot', 'fda', 'fdb', 'soundhw',
-                   'localtime', 'serial', 'stdvga', 'isa',
-                   'acpi', 'usb', 'usbdevice', 'keymap', 'pci' ]
-        
-        ret = ['-vcpus', str(self.vm.getVCpuCount())]
+        ret = ["-domain-name", str(self.vm.info['name_label'])]
 
-        for a in dmargs:
-            v = vmConfig['platform'].get(a)
-
-            # python doesn't allow '-' in variable names
-            if a == 'stdvga': a = 'std-vga'
-            if a == 'keymap': a = 'k'
-
-            # Handle booleans gracefully
-            if a in ['localtime', 'std-vga', 'isa', 'usb', 'acpi']:
-                try:
-                    if v != None: v = int(v)
-                    if v: ret.append("-%s" % a)
-                except (ValueError, TypeError):
-                    pass # if we can't convert it to a sane type, ignore it
-            else:
-                if v:
-                    ret.append("-%s" % a)
-                    ret.append("%s" % v)
-
-            if a in ['fda', 'fdb']:
-                if v:
-                    if not os.path.isabs(v):
-                        raise VmError("Floppy file %s does not exist." % v)
-            log.debug("args: %s, val: %s" % (a,v))
-
-        # Handle disk/network related options
-        mac = None
-        ret = ret + ["-domain-name", str(self.vm.info['name_label'])]
-        nics = 0
-        
-        for devuuid in vmConfig['vbd_refs']:
-            devinfo = vmConfig['devices'][devuuid][1]
-            uname = devinfo.get('uname')
-            if uname is not None and 'file:' in uname:
-                (_, vbdparam) = string.split(uname, ':', 1)
-                if not os.path.isfile(vbdparam):
-                    raise VmError('Disk image does not exist: %s' %
-                                  vbdparam)
-
-        for devuuid in vmConfig['vif_refs']:
-            devinfo = vmConfig['devices'][devuuid][1]
-            dtype = devinfo.get('type', 'ioemu')
-            if dtype != 'ioemu':
-                continue
-            nics += 1
-            mac = devinfo.get('mac')
-            if mac is None:
-                raise VmError("MAC address not specified or generated.")
-            bridge = devinfo.get('bridge', 'xenbr0')
-            model = devinfo.get('model', 'rtl8139')
-            ret.append("-net")
-            ret.append("nic,vlan=%d,macaddr=%s,model=%s" %
-                       (nics, mac, model))
-            ret.append("-net")
-            ret.append("tap,vlan=%d,bridge=%s" % (nics, bridge))
-
-
-        #
         # Find RFB console device, and if it exists, make QEMU enable
         # the VNC console.
-        #
         if int(vmConfig['platform'].get('nographic', 0)) != 0:
             # skip vnc init if nographic is set
             ret.append('-nographic')
@@ -397,6 +202,11 @@ class HVMImageHandler(ImageHandler):
                 vnc_config = dev_info.get('other_config', {})
                 has_vnc = True
                 break
+
+        keymap = vmConfig['platform'].get("keymap")
+        if keymap:
+            ret.append("-k")
+            ret.append(keymap)
 
         if has_vnc:
             if not vnc_config:
@@ -435,20 +245,20 @@ class HVMImageHandler(ImageHandler):
             ret = ret + ['-monitor', 'vc']
         return ret
 
+    def getDeviceModelArgs(self, restore = False):
+        args = [self.device_model]
+        args = args + ([ "-d",  "%d" % self.vm.getDomid() ])
+        args = args + self.dmargs
+        return args
+
     def createDeviceModel(self, restore = False):
+        if self.device_model is None:
+            return
         if self.pid:
             return
         # Execute device model.
         #todo: Error handling
-        args = [self.device_model]
-        args = args + ([ "-d",  "%d" % self.vm.getDomid() ])
-        if arch.type == "ia64":
-            args = args + ([ "-m", "%s" %
-                             (self.getRequiredInitialReservation() / 1024) ])
-        args = args + self.dmargs
-        if restore:
-            args = args + ([ "-loadvm", "/var/lib/xen/qemu-save.%d" %
-                             self.vm.getDomid() ])
+        args = self.getDeviceModelArgs(restore)
         env = dict(os.environ)
         if self.display:
             env['DISPLAY'] = self.display
@@ -463,6 +273,8 @@ class HVMImageHandler(ImageHandler):
         log.info("device model pid: %d", self.pid)
 
     def saveDeviceModel(self):
+        if self.device_model is None:
+            return
         # Signal the device model to pause itself and save its state
         xstransact.Store("/local/domain/0/device-model/%i"
                          % self.vm.getDomid(), ('command', 'save'))
@@ -479,15 +291,21 @@ class HVMImageHandler(ImageHandler):
                 raise VmError('Timed out waiting for device model to save')
 
     def resumeDeviceModel(self):
+        if self.device_model is None:
+            return
         # Signal the device model to resume activity after pausing to save.
         xstransact.Store("/local/domain/0/device-model/%i"
                          % self.vm.getDomid(), ('command', 'continue'))
 
     def recreate(self):
+        if self.device_model is None:
+            return
         self.pid = self.vm.gatherDom(('image/device-model-pid', int))
 
-    def destroy(self, suspend = False):
-        if self.pid and not suspend:
+    def destroyDeviceModel(self):
+        if self.device_model is None:
+            return
+        if self.pid:
             try:
                 os.kill(self.pid, signal.SIGKILL)
             except OSError, exn:
@@ -502,6 +320,201 @@ class HVMImageHandler(ImageHandler):
             self.pid = None
             state = xstransact.Remove("/local/domain/0/device-model/%i"
                                       % self.vm.getDomid())
+
+
+class LinuxImageHandler(ImageHandler):
+
+    ostype = "linux"
+    flags = 0
+    vhpt = 0
+
+    def buildDomain(self):
+        store_evtchn = self.vm.getStorePort()
+        console_evtchn = self.vm.getConsolePort()
+
+        mem_mb = self.getRequiredInitialReservation() / 1024
+
+        log.debug("domid          = %d", self.vm.getDomid())
+        log.debug("memsize        = %d", mem_mb)
+        log.debug("image          = %s", self.kernel)
+        log.debug("store_evtchn   = %d", store_evtchn)
+        log.debug("console_evtchn = %d", console_evtchn)
+        log.debug("cmdline        = %s", self.cmdline)
+        log.debug("ramdisk        = %s", self.ramdisk)
+        log.debug("vcpus          = %d", self.vm.getVCpuCount())
+        log.debug("features       = %s", self.vm.getFeatures())
+        if arch.type == "ia64":
+            log.debug("vhpt          = %d", self.flags)
+
+        return xc.linux_build(domid          = self.vm.getDomid(),
+                              memsize        = mem_mb,
+                              image          = self.kernel,
+                              store_evtchn   = store_evtchn,
+                              console_evtchn = console_evtchn,
+                              cmdline        = self.cmdline,
+                              ramdisk        = self.ramdisk,
+                              features       = self.vm.getFeatures(),
+                              flags          = self.flags,
+                              vhpt           = self.vhpt)
+
+    def parseDeviceModelArgs(self, vmConfig):
+        ret = ImageHandler.parseDeviceModelArgs(self, vmConfig)
+        # Equivalent to old xenconsoled behaviour. Should make
+        # it configurable in future
+        ret = ret + ["-serial", "pty"]
+        return ret
+
+    def getDeviceModelArgs(self, restore = False):
+        args = ImageHandler.getDeviceModelArgs(self, restore)
+        args = args + ([ "-M", "xenpv"])
+        return args
+
+
+class PPC_LinuxImageHandler(LinuxImageHandler):
+
+    ostype = "linux"
+    
+    def getRequiredShadowMemory(self, shadow_mem_kb, maxmem_kb):
+        """@param shadow_mem_kb The configured shadow memory, in KiB.
+        @param maxmem_kb The configured maxmem, in KiB.
+        @return The corresponding required amount of shadow memory, also in
+        KiB.
+        PowerPC currently uses "shadow memory" to refer to the hash table."""
+        return max(maxmem_kb / 64, shadow_mem_kb)
+
+
+
+class HVMImageHandler(ImageHandler):
+
+    ostype = "hvm"
+
+    def __init__(self, vm, vmConfig):
+        ImageHandler.__init__(self, vm, vmConfig)
+        self.shutdownWatch = None
+        self.rebootFeatureWatch = None
+
+    def configure(self, vmConfig):
+        ImageHandler.configure(self, vmConfig)
+
+        if not self.kernel:
+            self.kernel = '/usr/lib/xen/boot/hvmloader'
+
+        info = xc.xeninfo()
+        if 'hvm' not in info['xen_caps']:
+            raise HVMRequired()
+
+        rtc_timeoffset = vmConfig['platform'].get('rtc_timeoffset')
+
+        self.vm.storeVm(("image/dmargs", " ".join(self.dmargs)),
+                        ("image/device-model", self.device_model),
+                        ("image/display", self.display))
+        self.vm.storeVm(("rtc/timeoffset", rtc_timeoffset))
+
+        self.apic = int(vmConfig['platform'].get('apic', 0))
+        self.acpi = int(vmConfig['platform'].get('acpi', 0))
+
+    # Return a list of cmd line args to the device models based on the
+    # xm config file
+    def parseDeviceModelArgs(self, vmConfig):
+        ret = ImageHandler.parseDeviceModelArgs(self, vmConfig)
+        ret = ret + ['-vcpus', str(self.vm.getVCpuCount())]
+
+        dmargs = [ 'boot', 'fda', 'fdb', 'soundhw',
+                   'localtime', 'serial', 'stdvga', 'isa',
+                   'acpi', 'usb', 'usbdevice', 'pci' ]
+
+        for a in dmargs:
+            v = vmConfig['platform'].get(a)
+
+            # python doesn't allow '-' in variable names
+            if a == 'stdvga': a = 'std-vga'
+            if a == 'keymap': a = 'k'
+
+            # Handle booleans gracefully
+            if a in ['localtime', 'std-vga', 'isa', 'usb', 'acpi']:
+                try:
+                    if v != None: v = int(v)
+                    if v: ret.append("-%s" % a)
+                except (ValueError, TypeError):
+                    pass # if we can't convert it to a sane type, ignore it
+            else:
+                if v:
+                    ret.append("-%s" % a)
+                    ret.append("%s" % v)
+
+            if a in ['fda', 'fdb']:
+                if v:
+                    if not os.path.isabs(v):
+                        raise VmError("Floppy file %s does not exist." % v)
+            log.debug("args: %s, val: %s" % (a,v))
+
+        # Handle disk/network related options
+        mac = None
+        nics = 0
+        
+        for devuuid in vmConfig['vbd_refs']:
+            devinfo = vmConfig['devices'][devuuid][1]
+            uname = devinfo.get('uname')
+            if uname is not None and 'file:' in uname:
+                (_, vbdparam) = string.split(uname, ':', 1)
+                if not os.path.isfile(vbdparam):
+                    raise VmError('Disk image does not exist: %s' %
+                                  vbdparam)
+
+        for devuuid in vmConfig['vif_refs']:
+            devinfo = vmConfig['devices'][devuuid][1]
+            dtype = devinfo.get('type', 'ioemu')
+            if dtype != 'ioemu':
+                continue
+            nics += 1
+            mac = devinfo.get('mac')
+            if mac is None:
+                raise VmError("MAC address not specified or generated.")
+            bridge = devinfo.get('bridge', 'xenbr0')
+            model = devinfo.get('model', 'rtl8139')
+            ret.append("-net")
+            ret.append("nic,vlan=%d,macaddr=%s,model=%s" %
+                       (nics, mac, model))
+            ret.append("-net")
+            ret.append("tap,vlan=%d,bridge=%s" % (nics, bridge))
+
+        return ret
+
+    def getDeviceModelArgs(self, restore = False):
+        args = ImageHandler.getDeviceModelArgs(self, restore)
+        args = args + ([ "-M", "xenfv"])
+        if restore:
+            args = args + ([ "-loadvm", "/var/lib/xen/qemu-save.%d" %
+                             self.vm.getDomid() ])
+        return args
+
+    def buildDomain(self):
+        store_evtchn = self.vm.getStorePort()
+
+        mem_mb = self.getRequiredInitialReservation() / 1024
+
+        log.debug("domid          = %d", self.vm.getDomid())
+        log.debug("image          = %s", self.kernel)
+        log.debug("store_evtchn   = %d", store_evtchn)
+        log.debug("memsize        = %d", mem_mb)
+        log.debug("vcpus          = %d", self.vm.getVCpuCount())
+        log.debug("acpi           = %d", self.acpi)
+        log.debug("apic           = %d", self.apic)
+
+        rc = xc.hvm_build(domid          = self.vm.getDomid(),
+                          image          = self.kernel,
+                          memsize        = mem_mb,
+                          vcpus          = self.vm.getVCpuCount(),
+                          acpi           = self.acpi,
+                          apic           = self.apic)
+        rc['notes'] = { 'SUSPEND_CANCEL': 1 }
+
+        rc['store_mfn'] = xc.hvm_get_param(self.vm.getDomid(),
+                                           HVM_PARAM_STORE_PFN)
+        xc.hvm_set_param(self.vm.getDomid(), HVM_PARAM_STORE_EVTCHN,
+                         store_evtchn)
+
+        return rc
 
 
 class IA64_HVM_ImageHandler(HVMImageHandler):
@@ -528,6 +541,13 @@ class IA64_HVM_ImageHandler(HVMImageHandler):
     def getRequiredShadowMemory(self, shadow_mem_kb, maxmem_kb):
         # Explicit shadow memory is not a concept 
         return 0
+
+    def getDeviceModelArgs(self, restore = False):
+        args = HVMImageHandler.getDeviceModelArgs(self, restore)
+        args = args + ([ "-m", "%s" %
+                         (self.getRequiredInitialReservation() / 1024) ])
+        return args
+
 
 class IA64_Linux_ImageHandler(LinuxImageHandler):
 

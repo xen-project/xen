@@ -32,6 +32,7 @@ from xen.xend.server.BlktapController import blktap_disk_types
 from xen.xend.server.netif import randomMAC
 from xen.util.blkif import blkdev_name_to_number
 from xen.util import xsconstants
+import xen.util.auxbin
 
 log = logging.getLogger("xend.XendConfig")
 log.setLevel(logging.WARN)
@@ -234,8 +235,6 @@ LEGACY_XENSTORE_VM_PARAMS = [
     'on_xend_stop',
 ]
 
-DEFAULT_DM = '/usr/lib/xen/bin/qemu-dm'
-
 ##
 ## Config Choices
 ##
@@ -393,13 +392,14 @@ class XendConfig(dict):
             self['name_label'] = 'Domain-' + self['uuid']
 
     def _platform_sanity_check(self):
-        if self.is_hvm():
-            if 'keymap' not in self['platform'] and XendOptions.instance().get_keymap():
-                self['platform']['keymap'] = XendOptions.instance().get_keymap()
+        if 'keymap' not in self['platform'] and XendOptions.instance().get_keymap():
+            self['platform']['keymap'] = XendOptions.instance().get_keymap()
 
+        if self.is_hvm() or self.has_rfb():
             if 'device_model' not in self['platform']:
-                self['platform']['device_model'] = DEFAULT_DM
+                self['platform']['device_model'] = xen.util.auxbin.pathTo("qemu-dm")
 
+        if self.is_hvm():
             # Compatibility hack, can go away soon.
             if 'soundhw' not in self['platform'] and \
                self['platform'].get('enable_audio'):
@@ -744,16 +744,7 @@ class XendConfig(dict):
         # coalesce hvm vnc frame buffer with vfb config
         if self.is_hvm() and int(self['platform'].get('vnc', 0)) != 0:
             # add vfb device if it isn't there already
-            has_rfb = False
-            for console_uuid in self['console_refs']:
-                if self['devices'][console_uuid][1].get('protocol') == 'rfb':
-                    has_rfb = True
-                    break
-                if self['devices'][console_uuid][0] == 'vfb':
-                    has_rfb = True
-                    break
-
-            if not has_rfb:
+            if not self.has_rfb():
                 dev_config = ['vfb']
                 dev_config.append(['type', 'vnc'])
                 # copy VNC related params from platform config to vfb dev conf
@@ -764,6 +755,14 @@ class XendConfig(dict):
 
                 self.device_add('vfb', cfg_sxp = dev_config)
 
+
+    def has_rfb(self):
+        for console_uuid in self['console_refs']:
+            if self['devices'][console_uuid][1].get('protocol') == 'rfb':
+                return True
+            if self['devices'][console_uuid][0] == 'vfb':
+                return True
+        return False
 
     def _sxp_to_xapi_unsupported(self, sxp_cfg):
         """Read in an SXP configuration object and populate

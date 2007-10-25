@@ -1455,10 +1455,16 @@ class XendDomainInfo:
 
     def _releaseDevices(self, suspend = False):
         """Release all domain's devices.  Nothrow guarantee."""
-        if suspend and self.image:
-            self.image.destroy(suspend)
-            return
+        if self.image:
+            try:
+                log.debug("Destroying device model")
+                self.image.destroyDeviceModel()
+            except Exception, e:
+                log.exception("Device model destroy failed %s" % str(e))
+        else:
+            log.debug("No device model")
 
+        log.debug("Releasing devices")
         t = xstransact("%s/device" % self.dompath)
         for devclass in XendDevices.valid_devices():
             for dev in t.list(devclass):
@@ -1709,11 +1715,6 @@ class XendDomainInfo:
             bootloader_tidy(self)
 
             if self.image:
-                try:
-                    self.image.destroy()
-                except:
-                    log.exception(
-                        "XendDomainInfo.cleanup: image.destroy() failed.")
                 self.image = None
 
             try:
@@ -1881,8 +1882,8 @@ class XendDomainInfo:
             ResumeDomain(self.domid)
         except:
             log.exception("XendDomainInfo.resume: xc.domain_resume failed on domain %s." % (str(self.domid)))
-        if self.is_hvm():
-            self.image.resumeDeviceModel()
+        self.image.resumeDeviceModel()
+        log.debug("XendDomainInfo.resumeDomain: completed")
 
 
     #
