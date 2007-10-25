@@ -409,7 +409,7 @@ class HVMImageHandler(ImageHandler):
                                        xenopts().get_vnclisten_address())
             vncdisplay = vnc_config.get('vncdisplay', 0)
             ret.append('-vnc')
-            ret.append("%s:%d" % (vnclisten, vncdisplay))
+            ret.append("%s:%s" % (vnclisten, vncdisplay))
             
             if vnc_config.get('vncunused', 0):
                 ret.append('-vncunused')
