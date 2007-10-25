@@ -377,6 +377,7 @@ int xs_gather(struct xs_handle *xs, const char *dir, ...)
 static int domain_create_ring(struct domain *dom)
 {
 	int err, remote_port, ring_ref, rc;
+	char *type, path[PATH_MAX];
 
 	err = xs_gather(xs, dom->serialpath,
 			"ring-ref", "%u", &ring_ref,
@@ -392,6 +393,14 @@ static int domain_create_ring(struct domain *dom)
 		dom->use_consolepath = 1;
 	} else
 		dom->use_consolepath = 0;
+
+	sprintf(path, "%s/type", dom->use_consolepath ? dom->conspath: dom->serialpath);
+	type = xs_read(xs, XBT_NULL, path, NULL);
+	if (type && strcmp(type, "xenconsoled") != 0) {
+		free(type);
+		return 0;
+	}
+	free(type);
 
 	if ((ring_ref == dom->ring_ref) && (remote_port == dom->remote_port))
 		goto out;

@@ -916,8 +916,15 @@ class XendDomainInfo:
                 else:
                     to_store[n] = str(v)
 
+        # Figure out if we need to tell xenconsoled to ignore this guest's
+        # console - device model will handle console if it is running
+        constype = "ioemu"
+        if 'device_model' not in self.info['platform']:
+            constype = "xenconsoled"
+
         f('console/port',     self.console_port)
         f('console/ring-ref', self.console_mfn)
+        f('console/type',     constype)
         f('store/port',       self.store_port)
         f('store/ring-ref',   self.store_mfn)
 
