@@ -23,6 +23,7 @@
  */
 
 #include "vl.h"
+#include "xen_console.h"
 #include "xenfb.h"
 
 /* The Xen PV machine currently provides
@@ -38,6 +39,14 @@ static void xen_init_pv(uint64_t ram_size, int vga_ram_size, char *boot_device,
 {
     struct xenfb *xenfb;
     extern int domid;
+
+    /* Connect to text console */
+    if (serial_hds[0]) {
+        if (xencons_init(domid, serial_hds[0]) < 0) {
+            fprintf(stderr, "Could not connect to domain console\n");
+            exit(1);
+        }
+    }
 
     /* Prepare PVFB state */
     xenfb = xenfb_new(domid, ds);

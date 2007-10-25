@@ -17,7 +17,7 @@
 #include <sys/stat.h>
 #include <fcntl.h>
 
-static struct xs_handle *xsh = NULL;
+struct xs_handle *xsh = NULL;
 static char *media_filename[MAX_DISKS + MAX_SCSI_DISKS];
 static QEMUTimer *insert_timer = NULL;
 

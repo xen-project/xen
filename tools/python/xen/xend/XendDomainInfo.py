@@ -1761,10 +1761,9 @@ class XendDomainInfo:
         self.console_mfn = console_mfn
 
         self._introduceDomain()
-        if self.info.is_hvm():
-            self.image = image.create(self, self.info)
-            if self.image:
-                self.image.createDeviceModel(True)
+        self.image = image.create(self, self.info)
+        if self.image:
+            self.image.createDeviceModel(True)
         self._storeDomDetails()
         self._registerWatches()
         self.refreshShutdown()
