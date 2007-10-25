@@ -394,7 +394,7 @@ int monitor_tbufs(int outfd)
             }
 
             mb(); /* read buffer, then update cons. */
-            meta[i]->cons = meta[i]->prod;
+            meta[i]->cons = prod;
         }
 
         nanosleep(&opts.poll_sleep, NULL);
