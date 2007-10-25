@@ -318,6 +318,9 @@ void xenstore_process_logdirty_event(void)
         if (logdirty_bitmap_size != *(uint32_t *)seg) {
             fprintf(logfile, "Log-dirty: got %u, calc %lu\n", 
                     *(uint32_t *)seg, logdirty_bitmap_size);
+            /* Stale key: wait for next watch */
+            shmdt(seg);
+            seg = NULL;
             return;
         }
 
