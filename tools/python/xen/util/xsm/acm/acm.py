@@ -656,6 +656,10 @@ def get_res_security_details(resource):
         log.info("Resource label for "+resource+" not in file, using DEFAULT.")
         return default_security_details()
 
+    if policytype != xsconstants.ACM_POLICY_ID:
+        raise VmError("Unknown policy type '%s in label for resource '%s'" %
+                      (policytype, resource))
+
     # is this resource label for the running policy?
     if policy == active_policy:
         ssidref = label2ssidref(label, policy, 'res')
@@ -1373,11 +1377,9 @@ def get_security_label(self, xspol=None):
         from xen.xend.XendXSPolicyAdmin import XSPolicyAdminInstance
         xspol = XSPolicyAdminInstance().get_loaded_policy()
 
-    if domid == 0:
+        label = ""
         if xspol:
             label = xspol.policy_get_domain_label_formatted(domid)
-        else:
-            label = ""
-    else:
-        label = self.info.get('security_label', '')
+        if domid != 0:
+            label = self.info.get('security_label', label)
     return label
