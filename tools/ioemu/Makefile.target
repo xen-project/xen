@@ -411,7 +411,7 @@ VL_OBJS+= xenstore.o
 VL_OBJS+= xen_platform.o
 VL_OBJS+= xen_machine_fv.o
 VL_OBJS+= xen_machine_pv.o
-VL_OBJS+= ../../xenfb/xenfb.o
+VL_OBJS+= xenfb.o
 VL_OBJS+= tpm_tis.o
 CPPFLAGS += -DHAS_AUDIO
 endif

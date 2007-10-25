@@ -23,7 +23,7 @@
  */
 
 #include "vl.h"
-#include "../../xenfb/xenfb.h"
+#include "xenfb.h"
 #include <linux/input.h>
 
 /*
