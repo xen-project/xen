@@ -5,21 +5,7 @@
 #include <stdbool.h>
 #include <sys/types.h>
 
-struct xenfb
-{
-	void *pixels;
-
-	int row_stride;
-	int depth;
-	int width;
-	int height;
-	int abs_pointer_wanted;
-	int button_state;
-
-	void *user_data;
-
-	void (*update)(struct xenfb *xenfb, int x, int y, int width, int height);
-};
+struct xenfb;
 
 struct xenfb *xenfb_new(void);
 void xenfb_delete(struct xenfb *xenfb);

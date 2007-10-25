@@ -22,6 +22,8 @@
 
 // FIXME defend against malicious frontend?
 
+struct xenfb;
+
 struct xenfb_device {
 	const char *devicetype;
 	char nodename[64];	/* backend xenstore dir */
@@ -30,16 +32,23 @@ struct xenfb_device {
 	enum xenbus_state state; /* backend state */
 	void *page;		/* shared page */
 	evtchn_port_t port;
-	struct xenfb_private *xenfb;
+	struct xenfb *xenfb;
 };
 
-struct xenfb_private {
-	struct xenfb pub;
+struct xenfb {
+	DisplayState *ds;       /* QEMU graphical console state */
 	int evt_xch;		/* event channel driver handle */
 	int xc;			/* hypervisor interface handle */
 	struct xs_handle *xsh;	/* xs daemon handle */
 	struct xenfb_device fb, kbd;
+	void *pixels;           /* guest framebuffer data */
 	size_t fb_len;		/* size of framebuffer */
+	int row_stride;         /* width of one row in framebuffer */
+	int depth;              /* colour depth of guest framebuffer */
+	int width;              /* pixel width of guest framebuffer */
+	int height;             /* pixel height of guest framebuffer */
+	int abs_pointer_wanted; /* Whether guest supports absolute pointer */
+	int button_state;       /* Last seen pointer button state */
 	char protocol[64];	/* frontend protocol */
 };
 
@@ -95,7 +104,7 @@ static const unsigned char atkbd_unxlate_table[128] = {
 static unsigned char scancode2linux[512];
 
 
-static void xenfb_detach_dom(struct xenfb_private *);
+static void xenfb_detach_dom(struct xenfb *);
 
 static char *xenfb_path_in_dom(struct xs_handle *xsh,
 			       char *buf, size_t size,
@@ -176,7 +185,7 @@ static int xenfb_xs_printf(struct xs_handle *xsh,
 
 static void xenfb_device_init(struct xenfb_device *dev,
 			      const char *type,
-			      struct xenfb_private *xenfb)
+			      struct xenfb *xenfb)
 {
 	dev->devicetype = type;
 	dev->otherend_id = -1;
@@ -184,19 +193,17 @@ static void xenfb_device_init(struct xenfb_device *dev,
 	dev->xenfb = xenfb;
 }
 
-int xenfb_device_set_domain(struct xenfb_device *dev, int domid)
+static int xenfb_device_set_domain(struct xenfb_device *dev, int domid)
 {
-	struct xenfb_private *xenfb = dev->xenfb;
-
 	dev->otherend_id = domid;
 
-	if (!xenfb_path_in_dom(xenfb->xsh,
+	if (!xenfb_path_in_dom(dev->xenfb->xsh,
 			       dev->otherend, sizeof(dev->otherend),
 			       domid, "device/%s/0", dev->devicetype)) {
 		errno = ENOENT;
 		return -1;
 	}
-	if (!xenfb_path_in_dom(xenfb->xsh,
+	if (!xenfb_path_in_dom(dev->xenfb->xsh,
 			       dev->nodename, sizeof(dev->nodename),
 			       0, "backend/%s/%d/0", dev->devicetype, domid)) {
 		errno = ENOENT;
@@ -208,7 +215,7 @@ int xenfb_device_set_domain(struct xenfb_device *dev, int domid)
 
 struct xenfb *xenfb_new(void)
 {
-	struct xenfb_private *xenfb = malloc(sizeof(*xenfb));
+	struct xenfb *xenfb = qemu_malloc(sizeof(struct xenfb));
 	int serrno;
 	int i;
 
@@ -239,30 +246,26 @@ struct xenfb *xenfb_new(void)
 	if (!xenfb->xsh)
 		goto fail;
 
-	return &xenfb->pub;
+	return xenfb;
 
  fail:
 	serrno = errno;
-	xenfb_delete(&xenfb->pub);
+	xenfb_delete(xenfb);
 	errno = serrno;
 	return NULL;
 }
 
 /* Remove the backend area in xenbus since the framebuffer really is
    going away. */
-void xenfb_teardown(struct xenfb *xenfb_pub)
+void xenfb_teardown(struct xenfb *xenfb)
 {
-       struct xenfb_private *xenfb = (struct xenfb_private *)xenfb_pub;
-
        xs_rm(xenfb->xsh, XBT_NULL, xenfb->fb.nodename);
        xs_rm(xenfb->xsh, XBT_NULL, xenfb->kbd.nodename);
 }
 
 
-void xenfb_delete(struct xenfb *xenfb_pub)
+void xenfb_delete(struct xenfb *xenfb)
 {
-	struct xenfb_private *xenfb = (struct xenfb_private *)xenfb_pub;
-
 	xenfb_detach_dom(xenfb);
 	if (xenfb->xc >= 0)
 		xc_interface_close(xenfb->xc);
@@ -394,7 +397,7 @@ static void xenfb_copy_mfns(int mode, int count, unsigned long *dst, void *src)
 		dst[i] = (mode == 32) ? src32[i] : src64[i];
 }
 
-static int xenfb_map_fb(struct xenfb_private *xenfb, int domid)
+static int xenfb_map_fb(struct xenfb *xenfb, int domid)
 {
 	struct xenfb_page *page = xenfb->fb.page;
 	int n_fbmfns;
@@ -466,9 +469,9 @@ static int xenfb_map_fb(struct xenfb_private *xenfb, int domid)
 	xenfb_copy_mfns(mode, n_fbmfns, fbmfns, map);
 	munmap(map, n_fbdirs * XC_PAGE_SIZE);
 
-	xenfb->pub.pixels = xc_map_foreign_pages(xenfb->xc, domid,
+	xenfb->pixels = xc_map_foreign_pages(xenfb->xc, domid,
 				PROT_READ | PROT_WRITE, fbmfns, n_fbmfns);
-	if (xenfb->pub.pixels == NULL)
+	if (xenfb->pixels == NULL)
 		goto out;
 
 	ret = 0; /* all is fine */
@@ -483,7 +486,7 @@ static int xenfb_map_fb(struct xenfb_private *xenfb, int domid)
 
 static int xenfb_bind(struct xenfb_device *dev)
 {
-	struct xenfb_private *xenfb = dev->xenfb;
+	struct xenfb *xenfb = dev->xenfb;
 	unsigned long mfn;
 	evtchn_port_t evtchn;
 
@@ -566,17 +569,18 @@ static void xenfb_dev_fatal(struct xenfb_device *dev, int err,
 }
 
 
-static void xenfb_detach_dom(struct xenfb_private *xenfb)
+static void xenfb_detach_dom(struct xenfb *xenfb)
 {
 	xenfb_unbind(&xenfb->fb);
 	xenfb_unbind(&xenfb->kbd);
-	if (xenfb->pub.pixels) {
-		munmap(xenfb->pub.pixels, xenfb->fb_len);
-		xenfb->pub.pixels = NULL;
+	if (xenfb->pixels) {
+		munmap(xenfb->pixels, xenfb->fb_len);
+		xenfb->pixels = NULL;
 	}
 }
 
-static void xenfb_on_fb_event(struct xenfb_private *xenfb)
+
+static void xenfb_on_fb_event(struct xenfb *xenfb)
 {
 	uint32_t prod, cons;
 	struct xenfb_page *page = xenfb->fb.page;
@@ -590,11 +594,10 @@ static void xenfb_on_fb_event(struct xenfb_private *xenfb)
 
 		switch (event->type) {
 		case XENFB_TYPE_UPDATE:
-                    if (xenfb->pub.update)
-			xenfb->pub.update(&xenfb->pub,
-					  event->update.x, event->update.y,
-					  event->update.width, event->update.height);
-                    break;
+			xenfb_guest_copy(xenfb,
+					 event->update.x, event->update.y,
+					 event->update.width, event->update.height);
+			break;
 		}
 	}
 	mb();			/* ensure we're done with ring contents */
@@ -602,7 +605,7 @@ static void xenfb_on_fb_event(struct xenfb_private *xenfb)
 	xc_evtchn_notify(xenfb->evt_xch, xenfb->fb.port);
 }
 
-static void xenfb_on_kbd_event(struct xenfb_private *xenfb)
+static void xenfb_on_kbd_event(struct xenfb *xenfb)
 {
 	struct xenkbd_page *page = xenfb->kbd.page;
 
@@ -640,7 +643,7 @@ static int xenfb_on_state_change(struct xenfb_device *dev)
 	return 0;
 }
 
-static int xenfb_kbd_event(struct xenfb_private *xenfb,
+static int xenfb_kbd_event(struct xenfb *xenfb,
 			   union xenkbd_in_event *event)
 {
 	uint32_t prod;
@@ -662,9 +665,8 @@ static int xenfb_kbd_event(struct xenfb_private *xenfb,
 	return xc_evtchn_notify(xenfb->evt_xch, xenfb->kbd.port);
 }
 
-static int xenfb_send_key(struct xenfb *xenfb_pub, bool down, int keycode)
+static int xenfb_send_key(struct xenfb *xenfb, bool down, int keycode)
 {
-	struct xenfb_private *xenfb = (struct xenfb_private *)xenfb_pub;
 	union xenkbd_in_event event;
 
 	memset(&event, 0, XENKBD_IN_EVENT_SIZE);
@@ -675,9 +677,8 @@ static int xenfb_send_key(struct xenfb *xenfb_pub, bool down, int keycode)
 	return xenfb_kbd_event(xenfb, &event);
 }
 
-static int xenfb_send_motion(struct xenfb *xenfb_pub, int rel_x, int rel_y)
+static int xenfb_send_motion(struct xenfb *xenfb, int rel_x, int rel_y)
 {
-	struct xenfb_private *xenfb = (struct xenfb_private *)xenfb_pub;
 	union xenkbd_in_event event;
 
 	memset(&event, 0, XENKBD_IN_EVENT_SIZE);
@@ -688,9 +689,8 @@ static int xenfb_send_motion(struct xenfb *xenfb_pub, int rel_x, int rel_y)
 	return xenfb_kbd_event(xenfb, &event);
 }
 
-static int xenfb_send_position(struct xenfb *xenfb_pub, int abs_x, int abs_y)
+static int xenfb_send_position(struct xenfb *xenfb, int abs_x, int abs_y)
 {
-	struct xenfb_private *xenfb = (struct xenfb_private *)xenfb_pub;
 	union xenkbd_in_event event;
 
 	memset(&event, 0, XENKBD_IN_EVENT_SIZE);
@@ -702,9 +702,9 @@ static int xenfb_send_position(struct xenfb *xenfb_pub, int abs_x, int abs_y)
 }
 
 
-static void xenfb_dispatch_channel(void *xenfb_pub)
+static void xenfb_dispatch_channel(void *opaque)
 {
-	struct xenfb_private *xenfb = (struct xenfb_private *)xenfb_pub;
+	struct xenfb *xenfb = (struct xenfb *)opaque;
 	evtchn_port_t port;
 	port = xc_evtchn_pending(xenfb->evt_xch);
 	if (port == -1)
@@ -719,9 +719,9 @@ static void xenfb_dispatch_channel(void *xenfb_pub)
 		exit(1);
 }
 
-static void xenfb_dispatch_store(void *xenfb_pub)
+static void xenfb_dispatch_store(void *opaque)
 {
-	struct xenfb_private *xenfb = (struct xenfb_private *)xenfb_pub;
+	struct xenfb *xenfb = (struct xenfb *)opaque;
 	unsigned dummy;
 	char **vec;
 	int r;
@@ -736,9 +736,8 @@ static void xenfb_dispatch_store(void *xenfb_pub)
 }
 
 
-int xenfb_attach_dom(struct xenfb *xenfb_pub, int domid, DisplayState *ds)
+int xenfb_attach_dom(struct xenfb *xenfb, int domid, DisplayState *ds)
 {
-	struct xenfb_private *xenfb = (struct xenfb_private *)xenfb_pub;
 	struct xs_handle *xsh = xenfb->xsh;
 	int val, serrno;
 	struct xenfb_page *fb_page;
@@ -794,12 +793,12 @@ int xenfb_attach_dom(struct xenfb *xenfb_pub, int domid, DisplayState *ds)
 
 	/* TODO check for permitted ranges */
 	fb_page = xenfb->fb.page;
-	xenfb->pub.depth = fb_page->depth;
-	xenfb->pub.width = fb_page->width;
-	xenfb->pub.height = fb_page->height;
+	xenfb->depth = fb_page->depth;
+	xenfb->width = fb_page->width;
+	xenfb->height = fb_page->height;
 	/* TODO check for consistency with the above */
 	xenfb->fb_len = fb_page->mem_length;
-	xenfb->pub.row_stride = fb_page->line_length;
+	xenfb->row_stride = fb_page->line_length;
 
 	if (xenfb_map_fb(xenfb, domid) < 0)
 		goto error;
@@ -814,7 +813,7 @@ int xenfb_attach_dom(struct xenfb *xenfb_pub, int domid, DisplayState *ds)
 	if (xenfb_xs_scanf1(xsh, xenfb->kbd.otherend, "request-abs-pointer",
 			    "%d", &val) < 0)
 		val = 0;
-	xenfb->pub.abs_pointer_wanted = val;
+	xenfb->abs_pointer_wanted = val;
 
 	/* Listen for events from xenstore */
 	if (qemu_set_fd_handler2(xs_fileno(xenfb->xsh), NULL, xenfb_dispatch_store, NULL, xenfb) < 0)
@@ -827,19 +826,18 @@ int xenfb_attach_dom(struct xenfb *xenfb_pub, int domid, DisplayState *ds)
 	/* Register our keyboard & mouse handlers */
 	qemu_add_kbd_event_handler(xenfb_key_event, xenfb);
 	qemu_add_mouse_event_handler(xenfb_mouse_event, xenfb,
-				     xenfb_pub->abs_pointer_wanted,
+				     xenfb->abs_pointer_wanted,
 				     "Xen PVFB Mouse");
 
-	xenfb_pub->update = xenfb_guest_copy;
-	xenfb_pub->user_data = ds;
+	xenfb->ds = ds;
 
 	/* Tell QEMU to allocate a graphical console */
 	graphic_console_init(ds,
 			     xenfb_update,
 			     xenfb_invalidate,
 			     xenfb_screen_dump,
-			     xenfb_pub);
-	dpy_resize(ds, xenfb_pub->width, xenfb_pub->height);
+			     xenfb);
+	dpy_resize(ds, xenfb->width, xenfb->height);
 
 	return 0;
 
@@ -898,11 +896,10 @@ static void xenfb_mouse_event(void *opaque,
 {
     int i;
     struct xenfb *xenfb = opaque;
-    DisplayState *ds = (DisplayState *)xenfb->user_data;
     if (xenfb->abs_pointer_wanted)
 	    xenfb_send_position(xenfb,
-				dx * ds->width / 0x7fff,
-				dy * ds->height / 0x7fff);
+				dx * xenfb->ds->width / 0x7fff,
+				dy * xenfb->ds->height / 0x7fff);
     else
 	    xenfb_send_motion(xenfb, dx, dy);
 
@@ -924,9 +921,9 @@ static void xenfb_mouse_event(void *opaque,
         SRC_T *src = (SRC_T *)(xenfb->pixels                            \
                                + (line * xenfb->row_stride)             \
                                + (x * xenfb->depth / 8));               \
-        DST_T *dst = (DST_T *)(ds->data                                 \
-                               + (line * ds->linesize)                  \
-                               + (x * ds->depth / 8));                  \
+        DST_T *dst = (DST_T *)(xenfb->ds->data                                 \
+                               + (line * xenfb->ds->linesize)                  \
+                               + (x * xenfb->ds->depth / 8));                  \
         int col;                                                        \
         for (col = x ; col < w ; col++) {                               \
             *dst = (((*src >> RRS) & RM) << RLS) |                      \
@@ -945,40 +942,39 @@ static void xenfb_mouse_event(void *opaque,
  */
 static void xenfb_guest_copy(struct xenfb *xenfb, int x, int y, int w, int h)
 {
-    DisplayState *ds = (DisplayState *)xenfb->user_data;
     int line;
 
-    if (xenfb->depth == ds->depth) { /* Perfect match can use fast path */
+    if (xenfb->depth == xenfb->ds->depth) { /* Perfect match can use fast path */
         for (line = y ; line < (y+h) ; line++) {
-            memcpy(ds->data + (line * ds->linesize) + (x * ds->depth / 8),
+            memcpy(xenfb->ds->data + (line * xenfb->ds->linesize) + (x * xenfb->ds->depth / 8),
                    xenfb->pixels + (line * xenfb->row_stride) + (x * xenfb->depth / 8),
                    w * xenfb->depth / 8);
         }
     } else { /* Mismatch requires slow pixel munging */
         if (xenfb->depth == 8) {
             /* 8 bit source == r:3 g:3 b:2 */
-            if (ds->depth == 16) {
+            if (xenfb->ds->depth == 16) {
                 BLT(uint8_t, uint16_t,   5, 2, 0,   11, 5, 0,   7, 7, 3);
-            } else if (ds->depth == 32) {
+            } else if (xenfb->ds->depth == 32) {
                 BLT(uint8_t, uint32_t,   5, 2, 0,   16, 8, 0,   7, 7, 3);
             }
         } else if (xenfb->depth == 16) {
             /* 16 bit source == r:5 g:6 b:5 */
-            if (ds->depth == 8) {
+            if (xenfb->ds->depth == 8) {
                 BLT(uint16_t, uint8_t,    11, 5, 0,   5, 2, 0,    31, 63, 31);
-            } else if (ds->depth == 32) {
+            } else if (xenfb->ds->depth == 32) {
                 BLT(uint16_t, uint32_t,   11, 5, 0,   16, 8, 0,   31, 63, 31);
             }
         } else if (xenfb->depth == 32) {
             /* 32 bit source == r:8 g:8 b:8 (padding:8) */
-            if (ds->depth == 8) {
+            if (xenfb->ds->depth == 8) {
                 BLT(uint32_t, uint8_t,    16, 8, 0,   5, 2, 0,    255, 255, 255);
-            } else if (ds->depth == 16) {
+            } else if (xenfb->ds->depth == 16) {
                 BLT(uint32_t, uint16_t,   16, 8, 0,   11, 5, 0,   255, 255, 255);
             }
         }
     }
-    dpy_update(ds, x, y, w, h);
+    dpy_update(xenfb->ds, x, y, w, h);
 }
 
 /* QEMU display state changed, so refresh the framebuffer copy */

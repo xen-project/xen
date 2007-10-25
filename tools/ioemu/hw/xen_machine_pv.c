@@ -53,9 +53,6 @@ static void xen_init_pv(uint64_t ram_size, int vga_ram_size, char *boot_device,
                 strerror(errno));
         exit(1);
     }
-
-    /* Setup QEMU display */
-    dpy_resize(ds, xenfb->width, xenfb->height);
 }
 
 QEMUMachine xenpv_machine = {
