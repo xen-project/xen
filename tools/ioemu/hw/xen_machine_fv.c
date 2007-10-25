@@ -201,6 +201,7 @@ static void xen_init_fv(uint64_t ram_size, int vga_ram_size, char *boot_device,
     unsigned long nr_pages;
     xen_pfn_t *page_array;
     extern void *buffered_pio_page;
+    int i;
 #endif
 
 #if defined(__i386__) || defined(__x86_64__)
