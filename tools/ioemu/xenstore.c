@@ -303,12 +303,19 @@ void xenstore_process_logdirty_event(void)
         logdirty_bitmap_size *= sizeof (unsigned long); /* bytes */
 
         /* Map the shared-memory segment */
-        if ((shmid = shmget(key, 
-                            2 * logdirty_bitmap_size, 
-                            S_IRUSR|S_IWUSR)) == -1 
-            || (seg = shmat(shmid, NULL, 0)) == (void *)-1) {
-            fprintf(logfile, "Log-dirty: can't map segment %16.16llx (%s)\n",
-                    (unsigned long long) key, strerror(errno));
+        fprintf(logfile, "%s: key=%16.16llx size=%d\n", __FUNCTION__,
+                (unsigned long long)key, logdirty_bitmap_size);
+        shmid = shmget(key, 2 * logdirty_bitmap_size, S_IRUSR|S_IWUSR);
+        if (shmid == -1) {
+            fprintf(logfile, "Log-dirty: shmget failed: segment %16.16llx "
+                    "(%s)\n", (unsigned long long)key, strerror(errno));
+            exit(1);
+        }
+
+        seg = shmat(shmid, NULL, 0);
+        if (seg == (void *)-1) {
+            fprintf(logfile, "Log-dirty: shmat failed: segment %16.16llx "
+                    "(%s)\n", (unsigned long long)key, strerror(errno));
             exit(1);
         }
 
