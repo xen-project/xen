@@ -1228,7 +1228,7 @@ def config_security_check(config, verbose):
             if verbose:
                 print "   %s: PERMITTED" % (resource)
 
-        except security.XSMError:
+        except security.ACMError:
             print "   %s: DENIED" % (resource)
             (poltype, res_label, res_policy) = security.get_res_label(resource)
             if not res_label:

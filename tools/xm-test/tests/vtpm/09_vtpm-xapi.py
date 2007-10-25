@@ -17,7 +17,7 @@ from vtpm_utils import *
 import commands
 import os
 
-VTPM_RECORD_KEYS = [ 'backend', 'VM', 'uuid' ]
+VTPM_RECORD_KEYS = [ 'backend', 'VM', 'uuid', 'other_config' ]
 
 try:
     # XmTestAPIDomain tries to establish a connection to XenD

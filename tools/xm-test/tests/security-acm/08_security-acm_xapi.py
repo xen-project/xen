@@ -19,6 +19,9 @@ vm_label_green  = xsconstants.ACM_POLICY_ID + ":xm-test:green"
 vdi_label_red   = xsconstants.ACM_POLICY_ID + ":xm-test:red"
 vdi_label_green = xsconstants.ACM_POLICY_ID + ":xm-test:green"
 
+vm_label_unlabeled = xsconstants.ACM_POLICY_ID + ":xm-test:" + \
+                     acmpolicy.ACM_LABEL_UNLABELED
+
 vdi_file = "/dev/ram0"
 vdi_path = "phy:" + vdi_file
 
@@ -105,7 +108,7 @@ if int(res) != 0:
     FAIL("Should be able to unlabel the domain while it's halted.")
 
 res = session.xenapi.VM.get_security_label(vm_uuid)
-if res != "":
+if res != vm_label_unlabeled:
     FAIL("Unexpected VM security label after removal: %s" % res)
 
 res = session.xenapi.VM.set_security_label(vm_uuid, vm_label_red, res)
