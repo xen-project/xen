@@ -213,22 +213,6 @@ void xen_pvfb_invalidate(void *opaque)
 /* Screen dump is not used in Xen, so no need to impl this ? */
 void xen_pvfb_screen_dump(void *opaque, const char *name) { }
 
-void xen_pvfb_dispatch_store(void *opaque) {
-    int ret;
-    if ((ret = xenfb_dispatch_store(opaque)) < 0) {
-        fprintf(stderr, "Failure while dispatching store: %d\n", ret);
-        exit(1);
-    }
-}
-
-void xen_pvfb_dispatch_channel(void *opaque) {
-    int ret;
-    if ((ret = xenfb_dispatch_channel(opaque)) < 0) {
-        fprintf(stderr, "Failure while dispatching store: %d\n", ret);
-        exit(1);
-    }
-}
-
 /* The Xen PV machine currently provides
  *   - a virtual framebuffer
  *   - ....
@@ -242,7 +226,7 @@ static void xen_init_pv(uint64_t ram_size, int vga_ram_size, char *boot_device,
 {
     struct xenfb *xenfb;
     extern int domid;
-    int fd, i;
+    int i;
 
     /* Prepare scancode mapping table */
 	for (i = 0; i < 128; i++) {
@@ -281,19 +265,6 @@ static void xen_init_pv(uint64_t ram_size, int vga_ram_size, char *boot_device,
                                  xenfb->abs_pointer_wanted,
                                  "Xen PVFB Mouse");
 
-    /* Listen for events from xenstore */
-    fd = xenfb_get_store_fd(xenfb);
-    if (qemu_set_fd_handler2(fd, NULL, xen_pvfb_dispatch_store, NULL, xenfb) < 0) {
-        fprintf(stderr, "Could not register event handler (%s)\n",
-                strerror(errno));
-    }
-
-    /* Listen for events from the event channel */
-    fd = xenfb_get_channel_fd(xenfb);
-    if (qemu_set_fd_handler2(fd, NULL, xen_pvfb_dispatch_channel, NULL, xenfb) < 0) {
-        fprintf(stderr, "Could not register event handler (%s)\n",
-                strerror(errno));
-    }
 
     /* Setup QEMU display */
     dpy_resize(ds, xenfb->width, xenfb->height);

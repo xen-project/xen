@@ -25,13 +25,6 @@ void xenfb_teardown(struct xenfb *xenfb);
 
 int xenfb_attach_dom(struct xenfb *xenfb, int domid);
 
-int xenfb_dispatch_store(struct xenfb *xenfb_pub);
-int xenfb_dispatch_channel(struct xenfb *xenfb_pub);
-int xenfb_select_fds(struct xenfb *xenfb, fd_set *readfds);
-int xenfb_poll(struct xenfb *xenfb, fd_set *readfds);
-int xenfb_get_store_fd(struct xenfb *xenfb_pub);
-int xenfb_get_channel_fd(struct xenfb *xenfb_pub);
-
 int xenfb_send_key(struct xenfb *xenfb, bool down, int keycode);
 int xenfb_send_motion(struct xenfb *xenfb, int rel_x, int rel_y);
 int xenfb_send_position(struct xenfb *xenfb, int abs_x, int abs_y);

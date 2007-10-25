@@ -8,7 +8,6 @@
 #include <xen/io/fbif.h>
 #include <xen/io/kbdif.h>
 #include <xen/io/protocols.h>
-#include <sys/select.h>
 #include <stdbool.h>
 #include <xen/event_channel.h>
 #include <sys/mman.h>
@@ -18,6 +17,7 @@
 #include <time.h>
 #include <xs.h>
 
+#include "vl.h"
 #include "xenfb.h"
 
 // FIXME defend against malicious frontend?
@@ -505,6 +505,115 @@ static void xenfb_dev_fatal(struct xenfb_device *dev, int err,
 	xenfb_switch_state(dev, XenbusStateClosing);
 }
 
+
+static void xenfb_detach_dom(struct xenfb_private *xenfb)
+{
+	xenfb_unbind(&xenfb->fb);
+	xenfb_unbind(&xenfb->kbd);
+	if (xenfb->pub.pixels) {
+		munmap(xenfb->pub.pixels, xenfb->fb_len);
+		xenfb->pub.pixels = NULL;
+	}
+}
+
+static void xenfb_on_fb_event(struct xenfb_private *xenfb)
+{
+	uint32_t prod, cons;
+	struct xenfb_page *page = xenfb->fb.page;
+
+	prod = page->out_prod;
+	if (prod == page->out_cons)
+		return;
+	rmb();			/* ensure we see ring contents up to prod */
+	for (cons = page->out_cons; cons != prod; cons++) {
+		union xenfb_out_event *event = &XENFB_OUT_RING_REF(page, cons);
+
+		switch (event->type) {
+		case XENFB_TYPE_UPDATE:
+                    if (xenfb->pub.update)
+			xenfb->pub.update(&xenfb->pub,
+					  event->update.x, event->update.y,
+					  event->update.width, event->update.height);
+                    break;
+		}
+	}
+	mb();			/* ensure we're done with ring contents */
+	page->out_cons = cons;
+	xc_evtchn_notify(xenfb->evt_xch, xenfb->fb.port);
+}
+
+static void xenfb_on_kbd_event(struct xenfb_private *xenfb)
+{
+	struct xenkbd_page *page = xenfb->kbd.page;
+
+	/* We don't understand any keyboard events, so just ignore them. */
+	if (page->out_prod == page->out_cons)
+		return;
+	page->out_cons = page->out_prod;
+	xc_evtchn_notify(xenfb->evt_xch, xenfb->kbd.port);
+}
+
+static int xenfb_on_state_change(struct xenfb_device *dev)
+{
+	enum xenbus_state state;
+
+	state = xenfb_read_state(dev->xenfb->xsh, dev->otherend);
+
+	switch (state) {
+	case XenbusStateUnknown:
+		/* There was an error reading the frontend state.  The
+		   domain has probably gone away; in any case, there's
+		   not much point in us continuing. */
+		return -1;
+	case XenbusStateInitialising:
+	case XenbusStateInitWait:
+	case XenbusStateInitialised:
+	case XenbusStateConnected:
+		break;
+	case XenbusStateClosing:
+		xenfb_unbind(dev);
+		xenfb_switch_state(dev, state);
+		break;
+	case XenbusStateClosed:
+		xenfb_switch_state(dev, state);
+	}
+	return 0;
+}
+
+static void xenfb_dispatch_channel(void *xenfb_pub)
+{
+	struct xenfb_private *xenfb = (struct xenfb_private *)xenfb_pub;
+	evtchn_port_t port;
+	port = xc_evtchn_pending(xenfb->evt_xch);
+	if (port == -1)
+		exit(1);
+
+	if (port == xenfb->fb.port)
+		xenfb_on_fb_event(xenfb);
+	else if (port == xenfb->kbd.port)
+		xenfb_on_kbd_event(xenfb);
+
+	if (xc_evtchn_unmask(xenfb->evt_xch, port) == -1)
+		exit(1);
+}
+
+static void xenfb_dispatch_store(void *xenfb_pub)
+{
+	struct xenfb_private *xenfb = (struct xenfb_private *)xenfb_pub;
+	unsigned dummy;
+	char **vec;
+	int r;
+
+	vec = xs_read_watch(xenfb->xsh, &dummy);
+	free(vec);
+	r = xenfb_on_state_change(&xenfb->fb);
+	if (r == 0)
+		r = xenfb_on_state_change(&xenfb->kbd);
+	if (r == -1)
+		exit(1);
+}
+
+
 int xenfb_attach_dom(struct xenfb *xenfb_pub, int domid)
 {
 	struct xenfb_private *xenfb = (struct xenfb_private *)xenfb_pub;
@@ -585,6 +694,14 @@ int xenfb_attach_dom(struct xenfb *xenfb_pub, int domid)
 		val = 0;
 	xenfb->pub.abs_pointer_wanted = val;
 
+	/* Listen for events from xenstore */
+	if (qemu_set_fd_handler2(xs_fileno(xenfb->xsh), NULL, xenfb_dispatch_store, NULL, xenfb) < 0)
+		goto error;
+
+	/* Listen for events from the event channel */
+	if (qemu_set_fd_handler2(xc_evtchn_fd(xenfb->evt_xch), NULL, xenfb_dispatch_channel, NULL, xenfb) < 0)
+		goto error;
+
 	return 0;
 
  error:
@@ -594,160 +711,6 @@ int xenfb_attach_dom(struct xenfb *xenfb_pub, int domid)
 	xenfb_dev_fatal(&xenfb->kbd, serrno, "on fire");
         errno = serrno;
         return -1;
-}
-
-static void xenfb_detach_dom(struct xenfb_private *xenfb)
-{
-	xenfb_unbind(&xenfb->fb);
-	xenfb_unbind(&xenfb->kbd);
-	if (xenfb->pub.pixels) {
-		munmap(xenfb->pub.pixels, xenfb->fb_len);
-		xenfb->pub.pixels = NULL;
-	}
-}
-
-static void xenfb_on_fb_event(struct xenfb_private *xenfb)
-{
-	uint32_t prod, cons;
-	struct xenfb_page *page = xenfb->fb.page;
-
-	prod = page->out_prod;
-	if (prod == page->out_cons)
-		return;
-	rmb();			/* ensure we see ring contents up to prod */
-	for (cons = page->out_cons; cons != prod; cons++) {
-		union xenfb_out_event *event = &XENFB_OUT_RING_REF(page, cons);
-
-		switch (event->type) {
-		case XENFB_TYPE_UPDATE:
-                    if (xenfb->pub.update)
-			xenfb->pub.update(&xenfb->pub,
-					  event->update.x, event->update.y,
-					  event->update.width, event->update.height);
-                    break;
-		}
-	}
-	mb();			/* ensure we're done with ring contents */
-	page->out_cons = cons;
-	xc_evtchn_notify(xenfb->evt_xch, xenfb->fb.port);
-}
-
-static void xenfb_on_kbd_event(struct xenfb_private *xenfb)
-{
-	struct xenkbd_page *page = xenfb->kbd.page;
-
-	/* We don't understand any keyboard events, so just ignore them. */
-	if (page->out_prod == page->out_cons)
-		return;
-	page->out_cons = page->out_prod;
-	xc_evtchn_notify(xenfb->evt_xch, xenfb->kbd.port);
-}
-
-static int xenfb_on_state_change(struct xenfb_device *dev)
-{
-	enum xenbus_state state;
-
-	state = xenfb_read_state(dev->xenfb->xsh, dev->otherend);
-
-	switch (state) {
-	case XenbusStateUnknown:
-		/* There was an error reading the frontend state.  The
-		   domain has probably gone away; in any case, there's
-		   not much point in us continuing. */
-		return -1;
-	case XenbusStateInitialising:
-	case XenbusStateInitWait:
-	case XenbusStateInitialised:
-	case XenbusStateConnected:
-		break;
-	case XenbusStateClosing:
-		xenfb_unbind(dev);
-		xenfb_switch_state(dev, state);
-		break;
-	case XenbusStateClosed:
-		xenfb_switch_state(dev, state);
-	}
-	return 0;
-}
-
-int xenfb_dispatch_channel(struct xenfb *xenfb_pub)
-{
-	struct xenfb_private *xenfb = (struct xenfb_private *)xenfb_pub;
-	evtchn_port_t port;
-	port = xc_evtchn_pending(xenfb->evt_xch);
-	if (port == -1)
-		return -1;
-
-	if (port == xenfb->fb.port)
-		xenfb_on_fb_event(xenfb);
-	else if (port == xenfb->kbd.port)
-		xenfb_on_kbd_event(xenfb);
-
-	if (xc_evtchn_unmask(xenfb->evt_xch, port) == -1)
-		return -1;
-
-	return 0;
-}
-
-int xenfb_dispatch_store(struct xenfb *xenfb_pub)
-{
-	struct xenfb_private *xenfb = (struct xenfb_private *)xenfb_pub;
-	unsigned dummy;
-	char **vec;
-	int r;
-
-	vec = xs_read_watch(xenfb->xsh, &dummy);
-	free(vec);
-	r = xenfb_on_state_change(&xenfb->fb);
-	if (r == 0)
-		r = xenfb_on_state_change(&xenfb->kbd);
-	if (r == -1)
-		return -2;
-
-	return 0;
-}
-
-
-/* Returns 0 normally, -1 on error, or -2 if the domain went away. */
-int xenfb_poll(struct xenfb *xenfb_pub, fd_set *readfds)
-{
-	struct xenfb_private *xenfb = (struct xenfb_private *)xenfb_pub;
-	int ret;
-
-	if (FD_ISSET(xc_evtchn_fd(xenfb->evt_xch), readfds)) {
-		if ((ret = xenfb_dispatch_channel(xenfb_pub)) < 0)
-			return ret;
-	}
-
-	if (FD_ISSET(xs_fileno(xenfb->xsh), readfds)) {
-		if ((ret = xenfb_dispatch_store(xenfb_pub)) < 0)
-			return ret;
-	}
-
-	return 0;
-}
-
-int xenfb_select_fds(struct xenfb *xenfb_pub, fd_set *readfds)
-{
-	struct xenfb_private *xenfb = (struct xenfb_private *)xenfb_pub;
-	int fd1 = xc_evtchn_fd(xenfb->evt_xch);
-	int fd2 = xs_fileno(xenfb->xsh);
-
-	FD_SET(fd1, readfds);
-	FD_SET(fd2, readfds);
-	return fd1 > fd2 ? fd1 + 1 : fd2 + 1;
-}
-
-int xenfb_get_store_fd(struct xenfb *xenfb_pub)
-{
-	struct xenfb_private *xenfb = (struct xenfb_private *)xenfb_pub;
-	return xs_fileno(xenfb->xsh);
-}
-
-int xenfb_get_channel_fd(struct xenfb *xenfb_pub)
-{
-	struct xenfb_private *xenfb = (struct xenfb_private *)xenfb_pub;
-	return xc_evtchn_fd(xenfb->evt_xch);
 }
 
 static int xenfb_kbd_event(struct xenfb_private *xenfb,
