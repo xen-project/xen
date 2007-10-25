@@ -474,11 +474,11 @@ DEFINE_XEN_GUEST_HANDLE(xen_domctl_bind_pt_irq_t);
 /* Bind machine I/O address range -> HVM address range. */
 #define XEN_DOMCTL_memory_mapping    39
 struct xen_domctl_memory_mapping {
-    uint64_t first_gfn;       /* first page (hvm guest phys page) in range */
-    uint64_t first_mfn;       /* first page (machine page) in range */
-    uint64_t nr_mfns;         /* number of pages in range (>0) */
-    uint32_t add_mapping;     /* add or remove mapping */
-    uint32_t padding;         /* padding for 64-bit aligned structure */
+    uint64_aligned_t first_gfn; /* first page (hvm guest phys page) in range */
+    uint64_aligned_t first_mfn; /* first page (machine page) in range */
+    uint64_aligned_t nr_mfns;   /* number of pages in range (>0) */
+    uint32_t add_mapping;       /* add or remove mapping */
+    uint32_t padding;           /* padding for 64-bit aligned structure */
 };
 typedef struct xen_domctl_memory_mapping xen_domctl_memory_mapping_t;
 DEFINE_XEN_GUEST_HANDLE(xen_domctl_memory_mapping_t);
@@ -495,6 +495,7 @@ struct xen_domctl_ioport_mapping {
 typedef struct xen_domctl_ioport_mapping xen_domctl_ioport_mapping_t;
 DEFINE_XEN_GUEST_HANDLE(xen_domctl_ioport_mapping_t);
 
+
 /*
  * Pin caching type of RAM space for x86 HVM domU.
  */
@@ -507,11 +508,12 @@ DEFINE_XEN_GUEST_HANDLE(xen_domctl_ioport_mapping_t);
 #define XEN_DOMCTL_MEM_CACHEATTR_WB  6
 #define XEN_DOMCTL_MEM_CACHEATTR_UCM 7
 struct xen_domctl_pin_mem_cacheattr {
-    uint64_t start, end;
+    uint64_aligned_t start, end;
     unsigned int type; /* XEN_DOMCTL_MEM_CACHEATTR_* */
 };
 typedef struct xen_domctl_pin_mem_cacheattr xen_domctl_pin_mem_cacheattr_t;
 DEFINE_XEN_GUEST_HANDLE(xen_domctl_pin_mem_cacheattr_t);
+
 
 struct xen_domctl {
     uint32_t cmd;

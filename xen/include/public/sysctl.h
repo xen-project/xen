@@ -171,7 +171,7 @@ DEFINE_XEN_GUEST_HANDLE(xen_sysctl_debug_keys_t);
 /* Get physical CPU information. */
 #define XEN_SYSCTL_getcpuinfo        8
 struct xen_sysctl_cpuinfo {
-    uint64_t idletime;
+    uint64_aligned_t idletime;
 };
 typedef struct xen_sysctl_cpuinfo xen_sysctl_cpuinfo_t;
 DEFINE_XEN_GUEST_HANDLE(xen_sysctl_cpuinfo_t); 
@@ -192,7 +192,7 @@ struct xen_sysctl_availheap {
     uint32_t max_bitwidth;  /* Largest address width (zero if don't care). */
     int32_t  node;          /* NUMA node of interest (-1 for all nodes). */
     /* OUT variables. */
-    uint64_t avail_bytes;   /* Bytes available in the specified region. */
+    uint64_aligned_t avail_bytes;/* Bytes available in the specified region. */
 };
 typedef struct xen_sysctl_availheap xen_sysctl_availheap_t;
 DEFINE_XEN_GUEST_HANDLE(xen_sysctl_availheap_t);
