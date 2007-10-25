@@ -515,6 +515,31 @@ typedef struct xen_domctl_pin_mem_cacheattr xen_domctl_pin_mem_cacheattr_t;
 DEFINE_XEN_GUEST_HANDLE(xen_domctl_pin_mem_cacheattr_t);
 
 
+#define XEN_DOMCTL_set_ext_vcpucontext 42
+#define XEN_DOMCTL_get_ext_vcpucontext 43
+struct xen_domctl_ext_vcpucontext {
+    /* IN: VCPU that this call applies to. */
+    uint32_t         vcpu;
+    /*
+     * SET: Size of struct (IN)
+     * GET: Size of struct (OUT)
+     */
+    uint32_t         size;
+#if defined(__i386__) || defined(__x86_64__)
+    /* SYSCALL from 32-bit mode and SYSENTER callback information. */
+    /* NB. SYSCALL from 64-bit mode is contained in vcpu_guest_context_t */
+    uint64_aligned_t syscall32_callback_eip;
+    uint64_aligned_t sysenter_callback_eip;
+    uint16_t         syscall32_callback_cs;
+    uint16_t         sysenter_callback_cs;
+    uint8_t          syscall32_disables_events;
+    uint8_t          sysenter_disables_events;
+#endif
+};
+typedef struct xen_domctl_ext_vcpucontext xen_domctl_ext_vcpucontext_t;
+DEFINE_XEN_GUEST_HANDLE(xen_domctl_ext_vcpucontext_t);
+
+
 struct xen_domctl {
     uint32_t cmd;
     uint32_t interface_version; /* XEN_DOMCTL_INTERFACE_VERSION */
@@ -549,6 +574,7 @@ struct xen_domctl {
         struct xen_domctl_memory_mapping    memory_mapping;
         struct xen_domctl_ioport_mapping    ioport_mapping;
         struct xen_domctl_pin_mem_cacheattr pin_mem_cacheattr;
+        struct xen_domctl_ext_vcpucontext   ext_vcpucontext;
         uint8_t                             pad[128];
     } u;
 };
