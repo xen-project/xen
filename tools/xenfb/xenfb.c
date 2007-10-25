@@ -670,37 +670,58 @@ static int xenfb_on_state_change(struct xenfb_device *dev)
 	return 0;
 }
 
-/* Returns 0 normally, -1 on error, or -2 if the domain went away. */
-int xenfb_poll(struct xenfb *xenfb_pub, fd_set *readfds)
+int xenfb_dispatch_channel(struct xenfb *xenfb_pub)
 {
 	struct xenfb_private *xenfb = (struct xenfb_private *)xenfb_pub;
 	evtchn_port_t port;
+	port = xc_evtchn_pending(xenfb->evt_xch);
+	if (port == -1)
+		return -1;
+
+	if (port == xenfb->fb.port)
+		xenfb_on_fb_event(xenfb);
+	else if (port == xenfb->kbd.port)
+		xenfb_on_kbd_event(xenfb);
+
+	if (xc_evtchn_unmask(xenfb->evt_xch, port) == -1)
+		return -1;
+
+	return 0;
+}
+
+int xenfb_dispatch_store(struct xenfb *xenfb_pub)
+{
+	struct xenfb_private *xenfb = (struct xenfb_private *)xenfb_pub;
 	unsigned dummy;
 	char **vec;
 	int r;
 
+	vec = xs_read_watch(xenfb->xsh, &dummy);
+	free(vec);
+	r = xenfb_on_state_change(&xenfb->fb);
+	if (r == 0)
+		r = xenfb_on_state_change(&xenfb->kbd);
+	if (r == -1)
+		return -2;
+
+	return 0;
+}
+
+
+/* Returns 0 normally, -1 on error, or -2 if the domain went away. */
+int xenfb_poll(struct xenfb *xenfb_pub, fd_set *readfds)
+{
+	struct xenfb_private *xenfb = (struct xenfb_private *)xenfb_pub;
+	int ret;
+
 	if (FD_ISSET(xc_evtchn_fd(xenfb->evt_xch), readfds)) {
-		port = xc_evtchn_pending(xenfb->evt_xch);
-		if (port == -1)
-			return -1;
-
-		if (port == xenfb->fb.port)
-			xenfb_on_fb_event(xenfb);
-		else if (port == xenfb->kbd.port)
-			xenfb_on_kbd_event(xenfb);
-
-		if (xc_evtchn_unmask(xenfb->evt_xch, port) == -1)
-			return -1;
+		if ((ret = xenfb_dispatch_channel(xenfb_pub)) < 0)
+			return ret;
 	}
 
 	if (FD_ISSET(xs_fileno(xenfb->xsh), readfds)) {
-		vec = xs_read_watch(xenfb->xsh, &dummy);
-		free(vec);
-		r = xenfb_on_state_change(&xenfb->fb);
-		if (r == 0)
-			r = xenfb_on_state_change(&xenfb->kbd);
-		if (r == -1)
-			return -2;
+		if ((ret = xenfb_dispatch_store(xenfb_pub)) < 0)
+			return ret;
 	}
 
 	return 0;
@@ -715,6 +736,18 @@ int xenfb_select_fds(struct xenfb *xenfb_pub, fd_set *readfds)
 	FD_SET(fd1, readfds);
 	FD_SET(fd2, readfds);
 	return fd1 > fd2 ? fd1 + 1 : fd2 + 1;
+}
+
+int xenfb_get_store_fd(struct xenfb *xenfb_pub)
+{
+	struct xenfb_private *xenfb = (struct xenfb_private *)xenfb_pub;
+	return xs_fileno(xenfb->xsh);
+}
+
+int xenfb_get_channel_fd(struct xenfb *xenfb_pub)
+{
+	struct xenfb_private *xenfb = (struct xenfb_private *)xenfb_pub;
+	return xc_evtchn_fd(xenfb->evt_xch);
 }
 
 static int xenfb_kbd_event(struct xenfb_private *xenfb,
@@ -777,3 +810,10 @@ int xenfb_send_position(struct xenfb *xenfb_pub, int abs_x, int abs_y)
 
 	return xenfb_kbd_event(xenfb, &event);
 }
+/*
+ * Local variables:
+ *  c-indent-level: 8
+ *  c-basic-offset: 8
+ *  tab-width: 8
+ * End:
+ */

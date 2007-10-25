@@ -193,7 +193,7 @@ extern int vcpus;
 
 int xc_handle;
 
-char domain_name[64] = "Xen-HVM-no-name";
+char domain_name[64] = "Xen-no-name";
 extern int domid;
 
 char vncpasswd[64];
@@ -6700,6 +6700,7 @@ void register_machines(void)
     qemu_register_machine(&isapc_machine);
 #else
     qemu_register_machine(&xenfv_machine);
+    qemu_register_machine(&xenpv_machine);
 #endif
 #elif defined(TARGET_PPC)
     qemu_register_machine(&heathrow_machine);
@@ -7446,7 +7447,7 @@ int main(int argc, char **argv)
                 break;
             case QEMU_OPTION_domainname:
                 snprintf(domain_name, sizeof(domain_name),
-                         "Xen-HVM-%s", optarg);
+                         "Xen-%s", optarg);
                 break;
             case QEMU_OPTION_d:
                 domid = atoi(optarg);

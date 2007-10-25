@@ -50,8 +50,10 @@ class VfbifController(DevController):
             # is HVM, so qemu-dm will handle the vfb.
             return
         
-        std_args = [ "--domid", "%d" % self.vm.getDomid(),
-                     "--title", self.vm.getName() ]
+        args = [ xen.util.auxbin.pathTo("qemu-dm"),
+                 "-M", "xenpv",
+                 "-d", "%d" % self.vm.getDomid(),
+                 "-domain-name", self.vm.getName() ]
         t = config.get("type", None)
         if t == "vnc":
             passwd = None
@@ -65,15 +67,14 @@ class VfbifController(DevController):
             else:
                 log.debug("No VNC passwd configured for vfb access")
 
-            # Try to start the vnc backend
-            args = [xen.util.auxbin.pathTo("xen-vncfb")]
-            if config.has_key("vncunused"):
-                args += ["--unused"]
-            elif config.has_key("vncdisplay"):
-                args += ["--vncport", "%d" % (5900 + int(config["vncdisplay"]))]
-            vnclisten = config.get("vnclisten",
+            vnclisten = config.get('vnclisten',
                                    xen.xend.XendOptions.instance().get_vnclisten_address())
-            args += [ "--listen", vnclisten ]
+            vncdisplay = config.get('vncdisplay', 0)
+            args += ['-vnc', "%s:%d" % (vnclisten, vncdisplay)]
+
+            if config.get('vncunused', 0):
+                args += ['-vncunused']
+
             if config.has_key("keymap"):
                 args += ["-k", "%s" % config["keymap"]]
             else:
@@ -81,15 +82,14 @@ class VfbifController(DevController):
                 if xoptions.get_keymap():
                     args += ["-k", "%s" % xoptions.get_keymap()]
 
-            spawn_detached(args[0], args + std_args, os.environ)
+            spawn_detached(args[0], args, os.environ)
         elif t == "sdl":
-            args = [xen.util.auxbin.pathTo("xen-sdlfb")]
             env = dict(os.environ)
             if config.has_key("display"):
                 env['DISPLAY'] = config["display"]
             if config.has_key("xauthority"):
                 env['XAUTHORITY'] = config["xauthority"]
-            spawn_detached(args[0], args + std_args, env)
+            spawn_detached(args[0], args, env)
         else:
             raise VmError('Unknown vfb type %s (%s)' % (t, repr(config)))
 

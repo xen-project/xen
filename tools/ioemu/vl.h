@@ -1110,6 +1110,7 @@ extern QEMUMachine pc_machine;
 extern QEMUMachine isapc_machine;
 #ifdef CONFIG_DM
 extern QEMUMachine xenfv_machine;
+extern QEMUMachine xenpv_machine;
 #endif
 extern int fd_bootchk;
 

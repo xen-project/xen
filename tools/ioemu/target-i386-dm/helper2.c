@@ -616,7 +616,7 @@ int main_loop(void)
     extern int shutdown_requested;
     extern int suspend_requested;
     CPUState *env = cpu_single_env;
-    int evtchn_fd = xc_evtchn_fd(xce_handle);
+    int evtchn_fd = xce_handle == -1 ? -1 : xc_evtchn_fd(xce_handle);
     char qemu_file[PATH_MAX];
     fd_set fds;
 
@@ -624,7 +624,8 @@ int main_loop(void)
 				       cpu_single_env);
     qemu_mod_timer(buffered_io_timer, qemu_get_clock(rt_clock));
 
-    qemu_set_fd_handler(evtchn_fd, cpu_handle_ioreq, NULL, env);
+    if (evtchn_fd != -1)
+        qemu_set_fd_handler(evtchn_fd, cpu_handle_ioreq, NULL, env);
 
     xenstore_record_dm_state("running");
     while (1) {
