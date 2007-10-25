@@ -1108,6 +1108,9 @@ extern void pci_piix4_acpi_init(PCIBus *bus, int devfn);
 /* pc.c */
 extern QEMUMachine pc_machine;
 extern QEMUMachine isapc_machine;
+#ifdef CONFIG_DM
+extern QEMUMachine xenfv_machine;
+#endif
 extern int fd_bootchk;
 
 void ioport_set_a20(int enable);
