@@ -40,16 +40,9 @@ static void xen_init_pv(uint64_t ram_size, int vga_ram_size, char *boot_device,
     extern int domid;
 
     /* Prepare PVFB state */
-    xenfb = xenfb_new();
+    xenfb = xenfb_new(domid, ds);
     if (xenfb == NULL) {
         fprintf(stderr, "Could not create framebuffer (%s)\n",
-                strerror(errno));
-        exit(1);
-    }
-
-    /* Talk to the guest */
-    if (xenfb_attach_dom(xenfb, domid, ds) < 0) {
-        fprintf(stderr, "Could not connect to domain (%s)\n",
                 strerror(errno));
         exit(1);
     }

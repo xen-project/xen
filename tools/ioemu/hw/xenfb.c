@@ -52,6 +52,20 @@ struct xenfb {
 	char protocol[64];	/* frontend protocol */
 };
 
+/* Functions for frontend/backend state machine*/
+static int xenfb_wait_for_frontend(struct xenfb_device *dev, IOHandler *handler);
+static int xenfb_wait_for_backend(struct xenfb_device *dev, IOHandler *handler);
+static void xenfb_backend_created_kbd(void *opaque);
+static void xenfb_backend_created_fb(void *opaque);
+static void xenfb_frontend_initialized_kbd(void *opaque);
+static void xenfb_frontend_initialized_fb(void *opaque);
+static void xenfb_frontend_connected_kbd(void *opaque);
+
+/* Helper functions for checking state of frontend/backend devices */
+static int xenfb_frontend_connected(struct xenfb_device *dev);
+static int xenfb_frontend_initialized(struct xenfb_device *dev);
+static int xenfb_backend_created(struct xenfb_device *dev);
+
 /* Functions which tie the PVFB into the QEMU device model */
 static void xenfb_key_event(void *opaque, int keycode);
 static void xenfb_mouse_event(void *opaque,
@@ -60,6 +74,7 @@ static void xenfb_guest_copy(struct xenfb *xenfb, int x, int y, int w, int h);
 static void xenfb_update(void *opaque);
 static void xenfb_invalidate(void *opaque);
 static void xenfb_screen_dump(void *opaque, const char *name);
+static int xenfb_register_console(struct xenfb *xenfb);
 
 /*
  * Tables to map from scancode to Linux input layer keycode.
@@ -102,34 +117,6 @@ static const unsigned char atkbd_unxlate_table[128] = {
 };
 
 static unsigned char scancode2linux[512];
-
-
-static void xenfb_detach_dom(struct xenfb *);
-
-static char *xenfb_path_in_dom(struct xs_handle *xsh,
-			       char *buf, size_t size,
-			       unsigned domid, const char *fmt, ...)
-{
-	va_list ap;
-	char *domp = xs_get_domain_path(xsh, domid);
-	int n;
-
-        if (domp == NULL)
-		return NULL;
-
-	n = snprintf(buf, size, "%s/", domp);
-	free(domp);
-	if (n >= size)
-		return NULL;
-
-	va_start(ap, fmt);
-	n += vsnprintf(buf + n, size - n, fmt, ap);
-	va_end(ap);
-	if (n >= size)
-		return NULL;
-
-	return buf;
-}
 
 static int xenfb_xs_scanf1(struct xs_handle *xsh,
 			   const char *dir, const char *node,
@@ -193,27 +180,7 @@ static void xenfb_device_init(struct xenfb_device *dev,
 	dev->xenfb = xenfb;
 }
 
-static int xenfb_device_set_domain(struct xenfb_device *dev, int domid)
-{
-	dev->otherend_id = domid;
-
-	if (!xenfb_path_in_dom(dev->xenfb->xsh,
-			       dev->otherend, sizeof(dev->otherend),
-			       domid, "device/%s/0", dev->devicetype)) {
-		errno = ENOENT;
-		return -1;
-	}
-	if (!xenfb_path_in_dom(dev->xenfb->xsh,
-			       dev->nodename, sizeof(dev->nodename),
-			       0, "backend/%s/%d/0", dev->devicetype, domid)) {
-		errno = ENOENT;
-		return -1;
-	}
-
-	return 0;
-}
-
-struct xenfb *xenfb_new(void)
+struct xenfb *xenfb_new(int domid, DisplayState *ds)
 {
 	struct xenfb *xenfb = qemu_malloc(sizeof(struct xenfb));
 	int serrno;
@@ -246,35 +213,18 @@ struct xenfb *xenfb_new(void)
 	if (!xenfb->xsh)
 		goto fail;
 
+	fprintf(stderr, "FB: Waiting for KBD backend creation\n");
+	xenfb_wait_for_backend(&xenfb->kbd, xenfb_backend_created_kbd);
+
 	return xenfb;
 
  fail:
 	serrno = errno;
-	xenfb_delete(xenfb);
+	xenfb_shutdown(xenfb);
 	errno = serrno;
 	return NULL;
 }
 
-/* Remove the backend area in xenbus since the framebuffer really is
-   going away. */
-void xenfb_teardown(struct xenfb *xenfb)
-{
-       xs_rm(xenfb->xsh, XBT_NULL, xenfb->fb.nodename);
-       xs_rm(xenfb->xsh, XBT_NULL, xenfb->kbd.nodename);
-}
-
-
-void xenfb_delete(struct xenfb *xenfb)
-{
-	xenfb_detach_dom(xenfb);
-	if (xenfb->xc >= 0)
-		xc_interface_close(xenfb->xc);
-	if (xenfb->evt_xch >= 0)
-		xc_evtchn_close(xenfb->evt_xch);
-	if (xenfb->xsh)
-		xs_daemon_close(xenfb->xsh);
-	free(xenfb);
-}
 
 static enum xenbus_state xenfb_read_state(struct xs_handle *xsh,
 					  const char *dir)
@@ -301,89 +251,12 @@ static int xenfb_switch_state(struct xenfb_device *dev,
 	return 0;
 }
 
-static int xenfb_wait_for_state(struct xs_handle *xsh, const char *dir,
-				unsigned awaited)
-{
-	unsigned state, dummy;
-	char **vec;
-
-	awaited |= 1 << XenbusStateUnknown;
-
-	for (;;) {
-		state = xenfb_read_state(xsh, dir);
-		if ((1 << state) & awaited)
-			return state;
-
-		vec = xs_read_watch(xsh, &dummy);
-		if (!vec)
-			return -1;
-		free(vec);
-	}
-}
-
-static int xenfb_wait_for_backend_creation(struct xenfb_device *dev)
-{
-	struct xs_handle *xsh = dev->xenfb->xsh;
-	int state;
-
-	if (!xs_watch(xsh, dev->nodename, ""))
-		return -1;
-	state = xenfb_wait_for_state(xsh, dev->nodename,
-			(1 << XenbusStateInitialising)
-			| (1 << XenbusStateClosed)
-#if 1 /* TODO fudging state to permit restarting; to be removed */
-			| (1 << XenbusStateInitWait)
-			| (1 << XenbusStateConnected)
-			| (1 << XenbusStateClosing)
-#endif
-			);
-	xs_unwatch(xsh, dev->nodename, "");
-
-	switch (state) {
-#if 1
-	case XenbusStateInitWait:
-	case XenbusStateConnected:
-		printf("Fudging state to %d\n", XenbusStateInitialising); /* FIXME */
-#endif
-	case XenbusStateInitialising:
-	case XenbusStateClosing:
-	case XenbusStateClosed:
-		break;
-	default:
-		return -1;
-	}
-
-	return 0;
-}
 
 static int xenfb_hotplug(struct xenfb_device *dev)
 {
 	if (xenfb_xs_printf(dev->xenfb->xsh, dev->nodename,
 			    "hotplug-status", "connected"))
 		return -1;
-	return 0;
-}
-
-static int xenfb_wait_for_frontend_initialised(struct xenfb_device *dev)
-{
-	switch (xenfb_wait_for_state(dev->xenfb->xsh, dev->otherend,
-#if 1 /* TODO fudging state to permit restarting; to be removed */
-			(1 << XenbusStateInitialised)
-			| (1 << XenbusStateConnected)
-#else
-			1 << XenbusStateInitialised,
-#endif
-			)) {
-#if 1
-	case XenbusStateConnected:
-		printf("Fudging state to %d\n", XenbusStateInitialised); /* FIXME */
-#endif
-	case XenbusStateInitialised:
-		break;
-	default:
-		return -1;
-	}
-
 	return 0;
 }
 
@@ -522,52 +395,6 @@ static void xenfb_unbind(struct xenfb_device *dev)
 	}
 }
 
-static int xenfb_wait_for_frontend_connected(struct xenfb_device *dev)
-{
-	switch (xenfb_wait_for_state(dev->xenfb->xsh, dev->otherend,
-				     1 << XenbusStateConnected)) {
-	case XenbusStateConnected:
-		break;
-	default:
-		return -1;
-	}
-
-	return 0;
-}
-
-static void xenfb_dev_fatal(struct xenfb_device *dev, int err,
-			    const char *fmt, ...)
-{
-	struct xs_handle *xsh = dev->xenfb->xsh;
-	va_list ap;
-	char errdir[80];
-	char buf[1024];
-	int n;
-
-	fprintf(stderr, "%s ", dev->nodename); /* somewhat crude */
-	va_start(ap, fmt);
-	vfprintf(stderr, fmt, ap);
-	va_end(ap);
-	if (err)
-		fprintf(stderr, " (%s)", strerror(err));
-	putc('\n', stderr);
-
-	if (!xenfb_path_in_dom(xsh, errdir, sizeof(errdir), 0,
-			       "error/%s", dev->nodename))
-		goto out;	/* FIXME complain */
-
-	va_start(ap, fmt);
-	n = snprintf(buf, sizeof(buf), "%d ", err);
-	snprintf(buf + n, sizeof(buf) - n, fmt, ap);
-	va_end(ap);
-
-	if (xenfb_xs_printf(xsh, buf, "error", "%s", buf) < 0)
-		goto out;	/* FIXME complain */
-
- out:
-	xenfb_switch_state(dev, XenbusStateClosing);
-}
-
 
 static void xenfb_detach_dom(struct xenfb *xenfb)
 {
@@ -577,6 +404,24 @@ static void xenfb_detach_dom(struct xenfb *xenfb)
 		munmap(xenfb->pixels, xenfb->fb_len);
 		xenfb->pixels = NULL;
 	}
+}
+
+/* Remove the backend area in xenbus since the framebuffer really is
+   going away. */
+void xenfb_shutdown(struct xenfb *xenfb)
+{
+	fprintf(stderr, "FB: Shutting down backend\n");
+	xs_rm(xenfb->xsh, XBT_NULL, xenfb->fb.nodename);
+	xs_rm(xenfb->xsh, XBT_NULL, xenfb->kbd.nodename);
+
+	xenfb_detach_dom(xenfb);
+	if (xenfb->xc >= 0)
+		xc_interface_close(xenfb->xc);
+	if (xenfb->evt_xch >= 0)
+		xc_evtchn_close(xenfb->evt_xch);
+	if (xenfb->xsh)
+		xs_daemon_close(xenfb->xsh);
+	free(xenfb);
 }
 
 
@@ -643,6 +488,7 @@ static int xenfb_on_state_change(struct xenfb_device *dev)
 	return 0;
 }
 
+/* Send an event to the keyboard frontend driver */
 static int xenfb_kbd_event(struct xenfb *xenfb,
 			   union xenkbd_in_event *event)
 {
@@ -665,6 +511,7 @@ static int xenfb_kbd_event(struct xenfb *xenfb,
 	return xc_evtchn_notify(xenfb->evt_xch, xenfb->kbd.port);
 }
 
+/* Send a keyboard (or mouse button) event */
 static int xenfb_send_key(struct xenfb *xenfb, bool down, int keycode)
 {
 	union xenkbd_in_event event;
@@ -677,6 +524,7 @@ static int xenfb_send_key(struct xenfb *xenfb, bool down, int keycode)
 	return xenfb_kbd_event(xenfb, &event);
 }
 
+/* Send a relative mouse movement event */
 static int xenfb_send_motion(struct xenfb *xenfb, int rel_x, int rel_y)
 {
 	union xenkbd_in_event event;
@@ -689,6 +537,7 @@ static int xenfb_send_motion(struct xenfb *xenfb, int rel_x, int rel_y)
 	return xenfb_kbd_event(xenfb, &event);
 }
 
+/* Send an absolute mouse movement event */
 static int xenfb_send_position(struct xenfb *xenfb, int abs_x, int abs_y)
 {
 	union xenkbd_in_event event;
@@ -701,24 +550,29 @@ static int xenfb_send_position(struct xenfb *xenfb, int abs_x, int abs_y)
 	return xenfb_kbd_event(xenfb, &event);
 }
 
-
+/* Process events from the frontend event channel */
 static void xenfb_dispatch_channel(void *opaque)
 {
 	struct xenfb *xenfb = (struct xenfb *)opaque;
 	evtchn_port_t port;
 	port = xc_evtchn_pending(xenfb->evt_xch);
-	if (port == -1)
+	if (port == -1) {
+		xenfb_shutdown(xenfb);
 		exit(1);
+	}
 
 	if (port == xenfb->fb.port)
 		xenfb_on_fb_event(xenfb);
 	else if (port == xenfb->kbd.port)
 		xenfb_on_kbd_event(xenfb);
 
-	if (xc_evtchn_unmask(xenfb->evt_xch, port) == -1)
+	if (xc_evtchn_unmask(xenfb->evt_xch, port) == -1) {
+		xenfb_shutdown(xenfb);
 		exit(1);
+	}
 }
 
+/* Process ongoing events from the frontend devices */
 static void xenfb_dispatch_store(void *opaque)
 {
 	struct xenfb *xenfb = (struct xenfb *)opaque;
@@ -731,124 +585,347 @@ static void xenfb_dispatch_store(void *opaque)
 	r = xenfb_on_state_change(&xenfb->fb);
 	if (r == 0)
 		r = xenfb_on_state_change(&xenfb->kbd);
-	if (r == -1)
+	if (r < 0) {
+		xenfb_shutdown(xenfb);
 		exit(1);
+	}
 }
 
 
-int xenfb_attach_dom(struct xenfb *xenfb, int domid, DisplayState *ds)
-{
-	struct xs_handle *xsh = xenfb->xsh;
-	int val, serrno;
+/****************************************************************
+ *
+ * Functions for processing frontend config
+ *
+ ****************************************************************/
+
+
+/* Process the frontend framebuffer config */
+static int xenfb_read_frontend_fb_config(struct xenfb *xenfb) {
 	struct xenfb_page *fb_page;
+	int val;
 
-	xenfb_detach_dom(xenfb);
+        if (xenfb_xs_scanf1(xenfb->xsh, xenfb->fb.otherend, "feature-update",
+                            "%d", &val) < 0)
+                val = 0;
+        if (!val) {
+                fprintf(stderr, "feature-update not supported\n");
+                errno = ENOTSUP;
+                return -1;
+        }
+        if (xenfb_xs_scanf1(xenfb->xsh, xenfb->fb.otherend, "protocol", "%63s",
+                            xenfb->protocol) < 0)
+                xenfb->protocol[0] = '\0';
+        xenfb_xs_printf(xenfb->xsh, xenfb->fb.nodename, "request-update", "1");
 
-	xenfb_device_set_domain(&xenfb->fb, domid);
-	xenfb_device_set_domain(&xenfb->kbd, domid);
+        /* TODO check for permitted ranges */
+        fb_page = xenfb->fb.page;
+        xenfb->depth = fb_page->depth;
+        xenfb->width = fb_page->width;
+        xenfb->height = fb_page->height;
+        /* TODO check for consistency with the above */
+        xenfb->fb_len = fb_page->mem_length;
+        xenfb->row_stride = fb_page->line_length;
+        fprintf(stderr, "Framebuffer depth %d width %d height %d line %d\n",
+                fb_page->depth, fb_page->width, fb_page->height, fb_page->line_length);
+        if (xenfb_map_fb(xenfb, xenfb->fb.otherend_id) < 0)
+		return -1;
 
-	if (xenfb_wait_for_backend_creation(&xenfb->fb) < 0)
-		goto error;
-	if (xenfb_wait_for_backend_creation(&xenfb->kbd) < 0)
-		goto error;
+        if (xenfb_switch_state(&xenfb->fb, XenbusStateConnected))
+                return -1;
+        if (xenfb_switch_state(&xenfb->kbd, XenbusStateConnected))
+                return -1;
 
-	if (xenfb_xs_printf(xsh, xenfb->kbd.nodename, "feature-abs-pointer", "1"))
-		goto error;
-	if (xenfb_switch_state(&xenfb->fb, XenbusStateInitWait))
-		goto error;
-	if (xenfb_switch_state(&xenfb->kbd, XenbusStateInitWait))
-		goto error;
+	return 0;
+}
 
-	if (xenfb_hotplug(&xenfb->fb) < 0)
-		goto error;
-	if (xenfb_hotplug(&xenfb->kbd) < 0)
-		goto error;
+/* Process the frontend keyboard config */
+static int xenfb_read_frontend_kbd_config(struct xenfb *xenfb)
+{
+	int val;
 
-	if (!xs_watch(xsh, xenfb->fb.otherend, ""))
-		goto error;
-	if (!xs_watch(xsh, xenfb->kbd.otherend, ""))
-		goto error;
-
-	if (xenfb_wait_for_frontend_initialised(&xenfb->fb) < 0)
-		goto error;
-	if (xenfb_wait_for_frontend_initialised(&xenfb->kbd) < 0)
-		goto error;
-
-	if (xenfb_bind(&xenfb->fb) < 0)
-		goto error;
-	if (xenfb_bind(&xenfb->kbd) < 0)
-		goto error;
-
-	if (xenfb_xs_scanf1(xsh, xenfb->fb.otherend, "feature-update",
-			    "%d", &val) < 0)
-		val = 0;
-	if (!val) {
-		errno = ENOTSUP;
-		goto error;
-	}
-	if (xenfb_xs_scanf1(xsh, xenfb->fb.otherend, "protocol", "%63s",
-			    xenfb->protocol) < 0)
-		xenfb->protocol[0] = '\0';
-	xenfb_xs_printf(xsh, xenfb->fb.nodename, "request-update", "1");
-
-	/* TODO check for permitted ranges */
-	fb_page = xenfb->fb.page;
-	xenfb->depth = fb_page->depth;
-	xenfb->width = fb_page->width;
-	xenfb->height = fb_page->height;
-	/* TODO check for consistency with the above */
-	xenfb->fb_len = fb_page->mem_length;
-	xenfb->row_stride = fb_page->line_length;
-
-	if (xenfb_map_fb(xenfb, domid) < 0)
-		goto error;
-
-	if (xenfb_switch_state(&xenfb->fb, XenbusStateConnected))
-		goto error;
-	if (xenfb_switch_state(&xenfb->kbd, XenbusStateConnected))
-		goto error;
-
-	if (xenfb_wait_for_frontend_connected(&xenfb->kbd) < 0)
-		goto error;
-	if (xenfb_xs_scanf1(xsh, xenfb->kbd.otherend, "request-abs-pointer",
+	if (xenfb_xs_scanf1(xenfb->xsh, xenfb->kbd.otherend, "request-abs-pointer",
 			    "%d", &val) < 0)
 		val = 0;
 	xenfb->abs_pointer_wanted = val;
 
-	/* Listen for events from xenstore */
-	if (qemu_set_fd_handler2(xs_fileno(xenfb->xsh), NULL, xenfb_dispatch_store, NULL, xenfb) < 0)
-		goto error;
+	return 0;
+}
 
-	/* Listen for events from the event channel */
-	if (qemu_set_fd_handler2(xc_evtchn_fd(xenfb->evt_xch), NULL, xenfb_dispatch_channel, NULL, xenfb) < 0)
-		goto error;
 
-	/* Register our keyboard & mouse handlers */
-	qemu_add_kbd_event_handler(xenfb_key_event, xenfb);
-	qemu_add_mouse_event_handler(xenfb_mouse_event, xenfb,
-				     xenfb->abs_pointer_wanted,
-				     "Xen PVFB Mouse");
+/****************************************************************
+ *
+ * Functions for frontend/backend state machine
+ *
+ ****************************************************************/
 
-	xenfb->ds = ds;
+/* Register a watch against a frontend device, and setup
+ * QEMU event loop to poll the xenstore FD for notification */
+static int xenfb_wait_for_frontend(struct xenfb_device *dev, IOHandler *handler)
+{
+        fprintf(stderr, "Doing frontend watch on %s\n", dev->otherend);
+	if (!xs_watch(dev->xenfb->xsh, dev->otherend, "")) {
+		fprintf(stderr, "Watch for dev failed\n");
+		return -1;
+	}
 
-	/* Tell QEMU to allocate a graphical console */
-	graphic_console_init(ds,
-			     xenfb_update,
-			     xenfb_invalidate,
-			     xenfb_screen_dump,
-			     xenfb);
-	dpy_resize(ds, xenfb->width, xenfb->height);
+	if (qemu_set_fd_handler2(xs_fileno(dev->xenfb->xsh), NULL, handler, NULL, dev) < 0)
+		return -1;
 
 	return 0;
-
- error:
-	serrno = errno;
-	xenfb_detach_dom(xenfb);
-	xenfb_dev_fatal(&xenfb->fb, serrno, "on fire");
-	xenfb_dev_fatal(&xenfb->kbd, serrno, "on fire");
-        errno = serrno;
-        return -1;
 }
+
+/* Register a watch against a backend device, and setup
+ * QEMU event loop to poll the xenstore FD for notification */
+static int xenfb_wait_for_backend(struct xenfb_device *dev, IOHandler *handler)
+{
+	fprintf(stderr, "Doing backend watch on %s\n", dev->nodename);
+	if (!xs_watch(dev->xenfb->xsh, dev->nodename, "")) {
+		fprintf(stderr, "Watch for dev failed\n");
+		return -1;
+	}
+
+	if (qemu_set_fd_handler2(xs_fileno(dev->xenfb->xsh), NULL, handler, NULL, dev) < 0)
+		return -1;
+
+	return 0;
+}
+
+/* Callback invoked while waiting for KBD backend to change
+ * to the created state */
+static void xenfb_backend_created_kbd(void *opaque)
+{
+	struct xenfb_device *dev = (struct xenfb_device *)opaque;
+	int ret = xenfb_backend_created(dev);
+	if (ret < 0) {
+		xenfb_shutdown(dev->xenfb);
+		exit(1);
+	}
+	if (ret)
+		return; /* Still waiting */
+
+	if (xenfb_xs_printf(dev->xenfb->xsh, dev->nodename, "feature-abs-pointer", "1")) {
+		xenfb_shutdown(dev->xenfb);
+		exit(1);
+	}
+
+	fprintf(stderr, "FB: Waiting for FB backend creation\n");
+	xenfb_wait_for_backend(&dev->xenfb->fb, xenfb_backend_created_fb);
+}
+
+/* Callback invoked while waiting for FB backend to change
+ * to the created state */
+static void xenfb_backend_created_fb(void *opaque)
+{
+	struct xenfb_device *dev = (struct xenfb_device *)opaque;
+	int ret = xenfb_backend_created(dev);
+	if (ret < 0) {
+		xenfb_shutdown(dev->xenfb);
+		exit(1);
+	}
+	if (ret)
+		return; /* Still waiting */
+
+	fprintf(stderr, "FB: Waiting for KBD frontend initialization\n");
+	xenfb_wait_for_frontend(&dev->xenfb->kbd, xenfb_frontend_initialized_kbd);
+}
+
+/* Callback invoked while waiting for KBD frontend to change
+ * to the initialized state */
+static void xenfb_frontend_initialized_kbd(void *opaque)
+{
+	struct xenfb_device *dev = (struct xenfb_device *)opaque;
+	int ret = xenfb_frontend_initialized(dev);
+	if (ret < 0) {
+		xenfb_shutdown(dev->xenfb);
+		exit(1);
+	}
+	if (ret)
+		return; /* Still waiting */
+
+
+        fprintf(stderr, "FB: Waiting for FB frontend initialization\n");
+	xenfb_wait_for_frontend(&dev->xenfb->fb, xenfb_frontend_initialized_fb);
+}
+
+/* Callback invoked while waiting for FB frontend to change
+ * to the initialized state */
+static void xenfb_frontend_initialized_fb(void *opaque)
+{
+	struct xenfb_device *dev = (struct xenfb_device *)opaque;
+	int ret = xenfb_frontend_initialized(dev);
+	if (ret < 0) {
+		xenfb_shutdown(dev->xenfb);
+		exit(1);
+	}
+	if (ret)
+		return; /* Still waiting */
+
+
+	if (xenfb_read_frontend_fb_config(dev->xenfb)) {
+		xenfb_shutdown(dev->xenfb);
+	        exit(1);
+	}
+
+        fprintf(stderr, "FB: Waiting for KBD frontend connection\n");
+	xenfb_wait_for_frontend(&dev->xenfb->kbd, xenfb_frontend_connected_kbd);
+}
+
+/* Callback invoked while waiting for KBD frontend to change
+ * to the connected state */
+static void xenfb_frontend_connected_kbd(void *opaque)
+{
+	struct xenfb_device *dev = (struct xenfb_device *)opaque;
+	int ret = xenfb_frontend_connected(dev);
+	if (ret < 0) {
+		xenfb_shutdown(dev->xenfb);
+		exit(1);
+	}
+	if (ret)
+		return; /* Still waiting */
+
+	if (xenfb_read_frontend_kbd_config(dev->xenfb) < 0) {
+		xenfb_shutdown(dev->xenfb);
+	        exit(1);
+	}
+
+	xenfb_register_console(dev->xenfb);
+}
+
+
+/****************************************************************
+ *
+ * Helper functions for checking state of frontend/backend devices
+ *
+ ****************************************************************/
+
+/* Helper to determine if a frontend device is in Connected state */
+static int xenfb_frontend_connected(struct xenfb_device *dev)
+{
+	unsigned int state;
+	unsigned int dummy;
+	char **vec;
+	vec = xs_read_watch(dev->xenfb->xsh, &dummy);
+	if (!vec)
+		return -1;
+	free(vec);
+
+	state = xenfb_read_state(dev->xenfb->xsh, dev->otherend);
+	if (!((1 <<state) & ((1 << XenbusStateUnknown) |
+			     (1 << XenbusStateConnected)))) {
+		fprintf(stderr, "FB: Carry on waiting\n");
+		return 1;
+	}
+
+	/* Don't unwatch frontend - we need to detect shutdown */
+	/*xs_unwatch(dev->xenfb->xsh, dev->otherend, "");*/
+
+	switch (state) {
+	case XenbusStateConnected:
+		break;
+	default:
+		return -1;
+	}
+	return 0;
+}
+
+
+/* Helper to determine if a frontend device is in Initialized state */
+static int xenfb_frontend_initialized(struct xenfb_device *dev)
+{
+	unsigned int state;
+	unsigned int dummy;
+	char **vec;
+	vec = xs_read_watch(dev->xenfb->xsh, &dummy);
+	if (!vec)
+		return -1;
+	free(vec);
+
+	state = xenfb_read_state(dev->xenfb->xsh, dev->otherend);
+
+	if (!((1 << state) & ((1 << XenbusStateUnknown)
+			      | (1 << XenbusStateInitialised)
+#if 1 /* TODO fudging state to permit restarting; to be removed */
+			      | (1 << XenbusStateConnected)
+#endif
+			      ))) {
+		fprintf(stderr, "FB: Carry on waiting\n");
+		return 1;
+	}
+
+	xs_unwatch(dev->xenfb->xsh, dev->otherend, "");
+
+	switch (state) {
+#if 1
+	case XenbusStateConnected:
+                printf("Fudging state to %d\n", XenbusStateInitialised); /* FIXME */
+#endif
+        case XenbusStateInitialised:
+                break;
+        default:
+                return -1;
+        }
+
+	if (xenfb_bind(dev) < 0)
+		return -1;
+
+	return 0;
+}
+
+/* Helper to determine if a backend device is in Created state */
+static int xenfb_backend_created(struct xenfb_device *dev)
+{
+	unsigned int state;
+	unsigned int dummy;
+	char **vec;
+	vec = xs_read_watch(dev->xenfb->xsh, &dummy);
+	if (!vec)
+		return -1;
+	free(vec);
+
+	state = xenfb_read_state(dev->xenfb->xsh, dev->nodename);
+
+	if (!((1 <<state) & ((1 << XenbusStateUnknown)
+			     | (1 << XenbusStateInitialising)
+			     | (1 << XenbusStateClosed)
+#if 1 /* TODO fudging state to permit restarting; to be removed */
+			     | (1 << XenbusStateInitWait)
+			     | (1 << XenbusStateConnected)
+			     | (1 << XenbusStateClosing)
+#endif
+			     ))) {
+		fprintf(stderr, "FB: Carry on waiting\n");
+		return 1;
+	}
+
+	xs_unwatch(dev->xenfb->xsh, dev->nodename, "");
+
+        switch (state) {
+#if 1
+        case XenbusStateInitWait:
+        case XenbusStateConnected:
+                printf("Fudging state to %d\n", XenbusStateInitialising); /* FIXME */
+#endif
+        case XenbusStateInitialising:
+        case XenbusStateClosing:
+        case XenbusStateClosed:
+                break;
+        default:
+                fprintf(stderr, "Wrong state %d\n", state);
+                return -1;
+        }
+        xenfb_switch_state(dev, XenbusStateInitWait);
+        if (xenfb_hotplug(dev) < 0)
+                return -1;
+
+        return 0;
+}
+
+
+/****************************************************************
+ * 
+ * QEMU device model integration functions
+ *
+ ****************************************************************/
 
 /* 
  * Send a key event from the client to the guest OS
@@ -995,6 +1072,32 @@ static void xenfb_invalidate(void *opaque)
 /* Screen dump is not used in Xen, so no need to impl this....yet */
 static void xenfb_screen_dump(void *opaque, const char *name) { }
 
+
+/* Register a QEMU graphical console, and key/mouse handler,
+ * connecting up their events to the frontend */
+static int xenfb_register_console(struct xenfb *xenfb) {
+	/* Register our keyboard & mouse handlers */
+	qemu_add_kbd_event_handler(xenfb_key_event, xenfb);
+	qemu_add_mouse_event_handler(xenfb_mouse_event, xenfb,
+  				     xenfb->abs_pointer_wanted,
+  				     "Xen PVFB Mouse");
+  
+  	/* Tell QEMU to allocate a graphical console */
+	graphic_console_init(xenfb->ds,
+			     xenfb_update,
+			     xenfb_invalidate,
+			     xenfb_screen_dump,
+			     xenfb);
+	dpy_resize(xenfb->ds, xenfb->width, xenfb->height);
+
+	if (qemu_set_fd_handler2(xenfb->evt_xch, NULL, xenfb_dispatch_channel, NULL, xenfb) < 0)
+	        return -1;
+	if (qemu_set_fd_handler2(xs_fileno(xenfb->xsh), NULL, xenfb_dispatch_store, NULL, xenfb) < 0)
+		return -1;
+
+        fprintf(stderr, "Xen Framebuffer registered\n");
+        return 0;
+}
 
 /*
  * Local variables:
