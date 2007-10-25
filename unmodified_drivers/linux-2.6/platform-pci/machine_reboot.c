@@ -1,4 +1,3 @@
-#include <linux/config.h>
 #include <linux/cpumask.h>
 #include <linux/preempt.h>
 #include <xen/evtchn.h>

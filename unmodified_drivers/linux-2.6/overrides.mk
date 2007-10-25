@@ -11,4 +11,4 @@ ifeq ($(ARCH),ia64)
   EXTRA_CFLAGS += -DCONFIG_VMX_GUEST
 endif
 
-EXTRA_CFLAGS += -include $(srctree)/include/linux/autoconf.h
+EXTRA_CFLAGS += -include $(objtree)/include/linux/autoconf.h

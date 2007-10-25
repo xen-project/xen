@@ -28,7 +28,6 @@
  * IN THE SOFTWARE.
  */
 
-#include <linux/config.h>
 #include <linux/module.h>
 #include <linux/kernel.h>
 #include <linux/spinlock.h>
@@ -48,7 +47,7 @@ void *shared_info_area;
 
 static struct {
 	spinlock_t lock;
-	irqreturn_t(*handler) (int, void *, struct pt_regs *);
+	irq_handler_t handler;
 	void *dev_id;
 	int evtchn;
 	int close:1; /* close on unbind_from_irqhandler()? */
@@ -146,7 +145,7 @@ EXPORT_SYMBOL(unmask_evtchn);
 
 int bind_listening_port_to_irqhandler(
 	unsigned int remote_domain,
-	irqreturn_t (*handler)(int, void *, struct pt_regs *),
+	irq_handler_t handler,
 	unsigned long irqflags,
 	const char *devname,
 	void *dev_id)
@@ -187,7 +186,7 @@ EXPORT_SYMBOL(bind_listening_port_to_irqhandler);
 
 int bind_caller_port_to_irqhandler(
 	unsigned int caller_port,
-	irqreturn_t (*handler)(int, void *, struct pt_regs *),
+	irq_handler_t handler,
 	unsigned long irqflags,
 	const char *devname,
 	void *dev_id)
@@ -254,13 +253,18 @@ void notify_remote_via_irq(int irq)
 }
 EXPORT_SYMBOL(notify_remote_via_irq);
 
-static irqreturn_t evtchn_interrupt(int irq, void *dev_id,
-				    struct pt_regs *regs)
+static irqreturn_t evtchn_interrupt(int irq, void *dev_id
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,19)
+				    , struct pt_regs *regs
+#else
+# define handler(irq, dev_id, regs) handler(irq, dev_id)
+#endif
+				    )
 {
 	unsigned int l1i, port;
 	/* XXX: All events are bound to vcpu0 but irq may be redirected. */
 	int cpu = 0; /*smp_processor_id();*/
-	irqreturn_t(*handler) (int, void *, struct pt_regs *);
+	irq_handler_t handler;
 	shared_info_t *s = shared_info_area;
 	vcpu_info_t *v = &s->vcpu_info[cpu];
 	unsigned long l1, l2;
@@ -331,6 +335,10 @@ int xen_irq_init(struct pci_dev *pdev)
 		spin_lock_init(&irq_evtchn[irq].lock);
 
 	return request_irq(pdev->irq, evtchn_interrupt,
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,22)
 			   SA_SHIRQ | SA_SAMPLE_RANDOM | SA_INTERRUPT,
+#else
+			   IRQF_SHARED | IRQF_SAMPLE_RANDOM | IRQF_DISABLED,
+#endif
 			   "xen-platform-pci", pdev);
 }

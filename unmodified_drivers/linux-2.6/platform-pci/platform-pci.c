@@ -367,7 +367,11 @@ static int __init platform_pci_module_init(void)
 {
 	int rc;
 
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,10)
 	rc = pci_module_init(&platform_driver);
+#else
+	rc = pci_register_driver(&platform_driver);
+#endif
 	if (rc) {
 		printk(KERN_INFO DRV_NAME
 		       ": No platform pci device model found\n");
