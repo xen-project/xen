@@ -124,10 +124,14 @@ static void __serial_putc(struct serial_port *port, char c)
 
 void serial_putc(int handle, char c)
 {
-    struct serial_port *port = &com[handle & SERHND_IDX];
+    struct serial_port *port;
     unsigned long flags;
 
-    if ( (handle == -1) || !port->driver || !port->driver->putc )
+    if ( handle == -1 )
+        return;
+
+    port = &com[handle & SERHND_IDX];
+    if ( !port->driver || !port->driver->putc )
         return;
 
     spin_lock_irqsave(&port->tx_lock, flags);
@@ -147,11 +151,15 @@ void serial_putc(int handle, char c)
 
 void serial_puts(int handle, const char *s)
 {
-    struct serial_port *port = &com[handle & SERHND_IDX];
+    struct serial_port *port;
     unsigned long flags;
     char c;
 
-    if ( (handle == -1) || !port->driver || !port->driver->putc )
+    if ( handle == -1 )
+        return;
+
+    port = &com[handle & SERHND_IDX];
+    if ( !port->driver || !port->driver->putc )
         return;
 
     spin_lock_irqsave(&port->tx_lock, flags);
@@ -174,11 +182,15 @@ void serial_puts(int handle, const char *s)
 
 char serial_getc(int handle)
 {
-    struct serial_port *port = &com[handle & SERHND_IDX];
+    struct serial_port *port;
     char c;
     unsigned long flags;
 
-    if ( (handle == -1) || !port->driver || !port->driver->getc )
+    if ( handle == -1 )
+        return '\0';
+
+    port = &com[handle & SERHND_IDX];
+    if ( !port->driver || !port->driver->getc )
         return '\0';
 
     do {
@@ -249,11 +261,13 @@ int serial_parse_handle(char *conf)
 
 void serial_set_rx_handler(int handle, serial_rx_fn fn)
 {
-    struct serial_port *port = &com[handle & SERHND_IDX];
+    struct serial_port *port;
     unsigned long flags;
 
     if ( handle == -1 )
         return;
+
+    port = &com[handle & SERHND_IDX];
 
     spin_lock_irqsave(&port->rx_lock, flags);
 
@@ -290,10 +304,12 @@ void serial_set_rx_handler(int handle, serial_rx_fn fn)
 
 void serial_force_unlock(int handle)
 {
-    struct serial_port *port = &com[handle & SERHND_IDX];
+    struct serial_port *port;
 
     if ( handle == -1 )
         return;
+
+    port = &com[handle & SERHND_IDX];
 
     spin_lock_init(&port->rx_lock);
     spin_lock_init(&port->tx_lock);
@@ -303,12 +319,14 @@ void serial_force_unlock(int handle)
 
 void serial_start_sync(int handle)
 {
-    struct serial_port *port = &com[handle & SERHND_IDX];
+    struct serial_port *port;
     unsigned long flags;
 
     if ( handle == -1 )
         return;
     
+    port = &com[handle & SERHND_IDX];
+
     spin_lock_irqsave(&port->tx_lock, flags);
 
     if ( port->sync++ == 0 )
@@ -327,12 +345,14 @@ void serial_start_sync(int handle)
 
 void serial_end_sync(int handle)
 {
-    struct serial_port *port = &com[handle & SERHND_IDX];
+    struct serial_port *port;
     unsigned long flags;
 
     if ( handle == -1 )
         return;
     
+    port = &com[handle & SERHND_IDX];
+
     spin_lock_irqsave(&port->tx_lock, flags);
 
     port->sync--;
@@ -342,9 +362,10 @@ void serial_end_sync(int handle)
 
 int serial_tx_space(int handle)
 {
-    struct serial_port *port = &com[handle & SERHND_IDX];
+    struct serial_port *port;
     if ( handle == -1 )
         return SERIAL_TXBUFSZ;
+    port = &com[handle & SERHND_IDX];
     return SERIAL_TXBUFSZ - (port->txbufp - port->txbufc);
 }
 
