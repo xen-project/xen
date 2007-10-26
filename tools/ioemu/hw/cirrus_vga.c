@@ -294,6 +294,7 @@ void *shared_vram;
 
 static void cirrus_bitblt_reset(CirrusVGAState *s);
 static void cirrus_update_memory_access(CirrusVGAState *s);
+static void cirrus_vga_mem_writew(void *opaque, target_phys_addr_t addr, uint32_t val);
 
 /***************************************
  *
@@ -1496,6 +1497,17 @@ cirrus_hook_write_gr(CirrusVGAState * s, unsigned reg_index, int reg_value)
 	break;
     case 0x31:			// BLT STATUS/START
 	cirrus_write_bitblt(s, reg_value);
+	break;
+
+	// Extension to allow BIOS to clear 16K VRAM bank in one operation
+    case 0xFE:
+	s->gr[reg_index] = reg_value;  // Lower byte of value to be written
+	break;
+    case 0xFF: {
+	target_phys_addr_t addr;
+	for (addr = 0xa0000; addr < 0xa4000; addr += 2)
+	    cirrus_vga_mem_writew(s, addr, (reg_value << 8) | s->gr[0xFE]);
+	}
 	break;
     default:
 #ifdef DEBUG_CIRRUS
