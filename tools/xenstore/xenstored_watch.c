@@ -59,7 +59,16 @@ static void add_event(struct connection *conn,
 	if (!check_event_node(name)) {
 		/* Can this conn load node, or see that it doesn't exist? */
 		struct node *node = get_node(conn, name, XS_PERM_READ);
-		if (!node && errno != ENOENT)
+		/*
+		 * XXX We allow EACCES here because otherwise a non-dom0
+		 * backend driver cannot watch for disappearance of a frontend
+		 * xenstore directory. When the directory disappears, we
+		 * revert to permissions of the parent directory for that path,
+		 * which will typically disallow access for the backend.
+		 * But this breaks device-channel teardown!
+		 * Really we should fix this better...
+		 */
+		if (!node && errno != ENOENT && errno != EACCES)
 			return;
 	}
 
