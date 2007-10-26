@@ -616,9 +616,9 @@ int xc_domain_iomem_permission(int xc_handle,
 
 int xc_domain_pin_memory_cacheattr(int xc_handle,
                                    uint32_t domid,
-                                   unsigned long start,
-                                   unsigned long end,
-                                   unsigned int type);
+                                   uint64_t start,
+                                   uint64_t end,
+                                   uint32_t type);
 
 unsigned long xc_make_page_below_4G(int xc_handle, uint32_t domid,
                                     unsigned long mfn);

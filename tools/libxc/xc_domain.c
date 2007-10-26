@@ -378,9 +378,9 @@ int xc_domain_setmaxmem(int xc_handle,
 
 int xc_domain_pin_memory_cacheattr(int xc_handle,
                                    uint32_t domid,
-                                   unsigned long start,
-                                   unsigned long end,
-                                   unsigned int type)
+                                   uint64_t start,
+                                   uint64_t end,
+                                   uint32_t type)
 {
     DECLARE_DOMCTL;
     domctl.cmd = XEN_DOMCTL_pin_mem_cacheattr;
