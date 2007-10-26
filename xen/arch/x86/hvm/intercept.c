@@ -182,10 +182,11 @@ int hvm_buffered_io_send(ioreq_t *p)
     case 8:
         bp.size = 3;
         qw = 1;
-        gdprintk(XENLOG_INFO, "quadword ioreq type:%d data:%ld\n", p->type, p->data);
+        gdprintk(XENLOG_INFO, "quadword ioreq type:%d data:%"PRIx64"\n",
+                 p->type, p->data);
         break;
     default:
-        gdprintk(XENLOG_WARNING, "unexpected ioreq size:%ld\n", p->size);
+        gdprintk(XENLOG_WARNING, "unexpected ioreq size:%"PRId64"\n", p->size);
         return 0;
     }
     
