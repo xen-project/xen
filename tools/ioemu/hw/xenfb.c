@@ -180,6 +180,51 @@ static void xenfb_device_init(struct xenfb_device *dev,
 	dev->xenfb = xenfb;
 }
 
+static char *xenfb_path_in_dom(struct xs_handle *xsh,
+                               char *buf, size_t size,
+                               unsigned domid, const char *fmt, ...)
+{
+        va_list ap;
+        char *domp = xs_get_domain_path(xsh, domid);
+        int n;
+
+        if (domp == NULL)
+                return NULL;
+
+        n = snprintf(buf, size, "%s/", domp);
+        free(domp);
+        if (n >= size)
+                return NULL;
+
+        va_start(ap, fmt);
+        n += vsnprintf(buf + n, size - n, fmt, ap);
+        va_end(ap);
+        if (n >= size)
+                return NULL;
+
+        return buf;
+}
+
+static int xenfb_device_set_domain(struct xenfb_device *dev, int domid)
+{
+        dev->otherend_id = domid;
+
+        if (!xenfb_path_in_dom(dev->xenfb->xsh,
+                               dev->otherend, sizeof(dev->otherend),
+                               domid, "device/%s/0", dev->devicetype)) {
+                errno = ENOENT;
+                return -1;
+        }
+        if (!xenfb_path_in_dom(dev->xenfb->xsh,
+                               dev->nodename, sizeof(dev->nodename),
+                               0, "backend/%s/%d/0", dev->devicetype, domid)) {
+                errno = ENOENT;
+                return -1;
+        }
+
+        return 0;
+}
+
 struct xenfb *xenfb_new(int domid, DisplayState *ds)
 {
 	struct xenfb *xenfb = qemu_malloc(sizeof(struct xenfb));
@@ -212,6 +257,10 @@ struct xenfb *xenfb_new(int domid, DisplayState *ds)
 	xenfb->xsh = xs_daemon_open();
 	if (!xenfb->xsh)
 		goto fail;
+
+	xenfb->ds = ds;
+	xenfb_device_set_domain(&xenfb->fb, domid);
+	xenfb_device_set_domain(&xenfb->kbd, domid);
 
 	fprintf(stderr, "FB: Waiting for KBD backend creation\n");
 	xenfb_wait_for_backend(&xenfb->kbd, xenfb_backend_created_kbd);
