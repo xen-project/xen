@@ -307,6 +307,13 @@ void create_periodic_time(
     pt->period_cycles = (u64)period * cpu_khz / 1000000L;
     pt->one_shot = one_shot;
     pt->scheduled = NOW() + period;
+    /*
+     * Offset LAPIC ticks from other timer ticks. Otherwise guests which use
+     * LAPIC ticks for process accounting can see long sequences of process
+     * ticks incorrectly accounted to interrupt processing.
+     */
+    if ( is_lvtt(v, irq) )
+        pt->scheduled += period >> 1;
     pt->cb = cb;
     pt->priv = data;
 
