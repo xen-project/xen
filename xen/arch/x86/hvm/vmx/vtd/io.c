@@ -180,7 +180,10 @@ void iommu_domain_destroy(struct domain *d)
     {
         for ( i = 0; i < NR_IRQS; i++ )
             if ( hvm_irq_dpci->mirq[i].valid )
+            {
                 pirq_guest_unbind(d, i);
+                kill_timer(&hvm_irq_dpci->hvm_timer[irq_to_vector(i)]);
+            }
         d->arch.hvm_domain.irq.dpci = NULL;
         xfree(hvm_irq_dpci);
     }
