@@ -77,13 +77,26 @@ struct shared_iopage {
 };
 typedef struct shared_iopage shared_iopage_t;
 
-#define IOREQ_BUFFER_SLOT_NUM     80
+#pragma pack(push,2)
+
+struct buf_ioreq {
+    uint8_t  type;   /*  I/O type                    */
+    uint8_t  dir:1;  /*  1=read, 0=write             */
+    uint8_t  size:2; /*  0=>1, 1=>2, 3=>8. If 8 then use two contig buf_ioreqs */
+    uint32_t addr:20; /*  physical address or high-order data */
+    uint16_t data;   /*  (low order) data            */
+};
+typedef struct buf_ioreq buf_ioreq_t;
+
+#define IOREQ_BUFFER_SLOT_NUM     672
 struct buffered_iopage {
-    unsigned int    read_pointer;
-    unsigned int    write_pointer;
-    ioreq_t         ioreq[IOREQ_BUFFER_SLOT_NUM];
+    volatile unsigned int read_pointer;
+    volatile unsigned int write_pointer;
+    buf_ioreq_t buf_ioreq[IOREQ_BUFFER_SLOT_NUM];
 }; /* NB. Size of this structure must be no greater than one page. */
 typedef struct buffered_iopage buffered_iopage_t;
+
+#pragma pack(pop)
 
 #if defined(__ia64__)
 struct pio_buffer {

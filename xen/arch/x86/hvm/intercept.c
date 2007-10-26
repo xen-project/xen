@@ -45,20 +45,6 @@ static struct hvm_mmio_handler *hvm_mmio_handlers[HVM_MMIO_HANDLER_NR] =
     &vioapic_mmio_handler
 };
 
-struct hvm_buffered_io_range {
-    unsigned long start_addr;
-    unsigned long length;
-};
-
-#define HVM_BUFFERED_IO_RANGE_NR 1
-
-static struct hvm_buffered_io_range buffered_stdvga_range = {0xA0000, 0x20000};
-static struct hvm_buffered_io_range
-*hvm_buffered_io_ranges[HVM_BUFFERED_IO_RANGE_NR] =
-{
-    &buffered_stdvga_range
-};
-
 static inline void hvm_mmio_access(struct vcpu *v,
                                    ioreq_t *p,
                                    hvm_mmio_read_t read_handler,
@@ -170,47 +156,68 @@ int hvm_buffered_io_send(ioreq_t *p)
     struct vcpu *v = current;
     struct hvm_ioreq_page *iorp = &v->domain->arch.hvm_domain.buf_ioreq;
     buffered_iopage_t *pg = iorp->va;
+    buf_ioreq_t bp;
+    /* Timeoffset sends 64b data, but no address.  Use two consecutive slots. */
+    int qw = 0;
 
+    /* Ensure buffered_iopage fits in a page */
+    BUILD_BUG_ON(sizeof(buffered_iopage_t) > PAGE_SIZE);
+
+    /* Return 0 for the cases we can't deal with. */
+    if (p->addr > 0xffffful || p->data_is_ptr || p->df || p->count != 1)
+        return 0;
+
+    bp.type = p->type;
+    bp.dir  = p->dir;
+    switch (p->size) {
+    case 1:
+        bp.size = 0;
+        break;
+    case 2:
+        bp.size = 1;
+        break;
+    case 4:
+        bp.size = 2;
+        break;
+    case 8:
+        bp.size = 3;
+        qw = 1;
+        gdprintk(XENLOG_INFO, "quadword ioreq type:%d data:%ld\n", p->type, p->data);
+        break;
+    default:
+        gdprintk(XENLOG_WARNING, "unexpected ioreq size:%ld\n", p->size);
+        return 0;
+    }
+    
+    bp.data = p->data;
+    bp.addr = qw ? ((p->data >> 16) & 0xfffful) : (p->addr & 0xffffful);
+    
     spin_lock(&iorp->lock);
 
-    if ( (pg->write_pointer - pg->read_pointer) == IOREQ_BUFFER_SLOT_NUM )
+    if ( (pg->write_pointer - pg->read_pointer) >= IOREQ_BUFFER_SLOT_NUM - (qw ? 1 : 0))
     {
         /* The queue is full: send the iopacket through the normal path. */
         spin_unlock(&iorp->lock);
         return 0;
     }
-
-    memcpy(&pg->ioreq[pg->write_pointer % IOREQ_BUFFER_SLOT_NUM],
-           p, sizeof(ioreq_t));
+    
+    memcpy(&pg->buf_ioreq[pg->write_pointer % IOREQ_BUFFER_SLOT_NUM],
+           &bp, sizeof(bp));
+    
+    if (qw) {
+        bp.data = p->data >> 32;
+        bp.addr = (p->data >> 48) & 0xfffful;
+        memcpy(&pg->buf_ioreq[(pg->write_pointer+1) % IOREQ_BUFFER_SLOT_NUM],
+               &bp, sizeof(bp));
+    }
 
     /* Make the ioreq_t visible /before/ write_pointer. */
     wmb();
-    pg->write_pointer++;
-
+    pg->write_pointer += qw ? 2 : 1;
+    
     spin_unlock(&iorp->lock);
-
+    
     return 1;
-}
-
-int hvm_buffered_io_intercept(ioreq_t *p)
-{
-    int i;
-
-    /* ignore READ ioreq_t! */
-    if ( p->dir == IOREQ_READ )
-        return 0;
-
-    for ( i = 0; i < HVM_BUFFERED_IO_RANGE_NR; i++ ) {
-        if ( p->addr >= hvm_buffered_io_ranges[i]->start_addr &&
-             p->addr + p->size - 1 < hvm_buffered_io_ranges[i]->start_addr +
-                                     hvm_buffered_io_ranges[i]->length )
-            break;
-    }
-
-    if ( i == HVM_BUFFERED_IO_RANGE_NR )
-        return 0;
-
-    return hvm_buffered_io_send(p);
 }
 
 int hvm_mmio_intercept(ioreq_t *p)
@@ -253,7 +260,7 @@ int hvm_io_intercept(ioreq_t *p, int type)
         addr = handler->hdl_list[i].addr;
         size = handler->hdl_list[i].size;
         if (p->addr >= addr &&
-            p->addr <  addr + size)
+            p->addr + p->size <=  addr + size)
             return handler->hdl_list[i].action(p);
     }
     return 0;

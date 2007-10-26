@@ -478,6 +478,7 @@ void cpu_ioreq_timeoffset(CPUState *env, ioreq_t *req)
 
     time_offset += (ulong)req->data;
 
+    fprintf(logfile, "Time offset set %ld, added offset %ld\n", time_offset, req->data);
     sprintf(b, "%ld", time_offset);
     xenstore_vm_write(domid, "rtc/timeoffset", b);
 }
@@ -538,20 +539,39 @@ void __handle_ioreq(CPUState *env, ioreq_t *req)
 
 void __handle_buffered_iopage(CPUState *env)
 {
-    ioreq_t *req = NULL;
+    buf_ioreq_t *buf_req = NULL;
+    ioreq_t req;
+    int qw = 0;
 
     if (!buffered_io_page)
         return;
 
     while (buffered_io_page->read_pointer !=
            buffered_io_page->write_pointer) {
-        req = &buffered_io_page->ioreq[buffered_io_page->read_pointer %
+        memset(&req, 0, sizeof(req));
+        buf_req = &buffered_io_page->buf_ioreq[buffered_io_page->read_pointer %
 				       IOREQ_BUFFER_SLOT_NUM];
+        req.size = 1UL << buf_req->size;
+        req.count = 1;
+        req.data = buf_req->data;
+        req.state = STATE_IOREQ_READY;
+        req.dir  = buf_req->dir;
+        req.type = buf_req->type;
+        qw = req.size == 8;
+        if (qw) {
+            req.data |= ((uint64_t)buf_req->addr) << 16;
+            buf_req = &buffered_io_page->buf_ioreq[(buffered_io_page->read_pointer+1) %
+                                               IOREQ_BUFFER_SLOT_NUM];
+            req.data |= ((uint64_t)buf_req->data) << 32;
+            req.data |= ((uint64_t)buf_req->addr) << 48;
+        }
+        else
+            req.addr = buf_req->addr;
 
-        __handle_ioreq(env, req);
+        __handle_ioreq(env, &req);
 
         mb();
-        buffered_io_page->read_pointer++;
+        buffered_io_page->read_pointer += qw ? 2 : 1;
     }
 }
 

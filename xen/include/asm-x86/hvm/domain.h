@@ -51,6 +51,7 @@ struct hvm_domain {
     struct hvm_irq         irq;
     struct hvm_hw_vpic     vpic[2]; /* 0=master; 1=slave */
     struct hvm_vioapic    *vioapic;
+    struct hvm_hw_stdvga   stdvga;
 
     /* hvm_print_line() logging. */
     char                   pbuf[80];

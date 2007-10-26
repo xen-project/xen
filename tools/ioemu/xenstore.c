@@ -734,7 +734,7 @@ int xenstore_vm_write(int domid, char *key, char *value)
 
     pasprintf(&buf, "%s/%s", path, key);
     rc = xs_write(xsh, XBT_NULL, buf, value, strlen(value));
-    if (rc) {
+    if (rc == 0) {
         fprintf(logfile, "xs_write(%s, %s): write error\n", buf, key);
         goto out;
     }

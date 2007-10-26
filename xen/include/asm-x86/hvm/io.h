@@ -80,10 +80,11 @@ struct hvm_io_op {
     struct cpu_user_regs    io_context; /* current context */
 };
 
-#define MAX_IO_HANDLER              9
+#define MAX_IO_HANDLER             12
 
 #define HVM_PORTIO                  0
 #define HVM_MMIO                    1
+#define HVM_BUFFERED_IO             2
 
 typedef int (*intercept_action_t)(ioreq_t *);
 typedef unsigned long (*hvm_mmio_read_t)(struct vcpu *v,
@@ -126,15 +127,26 @@ static inline int hvm_portio_intercept(ioreq_t *p)
     return hvm_io_intercept(p, HVM_PORTIO);
 }
 
+static inline int hvm_buffered_io_intercept(ioreq_t *p)
+{
+    return hvm_io_intercept(p, HVM_BUFFERED_IO);
+}
+
 extern int hvm_mmio_intercept(ioreq_t *p);
 extern int hvm_buffered_io_send(ioreq_t *p);
-extern int hvm_buffered_io_intercept(ioreq_t *p);
 
 static inline int register_portio_handler(
     struct domain *d, unsigned long addr,
     unsigned long size, intercept_action_t action)
 {
     return register_io_handler(d, addr, size, action, HVM_PORTIO);
+}
+
+static inline int register_buffered_io_handler(
+    struct domain *d, unsigned long addr,
+    unsigned long size, intercept_action_t action)
+{
+    return register_io_handler(d, addr, size, action, HVM_BUFFERED_IO);
 }
 
 #if defined(__i386__) || defined(__x86_64__)
@@ -153,6 +165,39 @@ extern void hvm_interrupt_post(struct vcpu *v, int vector, int type);
 extern void hvm_io_assist(void);
 extern void hvm_dpci_eoi(struct domain *d, unsigned int guest_irq,
                          union vioapic_redir_entry *ent);
+
+
+#undef  STDVGA_STATS /* #define to enable stdvga statistics */
+#undef  STDVGA_CHECK /* debug: ensure cached value matches qemu value */
+
+struct hvm_hw_stdvga {
+    uint8_t sr_index;
+    uint8_t sr[0x18];
+    uint8_t gr_index;
+    uint8_t gr[256];
+    uint32_t latch;
+    int stdvga;
+    int cache;
+    uint8_t *vram_ptr[64];  /* shadow of 0xa0000-0xaffff */
+    spinlock_t lock;
+    
+#ifdef STDVGA_STATS
+    struct {
+        uint32_t nr_mmio_buffered_rd;
+        uint32_t nr_mmio_buffered_wr;
+        uint32_t nr_mmio_unbuffered_rd;
+        uint32_t nr_mmio_unbuffered_wr;
+        uint32_t nr_pio_buffered_rd;
+        uint32_t nr_pio_buffered_wr;
+        uint32_t nr_pio_unbuffered_rd;
+        uint32_t nr_pio_unbuffered_wr;
+    } stats;
+#endif
+};
+
+extern void stdvga_init(struct domain *d);
+extern void stdvga_deinit(struct domain *d);
+extern void stdvga_check_cached_value(ioreq_t *p);
 
 #endif /* __ASM_X86_HVM_IO_H__ */
 

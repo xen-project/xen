@@ -241,6 +241,8 @@ int hvm_domain_initialise(struct domain *d)
     if ( rc != 0 )
         goto fail1;
 
+    stdvga_init(d);
+
     hvm_init_ioreq_page(d, &d->arch.hvm_domain.ioreq);
     hvm_init_ioreq_page(d, &d->arch.hvm_domain.buf_ioreq);
 
@@ -266,6 +268,7 @@ void hvm_domain_relinquish_resources(struct domain *d)
     rtc_deinit(d);
     pmtimer_deinit(d);
     hpet_deinit(d);
+    stdvga_deinit(d);
 }
 
 void hvm_domain_destroy(struct domain *d)
