@@ -175,8 +175,10 @@ void hvm_vcpu_reset(struct vcpu *vcpu);
 
 void hvm_send_assist_req(struct vcpu *v);
 
-void hvm_set_guest_time(struct vcpu *v, u64 gtime);
-u64 hvm_get_guest_time(struct vcpu *v);
+void hvm_set_guest_tsc(struct vcpu *v, u64 guest_tsc);
+u64 hvm_get_guest_tsc(struct vcpu *v);
+#define hvm_set_guest_time(vcpu, gtime) hvm_set_guest_tsc(vcpu, gtime)
+#define hvm_get_guest_time(vcpu)        hvm_get_guest_tsc(vcpu)
 
 #define hvm_paging_enabled(v) \
     (!!((v)->arch.hvm_vcpu.guest_cr[0] & X86_CR0_PG))

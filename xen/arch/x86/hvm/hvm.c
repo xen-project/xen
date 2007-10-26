@@ -89,17 +89,17 @@ void hvm_enable(struct hvm_function_table *fns)
     }
 }
 
-void hvm_set_guest_time(struct vcpu *v, u64 gtime)
+void hvm_set_guest_tsc(struct vcpu *v, u64 guest_tsc)
 {
     u64 host_tsc;
 
     rdtscll(host_tsc);
 
-    v->arch.hvm_vcpu.cache_tsc_offset = gtime - host_tsc;
+    v->arch.hvm_vcpu.cache_tsc_offset = guest_tsc - host_tsc;
     hvm_funcs.set_tsc_offset(v, v->arch.hvm_vcpu.cache_tsc_offset);
 }
 
-u64 hvm_get_guest_time(struct vcpu *v)
+u64 hvm_get_guest_tsc(struct vcpu *v)
 {
     u64 host_tsc;
 
@@ -121,7 +121,7 @@ void hvm_do_resume(struct vcpu *v)
     if ( !v->fpu_dirtied )
         hvm_funcs.stts(v);
 
-    pt_thaw_time(v);
+    pt_restore_timer(v);
 
     /* NB. Optimised for common case (p->state == STATE_IOREQ_NONE). */
     p = &get_ioreq(v)->vp_ioreq;
@@ -1842,6 +1842,12 @@ long do_hvm_op(unsigned long op, XEN_GUEST_HANDLE(void) arg)
             case HVM_PARAM_CALLBACK_IRQ:
                 hvm_set_callback_via(d, a.value);
                 hvm_latch_shinfo_size(d);
+                break;
+            case HVM_PARAM_TIMER_MODE:
+                rc = -EINVAL;
+                if ( (a.value != HVMPTM_delay_for_missed_ticks) &&
+                     (a.value != HVMPTM_no_delay_for_missed_ticks) )
+                    goto param_fail;
                 break;
             }
             d->arch.hvm_domain.params[a.index] = a.value;

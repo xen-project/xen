@@ -23,6 +23,12 @@
 #include <asm/hvm/vpt.h>
 #include <asm/event.h>
 
+static int pt_support_time_frozen(struct domain *d)
+{
+    return (d->arch.hvm_domain.params[HVM_PARAM_TIMER_MODE] == 
+            HVMPTM_delay_for_missed_ticks);
+}
+
 static void pt_lock(struct periodic_time *pt)
 {
     struct vcpu *v;
@@ -67,7 +73,12 @@ static void missed_ticks(struct periodic_time *pt)
     pt->scheduled += missed_ticks * pt->period;
 }
 
-void pt_freeze_time(struct vcpu *v)
+static __inline__ void pt_freeze_time(struct vcpu *v)
+{
+    v->arch.hvm_vcpu.guest_time = hvm_get_guest_time(v);
+}
+
+void pt_save_timer(struct vcpu *v)
 {
     struct list_head *head = &v->arch.hvm_vcpu.tm_list;
     struct periodic_time *pt;
@@ -77,32 +88,39 @@ void pt_freeze_time(struct vcpu *v)
 
     spin_lock(&v->arch.hvm_vcpu.tm_lock);
 
-    v->arch.hvm_vcpu.guest_time = hvm_get_guest_time(v);
-
     list_for_each_entry ( pt, head, list )
         stop_timer(&pt->timer);
+
+    if ( pt_support_time_frozen(v->domain) )
+        pt_freeze_time(v);
 
     spin_unlock(&v->arch.hvm_vcpu.tm_lock);
 }
 
-void pt_thaw_time(struct vcpu *v)
+static __inline__ void pt_thaw_time(struct vcpu *v)
+{
+    if ( v->arch.hvm_vcpu.guest_time )
+    {
+        hvm_set_guest_time(v, v->arch.hvm_vcpu.guest_time);
+        v->arch.hvm_vcpu.guest_time = 0;
+    }
+}
+
+void pt_restore_timer(struct vcpu *v)
 {
     struct list_head *head = &v->arch.hvm_vcpu.tm_list;
     struct periodic_time *pt;
 
     spin_lock(&v->arch.hvm_vcpu.tm_lock);
 
-    if ( v->arch.hvm_vcpu.guest_time )
+    list_for_each_entry ( pt, head, list )
     {
-        hvm_set_guest_time(v, v->arch.hvm_vcpu.guest_time);
-        v->arch.hvm_vcpu.guest_time = 0;
-
-        list_for_each_entry ( pt, head, list )
-        {
-            missed_ticks(pt);
-            set_timer(&pt->timer, pt->scheduled);
-        }
+        missed_ticks(pt);
+        set_timer(&pt->timer, pt->scheduled);
     }
+
+    if ( pt_support_time_frozen(v->domain) )
+        pt_thaw_time(v);
 
     spin_unlock(&v->arch.hvm_vcpu.tm_lock);
 }
@@ -218,7 +236,8 @@ void pt_intr_post(struct vcpu *v, struct hvm_intack intack)
         pt->last_plt_gtime += pt->period_cycles;
     }
 
-    if ( hvm_get_guest_time(v) < pt->last_plt_gtime )
+    if ( pt_support_time_frozen(v->domain) &&
+            hvm_get_guest_time(v) < pt->last_plt_gtime )
         hvm_set_guest_time(v, pt->last_plt_gtime);
 
     cb = pt->cb;
