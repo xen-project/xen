@@ -1377,9 +1377,9 @@ def get_security_label(self, xspol=None):
         from xen.xend.XendXSPolicyAdmin import XSPolicyAdminInstance
         xspol = XSPolicyAdminInstance().get_loaded_policy()
 
-        label = ""
-        if xspol:
-            label = xspol.policy_get_domain_label_formatted(domid)
-        if domid != 0:
-            label = self.info.get('security_label', label)
+    label = ""
+    if xspol:
+        label = xspol.policy_get_domain_label_formatted(domid)
+    if domid != 0:
+        label = self.info.get('security_label', label)
     return label
