@@ -35,6 +35,7 @@
 #include <termios.h>
 #include <stdarg.h>
 #include <sys/mman.h>
+#include <sys/time.h>
 #if defined(__NetBSD__) || defined(__OpenBSD__)
 #include <util.h>
 #elif defined(__linux__) || defined(__Linux__)
@@ -46,6 +47,11 @@
 
 /* Each 10 bits takes ~ 3 digits, plus one, plus one for nul terminator. */
 #define MAX_STRLEN(x) ((sizeof(x) * CHAR_BIT + CHAR_BIT-1) / 10 * 3 + 2)
+
+/* How many events are allowed in each time period */
+#define RATE_LIMIT_ALLOWANCE 30
+/* Duration of each time period in ms */
+#define RATE_LIMIT_PERIOD 200
 
 extern int log_reload;
 extern int log_guest;
@@ -82,6 +88,8 @@ struct domain
 	evtchn_port_or_error_t remote_port;
 	int xce_handle;
 	struct xencons_interface *interface;
+	int event_count;
+	long long next_period;
 };
 
 static struct domain *dom_head;
@@ -494,6 +502,13 @@ static struct domain *create_domain(int domid)
 {
 	struct domain *dom;
 	char *s;
+	struct timeval tv;
+
+	if (gettimeofday(&tv, NULL) < 0) {
+		dolog(LOG_ERR, "Cannot get time of day %s:%s:L%d",
+		      __FILE__, __FUNCTION__, __LINE__);
+		return NULL;
+	}
 
 	dom = (struct domain *)malloc(sizeof(struct domain));
 	if (dom == NULL) {
@@ -529,6 +544,8 @@ static struct domain *create_domain(int domid)
 	dom->buffer.size = 0;
 	dom->buffer.capacity = 0;
 	dom->buffer.max_capacity = 0;
+	dom->event_count = 0;
+	dom->next_period = (tv.tv_sec * 1000) + (tv.tv_usec / 1000) + RATE_LIMIT_PERIOD;
 	dom->next = NULL;
 
 	dom->ring_ref = -1;
@@ -720,9 +737,12 @@ static void handle_ring_read(struct domain *dom)
 	if ((port = xc_evtchn_pending(dom->xce_handle)) == -1)
 		return;
 
+	dom->event_count++;
+
 	buffer_append(dom);
 
-	(void)xc_evtchn_unmask(dom->xce_handle, port);
+	if (dom->event_count < RATE_LIMIT_ALLOWANCE)
+		(void)xc_evtchn_unmask(dom->xce_handle, port);
 }
 
 static void handle_xs(void)
@@ -820,6 +840,9 @@ void handle_io(void)
 	for (;;) {
 		struct domain *d, *n;
 		int max_fd = -1;
+		struct timeval timeout;
+		struct timeval tv;
+		long long now, next_timeout = 0;
 
 		FD_ZERO(&readfds);
 		FD_ZERO(&writefds);
@@ -832,8 +855,33 @@ void handle_io(void)
 			max_fd = MAX(xc_evtchn_fd(xce_handle), max_fd);
 		}
 
+		if (gettimeofday(&tv, NULL) < 0)
+			return;
+		now = (tv.tv_sec * 1000) + (tv.tv_usec / 1000);
+
+		/* Re-calculate any event counter allowances & unblock
+		   domains with new allowance */
 		for (d = dom_head; d; d = d->next) {
-			if (d->xce_handle != -1) {
+			/* Add 5ms of fuzz since select() often returns
+			   a couple of ms sooner than requested. Without
+			   the fuzz we typically do an extra spin in select()
+			   with a 1/2 ms timeout every other iteration */
+			if ((now+5) > d->next_period) {
+				d->next_period = now + RATE_LIMIT_PERIOD;
+				if (d->event_count >= RATE_LIMIT_ALLOWANCE) {
+					(void)xc_evtchn_unmask(d->xce_handle, d->local_port);
+				}
+				d->event_count = 0;
+			}
+		}
+
+		for (d = dom_head; d; d = d->next) {
+			if (d->event_count >= RATE_LIMIT_ALLOWANCE) {
+				/* Determine if we're going to be the next time slice to expire */
+				if (!next_timeout ||
+				    d->next_period < next_timeout)
+					next_timeout = d->next_period;
+			} else if (d->xce_handle != -1) {
 				int evtchn_fd = xc_evtchn_fd(d->xce_handle);
 				FD_SET(evtchn_fd, &readfds);
 				max_fd = MAX(evtchn_fd, max_fd);
@@ -849,7 +897,19 @@ void handle_io(void)
 			}
 		}
 
-		ret = select(max_fd + 1, &readfds, &writefds, 0, NULL);
+		/* If any domain has been rate limited, we need to work
+		   out what timeout to supply to select */
+		if (next_timeout) {
+			long long duration = (next_timeout - now);
+			if (duration <= 0) /* sanity check */
+				duration = 1;
+			timeout.tv_sec = duration / 1000;
+			timeout.tv_usec = ((duration - (timeout.tv_sec * 1000))
+					   * 1000);
+		}
+
+		ret = select(max_fd + 1, &readfds, &writefds, 0,
+			     next_timeout ? &timeout : NULL);
 
 		if (log_reload) {
 			handle_log_reload();
@@ -877,9 +937,11 @@ void handle_io(void)
 
 		for (d = dom_head; d; d = n) {
 			n = d->next;
-			if (d->xce_handle != -1 &&
-			    FD_ISSET(xc_evtchn_fd(d->xce_handle), &readfds))
-				handle_ring_read(d);
+			if (d->event_count < RATE_LIMIT_ALLOWANCE) {
+				if (d->xce_handle != -1 &&
+				    FD_ISSET(xc_evtchn_fd(d->xce_handle), &readfds))
+					handle_ring_read(d);
+			}
 
 			if (d->tty_fd != -1 && FD_ISSET(d->tty_fd, &readfds))
 				handle_tty_read(d);
