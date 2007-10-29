@@ -166,9 +166,7 @@ extern void hvm_io_assist(void);
 extern void hvm_dpci_eoi(struct domain *d, unsigned int guest_irq,
                          union vioapic_redir_entry *ent);
 
-
-#undef  STDVGA_STATS /* #define to enable stdvga statistics */
-#undef  STDVGA_CHECK /* debug: ensure cached value matches qemu value */
+#ifdef __x86_64__
 
 struct hvm_hw_stdvga {
     uint8_t sr_index;
@@ -180,24 +178,18 @@ struct hvm_hw_stdvga {
     int cache;
     uint8_t *vram_ptr[64];  /* shadow of 0xa0000-0xaffff */
     spinlock_t lock;
-    
-#ifdef STDVGA_STATS
-    struct {
-        uint32_t nr_mmio_buffered_rd;
-        uint32_t nr_mmio_buffered_wr;
-        uint32_t nr_mmio_unbuffered_rd;
-        uint32_t nr_mmio_unbuffered_wr;
-        uint32_t nr_pio_buffered_rd;
-        uint32_t nr_pio_buffered_wr;
-        uint32_t nr_pio_unbuffered_rd;
-        uint32_t nr_pio_unbuffered_wr;
-    } stats;
-#endif
 };
 
-extern void stdvga_init(struct domain *d);
-extern void stdvga_deinit(struct domain *d);
-extern void stdvga_check_cached_value(ioreq_t *p);
+void stdvga_init(struct domain *d);
+void stdvga_deinit(struct domain *d);
+
+#else /* __i386__ */
+
+struct hvm_hw_stdvga {};
+#define stdvga_init(d)   ((void)0)
+#define stdvga_deinit(d) ((void)0)
+
+#endif
 
 #endif /* __ASM_X86_HVM_IO_H__ */
 
