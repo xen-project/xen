@@ -278,6 +278,16 @@ class XendOptions:
     def get_keymap(self):
         return self.get_config_value('keymap', None)
 
+    def get_resource_label_change_script(self):
+        s = self.get_config_value('resource-label-change-script')
+        if s:
+            result = s.split(" ")
+            result[0] = os.path.join(osdep.scripts_dir, result[0])
+            return result
+        else:
+            return None
+
+
 class XendOptionsFile(XendOptions):
 
     """Default path to the config file."""

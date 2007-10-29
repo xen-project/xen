@@ -27,6 +27,7 @@ import stat
 from xen.lowlevel import acm
 from xen.xend import sxp
 from xen.xend import XendConstants
+from xen.xend import XendOptions
 from xen.xend.XendLogging import log
 from xen.xend.XendError import VmError
 from xen.util import dictio, xsconstants
@@ -1081,9 +1082,14 @@ def set_resource_label(resource, policytype, policyref, reslabel, \
         if reslabel != "":
             new_entry = { resource : tuple([policytype, policyref, reslabel])}
             access_control.update(new_entry)
+            command = "add"
+            reslbl = ":".join([policytype, policyref, reslabel])
         else:
             if access_control.has_key(resource):
                 del access_control[resource]
+            command = "remove"
+            reslbl = ""
+        run_resource_label_change_script(resource, reslbl, command)
         dictio.dict_write(access_control, "resources", res_label_filename)
     finally:
         resfile_unlock()
@@ -1273,6 +1279,7 @@ def change_acm_policy(bin_pol, del_array, chg_array,
                 label = reslabel_map[label]
             elif label not in polnew_reslabels:
                 policytype = xsconstants.INVALID_POLICY_PREFIX + policytype
+                run_resource_label_change_script(key, "", "remove")
             # Update entry
             access_control[key] = \
                    tuple([ policytype, new_policyname, label ])
@@ -1383,3 +1390,18 @@ def get_security_label(self, xspol=None):
     if domid != 0:
         label = self.info.get('security_label', label)
     return label
+
+def run_resource_label_change_script(resource, label, command):
+    script = XendOptions.instance().get_resource_label_change_script()
+    if script:
+        parms = {
+            'resource' : resource,
+            'label'    : label,
+            'command'  : command,
+        }
+        log.info("Running resource label change script %s: %s" %
+                 (script, parms))
+        parms.update(os.environ)
+        os.spawnve(os.P_NOWAIT, script[0], script, parms)
+    else:
+        log.info("No script given for relabeling of resources.")

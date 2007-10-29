@@ -196,4 +196,5 @@
 # when not specififed in VM's configuration
 #(keymap 'en-us')
 
-
+# Script to run when the label of a resource has changed.
+#(resource-label-change-script '')
