@@ -33,6 +33,7 @@
 #include <asm/io.h>
 #include <asm/div64.h>
 #include <xsm/xsm.h>
+#include <public/sysctl.h>
 
 /* console: comma-separated list of console outputs. */
 static char opt_console[30] = OPT_CONSOLE_STR;
@@ -60,7 +61,7 @@ boolean_param("console_timestamps", opt_console_timestamps);
 #define CONRING_SIZE 16384
 #define CONRING_IDX_MASK(i) ((i)&(CONRING_SIZE-1))
 static char conring[CONRING_SIZE];
-static unsigned int conringc, conringp;
+static uint32_t conringc, conringp;
 
 static int sercon_handle = -1;
 
@@ -175,20 +176,25 @@ static char * __init loglvl_str(int lvl)
 
 static void putchar_console_ring(int c)
 {
+    ASSERT(spin_is_locked(&console_lock));
     conring[CONRING_IDX_MASK(conringp++)] = c;
-    if ( (conringp - conringc) > CONRING_SIZE )
+    if ( (uint32_t)(conringp - conringc) > CONRING_SIZE )
         conringc = conringp - CONRING_SIZE;
 }
 
-long read_console_ring(XEN_GUEST_HANDLE(char) str, u32 *pcount, int clear)
+long read_console_ring(struct xen_sysctl_readconsole *op)
 {
-    unsigned int idx, len, max, sofar, c;
-    unsigned long flags;
+    XEN_GUEST_HANDLE(char) str;
+    uint32_t idx, len, max, sofar, c;
 
-    max   = *pcount;
+    str   = guest_handle_cast(op->buffer, char),
+    max   = op->count;
     sofar = 0;
 
     c = conringc;
+    if ( op->incremental && ((int32_t)(op->index - c) < 0) )
+        c = op->index;
+
     while ( (c != conringp) && (sofar < max) )
     {
         idx = CONRING_IDX_MASK(c);
@@ -203,17 +209,19 @@ long read_console_ring(XEN_GUEST_HANDLE(char) str, u32 *pcount, int clear)
         c += len;
     }
 
-    if ( clear )
+    if ( op->clear )
     {
-        spin_lock_irqsave(&console_lock, flags);
-        if ( (conringp - c) > CONRING_SIZE )
+        spin_lock_irq(&console_lock);
+        if ( (uint32_t)(conringp - c) > CONRING_SIZE )
             conringc = conringp - CONRING_SIZE;
         else
             conringc = c;
-        spin_unlock_irqrestore(&console_lock, flags);
+        spin_unlock_irq(&console_lock);
     }
 
-    *pcount = sofar;
+    op->count = sofar;
+    op->index = c;
+
     return 0;
 }
 
@@ -333,15 +341,19 @@ static long guest_console_write(XEN_GUEST_HANDLE(char) buffer, int count)
             return -EFAULT;
         kbuf[kcount] = '\0';
 
+        spin_lock_irq(&console_lock);
+
         sercon_puts(kbuf);
         vga_puts(kbuf);
 
         if ( opt_console_to_ring )
+        {
             for ( kptr = kbuf; *kptr != '\0'; kptr++ )
                 putchar_console_ring(*kptr);
-
-        if ( opt_console_to_ring )
             send_guest_global_virq(dom0, VIRQ_CON_RING);
+        }
+
+        spin_unlock_irq(&console_lock);
 
         guest_handle_add_offset(buffer, kcount);
         count -= kcount;
@@ -407,6 +419,8 @@ long do_console_io(int cmd, int count, XEN_GUEST_HANDLE(char) buffer)
 static void __putstr(const char *str)
 {
     int c;
+
+    ASSERT(spin_is_locked(&console_lock));
 
     sercon_puts(str);
     vga_puts(str);
@@ -540,7 +554,9 @@ void __init init_console(void)
     serial_set_rx_handler(sercon_handle, serial_rx);
 
     /* HELLO WORLD --- start-of-day banner text. */
+    spin_lock(&console_lock);
     __putstr(xen_banner());
+    spin_unlock(&console_lock);
     printk("Xen version %d.%d%s (%s@%s) (%s) %s\n",
            xen_major_version(), xen_minor_version(), xen_extra_version(),
            xen_compile_by(), xen_compile_domain(),

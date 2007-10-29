@@ -11,7 +11,8 @@
 #include <xen/guest_access.h>
 #include <public/xen.h>
 
-long read_console_ring(XEN_GUEST_HANDLE(char), u32 *, int);
+struct xen_sysctl_readconsole;
+long read_console_ring(struct xen_sysctl_readconsole *op);
 
 void init_console(void);
 void console_endboot(void);

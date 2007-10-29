@@ -53,7 +53,9 @@ extern int log_hv;
 extern char *log_dir;
 
 static int log_hv_fd = -1;
+static evtchn_port_or_error_t log_hv_evtchn = -1;
 static int xc_handle = -1;
+static int xce_handle = -1;
 
 struct buffer
 {
@@ -76,8 +78,8 @@ struct domain
 	char *serialpath;
 	int use_consolepath;
 	int ring_ref;
-	evtchn_port_t local_port;
-	evtchn_port_t remote_port;
+	evtchn_port_or_error_t local_port;
+	evtchn_port_or_error_t remote_port;
 	int xce_handle;
 	struct xencons_interface *interface;
 };
@@ -713,7 +715,7 @@ static void handle_tty_write(struct domain *dom)
 
 static void handle_ring_read(struct domain *dom)
 {
-	evtchn_port_t port;
+	evtchn_port_or_error_t port;
 
 	if ((port = xc_evtchn_pending(dom->xce_handle)) == -1)
 		return;
@@ -752,12 +754,20 @@ static void handle_hv_logs(void)
 	char buffer[1024*16];
 	char *bufptr = buffer;
 	unsigned int size = sizeof(buffer);
-	if (xc_readconsolering(xc_handle, &bufptr, &size, 1) == 0) {
+	static uint32_t index = 0;
+	evtchn_port_or_error_t port;
+
+	if ((port = xc_evtchn_pending(xce_handle)) == -1)
+		return;
+
+	if (xc_readconsolering(xc_handle, &bufptr, &size, 0, 1, &index) == 0) {
 		int len = write(log_hv_fd, buffer, size);
 		if (len < 0)
 			dolog(LOG_ERR, "Failed to write hypervisor log: %d (%s)",
 			      errno, strerror(errno));
 	}
+
+	(void)xc_evtchn_unmask(xce_handle, port);
 }
 
 static void handle_log_reload(void)
@@ -785,16 +795,30 @@ void handle_io(void)
 
 	if (log_hv) {
 		xc_handle = xc_interface_open();
-		if (xc_handle == -1)
+		if (xc_handle == -1) {
 			dolog(LOG_ERR, "Failed to open xc handle: %d (%s)",
 			      errno, strerror(errno));
-		else
-			log_hv_fd = create_hv_log();
+			goto out;
+		}
+		xce_handle = xc_evtchn_open();
+		if (xce_handle == -1) {
+			dolog(LOG_ERR, "Failed to open xce handle: %d (%s)",
+			      errno, strerror(errno));
+			goto out;
+		}
+		log_hv_fd = create_hv_log();
+		if (log_hv_fd == -1)
+			goto out;
+		log_hv_evtchn = xc_evtchn_bind_virq(xce_handle, VIRQ_CON_RING);
+		if (log_hv_evtchn == -1) {
+			dolog(LOG_ERR, "Failed to bind to VIRQ_CON_RING: "
+			      "%d (%s)", errno, strerror(errno));
+			goto out;
+		}
 	}
 
 	for (;;) {
 		struct domain *d, *n;
-		struct timeval timeout = { 1, 0 }; /* Read HV logs every 1 second */
 		int max_fd = -1;
 
 		FD_ZERO(&readfds);
@@ -802,6 +826,11 @@ void handle_io(void)
 
 		FD_SET(xs_fileno(xs), &readfds);
 		max_fd = MAX(xs_fileno(xs), max_fd);
+
+		if (log_hv) {
+			FD_SET(xc_evtchn_fd(xce_handle), &readfds);
+			max_fd = MAX(xc_evtchn_fd(xce_handle), max_fd);
+		}
 
 		for (d = dom_head; d; d = d->next) {
 			if (d->xce_handle != -1) {
@@ -820,11 +849,7 @@ void handle_io(void)
 			}
 		}
 
-		/* XXX I wish we didn't have to busy wait for hypervisor logs
-		 * but there's no obvious way to get event channel notifications
-		 * for new HV log data as we can with guest */
-		ret = select(max_fd + 1, &readfds, &writefds, 0,
-			     log_hv_fd != -1 ? &timeout : NULL);
+		ret = select(max_fd + 1, &readfds, &writefds, 0, NULL);
 
 		if (log_reload) {
 			handle_log_reload();
@@ -841,12 +866,10 @@ void handle_io(void)
 			break;
 		}
 
-		/* Always process HV logs even if not a timeout */
-		if (log_hv_fd != -1)
+		if (log_hv && FD_ISSET(xc_evtchn_fd(xce_handle), &readfds))
 			handle_hv_logs();
 
-		/* Must not check returned FDSET if it was a timeout */
-		if (ret == 0)
+		if (ret <= 0)
 			continue;
 
 		if (FD_ISSET(xs_fileno(xs), &readfds))
@@ -869,6 +892,7 @@ void handle_io(void)
 		}
 	}
 
+ out:
 	if (log_hv_fd != -1) {
 		close(log_hv_fd);
 		log_hv_fd = -1;
@@ -877,6 +901,11 @@ void handle_io(void)
 		xc_interface_close(xc_handle);
 		xc_handle = -1;
 	}
+	if (xce_handle != -1) {
+		xc_evtchn_close(xce_handle);
+		xce_handle = -1;
+	}
+	log_hv_evtchn = -1;
 }
 
 /*
