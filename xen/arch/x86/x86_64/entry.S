@@ -235,15 +235,13 @@ process_softirqs:
 process_nmi:
         testb $1,VCPU_nmi_masked(%rbx)
         jnz  test_guest_events
-        movb $0,VCPU_nmi_pending(%rbx)
-        movq VCPU_nmi_addr(%rbx),%rax
-        test %rax,%rax
-        jz   test_guest_events
-        movb $1,VCPU_nmi_masked(%rbx)
         sti
+        movb $0,VCPU_nmi_pending(%rbx)
+        call set_guest_nmi_trapbounce
+        test %eax,%eax
+        jz   test_all_events
+        movb $1,VCPU_nmi_masked(%rbx)
         leaq VCPU_trap_bounce(%rbx),%rdx
-        movq %rax,TRAPBOUNCE_eip(%rdx)
-        movb $TBF_INTERRUPT,TRAPBOUNCE_flags(%rdx)
         call create_bounce_frame
         jmp  test_all_events
 

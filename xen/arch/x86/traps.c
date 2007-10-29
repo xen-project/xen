@@ -413,6 +413,19 @@ static int do_guest_trap(
     return 0;
 }
 
+/*
+ * Called from asm to set up the NMI trapbounce info.
+ * Returns 0 if no callback is set up, else 1.
+ */
+asmlinkage int set_guest_nmi_trapbounce(void)
+{
+    struct vcpu *v = current;
+    struct trap_bounce *tb = &v->arch.trap_bounce;
+    do_guest_trap(TRAP_nmi, guest_cpu_user_regs(), 0);
+    tb->flags &= ~TBF_EXCEPTION; /* not needed for NMI delivery path */
+    return !null_trap_bounce(v, tb);
+}
+
 static inline int do_trap(
     int trapnr, struct cpu_user_regs *regs, int use_error_code)
 {
@@ -2705,12 +2718,6 @@ long do_set_trap_table(XEN_GUEST_HANDLE(trap_info_t) traps)
 
         if ( cur.address == 0 )
             break;
-
-        if ( (cur.vector == TRAP_nmi) && !TI_GET_IF(&cur) )
-        {
-            rc = -EINVAL;
-            break;
-        }
 
         fixup_guest_code_selector(current->domain, cur.cs);
 

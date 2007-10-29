@@ -259,18 +259,13 @@ process_softirqs:
 process_nmi:
         testb $1,VCPU_nmi_masked(%ebx)
         jnz  test_guest_events
-        movb $0,VCPU_nmi_pending(%ebx)
-        movzwl VCPU_nmi_cs(%ebx),%eax
-        movl VCPU_nmi_addr(%ebx),%ecx
-        test %eax,%eax
-        jz   test_guest_events
-        movb $1,VCPU_nmi_masked(%ebx)
         sti
+        movb $0,VCPU_nmi_pending(%ebx)
+        call set_guest_nmi_trapbounce
+        test %eax,%eax
+        jz   test_all_events
+        movb $1,VCPU_nmi_masked(%ebx)
         leal VCPU_trap_bounce(%ebx),%edx
-        movw %ax,TRAPBOUNCE_cs(%edx)
-        movl %ecx,TRAPBOUNCE_eip(%edx)
-        movw $FLAT_KERNEL_CS,TRAPBOUNCE_cs(%edx)
-        movb $TBF_INTERRUPT,TRAPBOUNCE_flags(%edx)
         call create_bounce_frame
         jmp  test_all_events
 

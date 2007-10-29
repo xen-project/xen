@@ -86,11 +86,6 @@ void __dummy__(void)
     OFFSET(VCPU_kernel_sp, struct vcpu, arch.guest_context.kernel_sp);
     OFFSET(VCPU_kernel_ss, struct vcpu, arch.guest_context.kernel_ss);
     OFFSET(VCPU_guest_context_flags, struct vcpu, arch.guest_context.flags);
-    OFFSET(VCPU_arch_guest_fpu_ctxt, struct vcpu, arch.guest_context.fpu_ctxt);
-    OFFSET(VCPU_nmi_cs, struct vcpu,
-           arch.guest_context.trap_ctxt[TRAP_nmi].cs);
-    OFFSET(VCPU_nmi_addr, struct vcpu,
-           arch.guest_context.trap_ctxt[TRAP_nmi].address);
     OFFSET(VCPU_nmi_pending, struct vcpu, nmi_pending);
     OFFSET(VCPU_nmi_masked, struct vcpu, nmi_masked);
     DEFINE(_VGCF_failsafe_disables_events, _VGCF_failsafe_disables_events);
