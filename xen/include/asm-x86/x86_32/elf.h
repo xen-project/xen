@@ -1,8 +1,6 @@
 #ifndef __X86_32_ELF_H__
 #define __X86_32_ELF_H__
 
-#include <asm/processor.h>
-
 typedef struct {
     unsigned long ebx;
     unsigned long ecx;
@@ -40,7 +38,7 @@ static inline void elf_core_save_regs(ELF_Gregset *core_regs,
     asm volatile("movw %%fs, %%ax;" :"=a"(core_regs->fs));
     asm volatile("movw %%gs, %%ax;" :"=a"(core_regs->gs));
     /* orig_eax not filled in for now */
-    core_regs->eip = (unsigned long)current_text_addr();
+    core_regs->eip = (unsigned long)elf_core_save_regs;
     asm volatile("movw %%cs, %%ax;" :"=a"(core_regs->cs));
     asm volatile("pushfl; popl %0" :"=m"(core_regs->eflags));
     asm volatile("movl %%esp,%0" : "=m"(core_regs->esp));

@@ -155,6 +155,10 @@ static int enter_state(u32 state)
 
     pmprintk(XENLOG_DEBUG, "Back to C.");
 
+    /* Restore CR4 and EFER from cached values. */
+    write_cr4(read_cr4());
+    write_efer(read_efer());
+
     device_power_up();
 
     pmprintk(XENLOG_INFO, "Finishing wakeup from ACPI S%d state.", state);

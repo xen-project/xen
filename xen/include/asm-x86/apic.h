@@ -2,9 +2,7 @@
 #define __ASM_APIC_H
 
 #include <xen/config.h>
-#include <asm/fixmap.h>
 #include <asm/apicdef.h>
-#include <asm/processor.h>
 #include <asm/system.h>
 
 #define Dprintk(x...)
@@ -51,11 +49,7 @@ static __inline u32 apic_read(unsigned long reg)
 	return *((volatile u32 *)(APIC_BASE+reg));
 }
 
-static __inline__ void apic_wait_icr_idle(void)
-{
-	while ( apic_read( APIC_ICR ) & APIC_ICR_BUSY )
-		cpu_relax();
-}
+void apic_wait_icr_idle(void);
 
 int get_physical_broadcast(void);
 

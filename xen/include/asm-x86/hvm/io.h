@@ -149,13 +149,6 @@ static inline int register_buffered_io_handler(
     return register_io_handler(d, addr, size, action, HVM_BUFFERED_IO);
 }
 
-#if defined(__i386__) || defined(__x86_64__)
-static inline int irq_masked(unsigned long eflags)
-{
-    return ((eflags & X86_EFLAGS_IF) == 0);
-}
-#endif
-
 extern void send_pio_req(unsigned long port, unsigned long count, int size,
                          paddr_t value, int dir, int df, int value_is_ptr);
 void send_timeoffset_req(unsigned long timeoff);

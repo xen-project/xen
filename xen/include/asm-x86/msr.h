@@ -90,16 +90,14 @@ static inline void wrmsrl(unsigned int msr, __u64 val)
 			  : "c" (counter))
 
 
-DECLARE_PER_CPU(__u64, efer);
+DECLARE_PER_CPU(u64, efer);
 
-static inline __u64 read_efer(void)
+static inline u64 read_efer(void)
 {
-    if (!this_cpu(efer))
-        rdmsrl(MSR_EFER, this_cpu(efer));
     return this_cpu(efer);
 }
 
-static inline void write_efer(__u64 val)
+static inline void write_efer(u64 val)
 {
     this_cpu(efer) = val;
     wrmsrl(MSR_EFER, val);

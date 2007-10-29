@@ -24,6 +24,7 @@
 
 #include <xen/types.h>
 #include <xen/spinlock.h>
+#include <asm/irq.h>
 #include <asm/hvm/hvm.h>
 #include <asm/hvm/vpic.h>
 #include <asm/hvm/vioapic.h>

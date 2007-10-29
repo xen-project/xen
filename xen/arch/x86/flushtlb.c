@@ -83,9 +83,12 @@ void write_cr3(unsigned long cr3)
     hvm_flush_guest_tlbs();
 
 #ifdef USER_MAPPINGS_ARE_GLOBAL
-    __pge_off();
-    asm volatile ( "mov %0, %%cr3" : : "r" (cr3) : "memory" );
-    __pge_on();
+    {
+        unsigned long cr4 = read_cr4();
+        write_cr4(cr4 & ~X86_CR4_PGE);
+        asm volatile ( "mov %0, %%cr3" : : "r" (cr3) : "memory" );
+        write_cr4(cr4);
+    }
 #else
     asm volatile ( "mov %0, %%cr3" : : "r" (cr3) : "memory" );
 #endif
@@ -124,8 +127,7 @@ void flush_area_local(const void *va, unsigned int flags)
             hvm_flush_guest_tlbs();
 
 #ifndef USER_MAPPINGS_ARE_GLOBAL
-            if ( !(flags & FLUSH_TLB_GLOBAL) ||
-                 !(mmu_cr4_features & X86_CR4_PGE) )
+            if ( !(flags & FLUSH_TLB_GLOBAL) || !(read_cr4() & X86_CR4_PGE) )
             {
                 asm volatile ( "mov %0, %%cr3"
                                : : "r" (read_cr3()) : "memory" );
@@ -133,9 +135,10 @@ void flush_area_local(const void *va, unsigned int flags)
             else
 #endif
             {
-                __pge_off();
+                unsigned long cr4 = read_cr4();
+                write_cr4(cr4 & ~X86_CR4_PGE);
                 barrier();
-                __pge_on();
+                write_cr4(cr4);
             }
 
             post_flush(t);

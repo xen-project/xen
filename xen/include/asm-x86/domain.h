@@ -350,6 +350,8 @@ struct arch_vcpu
 /* Continue the current hypercall via func(data) on specified cpu. */
 int continue_hypercall_on_cpu(int cpu, long (*func)(void *data), void *data);
 
+unsigned long pv_guest_cr4_fixup(unsigned long guest_cr4);
+
 #endif /* __ASM_DOMAIN_H__ */
 
 /*

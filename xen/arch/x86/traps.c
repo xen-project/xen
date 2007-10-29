@@ -1794,10 +1794,8 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
             break;
 
         case 4: /* Write CR4 */
-            if ( *reg != (read_cr4() & ~(X86_CR4_PGE|X86_CR4_PSE)) )
-                gdprintk(XENLOG_WARNING,
-                         "Attempt to change CR4 flags %08lx -> %08lx\n",
-                         read_cr4() & ~(X86_CR4_PGE|X86_CR4_PSE), *reg);
+            v->arch.guest_context.ctrlreg[4] = pv_guest_cr4_fixup(*reg);
+            write_cr4(v->arch.guest_context.ctrlreg[4]);
             break;
 
         default:
@@ -1866,6 +1864,10 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
                         _p(regs->ecx), h, l, edx, eax);
             break;
         }
+        break;
+
+    case 0x31: /* RDTSC */
+        rdtsc(regs->eax, regs->edx);
         break;
 
     case 0x32: /* RDMSR */

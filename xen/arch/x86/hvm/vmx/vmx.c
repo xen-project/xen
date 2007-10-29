@@ -727,6 +727,10 @@ static void vmx_ctxt_switch_from(struct vcpu *v)
 
 static void vmx_ctxt_switch_to(struct vcpu *v)
 {
+    /* HOST_CR4 in VMCS is always mmu_cr4_features. Sync CR4 now. */
+    if ( unlikely(read_cr4() != mmu_cr4_features) )
+        write_cr4(mmu_cr4_features);
+
     vmx_restore_guest_msrs(v);
     vmx_restore_dr(v);
 }
@@ -990,7 +994,7 @@ static enum hvm_intblk vmx_interrupt_blocked(
     ASSERT((intack.source == hvm_intsrc_pic) ||
            (intack.source == hvm_intsrc_lapic));
 
-    if ( irq_masked(guest_cpu_user_regs()->eflags) )
+    if ( !(guest_cpu_user_regs()->eflags & X86_EFLAGS_IF) )
         return hvm_intblk_rflags_ie;
 
     if ( intack.source == hvm_intsrc_lapic )

@@ -2,9 +2,10 @@
 #define __ASM_IO_APIC_H
 
 #include <xen/config.h>
-#include <asm/fixmap.h>
 #include <asm/types.h>
 #include <asm/mpspec.h>
+#include <asm/apicdef.h>
+#include <asm/fixmap.h>
 
 /*
  * Intel IO-APIC support for SMP and UP systems.
