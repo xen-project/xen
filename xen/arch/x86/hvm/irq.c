@@ -191,6 +191,18 @@ void hvm_set_pci_link_route(struct domain *d, u8 link, u8 isa_irq)
         goto out;
     hvm_irq->pci_link.route[link] = isa_irq;
 
+    /* PCI pass-through fixup. */
+    if ( hvm_irq->dpci && hvm_irq->dpci->girq[old_isa_irq].valid )
+    {
+        uint32_t device = hvm_irq->dpci->girq[old_isa_irq].device;
+        uint32_t intx = hvm_irq->dpci->girq[old_isa_irq].intx;
+        if ( link == hvm_pci_intx_link(device, intx) )
+        {
+            hvm_irq->dpci->girq[isa_irq] = hvm_irq->dpci->girq[old_isa_irq];
+            hvm_irq->dpci->girq[old_isa_irq].valid = 0;
+        }
+    }
+
     if ( hvm_irq->pci_link_assert_count[link] == 0 )
         goto out;
 
