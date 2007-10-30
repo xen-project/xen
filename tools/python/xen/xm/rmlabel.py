@@ -50,9 +50,10 @@ def rm_resource_label(resource):
                 server.xenapi.XSPolicy.set_resource_label(resource,"",
                                                           oldlabel)
             else:
-                raise security.ACMError("Resource not labeled")
+                raise security.XSMError("Resource not labeled")
         except Exception, e:
-            print "Could not remove label from resource: %s" % e
+            raise security.XSMError("Could not remove label "
+                                    "from resource: %s" % e)
         return
 
     #build canonical resource name
@@ -128,7 +129,7 @@ def rm_domain_label_xapi(domainname):
         old_lab = server.xenapi.VM.get_security_label(uuid)
         server.xenapi.VM.set_security_label(uuid, "", old_lab)
     except Exception, e:
-        print('Could not remove label from domain: %s' % e)
+        raise security.XSMError('Could not remove label from domain: %s' % e)
 
 def rm_vif_label(vmname, idx):
     if xm_main.serverType != xm_main.SERVER_XEN_API:
@@ -142,16 +143,21 @@ def rm_vif_label(vmname, idx):
         raise OptionError("Bad VIF index.")
     vif_ref = server.xenapi.VIF.get_by_uuid(vif_refs[idx])
     if not vif_ref:
-        print "A VIF with this UUID does not exist."
+        raise security.XSMError("A VIF with this UUID does not exist.")
     try:
         old_lab = server.xenapi.VIF.get_security_label(vif_ref)
-        rc = server.xenapi.VIF.set_security_label(vif_ref, "", old_lab)
-        if int(rc) != 0:
-            print "Could not remove the label from the VIF."
+        if old_lab != "":
+            rc = server.xenapi.VIF.set_security_label(vif_ref, "", old_lab)
+            if int(rc) != 0:
+                raise security.XSMError("Could not remove the label from"
+                                        " the VIF.")
+            else:
+                print "Successfully removed the label from the VIF."
         else:
-            print "Successfully removed the label from the VIF."
+            raise security.XSMError("VIF is not labeled.")
     except Exception, e:
-        print "Could not remove the label the VIF: %s" % str(e)
+        raise security.XSMError("Could not remove the label from the VIF: %s" %
+                                str(e))
 
 
 def main (argv):
