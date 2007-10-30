@@ -28,6 +28,7 @@ from xen.xend.XendError import VmError
 from xen.xend.XendDevices import XendDevices
 from xen.xend.PrettyPrint import prettyprintstring
 from xen.xend.XendConstants import DOM_STATE_HALTED
+from xen.xend.xenstore.xstransact import xstransact
 from xen.xend.server.BlktapController import blktap_disk_types
 from xen.xend.server.netif import randomMAC
 from xen.util.blkif import blkdev_name_to_number
@@ -941,36 +942,43 @@ class XendConfig(dict):
 
         # Marshall devices (running or from configuration)
         if not ignore_devices:
-            for cls in XendDevices.valid_devices():
-                found = False
+            txn = xstransact()
+            try:
+                for cls in XendDevices.valid_devices():
+                    found = False
                 
-                # figure if there is a dev controller is valid and running
-                if domain and domain.getDomid() != None:
-                    try:
-                        controller = domain.getDeviceController(cls)
-                        configs = controller.configurations()
-                        for config in configs:
-                            if sxp.name(config) in ('vbd', 'tap'):
-                                # The bootable flag is never written to the
-                                # store as part of the device config.
-                                dev_uuid = sxp.child_value(config, 'uuid')
-                                dev_type, dev_cfg = self['devices'][dev_uuid]
-                                is_bootable = dev_cfg.get('bootable', 0)
-                                config.append(['bootable', int(is_bootable)])
+                    # figure if there is a dev controller is valid and running
+                    if domain and domain.getDomid() != None:
+                        try:
+                            controller = domain.getDeviceController(cls)
+                            configs = controller.configurations(txn)
+                            for config in configs:
+                                if sxp.name(config) in ('vbd', 'tap'):
+                                    # The bootable flag is never written to the
+                                    # store as part of the device config.
+                                    dev_uuid = sxp.child_value(config, 'uuid')
+                                    dev_type, dev_cfg = self['devices'][dev_uuid]
+                                    is_bootable = dev_cfg.get('bootable', 0)
+                                    config.append(['bootable', int(is_bootable)])
 
-                            sxpr.append(['device', config])
+                                sxpr.append(['device', config])
 
-                        found = True
-                    except:
-                        log.exception("dumping sxp from device controllers")
-                        pass
+                            found = True
+                        except:
+                            log.exception("dumping sxp from device controllers")
+                            pass
                     
-                # if we didn't find that device, check the existing config
-                # for a device in the same class
-                if not found:
-                    for dev_type, dev_info in self.all_devices_sxpr():
-                        if dev_type == cls:
-                            sxpr.append(['device', dev_info])
+                    # if we didn't find that device, check the existing config
+                    # for a device in the same class
+                    if not found:
+                        for dev_type, dev_info in self.all_devices_sxpr():
+                            if dev_type == cls:
+                                sxpr.append(['device', dev_info])
+
+                txn.commit()
+            except:
+                txn.abort()
+                raise
 
         return sxpr    
     

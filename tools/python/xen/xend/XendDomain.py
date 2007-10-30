@@ -393,13 +393,22 @@ class XendDomain:
         @rtype: None
         """
 
+        txn = xstransact()
+        try:
+            self._refreshTxn(txn, refresh_shutdown)
+            txn.commit()
+        except:
+            txn.abort()
+            raise
+
+    def _refreshTxn(self, transaction, refresh_shutdown):
         running = self._running_domains()
         # Add domains that are not already tracked but running in Xen,
         # and update domain state for those that are running and tracked.
         for dom in running:
             domid = dom['domid']
             if domid in self.domains:
-                self.domains[domid].update(dom, refresh_shutdown)
+                self.domains[domid].update(dom, refresh_shutdown, transaction)
             elif domid not in self.domains and dom['dying'] != 1:
                 try:
                     new_dom = XendDomainInfo.recreate(dom, False)

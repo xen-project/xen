@@ -19,9 +19,12 @@ class ConsoleController(DevController):
         return (self.allocateDeviceID(), back, {})
 
 
-    def getDeviceConfiguration(self, devid):
-        result = DevController.getDeviceConfiguration(self, devid)
-        devinfo = self.readBackend(devid, *self.valid_cfg)
+    def getDeviceConfiguration(self, devid, transaction = None):
+        result = DevController.getDeviceConfiguration(self, devid, transaction)
+        if transaction is None:
+            devinfo = self.readBackend(devid, *self.valid_cfg)
+        else:
+            devinfo = self.readBackendTxn(transaction, devid, *self.valid_cfg)
         config = dict(zip(self.valid_cfg, devinfo))
         config = dict([(key, val) for key, val in config.items()
                        if val != None])

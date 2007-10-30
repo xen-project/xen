@@ -239,15 +239,15 @@ class DevController:
 
         self.vm._removeVm("device/%s/%d" % (self.deviceClass, dev))
 
-    def configurations(self):
-        return map(self.configuration, self.deviceIDs())
+    def configurations(self, transaction = None):
+        return map(lambda x: self.configuration(x, transaction), self.deviceIDs(transaction))
 
 
-    def configuration(self, devid):
+    def configuration(self, devid, transaction = None):
         """@return an s-expression giving the current configuration of the
         specified device.  This would be suitable for giving to {@link
         #createDevice} in order to recreate that device."""
-        configDict = self.getDeviceConfiguration(devid)
+        configDict = self.getDeviceConfiguration(devid, transaction)
         sxpr = [self.deviceClass]
         for key, val in configDict.items():
             if isinstance(val, (types.ListType, types.TupleType)):
@@ -273,13 +273,16 @@ class DevController:
                                    'id', devid]]
 
 
-    def getDeviceConfiguration(self, devid):
+    def getDeviceConfiguration(self, devid, transaction = None):
         """Returns the configuration of a device.
 
         @note: Similar to L{configuration} except it returns a dict.
         @return: dict
         """
-        backdomid = xstransact.Read(self.frontendPath(devid), "backend-id")
+        if transaction is None:
+            backdomid = xstransact.Read(self.frontendPath(devid), "backend-id")
+        else:
+            backdomid = transaction.read(self.frontendPath(devid) + "/backend-id")
         if backdomid is None:
             raise VmError("Device %s not connected" % devid)
 
@@ -416,14 +419,28 @@ class DevController:
         else:
             raise VmError("Device %s not connected" % devid)
 
+    def readBackendTxn(self, transaction, devid, *args):
+        frontpath = self.frontendPath(devid)
+        backpath = transaction.read(frontpath + "/backend")
+        if backpath:
+            paths = map(lambda x: backpath + "/" + x, args)
+            return transaction.read(*paths)
+        else:
+            raise VmError("Device %s not connected" % devid)
+
     def readFrontend(self, devid, *args):
         return xstransact.Read(self.frontendPath(devid), *args)
+
+    def readFrontendTxn(self, transaction, devid, *args):
+        paths = map(lambda x: self.frontendPath(devid) + "/" + x, args)
+        return transaction.read(*paths)
 
     def deviceIDs(self, transaction = None):
         """@return The IDs of each of the devices currently configured for
         this instance's deviceClass.
         """
         fe = self.backendRoot()
+
         if transaction:
             return map(lambda x: int(x.split('/')[-1]), transaction.list(fe))
         else:

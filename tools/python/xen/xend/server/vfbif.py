@@ -27,10 +27,13 @@ class VfbifController(DevController):
         return (devid, back, {})
 
 
-    def getDeviceConfiguration(self, devid):
-        result = DevController.getDeviceConfiguration(self, devid)
+    def getDeviceConfiguration(self, devid, transaction = None):
+        result = DevController.getDeviceConfiguration(self, devid, transaction)
 
-        devinfo = self.readBackend(devid, *CONFIG_ENTRIES)
+        if transaction is None:
+            devinfo = self.readBackend(devid, *CONFIG_ENTRIES)
+        else:
+            devinfo = self.readBackendTxn(transaction, devid, *CONFIG_ENTRIES)
         return dict([(CONFIG_ENTRIES[i], devinfo[i])
                      for i in range(len(CONFIG_ENTRIES))
                      if devinfo[i] is not None])

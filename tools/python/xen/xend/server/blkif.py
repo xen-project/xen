@@ -124,19 +124,26 @@ class BlkifController(DevController):
                           (self.deviceClass, devid, config))
 
 
-    def getDeviceConfiguration(self, devid):
+    def getDeviceConfiguration(self, devid, transaction = None):
         """Returns the configuration of a device.
 
         @note: Similar to L{configuration} except it returns a dict.
         @return: dict
         """
-        config = DevController.getDeviceConfiguration(self, devid)
-        devinfo = self.readBackend(devid, 'dev', 'type', 'params', 'mode',
-                                   'uuid')
+        config = DevController.getDeviceConfiguration(self, devid, transaction)
+        if transaction is None:
+            devinfo = self.readBackend(devid, 'dev', 'type', 'params', 'mode',
+                                       'uuid')
+        else:
+            devinfo = self.readBackendTxn(transaction, devid,
+                                          'dev', 'type', 'params', 'mode', 'uuid')
         dev, typ, params, mode, uuid = devinfo
         
         if dev:
-            dev_type = self.readFrontend(devid, 'device-type')
+            if transaction is None:
+                dev_type = self.readFrontend(devid, 'device-type')
+            else:
+                dev_type = self.readFrontendTxn(transaction, devid, 'device-type')
             if dev_type:
                 dev += ':' + dev_type
             config['dev'] = dev

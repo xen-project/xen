@@ -75,9 +75,9 @@ class TPMifController(DevController):
 
         return (devid, back, front)
 
-    def getDeviceConfiguration(self, devid):
+    def getDeviceConfiguration(self, devid, transaction = None):
         """Returns the configuration of a device"""
-        result = DevController.getDeviceConfiguration(self, devid)
+        result = DevController.getDeviceConfiguration(self, devid, transaction)
 
         (instance, uuid, type) = \
                            self.readBackend(devid, 'instance',
