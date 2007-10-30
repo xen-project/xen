@@ -103,7 +103,7 @@ world:
 
 # clean doesn't do a kclean
 .PHONY: clean
-clean:: 
+clean::
 	$(MAKE) -C xen clean
 	$(MAKE) -C tools clean
 	$(MAKE) -C docs clean
@@ -154,6 +154,11 @@ help:
 	@echo '  uninstall        - attempt to remove installed Xen tools'
 	@echo '                     (use with extreme care!)'
 	@echo
+	@echo 'Trusted Boot (tboot) targets:'
+	@echo '  build-tboot      - download and build the tboot module'
+	@echo '  install-tboot    - download, build, and install the tboot module'
+	@echo '  clean-tboot      - clean the tboot module if it exists'
+	@echo
 	@echo 'Environment:'
 	@echo '  XEN_PYTHON_NATIVE_INSTALL=y'
 	@echo '                   - native python install or dist'
@@ -194,8 +199,43 @@ uninstall:
 	rm -rf $(D)/usr/share/xen
 	rm -rf $(D)/usr/share/man/man1/xen*
 	rm -rf $(D)/usr/share/man/man8/xen*
+	rm -rf $(D)/boot/tboot*
 
 # Legacy targets for compatibility
 .PHONY: linux26
 linux26:
 	$(MAKE) 'KERNELS=linux-2.6*' kernels
+
+
+#
+# tboot targets
+#
+
+TBOOT_TARFILE = tboot-20071029.tar.gz
+TBOOT_BASE_URL = http://downloads.sourceforge.net/tboot
+
+.PHONY: build-tboot
+build-tboot: download_tboot
+	$(MAKE) -C tboot build
+
+.PHONY: install-tboot
+install-tboot: download_tboot
+	$(MAKE) -C tboot install
+
+.PHONY: clean-tboot
+clean-tboot:
+	[ ! -d tboot ] || $(MAKE) -C tboot clean
+
+.PHONY: distclean-tboot
+distclean-tboot:
+	[ ! -d tboot ] || $(MAKE) -C tboot distclean
+
+.PHONY: download_tboot
+download_tboot: tboot/Makefile
+
+tboot/Makefile: tboot/$(TBOOT_TARFILE)
+	[ -e tboot/Makefile ] || tar -xzf tboot/$(TBOOT_TARFILE) -C tboot/ --strip-components 1
+
+tboot/$(TBOOT_TARFILE):
+	mkdir -p tboot
+	wget -O tboot/$(TBOOT_TARFILE) $(TBOOT_BASE_URL)/$(TBOOT_TARFILE)
