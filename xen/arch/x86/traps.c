@@ -128,12 +128,13 @@ boolean_param("ler", opt_ler);
 static void show_guest_stack(struct cpu_user_regs *regs)
 {
     int i;
+    struct vcpu *curr = current;
     unsigned long *stack, addr;
 
-    if ( is_hvm_vcpu(current) )
+    if ( is_hvm_vcpu(curr) )
         return;
 
-    if ( is_pv_32on64_vcpu(current) )
+    if ( is_pv_32on64_vcpu(curr) )
     {
         compat_show_guest_stack(regs, debug_stack_lines);
         return;
@@ -800,12 +801,13 @@ void propagate_page_fault(unsigned long addr, u16 error_code)
 static int handle_gdt_ldt_mapping_fault(
     unsigned long offset, struct cpu_user_regs *regs)
 {
+    struct vcpu *curr = current;
     /* Which vcpu's area did we fault in, and is it in the ldt sub-area? */
     unsigned int is_ldt_area = (offset >> (GDT_LDT_VCPU_VA_SHIFT-1)) & 1;
     unsigned int vcpu_area   = (offset >> GDT_LDT_VCPU_VA_SHIFT);
 
     /* Should never fault in another vcpu's area. */
-    BUG_ON(vcpu_area != current->vcpu_id);
+    BUG_ON(vcpu_area != curr->vcpu_id);
 
     /* Byte offset within the gdt/ldt sub-area. */
     offset &= (1UL << (GDT_LDT_VCPU_VA_SHIFT-1)) - 1UL;
@@ -826,7 +828,7 @@ static int handle_gdt_ldt_mapping_fault(
                 return 0;
             /* In guest mode? Propagate #PF to guest, with adjusted %cr2. */
             propagate_page_fault(
-                current->arch.guest_context.ldt_base + offset,
+                curr->arch.guest_context.ldt_base + offset,
                 regs->error_code);
         }
     }
@@ -2472,14 +2474,16 @@ void unset_nmi_callback(void)
 
 asmlinkage int do_device_not_available(struct cpu_user_regs *regs)
 {
+    struct vcpu *curr = current;
+
     BUG_ON(!guest_mode(regs));
 
-    setup_fpu(current);
+    setup_fpu(curr);
 
-    if ( current->arch.guest_context.ctrlreg[0] & X86_CR0_TS )
+    if ( curr->arch.guest_context.ctrlreg[0] & X86_CR0_TS )
     {
         do_guest_trap(TRAP_no_device, regs, 0);
-        current->arch.guest_context.ctrlreg[0] &= ~X86_CR0_TS;
+        curr->arch.guest_context.ctrlreg[0] &= ~X86_CR0_TS;
     }
     else
         TRACE_0D(TRC_PV_MATH_STATE_RESTORE);
@@ -2660,7 +2664,7 @@ void __init trap_init(void)
 long register_guest_nmi_callback(unsigned long address)
 {
     struct vcpu *v = current;
-    struct domain *d = current->domain;
+    struct domain *d = v->domain;
     struct trap_info *t = &v->arch.guest_context.trap_ctxt[TRAP_nmi];
 
     t->vector  = TRAP_nmi;
@@ -2692,14 +2696,15 @@ long unregister_guest_nmi_callback(void)
 long do_set_trap_table(XEN_GUEST_HANDLE(trap_info_t) traps)
 {
     struct trap_info cur;
-    struct trap_info *dst = current->arch.guest_context.trap_ctxt;
+    struct vcpu *curr = current;
+    struct trap_info *dst = curr->arch.guest_context.trap_ctxt;
     long rc = 0;
 
     /* If no table is presented then clear the entire virtual IDT. */
     if ( guest_handle_is_null(traps) )
     {
         memset(dst, 0, 256 * sizeof(*dst));
-        init_int80_direct_trap(current);
+        init_int80_direct_trap(curr);
         return 0;
     }
 
@@ -2721,12 +2726,12 @@ long do_set_trap_table(XEN_GUEST_HANDLE(trap_info_t) traps)
         if ( cur.address == 0 )
             break;
 
-        fixup_guest_code_selector(current->domain, cur.cs);
+        fixup_guest_code_selector(curr->domain, cur.cs);
 
         memcpy(&dst[cur.vector], &cur, sizeof(cur));
 
         if ( cur.vector == 0x80 )
-            init_int80_direct_trap(current);
+            init_int80_direct_trap(curr);
 
         guest_handle_add_offset(traps, 1);
     }
@@ -2734,35 +2739,35 @@ long do_set_trap_table(XEN_GUEST_HANDLE(trap_info_t) traps)
     return rc;
 }
 
-
-long set_debugreg(struct vcpu *p, int reg, unsigned long value)
+long set_debugreg(struct vcpu *v, int reg, unsigned long value)
 {
     int i;
+    struct vcpu *curr = current;
 
     switch ( reg )
     {
     case 0: 
         if ( !access_ok(value, sizeof(long)) )
             return -EPERM;
-        if ( p == current ) 
+        if ( v == curr ) 
             asm volatile ( "mov %0, %%db0" : : "r" (value) );
         break;
     case 1: 
         if ( !access_ok(value, sizeof(long)) )
             return -EPERM;
-        if ( p == current ) 
+        if ( v == curr ) 
             asm volatile ( "mov %0, %%db1" : : "r" (value) );
         break;
     case 2: 
         if ( !access_ok(value, sizeof(long)) )
             return -EPERM;
-        if ( p == current ) 
+        if ( v == curr ) 
             asm volatile ( "mov %0, %%db2" : : "r" (value) );
         break;
     case 3:
         if ( !access_ok(value, sizeof(long)) )
             return -EPERM;
-        if ( p == current ) 
+        if ( v == curr ) 
             asm volatile ( "mov %0, %%db3" : : "r" (value) );
         break;
     case 6:
@@ -2772,7 +2777,7 @@ long set_debugreg(struct vcpu *p, int reg, unsigned long value)
          */
         value &= 0xffffefff; /* reserved bits => 0 */
         value |= 0xffff0ff0; /* reserved bits => 1 */
-        if ( p == current ) 
+        if ( v == curr ) 
             asm volatile ( "mov %0, %%db6" : : "r" (value) );
         break;
     case 7:
@@ -2793,14 +2798,14 @@ long set_debugreg(struct vcpu *p, int reg, unsigned long value)
             for ( i = 0; i < 16; i += 2 )
                 if ( ((value >> (i+16)) & 3) == 2 ) return -EPERM;
         }
-        if ( p == current ) 
+        if ( v == current ) 
             asm volatile ( "mov %0, %%db7" : : "r" (value) );
         break;
     default:
         return -EINVAL;
     }
 
-    p->arch.guest_context.debugreg[reg] = value;
+    v->arch.guest_context.debugreg[reg] = value;
     return 0;
 }
 
