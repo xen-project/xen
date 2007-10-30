@@ -943,7 +943,10 @@ void sdl_display_init(DisplayState *ds, int full_screen);
 void cocoa_display_init(DisplayState *ds, int full_screen);
 
 /* vnc.c */
-int vnc_display_init(DisplayState *ds, const char *display, int find_unused);
+void vnc_display_init(DisplayState *ds);
+void vnc_display_close(DisplayState *ds);
+int vnc_display_open(DisplayState *ds, const char * display, int find_unused);
+int vnc_display_password(DisplayState *ds, const char *password);
 void do_info_vnc(void);
 int vnc_start_viewer(int port);
 

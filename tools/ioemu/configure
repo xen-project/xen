@@ -87,6 +87,7 @@ alsa="no"
 fmod="no"
 fmod_lib=""
 fmod_inc=""
+vnc_tls="yes"
 bsd="no"
 linux="no"
 kqemu="no"
@@ -225,6 +226,8 @@ for opt do
   ;;
   --fmod-inc=*) fmod_inc="$optarg"
   ;;
+  --disable-vnc-tls) vnc_tls="no"
+  ;;
   --enable-mingw32) mingw32="yes" ; cross_prefix="i386-mingw32-" ; user="no"
   ;;
   --disable-slirp) slirp="no"
@@ -292,6 +295,7 @@ echo "  --enable-coreaudio       enable Coreaudio audio driver"
 echo "  --enable-alsa            enable ALSA audio driver"
 echo "  --enable-fmod            enable FMOD audio driver"
 echo "  --enabled-dsound         enable DirectSound audio driver"
+echo "  --disable-vnc-tls        disable TLS encryption for VNC server"
 echo "  --enable-system          enable all system emulation targets"
 echo "  --disable-system         disable all system emulation targets"
 echo "  --enable-linux-user      enable all linux usermode emulation targets"
@@ -410,6 +414,18 @@ if test "$solaris" = "yes" ; then
   fi
 fi 
 
+##########################################
+
+# VNC TLS detection
+if test "$vnc_tls" = "yes" ; then
+  `pkg-config gnutls` || vnc_tls="no"
+fi
+if test "$vnc_tls" = "yes" ; then
+  vnc_tls_cflags=`pkg-config --cflags gnutls`
+  vnc_tls_libs=`pkg-config --libs gnutls`
+fi
+
+##########################################
 
 if test -z "$target_list" ; then
 # these targets are portable
@@ -772,6 +788,12 @@ if test "$fmod" = "yes" ; then
   echo "CONFIG_FMOD_INC=$fmod_inc" >> $config_mak
   echo "#define CONFIG_FMOD 1" >> $config_h
 fi
+if test "$vnc_tls" = "yes" ; then
+  echo "CONFIG_VNC_TLS=yes" >> $config_mak
+  echo "CONFIG_VNC_TLS_CFLAGS=$vnc_tls_cflags" >> $config_mak
+  echo "CONFIG_VNC_TLS_LIBS=$vnc_tls_libs" >> $config_mak
+  echo "#define CONFIG_VNC_TLS 1" >> $config_h
+fi
 qemu_version=`head $source_path/VERSION`
 echo "VERSION=$qemu_version" >>$config_mak
 echo "#define QEMU_VERSION \"$qemu_version\"" >> $config_h
@@ -997,6 +1019,12 @@ if test "$source_path_used" = "yes" ; then
         rm -f $f
         ln -s $source_path/$f $f
     done
+fi
+
+echo "VNC TLS support   $vnc_tls"
+if test "$vnc_tls" = "yes" ; then
+    echo "    TLS CFLAGS    $vnc_tls_cflags"
+    echo "    TLS LIBS      $vnc_tls_libs"
 fi
 
 rm -f $TMPO $TMPC $TMPE $TMPS

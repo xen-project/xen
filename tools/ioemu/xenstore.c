@@ -515,6 +515,7 @@ int xenstore_read_vncpasswd(int domid, char *pwbuf, size_t pwbuflen)
     passwd = xs_read(xsh, XBT_NULL, buf, &len);
     if (passwd == NULL) {
         fprintf(logfile, "xs_read(): vncpasswd get error. %s.\n", buf);
+        pwbuf[0] = '\0';
         free(uuid);
         free(path);
         return rc;

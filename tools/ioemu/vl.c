@@ -7683,8 +7683,14 @@ int main(int argc, char **argv)
         dumb_display_init(ds);
     } else if (vnc_display != NULL || vncunused != 0) {
 	int vnc_display_port;
-	vnc_display_port = vnc_display_init(ds, vnc_display, vncunused);
-	if (vncviewer)
+	char password[20];
+	vnc_display_init(ds);
+	if (xenstore_read_vncpasswd(domid, password, sizeof(password)) < 0)
+	    exit(0);
+	vnc_display_password(ds, password);
+	if ((vnc_display_port = vnc_display_open(ds, vnc_display, vncunused)) < 0) 
+	    exit (0);
+ 	if (vncviewer)
 	    vnc_start_viewer(vnc_display_port);
 	xenstore_write_vncport(vnc_display_port);
     } else {

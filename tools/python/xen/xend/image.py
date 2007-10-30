@@ -31,6 +31,7 @@ from xen.xend.XendOptions import instance as xenopts
 from xen.xend.xenstore.xstransact import xstransact
 from xen.xend.xenstore.xswatch import xswatch
 from xen.xend import arch
+from xen.xend import XendOptions
 
 xc = xen.lowlevel.xc.xc()
 
@@ -214,27 +215,27 @@ class ImageHandler:
                             'vncpasswd'):
                     if key in vmConfig['platform']:
                         vnc_config[key] = vmConfig['platform'][key]
+            if vnc_config.has_key("vncpasswd"):
+                passwd = vnc_config["vncpasswd"]
+            else:
+                passwd = XendOptions.instance().get_vncpasswd_default()
+            vncopts = ""
+            if passwd:
+                self.vm.storeVm("vncpasswd", passwd)
+                vncopts = vncopts + ",password"
+                log.debug("Stored a VNC password for vfb access")
+            else:
+                log.debug("No VNC passwd configured for vfb access")
 
             vnclisten = vnc_config.get('vnclisten',
-                                       xenopts().get_vnclisten_address())
+                                       XendOptions.instance().get_vnclisten_address())
             vncdisplay = vnc_config.get('vncdisplay', 0)
             ret.append('-vnc')
-            ret.append("%s:%s" % (vnclisten, vncdisplay))
-            
+            ret.append("%s:%s%s" % (vnclisten, vncdisplay, vncopts))
+
             if vnc_config.get('vncunused', 0):
                 ret.append('-vncunused')
 
-            # Store vncpassword in xenstore
-            vncpasswd = vnc_config.get('vncpasswd')
-            if not vncpasswd:
-                vncpasswd = xenopts().get_vncpasswd_default()
-
-            if vncpasswd is None:
-                raise VmError('vncpasswd is not setup in vmconfig or '
-                              'xend-config.sxp')
-
-            if vncpasswd != '':
-                self.vm.storeVm('vncpasswd', vncpasswd)
         elif has_sdl:
             # SDL is default in QEMU.
             pass
