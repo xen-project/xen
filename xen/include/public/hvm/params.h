@@ -66,10 +66,14 @@
  *  no_delay_for_missed_ticks:
  *   As above, missed interrupts are delivered, but guest time always tracks
  *   wallclock (i.e., real) time while doing so.
+ *  no_missed_ticks_pending:
+ *   No more than one missed interrupt is held pending, and guest time always
+ *   tracks wallclock (i.e., real) time.
  */
 #define HVM_PARAM_TIMER_MODE   10
 #define HVMPTM_delay_for_missed_ticks    0
 #define HVMPTM_no_delay_for_missed_ticks 1
+#define HVMPTM_no_missed_tick_accounting 2
 
 #define HVM_NR_PARAMS          11
 

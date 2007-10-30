@@ -23,11 +23,8 @@
 #include <asm/hvm/vpt.h>
 #include <asm/event.h>
 
-static int pt_support_time_frozen(struct domain *d)
-{
-    return (d->arch.hvm_domain.params[HVM_PARAM_TIMER_MODE] == 
-            HVMPTM_delay_for_missed_ticks);
-}
+#define mode_is(d, name) \
+    ((d)->arch.hvm_domain.params[HVM_PARAM_TIMER_MODE] == HVMPTM_##name)
 
 static void pt_lock(struct periodic_time *pt)
 {
@@ -48,7 +45,7 @@ static void pt_unlock(struct periodic_time *pt)
     spin_unlock(&pt->vcpu->arch.hvm_vcpu.tm_lock);
 }
 
-static void missed_ticks(struct periodic_time *pt)
+static void pt_process_missed_ticks(struct periodic_time *pt)
 {
     s_time_t missed_ticks;
 
@@ -73,9 +70,24 @@ static void missed_ticks(struct periodic_time *pt)
     pt->scheduled += missed_ticks * pt->period;
 }
 
-static __inline__ void pt_freeze_time(struct vcpu *v)
+static void pt_freeze_time(struct vcpu *v)
 {
+    if ( !mode_is(v->domain, delay_for_missed_ticks) )
+        return;
+
     v->arch.hvm_vcpu.guest_time = hvm_get_guest_time(v);
+}
+
+static void pt_thaw_time(struct vcpu *v)
+{
+    if ( !mode_is(v->domain, delay_for_missed_ticks) )
+        return;
+
+    if ( v->arch.hvm_vcpu.guest_time == 0 )
+        return;
+
+    hvm_set_guest_time(v, v->arch.hvm_vcpu.guest_time);
+    v->arch.hvm_vcpu.guest_time = 0;
 }
 
 void pt_save_timer(struct vcpu *v)
@@ -91,19 +103,9 @@ void pt_save_timer(struct vcpu *v)
     list_for_each_entry ( pt, head, list )
         stop_timer(&pt->timer);
 
-    if ( pt_support_time_frozen(v->domain) )
-        pt_freeze_time(v);
+    pt_freeze_time(v);
 
     spin_unlock(&v->arch.hvm_vcpu.tm_lock);
-}
-
-static __inline__ void pt_thaw_time(struct vcpu *v)
-{
-    if ( v->arch.hvm_vcpu.guest_time )
-    {
-        hvm_set_guest_time(v, v->arch.hvm_vcpu.guest_time);
-        v->arch.hvm_vcpu.guest_time = 0;
-    }
 }
 
 void pt_restore_timer(struct vcpu *v)
@@ -115,12 +117,12 @@ void pt_restore_timer(struct vcpu *v)
 
     list_for_each_entry ( pt, head, list )
     {
-        missed_ticks(pt);
+        if ( !mode_is(v->domain, no_missed_tick_accounting) )
+            pt_process_missed_ticks(pt);
         set_timer(&pt->timer, pt->scheduled);
     }
 
-    if ( pt_support_time_frozen(v->domain) )
-        pt_thaw_time(v);
+    pt_thaw_time(v);
 
     spin_unlock(&v->arch.hvm_vcpu.tm_lock);
 }
@@ -136,7 +138,15 @@ static void pt_timer_fn(void *data)
     if ( !pt->one_shot )
     {
         pt->scheduled += pt->period;
-        missed_ticks(pt);
+        if ( !mode_is(pt->vcpu->domain, no_missed_tick_accounting) )
+        {
+            pt_process_missed_ticks(pt);
+        }
+        else if ( (NOW() - pt->scheduled) >= 0 )
+        {
+            pt->pending_intr_nr++;
+            pt->scheduled = NOW() + pt->period;
+        }
         set_timer(&pt->timer, pt->scheduled);
     }
 
@@ -233,11 +243,14 @@ void pt_intr_post(struct vcpu *v, struct hvm_intack intack)
     else
     {
         pt->pending_intr_nr--;
-        pt->last_plt_gtime += pt->period_cycles;
+        if ( mode_is(v->domain, no_missed_tick_accounting) )
+            pt->last_plt_gtime = hvm_get_guest_time(v);
+        else
+            pt->last_plt_gtime += pt->period_cycles;
     }
 
-    if ( pt_support_time_frozen(v->domain) &&
-            hvm_get_guest_time(v) < pt->last_plt_gtime )
+    if ( mode_is(v->domain, delay_for_missed_ticks) &&
+         (hvm_get_guest_time(v) < pt->last_plt_gtime) )
         hvm_set_guest_time(v, pt->last_plt_gtime);
 
     cb = pt->cb;
