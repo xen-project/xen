@@ -55,53 +55,68 @@ static struct hvm_buffered_io_range
 static int hvm_buffered_io_intercept(ioreq_t *p)
 {
     struct vcpu *v = current;
-    spinlock_t  *buffered_io_lock;
-    buffered_iopage_t *buffered_iopage =
+    buffered_iopage_t *pg =
         (buffered_iopage_t *)(v->domain->arch.hvm_domain.buffered_io_va);
-    unsigned long tmp_write_pointer = 0;
+    buf_ioreq_t bp;
     int i;
 
+    /* Ensure buffered_iopage fits in a page */
+    BUILD_BUG_ON(sizeof(buffered_iopage_t) > PAGE_SIZE);
+
     /* ignore READ ioreq_t! */
-    if ( p->dir == IOREQ_READ )
+    if (p->dir == IOREQ_READ)
         return 0;
 
-    for ( i = 0; i < HVM_BUFFERED_IO_RANGE_NR; i++ ) {
-        if ( p->addr >= hvm_buffered_io_ranges[i]->start_addr &&
-             p->addr + p->size - 1 < hvm_buffered_io_ranges[i]->start_addr +
-                                     hvm_buffered_io_ranges[i]->length )
+    for (i = 0; i < HVM_BUFFERED_IO_RANGE_NR; i++) {
+        if (p->addr >= hvm_buffered_io_ranges[i]->start_addr &&
+            p->addr + p->size - 1 < hvm_buffered_io_ranges[i]->start_addr +
+                                    hvm_buffered_io_ranges[i]->length)
             break;
     }
 
-    if ( i == HVM_BUFFERED_IO_RANGE_NR )
+    if (i == HVM_BUFFERED_IO_RANGE_NR)
         return 0;
 
-    buffered_io_lock = &v->domain->arch.hvm_domain.buffered_io_lock;
-    spin_lock(buffered_io_lock);
+    bp.type = p->type;
+    bp.dir = p->dir;
+    switch (p->size) {
+    case 1:
+        bp.size = 0;
+        break;
+    case 2:
+        bp.size = 1;
+        break;
+    default:
+	/* Could use quad word semantics, but it only appears
+	 * to be useful for timeoffset data. */
+        return 0;
+    }
+    bp.data = (uint16_t)p->data;
+    bp.addr = (uint32_t)p->addr;
 
-    if ( buffered_iopage->write_pointer - buffered_iopage->read_pointer ==
-         (unsigned long)IOREQ_BUFFER_SLOT_NUM ) {
+    spin_lock(&v->domain->arch.hvm_domain.buffered_io_lock);
+
+    if (pg->write_pointer - pg->read_pointer == IOREQ_BUFFER_SLOT_NUM) {
         /* the queue is full.
          * send the iopacket through the normal path.
          * NOTE: The arithimetic operation could handle the situation for
          * write_pointer overflow.
          */
-        spin_unlock(buffered_io_lock);
+        spin_unlock(&v->domain->arch.hvm_domain.buffered_io_lock);
         return 0;
     }
 
-    tmp_write_pointer = buffered_iopage->write_pointer % IOREQ_BUFFER_SLOT_NUM;
+    memcpy(&pg->buf_ioreq[pg->write_pointer % IOREQ_BUFFER_SLOT_NUM],
+           &bp, sizeof(bp));
 
-    memcpy(&buffered_iopage->ioreq[tmp_write_pointer], p, sizeof(ioreq_t));
-
-    /*make the ioreq_t visible before write_pointer*/
+    /* Make the ioreq_t visible before write_pointer */
     wmb();
-    buffered_iopage->write_pointer++;
+    pg->write_pointer++;
 
-    spin_unlock(buffered_io_lock);
+    spin_unlock(&v->domain->arch.hvm_domain.buffered_io_lock);
 
     return 1;
 }
-
 
 static void low_mmio_access(VCPU *vcpu, u64 pa, u64 *val, size_t s, int dir)
 {
@@ -110,32 +125,36 @@ static void low_mmio_access(VCPU *vcpu, u64 pa, u64 *val, size_t s, int dir)
     ioreq_t *p;
 
     vio = get_vio(v->domain, v->vcpu_id);
-    if (vio == 0) {
-        panic_domain(NULL,"bad shared page: %lx", (unsigned long)vio);
-    }
+    if (!vio)
+        panic_domain(NULL, "bad shared page");
+
     p = &vio->vp_ioreq;
+
     p->addr = pa;
     p->size = s;
     p->count = 1;
-    p->dir = dir;
-    if (dir==IOREQ_WRITE)     // write;
+    if (dir == IOREQ_WRITE)
         p->data = *val;
-    else if (dir == IOREQ_READ)
-        p->data = 0;          // clear all bits
+    else
+        p->data = 0;
     p->data_is_ptr = 0;
-    p->type = 1;
+    p->dir = dir;
     p->df = 0;
+    p->type = 1;
 
     p->io_count++;
+
     if (hvm_buffered_io_intercept(p)) {
         p->state = STATE_IORESP_READY;
         vmx_io_assist(v);
-        return;
-    } else 
-        vmx_send_assist_req(v);
-    if (dir == IOREQ_READ) { // read
-        *val = p->data;
+        if (dir != IOREQ_READ)
+            return;
     }
+
+    vmx_send_assist_req(v);
+    if (dir == IOREQ_READ)
+        *val = p->data;
+
     return;
 }
 
@@ -227,16 +246,18 @@ static void legacy_io_access(VCPU *vcpu, u64 pa, u64 *val, size_t s, int dir)
     ioreq_t *p;
 
     vio = get_vio(v->domain, v->vcpu_id);
-    if (vio == 0) {
-        panic_domain(NULL,"bad shared page\n");
-    }
+    if (!vio)
+        panic_domain(NULL, "bad shared page\n");
+
     p = &vio->vp_ioreq;
-    p->addr = TO_LEGACY_IO(pa&0x3ffffffUL);
+    p->addr = TO_LEGACY_IO(pa & 0x3ffffffUL);
     p->size = s;
     p->count = 1;
     p->dir = dir;
-    if (dir == IOREQ_WRITE)     // write;
+    if (dir == IOREQ_WRITE)
         p->data = *val;
+    else
+        p->data = 0;
     p->data_is_ptr = 0;
     p->type = 0;
     p->df = 0;
