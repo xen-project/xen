@@ -1,0 +1,158 @@
+LINUX_SERIES = 2.6
+
+# Linux search path, will be searched for tarballs and mercurial
+# repositories.
+LINUX_SRC_PATH ?= .:..
+
+# The source directory is not automatically updated to avoid blowing
+# away developer's changes. If you want to automatically pull a new
+# version of the Linux tree then add `XEN_LINUX_UPDATE=y' to your make
+# command line.
+ifeq ($(XEN_LINUX_UPDATE),y)
+__XEN_LINUX_UPDATE = $(LINUX_SRCDIR)/.force-update
+else
+__XEN_LINUX_UPDATE =
+endif
+
+# Let XEN_TARGET_ARCH override ARCH.
+ifeq ($(XEN_TARGET_ARCH),x86_32)
+LINUX_ARCH	?= i386
+else
+LINUX_ARCH	?= $(XEN_TARGET_ARCH)
+endif
+
+LINUX_DIR     = build-linux-$(LINUX_VER)$(EXTRAVERSION)_$(XEN_TARGET_ARCH)
+
+IMAGE_TARGET ?= vmlinuz
+ifneq ($(XEN_TARGET_ARCH),ia64)
+IMAGE_PATH ?= arch/$(LINUX_ARCH)/boot/$(firstword $(IMAGE_TARGET))
+else
+IMAGE_PATH ?= arch/ia64/hp/sim/boot/vmlinux.gz
+endif
+INSTALL_BOOT_PATH := $(DESTDIR)/boot
+
+LINUX_VER3  := $(LINUX_SERIES).$(word 3, $(subst ., ,$(LINUX_VER)))
+
+.PHONY: _build
+_build: build
+
+include buildconfigs/src.$(XEN_LINUX_SOURCE)
+
+# Default to allowing interface mismatch
+ifndef XEN_LINUX_ALLOW_INTERFACE_MISMATCH
+XEN_LINUX_ALLOW_INTERFACE_MISMATCH := y
+endif
+
+KERNELRELEASE = $(shell $(MAKE) -s --no-print-directory -C $(LINUX_DIR) kernelrelease)
+
+# The real action starts here!
+.PHONY: build
+build: $(LINUX_DIR)/include/linux/autoconf.h
+ifneq ($(XEN_LINUX_ALLOW_INTERFACE_MISMATCH),y)
+	@if ! diff -urN -X buildconfigs/interface.exclude \
+              $(LINUX_SRCDIR)/include/xen/interface xen/include/public ; then \
+		echo "" 1>&2 ; \
+		echo " *** $(LINUX_SRCDIR)/include/xen/interface is out of date " 1>&2 ; \
+		echo " *** relative to $(XEN_ROOT)/xen/include/public." 1>&2 ; \
+		echo "" 1>&2 ; \
+		exit 1 ; \
+	fi
+endif
+	if grep "^CONFIG_MODULES=" $(LINUX_DIR)/.config ; then \
+	    $(MAKE) -C $(LINUX_DIR) ARCH=$(LINUX_ARCH) modules ; \
+	    $(MAKE) -C $(LINUX_DIR) ARCH=$(LINUX_ARCH) INSTALL_MOD_PATH=$(DESTDIR) modules_install ; \
+	fi
+	$(MAKE) -C $(LINUX_DIR) ARCH=$(LINUX_ARCH) INSTALL_PATH=$(DESTDIR) $(IMAGE_TARGET)
+	mkdir -p $(INSTALL_BOOT_PATH)
+	cp $(LINUX_DIR)/$(IMAGE_PATH) $(INSTALL_BOOT_PATH)/vmlinuz-$(KERNELRELEASE)
+	cp $(LINUX_DIR)/.config $(INSTALL_BOOT_PATH)/config-$(KERNELRELEASE)
+	cp $(LINUX_DIR)/System.map $(INSTALL_BOOT_PATH)/System.map-$(KERNELRELEASE)
+
+$(LINUX_DIR)/include/linux/autoconf.h: CONFIG_FILE=$(CURDIR)/$(LINUX_DIR)/.config
+$(LINUX_DIR)/include/linux/autoconf.h: $(LINUX_SRCDIR)/.valid-src
+	rm -rf $(LINUX_DIR)
+	mkdir -p $(LINUX_DIR)
+	# Re-use config from install dir if one exists. Next try to use
+	# buildconfigs/create_config.sh is one is provided by the source
+	# tree. Finally attempt to use make defconfig.
+	set -e ; \
+	CONFIG_VERSION=$$(sed -ne 's/$$(XENGUEST)//; s/^EXTRAVERSION = //p' $(LINUX_SRCDIR)/Makefile); \
+	if [ -r $(DESTDIR)/boot/config-$(LINUX_VER3)$$CONFIG_VERSION$(EXTRAVERSION) ] ; then \
+	  cp $(DESTDIR)/boot/config-$(LINUX_VER3)$$CONFIG_VERSION$(EXTRAVERSION) $(CONFIG_FILE) ; \
+        elif [ -e $(LINUX_SRCDIR)/buildconfigs/create_config.sh ] ; then \
+	  cd $(LINUX_SRCDIR) && sh buildconfigs/create_config.sh \
+		$(CONFIG_FILE) $(EXTRAVERSION) $(XEN_TARGET_ARCH) $(XEN_SYSTYPE) ; \
+          echo "Configured $(LINUX_DIR) using create_config.sh" ; \
+	elif $(MAKE) -C $(LINUX_SRCDIR) ARCH=$(LINUX_ARCH) defconfig O=$$(/bin/pwd)/$(LINUX_DIR) ; then \
+	  echo "Configured $(LINUX_DIR) using defconfig" ; \
+	else \
+          echo "No configuration method found for this kernel" ; \
+	fi
+ifneq ($(XEN_LINUX_CONFIG_UPDATE),)
+	echo "Updating $(CONFIG_FILE) using $(XEN_LINUX_CONFIG_UPDATE)"
+	sh $(XEN_LINUX_CONFIG_UPDATE) $(CONFIG_FILE)
+endif
+ifeq ($(XEN_TARGET_ARCH),x86_32)
+ifeq ($(pae),y)
+	sed -e 's!^CONFIG_HIGHMEM4G=y$$!\# CONFIG_HIGHMEM4G is not set!;s!^\# CONFIG_HIGHMEM64G is not set$$!CONFIG_HIGHMEM64G=y!' $(CONFIG_FILE) > $(CONFIG_FILE)- && mv $(CONFIG_FILE)- $(CONFIG_FILE)
+else
+	grep '^CONFIG_HIGHMEM64G=y' $(CONFIG_FILE) >/dev/null && ( sed -e 's!^CONFIG_HIGHMEM64G=y$$!\# CONFIG_HIGHMEM64G is not set!;s!^\# CONFIG_HIGHMEM4G is not set$$!CONFIG_HIGHMEM4G=y!' $(CONFIG_FILE) > $(CONFIG_FILE)- && mv $(CONFIG_FILE)- $(CONFIG_FILE) ) || true
+endif
+endif
+ifneq ($(EXTRAVERSION),)
+	echo "$(EXTRAVERSION)" >$(LINUX_DIR)/localversion-xen
+endif
+	$(MAKE) -C $(LINUX_SRCDIR) ARCH=$(LINUX_ARCH) oldconfig O=$$(/bin/pwd)/$(LINUX_DIR)
+	@if [ ! -f $(LINUX_DIR)/Makefile ] ; then \
+	    echo "***********************************"; \
+	    echo "oldconfig did not create a Makefile"; \
+	    echo "Generating $(LINUX_DIR)/Makefile   "; \
+	    echo "***********************************"; \
+	    ( echo "# Automatically generated: don't edit"; \
+	      echo ""; \
+	      echo "VERSION = 2"; \
+	      echo "PATCHLEVEL = 6"; \
+	      echo ""; \
+	      echo "KERNELSRC    := $(CURDIR)/$(LINUX_SRCDIR)"; \
+	      echo "KERNELOUTPUT := $(CURDIR)/$(LINUX_DIR)"; \
+	      echo ""; \
+	      echo "MAKEFLAGS += --no-print-directory"; \
+	      echo ""; \
+	      echo ".PHONY: all \$$(MAKECMDGOALS)"; \
+	      echo ""; \
+	      echo "all:"; \
+	      echo "	\$$(MAKE) -C \$$(KERNELSRC) O=\$$(KERNELOUTPUT)"; \
+	      echo ""; \
+	      echo "Makefile:;"; \
+	      echo ""; \
+	      echo "\$$(filter-out all Makefile,\$$(MAKECMDGOALS)) %/:"; \
+	      echo "	\$$(MAKE) -C \$$(KERNELSRC) O=\$$(KERNELOUTPUT) \$$@"; \
+	    ) > $(LINUX_DIR)/Makefile ; \
+	fi
+	$(MAKE) -C $(LINUX_DIR) ARCH=$(LINUX_ARCH) prepare
+
+.PHONY: prep
+prep: $(LINUX_DIR)/include/linux/autoconf.h
+
+.PHONY: config
+config: CONFIGMODE = menuconfig
+config: $(LINUX_DIR)/include/linux/autoconf.h
+	$(MAKE) -C $(LINUX_DIR) ARCH=$(LINUX_ARCH) $(CONFIGMODE)
+
+.PHONY: clean
+clean::
+	[ ! -d $(LINUX_DIR) ] || \
+		$(MAKE) -C $(LINUX_DIR) ARCH=$(LINUX_ARCH) clean
+
+.PHONY: delete
+delete: 
+	rm -rf tmp-linux-$(LINUX_VER) $(LINUX_DIR) $(LINUX_SRCDIR)
+
+.PHONY: mrproper
+mrproper:
+	rm -rf $(LINUX_SRCDIR)
+	rm -f linux-$(LINUX_VER).tar.bz2
+
+.PHONY: $(LINUX_SRCDIR)/.force-update
+$(LINUX_SRCDIR)/.force-update:
+	@ :
