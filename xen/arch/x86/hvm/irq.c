@@ -26,7 +26,7 @@
 #include <asm/hvm/domain.h>
 #include <asm/hvm/support.h>
 
-void __hvm_pci_intx_assert(
+static void __hvm_pci_intx_assert(
     struct domain *d, unsigned int device, unsigned int intx)
 {
     struct hvm_irq *hvm_irq = &d->arch.hvm_domain.irq;
@@ -59,7 +59,7 @@ void hvm_pci_intx_assert(
     spin_unlock(&d->arch.hvm_domain.irq_lock);
 }
 
-void __hvm_pci_intx_deassert(
+static void __hvm_pci_intx_deassert(
     struct domain *d, unsigned int device, unsigned int intx)
 {
     struct hvm_irq *hvm_irq = &d->arch.hvm_domain.irq;

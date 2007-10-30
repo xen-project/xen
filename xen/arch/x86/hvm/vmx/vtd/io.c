@@ -145,8 +145,6 @@ void hvm_dpci_eoi(struct domain *d, unsigned int guest_gsi,
     struct hvm_irq_dpci *hvm_irq_dpci = d->arch.hvm_domain.irq.dpci;
     uint32_t device, intx, machine_gsi;
 
-    ASSERT(spin_is_locked(&d->arch.hvm_domain.irq_lock));
-
     if ( !vtd_enabled || (hvm_irq_dpci == NULL) ||
          !hvm_irq_dpci->girq[guest_gsi].valid )
         return;
@@ -157,7 +155,7 @@ void hvm_dpci_eoi(struct domain *d, unsigned int guest_gsi,
     intx = hvm_irq_dpci->girq[guest_gsi].intx;
     gdprintk(XENLOG_INFO, "hvm_dpci_eoi:: device %x intx %x\n",
              device, intx);
-    __hvm_pci_intx_deassert(d, device, intx);
+    hvm_pci_intx_deassert(d, device, intx);
     if ( (ent == NULL) || !ent->fields.mask )
         pirq_guest_eoi(d, machine_gsi);
 }

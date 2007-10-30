@@ -249,13 +249,13 @@ static void vpic_ioport_write(
                 vpic->isr &= ~(1 << irq);
                 if ( cmd == 7 )
                     vpic->priority_add = (irq + 1) & 7;
-                if ( vtd_enabled )
-                {
-                    irq |= ((addr & 0xa0) == 0xa0) ? 8 : 0;
-                    hvm_dpci_eoi(current->domain,
-                                 hvm_isa_irq_to_gsi(irq), NULL);
-                }
-                break;
+                /* Release lock and EOI the physical interrupt (if any). */
+                vpic_update_int_output(vpic);
+                vpic_unlock(vpic);
+                hvm_dpci_eoi(current->domain,
+                             hvm_isa_irq_to_gsi((addr >> 7) ? (irq|8) : irq),
+                             NULL);
+                return; /* bail immediately */
             case 6: /* Set Priority                */
                 vpic->priority_add = (val + 1) & 7;
                 break;

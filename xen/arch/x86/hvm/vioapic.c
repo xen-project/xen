@@ -459,7 +459,11 @@ void vioapic_update_EOI(struct domain *d, int vector)
     ent->fields.remote_irr = 0;
 
     if ( vtd_enabled )
+    {
+        spin_unlock(&d->arch.hvm_domain.irq_lock);
         hvm_dpci_eoi(current->domain, gsi, ent);
+        spin_lock(&d->arch.hvm_domain.irq_lock);
+    }
 
     if ( (ent->fields.trig_mode == VIOAPIC_LEVEL_TRIG) &&
          !ent->fields.mask &&
