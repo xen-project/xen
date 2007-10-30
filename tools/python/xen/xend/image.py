@@ -17,7 +17,7 @@
 #============================================================================
 
 
-import os, string
+import os, os.path, string
 import re
 import math
 import time
@@ -226,6 +226,19 @@ class ImageHandler:
                 log.debug("Stored a VNC password for vfb access")
             else:
                 log.debug("No VNC passwd configured for vfb access")
+
+            if XendOptions.instance().get_vnc_tls():
+                vncx509certdir = XendOptions.instance().get_vnc_x509_cert_dir()
+                vncx509verify = XendOptions.instance().get_vnc_x509_verify()
+
+                if not os.path.exists(vncx509certdir):
+                    raise VmError("VNC x509 certificate dir %s does not exist" % vncx509certdir)
+
+                if vncx509verify:
+                    vncopts = vncopts + ",tls,x509verify=%s" % vncx509certdir
+                else:
+                    vncopts = vncopts + ",tls,x509=%s" % vncx509certdir
+
 
             vnclisten = vnc_config.get('vnclisten',
                                        XendOptions.instance().get_vnclisten_address())
