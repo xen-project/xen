@@ -3399,6 +3399,21 @@ sh_update_linear_entries(struct vcpu *v)
 #else
 #error this should not happen
 #endif
+
+    if ( shadow_mode_external(d) )
+    {
+        /*
+         * Having modified the linear pagetable mapping, flush local host TLBs.
+         * This was not needed when vmenter/vmexit always had the side effect
+         * of flushing host TLBs but, with ASIDs, it is possible to finish 
+         * this CR3 update, vmenter the guest, vmexit due to a page fault, 
+         * without an intervening host TLB flush. Then the page fault code 
+         * could use the linear pagetable to read a top-level shadow page 
+         * table entry. But, without this change, it would fetch the wrong 
+         * value due to a stale TLB.
+         */
+        flush_tlb_local();
+    }
 }
 
 
