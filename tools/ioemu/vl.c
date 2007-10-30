@@ -6203,12 +6203,10 @@ void main_loop_wait(int timeout)
         IOHandlerRecord **pioh;
 
         for(ioh = first_io_handler; ioh != NULL; ioh = ioh->next) {
-            if (ioh->deleted)
-                continue;
-            if (ioh->fd_read && FD_ISSET(ioh->fd, &rfds)) {
+            if (!ioh->deleted && ioh->fd_read && FD_ISSET(ioh->fd, &rfds)) {
                 ioh->fd_read(ioh->opaque);
             }
-            if (ioh->fd_write && FD_ISSET(ioh->fd, &wfds)) {
+            if (!ioh->deleted && ioh->fd_write && FD_ISSET(ioh->fd, &wfds)) {
                 ioh->fd_write(ioh->opaque);
             }
         }
