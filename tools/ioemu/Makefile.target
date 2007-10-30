@@ -387,6 +387,11 @@ SOUND_HW += fmopl.o adlib.o
 endif
 AUDIODRV+= wavcapture.o
 
+ifdef CONFIG_VNC_TLS
+CPPFLAGS += $(CONFIG_VNC_TLS_CFLAGS)
+LIBS += $(CONFIG_VNC_TLS_LIBS)
+endif
+
 # SCSI layer
 VL_OBJS+= scsi-disk.o cdrom.o lsi53c895a.o
 
@@ -409,6 +414,10 @@ VL_OBJS+= usb-uhci.o smbus_eeprom.o
 VL_OBJS+= piix4acpi.o
 VL_OBJS+= xenstore.o
 VL_OBJS+= xen_platform.o
+VL_OBJS+= xen_machine_fv.o
+VL_OBJS+= xen_machine_pv.o
+VL_OBJS+= xenfb.o
+VL_OBJS+= xen_console.o
 VL_OBJS+= tpm_tis.o
 CPPFLAGS += -DHAS_AUDIO
 endif
@@ -452,8 +461,7 @@ endif
 ifdef CONFIG_SDL
 VL_OBJS+=sdl.o x_keymap.o
 endif
-VL_OBJS+=vnc.o
-VL_OBJS+=d3des.o
+VL_OBJS+=vnc.o d3des.o
 ifdef CONFIG_COCOA
 VL_OBJS+=cocoa.o
 COCOA_LIBS=-F/System/Library/Frameworks -framework Cocoa -framework IOKit
@@ -511,11 +519,8 @@ cocoa.o: cocoa.m
 sdl.o: sdl.c keymaps.c sdl_keysym.h
 	$(CC) $(CFLAGS) $(CPPFLAGS) $(SDL_CFLAGS) $(BASE_CFLAGS) -c -o $@ $<
 
-vnc.o: vnc.c keymaps.c sdl_keysym.h vnchextile.h
+vnc.o: vnc.c keymaps.c sdl_keysym.h vnchextile.h d3des.c d3des.h
 	$(CC) $(CFLAGS) $(CPPFLAGS) $(BASE_CFLAGS) -c -o $@ $<
-
-d3des.o: d3des.c d3des.h
-	$(CC) $(CFLAGS) $(DEFINES) -c -o $@ $<
 
 sdlaudio.o: sdlaudio.c
 	$(CC) $(CFLAGS) $(CPPFLAGS) $(SDL_CFLAGS) $(BASE_CFLAGS) -c -o $@ $<

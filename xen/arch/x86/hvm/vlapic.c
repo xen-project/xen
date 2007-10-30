@@ -430,7 +430,7 @@ static uint32_t vlapic_get_tmcct(struct vlapic *vlapic)
     uint32_t tmcct, tmict = vlapic_get_reg(vlapic, APIC_TMICT);
     uint64_t counter_passed;
 
-    counter_passed = (hvm_get_guest_time(v) - vlapic->pt.last_plt_gtime) // TSC
+    counter_passed = (hvm_get_guest_time(v) - vlapic->timer_last_update) // TSC
                      * 1000000000ULL / ticks_per_sec(v) // NS
                      / APIC_BUS_CYCLE_NS / vlapic->hw.timer_divisor;
     tmcct = tmict - counter_passed;
@@ -529,6 +529,11 @@ static unsigned long vlapic_read(struct vcpu *v, unsigned long address,
  exit_and_crash:
     domain_crash(v->domain);
     return 0;
+}
+
+void vlapic_pt_cb(struct vcpu *v, void *data)
+{
+    *(s_time_t *)data = hvm_get_guest_time(v);
 }
 
 static void vlapic_write(struct vcpu *v, unsigned long address,
@@ -660,7 +665,8 @@ static void vlapic_write(struct vcpu *v, unsigned long address,
 
         vlapic_set_reg(vlapic, APIC_TMICT, val);
         create_periodic_time(current, &vlapic->pt, period, vlapic->pt.irq,
-                             !vlapic_lvtt_period(vlapic), NULL, vlapic);
+                             !vlapic_lvtt_period(vlapic), vlapic_pt_cb,
+                             &vlapic->timer_last_update);
 
         HVM_DBG_LOG(DBG_LEVEL_VLAPIC,
                     "bus cycle is %uns, "
@@ -820,7 +826,8 @@ static void lapic_rearm(struct vlapic *s)
 
         s->pt.irq = lvtt & APIC_VECTOR_MASK;
         create_periodic_time(vlapic_vcpu(s), &s->pt, period, s->pt.irq,
-                             !vlapic_lvtt_period(s), NULL, s);
+                             !vlapic_lvtt_period(s), vlapic_pt_cb,
+                             &s->timer_last_update);
 
         printk("lapic_load to rearm the actimer:"
                     "bus cycle is %uns, "

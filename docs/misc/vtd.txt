@@ -1,0 +1,50 @@
+Title   : How to do PCI Passthrough with VT-d
+Authors : Allen Kay    <allen.m.kay@intel.com>
+          Weidong Han  <weidong.han@intel.com>
+Created : October-24-2007
+Updated : October-24-2007
+
+How to turn on VT-d in Xen
+--------------------------
+
+1 ) cd xen-unstable.hg
+2 ) make install
+3 ) make linux-2.6-xen-config CONFIGMODE=menuconfig
+4 ) change XEN->"PCI-device backend driver" from "M" to "*".
+5 ) make linux-2.6-xen-build
+6 ) make linux-2.6-xen-install
+7 ) depmod 2.6.18.8-xen
+8 ) mkinitrd -v -f --with=ahci --with=aacraid --with=sd_mod --with=scsi_mod initrd-2.6.18-xen.img 2.6.18.8-xen
+9 ) cp initrd-2.6.18-xen.img /boot
+10) lspci - select the PCI BDF you want to assign to guest OS
+11) "hide" pci device from dom0 as following sample grub entry:
+
+title Xen-Fedora Core (2.6.18-xen)
+        root (hd0,0)
+        kernel /boot/xen.gz com1=115200,8n1 console=com1 vtd=1
+        module /boot/vmlinuz-2.6.18.8-xen root=LABEL=/ ro console=tty0 console=ttyS0,115200,8n1 pciback.hide=(01:00.0)(03:00.0) pciback.verbose_request=1 apic=debug maxcpus=1
+        module /boot/initrd-2.6.18-xen.img
+
+12) reboot system
+13) add "pci" line in /etc/xen/hvm.conf for to assigned devices
+        pci = [ '01:00.0', '03:00.0' ]
+15) start hvm guest and use "lspci" to see the passthru device and
+    "ifconfig" to see if IP address has been assigned to NIC devices.
+
+
+VT-d Enabled Systems
+--------------------
+
+1) For VT-d enabling work on Xen, we have been using development
+systems using following Intel motherboards:
+    - DQ35MP
+    - DQ35JO
+
+2) As far as we know, following OEM systems also has vt-d enabled.
+Feel free to add others as they become available.
+
+- Dell: Optiplex 755
+http://www.dell.com/content/products/category.aspx/optix?c=us&cs=555&l=en&s=biz
+
+- HP Compaq:  DC7800
+http://h10010.www1.hp.com/wwpc/us/en/en/WF04a/12454-12454-64287-321860-3328898.html

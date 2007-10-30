@@ -549,7 +549,7 @@ int xc_physdev_pci_access_modify(int xc_handle,
 int xc_readconsolering(int xc_handle,
                        char **pbuffer,
                        unsigned int *pnr_chars,
-                       int clear);
+                       int clear, int incremental, uint32_t *pindex);
 
 int xc_send_debug_keys(int xc_handle, char *keys);
 
@@ -616,9 +616,9 @@ int xc_domain_iomem_permission(int xc_handle,
 
 int xc_domain_pin_memory_cacheattr(int xc_handle,
                                    uint32_t domid,
-                                   unsigned long start,
-                                   unsigned long end,
-                                   unsigned int type);
+                                   uint64_t start,
+                                   uint64_t end,
+                                   uint32_t type);
 
 unsigned long xc_make_page_below_4G(int xc_handle, uint32_t domid,
                                     unsigned long mfn);

@@ -83,9 +83,12 @@ void write_cr3(unsigned long cr3)
     hvm_flush_guest_tlbs();
 
 #ifdef USER_MAPPINGS_ARE_GLOBAL
-    __pge_off();
-    asm volatile ( "mov %0, %%cr3" : : "r" (cr3) : "memory" );
-    __pge_on();
+    {
+        unsigned long cr4 = read_cr4();
+        write_cr4(cr4 & ~X86_CR4_PGE);
+        asm volatile ( "mov %0, %%cr3" : : "r" (cr3) : "memory" );
+        write_cr4(cr4);
+    }
 #else
     asm volatile ( "mov %0, %%cr3" : : "r" (cr3) : "memory" );
 #endif
@@ -98,17 +101,15 @@ void write_cr3(unsigned long cr3)
 void flush_area_local(const void *va, unsigned int flags)
 {
     const struct cpuinfo_x86 *c = &current_cpu_data;
-    unsigned int level = flags & FLUSH_LEVEL_MASK;
+    unsigned int order = (flags - 1) & FLUSH_ORDER_MASK;
     unsigned long irqfl;
-
-    ASSERT(level < CONFIG_PAGING_LEVELS);
 
     /* This non-reentrant function is sometimes called in interrupt context. */
     local_irq_save(irqfl);
 
     if ( flags & (FLUSH_TLB|FLUSH_TLB_GLOBAL) )
     {
-        if ( level == 1 )
+        if ( order == 0 )
         {
             /*
              * We don't INVLPG multi-page regions because the 2M/4M/1G
@@ -126,8 +127,7 @@ void flush_area_local(const void *va, unsigned int flags)
             hvm_flush_guest_tlbs();
 
 #ifndef USER_MAPPINGS_ARE_GLOBAL
-            if ( !(flags & FLUSH_TLB_GLOBAL) ||
-                 !(mmu_cr4_features & X86_CR4_PGE) )
+            if ( !(flags & FLUSH_TLB_GLOBAL) || !(read_cr4() & X86_CR4_PGE) )
             {
                 asm volatile ( "mov %0, %%cr3"
                                : : "r" (read_cr3()) : "memory" );
@@ -135,9 +135,10 @@ void flush_area_local(const void *va, unsigned int flags)
             else
 #endif
             {
-                __pge_off();
+                unsigned long cr4 = read_cr4();
+                write_cr4(cr4 & ~X86_CR4_PGE);
                 barrier();
-                __pge_on();
+                write_cr4(cr4);
             }
 
             post_flush(t);
@@ -146,14 +147,14 @@ void flush_area_local(const void *va, unsigned int flags)
 
     if ( flags & FLUSH_CACHE )
     {
-        unsigned long i, sz;
+        unsigned long i, sz = 0;
 
-        sz = level ? (1UL << ((level - 1) * PAGETABLE_ORDER)) : ULONG_MAX;
+        if ( order < (BITS_PER_LONG - PAGE_SHIFT - 1) )
+            sz = 1UL << (order + PAGE_SHIFT);
 
-        if ( c->x86_clflush_size && c->x86_cache_size &&
-             (sz < (c->x86_cache_size >> (PAGE_SHIFT - 10))) )
+        if ( c->x86_clflush_size && c->x86_cache_size && sz &&
+             ((sz >> 10) < c->x86_cache_size) )
         {
-            sz <<= PAGE_SHIFT;
             va = (const void *)((unsigned long)va & ~(sz - 1));
             for ( i = 0; i < sz; i += c->x86_clflush_size )
                  asm volatile ( "clflush %0"

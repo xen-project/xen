@@ -30,25 +30,25 @@
 /* Xen holds the native MTRR MSRs */
 extern struct mtrr_state mtrr_state;
 
-static u64 phys_base_msr_mask;
-static u64 phys_mask_msr_mask;
-static u32 size_or_mask;
-static u32 size_and_mask;
+static uint64_t phys_base_msr_mask;
+static uint64_t phys_mask_msr_mask;
+static uint32_t size_or_mask;
+static uint32_t size_and_mask;
 
-static void init_pat_entry_tbl(u64 pat);
+static void init_pat_entry_tbl(uint64_t pat);
 static void init_mtrr_epat_tbl(void);
-static unsigned char get_mtrr_type(struct mtrr_state *m, paddr_t pa);
+static uint8_t get_mtrr_type(struct mtrr_state *m, paddr_t pa);
 /* get page attribute fields (PAn) from PAT MSR */
-#define pat_cr_2_paf(pat_cr,n)  ((((u64)pat_cr) >> ((n)<<3)) & 0xff)
+#define pat_cr_2_paf(pat_cr,n)  ((((uint64_t)pat_cr) >> ((n)<<3)) & 0xff)
 /* pat entry to PTE flags (PAT, PCD, PWT bits) */
-static unsigned char pat_entry_2_pte_flags[8] = {
+static uint8_t pat_entry_2_pte_flags[8] = {
     0,           _PAGE_PWT,
     _PAGE_PCD,   _PAGE_PCD | _PAGE_PWT,
     _PAGE_PAT,   _PAGE_PAT | _PAGE_PWT,
     _PAGE_PAT | _PAGE_PCD, _PAGE_PAT | _PAGE_PCD | _PAGE_PWT };
 
 /* effective mm type lookup table, according to MTRR and PAT */
-static u8 mm_type_tbl[MTRR_NUM_TYPES][PAT_TYPE_NUMS] = {
+static uint8_t mm_type_tbl[MTRR_NUM_TYPES][PAT_TYPE_NUMS] = {
 /********PAT(UC,WC,RS,RS,WT,WP,WB,UC-)*/
 /* RS means reserved type(2,3), and type is hardcoded here */
  /*MTRR(UC):(UC,WC,RS,RS,UC,UC,UC,UC)*/
@@ -70,10 +70,10 @@ static u8 mm_type_tbl[MTRR_NUM_TYPES][PAT_TYPE_NUMS] = {
 /* reverse lookup table, to find a pat type according to MTRR and effective
  * memory type. This table is dynamically generated
  */
-static u8 mtrr_epat_tbl[MTRR_NUM_TYPES][MEMORY_NUM_TYPES];
+static uint8_t mtrr_epat_tbl[MTRR_NUM_TYPES][MEMORY_NUM_TYPES];
 
 /* lookup table for PAT entry of a given PAT value in host pat */
-static u8 pat_entry_tbl[PAT_TYPE_NUMS];
+static uint8_t pat_entry_tbl[PAT_TYPE_NUMS];
 
 static void get_mtrr_range(uint64_t base_msr, uint64_t mask_msr,
                            uint64_t *base, uint64_t *end)
@@ -104,23 +104,23 @@ static void get_mtrr_range(uint64_t base_msr, uint64_t mask_msr,
 
 bool_t is_var_mtrr_overlapped(struct mtrr_state *m)
 {
-    int seg, i;
+    int32_t seg, i;
     uint64_t phys_base, phys_mask, phys_base_pre, phys_mask_pre;
     uint64_t base_pre, end_pre, base, end;
-    uint8_t num_var_ranges = (u8)m->mtrr_cap;
+    uint8_t num_var_ranges = (uint8_t)m->mtrr_cap;
 
     for ( i = 0; i < num_var_ranges; i++ )
     {
-        phys_base_pre = ((u64*)m->var_ranges)[i*2];
-        phys_mask_pre = ((u64*)m->var_ranges)[i*2 + 1];
+        phys_base_pre = ((uint64_t*)m->var_ranges)[i*2];
+        phys_mask_pre = ((uint64_t*)m->var_ranges)[i*2 + 1];
 
         get_mtrr_range(phys_base_pre, phys_mask_pre,
                         &base_pre, &end_pre);
 
         for ( seg = i + 1; seg < num_var_ranges; seg ++ )
         {
-            phys_base = ((u64*)m->var_ranges)[seg*2];
-            phys_mask = ((u64*)m->var_ranges)[seg*2 + 1];
+            phys_base = ((uint64_t*)m->var_ranges)[seg*2];
+            phys_mask = ((uint64_t*)m->var_ranges)[seg*2 + 1];
 
             get_mtrr_range(phys_base, phys_mask,
                             &base, &end);
@@ -143,12 +143,14 @@ bool_t is_var_mtrr_overlapped(struct mtrr_state *m)
 #define RESERVED_MTRR 2
 #define MTRRphysBase_MSR(reg) (0x200 + 2 * (reg))
 #define MTRRphysMask_MSR(reg) (0x200 + 2 * (reg) + 1)
-bool_t mtrr_var_range_msr_set(struct mtrr_state *m, u32 msr, u64 msr_content);
-bool_t mtrr_def_type_msr_set(struct mtrr_state *m, u64 msr_content);
-bool_t mtrr_fix_range_msr_set(struct mtrr_state *m, int row, u64 msr_content);
-static void set_var_mtrr(unsigned int reg, struct mtrr_state *m,
-                    unsigned int base, unsigned int size,
-                    unsigned int type)
+bool_t mtrr_var_range_msr_set(struct mtrr_state *m, uint32_t msr,
+                              uint64_t msr_content);
+bool_t mtrr_def_type_msr_set(struct mtrr_state *m, uint64_t msr_content);
+bool_t mtrr_fix_range_msr_set(struct mtrr_state *m, uint32_t row,
+                              uint64_t msr_content);
+static void set_var_mtrr(uint32_t reg, struct mtrr_state *m,
+                         uint32_t base, uint32_t size,
+                         uint32_t type)
 {
     struct mtrr_var_range *vr;
 
@@ -168,9 +170,9 @@ static void set_var_mtrr(unsigned int reg, struct mtrr_state *m,
         vr->mask_lo = -size << PAGE_SHIFT | 0x800;
         vr->mask_hi = (-size & size_and_mask) >> (32 - PAGE_SHIFT);
 
-        mtrr_var_range_msr_set(m, MTRRphysBase_MSR(reg), *(unsigned long *)vr);
+        mtrr_var_range_msr_set(m, MTRRphysBase_MSR(reg), *(uint64_t *)vr);
         mtrr_var_range_msr_set(m, MTRRphysMask_MSR(reg),
-                               *((unsigned long *)vr + 1));
+                               *((uint64_t *)vr + 1));
     }
 }
 /* From Intel Vol. III Section 10.11.4, the Range Size and Base Alignment has
@@ -179,18 +181,19 @@ static void set_var_mtrr(unsigned int reg, struct mtrr_state *m,
  * 2. The base address must be 2^N aligned, where the N here is equal to
  * the N in previous requirement. So a 8K range must be 8K aligned not 4K aligned.
  */
-static unsigned int range_to_mtrr(unsigned int reg, struct mtrr_state *m,
-    unsigned int range_startk, unsigned int range_sizek, unsigned char type)
+static uint32_t range_to_mtrr(uint32_t reg, struct mtrr_state *m,
+                              uint32_t range_startk, uint32_t range_sizek,
+                              uint8_t type)
 {
     if ( !range_sizek || (reg >= ((m->mtrr_cap & 0xff) - RESERVED_MTRR)) )
         return reg;
 
     while ( range_sizek )
     {
-        unsigned int max_align, align, sizek;
+        uint32_t max_align, align, sizek;
 
         max_align = (range_startk == 0) ? 32 : ffs(range_startk);
-        align = min_t(unsigned int, fls(range_sizek), max_align);
+        align = min_t(uint32_t, fls(range_sizek), max_align);
         sizek = 1 << (align - 1);
 
         set_var_mtrr(reg++, m, range_startk, sizek, type);
@@ -208,7 +211,7 @@ static unsigned int range_to_mtrr(unsigned int reg, struct mtrr_state *m,
 static void setup_fixed_mtrrs(struct vcpu *v)
 {
     uint64_t content;
-    int i;
+    int32_t i;
     struct mtrr_state *m = &v->arch.hvm_vcpu.mtrr;
 
     /* 1. Map (0~A0000) as WB */
@@ -226,21 +229,21 @@ static void setup_fixed_mtrrs(struct vcpu *v)
 static void setup_var_mtrrs(struct vcpu *v)
 {
     p2m_type_t p2m;
-    unsigned long e820_mfn;
-    char *p = NULL;
-    unsigned char nr = 0;
-    int i;
-    unsigned int reg = 0;
-    unsigned long size = 0;
-    unsigned long addr = 0;
+    uint64_t e820_mfn;
+    int8_t *p = NULL;
+    uint8_t nr = 0;
+    int32_t i;
+    uint32_t reg = 0;
+    uint64_t size = 0;
+    uint64_t addr = 0;
     struct e820entry *e820_table;
 
     e820_mfn = mfn_x(gfn_to_mfn(v->domain,
                     HVM_E820_PAGE >> PAGE_SHIFT, &p2m));
 
-    p = (char *)map_domain_page(e820_mfn);
+    p = (int8_t *)map_domain_page(e820_mfn);
 
-    nr = *(unsigned char*)(p + HVM_E820_NR_OFFSET);
+    nr = *(uint8_t*)(p + HVM_E820_NR_OFFSET);
     e820_table = (struct e820entry*)(p + HVM_E820_OFFSET);
     /* search E820 table, set MTRR for RAM */
     for ( i = 0; i < nr; i++)
@@ -283,7 +286,7 @@ void init_mtrr_in_hyper(struct vcpu *v)
     v->arch.hvm_vcpu.mtrr.is_initialized = 1;
 }
 
-static int reset_mtrr(struct mtrr_state *m)
+static int32_t reset_mtrr(struct mtrr_state *m)
 {
     m->var_ranges = xmalloc_array(struct mtrr_var_range, MTRR_VCNT);
     if ( m->var_ranges == NULL )
@@ -300,8 +303,8 @@ static int reset_mtrr(struct mtrr_state *m)
 /* init global variables for MTRR and PAT */
 void global_init_mtrr_pat(void)
 {
-    extern u64 host_pat;
-    u32 phys_addr;
+    extern uint64_t host_pat;
+    uint32_t phys_addr;
 
     init_mtrr_epat_tbl();
     init_pat_entry_tbl(host_pat);
@@ -311,16 +314,16 @@ void global_init_mtrr_pat(void)
     else
         phys_addr = cpuid_eax(0x80000008);
 
-    phys_base_msr_mask = ~((((u64)1) << phys_addr) - 1) | 0xf00UL;
-    phys_mask_msr_mask = ~((((u64)1) << phys_addr) - 1) | 0x7ffUL;
+    phys_base_msr_mask = ~((((uint64_t)1) << phys_addr) - 1) | 0xf00UL;
+    phys_mask_msr_mask = ~((((uint64_t)1) << phys_addr) - 1) | 0x7ffUL;
 
     size_or_mask = ~((1 << (phys_addr - PAGE_SHIFT)) - 1);
     size_and_mask = ~size_or_mask & 0xfff00000;
 }
 
-static void init_pat_entry_tbl(u64 pat)
+static void init_pat_entry_tbl(uint64_t pat)
 {
-    int i, j;
+    int32_t i, j;
 
     memset(&pat_entry_tbl, INVALID_MEM_TYPE,
            PAT_TYPE_NUMS * sizeof(pat_entry_tbl[0]));
@@ -338,9 +341,9 @@ static void init_pat_entry_tbl(u64 pat)
     }
 }
 
-unsigned char pat_type_2_pte_flags(unsigned char pat_type)
+uint8_t pat_type_2_pte_flags(uint8_t pat_type)
 {
-    int pat_entry = pat_entry_tbl[pat_type];
+    int32_t pat_entry = pat_entry_tbl[pat_type];
 
     /* INVALID_MEM_TYPE, means doesn't find the pat_entry in host pat for
      * a given pat_type. If host pat covers all the pat types,
@@ -352,22 +355,22 @@ unsigned char pat_type_2_pte_flags(unsigned char pat_type)
     return pat_entry_2_pte_flags[pat_entry_tbl[PAT_TYPE_UNCACHABLE]];
 }
 
-int reset_vmsr(struct mtrr_state *m, u64 *pat_ptr)
+int32_t reset_vmsr(struct mtrr_state *m, uint64_t *pat_ptr)
 {
-    int rc;
+    int32_t rc;
 
     rc = reset_mtrr(m);
     if ( rc != 0 )
         return rc;
 
-    *pat_ptr = ( (u64)PAT_TYPE_WRBACK) |                /* PAT0: WB */
-        ( (u64)PAT_TYPE_WRTHROUGH << 8 ) |              /* PAT1: WT */
-        ( (u64)PAT_TYPE_UC_MINUS << 16 ) |              /* PAT2: UC- */
-        ( (u64)PAT_TYPE_UNCACHABLE << 24 ) |            /* PAT3: UC */
-        ( (u64)PAT_TYPE_WRBACK << 32 ) |                /* PAT4: WB */
-        ( (u64)PAT_TYPE_WRTHROUGH << 40 ) |             /* PAT5: WT */
-        ( (u64)PAT_TYPE_UC_MINUS << 48 ) |              /* PAT6: UC- */
-        ( (u64)PAT_TYPE_UNCACHABLE << 56 );             /* PAT7: UC */
+    *pat_ptr = ((uint64_t)PAT_TYPE_WRBACK) |               /* PAT0: WB */
+               ((uint64_t)PAT_TYPE_WRTHROUGH << 8) |       /* PAT1: WT */
+               ((uint64_t)PAT_TYPE_UC_MINUS << 16) |       /* PAT2: UC- */
+               ((uint64_t)PAT_TYPE_UNCACHABLE << 24) |     /* PAT3: UC */
+               ((uint64_t)PAT_TYPE_WRBACK << 32) |         /* PAT4: WB */
+               ((uint64_t)PAT_TYPE_WRTHROUGH << 40) |      /* PAT5: WT */
+               ((uint64_t)PAT_TYPE_UC_MINUS << 48) |       /* PAT6: UC- */
+               ((uint64_t)PAT_TYPE_UNCACHABLE << 56);      /* PAT7: UC */
 
     return 0;
 }
@@ -375,14 +378,14 @@ int reset_vmsr(struct mtrr_state *m, u64 *pat_ptr)
 /*
  * Get MTRR memory type for physical address pa.
  */
-static unsigned char get_mtrr_type(struct mtrr_state *m, paddr_t pa)
+static uint8_t get_mtrr_type(struct mtrr_state *m, paddr_t pa)
 {
-   int    addr, seg, index;
-   u8     overlap_mtrr = 0;
-   u8     overlap_mtrr_pos = 0;
-   u64    phys_base;
-   u64    phys_mask;
-   u8     num_var_ranges = m->mtrr_cap & 0xff;
+   int32_t     addr, seg, index;
+   uint8_t     overlap_mtrr = 0;
+   uint8_t     overlap_mtrr_pos = 0;
+   uint64_t    phys_base;
+   uint64_t    phys_mask;
+   uint8_t     num_var_ranges = m->mtrr_cap & 0xff;
 
    if ( unlikely(!(m->enabled & 0x2)) )
        return MTRR_TYPE_UNCACHABLE;
@@ -390,7 +393,7 @@ static unsigned char get_mtrr_type(struct mtrr_state *m, paddr_t pa)
    if ( (pa < 0x100000) && (m->enabled & 1) )
    {
        /* Fixed range MTRR takes effective */
-       addr = (unsigned int) pa;
+       addr = (uint32_t) pa;
        if ( addr < 0x80000 )
        {
            seg = (addr >> 16);
@@ -416,11 +419,11 @@ static unsigned char get_mtrr_type(struct mtrr_state *m, paddr_t pa)
    /* Match with variable MTRRs. */
    for ( seg = 0; seg < num_var_ranges; seg++ )
    {
-       phys_base = ((u64*)m->var_ranges)[seg*2];
-       phys_mask = ((u64*)m->var_ranges)[seg*2 + 1];
+       phys_base = ((uint64_t*)m->var_ranges)[seg*2];
+       phys_mask = ((uint64_t*)m->var_ranges)[seg*2 + 1];
        if ( phys_mask & (1 << MTRR_PHYSMASK_VALID_BIT) )
        {
-           if ( ((u64) pa & phys_mask) >> MTRR_PHYSMASK_SHIFT ==
+           if ( ((uint64_t) pa & phys_mask) >> MTRR_PHYSMASK_SHIFT ==
                 (phys_base & phys_mask) >> MTRR_PHYSMASK_SHIFT )
            {
                if ( unlikely(m->overlapped) )
@@ -441,7 +444,7 @@ static unsigned char get_mtrr_type(struct mtrr_state *m, paddr_t pa)
    if ( unlikely(overlap_mtrr == 0) )
        return m->def_type;
 
-   if ( likely(!(overlap_mtrr & ~( ((u8)1) << overlap_mtrr_pos ))) )
+   if ( likely(!(overlap_mtrr & ~( ((uint8_t)1) << overlap_mtrr_pos ))) )
        /* Covers both one variable memory range matches and
         * two or more identical match.
         */
@@ -450,7 +453,7 @@ static unsigned char get_mtrr_type(struct mtrr_state *m, paddr_t pa)
    if ( overlap_mtrr & 0x1 )
        /* Two or more match, one is UC. */
        return MTRR_TYPE_UNCACHABLE;
-   
+
    if ( !(overlap_mtrr & 0xaf) )
        /* Two or more match, WT and WB. */
        return MTRR_TYPE_WRTHROUGH;
@@ -464,9 +467,9 @@ static unsigned char get_mtrr_type(struct mtrr_state *m, paddr_t pa)
  * NOTE: valid only when paging is enabled.
  *       Only 4K page PTE is supported now.
  */
-static unsigned char page_pat_type(u64 pat_cr, unsigned long pte_flags)
+static uint8_t page_pat_type(uint64_t pat_cr, uint32_t pte_flags)
 {
-    int pat_entry;
+    int32_t pat_entry;
 
     /* PCD/PWT -> bit 1/0 of PAT entry */
     pat_entry = ( pte_flags >> 3 ) & 0x3;
@@ -474,19 +477,18 @@ static unsigned char page_pat_type(u64 pat_cr, unsigned long pte_flags)
     if ( pte_flags & _PAGE_PAT )
         pat_entry |= 4;
 
-    return (unsigned char)pat_cr_2_paf(pat_cr, pat_entry);
+    return (uint8_t)pat_cr_2_paf(pat_cr, pat_entry);
 }
 
 /*
  * Effective memory type for leaf page.
  */
-static u8 effective_mm_type(
-        struct mtrr_state *m,
-        u64 pat,
-        paddr_t gpa,
-        unsigned long pte_flags)
+static uint8_t effective_mm_type(struct mtrr_state *m,
+                                 uint64_t pat,
+                                 paddr_t gpa,
+                                 uint32_t pte_flags)
 {
-    unsigned char mtrr_mtype, pat_value, effective;
+    uint8_t mtrr_mtype, pat_value, effective;
 
     mtrr_mtype = get_mtrr_type(m, gpa);
 
@@ -499,7 +501,7 @@ static u8 effective_mm_type(
 
 static void init_mtrr_epat_tbl(void)
 {
-    int i, j;
+    int32_t i, j;
     /* set default value to an invalid type, just for checking conflict */
     memset(&mtrr_epat_tbl, INVALID_MEM_TYPE, sizeof(mtrr_epat_tbl));
 
@@ -507,22 +509,22 @@ static void init_mtrr_epat_tbl(void)
     {
         for ( j = 0; j < PAT_TYPE_NUMS; j++ )
         {
-            int tmp = mm_type_tbl[i][j];
+            int32_t tmp = mm_type_tbl[i][j];
             if ( (tmp >= 0) && (tmp < MEMORY_NUM_TYPES) )
                 mtrr_epat_tbl[i][tmp] = j;
         }
     }
 }
 
-u32 get_pat_flags(struct vcpu *v,
-                  u32 gl1e_flags,
-                  paddr_t gpaddr,
-                  paddr_t spaddr)
+uint32_t get_pat_flags(struct vcpu *v,
+                       uint32_t gl1e_flags,
+                       paddr_t gpaddr,
+                       paddr_t spaddr)
 {
-    u8 guest_eff_mm_type;
-    u8 shadow_mtrr_type;
-    u8 pat_entry_value;
-    u64 pat = v->arch.hvm_vcpu.pat_cr;
+    uint8_t guest_eff_mm_type;
+    uint8_t shadow_mtrr_type;
+    uint8_t pat_entry_value;
+    uint64_t pat = v->arch.hvm_vcpu.pat_cr;
     struct mtrr_state *g = &v->arch.hvm_vcpu.mtrr;
 
     /* 1. Get the effective memory type of guest physical address,
@@ -555,10 +557,10 @@ u32 get_pat_flags(struct vcpu *v,
 }
 
 /* Helper funtions for seting mtrr/pat */
-bool_t pat_msr_set(u64 *pat, u64 msr_content)
+bool_t pat_msr_set(uint64_t *pat, uint64_t msr_content)
 {
-    u8 *value = (u8*)&msr_content;
-    int i;
+    uint8_t *value = (uint8_t*)&msr_content;
+    int32_t i;
 
     if ( *pat != msr_content )
     {
@@ -574,10 +576,10 @@ bool_t pat_msr_set(u64 *pat, u64 msr_content)
     return 1;
 }
 
-bool_t mtrr_def_type_msr_set(struct mtrr_state *m, u64 msr_content)
+bool_t mtrr_def_type_msr_set(struct mtrr_state *m, uint64_t msr_content)
 {
-    u8 def_type = msr_content & 0xff;
-    u8 enabled = (msr_content >> 10) & 0x3;
+    uint8_t def_type = msr_content & 0xff;
+    uint8_t enabled = (msr_content >> 10) & 0x3;
 
     if ( unlikely(!(def_type == 0 || def_type == 1 || def_type == 4 ||
                     def_type == 5 || def_type == 6)) )
@@ -599,14 +601,15 @@ bool_t mtrr_def_type_msr_set(struct mtrr_state *m, u64 msr_content)
     return 1;
 }
 
-bool_t mtrr_fix_range_msr_set(struct mtrr_state *m, int row, u64 msr_content)
+bool_t mtrr_fix_range_msr_set(struct mtrr_state *m, uint32_t row,
+                              uint64_t msr_content)
 {
-    u64 *fixed_range_base = (u64 *)m->fixed_ranges;
+    uint64_t *fixed_range_base = (uint64_t *)m->fixed_ranges;
 
     if ( fixed_range_base[row] != msr_content )
     {
-        u8 *range = (u8*)&msr_content;
-        int i, type;
+        uint8_t *range = (uint8_t*)&msr_content;
+        int32_t i, type;
 
         for ( i = 0; i < 8; i++ )
         {
@@ -622,17 +625,18 @@ bool_t mtrr_fix_range_msr_set(struct mtrr_state *m, int row, u64 msr_content)
     return 1;
 }
 
-bool_t mtrr_var_range_msr_set(struct mtrr_state *m, u32 msr, u64 msr_content)
+bool_t mtrr_var_range_msr_set(struct mtrr_state *m, uint32_t msr,
+                              uint64_t msr_content)
 {
-    u32 index;
-    u64 msr_mask;
-    u64 *var_range_base = (u64*)m->var_ranges;
+    uint32_t index;
+    uint64_t msr_mask;
+    uint64_t *var_range_base = (uint64_t*)m->var_ranges;
 
     index = msr - MSR_IA32_MTRR_PHYSBASE0;
 
     if ( var_range_base[index] != msr_content )
     {
-        u32 type = msr_content & 0xff;
+        uint32_t type = msr_content & 0xff;
 
         msr_mask = (index & 1) ? phys_mask_msr_mask : phys_base_msr_mask;
 
@@ -659,8 +663,8 @@ bool_t mtrr_pat_not_equal(struct vcpu *vd, struct vcpu *vs)
 {
     struct mtrr_state *md = &vd->arch.hvm_vcpu.mtrr;
     struct mtrr_state *ms = &vs->arch.hvm_vcpu.mtrr;
-    int res;
-    u8 num_var_ranges = (u8)md->mtrr_cap;
+    int32_t res;
+    uint8_t num_var_ranges = (uint8_t)md->mtrr_cap;
 
     /* Test fixed ranges. */
     res = memcmp(md->fixed_ranges, ms->fixed_ranges,
@@ -708,10 +712,10 @@ void hvm_destroy_cacheattr_region_list(
     }
 }
 
-int hvm_get_mem_pinned_cacheattr(
+int32_t hvm_get_mem_pinned_cacheattr(
     struct domain *d,
-    unsigned long guest_fn,
-    unsigned int *type)
+    uint64_t guest_fn,
+    uint32_t *type)
 {
     struct hvm_mem_pinned_cacheattr_range *range;
 
@@ -734,11 +738,11 @@ int hvm_get_mem_pinned_cacheattr(
     return 0;
 }
 
-int hvm_set_mem_pinned_cacheattr(
+int32_t hvm_set_mem_pinned_cacheattr(
     struct domain *d,
-    unsigned long gfn_start,
-    unsigned long gfn_end,
-    unsigned int  type)
+    uint64_t gfn_start,
+    uint64_t gfn_end,
+    uint32_t  type)
 {
     struct hvm_mem_pinned_cacheattr_range *range;
 

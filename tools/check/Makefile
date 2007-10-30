@@ -7,7 +7,7 @@ all: build
 # Check this machine is OK for building on.
 .PHONY: build
 build:
-	XENFB_TOOLS=$(XENFB_TOOLS) LIBXENAPI_BINDINGS=$(LIBXENAPI_BINDINGS) ACM_SECURITY=$(ACM_SECURITY) ./chk build
+	LIBXENAPI_BINDINGS=$(LIBXENAPI_BINDINGS) ACM_SECURITY=$(ACM_SECURITY) ./chk build
 
 # Check this machine is OK for installing on.
 # DO NOT use this check from 'make install' in the parent
@@ -15,7 +15,7 @@ build:
 # copy rather than actually installing.
 .PHONY: install
 install:
-	XENFB_TOOLS=$(XENFB_TOOLS) LIBXENAPI_BINDINGS=$(LIBXENAPI_BINDINGS) ACM_SECURITY=$(ACM_SECURITY) ./chk install
+	LIBXENAPI_BINDINGS=$(LIBXENAPI_BINDINGS) ACM_SECURITY=$(ACM_SECURITY) ./chk install
 
 .PHONY: clean
 clean:

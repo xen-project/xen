@@ -777,16 +777,18 @@ static xen_pfn_t *map_and_save_p2m_table(int xc_handle,
      */
     {
         unsigned long signature = ~0UL;
-        uint32_t chunk_sz = ((guest_width==8) 
-                             ? sizeof(ctxt.x64) 
-                             : sizeof(ctxt.x32));
-        uint32_t tot_sz   = chunk_sz + 8;
-        char chunk_sig[]  = "vcpu";
+        uint32_t chunk1_sz = ((guest_width==8) 
+                              ? sizeof(ctxt.x64) 
+                              : sizeof(ctxt.x32));
+        uint32_t chunk2_sz = 0;
+        uint32_t tot_sz    = (chunk1_sz + 8) + (chunk2_sz + 8);
         if ( !write_exact(io_fd, &signature, sizeof(signature)) ||
-             !write_exact(io_fd, &tot_sz,    sizeof(tot_sz)) ||
-             !write_exact(io_fd, &chunk_sig, 4) ||
-             !write_exact(io_fd, &chunk_sz,  sizeof(chunk_sz)) ||
-             !write_exact(io_fd, &ctxt,      chunk_sz) )
+             !write_exact(io_fd, &tot_sz, sizeof(tot_sz)) ||
+             !write_exact(io_fd, "vcpu", 4) ||
+             !write_exact(io_fd, &chunk1_sz, sizeof(chunk1_sz)) ||
+             !write_exact(io_fd, &ctxt, chunk1_sz) ||
+             !write_exact(io_fd, "extv", 4) ||
+             !write_exact(io_fd, &chunk2_sz, sizeof(chunk2_sz)) )
         {
             ERROR("write: extended info");
             goto out;
@@ -830,6 +832,7 @@ int xc_domain_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
                    void (*qemu_flip_buffer)(int, int))
 {
     xc_dominfo_t info;
+    DECLARE_DOMCTL;
 
     int rc = 1, frc, i, j, last_iter, iter = 0;
     int live  = (flags & XCFLAGS_LIVE);
@@ -1095,7 +1098,6 @@ int xc_domain_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
         while ( N < p2m_size )
         {
             unsigned int this_pc = (N * 100) / p2m_size;
-            int rc;
 
             if ( (this_pc - prev_pc) >= 5 )
             {
@@ -1107,10 +1109,10 @@ int xc_domain_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
             {
                 /* Slightly wasteful to peek the whole array evey time,
                    but this is fast enough for the moment. */
-                rc = xc_shadow_control(
+                frc = xc_shadow_control(
                     xc_handle, dom, XEN_DOMCTL_SHADOW_OP_PEEK, to_skip, 
                     p2m_size, NULL, 0, NULL);
-                if ( rc != p2m_size )
+                if ( frc != p2m_size )
                 {
                     ERROR("Error peeking shadow bitmap");
                     goto out;
@@ -1599,6 +1601,20 @@ int xc_domain_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
                                          : sizeof(ctxt.x32))) )
         {
             ERROR("Error when writing to state file (1) (errno %d)", errno);
+            goto out;
+        }
+
+        domctl.cmd = XEN_DOMCTL_get_ext_vcpucontext;
+        domctl.domain = dom;
+        domctl.u.ext_vcpucontext.vcpu = i;
+        if ( xc_domctl(xc_handle, &domctl) < 0 )
+        {
+            ERROR("No extended context for VCPU%d", i);
+            goto out;
+        }
+        if ( !write_exact(io_fd, &domctl.u.ext_vcpucontext, 128) )
+        {
+            ERROR("Error when writing to state file (2) (errno %d)", errno);
             goto out;
         }
     }

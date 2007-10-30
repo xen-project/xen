@@ -1,9 +1,6 @@
 XEN_LINUX_MIRROR ?= http://www.kernel.org/pub/linux/kernel/v2.6/
 XEN_LINUX_TARBALL ?= linux-$(LINUX_VER)-xen.tar.bz2
 
-# Update using ketchup instead of manipulating tarball manually.
-XEN_LINUX_TARBALL_KETCHUP ?= n
-
 LINUX_SRCDIR ?= linux-$(LINUX_VER)
 
 KETCHUP ?= python buildconfigs/ketchup
@@ -17,17 +14,6 @@ linux-%.tar.bz2:
 
 # XXX create a pristine tree for diff -Nurp convenience
 
-ifeq ($(XEN_LINUX_TARBALL_KETCHUP),y)
 %/.valid-src: $(__XEN_LINUX_UPDATE)
 	$(KETCHUP) -d $(@D) $(LINUX_VER)
 	touch $@ # update timestamp to avoid rebuild
-else
-%/.valid-src: $(__XEN_LINUX_UPDATE) %.tar.bz2
-	rm -rf tmp-linux-$* $(@D)
-	mkdir -p tmp-linux-$*
-	tar -C tmp-linux-$* -jxf $<
-	-@rm -f tmp-linux-$*/pax_global_header
-	mv tmp-linux-$*/* $(@D)
-	@rm -rf tmp-linux-$*
-	touch $@ # update timestamp to avoid rebuild
-endif

@@ -168,6 +168,10 @@ trampoline_boot_cpu_entry:
         /* Disable irqs before returning to protected mode. */
         cli
 
+        /* Reset GDT and IDT. Some BIOSes clobber GDTR. */
+        lidt    bootsym(idt_48)
+        lgdt    bootsym(gdt_48)
+
         /* Enter protected mode, and flush insn queue. */
         xor     %ax,%ax
         inc     %ax

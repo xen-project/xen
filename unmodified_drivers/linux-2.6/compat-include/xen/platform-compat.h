@@ -125,4 +125,12 @@ extern char *kasprintf(gfp_t gfp, const char *fmt, ...)
 #define DEFINE_RWLOCK(x) rwlock_t x = RW_LOCK_UNLOCKED
 #endif
 
+#if defined(_LINUX_INTERRUPT_H) && LINUX_VERSION_CODE < KERNEL_VERSION(2,6,19)
+typedef irqreturn_t (*irq_handler_t)(int, void *, struct pt_regs *);
+#endif
+
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,23)
+#define setup_xen_features xen_setup_features
+#endif
+
 #endif

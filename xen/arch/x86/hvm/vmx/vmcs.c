@@ -36,6 +36,7 @@
 #include <xen/kernel.h>
 #include <xen/keyhandler.h>
 #include <asm/shadow.h>
+#include <asm/tboot.h>
 
 /* Dynamic (run-time adjusted) execution control flags. */
 u32 vmx_pin_based_exec_control __read_mostly;
@@ -277,6 +278,13 @@ int vmx_cpu_up(void)
         wrmsr(IA32_FEATURE_CONTROL_MSR, eax, 0);
     }
 
+    if ( !tboot_in_measured_env() &&
+         !(eax & IA32_FEATURE_CONTROL_MSR_ENABLE_VMXON_OUTSIDE_SMX) )
+    {
+        printk("VMX only allowed in SMX but SMX not active.\n");
+        return 0;
+    }
+
     vmx_init_vmcs_config();
 
     INIT_LIST_HEAD(&this_cpu(active_vmcs_list));
@@ -498,7 +506,7 @@ static int construct_vmcs(struct vcpu *v)
 
     /* Host control registers. */
     __vmwrite(HOST_CR0, read_cr0() | X86_CR0_TS);
-    __vmwrite(HOST_CR4, read_cr4());
+    __vmwrite(HOST_CR4, mmu_cr4_features);
 
     /* Host CS:RIP. */
     __vmwrite(HOST_CS_SELECTOR, __HYPERVISOR_CS);

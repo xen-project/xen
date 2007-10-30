@@ -23,6 +23,7 @@ import base64
 import struct
 import sys
 import string
+import xen.util.xsm.xsm as security
 from xen.util import xsconstants
 from xen.util.acmpolicy import ACMPolicy
 from xen.xm.opts import OptionError
@@ -100,21 +101,22 @@ def setpolicy(policytype, policy_name, flags, overwrite, is_update=False):
                                                               flags,
                                                               overwrite)
         except Exception, e:
-            print "An error occurred setting the policy: %s" % str(e)
-            return
+            raise security.XSMError("An error occurred setting the "
+                                    "policy: %s" % str(e))
         xserr = int(policystate['xserr'])
         if xserr != 0:
-            print "An error occurred trying to set the policy: %s" % \
+            txt = "An error occurred trying to set the policy: %s." % \
                   xsconstants.xserr2string(abs(xserr))
             errors = policystate['errors']
             if len(errors) > 0:
-                print "Hypervisor reported errors:"
+                txt += "Hypervisor reported errors:"
                 err = base64.b64decode(errors)
                 i = 0
                 while i + 7 < len(err):
                     code, data = struct.unpack("!ii", errors[i:i+8])
-                    print "(0x%08x, 0x%08x)" % (code, data)
+                    txt += "(0x%08x, 0x%08x)" % (code, data)
                     i += 8
+            raise security.XSMError(txt)
         else:
             print "Successfully set the new policy."
 

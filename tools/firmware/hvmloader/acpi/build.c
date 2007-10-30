@@ -226,7 +226,7 @@ static int construct_processor_objects(uint8_t *buf)
     }
 
     /* NameString */
-    strncpy(p, pr_scope, strlen(pr_scope));
+    strncpy((char *)p, pr_scope, strlen(pr_scope));
     p += strlen(pr_scope);
 
     /*

@@ -17,7 +17,7 @@
 #============================================================================
 
 
-import os, string
+import os, os.path, string
 import re
 import math
 import time
@@ -31,6 +31,7 @@ from xen.xend.XendOptions import instance as xenopts
 from xen.xend.xenstore.xstransact import xstransact
 from xen.xend.xenstore.xswatch import xswatch
 from xen.xend import arch
+from xen.xend import XendOptions
 
 xc = xen.lowlevel.xc.xc()
 
@@ -56,10 +57,9 @@ class ImageHandler:
     defining in a subclass.
 
     The method createDeviceModel() is called to create the domain device
-    model if it needs one.  The default is to do nothing.
+    model.
 
-    The method destroy() is called when the domain is destroyed.
-    The default is to do nothing.
+    The method destroyDeviceModel() is called to reap the device model
     """
 
     ostype = None
@@ -90,6 +90,15 @@ class ImageHandler:
                         ("image/kernel", self.kernel),
                         ("image/cmdline", self.cmdline),
                         ("image/ramdisk", self.ramdisk))
+
+        self.dmargs = self.parseDeviceModelArgs(vmConfig)
+        self.device_model = vmConfig['platform'].get('device_model')
+
+        self.display = vmConfig['platform'].get('display')
+        self.xauthority = vmConfig['platform'].get('xauthority')
+        self.vncconsole = vmConfig['platform'].get('vncconsole')
+        self.pid = None
+
 
 
     def cleanupBootloading(self):
@@ -173,25 +182,158 @@ class ImageHandler:
         """Build the domain. Define in subclass."""
         raise NotImplementedError()
 
+    # Return a list of cmd line args to the device models based on the
+    # xm config file
+    def parseDeviceModelArgs(self, vmConfig):
+        ret = ["-domain-name", str(self.vm.info['name_label'])]
+
+        # Find RFB console device, and if it exists, make QEMU enable
+        # the VNC console.
+        if int(vmConfig['platform'].get('nographic', 0)) != 0:
+            # skip vnc init if nographic is set
+            ret.append('-nographic')
+            return ret
+
+        vnc_config = {}
+        has_vnc = int(vmConfig['platform'].get('vnc', 0)) != 0
+        has_sdl = int(vmConfig['platform'].get('sdl', 0)) != 0
+        for dev_uuid in vmConfig['console_refs']:
+            dev_type, dev_info = vmConfig['devices'][dev_uuid]
+            if dev_type == 'vfb':
+                vnc_config = dev_info.get('other_config', {})
+                has_vnc = True
+                break
+
+        keymap = vmConfig['platform'].get("keymap")
+        if keymap:
+            ret.append("-k")
+            ret.append(keymap)
+
+        if has_vnc:
+            if not vnc_config:
+                for key in ('vncunused', 'vnclisten', 'vncdisplay',
+                            'vncpasswd'):
+                    if key in vmConfig['platform']:
+                        vnc_config[key] = vmConfig['platform'][key]
+            if vnc_config.has_key("vncpasswd"):
+                passwd = vnc_config["vncpasswd"]
+            else:
+                passwd = XendOptions.instance().get_vncpasswd_default()
+            vncopts = ""
+            if passwd:
+                self.vm.storeVm("vncpasswd", passwd)
+                vncopts = vncopts + ",password"
+                log.debug("Stored a VNC password for vfb access")
+            else:
+                log.debug("No VNC passwd configured for vfb access")
+
+            if XendOptions.instance().get_vnc_tls():
+                vncx509certdir = XendOptions.instance().get_vnc_x509_cert_dir()
+                vncx509verify = XendOptions.instance().get_vnc_x509_verify()
+
+                if not os.path.exists(vncx509certdir):
+                    raise VmError("VNC x509 certificate dir %s does not exist" % vncx509certdir)
+
+                if vncx509verify:
+                    vncopts = vncopts + ",tls,x509verify=%s" % vncx509certdir
+                else:
+                    vncopts = vncopts + ",tls,x509=%s" % vncx509certdir
+
+
+            vnclisten = vnc_config.get('vnclisten',
+                                       XendOptions.instance().get_vnclisten_address())
+            vncdisplay = vnc_config.get('vncdisplay', 0)
+            ret.append('-vnc')
+            ret.append("%s:%s%s" % (vnclisten, vncdisplay, vncopts))
+
+            if vnc_config.get('vncunused', 0):
+                ret.append('-vncunused')
+
+        elif has_sdl:
+            # SDL is default in QEMU.
+            pass
+        else:
+            ret.append('-nographic')
+
+        if int(vmConfig['platform'].get('monitor', 0)) != 0:
+            ret = ret + ['-monitor', 'vc']
+        return ret
+
+    def getDeviceModelArgs(self, restore = False):
+        args = [self.device_model]
+        args = args + ([ "-d",  "%d" % self.vm.getDomid() ])
+        args = args + self.dmargs
+        return args
+
     def createDeviceModel(self, restore = False):
-        """Create device model for the domain (define in subclass if needed)."""
-        pass
-    
+        if self.device_model is None:
+            return
+        if self.pid:
+            return
+        # Execute device model.
+        #todo: Error handling
+        args = self.getDeviceModelArgs(restore)
+        env = dict(os.environ)
+        if self.display:
+            env['DISPLAY'] = self.display
+        if self.xauthority:
+            env['XAUTHORITY'] = self.xauthority
+        if self.vncconsole:
+            args = args + ([ "-vncviewer" ])
+        log.info("spawning device models: %s %s", self.device_model, args)
+        # keep track of pid and spawned options to kill it later
+        self.pid = os.spawnve(os.P_NOWAIT, self.device_model, args, env)
+        self.vm.storeDom("image/device-model-pid", self.pid)
+        log.info("device model pid: %d", self.pid)
+
     def saveDeviceModel(self):
-        """Save device model for the domain (define in subclass if needed)."""
-        pass
+        if self.device_model is None:
+            return
+        # Signal the device model to pause itself and save its state
+        xstransact.Store("/local/domain/0/device-model/%i"
+                         % self.vm.getDomid(), ('command', 'save'))
+        # Wait for confirmation.  Could do this with a watch but we'd
+        # still end up spinning here waiting for the watch to fire. 
+        state = ''
+        count = 0
+        while state != 'paused':
+            state = xstransact.Read("/local/domain/0/device-model/%i/state"
+                                    % self.vm.getDomid())
+            time.sleep(0.1)
+            count += 1
+            if count > 100:
+                raise VmError('Timed out waiting for device model to save')
 
     def resumeDeviceModel(self):
-        """Unpause device model for the domain (define in subclass if needed)."""
-        pass
-
-    def destroy(self):
-        """Extra cleanup on domain destroy (define in subclass if needed)."""
-        pass
-
+        if self.device_model is None:
+            return
+        # Signal the device model to resume activity after pausing to save.
+        xstransact.Store("/local/domain/0/device-model/%i"
+                         % self.vm.getDomid(), ('command', 'continue'))
 
     def recreate(self):
-        pass
+        if self.device_model is None:
+            return
+        self.pid = self.vm.gatherDom(('image/device-model-pid', int))
+
+    def destroyDeviceModel(self):
+        if self.device_model is None:
+            return
+        if self.pid:
+            try:
+                os.kill(self.pid, signal.SIGKILL)
+            except OSError, exn:
+                log.exception(exn)
+            try:
+                os.waitpid(self.pid, 0)
+            except OSError, exn:
+                # This is expected if Xend has been restarted within the
+                # life of this domain.  In this case, we can kill the process,
+                # but we can't wait for it because it's not our child.
+                pass
+            self.pid = None
+            state = xstransact.Remove("/local/domain/0/device-model/%i"
+                                      % self.vm.getDomid())
 
 
 class LinuxImageHandler(ImageHandler):
@@ -229,6 +371,19 @@ class LinuxImageHandler(ImageHandler):
                               flags          = self.flags,
                               vhpt           = self.vhpt)
 
+    def parseDeviceModelArgs(self, vmConfig):
+        ret = ImageHandler.parseDeviceModelArgs(self, vmConfig)
+        # Equivalent to old xenconsoled behaviour. Should make
+        # it configurable in future
+        ret = ret + ["-serial", "pty"]
+        return ret
+
+    def getDeviceModelArgs(self, restore = False):
+        args = ImageHandler.getDeviceModelArgs(self, restore)
+        args = args + ([ "-M", "xenpv"])
+        return args
+
+
 class PPC_LinuxImageHandler(LinuxImageHandler):
 
     ostype = "linux"
@@ -262,15 +417,6 @@ class HVMImageHandler(ImageHandler):
         if 'hvm' not in info['xen_caps']:
             raise HVMRequired()
 
-        self.dmargs = self.parseDeviceModelArgs(vmConfig)
-        self.device_model = vmConfig['platform'].get('device_model')
-        if not self.device_model:
-            raise VmError("hvm: missing device model")
-        
-        self.display = vmConfig['platform'].get('display')
-        self.xauthority = vmConfig['platform'].get('xauthority')
-        self.vncconsole = vmConfig['platform'].get('vncconsole')
-
         rtc_timeoffset = vmConfig['platform'].get('rtc_timeoffset')
 
         self.vm.storeVm(("image/dmargs", " ".join(self.dmargs)),
@@ -278,49 +424,18 @@ class HVMImageHandler(ImageHandler):
                         ("image/display", self.display))
         self.vm.storeVm(("rtc/timeoffset", rtc_timeoffset))
 
-        self.pid = None
-
         self.apic = int(vmConfig['platform'].get('apic', 0))
         self.acpi = int(vmConfig['platform'].get('acpi', 0))
-        
-
-    def buildDomain(self):
-        store_evtchn = self.vm.getStorePort()
-
-        mem_mb = self.getRequiredInitialReservation() / 1024
-
-        log.debug("domid          = %d", self.vm.getDomid())
-        log.debug("image          = %s", self.kernel)
-        log.debug("store_evtchn   = %d", store_evtchn)
-        log.debug("memsize        = %d", mem_mb)
-        log.debug("vcpus          = %d", self.vm.getVCpuCount())
-        log.debug("acpi           = %d", self.acpi)
-        log.debug("apic           = %d", self.apic)
-
-        rc = xc.hvm_build(domid          = self.vm.getDomid(),
-                          image          = self.kernel,
-                          memsize        = mem_mb,
-                          vcpus          = self.vm.getVCpuCount(),
-                          acpi           = self.acpi,
-                          apic           = self.apic)
-
-        rc['notes'] = { 'SUSPEND_CANCEL': 1 }
-
-        rc['store_mfn'] = xc.hvm_get_param(self.vm.getDomid(),
-                                           HVM_PARAM_STORE_PFN)
-        xc.hvm_set_param(self.vm.getDomid(), HVM_PARAM_STORE_EVTCHN,
-                         store_evtchn)
-
-        return rc
 
     # Return a list of cmd line args to the device models based on the
     # xm config file
     def parseDeviceModelArgs(self, vmConfig):
+        ret = ImageHandler.parseDeviceModelArgs(self, vmConfig)
+        ret = ret + ['-vcpus', str(self.vm.getVCpuCount())]
+
         dmargs = [ 'boot', 'fda', 'fdb', 'soundhw',
                    'localtime', 'serial', 'stdvga', 'isa',
-                   'acpi', 'usb', 'usbdevice', 'keymap', 'pci' ]
-        
-        ret = ['-vcpus', str(self.vm.getVCpuCount())]
+                   'acpi', 'usb', 'usbdevice', 'pci' ]
 
         for a in dmargs:
             v = vmConfig['platform'].get(a)
@@ -349,7 +464,6 @@ class HVMImageHandler(ImageHandler):
 
         # Handle disk/network related options
         mac = None
-        ret = ret + ["-domain-name", str(self.vm.info['name_label'])]
         nics = 0
         
         for devuuid in vmConfig['vbd_refs']:
@@ -378,130 +492,43 @@ class HVMImageHandler(ImageHandler):
             ret.append("-net")
             ret.append("tap,vlan=%d,bridge=%s" % (nics, bridge))
 
-
-        #
-        # Find RFB console device, and if it exists, make QEMU enable
-        # the VNC console.
-        #
-        if int(vmConfig['platform'].get('nographic', 0)) != 0:
-            # skip vnc init if nographic is set
-            ret.append('-nographic')
-            return ret
-
-        vnc_config = {}
-        has_vnc = int(vmConfig['platform'].get('vnc', 0)) != 0
-        has_sdl = int(vmConfig['platform'].get('sdl', 0)) != 0
-        for dev_uuid in vmConfig['console_refs']:
-            dev_type, dev_info = vmConfig['devices'][dev_uuid]
-            if dev_type == 'vfb':
-                vnc_config = dev_info.get('other_config', {})
-                has_vnc = True
-                break
-
-        if has_vnc:
-            if not vnc_config:
-                for key in ('vncunused', 'vnclisten', 'vncdisplay',
-                            'vncpasswd'):
-                    if key in vmConfig['platform']:
-                        vnc_config[key] = vmConfig['platform'][key]
-
-            vnclisten = vnc_config.get('vnclisten',
-                                       xenopts().get_vnclisten_address())
-            vncdisplay = vnc_config.get('vncdisplay', 0)
-            ret.append('-vnc')
-            ret.append("%s:%d" % (vnclisten, vncdisplay))
-            
-            if vnc_config.get('vncunused', 0):
-                ret.append('-vncunused')
-
-            # Store vncpassword in xenstore
-            vncpasswd = vnc_config.get('vncpasswd')
-            if not vncpasswd:
-                vncpasswd = xenopts().get_vncpasswd_default()
-
-            if vncpasswd is None:
-                raise VmError('vncpasswd is not setup in vmconfig or '
-                              'xend-config.sxp')
-
-            if vncpasswd != '':
-                self.vm.storeVm('vncpasswd', vncpasswd)
-        elif has_sdl:
-            # SDL is default in QEMU.
-            pass
-        else:
-            ret.append('-nographic')
-
-        if int(vmConfig['platform'].get('monitor', 0)) != 0:
-            ret = ret + ['-monitor', 'vc']
         return ret
 
-    def createDeviceModel(self, restore = False):
-        if self.pid:
-            return
-        # Execute device model.
-        #todo: Error handling
-        args = [self.device_model]
-        args = args + ([ "-d",  "%d" % self.vm.getDomid() ])
-        if arch.type == "ia64":
-            args = args + ([ "-m", "%s" %
-                             (self.getRequiredInitialReservation() / 1024) ])
-        args = args + self.dmargs
+    def getDeviceModelArgs(self, restore = False):
+        args = ImageHandler.getDeviceModelArgs(self, restore)
+        args = args + ([ "-M", "xenfv"])
         if restore:
             args = args + ([ "-loadvm", "/var/lib/xen/qemu-save.%d" %
                              self.vm.getDomid() ])
-        env = dict(os.environ)
-        if self.display:
-            env['DISPLAY'] = self.display
-        if self.xauthority:
-            env['XAUTHORITY'] = self.xauthority
-        if self.vncconsole:
-            args = args + ([ "-vncviewer" ])
-        log.info("spawning device models: %s %s", self.device_model, args)
-        # keep track of pid and spawned options to kill it later
-        self.pid = os.spawnve(os.P_NOWAIT, self.device_model, args, env)
-        self.vm.storeDom("image/device-model-pid", self.pid)
-        log.info("device model pid: %d", self.pid)
+        return args
 
-    def saveDeviceModel(self):
-        # Signal the device model to pause itself and save its state
-        xstransact.Store("/local/domain/0/device-model/%i"
-                         % self.vm.getDomid(), ('command', 'save'))
-        # Wait for confirmation.  Could do this with a watch but we'd
-        # still end up spinning here waiting for the watch to fire. 
-        state = ''
-        count = 0
-        while state != 'paused':
-            state = xstransact.Read("/local/domain/0/device-model/%i/state"
-                                    % self.vm.getDomid())
-            time.sleep(0.1)
-            count += 1
-            if count > 100:
-                raise VmError('Timed out waiting for device model to save')
+    def buildDomain(self):
+        store_evtchn = self.vm.getStorePort()
 
-    def resumeDeviceModel(self):
-        # Signal the device model to resume activity after pausing to save.
-        xstransact.Store("/local/domain/0/device-model/%i"
-                         % self.vm.getDomid(), ('command', 'continue'))
+        mem_mb = self.getRequiredInitialReservation() / 1024
 
-    def recreate(self):
-        self.pid = self.vm.gatherDom(('image/device-model-pid', int))
+        log.debug("domid          = %d", self.vm.getDomid())
+        log.debug("image          = %s", self.kernel)
+        log.debug("store_evtchn   = %d", store_evtchn)
+        log.debug("memsize        = %d", mem_mb)
+        log.debug("vcpus          = %d", self.vm.getVCpuCount())
+        log.debug("acpi           = %d", self.acpi)
+        log.debug("apic           = %d", self.apic)
 
-    def destroy(self, suspend = False):
-        if self.pid and not suspend:
-            try:
-                os.kill(self.pid, signal.SIGKILL)
-            except OSError, exn:
-                log.exception(exn)
-            try:
-                os.waitpid(self.pid, 0)
-            except OSError, exn:
-                # This is expected if Xend has been restarted within the
-                # life of this domain.  In this case, we can kill the process,
-                # but we can't wait for it because it's not our child.
-                pass
-            self.pid = None
-            state = xstransact.Remove("/local/domain/0/device-model/%i"
-                                      % self.vm.getDomid())
+        rc = xc.hvm_build(domid          = self.vm.getDomid(),
+                          image          = self.kernel,
+                          memsize        = mem_mb,
+                          vcpus          = self.vm.getVCpuCount(),
+                          acpi           = self.acpi,
+                          apic           = self.apic)
+        rc['notes'] = { 'SUSPEND_CANCEL': 1 }
+
+        rc['store_mfn'] = xc.hvm_get_param(self.vm.getDomid(),
+                                           HVM_PARAM_STORE_PFN)
+        xc.hvm_set_param(self.vm.getDomid(), HVM_PARAM_STORE_EVTCHN,
+                         store_evtchn)
+
+        return rc
 
 
 class IA64_HVM_ImageHandler(HVMImageHandler):
@@ -528,6 +555,13 @@ class IA64_HVM_ImageHandler(HVMImageHandler):
     def getRequiredShadowMemory(self, shadow_mem_kb, maxmem_kb):
         # Explicit shadow memory is not a concept 
         return 0
+
+    def getDeviceModelArgs(self, restore = False):
+        args = HVMImageHandler.getDeviceModelArgs(self, restore)
+        args = args + ([ "-m", "%s" %
+                         (self.getRequiredInitialReservation() / 1024) ])
+        return args
+
 
 class IA64_Linux_ImageHandler(LinuxImageHandler):
 

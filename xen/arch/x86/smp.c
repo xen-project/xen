@@ -86,6 +86,12 @@ static inline void check_IPI_mask(cpumask_t cpumask)
     ASSERT(!cpus_empty(cpumask));
 }
 
+void apic_wait_icr_idle(void)
+{
+	while ( apic_read( APIC_ICR ) & APIC_ICR_BUSY )
+		cpu_relax();
+}
+
 void send_IPI_mask_flat(cpumask_t cpumask, int vector)
 {
     unsigned long mask = cpus_addr(cpumask)[0];

@@ -45,6 +45,8 @@ int xsm_policy_init(unsigned int *initrdidx, const multiboot_info_t *mbi,
         _policy_start = (u32 *)start;
 #elif defined(__x86_64__)
         _policy_start = maddr_to_virt(start);
+#else
+        _policy_start = NULL;
 #endif
         _policy_len   = mod[i].mod_end - mod[i].mod_start;
 

@@ -1,13 +1,13 @@
-#############################
- __  __            _____  _ 
- \ \/ /___ _ __   |___ / / |
-  \  // _ \ '_ \    |_ \ | |
-  /  \  __/ | | |  ___) || |
- /_/\_\___|_| |_| |____(_)_|
+#################################
+ __  __            _____  ____  
+ \ \/ /___ _ __   |___ / |___ \ 
+  \  // _ \ '_ \    |_ \   __) |
+  /  \  __/ | | |  ___) | / __/ 
+ /_/\_\___|_| |_| |____(_)_____|
+                                
+#################################
 
-#############################
-
-http://www.xensource.com/xen/about.html
+http://www.xen.org/
 
 What is Xen?
 ============
@@ -21,7 +21,7 @@ development community, spearheaded by XenSource Inc, a company created
 by the original Xen development team to build enterprise products
 around Xen.
 
-The 3.1 release offers excellent performance, hardware support and
+The 3.2 release offers excellent performance, hardware support and
 enterprise-grade features such as x86_32-PAE, x86_64, SMP guests and
 live relocation of VMs. This install tree contains source for a Linux
 2.6 guest; ports to Linux 2.4, NetBSD, FreeBSD and Solaris are
@@ -55,8 +55,8 @@ performed with root privileges.]
    /boot/grub/menu.lst: edit this file to include an entry like the
    following:
 
-    title Xen 3.1 / XenLinux 2.6
-       kernel /boot/xen-3.1.gz console=vga
+    title Xen 3.2 / XenLinux 2.6
+       kernel /boot/xen-3.2.gz console=vga
        module /boot/vmlinuz-2.6-xen root=<root-dev> ro console=tty0
        module /boot/initrd-2.6-xen.img
 
@@ -75,7 +75,7 @@ performed with root privileges.]
    32MB memory for internal use, which is not available for allocation
    to virtual machines.
 
-3. Reboot your system and select the "Xen 3.1 / XenLinux 2.6" menu
+3. Reboot your system and select the "Xen 3.2 / XenLinux 2.6" menu
    option. After booting Xen, Linux will start and your initialisation
    scripts should execute in the usual way.
 
@@ -202,3 +202,29 @@ Xend (the Xen daemon) has the following runtime dependencies:
     * For optional XenAPI support in XM, PyXML:
           URL:    http://pyxml.sourceforge.net
           YUM:    PyXML
+
+
+Intel(R) Trusted Execution Technology Support
+=============================================
+
+Intel's technology for safer computing, Intel(R) Trusted Execution Technology
+(Intel(R) TXT), defines platform-level enhancements that provide the building
+blocks for creating trusted platforms.  For more information, see
+http://www.intel.com/technology/security/.
+
+Intel(R) TXT support is provided by the Trusted Boot (tboot) module in
+conjunction with minimal logic in the Xen hypervisor.
+
+Tboot is an open source, pre- kernel/VMM module that uses Intel(R) TXT to
+perform a measured and verified launch of an OS kernel/VMM.
+
+The Trusted Boot module is available from
+http://sourceforge.net/projects/tboot.  This project hosts the code in a
+mercurial repo at http://tboot.sourceforge.net/hg/tboot.hg and contains
+tarballs of the source.  Instructions in the tboot README describe how
+to modify grub.conf to use tboot to launch Xen.
+
+There are optional targets as part of Xen's top-level makefile that will
+downlaod and build tboot: install-tboot, build-tboot, dist-tboot, clean-tboot.
+These will download the latest tar file from the SourceForge site using wget,
+then build/install/dist according to Xen's settings.

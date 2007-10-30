@@ -46,7 +46,7 @@ ACM_SIMPLE_TYPE_ENFORCEMENT_POLICY = 2
 ACM_POLICY_UNDEFINED = 15
 
 
-ACM_SCHEMA_FILE = "/etc/xen/acm-security/policies/security_policy.xsd"
+ACM_SCHEMA_FILE = ACM_POLICIES_DIR + "security_policy.xsd"
 
 ACM_LABEL_UNLABELED = "__UNLABELED__"
 ACM_LABEL_UNLABELED_DISPLAY = "unlabeled"
@@ -263,7 +263,7 @@ class ACMPolicy(XSPolicy):
         else:
             #Not loaded in HV
             self.dom = acmpol_new.dom
-            self.compile()
+            rc = self.compile()
         return rc, errors
 
 
@@ -842,9 +842,15 @@ class ACMPolicy(XSPolicy):
             rc, mapfile, bin_pol = self.policy_create_map_and_bin()
 
             if rc == 0:
-                rc = self.__write_to_file(".map", mapfile)
-                if rc != 0:
-                    log.error("Error writing map file")
+                try:
+                    security.mapfile_lock()
+
+                    rc = self.__write_to_file(".map", mapfile)
+                    if rc != 0:
+                        log.error("Error writing map file")
+
+                finally:
+                    security.mapfile_unlock()
 
             if rc == 0:
                 rc = self.__write_to_file(".bin", bin_pol)
@@ -919,7 +925,7 @@ class ACMPolicy(XSPolicy):
     def policy_get_domain_label_formatted(self, domid):
         label = self.policy_get_domain_label(domid)
         if label == "":
-            return ""
+            label = ACM_LABEL_UNLABELED
         return "%s:%s:%s" % (xsconstants.ACM_POLICY_ID, self.get_name(), label)
 
     def policy_get_domain_label_by_ssidref_formatted(self, ssidref):
@@ -941,6 +947,8 @@ class ACMPolicy(XSPolicy):
         secpolcode  = ACM_POLICY_UNDEFINED
         unknown_ste = set()
         unknown_chw = set()
+        unlabeled_ste = "__NULL_LABEL__"
+        unlabeled_chw = "__NULL_LABEL__"
 
         rc = self.validate()
         if rc:
@@ -979,6 +987,7 @@ class ACMPolicy(XSPolicy):
             vms_with_chws.sort()
 
         if ACM_LABEL_UNLABELED in vms_with_chws:
+            unlabeled_chw = ACM_LABEL_UNLABELED
             vms_with_chws.remove(ACM_LABEL_UNLABELED) ; # @1
 
         vms_with_stes = []
@@ -996,6 +1005,7 @@ class ACMPolicy(XSPolicy):
             vms_with_stes.sort()
 
         if ACM_LABEL_UNLABELED in vms_with_stes:
+            unlabeled_ste = ACM_LABEL_UNLABELED
             vms_with_stes.remove(ACM_LABEL_UNLABELED) ; # @2
 
         resnames = self.policy_get_resourcelabel_names()
@@ -1050,7 +1060,8 @@ class ACMPolicy(XSPolicy):
 
         if len(vms_with_chws) > 0:
             mapfile += \
-                 "LABEL->SSID ANY CHWALL __NULL_LABEL__       %x\n" % 0
+                 "LABEL->SSID ANY CHWALL %-20s %x\n" % \
+                 (unlabeled_chw, 0)
             i = 0
             for v in vms_with_chws:
                 mapfile += \
@@ -1061,7 +1072,8 @@ class ACMPolicy(XSPolicy):
 
         if len(vms_with_stes) > 0 or len(resnames) > 0:
             mapfile += \
-                 "LABEL->SSID ANY STE    __NULL_LABEL__       %08x\n" % 0
+                 "LABEL->SSID ANY STE    %-20s %08x\n" % \
+                 (unlabeled_ste, 0)
             i = 0
             for v in vms_with_stes:
                 mapfile += \
@@ -1260,9 +1272,11 @@ class ACMPolicy(XSPolicy):
         if len(unknown_ste) > 0:
             log.info("The following STEs in VM/res labels were unknown:" \
                      " %s" % list(unknown_ste))
+            rc = -xsconstants.XSERR_BAD_LABEL
         if len(unknown_chw) > 0:
             log.info("The following Ch. Wall types in labels were unknown:" \
                      " %s" % list(unknown_chw))
+            rc = -xsconstants.XSERR_BAD_LABEL
         return rc, mapfile, all_bin.tostring()
 
     def get_enforced_binary(self):

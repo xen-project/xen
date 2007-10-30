@@ -990,14 +990,16 @@ int __init construct_dom0(
             rc |= iomem_deny_access(dom0, mfn, mfn);
     }
 
-    /* Remove access to E820_UNUSABLE I/O regions. */
+    /* Remove access to E820_UNUSABLE I/O regions above 1MB. */
     for ( i = 0; i < e820.nr_map; i++ )
     {
-        if ( e820.map[i].type != E820_UNUSABLE)
-            continue;
-        mfn = paddr_to_pfn(e820.map[i].addr);
-        nr_pages = (e820.map[i].size + PAGE_SIZE - 1) >> PAGE_SHIFT;
-        rc |= iomem_deny_access(dom0, mfn, mfn + nr_pages - 1);
+        unsigned long sfn, efn;
+        sfn = max_t(unsigned long, paddr_to_pfn(e820.map[i].addr), 0x100ul);
+        efn = paddr_to_pfn(e820.map[i].addr + e820.map[i].size - 1);
+        if ( (e820.map[i].type == E820_UNUSABLE) &&
+             (e820.map[i].size != 0) &&
+             (sfn <= efn) )
+            rc |= iomem_deny_access(dom0, sfn, efn);
     }
 
     BUG_ON(rc != 0);

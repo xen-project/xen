@@ -22,8 +22,8 @@
 
 #include <xen/init.h>
 #include <xen/types.h>
+#include <xen/list.h>
 #include <xen/spinlock.h>
-#include <xen/mm.h>
 #include <asm/hvm/svm/amd-iommu-defs.h>
 
 #define iommu_found()           (!list_empty(&amd_iommu_head))

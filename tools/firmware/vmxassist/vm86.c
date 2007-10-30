@@ -33,6 +33,7 @@
 #define	SEG_SS		0x0020
 #define	SEG_FS		0x0040
 #define	SEG_GS		0x0080
+#define REP		0x0100
 
 static unsigned prev_eip = 0;
 enum vm86_mode mode = 0;
@@ -656,6 +657,108 @@ movr(struct regs *regs, unsigned prefix, unsigned opc)
 }
 
 /*
+ * We need to handle string moves that address memory beyond the 64KB segment
+ * limit that VM8086 mode enforces.
+ */
+static inline int
+movs(struct regs *regs, unsigned prefix, unsigned opc)
+{
+	unsigned eip = regs->eip - 1;
+	unsigned sseg = segment(prefix, regs, regs->vds);
+	unsigned dseg = regs->ves;
+	unsigned saddr, daddr;
+	unsigned count = 1;
+	int incr = ((regs->eflags & EFLAGS_DF) == 0) ? 1 : -1;
+
+	saddr = address(regs, sseg, regs->esi);
+	daddr = address(regs, dseg, regs->edi);
+
+	if ((prefix & REP) != 0) {
+		count = regs->ecx;
+		regs->ecx = 0;
+	}
+
+	switch (opc) {
+	case 0xA4: /* movsb */
+		regs->esi += (incr * count);
+		regs->edi += (incr * count);
+
+		while (count-- != 0) {
+			write8(daddr, read8(saddr));
+			daddr += incr;
+			saddr += incr;
+		}
+		TRACE((regs, regs->eip - eip, "movsb (%%esi),%%es:(%%edi)"));
+		break;
+
+	case 0xA5: /* movsw */
+		if ((prefix & DATA32) == 0) {
+			incr = 2 * incr;
+			regs->esi += (incr * count);
+			regs->edi += (incr * count);
+
+			while (count-- != 0) {
+				write16(daddr, read16(saddr));
+				daddr += incr;
+				saddr += incr;
+			}
+		} else {
+			incr = 4 * incr;
+			regs->esi += (incr * count);
+			regs->edi += (incr * count);
+
+			while (count-- != 0) {
+				write32(daddr, read32(saddr));
+				daddr += incr;
+				saddr += incr;
+			}
+		}			
+		TRACE((regs, regs->eip - eip, "movsw %s(%%esi),%%es:(%%edi)"));
+		break;
+	}
+
+	return 1;
+}
+
+static inline int
+lods(struct regs *regs, unsigned prefix, unsigned opc)
+{
+	unsigned eip = regs->eip - 1;
+	unsigned seg = segment(prefix, regs, regs->vds);
+	unsigned addr = address(regs, seg, regs->esi);
+	unsigned count = 1;
+	int incr = ((regs->eflags & EFLAGS_DF) == 0) ? 1 : -1;
+
+	if ((prefix & REP) != 0) {
+		count = regs->ecx;
+		regs->ecx = 0;
+	}
+
+	switch (opc) {
+	case 0xAD: /* lodsw */
+		if ((prefix & DATA32) == 0) {
+			incr = 2 * incr;
+			regs->esi += (incr * count);
+			while (count-- != 0) {
+				setreg16(regs, 0, read16(addr));
+				addr += incr;
+			}
+
+			TRACE((regs, regs->eip - eip, "lodsw (%%esi),%%ax"));
+		} else {
+			incr = 4 * incr;
+			regs->esi += (incr * count);
+			while (count-- != 0) {
+				setreg32(regs, 0, read32(addr));
+				addr += incr;
+			}
+			TRACE((regs, regs->eip - eip, "lodsw (%%esi),%%eax"));
+		}
+		break;
+	}
+	return 1;
+}
+/*
  * Move to and from a control register.
  */
 static int
@@ -716,6 +819,55 @@ static inline void set_eflags_ZF(unsigned mask, unsigned v1, struct regs *regs)
 		regs->eflags |= EFLAGS_ZF;
 	else
 		regs->eflags &= ~EFLAGS_ZF;
+}
+
+static void set_eflags_add(unsigned hi_bit_mask, unsigned v1, unsigned v2,
+				unsigned result, struct regs *regs)
+{
+	int bit_count;
+	unsigned tmp;
+	unsigned full_mask;
+	unsigned nonsign_mask;
+
+	/* Carry out of high order bit? */
+	if ( v1 & v2 & hi_bit_mask )
+		regs->eflags |= EFLAGS_CF;
+	else
+		regs->eflags &= ~EFLAGS_CF;
+
+	/* Even parity in least significant byte? */
+	tmp = result & 0xff;
+	for (bit_count = 0; tmp != 0; bit_count++)
+		tmp &= (tmp - 1);
+
+	if (bit_count & 1)
+		regs->eflags &= ~EFLAGS_PF;
+	else
+		regs->eflags |= EFLAGS_PF;
+
+	/* Carry out of least significant BCD digit? */
+	if ( v1 & v2 & (1<<3) )
+		regs->eflags |= EFLAGS_AF;
+	else
+		regs->eflags &= ~EFLAGS_AF;
+
+	/* Result is zero? */
+	full_mask = (hi_bit_mask - 1) | hi_bit_mask;
+	set_eflags_ZF(full_mask, result, regs);
+
+	/* Sign of result? */
+	if ( result & hi_bit_mask )
+		regs->eflags |= EFLAGS_SF;
+	else
+		regs->eflags &= ~EFLAGS_SF;
+
+	/* Carry out of highest non-sign bit? */
+	nonsign_mask = (hi_bit_mask >> 1) & ~hi_bit_mask;
+	if ( v1 & v2 & hi_bit_mask )
+		regs->eflags |= EFLAGS_OF;
+	else
+		regs->eflags &= ~EFLAGS_OF;
+
 }
 
 /*
@@ -787,6 +939,82 @@ test(struct regs *regs, unsigned prefix, unsigned opc)
 
 	/* other test opcodes ... */
 	}
+
+	return 1;
+}
+
+/*
+ * We need to handle add opcodes that address memory beyond the 64KB
+ * segment limit that VM8086 mode enforces.
+ */
+static int
+add(struct regs *regs, unsigned prefix, unsigned opc)
+{
+	unsigned eip = regs->eip - 1;
+	unsigned modrm = fetch8(regs);
+	unsigned addr = operand(prefix, regs, modrm);
+	unsigned r = (modrm >> 3) & 7;
+
+	unsigned val1 = 0;
+	unsigned val2 = 0;
+	unsigned result = 0;
+	unsigned hi_bit;
+
+	if ((modrm & 0xC0) == 0xC0) /* no registers */
+		return 0;
+
+	switch (opc) {
+	case 0x00: /* addr32 add r8, r/m8 */
+		val1 = getreg8(regs, r);
+		val2 = read8(addr);
+		result = val1 + val2;
+		write8(addr, result);
+		TRACE((regs, regs->eip - eip,
+			"addb %%e%s, *0x%x", rnames[r], addr));
+		break;
+		
+	case 0x01: /* addr32 add r16, r/m16 */
+		if (prefix & DATA32) {
+			val1 = getreg32(regs, r);
+			val2 = read32(addr);
+			result = val1 + val2;
+			write32(addr, result);
+			TRACE((regs, regs->eip - eip,
+				"addl %%e%s, *0x%x", rnames[r], addr));
+		} else {
+			val1 = getreg16(regs, r);
+			val2 = read16(addr);
+			result = val1 + val2;
+			write16(addr, result);
+			TRACE((regs, regs->eip - eip,
+				"addw %%e%s, *0x%x", rnames[r], addr));
+		}
+		break;
+		
+	case 0x03: /* addr32 add r/m16, r16 */
+		if (prefix & DATA32) {
+			val1 = getreg32(regs, r);
+			val2 = read32(addr);
+			result = val1 + val2;
+			setreg32(regs, r, result);
+			TRACE((regs, regs->eip - eip,
+				"addl *0x%x, %%e%s", addr, rnames[r]));
+		} else {
+			val1 = getreg16(regs, r);
+			val2 = read16(addr);
+			result = val1 + val2;
+			setreg16(regs, r, result);
+			TRACE((regs, regs->eip - eip,
+				"addw *0x%x, %%%s", addr, rnames[r]));
+		}
+		break;
+	}
+
+	if (opc == 0x00)
+		hi_bit = (1<<7);
+	else
+		hi_bit = (prefix & DATA32) ? (1<<31) : (1<<15);
+	set_eflags_add(hi_bit, val1, val2, result, regs);
 
 	return 1;
 }
@@ -1314,6 +1542,18 @@ opcode(struct regs *regs)
 
 	for (;;) {
 		switch ((opc = fetch8(regs))) {
+
+		case 0x00: /* addr32 add r8, r/m8 */
+		case 0x01: /* addr32 add r16, r/m16 */
+		case 0x03: /* addr32 add r/m16, r16 */
+			if (mode != VM86_REAL && mode != VM86_REAL_TO_PROTECTED)
+				goto invalid;
+			if ((prefix & ADDR32) == 0)
+				goto invalid;
+			if (!add(regs, prefix, opc))
+				goto invalid;
+			return OPC_EMULATED;
+			
 		case 0x07: /* pop %es */
 			regs->ves = (prefix & DATA32) ?
 				pop32(regs) : pop16(regs);
@@ -1510,6 +1750,21 @@ opcode(struct regs *regs)
 			return OPC_EMULATED;
 		}
 
+		case 0xA4: /* movsb */
+		case 0xA5: /* movsw */
+			if ((prefix & ADDR32) == 0)
+				goto invalid;
+			if (!movs(regs, prefix, opc))
+				goto invalid;
+			return OPC_EMULATED;
+
+		case 0xAD: /* lodsw */
+			if ((prefix & ADDR32) == 0)
+				goto invalid;
+			if (!lods(regs, prefix, opc))
+				goto invalid;
+			return OPC_EMULATED;
+			
 		case 0xBB: /* mov bx, imm16 */
 		{
 			int data;
@@ -1627,6 +1882,11 @@ opcode(struct regs *regs)
 			/* Do something power-saving here! */
 			return OPC_EMULATED;
 
+		case 0xF3: /* rep/repe/repz */
+			TRACE((regs, regs->eip - eip, "rep"));
+			prefix |= REP;
+			continue;
+
 		case 0xF6: /* addr32 testb $imm, r/m8 */
 			if (!(prefix & ADDR32))
 				goto invalid;
@@ -1660,6 +1920,7 @@ emulate(struct regs *regs)
 {
 	unsigned flteip;
 	int nemul = 0;
+	unsigned ip;
 
 	/* emulate as many instructions as possible */
 	while (opcode(regs) != OPC_INVALID)
@@ -1668,6 +1929,12 @@ emulate(struct regs *regs)
 	/* detect the case where we are not making progress */
 	if (nemul == 0 && prev_eip == regs->eip) {
 		flteip = address(regs, MASK16(regs->cs), regs->eip);
+
+		printf("Undecoded sequence: \n");
+		for (ip=flteip; ip < flteip+16; ip++)
+			printf("0x%02x ", read8(ip));
+		printf("\n");
+
 		panic("Unknown opcode at %04x:%04x=0x%x",
 			MASK16(regs->cs), regs->eip, flteip);
 	} else

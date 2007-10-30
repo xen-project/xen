@@ -21,11 +21,8 @@
 #define _IOMMU_H_
 
 #include <xen/init.h>
-#include <xen/bitmap.h>
-#include <xen/irq.h>
+#include <xen/list.h>
 #include <xen/spinlock.h>
-#include <xen/mm.h>
-#include <xen/xmalloc.h>
 #include <asm/hvm/vmx/intel-iommu.h>
 #include <public/hvm/ioreq.h>
 #include <public/domctl.h>

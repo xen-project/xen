@@ -383,14 +383,16 @@ int check_descriptor(const struct domain *dom, struct desc_struct *d)
 {
     u32 a = d->a, b = d->b;
     u16 cs;
+    unsigned int dpl;
 
     /* A not-present descriptor will always fault, so is safe. */
     if ( !(b & _SEGMENT_P) ) 
         goto good;
 
     /* Check and fix up the DPL. */
-    if ( (b & _SEGMENT_DPL) < (GUEST_KERNEL_RPL(dom) << 13) )
-        d->b = b = (b & ~_SEGMENT_DPL) | (GUEST_KERNEL_RPL(dom) << 13);
+    dpl = (b >> 13) & 3;
+    __fixup_guest_selector(dom, dpl);
+    b = (b & ~_SEGMENT_DPL) | (dpl << 13);
 
     /* All code and data segments are okay. No base/limit checking. */
     if ( (b & _SEGMENT_S) )
@@ -408,18 +410,31 @@ int check_descriptor(const struct domain *dom, struct desc_struct *d)
     if ( (b & _SEGMENT_TYPE) != 0xc00 )
         goto bad;
 
-    /* Validate and fix up the target code selector. */
+    /* Validate the target code selector. */
     cs = a >> 16;
-    fixup_guest_code_selector(dom, cs);
     if ( !guest_gate_selector_okay(dom, cs) )
         goto bad;
-    a = d->a = (d->a & 0xffffU) | (cs << 16);
+    /*
+     * Force DPL to zero, causing a GP fault with its error code indicating
+     * the gate in use, allowing emulation. This is necessary because with
+     * native guests (kernel in ring 3) call gates cannot be used directly
+     * to transition from user to kernel mode (and whether a gate is used
+     * to enter the kernel can only be determined when the gate is being
+     * used), and with compat guests call gates cannot be used at all as
+     * there are only 64-bit ones.
+     * Store the original DPL in the selector's RPL field.
+     */
+    b &= ~_SEGMENT_DPL;
+    cs = (cs & ~3) | dpl;
+    a = (a & 0xffffU) | (cs << 16);
 
     /* Reserved bits must be zero. */
-    if ( (b & 0xe0) != 0 )
+    if ( b & (is_pv_32bit_domain(dom) ? 0xe0 : 0xff) )
         goto bad;
         
  good:
+    d->a = a;
+    d->b = b;
     return 1;
  bad:
     return 0;

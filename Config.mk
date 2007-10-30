@@ -89,7 +89,6 @@ ACM_SECURITY ?= n
 XENSTAT_XENTOP     ?= y
 VTPM_TOOLS         ?= n
 LIBXENAPI_BINDINGS ?= n
-XENFB_TOOLS        ?= n
 PYTHON_TOOLS       ?= y
 
 -include $(XEN_ROOT)/.config

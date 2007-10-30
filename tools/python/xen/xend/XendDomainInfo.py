@@ -819,12 +819,15 @@ class XendDomainInfo:
 
         self._update_consoles()
 
-    def _update_consoles(self):
+    def _update_consoles(self, transaction = None):
         if self.domid == None or self.domid == 0:
             return
 
         # Update VT100 port if it exists
-        self.console_port = self.readDom('console/port')
+        if transaction is None:
+            self.console_port = self.readDom('console/port')
+        else:
+            self.console_port = self.readDomTxn(transaction, 'console/port')
         if self.console_port is not None:
             serial_consoles = self.info.console_get_all('vt100')
             if not serial_consoles:
@@ -837,7 +840,10 @@ class XendDomainInfo:
                 
 
         # Update VNC port if it exists and write to xenstore
-        vnc_port = self.readDom('console/vnc-port')
+        if transaction is None:
+            vnc_port = self.readDom('console/vnc-port')
+        else:
+            vnc_port = self.readDomTxn(transaction, 'console/vnc-port')
         if vnc_port is not None:
             for dev_uuid, (dev_type, dev_info) in self.info['devices'].items():
                 if dev_type == 'vfb':
@@ -872,6 +878,27 @@ class XendDomainInfo:
     def storeVm(self, *args):
         return xstransact.Store(self.vmpath, *args)
 
+
+    def _readVmTxn(self, transaction,  *args):
+        paths = map(lambda x: self.vmpath + "/" + x, args)
+        return transaction.read(*paths)
+
+    def _writeVmTxn(self, transaction,  *args):
+        paths = map(lambda x: self.vmpath + "/" + x, args)
+        return transaction.write(*paths)
+
+    def _removeVmTxn(self, transaction,  *args):
+        paths = map(lambda x: self.vmpath + "/" + x, args)
+        return transaction.remove(*paths)
+
+    def _gatherVmTxn(self, transaction,  *args):
+        paths = map(lambda x: self.vmpath + "/" + x, args)
+        return transaction.gather(paths)
+
+    def storeVmTxn(self, transaction,  *args):
+        paths = map(lambda x: self.vmpath + "/" + x, args)
+        return transaction.store(*paths)
+
     #
     # Function to update xenstore /dom/*
     #
@@ -890,6 +917,28 @@ class XendDomainInfo:
 
     def storeDom(self, *args):
         return xstransact.Store(self.dompath, *args)
+
+
+    def readDomTxn(self, transaction, *args):
+        paths = map(lambda x: self.vmpath + "/" + x, args)
+        return transaction.read(*paths)
+
+    def gatherDomTxn(self, transaction, *args):
+        paths = map(lambda x: self.vmpath + "/" + x, args)
+        return transaction.gather(*paths)
+
+    def _writeDomTxn(self, transaction, *args):
+        paths = map(lambda x: self.vmpath + "/" + x, args)
+        return transaction.write(*paths)
+
+    def _removeDomTxn(self, transaction, *args):
+        paths = map(lambda x: self.vmpath + "/" + x, args)
+        return transaction.remove(*paths)
+
+    def storeDomTxn(self, transaction, *args):
+        paths = map(lambda x: self.vmpath + "/" + x, args)
+        return transaction.store(*paths)
+
 
     def _recreateDom(self):
         complete(self.dompath, lambda t: self._recreateDomFunc(t))
@@ -916,8 +965,15 @@ class XendDomainInfo:
                 else:
                     to_store[n] = str(v)
 
+        # Figure out if we need to tell xenconsoled to ignore this guest's
+        # console - device model will handle console if it is running
+        constype = "ioemu"
+        if 'device_model' not in self.info['platform']:
+            constype = "xenconsoled"
+
         f('console/port',     self.console_port)
         f('console/ring-ref', self.console_mfn)
+        f('console/type',     constype)
         f('store/port',       self.store_port)
         f('store/ring-ref',   self.store_mfn)
 
@@ -1455,10 +1511,16 @@ class XendDomainInfo:
 
     def _releaseDevices(self, suspend = False):
         """Release all domain's devices.  Nothrow guarantee."""
-        if suspend and self.image:
-            self.image.destroy(suspend)
-            return
+        if self.image:
+            try:
+                log.debug("Destroying device model")
+                self.image.destroyDeviceModel()
+            except Exception, e:
+                log.exception("Device model destroy failed %s" % str(e))
+        else:
+            log.debug("No device model")
 
+        log.debug("Releasing devices")
         t = xstransact("%s/device" % self.dompath)
         for devclass in XendDevices.valid_devices():
             for dev in t.list(devclass):
@@ -1582,6 +1644,11 @@ class XendDomainInfo:
         self.dompath = GetDomainPath(self.domid)
 
         self._recreateDom()
+
+        # Set timer configration of domain
+        if hvm:
+            xc.hvm_set_param(self.domid, HVM_PARAM_TIMER_MODE,
+                long(self.info["platform"].get("timer_mode")))
 
         # Set maximum number of vcpus in domain
         xc.domain_max_vcpus(self.domid, int(self.info['VCPUs_max']))
@@ -1709,11 +1776,6 @@ class XendDomainInfo:
             bootloader_tidy(self)
 
             if self.image:
-                try:
-                    self.image.destroy()
-                except:
-                    log.exception(
-                        "XendDomainInfo.cleanup: image.destroy() failed.")
                 self.image = None
 
             try:
@@ -1761,10 +1823,9 @@ class XendDomainInfo:
         self.console_mfn = console_mfn
 
         self._introduceDomain()
-        if self.info.is_hvm():
-            self.image = image.create(self, self.info)
-            if self.image:
-                self.image.createDeviceModel(True)
+        self.image = image.create(self, self.info)
+        if self.image:
+            self.image.createDeviceModel(True)
         self._storeDomDetails()
         self._registerWatches()
         self.refreshShutdown()
@@ -1882,8 +1943,8 @@ class XendDomainInfo:
             ResumeDomain(self.domid)
         except:
             log.exception("XendDomainInfo.resume: xc.domain_resume failed on domain %s." % (str(self.domid)))
-        if self.is_hvm():
-            self.image.resumeDeviceModel()
+        self.image.resumeDeviceModel()
+        log.debug("XendDomainInfo.resumeDomain: completed")
 
 
     #
@@ -2211,7 +2272,7 @@ class XendDomainInfo:
                            (" as domain %s" % str(dom.domid)) or ""))
         
 
-    def update(self, info = None, refresh = True):
+    def update(self, info = None, refresh = True, transaction = None):
         """Update with info from xc.domain_getinfo().
         """
         log.trace("XendDomainInfo.update(%s) on domain %s", info,
@@ -2234,7 +2295,7 @@ class XendDomainInfo:
         # TODO: we should eventually get rid of old_dom_states
 
         self.info.update_config(info)
-        self._update_consoles()
+        self._update_consoles(transaction)
         
         if refresh:
             self.refreshShutdown(info)

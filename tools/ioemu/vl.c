@@ -96,7 +96,6 @@
 
 #include "exec-all.h"
 
-#include <xen/hvm/params.h>
 #define DEFAULT_NETWORK_SCRIPT "/etc/xen/qemu-ifup"
 #ifdef _BSD
 #define DEFAULT_BRIDGE "bridge0"
@@ -194,11 +193,8 @@ extern int vcpus;
 
 int xc_handle;
 
-char domain_name[64] = "Xen-HVM-no-name";
+char domain_name[64] = "Xen-no-name";
 extern int domid;
-
-char vncpasswd[64];
-unsigned char challenge[AUTHCHALLENGESIZE];
 
 /***********************************************************/
 /* x86 ISA bus support */
@@ -6204,12 +6200,10 @@ void main_loop_wait(int timeout)
         IOHandlerRecord **pioh;
 
         for(ioh = first_io_handler; ioh != NULL; ioh = ioh->next) {
-            if (ioh->deleted)
-                continue;
-            if (ioh->fd_read && FD_ISSET(ioh->fd, &rfds)) {
+            if (!ioh->deleted && ioh->fd_read && FD_ISSET(ioh->fd, &rfds)) {
                 ioh->fd_read(ioh->opaque);
             }
-            if (ioh->fd_write && FD_ISSET(ioh->fd, &wfds)) {
+            if (!ioh->deleted && ioh->fd_write && FD_ISSET(ioh->fd, &wfds)) {
                 ioh->fd_write(ioh->opaque);
             }
         }
@@ -6696,8 +6690,13 @@ static void read_passwords(void)
 void register_machines(void)
 {
 #if defined(TARGET_I386)
+#ifndef CONFIG_DM
     qemu_register_machine(&pc_machine);
     qemu_register_machine(&isapc_machine);
+#else
+    qemu_register_machine(&xenfv_machine);
+    qemu_register_machine(&xenpv_machine);
+#endif
 #elif defined(TARGET_PPC)
     qemu_register_machine(&heathrow_machine);
     qemu_register_machine(&core99_machine);
@@ -6905,156 +6904,6 @@ int set_mm_mapping(int xc_handle, uint32_t domid,
     return 0;
 }
 
-#if defined(MAPCACHE)
-
-#if defined(__i386__) 
-#define MAX_MCACHE_SIZE    0x40000000 /* 1GB max for x86 */
-#define MCACHE_BUCKET_SHIFT 16
-#elif defined(__x86_64__)
-#define MAX_MCACHE_SIZE    0x1000000000 /* 64GB max for x86_64 */
-#define MCACHE_BUCKET_SHIFT 20
-#endif
-
-#define MCACHE_BUCKET_SIZE (1UL << MCACHE_BUCKET_SHIFT)
-
-#define BITS_PER_LONG (sizeof(long)*8)
-#define BITS_TO_LONGS(bits) \
-    (((bits)+BITS_PER_LONG-1)/BITS_PER_LONG)
-#define DECLARE_BITMAP(name,bits) \
-    unsigned long name[BITS_TO_LONGS(bits)]
-#define test_bit(bit,map) \
-    (!!((map)[(bit)/BITS_PER_LONG] & (1UL << ((bit)%BITS_PER_LONG))))
-
-struct map_cache {
-    unsigned long paddr_index;
-    uint8_t      *vaddr_base;
-    DECLARE_BITMAP(valid_mapping, MCACHE_BUCKET_SIZE>>PAGE_SHIFT);
-};
-
-static struct map_cache *mapcache_entry;
-static unsigned long nr_buckets;
-
-/* For most cases (>99.9%), the page address is the same. */
-static unsigned long last_address_index = ~0UL;
-static uint8_t      *last_address_vaddr;
-
-static int qemu_map_cache_init(void)
-{
-    unsigned long size;
-
-    nr_buckets = (((MAX_MCACHE_SIZE >> PAGE_SHIFT) +
-                   (1UL << (MCACHE_BUCKET_SHIFT - PAGE_SHIFT)) - 1) >>
-                  (MCACHE_BUCKET_SHIFT - PAGE_SHIFT));
-
-    /*
-     * Use mmap() directly: lets us allocate a big hash table with no up-front
-     * cost in storage space. The OS will allocate memory only for the buckets
-     * that we actually use. All others will contain all zeroes.
-     */
-    size = nr_buckets * sizeof(struct map_cache);
-    size = (size + PAGE_SIZE - 1) & ~(PAGE_SIZE - 1);
-    fprintf(logfile, "qemu_map_cache_init nr_buckets = %lx size %lu\n", nr_buckets, size);
-    mapcache_entry = mmap(NULL, size, PROT_READ|PROT_WRITE,
-                          MAP_SHARED|MAP_ANON, -1, 0);
-    if (mapcache_entry == MAP_FAILED) {
-        errno = ENOMEM;
-        return -1;
-    }
-
-    return 0;
-}
-
-static void qemu_remap_bucket(struct map_cache *entry,
-                              unsigned long address_index)
-{
-    uint8_t *vaddr_base;
-    unsigned long pfns[MCACHE_BUCKET_SIZE >> PAGE_SHIFT];
-    unsigned int i, j;
-
-    if (entry->vaddr_base != NULL) {
-        errno = munmap(entry->vaddr_base, MCACHE_BUCKET_SIZE);
-        if (errno) {
-            fprintf(logfile, "unmap fails %d\n", errno);
-            exit(-1);
-        }
-    }
-
-    for (i = 0; i < MCACHE_BUCKET_SIZE >> PAGE_SHIFT; i++)
-        pfns[i] = (address_index << (MCACHE_BUCKET_SHIFT-PAGE_SHIFT)) + i;
-
-    vaddr_base = xc_map_foreign_batch(xc_handle, domid, PROT_READ|PROT_WRITE,
-                                      pfns, MCACHE_BUCKET_SIZE >> PAGE_SHIFT);
-    if (vaddr_base == NULL) {
-        fprintf(logfile, "xc_map_foreign_batch error %d\n", errno);
-        exit(-1);
-    }
-
-    entry->vaddr_base  = vaddr_base;
-    entry->paddr_index = address_index;
-
-    for (i = 0; i < MCACHE_BUCKET_SIZE >> PAGE_SHIFT; i += BITS_PER_LONG) {
-        unsigned long word = 0;
-        j = ((i + BITS_PER_LONG) > (MCACHE_BUCKET_SIZE >> PAGE_SHIFT)) ?
-            (MCACHE_BUCKET_SIZE >> PAGE_SHIFT) % BITS_PER_LONG : BITS_PER_LONG;
-        while (j > 0)
-            word = (word << 1) | (((pfns[i + --j] >> 28) & 0xf) != 0xf);
-        entry->valid_mapping[i / BITS_PER_LONG] = word;
-    }
-}
-
-uint8_t *qemu_map_cache(target_phys_addr_t phys_addr)
-{
-    struct map_cache *entry;
-    unsigned long address_index  = phys_addr >> MCACHE_BUCKET_SHIFT;
-    unsigned long address_offset = phys_addr & (MCACHE_BUCKET_SIZE-1);
-
-    if (address_index == last_address_index)
-        return last_address_vaddr + address_offset;
-
-    entry = &mapcache_entry[address_index % nr_buckets];
-
-    if (entry->vaddr_base == NULL || entry->paddr_index != address_index ||
-        !test_bit(address_offset>>PAGE_SHIFT, entry->valid_mapping))
-        qemu_remap_bucket(entry, address_index);
-
-    if (!test_bit(address_offset>>PAGE_SHIFT, entry->valid_mapping))
-        return NULL;
-
-    last_address_index = address_index;
-    last_address_vaddr = entry->vaddr_base;
-
-    return last_address_vaddr + address_offset;
-}
-
-void qemu_invalidate_map_cache(void)
-{
-    unsigned long i;
-
-    mapcache_lock();
-
-    for (i = 0; i < nr_buckets; i++) {
-        struct map_cache *entry = &mapcache_entry[i];
-
-        if (entry->vaddr_base == NULL)
-            continue;
-
-        errno = munmap(entry->vaddr_base, MCACHE_BUCKET_SIZE);
-        if (errno) {
-            fprintf(logfile, "unmap fails %d\n", errno);
-            exit(-1);
-        }
-
-        entry->paddr_index = 0;
-        entry->vaddr_base  = NULL;
-    }
-
-    last_address_index =  ~0UL;
-    last_address_vaddr = NULL;
-
-    mapcache_unlock();
-}
-
-#endif /* defined(MAPCACHE) */
 
 int main(int argc, char **argv)
 {
@@ -7089,15 +6938,7 @@ int main(int argc, char **argv)
     char usb_devices[MAX_USB_CMDLINE][128];
     int usb_devices_index;
     int fds[2];
-    unsigned long ioreq_pfn;
-    extern void *shared_page;
-    extern void *buffered_io_page;
     struct rlimit rl;
-#ifdef __ia64__
-    unsigned long nr_pages;
-    xen_pfn_t *page_array;
-    extern void *buffered_pio_page;
-#endif
     sigset_t set;
     char qemu_dm_logfilename[128];
     const char *direct_pci = NULL;
@@ -7193,7 +7034,6 @@ int main(int argc, char **argv)
     vncunused = 0;
     kernel_filename = NULL;
     kernel_cmdline = "";
-    *vncpasswd = '\0';
 #ifndef CONFIG_DM
 #ifdef TARGET_PPC
     cdrom_index = 1;
@@ -7601,7 +7441,7 @@ int main(int argc, char **argv)
                 break;
             case QEMU_OPTION_domainname:
                 snprintf(domain_name, sizeof(domain_name),
-                         "Xen-HVM-%s", optarg);
+                         "Xen-%s", optarg);
                 break;
             case QEMU_OPTION_d:
                 domid = atoi(optarg);
@@ -7681,6 +7521,7 @@ int main(int argc, char **argv)
 
 #ifdef CONFIG_DM
     bdrv_init();
+    xc_handle = xc_interface_open();
     xenstore_parse_domain_config(domid);
 #endif /* CONFIG_DM */
 
@@ -7774,83 +7615,6 @@ int main(int argc, char **argv)
 	}
 	phys_ram_size += ret;
     }
-#endif /* !CONFIG_DM */
-
-#ifdef CONFIG_DM
-
-    xc_handle = xc_interface_open();
-
-#if defined(__i386__) || defined(__x86_64__)
-
-    if (qemu_map_cache_init()) {
-        fprintf(logfile, "qemu_map_cache_init returned: error %d\n", errno);
-        exit(-1);
-    }
-
-    xc_get_hvm_param(xc_handle, domid, HVM_PARAM_IOREQ_PFN, &ioreq_pfn);
-    fprintf(logfile, "shared page at pfn %lx\n", ioreq_pfn);
-    shared_page = xc_map_foreign_range(xc_handle, domid, PAGE_SIZE,
-                                       PROT_READ|PROT_WRITE, ioreq_pfn);
-    if (shared_page == NULL) {
-        fprintf(logfile, "map shared IO page returned error %d\n", errno);
-        exit(-1);
-    }
-
-    xc_get_hvm_param(xc_handle, domid, HVM_PARAM_BUFIOREQ_PFN, &ioreq_pfn);
-    fprintf(logfile, "buffered io page at pfn %lx\n", ioreq_pfn);
-    buffered_io_page = xc_map_foreign_range(xc_handle, domid, PAGE_SIZE,
-                                            PROT_READ|PROT_WRITE, ioreq_pfn);
-    if (buffered_io_page == NULL) {
-        fprintf(logfile, "map buffered IO page returned error %d\n", errno);
-        exit(-1);
-    }
-
-#elif defined(__ia64__)
-
-    nr_pages = ram_size/PAGE_SIZE;
-
-    page_array = (xen_pfn_t *)malloc(nr_pages * sizeof(xen_pfn_t));
-    if (page_array == NULL) {
-        fprintf(logfile, "malloc returned error %d\n", errno);
-        exit(-1);
-    }
-
-    shared_page = xc_map_foreign_range(xc_handle, domid, PAGE_SIZE,
-                                       PROT_READ|PROT_WRITE,
-                                       IO_PAGE_START >> PAGE_SHIFT);
-
-    buffered_io_page =xc_map_foreign_range(xc_handle, domid, PAGE_SIZE,
-                                       PROT_READ|PROT_WRITE,
-                                       BUFFER_IO_PAGE_START >> PAGE_SHIFT);
-
-    buffered_pio_page = xc_map_foreign_range(xc_handle, domid, PAGE_SIZE,
-                                       PROT_READ|PROT_WRITE,
-                                       BUFFER_PIO_PAGE_START >> PAGE_SHIFT);
-
-    for (i = 0; i < nr_pages; i++)
-        page_array[i] = i;
-	
-    /* VTI will not use memory between 3G~4G, so we just pass a legal pfn
-       to make QEMU map continuous virtual memory space */
-    if (ram_size > MMIO_START) {	
-        for (i = 0 ; i < (MEM_G >> PAGE_SHIFT); i++)
-            page_array[(MMIO_START >> PAGE_SHIFT) + i] =
-                (STORE_PAGE_START >> PAGE_SHIFT); 
-    }
-
-    phys_ram_base = xc_map_foreign_batch(xc_handle, domid,
-                                         PROT_READ|PROT_WRITE,
-                                         page_array, nr_pages);
-    if (phys_ram_base == 0) {
-        fprintf(logfile, "xc_map_foreign_batch returned error %d\n", errno);
-        exit(-1);
-    }
-    free(page_array);
-#endif
-
-    timeoffset_get();
-
-#else  /* !CONFIG_DM */
 
     phys_ram_base = qemu_vmalloc(phys_ram_size);
     if (!phys_ram_base) {
@@ -7858,9 +7622,6 @@ int main(int argc, char **argv)
         exit(1);
     }
 
-#endif /* !CONFIG_DM */
-
-#ifndef CONFIG_DM
     /* we always create the cdrom drive, even if no disk is there */
     bdrv_init();
     if (cdrom_index >= 0) {
@@ -7917,17 +7678,19 @@ int main(int argc, char **argv)
 
     init_ioports();
 
-    /* read vncpasswd from xenstore */
-    if (0 > xenstore_read_vncpasswd(domid))
-        exit(1);
-
     /* terminal init */
     if (nographic) {
         dumb_display_init(ds);
     } else if (vnc_display != NULL || vncunused != 0) {
 	int vnc_display_port;
-	vnc_display_port = vnc_display_init(ds, vnc_display, vncunused);
-	if (vncviewer)
+	char password[20];
+	vnc_display_init(ds);
+	if (xenstore_read_vncpasswd(domid, password, sizeof(password)) < 0)
+	    exit(0);
+	vnc_display_password(ds, password);
+	if ((vnc_display_port = vnc_display_open(ds, vnc_display, vncunused)) < 0) 
+	    exit (0);
+ 	if (vncviewer)
 	    vnc_start_viewer(vnc_display_port);
 	xenstore_write_vncport(vnc_display_port);
     } else {

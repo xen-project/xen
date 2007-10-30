@@ -73,21 +73,17 @@ void write_cr3(unsigned long cr3);
 
 /* flush_* flag fields: */
  /*
-  * Area to flush:
-  *  0 -> flush entire address space
-  *  1 -> 4kB area containing specified virtual address
-  *  2 -> 4MB/2MB area containing specified virtual address
-  *  3 -> 1GB area containing specified virtual address (x86/64 only)
+  * Area to flush: 2^flush_order pages. Default is flush entire address space.
   * NB. Multi-page areas do not need to have been mapped with a superpage.
   */
-#define FLUSH_LEVEL_MASK 0x0f
-#define FLUSH_LEVEL(x)   (x)
+#define FLUSH_ORDER_MASK 0xff
+#define FLUSH_ORDER(x)   ((x)+1)
  /* Flush TLBs (or parts thereof) */
-#define FLUSH_TLB        0x10
+#define FLUSH_TLB        0x100
  /* Flush TLBs (or parts thereof) including global mappings */
-#define FLUSH_TLB_GLOBAL 0x20
+#define FLUSH_TLB_GLOBAL 0x200
  /* Flush data caches */
-#define FLUSH_CACHE      0x40
+#define FLUSH_CACHE      0x400
 
 /* Flush local TLBs/caches. */
 void flush_area_local(const void *va, unsigned int flags);
@@ -105,13 +101,13 @@ void flush_area_mask(cpumask_t, const void *va, unsigned int flags);
 #define flush_tlb_local()                       \
     flush_local(FLUSH_TLB)
 #define flush_tlb_one_local(v)                  \
-    flush_area_local((const void *)(v), FLUSH_TLB|FLUSH_LEVEL(1))
+    flush_area_local((const void *)(v), FLUSH_TLB|FLUSH_ORDER(0))
 
 /* Flush specified CPUs' TLBs */
 #define flush_tlb_mask(mask)                    \
     flush_mask(mask, FLUSH_TLB)
 #define flush_tlb_one_mask(mask,v)              \
-    flush_area_mask(mask, (const void *)(v), FLUSH_TLB|FLUSH_LEVEL(1))
+    flush_area_mask(mask, (const void *)(v), FLUSH_TLB|FLUSH_ORDER(0))
 
 /* Flush all CPUs' TLBs */
 #define flush_tlb_all()                         \

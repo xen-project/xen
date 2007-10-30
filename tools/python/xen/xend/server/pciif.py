@@ -78,8 +78,8 @@ class PciController(DevController):
         back['uuid'] = config.get('uuid','')
         return (0, back, {})
 
-    def getDeviceConfiguration(self, devid):
-        result = DevController.getDeviceConfiguration(self, devid)
+    def getDeviceConfiguration(self, devid, transaction = None):
+        result = DevController.getDeviceConfiguration(self, devid, transaction)
         num_devs = self.readBackend(devid, 'num_devs')
         pci_devs = []
         

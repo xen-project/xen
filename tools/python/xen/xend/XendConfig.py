@@ -28,10 +28,12 @@ from xen.xend.XendError import VmError
 from xen.xend.XendDevices import XendDevices
 from xen.xend.PrettyPrint import prettyprintstring
 from xen.xend.XendConstants import DOM_STATE_HALTED
+from xen.xend.xenstore.xstransact import xstransact
 from xen.xend.server.BlktapController import blktap_disk_types
 from xen.xend.server.netif import randomMAC
 from xen.util.blkif import blkdev_name_to_number
 from xen.util import xsconstants
+import xen.util.auxbin
 
 log = logging.getLogger("xend.XendConfig")
 log.setLevel(logging.WARN)
@@ -126,7 +128,7 @@ XENAPI_PLATFORM_CFG = [ 'acpi', 'apic', 'boot', 'device_model', 'display',
                         'fda', 'fdb', 'keymap', 'isa', 'localtime', 'monitor', 
                         'nographic', 'pae', 'rtc_timeoffset', 'serial', 'sdl',
                         'soundhw','stdvga', 'usb', 'usbdevice', 'vnc',
-                        'vncconsole', 'vncdisplay', 'vnclisten',
+                        'vncconsole', 'vncdisplay', 'vnclisten', 'timer_mode',
                         'vncpasswd', 'vncunused', 'xauthority', 'pci', 'vhpt']
 
 # Xen API console 'other_config' keys.
@@ -233,8 +235,6 @@ LEGACY_XENSTORE_VM_PARAMS = [
     'on_xend_start',
     'on_xend_stop',
 ]
-
-DEFAULT_DM = '/usr/lib/xen/bin/qemu-dm'
 
 ##
 ## Config Choices
@@ -393,13 +393,14 @@ class XendConfig(dict):
             self['name_label'] = 'Domain-' + self['uuid']
 
     def _platform_sanity_check(self):
-        if self.is_hvm():
-            if 'keymap' not in self['platform'] and XendOptions.instance().get_keymap():
-                self['platform']['keymap'] = XendOptions.instance().get_keymap()
+        if 'keymap' not in self['platform'] and XendOptions.instance().get_keymap():
+            self['platform']['keymap'] = XendOptions.instance().get_keymap()
 
+        if self.is_hvm() or self.has_rfb():
             if 'device_model' not in self['platform']:
-                self['platform']['device_model'] = DEFAULT_DM
+                self['platform']['device_model'] = xen.util.auxbin.pathTo("qemu-dm")
 
+        if self.is_hvm():
             # Compatibility hack, can go away soon.
             if 'soundhw' not in self['platform'] and \
                self['platform'].get('enable_audio'):
@@ -744,16 +745,7 @@ class XendConfig(dict):
         # coalesce hvm vnc frame buffer with vfb config
         if self.is_hvm() and int(self['platform'].get('vnc', 0)) != 0:
             # add vfb device if it isn't there already
-            has_rfb = False
-            for console_uuid in self['console_refs']:
-                if self['devices'][console_uuid][1].get('protocol') == 'rfb':
-                    has_rfb = True
-                    break
-                if self['devices'][console_uuid][0] == 'vfb':
-                    has_rfb = True
-                    break
-
-            if not has_rfb:
+            if not self.has_rfb():
                 dev_config = ['vfb']
                 dev_config.append(['type', 'vnc'])
                 # copy VNC related params from platform config to vfb dev conf
@@ -764,6 +756,14 @@ class XendConfig(dict):
 
                 self.device_add('vfb', cfg_sxp = dev_config)
 
+
+    def has_rfb(self):
+        for console_uuid in self['console_refs']:
+            if self['devices'][console_uuid][1].get('protocol') == 'rfb':
+                return True
+            if self['devices'][console_uuid][0] == 'vfb':
+                return True
+        return False
 
     def _sxp_to_xapi_unsupported(self, sxp_cfg):
         """Read in an SXP configuration object and populate
@@ -942,36 +942,43 @@ class XendConfig(dict):
 
         # Marshall devices (running or from configuration)
         if not ignore_devices:
-            for cls in XendDevices.valid_devices():
-                found = False
+            txn = xstransact()
+            try:
+                for cls in XendDevices.valid_devices():
+                    found = False
                 
-                # figure if there is a dev controller is valid and running
-                if domain and domain.getDomid() != None:
-                    try:
-                        controller = domain.getDeviceController(cls)
-                        configs = controller.configurations()
-                        for config in configs:
-                            if sxp.name(config) in ('vbd', 'tap'):
-                                # The bootable flag is never written to the
-                                # store as part of the device config.
-                                dev_uuid = sxp.child_value(config, 'uuid')
-                                dev_type, dev_cfg = self['devices'][dev_uuid]
-                                is_bootable = dev_cfg.get('bootable', 0)
-                                config.append(['bootable', int(is_bootable)])
+                    # figure if there is a dev controller is valid and running
+                    if domain and domain.getDomid() != None:
+                        try:
+                            controller = domain.getDeviceController(cls)
+                            configs = controller.configurations(txn)
+                            for config in configs:
+                                if sxp.name(config) in ('vbd', 'tap'):
+                                    # The bootable flag is never written to the
+                                    # store as part of the device config.
+                                    dev_uuid = sxp.child_value(config, 'uuid')
+                                    dev_type, dev_cfg = self['devices'][dev_uuid]
+                                    is_bootable = dev_cfg.get('bootable', 0)
+                                    config.append(['bootable', int(is_bootable)])
 
-                            sxpr.append(['device', config])
+                                sxpr.append(['device', config])
 
-                        found = True
-                    except:
-                        log.exception("dumping sxp from device controllers")
-                        pass
+                            found = True
+                        except:
+                            log.exception("dumping sxp from device controllers")
+                            pass
                     
-                # if we didn't find that device, check the existing config
-                # for a device in the same class
-                if not found:
-                    for dev_type, dev_info in self.all_devices_sxpr():
-                        if dev_type == cls:
-                            sxpr.append(['device', dev_info])
+                    # if we didn't find that device, check the existing config
+                    # for a device in the same class
+                    if not found:
+                        for dev_type, dev_info in self.all_devices_sxpr():
+                            if dev_type == cls:
+                                sxpr.append(['device', dev_info])
+
+                txn.commit()
+            except:
+                txn.abort()
+                raise
 
         return sxpr    
     

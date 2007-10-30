@@ -28,7 +28,6 @@ from xen.util.xspolicy import XSPolicy
 from xen.util.acmpolicy import ACMPolicy
 from xen.xend.XendError import SecurityError
 
-XS_MANAGED_POLICIES_FILE = "/etc/xen/acm-security/policies/managed_policies"
 
 class XSPolicyAdmin:
     """ The class that handles the managed policies in the system.
@@ -45,28 +44,19 @@ class XSPolicyAdmin:
                                 on the system (currently '1')
         """
         self.maxpolicies = maxpolicies
-        try:
-            self.policies = dictio.dict_read("managed_policies",
-                                             XS_MANAGED_POLICIES_FILE)
-        except Exception, e:
-            self.policies = {}
-
+        self.policies = {}
         self.xsobjs = {}
-        for ref, data in self.policies.items():
-            name = data[0]
-            typ = data[1]
-            try:
-                if typ == xsconstants.ACM_POLICY_ID:
-                    try:
-                        self.xsobjs[ref] = ACMPolicy(name=name, ref=ref)
-                    except Exception, e:
-                        del self.policies[ref]
-                else:
-                    del self.policies[ref]
-            except Exception, e:
-                log.error("XSPolicyAdmin: Could not find policy '%s': %s" %
-                         (name, str(e)))
-                del self.policies[ref]
+
+        act_pol_name = self.get_hv_loaded_policy_name()
+
+        ref = uuid.createString()
+        try:
+            self.xsobjs[ref] = ACMPolicy(name=act_pol_name, ref=ref)
+            self.policies[ref] = (act_pol_name, xsconstants.ACM_POLICY_ID)
+        except Exception, e:
+            log.error("Could not find XML representation of policy '%s': "
+                      "%s" % (act_pol_name,e))
+
         log.debug("XSPolicyAdmin: Known policies: %s" % self.policies)
 
     def isXSEnabled(self):
@@ -113,6 +103,7 @@ class XSPolicyAdmin:
             if rc == 0:
                 self.rm_bootpolicy()
                 irc = self.activate_xspolicy(loadedpol, flags)
+                # policy is loaded; if setting the boot flag fails it's ok.
             return (loadedpol, rc, errors)
 
         try:
@@ -166,9 +157,6 @@ class XSPolicyAdmin:
                                        xsconstants.ACM_POLICY_ID]) }
             self.policies.update(new_entry)
             self.xsobjs[ref]  = acmpol
-            dictio.dict_write(self.policies,
-                              "managed_policies",
-                              XS_MANAGED_POLICIES_FILE)
         return (acmpol, xsconstants.XSERR_SUCCESS, errors)
 
     def make_boot_policy(self, acmpol):
@@ -217,9 +205,6 @@ class XSPolicyAdmin:
             if rc == xsconstants.XSERR_SUCCESS or force:
                 del self.policies[ref]
                 del self.xsobjs[ref]
-                dictio.dict_write(self.policies,
-                                  "managed_policies",
-                                  XS_MANAGED_POLICIES_FILE)
                 rc = xsconstants.XSERR_SUCCESS
             return rc
 

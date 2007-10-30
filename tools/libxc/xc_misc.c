@@ -10,7 +10,7 @@
 int xc_readconsolering(int xc_handle,
                        char **pbuffer,
                        unsigned int *pnr_chars,
-                       int clear)
+                       int clear, int incremental, uint32_t *pindex)
 {
     int ret;
     DECLARE_SYSCTL;
@@ -19,14 +19,24 @@ int xc_readconsolering(int xc_handle,
 
     sysctl.cmd = XEN_SYSCTL_readconsole;
     set_xen_guest_handle(sysctl.u.readconsole.buffer, buffer);
-    sysctl.u.readconsole.count  = nr_chars;
-    sysctl.u.readconsole.clear  = clear;
+    sysctl.u.readconsole.count = nr_chars;
+    sysctl.u.readconsole.clear = clear;
+    sysctl.u.readconsole.incremental = 0;
+    if ( pindex )
+    {
+        sysctl.u.readconsole.index = *pindex;
+        sysctl.u.readconsole.incremental = incremental;
+    }
 
     if ( (ret = lock_pages(buffer, nr_chars)) != 0 )
         return ret;
 
     if ( (ret = do_sysctl(xc_handle, &sysctl)) == 0 )
+    {
         *pnr_chars = sysctl.u.readconsole.count;
+        if ( pindex )
+            *pindex = sysctl.u.readconsole.index;
+    }
 
     unlock_pages(buffer, nr_chars);
 

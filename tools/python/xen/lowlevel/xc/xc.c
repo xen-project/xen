@@ -716,17 +716,19 @@ static PyObject *pyxc_readconsolering(XcObject *self,
                                       PyObject *args,
                                       PyObject *kwds)
 {
-    unsigned int clear = 0;
+    unsigned int clear = 0, index = 0, incremental = 0;
     char         _str[32768], *str = _str;
     unsigned int count = 32768;
     int          ret;
 
-    static char *kwd_list[] = { "clear", NULL };
+    static char *kwd_list[] = { "clear", "index", "incremental", NULL };
 
-    if ( !PyArg_ParseTupleAndKeywords(args, kwds, "|i", kwd_list, &clear) )
+    if ( !PyArg_ParseTupleAndKeywords(args, kwds, "|iii", kwd_list,
+                                      &clear, &index, &incremental) )
         return NULL;
 
-    ret = xc_readconsolering(self->xc_handle, &str, &count, clear);
+    ret = xc_readconsolering(self->xc_handle, &str, &count, clear,
+                             incremental, &index);
     if ( ret < 0 )
         return pyxc_error_to_exception();
 

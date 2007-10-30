@@ -4,7 +4,7 @@
 struct hvm_mem_pinned_cacheattr_range {
     struct list_head list;
     uint64_t start, end;
-    unsigned int type;
+    uint32_t type;
 };
 
 void hvm_init_cacheattr_region_list(
@@ -17,17 +17,17 @@ void hvm_destroy_cacheattr_region_list(
  * if yes, return 1, and set type to value in this range
  * if no,  return 0, and set type to 0
  */
-int hvm_get_mem_pinned_cacheattr(
+int32_t hvm_get_mem_pinned_cacheattr(
     struct domain *d,
-    unsigned long guest_fn,
-    unsigned int *type);
+    uint64_t guest_fn,
+    uint32_t *type);
 
 
 /* Set pinned caching type for a domain. */
-int hvm_set_mem_pinned_cacheattr(
+int32_t hvm_set_mem_pinned_cacheattr(
     struct domain *d,
-    unsigned long gfn_start,
-    unsigned long gfn_end,
-    unsigned int  type);
+    uint64_t gfn_start,
+    uint64_t gfn_end,
+    uint32_t  type);
 
 #endif /* __HVM_CACHEATTR_H__ */

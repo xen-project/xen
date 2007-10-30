@@ -53,10 +53,7 @@ long do_sysctl(XEN_GUEST_HANDLE(xen_sysctl_t) u_sysctl)
         if ( ret )
             break;
 
-        ret = read_console_ring(
-            guest_handle_cast(op->u.readconsole.buffer, char),
-            &op->u.readconsole.count,
-            op->u.readconsole.clear);
+        ret = read_console_ring(&op->u.readconsole);
         if ( copy_to_guest(u_sysctl, op, 1) )
             ret = -EFAULT;
     }

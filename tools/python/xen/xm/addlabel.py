@@ -117,15 +117,18 @@ def add_resource_label(label, resource, policyref, policy_type):
                                                           res_xapi,
                                                           "")
             except Exception, e:
-                security.err("Could not label this resource: %s" % e)
+                raise security.XSMError("Could not label this resource: %s" %
+                                        str(e))
         else:
-            security.err("'%s' is already labeled with '%s'" % (resource,old))
+            raise security.XSMError("'%s' is already labeled with '%s'" %
+                                    (resource,old))
 
 def add_domain_label(label, configfile, policyref):
     # sanity checks: make sure this label can be instantiated later on
     ssidref = security.label2ssidref(label, policyref, 'dom')
 
-    new_label = "access_control = ['policy=%s,label=%s']\n" % (policyref, label)
+    new_label = "access_control = ['policy=%s,label=%s']\n" % \
+                (policyref, label)
     if not os.path.isfile(configfile):
         security.err("Configuration file \'" + configfile + "\' not found.")
     config_fd = open(configfile, "ra+")
@@ -150,14 +153,14 @@ def add_domain_label_xapi(label, domainname, policyref, policy_type):
     try:
         old_lab = server.xenapi.VM.get_security_label(uuid)
         rc = server.xenapi.VM.set_security_label(uuid, sec_lab, old_lab)
-    except:
-        rc = -1
+    except Exception, e:
+        raise security.XSMError("Could not label the domain: %s" % e)
     if int(rc) < 0:
         raise OptionError('Could not label domain.')
     else:
         ssidref = int(rc)
         if ssidref != 0:
-            print "Set the label of domain '%s' to '%s'. New ssidref = %08x" % \
+            print "Set the label of domain '%s' to '%s'. New ssidref = %08x" %\
                   (domainname,label,ssidref)
         else:
             print "Set the label of dormant domain '%s' to '%s'." % \

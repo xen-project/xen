@@ -26,7 +26,6 @@
 #include <asm/hvm/cacheattr.h>
 #include <asm/processor.h>
 #include <xsm/xsm.h>
-#include <xen/list.h>
 #include <asm/iommu.h>
 
 long arch_do_domctl(
@@ -697,6 +696,79 @@ long arch_do_domctl(
     }
     break;
 
+    case XEN_DOMCTL_set_ext_vcpucontext:
+    case XEN_DOMCTL_get_ext_vcpucontext:
+    {
+        struct xen_domctl_ext_vcpucontext *evc;
+        struct domain *d;
+        struct vcpu *v;
+
+        evc = &domctl->u.ext_vcpucontext;
+
+        ret = (evc->size < sizeof(*evc)) ? -EINVAL : 0;
+        evc->size = sizeof(*evc);
+        if ( ret != 0 )
+            break;
+
+        ret = -ESRCH;
+        d = rcu_lock_domain_by_id(domctl->domain);
+        if ( d == NULL )
+            break;
+
+        ret = -ESRCH;
+        if ( (evc->vcpu >= MAX_VIRT_CPUS) ||
+             ((v = d->vcpu[evc->vcpu]) == NULL) )
+            goto ext_vcpucontext_out;
+
+        if ( domctl->cmd == XEN_DOMCTL_get_ext_vcpucontext )
+        {
+#ifdef __x86_64__
+            evc->sysenter_callback_cs      = v->arch.sysenter_callback_cs;
+            evc->sysenter_callback_eip     = v->arch.sysenter_callback_eip;
+            evc->sysenter_disables_events  = v->arch.sysenter_disables_events;
+            evc->syscall32_callback_cs     = v->arch.syscall32_callback_cs;
+            evc->syscall32_callback_eip    = v->arch.syscall32_callback_eip;
+            evc->syscall32_disables_events = v->arch.syscall32_disables_events;
+#else
+            evc->sysenter_callback_cs      = 0;
+            evc->sysenter_callback_eip     = 0;
+            evc->sysenter_disables_events  = 0;
+            evc->syscall32_callback_cs     = 0;
+            evc->syscall32_callback_eip    = 0;
+            evc->syscall32_disables_events = 0;
+#endif
+        }
+        else
+        {
+#ifdef __x86_64__
+            fixup_guest_code_selector(d, evc->sysenter_callback_cs);
+            v->arch.sysenter_callback_cs      = evc->sysenter_callback_cs;
+            v->arch.sysenter_callback_eip     = evc->sysenter_callback_eip;
+            v->arch.sysenter_disables_events  = evc->sysenter_disables_events;
+            fixup_guest_code_selector(d, evc->syscall32_callback_cs);
+            v->arch.syscall32_callback_cs     = evc->syscall32_callback_cs;
+            v->arch.syscall32_callback_eip    = evc->syscall32_callback_eip;
+            v->arch.syscall32_disables_events = evc->syscall32_disables_events;
+#else
+            /* We do not support syscall/syscall32/sysenter on 32-bit Xen. */
+            ret = -EINVAL;
+            if ( (evc->sysenter_callback_cs & ~3) ||
+                 evc->sysenter_callback_eip ||
+                 (evc->syscall32_callback_cs & ~3) ||
+                 evc->syscall32_callback_eip )
+                goto ext_vcpucontext_out;
+#endif
+        }
+
+        ret = 0;
+
+    ext_vcpucontext_out:
+        rcu_unlock_domain(d);
+        if ( copy_to_guest(u_domctl, domctl, 1) )
+            ret = -EFAULT;
+    }
+    break;
+
     default:
         ret = -ENOSYS;
         break;
@@ -728,24 +800,11 @@ void arch_get_info_guest(struct vcpu *v, vcpu_guest_context_u c)
 
     if ( is_hvm_vcpu(v) )
     {
-        if ( !is_pv_32on64_domain(v->domain) )
-        {
-            memset(c.nat->ctrlreg, 0, sizeof(c.nat->ctrlreg));
-            c.nat->ctrlreg[0] = v->arch.hvm_vcpu.guest_cr[0];
-            c.nat->ctrlreg[2] = v->arch.hvm_vcpu.guest_cr[2];
-            c.nat->ctrlreg[3] = v->arch.hvm_vcpu.guest_cr[3];
-            c.nat->ctrlreg[4] = v->arch.hvm_vcpu.guest_cr[4];
-        }
-#ifdef CONFIG_COMPAT
-        else
-        {
-            memset(c.cmp->ctrlreg, 0, sizeof(c.cmp->ctrlreg));
-            c.cmp->ctrlreg[0] = v->arch.hvm_vcpu.guest_cr[0];
-            c.cmp->ctrlreg[2] = v->arch.hvm_vcpu.guest_cr[2];
-            c.cmp->ctrlreg[3] = v->arch.hvm_vcpu.guest_cr[3];
-            c.cmp->ctrlreg[4] = v->arch.hvm_vcpu.guest_cr[4];
-        }
-#endif
+        memset(c.nat->ctrlreg, 0, sizeof(c.nat->ctrlreg));
+        c.nat->ctrlreg[0] = v->arch.hvm_vcpu.guest_cr[0];
+        c.nat->ctrlreg[2] = v->arch.hvm_vcpu.guest_cr[2];
+        c.nat->ctrlreg[3] = v->arch.hvm_vcpu.guest_cr[3];
+        c.nat->ctrlreg[4] = v->arch.hvm_vcpu.guest_cr[4];
     }
     else
     {

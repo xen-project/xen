@@ -13,7 +13,6 @@
 
 #ifdef CONFIG_X86_LOCAL_APIC
 #ifndef __ASSEMBLY__
-#include <asm/fixmap.h>
 #include <asm/bitops.h>
 #include <asm/mpspec.h>
 #ifdef CONFIG_X86_IO_APIC

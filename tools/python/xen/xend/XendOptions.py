@@ -102,6 +102,15 @@ class XendOptions:
     """Default interface to listen for VNC connections on"""
     xend_vnc_listen_default = '127.0.0.1'
 
+    """Use of TLS mode in QEMU VNC server"""
+    xend_vnc_tls = 0
+
+    """x509 certificate directory for QEMU VNC server"""
+    xend_vnc_x509_cert_dir = "/etc/xen/vnc"
+
+    """Verify incoming client x509 certs"""
+    xend_vnc_x509_verify = 0
+
     """Default session storage path."""
     xend_domains_path_default = '/var/lib/xend/domains'
 
@@ -277,6 +286,26 @@ class XendOptions:
 
     def get_keymap(self):
         return self.get_config_value('keymap', None)
+
+    def get_resource_label_change_script(self):
+        s = self.get_config_value('resource-label-change-script')
+        if s:
+            result = s.split(" ")
+            result[0] = os.path.join(osdep.scripts_dir, result[0])
+            return result
+        else:
+            return None
+
+
+    def get_vnc_tls(self):
+        return self.get_config_string('vnc-tls', self.xend_vnc_tls)
+
+    def get_vnc_x509_cert_dir(self):
+        return self.get_config_string('vnc-x509-cert-dir', self.xend_vnc_x509_cert_dir)
+
+    def get_vnc_x509_verify(self):
+        return self.get_config_string('vnc-x509-verify', self.xend_vnc_x509_verify)
+
 
 class XendOptionsFile(XendOptions):
 

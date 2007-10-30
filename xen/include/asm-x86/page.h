@@ -294,9 +294,6 @@ void paging_init(void);
 void setup_idle_pagetable(void);
 #endif /* !defined(__ASSEMBLY__) */
 
-#define __pge_off() write_cr4(mmu_cr4_features & ~X86_CR4_PGE)
-#define __pge_on()  write_cr4(mmu_cr4_features)
-
 #define _PAGE_PRESENT  0x001U
 #define _PAGE_RW       0x002U
 #define _PAGE_USER     0x004U

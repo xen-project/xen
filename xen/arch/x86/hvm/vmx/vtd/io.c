@@ -63,6 +63,7 @@ int pt_irq_create_bind_vtd(
     struct hvm_irq_dpci *hvm_irq_dpci = d->arch.hvm_domain.irq.dpci;
     uint32_t machine_gsi, guest_gsi;
     uint32_t device, intx;
+    uint32_t link, isa_irq;
 
     if ( hvm_irq_dpci == NULL )
     {
@@ -83,6 +84,8 @@ int pt_irq_create_bind_vtd(
     device = pt_irq_bind->u.pci.device;
     intx = pt_irq_bind->u.pci.intx;
     guest_gsi = hvm_pci_intx_gsi(device, intx);
+    link = hvm_pci_intx_link(device, intx);
+    isa_irq = d->arch.hvm_domain.irq.pci_link.route[link];
 
     hvm_irq_dpci->mirq[machine_gsi].valid = 1;
     hvm_irq_dpci->mirq[machine_gsi].device = device;
@@ -95,6 +98,12 @@ int pt_irq_create_bind_vtd(
     hvm_irq_dpci->girq[guest_gsi].intx = intx;
     hvm_irq_dpci->girq[guest_gsi].machine_gsi = machine_gsi;
     hvm_irq_dpci->girq[guest_gsi].dom = d;
+
+    hvm_irq_dpci->girq[isa_irq].valid = 1;
+    hvm_irq_dpci->girq[isa_irq].device = device;
+    hvm_irq_dpci->girq[isa_irq].intx = intx;
+    hvm_irq_dpci->girq[isa_irq].machine_gsi = machine_gsi;
+    hvm_irq_dpci->girq[isa_irq].dom = d;
 
     init_timer(&hvm_irq_dpci->hvm_timer[irq_to_vector(machine_gsi)],
                pt_irq_time_out, &hvm_irq_dpci->mirq[machine_gsi], 0);
@@ -110,26 +119,11 @@ int pt_irq_create_bind_vtd(
 
 int hvm_do_IRQ_dpci(struct domain *d, unsigned int mirq)
 {
-    uint32_t device, intx;
-    uint32_t link, isa_irq;
     struct hvm_irq *hvm_irq = &d->arch.hvm_domain.irq;
 
     if ( !vtd_enabled || (d == dom0) || (hvm_irq->dpci == NULL) ||
          !hvm_irq->dpci->mirq[mirq].valid )
         return 0;
-
-    device = hvm_irq->dpci->mirq[mirq].device;
-    intx = hvm_irq->dpci->mirq[mirq].intx;
-    link = hvm_pci_intx_link(device, intx);
-    isa_irq = hvm_irq->pci_link.route[link];
-
-    if ( !hvm_irq->dpci->girq[isa_irq].valid )
-    {
-        hvm_irq->dpci->girq[isa_irq].valid = 1;
-        hvm_irq->dpci->girq[isa_irq].device = device;
-        hvm_irq->dpci->girq[isa_irq].intx = intx;
-        hvm_irq->dpci->girq[isa_irq].machine_gsi = mirq;
-    }
 
     /*
      * Set a timer here to avoid situations where the IRQ line is shared, and
@@ -151,8 +145,6 @@ void hvm_dpci_eoi(struct domain *d, unsigned int guest_gsi,
     struct hvm_irq_dpci *hvm_irq_dpci = d->arch.hvm_domain.irq.dpci;
     uint32_t device, intx, machine_gsi;
 
-    ASSERT(spin_is_locked(&d->arch.hvm_domain.irq_lock));
-
     if ( !vtd_enabled || (hvm_irq_dpci == NULL) ||
          !hvm_irq_dpci->girq[guest_gsi].valid )
         return;
@@ -163,7 +155,7 @@ void hvm_dpci_eoi(struct domain *d, unsigned int guest_gsi,
     intx = hvm_irq_dpci->girq[guest_gsi].intx;
     gdprintk(XENLOG_INFO, "hvm_dpci_eoi:: device %x intx %x\n",
              device, intx);
-    __hvm_pci_intx_deassert(d, device, intx);
+    hvm_pci_intx_deassert(d, device, intx);
     if ( (ent == NULL) || !ent->fields.mask )
         pirq_guest_eoi(d, machine_gsi);
 }
@@ -180,7 +172,10 @@ void iommu_domain_destroy(struct domain *d)
     {
         for ( i = 0; i < NR_IRQS; i++ )
             if ( hvm_irq_dpci->mirq[i].valid )
+            {
                 pirq_guest_unbind(d, i);
+                kill_timer(&hvm_irq_dpci->hvm_timer[irq_to_vector(i)]);
+            }
         d->arch.hvm_domain.irq.dpci = NULL;
         xfree(hvm_irq_dpci);
     }

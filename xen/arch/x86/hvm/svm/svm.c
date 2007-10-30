@@ -441,7 +441,7 @@ static enum hvm_intblk svm_interrupt_blocked(
     ASSERT((intack.source == hvm_intsrc_pic) ||
            (intack.source == hvm_intsrc_lapic));
 
-    if ( irq_masked(guest_cpu_user_regs()->eflags) )
+    if ( !(guest_cpu_user_regs()->eflags & X86_EFLAGS_IF) )
         return hvm_intblk_rflags_ie;
 
     if ( (intack.source == hvm_intsrc_lapic) &&

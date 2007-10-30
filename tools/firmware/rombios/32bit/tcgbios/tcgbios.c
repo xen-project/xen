@@ -591,7 +591,7 @@ void tcpa_add_measurement(uint32_t pcrIndex,
 	case EV_SEPARATOR:
 		tcpa_add_measurement_to_log_simple(pcrIndex,
 		                            event_type,
-		                            evt_separator,
+		                            (uint8_t *)evt_separator,
 		                            4);
 	break;
 	case EV_ACTION:

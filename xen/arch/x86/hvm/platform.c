@@ -944,7 +944,8 @@ void send_timeoffset_req(unsigned long timeoff)
     memset(p, 0, sizeof(*p));
 
     p->type = IOREQ_TYPE_TIMEOFFSET;
-    p->size = 4;
+    p->size = 8;
+    p->count = 1;
     p->dir = IOREQ_WRITE;
     p->data = timeoff;
 

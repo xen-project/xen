@@ -183,17 +183,20 @@ class NetifController(DevController):
                               "network device")
 
 
-    def getDeviceConfiguration(self, devid):
+    def getDeviceConfiguration(self, devid, transaction = None):
         """@see DevController.configuration"""
 
-        result = DevController.getDeviceConfiguration(self, devid)
+        result = DevController.getDeviceConfiguration(self, devid, transaction)
 
         config_path = "device/%s/%d/" % (self.deviceClass, devid)
         devinfo = ()
         for x in ( 'script', 'ip', 'bridge', 'mac',
                    'type', 'vifname', 'rate', 'uuid', 'model', 'accel',
                    'security_label'):
-            y = self.vm._readVm(config_path + x)
+            if transaction is None:
+                y = self.vm._readVm(config_path + x)
+            else:
+                y = self.vm._readVmTxn(transaction, config_path + x)
             devinfo += (y,)
         (script, ip, bridge, mac, typ, vifname, rate, uuid,
          model, accel, security_label) = devinfo

@@ -1,12 +1,12 @@
 To build:
 
 1. ./mkbuildtree
-   NB. You can override paths to Xen sources and XenLinux sources via
-       the XEN and XL environment variable.
+   NB. You can override paths to Xen sources and a (stub) XenLinux
+       build tree via the XEN and XL environment variable.
 
-2. make -C /path/to/kernel/source M=$PWD modules
-   NB. The kernel sources here are your native kernel build tree, not
-       the XenLinux sources referred to in step 1.
+2. make -C /path/to/kernel/build M=$PWD modules
+   NB. This is your native kernel build tree (or a distro provided
+       stub), not the XenLinux sources referred to in step 1.
 
 You get four modules, xen-platform-pci.ko, xenbus.ko, xen-vbd.ko, and
 xen-vnif.ko.  Load xen-platform-pci first, then xenbus, and then

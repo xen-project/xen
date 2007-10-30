@@ -35,6 +35,7 @@
 #include <termios.h>
 #include <stdarg.h>
 #include <sys/mman.h>
+#include <sys/time.h>
 #if defined(__NetBSD__) || defined(__OpenBSD__)
 #include <util.h>
 #elif defined(__linux__) || defined(__Linux__)
@@ -47,13 +48,20 @@
 /* Each 10 bits takes ~ 3 digits, plus one, plus one for nul terminator. */
 #define MAX_STRLEN(x) ((sizeof(x) * CHAR_BIT + CHAR_BIT-1) / 10 * 3 + 2)
 
+/* How many events are allowed in each time period */
+#define RATE_LIMIT_ALLOWANCE 30
+/* Duration of each time period in ms */
+#define RATE_LIMIT_PERIOD 200
+
 extern int log_reload;
 extern int log_guest;
 extern int log_hv;
 extern char *log_dir;
 
 static int log_hv_fd = -1;
+static evtchn_port_or_error_t log_hv_evtchn = -1;
 static int xc_handle = -1;
+static int xce_handle = -1;
 
 struct buffer
 {
@@ -76,10 +84,12 @@ struct domain
 	char *serialpath;
 	int use_consolepath;
 	int ring_ref;
-	evtchn_port_t local_port;
-	evtchn_port_t remote_port;
+	evtchn_port_or_error_t local_port;
+	evtchn_port_or_error_t remote_port;
 	int xce_handle;
 	struct xencons_interface *interface;
+	int event_count;
+	long long next_period;
 };
 
 static struct domain *dom_head;
@@ -377,6 +387,7 @@ int xs_gather(struct xs_handle *xs, const char *dir, ...)
 static int domain_create_ring(struct domain *dom)
 {
 	int err, remote_port, ring_ref, rc;
+	char *type, path[PATH_MAX];
 
 	err = xs_gather(xs, dom->serialpath,
 			"ring-ref", "%u", &ring_ref,
@@ -392,6 +403,14 @@ static int domain_create_ring(struct domain *dom)
 		dom->use_consolepath = 1;
 	} else
 		dom->use_consolepath = 0;
+
+	sprintf(path, "%s/type", dom->use_consolepath ? dom->conspath: dom->serialpath);
+	type = xs_read(xs, XBT_NULL, path, NULL);
+	if (type && strcmp(type, "xenconsoled") != 0) {
+		free(type);
+		return 0;
+	}
+	free(type);
 
 	if ((ring_ref == dom->ring_ref) && (remote_port == dom->remote_port))
 		goto out;
@@ -483,6 +502,13 @@ static struct domain *create_domain(int domid)
 {
 	struct domain *dom;
 	char *s;
+	struct timeval tv;
+
+	if (gettimeofday(&tv, NULL) < 0) {
+		dolog(LOG_ERR, "Cannot get time of day %s:%s:L%d",
+		      __FILE__, __FUNCTION__, __LINE__);
+		return NULL;
+	}
 
 	dom = (struct domain *)malloc(sizeof(struct domain));
 	if (dom == NULL) {
@@ -518,6 +544,8 @@ static struct domain *create_domain(int domid)
 	dom->buffer.size = 0;
 	dom->buffer.capacity = 0;
 	dom->buffer.max_capacity = 0;
+	dom->event_count = 0;
+	dom->next_period = (tv.tv_sec * 1000) + (tv.tv_usec / 1000) + RATE_LIMIT_PERIOD;
 	dom->next = NULL;
 
 	dom->ring_ref = -1;
@@ -704,14 +732,17 @@ static void handle_tty_write(struct domain *dom)
 
 static void handle_ring_read(struct domain *dom)
 {
-	evtchn_port_t port;
+	evtchn_port_or_error_t port;
 
 	if ((port = xc_evtchn_pending(dom->xce_handle)) == -1)
 		return;
 
+	dom->event_count++;
+
 	buffer_append(dom);
 
-	(void)xc_evtchn_unmask(dom->xce_handle, port);
+	if (dom->event_count < RATE_LIMIT_ALLOWANCE)
+		(void)xc_evtchn_unmask(dom->xce_handle, port);
 }
 
 static void handle_xs(void)
@@ -743,12 +774,20 @@ static void handle_hv_logs(void)
 	char buffer[1024*16];
 	char *bufptr = buffer;
 	unsigned int size = sizeof(buffer);
-	if (xc_readconsolering(xc_handle, &bufptr, &size, 1) == 0) {
+	static uint32_t index = 0;
+	evtchn_port_or_error_t port;
+
+	if ((port = xc_evtchn_pending(xce_handle)) == -1)
+		return;
+
+	if (xc_readconsolering(xc_handle, &bufptr, &size, 0, 1, &index) == 0) {
 		int len = write(log_hv_fd, buffer, size);
 		if (len < 0)
 			dolog(LOG_ERR, "Failed to write hypervisor log: %d (%s)",
 			      errno, strerror(errno));
 	}
+
+	(void)xc_evtchn_unmask(xce_handle, port);
 }
 
 static void handle_log_reload(void)
@@ -776,17 +815,34 @@ void handle_io(void)
 
 	if (log_hv) {
 		xc_handle = xc_interface_open();
-		if (xc_handle == -1)
+		if (xc_handle == -1) {
 			dolog(LOG_ERR, "Failed to open xc handle: %d (%s)",
 			      errno, strerror(errno));
-		else
-			log_hv_fd = create_hv_log();
+			goto out;
+		}
+		xce_handle = xc_evtchn_open();
+		if (xce_handle == -1) {
+			dolog(LOG_ERR, "Failed to open xce handle: %d (%s)",
+			      errno, strerror(errno));
+			goto out;
+		}
+		log_hv_fd = create_hv_log();
+		if (log_hv_fd == -1)
+			goto out;
+		log_hv_evtchn = xc_evtchn_bind_virq(xce_handle, VIRQ_CON_RING);
+		if (log_hv_evtchn == -1) {
+			dolog(LOG_ERR, "Failed to bind to VIRQ_CON_RING: "
+			      "%d (%s)", errno, strerror(errno));
+			goto out;
+		}
 	}
 
 	for (;;) {
 		struct domain *d, *n;
-		struct timeval timeout = { 1, 0 }; /* Read HV logs every 1 second */
 		int max_fd = -1;
+		struct timeval timeout;
+		struct timeval tv;
+		long long now, next_timeout = 0;
 
 		FD_ZERO(&readfds);
 		FD_ZERO(&writefds);
@@ -794,8 +850,38 @@ void handle_io(void)
 		FD_SET(xs_fileno(xs), &readfds);
 		max_fd = MAX(xs_fileno(xs), max_fd);
 
+		if (log_hv) {
+			FD_SET(xc_evtchn_fd(xce_handle), &readfds);
+			max_fd = MAX(xc_evtchn_fd(xce_handle), max_fd);
+		}
+
+		if (gettimeofday(&tv, NULL) < 0)
+			return;
+		now = (tv.tv_sec * 1000) + (tv.tv_usec / 1000);
+
+		/* Re-calculate any event counter allowances & unblock
+		   domains with new allowance */
 		for (d = dom_head; d; d = d->next) {
-			if (d->xce_handle != -1) {
+			/* Add 5ms of fuzz since select() often returns
+			   a couple of ms sooner than requested. Without
+			   the fuzz we typically do an extra spin in select()
+			   with a 1/2 ms timeout every other iteration */
+			if ((now+5) > d->next_period) {
+				d->next_period = now + RATE_LIMIT_PERIOD;
+				if (d->event_count >= RATE_LIMIT_ALLOWANCE) {
+					(void)xc_evtchn_unmask(d->xce_handle, d->local_port);
+				}
+				d->event_count = 0;
+			}
+		}
+
+		for (d = dom_head; d; d = d->next) {
+			if (d->event_count >= RATE_LIMIT_ALLOWANCE) {
+				/* Determine if we're going to be the next time slice to expire */
+				if (!next_timeout ||
+				    d->next_period < next_timeout)
+					next_timeout = d->next_period;
+			} else if (d->xce_handle != -1) {
 				int evtchn_fd = xc_evtchn_fd(d->xce_handle);
 				FD_SET(evtchn_fd, &readfds);
 				max_fd = MAX(evtchn_fd, max_fd);
@@ -811,11 +897,19 @@ void handle_io(void)
 			}
 		}
 
-		/* XXX I wish we didn't have to busy wait for hypervisor logs
-		 * but there's no obvious way to get event channel notifications
-		 * for new HV log data as we can with guest */
+		/* If any domain has been rate limited, we need to work
+		   out what timeout to supply to select */
+		if (next_timeout) {
+			long long duration = (next_timeout - now);
+			if (duration <= 0) /* sanity check */
+				duration = 1;
+			timeout.tv_sec = duration / 1000;
+			timeout.tv_usec = ((duration - (timeout.tv_sec * 1000))
+					   * 1000);
+		}
+
 		ret = select(max_fd + 1, &readfds, &writefds, 0,
-			     log_hv_fd != -1 ? &timeout : NULL);
+			     next_timeout ? &timeout : NULL);
 
 		if (log_reload) {
 			handle_log_reload();
@@ -832,12 +926,10 @@ void handle_io(void)
 			break;
 		}
 
-		/* Always process HV logs even if not a timeout */
-		if (log_hv_fd != -1)
+		if (log_hv && FD_ISSET(xc_evtchn_fd(xce_handle), &readfds))
 			handle_hv_logs();
 
-		/* Must not check returned FDSET if it was a timeout */
-		if (ret == 0)
+		if (ret <= 0)
 			continue;
 
 		if (FD_ISSET(xs_fileno(xs), &readfds))
@@ -845,9 +937,11 @@ void handle_io(void)
 
 		for (d = dom_head; d; d = n) {
 			n = d->next;
-			if (d->xce_handle != -1 &&
-			    FD_ISSET(xc_evtchn_fd(d->xce_handle), &readfds))
-				handle_ring_read(d);
+			if (d->event_count < RATE_LIMIT_ALLOWANCE) {
+				if (d->xce_handle != -1 &&
+				    FD_ISSET(xc_evtchn_fd(d->xce_handle), &readfds))
+					handle_ring_read(d);
+			}
 
 			if (d->tty_fd != -1 && FD_ISSET(d->tty_fd, &readfds))
 				handle_tty_read(d);
@@ -860,6 +954,7 @@ void handle_io(void)
 		}
 	}
 
+ out:
 	if (log_hv_fd != -1) {
 		close(log_hv_fd);
 		log_hv_fd = -1;
@@ -868,6 +963,11 @@ void handle_io(void)
 		xc_interface_close(xc_handle);
 		xc_handle = -1;
 	}
+	if (xce_handle != -1) {
+		xc_evtchn_close(xce_handle);
+		xce_handle = -1;
+	}
+	log_hv_evtchn = -1;
 }
 
 /*

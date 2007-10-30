@@ -128,12 +128,13 @@ boolean_param("ler", opt_ler);
 static void show_guest_stack(struct cpu_user_regs *regs)
 {
     int i;
+    struct vcpu *curr = current;
     unsigned long *stack, addr;
 
-    if ( is_hvm_vcpu(current) )
+    if ( is_hvm_vcpu(curr) )
         return;
 
-    if ( is_pv_32on64_vcpu(current) )
+    if ( is_pv_32on64_vcpu(curr) )
     {
         compat_show_guest_stack(regs, debug_stack_lines);
         return;
@@ -411,6 +412,19 @@ static int do_guest_trap(
                  regs->error_code);
 
     return 0;
+}
+
+/*
+ * Called from asm to set up the NMI trapbounce info.
+ * Returns 0 if no callback is set up, else 1.
+ */
+asmlinkage int set_guest_nmi_trapbounce(void)
+{
+    struct vcpu *v = current;
+    struct trap_bounce *tb = &v->arch.trap_bounce;
+    do_guest_trap(TRAP_nmi, guest_cpu_user_regs(), 0);
+    tb->flags &= ~TBF_EXCEPTION; /* not needed for NMI delivery path */
+    return !null_trap_bounce(v, tb);
 }
 
 static inline int do_trap(
@@ -787,12 +801,13 @@ void propagate_page_fault(unsigned long addr, u16 error_code)
 static int handle_gdt_ldt_mapping_fault(
     unsigned long offset, struct cpu_user_regs *regs)
 {
+    struct vcpu *curr = current;
     /* Which vcpu's area did we fault in, and is it in the ldt sub-area? */
     unsigned int is_ldt_area = (offset >> (GDT_LDT_VCPU_VA_SHIFT-1)) & 1;
     unsigned int vcpu_area   = (offset >> GDT_LDT_VCPU_VA_SHIFT);
 
     /* Should never fault in another vcpu's area. */
-    BUG_ON(vcpu_area != current->vcpu_id);
+    BUG_ON(vcpu_area != curr->vcpu_id);
 
     /* Byte offset within the gdt/ldt sub-area. */
     offset &= (1UL << (GDT_LDT_VCPU_VA_SHIFT-1)) - 1UL;
@@ -813,7 +828,7 @@ static int handle_gdt_ldt_mapping_fault(
                 return 0;
             /* In guest mode? Propagate #PF to guest, with adjusted %cr2. */
             propagate_page_fault(
-                current->arch.guest_context.ldt_base + offset,
+                curr->arch.guest_context.ldt_base + offset,
                 regs->error_code);
         }
     }
@@ -1154,6 +1169,63 @@ static int read_descriptor(unsigned int sel,
     return 1;
 }
 
+#ifdef __x86_64__
+static int read_gate_descriptor(unsigned int gate_sel,
+                                const struct vcpu *v,
+                                unsigned int *sel,
+                                unsigned long *off,
+                                unsigned int *ar)
+{
+    struct desc_struct desc;
+    const struct desc_struct *pdesc;
+
+
+    pdesc = (const struct desc_struct *)(!(gate_sel & 4) ?
+                                         GDT_VIRT_START(v) :
+                                         LDT_VIRT_START(v))
+            + (gate_sel >> 3);
+    if ( gate_sel < 4 ||
+         (gate_sel >= FIRST_RESERVED_GDT_BYTE && !(gate_sel & 4)) ||
+         __get_user(desc, pdesc) )
+        return 0;
+
+    *sel = (desc.a >> 16) & 0x0000fffc;
+    *off = (desc.a & 0x0000ffff) | (desc.b & 0xffff0000);
+    *ar = desc.b & 0x0000ffff;
+    /*
+     * check_descriptor() clears the DPL field and stores the
+     * guest requested DPL in the selector's RPL field.
+     */
+    ASSERT(!(*ar & _SEGMENT_DPL));
+    *ar |= (desc.a >> (16 - 13)) & _SEGMENT_DPL;
+
+    if ( !is_pv_32bit_vcpu(v) )
+    {
+        if ( (*ar & 0x1f00) != 0x0c00 ||
+             (gate_sel >= FIRST_RESERVED_GDT_BYTE - 8 && !(gate_sel & 4)) ||
+             __get_user(desc, pdesc + 1) ||
+             (desc.b & 0x1f00) )
+            return 0;
+
+        *off |= (unsigned long)desc.a << 32;
+        return 1;
+    }
+
+    switch ( *ar & 0x1f00 )
+    {
+    case 0x0400:
+        *off &= 0xffff;
+        break;
+    case 0x0c00:
+        break;
+    default:
+        return 0;
+    }
+
+    return 1;
+}
+#endif
+
 /* Has the guest requested sufficient permission for this I/O access? */
 static inline int guest_io_okay(
     unsigned int port, unsigned int bytes,
@@ -1223,6 +1295,8 @@ void (*pv_post_outb_hook)(unsigned int port, u8 value);
 #define insn_fetch(type, base, eip, limit)                                  \
 ({  unsigned long _rc, _ptr = (base) + (eip);                               \
     type _x;                                                                \
+    if ( ad_default < 8 )                                                   \
+        _ptr = (unsigned int)_ptr;                                          \
     if ( (limit) < sizeof(_x) - 1 || (eip) > (limit) - (sizeof(_x) - 1) )   \
         goto fail;                                                          \
     if ( (_rc = copy_from_user(&_x, (type *)_ptr, sizeof(_x))) != 0 )       \
@@ -1722,10 +1796,8 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
             break;
 
         case 4: /* Write CR4 */
-            if ( *reg != (read_cr4() & ~(X86_CR4_PGE|X86_CR4_PSE)) )
-                gdprintk(XENLOG_WARNING,
-                         "Attempt to change CR4 flags %08lx -> %08lx\n",
-                         read_cr4() & ~(X86_CR4_PGE|X86_CR4_PSE), *reg);
+            v->arch.guest_context.ctrlreg[4] = pv_guest_cr4_fixup(*reg);
+            write_cr4(v->arch.guest_context.ctrlreg[4]);
             break;
 
         default:
@@ -1796,6 +1868,10 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
         }
         break;
 
+    case 0x31: /* RDTSC */
+        rdtsc(regs->eax, regs->edx);
+        break;
+
     case 0x32: /* RDMSR */
         switch ( regs->ecx )
         {
@@ -1862,6 +1938,336 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
     return 0;
 }
 
+static inline int check_stack_limit(unsigned int ar, unsigned int limit,
+                                    unsigned int esp, unsigned int decr)
+{
+    return (((esp - decr) < (esp - 1)) &&
+            (!(ar & _SEGMENT_EC) ? (esp - 1) <= limit : (esp - decr) > limit));
+}
+
+static int emulate_gate_op(struct cpu_user_regs *regs)
+{
+#ifdef __x86_64__
+    struct vcpu *v = current;
+    unsigned int sel, ar, dpl, nparm, opnd_sel;
+    unsigned int op_default, op_bytes, ad_default, ad_bytes;
+    unsigned long off, eip, opnd_off, base, limit;
+    int jump;
+
+    /* Check whether this fault is due to the use of a call gate. */
+    if ( !read_gate_descriptor(regs->error_code, v, &sel, &off, &ar) ||
+         ((ar >> 13) & 3) < (regs->cs & 3) ||
+         (ar & _SEGMENT_TYPE) != 0xc00 )
+        return do_guest_trap(TRAP_gp_fault, regs, 1);
+    if ( !(ar & _SEGMENT_P) )
+        return do_guest_trap(TRAP_no_segment, regs, 1);
+    dpl = (ar >> 13) & 3;
+    nparm = ar & 0x1f;
+
+    /*
+     * Decode instruction (and perhaps operand) to determine RPL,
+     * whether this is a jump or a call, and the call return offset.
+     */
+    if ( !read_descriptor(regs->cs, v, regs, &base, &limit, &ar, 0) ||
+         !(ar & _SEGMENT_S) ||
+         !(ar & _SEGMENT_P) ||
+         !(ar & _SEGMENT_CODE) )
+        return do_guest_trap(TRAP_gp_fault, regs, 1);
+
+    op_bytes = op_default = ar & _SEGMENT_DB ? 4 : 2;
+    ad_default = ad_bytes = op_default;
+    opnd_sel = opnd_off = 0;
+    jump = -1;
+    for ( eip = regs->eip; eip - regs->_eip < 10; )
+    {
+        switch ( insn_fetch(u8, base, eip, limit) )
+        {
+        case 0x66: /* operand-size override */
+            op_bytes = op_default ^ 6; /* switch between 2/4 bytes */
+            continue;
+        case 0x67: /* address-size override */
+            ad_bytes = ad_default != 4 ? 4 : 2; /* switch to 2/4 bytes */
+            continue;
+        case 0x2e: /* CS override */
+            opnd_sel = regs->cs;
+            ASSERT(opnd_sel);
+            continue;
+        case 0x3e: /* DS override */
+            opnd_sel = read_sreg(regs, ds);
+            if ( !opnd_sel )
+                opnd_sel = dpl;
+            continue;
+        case 0x26: /* ES override */
+            opnd_sel = read_sreg(regs, es);
+            if ( !opnd_sel )
+                opnd_sel = dpl;
+            continue;
+        case 0x64: /* FS override */
+            opnd_sel = read_sreg(regs, fs);
+            if ( !opnd_sel )
+                opnd_sel = dpl;
+            continue;
+        case 0x65: /* GS override */
+            opnd_sel = read_sreg(regs, gs);
+            if ( !opnd_sel )
+                opnd_sel = dpl;
+            continue;
+        case 0x36: /* SS override */
+            opnd_sel = regs->ss;
+            if ( !opnd_sel )
+                opnd_sel = dpl;
+            continue;
+        case 0xea:
+            ++jump;
+            /* FALLTHROUGH */
+        case 0x9a:
+            ++jump;
+            opnd_sel = regs->cs;
+            opnd_off = eip;
+            ad_bytes = ad_default;
+            eip += op_bytes + 2;
+            break;
+        case 0xff:
+            {
+                unsigned int modrm;
+
+                switch ( (modrm = insn_fetch(u8, base, eip, limit)) & 0xf8 )
+                {
+                case 0x28: case 0x68: case 0xa8:
+                    ++jump;
+                    /* FALLTHROUGH */
+                case 0x18: case 0x58: case 0x98:
+                    ++jump;
+                    if ( ad_bytes != 2 )
+                    {
+                        if ( (modrm & 7) == 4 )
+                        {
+                            unsigned int sib = insn_fetch(u8, base, eip, limit);
+
+                            modrm = (modrm & ~7) | (sib & 7);
+                            if ( (sib >>= 3) != 4 )
+                                opnd_off = *(unsigned long *)decode_register(sib & 7, regs, 0);
+                            opnd_off <<= sib >> 3;
+                        }
+                        if ( (modrm & 7) != 5 || (modrm & 0xc0) )
+                            opnd_off += *(unsigned long *)decode_register(modrm & 7, regs, 0);
+                        else
+                            modrm |= 0x87;
+                        if ( !opnd_sel )
+                        {
+                            switch ( modrm & 7 )
+                            {
+                            default:
+                                opnd_sel = read_sreg(regs, ds);
+                                break;
+                            case 4: case 5:
+                                opnd_sel = regs->ss;
+                                break;
+                            }
+                        }
+                    }
+                    else
+                    {
+                        switch ( modrm & 7 )
+                        {
+                        case 0: case 1: case 7:
+                            opnd_off = regs->ebx;
+                            break;
+                        case 6:
+                            if ( !(modrm & 0xc0) )
+                                modrm |= 0x80;
+                            else
+                        case 2: case 3:
+                            {
+                                opnd_off = regs->ebp;
+                                if ( !opnd_sel )
+                                    opnd_sel = regs->ss;
+                            }
+                            break;
+                        }
+                        if ( !opnd_sel )
+                            opnd_sel = read_sreg(regs, ds);
+                        switch ( modrm & 7 )
+                        {
+                        case 0: case 2: case 4:
+                            opnd_off += regs->esi;
+                            break;
+                        case 1: case 3: case 5:
+                            opnd_off += regs->edi;
+                            break;
+                        }
+                    }
+                    switch ( modrm & 0xc0 )
+                    {
+                    case 0x40:
+                        opnd_off += insn_fetch(s8, base, eip, limit);
+                        break;
+                    case 0x80:
+                        opnd_off += insn_fetch(s32, base, eip, limit);
+                        break;
+                    }
+                    if ( ad_bytes == 4 )
+                        opnd_off = (unsigned int)opnd_off;
+                    else if ( ad_bytes == 2 )
+                        opnd_off = (unsigned short)opnd_off;
+                    break;
+                }
+            }
+            break;
+        }
+        break;
+    }
+
+    if ( jump < 0 )
+    {
+ fail:
+        return do_guest_trap(TRAP_gp_fault, regs, 1);
+    }
+
+    if ( (opnd_sel != regs->cs &&
+          !read_descriptor(opnd_sel, v, regs, &base, &limit, &ar, 0)) ||
+         !(ar & _SEGMENT_S) ||
+         !(ar & _SEGMENT_P) ||
+         ((ar & _SEGMENT_CODE) && !(ar & _SEGMENT_WR)) )
+        return do_guest_trap(TRAP_gp_fault, regs, 1);
+
+    opnd_off += op_bytes;
+#define ad_default ad_bytes
+    opnd_sel = insn_fetch(u16, base, opnd_off, limit);
+#undef ad_default
+    ASSERT((opnd_sel & ~3) == regs->error_code);
+    if ( dpl < (opnd_sel & 3) )
+        return do_guest_trap(TRAP_gp_fault, regs, 1);
+
+    if ( !read_descriptor(sel, v, regs, &base, &limit, &ar, 0) ||
+         !(ar & _SEGMENT_S) ||
+         !(ar & _SEGMENT_CODE) ||
+         (!jump || (ar & _SEGMENT_EC) ?
+          ((ar >> 13) & 3) > (regs->cs & 3) :
+          ((ar >> 13) & 3) != (regs->cs & 3)) )
+    {
+        regs->error_code = sel;
+        return do_guest_trap(TRAP_gp_fault, regs, 1);
+    }
+    if ( !(ar & _SEGMENT_P) )
+    {
+        regs->error_code = sel;
+        return do_guest_trap(TRAP_no_segment, regs, 1);
+    }
+    if ( off > limit )
+    {
+        regs->error_code = 0;
+        return do_guest_trap(TRAP_gp_fault, regs, 1);
+    }
+
+    if ( !jump )
+    {
+        unsigned int ss, esp, *stkp;
+        int rc;
+#define push(item) do \
+        { \
+            --stkp; \
+            esp -= 4; \
+            rc = __put_user(item, stkp); \
+            if ( rc ) \
+            { \
+                propagate_page_fault((unsigned long)(stkp + 1) - rc, \
+                                     PFEC_write_access); \
+                return 0; \
+            } \
+        } while ( 0 )
+
+        if ( ((ar >> 13) & 3) < (regs->cs & 3) )
+        {
+            sel |= (ar >> 13) & 3;
+            /* Inner stack known only for kernel ring. */
+            if ( (sel & 3) != GUEST_KERNEL_RPL(v->domain) )
+                return do_guest_trap(TRAP_gp_fault, regs, 1);
+            esp = v->arch.guest_context.kernel_sp;
+            ss = v->arch.guest_context.kernel_ss;
+            if ( (ss & 3) != (sel & 3) ||
+                 !read_descriptor(ss, v, regs, &base, &limit, &ar, 0) ||
+                 ((ar >> 13) & 3) != (sel & 3) ||
+                 !(ar & _SEGMENT_S) ||
+                 (ar & _SEGMENT_CODE) ||
+                 !(ar & _SEGMENT_WR) )
+            {
+                regs->error_code = ss & ~3;
+                return do_guest_trap(TRAP_invalid_tss, regs, 1);
+            }
+            if ( !(ar & _SEGMENT_P) ||
+                 !check_stack_limit(ar, limit, esp, (4 + nparm) * 4) )
+            {
+                regs->error_code = ss & ~3;
+                return do_guest_trap(TRAP_stack_error, regs, 1);
+            }
+            stkp = (unsigned int *)(unsigned long)((unsigned int)base + esp);
+            if ( !compat_access_ok(stkp - 4 - nparm, (4 + nparm) * 4) )
+                return do_guest_trap(TRAP_gp_fault, regs, 1);
+            push(regs->ss);
+            push(regs->esp);
+            if ( nparm )
+            {
+                const unsigned int *ustkp;
+
+                if ( !read_descriptor(regs->ss, v, regs, &base, &limit, &ar, 0) ||
+                     ((ar >> 13) & 3) != (regs->cs & 3) ||
+                     !(ar & _SEGMENT_S) ||
+                     (ar & _SEGMENT_CODE) ||
+                     !(ar & _SEGMENT_WR) ||
+                     !check_stack_limit(ar, limit, esp + nparm * 4, nparm * 4) )
+                    return do_guest_trap(TRAP_gp_fault, regs, 1);
+                ustkp = (unsigned int *)(unsigned long)((unsigned int)base + regs->_esp + nparm * 4);
+                if ( !compat_access_ok(ustkp - nparm, nparm * 4) )
+                    return do_guest_trap(TRAP_gp_fault, regs, 1);
+                do
+                {
+                    unsigned int parm;
+
+                    --ustkp;
+                    rc = __get_user(parm, ustkp);
+                    if ( rc )
+                    {
+                        propagate_page_fault((unsigned long)(ustkp + 1) - rc, 0);
+                        return 0;
+                    }
+                    push(parm);
+                } while ( --nparm );
+            }
+        }
+        else
+        {
+            sel |= (regs->cs & 3);
+            esp = regs->esp;
+            ss = regs->ss;
+            if ( !read_descriptor(ss, v, regs, &base, &limit, &ar, 0) ||
+                 ((ar >> 13) & 3) != (sel & 3) )
+                return do_guest_trap(TRAP_gp_fault, regs, 1);
+            if ( !check_stack_limit(ar, limit, esp, 2 * 4) )
+            {
+                regs->error_code = 0;
+                return do_guest_trap(TRAP_stack_error, regs, 1);
+            }
+            stkp = (unsigned int *)(unsigned long)((unsigned int)base + esp);
+            if ( !compat_access_ok(stkp - 2, 2 * 4) )
+                return do_guest_trap(TRAP_gp_fault, regs, 1);
+        }
+        push(regs->cs);
+        push(eip);
+#undef push
+        regs->esp = esp;
+        regs->ss = ss;
+    }
+    else
+        sel |= (regs->cs & 3);
+
+    regs->eip = off;
+    regs->cs = sel;
+#endif
+
+    return 0;
+}
+
 asmlinkage int do_general_protection(struct cpu_user_regs *regs)
 {
     struct vcpu *v = current;
@@ -1907,6 +2313,8 @@ asmlinkage int do_general_protection(struct cpu_user_regs *regs)
             return do_guest_trap(vector, regs, 0);
         }
     }
+    else if ( is_pv_32on64_vcpu(v) && regs->error_code )
+        return emulate_gate_op(regs);
 
     /* Emulate some simple privileged and I/O instructions. */
     if ( (regs->error_code == 0) &&
@@ -2066,14 +2474,16 @@ void unset_nmi_callback(void)
 
 asmlinkage int do_device_not_available(struct cpu_user_regs *regs)
 {
+    struct vcpu *curr = current;
+
     BUG_ON(!guest_mode(regs));
 
-    setup_fpu(current);
+    setup_fpu(curr);
 
-    if ( current->arch.guest_context.ctrlreg[0] & X86_CR0_TS )
+    if ( curr->arch.guest_context.ctrlreg[0] & X86_CR0_TS )
     {
         do_guest_trap(TRAP_no_device, regs, 0);
-        current->arch.guest_context.ctrlreg[0] &= ~X86_CR0_TS;
+        curr->arch.guest_context.ctrlreg[0] &= ~X86_CR0_TS;
     }
     else
         TRACE_0D(TRC_PV_MATH_STATE_RESTORE);
@@ -2254,7 +2664,7 @@ void __init trap_init(void)
 long register_guest_nmi_callback(unsigned long address)
 {
     struct vcpu *v = current;
-    struct domain *d = current->domain;
+    struct domain *d = v->domain;
     struct trap_info *t = &v->arch.guest_context.trap_ctxt[TRAP_nmi];
 
     t->vector  = TRAP_nmi;
@@ -2286,14 +2696,15 @@ long unregister_guest_nmi_callback(void)
 long do_set_trap_table(XEN_GUEST_HANDLE(trap_info_t) traps)
 {
     struct trap_info cur;
-    struct trap_info *dst = current->arch.guest_context.trap_ctxt;
+    struct vcpu *curr = current;
+    struct trap_info *dst = curr->arch.guest_context.trap_ctxt;
     long rc = 0;
 
     /* If no table is presented then clear the entire virtual IDT. */
     if ( guest_handle_is_null(traps) )
     {
         memset(dst, 0, 256 * sizeof(*dst));
-        init_int80_direct_trap(current);
+        init_int80_direct_trap(curr);
         return 0;
     }
 
@@ -2315,18 +2726,12 @@ long do_set_trap_table(XEN_GUEST_HANDLE(trap_info_t) traps)
         if ( cur.address == 0 )
             break;
 
-        if ( (cur.vector == TRAP_nmi) && !TI_GET_IF(&cur) )
-        {
-            rc = -EINVAL;
-            break;
-        }
-
-        fixup_guest_code_selector(current->domain, cur.cs);
+        fixup_guest_code_selector(curr->domain, cur.cs);
 
         memcpy(&dst[cur.vector], &cur, sizeof(cur));
 
         if ( cur.vector == 0x80 )
-            init_int80_direct_trap(current);
+            init_int80_direct_trap(curr);
 
         guest_handle_add_offset(traps, 1);
     }
@@ -2334,35 +2739,35 @@ long do_set_trap_table(XEN_GUEST_HANDLE(trap_info_t) traps)
     return rc;
 }
 
-
-long set_debugreg(struct vcpu *p, int reg, unsigned long value)
+long set_debugreg(struct vcpu *v, int reg, unsigned long value)
 {
     int i;
+    struct vcpu *curr = current;
 
     switch ( reg )
     {
     case 0: 
         if ( !access_ok(value, sizeof(long)) )
             return -EPERM;
-        if ( p == current ) 
+        if ( v == curr ) 
             asm volatile ( "mov %0, %%db0" : : "r" (value) );
         break;
     case 1: 
         if ( !access_ok(value, sizeof(long)) )
             return -EPERM;
-        if ( p == current ) 
+        if ( v == curr ) 
             asm volatile ( "mov %0, %%db1" : : "r" (value) );
         break;
     case 2: 
         if ( !access_ok(value, sizeof(long)) )
             return -EPERM;
-        if ( p == current ) 
+        if ( v == curr ) 
             asm volatile ( "mov %0, %%db2" : : "r" (value) );
         break;
     case 3:
         if ( !access_ok(value, sizeof(long)) )
             return -EPERM;
-        if ( p == current ) 
+        if ( v == curr ) 
             asm volatile ( "mov %0, %%db3" : : "r" (value) );
         break;
     case 6:
@@ -2372,7 +2777,7 @@ long set_debugreg(struct vcpu *p, int reg, unsigned long value)
          */
         value &= 0xffffefff; /* reserved bits => 0 */
         value |= 0xffff0ff0; /* reserved bits => 1 */
-        if ( p == current ) 
+        if ( v == curr ) 
             asm volatile ( "mov %0, %%db6" : : "r" (value) );
         break;
     case 7:
@@ -2393,14 +2798,14 @@ long set_debugreg(struct vcpu *p, int reg, unsigned long value)
             for ( i = 0; i < 16; i += 2 )
                 if ( ((value >> (i+16)) & 3) == 2 ) return -EPERM;
         }
-        if ( p == current ) 
+        if ( v == current ) 
             asm volatile ( "mov %0, %%db7" : : "r" (value) );
         break;
     default:
         return -EINVAL;
     }
 
-    p->arch.guest_context.debugreg[reg] = value;
+    v->arch.guest_context.debugreg[reg] = value;
     return 0;
 }
 

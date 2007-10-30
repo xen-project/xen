@@ -26,7 +26,7 @@
 #include <asm/hvm/domain.h>
 #include <asm/hvm/support.h>
 
-void __hvm_pci_intx_assert(
+static void __hvm_pci_intx_assert(
     struct domain *d, unsigned int device, unsigned int intx)
 {
     struct hvm_irq *hvm_irq = &d->arch.hvm_domain.irq;
@@ -59,7 +59,7 @@ void hvm_pci_intx_assert(
     spin_unlock(&d->arch.hvm_domain.irq_lock);
 }
 
-void __hvm_pci_intx_deassert(
+static void __hvm_pci_intx_deassert(
     struct domain *d, unsigned int device, unsigned int intx)
 {
     struct hvm_irq *hvm_irq = &d->arch.hvm_domain.irq;
@@ -190,6 +190,18 @@ void hvm_set_pci_link_route(struct domain *d, u8 link, u8 isa_irq)
     if ( old_isa_irq == isa_irq )
         goto out;
     hvm_irq->pci_link.route[link] = isa_irq;
+
+    /* PCI pass-through fixup. */
+    if ( hvm_irq->dpci && hvm_irq->dpci->girq[old_isa_irq].valid )
+    {
+        uint32_t device = hvm_irq->dpci->girq[old_isa_irq].device;
+        uint32_t intx = hvm_irq->dpci->girq[old_isa_irq].intx;
+        if ( link == hvm_pci_intx_link(device, intx) )
+        {
+            hvm_irq->dpci->girq[isa_irq] = hvm_irq->dpci->girq[old_isa_irq];
+            hvm_irq->dpci->girq[old_isa_irq].valid = 0;
+        }
+    }
 
     if ( hvm_irq->pci_link_assert_count[link] == 0 )
         goto out;

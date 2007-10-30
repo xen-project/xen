@@ -364,10 +364,12 @@ static void __init ns16550_parse_port_config(
 
 void __init ns16550_init(int index, struct ns16550_defaults *defaults)
 {
-    struct ns16550 *uart = &ns16550_com[index];
+    struct ns16550 *uart;
 
     if ( (index < 0) || (index > 1) )
         return;
+
+    uart = &ns16550_com[index];
 
     uart->baud      = (defaults->baud ? :
                        console_has((index == 0) ? "com1" : "com2")

@@ -194,6 +194,11 @@ gopts.var('pae', val='PAE',
           fn=set_int, default=1,
           use="Disable or enable PAE of HVM domain.")
 
+gopts.var('timer_mode', val='TIMER_MODE',
+          fn=set_int, default=0,
+          use="""Timer mode (0=delay virtual time when ticks are missed;
+          1=virtual time is always wallclock time.""")
+
 gopts.var('acpi', val='ACPI',
           fn=set_int, default=1,
           use="Disable or enable ACPI of HVM domain.")
@@ -724,7 +729,7 @@ def configure_vifs(config_devs, vals):
 def configure_hvm(config_image, vals):
     """Create the config for HVM devices.
     """
-    args = [ 'device_model', 'pae', 'vcpus', 'boot', 'fda', 'fdb',
+    args = [ 'device_model', 'pae', 'vcpus', 'boot', 'fda', 'fdb', 'timer_mode',
              'localtime', 'serial', 'stdvga', 'isa', 'nographic', 'soundhw',
              'vnc', 'vncdisplay', 'vncunused', 'vncconsole', 'vnclisten',
              'sdl', 'display', 'xauthority', 'rtc_timeoffset', 'monitor',
@@ -1228,7 +1233,7 @@ def config_security_check(config, verbose):
             if verbose:
                 print "   %s: PERMITTED" % (resource)
 
-        except security.XSMError:
+        except security.ACMError:
             print "   %s: DENIED" % (resource)
             (poltype, res_label, res_policy) = security.get_res_label(resource)
             if not res_label:

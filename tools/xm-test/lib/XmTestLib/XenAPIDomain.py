@@ -38,7 +38,8 @@ class XenAPIConfig:
                                         'memory_dynamic_max' ],
                            'kernel' : 'PV_kernel',
                            'ramdisk': 'PV_ramdisk',
-                           'root'   : 'PV_args'}
+                           'root'   : 'PV_args',
+                           'extra'  : 'PV_args' }
         if isACMEnabled():
             #A default so every VM can start with ACM enabled
             self.opts["security_label"] = "ACM:xm-test:red"
@@ -47,6 +48,8 @@ class XenAPIConfig:
         """Set an option in the config"""
         if name == "memory":
             value <<= 20
+        if name == "root":
+            value = "root=" + value
         if name in self.opttrlate.keys():
             _name = self.opttrlate[name]
         else:
@@ -56,7 +59,11 @@ class XenAPIConfig:
             for _n in _name:
                 self.opts[_n] = value
         else:
-            self.opts[_name] = value
+            if not self.opts.get(_name) or \
+               not _name in [ "PV_args" ]:
+                self.opts[_name] = value
+            else:
+                self.opts[_name] += " " + value
 
     def getOpt(self, name):
         """Return the value of a config option"""

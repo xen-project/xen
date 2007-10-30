@@ -8,6 +8,8 @@
 #include <xen/config.h>
 #include <xen/cache.h>
 #include <xen/types.h>
+#include <xen/smp.h>
+#include <xen/percpu.h>
 #include <public/xen.h>
 #include <asm/types.h>
 #include <asm/cpufeature.h>
@@ -298,16 +300,17 @@ static inline unsigned long read_cr2(void)
     return cr2;
 }
 
+DECLARE_PER_CPU(unsigned long, cr4);
+
 static inline unsigned long read_cr4(void)
 {
-    unsigned long cr4;
-    asm volatile ( "mov %%cr4,%0\n\t" : "=r" (cr4) );
-    return cr4;
-} 
-    
+    return this_cpu(cr4);
+}
+
 static inline void write_cr4(unsigned long val)
 {
-    asm volatile ( "mov %0,%%cr4" : : "r" ((unsigned long)val) );
+    this_cpu(cr4) = val;
+    asm volatile ( "mov %0,%%cr4" : : "r" (val) );
 }
 
 /* Clear and set 'TS' bit respectively */
@@ -332,13 +335,13 @@ extern unsigned long mmu_cr4_features;
 static always_inline void set_in_cr4 (unsigned long mask)
 {
     mmu_cr4_features |= mask;
-    write_cr4(mmu_cr4_features);
+    write_cr4(read_cr4() | mask);
 }
 
 static always_inline void clear_in_cr4 (unsigned long mask)
 {
-	mmu_cr4_features &= ~mask;
-	write_cr4(mmu_cr4_features);
+    mmu_cr4_features &= ~mask;
+    write_cr4(read_cr4() & ~mask);
 }
 
 /*

@@ -1489,14 +1489,26 @@ cirrus_clear_vram_1:
   mov dx, #0x3ce
   out dx, ax
   push ax
-  mov cx, #0xa000
-  mov es, cx
-  xor di, di
+
+;; Windows Vista appears to be emulating this sequence as part of changing 
+;; screen resolution, but it generates 4096 writes per iteration.
+;; Instead, use a magic register sequence to write the whole bank.
+;;mov cx, #0xa000
+;;mov es, cx
+;;xor di, di
+;;mov ax, si
+;;mov cx, #8192
+;;cld
+;;rep
+;;    stosw
   mov ax, si
-  mov cx, #8192
-  cld
-  rep
-      stosw
+  shl ax, #8
+  mov al, #0xfe
+  out dx, ax	;; Low byte of value to be written to the bank
+  mov ax, si
+  mov al, #0xff  
+  out dx, ax    ;; High byte and trigger the write
+
   pop ax
   inc ah
   cmp ah, bl

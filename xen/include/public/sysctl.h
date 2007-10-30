@@ -34,18 +34,27 @@
 #include "xen.h"
 #include "domctl.h"
 
-#define XEN_SYSCTL_INTERFACE_VERSION 0x00000005
+#define XEN_SYSCTL_INTERFACE_VERSION 0x00000006
 
 /*
  * Read console content from Xen buffer ring.
  */
 #define XEN_SYSCTL_readconsole       1
 struct xen_sysctl_readconsole {
-    /* IN variables. */
-    uint32_t clear;                /* Non-zero -> clear after reading. */
-    XEN_GUEST_HANDLE_64(char) buffer; /* Buffer start */
-    /* IN/OUT variables. */
-    uint32_t count;            /* In: Buffer size;  Out: Used buffer size  */
+    /* IN: Non-zero -> clear after reading. */
+    uint8_t clear;
+    /* IN: Non-zero -> start index specified by @index field. */
+    uint8_t incremental;
+    uint8_t pad0, pad1;
+    /*
+     * IN:  Start index for consuming from ring buffer (if @incremental);
+     * OUT: End index after consuming from ring buffer.
+     */
+    uint32_t index; 
+    /* IN: Virtual address to write console data. */
+    XEN_GUEST_HANDLE_64(char) buffer;
+    /* IN: Size of buffer; OUT: Bytes written to buffer. */
+    uint32_t count;
 };
 typedef struct xen_sysctl_readconsole xen_sysctl_readconsole_t;
 DEFINE_XEN_GUEST_HANDLE(xen_sysctl_readconsole_t);
@@ -171,7 +180,7 @@ DEFINE_XEN_GUEST_HANDLE(xen_sysctl_debug_keys_t);
 /* Get physical CPU information. */
 #define XEN_SYSCTL_getcpuinfo        8
 struct xen_sysctl_cpuinfo {
-    uint64_t idletime;
+    uint64_aligned_t idletime;
 };
 typedef struct xen_sysctl_cpuinfo xen_sysctl_cpuinfo_t;
 DEFINE_XEN_GUEST_HANDLE(xen_sysctl_cpuinfo_t); 
@@ -192,7 +201,7 @@ struct xen_sysctl_availheap {
     uint32_t max_bitwidth;  /* Largest address width (zero if don't care). */
     int32_t  node;          /* NUMA node of interest (-1 for all nodes). */
     /* OUT variables. */
-    uint64_t avail_bytes;   /* Bytes available in the specified region. */
+    uint64_aligned_t avail_bytes;/* Bytes available in the specified region. */
 };
 typedef struct xen_sysctl_availheap xen_sysctl_availheap_t;
 DEFINE_XEN_GUEST_HANDLE(xen_sysctl_availheap_t);

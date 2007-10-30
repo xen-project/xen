@@ -17,7 +17,7 @@
 #include <sys/stat.h>
 #include <fcntl.h>
 
-static struct xs_handle *xsh = NULL;
+struct xs_handle *xsh = NULL;
 static char *media_filename[MAX_DISKS + MAX_SCSI_DISKS];
 static QEMUTimer *insert_timer = NULL;
 
@@ -303,12 +303,19 @@ void xenstore_process_logdirty_event(void)
         logdirty_bitmap_size *= sizeof (unsigned long); /* bytes */
 
         /* Map the shared-memory segment */
-        if ((shmid = shmget(key, 
-                            2 * logdirty_bitmap_size, 
-                            S_IRUSR|S_IWUSR)) == -1 
-            || (seg = shmat(shmid, NULL, 0)) == (void *)-1) {
-            fprintf(logfile, "Log-dirty: can't map segment %16.16llx (%s)\n",
-                    (unsigned long long) key, strerror(errno));
+        fprintf(logfile, "%s: key=%16.16llx size=%d\n", __FUNCTION__,
+                (unsigned long long)key, logdirty_bitmap_size);
+        shmid = shmget(key, 2 * logdirty_bitmap_size, S_IRUSR|S_IWUSR);
+        if (shmid == -1) {
+            fprintf(logfile, "Log-dirty: shmget failed: segment %16.16llx "
+                    "(%s)\n", (unsigned long long)key, strerror(errno));
+            exit(1);
+        }
+
+        seg = shmat(shmid, NULL, 0);
+        if (seg == (void *)-1) {
+            fprintf(logfile, "Log-dirty: shmat failed: segment %16.16llx "
+                    "(%s)\n", (unsigned long long)key, strerror(errno));
             exit(1);
         }
 
@@ -318,6 +325,9 @@ void xenstore_process_logdirty_event(void)
         if (logdirty_bitmap_size != *(uint32_t *)seg) {
             fprintf(logfile, "Log-dirty: got %u, calc %lu\n", 
                     *(uint32_t *)seg, logdirty_bitmap_size);
+            /* Stale key: wait for next watch */
+            shmdt(seg);
+            seg = NULL;
             return;
         }
 
@@ -478,9 +488,8 @@ void xenstore_write_vncport(int display)
     free(buf);
 }
 
-int xenstore_read_vncpasswd(int domid)
+int xenstore_read_vncpasswd(int domid, char *pwbuf, size_t pwbuflen)
 {
-    extern char vncpasswd[64];
     char *buf = NULL, *path, *uuid = NULL, *passwd = NULL;
     unsigned int i, len, rc = 0;
 
@@ -506,16 +515,17 @@ int xenstore_read_vncpasswd(int domid)
     passwd = xs_read(xsh, XBT_NULL, buf, &len);
     if (passwd == NULL) {
         fprintf(logfile, "xs_read(): vncpasswd get error. %s.\n", buf);
+        pwbuf[0] = '\0';
         free(uuid);
         free(path);
         return rc;
     }
 
-    for (i=0; i<len && i<63; i++) {
-        vncpasswd[i] = passwd[i];
-        passwd[i] = '\0';
+    for (i=0; i<len && i<pwbuflen; i++) {
+        pwbuf[i] = passwd[i];
     }
-    vncpasswd[len] = '\0';
+    pwbuf[len < (pwbuflen-1) ? len : (pwbuflen-1)] = '\0';
+    passwd[0] = '\0';
     pasprintf(&buf, "%s/vncpasswd", uuid);
     if (xs_write(xsh, XBT_NULL, buf, passwd, len) == 0) {
         fprintf(logfile, "xs_write() vncpasswd failed.\n");
@@ -724,7 +734,7 @@ int xenstore_vm_write(int domid, char *key, char *value)
 
     pasprintf(&buf, "%s/%s", path, key);
     rc = xs_write(xsh, XBT_NULL, buf, value, strlen(value));
-    if (rc) {
+    if (rc == 0) {
         fprintf(logfile, "xs_write(%s, %s): write error\n", buf, key);
         goto out;
     }

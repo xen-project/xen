@@ -50,7 +50,8 @@
 #endif
 
 DEFINE_PER_CPU(struct vcpu *, curr_vcpu);
-DEFINE_PER_CPU(__u64, efer);
+DEFINE_PER_CPU(u64, efer);
+DEFINE_PER_CPU(unsigned long, cr4);
 
 static void unmap_vcpu_info(struct vcpu *v);
 
@@ -413,6 +414,8 @@ int vcpu_initialise(struct vcpu *v)
             v->arch.schedule_tail = continue_idle_domain;
             v->arch.cr3           = __pa(idle_pg_table);
         }
+
+        v->arch.guest_context.ctrlreg[4] = mmu_cr4_features;
     }
 
     v->arch.perdomain_ptes =
@@ -568,13 +571,28 @@ void arch_domain_destroy(struct domain *d)
     free_xenheap_page(d->shared_info);
 }
 
+unsigned long pv_guest_cr4_fixup(unsigned long guest_cr4)
+{
+    unsigned long hv_cr4 = read_cr4(), hv_cr4_mask = ~X86_CR4_TSD;
+    if ( cpu_has_de )
+        hv_cr4_mask &= ~X86_CR4_DE;
+
+    if ( (guest_cr4 & hv_cr4_mask) !=
+         (hv_cr4 & hv_cr4_mask & ~(X86_CR4_PGE|X86_CR4_PSE)) )
+        gdprintk(XENLOG_WARNING,
+                 "Attempt to change CR4 flags %08lx -> %08lx\n",
+                 hv_cr4 & ~(X86_CR4_PGE|X86_CR4_PSE), guest_cr4);
+
+    return  (hv_cr4 & hv_cr4_mask) | (guest_cr4 & ~hv_cr4_mask);
+}
+
 /* This is called by arch_final_setup_guest and do_boot_vcpu */
 int arch_set_info_guest(
     struct vcpu *v, vcpu_guest_context_u c)
 {
     struct domain *d = v->domain;
     unsigned long cr3_pfn = INVALID_MFN;
-    unsigned long flags;
+    unsigned long flags, cr4;
     int i, rc = 0, compat;
 
     /* The context is a compat-mode one if the target domain is compat-mode;
@@ -664,6 +682,10 @@ int arch_set_info_guest(
 
     /* Ensure real hardware interrupts are enabled. */
     v->arch.guest_context.user_regs.eflags |= EF_IE;
+
+    cr4 = v->arch.guest_context.ctrlreg[4];
+    v->arch.guest_context.ctrlreg[4] =
+        (cr4 == 0) ? mmu_cr4_features : pv_guest_cr4_fixup(cr4);
 
     if ( v->is_initialised )
         goto out;
@@ -1194,6 +1216,9 @@ static void paravirt_ctxt_switch_to(struct vcpu *v)
 {
     set_int80_direct_trap(v);
     switch_kernel_stack(v);
+
+    if ( unlikely(read_cr4() != v->arch.guest_context.ctrlreg[4]) )
+        write_cr4(v->arch.guest_context.ctrlreg[4]);
 }
 
 #define loaddebug(_v,_reg) \
@@ -1279,7 +1304,7 @@ void context_switch(struct vcpu *prev, struct vcpu *next)
     local_irq_disable();
 
     if ( is_hvm_vcpu(prev) && !list_empty(&prev->arch.hvm_vcpu.tm_list) )
-        pt_freeze_time(prev);
+        pt_save_timer(prev);
 
     set_current(next);
 

@@ -169,7 +169,8 @@ static int uncanonicalize_pagetable(int xc_handle, uint32_t dom,
 
 
 /* Load the p2m frame list, plus potential extended info chunk */
-static xen_pfn_t *load_p2m_frame_list(int io_fd, int *pae_extended_cr3)
+static xen_pfn_t *load_p2m_frame_list(
+    int io_fd, int *pae_extended_cr3, int *ext_vcpucontext)
 {
     xen_pfn_t *p2m_frame_list;
     vcpu_guest_context_either_t ctxt;
@@ -200,7 +201,8 @@ static xen_pfn_t *load_p2m_frame_list(int io_fd, int *pae_extended_cr3)
             
             /* 4-character chunk signature + 4-byte remaining chunk size. */
             if ( !read_exact(io_fd, chunk_sig, sizeof(chunk_sig)) ||
-                 !read_exact(io_fd, &chunk_bytes, sizeof(chunk_bytes)) )
+                 !read_exact(io_fd, &chunk_bytes, sizeof(chunk_bytes)) ||
+                 (tot_bytes < (chunk_bytes + 8)) )
             {
                 ERROR("read extended-info chunk signature failed");
                 return NULL;
@@ -239,6 +241,10 @@ static xen_pfn_t *load_p2m_frame_list(int io_fd, int *pae_extended_cr3)
                 if ( GET_FIELD(&ctxt, vm_assist) 
                      & (1UL << VMASST_TYPE_pae_extended_cr3) )
                     *pae_extended_cr3 = 1;
+            }
+            else if ( !strncmp(chunk_sig, "extv", 4) )
+            {
+                *ext_vcpucontext = 1;
             }
             
             /* Any remaining bytes of this chunk: read and discard. */
@@ -289,7 +295,7 @@ int xc_domain_restore(int xc_handle, int io_fd, uint32_t dom,
                       unsigned int hvm, unsigned int pae)
 {
     DECLARE_DOMCTL;
-    int rc = 1, i, j, n, m, pae_extended_cr3 = 0;
+    int rc = 1, frc, i, j, n, m, pae_extended_cr3 = 0, ext_vcpucontext = 0;
     unsigned long mfn, pfn;
     unsigned int prev_pc, this_pc;
     int verify = 0;
@@ -373,7 +379,8 @@ int xc_domain_restore(int xc_handle, int io_fd, uint32_t dom,
     if ( !hvm ) 
     {
         /* Load the p2m frame list, plus potential extended info chunk */
-        p2m_frame_list = load_p2m_frame_list(io_fd, &pae_extended_cr3);
+        p2m_frame_list = load_p2m_frame_list(
+            io_fd, &pae_extended_cr3, &ext_vcpucontext);
         if ( !p2m_frame_list )
             goto out;
 
@@ -382,13 +389,12 @@ int xc_domain_restore(int xc_handle, int io_fd, uint32_t dom,
         domctl.domain = dom;
         domctl.cmd    = XEN_DOMCTL_set_address_size;
         domctl.u.address_size.size = guest_width * 8;
-        rc = do_domctl(xc_handle, &domctl);
-        if ( rc != 0 )
+        frc = do_domctl(xc_handle, &domctl);
+        if ( frc != 0 )
         {
             ERROR("Unable to set guest address size.");
             goto out;
         }
-        rc = 1;
     }
 
     /* We want zeroed memory so use calloc rather than malloc. */
@@ -713,18 +719,19 @@ int xc_domain_restore(int xc_handle, int io_fd, uint32_t dom,
             goto out;
         }
                 
-        if ( (rc = xc_set_hvm_param(xc_handle, dom, 
-                                    HVM_PARAM_IOREQ_PFN, magic_pfns[0]))
-             || (rc = xc_set_hvm_param(xc_handle, dom, 
-                                       HVM_PARAM_BUFIOREQ_PFN, magic_pfns[1]))
-             || (rc = xc_set_hvm_param(xc_handle, dom, 
-                                       HVM_PARAM_STORE_PFN, magic_pfns[2]))
-             || (rc = xc_set_hvm_param(xc_handle, dom, 
-                                       HVM_PARAM_PAE_ENABLED, pae))
-             || (rc = xc_set_hvm_param(xc_handle, dom, 
-                                       HVM_PARAM_STORE_EVTCHN, store_evtchn)) )
+        if ( (frc = xc_set_hvm_param(xc_handle, dom, 
+                                     HVM_PARAM_IOREQ_PFN, magic_pfns[0]))
+             || (frc = xc_set_hvm_param(xc_handle, dom, 
+                                        HVM_PARAM_BUFIOREQ_PFN, magic_pfns[1]))
+             || (frc = xc_set_hvm_param(xc_handle, dom, 
+                                        HVM_PARAM_STORE_PFN, magic_pfns[2]))
+             || (frc = xc_set_hvm_param(xc_handle, dom, 
+                                        HVM_PARAM_PAE_ENABLED, pae))
+             || (frc = xc_set_hvm_param(xc_handle, dom, 
+                                        HVM_PARAM_STORE_EVTCHN,
+                                        store_evtchn)) )
         {
-            ERROR("error setting HVM params: %i", rc);
+            ERROR("error setting HVM params: %i", frc);
             goto out;
         }
         *store_mfn = magic_pfns[2];
@@ -750,10 +757,15 @@ int xc_domain_restore(int xc_handle, int io_fd, uint32_t dom,
             goto out;
         }
         
-        rc = xc_domain_hvm_setcontext(xc_handle, dom, hvm_buf, rec_len);
-        if ( rc ) 
+        frc = xc_domain_hvm_setcontext(xc_handle, dom, hvm_buf, rec_len);
+        if ( frc )
+        {
             ERROR("error setting the HVM context");
-       
+            goto out;
+        }
+
+        /* HVM success! */
+        rc = 0;
         goto out;
     }
 
@@ -929,7 +941,7 @@ int xc_domain_restore(int xc_handle, int io_fd, uint32_t dom,
     {
         unsigned int count = 0;
         unsigned long *pfntab;
-        int nr_frees, rc;
+        int nr_frees;
 
         if ( !read_exact(io_fd, &count, sizeof(count)) ||
              (count > (1U << 28)) ) /* up to 1TB of address space */
@@ -973,10 +985,10 @@ int xc_domain_restore(int xc_handle, int io_fd, uint32_t dom,
             };
             set_xen_guest_handle(reservation.extent_start, pfntab);
 
-            if ( (rc = xc_memory_op(xc_handle, XENMEM_decrease_reservation,
-                                    &reservation)) != nr_frees )
+            if ( (frc = xc_memory_op(xc_handle, XENMEM_decrease_reservation,
+                                     &reservation)) != nr_frees )
             {
-                ERROR("Could not decrease reservation : %d", rc);
+                ERROR("Could not decrease reservation : %d", frc);
                 goto out;
             }
             else
@@ -1091,13 +1103,29 @@ int xc_domain_restore(int xc_handle, int io_fd, uint32_t dom,
         domctl.domain = (domid_t)dom;
         domctl.u.vcpucontext.vcpu = i;
         set_xen_guest_handle(domctl.u.vcpucontext.ctxt, &ctxt.c);
-        rc = xc_domctl(xc_handle, &domctl);
-        if ( rc != 0 )
+        frc = xc_domctl(xc_handle, &domctl);
+        if ( frc != 0 )
         {
             ERROR("Couldn't build vcpu%d", i);
             goto out;
         }
-        rc = 1;
+
+        if ( !ext_vcpucontext )
+            continue;
+        if ( !read_exact(io_fd, &domctl.u.ext_vcpucontext, 128) ||
+             (domctl.u.ext_vcpucontext.vcpu != i) )
+        {
+            ERROR("Error when reading extended ctxt %d", i);
+            goto out;
+        }
+        domctl.cmd = XEN_DOMCTL_set_ext_vcpucontext;
+        domctl.domain = dom;
+        frc = xc_domctl(xc_handle, &domctl);
+        if ( frc != 0 )
+        {
+            ERROR("Couldn't set extended vcpu%d info\n", i);
+            goto out;
+        }
     }
 
     if ( !read_exact(io_fd, shared_info_page, PAGE_SIZE) )
