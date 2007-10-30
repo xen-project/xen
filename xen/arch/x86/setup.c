@@ -37,6 +37,7 @@
 #include <xen/kexec.h>
 #include <asm/edd.h>
 #include <xsm/xsm.h>
+#include <asm/tboot.h>
 
 #if defined(CONFIG_X86_64)
 #define BOOTSTRAP_DIRECTMAP_END (1UL << 32) /* 4GB */
@@ -845,6 +846,8 @@ void __init __start_xen(unsigned long mbi_p)
     early_cpu_init();
 
     paging_init();
+
+    tboot_probe();
 
     /* Unmap the first page of CPU0's stack. */
     memguard_guard_stack(cpu0_stack);

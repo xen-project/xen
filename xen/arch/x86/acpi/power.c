@@ -25,6 +25,7 @@
 #include <xen/domain.h>
 #include <xen/console.h>
 #include <public/platform.h>
+#include <asm/tboot.h>
 
 #define pmprintk(_l, _f, _a...) printk(_l "<PM> " _f "\n", ## _a )
 
@@ -94,11 +95,19 @@ static void acpi_sleep_prepare(u32 state)
     wakeup_vector_va = __acpi_map_table(
         acpi_sinfo.wakeup_vector, sizeof(uint64_t));
     if ( acpi_sinfo.vector_width == 32 )
-        *(uint32_t *)wakeup_vector_va =
-            (uint32_t)bootsym_phys(wakeup_start);
+    {
+            *(uint32_t *)wakeup_vector_va =
+                tboot_in_measured_env() ?
+                (uint32_t)g_tboot_shared->s3_tb_wakeup_entry :
+                (uint32_t)bootsym_phys(wakeup_start);
+    }
     else
-        *(uint64_t *)wakeup_vector_va =
-            (uint64_t)bootsym_phys(wakeup_start);
+    {
+            *(uint64_t *)wakeup_vector_va =
+                tboot_in_measured_env() ?
+                (uint64_t)g_tboot_shared->s3_tb_wakeup_entry :
+	        (uint64_t)bootsym_phys(wakeup_start);
+    }
 }
 
 static void acpi_sleep_post(u32 state) {}
@@ -221,9 +230,43 @@ static int acpi_get_wake_status(void)
     return val;
 }
 
+static void tboot_sleep(u8 sleep_state)
+{
+   uint32_t shutdown_type;
+   
+   *((struct acpi_sleep_info *)(unsigned long)g_tboot_shared->acpi_sinfo) =
+       acpi_sinfo;
+
+   switch ( sleep_state )
+   {
+       case ACPI_STATE_S3:
+           shutdown_type = TB_SHUTDOWN_S3;
+           g_tboot_shared->s3_k_wakeup_entry =
+	       (uint32_t)bootsym_phys(wakeup_start);
+           break;
+       case ACPI_STATE_S4:
+           shutdown_type = TB_SHUTDOWN_S4;
+           break;
+       case ACPI_STATE_S5:
+           shutdown_type = TB_SHUTDOWN_S5;
+           break;
+       default:
+           return;
+   }
+
+   tboot_shutdown(shutdown_type);
+}
+         
 /* System is really put into sleep state by this stub */
 acpi_status asmlinkage acpi_enter_sleep_state(u8 sleep_state)
 {
+    if ( tboot_in_measured_env() )
+    {
+        tboot_sleep(sleep_state);
+        pmprintk(XENLOG_ERR, "TBOOT failed entering s3 state\n");
+        return_ACPI_STATUS(AE_ERROR);
+    }
+
     ACPI_FLUSH_CPU_CACHE();
 
     outw((u16)acpi_sinfo.pm1a_cnt_val, acpi_sinfo.pm1a_cnt);

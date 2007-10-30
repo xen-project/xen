@@ -170,6 +170,12 @@ cmdline_parse_early:
         test    %eax,%eax
         setnz   bootsym_phys(skip_realmode)
 
+        /* Check for 'tboot=' command-line option. */
+        movl    $sym_phys(.Ltboot_opt),4(%esp)
+        call    .Lfind_option
+        test    %eax,%eax
+        setnz   bootsym_phys(skip_realmode) /* tboot= implies no-real-mode */
+
 .Lparse_edd:
         /* Check for 'edd=' command-line option. */
         movl    $sym_phys(.Ledd_opt),4(%esp)
@@ -346,6 +352,8 @@ cmdline_parse_early:
         .asciz  "current"
 .Lno_rm_opt:
         .asciz  "no-real-mode"
+.Ltboot_opt:
+        .asciz  "tboot"
 .Ledid_opt:
         .asciz  "edid"
 .Ledid_force:

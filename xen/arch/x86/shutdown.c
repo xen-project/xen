@@ -21,6 +21,7 @@
 #include <asm/io.h>
 #include <asm/processor.h>
 #include <asm/mpspec.h>
+#include <asm/tboot.h>
 
 /* reboot_str: comma-separated list of reboot options. */
 static char __initdata reboot_str[10] = "";
@@ -219,6 +220,9 @@ void machine_restart(void)
 
     smp_send_stop();
 
+    if ( tboot_in_measured_env() )
+        tboot_shutdown(TB_SHUTDOWN_REBOOT);
+
     /* Rebooting needs to touch the page at absolute address 0. */
     *((unsigned short *)__va(0x472)) = reboot_mode;
 
@@ -328,3 +332,13 @@ static int __init reboot_init(void)
     return 0;
 }
 __initcall(reboot_init);
+
+/*
+ * Local variables:
+ * mode: C
+ * c-set-style: "BSD"
+ * c-basic-offset: 4
+ * tab-width: 4
+ * indent-tabs-mode: nil
+ * End:
+ */
