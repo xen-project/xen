@@ -939,7 +939,6 @@ static IA64FAULT vmx_emul_mov_to_rr(VCPU *vcpu, INST64 inst)
 static IA64FAULT vmx_emul_mov_to_dbr(VCPU *vcpu, INST64 inst)
 {
     u64 r3,r2;
-    return IA64_NO_FAULT;
 #ifdef  CHECK_FAULT
     IA64_PSR vpsr;
     vpsr.val=vmx_vcpu_get_psr(vcpu);
