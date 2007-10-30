@@ -60,19 +60,21 @@ GLOBAL_ENTRY(ia64_new_rr7)
 	mov ar.rsc=0			// put RSE in enforced lazy, LE mode
 	or loc3=loc3,r17		// add in psr the bits to set
 	;;
+	movl loc5=pal_vaddr		// get pal_vaddr
+	;;
+	ld8 loc5=[loc5]			// read pal_vaddr
+	;;
 	andcm r16=loc3,r16		// removes bits to clear from psr
 	dep loc6=0,r8,0,KERNEL_TR_PAGE_SHIFT // Xen code paddr
 	br.call.sptk.many rp=ia64_switch_mode_phys
 1:
 	// now in physical mode with psr.i/ic off so do rr7 switch
-	movl r16=pal_vaddr		// Note: belong to region 7!
+	dep r16=-1,r0,61,3		// Note: belong to region 7!
 	;; 
 	mov	rr[r16]=in0
 	;; 
 	srlz.d
-	dep	r16=0,r16,60,4		// Get physical address.
 	;;
-	ld8 loc5=[r16]			// read pal_vaddr
 	movl	r26=PAGE_KERNEL
 	;; 
 
@@ -90,7 +92,17 @@ GLOBAL_ENTRY(ia64_new_rr7)
 	itr.i itr[r16]=r18
 	;; 
 	itr.d dtr[r16]=r18
-
+	;;
+	/* xen heap is also identity mapped */
+	mov r16 = IA64_TR_XEN_HEAP_REGS  
+	dep r17=-1,loc6,60,4
+	;;
+	ptr.d r17,r24
+	;;
+	mov cr.ifa=r17
+	;;
+	itr.d dtr[r16]=r18
+	;;
 	// re-pin mappings for stack (current)
 
 	// unless overlaps with KERNEL_TR

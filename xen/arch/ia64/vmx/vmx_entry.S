@@ -677,13 +677,23 @@ GLOBAL_ENTRY(vmx_switch_rr7)
     ;;
     dep r2=0,r3,0,KERNEL_TR_PAGE_SHIFT
     ;;
-    or r18=r2,r25
+    or r24=r2,r25
     ;;
    srlz.i
    ;;
-   itr.i itr[r16]=r18
+   itr.i itr[r16]=r24
    ;;
-   itr.d dtr[r16]=r18
+   itr.d dtr[r16]=r24
+   ;;
+   /* xen heap is also identity mapped */
+   mov r16 = IA64_TR_XEN_HEAP_REGS
+   dep r17=-1,r3,60,4
+   ;;
+   ptr.d r17, r18
+   ;;
+   mov cr.ifa=r17
+   ;;
+   itr.d dtr[r16]=r24
    ;;
 
    // re-pin mappings for per-cpu data

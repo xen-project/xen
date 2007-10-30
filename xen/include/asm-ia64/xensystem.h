@@ -30,7 +30,7 @@
 
 #define XEN_VIRT_UC_BIT	 57
 
-#define KERNEL_START		 0xf000000004000000
+#define KERNEL_START		 0xf400000004000000
 #define GATE_ADDR		 KERNEL_START
 
 #define IS_VMM_ADDRESS(addr) ((((addr) >> 60) ^ ((addr) >> 59)) & 1)

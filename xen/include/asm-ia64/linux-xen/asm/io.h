@@ -82,6 +82,8 @@ extern unsigned int num_io_spaces;
 #include <asm/system.h>
 #include <asm-generic/iomap.h>
 
+
+#ifndef XEN
 /*
  * Change virtual addresses to physical addresses and vv.
  */
@@ -90,12 +92,14 @@ virt_to_maddr (volatile void *address)
 {
 	return (unsigned long) address - PAGE_OFFSET;
 }
+#endif
 
 static inline void*
 maddr_to_virt (unsigned long address)
 {
 	return (void *) (address + PAGE_OFFSET);
 }
+
 
 #define ARCH_HAS_VALID_PHYS_ADDR_RANGE
 extern int valid_phys_addr_range (unsigned long addr, size_t *count); /* efi.c */

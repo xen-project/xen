@@ -117,6 +117,7 @@ vmx_init_env(void)
 	if (!vm_buffer) {
 		vm_buffer = (unsigned long)alloc_xenheap_pages(vm_order);
 		ASSERT(vm_buffer);
+		vm_buffer = virt_to_xenva((vm_buffer));
 		printk("vm_buffer: 0x%lx\n", vm_buffer);
 	}
 
@@ -162,6 +163,7 @@ static vpd_t *alloc_vpd(void)
 		printk("VPD allocation failed.\n");
 		return NULL;
 	}
+	vpd = (vpd_t *)virt_to_xenva(vpd);
 
 	printk(XENLOG_DEBUG "vpd base: 0x%p, vpd size:%ld\n",
 	       vpd, sizeof(vpd_t));

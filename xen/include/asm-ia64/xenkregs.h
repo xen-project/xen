@@ -7,7 +7,8 @@
 #define IA64_TR_SHARED_INFO	3	/* dtr3: page shared with domain */
 #define	IA64_TR_VHPT		4	/* dtr4: vhpt */
 #define IA64_TR_MAPPED_REGS	5	/* dtr5: vcpu mapped regs */
-#define IA64_DTR_GUEST_KERNEL   6
+#define IA64_TR_XEN_HEAP_REGS	6	/* dtr6: xen heap identity mapped regs */
+#define IA64_DTR_GUEST_KERNEL   7
 #define IA64_ITR_GUEST_KERNEL   2
 /* Processor status register bits: */
 #define IA64_PSR_VM_BIT		46

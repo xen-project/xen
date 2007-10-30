@@ -263,6 +263,16 @@ start_ap:
 	itr.d dtr[r16]=r18
 	;;
 	srlz.i
+	;;
+	/* XEN HEAP is identity mapped */
+	mov r16 = IA64_TR_XEN_HEAP_REGS
+	dep r17 = -1, r2, 60, 4
+	;;
+	mov cr.ifa = r17
+	;;
+	itr.d dtr[r16]=r18
+	;;
+	srlz.i
 
 	/*
 	 * Switch into virtual mode:
@@ -294,7 +304,7 @@ start_ap:
 	;;
 	srlz.i
 	movl gp=__gp
-
+	;;
 	mov ar.fpsr=r2
 	;;
 
