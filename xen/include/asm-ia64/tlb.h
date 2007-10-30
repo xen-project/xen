@@ -1,8 +1,8 @@
 #ifndef XEN_ASM_IA64_TLB_H
 #define XEN_ASM_IA64_TLB_H
 
-#define	NITRS	8
-#define NDTRS	8
+#define NITRS	12
+#define NDTRS	12
 
 union pte_flags {
     struct {

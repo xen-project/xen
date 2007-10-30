@@ -297,8 +297,8 @@ typedef struct ia64_tr_entry ia64_tr_entry_t;
 DEFINE_XEN_GUEST_HANDLE(ia64_tr_entry_t);
 
 struct vcpu_tr_regs {
-    struct ia64_tr_entry itrs[8];
-    struct ia64_tr_entry dtrs[8];
+    struct ia64_tr_entry itrs[12];
+    struct ia64_tr_entry dtrs[12];
 };
 
 union vcpu_ar_regs {
@@ -402,6 +402,7 @@ struct vcpu_guest_context_regs {
 
         /* Physical registers in case of debug event.  */
         unsigned long excp_iipa;
+        unsigned long excp_ifa;
         unsigned long excp_isr;
         unsigned int excp_vector;
 
@@ -421,7 +422,7 @@ struct vcpu_guest_context_regs {
 };
 
 struct vcpu_guest_context {
-#define VGCF_EXTRA_REGS (1UL << 1)	/* Get/Set extra regs.  */
+#define VGCF_EXTRA_REGS (1UL << 1)	/* Set extra regs.  */
     unsigned long flags;       /* VGCF_* flags */
 
     struct vcpu_guest_context_regs regs;
