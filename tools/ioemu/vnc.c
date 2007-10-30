@@ -47,7 +47,6 @@
 
 #include "vnc_keysym.h"
 #include "keymaps.c"
-#include "d3des.h"
 
 typedef struct Buffer
 {
@@ -164,9 +163,6 @@ static void _vnc_update_client(void *opaque);
 static void vnc_update_client(void *opaque);
 static void vnc_client_read(void *opaque);
 static void framebuffer_set_updated(VncState *vs, int x, int y, int w, int h);
-static int make_challenge(unsigned char *random, int size);
-static void set_seed(unsigned int *seedp);
-static void get_random(int len, unsigned char *buf);
 
 #if 0
 static inline void vnc_set_bit(uint32_t *d, int k)
@@ -1387,92 +1383,24 @@ static int protocol_client_init(VncState *vs, uint8_t *data, size_t len)
     return 0;
 }
 
-static int protocol_response(VncState *vs, uint8_t *client_response, size_t len)
-{
-    extern char vncpasswd[64];
-    extern unsigned char challenge[AUTHCHALLENGESIZE];
-    unsigned char cryptchallenge[AUTHCHALLENGESIZE];
-    unsigned char key[8];
-    int passwdlen, i, j;
-
-    memcpy(cryptchallenge, challenge, AUTHCHALLENGESIZE);
-
-    /* Calculate the sent challenge */
-    passwdlen = strlen(vncpasswd);
-    for (i=0; i<8; i++)
-	key[i] = i<passwdlen ? vncpasswd[i] : 0;
-    deskey(key, EN0);
-    for (j = 0; j < AUTHCHALLENGESIZE; j += 8)
-	des(cryptchallenge+j, cryptchallenge+j);
-
-    /* Check the actual response */
-    if (memcmp(cryptchallenge, client_response, AUTHCHALLENGESIZE) != 0) {
-	/* password error */
-	vnc_write_u32(vs, 1);
-	vnc_write_u32(vs, 22);
-	vnc_write(vs, "Authentication failure", 22);
-	vnc_flush(vs);
-	fprintf(stderr, "VNC Password error.\n");
-	vnc_client_error(vs);
-	return 0;
-    }
-
-    vnc_write_u32(vs, 0);
-    vnc_flush(vs);
-
-    vnc_read_when(vs, protocol_client_init, 1);
-
-    return 0;
-}
 
 static int protocol_version(VncState *vs, uint8_t *version, size_t len)
 {
-    extern char vncpasswd[64];
-    extern unsigned char challenge[AUTHCHALLENGESIZE];
     char local[13];
-    int  support, maj, min;
+    int maj, min;
 
     memcpy(local, version, 12);
     local[12] = 0;
 
-    /* protocol version check */
     if (sscanf(local, "RFB %03d.%03d\n", &maj, &min) != 2) {
-	fprintf(stderr, "Protocol version error.\n");
 	vnc_client_error(vs);
 	return 0;
     }
 
-
-    support = 0;
-    if (maj == 3) {
-	if (min == 3 || min ==4) {
-	    support = 1;
-	}
-    }
-
-    if (! support) {
-	fprintf(stderr, "Client uses unsupported protocol version %d.%d.\n",
-		maj, min);
-	vnc_client_error(vs);
-	return 0;
-    }
-
-    if (*vncpasswd == '\0') {
-	/* AuthType is None */
-	vnc_write_u32(vs, 1);
-	vnc_flush(vs);
-	vnc_read_when(vs, protocol_client_init, 1);
-    } else {
-	/* AuthType is VncAuth */
-	vnc_write_u32(vs, 2);
-
-	/* Challenge-Responce authentication */
-	/* Send Challenge */
-	make_challenge(challenge, AUTHCHALLENGESIZE);
-	vnc_write(vs, challenge, AUTHCHALLENGESIZE);
-	vnc_flush(vs);
-	vnc_read_when(vs, protocol_response, AUTHCHALLENGESIZE);
-    }
+    vnc_write_u32(vs, 1); /* None */
+    vnc_flush(vs);
+  
+    vnc_read_when(vs, protocol_client_init, 1);
 
     return 0;
 }
@@ -1640,31 +1568,3 @@ int vnc_start_viewer(int port)
     }
 }
 
-unsigned int seed;
-
-static int make_challenge(unsigned char *random, int size)
-{
- 
-    set_seed(&seed);
-    get_random(size, random);
-
-    return 0;
-}
-
-static void set_seed(unsigned int *seedp)
-{
-    *seedp += (unsigned int)(time(NULL)+getpid()+getpid()*987654+rand());
-    srand(*seedp);
-
-    return;
-}
-
-static void get_random(int len, unsigned char *buf)
-{
-    int i;
-
-    for (i=0; i<len; i++)
-	buf[i] = (int) (256.0*rand()/(RAND_MAX+1.0));
-
-    return;
-}

@@ -488,9 +488,8 @@ void xenstore_write_vncport(int display)
     free(buf);
 }
 
-int xenstore_read_vncpasswd(int domid)
+int xenstore_read_vncpasswd(int domid, char *pwbuf, size_t pwbuflen)
 {
-    extern char vncpasswd[64];
     char *buf = NULL, *path, *uuid = NULL, *passwd = NULL;
     unsigned int i, len, rc = 0;
 
@@ -521,11 +520,11 @@ int xenstore_read_vncpasswd(int domid)
         return rc;
     }
 
-    for (i=0; i<len && i<63; i++) {
-        vncpasswd[i] = passwd[i];
-        passwd[i] = '\0';
+    for (i=0; i<len && i<pwbuflen; i++) {
+        pwbuf[i] = passwd[i];
     }
-    vncpasswd[len] = '\0';
+    pwbuf[len < (pwbuflen-1) ? len : (pwbuflen-1)] = '\0';
+    passwd[0] = '\0';
     pasprintf(&buf, "%s/vncpasswd", uuid);
     if (xs_write(xsh, XBT_NULL, buf, passwd, len) == 0) {
         fprintf(logfile, "xs_write() vncpasswd failed.\n");
