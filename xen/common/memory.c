@@ -131,7 +131,8 @@ static void populate_physmap(struct memop_args *a)
         if ( unlikely(paging_mode_translate(d)) )
         {
             for ( j = 0; j < (1 << a->extent_order); j++ )
-                guest_physmap_add_page(d, gpfn + j, mfn + j);
+                if ( guest_physmap_add_page(d, gpfn + j, mfn + j) )
+                    goto out;
         }
         else
         {
@@ -445,8 +446,9 @@ static long memory_exchange(XEN_GUEST_HANDLE(xen_memory_exchange_t) arg)
             mfn = page_to_mfn(page);
             if ( unlikely(paging_mode_translate(d)) )
             {
+                /* Ignore failure here. There's nothing we can do. */
                 for ( k = 0; k < (1UL << exch.out.extent_order); k++ )
-                    guest_physmap_add_page(d, gpfn + k, mfn + k);
+                    (void)guest_physmap_add_page(d, gpfn + k, mfn + k);
             }
             else
             {
