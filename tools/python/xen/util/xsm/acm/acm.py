@@ -711,33 +711,24 @@ def unify_resname(resource, mustexist=True):
         except:
             err("Resource spec '%s' contains no tap subtype" % resource)
 
-    import os
-    if typ in ["phy", "tap"]:
+    if typ in ["phy"]:
         if not resfile.startswith("/"):
             resfile = "/dev/" + resfile
         if mustexist:
-            stats = os.lstat(resfile)
-            if stat.S_ISLNK(stats[stat.ST_MODE]):
-                resolved = os.readlink(resfile)
-                if resolved[0] != "/":
-                    resfile = os.path.join(os.path.dirname(resfile), resolved)
-                    resfile = os.path.abspath(resfile)
-                else:
-                    resfile = resolved
+            resfile = os.path.realpath(resfile)
+            try:
                 stats = os.lstat(resfile)
-            if not (stat.S_ISBLK(stats[stat.ST_MODE])):
+                if not (stat.S_ISBLK(stats[stat.ST_MODE])):
+                    err("Invalid resource")
+            except:
                 err("Invalid resource")
 
     if typ in [ "file", "tap" ]:
-        if mustexist:
-            stats = os.lstat(resfile)
-            if stat.S_ISLNK(stats[stat.ST_MODE]):
-                resfile = os.readlink(resfile)
-                stats = os.lstat(resfile)
-            if not stat.S_ISREG(stats[stat.ST_MODE]):
-                err("Invalid resource")
+        resfile = os.path.realpath(resfile)
+        if mustexist and not os.path.isfile(resfile):
+            err("Invalid resource")
 
-    #file: resources must specified with absolute path
+    #file: resources must be specified with absolute path
     #vlan resources don't start with '/'
     if typ != "vlan":
         if (not resfile.startswith("/")) or \

@@ -118,7 +118,14 @@ void pt_restore_timer(struct vcpu *v)
     list_for_each_entry ( pt, head, list )
     {
         if ( !mode_is(v->domain, no_missed_tick_accounting) )
+        {
             pt_process_missed_ticks(pt);
+        }
+        else if ( (NOW() - pt->scheduled) >= 0 )
+        {
+            pt->pending_intr_nr++;
+            pt->scheduled = NOW() + pt->period;
+        }
         set_timer(&pt->timer, pt->scheduled);
     }
 
@@ -139,14 +146,7 @@ static void pt_timer_fn(void *data)
     {
         pt->scheduled += pt->period;
         if ( !mode_is(pt->vcpu->domain, no_missed_tick_accounting) )
-        {
             pt_process_missed_ticks(pt);
-        }
-        else if ( (NOW() - pt->scheduled) >= 0 )
-        {
-            pt->pending_intr_nr++;
-            pt->scheduled = NOW() + pt->period;
-        }
         set_timer(&pt->timer, pt->scheduled);
     }
 

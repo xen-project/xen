@@ -219,15 +219,17 @@ set_p2m_entry(struct domain *d, unsigned long gfn, mfn_t mfn, p2m_type_t p2mt)
         goto out;
 #endif
 #if CONFIG_PAGING_LEVELS >= 3
-    // When using PAE Xen, we only allow 33 bits of pseudo-physical
-    // address in translated guests (i.e. 8 GBytes).  This restriction
-    // comes from wanting to map the P2M table into the 16MB RO_MPT hole
-    // in Xen's address space for translated PV guests.
-    //
+    /*
+     * When using PAE Xen, we only allow 33 bits of pseudo-physical
+     * address in translated guests (i.e. 8 GBytes).  This restriction
+     * comes from wanting to map the P2M table into the 16MB RO_MPT hole
+     * in Xen's address space for translated PV guests.
+     * When using AMD's NPT on PAE Xen, we are restricted to 4GB.
+     */
     if ( !p2m_next_level(d, &table_mfn, &table, &gfn_remainder, gfn,
                          L3_PAGETABLE_SHIFT - PAGE_SHIFT,
-                         (CONFIG_PAGING_LEVELS == 3
-                          ? 8
+                         ((CONFIG_PAGING_LEVELS == 3)
+                          ? (hvm_funcs.hap_supported ? 4 : 8)
                           : L3_PAGETABLE_ENTRIES),
                          PGT_l2_page_table) )
         goto out;
@@ -686,16 +688,26 @@ guest_physmap_remove_page(struct domain *d, unsigned long gfn,
     p2m_unlock(d);
 }
 
-void
+int
 guest_physmap_add_entry(struct domain *d, unsigned long gfn,
                         unsigned long mfn, p2m_type_t t)
 {
     unsigned long ogfn;
     p2m_type_t ot;
     mfn_t omfn;
+    int rc = 0;
 
     if ( !paging_mode_translate(d) )
-        return;
+        return -EINVAL;
+
+#if CONFIG_PAGING_LEVELS == 3
+    /* 32bit PAE nested paging does not support over 4GB guest due to 
+     * hardware translation limit. This limitation is checked by comparing
+     * gfn with 0xfffffUL.
+     */
+    if ( paging_mode_hap(d) && (gfn > 0xfffffUL) )
+        return -EINVAL;
+#endif
 
     p2m_lock(d);
     audit_p2m(d);
@@ -735,18 +747,22 @@ guest_physmap_add_entry(struct domain *d, unsigned long gfn,
 
     if ( mfn_valid(_mfn(mfn)) ) 
     {
-        set_p2m_entry(d, gfn, _mfn(mfn), t);
+        if ( !set_p2m_entry(d, gfn, _mfn(mfn), t) )
+            rc = -EINVAL;
         set_gpfn_from_mfn(mfn, gfn);
     }
     else
     {
         gdprintk(XENLOG_WARNING, "Adding bad mfn to p2m map (%#lx -> %#lx)\n",
                  gfn, mfn);
-        set_p2m_entry(d, gfn, _mfn(INVALID_MFN), p2m_invalid);
+        if ( !set_p2m_entry(d, gfn, _mfn(INVALID_MFN), p2m_invalid) )
+            rc = -EINVAL;
     }
 
     audit_p2m(d);
     p2m_unlock(d);
+
+    return rc;
 }
 
 /* Walk the whole p2m table, changing any entries of the old type

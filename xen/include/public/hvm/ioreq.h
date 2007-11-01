@@ -80,9 +80,9 @@ typedef struct shared_iopage shared_iopage_t;
 struct buf_ioreq {
     uint8_t  type;   /*  I/O type                    */
     uint8_t  dir:1;  /*  1=read, 0=write             */
-    uint8_t  size:2; /*  0=>1, 1=>2, 3=>8. If 8 then use two contig buf_ioreqs */
-    uint16_t data;   /*  (low order) data            */
-    uint32_t addr;   /*  physical address or high-order data */
+    uint8_t  size:2; /*  0=>1, 1=>2, 2=>4, 3=>8. If 8, use two buf_ioreqs */
+    uint32_t addr:20;/*  physical address            */
+    uint32_t data;   /*  data                        */
 };
 typedef struct buf_ioreq buf_ioreq_t;
 

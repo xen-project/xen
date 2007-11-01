@@ -161,7 +161,7 @@ int main(int argc, char *argv[])
     if ( pcd == NULL
          || lock_pages(pcd, sizeof(*pcd) * num_desc) != 0
          || pcv == NULL
-         || lock_pages(pcd, sizeof(*pcv) * num_val) != 0)
+         || lock_pages(pcv, sizeof(*pcv) * num_val) != 0)
     {
         fprintf(stderr, "Could not alloc or lock buffers: %d (%s)\n",
                 errno, strerror(errno));

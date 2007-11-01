@@ -50,9 +50,15 @@
 #include <public/version.h>
 #include <public/memory.h>
 
-/* Xen command-line option to disable hardware-assisted paging */
-static int opt_hap_disabled;
-invbool_param("hap", opt_hap_disabled);
+/*
+ * Xen command-line option to allow/disallow hardware-assisted paging.
+ * Since the phys-to-machine table of AMD NPT is in host format, 32-bit Xen
+ * can only support guests using NPT with up to a 4GB memory map. Therefore
+ * we disallow HAP by default on PAE Xen (by default we want to support an
+ * 8GB pseudophysical memory map for HVM guests on a PAE host).
+ */
+static int opt_hap_permitted = (CONFIG_PAGING_LEVELS != 3);
+boolean_param("hap", opt_hap_permitted);
 
 int hvm_enabled __read_mostly;
 
@@ -82,10 +88,10 @@ void hvm_enable(struct hvm_function_table *fns)
 
     if ( hvm_funcs.hap_supported )
     {
-        if ( opt_hap_disabled )
+        if ( !opt_hap_permitted )
             hvm_funcs.hap_supported = 0;
-        printk("HVM: Hardware Assisted Paging %sabled\n",
-               hvm_funcs.hap_supported ? "en" : "dis");
+        printk("HVM: Hardware Assisted Paging detected %s.\n",
+               hvm_funcs.hap_supported ? "and enabled" : "but disabled");
     }
 }
 
@@ -1849,7 +1855,8 @@ long do_hvm_op(unsigned long op, XEN_GUEST_HANDLE(void) arg)
             case HVM_PARAM_TIMER_MODE:
                 rc = -EINVAL;
                 if ( (a.value != HVMPTM_delay_for_missed_ticks) &&
-                     (a.value != HVMPTM_no_delay_for_missed_ticks) )
+                     (a.value != HVMPTM_no_delay_for_missed_ticks) &&
+                     (a.value != HVMPTM_no_missed_tick_accounting) )
                     goto param_fail;
                 break;
             }

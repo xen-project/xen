@@ -2412,7 +2412,7 @@ steal_page(struct domain *d, struct page_info *page, unsigned int memflags)
     return 0;
 }
 
-void
+int
 guest_physmap_add_page(struct domain *d, unsigned long gpfn,
                        unsigned long mfn)
 {
@@ -2426,6 +2426,7 @@ guest_physmap_add_page(struct domain *d, unsigned long gpfn,
     //BUG_ON(mfn != ((lookup_domain_mpa(d, gpfn << PAGE_SHIFT) & _PFN_MASK) >> PAGE_SHIFT));
 
     perfc_incr(guest_physmap_add_page);
+    return 0;
 }
 
 void

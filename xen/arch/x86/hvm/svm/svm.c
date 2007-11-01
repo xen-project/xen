@@ -940,14 +940,7 @@ int start_svm(struct cpuinfo_x86 *c)
     svm_feature_flags = ((cpuid_eax(0x80000000) >= 0x8000000A) ?
                          cpuid_edx(0x8000000A) : 0);
 
-#ifdef __x86_64__
-    /*
-     * Check CPUID for nested paging support. We support NPT only on 64-bit
-     * hosts since the phys-to-machine table is in host format. Hence 32-bit
-     * Xen could only support guests using NPT with up to a 4GB memory map.
-     */
     svm_function_table.hap_supported = cpu_has_svm_npt;
-#endif
 
     hvm_enable(&svm_function_table);
 

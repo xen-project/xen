@@ -12,7 +12,7 @@ int create_grant_host_mapping(unsigned long gpaddr, unsigned long mfn, unsigned 
 int replace_grant_host_mapping(unsigned long gpaddr, unsigned long mfn, unsigned long new_gpaddr, unsigned int flags);
 
 // for grant transfer
-void guest_physmap_add_page(struct domain *d, unsigned long gpfn, unsigned long mfn);
+int guest_physmap_add_page(struct domain *d, unsigned long gpfn, unsigned long mfn);
 
 /* XXX
  * somewhere appropriate
