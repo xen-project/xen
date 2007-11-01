@@ -166,8 +166,8 @@ int hvm_buffered_io_send(ioreq_t *p)
     /* Return 0 for the cases we can't deal with. */
     if ( (p->addr > 0xffffful) || p->data_is_ptr || p->df || (p->count != 1) )
     {
-        gdprintk(XENLOG_DEBUG, "slow ioreq.  type:%d size:%ld addr:0x%08lx "
-                 "dir:%d ptr:%d df:%d count:%ld\n",
+        gdprintk(XENLOG_DEBUG, "slow ioreq. type:%d size:%"PRIu64" addr:0x%"
+                 PRIx64" dir:%d ptr:%d df:%d count:%"PRIu64"\n",
                  p->type, p->size, p->addr, !!p->dir,
                  !!p->data_is_ptr, !!p->df, p->count);
         return 0;
