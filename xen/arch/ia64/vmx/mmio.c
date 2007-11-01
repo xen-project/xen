@@ -58,13 +58,14 @@ static int hvm_buffered_io_intercept(ioreq_t *p)
     buffered_iopage_t *pg =
         (buffered_iopage_t *)(v->domain->arch.hvm_domain.buffered_io_va);
     buf_ioreq_t bp;
-    int i;
+    int i, qw = 0;
 
     /* Ensure buffered_iopage fits in a page */
     BUILD_BUG_ON(sizeof(buffered_iopage_t) > PAGE_SIZE);
 
-    /* ignore READ ioreq_t! */
-    if (p->dir == IOREQ_READ)
+    /* ignore READ ioreq_t and anything buffered io can't deal with */
+    if (p->dir == IOREQ_READ || p->addr > 0xFFFFFUL ||
+        p->data_is_ptr || p->df || p->count != 1)
         return 0;
 
     for (i = 0; i < HVM_BUFFERED_IO_RANGE_NR; i++) {
@@ -86,17 +87,23 @@ static int hvm_buffered_io_intercept(ioreq_t *p)
     case 2:
         bp.size = 1;
         break;
+    case 4:
+        bp.size = 2;
+        break;
+    case 8:
+        bp.size = 3;
+        qw = 1;
+        break;
     default:
-	/* Could use quad word semantics, but it only appears
-	 * to be useful for timeoffset data. */
+        gdprintk(XENLOG_WARNING, "unexpected ioreq size:%"PRId64"\n", p->size);
         return 0;
     }
-    bp.data = (uint16_t)p->data;
-    bp.addr = (uint32_t)p->addr;
+    bp.data = p->data;
+    bp.addr = p->addr;
 
     spin_lock(&v->domain->arch.hvm_domain.buffered_io_lock);
 
-    if (pg->write_pointer - pg->read_pointer == IOREQ_BUFFER_SLOT_NUM) {
+    if (pg->write_pointer - pg->read_pointer >= IOREQ_BUFFER_SLOT_NUM - qw) {
         /* the queue is full.
          * send the iopacket through the normal path.
          * NOTE: The arithimetic operation could handle the situation for
@@ -109,9 +116,15 @@ static int hvm_buffered_io_intercept(ioreq_t *p)
     memcpy(&pg->buf_ioreq[pg->write_pointer % IOREQ_BUFFER_SLOT_NUM],
            &bp, sizeof(bp));
 
+    if (qw) {
+        bp.data = p->data >> 32;
+        memcpy(&pg->buf_ioreq[(pg->write_pointer + 1) % IOREQ_BUFFER_SLOT_NUM],
+               &bp, sizeof(bp));
+    }
+
     /* Make the ioreq_t visible before write_pointer */
     wmb();
-    pg->write_pointer++;
+    pg->write_pointer += qw ? 2 : 1;
 
     spin_unlock(&v->domain->arch.hvm_domain.buffered_io_lock);
 
