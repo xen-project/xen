@@ -687,13 +687,13 @@ int arch_set_info_guest(
     v->arch.guest_context.ctrlreg[4] =
         (cr4 == 0) ? mmu_cr4_features : pv_guest_cr4_fixup(cr4);
 
-    if ( v->is_initialised )
-        goto out;
-
     memset(v->arch.guest_context.debugreg, 0,
            sizeof(v->arch.guest_context.debugreg));
     for ( i = 0; i < 8; i++ )
         (void)set_debugreg(v, i, c(debugreg[i]));
+
+    if ( v->is_initialised )
+        goto out;
 
     if ( v->vcpu_id == 0 )
         d->vm_assist = c(vm_assist);
@@ -1210,6 +1210,15 @@ static inline void switch_kernel_stack(struct vcpu *v)
 static void paravirt_ctxt_switch_from(struct vcpu *v)
 {
     save_segments(v);
+
+    /*
+     * Disable debug breakpoints. We do this aggressively because if we switch
+     * to an HVM guest we may load DR0-DR3 with values that can cause #DE
+     * inside Xen, before we get a chance to reload DR7, and this cannot always
+     * safely be handled.
+     */
+    if ( unlikely(v->arch.guest_context.debugreg[7]) )
+        write_debugreg(7, 0);
 }
 
 static void paravirt_ctxt_switch_to(struct vcpu *v)
@@ -1219,10 +1228,17 @@ static void paravirt_ctxt_switch_to(struct vcpu *v)
 
     if ( unlikely(read_cr4() != v->arch.guest_context.ctrlreg[4]) )
         write_cr4(v->arch.guest_context.ctrlreg[4]);
-}
 
-#define loaddebug(_v,_reg) \
-    asm volatile ( "mov %0,%%db" #_reg : : "r" ((_v)->debugreg[_reg]) )
+    if ( unlikely(v->arch.guest_context.debugreg[7]) )
+    {
+        write_debugreg(0, v->arch.guest_context.debugreg[0]);
+        write_debugreg(1, v->arch.guest_context.debugreg[1]);
+        write_debugreg(2, v->arch.guest_context.debugreg[2]);
+        write_debugreg(3, v->arch.guest_context.debugreg[3]);
+        write_debugreg(6, v->arch.guest_context.debugreg[6]);
+        write_debugreg(7, v->arch.guest_context.debugreg[7]);
+    }
+}
 
 static void __context_switch(void)
 {
@@ -1248,18 +1264,6 @@ static void __context_switch(void)
         memcpy(stack_regs,
                &n->arch.guest_context.user_regs,
                CTXT_SWITCH_STACK_BYTES);
-
-        /* Maybe switch the debug registers. */
-        if ( unlikely(n->arch.guest_context.debugreg[7]) )
-        {
-            loaddebug(&n->arch.guest_context, 0);
-            loaddebug(&n->arch.guest_context, 1);
-            loaddebug(&n->arch.guest_context, 2);
-            loaddebug(&n->arch.guest_context, 3);
-            /* no 4 and 5 */
-            loaddebug(&n->arch.guest_context, 6);
-            loaddebug(&n->arch.guest_context, 7);
-        }
         n->arch.ctxt_switch_to(n);
     }
 

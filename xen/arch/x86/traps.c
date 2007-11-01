@@ -2493,50 +2493,44 @@ asmlinkage int do_device_not_available(struct cpu_user_regs *regs)
 
 asmlinkage int do_debug(struct cpu_user_regs *regs)
 {
-    unsigned long condition;
     struct vcpu *v = current;
-
-    asm volatile ( "mov %%db6,%0" : "=r" (condition) );
-
-    /* Mask out spurious debug traps due to lazy DR7 setting */
-    if ( (condition & (DR_TRAP0|DR_TRAP1|DR_TRAP2|DR_TRAP3)) &&
-         (v->arch.guest_context.debugreg[7] == 0) )
-    {
-        asm volatile ( "mov %0,%%db7" : : "r" (0UL) );
-        goto out;
-    }
 
     DEBUGGER_trap_entry(TRAP_debug, regs);
 
     if ( !guest_mode(regs) )
     {
+        if ( regs->eflags & EF_TF )
+        {
 #ifdef __x86_64__
-        void sysenter_entry(void);
-        void sysenter_eflags_saved(void);
-        /* In SYSENTER entry path we cannot zap TF until EFLAGS is saved. */
-        if ( (regs->rip >= (unsigned long)sysenter_entry) &&
-             (regs->rip < (unsigned long)sysenter_eflags_saved) )
-            goto out;
-        WARN_ON(regs->rip != (unsigned long)sysenter_eflags_saved);
+            void sysenter_entry(void);
+            void sysenter_eflags_saved(void);
+            /* In SYSENTER entry path we can't zap TF until EFLAGS is saved. */
+            if ( (regs->rip >= (unsigned long)sysenter_entry) &&
+                 (regs->rip < (unsigned long)sysenter_eflags_saved) )
+                goto out;
+            WARN_ON(regs->rip != (unsigned long)sysenter_eflags_saved);
 #else
-        WARN_ON(1);
+            WARN_ON(1);
 #endif
-        /* Clear TF just for absolute sanity. */
-        regs->eflags &= ~EF_TF;
-        /*
-         * We ignore watchpoints when they trigger within Xen. This may happen
-         * when a buffer is passed to us which previously had a watchpoint set
-         * on it. No need to bump EIP; the only faulting trap is an instruction
-         * breakpoint, which can't happen to us.
-         */
+            regs->eflags &= ~EF_TF;
+        }
+        else
+        {
+            /*
+             * We ignore watchpoints when they trigger within Xen. This may
+             * happen when a buffer is passed to us which previously had a
+             * watchpoint set on it. No need to bump EIP; the only faulting
+             * trap is an instruction breakpoint, which can't happen to us.
+             */
+            WARN_ON(!search_exception_table(regs->eip));
+        }
         goto out;
-    } 
+    }
 
     /* Save debug status register where guest OS can peek at it */
-    v->arch.guest_context.debugreg[6] = condition;
+    v->arch.guest_context.debugreg[6] = read_debugreg(6);
 
     ler_enable();
-
     return do_guest_trap(TRAP_debug, regs, 0);
 
  out:
@@ -2750,25 +2744,25 @@ long set_debugreg(struct vcpu *v, int reg, unsigned long value)
         if ( !access_ok(value, sizeof(long)) )
             return -EPERM;
         if ( v == curr ) 
-            asm volatile ( "mov %0, %%db0" : : "r" (value) );
+            write_debugreg(0, value);
         break;
     case 1: 
         if ( !access_ok(value, sizeof(long)) )
             return -EPERM;
         if ( v == curr ) 
-            asm volatile ( "mov %0, %%db1" : : "r" (value) );
+            write_debugreg(1, value);
         break;
     case 2: 
         if ( !access_ok(value, sizeof(long)) )
             return -EPERM;
         if ( v == curr ) 
-            asm volatile ( "mov %0, %%db2" : : "r" (value) );
+            write_debugreg(2, value);
         break;
     case 3:
         if ( !access_ok(value, sizeof(long)) )
             return -EPERM;
         if ( v == curr ) 
-            asm volatile ( "mov %0, %%db3" : : "r" (value) );
+            write_debugreg(3, value);
         break;
     case 6:
         /*
@@ -2778,7 +2772,7 @@ long set_debugreg(struct vcpu *v, int reg, unsigned long value)
         value &= 0xffffefff; /* reserved bits => 0 */
         value |= 0xffff0ff0; /* reserved bits => 1 */
         if ( v == curr ) 
-            asm volatile ( "mov %0, %%db6" : : "r" (value) );
+            write_debugreg(6, value);
         break;
     case 7:
         /*
@@ -2797,9 +2791,22 @@ long set_debugreg(struct vcpu *v, int reg, unsigned long value)
             if ( (value & (1<<13)) != 0 ) return -EPERM;
             for ( i = 0; i < 16; i += 2 )
                 if ( ((value >> (i+16)) & 3) == 2 ) return -EPERM;
+            /*
+             * If DR7 was previously clear then we need to load all other
+             * debug registers at this point as they were not restored during
+             * context switch.
+             */
+            if ( (v == curr) && (v->arch.guest_context.debugreg[7] == 0) )
+            {
+                write_debugreg(0, v->arch.guest_context.debugreg[0]);
+                write_debugreg(1, v->arch.guest_context.debugreg[1]);
+                write_debugreg(2, v->arch.guest_context.debugreg[2]);
+                write_debugreg(3, v->arch.guest_context.debugreg[3]);
+                write_debugreg(6, v->arch.guest_context.debugreg[6]);
+            }
         }
-        if ( v == current ) 
-            asm volatile ( "mov %0, %%db7" : : "r" (value) );
+        if ( v == curr ) 
+            write_debugreg(7, value);
         break;
     default:
         return -EINVAL;

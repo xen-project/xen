@@ -29,9 +29,6 @@ void save_rest_processor_state(void)
 #endif
 }
 
-#define loaddebug(_v,_reg) \
-    __asm__ __volatile__ ("mov %0,%%db" #_reg : : "r" ((_v)->debugreg[_reg]))
-
 void restore_rest_processor_state(void)
 {
     int cpu = smp_processor_id();
@@ -54,15 +51,15 @@ void restore_rest_processor_state(void)
 #endif
 
     /* Maybe load the debug registers. */
+    BUG_ON(is_hvm_vcpu(v));
     if ( !is_idle_vcpu(v) && unlikely(v->arch.guest_context.debugreg[7]) )
     {
-        loaddebug(&v->arch.guest_context, 0);
-        loaddebug(&v->arch.guest_context, 1);
-        loaddebug(&v->arch.guest_context, 2);
-        loaddebug(&v->arch.guest_context, 3);
-        /* no 4 and 5 */
-        loaddebug(&v->arch.guest_context, 6);
-        loaddebug(&v->arch.guest_context, 7);
+        write_debugreg(0, v->arch.guest_context.debugreg[0]);
+        write_debugreg(1, v->arch.guest_context.debugreg[1]);
+        write_debugreg(2, v->arch.guest_context.debugreg[2]);
+        write_debugreg(3, v->arch.guest_context.debugreg[3]);
+        write_debugreg(6, v->arch.guest_context.debugreg[6]);
+        write_debugreg(7, v->arch.guest_context.debugreg[7]);
     }
 
     /* Reload FPU state on next FPU use. */

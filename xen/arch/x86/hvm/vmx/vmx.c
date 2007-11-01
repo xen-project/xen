@@ -381,11 +381,6 @@ static enum handler_return long_mode_do_msr_write(struct cpu_user_regs *regs)
 
 #endif /* __i386__ */
 
-#define loaddebug(_v,_reg)  \
-    __asm__ __volatile__ ("mov %0,%%db" #_reg : : "r" ((_v)->debugreg[_reg]))
-#define savedebug(_v,_reg)  \
-    __asm__ __volatile__ ("mov %%db" #_reg ",%0" : : "r" ((_v)->debugreg[_reg]))
-
 static int vmx_guest_x86_mode(struct vcpu *v)
 {
     unsigned int cs_ar_bytes;
@@ -411,23 +406,41 @@ static void vmx_save_dr(struct vcpu *v)
     v->arch.hvm_vmx.exec_control |= CPU_BASED_MOV_DR_EXITING;
     __vmwrite(CPU_BASED_VM_EXEC_CONTROL, v->arch.hvm_vmx.exec_control);
 
-    savedebug(&v->arch.guest_context, 0);
-    savedebug(&v->arch.guest_context, 1);
-    savedebug(&v->arch.guest_context, 2);
-    savedebug(&v->arch.guest_context, 3);
-    savedebug(&v->arch.guest_context, 6);
+    v->arch.guest_context.debugreg[0] = read_debugreg(0);
+    v->arch.guest_context.debugreg[1] = read_debugreg(1);
+    v->arch.guest_context.debugreg[2] = read_debugreg(2);
+    v->arch.guest_context.debugreg[3] = read_debugreg(3);
+    v->arch.guest_context.debugreg[6] = read_debugreg(6);
+    /* DR7 must be saved as it is used by vmx_restore_dr(). */
     v->arch.guest_context.debugreg[7] = __vmread(GUEST_DR7);
 }
 
 static void __restore_debug_registers(struct vcpu *v)
 {
-    loaddebug(&v->arch.guest_context, 0);
-    loaddebug(&v->arch.guest_context, 1);
-    loaddebug(&v->arch.guest_context, 2);
-    loaddebug(&v->arch.guest_context, 3);
-    /* No 4 and 5 */
-    loaddebug(&v->arch.guest_context, 6);
+    ASSERT(!v->arch.hvm_vcpu.flag_dr_dirty);
+    v->arch.hvm_vcpu.flag_dr_dirty = 1;
+
+    write_debugreg(0, v->arch.guest_context.debugreg[0]);
+    write_debugreg(1, v->arch.guest_context.debugreg[1]);
+    write_debugreg(2, v->arch.guest_context.debugreg[2]);
+    write_debugreg(3, v->arch.guest_context.debugreg[3]);
+    write_debugreg(6, v->arch.guest_context.debugreg[6]);
     /* DR7 is loaded from the VMCS. */
+}
+
+/*
+ * DR7 is saved and restored on every vmexit.  Other debug registers only
+ * need to be restored if their value is going to affect execution -- i.e.,
+ * if one of the breakpoints is enabled.  So mask out all bits that don't
+ * enable some breakpoint functionality.
+ */
+#define DR7_ACTIVE_MASK 0xff
+
+static void vmx_restore_dr(struct vcpu *v)
+{
+    /* NB. __vmread() is not usable here, so we cannot read from the VMCS. */
+    if ( unlikely(v->arch.guest_context.debugreg[7] & DR7_ACTIVE_MASK) )
+        __restore_debug_registers(v);
 }
 
 void vmx_vmcs_save(struct vcpu *v, struct hvm_hw_cpu *c)
@@ -701,21 +714,6 @@ static int vmx_load_vmcs_ctxt(struct vcpu *v, struct hvm_hw_cpu *ctxt)
     }
 
     return 0;
-}
-
-/*
- * DR7 is saved and restored on every vmexit.  Other debug registers only
- * need to be restored if their value is going to affect execution -- i.e.,
- * if one of the breakpoints is enabled.  So mask out all bits that don't
- * enable some breakpoint functionality.
- */
-#define DR7_ACTIVE_MASK 0xff
-
-static void vmx_restore_dr(struct vcpu *v)
-{
-    /* NB. __vmread() is not usable here, so we cannot read from the VMCS. */
-    if ( unlikely(v->arch.guest_context.debugreg[7] & DR7_ACTIVE_MASK) )
-        __restore_debug_registers(v);
 }
 
 static void vmx_ctxt_switch_from(struct vcpu *v)
@@ -1322,15 +1320,12 @@ static void vmx_dr_access(unsigned long exit_qualification,
 
     HVMTRACE_0D(DR_WRITE, v);
 
-    v->arch.hvm_vcpu.flag_dr_dirty = 1;
-
-    /* We could probably be smarter about this */
-    __restore_debug_registers(v);
+    if ( !v->arch.hvm_vcpu.flag_dr_dirty )
+        __restore_debug_registers(v);
 
     /* Allow guest direct access to DR registers */
     v->arch.hvm_vmx.exec_control &= ~CPU_BASED_MOV_DR_EXITING;
-    __vmwrite(CPU_BASED_VM_EXEC_CONTROL,
-              v->arch.hvm_vmx.exec_control);
+    __vmwrite(CPU_BASED_VM_EXEC_CONTROL, v->arch.hvm_vmx.exec_control);
 }
 
 /*
