@@ -242,6 +242,8 @@ sal_emulator (long index, unsigned long in1, unsigned long in2,
 			}
 			e = list_entry(sal_queue[in1].next,
 			               sal_queue_entry_t, list);
+
+			list_del(&e->list);
 			spin_unlock_irqrestore(&sal_queue_lock, flags);
 
 			IA64_SAL_DEBUG("SAL_GET_STATE_INFO(%s <= %s) "
@@ -277,10 +279,12 @@ sal_emulator (long index, unsigned long in1, unsigned long in2,
 			r9 = arg.ret;
 			status = arg.status;
 			if (r9 == 0) {
-				spin_lock_irqsave(&sal_queue_lock, flags);
-				list_del(&e->list);
-				spin_unlock_irqrestore(&sal_queue_lock, flags);
 				xfree(e);
+			} else {
+				/* Re-add the entry to sal_queue */
+				spin_lock_irqsave(&sal_queue_lock, flags);
+				list_add(&e->list, &sal_queue[in1]);
+				spin_unlock_irqrestore(&sal_queue_lock, flags);
 			}
 		} else {
 			status = IA64_SAL_NO_INFORMATION_AVAILABLE;
@@ -316,10 +320,10 @@ sal_emulator (long index, unsigned long in1, unsigned long in2,
 			               "on CPU#%d.\n",
 			               rec_name[e->sal_info_type],
 			               rec_name[in1], e->cpuid);
-			
 
 			arg.type = e->sal_info_type;
 			arg.status = 0;
+
 			if (e->cpuid == smp_processor_id()) {
 				IA64_SAL_DEBUG("SAL_CLEAR_STATE_INFO: local\n");
 				clear_state_info_on(&arg);
