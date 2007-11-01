@@ -386,6 +386,10 @@ if os.uname()[0] == 'SunOS':
                 return scf.get_bool(name)
             except scf.error, e:
                 if e[0] == scf.SCF_ERROR_NOT_FOUND:
+                    if val in ['yes', 'y', '1', 'on',  'true',  't']:
+                        return True
+                    if val in ['no',  'n', '0', 'off', 'false', 'f']:
+                        return False
                     return val
                 else:
                     raise XendError("option %s: %s:%s" % (name, e[1], e[2]))
