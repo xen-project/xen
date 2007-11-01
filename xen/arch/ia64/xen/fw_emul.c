@@ -589,6 +589,19 @@ remote_pal_cache_flush(void *v)
 		args->status = status;
 }
 
+static void
+remote_pal_prefetch_visibility(void *v)
+{
+	s64 trans_type = (s64)v;
+	ia64_pal_prefetch_visibility(trans_type);
+}
+
+static void
+remote_pal_mc_drain(void *v)
+{
+	ia64_pal_mc_drain();
+}
+
 struct ia64_pal_retval
 xen_pal_emulator(unsigned long index, u64 in1, u64 in2, u64 in3)
 {
@@ -850,7 +863,35 @@ xen_pal_emulator(unsigned long index, u64 in1, u64 in2, u64 in3)
 		status = PAL_STATUS_SUCCESS;
 		r9 = current->vcpu_id;
 		break;
+	    case PAL_PREFETCH_VISIBILITY:
+		status = ia64_pal_prefetch_visibility(in1);
+		if (status == 0) {
+			/* must be performed on all remote processors 
+			   in the coherence domain. */
+			smp_call_function(remote_pal_prefetch_visibility,
+					  (void *)in1, 1, 1);
+			status = 1; /* no more necessary on remote processor */
+		}
+		break;
+	    case PAL_MC_DRAIN:
+		status = ia64_pal_mc_drain();
+		/* FIXME: All vcpus likely call PAL_MC_DRAIN.
+		   That causes the congestion. */
+		smp_call_function(remote_pal_mc_drain, NULL, 1, 1);
+		break;
+	    case PAL_BRAND_INFO:
+		if (in1 == 0) {
+			char brand_info[128];
+			status = ia64_pal_get_brand_info(brand_info);
+			if (status == PAL_STATUS_SUCCESS)
+				copy_to_user((void *)in2, brand_info, 128);
+		} else {
+			status = PAL_STATUS_EINVAL;
+		}
+		break;
 	    case PAL_LOGICAL_TO_PHYSICAL:
+	    case PAL_GET_PSTATE:
+	    case PAL_CACHE_SHARED_INFO:
 		/* Optional, no need to complain about being unimplemented */
 		break;
 	    default:
