@@ -17,7 +17,6 @@ mca_asm.h		-> linux/include/asm-ia64/mca_asm.h
 meminit.h		-> linux/include/asm-ia64/meminit.h
 numa.h			-> linux/include/asm-ia64/numa.h
 page.h			-> linux/include/asm-ia64/page.h
-pal.h			-> linux/include/asm-ia64/pal.h
 percpu.h		-> linux/include/asm-ia64/percpu.h
 pgalloc.h		-> linux/include/asm-ia64/pgalloc.h
 pgtable.h		-> linux/include/asm-ia64/pgtable.h
@@ -42,3 +41,6 @@ machvec_dig.h		-> linux/include/asm-ia64/machvec_dig.h
 machvec_sn2.h		-> linux/include/asm-ia64/machvec_sn2.h
 machvec_hpzx1.h		-> linux/include/asm-ia64/machvec_hpzx1.h
 machvec_pci.h		-> linux/include/asm-ia64/pci.h
+
+# The files below are from Linux-2.6.21
+pal.h			-> linux/include/asm-ia64/pal.h
