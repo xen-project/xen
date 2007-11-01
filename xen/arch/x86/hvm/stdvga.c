@@ -296,6 +296,8 @@ int stdvga_intercept_pio(ioreq_t *p)
     {
         if ( p->size != 1 )
             gdprintk(XENLOG_WARNING, "unexpected io size:%d\n", (int)p->size);
+        if ( p->data_is_ptr )
+            gdprintk(XENLOG_WARNING, "unexpected data_is_ptr\n");
         if ( !((p->addr == 0x3c5) && (s->sr_index >= sizeof(sr_mask))) &&
              !((p->addr == 0x3cf) && (s->gr_index >= sizeof(gr_mask))) )
         {
@@ -642,6 +644,10 @@ int stdvga_intercept_mmio(ioreq_t *p)
                      p->data_is_ptr, p->dir, p->df);
             s->cache = 0;
         }
+    }
+    else
+    {
+        buf = (p->dir == IOREQ_WRITE);
     }
 
     rc = (buf && hvm_buffered_io_send(p));

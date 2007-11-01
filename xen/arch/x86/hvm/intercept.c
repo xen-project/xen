@@ -157,19 +157,26 @@ int hvm_buffered_io_send(ioreq_t *p)
     struct hvm_ioreq_page *iorp = &v->domain->arch.hvm_domain.buf_ioreq;
     buffered_iopage_t *pg = iorp->va;
     buf_ioreq_t bp;
-    /* Timeoffset sends 64b data, but no address.  Use two consecutive slots. */
+    /* Timeoffset sends 64b data, but no address. Use two consecutive slots. */
     int qw = 0;
 
     /* Ensure buffered_iopage fits in a page */
     BUILD_BUG_ON(sizeof(buffered_iopage_t) > PAGE_SIZE);
 
     /* Return 0 for the cases we can't deal with. */
-    if (p->addr > 0xffffful || p->data_is_ptr || p->df || p->count != 1)
+    if ( (p->addr > 0xffffful) || p->data_is_ptr || p->df || (p->count != 1) )
+    {
+        gdprintk(XENLOG_DEBUG, "slow ioreq.  type:%d size:%ld addr:0x%08lx "
+                 "dir:%d ptr:%d df:%d count:%ld\n",
+                 p->type, p->size, p->addr, !!p->dir,
+                 !!p->data_is_ptr, !!p->df, p->count);
         return 0;
+    }
 
     bp.type = p->type;
     bp.dir  = p->dir;
-    switch (p->size) {
+    switch ( p->size )
+    {
     case 1:
         bp.size = 0;
         break;
@@ -182,8 +189,6 @@ int hvm_buffered_io_send(ioreq_t *p)
     case 8:
         bp.size = 3;
         qw = 1;
-        gdprintk(XENLOG_INFO, "quadword ioreq type:%d data:%"PRIx64"\n",
-                 p->type, p->data);
         break;
     default:
         gdprintk(XENLOG_WARNING, "unexpected ioreq size:%"PRId64"\n", p->size);
@@ -191,11 +196,12 @@ int hvm_buffered_io_send(ioreq_t *p)
     }
     
     bp.data = p->data;
-    bp.addr = qw ? ((p->data >> 16) & 0xfffful) : (p->addr & 0xffffful);
+    bp.addr = p->addr;
     
     spin_lock(&iorp->lock);
 
-    if ( (pg->write_pointer - pg->read_pointer) >= IOREQ_BUFFER_SLOT_NUM - (qw ? 1 : 0))
+    if ( (pg->write_pointer - pg->read_pointer) >=
+         (IOREQ_BUFFER_SLOT_NUM - qw) )
     {
         /* The queue is full: send the iopacket through the normal path. */
         spin_unlock(&iorp->lock);
@@ -205,9 +211,9 @@ int hvm_buffered_io_send(ioreq_t *p)
     memcpy(&pg->buf_ioreq[pg->write_pointer % IOREQ_BUFFER_SLOT_NUM],
            &bp, sizeof(bp));
     
-    if (qw) {
+    if ( qw )
+    {
         bp.data = p->data >> 32;
-        bp.addr = (p->data >> 48) & 0xfffful;
         memcpy(&pg->buf_ioreq[(pg->write_pointer+1) % IOREQ_BUFFER_SLOT_NUM],
                &bp, sizeof(bp));
     }
@@ -215,7 +221,7 @@ int hvm_buffered_io_send(ioreq_t *p)
     /* Make the ioreq_t visible /before/ write_pointer. */
     wmb();
     pg->write_pointer += qw ? 2 : 1;
-    
+
     spin_unlock(&iorp->lock);
     
     return 1;
