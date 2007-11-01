@@ -44,11 +44,18 @@
 #define gfp_t unsigned
 #endif
 
-#if defined (_LINUX_NOTIFIER_H) && !defined ATOMIC_NOTIFIER_HEAD
+#if defined(_LINUX_NOTIFIER_H) && !defined(ATOMIC_NOTIFIER_HEAD)
 #define ATOMIC_NOTIFIER_HEAD(name) struct notifier_block *name
 #define atomic_notifier_chain_register(chain,nb) notifier_chain_register(chain,nb)
 #define atomic_notifier_chain_unregister(chain,nb) notifier_chain_unregister(chain,nb)
 #define atomic_notifier_call_chain(chain,val,v) notifier_call_chain(chain,val,v)
+#endif
+
+#if defined(_LINUX_NOTIFIER_H) && !defined(BLOCKING_NOTIFIER_HEAD)
+#define BLOCKING_NOTIFIER_HEAD(name) struct notifier_block *name
+#define blocking_notifier_chain_register(chain,nb) notifier_chain_register(chain,nb)
+#define blocking_notifier_chain_unregister(chain,nb) notifier_chain_unregister(chain,nb)
+#define blocking_notifier_call_chain(chain,val,v) notifier_call_chain(chain,val,v)
 #endif
 
 #if defined(_LINUX_MM_H) && defined set_page_count
