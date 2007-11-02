@@ -553,20 +553,17 @@ void __handle_buffered_iopage(CPUState *env)
 				       IOREQ_BUFFER_SLOT_NUM];
         req.size = 1UL << buf_req->size;
         req.count = 1;
+        req.addr = buf_req->addr;
         req.data = buf_req->data;
         req.state = STATE_IOREQ_READY;
         req.dir  = buf_req->dir;
         req.type = buf_req->type;
         qw = req.size == 8;
         if (qw) {
-            req.data |= ((uint64_t)buf_req->addr) << 16;
             buf_req = &buffered_io_page->buf_ioreq[(buffered_io_page->read_pointer+1) %
                                                IOREQ_BUFFER_SLOT_NUM];
             req.data |= ((uint64_t)buf_req->data) << 32;
-            req.data |= ((uint64_t)buf_req->addr) << 48;
         }
-        else
-            req.addr = buf_req->addr;
 
         __handle_ioreq(env, &req);
 

@@ -151,13 +151,6 @@ enum DRInterceptBits
     DR_INTERCEPT_DR15_WRITE = 1 << 31,
 };
 
-/* for lazy save/restore we'd like to intercept all DR writes */
-#define DR_INTERCEPT_ALL_WRITES \
-    (DR_INTERCEPT_DR0_WRITE|DR_INTERCEPT_DR1_WRITE|DR_INTERCEPT_DR2_WRITE \
-    |DR_INTERCEPT_DR3_WRITE|DR_INTERCEPT_DR4_WRITE|DR_INTERCEPT_DR5_WRITE \
-    |DR_INTERCEPT_DR6_WRITE|DR_INTERCEPT_DR7_WRITE) 
-
-
 enum VMEXIT_EXITCODE
 {
     /* control register read exitcodes */

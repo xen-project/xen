@@ -628,7 +628,6 @@ static void shutdown_domain(struct domain *d)
 	if (d->xce_handle != -1)
 		xc_evtchn_close(d->xce_handle);
 	d->xce_handle = -1;
-	cleanup_domain(d);
 }
 
 void enum_domains(void)
@@ -674,6 +673,9 @@ static void handle_tty_read(struct domain *dom)
 	struct xencons_interface *intf = dom->interface;
 	XENCONS_RING_IDX prod;
 
+	if (dom->is_dead)
+		return;
+
 	len = ring_free_bytes(dom);
 	if (len == 0)
 		return;
@@ -711,6 +713,9 @@ static void handle_tty_write(struct domain *dom)
 {
 	ssize_t len;
 
+	if (dom->is_dead)
+		return;
+
 	len = write(dom->tty_fd, dom->buffer.data + dom->buffer.consumed,
 		    dom->buffer.size - dom->buffer.consumed);
  	if (len < 1) {
@@ -733,6 +738,9 @@ static void handle_tty_write(struct domain *dom)
 static void handle_ring_read(struct domain *dom)
 {
 	evtchn_port_or_error_t port;
+
+	if (dom->is_dead)
+		return;
 
 	if ((port = xc_evtchn_pending(dom->xce_handle)) == -1)
 		return;

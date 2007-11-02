@@ -137,12 +137,6 @@ static enum handler_return long_mode_do_msr_write(struct cpu_user_regs *regs)
     return HNDL_done;
 }
 
-
-#define loaddebug(_v,_reg) \
-    asm volatile ("mov %0,%%db" #_reg : : "r" ((_v)->debugreg[_reg]))
-#define savedebug(_v,_reg) \
-    asm volatile ("mov %%db" #_reg ",%0" : : "r" ((_v)->debugreg[_reg]))
-
 static void svm_save_dr(struct vcpu *v)
 {
     struct vmcb_struct *vmcb = v->arch.hvm_svm.vmcb;
@@ -152,26 +146,45 @@ static void svm_save_dr(struct vcpu *v)
 
     /* Clear the DR dirty flag and re-enable intercepts for DR accesses. */
     v->arch.hvm_vcpu.flag_dr_dirty = 0;
-    v->arch.hvm_svm.vmcb->dr_intercepts = DR_INTERCEPT_ALL_WRITES;
+    v->arch.hvm_svm.vmcb->dr_intercepts = ~0u;
 
-    savedebug(&v->arch.guest_context, 0);
-    savedebug(&v->arch.guest_context, 1);
-    savedebug(&v->arch.guest_context, 2);
-    savedebug(&v->arch.guest_context, 3);
+    v->arch.guest_context.debugreg[0] = read_debugreg(0);
+    v->arch.guest_context.debugreg[1] = read_debugreg(1);
+    v->arch.guest_context.debugreg[2] = read_debugreg(2);
+    v->arch.guest_context.debugreg[3] = read_debugreg(3);
     v->arch.guest_context.debugreg[6] = vmcb->dr6;
     v->arch.guest_context.debugreg[7] = vmcb->dr7;
 }
 
-
 static void __restore_debug_registers(struct vcpu *v)
 {
-    loaddebug(&v->arch.guest_context, 0);
-    loaddebug(&v->arch.guest_context, 1);
-    loaddebug(&v->arch.guest_context, 2);
-    loaddebug(&v->arch.guest_context, 3);
-    /* DR6 and DR7 are loaded from the VMCB. */
+    struct vmcb_struct *vmcb = v->arch.hvm_svm.vmcb;
+
+    ASSERT(!v->arch.hvm_vcpu.flag_dr_dirty);
+    v->arch.hvm_vcpu.flag_dr_dirty = 1;
+    vmcb->dr_intercepts = 0;
+
+    write_debugreg(0, v->arch.guest_context.debugreg[0]);
+    write_debugreg(1, v->arch.guest_context.debugreg[1]);
+    write_debugreg(2, v->arch.guest_context.debugreg[2]);
+    write_debugreg(3, v->arch.guest_context.debugreg[3]);
+    vmcb->dr6 = v->arch.guest_context.debugreg[6];
+    vmcb->dr7 = v->arch.guest_context.debugreg[7];
 }
 
+/*
+ * DR7 is saved and restored on every vmexit.  Other debug registers only
+ * need to be restored if their value is going to affect execution -- i.e.,
+ * if one of the breakpoints is enabled.  So mask out all bits that don't
+ * enable some breakpoint functionality.
+ */
+#define DR7_ACTIVE_MASK 0xff
+
+static void svm_restore_dr(struct vcpu *v)
+{
+    if ( unlikely(v->arch.guest_context.debugreg[7] & DR7_ACTIVE_MASK) )
+        __restore_debug_registers(v);
+}
 
 int svm_vmcb_save(struct vcpu *v, struct hvm_hw_cpu *c)
 {
@@ -351,9 +364,6 @@ int svm_vmcb_restore(struct vcpu *v, struct hvm_hw_cpu *c)
         vmcb->h_cr3 = pagetable_get_paddr(v->domain->arch.phys_table);
     }
 
-    vmcb->dr6 = c->dr6;
-    vmcb->dr7 = c->dr7;
-
     if ( c->pending_valid ) 
     {
         gdprintk(XENLOG_INFO, "Re-injecting 0x%"PRIx32", 0x%"PRIx32"\n",
@@ -419,12 +429,6 @@ static int svm_load_vmcb_ctxt(struct vcpu *v, struct hvm_hw_cpu *ctxt)
     }
 
     return 0;
-}
-
-static void svm_restore_dr(struct vcpu *v)
-{
-    if ( unlikely(v->arch.guest_context.debugreg[7] & 0xFF) )
-        __restore_debug_registers(v);
 }
 
 static enum hvm_intblk svm_interrupt_blocked(
@@ -1147,16 +1151,8 @@ static void set_reg(
 
 static void svm_dr_access(struct vcpu *v, struct cpu_user_regs *regs)
 {
-    struct vmcb_struct *vmcb = v->arch.hvm_svm.vmcb;
-
     HVMTRACE_0D(DR_WRITE, v);
-
-    v->arch.hvm_vcpu.flag_dr_dirty = 1;
-
     __restore_debug_registers(v);
-
-    /* allow the guest full access to the debug registers */
-    vmcb->dr_intercepts = 0;
 }
 
 

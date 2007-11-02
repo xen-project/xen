@@ -130,7 +130,7 @@ static int construct_vmcb(struct vcpu *v)
         GENERAL2_INTERCEPT_SKINIT      | GENERAL2_INTERCEPT_RDTSCP;
 
     /* Intercept all debug-register writes. */
-    vmcb->dr_intercepts = DR_INTERCEPT_ALL_WRITES;
+    vmcb->dr_intercepts = ~0u;
 
     /* Intercept all control-register accesses except for CR2 and CR8. */
     vmcb->cr_intercepts = ~(CR_INTERCEPT_CR2_READ |
