@@ -251,6 +251,7 @@ TYPE_SAFE(u32,gfn)
 /* Types of the guest's page tables */
 typedef l1_pgentry_32_t guest_l1e_t;
 typedef l2_pgentry_32_t guest_l2e_t;
+typedef intpte_32_t guest_intpte_t;
 
 /* Access functions for them */
 static inline paddr_t guest_l1e_get_paddr(guest_l1e_t gl1e)
@@ -319,6 +320,7 @@ typedef l3_pgentry_t guest_l3e_t;
 #if GUEST_PAGING_LEVELS >= 4
 typedef l4_pgentry_t guest_l4e_t;
 #endif
+typedef intpte_t guest_intpte_t;
 
 /* Access functions for them */
 static inline paddr_t guest_l1e_get_paddr(guest_l1e_t gl1e)
@@ -419,32 +421,27 @@ gfn_to_paddr(gfn_t gfn)
 
 /* Type used for recording a walk through guest pagetables.  It is
  * filled in by the pagetable walk function, and also used as a cache
- * for later walks.  
- * Any non-null pointer in this structure represents a mapping of guest
- * memory.  We must always call walk_init() before using a walk_t, and 
- * call walk_unmap() when we're done. 
- * The "Effective l1e" field is used when there isn't an l1e to point to, 
- * but we have fabricated an l1e for propagation to the shadow (e.g., 
- * for splintering guest superpages into many shadow l1 entries).  */
+ * for later walks.  When we encounter a suporpage l2e, we fabricate an
+ * l1e for propagation to the shadow (for splintering guest superpages
+ * into many shadow l1 entries).  */
 typedef struct shadow_walk_t walk_t;
 struct shadow_walk_t 
 {
     unsigned long va;           /* Address we were looking for */
 #if GUEST_PAGING_LEVELS >= 3
 #if GUEST_PAGING_LEVELS >= 4
-    guest_l4e_t *l4e;           /* Pointer to guest's level 4 entry */
+    guest_l4e_t l4e;            /* Guest's level 4 entry */
 #endif
-    guest_l3e_t *l3e;           /* Pointer to guest's level 3 entry */
+    guest_l3e_t l3e;            /* Guest's level 3 entry */
 #endif
-    guest_l2e_t *l2e;           /* Pointer to guest's level 2 entry */
-    guest_l1e_t *l1e;           /* Pointer to guest's level 1 entry */
-    guest_l1e_t eff_l1e;        /* Effective level 1 entry */
+    guest_l2e_t l2e;            /* Guest's level 2 entry */
+    guest_l1e_t l1e;            /* Guest's level 1 entry (or fabrication) */
 #if GUEST_PAGING_LEVELS >= 4
-    mfn_t l4mfn;                /* MFN that the level 4 entry is in */
-    mfn_t l3mfn;                /* MFN that the level 3 entry is in */
+    mfn_t l4mfn;                /* MFN that the level 4 entry was in */
+    mfn_t l3mfn;                /* MFN that the level 3 entry was in */
 #endif
-    mfn_t l2mfn;                /* MFN that the level 2 entry is in */
-    mfn_t l1mfn;                /* MFN that the level 1 entry is in */
+    mfn_t l2mfn;                /* MFN that the level 2 entry was in */
+    mfn_t l1mfn;                /* MFN that the level 1 entry was in */
 };
 
 /* macros for dealing with the naming of the internal function names of the
@@ -542,7 +539,7 @@ accumulate_guest_flags(struct vcpu *v, walk_t *gw)
 {
     u32 accumulated_flags;
 
-    if ( unlikely(!(guest_l1e_get_flags(gw->eff_l1e) & _PAGE_PRESENT)) )
+    if ( unlikely(!(guest_l1e_get_flags(gw->l1e) & _PAGE_PRESENT)) )
         return 0;
         
     // We accumulate the permission flags with bitwise ANDing.
@@ -550,17 +547,17 @@ accumulate_guest_flags(struct vcpu *v, walk_t *gw)
     // For the NX bit, however, the polarity is wrong, so we accumulate the
     // inverse of the NX bit.
     //
-    accumulated_flags =  guest_l1e_get_flags(gw->eff_l1e) ^ _PAGE_NX_BIT;
-    accumulated_flags &= guest_l2e_get_flags(*gw->l2e) ^ _PAGE_NX_BIT;
+    accumulated_flags =  guest_l1e_get_flags(gw->l1e) ^ _PAGE_NX_BIT;
+    accumulated_flags &= guest_l2e_get_flags(gw->l2e) ^ _PAGE_NX_BIT;
 
     // Note that PAE guests do not have USER or RW or NX bits in their L3s.
     //
 #if GUEST_PAGING_LEVELS == 3
     accumulated_flags &=
-        ~_PAGE_PRESENT | (guest_l3e_get_flags(*gw->l3e) & _PAGE_PRESENT);
+        ~_PAGE_PRESENT | (guest_l3e_get_flags(gw->l3e) & _PAGE_PRESENT);
 #elif GUEST_PAGING_LEVELS >= 4
-    accumulated_flags &= guest_l3e_get_flags(*gw->l3e) ^ _PAGE_NX_BIT;
-    accumulated_flags &= guest_l4e_get_flags(*gw->l4e) ^ _PAGE_NX_BIT;
+    accumulated_flags &= guest_l3e_get_flags(gw->l3e) ^ _PAGE_NX_BIT;
+    accumulated_flags &= guest_l4e_get_flags(gw->l4e) ^ _PAGE_NX_BIT;
 #endif
 
     // Revert the NX bit back to its original polarity

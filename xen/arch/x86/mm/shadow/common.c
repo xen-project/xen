@@ -150,11 +150,13 @@ hvm_read(enum x86_segment seg,
         return rc;
 
     *val = 0;
-    // XXX -- this is WRONG.
-    //        It entirely ignores the permissions in the page tables.
-    //        In this case, that is only a user vs supervisor access check.
-    //
-    if ( (rc = hvm_copy_from_guest_virt(val, addr, bytes)) == 0 )
+
+    if ( access_type == hvm_access_insn_fetch )
+        rc = hvm_fetch_from_guest_virt(val, addr, bytes);
+    else
+        rc = hvm_copy_from_guest_virt(val, addr, bytes);
+
+    if ( rc == 0 ) 
         return X86EMUL_OKAY;
 
     /* If we got here, there was nothing mapped here, or a bad GFN 
@@ -395,7 +397,7 @@ struct x86_emulate_ops *shadow_init_emulation(
         (!hvm_translate_linear_addr(
             x86_seg_cs, regs->eip, sizeof(sh_ctxt->insn_buf),
             hvm_access_insn_fetch, sh_ctxt, &addr) &&
-         !hvm_copy_from_guest_virt(
+         !hvm_fetch_from_guest_virt(
              sh_ctxt->insn_buf, addr, sizeof(sh_ctxt->insn_buf)))
         ? sizeof(sh_ctxt->insn_buf) : 0;
 
@@ -423,7 +425,7 @@ void shadow_continue_emulation(struct sh_emulate_ctxt *sh_ctxt,
                 (!hvm_translate_linear_addr(
                     x86_seg_cs, regs->eip, sizeof(sh_ctxt->insn_buf),
                     hvm_access_insn_fetch, sh_ctxt, &addr) &&
-                 !hvm_copy_from_guest_virt(
+                 !hvm_fetch_from_guest_virt(
                      sh_ctxt->insn_buf, addr, sizeof(sh_ctxt->insn_buf)))
                 ? sizeof(sh_ctxt->insn_buf) : 0;
             sh_ctxt->insn_buf_eip = regs->eip;

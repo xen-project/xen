@@ -31,7 +31,7 @@
 
 /* Debugging and auditing of the P2M code? */
 #define P2M_AUDIT     0
-#define P2M_DEBUGGING 1
+#define P2M_DEBUGGING 0
 
 /*
  * The P2M lock.  This protects all updates to the p2m table.
@@ -290,11 +290,11 @@ int p2m_alloc_table(struct domain *d,
                     void (*free_page)(struct domain *d, struct page_info *pg))
 
 {
-    mfn_t mfn;
+    mfn_t mfn = _mfn(INVALID_MFN);
     struct list_head *entry;
     struct page_info *page, *p2m_top;
     unsigned int page_count = 0;
-    unsigned long gfn;
+    unsigned long gfn = -1UL;
 
     p2m_lock(d);
 

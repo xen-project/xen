@@ -833,7 +833,7 @@ int inst_copy_from_guest(unsigned char *buf, unsigned long guest_eip, int inst_l
 {
     if ( inst_len > MAX_INST_LEN || inst_len <= 0 )
         return 0;
-    if ( hvm_copy_from_guest_virt(buf, guest_eip, inst_len) )
+    if ( hvm_fetch_from_guest_virt(buf, guest_eip, inst_len) )
         return 0;
     return inst_len;
 }
@@ -1075,6 +1075,7 @@ void handle_mmio(unsigned long gpa)
         unsigned long addr, gfn; 
         paddr_t paddr;
         int dir, size = op_size;
+        uint32_t pfec;
 
         ASSERT(count);
 
@@ -1082,8 +1083,11 @@ void handle_mmio(unsigned long gpa)
         addr = regs->edi;
         if ( ad_size == WORD )
             addr &= 0xFFFF;
-        addr += hvm_get_segment_base(v, x86_seg_es);
-        gfn = paging_gva_to_gfn(v, addr);
+        addr += hvm_get_segment_base(v, x86_seg_es);        
+        pfec = PFEC_page_present | PFEC_write_access;
+        if ( ring_3(regs) )
+            pfec |= PFEC_user_mode;
+        gfn = paging_gva_to_gfn(v, addr, &pfec);
         paddr = (paddr_t)gfn << PAGE_SHIFT | (addr & ~PAGE_MASK);
         if ( paddr == gpa )
         {
@@ -1105,7 +1109,8 @@ void handle_mmio(unsigned long gpa)
             default: domain_crash_synchronous();
             }
             addr += hvm_get_segment_base(v, seg);
-            gfn = paging_gva_to_gfn(v, addr);
+            pfec &= ~PFEC_write_access;
+            gfn = paging_gva_to_gfn(v, addr, &pfec);
             paddr = (paddr_t)gfn << PAGE_SHIFT | (addr & ~PAGE_MASK);
         }
         else
@@ -1115,12 +1120,9 @@ void handle_mmio(unsigned long gpa)
         {
             /* The guest does not have the non-mmio address mapped. 
              * Need to send in a page fault */
-            int errcode = 0;
-            /* IO read --> memory write */
-            if ( dir == IOREQ_READ ) errcode |= PFEC_write_access;
             regs->eip -= inst_len; /* do not advance %eip */
             regs->eflags |= X86_EFLAGS_RF; /* RF was set by original #PF */
-            hvm_inject_exception(TRAP_page_fault, errcode, addr);
+            hvm_inject_exception(TRAP_page_fault, pfec, addr);
             return;
         }
 
@@ -1308,10 +1310,9 @@ void handle_mmio(unsigned long gpa)
 
 DEFINE_PER_CPU(int, guest_handles_in_xen_space);
 
-/* Note that copy_{to,from}_user_hvm don't set the A and D bits on
-   PTEs, and require the PTE to be writable even when they're only
-   trying to read from it.  The guest is expected to deal with
-   this. */
+/* Note that copy_{to,from}_user_hvm require the PTE to be writable even
+   when they're only trying to read from it.  The guest is expected to
+   deal with this. */
 unsigned long copy_to_user_hvm(void *to, const void *from, unsigned len)
 {
     if ( this_cpu(guest_handles_in_xen_space) )

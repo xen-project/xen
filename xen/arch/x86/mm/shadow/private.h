@@ -665,9 +665,10 @@ void shadow_continue_emulation(
 #define VTLB_ENTRIES 13
 
 struct shadow_vtlb {
-    unsigned long page_number;    /* Guest virtual address >> PAGE_SHIFT  */
-    unsigned long frame_number;   /* Guest physical address >> PAGE_SHIFT */
-    u32 flags;    /* Accumulated guest pte flags, or 0 for an empty slot. */
+    unsigned long page_number;      /* Guest virtual address >> PAGE_SHIFT  */
+    unsigned long frame_number;     /* Guest physical address >> PAGE_SHIFT */
+    uint32_t pfec;  /* Pagefault code for the lookup that filled this entry */
+    uint32_t flags; /* Accumulated guest pte flags, or 0 for an empty slot. */
 };
 
 /* Call whenever the guest flushes hit actual TLB */
@@ -692,7 +693,7 @@ static inline void vtlb_insert(struct vcpu *v, struct shadow_vtlb entry)
 }
 
 /* Look a translation up in the vTLB.  Returns 0 if not found. */
-static inline int vtlb_lookup(struct vcpu *v, unsigned long va,
+static inline int vtlb_lookup(struct vcpu *v, unsigned long va, uint32_t pfec,
                               struct shadow_vtlb *result) 
 {
     unsigned long page_number = va >> PAGE_SHIFT;
@@ -701,7 +702,9 @@ static inline int vtlb_lookup(struct vcpu *v, unsigned long va,
 
     spin_lock(&v->arch.paging.vtlb_lock);
     if ( v->arch.paging.vtlb[i].flags != 0 
-         && v->arch.paging.vtlb[i].page_number == page_number )
+         && v->arch.paging.vtlb[i].page_number == page_number 
+         /* Any successful walk that had at least these pfec bits is OK */
+         && (v->arch.paging.vtlb[i].pfec & pfec) == pfec )
     {
         rv = 1; 
         result[0] = v->arch.paging.vtlb[i];

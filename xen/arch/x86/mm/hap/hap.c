@@ -695,7 +695,7 @@ hap_write_p2m_entry(struct vcpu *v, unsigned long gfn, l1_pgentry_t *p,
 }
 
 static unsigned long hap_gva_to_gfn_real_mode(
-    struct vcpu *v, unsigned long gva)
+    struct vcpu *v, unsigned long gva, uint32_t *pfec)
 {
     return ((paddr_t)gva >> PAGE_SHIFT);
 }

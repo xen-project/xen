@@ -105,7 +105,8 @@ struct paging_mode {
     int           (*page_fault            )(struct vcpu *v, unsigned long va,
                                             struct cpu_user_regs *regs);
     int           (*invlpg                )(struct vcpu *v, unsigned long va);
-    unsigned long (*gva_to_gfn            )(struct vcpu *v, unsigned long va);
+    unsigned long (*gva_to_gfn            )(struct vcpu *v, unsigned long va,
+                                            uint32_t *pfec);
     void          (*update_cr3            )(struct vcpu *v, int do_locking);
     void          (*update_paging_modes   )(struct vcpu *v);
     void          (*write_p2m_entry       )(struct vcpu *v, unsigned long gfn,
@@ -204,12 +205,17 @@ static inline int paging_invlpg(struct vcpu *v, unsigned long va)
 }
 
 /* Translate a guest virtual address to the frame number that the
- * *guest* pagetables would map it to.  Returns INVALID_GFN if the guest 
- * tables don't map this address. */
+ * *guest* pagetables would map it to.  Returns INVALID_GFN if the guest
+ * tables don't map this address for this kind of access.
+ * pfec[0] is used to determine which kind of access this is when
+ * walking the tables.  The caller should set the PFEC_page_present bit
+ * in pfec[0]; in the failure case, that bit will be cleared if appropriate. */
 #define INVALID_GFN (-1UL)
-static inline unsigned long paging_gva_to_gfn(struct vcpu *v, unsigned long va)
+static inline unsigned long paging_gva_to_gfn(struct vcpu *v, 
+                                              unsigned long va,
+                                              uint32_t *pfec)
 {
-    return v->arch.paging.mode->gva_to_gfn(v, va);
+    return v->arch.paging.mode->gva_to_gfn(v, va, pfec);
 }
 
 /* Update all the things that are derived from the guest's CR3.

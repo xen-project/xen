@@ -931,6 +931,7 @@ static void *hvm_map(unsigned long va, int size)
 {
     unsigned long gfn, mfn;
     p2m_type_t p2mt;
+    uint32_t pfec;
 
     if ( ((va & ~PAGE_MASK) + size) > PAGE_SIZE )
     {
@@ -939,11 +940,15 @@ static void *hvm_map(unsigned long va, int size)
         return NULL;
     }
 
-    gfn = paging_gva_to_gfn(current, va);
+    /* We're mapping on behalf of the segment-load logic, which might
+     * write the accessed flags in the descriptors (in 32-bit mode), but
+     * we still treat it as a kernel-mode read (i.e. no access checks). */
+    pfec = PFEC_page_present;
+    gfn = paging_gva_to_gfn(current, va, &pfec);
     mfn = mfn_x(gfn_to_mfn_current(gfn, &p2mt));
     if ( !p2m_is_ram(p2mt) )
     {
-        hvm_inject_exception(TRAP_page_fault, PFEC_write_access, va);
+        hvm_inject_exception(TRAP_page_fault, pfec, va);
         return NULL;
     }
 
@@ -1263,14 +1268,24 @@ void hvm_task_switch(
  *  @size = number of bytes to copy
  *  @dir  = copy *to* guest (TRUE) or *from* guest (FALSE)?
  *  @virt = addr is *virtual* (TRUE) or *guest physical* (FALSE)?
+ *  @fetch = copy is an instruction fetch?
  * Returns number of bytes failed to copy (0 == complete success).
  */
-static int __hvm_copy(void *buf, paddr_t addr, int size, int dir, int virt)
+static int __hvm_copy(void *buf, paddr_t addr, int size, int dir, 
+                      int virt, int fetch)
 {
     unsigned long gfn, mfn;
     p2m_type_t p2mt;
     char *p;
     int count, todo;
+    uint32_t pfec = PFEC_page_present;
+
+    if ( dir ) 
+        pfec |= PFEC_write_access;
+    if ( ring_3(guest_cpu_user_regs()) )
+        pfec |= PFEC_user_mode;
+    if ( fetch ) 
+        pfec |= PFEC_insn_fetch;
 
     todo = size;
     while ( todo > 0 )
@@ -1278,7 +1293,7 @@ static int __hvm_copy(void *buf, paddr_t addr, int size, int dir, int virt)
         count = min_t(int, PAGE_SIZE - (addr & ~PAGE_MASK), todo);
 
         if ( virt )
-            gfn = paging_gva_to_gfn(current, addr);
+            gfn = paging_gva_to_gfn(current, addr, &pfec);
         else
             gfn = addr >> PAGE_SHIFT;
         
@@ -1310,22 +1325,27 @@ static int __hvm_copy(void *buf, paddr_t addr, int size, int dir, int virt)
 
 int hvm_copy_to_guest_phys(paddr_t paddr, void *buf, int size)
 {
-    return __hvm_copy(buf, paddr, size, 1, 0);
+    return __hvm_copy(buf, paddr, size, 1, 0, 0);
 }
 
 int hvm_copy_from_guest_phys(void *buf, paddr_t paddr, int size)
 {
-    return __hvm_copy(buf, paddr, size, 0, 0);
+    return __hvm_copy(buf, paddr, size, 0, 0, 0);
 }
 
 int hvm_copy_to_guest_virt(unsigned long vaddr, void *buf, int size)
 {
-    return __hvm_copy(buf, vaddr, size, 1, 1);
+    return __hvm_copy(buf, vaddr, size, 1, 1, 0);
 }
 
 int hvm_copy_from_guest_virt(void *buf, unsigned long vaddr, int size)
 {
-    return __hvm_copy(buf, vaddr, size, 0, 1);
+    return __hvm_copy(buf, vaddr, size, 0, 1, 0);
+}
+
+int hvm_fetch_from_guest_virt(void *buf, unsigned long vaddr, int size)
+{
+    return __hvm_copy(buf, vaddr, size, 0, 1, hvm_nx_enabled(current));
 }
 
 

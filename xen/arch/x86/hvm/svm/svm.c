@@ -1441,6 +1441,7 @@ static void svm_io_instruction(struct vcpu *v)
         unsigned long addr, count;
         paddr_t paddr;
         unsigned long gfn;
+        uint32_t pfec;
         int sign = regs->eflags & X86_EFLAGS_DF ? -1 : 1;
 
         if (!svm_get_io_address(v, regs, size, info, &count, &addr))
@@ -1459,15 +1460,17 @@ static void svm_io_instruction(struct vcpu *v)
         }
 
         /* Translate the address to a physical address */
-        gfn = paging_gva_to_gfn(v, addr);
+        pfec = PFEC_page_present;
+        if ( dir == IOREQ_READ ) /* Read from PIO --> write to RAM */
+            pfec |= PFEC_write_access;
+        if ( ring_3(regs) )
+            pfec |= PFEC_user_mode;
+        gfn = paging_gva_to_gfn(v, addr, &pfec);
         if ( gfn == INVALID_GFN ) 
         {
             /* The guest does not have the RAM address mapped. 
              * Need to send in a page fault */
-            int errcode = 0;
-            /* IO read --> memory write */
-            if ( dir == IOREQ_READ ) errcode |= PFEC_write_access;
-            svm_hvm_inject_exception(TRAP_page_fault, errcode, addr);
+            svm_hvm_inject_exception(TRAP_page_fault, pfec, addr);
             return;
         }
         paddr = (paddr_t)gfn << PAGE_SHIFT | (addr & ~PAGE_MASK);
