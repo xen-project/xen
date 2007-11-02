@@ -2286,6 +2286,7 @@ asmlinkage void svm_vmexit_handler(struct cpu_user_regs *regs)
         break;
 
     case VMEXIT_NPF:
+        perfc_incra(svmexits, VMEXIT_NPF_PERFC);
         regs->error_code = vmcb->exitinfo1;
         svm_do_nested_pgfault(vmcb->exitinfo2, regs);
         break;
