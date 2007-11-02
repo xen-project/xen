@@ -16,9 +16,12 @@
 #include <string.h>
 #include <time.h>
 #include <xs.h>
-#include <linux/input.h>
 
 #include "xenfb.h"
+
+#ifndef BTN_LEFT
+#define BTN_LEFT 0x110 /* from <linux/input.h> */
+#endif
 
 // FIXME defend against malicious frontend?
 
