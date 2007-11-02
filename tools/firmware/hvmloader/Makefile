@@ -31,9 +31,7 @@ CFLAGS  += $(call cc-option,$(CC),-nopie,)
 CFLAGS  += $(call cc-option,$(CC),-fno-stack-protector,)
 CFLAGS  += $(call cc-option,$(CC),-fno-stack-protector-all,)
 
-OBJCOPY  = objcopy
 CFLAGS  += -fno-builtin -O2 -msoft-float
-LDFLAGS  = -nostdlib -Wl,-N -Wl,-Ttext -Wl,$(LOADADDR)
 
 SRCS = hvmloader.c mp_tables.c util.c smbios.c 32bitbios_support.c
 OBJS = $(patsubst %.c,%.o,$(SRCS))
@@ -43,7 +41,7 @@ all: hvmloader
 
 hvmloader: roms.h acpi/acpi.a $(SRCS)
 	$(CC) $(CFLAGS) -c $(SRCS)
-	$(CC) $(CFLAGS) $(LDFLAGS) -o hvmloader.tmp $(OBJS) acpi/acpi.a
+	$(LD) $(LDFLAGS_DIRECT) -nostdlib -N -Ttext $(LOADADDR) -o hvmloader.tmp $(OBJS) acpi/acpi.a
 	$(OBJCOPY) hvmloader.tmp hvmloader
 	rm -f hvmloader.tmp
 

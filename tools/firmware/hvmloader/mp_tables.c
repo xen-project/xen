@@ -28,22 +28,8 @@
  * Place - Suite 330, Boston, MA 02111-1307 USA.
  */
 
+#include <stdint.h>
 #include "config.h"
-
-/* FIXME find a header that already has types defined!!! */
-typedef unsigned char  uint8_t;
-typedef   signed char  int8_t;
-typedef unsigned short uint16_t;
-typedef   signed short int16_t;
-typedef unsigned int   uint32_t;
-typedef   signed int   int32_t;
-#ifdef __i386__
-typedef unsigned long long uint64_t;
-typedef   signed long long int64_t;
-#else
-typedef unsigned long uint64_t;
-typedef   signed long int64_t;
-#endif
 
 /* number of non-processor MP table entries */
 #define NR_NONPROC_ENTRIES     18

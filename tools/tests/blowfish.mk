@@ -9,7 +9,6 @@ CFLAGS  += $(call cc-option,$(CC),-nopie,)
 CFLAGS  += $(call cc-option,$(CC),-fno-stack-protector,)
 CFLAGS  += $(call cc-option,$(CC),-fno-stack-protector-all,)
 
-OBJCOPY  = objcopy
 CFLAGS  += -fno-builtin -O2 -msoft-float
 LDFLAGS  = -nostdlib -Wl,-N -Wl,-Ttext -Wl,0x100000
 
