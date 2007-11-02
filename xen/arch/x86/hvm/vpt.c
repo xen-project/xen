@@ -49,6 +49,9 @@ static void pt_process_missed_ticks(struct periodic_time *pt)
 {
     s_time_t missed_ticks;
 
+    if ( mode_is(pt->vcpu->domain, no_missed_tick_accounting) )
+        return;
+
     if ( pt->one_shot )
         return;
 
@@ -57,16 +60,7 @@ static void pt_process_missed_ticks(struct periodic_time *pt)
         return;
 
     missed_ticks = missed_ticks / (s_time_t) pt->period + 1;
-    if ( missed_ticks > 1000 )
-    {
-        /* TODO: Adjust guest time together */
-        pt->pending_intr_nr++;
-    }
-    else
-    {
-        pt->pending_intr_nr += missed_ticks;
-    }
-
+    pt->pending_intr_nr += missed_ticks;
     pt->scheduled += missed_ticks * pt->period;
 }
 
@@ -117,15 +111,7 @@ void pt_restore_timer(struct vcpu *v)
 
     list_for_each_entry ( pt, head, list )
     {
-        if ( !mode_is(v->domain, no_missed_tick_accounting) )
-        {
-            pt_process_missed_ticks(pt);
-        }
-        else if ( (NOW() - pt->scheduled) >= 0 )
-        {
-            pt->pending_intr_nr++;
-            pt->scheduled = NOW() + pt->period;
-        }
+        pt_process_missed_ticks(pt);
         set_timer(&pt->timer, pt->scheduled);
     }
 
@@ -140,13 +126,15 @@ static void pt_timer_fn(void *data)
 
     pt_lock(pt);
 
-    pt->pending_intr_nr++;
+    if ( mode_is(pt->vcpu->domain, no_missed_tick_accounting) )
+        pt->pending_intr_nr = 1;
+    else
+        pt->pending_intr_nr++;
 
     if ( !pt->one_shot )
     {
         pt->scheduled += pt->period;
-        if ( !mode_is(pt->vcpu->domain, no_missed_tick_accounting) )
-            pt_process_missed_ticks(pt);
+        pt_process_missed_ticks(pt);
         set_timer(&pt->timer, pt->scheduled);
     }
 
