@@ -50,12 +50,8 @@ PERFCOUNTER(shadow_fault_fast_gnp, "shadow_fault fast path n/p")
 PERFCOUNTER(shadow_fault_fast_mmio, "shadow_fault fast path mmio")
 PERFCOUNTER(shadow_fault_fast_fail, "shadow_fault fast path error")
 PERFCOUNTER(shadow_fault_bail_bad_gfn, "shadow_fault guest bad gfn")
-PERFCOUNTER(shadow_fault_bail_not_present, 
-                                        "shadow_fault guest not-present")
-PERFCOUNTER(shadow_fault_bail_nx,  "shadow_fault guest NX fault")
-PERFCOUNTER(shadow_fault_bail_ro_mapping, "shadow_fault guest R/W fault")
-PERFCOUNTER(shadow_fault_bail_user_supervisor, 
-                                        "shadow_fault guest U/S fault")
+PERFCOUNTER(shadow_fault_bail_real_fault, 
+                                        "shadow_fault really guest fault")
 PERFCOUNTER(shadow_fault_emulate_read, "shadow_fault emulates a read")
 PERFCOUNTER(shadow_fault_emulate_write, "shadow_fault emulates a write")
 PERFCOUNTER(shadow_fault_emulate_failed, "shadow_fault emulator fails")

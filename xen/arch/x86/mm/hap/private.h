@@ -26,9 +26,12 @@
 /********************************************/
 /*          GUEST TRANSLATION FUNCS         */
 /********************************************/
-unsigned long hap_gva_to_gfn_2level(struct vcpu *v, unsigned long gva);
-unsigned long hap_gva_to_gfn_3level(struct vcpu *v, unsigned long gva);
-unsigned long hap_gva_to_gfn_4level(struct vcpu *v, unsigned long gva);
+unsigned long hap_gva_to_gfn_2level(struct vcpu *v, unsigned long gva, 
+                                    uint32_t *pfec);
+unsigned long hap_gva_to_gfn_3level(struct vcpu *v, unsigned long gva,
+                                    uint32_t *pfec);
+unsigned long hap_gva_to_gfn_4level(struct vcpu *v, unsigned long gva,
+                                    uint32_t *pfec);
 
 /********************************************/
 /*            MISC DEFINITIONS              */

@@ -1642,7 +1642,7 @@ static void vmx_do_str_pio(unsigned long exit_qualification,
     unsigned long addr, count = 1, base;
     paddr_t paddr;
     unsigned long gfn;
-    u32 ar_bytes, limit;
+    u32 ar_bytes, limit, pfec;
     int sign;
     int long_mode = 0;
 
@@ -1714,15 +1714,17 @@ static void vmx_do_str_pio(unsigned long exit_qualification,
 #endif
 
     /* Translate the address to a physical address */
-    gfn = paging_gva_to_gfn(current, addr);
+    pfec = PFEC_page_present;
+    if ( dir == IOREQ_READ ) /* Read from PIO --> write to RAM */
+        pfec |= PFEC_write_access;
+    if ( ring_3(regs) )
+        pfec |= PFEC_user_mode;
+    gfn = paging_gva_to_gfn(current, addr, &pfec);
     if ( gfn == INVALID_GFN )
     {
         /* The guest does not have the RAM address mapped.
          * Need to send in a page fault */
-        int errcode = 0;
-        /* IO read --> memory write */
-        if ( dir == IOREQ_READ ) errcode |= PFEC_write_access;
-        vmx_inject_exception(TRAP_page_fault, errcode, addr);
+        vmx_inject_exception(TRAP_page_fault, pfec, addr);
         return;
     }
     paddr = (paddr_t)gfn << PAGE_SHIFT | (addr & ~PAGE_MASK);

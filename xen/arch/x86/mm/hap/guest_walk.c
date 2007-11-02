@@ -40,7 +40,7 @@
 #if GUEST_PAGING_LEVELS > CONFIG_PAGING_LEVELS
 
 unsigned long hap_gva_to_gfn(GUEST_PAGING_LEVELS)(
-    struct vcpu *v, unsigned long gva)
+    struct vcpu *v, unsigned long gva, uint32_t *pfec)
 {
     gdprintk(XENLOG_ERR,
              "Guest paging level is greater than host paging level!\n");
@@ -61,7 +61,7 @@ unsigned long hap_gva_to_gfn(GUEST_PAGING_LEVELS)(
 #endif
 
 unsigned long hap_gva_to_gfn(GUEST_PAGING_LEVELS)(
-    struct vcpu *v, unsigned long gva)
+    struct vcpu *v, unsigned long gva, uint32_t *pfec)
 {
     unsigned long gcr3 = v->arch.hvm_vcpu.guest_cr[3];
     int mode = GUEST_PAGING_LEVELS;
