@@ -2259,6 +2259,7 @@ asmlinkage void svm_vmexit_handler(struct cpu_user_regs *regs)
                       TYPE_MOV_TO_CR, regs);
         break;
 
+    case VMEXIT_DR0_READ ... VMEXIT_DR7_READ:
     case VMEXIT_DR0_WRITE ... VMEXIT_DR7_WRITE:
         svm_dr_access(v, regs);
         break;
