@@ -697,7 +697,8 @@ _sh_propagate(struct vcpu *v,
     /* N.B. For pass-through MMIO, either this test needs to be relaxed,
      * and shadow_set_l1e() trained to handle non-valid MFNs (ugh), or the
      * MMIO areas need to be added to the frame-table to make them "valid". */
-    if ( !mfn_valid(target_mfn) && (p2mt != p2m_mmio_direct) )
+    if ( shadow_mode_refcounts(d) && 
+         !mfn_valid(target_mfn) && (p2mt != p2m_mmio_direct) )
     {
         ASSERT((ft == ft_prefetch));
         *sp = shadow_l1e_empty();
@@ -713,6 +714,8 @@ _sh_propagate(struct vcpu *v,
                        _PAGE_RW | _PAGE_PRESENT);
     if ( guest_supports_nx(v) )
         pass_thru_flags |= _PAGE_NX_BIT;
+    if ( !shadow_mode_refcounts(d) && !mfn_valid(target_mfn) )
+        pass_thru_flags |= _PAGE_PAT | _PAGE_PCD | _PAGE_PWT;
     sflags = gflags & pass_thru_flags;
 
     /* Only change memory caching type for pass-through domain */
@@ -765,10 +768,12 @@ _sh_propagate(struct vcpu *v,
     // p2m_ram_logdirty p2m type: only HAP uses that.)
     if ( unlikely((level == 1) && shadow_mode_log_dirty(d)) )
     {
-        if ( ft & FETCH_TYPE_WRITE ) 
-            paging_mark_dirty(d, mfn_x(target_mfn));
-        else if ( !sh_mfn_is_dirty(d, target_mfn) )
-            sflags &= ~_PAGE_RW;
+        if ( mfn_valid(target_mfn) ) {
+            if ( ft & FETCH_TYPE_WRITE ) 
+                paging_mark_dirty(d, mfn_x(target_mfn));
+            else if ( !sh_mfn_is_dirty(d, target_mfn) )
+                sflags &= ~_PAGE_RW;
+        }
     }
 
     /* Read-only memory */
@@ -2843,7 +2848,8 @@ static int sh_page_fault(struct vcpu *v,
     gfn = guest_l1e_get_gfn(gw.eff_l1e);
     gmfn = gfn_to_mfn(d, gfn, &p2mt);
 
-    if ( !p2m_is_valid(p2mt) || (!p2m_is_mmio(p2mt) && !mfn_valid(gmfn)) )
+    if ( shadow_mode_refcounts(d) && 
+         (!p2m_is_valid(p2mt) || (!p2m_is_mmio(p2mt) && !mfn_valid(gmfn))) )
     {
         perfc_incr(shadow_fault_bail_bad_gfn);
         SHADOW_PRINTK("BAD gfn=%"SH_PRI_gfn" gmfn=%"PRI_mfn"\n", 
