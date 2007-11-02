@@ -262,6 +262,7 @@ struct operand {
 };
 
 /* EFLAGS bit definitions. */
+#define EFLG_RF (1<<16)
 #define EFLG_OF (1<<11)
 #define EFLG_DF (1<<10)
 #define EFLG_IF (1<<9)
@@ -287,9 +288,11 @@ struct operand {
 #if defined(__x86_64__)
 #define _LO32 "k"          /* force 32-bit operand */
 #define _STK  "%%rsp"      /* stack pointer */
+#define _BYTES_PER_LONG "8"
 #elif defined(__i386__)
 #define _LO32 ""           /* force 32-bit operand */
 #define _STK  "%%esp"      /* stack pointer */
+#define _BYTES_PER_LONG "4"
 #endif
 
 /*
@@ -309,7 +312,7 @@ struct operand {
 "pushf; "                                                       \
 "notl %"_LO32 _tmp"; "                                          \
 "andl %"_LO32 _tmp",("_STK"); "                                 \
-"andl %"_LO32 _tmp","STR(BITS_PER_LONG/4)"("_STK"); "           \
+"andl %"_LO32 _tmp",2*"_BYTES_PER_LONG"("_STK"); "              \
 "pop  %"_tmp"; "                                                \
 "orl  %"_LO32 _tmp",("_STK"); "                                 \
 "popf; "                                                        \
@@ -1630,7 +1633,7 @@ x86_emulate(
     }
 
     /* Commit shadow register state. */
-    _regs.eflags &= ~EF_RF;
+    _regs.eflags &= ~EFLG_RF;
     *ctxt->regs = _regs;
 
  done:
