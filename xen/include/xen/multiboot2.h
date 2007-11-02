@@ -31,8 +31,6 @@
 /* Passed from the bootloader to the kernel.  */
 #define MB2_BOOTLOADER_MAGIC        0x36d76289
 
-#include <stdint.h>
-
 #define for_each_tag(_tag, _tags) \
     for ((_tag) = (_tags); \
             ((_tag)->key != MB2_TAG_END && (_tag)->key != 0); \
