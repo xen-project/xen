@@ -98,11 +98,8 @@ def labels_xapi(policy, ptype):
             names1 = acmpol.policy_get_virtualmachinelabel_names()
         if ptype == 'res' or ptype == 'any':
             names2 = acmpol.policy_get_resourcelabel_names()
-        if len(names1) > 0:
-            names = set(names1)
-            names.union(names2)
-        else:
-            names = set(names2)
+        names = list(set(names1).union(names2))
+        names.sort()
         for n in names:
             print n
     elif int(policystate['type']) == 0:
