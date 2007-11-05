@@ -47,21 +47,26 @@ static void pt_unlock(struct periodic_time *pt)
 
 static void pt_process_missed_ticks(struct periodic_time *pt)
 {
-    s_time_t missed_ticks;
-
-    if ( mode_is(pt->vcpu->domain, no_missed_tick_accounting) )
-        return;
+    s_time_t missed_ticks, now = NOW();
 
     if ( pt->one_shot )
         return;
 
-    missed_ticks = NOW() - pt->scheduled;
+    missed_ticks = now - pt->scheduled;
     if ( missed_ticks <= 0 )
         return;
 
-    missed_ticks = missed_ticks / (s_time_t) pt->period + 1;
-    pt->pending_intr_nr += missed_ticks;
-    pt->scheduled += missed_ticks * pt->period;
+    if ( mode_is(pt->vcpu->domain, no_missed_tick_accounting) )
+    {
+        pt->pending_intr_nr = 1;
+        pt->scheduled = now + pt->scheduled;
+    }
+    else
+    {
+        missed_ticks = missed_ticks / (s_time_t) pt->period + 1;
+        pt->pending_intr_nr += missed_ticks;
+        pt->scheduled += missed_ticks * pt->period;
+    }
 }
 
 static void pt_freeze_time(struct vcpu *v)
