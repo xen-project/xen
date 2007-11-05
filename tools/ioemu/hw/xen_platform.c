@@ -38,21 +38,22 @@ static uint32_t platform_mmio_read(void *opaque, target_phys_addr_t addr)
 {
     static int warnings = 0;
     if (warnings < 5) {
-	    fprintf(logfile, "Warning: attempted read from physical address "
-		    "0x%lx in xen platform mmio space\n", addr);
-	    warnings++;
+        fprintf(logfile, "Warning: attempted read from physical address "
+                "0x%"PRIx64" in xen platform mmio space\n", (uint64_t)addr);
+        warnings++;
     }
     return 0;
 }
 
 static void platform_mmio_write(void *opaque, target_phys_addr_t addr,
-			       uint32_t val)
+                                uint32_t val)
 {
     static int warnings = 0;
     if (warnings < 5) {
-	    fprintf(logfile, "Warning: attempted write of 0x%x to physical "
-		    "address 0x%lx in xen platform mmio space\n", val, addr);
-	    warnings++;
+        fprintf(logfile, "Warning: attempted write of 0x%x to physical "
+                "address 0x%"PRIx64" in xen platform mmio space\n",
+                val, (uint64_t)addr);
+        warnings++;
     }
     return;
 }

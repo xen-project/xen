@@ -1477,7 +1477,7 @@ int xenstore_unsubscribe_from_hotplug_status(struct xs_handle *handle,
                                              const char *token);
 
 int xenstore_vm_write(int domid, char *key, char *val);
-char *xenstore_vm_read(int domid, char *key, int *len);
+char *xenstore_vm_read(int domid, char *key, unsigned int *len);
 
 /* helper2.c */
 extern long time_offset;

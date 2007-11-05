@@ -35,7 +35,8 @@ static void xen_init_pv(uint64_t ram_size, int vga_ram_size, char *boot_device,
 			int snapshot,
 			const char *kernel_filename,
 			const char *kernel_cmdline,
-			const char *initrd_filename)
+			const char *initrd_filename,
+			const char *direct_pci)
 {
     struct xenfb *xenfb;
     extern int domid;

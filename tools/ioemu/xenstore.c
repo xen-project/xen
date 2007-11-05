@@ -303,7 +303,7 @@ void xenstore_process_logdirty_event(void)
         logdirty_bitmap_size *= sizeof (unsigned long); /* bytes */
 
         /* Map the shared-memory segment */
-        fprintf(logfile, "%s: key=%16.16llx size=%d\n", __FUNCTION__,
+        fprintf(logfile, "%s: key=%16.16llx size=%lu\n", __FUNCTION__,
                 (unsigned long long)key, logdirty_bitmap_size);
         shmid = shmget(key, 2 * logdirty_bitmap_size, S_IRUSR|S_IWUSR);
         if (shmid == -1) {
@@ -676,7 +676,7 @@ int xenstore_unsubscribe_from_hotplug_status(struct xs_handle *handle,
     return rc;
 }
 
-char *xenstore_vm_read(int domid, char *key, int *len)
+char *xenstore_vm_read(int domid, char *key, unsigned int *len)
 {
     char *buf = NULL, *path = NULL, *value = NULL;
 

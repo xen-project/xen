@@ -194,7 +194,9 @@ static void xen_init_fv(uint64_t ram_size, int vga_ram_size, char *boot_device,
                         const char *initrd_filename,
                         const char *direct_pci)
 {
+#if defined(__i386__) || defined(__x86_64__)
     unsigned long ioreq_pfn;
+#endif
     extern void *shared_page;
     extern void *buffered_io_page;
 #ifdef __ia64__
