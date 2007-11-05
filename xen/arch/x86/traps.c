@@ -1845,6 +1845,17 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
 #endif
         case MSR_K7_FID_VID_STATUS:
         case MSR_K7_FID_VID_CTL:
+        case MSR_K8_PSTATE_LIMIT:
+        case MSR_K8_PSTATE_CTRL:
+        case MSR_K8_PSTATE_STATUS:
+        case MSR_K8_PSTATE0:
+        case MSR_K8_PSTATE1:
+        case MSR_K8_PSTATE2:
+        case MSR_K8_PSTATE3:
+        case MSR_K8_PSTATE4:
+        case MSR_K8_PSTATE5:
+        case MSR_K8_PSTATE6:
+        case MSR_K8_PSTATE7:
             if ( (cpufreq_controller != FREQCTL_dom0_kernel) ||
                  (boot_cpu_data.x86_vendor != X86_VENDOR_AMD) ||
                  wrmsr_safe(regs->ecx, eax, edx) )
@@ -1897,6 +1908,17 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
 #endif
         case MSR_K7_FID_VID_CTL:
         case MSR_K7_FID_VID_STATUS:
+        case MSR_K8_PSTATE_LIMIT:
+        case MSR_K8_PSTATE_CTRL:
+        case MSR_K8_PSTATE_STATUS:
+        case MSR_K8_PSTATE0:
+        case MSR_K8_PSTATE1:
+        case MSR_K8_PSTATE2:
+        case MSR_K8_PSTATE3:
+        case MSR_K8_PSTATE4:
+        case MSR_K8_PSTATE5:
+        case MSR_K8_PSTATE6:
+        case MSR_K8_PSTATE7:
             if ( (cpufreq_controller != FREQCTL_dom0_kernel) ||
                  (boot_cpu_data.x86_vendor != X86_VENDOR_AMD) ||
                  rdmsr_safe(regs->ecx, regs->eax, regs->edx) )
