@@ -43,7 +43,7 @@ string_param("console", opt_console);
 /* Char 1: CTRL+<char1> is used to switch console input between Xen and DOM0 */
 /* Char 2: If this character is 'x', then do not auto-switch to DOM0 when it */
 /*         boots. Any other value, or omitting the char, enables auto-switch */
-static unsigned char opt_conswitch[5] = "a";
+static unsigned char opt_conswitch[3] = "a";
 string_param("conswitch", opt_conswitch);
 
 /* sync_console: force synchronous console output (useful for debugging). */
@@ -267,19 +267,18 @@ static void sercon_puts(const char *s)
 }
 
 /* CTRL-<switch_char> switches input direction between Xen and DOM0. */
-#define SWITCH_CODE (opt_conswitch[0]-'a'+1)
+#define switch_code (opt_conswitch[0]-'a'+1)
 static int xen_rx = 1; /* FALSE => serial input passed to domain 0. */
 
 static void switch_serial_input(void)
 {
     static char *input_str[2] = { "DOM0", "Xen" };
     xen_rx = !xen_rx;
-    if ( (SWITCH_CODE != 0) && (dom0 != NULL) )
-    {
-        printk("*** Serial input -> %s "
-               "(type 'CTRL-%c' three times to switch input to %s).\n",
-               input_str[xen_rx], opt_conswitch[0], input_str[!xen_rx]);
-    }
+    printk("*** Serial input -> %s", input_str[xen_rx]);
+    if ( switch_code )
+        printk(" (type 'CTRL-%c' three times to switch input to %s)",
+               opt_conswitch[0], input_str[!xen_rx]);
+    printk("\n");
 }
 
 static void __serial_rx(char c, struct cpu_user_regs *regs)
@@ -298,20 +297,19 @@ static void serial_rx(char c, struct cpu_user_regs *regs)
 {
     static int switch_code_count = 0;
 
-    if ( (SWITCH_CODE != 0) && (c == SWITCH_CODE) )
+    if ( switch_code && (c == switch_code) )
     {
         /* We eat CTRL-<switch_char> in groups of 3 to switch console input. */
         if ( ++switch_code_count == 3 )
         {
             switch_serial_input();
             switch_code_count = 0;
-            return;
         }
+        return;
     }
-    else
-    {
-        switch_code_count = 0;
-    }
+
+    for ( ; switch_code_count != 0; switch_code_count-- )
+        __serial_rx(switch_code, regs);
 
     /* Finally process the just-received character. */
     __serial_rx(c, regs);
