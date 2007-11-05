@@ -207,7 +207,7 @@ void hvm_set_pci_link_route(struct domain *d, u8 link, u8 isa_irq)
         goto out;
 
     if ( old_isa_irq && (--hvm_irq->gsi_assert_count[old_isa_irq] == 0) )
-        vpic_irq_negative_edge(d, isa_irq);
+        vpic_irq_negative_edge(d, old_isa_irq);
 
     if ( isa_irq && (hvm_irq->gsi_assert_count[isa_irq]++ == 0) )
     {
