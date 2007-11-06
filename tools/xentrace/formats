@@ -1,6 +1,8 @@
 0x00000000  CPU%(cpu)d  %(tsc)d (+%(reltsc)8d)  unknown (0x%(event)016x)  [ 0x%(1)08x 0x%(2)08x 0x%(3)08x 0x%(4)08x 0x%(5)08x ]
 
 0x0001f001  CPU%(cpu)d  %(tsc)d (+%(reltsc)8d)  lost_records        0x%(1)08x
+0x0001f002  CPU%(cpu)d  %(tsc)d (+%(reltsc)8d)  wrap_buffer         0x%(1)08x
+0x0001f003  CPU%(cpu)d  %(tsc)d (+%(reltsc)8d)  cpu_change          0x%(1)08x
 
 0x0002f001  CPU%(cpu)d  %(tsc)d (+%(reltsc)8d)  sched_add_domain	[ domid = 0x%(1)08x, edomid = 0x%(2)08x ]
 0x0002f002  CPU%(cpu)d  %(tsc)d (+%(reltsc)8d)  sched_rem_domain	[ domid = 0x%(1)08x, edomid = 0x%(2)08x ]
@@ -38,3 +40,9 @@
 0x00082012  CPU%(cpu)d  %(tsc)d (+%(reltsc)8d)  VMMCALL     [ dom:vcpu = 0x%(1)08x, func = 0x%(2)08x ]
 0x00082013  CPU%(cpu)d  %(tsc)d (+%(reltsc)8d)  HLT         [ dom:vcpu = 0x%(1)08x, intpending = %(2)d ]
 0x00082014  CPU%(cpu)d  %(tsc)d (+%(reltsc)8d)  INVLPG      [ dom:vcpu = 0x%(1)08x, virt = 0x%(2)08x, invlpga = %(3)d, asid = 0x%(4)02x ]
+0x00082015  CPU%(cpu)d  %(tsc)d (+%(reltsc)8d)  MCE         [ dom:vcpu = 0x%(1)08x ]
+0x00082016  CPU%(cpu)d  %(tsc)d (+%(reltsc)8d)  IO_ASSIST   [ dom:vcpu = 0x%(1)08x, data = 0x%(2)04x ]
+0x00082017  CPU%(cpu)d  %(tsc)d (+%(reltsc)8d)  MMIO_ASSIST [ dom:vcpu = 0x%(1)08x, data = 0x%(2)04x ]
+0x00082018  CPU%(cpu)d  %(tsc)d (+%(reltsc)8d)  CLTS        [ dom:vcpu = 0x%(1)08x ]
+0x00082019  CPU%(cpu)d  %(tsc)d (+%(reltsc)8d)  LMSW        [ dom:vcpu = 0x%(1)08x, value = 0x%(2)08x ]
+0x00082020  CPU%(cpu)d  %(tsc)d (+%(reltsc)8d)  PF_XEN64    [ dom:vcpu = 0x%(1)08x, virt = 0x%(2)08x, errorcode = 0x%(3)02x ]
