@@ -223,7 +223,7 @@ void unbind_from_irqhandler(unsigned int irq, void *dev_id)
 	evtchn = evtchn_from_irq(irq);
 
 	if (is_valid_evtchn(evtchn)) {
-		evtchn_to_irq[irq] = -1;
+		evtchn_to_irq[evtchn] = -1;
 		mask_evtchn(evtchn);
 		if (irq_evtchn[irq].close) {
 			struct evtchn_close close = { .port = evtchn };
