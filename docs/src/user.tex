@@ -124,9 +124,9 @@ functionality, including:
 \begin{itemize}
 \item Virtual machines with performance close to native hardware.
 \item Live migration of running virtual machines between physical hosts.
-\item Up to 32 virtual CPUs per guest virtual machine, with VCPU hotplug.
-\item x86/32, x86/32 with PAE, and x86/64 platform support.
-\item Intel Virtualization Technology (VT-x) for unmodified guest operating systems (including Microsoft Windows).
+\item Up to 32\footnote{IA64 supports up to 64 virtual CPUs per guest virtual machine} virtual CPUs per guest virtual machine, with VCPU hotplug.
+\item x86/32, x86/32 with PAE, x86/64, IA64 and Power platform support.
+\item Intel and AMD Virtualization Technology for unmodified guest operating systems (including Microsoft Windows).
 \item Excellent hardware support (supports almost all Linux device
   drivers). 
 \end{itemize}
@@ -178,8 +178,7 @@ traditional full virtualization hypervisors, which suffer a tremendous
 performance overhead, the combination of Xen and VT or Xen and
 Pacifica technology complement one another to offer superb performance
 for para-virtualized guest operating systems and full support for
-unmodified guests running natively on the processor.  Full support for
-VT and Pacifica chipsets will appear in early 2006.
+unmodified guests running natively on the processor.
 
 Paravirtualized Xen support is available for increasingly many
 operating systems: currently, mature Linux support is available and
@@ -193,12 +192,11 @@ Xen currently runs on the x86 architecture, requiring a ``P6'' or
 newer processor (e.g.\ Pentium Pro, Celeron, Pentium~II, Pentium~III,
 Pentium~IV, Xeon, AMD~Athlon, AMD~Duron). Multiprocessor machines are
 supported, and there is support for HyperThreading (SMT).  In 
-addition, ports to IA64 and Power architectures are in progress.
+addition, ports to IA64 and Power architectures are supported.
 
-The default 32-bit Xen supports up to 4GB of memory. However Xen 3.0
-adds support for Intel's Physical Addressing Extensions (PAE), which
-enable x86/32 machines to address up to 64 GB of physical memory.  Xen
-3.0 also supports x86/64 platforms such as Intel EM64T and AMD Opteron
+The default 32-bit Xen supports for Intel's Physical Addressing Extensions (PAE), which enable x86/32 machines to address up to 64 GB of physical memory.
+It also supports non-PAE 32-bit Xen up to 4GB of memory. 
+Xen also supports x86/64 platforms such as Intel EM64T and AMD Opteron
 which can currently address up to 1TB of physical memory.
 
 Xen offloads most of the hardware support issues to the guest OS
@@ -3093,7 +3091,7 @@ files: \path{Config.mk} and \path{Makefile}.
 
 The former allows the overall build target architecture to be 
 specified. You will typically not need to modify this unless 
-you are cross-compiling or if you wish to build a PAE-enabled 
+you are cross-compiling or if you wish to build a non-PAE  
 Xen system. Additional configuration options are documented 
 in the \path{Config.mk} file. 
 
@@ -3225,6 +3223,8 @@ writing to the VGA console after domain 0 starts booting (e.g., `vga=text-80x50,
 \item [ guest\_loglvl=$<$level$>/<$level$>$ ] As for loglvl, but
   applies to messages relating to guests. Default is
   `guest\_loglvl=none/warning'. 
+\item [ console\_timestamps ] 
+  Adds a timestamp prefix to each line of Xen console output.
 \item [ nmi=xxx ]
   Specify what to do with an NMI parity or I/O error. \\
   `nmi=fatal':  Xen prints a diagnostic and then hangs. \\
