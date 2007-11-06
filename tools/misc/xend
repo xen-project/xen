@@ -23,6 +23,8 @@
    On Solaris, the daemons are SMF managed, and you should not attempt
    to start xend by hand.
 """
+import fcntl
+import glob
 import os
 import os.path
 import sys
@@ -76,6 +78,23 @@ def check_user():
         raise CheckError("invalid user")
 
 def start_xenstored():
+    pidfname = "/var/run/xenstore.pid"
+    try:
+        f = open(pidfname, "a")
+        try:
+            fcntl.lockf(f, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            rootdir = os.getenv("XENSTORED_ROOTDIR") or "/var/lib/xenstored"
+            for i in glob.glob(rootdir + "/tdb*"):
+                try:
+                    os.unlink(i)
+                except:
+                    pass
+            os.unlink(pidfname)
+        except:
+            pass
+        f.close()
+    except:
+        pass
     XENSTORED_TRACE = os.getenv("XENSTORED_TRACE")
     cmd = "xenstored --pid-file /var/run/xenstore.pid"
     if XENSTORED_TRACE:
