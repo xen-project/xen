@@ -152,8 +152,6 @@ struct arch_domain {
     struct virtual_platform_def     vmx_platform;
 #define	hvm_domain vmx_platform /* platform defs are not vmx specific */
 
-    u64 xen_vastart;
-    u64 xen_vaend;
     u64 shared_info_va;
  
     /* Address of SAL emulator data  */
