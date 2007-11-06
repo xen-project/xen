@@ -379,6 +379,9 @@ sal_emulator (long index, unsigned long in1, unsigned long in2,
 	    case SAL_UPDATE_PAL:
 		printk("*** CALLED SAL_UPDATE_PAL.  IGNORED...\n");
 		break;
+	    case SAL_PHYSICAL_ID_INFO:
+		status = -1;
+		break;
 	    case SAL_XEN_SAL_RETURN:
 	        if (!test_and_set_bit(_VPF_down, &current->pause_flags))
 			vcpu_sleep_nosync(current);
