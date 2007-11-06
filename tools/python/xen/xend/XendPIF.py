@@ -65,6 +65,7 @@ def linux_get_phy_ifaces():
             if name.startswith('peth'):
                 bridged_ifname = linux_phy_to_virt(name)
                 bridged_if = ifaces.get(bridged_ifname)
+                bridged_mac = ''
                 if bridged_if:
                     bridged_mac = bridged_if[2]
                 phy_ifaces.append((name, int(mtu), bridged_mac))
