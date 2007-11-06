@@ -38,9 +38,9 @@ seqlock_t xtime_lock __cacheline_aligned_in_smp = SEQLOCK_UNLOCKED;
 
 #define TIME_KEEPER_ID  0
 unsigned long domain0_ready = 0;
-static s_time_t        stime_irq = 0x0;       /* System time at last 'time update' */
-unsigned long itc_scale __read_mostly, ns_scale __read_mostly;
-unsigned long itc_at_irq;
+static s_time_t stime_irq = 0x0;       /* System time at last 'time update' */
+static unsigned long itc_scale __read_mostly, ns_scale __read_mostly;
+static unsigned long itc_at_irq;
 
 static u32 wc_sec, wc_nsec; /* UTC time at last 'time update'. */
 static void ia64_wallclock_set(void);
@@ -54,7 +54,7 @@ u64 cycle_to_ns(u64 cycle)
     return (cycle * itc_scale) >> 32;
 }
 
-u64 ns_to_cycle(u64 ns)
+static u64 ns_to_cycle(u64 ns)
 {
     return (ns * ns_scale) >> 32;
 }
@@ -93,40 +93,10 @@ void update_vcpu_system_time(struct vcpu *v)
     return;
 }
 
-void update_domain_wallclock_time(struct domain *d)
-{
-    /* N-op here, and let dom0 to manage system time directly */
-    return;
-}
-
-/* Set clock to <secs,usecs> after 00:00:00 UTC, 1 January, 1970. */
-void do_settime(unsigned long secs, unsigned long nsecs, u64 system_time_base)
-{
-    /* If absolute system time is managed by dom0, there's no need for such
-     * action since only virtual itc/itm service is provided.
-     */
-    return;
-}
-
 void
 xen_timer_interrupt (int irq, void *dev_id, struct pt_regs *regs)
 {
 	unsigned long new_itm, old_itc;
-
-#if 0
-#define HEARTBEAT_FREQ 16	// period in seconds
-#ifdef HEARTBEAT_FREQ
-	static long count = 0;
-	if (!(++count & ((HEARTBEAT_FREQ*1024)-1))) {
-		printk("Heartbeat... iip=%p\n", /*",psr.i=%d,pend=%d\n", */
-			regs->cr_iip /*,
-			!current->vcpu_info->evtchn_upcall_mask,
-			VCPU(current,pending_interruption) */);
-		count = 0;
-	}
-#endif
-#endif
-
 
 	new_itm = local_cpu_data->itm_next;
 	while (1) {
@@ -138,9 +108,6 @@ xen_timer_interrupt (int irq, void *dev_id, struct pt_regs *regs)
 			 * xtime_lock.
 			 */
 			write_seqlock(&xtime_lock);
-#ifdef TURN_ME_OFF_FOR_NOW_IA64_XEN
-			do_timer(regs);
-#endif
 			/* Updates system time (nanoseconds since boot). */
 			old_itc = itc_at_irq;
 			itc_at_irq = ia64_get_itc();
