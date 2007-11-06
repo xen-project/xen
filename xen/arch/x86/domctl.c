@@ -535,9 +535,10 @@ long arch_do_domctl(
         if ( !vtd_enabled )
             break;
 
-        if ( unlikely((d = get_domain_by_id(domctl->domain)) == NULL) ) {
+        if ( unlikely((d = get_domain_by_id(domctl->domain)) == NULL) )
+        {
             gdprintk(XENLOG_ERR,
-                "XEN_DOMCTL_assign_device: get_domain_by_id() failed\n"); 
+                "XEN_DOMCTL_assign_device: get_domain_by_id() failed\n");
             break;
         }
         hd = domain_hvm_iommu(d);
@@ -548,7 +549,7 @@ long arch_do_domctl(
             break;
 
         ret = assign_device(d, bus, devfn);
-        gdprintk(XENLOG_ERR, "XEN_DOMCTL_assign_device: bdf = %x:%x:%x\n",
+        gdprintk(XENLOG_INFO, "XEN_DOMCTL_assign_device: bdf = %x:%x:%x\n",
             bus, PCI_SLOT(devfn), PCI_FUNC(devfn));
         put_domain(d);
     }
@@ -569,7 +570,7 @@ long arch_do_domctl(
             gdprintk(XENLOG_ERR, "pt_irq_create_bind failed!\n");
         rcu_unlock_domain(d);
     }
-    break;    
+    break;
 
     case XEN_DOMCTL_memory_mapping:
     {
@@ -587,25 +588,25 @@ long arch_do_domctl(
         if ( unlikely((d = rcu_lock_domain_by_id(domctl->domain)) == NULL) )
             break;
 
-        ret=0;        
-        if ( domctl->u.memory_mapping.add_mapping ) 
+        ret=0;
+        if ( domctl->u.memory_mapping.add_mapping )
         {
             gdprintk(XENLOG_INFO,
                 "memory_map:add: gfn=%lx mfn=%lx nr_mfns=%lx\n",
-                gfn, mfn, nr_mfns);   
-            
+                gfn, mfn, nr_mfns);
+
             ret = iomem_permit_access(d, mfn, mfn + nr_mfns - 1);
             for ( i = 0; i < nr_mfns; i++ )
-                set_mmio_p2m_entry(d, gfn+i, _mfn(mfn+i)); 
+                set_mmio_p2m_entry(d, gfn+i, _mfn(mfn+i));
         }
-        else 
+        else
         {
             gdprintk(XENLOG_INFO,
                 "memory_map:remove: gfn=%lx mfn=%lx nr_mfns=%lx\n",
                  gfn, mfn, nr_mfns);
 
             for ( i = 0; i < nr_mfns; i++ )
-                clear_mmio_p2m_entry(d, gfn+i); 
+                clear_mmio_p2m_entry(d, gfn+i);
             ret = iomem_deny_access(d, mfn, mfn + nr_mfns - 1);
         }
 
@@ -644,39 +645,42 @@ long arch_do_domctl(
             gdprintk(XENLOG_INFO,
                 "ioport_map:add f_gport=%x f_mport=%x np=%x\n",
                 fgp, fmp, np);
-                
+
             list_for_each_entry(g2m_ioport, &hd->g2m_ioport_list, list)
-                if (g2m_ioport->mport == fmp ) {
+                if (g2m_ioport->mport == fmp )
+                {
                     g2m_ioport->gport = fgp;
-                    g2m_ioport->np = np;                    
+                    g2m_ioport->np = np;
                     found = 1;
                     break;
                 }
-            if ( !found ) 
-            {                 
+            if ( !found )
+            {
                 g2m_ioport = xmalloc(struct g2m_ioport);
                 g2m_ioport->gport = fgp;
                 g2m_ioport->mport = fmp;
                 g2m_ioport->np = np;
                 list_add_tail(&g2m_ioport->list, &hd->g2m_ioport_list);
-            } 
+            }
             ret = ioports_permit_access(d, fmp, fmp + np - 1);
-            
         }
-        else {
+        else
+        {
             gdprintk(XENLOG_INFO,
                 "ioport_map:remove f_gport=%x f_mport=%x np=%x\n",
                 fgp, fmp, np);
             list_for_each_entry(g2m_ioport, &hd->g2m_ioport_list, list)
-                if ( g2m_ioport->mport == fmp ) {
+                if ( g2m_ioport->mport == fmp )
+                {
                     list_del(&g2m_ioport->list);
+                    xfree(g2m_ioport);
                     break;
                 }
             ret = ioports_deny_access(d, fmp, fmp + np - 1);
         }
         rcu_unlock_domain(d);
     }
-    break;    
+    break;
 
     case XEN_DOMCTL_pin_mem_cacheattr:
     {

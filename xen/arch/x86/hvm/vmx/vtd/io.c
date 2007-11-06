@@ -164,6 +164,9 @@ void iommu_domain_destroy(struct domain *d)
 {
     struct hvm_irq_dpci *hvm_irq_dpci = d->arch.hvm_domain.irq.dpci;
     uint32_t i;
+    struct hvm_iommu *hd  = domain_hvm_iommu(d);
+    struct list_head *ioport_list, *tmp;
+    struct g2m_ioport *ioport;
 
     if ( !vtd_enabled )
         return;
@@ -178,6 +181,16 @@ void iommu_domain_destroy(struct domain *d)
             }
         d->arch.hvm_domain.irq.dpci = NULL;
         xfree(hvm_irq_dpci);
+    }
+
+    if ( hd )
+    {
+        list_for_each_safe ( ioport_list, tmp, &hd->g2m_ioport_list )
+        {
+            ioport = list_entry(ioport_list, struct g2m_ioport, list);
+            list_del(&ioport->list);
+            xfree(ioport);
+        }
     }
 
     iommu_domain_teardown(d);
