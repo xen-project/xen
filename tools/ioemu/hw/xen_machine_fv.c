@@ -203,6 +203,7 @@ static void xen_init_fv(uint64_t ram_size, int vga_ram_size, char *boot_device,
         fprintf(logfile, "qemu_map_cache_init returned: error %d\n", errno);
         exit(-1);
     }
+#endif
 
     xc_get_hvm_param(xc_handle, domid, HVM_PARAM_IOREQ_PFN, &ioreq_pfn);
     fprintf(logfile, "shared page at pfn %lx\n", ioreq_pfn);
@@ -222,36 +223,17 @@ static void xen_init_fv(uint64_t ram_size, int vga_ram_size, char *boot_device,
         exit(-1);
     }
 
-#elif defined(__ia64__)
-
-    xc_get_hvm_param(xc_handle, domid, HVM_PARAM_IOREQ_PFN, &ioreq_pfn);
-    fprintf(logfile, "shared page at pfn %lx\n", ioreq_pfn);
-    shared_page = xc_map_foreign_range(xc_handle, domid, PAGE_SIZE,
-                                       PROT_READ|PROT_WRITE, ioreq_pfn);
-    if (shared_page == NULL) {
-        fprintf(logfile, "map shared IO page returned error %d\n", errno);
-        exit(-1);
-    }
-    
-    xc_get_hvm_param(xc_handle, domid, HVM_PARAM_BUFIOREQ_PFN, &ioreq_pfn);
-    fprintf(logfile, "buffered io page at pfn %lx\n", ioreq_pfn);
-    buffered_io_page = xc_map_foreign_range(xc_handle, domid, PAGE_SIZE,
-                                            PROT_READ|PROT_WRITE, ioreq_pfn);
-    if (buffered_io_page == NULL) {
-        fprintf(logfile, "map buffered IO page returned error %d\n", errno);
-        exit(-1);
-    }
-
+#if defined(__ia64__)
     xc_get_hvm_param(xc_handle, domid, HVM_PARAM_BUFPIOREQ_PFN, &ioreq_pfn);
     fprintf(logfile, "buffered pio page at pfn %lx\n", ioreq_pfn);
-    buffered_pio_page = xc_map_foreign_range(xc_handle, domid, PAGE_SIZE,
+    buffered_pio_page = xc_map_foreign_range(xc_handle, domid, XC_PAGE_SIZE,
 					     PROT_READ|PROT_WRITE, ioreq_pfn);
     if (buffered_pio_page == NULL) {
         fprintf(logfile, "map buffered PIO page returned error %d\n", errno);
         exit(-1);
     }
 
-    nr_pages = ram_size / PAGE_SIZE;
+    nr_pages = ram_size / XC_PAGE_SIZE;
 
     page_array = (xen_pfn_t *)malloc(nr_pages * sizeof(xen_pfn_t));
     if (page_array == NULL) {
@@ -267,7 +249,7 @@ static void xen_init_fv(uint64_t ram_size, int vga_ram_size, char *boot_device,
     if (ram_size > MMIO_START) {	
         for (i = 0 ; i < (MEM_G >> XC_PAGE_SHIFT); i++)
             page_array[(MMIO_START >> XC_PAGE_SHIFT) + i] =
-                (STORE_XC_PAGE_START >> XC_PAGE_SHIFT); 
+                (STORE_PAGE_START >> XC_PAGE_SHIFT); 
     }
 
     phys_ram_base = xc_map_foreign_batch(xc_handle, domid,
