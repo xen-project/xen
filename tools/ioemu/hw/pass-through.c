@@ -20,8 +20,8 @@
  * Guy Zana <guy@neocleus.com>
  *
  * This file implements direct PCI assignment to a HVM guest
- *
  */
+
 #include "vl.h"
 #include "pass-through.h"
 #include "pci/header.h"
@@ -128,9 +128,9 @@ void pt_iomem_map(PCIDevice *d, int i, uint32_t e_phys, uint32_t e_size,
     {
         /* Remove old mapping */
         ret = xc_domain_memory_mapping(xc_handle, domid,
-                old_ebase >> PAGE_SHIFT,
-                assigned_device->bases[i].access.maddr >> PAGE_SHIFT,
-                (e_size+PAGE_MASK) >> PAGE_SHIFT,
+                old_ebase >> XC_PAGE_SHIFT,
+                assigned_device->bases[i].access.maddr >> XC_PAGE_SHIFT,
+                (e_size+XC_PAGE_MASK) >> XC_PAGE_SHIFT,
                 DPCI_REMOVE_MAPPING);
         if ( ret != 0 )
         {
@@ -141,9 +141,9 @@ void pt_iomem_map(PCIDevice *d, int i, uint32_t e_phys, uint32_t e_size,
 
     /* Create new mapping */
     ret = xc_domain_memory_mapping(xc_handle, domid,
-            assigned_device->bases[i].e_physbase >> PAGE_SHIFT,
-            assigned_device->bases[i].access.maddr >> PAGE_SHIFT,
-            (e_size+PAGE_MASK) >> PAGE_SHIFT,
+            assigned_device->bases[i].e_physbase >> XC_PAGE_SHIFT,
+            assigned_device->bases[i].access.maddr >> XC_PAGE_SHIFT,
+            (e_size+XC_PAGE_MASK) >> XC_PAGE_SHIFT,
             DPCI_ADD_MAPPING);
     if ( ret != 0 )
         PT_LOG("Error: create new mapping failed!\n");
