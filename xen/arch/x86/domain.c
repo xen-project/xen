@@ -415,7 +415,8 @@ int vcpu_initialise(struct vcpu *v)
             v->arch.cr3           = __pa(idle_pg_table);
         }
 
-        v->arch.guest_context.ctrlreg[4] = mmu_cr4_features;
+        v->arch.guest_context.ctrlreg[4] =
+            real_cr4_to_pv_guest_cr4(mmu_cr4_features);
     }
 
     v->arch.perdomain_ptes =
@@ -573,17 +574,18 @@ void arch_domain_destroy(struct domain *d)
 
 unsigned long pv_guest_cr4_fixup(unsigned long guest_cr4)
 {
-    unsigned long hv_cr4 = read_cr4(), hv_cr4_mask = ~X86_CR4_TSD;
+    unsigned long hv_cr4_mask, hv_cr4 = real_cr4_to_pv_guest_cr4(read_cr4());
+
+    hv_cr4_mask = ~X86_CR4_TSD;
     if ( cpu_has_de )
         hv_cr4_mask &= ~X86_CR4_DE;
 
-    if ( (guest_cr4 & hv_cr4_mask) !=
-         (hv_cr4 & hv_cr4_mask & ~(X86_CR4_PGE|X86_CR4_PSE)) )
+    if ( (guest_cr4 & hv_cr4_mask) != (hv_cr4 & hv_cr4_mask) )
         gdprintk(XENLOG_WARNING,
                  "Attempt to change CR4 flags %08lx -> %08lx\n",
                  hv_cr4 & ~(X86_CR4_PGE|X86_CR4_PSE), guest_cr4);
 
-    return  (hv_cr4 & hv_cr4_mask) | (guest_cr4 & ~hv_cr4_mask);
+    return (hv_cr4 & hv_cr4_mask) | (guest_cr4 & ~hv_cr4_mask);
 }
 
 /* This is called by arch_final_setup_guest and do_boot_vcpu */
@@ -684,8 +686,8 @@ int arch_set_info_guest(
     v->arch.guest_context.user_regs.eflags |= EF_IE;
 
     cr4 = v->arch.guest_context.ctrlreg[4];
-    v->arch.guest_context.ctrlreg[4] =
-        (cr4 == 0) ? mmu_cr4_features : pv_guest_cr4_fixup(cr4);
+    v->arch.guest_context.ctrlreg[4] = cr4 ? pv_guest_cr4_fixup(cr4) :
+        real_cr4_to_pv_guest_cr4(mmu_cr4_features);
 
     memset(v->arch.guest_context.debugreg, 0,
            sizeof(v->arch.guest_context.debugreg));
@@ -1223,11 +1225,14 @@ static void paravirt_ctxt_switch_from(struct vcpu *v)
 
 static void paravirt_ctxt_switch_to(struct vcpu *v)
 {
+    unsigned long cr4;
+
     set_int80_direct_trap(v);
     switch_kernel_stack(v);
 
-    if ( unlikely(read_cr4() != v->arch.guest_context.ctrlreg[4]) )
-        write_cr4(v->arch.guest_context.ctrlreg[4]);
+    cr4 = pv_guest_cr4_to_real_cr4(v->arch.guest_context.ctrlreg[4]);
+    if ( unlikely(cr4 != read_cr4()) )
+        write_cr4(cr4);
 
     if ( unlikely(v->arch.guest_context.debugreg[7]) )
     {
