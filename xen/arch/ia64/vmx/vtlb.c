@@ -413,7 +413,7 @@ static thash_data_t *__alloc_chain(thash_cb_t *hcb)
  *  3: The caller need to make sure the new entry will not overlap
  *     with any existed entry.
  */
-void vtlb_insert(VCPU *v, u64 pte, u64 itir, u64 va)
+static void vtlb_insert(VCPU *v, u64 pte, u64 itir, u64 va)
 {
     thash_data_t *hash_table, *cch;
     /* int flag; */
@@ -421,6 +421,8 @@ void vtlb_insert(VCPU *v, u64 pte, u64 itir, u64 va)
     /* u64 gppn, ppns, ppne; */
     u64 tag, len;
     thash_cb_t *hcb = &v->arch.vtlb;
+
+    vcpu_quick_region_set(PSCBX(v, tc_regions), va);
 
     vcpu_get_rr(v, va, &vrr.rrval);
     vrr.ps = itir_ps(itir);
@@ -545,60 +547,35 @@ u64 translate_phy_pte(VCPU *v, u64 *pte, u64 itir, u64 va)
  */
 int thash_purge_and_insert(VCPU *v, u64 pte, u64 itir, u64 ifa, int type)
 {
-    u64 ps;//, va;
-    u64 phy_pte;
+    u64 ps, phy_pte, psr;
     ia64_rr mrr;
-    int ret = 0;
 
     ps = itir_ps(itir);
     mrr.rrval = ia64_get_rr(ifa);
-    if (VMX_DOMAIN(v)) {
-        phy_pte = translate_phy_pte(v, &pte, itir, ifa);
 
-        if (pte & VTLB_PTE_IO)
-            ret = 1;
-        vtlb_purge(v, ifa, ps);
-        vhpt_purge(v, ifa, ps);
-        if (ps == mrr.ps) {
-            if (!(pte & VTLB_PTE_IO)) {
-                vmx_vhpt_insert(&v->arch.vhpt, phy_pte, itir, ifa);
-            }
-            else{
-                vtlb_insert(v, pte, itir, ifa);
-                vcpu_quick_region_set(PSCBX(v, tc_regions), ifa);
-            }
-        }
-        else if (ps > mrr.ps) {
-            vtlb_insert(v, pte, itir, ifa);
-            vcpu_quick_region_set(PSCBX(v, tc_regions), ifa);
-            if (!(pte & VTLB_PTE_IO)) {
-                vmx_vhpt_insert(&v->arch.vhpt, phy_pte, itir, ifa);
-            }
-        }
-        else {
-            u64 psr;
+    phy_pte = translate_phy_pte(v, &pte, itir, ifa);
 
-            vtlb_insert(v, pte, itir, ifa);
-            vcpu_quick_region_set(PSCBX(v, tc_regions), ifa);
-            if (!(pte & VTLB_PTE_IO)) {
-                phy_pte  &= ~PAGE_FLAGS_RV_MASK;
-                psr = ia64_clear_ic();
-                ia64_itc(type + 1, ifa, phy_pte, IA64_ITIR_PS_KEY(ps, 0));
-                ia64_set_psr(psr);
-                ia64_srlz_i();
-            }
-        }
+    vtlb_purge(v, ifa, ps);
+    vhpt_purge(v, ifa, ps);
+
+    if (pte & VTLB_PTE_IO) {
+        vtlb_insert(v, pte, itir, ifa);
+        return 1;
     }
-    else{
-        phy_pte = translate_phy_pte(v, &pte, itir, ifa);
-        if (ps != PAGE_SHIFT) {
-            vtlb_insert(v, pte, itir, ifa);
-            vcpu_quick_region_set(PSCBX(v, tc_regions), ifa);
-        }
-        machine_tlb_purge(ifa, ps);
+
+    if (ps != mrr.ps)
+        vtlb_insert(v, pte, itir, ifa);
+
+    if (ps >= mrr.ps) {
         vmx_vhpt_insert(&v->arch.vhpt, phy_pte, itir, ifa);
+    } else { /* Subpaging */
+        phy_pte &= ~PAGE_FLAGS_RV_MASK;
+        psr = ia64_clear_ic();
+        ia64_itc(type + 1, ifa, phy_pte, IA64_ITIR_PS_KEY(ps, 0));
+        ia64_set_psr(psr);
+        ia64_srlz_i();
     }
-    return ret;
+    return 0;
 }
 
 /*
