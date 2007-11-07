@@ -636,6 +636,7 @@ int arch_vcpu_reset(struct vcpu *v)
 	return 0;
 }
 
+/* Here it is assumed that all of the CPUs has same RSE.N_STACKED_PHYS */
 static unsigned long num_phys_stacked;
 static int __init
 init_num_phys_stacked(void)
@@ -822,8 +823,9 @@ void arch_get_info_guest(struct vcpu *v, vcpu_guest_context_u c)
 	COPY_FPREG(&c.nat->regs.f[30], &sw->f30);
 	COPY_FPREG(&c.nat->regs.f[31], &sw->f31);
 
-	for (i = 0; i < 96; i++)
-		COPY_FPREG(&c.nat->regs.f[i + 32], &v->arch._thread.fph[i]);
+	// f32 - f127
+	memcpy(&c.nat->regs.f[32], &v->arch._thread.fph[0],
+	       sizeof(v->arch._thread.fph));
 
 #define NATS_UPDATE(reg)						\
 	nats_update(&c.nat->regs.nats, (reg),				\
@@ -938,6 +940,8 @@ void arch_get_info_guest(struct vcpu *v, vcpu_guest_context_u c)
 		unsigned int bottom_slot = ia64_rse_slot_num(rbs_bottom);
 		c.nat->regs.rbs_rnat &= ~((1UL << bottom_slot) - 1);
 	}
+
+	c.nat->regs.num_phys_stacked = num_phys_stacked;
 
 	if (VMX_DOMAIN(v))
 		c.nat->privregs_pfn = VGC_PRIVREGS_HVM;
@@ -1101,7 +1105,6 @@ copy_rbs(struct vcpu* v, unsigned long* dst_rbs_size,
 	if (((unsigned long)dst_bsp & ~PAGE_MASK) > KERNEL_STACK_SIZE / 2)
 		goto out;
 
-	//XXX TODO
 	// ia64_copy_rbs() uses real cpu's stack register.
 	// So it may fault with an Illigal Operation fault resulting
 	// in panic if rbs_size is too large to load compared to
@@ -1113,10 +1116,9 @@ copy_rbs(struct vcpu* v, unsigned long* dst_rbs_size,
 	// we need to copy them by hand without loadrs and flushrs
 	// However even if we implement that, similar issue still occurs
 	// when running guest. CPU context restore routine issues loadrs
-	// resulting in Illegal Operation fault. For such a case,
-	// we need to emulate RSE store.
-	// So it would be better to implement only RSE store emulation
-	// and copy stacked registers directly into guest RBS.
+	// resulting in Illegal Operation fault. And what if the vRSE is in
+	// enforced lazy mode? We can't store any dirty stacked registers
+	// into RBS without cover or br.call.
 	if (num_regs > num_phys_stacked) {
 		rc = -ENOSYS;
 		gdprintk(XENLOG_WARNING,
@@ -1240,10 +1242,6 @@ int arch_set_info_guest(struct vcpu *v, vcpu_guest_context_u c)
 	
 	uregs->pr = c.nat->regs.pr;
 	uregs->b0 = c.nat->regs.b[0];
-	if (((IA64_RBS_OFFSET / 8) % 64) != c.nat->regs.rbs_voff)
-		gdprintk(XENLOG_INFO,
-			 "rbs stack offset is different! xen 0x%x given 0x%x",
-			 (IA64_RBS_OFFSET / 8) % 64, c.nat->regs.rbs_voff);
 	num_regs = ia64_rse_num_regs((unsigned long*)c.nat->regs.ar.bspstore,
 				     (unsigned long*)c.nat->regs.ar.bsp);
 	rbs_size = (unsigned long)ia64_rse_skip_regs(rbs_bottom, num_regs) -
@@ -1254,6 +1252,11 @@ int arch_set_info_guest(struct vcpu *v, vcpu_guest_context_u c)
 			 rbs_size, sizeof (c.nat->regs.rbs));
 		return -EINVAL;
 	}
+	if (rbs_size > 0 &&
+	    ((IA64_RBS_OFFSET / 8) % 64) != c.nat->regs.rbs_voff)
+		gdprintk(XENLOG_INFO,
+			 "rbs stack offset is different! xen 0x%x given 0x%x",
+			 (IA64_RBS_OFFSET / 8) % 64, c.nat->regs.rbs_voff);
 	
 	/* Protection against crazy user code.  */
 	if (!was_initialised)
@@ -1279,6 +1282,49 @@ int arch_set_info_guest(struct vcpu *v, vcpu_guest_context_u c)
 			sw->ar_bspstore = (unsigned long)((char*)rbs_bottom +
 							  dst_rbs_size);
 		}
+	}
+
+	// inhibit save/restore between cpus of different RSE.N_STACKED_PHYS.
+	// to avoid nasty issues.
+	// 
+	// The number of physical stacked general register(RSE.N_STACKED_PHYS)
+	// isn't virtualized. Guest OS utilizes it via PAL_RSE_INFO call and
+	// the value might be exported to user/user process.
+	// (Linux does via /proc/cpuinfo)
+	// The SDM says only that the number is cpu implementation specific.
+	//
+	// If the number of restoring cpu is different from one of saving cpu,
+	// the following, or something worse, might happen.
+	// - Xen VMM itself may panic when issuing loadrs to run guest with
+	//   illegal operation fault
+	//   When RSE.N_STACKED_PHYS of saving CPU > RSE.N_STACKED_PHYS of
+	//   restoring CPU
+	//   This case is detected to refuse restore by rbs_copy()
+	// - guest kernel may panic with illegal operation fault
+	//   When RSE.N_STACKED_PHYS of saving CPU > RSE.N_STACKED_PHYS of
+	//   restoring CPU
+	// - infomation leak from guest kernel to user process
+	//   When RSE.N_STACKED_PHYS of saving CPU < RSE.N_STACKED_PHYS of
+	//   restoring CPU
+	//   Before returning to user process, kernel should zero clear all
+	//   physical stacked resgisters to prevent kernel bits leak.
+	//   It would be based on RSE.N_STACKED_PHYS (Linux does.).
+	//   On the restored environtment the kernel clears only a part
+	//   of the physical stacked registers.
+	// - user processes or human operators would be confused.
+	//   RSE.N_STACKED_PHYS might be exported to user process or human
+	//   operators. Actually on linux it is exported via /proc/cpuinfo.
+	//   user processes might use it.
+	//   I don't know any concrete example, but it's possible in theory.
+	//   e.g. thread libraly may allocate RBS area based on the value.
+	//        (Fortunately glibc nptl doesn't)
+	if (c.nat->regs.num_phys_stacked != 0 && /* COMPAT */
+	    c.nat->regs.num_phys_stacked != num_phys_stacked) {
+		gdprintk(XENLOG_WARNING,
+			 "num phys stacked is different! "
+			 "xen 0x%lx given 0x%lx",
+			 num_phys_stacked, c.nat->regs.num_phys_stacked);
+		return -EINVAL;
 	}
 
 	uregs->r1 = c.nat->regs.r[1];
@@ -1342,9 +1388,9 @@ int arch_set_info_guest(struct vcpu *v, vcpu_guest_context_u c)
 	COPY_FPREG(&sw->f30, &c.nat->regs.f[30]);
 	COPY_FPREG(&sw->f31, &c.nat->regs.f[31]);
 
-	for (i = 0; i < 96; i++)
-		COPY_FPREG(&v->arch._thread.fph[i], &c.nat->regs.f[i + 32]);
-
+	// f32 - f127
+	memcpy(&v->arch._thread.fph[0], &c.nat->regs.f[32],
+	       sizeof(v->arch._thread.fph));
 
 #define UNAT_UPDATE(reg)					\
 	unat_update(&uregs->eml_unat, &uregs->r ## reg,		\
@@ -1439,20 +1485,21 @@ int arch_set_info_guest(struct vcpu *v, vcpu_guest_context_u c)
 
 	/* rr[] must be set before setting itrs[] dtrs[] */
 	for (i = 0; i < 8; i++) {
-		//XXX TODO integrity check.
-		//    if invalid value is given, 
-		//    vmx_load_all_rr() and load_region_regs()
-		//    result in General exception, reserved register/field
-		//    failt causing panicing xen.
+		unsigned long rrval = c.nat->regs.rr[i];
+		unsigned long reg = (unsigned long)i << 61;
+		IA64FAULT fault = IA64_NO_FAULT;
+
+		if (rrval == 0)
+			continue;
 		if (d->arch.is_vti) {
 			//without VGCF_EXTRA_REGS check,
 			//VTi domain doesn't boot.
 			if (c.nat->flags & VGCF_EXTRA_REGS)
-				vmx_vcpu_set_rr(v, (unsigned long)i << 61,
-						c.nat->regs.rr[i]);
+				fault = vmx_vcpu_set_rr(v, reg, rrval);
 		} else
-			vcpu_set_rr(v, (unsigned long)i << 61,
-				    c.nat->regs.rr[i]);
+			fault = vcpu_set_rr(v, reg, rrval);
+		if (fault != IA64_NO_FAULT)
+			return -EINVAL;
 	}
 
 	if (c.nat->flags & VGCF_EXTRA_REGS) {

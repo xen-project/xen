@@ -417,8 +417,14 @@ struct vcpu_guest_context_regs {
          */
         unsigned int rbs_voff;
         unsigned long rbs[2048];
-        unsigned long rbs_nat;
         unsigned long rbs_rnat;
+
+        /*
+         * RSE.N_STACKED_PHYS via PAL_RSE_INFO
+         * Strictly this isn't cpu context, but this value is necessary
+         * for domain save/restore. So is here.
+         */
+        unsigned long num_phys_stacked;
 };
 
 struct vcpu_guest_context {
