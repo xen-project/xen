@@ -285,9 +285,10 @@ xc_ia64_hvm_recv_context(int xc_handle, int io_fd, uint32_t dom,
 
     /* HVM: magic frames for ioreqs and xenstore comms */
     const int hvm_params[] = {
+        HVM_PARAM_STORE_PFN,
         HVM_PARAM_IOREQ_PFN,
         HVM_PARAM_BUFIOREQ_PFN,
-        HVM_PARAM_STORE_PFN,
+        HVM_PARAM_BUFPIOREQ_PFN,
     };
     const int NR_PARAMS = sizeof(hvm_params) / sizeof(hvm_params[0]);
     /* ioreq_pfn, bufioreq_pfn, store_pfn */
@@ -368,7 +369,7 @@ xc_ia64_hvm_recv_context(int xc_handle, int io_fd, uint32_t dom,
         ERROR("error setting HVM params: %i", rc);
         goto out;
     }
-    *store_mfn = magic_pfns[2];
+    *store_mfn = magic_pfns[0];
 
     /* Read HVM context */
     if (!read_exact(io_fd, &rec_size, sizeof(rec_size))) {

@@ -893,9 +893,6 @@ setup_guest(int xc_handle, uint32_t dom, unsigned long memsize,
             char *image, unsigned long image_size)
 {
     xen_pfn_t *pfn_list;
-    shared_iopage_t *sp;
-    void *ioreq_buffer_page;
-    void *pio_buffer_page;
     unsigned long dom_memsize = memsize << 20;
     unsigned long nr_pages = memsize << (20 - PAGE_SHIFT);
     unsigned long vcpus;
@@ -905,6 +902,16 @@ setup_guest(int xc_handle, uint32_t dom, unsigned long memsize,
     unsigned long nvram_start = NVRAM_START, nvram_fd = 0; 
     int rc;
     long i;
+    const struct hvm_special_page {
+        int             param;
+        xen_pfn_t       pfn;
+    } special_pages[] = {
+        // pfn-sorted array
+        { HVM_PARAM_IOREQ_PFN,          IO_PAGE_START         >> PAGE_SHIFT},
+        { HVM_PARAM_STORE_PFN,          STORE_PAGE_START      >> PAGE_SHIFT},
+        { HVM_PARAM_BUFIOREQ_PFN,       BUFFER_IO_PAGE_START  >> PAGE_SHIFT}, 
+        { HVM_PARAM_BUFPIOREQ_PFN,      BUFFER_PIO_PAGE_START >> PAGE_SHIFT},
+    };
     DECLARE_DOMCTL;
 
 
@@ -957,18 +964,12 @@ setup_guest(int xc_handle, uint32_t dom, unsigned long memsize,
         goto error_out;
     }
 
-    nr_special_pages = 0;
-    pfn_list[nr_special_pages] = IO_PAGE_START >> PAGE_SHIFT;
-    nr_special_pages++;
-    pfn_list[nr_special_pages] = STORE_PAGE_START >> PAGE_SHIFT;
-    nr_special_pages++;
-    pfn_list[nr_special_pages] = BUFFER_IO_PAGE_START >> PAGE_SHIFT;
-    nr_special_pages++;
-    pfn_list[nr_special_pages] = BUFFER_PIO_PAGE_START >> PAGE_SHIFT;
+    for (i = 0; i < sizeof(special_pages) / sizeof(special_pages[0]); i++)
+        pfn_list[i] = special_pages[i].pfn;
 
-    memmap_info_pfn = pfn_list[nr_special_pages] + 1;
+    nr_special_pages = i;
+    memmap_info_pfn = pfn_list[nr_special_pages - 1] + 1;
     memmap_info_num_pages = 1;
-    nr_special_pages++;
     pfn_list[nr_special_pages] = memmap_info_pfn;
     nr_special_pages++;
 
@@ -1033,28 +1034,14 @@ setup_guest(int xc_handle, uint32_t dom, unsigned long memsize,
         goto error_out;
     }
 
-    xc_set_hvm_param(xc_handle, dom, HVM_PARAM_STORE_PFN, pfn_list[1]);
+    // zero clear all special pages
+    for (i = 0; i < sizeof(special_pages) / sizeof(special_pages[0]); i++) {
+        xc_set_hvm_param(xc_handle, dom,
+                         special_pages[i].param, special_pages[i].pfn);
+        if (xc_clear_domain_page(xc_handle, dom, special_pages[i].pfn))
+            goto error_out;
+    }
 
-    // Retrieve special pages like io, xenstore, etc. 
-    sp = (shared_iopage_t *)xc_map_foreign_range(xc_handle, dom, PAGE_SIZE,
-                                                 PROT_READ | PROT_WRITE,
-                                                 pfn_list[0]);
-    if (sp == 0)
-        goto error_out;
-
-    memset(sp, 0, PAGE_SIZE);
-    munmap(sp, PAGE_SIZE);
-    ioreq_buffer_page = xc_map_foreign_range(xc_handle, dom, PAGE_SIZE,
-                                             PROT_READ | PROT_WRITE,
-                                             pfn_list[2]); 
-    memset(ioreq_buffer_page,0,PAGE_SIZE);
-    munmap(ioreq_buffer_page, PAGE_SIZE);
-
-    pio_buffer_page = xc_map_foreign_range(xc_handle, dom, PAGE_SIZE,
-                                           PROT_READ | PROT_WRITE,
-                                           pfn_list[3]);
-    memset(pio_buffer_page,0,PAGE_SIZE);
-    munmap(pio_buffer_page, PAGE_SIZE);
     free(pfn_list);
     return 0;
 
