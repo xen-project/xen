@@ -1627,6 +1627,7 @@ domain_set_shared_info_va (unsigned long va)
 {
 	struct vcpu *v = current;
 	struct domain *d = v->domain;
+	int rc;
 
 	/* Check virtual address:
 	   must belong to region 7,
@@ -1648,9 +1649,10 @@ domain_set_shared_info_va (unsigned long va)
 	__ia64_per_cpu_var(current_psr_ic_addr) = (int *)(va + XSI_PSR_IC_OFS);
 
 	/* Remap the shared pages.  */
-	set_one_rr (7UL << 61, PSCB(v,rrs[7]));
+	rc = !set_one_rr(7UL << 61, PSCB(v,rrs[7]));
+	BUG_ON(rc);
 
-	return 0;
+	return rc;
 }
 
 /* Transfer and clear the shadow bitmap in 1kB chunks for L1 cache. */

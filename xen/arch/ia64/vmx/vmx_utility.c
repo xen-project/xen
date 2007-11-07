@@ -637,10 +637,9 @@ int is_reserved_itir_field(VCPU* vcpu, u64 itir)
 	return 0;
 }
 
-int is_reserved_rr_field(VCPU* vcpu, u64 reg_value)
+static int __is_reserved_rr_field(u64 reg_value)
 {
-    ia64_rr rr;
-    rr.rrval = reg_value;
+    ia64_rr rr = { .rrval = reg_value };
 
     if(rr.reserved0 != 0 || rr.reserved1 != 0){
         return 1;
@@ -656,3 +655,20 @@ int is_reserved_rr_field(VCPU* vcpu, u64 reg_value)
     return 0;
 }
 
+int is_reserved_rr_rid(VCPU* vcpu, u64 reg_value)
+{
+    ia64_rr rr = { .rrval = reg_value };
+
+    if (rr.rid >= (1UL << vcpu->domain->arch.rid_bits))
+        return 1;
+
+    return 0;
+}
+
+int is_reserved_rr_field(VCPU* vcpu, u64 reg_value)
+{
+    if (__is_reserved_rr_field(reg_value))
+        return 1;
+
+    return is_reserved_rr_rid(vcpu, reg_value);
+}

@@ -1,3 +1,4 @@
+
 #ifndef _REGIONREG_H_
 #define _REGIONREG_H_
 
@@ -84,6 +85,9 @@ extern void set_virtual_rr0(void);
 extern void set_metaphysical_rr0(void);
 
 extern void load_region_regs(struct vcpu *v);
+
+extern int is_reserved_rr_rid(struct vcpu *vcpu, u64 reg_value);
+extern int is_reserved_rr_field(struct vcpu *vcpu, u64 reg_value);
 
 #endif /* !_REGIONREG_H_ */
 

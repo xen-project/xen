@@ -287,7 +287,7 @@ static void vcpu_set_metaphysical_mode(VCPU * vcpu, BOOLEAN newmode)
 		PSCB(vcpu, metaphysical_mode) = newmode;
 		if (newmode)
 			set_metaphysical_rr0();
-		else if (PSCB(vcpu, rrs[0]) != -1)
+		else
 			set_virtual_rr0();
 	}
 }
@@ -2095,9 +2095,16 @@ unsigned long vcpu_get_rr_ve(VCPU * vcpu, u64 vadr)
 
 IA64FAULT vcpu_set_rr(VCPU * vcpu, u64 reg, u64 val)
 {
+	if (unlikely(is_reserved_rr_field(vcpu, val))) {
+		gdprintk(XENLOG_DEBUG, "use of invalid rrval %lx\n", val);
+		return IA64_RSVDREG_FAULT;
+	}
+
 	PSCB(vcpu, rrs)[reg >> 61] = val;
-	if (vcpu == current)
-		set_one_rr(reg, val);
+	if (likely(vcpu == current)) {
+		int rc = set_one_rr(reg, val);
+		BUG_ON(rc == 0);
+	}
 	return IA64_NO_FAULT;
 }
 
@@ -2120,17 +2127,30 @@ IA64FAULT vcpu_set_rr0_to_rr4(VCPU * vcpu, u64 val0, u64 val1, u64 val2,
 	u64 reg3 = 0x6000000000000000UL;
 	u64 reg4 = 0x8000000000000000UL;
 
+	if (unlikely(is_reserved_rr_field(vcpu, val0) ||
+		     is_reserved_rr_field(vcpu, val1) ||
+		     is_reserved_rr_field(vcpu, val2) ||
+		     is_reserved_rr_field(vcpu, val3) ||
+		     is_reserved_rr_field(vcpu, val4))) {
+		gdprintk(XENLOG_DEBUG,
+			 "use of invalid rrval %lx %lx %lx %lx %lx\n",
+			 val0, val1, val2, val3, val4);
+		return IA64_RSVDREG_FAULT;
+	}
+
 	PSCB(vcpu, rrs)[reg0 >> 61] = val0;
 	PSCB(vcpu, rrs)[reg1 >> 61] = val1;
 	PSCB(vcpu, rrs)[reg2 >> 61] = val2;
 	PSCB(vcpu, rrs)[reg3 >> 61] = val3;
 	PSCB(vcpu, rrs)[reg4 >> 61] = val4;
-	if (vcpu == current) {
-		set_one_rr(reg0, val0);
-		set_one_rr(reg1, val1);
-		set_one_rr(reg2, val2);
-		set_one_rr(reg3, val3);
-		set_one_rr(reg4, val4);
+	if (likely(vcpu == current)) {
+		int rc;
+		rc  = !set_one_rr(reg0, val0);
+		rc |= !set_one_rr(reg1, val1);
+		rc |= !set_one_rr(reg2, val2);
+		rc |= !set_one_rr(reg3, val3);
+		rc |= !set_one_rr(reg4, val4);
+		BUG_ON(rc != 0);
 	}
 	return IA64_NO_FAULT;
 }

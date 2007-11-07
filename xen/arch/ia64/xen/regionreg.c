@@ -238,14 +238,12 @@ int set_one_rr(unsigned long rr, unsigned long val)
 	ia64_rr rrv, newrrv, memrrv;
 	unsigned long newrid;
 
-	if (val == -1)
-		return 1;
-
 	rrv.rrval = val;
 	newrrv.rrval = 0;
 	newrid = v->arch.starting_rid + rrv.rid;
 
-	if (newrid > v->arch.ending_rid) {
+	// avoid reserved register/field fault
+	if (unlikely(is_reserved_rr_field(v, val))) {
 		printk("can't set rr%d to %lx, starting_rid=%x,"
 			"ending_rid=%x, val=%lx\n", (int) rreg, newrid,
 			v->arch.starting_rid,v->arch.ending_rid,val);
@@ -295,12 +293,11 @@ void init_all_rr(struct vcpu *v)
 	ia64_rr rrv;
 
 	rrv.rrval = 0;
-	//rrv.rrval = v->domain->arch.metaphysical_rr0;
 	rrv.ps = v->arch.vhpt_pg_shift;
 	rrv.ve = 1;
 	if (!v->vcpu_info)
 		panic("Stopping in init_all_rr\n");
-	VCPU(v,rrs[0]) = -1;
+	VCPU(v,rrs[0]) = rrv.rrval;
 	VCPU(v,rrs[1]) = rrv.rrval;
 	VCPU(v,rrs[2]) = rrv.rrval;
 	VCPU(v,rrs[3]) = rrv.rrval;
@@ -308,7 +305,7 @@ void init_all_rr(struct vcpu *v)
 	VCPU(v,rrs[5]) = rrv.rrval;
 	rrv.ve = 0; 
 	VCPU(v,rrs[6]) = rrv.rrval;
-//	v->shared_info->arch.rrs[7] = rrv.rrval;
+	VCPU(v,rrs[7]) = rrv.rrval;
 }
 
 
