@@ -72,8 +72,8 @@ find_alt_device () {
     echo "$ifs"
 }
 
-netdev=${netdev:-$(ip route list | awk '/^default / { print $NF }' |
-		   sed 's/.* dev //')}
+netdev=${netdev:-$(ip route list 0.0.0.0/0  | \
+                   sed 's/.*dev \([a-z]\+[0-9]\+\).*$/\1/')}
 if is_network_root ; then
     altdevs=$(find_alt_device $netdev)
     for netdev in $altdevs; do break; done

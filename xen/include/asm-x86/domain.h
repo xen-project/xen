@@ -350,7 +350,14 @@ struct arch_vcpu
 /* Continue the current hypercall via func(data) on specified cpu. */
 int continue_hypercall_on_cpu(int cpu, long (*func)(void *data), void *data);
 
+/* Clean up CR4 bits that are not under guest control. */
 unsigned long pv_guest_cr4_fixup(unsigned long guest_cr4);
+
+/* Convert between guest-visible and real CR4 values. */
+#define pv_guest_cr4_to_real_cr4(c) \
+    ((c) | (mmu_cr4_features & (X86_CR4_PGE | X86_CR4_PSE)))
+#define real_cr4_to_pv_guest_cr4(c) \
+    ((c) & ~(X86_CR4_PGE | X86_CR4_PSE))
 
 #endif /* __ASM_DOMAIN_H__ */
 

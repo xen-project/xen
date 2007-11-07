@@ -84,25 +84,23 @@ struct page_info
 #define _PGT_pae_xen_l2     26
 #define PGT_pae_xen_l2      (1U<<_PGT_pae_xen_l2)
 
- /* 16-bit count of uses of this frame as its current type. */
-#define PGT_count_mask      ((1U<<16)-1)
+ /* 26-bit count of uses of this frame as its current type. */
+#define PGT_count_mask      ((1U<<26)-1)
 
  /* Cleared when the owning guest 'frees' this page. */
 #define _PGC_allocated      31
 #define PGC_allocated       (1U<<_PGC_allocated)
  /* Set on a *guest* page to mark it out-of-sync with its shadow */
-#define _PGC_out_of_sync     30
+#define _PGC_out_of_sync    30
 #define PGC_out_of_sync     (1U<<_PGC_out_of_sync)
  /* Set when is using a page as a page table */
-#define _PGC_page_table      29
+#define _PGC_page_table     29
 #define PGC_page_table      (1U<<_PGC_page_table)
- /* 29-bit count of references to this frame. */
-#define PGC_count_mask      ((1U<<29)-1)
-
-/* We trust the slab allocator in slab.c, and our use of it. */
-#define PageSlab(page)	    (1)
-#define PageSetSlab(page)   ((void)0)
-#define PageClearSlab(page) ((void)0)
+ /* 3-bit PAT/PCD/PWT cache-attribute hint. */
+#define PGC_cacheattr_base  26
+#define PGC_cacheattr_mask  (7U<<PGC_cacheattr_base)
+ /* 26-bit count of references to this frame. */
+#define PGC_count_mask      ((1U<<26)-1)
 
 #define is_xen_heap_frame(pfn) ({                                       \
     paddr_t maddr = page_to_maddr(pfn);                                 \
@@ -147,6 +145,8 @@ void init_frametable(void);
 void free_page_type(struct page_info *page, unsigned long type);
 int _shadow_mode_refcounts(struct domain *d);
 
+void cleanup_page_cacheattr(struct page_info *page);
+
 static inline void put_page(struct page_info *page)
 {
     u32 nx, x, y = page->count_info;
@@ -158,7 +158,10 @@ static inline void put_page(struct page_info *page)
     while ( unlikely((y = cmpxchg(&page->count_info, x, nx)) != x) );
 
     if ( unlikely((nx & PGC_count_mask) == 0) )
+    {
+        cleanup_page_cacheattr(page);
         free_domheap_page(page);
+    }
 }
 
 
@@ -196,8 +199,7 @@ static inline int get_page(struct page_info *page,
     return 1;
 }
 
-/* Decide whether this page looks like iomem or real memory */
-int iomem_page_test(unsigned long mfn, struct page_info *page);
+int is_iomem_page(unsigned long mfn);
 
 void put_page_type(struct page_info *page);
 int  get_page_type(struct page_info *page, unsigned long type);

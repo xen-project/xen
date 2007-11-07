@@ -40,7 +40,7 @@
 /* Misc PCI constants that should be moved to a separate library :) */
 #define PCI_CONFIG_SIZE         (256)
 #define PCI_EXP_DEVCAP_FLR      (1 << 28)
-#define PCI_EXP_DEVCTL_FLR      (0x1b)
+#define PCI_EXP_DEVCTL_FLR      (1 << 15)
 #define PCI_BAR_ENTRIES         (6)
 
 struct pt_region {

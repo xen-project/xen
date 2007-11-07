@@ -59,7 +59,7 @@ static void pt_process_missed_ticks(struct periodic_time *pt)
     if ( mode_is(pt->vcpu->domain, no_missed_tick_accounting) )
     {
         pt->pending_intr_nr = 1;
-        pt->scheduled = now + pt->scheduled;
+        pt->scheduled = now + pt->period;
     }
     else
     {

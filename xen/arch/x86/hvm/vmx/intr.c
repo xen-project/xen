@@ -113,6 +113,7 @@ static void vmx_dirq_assist(struct vcpu *v)
     uint32_t device, intx;
     struct domain *d = v->domain;
     struct hvm_irq_dpci *hvm_irq_dpci = d->arch.hvm_domain.irq.dpci;
+    struct dev_intx_gsi *dig;
 
     if ( !vtd_enabled || (v->vcpu_id != 0) || (hvm_irq_dpci == NULL) )
         return;
@@ -122,11 +123,17 @@ static void vmx_dirq_assist(struct vcpu *v)
           irq = find_next_bit(hvm_irq_dpci->dirq_mask, NR_IRQS, irq + 1) )
     {
         stop_timer(&hvm_irq_dpci->hvm_timer[irq_to_vector(irq)]);
+        clear_bit(irq, &hvm_irq_dpci->dirq_mask);
 
-        test_and_clear_bit(irq, &hvm_irq_dpci->dirq_mask);
-        device = hvm_irq_dpci->mirq[irq].device;
-        intx = hvm_irq_dpci->mirq[irq].intx;
-        hvm_pci_intx_assert(d, device, intx);
+        list_for_each_entry ( dig, &hvm_irq_dpci->mirq[irq].dig_list, list )
+        {
+            device = dig->device;
+            intx = dig->intx;
+            hvm_pci_intx_assert(d, device, intx);
+            spin_lock(&hvm_irq_dpci->dirq_lock);
+            hvm_irq_dpci->mirq[irq].pending++;
+            spin_unlock(&hvm_irq_dpci->dirq_lock);
+        }
 
         /*
          * Set a timer to see if the guest can finish the interrupt or not. For

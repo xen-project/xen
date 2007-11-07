@@ -607,10 +607,9 @@ get_##level##_linear_pagetable(                                             \
 }
 
 
-int iomem_page_test(unsigned long mfn, struct page_info *page)
+int is_iomem_page(unsigned long mfn)
 {
-    return unlikely(!mfn_valid(mfn)) ||
-        unlikely(page_get_owner(page) == dom_io);
+    return (!mfn_valid(mfn) || (page_get_owner(mfn_to_page(mfn)) == dom_io));
 }
 
 
@@ -620,19 +619,19 @@ get_page_from_l1e(
 {
     unsigned long mfn = l1e_get_pfn(l1e);
     struct page_info *page = mfn_to_page(mfn);
+    uint32_t l1f = l1e_get_flags(l1e);
     int okay;
 
-    if ( !(l1e_get_flags(l1e) & _PAGE_PRESENT) )
+    if ( !(l1f & _PAGE_PRESENT) )
         return 1;
 
-    if ( unlikely(l1e_get_flags(l1e) & l1_disallow_mask(d)) )
+    if ( unlikely(l1f & l1_disallow_mask(d)) )
     {
-        MEM_LOG("Bad L1 flags %x",
-                l1e_get_flags(l1e) & l1_disallow_mask(d));
+        MEM_LOG("Bad L1 flags %x", l1f & l1_disallow_mask(d));
         return 0;
     }
 
-    if ( iomem_page_test(mfn, page) )
+    if ( is_iomem_page(mfn) )
     {
         /* DOMID_IO reverts to caller for privilege checks. */
         if ( d == dom_io )
@@ -657,7 +656,7 @@ get_page_from_l1e(
      * contribute to writeable mapping refcounts.  (This allows the
      * qemu-dm helper process in dom0 to map the domain's memory without
      * messing up the count of "real" writable mappings.) */
-    okay = (((l1e_get_flags(l1e) & _PAGE_RW) && 
+    okay = (((l1f & _PAGE_RW) && 
              !(unlikely(paging_mode_external(d) && (d != current->domain))))
             ? get_page_and_type(page, d, PGT_writable_page)
             : get_page(page, d));
@@ -667,6 +666,36 @@ get_page_from_l1e(
                 " for dom%d",
                 mfn, get_gpfn_from_mfn(mfn),
                 l1e_get_intpte(l1e), d->domain_id);
+    }
+    else if ( (pte_flags_to_cacheattr(l1f) !=
+               ((page->count_info >> PGC_cacheattr_base) & 7)) &&
+              !is_iomem_page(mfn) )
+    {
+        uint32_t x, nx, y = page->count_info;
+        uint32_t cacheattr = pte_flags_to_cacheattr(l1f);
+
+        if ( is_xen_heap_frame(page) )
+        {
+            if ( (l1f & _PAGE_RW) &&
+                 !(unlikely(paging_mode_external(d) &&
+                            (d != current->domain))) )
+                put_page_type(page);
+            put_page(page);
+            MEM_LOG("Attempt to change cache attributes of Xen heap page");
+            return 0;
+        }
+
+        while ( ((y >> PGC_cacheattr_base) & 7) != cacheattr )
+        {
+            x  = y;
+            nx = (x & ~PGC_cacheattr_mask) | (cacheattr << PGC_cacheattr_base);
+            y  = cmpxchg(&page->count_info, x, nx);
+        }
+
+#ifdef __x86_64__
+        map_pages_to_xen((unsigned long)mfn_to_virt(mfn), mfn, 1,
+                         PAGE_HYPERVISOR | cacheattr_to_pte_flags(cacheattr));
+#endif
     }
 
     return okay;
@@ -1825,6 +1854,24 @@ int get_page_type(struct page_info *page, unsigned long type)
     }
 
     return 1;
+}
+
+
+void cleanup_page_cacheattr(struct page_info *page)
+{
+    uint32_t cacheattr = (page->count_info >> PGC_cacheattr_base) & 7;
+
+    if ( likely(cacheattr == 0) )
+        return;
+
+    page->count_info &= ~PGC_cacheattr_mask;
+
+    BUG_ON(is_xen_heap_frame(page));
+
+#ifdef __x86_64__
+    map_pages_to_xen((unsigned long)page_to_virt(page), page_to_mfn(page),
+                     1, PAGE_HYPERVISOR);
+#endif
 }
 
 
@@ -3803,7 +3850,7 @@ static void __memguard_change_range(void *p, unsigned long l, int guard)
 {
     unsigned long _p = (unsigned long)p;
     unsigned long _l = (unsigned long)l;
-    unsigned long flags = __PAGE_HYPERVISOR | MAP_SMALL_PAGES;
+    unsigned int flags = __PAGE_HYPERVISOR | MAP_SMALL_PAGES;
 
     /* Ensure we are dealing with a page-aligned whole number of pages. */
     ASSERT((_p&~PAGE_MASK) == 0);

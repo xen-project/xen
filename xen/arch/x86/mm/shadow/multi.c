@@ -716,12 +716,14 @@ _sh_propagate(struct vcpu *v,
         goto done;
     }
 
-    // Must have a valid target_mfn unless this is a prefetch.  In the
-    // case of a prefetch, an invalid mfn means that we can not usefully
-    // shadow anything, and so we return early.
+    // Must have a valid target_mfn unless this is a prefetch or an l1
+    // pointing at MMIO space.  In the case of a prefetch, an invalid
+    // mfn means that we can not usefully shadow anything, and so we
+    // return early.
     //
-    if ( shadow_mode_refcounts(d) && 
-         !mfn_valid(target_mfn) && (p2mt != p2m_mmio_direct) )
+    if ( !mfn_valid(target_mfn)
+         && !(level == 1 && (!shadow_mode_refcounts(d) 
+                             || p2mt == p2m_mmio_direct)) )
     {
         ASSERT((ft == ft_prefetch));
         *sp = shadow_l1e_empty();

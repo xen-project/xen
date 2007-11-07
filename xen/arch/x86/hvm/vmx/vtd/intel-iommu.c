@@ -688,6 +688,9 @@ static int iommu_enable_translation(struct iommu *iommu)
             break;
         cpu_relax();
     }
+
+    /* Disable PMRs when VT-d engine takes effect per spec definition */
+    disable_pmr(iommu);
     spin_unlock_irqrestore(&iommu->register_lock, flags);
     return 0;
 }
@@ -1767,7 +1770,7 @@ int iommu_setup(void)
     struct hvm_iommu *hd  = domain_hvm_iommu(dom0);
     struct acpi_drhd_unit *drhd;
     struct iommu *iommu;
-    unsigned long i, status;
+    unsigned long i;
 
     if ( !vtd_enabled )
         return 0;
@@ -1796,10 +1799,6 @@ int iommu_setup(void)
     setup_dom0_rmrr();
     if ( enable_vtd_translation() )
         goto error;
-
-    status = dmar_readl(iommu->reg, DMAR_PMEN_REG);
-    if (status & DMA_PMEN_PRS)
-        disable_pmr(iommu);
 
     return 0;
 
