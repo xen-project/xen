@@ -203,11 +203,9 @@ void schedule_tail(struct vcpu *prev)
 	context_saved(prev);
 	ia64_disable_vhpt_walker();
 
-	if (VMX_DOMAIN(current)) {
-		vmx_do_launch(current);
-		migrate_timer(&current->arch.arch_vmx.vtm.vtm_timer,
-		              current->processor);
-	} else {
+	if (VMX_DOMAIN(current))
+		vmx_do_resume(current);
+	else {
 		if (VMX_DOMAIN(prev))
 			ia64_set_iva(&ia64_ivt);
 		load_region_regs(current);

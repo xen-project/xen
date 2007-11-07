@@ -436,7 +436,32 @@ int vmx_setup_platform(struct domain *d)
 	return 0;
 }
 
-void vmx_do_launch(struct vcpu *v)
+void vmx_do_resume(struct vcpu *v)
 {
+	ioreq_t *p;
+
 	vmx_load_all_rr(v);
+	migrate_timer(&v->arch.arch_vmx.vtm.vtm_timer, v->processor);
+
+	/* stolen from hvm_do_resume() in arch/x86/hvm/hvm.c */
+	/* NB. Optimised for common case (p->state == STATE_IOREQ_NONE). */
+	p = &get_vio(v->domain, v->vcpu_id)->vp_ioreq;
+	while (p->state != STATE_IOREQ_NONE) {
+		switch (p->state) {
+		case STATE_IORESP_READY: /* IORESP_READY -> NONE */
+			vmx_io_assist(v);
+			break;
+		case STATE_IOREQ_READY:
+		case STATE_IOREQ_INPROCESS:
+			/* IOREQ_{READY,INPROCESS} -> IORESP_READY */
+			wait_on_xen_event_channel(v->arch.arch_vmx.xen_port,
+					  (p->state != STATE_IOREQ_READY) &&
+					  (p->state != STATE_IOREQ_INPROCESS));
+			break;
+		default:
+			gdprintk(XENLOG_ERR,
+				 "Weird HVM iorequest state %d.\n", p->state);
+			domain_crash_synchronous();
+		}
+	}
 }
