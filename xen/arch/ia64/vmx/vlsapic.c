@@ -523,8 +523,11 @@ void guest_write_eoi(VCPU *vcpu)
     int vec;
 
     vec = highest_inservice_irq(vcpu);
-    if ( vec == NULL_VECTOR ) 
-        panic_domain(vcpu_regs(vcpu), "Wrong vector to EOI\n");
+    if (vec == NULL_VECTOR) {
+        gdprintk(XENLOG_WARNING, "vcpu(%d): Wrong vector to EOI\n",
+                 vcpu->vcpu_id);
+        return;
+    }
     VLSAPIC_INSVC(vcpu,vec>>6) &= ~(1UL <<(vec&63));
     VCPU(vcpu, eoi)=0;    // overwrite the data
     vcpu->arch.irq_new_pending=1;
