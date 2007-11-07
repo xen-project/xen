@@ -360,6 +360,16 @@ int map_pages_to_xen(
     unsigned int flags);
 void destroy_xen_mappings(unsigned long v, unsigned long e);
 
+/* Convert between PAT/PCD/PWT embedded in PTE flags and 3-bit cacheattr. */
+static inline uint32_t pte_flags_to_cacheattr(uint32_t flags)
+{
+    return ((flags >> 5) & 4) | ((flags >> 3) & 3);
+}
+static inline uint32_t cacheattr_to_pte_flags(uint32_t cacheattr)
+{
+    return ((cacheattr & 4) << 5) | ((cacheattr & 3) << 3);
+}
+
 #endif /* !__ASSEMBLY__ */
 
 #define PFN_DOWN(x)   ((x) >> PAGE_SHIFT)

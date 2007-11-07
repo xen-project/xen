@@ -2894,11 +2894,9 @@ arch_memory_op(int op, XEN_GUEST_HANDLE(void) arg)
     return 0;
 }
 
-int
-iomem_page_test(unsigned long mfn, struct page_info *page)
+int is_iomem_page(unsigned long mfn)
 {
-	return unlikely(!mfn_valid(mfn)) ||
-	       unlikely(page_get_owner(page) == dom_io);
+    return (!mfn_valid(mfn) || (page_get_owner(mfn_to_page(mfn)) == dom_io));
 }
 
 /*

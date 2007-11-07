@@ -332,7 +332,7 @@ __gnttab_map_grant_ref(
     if ( op->flags & GNTMAP_host_map ) 
     {
         /* Could be an iomem page for setting up permission */
-        if ( iomem_page_test(frame, mfn_to_page(frame)) )
+        if ( is_iomem_page(frame) )
         {
             is_iomem = 1;
             if ( iomem_permit_access(ld, frame, frame) )
@@ -527,7 +527,7 @@ __gnttab_unmap_common(
                                                   op->flags)) < 0 )
                 goto unmap_out;
         }
-        else if ( iomem_page_test(op->frame, mfn_to_page(op->frame)) &&
+        else if ( is_iomem_page(op->frame) &&
                   iomem_access_permitted(ld, op->frame, op->frame) )
         {
             if ( (rc = iomem_deny_access(ld, op->frame, op->frame)) < 0 )
@@ -1651,7 +1651,7 @@ gnttab_release_mappings(
                 BUG_ON(!(act->pin & GNTPIN_hstw_mask));
                 act->pin -= GNTPIN_hstw_inc;
 
-                if ( iomem_page_test(act->frame, mfn_to_page(act->frame)) &&
+                if ( is_iomem_page(act->frame) &&
                      iomem_access_permitted(rd, act->frame, act->frame) )
                     rc = iomem_deny_access(rd, act->frame, act->frame);
                 else 
