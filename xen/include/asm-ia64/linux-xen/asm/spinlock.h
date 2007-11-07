@@ -33,8 +33,20 @@ typedef struct {
 #endif
 } spinlock_t;
 
+#ifdef XEN
+#ifdef DEBUG_SPINLOCK
+#define SPIN_LOCK_UNLOCKED	/*(spinlock_t)*/ { 0, NULL, -1, 0 }
+#else
+#define SPIN_LOCK_UNLOCKED	/*(spinlock_t)*/ { 0, -1, 0 }
+#endif
+static inline void spin_lock_init(spinlock_t *lock)
+{
+	*lock = ((spinlock_t)SPIN_LOCK_UNLOCKED);
+}
+#else
 #define SPIN_LOCK_UNLOCKED			/*(spinlock_t)*/ { 0 }
 #define spin_lock_init(x)			((x)->lock = 0)
+#endif
 
 #ifdef ASM_SUPPORTED
 /*
