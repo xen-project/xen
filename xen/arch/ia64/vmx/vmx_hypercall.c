@@ -133,8 +133,34 @@ do_hvm_op(unsigned long op, XEN_GUEST_HANDLE(void) arg)
             return -EPERM;
 
         if (op == HVMOP_set_param) {
-            d->arch.hvm_domain.params[a.index] = a.value;
-            rc = 0;
+            struct vmx_ioreq_page *iorp;
+            struct vcpu *v;
+
+            switch (a.index) {
+            case HVM_PARAM_IOREQ_PFN:
+                iorp = &d->arch.hvm_domain.ioreq;
+                rc = vmx_set_ioreq_page(d, iorp, a.value);
+                spin_lock(&iorp->lock);
+                if (rc == 0 && iorp->va != NULL)
+                    /* Initialise evtchn port info if VCPUs already created. */
+                    for_each_vcpu(d, v)
+                        get_vio(v)->vp_eport = v->arch.arch_vmx.xen_port;
+                spin_unlock(&iorp->lock);
+                break;
+            case HVM_PARAM_BUFIOREQ_PFN: 
+                iorp = &d->arch.hvm_domain.buf_ioreq;
+                rc = vmx_set_ioreq_page(d, iorp, a.value);
+                break;
+            case HVM_PARAM_BUFPIOREQ_PFN: 
+                iorp = &d->arch.hvm_domain.buf_pioreq;
+                rc = vmx_set_ioreq_page(d, iorp, a.value);
+                break;
+            default:
+                /* nothing */
+                break;
+            }
+            if (rc == 0)
+                d->arch.hvm_domain.params[a.index] = a.value;
         }
         else {
             a.value = d->arch.hvm_domain.params[a.index];

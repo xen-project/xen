@@ -57,8 +57,12 @@ extern void vmx_send_assist_req(struct vcpu *v);
 extern void deliver_pal_init(struct vcpu *vcpu);
 extern void vmx_pend_pal_init(struct domain *d);
 
-static inline vcpu_iodata_t *get_vio(struct domain *d, unsigned long cpu)
+static inline vcpu_iodata_t *get_vio(struct vcpu *v)
 {
-    return &((shared_iopage_t *)d->arch.vmx_platform.shared_page_va)->vcpu_iodata[cpu];
+    struct domain *d = v->domain;
+    shared_iopage_t *p = (shared_iopage_t *)d->arch.vmx_platform.ioreq.va;
+    ASSERT((v == current) || spin_is_locked(&d->arch.vmx_platform.ioreq.lock));
+    ASSERT(d->arch.vmx_platform.ioreq.va != NULL);
+    return &p->vcpu_iodata[v->vcpu_id];
 }
 #endif /* _ASM_IA64_VT_H */

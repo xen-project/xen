@@ -267,22 +267,44 @@ vmx_load_state(struct vcpu *v)
 	 * anchored in vcpu */
 }
 
-static void vmx_create_event_channels(struct vcpu *v)
+static int
+vmx_vcpu_initialise(struct vcpu *v)
 {
-	vcpu_iodata_t *p;
+	struct vmx_ioreq_page *iorp = &v->domain->arch.hvm_domain.ioreq;
+
+	int rc = alloc_unbound_xen_event_channel(v, 0);
+	if (rc < 0)
+		return rc;
+	v->arch.arch_vmx.xen_port = rc;
+
+	spin_lock(&iorp->lock);
+	if (v->domain->arch.vmx_platform.ioreq.va != 0) {
+		vcpu_iodata_t *p = get_vio(v);
+		p->vp_eport = v->arch.arch_vmx.xen_port;
+	}
+	spin_unlock(&iorp->lock);
+
+	gdprintk(XENLOG_INFO, "Allocated port %ld for hvm %d vcpu %d.\n",
+		 v->arch.arch_vmx.xen_port, v->domain->domain_id, v->vcpu_id);
+
+	return 0;
+}
+
+static int vmx_create_event_channels(struct vcpu *v)
+{
 	struct vcpu *o;
 
 	if (v->vcpu_id == 0) {
 		/* Ugly: create event channels for every vcpu when vcpu 0
 		   starts, so that they're available for ioemu to bind to. */
 		for_each_vcpu(v->domain, o) {
-			p = get_vio(v->domain, o->vcpu_id);
-			o->arch.arch_vmx.xen_port = p->vp_eport =
-					alloc_unbound_xen_event_channel(o, 0);
-			gdprintk(XENLOG_INFO, "Allocated port %ld for hvm.\n",
-			         o->arch.arch_vmx.xen_port);
+			int rc = vmx_vcpu_initialise(o);
+			if (rc < 0) //XXX error recovery
+				return rc;
 		}
 	}
+
+	return 0;
 }
 
 /*
@@ -292,6 +314,67 @@ static void vmx_create_event_channels(struct vcpu *v)
 static void vmx_release_assist_channel(struct vcpu *v)
 {
 	return;
+}
+
+/* following three functions are based from hvm_xxx_ioreq_page()
+ * in xen/arch/x86/hvm/hvm.c */
+static void vmx_init_ioreq_page(
+	struct domain *d, struct vmx_ioreq_page *iorp)
+{
+	memset(iorp, 0, sizeof(*iorp));
+	spin_lock_init(&iorp->lock);
+	domain_pause(d);
+}
+
+static void vmx_destroy_ioreq_page(
+	struct domain *d, struct vmx_ioreq_page *iorp)
+{
+	spin_lock(&iorp->lock);
+
+	ASSERT(d->is_dying);
+
+	if (iorp->va != NULL) {
+		put_page(iorp->page);
+		iorp->page = NULL;
+		iorp->va = NULL;
+	}
+
+	spin_unlock(&iorp->lock);
+}
+
+int vmx_set_ioreq_page(
+	struct domain *d, struct vmx_ioreq_page *iorp, unsigned long gpfn)
+{
+	struct page_info *page;
+	unsigned long mfn;
+	pte_t pte;
+
+	pte = *lookup_noalloc_domain_pte(d, gpfn << PAGE_SHIFT);
+	if (!pte_present(pte) || !pte_mem(pte))
+		return -EINVAL;
+	mfn = (pte_val(pte) & _PFN_MASK) >> PAGE_SHIFT;
+	ASSERT(mfn_valid(mfn));
+
+	page = mfn_to_page(mfn);
+	if (get_page(page, d) == 0)
+		return -EINVAL;
+
+	spin_lock(&iorp->lock);
+
+	if ((iorp->va != NULL) || d->is_dying) {
+		spin_unlock(&iorp->lock);
+		put_page(page);
+		return -EINVAL;
+	}
+
+	iorp->va = mfn_to_virt(mfn);
+	iorp->page = page;
+
+	spin_unlock(&iorp->lock);
+
+	domain_unpause(d);
+
+	return 0;
 }
 
 /*
@@ -320,7 +403,10 @@ vmx_final_setup_guest(struct vcpu *v)
 	rc = init_domain_tlb(v);
 	if (rc)
 		return rc;
-	vmx_create_event_channels(v);
+
+	rc = vmx_create_event_channels(v);
+	if (rc)
+		return rc;
 
 	/* v->arch.schedule_tail = arch_vmx_do_launch; */
 	vmx_create_vp(v);
@@ -352,6 +438,10 @@ vmx_relinquish_guest_resources(struct domain *d)
 		vmx_release_assist_channel(v);
 
 	vacpi_relinquish_resources(d);
+
+	vmx_destroy_ioreq_page(d, &d->arch.vmx_platform.ioreq);
+	vmx_destroy_ioreq_page(d, &d->arch.vmx_platform.buf_ioreq);
+	vmx_destroy_ioreq_page(d, &d->arch.vmx_platform.buf_pioreq);
 }
 
 void
@@ -397,26 +487,14 @@ static void vmx_build_io_physmap_table(struct domain *d)
 
 int vmx_setup_platform(struct domain *d)
 {
-	unsigned long mpa;
 	ASSERT(d != dom0); /* only for non-privileged vti domain */
 
 	vmx_build_io_physmap_table(d);
 
-	mpa = __gpa_to_mpa(d, IO_PAGE_START);
-	if (mpa == 0)
-		return -EINVAL;
-	d->arch.vmx_platform.shared_page_va = (unsigned long)__va(mpa);
-	/* For buffered IO requests. */
-	spin_lock_init(&d->arch.hvm_domain.buffered_io_lock);
+	vmx_init_ioreq_page(d, &d->arch.vmx_platform.ioreq);
+	vmx_init_ioreq_page(d, &d->arch.vmx_platform.buf_ioreq);
+	vmx_init_ioreq_page(d, &d->arch.vmx_platform.buf_pioreq);
 
-	mpa = __gpa_to_mpa(d, BUFFER_IO_PAGE_START);
-	if (mpa == 0)
-		return -EINVAL;
-	d->arch.hvm_domain.buffered_io_va = (unsigned long)__va(mpa);
-	mpa = __gpa_to_mpa(d, BUFFER_PIO_PAGE_START);
-	if (mpa == 0)
-		return -EINVAL;
-	d->arch.hvm_domain.buffered_pio_va = (unsigned long)__va(mpa);
 	/* TEMP */
 	d->arch.vmx_platform.pib_base = 0xfee00000UL;
 
@@ -445,7 +523,7 @@ void vmx_do_resume(struct vcpu *v)
 
 	/* stolen from hvm_do_resume() in arch/x86/hvm/hvm.c */
 	/* NB. Optimised for common case (p->state == STATE_IOREQ_NONE). */
-	p = &get_vio(v->domain, v->vcpu_id)->vp_ioreq;
+	p = &get_vio(v)->vp_ioreq;
 	while (p->state != STATE_IOREQ_NONE) {
 		switch (p->state) {
 		case STATE_IORESP_READY: /* IORESP_READY -> NONE */

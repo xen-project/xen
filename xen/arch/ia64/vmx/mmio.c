@@ -56,7 +56,7 @@ static int hvm_buffered_io_intercept(ioreq_t *p)
 {
     struct vcpu *v = current;
     buffered_iopage_t *pg =
-        (buffered_iopage_t *)(v->domain->arch.hvm_domain.buffered_io_va);
+        (buffered_iopage_t *)(v->domain->arch.hvm_domain.buf_ioreq.va);
     buf_ioreq_t bp;
     int i, qw = 0;
 
@@ -101,7 +101,7 @@ static int hvm_buffered_io_intercept(ioreq_t *p)
     bp.data = p->data;
     bp.addr = p->addr;
 
-    spin_lock(&v->domain->arch.hvm_domain.buffered_io_lock);
+    spin_lock(&v->domain->arch.hvm_domain.buf_ioreq.lock);
 
     if (pg->write_pointer - pg->read_pointer >= IOREQ_BUFFER_SLOT_NUM - qw) {
         /* the queue is full.
@@ -109,7 +109,7 @@ static int hvm_buffered_io_intercept(ioreq_t *p)
          * NOTE: The arithimetic operation could handle the situation for
          * write_pointer overflow.
          */
-        spin_unlock(&v->domain->arch.hvm_domain.buffered_io_lock);
+        spin_unlock(&v->domain->arch.hvm_domain.buf_ioreq.lock);
         return 0;
     }
 
@@ -126,7 +126,7 @@ static int hvm_buffered_io_intercept(ioreq_t *p)
     wmb();
     pg->write_pointer += qw ? 2 : 1;
 
-    spin_unlock(&v->domain->arch.hvm_domain.buffered_io_lock);
+    spin_unlock(&v->domain->arch.hvm_domain.buf_ioreq.lock);
 
     return 1;
 }
@@ -137,7 +137,7 @@ static void low_mmio_access(VCPU *vcpu, u64 pa, u64 *val, size_t s, int dir)
     vcpu_iodata_t *vio;
     ioreq_t *p;
 
-    vio = get_vio(v->domain, v->vcpu_id);
+    vio = get_vio(v);
     if (!vio)
         panic_domain(NULL, "bad shared page");
 
@@ -174,7 +174,8 @@ static void low_mmio_access(VCPU *vcpu, u64 pa, u64 *val, size_t s, int dir)
 static int vmx_ide_pio_intercept(ioreq_t *p, u64 *val)
 {
     struct buffered_piopage *pio_page =
-        (void *)(current->domain->arch.hvm_domain.buffered_pio_va);
+        (void *)(current->domain->arch.hvm_domain.buf_pioreq.va);
+    spinlock_t *pio_lock;
     struct pio_buffer *piobuf;
     uint32_t pointer, page_offset;
 
@@ -188,14 +189,17 @@ static int vmx_ide_pio_intercept(ioreq_t *p, u64 *val)
     if (p->size != 2 && p->size != 4)
         return 0;
 
+    pio_lock = &current->domain->arch.hvm_domain.buf_pioreq.lock;
+    spin_lock(pio_lock);
+
     pointer = piobuf->pointer;
     page_offset = piobuf->page_offset;
 
     /* sanity check */
     if (page_offset + pointer < offsetof(struct buffered_piopage, buffer))
-        return 0;
+        goto unlock_out;
     if (page_offset + piobuf->data_end > PAGE_SIZE)
-        return 0;
+        goto unlock_out;
 
     if (pointer + p->size < piobuf->data_end) {
         uint8_t *bufp = (uint8_t *)pio_page + page_offset + pointer;
@@ -213,10 +217,15 @@ static int vmx_ide_pio_intercept(ioreq_t *p, u64 *val)
             }
         }
         piobuf->pointer += p->size;
+        spin_unlock(pio_lock);
+
         p->state = STATE_IORESP_READY;
         vmx_io_assist(current);
         return 1;
     }
+
+ unlock_out:
+    spin_unlock(pio_lock);
     return 0;
 }
 
@@ -258,7 +267,7 @@ static void legacy_io_access(VCPU *vcpu, u64 pa, u64 *val, size_t s, int dir)
     vcpu_iodata_t *vio;
     ioreq_t *p;
 
-    vio = get_vio(v->domain, v->vcpu_id);
+    vio = get_vio(v);
     if (!vio)
         panic_domain(NULL, "bad shared page\n");
 

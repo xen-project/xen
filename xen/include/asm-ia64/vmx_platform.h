@@ -43,17 +43,24 @@
  * it is not used on ia64 */
 #define OS_TYPE_PORT    0xB2
 
+struct vmx_ioreq_page {
+    spinlock_t          lock;
+    struct page_info   *page;
+    void               *va;
+};
+int vmx_set_ioreq_page(struct domain *d,
+                       struct vmx_ioreq_page *iorp, unsigned long gmfn);
+
 typedef struct virtual_platform_def {
-    unsigned long       gos_type;
-    unsigned long       buffered_io_va;
-    spinlock_t          buffered_io_lock;
-    unsigned long       buffered_pio_va;
-    unsigned long       shared_page_va;
-    unsigned long       pib_base;
-    unsigned long       params[HVM_NR_PARAMS];
+    unsigned long               gos_type;
+    struct vmx_ioreq_page       ioreq;
+    struct vmx_ioreq_page       buf_ioreq;
+    struct vmx_ioreq_page       buf_pioreq;
+    unsigned long               pib_base;
+    unsigned long               params[HVM_NR_PARAMS];
     /* One IOSAPIC now... */
-    struct viosapic     viosapic;
-    struct vacpi        vacpi;
+    struct viosapic             viosapic;
+    struct vacpi                vacpi;
 } vir_plat_t;
 
 static inline int __fls(uint32_t word)

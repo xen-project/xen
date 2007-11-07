@@ -42,7 +42,7 @@ void vmx_io_assist(struct vcpu *v)
      * This shared page contains I/O request between emulation code
      * and device model.
      */
-    vio = get_vio(v->domain, v->vcpu_id);
+    vio = get_vio(v);
     if (!vio)
         panic_domain(vcpu_regs(v),"Corruption: bad shared page: %lx\n",
                      (unsigned long)vio);
@@ -65,7 +65,7 @@ void vmx_send_assist_req(struct vcpu *v)
 {
     ioreq_t *p;
 
-    p = &get_vio(v->domain, v->vcpu_id)->vp_ioreq;
+    p = &get_vio(v)->vp_ioreq;
     if (unlikely(p->state != STATE_IOREQ_NONE)) {
         /* This indicates a bug in the device model.  Crash the
            domain. */
