@@ -146,8 +146,9 @@ void vcpu_init_regs(struct vcpu *v)
 	regs = vcpu_regs(v);
 	if (VMX_DOMAIN(v)) {
 		/* dt/rt/it:1;i/ic:1, si:1, vm/bn:1, ac:1 */
-		/* Need to be expanded as macro */
-		regs->cr_ipsr = 0x501008826008;
+		regs->cr_ipsr = IA64_PSR_DT | IA64_PSR_RT | IA64_PSR_IT |
+				IA64_PSR_I  | IA64_PSR_IC | IA64_PSR_SI |
+				IA64_PSR_AC | IA64_PSR_BN | IA64_PSR_VM;
 		/* lazy fp */
 		FP_PSR(v) = IA64_PSR_DFH;
 		regs->cr_ipsr |= IA64_PSR_DFH;
