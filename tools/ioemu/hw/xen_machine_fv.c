@@ -194,9 +194,7 @@ static void xen_init_fv(uint64_t ram_size, int vga_ram_size, char *boot_device,
                         const char *initrd_filename,
                         const char *direct_pci)
 {
-#if defined(__i386__) || defined(__x86_64__)
     unsigned long ioreq_pfn;
-#endif
     extern void *shared_page;
     extern void *buffered_io_page;
 #ifdef __ia64__
@@ -233,25 +231,40 @@ static void xen_init_fv(uint64_t ram_size, int vga_ram_size, char *boot_device,
 
 #elif defined(__ia64__)
 
-    nr_pages = ram_size/PAGE_SIZE;
+    xc_get_hvm_param(xc_handle, domid, HVM_PARAM_IOREQ_PFN, &ioreq_pfn);
+    fprintf(logfile, "shared page at pfn %lx\n", ioreq_pfn);
+    shared_page = xc_map_foreign_range(xc_handle, domid, PAGE_SIZE,
+                                       PROT_READ|PROT_WRITE, ioreq_pfn);
+    if (shared_page == NULL) {
+        fprintf(logfile, "map shared IO page returned error %d\n", errno);
+        exit(-1);
+    }
+    
+    xc_get_hvm_param(xc_handle, domid, HVM_PARAM_BUFIOREQ_PFN, &ioreq_pfn);
+    fprintf(logfile, "buffered io page at pfn %lx\n", ioreq_pfn);
+    buffered_io_page = xc_map_foreign_range(xc_handle, domid, PAGE_SIZE,
+                                            PROT_READ|PROT_WRITE, ioreq_pfn);
+    if (buffered_io_page == NULL) {
+        fprintf(logfile, "map buffered IO page returned error %d\n", errno);
+        exit(-1);
+    }
+
+    xc_get_hvm_param(xc_handle, domid, HVM_PARAM_BUFPIOREQ_PFN, &ioreq_pfn);
+    fprintf(logfile, "buffered pio page at pfn %lx\n", ioreq_pfn);
+    buffered_pio_page = xc_map_foreign_range(xc_handle, domid, PAGE_SIZE,
+					     PROT_READ|PROT_WRITE, ioreq_pfn);
+    if (buffered_pio_page == NULL) {
+        fprintf(logfile, "map buffered PIO page returned error %d\n", errno);
+        exit(-1);
+    }
+
+    nr_pages = ram_size / PAGE_SIZE;
 
     page_array = (xen_pfn_t *)malloc(nr_pages * sizeof(xen_pfn_t));
     if (page_array == NULL) {
         fprintf(logfile, "malloc returned error %d\n", errno);
         exit(-1);
     }
-
-    shared_page = xc_map_foreign_range(xc_handle, domid, PAGE_SIZE,
-                                       PROT_READ|PROT_WRITE,
-                                       IO_PAGE_START >> PAGE_SHIFT);
-
-    buffered_io_page =xc_map_foreign_range(xc_handle, domid, PAGE_SIZE,
-                                       PROT_READ|PROT_WRITE,
-                                       BUFFER_IO_PAGE_START >> PAGE_SHIFT);
-
-    buffered_pio_page = xc_map_foreign_range(xc_handle, domid, PAGE_SIZE,
-                                       PROT_READ|PROT_WRITE,
-                                       BUFFER_PIO_PAGE_START >> PAGE_SHIFT);
 
     for (i = 0; i < nr_pages; i++)
         page_array[i] = i;
