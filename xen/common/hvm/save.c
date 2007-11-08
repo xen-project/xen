@@ -94,7 +94,7 @@ int hvm_save(struct domain *d, hvm_domain_context_t *h)
     else 
         hdr.changeset = -1ULL; /* Unknown */
 
-    arch_hvm_save(&hdr);
+    arch_hvm_save(d, &hdr);
 
     if ( hvm_save_entry(HEADER, 0, h, &hdr) != 0 )
     {
@@ -144,7 +144,7 @@ int hvm_load(struct domain *d, hvm_domain_context_t *h)
     if ( hvm_load_entry(HEADER, h, &hdr) != 0 ) 
         return -1;
 
-    if ( arch_hvm_load(&hdr) )
+    if ( arch_hvm_load(d, &hdr) )
         return -1;
 
     c = strrchr(xen_changeset(), ':');

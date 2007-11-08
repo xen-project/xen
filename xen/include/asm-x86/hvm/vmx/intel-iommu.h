@@ -230,6 +230,19 @@ struct context_entry {
     do {(c).hi &= 0xff; (c).hi |= ((val + 1) & ((1 << 16) - 1)) << 8;} while(0)
 #define context_clear_entry(c) do {(c).lo = 0; (c).hi = 0;} while(0)
 
+/* page table handling */
+#define LEVEL_STRIDE       (9)
+#define LEVEL_MASK         ((1 << LEVEL_STRIDE) - 1)
+#define agaw_to_level(val) ((val) + 2)
+#define agaw_to_width(val) (30 + val * LEVEL_STRIDE)
+#define width_to_agaw(w)   ((w - 30)/LEVEL_STRIDE)
+#define level_to_offset_bits(l) (12 + (l - 1) * LEVEL_STRIDE)
+#define address_level_offset(addr, level) \
+            ((addr >> level_to_offset_bits(level)) & LEVEL_MASK)
+#define level_mask(l) (((u64)(-1)) << level_to_offset_bits(l))
+#define level_size(l) (1 << level_to_offset_bits(l))
+#define align_to_level(addr, l) ((addr + level_size(l) - 1) & level_mask(l))
+
 /*
  * 0: readable
  * 1: writable

@@ -23,8 +23,7 @@
 #include <xen/types.h>
 #include <xen/hvm/save.h>
 
-void
-arch_hvm_save(struct hvm_save_header *hdr)
+void arch_hvm_save(struct domain *d, struct hvm_save_header *hdr)
 {
     unsigned int i;
     
@@ -32,8 +31,7 @@ arch_hvm_save(struct hvm_save_header *hdr)
         hdr->cpuid[i] = ia64_get_cpuid(i);
 }
 
-int
-arch_hvm_load(struct hvm_save_header *hdr)
+int arch_hvm_load(struct domain *d, struct hvm_save_header *hdr)
 {
     unsigned int i;
     if (hdr->magic != HVM_FILE_MAGIC) {

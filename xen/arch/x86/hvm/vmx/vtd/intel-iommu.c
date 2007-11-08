@@ -115,18 +115,6 @@ static int device_context_mapped(struct iommu *iommu, u8 bus, u8 devfn)
     return ret;
 }
 
-/* page table handling */
-#define LEVEL_STRIDE        (9)
-#define LEVEL_MASK        ((1 << LEVEL_STRIDE) - 1)
-#define agaw_to_level(val) ((val) + 2)
-#define agaw_to_width(val) (30 + val * LEVEL_STRIDE)
-#define width_to_agaw(w)  ((w - 30)/LEVEL_STRIDE)
-#define level_to_offset_bits(l) (12 + (l - 1) * LEVEL_STRIDE)
-#define address_level_offset(addr, level) \
-    ((addr >> level_to_offset_bits(level)) & LEVEL_MASK)
-#define level_mask(l) (((u64)(-1)) << level_to_offset_bits(l))
-#define level_size(l) (1 << level_to_offset_bits(l))
-#define align_to_level(addr, l) ((addr + level_size(l) - 1) & level_mask(l))
 static struct page_info *addr_to_dma_page(struct domain *domain, u64 addr)
 {
     struct hvm_iommu *hd = domain_hvm_iommu(domain);

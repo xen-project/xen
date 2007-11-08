@@ -155,7 +155,7 @@ int hvm_load(struct domain *d, hvm_domain_context_t *h);
 
 /* Arch-specific definitions. */
 struct hvm_save_header;
-void arch_hvm_save(struct hvm_save_header *hdr);
-int arch_hvm_load(struct hvm_save_header *hdr);
+void arch_hvm_save(struct domain *d, struct hvm_save_header *hdr);
+int arch_hvm_load(struct domain *d, struct hvm_save_header *hdr);
 
 #endif /* __XEN_HVM_SAVE_H__ */

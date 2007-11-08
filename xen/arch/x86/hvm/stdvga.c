@@ -220,7 +220,9 @@ static void stdvga_outb(uint64_t addr, uint8_t val)
         gdprintk(XENLOG_INFO, "entering stdvga and caching modes\n");
     }
     else if ( prev_stdvga && !s->stdvga )
+    {
         gdprintk(XENLOG_INFO, "leaving stdvga\n");
+    }
 }
 
 static void stdvga_outv(uint64_t addr, uint64_t data, uint32_t size)
@@ -636,7 +638,7 @@ int stdvga_intercept_mmio(ioreq_t *p)
             buf = mmio_op(s, p);
             break;
         default:
-            gdprintk(XENLOG_ERR, "unsupported mmio request type:%d "
+            gdprintk(XENLOG_WARNING, "unsupported mmio request type:%d "
                      "addr:0x%04x data:0x%04x size:%d count:%d state:%d "
                      "isptr:%d dir:%d df:%d\n",
                      p->type, (int)p->addr, (int)p->data, (int)p->size,

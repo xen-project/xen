@@ -745,10 +745,11 @@ _sh_propagate(struct vcpu *v,
 
     /*
      * For HVM domains with direct access to MMIO areas, set the correct
-     * caching attributes in the shadows to match what was asked for
+     * caching attributes in the shadows to match what was asked for.
      */
     if ( (level == 1) && is_hvm_domain(d) &&
-         !list_empty(&(domain_hvm_iommu(d)->pdev_list)) )
+         !list_empty(&(domain_hvm_iommu(d)->pdev_list)) &&
+         !is_xen_heap_mfn(mfn_x(target_mfn)) )
     {
         unsigned int type;
         if ( hvm_get_mem_pinned_cacheattr(d, gfn_x(target_gfn), &type) )

@@ -65,7 +65,7 @@ static int hvm_buffered_io_intercept(ioreq_t *p)
 
     /* ignore READ ioreq_t and anything buffered io can't deal with */
     if (p->dir == IOREQ_READ || p->addr > 0xFFFFFUL ||
-        p->data_is_ptr || p->df || p->count != 1)
+        p->data_is_ptr || p->count != 1)
         return 0;
 
     for (i = 0; i < HVM_BUFFERED_IO_RANGE_NR; i++) {
@@ -80,6 +80,7 @@ static int hvm_buffered_io_intercept(ioreq_t *p)
 
     bp.type = p->type;
     bp.dir = p->dir;
+    bp.df = p->df;
     switch (p->size) {
     case 1:
         bp.size = 0;

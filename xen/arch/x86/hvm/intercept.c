@@ -163,18 +163,20 @@ int hvm_buffered_io_send(ioreq_t *p)
     /* Ensure buffered_iopage fits in a page */
     BUILD_BUG_ON(sizeof(buffered_iopage_t) > PAGE_SIZE);
 
-    /* Return 0 for the cases we can't deal with. */
-    if ( (p->addr > 0xffffful) || p->data_is_ptr || p->df || (p->count != 1) )
-    {
-        gdprintk(XENLOG_DEBUG, "slow ioreq. type:%d size:%"PRIu64" addr:0x%"
-                 PRIx64" dir:%d ptr:%d df:%d count:%"PRIu64"\n",
-                 p->type, p->size, p->addr, !!p->dir,
-                 !!p->data_is_ptr, !!p->df, p->count);
+    /*
+     * Return 0 for the cases we can't deal with:
+     *  - 'addr' is only a 20-bit field, so we cannot address beyond 1MB
+     *  - we cannot buffer accesses to guest memory buffers, as the guest
+     *    may expect the memory buffer to be synchronously accessed
+     *  - the count field is usually used with data_is_ptr and since we don't
+     *    support data_is_ptr we do not waste space for the count field either
+     */
+    if ( (p->addr > 0xffffful) || p->data_is_ptr || (p->count != 1) )
         return 0;
-    }
 
     bp.type = p->type;
     bp.dir  = p->dir;
+    bp.df   = p->df;
     switch ( p->size )
     {
     case 1:

@@ -559,8 +559,7 @@ static unsigned long avail_heap_pages(
     return free_pages;
 }
 
-#define avail_for_domheap(mfn) \
-    (!allocated_in_map(mfn) && !is_xen_heap_frame(mfn_to_page(mfn)))
+#define avail_for_domheap(mfn) !(allocated_in_map(mfn) || is_xen_heap_mfn(mfn))
 void __init end_boot_allocator(void)
 {
     unsigned long i;
@@ -615,7 +614,7 @@ void __init scrub_heap_pages(void)
         /* Re-check page status with lock held. */
         if ( !allocated_in_map(mfn) )
         {
-            if ( is_xen_heap_frame(mfn_to_page(mfn)) )
+            if ( is_xen_heap_mfn(mfn) )
             {
                 p = page_to_virt(mfn_to_page(mfn));
                 memguard_unguard_range(p, PAGE_SIZE);
@@ -655,9 +654,9 @@ void init_xenheap_pages(paddr_t ps, paddr_t pe)
      * Yuk! Ensure there is a one-page buffer between Xen and Dom zones, to
      * prevent merging of power-of-two blocks across the zone boundary.
      */
-    if ( ps && !is_xen_heap_frame(maddr_to_page(ps)-1) )
+    if ( ps && !is_xen_heap_mfn(paddr_to_pfn(ps)-1) )
         ps += PAGE_SIZE;
-    if ( !is_xen_heap_frame(maddr_to_page(pe)) )
+    if ( !is_xen_heap_mfn(paddr_to_pfn(pe)) )
         pe -= PAGE_SIZE;
 
     init_heap_pages(MEMZONE_XEN, maddr_to_page(ps), (pe - ps) >> PAGE_SHIFT);
@@ -838,7 +837,7 @@ void free_domheap_pages(struct page_info *pg, unsigned int order)
 
     ASSERT(!in_irq());
 
-    if ( unlikely(is_xen_heap_frame(pg)) )
+    if ( unlikely(is_xen_heap_page(pg)) )
     {
         /* NB. May recursively lock from relinquish_memory(). */
         spin_lock_recursive(&d->page_alloc_lock);

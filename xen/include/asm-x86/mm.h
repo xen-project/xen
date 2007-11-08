@@ -102,9 +102,11 @@ struct page_info
  /* 26-bit count of references to this frame. */
 #define PGC_count_mask      ((1U<<26)-1)
 
-#define is_xen_heap_frame(pfn) ({                                       \
-    paddr_t maddr = page_to_maddr(pfn);                                 \
-    ((maddr >= xenheap_phys_start) && (maddr < xenheap_phys_end));      \
+#define is_xen_heap_page(page) is_xen_heap_mfn(page_to_mfn(page))
+#define is_xen_heap_mfn(mfn) ({                         \
+    unsigned long _mfn = (mfn);                         \
+    ((_mfn >= paddr_to_pfn(xenheap_phys_start)) &&      \
+     (_mfn < paddr_to_pfn(xenheap_phys_end)));          \
 })
 
 #if defined(__i386__)
