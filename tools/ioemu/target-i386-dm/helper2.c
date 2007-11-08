@@ -541,27 +541,28 @@ void __handle_buffered_iopage(CPUState *env)
 {
     buf_ioreq_t *buf_req = NULL;
     ioreq_t req;
-    int qw = 0;
+    int qw;
 
     if (!buffered_io_page)
         return;
 
     while (buffered_io_page->read_pointer !=
            buffered_io_page->write_pointer) {
-        memset(&req, 0, sizeof(req));
-        buf_req = &buffered_io_page->buf_ioreq[buffered_io_page->read_pointer %
-				       IOREQ_BUFFER_SLOT_NUM];
+        buf_req = &buffered_io_page->buf_ioreq[
+            buffered_io_page->read_pointer % IOREQ_BUFFER_SLOT_NUM];
         req.size = 1UL << buf_req->size;
         req.count = 1;
         req.addr = buf_req->addr;
         req.data = buf_req->data;
         req.state = STATE_IOREQ_READY;
-        req.dir  = buf_req->dir;
+        req.dir = buf_req->dir;
+        req.df = buf_req->df;
         req.type = buf_req->type;
-        qw = req.size == 8;
+        req.data_is_ptr = 0;
+        qw = (req.size == 8);
         if (qw) {
-            buf_req = &buffered_io_page->buf_ioreq[(buffered_io_page->read_pointer+1) %
-                                               IOREQ_BUFFER_SLOT_NUM];
+            buf_req = &buffered_io_page->buf_ioreq[
+                (buffered_io_page->read_pointer+1) % IOREQ_BUFFER_SLOT_NUM];
             req.data |= ((uint64_t)buf_req->data) << 32;
         }
 

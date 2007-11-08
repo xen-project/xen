@@ -24,8 +24,7 @@
 #include <asm/hvm/support.h>
 #include <public/hvm/save.h>
 
-void
-arch_hvm_save(struct hvm_save_header *hdr)
+void arch_hvm_save(struct domain *d, struct hvm_save_header *hdr)
 {
     uint32_t eax, ebx, ecx, edx;
 
@@ -36,10 +35,10 @@ arch_hvm_save(struct hvm_save_header *hdr)
     hdr->pad0 = 0;
 }
 
-int
-arch_hvm_load(struct hvm_save_header *hdr)
+int arch_hvm_load(struct domain *d, struct hvm_save_header *hdr)
 {
     uint32_t eax, ebx, ecx, edx;
+
     if ( hdr->magic != HVM_FILE_MAGIC )
     {
         gdprintk(XENLOG_ERR, 
@@ -55,10 +54,13 @@ arch_hvm_load(struct hvm_save_header *hdr)
     }
 
     cpuid(1, &eax, &ebx, &ecx, &edx);
-    /*TODO: need to define how big a difference is acceptable */
+    /* TODO: need to define how big a difference is acceptable? */
     if ( hdr->cpuid != eax )
         gdprintk(XENLOG_WARNING, "HVM restore: saved CPUID (%#"PRIx32") "
                "does not match host (%#"PRIx32").\n", hdr->cpuid, eax);
+
+    /* VGA state is not saved/restored, so we nobble the cache. */
+    d->arch.hvm_domain.stdvga.cache = 0;
 
     return 0;
 }
