@@ -32,8 +32,9 @@
 
 #include <xen/mm.h>
 #include <xen/xmalloc.h>
+#include <xen/inttypes.h>
 
-#define VTDPREFIX "[VT-D]" 
+#define VTDPREFIX "[VT-D]"
 #define INTEL   0x8086
 #define SEABURG 0x4000
 #define C_STEP  2
@@ -93,47 +94,57 @@ void disable_pmr(struct iommu *iommu)
             "Disabled protected memory registers\n");
 }
 
-#if defined(__x86_64__)
+
 void print_iommu_regs(struct acpi_drhd_unit *drhd)
 {
     struct iommu *iommu = drhd->iommu;
- 
-    printk("---- print_iommu_regs ----\n"); 
+
+    printk("---- print_iommu_regs ----\n");
     printk("print_iommu_regs: drhd->address = %lx\n", drhd->address);
     printk("print_iommu_regs: DMAR_VER_REG = %x\n",
-                   dmar_readl(iommu->reg,DMAR_VER_REG));
-    printk("print_iommu_regs: DMAR_CAP_REG = %lx\n",
-                   dmar_readq(iommu->reg,DMAR_CAP_REG));
-    printk("print_iommu_regs: n_fault_reg = %lx\n",
-                   cap_num_fault_regs(dmar_readq(iommu->reg, DMAR_CAP_REG)));
-    printk("print_iommu_regs: fault_recording_offset_l = %lx\n",
-                   cap_fault_reg_offset(dmar_readq(iommu->reg, DMAR_CAP_REG)));
-    printk("print_iommu_regs: fault_recording_offset_h = %lx\n",
-                   cap_fault_reg_offset(dmar_readq(iommu->reg, DMAR_CAP_REG)) + 8);
-    printk("print_iommu_regs: fault_recording_reg_l = %lx\n",
-        dmar_readq(iommu->reg, cap_fault_reg_offset(dmar_readq(iommu->reg, DMAR_CAP_REG))));
-    printk("print_iommu_regs: fault_recording_reg_h = %lx\n",
-        dmar_readq(iommu->reg, cap_fault_reg_offset(dmar_readq(iommu->reg, DMAR_CAP_REG)) + 8));
-    printk("print_iommu_regs: DMAR_ECAP_REG = %lx\n",
-                   dmar_readq(iommu->reg,DMAR_ECAP_REG));
+           dmar_readl(iommu->reg,DMAR_VER_REG));
+    printk("print_iommu_regs: DMAR_CAP_REG = %"PRIx64"\n",
+           dmar_readq(iommu->reg,DMAR_CAP_REG));
+    printk("print_iommu_regs: n_fault_reg = %"PRIx64"\n",
+           cap_num_fault_regs(dmar_readq(iommu->reg, DMAR_CAP_REG)));
+    printk("print_iommu_regs: fault_recording_offset_l = %"PRIx64"\n",
+           cap_fault_reg_offset(dmar_readq(iommu->reg, DMAR_CAP_REG)));
+    printk("print_iommu_regs: fault_recording_offset_h = %"PRIx64"\n",
+           cap_fault_reg_offset(dmar_readq(iommu->reg, DMAR_CAP_REG)) + 8);
+    printk("print_iommu_regs: fault_recording_reg_l = %"PRIx64"\n",
+           dmar_readq(iommu->reg,
+               cap_fault_reg_offset(dmar_readq(iommu->reg, DMAR_CAP_REG))));
+    printk("print_iommu_regs: fault_recording_reg_h = %"PRIx64"\n",
+           dmar_readq(iommu->reg,
+               cap_fault_reg_offset(dmar_readq(iommu->reg, DMAR_CAP_REG)) + 8));
+    printk("print_iommu_regs: DMAR_ECAP_REG = %"PRIx64"\n",
+           dmar_readq(iommu->reg,DMAR_ECAP_REG));
     printk("print_iommu_regs: DMAR_GCMD_REG = %x\n",
-                   dmar_readl(iommu->reg,DMAR_GCMD_REG));
+           dmar_readl(iommu->reg,DMAR_GCMD_REG));
     printk("print_iommu_regs: DMAR_GSTS_REG = %x\n",
-                   dmar_readl(iommu->reg,DMAR_GSTS_REG));
-    printk("print_iommu_regs: DMAR_RTADDR_REG = %lx\n",
-                   dmar_readq(iommu->reg,DMAR_RTADDR_REG));
-    printk("print_iommu_regs: DMAR_CCMD_REG = %lx\n",
-                   dmar_readq(iommu->reg,DMAR_CCMD_REG));
+           dmar_readl(iommu->reg,DMAR_GSTS_REG));
+    printk("print_iommu_regs: DMAR_RTADDR_REG = %"PRIx64"\n",
+           dmar_readq(iommu->reg,DMAR_RTADDR_REG));
+    printk("print_iommu_regs: DMAR_CCMD_REG = %"PRIx64"\n",
+           dmar_readq(iommu->reg,DMAR_CCMD_REG));
     printk("print_iommu_regs: DMAR_FSTS_REG = %x\n",
-                   dmar_readl(iommu->reg,DMAR_FSTS_REG));
+           dmar_readl(iommu->reg,DMAR_FSTS_REG));
     printk("print_iommu_regs: DMAR_FECTL_REG = %x\n",
-                   dmar_readl(iommu->reg,DMAR_FECTL_REG));
+           dmar_readl(iommu->reg,DMAR_FECTL_REG));
     printk("print_iommu_regs: DMAR_FEDATA_REG = %x\n",
-                   dmar_readl(iommu->reg,DMAR_FEDATA_REG));
+           dmar_readl(iommu->reg,DMAR_FEDATA_REG));
     printk("print_iommu_regs: DMAR_FEADDR_REG = %x\n",
-                   dmar_readl(iommu->reg,DMAR_FEADDR_REG));
+           dmar_readl(iommu->reg,DMAR_FEADDR_REG));
     printk("print_iommu_regs: DMAR_FEUADDR_REG = %x\n",
-                   dmar_readl(iommu->reg,DMAR_FEUADDR_REG));
+           dmar_readl(iommu->reg,DMAR_FEUADDR_REG));
+}
+
+u32 get_level_index(unsigned long gmfn, int level)
+{
+    while ( --level )
+        gmfn = gmfn >> LEVEL_STRIDE;
+
+    return gmfn & LEVEL_MASK;
 }
 
 void print_vtd_entries(struct domain *d, int bus, int devfn,
@@ -144,219 +155,120 @@ void print_vtd_entries(struct domain *d, int bus, int devfn,
     struct iommu *iommu;
     struct context_entry *ctxt_entry;
     struct root_entry *root_entry;
-    u64 *l3, *l2, *l1;
-    u32 l3_index, l2_index, l1_index;
+    u64 *l4 = NULL, *l3, *l2, *l1;
+    u32 l4_index = 0, l3_index, l2_index, l1_index;
     u32 i = 0;
+    int level = agaw_to_level(hd->agaw);
 
-    printk("print_vtd_entries: domain_id = %x bdf = %x:%x:%x devfn = %x, gmfn = %lx\n", d->domain_id, bus, PCI_SLOT(devfn), PCI_FUNC(devfn), devfn, gmfn);
+    printk("print_vtd_entries: domain_id = %x bdf = %x:%x:%x gmfn = %lx\n",
+           d->domain_id, bus, PCI_SLOT(devfn), PCI_FUNC(devfn), gmfn);
 
-    for_each_drhd_unit(drhd) {
+    if ( hd->pgd == NULL )
+    {
+        printk("    hg->pgd == NULL\n");
+        return;
+    }
+    printk("    d->pgd = %p virt_to_maddr(hd->pgd) = %lx\n",
+           hd->pgd, virt_to_maddr(hd->pgd));
+
+    for_each_drhd_unit ( drhd )
+    {
         printk("---- print_vtd_entries %d ----\n", i++);
-
-        if (hd->pgd == NULL) {
-            printk("    hg->pgd == NULL\n");
-            return;
-        }
 
         iommu = drhd->iommu;
         root_entry = iommu->root_entry;
-        printk("    hd->pgd = %p virt_to_maddr(hd->pgd) = %lx\n",
-               hd->pgd, virt_to_maddr(hd->pgd));
-
         printk("    root_entry = %p\n", root_entry);
-        if (root_entry == NULL) {
+        if ( root_entry == NULL )
+        {
             printk("    root_entry == NULL\n");
-            return;
+            continue;
         }
 
-        printk("    root_entry[%x] = %lx\n", bus, root_entry[bus].val);
+        printk("    root_entry[%x] = %"PRIx64"\n", bus, root_entry[bus].val);
         printk("    maddr_to_virt(root_entry[%x]) = %p\n",
-            bus, maddr_to_virt(root_entry[bus].val));
+               bus, maddr_to_virt(root_entry[bus].val));
 
-        if (root_entry[bus].val == 0) {
+        if ( root_entry[bus].val == 0 )
+        {
             printk("    root_entry[%x].lo == 0\n", bus);
-            return;
-        }
- 
-        ctxt_entry = maddr_to_virt((root_entry[bus].val >> PAGE_SHIFT) << PAGE_SHIFT);
-        if (ctxt_entry == NULL) {
-            printk("    ctxt_entry == NULL\n");
-            return;
+            continue;
         }
 
-        if (ctxt_entry[devfn].lo == 0) {
+        ctxt_entry =
+            maddr_to_virt((root_entry[bus].val >> PAGE_SHIFT) << PAGE_SHIFT);
+        if ( ctxt_entry == NULL )
+        {
+            printk("    ctxt_entry == NULL\n");
+            continue;
+        }
+
+        if ( ctxt_entry[devfn].lo == 0 )
+        {
             printk("    ctxt_entry[%x].lo == 0\n", devfn);
-            return;
+            continue;
         }
 
         printk("    context = %p\n", ctxt_entry);
-        printk("    context[%x] = %lx %lx\n",
+        printk("    context[%x] = %"PRIx64" %"PRIx64"\n",
                devfn, ctxt_entry[devfn].hi, ctxt_entry[devfn].lo);
         printk("    maddr_to_virt(context[%x].lo) = %p\n",
                devfn, maddr_to_virt(ctxt_entry[devfn].lo));
-        printk("    context[%x] = %lx\n", devfn, ctxt_entry[devfn].lo); 
+        printk("    context[%x] = %"PRIx64"\n", devfn, ctxt_entry[devfn].lo);
 
-        l3 = maddr_to_virt(ctxt_entry[devfn].lo);
-        l3 = (u64*)(((u64) l3 >> PAGE_SHIFT_4K) << PAGE_SHIFT_4K);
-        printk("    l3 = %p\n", l3); 
-        if (l3 == NULL) return;
+        switch ( level )
+        {
+        case VTD_PAGE_TABLE_LEVEL_3:
+            l3 = maddr_to_virt(ctxt_entry[devfn].lo);
+            l3 = (u64*)(((unsigned long)l3 >> PAGE_SHIFT_4K) << PAGE_SHIFT_4K);
+            printk("    l3 = %p\n", l3);
+            if ( l3 == NULL )
+                continue;
+            l3_index = get_level_index(gmfn, 3);
+            printk("    l3_index = %x\n", l3_index);
+            printk("    l3[%x] = %"PRIx64"\n", l3_index, l3[l3_index]);
 
-        l3_index = (gmfn >> 9 >> 9) & 0x1ff;
-        printk("    l3_index = %x\n", l3_index);
-        printk("    l3[%x] = %lx\n", l3_index, l3[l3_index]);
+            break;
+        case VTD_PAGE_TABLE_LEVEL_4:
+            l4 = maddr_to_virt(ctxt_entry[devfn].lo);
+            l4 = (u64*)(((unsigned long)l4 >> PAGE_SHIFT_4K) << PAGE_SHIFT_4K);
+            printk("    l4 = %p\n", l4);
+            if ( l4 == NULL )
+                continue;
+            l4_index = get_level_index(gmfn, 4);
+            printk("    l4_index = %x\n", l4_index);
+            printk("    l4[%x] = %"PRIx64"\n", l4_index, l4[l4_index]);
+
+            l3 = maddr_to_virt(l4[l4_index]);
+            l3 = (u64*)(((unsigned long)l3 >> PAGE_SHIFT_4K) << PAGE_SHIFT_4K);
+            printk("    l3 = %p\n", l3);
+            if ( l3 == NULL )
+                continue;
+            l3_index = get_level_index(gmfn, 3);
+            printk("    l3_index = %x\n", l3_index);
+            printk("    l3[%x] = %"PRIx64"\n", l3_index, l3[l3_index]);
+
+            break;
+        default:
+            printk("Unsupported VTD page table level (%d)!\n", level);
+            continue;
+        }
 
         l2 = maddr_to_virt(l3[l3_index]);
-        l2 = (u64*)(((u64) l2 >> PAGE_SHIFT_4K) << PAGE_SHIFT_4K);
-        printk("    l2 = %p\n", l2); 
-        if (l2 == NULL) return;
-
-        l2_index = (gmfn >> 9) & 0x1ff;
-        printk("    gmfn = %lx\n", gmfn);
-        printk("    gmfn >> 9= %lx\n", gmfn >> 9);
+        l2 = (u64*)(((unsigned long)l2 >> PAGE_SHIFT_4K) << PAGE_SHIFT_4K);
+        printk("    l2 = %p\n", l2);
+        if ( l2 == NULL )
+            continue;
+        l2_index = get_level_index(gmfn, 2);
         printk("    l2_index = %x\n", l2_index);
-        printk("    l2[%x] = %lx\n", l2_index, l2[l2_index]);
+        printk("    l2[%x] = %"PRIx64"\n", l2_index, l2[l2_index]);
 
         l1 = maddr_to_virt(l2[l2_index]);
-        l1 = (u64*)(((u64) l1 >> PAGE_SHIFT_4K) << PAGE_SHIFT_4K);
-        if (l1 == NULL) return;
-        l1_index = gmfn & 0x1ff;
-        printk("    l1 = %p\n", l1); 
+        l1 = (u64*)(((unsigned long)l1 >> PAGE_SHIFT_4K) << PAGE_SHIFT_4K);
+        printk("    l1 = %p\n", l1);
+        if ( l1 == NULL )
+            continue;
+        l1_index = get_level_index(gmfn, 1);
         printk("    l1_index = %x\n", l1_index);
-        printk("    l1[%x] = %lx\n", l1_index, l1[l1_index]); 
-    }
+        printk("    l1[%x] = %"PRIx64"\n", l1_index, l1[l1_index]);
+   }
 }
-
-#else    // !m64
-
-void print_iommu_regs(struct acpi_drhd_unit *drhd)
-{
-    struct iommu *iommu = drhd->iommu;
- 
-    printk("---- print_iommu_regs ----\n"); 
-    printk("print_iommu_regs: drhd->address = %lx\n", drhd->address);
-    printk("print_iommu_regs: DMAR_VER_REG = %x\n",
-                   dmar_readl(iommu->reg,DMAR_VER_REG));
-    printk("print_iommu_regs: DMAR_CAP_REG = %llx\n",
-                   dmar_readq(iommu->reg,DMAR_CAP_REG));
-    printk("print_iommu_regs: n_fault_reg = %llx\n",
-                   cap_num_fault_regs(dmar_readq(iommu->reg, DMAR_CAP_REG)));
-    printk("print_iommu_regs: fault_recording_offset_l = %llx\n",
-                   cap_fault_reg_offset(dmar_readq(iommu->reg, DMAR_CAP_REG)));
-    printk("print_iommu_regs: fault_recording_offset_h = %llx\n",
-                   cap_fault_reg_offset(dmar_readq(iommu->reg, DMAR_CAP_REG)) + 8);
-    printk("print_iommu_regs: fault_recording_reg_l = %llx\n",
-        dmar_readq(iommu->reg, cap_fault_reg_offset(dmar_readq(iommu->reg, DMAR_CAP_REG))));
-    printk("print_iommu_regs: fault_recording_reg_h = %llx\n",
-        dmar_readq(iommu->reg, cap_fault_reg_offset(dmar_readq(iommu->reg, DMAR_CAP_REG)) + 8));
-    printk("print_iommu_regs: DMAR_ECAP_REG = %llx\n",
-                   dmar_readq(iommu->reg,DMAR_ECAP_REG));
-    printk("print_iommu_regs: DMAR_GCMD_REG = %x\n",
-                   dmar_readl(iommu->reg,DMAR_GCMD_REG));
-    printk("print_iommu_regs: DMAR_GSTS_REG = %x\n",
-                   dmar_readl(iommu->reg,DMAR_GSTS_REG));
-    printk("print_iommu_regs: DMAR_RTADDR_REG = %llx\n",
-                   dmar_readq(iommu->reg,DMAR_RTADDR_REG));
-    printk("print_iommu_regs: DMAR_CCMD_REG = %llx\n",
-                   dmar_readq(iommu->reg,DMAR_CCMD_REG));
-    printk("print_iommu_regs: DMAR_FSTS_REG = %x\n",
-                   dmar_readl(iommu->reg,DMAR_FSTS_REG));
-    printk("print_iommu_regs: DMAR_FECTL_REG = %x\n",
-                   dmar_readl(iommu->reg,DMAR_FECTL_REG));
-    printk("print_iommu_regs: DMAR_FEDATA_REG = %x\n",
-                   dmar_readl(iommu->reg,DMAR_FEDATA_REG));
-    printk("print_iommu_regs: DMAR_FEADDR_REG = %x\n",
-                   dmar_readl(iommu->reg,DMAR_FEADDR_REG));
-    printk("print_iommu_regs: DMAR_FEUADDR_REG = %x\n",
-                   dmar_readl(iommu->reg,DMAR_FEUADDR_REG));
-}
-
-void print_vtd_entries(struct domain *d, int bus, int devfn,
-                       unsigned long gmfn)
-{
-    struct hvm_iommu *hd = domain_hvm_iommu(d);
-    struct acpi_drhd_unit *drhd;
-    struct iommu *iommu;
-    struct context_entry *ctxt_entry;
-    struct root_entry *root_entry;
-    u64 *l3, *l2, *l1;
-    u32 l3_index, l2_index, l1_index;
-    u32 i = 0;
-
-    printk("print_vtd_entries: domain_id = %x bdf = %x:%x:%x devfn = %x, gmfn = %lx\n", d->domain_id, bus, PCI_SLOT(devfn), PCI_FUNC(devfn), devfn, gmfn);
-
-    for_each_drhd_unit(drhd) {
-        printk("---- print_vtd_entries %d ----\n", i++);
-
-        if (hd->pgd == NULL) {
-            printk("    hg->pgd == NULL\n");
-            return;
-        }
-
-        iommu = drhd->iommu;
-        root_entry = iommu->root_entry;
-        printk("    d->pgd = %p virt_to_maddr(hd->pgd) = %lx\n",
-               hd->pgd, virt_to_maddr(hd->pgd));
-
-        printk("    root_entry = %p\n", root_entry);
-        if (root_entry == NULL) {
-            printk("    root_entry == NULL\n");
-            return;
-        }
-
-        printk("    root_entry[%x] = %llx\n", bus, root_entry[bus].val);
-        printk("    maddr_to_virt(root_entry[%x]) = %p\n",
-            bus, maddr_to_virt(root_entry[bus].val));
-
-        if (root_entry[bus].val == 0) {
-            printk("    root_entry[%x].lo == 0\n", bus);
-            return;
-        }
- 
-        ctxt_entry = maddr_to_virt((root_entry[bus].val >> PAGE_SHIFT) << PAGE_SHIFT);
-        if (ctxt_entry == NULL) {
-            printk("    ctxt_entry == NULL\n");
-            return;
-        }
-
-        if (ctxt_entry[devfn].lo == 0) {
-            printk("    ctxt_entry[%x].lo == 0\n", devfn);
-            return;
-        }
-
-        printk("    context = %p\n", ctxt_entry);
-        printk("    context[%x] = %llx %llx\n",
-               devfn, ctxt_entry[devfn].hi, ctxt_entry[devfn].lo);
-        printk("    maddr_to_virt(context[%x].lo) = %p\n",
-               devfn, maddr_to_virt(ctxt_entry[devfn].lo));
-        printk("    context[%x] = %llx\n", devfn, ctxt_entry[devfn].lo); 
-
-        l3 = maddr_to_virt(ctxt_entry[devfn].lo);
-        l3 = (u64*)(((u32) l3 >> PAGE_SHIFT_4K) << PAGE_SHIFT_4K);
-        printk("    l3 = %p\n", l3); 
-        if (l3 == NULL) return;
-
-        l3_index = (gmfn >> 9 >> 9) & 0x1ff;
-        printk("    l3_index = %x\n", l3_index);
-        printk("    l3[%x] = %llx\n", l3_index, l3[l3_index]);
-
-        l2 = maddr_to_virt(l3[l3_index]);
-        l2 = (u64*)(((u32) l2 >> PAGE_SHIFT_4K) << PAGE_SHIFT_4K);
-        printk("    l2 = %p\n", l2); 
-        if (l2 == NULL) return;
-
-        l2_index = (gmfn >> 9) & 0x1ff;
-        printk("    gmfn = %lx\n", gmfn);
-        printk("    gmfn >> 9= %lx\n", gmfn >> 9);
-        printk("    l2_index = %x\n", l2_index);
-        printk("    l2[%x] = %llx\n", l2_index, l2[l2_index]);
-
-        l1 = maddr_to_virt(l2[l2_index]);
-        l1 = (u64*)(((u32) l1 >> PAGE_SHIFT_4K) << PAGE_SHIFT_4K);
-        if (l1 == NULL) return;
-        l1_index = gmfn & 0x1ff;
-        printk("    l1 = %p\n", l1); 
-        printk("    l1_index = %x\n", l1_index);
-        printk("    l1[%x] = %llx\n", l1_index, l1[l1_index]); 
-    }
-}
-#endif    // !m64
