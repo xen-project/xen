@@ -674,7 +674,7 @@ get_page_from_l1e(
         uint32_t x, nx, y = page->count_info;
         uint32_t cacheattr = pte_flags_to_cacheattr(l1f);
 
-        if ( is_xen_heap_frame(page) )
+        if ( is_xen_heap_page(page) )
         {
             if ( (l1f & _PAGE_RW) &&
                  !(unlikely(paging_mode_external(d) &&
@@ -1866,7 +1866,7 @@ void cleanup_page_cacheattr(struct page_info *page)
 
     page->count_info &= ~PGC_cacheattr_mask;
 
-    BUG_ON(is_xen_heap_frame(page));
+    BUG_ON(is_xen_heap_page(page));
 
 #ifdef __x86_64__
     map_pages_to_xen((unsigned long)page_to_virt(page), page_to_mfn(page),
@@ -3200,7 +3200,7 @@ long arch_memory_op(int op, XEN_GUEST_HANDLE(void) arg)
         prev_mfn = gmfn_to_mfn(d, xatp.gpfn);
         if ( mfn_valid(prev_mfn) )
         {
-            if ( is_xen_heap_frame(mfn_to_page(prev_mfn)) )
+            if ( is_xen_heap_mfn(prev_mfn) )
                 /* Xen heap frames are simply unhooked from this phys slot. */
                 guest_physmap_remove_page(d, xatp.gpfn, prev_mfn);
             else
@@ -3583,7 +3583,7 @@ void free_xen_pagetable(void *v)
 
     BUG_ON(early_boot);
     
-    if ( is_xen_heap_frame(virt_to_page(v)) )
+    if ( is_xen_heap_page(virt_to_page(v)) )
         free_xenheap_page(v);
     else
         free_domheap_page(virt_to_page(v));

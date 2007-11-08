@@ -1057,7 +1057,7 @@ gnttab_transfer(
         }
 
         page = mfn_to_page(mfn);
-        if ( unlikely(is_xen_heap_frame(page)) )
+        if ( unlikely(is_xen_heap_page(page)) )
         { 
             gdprintk(XENLOG_INFO, "gnttab_transfer: xen frame %lx\n",
                     (unsigned long)gop.mfn);
