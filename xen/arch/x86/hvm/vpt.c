@@ -56,17 +56,9 @@ static void pt_process_missed_ticks(struct periodic_time *pt)
     if ( missed_ticks <= 0 )
         return;
 
-    if ( mode_is(pt->vcpu->domain, no_missed_tick_accounting) )
-    {
-        pt->pending_intr_nr = 1;
-        pt->scheduled = now + pt->period;
-    }
-    else
-    {
-        missed_ticks = missed_ticks / (s_time_t) pt->period + 1;
-        pt->pending_intr_nr += missed_ticks;
-        pt->scheduled += missed_ticks * pt->period;
-    }
+    missed_ticks = missed_ticks / (s_time_t) pt->period + 1;
+    pt->pending_intr_nr += missed_ticks;
+    pt->scheduled += missed_ticks * pt->period;
 }
 
 static void pt_freeze_time(struct vcpu *v)
@@ -131,10 +123,7 @@ static void pt_timer_fn(void *data)
 
     pt_lock(pt);
 
-    if ( mode_is(pt->vcpu->domain, no_missed_tick_accounting) )
-        pt->pending_intr_nr = 1;
-    else
-        pt->pending_intr_nr++;
+    pt->pending_intr_nr++;
 
     if ( !pt->one_shot )
     {
@@ -235,11 +224,16 @@ void pt_intr_post(struct vcpu *v, struct hvm_intack intack)
     }
     else
     {
-        pt->pending_intr_nr--;
         if ( mode_is(v->domain, no_missed_tick_accounting) )
+        {
             pt->last_plt_gtime = hvm_get_guest_time(v);
+            pt->pending_intr_nr = 0; /* 'collapse' all missed ticks */
+        }
         else
+        {
             pt->last_plt_gtime += pt->period_cycles;
+            pt->pending_intr_nr--;
+        }
     }
 
     if ( mode_is(v->domain, delay_for_missed_ticks) &&
