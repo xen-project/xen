@@ -33,13 +33,12 @@ import signal
 import time
 import commands
 
-xpp = os.path.join(os.path.dirname(sys.argv[0], 'xen-python-path'))
+xpp = os.path.join(os.path.dirname(sys.argv[0]), 'xen-python-path')
 if os.path.exists(xpp):
     result = commands.getstatusoutput(xpp)
     if result[0] != 0:
         print >>sys.stderr, result[1]
         sys.exit(1)
-
     sys.path.append(result[1])
 
 from xen.xend.server import SrvDaemon
