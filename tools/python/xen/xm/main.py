@@ -1529,11 +1529,11 @@ def xm_sched_credit(args):
     cap = None
 
     for o, a in opts:
-        if o == "-d":
+        if o in ["-d", "--domain"]:
             domid = a
-        elif o == "-w":
+        elif o in ["-w", "--weight"]:
             weight = int(a)
-        elif o == "-c":
+        elif o in ["-c", "--cap"]:
             cap = int(a);
 
     doms = filter(lambda x : domid_match(domid, x),
