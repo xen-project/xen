@@ -41,6 +41,10 @@ static inline unsigned long __virt_to_maddr(unsigned long va)
 #define virt_to_mfn(va)		(virt_to_maddr(va) >> PAGE_SHIFT)
 #define mfn_to_virt(mfn)	maddr_to_virt(mfn << PAGE_SHIFT)
 
+/* Convert between frame number and address formats.  */
+#define pfn_to_paddr(pfn)	((paddr_t)(pfn) << PAGE_SHIFT)
+#define paddr_to_pfn(pa)	((unsigned long)((pa) >> PAGE_SHIFT))
+
 typedef union xen_va {
 	struct {
 		unsigned long off : 60;
