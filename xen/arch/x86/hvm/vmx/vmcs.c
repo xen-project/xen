@@ -106,7 +106,8 @@ static void vmx_init_vmcs_config(void)
     if ( _vmx_cpu_based_exec_control & CPU_BASED_ACTIVATE_SECONDARY_CONTROLS )
     {
         min = 0;
-        opt = SECONDARY_EXEC_VIRTUALIZE_APIC_ACCESSES;
+        opt = (SECONDARY_EXEC_VIRTUALIZE_APIC_ACCESSES |
+               SECONDARY_EXEC_WBINVD_EXITING);
         _vmx_secondary_exec_control = adjust_vmx_controls(
             min, opt, MSR_IA32_VMX_PROCBASED_CTLS2);
     }

@@ -2909,11 +2909,21 @@ asmlinkage void vmx_vmexit_handler(struct cpu_user_regs *regs)
     }
 
     case EXIT_REASON_INVD:
+    case EXIT_REASON_WBINVD:
     {
-        inst_len = __get_instruction_length(); /* Safe: INVD */
+        inst_len = __get_instruction_length(); /* Safe: INVD, WBINVD */
         __update_guest_eip(inst_len);
         if ( !list_empty(&(domain_hvm_iommu(v->domain)->pdev_list)) )
+        {
             wbinvd();
+            /* Disable further WBINVD intercepts. */
+            if ( (exit_reason == EXIT_REASON_WBINVD) &&
+                 (vmx_cpu_based_exec_control &
+                  CPU_BASED_ACTIVATE_SECONDARY_CONTROLS) )
+                __vmwrite(SECONDARY_VM_EXEC_CONTROL,
+                          vmx_secondary_exec_control &
+                          ~SECONDARY_EXEC_WBINVD_EXITING);
+        }
         break;
     }
 

@@ -71,18 +71,15 @@ void vmx_vlapic_msr_changed(struct vcpu *v);
 #define EXIT_REASON_IO_INSTRUCTION      30
 #define EXIT_REASON_MSR_READ            31
 #define EXIT_REASON_MSR_WRITE           32
-
 #define EXIT_REASON_INVALID_GUEST_STATE 33
 #define EXIT_REASON_MSR_LOADING         34
-
 #define EXIT_REASON_MWAIT_INSTRUCTION   36
 #define EXIT_REASON_MONITOR_INSTRUCTION 39
 #define EXIT_REASON_PAUSE_INSTRUCTION   40
-
 #define EXIT_REASON_MACHINE_CHECK       41
-
 #define EXIT_REASON_TPR_BELOW_THRESHOLD 43
 #define EXIT_REASON_APIC_ACCESS         44
+#define EXIT_REASON_WBINVD              54
 
 /*
  * Interruption-information format
