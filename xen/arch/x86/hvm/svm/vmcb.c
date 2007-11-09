@@ -127,7 +127,8 @@ static int construct_vmcb(struct vcpu *v)
         GENERAL2_INTERCEPT_VMRUN       | GENERAL2_INTERCEPT_VMMCALL     |
         GENERAL2_INTERCEPT_VMLOAD      | GENERAL2_INTERCEPT_VMSAVE      |
         GENERAL2_INTERCEPT_STGI        | GENERAL2_INTERCEPT_CLGI        |
-        GENERAL2_INTERCEPT_SKINIT      | GENERAL2_INTERCEPT_RDTSCP;
+        GENERAL2_INTERCEPT_SKINIT      | GENERAL2_INTERCEPT_RDTSCP      |
+        GENERAL2_INTERCEPT_WBINVD;
 
     /* Intercept all debug-register writes. */
     vmcb->dr_intercepts = ~0u;

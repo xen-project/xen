@@ -43,6 +43,7 @@ typedef enum OPERATING_MODE_ {
 /* Enumerate some standard instructions that we support */
 enum instruction_index {
     INSTR_INVD,
+    INSTR_WBINVD,
     INSTR_CPUID,
     INSTR_RDMSR,
     INSTR_WRMSR,

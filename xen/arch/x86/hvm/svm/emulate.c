@@ -344,6 +344,7 @@ unsigned long svm_rip2pointer(struct vcpu *v)
  * Special case: Last byte, if zero, doesn't need to match. 
  */
 MAKE_INSTR(INVD,   2, 0x0f, 0x08);
+MAKE_INSTR(WBINVD, 2, 0x0f, 0x09);
 MAKE_INSTR(CPUID,  2, 0x0f, 0xa2);
 MAKE_INSTR(RDMSR,  2, 0x0f, 0x32);
 MAKE_INSTR(WRMSR,  2, 0x0f, 0x30);
@@ -378,6 +379,7 @@ MAKE_INSTR(INT3,   1, 0xcc);
 static const u8 *opc_bytes[INSTR_MAX_COUNT] = 
 {
     [INSTR_INVD]   = OPCODE_INVD,
+    [INSTR_WBINVD] = OPCODE_WBINVD,
     [INSTR_CPUID]  = OPCODE_CPUID,
     [INSTR_RDMSR]  = OPCODE_RDMSR,
     [INSTR_WRMSR]  = OPCODE_WRMSR,

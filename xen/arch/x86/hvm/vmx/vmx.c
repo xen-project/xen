@@ -2881,10 +2881,9 @@ asmlinkage void vmx_vmexit_handler(struct cpu_user_regs *regs)
         if ( vmx_do_msr_write(regs) )
             __update_guest_eip(inst_len);
         break;
+
     case EXIT_REASON_MWAIT_INSTRUCTION:
     case EXIT_REASON_MONITOR_INSTRUCTION:
-    case EXIT_REASON_PAUSE_INSTRUCTION:
-        goto exit_and_crash;
     case EXIT_REASON_VMCLEAR:
     case EXIT_REASON_VMLAUNCH:
     case EXIT_REASON_VMPTRLD:
@@ -2894,8 +2893,6 @@ asmlinkage void vmx_vmexit_handler(struct cpu_user_regs *regs)
     case EXIT_REASON_VMWRITE:
     case EXIT_REASON_VMXOFF:
     case EXIT_REASON_VMXON:
-        /* Report invalid opcode exception when a VMX guest tries to execute
-            any of the VMX instructions */
         vmx_inject_hw_exception(v, TRAP_invalid_op, VMX_DELIVER_NO_ERROR_CODE);
         break;
 
@@ -2908,6 +2905,15 @@ asmlinkage void vmx_vmexit_handler(struct cpu_user_regs *regs)
         exit_qualification = __vmread(EXIT_QUALIFICATION);
         offset = exit_qualification & 0x0fffUL;
         handle_mmio(APIC_DEFAULT_PHYS_BASE | offset);
+        break;
+    }
+
+    case EXIT_REASON_INVD:
+    {
+        inst_len = __get_instruction_length(); /* Safe: INVD */
+        __update_guest_eip(inst_len);
+        if ( !list_empty(&(domain_hvm_iommu(v->domain)->pdev_list)) )
+            wbinvd();
         break;
     }
 

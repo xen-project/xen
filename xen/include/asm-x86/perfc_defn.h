@@ -9,8 +9,8 @@ PERFCOUNTER_ARRAY(exceptions,           "exceptions", 32)
 PERFCOUNTER_ARRAY(vmexits,              "vmexits", VMX_PERF_EXIT_REASON_SIZE)
 PERFCOUNTER_ARRAY(cause_vector,         "cause vector", VMX_PERF_VECTOR_SIZE)
 
-#define VMEXIT_NPF_PERFC 137
-#define SVM_PERF_EXIT_REASON_SIZE (1+137)
+#define VMEXIT_NPF_PERFC 141
+#define SVM_PERF_EXIT_REASON_SIZE (1+141)
 PERFCOUNTER_ARRAY(svmexits,             "SVMexits", SVM_PERF_EXIT_REASON_SIZE)
 
 PERFCOUNTER(seg_fixups,             "segmentation fixups")

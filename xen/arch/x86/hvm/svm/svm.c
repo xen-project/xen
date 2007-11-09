@@ -1942,24 +1942,24 @@ static void svm_vmexit_do_hlt(struct vmcb_struct *vmcb,
     hvm_hlt(regs->eflags);
 }
 
-static void svm_vmexit_do_invd(struct cpu_user_regs *regs)
+static void svm_vmexit_do_invalidate_cache(struct cpu_user_regs *regs)
 {
+    enum instruction_index list[] = { INSTR_INVD, INSTR_WBINVD };
+    struct vcpu *curr = current;
+    struct vmcb_struct *vmcb = curr->arch.hvm_svm.vmcb;
     int inst_len;
-    
-    /* Invalidate the cache - we can't really do that safely - maybe we should 
-     * WBINVD, but I think it's just fine to completely ignore it - we should 
-     * have cache-snooping that solves it anyways. -- Mats P. 
-     */
 
-    /* Tell the user that we did this - just in case someone runs some really 
-     * weird operating system and wants to know why it's not working...
-     */
-    gdprintk(XENLOG_WARNING, "INVD instruction intercepted - ignored\n");
-    
-    inst_len = __get_instruction_length(current, INSTR_INVD, NULL);
+    if ( !list_empty(&(domain_hvm_iommu(curr->domain)->pdev_list)) )
+    {
+        vmcb->general2_intercepts &= ~GENERAL2_INTERCEPT_WBINVD;
+        wbinvd();
+    }
+
+    inst_len = __get_instruction_length_from_list(
+        curr, list, ARRAY_SIZE(list), NULL, NULL);
     __update_guest_eip(regs, inst_len);
-}    
-        
+}
+
 void svm_handle_invlpg(const short invlpga, struct cpu_user_regs *regs)
 {
     struct vcpu *v = current;
@@ -2205,7 +2205,8 @@ asmlinkage void svm_vmexit_handler(struct cpu_user_regs *regs)
         break;
 
     case VMEXIT_INVD:
-        svm_vmexit_do_invd(regs);
+    case VMEXIT_WBINVD:
+        svm_vmexit_do_invalidate_cache(regs);
         break;
 
     case VMEXIT_TASK_SWITCH: {

@@ -72,7 +72,11 @@ enum GenericIntercept2bits
     GENERAL2_INTERCEPT_CLGI    = 1 << 5,
     GENERAL2_INTERCEPT_SKINIT  = 1 << 6,
     GENERAL2_INTERCEPT_RDTSCP  = 1 << 7,
-    GENERAL2_INTERCEPT_ICEBP   = 1 << 8
+    GENERAL2_INTERCEPT_ICEBP   = 1 << 8,
+    GENERAL2_INTERCEPT_WBINVD  = 1 << 9,
+    GENERAL2_INTERCEPT_MONITOR = 1 << 10,
+    GENERAL2_INTERCEPT_MWAIT   = 1 << 11,
+    GENERAL2_INTERCEPT_MWAIT_CONDITIONAL = 1 << 12
 };
 
 
@@ -291,6 +295,10 @@ enum VMEXIT_EXITCODE
     VMEXIT_SKINIT           = 134,
     VMEXIT_RDTSCP           = 135,
     VMEXIT_ICEBP            = 136,
+    VMEXIT_WBINVD           = 137,
+    VMEXIT_MONITOR          = 138,
+    VMEXIT_MWAIT            = 139,
+    VMEXIT_MWAIT_CONDITIONAL= 140,
     VMEXIT_NPF              = 1024, /* nested paging fault */
     VMEXIT_INVALID          =  -1
 };

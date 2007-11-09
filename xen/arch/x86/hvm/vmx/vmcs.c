@@ -84,6 +84,7 @@ static void vmx_init_vmcs_config(void)
 
     min = (CPU_BASED_HLT_EXITING |
            CPU_BASED_INVLPG_EXITING |
+           CPU_BASED_MONITOR_EXITING |
            CPU_BASED_MWAIT_EXITING |
            CPU_BASED_MOV_DR_EXITING |
            CPU_BASED_ACTIVATE_IO_BITMAP |
