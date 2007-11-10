@@ -65,6 +65,8 @@ def get_kernel_val(index, att):
 
 def set_boot_policy(title_idx, filename):
     boottitles = get_boot_policies()
+    for key in boottitles.iterkeys():
+        boottitles[key] += ".bin"
     if boottitles.has_key(title_idx):
         rm_policy_from_boottitle(title_idx, [ boottitles[title_idx] ])
     rc = add_boot_policy(title_idx, filename)
@@ -336,6 +338,8 @@ class Grub(Bootloader):
                 os.write(tmp_fd, line)
 
             if module_line != "" and not found:
+                if ord(line[-1]) not in [ 10 ]:
+                    os.write(tmp_fd, '\n')
                 os.write(tmp_fd, module_line)
                 found = True
 
