@@ -581,6 +581,42 @@ void bitmap_byte_to_64(uint64_t *lp, const uint8_t *bp, int nbits)
     }
 }
 
+int read_exact(int fd, void *data, size_t size)
+{
+    size_t offset = 0;
+    ssize_t len;
+
+    while ( offset < size )
+    {
+        len = read(fd, (char *)data + offset, size - offset);
+        if ( (len == -1) && (errno == EINTR) )
+            continue;
+        if ( len <= 0 )
+            return -1;
+        offset += len;
+    }
+
+    return 0;
+}
+
+int write_exact(int fd, const void *data, size_t size)
+{
+    size_t offset = 0;
+    ssize_t len;
+
+    while ( offset < size )
+    {
+        len = write(fd, (const char *)data + offset, size - offset);
+        if ( (len == -1) && (errno == EINTR) )
+            continue;
+        if ( len <= 0 )
+            return -1;
+        offset += len;
+    }
+
+    return 0;
+}
+
 /*
  * Local variables:
  * mode: C

@@ -79,14 +79,6 @@ static int xc_ia64_shadow_control(int xc_handle,
                              dirty_bitmap, pages, NULL, 0, stats);
 }
 
-static inline ssize_t
-write_exact(int fd, void *buf, size_t count)
-{
-    if (write(fd, buf, count) != count)
-        return 0;
-    return 1;
-}
-
 static int
 suspend_and_state(int (*suspend)(int), int xc_handle, int io_fd,
                   int dom, xc_dominfo_t *info)
@@ -174,7 +166,7 @@ xc_ia64_send_unallocated_list(int xc_handle, int io_fd,
                 j++;
         }
     }
-    if (!write_exact(io_fd, &j, sizeof(unsigned int))) {
+    if (write_exact(io_fd, &j, sizeof(unsigned int))) {
         ERROR("Error when writing to state file (6a)");
         return -1;
     }
@@ -195,7 +187,7 @@ xc_ia64_send_unallocated_list(int xc_handle, int io_fd,
             if (!xc_ia64_p2m_allocated(p2m_table, N))
                 pfntab[j++] = N;
             if (j == sizeof(pfntab)/sizeof(pfntab[0])) {
-                if (!write_exact(io_fd, &pfntab, sizeof(pfntab[0]) * j)) {
+                if (write_exact(io_fd, &pfntab, sizeof(pfntab[0]) * j)) {
                     ERROR("Error when writing to state file (6b)");
                     return -1;
                 }
@@ -204,7 +196,7 @@ xc_ia64_send_unallocated_list(int xc_handle, int io_fd,
         }
     }
     if (j > 0) {
-        if (!write_exact(io_fd, &pfntab, sizeof(pfntab[0]) * j)) {
+        if (write_exact(io_fd, &pfntab, sizeof(pfntab[0]) * j)) {
             ERROR("Error when writing to state file (6c)");
             return -1;
         }
@@ -222,7 +214,7 @@ xc_ia64_send_vcpu_context(int xc_handle, int io_fd, uint32_t dom,
         return -1;
     }
 
-    if (!write_exact(io_fd, ctxt, sizeof(*ctxt))) {
+    if (write_exact(io_fd, ctxt, sizeof(*ctxt))) {
         ERROR("Error when writing to state file (1)");
         return -1;
     }
@@ -234,7 +226,7 @@ xc_ia64_send_vcpu_context(int xc_handle, int io_fd, uint32_t dom,
 static int
 xc_ia64_send_shared_info(int xc_handle, int io_fd, shared_info_t *live_shinfo)
 {
-    if (!write_exact(io_fd, live_shinfo, PAGE_SIZE)) {
+    if (write_exact(io_fd, live_shinfo, PAGE_SIZE)) {
         ERROR("Error when writing to state file (1)");
         return -1;
     }
@@ -258,7 +250,7 @@ xc_ia64_pv_send_context(int xc_handle, int io_fd, uint32_t dom,
         ERROR("cannot map privreg page");
         return -1;
     }
-    if (!write_exact(io_fd, mem, PAGE_SIZE)) {
+    if (write_exact(io_fd, mem, PAGE_SIZE)) {
         ERROR("Error when writing privreg to state file (5)");
         munmap(mem, PAGE_SIZE);
         return -1;
@@ -319,12 +311,12 @@ xc_ia64_hvm_send_context(int xc_handle, int io_fd, uint32_t dom,
             __set_bit(i, vcpumap);
     }
 
-    if (!write_exact(io_fd, &max_virt_cpus, sizeof(max_virt_cpus))) {
+    if (write_exact(io_fd, &max_virt_cpus, sizeof(max_virt_cpus))) {
         ERROR("write max_virt_cpus");
         goto out;
     }
 
-    if (!write_exact(io_fd, vcpumap, vcpumap_size)) {
+    if (write_exact(io_fd, vcpumap, vcpumap_size)) {
         ERROR("write vcpumap");
         goto out;
     }
@@ -352,7 +344,7 @@ xc_ia64_hvm_send_context(int xc_handle, int io_fd, uint32_t dom,
         }
     }
 
-    if (!write_exact(io_fd, magic_pfns, sizeof(magic_pfns))) {
+    if (write_exact(io_fd, magic_pfns, sizeof(magic_pfns))) {
         ERROR("Error when writing to state file (7)");
         goto out;
     }
@@ -377,12 +369,12 @@ xc_ia64_hvm_send_context(int xc_handle, int io_fd, uint32_t dom,
         goto out;
     }
         
-    if (!write_exact(io_fd, &rec_size, sizeof(rec_size))) {
+    if (write_exact(io_fd, &rec_size, sizeof(rec_size))) {
         ERROR("error write hvm buffer size");
         goto out;
     }
         
-    if (!write_exact(io_fd, hvm_buf, rec_size)) {
+    if (write_exact(io_fd, hvm_buf, rec_size)) {
         ERROR("write HVM info failed!\n");
         goto out;
     }
@@ -496,7 +488,7 @@ xc_domain_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
     p2m_size = xc_memory_op(xc_handle, XENMEM_maximum_gpfn, &dom);
 
     /* This is expected by xm restore.  */
-    if (!write_exact(io_fd, &p2m_size, sizeof(unsigned long))) {
+    if (write_exact(io_fd, &p2m_size, sizeof(unsigned long))) {
         ERROR("write: p2m_size");
         goto out;
     }
@@ -509,7 +501,7 @@ xc_domain_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
     {
         unsigned long version = XC_IA64_SR_FORMAT_VER_CURRENT;
 
-        if (!write_exact(io_fd, &version, sizeof(unsigned long))) {
+        if (write_exact(io_fd, &version, sizeof(unsigned long))) {
             ERROR("write: version");
             goto out;
         }
@@ -522,7 +514,7 @@ xc_domain_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
         ERROR("Could not get domain setup");
         goto out;
     }
-    if (!write_exact(io_fd, &domctl.u.arch_setup,
+    if (write_exact(io_fd, &domctl.u.arch_setup,
                      sizeof(domctl.u.arch_setup))) {
         ERROR("write: domain setup");
         goto out;
@@ -605,12 +597,12 @@ xc_domain_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
         PERROR("xc_ia64_p2m_map");
         goto out;
     }
-    if (!write_exact(io_fd,
+    if (write_exact(io_fd,
                      &memmap_info_num_pages, sizeof(memmap_info_num_pages))) {
         PERROR("write: arch.memmap_info_num_pages");
         goto out;
     }
-    if (!write_exact(io_fd, memmap_info, memmap_size)) {
+    if (write_exact(io_fd, memmap_info, memmap_size)) {
         PERROR("write: memmap_info");
         goto out;
     }
@@ -679,7 +671,7 @@ xc_domain_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
                     continue;
                 }
 
-                if (!write_exact(io_fd, &N, sizeof(N))) {
+                if (write_exact(io_fd, &N, sizeof(N))) {
                     ERROR("write: p2m_size");
                     munmap(mem, PAGE_SIZE);
                     goto out;
@@ -751,7 +743,7 @@ xc_domain_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
     /* terminate */
     {
         unsigned long pfn = INVALID_MFN;
-        if (!write_exact(io_fd, &pfn, sizeof(pfn))) {
+        if (write_exact(io_fd, &pfn, sizeof(pfn))) {
             ERROR("Error when writing to state file (6)");
             goto out;
         }

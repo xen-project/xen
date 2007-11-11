@@ -860,19 +860,15 @@ struct dump_args {
 static int local_file_dump(void *args, char *buffer, unsigned int length)
 {
     struct dump_args *da = args;
-    int bytes, offset;
 
-    for ( offset = 0; offset < length; offset += bytes )
+    if ( write_exact(da->fd, buffer, length) == -1 )
     {
-        bytes = write(da->fd, &buffer[offset], length-offset);
-        if ( bytes <= 0 )
-        {
-            PERROR("Failed to write buffer");
-            return -errno;
-        }
+        PERROR("Failed to write buffer");
+        return -errno;
     }
 
-    if (length >= DUMP_INCREMENT*PAGE_SIZE) {
+    if ( length >= (DUMP_INCREMENT * PAGE_SIZE) )
+    {
         // Now dumping pages -- make sure we discard clean pages from
         // the cache after each write
         discard_file_cache(da->fd, 0 /* no flush */);

@@ -175,8 +175,7 @@ static uint64_t tv_delta(struct timeval *new, struct timeval *old)
 static int noncached_write(int fd, int live, void *buffer, int len) 
 {
     static int write_count = 0;
-
-    int rc = write(fd,buffer,len);
+    int rc = (write_exact(fd, buffer, len) == 0) ? len : -1;
 
     write_count += len;
     if ( write_count >= (MAX_PAGECACHE_USAGE * PAGE_SIZE) )
@@ -280,11 +279,6 @@ static int ratewrite(int io_fd, int live, void *buf, int n)
 #define initialize_mbit_rate()
 
 #endif
-
-static inline ssize_t write_exact(int fd, void *buf, size_t count)
-{
-    return (write(fd, buf, count) == count);
-}
 
 static int print_stats(int xc_handle, uint32_t domid, int pages_sent,
                        xc_shadow_op_stats_t *stats, int print)
@@ -782,21 +776,21 @@ static xen_pfn_t *map_and_save_p2m_table(int xc_handle,
                               : sizeof(ctxt.x32));
         uint32_t chunk2_sz = 0;
         uint32_t tot_sz    = (chunk1_sz + 8) + (chunk2_sz + 8);
-        if ( !write_exact(io_fd, &signature, sizeof(signature)) ||
-             !write_exact(io_fd, &tot_sz, sizeof(tot_sz)) ||
-             !write_exact(io_fd, "vcpu", 4) ||
-             !write_exact(io_fd, &chunk1_sz, sizeof(chunk1_sz)) ||
-             !write_exact(io_fd, &ctxt, chunk1_sz) ||
-             !write_exact(io_fd, "extv", 4) ||
-             !write_exact(io_fd, &chunk2_sz, sizeof(chunk2_sz)) )
+        if ( write_exact(io_fd, &signature, sizeof(signature)) ||
+             write_exact(io_fd, &tot_sz, sizeof(tot_sz)) ||
+             write_exact(io_fd, "vcpu", 4) ||
+             write_exact(io_fd, &chunk1_sz, sizeof(chunk1_sz)) ||
+             write_exact(io_fd, &ctxt, chunk1_sz) ||
+             write_exact(io_fd, "extv", 4) ||
+             write_exact(io_fd, &chunk2_sz, sizeof(chunk2_sz)) )
         {
             ERROR("write: extended info");
             goto out;
         }
     }
 
-    if ( !write_exact(io_fd, p2m_frame_list, 
-                      P2M_FL_ENTRIES * sizeof(xen_pfn_t)) )
+    if ( write_exact(io_fd, p2m_frame_list, 
+                     P2M_FL_ENTRIES * sizeof(xen_pfn_t)) )
     {
         ERROR("write: p2m_frame_list");
         goto out;
@@ -1044,7 +1038,7 @@ int xc_domain_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
     }
 
     /* Start writing out the saved-domain record. */
-    if ( !write_exact(io_fd, &p2m_size, sizeof(unsigned long)) )
+    if ( write_exact(io_fd, &p2m_size, sizeof(unsigned long)) )
     {
         ERROR("write: p2m_size");
         goto out;
@@ -1249,14 +1243,14 @@ int xc_domain_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
                 }
             }
 
-            if ( !write_exact(io_fd, &batch, sizeof(unsigned int)) )
+            if ( write_exact(io_fd, &batch, sizeof(unsigned int)) )
             {
                 ERROR("Error when writing to state file (2) (errno %d)",
                       errno);
                 goto out;
             }
 
-            if ( !write_exact(io_fd, pfn_type, sizeof(unsigned long)*batch) )
+            if ( write_exact(io_fd, pfn_type, sizeof(unsigned long)*batch) )
             {
                 ERROR("Error when writing to state file (3) (errno %d)",
                       errno);
@@ -1342,7 +1336,7 @@ int xc_domain_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
             DPRINTF("Entering debug resend-all mode\n");
 
             /* send "-1" to put receiver into debug mode */
-            if ( !write_exact(io_fd, &minusone, sizeof(int)) )
+            if ( write_exact(io_fd, &minusone, sizeof(int)) )
             {
                 ERROR("Error when writing to state file (6) (errno %d)",
                       errno);
@@ -1434,7 +1428,7 @@ int xc_domain_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
         }
 
         chunk.vcpumap = vcpumap;
-        if ( !write_exact(io_fd, &chunk, sizeof(chunk)) )
+        if ( write_exact(io_fd, &chunk, sizeof(chunk)) )
         {
             ERROR("Error when writing to state file (errno %d)", errno);
             goto out;
@@ -1443,7 +1437,7 @@ int xc_domain_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
 
     /* Zero terminate */
     i = 0;
-    if ( !write_exact(io_fd, &i, sizeof(int)) )
+    if ( write_exact(io_fd, &i, sizeof(int)) )
     {
         ERROR("Error when writing to state file (6') (errno %d)", errno);
         goto out;
@@ -1461,7 +1455,7 @@ int xc_domain_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
                          (unsigned long *)&magic_pfns[1]);
         xc_get_hvm_param(xc_handle, dom, HVM_PARAM_STORE_PFN,
                          (unsigned long *)&magic_pfns[2]);
-        if ( !write_exact(io_fd, magic_pfns, sizeof(magic_pfns)) )
+        if ( write_exact(io_fd, magic_pfns, sizeof(magic_pfns)) )
         {
             ERROR("Error when writing to state file (7)");
             goto out;
@@ -1475,13 +1469,13 @@ int xc_domain_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
             goto out;
         }
         
-        if ( !write_exact(io_fd, &rec_size, sizeof(uint32_t)) )
+        if ( write_exact(io_fd, &rec_size, sizeof(uint32_t)) )
         {
             ERROR("error write hvm buffer size");
             goto out;
         }
         
-        if ( !write_exact(io_fd, hvm_buf, rec_size) )
+        if ( write_exact(io_fd, hvm_buf, rec_size) )
         {
             ERROR("write HVM info failed!\n");
             goto out;
@@ -1505,7 +1499,7 @@ int xc_domain_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
                 j++;
         }
 
-        if ( !write_exact(io_fd, &j, sizeof(unsigned int)) )
+        if ( write_exact(io_fd, &j, sizeof(unsigned int)) )
         {
             ERROR("Error when writing to state file (6a) (errno %d)", errno);
             goto out;
@@ -1519,7 +1513,7 @@ int xc_domain_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
             i++;
             if ( (j == 1024) || (i == p2m_size) )
             {
-                if ( !write_exact(io_fd, &pfntab, sizeof(unsigned long)*j) )
+                if ( write_exact(io_fd, &pfntab, sizeof(unsigned long)*j) )
                 {
                     ERROR("Error when writing to state file (6b) (errno %d)",
                           errno);
@@ -1596,9 +1590,9 @@ int xc_domain_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
                     mfn_to_pfn(xen_cr3_to_pfn(ctxt.x64.ctrlreg[1])));
         }
 
-        if ( !write_exact(io_fd, &ctxt, ((guest_width==8) 
-                                         ? sizeof(ctxt.x64) 
-                                         : sizeof(ctxt.x32))) )
+        if ( write_exact(io_fd, &ctxt, ((guest_width==8) 
+                                        ? sizeof(ctxt.x64) 
+                                        : sizeof(ctxt.x32))) )
         {
             ERROR("Error when writing to state file (1) (errno %d)", errno);
             goto out;
@@ -1612,7 +1606,7 @@ int xc_domain_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
             ERROR("No extended context for VCPU%d", i);
             goto out;
         }
-        if ( !write_exact(io_fd, &domctl.u.ext_vcpucontext, 128) )
+        if ( write_exact(io_fd, &domctl.u.ext_vcpucontext, 128) )
         {
             ERROR("Error when writing to state file (2) (errno %d)", errno);
             goto out;
@@ -1625,7 +1619,7 @@ int xc_domain_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
     memcpy(page, live_shinfo, PAGE_SIZE);
     SET_FIELD(((shared_info_either_t *)page), 
               arch.pfn_to_mfn_frame_list_list, 0);
-    if ( !write_exact(io_fd, page, PAGE_SIZE) )
+    if ( write_exact(io_fd, page, PAGE_SIZE) )
     {
         ERROR("Error when writing to state file (1) (errno %d)", errno);
         goto out;

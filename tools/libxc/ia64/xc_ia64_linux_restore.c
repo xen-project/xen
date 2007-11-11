@@ -28,25 +28,6 @@ static unsigned long p2m_size;
 /* number of 'in use' pfns in the guest (i.e. #P2M entries with a valid mfn) */
 static unsigned long nr_pfns;
 
-static ssize_t
-read_exact(int fd, void *buf, size_t count)
-{
-    int r = 0, s;
-    unsigned char *b = buf;
-
-    while (r < count) {
-        s = read(fd, &b[r], count - r);
-        if ((s == -1) && (errno == EINTR))
-            continue;
-        if (s <= 0) {
-            break;
-        }
-        r += s;
-    }
-
-    return (r == count) ? 1 : 0;
-}
-
 static int
 populate_page_if_necessary(int xc_handle, uint32_t dom, unsigned long gmfn,
                            struct xen_ia64_p2m_table *p2m_table)
@@ -68,7 +49,7 @@ read_page(int xc_handle, int io_fd, uint32_t dom, unsigned long pfn)
         ERROR("cannot map page");
         return -1;
     }
-    if (!read_exact(io_fd, mem, PAGE_SIZE)) {
+    if (read_exact(io_fd, mem, PAGE_SIZE)) {
         ERROR("Error when reading from state file (5)");
         munmap(mem, PAGE_SIZE);
         return -1;
@@ -93,7 +74,7 @@ xc_ia64_recv_unallocated_list(int xc_handle, int io_fd, uint32_t dom,
     unsigned long *pfntab = NULL;
     unsigned int nr_frees;
 
-    if (!read_exact(io_fd, &count, sizeof(count))) {
+    if (read_exact(io_fd, &count, sizeof(count))) {
         ERROR("Error when reading pfn count");
         goto out;
     }
@@ -104,7 +85,7 @@ xc_ia64_recv_unallocated_list(int xc_handle, int io_fd, uint32_t dom,
         goto out;
     }
 
-    if (!read_exact(io_fd, pfntab, sizeof(unsigned long)*count)) {
+    if (read_exact(io_fd, pfntab, sizeof(unsigned long)*count)) {
         ERROR("Error when reading pfntab");
         goto out;
     }
@@ -138,7 +119,7 @@ static int
 xc_ia64_recv_vcpu_context(int xc_handle, int io_fd, uint32_t dom,
                           uint32_t vcpu, vcpu_guest_context_t *ctxt)
 {
-    if (!read_exact(io_fd, ctxt, sizeof(*ctxt))) {
+    if (read_exact(io_fd, ctxt, sizeof(*ctxt))) {
         ERROR("Error when reading ctxt");
         return -1;
     }
@@ -182,7 +163,7 @@ xc_ia64_recv_shared_info(int xc_handle, int io_fd, uint32_t dom,
         return -1;
     }
 
-    if (!read_exact(io_fd, shared_info, PAGE_SIZE)) {
+    if (read_exact(io_fd, shared_info, PAGE_SIZE)) {
         ERROR("Error when reading shared_info page");
         munmap(shared_info, PAGE_SIZE);
         return -1;
@@ -308,7 +289,7 @@ xc_ia64_hvm_recv_context(int xc_handle, int io_fd, uint32_t dom,
         ERROR("Could not get domain info");
         goto out;
     }
-    if (!read_exact(io_fd, &max_virt_cpus, sizeof(max_virt_cpus))) {
+    if (read_exact(io_fd, &max_virt_cpus, sizeof(max_virt_cpus))) {
         ERROR("error reading max_virt_cpus");
         goto out;
     }
@@ -325,7 +306,7 @@ xc_ia64_hvm_recv_context(int xc_handle, int io_fd, uint32_t dom,
         goto out;
     }
     memset(vcpumap, 0, vcpumap_size);
-    if (!read_exact(io_fd, vcpumap, vcpumap_size)) {
+    if (read_exact(io_fd, vcpumap, vcpumap_size)) {
         ERROR("read vcpumap");
         goto out;
     }
@@ -345,7 +326,7 @@ xc_ia64_hvm_recv_context(int xc_handle, int io_fd, uint32_t dom,
     }    
 
     /* Set HVM-specific parameters */
-    if (!read_exact(io_fd, magic_pfns, sizeof(magic_pfns))) {
+    if (read_exact(io_fd, magic_pfns, sizeof(magic_pfns))) {
         ERROR("error reading magic page addresses");
         goto out;
     }
@@ -372,7 +353,7 @@ xc_ia64_hvm_recv_context(int xc_handle, int io_fd, uint32_t dom,
     *store_mfn = magic_pfns[0];
 
     /* Read HVM context */
-    if (!read_exact(io_fd, &rec_size, sizeof(rec_size))) {
+    if (read_exact(io_fd, &rec_size, sizeof(rec_size))) {
         ERROR("error read hvm context size!\n");
         goto out;
     }
@@ -384,7 +365,7 @@ xc_ia64_hvm_recv_context(int xc_handle, int io_fd, uint32_t dom,
         goto out;
     }
 
-    if (!read_exact(io_fd, hvm_buf, rec_size)) {
+    if (read_exact(io_fd, hvm_buf, rec_size)) {
         ERROR("error loading the HVM context");
         goto out;
     }
@@ -445,14 +426,14 @@ xc_domain_restore(int xc_handle, int io_fd, uint32_t dom,
     /* For info only */
     nr_pfns = 0;
 
-    if ( !read_exact(io_fd, &p2m_size, sizeof(unsigned long)) )
+    if ( read_exact(io_fd, &p2m_size, sizeof(unsigned long)) )
     {
         ERROR("read: p2m_size");
         goto out;
     }
     DPRINTF("xc_linux_restore start: p2m_size = %lx\n", p2m_size);
 
-    if (!read_exact(io_fd, &ver, sizeof(unsigned long))) {
+    if (read_exact(io_fd, &ver, sizeof(unsigned long))) {
         ERROR("Error when reading version");
         goto out;
     }
@@ -461,7 +442,7 @@ xc_domain_restore(int xc_handle, int io_fd, uint32_t dom,
         goto out;
     }
 
-    if (!read_exact(io_fd, &domctl.u.arch_setup, sizeof(domctl.u.arch_setup))) {
+    if (read_exact(io_fd, &domctl.u.arch_setup, sizeof(domctl.u.arch_setup))) {
         ERROR("read: domain setup");
         goto out;
     }
@@ -492,7 +473,7 @@ xc_domain_restore(int xc_handle, int io_fd, uint32_t dom,
         unsigned long memmap_size;
         xen_ia64_memmap_info_t *memmap_info;
 
-        if (!read_exact(io_fd, &memmap_info_num_pages,
+        if (read_exact(io_fd, &memmap_info_num_pages,
                         sizeof(memmap_info_num_pages))) {
             ERROR("read: memmap_info_num_pages");
             goto out;
@@ -503,7 +484,7 @@ xc_domain_restore(int xc_handle, int io_fd, uint32_t dom,
             ERROR("Could not allocate memory for memmap_info");
             goto out;
         }
-        if (!read_exact(io_fd, memmap_info, memmap_size)) {
+        if (read_exact(io_fd, memmap_info, memmap_size)) {
             ERROR("read: memmap_info");
             goto out;
         }
@@ -546,7 +527,7 @@ xc_domain_restore(int xc_handle, int io_fd, uint32_t dom,
 
     while (1) {
         unsigned long gmfn;
-        if (!read_exact(io_fd, &gmfn, sizeof(unsigned long))) {
+        if (read_exact(io_fd, &gmfn, sizeof(unsigned long))) {
             ERROR("Error when reading batch size");
             goto out;
         }

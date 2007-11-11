@@ -180,4 +180,8 @@ int xc_add_mmu_update(int xc_handle, struct xc_mmu *mmu,
                    unsigned long long ptr, unsigned long long val);
 int xc_flush_mmu_updates(int xc_handle, struct xc_mmu *mmu);
 
+/* Return 0 on success; -1 on error. */
+int read_exact(int fd, void *data, size_t size);
+int write_exact(int fd, const void *data, size_t size);
+
 #endif /* __XC_PRIVATE_H__ */

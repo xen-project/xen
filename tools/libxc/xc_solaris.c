@@ -206,37 +206,12 @@ int xc_evtchn_unbind(int xce_handle, evtchn_port_t port)
     return ioctl(xce_handle, IOCTL_EVTCHN_UNBIND, &unbind);
 }
 
-static int dorw(int fd, char *data, size_t size, int do_write)
-{
-    size_t offset = 0;
-    ssize_t len;
-
-    while ( offset < size )
-    {
-        if (do_write)
-            len = write(fd, data + offset, size - offset);
-        else
-            len = read(fd, data + offset, size - offset);
-
-        if ( len == -1 )
-        {
-             if ( errno == EINTR )
-                 continue;
-             return -1;
-        }
-
-        offset += len;
-    }
-
-    return 0;
-}
-
 evtchn_port_or_error_t
 xc_evtchn_pending(int xce_handle)
 {
     evtchn_port_t port;
 
-    if ( dorw(xce_handle, (char *)&port, sizeof(port), 0) == -1 )
+    if ( read_exact(xce_handle, (char *)&port, sizeof(port)) == -1 )
         return -1;
 
     return port;
@@ -244,7 +219,7 @@ xc_evtchn_pending(int xce_handle)
 
 int xc_evtchn_unmask(int xce_handle, evtchn_port_t port)
 {
-    return dorw(xce_handle, (char *)&port, sizeof(port), 1);
+    return write_exact(xce_handle, (char *)&port, sizeof(port));
 }
 
 /* Optionally flush file to disk and discard page cache */

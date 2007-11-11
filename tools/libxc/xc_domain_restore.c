@@ -59,26 +59,6 @@ static xen_pfn_t *p2m_batch = NULL;
 /* Address size of the guest, in bytes */
 unsigned int guest_width;
 
-
-static ssize_t
-read_exact(int fd, void *buf, size_t count)
-{
-    int r = 0, s;
-    unsigned char *b = buf;
-
-    while ( r < count )
-    {
-        s = read(fd, &b[r], count - r);
-        if ( (s == -1) && (errno == EINTR) )
-            continue;
-        if ( s <= 0 )
-            break;
-        r += s;
-    }
-
-    return (r == count);
-}
-
 /*
 ** In the state file (or during transfer), all page-table pages are
 ** converted into a 'canonical' form where references to actual mfns
@@ -177,7 +157,7 @@ static xen_pfn_t *load_p2m_frame_list(
     xen_pfn_t p2m_fl_zero;
 
     /* Read first entry of P2M list, or extended-info signature (~0UL). */
-    if ( !read_exact(io_fd, &p2m_fl_zero, sizeof(long)) )
+    if ( read_exact(io_fd, &p2m_fl_zero, sizeof(long)) )
     {
         ERROR("read extended-info signature failed");
         return NULL;
@@ -188,7 +168,7 @@ static xen_pfn_t *load_p2m_frame_list(
         uint32_t tot_bytes;
         
         /* Next 4 bytes: total size of following extended info. */
-        if ( !read_exact(io_fd, &tot_bytes, sizeof(tot_bytes)) )
+        if ( read_exact(io_fd, &tot_bytes, sizeof(tot_bytes)) )
         {
             ERROR("read extended-info size failed");
             return NULL;
@@ -200,8 +180,8 @@ static xen_pfn_t *load_p2m_frame_list(
             char     chunk_sig[4];
             
             /* 4-character chunk signature + 4-byte remaining chunk size. */
-            if ( !read_exact(io_fd, chunk_sig, sizeof(chunk_sig)) ||
-                 !read_exact(io_fd, &chunk_bytes, sizeof(chunk_bytes)) ||
+            if ( read_exact(io_fd, chunk_sig, sizeof(chunk_sig)) ||
+                 read_exact(io_fd, &chunk_bytes, sizeof(chunk_bytes)) ||
                  (tot_bytes < (chunk_bytes + 8)) )
             {
                 ERROR("read extended-info chunk signature failed");
@@ -230,7 +210,7 @@ static xen_pfn_t *load_p2m_frame_list(
                     return NULL;
                 }
 
-                if ( !read_exact(io_fd, &ctxt, chunk_bytes) )
+                if ( read_exact(io_fd, &ctxt, chunk_bytes) )
                 {
                     ERROR("read extended-info vcpu context failed");
                     return NULL;
@@ -251,7 +231,7 @@ static xen_pfn_t *load_p2m_frame_list(
             while ( chunk_bytes )
             {
                 unsigned long sz = MIN(chunk_bytes, sizeof(xen_pfn_t));
-                if ( !read_exact(io_fd, &p2m_fl_zero, sz) )
+                if ( read_exact(io_fd, &p2m_fl_zero, sz) )
                 {
                     ERROR("read-and-discard extended-info chunk bytes failed");
                     return NULL;
@@ -262,7 +242,7 @@ static xen_pfn_t *load_p2m_frame_list(
         }
 
         /* Now read the real first entry of P2M list. */
-        if ( !read_exact(io_fd, &p2m_fl_zero, sizeof(xen_pfn_t)) )
+        if ( read_exact(io_fd, &p2m_fl_zero, sizeof(xen_pfn_t)) )
         {
             ERROR("read first entry of p2m_frame_list failed");
             return NULL;
@@ -279,8 +259,8 @@ static xen_pfn_t *load_p2m_frame_list(
 
     /* First entry has already been read. */
     p2m_frame_list[0] = p2m_fl_zero;
-    if ( !read_exact(io_fd, &p2m_frame_list[1], 
-                     (P2M_FL_ENTRIES - 1) * sizeof(xen_pfn_t)) )
+    if ( read_exact(io_fd, &p2m_frame_list[1], 
+                    (P2M_FL_ENTRIES - 1) * sizeof(xen_pfn_t)) )
     {
         ERROR("read p2m_frame_list failed");
         return NULL;
@@ -349,7 +329,7 @@ int xc_domain_restore(int xc_handle, int io_fd, uint32_t dom,
     /* For info only */
     nr_pfns = 0;
 
-    if ( !read_exact(io_fd, &p2m_size, sizeof(unsigned long)) )
+    if ( read_exact(io_fd, &p2m_size, sizeof(unsigned long)) )
     {
         ERROR("read: p2m_size");
         goto out;
@@ -464,7 +444,7 @@ int xc_domain_restore(int xc_handle, int io_fd, uint32_t dom,
             prev_pc = this_pc;
         }
 
-        if ( !read_exact(io_fd, &j, sizeof(int)) )
+        if ( read_exact(io_fd, &j, sizeof(int)) )
         {
             ERROR("Error when reading batch size");
             goto out;
@@ -482,9 +462,9 @@ int xc_domain_restore(int xc_handle, int io_fd, uint32_t dom,
         if ( j == -2 )
         {
             new_ctxt_format = 1;
-            if ( !read_exact(io_fd, &max_vcpu_id, sizeof(int)) ||
+            if ( read_exact(io_fd, &max_vcpu_id, sizeof(int)) ||
                  (max_vcpu_id >= 64) ||
-                 !read_exact(io_fd, &vcpumap, sizeof(uint64_t)) )
+                 read_exact(io_fd, &vcpumap, sizeof(uint64_t)) )
             {
                 ERROR("Error when reading max_vcpu_id");
                 goto out;
@@ -501,7 +481,7 @@ int xc_domain_restore(int xc_handle, int io_fd, uint32_t dom,
             goto out;
         }
 
-        if ( !read_exact(io_fd, region_pfn_type, j*sizeof(unsigned long)) )
+        if ( read_exact(io_fd, region_pfn_type, j*sizeof(unsigned long)) )
         {
             ERROR("Error when reading region pfn types");
             goto out;
@@ -594,7 +574,7 @@ int xc_domain_restore(int xc_handle, int io_fd, uint32_t dom,
             /* In verify mode, we use a copy; otherwise we work in place */
             page = verify ? (void *)buf : (region_base + i*PAGE_SIZE);
 
-            if ( !read_exact(io_fd, page, PAGE_SIZE) )
+            if ( read_exact(io_fd, page, PAGE_SIZE) )
             {
                 ERROR("Error when reading page (type was %lx)", pagetype);
                 goto out;
@@ -704,7 +684,7 @@ int xc_domain_restore(int xc_handle, int io_fd, uint32_t dom,
         uint32_t rec_len;
 
         /* Set HVM-specific parameters */
-        if ( !read_exact(io_fd, magic_pfns, sizeof(magic_pfns)) )
+        if ( read_exact(io_fd, magic_pfns, sizeof(magic_pfns)) )
         {
             ERROR("error reading magic page addresses");
             goto out;
@@ -737,7 +717,7 @@ int xc_domain_restore(int xc_handle, int io_fd, uint32_t dom,
         *store_mfn = magic_pfns[2];
 
         /* Read HVM context */
-        if ( !read_exact(io_fd, &rec_len, sizeof(uint32_t)) )
+        if ( read_exact(io_fd, &rec_len, sizeof(uint32_t)) )
         {
             ERROR("error read hvm context size!\n");
             goto out;
@@ -751,7 +731,7 @@ int xc_domain_restore(int xc_handle, int io_fd, uint32_t dom,
             goto out;
         }
         
-        if ( !read_exact(io_fd, hvm_buf, rec_len) )
+        if ( read_exact(io_fd, hvm_buf, rec_len) )
         {
             ERROR("error loading the HVM context");
             goto out;
@@ -943,7 +923,7 @@ int xc_domain_restore(int xc_handle, int io_fd, uint32_t dom,
         unsigned long *pfntab;
         int nr_frees;
 
-        if ( !read_exact(io_fd, &count, sizeof(count)) ||
+        if ( read_exact(io_fd, &count, sizeof(count)) ||
              (count > (1U << 28)) ) /* up to 1TB of address space */
         {
             ERROR("Error when reading pfn count (= %u)", count);
@@ -956,7 +936,7 @@ int xc_domain_restore(int xc_handle, int io_fd, uint32_t dom,
             goto out;
         }
 
-        if ( !read_exact(io_fd, pfntab, sizeof(unsigned long)*count) )
+        if ( read_exact(io_fd, pfntab, sizeof(unsigned long)*count) )
         {
             ERROR("Error when reading pfntab");
             goto out;
@@ -1001,9 +981,9 @@ int xc_domain_restore(int xc_handle, int io_fd, uint32_t dom,
         if ( !(vcpumap & (1ULL << i)) )
             continue;
 
-        if ( !read_exact(io_fd, &ctxt, ((guest_width == 8)
-                                        ? sizeof(ctxt.x64)
-                                        : sizeof(ctxt.x32))) )
+        if ( read_exact(io_fd, &ctxt, ((guest_width == 8)
+                                       ? sizeof(ctxt.x64)
+                                       : sizeof(ctxt.x32))) )
         {
             ERROR("Error when reading ctxt %d", i);
             goto out;
@@ -1112,7 +1092,7 @@ int xc_domain_restore(int xc_handle, int io_fd, uint32_t dom,
 
         if ( !ext_vcpucontext )
             continue;
-        if ( !read_exact(io_fd, &domctl.u.ext_vcpucontext, 128) ||
+        if ( read_exact(io_fd, &domctl.u.ext_vcpucontext, 128) ||
              (domctl.u.ext_vcpucontext.vcpu != i) )
         {
             ERROR("Error when reading extended ctxt %d", i);
@@ -1128,7 +1108,7 @@ int xc_domain_restore(int xc_handle, int io_fd, uint32_t dom,
         }
     }
 
-    if ( !read_exact(io_fd, shared_info_page, PAGE_SIZE) )
+    if ( read_exact(io_fd, shared_info_page, PAGE_SIZE) )
     {
         ERROR("Error when reading shared info page");
         goto out;
