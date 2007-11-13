@@ -495,7 +495,8 @@ void __devinit start_secondary(void *unused)
 	set_processor_id(cpu);
 	set_current(idle_vcpu[cpu]);
 	this_cpu(curr_vcpu) = idle_vcpu[cpu];
-	rdmsrl(MSR_EFER, this_cpu(efer));
+        if ( cpu_has_efer )
+            rdmsrl(MSR_EFER, this_cpu(efer));
 	asm volatile ( "mov %%cr4,%0" : "=r" (this_cpu(cr4)) );
 
 	percpu_traps_init();

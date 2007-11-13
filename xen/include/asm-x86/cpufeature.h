@@ -146,6 +146,7 @@
 #define cpu_has_centaur_mcr	boot_cpu_has(X86_FEATURE_CENTAUR_MCR)
 #define cpu_has_clflush		boot_cpu_has(X86_FEATURE_CLFLSH)
 #define cpu_has_page1gb		0
+#define cpu_has_efer		(boot_cpu_data.x86_capability[1] & 0x20100800)
 #else /* __x86_64__ */
 #define cpu_has_vme		0
 #define cpu_has_de		1
@@ -171,6 +172,7 @@
 #define cpu_has_centaur_mcr	0
 #define cpu_has_clflush		boot_cpu_has(X86_FEATURE_CLFLSH)
 #define cpu_has_page1gb		boot_cpu_has(X86_FEATURE_PAGE1GB)
+#define cpu_has_efer		1
 #endif
 
 #define cpu_has_ffxsr           ((boot_cpu_data.x86_vendor == X86_VENDOR_AMD) \

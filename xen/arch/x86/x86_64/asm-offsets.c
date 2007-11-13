@@ -137,4 +137,7 @@ void __dummy__(void)
 #endif
 
     DEFINE(IRQSTAT_shift, LOG_2(sizeof(irq_cpustat_t)));
+    BLANK();
+
+    OFFSET(CPUINFO_ext_features, struct cpuinfo_x86, x86_capability[1]);
 }

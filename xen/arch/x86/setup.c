@@ -416,7 +416,8 @@ void __init __start_xen(unsigned long mbi_p)
     set_current((struct vcpu *)0xfffff000); /* debug sanity */
     idle_vcpu[0] = current;
     set_processor_id(0); /* needed early, for smp_processor_id() */
-    rdmsrl(MSR_EFER, this_cpu(efer));
+    if ( cpu_has_efer )
+        rdmsrl(MSR_EFER, this_cpu(efer));
     asm volatile ( "mov %%cr4,%0" : "=r" (this_cpu(cr4)) );
 
     smp_prepare_boot_cpu();
