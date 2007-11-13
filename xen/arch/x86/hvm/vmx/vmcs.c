@@ -493,18 +493,10 @@ static int construct_vmcs(struct vcpu *v)
     __vmwrite(HOST_SS_SELECTOR, __HYPERVISOR_DS);
     __vmwrite(HOST_DS_SELECTOR, __HYPERVISOR_DS);
     __vmwrite(HOST_ES_SELECTOR, __HYPERVISOR_DS);
-#if defined(__i386__)
-    __vmwrite(HOST_FS_SELECTOR, __HYPERVISOR_DS);
-    __vmwrite(HOST_GS_SELECTOR, __HYPERVISOR_DS);
+    __vmwrite(HOST_FS_SELECTOR, 0);
+    __vmwrite(HOST_GS_SELECTOR, 0);
     __vmwrite(HOST_FS_BASE, 0);
     __vmwrite(HOST_GS_BASE, 0);
-#elif defined(__x86_64__)
-    {
-        unsigned long msr;
-        rdmsrl(MSR_FS_BASE, msr); __vmwrite(HOST_FS_BASE, msr);
-        rdmsrl(MSR_GS_BASE, msr); __vmwrite(HOST_GS_BASE, msr);
-    }
-#endif
 
     /* Host control registers. */
     __vmwrite(HOST_CR0, read_cr0() | X86_CR0_TS);
