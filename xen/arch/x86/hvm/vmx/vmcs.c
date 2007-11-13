@@ -399,20 +399,14 @@ struct xgt_desc {
 
 static void vmx_set_host_env(struct vcpu *v)
 {
-    unsigned int tr, cpu;
-    struct xgt_desc desc;
+    unsigned int cpu = smp_processor_id();
 
-    cpu = smp_processor_id();
+    __vmwrite(HOST_IDTR_BASE, (unsigned long)idt_tables[cpu]);
 
-    __asm__ __volatile__ ( "sidt (%0) \n" : : "a" (&desc) : "memory" );
-    __vmwrite(HOST_IDTR_BASE, desc.address);
-
-    __asm__ __volatile__ ( "sgdt (%0) \n" : : "a" (&desc) : "memory" );
-    __vmwrite(HOST_GDTR_BASE, desc.address);
-
-    __asm__ __volatile__ ( "str (%0) \n" : : "a" (&tr) : "memory" );
-    __vmwrite(HOST_TR_SELECTOR, tr);
+    __vmwrite(HOST_TR_SELECTOR, __TSS(cpu) << 3);
     __vmwrite(HOST_TR_BASE, (unsigned long)&init_tss[cpu]);
+
+    __vmwrite(HOST_SYSENTER_ESP, get_stack_bottom());
 
     /*
      * Skip end of cpu_user_regs when entering the hypervisor because the
@@ -454,6 +448,8 @@ void vmx_disable_intercept_for_msr(struct vcpu *v, u32 msr)
 static int construct_vmcs(struct vcpu *v)
 {
     union vmcs_arbytes arbytes;
+    uint16_t sysenter_cs;
+    unsigned long sysenter_eip;
 
     vmx_vmcs_enter(v);
 
@@ -489,6 +485,9 @@ static int construct_vmcs(struct vcpu *v)
     __vmwrite(IO_BITMAP_A, virt_to_maddr(hvm_io_bitmap));
     __vmwrite(IO_BITMAP_B, virt_to_maddr(hvm_io_bitmap + PAGE_SIZE));
 
+    /* Host GDTR base. */
+    __vmwrite(HOST_GDTR_BASE, GDT_VIRT_START(v));
+
     /* Host data selectors. */
     __vmwrite(HOST_SS_SELECTOR, __HYPERVISOR_DS);
     __vmwrite(HOST_DS_SELECTOR, __HYPERVISOR_DS);
@@ -505,6 +504,12 @@ static int construct_vmcs(struct vcpu *v)
     /* Host CS:RIP. */
     __vmwrite(HOST_CS_SELECTOR, __HYPERVISOR_CS);
     __vmwrite(HOST_RIP, (unsigned long)vmx_asm_vmexit_handler);
+
+    /* Host SYSENTER CS:RIP. */
+    rdmsrl(MSR_IA32_SYSENTER_CS, sysenter_cs);
+    __vmwrite(HOST_SYSENTER_CS, sysenter_cs);
+    rdmsrl(MSR_IA32_SYSENTER_EIP, sysenter_eip);
+    __vmwrite(HOST_SYSENTER_EIP, sysenter_eip);
 
     /* MSR intercepts. */
     __vmwrite(VM_EXIT_MSR_LOAD_COUNT, 0);
@@ -903,9 +908,9 @@ void vmcs_dump_vcpu(void)
            (unsigned long long)vmr(HOST_CR3),
            (unsigned long long)vmr(HOST_CR4));
     printk("Sysenter RSP=%016llx CS:RIP=%04x:%016llx\n",
-           (unsigned long long)vmr(HOST_IA32_SYSENTER_ESP),
-           (int)vmr(HOST_IA32_SYSENTER_CS),
-           (unsigned long long)vmr(HOST_IA32_SYSENTER_EIP));
+           (unsigned long long)vmr(HOST_SYSENTER_ESP),
+           (int)vmr(HOST_SYSENTER_CS),
+           (unsigned long long)vmr(HOST_SYSENTER_EIP));
 
     printk("*** Control State ***\n");
     printk("PinBased=%08x CPUBased=%08x SecondaryExec=%08x\n",
