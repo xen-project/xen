@@ -39,7 +39,7 @@ TARGET := $(BASEDIR)/xen
 
 HDRS := $(wildcard *.h)
 HDRS += $(wildcard $(BASEDIR)/include/xen/*.h)
-HDRS := $(wildcard $(BASEDIR)/include/xen/hvm/*.h)
+HDRS += $(wildcard $(BASEDIR)/include/xen/hvm/*.h)
 HDRS += $(wildcard $(BASEDIR)/include/public/*.h)
 HDRS += $(wildcard $(BASEDIR)/include/public/*/*.h)
 HDRS += $(wildcard $(BASEDIR)/include/compat/*.h)
