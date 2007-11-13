@@ -41,7 +41,7 @@ all: hvmloader
 
 hvmloader: roms.h acpi/acpi.a $(SRCS)
 	$(CC) $(CFLAGS) -c $(SRCS)
-	$(LD) $(LDFLAGS_DIRECT) -nostdlib -N -Ttext $(LOADADDR) -o hvmloader.tmp $(OBJS) acpi/acpi.a
+	$(LD) $(LDFLAGS_DIRECT) -N -Ttext $(LOADADDR) -o hvmloader.tmp $(OBJS) acpi/acpi.a
 	$(OBJCOPY) hvmloader.tmp hvmloader
 	rm -f hvmloader.tmp
 

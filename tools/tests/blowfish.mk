@@ -10,13 +10,12 @@ CFLAGS  += $(call cc-option,$(CC),-fno-stack-protector,)
 CFLAGS  += $(call cc-option,$(CC),-fno-stack-protector-all,)
 
 CFLAGS  += -fno-builtin -O2 -msoft-float
-LDFLAGS  = -nostdlib -Wl,-N -Wl,-Ttext -Wl,0x100000
 
 .PHONY: all
 all: blowfish.bin
 
 blowfish.bin: blowfish.c
 	$(CC) $(CFLAGS) -c blowfish.c
-	$(CC) $(CFLAGS) $(LDFLAGS) -o blowfish.tmp blowfish.o
+	$(LD) $(LDFLAGS_DIRECT) -N -Ttext 0x100000 -o blowfish.tmp blowfish.o
 	$(OBJCOPY) -O binary blowfish.tmp blowfish.bin
 	rm -f blowfish.tmp

@@ -46,7 +46,7 @@ all: vmxassist.bin
 
 vmxassist.bin: vmxassist.ld $(OBJECTS)
 	$(CPP) $(DEFINES) vmxassist.ld > vmxassist.tmp
-	$(LD) -o vmxassist $(LDFLAGS_DIRECT) -nostdlib --fatal-warnings -N -T vmxassist.tmp $(OBJECTS)
+	$(LD) -o vmxassist $(LDFLAGS_DIRECT) --fatal-warnings -N -T vmxassist.tmp $(OBJECTS)
 	nm -n vmxassist > vmxassist.sym
 	$(OBJCOPY) -p -O binary -R .note -R .comment -R .bss -S --gap-fill=0 vmxassist vmxassist.tmp
 	dd if=vmxassist.tmp of=vmxassist.bin ibs=512 conv=sync
