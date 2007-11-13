@@ -80,6 +80,16 @@ gdt_descr:
         .word   LAST_RESERVED_GDT_BYTE
         .long   gdt_table - FIRST_RESERVED_GDT_BYTE
 
+
+#ifdef CONFIG_X86_PAE
+        .align 32
+ENTRY(idle_pg_table)
+        .long sym_phys(idle_pg_table_l2) + 0*PAGE_SIZE + 0x01, 0
+        .long sym_phys(idle_pg_table_l2) + 1*PAGE_SIZE + 0x01, 0
+        .long sym_phys(idle_pg_table_l2) + 2*PAGE_SIZE + 0x01, 0
+        .long sym_phys(idle_pg_table_l2) + 3*PAGE_SIZE + 0x01, 0
+#endif
+
         .align PAGE_SIZE, 0
 /* NB. Rings != 0 get access up to MACH2PHYS_VIRT_END. This allows access to */
 /*     the machine->physical mapping table. Ring 0 can access all memory.    */
@@ -94,14 +104,4 @@ ENTRY(gdt_table)
         GUEST_DESC(0x00c0b200)       /* 0xe021 ring 1 3.xxGB data at 0x0 */
         GUEST_DESC(0x00c0fa00)       /* 0xe02b ring 3 3.xxGB code at 0x0 */
         GUEST_DESC(0x00c0f200)       /* 0xe033 ring 3 3.xxGB data at 0x0 */
-        .quad 0x0000000000000000     /* unused                           */
-        .fill 2*NR_CPUS,8,0          /* space for TSS and LDT per CPU    */
-
-#ifdef CONFIG_X86_PAE
-        .align 32
-ENTRY(idle_pg_table)
-        .long sym_phys(idle_pg_table_l2) + 0*PAGE_SIZE + 0x01, 0
-        .long sym_phys(idle_pg_table_l2) + 1*PAGE_SIZE + 0x01, 0
-        .long sym_phys(idle_pg_table_l2) + 2*PAGE_SIZE + 0x01, 0
-        .long sym_phys(idle_pg_table_l2) + 3*PAGE_SIZE + 0x01, 0
-#endif
+        .align PAGE_SIZE,0

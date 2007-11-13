@@ -105,8 +105,6 @@ ENTRY(gdt_table)
         .quad 0x00cff2000000ffff     /* 0xe02b ring 3 data                */
         .quad 0x00affa000000ffff     /* 0xe033 ring 3 code, 64-bit mode   */
         .quad 0x00cf9a000000ffff     /* 0xe038 ring 0 code, compatibility */
-        .org gdt_table - FIRST_RESERVED_GDT_BYTE + __TSS(0) * 8
-        .fill 4*NR_CPUS,8,0          /* space for TSS and LDT per CPU     */
 
         .align PAGE_SIZE, 0
 /* NB. Even rings != 0 get access to the full 4Gb, as only the            */
@@ -120,5 +118,4 @@ ENTRY(compat_gdt_table)
         .quad 0x00cffa000000ffff     /* 0xe02b ring 3 code, compatibility */
         .quad 0x00cff2000000ffff     /* 0xe033 ring 3 data                */
         .quad 0x00cf9a000000ffff     /* 0xe038 ring 0 code, compatibility */
-        .org compat_gdt_table - FIRST_RESERVED_GDT_BYTE + __TSS(0) * 8
-        .fill 4*NR_CPUS,8,0          /* space for TSS and LDT per CPU     */
+        .align PAGE_SIZE, 0
