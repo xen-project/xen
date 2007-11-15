@@ -920,23 +920,23 @@ class XendDomainInfo:
 
 
     def readDomTxn(self, transaction, *args):
-        paths = map(lambda x: self.vmpath + "/" + x, args)
+        paths = map(lambda x: self.dompath + "/" + x, args)
         return transaction.read(*paths)
 
     def gatherDomTxn(self, transaction, *args):
-        paths = map(lambda x: self.vmpath + "/" + x, args)
+        paths = map(lambda x: self.dompath + "/" + x, args)
         return transaction.gather(*paths)
 
     def _writeDomTxn(self, transaction, *args):
-        paths = map(lambda x: self.vmpath + "/" + x, args)
+        paths = map(lambda x: self.dompath + "/" + x, args)
         return transaction.write(*paths)
 
     def _removeDomTxn(self, transaction, *args):
-        paths = map(lambda x: self.vmpath + "/" + x, args)
+        paths = map(lambda x: self.dompath + "/" + x, args)
         return transaction.remove(*paths)
 
     def storeDomTxn(self, transaction, *args):
-        paths = map(lambda x: self.vmpath + "/" + x, args)
+        paths = map(lambda x: self.dompath + "/" + x, args)
         return transaction.store(*paths)
 
 
