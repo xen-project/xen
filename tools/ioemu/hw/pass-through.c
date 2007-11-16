@@ -130,7 +130,7 @@ void pt_iomem_map(PCIDevice *d, int i, uint32_t e_phys, uint32_t e_size,
         ret = xc_domain_memory_mapping(xc_handle, domid,
                 old_ebase >> XC_PAGE_SHIFT,
                 assigned_device->bases[i].access.maddr >> XC_PAGE_SHIFT,
-                (e_size+XC_PAGE_MASK) >> XC_PAGE_SHIFT,
+                (e_size+XC_PAGE_SIZE-1) >> XC_PAGE_SHIFT,
                 DPCI_REMOVE_MAPPING);
         if ( ret != 0 )
         {
@@ -143,7 +143,7 @@ void pt_iomem_map(PCIDevice *d, int i, uint32_t e_phys, uint32_t e_size,
     ret = xc_domain_memory_mapping(xc_handle, domid,
             assigned_device->bases[i].e_physbase >> XC_PAGE_SHIFT,
             assigned_device->bases[i].access.maddr >> XC_PAGE_SHIFT,
-            (e_size+XC_PAGE_MASK) >> XC_PAGE_SHIFT,
+            (e_size+XC_PAGE_SIZE-1) >> XC_PAGE_SHIFT,
             DPCI_ADD_MAPPING);
     if ( ret != 0 )
         PT_LOG("Error: create new mapping failed!\n");
