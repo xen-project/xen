@@ -159,8 +159,6 @@ extern void hvm_io_assist(void);
 extern void hvm_dpci_eoi(struct domain *d, unsigned int guest_irq,
                          union vioapic_redir_entry *ent);
 
-#ifdef __x86_64__
-
 struct hvm_hw_stdvga {
     uint8_t sr_index;
     uint8_t sr[0x18];
@@ -169,20 +167,12 @@ struct hvm_hw_stdvga {
     uint32_t latch;
     int stdvga;
     int cache;
-    uint8_t *vram_ptr[64];  /* shadow of 0xa0000-0xaffff */
+    struct page_info *vram_page[64];  /* shadow of 0xa0000-0xaffff */
     spinlock_t lock;
 };
 
 void stdvga_init(struct domain *d);
 void stdvga_deinit(struct domain *d);
-
-#else /* __i386__ */
-
-struct hvm_hw_stdvga {};
-#define stdvga_init(d)   ((void)0)
-#define stdvga_deinit(d) ((void)0)
-
-#endif
 
 #endif /* __ASM_X86_HVM_IO_H__ */
 

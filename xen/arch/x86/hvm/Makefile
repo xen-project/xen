@@ -17,5 +17,4 @@ obj-y += vioapic.o
 obj-y += vlapic.o
 obj-y += vpic.o
 obj-y += save.o
-
-obj-$(x86_64) += stdvga.o
+obj-y += stdvga.o

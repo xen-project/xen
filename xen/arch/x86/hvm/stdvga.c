@@ -30,14 +30,8 @@
 #include <xen/config.h>
 #include <xen/types.h>
 #include <xen/sched.h>
+#include <xen/domain_page.h>
 #include <asm/hvm/support.h>
-
-#define vram_b(_s, _a) \
-    (((uint8_t*) (_s)->vram_ptr[((_a)>>12)&0x3f])[(_a)&0xfff])
-#define vram_w(_s, _a) \
-    (((uint16_t*)(_s)->vram_ptr[((_a)>>11)&0x3f])[(_a)&0x7ff])
-#define vram_l(_s, _a) \
-    (((uint32_t*)(_s)->vram_ptr[((_a)>>10)&0x3f])[(_a)&0x3ff])
 
 #define PAT(x) (x)
 static const uint32_t mask16[16] = {
@@ -82,6 +76,25 @@ const uint8_t gr_mask[16] = {
     (uint8_t)~0xf0, /* 0x07 */
     (uint8_t)~0x00, /* 0x08 */
 };
+
+static uint8_t *vram_getb(struct hvm_hw_stdvga *s, unsigned int a)
+{
+    struct page_info *pg = s->vram_page[(a >> 12) & 0x3f];
+    uint8_t *p = map_domain_page(page_to_mfn(pg));
+    return &p[a & 0xfff];
+}
+
+static uint32_t *vram_getl(struct hvm_hw_stdvga *s, unsigned int a)
+{
+    struct page_info *pg = s->vram_page[(a >> 10) & 0x3f];
+    uint32_t *p = map_domain_page(page_to_mfn(pg));
+    return &p[a & 0x3ff];
+}
+
+static void vram_put(struct hvm_hw_stdvga *s, void *p)
+{
+    unmap_domain_page(p);
+}
 
 static uint64_t stdvga_inb(uint64_t addr)
 {
@@ -190,20 +203,9 @@ static void stdvga_outb(uint64_t addr, uint8_t val)
         break;
 
     case 0x3cf:                 /* graphics data register */
+        s->gr[s->gr_index] = val;
         if ( s->gr_index < sizeof(gr_mask) )
-        {
-            s->gr[s->gr_index] = val & gr_mask[s->gr_index];
-        }
-        else if ( (s->gr_index == 0xff) && (s->vram_ptr != NULL) )
-        {
-            uint32_t addr;
-            for ( addr = 0xa0000; addr < 0xa4000; addr += 2 )
-                vram_w(s, addr) = (val << 8) | s->gr[0xfe];
-        }
-        else
-        {
-            s->gr[s->gr_index] = val;
-        }
+            s->gr[s->gr_index] &= gr_mask[s->gr_index];
         break;
     }
 
@@ -326,7 +328,8 @@ static uint8_t stdvga_mem_readb(uint64_t addr)
 {
     struct hvm_hw_stdvga *s = &current->domain->arch.hvm_domain.stdvga;
     int plane;
-    uint32_t ret;
+    uint32_t ret, *vram_l;
+    uint8_t *vram_b;
 
     addr &= 0x1ffff;
     if ( addr >= 0x10000 )
@@ -335,18 +338,24 @@ static uint8_t stdvga_mem_readb(uint64_t addr)
     if ( s->sr[4] & 0x08 )
     {
         /* chain 4 mode : simplest access */
-        ret = vram_b(s, addr);
+        vram_b = vram_getb(s, addr);
+        ret = *vram_b;
+        vram_put(s, vram_b);
     }
     else if ( s->gr[5] & 0x10 )
     {
         /* odd/even mode (aka text mode mapping) */
         plane = (s->gr[4] & 2) | (addr & 1);
-        ret = vram_b(s, ((addr & ~1) << 1) | plane);
+        vram_b = vram_getb(s, ((addr & ~1) << 1) | plane);
+        ret = *vram_b;
+        vram_put(s, vram_b);
     }
     else
     {
         /* standard VGA latched access */
-        s->latch = vram_l(s, addr);
+        vram_l = vram_getl(s, addr);
+        s->latch = *vram_l;
+        vram_put(s, vram_l);
 
         if ( !(s->gr[5] & 0x08) )
         {
@@ -401,7 +410,8 @@ static void stdvga_mem_writeb(uint64_t addr, uint32_t val)
 {
     struct hvm_hw_stdvga *s = &current->domain->arch.hvm_domain.stdvga;
     int plane, write_mode, b, func_select, mask;
-    uint32_t write_mask, bit_mask, set_mask;
+    uint32_t write_mask, bit_mask, set_mask, *vram_l;
+    uint8_t *vram_b;
 
     addr &= 0x1ffff;
     if ( addr >= 0x10000 )
@@ -413,8 +423,13 @@ static void stdvga_mem_writeb(uint64_t addr, uint32_t val)
         plane = addr & 3;
         mask = (1 << plane);
         if ( s->sr[2] & mask )
-            vram_b(s, addr) = val;
-    } else if ( s->gr[5] & 0x10 )
+        {
+            vram_b = vram_getb(s, addr);
+            *vram_b = val;
+            vram_put(s, vram_b);
+        }
+    }
+    else if ( s->gr[5] & 0x10 )
     {
         /* odd/even mode (aka text mode mapping) */
         plane = (s->gr[4] & 2) | (addr & 1);
@@ -422,7 +437,9 @@ static void stdvga_mem_writeb(uint64_t addr, uint32_t val)
         if ( s->sr[2] & mask )
         {
             addr = ((addr & ~1) << 1) | plane;
-            vram_b(s, addr) = val;
+            vram_b = vram_getb(s, addr);
+            *vram_b = val;
+            vram_put(s, vram_b);
         }
     }
     else
@@ -491,9 +508,9 @@ static void stdvga_mem_writeb(uint64_t addr, uint32_t val)
         /* mask data according to sr[2] */
         mask = s->sr[2];
         write_mask = mask16[mask];
-        vram_l(s, addr) =
-            (vram_l(s, addr) & ~write_mask) |
-            (val & write_mask);
+        vram_l = vram_getl(s, addr);
+        *vram_l = (*vram_l & ~write_mask) | (val & write_mask);
+        vram_put(s, vram_l);
     }
 }
 
@@ -661,30 +678,33 @@ int stdvga_intercept_mmio(ioreq_t *p)
 
 void stdvga_init(struct domain *d)
 {
-    int i;
     struct hvm_hw_stdvga *s = &d->arch.hvm_domain.stdvga;
+    struct page_info *pg;
+    void *p;
+    int i;
+
     memset(s, 0, sizeof(*s));
     spin_lock_init(&s->lock);
     
-    for ( i = 0; i != ARRAY_SIZE(s->vram_ptr); i++ )
+    for ( i = 0; i != ARRAY_SIZE(s->vram_page); i++ )
     {
-        struct page_info *vram_page;
-        vram_page = alloc_domheap_page(NULL);
-        if ( vram_page == NULL )
+        if ( (pg = alloc_domheap_page(NULL)) == NULL )
             break;
-        s->vram_ptr[i] = page_to_virt(vram_page);
-        memset(s->vram_ptr[i], 0, PAGE_SIZE);
+        s->vram_page[i] = pg;
+        p = map_domain_page(page_to_mfn(pg));
+        clear_page(p);
+        unmap_domain_page(p);
     }
 
-    if ( i == ARRAY_SIZE(s->vram_ptr) )
+    if ( i == ARRAY_SIZE(s->vram_page) )
     {
         /* Sequencer registers. */
         register_portio_handler(d, 0x3c4, 2, stdvga_intercept_pio);
         /* Graphics registers. */
         register_portio_handler(d, 0x3ce, 2, stdvga_intercept_pio);
         /* MMIO. */
-        register_buffered_io_handler(d, 0xa0000, 0x10000,
-                                     stdvga_intercept_mmio);
+        register_buffered_io_handler(
+            d, 0xa0000, 0x10000, stdvga_intercept_mmio);
     }
 }
 
@@ -693,13 +713,11 @@ void stdvga_deinit(struct domain *d)
     struct hvm_hw_stdvga *s = &d->arch.hvm_domain.stdvga;
     int i;
 
-    for ( i = 0; i != ARRAY_SIZE(s->vram_ptr); i++ )
+    for ( i = 0; i != ARRAY_SIZE(s->vram_page); i++ )
     {
-        struct page_info *vram_page;
-        if ( s->vram_ptr[i] == NULL )
+        if ( s->vram_page[i] == NULL )
             continue;
-        vram_page = virt_to_page(s->vram_ptr[i]);
-        free_domheap_page(vram_page);
-        s->vram_ptr[i] = NULL;
+        free_domheap_page(s->vram_page[i]);
+        s->vram_page[i] = NULL;
     }
 }
