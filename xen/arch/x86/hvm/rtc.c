@@ -128,7 +128,6 @@ static int rtc_ioport_write(void *opaque, uint32_t addr, uint32_t data)
         {
             /* set mode: reset UIP mode */
             s->hw.cmos_data[RTC_REG_A] &= ~RTC_UIP;
-            data &= ~RTC_UIE;
         }
         else
         {
@@ -350,7 +349,7 @@ static void rtc_update_second2(void *opaque)
     }
 
     /* update ended interrupt */
-    if ( s->hw.cmos_data[RTC_REG_B] & RTC_UIE )
+    if ( (s->hw.cmos_data[RTC_REG_B] & (RTC_UIE|RTC_SET)) == RTC_UIE )
     {
         s->hw.cmos_data[RTC_REG_C] |= 0x90; 
         hvm_isa_irq_deassert(d, RTC_IRQ);
