@@ -198,10 +198,15 @@ while not interrupted:
             if defs.has_key(str(event)): 
                 print defs[str(event)] % args
             else:
-               if defs.has_key(str(0)): print defs[str(0)] % args
+                if defs.has_key(str(0)): print defs[str(0)] % args
         except TypeError:
-            print defs[str(event)]
-            print args
+            if defs.has_key(str(event)):
+                print defs[str(event)]
+                print args
+            else:
+                if defs.has_key(str(0)):
+                    print defs[str(0)]
+                    print args
 
 
     except IOError, struct.error: sys.exit()
