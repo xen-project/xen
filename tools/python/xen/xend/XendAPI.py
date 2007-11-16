@@ -994,6 +994,8 @@ class XendAPI(object):
     def host_get_log(self, session, host_ref):
         log_file = open(XendLogging.getLogFilename())
         log_buffer = log_file.read()
+        log_buffer = log_buffer.replace('\b', ' ')
+        log_buffer = log_buffer.replace('\f', '\n')
         return xen_api_success(log_buffer)
 
     def host_send_debug_keys(self, _, host_ref, keys):
