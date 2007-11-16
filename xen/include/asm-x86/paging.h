@@ -152,6 +152,28 @@ void paging_log_dirty_init(struct domain *d,
 /* mark a page as dirty */
 void paging_mark_dirty(struct domain *d, unsigned long guest_mfn);
 
+/*
+ * Log-dirty radix tree indexing:
+ *   All tree nodes are PAGE_SIZE bytes, mapped on-demand.
+ *   Leaf nodes are simple bitmaps; 1 bit per guest pfn.
+ *   Interior nodes are arrays of LOGDIRTY_NODE_ENTRIES mfns.
+ * TODO: Dynamic radix tree height. Most guests will only need 2 levels.
+ *       The fourth level is basically unusable on 32-bit Xen.
+ * TODO2: Abstract out the radix-tree mechanics?
+ */
+#define LOGDIRTY_NODE_ENTRIES (1 << PAGETABLE_ORDER)
+#define L1_LOGDIRTY_IDX(pfn) ((pfn) & ((1 << (PAGE_SHIFT+3)) - 1))
+#define L2_LOGDIRTY_IDX(pfn) (((pfn) >> (PAGE_SHIFT+3)) & \
+                              (LOGDIRTY_NODE_ENTRIES-1))
+#define L3_LOGDIRTY_IDX(pfn) (((pfn) >> (PAGE_SHIFT+3+PAGETABLE_ORDER)) & \
+                              (LOGDIRTY_NODE_ENTRIES-1))
+#if BITS_PER_LONG == 64
+#define L4_LOGDIRTY_IDX(pfn) (((pfn) >> (PAGE_SHIFT+3+PAGETABLE_ORDER*2)) & \
+                              (LOGDIRTY_NODE_ENTRIES-1))
+#else
+#define L4_LOGDIRTY_IDX(pfn) 0
+#endif
+
 /*****************************************************************************
  * Entry points into the paging-assistance code */
 

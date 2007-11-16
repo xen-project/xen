@@ -158,9 +158,10 @@ struct log_dirty_domain {
     int            locker; /* processor that holds the lock */
     const char    *locker_function; /* func that took it */
 
-    /* log-dirty bitmap to record dirty pages */
-    unsigned long *bitmap;
-    unsigned int   bitmap_size;  /* in pages, bit per page */
+    /* log-dirty radix tree to record dirty pages */
+    mfn_t          top;
+    unsigned int   allocs;
+    unsigned int   failed_allocs;
 
     /* log-dirty mode stats */
     unsigned int   fault_count;

@@ -491,17 +491,50 @@ sh_mfn_is_dirty(struct domain *d, mfn_t gmfn)
 /* Is this guest page dirty?  Call only in log-dirty mode. */
 {
     unsigned long pfn;
+    mfn_t mfn, *l4, *l3, *l2;
+    uint8_t *l1;
+    int rv;
+
     ASSERT(shadow_mode_log_dirty(d));
-    ASSERT(d->arch.paging.log_dirty.bitmap != NULL);
+    ASSERT(mfn_valid(d->arch.paging.log_dirty.top));
 
     /* We /really/ mean PFN here, even for non-translated guests. */
     pfn = get_gpfn_from_mfn(mfn_x(gmfn));
-    if ( likely(VALID_M2P(pfn))
-         && likely(pfn < d->arch.paging.log_dirty.bitmap_size) 
-         && test_bit(pfn, d->arch.paging.log_dirty.bitmap) )
+    if ( unlikely(!VALID_M2P(pfn)) )
+        return 0;
+    
+    if (d->arch.paging.log_dirty.failed_allocs > 0)
+        /* If we have any failed allocations our dirty log is bogus.
+         * Since we can't signal an error here, be conservative and
+         * report "dirty" in this case.  (The only current caller,
+         * _sh_propagate, leaves known-dirty pages writable, preventing
+         * subsequent dirty-logging faults from them.)
+         */
         return 1;
 
-    return 0;
+    l4 = map_domain_page(mfn_x(d->arch.paging.log_dirty.top));
+    mfn = l4[L4_LOGDIRTY_IDX(pfn)];
+    unmap_domain_page(l4);
+    if (!mfn_valid(mfn))
+        return 0;
+
+    l3 = map_domain_page(mfn_x(mfn));
+    mfn = l3[L3_LOGDIRTY_IDX(pfn)];
+    unmap_domain_page(l3);
+    if (!mfn_valid(mfn))
+        return 0;
+
+    l2 = map_domain_page(mfn_x(mfn));
+    mfn = l2[L2_LOGDIRTY_IDX(pfn)];
+    unmap_domain_page(l2);
+    if (!mfn_valid(mfn))
+        return 0;
+
+    l1 = map_domain_page(mfn_x(mfn));
+    rv = test_bit(L1_LOGDIRTY_IDX(pfn), l1);
+    unmap_domain_page(l1);
+
+    return rv;
 }
 
 
