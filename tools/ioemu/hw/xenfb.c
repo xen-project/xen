@@ -488,12 +488,27 @@ static void xenfb_on_fb_event(struct xenfb *xenfb)
 	rmb();			/* ensure we see ring contents up to prod */
 	for (cons = page->out_cons; cons != prod; cons++) {
 		union xenfb_out_event *event = &XENFB_OUT_RING_REF(page, cons);
+		int x, y, w, h;
 
 		switch (event->type) {
 		case XENFB_TYPE_UPDATE:
-			xenfb_guest_copy(xenfb,
-					 event->update.x, event->update.y,
-					 event->update.width, event->update.height);
+			x = MAX(event->update.x, 0);
+			y = MAX(event->update.y, 0);
+			w = MIN(event->update.width, xenfb->width - x);
+			h = MIN(event->update.height, xenfb->height - y);
+			if (w < 0 || h < 0) {
+				fprintf(stderr, "%s bogus update ignored\n",
+					xenfb->fb.nodename);
+				break;
+			}
+			if (x != event->update.x || y != event->update.y
+			    || w != event->update.width
+			    || h != event->update.height) {
+				fprintf(stderr, "%s bogus update clipped\n",
+					xenfb->fb.nodename);
+				break;
+			}
+			xenfb_guest_copy(xenfb, x, y, w, h);
 			break;
 		}
 	}
