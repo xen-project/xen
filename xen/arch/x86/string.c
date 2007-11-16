@@ -13,7 +13,7 @@ void *memcpy(void *dest, const void *src, size_t n)
 {
     long d0, d1, d2;
 
-    __asm__ __volatile__ (
+    asm volatile (
 #ifdef __i386__
         "   rep movsl        ; "
 #else
@@ -42,7 +42,7 @@ void *memset(void *s, int c, size_t n)
 {
     long d0, d1;
 
-    __asm__ __volatile__ (
+    asm volatile (
         "rep stosb"
         : "=&c" (d0), "=&D" (d1)
         : "a" (c), "1" (s), "0" (n)
@@ -59,7 +59,7 @@ void *memmove(void *dest, const void *src, size_t n)
     if ( dest < src )
         return memcpy(dest, src, n);
 
-    __asm__ __volatile__ (
+    asm volatile (
         "   std         ; "
         "   rep movsb   ; "
         "   cld           "
@@ -69,3 +69,13 @@ void *memmove(void *dest, const void *src, size_t n)
 
     return dest;
 }
+
+/*
+ * Local variables:
+ * mode: C
+ * c-set-style: "BSD"
+ * c-basic-offset: 4
+ * tab-width: 4
+ * indent-tabs-mode: nil
+ * End:
+ */
