@@ -533,6 +533,7 @@ static void dma_pte_clear_one(struct domain *domain, u64 addr)
                 iommu_flush_write_buffer(iommu);
         }
     }
+    unmap_domain_page(pte);
 }
 
 /* clear last level pte, a tlb flush should be followed */
@@ -899,7 +900,7 @@ struct iommu *iommu_alloc(void *hw_data)
 {
     struct acpi_drhd_unit *drhd = (struct acpi_drhd_unit *) hw_data;
     struct iommu *iommu;
-    
+
     if ( nr_iommus > MAX_IOMMUS )
     {
         gdprintk(XENLOG_ERR VTDPREFIX,
@@ -914,7 +915,7 @@ struct iommu *iommu_alloc(void *hw_data)
 
     set_fixmap_nocache(FIX_IOMMU_REGS_BASE_0 + nr_iommus, drhd->address);
     iommu->reg = (void *) fix_to_virt(FIX_IOMMU_REGS_BASE_0 + nr_iommus);
-    dprintk(XENLOG_INFO VTDPREFIX,
+    dprintk(XENLOG_ERR VTDPREFIX,
             "iommu_alloc: iommu->reg = %p drhd->address = %lx\n",
             iommu->reg, drhd->address);
     nr_iommus++;
@@ -1009,28 +1010,22 @@ static int domain_context_mapping_one(
     context = device_to_context_entry(iommu, bus, devfn);
     if ( !context )
     {
-        gdprintk(XENLOG_INFO VTDPREFIX,
+        gdprintk(XENLOG_ERR VTDPREFIX,
                  "domain_context_mapping_one:context == NULL:"
                  "bdf = %x:%x:%x\n",
                  bus, PCI_SLOT(devfn), PCI_FUNC(devfn));
         return -ENOMEM;
     }
-    spin_lock_irqsave(&iommu->lock, flags);
+
     if ( context_present(*context) )
     {
-        spin_unlock_irqrestore(&iommu->lock, flags);
         gdprintk(XENLOG_INFO VTDPREFIX,
                  "domain_context_mapping_one:context present:bdf=%x:%x:%x\n",
                  bus, PCI_SLOT(devfn), PCI_FUNC(devfn));
         return 0;
     }
 
-#ifdef VTD_DEBUG
-    dprintk(XENLOG_INFO VTDPREFIX,
-            "context_mapping_one_1-%x:%x:%x-*context = %lx %lx\n",
-            bus, PCI_SLOT(devfn), PCI_FUNC(devfn), context->hi, context->lo);
-#endif
-
+    spin_lock_irqsave(&iommu->lock, flags);
     /*
      * domain_id 0 is not valid on Intel's IOMMU, force domain_id to
      * be 1 based as required by intel's iommu hw.
@@ -1039,9 +1034,7 @@ static int domain_context_mapping_one(
     context_set_address_width(*context, hd->agaw);
 
     if ( ecap_pass_thru(iommu->ecap) )
-    {
         context_set_translation_type(*context, CONTEXT_TT_PASS_THRU);
-    }
     else
     {
         context_set_address_root(*context, virt_to_maddr(hd->pgd));
@@ -1052,15 +1045,14 @@ static int domain_context_mapping_one(
     context_set_present(*context);
     iommu_flush_cache_entry(iommu, context);
 
-#ifdef VTD_DEBUG
-    dprintk(XENLOG_INFO VTDPREFIX,
-            "context_mapping_one_2-%x:%x:%x-*context=%lx %lx hd->pgd = %p\n",
-            bus, PCI_SLOT(devfn), PCI_FUNC(devfn),
-            context->hi, context->lo, hd->pgd);
-#endif
+    gdprintk(XENLOG_INFO VTDPREFIX,
+             "context_mapping_one-%x:%x:%x-*context=%"PRIx64":%"PRIx64
+             " hd->pgd=%p\n",
+             bus, PCI_SLOT(devfn), PCI_FUNC(devfn),
+             context->hi, context->lo, hd->pgd);
 
     if ( iommu_flush_context_device(iommu, domain->domain_id,
-                                   (((u16)bus) << 8) | devfn,
+                                    (((u16)bus) << 8) | devfn,
                                     DMA_CCMD_MASK_NOBIT, 1) )
         iommu_flush_write_buffer(iommu);
     else
@@ -1177,14 +1169,12 @@ static int domain_context_mapping(
                  pdev->bus, PCI_SLOT(pdev->devfn), PCI_FUNC(pdev->devfn));
 
         if ( pdev->bus == 0 )
-        {
             ret = domain_context_mapping_one(
                 domain, iommu, (u8)(pdev->bus), (u8)(pdev->devfn));
-        }
         else
         {
             if ( bus2bridge[pdev->bus].bus != 0 )
-                gdprintk(XENLOG_ERR VTDPREFIX,
+                gdprintk(XENLOG_WARNING VTDPREFIX,
                          "domain_context_mapping:bus2bridge"
                          "[pdev->bus].bus != 0\n");
 
@@ -1229,17 +1219,15 @@ static int domain_context_unmap_one(
     context = device_to_context_entry(iommu, bus, devfn);
     if ( !context )
     {
-        gdprintk(XENLOG_INFO VTDPREFIX,
+        gdprintk(XENLOG_ERR VTDPREFIX,
                  "domain_context_unmap_one-%x:%x:%x- context == NULL:return\n",
                  bus, PCI_SLOT(devfn), PCI_FUNC(devfn));
         return -ENOMEM;
     }
 
-    spin_lock_irqsave(&iommu->lock, flags);
     if ( !context_present(*context) )
     {
-        spin_unlock_irqrestore(&iommu->lock, flags);
-        gdprintk(XENLOG_INFO VTDPREFIX,
+        gdprintk(XENLOG_WARNING VTDPREFIX,
                  "domain_context_unmap_one-%x:%x:%x- "
                  "context NOT present:return\n",
                  bus, PCI_SLOT(devfn), PCI_FUNC(devfn));
@@ -1247,19 +1235,16 @@ static int domain_context_unmap_one(
     }
 
     gdprintk(XENLOG_INFO VTDPREFIX,
-             "domain_context_unmap_one_1:bdf = %x:%x:%x\n",
+             "domain_context_unmap_one: bdf = %x:%x:%x\n",
              bus, PCI_SLOT(devfn), PCI_FUNC(devfn));
 
+    spin_lock_irqsave(&iommu->lock, flags);
     context_clear_present(*context);
     context_clear_entry(*context);
     iommu_flush_cache_entry(iommu, context);
     iommu_flush_context_global(iommu, 0);
     iommu_flush_iotlb_global(iommu, 0);
     spin_unlock_irqrestore(&iommu->lock, flags);
-
-    gdprintk(XENLOG_INFO VTDPREFIX,
-             "domain_context_unmap_one_2:bdf = %x:%x:%x\n",
-             bus, PCI_SLOT(devfn), PCI_FUNC(devfn));
 
     return 0;
 }
@@ -1302,15 +1287,13 @@ static int domain_context_unmap(
                  "domain_context_unmap:PCI: bdf = %x:%x:%x\n",
                  pdev->bus, PCI_SLOT(pdev->devfn), PCI_FUNC(pdev->devfn));
         if ( pdev->bus == 0 )
-        {
             ret = domain_context_unmap_one(
                 domain, iommu,
                 (u8)(pdev->bus), (u8)(pdev->devfn));
-        }
         else
         {
             if ( bus2bridge[pdev->bus].bus != 0 )
-                gdprintk(XENLOG_INFO VTDPREFIX,
+                gdprintk(XENLOG_WARNING VTDPREFIX,
                          "domain_context_mapping:"
                          "bus2bridge[pdev->bus].bus != 0\n");
 
@@ -1318,7 +1301,7 @@ static int domain_context_unmap(
                                            (u8)(bus2bridge[pdev->bus].bus),
                                            (u8)(bus2bridge[pdev->bus].devfn));
 
-            /* now map everything behind the PCI bridge */
+            /* Unmap everything behind the PCI bridge */
             for ( dev = 0; dev < 32; dev++ )
             {
                 for ( func = 0; func < 8; func++ )
@@ -1356,7 +1339,7 @@ void reassign_device_ownership(
     int status;
     unsigned long flags;
 
-    gdprintk(XENLOG_ERR VTDPREFIX,
+    gdprintk(XENLOG_INFO VTDPREFIX,
              "reassign_device-%x:%x:%x- source = %d target = %d\n",
              bus, PCI_SLOT(devfn), PCI_FUNC(devfn),
              source->domain_id, target->domain_id);
@@ -1366,8 +1349,6 @@ void reassign_device_ownership(
         if ( (pdev->bus != bus) || (pdev->devfn != devfn) )
             continue;
 
-        pdev->bus = bus;
-        pdev->devfn = devfn;
         drhd = acpi_find_matched_drhd_unit(pdev);
         iommu = drhd->iommu;
         domain_context_unmap(source, iommu, pdev);
@@ -1825,9 +1806,9 @@ int assign_device(struct domain *d, u8 bus, u8 devfn)
     if ( list_empty(&acpi_drhd_units) )
         return ret;
 
-    dprintk(XENLOG_INFO VTDPREFIX,
-            "assign_device: bus = %x dev = %x func = %x\n",
-            bus, PCI_SLOT(devfn), PCI_FUNC(devfn));
+    gdprintk(XENLOG_INFO VTDPREFIX,
+             "assign_device: bus = %x dev = %x func = %x\n",
+             bus, PCI_SLOT(devfn), PCI_FUNC(devfn));
 
     reassign_device_ownership(dom0, d, bus, devfn);
 
@@ -1870,12 +1851,16 @@ void iommu_set_pgd(struct domain *d)
         if ( !hd->pgd )
         {
             pgd = (struct dma_pte *)alloc_xenheap_page();
-            memset((u8*)pgd, 0, PAGE_SIZE);
-            if ( !hd->pgd )
-                hd->pgd = pgd;
-            else /* somebody is fast */
-                free_xenheap_page((void *) pgd);
-        }
+            if ( !pgd )
+            {
+                spin_unlock_irqrestore(&hd->mapping_lock, flags);
+                gdprintk(XENLOG_ERR VTDPREFIX,
+                         "Allocate pgd memory failed!\n");
+                return;
+            }
+            memset(pgd, 0, PAGE_SIZE);
+            hd->pgd = pgd;
+       }
 
         l3e = map_domain_page(p2m_table);
         switch ( level )
@@ -1892,6 +1877,14 @@ void iommu_set_pgd(struct domain *d)
         case VTD_PAGE_TABLE_LEVEL_4:        /* Stoakley */
             /* We allocate one more page for the top vtd page table. */
             pmd = (struct dma_pte *)alloc_xenheap_page();
+            if ( !pmd )
+            {
+                unmap_domain_page(l3e);
+                spin_unlock_irqrestore(&hd->mapping_lock, flags);
+                gdprintk(XENLOG_ERR VTDPREFIX,
+                         "Allocate pmd memory failed!\n");
+                return;
+            }
             memset((u8*)pmd, 0, PAGE_SIZE);
             pte = &pgd[0];
             dma_set_pte_addr(*pte, virt_to_maddr(pmd));
