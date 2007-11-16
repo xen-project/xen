@@ -763,7 +763,7 @@ void vm_resume_fail(unsigned long eflags)
     domain_crash_synchronous();
 }
 
-static void flush_cache(void *info)
+static void wbinvd_ipi(void *info)
 {
     wbinvd();
 }
@@ -779,16 +779,21 @@ void vmx_do_resume(struct vcpu *v)
     }
     else
     {
-        /* For pass-through domain, guest PCI-E device driver may leverage the
-         * "Non-Snoop" I/O, and explicitly "WBINVD" or "CFLUSH" to a RAM space.
-         * In that case, if migration occurs before "WBINVD" or "CFLUSH", need
-         * to maintain data consistency.
+        /*
+         * For pass-through domain, guest PCI-E device driver may leverage the
+         * "Non-Snoop" I/O, and explicitly WBINVD or CLFLUSH to a RAM space.
+         * Since migration may occur before WBINVD or CLFLUSH, we need to
+         * maintain data consistency either by:
+         *  1: flushing cache (wbinvd) when the guest is scheduled out if
+         *     there is no wbinvd exit, or
+         *  2: execute wbinvd on all dirty pCPUs when guest wbinvd exits.
          */
-        if ( !list_empty(&(domain_hvm_iommu(v->domain)->pdev_list)) )
+        if ( !list_empty(&(domain_hvm_iommu(v->domain)->pdev_list)) &&
+             !cpu_has_wbinvd_exiting )
         {
             int cpu = v->arch.hvm_vmx.active_cpu;
             if ( cpu != -1 )
-                on_selected_cpus(cpumask_of_cpu(cpu), flush_cache, NULL, 1, 1);
+                on_selected_cpus(cpumask_of_cpu(cpu), wbinvd_ipi, NULL, 1, 1);
         }
 
         vmx_clear_vmcs(v);

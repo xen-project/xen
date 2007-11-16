@@ -2638,6 +2638,11 @@ static void vmx_do_extint(struct cpu_user_regs *regs)
     }
 }
 
+static void wbinvd_ipi(void *info)
+{
+    wbinvd();
+}
+
 static void vmx_failed_vmentry(unsigned int exit_reason,
                                struct cpu_user_regs *regs)
 {
@@ -2913,14 +2918,21 @@ asmlinkage void vmx_vmexit_handler(struct cpu_user_regs *regs)
         __update_guest_eip(inst_len);
         if ( !list_empty(&(domain_hvm_iommu(v->domain)->pdev_list)) )
         {
-            wbinvd();
-            /* Disable further WBINVD intercepts. */
-            if ( (exit_reason == EXIT_REASON_WBINVD) &&
-                 (vmx_cpu_based_exec_control &
-                  CPU_BASED_ACTIVATE_SECONDARY_CONTROLS) )
-                __vmwrite(SECONDARY_VM_EXEC_CONTROL,
-                          vmx_secondary_exec_control &
-                          ~SECONDARY_EXEC_WBINVD_EXITING);
+            if ( cpu_has_wbinvd_exiting )
+            {
+                on_each_cpu(wbinvd_ipi, NULL, 1, 1);
+            }
+            else
+            {
+                wbinvd();
+                /* Disable further WBINVD intercepts. */
+                if ( (exit_reason == EXIT_REASON_WBINVD) &&
+                     (vmx_cpu_based_exec_control &
+                      CPU_BASED_ACTIVATE_SECONDARY_CONTROLS) )
+                    __vmwrite(SECONDARY_VM_EXEC_CONTROL,
+                              vmx_secondary_exec_control &
+                              ~SECONDARY_EXEC_WBINVD_EXITING);
+            }
         }
         break;
     }
