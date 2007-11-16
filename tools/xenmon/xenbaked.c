@@ -37,12 +37,12 @@
 #include <fcntl.h>
 #include <unistd.h>
 #include <errno.h>
-#include <argp.h>
 #include <signal.h>
 #include <xenctrl.h>
 #include <xen/xen.h>
 #include <string.h>
 #include <sys/select.h>
+#include <getopt.h>
 
 #define PERROR(_m, _a...)                                       \
 do {                                                            \
@@ -58,7 +58,6 @@ typedef struct { int counter; } atomic_t;
 #include <xen/trace.h>
 #include "xenbaked.h"
 
-extern FILE *stderr;
 
 /***** Compile time configuration of defaults ********************************/
 
@@ -78,7 +77,6 @@ extern FILE *stderr;
 /***** The code **************************************************************/
 
 typedef struct settings_st {
-    char *outfile;
     struct timespec poll_sleep;
     unsigned long new_data_thresh;
     unsigned long ms_per_sample;
@@ -230,10 +228,10 @@ void dump_stats(void)
     }
 
     printf("processed %d total records in %d seconds (%ld per second)\n",
-           rec_count, (int)run_time, rec_count/run_time);
+           rec_count, (int)run_time, (long)(rec_count/run_time));
 
     printf("woke up %d times in %d seconds (%ld per second)\n", wakeups,
-	   (int) run_time, wakeups/run_time);
+	   (int) run_time, (long)(wakeups/run_time));
 
     check_gotten_sum();
 }
@@ -535,58 +533,106 @@ int monitor_tbufs(void)
 
 
 /******************************************************************************
- * Various declarations / definitions GNU argp needs to do its work
+ * Command line handling
  *****************************************************************************/
 
+const char *program_version     = "xenbaked v1.4";
+const char *program_bug_address = "<rob.gardner@hp.com>";
 
-/* command parser for GNU argp - see GNU docs for more info */
-error_t cmd_parser(int key, char *arg, struct argp_state *state)
+#define xstr(x) str(x)
+#define str(x) #x
+
+void usage(void)
 {
-    settings_t *setup = (settings_t *)state->input;
+#define USAGE_STR \
+"Usage: xenbaked [OPTION...]\n" \
+"Tool to capture and partially process Xen trace buffer data\n" \
+"\n" \
+"  -m, --ms_per_sample=MS     Specify the number of milliseconds per sample\n" \
+"                             (default " xstr(MS_PER_SAMPLE) ").\n" \
+"  -s, --poll-sleep=p         Set sleep time, p, in milliseconds between\n" \
+"                             polling the trace buffer for new data\n" \
+"                             (default " xstr(POLL_SLEEP_MILLIS) ").\n" \
+"  -t, --log-thresh=l         Set number, l, of new records required to\n" \
+"                             trigger a write to output (default " \
+                              xstr(NEW_DATA_THRESH) ").\n" \
+"  -?, --help                 Show this message\n" \
+" -V, --version              Print program version\n" \
+"\n" \
+"This tool is used to capture trace buffer data from Xen.  The data is\n" \
+"saved in a shared memory structure to be further processed by xenmon.\n"
 
-    switch ( key )
-    {
-    case 't': /* set new records threshold for logging */
-    {
-        char *inval;
-        setup->new_data_thresh = strtol(arg, &inval, 0);
-        if ( inval == arg )
-            argp_usage(state);
-    }
-    break;
+    printf(USAGE_STR);
+    printf("\nReport bugs to %s\n", program_bug_address);
 
-    case 's': /* set sleep time (given in milliseconds) */
-    {
-        char *inval;
-        setup->poll_sleep = millis_to_timespec(strtol(arg, &inval, 0));
-        if ( inval == arg )
-            argp_usage(state);
-    }
-    break;
+    exit(EXIT_FAILURE);
+}
 
-    case 'm': /* set ms_per_sample */
-    {
-        char *inval;
-        setup->ms_per_sample = strtol(arg, &inval, 0);
-        if ( inval == arg )
-            argp_usage(state);
-    }
-    break;
+/* convert the argument string pointed to by arg to a long int representation */
+long argtol(const char *restrict arg, int base)
+{
+    char *endp; 
+    long val;
 
-    case ARGP_KEY_ARG:
-    {
-        if ( state->arg_num == 0 )
-            setup->outfile = arg;
-        else
-            argp_usage(state);
-    }
-    break;
+    errno = 0;
+    val = strtol(arg, &endp, base);
 
-    default:
-        return ARGP_ERR_UNKNOWN;
+    if (errno != 0) {
+        fprintf(stderr, "Invalid option argument: %s\n", arg);
+        fprintf(stderr, "Error: %s\n\n", strerror(errno));
+        usage();
+    } else if (endp == arg || *endp != '\0') {
+        fprintf(stderr, "Invalid option argument: %s\n\n", arg);
+        usage();
     }
 
-    return 0;
+    return val;
+}
+
+/* parse command line arguments */
+void parse_args(int argc, char **argv)
+{
+    int option;
+    static struct option long_options[] = {
+        { "log-thresh",    required_argument, 0, 't' },
+        { "poll-sleep",    required_argument, 0, 's' },
+        { "ms_per_sample", required_argument, 0, 'm' },
+        { "help",          no_argument,       0, '?' },
+        { "version",       no_argument,       0, 'V' },
+        { 0, 0, 0, 0 }
+    };
+
+    while ( (option = getopt_long(argc, argv, "m:s:t:?V",
+                    long_options, NULL)) != -1)
+    {
+        switch ( option )
+        {
+            case 't': /* set new records threshold for logging */
+                opts.new_data_thresh = argtol(optarg, 0);
+                break;
+
+            case 's': /* set sleep time (given in milliseconds) */
+                opts.poll_sleep = millis_to_timespec(argtol(optarg, 0));
+                break;
+
+            case 'm': /* set ms_per_sample */
+                opts.ms_per_sample = argtol(optarg, 0);
+                break;
+
+            case 'V': /* print program version */
+                printf("%s\n", program_version);
+                exit(EXIT_SUCCESS);
+                break;
+
+            default:
+               usage(); 
+        }
+    }
+
+    /* all arguments should have been processed */
+    if (optind != argc) {
+        usage();
+    }
 }
 
 #define SHARED_MEM_FILE "/var/run/xenq-shm"
@@ -637,59 +683,18 @@ void alloc_qos_data(int ncpu)
 }
 
 
-#define xstr(x) str(x)
-#define str(x) #x
-
-const struct argp_option cmd_opts[] =
-{
-    { .name = "log-thresh", .key='t', .arg="l",
-      .doc =
-      "Set number, l, of new records required to trigger a write to output "
-      "(default " xstr(NEW_DATA_THRESH) ")." },
-
-    { .name = "poll-sleep", .key='s', .arg="p",
-      .doc = 
-      "Set sleep time, p, in milliseconds between polling the trace buffer "
-      "for new data (default " xstr(POLL_SLEEP_MILLIS) ")." },
-
-    { .name = "ms_per_sample", .key='m', .arg="MS",
-      .doc = 
-      "Specify the number of milliseconds per sample "
-      " (default " xstr(MS_PER_SAMPLE) ")." },
-
-    {0}
-};
-
-const struct argp parser_def =
-{
-    .options = cmd_opts,
-    .parser = cmd_parser,
-    //    .args_doc = "[output file]",
-    .doc =
-    "Tool to capture and partially process Xen trace buffer data"
-    "\v"
-    "This tool is used to capture trace buffer data from Xen.  The data is "
-    "saved in a shared memory structure to be further processed by xenmon."
-};
-
-
-const char *argp_program_version     = "xenbaked v1.4";
-const char *argp_program_bug_address = "<rob.gardner@hp.com>";
-
-
 int main(int argc, char **argv)
 {
     int ret;
     struct sigaction act;
 
     time(&start_time);
-    opts.outfile = 0;
     opts.poll_sleep = millis_to_timespec(POLL_SLEEP_MILLIS);
     opts.new_data_thresh = NEW_DATA_THRESH;
     opts.ms_per_sample = MS_PER_SAMPLE;
     opts.cpu_freq = CPU_FREQ;
 
-    argp_parse(&parser_def, argc, argv, 0, 0, &opts);
+    parse_args(argc, argv);
     fprintf(stderr, "ms_per_sample = %ld\n", opts.ms_per_sample);
 
 

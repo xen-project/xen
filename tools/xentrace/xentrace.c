@@ -18,10 +18,10 @@
 #include <fcntl.h>
 #include <unistd.h>
 #include <errno.h>
-#include <argp.h>
 #include <signal.h>
 #include <inttypes.h>
 #include <string.h>
+#include <getopt.h>
 #include <assert.h>
 
 #include <xen/xen.h>
@@ -37,7 +37,6 @@ do {                                                            \
     errno = __saved_errno;                                      \
 } while (0)
 
-extern FILE *stderr;
 
 /***** Compile time configuration of defaults ********************************/
 
@@ -411,166 +410,155 @@ int monitor_tbufs(int outfd)
 
 
 /******************************************************************************
- * Various declarations / definitions GNU argp needs to do its work
+ * Command line handling
  *****************************************************************************/
-
-int parse_evtmask(char *arg, struct argp_state *state)
-{
-    settings_t *setup = (settings_t *)state->input;
-    char *inval;
-
-    /* search filtering class */
-    if (strcmp(arg, "gen") == 0){ 
-        setup->evt_mask |= TRC_GEN;
-    } else if(strcmp(arg, "sched") == 0){ 
-        setup->evt_mask |= TRC_SCHED;
-    } else if(strcmp(arg, "dom0op") == 0){ 
-        setup->evt_mask |= TRC_DOM0OP;
-    } else if(strcmp(arg, "hvm") == 0){ 
-        setup->evt_mask |= TRC_HVM;
-    } else if(strcmp(arg, "all") == 0){ 
-        setup->evt_mask |= TRC_ALL;
-    } else {
-        setup->evt_mask = strtol(arg, &inval, 0);
-        if ( inval == arg )
-            argp_usage(state);
-    }
-
-    return 0;
-
-}
-
-/* command parser for GNU argp - see GNU docs for more info */
-error_t cmd_parser(int key, char *arg, struct argp_state *state)
-{
-    settings_t *setup = (settings_t *)state->input;
-
-    switch ( key )
-    {
-    case 't': /* set new records threshold for logging */
-    {
-        char *inval;
-        setup->new_data_thresh = strtol(arg, &inval, 0);
-        if ( inval == arg )
-            argp_usage(state);
-    }
-    break;
-
-    case 's': /* set sleep time (given in milliseconds) */
-    {
-        char *inval;
-        setup->poll_sleep = millis_to_timespec(strtol(arg, &inval, 0));
-        if ( inval == arg )
-            argp_usage(state);
-    }
-    break;
-
-    case 'c': /* set new cpu mask for filtering*/
-    {
-        char *inval;
-        setup->cpu_mask = strtol(arg, &inval, 0);
-        if ( inval == arg )
-            argp_usage(state);
-    }
-    break;
-    
-    case 'e': /* set new event mask for filtering*/
-    {
-        parse_evtmask(arg, state);
-    }
-    break;
-    
-    case 'S': /* set tbuf size (given in pages) */
-    {
-        char *inval;
-        setup->tbuf_size = strtol(arg, &inval, 0);
-        if ( inval == arg )
-            argp_usage(state);
-    }
-    break;
-
-    case 'D': /* Discard traces currently in the buffer before beginning */
-    {
-        opts.discard = 1;
-    }
-    break;
-
-    case ARGP_KEY_ARG:
-    {
-        if ( state->arg_num == 0 )
-            setup->outfile = arg;
-        else
-            argp_usage(state);
-    }
-    break;
-        
-    default:
-        return ARGP_ERR_UNKNOWN;
-    }
-
-    return 0;
-}
 
 #define xstr(x) str(x)
 #define str(x) #x
 
-const struct argp_option cmd_opts[] =
+const char *program_version     = "xentrace v1.1";
+const char *program_bug_address = "<mark.a.williamson@intel.com>";
+
+void usage(void)
 {
-    { .name = "log-thresh", .key='t', .arg="l",
-      .doc =
-      "Set number, l, of new records required to trigger a write to output "
-      "(default " xstr(NEW_DATA_THRESH) ")." },
+#define USAGE_STR \
+"Usage: xentrace [OPTION...] [output file]\n" \
+"Tool to capture Xen trace buffer data\n" \
+"\n" \
+"  -c, --cpu-mask=c        Set cpu-mask\n" \
+"  -e, --evt-mask=e        Set evt-mask\n" \
+"  -s, --poll-sleep=p      Set sleep time, p, in milliseconds between\n" \
+"                          polling the trace buffer for new data\n" \
+"                          (default " xstr(POLL_SLEEP_MILLIS) ").\n" \
+"  -S, --trace-buf-size=N  Set trace buffer size in pages (default " \
+                           xstr(DEFAULT_TBUF_SIZE) ").\n" \
+"                          N.B. that the trace buffer cannot be resized.\n" \
+"                          if it has already been set this boot cycle,\n" \
+"                          this argument will be ignored.\n" \
+"  -t, --log-thresh=l      Set number, l, of new records required to\n" \
+"                          trigger a write to output (default " \
+                           xstr(NEW_DATA_THRESH) ").\n" \
+"  -?, --help              Show this message\n" \
+"  -V, --version           Print program version\n" \
+"\n" \
+"This tool is used to capture trace buffer data from Xen. The\n" \
+"data is output in a binary format, in the following order:\n" \
+"\n" \
+"  CPU(uint) TSC(uint64_t) EVENT(uint32_t) D1 D2 D3 D4 D5 (all uint32_t)\n" \
+"\n" \
+"The output should be parsed using the tool xentrace_format,\n" \
+"which can produce human-readable output in ASCII format.\n" 
 
-    { .name = "poll-sleep", .key='s', .arg="p",
-      .doc = 
-      "Set sleep time, p, in milliseconds between polling the trace buffer "
-      "for new data (default " xstr(POLL_SLEEP_MILLIS) ")." },
+    printf(USAGE_STR);
+    printf("\nReport bugs to %s\n", program_bug_address);
 
-    { .name = "cpu-mask", .key='c', .arg="c",
-      .doc = 
-      "Set cpu-mask." },
+    exit(EXIT_FAILURE);
+}
 
-    { .name = "evt-mask", .key='e', .arg="e",
-      .doc = 
-      "Set trace event mask.  This can accept a numerical (including hex) "
-      " argument or a symbolic name.  Symbolic names include: gen, sched, "
-      "dom0op, hvm, and all." },
-
-    { .name = "trace-buf-size", .key='S', .arg="N",
-      .doc =
-      "Set trace buffer size in pages (default " xstr(DEFAULT_TBUF_SIZE) "). "
-      "N.B. that the trace buffer cannot be resized.  If it has "
-      "already been set this boot cycle, this argument will be ignored." },
-
-    { .name = "discard-buffers", .key='D', .arg=NULL,
-      .flags=OPTION_ARG_OPTIONAL,
-      .doc = "Discard all records currently in the trace buffers before "
-      " beginning." },
-
-    {0}
-};
-
-const struct argp parser_def =
+/* convert the argument string pointed to by arg to a long int representation */
+long argtol(const char *restrict arg, int base)
 {
-    .options = cmd_opts,
-    .parser = cmd_parser,
-    .args_doc = "[output file]",
-    .doc =
-    "Tool to capure Xen trace buffer data"
-    "\v"
-    "This tool is used to capture trace buffer data from Xen.  The data is "
-    "output in a binary format, in the following order:\n\n"
-    "  CPU(uint) TSC(uint64_t) EVENT(uint32_t) D1 D2 D3 D4 D5 "
-    "(all uint32_t)\n\n"
-    "The output should be parsed using the tool xentrace_format, which can "
-    "produce human-readable output in ASCII format."
-};
+    char *endp;
+    long val;
 
-
-const char *argp_program_version     = "xentrace v1.1";
-const char *argp_program_bug_address = "<mark.a.williamson@intel.com>";
-        
+    errno = 0;
+    val = strtol(arg, &endp, base);
     
+    if (errno != 0) {
+        fprintf(stderr, "Invalid option argument: %s\n", arg);
+        fprintf(stderr, "Error: %s\n\n", strerror(errno));
+        usage();
+    } else if (endp == arg || *endp != '\0') {
+        fprintf(stderr, "Invalid option argument: %s\n\n", arg);
+        usage();
+    }
+
+    return val;
+}
+
+int parse_evtmask(char *arg)
+{
+    /* search filtering class */
+    if (strcmp(arg, "gen") == 0){ 
+        opts.evt_mask |= TRC_GEN;
+    } else if(strcmp(arg, "sched") == 0){ 
+        opts.evt_mask |= TRC_SCHED;
+    } else if(strcmp(arg, "dom0op") == 0){ 
+        opts.evt_mask |= TRC_DOM0OP;
+    } else if(strcmp(arg, "hvm") == 0){ 
+        opts.evt_mask |= TRC_HVM;
+    } else if(strcmp(arg, "all") == 0){ 
+        opts.evt_mask |= TRC_ALL;
+    } else {
+        opts.evt_mask = argtol(arg, 0);
+    }
+
+    return 0;
+}
+
+/* parse command line arguments */
+void parse_args(int argc, char **argv)
+{
+    int option;
+    static struct option long_options[] = {
+        { "log-thresh",     required_argument, 0, 't' },
+        { "poll-sleep",     required_argument, 0, 's' },
+        { "cpu-mask",       required_argument, 0, 'c' },
+        { "evt-mask",       required_argument, 0, 'e' },
+        { "trace-buf-size", required_argument, 0, 'S' },
+        { "help",           no_argument,       0, '?' },
+        { "version",        no_argument,       0, 'V' },
+        { 0, 0, 0, 0 }
+    };
+
+    while ( (option = getopt_long(argc, argv, "c:e:s:S:t:?V",
+                    long_options, NULL)) != -1) 
+    {
+        switch ( option )
+        {
+        case 't': /* set new records threshold for logging */
+            opts.new_data_thresh = argtol(optarg, 0);
+            break;
+
+        case 's': /* set sleep time (given in milliseconds) */
+            opts.poll_sleep = millis_to_timespec(argtol(optarg, 0));
+            break;
+
+        case 'c': /* set new cpu mask for filtering*/
+            opts.cpu_mask = argtol(optarg, 0);
+            break;
+        
+        case 'e': /* set new event mask for filtering*/
+            parse_evtmask(optarg);
+            break;
+        
+        case 'S': /* set tbuf size (given in pages) */
+            opts.tbuf_size = argtol(optarg, 0);
+            break;
+
+        case 'V': /* print program version */
+            printf("%s\n", program_version);
+            exit(EXIT_SUCCESS);
+            break;
+            
+        default:
+            usage();
+        }
+    }
+
+    /* get outfile (required last argument) */
+    if (optind != (argc-1))
+        usage();
+
+    opts.outfile = argv[optind];
+}
+
+
+/* *BSD has no O_LARGEFILE */
+#ifndef O_LARGEFILE
+#define O_LARGEFILE	0
+#endif
+
 int main(int argc, char **argv)
 {
     int outfd = 1, ret;
@@ -582,8 +570,8 @@ int main(int argc, char **argv)
     opts.evt_mask = 0;
     opts.cpu_mask = 0;
 
-    argp_parse(&parser_def, argc, argv, 0, 0, &opts);
-
+    parse_args(argc, argv);
+    
     if (opts.evt_mask != 0) { 
         set_mask(opts.evt_mask, 0);
     }

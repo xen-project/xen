@@ -18,7 +18,6 @@
 #include <fcntl.h>
 #include <unistd.h>
 #include <errno.h>
-#include <argp.h>
 #include <signal.h>
 #include <string.h>
 #include <inttypes.h>
@@ -32,10 +31,15 @@ int frame_ptrs = 0;
 int stack_trace = 0;
 
 #if defined (__i386__)
+#if defined (__OpenBSD__)
+#define FMT_SIZE_T		"%08lx"
+#define INSTR_POINTER(regs)	(unsigned long)(regs->eip)
+#else
 #define FMT_SIZE_T		"%08x"
+#define INSTR_POINTER(regs)	(regs->eip)
+#endif
 #define STACK_POINTER(regs)	(regs->esp)
 #define FRAME_POINTER(regs)	(regs->ebp)
-#define INSTR_POINTER(regs)	(regs->eip)
 #define STACK_ROWS		4
 #define STACK_COLS		8
 #elif defined (__x86_64__)
@@ -622,7 +626,8 @@ void print_stack(vcpu_guest_context_t *ctx, int vcpu)
         printf("Stack Trace:\n");
     else
         printf("Call Trace:\n");
-    printf("%c [<" FMT_SIZE_T ">] ", stack_trace ? '*' : ' ', INSTR_POINTER(regs));
+    printf("%c [<" FMT_SIZE_T ">] ",
+        stack_trace ? '*' : ' ', INSTR_POINTER(regs));
 
     print_symbol(INSTR_POINTER(regs));
     printf(" <--\n");
