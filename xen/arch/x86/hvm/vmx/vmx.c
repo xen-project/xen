@@ -518,10 +518,36 @@ void vmx_vmcs_save(struct vcpu *v, struct hvm_hw_cpu *c)
     vmx_vmcs_exit(v);
 }
 
-int vmx_vmcs_restore(struct vcpu *v, struct hvm_hw_cpu *c)
+static int vmx_restore_cr0_cr3(
+    struct vcpu *v, unsigned long cr0, unsigned long cr3)
 {
     unsigned long mfn = 0;
     p2m_type_t p2mt;
+
+    if ( cr0 & X86_CR0_PG )
+    {
+        mfn = mfn_x(gfn_to_mfn(v->domain, cr3 >> PAGE_SHIFT, &p2mt));
+        if ( !p2m_is_ram(p2mt) || !get_page(mfn_to_page(mfn), v->domain) )
+        {
+            gdprintk(XENLOG_ERR, "Invalid CR3 value=0x%lx\n", cr3);
+            return -EINVAL;
+        }
+    }
+
+    if ( v->arch.hvm_vcpu.guest_cr[0] & X86_CR0_PG )
+        put_page(pagetable_get_page(v->arch.guest_table));
+
+    v->arch.guest_table = pagetable_from_pfn(mfn);
+
+    v->arch.hvm_vcpu.guest_cr[0] = cr0 | X86_CR0_ET;
+    v->arch.hvm_vcpu.guest_cr[3] = cr3;
+
+    return 0;
+}
+
+int vmx_vmcs_restore(struct vcpu *v, struct hvm_hw_cpu *c)
+{
+    int rc;
 
     if ( c->pending_valid &&
          ((c->pending_type == 1) || (c->pending_type > 6) ||
@@ -532,26 +558,13 @@ int vmx_vmcs_restore(struct vcpu *v, struct hvm_hw_cpu *c)
         return -EINVAL;
     }
 
-    if ( c->cr0 & X86_CR0_PG )
-    {
-        mfn = mfn_x(gfn_to_mfn(v->domain, c->cr3 >> PAGE_SHIFT, &p2mt));
-        if ( !p2m_is_ram(p2mt) || !get_page(mfn_to_page(mfn), v->domain) )
-        {
-            gdprintk(XENLOG_ERR, "Invalid CR3 value=0x%"PRIx64"\n", c->cr3);
-            return -EINVAL;
-        }
-    }
-
-    if ( v->arch.hvm_vcpu.guest_cr[0] & X86_CR0_PG )
-        put_page(pagetable_get_page(v->arch.guest_table));
-
-    v->arch.guest_table = pagetable_from_pfn(mfn);
+    rc = vmx_restore_cr0_cr3(v, c->cr0, c->cr3);
+    if ( rc )
+        return rc;
 
     vmx_vmcs_enter(v);
 
-    v->arch.hvm_vcpu.guest_cr[0] = c->cr0 | X86_CR0_ET;
     v->arch.hvm_vcpu.guest_cr[2] = c->cr2;
-    v->arch.hvm_vcpu.guest_cr[3] = c->cr3;
     v->arch.hvm_vcpu.guest_cr[4] = c->cr4;
     vmx_update_guest_cr(v, 0);
     vmx_update_guest_cr(v, 2);
@@ -1846,30 +1859,16 @@ static void vmx_world_save(struct vcpu *v, struct vmx_assist_context *c)
 static int vmx_world_restore(struct vcpu *v, struct vmx_assist_context *c)
 {
     struct cpu_user_regs *regs = guest_cpu_user_regs();
-    unsigned long mfn = 0;
-    p2m_type_t p2mt;
+    int rc;
 
-    if ( c->cr0 & X86_CR0_PG )
-    {
-        mfn = mfn_x(gfn_to_mfn(v->domain, c->cr3 >> PAGE_SHIFT, &p2mt));
-        if ( !p2m_is_ram(p2mt) || !get_page(mfn_to_page(mfn), v->domain) )
-        {
-            gdprintk(XENLOG_ERR, "Invalid CR3 value=%x", c->cr3);
-            return -EINVAL;
-        }
-    }
-
-    if ( v->arch.hvm_vcpu.guest_cr[0] & X86_CR0_PG )
-        put_page(pagetable_get_page(v->arch.guest_table));
-
-    v->arch.guest_table = pagetable_from_pfn(mfn);
+    rc = vmx_restore_cr0_cr3(v, c->cr0, c->cr3);
+    if ( rc )
+        return rc;
 
     regs->eip = c->eip;
     regs->esp = c->esp;
     regs->eflags = c->eflags | 2;
 
-    v->arch.hvm_vcpu.guest_cr[0] = c->cr0;
-    v->arch.hvm_vcpu.guest_cr[3] = c->cr3;
     v->arch.hvm_vcpu.guest_cr[4] = c->cr4;
     vmx_update_guest_cr(v, 0);
     vmx_update_guest_cr(v, 4);
@@ -2016,9 +2015,8 @@ static int vmx_assist(struct vcpu *v, int mode)
 static int vmx_set_cr0(unsigned long value)
 {
     struct vcpu *v = current;
-    int rc = hvm_set_cr0(value);
 
-    if ( rc == 0 )
+    if ( hvm_set_cr0(value) == 0 )
         return 0;
 
     /*

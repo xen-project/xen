@@ -667,7 +667,7 @@ int hvm_set_cr0(unsigned long value)
     struct vcpu *v = current;
     p2m_type_t p2mt;
     unsigned long gfn, mfn, old_value = v->arch.hvm_vcpu.guest_cr[0];
-  
+
     HVM_DBG_LOG(DBG_LEVEL_VMMU, "Update CR0 value = %lx", value);
 
     if ( (u32)value != value )
@@ -684,7 +684,7 @@ int hvm_set_cr0(unsigned long value)
     /* ET is reserved and should be always be 1. */
     value |= X86_CR0_ET;
 
-    if ( (value & (X86_CR0_PE|X86_CR0_PG)) == X86_CR0_PG )
+    if ( (value & (X86_CR0_PE | X86_CR0_PG)) == X86_CR0_PG )
     {
         hvm_inject_exception(TRAP_gp_fault, 0, 0);
         return 0;
@@ -710,10 +710,10 @@ int hvm_set_cr0(unsigned long value)
             /* The guest CR3 must be pointing to the guest physical. */
             gfn = v->arch.hvm_vcpu.guest_cr[3]>>PAGE_SHIFT;
             mfn = mfn_x(gfn_to_mfn_current(gfn, &p2mt));
-            if ( !p2m_is_ram(p2mt) || !mfn_valid(mfn) || 
+            if ( !p2m_is_ram(p2mt) || !mfn_valid(mfn) ||
                  !get_page(mfn_to_page(mfn), v->domain))
             {
-                gdprintk(XENLOG_ERR, "Invalid CR3 value = %lx (mfn=%lx)\n", 
+                gdprintk(XENLOG_ERR, "Invalid CR3 value = %lx (mfn=%lx)\n",
                          v->arch.hvm_vcpu.guest_cr[3], mfn);
                 domain_crash(v->domain);
                 return 0;
@@ -742,7 +742,7 @@ int hvm_set_cr0(unsigned long value)
         }
     }
 
-    if ( !list_empty(&(domain_hvm_iommu(v->domain)->pdev_list)) )
+    if ( !list_empty(&domain_hvm_iommu(v->domain)->pdev_list) )
     {
         if ( (value & X86_CR0_CD) && !(value & X86_CR0_NW) )
         {
