@@ -503,7 +503,7 @@ sh_mfn_is_dirty(struct domain *d, mfn_t gmfn)
     if ( unlikely(!VALID_M2P(pfn)) )
         return 0;
     
-    if (d->arch.paging.log_dirty.failed_allocs > 0)
+    if ( d->arch.paging.log_dirty.failed_allocs > 0 )
         /* If we have any failed allocations our dirty log is bogus.
          * Since we can't signal an error here, be conservative and
          * report "dirty" in this case.  (The only current caller,
@@ -515,19 +515,19 @@ sh_mfn_is_dirty(struct domain *d, mfn_t gmfn)
     l4 = map_domain_page(mfn_x(d->arch.paging.log_dirty.top));
     mfn = l4[L4_LOGDIRTY_IDX(pfn)];
     unmap_domain_page(l4);
-    if (!mfn_valid(mfn))
+    if ( !mfn_valid(mfn) )
         return 0;
 
     l3 = map_domain_page(mfn_x(mfn));
     mfn = l3[L3_LOGDIRTY_IDX(pfn)];
     unmap_domain_page(l3);
-    if (!mfn_valid(mfn))
+    if ( !mfn_valid(mfn) )
         return 0;
 
     l2 = map_domain_page(mfn_x(mfn));
     mfn = l2[L2_LOGDIRTY_IDX(pfn)];
     unmap_domain_page(l2);
-    if (!mfn_valid(mfn))
+    if ( !mfn_valid(mfn) )
         return 0;
 
     l1 = map_domain_page(mfn_x(mfn));
