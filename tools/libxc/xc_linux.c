@@ -67,8 +67,10 @@ void *xc_map_foreign_batch(int xc_handle, uint32_t dom, int prot,
     privcmd_mmapbatch_t ioctlx;
     void *addr;
     addr = mmap(NULL, num*PAGE_SIZE, prot, MAP_SHARED, xc_handle, 0);
-    if ( addr == MAP_FAILED )
+    if ( addr == MAP_FAILED ) {
+        perror("xc_map_foreign_batch: mmap failed");
         return NULL;
+    }
 
     ioctlx.num=num;
     ioctlx.dom=dom;
@@ -77,7 +79,7 @@ void *xc_map_foreign_batch(int xc_handle, uint32_t dom, int prot,
     if ( ioctl(xc_handle, IOCTL_PRIVCMD_MMAPBATCH, &ioctlx) < 0 )
     {
         int saved_errno = errno;
-        perror("XXXXXXXX");
+        perror("xc_map_foreign_batch: ioctl failed");
         (void)munmap(addr, num*PAGE_SIZE);
         errno = saved_errno;
         return NULL;
@@ -94,8 +96,10 @@ void *xc_map_foreign_range(int xc_handle, uint32_t dom,
     privcmd_mmap_entry_t entry;
     void *addr;
     addr = mmap(NULL, size, prot, MAP_SHARED, xc_handle, 0);
-    if ( addr == MAP_FAILED )
+    if ( addr == MAP_FAILED ) {
+        perror("xc_map_foreign_range: mmap failed");
         return NULL;
+    }
 
     ioctlx.num=1;
     ioctlx.dom=dom;
@@ -106,6 +110,7 @@ void *xc_map_foreign_range(int xc_handle, uint32_t dom,
     if ( ioctl(xc_handle, IOCTL_PRIVCMD_MMAP, &ioctlx) < 0 )
     {
         int saved_errno = errno;
+        perror("xc_map_foreign_range: ioctl failed");
         (void)munmap(addr, size);
         errno = saved_errno;
         return NULL;
@@ -402,6 +407,7 @@ void *xc_gnttab_map_grant_ref(int xcg_handle,
         int saved_errno = errno;
         struct ioctl_gntdev_unmap_grant_ref unmap_grant;
         /* Unmap the driver slots used to store the grant information. */
+        perror("xc_gnttab_map_grant_ref: mmap failed");
         unmap_grant.index = map.index;
         unmap_grant.count = 1;
         ioctl(xcg_handle, IOCTL_GNTDEV_UNMAP_GRANT_REF, &unmap_grant);
@@ -445,6 +451,7 @@ void *xc_gnttab_map_grant_refs(int xcg_handle,
         int saved_errno = errno;
         struct ioctl_gntdev_unmap_grant_ref unmap_grant;
         /* Unmap the driver slots used to store the grant information. */
+        perror("xc_gnttab_map_grant_refs: mmap failed");
         unmap_grant.index = map->index;
         unmap_grant.count = count;
         ioctl(xcg_handle, IOCTL_GNTDEV_UNMAP_GRANT_REF, &unmap_grant);
