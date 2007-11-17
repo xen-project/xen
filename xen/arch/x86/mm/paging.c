@@ -269,12 +269,12 @@ void paging_mark_dirty(struct domain *d, unsigned long guest_mfn)
 
     gmfn = _mfn(guest_mfn);
 
-    ASSERT(mfn_valid(d->arch.paging.log_dirty.top));
-
     if ( !paging_mode_log_dirty(d) || !mfn_valid(gmfn) )
         return;
 
     log_dirty_lock(d);
+
+    ASSERT(mfn_valid(d->arch.paging.log_dirty.top));
 
     /* We /really/ mean PFN here, even for non-translated guests. */
     pfn = get_gpfn_from_mfn(mfn_x(gmfn));
