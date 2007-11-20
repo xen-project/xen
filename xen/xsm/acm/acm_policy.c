@@ -430,6 +430,9 @@ int
 acm_get_decision(ssidref_t ssidref1, ssidref_t ssidref2, u32 hook)
 {
     int ret = ACM_ACCESS_DENIED;
+
+    read_lock(&acm_bin_pol_rwlock);
+
     switch ( hook )
     {
 
@@ -446,6 +449,8 @@ acm_get_decision(ssidref_t ssidref1, ssidref_t ssidref2, u32 hook)
         /* deny */
         break;
     }
+
+    read_unlock(&acm_bin_pol_rwlock);
 
     printkd("%s: ssid1=%x, ssid2=%x, decision=%s.\n",
             __func__, ssidref1, ssidref2,
