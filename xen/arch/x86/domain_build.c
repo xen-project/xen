@@ -832,10 +832,8 @@ int __init construct_dom0(
     si->pt_base      = vpt_start + 2 * PAGE_SIZE * !!is_pv_32on64_domain(d);
     si->nr_pt_frames = nr_pt_pages;
     si->mfn_list     = vphysmap_start;
-    snprintf(si->magic, sizeof(si->magic), "xen-%i.%i-x86_%d%s",
-            xen_major_version(), xen_minor_version(),
-            elf_64bit(&elf) ? 64 : 32,
-            parms.pae ? "p" : "");
+    snprintf(si->magic, sizeof(si->magic), "xen-3.0-x86_%d%s",
+             elf_64bit(&elf) ? 64 : 32, parms.pae ? "p" : "");
 
     /* Write the phys->machine and machine->phys table entries. */
     for ( pfn = 0; pfn < d->tot_pages; pfn++ )
