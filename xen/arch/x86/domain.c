@@ -1756,10 +1756,6 @@ static void vcpu_destroy_pagetables(struct vcpu *v)
             put_page(mfn_to_page(pfn));
         else
             put_page_and_type(mfn_to_page(pfn));
-#ifdef __x86_64__
-        if ( pfn == pagetable_get_pfn(v->arch.guest_table_user) )
-            v->arch.guest_table_user = pagetable_null();
-#endif
         v->arch.guest_table = pagetable_null();
     }
 
@@ -1768,10 +1764,13 @@ static void vcpu_destroy_pagetables(struct vcpu *v)
     pfn = pagetable_get_pfn(v->arch.guest_table_user);
     if ( pfn != 0 )
     {
-        if ( paging_mode_refcounts(d) )
-            put_page(mfn_to_page(pfn));
-        else
-            put_page_and_type(mfn_to_page(pfn));
+        if ( !is_pv_32bit_vcpu(v) )
+        {
+            if ( paging_mode_refcounts(d) )
+                put_page(mfn_to_page(pfn));
+            else
+                put_page_and_type(mfn_to_page(pfn));
+        }
         v->arch.guest_table_user = pagetable_null();
     }
 #endif
