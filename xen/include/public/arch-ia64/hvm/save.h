@@ -74,13 +74,15 @@ struct hvm_hw_ia64_vlsapic {
     uint8_t pad[2];
 };
 DECLARE_HVM_SAVE_TYPE(VLSAPIC, 4, struct hvm_hw_ia64_vlsapic);
-// unconditionaly set v->arch.irq_new_peding = 1 
-// unconditionaly set v->arch.irq_new_condition = 0
+/* set
+ * unconditionaly set v->arch.irq_new_peding = 1 
+ * unconditionaly set v->arch.irq_new_condition = 0
+ */
 
 /*
  * vtime
  */
-// itc, itm, itv are saved by arch vcpu context
+/* itc, itm, itv are saved by arch vcpu context */
 struct hvm_hw_ia64_vtime {
     uint64_t itc;
     uint64_t itm;
@@ -89,13 +91,15 @@ struct hvm_hw_ia64_vtime {
     uint64_t pending;
 };
 DECLARE_HVM_SAVE_TYPE(VTIME, 5, struct hvm_hw_ia64_vtime);
-// calculate v->vtm.vtm_offset
-// ??? Or should vtm_offset be set by leave_hypervisor_tail()?
-// start vtm_timer if necessary by vtm_set_itm().
-// ??? Or should vtm_timer be set by leave_hypervisor_tail()?
-//
-// ??? or should be done by schedule_tail()
-//        => schedule_tail() should do.
+/*
+ * calculate v->vtm.vtm_offset
+ * ??? Or should vtm_offset be set by leave_hypervisor_tail()?
+ * start vtm_timer if necessary by vtm_set_itm().
+ * ??? Or should vtm_timer be set by leave_hypervisor_tail()?
+ *
+ * ??? or should be done by schedule_tail()
+ *        => schedule_tail() should do.
+ */
 
 /*
  * viosapic
@@ -138,30 +142,22 @@ DECLARE_HVM_SAVE_TYPE(VIOSAPIC, 6, struct hvm_hw_ia64_viosapic);
  * vacpi
  * PM timer
  */
-#if 0
-struct hvm_hw_ia64_pmtimer {
-    uint32_t tmr_val;   /* PM_TMR_BLK.TMR_VAL: 32bit free-running counter */
-    uint16_t pm1a_sts;  /* PM1a_EVT_BLK.PM1a_STS: status register */
-    uint16_t pm1a_en;   /* PM1a_EVT_BLK.PM1a_EN: enable register */
-};
-DECLARE_HVM_SAVE_TYPE(PMTIMER, 7, struct hvm_hw_ia64_pmtimer);
-#else
 struct vacpi_regs {
-	union {
-		struct {
-			uint32_t pm1a_sts:16;
-			uint32_t pm1a_en:16;
-		};
-		uint32_t evt_blk;
-	};
-	uint32_t tmr_val;
+    union {
+        struct {
+            uint32_t pm1a_sts:16;/* PM1a_EVT_BLK.PM1a_STS: status register */
+            uint32_t pm1a_en:16; /* PM1a_EVT_BLK.PM1a_EN: enable register */
+        };
+        uint32_t evt_blk;
+    };
+    uint32_t tmr_val;   /* PM_TMR_BLK.TMR_VAL: 32bit free-running counter */
 };
 
 struct hvm_hw_ia64_vacpi {
     struct vacpi_regs   regs;
 };
 DECLARE_HVM_SAVE_TYPE(VACPI, 7, struct hvm_hw_ia64_vacpi);
-// update last_gtime and setup timer of struct vacpi
+/* update last_gtime and setup timer of struct vacpi */
 
 /*
  * opt_feature: identity mapping of region 4, 5 and 7.
