@@ -252,11 +252,11 @@ static inline void set_os_type(VCPU *v, u64 type)
             optf.on = XEN_IA64_OPTF_ON;
             optf.pgprot = (_PAGE_P|_PAGE_A|_PAGE_D|_PAGE_MA_WB|_PAGE_AR_RW);
             optf.key = 0;
-            domain_opt_feature(&optf);
+            domain_opt_feature(v->domain, &optf);
 
             optf.cmd = XEN_IA64_OPTF_IDENT_MAP_REG5;
             optf.pgprot = (_PAGE_P|_PAGE_A|_PAGE_D|_PAGE_MA_UC|_PAGE_AR_RW);
-            domain_opt_feature(&optf);
+            domain_opt_feature(v->domain, &optf);
         }
     }
 }

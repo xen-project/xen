@@ -2290,9 +2290,8 @@ optf_set_identity_mapping(unsigned long* mask, struct identity_mapping* im,
  * The vcpu must be paused to avoid racy access to opt_feature.
  */
 int
-domain_opt_feature(struct xen_ia64_opt_feature* f)
+domain_opt_feature(struct domain *d, struct xen_ia64_opt_feature* f)
 {
-	struct domain *d = current->domain;
 	struct opt_feature* optf = &d->arch.opt_feature;
 	struct vcpu *v;
 	long rc = 0;

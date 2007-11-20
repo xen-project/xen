@@ -116,7 +116,7 @@ struct opt_feature {
     (1UL << XEN_IA64_OPTF_IDENT_MAP_REG5_BIT)
 
 /* Set an optimization feature in the struct arch_domain. */
-extern int domain_opt_feature(struct xen_ia64_opt_feature*);
+extern int domain_opt_feature(struct domain *, struct xen_ia64_opt_feature*);
 
 struct arch_domain {
     struct mm_struct mm;

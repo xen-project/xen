@@ -229,7 +229,7 @@ ia64_hypercall(struct pt_regs *regs)
 		struct xen_ia64_opt_feature optf;
 		set_xen_guest_handle(arg, (void*)(vcpu_get_gr(v, 32)));
 		if (copy_from_guest(&optf, arg, 1) == 0)
-			regs->r8 = domain_opt_feature(&optf);
+			regs->r8 = domain_opt_feature(v->domain, &optf);
 		else
 			regs->r8 = -EFAULT;
 		break;
