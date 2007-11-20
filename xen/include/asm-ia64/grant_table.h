@@ -8,7 +8,8 @@
 #define INITIAL_NR_GRANT_FRAMES 1
 
 // for grant map/unmap
-int create_grant_host_mapping(unsigned long gpaddr, unsigned long mfn, unsigned int flags);
+int create_grant_host_mapping(unsigned long gpaddr, unsigned long mfn, 
+			      unsigned int flags, unsigned int cache_flags);
 int replace_grant_host_mapping(unsigned long gpaddr, unsigned long mfn, unsigned long new_gpaddr, unsigned int flags);
 
 // for grant transfer

@@ -2606,9 +2606,14 @@ class XendDomainInfo:
                 rx_bps, tx_bps = xennode.get_vif_util(self.domid, devid)
                 config['io_read_kbs'] = rx_bps/1024
                 config['io_write_kbs'] = tx_bps/1024
+                rx, tx = xennode.get_vif_stat(self.domid, devid)
+                config['io_total_read_kbs'] = rx/1024
+                config['io_total_write_kbs'] = tx/1024
             else:
                 config['io_read_kbs'] = 0.0
-                config['io_write_kbs'] = 0.0                
+                config['io_write_kbs'] = 0.0          
+                config['io_total_read_kbs'] = 0.0
+                config['io_total_write_kbs'] = 0.0
 
             config['security_label'] = config.get('security_label', '')
 

@@ -651,6 +651,12 @@ class XendNode:
             return vif_loads[domid].get(vifid, (0.0, 0.0))
         return (0.0, 0.0)
 
+    def get_vif_stat(self, domid, vifid):
+        vif_loads = self.monitor.get_domain_vifs_stat()
+        if domid in vif_loads:
+            return vif_loads[domid].get(vifid, (0.0, 0.0))
+        return (0.0, 0.0)
+
     def get_vbd_util(self, domid, vbdid):
         vbd_loads = self.monitor.get_domain_vbds_util()
         if domid in vbd_loads:

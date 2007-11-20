@@ -325,7 +325,7 @@ static inline int acm_authorization(ssidref_t ssidref1, ssidref_t ssidref2)
              acm_secondary_ops->authorization(ssidref1, ssidref2)) {
         return ACM_ACCESS_DENIED;
     } else
-        return ACM_ACCESS_PERMITTED;
+        return acm_sharing(ssidref1, ssidref2);
 }
 
 

@@ -2111,6 +2111,8 @@ class XendAPI(object):
 
     VIF_metrics_attr_ro = ['io_read_kbs',
                            'io_write_kbs',
+                           'io_total_read_kbs',
+                           'io_total_write_kbs',
                            'last_updated']
     VIF_metrics_attr_rw = []
     VIF_metrics_methods = []
@@ -2125,6 +2127,8 @@ class XendAPI(object):
         return xen_api_success(
             { 'io_read_kbs'  : vm.get_dev_property('vif', ref, 'io_read_kbs'),
               'io_write_kbs' : vm.get_dev_property('vif', ref, 'io_write_kbs'),
+              'io_total_read_kbs'  : vm.get_dev_property('vif', ref, 'io_total_read_kbs'),
+              'io_total_write_kbs' : vm.get_dev_property('vif', ref, 'io_total_write_kbs'),
               'last_updated' : now()
             })
 
@@ -2133,6 +2137,12 @@ class XendAPI(object):
     
     def VIF_metrics_get_io_write_kbs(self, session, ref):
         return self._VIF_get(ref, 'io_write_kbs')
+
+    def VIF_metrics_get_io_total_read_kbs(self, _, ref):
+        return self._VIF_get(ref, 'io_total_read_kbs')
+
+    def VIF_metrics_get_io_total_write_kbs(self, session, ref):
+        return self._VIF_get(ref, 'io_total_write_kbs')
 
     def VIF_metrics_get_last_updated(self, _1, _2):
         return xen_api_success(now())

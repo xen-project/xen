@@ -13,8 +13,8 @@
  * Caller must own caller's BIGLOCK, is responsible for flushing the TLB, and
  * must hold a reference to the page.
  */
-int create_grant_host_mapping(
-    uint64_t addr, unsigned long frame, unsigned int flags);
+int create_grant_host_mapping(uint64_t addr, unsigned long frame,
+			      unsigned int flags, unsigned int cache_flags);
 int replace_grant_host_mapping(
     uint64_t addr, unsigned long frame, uint64_t new_addr, unsigned int flags);
 

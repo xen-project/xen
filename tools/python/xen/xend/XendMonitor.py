@@ -63,6 +63,8 @@ class XendMonitor(threading.Thread):
     @type domain_vcpus_util: {domid: {vcpuid: float, vcpuid: float}}
     @ivar domain_vifs_util: Bytes per second for VIFs indexed by domain
     @type domain_vifs_util: {domid: {vifid: (rx_bps, tx_bps)}}
+    @ivar domain_vifs_stat: Total amount of bytes used for VIFs indexed by domain
+    @type domain_vifs_stat: {domid: {vbdid: (rx, tx)}}
     @ivar domain_vbds_util: Blocks per second for VBDs index by domain.
     @type domain_vbds_util: {domid: {vbdid: (rd_reqps, wr_reqps)}}    
     
@@ -83,6 +85,7 @@ class XendMonitor(threading.Thread):
         # instantaneous statistics
         self._domain_vcpus_util = {}
         self._domain_vifs_util = {}
+        self._domain_vifs_stat = {}
         self._domain_vbds_util = {}
         self.pifs_util = {}
 
@@ -104,6 +107,13 @@ class XendMonitor(threading.Thread):
         self.lock.acquire()
         try:
             return self._domain_vifs_util
+        finally:
+            self.lock.release()
+
+    def get_domain_vifs_stat(self):
+        self.lock.acquire()
+        try:
+            return self._domain_vifs_stat
         finally:
             self.lock.release()
 
@@ -269,6 +279,7 @@ class XendMonitor(threading.Thread):
                     if domid not in self._domain_vifs:
                         self._domain_vifs[domid] = vifs
                         self._domain_vifs_util[domid] = {}
+                        self._domain_vifs_stat[domid] = {}
                         continue
                 
                     for devid, (usage_at, rx, tx) in vifs.items():
@@ -286,6 +297,8 @@ class XendMonitor(threading.Thread):
                         # not the guest interface
                         self._domain_vifs_util[domid][devid] = \
                              (tx_util, rx_util)
+                        self._domain_vifs_stat[domid][devid] = \
+                             (float(tx), float(rx))
                         
                     self._domain_vifs[domid] = vifs
 
@@ -313,6 +326,7 @@ class XendMonitor(threading.Thread):
                     if domid not in active_domids:
                         del self._domain_vifs_util[domid]
                         del self._domain_vifs[domid]
+                        del self._domain_vifs_stat[domid]
                 for domid in self._domain_vbds_util.keys():
                     if domid not in active_domids:
                         del self._domain_vbds_util[domid]
