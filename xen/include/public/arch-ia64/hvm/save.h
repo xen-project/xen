@@ -162,25 +162,35 @@ struct hvm_hw_ia64_vacpi {
 };
 DECLARE_HVM_SAVE_TYPE(VACPI, 7, struct hvm_hw_ia64_vacpi);
 // update last_gtime and setup timer of struct vacpi
-#endif
 
-#if 0
 /*
- * guest os type
- * XXX Xen guest os specific optimization
- *     This isn't hvm specific so this should be addressed genericly
- *     including paravirtualized domain.
+ * opt_feature: identity mapping of region 4, 5 and 7.
+ * With the c/s 16396:d2935f9c217f of xen-ia64-devel.hg,
+ * opt_feature hypercall supports only region 4,5,7 identity mappings.
+ * structure hvm_hw_ia64_identity_mappings only supports them.
+ * The new structure, struct hvm_hw_ia64_identity_mappings, is created to
+ * avoid to keep up with change of the xen/ia64 internal structure, struct
+ * opt_feature.
+ *
+ * If it is enhanced in the future, new structure will be created.
  */
-struct hvm_hw_ia64_gos {
-    uint64_t	gos_type;
+struct hvm_hw_ia64_identity_mapping {
+    uint64_t on;        /* on/off */
+    uint64_t pgprot;    /* The page protection bit mask of the pte. */
+    uint64_t key;       /* A protection key. */
 };
-DECLARE_HVM_SAVE_TYPE(GOS_TYPE, 8, struct hvm_hw_ia64_gos);
-#endif
+
+struct hvm_hw_ia64_identity_mappings {
+    struct hvm_hw_ia64_identity_mapping im_reg4;/* Region 4 identity mapping */
+    struct hvm_hw_ia64_identity_mapping im_reg5;/* Region 5 identity mapping */
+    struct hvm_hw_ia64_identity_mapping im_reg7;/* Region 7 identity mapping */
+};
+DECLARE_HVM_SAVE_TYPE(OPT_FEATURE_IDENTITY_MAPPINGS, 8, struct hvm_hw_ia64_identity_mappings);
 
 /* 
  * Largest type-code in use
  */
-#define HVM_SAVE_CODE_MAX       7
+#define HVM_SAVE_CODE_MAX       8
 
 #endif /* __XEN_PUBLIC_HVM_SAVE_IA64_H__ */
 
