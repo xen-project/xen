@@ -105,9 +105,15 @@ struct opt_feature {
  * The base XEN_IA64_OPTF_IDENT_MAP_REG7 is defined in public/arch-ia64.h.
  * Identity mapping of region 4 addresses in HVM.
  */
-#define XEN_IA64_OPTF_IDENT_MAP_REG4	(XEN_IA64_OPTF_IDENT_MAP_REG7 + 1)
+#define XEN_IA64_OPTF_IDENT_MAP_REG4_BIT        \
+    (XEN_IA64_OPTF_IDENT_MAP_REG7_BIT + 1)
+#define XEN_IA64_OPTF_IDENT_MAP_REG4            \
+    (1UL << XEN_IA64_OPTF_IDENT_MAP_REG4_BIT)
 /* Identity mapping of region 5 addresses in HVM. */
-#define XEN_IA64_OPTF_IDENT_MAP_REG5	(XEN_IA64_OPTF_IDENT_MAP_REG4 + 1)
+#define XEN_IA64_OPTF_IDENT_MAP_REG5_BIT        \
+    (XEN_IA64_OPTF_IDENT_MAP_REG7_BIT + 2)
+#define XEN_IA64_OPTF_IDENT_MAP_REG5            \
+    (1UL << XEN_IA64_OPTF_IDENT_MAP_REG5_BIT)
 
 /* Set an optimization feature in the struct arch_domain. */
 extern int domain_opt_feature(struct xen_ia64_opt_feature*);

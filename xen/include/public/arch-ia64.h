@@ -674,7 +674,9 @@ DEFINE_XEN_GUEST_HANDLE(xen_ia64_debug_op_t);
  * This is useful in guests using region 7 for identity mapping
  * like the linux kernel does.
  */
-#define XEN_IA64_OPTF_IDENT_MAP_REG7	0x1UL
+#define XEN_IA64_OPTF_IDENT_MAP_REG7_BIT	0
+#define XEN_IA64_OPTF_IDENT_MAP_REG7		\
+	(1UL << XEN_IA64_OPTF_IDENT_MAP_REG7_BIT)
 
 struct xen_ia64_opt_feature {
 	unsigned long cmd;		/* Which feature */
