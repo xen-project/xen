@@ -33,8 +33,8 @@ extern long pte_enter(ulong flags, ulong ptex, ulong vsid, ulong rpn);
 extern long pte_remove(ulong flags, ulong ptex, ulong avpn,
                        ulong *hi, ulong *lo);
 
-int create_grant_host_mapping(
-    unsigned long addr, unsigned long frame, unsigned int flags);
+int create_grant_host_mapping(unsigned long addr, unsigned long frame, 
+			      unsigned int flags, unsigned int cache_flags);
 int replace_grant_host_mapping(
     unsigned long addr, unsigned long frame, unsigned long new_addr,
     unsigned int flags);

@@ -2144,16 +2144,18 @@ dom0vp_unexpose_foreign_p2m(struct domain* dest_dom,
 // mfn: frame: machine page frame
 // flags: GNTMAP_readonly | GNTMAP_application_map | GNTMAP_contains_pte
 int
-create_grant_host_mapping(unsigned long gpaddr,
-              unsigned long mfn, unsigned int flags)
+create_grant_host_mapping(unsigned long gpaddr, unsigned long mfn, 
+                          unsigned int flags, unsigned int cache_flags)
 {
     struct domain* d = current->domain;
     struct page_info* page;
     int ret;
 
-    if (flags & (GNTMAP_device_map |
-                 GNTMAP_application_map | GNTMAP_contains_pte)) {
-        gdprintk(XENLOG_INFO, "%s: flags 0x%x\n", __func__, flags);
+    if ((flags & (GNTMAP_device_map | 
+                  GNTMAP_application_map | GNTMAP_contains_pte)) ||
+        (cache_flags)) {
+        gdprintk(XENLOG_INFO, "%s: flags 0x%x cache_flags 0x%x\n",
+                 __func__, flags, cache_flags);
         return GNTST_general_error;
     }
 

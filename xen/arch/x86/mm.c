@@ -645,11 +645,7 @@ get_page_from_l1e(
             return 0;
         }
 
-        /* No reference counting for out-of-range I/O pages. */
-        if ( !mfn_valid(mfn) )
-            return 1;
-
-        d = dom_io;
+        return 1;
     }
 
     /* Foreign mappings into guests in shadow external mode don't
@@ -667,9 +663,8 @@ get_page_from_l1e(
                 mfn, get_gpfn_from_mfn(mfn),
                 l1e_get_intpte(l1e), d->domain_id);
     }
-    else if ( (pte_flags_to_cacheattr(l1f) !=
-               ((page->count_info >> PGC_cacheattr_base) & 7)) &&
-              !is_iomem_page(mfn) )
+    else if ( pte_flags_to_cacheattr(l1f) !=
+              ((page->count_info >> PGC_cacheattr_base) & 7) )
     {
         uint32_t x, nx, y = page->count_info;
         uint32_t cacheattr = pte_flags_to_cacheattr(l1f);
@@ -848,13 +843,15 @@ get_page_from_l4e(
 
 void put_page_from_l1e(l1_pgentry_t l1e, struct domain *d)
 {
-    unsigned long    pfn  = l1e_get_pfn(l1e);
-    struct page_info *page = mfn_to_page(pfn);
-    struct domain   *e;
-    struct vcpu     *v;
+    unsigned long     pfn = l1e_get_pfn(l1e);
+    struct page_info *page;
+    struct domain    *e;
+    struct vcpu      *v;
 
-    if ( !(l1e_get_flags(l1e) & _PAGE_PRESENT) || !mfn_valid(pfn) )
+    if ( !(l1e_get_flags(l1e) & _PAGE_PRESENT) || is_iomem_page(pfn) )
         return;
+
+    page = mfn_to_page(pfn);
 
     e = page_get_owner(page);
 
@@ -2763,8 +2760,8 @@ static int destroy_grant_va_mapping(
     return replace_grant_va_mapping(addr, frame, l1e_empty(), v);
 }
 
-int create_grant_host_mapping(
-    uint64_t addr, unsigned long frame, unsigned int flags)
+int create_grant_host_mapping(uint64_t addr, unsigned long frame, 
+                              unsigned int flags, unsigned int cache_flags)
 {
     l1_pgentry_t pte = l1e_from_pfn(frame, GRANT_PTE_FLAGS);
 
@@ -2772,6 +2769,8 @@ int create_grant_host_mapping(
         l1e_add_flags(pte,_PAGE_USER);
     if ( !(flags & GNTMAP_readonly) )
         l1e_add_flags(pte,_PAGE_RW);
+
+    l1e_add_flags(pte, cacheattr_to_pte_flags(cache_flags >> 5));
 
     if ( flags & GNTMAP_contains_pte )
         return create_grant_pte_mapping(addr, pte, current);

@@ -119,6 +119,7 @@ typedef struct grant_entry grant_entry_t;
  *  GTF_readonly: Restrict @domid to read-only mappings and accesses. [GST]
  *  GTF_reading: Grant entry is currently mapped for reading by @domid. [XEN]
  *  GTF_writing: Grant entry is currently mapped for writing by @domid. [XEN]
+ *  GTF_PAT, GTF_PWT, GTF_PCD: (x86) cache attribute flags for the grant [GST]
  */
 #define _GTF_readonly       (2)
 #define GTF_readonly        (1U<<_GTF_readonly)
@@ -126,6 +127,12 @@ typedef struct grant_entry grant_entry_t;
 #define GTF_reading         (1U<<_GTF_reading)
 #define _GTF_writing        (4)
 #define GTF_writing         (1U<<_GTF_writing)
+#define _GTF_PWT            (5)
+#define GTF_PWT             (1U<<_GTF_PWT)
+#define _GTF_PCD            (6)
+#define GTF_PCD             (1U<<_GTF_PCD)
+#define _GTF_PAT            (7)
+#define GTF_PAT             (1U<<_GTF_PAT)
 
 /*
  * Subflags for GTF_accept_transfer:

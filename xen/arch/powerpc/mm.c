@@ -168,7 +168,7 @@ static int destroy_grant_va_mapping(
 }
 
 int create_grant_host_mapping(
-    unsigned long addr, unsigned long frame, unsigned int flags)
+    unsigned long addr, unsigned long frame, unsigned int flags, unsigned int cache_flags)
 {
     if (flags & GNTMAP_application_map) {
         printk("%s: GNTMAP_application_map not supported\n", __func__);
@@ -177,6 +177,11 @@ int create_grant_host_mapping(
     }
     if (flags & GNTMAP_contains_pte) {
         printk("%s: GNTMAP_contains_pte not supported\n", __func__);
+        BUG();
+        return GNTST_general_error;
+    }
+    if (cache_flags) {
+        printk("%s: cache_flags not supported\n", __func__);
         BUG();
         return GNTST_general_error;
     }
