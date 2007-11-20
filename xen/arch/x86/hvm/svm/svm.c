@@ -74,11 +74,21 @@ static void *root_vmcb[NR_CPUS] __read_mostly;
 static void svm_update_guest_efer(struct vcpu *v);
 
 static void inline __update_guest_eip(
-    struct cpu_user_regs *regs, int inst_len) 
+    struct cpu_user_regs *regs, unsigned int inst_len)
 {
-    ASSERT(inst_len > 0);
+    if ( unlikely((inst_len == 0) || (inst_len > 15)) )
+    {
+        gdprintk(XENLOG_ERR, "Bad instruction length %u\n", inst_len);
+        domain_crash(current->domain);
+        return;
+    }
+
+    ASSERT(regs == guest_cpu_user_regs());
+
     regs->eip += inst_len;
     regs->eflags &= ~X86_EFLAGS_RF;
+
+    current->arch.hvm_svm.vmcb->interrupt_shadow = 0;
 }
 
 static void svm_inject_exception(
@@ -1061,7 +1071,6 @@ static void svm_vmexit_do_cpuid(struct vmcb_struct *vmcb,
                 ((uint64_t)eax << 32) | ebx, ((uint64_t)ecx << 32) | edx);
 
     inst_len = __get_instruction_length(v, INSTR_CPUID, NULL);
-    ASSERT(inst_len > 0);
     __update_guest_eip(regs, inst_len);
 }
 
@@ -1643,8 +1652,6 @@ static void svm_cr_access(
             v, list_b, ARRAY_SIZE(list_b), &buffer[index], &match);
     }
 
-    ASSERT(inst_len > 0);
-
     inst_len += index;
 
     /* Check for REX prefix - it's ALWAYS the last byte of any prefix bytes */
@@ -1744,8 +1751,6 @@ static void svm_cr_access(
     default:
         BUG();
     }
-
-    ASSERT(inst_len);
 
     if ( result )
         __update_guest_eip(regs, inst_len);
@@ -1925,20 +1930,23 @@ static void svm_do_msr_access(
 static void svm_vmexit_do_hlt(struct vmcb_struct *vmcb,
                               struct cpu_user_regs *regs)
 {
-    struct hvm_intack intack = hvm_vcpu_has_pending_irq(current);
+    struct vcpu *curr = current;
+    struct hvm_intack intack = hvm_vcpu_has_pending_irq(curr);
+    unsigned int inst_len;
 
-    __update_guest_eip(regs, 1);
+    inst_len = __get_instruction_length(curr, INSTR_HLT, NULL);
+    __update_guest_eip(regs, inst_len);
 
     /* Check for interrupt not handled or new interrupt. */
     if ( vmcb->eventinj.fields.v ||
          ((intack.source != hvm_intsrc_none) &&
           !svm_interrupt_blocked(current, intack)) )
     {
-        HVMTRACE_1D(HLT, current, /*int pending=*/ 1);
+        HVMTRACE_1D(HLT, curr, /*int pending=*/ 1);
         return;
     }
 
-    HVMTRACE_1D(HLT, current, /*int pending=*/ 0);
+    HVMTRACE_1D(HLT, curr, /*int pending=*/ 0);
     hvm_hlt(regs->eflags);
 }
 
@@ -1971,17 +1979,15 @@ void svm_handle_invlpg(const short invlpga, struct cpu_user_regs *regs)
      * Unknown how many bytes the invlpg instruction will take.  Use the
      * maximum instruction length here
      */
-    if (inst_copy_from_guest(opcode, svm_rip2pointer(v), length) < length)
+    if ( inst_copy_from_guest(opcode, svm_rip2pointer(v), length) < length )
     {
         gdprintk(XENLOG_ERR, "Error reading memory %d bytes\n", length);
-        domain_crash(v->domain);
-        return;
+        goto crash;
     }
 
-    if (invlpga)
+    if ( invlpga )
     {
         inst_len = __get_instruction_length(v, INSTR_INVLPGA, opcode);
-        ASSERT(inst_len > 0);
         __update_guest_eip(regs, inst_len);
 
         /* 
@@ -1993,9 +1999,13 @@ void svm_handle_invlpg(const short invlpga, struct cpu_user_regs *regs)
     else
     {
         /* What about multiple prefix codes? */
-        prefix = (is_prefix(opcode[0])?opcode[0]:0);
+        prefix = (is_prefix(opcode[0]) ? opcode[0] : 0);
         inst_len = __get_instruction_length(v, INSTR_INVLPG, opcode);
-        ASSERT(inst_len > 0);
+        if ( inst_len <= 0 )
+        {
+            gdprintk(XENLOG_ERR, "Error getting invlpg instr len\n");
+            goto crash;
+        }
 
         inst_len--;
         length -= inst_len;
@@ -2012,10 +2022,14 @@ void svm_handle_invlpg(const short invlpga, struct cpu_user_regs *regs)
         __update_guest_eip(regs, inst_len);
     }
 
-    HVMTRACE_3D(INVLPG, v, (invlpga?1:0), g_vaddr, (invlpga?regs->ecx:0));
+    HVMTRACE_3D(INVLPG, v, !!invlpga, g_vaddr, (invlpga ? regs->ecx : 0));
 
     paging_invlpg(v, g_vaddr);
     svm_asid_g_invlpg(v, g_vaddr);
+    return;
+
+ crash:
+    domain_crash(v->domain);
 }
 
 
@@ -2242,7 +2256,6 @@ asmlinkage void svm_vmexit_handler(struct cpu_user_regs *regs)
 
     case VMEXIT_VMMCALL:
         inst_len = __get_instruction_length(v, INSTR_VMCALL, NULL);
-        ASSERT(inst_len > 0);
         HVMTRACE_1D(VMMCALL, v, regs->eax);
         rc = hvm_do_hypercall(regs);
         if ( rc != HVM_HCALL_preempted )
