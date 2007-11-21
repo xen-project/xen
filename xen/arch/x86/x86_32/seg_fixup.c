@@ -216,10 +216,6 @@ static int linearise_address(u16 seg, unsigned long off, unsigned long *linear)
 
     *linear = base + off;
 
-    /* Conservatively check 32 bytes from returned linear base. */
-    if ( !access_ok(linear, 32) )
-        return 0;
-
     return 1;
 }
 
