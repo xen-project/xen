@@ -153,7 +153,7 @@ static unsigned char twobyte_decode[256] = {
  *  @base  (OUT): Decoded linear base address.
  *  @limit (OUT): Decoded segment limit, in bytes. 0 == unlimited (4GB).
  */
-int get_baselimit(u16 seg, unsigned long *base, unsigned long *limit)
+static int get_baselimit(u16 seg, unsigned long *base, unsigned long *limit)
 {
     struct vcpu *d = current;
     unsigned long *table, a, b;
@@ -204,7 +204,7 @@ int get_baselimit(u16 seg, unsigned long *base, unsigned long *limit)
 }
 
 /* Turn a segment+offset into a linear address. */
-int linearise_address(u16 seg, unsigned long off, unsigned long *linear)
+static int linearise_address(u16 seg, unsigned long off, unsigned long *linear)
 {
     unsigned long base, limit;
 
@@ -216,10 +216,14 @@ int linearise_address(u16 seg, unsigned long off, unsigned long *linear)
 
     *linear = base + off;
 
+    /* Conservatively check 32 bytes from returned linear base. */
+    if ( !access_ok(linear, 32) )
+        return 0;
+
     return 1;
 }
 
-int fixup_seg(u16 seg, unsigned long offset)
+static int fixup_seg(u16 seg, unsigned long offset)
 {
     struct vcpu *d = current;
     unsigned long *table, a, b, base, limit;
@@ -303,9 +307,8 @@ int fixup_seg(u16 seg, unsigned long offset)
     a &= ~0x0ffff; a |= limit & 0x0ffff;
     b &= ~0xf0000; b |= limit & 0xf0000;
     b ^= _SEGMENT_EC; /* grows-up <-> grows-down */
-    /* NB. These can't fault. Checked readable above; must also be writable. */
-    table[2*idx+0] = a;
-    table[2*idx+1] = b;
+    /* NB. This can't fault. Checked readable above; must also be writable. */
+    atomic_write64((uint64_t *)&table[2*idx], ((uint64_t)b<<32) | a);
     return 1;
 }
 

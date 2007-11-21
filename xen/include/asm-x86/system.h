@@ -256,6 +256,17 @@ static always_inline unsigned long long __cmpxchg8b(
 })
 #endif
 
+static inline void atomic_write64(uint64_t *p, uint64_t v)
+{
+#ifdef __i386__
+    uint64_t w = *p, x;
+    while ( (x = __cmpxchg8b(p, w, v)) != w )
+        w = x;
+#else
+    *p = v;
+#endif
+}
+
 #if defined(__i386__)
 #define mb() 	__asm__ __volatile__ ("lock; addl $0,0(%%esp)": : :"memory")
 #define rmb()	__asm__ __volatile__ ("lock; addl $0,0(%%esp)": : :"memory")
