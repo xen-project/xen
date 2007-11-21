@@ -98,9 +98,8 @@ static inline void atomic_write64(uint64_t *p, uint64_t v)
         w = x;
 }
 
-#define mb()    asm volatile ( "lock; addl $0,0(%%esp)" : : : "memory" )
-#define rmb()   asm volatile ( "lock; addl $0,0(%%esp)" : : : "memory" )
-#define wmb()   asm volatile ( "" : : : "memory" )
+#define mb()                    \
+    asm volatile ( "lock; addl $0,0(%%esp)" : : : "memory" )
 
 #define __save_flags(x)         \
     asm volatile ( "pushfl ; popl %0" : "=g" (x) : )

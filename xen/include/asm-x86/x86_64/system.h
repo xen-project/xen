@@ -52,9 +52,8 @@ static inline void atomic_write64(uint64_t *p, uint64_t v)
     *p = v;
 }
 
-#define mb()    asm volatile ( "mfence" : : : "memory" )
-#define rmb()   asm volatile ( "lfence" : : : "memory" )
-#define wmb()   asm volatile ( "" : : : "memory" )
+#define mb()                    \
+    asm volatile ( "mfence" : : : "memory" )
 
 #define __save_flags(x)         \
     asm volatile ( "pushfq ; popq %q0" : "=g" (x) : :"memory" )

@@ -135,6 +135,21 @@ static always_inline unsigned long __cmpxchg(
 
 #define __HAVE_ARCH_CMPXCHG
 
+/*
+ * Both Intel and AMD agree that, from a programmer's viewpoint:
+ *  Loads cannot be reordered relative to other loads.
+ *  Stores cannot be reordered relative to other stores.
+ * 
+ * Intel64 Architecture Memory Ordering White Paper
+ * <http://developer.intel.com/products/processor/manuals/318147.pdf>
+ * 
+ * AMD64 Architecture Programmer's Manual, Volume 2: System Programming
+ * <http://www.amd.com/us-en/assets/content_type/\
+ *  white_papers_and_tech_docs/24593.pdf>
+ */
+#define rmb()           barrier()
+#define wmb()           barrier()
+
 #ifdef CONFIG_SMP
 #define smp_mb()        mb()
 #define smp_rmb()       rmb()
