@@ -42,7 +42,7 @@
 #define O  OPCODE_BYTE
 #define M  HAS_MODRM
 
-static unsigned char insn_decode[256] = {
+static const unsigned char insn_decode[256] = {
     /* 0x00 - 0x0F */
     O|M, O|M, O|M, O|M, X, X, X, X,
     O|M, O|M, O|M, O|M, X, X, X, X,
@@ -69,7 +69,7 @@ static unsigned char insn_decode[256] = {
     X, X, X, X, X, X, X, X,
     /* 0x80 - 0x8F */
     O|M|1, O|M|4, O|M|1, O|M|1, O|M, O|M, O|M, O|M,
-    O|M, O|M, O|M, O|M, O|M, O|M, O|M, X,
+    O|M, O|M, O|M, O|M, O|M, X|M, O|M, O|M,
     /* 0x90 - 0x9F */
     X, X, X, X, X, X, X, X,
     X, X, X, X, X, X, X, X,
@@ -89,17 +89,17 @@ static unsigned char insn_decode[256] = {
     X, X, X, X, X, X, X, X,
     X, X, X, X, X, X, X, X,
     /* 0xF0 - 0xFF */
-    X, X, X, X, X, X, X, X,
+    X, X, X, X, X, X, O|M, O|M,
     X, X, X, X, X, X, O|M, O|M
 };
 
-static unsigned char twobyte_decode[256] = {
+static const unsigned char twobyte_decode[256] = {
     /* 0x00 - 0x0F */
     X, X, X, X, X, X, X, X,
     X, X, X, X, X, X, X, X,
     /* 0x10 - 0x1F */
     X, X, X, X, X, X, X, X,
-    X, X, X, X, X, X, X, X,
+    O|M, X, X, X, X, X, X, X,
     /* 0x20 - 0x2F */
     X, X, X, X, X, X, X, X,
     X, X, X, X, X, X, X, X,
@@ -122,16 +122,16 @@ static unsigned char twobyte_decode[256] = {
     X, X, X, X, X, X, X, X,
     X, X, X, X, X, X, X, X,
     /* 0x90 - 0x9F */
-    X, X, X, X, X, X, X, X,
-    X, X, X, X, X, X, X, X,
+    O|M, O|M, O|M, O|M, O|M, O|M, O|M, O|M,
+    O|M, O|M, O|M, O|M, O|M, O|M, O|M, O|M,
     /* 0xA0 - 0xAF */
-    X, X, X, X, X, X, X, X,
-    X, X, X, X, X, X, X, X,
+    X, X, X, O|M, O|M|1, O|M, O|M, X,
+    X, X, X, O|M, O|M|1, O|M, X, O|M,
     /* 0xB0 - 0xBF */
-    X, X, X, X, X, X, X, X,
-    X, X, X, X, X, X, X, X,
+    X, X, X, O|M, X, X, O|M, O|M,
+    X, X, O|M|1, O|M, O|M, O|M, O|M, O|M,
     /* 0xC0 - 0xCF */
-    X, X, X, X, X, X, X, X,
+    O|M, O|M, X, O|M, X, X, X, O|M,
     X, X, X, X, X, X, X, X,
     /* 0xD0 - 0xDF */
     X, X, X, X, X, X, X, X,
@@ -155,22 +155,22 @@ static unsigned char twobyte_decode[256] = {
  */
 static int get_baselimit(u16 seg, unsigned long *base, unsigned long *limit)
 {
-    struct vcpu *d = current;
-    unsigned long *table, a, b;
-    int            ldt = !!(seg & 4);
-    int            idx = (seg >> 3) & 8191;
+    struct vcpu *curr = current;
+    uint32_t    *table, a, b;
+    int          ldt = !!(seg & 4);
+    int          idx = (seg >> 3) & 8191;
 
     /* Get base and check limit. */
     if ( ldt )
     {
-        table = (unsigned long *)LDT_VIRT_START(d);
-        if ( idx >= d->arch.guest_context.ldt_ents )
+        table = (uint32_t *)LDT_VIRT_START(curr);
+        if ( idx >= curr->arch.guest_context.ldt_ents )
             goto fail;
     }
     else /* gdt */
     {
-        table = (unsigned long *)GDT_VIRT_START(d);
-        if ( idx >= d->arch.guest_context.gdt_ents )
+        table = (uint32_t *)GDT_VIRT_START(curr);
+        if ( idx >= curr->arch.guest_context.gdt_ents )
             goto fail;
     }
 
@@ -225,29 +225,29 @@ static int linearise_address(u16 seg, unsigned long off, unsigned long *linear)
 
 static int fixup_seg(u16 seg, unsigned long offset)
 {
-    struct vcpu *d = current;
-    unsigned long *table, a, b, base, limit;
-    int            ldt = !!(seg & 4);
-    int            idx = (seg >> 3) & 8191;
+    struct vcpu *curr = current;
+    uint32_t    *table, a, b, base, limit;
+    int          ldt = !!(seg & 4);
+    int          idx = (seg >> 3) & 8191;
 
     /* Get base and check limit. */
     if ( ldt )
     {
-        table = (unsigned long *)LDT_VIRT_START(d);
-        if ( idx >= d->arch.guest_context.ldt_ents )
+        table = (uint32_t *)LDT_VIRT_START(curr);
+        if ( idx >= curr->arch.guest_context.ldt_ents )
         {
             dprintk(XENLOG_DEBUG, "Segment %04x out of LDT range (%ld)\n",
-                    seg, d->arch.guest_context.ldt_ents);
+                    seg, curr->arch.guest_context.ldt_ents);
             goto fail;
         }
     }
     else /* gdt */
     {
-        table = (unsigned long *)GDT_VIRT_START(d);
-        if ( idx >= d->arch.guest_context.gdt_ents )
+        table = (uint32_t *)GDT_VIRT_START(curr);
+        if ( idx >= curr->arch.guest_context.gdt_ents )
         {
             dprintk(XENLOG_DEBUG, "Segment %04x out of GDT range (%ld)\n",
-                    seg, d->arch.guest_context.gdt_ents);
+                    seg, curr->arch.guest_context.gdt_ents);
             goto fail;
         }
     }
@@ -265,7 +265,7 @@ static int fixup_seg(u16 seg, unsigned long offset)
                _SEGMENT_G|_SEGMENT_CODE|_SEGMENT_DPL)) != 
          (_SEGMENT_P|_SEGMENT_S|_SEGMENT_DB|_SEGMENT_G|_SEGMENT_DPL) )
     {
-        dprintk(XENLOG_DEBUG, "Bad segment %08lx:%08lx\n", a, b);
+        dprintk(XENLOG_DEBUG, "Bad segment %08x:%08x\n", a, b);
         goto fail;
     }
 
@@ -295,8 +295,7 @@ static int fixup_seg(u16 seg, unsigned long offset)
         }
     }
 
-    dprintk(XENLOG_DEBUG, "None of the above! "
-            "(%08lx:%08lx, %08lx, %08lx, %08lx)\n",
+    dprintk(XENLOG_DEBUG, "None of the above! (%08x:%08x, %08x, %08x, %08x)\n",
             a, b, base, limit, base+limit);
 
  fail:
@@ -318,18 +317,15 @@ static int fixup_seg(u16 seg, unsigned long offset)
  */
 int gpf_emulate_4gb(struct cpu_user_regs *regs)
 {
-    struct vcpu *d = current;
-    struct trap_info   *ti;
-    struct trap_bounce *tb;
-    u8            modrm, mod, reg, rm, decode;
-    void         *memreg;
-    unsigned long offset;
-    u8            disp8;
-    u32           disp32 = 0;
+    struct vcpu   *curr = current;
+    u8             modrm, mod, rm, decode;
+    const u32     *base, *index = NULL;
+    unsigned long  offset;
+    s8             disp8;
+    s32            disp32 = 0;
     u8            *eip;         /* ptr to instruction start */
     u8            *pb, b;       /* ptr into instr. / current instr. byte */
-    int            gs_override = 0;
-    int            twobyte = 0;
+    int            gs_override = 0, scale = 0, twobyte = 0;
 
     /* WARNING: We only work for ring-3 segments. */
     if ( unlikely(vm86_mode(regs)) || unlikely(!ring_3(regs)) )
@@ -360,6 +356,9 @@ int gpf_emulate_4gb(struct cpu_user_regs *regs)
             goto fail;
         }
 
+        if ( twobyte )
+            break;
+
         switch ( b )
         {
         case 0x67: /* Address-size override */
@@ -378,6 +377,9 @@ int gpf_emulate_4gb(struct cpu_user_regs *regs)
         case 0x65: /* GS override */
             gs_override = 1;
             break;
+        case 0x0f: /* Not really a prefix byte */
+            twobyte = 1;
+            break;
         default: /* Not a prefix byte */
             goto done_prefix;
         }
@@ -390,32 +392,10 @@ int gpf_emulate_4gb(struct cpu_user_regs *regs)
         goto fail;
     }
 
-    decode = insn_decode[b]; /* opcode byte */
+    decode = (!twobyte ? insn_decode : twobyte_decode)[b];
     pb++;
-    if ( decode == 0 && b == 0x0f )
-    {
-        twobyte = 1;
 
-        if ( get_user(b, pb) )
-        {
-            dprintk(XENLOG_DEBUG,
-                    "Fault while accessing byte %ld of instruction\n",
-                    (long)(pb-eip));
-            goto page_fault;
-        }
-
-        if ( (pb - eip) >= 15 )
-        {
-            dprintk(XENLOG_DEBUG, "Too many opcode bytes for a "
-                    "legal instruction\n");
-            goto fail;
-        }
-
-        decode = twobyte_decode[b];
-        pb++;
-    }
-
-    if ( decode == 0 )
+    if ( !(decode & OPCODE_BYTE) )
     {
         dprintk(XENLOG_DEBUG, "Unsupported %sopcode %02x\n",
                 twobyte ? "two byte " : "", b);
@@ -425,12 +405,12 @@ int gpf_emulate_4gb(struct cpu_user_regs *regs)
     if ( !(decode & HAS_MODRM) )
     {
         /* Must be a <disp32>, or bail. */
-        if ( (decode & 7) != 4 )
+        if ( (decode & INSN_SUFFIX_BYTES) != 4 )
             goto fail;
 
         if ( get_user(offset, (u32 *)pb) )
         {
-            dprintk(XENLOG_DEBUG, "Fault while extracting <disp32>.\n");
+            dprintk(XENLOG_DEBUG, "Fault while extracting <moffs32>.\n");
             goto page_fault;
         }
         pb += 4;
@@ -451,29 +431,39 @@ int gpf_emulate_4gb(struct cpu_user_regs *regs)
     pb++;
 
     mod = (modrm >> 6) & 3;
-    reg = (modrm >> 3) & 7;
     rm  = (modrm >> 0) & 7;
 
     if ( rm == 4 )
     {
-        dprintk(XENLOG_DEBUG, "FIXME: Add decoding for the SIB byte.\n");
-        goto fixme;
+        u8 sib;
+
+        if ( get_user(sib, pb) )
+        {
+            dprintk(XENLOG_DEBUG, "Fault while extracting sib byte\n");
+            goto page_fault;
+        }
+
+        pb++;
+
+        rm = sib & 7;
+        if ( (sib & 0x38) != 0x20 )
+            index = decode_register((sib >> 3) & 7, regs, 0);
+        scale = sib >> 6;
     }
 
     /* Decode R/M field. */
-    memreg = decode_register(rm,  regs, 0);
+    base = decode_register(rm, regs, 0);
 
     /* Decode Mod field. */
-    switch ( modrm >> 6 )
+    switch ( mod )
     {
     case 0:
-        disp32 = 0;
         if ( rm == 5 ) /* disp32 rather than (EBP) */
         {
-            memreg = NULL;
+            base = NULL;
             if ( get_user(disp32, (u32 *)pb) )
             {
-                dprintk(XENLOG_DEBUG, "Fault while extracting <disp8>.\n");
+                dprintk(XENLOG_DEBUG, "Fault while extracting <base32>.\n");
                 goto page_fault;
             }
             pb += 4;
@@ -487,13 +477,13 @@ int gpf_emulate_4gb(struct cpu_user_regs *regs)
             goto page_fault;
         }
         pb++;
-        disp32 = (disp8 & 0x80) ? (disp8 | ~0xff) : disp8;;
+        disp32 = disp8;
         break;
 
     case 2:
         if ( get_user(disp32, (u32 *)pb) )
         {
-            dprintk(XENLOG_DEBUG, "Fault while extracting <disp8>.\n");
+            dprintk(XENLOG_DEBUG, "Fault while extracting <disp32>.\n");
             goto page_fault;
         }
         pb += 4;
@@ -505,8 +495,10 @@ int gpf_emulate_4gb(struct cpu_user_regs *regs)
     }
 
     offset = disp32;
-    if ( memreg != NULL )
-        offset += *(u32 *)memreg;
+    if ( base != NULL )
+        offset += *base;
+    if ( index != NULL )
+        offset += *index << scale;
 
  skip_modrm:
     if ( !fixup_seg((u16)regs->gs, offset) )
@@ -516,10 +508,11 @@ int gpf_emulate_4gb(struct cpu_user_regs *regs)
     perfc_incr(seg_fixups);
 
     /* If requested, give a callback on otherwise unused vector 15. */
-    if ( VM_ASSIST(d->domain, VMASST_TYPE_4gb_segments_notify) )
+    if ( VM_ASSIST(curr->domain, VMASST_TYPE_4gb_segments_notify) )
     {
-        ti  = &d->arch.guest_context.trap_ctxt[15];
-        tb  = &d->arch.trap_bounce;
+        struct trap_info   *ti  = &curr->arch.guest_context.trap_ctxt[15];
+        struct trap_bounce *tb  = &curr->arch.trap_bounce;
+
         tb->flags      = TBF_EXCEPTION | TBF_EXCEPTION_ERRCODE;
         tb->error_code = pb - eip;
         tb->cs         = ti->cs;
@@ -530,13 +523,6 @@ int gpf_emulate_4gb(struct cpu_user_regs *regs)
 
     return EXCRET_fault_fixed;
 
- fixme:
-    dprintk(XENLOG_DEBUG, "Undecodable instruction "
-            "%02x:%02x:%02x:%02x:%02x:%02x:%02x:%02x "
-            "caused GPF(0) at %04x:%08x\n",
-            eip[0], eip[1], eip[2], eip[3],
-            eip[4], eip[5], eip[6], eip[7],
-            regs->cs, regs->eip);
  fail:
     return 0;
 
