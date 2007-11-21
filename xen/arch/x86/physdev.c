@@ -8,7 +8,6 @@
 #include <xen/event.h>
 #include <xen/guest_access.h>
 #include <asm/current.h>
-#include <asm/smpboot.h>
 #include <asm/hypercall.h>
 #include <public/xen.h>
 #include <public/physdev.h>

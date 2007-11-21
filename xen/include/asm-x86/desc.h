@@ -143,6 +143,11 @@ typedef struct {
 
 #define _set_gate(gate_addr,type,dpl,addr)               \
 do {                                                     \
+    (gate_addr)->a = 0;                                  \
+    wmb(); /* disable gate /then/ rewrite */             \
+    (gate_addr)->b =                                     \
+        ((unsigned long)(addr) >> 32);                   \
+    wmb(); /* rewrite /then/ enable gate */              \
     (gate_addr)->a =                                     \
         (((unsigned long)(addr) & 0xFFFF0000UL) << 32) | \
         ((unsigned long)(dpl) << 45) |                   \
@@ -150,49 +155,53 @@ do {                                                     \
         ((unsigned long)(addr) & 0xFFFFUL) |             \
         ((unsigned long)__HYPERVISOR_CS64 << 16) |       \
         (1UL << 47);                                     \
-    (gate_addr)->b =                                     \
-        ((unsigned long)(addr) >> 32);                   \
 } while (0)
 
 #define _set_tssldt_desc(desc,addr,limit,type)           \
 do {                                                     \
+    (desc)[0].b = (desc)[1].b = 0;                       \
+    wmb(); /* disable entry /then/ rewrite */            \
     (desc)[0].a =                                        \
         ((u32)(addr) << 16) | ((u32)(limit) & 0xFFFF);   \
+    (desc)[1].a = (u32)(((unsigned long)(addr)) >> 32);  \
+    wmb(); /* rewrite /then/ enable entry */             \
     (desc)[0].b =                                        \
         ((u32)(addr) & 0xFF000000U) |                    \
         ((u32)(type) << 8) | 0x8000U |                   \
         (((u32)(addr) & 0x00FF0000U) >> 16);             \
-    (desc)[1].a = (u32)(((unsigned long)(addr)) >> 32);  \
-    (desc)[1].b = 0;                                     \
 } while (0)
 
 #elif defined(__i386__)
 
 typedef struct desc_struct idt_entry_t;
 
-#define _set_gate(gate_addr,type,dpl,addr) \
-do { \
-  int __d0, __d1; \
-  __asm__ __volatile__ ("movw %%dx,%%ax\n\t" \
- "movw %4,%%dx\n\t" \
- "movl %%eax,%0\n\t" \
- "movl %%edx,%1" \
- :"=m" (*((long *) (gate_addr))), \
-  "=m" (*(1+(long *) (gate_addr))), "=&a" (__d0), "=&d" (__d1) \
- :"i" ((short) (0x8000+(dpl<<13)+(type<<8))), \
-  "3" ((char *) (addr)),"2" (__HYPERVISOR_CS << 16)); \
+#define _set_gate(gate_addr,type,dpl,addr)               \
+do {                                                     \
+    (gate_addr)->b = 0;                                  \
+    wmb(); /* disable gate /then/ rewrite */             \
+    (gate_addr)->a =                                     \
+        ((unsigned long)(addr) & 0xFFFFUL) |             \
+        ((unsigned long)__HYPERVISOR_CS << 16);          \
+    wmb(); /* rewrite /then/ enable gate */              \
+    (gate_addr)->b =                                     \
+        ((unsigned long)(addr) & 0xFFFF0000UL) |         \
+        ((unsigned long)(dpl) << 13) |                   \
+        ((unsigned long)(type) << 8) |                   \
+        (1UL << 15);                                     \
 } while (0)
 
-#define _set_tssldt_desc(n,addr,limit,type) \
-__asm__ __volatile__ ("movw %w3,0(%2)\n\t" \
- "movw %%ax,2(%2)\n\t" \
- "rorl $16,%%eax\n\t" \
- "movb %%al,4(%2)\n\t" \
- "movb %4,5(%2)\n\t" \
- "movb $0,6(%2)\n\t" \
- "movb %%ah,7(%2)\n\t" \
- "rorl $16,%%eax" \
- : "=m"(*(n)) : "a" (addr), "r"(n), "ir"(limit), "i"(type|0x80))
+#define _set_tssldt_desc(desc,addr,limit,type)           \
+do {                                                     \
+    (desc)->b = 0;                                       \
+    wmb(); /* disable entry /then/ rewrite */            \
+    (desc)->a =                                          \
+        ((u32)(addr) << 16) | ((u32)(limit) & 0xFFFF);   \
+    wmb(); /* rewrite /then/ enable entry */             \
+    (desc)->b =                                          \
+        ((u32)(addr) & 0xFF000000U) |                    \
+        ((u32)(type) << 8) | 0x8000U |                   \
+        (((u32)(addr) & 0x00FF0000U) >> 16);             \
+} while (0)
 
 #endif
 

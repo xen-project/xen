@@ -18,7 +18,6 @@
 #include <asm/smp.h>
 #include <asm/mc146818rtc.h>
 #include <asm/flushtlb.h>
-#include <asm/smpboot.h>
 #include <asm/hardirq.h>
 #include <asm/ipi.h>
 #include <asm/hvm/support.h>

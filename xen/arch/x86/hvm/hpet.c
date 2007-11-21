@@ -127,9 +127,13 @@ static inline int hpet_check_access_length(
 {
     if ( (addr & (len - 1)) || (len > 8) )
     {
-        gdprintk(XENLOG_ERR, "HPET: access across register boundary: "
+        /*
+         * According to ICH9 specification, unaligned accesses may result
+         * in unexpected behaviour or master abort, but should not crash/hang.
+         * Hence we read all-ones, drop writes, and log a warning.
+         */
+        gdprintk(XENLOG_WARNING, "HPET: access across register boundary: "
                  "%lx %lx\n", addr, len);
-        domain_crash(current->domain);
         return -EINVAL;
     }
 

@@ -3007,7 +3007,8 @@ long set_gdt(struct vcpu *v,
         return -EINVAL;
 
     /* Check the pages in the new GDT. */
-    for ( i = 0; i < nr_pages; i++ ) {
+    for ( i = 0; i < nr_pages; i++ )
+    {
         mfn = frames[i] = gmfn_to_mfn(d, frames[i]);
         if ( !mfn_valid(mfn) ||
              !get_page_and_type(mfn_to_page(mfn), d, PGT_gdt_page) )
@@ -3073,23 +3074,15 @@ long do_update_descriptor(u64 pa, u64 desc)
 
     *(u64 *)&d = desc;
 
-    LOCK_BIGLOCK(dom);
-
     mfn = gmfn_to_mfn(dom, gmfn);
     if ( (((unsigned int)pa % sizeof(struct desc_struct)) != 0) ||
          !mfn_valid(mfn) ||
          !check_descriptor(dom, &d) )
-    {
-        UNLOCK_BIGLOCK(dom);
         return -EINVAL;
-    }
 
     page = mfn_to_page(mfn);
     if ( unlikely(!get_page(page, dom)) )
-    {
-        UNLOCK_BIGLOCK(dom);
         return -EINVAL;
-    }
 
     /* Check if the given frame is in use in an unsafe context. */
     switch ( page->u.inuse.type_info & PGT_type_mask )
@@ -3112,7 +3105,7 @@ long do_update_descriptor(u64 pa, u64 desc)
 
     /* All is good so make the update. */
     gdt_pent = map_domain_page(mfn);
-    memcpy(&gdt_pent[offset], &d, 8);
+    atomic_write64((uint64_t *)&gdt_pent[offset], *(uint64_t *)&d);
     unmap_domain_page(gdt_pent);
 
     put_page_type(page);
@@ -3121,8 +3114,6 @@ long do_update_descriptor(u64 pa, u64 desc)
 
  out:
     put_page(page);
-
-    UNLOCK_BIGLOCK(dom);
 
     return ret;
 }

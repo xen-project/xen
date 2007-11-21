@@ -5,69 +5,78 @@
 #include <xen/types.h>
 #include <asm/bitops.h>
 
-#define read_segment_register(name)                                     \
-({  u16 __sel;                                                          \
-    __asm__ __volatile__ ( "movw %%" STR(name) ",%0" : "=r" (__sel) );  \
-    __sel;                                                              \
+#define read_segment_register(name)                             \
+({  u16 __sel;                                                  \
+    asm volatile ( "movw %%" STR(name) ",%0" : "=r" (__sel) );  \
+    __sel;                                                      \
 })
 
 #define wbinvd() \
-	__asm__ __volatile__ ("wbinvd": : :"memory");
+    asm volatile ( "wbinvd" : : : "memory" )
 
 #define clflush(a) \
-	__asm__ __volatile__ ("clflush (%0)": :"r"(a));
+    asm volatile ( "clflush (%0)" : : "r"(a) )
 
-#define nop() __asm__ __volatile__ ("nop")
+#define nop() \
+    asm volatile ( "nop" )
 
-#define xchg(ptr,v) ((__typeof__(*(ptr)))__xchg((unsigned long)(v),(ptr),sizeof(*(ptr))))
+#define xchg(ptr,v) \
+    ((__typeof__(*(ptr)))__xchg((unsigned long)(v),(ptr),sizeof(*(ptr))))
 
 struct __xchg_dummy { unsigned long a[100]; };
 #define __xg(x) ((volatile struct __xchg_dummy *)(x))
 
+#if defined(__i386__)
+# include <asm/x86_32/system.h>
+#elif defined(__x86_64__)
+# include <asm/x86_64/system.h>
+#endif
 
 /*
  * Note: no "lock" prefix even on SMP: xchg always implies lock anyway
  * Note 2: xchg has side effect, so that attribute volatile is necessary,
  *   but generally the primitive is invalid, *ptr is output argument. --ANK
  */
-static always_inline unsigned long __xchg(unsigned long x, volatile void * ptr, int size)
+static always_inline unsigned long __xchg(
+    unsigned long x, volatile void *ptr, int size)
 {
-	switch (size) {
-		case 1:
-			__asm__ __volatile__("xchgb %b0,%1"
-				:"=q" (x)
-				:"m" (*__xg((volatile void *)ptr)), "0" (x)
-				:"memory");
-			break;
-		case 2:
-			__asm__ __volatile__("xchgw %w0,%1"
-				:"=r" (x)
-				:"m" (*__xg((volatile void *)ptr)), "0" (x)
-				:"memory");
-			break;
+    switch ( size )
+    {
+    case 1:
+        asm volatile ( "xchgb %b0,%1"
+                       : "=q" (x)
+                       : "m" (*__xg((volatile void *)ptr)), "0" (x)
+                       : "memory" );
+        break;
+    case 2:
+        asm volatile ( "xchgw %w0,%1"
+                       : "=r" (x)
+                       : "m" (*__xg((volatile void *)ptr)), "0" (x)
+                       : "memory" );
+        break;
 #if defined(__i386__)
-		case 4:
-			__asm__ __volatile__("xchgl %0,%1"
-				:"=r" (x)
-				:"m" (*__xg((volatile void *)ptr)), "0" (x)
-				:"memory");
-			break;
+    case 4:
+        asm volatile ( "xchgl %0,%1"
+                       : "=r" (x)
+                       : "m" (*__xg((volatile void *)ptr)), "0" (x)
+                       : "memory" );
+        break;
 #elif defined(__x86_64__)
-		case 4:
-			__asm__ __volatile__("xchgl %k0,%1"
-				:"=r" (x)
-				:"m" (*__xg((volatile void *)ptr)), "0" (x)
-				:"memory");
-			break;
-		case 8:
-			__asm__ __volatile__("xchgq %0,%1"
-				:"=r" (x)
-				:"m" (*__xg((volatile void *)ptr)), "0" (x)
-				:"memory");
-			break;
+    case 4:
+        asm volatile ( "xchgl %k0,%1"
+                       : "=r" (x)
+                       : "m" (*__xg((volatile void *)ptr)), "0" (x)
+                       : "memory" );
+        break;
+    case 8:
+        asm volatile ( "xchgq %0,%1"
+                       : "=r" (x)
+                       : "m" (*__xg((volatile void *)ptr)), "0" (x)
+                       : "memory" );
+        break;
 #endif
-	}
-	return x;
+    }
+    return x;
 }
 
 /*
@@ -79,230 +88,88 @@ static always_inline unsigned long __xchg(unsigned long x, volatile void * ptr, 
 static always_inline unsigned long __cmpxchg(
     volatile void *ptr, unsigned long old, unsigned long new, int size)
 {
-	unsigned long prev;
-	switch (size) {
-	case 1:
-		__asm__ __volatile__(LOCK_PREFIX "cmpxchgb %b1,%2"
-				     : "=a"(prev)
-				     : "q"(new), "m"(*__xg((volatile void *)ptr)), "0"(old)
-				     : "memory");
-		return prev;
-	case 2:
-		__asm__ __volatile__(LOCK_PREFIX "cmpxchgw %w1,%2"
-				     : "=a"(prev)
-				     : "r"(new), "m"(*__xg((volatile void *)ptr)), "0"(old)
-				     : "memory");
-		return prev;
+    unsigned long prev;
+    switch ( size )
+    {
+    case 1:
+        asm volatile ( LOCK_PREFIX "cmpxchgb %b1,%2"
+                       : "=a" (prev)
+                       : "q" (new), "m" (*__xg((volatile void *)ptr)),
+                       "0" (old)
+                       : "memory" );
+        return prev;
+    case 2:
+        asm volatile ( LOCK_PREFIX "cmpxchgw %w1,%2"
+                       : "=a" (prev)
+                       : "r" (new), "m" (*__xg((volatile void *)ptr)),
+                       "0" (old)
+                       : "memory" );
+        return prev;
 #if defined(__i386__)
-	case 4:
-		__asm__ __volatile__(LOCK_PREFIX "cmpxchgl %1,%2"
-				     : "=a"(prev)
-				     : "r"(new), "m"(*__xg((volatile void *)ptr)), "0"(old)
-				     : "memory");
-		return prev;
+    case 4:
+        asm volatile ( LOCK_PREFIX "cmpxchgl %1,%2"
+                       : "=a" (prev)
+                       : "r" (new), "m" (*__xg((volatile void *)ptr)),
+                       "0" (old)
+                       : "memory" );
+        return prev;
 #elif defined(__x86_64__)
-	case 4:
-		__asm__ __volatile__(LOCK_PREFIX "cmpxchgl %k1,%2"
-				     : "=a"(prev)
-				     : "r"(new), "m"(*__xg((volatile void *)ptr)), "0"(old)
-				     : "memory");
-		return prev;
-	case 8:
-		__asm__ __volatile__(LOCK_PREFIX "cmpxchgq %1,%2"
-				     : "=a"(prev)
-				     : "r"(new), "m"(*__xg((volatile void *)ptr)), "0"(old)
-				     : "memory");
-		return prev;
+    case 4:
+        asm volatile ( LOCK_PREFIX "cmpxchgl %k1,%2"
+                       : "=a" (prev)
+                       : "r" (new), "m" (*__xg((volatile void *)ptr)),
+                       "0" (old)
+                       : "memory" );
+        return prev;
+    case 8:
+        asm volatile ( LOCK_PREFIX "cmpxchgq %1,%2"
+                       : "=a" (prev)
+                       : "r" (new), "m" (*__xg((volatile void *)ptr)),
+                       "0" (old)
+                       : "memory" );
+        return prev;
 #endif
-	}
-	return old;
+    }
+    return old;
 }
 
 #define __HAVE_ARCH_CMPXCHG
 
-#if BITS_PER_LONG == 64
-
-#define cmpxchg(ptr,o,n)                                                \
-    ((__typeof__(*(ptr)))__cmpxchg((ptr),(unsigned long)(o),            \
-                                   (unsigned long)(n),sizeof(*(ptr))))
-#else
-
-static always_inline unsigned long long __cmpxchg8b(
-    volatile void *ptr, unsigned long long old, unsigned long long new)
-{
-    unsigned long long prev;
-    __asm__ __volatile__ (
-        LOCK_PREFIX "cmpxchg8b %3"
-        : "=A" (prev)
-        : "c" ((u32)(new>>32)), "b" ((u32)new),
-          "m" (*__xg((volatile void *)ptr)), "0" (old)
-        : "memory" );
-    return prev;
-}
-
-#define cmpxchg(ptr,o,n)                                \
-({                                                      \
-    __typeof__(*(ptr)) __prev;                          \
-    switch ( sizeof(*(ptr)) ) {                         \
-    case 8:                                             \
-        __prev = ((__typeof__(*(ptr)))__cmpxchg8b(      \
-            (ptr),                                      \
-            (unsigned long long)(o),                    \
-            (unsigned long long)(n)));                  \
-        break;                                          \
-    default:                                            \
-        __prev = ((__typeof__(*(ptr)))__cmpxchg(        \
-            (ptr),                                      \
-            (unsigned long)(o),                         \
-            (unsigned long)(n),                         \
-            sizeof(*(ptr))));                           \
-        break;                                          \
-    }                                                   \
-    __prev;                                             \
-})
-
-#endif
-
-
 /*
- * This function causes value _o to be changed to _n at location _p.
- * If this access causes a fault then we return 1, otherwise we return 0.
- * If no fault occurs then _o is updated to the value we saw at _p. If this
- * is the same as the initial value of _o then _n is written to location _p.
+ * Both Intel and AMD agree that, from a programmer's viewpoint:
+ *  Loads cannot be reordered relative to other loads.
+ *  Stores cannot be reordered relative to other stores.
+ * 
+ * Intel64 Architecture Memory Ordering White Paper
+ * <http://developer.intel.com/products/processor/manuals/318147.pdf>
+ * 
+ * AMD64 Architecture Programmer's Manual, Volume 2: System Programming
+ * <http://www.amd.com/us-en/assets/content_type/\
+ *  white_papers_and_tech_docs/24593.pdf>
  */
-#ifdef __i386__
-#define __cmpxchg_user(_p,_o,_n,_isuff,_oppre,_regtype)                 \
-    __asm__ __volatile__ (                                              \
-        "1: " LOCK_PREFIX "cmpxchg"_isuff" %"_oppre"2,%3\n"             \
-        "2:\n"                                                          \
-        ".section .fixup,\"ax\"\n"                                      \
-        "3:     movl $1,%1\n"                                           \
-        "       jmp 2b\n"                                               \
-        ".previous\n"                                                   \
-        ".section __ex_table,\"a\"\n"                                   \
-        "       .align 4\n"                                             \
-        "       .long 1b,3b\n"                                          \
-        ".previous"                                                     \
-        : "=a" (_o), "=r" (_rc)                                         \
-        : _regtype (_n), "m" (*__xg((volatile void *)_p)), "0" (_o), "1" (0) \
-        : "memory");
-#define cmpxchg_user(_p,_o,_n)                                          \
-({                                                                      \
-    int _rc;                                                            \
-    switch ( sizeof(*(_p)) ) {                                          \
-    case 1:                                                             \
-        __cmpxchg_user(_p,_o,_n,"b","b","q");                           \
-        break;                                                          \
-    case 2:                                                             \
-        __cmpxchg_user(_p,_o,_n,"w","w","r");                           \
-        break;                                                          \
-    case 4:                                                             \
-        __cmpxchg_user(_p,_o,_n,"l","","r");                            \
-        break;                                                          \
-    case 8:                                                             \
-        __asm__ __volatile__ (                                          \
-            "1: " LOCK_PREFIX "cmpxchg8b %4\n"                          \
-            "2:\n"                                                      \
-            ".section .fixup,\"ax\"\n"                                  \
-            "3:     movl $1,%1\n"                                       \
-            "       jmp 2b\n"                                           \
-            ".previous\n"                                               \
-            ".section __ex_table,\"a\"\n"                               \
-            "       .align 4\n"                                         \
-            "       .long 1b,3b\n"                                      \
-            ".previous"                                                 \
-            : "=A" (_o), "=r" (_rc)                                     \
-            : "c" ((u32)((u64)(_n)>>32)), "b" ((u32)(_n)),              \
-              "m" (*__xg((volatile void *)(_p))), "0" (_o), "1" (0)     \
-            : "memory");                                                \
-        break;                                                          \
-    }                                                                   \
-    _rc;                                                                \
-})
-#else
-#define __cmpxchg_user(_p,_o,_n,_isuff,_oppre,_regtype)                 \
-    __asm__ __volatile__ (                                              \
-        "1: " LOCK_PREFIX "cmpxchg"_isuff" %"_oppre"2,%3\n"             \
-        "2:\n"                                                          \
-        ".section .fixup,\"ax\"\n"                                      \
-        "3:     movl $1,%1\n"                                           \
-        "       jmp 2b\n"                                               \
-        ".previous\n"                                                   \
-        ".section __ex_table,\"a\"\n"                                   \
-        "       .align 8\n"                                             \
-        "       .quad 1b,3b\n"                                          \
-        ".previous"                                                     \
-        : "=a" (_o), "=r" (_rc)                                         \
-        : _regtype (_n), "m" (*__xg((volatile void *)_p)), "0" (_o), "1" (0) \
-        : "memory");
-#define cmpxchg_user(_p,_o,_n)                                          \
-({                                                                      \
-    int _rc;                                                            \
-    switch ( sizeof(*(_p)) ) {                                          \
-    case 1:                                                             \
-        __cmpxchg_user(_p,_o,_n,"b","b","q");                           \
-        break;                                                          \
-    case 2:                                                             \
-        __cmpxchg_user(_p,_o,_n,"w","w","r");                           \
-        break;                                                          \
-    case 4:                                                             \
-        __cmpxchg_user(_p,_o,_n,"l","k","r");                           \
-        break;                                                          \
-    case 8:                                                             \
-        __cmpxchg_user(_p,_o,_n,"q","","r");                            \
-        break;                                                          \
-    }                                                                   \
-    _rc;                                                                \
-})
-#endif
-
-#if defined(__i386__)
-#define mb() 	__asm__ __volatile__ ("lock; addl $0,0(%%esp)": : :"memory")
-#define rmb()	__asm__ __volatile__ ("lock; addl $0,0(%%esp)": : :"memory")
-#elif defined(__x86_64__)
-#define mb()    __asm__ __volatile__ ("mfence":::"memory")
-#define rmb()   __asm__ __volatile__ ("lfence":::"memory")
-#endif
-#define wmb()	__asm__ __volatile__ ("": : :"memory")
+#define rmb()           barrier()
+#define wmb()           barrier()
 
 #ifdef CONFIG_SMP
-#define smp_mb()	mb()
-#define smp_rmb()	rmb()
-#define smp_wmb()	wmb()
+#define smp_mb()        mb()
+#define smp_rmb()       rmb()
+#define smp_wmb()       wmb()
 #else
-#define smp_mb()	barrier()
-#define smp_rmb()	barrier()
-#define smp_wmb()	barrier()
+#define smp_mb()        barrier()
+#define smp_rmb()       barrier()
+#define smp_wmb()       barrier()
 #endif
 
 #define set_mb(var, value) do { xchg(&var, value); } while (0)
 #define set_wmb(var, value) do { var = value; wmb(); } while (0)
 
-/* interrupt control.. */
-#if defined(__i386__)
-#define __save_flags(x)		__asm__ __volatile__("pushfl ; popl %0":"=g" (x): /* no input */)
-#define __restore_flags(x) 	__asm__ __volatile__("pushl %0 ; popfl": /* no output */ :"g" (x):"memory", "cc")
-#elif defined(__x86_64__)
-#define __save_flags(x)		do { __asm__ __volatile__("# save_flags \n\t pushfq ; popq %q0":"=g" (x): /* no input */ :"memory"); } while (0)
-#define __restore_flags(x) 	__asm__ __volatile__("# restore_flags \n\t pushq %0 ; popfq": /* no output */ :"g" (x):"memory", "cc")
-#endif
-#define __cli() 		__asm__ __volatile__("cli": : :"memory")
-#define __sti()			__asm__ __volatile__("sti": : :"memory")
-/* used in the idle loop; sti takes one instruction cycle to complete */
-#define safe_halt()		__asm__ __volatile__("sti; hlt": : :"memory")
-/* used when interrupts are already enabled or to shutdown the processor */
-#define halt()			__asm__ __volatile__("hlt": : :"memory")
+#define local_irq_disable()     asm volatile ( "cli" : : : "memory" )
+#define local_irq_enable()      asm volatile ( "sti" : : : "memory" )
 
-/* For spinlocks etc */
-#if defined(__i386__)
-#define local_irq_save(x)	__asm__ __volatile__("pushfl ; popl %0 ; cli":"=g" (x): /* no input */ :"memory")
-#define local_irq_restore(x)	__restore_flags(x)
-#elif defined(__x86_64__)
-#define local_irq_save(x) 	do { __asm__ __volatile__("# local_irq_save \n\t pushfq ; popq %0 ; cli":"=g" (x): /* no input */ :"memory"); } while (0)
-#define local_irq_restore(x)	__asm__ __volatile__("# local_irq_restore \n\t pushq %0 ; popfq": /* no output */ :"g" (x):"memory")
-#endif
-#define local_irq_disable()	__cli()
-#define local_irq_enable()	__sti()
+/* used in the idle loop; sti takes one instruction cycle to complete */
+#define safe_halt()     asm volatile ( "sti; hlt" : : : "memory" )
+/* used when interrupts are already enabled or to shutdown the processor */
+#define halt()          asm volatile ( "hlt" : : : "memory" )
 
 static inline int local_irq_is_enabled(void)
 {
@@ -311,8 +178,8 @@ static inline int local_irq_is_enabled(void)
     return !!(flags & (1<<9)); /* EFLAGS_IF */
 }
 
-#define BROKEN_ACPI_Sx		0x0001
-#define BROKEN_INIT_AFTER_S1	0x0002
+#define BROKEN_ACPI_Sx          0x0001
+#define BROKEN_INIT_AFTER_S1    0x0002
 
 void trap_init(void);
 void percpu_traps_init(void);
