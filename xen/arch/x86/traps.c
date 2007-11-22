@@ -2581,15 +2581,6 @@ void set_system_gate(unsigned int n, void *addr)
     _set_gate(idt_table+n,14,3,addr);
 }
 
-void set_task_gate(unsigned int n, unsigned int sel)
-{
-    idt_table[n].b = 0;
-    wmb(); /* disable gate /then/ rewrite */
-    idt_table[n].a = sel << 16;
-    wmb(); /* rewrite /then/ enable gate */
-    idt_table[n].b = 0x8500;
-}
-
 void set_tss_desc(unsigned int n, void *addr)
 {
     _set_tssldt_desc(

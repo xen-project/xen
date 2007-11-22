@@ -258,6 +258,15 @@ unsigned long do_iret(void)
     return 0;
 }
 
+static void set_task_gate(unsigned int n, unsigned int sel)
+{
+    idt_table[n].b = 0;
+    wmb(); /* disable gate /then/ rewrite */
+    idt_table[n].a = sel << 16;
+    wmb(); /* rewrite /then/ enable gate */
+    idt_table[n].b = 0x8500;
+}
+
 void __devinit subarch_percpu_traps_init(void)
 {
     struct tss_struct *tss = &doublefault_tss;
