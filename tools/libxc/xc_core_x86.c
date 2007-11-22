@@ -89,7 +89,7 @@ xc_core_arch_map_p2m(int xc_handle, xc_dominfo_t *info,
     }
 
     live_p2m_frame_list =
-        xc_map_foreign_batch(xc_handle, dom, PROT_READ,
+        xc_map_foreign_pages(xc_handle, dom, PROT_READ,
                              live_p2m_frame_list_list,
                              P2M_FLL_ENTRIES);
 
@@ -99,7 +99,7 @@ xc_core_arch_map_p2m(int xc_handle, xc_dominfo_t *info,
         goto out;
     }
 
-    *live_p2m = xc_map_foreign_batch(xc_handle, dom, PROT_READ,
+    *live_p2m = xc_map_foreign_pages(xc_handle, dom, PROT_READ,
                                     live_p2m_frame_list,
                                     P2M_FL_ENTRIES);
 

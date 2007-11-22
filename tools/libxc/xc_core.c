@@ -107,16 +107,22 @@ xc_core_strtab_get(struct xc_core_strtab *strtab, const char *name)
     uint16_t ret = 0;
     uint16_t len = strlen(name) + 1;
 
+    if ( strtab->current > UINT16_MAX - len )
+    {
+        PERROR("too long string table");
+        errno = E2BIG;
+        return ret;
+    }
+    
     if ( strtab->current + len > strtab->max )
     {
         char *tmp;
-        if ( strtab->max * 2 < strtab->max )
+        if ( strtab->max > UINT16_MAX / 2 )
         {
             PERROR("too long string table");
             errno = ENOMEM;
             return ret;
         }
-
 
         tmp = realloc(strtab->strings, strtab->max * 2);
         if ( tmp == NULL )
@@ -143,8 +149,8 @@ struct xc_core_section_headers {
 
     Elf64_Shdr  *shdrs;
 };
-#define SHDR_INIT       16
-#define SHDR_INC        4U
+#define SHDR_INIT       ((uint16_t)16)
+#define SHDR_INC        ((uint16_t)4)
 
 static struct xc_core_section_headers*
 xc_core_shdr_init(void)
@@ -180,7 +186,7 @@ xc_core_shdr_get(struct xc_core_section_headers *sheaders)
     if ( sheaders->num == sheaders->num_max )
     {
         Elf64_Shdr *shdrs;
-        if ( sheaders->num_max + SHDR_INC < sheaders->num_max )
+        if ( sheaders->num_max > UINT16_MAX - SHDR_INC )
         {
             errno = E2BIG;
             return NULL;
