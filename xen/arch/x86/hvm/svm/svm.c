@@ -996,6 +996,7 @@ static void svm_do_no_device_fault(struct vmcb_struct *vmcb)
 /* Reserved bits EDX: [31:29], [27], [22:20], [18], [10] */
 #define SVM_VCPU_CPUID_L1_EDX_RESERVED 0xe8740400
 
+#define bitmaskof(idx)  (1U << ((idx) & 31))
 static void svm_vmexit_do_cpuid(struct vmcb_struct *vmcb,
                                 struct cpu_user_regs *regs)
 {
@@ -1022,32 +1023,23 @@ static void svm_vmexit_do_cpuid(struct vmcb_struct *vmcb,
         break;
 
     case 0x80000001:
+        /* Filter features which are shared with 0x00000001:EDX. */
         if ( vlapic_hw_disabled(vcpu_vlapic(v)) )
             __clear_bit(X86_FEATURE_APIC & 31, &edx);
-
 #if CONFIG_PAGING_LEVELS >= 3
         if ( !v->domain->arch.hvm_domain.params[HVM_PARAM_PAE_ENABLED] )
 #endif
             __clear_bit(X86_FEATURE_PAE & 31, &edx);
-
         __clear_bit(X86_FEATURE_PSE36 & 31, &edx);
 
-        /* Clear the Cmp_Legacy bit
-         * This bit is supposed to be zero when HTT = 0.
-         * See details on page 23 of AMD CPUID Specification.
-         */
-        __clear_bit(X86_FEATURE_CMP_LEGACY & 31, &ecx);
-
-        /* Make SVM feature invisible to the guest. */
-        __clear_bit(X86_FEATURE_SVME & 31, &ecx);
-        __clear_bit(X86_FEATURE_SKINIT & 31, &ecx);
-
-        __clear_bit(X86_FEATURE_OSVW & 31, &ecx);
-        __clear_bit(X86_FEATURE_WDT & 31, &ecx);
-
-        /* So far, we do not support 3DNow for the guest. */
-        __clear_bit(X86_FEATURE_3DNOW & 31, &edx);
-        __clear_bit(X86_FEATURE_3DNOWEXT & 31, &edx);
+        /* Filter all other features according to a whitelist. */
+        edx &= (0x0183f3ff | /* features shared with 0x00000001:EDX */
+                bitmaskof(X86_FEATURE_NX) |
+                bitmaskof(X86_FEATURE_LM) |
+                bitmaskof(X86_FEATURE_SYSCALL) |
+                bitmaskof(X86_FEATURE_MP) |
+                bitmaskof(X86_FEATURE_MMXEXT) |
+                bitmaskof(X86_FEATURE_FFXSR));
         break;
 
     case 0x80000007:
@@ -2293,6 +2285,7 @@ asmlinkage void svm_vmexit_handler(struct cpu_user_regs *regs)
         hvm_triple_fault();
         break;
 
+    case VMEXIT_RDTSCP:
     case VMEXIT_MONITOR:
     case VMEXIT_MWAIT:
     case VMEXIT_VMRUN:

@@ -47,8 +47,6 @@ enum instruction_index {
     INSTR_CPUID,
     INSTR_RDMSR,
     INSTR_WRMSR,
-    INSTR_RDTSC,
-    INSTR_RDTSCP,
     INSTR_CLI,
     INSTR_STI,
     INSTR_RDPMC,

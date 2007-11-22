@@ -1298,6 +1298,14 @@ static void vmx_do_cpuid(struct cpu_user_regs *regs)
     case 0x0000000A:
         eax = ebx = ecx = edx = 0;
         break;
+
+    case 0x80000001:
+        /* Only a few features are advertised in Intel's 0x80000001. */
+        ecx &= (bitmaskof(X86_FEATURE_LAHF_LM));
+        edx &= (bitmaskof(X86_FEATURE_NX) |
+                bitmaskof(X86_FEATURE_LM) |
+                bitmaskof(X86_FEATURE_SYSCALL));
+        break;
     }
 
     regs->eax = eax;
