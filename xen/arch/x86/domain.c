@@ -42,6 +42,7 @@
 #include <asm/hypercall.h>
 #include <asm/hvm/hvm.h>
 #include <asm/hvm/support.h>
+#include <asm/debugreg.h>
 #include <asm/msr.h>
 #include <asm/nmi.h>
 #include <asm/iommu.h>
@@ -583,7 +584,7 @@ unsigned long pv_guest_cr4_fixup(unsigned long guest_cr4)
     if ( (guest_cr4 & hv_cr4_mask) != (hv_cr4 & hv_cr4_mask) )
         gdprintk(XENLOG_WARNING,
                  "Attempt to change CR4 flags %08lx -> %08lx\n",
-                 hv_cr4 & ~(X86_CR4_PGE|X86_CR4_PSE), guest_cr4);
+                 hv_cr4, guest_cr4);
 
     return (hv_cr4 & hv_cr4_mask) | (guest_cr4 & ~hv_cr4_mask);
 }
@@ -1219,7 +1220,7 @@ static void paravirt_ctxt_switch_from(struct vcpu *v)
      * inside Xen, before we get a chance to reload DR7, and this cannot always
      * safely be handled.
      */
-    if ( unlikely(v->arch.guest_context.debugreg[7]) )
+    if ( unlikely(v->arch.guest_context.debugreg[7] & DR7_ACTIVE_MASK) )
         write_debugreg(7, 0);
 }
 
@@ -1234,7 +1235,7 @@ static void paravirt_ctxt_switch_to(struct vcpu *v)
     if ( unlikely(cr4 != read_cr4()) )
         write_cr4(cr4);
 
-    if ( unlikely(v->arch.guest_context.debugreg[7]) )
+    if ( unlikely(v->arch.guest_context.debugreg[7] & DR7_ACTIVE_MASK) )
     {
         write_debugreg(0, v->arch.guest_context.debugreg[0]);
         write_debugreg(1, v->arch.guest_context.debugreg[1]);

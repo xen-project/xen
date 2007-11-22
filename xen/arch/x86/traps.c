@@ -414,15 +414,53 @@ static int do_guest_trap(
     return 0;
 }
 
-static void instruction_done(struct cpu_user_regs *regs, unsigned long eip)
+static void instruction_done(
+    struct cpu_user_regs *regs, unsigned long eip, unsigned int bpmatch)
 {
     regs->eip = eip;
     regs->eflags &= ~X86_EFLAGS_RF;
-    if ( regs->eflags & X86_EFLAGS_TF )
+    if ( bpmatch || (regs->eflags & X86_EFLAGS_TF) )
     {
-        current->arch.guest_context.debugreg[6] |= 0xffff4ff0;
+        current->arch.guest_context.debugreg[6] |= bpmatch | 0xffff0ff0;
+        if ( regs->eflags & X86_EFLAGS_TF )
+            current->arch.guest_context.debugreg[6] |= 0x4000;
         do_guest_trap(TRAP_debug, regs, 0);
     }
+}
+
+static unsigned int check_guest_io_breakpoint(struct vcpu *v,
+    unsigned int port, unsigned int len)
+{
+    unsigned int width, i, match = 0;
+    unsigned long start;
+
+    if ( !(v->arch.guest_context.debugreg[5]) || 
+         !(v->arch.guest_context.ctrlreg[4] & X86_CR4_DE) )
+        return 0;
+
+    for ( i = 0; i < 4; i++ )
+    {
+        if ( !(v->arch.guest_context.debugreg[5] &
+               (3 << (i * DR_ENABLE_SIZE))) )
+            continue;
+
+        start = v->arch.guest_context.debugreg[i];
+        width = 0;
+
+        switch ( (v->arch.guest_context.debugreg[7] >>
+                  (DR_CONTROL_SHIFT + i * DR_CONTROL_SIZE)) & 0xc )
+        {
+        case DR_LEN_1: width = 1; break;
+        case DR_LEN_2: width = 2; break;
+        case DR_LEN_4: width = 4; break;
+        case DR_LEN_8: width = 8; break;
+        }
+
+        if ( (start < (port + len)) && ((start + width) > port) )
+            match |= 1 << i;
+    }
+
+    return match;
 }
 
 /*
@@ -639,7 +677,6 @@ static int emulate_forced_invalid_op(struct cpu_user_regs *regs)
     {
         /* Modify Feature Information. */
         clear_bit(X86_FEATURE_VME, &d);
-        clear_bit(X86_FEATURE_DE,  &d);
         clear_bit(X86_FEATURE_PSE, &d);
         clear_bit(X86_FEATURE_PGE, &d);
         if ( !cpu_has_sep )
@@ -669,7 +706,7 @@ static int emulate_forced_invalid_op(struct cpu_user_regs *regs)
     regs->ecx = c;
     regs->edx = d;
 
-    instruction_done(regs, eip);
+    instruction_done(regs, eip, 0);
 
     trace_trap_one_addr(TRC_PV_FORCED_INVALID_OP, regs->eip);
 
@@ -1329,7 +1366,7 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
     unsigned long *reg, eip = regs->eip, res;
     u8 opcode, modrm_reg = 0, modrm_rm = 0, rep_prefix = 0, lock = 0, rex = 0;
     enum { lm_seg_none, lm_seg_fs, lm_seg_gs } lm_ovr = lm_seg_none;
-    unsigned int port, i, data_sel, ar, data, rc;
+    unsigned int port, i, data_sel, ar, data, rc, bpmatch = 0;
     unsigned int op_bytes, op_default, ad_bytes, ad_default;
 #define rd_ad(reg) (ad_bytes >= sizeof(regs->reg) \
                     ? regs->reg \
@@ -1479,6 +1516,8 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
         }
 #endif
 
+        port = (u16)regs->edx;
+
     continue_io_string:
         switch ( opcode )
         {
@@ -1487,9 +1526,8 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
         case 0x6d: /* INSW/INSL */
             if ( data_limit < op_bytes - 1 ||
                  rd_ad(edi) > data_limit - (op_bytes - 1) ||
-                 !guest_io_okay((u16)regs->edx, op_bytes, v, regs) )
+                 !guest_io_okay(port, op_bytes, v, regs) )
                 goto fail;
-            port = (u16)regs->edx;
             switch ( op_bytes )
             {
             case 1:
@@ -1519,7 +1557,7 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
         case 0x6f: /* OUTSW/OUTSL */
             if ( data_limit < op_bytes - 1 ||
                  rd_ad(esi) > data_limit - (op_bytes - 1) ||
-                 !guest_io_okay((u16)regs->edx, op_bytes, v, regs) )
+                 !guest_io_okay(port, op_bytes, v, regs) )
                 goto fail;
             rc = copy_from_user(&data, (void *)data_base + rd_ad(esi), op_bytes);
             if ( rc != 0 )
@@ -1527,7 +1565,6 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
                 propagate_page_fault(data_base + rd_ad(esi) + op_bytes - rc, 0);
                 return EXCRET_fault_fixed;
             }
-            port = (u16)regs->edx;
             switch ( op_bytes )
             {
             case 1:
@@ -1553,9 +1590,11 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
             break;
         }
 
+        bpmatch = check_guest_io_breakpoint(v, port, op_bytes);
+
         if ( rep_prefix && (wr_ad(ecx, regs->ecx - 1) != 0) )
         {
-            if ( !hypercall_preempt_check() )
+            if ( !bpmatch && !hypercall_preempt_check() )
                 goto continue_io_string;
             eip = regs->eip;
         }
@@ -1634,6 +1673,7 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
                 regs->eax = (u32)~0;
             break;
         }
+        bpmatch = check_guest_io_breakpoint(v, port, op_bytes);
         goto done;
 
     case 0xec: /* IN %dx,%al */
@@ -1671,6 +1711,7 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
                 io_emul(regs);
             break;
         }
+        bpmatch = check_guest_io_breakpoint(v, port, op_bytes);
         goto done;
 
     case 0xee: /* OUT %al,%dx */
@@ -1964,7 +2005,7 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
 #undef rd_ad
 
  done:
-    instruction_done(regs, eip);
+    instruction_done(regs, eip, bpmatch);
     return EXCRET_fault_fixed;
 
  fail:
@@ -2295,7 +2336,7 @@ static int emulate_gate_op(struct cpu_user_regs *regs)
         sel |= (regs->cs & 3);
 
     regs->cs = sel;
-    instruction_done(regs, off);
+    instruction_done(regs, off, 0);
 #endif
 
     return 0;
@@ -2805,25 +2846,47 @@ long set_debugreg(struct vcpu *v, int reg, unsigned long value)
         /*
          * DR7: Bit 10 reserved (set to 1).
          *      Bits 11-12,14-15 reserved (set to 0).
+         */
+        value &= ~DR_CONTROL_RESERVED_ZERO; /* reserved bits => 0 */
+        value |=  DR_CONTROL_RESERVED_ONE;  /* reserved bits => 1 */
+        /*
          * Privileged bits:
          *      GD (bit 13): must be 0.
-         *      R/Wn (bits 16-17,20-21,24-25,28-29): mustn't be 10.
-         *      LENn (bits 18-19,22-23,26-27,30-31): mustn't be 10.
          */
-        /* DR7 == 0 => debugging disabled for this domain. */
-        if ( value != 0 )
+        if ( value & DR_GENERAL_DETECT )
+            return -EPERM;
+        /* DR7.{G,L}E = 0 => debugging disabled for this domain. */
+        if ( value & DR7_ACTIVE_MASK )
         {
-            value &= 0xffff27ff; /* reserved bits => 0 */
-            value |= 0x00000400; /* reserved bits => 1 */
-            if ( (value & (1<<13)) != 0 ) return -EPERM;
-            for ( i = 0; i < 16; i += 2 )
-                if ( ((value >> (i+16)) & 3) == 2 ) return -EPERM;
+            unsigned int io_enable = 0;
+
+            for ( i = DR_CONTROL_SHIFT; i < 32; i += DR_CONTROL_SIZE )
+            {
+                if ( ((value >> i) & 3) == DR_IO )
+                {
+                    if ( !(v->arch.guest_context.ctrlreg[4] & X86_CR4_DE) )
+                        return -EPERM;
+                    io_enable |= value & (3 << ((i - 16) >> 1));
+                }
+#ifdef __i386__
+                if ( ((boot_cpu_data.x86_vendor != X86_VENDOR_INTEL) ||
+                      !boot_cpu_has(X86_FEATURE_LM)) &&
+                     (((value >> i) & 0xc) == DR_LEN_8) )
+                    return -EPERM;
+#endif
+            }
+
+            /* Guest DR5 is a handy stash for I/O intercept information. */
+            v->arch.guest_context.debugreg[5] = io_enable;
+            value &= ~io_enable;
+
             /*
              * If DR7 was previously clear then we need to load all other
              * debug registers at this point as they were not restored during
              * context switch.
              */
-            if ( (v == curr) && (v->arch.guest_context.debugreg[7] == 0) )
+            if ( (v == curr) &&
+                 !(v->arch.guest_context.debugreg[7] & DR7_ACTIVE_MASK) )
             {
                 write_debugreg(0, v->arch.guest_context.debugreg[0]);
                 write_debugreg(1, v->arch.guest_context.debugreg[1]);
@@ -2832,7 +2895,7 @@ long set_debugreg(struct vcpu *v, int reg, unsigned long value)
                 write_debugreg(6, v->arch.guest_context.debugreg[6]);
             }
         }
-        if ( v == curr ) 
+        if ( v == curr )
             write_debugreg(7, value);
         break;
     default:
@@ -2850,8 +2913,22 @@ long do_set_debugreg(int reg, unsigned long value)
 
 unsigned long do_get_debugreg(int reg)
 {
-    if ( (reg < 0) || (reg > 7) ) return -EINVAL;
-    return current->arch.guest_context.debugreg[reg];
+    struct vcpu *curr = current;
+
+    switch ( reg )
+    {
+    case 0 ... 3:
+    case 6:
+        return curr->arch.guest_context.debugreg[reg];
+    case 7:
+        return (curr->arch.guest_context.debugreg[7] |
+                curr->arch.guest_context.debugreg[5]);
+    case 4 ... 5:
+        return ((curr->arch.guest_context.ctrlreg[4] & X86_CR4_DE) ?
+                curr->arch.guest_context.debugreg[reg + 2] : 0);
+    }
+
+    return -EINVAL;
 }
 
 /*

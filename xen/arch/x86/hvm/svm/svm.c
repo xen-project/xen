@@ -34,6 +34,7 @@
 #include <asm/cpufeature.h>
 #include <asm/processor.h>
 #include <asm/types.h>
+#include <asm/debugreg.h>
 #include <asm/msr.h>
 #include <asm/spinlock.h>
 #include <asm/hvm/hvm.h>
@@ -176,8 +177,6 @@ static void __restore_debug_registers(struct vcpu *v)
  * if one of the breakpoints is enabled.  So mask out all bits that don't
  * enable some breakpoint functionality.
  */
-#define DR7_ACTIVE_MASK 0xff
-
 static void svm_restore_dr(struct vcpu *v)
 {
     if ( unlikely(v->arch.guest_context.debugreg[7] & DR7_ACTIVE_MASK) )

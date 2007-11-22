@@ -825,12 +825,20 @@ void arch_get_info_guest(struct vcpu *v, vcpu_guest_context_u c)
                 c.nat->ctrlreg[1] = xen_pfn_to_cr3(
                     pagetable_get_pfn(v->arch.guest_table_user));
 #endif
+
+            /* Merge shadow DR7 bits into real DR7. */
+            c.nat->debugreg[7] |= c.nat->debugreg[5];
+            c.nat->debugreg[5] = 0;
         }
 #ifdef CONFIG_COMPAT
         else
         {
             l4_pgentry_t *l4e = __va(pagetable_get_paddr(v->arch.guest_table));
             c.cmp->ctrlreg[3] = compat_pfn_to_cr3(l4e_get_pfn(*l4e));
+
+            /* Merge shadow DR7 bits into real DR7. */
+            c.cmp->debugreg[7] |= c.cmp->debugreg[5];
+            c.cmp->debugreg[5] = 0;
         }
 #endif
 
