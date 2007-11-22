@@ -1061,7 +1061,6 @@ void handle_mmio(unsigned long gpa)
     }
 
     regs->eip += inst_len; /* advance %eip */
-    regs->eflags &= ~X86_EFLAGS_RF;
 
     switch ( mmio_op->instr ) {
     case INSTR_MOV:
@@ -1121,7 +1120,6 @@ void handle_mmio(unsigned long gpa)
             /* The guest does not have the non-mmio address mapped. 
              * Need to send in a page fault */
             regs->eip -= inst_len; /* do not advance %eip */
-            regs->eflags |= X86_EFLAGS_RF; /* RF was set by original #PF */
             hvm_inject_exception(TRAP_page_fault, pfec, addr);
             return;
         }
@@ -1150,7 +1148,6 @@ void handle_mmio(unsigned long gpa)
                         /* Failed on the page-spanning copy.  Inject PF into
                          * the guest for the address where we failed */
                         regs->eip -= inst_len; /* do not advance %eip */
-                        regs->eflags |= X86_EFLAGS_RF; /* RF was set by #PF */
                         /* Must set CR2 at the failing address */ 
                         addr += size - rv;
                         gdprintk(XENLOG_DEBUG, "Pagefault on non-io side of a "

@@ -863,6 +863,8 @@ void hvm_io_assist(void)
     /* Copy register changes back into current guest state. */
     regs->eflags &= ~X86_EFLAGS_RF;
     memcpy(guest_cpu_user_regs(), regs, HVM_CONTEXT_STACK_BYTES);
+    if ( regs->eflags & X86_EFLAGS_TF )
+        hvm_inject_exception(TRAP_debug, HVM_DELIVER_NO_ERROR_CODE, 0);
 
  out:
     vcpu_end_shutdown_deferral(v);

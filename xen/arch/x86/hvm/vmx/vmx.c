@@ -14,7 +14,6 @@
  * You should have received a copy of the GNU General Public License along with
  * this program; if not, write to the Free Software Foundation, Inc., 59 Temple
  * Place - Suite 330, Boston, MA 02111-1307 USA.
- *
  */
 
 #include <xen/config.h>
@@ -417,7 +416,9 @@ static void vmx_save_dr(struct vcpu *v)
 
 static void __restore_debug_registers(struct vcpu *v)
 {
-    ASSERT(!v->arch.hvm_vcpu.flag_dr_dirty);
+    if ( v->arch.hvm_vcpu.flag_dr_dirty )
+        return;
+
     v->arch.hvm_vcpu.flag_dr_dirty = 1;
 
     write_debugreg(0, v->arch.guest_context.debugreg[0]);
@@ -1102,10 +1103,19 @@ static void vmx_flush_guest_tlbs(void)
 static void vmx_inject_exception(
     unsigned int trapnr, int errcode, unsigned long cr2)
 {
-    struct vcpu *v = current;
-    vmx_inject_hw_exception(v, trapnr, errcode);
+    struct vcpu *curr = current;
+
+    vmx_inject_hw_exception(curr, trapnr, errcode);
+
     if ( trapnr == TRAP_page_fault )
-        v->arch.hvm_vcpu.guest_cr[2] = cr2;
+        curr->arch.hvm_vcpu.guest_cr[2] = cr2;
+
+    if ( (trapnr == TRAP_debug) &&
+         (guest_cpu_user_regs()->eflags & X86_EFLAGS_TF) )
+    {
+        __restore_debug_registers(curr);
+        write_debugreg(6, read_debugreg(6) | 0x4000);
+    }
 }
 
 static void vmx_update_vtpr(struct vcpu *v, unsigned long value)
@@ -1211,6 +1221,9 @@ static void __update_guest_eip(unsigned long inst_len)
         x &= ~(VMX_INTR_SHADOW_STI | VMX_INTR_SHADOW_MOV_SS);
         __vmwrite(GUEST_INTERRUPTIBILITY_INFO, x);
     }
+
+    if ( regs->eflags & X86_EFLAGS_TF )
+        vmx_inject_exception(TRAP_debug, HVM_DELIVER_NO_ERROR_CODE, 0);
 }
 
 static void vmx_do_no_device_fault(void)
@@ -2589,7 +2602,17 @@ gp_fault:
 
 static void vmx_do_hlt(struct cpu_user_regs *regs)
 {
-    HVMTRACE_0D(HLT, current);
+    unsigned long intr_info = __vmread(VM_ENTRY_INTR_INFO);
+    struct vcpu *curr = current;
+
+    /* Check for pending exception. */
+    if ( intr_info & INTR_INFO_VALID_MASK )
+    {
+        HVMTRACE_1D(HLT, curr, /*int pending=*/ 1);
+        return;
+    }
+
+    HVMTRACE_1D(HLT, curr, /*int pending=*/ 0);
     hvm_hlt(regs->eflags);
 }
 
@@ -2904,7 +2927,7 @@ asmlinkage void vmx_vmexit_handler(struct cpu_user_regs *regs)
     case EXIT_REASON_VMWRITE:
     case EXIT_REASON_VMXOFF:
     case EXIT_REASON_VMXON:
-        vmx_inject_hw_exception(v, TRAP_invalid_op, VMX_DELIVER_NO_ERROR_CODE);
+        vmx_inject_hw_exception(v, TRAP_invalid_op, HVM_DELIVER_NO_ERROR_CODE);
         break;
 
     case EXIT_REASON_TPR_BELOW_THRESHOLD:

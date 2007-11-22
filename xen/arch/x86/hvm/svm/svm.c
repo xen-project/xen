@@ -64,6 +64,9 @@ asmlinkage void do_IRQ(struct cpu_user_regs *);
 static int svm_reset_to_realmode(
     struct vcpu *v, struct cpu_user_regs *regs);
 static void svm_update_guest_cr(struct vcpu *v, unsigned int cr);
+static void svm_update_guest_efer(struct vcpu *v);
+static void svm_inject_exception(
+    unsigned int trapnr, int errcode, unsigned long cr2);
 
 /* va of hardware host save area     */
 static void *hsa[NR_CPUS] __read_mostly;
@@ -71,15 +74,15 @@ static void *hsa[NR_CPUS] __read_mostly;
 /* vmcb used for extended host state */
 static void *root_vmcb[NR_CPUS] __read_mostly;
 
-static void svm_update_guest_efer(struct vcpu *v);
-
 static void inline __update_guest_eip(
     struct cpu_user_regs *regs, unsigned int inst_len)
 {
+    struct vcpu *curr = current;
+
     if ( unlikely((inst_len == 0) || (inst_len > 15)) )
     {
         gdprintk(XENLOG_ERR, "Bad instruction length %u\n", inst_len);
-        domain_crash(current->domain);
+        domain_crash(curr->domain);
         return;
     }
 
@@ -88,28 +91,10 @@ static void inline __update_guest_eip(
     regs->eip += inst_len;
     regs->eflags &= ~X86_EFLAGS_RF;
 
-    current->arch.hvm_svm.vmcb->interrupt_shadow = 0;
-}
+    curr->arch.hvm_svm.vmcb->interrupt_shadow = 0;
 
-static void svm_inject_exception(
-    struct vcpu *v, int trap, int ev, int error_code)
-{
-    eventinj_t event;
-    struct vmcb_struct *vmcb = v->arch.hvm_svm.vmcb;
-
-    if ( trap == TRAP_page_fault )
-        HVMTRACE_2D(PF_INJECT, v, v->arch.hvm_vcpu.guest_cr[2], error_code);
-    else
-        HVMTRACE_2D(INJ_EXC, v, trap, error_code);
-
-    event.bytes = 0;            
-    event.fields.v = 1;
-    event.fields.type = X86_EVENTTYPE_HW_EXCEPTION;
-    event.fields.vector = trap;
-    event.fields.ev = ev;
-    event.fields.errorcode = error_code;
-
-    vmcb->eventinj = event;
+    if ( regs->eflags & X86_EFLAGS_TF )
+        svm_inject_exception(TRAP_debug, HVM_DELIVER_NO_ERROR_CODE, 0);
 }
 
 static void svm_cpu_down(void)
@@ -171,7 +156,9 @@ static void __restore_debug_registers(struct vcpu *v)
 {
     struct vmcb_struct *vmcb = v->arch.hvm_svm.vmcb;
 
-    ASSERT(!v->arch.hvm_vcpu.flag_dr_dirty);
+    if ( v->arch.hvm_vcpu.flag_dr_dirty )
+        return;
+
     v->arch.hvm_vcpu.flag_dr_dirty = 1;
     vmcb->dr_intercepts = 0;
 
@@ -868,13 +855,38 @@ static void svm_vcpu_destroy(struct vcpu *v)
     svm_destroy_vmcb(v);
 }
 
-static void svm_hvm_inject_exception(
+static void svm_inject_exception(
     unsigned int trapnr, int errcode, unsigned long cr2)
 {
-    struct vcpu *v = current;
+    struct vcpu *curr = current;
+    struct vmcb_struct *vmcb = curr->arch.hvm_svm.vmcb;
+    eventinj_t event;
+
+    event.bytes = 0;
+    event.fields.v = 1;
+    event.fields.type = X86_EVENTTYPE_HW_EXCEPTION;
+    event.fields.vector = trapnr;
+    event.fields.ev = (errcode != HVM_DELIVER_NO_ERROR_CODE);
+    event.fields.errorcode = errcode;
+
+    vmcb->eventinj = event;
+
     if ( trapnr == TRAP_page_fault )
-        v->arch.hvm_svm.vmcb->cr2 = v->arch.hvm_vcpu.guest_cr[2] = cr2;
-    svm_inject_exception(v, trapnr, (errcode != -1), errcode);
+    {
+        vmcb->cr2 = curr->arch.hvm_vcpu.guest_cr[2] = cr2;
+        HVMTRACE_2D(PF_INJECT, curr, curr->arch.hvm_vcpu.guest_cr[2], errcode);
+    }
+    else
+    {
+        HVMTRACE_2D(INJ_EXC, curr, trapnr, errcode);
+    }
+
+    if ( (trapnr == TRAP_debug) &&
+         (guest_cpu_user_regs()->eflags & X86_EFLAGS_TF) )
+    {
+        __restore_debug_registers(curr);
+        vmcb->dr6 |= 0x4000;
+    }
 }
 
 static int svm_event_pending(struct vcpu *v)
@@ -904,7 +916,7 @@ static struct hvm_function_table svm_function_table = {
     .update_vtpr          = svm_update_vtpr,
     .stts                 = svm_stts,
     .set_tsc_offset       = svm_set_tsc_offset,
-    .inject_exception     = svm_hvm_inject_exception,
+    .inject_exception     = svm_inject_exception,
     .init_ap_context      = svm_init_ap_context,
     .init_hypercall_page  = svm_init_hypercall_page,
     .event_pending        = svm_event_pending
@@ -1274,7 +1286,7 @@ static int svm_get_io_address(
         if (!seg)               /* If no prefix, used DS. */
             seg = &vmcb->ds;
         if (!long_mode && (seg->attr.fields.type & 0xa) == 0x8) {
-            svm_inject_exception(v, TRAP_gp_fault, 1, 0);
+            svm_inject_exception(TRAP_gp_fault, 0, 0);
             return 0;
         }
     }
@@ -1283,7 +1295,7 @@ static int svm_get_io_address(
         reg = regs->edi;
         seg = &vmcb->es;        /* Note: This is ALWAYS ES. */
         if (!long_mode && (seg->attr.fields.type & 0xa) != 0x2) {
-            svm_inject_exception(v, TRAP_gp_fault, 1, 0);
+            svm_inject_exception(TRAP_gp_fault, 0, 0);
             return 0;
         }
     }
@@ -1291,7 +1303,7 @@ static int svm_get_io_address(
     /* If the segment isn't present, give GP fault! */
     if (!long_mode && !seg->attr.fields.p) 
     {
-        svm_inject_exception(v, TRAP_gp_fault, 1, 0);
+        svm_inject_exception(TRAP_gp_fault, 0, 0);
         return 0;
     }
 
@@ -1316,7 +1328,7 @@ static int svm_get_io_address(
             *addr + size - 1 > seg->limit :
             *addr <= seg->limit)
         {
-            svm_inject_exception(v, TRAP_gp_fault, 1, 0);
+            svm_inject_exception(TRAP_gp_fault, 0, 0);
             return 0;
         }
 
@@ -1371,7 +1383,7 @@ static int svm_get_io_address(
         if (!is_canonical_address(*addr) ||
             !is_canonical_address(*addr + size - 1))
         {
-            svm_inject_exception(v, TRAP_gp_fault, 1, 0);
+            svm_inject_exception(TRAP_gp_fault, 0, 0);
             return 0;
         }
         if (*count > (1UL << 48) / size)
@@ -1472,7 +1484,7 @@ static void svm_io_instruction(struct vcpu *v)
         {
             /* The guest does not have the RAM address mapped. 
              * Need to send in a page fault */
-            svm_hvm_inject_exception(TRAP_page_fault, pfec, addr);
+            svm_inject_exception(TRAP_page_fault, pfec, addr);
             return;
         }
         paddr = (paddr_t)gfn << PAGE_SHIFT | (addr & ~PAGE_MASK);
@@ -1500,7 +1512,7 @@ static void svm_io_instruction(struct vcpu *v)
                         addr += size - rv;
                         gdprintk(XENLOG_DEBUG, "Pagefault reading non-io side "
                                  "of a page-spanning PIO: va=%#lx\n", addr);
-                        svm_hvm_inject_exception(TRAP_page_fault, 0, addr);
+                        svm_inject_exception(TRAP_page_fault, 0, addr);
                         return;
                     }
                 }
@@ -1796,7 +1808,7 @@ static void svm_do_msr_access(
             break;
 
         case MSR_K8_VM_HSAVE_PA:
-            svm_inject_exception(v, TRAP_gp_fault, 1, 0);
+            svm_inject_exception(TRAP_gp_fault, 0, 0);
             break;
 
         case MSR_IA32_MCG_CAP:
@@ -1839,7 +1851,7 @@ static void svm_do_msr_access(
                 regs->edx = edx;
                 goto done;
             }
-            svm_inject_exception(v, TRAP_gp_fault, 1, 0);
+            svm_inject_exception(TRAP_gp_fault, 0, 0);
             return;
         }
         regs->eax = msr_content & 0xFFFFFFFF;
@@ -1870,7 +1882,7 @@ static void svm_do_msr_access(
             break;
 
         case MSR_K8_VM_HSAVE_PA:
-            svm_inject_exception(v, TRAP_gp_fault, 1, 0);
+            svm_inject_exception(TRAP_gp_fault, 0, 0);
             break;
 
         case MSR_IA32_DEBUGCTLMSR:
@@ -1931,7 +1943,7 @@ static void svm_vmexit_do_hlt(struct vmcb_struct *vmcb,
     inst_len = __get_instruction_length(curr, INSTR_HLT, NULL);
     __update_guest_eip(regs, inst_len);
 
-    /* Check for interrupt not handled or new interrupt. */
+    /* Check for pending exception or new interrupt. */
     if ( vmcb->eventinj.fields.v ||
          ((intack.source != hvm_intsrc_none) &&
           !svm_interrupt_blocked(current, intack)) )
@@ -2197,8 +2209,7 @@ asmlinkage void svm_vmexit_handler(struct cpu_user_regs *regs)
             break;
         }
 
-        v->arch.hvm_vcpu.guest_cr[2] = vmcb->cr2 = va;
-        svm_inject_exception(v, TRAP_page_fault, 1, regs->error_code);
+        svm_inject_exception(TRAP_page_fault, regs->error_code, va);
         break;
     }
 
@@ -2296,7 +2307,7 @@ asmlinkage void svm_vmexit_handler(struct cpu_user_regs *regs)
     case VMEXIT_STGI:
     case VMEXIT_CLGI:
     case VMEXIT_SKINIT:
-        svm_inject_exception(v, TRAP_invalid_op, 0, 0);
+        svm_inject_exception(TRAP_invalid_op, HVM_DELIVER_NO_ERROR_CODE, 0);
         break;
 
     case VMEXIT_NPF:

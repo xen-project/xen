@@ -269,7 +269,7 @@ static inline void __vmx_inject_exception(
      */
 
     intr_fields = (INTR_INFO_VALID_MASK | (type<<8) | trap);
-    if ( error_code != VMX_DELIVER_NO_ERROR_CODE ) {
+    if ( error_code != HVM_DELIVER_NO_ERROR_CODE ) {
         __vmwrite(VM_ENTRY_EXCEPTION_ERROR_CODE, error_code);
         intr_fields |= INTR_INFO_DELIVER_CODE_MASK;
     }
@@ -291,13 +291,13 @@ static inline void vmx_inject_hw_exception(
 static inline void vmx_inject_extint(struct vcpu *v, int trap)
 {
     __vmx_inject_exception(v, trap, X86_EVENTTYPE_EXT_INTR,
-                           VMX_DELIVER_NO_ERROR_CODE);
+                           HVM_DELIVER_NO_ERROR_CODE);
 }
 
 static inline void vmx_inject_nmi(struct vcpu *v)
 {
     __vmx_inject_exception(v, 2, X86_EVENTTYPE_NMI,
-                           VMX_DELIVER_NO_ERROR_CODE);
+                           HVM_DELIVER_NO_ERROR_CODE);
 }
 
 #endif /* __ASM_X86_HVM_VMX_VMX_H__ */

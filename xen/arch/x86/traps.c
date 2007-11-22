@@ -414,6 +414,17 @@ static int do_guest_trap(
     return 0;
 }
 
+static void instruction_done(struct cpu_user_regs *regs, unsigned long eip)
+{
+    regs->eip = eip;
+    regs->eflags &= ~X86_EFLAGS_RF;
+    if ( regs->eflags & X86_EFLAGS_TF )
+    {
+        current->arch.guest_context.debugreg[6] |= 0xffff4ff0;
+        do_guest_trap(TRAP_debug, regs, 0);
+    }
+}
+
 /*
  * Called from asm to set up the NMI trapbounce info.
  * Returns 0 if no callback is set up, else 1.
@@ -657,8 +668,8 @@ static int emulate_forced_invalid_op(struct cpu_user_regs *regs)
     regs->ebx = b;
     regs->ecx = c;
     regs->edx = d;
-    regs->eip = eip;
-    regs->eflags &= ~X86_EFLAGS_RF;
+
+    instruction_done(regs, eip);
 
     trace_trap_one_addr(TRC_PV_FORCED_INVALID_OP, regs->eip);
 
@@ -1953,8 +1964,7 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
 #undef rd_ad
 
  done:
-    regs->eip = eip;
-    regs->eflags &= ~X86_EFLAGS_RF;
+    instruction_done(regs, eip);
     return EXCRET_fault_fixed;
 
  fail:
@@ -2284,8 +2294,8 @@ static int emulate_gate_op(struct cpu_user_regs *regs)
     else
         sel |= (regs->cs & 3);
 
-    regs->eip = off;
     regs->cs = sel;
+    instruction_done(regs, off);
 #endif
 
     return 0;

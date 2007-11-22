@@ -50,7 +50,7 @@ static inline vcpu_iodata_t *get_ioreq(struct vcpu *v)
 #define TYPE_CLTS               (2 << 4)
 #define TYPE_LMSW               (3 << 4)
 
-#define VMX_DELIVER_NO_ERROR_CODE  -1
+#define HVM_DELIVER_NO_ERROR_CODE  -1
 
 #if HVM_DEBUG
 #define DBG_LEVEL_0                 (1 << 0)

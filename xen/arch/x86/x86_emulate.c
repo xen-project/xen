@@ -1635,6 +1635,7 @@ x86_emulate(
     /* Commit shadow register state. */
     _regs.eflags &= ~EFLG_RF;
     *ctxt->regs = _regs;
+    /* FIXME generate_exception_if(_regs.eflags & EFLG_TF, EXC_DB); */
 
  done:
     return rc;
