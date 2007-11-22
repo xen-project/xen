@@ -104,7 +104,7 @@ _acm_update_policy(void *buf, u32 buf_size, int is_bootpolicy,
     /* if ssidrefs are to be deleted, make sure no domain is using them */
     if ( deletions != NULL )
         if ( acm_check_deleted_ssidrefs(deletions, errors) )
-            goto error_lock_free;
+            goto error_lock_free_nossidchange;
 
     if ( (ssidchanges != NULL) && (ssidchanges->num_items > 0) )
         /* assign all running domains new ssidrefs as requested */
@@ -169,6 +169,7 @@ error_lock_free:
     {
         acm_doms_restore_ssidref();
     }
+error_lock_free_nossidchange:
     do_chwall_init_state_curr(NULL);
     write_unlock(&acm_bin_pol_rwlock);
 
