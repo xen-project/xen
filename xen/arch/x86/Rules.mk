@@ -57,6 +57,7 @@ endif
 HDRS += $(wildcard $(BASEDIR)/include/asm-x86/hvm/*.h)
 HDRS += $(wildcard $(BASEDIR)/include/asm-x86/hvm/svm/*.h)
 HDRS += $(wildcard $(BASEDIR)/include/asm-x86/hvm/vmx/*.h)
+HDRS += $(wildcard $(BASEDIR)/include/asm-x86/mach-*/*.h)
 
 # Require GCC v3.4+ (to avoid issues with alignment constraints in Xen headers)
 $(call cc-ver-check,CC,0x030400,"Xen requires at least gcc-3.4")

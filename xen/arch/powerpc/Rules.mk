@@ -12,7 +12,6 @@ C_WARNINGS += -Wpacked
 CFLAGS += -m64 -ffreestanding -fno-builtin -fno-common
 CFLAGS += -iwithprefix include -Werror -pipe
 CFLAGS += -I$(BASEDIR)/include
-CFLAGS += -I$(BASEDIR)/include/asm-powerpc/mach-generic
 CFLAGS += -I$(BASEDIR)/include/asm-powerpc/mach-default
 CFLAGS += $(C_WARNINGS)
 CFLAGS += -msoft-float -O2
@@ -32,6 +31,8 @@ LDFLAGS += -m elf64ppc
 		--redefine-sym _binary_$*_bin_end=$*_end \
 		--redefine-sym _binary_$*_bin_size=$*_size \
 		$< $@
+
+HDRS += $(wildcard $(BASEDIR)/include/asm-powerpc/mach-*/*.h)
 
 # Test for at least GCC v3.2.x.
 gcc-ver = $(shell $(CC) -dumpversion | sed -e 's/^\(.\)\.\(.\)\.\(.\)/\$(1)/')
