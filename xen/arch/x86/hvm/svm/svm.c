@@ -133,6 +133,7 @@ static enum handler_return long_mode_do_msr_write(struct cpu_user_regs *regs)
         break;
 
     case MSR_IA32_MC4_MISC: /* Threshold register */
+    case MSR_F10_MC4_MISC1 ... MSR_F10_MC4_MISC3:
         /*
          * MCA/MCE: Threshold register is reported to be locked, so we ignore
          * all write accesses. This behaviour matches real HW, so guests should
@@ -1777,6 +1778,7 @@ static void svm_do_msr_access(
             break;
 
         case MSR_IA32_MC4_MISC: /* Threshold register */
+        case MSR_F10_MC4_MISC1 ... MSR_F10_MC4_MISC3:
             /*
              * MCA/MCE: We report that the threshold register is unavailable
              * for OS use (locked by the BIOS).
