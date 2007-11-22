@@ -443,11 +443,8 @@ void vmx_disable_intercept_for_msr(struct vcpu *v, u32 msr)
     }
 }
 
-#define GUEST_SEGMENT_LIMIT     0xffffffff
-
 static int construct_vmcs(struct vcpu *v)
 {
-    union vmcs_arbytes arbytes;
     uint16_t sysenter_cs;
     unsigned long sysenter_eip;
 
@@ -537,46 +534,39 @@ static int construct_vmcs(struct vcpu *v)
     __vmwrite(GUEST_CS_BASE, 0);
 
     /* Guest segment limits. */
-    __vmwrite(GUEST_ES_LIMIT, GUEST_SEGMENT_LIMIT);
-    __vmwrite(GUEST_SS_LIMIT, GUEST_SEGMENT_LIMIT);
-    __vmwrite(GUEST_DS_LIMIT, GUEST_SEGMENT_LIMIT);
-    __vmwrite(GUEST_FS_LIMIT, GUEST_SEGMENT_LIMIT);
-    __vmwrite(GUEST_GS_LIMIT, GUEST_SEGMENT_LIMIT);
-    __vmwrite(GUEST_CS_LIMIT, GUEST_SEGMENT_LIMIT);
+    __vmwrite(GUEST_ES_LIMIT, ~0u);
+    __vmwrite(GUEST_SS_LIMIT, ~0u);
+    __vmwrite(GUEST_DS_LIMIT, ~0u);
+    __vmwrite(GUEST_FS_LIMIT, ~0u);
+    __vmwrite(GUEST_GS_LIMIT, ~0u);
+    __vmwrite(GUEST_CS_LIMIT, ~0u);
 
     /* Guest segment AR bytes. */
-    arbytes.bytes = 0;
-    arbytes.fields.seg_type = 0x3;          /* type = 3 */
-    arbytes.fields.s = 1;                   /* code or data, i.e. not system */
-    arbytes.fields.dpl = 0;                 /* DPL = 3 */
-    arbytes.fields.p = 1;                   /* segment present */
-    arbytes.fields.default_ops_size = 1;    /* 32-bit */
-    arbytes.fields.g = 1;
-    arbytes.fields.null_bit = 0;            /* not null */
-    __vmwrite(GUEST_ES_AR_BYTES, arbytes.bytes);
-    __vmwrite(GUEST_SS_AR_BYTES, arbytes.bytes);
-    __vmwrite(GUEST_DS_AR_BYTES, arbytes.bytes);
-    __vmwrite(GUEST_FS_AR_BYTES, arbytes.bytes);
-    __vmwrite(GUEST_GS_AR_BYTES, arbytes.bytes);
-    arbytes.fields.seg_type = 0xb;          /* type = 0xb */
-    __vmwrite(GUEST_CS_AR_BYTES, arbytes.bytes);
-
-    /* Guest GDT. */
-    __vmwrite(GUEST_GDTR_BASE, 0);
-    __vmwrite(GUEST_GDTR_LIMIT, 0);
+    __vmwrite(GUEST_ES_AR_BYTES, 0xc093); /* read/write, accessed */
+    __vmwrite(GUEST_SS_AR_BYTES, 0xc093);
+    __vmwrite(GUEST_DS_AR_BYTES, 0xc093);
+    __vmwrite(GUEST_FS_AR_BYTES, 0xc093);
+    __vmwrite(GUEST_GS_AR_BYTES, 0xc093);
+    __vmwrite(GUEST_CS_AR_BYTES, 0xc09b); /* exec/read, accessed */
 
     /* Guest IDT. */
     __vmwrite(GUEST_IDTR_BASE, 0);
     __vmwrite(GUEST_IDTR_LIMIT, 0);
 
-    /* Guest LDT and TSS. */
-    arbytes.fields.s = 0;                   /* not code or data segement */
-    arbytes.fields.seg_type = 0x2;          /* LTD */
-    arbytes.fields.default_ops_size = 0;    /* 16-bit */
-    arbytes.fields.g = 0;
-    __vmwrite(GUEST_LDTR_AR_BYTES, arbytes.bytes);
-    arbytes.fields.seg_type = 0xb;          /* 32-bit TSS (busy) */
-    __vmwrite(GUEST_TR_AR_BYTES, arbytes.bytes);
+    /* Guest GDT. */
+    __vmwrite(GUEST_GDTR_BASE, 0);
+    __vmwrite(GUEST_GDTR_LIMIT, 0);
+
+    /* Guest LDT. */
+    __vmwrite(GUEST_LDTR_AR_BYTES, 0x0082); /* LDT */
+    __vmwrite(GUEST_LDTR_SELECTOR, 0);
+    __vmwrite(GUEST_LDTR_BASE, 0);
+    __vmwrite(GUEST_LDTR_LIMIT, 0);
+
+    /* Guest TSS. */
+    __vmwrite(GUEST_TR_AR_BYTES, 0x008b); /* 32-bit TSS (busy) */
+    __vmwrite(GUEST_TR_BASE, 0);
+    __vmwrite(GUEST_TR_LIMIT, 0xff);
 
     __vmwrite(GUEST_INTERRUPTIBILITY_INFO, 0);
     __vmwrite(GUEST_DR7, 0);
@@ -599,13 +589,6 @@ static int construct_vmcs(struct vcpu *v)
                   page_to_maddr(vcpu_vlapic(v)->regs_page));
         __vmwrite(TPR_THRESHOLD, 0);
     }
-
-    __vmwrite(GUEST_LDTR_SELECTOR, 0);
-    __vmwrite(GUEST_LDTR_BASE, 0);
-    __vmwrite(GUEST_LDTR_LIMIT, 0);
-
-    __vmwrite(GUEST_TR_BASE, 0);
-    __vmwrite(GUEST_TR_LIMIT, 0xff);
 
     vmx_vmcs_exit(v);
 

@@ -303,8 +303,7 @@ enum VMEXIT_EXITCODE
     VMEXIT_INVALID          =  -1
 };
 
-/* Definitions of segment state are borrowed by the generic HVM code. */
-typedef segment_attributes_t svm_segment_attributes_t;
+/* Definition of segment state is borrowed by the generic HVM code. */
 typedef segment_register_t svm_segment_register_t;
 
 typedef union 

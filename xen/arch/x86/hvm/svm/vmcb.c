@@ -40,8 +40,6 @@
 
 extern int svm_dbg_on;
 
-#define GUEST_SEGMENT_LIMIT 0xffffffff
-
 #define IOPM_SIZE   (12 * 1024)
 #define MSRPM_SIZE  (8  * 1024)
 
@@ -110,7 +108,6 @@ static int construct_vmcb(struct vcpu *v)
 {
     struct arch_svm_struct *arch_svm = &v->arch.hvm_svm;
     struct vmcb_struct *vmcb = arch_svm->vmcb;
-    svm_segment_attributes_t attrib;
 
     /* TLB control, and ASID assigment. */
     svm_asid_init_vcpu(v);
@@ -173,12 +170,12 @@ static int construct_vmcb(struct vcpu *v)
     vmcb->efer = EFER_SVME;
 
     /* Guest segment limits. */
-    vmcb->cs.limit = GUEST_SEGMENT_LIMIT;
-    vmcb->es.limit = GUEST_SEGMENT_LIMIT;
-    vmcb->ss.limit = GUEST_SEGMENT_LIMIT;
-    vmcb->ds.limit = GUEST_SEGMENT_LIMIT;
-    vmcb->fs.limit = GUEST_SEGMENT_LIMIT;
-    vmcb->gs.limit = GUEST_SEGMENT_LIMIT;
+    vmcb->cs.limit = ~0u;
+    vmcb->es.limit = ~0u;
+    vmcb->ss.limit = ~0u;
+    vmcb->ds.limit = ~0u;
+    vmcb->fs.limit = ~0u;
+    vmcb->gs.limit = ~0u;
 
     /* Guest segment bases. */
     vmcb->cs.base = 0;
@@ -189,20 +186,12 @@ static int construct_vmcb(struct vcpu *v)
     vmcb->gs.base = 0;
 
     /* Guest segment AR bytes. */
-    attrib.bytes = 0;
-    attrib.fields.type = 0x3; /* type = 3 */
-    attrib.fields.s = 1;      /* code or data, i.e. not system */
-    attrib.fields.dpl = 0;    /* DPL = 0 */
-    attrib.fields.p = 1;      /* segment present */
-    attrib.fields.db = 1;     /* 32-bit */
-    attrib.fields.g = 1;      /* 4K pages in limit */
-    vmcb->es.attr = attrib;
-    vmcb->ss.attr = attrib;
-    vmcb->ds.attr = attrib;
-    vmcb->fs.attr = attrib;
-    vmcb->gs.attr = attrib;
-    attrib.fields.type = 0xb; /* type=0xb -> executable/readable, accessed */
-    vmcb->cs.attr = attrib;
+    vmcb->es.attr.bytes = 0xc93; /* read/write, accessed */
+    vmcb->ss.attr.bytes = 0xc93;
+    vmcb->ds.attr.bytes = 0xc93;
+    vmcb->fs.attr.bytes = 0xc93;
+    vmcb->gs.attr.bytes = 0xc93;
+    vmcb->cs.attr.bytes = 0xc9b; /* exec/read, accessed */
 
     /* Guest IDT. */
     vmcb->idtr.base = 0;
@@ -219,8 +208,7 @@ static int construct_vmcb(struct vcpu *v)
     vmcb->ldtr.attr.bytes = 0;
 
     /* Guest TSS. */
-    attrib.fields.type = 0xb; /* 32-bit TSS (busy) */
-    vmcb->tr.attr = attrib;
+    vmcb->tr.attr.bytes = 0x08b; /* 32-bit TSS (busy) */
     vmcb->tr.base = 0;
     vmcb->tr.limit = 0xff;
 
