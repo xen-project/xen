@@ -140,6 +140,15 @@ char * strchr(const char * s, int c)
         return (char *)s;
 }
 
+char * strrchr(const char * s, int c)
+{
+        const char *res;
+        for(; *s != '\0'; ++s)
+                if (*s == (char) c)
+                        res = s;
+        return (char *)res;
+}
+
 char * strstr(const char * s1,const char * s2)
 {
         int l1, l2;

@@ -87,6 +87,7 @@ void  *memset(void *s,int c, size_t count);
 size_t strnlen(const char *s, size_t count);
 size_t strlen(const char *s);
 char  *strchr(const char *s, int c);
+char  *strrchr(const char *s, int c);
 char  *strstr(const char *s1, const char *s2);
 char * strcat(char * dest, const char * src);
 char  *strdup(const char *s);
