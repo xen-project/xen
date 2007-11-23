@@ -30,17 +30,18 @@
 #include <asm/hvm/vioapic.h>
 #include <public/hvm/save.h>
 
-struct dev_intx_gsi {
+struct dev_intx_gsi_link {
     struct list_head list;
     uint8_t device;
     uint8_t intx;
     uint8_t gsi;
+    uint8_t link;
 };
 
 struct hvm_mirq_dpci_mapping {
     uint8_t valid;
     int pending;
-    struct list_head dig_list;
+    struct list_head digl_list;
     struct domain *dom;
 };
 
@@ -51,15 +52,19 @@ struct hvm_girq_dpci_mapping {
     uint8_t machine_gsi;
 };
 
+#define NR_ISAIRQS  16
+#define NR_LINK     4
 struct hvm_irq_dpci {
     spinlock_t dirq_lock;
     /* Machine IRQ to guest device/intx mapping. */
     struct hvm_mirq_dpci_mapping mirq[NR_IRQS];
     /* Guest IRQ to guest device/intx mapping. */
     struct hvm_girq_dpci_mapping girq[NR_IRQS];
-    /* Link to guest device/intx mapping. */
-    struct hvm_girq_dpci_mapping link[4];
     DECLARE_BITMAP(dirq_mask, NR_IRQS);
+    /* Record of mapped ISA IRQs */
+    DECLARE_BITMAP(isairq_map, NR_ISAIRQS);
+    /* Record of mapped Links */
+    DECLARE_BITMAP(link_map, NR_LINK);
     struct timer hvm_timer[NR_IRQS];
 };
 

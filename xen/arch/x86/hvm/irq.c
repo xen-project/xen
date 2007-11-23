@@ -181,6 +181,7 @@ void hvm_set_pci_link_route(struct domain *d, u8 link, u8 isa_irq)
 {
     struct hvm_irq *hvm_irq = &d->arch.hvm_domain.irq;
     u8 old_isa_irq;
+    int i;
 
     ASSERT((link <= 3) && (isa_irq <= 15));
 
@@ -192,12 +193,16 @@ void hvm_set_pci_link_route(struct domain *d, u8 link, u8 isa_irq)
     hvm_irq->pci_link.route[link] = isa_irq;
 
     /* PCI pass-through fixup. */
-    if ( hvm_irq->dpci && hvm_irq->dpci->link[link].valid )
+    if ( hvm_irq->dpci )
     {
-        hvm_irq->dpci->girq[isa_irq] = hvm_irq->dpci->link[link];
-        if ( hvm_irq->dpci->girq[old_isa_irq].device ==
-             hvm_irq->dpci->link[link].device )
-            hvm_irq->dpci->girq[old_isa_irq].valid = 0;
+        if ( old_isa_irq )
+            clear_bit(old_isa_irq, &hvm_irq->dpci->isairq_map);
+
+        for ( i = 0; i < NR_LINK; i++ )
+            if ( test_bit(i, &hvm_irq->dpci->link_map) &&
+                 hvm_irq->pci_link.route[i] )
+                set_bit(hvm_irq->pci_link.route[i],
+                        &hvm_irq->dpci->isairq_map);
     }
 
     if ( hvm_irq->pci_link_assert_count[link] == 0 )

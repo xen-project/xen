@@ -113,7 +113,7 @@ static void vmx_dirq_assist(struct vcpu *v)
     uint32_t device, intx;
     struct domain *d = v->domain;
     struct hvm_irq_dpci *hvm_irq_dpci = d->arch.hvm_domain.irq.dpci;
-    struct dev_intx_gsi *dig;
+    struct dev_intx_gsi_link *digl;
 
     if ( !vtd_enabled || (v->vcpu_id != 0) || (hvm_irq_dpci == NULL) )
         return;
@@ -125,10 +125,10 @@ static void vmx_dirq_assist(struct vcpu *v)
         stop_timer(&hvm_irq_dpci->hvm_timer[irq_to_vector(irq)]);
         clear_bit(irq, &hvm_irq_dpci->dirq_mask);
 
-        list_for_each_entry ( dig, &hvm_irq_dpci->mirq[irq].dig_list, list )
+        list_for_each_entry ( digl, &hvm_irq_dpci->mirq[irq].digl_list, list )
         {
-            device = dig->device;
-            intx = dig->intx;
+            device = digl->device;
+            intx = digl->intx;
             hvm_pci_intx_assert(d, device, intx);
             spin_lock(&hvm_irq_dpci->dirq_lock);
             hvm_irq_dpci->mirq[irq].pending++;

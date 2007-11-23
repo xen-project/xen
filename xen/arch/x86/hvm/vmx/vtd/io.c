@@ -50,15 +50,15 @@ static void pt_irq_time_out(void *data)
     struct hvm_mirq_dpci_mapping *irq_map = data;
     unsigned int guest_gsi, machine_gsi = 0;
     struct hvm_irq_dpci *dpci = irq_map->dom->arch.hvm_domain.irq.dpci;
-    struct dev_intx_gsi *dig;
+    struct dev_intx_gsi_link *digl;
     uint32_t device, intx;
 
-    list_for_each_entry ( dig, &irq_map->dig_list, list )
+    list_for_each_entry ( digl, &irq_map->digl_list, list )
     {
-        guest_gsi = dig->gsi;
+        guest_gsi = digl->gsi;
         machine_gsi = dpci->girq[guest_gsi].machine_gsi;
-        device = dig->device;
-        intx = dig->intx;
+        device = digl->device;
+        intx = digl->intx;
         hvm_pci_intx_deassert(irq_map->dom, device, intx);
     }
 
@@ -76,7 +76,7 @@ int pt_irq_create_bind_vtd(
     struct hvm_irq_dpci *hvm_irq_dpci = d->arch.hvm_domain.irq.dpci;
     uint32_t machine_gsi, guest_gsi;
     uint32_t device, intx, link;
-    struct dev_intx_gsi *dig;
+    struct dev_intx_gsi_link *digl;
 
     if ( hvm_irq_dpci == NULL )
     {
@@ -87,7 +87,7 @@ int pt_irq_create_bind_vtd(
         memset(hvm_irq_dpci, 0, sizeof(*hvm_irq_dpci));
         spin_lock_init(&hvm_irq_dpci->dirq_lock);
         for ( int i = 0; i < NR_IRQS; i++ )
-            INIT_LIST_HEAD(&hvm_irq_dpci->mirq[i].dig_list);
+            INIT_LIST_HEAD(&hvm_irq_dpci->mirq[i].digl_list);
 
         if ( cmpxchg((unsigned long *)&d->arch.hvm_domain.irq.dpci,
                      0, (unsigned long)hvm_irq_dpci) != 0 )
@@ -101,26 +101,23 @@ int pt_irq_create_bind_vtd(
     intx = pt_irq_bind->u.pci.intx;
     guest_gsi = hvm_pci_intx_gsi(device, intx);
     link = hvm_pci_intx_link(device, intx);
+    set_bit(link, hvm_irq_dpci->link_map);
 
-    dig = xmalloc(struct dev_intx_gsi);
-    if ( !dig )
+    digl = xmalloc(struct dev_intx_gsi_link);
+    if ( !digl )
         return -ENOMEM;
 
-    dig->device = device;
-    dig->intx = intx;
-    dig->gsi = guest_gsi;
-    list_add_tail(&dig->list,
-                  &hvm_irq_dpci->mirq[machine_gsi].dig_list);
- 
+    digl->device = device;
+    digl->intx = intx;
+    digl->gsi = guest_gsi;
+    digl->link = link;
+    list_add_tail(&digl->list,
+                  &hvm_irq_dpci->mirq[machine_gsi].digl_list);
+
     hvm_irq_dpci->girq[guest_gsi].valid = 1;
     hvm_irq_dpci->girq[guest_gsi].device = device;
     hvm_irq_dpci->girq[guest_gsi].intx = intx;
     hvm_irq_dpci->girq[guest_gsi].machine_gsi = machine_gsi;
-
-    hvm_irq_dpci->link[link].valid = 1;
-    hvm_irq_dpci->link[link].device = device;
-    hvm_irq_dpci->link[link].intx = intx;
-    hvm_irq_dpci->link[link].machine_gsi = machine_gsi;
 
     /* Bind the same mirq once in the same domain */
     if ( !hvm_irq_dpci->mirq[machine_gsi].valid )
@@ -162,6 +159,46 @@ int hvm_do_IRQ_dpci(struct domain *d, unsigned int mirq)
     return 1;
 }
 
+static void hvm_dpci_isairq_eoi(struct domain *d, unsigned int isairq)
+{
+    struct hvm_irq *hvm_irq = &d->arch.hvm_domain.irq;
+    struct hvm_irq_dpci *dpci = hvm_irq->dpci;
+    struct dev_intx_gsi_link *digl, *tmp;
+    int i;
+
+    ASSERT(isairq < NR_ISAIRQS);
+    if ( !vtd_enabled || !dpci ||
+         !test_bit(isairq, dpci->isairq_map) )
+        return;
+
+    /* Multiple mirq may be mapped to one isa irq */
+    for ( i = 0; i < NR_IRQS; i++ )
+    {
+        if ( !dpci->mirq[i].valid )
+            continue;
+
+        list_for_each_entry_safe ( digl, tmp,
+            &dpci->mirq[i].digl_list, list )
+        {
+            if ( hvm_irq->pci_link.route[digl->link] == isairq )
+            {
+                hvm_pci_intx_deassert(d, digl->device, digl->intx);
+                spin_lock(&dpci->dirq_lock);
+                if ( --dpci->mirq[i].pending == 0 )
+                {
+                    spin_unlock(&dpci->dirq_lock);
+                    gdprintk(XENLOG_INFO,
+                             "hvm_dpci_isairq_eoi:: mirq = %x\n", i);
+                    stop_timer(&dpci->hvm_timer[irq_to_vector(i)]);
+                    pirq_guest_eoi(d, i);
+                }
+                else
+                    spin_unlock(&dpci->dirq_lock);
+            }
+        }
+    }
+}
+
 void hvm_dpci_eoi(struct domain *d, unsigned int guest_gsi,
                   union vioapic_redir_entry *ent)
 {
@@ -169,14 +206,21 @@ void hvm_dpci_eoi(struct domain *d, unsigned int guest_gsi,
     uint32_t device, intx, machine_gsi;
 
     if ( !vtd_enabled || (hvm_irq_dpci == NULL) ||
-         !hvm_irq_dpci->girq[guest_gsi].valid )
+         (guest_gsi >= NR_ISAIRQS &&
+          !hvm_irq_dpci->girq[guest_gsi].valid) )
         return;
+
+    if ( guest_gsi < NR_ISAIRQS )
+    {
+        hvm_dpci_isairq_eoi(d, guest_gsi);
+        return;
+    }
 
     machine_gsi = hvm_irq_dpci->girq[guest_gsi].machine_gsi;
     device = hvm_irq_dpci->girq[guest_gsi].device;
     intx = hvm_irq_dpci->girq[guest_gsi].intx;
     hvm_pci_intx_deassert(d, device, intx);
- 
+
     spin_lock(&hvm_irq_dpci->dirq_lock);
     if ( --hvm_irq_dpci->mirq[machine_gsi].pending == 0 )
     {
@@ -196,9 +240,9 @@ void iommu_domain_destroy(struct domain *d)
     struct hvm_irq_dpci *hvm_irq_dpci = d->arch.hvm_domain.irq.dpci;
     uint32_t i;
     struct hvm_iommu *hd  = domain_hvm_iommu(d);
-    struct list_head *ioport_list, *dig_list, *tmp;
+    struct list_head *ioport_list, *digl_list, *tmp;
     struct g2m_ioport *ioport;
-    struct dev_intx_gsi *dig;
+    struct dev_intx_gsi_link *digl;
 
     if ( !vtd_enabled )
         return;
@@ -211,12 +255,13 @@ void iommu_domain_destroy(struct domain *d)
                 pirq_guest_unbind(d, i);
                 kill_timer(&hvm_irq_dpci->hvm_timer[irq_to_vector(i)]);
 
-                list_for_each_safe ( dig_list, tmp,
-                                     &hvm_irq_dpci->mirq[i].dig_list )
+                list_for_each_safe ( digl_list, tmp,
+                                     &hvm_irq_dpci->mirq[i].digl_list )
                 {
-                    dig = list_entry(dig_list, struct dev_intx_gsi, list);
-                    list_del(&dig->list);
-                    xfree(dig);
+                    digl = list_entry(digl_list,
+                                      struct dev_intx_gsi_link, list);
+                    list_del(&digl->list);
+                    xfree(digl);
                 }
             }
 
