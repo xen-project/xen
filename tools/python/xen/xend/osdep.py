@@ -25,6 +25,7 @@ _scripts_dir = {
 }
 
 _xend_autorestart = {
+    "NetBSD": True,
     "Linux": True,
     "SunOS": False,
 }
