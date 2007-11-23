@@ -102,7 +102,7 @@ void unbind_evtchn(evtchn_port_t port )
 	ev_actions[port].data = NULL;
 }
 
-int bind_virq(uint32_t virq, evtchn_handler_t handler, void *data)
+evtchn_port_t bind_virq(uint32_t virq, evtchn_handler_t handler, void *data)
 {
 	evtchn_bind_virq_t op;
 
@@ -113,11 +113,11 @@ int bind_virq(uint32_t virq, evtchn_handler_t handler, void *data)
 	if ( HYPERVISOR_event_channel_op(EVTCHNOP_bind_virq, &op) != 0 )
 	{
 		printk("Failed to bind virtual IRQ %d\n", virq);
-		return 1;
+		return -1;
     }
     set_bit(op.port,bound_ports);
     bind_evtchn(op.port, handler, data);
-	return 0;
+	return op.port;
 }
 
 #if defined(__x86_64__)

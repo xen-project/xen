@@ -267,7 +267,7 @@ init_time(void)
 		printk("efi_get_time() failed\n");
 
 	err = bind_virq(VIRQ_ITC, timer_interrupt, NULL);
-	if (err != 0) {
+	if (err == -1) {
 		printk("XEN timer request chn bind failed %i\n", err);
 		return;
 	}

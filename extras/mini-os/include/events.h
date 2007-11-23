@@ -26,7 +26,7 @@ typedef void (*evtchn_handler_t)(evtchn_port_t, struct pt_regs *, void *);
 
 /* prototypes */
 int do_event(evtchn_port_t port, struct pt_regs *regs);
-int bind_virq(uint32_t virq, evtchn_handler_t handler, void *data);
+evtchn_port_t bind_virq(uint32_t virq, evtchn_handler_t handler, void *data);
 evtchn_port_t bind_evtchn(evtchn_port_t port, evtchn_handler_t handler,
 						  void *data);
 void unbind_evtchn(evtchn_port_t port);
