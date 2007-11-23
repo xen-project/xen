@@ -10,6 +10,7 @@ struct thread
     char *name;
     char *stack;
 #if !defined(__ia64__)
+    /* keep in that order */
     unsigned long sp;  /* Stack pointer */
     unsigned long ip;  /* Instruction pointer */
 #else /* !defined(__ia64__) */
