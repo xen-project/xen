@@ -18,11 +18,12 @@
 _start:
         cld
         movq stack_start(%rip),%rsp
+        andq $(~(8192-1)), %rsp
         movq %rsi,%rdi
         call start_kernel
 
 stack_start:
-        .quad stack+8192
+        .quad stack+(2*8192)
 
         /* Unpleasant -- the PTE that maps this page is actually overwritten */
         /* to map the real shared-info page! :-)                             */

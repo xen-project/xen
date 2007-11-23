@@ -21,11 +21,12 @@
 _start:
         cld
         lss stack_start,%esp
+        andl $(~(8192-1)), %esp
         push %esi 
         call start_kernel
 
 stack_start:
-	.long stack+8192, __KERNEL_SS
+	.long stack+(2*8192), __KERNEL_SS
 
         /* Unpleasant -- the PTE that maps this page is actually overwritten */
         /* to map the real shared-info page! :-)                             */
