@@ -7,10 +7,11 @@ static inline struct thread* get_current(void)
 {
     struct thread **current;
 #ifdef __i386__    
-    __asm__("andl %%esp,%0; ":"=r" (current) : "0" (~8191UL));
+    register unsigned long sp asm("esp");
 #else
-    __asm__("andq %%rsp,%0; ":"=r" (current) : "0" (~8191UL));
+    register unsigned long sp asm("rsp");
 #endif 
+    current = (void *)(sp & ~8191UL);
     return *current;
 }
 
