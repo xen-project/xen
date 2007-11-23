@@ -380,6 +380,8 @@ ENTRY(page_fault)
 ENTRY(thread_starter)
         popq %rdi
         popq %rbx
+        pushq $0
+        xorq %rbp,%rbp
         call *%rbx
         call exit_thread 
         

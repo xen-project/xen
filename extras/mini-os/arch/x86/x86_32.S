@@ -126,6 +126,7 @@ ENTRY(hypervisor_callback)
         cmpl $ecrit,%eax
         jb   critical_region_fixup
 11:     push %esp
+        xorl %ebp,%ebp
         call do_hypervisor_callback
         add  $4,%esp
         movl HYPERVISOR_shared_info,%esi
@@ -281,6 +282,8 @@ ENTRY(spurious_interrupt_bug)
 ENTRY(thread_starter)
     popl %eax
     popl %ebx
+    pushl $0
+    xorl %ebp,%ebp
     pushl %eax
     call *%ebx
     call exit_thread 
