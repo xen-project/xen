@@ -2291,7 +2291,7 @@ x86_emulate(
                      ? ops->write_dr(modrm_reg, src.val, ctxt)
                      : X86EMUL_UNHANDLEABLE)
                   : (ops->write_cr
-                     ? ops->write_dr(modrm_reg, src.val, ctxt)
+                     ? ops->write_cr(modrm_reg, src.val, ctxt)
                      : X86EMUL_UNHANDLEABLE));
         }
         else
@@ -2305,7 +2305,7 @@ x86_emulate(
                      ? ops->read_dr(modrm_reg, &dst.val, ctxt)
                      : X86EMUL_UNHANDLEABLE)
                   : (ops->read_cr
-                     ? ops->read_dr(modrm_reg, &dst.val, ctxt)
+                     ? ops->read_cr(modrm_reg, &dst.val, ctxt)
                      : X86EMUL_UNHANDLEABLE));
         }
         if ( rc != 0 )
