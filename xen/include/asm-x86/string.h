@@ -109,10 +109,6 @@ void *__memcpy(void *t, const void *f, size_t n)
 #define __HAVE_ARCH_MEMMOVE
 extern void *memmove(void *dest, const void *src, size_t n);
 
-/* Some versions of gcc emit references to memcmp despite this macro defn. */
-/*#define __HAVE_ARCH_MEMCMP*/
-#define memcmp __builtin_memcmp
-
 static inline void *__memset_generic(void *s, char c, size_t count)
 {
     long d0, d1;
