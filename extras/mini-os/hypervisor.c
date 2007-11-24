@@ -33,6 +33,8 @@
     ((sh)->evtchn_pending[idx] &                \
      ~(sh)->evtchn_mask[idx])
 
+int in_callback;
+
 void do_hypervisor_callback(struct pt_regs *regs)
 {
     unsigned long  l1, l2, l1i, l2i;
@@ -41,6 +43,7 @@ void do_hypervisor_callback(struct pt_regs *regs)
     shared_info_t *s = HYPERVISOR_shared_info;
     vcpu_info_t   *vcpu_info = &s->vcpu_info[cpu];
 
+    in_callback = 1;
    
     vcpu_info->evtchn_upcall_pending = 0;
     /* NB. No need for a barrier here -- XCHG is a barrier on x86. */
@@ -59,6 +62,8 @@ void do_hypervisor_callback(struct pt_regs *regs)
 			do_event(port, regs);
         }
     }
+
+    in_callback = 0;
 }
 
 

@@ -125,6 +125,14 @@ void schedule(void)
     unsigned long flags;
     prev = current;
     local_irq_save(flags); 
+    if (in_callback) {
+        printk("Must not call schedule() from a callback\n");
+        BUG();
+    }
+    if (flags) {
+        printk("Must not call schedule() with IRQs disabled\n");
+        BUG();
+    }
     list_for_each(iterator, &exited_threads)
     {
         thread = list_entry(iterator, struct thread, thread_list);

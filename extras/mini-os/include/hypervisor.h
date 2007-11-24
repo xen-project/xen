@@ -42,4 +42,6 @@ void mask_evtchn(u32 port);
 void unmask_evtchn(u32 port);
 void clear_evtchn(u32 port);
 
+extern int in_callback;
+
 #endif /* __HYPERVISOR_H__ */
