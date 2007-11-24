@@ -49,14 +49,25 @@ static inline void init_MUTEX(struct semaphore *sem)
 
 static void inline down(struct semaphore *sem)
 {
-    wait_event(sem->wait, sem->count > 0);
+    unsigned long flags;
+    while (1) {
+        wait_event(sem->wait, sem->count > 0);
+        local_irq_save(flags);
+        if (sem->count > 0)
+            break;
+        local_irq_restore(flags);
+    }
     sem->count--;
+    local_irq_restore(flags);
 }
 
 static void inline up(struct semaphore *sem)
 {
+    unsigned long flags;
+    local_irq_save(flags);
     sem->count++;
     wake_up(&sem->wait);
+    local_irq_restore(flags);
 }
 
 /* FIXME! Thre read/write semaphores are unimplemented! */
