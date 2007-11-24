@@ -22,7 +22,10 @@
 #include <asm/config.h>
 #include <asm/hvm/io.h>
 #include <asm/hvm/vmx/cpu.h>
+
+#ifdef VMXASSIST
 #include <public/hvm/vmx_assist.h>
+#endif
 
 extern void start_vmx(void);
 extern void vmcs_dump_vcpu(void);
@@ -85,10 +88,11 @@ struct arch_vmx_struct {
     unsigned int         host_msr_count;
     struct vmx_msr_entry *host_msr_area;
 
-    /* Following fields are all specific to vmxassist. */
+#ifdef VMXASSIST
     unsigned long        vmxassist_enabled:1;
     unsigned long        irqbase_mode:1;
     unsigned char        pm_irqbase[2];
+#endif
 };
 
 int vmx_create_vmcs(struct vcpu *v);

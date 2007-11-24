@@ -271,7 +271,7 @@ static void vpic_ioport_write(
             vpic->imr = val;
             break;
         case 1:
-#if 1 /* Delete me when vmxassist is retired. */
+#ifdef VMXASSIST
             /* Which mode is irqbase programmed in? */
             current->arch.hvm_vmx.irqbase_mode =
                 current->arch.hvm_vmx.vmxassist_enabled;

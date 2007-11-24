@@ -92,6 +92,11 @@ static int vmx_vcpu_initialise(struct vcpu *v)
 
     vmx_install_vlapic_mapping(v);
 
+#ifndef VMXASSIST
+    if ( v->vcpu_id == 0 )
+        v->arch.guest_context.user_regs.eax = 1;
+#endif
+
     return 0;
 }
 
@@ -701,7 +706,9 @@ static void vmx_load_cpu_state(struct vcpu *v, struct hvm_hw_cpu *data)
     v->arch.hvm_vmx.shadow_gs = data->shadow_gs;
 #endif
 
+#ifdef VMXASSIST
     v->arch.hvm_vmx.vmxassist_enabled = !(data->cr0 & X86_CR0_PE);
+#endif
 
     hvm_set_guest_time(v, data->tsc);
 
@@ -961,9 +968,11 @@ static void vmx_init_ap_context(
     struct vcpu_guest_context *ctxt, int vcpuid, int trampoline_vector)
 {
     memset(ctxt, 0, sizeof(*ctxt));
+#ifdef VMXASSIST
     ctxt->user_regs.eip = VMXASSIST_BASE;
     ctxt->user_regs.edx = vcpuid;
     ctxt->user_regs.ebx = trampoline_vector;
+#endif
 }
 
 void do_nmi(struct cpu_user_regs *);
@@ -1045,7 +1054,10 @@ static void vmx_update_guest_cr(struct vcpu *v, unsigned int cr)
 
         v->arch.hvm_vcpu.hw_cr[0] =
             v->arch.hvm_vcpu.guest_cr[0] |
-            X86_CR0_PE | X86_CR0_NE | X86_CR0_PG | X86_CR0_WP;
+            X86_CR0_NE | X86_CR0_PG | X86_CR0_WP;
+#ifdef VMXASSIST
+        v->arch.hvm_vcpu.hw_cr[0] |= X86_CR0_PE;
+#endif
         __vmwrite(GUEST_CR0, v->arch.hvm_vcpu.hw_cr[0]);
         __vmwrite(CR0_READ_SHADOW, v->arch.hvm_vcpu.guest_cr[0]);
         break;
@@ -1246,6 +1258,7 @@ static void vmx_do_cpuid(struct cpu_user_regs *regs)
     unsigned int input = regs->eax;
     unsigned int eax, ebx, ecx, edx;
 
+#ifdef VMXASSIST
     if ( input == 0x40000003 )
     {
         /*
@@ -1280,6 +1293,7 @@ static void vmx_do_cpuid(struct cpu_user_regs *regs)
         regs->edx = (u32)(value >> 32);
         return;
     }
+#endif
 
     hvm_cpuid(input, &eax, &ebx, &ecx, &edx);
 
@@ -1816,6 +1830,8 @@ static void vmx_io_instruction(unsigned long exit_qualification,
     }
 }
 
+#ifdef VMXASSIST
+
 static void vmx_world_save(struct vcpu *v, struct vmx_assist_context *c)
 {
     struct cpu_user_regs *regs = guest_cpu_user_regs();
@@ -2057,6 +2073,19 @@ static int vmx_set_cr0(unsigned long value)
 
     return 1;
 }
+
+#else /* !defined(VMXASSIST) */
+
+#define vmx_set_cr0(v) hvm_set_cr0(v)
+
+static int vmx_realmode(struct cpu_user_regs *regs)
+{
+    gdprintk(XENLOG_ERR, "Attempt to enter real mode on VCPU %d\n",
+             current->vcpu_id);
+    return -EINVAL;
+}
+
+#endif
 
 #define CASE_SET_REG(REG, reg)      \
     case REG_ ## REG: regs->reg = value; break
@@ -2677,9 +2706,16 @@ static void vmx_failed_vmentry(unsigned int exit_reason,
                                struct cpu_user_regs *regs)
 {
     unsigned int failed_vmentry_reason = (uint16_t)exit_reason;
-    unsigned long exit_qualification;
+    unsigned long exit_qualification = __vmread(EXIT_QUALIFICATION);
 
-    exit_qualification = __vmread(EXIT_QUALIFICATION);
+#ifndef VMXASSIST
+    if ( (failed_vmentry_reason == EXIT_REASON_INVALID_GUEST_STATE) &&
+         (exit_qualification == 0) &&
+         !(current->arch.hvm_vcpu.hw_cr[0] & X86_CR0_PE) &&
+         (vmx_realmode(regs) == 0) )
+        return;
+#endif
+
     printk("Failed vm entry (exit reason 0x%x) ", exit_reason);
     switch ( failed_vmentry_reason )
     {

@@ -40,6 +40,7 @@ asm(
     "    cli                         \n"
     "    movl $stack_top,%esp        \n"
     "    movl %esp,%ebp              \n"
+    "    movl %eax,initial_eax       \n"
     "    call main                   \n"
     /* Relocate real-mode trampoline to 0x0. */
     "    mov  $trampoline_start,%esi \n"
@@ -97,6 +98,8 @@ asm(
     "stack_top:                      \n"
     );
 
+static unsigned int initial_eax;
+
 void create_mp_tables(void);
 int hvm_write_smbios_tables(void);
 
@@ -119,6 +122,12 @@ check_amd(void)
         "=d" (*(int *)(&id[4]))
         : "a" (0) );
     return __builtin_memcmp(id, "AuthenticAMD", 12) == 0;
+}
+
+static int
+use_vmxassist(void)
+{
+    return !check_amd() && !initial_eax;
 }
 
 static void
@@ -407,7 +416,7 @@ int main(void)
         printf(" %05x-%05x: Etherboot ROM\n",
                ETHERBOOT_PHYSICAL_ADDRESS,
                ETHERBOOT_PHYSICAL_ADDRESS + etherboot_sz - 1);
-    if ( !check_amd() )
+    if ( use_vmxassist() )
         printf(" %05x-%05x: VMXAssist\n",
                VMXASSIST_PHYSICAL_ADDRESS,
                VMXASSIST_PHYSICAL_ADDRESS + sizeof(vmxassist) - 1);
@@ -424,7 +433,7 @@ int main(void)
                ROMBIOS_PHYSICAL_ADDRESS,
                ROMBIOS_PHYSICAL_ADDRESS + rombios_sz - 1);
 
-    if ( !check_amd() )
+    if ( use_vmxassist() )
     {
         printf("Loading VMXAssist ...\n");
         memcpy((void *)VMXASSIST_PHYSICAL_ADDRESS,

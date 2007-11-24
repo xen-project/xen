@@ -11,6 +11,11 @@ xenoprof := y
 #
 pae ?= n
 supervisor_mode_kernel ?= n
+vmxassist ?= y
+
+ifeq ($(vmxassist),y)
+CFLAGS += -DVMXASSIST
+endif
 
 # Solaris grabs stdarg.h and friends from the system include directory.
 ifneq ($(XEN_OS),SunOS)
