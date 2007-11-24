@@ -224,12 +224,29 @@ void wake(struct thread *thread)
 void idle_thread_fn(void *unused)
 {
     s_time_t until;
+    unsigned long flags;
+    struct list_head *iterator;
+    struct thread *next, *thread;
     for(;;)
     {
         schedule();
-        /* block until the next timeout expires, or for 10 secs, whichever comes first */
-        until = blocking_time();
-        block_domain(until);
+        next = NULL;
+        local_irq_save(flags);
+        list_for_each(iterator, &idle_thread->thread_list)
+        {
+            thread = list_entry(iterator, struct thread, thread_list);
+            if(is_runnable(thread)) 
+            {
+                next = thread;
+                break;
+            }
+        }
+        if (!next) {
+            /* block until the next timeout expires, or for 10 secs, whichever comes first */
+            until = blocking_time();
+            block_domain(until);
+        }
+        local_irq_restore(flags);
         wake_expired();
     }
 }
