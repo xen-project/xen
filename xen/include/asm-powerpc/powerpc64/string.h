@@ -18,7 +18,6 @@
 #define __HAVE_ARCH_STRCMP
 #define __HAVE_ARCH_STRCAT
 #define __HAVE_ARCH_MEMSET
-#define __HAVE_ARCH_BCOPY
 #define __HAVE_ARCH_MEMCPY
 #define __HAVE_ARCH_MEMMOVE
 #define __HAVE_ARCH_MEMCMP
