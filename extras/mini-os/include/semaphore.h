@@ -41,11 +41,13 @@ struct rw_semaphore {
 
 #define DECLARE_MUTEX_LOCKED(name) __DECLARE_SEMAPHORE_GENERIC(name,0)
 
-static inline void init_MUTEX(struct semaphore *sem)
+static inline void init_SEMAPHORE(struct semaphore *sem, int count)
 {
-  sem->count = 1;
+  sem->count = count;
   init_waitqueue_head(&sem->wait);
 }
+
+#define init_MUTEX(sem) init_SEMAPHORE(sem, 1)
 
 static void inline down(struct semaphore *sem)
 {
