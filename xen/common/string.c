@@ -370,6 +370,7 @@ void * memmove(void * dest,const void *src,size_t count)
 #endif
 
 #ifndef __HAVE_ARCH_MEMCMP
+#undef memcmp
 /**
  * memcmp - Compare two areas of memory
  * @cs: One area of memory
