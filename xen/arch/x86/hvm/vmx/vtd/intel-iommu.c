@@ -1538,7 +1538,7 @@ int iommu_page_mapping(struct domain *domain, dma_addr_t iova,
     {
         iommu = drhd->iommu;
         if ( cap_caching_mode(iommu->cap) )
-            iommu_flush_iotlb_psi(iommu, domain->domain_id, iova, size, 0);
+            iommu_flush_iotlb_psi(iommu, domain->domain_id, iova, index, 0);
         else if ( cap_rwbf(iommu->cap) )
             iommu_flush_write_buffer(iommu);
     }
@@ -1726,13 +1726,11 @@ static void setup_dom0_rmrr(void)
 
     for_each_rmrr_device ( rmrr, pdev )
         ret = iommu_prepare_rmrr_dev(dom0, rmrr, pdev);
-
-    if ( ret )
-        gdprintk(XENLOG_ERR VTDPREFIX,
-                 "IOMMU: mapping reserved region failed\n");
-
+        if ( ret )
+            gdprintk(XENLOG_ERR VTDPREFIX,
+                     "IOMMU: mapping reserved region failed\n");
     end_for_each_rmrr_device ( rmrr, pdev )
-        }
+}
 
 int iommu_setup(void)
 {
@@ -1798,7 +1796,6 @@ int device_assigned(u8 bus, u8 devfn)
 
 int assign_device(struct domain *d, u8 bus, u8 devfn)
 {
-    struct hvm_iommu *hd  = domain_hvm_iommu(d);
     struct acpi_rmrr_unit *rmrr;
     struct pci_dev *pdev;
     int ret = 0;
@@ -1813,14 +1810,17 @@ int assign_device(struct domain *d, u8 bus, u8 devfn)
     reassign_device_ownership(dom0, d, bus, devfn);
 
     /* setup rmrr identify mapping just once per domain */
-    if ( list_empty(&hd->pdev_list) )
-        for_each_rmrr_device(rmrr, pdev)
-            ret = iommu_prepare_rmrr_dev(d, rmrr, pdev);
-    if ( ret )
-        gdprintk(XENLOG_ERR VTDPREFIX,
-                 "IOMMU: mapping reserved region failed\n");
+    for_each_rmrr_device(rmrr, pdev)
+        ret = iommu_prepare_rmrr_dev(d, rmrr, pdev);
+        if ( ret )
+        {
+            gdprintk(XENLOG_ERR VTDPREFIX,
+                     "IOMMU: mapping reserved region failed\n");
+            return ret;
+        }
     end_for_each_rmrr_device(rmrr, pdev)
-        return ret;
+
+    return ret;
 }
 
 void iommu_set_pgd(struct domain *d)
