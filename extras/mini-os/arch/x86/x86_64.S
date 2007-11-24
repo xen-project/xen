@@ -193,6 +193,7 @@ error_call_handler:
 	movq ORIG_RAX(%rsp),%rsi	# get error code 
 	movq $-1,ORIG_RAX(%rsp)
 	call *%rax
+	jmp error_exit
 
 .macro zeroentry sym
 #	INTR_FRAME
