@@ -383,6 +383,7 @@ void shutdown_netfront(void)
 
     unbind_all_ports();
 
+    free(backend);
 }
 
 
