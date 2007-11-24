@@ -41,6 +41,7 @@ static inline void init_waitqueue_head(struct wait_queue_head *h)
 static inline void init_waitqueue_entry(struct wait_queue *q, struct thread *thread)
 {
     q->thread = thread;
+    INIT_LIST_HEAD(&q->thread_list);
 }
 
 
