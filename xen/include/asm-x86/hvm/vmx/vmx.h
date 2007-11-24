@@ -33,6 +33,7 @@ void vmx_intr_assist(void);
 void vmx_do_resume(struct vcpu *);
 void set_guest_time(struct vcpu *v, u64 gtime);
 void vmx_vlapic_msr_changed(struct vcpu *v);
+int vmx_realmode(struct cpu_user_regs *regs);
 
 /*
  * Exit Reasons

@@ -2078,13 +2078,6 @@ static int vmx_set_cr0(unsigned long value)
 
 #define vmx_set_cr0(v) hvm_set_cr0(v)
 
-static int vmx_realmode(struct cpu_user_regs *regs)
-{
-    gdprintk(XENLOG_ERR, "Attempt to enter real mode on VCPU %d\n",
-             current->vcpu_id);
-    return -EINVAL;
-}
-
 #endif
 
 #define CASE_SET_REG(REG, reg)      \
