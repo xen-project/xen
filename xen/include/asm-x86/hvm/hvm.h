@@ -26,36 +26,6 @@
 #include <public/domctl.h>
 #include <public/hvm/save.h>
 
-/* 
- * Attribute for segment selector. This is a copy of bit 40:47 & 52:55 of the
- * segment descriptor. It happens to match the format of an AMD SVM VMCB.
- */
-typedef union segment_attributes {
-    u16 bytes;
-    struct
-    {
-        u16 type:4;    /* 0;  Bit 40-43 */
-        u16 s:   1;    /* 4;  Bit 44 */
-        u16 dpl: 2;    /* 5;  Bit 45-46 */
-        u16 p:   1;    /* 7;  Bit 47 */
-        u16 avl: 1;    /* 8;  Bit 52 */
-        u16 l:   1;    /* 9;  Bit 53 */
-        u16 db:  1;    /* 10; Bit 54 */
-        u16 g:   1;    /* 11; Bit 55 */
-    } fields;
-} __attribute__ ((packed)) segment_attributes_t;
-
-/*
- * Full state of a segment register (visible and hidden portions).
- * Again, this happens to match the format of an AMD SVM VMCB.
- */
-typedef struct segment_register {
-    u16        sel;
-    segment_attributes_t attr;
-    u32        limit;
-    u64        base;
-} __attribute__ ((packed)) segment_register_t;
-
 /* Interrupt acknowledgement sources. */
 enum hvm_intsrc {
     hvm_intsrc_none,

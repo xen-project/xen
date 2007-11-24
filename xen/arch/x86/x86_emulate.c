@@ -60,19 +60,19 @@ static uint8_t opcode_table[256] = {
     /* 0x00 - 0x07 */
     ByteOp|DstMem|SrcReg|ModRM, DstMem|SrcReg|ModRM,
     ByteOp|DstReg|SrcMem|ModRM, DstReg|SrcMem|ModRM,
-    ByteOp|DstReg|SrcImm, DstReg|SrcImm, 0, 0,
+    ByteOp|DstReg|SrcImm, DstReg|SrcImm, ImplicitOps, ImplicitOps,
     /* 0x08 - 0x0F */
     ByteOp|DstMem|SrcReg|ModRM, DstMem|SrcReg|ModRM,
     ByteOp|DstReg|SrcMem|ModRM, DstReg|SrcMem|ModRM,
-    ByteOp|DstReg|SrcImm, DstReg|SrcImm, 0, 0,
+    ByteOp|DstReg|SrcImm, DstReg|SrcImm, ImplicitOps, 0,
     /* 0x10 - 0x17 */
     ByteOp|DstMem|SrcReg|ModRM, DstMem|SrcReg|ModRM,
     ByteOp|DstReg|SrcMem|ModRM, DstReg|SrcMem|ModRM,
-    ByteOp|DstReg|SrcImm, DstReg|SrcImm, 0, 0,
+    ByteOp|DstReg|SrcImm, DstReg|SrcImm, ImplicitOps, ImplicitOps,
     /* 0x18 - 0x1F */
     ByteOp|DstMem|SrcReg|ModRM, DstMem|SrcReg|ModRM,
     ByteOp|DstReg|SrcMem|ModRM, DstReg|SrcMem|ModRM,
-    ByteOp|DstReg|SrcImm, DstReg|SrcImm, 0, 0,
+    ByteOp|DstReg|SrcImm, DstReg|SrcImm, ImplicitOps, ImplicitOps,
     /* 0x20 - 0x27 */
     ByteOp|DstMem|SrcReg|ModRM, DstMem|SrcReg|ModRM,
     ByteOp|DstReg|SrcMem|ModRM, DstReg|SrcMem|ModRM,
@@ -120,7 +120,8 @@ static uint8_t opcode_table[256] = {
     /* 0x88 - 0x8F */
     ByteOp|DstMem|SrcReg|ModRM|Mov, DstMem|SrcReg|ModRM|Mov,
     ByteOp|DstReg|SrcMem|ModRM|Mov, DstReg|SrcMem|ModRM|Mov,
-    0, DstReg|SrcNone|ModRM, 0, DstMem|SrcNone|ModRM|Mov,
+    DstMem|SrcReg|ModRM|Mov, DstReg|SrcNone|ModRM,
+    DstReg|SrcMem|ModRM|Mov, DstMem|SrcNone|ModRM|Mov,
     /* 0x90 - 0x97 */
     ImplicitOps, ImplicitOps, ImplicitOps, ImplicitOps,
     ImplicitOps, ImplicitOps, ImplicitOps, ImplicitOps,
@@ -158,7 +159,7 @@ static uint8_t opcode_table[256] = {
     ImplicitOps, ImplicitOps, ImplicitOps, ImplicitOps,
     ImplicitOps, ImplicitOps, ImplicitOps, ImplicitOps,
     /* 0xE8 - 0xEF */
-    ImplicitOps, ImplicitOps, 0, ImplicitOps,
+    ImplicitOps, ImplicitOps, ImplicitOps, ImplicitOps,
     ImplicitOps, ImplicitOps, ImplicitOps, ImplicitOps,
     /* 0xF0 - 0xF7 */
     0, 0, 0, 0,
@@ -170,7 +171,7 @@ static uint8_t opcode_table[256] = {
 
 static uint8_t twobyte_table[256] = {
     /* 0x00 - 0x07 */
-    0, 0, 0, 0, 0, ImplicitOps, 0, 0,
+    0, ImplicitOps|ModRM, 0, 0, 0, ImplicitOps, 0, 0,
     /* 0x08 - 0x0F */
     ImplicitOps, ImplicitOps, 0, 0, 0, ImplicitOps|ModRM, 0, 0,
     /* 0x10 - 0x17 */
@@ -220,9 +221,10 @@ static uint8_t twobyte_table[256] = {
     ByteOp|DstMem|SrcNone|ModRM|Mov, ByteOp|DstMem|SrcNone|ModRM|Mov,
     ByteOp|DstMem|SrcNone|ModRM|Mov, ByteOp|DstMem|SrcNone|ModRM|Mov,
     /* 0xA0 - 0xA7 */
-    0, 0, 0, DstBitBase|SrcReg|ModRM, 0, 0, 0, 0, 
+    ImplicitOps, ImplicitOps, 0, DstBitBase|SrcReg|ModRM, 0, 0, 0, 0, 
     /* 0xA8 - 0xAF */
-    0, 0, 0, DstBitBase|SrcReg|ModRM, 0, 0, 0, DstReg|SrcMem|ModRM,
+    ImplicitOps, ImplicitOps, 0, DstBitBase|SrcReg|ModRM,
+    0, 0, 0, DstReg|SrcMem|ModRM,
     /* 0xB0 - 0xB7 */
     ByteOp|DstMem|SrcReg|ModRM, DstMem|SrcReg|ModRM,
     0, DstBitBase|SrcReg|ModRM,
@@ -677,6 +679,45 @@ test_cc(
     return (!!rc ^ (condition & 1));
 }
 
+static int
+in_realmode(
+    struct x86_emulate_ctxt *ctxt,
+    struct x86_emulate_ops  *ops)
+{
+    unsigned long cr0;
+    int rc;
+
+    if ( ops->read_cr == NULL )
+        return 0;
+
+    rc = ops->read_cr(0, &cr0, ctxt);
+    return (!rc && !(cr0 & 1));
+}
+
+static int
+load_seg(
+    enum x86_segment seg,
+    uint16_t sel,
+    struct x86_emulate_ctxt *ctxt,
+    struct x86_emulate_ops *ops)
+{
+    struct segment_register reg;
+    int rc;
+
+    if ( !in_realmode(ctxt, ops) ||
+         (ops->read_segment == NULL) ||
+         (ops->write_segment == NULL) )
+        return X86EMUL_UNHANDLEABLE;
+
+    if ( (rc = ops->read_segment(seg, &reg, ctxt)) != 0 )
+        return rc;
+
+    reg.sel  = sel;
+    reg.base = (uint32_t)sel << 4;
+
+    return ops->write_segment(seg, &reg, ctxt);
+}
+
 void *
 decode_register(
     uint8_t modrm_reg, struct cpu_user_regs *regs, int highbyte_regs)
@@ -715,6 +756,24 @@ decode_register(
     }
 
     return p;
+}
+
+#define decode_segment_failed x86_seg_tr
+enum x86_segment
+decode_segment(
+    uint8_t modrm_reg)
+{
+    switch ( modrm_reg )
+    {
+    case 0: return x86_seg_es;
+    case 1: return x86_seg_cs;
+    case 2: return x86_seg_ss;
+    case 3: return x86_seg_ds;
+    case 4: return x86_seg_fs;
+    case 5: return x86_seg_gs;
+    default: break;
+    }
+    return decode_segment_failed;
 }
 
 int
@@ -1205,6 +1264,7 @@ x86_emulate(
                 dst.val  = (dst.val & ~3) | (src_val & 3);
             else
                 dst.type = OP_NONE;
+            generate_exception_if(in_realmode(ctxt, ops), EXC_UD);
         }
         break;
 
@@ -1283,6 +1343,28 @@ x86_emulate(
     case 0x88 ... 0x8b: /* mov */
         dst.val = src.val;
         break;
+
+    case 0x8c: /* mov Sreg,r/m */ {
+        struct segment_register reg;
+        enum x86_segment seg = decode_segment(modrm_reg);
+        generate_exception_if(seg == decode_segment_failed, EXC_UD);
+        fail_if(ops->read_segment == NULL);
+        if ( (rc = ops->read_segment(seg, &reg, ctxt)) != 0 )
+            goto done;
+        dst.val = reg.sel;
+        if ( dst.type == OP_MEM )
+            dst.bytes = 2;
+        break;
+    }
+
+    case 0x8e: /* mov r/m,Sreg */ {
+        enum x86_segment seg = decode_segment(modrm_reg);
+        generate_exception_if(seg == decode_segment_failed, EXC_UD);
+        if ( (rc = load_seg(seg, (uint16_t)src.val, ctxt, ops)) != 0 )
+            goto done;
+        dst.type = OP_NONE;
+        break;
+    }
 
     case 0x8d: /* lea */
         dst.val = ea.mem.off;
@@ -1657,6 +1739,56 @@ x86_emulate(
 
     switch ( b )
     {
+    case 0x06: /* push %%es */ {
+        struct segment_register reg;
+        src.val = x86_seg_es;
+    push_seg:
+        fail_if(ops->read_segment == NULL);
+        if ( (rc = ops->read_segment(src.val, &reg, ctxt)) != 0 )
+            return rc;
+        /* 64-bit mode: PUSH defaults to a 64-bit operand. */
+        if ( mode_64bit() && (op_bytes == 4) )
+            op_bytes = 8;
+        if ( (rc = ops->write(x86_seg_ss, sp_pre_dec(op_bytes),
+                              reg.sel, op_bytes, ctxt)) != 0 )
+            goto done;
+        break;
+    }
+
+    case 0x07: /* pop %%es */
+        src.val = x86_seg_es;
+    pop_seg:
+        fail_if(ops->write_segment == NULL);
+        /* 64-bit mode: PUSH defaults to a 64-bit operand. */
+        if ( mode_64bit() && (op_bytes == 4) )
+            op_bytes = 8;
+        if ( (rc = ops->read(x86_seg_ss, sp_post_inc(op_bytes),
+                             &dst.val, op_bytes, ctxt)) != 0 )
+            goto done;
+        if ( (rc = load_seg(src.val, (uint16_t)dst.val, ctxt, ops)) != 0 )
+            return rc;
+        break;
+
+    case 0x0e: /* push %%cs */
+        src.val = x86_seg_cs;
+        goto push_seg;
+
+    case 0x16: /* push %%ss */
+        src.val = x86_seg_ss;
+        goto push_seg;
+
+    case 0x17: /* pop %%ss */
+        src.val = x86_seg_ss;
+        goto pop_seg;
+
+    case 0x1e: /* push %%ds */
+        src.val = x86_seg_ds;
+        goto push_seg;
+
+    case 0x1f: /* pop %%ds */
+        src.val = x86_seg_ds;
+        goto pop_seg;
+
     case 0x27: /* daa */ {
         uint8_t al = _regs.eax;
         unsigned long eflags = _regs.eflags;
@@ -2066,6 +2198,18 @@ x86_emulate(
         break;
     }
 
+    case 0xea: /* jmp (far, absolute) */ {
+        uint16_t sel;
+        uint32_t eip;
+        generate_exception_if(mode_64bit(), EXC_UD);
+        eip = insn_fetch_bytes(op_bytes);
+        sel = insn_fetch_type(uint16_t);
+        if ( (rc = load_seg(x86_seg_cs, sel, ctxt, ops)) != 0 )
+            goto done;
+        _regs.eip = eip;
+        break;
+    }
+
     case 0xeb: /* jmp (short) */
         jmp_rel(insn_fetch_type(int8_t));
         break;
@@ -2252,6 +2396,51 @@ x86_emulate(
  twobyte_special_insn:
     switch ( b )
     {
+    case 0x01: /* Grp7 */ {
+        struct segment_register reg;
+
+        switch ( modrm_reg & 7 )
+        {
+        case 0: /* sgdt */
+        case 1: /* sidt */
+            generate_exception_if(ea.type != OP_MEM, EXC_UD);
+            fail_if(ops->read_segment == NULL);
+            if ( (rc = ops->read_segment((modrm_reg & 1) ?
+                                         x86_seg_idtr : x86_seg_gdtr,
+                                         &reg, ctxt)) )
+                goto done;
+            if ( op_bytes == 2 )
+                reg.base &= 0xffffff;
+            if ( (rc = ops->write(ea.mem.seg, ea.mem.off+0,
+                                  reg.limit, 2, ctxt)) ||
+                 (rc = ops->write(ea.mem.seg, ea.mem.off+2,
+                                  reg.base, mode_64bit() ? 8 : 4, ctxt)) )
+                goto done;
+            break;
+        case 2: /* lgdt */
+        case 3: /* lidt */
+            generate_exception_if(ea.type != OP_MEM, EXC_UD);
+            fail_if(ops->write_segment == NULL);
+            memset(&reg, 0, sizeof(reg));
+            if ( (rc = ops->read(ea.mem.seg, ea.mem.off+0,
+                                 (unsigned long *)&reg.limit, 2, ctxt)) ||
+                 (rc = ops->read(ea.mem.seg, ea.mem.off+2,
+                                 (unsigned long *)&reg.base,
+                                 mode_64bit() ? 8 : 4, ctxt)) )
+                goto done;
+            if ( op_bytes == 2 )
+                reg.base &= 0xffffff;
+            if ( (rc = ops->write_segment((modrm_reg & 1) ?
+                                          x86_seg_idtr : x86_seg_gdtr,
+                                          &reg, ctxt)) )
+                goto done;
+            break;
+        default:
+            goto cannot_emulate;
+        }
+        break;
+    }
+
     case 0x06: /* clts */
         generate_exception_if(!mode_ring0(), EXC_GP);
         fail_if((ops->read_cr == NULL) || (ops->write_cr == NULL));
@@ -2340,6 +2529,22 @@ x86_emulate(
             jmp_rel(rel);
         break;
     }
+
+    case 0xa0: /* push %%fs */
+        src.val = x86_seg_fs;
+        goto push_seg;
+
+    case 0xa1: /* pop %%fs */
+        src.val = x86_seg_fs;
+        goto pop_seg;
+
+    case 0xa8: /* push %%gs */
+        src.val = x86_seg_gs;
+        goto push_seg;
+
+    case 0xa9: /* pop %%gs */
+        src.val = x86_seg_gs;
+        goto pop_seg;
 
     case 0xc7: /* Grp9 (cmpxchg8b) */
 #if defined(__i386__)

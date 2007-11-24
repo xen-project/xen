@@ -304,7 +304,7 @@ enum VMEXIT_EXITCODE
 };
 
 /* Definition of segment state is borrowed by the generic HVM code. */
-typedef segment_register_t svm_segment_register_t;
+typedef struct segment_register svm_segment_register_t;
 
 typedef union 
 {
