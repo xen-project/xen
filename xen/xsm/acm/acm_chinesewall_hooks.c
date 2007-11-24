@@ -547,7 +547,7 @@ static int _chwall_pre_domain_create(void *subject_ssid, ssidref_t ssidref)
 
 static void _chwall_post_domain_create(domid_t domid, ssidref_t ssidref)
 {
-    int i, j;
+    int i;
     ssidref_t chwall_ssidref;
 
     chwall_ssidref = GET_SSIDREF(ACM_CHINESE_WALL_POLICY, ssidref);
@@ -556,48 +556,6 @@ static void _chwall_post_domain_create(domid_t domid, ssidref_t ssidref)
         chwall_bin_pol.running_types[i] +=
             chwall_bin_pol.ssidrefs[chwall_ssidref *
                                    chwall_bin_pol.max_types + i];
-    if ( domid )
-        return;
-
-    /* Xen does not call pre-create hook for DOM0;
-     * to consider type conflicts of any domain with DOM0, we need
-     * to adjust the conflict_aggregate for DOM0 here the same way it
-     * is done for non-DOM0 domains in the pre-hook */
-    printkd("%s: adjusting security state for DOM0 (ssidref=%x, chwall_ssidref=%x).\n",
-            __func__, ssidref, chwall_ssidref);
-
-    /* chinese wall conflict set adjustment (so that other
-     *      other domains simultaneously created are evaluated against this new set)*/
-    for ( i = 0; i < chwall_bin_pol.max_conflictsets; i++ )
-    {
-        int common = 0;
-        /* check if conflict_set_i and ssidref have common types */
-        for ( j = 0; j < chwall_bin_pol.max_types; j++ )
-            if ( chwall_bin_pol.
-                 conflict_sets[i * chwall_bin_pol.max_types + j]
-                 && chwall_bin_pol.ssidrefs[chwall_ssidref *
-                                            chwall_bin_pol.max_types + j] )
-            {
-                common = 1;
-                break;
-            }
-
-        if ( common == 0 )
-        {
-            /* try next conflict set */
-            continue;
-        }
-
-        /* now add types of the conflict set to conflict_aggregate_set
-           (except types in chwall_ssidref) */
-        for ( j = 0; j < chwall_bin_pol.max_types; j++ )
-            if ( chwall_bin_pol.
-                 conflict_sets[i * chwall_bin_pol.max_types + j]
-                 && !chwall_bin_pol.ssidrefs[chwall_ssidref *
-                                             chwall_bin_pol.max_types + j] )
-                chwall_bin_pol.conflict_aggregate_set[j]++;
-    }
-    return;
 }
 
 
