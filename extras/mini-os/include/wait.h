@@ -58,13 +58,16 @@ static inline void remove_wait_queue(struct wait_queue *q)
 
 static inline void wake_up(struct wait_queue_head *head)
 {
+    unsigned long flags;
     struct list_head *tmp, *next;
+    local_irq_save(flags);
     list_for_each_safe(tmp, next, &head->thread_list)
     {
          struct wait_queue *curr;
          curr = list_entry(tmp, struct wait_queue, thread_list);
          wake(curr->thread);
     }
+    local_irq_restore(flags);
 }
 
 #define add_waiter(w, wq) do {  \
