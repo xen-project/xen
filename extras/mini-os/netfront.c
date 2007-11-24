@@ -13,6 +13,7 @@
 #include <gnttab.h>
 #include <xmalloc.h>
 #include <time.h>
+#include <semaphore.h>
 
 void init_rx_buffers(void);
 
@@ -48,6 +49,7 @@ char* xenbus_printf(xenbus_transaction_t xbt,
 
 unsigned short rx_freelist[NET_RX_RING_SIZE];
 unsigned short tx_freelist[NET_TX_RING_SIZE];
+__DECLARE_SEMAPHORE_GENERIC(tx_sem, NET_TX_RING_SIZE);
 
 struct net_buffer {
     void* page;
@@ -188,6 +190,7 @@ void network_tx_buf_gc(void)
             buf->gref=GRANT_INVALID_REF;
 
             add_id_to_freelist(id,tx_freelist);
+            up(&tx_sem);
         }
 
         np->tx.rsp_cons = prod;
@@ -422,16 +425,23 @@ void init_rx_buffers(void)
 void netfront_xmit(unsigned char* data,int len)
 {
     int flags;
-    local_irq_save(flags);
-
     struct net_info* info = &net_info;
     struct netif_tx_request *tx;
-    RING_IDX i = info->tx.req_prod_pvt;
+    RING_IDX i;
     int notify;
-    int id = get_id_from_freelist(tx_freelist);
-    struct net_buffer* buf = &tx_buffers[id];
-    void* page = buf->page;
+    int id;
+    struct net_buffer* buf;
+    void* page;
 
+    down(&tx_sem);
+
+    local_irq_save(flags);
+
+    id = get_id_from_freelist(tx_freelist);
+    buf = &tx_buffers[id];
+    page = buf->page;
+
+    i = info->tx.req_prod_pvt;
     tx = RING_GET_REQUEST(&info->tx, i);
 
     memcpy(page,data,len);
