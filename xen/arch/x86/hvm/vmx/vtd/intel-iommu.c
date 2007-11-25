@@ -1464,7 +1464,7 @@ int iommu_map_page(struct domain *d, paddr_t gfn, paddr_t mfn)
     if ( !pg )
         return -ENOMEM;
     pte = (struct dma_pte *)map_domain_page(page_to_mfn(pg));
-    pte += mfn & LEVEL_MASK;
+    pte += gfn & LEVEL_MASK;
     dma_set_pte_addr(*pte, mfn << PAGE_SHIFT_4K);
     dma_set_pte_prot(*pte, DMA_PTE_READ | DMA_PTE_WRITE);
     iommu_flush_cache_entry(iommu, pte);
