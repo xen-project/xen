@@ -127,7 +127,7 @@ static uint8_t opcode_table[256] = {
     ImplicitOps, ImplicitOps, ImplicitOps, ImplicitOps,
     /* 0x98 - 0x9F */
     ImplicitOps, ImplicitOps, ImplicitOps, 0,
-    0, 0, ImplicitOps, ImplicitOps,
+    ImplicitOps, ImplicitOps, ImplicitOps, ImplicitOps,
     /* 0xA0 - 0xA7 */
     ByteOp|ImplicitOps|Mov, ImplicitOps|Mov,
     ByteOp|ImplicitOps|Mov, ImplicitOps|Mov,
@@ -265,17 +265,22 @@ struct operand {
 };
 
 /* EFLAGS bit definitions. */
-#define EFLG_VM (1<<17)
-#define EFLG_RF (1<<16)
-#define EFLG_OF (1<<11)
-#define EFLG_DF (1<<10)
-#define EFLG_IF (1<<9)
-#define EFLG_TF (1<<8)
-#define EFLG_SF (1<<7)
-#define EFLG_ZF (1<<6)
-#define EFLG_AF (1<<4)
-#define EFLG_PF (1<<2)
-#define EFLG_CF (1<<0)
+#define EFLG_VIP  (1<<20)
+#define EFLG_VIF  (1<<19)
+#define EFLG_AC   (1<<18)
+#define EFLG_VM   (1<<17)
+#define EFLG_RF   (1<<16)
+#define EFLG_NT   (1<<14)
+#define EFLG_IOPL (3<<12)
+#define EFLG_OF   (1<<11)
+#define EFLG_DF   (1<<10)
+#define EFLG_IF   (1<<9)
+#define EFLG_TF   (1<<8)
+#define EFLG_SF   (1<<7)
+#define EFLG_ZF   (1<<6)
+#define EFLG_AF   (1<<4)
+#define EFLG_PF   (1<<2)
+#define EFLG_CF   (1<<0)
 
 /* Exception definitions. */
 #define EXC_DE  0
@@ -2086,6 +2091,31 @@ x86_emulate(
         if ( (rc = load_seg(x86_seg_cs, sel, ctxt, ops)) != 0 )
             goto done;
         _regs.eip = eip;
+        break;
+    }
+
+    case 0x9c: /* pushf */
+        src.val = _regs.eflags;
+        goto push;
+
+    case 0x9d: /* popf */ {
+        uint32_t mask = EFLG_VIP | EFLG_VIF | EFLG_VM;
+        if ( !mode_iopl() )
+            mask |= EFLG_IOPL;
+        fail_if(ops->write_rflags == NULL);
+        /* 64-bit mode: POP defaults to a 64-bit operand. */
+        if ( mode_64bit() && (op_bytes == 4) )
+            op_bytes = 8;
+        if ( (rc = ops->read(x86_seg_ss, sp_post_inc(op_bytes),
+                             &dst.val, op_bytes, ctxt)) != 0 )
+            goto done;
+        if ( op_bytes == 2 )
+            dst.val = (uint16_t)dst.val | (_regs.eflags & 0xffff0000u);
+        dst.val &= 0x257fd5;
+        _regs.eflags &= mask;
+        _regs.eflags |= (uint32_t)(dst.val & ~mask) | 0x02;
+        if ( (rc = ops->write_rflags(_regs.eflags, ctxt)) != 0 )
+            goto done;
         break;
     }
 
