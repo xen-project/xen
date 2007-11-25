@@ -274,6 +274,17 @@ struct x86_emulate_ops
     /* wbinvd: Write-back and invalidate cache contents. */
     int (*wbinvd)(
         struct x86_emulate_ctxt *ctxt);
+
+    /* inject_hw_exception */
+    int (*inject_hw_exception)(
+        uint8_t vector,
+        struct x86_emulate_ctxt *ctxt);
+
+    /* inject_sw_interrupt */
+    int (*inject_sw_interrupt)(
+        uint8_t vector,
+        uint8_t insn_len,
+        struct x86_emulate_ctxt *ctxt);
 };
 
 struct cpu_user_regs;

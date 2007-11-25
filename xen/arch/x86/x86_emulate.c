@@ -149,7 +149,7 @@ static uint8_t opcode_table[256] = {
     ImplicitOps, ImplicitOps,
     0, 0, ByteOp|DstMem|SrcImm|ModRM|Mov, DstMem|SrcImm|ModRM|Mov,
     /* 0xC8 - 0xCF */
-    0, 0, 0, 0, 0, 0, 0, 0,
+    0, 0, 0, 0, ImplicitOps, ImplicitOps, ImplicitOps, 0,
     /* 0xD0 - 0xD7 */
     ByteOp|DstMem|SrcImplicit|ModRM, DstMem|SrcImplicit|ModRM, 
     ByteOp|DstMem|SrcImplicit|ModRM, DstMem|SrcImplicit|ModRM, 
@@ -163,7 +163,7 @@ static uint8_t opcode_table[256] = {
     ImplicitOps, ImplicitOps, ImplicitOps, ImplicitOps,
     ImplicitOps, ImplicitOps, ImplicitOps, ImplicitOps,
     /* 0xF0 - 0xF7 */
-    0, 0, 0, 0,
+    0, ImplicitOps, 0, 0,
     0, ImplicitOps, ByteOp|DstMem|SrcNone|ModRM, DstMem|SrcNone|ModRM,
     /* 0xF8 - 0xFF */
     ImplicitOps, ImplicitOps, ImplicitOps, ImplicitOps,
@@ -270,6 +270,7 @@ struct operand {
 #define EFLG_OF (1<<11)
 #define EFLG_DF (1<<10)
 #define EFLG_IF (1<<9)
+#define EFLG_TF (1<<8)
 #define EFLG_SF (1<<7)
 #define EFLG_ZF (1<<6)
 #define EFLG_AF (1<<4)
@@ -278,6 +279,9 @@ struct operand {
 
 /* Exception definitions. */
 #define EXC_DE  0
+#define EXC_DB  1
+#define EXC_BP  3
+#define EXC_OF  4
 #define EXC_BR  5
 #define EXC_UD  6
 #define EXC_GP 13
@@ -477,8 +481,13 @@ do {                                                    \
     if ( rc ) goto done;                                \
 } while (0)
 
-/* In future we will be able to generate arbitrary exceptions. */
-#define generate_exception_if(p, e) fail_if(p)
+#define generate_exception_if(p, e)                                     \
+({  if ( (p) ) {                                                        \
+        fail_if(ops->inject_hw_exception == NULL);                      \
+        rc = ops->inject_hw_exception(e, ctxt) ? : X86EMUL_EXCEPTION;   \
+        goto done;                                                      \
+    }                                                                   \
+})
 
 /* Given byte has even parity (even number of 1s)? */
 static int even_parity(uint8_t v)
@@ -1771,7 +1780,11 @@ x86_emulate(
     /* Commit shadow register state. */
     _regs.eflags &= ~EFLG_RF;
     *ctxt->regs = _regs;
-    /* FIXME generate_exception_if(_regs.eflags & EFLG_TF, EXC_DB); */
+
+    if ( (_regs.eflags & EFLG_TF) &&
+         (rc == X86EMUL_OKAY) &&
+         (ops->inject_hw_exception != NULL) )
+        rc = ops->inject_hw_exception(EXC_DB, ctxt) ? : X86EMUL_EXCEPTION;
 
  done:
     return rc;
@@ -2152,6 +2165,25 @@ x86_emulate(
         break;
     }
 
+    case 0xcc: /* int3 */
+        src.val = EXC_BP;
+        goto swint;
+
+    case 0xcd: /* int imm8 */
+        src.val = insn_fetch_type(uint8_t);
+    swint:
+        fail_if(ops->inject_sw_interrupt == NULL);
+        rc = ops->inject_sw_interrupt(src.val, _regs.eip - ctxt->regs->eip,
+                                      ctxt) ? : X86EMUL_EXCEPTION;
+        goto done;
+
+    case 0xce: /* into */
+        generate_exception_if(mode_64bit(), EXC_UD);
+        if ( !(_regs.eflags & EFLG_OF) )
+            break;
+        src.val = EXC_OF;
+        goto swint;
+
     case 0xd4: /* aam */ {
         unsigned int base = insn_fetch_type(uint8_t);
         uint8_t al = _regs.eax;
@@ -2291,6 +2323,10 @@ x86_emulate(
     case 0xeb: /* jmp (short) */
         jmp_rel(insn_fetch_type(int8_t));
         break;
+
+    case 0xf1: /* int1 (icebp) */
+        src.val = EXC_DB;
+        goto swint;
 
     case 0xf5: /* cmc */
         _regs.eflags ^= EFLG_CF;
