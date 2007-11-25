@@ -92,6 +92,10 @@ struct arch_vmx_struct {
     unsigned long        vmxassist_enabled:1;
     unsigned long        irqbase_mode:1;
     unsigned char        pm_irqbase[2];
+#else
+    bool_t               real_mode_io_in_progress;
+    bool_t               real_mode_io_completed;
+    unsigned long        real_mode_io_data;
 #endif
 };
 

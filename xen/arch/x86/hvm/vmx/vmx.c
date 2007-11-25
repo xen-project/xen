@@ -95,6 +95,7 @@ static int vmx_vcpu_initialise(struct vcpu *v)
 #ifndef VMXASSIST
     if ( v->vcpu_id == 0 )
         v->arch.guest_context.user_regs.eax = 1;
+    v->arch.hvm_vcpu.io_complete = vmx_realmode_io_complete;
 #endif
 
     return 0;

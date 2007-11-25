@@ -841,12 +841,16 @@ void hvm_io_assist(void)
     if ( p->state != STATE_IORESP_READY )
     {
         gdprintk(XENLOG_ERR, "Unexpected HVM iorequest state %d.\n", p->state);
-        domain_crash_synchronous();
+        domain_crash(v->domain);
+        goto out;
     }
 
     rmb(); /* see IORESP_READY /then/ read contents of ioreq */
 
     p->state = STATE_IOREQ_NONE;
+
+    if ( v->arch.hvm_vcpu.io_complete && v->arch.hvm_vcpu.io_complete() )
+        goto out;
 
     switch ( p->type )
     {

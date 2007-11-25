@@ -178,7 +178,24 @@ realmode_read_io(
     unsigned long *val,
     struct x86_emulate_ctxt *ctxt)
 {
-    return X86EMUL_UNHANDLEABLE;
+    struct vcpu *curr = current;
+
+    if ( curr->arch.hvm_vmx.real_mode_io_in_progress )
+        return X86EMUL_UNHANDLEABLE;
+
+    if ( !curr->arch.hvm_vmx.real_mode_io_completed )
+    {
+        curr->arch.hvm_vmx.real_mode_io_in_progress = 1;
+        send_pio_req(port, 1, bytes, 0, IOREQ_READ, 0, 0);
+    }
+
+    if ( !curr->arch.hvm_vmx.real_mode_io_completed )
+        return X86EMUL_UNHANDLEABLE;
+    
+    *val = curr->arch.hvm_vmx.real_mode_io_data;
+    curr->arch.hvm_vmx.real_mode_io_completed = 0;
+
+    return X86EMUL_OKAY;
 }
 
 static int realmode_write_io(
@@ -187,7 +204,15 @@ static int realmode_write_io(
     unsigned long val,
     struct x86_emulate_ctxt *ctxt)
 {
-    return X86EMUL_UNHANDLEABLE;
+    struct vcpu *curr = current;
+
+    if ( curr->arch.hvm_vmx.real_mode_io_in_progress )
+        return X86EMUL_UNHANDLEABLE;
+
+    curr->arch.hvm_vmx.real_mode_io_in_progress = 1;
+    send_pio_req(port, 1, bytes, val, IOREQ_WRITE, 0, 0);
+
+    return X86EMUL_OKAY;
 }
 
 static int
@@ -259,8 +284,19 @@ int vmx_realmode(struct cpu_user_regs *regs)
                  rm_ctxt.insn_buf[2], rm_ctxt.insn_buf[3],
                  rm_ctxt.insn_buf[4], rm_ctxt.insn_buf[5]);
 
-        if ( x86_emulate(&rm_ctxt.ctxt, &realmode_emulator_ops) )
-        {            
+        rc = x86_emulate(&rm_ctxt.ctxt, &realmode_emulator_ops);
+
+        if ( curr->arch.hvm_vmx.real_mode_io_in_progress )
+        {
+            ioreq_t *p = &get_ioreq(curr)->vp_ioreq;
+            gdprintk(XENLOG_DEBUG, "RM I/O %d %c addr=%lx data=%lx\n",
+                     p->type, p->dir ? 'R' : 'W', p->addr, p->data);
+            rc = 0;
+            break;
+        }
+
+        if ( rc )
+        {
             gdprintk(XENLOG_ERR, "Emulation failed\n");
             rc = -EINVAL;
             break;
@@ -271,4 +307,22 @@ int vmx_realmode(struct cpu_user_regs *regs)
         hvm_set_segment_register(curr, i, &rm_ctxt.seg_reg[i]);
 
     return rc;
+}
+
+int vmx_realmode_io_complete(void)
+{
+    struct vcpu *curr = current;
+    ioreq_t *p = &get_ioreq(curr)->vp_ioreq;
+
+    if ( !curr->arch.hvm_vmx.real_mode_io_in_progress )
+        return 0;
+
+    curr->arch.hvm_vmx.real_mode_io_in_progress = 0;
+    if ( p->dir == IOREQ_READ )
+    {
+        curr->arch.hvm_vmx.real_mode_io_completed = 1;
+        curr->arch.hvm_vmx.real_mode_io_data = p->data;
+    }
+
+    return 1;
 }

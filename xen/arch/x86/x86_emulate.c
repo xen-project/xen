@@ -264,6 +264,7 @@ struct operand {
 };
 
 /* EFLAGS bit definitions. */
+#define EFLG_VM (1<<17)
 #define EFLG_RF (1<<16)
 #define EFLG_OF (1<<11)
 #define EFLG_DF (1<<10)
@@ -478,10 +479,6 @@ do {                                                    \
 /* In future we will be able to generate arbitrary exceptions. */
 #define generate_exception_if(p, e) fail_if(p)
 
-/* To be done... */
-#define mode_ring0() (0)
-#define mode_iopl()  (0)
-
 /* Given byte has even parity (even number of 1s)? */
 static int even_parity(uint8_t v)
 {
@@ -678,6 +675,35 @@ test_cc(
     /* Odd condition identifiers (lsb == 1) have inverted sense. */
     return (!!rc ^ (condition & 1));
 }
+
+static int
+get_cpl(
+    struct x86_emulate_ctxt *ctxt,
+    struct x86_emulate_ops  *ops)
+{
+    struct segment_register reg;
+
+    if ( ctxt->regs->eflags & EFLG_VM )
+        return 3;
+
+    if ( (ops->read_segment == NULL) ||
+         ops->read_segment(x86_seg_ss, &reg, ctxt) )
+        return -1;
+
+    return reg.attr.fields.dpl;
+}
+
+static int
+_mode_iopl(
+    struct x86_emulate_ctxt *ctxt,
+    struct x86_emulate_ops  *ops)
+{
+    int cpl = get_cpl(ctxt, ops);
+    return ((cpl >= 0) && (cpl <= ((ctxt->regs->eflags >> 12) & 3)));
+}
+
+#define mode_ring0() (get_cpl(ctxt, ops) == 0)
+#define mode_iopl()  _mode_iopl(ctxt, ops)
 
 static int
 in_realmode(

@@ -59,6 +59,9 @@ struct hvm_vcpu {
     bool_t              flag_dr_dirty;
     bool_t              debug_state_latch;
 
+    /* Callback function for I/O completion. */
+    int                 (*io_complete)(void);
+
     union {
         struct arch_vmx_struct vmx;
         struct arch_svm_struct svm;
