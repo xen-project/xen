@@ -149,7 +149,7 @@ static uint8_t opcode_table[256] = {
     ImplicitOps, ImplicitOps,
     0, 0, ByteOp|DstMem|SrcImm|ModRM|Mov, DstMem|SrcImm|ModRM|Mov,
     /* 0xC8 - 0xCF */
-    0, 0, 0, 0, ImplicitOps, ImplicitOps, ImplicitOps, 0,
+    0, 0, 0, 0, ImplicitOps, ImplicitOps, ImplicitOps, ImplicitOps,
     /* 0xD0 - 0xD7 */
     ByteOp|DstMem|SrcImplicit|ModRM, DstMem|SrcImplicit|ModRM, 
     ByteOp|DstMem|SrcImplicit|ModRM, DstMem|SrcImplicit|ModRM, 
@@ -2213,6 +2213,33 @@ x86_emulate(
             break;
         src.val = EXC_OF;
         goto swint;
+
+    case 0xcf: /* iret */ {
+        unsigned long cs, eip, eflags;
+        uint32_t mask = EFLG_VIP | EFLG_VIF | EFLG_VM;
+        if ( !mode_iopl() )
+            mask |= EFLG_IOPL;
+        fail_if(!in_realmode(ctxt, ops));
+        fail_if(ops->write_rflags == NULL);
+        if ( (rc = ops->read(x86_seg_ss, sp_post_inc(op_bytes),
+                             &eip, op_bytes, ctxt)) ||
+             (rc = ops->read(x86_seg_ss, sp_post_inc(op_bytes),
+                             &cs, op_bytes, ctxt)) ||
+             (rc = ops->read(x86_seg_ss, sp_post_inc(op_bytes),
+                             &eflags, op_bytes, ctxt)) )
+            goto done;
+        if ( op_bytes == 2 )
+            eflags = (uint16_t)eflags | (_regs.eflags & 0xffff0000u);
+        eflags &= 0x257fd5;
+        _regs.eflags &= mask;
+        _regs.eflags |= (uint32_t)(eflags & ~mask) | 0x02;
+        if ( (rc = ops->write_rflags(_regs.eflags, ctxt)) != 0 )
+            goto done;
+        _regs.eip = eip;
+        if ( (rc = load_seg(x86_seg_cs, (uint16_t)cs, ctxt, ops)) != 0 )
+            goto done;
+        break;
+    }
 
     case 0xd4: /* aam */ {
         unsigned int base = insn_fetch_type(uint8_t);
