@@ -131,11 +131,13 @@ static uint8_t opcode_table[256] = {
     /* 0xA0 - 0xA7 */
     ByteOp|ImplicitOps|Mov, ImplicitOps|Mov,
     ByteOp|ImplicitOps|Mov, ImplicitOps|Mov,
-    ByteOp|ImplicitOps|Mov, ImplicitOps|Mov, 0, 0,
+    ByteOp|ImplicitOps|Mov, ImplicitOps|Mov,
+    ByteOp|ImplicitOps, ImplicitOps,
     /* 0xA8 - 0xAF */
     ByteOp|DstReg|SrcImm, DstReg|SrcImm,
     ByteOp|ImplicitOps|Mov, ImplicitOps|Mov,
-    ByteOp|ImplicitOps|Mov, ImplicitOps|Mov, 0, 0,
+    ByteOp|ImplicitOps|Mov, ImplicitOps|Mov,
+    ByteOp|ImplicitOps, ImplicitOps,
     /* 0xB0 - 0xB7 */
     ByteOp|DstReg|SrcImm|Mov, ByteOp|DstReg|SrcImm|Mov,
     ByteOp|DstReg|SrcImm|Mov, ByteOp|DstReg|SrcImm|Mov,
@@ -828,6 +830,8 @@ x86_emulate(
     uint8_t b, d, sib, sib_index, sib_base, twobyte = 0, rex_prefix = 0;
     uint8_t modrm, modrm_mod = 0, modrm_reg = 0, modrm_rm = 0;
     unsigned int op_bytes, def_op_bytes, ad_bytes, def_ad_bytes;
+#define REPE_PREFIX  1
+#define REPNE_PREFIX 2
     unsigned int lock_prefix = 0, rep_prefix = 0;
     int override_seg = -1, rc = X86EMUL_OKAY;
     struct operand src, dst;
@@ -882,8 +886,10 @@ x86_emulate(
             lock_prefix = 1;
             break;
         case 0xf2: /* REPNE/REPNZ */
+            rep_prefix = REPNE_PREFIX;
+            break;
         case 0xf3: /* REP/REPE/REPZ */
-            rep_prefix = 1;
+            rep_prefix = REPE_PREFIX;
             break;
         case 0x40 ... 0x4f: /* REX */
             if ( !mode_64bit() )
@@ -2161,6 +2167,27 @@ x86_emulate(
             _regs.edi, (_regs.eflags & EFLG_DF) ? -dst.bytes : dst.bytes);
         break;
 
+    case 0xa6 ... 0xa7: /* cmps */ {
+        unsigned long next_eip = _regs.eip;
+        handle_rep_prefix();
+        src.bytes = dst.bytes = (d & ByteOp) ? 1 : op_bytes;
+        if ( (rc = ops->read(ea.mem.seg, truncate_ea(_regs.esi),
+                             &dst.val, dst.bytes, ctxt)) ||
+             (rc = ops->read(x86_seg_es, truncate_ea(_regs.edi),
+                             &src.val, src.bytes, ctxt)) )
+            goto done;
+        register_address_increment(
+            _regs.esi, (_regs.eflags & EFLG_DF) ? -dst.bytes : dst.bytes);
+        register_address_increment(
+            _regs.edi, (_regs.eflags & EFLG_DF) ? -src.bytes : src.bytes);
+        /* cmp: dst - src ==> src=*%%edi,dst=*%%esi ==> *%%esi - *%%edi */
+        emulate_2op_SrcV("cmp", src, dst, _regs.eflags);
+        if ( ((rep_prefix == REPE_PREFIX) && !(_regs.eflags & EFLG_ZF)) ||
+             ((rep_prefix == REPNE_PREFIX) && (_regs.eflags & EFLG_ZF)) )
+            _regs.eip = next_eip;
+        break;
+    }
+
     case 0xaa ... 0xab: /* stos */
         handle_rep_prefix();
         dst.type  = OP_MEM;
@@ -2183,6 +2210,24 @@ x86_emulate(
         register_address_increment(
             _regs.esi, (_regs.eflags & EFLG_DF) ? -dst.bytes : dst.bytes);
         break;
+
+    case 0xae ... 0xaf: /* scas */ {
+        unsigned long next_eip = _regs.eip;
+        handle_rep_prefix();
+        src.bytes = dst.bytes = (d & ByteOp) ? 1 : op_bytes;
+        dst.val = _regs.eax;
+        if ( (rc = ops->read(x86_seg_es, truncate_ea(_regs.edi),
+                             &src.val, src.bytes, ctxt)) != 0 )
+            goto done;
+        register_address_increment(
+            _regs.edi, (_regs.eflags & EFLG_DF) ? -src.bytes : src.bytes);
+        /* cmp: dst - src ==> src=*%%edi,dst=%%eax ==> %%eax - *%%edi */
+        emulate_2op_SrcV("cmp", src, dst, _regs.eflags);
+        if ( ((rep_prefix == REPE_PREFIX) && !(_regs.eflags & EFLG_ZF)) ||
+             ((rep_prefix == REPNE_PREFIX) && (_regs.eflags & EFLG_ZF)) )
+            _regs.eip = next_eip;
+        break;
+    }
 
     case 0xc2: /* ret imm16 (near) */
     case 0xc3: /* ret (near) */ {
