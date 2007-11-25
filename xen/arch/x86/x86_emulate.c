@@ -2253,16 +2253,13 @@ x86_emulate(
         break;
 
     case 0xfa: /* cli */
-        generate_exception_if(!mode_iopl(), EXC_GP);
-        fail_if(ops->write_rflags == NULL);
-        if ( (rc = ops->write_rflags(_regs.eflags & ~EFLG_IF, ctxt)) != 0 )
-            goto done;
-        break;
-
     case 0xfb: /* sti */
         generate_exception_if(!mode_iopl(), EXC_GP);
         fail_if(ops->write_rflags == NULL);
-        if ( (rc = ops->write_rflags(_regs.eflags | EFLG_IF, ctxt)) != 0 )
+        _regs.eflags &= ~EFLG_IF;
+        if ( b == 0xfb ) /* sti */
+            _regs.eflags |= EFLG_IF;
+        if ( (rc = ops->write_rflags(_regs.eflags, ctxt)) != 0 )
             goto done;
         break;
 

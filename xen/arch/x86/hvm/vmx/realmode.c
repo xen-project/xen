@@ -168,6 +168,14 @@ realmode_write_segment(
     struct realmode_emulate_ctxt *rm_ctxt =
         container_of(ctxt, struct realmode_emulate_ctxt, ctxt);
     memcpy(&rm_ctxt->seg_reg[seg], reg, sizeof(struct segment_register));
+
+    if ( seg == x86_seg_ss )
+    {
+        u32 intr_shadow = __vmread(GUEST_INTERRUPTIBILITY_INFO);
+        intr_shadow ^= VMX_INTR_SHADOW_MOV_SS;
+        __vmwrite(GUEST_INTERRUPTIBILITY_INFO, intr_shadow);
+    }
+
     return X86EMUL_OKAY;
 }
 
@@ -236,6 +244,20 @@ realmode_read_cr(
     return X86EMUL_OKAY;
 }
 
+static int realmode_write_rflags(
+    unsigned long val,
+    struct x86_emulate_ctxt *ctxt)
+{
+    if ( (val & X86_EFLAGS_IF) && !(ctxt->regs->eflags & X86_EFLAGS_IF) )
+    {
+        u32 intr_shadow = __vmread(GUEST_INTERRUPTIBILITY_INFO);
+        intr_shadow ^= VMX_INTR_SHADOW_STI;
+        __vmwrite(GUEST_INTERRUPTIBILITY_INFO, intr_shadow);
+    }
+
+    return X86EMUL_OKAY;
+}
+
 static struct x86_emulate_ops realmode_emulator_ops = {
     .read          = realmode_emulate_read,
     .insn_fetch    = realmode_emulate_insn_fetch,
@@ -245,7 +267,8 @@ static struct x86_emulate_ops realmode_emulator_ops = {
     .write_segment = realmode_write_segment,
     .read_io       = realmode_read_io,
     .write_io      = realmode_write_io,
-    .read_cr       = realmode_read_cr
+    .read_cr       = realmode_read_cr,
+    .write_rflags  = realmode_write_rflags
 };
 
 int vmx_realmode(struct cpu_user_regs *regs)
@@ -277,26 +300,22 @@ int vmx_realmode(struct cpu_user_regs *regs)
                  rm_ctxt.insn_buf, addr, sizeof(rm_ctxt.insn_buf)))
             ? sizeof(rm_ctxt.insn_buf) : 0;
 
-        gdprintk(XENLOG_DEBUG,
-                 "RM %04x:%08lx: %02x %02x %02x %02x %02x %02x\n",
-                 rm_ctxt.seg_reg[x86_seg_cs].sel, regs->eip,
-                 rm_ctxt.insn_buf[0], rm_ctxt.insn_buf[1],
-                 rm_ctxt.insn_buf[2], rm_ctxt.insn_buf[3],
-                 rm_ctxt.insn_buf[4], rm_ctxt.insn_buf[5]);
-
         rc = x86_emulate(&rm_ctxt.ctxt, &realmode_emulator_ops);
 
         if ( curr->arch.hvm_vmx.real_mode_io_in_progress )
         {
-            ioreq_t *p = &get_ioreq(curr)->vp_ioreq;
-            gdprintk(XENLOG_DEBUG, "RM I/O %d %c addr=%lx data=%lx\n",
-                     p->type, p->dir ? 'R' : 'W', p->addr, p->data);
             rc = 0;
             break;
         }
 
         if ( rc )
         {
+            gdprintk(XENLOG_DEBUG,
+                     "RM %04x:%08lx: %02x %02x %02x %02x %02x %02x\n",
+                     rm_ctxt.seg_reg[x86_seg_cs].sel, rm_ctxt.insn_buf_eip,
+                     rm_ctxt.insn_buf[0], rm_ctxt.insn_buf[1],
+                     rm_ctxt.insn_buf[2], rm_ctxt.insn_buf[3],
+                     rm_ctxt.insn_buf[4], rm_ctxt.insn_buf[5]);
             gdprintk(XENLOG_ERR, "Emulation failed\n");
             rc = -EINVAL;
             break;
@@ -316,6 +335,12 @@ int vmx_realmode_io_complete(void)
 
     if ( !curr->arch.hvm_vmx.real_mode_io_in_progress )
         return 0;
+
+#if 0
+    gdprintk(XENLOG_DEBUG, "RM I/O %d %c bytes=%d addr=%lx data=%lx\n",
+             p->type, p->dir ? 'R' : 'W',
+             (int)p->size, (long)p->addr, (long)p->data);
+#endif
 
     curr->arch.hvm_vmx.real_mode_io_in_progress = 0;
     if ( p->dir == IOREQ_READ )
