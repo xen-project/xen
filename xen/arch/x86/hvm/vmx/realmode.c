@@ -108,8 +108,39 @@ realmode_read(
     struct realmode_emulate_ctxt *rm_ctxt)
 {
     uint32_t addr = rm_ctxt->seg_reg[seg].base + offset;
+    int todo;
+
     *val = 0;
-    (void)hvm_copy_from_guest_phys(val, addr, bytes);
+    todo = hvm_copy_from_guest_phys(val, addr, bytes);
+
+    if ( todo )
+    {
+        struct vcpu *curr = current;
+
+        if ( todo != bytes )
+        {
+            gdprintk(XENLOG_WARNING, "RM: Partial read at %08x (%d/%d)\n",
+                     addr, todo, bytes);
+            return X86EMUL_UNHANDLEABLE;
+        }
+
+        if ( curr->arch.hvm_vmx.real_mode_io_in_progress )
+            return X86EMUL_UNHANDLEABLE;
+
+        if ( !curr->arch.hvm_vmx.real_mode_io_completed )
+        {
+            curr->arch.hvm_vmx.real_mode_io_in_progress = 1;
+            send_mmio_req(IOREQ_TYPE_COPY, addr, 1, bytes,
+                          0, IOREQ_READ, 0, 0);
+        }
+
+        if ( !curr->arch.hvm_vmx.real_mode_io_completed )
+            return X86EMUL_UNHANDLEABLE;
+
+        *val = curr->arch.hvm_vmx.real_mode_io_data;
+        curr->arch.hvm_vmx.real_mode_io_completed = 0;
+    }
+
     return X86EMUL_OKAY;
 }
 
@@ -161,7 +192,29 @@ realmode_emulate_write(
     struct realmode_emulate_ctxt *rm_ctxt =
         container_of(ctxt, struct realmode_emulate_ctxt, ctxt);
     uint32_t addr = rm_ctxt->seg_reg[seg].base + offset;
-    (void)hvm_copy_to_guest_phys(addr, &val, bytes);
+    int todo;
+
+    todo = hvm_copy_to_guest_phys(addr, &val, bytes);
+
+    if ( todo )
+    {
+        struct vcpu *curr = current;
+
+        if ( todo != bytes )
+        {
+            gdprintk(XENLOG_WARNING, "RM: Partial write at %08x (%d/%d)\n",
+                     addr, todo, bytes);
+            return X86EMUL_UNHANDLEABLE;
+        }
+
+        if ( curr->arch.hvm_vmx.real_mode_io_in_progress )
+            return X86EMUL_UNHANDLEABLE;
+
+        curr->arch.hvm_vmx.real_mode_io_in_progress = 1;
+        send_mmio_req(IOREQ_TYPE_COPY, addr, 1, bytes,
+                      val, IOREQ_WRITE, 0, 0);
+    }
+
     return X86EMUL_OKAY;
 }
 
@@ -243,6 +296,12 @@ static int realmode_write_io(
     struct x86_emulate_ctxt *ctxt)
 {
     struct vcpu *curr = current;
+
+    if ( port == 0xe9 )
+    {
+        hvm_print_line(curr, val);
+        return X86EMUL_OKAY;
+    }
 
     if ( curr->arch.hvm_vmx.real_mode_io_in_progress )
         return X86EMUL_UNHANDLEABLE;

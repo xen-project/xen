@@ -885,9 +885,9 @@ void send_pio_req(unsigned long port, unsigned long count, int size,
     hvm_send_assist_req(v);
 }
 
-static void send_mmio_req(unsigned char type, unsigned long gpa,
-                          unsigned long count, int size, paddr_t value,
-                          int dir, int df, int value_is_ptr)
+void send_mmio_req(unsigned char type, unsigned long gpa,
+                   unsigned long count, int size, paddr_t value,
+                   int dir, int df, int value_is_ptr)
 {
     struct vcpu *v = current;
     vcpu_iodata_t *vio;
