@@ -126,7 +126,8 @@ static uint8_t opcode_table[256] = {
     ImplicitOps, ImplicitOps, ImplicitOps, ImplicitOps,
     ImplicitOps, ImplicitOps, ImplicitOps, ImplicitOps,
     /* 0x98 - 0x9F */
-    ImplicitOps, ImplicitOps, 0, 0, 0, 0, ImplicitOps, ImplicitOps,
+    ImplicitOps, ImplicitOps, ImplicitOps, 0,
+    0, 0, ImplicitOps, ImplicitOps,
     /* 0xA0 - 0xA7 */
     ByteOp|ImplicitOps|Mov, ImplicitOps|Mov,
     ByteOp|ImplicitOps|Mov, ImplicitOps|Mov,
@@ -1687,6 +1688,33 @@ x86_emulate(
             if ( (modrm_reg & 7) == 2 )
                 goto push; /* call */
             break;
+        case 3: /* call (far, absolute indirect) */
+        case 5: /* jmp (far, absolute indirect) */ {
+            unsigned long sel, eip = dst.val;
+
+            if ( (rc = ops->read(dst.mem.seg, dst.mem.off+dst.bytes,
+                                 &sel, 2, ctxt)) )
+                goto done;
+
+            if ( (modrm_reg & 7) == 3 ) /* call */
+            {
+                struct segment_register reg;
+                fail_if(ops->read_segment == NULL);
+                if ( (rc = ops->read_segment(x86_seg_cs, &reg, ctxt)) ||
+                     (rc = ops->write(x86_seg_ss, sp_pre_dec(op_bytes),
+                                      reg.sel, op_bytes, ctxt)) ||
+                     (rc = ops->write(x86_seg_ss, sp_pre_dec(op_bytes),
+                                      _regs.eip, op_bytes, ctxt)) )
+                    goto done;
+            }
+
+            if ( (rc = load_seg(x86_seg_cs, sel, ctxt, ops)) != 0 )
+                goto done;
+            _regs.eip = eip;
+
+            dst.type = OP_NONE;
+            break;
+        }
         case 6: /* push */
             /* 64-bit mode: PUSH defaults to a 64-bit operand. */
             if ( mode_64bit() && (dst.bytes == 4) )
@@ -2023,6 +2051,30 @@ x86_emulate(
             break;
         }
         break;
+
+    case 0x9a: /* call (far, absolute) */ {
+        struct segment_register reg;
+        uint16_t sel;
+        uint32_t eip;
+
+        fail_if(ops->read_segment == NULL);
+        generate_exception_if(mode_64bit(), EXC_UD);
+
+        eip = insn_fetch_bytes(op_bytes);
+        sel = insn_fetch_type(uint16_t);
+
+        if ( (rc = ops->read_segment(x86_seg_cs, &reg, ctxt)) ||
+             (rc = ops->write(x86_seg_ss, sp_pre_dec(op_bytes),
+                              reg.sel, op_bytes, ctxt)) ||
+             (rc = ops->write(x86_seg_ss, sp_pre_dec(op_bytes),
+                              _regs.eip, op_bytes, ctxt)) )
+            goto done;
+
+        if ( (rc = load_seg(x86_seg_cs, sel, ctxt, ops)) != 0 )
+            goto done;
+        _regs.eip = eip;
+        break;
+    }
 
     case 0x9e: /* sahf */
         *(uint8_t *)_regs.eflags = (((uint8_t *)&_regs.eax)[1] & 0xd7) | 0x02;
