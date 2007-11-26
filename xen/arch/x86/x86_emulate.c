@@ -2666,6 +2666,7 @@ x86_emulate(
     {
     case 0x01: /* Grp7 */ {
         struct segment_register reg;
+        unsigned long base, limit, cr0, cr0w;
 
         switch ( modrm_reg & 7 )
         {
@@ -2691,16 +2692,40 @@ x86_emulate(
             fail_if(ops->write_segment == NULL);
             memset(&reg, 0, sizeof(reg));
             if ( (rc = ops->read(ea.mem.seg, ea.mem.off+0,
-                                 (unsigned long *)&reg.limit, 2, ctxt)) ||
+                                 &limit, 2, ctxt)) ||
                  (rc = ops->read(ea.mem.seg, ea.mem.off+2,
-                                 (unsigned long *)&reg.base,
-                                 mode_64bit() ? 8 : 4, ctxt)) )
+                                 &base, mode_64bit() ? 8 : 4, ctxt)) )
                 goto done;
+            reg.base = base;
+            reg.limit = limit;
             if ( op_bytes == 2 )
                 reg.base &= 0xffffff;
             if ( (rc = ops->write_segment((modrm_reg & 1) ?
                                           x86_seg_idtr : x86_seg_gdtr,
                                           &reg, ctxt)) )
+                goto done;
+            break;
+        case 4: /* smsw */
+            dst = ea;
+            dst.bytes = 2;
+            fail_if(ops->read_cr == NULL);
+            if ( (rc = ops->read_cr(0, &dst.val, ctxt)) )
+                goto done;
+            d |= Mov; /* force writeback */
+            break;
+        case 6: /* lmsw */
+            fail_if(ops->read_cr == NULL);
+            fail_if(ops->write_cr == NULL);
+            if ( (rc = ops->read_cr(0, &cr0, ctxt)) )
+                goto done;
+            if ( ea.type == OP_REG )
+                cr0w = *ea.reg;
+            else if ( (rc = ops->read(ea.mem.seg, ea.mem.off,
+                                      &cr0w, 2, ctxt)) )
+                goto done;
+            cr0 &= 0xffff0000;
+            cr0 |= (uint16_t)cr0w;
+            if ( (rc = ops->write_cr(0, cr0, ctxt)) )
                 goto done;
             break;
         default:
