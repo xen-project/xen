@@ -35,6 +35,7 @@
 #include <asm/vmx_mm_def.h>
 #include <asm/vmx.h>
 #include <asm/vmx_phy_mode.h>
+#include <asm/debugger.h>
 
 /**************************************************************************
  VCPU general register access routines

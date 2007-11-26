@@ -40,6 +40,7 @@
 #include <xen/sched.h>
 #include <xen/softirq.h>
 #include <xen/gdbstub.h>
+#include <public/arch-ia64/debug_op.h>
 
 void show_registers(struct cpu_user_regs *regs);
 void dump_stack(void);

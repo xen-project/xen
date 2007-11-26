@@ -32,6 +32,7 @@
 #include <public/callback.h>
 #include <xen/event.h>
 #include <xen/perfc.h>
+#include <public/arch-ia64/debug_op.h>
 
 extern long do_physdev_op(int cmd, XEN_GUEST_HANDLE(void) arg);
 extern long do_callback_op(int cmd, XEN_GUEST_HANDLE(void) arg);
