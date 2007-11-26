@@ -149,7 +149,8 @@ static uint8_t opcode_table[256] = {
     /* 0xC0 - 0xC7 */
     ByteOp|DstMem|SrcImm|ModRM, DstMem|SrcImmByte|ModRM,
     ImplicitOps, ImplicitOps,
-    0, 0, ByteOp|DstMem|SrcImm|ModRM|Mov, DstMem|SrcImm|ModRM|Mov,
+    DstReg|SrcMem|ModRM|Mov, DstReg|SrcMem|ModRM|Mov,
+    ByteOp|DstMem|SrcImm|ModRM|Mov, DstMem|SrcImm|ModRM|Mov,
     /* 0xC8 - 0xCF */
     0, 0, 0, 0, ImplicitOps, ImplicitOps, ImplicitOps, ImplicitOps,
     /* 0xD0 - 0xD7 */
@@ -230,8 +231,9 @@ static uint8_t twobyte_table[256] = {
     0, 0, 0, DstReg|SrcMem|ModRM,
     /* 0xB0 - 0xB7 */
     ByteOp|DstMem|SrcReg|ModRM, DstMem|SrcReg|ModRM,
-    0, DstBitBase|SrcReg|ModRM,
-    0, 0, ByteOp|DstReg|SrcMem|ModRM|Mov, DstReg|SrcMem16|ModRM|Mov,
+    DstReg|SrcMem|ModRM|Mov, DstBitBase|SrcReg|ModRM,
+    DstReg|SrcMem|ModRM|Mov, DstReg|SrcMem|ModRM|Mov,
+    ByteOp|DstReg|SrcMem|ModRM|Mov, DstReg|SrcMem16|ModRM|Mov,
     /* 0xB8 - 0xBF */
     0, 0, DstBitBase|SrcImmByte|ModRM, DstBitBase|SrcReg|ModRM,
     DstReg|SrcMem|ModRM, DstReg|SrcMem|ModRM,
@@ -1470,6 +1472,24 @@ x86_emulate(
         }
         break;
 
+    case 0xc4: /* les */ {
+        unsigned long sel;
+        dst.val = x86_seg_es;
+    les:
+        generate_exception_if(src.type != OP_MEM, EXC_UD);
+        if ( (rc = ops->read(src.mem.seg, src.mem.off + src.bytes,
+                             &sel, 2, ctxt)) != 0 )
+            goto done;
+        if ( (rc = load_seg(dst.val, (uint16_t)sel, ctxt, ops)) != 0 )
+            goto done;
+        dst.val = src.val;
+        break;
+    }
+
+    case 0xc5: /* lds */
+        dst.val = x86_seg_ds;
+        goto les;
+
     case 0xd0 ... 0xd1: /* Grp2 */
         src.val = 1;
         goto grp2;
@@ -2535,6 +2555,18 @@ x86_emulate(
         }
         }
         break;
+
+    case 0xb2: /* lss */
+        dst.val = x86_seg_ss;
+        goto les;
+
+    case 0xb4: /* lfs */
+        dst.val = x86_seg_fs;
+        goto les;
+
+    case 0xb5: /* lgs */
+        dst.val = x86_seg_gs;
+        goto les;
 
     case 0xb6: /* movzx rm8,r{16,32,64} */
         /* Recompute DstReg as we may have decoded AH/BH/CH/DH. */
