@@ -523,14 +523,13 @@ void vmx_realmode(struct cpu_user_regs *regs)
 
         if ( rc == X86EMUL_UNHANDLEABLE )
         {
-            gdprintk(XENLOG_DEBUG,
+            gdprintk(XENLOG_ERR,
                      "Real-mode emulation failed @ %04x:%08lx: "
                      "%02x %02x %02x %02x %02x %02x\n",
                      rm_ctxt.seg_reg[x86_seg_cs].sel, rm_ctxt.insn_buf_eip,
                      rm_ctxt.insn_buf[0], rm_ctxt.insn_buf[1],
                      rm_ctxt.insn_buf[2], rm_ctxt.insn_buf[3],
                      rm_ctxt.insn_buf[4], rm_ctxt.insn_buf[5]);
-            gdprintk(XENLOG_ERR, "Emulation failed\n");
             domain_crash_synchronous();
         }
     }
