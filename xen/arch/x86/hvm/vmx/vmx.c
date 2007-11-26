@@ -1055,10 +1055,7 @@ static void vmx_update_guest_cr(struct vcpu *v, unsigned int cr)
 
         v->arch.hvm_vcpu.hw_cr[0] =
             v->arch.hvm_vcpu.guest_cr[0] |
-            X86_CR0_NE | X86_CR0_PG | X86_CR0_WP;
-#ifdef VMXASSIST
-        v->arch.hvm_vcpu.hw_cr[0] |= X86_CR0_PE;
-#endif
+            X86_CR0_NE | X86_CR0_PG | X86_CR0_WP | X86_CR0_PE;
         __vmwrite(GUEST_CR0, v->arch.hvm_vcpu.hw_cr[0]);
         __vmwrite(CR0_READ_SHADOW, v->arch.hvm_vcpu.guest_cr[0]);
         break;
@@ -1254,10 +1251,11 @@ static void vmx_do_no_device_fault(void)
 }
 
 #define bitmaskof(idx)  (1U << ((idx) & 31))
-static void vmx_do_cpuid(struct cpu_user_regs *regs)
+void vmx_cpuid_intercept(
+    unsigned int *eax, unsigned int *ebx,
+    unsigned int *ecx, unsigned int *edx)
 {
-    unsigned int input = regs->eax;
-    unsigned int eax, ebx, ecx, edx;
+    unsigned int input = *eax;
 
 #ifdef VMXASSIST
     if ( input == 0x40000003 )
@@ -1266,7 +1264,7 @@ static void vmx_do_cpuid(struct cpu_user_regs *regs)
          * NB. Unsupported interface for private use of VMXASSIST only.
          * Note that this leaf lives at <max-hypervisor-leaf> + 1.
          */
-        u64 value = ((u64)regs->edx << 32) | (u32)regs->ecx;
+        u64 value = ((u64)*edx << 32) | (u32)*ecx;
         p2m_type_t p2mt;
         unsigned long mfn;
         struct vcpu *v = current;
@@ -1290,58 +1288,70 @@ static void vmx_do_cpuid(struct cpu_user_regs *regs)
         unmap_domain_page(p);
 
         gdprintk(XENLOG_INFO, "Output value is 0x%"PRIx64".\n", value);
-        regs->ecx = (u32)value;
-        regs->edx = (u32)(value >> 32);
+        *ecx = (u32)value;
+        *edx = (u32)(value >> 32);
         return;
     }
 #endif
 
-    hvm_cpuid(input, &eax, &ebx, &ecx, &edx);
+    hvm_cpuid(input, eax, ebx, ecx, edx);
 
     switch ( input )
     {
     case 0x00000001:
-        ecx &= ~VMX_VCPU_CPUID_L1_ECX_RESERVED;
-        ebx &= NUM_THREADS_RESET_MASK;
-        ecx &= ~(bitmaskof(X86_FEATURE_VMXE) |
-                 bitmaskof(X86_FEATURE_EST)  |
-                 bitmaskof(X86_FEATURE_TM2)  |
-                 bitmaskof(X86_FEATURE_CID)  |
-                 bitmaskof(X86_FEATURE_PDCM) |
-                 bitmaskof(X86_FEATURE_DSCPL));
-        edx &= ~(bitmaskof(X86_FEATURE_HT)   |
-                 bitmaskof(X86_FEATURE_ACPI) |
-                 bitmaskof(X86_FEATURE_ACC)  |
-                 bitmaskof(X86_FEATURE_DS));
+        *ecx &= ~VMX_VCPU_CPUID_L1_ECX_RESERVED;
+        *ebx &= NUM_THREADS_RESET_MASK;
+        *ecx &= ~(bitmaskof(X86_FEATURE_VMXE) |
+                  bitmaskof(X86_FEATURE_EST)  |
+                  bitmaskof(X86_FEATURE_TM2)  |
+                  bitmaskof(X86_FEATURE_CID)  |
+                  bitmaskof(X86_FEATURE_PDCM) |
+                  bitmaskof(X86_FEATURE_DSCPL));
+        *edx &= ~(bitmaskof(X86_FEATURE_HT)   |
+                  bitmaskof(X86_FEATURE_ACPI) |
+                  bitmaskof(X86_FEATURE_ACC)  |
+                  bitmaskof(X86_FEATURE_DS));
         break;
 
     case 0x00000004:
-        cpuid_count(input, regs->ecx, &eax, &ebx, &ecx, &edx);
-        eax &= NUM_CORES_RESET_MASK;
+        cpuid_count(input, *ecx, eax, ebx, ecx, edx);
+        *eax &= NUM_CORES_RESET_MASK;
         break;
 
     case 0x00000006:
     case 0x00000009:
     case 0x0000000A:
-        eax = ebx = ecx = edx = 0;
+        *eax = *ebx = *ecx = *edx = 0;
         break;
 
     case 0x80000001:
         /* Only a few features are advertised in Intel's 0x80000001. */
-        ecx &= (bitmaskof(X86_FEATURE_LAHF_LM));
-        edx &= (bitmaskof(X86_FEATURE_NX) |
-                bitmaskof(X86_FEATURE_LM) |
-                bitmaskof(X86_FEATURE_SYSCALL));
+        *ecx &= (bitmaskof(X86_FEATURE_LAHF_LM));
+        *edx &= (bitmaskof(X86_FEATURE_NX) |
+                 bitmaskof(X86_FEATURE_LM) |
+                 bitmaskof(X86_FEATURE_SYSCALL));
         break;
     }
+
+    HVMTRACE_3D(CPUID, current, input,
+                ((uint64_t)*eax << 32) | *ebx, ((uint64_t)*ecx << 32) | *edx);
+}
+
+static void vmx_do_cpuid(struct cpu_user_regs *regs)
+{
+    unsigned int eax, ebx, ecx, edx;
+
+    eax = regs->eax;
+    ebx = regs->ebx;
+    ecx = regs->ecx;
+    edx = regs->edx;
+
+    vmx_cpuid_intercept(&eax, &ebx, &ecx, &edx);
 
     regs->eax = eax;
     regs->ebx = ebx;
     regs->ecx = ecx;
     regs->edx = edx;
-
-    HVMTRACE_3D(CPUID, current, input,
-                ((uint64_t)eax << 32) | ebx, ((uint64_t)ecx << 32) | edx);
 }
 
 #define CASE_GET_REG_P(REG, reg)    \
@@ -2696,19 +2706,22 @@ static void wbinvd_ipi(void *info)
     wbinvd();
 }
 
+void vmx_wbinvd_intercept(void)
+{
+    if ( list_empty(&(domain_hvm_iommu(current->domain)->pdev_list)) )
+        return;
+
+    if ( cpu_has_wbinvd_exiting )
+        on_each_cpu(wbinvd_ipi, NULL, 1, 1);
+    else
+        wbinvd();
+}
+
 static void vmx_failed_vmentry(unsigned int exit_reason,
                                struct cpu_user_regs *regs)
 {
     unsigned int failed_vmentry_reason = (uint16_t)exit_reason;
     unsigned long exit_qualification = __vmread(EXIT_QUALIFICATION);
-
-#ifndef VMXASSIST
-    if ( (failed_vmentry_reason == EXIT_REASON_INVALID_GUEST_STATE) &&
-         (exit_qualification == 0) &&
-         !(current->arch.hvm_vcpu.hw_cr[0] & X86_CR0_PE) &&
-         (vmx_realmode(regs) == 0) )
-        return;
-#endif
 
     printk("Failed vm entry (exit reason 0x%x) ", exit_reason);
     switch ( failed_vmentry_reason )
@@ -2976,24 +2989,7 @@ asmlinkage void vmx_vmexit_handler(struct cpu_user_regs *regs)
     {
         inst_len = __get_instruction_length(); /* Safe: INVD, WBINVD */
         __update_guest_eip(inst_len);
-        if ( !list_empty(&(domain_hvm_iommu(v->domain)->pdev_list)) )
-        {
-            if ( cpu_has_wbinvd_exiting )
-            {
-                on_each_cpu(wbinvd_ipi, NULL, 1, 1);
-            }
-            else
-            {
-                wbinvd();
-                /* Disable further WBINVD intercepts. */
-                if ( (exit_reason == EXIT_REASON_WBINVD) &&
-                     (vmx_cpu_based_exec_control &
-                      CPU_BASED_ACTIVATE_SECONDARY_CONTROLS) )
-                    __vmwrite(SECONDARY_VM_EXEC_CONTROL,
-                              vmx_secondary_exec_control &
-                              ~SECONDARY_EXEC_WBINVD_EXITING);
-            }
-        }
+        vmx_wbinvd_intercept();
         break;
     }
 

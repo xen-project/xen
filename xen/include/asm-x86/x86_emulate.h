@@ -275,6 +275,18 @@ struct x86_emulate_ops
     int (*wbinvd)(
         struct x86_emulate_ctxt *ctxt);
 
+    /* cpuid: Emulate CPUID via given set of EAX-EDX inputs/outputs. */
+    int (*cpuid)(
+        unsigned int *eax,
+        unsigned int *ebx,
+        unsigned int *ecx,
+        unsigned int *edx,
+        struct x86_emulate_ctxt *ctxt);
+
+    /* hlt: Emulate HLT. */
+    int (*hlt)(
+        struct x86_emulate_ctxt *ctxt);
+
     /* inject_hw_exception */
     int (*inject_hw_exception)(
         uint8_t vector,

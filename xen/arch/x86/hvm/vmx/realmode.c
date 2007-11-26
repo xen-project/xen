@@ -29,6 +29,16 @@ struct realmode_emulate_ctxt {
     unsigned long insn_buf_eip;
 
     struct segment_register seg_reg[10];
+
+    union {
+        struct {
+            unsigned int hlt:1;
+            unsigned int mov_ss:1;
+            unsigned int sti:1;
+            unsigned int exn_raised:1;
+        } flags;
+        unsigned int flag_word;
+    };
 };
 
 static void realmode_deliver_exception(
@@ -251,14 +261,8 @@ realmode_write_segment(
     struct realmode_emulate_ctxt *rm_ctxt =
         container_of(ctxt, struct realmode_emulate_ctxt, ctxt);
     memcpy(&rm_ctxt->seg_reg[seg], reg, sizeof(struct segment_register));
-
     if ( seg == x86_seg_ss )
-    {
-        u32 intr_shadow = __vmread(GUEST_INTERRUPTIBILITY_INFO);
-        intr_shadow ^= VMX_INTR_SHADOW_MOV_SS;
-        __vmwrite(GUEST_INTERRUPTIBILITY_INFO, intr_shadow);
-    }
-
+        rm_ctxt->flags.mov_ss = 1;
     return X86EMUL_OKAY;
 }
 
@@ -337,13 +341,37 @@ static int realmode_write_rflags(
     unsigned long val,
     struct x86_emulate_ctxt *ctxt)
 {
+    struct realmode_emulate_ctxt *rm_ctxt =
+        container_of(ctxt, struct realmode_emulate_ctxt, ctxt);
     if ( (val & X86_EFLAGS_IF) && !(ctxt->regs->eflags & X86_EFLAGS_IF) )
-    {
-        u32 intr_shadow = __vmread(GUEST_INTERRUPTIBILITY_INFO);
-        intr_shadow ^= VMX_INTR_SHADOW_STI;
-        __vmwrite(GUEST_INTERRUPTIBILITY_INFO, intr_shadow);
-    }
+        rm_ctxt->flags.sti = 1;
+    return X86EMUL_OKAY;
+}
 
+static int realmode_wbinvd(
+    struct x86_emulate_ctxt *ctxt)
+{
+    vmx_wbinvd_intercept();
+    return X86EMUL_OKAY;
+}
+
+static int realmode_cpuid(
+    unsigned int *eax,
+    unsigned int *ebx,
+    unsigned int *ecx,
+    unsigned int *edx,
+    struct x86_emulate_ctxt *ctxt)
+{
+    vmx_cpuid_intercept(eax, ebx, ecx, edx);
+    return X86EMUL_OKAY;
+}
+
+static int realmode_hlt(
+    struct x86_emulate_ctxt *ctxt)
+{
+    struct realmode_emulate_ctxt *rm_ctxt =
+        container_of(ctxt, struct realmode_emulate_ctxt, ctxt);
+    rm_ctxt->flags.hlt = 1;
     return X86EMUL_OKAY;
 }
 
@@ -354,6 +382,7 @@ static int realmode_inject_hw_exception(
     struct realmode_emulate_ctxt *rm_ctxt =
         container_of(ctxt, struct realmode_emulate_ctxt, ctxt);
 
+    rm_ctxt->flags.exn_raised = 1;
     realmode_deliver_exception(vector, 0, rm_ctxt);
 
     return X86EMUL_OKAY;
@@ -383,6 +412,9 @@ static struct x86_emulate_ops realmode_emulator_ops = {
     .write_io      = realmode_write_io,
     .read_cr       = realmode_read_cr,
     .write_rflags  = realmode_write_rflags,
+    .wbinvd        = realmode_wbinvd,
+    .cpuid         = realmode_cpuid,
+    .hlt           = realmode_hlt,
     .inject_hw_exception = realmode_inject_hw_exception,
     .inject_sw_interrupt = realmode_inject_sw_interrupt
 };
@@ -393,6 +425,7 @@ int vmx_realmode(struct cpu_user_regs *regs)
     struct realmode_emulate_ctxt rm_ctxt;
     unsigned long intr_info;
     int i, rc = 0;
+    u32 intr_shadow, new_intr_shadow;
 
     rm_ctxt.ctxt.regs = regs;
 
@@ -411,6 +444,9 @@ int vmx_realmode(struct cpu_user_regs *regs)
         realmode_deliver_exception((uint8_t)intr_info, 0, &rm_ctxt);
     }
 
+    intr_shadow = __vmread(GUEST_INTERRUPTIBILITY_INFO);
+    new_intr_shadow = intr_shadow;
+
     while ( !(curr->arch.hvm_vcpu.guest_cr[0] & X86_CR0_PE) &&
             !softirq_pending(smp_processor_id()) &&
             !hvm_local_events_need_delivery(curr) )
@@ -421,7 +457,34 @@ int vmx_realmode(struct cpu_user_regs *regs)
             (uint32_t)(rm_ctxt.seg_reg[x86_seg_cs].base + regs->eip),
             sizeof(rm_ctxt.insn_buf));
 
+        rm_ctxt.flag_word = 0;
+
         rc = x86_emulate(&rm_ctxt.ctxt, &realmode_emulator_ops);
+
+        /* MOV-SS instruction toggles MOV-SS shadow, else we just clear it. */
+        if ( rm_ctxt.flags.mov_ss )
+            new_intr_shadow ^= VMX_INTR_SHADOW_MOV_SS;
+        else
+            new_intr_shadow &= ~VMX_INTR_SHADOW_MOV_SS;
+
+        /* STI instruction toggles STI shadow, else we just clear it. */
+        if ( rm_ctxt.flags.sti )
+            new_intr_shadow ^= VMX_INTR_SHADOW_STI;
+        else
+            new_intr_shadow &= ~VMX_INTR_SHADOW_STI;
+
+        /* Update interrupt shadow information in VMCS only if it changes. */
+        if ( intr_shadow != new_intr_shadow )
+        {
+            intr_shadow = new_intr_shadow;
+            __vmwrite(GUEST_INTERRUPTIBILITY_INFO, intr_shadow);
+        }
+
+        /* HLT happens after instruction retire, if no interrupt/exception. */
+        if ( unlikely(rm_ctxt.flags.hlt) &&
+             !rm_ctxt.flags.exn_raised &&
+             !hvm_local_events_need_delivery(curr) )
+            hvm_hlt(regs->eflags);
 
         if ( curr->arch.hvm_vmx.real_mode_io_in_progress )
         {

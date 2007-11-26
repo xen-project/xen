@@ -103,7 +103,12 @@ ENTRY(vmx_asm_do_vmentry)
         movl $GUEST_RFLAGS,%eax
         VMWRITE(UREGS_eflags)
 
-        cmpl $0,VCPU_vmx_launched(%ebx)
+#ifndef VMXASSIST
+        testb $X86_CR0_PE,VCPU_hvm_guest_cr0(%ebx)
+        jz   vmx_goto_realmode
+#endif
+
+        cmpb $0,VCPU_vmx_launched(%ebx)
         je   vmx_launch
 
 /*vmx_resume:*/
@@ -114,9 +119,19 @@ ENTRY(vmx_asm_do_vmentry)
         ud2
 
 vmx_launch:
-        movl $1,VCPU_vmx_launched(%ebx)
+        movb $1,VCPU_vmx_launched(%ebx)
         HVM_RESTORE_ALL_NOSEGREGS
         VMLAUNCH
         pushf
         call vm_launch_fail
         ud2
+
+#ifndef VMXASSIST
+vmx_goto_realmode:
+        sti
+        movl %esp,%eax
+        push %eax
+        call vmx_realmode
+        addl $4,%esp
+        jmp vmx_asm_do_vmentry
+#endif

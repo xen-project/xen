@@ -167,7 +167,8 @@ static uint8_t opcode_table[256] = {
     ImplicitOps, ImplicitOps, ImplicitOps, ImplicitOps,
     /* 0xF0 - 0xF7 */
     0, ImplicitOps, 0, 0,
-    0, ImplicitOps, ByteOp|DstMem|SrcNone|ModRM, DstMem|SrcNone|ModRM,
+    ImplicitOps, ImplicitOps,
+    ByteOp|DstMem|SrcNone|ModRM, DstMem|SrcNone|ModRM,
     /* 0xF8 - 0xFF */
     ImplicitOps, ImplicitOps, ImplicitOps, ImplicitOps,
     ImplicitOps, ImplicitOps, ByteOp|DstMem|SrcNone|ModRM, DstMem|SrcNone|ModRM
@@ -225,7 +226,8 @@ static uint8_t twobyte_table[256] = {
     ByteOp|DstMem|SrcNone|ModRM|Mov, ByteOp|DstMem|SrcNone|ModRM|Mov,
     ByteOp|DstMem|SrcNone|ModRM|Mov, ByteOp|DstMem|SrcNone|ModRM|Mov,
     /* 0xA0 - 0xA7 */
-    ImplicitOps, ImplicitOps, 0, DstBitBase|SrcReg|ModRM, 0, 0, 0, 0, 
+    ImplicitOps, ImplicitOps, ImplicitOps, DstBitBase|SrcReg|ModRM,
+    0, 0, 0, 0, 
     /* 0xA8 - 0xAF */
     ImplicitOps, ImplicitOps, 0, DstBitBase|SrcReg|ModRM,
     0, 0, 0, DstReg|SrcMem|ModRM,
@@ -2450,6 +2452,12 @@ x86_emulate(
         src.val = EXC_DB;
         goto swint;
 
+    case 0xf4: /* hlt */
+        fail_if(ops->hlt == NULL);
+        if ( (rc = ops->hlt(ctxt)) != 0 )
+            goto done;
+        break;
+
     case 0xf5: /* cmc */
         _regs.eflags ^= EFLG_CF;
         break;
@@ -2782,6 +2790,17 @@ x86_emulate(
     case 0xa1: /* pop %%fs */
         src.val = x86_seg_fs;
         goto pop_seg;
+
+    case 0xa2: /* cpuid */ {
+        unsigned int eax = _regs.eax, ebx = _regs.ebx;
+        unsigned int ecx = _regs.ecx, edx = _regs.edx;
+        fail_if(ops->cpuid == NULL);
+        if ( (rc = ops->cpuid(&eax, &ebx, &ecx, &edx, ctxt)) != 0 )
+            goto done;
+        _regs.eax = eax; _regs.ebx = ebx;
+        _regs.ecx = ecx; _regs.edx = edx;
+        break;
+    }
 
     case 0xa8: /* push %%gs */
         src.val = x86_seg_gs;
