@@ -237,7 +237,8 @@ realmode_emulate_cmpxchg(
     unsigned int bytes,
     struct x86_emulate_ctxt *ctxt)
 {
-    return X86EMUL_UNHANDLEABLE;
+    /* Fix this in case the guest is really relying on r-m-w atomicity. */
+    return realmode_emulate_write(seg, offset, new, bytes, ctxt);
 }
 
 static int
