@@ -33,9 +33,9 @@
     (((psr).it << 2) + ((psr).dt << 1) + (psr).rt)
 
 #define SW_BAD    0   /* Bad mode transitition */
-#define SW_V2P_DT 1   /* Physical emulation is activated */
-#define SW_V2P_D  2   /* Physical emulation is activated (only for data) */
-#define SW_P2V    3   /* Exit physical mode emulation */
+#define SW_2P_DT  1   /* Physical emulation is activated */
+#define SW_2P_D   2   /* Physical emulation is activated (only for data) */
+#define SW_2V     3   /* Exit physical mode emulation */
 #define SW_SELF   4   /* No mode transition */
 #define SW_NOP    5   /* Mode transition, but without action required */
 
@@ -59,8 +59,10 @@ static const unsigned char mm_switch_table[8][8] = {
      *  service. Due to gva = gpa in this case (Same region),
      *  data access can be satisfied though itlb entry for physical
      *  emulation is hit.
+     *
+     *  (it,dt,rt): (0,0,0) -> (1,0,1)
      */
-    {SW_SELF,0,  0,  SW_NOP, 0,  0,  0,  SW_P2V},
+    {SW_SELF,0,  0,  SW_NOP, 0,  SW_2P_D,  0,  SW_2V},
     {0,  0,  0,  0,  0,  0,  0,  0},
     {0,  0,  0,  0,  0,  0,  0,  0},
     /*
@@ -70,16 +72,18 @@ static const unsigned char mm_switch_table[8][8] = {
      *  (it,dt,rt): (0,1,1) -> (0,0,0)
      *  This kind of transition is found in OSYa
      */
-    {SW_NOP, 0,  0,  SW_SELF,0,  0,  0,  SW_P2V},
+    {SW_NOP, 0,  0,  SW_SELF,0,  0,  0,  SW_2V},
     /* (1,0,0)->(1,1,1) */
-    {0,  0,  0,  0,  0,  0,  0,  SW_P2V},
+    {0,  0,  0,  0,  0,  0,  0,  SW_2V},
     /*
      *  (it,dt,rt): (1,0,1) -> (1,1,1)
      *  This kind of transition usually occurs when Linux returns
      *  from the low level TLB miss handlers.
      *  (see "arch/ia64/kernel/ivt.S")
+     *
+     *  (it,dt,rt): (1,0,1) -> (0,0,0)
      */
-    {0,  0,  0,  0,  0,  SW_SELF,0,  SW_P2V},
+    {SW_2P_DT,  0,  0,  0,  0,  SW_SELF,0,  SW_2V},
     {0,  0,  0,  0,  0,  0,  0,  0},
     /*
      *  (it,dt,rt): (1,1,1) -> (1,0,1)
@@ -90,9 +94,10 @@ static const unsigned char mm_switch_table[8][8] = {
      *  This kind of transition usually occurs in pal and efi calls,
      *  which requires running in physical mode.
      *  (see "arch/ia64/kernel/head.S")
-     *  (1,1,1)->(1,0,0)
+     *
+     *  (it,dt,rt): (1,1,1)->(1,0,0)
      */
-    {SW_V2P_DT, 0,  0,  0,  SW_V2P_D, SW_V2P_D, 0,  SW_SELF},
+    {SW_2P_DT, 0,  0,  0,  SW_2P_D, SW_2P_D, 0,  SW_SELF},
 };
 
 void
@@ -234,17 +239,17 @@ switch_mm_mode(VCPU *vcpu, IA64_PSR old_psr, IA64_PSR new_psr)
     act = mm_switch_action(old_psr, new_psr);
     perfc_incra(vmx_switch_mm_mode, act);
     switch (act) {
-    case SW_V2P_DT:
+    case SW_2P_DT:
         vcpu->arch.arch_vmx.mmu_mode = VMX_MMU_PHY_DT;
         switch_to_physical_rid(vcpu);
         break;
-    case SW_V2P_D:
+    case SW_2P_D:
 //        printk("V -> P_D mode transition: (0x%lx -> 0x%lx)\n",
 //               old_psr.val, new_psr.val);
         vcpu->arch.arch_vmx.mmu_mode = VMX_MMU_PHY_D;
         switch_to_physical_rid(vcpu);
         break;
-    case SW_P2V:
+    case SW_2V:
 //        printk("P -> V mode transition: (0x%lx -> 0x%lx)\n",
 //               old_psr.val, new_psr.val);
         vcpu->arch.arch_vmx.mmu_mode = VMX_MMU_VIRTUAL;
