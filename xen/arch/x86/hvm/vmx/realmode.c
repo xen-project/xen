@@ -338,6 +338,36 @@ realmode_read_cr(
     return X86EMUL_OKAY;
 }
 
+static int
+realmode_write_cr(
+    unsigned int reg,
+    unsigned long val,
+    struct x86_emulate_ctxt *ctxt)
+{
+    switch ( reg )
+    {
+    case 0:
+        if ( !hvm_set_cr0(val) )
+            return X86EMUL_UNHANDLEABLE;
+        break;
+    case 2:
+        current->arch.hvm_vcpu.guest_cr[2] = val;
+        break;
+    case 3:
+        if ( !hvm_set_cr3(val) )
+            return X86EMUL_UNHANDLEABLE;
+        break;
+    case 4:
+        if ( !hvm_set_cr4(val) )
+            return X86EMUL_UNHANDLEABLE;
+        break;
+    default:
+        return X86EMUL_UNHANDLEABLE;
+    }
+
+    return X86EMUL_OKAY;
+}
+
 static int realmode_write_rflags(
     unsigned long val,
     struct x86_emulate_ctxt *ctxt)
@@ -412,6 +442,7 @@ static struct x86_emulate_ops realmode_emulator_ops = {
     .read_io       = realmode_read_io,
     .write_io      = realmode_write_io,
     .read_cr       = realmode_read_cr,
+    .write_cr      = realmode_write_cr,
     .write_rflags  = realmode_write_rflags,
     .wbinvd        = realmode_wbinvd,
     .cpuid         = realmode_cpuid,
