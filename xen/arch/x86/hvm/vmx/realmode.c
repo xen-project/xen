@@ -524,7 +524,8 @@ void vmx_realmode(struct cpu_user_regs *regs)
         if ( rc == X86EMUL_UNHANDLEABLE )
         {
             gdprintk(XENLOG_DEBUG,
-                     "RM %04x:%08lx: %02x %02x %02x %02x %02x %02x\n",
+                     "Real-mode emulation failed @ %04x:%08lx: "
+                     "%02x %02x %02x %02x %02x %02x\n",
                      rm_ctxt.seg_reg[x86_seg_cs].sel, rm_ctxt.insn_buf_eip,
                      rm_ctxt.insn_buf[0], rm_ctxt.insn_buf[1],
                      rm_ctxt.insn_buf[2], rm_ctxt.insn_buf[3],
@@ -532,6 +533,26 @@ void vmx_realmode(struct cpu_user_regs *regs)
             gdprintk(XENLOG_ERR, "Emulation failed\n");
             domain_crash_synchronous();
         }
+    }
+
+    /*
+     * Cannot enter protected mode with bogus selector RPLs and DPLs. Hence we
+     * fix up as best we can, even though this deviates from native execution
+     */
+    if  ( curr->arch.hvm_vcpu.guest_cr[0] & X86_CR0_PE )
+    {
+        /* CS.RPL == SS.RPL == SS.DPL == 0. */
+        rm_ctxt.seg_reg[x86_seg_cs].sel &= ~3;
+        rm_ctxt.seg_reg[x86_seg_ss].sel &= ~3;
+        /* DS,ES,FS,GS: The most uninvasive trick is to set DPL == RPL. */
+        rm_ctxt.seg_reg[x86_seg_ds].attr.fields.dpl =
+            rm_ctxt.seg_reg[x86_seg_ds].sel & 3;
+        rm_ctxt.seg_reg[x86_seg_es].attr.fields.dpl =
+            rm_ctxt.seg_reg[x86_seg_es].sel & 3;
+        rm_ctxt.seg_reg[x86_seg_fs].attr.fields.dpl =
+            rm_ctxt.seg_reg[x86_seg_fs].sel & 3;
+        rm_ctxt.seg_reg[x86_seg_gs].attr.fields.dpl =
+            rm_ctxt.seg_reg[x86_seg_gs].sel & 3;
     }
 
     for ( i = 0; i < 10; i++ )
@@ -545,12 +566,6 @@ int vmx_realmode_io_complete(void)
 
     if ( !curr->arch.hvm_vmx.real_mode_io_in_progress )
         return 0;
-
-#if 0
-    gdprintk(XENLOG_DEBUG, "RM I/O %d %c bytes=%d addr=%lx data=%lx\n",
-             p->type, p->dir ? 'R' : 'W',
-             (int)p->size, (long)p->addr, (long)p->data);
-#endif
 
     curr->arch.hvm_vmx.real_mode_io_in_progress = 0;
     if ( p->dir == IOREQ_READ )
