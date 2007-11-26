@@ -152,7 +152,8 @@ static uint8_t opcode_table[256] = {
     DstReg|SrcMem|ModRM|Mov, DstReg|SrcMem|ModRM|Mov,
     ByteOp|DstMem|SrcImm|ModRM|Mov, DstMem|SrcImm|ModRM|Mov,
     /* 0xC8 - 0xCF */
-    0, 0, 0, 0, ImplicitOps, ImplicitOps, ImplicitOps, ImplicitOps,
+    0, 0, ImplicitOps, ImplicitOps,
+    ImplicitOps, ImplicitOps, ImplicitOps, ImplicitOps,
     /* 0xD0 - 0xD7 */
     ByteOp|DstMem|SrcImplicit|ModRM, DstMem|SrcImplicit|ModRM, 
     ByteOp|DstMem|SrcImplicit|ModRM, DstMem|SrcImplicit|ModRM, 
@@ -2257,6 +2258,20 @@ x86_emulate(
         op_bytes = mode_64bit() ? 8 : op_bytes;
         if ( (rc = ops->read(x86_seg_ss, sp_post_inc(op_bytes + offset),
                              &dst.val, op_bytes, ctxt)) != 0 )
+            goto done;
+        _regs.eip = dst.val;
+        break;
+    }
+
+    case 0xca: /* ret imm16 (far) */
+    case 0xcb: /* ret (far) */ {
+        int offset = (b == 0xca) ? insn_fetch_type(uint16_t) : 0;
+        op_bytes = mode_64bit() ? 8 : op_bytes;
+        if ( (rc = ops->read(x86_seg_ss, sp_post_inc(op_bytes),
+                             &dst.val, op_bytes, ctxt)) || 
+             (rc = ops->read(x86_seg_ss, sp_post_inc(op_bytes + offset),
+                             &src.val, op_bytes, ctxt)) ||
+             (rc = load_seg(x86_seg_cs, (uint16_t)src.val, ctxt, ops)) )
             goto done;
         _regs.eip = dst.val;
         break;
