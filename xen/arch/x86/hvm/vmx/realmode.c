@@ -88,12 +88,12 @@ static void realmode_deliver_exception(
 
     if ( rm_ctxt->ctxt.addr_size == 32 )
     {
-        regs->esp -= 4;
+        regs->esp -= 6;
         pstk = regs->esp;
     }
     else
     {
-        pstk = (uint16_t)(regs->esp - 4);
+        pstk = (uint16_t)(regs->esp - 6);
         regs->esp &= ~0xffff;
         regs->esp |= pstk;
     }
@@ -419,12 +419,12 @@ static struct x86_emulate_ops realmode_emulator_ops = {
     .inject_sw_interrupt = realmode_inject_sw_interrupt
 };
 
-int vmx_realmode(struct cpu_user_regs *regs)
+void vmx_realmode(struct cpu_user_regs *regs)
 {
     struct vcpu *curr = current;
     struct realmode_emulate_ctxt rm_ctxt;
     unsigned long intr_info;
-    int i, rc = 0;
+    int i, rc;
     u32 intr_shadow, new_intr_shadow;
 
     rm_ctxt.ctxt.regs = regs;
@@ -487,10 +487,7 @@ int vmx_realmode(struct cpu_user_regs *regs)
             hvm_hlt(regs->eflags);
 
         if ( curr->arch.hvm_vmx.real_mode_io_in_progress )
-        {
-            rc = 0;
             break;
-        }
 
         if ( rc == X86EMUL_UNHANDLEABLE )
         {
@@ -501,15 +498,12 @@ int vmx_realmode(struct cpu_user_regs *regs)
                      rm_ctxt.insn_buf[2], rm_ctxt.insn_buf[3],
                      rm_ctxt.insn_buf[4], rm_ctxt.insn_buf[5]);
             gdprintk(XENLOG_ERR, "Emulation failed\n");
-            rc = -EINVAL;
-            break;
+            domain_crash_synchronous();
         }
     }
 
     for ( i = 0; i < 10; i++ )
         hvm_set_segment_register(curr, i, &rm_ctxt.seg_reg[i]);
-
-    return rc;
 }
 
 int vmx_realmode_io_complete(void)
