@@ -2706,8 +2706,8 @@ x86_emulate(
                 goto done;
             break;
         case 4: /* smsw */
+            ea.bytes = 2;
             dst = ea;
-            dst.bytes = 2;
             fail_if(ops->read_cr == NULL);
             if ( (rc = ops->read_cr(0, &dst.val, ctxt)) )
                 goto done;
