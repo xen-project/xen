@@ -191,7 +191,7 @@ static uint8_t twobyte_table[256] = {
     /* 0x28 - 0x2F */
     0, 0, 0, 0, 0, 0, 0, 0,
     /* 0x30 - 0x37 */
-    ImplicitOps, 0, ImplicitOps, 0, 0, 0, 0, 0,
+    ImplicitOps, ImplicitOps, ImplicitOps, 0, 0, 0, 0, 0,
     /* 0x38 - 0x3F */
     0, 0, 0, 0, 0, 0, 0, 0,
     /* 0x40 - 0x47 */
@@ -270,6 +270,13 @@ struct operand {
         } mem;
     };
 };
+
+/* MSRs. */
+#define MSR_TSC   0x10
+
+/* Control register flags. */
+#define CR0_PE    (1<<0)
+#define CR4_TSD   (1<<2)
 
 /* EFLAGS bit definitions. */
 #define EFLG_VIP  (1<<20)
@@ -739,7 +746,7 @@ in_realmode(
         return 0;
 
     rc = ops->read_cr(0, &cr0, ctxt);
-    return (!rc && !(cr0 & 1));
+    return (!rc && !(cr0 & CR0_PE));
 }
 
 static int
@@ -2857,6 +2864,21 @@ x86_emulate(
         fail_if(ops->write_msr == NULL);
         if ( (rc = ops->write_msr((uint32_t)_regs.ecx, val, ctxt)) != 0 )
             goto done;
+        break;
+    }
+
+    case 0x31: /* rdtsc */ {
+        unsigned long cr4;
+        uint64_t val;
+        fail_if(ops->read_cr == NULL);
+        if ( (rc = ops->read_cr(4, &cr4, ctxt)) )
+            goto done;
+        generate_exception_if((cr4 & CR4_TSD) && !mode_ring0(), EXC_GP);
+        fail_if(ops->read_msr == NULL);
+        if ( (rc = ops->read_msr(MSR_TSC, &val, ctxt)) != 0 )
+            goto done;
+        _regs.edx = (uint32_t)(val >> 32);
+        _regs.eax = (uint32_t)(val >>  0);
         break;
     }
 
