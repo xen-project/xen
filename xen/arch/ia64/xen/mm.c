@@ -1194,7 +1194,7 @@ assign_domain_mmio_page(struct domain *d, unsigned long mpaddr,
         gdprintk(XENLOG_INFO, "%s: domain %p mpaddr 0x%lx size = 0x%lx\n",
                 __func__, d, mpaddr, size);
     }
-    if (!efi_mmio(mpaddr, size)) {
+    if (!efi_mmio(phys_addr, size)) {
 #ifndef NDEBUG
         gdprintk(XENLOG_INFO, "%s: domain %p mpaddr 0x%lx size = 0x%lx\n",
                 __func__, d, mpaddr, size);
