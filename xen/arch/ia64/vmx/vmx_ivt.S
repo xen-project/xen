@@ -472,7 +472,7 @@ ENTRY(vmx_break_fault)
     ;;
     ld4 r22=[r22]
     extr.u r24=r29,IA64_PSR_CPL0_BIT,2
-    cmp.eq p0,p6=r0,r0
+    cmp.ltu p6,p0=NR_hypercalls,r2
     ;;
     cmp.ne.or p6,p0=r22,r17
     cmp.ne.or p6,p0=r0,r24
