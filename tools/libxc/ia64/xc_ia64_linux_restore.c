@@ -127,7 +127,7 @@ xc_ia64_recv_vcpu_context(int xc_handle, int io_fd, uint32_t dom,
     fprintf(stderr, "ip=%016lx, b0=%016lx\n", ctxt->regs.ip, ctxt->regs.b[0]);
 
     /* Initialize and set registers.  */
-    ctxt->flags = VGCF_EXTRA_REGS;
+    ctxt->flags = VGCF_EXTRA_REGS | VGCF_SET_CR_IRR;
     if (xc_vcpu_setcontext(xc_handle, dom, vcpu, ctxt) != 0) {
         ERROR("Couldn't set vcpu context");
         return -1;

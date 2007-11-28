@@ -435,6 +435,7 @@ struct vcpu_guest_context_regs {
 
 struct vcpu_guest_context {
 #define VGCF_EXTRA_REGS (1UL << 1)	/* Set extra regs.  */
+#define VGCF_SET_CR_IRR (1UL << 2)	/* Set cr_irr[0:3]. */
     unsigned long flags;       /* VGCF_* flags */
 
     struct vcpu_guest_context_regs regs;

@@ -118,8 +118,8 @@ vmx_arch_set_info_guest(struct vcpu *v, vcpu_guest_context_u c)
     unsigned long vnat;
     unsigned long vbnat;
 
-     union vcpu_ar_regs *ar = &c.nat->regs.ar;
-     union vcpu_cr_regs *cr = &c.nat->regs.cr;
+    union vcpu_ar_regs *ar = &c.nat->regs.ar;
+    union vcpu_cr_regs *cr = &c.nat->regs.cr;
     int i;
 
     // banked registers
@@ -177,13 +177,15 @@ vmx_arch_set_info_guest(struct vcpu *v, vcpu_guest_context_u c)
     vpd_low->iim = cr->iim;
     vpd_low->iha = cr->iha;
     vpd_low->lid = cr->lid;
-    vpd_low->ivr = cr->ivr; //XXX vlsapic
     vpd_low->tpr = cr->tpr;
+    vpd_low->ivr = cr->ivr; //XXX vlsapic
     vpd_low->eoi = cr->eoi;
-    vpd_low->irr[0] = cr->irr[0];
-    vpd_low->irr[1] = cr->irr[1];
-    vpd_low->irr[2] = cr->irr[2];
-    vpd_low->irr[3] = cr->irr[3];
+    if (c.nat->flags & VGCF_SET_CR_IRR) {
+        vpd_low->irr[0] = cr->irr[0];
+        vpd_low->irr[1] = cr->irr[1];
+        vpd_low->irr[2] = cr->irr[2];
+        vpd_low->irr[3] = cr->irr[3];
+    }
     vpd_low->itv = cr->itv;
     vpd_low->pmv = cr->pmv;
     vpd_low->cmcv = cr->cmcv;
