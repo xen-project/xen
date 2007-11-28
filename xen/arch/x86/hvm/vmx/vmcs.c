@@ -819,9 +819,15 @@ static unsigned long vmr(unsigned long field)
     return rc ? 0 : val;
 }
 
-void vmcs_dump_vcpu(void)
+void vmcs_dump_vcpu(struct vcpu *v)
 {
+    struct cpu_user_regs *regs = &v->arch.guest_context.user_regs;
     unsigned long long x;
+
+    if ( v == current )
+        regs = guest_cpu_user_regs();
+
+    vmx_vmcs_enter(v);
 
     printk("*** Guest State ***\n");
     printk("CR0: actual=0x%016llx, shadow=0x%016llx, gh_mask=%016llx\n",
@@ -841,11 +847,14 @@ void vmcs_dump_vcpu(void)
     printk("     target2=%016llx, target3=%016llx\n",
            (unsigned long long)vmr(CR3_TARGET_VALUE2),
            (unsigned long long)vmr(CR3_TARGET_VALUE3));
-    printk("RSP = 0x%016llx  RIP = 0x%016llx\n", 
+    printk("RSP = 0x%016llx (0x%016llx)  RIP = 0x%016llx (0x%016llx)\n", 
            (unsigned long long)vmr(GUEST_RSP),
-           (unsigned long long)vmr(GUEST_RIP));
-    printk("RFLAGS=0x%016llx  DR7 = 0x%016llx\n", 
+           (unsigned long long)regs->esp,
+           (unsigned long long)vmr(GUEST_RIP),
+           (unsigned long long)regs->eip);
+    printk("RFLAGS=0x%016llx (0x%016llx)  DR7 = 0x%016llx\n", 
            (unsigned long long)vmr(GUEST_RFLAGS),
+           (unsigned long long)regs->eflags,
            (unsigned long long)vmr(GUEST_DR7));
     printk("Sysenter RSP=%016llx CS:RIP=%04x:%016llx\n",
            (unsigned long long)vmr(GUEST_SYSENTER_ESP),
@@ -926,6 +935,8 @@ void vmcs_dump_vcpu(void)
            (uint32_t)vmr(IDT_VECTORING_ERROR_CODE));
     printk("TPR Threshold = 0x%02x\n",
            (uint32_t)vmr(TPR_THRESHOLD));
+
+    vmx_vmcs_exit(v);
 }
 
 static void vmcs_dump(unsigned char ch)
@@ -945,9 +956,7 @@ static void vmcs_dump(unsigned char ch)
         for_each_vcpu ( d, v )
         {
             printk("\tVCPU %d\n", v->vcpu_id);
-            vmx_vmcs_enter(v);
-            vmcs_dump_vcpu();
-            vmx_vmcs_exit(v);
+            vmcs_dump_vcpu(v);
         }
     }
 
