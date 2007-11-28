@@ -1051,13 +1051,18 @@ void handle_mmio(unsigned long gpa)
     }
 
     if ( mmio_decode(address_bytes, inst, mmio_op, &ad_size,
-                     &op_size, &seg_sel) == DECODE_failure ) {
-        printk("handle_mmio: failed to decode instruction\n");
-        printk("mmio opcode: gpa 0x%lx, len %d:", gpa, inst_len);
+                     &op_size, &seg_sel) == DECODE_failure )
+    {
+        gdprintk(XENLOG_WARNING,
+                 "handle_mmio: failed to decode instruction\n");
+        gdprintk(XENLOG_WARNING,
+                 "mmio opcode: gpa 0x%lx, len %d:", gpa, inst_len);
         for ( i = 0; i < inst_len; i++ )
             printk(" %02x", inst[i] & 0xFF);
         printk("\n");
-        domain_crash_synchronous();
+
+        hvm_inject_exception(TRAP_invalid_op, HVM_DELIVER_NO_ERROR_CODE, 0);
+        return;
     }
 
     regs->eip += inst_len; /* advance %eip */
