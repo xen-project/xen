@@ -170,7 +170,7 @@ static unsigned long hpet_read(
 
     result = val;
     if ( length != 8 )
-        result = (val >> ((addr & 7) * 8)) & ((1UL << (length * 8)) - 1);
+        result = (val >> ((addr & 7) * 8)) & ((1ULL << (length * 8)) - 1);
 
     spin_unlock(&h->lock);
 
