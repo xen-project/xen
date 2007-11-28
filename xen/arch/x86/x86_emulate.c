@@ -228,10 +228,10 @@ static uint8_t twobyte_table[256] = {
     ByteOp|DstMem|SrcNone|ModRM|Mov, ByteOp|DstMem|SrcNone|ModRM|Mov,
     /* 0xA0 - 0xA7 */
     ImplicitOps, ImplicitOps, ImplicitOps, DstBitBase|SrcReg|ModRM,
-    0, 0, 0, 0, 
+    DstMem|SrcReg|ModRM, DstMem|SrcReg|ModRM, 0, 0, 
     /* 0xA8 - 0xAF */
     ImplicitOps, ImplicitOps, 0, DstBitBase|SrcReg|ModRM,
-    0, 0, 0, DstReg|SrcMem|ModRM,
+    DstMem|SrcReg|ModRM, DstMem|SrcReg|ModRM, 0, DstReg|SrcMem|ModRM,
     /* 0xB0 - 0xB7 */
     ByteOp|DstMem|SrcReg|ModRM, DstMem|SrcReg|ModRM,
     DstReg|SrcMem|ModRM|Mov, DstBitBase|SrcReg|ModRM,
@@ -484,13 +484,13 @@ do{ asm volatile (                                                      \
 })
 #define insn_fetch_type(_type) ((_type)insn_fetch_bytes(sizeof(_type)))
 
-#define _truncate_ea(ea, byte_width)            \
+#define truncate_word(ea, byte_width)           \
 ({  unsigned long __ea = (ea);                  \
     unsigned int _width = (byte_width);         \
     ((_width == sizeof(unsigned long)) ? __ea : \
      (__ea & ((1UL << (_width << 3)) - 1)));    \
 })
-#define truncate_ea(ea) _truncate_ea((ea), ad_bytes)
+#define truncate_ea(ea) truncate_word((ea), ad_bytes)
 
 #define mode_64bit() (def_ad_bytes == 8)
 
@@ -508,12 +508,11 @@ do {                                                    \
     }                                                                   \
 })
 
-/* Given byte has even parity (even number of 1s)? */
-static int even_parity(uint8_t v)
+/* Given longword has even parity (even number of 1s)? */
+static int even_parity(unsigned long v)
 {
-    asm ( "test %%al,%%al; setp %%al"
-              : "=a" (v) : "0" (v) );
-    return v;
+    asm ( "test %0,%0; setp %b0" : "=a" (v) : "0" (v) );
+    return (uint8_t)v;
 }
 
 /* Update address held in a register, based on addressing mode. */
@@ -534,10 +533,10 @@ do {                                                                    \
 
 #define sp_pre_dec(dec) ({                                              \
     _register_address_increment(_regs.esp, -(dec), ctxt->sp_size/8);    \
-    _truncate_ea(_regs.esp, ctxt->sp_size/8);                           \
+    truncate_word(_regs.esp, ctxt->sp_size/8);                          \
 })
 #define sp_post_inc(inc) ({                                             \
-    unsigned long __esp = _truncate_ea(_regs.esp, ctxt->sp_size/8);     \
+    unsigned long __esp = truncate_word(_regs.esp, ctxt->sp_size/8);    \
     _register_address_increment(_regs.esp, (inc), ctxt->sp_size/8);     \
     __esp;                                                              \
 })
@@ -1915,7 +1914,7 @@ x86_emulate(
         _regs.eflags &= ~(EFLG_SF|EFLG_ZF|EFLG_PF);
         _regs.eflags |= ((uint8_t)_regs.eax == 0) ? EFLG_ZF : 0;
         _regs.eflags |= (( int8_t)_regs.eax <  0) ? EFLG_SF : 0;
-        _regs.eflags |= even_parity(_regs.eax) ? EFLG_PF : 0;
+        _regs.eflags |= even_parity((uint8_t)_regs.eax) ? EFLG_PF : 0;
         break;
     }
 
@@ -1939,7 +1938,7 @@ x86_emulate(
         _regs.eflags &= ~(EFLG_SF|EFLG_ZF|EFLG_PF);
         _regs.eflags |= ((uint8_t)_regs.eax == 0) ? EFLG_ZF : 0;
         _regs.eflags |= (( int8_t)_regs.eax <  0) ? EFLG_SF : 0;
-        _regs.eflags |= even_parity(_regs.eax) ? EFLG_PF : 0;
+        _regs.eflags |= even_parity((uint8_t)_regs.eax) ? EFLG_PF : 0;
         break;
     }
 
@@ -2288,7 +2287,7 @@ x86_emulate(
             for ( i = 1; i < depth; i++ )
             {
                 unsigned long ebp, temp_data;
-                ebp = _truncate_ea(_regs.ebp - i*dst.bytes, ctxt->sp_size/8);
+                ebp = truncate_word(_regs.ebp - i*dst.bytes, ctxt->sp_size/8);
                 if ( (rc = ops->read(x86_seg_ss, ebp,
                                      &temp_data, dst.bytes, ctxt)) ||
                      (rc = ops->write(x86_seg_ss, sp_pre_dec(dst.bytes),
@@ -2396,7 +2395,7 @@ x86_emulate(
         _regs.eflags &= ~(EFLG_SF|EFLG_ZF|EFLG_PF);
         _regs.eflags |= ((uint8_t)_regs.eax == 0) ? EFLG_ZF : 0;
         _regs.eflags |= (( int8_t)_regs.eax <  0) ? EFLG_SF : 0;
-        _regs.eflags |= even_parity(_regs.eax) ? EFLG_PF : 0;
+        _regs.eflags |= even_parity((uint8_t)_regs.eax) ? EFLG_PF : 0;
         break;
     }
 
@@ -2408,7 +2407,7 @@ x86_emulate(
         _regs.eflags &= ~(EFLG_SF|EFLG_ZF|EFLG_PF);
         _regs.eflags |= ((uint8_t)_regs.eax == 0) ? EFLG_ZF : 0;
         _regs.eflags |= (( int8_t)_regs.eax <  0) ? EFLG_SF : 0;
-        _regs.eflags |= even_parity(_regs.eax) ? EFLG_PF : 0;
+        _regs.eflags |= even_parity((uint8_t)_regs.eax) ? EFLG_PF : 0;
         break;
     }
 
@@ -2606,6 +2605,35 @@ x86_emulate(
     case 0xa3: bt: /* bt */
         emulate_2op_SrcV_nobyte("bt", src, dst, _regs.eflags);
         break;
+
+    case 0xa4: /* shld imm8,r,r/m */
+    case 0xa5: /* shld %%cl,r,r/m */
+    case 0xac: /* shrd imm8,r,r/m */
+    case 0xad: /* shrd %%cl,r,r/m */ {
+        uint8_t shift, width = dst.bytes << 3;
+        shift = (b & 1) ? (uint8_t)_regs.ecx : insn_fetch_type(uint8_t);
+        if ( (shift &= width - 1) == 0 )
+            break;
+        dst.orig_val = truncate_word(dst.orig_val, dst.bytes);
+        dst.val = ((shift == width) ? src.val :
+                   (b & 8) ?
+                   /* shrd */
+                   ((dst.orig_val >> shift) |
+                    truncate_word(src.val << (width - shift), dst.bytes)) :
+                   /* shld */
+                   ((dst.orig_val << shift) |
+                    ((src.val >> (width - shift)) & ((1ull << shift) - 1))));
+        dst.val = truncate_word(dst.val, dst.bytes);
+        _regs.eflags &= ~(EFLG_OF|EFLG_SF|EFLG_ZF|EFLG_PF|EFLG_CF);
+        if ( (dst.val >> ((b & 8) ? (shift - 1) : (width - shift))) & 1 )
+            _regs.eflags |= EFLG_CF;
+        if ( ((dst.val ^ dst.orig_val) >> (width - 1)) & 1 )
+            _regs.eflags |= EFLG_OF;
+        _regs.eflags |= ((dst.val >> (width - 1)) & 1) ? EFLG_SF : 0;
+        _regs.eflags |= (dst.val == 0) ? EFLG_ZF : 0;
+        _regs.eflags |= even_parity(dst.val) ? EFLG_PF : 0;
+        break;
+    }
 
     case 0xb3: btr: /* btr */
         emulate_2op_SrcV_nobyte("btr", src, dst, _regs.eflags);
