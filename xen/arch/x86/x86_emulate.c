@@ -152,7 +152,7 @@ static uint8_t opcode_table[256] = {
     DstReg|SrcMem|ModRM|Mov, DstReg|SrcMem|ModRM|Mov,
     ByteOp|DstMem|SrcImm|ModRM|Mov, DstMem|SrcImm|ModRM|Mov,
     /* 0xC8 - 0xCF */
-    0, 0, ImplicitOps, ImplicitOps,
+    ImplicitOps, ImplicitOps, ImplicitOps, ImplicitOps,
     ImplicitOps, ImplicitOps, ImplicitOps, ImplicitOps,
     /* 0xD0 - 0xD7 */
     ByteOp|DstMem|SrcImplicit|ModRM, DstMem|SrcImplicit|ModRM, 
@@ -2262,6 +2262,63 @@ x86_emulate(
         _regs.eip = dst.val;
         break;
     }
+
+    case 0xc8: /* enter imm16,imm8 */ {
+        uint16_t size = insn_fetch_type(uint16_t);
+        uint8_t depth = insn_fetch_type(uint8_t) & 31;
+        int i;
+
+        dst.type = OP_REG;
+        dst.bytes = (mode_64bit() && (op_bytes == 4)) ? 8 : op_bytes;
+        dst.reg = (unsigned long *)&_regs.ebp;
+        if ( (rc = ops->write(x86_seg_ss, sp_pre_dec(dst.bytes),
+                              _regs.ebp, dst.bytes, ctxt)) )
+            goto done;
+        dst.val = _regs.esp;
+
+        if ( depth > 0 )
+        {
+            for ( i = 1; i < depth; i++ )
+            {
+                unsigned long ebp, temp_data;
+                ebp = _truncate_ea(_regs.ebp - i*dst.bytes, ctxt->sp_size/8);
+                if ( (rc = ops->read(x86_seg_ss, ebp,
+                                     &temp_data, dst.bytes, ctxt)) ||
+                     (rc = ops->write(x86_seg_ss, sp_pre_dec(dst.bytes),
+                                      temp_data, dst.bytes, ctxt)) )
+                    goto done;
+            }
+            if ( (rc = ops->write(x86_seg_ss, sp_pre_dec(dst.bytes),
+                                  dst.val, dst.bytes, ctxt)) )
+                goto done;
+        }
+
+        sp_pre_dec(size);
+        break;
+    }
+
+    case 0xc9: /* leave */
+        /* First writeback, to %%esp. */
+        dst.type = OP_REG;
+        dst.bytes = (mode_64bit() && (op_bytes == 4)) ? 8 : op_bytes;
+        dst.reg = (unsigned long *)&_regs.esp;
+        dst.val = _regs.ebp;
+
+        /* Flush first writeback, since there is a second. */
+        switch ( dst.bytes )
+        {
+        case 1: *(uint8_t  *)dst.reg = (uint8_t)dst.val; break;
+        case 2: *(uint16_t *)dst.reg = (uint16_t)dst.val; break;
+        case 4: *dst.reg = (uint32_t)dst.val; break; /* 64b: zero-ext */
+        case 8: *dst.reg = dst.val; break;
+        }
+
+        /* Second writeback, to %%ebp. */
+        dst.reg = (unsigned long *)&_regs.ebp;
+        if ( (rc = ops->read(x86_seg_ss, sp_post_inc(dst.bytes),
+                             &dst.val, dst.bytes, ctxt)) )
+            goto done;
+        break;
 
     case 0xca: /* ret imm16 (far) */
     case 0xcb: /* ret (far) */ {
