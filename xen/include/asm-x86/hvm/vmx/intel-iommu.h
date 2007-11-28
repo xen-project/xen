@@ -89,7 +89,8 @@
 #define cap_plmr(c)        (((c) >> 5) & 1)
 #define cap_rwbf(c)        (((c) >> 4) & 1)
 #define cap_afl(c)        (((c) >> 3) & 1)
-#define cap_ndoms(c)        (2 ^ (4 + 2 * ((c) & 0x7)))
+#define cap_ndoms(c)        (1 << (4 + 2 * ((c) & 0x7)))
+
 /*
  * Extended Capability Register
  */
