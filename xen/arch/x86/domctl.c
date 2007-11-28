@@ -709,11 +709,6 @@ long arch_do_domctl(
 
         evc = &domctl->u.ext_vcpucontext;
 
-        ret = (evc->size < sizeof(*evc)) ? -EINVAL : 0;
-        evc->size = sizeof(*evc);
-        if ( ret != 0 )
-            break;
-
         ret = -ESRCH;
         d = rcu_lock_domain_by_id(domctl->domain);
         if ( d == NULL )
@@ -726,6 +721,7 @@ long arch_do_domctl(
 
         if ( domctl->cmd == XEN_DOMCTL_get_ext_vcpucontext )
         {
+            evc->size = sizeof(*evc);
 #ifdef __x86_64__
             evc->sysenter_callback_cs      = v->arch.sysenter_callback_cs;
             evc->sysenter_callback_eip     = v->arch.sysenter_callback_eip;
@@ -744,6 +740,9 @@ long arch_do_domctl(
         }
         else
         {
+            ret = -EINVAL;
+            if ( evc->size != sizeof(*evc) )
+                goto ext_vcpucontext_out;
 #ifdef __x86_64__
             fixup_guest_code_selector(d, evc->sysenter_callback_cs);
             v->arch.sysenter_callback_cs      = evc->sysenter_callback_cs;
@@ -755,7 +754,6 @@ long arch_do_domctl(
             v->arch.syscall32_disables_events = evc->syscall32_disables_events;
 #else
             /* We do not support syscall/syscall32/sysenter on 32-bit Xen. */
-            ret = -EINVAL;
             if ( (evc->sysenter_callback_cs & ~3) ||
                  evc->sysenter_callback_eip ||
                  (evc->syscall32_callback_cs & ~3) ||
@@ -768,7 +766,8 @@ long arch_do_domctl(
 
     ext_vcpucontext_out:
         rcu_unlock_domain(d);
-        if ( copy_to_guest(u_domctl, domctl, 1) )
+        if ( (domctl->cmd == XEN_DOMCTL_get_ext_vcpucontext) &&
+             copy_to_guest(u_domctl, domctl, 1) )
             ret = -EFAULT;
     }
     break;
