@@ -142,7 +142,7 @@ char * strchr(const char * s, int c)
 
 char * strrchr(const char * s, int c)
 {
-        const char *res;
+        const char *res = NULL;
         for(; *s != '\0'; ++s)
                 if (*s == (char) c)
                         res = s;
