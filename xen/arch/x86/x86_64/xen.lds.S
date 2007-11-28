@@ -61,6 +61,9 @@ SECTIONS
   __initcall_start = .;
   .initcall.init : { *(.initcall1.init) } :text
   __initcall_end = .;
+  __xsm_initcall_start = .; 
+  .xsm_initcall.init : { *(.xsm_initcall.init) } :text
+  __xsm_initcall_end = .;
   . = ALIGN(PAGE_SIZE);
   __init_end = .;
 
