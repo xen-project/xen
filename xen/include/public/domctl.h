@@ -539,6 +539,17 @@ struct xen_domctl_ext_vcpucontext {
 typedef struct xen_domctl_ext_vcpucontext xen_domctl_ext_vcpucontext_t;
 DEFINE_XEN_GUEST_HANDLE(xen_domctl_ext_vcpucontext_t);
 
+/*
+ * Set optimizaton features for a domain
+ */
+#define XEN_DOMCTL_set_opt_feature    44
+struct xen_domctl_set_opt_feature {
+#ifdef __ia64__
+    struct xen_ia64_opt_feature optf;
+#endif
+};
+typedef struct xen_domctl_set_opt_feature xen_domctl_set_opt_feature_t;
+DEFINE_XEN_GUEST_HANDLE(xen_domctl_set_opt_feature_t);
 
 struct xen_domctl {
     uint32_t cmd;
@@ -575,6 +586,7 @@ struct xen_domctl {
         struct xen_domctl_ioport_mapping    ioport_mapping;
         struct xen_domctl_pin_mem_cacheattr pin_mem_cacheattr;
         struct xen_domctl_ext_vcpucontext   ext_vcpucontext;
+        struct xen_domctl_set_opt_feature   set_opt_feature;
         uint8_t                             pad[128];
     } u;
 };
