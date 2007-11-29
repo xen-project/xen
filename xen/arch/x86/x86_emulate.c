@@ -1484,7 +1484,7 @@ x86_emulate(
     case 0xc4: /* les */ {
         unsigned long sel;
         dst.val = x86_seg_es;
-    les:
+    les: /* dst.val identifies the segment */
         generate_exception_if(src.type != OP_MEM, EXC_UD);
         if ( (rc = ops->read(src.mem.seg, src.mem.off + src.bytes,
                              &sel, 2, ctxt)) != 0 )
@@ -1723,7 +1723,8 @@ x86_emulate(
             break;
         case 2: /* call (near) */
         case 4: /* jmp (near) */
-            if ( ((op_bytes = dst.bytes) != 8) && mode_64bit() )
+            dst.type = OP_NONE;
+            if ( (dst.bytes != 8) && mode_64bit() )
             {
                 dst.bytes = op_bytes = 8;
                 if ( dst.type == OP_REG )
@@ -1739,7 +1740,7 @@ x86_emulate(
             break;
         case 3: /* call (far, absolute indirect) */
         case 5: /* jmp (far, absolute indirect) */ {
-            unsigned long sel, eip = dst.val;
+            unsigned long sel;
 
             if ( (rc = ops->read(dst.mem.seg, dst.mem.off+dst.bytes,
                                  &sel, 2, ctxt)) )
@@ -1759,7 +1760,7 @@ x86_emulate(
 
             if ( (rc = load_seg(x86_seg_cs, sel, ctxt, ops)) != 0 )
                 goto done;
-            _regs.eip = eip;
+            _regs.eip = dst.val;
 
             dst.type = OP_NONE;
             break;
@@ -1866,7 +1867,7 @@ x86_emulate(
         src.val = x86_seg_es;
     pop_seg:
         fail_if(ops->write_segment == NULL);
-        /* 64-bit mode: PUSH defaults to a 64-bit operand. */
+        /* 64-bit mode: POP defaults to a 64-bit operand. */
         if ( mode_64bit() && (op_bytes == 4) )
             op_bytes = 8;
         if ( (rc = ops->read(x86_seg_ss, sp_post_inc(op_bytes),
@@ -2005,9 +2006,18 @@ x86_emulate(
             (unsigned long *)&_regs.ecx, (unsigned long *)&_regs.eax };
         generate_exception_if(mode_64bit(), EXC_UD);
         for ( i = 0; i < 8; i++ )
+        {
             if ( (rc = ops->read(x86_seg_ss, sp_post_inc(op_bytes),
-                                 regs[i], op_bytes, ctxt)) != 0 )
-            goto done;
+                                 &dst.val, op_bytes, ctxt)) != 0 )
+                goto done;
+            switch ( op_bytes )
+            {
+            case 1: *(uint8_t  *)regs[i] = (uint8_t)dst.val; break;
+            case 2: *(uint16_t *)regs[i] = (uint16_t)dst.val; break;
+            case 4: *regs[i] = (uint32_t)dst.val; break; /* 64b: zero-ext */
+            case 8: *regs[i] = dst.val; break;
+            }
+        }
         break;
     }
 
