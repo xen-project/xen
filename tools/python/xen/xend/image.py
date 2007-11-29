@@ -426,6 +426,7 @@ class HVMImageHandler(ImageHandler):
 
         self.apic = int(vmConfig['platform'].get('apic', 0))
         self.acpi = int(vmConfig['platform'].get('acpi', 0))
+        self.guest_os_type = vmConfig['platform'].get('guest_os_type')
 
     # Return a list of cmd line args to the device models based on the
     # xm config file

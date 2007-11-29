@@ -129,7 +129,8 @@ XENAPI_PLATFORM_CFG = [ 'acpi', 'apic', 'boot', 'device_model', 'display',
                         'nographic', 'pae', 'rtc_timeoffset', 'serial', 'sdl',
                         'soundhw','stdvga', 'usb', 'usbdevice', 'vnc',
                         'vncconsole', 'vncdisplay', 'vnclisten', 'timer_mode',
-                        'vncpasswd', 'vncunused', 'xauthority', 'pci', 'vhpt']
+                        'vncpasswd', 'vncunused', 'xauthority', 'pci', 'vhpt',
+                        'guest_os_type' ]
 
 # Xen API console 'other_config' keys.
 XENAPI_CONSOLE_OTHER_CFG = ['vncunused', 'vncdisplay', 'vnclisten',
