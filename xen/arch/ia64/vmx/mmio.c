@@ -234,35 +234,6 @@ static int vmx_ide_pio_intercept(ioreq_t *p, u64 *val)
 
 #define TO_LEGACY_IO(pa)  (((pa)>>12<<2)|((pa)&0x3))
 
-static const char * const guest_os_name[] = {
-    "Unknown",
-    "Windows 2003 server",
-    "Linux",
-};
-
-static inline void set_os_type(VCPU *v, u64 type)
-{
-    if (type > OS_BASE && type < OS_END) {
-        v->domain->arch.vmx_platform.gos_type = type;
-        gdprintk(XENLOG_INFO, "Guest OS : %s\n", guest_os_name[type - OS_BASE]);
-
-        if (GOS_WINDOWS(v)) {
-            struct xen_ia64_opt_feature optf;
-
-            /* Windows identity maps regions 4 & 5 */
-            optf.cmd = XEN_IA64_OPTF_IDENT_MAP_REG4;
-            optf.on = XEN_IA64_OPTF_ON;
-            optf.pgprot = (_PAGE_P|_PAGE_A|_PAGE_D|_PAGE_MA_WB|_PAGE_AR_RW);
-            optf.key = 0;
-            domain_opt_feature(v->domain, &optf);
-
-            optf.cmd = XEN_IA64_OPTF_IDENT_MAP_REG5;
-            optf.pgprot = (_PAGE_P|_PAGE_A|_PAGE_D|_PAGE_MA_UC|_PAGE_AR_RW);
-            domain_opt_feature(v->domain, &optf);
-        }
-    }
-}
-
 static void __vmx_identity_mapping_save(int on,
         const struct identity_mapping* im,
         struct hvm_hw_ia64_identity_mapping *im_save)
@@ -359,11 +330,6 @@ static void legacy_io_access(VCPU *vcpu, u64 pa, u64 *val, size_t s, int dir)
 
     p->io_count++;
     
-    if (dir == IOREQ_WRITE && p->addr == OS_TYPE_PORT) {
-        set_os_type(v, *val);
-        return;
-    }
-
     if (vmx_ide_pio_intercept(p, val))
         return;
 

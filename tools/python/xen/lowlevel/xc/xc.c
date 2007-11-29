@@ -604,6 +604,21 @@ static PyObject *pyxc_nvram_init(XcObject *self,
     Py_INCREF(zero);
     return zero;
 }
+
+static PyObject *pyxc_set_os_type(XcObject *self,
+                                  PyObject *args)
+{
+    char *os_type;
+    uint32_t dom;
+
+    if ( !PyArg_ParseTuple(args, "si", &os_type, &dom) )
+        return NULL;
+
+    xc_ia64_set_os_type(self->xc_handle, os_type, dom);
+
+    Py_INCREF(zero);
+    return zero;
+}
 #endif /* __ia64__ */
 
 static PyObject *pyxc_hvm_build(XcObject *self,
@@ -1557,6 +1572,11 @@ static PyMethodDef pyxc_methods[] = {
       (PyCFunction)pyxc_nvram_init,
       METH_VARARGS, "\n"
       "Init nvram in IA64 platform\n"
+      "Returns: [int] 0 on success; -1 on error.\n" },
+    { "set_os_type",
+      (PyCFunction)pyxc_set_os_type,
+      METH_VARARGS, "\n"
+      "Set guest OS type on IA64 platform\n"
       "Returns: [int] 0 on success; -1 on error.\n" },
 #endif /* __ia64__ */
     { "domain_ioport_permission",

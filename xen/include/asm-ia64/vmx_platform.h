@@ -24,25 +24,6 @@
 #include <asm/viosapic.h>
 #include <asm/hvm/vacpi.h>
 
-
-/* Value of guest os type */
-#define OS_BASE     0xB0
-#define OS_UNKNOWN  0xB0
-#define OS_WINDOWS  0xB1
-#define OS_LINUX    0xB2
-#define OS_END      0xB3
-
-#define GOS_WINDOWS(_v) \
-    ((_v)->domain->arch.vmx_platform.gos_type == OS_WINDOWS)
-
-#define GOS_LINUX(_v) \
-    ((_v)->domain->arch.vmx_platform.gos_type == OS_LINUX)
-
-/* port guest Firmware use to indicate os type 
- * this port is used to trigger SMI on x86,
- * it is not used on ia64 */
-#define OS_TYPE_PORT    0xB2
-
 struct vmx_ioreq_page {
     spinlock_t          lock;
     struct page_info   *page;
@@ -52,7 +33,6 @@ int vmx_set_ioreq_page(struct domain *d,
                        struct vmx_ioreq_page *iorp, unsigned long gmfn);
 
 typedef struct virtual_platform_def {
-    unsigned long               gos_type;
     struct vmx_ioreq_page       ioreq;
     struct vmx_ioreq_page       buf_ioreq;
     struct vmx_ioreq_page       buf_pioreq;

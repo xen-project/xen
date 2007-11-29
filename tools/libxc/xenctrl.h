@@ -906,6 +906,9 @@ int xc_ia64_save_to_nvram(int xc_handle, uint32_t dom);
 /* IA64 specific, nvram init */
 int xc_ia64_nvram_init(int xc_handle, char *dom_name, uint32_t dom);
 
+/* IA64 specific, set guest OS type optimizations */
+int xc_ia64_set_os_type(int xc_handle, char *guest_os_type, uint32_t dom);
+
 /* HVM guest pass-through */
 int xc_assign_device(int xc_handle,
                      uint32_t domid,

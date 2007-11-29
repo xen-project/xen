@@ -147,3 +147,16 @@ serial='pty'
 #-----------------------------------------------------------------------------
 #   Set keyboard layout, default is en-us keyboard.
 #keymap='ja'
+
+#-----------------------------------------------------------------------------
+#   Enable optimization features for the specified OS type. (Specific to the
+#           OS running in the guest domain.  Other OSes may not run correctly
+#           if the wrong OS type is specified.)
+#
+#   Default is "default", which should work for all supported guest OSes.
+#
+#   Known values:
+#    'linux' - All Linux variants
+#    'windows' - All Windows variants (Windows Server 2003/2008)
+#
+#guest_os_type='default'

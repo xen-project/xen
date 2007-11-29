@@ -1094,6 +1094,78 @@ error_out:
 }
 
 /*
+ * From asm/pgtable.h
+ */
+#define _PAGE_P_BIT     0
+#define _PAGE_A_BIT     5
+#define _PAGE_D_BIT     6
+
+#define _PAGE_P         (1 << _PAGE_P_BIT)      /* page present bit */
+#define _PAGE_A         (1 << _PAGE_A_BIT)      /* page accessed bit */
+#define _PAGE_D         (1 << _PAGE_D_BIT)      /* page dirty bit */
+
+#define _PAGE_MA_WB     (0x0 <<  2)     /* write back memory attribute */
+#define _PAGE_MA_UC     (0x4 <<  2)     /* uncacheable memory attribute */
+#define _PAGE_AR_RW     (2 <<  9)       /* read & write */
+
+int
+xc_ia64_set_os_type(int xc_handle, char *guest_os_type, uint32_t dom)
+{
+    DECLARE_DOMCTL;
+
+    domctl.cmd = XEN_DOMCTL_set_opt_feature;
+    domctl.domain = (domid_t)dom;
+
+    if (!guest_os_type || !strlen(guest_os_type) ||
+        !strcmp("default", guest_os_type)) {
+
+        /* Nothing */
+        return 0;
+
+    } else if (!strcmp("windows", guest_os_type)) {
+        DPRINTF("Enabling Windows guest OS optimizations\n");
+
+        /* Windows identity maps regions 4 & 5 */
+        domctl.u.set_opt_feature.optf.cmd = XEN_IA64_OPTF_IDENT_MAP_REG4;
+        domctl.u.set_opt_feature.optf.on = XEN_IA64_OPTF_ON;
+        domctl.u.set_opt_feature.optf.pgprot = (_PAGE_P | _PAGE_A | _PAGE_D |
+                                                _PAGE_MA_WB | _PAGE_AR_RW);
+        domctl.u.set_opt_feature.optf.key = 0;
+        if (xc_domctl(xc_handle, &domctl))
+            PERROR("Failed to set region 4 identity mapping for Windows "
+                   "guest OS type.\n");
+
+        domctl.u.set_opt_feature.optf.cmd = XEN_IA64_OPTF_IDENT_MAP_REG5;
+        domctl.u.set_opt_feature.optf.on = XEN_IA64_OPTF_ON;
+        domctl.u.set_opt_feature.optf.pgprot = (_PAGE_P | _PAGE_A | _PAGE_D |
+                                                _PAGE_MA_UC | _PAGE_AR_RW);
+        domctl.u.set_opt_feature.optf.key = 0;
+        if (xc_domctl(xc_handle, &domctl))
+            PERROR("Failed to set region 5 identity mapping for Windows "
+                   "guest OS type.\n");
+        return 0;
+
+    } else if (!strcmp("linux", guest_os_type)) {
+        DPRINTF("Enabling Linux guest OS optimizations\n");
+
+        /* Linux identity maps regions 7 */
+        domctl.u.set_opt_feature.optf.cmd = XEN_IA64_OPTF_IDENT_MAP_REG7;
+        domctl.u.set_opt_feature.optf.on = XEN_IA64_OPTF_ON;
+        domctl.u.set_opt_feature.optf.pgprot = (_PAGE_P | _PAGE_A | _PAGE_D |
+                                                _PAGE_MA_WB | _PAGE_AR_RW);
+        domctl.u.set_opt_feature.optf.key = 0;
+        if (xc_domctl(xc_handle, &domctl))
+            PERROR("Failed to set region 7 identity mapping for Linux "
+                   "guest OS type.\n");
+        return 0;
+    }
+
+    DPRINTF("Unknown guest_os_type (%s), using defaults\n", guest_os_type);
+
+    return 0;
+}
+
+/*
  * Local variables:
  * mode: C
  * c-set-style: "BSD"

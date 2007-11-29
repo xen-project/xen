@@ -606,6 +606,20 @@ struct xen_ia64_boot_param {
 #define XEN_IA64_OPTF_IDENT_MAP_REG7		\
 	(1UL << XEN_IA64_OPTF_IDENT_MAP_REG7_BIT)
 
+/* Identity mapping of region 4 addresses in HVM. */
+#define XEN_IA64_OPTF_IDENT_MAP_REG4_BIT        \
+        (XEN_IA64_OPTF_IDENT_MAP_REG7_BIT + 1)
+#define XEN_IA64_OPTF_IDENT_MAP_REG4            \
+        (1UL << XEN_IA64_OPTF_IDENT_MAP_REG4_BIT)
+
+/* Identity mapping of region 5 addresses in HVM. */
+#define XEN_IA64_OPTF_IDENT_MAP_REG5_BIT        \
+        (XEN_IA64_OPTF_IDENT_MAP_REG7_BIT + 2)
+#define XEN_IA64_OPTF_IDENT_MAP_REG5            \
+        (1UL << XEN_IA64_OPTF_IDENT_MAP_REG5_BIT)
+
+#define XEN_IA64_OPTF_IDENT_MAP_NOT_SET  (0)
+
 struct xen_ia64_opt_feature {
 	unsigned long cmd;		/* Which feature */
 	unsigned char on;		/* Switch feature on/off */

@@ -541,6 +541,8 @@ class IA64_HVM_ImageHandler(HVMImageHandler):
     def buildDomain(self):
         xc.nvram_init(self.vm.getName(), self.vm.getDomid())
         xc.hvm_set_param(self.vm.getDomid(), HVM_PARAM_VHPT_SIZE, self.vhpt)
+        if self.guest_os_type is not None:
+            xc.set_os_type(self.guest_os_type.lower(), self.vm.getDomid())
         return HVMImageHandler.buildDomain(self)
 
     def getRequiredAvailableMemory(self, mem_kb):

@@ -75,11 +75,11 @@ struct xen_sal_data {
 };
 
 /*
- * Optimization features
- * are used by the hypervisor to do some optimizations for guests.
- * By default the optimizations are switched off and the guest has to activate
- * the feature. On PV the guest must do this via the hypercall
- * __HYPERVISOR_opt_feature, on HVM it's done within xen in set_os_type().
+ * Optimization features are used by the hypervisor to do some optimizations
+ * for guests.  By default the optimizations are switched off and the guest
+ * may activate the feature. The guest may do this via the hypercall
+ * __HYPERVISOR_opt_feature.  Domain builder code can also enable these
+ * via XEN_DOMCTL_set_opt_feature.
  */
 
 /*
@@ -100,20 +100,6 @@ struct opt_feature {
     struct identity_mapping im_reg5;	/* Region 5 identity mapping */
     struct identity_mapping im_reg7;	/* Region 7 identity mapping */
 };
-
-/*
- * The base XEN_IA64_OPTF_IDENT_MAP_REG7 is defined in public/arch-ia64.h.
- * Identity mapping of region 4 addresses in HVM.
- */
-#define XEN_IA64_OPTF_IDENT_MAP_REG4_BIT        \
-    (XEN_IA64_OPTF_IDENT_MAP_REG7_BIT + 1)
-#define XEN_IA64_OPTF_IDENT_MAP_REG4            \
-    (1UL << XEN_IA64_OPTF_IDENT_MAP_REG4_BIT)
-/* Identity mapping of region 5 addresses in HVM. */
-#define XEN_IA64_OPTF_IDENT_MAP_REG5_BIT        \
-    (XEN_IA64_OPTF_IDENT_MAP_REG7_BIT + 2)
-#define XEN_IA64_OPTF_IDENT_MAP_REG5            \
-    (1UL << XEN_IA64_OPTF_IDENT_MAP_REG5_BIT)
 
 /* Set an optimization feature in the struct arch_domain. */
 extern int domain_opt_feature(struct domain *, struct xen_ia64_opt_feature*);
