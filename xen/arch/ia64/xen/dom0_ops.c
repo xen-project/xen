@@ -343,6 +343,20 @@ long arch_do_domctl(xen_domctl_t *op, XEN_GUEST_HANDLE(xen_domctl_t) u_domctl)
     }
     break;
 
+    case XEN_DOMCTL_set_opt_feature:
+    {
+        struct xen_ia64_opt_feature *optf = &op->u.set_opt_feature.optf;
+        struct domain *d = get_domain_by_id(op->domain);
+
+        if (d == NULL) {
+            ret = -EINVAL;
+            break;
+        }
+
+        ret = domain_opt_feature(d, optf);
+    }
+    break;
+
     default:
         printk("arch_do_domctl: unrecognized domctl: %d!!!\n",op->cmd);
         ret = -ENOSYS;
