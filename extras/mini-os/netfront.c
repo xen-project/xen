@@ -147,6 +147,7 @@ moretodo:
         struct net_buffer* buf = &rx_buffers[id];
         void* page = buf->page;
 
+        /* We are sure to have free gnttab entries since they got released above */
         buf->gref = req->gref = 
             gnttab_grant_access(0,virt_to_mfn(page),0);
 
@@ -436,8 +437,9 @@ void netfront_xmit(unsigned char* data,int len)
     down(&tx_sem);
 
     local_irq_save(flags);
-
     id = get_id_from_freelist(tx_freelist);
+    local_irq_restore(flags);
+
     buf = &tx_buffers[id];
     page = buf->page;
 
@@ -461,7 +463,7 @@ void netfront_xmit(unsigned char* data,int len)
 
     if(notify) notify_remote_via_evtchn(info->evtchn);
 
+    local_irq_save(flags);
     network_tx_buf_gc();
-
     local_irq_restore(flags);
 }

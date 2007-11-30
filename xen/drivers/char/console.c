@@ -835,7 +835,7 @@ void debugtrace_printk(const char *fmt, ...)
     snprintf(buf, sizeof(buf), "%u ", ++count);
 
     va_start(args, fmt);
-    (void)vsnprintf(buf + strlen(buf), sizeof(buf), fmt, args);
+    (void)vsnprintf(buf + strlen(buf), sizeof(buf) - strlen(buf), fmt, args);
     va_end(args);
 
     if ( debugtrace_send_to_console )

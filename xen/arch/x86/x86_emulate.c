@@ -152,7 +152,8 @@ static uint8_t opcode_table[256] = {
     DstReg|SrcMem|ModRM|Mov, DstReg|SrcMem|ModRM|Mov,
     ByteOp|DstMem|SrcImm|ModRM|Mov, DstMem|SrcImm|ModRM|Mov,
     /* 0xC8 - 0xCF */
-    0, 0, 0, 0, ImplicitOps, ImplicitOps, ImplicitOps, ImplicitOps,
+    ImplicitOps, ImplicitOps, ImplicitOps, ImplicitOps,
+    ImplicitOps, ImplicitOps, ImplicitOps, ImplicitOps,
     /* 0xD0 - 0xD7 */
     ByteOp|DstMem|SrcImplicit|ModRM, DstMem|SrcImplicit|ModRM, 
     ByteOp|DstMem|SrcImplicit|ModRM, DstMem|SrcImplicit|ModRM, 
@@ -190,7 +191,7 @@ static uint8_t twobyte_table[256] = {
     /* 0x28 - 0x2F */
     0, 0, 0, 0, 0, 0, 0, 0,
     /* 0x30 - 0x37 */
-    ImplicitOps, 0, ImplicitOps, 0, 0, 0, 0, 0,
+    ImplicitOps, ImplicitOps, ImplicitOps, 0, 0, 0, 0, 0,
     /* 0x38 - 0x3F */
     0, 0, 0, 0, 0, 0, 0, 0,
     /* 0x40 - 0x47 */
@@ -227,10 +228,10 @@ static uint8_t twobyte_table[256] = {
     ByteOp|DstMem|SrcNone|ModRM|Mov, ByteOp|DstMem|SrcNone|ModRM|Mov,
     /* 0xA0 - 0xA7 */
     ImplicitOps, ImplicitOps, ImplicitOps, DstBitBase|SrcReg|ModRM,
-    0, 0, 0, 0, 
+    DstMem|SrcReg|ModRM, DstMem|SrcReg|ModRM, 0, 0, 
     /* 0xA8 - 0xAF */
     ImplicitOps, ImplicitOps, 0, DstBitBase|SrcReg|ModRM,
-    0, 0, 0, DstReg|SrcMem|ModRM,
+    DstMem|SrcReg|ModRM, DstMem|SrcReg|ModRM, 0, DstReg|SrcMem|ModRM,
     /* 0xB0 - 0xB7 */
     ByteOp|DstMem|SrcReg|ModRM, DstMem|SrcReg|ModRM,
     DstReg|SrcMem|ModRM|Mov, DstBitBase|SrcReg|ModRM,
@@ -269,6 +270,13 @@ struct operand {
         } mem;
     };
 };
+
+/* MSRs. */
+#define MSR_TSC   0x10
+
+/* Control register flags. */
+#define CR0_PE    (1<<0)
+#define CR4_TSD   (1<<2)
 
 /* EFLAGS bit definitions. */
 #define EFLG_VIP  (1<<20)
@@ -476,13 +484,13 @@ do{ asm volatile (                                                      \
 })
 #define insn_fetch_type(_type) ((_type)insn_fetch_bytes(sizeof(_type)))
 
-#define _truncate_ea(ea, byte_width)            \
+#define truncate_word(ea, byte_width)           \
 ({  unsigned long __ea = (ea);                  \
     unsigned int _width = (byte_width);         \
     ((_width == sizeof(unsigned long)) ? __ea : \
      (__ea & ((1UL << (_width << 3)) - 1)));    \
 })
-#define truncate_ea(ea) _truncate_ea((ea), ad_bytes)
+#define truncate_ea(ea) truncate_word((ea), ad_bytes)
 
 #define mode_64bit() (def_ad_bytes == 8)
 
@@ -500,12 +508,11 @@ do {                                                    \
     }                                                                   \
 })
 
-/* Given byte has even parity (even number of 1s)? */
-static int even_parity(uint8_t v)
+/* Given longword has even parity (even number of 1s)? */
+static int even_parity(unsigned long v)
 {
-    asm ( "test %%al,%%al; setp %%al"
-              : "=a" (v) : "0" (v) );
-    return v;
+    asm ( "test %0,%0; setp %b0" : "=a" (v) : "0" (v) );
+    return (uint8_t)v;
 }
 
 /* Update address held in a register, based on addressing mode. */
@@ -526,10 +533,10 @@ do {                                                                    \
 
 #define sp_pre_dec(dec) ({                                              \
     _register_address_increment(_regs.esp, -(dec), ctxt->sp_size/8);    \
-    _truncate_ea(_regs.esp, ctxt->sp_size/8);                           \
+    truncate_word(_regs.esp, ctxt->sp_size/8);                          \
 })
 #define sp_post_inc(inc) ({                                             \
-    unsigned long __esp = _truncate_ea(_regs.esp, ctxt->sp_size/8);     \
+    unsigned long __esp = truncate_word(_regs.esp, ctxt->sp_size/8);    \
     _register_address_increment(_regs.esp, (inc), ctxt->sp_size/8);     \
     __esp;                                                              \
 })
@@ -738,7 +745,7 @@ in_realmode(
         return 0;
 
     rc = ops->read_cr(0, &cr0, ctxt);
-    return (!rc && !(cr0 & 1));
+    return (!rc && !(cr0 & CR0_PE));
 }
 
 static int
@@ -1477,7 +1484,7 @@ x86_emulate(
     case 0xc4: /* les */ {
         unsigned long sel;
         dst.val = x86_seg_es;
-    les:
+    les: /* dst.val identifies the segment */
         generate_exception_if(src.type != OP_MEM, EXC_UD);
         if ( (rc = ops->read(src.mem.seg, src.mem.off + src.bytes,
                              &sel, 2, ctxt)) != 0 )
@@ -1716,7 +1723,8 @@ x86_emulate(
             break;
         case 2: /* call (near) */
         case 4: /* jmp (near) */
-            if ( ((op_bytes = dst.bytes) != 8) && mode_64bit() )
+            dst.type = OP_NONE;
+            if ( (dst.bytes != 8) && mode_64bit() )
             {
                 dst.bytes = op_bytes = 8;
                 if ( dst.type == OP_REG )
@@ -1732,7 +1740,7 @@ x86_emulate(
             break;
         case 3: /* call (far, absolute indirect) */
         case 5: /* jmp (far, absolute indirect) */ {
-            unsigned long sel, eip = dst.val;
+            unsigned long sel;
 
             if ( (rc = ops->read(dst.mem.seg, dst.mem.off+dst.bytes,
                                  &sel, 2, ctxt)) )
@@ -1752,7 +1760,7 @@ x86_emulate(
 
             if ( (rc = load_seg(x86_seg_cs, sel, ctxt, ops)) != 0 )
                 goto done;
-            _regs.eip = eip;
+            _regs.eip = dst.val;
 
             dst.type = OP_NONE;
             break;
@@ -1859,7 +1867,7 @@ x86_emulate(
         src.val = x86_seg_es;
     pop_seg:
         fail_if(ops->write_segment == NULL);
-        /* 64-bit mode: PUSH defaults to a 64-bit operand. */
+        /* 64-bit mode: POP defaults to a 64-bit operand. */
         if ( mode_64bit() && (op_bytes == 4) )
             op_bytes = 8;
         if ( (rc = ops->read(x86_seg_ss, sp_post_inc(op_bytes),
@@ -1907,7 +1915,7 @@ x86_emulate(
         _regs.eflags &= ~(EFLG_SF|EFLG_ZF|EFLG_PF);
         _regs.eflags |= ((uint8_t)_regs.eax == 0) ? EFLG_ZF : 0;
         _regs.eflags |= (( int8_t)_regs.eax <  0) ? EFLG_SF : 0;
-        _regs.eflags |= even_parity(_regs.eax) ? EFLG_PF : 0;
+        _regs.eflags |= even_parity((uint8_t)_regs.eax) ? EFLG_PF : 0;
         break;
     }
 
@@ -1931,7 +1939,7 @@ x86_emulate(
         _regs.eflags &= ~(EFLG_SF|EFLG_ZF|EFLG_PF);
         _regs.eflags |= ((uint8_t)_regs.eax == 0) ? EFLG_ZF : 0;
         _regs.eflags |= (( int8_t)_regs.eax <  0) ? EFLG_SF : 0;
-        _regs.eflags |= even_parity(_regs.eax) ? EFLG_PF : 0;
+        _regs.eflags |= even_parity((uint8_t)_regs.eax) ? EFLG_PF : 0;
         break;
     }
 
@@ -1998,9 +2006,18 @@ x86_emulate(
             (unsigned long *)&_regs.ecx, (unsigned long *)&_regs.eax };
         generate_exception_if(mode_64bit(), EXC_UD);
         for ( i = 0; i < 8; i++ )
+        {
             if ( (rc = ops->read(x86_seg_ss, sp_post_inc(op_bytes),
-                                 regs[i], op_bytes, ctxt)) != 0 )
-            goto done;
+                                 &dst.val, op_bytes, ctxt)) != 0 )
+                goto done;
+            switch ( op_bytes )
+            {
+            case 1: *(uint8_t  *)regs[i] = (uint8_t)dst.val; break;
+            case 2: *(uint16_t *)regs[i] = (uint16_t)dst.val; break;
+            case 4: *regs[i] = (uint32_t)dst.val; break; /* 64b: zero-ext */
+            case 8: *regs[i] = dst.val; break;
+            }
+        }
         break;
     }
 
@@ -2262,6 +2279,77 @@ x86_emulate(
         break;
     }
 
+    case 0xc8: /* enter imm16,imm8 */ {
+        uint16_t size = insn_fetch_type(uint16_t);
+        uint8_t depth = insn_fetch_type(uint8_t) & 31;
+        int i;
+
+        dst.type = OP_REG;
+        dst.bytes = (mode_64bit() && (op_bytes == 4)) ? 8 : op_bytes;
+        dst.reg = (unsigned long *)&_regs.ebp;
+        if ( (rc = ops->write(x86_seg_ss, sp_pre_dec(dst.bytes),
+                              _regs.ebp, dst.bytes, ctxt)) )
+            goto done;
+        dst.val = _regs.esp;
+
+        if ( depth > 0 )
+        {
+            for ( i = 1; i < depth; i++ )
+            {
+                unsigned long ebp, temp_data;
+                ebp = truncate_word(_regs.ebp - i*dst.bytes, ctxt->sp_size/8);
+                if ( (rc = ops->read(x86_seg_ss, ebp,
+                                     &temp_data, dst.bytes, ctxt)) ||
+                     (rc = ops->write(x86_seg_ss, sp_pre_dec(dst.bytes),
+                                      temp_data, dst.bytes, ctxt)) )
+                    goto done;
+            }
+            if ( (rc = ops->write(x86_seg_ss, sp_pre_dec(dst.bytes),
+                                  dst.val, dst.bytes, ctxt)) )
+                goto done;
+        }
+
+        sp_pre_dec(size);
+        break;
+    }
+
+    case 0xc9: /* leave */
+        /* First writeback, to %%esp. */
+        dst.type = OP_REG;
+        dst.bytes = (mode_64bit() && (op_bytes == 4)) ? 8 : op_bytes;
+        dst.reg = (unsigned long *)&_regs.esp;
+        dst.val = _regs.ebp;
+
+        /* Flush first writeback, since there is a second. */
+        switch ( dst.bytes )
+        {
+        case 1: *(uint8_t  *)dst.reg = (uint8_t)dst.val; break;
+        case 2: *(uint16_t *)dst.reg = (uint16_t)dst.val; break;
+        case 4: *dst.reg = (uint32_t)dst.val; break; /* 64b: zero-ext */
+        case 8: *dst.reg = dst.val; break;
+        }
+
+        /* Second writeback, to %%ebp. */
+        dst.reg = (unsigned long *)&_regs.ebp;
+        if ( (rc = ops->read(x86_seg_ss, sp_post_inc(dst.bytes),
+                             &dst.val, dst.bytes, ctxt)) )
+            goto done;
+        break;
+
+    case 0xca: /* ret imm16 (far) */
+    case 0xcb: /* ret (far) */ {
+        int offset = (b == 0xca) ? insn_fetch_type(uint16_t) : 0;
+        op_bytes = mode_64bit() ? 8 : op_bytes;
+        if ( (rc = ops->read(x86_seg_ss, sp_post_inc(op_bytes),
+                             &dst.val, op_bytes, ctxt)) || 
+             (rc = ops->read(x86_seg_ss, sp_post_inc(op_bytes + offset),
+                             &src.val, op_bytes, ctxt)) ||
+             (rc = load_seg(x86_seg_cs, (uint16_t)src.val, ctxt, ops)) )
+            goto done;
+        _regs.eip = dst.val;
+        break;
+    }
+
     case 0xcc: /* int3 */
         src.val = EXC_BP;
         goto swint;
@@ -2317,7 +2405,7 @@ x86_emulate(
         _regs.eflags &= ~(EFLG_SF|EFLG_ZF|EFLG_PF);
         _regs.eflags |= ((uint8_t)_regs.eax == 0) ? EFLG_ZF : 0;
         _regs.eflags |= (( int8_t)_regs.eax <  0) ? EFLG_SF : 0;
-        _regs.eflags |= even_parity(_regs.eax) ? EFLG_PF : 0;
+        _regs.eflags |= even_parity((uint8_t)_regs.eax) ? EFLG_PF : 0;
         break;
     }
 
@@ -2329,7 +2417,7 @@ x86_emulate(
         _regs.eflags &= ~(EFLG_SF|EFLG_ZF|EFLG_PF);
         _regs.eflags |= ((uint8_t)_regs.eax == 0) ? EFLG_ZF : 0;
         _regs.eflags |= (( int8_t)_regs.eax <  0) ? EFLG_SF : 0;
-        _regs.eflags |= even_parity(_regs.eax) ? EFLG_PF : 0;
+        _regs.eflags |= even_parity((uint8_t)_regs.eax) ? EFLG_PF : 0;
         break;
     }
 
@@ -2528,6 +2616,35 @@ x86_emulate(
         emulate_2op_SrcV_nobyte("bt", src, dst, _regs.eflags);
         break;
 
+    case 0xa4: /* shld imm8,r,r/m */
+    case 0xa5: /* shld %%cl,r,r/m */
+    case 0xac: /* shrd imm8,r,r/m */
+    case 0xad: /* shrd %%cl,r,r/m */ {
+        uint8_t shift, width = dst.bytes << 3;
+        shift = (b & 1) ? (uint8_t)_regs.ecx : insn_fetch_type(uint8_t);
+        if ( (shift &= width - 1) == 0 )
+            break;
+        dst.orig_val = truncate_word(dst.orig_val, dst.bytes);
+        dst.val = ((shift == width) ? src.val :
+                   (b & 8) ?
+                   /* shrd */
+                   ((dst.orig_val >> shift) |
+                    truncate_word(src.val << (width - shift), dst.bytes)) :
+                   /* shld */
+                   ((dst.orig_val << shift) |
+                    ((src.val >> (width - shift)) & ((1ull << shift) - 1))));
+        dst.val = truncate_word(dst.val, dst.bytes);
+        _regs.eflags &= ~(EFLG_OF|EFLG_SF|EFLG_ZF|EFLG_PF|EFLG_CF);
+        if ( (dst.val >> ((b & 8) ? (shift - 1) : (width - shift))) & 1 )
+            _regs.eflags |= EFLG_CF;
+        if ( ((dst.val ^ dst.orig_val) >> (width - 1)) & 1 )
+            _regs.eflags |= EFLG_OF;
+        _regs.eflags |= ((dst.val >> (width - 1)) & 1) ? EFLG_SF : 0;
+        _regs.eflags |= (dst.val == 0) ? EFLG_ZF : 0;
+        _regs.eflags |= even_parity(dst.val) ? EFLG_PF : 0;
+        break;
+    }
+
     case 0xb3: btr: /* btr */
         emulate_2op_SrcV_nobyte("btr", src, dst, _regs.eflags);
         break;
@@ -2651,6 +2768,7 @@ x86_emulate(
     {
     case 0x01: /* Grp7 */ {
         struct segment_register reg;
+        unsigned long base, limit, cr0, cr0w;
 
         switch ( modrm_reg & 7 )
         {
@@ -2676,16 +2794,40 @@ x86_emulate(
             fail_if(ops->write_segment == NULL);
             memset(&reg, 0, sizeof(reg));
             if ( (rc = ops->read(ea.mem.seg, ea.mem.off+0,
-                                 (unsigned long *)&reg.limit, 2, ctxt)) ||
+                                 &limit, 2, ctxt)) ||
                  (rc = ops->read(ea.mem.seg, ea.mem.off+2,
-                                 (unsigned long *)&reg.base,
-                                 mode_64bit() ? 8 : 4, ctxt)) )
+                                 &base, mode_64bit() ? 8 : 4, ctxt)) )
                 goto done;
+            reg.base = base;
+            reg.limit = limit;
             if ( op_bytes == 2 )
                 reg.base &= 0xffffff;
             if ( (rc = ops->write_segment((modrm_reg & 1) ?
                                           x86_seg_idtr : x86_seg_gdtr,
                                           &reg, ctxt)) )
+                goto done;
+            break;
+        case 4: /* smsw */
+            ea.bytes = 2;
+            dst = ea;
+            fail_if(ops->read_cr == NULL);
+            if ( (rc = ops->read_cr(0, &dst.val, ctxt)) )
+                goto done;
+            d |= Mov; /* force writeback */
+            break;
+        case 6: /* lmsw */
+            fail_if(ops->read_cr == NULL);
+            fail_if(ops->write_cr == NULL);
+            if ( (rc = ops->read_cr(0, &cr0, ctxt)) )
+                goto done;
+            if ( ea.type == OP_REG )
+                cr0w = *ea.reg;
+            else if ( (rc = ops->read(ea.mem.seg, ea.mem.off,
+                                      &cr0w, 2, ctxt)) )
+                goto done;
+            cr0 &= 0xffff0000;
+            cr0 |= (uint16_t)cr0w;
+            if ( (rc = ops->write_cr(0, cr0, ctxt)) )
                 goto done;
             break;
         default:
@@ -2760,6 +2902,21 @@ x86_emulate(
         fail_if(ops->write_msr == NULL);
         if ( (rc = ops->write_msr((uint32_t)_regs.ecx, val, ctxt)) != 0 )
             goto done;
+        break;
+    }
+
+    case 0x31: /* rdtsc */ {
+        unsigned long cr4;
+        uint64_t val;
+        fail_if(ops->read_cr == NULL);
+        if ( (rc = ops->read_cr(4, &cr4, ctxt)) )
+            goto done;
+        generate_exception_if((cr4 & CR4_TSD) && !mode_ring0(), EXC_GP);
+        fail_if(ops->read_msr == NULL);
+        if ( (rc = ops->read_msr(MSR_TSC, &val, ctxt)) != 0 )
+            goto done;
+        _regs.edx = (uint32_t)(val >> 32);
+        _regs.eax = (uint32_t)(val >>  0);
         break;
     }
 

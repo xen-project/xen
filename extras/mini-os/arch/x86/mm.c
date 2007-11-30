@@ -270,6 +270,9 @@ void build_pagetable(unsigned long *start_pfn, unsigned long *max_pfn)
         start_address += PAGE_SIZE;
     }
 
+    if (HYPERVISOR_update_va_mapping(0, (pte_t) {}, UVMF_INVLPG))
+        printk("Unable to unmap page 0\n");
+
     *start_pfn = pt_pfn;
 }
 

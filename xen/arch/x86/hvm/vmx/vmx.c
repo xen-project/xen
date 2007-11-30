@@ -2722,6 +2722,7 @@ static void vmx_failed_vmentry(unsigned int exit_reason,
 {
     unsigned int failed_vmentry_reason = (uint16_t)exit_reason;
     unsigned long exit_qualification = __vmread(EXIT_QUALIFICATION);
+    struct vcpu *curr = current;
 
     printk("Failed vm entry (exit reason 0x%x) ", exit_reason);
     switch ( failed_vmentry_reason )
@@ -2734,7 +2735,7 @@ static void vmx_failed_vmentry(unsigned int exit_reason,
         break;
     case EXIT_REASON_MACHINE_CHECK:
         printk("caused by machine check.\n");
-        HVMTRACE_0D(MCE, current);
+        HVMTRACE_0D(MCE, curr);
         do_machine_check(regs);
         break;
     default:
@@ -2743,10 +2744,10 @@ static void vmx_failed_vmentry(unsigned int exit_reason,
     }
 
     printk("************* VMCS Area **************\n");
-    vmcs_dump_vcpu();
+    vmcs_dump_vcpu(curr);
     printk("**************************************\n");
 
-    domain_crash(current->domain);
+    domain_crash(curr->domain);
 }
 
 asmlinkage void vmx_vmexit_handler(struct cpu_user_regs *regs)

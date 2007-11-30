@@ -661,7 +661,8 @@ static void vlapic_write(struct vcpu *v, unsigned long address,
 
     case APIC_TMICT:
     {
-        uint64_t period = APIC_BUS_CYCLE_NS * (uint32_t)val * vlapic->hw.timer_divisor;
+        uint64_t period = (uint64_t)APIC_BUS_CYCLE_NS *
+                            (uint32_t)val * vlapic->hw.timer_divisor;
 
         vlapic_set_reg(vlapic, APIC_TMICT, val);
         create_periodic_time(current, &vlapic->pt, period, vlapic->pt.irq,
@@ -820,8 +821,10 @@ static void lapic_rearm(struct vlapic *s)
     unsigned long tmict;
 
     tmict = vlapic_get_reg(s, APIC_TMICT);
-    if (tmict > 0) {
-        uint64_t period = APIC_BUS_CYCLE_NS * (uint32_t)tmict * s->hw.timer_divisor;
+    if ( tmict > 0 )
+    {
+        uint64_t period = (uint64_t)APIC_BUS_CYCLE_NS *
+                            (uint32_t)tmict * s->hw.timer_divisor;
         uint32_t lvtt = vlapic_get_reg(s, APIC_LVTT);
 
         s->pt.irq = lvtt & APIC_VECTOR_MASK;
@@ -830,9 +833,9 @@ static void lapic_rearm(struct vlapic *s)
                              &s->timer_last_update);
 
         printk("lapic_load to rearm the actimer:"
-                    "bus cycle is %uns, "
-                    "saved tmict count %lu, period %"PRIu64"ns, irq=%"PRIu8"\n",
-                    APIC_BUS_CYCLE_NS, tmict, period, s->pt.irq);
+               "bus cycle is %uns, "
+               "saved tmict count %lu, period %"PRIu64"ns, irq=%"PRIu8"\n",
+               APIC_BUS_CYCLE_NS, tmict, period, s->pt.irq);
     }
 
     lapic_info(s);

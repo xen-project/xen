@@ -18,6 +18,7 @@
 #include <os.h>
 #include <mm.h>
 #include <gnttab.h>
+#include <semaphore.h>
 
 #define NR_RESERVED_ENTRIES 8
 
@@ -31,20 +32,29 @@
 
 static grant_entry_t *gnttab_table;
 static grant_ref_t gnttab_list[NR_GRANT_ENTRIES];
+static __DECLARE_SEMAPHORE_GENERIC(gnttab_sem, NR_GRANT_ENTRIES);
 
 static void
 put_free_entry(grant_ref_t ref)
 {
+    unsigned long flags;
+    local_irq_save(flags);
     gnttab_list[ref] = gnttab_list[0];
     gnttab_list[0]  = ref;
-
+    local_irq_restore(flags);
+    up(&gnttab_sem);
 }
 
 static grant_ref_t
 get_free_entry(void)
 {
-    unsigned int ref = gnttab_list[0];
+    unsigned int ref;
+    unsigned long flags;
+    down(&gnttab_sem);
+    local_irq_save(flags);
+    ref = gnttab_list[0];
     gnttab_list[0] = gnttab_list[ref];
+    local_irq_restore(flags);
     return ref;
 }
 

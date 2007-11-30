@@ -276,6 +276,9 @@ static int __iommu_flush_context(
     unsigned long flag;
     unsigned long start_time;
 
+    /* Domain id in context is 1 based */
+    did++;
+
     /*
      * In the non-present entry flush case, if hardware doesn't cache
      * non-present entry we do nothing and if hardware cache non-present
@@ -359,6 +362,9 @@ static int __iommu_flush_iotlb(struct iommu *iommu, u16 did,
     u64 val = 0, val_iva = 0;
     unsigned long flag;
     unsigned long start_time;
+
+    /* Domain id in context is 1 based */
+    did++;
 
     /*
      * In the non-present entry flush case, if hardware doesn't cache
@@ -1037,6 +1043,18 @@ static int domain_context_mapping_one(
         context_set_translation_type(*context, CONTEXT_TT_PASS_THRU);
     else
     {
+        if ( !hd->pgd )
+        {
+            struct dma_pte *pgd = (struct dma_pte *)alloc_xenheap_page();
+            if ( !pgd )
+            {
+                spin_unlock_irqrestore(&hd->mapping_lock, flags);
+                return -ENOMEM;
+            }
+            memset(pgd, 0, PAGE_SIZE);
+            hd->pgd = pgd;
+        }
+ 
         context_set_address_root(*context, virt_to_maddr(hd->pgd));
         context_set_translation_type(*context, CONTEXT_TT_MULTI_LEVEL);
     }
@@ -1429,7 +1447,7 @@ void iommu_domain_teardown(struct domain *d)
     return_devices_to_dom0(d);
 }
 
-static int domain_context_mapped(struct domain *domain, struct pci_dev *pdev)
+static int domain_context_mapped(struct pci_dev *pdev)
 {
     struct acpi_drhd_unit *drhd;
     struct iommu *iommu;
@@ -1589,7 +1607,7 @@ static int iommu_prepare_rmrr_dev(
     if ( ret )
         return ret;
 
-    if ( domain_context_mapped(d, pdev) == 0 )
+    if ( domain_context_mapped(pdev) == 0 )
     {
         drhd = acpi_find_matched_drhd_unit(pdev);
         ret = domain_context_mapping(d, drhd->iommu, pdev);

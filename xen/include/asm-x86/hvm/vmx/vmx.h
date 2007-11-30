@@ -37,7 +37,7 @@ void vmx_cpuid_intercept(
     unsigned int *eax, unsigned int *ebx,
     unsigned int *ecx, unsigned int *edx);
 void vmx_wbinvd_intercept(void);
-int vmx_realmode(struct cpu_user_regs *regs);
+void vmx_realmode(struct cpu_user_regs *regs);
 int vmx_realmode_io_complete(void);
 
 /*
