@@ -65,7 +65,7 @@ class XendNetwork(XendBase):
         return XendBase.getMethods() + methods
 
     def getFuncs(self):
-        funcs = ['create']
+        funcs = ['create', 'get_by_name_label']
         return XendBase.getFuncs() + funcs
 
     getClass    = classmethod(getClass)
@@ -133,9 +133,15 @@ class XendNetwork(XendBase):
 
         return uuid
 
-    create_phy  = classmethod(create_phy)
-    recreate    = classmethod(recreate)
-    create      = classmethod(create)
+    def get_by_name_label(cls, name):
+        return [inst.get_uuid()
+                 for inst in XendAPIStore.get_all(cls.getClass())
+                 if inst.get_name_label() == name]
+    
+    create_phy        = classmethod(create_phy)
+    recreate          = classmethod(recreate)
+    create            = classmethod(create)
+    get_by_name_label = classmethod(get_by_name_label)
         
     def __init__(self, record, uuid):       
         XendBase.__init__(self, uuid, record)

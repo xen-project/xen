@@ -553,5 +553,7 @@ int acpi_dmar_init(void)
         return -ENODEV;
     }
 
+    printk("Intel VT-d has been enabled\n");
+
     return 0;
 }

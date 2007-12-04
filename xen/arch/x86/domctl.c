@@ -546,7 +546,12 @@ long arch_do_domctl(
         devfn = (domctl->u.assign_device.machine_bdf >> 8) & 0xff;
 
         if ( device_assigned(bus, devfn) )
+        {
+            gdprintk(XENLOG_ERR, "XEN_DOMCTL_assign_device: "
+                     "%x:%x:%x already assigned\n",
+                     bus, PCI_SLOT(devfn), PCI_FUNC(devfn)); 
             break;
+        }
 
         ret = assign_device(d, bus, devfn);
         gdprintk(XENLOG_INFO, "XEN_DOMCTL_assign_device: bdf = %x:%x:%x\n",

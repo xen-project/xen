@@ -27,7 +27,6 @@
 #include <poll.h>
 #include <sys/statvfs.h>
 #include <sys/ioctl.h>
-#include <linux/fs.h>
 #include "blktaplib.h"
 #include "tapdisk.h"
 

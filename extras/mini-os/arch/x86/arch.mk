@@ -17,7 +17,7 @@ endif
 endif
 
 ifeq ($(TARGET_ARCH),x86_64)
-ARCH_CFLAGS := -m64 -mno-red-zone -fpic -fno-reorder-blocks
+ARCH_CFLAGS := -m64 -mno-red-zone -fno-reorder-blocks
 ARCH_CFLAGS += -fno-asynchronous-unwind-tables
 ARCH_ASFLAGS := -m64
 ARCH_LDFLAGS := -m elf_x86_64

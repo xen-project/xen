@@ -41,7 +41,6 @@
 #include <err.h>
 #include <errno.h>
 #include <sys/types.h>
-#include <linux/types.h>
 #include <sys/wait.h>
 #include <signal.h>
 #include <fcntl.h>
@@ -50,7 +49,6 @@
 #include <string.h>
 #include <unistd.h>
 #include <xs.h>
-#include <printf.h>
 #include <sys/time.h>
 #include <syslog.h>
                                                                      

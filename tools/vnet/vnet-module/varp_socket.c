@@ -77,9 +77,10 @@ static inline _syscall3(int, fcntl,
  * Some architectures use socketcall() to multiplex the socket-related calls,
  * but others define individual syscalls instead.
  * Architectures using socketcall() define __ARCH_WANT_SYS_SOCKETCALL.
+ * NB. x86_64 architecture asserts __ARCH_WANT_SYS_SOCKETCALL in error.
  */
 
-#ifdef __ARCH_WANT_SYS_SOCKETCALL
+#if defined(__ARCH_WANT_SYS_SOCKETCALL) && !defined(__x86_64__)
 
 /* Define the socketcall() syscall.
  * Multiplexes all the socket-related calls.

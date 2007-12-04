@@ -211,7 +211,7 @@ linux26:
 # tboot targets
 #
 
-TBOOT_TARFILE = tboot-20071029.tar.gz
+TBOOT_TARFILE = tboot-20071128.tar.gz
 TBOOT_BASE_URL = http://downloads.sourceforge.net/tboot
 
 .PHONY: build-tboot
@@ -221,6 +221,10 @@ build-tboot: download_tboot
 .PHONY: install-tboot
 install-tboot: download_tboot
 	$(MAKE) -C tboot install
+
+.PHONY: dist-tboot
+dist-tboot: download_tboot
+	$(MAKE) DESTDIR=$(DISTDIR)/install -C tboot dist
 
 .PHONY: clean-tboot
 clean-tboot:
