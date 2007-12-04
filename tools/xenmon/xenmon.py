@@ -653,21 +653,36 @@ def writelog():
 # start xenbaked
 def start_xenbaked():
     global options
-    
-    os.system("killall -9 xenbaked")
-    # assumes that xenbaked is in your path
-    os.system("xenbaked --ms_per_sample=%d &" %
+    global kill_cmd
+    global xenbaked_cmd
+
+    os.system(kill_cmd)
+    os.system(xenbaked_cmd + " --ms_per_sample=%d &" %
               options.mspersample)
     time.sleep(1)
 
 # stop xenbaked
 def stop_xenbaked():
-    os.system("killall -s INT xenbaked")
+    global stop_cmd
+    os.system(stop_cmd)
 
 def main():
     global options
     global args
     global domains
+    global stop_cmd
+    global kill_cmd
+    global xenbaked_cmd
+
+    if os.uname()[0] == "SunOS":
+        xenbaked_cmd = "/usr/lib/xenbaked"
+	stop_cmd = "/usr/bin/pkill -INT -z global xenbaked"
+	kill_cmd = "/usr/bin/pkill -KILL -z global xenbaked"
+    else:
+        # assumes that xenbaked is in your path
+        xenbaked_cmd = "xenbaked"
+        stop_cmd = "/usr/bin/pkill -INT xenbaked"
+        kill_cmd = "/usr/bin/pkill -KILL xenbaked"
 
     parser = setup_cmdline_parser()
     (options, args) = parser.parse_args()
