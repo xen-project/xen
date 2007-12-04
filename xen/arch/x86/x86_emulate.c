@@ -2624,7 +2624,7 @@ x86_emulate(
         shift = (b & 1) ? (uint8_t)_regs.ecx : insn_fetch_type(uint8_t);
         if ( (shift &= width - 1) == 0 )
             break;
-        dst.orig_val = truncate_word(dst.orig_val, dst.bytes);
+        dst.orig_val = truncate_word(dst.val, dst.bytes);
         dst.val = ((shift == width) ? src.val :
                    (b & 8) ?
                    /* shrd */
