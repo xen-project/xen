@@ -620,6 +620,7 @@ get_page_from_l1e(
     unsigned long mfn = l1e_get_pfn(l1e);
     struct page_info *page = mfn_to_page(mfn);
     uint32_t l1f = l1e_get_flags(l1e);
+    struct vcpu *curr = current;
     int okay;
 
     if ( !(l1f & _PAGE_PRESENT) )
@@ -635,7 +636,7 @@ get_page_from_l1e(
     {
         /* DOMID_IO reverts to caller for privilege checks. */
         if ( d == dom_io )
-            d = current->domain;
+            d = curr->domain;
 
         if ( !iomem_access_permitted(d, mfn, mfn) )
         {
@@ -653,7 +654,7 @@ get_page_from_l1e(
      * qemu-dm helper process in dom0 to map the domain's memory without
      * messing up the count of "real" writable mappings.) */
     okay = (((l1f & _PAGE_RW) && 
-             !(unlikely(paging_mode_external(d) && (d != current->domain))))
+             !(unlikely(paging_mode_external(d) && (d != curr->domain))))
             ? get_page_and_type(page, d, PGT_writable_page)
             : get_page(page, d));
     if ( !okay )
@@ -673,7 +674,7 @@ get_page_from_l1e(
         {
             if ( (l1f & _PAGE_RW) &&
                  !(unlikely(paging_mode_external(d) &&
-                            (d != current->domain))) )
+                            (d != curr->domain))) )
                 put_page_type(page);
             put_page(page);
             MEM_LOG("Attempt to change cache attributes of Xen heap page");
@@ -1384,14 +1385,15 @@ static int mod_l1_entry(l1_pgentry_t *pl1e, l1_pgentry_t nl1e,
                         unsigned long gl1mfn)
 {
     l1_pgentry_t ol1e;
-    struct domain *d = current->domain;
+    struct vcpu *curr = current;
+    struct domain *d = curr->domain;
     unsigned long mfn;
 
     if ( unlikely(__copy_from_user(&ol1e, pl1e, sizeof(ol1e)) != 0) )
         return 0;
 
     if ( unlikely(paging_mode_refcounts(d)) )
-        return UPDATE_ENTRY(l1, pl1e, ol1e, nl1e, gl1mfn, current);
+        return UPDATE_ENTRY(l1, pl1e, ol1e, nl1e, gl1mfn, curr);
 
     if ( l1e_get_flags(nl1e) & _PAGE_PRESENT )
     {
@@ -1413,12 +1415,12 @@ static int mod_l1_entry(l1_pgentry_t *pl1e, l1_pgentry_t nl1e,
 
         /* Fast path for identical mapping, r/w and presence. */
         if ( !l1e_has_changed(ol1e, nl1e, _PAGE_RW | _PAGE_PRESENT) )
-            return UPDATE_ENTRY(l1, pl1e, ol1e, nl1e, gl1mfn, current);
+            return UPDATE_ENTRY(l1, pl1e, ol1e, nl1e, gl1mfn, curr);
 
         if ( unlikely(!get_page_from_l1e(nl1e, FOREIGNDOM)) )
             return 0;
         
-        if ( unlikely(!UPDATE_ENTRY(l1, pl1e, ol1e, nl1e, gl1mfn, current)) )
+        if ( unlikely(!UPDATE_ENTRY(l1, pl1e, ol1e, nl1e, gl1mfn, curr)) )
         {
             put_page_from_l1e(nl1e, d);
             return 0;
@@ -1426,7 +1428,7 @@ static int mod_l1_entry(l1_pgentry_t *pl1e, l1_pgentry_t nl1e,
     }
     else
     {
-        if ( unlikely(!UPDATE_ENTRY(l1, pl1e, ol1e, nl1e, gl1mfn, current)) )
+        if ( unlikely(!UPDATE_ENTRY(l1, pl1e, ol1e, nl1e, gl1mfn, curr)) )
             return 0;
     }
 
@@ -1442,7 +1444,8 @@ static int mod_l2_entry(l2_pgentry_t *pl2e,
                         unsigned long type)
 {
     l2_pgentry_t ol2e;
-    struct domain *d = current->domain;
+    struct vcpu *curr = current;
+    struct domain *d = curr->domain;
 
     if ( unlikely(!is_guest_l2_slot(d, type, pgentry_ptr_to_slot(pl2e))) )
     {
@@ -1466,18 +1469,18 @@ static int mod_l2_entry(l2_pgentry_t *pl2e,
 
         /* Fast path for identical mapping and presence. */
         if ( !l2e_has_changed(ol2e, nl2e, _PAGE_PRESENT))
-            return UPDATE_ENTRY(l2, pl2e, ol2e, nl2e, pfn, current);
+            return UPDATE_ENTRY(l2, pl2e, ol2e, nl2e, pfn, curr);
 
         if ( unlikely(!get_page_from_l2e(nl2e, pfn, d)) )
             return 0;
 
-        if ( unlikely(!UPDATE_ENTRY(l2, pl2e, ol2e, nl2e, pfn, current)) )
+        if ( unlikely(!UPDATE_ENTRY(l2, pl2e, ol2e, nl2e, pfn, curr)) )
         {
             put_page_from_l2e(nl2e, pfn);
             return 0;
         }
     }
-    else if ( unlikely(!UPDATE_ENTRY(l2, pl2e, ol2e, nl2e, pfn, current)) )
+    else if ( unlikely(!UPDATE_ENTRY(l2, pl2e, ol2e, nl2e, pfn, curr)) )
     {
         return 0;
     }
@@ -1494,7 +1497,8 @@ static int mod_l3_entry(l3_pgentry_t *pl3e,
                         unsigned long pfn)
 {
     l3_pgentry_t ol3e;
-    struct domain *d = current->domain;
+    struct vcpu *curr = current;
+    struct domain *d = curr->domain;
     int okay;
 
     if ( unlikely(!is_guest_l3_slot(pgentry_ptr_to_slot(pl3e))) )
@@ -1528,18 +1532,18 @@ static int mod_l3_entry(l3_pgentry_t *pl3e,
 
         /* Fast path for identical mapping and presence. */
         if (!l3e_has_changed(ol3e, nl3e, _PAGE_PRESENT))
-            return UPDATE_ENTRY(l3, pl3e, ol3e, nl3e, pfn, current);
+            return UPDATE_ENTRY(l3, pl3e, ol3e, nl3e, pfn, curr);
 
         if ( unlikely(!get_page_from_l3e(nl3e, pfn, d)) )
             return 0;
 
-        if ( unlikely(!UPDATE_ENTRY(l3, pl3e, ol3e, nl3e, pfn, current)) )
+        if ( unlikely(!UPDATE_ENTRY(l3, pl3e, ol3e, nl3e, pfn, curr)) )
         {
             put_page_from_l3e(nl3e, pfn);
             return 0;
         }
     }
-    else if ( unlikely(!UPDATE_ENTRY(l3, pl3e, ol3e, nl3e, pfn, current)) )
+    else if ( unlikely(!UPDATE_ENTRY(l3, pl3e, ol3e, nl3e, pfn, curr)) )
     {
         return 0;
     }
@@ -1558,11 +1562,12 @@ static int mod_l3_entry(l3_pgentry_t *pl3e,
 #if CONFIG_PAGING_LEVELS >= 4
 
 /* Update the L4 entry at pl4e to new value nl4e. pl4e is within frame pfn. */
-static int mod_l4_entry(struct domain *d,
-                        l4_pgentry_t *pl4e, 
+static int mod_l4_entry(l4_pgentry_t *pl4e, 
                         l4_pgentry_t nl4e, 
                         unsigned long pfn)
 {
+    struct vcpu *curr = current;
+    struct domain *d = curr->domain;
     l4_pgentry_t ol4e;
 
     if ( unlikely(!is_guest_l4_slot(d, pgentry_ptr_to_slot(pl4e))) )
@@ -1583,22 +1588,22 @@ static int mod_l4_entry(struct domain *d,
             return 0;
         }
 
-        adjust_guest_l4e(nl4e, current->domain);
+        adjust_guest_l4e(nl4e, d);
 
         /* Fast path for identical mapping and presence. */
         if (!l4e_has_changed(ol4e, nl4e, _PAGE_PRESENT))
-            return UPDATE_ENTRY(l4, pl4e, ol4e, nl4e, pfn, current);
+            return UPDATE_ENTRY(l4, pl4e, ol4e, nl4e, pfn, curr);
 
-        if ( unlikely(!get_page_from_l4e(nl4e, pfn, current->domain)) )
+        if ( unlikely(!get_page_from_l4e(nl4e, pfn, d)) )
             return 0;
 
-        if ( unlikely(!UPDATE_ENTRY(l4, pl4e, ol4e, nl4e, pfn, current)) )
+        if ( unlikely(!UPDATE_ENTRY(l4, pl4e, ol4e, nl4e, pfn, curr)) )
         {
             put_page_from_l4e(nl4e, pfn);
             return 0;
         }
     }
-    else if ( unlikely(!UPDATE_ENTRY(l4, pl4e, ol4e, nl4e, pfn, current)) )
+    else if ( unlikely(!UPDATE_ENTRY(l4, pl4e, ol4e, nl4e, pfn, curr)) )
     {
         return 0;
     }
@@ -1937,7 +1942,6 @@ int new_guest_cr3(unsigned long mfn)
         okay = paging_mode_refcounts(d)
             ? 0 /* Old code was broken, but what should it be? */
             : mod_l4_entry(
-                    d,
                     __va(pagetable_get_paddr(v->arch.guest_table)),
                     l4e_from_pfn(
                         mfn,
@@ -2169,7 +2173,7 @@ int do_mmuext_op(
             type = PGT_l4_page_table;
 
         pin_page:
-            rc = xsm_memory_pin_page(current->domain, page);
+            rc = xsm_memory_pin_page(d, page);
             if ( rc )
                 break;
 
@@ -2459,14 +2463,14 @@ int do_mmu_update(
              */
         case MMU_NORMAL_PT_UPDATE:
 
-            rc = xsm_mmu_normal_update(current->domain, req.val);
+            rc = xsm_mmu_normal_update(d, req.val);
             if ( rc )
                 break;
 
             gmfn = req.ptr >> PAGE_SHIFT;
             mfn = gmfn_to_mfn(d, gmfn);
 
-            if ( unlikely(!get_page_from_pagenr(mfn, current->domain)) )
+            if ( unlikely(!get_page_from_pagenr(mfn, d)) )
             {
                 MEM_LOG("Could not get page for normal update");
                 break;
@@ -2520,7 +2524,7 @@ int do_mmu_update(
                 case PGT_l4_page_table:
                 {
                     l4_pgentry_t l4e = l4e_from_intpte(req.val);
-                    okay = mod_l4_entry(d, va, l4e, mfn);
+                    okay = mod_l4_entry(va, l4e, mfn);
                 }
                 break;
 #endif
@@ -2553,7 +2557,7 @@ int do_mmu_update(
             mfn = req.ptr >> PAGE_SHIFT;
             gpfn = req.val;
 
-            rc = xsm_mmu_machphys_update(current->domain, mfn);
+            rc = xsm_mmu_machphys_update(d, mfn);
             if ( rc )
                 break;
 
@@ -2832,6 +2836,7 @@ int create_grant_host_mapping(uint64_t addr, unsigned long frame,
 int replace_grant_host_mapping(
     uint64_t addr, unsigned long frame, uint64_t new_addr, unsigned int flags)
 {
+    struct vcpu *curr = current;
     l1_pgentry_t *pl1e, ol1e;
     unsigned long gl1mfn;
     int rc;
@@ -2839,16 +2844,16 @@ int replace_grant_host_mapping(
     if ( flags & GNTMAP_contains_pte )
     {
         if ( !new_addr )
-            return destroy_grant_pte_mapping(addr, frame, current->domain);
+            return destroy_grant_pte_mapping(addr, frame, curr->domain);
         
         MEM_LOG("Unsupported grant table operation");
         return GNTST_general_error;
     }
 
     if ( !new_addr )
-        return destroy_grant_va_mapping(addr, frame, current);
+        return destroy_grant_va_mapping(addr, frame, curr);
 
-    pl1e = guest_map_l1e(current, new_addr, &gl1mfn);
+    pl1e = guest_map_l1e(curr, new_addr, &gl1mfn);
     if ( !pl1e )
     {
         MEM_LOG("Could not find L1 PTE for address %lx",
@@ -2857,19 +2862,18 @@ int replace_grant_host_mapping(
     }
     ol1e = *pl1e;
 
-    if ( unlikely(!UPDATE_ENTRY(l1, pl1e, ol1e, l1e_empty(),
-                                gl1mfn, current)) )
+    if ( unlikely(!UPDATE_ENTRY(l1, pl1e, ol1e, l1e_empty(), gl1mfn, curr)) )
     {
         MEM_LOG("Cannot delete PTE entry at %p", (unsigned long *)pl1e);
-        guest_unmap_l1e(current, pl1e);
+        guest_unmap_l1e(curr, pl1e);
         return GNTST_general_error;
     }
 
-    guest_unmap_l1e(current, pl1e);
+    guest_unmap_l1e(curr, pl1e);
 
-    rc = replace_grant_va_mapping(addr, frame, ol1e, current);
-    if ( rc && !paging_mode_refcounts(current->domain) )
-        put_page_from_l1e(ol1e, current->domain);
+    rc = replace_grant_va_mapping(addr, frame, ol1e, curr);
+    if ( rc && !paging_mode_refcounts(curr->domain) )
+        put_page_from_l1e(ol1e, curr->domain);
 
     return rc;
 }
@@ -2983,8 +2987,8 @@ int do_update_va_mapping(unsigned long va, u64 val64,
         switch ( (bmap_ptr = flags & ~UVMF_FLUSHTYPE_MASK) )
         {
         case UVMF_LOCAL:
-            if ( !paging_mode_enabled(d) 
-                 || (paging_invlpg(current, va) != 0) ) 
+            if ( !paging_mode_enabled(d) ||
+                 (paging_invlpg(v, va) != 0) ) 
                 flush_tlb_one_local(va);
             break;
         case UVMF_ALL:
@@ -3093,6 +3097,7 @@ long do_set_gdt(XEN_GUEST_HANDLE(ulong) frame_list, unsigned int entries)
 {
     int nr_pages = (entries + 511) / 512;
     unsigned long frames[16];
+    struct vcpu *curr = current;
     long ret;
 
     /* Rechecked in set_gdt, but ensures a sane limit for copy_from_user(). */
@@ -3102,12 +3107,12 @@ long do_set_gdt(XEN_GUEST_HANDLE(ulong) frame_list, unsigned int entries)
     if ( copy_from_guest(frames, frame_list, nr_pages) )
         return -EFAULT;
 
-    LOCK_BIGLOCK(current->domain);
+    LOCK_BIGLOCK(curr->domain);
 
-    if ( (ret = set_gdt(current, frames, entries)) == 0 )
+    if ( (ret = set_gdt(curr, frames, entries)) == 0 )
         flush_tlb_local();
 
-    UNLOCK_BIGLOCK(current->domain);
+    UNLOCK_BIGLOCK(curr->domain);
 
     return ret;
 }
