@@ -43,7 +43,8 @@ void cpumask_to_xenctl_cpumap(
 
     bitmap_long_to_byte(bytemap, cpus_addr(*cpumask), NR_CPUS);
 
-    copy_to_guest(xenctl_cpumap->bitmap, bytemap, copy_bytes);
+    if ( copy_bytes != 0 )
+        copy_to_guest(xenctl_cpumap->bitmap, bytemap, copy_bytes);
 
     for ( i = copy_bytes; i < guest_bytes; i++ )
         copy_to_guest_offset(xenctl_cpumap->bitmap, i, &zero, 1);
@@ -55,15 +56,20 @@ void xenctl_cpumap_to_cpumask(
     unsigned int guest_bytes, copy_bytes;
     uint8_t bytemap[(NR_CPUS + 7) / 8];
 
-    guest_bytes = (xenctl_cpumap->nr_cpus + 7) / 8;
-    copy_bytes  = min_t(unsigned int, guest_bytes, sizeof(bytemap));
-
-    cpus_clear(*cpumask);
-
     if ( guest_handle_is_null(xenctl_cpumap->bitmap) )
         return;
 
-    copy_from_guest(bytemap, xenctl_cpumap->bitmap, copy_bytes);
+    guest_bytes = (xenctl_cpumap->nr_cpus + 7) / 8;
+    copy_bytes  = min_t(unsigned int, guest_bytes, sizeof(bytemap));
+
+    memset(bytemap, 0, sizeof(bytemap));
+
+    if ( copy_bytes != 0 )
+    {
+        copy_from_guest(bytemap, xenctl_cpumap->bitmap, copy_bytes);
+        if ( (xenctl_cpumap->nr_cpus & 7) && (guest_bytes <= sizeof(bytemap)) )
+            bytemap[guest_bytes-1] &= ~(0xff << (xenctl_cpumap->nr_cpus & 7));
+    }
 
     bitmap_byte_to_long(cpus_addr(*cpumask), bytemap, NR_CPUS);
 }
