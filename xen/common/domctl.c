@@ -187,6 +187,9 @@ long do_domctl(XEN_GUEST_HANDLE(xen_domctl_t) u_domctl)
 
     spin_lock(&domctl_lock);
 
+    if ( xsm_domctl(op) )
+        goto domctl_out;
+
     switch ( op->cmd )
     {
 
@@ -200,10 +203,6 @@ long do_domctl(XEN_GUEST_HANDLE(xen_domctl_t) u_domctl)
         ret = -ESRCH;
         if ( d == NULL )
             break;
-
-        ret = xsm_setvcpucontext(d);
-        if ( ret )
-            goto svc_out;
 
         ret = -EINVAL;
         if ( (vcpu >= MAX_VIRT_CPUS) || ((v = d->vcpu[vcpu]) == NULL) )
@@ -252,17 +251,12 @@ long do_domctl(XEN_GUEST_HANDLE(xen_domctl_t) u_domctl)
         ret = -ESRCH;
         if ( d != NULL )
         {
-            ret = xsm_pausedomain(d);
-            if ( ret )
-                goto pausedomain_out;
-
             ret = -EINVAL;
             if ( d != current->domain )
             {
                 domain_pause_by_systemcontroller(d);
                 ret = 0;
             }
-        pausedomain_out:
             rcu_unlock_domain(d);
         }
     }
@@ -275,14 +269,6 @@ long do_domctl(XEN_GUEST_HANDLE(xen_domctl_t) u_domctl)
         ret = -ESRCH;
         if ( d == NULL )
             break;
-
-        ret = xsm_unpausedomain(d);
-        if ( ret )
-        {
-            rcu_unlock_domain(d);
-            break;
-        }
-
         domain_unpause_by_systemcontroller(d);
         rcu_unlock_domain(d);
         ret = 0;
@@ -296,13 +282,6 @@ long do_domctl(XEN_GUEST_HANDLE(xen_domctl_t) u_domctl)
         ret = -ESRCH;
         if ( d == NULL )
             break;
-
-        ret = xsm_resumedomain(d);
-        if ( ret )
-        {
-            rcu_unlock_domain(d);
-            break;
-        }
 
         domain_resume(d);
         rcu_unlock_domain(d);
@@ -379,13 +358,6 @@ long do_domctl(XEN_GUEST_HANDLE(xen_domctl_t) u_domctl)
         if ( (d = rcu_lock_domain_by_id(op->domain)) == NULL )
             break;
 
-        ret = xsm_max_vcpus(d);
-        if ( ret )
-        {
-            rcu_unlock_domain(d);
-            break;
-        }
-
         /* Needed, for example, to ensure writable p.t. state is synced. */
         domain_pause(d);
 
@@ -422,7 +394,7 @@ long do_domctl(XEN_GUEST_HANDLE(xen_domctl_t) u_domctl)
         ret = -ESRCH;
         if ( d != NULL )
         {
-            ret = xsm_destroydomain(d) ? : domain_kill(d);
+            domain_kill(d);
             rcu_unlock_domain(d);
         }
     }
@@ -439,10 +411,6 @@ long do_domctl(XEN_GUEST_HANDLE(xen_domctl_t) u_domctl)
         ret = -ESRCH;
         if ( d == NULL )
             break;
-
-        ret = xsm_vcpuaffinity(op->cmd, d);
-        if ( ret )
-            goto vcpuaffinity_out;
 
         ret = -EINVAL;
         if ( op->u.vcpuaffinity.vcpu >= MAX_VIRT_CPUS )
@@ -478,15 +446,10 @@ long do_domctl(XEN_GUEST_HANDLE(xen_domctl_t) u_domctl)
         if ( (d = rcu_lock_domain_by_id(op->domain)) == NULL )
             break;
 
-        ret = xsm_scheduler(d);
-        if ( ret )
-            goto scheduler_op_out;
-
         ret = sched_adjust(d, &op->u.scheduler_op);
         if ( copy_to_guest(u_domctl, op, 1) )
             ret = -EFAULT;
 
-    scheduler_op_out:
         rcu_unlock_domain(d);
     }
     break;
@@ -509,17 +472,12 @@ long do_domctl(XEN_GUEST_HANDLE(xen_domctl_t) u_domctl)
             break;
         }
 
-        ret = xsm_getdomaininfo(d);
-        if ( ret )
-            goto getdomaininfo_out;
-
         getdomaininfo(d, &op->u.getdomaininfo);
 
         op->domain = op->u.getdomaininfo.domain;
         if ( copy_to_guest(u_domctl, op, 1) )
             ret = -EFAULT;
 
-    getdomaininfo_out:
         rcu_read_unlock(&domlist_read_lock);
     }
     break;
@@ -533,10 +491,6 @@ long do_domctl(XEN_GUEST_HANDLE(xen_domctl_t) u_domctl)
         ret = -ESRCH;
         if ( (d = rcu_lock_domain_by_id(op->domain)) == NULL )
             break;
-
-        ret = xsm_getvcpucontext(d);
-        if ( ret )
-            goto getvcpucontext_out;
 
         ret = -EINVAL;
         if ( op->u.vcpucontext.vcpu >= MAX_VIRT_CPUS )
@@ -594,10 +548,6 @@ long do_domctl(XEN_GUEST_HANDLE(xen_domctl_t) u_domctl)
         if ( (d = rcu_lock_domain_by_id(op->domain)) == NULL )
             break;
 
-        ret = xsm_getvcpuinfo(d);
-        if ( ret )
-            goto getvcpuinfo_out;
-
         ret = -EINVAL;
         if ( op->u.getvcpuinfo.vcpu >= MAX_VIRT_CPUS )
             goto getvcpuinfo_out;
@@ -633,10 +583,6 @@ long do_domctl(XEN_GUEST_HANDLE(xen_domctl_t) u_domctl)
         if ( d == NULL )
             break;
 
-        ret = xsm_setdomainmaxmem(d);
-        if ( ret )
-            goto max_mem_out;
-
         ret = -EINVAL;
         new_max = op->u.max_mem.max_memkb >> (PAGE_SHIFT-10);
 
@@ -651,7 +597,6 @@ long do_domctl(XEN_GUEST_HANDLE(xen_domctl_t) u_domctl)
         }
         spin_unlock(&d->page_alloc_lock);
 
-    max_mem_out:
         rcu_unlock_domain(d);
     }
     break;
@@ -664,13 +609,6 @@ long do_domctl(XEN_GUEST_HANDLE(xen_domctl_t) u_domctl)
         d = rcu_lock_domain_by_id(op->domain);
         if ( d == NULL )
             break;
-
-        ret = xsm_setdomainhandle(d);
-        if ( ret )
-        {
-            rcu_unlock_domain(d);
-            break;
-        }
 
         memcpy(d->handle, op->u.setdomainhandle.handle,
                sizeof(xen_domain_handle_t));
@@ -687,13 +625,6 @@ long do_domctl(XEN_GUEST_HANDLE(xen_domctl_t) u_domctl)
         d = rcu_lock_domain_by_id(op->domain);
         if ( d == NULL )
             break;
-
-        ret = xsm_setdebugging(d);
-        if ( ret )
-        {
-            rcu_unlock_domain(d);
-            break;
-        }
 
         domain_pause(d);
         d->debugger_attached = !!op->u.setdebugging.enable;
@@ -717,16 +648,11 @@ long do_domctl(XEN_GUEST_HANDLE(xen_domctl_t) u_domctl)
         if ( d == NULL )
             break;
 
-        ret = xsm_irq_permission(d, pirq, op->u.irq_permission.allow_access);
-        if ( ret )
-            goto irq_permission_out;
-        
         if ( op->u.irq_permission.allow_access )
             ret = irq_permit_access(d, pirq);
         else
             ret = irq_deny_access(d, pirq);
 
-    irq_permission_out:
         rcu_unlock_domain(d);
     }
     break;
@@ -746,16 +672,11 @@ long do_domctl(XEN_GUEST_HANDLE(xen_domctl_t) u_domctl)
         if ( d == NULL )
             break;
 
-        ret = xsm_iomem_permission(d, mfn, op->u.iomem_permission.allow_access);
-        if ( ret )
-            goto iomem_permission_out;
-
         if ( op->u.iomem_permission.allow_access )
             ret = iomem_permit_access(d, mfn, mfn + nr_mfns - 1);
         else
             ret = iomem_deny_access(d, mfn, mfn + nr_mfns - 1);
 
-    iomem_permission_out:
         rcu_unlock_domain(d);
     }
     break;
@@ -768,13 +689,6 @@ long do_domctl(XEN_GUEST_HANDLE(xen_domctl_t) u_domctl)
         d = rcu_lock_domain_by_id(op->domain);
         if ( d != NULL )
         {
-            ret = xsm_domain_settime(d);
-            if ( ret )
-            {
-                rcu_unlock_domain(d);
-                break;
-            }
-
             d->time_offset_seconds = op->u.settimeoffset.time_offset_seconds;
             rcu_unlock_domain(d);
             ret = 0;
@@ -787,6 +701,7 @@ long do_domctl(XEN_GUEST_HANDLE(xen_domctl_t) u_domctl)
         break;
     }
 
+domctl_out:
     spin_unlock(&domctl_lock);
 
     return ret;
