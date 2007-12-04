@@ -49,8 +49,9 @@ typedef struct __attribute__ ((__packed__)) {
 #define MAX_TB_ACPI_SINFO_SIZE   64
 
 typedef struct __attribute__ ((__packed__)) {
+    /* version 0x01+ fields: */
     uuid_t    uuid;              /* {663C8DFF-E8B3-4b82-AABF-19EA4D057A08} */
-    uint32_t  version;           /* 0x01 */
+    uint32_t  version;           /* Version number: 0x01, 0x02, ... */
     uint32_t  log_addr;          /* physical addr of tb_log_t log */
     uint32_t  shutdown_entry32;  /* entry point for tboot shutdown from 32b */
     uint32_t  shutdown_entry64;  /* entry point for tboot shutdown from 64b */
@@ -59,6 +60,9 @@ typedef struct __attribute__ ((__packed__)) {
     uint32_t  s3_k_wakeup_entry; /* entry point for xen s3 wake up */
     uint8_t   acpi_sinfo[MAX_TB_ACPI_SINFO_SIZE];
                                  /* where kernel put acpi sleep info in Sx */
+    /* version 0x02+ fields: */
+    uint32_t  tboot_base;        /* starting addr for tboot */
+    uint32_t  tboot_size;        /* size of tboot */
 } tboot_shared_t;
 
 #define TB_SHUTDOWN_REBOOT      0
