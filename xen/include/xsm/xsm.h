@@ -50,18 +50,34 @@ extern xsm_initcall_t __xsm_initcall_start[], __xsm_initcall_end[];
 
 struct xsm_operations {
     void (*security_domaininfo) (struct domain *d,
-                                 struct xen_domctl_getdomaininfo *info);
-    int (*domctl) (struct xen_domctl *domctl);
+                                        struct xen_domctl_getdomaininfo *info);
+    int (*setvcpucontext) (struct domain *d);
+    int (*pausedomain) (struct domain *d);
+    int (*unpausedomain) (struct domain *d);
+    int (*resumedomain) (struct domain *d);
     int (*domain_create) (struct domain *d, u32 ssidref);
+    int (*max_vcpus) (struct domain *d);
+    int (*destroydomain) (struct domain *d);
+    int (*vcpuaffinity) (int cmd, struct domain *d);
+    int (*scheduler) (struct domain *d);
     int (*getdomaininfo) (struct domain *d);
+    int (*getvcpucontext) (struct domain *d);
+    int (*getvcpuinfo) (struct domain *d);
+    int (*domain_settime) (struct domain *d);
     int (*tbufcontrol) (void);
     int (*readconsole) (uint32_t clear);
     int (*sched_id) (void);
+    int (*setdomainmaxmem) (struct domain *d);
+    int (*setdomainhandle) (struct domain *d);
+    int (*setdebugging) (struct domain *d);
+    int (*irq_permission) (struct domain *d, uint8_t pirq, uint8_t access);
+    int (*iomem_permission) (struct domain *d, unsigned long mfn, 
+                                                                uint8_t access);
     int (*perfcontrol) (void);
 
     int (*evtchn_unbound) (struct domain *d, struct evtchn *chn, domid_t id2);
     int (*evtchn_interdomain) (struct domain *d1, struct evtchn *chn1,
-                               struct domain *d2, struct evtchn *chn2);
+                                        struct domain *d2, struct evtchn *chn2);
     void (*evtchn_close_post) (struct evtchn *chn);
     int (*evtchn_send) (struct domain *d, struct evtchn *chn);
     int (*evtchn_status) (struct domain *d, struct evtchn *chn);
@@ -133,19 +149,69 @@ static inline void xsm_security_domaininfo (struct domain *d,
     xsm_call(security_domaininfo(d, info));
 }
 
-static inline int xsm_domctl(struct xen_domctl *domctl)
+static inline int xsm_setvcpucontext(struct domain *d)
 {
-    return xsm_call(domctl(domctl));
+    return xsm_call(setvcpucontext(d));
 }
 
-static inline int xsm_domain_create(struct domain *d, u32 ssidref)
+static inline int xsm_pausedomain (struct domain *d)
+{
+    return xsm_call(pausedomain(d));
+}
+
+static inline int xsm_unpausedomain (struct domain *d)
+{
+    return xsm_call(unpausedomain(d));
+}
+
+static inline int xsm_resumedomain (struct domain *d)
+{
+    return xsm_call(resumedomain(d));
+}
+
+static inline int xsm_domain_create (struct domain *d, u32 ssidref)
 {
     return xsm_call(domain_create(d, ssidref));
 }
 
-static inline int xsm_getdomaininfo(struct domain *d)
+static inline int xsm_max_vcpus(struct domain *d)
 {
-    return xsm_call(domain_getdomaininfo(d));
+    return xsm_call(max_vcpus(d));
+}
+
+static inline int xsm_destroydomain (struct domain *d)
+{
+    return xsm_call(destroydomain(d));
+}
+
+static inline int xsm_vcpuaffinity (int cmd, struct domain *d)
+{
+    return xsm_call(vcpuaffinity(cmd, d));
+}
+
+static inline int xsm_scheduler (struct domain *d)
+{
+    return xsm_call(scheduler(d));
+}
+
+static inline int xsm_getdomaininfo (struct domain *d)
+{
+    return xsm_call(getdomaininfo(d));
+}
+
+static inline int xsm_getvcpucontext (struct domain *d)
+{
+    return xsm_call(getvcpucontext(d));
+}
+
+static inline int xsm_getvcpuinfo (struct domain *d)
+{
+    return xsm_call(getvcpuinfo(d));
+}
+
+static inline int xsm_domain_settime (struct domain *d)
+{
+    return xsm_call(domain_settime(d));
 }
 
 static inline int xsm_tbufcontrol (void)
@@ -161,6 +227,33 @@ static inline int xsm_readconsole (uint32_t clear)
 static inline int xsm_sched_id (void)
 {
     return xsm_call(sched_id());
+}
+
+static inline int xsm_setdomainmaxmem (struct domain *d)
+{
+    return xsm_call(setdomainmaxmem(d));
+}
+
+static inline int xsm_setdomainhandle (struct domain *d)
+{
+    return xsm_call(setdomainhandle(d));
+}
+
+static inline int xsm_setdebugging (struct domain *d)
+{
+    return xsm_call(setdebugging(d));
+}
+
+static inline int xsm_irq_permission (struct domain *d, uint8_t pirq,
+                                                                uint8_t access)
+{
+    return xsm_call(irq_permission(d, pirq, access));
+} 
+
+static inline int xsm_iomem_permission (struct domain *d, unsigned long mfn,
+                                                                uint8_t access)
+{
+    return xsm_call(iomem_permission(d, mfn, access));
 }
 
 static inline int xsm_perfcontrol (void)
