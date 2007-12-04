@@ -352,15 +352,19 @@ void *xc_dom_pfn_to_ptr(struct xc_dom_image *dom, xen_pfn_t pfn,
     }
     else
     {
+        int err;
+
         mode = "anonymous memory";
         phys->ptr = mmap(NULL, phys->count << page_shift,
                          PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANON,
                          -1, 0);
         if ( phys->ptr == MAP_FAILED )
         {
+            err = errno;
             xc_dom_panic(XC_OUT_OF_MEMORY,
-                         "%s: oom: can't allocate 0x%" PRIpfn " pages\n",
-                         __FUNCTION__, count);
+                         "%s: oom: can't allocate 0x%" PRIpfn " pages"
+                         " [mmap, errno=%i (%s)]\n",
+                         __FUNCTION__, count, err, strerror(err));
             return NULL;
         }
         dom->alloc_mem_map += phys->count << page_shift;
