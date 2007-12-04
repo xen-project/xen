@@ -16,7 +16,6 @@
  * 59 Temple Place, suite 330, Boston, MA 02111-1307 USA
  *
  */
-#include <linux/config.h>
 #include <linux/kernel.h>
 
 #include <tunnel.h>

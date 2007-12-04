@@ -20,14 +20,14 @@
 
 LINUX_SERIES?=2.6
 
-LINUX_VERSION?=$(shell (/bin/ls -d $(XEN_ROOT)/pristine-linux-$(LINUX_SERIES).* 2>/dev/null) | \
-                      sed -e 's!^.*linux-\(.\+\)!\1!' )
+LINUX_VERSION?=$(shell (/bin/ls -d $(XEN_ROOT)/linux-$(LINUX_SERIES).* 2>/dev/null) | \
+                      sed -e 's!^.*linux-\(.\+\).hg!\1!' )
 
 ifeq ($(LINUX_VERSION),)
 $(error Kernel source for linux $(LINUX_SERIES) not found)
 endif
 
-KERNEL_VERSION?=$(shell (/bin/ls -d $(XEN_ROOT)/build-linux-$(LINUX_VERSION)-xen* 2>/dev/null) | \
+KERNEL_VERSION?=$(shell (/bin/ls -d $(XEN_ROOT)/build-linux-$(LINUX_VERSION)* 2>/dev/null) | \
                       grep -v -m 1 -e '-xenU' | \
                       sed -e 's!^.*linux-\(.\+\)!\1!' )
 
