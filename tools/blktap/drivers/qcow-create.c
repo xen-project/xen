@@ -37,7 +37,6 @@
 #include <sys/statvfs.h>
 #include <sys/stat.h>
 #include <sys/ioctl.h>
-#include <linux/fs.h>
 #include <string.h>
 #include "tapdisk.h"
 
