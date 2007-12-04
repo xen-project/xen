@@ -572,24 +572,24 @@ int main(int argc, char **argv)
 
     parse_args(argc, argv);
     
-    if (opts.evt_mask != 0) { 
+    if ( opts.evt_mask != 0 )
         set_mask(opts.evt_mask, 0);
-    }
 
-    if (opts.cpu_mask != 0) {
+    if ( opts.cpu_mask != 0 )
         set_mask(opts.cpu_mask, 1);
-    }
 
     if ( opts.outfile )
-        outfd = open(opts.outfile, O_WRONLY | O_CREAT | O_LARGEFILE, 0644);
+        outfd = open(opts.outfile,
+                     O_WRONLY | O_CREAT | O_TRUNC | O_LARGEFILE,
+                     0644);
 
-    if(outfd < 0)
+    if ( outfd < 0 )
     {
         perror("Could not open output file");
         exit(EXIT_FAILURE);
     }        
 
-    if(isatty(outfd))
+    if ( isatty(outfd) )
     {
         fprintf(stderr, "Cannot output to a TTY, specify a log file.\n");
         exit(EXIT_FAILURE);
