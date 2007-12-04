@@ -1831,7 +1831,7 @@ Finally, sufficiently privileged domains may occasionally wish to manipulate
 the pages of others: 
 
 \begin{quote}
-\hypercall{update\_va\_mapping(unsigned long va, uint64\_t val,
+\hypercall{update\_va\_mapping\_otherdomain(unsigned long va, uint64\_t val,
                          unsigned long flags, domid\_t domid)}
 
 Identical to {\bf update\_va\_mapping} save that the pages being
