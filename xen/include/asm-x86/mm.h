@@ -149,60 +149,10 @@ int _shadow_mode_refcounts(struct domain *d);
 
 void cleanup_page_cacheattr(struct page_info *page);
 
-static inline void put_page(struct page_info *page)
-{
-    u32 nx, x, y = page->count_info;
-
-    do {
-        x  = y;
-        nx = x - 1;
-    }
-    while ( unlikely((y = cmpxchg(&page->count_info, x, nx)) != x) );
-
-    if ( unlikely((nx & PGC_count_mask) == 0) )
-    {
-        cleanup_page_cacheattr(page);
-        free_domheap_page(page);
-    }
-}
-
-
-static inline int get_page(struct page_info *page,
-                           struct domain *domain)
-{
-    u32 x, nx, y = page->count_info;
-    u32 d, nd = page->u.inuse._domain;
-    u32 _domain = pickle_domptr(domain);
-
-    do {
-        x  = y;
-        nx = x + 1;
-        d  = nd;
-        if ( unlikely((x & PGC_count_mask) == 0) ||  /* Not allocated? */
-             unlikely((nx & PGC_count_mask) == 0) || /* Count overflow? */
-             unlikely(d != _domain) )                /* Wrong owner? */
-        {
-            if ( !_shadow_mode_refcounts(domain) )
-                gdprintk(XENLOG_INFO,
-                        "Error pfn %lx: rd=%p, od=%p, caf=%08x, taf=%"
-                        PRtype_info "\n",
-                        page_to_mfn(page), domain, unpickle_domptr(d),
-                        x, page->u.inuse.type_info);
-            return 0;
-        }
-        __asm__ __volatile__(
-            LOCK_PREFIX "cmpxchg8b %3"
-            : "=d" (nd), "=a" (y), "=c" (d),
-              "=m" (*(volatile u64 *)(&page->count_info))
-            : "0" (d), "1" (x), "c" (d), "b" (nx) );
-    }
-    while ( unlikely(nd != d) || unlikely(y != x) );
-
-    return 1;
-}
-
 int is_iomem_page(unsigned long mfn);
 
+void put_page(struct page_info *page);
+int  get_page(struct page_info *page, struct domain *domain);
 void put_page_type(struct page_info *page);
 int  get_page_type(struct page_info *page, unsigned long type);
 int  get_page_from_l1e(l1_pgentry_t l1e, struct domain *d);

@@ -1609,6 +1609,58 @@ static int mod_l4_entry(struct domain *d,
 
 #endif
 
+void put_page(struct page_info *page)
+{
+    u32 nx, x, y = page->count_info;
+
+    do {
+        x  = y;
+        nx = x - 1;
+    }
+    while ( unlikely((y = cmpxchg(&page->count_info, x, nx)) != x) );
+
+    if ( unlikely((nx & PGC_count_mask) == 0) )
+    {
+        cleanup_page_cacheattr(page);
+        free_domheap_page(page);
+    }
+}
+
+
+int get_page(struct page_info *page, struct domain *domain)
+{
+    u32 x, nx, y = page->count_info;
+    u32 d, nd = page->u.inuse._domain;
+    u32 _domain = pickle_domptr(domain);
+
+    do {
+        x  = y;
+        nx = x + 1;
+        d  = nd;
+        if ( unlikely((x & PGC_count_mask) == 0) ||  /* Not allocated? */
+             unlikely((nx & PGC_count_mask) == 0) || /* Count overflow? */
+             unlikely(d != _domain) )                /* Wrong owner? */
+        {
+            if ( !_shadow_mode_refcounts(domain) && !domain->is_dying )
+                gdprintk(XENLOG_INFO,
+                         "Error pfn %lx: rd=%p, od=%p, caf=%08x, taf=%"
+                         PRtype_info "\n",
+                         page_to_mfn(page), domain, unpickle_domptr(d),
+                         x, page->u.inuse.type_info);
+            return 0;
+        }
+        asm volatile (
+            LOCK_PREFIX "cmpxchg8b %3"
+            : "=d" (nd), "=a" (y), "=c" (d),
+            "=m" (*(volatile u64 *)(&page->count_info))
+            : "0" (d), "1" (x), "c" (d), "b" (nx) );
+    }
+    while ( unlikely(nd != d) || unlikely(y != x) );
+
+    return 1;
+}
+
+
 static int alloc_page_type(struct page_info *page, unsigned long type)
 {
     struct domain *owner = page_get_owner(page);
@@ -2839,8 +2891,9 @@ int steal_page(
     y   = page->count_info;
     do {
         x = y;
-        if (unlikely((x & (PGC_count_mask|PGC_allocated)) !=
-                     (1 | PGC_allocated)) || unlikely(_nd != _d)) { 
+        if ( unlikely((x & (PGC_count_mask|PGC_allocated)) !=
+                      (1 | PGC_allocated)) || unlikely(_nd != _d) )
+        { 
             MEM_LOG("gnttab_transfer: Bad page %p: ed=%p(%u), sd=%p,"
                     " caf=%08x, taf=%" PRtype_info "\n", 
                     (void *) page_to_mfn(page),
@@ -2849,7 +2902,7 @@ int steal_page(
             spin_unlock(&d->page_alloc_lock);
             return -1;
         }
-        __asm__ __volatile__(
+        asm volatile (
             LOCK_PREFIX "cmpxchg8b %2"
             : "=d" (_nd), "=a" (y),
             "=m" (*(volatile u64 *)(&page->count_info))
