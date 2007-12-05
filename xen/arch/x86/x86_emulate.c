@@ -508,11 +508,14 @@ do {                                                    \
     }                                                                   \
 })
 
-/* Given longword has even parity (even number of 1s)? */
-static int even_parity(unsigned long v)
+/*
+ * Given byte has even parity (even number of 1s)? SDM Vol. 1 Sec. 3.4.3.1,
+ * "Status Flags": EFLAGS.PF reflects parity of least-sig. byte of result only.
+ */
+static int even_parity(uint8_t v)
 {
-    asm ( "test %0,%0; setp %b0" : "=a" (v) : "0" (v) );
-    return (uint8_t)v;
+    asm ( "test %b0,%b0; setp %b0" : "=a" (v) : "0" (v) );
+    return v;
 }
 
 /* Update address held in a register, based on addressing mode. */
@@ -1915,7 +1918,7 @@ x86_emulate(
         _regs.eflags &= ~(EFLG_SF|EFLG_ZF|EFLG_PF);
         _regs.eflags |= ((uint8_t)_regs.eax == 0) ? EFLG_ZF : 0;
         _regs.eflags |= (( int8_t)_regs.eax <  0) ? EFLG_SF : 0;
-        _regs.eflags |= even_parity((uint8_t)_regs.eax) ? EFLG_PF : 0;
+        _regs.eflags |= even_parity(_regs.eax) ? EFLG_PF : 0;
         break;
     }
 
@@ -1939,7 +1942,7 @@ x86_emulate(
         _regs.eflags &= ~(EFLG_SF|EFLG_ZF|EFLG_PF);
         _regs.eflags |= ((uint8_t)_regs.eax == 0) ? EFLG_ZF : 0;
         _regs.eflags |= (( int8_t)_regs.eax <  0) ? EFLG_SF : 0;
-        _regs.eflags |= even_parity((uint8_t)_regs.eax) ? EFLG_PF : 0;
+        _regs.eflags |= even_parity(_regs.eax) ? EFLG_PF : 0;
         break;
     }
 
@@ -2405,7 +2408,7 @@ x86_emulate(
         _regs.eflags &= ~(EFLG_SF|EFLG_ZF|EFLG_PF);
         _regs.eflags |= ((uint8_t)_regs.eax == 0) ? EFLG_ZF : 0;
         _regs.eflags |= (( int8_t)_regs.eax <  0) ? EFLG_SF : 0;
-        _regs.eflags |= even_parity((uint8_t)_regs.eax) ? EFLG_PF : 0;
+        _regs.eflags |= even_parity(_regs.eax) ? EFLG_PF : 0;
         break;
     }
 
@@ -2417,7 +2420,7 @@ x86_emulate(
         _regs.eflags &= ~(EFLG_SF|EFLG_ZF|EFLG_PF);
         _regs.eflags |= ((uint8_t)_regs.eax == 0) ? EFLG_ZF : 0;
         _regs.eflags |= (( int8_t)_regs.eax <  0) ? EFLG_SF : 0;
-        _regs.eflags |= even_parity((uint8_t)_regs.eax) ? EFLG_PF : 0;
+        _regs.eflags |= even_parity(_regs.eax) ? EFLG_PF : 0;
         break;
     }
 
