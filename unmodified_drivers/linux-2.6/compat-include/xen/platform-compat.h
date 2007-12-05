@@ -114,9 +114,17 @@ extern char *kasprintf(gfp_t gfp, const char *fmt, ...)
 #define __supported_pte_mask ((maddr_t)0)
 #endif
 
+/* This code duplication is not ideal, but || does not seem to properly 
+ *  short circuit in a #if condition.
+ **/
 #if defined(_LINUX_NETDEVICE_H) && LINUX_VERSION_CODE < KERNEL_VERSION(2,6,18)
+#if !defined(SLE_VERSION) 
 #define netif_tx_lock_bh(dev) spin_lock_bh(&(dev)->xmit_lock)
 #define netif_tx_unlock_bh(dev) spin_unlock_bh(&(dev)->xmit_lock)
+#elif SLE_VERSION_CODE < SLE_VERSION(10,1,0)
+#define netif_tx_lock_bh(dev) spin_lock_bh(&(dev)->xmit_lock)
+#define netif_tx_unlock_bh(dev) spin_unlock_bh(&(dev)->xmit_lock)
+#endif
 #endif
 
 #if defined(__LINUX_SEQLOCK_H) && !defined(DEFINE_SEQLOCK)
@@ -133,7 +141,14 @@ extern char *kasprintf(gfp_t gfp, const char *fmt, ...)
 #endif
 
 #if defined(_LINUX_INTERRUPT_H) && LINUX_VERSION_CODE < KERNEL_VERSION(2,6,19)
+/**
+ *   RHEL4-U5 pulled back this feature into the older kernel 
+ *   Since it is a typedef, and not a macro - detect this kernel via
+ *   RHEL_VERSION
+ */
+#if !defined(RHEL_VERSION) || (RHEL_VERSION == 4 && RHEL_UPDATE < 5)
 typedef irqreturn_t (*irq_handler_t)(int, void *, struct pt_regs *);
+#endif
 #endif
 
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,23)
