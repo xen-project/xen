@@ -220,6 +220,7 @@ case "$command" in
         # Canonicalise the file, for sharing check comparison, and the mode
         # for ease of use here.
         file=$(readlink -f "$p") || fatal "$p does not exist."
+        test -f "$file" || fatal "$file does not exist."
         mode=$(canonicalise_mode "$mode")
 
         claim_lock "block"
