@@ -563,7 +563,9 @@ static struct buffered_data *new_buffer(void *ctx)
 	return data;
 }
 
-/* Return length of string (including nul) at this offset. */
+/* Return length of string (including nul) at this offset.
+ * If there is no nul, returns 0 for failure.
+ */
 static unsigned int get_string(const struct buffered_data *data,
 			       unsigned int offset)
 {
@@ -579,7 +581,12 @@ static unsigned int get_string(const struct buffered_data *data,
 	return nul - (data->buffer + offset) + 1;
 }
 
-/* Break input into vectors, return the number, fill in up to num of them. */
+/* Break input into vectors, return the number, fill in up to num of them.
+ * Always returns the actual number of nuls in the input.  Stores the
+ * positions of the starts of the nul-terminated strings in vec.
+ * Callers who use this and then rely only on vec[] will
+ * ignore any data after the final nul.
+ */
 unsigned int get_strings(struct buffered_data *data,
 			 char *vec[], unsigned int num)
 {
@@ -668,7 +675,9 @@ bool is_valid_nodename(const char *node)
 	return valid_chars(node);
 }
 
-/* We expect one arg in the input: return NULL otherwise. */
+/* We expect one arg in the input: return NULL otherwise.
+ * The payload must contain exactly one nul, at the end.
+ */
 static const char *onearg(struct buffered_data *in)
 {
 	if (!in->used || get_string(in, 0) != in->used)

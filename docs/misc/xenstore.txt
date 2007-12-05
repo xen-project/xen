@@ -1,0 +1,287 @@
+Xenstore protocol specification
+-------------------------------
+
+Xenstore implements a database which maps filename-like pathnames
+(also known as `keys') to values.  Clients may read and write values,
+watch for changes, and set permissions to allow or deny access.  There
+is a rudimentary transaction system.
+
+While xenstore and most tools and APIs are capable of dealing with
+arbitrary binary data as values, this should generally be avoided.
+Data should generally be human-readable for ease of management and
+debugging; xenstore is not a high-performance facility and should be
+used only for small amounts of control plane data.  Therefore xenstore
+values should normally be 7-bit ASCII text strings containing bytes
+0x20..0x7f only, and should not contain a trailing nul byte.  (The
+APIs used for accessing xenstore generally add a nul when reading, for
+the caller's convenience.)
+
+A separate specification will detail the keys and values which are
+used in the Xen system and what their meanings are.  (Sadly that
+specification currently exists only in multiple out-of-date versions.)
+
+
+Paths are /-separated and start with a /, just as Unix filenames.
+
+We can speak of two paths being <child> and <parent>, which is the
+case if they're identical, or if <parent> is /, or if <parent>/ is an
+initial substring of <child>.  (This includes <path> being a child of
+itself.)
+
+If a particular path exists, all of its parents do too.  Every
+existing path maps to a possibly empty value, and may also have zero
+or more immediate children.  There is thus no particular distinction
+between directories and leaf nodes.  However, it is conventional not
+to store nonempty values at nodes which also have children.
+
+The permitted character for paths set is ASCII alphanumerics and plus
+the four punctuation characters -/_@ (hyphen slash underscore atsign).
+@ should be avoided except to specify special watches (see below).
+Doubled slashes and trailing slashes (except to specify the root) are
+forbidden.  The empty path is also forbidden.
+
+
+Communication with xenstore is via either sockets, or event channel
+and shared memory, as specified in io/xs_wire.h: each message in
+either direction is a header formatted as a struct xsd_sockmsg
+followed by xsd_sockmsg.len bytes of payload.
+
+The payload syntax varies according to the type field.  Generally
+requests each generate a reply with an identical type, req_id and
+tx_id.  However, if an error occurs, a reply will be returned with
+type ERROR, and only req_id and tx_id copied from the request.
+
+A caller who sends several requests may receive the replies in any
+order and must use req_id (and tx_id, if applicable) to match up
+replies to requests.  (The current implementation always replies to
+requests in the order received but this should not be relied on.)
+
+
+---------- Xenstore protocol details - introduction ----------
+
+The payload syntax and semantics of the requests and replies are
+described below.  In the payload syntax specifications we use the
+following notations:
+
+ |		A nul (zero) byte.
+ <foo>		A string guaranteed not to contain any nul bytes.
+ <foo|>		Binary data (which may contain zero or more nul bytes)
+ <foo>|*	Zero or more strings each followed by a trailing nul
+ <foo>|+	One or more strings each followed by a trailing nul
+ ?		Reserved value (may not contain nuls)
+ ??		Reserved value (may contain nuls)
+
+Except as otherwise noted, reserved values are believed to be sent as
+empty strings by all current clients.  Clients should not send
+nonempty strings for reserved values; those parts of the protocol may
+be used for extension in the future.
+
+
+Error replies are as follows:
+
+ERROR						E<something>|
+	Where E<something> is the name of an errno value
+	listed in io/xs_wire.h.  Note that the string name
+	is transmitted, not a numeric value.
+
+
+Where no reply payload format is specified below, success responses
+have the following payload:
+						OK|
+
+Values commonly included in payloads include:
+
+    <path>
+	Specifies a path in the hierarchical key structure.
+	If <path> starts with a / it simply represents that path.
+
+	<path> is allowed not to start with /, in which case the
+	caller must be a domain (rather than connected via a socket)
+	and the path is taken to be relative to /local/domain/<domid>
+	(eg, `x/y' sent by domain 3 would mean `/local/domain/3/x/y').
+
+    <domid>
+	Integer domid, represented as decimal number 0..65535.
+	Parsing errors and values out of range generally go
+	undetected.  The special DOMID_... values (see xen.h) are
+	represented as integers; unless otherwise specified it
+	is an error not to specify a real domain id.
+
+
+
+The following are the actual type values, including the request and
+reply payloads as applicable:
+
+
+---------- Database read, write and permissions operatons ----------
+
+READ			<path>|			<value|>
+WRITE			<path>|<value|>
+	Store and read the octet string <value> at <path>.
+	WRITE creates any missing parent paths, with empty values.
+
+MKDIR			<path>|
+	Ensures that the <path> exists, by necessary by creating
+	it and any missing parents with empty values.  If <path>
+	or any parent already exists, its value is left unchanged.
+
+RM			<path>|
+	Ensures that the <path> does not exist, by deleting
+	it and all of its children.  It is not an error if <path> does
+	not exist, but it _is_ an error if <path>'s immediate parent
+	does not exist either.
+
+DIRECTORY		<path>|			<child-leaf-name>|*
+	Gives a list of the immediate children of <path>, as only the
+	leafnames.  The resulting children are each named
+	<path>/<child-leaf-name>.
+
+GET_PERMS	 	<path>|			<perm-as-string>|+
+SET_PERMS		<path>|<perm-as-string>|+?
+	<perm-as-string> is one of the following
+		w<domid>	write only
+		r<domid>	read only
+		b<domid>	both read and write
+		n<domid>	no access
+	See http://wiki.xensource.com/xenwiki/XenBus section
+	`Permissions' for details of the permissions system.
+
+---------- Watches ----------
+
+WATCH			<wpath>|<token>|?
+	Adds a watch.
+
+	When a <path> is modified (including path creation, removal,
+	contents change or permissions change) this generates an event
+	on the changed <path>.  Changes made in transactions cause an
+	event only if and when committed.  Each occurring event is
+	matched against all the watches currently set up, and each
+	matching watch results in a WATCH_EVENT message (see below).
+
+	The event's path matches the watch's <wpath> if it is an child
+	of <wpath>.
+
+	<wpath> can be a <path> to watch or @<wspecial>.  In the
+	latter case <wspecial> may have any syntax but it matches
+	(according to the rules above) only the following special
+	events which are invented by xenstored:
+	    @introduceDomain	occurs on INTRODUCE
+	    @releaseDomain 	occurs on any domain crash or
+				shutdown, and also on RELEASE
+				and domain destruction
+
+	When a watch is first set up it is triggered once straight
+	away, with <path> equal to <wpath>.  Watches may be triggered
+	spuriously.  The tx_id in a WATCH request is ignored.
+
+WATCH_EVENT					<epath>|<token>|
+	Unsolicited `reply' generated for matching modfication events
+	as described above.  req_id and tx_id are both 0.
+
+	<epath> is the event's path, ie the actual path that was
+	modifed; however if the event was the recursive removal of an
+	parent of <wpath>, <epath> is just
+	<wpath> (rather than the actual path which was removed).  So
+	<epath> is a child of <epath>, regardless.
+
+	Iff <wpath> for the watch was specified as a relative pathname,
+	the <epath> path will also be relative (with the same base,
+	obviously).
+
+UNWATCH			<wpath>|<token>|?
+
+---------- Transactions ----------
+
+TRANSACTION_START	??			<transid>|
+	<transid> is an opaque uint32_t allocated by xenstored
+	represented as unsigned decimal.  After this, transaction may
+	be referenced by using <transid> (as 32-bit binary) in the
+	tx_id request header field.  When transaction is started whole
+	db is copied; reads and writes happen on the copy.
+	It is not legal to send non-0 tx_id in TRANSACTION_START.
+	Currently xenstored has the bug that after 2^32 transactions
+	it will allocate the transid 0 for an actual transaction.
+
+	Clients using the provided xs.c bindings will send a single
+	nul byte for the argument payload.  We recommend that future
+	clients continue to do the same; any future extension will not
+	use that syntax.
+
+TRANSACTION_END		T|
+TRANSACTION_END		F|
+	tx_id must refer to existing transaction.  After this
+ 	request the tx_id is no longer valid and may be reused by
+	xenstore.  If F, the transaction is discarded.  If T,
+	it is committed: if there were any other intervening writes
+	then our END gets get EAGAIN.
+
+	The plan is that in the future only intervening `conflicting'
+	writes cause EAGAIN, meaning only writes or other commits
+	which changed paths which were read or written in the
+	transaction at hand.
+
+---------- Domain management and xenstored communications ----------
+
+INTRODUCE		<domid>|<mfn>|<evtchn>|?
+	Notifies xenstored to communicate with this domain.
+
+	INTRODUCE is currently only used by xend (during domain
+	startup and various forms of restore and resume), and
+	xenstored prevents its use other than by dom0.
+
+	<domid> must be a real domain id (not 0 and not a special
+	DOMID_... value).  <mfn> must be a machine page in that domain
+	represented in signed decimal (!).  <evtchn> must be event
+	channel is an unbound event channel in <domid> (likewise in
+	decimal), on which xenstored will call bind_interdomain.
+	Violations of these rules may result in undefined behaviour;
+	for example passing a high-bit-set 32-bit mfn as an unsigned
+	decimal will attempt to use 0x7fffffff instead (!).
+
+RELEASE			<domid>|
+	Manually requests that xenstored disconnect from the domain.
+	The event channel is unbound at the xenstored end and the page
+	unmapped.  If the domain is still running it won't be able to
+	communicate with xenstored.  NB that xenstored will in any
+	case detect domain destruction and disconnect by itself.
+	xenstored prevents the use of RELEASE other than by dom0.
+
+GET_DOMAIN_PATH		<domid>|		<path>|
+	Returns the domain's base path, as is used for relative
+	transactions: ie, /local/domain/<domid> (with <domid>
+	normalised).  The answer will be useless unless <domid> is a
+	real domain id.
+
+IS_DOMAIN_INTRODUCED	<domid>|		T| or F|
+	Returns T if xenstored is in communication with the domain:
+	ie, if INTRODUCE for the domain has not yet been followed by
+	domain destruction or explicit RELEASE.
+
+RESUME			<domid>|
+
+	Arranges that @releaseDomain events will once more be
+	generated when the domain becomes shut down.  This might have
+	to be used if a domain were to be shut down (generating one
+	@releaseDomain) and then subsequently restarted, since the
+	state-sensitive algorithm in xenstored will not otherwise send
+	further watch event notifications if the domain were to be
+	shut down again.
+
+	It is not clear whether this is possible since one would
+	normally expect a domain not to be restarted after being shut
+	down without being destroyed in the meantime.  There are
+	currently no users of this request in xen-unstable.
+
+	xenstored prevents the use of RESUME other than by dom0.
+
+---------- Miscellaneous ----------
+
+DEBUG			print|<string>|??	    sends <string> to debug log
+DEBUG			print|<thing-with-no-nul>   EINVAL
+DEBUG			check|??		    checks xenstored innards
+DEBUG			<anything-else|>	    no-op (future extension)
+
+	These requests should not generally be used and may be
+	withdrawn in the future.
+
+
