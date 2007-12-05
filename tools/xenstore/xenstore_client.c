@@ -138,7 +138,7 @@ perform(int optind, int argc, char **argv, struct xs_handle *xsh,
 {
     while (optind < argc) {
 #if defined(CLIENT_read)
-	struct expanding_buffer ebuf;
+	static struct expanding_buffer ebuf;
 	unsigned len;
 	char *val = xs_read(xsh, xth, argv[optind], &len);
 	if (val == NULL) {
@@ -151,7 +151,7 @@ perform(int optind, int argc, char **argv, struct xs_handle *xsh,
 	free(val);
 	optind++;
 #elif defined(CLIENT_write)
-	struct expanding_buffer ebuf;
+	static struct expanding_buffer ebuf;
 	char *val_spec = argv[optind + 1];
 	unsigned len;
 	expanding_buffer_ensure(&ebuf, strlen(val_spec)+1);
