@@ -17,9 +17,9 @@
 #define tsc_disable 0
 #define disable_pse 0
 
-static int cachesize_override __devinitdata = -1;
-static int disable_x86_fxsr __devinitdata = 0;
-static int disable_x86_serial_nr __devinitdata = 0;
+static int cachesize_override __cpuinitdata = -1;
+static int disable_x86_fxsr __cpuinitdata;
+static int disable_x86_serial_nr __cpuinitdata;
 
 struct cpu_dev * cpu_devs[X86_VENDOR_NUM] = {};
 
@@ -44,12 +44,13 @@ static void default_init(struct cpuinfo_x86 * c)
 
 static struct cpu_dev default_cpu = {
 	.c_init	= default_init,
+	.c_vendor = "Unknown",
 };
 static struct cpu_dev * this_cpu = &default_cpu;
 
 integer_param("cachesize", cachesize_override);
 
-int __devinit get_model_name(struct cpuinfo_x86 *c)
+int __cpuinit get_model_name(struct cpuinfo_x86 *c)
 {
 	unsigned int *v;
 	char *p, *q;
@@ -79,7 +80,7 @@ int __devinit get_model_name(struct cpuinfo_x86 *c)
 }
 
 
-void __devinit display_cacheinfo(struct cpuinfo_x86 *c)
+void __cpuinit display_cacheinfo(struct cpuinfo_x86 *c)
 {
 	unsigned int n, dummy, ecx, edx, l2size;
 
@@ -120,7 +121,7 @@ void __devinit display_cacheinfo(struct cpuinfo_x86 *c)
 /* in particular, if CPUID levels 0x80000002..4 are supported, this isn't used */
 
 /* Look up CPU names by table lookup. */
-static char __devinit *table_lookup_model(struct cpuinfo_x86 *c)
+static char __cpuinit *table_lookup_model(struct cpuinfo_x86 *c)
 {
 	struct cpu_model_info *info;
 
@@ -141,10 +142,11 @@ static char __devinit *table_lookup_model(struct cpuinfo_x86 *c)
 }
 
 
-static void __devinit get_cpu_vendor(struct cpuinfo_x86 *c, int early)
+static void __cpuinit get_cpu_vendor(struct cpuinfo_x86 *c, int early)
 {
 	char *v = c->x86_vendor_id;
 	int i;
+	static int printed;
 
 	for (i = 0; i < X86_VENDOR_NUM; i++) {
 		if (cpu_devs[i]) {
@@ -154,10 +156,17 @@ static void __devinit get_cpu_vendor(struct cpuinfo_x86 *c, int early)
 				c->x86_vendor = i;
 				if (!early)
 					this_cpu = cpu_devs[i];
-				break;
+				return;
 			}
 		}
 	}
+	if (!printed) {
+		printed++;
+		printk(KERN_ERR "CPU: Vendor unknown, using generic init.\n");
+		printk(KERN_ERR "CPU: Your system may be unstable.\n");
+	}
+	c->x86_vendor = X86_VENDOR_UNKNOWN;
+	this_cpu = &default_cpu;
 }
 
 
@@ -187,7 +196,7 @@ static inline int flag_is_changeable_p(unsigned long flag)
 
 
 /* Probe for the CPUID instruction */
-static int __devinit have_cpuid_p(void)
+static int __cpuinit have_cpuid_p(void)
 {
 	return flag_is_changeable_p(X86_EFLAGS_ID);
 }
@@ -232,7 +241,7 @@ static void __init early_cpu_detect(void)
 	}
 }
 
-void __devinit generic_identify(struct cpuinfo_x86 * c)
+void __cpuinit generic_identify(struct cpuinfo_x86 * c)
 {
 	u32 tfms, xlvl;
 
@@ -255,10 +264,10 @@ void __devinit generic_identify(struct cpuinfo_x86 * c)
 			c->x86_capability[4] = excap;
 			c->x86 = (tfms >> 8) & 15;
 			c->x86_model = (tfms >> 4) & 15;
-			if (c->x86 == 0xf) {
+			if (c->x86 == 0xf)
 				c->x86 += (tfms >> 20) & 0xff;
+			if (c->x86 >= 0x6)
 				c->x86_model += ((tfms >> 16) & 0xF) << 4;
-			} 
 			c->x86_mask = tfms & 15;
 			if ( cpu_has(c, X86_FEATURE_CLFLSH) )
 				c->x86_clflush_size = ((ebx >> 8) & 0xff) * 8;
@@ -286,7 +295,7 @@ void __devinit generic_identify(struct cpuinfo_x86 * c)
 #endif
 }
 
-static void __devinit squash_the_stupid_serial_number(struct cpuinfo_x86 *c)
+static void __cpuinit squash_the_stupid_serial_number(struct cpuinfo_x86 *c)
 {
 	if (cpu_has(c, X86_FEATURE_PN) && disable_x86_serial_nr ) {
 		/* Disable processor serial number */
@@ -309,7 +318,7 @@ boolean_param("noserialnumber", disable_x86_serial_nr);
 /*
  * This does the hard work of actually picking apart the CPU stuff...
  */
-void __devinit identify_cpu(struct cpuinfo_x86 *c)
+void __cpuinit identify_cpu(struct cpuinfo_x86 *c)
 {
 	int i;
 
@@ -446,7 +455,7 @@ static inline u32 phys_pkg_id(u32 cpuid_apic, int index_msb)
 	return hard_smp_processor_id() >> index_msb;
 }
 
-void __devinit detect_ht(struct cpuinfo_x86 *c)
+void __cpuinit detect_ht(struct cpuinfo_x86 *c)
 {
 	u32 	eax, ebx, ecx, edx;
 	int 	index_msb, core_bits;
@@ -493,7 +502,7 @@ void __devinit detect_ht(struct cpuinfo_x86 *c)
 }
 #endif
 
-void __devinit print_cpu_info(struct cpuinfo_x86 *c)
+void __cpuinit print_cpu_info(struct cpuinfo_x86 *c)
 {
 	char *vendor = NULL;
 
@@ -516,7 +525,7 @@ void __devinit print_cpu_info(struct cpuinfo_x86 *c)
 		printk("\n");
 }
 
-cpumask_t cpu_initialized __devinitdata = CPU_MASK_NONE;
+cpumask_t cpu_initialized __cpuinitdata = CPU_MASK_NONE;
 
 /* This is hacky. :)
  * We're emulating future behavior.
@@ -551,7 +560,7 @@ void __init early_cpu_init(void)
  * and IDT. We reload them nevertheless, this function acts as a
  * 'CPU state barrier', nothing should get across.
  */
-void __devinit cpu_init(void)
+void __cpuinit cpu_init(void)
 {
 	int cpu = smp_processor_id();
 	struct tss_struct *t = &init_tss[cpu];
