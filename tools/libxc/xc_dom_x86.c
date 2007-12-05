@@ -694,7 +694,9 @@ int arch_setup_meminit(struct xc_dom_image *dom)
     int rc;
     xen_pfn_t pfn;
 
-    x86_compat(dom->guest_xc, dom->guest_domid, dom->guest_type);
+    rc = x86_compat(dom->guest_xc, dom->guest_domid, dom->guest_type);
+    if ( rc )
+        return rc;
     if ( xc_dom_feature_translated(dom) )
     {
         dom->shadow_enabled = 1;
