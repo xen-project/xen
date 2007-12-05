@@ -227,8 +227,6 @@ struct context_entry {
     do {(c).lo &= 0xfff; (c).lo |= (val) & PAGE_MASK_4K ;} while(0)
 #define context_set_address_width(c, val) \
     do {(c).hi &= 0xfffffff8; (c).hi |= (val) & 7;} while(0)
-#define context_set_domain_id(c, val) \
-    do {(c).hi &= 0xff; (c).hi |= ((val + 1) & ((1 << 16) - 1)) << 8;} while(0)
 #define context_clear_entry(c) do {(c).lo = 0; (c).hi = 0;} while(0)
 
 /* page table handling */

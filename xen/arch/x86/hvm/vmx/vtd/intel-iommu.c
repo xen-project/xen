@@ -35,10 +35,48 @@
 #include "pci_regs.h"
 #include "msi.h"
 
+#define domain_iommu_domid(d) ((d)->arch.hvm_domain.hvm_iommu.iommu_domid)
+
 #define VTDPREFIX
 extern void print_iommu_regs(struct acpi_drhd_unit *drhd);
 extern void print_vtd_entries(struct domain *d, int bus, int devfn,
                               unsigned long gmfn);
+
+static spinlock_t domid_bitmap_lock;    /* protect domain id bitmap */
+static int domid_bitmap_size;           /* domain id bitmap size in bit */
+static void *domid_bitmap;              /* iommu domain id bitmap */
+
+#define DID_FIELD_WIDTH 16
+#define DID_HIGH_OFFSET 8
+static void context_set_domain_id(struct context_entry *context,
+                                  struct domain *d)
+{
+    unsigned long flags;
+    domid_t iommu_domid = domain_iommu_domid(d);
+
+    if ( iommu_domid == 0 )
+    {
+        spin_lock_irqsave(&domid_bitmap_lock, flags);
+        iommu_domid = find_first_zero_bit(domid_bitmap, domid_bitmap_size);
+        set_bit(iommu_domid, domid_bitmap);
+        spin_unlock_irqrestore(&domid_bitmap_lock, flags);
+        d->arch.hvm_domain.hvm_iommu.iommu_domid = iommu_domid;
+    }
+
+    context->hi &= (1 << DID_HIGH_OFFSET) - 1;
+    context->hi |= iommu_domid << DID_HIGH_OFFSET;
+}
+
+static void iommu_domid_release(struct domain *d)
+{
+    domid_t iommu_domid = domain_iommu_domid(d);
+
+    if ( iommu_domid != 0 )
+    {
+        d->arch.hvm_domain.hvm_iommu.iommu_domid = 0;
+        clear_bit(iommu_domid, domid_bitmap);
+    }
+}
 
 unsigned int x86_clflush_size;
 void clflush_cache_range(void *adr, int size)
@@ -276,9 +314,6 @@ static int __iommu_flush_context(
     unsigned long flag;
     unsigned long start_time;
 
-    /* Domain id in context is 1 based */
-    did++;
-
     /*
      * In the non-present entry flush case, if hardware doesn't cache
      * non-present entry we do nothing and if hardware cache non-present
@@ -362,9 +397,6 @@ static int __iommu_flush_iotlb(struct iommu *iommu, u16 did,
     u64 val = 0, val_iva = 0;
     unsigned long flag;
     unsigned long start_time;
-
-    /* Domain id in context is 1 based */
-    did++;
 
     /*
      * In the non-present entry flush case, if hardware doesn't cache
@@ -534,7 +566,8 @@ static void dma_pte_clear_one(struct domain *domain, u64 addr)
         {
             iommu = drhd->iommu;
             if ( cap_caching_mode(iommu->cap) )
-                iommu_flush_iotlb_psi(iommu, domain->domain_id, addr, 1, 0);
+                iommu_flush_iotlb_psi(iommu, domain_iommu_domid(domain),
+                                      addr, 1, 0);
             else if (cap_rwbf(iommu->cap))
                 iommu_flush_write_buffer(iommu);
         }
@@ -1036,7 +1069,7 @@ static int domain_context_mapping_one(
      * domain_id 0 is not valid on Intel's IOMMU, force domain_id to
      * be 1 based as required by intel's iommu hw.
      */
-    context_set_domain_id(*context, domain->domain_id);
+    context_set_domain_id(context, domain);
     context_set_address_width(*context, hd->agaw);
 
     if ( ecap_pass_thru(iommu->ecap) )
@@ -1069,12 +1102,12 @@ static int domain_context_mapping_one(
              bus, PCI_SLOT(devfn), PCI_FUNC(devfn),
              context->hi, context->lo, hd->pgd);
 
-    if ( iommu_flush_context_device(iommu, domain->domain_id,
+    if ( iommu_flush_context_device(iommu, domain_iommu_domid(domain),
                                     (((u16)bus) << 8) | devfn,
                                     DMA_CCMD_MASK_NOBIT, 1) )
         iommu_flush_write_buffer(iommu);
     else
-        iommu_flush_iotlb_dsi(iommu, domain->domain_id, 0);
+        iommu_flush_iotlb_dsi(iommu, domain_iommu_domid(domain), 0);
     spin_unlock_irqrestore(&iommu->lock, flags);
     return ret;
 }
@@ -1414,6 +1447,8 @@ void iommu_domain_teardown(struct domain *d)
     if ( list_empty(&acpi_drhd_units) )
         return;
 
+    iommu_domid_release(d);
+
 #if CONFIG_PAGING_LEVELS == 3
     {
         struct hvm_iommu *hd  = domain_hvm_iommu(d);
@@ -1492,7 +1527,7 @@ int iommu_map_page(struct domain *d, paddr_t gfn, paddr_t mfn)
     {
         iommu = drhd->iommu;
         if ( cap_caching_mode(iommu->cap) )
-            iommu_flush_iotlb_psi(iommu, d->domain_id,
+            iommu_flush_iotlb_psi(iommu, domain_iommu_domid(d),
                                   gfn << PAGE_SHIFT_4K, 1, 0);
         else if ( cap_rwbf(iommu->cap) )
             iommu_flush_write_buffer(iommu);
@@ -1556,7 +1591,8 @@ int iommu_page_mapping(struct domain *domain, dma_addr_t iova,
     {
         iommu = drhd->iommu;
         if ( cap_caching_mode(iommu->cap) )
-            iommu_flush_iotlb_psi(iommu, domain->domain_id, iova, index, 0);
+            iommu_flush_iotlb_psi(iommu, domain_iommu_domid(domain),
+                                  iova, index, 0);
         else if ( cap_rwbf(iommu->cap) )
             iommu_flush_write_buffer(iommu);
     }
@@ -1581,7 +1617,7 @@ void iommu_flush(struct domain *d, dma_addr_t gfn, u64 *p2m_entry)
     {
         iommu = drhd->iommu;
         if ( cap_caching_mode(iommu->cap) )
-            iommu_flush_iotlb_psi(iommu, d->domain_id,
+            iommu_flush_iotlb_psi(iommu, domain_iommu_domid(d),
                                   gfn << PAGE_SHIFT_4K, 1, 0);
         else if ( cap_rwbf(iommu->cap) )
             iommu_flush_write_buffer(iommu);
@@ -1760,6 +1796,7 @@ int iommu_setup(void)
     if ( !vtd_enabled )
         return 0;
 
+    spin_lock_init(&domid_bitmap_lock);
     INIT_LIST_HEAD(&hd->pdev_list);
 
     /* start from scratch */
@@ -1768,11 +1805,17 @@ int iommu_setup(void)
     /* setup clflush size */
     x86_clflush_size = ((cpuid_ebx(1) >> 8) & 0xff) * 8;
 
-    /*
-     * allocate IO page directory page for the domain.
-     */
+    /* Allocate IO page directory page for the domain. */
     drhd = list_entry(acpi_drhd_units.next, typeof(*drhd), list);
     iommu = drhd->iommu;
+
+    /* Allocate domain id bitmap, and set bit 0 as reserved */
+    domid_bitmap_size = cap_ndoms(iommu->cap);
+    domid_bitmap = xmalloc_bytes(domid_bitmap_size / 8);
+    if ( domid_bitmap == NULL )
+        goto error;
+    memset(domid_bitmap, 0, domid_bitmap_size / 8);
+    set_bit(0, domid_bitmap);
 
     /* setup 1:1 page table for dom0 */
     for ( i = 0; i < max_page; i++ )
