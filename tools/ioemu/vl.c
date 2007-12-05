@@ -1932,6 +1932,16 @@ static int tty_serial_ioctl(CharDriverState *chr, int cmd, void *arg)
                 tcsendbreak(s->fd_in, 1);
         }
         break;
+    case CHR_IOCTL_SERIAL_GET_TIOCM:
+        {
+            ioctl(s->fd_in, TIOCMGET, arg);
+        }
+        break;
+    case CHR_IOCTL_SERIAL_SET_TIOCM:
+        {
+            ioctl(s->fd_in, TIOCMSET, arg);
+        }
+        break;
     default:
         return -ENOTSUP;
     }

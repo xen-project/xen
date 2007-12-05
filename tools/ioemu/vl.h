@@ -317,6 +317,10 @@ typedef struct {
 #define CHR_IOCTL_PP_WRITE_CONTROL    6
 #define CHR_IOCTL_PP_READ_STATUS      7
 
+
+#define CHR_IOCTL_SERIAL_SET_TIOCM    8
+#define CHR_IOCTL_SERIAL_GET_TIOCM    9
+
 typedef void IOEventHandler(void *opaque, int event);
 
 typedef struct CharDriverState {

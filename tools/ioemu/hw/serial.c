@@ -25,6 +25,7 @@
 #include <sys/time.h>
 #include <time.h>
 #include <assert.h>
+#include <asm/termios.h>
 
 //#define DEBUG_SERIAL
 
@@ -63,7 +64,7 @@
 #define UART_MSR_TERI	0x04	/* Trailing edge ring indicator */
 #define UART_MSR_DDSR	0x02	/* Delta DSR */
 #define UART_MSR_DCTS	0x01	/* Delta CTS */
-#define UART_MSR_ANY_DELTA 0x0F	/* Any of the delta bits! */
+#define UART_MSR_ANY_DELTA 0x0F	/* Any of the msr delta bits */
 
 #define UART_LSR_TEMT	0x40	/* Transmitter empty */
 #define UART_LSR_THRE	0x20	/* Transmit-hold-register empty */
@@ -72,6 +73,7 @@
 #define UART_LSR_PE	0x04	/* Parity error indicator */
 #define UART_LSR_OE	0x02	/* Overrun error indicator */
 #define UART_LSR_DR	0x01	/* Receiver data ready */
+#define UART_LSR_INT_ANY 0x1E	/* Any of the lsr-interrupt-triggering status bits */
 
 /* Maximum retries for a single byte transmit. */
 #define WRITE_MAX_SINGLE_RETRIES 3
@@ -98,6 +100,8 @@ struct SerialState {
     int last_break_enable;
     target_ulong base;
     int it_shift;
+    uint64_t char_transmit_time;               /* time to transmit a char in ticks*/
+    int poll_msl;
 
     /*
      * If a character transmitted via UART cannot be written to its
@@ -111,18 +115,31 @@ struct SerialState {
     int write_total_retries;
     char write_chr;
     QEMUTimer *write_retry_timer;
+    QEMUTimer *modem_status_poll;
 };
 
 static void serial_update_irq(SerialState *s)
 {
-    if ((s->lsr & UART_LSR_DR) && (s->ier & UART_IER_RDI)) {
-        s->iir = UART_IIR_RDI;
-    } else if (s->thr_ipending && (s->ier & UART_IER_THRI)) {
-        s->iir = UART_IIR_THRI;
-    } else {
-        s->iir = UART_IIR_NO_INT;
+    uint8_t tmp_iir = UART_IIR_NO_INT;
+
+    if (!s->ier) {
+        s->set_irq(s->irq_opaque, s->irq, 0);
+	return;
     }
-    if (s->iir != UART_IIR_NO_INT) {
+
+    if ( ( s->ier & UART_IER_RLSI ) && ( s->lsr & UART_LSR_INT_ANY ) ) {
+        tmp_iir = UART_IIR_RLSI;
+    } else if ( ( s->ier & UART_IER_RDI ) && ( s->lsr & UART_LSR_DR ) ) {
+        tmp_iir = UART_IIR_RDI;
+    } else if ( ( s->ier & UART_IER_THRI ) && s->thr_ipending ) {
+        tmp_iir = UART_IIR_THRI; 
+    } else if ( ( s->ier & UART_IER_MSI ) && ( s->msr & UART_MSR_ANY_DELTA ) ) {
+        tmp_iir = UART_IIR_MSI;
+    }
+
+    s->iir = tmp_iir | ( s->iir & 0xF0 );
+
+    if ( tmp_iir != UART_IIR_NO_INT ) {
         s->set_irq(s->irq_opaque, s->irq, 1);
     } else {
         s->set_irq(s->irq_opaque, s->irq, 0);
@@ -131,9 +148,13 @@ static void serial_update_irq(SerialState *s)
 
 static void serial_update_parameters(SerialState *s)
 {
-    int speed, parity, data_bits, stop_bits;
+    int speed, parity, data_bits, stop_bits, frame_size;
     QEMUSerialSetParams ssp;
 
+    if (s->divider == 0)
+        return;
+
+    frame_size = 1;
     if (s->lcr & 0x08) {
         if (s->lcr & 0x10)
             parity = 'E';
@@ -141,19 +162,22 @@ static void serial_update_parameters(SerialState *s)
             parity = 'O';
     } else {
             parity = 'N';
+            frame_size = 0;
     }
     if (s->lcr & 0x04) 
         stop_bits = 2;
     else
         stop_bits = 1;
+
     data_bits = (s->lcr & 0x03) + 5;
-    if (s->divider == 0)
-        return;
+    frame_size += data_bits + stop_bits;
+
     speed = 115200 / s->divider;
     ssp.speed = speed;
     ssp.parity = parity;
     ssp.data_bits = data_bits;
     ssp.stop_bits = stop_bits;
+    s->char_transmit_time =  ( ticks_per_sec / speed ) * frame_size;
     qemu_chr_ioctl(s->chr, CHR_IOCTL_SERIAL_SET_PARAMS, &ssp);
 #if 0
     printf("speed=%d parity=%c data=%d stop=%d\n", 
@@ -250,6 +274,41 @@ static void serial_chr_write(void *opaque)
     serial_update_irq(s);
 }
 
+static void serial_update_msl( SerialState *s )
+{
+    uint8_t omsr;
+    int flags;
+
+    qemu_del_timer(s->modem_status_poll);
+
+    if ( qemu_chr_ioctl(s->chr,CHR_IOCTL_SERIAL_GET_TIOCM, &flags) == -ENOTSUP ) {
+        s->poll_msl = -1;
+        return;
+    }
+
+    omsr = s->msr;
+
+    s->msr = ( flags & TIOCM_CTS ) ? s->msr | UART_MSR_CTS : s->msr & ~UART_MSR_CTS;
+    s->msr = ( flags & TIOCM_DSR ) ? s->msr | UART_MSR_DSR : s->msr & ~UART_MSR_DSR;
+    s->msr = ( flags & TIOCM_CAR ) ? s->msr | UART_MSR_DCD : s->msr & ~UART_MSR_DCD;
+    s->msr = ( flags & TIOCM_RI ) ? s->msr | UART_MSR_RI : s->msr & ~UART_MSR_RI;
+
+    if ( s->msr != omsr ) {
+         /* Set delta bits */
+         s->msr = s->msr | ( ( s->msr >> 4 ) ^ ( omsr >> 4 ) );
+         /* UART_MSR_TERI only if change was from 1 -> 0 */
+         if ( (s->msr & UART_MSR_TERI) && !(omsr & UART_MSR_RI))
+             s->msr &= ~UART_MSR_TERI;
+         serial_update_irq(s);
+    }
+
+    /* The real 16550A apparently has a 250ns response latency to line status changes.
+       We'll be lazy and poll only every 10ms, and only poll it at all if MSI interrupts are turned on */
+
+    if (s->poll_msl)
+        qemu_mod_timer(s->modem_status_poll, qemu_get_clock(vm_clock) + ticks_per_sec / 100);
+}
+
 static void serial_ioport_write(void *opaque, uint32_t addr, uint32_t val)
 {
     SerialState *s = opaque;
@@ -279,6 +338,17 @@ static void serial_ioport_write(void *opaque, uint32_t addr, uint32_t val)
             serial_update_parameters(s);
         } else {
             s->ier = val & 0x0f;
+            /* Turn on polling of modem status lines if guest has IER_MSI turned on */
+            if ( s->poll_msl >= 0 ) { 
+                if ( s->ier & UART_IER_MSI ) {
+                     s->poll_msl = 1;
+                     serial_update_msl(s);
+                } else {
+                     qemu_del_timer(s->modem_status_poll);
+                     s->poll_msl = 0;
+                }
+            }
+
             if (s->lsr & UART_LSR_THRE) {
                 s->thr_ipending = 1;
             }
@@ -301,7 +371,30 @@ static void serial_ioport_write(void *opaque, uint32_t addr, uint32_t val)
         }
         break;
     case 4:
-        s->mcr = val & 0x1f;
+	{
+            int flags;
+	    int old_mcr = s->mcr;
+            s->mcr = val & 0x1f;
+            if ( val & UART_MCR_LOOP )
+                break;
+
+            if ( ( s->poll_msl >= 0 ) && ( old_mcr != s->mcr ) ) {
+
+                qemu_chr_ioctl(s->chr,CHR_IOCTL_SERIAL_GET_TIOCM, &flags);
+
+                flags &= ~( TIOCM_RTS | TIOCM_DTR );
+
+                if ( val & UART_MCR_RTS )
+                    flags |= TIOCM_RTS;
+                if ( val & UART_MCR_DTR )
+                    flags |= TIOCM_DTR;
+
+                qemu_chr_ioctl(s->chr,CHR_IOCTL_SERIAL_SET_TIOCM, &flags);
+
+                /* Update the modem status after a one-character-send wait-time. The dev */
+                qemu_mod_timer(s->modem_status_poll, qemu_get_clock(vm_clock) + s->char_transmit_time );
+            }
+	}
         break;
     case 5:
         break;
@@ -363,7 +456,12 @@ static uint32_t serial_ioport_read(void *opaque, uint32_t addr)
             ret |= (s->mcr & 0x02) << 3;
             ret |= (s->mcr & 0x01) << 5;
         } else {
+            ret = 0;
+            if ( s->poll_msl >= 0 )
+                serial_update_msl(s);
             ret = s->msr;
+            s->msr &= 0xF0; /* Clear delta bits after read */
+            serial_update_irq(s);
         }
         break;
     case 7:
@@ -466,10 +564,19 @@ SerialState *serial_init(SetIRQFunc *set_irq, void *opaque,
     s->set_irq = set_irq;
     s->irq_opaque = opaque;
     s->irq = irq;
+    s->ier = 0;
     s->lsr = UART_LSR_TEMT | UART_LSR_THRE;
     s->iir = UART_IIR_NO_INT;
+    s->mcr = UART_MCR_OUT2;
     s->msr = UART_MSR_DCD | UART_MSR_DSR | UART_MSR_CTS;
+    /* Default to 9600 baud, no parity, one stop bit */
+    s->divider = 0x0C;
+    s->char_transmit_time = ticks_per_sec * ( 9 / 9600 );
+
     s->write_retry_timer = qemu_new_timer(vm_clock, serial_chr_write, s);
+    s->modem_status_poll = qemu_new_timer(vm_clock, serial_update_msl, s);
+ 
+    s->poll_msl = 0;
 
     register_savevm("serial", base, 2, serial_save, serial_load, s);
 
@@ -478,6 +585,8 @@ SerialState *serial_init(SetIRQFunc *set_irq, void *opaque,
     s->chr = chr;
     qemu_chr_add_handlers(chr, serial_can_receive1, serial_receive1,
                           serial_event, s);
+    serial_update_msl(s);
+
     return s;
 }
 
@@ -552,12 +661,21 @@ SerialState *serial_mm_init (SetIRQFunc *set_irq, void *opaque,
     s->set_irq = set_irq;
     s->irq_opaque = opaque;
     s->irq = irq;
+    s->ier = 0;
     s->lsr = UART_LSR_TEMT | UART_LSR_THRE;
     s->iir = UART_IIR_NO_INT;
+    s->mcr = UART_MCR_OUT2;
     s->msr = UART_MSR_DCD | UART_MSR_DSR | UART_MSR_CTS;
+    /* Default to 9600 baud, no parity, one stop bit */
+    s->divider = 0x0C;
+    s->char_transmit_time = ticks_per_sec * ( 9 / 9600 );
+
     s->base = base;
     s->it_shift = it_shift;
+
     s->write_retry_timer = qemu_new_timer(vm_clock, serial_chr_write, s);
+    s->modem_status_poll = qemu_new_timer(vm_clock, serial_update_msl, s); 
+    s->poll_msl = 0;
 
     register_savevm("serial", base, 2, serial_save, serial_load, s);
 
