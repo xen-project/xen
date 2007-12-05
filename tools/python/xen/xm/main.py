@@ -133,7 +133,7 @@ SUBCOMMAND_HELP = {
     'domname'     : ('<DomId>', 'Convert a domain id to domain name.'),
     'dump-core'   : ('[-L|--live] [-C|--crash] <Domain> [Filename]',
                      'Dump core for a specific domain.'),
-    'info'        : ('', 'Get information about Xen host.'),
+    'info'        : ('[-c|--config]', 'Get information about Xen host.'),
     'log'         : ('', 'Print Xend log'),
     'rename'      : ('<Domain> <NewDomainName>', 'Rename a domain.'),
     'sched-sedf'  : ('<Domain> [options]', 'Get/set EDF parameters.'),
@@ -237,17 +237,20 @@ SUBCOMMAND_OPTIONS = {
        ('-C', '--crash', 'Crash domain after dumping core'),
     ),
     'start': (
-      ('-p', '--paused', 'Do not unpause domain after starting it'),
-      ('-c', '--console_autoconnect', 'Connect to the console after the domain is created'),
+       ('-p', '--paused', 'Do not unpause domain after starting it'),
+       ('-c', '--console_autoconnect', 'Connect to the console after the domain is created'),
     ),
     'resume': (
-      ('-p', '--paused', 'Do not unpause domain after resuming it'),
+       ('-p', '--paused', 'Do not unpause domain after resuming it'),
     ),
     'save': (
-      ('-c', '--checkpoint', 'Leave domain running after creating snapshot'),
+       ('-c', '--checkpoint', 'Leave domain running after creating snapshot'),
     ),
-   'restore': (
-      ('-p', '--paused', 'Do not unpause domain after restoring it'),
+    'restore': (
+       ('-p', '--paused', 'Do not unpause domain after restoring it'),
+    ),
+    'info': (
+       ('-c', '--config', 'List Xend configuration parameters'),
     ),
 }
 
