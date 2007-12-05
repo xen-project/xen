@@ -646,6 +646,7 @@ int __init construct_dom0(
         l4start = l4tab = page_to_virt(page);
     }
     copy_page(l4tab, idle_pg_table);
+    l4tab[0] = l4e_empty(); /* zap trampoline mapping */
     l4tab[l4_table_offset(LINEAR_PT_VIRT_START)] =
         l4e_from_paddr(__pa(l4start), __PAGE_HYPERVISOR);
     l4tab[l4_table_offset(PERDOMAIN_VIRT_START)] =
