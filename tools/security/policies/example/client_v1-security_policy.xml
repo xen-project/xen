@@ -46,7 +46,7 @@
 		</ConflictSets>
 	</ChineseWall>
 	<SecurityLabelTemplate>
-		<SubjectLabels bootstrap="dom_SystemManagement">
+		<SubjectLabels bootstrap="SystemManagement">
 			<!-- single ste typed domains            -->
 			<!-- ACM enforces that only domains with -->
 			<!-- the same type can share information -->
@@ -89,7 +89,7 @@
 			<!-- Domains with multiple ste types services; such domains   -->
 			<!-- must keep the types inside their domain safely confined. -->
 			<VirtualMachineLabel>
-				<Name>dom_SystemManagement</Name>
+				<Name>SystemManagement</Name>
 				<SimpleTypeEnforcementTypes>
 					<!-- since dom0 needs access to every domain and -->
 					<!-- resource right now ... -->

@@ -15,12 +15,10 @@ LDFLAGS    += $(shell xml2-config --libs ) # if this does not work, try -L/usr/l
 
 SRCS_TOOL     = secpol_tool.c
 OBJS_TOOL    := $(patsubst %.c,%.o,$(filter %.c,$(SRCS_TOOL)))
-SRCS_XML2BIN  = secpol_xml2bin.c secpol_xml2bin.h
-OBJS_XML2BIN := $(patsubst %.c,%.o,$(filter %.c,$(SRCS_XML2BIN)))
 
-ACM_INST_TOOLS    = xensec_tool xensec_xml2bin xensec_gen
+ACM_INST_TOOLS    = xensec_tool xensec_gen
 ACM_EZPOLICY      = xensec_ezpolicy
-ACM_OBJS          = $(OBJS_TOOL) $(OBJS_XML2BIN) $(OBJS_GETD)
+ACM_OBJS          = $(OBJS_TOOL) $(OBJS_GETD)
 ACM_SCRIPTS       = python/xensec_tools/acm_getlabel
 
 ACM_CONFIG_DIR    = /etc/xen/acm-security
@@ -85,9 +83,6 @@ build: $(ACM_INST_TOOLS) $(ACM_NOINST_TOOLS)
 
 xensec_tool: $(OBJS_TOOL)
 	$(CC) -g $(CFLAGS) $(LDFLAGS) -O0 -o $@ $^ -L$(XEN_LIBXC) -lxenctrl
-
-xensec_xml2bin: $(OBJS_XML2BIN)
-	$(CC) -g $(CFLAGS) $(LDFLAGS) -O0 -o $@ $^
 
 xensec_gen: xensec_gen.py
 	cp -f $^ $@

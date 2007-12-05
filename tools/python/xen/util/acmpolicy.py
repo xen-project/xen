@@ -51,6 +51,19 @@ ACM_SCHEMA_FILE = ACM_POLICIES_DIR + "security_policy.xsd"
 ACM_LABEL_UNLABELED = "__UNLABELED__"
 ACM_LABEL_UNLABELED_DISPLAY = "unlabeled"
 
+"""
+   Error codes reported in when trying to test for a new policy
+   These error codes are reported in an array of tuples where
+   each error code is followed by a parameter describing the error
+   more closely, such as a domain id.
+"""
+ACM_EVTCHN_SHARING_VIOLATION = 0x100
+ACM_GNTTAB_SHARING_VIOLATION = 0x101
+ACM_DOMAIN_LOOKUP            = 0x102
+ACM_CHWALL_CONFLICT          = 0x103
+ACM_SSIDREF_IN_USE           = 0x104
+
+
 class ACMPolicy(XSPolicy):
     """
      ACMPolicy class. Implements methods for getting information from
@@ -228,7 +241,7 @@ class ACMPolicy(XSPolicy):
                 return -xsconstants.XSERR_BAD_LABEL, errors
 
             #Get binary and map from the new policy
-            rc, map, bin_pol = acmpol_new.policy_create_map_and_bin()
+            rc, pol_map, bin_pol = acmpol_new.policy_create_map_and_bin()
             if rc != xsconstants.XSERR_SUCCESS:
                 log.error("Could not build the map and binary policy.")
                 return rc, errors
@@ -356,7 +369,7 @@ class ACMPolicy(XSPolicy):
             pass
         return ssidref
 
-    def set_vm_bootlabel(self, vm_label):
+    def set_vm_bootlabel(self, vm_label, remove=False):
         parms="<>"
         if vm_label != "":
             ssidref = self.vmlabel_to_ssidref(vm_label)
@@ -367,6 +380,10 @@ class ACMPolicy(XSPolicy):
                          self.get_name(),vm_label)
         else:
             ssidref = 0 #Identifier for removal
+
+        if remove == True:
+            parms = "<>"
+
         try:
             def_title = bootloader.get_default_title()
             bootloader.set_kernel_attval(def_title, "ssidref", parms)
@@ -387,7 +404,7 @@ class ACMPolicy(XSPolicy):
         if name:
             p = name.split(".")
             path = ""
-            if dotted == True:
+            if dotted:
                 sep = "."
             else:
                 sep = "/"
@@ -513,8 +530,8 @@ class ACMPolicy(XSPolicy):
         self.set_frompolicy_name(curpol.policy_dom_get_hdr_item("PolicyName"))
         version = curpol.policy_dom_get_hdr_item("Version")
         self.set_frompolicy_version(version)
-        (maj, min) = self.__convVersionToTuple(version)
-        self.set_policy_version("%s.%s" % (maj, min+1))
+        (maj, minor) = self.__convVersionToTuple(version)
+        self.set_policy_version("%s.%s" % (maj, minor+1))
 
     #
     # Get all types that are part of a node
@@ -877,8 +894,7 @@ class ACMPolicy(XSPolicy):
         """
             Determine whether this policy is the active one.
         """
-        security.refresh_security_policy()
-        if self.get_name() == security.active_policy:
+        if self.get_name() == security.get_active_policy_name():
             return True
         return False
 

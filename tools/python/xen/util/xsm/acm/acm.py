@@ -24,6 +24,7 @@ import os, string, re
 import threading
 import struct
 import stat
+import base64
 from xen.lowlevel import acm
 from xen.xend import sxp
 from xen.xend import XendConstants
@@ -39,7 +40,6 @@ policy_dir_prefix = security_dir_prefix + "/policies"
 res_label_filename = policy_dir_prefix + "/resource_labels"
 boot_filename = "/boot/grub/menu.lst"
 altboot_filename = "/boot/grub/grub.conf"
-xensec_xml2bin = "/usr/sbin/xensec_xml2bin"
 xensec_tool = "/usr/sbin/xensec_tool"
 
 #global patterns for map file
@@ -49,7 +49,7 @@ secondary_entry_re = re.compile("\s*SECONDARY\s+.*", re.IGNORECASE)
 label_template_re =  re.compile(".*security_label_template.xml", re.IGNORECASE)
 mapping_filename_re = re.compile(".*\.map", re.IGNORECASE)
 policy_reference_entry_re = re.compile("\s*POLICYREFERENCENAME\s+.*", re.IGNORECASE)
-vm_label_re = re.compile("\s*LABEL->SSID\s+VM\s+.*", re.IGNORECASE)
+vm_label_re = re.compile("\s*LABEL->SSID\s.+[VM|ANY]\s+.*", re.IGNORECASE)
 res_label_re = re.compile("\s*LABEL->SSID\s+RES\s+.*", re.IGNORECASE)
 all_label_re = re.compile("\s*LABEL->SSID\s+.*", re.IGNORECASE)
 access_control_re = re.compile("\s*access_control\s*=", re.IGNORECASE)
@@ -77,9 +77,25 @@ __resfile_lock = threading.RLock()
 
 log = logging.getLogger("xend.util.security")
 
+
+#Functions exported through XML-RPC
+xmlrpc_exports = [
+  'set_resource_label',
+  'get_resource_label',
+  'list_labels',
+  'get_labeled_resources',
+  'set_policy',
+  'get_policy',
+  'activate_policy',
+  'rm_bootpolicy',
+  'get_xstype',
+  'get_domain_label',
+  'set_domain_label'
+]
+
 # Our own exception definition. It is masked (pass) if raised and
 # whoever raises this exception must provide error information.
-class ACMError(Exception):
+class XSMError(Exception):
     def __init__(self,value):
         self.value = value
     def __str__(self):
@@ -90,7 +106,7 @@ class ACMError(Exception):
 def err(msg):
     """Raise ACM exception.
     """
-    raise ACMError(msg)
+    raise XSMError(msg)
 
 
 
@@ -118,11 +134,16 @@ def refresh_security_policy():
     global active_policy
 
     active_policy = 'INACCESSIBLE'
+
     if os.access("/proc/xen/privcmd", os.R_OK|os.W_OK):
         try:
             active_policy = acm.policy()
         except:
             active_policy = "INACTIVE"
+
+def get_active_policy_name():
+    refresh_security_policy()
+    return active_policy
 
 # now set active_policy
 refresh_security_policy()
@@ -132,8 +153,7 @@ def on():
     returns none if security policy is off (not compiled),
     any string otherwise, use it: if not security.on() ...
     """
-    refresh_security_policy()
-    return (active_policy not in ['INACTIVE', 'NULL'])
+    return (get_active_policy_name() not in ['INACTIVE', 'NULL'])
 
 
 def calc_dom_ssidref_from_info(info):
@@ -158,11 +178,10 @@ def calc_dom_ssidref_from_info(info):
             typ, policyname, vmlabel = seclab.split(":")
             if typ != xsconstants.ACM_POLICY_ID:
                 raise VmError("Policy type '%s' must be changed." % typ)
-            refresh_security_policy()
-            if active_policy != policyname:
+            if get_active_policy_name() != policyname:
                 raise VmError("Active policy '%s' different than "
                               "what in VM's label ('%s')." %
-                              (active_policy, policyname))
+                              (get_active_policy_name(), policyname))
             ssidref = label2ssidref(vmlabel, policyname, "dom")
             return ssidref
         else:
@@ -180,7 +199,7 @@ def getmapfile(policyname):
     4. True if policy file is available, False otherwise
     """
     if not policyname:
-        policyname = active_policy
+        policyname = get_active_policy_name()
     map_file_ok = False
     primary = None
     secondary = None
@@ -199,8 +218,7 @@ def getmapfile(policyname):
         if not os.path.isfile(policy_filename):
             err("Policy file \'" + policy_filename + "\' not found.")
         else:
-            err("Mapping file \'" + map_filename + "\' not found." +
-                " Use xm makepolicy to create it.")
+            err("Mapping file \'" + map_filename + "\' not found.")
 
     f = open(map_filename)
     for line in f:
@@ -221,7 +239,7 @@ def getmapfile(policyname):
     if map_file_ok and primary and secondary:
         return (primary, secondary, f, True)
     else:
-        err("Mapping file inconsistencies found. Try makepolicy to create a new one.")
+        err("Mapping file inconsistencies found.")
 
 
 
@@ -253,10 +271,10 @@ def ssidref2label(ssidref_var):
         (primary, secondary, f, pol_exists) = getmapfile(None)
         if not f:
             if (pol_exists):
-                err("Mapping file for policy not found.\n" +
-                    "Please use makepolicy command to create mapping file!")
+                err("Mapping file for policy not found.")
             else:
-                err("Policy file for \'" + active_policy + "\' not found.")
+                err("Policy file for \'" + get_active_policy_name() +
+                    "\' not found.")
 
         #2. get labelnames for both ssidref parts
         pri_ssid = ssidref & 0xffff
@@ -534,36 +552,98 @@ def hv_get_policy():
     return rc, bin_pol
 
 
-def make_policy(policy_name):
-    policy_file = string.join(string.split(policy_name, "."), "/")
-    if not os.path.isfile(policy_dir_prefix + "/" + policy_file + "-security_policy.xml"):
-        err("Unknown policy \'" + policy_name + "\'")
+def set_policy(xs_type, xml, flags, overwrite):
+    """
+        Xend exports this function via XML-RPC
+    """
+    from xen.xend import XendXSPolicyAdmin
+    xspoladmin = XendXSPolicyAdmin.XSPolicyAdminInstance()
+    try:
+        acmpol, rc, errors = \
+             xspoladmin.add_acmpolicy_to_system(xml,
+                                                int(flags),
+                                                True)
+        return rc, base64.b64encode(errors)
+    except Exception, e:
+        err(str(e))
 
-    (ret, output) = commands.getstatusoutput(xensec_xml2bin + " -d " + policy_dir_prefix + " " + policy_file)
-    if ret:
-        err("Creating policy failed:\n" + output)
 
-def load_policy(policy_name):
-    global active_policy
-    policy_file = policy_dir_prefix + "/" + string.join(string.split(policy_name, "."), "/")
-    if not os.path.isfile(policy_file + ".bin"):
-        if os.path.isfile(policy_file + "-security_policy.xml"):
-            err("Binary file does not exist." +
-                "Please use makepolicy to build the policy binary.")
-        else:
-            err("Unknown Policy " + policy_name)
+def get_policy():
+    """
+        Xend exports this function via XML-RPC
+    """
+    from xen.xend import XendXSPolicyAdmin
+    poladmin = XendXSPolicyAdmin.XSPolicyAdminInstance()
+    try:
+        policy = poladmin.get_loaded_policy()
+        if policy != None:
+            return policy.toxml(), poladmin.get_policy_flags(policy)
+    except Exception, e:
+        err(str(e))
+    return "", 0
 
-    #require this policy to be the first or the same as installed
-    if active_policy not in ['DEFAULT', policy_name]:
-        err("Active policy \'" + active_policy +
-            "\' incompatible with new policy \'" + policy_name + "\'")
-    (ret, output) = commands.getstatusoutput(xensec_tool + " loadpolicy " + policy_file + ".bin")
-    if ret:
-        err("Loading policy failed:\n" + output)
+def activate_policy(flags):
+    """
+        Xend exports this function via XML-RPC
+    """
+    from xen.xend import XendXSPolicyAdmin
+    poladmin = XendXSPolicyAdmin.XSPolicyAdminInstance()
+    try:
+        policies = poladmin.get_policies()
+        if len(policies) > 0:
+           flags = int(flags)
+           irc = poladmin.activate_xspolicy(policies[0], flags)
+           return irc
+    except Exception, e:
+        err("Error while activating the policy: " % str(e))
+    return 0
+
+
+def rm_bootpolicy():
+    """
+        Xend exports this function via XML-RPC
+    """
+    from xen.xend import XendXSPolicyAdmin
+    rc = XendXSPolicyAdmin.XSPolicyAdminInstance().rm_bootpolicy()
+    if rc != xsconstants.XSERR_SUCCESS:
+        err("Error while removing boot policy: %s" % \
+            str(xsconstants.xserr2string(-rc)))
+    return rc
+
+
+def get_xstype():
+    """
+        Xend exports this function via XML-RPC
+    """
+    from xen.xend import XendXSPolicyAdmin
+    return XendXSPolicyAdmin.XSPolicyAdminInstance().isXSEnabled()
+
+
+def get_domain_label(domain):
+    """
+        Xend exports this function via XML-RPC
+    """
+    from xen.xend import XendDomain
+    dom = XendDomain.instance().domain_lookup_nr(domain)
+    if dom:
+        seclab = dom.get_security_label()
+        return seclab
     else:
-        # refresh active policy
-        refresh_security_policy()
+        err("Domain not found.")
 
+
+def set_domain_label(domain, seclab, old_seclab):
+    """
+        Xend exports this function via XML-RPC
+    """
+    from xen.xend import XendDomain
+    dom = XendDomain.instance().domain_lookup_nr(domain)
+    if dom:
+        results = dom.set_security_label(seclab, old_seclab)
+        rc, errors, old_label, new_ssidref = results
+        return rc, new_ssidref
+    else:
+        err("Domain not found.")
 
 
 def dump_policy():
@@ -589,16 +669,32 @@ def dump_policy_file(filename, ssidref=None):
     print output
 
 
-def list_labels(policy_name, condition):
-    if (not policy_name) and active_policy in \
-              [ 'NULL', 'INACTIVE', 'DEFAULT', 'INACCESSIBLE' ]:
-        err("Current policy \'" + active_policy + "\' has no labels defined.\n")
+def list_labels(policy_name, ltype):
+    """
+        Xend exports this function via XML-RPC
+
+        List the VM,resource or any kind of labels contained in the
+        given policy. If no policy name is given, the currently
+        active policy's label will be returned if they exist.
+    """
+    if not policy_name:
+        if active_policy in [ 'NULL', 'INACTIVE', "" ]:
+            err("Current policy \'" + active_policy + "\' "
+                "has no labels defined.\n")
+
+    if not ltype or ltype == 'dom':
+        condition = vm_label_re
+    elif ltype == 'res':
+        condition = res_label_re
+    elif ltype == 'any':
+        condition = all_label_re
+    else:
+        err("Unknown label type \'" + ltype + "\'")
 
     (primary, secondary, f, pol_exists) = getmapfile(policy_name)
     if not f:
         if pol_exists:
-            err("Cannot find mapfile for policy \'" + policy_name +
-                "\'.\nPlease use makepolicy to create mapping file.")
+            err("Cannot find mapfile for policy \'" + policy_name + "\'.\n")
         else:
             err("Unknown policy \'" + policy_name + "\'")
 
@@ -608,6 +704,10 @@ def list_labels(policy_name, condition):
             label = line.split()[3]
             if label not in labels:
                 labels.append(label)
+
+    if '__NULL_LABEL__' in labels:
+        labels.remove('__NULL_LABEL__')
+
     return labels
 
 
@@ -763,10 +863,10 @@ def res_security_check(resource, domain_label):
         # provide descriptive error messages
         if decision == 'DENIED':
             if label == ssidref2label(NULL_SSIDREF):
-                raise ACMError("Resource '"+resource+"' is not labeled")
+                raise XSMError("Resource '"+resource+"' is not labeled")
                 rtnval = 0
             else:
-                raise ACMError("Permission denied for resource '"+resource+"' because label '"+label+"' is not allowed")
+                raise XSMError("Permission denied for resource '"+resource+"' because label '"+label+"' is not allowed")
                 rtnval = 0
 
     # security is off, make sure resource isn't labeled
@@ -775,7 +875,7 @@ def res_security_check(resource, domain_label):
         # xm without ACM are free to use relative paths.
         (policytype, label, policy) = get_res_label(resource)
         if policy != 'NULL':
-            raise ACMError("Security is off, but '"+resource+"' is labeled")
+            raise XSMError("Security is off, but '"+resource+"' is labeled")
             rtnval = 0
 
     return rtnval
@@ -803,10 +903,10 @@ def res_security_check_xapi(rlabel, rssidref, rpolicy, xapi_dom_label):
         # provide descriptive error messages
         if decision == 'DENIED':
             if rlabel == ssidref2label(NULL_SSIDREF):
-                #raise ACMError("Resource is not labeled")
+                #raise XSMError("Resource is not labeled")
                 rtnval = 0
             else:
-                #raise ACMError("Permission denied for resource because label '"+rlabel+"' is not allowed")
+                #raise XSMError("Permission denied for resource because label '"+rlabel+"' is not allowed")
                 rtnval = 0
 
     # security is off, make sure resource isn't labeled
@@ -814,17 +914,35 @@ def res_security_check_xapi(rlabel, rssidref, rpolicy, xapi_dom_label):
         # Note, we can't canonicalise the resource here, because people using
         # xm without ACM are free to use relative paths.
         if rpolicy != 'NULL':
-            #raise ACMError("Security is off, but resource is labeled")
+            #raise XSMError("Security is off, but resource is labeled")
             rtnval = 0
 
     return rtnval
 
 
-def validate_label(label, policyref):
+def validate_label_xapi(xapi_label, dom_or_res):
+    """
+       Make sure that this label is part of the currently enforced policy
+       and that it references the current policy.
+       dom_or_res defines whether this is a VM ('res') or resource label
+       ('res')
+    """
+    tmp = xapi_label.split(":")
+    if len(tmp) != 3:
+        return -xsconstants.XSERR_BAD_LABEL_FORMAT
+    policytyp, policyref, label = tmp
+    return validate_label(policytyp, policyref, label, dom_or_res)
+
+
+def validate_label(policytype, policyref, label, dom_or_res):
     """
        Make sure that this label is part of the currently enforced policy
        and that it reference the current policy.
     """
+    if policytype != xsconstants.ACM_POLICY_ID:
+        return -xsconstants.XSERR_WRONG_POLICY_TYPE
+    if not policytype or not label:
+        return -xsconstants.XSERR_BAD_LABEL_FORMAT
     rc = xsconstants.XSERR_SUCCESS
     from xen.xend.XendXSPolicyAdmin import XSPolicyAdminInstance
     curpol = XSPolicyAdminInstance().get_loaded_policy()
@@ -832,7 +950,7 @@ def validate_label(label, policyref):
         rc = -xsconstants.XSERR_BAD_LABEL
     else:
         try:
-            label2ssidref(label, curpol.get_name() , 'res')
+            label2ssidref(label, curpol.get_name() , dom_or_res)
         except:
             rc = -xsconstants.XSERR_BAD_LABEL
     return rc
@@ -851,11 +969,11 @@ def set_resource_label_xapi(resource, reslabel_xapi, oldlabel_xapi):
     olabel = ""
     if reslabel_xapi == "":
         return rm_resource_label(resource, oldlabel_xapi)
-    typ, policyref, label = reslabel_xapi.split(":")
-    if typ != xsconstants.ACM_POLICY_ID:
-        return -xsconstants.XSERR_WRONG_POLICY_TYPE
-    if not policyref or not label:
-        return -xsconstants.XSERR_BAD_LABEL_FORMAT
+
+    rc = validate_label_xapi(reslabel_xapi, 'res')
+    if rc != xsconstants.XSERR_SUCCESS:
+        return rc
+
     if oldlabel_xapi not in [ "" ]:
         tmp = oldlabel_xapi.split(":")
         if len(tmp) != 3:
@@ -866,9 +984,7 @@ def set_resource_label_xapi(resource, reslabel_xapi, oldlabel_xapi):
            otyp != xsconstants.INVALID_POLICY_PREFIX + \
                    xsconstants.ACM_POLICY_ID:
             return -xsconstants.XSERR_WRONG_POLICY_TYPE
-    rc = validate_label(label, policyref)
-    if rc != xsconstants.XSERR_SUCCESS:
-        return rc
+    typ, policyref, label = reslabel_xapi.split(":")
     return set_resource_label(resource, typ, policyref, label, olabel)
 
 
@@ -1033,7 +1149,10 @@ def __resources_compatible_with_vmlabel(xspol, dominfo, vmlabel,
 
 def set_resource_label(resource, policytype, policyref, reslabel, \
                        oreslabel = None):
-    """Assign a label to a resource
+    """
+       Xend exports this function via XML-RPC.
+
+       Assign a label to a resource
        If the old label (oreslabel) is given, then the resource must have
        that old label.
        A resource label may be changed if
@@ -1046,6 +1165,10 @@ def set_resource_label(resource, policytype, policyref, reslabel, \
     @rtype: int
     @return Success (0) or failure value (< 0)
     """
+
+    if reslabel != "":
+        ssidref = label2ssidref(reslabel, policyref, 'res')
+
     try:
         resource = unify_resname(resource, mustexist=False)
     except Exception:
@@ -1123,7 +1246,10 @@ def format_resource_label(res):
     return ""
 
 def get_resource_label(resource):
-    """Get the assigned resource label of a given resource
+    """
+       Xend exports this function via XML-RPC.
+
+       Get the assigned resource label of a given resource
     @param resource: The name of a resource, i.e., "phy:/dev/hda"
 
     @rtype: list
@@ -1161,7 +1287,10 @@ def get_labeled_resources_xapi():
 
 
 def get_labeled_resources():
-    """Get a map of all labeled resources
+    """
+        Xend exports this function via XML-RPC
+
+        Get a map of all labeled resources.
     @rtype: list
     @return list of labeled resources
     """
@@ -1225,6 +1354,7 @@ def change_acm_policy(bin_pol, del_array, chg_array,
        This function should be called with the lock to the domains
        held (XendDomain.instance().domains_lock)
     """
+    from xen.util.acmpolicy import ACM_LABEL_UNLABELED
     rc = xsconstants.XSERR_SUCCESS
 
     domain_label_map = {}
@@ -1266,14 +1396,25 @@ def change_acm_policy(bin_pol, del_array, chg_array,
                 continue
 
             # label been renamed or deleted?
-            if reslabel_map.has_key(label) and cur_policyname == policy:
+            if policytype != xsconstants.ACM_POLICY_ID:
+                continue
+            elif reslabel_map.has_key(label) and cur_policyname == policy:
+                # renaming of an active label; policy may have been renamed
                 label = reslabel_map[label]
+                polname = new_policyname
             elif label not in polnew_reslabels:
+                # label been removed
                 policytype = xsconstants.INVALID_POLICY_PREFIX + policytype
                 run_resource_label_change_script(key, "", "remove")
+                polname = policy
+            else:
+                # no change to label
+                policytype = xsconstants.ACM_POLICY_ID
+                polname = new_policyname
+
             # Update entry
             access_control[key] = \
-                   tuple([ policytype, new_policyname, label ])
+                   tuple([ policytype, polname, label ])
 
         # All resources have new labels in the access_control map
         # There may still be labels in there that are invalid now.
@@ -1297,11 +1438,19 @@ def change_acm_policy(bin_pol, del_array, chg_array,
 
             new_vmlabel = vmlabel
             if vmlabel_map.has_key(vmlabel):
+                # renaming of the label
                 new_vmlabel = vmlabel_map[vmlabel]
-            if new_vmlabel not in polnew_vmlabels:
+                polname = new_policyname
+            elif new_vmlabel not in polnew_vmlabels and \
+               vmlabel != ACM_LABEL_UNLABELED:
+                # removal of VM label and not the 'unlabeled' label
                 policytype = xsconstants.INVALID_POLICY_PREFIX + policytype
+                polname = policy
+            else:
+                polname = new_policyname
+
             new_seclab = "%s:%s:%s" % \
-                    (policytype, new_policyname, new_vmlabel)
+                    (policytype, polname, new_vmlabel)
 
             domain_label_map[dominfo] = [ sec_lab, new_seclab ]
 
@@ -1383,16 +1532,20 @@ def get_security_label(self, xspol=None):
     return label
 
 def run_resource_label_change_script(resource, label, command):
-    script = XendOptions.instance().get_resource_label_change_script()
-    if script:
-        parms = {
-            'resource' : resource,
-            'label'    : label,
-            'command'  : command,
-        }
-        log.info("Running resource label change script %s: %s" %
-                 (script, parms))
-        parms.update(os.environ)
-        os.spawnve(os.P_NOWAIT, script[0], script, parms)
-    else:
-        log.info("No script given for relabeling of resources.")
+    def __run_resource_label_change_script(label, command):
+        script = XendOptions.instance().get_resource_label_change_script()
+        if script:
+            parms = {
+                'resource' : resource,
+                'label'    : label,
+                'command'  : command,
+            }
+            log.info("Running resource label change script %s: %s" %
+                     (script, parms))
+            parms.update(os.environ)
+            os.spawnve(os.P_WAIT, script[0], script, parms)
+        else:
+            log.info("No script given for relabeling of resources.")
+    thread = threading.Thread(target=__run_resource_label_change_script,
+                              args=(label,command))
+    thread.start()

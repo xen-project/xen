@@ -2460,12 +2460,14 @@ class XendDomainInfo:
                           self, label):
                     return (-xsconstants.XSERR_BAD_LABEL, "", "", 0)
 
-                #Check label against expected one.
-                old_label = self.get_security_label(xspol_old)
-                if old_label != old_seclab:
-                    log.info("old_label != old_seclab: %s != %s" %
-                             (old_label, old_seclab))
-                    return (-xsconstants.XSERR_BAD_LABEL, "", "", 0)
+                #Check label against expected one. Can only do this
+                # if the policy hasn't changed underneath in the meantime
+                if xspol_old == None:
+                    old_label = self.get_security_label()
+                    if old_label != old_seclab:
+                        log.info("old_label != old_seclab: %s != %s" %
+                                 (old_label, old_seclab))
+                        return (-xsconstants.XSERR_BAD_LABEL, "", "", 0)
 
                 # relabel domain in the hypervisor
                 rc, errors = security.relabel_domains([[domid, new_ssidref]])
@@ -2477,6 +2479,7 @@ class XendDomainInfo:
             # HALTED, RUNNING or PAUSED
             if domid == 0:
                 if xspol:
+                    self.info['security_label'] = seclab
                     ssidref = poladmin.set_domain0_bootlabel(xspol, label)
                 else:
                     return (-xsconstants.XSERR_POLICY_NOT_LOADED, "", "", 0)
@@ -2488,6 +2491,7 @@ class XendDomainInfo:
                         return (-xsconstants.XSERR_BAD_LABEL, "", "", 0)
 
                 self.info['security_label'] = seclab
+
                 try:
                     xen.xend.XendDomain.instance().managed_config_save(self)
                 except:

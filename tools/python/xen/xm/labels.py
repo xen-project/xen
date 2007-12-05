@@ -20,9 +20,7 @@
 """
 import sys
 import traceback
-import string
-from xen.util.xsm.xsm import XSMError, err, list_labels, active_policy
-from xen.util.xsm.xsm import vm_label_re, res_label_re, all_label_re
+from xen.util.xsm.xsm import XSMError, err
 from xen.xm.opts import OptionError
 from xen.util.acmpolicy import ACMPolicy
 from xen.util import xsconstants
@@ -58,32 +56,12 @@ def main(argv):
         labels_xapi(policy, ptype)
 
 def labels(policy, ptype):
-    if not policy:
-        policy = active_policy
-        if active_policy in ['NULL', 'INACTIVE', 'DEFAULT']:
-            raise OptionError('No policy active, you must specify a <policy>')
-        if active_policy in ['INACCESSIBLE']:
-            raise OptionError('Cannot access the policy. Try as root.')
 
-    if not ptype or ptype == 'dom':
-        condition = vm_label_re
-    elif ptype == 'res':
-        condition = res_label_re
-    elif ptype == 'any':
-        condition = all_label_re
-    else:
-        err("Unknown label type \'" + ptype + "\'")
+    labels = server.xend.security.list_labels(policy, ptype)
+    labels.sort()
+    for label in labels:
+        print label
 
-    try:
-        labels = list_labels(policy, condition)
-        labels.sort()
-        for label in labels:
-            print label
-
-    except XSMError:
-        sys.exit(-1)
-    except:
-        traceback.print_exc(limit = 1)
 
 def labels_xapi(policy, ptype):
     policystate = server.xenapi.XSPolicy.get_xspolicy()

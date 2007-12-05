@@ -207,6 +207,12 @@ class XMLRPCServer:
         self.server.register_function(domain_create, 'xend.domain.create')
         self.server.register_function(domain_restore, 'xend.domain.restore')
 
+        # A couple of the security functions
+        from xen.util.xsm import xsm as security
+        for name in security.xmlrpc_exports:
+            fn = getattr(security, name)
+            self.server.register_function(fn, "xend.security.%s" % name)
+
         self.server.register_introspection_functions()
         self.ready = True
 

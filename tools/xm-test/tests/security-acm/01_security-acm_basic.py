@@ -6,7 +6,6 @@
 # A couple of simple tests that test ACM security extensions
 # for the xm tool. The following xm subcommands are tested:
 #
-# - makepolicy
 # - labels
 # - rmlabel
 # - addlabel
@@ -27,11 +26,6 @@ testresource = "phy:ram0"
 
 if not isACMEnabled():
     SKIP("Not running this test since ACM not enabled.")
-
-status, output = traceCommand("xm makepolicy %s" % (testpolicy))
-if status != 0:
-    FAIL("'xm makepolicy' failed with status %d and output\n%s" %
-         (status,output));
 
 status, output = traceCommand("xm labels %s" % (testpolicy))
 if status != 0:

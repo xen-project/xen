@@ -19,106 +19,128 @@
 """Get the managed policy of the system.
 """
 
+import os
+import sys
 import base64
 import struct
-import sys
-import string
 import xen.util.xsm.xsm as security
 from xen.util import xsconstants
-from xen.util.acmpolicy import ACMPolicy
+from xen.util.acmpolicy import ACMPolicy, \
+   ACM_EVTCHN_SHARING_VIOLATION,\
+   ACM_GNTTAB_SHARING_VIOLATION, \
+   ACM_DOMAIN_LOOKUP,   \
+   ACM_CHWALL_CONFLICT, \
+   ACM_SSIDREF_IN_USE
 from xen.xm.opts import OptionError
 from xen.util.xsm.acm.acm import policy_dir_prefix
 from xen.xm import main as xm_main
+from xen.xm.getpolicy import getpolicy
 from xen.xm.main import server
 
 def help():
     return """
-    Usage: xm setpolicy <policytype> <policy> [options]
+    Usage: xm setpolicy <policytype> <policyname>
 
     Set the policy managed by xend.
 
     The only policytype that is currently supported is 'ACM'.
 
-    The following options are defined
-      --load     Load the policy immediately
-      --boot     Have the system load the policy during boot
-      --update   Automatically adapt the policy so that it will be
-                 treated as an update to the current policy
+    The filename of the policy is the policy name plus the suffic
+    '-security_policy.xml'. The location of the policy file is either
+    the the current directory or '/etc/xen/acm-security/policies'.
+
     """
 
-def create_update_xml(xml):
+def build_hv_error_message(errors):
     """
-        Adapt the new policy's xml header to be a simple type of an
-        update to the currently enforce policy on the remote system.
-        Increases the minor number by '1'.
+       Build a message from the error codes return by the hypervisor.
     """
-    policystate = server.xenapi.XSPolicy.get_xspolicy()
-    if int(policystate['type']) == 0:
-        return xml
-    curpol = ACMPolicy(xml = policystate['repr'])
-    curpol_version = curpol.get_version()
-    tmp = curpol_version.split('.')
-    if len(tmp) == 2:
-        maj = int(tmp[0])
-        min = int(tmp[1])
-    else:
-        maj = int(tmp)
-        min = 0
-    min += 1
-    newpol_version = ""+str(maj)+"."+str(min)
+    txt = "Hypervisor reported errors:"
+    i = 0
+    while i + 7 < len(errors):
+        code, data = struct.unpack("!ii", errors[i:i+8])
+        err_msgs  = {
+            ACM_EVTCHN_SHARING_VIOLATION : \
+                    ["event channel sharing violation between domains",2],
+            ACM_GNTTAB_SHARING_VIOLATION : \
+                    ["grant table sharing violation between domains",2],
+            ACM_DOMAIN_LOOKUP : \
+                    ["domain lookup",1],
+            ACM_CHWALL_CONFLICT : \
+                    ["Chinese Wall conflict between domains",2],
+            ACM_SSIDREF_IN_USE : \
+                    ["A domain used SSIDREF",1],
+        }
+        num = err_msgs[code][1]
+        if num == 1:
+            txt += "%s %d" % (err_msgs[code][0], data)
+        else:
+            txt += "%s %d and %d" % (err_msgs[code][0],
+                                     data >> 16 , data & 0xffff)
+        i += 8
+    return txt
 
-    newpol = ACMPolicy(xml = xml)
-    newpol.set_frompolicy_name(curpol.get_name())
-    newpol.set_frompolicy_version(curpol.get_version())
-    newpol.set_policy_version(newpol_version)
-    return newpol.toxml()
 
-def setpolicy(policytype, policy_name, flags, overwrite, is_update=False):
-    if xm_main.serverType != xm_main.SERVER_XEN_API:
-        raise OptionError('xm needs to be configured to use the xen-api.')
-    if policytype != xsconstants.ACM_POLICY_ID:
-        raise OptionError("Unsupported policytype '%s'." % policytype)
-    else:
+def setpolicy(policytype, policy_name, flags, overwrite):
+
+    if policytype.upper() == xsconstants.ACM_POLICY_ID:
         xs_type = xsconstants.XS_POLICY_ACM
 
-        policy_file = policy_dir_prefix + "/" + \
-                      string.join(string.split(policy_name, "."), "/")
-        policy_file += "-security_policy.xml"
+        for prefix in [ './', policy_dir_prefix+"/" ]:
+            policy_file = prefix + "/".join(policy_name.split(".")) + \
+                          "-security_policy.xml"
+
+            if os.path.exists(policy_file):
+                break
 
         try:
             f = open(policy_file,"r")
-            xml = f.read(-1)
+            xml = f.read()
             f.close()
         except:
-            raise OptionError("Not a valid policy file")
+            raise OptionError("Could not read policy file from current"
+                              " directory or '%s'." % policy_dir_prefix)
 
-        if is_update:
-            xml = create_update_xml(xml)
+        if xm_main.serverType == xm_main.SERVER_XEN_API:
 
-        try:
-            policystate = server.xenapi.XSPolicy.set_xspolicy(xs_type,
-                                                              xml,
-                                                              flags,
-                                                              overwrite)
-        except Exception, e:
-            raise security.XSMError("An error occurred setting the "
-                                    "policy: %s" % str(e))
-        xserr = int(policystate['xserr'])
-        if xserr != 0:
-            txt = "An error occurred trying to set the policy: %s." % \
-                  xsconstants.xserr2string(abs(xserr))
-            errors = policystate['errors']
-            if len(errors) > 0:
-                txt += "Hypervisor reported errors:"
-                err = base64.b64decode(errors)
-                i = 0
-                while i + 7 < len(err):
-                    code, data = struct.unpack("!ii", errors[i:i+8])
-                    txt += "(0x%08x, 0x%08x)" % (code, data)
-                    i += 8
-            raise security.XSMError(txt)
+            try:
+                policystate = server.xenapi.XSPolicy.set_xspolicy(xs_type,
+                                                                  xml,
+                                                                  flags,
+                                                                  overwrite)
+            except Exception, e:
+                raise security.XSMError("An error occurred setting the "
+                                        "policy: %s" % str(e))
+            xserr = int(policystate['xserr'])
+            if xserr != xsconstants.XSERR_SUCCESS:
+                txt = "An error occurred trying to set the policy: %s." % \
+                      xsconstants.xserr2string(abs(xserr))
+                errors = policystate['errors']
+                if len(errors) > 0:
+                    txt += " " + build_hv_error_message(base64.b64decode(errors))
+                raise security.XSMError(txt)
+            else:
+                print "Successfully set the new policy."
+                getpolicy(False)
         else:
-            print "Successfully set the new policy."
+            # Non-Xen-API call.
+
+            rc, errors = server.xend.security.set_policy(xs_type,
+                                                         xml,
+                                                         flags,
+                                                         overwrite)
+            if rc != xsconstants.XSERR_SUCCESS:
+                txt = "An error occurred trying to set the policy: %s." % \
+                      xsconstants.xserr2string(abs(rc))
+                if len(errors) > 0:
+                    txt += " " + build_hv_error_message(
+                                       base64.b64decode(errors))
+                raise security.XSMError(txt)
+            else:
+                print "Successfully set the new policy."
+                getpolicy(False)
+    else:
+        raise OptionError("Unsupported policytype '%s'." % policytype)
 
 
 def main(argv):
@@ -131,21 +153,11 @@ def main(argv):
 
     policytype  = argv[1]
     policy_name = argv[2]
-    is_update = False
 
-    flags = 0
-    if '--load' in argv:
-        flags |= xsconstants.XS_INST_LOAD
-    if '--boot' in argv:
-        flags |= xsconstants.XS_INST_BOOT
-    if '--update' in argv:
-        is_update = True
-
+    flags = xsconstants.XS_INST_LOAD | xsconstants.XS_INST_BOOT
     overwrite = True
-    if '--nooverwrite' in argv:
-        overwrite = False
 
-    setpolicy(policytype, policy_name, flags, overwrite, is_update)
+    setpolicy(policytype, policy_name, flags, overwrite)
 
 if __name__ == '__main__':
     try:

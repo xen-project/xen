@@ -18,9 +18,12 @@
 
 """Remove a label from a domain configuration file or a resoruce.
 """
-import sys, os, re
-from xen.util import dictio
+import os
+import re
+import sys
 import xen.util.xsm.xsm as security
+from xen.util import xsconstants
+from xen.util.acmpolicy import ACM_LABEL_UNLABELED
 from xen.xm.opts import OptionError
 from xen.xm import main as xm_main
 from xen.xm.main import server
@@ -33,10 +36,11 @@ def help():
              xm rmlabel vif-<idx> <domain name>
 
     This program removes an acm_label entry from the 'configfile'
-    for a domain, from a Xend-managed domain, from the global resource label
-    file for a resource or from the virtual network interface of a Xend-managed
-    domain. If the label does not exist for the given domain or resource, then
-    rmlabel fails."""
+    for a domain, the label from a Xend-managed domain or a resources
+    or from the network interface of a Xend-managed domain (requires
+    xm to be used in Xen-API mode). If the label does not exist for
+    the given domain or resource, then rmlabel fails and reports an error.
+    """
 
 
 def rm_resource_label(resource):
@@ -55,24 +59,19 @@ def rm_resource_label(resource):
             raise security.XSMError("Could not remove label "
                                     "from resource: %s" % e)
         return
-
-    #build canonical resource name
-    resource = security.unify_resname(resource)
-
-    # read in the resource file
-    fil = security.res_label_filename
-    try:
-        access_control = dictio.dict_read("resources", fil)
-    except:
-        raise security.ACMError("Resource file not found, cannot remove label!")
-
-    # remove the entry and update file
-    if access_control.has_key(resource):
-        del access_control[resource]
-        dictio.dict_write(access_control, "resources", fil)
     else:
-        raise security.ACMError("Resource not labeled")
-
+        oldlabel = server.xend.security.get_resource_label(resource)
+        if len(oldlabel) != 0:
+            rc = server.xend.security.set_resource_label(resource,
+                                                         "",
+                                                         "",
+                                                         "")
+            if rc != xsconstants.XSERR_SUCCESS:
+                raise security.XSMError("An error occurred removing the "
+                                        "label: %s" % \
+                                        xsconstants.xserr2string(-rc))
+        else:
+            raise security.XSMError("Resource not labeled")
 
 def rm_domain_label(configfile):
     # open the domain config file
@@ -116,20 +115,43 @@ def rm_domain_label(configfile):
     fd.writelines(file_contents)
     fd.close()
 
-def rm_domain_label_xapi(domainname):
+def rm_domain_label_xapi(domain):
     if xm_main.serverType != xm_main.SERVER_XEN_API:
-        raise OptionError('Need to be configure for using xen-api.')
-    uuids = server.xenapi.VM.get_by_name_label(domainname)
-    if len(uuids) == 0:
-        raise OptionError('A VM with that name does not exist.')
-    if len(uuids) != 1:
-        raise OptionError('Too many domains with the same name.')
-    uuid = uuids[0]
-    try:
-        old_lab = server.xenapi.VM.get_security_label(uuid)
-        server.xenapi.VM.set_security_label(uuid, "", old_lab)
-    except Exception, e:
-        raise security.XSMError('Could not remove label from domain: %s' % e)
+        old_lab = server.xend.security.get_domain_label(domain)
+
+        vmlabel = ""
+        if old_lab != "":
+            tmp = old_lab.split(":")
+            if len(tmp) == 3:
+                vmlabel = tmp[2]
+
+        if old_lab != "" and  vmlabel != ACM_LABEL_UNLABELED:
+            server.xend.security.set_domain_label(domain, "", old_lab)
+            print "Successfully removed label from domain %s." % domain
+        else:
+            raise security.XSMError("Domain was not labeled.")
+    else:
+        uuids = server.xenapi.VM.get_by_name_label(domain)
+        if len(uuids) == 0:
+            raise OptionError('A VM with that name does not exist.')
+        if len(uuids) != 1:
+            raise OptionError('Too many domains with the same name.')
+        uuid = uuids[0]
+        try:
+            old_lab = server.xenapi.VM.get_security_label(uuid)
+
+            vmlabel = ""
+            if old_lab != "":
+                tmp = old_lab.split(":")
+                if len(tmp) == 3:
+                    vmlabel = tmp[2]
+
+            if old_lab != "":
+                server.xenapi.VM.set_security_label(uuid, "", old_lab)
+            else:
+                raise security.XSMError("Domain was not labeled.")
+        except Exception, e:
+            raise security.XSMError('Could not remove label from domain: %s' % e)
 
 def rm_vif_label(vmname, idx):
     if xm_main.serverType != xm_main.SERVER_XEN_API:

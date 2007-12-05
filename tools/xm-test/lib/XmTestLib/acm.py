@@ -34,56 +34,20 @@ acm_verbose = False
 def isACMEnabled():
     return security.on()
 
-
-def getSystemPolicyName():
-    s,o = traceCommand("xm getpolicy")
-    m = re.compile("Policy name[\s]*: ([A-z\-]+)").search(o)
-    if m:
-        polname = m.group(1)
-        return polname
-    return ""
-
-
-def ACMLoadPolicy_XenAPI(policy='xm-test'):
-    polname = getSystemPolicyName()
-    if polname != policy:
-        # Try it, maybe it's not activated
-        traceCommand("xm setpolicy %s %s" %
-                     (xsconstants.ACM_POLICY_ID, policy))
-        polname = getSystemPolicyName()
-        if polname != policy:
-            FAIL("Need to have a system with no or policy '%s' active, "
-                 "not %s" % (policy,polname))
-        else:
-            s, o = traceCommand("xm activatepolicy --load")
-    else:
-        s, o = traceCommand("xm activatepolicy --load")
-        if not re.search("Successfully", o):
-            FAIL("Could not set the policy '%s'." % policy)
-
-
-def ACMLoadPolicy(policy='xm-test'):
-    from xen.xm import main
-    if main.serverType == main.SERVER_XEN_API:
-        ACMLoadPolicy_XenAPI()
-    else:
-        cmd='xm dumppolicy | grep -E "^POLICY REFERENCE = ' + policy + '.$"'
-        s, o = traceCommand(cmd)
-        if o != "":
-            return
-        s, o = traceCommand("xm makepolicy %s" % (policy))
-        if s != 0:
-            FAIL("Need to be able to do 'xm makepolicy %s' but could not" %
-                 (policy))
-        s, o = traceCommand("xm loadpolicy %s" % (policy))
-        if s != 0:
-            FAIL("Could not load the required policy '%s'.\n"
-                 "Start the system without any policy.\n%s" %
-                 (policy, o))
+def ACMSetPolicy(policy='xm-test'):
+    cmd='xm dumppolicy | grep -E "^POLICY REFERENCE = ' + policy + '.$"'
+    s, o = traceCommand(cmd)
+    if o != "":
+        return
+    s, o = traceCommand("xm setpolicy ACM %s" % (policy))
+    if s != 0:
+        FAIL("Could not load the required policy '%s'.\n"
+             "Start the system without any policy.\n%s" % \
+             (policy, o))
 
 def ACMPrepareSystem(resources):
     if isACMEnabled():
-        ACMLoadPolicy()
+        ACMSetPolicy()
         ACMLabelResources(resources)
 
 def ACMLabelResources(resources):

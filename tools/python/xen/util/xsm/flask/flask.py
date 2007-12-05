@@ -2,6 +2,9 @@ import sys
 from xen.lowlevel import flask
 from xen.xend import sxp
 
+#Functions exported through XML-RPC
+xmlrpc_exports = [ ]
+
 def err(msg):
     """Raise XSM-Flask exception.
     """

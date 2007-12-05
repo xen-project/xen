@@ -647,11 +647,18 @@ class XendConfig(dict):
                 except ValueError, e:
                     raise XendConfigError('cpus = %s: %s' % (cfg['cpus'], e))
 
-        if not 'security' in cfg and sxp.child_value(sxp_cfg, 'security'):
-            cfg['security'] = sxp.child_value(sxp_cfg, 'security')
-        if 'security' in cfg and not cfg.get('security_label'):
-            secinfo = cfg['security']
-            if isinstance(secinfo, list):
+        import xen.util.xsm.xsm as security
+        if security.on():
+            from xen.util.acmpolicy import ACM_LABEL_UNLABELED
+            if not 'security' in cfg and sxp.child_value(sxp_cfg, 'security'):
+                cfg['security'] = sxp.child_value(sxp_cfg, 'security')
+            elif not cfg.get('security_label'):
+                cfg['security'] = [['access_control',
+                                     ['policy', security.get_active_policy_name() ],
+                                     ['label', ACM_LABEL_UNLABELED ]]]
+
+            if 'security' in cfg and not cfg.get('security_label'):
+                secinfo = cfg['security']
                 # The xm command sends a list formatted like this:
                 # [['access_control', ['policy', 'xm-test'],['label', 'red']],
                 #                     ['ssidref', 196611]]
@@ -664,11 +671,15 @@ class XendConfig(dict):
                                 policy = secinfo[idx][aidx][1]
                             if secinfo[idx][aidx][0] == "label":
                                 label  = secinfo[idx][aidx][1]
-                import xen.util.xsm.xsm as security
                 cfg['security_label'] = \
                     security.set_security_label(policy, label)
                 if not sxp.child_value(sxp_cfg, 'security_label'):
                     del cfg['security']
+
+            sec_lab = cfg['security_label'].split(":")
+            if len(sec_lab) != 3:
+                raise XendConfigError("Badly formatted security label: %s"
+                                      % cfg['security_label'])
 
         old_state = sxp.child_value(sxp_cfg, 'state')
         if old_state:

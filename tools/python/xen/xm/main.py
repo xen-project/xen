@@ -187,16 +187,12 @@ SUBCOMMAND_HELP = {
     'dry-run'       :  ('<ConfigFile>',
                         'Test if a domain can access its resources.'),
     'resources'     :  ('', 'Show info for each labeled resource.'),
-    'cfgbootpolicy' :  ('<policy> [boot-title]',
-                        'Add policy to boot configuration.'),
     'dumppolicy'    :  ('', 'Print hypervisor ACM state information.'),
-    'loadpolicy'    :  ('<policy.bin>', 'Load binary policy into hypervisor.'),
-    'makepolicy'    :  ('<policy>', 'Build policy and create .bin/.map '
-                        'files.'),
     'setpolicy'     :  ('<policytype> <policyfile> [options]',
                         'Set the policy of the system.'),
+    'resetpolicy'   :  ('',
+                        'Set the policy of the system to the default policy.'),
     'getpolicy'     :  ('[options]', 'Get the policy of the system.'),
-    'activatepolicy':  ('[options]', 'Activate the xend-managed policy.'),
     'labels'        :  ('[policy] [type=dom|res|any]',
                         'List <type> labels for (active) policy.'),
     'serve'         :  ('', 'Proxy Xend XMLRPC over stdio.'),
@@ -350,12 +346,9 @@ acm_commands = [
     "getlabel",
     "dry-run",
     "resources",
-    "makepolicy",
-    "loadpolicy",
-    "cfgbootpolicy",
     "dumppolicy",
-    "activatepolicy",
     "setpolicy",
+    "resetpolicy",
     "getpolicy",
     ]
 
@@ -942,18 +935,13 @@ def xm_label_list(doms):
     format = '%(name)-40s %(domid)5s %(mem)5d %(vcpus)5d %(state)10s ' \
              '%(cpu_time)8.1f %(seclabel)10s'
 
-    import xen.util.xsm.xsm as security
-        
     for dom in doms:
         d = parse_doms_info(dom)
-        if security.active_policy not in ['INACTIVE', 'NULL', 'DEFAULT']:
-            if not d['seclabel']:
-                d['seclabel'] = ACM_LABEL_UNLABELED_DISPLAY
-        elif security.active_policy in ['DEFAULT']:
-            d['seclabel'] = 'DEFAULT'
-        else:
-            d['seclabel'] = 'INACTIVE'
-
+        if d['seclabel'] == "" and serverType != SERVER_XEN_API:
+            seclab = server.xend.security.get_domain_label(d['name'])
+            if len(seclab) > 0 and seclab[0] == '\'':
+                seclab = seclab[1:]
+            d['seclabel'] = seclab
         output.append((format % d, d['seclabel']))
         
     #sort by labels
@@ -2471,9 +2459,6 @@ IMPORTED_COMMANDS = [
     'new',    
     'migrate',
     'labels',
-    'cfgbootpolicy',
-    'makepolicy',
-    'loadpolicy',
     'dumppolicy',        
     'addlabel',
     'rmlabel',
@@ -2482,7 +2467,7 @@ IMPORTED_COMMANDS = [
     'resources',
     'getpolicy',
     'setpolicy',
-    'activatepolicy',
+    'resetpolicy',
     ]
 
 for c in IMPORTED_COMMANDS:

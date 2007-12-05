@@ -19,7 +19,6 @@
 """Show the label for a domain or resoruce.
 """
 import sys, os, re
-from xen.util import dictio
 import xen.util.xsm.xsm as security
 from xen.util import xsconstants
 from xen.xm.opts import OptionError
@@ -33,36 +32,25 @@ def help():
            xm getlabel res <resource>
            xm getlabel vif-<idx> <vmname>
            
-    This program shows the label for a domain, resource or virtual network
-    interface of a Xend-managed domain."""
+    This program shows the label for a domain from its configuration
+    file, the label of a Xend-managed domain, that of a resources or
+    the label of a virtual network interface of a managed domain
+    (requires xm to be used in Xen-API mode).
+    """
 
 def get_resource_label(resource):
     """Gets the resource label
     """
-    #build canonical resource name
-    resource = security.unify_resname(resource)
-
-    # read in the resource file
-    fil = security.res_label_filename
-    try:
-        access_control = dictio.dict_read("resources", fil)
-    except:
-        raise OptionError("Resource label file not found")
-
-    # get the entry and print label
-    if access_control.has_key(resource):
-        tmp = access_control[resource]
-        if len(tmp) == 2:
-            policy, label = tmp
-            policytype = xsconstants.ACM_POLICY_ID
-        elif len(tmp) == 3:
-            policytype, policy, label = tmp
-        else:
-            raise security.ACMError("Resource not properly labeled. "
-                                    "Please relabel the resource.")
-        print policytype+":"+policy+":"+label
+    if xm_main.serverType == xm_main.SERVER_XEN_API:
+        reslabel = server.xenapi.XSPolicy.get_resource_label(resource)
+        if reslabel == "":
+            raise security.XSMError("Resource not labeled")
+        print reslabel
     else:
-        raise security.XSMError("Resource not labeled")
+        reslabel = server.xend.security.get_resource_label(resource)
+        if len(reslabel) == 0:
+            raise security.XSMError("Resource not labeled")
+        print ":".join(reslabel)
 
 
 def get_domain_label(configfile):
@@ -120,16 +108,19 @@ def get_vif_label(vmname, idx):
     sec_lab = server.xenapi.VIF.get_security_label(vif_ref)
     print "%s" % sec_lab
 
-def get_domain_label_xapi(domainname):
+def get_domain_label_xapi(domain):
     if xm_main.serverType != xm_main.SERVER_XEN_API:
-        raise OptionError('xm needs to be configure to use the xen-api.')
-    uuids = server.xenapi.VM.get_by_name_label(domainname)
-    if len(uuids) == 0:
-        raise OptionError('A VM with that name does not exist.')
-    if len(uuids) != 1:
-        raise OptionError('There are multiple domains with the same name.')
-    uuid = uuids[0]
-    sec_lab = server.xenapi.VM.get_security_label(uuid)
+        sec_lab = server.xend.security.get_domain_label(domain)
+        if len(sec_lab) > 0 and sec_lab[0] == '\'':
+            sec_lab = sec_lab[1:]
+    else:
+        uuids = server.xenapi.VM.get_by_name_label(domain)
+        if len(uuids) == 0:
+            raise OptionError('A VM with that name does not exist.')
+        if len(uuids) != 1:
+            raise OptionError('There are multiple domains with the same name.')
+        uuid = uuids[0]
+        sec_lab = server.xenapi.VM.get_security_label(uuid)
     print "%s" %sec_lab
 
 def main(argv):
@@ -164,4 +155,3 @@ if __name__ == '__main__':
     except Exception, e:
         sys.stderr.write('Error: %s\n' % str(e))
         sys.exit(-1)
-

@@ -19,8 +19,6 @@
 """List the resource label information from the global resource label file
 """
 import sys
-from xen.util import dictio
-import xen.util.xsm.xsm as security
 from xen.util import xsconstants
 from xen.xm.opts import OptionError
 from xen.xm import main as xm_main
@@ -55,11 +53,7 @@ def main (argv):
         for key, value in access_control.items():
             access_control[key] = tuple(value.split(':'))
     else:
-        try:
-            filename = security.res_label_filename
-            access_control = dictio.dict_read("resources", filename)
-        except:
-            raise OptionError("Resource file not found")
+        access_control = server.xend.security.get_labeled_resources()
 
     print_resource_data(access_control)
 

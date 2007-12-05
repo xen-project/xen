@@ -821,15 +821,13 @@ security in Xen, you must compile Xen with ACM support enabled as
 described under "Configuring Security" below. There, you will find
 also examples of each subcommand described here.
 
-=item B<setpolicy> ACM I<policy> I<[--load|--boot]>
+=item B<setpolicy> ACM I<policy>
 
 Makes the given ACM policy available to xend as a I<xend-managed policy>.
 The policy is compiled and a mapping (.map) as well as a binary (.bin)
-version of the policy is created. If the option I<--load> is provided
-the policy is loaded into Xen. If the option I<--boot> is provided the
-system is configure to be loaded with the policy at boot time. If these
-options are not provided with the B<setpolicy> subcommand, the
-B<activatepolicy> subcommand provides this functionality.
+version of the policy is created. The policy is loaded and the system's
+bootloader is prepared to boot the system with this policy the next time
+it is started.
 
 =over 4
 
@@ -844,16 +842,13 @@ global policy root directory.
 
 =back
 
-=item B<activatepolicy> I<[--load|--boot]>
+=item B<resetpolicy>
 
-Activates the xend-managed policy by loading it into Xen using the
-I<--load> option or configures the system to boot with the
-xend-managed policy during the next reboot as a result of the
-I<--boot> option. The latter is only supported if the system is booted
-with the grub boot loader and the default boot title is modified.
-It copies the binary policy representation into the /boot directory and
-adds a module line specifying the binary policy to the /boot/grub/menu.lst
-or /boot/grub/grub.conf file.
+Reset the system's policy to the default state where the DEFAULT policy
+is loaded and enforced. This operation may fail if for example guest VMs are
+running and and one of them uses a different label than what Domain-0
+does. It is best to make sure that no guests are running before issuing
+this command.
 
 =item B<getpolicy> [--dumpxml]
 
@@ -938,12 +933,28 @@ B<CONFIGURING SECURITY>
 
 In xen_source_dir/Config.mk set the following parameter:
 
+    XSM_ENABLE ?= y
     ACM_SECURITY ?= y
+
 Then recompile and install xen and the security tools and then reboot:
 
-    cd xen_source_dir/xen; make clean; make; cp xen.gz /boot;
-    cd xen_source_dir/tools/security; make install;
+    cd xen_source_dir; make clean; make install
     reboot into Xen
+
+=back
+
+B<RESETTING THE SYSTEM'S SECURITY>
+
+=over 4
+
+To set the system's security policy enforcement into its default state,
+the follow command can be issued. Make sure that no guests are running
+while doing this.
+
+    xm resetpolicy
+
+After this command has successfully completed, the system's DEFAULT policy
+is enforced.
 
 =back
 
@@ -951,34 +962,10 @@ B<SETTING A SECURITY POLICY>
 
 =over 4
 
-This step makes the policy available to xend and creates the client_v1.map and
-client_v1.bin files in /etc/xen/acm-security/policies/example/chwall_ste.
+This step sets the system's policy and automatically loads it into Xen
+for enforcement.
 
     xm setpolicy ACM example.client_v1
-
-=back
-
-B<ACTIVATING THE XEND-MANAGED SECURITY POLICY>
-
-=over 4
-
-This step activates the xend-manged policy as new security policy in Xen.
-You can use the dumppolicy subcommand before and afterwards to see the
-change in the Xen policy state.
-
-    xm activatpolicy --load
-
-=back
-
-B<CONFIGURING A BOOT SECURITY POLICY>
-
-=over 4
-
-This configures the boot loader to load the current xend-managed policy at
-boot time. During system start, the ACM configures Xen with this policy and
-Xen enforces this policy from then on.
-
-    xm activatepolicy --boot
 
 =back
 

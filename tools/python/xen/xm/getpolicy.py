@@ -36,47 +36,88 @@ def help():
 
     Get the policy managed by xend."""
 
-def getpolicy(dumpxml):
-    if xm_main.serverType != xm_main.SERVER_XEN_API:
-        raise OptionError('xm needs to be configured to use the xen-api.')
+
+def display_policy_info(acmpol, policytype, uuid, version, flags,
+                        dumpxml, xml):
+    print "Policy name           : %s" % acmpol.get_name()
+    print "Policy type           : %s" % policytype
+    if uuid:
+        print "Reference             : %s" % uuid
+    print "Version of XML policy : %s" % version
+
+    state = []
+    if flags & xsconstants.XS_INST_LOAD:
+        state.append("loaded")
+    if flags & xsconstants.XS_INST_BOOT:
+        state.append("activated for boot")
+    print "Policy configuration  : %s" % ", ".join(state)
+    if dumpxml:
+        if xml:
+            dom = minidom.parseString(xml.encode("utf-8"))
+            print "%s" % dom.toprettyxml(indent="   ",newl="\n")
+
+
+def display_security_subsystems(xstype):
     types = []
-    xstype = int(server.xenapi.XSPolicy.get_xstype())
     if xstype & xsconstants.XS_POLICY_ACM:
         types.append("ACM")
         xstype ^= xsconstants.XS_POLICY_ACM
     if xstype != 0:
         types.append("unsupported (%08x)" % xstype)
+    if len(types) == 0:
+        types.append("None")
     print "Supported security subsystems   : %s \n" % ", ".join(types)
 
-    policystate = server.xenapi.XSPolicy.get_xspolicy()
-    if int(policystate['type']) == 0:
-        print "No policy is installed."
-        return
-    if int(policystate['type']) != xsconstants.XS_POLICY_ACM:
-        print "Unknown policy type '%s'." % policystate['type']
-    else:
-        xml = policystate['repr']
-        acmpol = None
-        if xml:
-            acmpol = ACMPolicy(xml=xml)
-        print "Policy installed on the system:"
-        if acmpol:
-            print "Policy name           : %s" % acmpol.get_name()
-        print "Policy type           : %s" % xsconstants.ACM_POLICY_ID
-        print "Reference             : %s" % policystate['xs_ref']
-        print "Version of XML policy : %s" % policystate['version']
-        state = []
-        flags = int(policystate['flags'])
-        if flags & xsconstants.XS_INST_LOAD:
-            state.append("loaded")
-        if flags & xsconstants.XS_INST_BOOT:
-            state.append("system booted with")
-        print "State of the policy   : %s" % ", ".join(state)
-        if dumpxml:
+
+def getpolicy(dumpxml):
+    if xm_main.serverType == xm_main.SERVER_XEN_API:
+        xstype = int(server.xenapi.XSPolicy.get_xstype())
+        display_security_subsystems(xstype)
+
+        policystate = server.xenapi.XSPolicy.get_xspolicy()
+        if int(policystate['type']) == 0:
+            print "No policy is installed."
+            return
+        if int(policystate['type']) != xsconstants.XS_POLICY_ACM:
+            print "Unknown policy type '%s'." % policystate['type']
+        else:
             xml = policystate['repr']
+            acmpol = None
             if xml:
-                dom = minidom.parseString(xml.encode("utf-8"))
-                print "%s" % dom.toprettyxml(indent="   ",newl="\n")
+                acmpol = ACMPolicy(xml=xml)
+
+            display_policy_info(acmpol,
+                                xsconstants.ACM_POLICY_ID,
+                                policystate['xs_ref'],
+                                policystate['version'],
+                                int(policystate['flags']),
+                                dumpxml,
+                                xml)
+    else:
+        xstype = server.xend.security.get_xstype()
+        display_security_subsystems(xstype)
+
+        xml, flags = server.xend.security.get_policy()
+        acmpol = None
+        if xml != "":
+            dom = None
+            try:
+                dom = minidom.parseString(xml)
+                if dom:
+                    acmpol = ACMPolicy(dom=dom)
+            except Exception, e:
+                print "Error parsing the library: " + str(e)
+
+        if acmpol:
+            display_policy_info(acmpol,
+                                xsconstants.ACM_POLICY_ID,
+                                None,
+                                acmpol.get_version(),
+                                flags,
+                                dumpxml,
+                                xml)
+        else:
+            print "No policy is installed."
 
 def main(argv):
     dumpxml = False

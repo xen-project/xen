@@ -12,4 +12,4 @@ vmconfigfile = "/tmp/xm-test.conf"
 if not isACMEnabled():
     SKIP("Not running this test since ACM not enabled.")
 
-ACMLoadPolicy(testpolicy)
+ACMSetPolicy(testpolicy)

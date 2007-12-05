@@ -99,9 +99,10 @@ class XSPolicyAdmin:
             # This is meant as an update to a currently loaded policy
             if flags & xsconstants.XS_INST_LOAD == 0:
                 raise SecurityError(-xsconstants.XSERR_POLICY_LOADED)
+            if flags & xsconstants.XS_INST_BOOT == 0:
+                self.rm_bootpolicy()
             rc, errors = loadedpol.update(xmltext)
             if rc == 0:
-                self.rm_bootpolicy()
                 irc = self.activate_xspolicy(loadedpol, flags)
                 # policy is loaded; if setting the boot flag fails it's ok.
             return (loadedpol, rc, errors)
@@ -279,8 +280,7 @@ class XSPolicyAdmin:
         return None
 
     def get_hv_loaded_policy_name(self):
-        security.refresh_security_policy()
-        return security.active_policy
+        return security.get_active_policy_name()
 
     def get_policy_by_name(self, name):
         for pol in self.xsobjs.values():
@@ -300,8 +300,10 @@ class XSPolicyAdmin:
         return title
 
     def set_domain0_bootlabel(self, xspol, label):
-        """ Set the domain-0 bootlabel under the given policy """
-        return xspol.set_vm_bootlabel(label)
+        """ Set the domain-0 bootlabel under the given policy. If the
+            current policy is the default policy, it will remove it. """
+        rm_entry = (xspol.get_name() == "DEFAULT")
+        return xspol.set_vm_bootlabel(label, rm_entry)
 
     def rm_domain0_bootlabel(self):
         """ Remove the domain-0 bootlabel from the default boot title """
