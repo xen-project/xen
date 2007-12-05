@@ -11,6 +11,7 @@
 #define STRING_MAX PATH_MAX
 static int max_width = 80;
 static int desired_width = 60;
+static int show_whole_path = 0;
 
 #define TAG " = \"...\""
 #define TAG_LEN strlen(TAG)
@@ -36,23 +37,31 @@ void print_dir(struct xs_handle *h, char *path, int cur_depth, int show_perms)
         unsigned int nperms;
         int linewid;
 
-        /* Print indent and path basename */
-        for (linewid=0; linewid<cur_depth; linewid++) {
-            putchar(' ');
-        }
-        linewid += printf("%.*s",
-                          (int) (max_width - TAG_LEN - linewid), e[i]);
-
-        /* Compose fullpath and fetch value */
+        /* Compose fullpath */
         newpath_len = snprintf(newpath, sizeof(newpath), "%s%s%s", path, 
                 path[strlen(path)-1] == '/' ? "" : "/", 
                 e[i]);
+
+        /* Print indent and path basename */
+        linewid = 0;
+        if (show_whole_path) {
+            fputs(newpath, stdout);
+        } else {
+            for (; linewid<cur_depth; linewid++) {
+                putchar(' ');
+            }
+            linewid += printf("%.*s",
+                              (int) (max_width - TAG_LEN - linewid), e[i]);
+        }
+
+	/* Fetch value */
         if ( newpath_len < sizeof(newpath) ) {
             val = xs_read(h, XBT_NULL, newpath, &len);
         }
         else {
             /* Path was truncated and thus invalid */
             val = NULL;
+            len = 0;
         }
 
         /* Print value */
@@ -106,7 +115,7 @@ void print_dir(struct xs_handle *h, char *path, int cur_depth, int show_perms)
 
 void usage(int argc, char *argv[])
 {
-    fprintf(stderr, "Usage: %s [-w] [-p] [path]\n", argv[0]);
+    fprintf(stderr, "Usage: %s [-w] [-p] [-f] [-s] [path]\n", argv[0]);
 }
 
 int main(int argc, char *argv[])
@@ -122,7 +131,7 @@ int main(int argc, char *argv[])
     if (!ret)
         max_width = ws.ws_col - PAD;
 
-    while (0 < (c = getopt(argc, argv, "psw"))) {
+    while (0 < (c = getopt(argc, argv, "pswf"))) {
         switch (c) {
         case 'w':
             max_width= STRING_MAX - PAD;
@@ -133,6 +142,11 @@ int main(int argc, char *argv[])
             break;
         case 's':
             socket = 1;
+            break;
+        case 'f':
+            max_width = INT_MAX/2;
+            desired_width = 0;
+            show_whole_path = 1;
             break;
         case ':':
         case '?':
