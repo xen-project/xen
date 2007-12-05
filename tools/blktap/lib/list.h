@@ -8,6 +8,10 @@
 #ifndef __LIST_H__
 #define __LIST_H__
 
+#ifdef LIST_HEAD
+#undef LIST_HEAD
+#endif
+
 #define LIST_POISON1  ((void *) 0x00100100)
 #define LIST_POISON2  ((void *) 0x00200200)
 

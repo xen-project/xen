@@ -33,6 +33,7 @@
 #define __BLKTAPLIB_H__
 
 #include <xenctrl.h>
+#include <sys/param.h>
 #include <sys/user.h>
 #include <xen/xen.h>
 #include <xen/io/blkif.h>

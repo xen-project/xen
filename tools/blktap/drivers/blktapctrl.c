@@ -37,7 +37,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <sys/mman.h>
-#include <sys/user.h>
+#include <sys/stat.h>
 #include <err.h>
 #include <errno.h>
 #include <sys/types.h>
@@ -684,7 +684,7 @@ static void write_pidfile(long pid)
 		exit(1);
 	}
 
-	len = sprintf(buf, "%ld\n", pid);
+	len = snprintf(buf, sizeof(buf), "%ld\n", pid);
 	if (write(fd, buf, len) != len) {
 		DPRINTF("Writing pid file failed (%d)\n", errno);
 		exit(1);

@@ -5,9 +5,14 @@
 
 #include <inttypes.h>
 
-#if defined(__NetBSD__) || defined(__OpenBSD__)
+#if defined(__NetBSD__)
 #include <sys/endian.h>
 #include <sys/types.h>
+#elif defined(__OpenBSD__)
+#include <machine/endian.h>
+#define bswap_16(x) swap16(x)
+#define bswap_32(x) swap32(x)
+#define bswap_64(x) swap64(x)
 #else
 
 #ifdef HAVE_BYTESWAP_H

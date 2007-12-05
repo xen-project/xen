@@ -282,7 +282,7 @@ int register_xenbus_watch(struct xs_handle *h, struct xenbus_watch *watch)
 	/* Pointer in ascii is the token. */
 	char token[sizeof(watch) * 2 + 1];
 
-	sprintf(token, "%lX", (long)watch);
+	snprintf(token, sizeof(token), "%lX", (long)watch);
 	if (find_watch(token)) {
 		DPRINTF("watch collision!\n");
 		return -EINVAL;
@@ -302,7 +302,7 @@ int unregister_xenbus_watch(struct xs_handle *h, struct xenbus_watch *watch)
 {
 	char token[sizeof(watch) * 2 + 1];
 	
-	sprintf(token, "%lX", (long)watch);
+	snprintf(token, sizeof(token), "%lX", (long)watch);
 	if (!find_watch(token)) {
 		DPRINTF("no such watch!\n");
 		return -EINVAL;
@@ -326,7 +326,7 @@ void reregister_xenbus_watches(struct xs_handle *h)
 	char token[sizeof(watch) * 2 + 1];
 	
 	list_for_each_entry(watch, &watches, list) {
-		sprintf(token, "%lX", (long)watch);
+		snprintf(token, sizeof(token), "%lX", (long)watch);
 		xs_watch(h, watch->node, token);
 	}
 }
