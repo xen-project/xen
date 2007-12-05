@@ -518,7 +518,7 @@ gopts.var('on_xend_start', val='ignore|start',
           fn=set_value, default='ignore',
           use='Action to perform when xend starts')
 
-gopts.var('on_xend_stop', val='continue|shutdown|suspend',
+gopts.var('on_xend_stop', val='ignore|shutdown|suspend',
           fn=set_value, default="ignore",
           use="""Behaviour when Xend stops:
           - ignore:         Domain continues to run;
