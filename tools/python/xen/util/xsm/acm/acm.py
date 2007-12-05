@@ -35,7 +35,8 @@ from xen.util import dictio, xsconstants
 from xen.xend.XendConstants import *
 
 #global directories and tools for security management
-security_dir_prefix = "/etc/xen/acm-security"
+install_policy_dir_prefix = "/etc/xen/acm-security/policies"
+security_dir_prefix = XendOptions.instance().get_xend_security_path()
 policy_dir_prefix = security_dir_prefix + "/policies"
 res_label_filename = policy_dir_prefix + "/resource_labels"
 boot_filename = "/boot/grub/menu.lst"
@@ -323,7 +324,7 @@ def label2ssidref(labelname, policyname, typ):
     maps current policy to default directory
     to find mapping file    """
 
-    if policyname in ['NULL', 'INACTIVE', 'DEFAULT', 'INACCESSIBLE' ]:
+    if policyname in ['NULL', 'INACTIVE', 'INACCESSIBLE' ]:
         err("Cannot translate labels for \'" + policyname + "\' policy.")
 
     allowed_types = ['ANY']
@@ -447,10 +448,8 @@ def get_ssid(domain):
     except:
         err("Cannot determine security information.")
 
-    if active_policy in ["DEFAULT"]:
-        label = "DEFAULT"
-    else:
-        label = ssidref2label(ssid_info["ssidref"])
+    label = ssidref2label(ssid_info["ssidref"])
+
     return(ssid_info["policyreference"],
            label,
            ssid_info["policytype"],

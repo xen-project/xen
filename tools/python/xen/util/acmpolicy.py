@@ -1,4 +1,4 @@
- #============================================================================
+#============================================================================
 # This library is free software; you can redistribute it and/or
 # modify it under the terms of version 2.1 of the GNU Lesser General Public
 # License as published by the Free Software Foundation.
@@ -17,10 +17,11 @@
 #============================================================================
 
 import os
-import commands
-import struct
 import stat
 import array
+import struct
+import shutil
+import commands
 from xml.dom import minidom, Node
 from xen.xend.XendLogging import log
 from xen.util import xsconstants, bootloader, mkdir
@@ -28,6 +29,7 @@ from xen.util.xspolicy import XSPolicy
 from xen.xend.XendError import SecurityError
 import xen.util.xsm.acm.acm as security
 from xen.util.xsm.xsm import XSMError
+from xen.xend import XendOptions
 
 ACM_POLICIES_DIR = security.policy_dir_prefix + "/"
 
@@ -64,6 +66,73 @@ ACM_CHWALL_CONFLICT          = 0x103
 ACM_SSIDREF_IN_USE           = 0x104
 
 
+DEFAULT_policy = \
+"<?xml version=\"1.0\" ?>\n" +\
+"<SecurityPolicyDefinition xmlns=\"http://www.ibm.com\" xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\" xsi:schemaLocation=\"http://www.ibm.com ../../security_policy.xsd\">\n" +\
+"  <PolicyHeader>\n" +\
+"    <PolicyName>DEFAULT</PolicyName>\n" +\
+"    <Version>1.0</Version>\n" +\
+"  </PolicyHeader>\n" +\
+"  <SimpleTypeEnforcement>\n" +\
+"    <SimpleTypeEnforcementTypes>\n" +\
+"      <Type>SystemManagement</Type>\n" +\
+"    </SimpleTypeEnforcementTypes>\n" +\
+"  </SimpleTypeEnforcement>\n" +\
+"  <ChineseWall>\n" +\
+"    <ChineseWallTypes>\n" +\
+"      <Type>SystemManagement</Type>\n" +\
+"    </ChineseWallTypes>\n" +\
+"  </ChineseWall>\n" +\
+"  <SecurityLabelTemplate>\n" +\
+"    <SubjectLabels bootstrap=\"SystemManagement\">\n" +\
+"      <VirtualMachineLabel>\n" +\
+"        <Name>SystemManagement</Name>\n" +\
+"        <SimpleTypeEnforcementTypes>\n" +\
+"          <Type>SystemManagement</Type>\n" +\
+"        </SimpleTypeEnforcementTypes>\n" +\
+"        <ChineseWallTypes>\n" +\
+"          <Type/>\n" +\
+"        </ChineseWallTypes>\n" +\
+"      </VirtualMachineLabel>\n" +\
+"    </SubjectLabels>\n" +\
+"  </SecurityLabelTemplate>\n" +\
+"</SecurityPolicyDefinition>\n"
+
+
+def get_DEFAULT_policy():
+    return DEFAULT_policy
+
+def initialize():
+    xoptions = XendOptions.instance()
+    basedir = xoptions.get_xend_security_path()
+    policiesdir = basedir + "/policies"
+    mkdir.parents(policiesdir, stat.S_IRWXU)
+
+    instdir = security.install_policy_dir_prefix
+    DEF_policy_file = "DEFAULT-security_policy.xml"
+    xsd_file = "security_policy.xsd"
+
+    files = [ xsd_file ]
+
+    for file in files:
+        if not os.path.isfile(policiesdir + "/" + file ):
+            try:
+                shutil.copyfile(instdir + "/" + file,
+                                policiesdir + "/" + file)
+            except Exception, e:
+                log.info("could not copy '%s': %s" %
+                         (file, str(e)))
+    #Install default policy.
+    f = open(policiesdir + "/" + DEF_policy_file, 'w')
+    if f:
+        f.write(get_DEFAULT_policy())
+        f.close()
+    else:
+        log.error("Could not write the default policy's file.")
+    defpol = ACMPolicy(xml=get_DEFAULT_policy())
+    defpol.compile()
+
+
 class ACMPolicy(XSPolicy):
     """
      ACMPolicy class. Implements methods for getting information from
@@ -92,7 +161,6 @@ class ACMPolicy(XSPolicy):
         rc = self.validate()
         if rc != xsconstants.XSERR_SUCCESS:
             raise SecurityError(rc)
-        mkdir.parents(ACM_POLICIES_DIR, stat.S_IRWXU)
         if ref:
             from xen.xend.XendXSPolicy import XendACMPolicy
             self.xendacmpolicy = XendACMPolicy(self, {}, ref)
@@ -341,8 +409,13 @@ class ACMPolicy(XSPolicy):
                 minor = int(tmp[1])
         return (major, minor)
 
+    def get_policies_path(self):
+        xoptions = XendOptions.instance()
+        basedir = xoptions.get_xend_security_path()
+        return basedir + "/policies/"
 
-    def policy_path(self, name, prefix = ACM_POLICIES_DIR ):
+    def policy_path(self, name):
+        prefix = self.get_policies_path()
         path = prefix + name.replace('.','/')
         _path = path.split("/")
         del _path[-1]
@@ -394,12 +467,14 @@ class ACMPolicy(XSPolicy):
     #
     # Utility functions related to the policy's files
     #
-    def get_filename(self, postfix, prefix = ACM_POLICIES_DIR, dotted=False):
+    def get_filename(self, postfix, prefix=None, dotted=False):
         """
            Create the filename for the policy. The prefix is prepended
            to the path. If dotted is True, then a policy name like
            'a.b.c' will remain as is, otherwise it will become 'a/b/c'
         """
+        if prefix == None:
+            prefix = self.get_policies_path()
         name = self.get_name()
         if name:
             p = name.split(".")
@@ -431,6 +506,17 @@ class ACMPolicy(XSPolicy):
 
     def get_bin(self):
         return self.__readfile(".bin")
+
+    def copy_policy_file(self, suffix, destdir):
+        spolfile = self.get_filename(suffix)
+        dpolfile = destdir + "/" + self.get_filename(suffix,"",dotted=True)
+        try:
+            shutil.copyfile(spolfile, dpolfile)
+        except Exception, e:
+            log.error("Could not copy policy file %s to %s: %s" %
+                      (spolfile, dpolfile, str(e)))
+            return -xsconstants.XSERR_FILE_ERROR
+        return xsconstants.XSERR_SUCCESS
 
     #
     # DOM-related functions
@@ -831,9 +917,14 @@ class ACMPolicy(XSPolicy):
             if path:
                 f = open(path, 'w')
                 if f:
-                    f.write(self.toxml())
-                    f.close()
-                    rc = 0
+                    try:
+                        try:
+                            f.write(self.toxml())
+                            rc = 0
+                        except:
+                            pass
+                    finally:
+                        f.close()
         return rc
 
     def __write_to_file(self, suffix, data):

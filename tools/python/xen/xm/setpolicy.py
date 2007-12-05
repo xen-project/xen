@@ -25,6 +25,7 @@ import base64
 import struct
 import xen.util.xsm.xsm as security
 from xen.util import xsconstants
+from xen.util.xsm.acm.acm import install_policy_dir_prefix
 from xen.util.acmpolicy import ACMPolicy, \
    ACM_EVTCHN_SHARING_VIOLATION,\
    ACM_GNTTAB_SHARING_VIOLATION, \
@@ -32,7 +33,6 @@ from xen.util.acmpolicy import ACMPolicy, \
    ACM_CHWALL_CONFLICT, \
    ACM_SSIDREF_IN_USE
 from xen.xm.opts import OptionError
-from xen.util.xsm.acm.acm import policy_dir_prefix
 from xen.xm import main as xm_main
 from xen.xm.getpolicy import getpolicy
 from xen.xm.main import server
@@ -86,7 +86,7 @@ def setpolicy(policytype, policy_name, flags, overwrite):
     if policytype.upper() == xsconstants.ACM_POLICY_ID:
         xs_type = xsconstants.XS_POLICY_ACM
 
-        for prefix in [ './', policy_dir_prefix+"/" ]:
+        for prefix in [ './', install_policy_dir_prefix+"/" ]:
             policy_file = prefix + "/".join(policy_name.split(".")) + \
                           "-security_policy.xml"
 
@@ -99,9 +99,12 @@ def setpolicy(policytype, policy_name, flags, overwrite):
             f.close()
         except:
             raise OptionError("Could not read policy file from current"
-                              " directory or '%s'." % policy_dir_prefix)
+                              " directory or '%s'." %
+                              install_policy_dir_prefix)
 
         if xm_main.serverType == xm_main.SERVER_XEN_API:
+            if xs_type != int(server.xenapi.XSPolicy.get_xstype()):
+                raise security.XSMError("ACM policy type not supported.")
 
             try:
                 policystate = server.xenapi.XSPolicy.set_xspolicy(xs_type,
@@ -124,6 +127,8 @@ def setpolicy(policytype, policy_name, flags, overwrite):
                 getpolicy(False)
         else:
             # Non-Xen-API call.
+            if xs_type != server.xend.security.get_xstype():
+                raise security.XSMError("ACM policy type not supported.")
 
             rc, errors = server.xend.security.set_policy(xs_type,
                                                          xml,

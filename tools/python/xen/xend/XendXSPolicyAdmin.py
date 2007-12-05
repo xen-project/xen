@@ -22,10 +22,10 @@ from xml.dom import minidom, Node
 
 from xen.xend.XendLogging import log
 from xen.xend import uuid
-from xen.util import xsconstants, dictio, bootloader
+from xen.util import xsconstants, bootloader
 import xen.util.xsm.acm.acm as security
 from xen.util.xspolicy import XSPolicy
-from xen.util.acmpolicy import ACMPolicy
+from xen.util.acmpolicy import ACMPolicy, initialize
 from xen.xend.XendError import SecurityError
 
 
@@ -48,6 +48,7 @@ class XSPolicyAdmin:
         self.xsobjs = {}
 
         act_pol_name = self.get_hv_loaded_policy_name()
+        initialize()
 
         ref = uuid.createString()
         try:
@@ -58,6 +59,7 @@ class XSPolicyAdmin:
                       "%s" % (act_pol_name,e))
 
         log.debug("XSPolicyAdmin: Known policies: %s" % self.policies)
+
 
     def isXSEnabled(self):
         """ Check whether 'security' is enabled on this system.
@@ -99,12 +101,23 @@ class XSPolicyAdmin:
             # This is meant as an update to a currently loaded policy
             if flags & xsconstants.XS_INST_LOAD == 0:
                 raise SecurityError(-xsconstants.XSERR_POLICY_LOADED)
-            if flags & xsconstants.XS_INST_BOOT == 0:
-                self.rm_bootpolicy()
+
+            # Remember old flags, so they can be restored if update fails
+            old_flags = self.get_policy_flags(loadedpol)
+
+            # Remove policy from bootloader in case of new name of policy
+            self.rm_bootpolicy()
+
             rc, errors = loadedpol.update(xmltext)
             if rc == 0:
                 irc = self.activate_xspolicy(loadedpol, flags)
                 # policy is loaded; if setting the boot flag fails it's ok.
+            else:
+                old_flags = old_flags & xsconstants.XS_INST_BOOT
+                log.info("OLD FLAGS TO RESTORE: %s" % str(old_flags))
+                if old_flags != 0:
+                    self.activate_xspolicy(loadedpol, xsconstants.XS_INST_BOOT)
+
             return (loadedpol, rc, errors)
 
         try:
@@ -161,15 +174,11 @@ class XSPolicyAdmin:
         return (acmpol, xsconstants.XSERR_SUCCESS, errors)
 
     def make_boot_policy(self, acmpol):
-        spolfile = acmpol.get_filename(".bin")
-        dpolfile = "/boot/" + acmpol.get_filename(".bin","",dotted=True)
-        if not os.path.isfile(spolfile):
-            log.error("binary policy file does not exist.")
-            return -xsconstants.XSERR_FILE_ERROR
-        try:
-            shutil.copyfile(spolfile, dpolfile)
-        except:
-            return -xsconstants.XSERR_FILE_ERROR
+        if acmpol.is_default_policy():
+            return xsconstants.XSERR_SUCCESS
+        rc = acmpol.copy_policy_file(".bin","/boot")
+        if rc != xsconstants.XSERR_SUCCESS:
+            return rc
 
         try:
             filename = acmpol.get_filename(".bin","",dotted=True)
@@ -231,7 +240,8 @@ class XSPolicyAdmin:
         flags = 0
 
         filename = acmpol.get_filename(".bin","", dotted=True)
-        if bootloader.loads_default_policy(filename):
+        if bootloader.loads_default_policy(filename) or \
+           acmpol.is_default_policy():
             flags |= xsconstants.XS_INST_BOOT
 
         if acmpol.isloaded():

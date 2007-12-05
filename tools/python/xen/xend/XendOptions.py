@@ -120,6 +120,9 @@ class XendOptions:
     """Default xend QCoW storage repository location."""
     xend_storage_path_default = '/var/lib/xend/storage'
 
+    """Default xend security state storage path."""
+    xend_security_path_default = '/var/lib/xend/security'
+
     """Default script to configure a backend network interface"""
     vif_script = osdep.vif_script
 
@@ -244,6 +247,11 @@ class XendOptions:
         """ Get the path for persistent domain configuration storage
         """
         return self.get_config_string("xend-storage-path", self.xend_storage_path_default)        
+
+    def get_xend_security_path(self):
+        """ Get the path for security state
+        """
+        return self.get_config_string("xend-security-path", self.xend_security_path_default)
 
     def get_network_script(self):
         """@return the script used to alter the network configuration when

@@ -32,7 +32,7 @@ ACM_SECGEN_CGIDIR = $(ACM_SECGEN_HTMLDIR)/cgi-bin
 
 ACM_SCHEMA        = security_policy.xsd
 ACM_EXAMPLES      = client_v1 test
-ACM_DEF_POLICIES  = default default-ul
+ACM_DEF_POLICIES  = DEFAULT-UL
 ACM_POLICY_SUFFIX = security_policy.xml
 
 ifeq ($(ACM_SECURITY),y)
