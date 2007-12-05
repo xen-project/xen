@@ -19,6 +19,7 @@ static int desired_width = 60;
 
 void print_dir(struct xs_handle *h, char *path, int cur_depth, int show_perms)
 {
+    static struct expanding_buffer ebuf;
     char **e;
     char newpath[STRING_MAX], *val;
     int newpath_len;
@@ -60,11 +61,13 @@ void print_dir(struct xs_handle *h, char *path, int cur_depth, int show_perms)
         }
         else {
             if (max_width < (linewid + len + TAG_LEN)) {
-                printf(" = \"%.*s...\"",
-                       (int)(max_width - TAG_LEN - linewid), val);
+                printf(" = \"%.*s\\...\"",
+                       (int)(max_width - TAG_LEN - linewid),
+		       sanitise_value(&ebuf, val, len));
             }
             else {
-                linewid += printf(" = \"%s\"", val);
+                linewid += printf(" = \"%s\"",
+				  sanitise_value(&ebuf, val, len));
                 if (show_perms) {
                     putchar(' ');
                     for (linewid++;

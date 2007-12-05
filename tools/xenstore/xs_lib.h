@@ -67,4 +67,19 @@ bool xs_perm_to_string(const struct xs_permissions *perm,
 /* Given a string and a length, count how many strings (nul terms). */
 unsigned int xs_count_strings(const char *strings, unsigned int len);
 
+/* Sanitising (quoting) possibly-binary strings. */
+struct expanding_buffer {
+	char *buf;
+	int avail;
+};
+
+/* Ensure that given expanding buffer has at least min_avail characters. */
+char *expanding_buffer_ensure(struct expanding_buffer *, int min_avail);
+
+/* sanitise_value() may return NULL if malloc fails. */
+char *sanitise_value(struct expanding_buffer *, const char *val, unsigned len);
+
+/* *out_len_r on entry is ignored; out must be at least strlen(in)+1 bytes. */
+void unsanitise_value(char *out, unsigned *out_len_r, const char *in);
+
 #endif /* _XS_LIB_H */

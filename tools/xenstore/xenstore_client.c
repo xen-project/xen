@@ -138,19 +138,25 @@ perform(int optind, int argc, char **argv, struct xs_handle *xsh,
 {
     while (optind < argc) {
 #if defined(CLIENT_read)
-	char *val = xs_read(xsh, xth, argv[optind], NULL);
+	struct expanding_buffer ebuf;
+	unsigned len;
+	char *val = xs_read(xsh, xth, argv[optind], &len);
 	if (val == NULL) {
 	    warnx("couldn't read path %s", argv[optind]);
 	    return 1;
 	}
 	if (prefix)
 	    output("%s: ", argv[optind]);
-	output("%s\n", val);
+	output("%s\n", sanitise_value(&ebuf, val, len));
 	free(val);
 	optind++;
 #elif defined(CLIENT_write)
-	if (!xs_write(xsh, xth, argv[optind], argv[optind + 1],
-                      strlen(argv[optind + 1]))) {
+	struct expanding_buffer ebuf;
+	char *val_spec = argv[optind + 1];
+	unsigned len;
+	expanding_buffer_ensure(&ebuf, strlen(val_spec)+1);
+	unsanitise_value(ebuf.buf, &len, val_spec);
+	if (!xs_write(xsh, xth, argv[optind], ebuf.buf, len)) {
 	    warnx("could not write path %s", argv[optind]);
 	    return 1;
 	}
@@ -179,9 +185,10 @@ perform(int optind, int argc, char **argv, struct xs_handle *xsh,
             slash = strrchr(p, '/');
             if (slash) {
                 char *val;
+                unsigned len;
                 *slash = '\0';
-                val = xs_read(xsh, xth, p, NULL);
-                if (val && strlen(val) == 0) {
+                val = xs_read(xsh, xth, p, &len);
+                if (val && len == 0) {
                     unsigned int num;
                     char ** list = xs_directory(xsh, xth, p, &num);
 
