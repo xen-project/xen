@@ -1,7 +1,7 @@
 XEN_ROOT = ../..
 include $(XEN_ROOT)/tools/Rules.mk
 
-MAJOR    = 3.0
+MAJOR    = 3.1
 MINOR    = 0
 
 CTRL_SRCS-y       :=
