@@ -298,9 +298,8 @@ int compat_mmuext_op(XEN_GUEST_HANDLE(mmuext_op_compat_t) cmp_uops,
 
                 BUG_ON(left == arg1);
                 BUG_ON(left > count);
-                guest_handle_add_offset(nat_ops, count - left);
-                BUG_ON(left + i < count);
-                guest_handle_add_offset(cmp_uops, (signed int)(count - left - i));
+                guest_handle_add_offset(nat_ops, i - left);
+                guest_handle_subtract_offset(cmp_uops, left);
                 left = 1;
                 BUG_ON(!hypercall_xlat_continuation(&left, 0x01, nat_ops, cmp_uops));
                 BUG_ON(left != arg1);

@@ -17,6 +17,7 @@
 
 /* Offset the given guest handle into the array it refers to. */
 #define guest_handle_add_offset(hnd, nr) ((hnd).p += (nr))
+#define guest_handle_subtract_offset(hnd, nr) ((hnd).p -= (nr))
 
 /* Cast a guest handle to the specified type of handle. */
 #define guest_handle_cast(hnd, type) ({         \
