@@ -347,6 +347,33 @@ class ACMPolicy(XSPolicy):
             rc = self.compile()
         return rc, errors
 
+    def force_default_policy(klass):
+        """
+           Force the installation of the DEFAULT policy if for
+           example no XML of the current policy is available and
+           the update path with comparisons of old and new policy
+           cannot be taken.
+           This only succeeds if only Domain-0 is running or
+           all guest have the same ssidref as Domain-0.
+        """
+        errors = ""
+
+        acmpol_new = ACMPolicy(xml = get_DEFAULT_policy())
+
+        from xen.lowlevel import acm
+        dom0_ssidref = acm.getssid(0)
+        del_array = ""
+        chg_array = struct.pack("ii",
+                                dom0_ssidref['ssidref'] & 0xffff,
+                                0x1)
+
+        rc, pol_map, bin_pol = acmpol_new.policy_create_map_and_bin()
+        if rc != xsconstants.XSERR_SUCCESS:
+            return rc, errors, acmpol_new
+        rc, errors = security.hv_chg_policy(bin_pol, del_array, chg_array)
+        return rc, errors, acmpol_new
+
+    force_default_policy = classmethod(force_default_policy)
 
     def __do_update_version_check(self, acmpol_new):
         acmpol_old = self

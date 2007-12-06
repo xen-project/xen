@@ -57,6 +57,12 @@ class XSPolicyAdmin:
         except Exception, e:
             log.error("Could not find XML representation of policy '%s': "
                       "%s" % (act_pol_name,e))
+            rc, errors, acmpol_def = ACMPolicy.force_default_policy()
+            if rc == xsconstants.XSERR_SUCCESS:
+                self.xsobjs[ref] = acmpol_def
+                self.policies[ref] = (acmpol_def.get_name(),
+                                      xsconstants.ACM_POLICY_ID)
+                log.info("Switched to DEFAULT policy.")
 
         log.debug("XSPolicyAdmin: Known policies: %s" % self.policies)
 
