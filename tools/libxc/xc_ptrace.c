@@ -156,21 +156,8 @@ online_vcpus_changed(uint64_t cpumap)
 static long      nr_pages = 0;
 static uint64_t *page_array = NULL;
 
-
-/*
- * Translates physical addresses to machine addresses for HVM
- * guests. For paravirtual domains the function will just return the
- * given address.
- *
- * This function should be used when reading page directories/page
- * tables.
- *
- */
-static uint64_t
-to_ma(int cpu, uint64_t maddr)
+static uint64_t to_ma(int cpu, uint64_t maddr)
 {
-    if ( current_is_hvm && paging_enabled(&ctxt[cpu]) )
-        maddr = page_array[maddr >> PAGE_SHIFT] << PAGE_SHIFT;
     return maddr;
 }
 
@@ -310,7 +297,7 @@ map_domain_va_64(
         return NULL;
     l1p = to_ma(cpu, l2e);
     if (l2e & 0x80)  { /* 2M pages */
-        p = to_ma(cpu, (l1p + l1_table_offset(va)) << PAGE_SHIFT);
+        p = to_ma(cpu, l1p + (l1_table_offset(va) << PAGE_SHIFT));
     } else { /* 4K pages */
         l1 = xc_map_foreign_range(xc_handle, current_domid, PAGE_SIZE, PROT_READ, l1p >> PAGE_SHIFT);
         if ( l1 == NULL )
