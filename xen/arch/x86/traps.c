@@ -110,6 +110,8 @@ DECLARE_TRAP_HANDLER(spurious_interrupt_bug);
 
 long do_set_debugreg(int reg, unsigned long value);
 unsigned long do_get_debugreg(int reg);
+void (*ioemul_handle_quirk)(
+    u8 opcode, char *io_emul_stub, struct cpu_user_regs *regs);
 
 static int debug_stack_lines = 20;
 integer_param("debug_stack_lines", debug_stack_lines);
@@ -1379,7 +1381,7 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
                            ? (*(u32 *)&regs->reg = (val)) \
                            : (*(u16 *)&regs->reg = (val)))
     unsigned long code_base, code_limit;
-    char io_emul_stub[16];
+    char io_emul_stub[32];
     void (*io_emul)(struct cpu_user_regs *) __attribute__((__regparm__(1)));
     u32 l, h, eax, edx;
 
@@ -1635,6 +1637,9 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
 
     /* Handy function-typed pointer to the stub. */
     io_emul = (void *)io_emul_stub;
+
+    if ( ioemul_handle_quirk )
+        ioemul_handle_quirk(opcode, &io_emul_stub[12], regs);
 
     /* I/O Port and Interrupt Flag instructions. */
     switch ( opcode )
