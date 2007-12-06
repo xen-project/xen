@@ -1874,9 +1874,7 @@ long do_hvm_op(unsigned long op, XEN_GUEST_HANDLE(void) arg)
                 break;
             case HVM_PARAM_TIMER_MODE:
                 rc = -EINVAL;
-                if ( (a.value != HVMPTM_delay_for_missed_ticks) &&
-                     (a.value != HVMPTM_no_delay_for_missed_ticks) &&
-                     (a.value != HVMPTM_no_missed_tick_accounting) )
+                if ( a.value > HVMPTM_one_missed_tick_pending )
                     goto param_fail;
                 break;
             }

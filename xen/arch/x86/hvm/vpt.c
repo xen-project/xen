@@ -57,7 +57,10 @@ static void pt_process_missed_ticks(struct periodic_time *pt)
         return;
 
     missed_ticks = missed_ticks / (s_time_t) pt->period + 1;
-    pt->pending_intr_nr += missed_ticks;
+    if ( mode_is(pt->vcpu->domain, no_missed_ticks_pending) )
+        pt->do_not_freeze = !pt->pending_intr_nr;
+    else
+        pt->pending_intr_nr += missed_ticks;
     pt->scheduled += missed_ticks * pt->period;
 }
 
@@ -92,7 +95,8 @@ void pt_save_timer(struct vcpu *v)
     spin_lock(&v->arch.hvm_vcpu.tm_lock);
 
     list_for_each_entry ( pt, head, list )
-        stop_timer(&pt->timer);
+        if ( !pt->do_not_freeze )
+            stop_timer(&pt->timer);
 
     pt_freeze_time(v);
 
@@ -217,6 +221,8 @@ void pt_intr_post(struct vcpu *v, struct hvm_intack intack)
         return;
     }
 
+    pt->do_not_freeze = 0;
+
     if ( pt->one_shot )
     {
         pt->enabled = 0;
@@ -224,7 +230,7 @@ void pt_intr_post(struct vcpu *v, struct hvm_intack intack)
     }
     else
     {
-        if ( mode_is(v->domain, no_missed_tick_accounting) )
+        if ( mode_is(v->domain, one_missed_tick_pending) )
         {
             pt->last_plt_gtime = hvm_get_guest_time(v);
             pt->pending_intr_nr = 0; /* 'collapse' all missed ticks */
@@ -290,6 +296,7 @@ void create_periodic_time(
 
     pt->enabled = 1;
     pt->pending_intr_nr = 0;
+    pt->do_not_freeze = 0;
 
     /* Periodic timer must be at least 0.9ms. */
     if ( (period < 900000) && !one_shot )

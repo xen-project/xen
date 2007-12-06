@@ -67,13 +67,19 @@
  *   As above, missed interrupts are delivered, but guest time always tracks
  *   wallclock (i.e., real) time while doing so.
  *  no_missed_ticks_pending:
- *   No more than one missed interrupt is held pending, and guest time always
- *   tracks wallclock (i.e., real) time.
+ *   No missed interrupts are held pending. Instead, to ensure ticks are
+ *   delivered at some non-zero rate, if we detect missed ticks then the
+ *   internal tick alarm is not disabled if the VCPU is preempted during the
+ *   next tick period.
+ *  one_missed_tick_pending:
+ *   Missed interrupts are collapsed together and delivered as one 'late tick'.
+ *   Guest time always tracks wallclock (i.e., real) time.
  */
 #define HVM_PARAM_TIMER_MODE   10
 #define HVMPTM_delay_for_missed_ticks    0
 #define HVMPTM_no_delay_for_missed_ticks 1
-#define HVMPTM_no_missed_tick_accounting 2
+#define HVMPTM_no_missed_ticks_pending   2
+#define HVMPTM_one_missed_tick_pending   3
 
 #define HVM_NR_PARAMS          11
 

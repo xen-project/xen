@@ -74,6 +74,7 @@ struct periodic_time {
     struct list_head list;
     char enabled;
     char one_shot;              /* one shot time */
+    char do_not_freeze;
     u8 irq;
     struct vcpu *vcpu;          /* vcpu timer interrupt delivers to */
     u32 pending_intr_nr;        /* the couner for pending timer interrupts */
