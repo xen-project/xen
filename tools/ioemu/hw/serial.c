@@ -96,6 +96,7 @@
 
 #define XMIT_FIFO           0
 #define RECV_FIFO           1
+#define MAX_XMIT_RETRY      4
  
 struct SerialFIFO {
     uint8_t data[UART_FIFO_LENGTH];
@@ -136,7 +137,7 @@ struct SerialState {
 
     struct QEMUTimer *fifo_timeout_timer;
     int timeout_ipending;                   /* timeout interrupt pending state */
-    struct QEMUTimer *fifo_transmit_timer;
+    struct QEMUTimer *transmit_timer;
 
 
     uint64_t char_transmit_time;               /* time to transmit a char in ticks*/
@@ -370,15 +371,17 @@ static void serial_xmit(void *opaque) {
 
     if ( qemu_chr_write(s->chr, &s->tsr, 1) != 1 ) {
         s->tsr_retry++;
-        qemu_mod_timer(s->fifo_transmit_timer,  new_xmit_ts + s->char_transmit_time );
-        return;
+        if ( s->tsr_retry <= MAX_XMIT_RETRY ) {
+            qemu_mod_timer(s->transmit_timer,  new_xmit_ts + s->char_transmit_time );
+            return;
+        }
     }
  
     s->tsr_retry = 0;
     s->last_xmit_ts = qemu_get_clock(vm_clock);
 
-    if ( s->xmit_fifo.count > 0 )
-        qemu_mod_timer(s->fifo_transmit_timer, s->last_xmit_ts + s->char_transmit_time );
+    if ( !(s->lsr & UART_LSR_THRE) )
+        qemu_mod_timer(s->transmit_timer, s->last_xmit_ts + s->char_transmit_time );
 
     if ( s->lsr & UART_LSR_THRE ) {
         s->lsr |= UART_LSR_TEMT;
@@ -752,7 +755,7 @@ SerialState *serial_init(SetIRQFunc *set_irq, void *opaque,
     fifo_clear(s,XMIT_FIFO);
     s->last_xmit_ts = qemu_get_clock(vm_clock);
     s->fifo_timeout_timer = qemu_new_timer(vm_clock, ( QEMUTimerCB *) fifo_timeout_int, s);
-    s->fifo_transmit_timer = qemu_new_timer(vm_clock, ( QEMUTimerCB *) serial_xmit, s);
+    s->transmit_timer = qemu_new_timer(vm_clock, ( QEMUTimerCB *) serial_xmit, s);
 
     register_savevm("serial", base, 2, serial_save, serial_load, s);
 
