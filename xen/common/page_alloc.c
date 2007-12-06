@@ -786,7 +786,7 @@ struct page_info *__alloc_domheap_pages(
 
     ASSERT(!in_irq());
 
-    bits = domain_clamp_alloc_bitsize(d, bits ? : BITS_PER_LONG);
+    bits = domain_clamp_alloc_bitsize(d, bits ? : (BITS_PER_LONG+PAGE_SHIFT));
     if ( bits <= (PAGE_SHIFT + 1) )
         return NULL;
 

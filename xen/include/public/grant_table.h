@@ -400,7 +400,8 @@ DEFINE_XEN_GUEST_HANDLE(gnttab_unmap_and_replace_t);
 #define GNTST_no_device_space  (-7) /* Out of space in I/O MMU.              */
 #define GNTST_permission_denied (-8) /* Not enough privilege for operation.  */
 #define GNTST_bad_page         (-9) /* Specified page was invalid for op.    */
-#define GNTST_bad_copy_arg    (-10) /* copy arguments cross page boundary */
+#define GNTST_bad_copy_arg    (-10) /* copy arguments cross page boundary.   */
+#define GNTST_address_too_big (-11) /* transfer page address too large.      */
 
 #define GNTTABOP_error_msgs {                   \
     "okay",                                     \
@@ -413,7 +414,8 @@ DEFINE_XEN_GUEST_HANDLE(gnttab_unmap_and_replace_t);
     "no spare translation slot in the I/O MMU", \
     "permission denied",                        \
     "bad page",                                 \
-    "copy arguments cross page boundary"        \
+    "copy arguments cross page boundary",       \
+    "page address size too large"               \
 }
 
 #endif /* __XEN_PUBLIC_GRANT_TABLE_H__ */

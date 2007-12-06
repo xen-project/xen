@@ -342,7 +342,7 @@ static long memory_exchange(XEN_GUEST_HANDLE(xen_memory_exchange_t) arg)
     d = current->domain;
 
     memflags |= MEMF_bits(domain_clamp_alloc_bitsize(
-        d, exch.out.address_bits ? : BITS_PER_LONG));
+        d, exch.out.address_bits ? : (BITS_PER_LONG+PAGE_SHIFT)));
 
     cpu = select_local_cpu(d);
 

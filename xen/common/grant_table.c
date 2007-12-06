@@ -1031,6 +1031,7 @@ gnttab_transfer(
     grant_entry_t *sha;
     struct gnttab_transfer gop;
     unsigned long mfn;
+    unsigned int max_bitsize;
 
     for ( i = 0; i < count; i++ )
     {
@@ -1081,24 +1082,27 @@ gnttab_transfer(
 
         if ( xsm_grant_transfer(d, e) )
         {
+            gop.status = GNTST_permission_denied;
         unlock_and_copyback:
             rcu_unlock_domain(e);
             page->count_info &= ~(PGC_count_mask|PGC_allocated);
             free_domheap_page(page);
-            gop.status = GNTST_permission_denied;
             goto copyback;
         }
 
-        if ( (1UL << domain_clamp_alloc_bitsize(e, BITS_PER_LONG-1)) <= mfn )
+        max_bitsize = domain_clamp_alloc_bitsize(
+            e, BITS_PER_LONG+PAGE_SHIFT-1);
+        if ( (1UL << (max_bitsize - PAGE_SHIFT)) <= mfn )
         {
             struct page_info *new_page;
             void *sp, *dp;
 
-            new_page = alloc_domheap_pages(
-                NULL, 0, 
-                MEMF_bits(domain_clamp_alloc_bitsize(e, BITS_PER_LONG-1)));
+            new_page = alloc_domheap_pages(NULL, 0, MEMF_bits(max_bitsize));
             if ( new_page == NULL )
+            {
+                gop.status = GNTST_address_too_big;
                 goto unlock_and_copyback;
+            }
 
             sp = map_domain_page(mfn);
             dp = map_domain_page(page_to_mfn(new_page));
