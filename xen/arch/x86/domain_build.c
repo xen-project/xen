@@ -367,7 +367,7 @@ int __init construct_dom0(
 #ifdef CONFIG_COMPAT
         HYPERVISOR_COMPAT_VIRT_START(d) =
             max_t(unsigned int, m2p_compat_vstart, value);
-        d->arch.physaddr_bitsize = !is_pv_32on64_domain(d) ? 64 :
+        d->arch.physaddr_bitsize =
             fls((1UL << 32) - HYPERVISOR_COMPAT_VIRT_START(d)) - 1
             + (PAGE_SIZE - 2);
         if ( value > (!is_pv_32on64_domain(d) ?

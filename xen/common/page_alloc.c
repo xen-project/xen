@@ -786,15 +786,13 @@ struct page_info *__alloc_domheap_pages(
 
     ASSERT(!in_irq());
 
-    if ( bits )
-    {
-        bits = domain_clamp_alloc_bitsize(d, bits);
-        if ( bits <= (PAGE_SHIFT + 1) )
-            return NULL;
-        bits -= PAGE_SHIFT + 1;
-        if ( bits < zone_hi )
-            zone_hi = bits;
-    }
+    bits = domain_clamp_alloc_bitsize(d, bits ? : BITS_PER_LONG);
+    if ( bits <= (PAGE_SHIFT + 1) )
+        return NULL;
+
+    bits -= PAGE_SHIFT + 1;
+    if ( bits < zone_hi )
+        zone_hi = bits;
 
     if ( (zone_hi + PAGE_SHIFT) >= dma_bitsize )
     {

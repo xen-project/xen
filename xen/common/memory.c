@@ -319,18 +319,6 @@ static long memory_exchange(XEN_GUEST_HANDLE(xen_memory_exchange_t) arg)
         goto fail_early;
     }
 
-    if ( (exch.out.address_bits != 0) &&
-         (exch.out.address_bits <
-          (get_order_from_pages(max_page) + PAGE_SHIFT)) )
-    {
-        if ( exch.out.address_bits <= PAGE_SHIFT )
-        {
-            rc = -ENOMEM;
-            goto fail_early;
-        }
-        memflags = MEMF_bits(exch.out.address_bits);
-    }
-
     if ( exch.in.extent_order <= exch.out.extent_order )
     {
         in_chunk_order  = exch.out.extent_order - exch.in.extent_order;
@@ -352,6 +340,9 @@ static long memory_exchange(XEN_GUEST_HANDLE(xen_memory_exchange_t) arg)
         goto fail_early;
     }
     d = current->domain;
+
+    memflags |= MEMF_bits(domain_clamp_alloc_bitsize(
+        d, exch.out.address_bits ? : BITS_PER_LONG));
 
     cpu = select_local_cpu(d);
 

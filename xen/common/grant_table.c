@@ -1081,9 +1081,34 @@ gnttab_transfer(
 
         if ( xsm_grant_transfer(d, e) )
         {
+        unlock_and_copyback:
             rcu_unlock_domain(e);
+            page->count_info &= ~(PGC_count_mask|PGC_allocated);
+            free_domheap_page(page);
             gop.status = GNTST_permission_denied;
             goto copyback;
+        }
+
+        if ( (1UL << domain_clamp_alloc_bitsize(e, BITS_PER_LONG-1)) <= mfn )
+        {
+            struct page_info *new_page;
+            void *sp, *dp;
+
+            new_page = alloc_domheap_pages(
+                NULL, 0, 
+                MEMF_bits(domain_clamp_alloc_bitsize(e, BITS_PER_LONG-1)));
+            if ( new_page == NULL )
+                goto unlock_and_copyback;
+
+            sp = map_domain_page(mfn);
+            dp = map_domain_page(page_to_mfn(new_page));
+            memcpy(dp, sp, PAGE_SIZE);
+            unmap_domain_page(dp);
+            unmap_domain_page(sp);
+
+            page->count_info &= ~(PGC_count_mask|PGC_allocated);
+            free_domheap_page(page);
+            page = new_page;
         }
 
         spin_lock(&e->page_alloc_lock);

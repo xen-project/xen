@@ -370,13 +370,6 @@ static void __init machine_specific_memory_setup(
                   "can be accessed by Xen in 32-bit mode.");
 #endif
 
-#ifdef __x86_64__
-    clip_to_limit((uint64_t)(MACH2PHYS_COMPAT_VIRT_END -
-                             __HYPERVISOR_COMPAT_VIRT_START) << 10,
-                  "Only the first %u GB of the physical memory map "
-                  "can be accessed by 32-on-64 guests.");
-#endif
-
     reserve_dmi_region();
 }
 

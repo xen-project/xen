@@ -442,7 +442,7 @@ int check_descriptor(const struct domain *dom, struct desc_struct *d)
 
 unsigned int domain_clamp_alloc_bitsize(struct domain *d, unsigned int bits)
 {
-    if ( d == NULL )
+    if ( (d == NULL) || !is_pv_32on64_domain(d) )
         return bits;
     return min(d->arch.physaddr_bitsize, bits);
 }

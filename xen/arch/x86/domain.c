@@ -319,8 +319,6 @@ int switch_native(struct domain *d)
             release_compat_l4(d->vcpu[vcpuid]);
     }
 
-    d->arch.physaddr_bitsize = 64;
-
     return 0;
 }
 
