@@ -252,10 +252,6 @@ int __init construct_dom0(
     /* Machine address of next candidate page-table page. */
     unsigned long mpt_alloc;
 
-    /* Features supported. */
-    uint32_t dom0_features_supported[XENFEAT_NR_SUBMAPS] = { 0 };
-    uint32_t dom0_features_required[XENFEAT_NR_SUBMAPS] = { 0 };
-
     /* Sanity! */
     BUG_ON(d->domain_id != 0);
     BUG_ON(d->vcpu[0] == NULL);
@@ -942,12 +938,12 @@ int __init construct_dom0(
         v->arch.guest_context.user_regs.gs &= ~3;
         printk("Dom0 runs in ring 0 (supervisor mode)\n");
         if ( !test_bit(XENFEAT_supervisor_mode_kernel,
-                       dom0_features_supported) )
+                       parms.f_supported) )
             panic("Dom0 does not support supervisor-mode execution\n");
     }
     else
     {
-        if ( test_bit(XENFEAT_supervisor_mode_kernel, dom0_features_required) )
+        if ( test_bit(XENFEAT_supervisor_mode_kernel, parms.f_required) )
             panic("Dom0 requires supervisor-mode execution\n");
     }
 
