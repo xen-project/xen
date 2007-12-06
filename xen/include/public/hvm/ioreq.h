@@ -58,6 +58,7 @@ struct ioreq {
                              *   of the real data to use.   */
     uint8_t dir:1;          /*  1=read, 0=write             */
     uint8_t df:1;
+    uint8_t pad:1;
     uint8_t type;           /* I/O type                     */
     uint8_t _pad0[6];
     uint64_t io_count;      /* How many IO done on a vcpu   */
@@ -79,7 +80,7 @@ typedef struct shared_iopage shared_iopage_t;
 
 struct buf_ioreq {
     uint8_t  type;   /* I/O type                    */
-    uint8_t  df:1;   /* EFLAGS.DF                   */
+    uint8_t  pad:1;
     uint8_t  dir:1;  /* 1=read, 0=write             */
     uint8_t  size:2; /* 0=>1, 1=>2, 2=>4, 3=>8. If 8, use two buf_ioreqs */
     uint32_t addr:20;/* physical address            */

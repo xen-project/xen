@@ -556,7 +556,7 @@ void __handle_buffered_iopage(CPUState *env)
         req.data = buf_req->data;
         req.state = STATE_IOREQ_READY;
         req.dir = buf_req->dir;
-        req.df = buf_req->df;
+        req.df = 1;
         req.type = buf_req->type;
         req.data_is_ptr = 0;
         qw = (req.size == 8);

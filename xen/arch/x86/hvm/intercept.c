@@ -176,7 +176,6 @@ int hvm_buffered_io_send(ioreq_t *p)
 
     bp.type = p->type;
     bp.dir  = p->dir;
-    bp.df   = p->df;
     switch ( p->size )
     {
     case 1:
