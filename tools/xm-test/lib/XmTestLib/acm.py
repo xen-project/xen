@@ -30,11 +30,17 @@ except:
 
 labeled_resources = {}
 acm_verbose = False
+policy='xm-test'
+
 
 def isACMEnabled():
     return security.on()
 
-def ACMSetPolicy(policy='xm-test'):
+def setCurrentPolicy(plcy):
+    global policy
+    policy = plcy
+
+def ACMSetPolicy():
     cmd='xm dumppolicy | grep -E "^POLICY REFERENCE = ' + policy + '.$"'
     s, o = traceCommand(cmd)
     if o != "":
