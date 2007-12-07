@@ -26,15 +26,10 @@
 #include <sys/time.h>
 #include <time.h>
 #include <assert.h>
+#include <termios.h>
+#include <sys/ioctl.h>
 
 //#define DEBUG_SERIAL
-
-#define TIOCM_DTR	0x002
-#define TIOCM_RTS	0x004
-#define TIOCM_CTS	0x020
-#define TIOCM_CAR	0x040
-#define TIOCM_RI	0x080
-#define TIOCM_DSR	0x100
 
 #define UART_LCR_DLAB	0x80	/* Divisor latch access bit */
 
