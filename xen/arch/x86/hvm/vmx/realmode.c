@@ -35,10 +35,12 @@ struct realmode_emulate_ctxt {
             unsigned int hlt:1;
             unsigned int mov_ss:1;
             unsigned int sti:1;
-            unsigned int exn_raised:1;
         } flags;
         unsigned int flag_word;
     };
+
+    uint8_t exn_vector;
+    uint8_t exn_insn_len;
 };
 
 static void realmode_deliver_exception(
@@ -104,8 +106,7 @@ static void realmode_deliver_exception(
     csr->sel  = cs_eip >> 16;
     csr->base = (uint32_t)csr->sel << 4;
     regs->eip = (uint16_t)cs_eip;
-    regs->eflags &= ~(X86_EFLAGS_AC | X86_EFLAGS_TF |
-                      X86_EFLAGS_AC | X86_EFLAGS_RF);
+    regs->eflags &= ~(X86_EFLAGS_TF | X86_EFLAGS_IF | X86_EFLAGS_RF);
 }
 
 static int
@@ -145,7 +146,7 @@ realmode_read(
         }
 
         if ( !curr->arch.hvm_vmx.real_mode_io_completed )
-            return X86EMUL_UNHANDLEABLE;
+            return X86EMUL_RETRY;
 
         *val = curr->arch.hvm_vmx.real_mode_io_data;
         curr->arch.hvm_vmx.real_mode_io_completed = 0;
@@ -286,7 +287,7 @@ realmode_read_io(
     }
 
     if ( !curr->arch.hvm_vmx.real_mode_io_completed )
-        return X86EMUL_UNHANDLEABLE;
+        return X86EMUL_RETRY;
     
     *val = curr->arch.hvm_vmx.real_mode_io_data;
     curr->arch.hvm_vmx.real_mode_io_completed = 0;
@@ -413,8 +414,8 @@ static int realmode_inject_hw_exception(
     struct realmode_emulate_ctxt *rm_ctxt =
         container_of(ctxt, struct realmode_emulate_ctxt, ctxt);
 
-    rm_ctxt->flags.exn_raised = 1;
-    realmode_deliver_exception(vector, 0, rm_ctxt);
+    rm_ctxt->exn_vector = vector;
+    rm_ctxt->exn_insn_len = 0;
 
     return X86EMUL_OKAY;
 }
@@ -427,7 +428,8 @@ static int realmode_inject_sw_interrupt(
     struct realmode_emulate_ctxt *rm_ctxt =
         container_of(ctxt, struct realmode_emulate_ctxt, ctxt);
 
-    realmode_deliver_exception(vector, insn_len, rm_ctxt);
+    rm_ctxt->exn_vector = vector;
+    rm_ctxt->exn_insn_len = insn_len;
 
     return X86EMUL_OKAY;
 }
@@ -470,19 +472,22 @@ void vmx_realmode(struct cpu_user_regs *regs)
         rm_ctxt.seg_reg[x86_seg_ss].attr.fields.db ? 32 : 16;
 
     intr_info = __vmread(VM_ENTRY_INTR_INFO);
-    if ( intr_info & INTR_INFO_VALID_MASK )
-    {
-        __vmwrite(VM_ENTRY_INTR_INFO, 0);
-        realmode_deliver_exception((uint8_t)intr_info, 0, &rm_ctxt);
-    }
-
     intr_shadow = __vmread(GUEST_INTERRUPTIBILITY_INFO);
     new_intr_shadow = intr_shadow;
 
     while ( !(curr->arch.hvm_vcpu.guest_cr[0] & X86_CR0_PE) &&
             !softirq_pending(smp_processor_id()) &&
-            !hvm_local_events_need_delivery(curr) )
+            !hvm_local_events_need_delivery(curr) &&
+            !curr->arch.hvm_vmx.real_mode_io_in_progress )
     {
+        if ( (intr_info & INTR_INFO_VALID_MASK) &&
+             !curr->arch.hvm_vmx.real_mode_io_completed )
+        {
+            realmode_deliver_exception((uint8_t)intr_info, 0, &rm_ctxt);
+            __vmwrite(VM_ENTRY_INTR_INFO, 0);
+            intr_info = 0;
+        }
+
         rm_ctxt.insn_buf_eip = regs->eip;
         (void)hvm_copy_from_guest_phys(
             rm_ctxt.insn_buf,
@@ -492,6 +497,21 @@ void vmx_realmode(struct cpu_user_regs *regs)
         rm_ctxt.flag_word = 0;
 
         rc = x86_emulate(&rm_ctxt.ctxt, &realmode_emulator_ops);
+
+        if ( rc == X86EMUL_RETRY )
+            continue;
+
+        if ( rc == X86EMUL_UNHANDLEABLE )
+        {
+            gdprintk(XENLOG_ERR,
+                     "Real-mode emulation failed @ %04x:%08lx: "
+                     "%02x %02x %02x %02x %02x %02x\n",
+                     rm_ctxt.seg_reg[x86_seg_cs].sel, rm_ctxt.insn_buf_eip,
+                     rm_ctxt.insn_buf[0], rm_ctxt.insn_buf[1],
+                     rm_ctxt.insn_buf[2], rm_ctxt.insn_buf[3],
+                     rm_ctxt.insn_buf[4], rm_ctxt.insn_buf[5]);
+            domain_crash_synchronous();
+        }
 
         /* MOV-SS instruction toggles MOV-SS shadow, else we just clear it. */
         if ( rm_ctxt.flags.mov_ss )
@@ -512,25 +532,14 @@ void vmx_realmode(struct cpu_user_regs *regs)
             __vmwrite(GUEST_INTERRUPTIBILITY_INFO, intr_shadow);
         }
 
-        /* HLT happens after instruction retire, if no interrupt/exception. */
-        if ( unlikely(rm_ctxt.flags.hlt) &&
-             !rm_ctxt.flags.exn_raised &&
-             !hvm_local_events_need_delivery(curr) )
-            hvm_hlt(regs->eflags);
-
-        if ( curr->arch.hvm_vmx.real_mode_io_in_progress )
-            break;
-
-        if ( rc == X86EMUL_UNHANDLEABLE )
+        if ( rc == X86EMUL_EXCEPTION )
         {
-            gdprintk(XENLOG_ERR,
-                     "Real-mode emulation failed @ %04x:%08lx: "
-                     "%02x %02x %02x %02x %02x %02x\n",
-                     rm_ctxt.seg_reg[x86_seg_cs].sel, rm_ctxt.insn_buf_eip,
-                     rm_ctxt.insn_buf[0], rm_ctxt.insn_buf[1],
-                     rm_ctxt.insn_buf[2], rm_ctxt.insn_buf[3],
-                     rm_ctxt.insn_buf[4], rm_ctxt.insn_buf[5]);
-            domain_crash_synchronous();
+            realmode_deliver_exception(
+                rm_ctxt.exn_vector, rm_ctxt.exn_insn_len, &rm_ctxt);
+        }
+        else if ( rm_ctxt.flags.hlt && !hvm_local_events_need_delivery(curr) )
+        {
+            hvm_hlt(regs->eflags);
         }
     }
 
