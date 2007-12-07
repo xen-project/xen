@@ -346,6 +346,32 @@ static void __init parse_video_info(void)
     }
 }
 
+void __init kexec_reserve_area(struct e820map *e820)
+{
+    unsigned long kdump_start = kexec_crash_area.start;
+    unsigned long kdump_size  = kexec_crash_area.size;
+    static int is_reserved = 0;
+
+    kdump_size = (kdump_size + PAGE_SIZE - 1) & PAGE_MASK;
+
+    if ( (kdump_start == 0) || (kdump_size == 0) || is_reserved )
+        return;
+
+    is_reserved = 1;
+
+    if ( !reserve_e820_ram(e820, kdump_start, kdump_size) )
+    {
+        printk("Kdump: DISABLED (failed to reserve %luMB (%lukB) at 0x%lx)"
+               "\n", kdump_size >> 20, kdump_size >> 10, kdump_start);
+        kexec_crash_area.start = kexec_crash_area.size = 0;
+    }
+    else
+    {
+        printk("Kdump: %luMB (%lukB) at 0x%lx\n",
+               kdump_size >> 20, kdump_size >> 10, kdump_start);
+    }
+}
+
 void init_done(void)
 {
     extern char __init_begin[], __init_end[];
@@ -571,27 +597,11 @@ void __init __start_xen(unsigned long mbi_p)
     /* Sanitise the raw E820 map to produce a final clean version. */
     max_page = init_e820(memmap_type, e820_raw, &e820_raw_nr);
 
-    /*
-     * Create a temporary copy of the E820 map. Truncate it to above 16MB
-     * as anything below that is already mapped and has a statically-allocated
-     * purpose.
-     */
+    /* Create a temporary copy of the E820 map. */
     memcpy(&boot_e820, &e820, sizeof(e820));
-    for ( i = 0; i < boot_e820.nr_map; i++ )
-    {
-        uint64_t s, e, min = 16 << 20; /* 16MB */
-        s = boot_e820.map[i].addr;
-        e = boot_e820.map[i].addr + boot_e820.map[i].size;
-        if ( s >= min )
-            continue;
-        if ( e > min )
-        {
-            boot_e820.map[i].addr = min;
-            boot_e820.map[i].size = e - min;
-        }
-        else
-            boot_e820.map[i].type = E820_RESERVED;
-    }
+
+    /* Early kexec reservation (explicit static start address). */
+    kexec_reserve_area(&boot_e820);
 
     /*
      * Iterate backwards over all superpage-aligned RAM regions.
@@ -611,9 +621,10 @@ void __init __start_xen(unsigned long mbi_p)
     {
         uint64_t s, e, mask = (1UL << L2_PAGETABLE_SHIFT) - 1;
 
-        /* Superpage-aligned chunks up to BOOTSTRAP_DIRECTMAP_END, please. */
+        /* Superpage-aligned chunks from 16MB to BOOTSTRAP_DIRECTMAP_END. */
         s = (boot_e820.map[i].addr + mask) & ~mask;
         e = (boot_e820.map[i].addr + boot_e820.map[i].size) & ~mask;
+        s = max_t(uint64_t, s, 16 << 20);
         e = min_t(uint64_t, e, BOOTSTRAP_DIRECTMAP_END);
         if ( (boot_e820.map[i].type != E820_RAM) || (s >= e) )
             continue;
@@ -716,10 +727,7 @@ void __init __start_xen(unsigned long mbi_p)
         EARLY_FAIL("Not enough memory to relocate the dom0 kernel image.\n");
     reserve_e820_ram(&boot_e820, initial_images_start, initial_images_end);
 
-    /*
-     * With modules (and Xen itself, on x86/64) relocated out of the way, we
-     * can now initialise the boot allocator with some memory.
-     */
+    /* Initialise Xen heap and boot heap. */
     xenheap_phys_start = init_boot_allocator(__pa(&_end));
     xenheap_phys_end   = opt_xenheap_megabytes << 20;
 #if defined(CONFIG_X86_64)
@@ -728,30 +736,10 @@ void __init __start_xen(unsigned long mbi_p)
     xenheap_phys_end += xen_phys_start;
     reserve_e820_ram(&boot_e820, xen_phys_start,
                      xen_phys_start + (opt_xenheap_megabytes<<20));
-    init_boot_pages(1<<20, 16<<20); /* Initial seed: 15MB */
-#else
-    init_boot_pages(xenheap_phys_end, 16<<20); /* Initial seed: 4MB */
 #endif
 
-    if ( kexec_crash_area.size != 0 )
-    {
-        unsigned long kdump_start = kexec_crash_area.start;
-        unsigned long kdump_size  = kexec_crash_area.size;
-
-        kdump_size = (kdump_size + PAGE_SIZE - 1) & PAGE_MASK;
-
-        if ( !reserve_e820_ram(&boot_e820, kdump_start, kdump_size) )
-        {
-            printk("Kdump: DISABLED (failed to reserve %luMB (%lukB) at 0x%lx)"
-                   "\n", kdump_size >> 20, kdump_size >> 10, kdump_start);
-            kexec_crash_area.start = kexec_crash_area.size = 0;
-        }
-        else
-        {
-            printk("Kdump: %luMB (%lukB) at 0x%lx\n",
-                   kdump_size >> 20, kdump_size >> 10, kdump_start);
-        }
-    }
+    /* Late kexec reservation (dynamic start address). */
+    kexec_reserve_area(&boot_e820);
 
     /*
      * With the boot allocator now seeded, we can walk every RAM region and
@@ -760,25 +748,40 @@ void __init __start_xen(unsigned long mbi_p)
      */
     for ( i = 0; i < boot_e820.nr_map; i++ )
     {
-        uint64_t s, e, map_e, mask = PAGE_SIZE - 1;
+        uint64_t s, e, map_s, map_e, mask = PAGE_SIZE - 1;
 
         /* Only page alignment required now. */
         s = (boot_e820.map[i].addr + mask) & ~mask;
         e = (boot_e820.map[i].addr + boot_e820.map[i].size) & ~mask;
+#if defined(CONFIG_X86_32)
+        s = max_t(uint64_t, s, xenheap_phys_end);
+#else
+        s = max_t(uint64_t, s, 1<<20);
+#endif
         if ( (boot_e820.map[i].type != E820_RAM) || (s >= e) )
             continue;
 
-        /* Perform the mapping (truncated in 32-bit mode). */
+        /* Need to create mappings above 16MB. */
+        map_s = max_t(uint64_t, s, 16<<20);
         map_e = e;
-#if defined(CONFIG_X86_32)
+#if defined(CONFIG_X86_32) /* mappings are truncated on x86_32 */
         map_e = min_t(uint64_t, map_e, BOOTSTRAP_DIRECTMAP_END);
 #endif
-        if ( s < map_e )
-            map_pages_to_xen(
-                (unsigned long)maddr_to_bootstrap_virt(s),
-                s >> PAGE_SHIFT, (map_e-s) >> PAGE_SHIFT, PAGE_HYPERVISOR);
 
-        init_boot_pages(s, e);
+        /* Pass mapped memory to allocator /before/ creating new mappings. */
+        if ( s < map_s )
+            init_boot_pages(s, map_s);
+
+        /* Create new mappings /before/ passing memory to the allocator. */
+        if ( map_s < map_e )
+            map_pages_to_xen(
+                (unsigned long)maddr_to_bootstrap_virt(map_s),
+                map_s >> PAGE_SHIFT, (map_e-map_s) >> PAGE_SHIFT,
+                PAGE_HYPERVISOR);
+
+        /* Pass remainder of this memory chunk to the allocator. */
+        if ( map_s < e )
+            init_boot_pages(map_s, e);
     }
 
     memguard_init();
