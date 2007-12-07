@@ -114,7 +114,8 @@ SUBCOMMAND_HELP = {
     'shutdown'    : ('<Domain> [-waRH]', 'Shutdown a domain.'),
     'top'         : ('', 'Monitor a host and the domains in real time.'),
     'unpause'     : ('<Domain>', 'Unpause a paused domain.'),
-    'uptime'      : ('[-s] <Domain>', 'Print uptime for a domain.'),
+    'uptime'      : ('[-s] [Domain, ...]',
+                     'Print uptime for all/some domains.'),
 
     # Life cycle xm commands
     'new'         : ('<ConfigFile> [options] [vars]',
@@ -143,8 +144,8 @@ SUBCOMMAND_HELP = {
     'debug-keys'  : ('<Keys>', 'Send debug keys to Xen.'),
     'trigger'     : ('<Domain> <nmi|reset|init> [<VCPU>]',
                      'Send a trigger to a domain.'),
-    'vcpu-list'   : ('[<Domain>]',
-                     'List the VCPUs for a domain or all domains.'),
+    'vcpu-list'   : ('[Domain, ...]',
+                     'List the VCPUs for all/some domains.'),
     'vcpu-pin'    : ('<Domain> <VCPU|all> <CPUs|all>',
                      'Set which CPUs a VCPU can use.'),
     'vcpu-set'    : ('<Domain> <vCPUs>',
