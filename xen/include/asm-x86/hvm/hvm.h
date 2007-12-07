@@ -121,9 +121,6 @@ struct hvm_function_table {
     void (*inject_exception)(unsigned int trapnr, int errcode,
                              unsigned long cr2);
 
-    void (*init_ap_context)(struct vcpu_guest_context *ctxt,
-                            int vcpuid, int trampoline_vector);
-
     void (*init_hypercall_page)(struct domain *d, void *hypercall_page);
 
     int  (*event_pending)(struct vcpu *v);
@@ -237,13 +234,6 @@ void hvm_cpuid(unsigned int input, unsigned int *eax, unsigned int *ebx,
                                    unsigned int *ecx, unsigned int *edx);
 void hvm_migrate_timers(struct vcpu *v);
 void hvm_do_resume(struct vcpu *v);
-
-static inline void
-hvm_init_ap_context(struct vcpu_guest_context *ctxt,
-                    int vcpuid, int trampoline_vector)
-{
-    return hvm_funcs.init_ap_context(ctxt, vcpuid, trampoline_vector);
-}
 
 static inline void
 hvm_inject_exception(unsigned int trapnr, int errcode, unsigned long cr2)

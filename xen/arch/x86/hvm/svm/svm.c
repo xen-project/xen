@@ -62,8 +62,6 @@ int inst_copy_from_guest(unsigned char *buf, unsigned long guest_eip,
                          int inst_len);
 asmlinkage void do_IRQ(struct cpu_user_regs *);
 
-static int svm_reset_to_realmode(
-    struct vcpu *v, struct cpu_user_regs *regs);
 static void svm_update_guest_cr(struct vcpu *v, unsigned int cr);
 static void svm_update_guest_efer(struct vcpu *v);
 static void svm_inject_exception(
@@ -617,8 +615,24 @@ static void svm_set_segment_register(struct vcpu *v, enum x86_segment seg,
                                      struct segment_register *reg)
 {
     struct vmcb_struct *vmcb = v->arch.hvm_svm.vmcb;
+    int sync = 0;
 
-    ASSERT(v == current);
+    ASSERT((v == current) || !vcpu_runnable(v));
+
+    switch ( seg )
+    {
+    case x86_seg_fs:
+    case x86_seg_gs:
+    case x86_seg_tr:
+    case x86_seg_ldtr:
+        sync = (v == current);
+        break;
+    default:
+        break;
+    }
+
+    if ( sync )
+        svm_sync_vmcb(v);
 
     switch ( seg )
     {
@@ -632,23 +646,17 @@ static void svm_set_segment_register(struct vcpu *v, enum x86_segment seg,
         memcpy(&vmcb->es, reg, sizeof(*reg));
         break;
     case x86_seg_fs:
-        svm_sync_vmcb(v);
         memcpy(&vmcb->fs, reg, sizeof(*reg));
-        svm_vmload(vmcb);
         break;
     case x86_seg_gs:
-        svm_sync_vmcb(v);
         memcpy(&vmcb->gs, reg, sizeof(*reg));
-        svm_vmload(vmcb);
         break;
     case x86_seg_ss:
         memcpy(&vmcb->ss, reg, sizeof(*reg));
         vmcb->cpl = vmcb->ss.attr.fields.dpl;
         break;
     case x86_seg_tr:
-        svm_sync_vmcb(v);
         memcpy(&vmcb->tr, reg, sizeof(*reg));
-        svm_vmload(vmcb);
         break;
     case x86_seg_gdtr:
         memcpy(&vmcb->gdtr, reg, sizeof(*reg));
@@ -657,13 +665,14 @@ static void svm_set_segment_register(struct vcpu *v, enum x86_segment seg,
         memcpy(&vmcb->idtr, reg, sizeof(*reg));
         break;
     case x86_seg_ldtr:
-        svm_sync_vmcb(v);
         memcpy(&vmcb->ldtr, reg, sizeof(*reg));
-        svm_vmload(vmcb);
         break;
     default:
         BUG();
     }
+
+    if ( sync )
+        svm_vmload(vmcb);
 }
 
 /* Make sure that xen intercepts any FP accesses from current */
@@ -684,45 +693,9 @@ static void svm_stts(struct vcpu *v)
     }
 }
 
-
 static void svm_set_tsc_offset(struct vcpu *v, u64 offset)
 {
     v->arch.hvm_svm.vmcb->tsc_offset = offset;
-}
-
-
-static void svm_init_ap_context(
-    struct vcpu_guest_context *ctxt, int vcpuid, int trampoline_vector)
-{
-    struct vcpu *v;
-    struct vmcb_struct *vmcb;
-    cpu_user_regs_t *regs;
-    u16 cs_sel;
-
-    /* We know this is safe because hvm_bringup_ap() does it */
-    v = current->domain->vcpu[vcpuid];
-    vmcb = v->arch.hvm_svm.vmcb;
-    regs = &v->arch.guest_context.user_regs;
-
-    memset(ctxt, 0, sizeof(*ctxt));
-
-    /*
-     * We execute the trampoline code in real mode. The trampoline vector
-     * passed to us is page alligned and is the physical frame number for
-     * the code. We will execute this code in real mode.
-     */
-    cs_sel = trampoline_vector << 8;
-    ctxt->user_regs.eip = 0x0;
-    ctxt->user_regs.cs = cs_sel;
-
-    /*
-     * This is the launch of an AP; set state so that we begin executing
-     * the trampoline code in real-mode.
-     */
-    svm_reset_to_realmode(v, regs);  
-    /* Adjust the vmcb's hidden register state. */
-    vmcb->cs.sel = cs_sel;
-    vmcb->cs.base = (cs_sel << 4);
 }
 
 static void svm_init_hypercall_page(struct domain *d, void *hypercall_page)
@@ -916,7 +889,6 @@ static struct hvm_function_table svm_function_table = {
     .stts                 = svm_stts,
     .set_tsc_offset       = svm_set_tsc_offset,
     .inject_exception     = svm_inject_exception,
-    .init_ap_context      = svm_init_ap_context,
     .init_hypercall_page  = svm_init_hypercall_page,
     .event_pending        = svm_event_pending
 };
@@ -2035,90 +2007,6 @@ void svm_handle_invlpg(const short invlpga, struct cpu_user_regs *regs)
 
  crash:
     domain_crash(v->domain);
-}
-
-
-/*
- * Reset to realmode causes execution to start at 0xF000:0xFFF0 in
- * 16-bit realmode.  Basically, this mimics a processor reset.
- *
- * returns 0 on success, non-zero otherwise
- */
-static int svm_reset_to_realmode(struct vcpu *v, 
-                                 struct cpu_user_regs *regs)
-{
-    struct vmcb_struct *vmcb = v->arch.hvm_svm.vmcb;
-
-    memset(regs, 0, sizeof(struct cpu_user_regs));
-
-    regs->eflags = 2;
-
-    v->arch.hvm_vcpu.guest_cr[0] = X86_CR0_ET;
-    svm_update_guest_cr(v, 0);
-
-    v->arch.hvm_vcpu.guest_cr[2] = 0;
-    svm_update_guest_cr(v, 2);
-
-    v->arch.hvm_vcpu.guest_cr[4] = 0;
-    svm_update_guest_cr(v, 4);
-
-    vmcb->efer = EFER_SVME;
-
-    /* This will jump to ROMBIOS */
-    regs->eip = 0xFFF0;
-
-    /* Set up the segment registers and all their hidden states. */
-    vmcb->cs.sel = 0xF000;
-    vmcb->cs.attr.bytes = 0x089b;
-    vmcb->cs.limit = 0xffff;
-    vmcb->cs.base = 0x000F0000;
-
-    vmcb->ss.sel = 0x00;
-    vmcb->ss.attr.bytes = 0x0893;
-    vmcb->ss.limit = 0xffff;
-    vmcb->ss.base = 0x00;
-
-    vmcb->ds.sel = 0x00;
-    vmcb->ds.attr.bytes = 0x0893;
-    vmcb->ds.limit = 0xffff;
-    vmcb->ds.base = 0x00;
-    
-    vmcb->es.sel = 0x00;
-    vmcb->es.attr.bytes = 0x0893;
-    vmcb->es.limit = 0xffff;
-    vmcb->es.base = 0x00;
-    
-    vmcb->fs.sel = 0x00;
-    vmcb->fs.attr.bytes = 0x0893;
-    vmcb->fs.limit = 0xffff;
-    vmcb->fs.base = 0x00;
-    
-    vmcb->gs.sel = 0x00;
-    vmcb->gs.attr.bytes = 0x0893;
-    vmcb->gs.limit = 0xffff;
-    vmcb->gs.base = 0x00;
-
-    vmcb->ldtr.sel = 0x00;
-    vmcb->ldtr.attr.bytes = 0x0000;
-    vmcb->ldtr.limit = 0x0;
-    vmcb->ldtr.base = 0x00;
-
-    vmcb->gdtr.sel = 0x00;
-    vmcb->gdtr.attr.bytes = 0x0000;
-    vmcb->gdtr.limit = 0x0;
-    vmcb->gdtr.base = 0x00;
-    
-    vmcb->tr.sel = 0;
-    vmcb->tr.attr.bytes = 0;
-    vmcb->tr.limit = 0x0;
-    vmcb->tr.base = 0;
-
-    vmcb->idtr.sel = 0x00;
-    vmcb->idtr.attr.bytes = 0x0000;
-    vmcb->idtr.limit = 0x3ff;
-    vmcb->idtr.base = 0x00;
-
-    return 0;
 }
 
 asmlinkage void svm_vmexit_handler(struct cpu_user_regs *regs)

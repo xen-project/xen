@@ -863,7 +863,7 @@ static void vmx_set_segment_register(struct vcpu *v, enum x86_segment seg,
 {
     uint32_t attr;
 
-    ASSERT(v == current);
+    ASSERT((v == current) || !vcpu_runnable(v));
 
     attr = reg->attr.bytes;
     attr = ((attr & 0xf00) << 4) | (attr & 0xff);
@@ -871,6 +871,8 @@ static void vmx_set_segment_register(struct vcpu *v, enum x86_segment seg,
     /* Not-present must mean unusable. */
     if ( !reg->attr.fields.p )
         attr |= (1u << 16);
+
+    vmx_vmcs_enter(v);
 
     switch ( seg )
     {
@@ -933,6 +935,8 @@ static void vmx_set_segment_register(struct vcpu *v, enum x86_segment seg,
     default:
         BUG();
     }
+
+    vmx_vmcs_exit(v);
 }
 
 /* Make sure that xen intercepts any FP accesses from current */
@@ -963,17 +967,6 @@ static void vmx_set_tsc_offset(struct vcpu *v, u64 offset)
     __vmwrite(TSC_OFFSET_HIGH, offset >> 32);
 #endif
     vmx_vmcs_exit(v);
-}
-
-static void vmx_init_ap_context(
-    struct vcpu_guest_context *ctxt, int vcpuid, int trampoline_vector)
-{
-    memset(ctxt, 0, sizeof(*ctxt));
-#ifdef VMXASSIST
-    ctxt->user_regs.eip = VMXASSIST_BASE;
-    ctxt->user_regs.edx = vcpuid;
-    ctxt->user_regs.ebx = trampoline_vector;
-#endif
 }
 
 void do_nmi(struct cpu_user_regs *);
@@ -1159,7 +1152,6 @@ static struct hvm_function_table vmx_function_table = {
     .stts                 = vmx_stts,
     .set_tsc_offset       = vmx_set_tsc_offset,
     .inject_exception     = vmx_inject_exception,
-    .init_ap_context      = vmx_init_ap_context,
     .init_hypercall_page  = vmx_init_hypercall_page,
     .event_pending        = vmx_event_pending,
     .cpu_up               = vmx_cpu_up,

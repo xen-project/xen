@@ -1590,57 +1590,90 @@ void hvm_hypercall_page_initialise(struct domain *d,
     hvm_funcs.init_hypercall_page(d, hypercall_page);
 }
 
-
-/*
- * only called in HVM domain BSP context
- * when booting, vcpuid is always equal to apic_id
- */
 int hvm_bringup_ap(int vcpuid, int trampoline_vector)
 {
-    struct vcpu *v;
     struct domain *d = current->domain;
+    struct vcpu *v;
     struct vcpu_guest_context *ctxt;
-    int rc = 0;
+    struct segment_register reg;
 
-    BUG_ON(!is_hvm_domain(d));
+    ASSERT(is_hvm_domain(d));
 
     if ( (v = d->vcpu[vcpuid]) == NULL )
         return -ENOENT;
 
-    if ( (ctxt = xmalloc(struct vcpu_guest_context)) == NULL )
+    v->fpu_initialised = 0;
+    v->arch.flags |= TF_kernel_mode;
+    v->is_initialised = 1;
+
+    ctxt = &v->arch.guest_context;
+    memset(ctxt, 0, sizeof(*ctxt));
+    ctxt->flags = VGCF_online;
+    ctxt->user_regs.eflags = 2;
+
+#ifdef VMXASSIST
+    if ( boot_cpu_data.x86_vendor == X86_VENDOR_INTEL )
     {
-        gdprintk(XENLOG_ERR,
-                "Failed to allocate memory in hvm_bringup_ap.\n");
-        return -ENOMEM;
+        ctxt->user_regs.eip = VMXASSIST_BASE;
+        ctxt->user_regs.edx = vcpuid;
+        ctxt->user_regs.ebx = trampoline_vector;
+        goto done;
     }
+#endif
 
-    hvm_init_ap_context(ctxt, vcpuid, trampoline_vector);
+    v->arch.hvm_vcpu.guest_cr[0] = X86_CR0_ET;
+    hvm_update_guest_cr(v, 0);
 
+    v->arch.hvm_vcpu.guest_cr[2] = 0;
+    hvm_update_guest_cr(v, 2);
+
+    v->arch.hvm_vcpu.guest_cr[3] = 0;
+    hvm_update_guest_cr(v, 3);
+
+    v->arch.hvm_vcpu.guest_cr[4] = 0;
+    hvm_update_guest_cr(v, 4);
+
+    v->arch.hvm_vcpu.guest_efer = 0;
+    hvm_update_guest_efer(v);
+
+    reg.sel = trampoline_vector << 8;
+    reg.base = (uint32_t)reg.sel << 4;
+    reg.limit = 0xffff;
+    reg.attr.bytes = 0x89b;
+    hvm_set_segment_register(v, x86_seg_cs, &reg);
+
+    reg.sel = reg.base = 0;
+    reg.limit = 0xffff;
+    reg.attr.bytes = 0x893;
+    hvm_set_segment_register(v, x86_seg_ds, &reg);
+    hvm_set_segment_register(v, x86_seg_es, &reg);
+    hvm_set_segment_register(v, x86_seg_fs, &reg);
+    hvm_set_segment_register(v, x86_seg_gs, &reg);
+    hvm_set_segment_register(v, x86_seg_ss, &reg);
+
+    reg.attr.bytes = 0x82; /* LDT */
+    hvm_set_segment_register(v, x86_seg_ldtr, &reg);
+
+    reg.attr.bytes = 0x8b; /* 32-bit TSS (busy) */
+    hvm_set_segment_register(v, x86_seg_tr, &reg);
+
+    reg.attr.bytes = 0;
+    hvm_set_segment_register(v, x86_seg_gdtr, &reg);
+    hvm_set_segment_register(v, x86_seg_idtr, &reg);
+
+#ifdef VMXASSIST
+ done:
+#endif
     /* Sync AP's TSC with BSP's. */
     v->arch.hvm_vcpu.cache_tsc_offset =
         v->domain->vcpu[0]->arch.hvm_vcpu.cache_tsc_offset;
     hvm_funcs.set_tsc_offset(v, v->arch.hvm_vcpu.cache_tsc_offset);
 
-    LOCK_BIGLOCK(d);
-    rc = -EEXIST;
-    if ( !v->is_initialised )
-        rc = boot_vcpu(d, vcpuid, ctxt);
-    UNLOCK_BIGLOCK(d);
-
-    if ( rc != 0 )
-    {
-        gdprintk(XENLOG_ERR,
-               "AP %d bringup failed in boot_vcpu %x.\n", vcpuid, rc);
-        goto out;
-    }
-
     if ( test_and_clear_bit(_VPF_down, &v->pause_flags) )
         vcpu_wake(v);
-    gdprintk(XENLOG_INFO, "AP %d bringup suceeded.\n", vcpuid);
 
- out:
-    xfree(ctxt);
-    return rc;
+    gdprintk(XENLOG_INFO, "AP %d bringup succeeded.\n", vcpuid);
+    return 0;
 }
 
 static int hvmop_set_pci_intx_level(
