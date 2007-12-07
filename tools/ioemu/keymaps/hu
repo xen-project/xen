@@ -7,29 +7,27 @@ map 0x40e
 
 # AltGr keys:
 notsign 0x29 altgr
-asciitilde 0x02 altgr
-caron 0x03 altgr
-asciicircum 0x04 altgr
-breve 0x05 altgr
-degree 0x06 altgr
-ogonek 0x07 altgr
-grave 0x08 altgr
-abovedot 0x09 altgr
-acute 0x0a altgr
-doubleacute 0x0b altgr
-diaeresis 0x0c altgr
-cedilla 0x0d altgr
+dead_tilde 0x02 altgr
+dead_caron 0x03 altgr
+dead_circumflex 0x04 altgr
+dead_breve 0x05 altgr
+dead_degree 0x06 altgr
+dead_ogonek 0x07 altgr
+dead_grave 0x08 altgr
+dead_abovedot 0x09 altgr
+dead_acute 0x0a altgr
+dead_doubleacute 0x0b altgr
+dead_diaeresis 0x0c altgr
+dead_cedilla 0x0d altgr
 backslash 0x10 altgr
 bar 0x11 altgr
 EuroSign 0x12 altgr
-Iacute 0x17 altgr
 division 0x1a altgr
 multiply 0x1b altgr
 dstroke 0x1f altgr
 Dstroke 0x20 altgr
 bracketleft 0x21 altgr
 bracketright 0x22 altgr
-iacute 0x24 altgr
 lstroke 0x25 altgr
 Lstroke 0x26 altgr
 dollar 0x27 altgr
@@ -82,7 +80,7 @@ F21 0x43 shift
 F22 0x44 shift
 F23 0x57 shift
 F24 0x58 shift
-
+Iacute 0x56 shift
 
 # Ctrl keys:
 F25 0x3b ctrl
@@ -113,3 +111,4 @@ y 0x2c
 comma 0x33
 period 0x34
 minus 0x35
+iacute 0x56
