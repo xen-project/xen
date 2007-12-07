@@ -22,26 +22,24 @@ static void ioemul_handle_proliant_quirk(
     if ( (opcode != 0xee) || (port != 0xcd4) || !(value & 0x80) )
         return;
 
-    /*    pushfw */
-    io_emul_stub[ 0] = 0x66;
-    io_emul_stub[ 1] = 0x9c;
+    /*    pushf */
+    io_emul_stub[0] = 0x9c;
     /*    cli */
-    io_emul_stub[ 2] = 0xfa;
+    io_emul_stub[1] = 0xfa;
     /*    out %al,%dx */
-    io_emul_stub[ 3] = 0xee;
+    io_emul_stub[2] = 0xee;
     /* 1: in %dx,%al */
-    io_emul_stub[ 4] = 0xec;
+    io_emul_stub[3] = 0xec;
     /*    test $0x80,%al */
-    io_emul_stub[ 5] = 0xa8;
-    io_emul_stub[ 6] = 0x80;
+    io_emul_stub[4] = 0xa8;
+    io_emul_stub[5] = 0x80;
     /*    jnz 1b */
-    io_emul_stub[ 7] = 0x75;
-    io_emul_stub[ 8] = 0xfb;
-    /*    popfw */
-    io_emul_stub[ 9] = 0x66;
-    io_emul_stub[10] = 0x9d;
+    io_emul_stub[6] = 0x75;
+    io_emul_stub[7] = 0xfb;
+    /*    popf */
+    io_emul_stub[8] = 0x9d;
     /*    ret */
-    io_emul_stub[11] = 0xc3;
+    io_emul_stub[9] = 0xc3;
 }
 
 int __init proliant_quirk(struct dmi_system_id *d)
