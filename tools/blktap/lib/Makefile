@@ -1,8 +1,8 @@
 XEN_ROOT = ../../..
 include $(XEN_ROOT)/tools/Rules.mk
 
-MAJOR = $(LIBRARIES_VERSION_MAJOR)
-MINOR = $(LIBRARIES_VERSION_MINOR)
+MAJOR    = 3.0
+MINOR    = 0
 SONAME   = libblktap.so.$(MAJOR)
 
 BLKTAP_INSTALL_DIR = /usr/sbin

@@ -2,8 +2,8 @@ XEN_ROOT=../..
 include $(XEN_ROOT)/tools/Rules.mk
 XEN_LIBXC          = $(XEN_ROOT)/tools/libxc
 
-MAJOR = $(LIBRARIES_VERSION_MAJOR)
-MINOR = $(LIBRARIES_VERSION_MINOR)
+MAJOR = 3.0
+MINOR = 0
 
 PROFILE=#-pg
 BASECFLAGS=-Werror

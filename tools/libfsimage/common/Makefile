@@ -1,8 +1,8 @@
 XEN_ROOT = ../../..
 include $(XEN_ROOT)/tools/Rules.mk
 
-MAJOR = $(LIBRARIES_VERSION_MAJOR)
-MINOR = $(LIBRARIES_VERSION_MINOR)
+MAJOR = 1.0
+MINOR = 0
 
 CFLAGS += -Werror -Wp,-MD,.$(@F).d
 DEPS = .*.d

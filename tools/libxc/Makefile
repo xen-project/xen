@@ -1,8 +1,8 @@
 XEN_ROOT = ../..
 include $(XEN_ROOT)/tools/Rules.mk
 
-MAJOR = $(LIBRARIES_VERSION_MAJOR)
-MINOR = $(LIBRARIES_VERSION_MINOR)
+MAJOR    = 3.2
+MINOR    = 0
 
 CTRL_SRCS-y       :=
 CTRL_SRCS-y       += xc_core.c
