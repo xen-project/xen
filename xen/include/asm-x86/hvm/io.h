@@ -164,12 +164,12 @@ extern void hvm_dpci_eoi(struct domain *d, unsigned int guest_irq,
 
 struct hvm_hw_stdvga {
     uint8_t sr_index;
-    uint8_t sr[0x18];
+    uint8_t sr[8];
     uint8_t gr_index;
-    uint8_t gr[256];
+    uint8_t gr[9];
+    bool_t stdvga;
+    bool_t cache;
     uint32_t latch;
-    int stdvga;
-    int cache;
     struct page_info *vram_page[64];  /* shadow of 0xa0000-0xaffff */
     spinlock_t lock;
 };

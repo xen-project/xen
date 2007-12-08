@@ -65,7 +65,7 @@ const uint8_t sr_mask[8] = {
     (uint8_t)~0x00,
 };
 
-const uint8_t gr_mask[16] = {
+const uint8_t gr_mask[9] = {
     (uint8_t)~0xf0, /* 0x00 */
     (uint8_t)~0xf0, /* 0x01 */
     (uint8_t)~0xf0, /* 0x02 */
@@ -96,84 +96,10 @@ static void vram_put(struct hvm_hw_stdvga *s, void *p)
     unmap_domain_page(p);
 }
 
-static uint64_t stdvga_inb(uint64_t addr)
+static int stdvga_outb(uint64_t addr, uint8_t val)
 {
     struct hvm_hw_stdvga *s = &current->domain->arch.hvm_domain.stdvga;
-    uint8_t val = 0;
-
-    switch ( addr )
-    {
-    case 0x3c4:                 /* sequencer address register */
-        val = s->sr_index;
-        break;
-
-    case 0x3c5:                 /* sequencer data register */
-        if ( s->sr_index < sizeof(s->sr) )
-            val = s->sr[s->sr_index];
-        break;
-
-    case 0x3ce:                 /* graphics address register */
-        val = s->gr_index;
-        break;
-
-    case 0x3cf:                 /* graphics data register */
-        val = s->gr[s->gr_index];
-        break;
-
-    default:
-        gdprintk(XENLOG_WARNING, "unexpected io addr 0x%04x\n", (int)addr);
-    }
-
-    return val;
-}
-
-static uint64_t stdvga_in(ioreq_t *p)
-{
-    /* Satisfy reads from sequence and graphics registers using local values */
-    uint64_t data = 0;
-
-    switch ( p->size )
-    {
-    case 1:
-        data = stdvga_inb(p->addr);
-        break;
-
-    case 2:
-        data = stdvga_inb(p->addr);
-        data |= stdvga_inb(p->addr + 1) << 8;
-        break;
-
-    case 4:
-        data = stdvga_inb(p->addr);
-        data |= stdvga_inb(p->addr + 1) << 8;
-        data |= stdvga_inb(p->addr + 2) << 16;
-        data |= stdvga_inb(p->addr + 3) << 24;
-        break;
-
-    case 8:
-        data = stdvga_inb(p->addr);
-        data |= stdvga_inb(p->addr + 1) << 8;
-        data |= stdvga_inb(p->addr + 2) << 16;
-        data |= stdvga_inb(p->addr + 3) << 24;
-        data |= stdvga_inb(p->addr + 4) << 32;
-        data |= stdvga_inb(p->addr + 5) << 40;
-        data |= stdvga_inb(p->addr + 6) << 48;
-        data |= stdvga_inb(p->addr + 7) << 56;
-        break;
-
-    default:
-        gdprintk(XENLOG_WARNING, "invalid io size:%d\n", (int)p->size);
-    }
-
-    return data;
-}
-
-static void stdvga_outb(uint64_t addr, uint8_t val)
-{
-    /* Bookkeep (via snooping) the sequencer and graphics registers */
-
-    struct hvm_hw_stdvga *s = &current->domain->arch.hvm_domain.stdvga;
-    int prev_stdvga = s->stdvga;
+    int rc = 1, prev_stdvga = s->stdvga;
 
     switch ( addr )
     {
@@ -182,20 +108,9 @@ static void stdvga_outb(uint64_t addr, uint8_t val)
         break;
 
     case 0x3c5:                 /* sequencer data register */
-        switch ( s->sr_index )
-        {
-        case 0x00 ... 0x05:
-        case 0x07:
-            s->sr[s->sr_index] = val & sr_mask[s->sr_index];
-            break;
-        case 0x06:
-            s->sr[s->sr_index] = ((val & 0x17) == 0x12) ? 0x12 : 0x0f;
-            break;
-        default:
-            if ( s->sr_index < sizeof(s->sr) )
-                s->sr[s->sr_index] = val;
-            break;
-        }
+        rc = (s->sr_index < sizeof(s->sr));
+        if ( rc )
+            s->sr[s->sr_index] = val & sr_mask[s->sr_index] ;
         break;
 
     case 0x3ce:                 /* graphics address register */
@@ -203,16 +118,20 @@ static void stdvga_outb(uint64_t addr, uint8_t val)
         break;
 
     case 0x3cf:                 /* graphics data register */
-        s->gr[s->gr_index] = val;
-        if ( s->gr_index < sizeof(gr_mask) )
-            s->gr[s->gr_index] &= gr_mask[s->gr_index];
+        rc = (s->gr_index < sizeof(s->gr));
+        if ( rc )
+            s->gr[s->gr_index] = val & gr_mask[s->gr_index];
+        break;
+
+    default:
+        rc = 0;
         break;
     }
 
     /* When in standard vga mode, emulate here all writes to the vram buffer
      * so we can immediately satisfy reads without waiting for qemu. */
     s->stdvga =
-        (s->sr[0x07] == 0) &&  /* standard vga mode */
+        (s->sr[7] == 0x00) &&  /* standard vga mode */
         (s->gr[6] == 0x05);    /* misc graphics register w/ MemoryMapSelect=1
                                 * 0xa0000-0xaffff (64k region), AlphaDis=1 */
 
@@ -225,98 +144,43 @@ static void stdvga_outb(uint64_t addr, uint8_t val)
     {
         gdprintk(XENLOG_INFO, "leaving stdvga\n");
     }
+
+    return rc;
 }
 
-static void stdvga_outv(uint64_t addr, uint64_t data, uint32_t size)
+static int stdvga_out(ioreq_t *p)
 {
-    switch ( size )
+    int rc = 1;
+
+    switch ( p->size )
     {
     case 1:
-        stdvga_outb(addr, data);
+        rc &= stdvga_outb(p->addr, p->data);
         break;
 
     case 2:
-        stdvga_outb(addr+0, data >>  0);
-        stdvga_outb(addr+1, data >>  8);
-        break;
-
-    case 4:
-        stdvga_outb(addr+0, data >>  0);
-        stdvga_outb(addr+1, data >>  8);
-        stdvga_outb(addr+2, data >> 16);
-        stdvga_outb(addr+3, data >> 24);
-        break;
-
-    case 8:
-        stdvga_outb(addr+0, data >>  0);
-        stdvga_outb(addr+1, data >>  8);
-        stdvga_outb(addr+2, data >> 16);
-        stdvga_outb(addr+3, data >> 24);
-        stdvga_outb(addr+4, data >> 32);
-        stdvga_outb(addr+5, data >> 40);
-        stdvga_outb(addr+6, data >> 48);
-        stdvga_outb(addr+7, data >> 56);
+        rc &= stdvga_outb(p->addr + 0, p->data >> 0);
+        rc &= stdvga_outb(p->addr + 1, p->data >> 8);
         break;
 
     default:
-        gdprintk(XENLOG_WARNING, "invalid io size:%d\n", size);
+        rc = 0;
+        break;
     }
-}
 
-static void stdvga_out(ioreq_t *p)
-{
-    if ( p->data_is_ptr )
-    {
-        int i, sign = p->df ? -1 : 1;
-        uint64_t addr = p->addr, data = p->data, tmp;
-        for ( i = 0; i < p->count; i++ )
-        {
-            hvm_copy_from_guest_phys(&tmp, data, p->size);
-            stdvga_outv(addr, tmp, p->size);
-            data += sign * p->size;
-            addr += sign * p->size;
-        }
-    }
-    else
-    {
-        stdvga_outv(p->addr, p->data, p->size);
-    }
+    return rc;
 }
 
 int stdvga_intercept_pio(ioreq_t *p)
 {
     struct hvm_hw_stdvga *s = &current->domain->arch.hvm_domain.stdvga;
-    int buf = 0, rc;
+    int rc;
 
-    if ( p->size > 8 )
-    {
-        gdprintk(XENLOG_WARNING, "stdvga bad access size %d\n", (int)p->size);
+    if ( p->data_is_ptr || (p->dir == IOREQ_READ) )
         return 0;
-    }
 
     spin_lock(&s->lock);
-
-    if ( p->dir == IOREQ_READ )
-    {
-        if ( p->size != 1 )
-            gdprintk(XENLOG_WARNING, "unexpected io size:%d\n", (int)p->size);
-        if ( p->data_is_ptr )
-            gdprintk(XENLOG_WARNING, "unexpected data_is_ptr\n");
-        if ( !((p->addr == 0x3c5) && (s->sr_index >= sizeof(sr_mask))) &&
-             !((p->addr == 0x3cf) && (s->gr_index >= sizeof(gr_mask))) )
-        {
-            p->data = stdvga_in(p);
-            buf = 1;
-        }
-    }
-    else
-    {
-        stdvga_out(p);
-        buf = 1;
-    }
-
-    rc = (buf && hvm_buffered_io_send(p));
-
+    rc = (stdvga_out(p) && hvm_buffered_io_send(p));
     spin_unlock(&s->lock);
 
     return rc;

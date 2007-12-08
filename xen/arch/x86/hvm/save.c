@@ -59,10 +59,8 @@ int arch_hvm_load(struct domain *d, struct hvm_save_header *hdr)
         gdprintk(XENLOG_WARNING, "HVM restore: saved CPUID (%#"PRIx32") "
                "does not match host (%#"PRIx32").\n", hdr->cpuid, eax);
 
-#ifdef __x86_64__
     /* VGA state is not saved/restored, so we nobble the cache. */
     d->arch.hvm_domain.stdvga.cache = 0;
-#endif
 
     return 0;
 }
