@@ -512,8 +512,7 @@ int paging_domctl(struct domain *d, xen_domctl_shadow_op_t *sc,
 
     if ( unlikely(d == current->domain) )
     {
-        gdprintk(XENLOG_INFO, "Dom %u tried to do a paging op on itself.\n",
-                 d->domain_id);
+        gdprintk(XENLOG_INFO, "Tried to do a paging op on itself.\n");
         return -EINVAL;
     }
 

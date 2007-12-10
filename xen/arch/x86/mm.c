@@ -2028,8 +2028,7 @@ static int set_foreigndom(domid_t domid)
 
     if ( unlikely(domid == d->domain_id) )
     {
-        MEM_LOG("Dom %u tried to specify itself as foreign domain",
-                d->domain_id);
+        MEM_LOG("Cannot specify itself as foreign domain");
         okay = 0;
     }
     else if ( unlikely(paging_mode_translate(d)) )
@@ -2045,7 +2044,7 @@ static int set_foreigndom(domid_t domid)
             info->foreign = rcu_lock_domain(dom_io);
             break;
         default:
-            MEM_LOG("Dom %u cannot set foreign dom", d->domain_id);
+            MEM_LOG("Cannot set foreign dom");
             okay = 0;
             break;
         }
@@ -2336,8 +2335,7 @@ int do_mmuext_op(
 
             if ( paging_mode_external(d) )
             {
-                MEM_LOG("ignoring SET_LDT hypercall from external "
-                        "domain %u", d->domain_id);
+                MEM_LOG("ignoring SET_LDT hypercall from external domain");
                 okay = 0;
             }
             else if ( ((ptr & (PAGE_SIZE-1)) != 0) || 

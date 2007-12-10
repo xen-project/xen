@@ -408,10 +408,9 @@ static int do_guest_trap(
         tb->flags |= TBF_INTERRUPT;
 
     if ( unlikely(null_trap_bounce(v, tb)) )
-        gdprintk(XENLOG_WARNING, "Unhandled %s fault/trap [#%d] in "
-                 "domain %d on VCPU %d [ec=%04x]\n",
-                 trapstr(trapnr), trapnr, v->domain->domain_id, v->vcpu_id,
-                 regs->error_code);
+        gdprintk(XENLOG_WARNING, "Unhandled %s fault/trap [#%d] "
+                 "on VCPU %d [ec=%04x]\n",
+                 trapstr(trapnr), trapnr, v->vcpu_id, regs->error_code);
 
     return 0;
 }
@@ -570,8 +569,8 @@ int wrmsr_hypervisor_regs(
         if ( idx > 0 )
         {
             gdprintk(XENLOG_WARNING,
-                    "Dom%d: Out of range index %u to MSR %08x\n",
-                    d->domain_id, idx, 0x40000000);
+                     "Out of range index %u to MSR %08x\n",
+                     idx, 0x40000000);
             return 0;
         }
 
@@ -581,8 +580,8 @@ int wrmsr_hypervisor_regs(
              !get_page_and_type(mfn_to_page(mfn), d, PGT_writable_page) )
         {
             gdprintk(XENLOG_WARNING,
-                    "Dom%d: Bad GMFN %lx (MFN %lx) to MSR %08x\n",
-                    d->domain_id, gmfn, mfn, 0x40000000);
+                     "Bad GMFN %lx (MFN %lx) to MSR %08x\n",
+                     gmfn, mfn, 0x40000000);
             return 0;
         }
 

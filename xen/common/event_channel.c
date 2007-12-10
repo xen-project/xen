@@ -42,8 +42,16 @@
 #define ERROR_EXIT(_errno)                                          \
     do {                                                            \
         gdprintk(XENLOG_WARNING,                                    \
-                "EVTCHNOP failure: domain %d, error %d, line %d\n", \
-                current->domain->domain_id, (_errno), __LINE__);    \
+                "EVTCHNOP failure: error %d\n",                     \
+                (_errno));                                          \
+        rc = (_errno);                                              \
+        goto out;                                                   \
+    } while ( 0 )
+#define ERROR_EXIT_DOM(_errno, _dom)                                \
+    do {                                                            \
+        gdprintk(XENLOG_WARNING,                                    \
+                "EVTCHNOP failure: domain %d, error %d\n",          \
+                (_dom)->domain_id, (_errno));                       \
         rc = (_errno);                                              \
         goto out;                                                   \
     } while ( 0 )
@@ -132,7 +140,7 @@ static long evtchn_alloc_unbound(evtchn_alloc_unbound_t *alloc)
     spin_lock(&d->evtchn_lock);
 
     if ( (port = get_free_port(d)) < 0 )
-        ERROR_EXIT(port);
+        ERROR_EXIT_DOM(port, d);
     chn = evtchn_from_port(d, port);
 
     rc = xsm_evtchn_unbound(d, chn, alloc->remote_dom);
@@ -186,11 +194,11 @@ static long evtchn_bind_interdomain(evtchn_bind_interdomain_t *bind)
     lchn = evtchn_from_port(ld, lport);
 
     if ( !port_is_valid(rd, rport) )
-        ERROR_EXIT(-EINVAL);
+        ERROR_EXIT_DOM(-EINVAL, rd);
     rchn = evtchn_from_port(rd, rport);
     if ( (rchn->state != ECS_UNBOUND) ||
          (rchn->u.unbound.remote_domid != ld->domain_id) )
-        ERROR_EXIT(-EINVAL);
+        ERROR_EXIT_DOM(-EINVAL, rd);
 
     rc = xsm_evtchn_interdomain(ld, lchn, rd, rchn);
     if ( rc )

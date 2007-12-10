@@ -533,8 +533,7 @@ static void hvm_vcpu_down(void)
     struct domain *d = v->domain;
     int online_count = 0;
 
-    gdprintk(XENLOG_INFO, "DOM%d/VCPU%d: going offline.\n",
-           d->domain_id, v->vcpu_id);
+    gdprintk(XENLOG_INFO, "VCPU%d: going offline.\n", v->vcpu_id);
 
     /* Doesn't halt us immediately, but we'll never return to guest context. */
     set_bit(_VPF_down, &v->pause_flags);
@@ -550,8 +549,7 @@ static void hvm_vcpu_down(void)
     /* ... Shut down the domain if not. */
     if ( online_count == 0 )
     {
-        gdprintk(XENLOG_INFO, "DOM%d: all CPUs offline -- powering off.\n",
-                d->domain_id);
+        gdprintk(XENLOG_INFO, "all CPUs offline -- powering off.\n");
         domain_shutdown(d, SHUTDOWN_poweroff);
     }
 }
