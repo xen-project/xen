@@ -301,14 +301,15 @@ static void init_node_heap(int node)
     /* First node to be discovered has its heap metadata statically alloced. */
     static heap_by_zone_and_order_t _heap_static;
     static unsigned long avail_static[NR_ZONES];
-    static unsigned long first_node_initialised;
+    static int first_node_initialised;
 
     int i, j;
 
-    if ( !test_and_set_bit(0, &first_node_initialised) )
+    if ( !first_node_initialised )
     {
         _heap[node] = &_heap_static;
         avail[node] = avail_static;
+        first_node_initialised = 1;
     }
     else
     {

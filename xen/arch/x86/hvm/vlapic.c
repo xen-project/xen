@@ -408,7 +408,7 @@ static void vlapic_ipi(struct vlapic *vlapic)
         if ( vlapic_match_dest(v, vlapic, short_hand, dest, dest_mode) )
         {
             if ( delivery_mode == APIC_DM_LOWEST )
-                set_bit(v->vcpu_id, &lpr_map);
+                __set_bit(v->vcpu_id, &lpr_map);
             else
                 vlapic_accept_irq(v, delivery_mode,
                                   vector, level, trig_mode);

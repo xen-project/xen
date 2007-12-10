@@ -81,7 +81,7 @@ void hvm_enable(struct hvm_function_table *fns)
      * delays, but the vmexits simply slow things down).
      */
     memset(hvm_io_bitmap, ~0, sizeof(hvm_io_bitmap));
-    clear_bit(0x80, hvm_io_bitmap);
+    __clear_bit(0x80, hvm_io_bitmap);
 
     hvm_funcs   = *fns;
     hvm_enabled = 1;

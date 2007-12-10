@@ -677,25 +677,25 @@ static int emulate_forced_invalid_op(struct cpu_user_regs *regs)
     if ( regs->eax == 1 )
     {
         /* Modify Feature Information. */
-        clear_bit(X86_FEATURE_VME, &d);
-        clear_bit(X86_FEATURE_PSE, &d);
-        clear_bit(X86_FEATURE_PGE, &d);
+        __clear_bit(X86_FEATURE_VME, &d);
+        __clear_bit(X86_FEATURE_PSE, &d);
+        __clear_bit(X86_FEATURE_PGE, &d);
         if ( !cpu_has_sep )
-            clear_bit(X86_FEATURE_SEP, &d);
+            __clear_bit(X86_FEATURE_SEP, &d);
 #ifdef __i386__
         if ( !supervisor_mode_kernel )
-            clear_bit(X86_FEATURE_SEP, &d);
+            __clear_bit(X86_FEATURE_SEP, &d);
 #endif
         if ( !IS_PRIV(current->domain) )
-            clear_bit(X86_FEATURE_MTRR, &d);
+            __clear_bit(X86_FEATURE_MTRR, &d);
     }
     else if ( regs->eax == 0x80000001 )
     {
         /* Modify Feature Information. */
 #ifdef __i386__
-        clear_bit(X86_FEATURE_SYSCALL % 32, &d);
+        __clear_bit(X86_FEATURE_SYSCALL % 32, &d);
 #endif
-        clear_bit(X86_FEATURE_RDTSCP % 32, &d);
+        __clear_bit(X86_FEATURE_RDTSCP % 32, &d);
     }
     else
     {
