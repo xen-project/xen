@@ -21,10 +21,19 @@ def checkLabel(labeldata, expected, domname):
         FAIL("%s does not have '%s' label but '%s'." %
              (domname, expected[2], labeldata[2]))
 
+if not isACMEnabled():
+    SKIP("Not running this test since ACM not enabled.")
+
 testpolicy = "xm-test"
 testlabel1 = "blue"
 testlabel2 = "red"
 testlabel3 = "green"
+
+# reset the policy - must work
+s, o = traceCommand('xm resetpolicy')
+if s:
+    FAIL("Could not reset the policy.")
+
 
 s, o = traceCommand('xm resources | grep -E "^[phy|file|vlan]" ')
 resnames = []
@@ -183,7 +192,7 @@ if label != 'ACM:xm-test:blue':
          % label)
 
 # Terminate blue domain
-domain_blue.stop()
+domain_blue.destroy()
 
 # Update the system's policy. Should work and rename the green domain to GREEN
 s, o = traceCommand('xm setpolicy ACM xm-test-update')
