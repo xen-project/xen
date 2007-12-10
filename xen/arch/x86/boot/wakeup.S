@@ -1,12 +1,9 @@
         .code16
 
-#undef wakesym
-/* Used in real mode, to cal offset in current segment */
 #define wakesym(sym) (sym - wakeup_start)
 
+        .align 16
 ENTRY(wakeup_start)
-        wakeup_code_start = .
-
         cli
         cld
 
@@ -14,7 +11,7 @@ ENTRY(wakeup_start)
         movw    %cs, %ax
         movw    %ax, %ds
         movw    %ax, %ss        # A stack required for BIOS call
-        movw    $wakesym(wakeup_stack), %sp
+        movw    $wakesym(early_stack), %sp
 
         pushl   $0              # Kill dangerous flag early
         popfl
@@ -117,7 +114,7 @@ wakeup_32:
         mov     $BOOT_DS, %eax
         mov     %eax, %ds
         mov     %eax, %ss
-        mov     $bootsym_phys(wakeup_stack), %esp
+        mov     $bootsym_phys(early_stack), %esp
 
         # check saved magic again
         mov     $sym_phys(saved_magic), %eax
@@ -203,10 +200,3 @@ ret_point:
 bogus_saved_magic:
         movw    $0x0e00 + 'S', 0xb8014
         jmp     bogus_saved_magic
-
-        .align  16
-wakeup_stack_begin:     # Stack grows down
-
-        .fill   PAGE_SIZE,1,0
-wakeup_stack:           # Just below end of first page in this section
-ENTRY(wakeup_end)

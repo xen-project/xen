@@ -15,8 +15,8 @@
 
 #include "video.h"
 
-/* Scratch space layout: +0x3000 to +0x4000. */
-#define modelist       (0x3000)                  /* 2kB (256 entries) */
+/* Scratch space layout: trampoline_end to trampoline_end+0x1000. */
+#define modelist       bootsym(trampoline_end)   /* 2kB (256 entries) */
 #define vesa_glob_info (modelist + 0x800)        /* 1kB */
 #define vesa_mode_info (vesa_glob_info + 0x400)  /* 1kB */
 

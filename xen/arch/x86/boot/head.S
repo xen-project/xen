@@ -168,7 +168,7 @@ __start:
         mov     $trampoline_end - trampoline_start,%ecx
         rep     movsb
 
-        mov     $0x90000,%esp
+        mov     $bootsym_phys(early_stack),%esp
         call    cmdline_parse_early
 
         /* Jump into the relocated trampoline. */
@@ -180,7 +180,6 @@ __start:
         .globl trampoline_start, trampoline_end
 trampoline_start:
 #include "trampoline.S"
-#include "wakeup.S"
 trampoline_end:
 
         .text

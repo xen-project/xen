@@ -150,8 +150,8 @@ trampoline_boot_cpu_entry:
         mov     %ax,%es
         mov     %ax,%ss
 
-        /* Stack grows down from +0x3000. Initialise IDT and enable irqs. */
-        mov     $0x3000,%sp
+        /* Initialise stack pointer and IDT, and enable irqs. */
+        mov     $bootsym(early_stack),%sp
         lidt    bootsym(rm_idt)
         sti
 
@@ -202,3 +202,8 @@ rm_idt: .word   256*4-1, 0, 0
 #include "mem.S"
 #include "edd.S"
 #include "video.S"
+#include "wakeup.S"
+
+        .align  16
+        .fill   PAGE_SIZE,1,0
+early_stack:
