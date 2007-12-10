@@ -592,7 +592,7 @@ static int xenfb_send_key(struct xenfb *xenfb, bool down, int keycode)
 }
 
 /* Send a relative mouse movement event */
-static int xenfb_send_motion(struct xenfb *xenfb, int rel_x, int rel_y)
+static int xenfb_send_motion(struct xenfb *xenfb, int rel_x, int rel_y, int rel_z)
 {
 	union xenkbd_in_event event;
 
@@ -600,12 +600,13 @@ static int xenfb_send_motion(struct xenfb *xenfb, int rel_x, int rel_y)
 	event.type = XENKBD_TYPE_MOTION;
 	event.motion.rel_x = rel_x;
 	event.motion.rel_y = rel_y;
+	event.motion.rel_z = rel_z;
 
 	return xenfb_kbd_event(xenfb, &event);
 }
 
 /* Send an absolute mouse movement event */
-static int xenfb_send_position(struct xenfb *xenfb, int abs_x, int abs_y)
+static int xenfb_send_position(struct xenfb *xenfb, int abs_x, int abs_y, int abs_z)
 {
 	union xenkbd_in_event event;
 
@@ -613,6 +614,7 @@ static int xenfb_send_position(struct xenfb *xenfb, int abs_x, int abs_y)
 	event.type = XENKBD_TYPE_POS;
 	event.pos.abs_x = abs_x;
 	event.pos.abs_y = abs_y;
+	event.pos.abs_z = abs_z;
 
 	return xenfb_kbd_event(xenfb, &event);
 }
@@ -1043,9 +1045,10 @@ static void xenfb_mouse_event(void *opaque,
     if (xenfb->abs_pointer_wanted)
 	    xenfb_send_position(xenfb,
 				dx * xenfb->ds->width / 0x7fff,
-				dy * xenfb->ds->height / 0x7fff);
+				dy * xenfb->ds->height / 0x7fff,
+				dz);
     else
-	    xenfb_send_motion(xenfb, dx, dy);
+	    xenfb_send_motion(xenfb, dx, dy, dz);
 
     for (i = 0 ; i < 8 ; i++) {
 	    int lastDown = xenfb->button_state & (1 << i);
