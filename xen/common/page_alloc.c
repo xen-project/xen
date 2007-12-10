@@ -503,7 +503,7 @@ static void free_heap_pages(
  * not freeing it to the buddy allocator.
  */
 #define MAX_ORDER_ALIGNED (1UL << (MAX_ORDER))
-void init_heap_pages(
+static void init_heap_pages(
     unsigned int zone, struct page_info *pg, unsigned long nr_pages)
 {
     unsigned int nid_curr, nid_prev;
