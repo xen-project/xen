@@ -86,12 +86,11 @@ idt_entry_t *idt_tables[NR_CPUS] __read_mostly;
 
 #define DECLARE_TRAP_HANDLER(_name)                     \
 asmlinkage void _name(void);                            \
-asmlinkage int do_ ## _name(struct cpu_user_regs *regs)
+asmlinkage void do_ ## _name(struct cpu_user_regs *regs)
 
-asmlinkage void nmi(void);
-asmlinkage void machine_check(void);
 DECLARE_TRAP_HANDLER(divide_error);
 DECLARE_TRAP_HANDLER(debug);
+DECLARE_TRAP_HANDLER(nmi);
 DECLARE_TRAP_HANDLER(int3);
 DECLARE_TRAP_HANDLER(overflow);
 DECLARE_TRAP_HANDLER(bounds);
@@ -105,6 +104,7 @@ DECLARE_TRAP_HANDLER(general_protection);
 DECLARE_TRAP_HANDLER(page_fault);
 DECLARE_TRAP_HANDLER(coprocessor_error);
 DECLARE_TRAP_HANDLER(simd_coprocessor_error);
+DECLARE_TRAP_HANDLER(machine_check);
 DECLARE_TRAP_HANDLER(alignment_check);
 DECLARE_TRAP_HANDLER(spurious_interrupt_bug);
 
@@ -382,7 +382,7 @@ asmlinkage void fatal_trap(int trapnr, struct cpu_user_regs *regs)
           (regs->eflags & X86_EFLAGS_IF) ? "" : ", IN INTERRUPT CONTEXT");
 }
 
-static int do_guest_trap(
+static void do_guest_trap(
     int trapnr, const struct cpu_user_regs *regs, int use_error_code)
 {
     struct vcpu *v = current;
@@ -411,8 +411,6 @@ static int do_guest_trap(
         gdprintk(XENLOG_WARNING, "Unhandled %s fault/trap [#%d] "
                  "on VCPU %d [ec=%04x]\n",
                  trapstr(trapnr), trapnr, v->vcpu_id, regs->error_code);
-
-    return 0;
 }
 
 static void instruction_done(
@@ -477,7 +475,7 @@ asmlinkage int set_guest_nmi_trapbounce(void)
     return !null_trap_bounce(v, tb);
 }
 
-static inline int do_trap(
+static inline void do_trap(
     int trapnr, struct cpu_user_regs *regs, int use_error_code)
 {
     unsigned long fixup;
@@ -485,14 +483,17 @@ static inline int do_trap(
     DEBUGGER_trap_entry(trapnr, regs);
 
     if ( guest_mode(regs) )
-        return do_guest_trap(trapnr, regs, use_error_code);
+    {
+        do_guest_trap(trapnr, regs, use_error_code);
+        return;
+    }
 
     if ( likely((fixup = search_exception_table(regs->eip)) != 0) )
     {
         dprintk(XENLOG_ERR, "Trap %d: %p -> %p\n",
                 trapnr, _p(regs->eip), _p(fixup));
         regs->eip = fixup;
-        return 0;
+        return;
     }
 
     DEBUGGER_trap_fatal(trapnr, regs);
@@ -501,19 +502,18 @@ static inline int do_trap(
     panic("FATAL TRAP: vector = %d (%s)\n"
           "[error_code=%04x]\n",
           trapnr, trapstr(trapnr), regs->error_code);
-    return 0;
 }
 
 #define DO_ERROR_NOCODE(trapnr, name)                   \
-asmlinkage int do_##name(struct cpu_user_regs *regs)    \
+asmlinkage void do_##name(struct cpu_user_regs *regs)   \
 {                                                       \
-    return do_trap(trapnr, regs, 0);                    \
+    do_trap(trapnr, regs, 0);                           \
 }
 
 #define DO_ERROR(trapnr, name)                          \
-asmlinkage int do_##name(struct cpu_user_regs *regs)    \
+asmlinkage void do_##name(struct cpu_user_regs *regs)   \
 {                                                       \
-    return do_trap(trapnr, regs, 1);                    \
+    do_trap(trapnr, regs, 1);                           \
 }
 
 DO_ERROR_NOCODE(TRAP_divide_error,    divide_error)
@@ -714,20 +714,20 @@ static int emulate_forced_invalid_op(struct cpu_user_regs *regs)
     return EXCRET_fault_fixed;
 }
 
-asmlinkage int do_invalid_op(struct cpu_user_regs *regs)
+asmlinkage void do_invalid_op(struct cpu_user_regs *regs)
 {
     struct bug_frame bug;
     struct bug_frame_str bug_str;
     char *filename, *predicate, *eip = (char *)regs->eip;
-    int rc, id, lineno;
+    int id, lineno;
 
     DEBUGGER_trap_entry(TRAP_invalid_op, regs);
 
     if ( likely(guest_mode(regs)) )
     {
-        if ( (rc = emulate_forced_invalid_op(regs)) != 0 )
-            return rc;
-        return do_guest_trap(TRAP_invalid_op, regs, 0);
+        if ( !emulate_forced_invalid_op(regs) )
+            do_guest_trap(TRAP_invalid_op, regs, 0);
+        return;
     }
 
     if ( !is_kernel(eip) ||
@@ -743,7 +743,7 @@ asmlinkage int do_invalid_op(struct cpu_user_regs *regs)
     {
         show_execution_state(regs);
         regs->eip = (unsigned long)eip;
-        return EXCRET_fault_fixed;
+        return;
     }
 
     /* WARN, BUG or ASSERT: decode the filename pointer and line number. */
@@ -761,7 +761,7 @@ asmlinkage int do_invalid_op(struct cpu_user_regs *regs)
         printk("Xen WARN at %.50s:%d\n", filename, lineno);
         show_execution_state(regs);
         regs->eip = (unsigned long)eip;
-        return EXCRET_fault_fixed;
+        return;
     }
 
     if ( id == BUGFRAME_bug )
@@ -792,10 +792,9 @@ asmlinkage int do_invalid_op(struct cpu_user_regs *regs)
     DEBUGGER_trap_fatal(TRAP_invalid_op, regs);
     show_execution_state(regs);
     panic("FATAL TRAP: vector = %d (invalid opcode)\n", TRAP_invalid_op);
-    return 0;
 }
 
-asmlinkage int do_int3(struct cpu_user_regs *regs)
+asmlinkage void do_int3(struct cpu_user_regs *regs)
 {
     DEBUGGER_trap_entry(TRAP_int3, regs);
 
@@ -806,7 +805,7 @@ asmlinkage int do_int3(struct cpu_user_regs *regs)
         panic("FATAL TRAP: vector = 3 (Int3)\n");
     } 
 
-    return do_guest_trap(TRAP_int3, regs, 0);
+    do_guest_trap(TRAP_int3, regs, 0);
 }
 
 asmlinkage void do_machine_check(struct cpu_user_regs *regs)
@@ -1065,10 +1064,9 @@ static int fixup_page_fault(unsigned long addr, struct cpu_user_regs *regs)
  *  Bit 3: Reserved bit violation
  *  Bit 4: Instruction fetch
  */
-asmlinkage int do_page_fault(struct cpu_user_regs *regs)
+asmlinkage void do_page_fault(struct cpu_user_regs *regs)
 {
     unsigned long addr, fixup;
-    int rc;
 
     addr = read_cr2();
 
@@ -1076,19 +1074,19 @@ asmlinkage int do_page_fault(struct cpu_user_regs *regs)
 
     perfc_incr(page_faults);
 
-    if ( unlikely((rc = fixup_page_fault(addr, regs)) != 0) )
-        return rc;
+    if ( unlikely(fixup_page_fault(addr, regs) != 0) )
+        return;
 
     if ( unlikely(!guest_mode(regs)) )
     {
         if ( spurious_page_fault(addr, regs) )
-            return EXCRET_not_a_fault;
+            return;
 
         if ( likely((fixup = search_exception_table(regs->eip)) != 0) )
         {
             perfc_incr(copy_user_faults);
             regs->eip = fixup;
-            return 0;
+            return;
         }
 
         DEBUGGER_trap_fatal(TRAP_page_fault, regs);
@@ -1102,7 +1100,6 @@ asmlinkage int do_page_fault(struct cpu_user_regs *regs)
     }
 
     propagate_page_fault(addr, regs->error_code);
-    return 0;
 }
 
 /*
@@ -1113,7 +1110,7 @@ asmlinkage int do_page_fault(struct cpu_user_regs *regs)
  * page fault when it is retired, despite the fact that the PTE is present and 
  * correct at that point in time.
  */
-asmlinkage int do_early_page_fault(struct cpu_user_regs *regs)
+asmlinkage void do_early_page_fault(struct cpu_user_regs *regs)
 {
     static int stuck;
     static unsigned long prev_eip, prev_cr2;
@@ -1126,14 +1123,12 @@ asmlinkage int do_early_page_fault(struct cpu_user_regs *regs)
         prev_eip = regs->eip;
         prev_cr2 = cr2;
         stuck    = 0;
-        return EXCRET_not_a_fault;
+        return;
     }
 
     if ( stuck++ == 1000 )
         panic("Early fatal page fault at %04x:%p (cr2=%p, ec=%04x)\n", 
               regs->cs, _p(regs->eip), _p(cr2), regs->error_code);
-
-    return EXCRET_not_a_fault;
 }
 
 long do_fpu_taskswitch(int set)
@@ -1351,7 +1346,7 @@ void (*pv_post_outb_hook)(unsigned int port, u8 value);
     if ( (_rc = copy_from_user(&_x, (type *)_ptr, sizeof(_x))) != 0 )       \
     {                                                                       \
         propagate_page_fault(_ptr + sizeof(_x) - _rc, 0);                   \
-        return EXCRET_fault_fixed;                                          \
+        goto skip;                                                          \
     }                                                                       \
     (eip) += sizeof(_x); _x; })
 
@@ -2010,6 +2005,7 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
 
  done:
     instruction_done(regs, eip, bpmatch);
+ skip:
     return EXCRET_fault_fixed;
 
  fail:
@@ -2023,7 +2019,7 @@ static inline int check_stack_limit(unsigned int ar, unsigned int limit,
             (!(ar & _SEGMENT_EC) ? (esp - 1) <= limit : (esp - decr) > limit));
 }
 
-static int emulate_gate_op(struct cpu_user_regs *regs)
+static void emulate_gate_op(struct cpu_user_regs *regs)
 {
 #ifdef __x86_64__
     struct vcpu *v = current;
@@ -2036,9 +2032,15 @@ static int emulate_gate_op(struct cpu_user_regs *regs)
     if ( !read_gate_descriptor(regs->error_code, v, &sel, &off, &ar) ||
          ((ar >> 13) & 3) < (regs->cs & 3) ||
          (ar & _SEGMENT_TYPE) != 0xc00 )
-        return do_guest_trap(TRAP_gp_fault, regs, 1);
+    {
+        do_guest_trap(TRAP_gp_fault, regs, 1);
+        return;
+    }
     if ( !(ar & _SEGMENT_P) )
-        return do_guest_trap(TRAP_no_segment, regs, 1);
+    {
+        do_guest_trap(TRAP_no_segment, regs, 1);
+        return;
+    }
     dpl = (ar >> 13) & 3;
     nparm = ar & 0x1f;
 
@@ -2050,7 +2052,10 @@ static int emulate_gate_op(struct cpu_user_regs *regs)
          !(ar & _SEGMENT_S) ||
          !(ar & _SEGMENT_P) ||
          !(ar & _SEGMENT_CODE) )
-        return do_guest_trap(TRAP_gp_fault, regs, 1);
+    {
+        do_guest_trap(TRAP_gp_fault, regs, 1);
+        return;
+    }
 
     op_bytes = op_default = ar & _SEGMENT_DB ? 4 : 2;
     ad_default = ad_bytes = op_default;
@@ -2199,7 +2204,9 @@ static int emulate_gate_op(struct cpu_user_regs *regs)
     if ( jump < 0 )
     {
  fail:
-        return do_guest_trap(TRAP_gp_fault, regs, 1);
+        do_guest_trap(TRAP_gp_fault, regs, 1);
+ skip:
+        return;
     }
 
     if ( (opnd_sel != regs->cs &&
@@ -2207,7 +2214,10 @@ static int emulate_gate_op(struct cpu_user_regs *regs)
          !(ar & _SEGMENT_S) ||
          !(ar & _SEGMENT_P) ||
          ((ar & _SEGMENT_CODE) && !(ar & _SEGMENT_WR)) )
-        return do_guest_trap(TRAP_gp_fault, regs, 1);
+    {
+        do_guest_trap(TRAP_gp_fault, regs, 1);
+        return;
+    }
 
     opnd_off += op_bytes;
 #define ad_default ad_bytes
@@ -2215,7 +2225,10 @@ static int emulate_gate_op(struct cpu_user_regs *regs)
 #undef ad_default
     ASSERT((opnd_sel & ~3) == regs->error_code);
     if ( dpl < (opnd_sel & 3) )
-        return do_guest_trap(TRAP_gp_fault, regs, 1);
+    {
+        do_guest_trap(TRAP_gp_fault, regs, 1);
+        return;
+    }
 
     if ( !read_descriptor(sel, v, regs, &base, &limit, &ar, 0) ||
          !(ar & _SEGMENT_S) ||
@@ -2225,17 +2238,20 @@ static int emulate_gate_op(struct cpu_user_regs *regs)
           ((ar >> 13) & 3) != (regs->cs & 3)) )
     {
         regs->error_code = sel;
-        return do_guest_trap(TRAP_gp_fault, regs, 1);
+        do_guest_trap(TRAP_gp_fault, regs, 1);
+        return;
     }
     if ( !(ar & _SEGMENT_P) )
     {
         regs->error_code = sel;
-        return do_guest_trap(TRAP_no_segment, regs, 1);
+        do_guest_trap(TRAP_no_segment, regs, 1);
+        return;
     }
     if ( off > limit )
     {
         regs->error_code = 0;
-        return do_guest_trap(TRAP_gp_fault, regs, 1);
+        do_guest_trap(TRAP_gp_fault, regs, 1);
+        return;
     }
 
     if ( !jump )
@@ -2251,7 +2267,7 @@ static int emulate_gate_op(struct cpu_user_regs *regs)
             { \
                 propagate_page_fault((unsigned long)(stkp + 1) - rc, \
                                      PFEC_write_access); \
-                return 0; \
+                return; \
             } \
         } while ( 0 )
 
@@ -2260,7 +2276,10 @@ static int emulate_gate_op(struct cpu_user_regs *regs)
             sel |= (ar >> 13) & 3;
             /* Inner stack known only for kernel ring. */
             if ( (sel & 3) != GUEST_KERNEL_RPL(v->domain) )
-                return do_guest_trap(TRAP_gp_fault, regs, 1);
+            {
+                do_guest_trap(TRAP_gp_fault, regs, 1);
+                return;
+            }
             esp = v->arch.guest_context.kernel_sp;
             ss = v->arch.guest_context.kernel_ss;
             if ( (ss & 3) != (sel & 3) ||
@@ -2271,17 +2290,22 @@ static int emulate_gate_op(struct cpu_user_regs *regs)
                  !(ar & _SEGMENT_WR) )
             {
                 regs->error_code = ss & ~3;
-                return do_guest_trap(TRAP_invalid_tss, regs, 1);
+                do_guest_trap(TRAP_invalid_tss, regs, 1);
+                return;
             }
             if ( !(ar & _SEGMENT_P) ||
                  !check_stack_limit(ar, limit, esp, (4 + nparm) * 4) )
             {
                 regs->error_code = ss & ~3;
-                return do_guest_trap(TRAP_stack_error, regs, 1);
+                do_guest_trap(TRAP_stack_error, regs, 1);
+                return;
             }
             stkp = (unsigned int *)(unsigned long)((unsigned int)base + esp);
             if ( !compat_access_ok(stkp - 4 - nparm, (4 + nparm) * 4) )
-                return do_guest_trap(TRAP_gp_fault, regs, 1);
+            {
+                do_guest_trap(TRAP_gp_fault, regs, 1);
+                return;
+            }
             push(regs->ss);
             push(regs->esp);
             if ( nparm )
@@ -2297,7 +2321,10 @@ static int emulate_gate_op(struct cpu_user_regs *regs)
                     return do_guest_trap(TRAP_gp_fault, regs, 1);
                 ustkp = (unsigned int *)(unsigned long)((unsigned int)base + regs->_esp + nparm * 4);
                 if ( !compat_access_ok(ustkp - nparm, nparm * 4) )
-                    return do_guest_trap(TRAP_gp_fault, regs, 1);
+                {
+                    do_guest_trap(TRAP_gp_fault, regs, 1);
+                    return;
+                }
                 do
                 {
                     unsigned int parm;
@@ -2307,7 +2334,7 @@ static int emulate_gate_op(struct cpu_user_regs *regs)
                     if ( rc )
                     {
                         propagate_page_fault((unsigned long)(ustkp + 1) - rc, 0);
-                        return 0;
+                        return;
                     }
                     push(parm);
                 } while ( --nparm );
@@ -2320,15 +2347,22 @@ static int emulate_gate_op(struct cpu_user_regs *regs)
             ss = regs->ss;
             if ( !read_descriptor(ss, v, regs, &base, &limit, &ar, 0) ||
                  ((ar >> 13) & 3) != (sel & 3) )
-                return do_guest_trap(TRAP_gp_fault, regs, 1);
+            {
+                do_guest_trap(TRAP_gp_fault, regs, 1);
+                return;
+            }
             if ( !check_stack_limit(ar, limit, esp, 2 * 4) )
             {
                 regs->error_code = 0;
-                return do_guest_trap(TRAP_stack_error, regs, 1);
+                do_guest_trap(TRAP_stack_error, regs, 1);
+                return;
             }
             stkp = (unsigned int *)(unsigned long)((unsigned int)base + esp);
             if ( !compat_access_ok(stkp - 2, 2 * 4) )
-                return do_guest_trap(TRAP_gp_fault, regs, 1);
+            {
+                do_guest_trap(TRAP_gp_fault, regs, 1);
+                return;
+            }
         }
         push(regs->cs);
         push(eip);
@@ -2342,11 +2376,9 @@ static int emulate_gate_op(struct cpu_user_regs *regs)
     regs->cs = sel;
     instruction_done(regs, off, 0);
 #endif
-
-    return 0;
 }
 
-asmlinkage int do_general_protection(struct cpu_user_regs *regs)
+asmlinkage void do_general_protection(struct cpu_user_regs *regs)
 {
     struct vcpu *v = current;
     unsigned long fixup;
@@ -2388,18 +2420,22 @@ asmlinkage int do_general_protection(struct cpu_user_regs *regs)
         if ( permit_softint(TI_GET_DPL(ti), v, regs) )
         {
             regs->eip += 2;
-            return do_guest_trap(vector, regs, 0);
+            do_guest_trap(vector, regs, 0);
+            return;
         }
     }
     else if ( is_pv_32on64_vcpu(v) && regs->error_code )
-        return emulate_gate_op(regs);
+    {
+        emulate_gate_op(regs);
+        return;
+    }
 
     /* Emulate some simple privileged and I/O instructions. */
     if ( (regs->error_code == 0) &&
          emulate_privileged_op(regs) )
     {
         trace_trap_one_addr(TRC_PV_EMULATE_PRIVOP, regs->eip);
-        return 0;
+        return;
     }
 
 #if defined(__i386__)
@@ -2408,12 +2444,13 @@ asmlinkage int do_general_protection(struct cpu_user_regs *regs)
          gpf_emulate_4gb(regs) )
     {
         TRACE_1D(TRC_PV_EMULATE_4GB, regs->eip);
-        return 0;
+        return;
     }
 #endif
 
     /* Pass on GPF as is. */
-    return do_guest_trap(TRAP_gp_fault, regs, 1);
+    do_guest_trap(TRAP_gp_fault, regs, 1);
+    return;
 
  gp_in_kernel:
 
@@ -2422,7 +2459,7 @@ asmlinkage int do_general_protection(struct cpu_user_regs *regs)
         dprintk(XENLOG_INFO, "GPF (%04x): %p -> %p\n",
                 regs->error_code, _p(regs->eip), _p(fixup));
         regs->eip = fixup;
-        return 0;
+        return;
     }
 
     DEBUGGER_trap_fatal(TRAP_gp_fault, regs);
@@ -2430,7 +2467,6 @@ asmlinkage int do_general_protection(struct cpu_user_regs *regs)
  hardware_gp:
     show_execution_state(regs);
     panic("GENERAL PROTECTION FAULT\n[error_code=%04x]\n", regs->error_code);
-    return 0;
 }
 
 static void nmi_softirq(void)
@@ -2550,7 +2586,7 @@ void unset_nmi_callback(void)
     nmi_callback = dummy_nmi_callback;
 }
 
-asmlinkage int do_device_not_available(struct cpu_user_regs *regs)
+asmlinkage void do_device_not_available(struct cpu_user_regs *regs)
 {
     struct vcpu *curr = current;
 
@@ -2566,10 +2602,10 @@ asmlinkage int do_device_not_available(struct cpu_user_regs *regs)
     else
         TRACE_0D(TRC_PV_MATH_STATE_RESTORE);
 
-    return EXCRET_fault_fixed;
+    return;
 }
 
-asmlinkage int do_debug(struct cpu_user_regs *regs)
+asmlinkage void do_debug(struct cpu_user_regs *regs)
 {
     struct vcpu *v = current;
 
@@ -2609,16 +2645,16 @@ asmlinkage int do_debug(struct cpu_user_regs *regs)
     v->arch.guest_context.debugreg[6] = read_debugreg(6);
 
     ler_enable();
-    return do_guest_trap(TRAP_debug, regs, 0);
+    do_guest_trap(TRAP_debug, regs, 0);
+    return;
 
  out:
     ler_enable();
-    return EXCRET_not_a_fault;
+    return;
 }
 
-asmlinkage int do_spurious_interrupt_bug(struct cpu_user_regs *regs)
+asmlinkage void do_spurious_interrupt_bug(struct cpu_user_regs *regs)
 {
-    return EXCRET_not_a_fault;
 }
 
 void set_intr_gate(unsigned int n, void *addr)

@@ -112,14 +112,8 @@
 /* NB. Same as VGCF_in_syscall. No bits in common with any other TRAP_ defn. */
 #define TRAP_syscall         256
 
-/*
- * Non-fatal fault/trap handlers return an error code to the caller. If the
- * code is non-zero, it means that either the exception was not due to a fault
- * (i.e., it was a trap) or that the fault has been fixed up so the instruction
- * replay ought to succeed.
- */
-#define EXCRET_not_a_fault 1 /* It was a trap. No instruction replay needed. */
-#define EXCRET_fault_fixed 1 /* It was fault that we fixed: try a replay. */
+/* Boolean return code: the reason for a fault has been fixed. */
+#define EXCRET_fault_fixed 1
 
 /* 'trap_bounce' flags values */
 #define TBF_EXCEPTION          1

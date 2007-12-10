@@ -35,9 +35,9 @@
 
 /* The main trap handlers use these helper macros which include early bail. */
 #define DEBUGGER_trap_entry(_v, _r) \
-    if ( debugger_trap_entry(_v, _r) ) return EXCRET_fault_fixed;
+    if ( debugger_trap_entry(_v, _r) ) return;
 #define DEBUGGER_trap_fatal(_v, _r) \
-    if ( debugger_trap_fatal(_v, _r) ) return EXCRET_fault_fixed;
+    if ( debugger_trap_fatal(_v, _r) ) return;
 
 #if defined(CRASH_DEBUG)
 
