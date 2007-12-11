@@ -500,9 +500,7 @@ setup_arch (char **cmdline_p)
 {
 	unw_init();
 
-#ifndef XEN
 	ia64_patch_vtop((u64) __start___vtop_patchlist, (u64) __end___vtop_patchlist);
-#endif
 
 	*cmdline_p = __va(ia64_boot_param->command_line);
 #ifndef XEN

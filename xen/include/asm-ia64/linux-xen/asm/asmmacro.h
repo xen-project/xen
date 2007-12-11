@@ -59,17 +59,9 @@ name:
 	.section ".data.patch.vtop", "a"	// declare section & section attributes
 	.previous
 
-#ifdef XEN
-#define	LOAD_PHYSICAL(pr, reg, obj)		\
-[1:](pr)movl reg = obj;;			\
-	shl reg = reg,4;;			\
-	shr.u reg = reg,4;;			\
-	.xdata4 ".data.patch.vtop", 1b-.
-#else
 #define	LOAD_PHYSICAL(pr, reg, obj)		\
 [1:](pr)movl reg = obj;				\
 	.xdata4 ".data.patch.vtop", 1b-.
-#endif
 
 /*
  * For now, we always put in the McKinley E9 workaround.  On CPUs that don't need it,
