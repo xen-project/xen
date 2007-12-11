@@ -122,9 +122,7 @@ stop_this_cpu (void)
 	cpu_clear(smp_processor_id(), cpu_online_map);
 	max_xtp();
 	local_irq_disable();
-#ifndef XEN
 	cpu_halt();
-#endif
 }
 
 void
@@ -132,9 +130,7 @@ cpu_die(void)
 {
 	max_xtp();
 	local_irq_disable();
-#ifndef XEN
 	cpu_halt();
-#endif
 	/* Should never be here */
 	BUG();
 	for (;;);

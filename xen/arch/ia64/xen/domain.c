@@ -2207,10 +2207,12 @@ extern void cpu_halt(void);
 void machine_halt(void)
 {
 	console_start_sync();
-	if (running_on_sim)
-		printk ("machine_halt called.  spinning...\n");
-	else
-		cpu_halt();
+
+#ifdef CONFIG_SMP
+	smp_send_stop();
+#endif
+
+	printk ("machine_halt called.  spinning...\n");
 	while(1);
 }
 
