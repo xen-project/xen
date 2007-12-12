@@ -1880,8 +1880,6 @@ class XendDomainInfo:
 
         self._cleanupVm()
         if self.dompath is not None:
-            if self.domid is not None:
-                xc.domain_destroy_hook(self.domid)
             self.destroyDomain()
 
         self._cleanup_phantom_devs(paths)
@@ -1899,6 +1897,7 @@ class XendDomainInfo:
 
         try:
             if self.domid is not None:
+                xc.domain_destroy_hook(self.domid)
                 xc.domain_destroy(self.domid)
                 for state in DOM_STATES_OLD:
                     self.info[state] = 0
