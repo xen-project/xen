@@ -544,8 +544,11 @@ DEFINE_XEN_GUEST_HANDLE(xen_domctl_ext_vcpucontext_t);
  */
 #define XEN_DOMCTL_set_opt_feature    44
 struct xen_domctl_set_opt_feature {
-#ifdef __ia64__
+#if defined(__ia64__)
     struct xen_ia64_opt_feature optf;
+#else
+    /* Make struct non-empty: do not depend on this field name! */
+    uint64_t dummy;
 #endif
 };
 typedef struct xen_domctl_set_opt_feature xen_domctl_set_opt_feature_t;
