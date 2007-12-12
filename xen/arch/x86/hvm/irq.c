@@ -362,12 +362,13 @@ int get_isa_irq_vector(struct vcpu *v, int isa_irq, enum hvm_intsrc src)
 int is_isa_irq_masked(struct vcpu *v, int isa_irq)
 {
     unsigned int gsi = hvm_isa_irq_to_gsi(isa_irq);
+    uint8_t pic_imr;
 
     if ( is_lvtt(v, isa_irq) )
         return !is_lvtt_enabled(v);
 
-    return ((v->domain->arch.hvm_domain.vpic[isa_irq >> 3].imr &
-             (1 << (isa_irq & 7))) &&
+    pic_imr = v->domain->arch.hvm_domain.vpic[isa_irq >> 3].imr;
+    return (((pic_imr & (1 << (isa_irq & 7))) || !vlapic_accept_pic_intr(v)) &&
             domain_vioapic(v->domain)->redirtbl[gsi].fields.mask);
 }
 
