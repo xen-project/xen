@@ -783,8 +783,8 @@ asmlinkage void do_invalid_op(struct cpu_user_regs *regs)
     predicate = is_kernel(bug_str.str) ? (char *)bug_str.str : "<unknown>";
     printk("Assertion '%s' failed at %.50s:%d\n",
            predicate, filename, lineno);
-    show_execution_state(regs);
     DEBUGGER_trap_fatal(TRAP_invalid_op, regs);
+    show_execution_state(regs);
     panic("Assertion '%s' failed at %.50s:%d\n",
           predicate, filename, lineno);
 
