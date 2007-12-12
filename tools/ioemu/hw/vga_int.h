@@ -157,9 +157,6 @@ static inline int c6_to_8(int v)
     return (v << 2) | (b << 1) | b;
 }
 
-#define VGA_SAVE_FORMAT_FLAG_BOCHS_VBE  0x01
-#define VGA_SAVE_FORMAT_FLAG_VRAM_DATA  0x02
-
 void vga_common_init(VGAState *s, DisplayState *ds, uint8_t *vga_ram_base, 
                      unsigned long vga_ram_offset, int vga_ram_size);
 uint32_t vga_mem_readb(void *opaque, target_phys_addr_t addr);
