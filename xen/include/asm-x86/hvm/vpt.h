@@ -75,6 +75,10 @@ struct periodic_time {
     bool_t on_list;
     bool_t one_shot;
     bool_t do_not_freeze;
+    bool_t irq_issued;
+#define PTSRC_isa    1 /* ISA time source */
+#define PTSRC_lapic  2 /* LAPIC time source */
+    u8 source;                  /* PTSRC_ */
     u8 irq;
     struct vcpu *vcpu;          /* vcpu timer interrupt delivers to */
     u32 pending_intr_nr;        /* pending timer interrupts */
@@ -146,8 +150,10 @@ void pt_migrate(struct vcpu *v);
 
 /*
  * Create/destroy a periodic (or one-shot!) timer.
- * The given periodic timer structure must be initialised with zero bytes or
- * have been initialised by a previous invocation of create_periodic_time().
+ * The given periodic timer structure must be initialised with zero bytes,
+ * except for the 'source' field which must be initialised with the
+ * correct PTSRC_ value. The initialised timer structure can then be passed
+ * to {create,destroy}_periodic_time() and number of times and in any order.
  * Note that, for a given periodic timer, invocations of these functions MUST
  * be serialised.
  */
@@ -163,7 +169,6 @@ void pit_deinit(struct domain *d);
 void rtc_init(struct vcpu *v, int base);
 void rtc_migrate_timers(struct vcpu *v);
 void rtc_deinit(struct domain *d);
-int is_rtc_periodic_irq(void *opaque);
 void pmtimer_init(struct vcpu *v);
 void pmtimer_deinit(struct domain *d);
 

@@ -42,14 +42,6 @@ static void rtc_periodic_cb(struct vcpu *v, void *opaque)
     spin_unlock(&s->lock);
 }
 
-int is_rtc_periodic_irq(void *opaque)
-{
-    RTCState *s = opaque;
-
-    return !(s->hw.cmos_data[RTC_REG_C] & RTC_AF || 
-             s->hw.cmos_data[RTC_REG_C] & RTC_UF);
-}
-
 /* Enable/configure/disable the periodic timer based on the RTC_PIE and
  * RTC_RATE_SELECT settings */
 static void rtc_timer_update(RTCState *s)
@@ -487,6 +479,8 @@ void rtc_init(struct vcpu *v, int base)
     RTCState *s = vcpu_vrtc(v);
 
     spin_lock_init(&s->lock);
+
+    s->pt.source = PTSRC_isa;
 
     s->hw.cmos_data[RTC_REG_A] = RTC_REF_CLCK_32KHZ | 6; /* ~1kHz */
     s->hw.cmos_data[RTC_REG_B] = RTC_24H;

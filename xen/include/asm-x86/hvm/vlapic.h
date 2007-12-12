@@ -92,7 +92,4 @@ struct vlapic *apic_round_robin(
 
 int vlapic_match_logical_addr(struct vlapic *vlapic, uint8_t mda);
 
-int is_lvtt(struct vcpu *v, int vector);
-int is_lvtt_enabled(struct vcpu *v);
-
 #endif /* __ASM_X86_HVM_VLAPIC_H__ */
