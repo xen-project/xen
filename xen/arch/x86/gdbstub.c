@@ -71,18 +71,20 @@ gdb_arch_read_reg(unsigned long regnum, struct cpu_user_regs *regs,
     gdb_send_reply("", ctx);
 }
 
-/* Like copy_from_user, but safe to call with interrupts disabled.
-   Trust me, and don't look behind the curtain. */
+/*
+ * Use __copy_*_user to make us page-fault safe, but not otherwise restrict
+ * our access to the full virtual address space.
+ */
 unsigned int
 gdb_arch_copy_from_user(void *dest, const void *src, unsigned len)
 {
-    return copy_from_user(dest, src, len);
+    return __copy_from_user(dest, src, len);
 }
 
 unsigned int 
 gdb_arch_copy_to_user(void *dest, const void *src, unsigned len)
 {
-    return copy_to_user(dest, src, len);
+    return __copy_to_user(dest, src, len);
 }
 
 void 

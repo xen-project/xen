@@ -5,31 +5,46 @@ Xen has a simple gdb stub for doing post-mortem debugging i.e. once
 you've crashed it, you get to poke around and find out why.  There's
 also a special key handler for making it crash, which is handy.
 
-You need to have crash_debug=y set when compiling to enable the crash
-debugger (so go ``export crash_debug=y; make'', or ``crash_debug=y
-make'' or ``make crash_debug=y''), and you also need to enable it on
-the Xen command line, by going e.g. cdb=com1.  If you need to have a
-serial port shared between cdb and the console, try cdb=com1H.  CDB
-will then set the high bit on every byte it sends, and only respond to
-bytes with the high bit set.  Similarly for com2.
+You need to have crash_debug=y set when compiling , and you also need
+to enable it on the Xen command line, eg by gdb=com1.
 
-The next step depends on your individual setup.  This is how to do
-it for a normal test box in the SRG:
+If you need to have a serial port shared between gdb and the console,
+you can use gdb=com1H.  CDB will then set the high bit on every byte
+it sends, and only respond to bytes with the high bit set.  Similarly
+for com2.  If you do this you will need a demultiplexing program on
+the debugging workstation, such as perhaps tools/misc/nsplitd.
 
--- Make your test machine crash.  Either a normal panic or hitting
-   'C-A C-A C-A %' on the serial console will do.
--- Start gdb as ``gdb ./xen-syms''
--- Go ``target remote serial.srg:12331'', where 12331 is the second port
-   reported for that machine by xenuse. (In this case, the machine is
-   bombjack)
--- Go ``add-symbol-file vmlinux''
--- Debug as if you had a core file
--- When you're finished, go and reboot your test box.  Hitting 'R' on the
-   serial console won't work.
+The next step depends on your individual setup.  This is how to do it
+if you have a simple null modem connection between the test box and
+the workstation, and aren't using a H/L split console:
 
-At one stage, it was sometimes possible to resume after entering the
-debugger from the serial console.  This seems to have rotted, however,
-and I'm not terribly interested in putting it back.
+  * Set debug=y in Config.mk
+  * Set crash_debug=y in xen/Rules.mk
+  * Make the changes in the attached patch, and build.
+  * Arrange to pass gdb=com1 as a hypervisor command line argument
+    (I already have com1=38400,8n1 console=com1,vga sync_console)
+    
+  * Boot the system with minicom (or your favourite terminal program)
+    connected from your workstation via a null modem cable in the
+    usual way.
+  * In minicom, give the escape character (^A by default) three times
+    to talk to Xen (Xen prints `(XEN) *** Serial input -> Xen...').
+  * Press % and observe the messages
+     (XEN) '%' pressed -> trapping into debugger
+     (XEN) GDB connection activated.
+     (XEN) Waiting for GDB to attach...
+  * Disconnect from minicom without allowing minicom to send any
+    modem control sequences.
+  * Start gdb with   gdb /path/to/build/tree/xen/xen-syms  and then
+      (gdb) set remotebaud 38400
+      Remote debugging using /dev/ttyS0
+      0xff124d61 in idle_loop () at domain.c:78
+      78              safe_halt();
+      (gdb)
+
+There is code which was once intended to make it possible to resume
+after entering the debugger.  However this does not presently work; it
+has been nonfunctional for quite some time.
 
 As soon as you reach the debugger, we disable interrupts, the
 watchdog, and every other CPU, so the state of the world shouldn't
@@ -44,7 +59,5 @@ Reasons why we might fail to reach the debugger:
    you're screwed.
 -- If the page tables are wrong, you're screwed
 -- If the serial port setup is wrong, badness happens
--- We acquire the console lock at one stage XXX this is unnecessary and
-   stupid
 -- Obviously, the low level processor state can be screwed in any
    number of wonderful ways

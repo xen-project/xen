@@ -783,8 +783,8 @@ asmlinkage void do_invalid_op(struct cpu_user_regs *regs)
     predicate = is_kernel(bug_str.str) ? (char *)bug_str.str : "<unknown>";
     printk("Assertion '%s' failed at %.50s:%d\n",
            predicate, filename, lineno);
-    DEBUGGER_trap_fatal(TRAP_invalid_op, regs);
     show_execution_state(regs);
+    DEBUGGER_trap_fatal(TRAP_invalid_op, regs);
     panic("Assertion '%s' failed at %.50s:%d\n",
           predicate, filename, lineno);
 
@@ -911,6 +911,14 @@ static int __spurious_page_fault(
     l2_pgentry_t l2e, *l2t;
     l1_pgentry_t l1e, *l1t;
     unsigned int required_flags, disallowed_flags;
+
+    /*
+     * We do not take spurious page faults in IRQ handlers as we do not
+     * modify page tables in IRQ context. We therefore bail here because
+     * map_domain_page() is not IRQ-safe.
+     */
+    if ( in_irq() )
+        return 0;
 
     /* Reserved bit violations are never spurious faults. */
     if ( regs->error_code & PFEC_reserved_bit )

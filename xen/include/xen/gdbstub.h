@@ -53,6 +53,7 @@ void gdb_write_to_packet(
     const char *buf, int count, struct gdb_context *ctx);
 void gdb_write_to_packet_hex(
     unsigned long x, int int_size, struct gdb_context *ctx);
+    /* ... writes in target native byte order as required by gdb spec. */
 void gdb_send_packet(struct gdb_context *ctx);
 void gdb_send_reply(const char *buf, struct gdb_context *ctx);
 
