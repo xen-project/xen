@@ -772,7 +772,7 @@ int xc_test_assign_device(
 
     domctl.cmd = XEN_DOMCTL_test_assign_device;
     domctl.domain = domid;
-    domctl.u.test_assign_device.machine_bdf = machine_bdf;
+    domctl.u.assign_device.machine_bdf = machine_bdf;
 
     return do_domctl(xc_handle, &domctl);
 }

@@ -533,8 +533,8 @@ long arch_do_domctl(
         if ( !vtd_enabled )
             break;
 
-        bus = (domctl->u.test_assign_device.machine_bdf >> 16) & 0xff;
-        devfn = (domctl->u.test_assign_device.machine_bdf >> 8) & 0xff;
+        bus = (domctl->u.assign_device.machine_bdf >> 16) & 0xff;
+        devfn = (domctl->u.assign_device.machine_bdf >> 8) & 0xff;
 
         if ( device_assigned(bus, devfn) )
         {
