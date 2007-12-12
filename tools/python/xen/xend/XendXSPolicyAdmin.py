@@ -179,6 +179,23 @@ class XSPolicyAdmin:
             self.xsobjs[ref]  = acmpol
         return (acmpol, xsconstants.XSERR_SUCCESS, errors)
 
+
+    def reset_acmpolicy(self):
+        """
+           Attempt to reset the system's policy by udating it with
+           the DEFAULT policy.
+        """
+        from xen.xend import XendDomain
+        domains = XendDomain.instance()
+        try:
+            domains.domains_lock.acquire()
+            xml = ACMPolicy.get_reset_policy_xml()
+            flags = xsconstants.XS_INST_BOOT | xsconstants.XS_INST_LOAD
+            return self.__add_acmpolicy_to_system(xml, flags, True)
+        finally:
+            domains.domains_lock.release()
+
+
     def make_boot_policy(self, acmpol):
         if acmpol.is_default_policy():
             return xsconstants.XSERR_SUCCESS

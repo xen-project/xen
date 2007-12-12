@@ -225,6 +225,24 @@ xen_xspolicy_set_xspolicy(xen_session *session, xen_xs_policystate **result,
 
 
 bool
+xen_xspolicy_reset_xspolicy(xen_session *session, xen_xs_policystate **result,
+                            xs_type type)
+{
+    abstract_value param_values[] =
+        {
+            { .type = &abstract_type_int,
+              .u.int_val = type },
+        };
+
+    abstract_type result_type = xen_xs_policystate_abstract_type_;
+
+    *result = NULL;
+    XEN_CALL_("XSPolicy.reset_xspolicy");
+    return session->ok;
+}
+
+
+bool
 xen_xspolicy_get_xspolicy(xen_session *session, xen_xs_policystate **result)
 {
     abstract_value param_values[] =

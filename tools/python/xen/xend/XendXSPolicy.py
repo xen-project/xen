@@ -43,6 +43,7 @@ class XendXSPolicy(XendBase):
     def getFuncs(self):
         funcs = [ 'get_xstype',
                   'set_xspolicy',
+                  'reset_xspolicy',
                   'get_xspolicy',
                   'rm_xsbootpolicy',
                   'get_resource_label',
@@ -104,6 +105,36 @@ class XendXSPolicy(XendBase):
             raise SecurityError(-xsconstants.XSERR_POLICY_TYPE_UNSUPPORTED)
         return polstate
 
+
+    def reset_xspolicy(self, xstype):
+        xstype = int(xstype)
+        polstate = { 'xs_ref': "", 'repr'   : "", 'type'   : 0,
+                     'flags' : 0 , 'version': 0 , 'errors' : "", 'xserr' : 0 }
+        if xstype == xsconstants.XS_POLICY_ACM:
+            poladmin = XSPolicyAdminInstance()
+            try:
+                (xspol, rc, errors) = poladmin.reset_acmpolicy()
+                if rc != 0:
+                    polstate.update( { 'xserr' : rc,
+                                       'errors': base64.b64encode(errors) } )
+                else:
+                    ref = xspol.get_ref()
+                    polstate = {
+                      'xs_ref' : ref,
+                      'flags'  : poladmin.get_policy_flags(xspol),
+                      'type'   : xstype,
+                      'repr'   : "",
+                      'version': xspol.get_version(),
+                      'errors' : base64.b64encode(errors),
+                      'xserr'  : rc,
+                    }
+            except Exception, e:
+                raise
+        else:
+            raise SecurityError(-xsconstants.XSERR_POLICY_TYPE_UNSUPPORTED)
+        return polstate
+
+
     def activate_xspolicy(self, flags):
         flags = int(flags)
         rc = -xsconstants.XSERR_GENERAL_FAILURE
@@ -162,6 +193,7 @@ class XendXSPolicy(XendBase):
     get_xstype      = classmethod(get_xstype)
     get_xspolicy    = classmethod(get_xspolicy)
     set_xspolicy    = classmethod(set_xspolicy)
+    reset_xspolicy  = classmethod(reset_xspolicy)
     rm_xsbootpolicy = classmethod(rm_xsbootpolicy)
     set_resource_label = classmethod(set_resource_label)
     get_resource_label = classmethod(get_resource_label)

@@ -240,6 +240,19 @@ xen_xspolicy_set_xspolicy(xen_session *session, xen_xs_policystate **result,
                           bool overwrite);
 
 
+
+/**
+ * Attempt to reset the system's policy to the DEFAULT policy for the
+ * respective policy type. This is done by updating the system and therefore
+ * underlies the same restrictions of a policy update. This operation may
+ * for example fail if other domains than Domain-0 are running and have
+ * different labels than Domain-0.
+ */
+bool
+xen_xspolicy_reset_xspolicy(xen_session *session, xen_xs_policystate **result,
+                            xs_type type);
+
+
 /**
  * Remove any policy from having the system booted with.
  */
