@@ -79,5 +79,6 @@ int pt_irq_create_bind_vtd(struct domain *d,
                            xen_domctl_bind_pt_irq_t *pt_irq_bind);
 
 #define PT_IRQ_TIME_OUT MILLISECS(8)
+#define VTDPREFIX "[VT-D]"
 
 #endif /* _IOMMU_H_ */

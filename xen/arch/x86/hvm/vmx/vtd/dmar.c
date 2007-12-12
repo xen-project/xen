@@ -30,7 +30,6 @@
 #include "pci-direct.h"
 #include "pci_regs.h"
 
-#define VTDPREFIX
 int vtd_enabled;
 boolean_param("vtd", vtd_enabled);
 
