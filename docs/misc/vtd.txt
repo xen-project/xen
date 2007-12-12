@@ -2,7 +2,7 @@ Title   : How to do PCI Passthrough with VT-d
 Authors : Allen Kay    <allen.m.kay@intel.com>
           Weidong Han  <weidong.han@intel.com>
 Created : October-24-2007
-Updated : October-24-2007
+Updated : December-11-2007
 
 How to turn on VT-d in Xen
 --------------------------
@@ -22,7 +22,7 @@ How to turn on VT-d in Xen
 title Xen-Fedora Core (2.6.18-xen)
         root (hd0,0)
         kernel /boot/xen.gz com1=115200,8n1 console=com1 vtd=1
-        module /boot/vmlinuz-2.6.18.8-xen root=LABEL=/ ro console=tty0 console=ttyS0,115200,8n1 pciback.hide=(01:00.0)(03:00.0) pciback.verbose_request=1 apic=debug maxcpus=1
+        module /boot/vmlinuz-2.6.18.8-xen root=LABEL=/ ro console=tty0 console=ttyS0,115200,8n1 pciback.hide=(01:00.0)(03:00.0) pciback.verbose_request=1 apic=debug
         module /boot/initrd-2.6.18-xen.img
 
 12) reboot system
@@ -30,6 +30,15 @@ title Xen-Fedora Core (2.6.18-xen)
         pci = [ '01:00.0', '03:00.0' ]
 15) start hvm guest and use "lspci" to see the passthru device and
     "ifconfig" to see if IP address has been assigned to NIC devices.
+
+
+Caveat on Conventional PCI Device Passthrough
+---------------------------------------------
+
+VT-d spec specifies that all conventional PCI devices behind a
+PCIe-to-PCI bridge have to be assigned to the same domain.
+
+PCIe devices do not have this restriction.
 
 
 VT-d Enabled Systems
@@ -48,3 +57,4 @@ http://www.dell.com/content/products/category.aspx/optix?c=us&cs=555&l=en&s=biz
 
 - HP Compaq:  DC7800
 http://h10010.www1.hp.com/wwpc/us/en/en/WF04a/12454-12454-64287-321860-3328898.html
+
