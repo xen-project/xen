@@ -309,11 +309,6 @@ gopts.var('irq', val='IRQ',
          For example 'irq=7'.
          This option may be repeated to add more than one IRQ.""")
 
-gopts.var('usbport', val='PATH',
-          fn=append_value, default=[],
-          use="""Add a physical USB port to a domain, as specified by the path
-          to that port.  This option may be repeated to add more than one port.""")
-
 gopts.var('vfb', val="type={vnc,sdl},vncunused=1,vncdisplay=N,vnclisten=ADDR,display=DISPLAY,xauthority=XAUTHORITY,vncpasswd=PASSWORD",
           fn=append_value, default=[],
           use="""Make the domain a framebuffer backend.
@@ -617,11 +612,6 @@ def configure_irq(config_devs, vals):
         config_irq = ['irq', ['irq', irq]]
         config_devs.append(['device', config_irq])
 
-def configure_usb(config_devs, vals):
-    for path in vals.usbport:
-        config_usb = ['usbport', ['path', path]]
-        config_devs.append(['device', config_usb])
-
 def configure_vfbs(config_devs, vals):
     for f in vals.vfb:
         d = comma_sep_kv_to_dict(f)
@@ -800,7 +790,6 @@ def make_config(vals):
     configure_ioports(config_devs, vals)
     configure_irq(config_devs, vals)
     configure_vifs(config_devs, vals)
-    configure_usb(config_devs, vals)
     configure_vtpm(config_devs, vals)
     configure_vfbs(config_devs, vals)
     configure_security(config, vals)
