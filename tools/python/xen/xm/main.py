@@ -1833,7 +1833,7 @@ def xm_debug_keys(args):
 def xm_top(args):
     arg_check(args, "top", 0)
 
-    os.execvp('xentop', ['xentop'])
+    os.system('xentop')
 
 def xm_dmesg(args):
     arg_check(args, "dmesg", 0, 1)
