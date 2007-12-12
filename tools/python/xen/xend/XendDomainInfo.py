@@ -1653,10 +1653,10 @@ class XendDomainInfo:
         # Set maximum number of vcpus in domain
         xc.domain_max_vcpus(self.domid, int(self.info['VCPUs_max']))
 
-        # Assign devices with VT-d
+        # Test whether the devices can be assigned with VT-d
         pci_str = str(self.info["platform"].get("pci"))
         if hvm and pci_str:
-            bdf = xc.assign_device(self.domid, pci_str)
+            bdf = xc.test_assign_device(self.domid, pci_str)
             if bdf != 0:
                 bus = (bdf >> 16) & 0xff
                 devfn = (bdf >> 8) & 0xff

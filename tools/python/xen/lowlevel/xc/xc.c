@@ -560,9 +560,9 @@ static int next_bdf(char **str, int *seg, int *bus, int *dev, int *func)
     return 1;
 }
 
-static PyObject *pyxc_assign_device(XcObject *self,
-                                    PyObject *args,
-                                    PyObject *kwds)
+static PyObject *pyxc_test_assign_device(XcObject *self,
+                                         PyObject *args,
+                                         PyObject *kwds)
 {
     uint32_t dom;
     char *pci_str;
@@ -580,7 +580,7 @@ static PyObject *pyxc_assign_device(XcObject *self,
         bdf |= (dev & 0x1f) << 11;
         bdf |= (func & 0x7) << 8;
 
-        if ( xc_assign_device(self->xc_handle, dom, bdf) != 0 )
+        if ( xc_test_assign_device(self->xc_handle, dom, bdf) != 0 )
             break;
 
         bdf = 0;
@@ -1426,10 +1426,10 @@ static PyMethodDef pyxc_methods[] = {
       " value   [long]:     Value of param.\n"
       "Returns: [int] 0 on success.\n" },
 
-     { "assign_device",
-       (PyCFunction)pyxc_assign_device,
+     { "test_assign_device",
+       (PyCFunction)pyxc_test_assign_device,
        METH_VARARGS | METH_KEYWORDS, "\n"
-       "assign device with VT-d.\n"
+       "test device assignment with VT-d.\n"
        " dom     [int]:      Identifier of domain to build into.\n"
        " pci_str [str]:      PCI devices.\n"
        "Returns: [int] 0 on success, or device bdf that can't be assigned.\n" },

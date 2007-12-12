@@ -435,9 +435,8 @@ DEFINE_XEN_GUEST_HANDLE(xen_domctl_sendtrigger_t);
 
 
 /* Assign PCI device to HVM guest. Sets up IOMMU structures. */
-#define XEN_DOMCTL_assign_device     37
-#define DPCI_ADD_MAPPING         1
-#define DPCI_REMOVE_MAPPING      0 
+#define XEN_DOMCTL_assign_device      37
+#define XEN_DOMCTL_test_assign_device 45
 struct xen_domctl_assign_device {
     uint32_t  machine_bdf;   /* machine PCI ID of assigned device */
 };
@@ -473,6 +472,8 @@ DEFINE_XEN_GUEST_HANDLE(xen_domctl_bind_pt_irq_t);
 
 /* Bind machine I/O address range -> HVM address range. */
 #define XEN_DOMCTL_memory_mapping    39
+#define DPCI_ADD_MAPPING         1
+#define DPCI_REMOVE_MAPPING      0
 struct xen_domctl_memory_mapping {
     uint64_aligned_t first_gfn; /* first page (hvm guest phys page) in range */
     uint64_aligned_t first_mfn; /* first page (machine page) in range */

@@ -525,10 +525,31 @@ long arch_do_domctl(
     }
     break;
 
+    case XEN_DOMCTL_test_assign_device:
+    {
+        u8 bus, devfn;
+
+        ret = -EINVAL;
+        if ( !vtd_enabled )
+            break;
+
+        bus = (domctl->u.test_assign_device.machine_bdf >> 16) & 0xff;
+        devfn = (domctl->u.test_assign_device.machine_bdf >> 8) & 0xff;
+
+        if ( device_assigned(bus, devfn) )
+        {
+            gdprintk(XENLOG_ERR, "XEN_DOMCTL_test_assign_device: "
+                     "%x:%x:%x already assigned\n",
+                     bus, PCI_SLOT(devfn), PCI_FUNC(devfn));
+            break;
+        }
+        ret = 0;
+    }
+    break;
+
     case XEN_DOMCTL_assign_device:
     {
         struct domain *d;
-        struct hvm_iommu *hd;
         u8 bus, devfn;
 
         ret = -EINVAL;
@@ -541,7 +562,6 @@ long arch_do_domctl(
                 "XEN_DOMCTL_assign_device: get_domain_by_id() failed\n");
             break;
         }
-        hd = domain_hvm_iommu(d);
         bus = (domctl->u.assign_device.machine_bdf >> 16) & 0xff;
         devfn = (domctl->u.assign_device.machine_bdf >> 8) & 0xff;
 
@@ -549,7 +569,7 @@ long arch_do_domctl(
         {
             gdprintk(XENLOG_ERR, "XEN_DOMCTL_assign_device: "
                      "%x:%x:%x already assigned\n",
-                     bus, PCI_SLOT(devfn), PCI_FUNC(devfn)); 
+                     bus, PCI_SLOT(devfn), PCI_FUNC(devfn));
             break;
         }
 
