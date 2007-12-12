@@ -283,6 +283,19 @@ ia64_do_tlb_purge:
 	;;
 	srlz.d
 	;;
+#ifdef XEN
+	/* xen heap is identity mapped */
+	mov r19=ip
+	;; 
+	dep r17=0,r19,0,KERNEL_TR_PAGE_SHIFT
+	;; 
+	dep r17=-1,r17,60,4
+	;; 
+	ptr.d r17,r18
+	;;
+	srlz.d
+	;; 
+#endif
 	// 2. Purge DTR for PERCPU data.
 	movl r16=PERCPU_ADDR
 	mov r18=PERCPU_PAGE_SHIFT<<2
@@ -418,6 +431,18 @@ ia64_reload_tr:
 	srlz.i
 	srlz.d
 	;;
+#ifdef XEN
+	/* xen heap is identity mapped */
+	mov r16=IA64_TR_XEN_HEAP_REGS  
+	dep r17=-1,r17,60,4
+	;; 
+	mov cr.ifa=r17
+	;;
+	itr.d dtr[r16]=r18
+	;;
+	srlz.d
+	;; 
+#endif
 	// 2. Reload DTR register for PERCPU data.
 	GET_THIS_PADDR(r2, ia64_mca_per_cpu_pte)
 	;;
