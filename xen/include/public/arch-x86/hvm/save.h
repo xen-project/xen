@@ -405,9 +405,26 @@ struct hvm_hw_pmtimer {
 
 DECLARE_HVM_SAVE_TYPE(PMTIMER, 13, struct hvm_hw_pmtimer);
 
+/*
+ * MTRR MSRs
+ */
+
+struct hvm_hw_mtrr {
+#define MTRR_VCNT 8
+#define NUM_FIXED_MSR 11
+    uint64_t msr_pat_cr;
+    /* mtrr physbase & physmask msr pair*/
+    uint64_t msr_mtrr_var[MTRR_VCNT*2];
+    uint64_t msr_mtrr_fixed[NUM_FIXED_MSR];
+    uint64_t msr_mtrr_cap;
+    uint64_t msr_mtrr_def_type;
+};
+
+DECLARE_HVM_SAVE_TYPE(MTRR, 14, struct hvm_hw_mtrr);
+
 /* 
  * Largest type-code in use
  */
-#define HVM_SAVE_CODE_MAX 13
+#define HVM_SAVE_CODE_MAX 14
 
 #endif /* __XEN_PUBLIC_HVM_SAVE_X86_H__ */

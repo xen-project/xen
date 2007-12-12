@@ -769,3 +769,83 @@ int32_t hvm_set_mem_pinned_cacheattr(
 
     return 0;
 }
+
+static int hvm_save_mtrr_msr(struct domain *d, hvm_domain_context_t *h)
+{
+    int i;
+    struct vcpu *v;
+    struct hvm_hw_mtrr hw_mtrr;
+    struct mtrr_state *mtrr_state;
+    /* save mtrr&pat */
+    for_each_vcpu(d, v)
+    {
+        mtrr_state = &v->arch.hvm_vcpu.mtrr;
+
+        hw_mtrr.msr_pat_cr = v->arch.hvm_vcpu.pat_cr;
+
+        hw_mtrr.msr_mtrr_def_type = mtrr_state->def_type
+                                | (mtrr_state->enabled << 10);
+        hw_mtrr.msr_mtrr_cap = mtrr_state->mtrr_cap;
+
+        for ( i = 0; i < MTRR_VCNT; i++ )
+        {
+            /* save physbase */
+            hw_mtrr.msr_mtrr_var[i*2] =
+                ((uint64_t*)mtrr_state->var_ranges)[i*2];
+            /* save physmask */
+            hw_mtrr.msr_mtrr_var[i*2+1] =
+                ((uint64_t*)mtrr_state->var_ranges)[i*2+1];
+        }
+
+        for ( i = 0; i < NUM_FIXED_MSR; i++ )
+            hw_mtrr.msr_mtrr_fixed[i] =
+                ((uint64_t*)mtrr_state->fixed_ranges)[i];
+
+        if ( hvm_save_entry(MTRR, v->vcpu_id, h, &hw_mtrr) != 0 )
+            return 1;
+    }
+    return 0;
+}
+
+static int hvm_load_mtrr_msr(struct domain *d, hvm_domain_context_t *h)
+{
+    int vcpuid, i;
+    struct vcpu *v;
+    struct mtrr_state *mtrr_state;
+    struct hvm_hw_mtrr hw_mtrr;
+
+    vcpuid = hvm_load_instance(h);
+    if ( vcpuid > MAX_VIRT_CPUS || (v = d->vcpu[vcpuid]) == NULL )
+    {
+        gdprintk(XENLOG_ERR, "HVM restore: domain has no vcpu %u\n", vcpuid);
+        return -EINVAL;
+    }
+
+    if ( hvm_load_entry(MTRR, h, &hw_mtrr) != 0 )
+        return -EINVAL;
+
+    mtrr_state = &v->arch.hvm_vcpu.mtrr;
+
+    pat_msr_set(&v->arch.hvm_vcpu.pat_cr, hw_mtrr.msr_pat_cr);
+
+    mtrr_state->mtrr_cap = hw_mtrr.msr_mtrr_cap;
+
+    for ( i = 0; i < NUM_FIXED_MSR; i++ )
+        mtrr_fix_range_msr_set(mtrr_state, i, hw_mtrr.msr_mtrr_fixed[i]);
+
+    for ( i = 0; i < MTRR_VCNT; i++ )
+    {
+        mtrr_var_range_msr_set(mtrr_state,
+                MTRRphysBase_MSR(i), hw_mtrr.msr_mtrr_var[i*2]);
+        mtrr_var_range_msr_set(mtrr_state,
+                MTRRphysMask_MSR(i), hw_mtrr.msr_mtrr_var[i*2+1]);
+    }
+
+    mtrr_def_type_msr_set(mtrr_state, hw_mtrr.msr_mtrr_def_type);
+
+    v->arch.hvm_vcpu.mtrr.is_initialized = 1;
+    return 0;
+}
+
+HVM_REGISTER_SAVE_RESTORE(MTRR, hvm_save_mtrr_msr, hvm_load_mtrr_msr,
+                          1, HVMSR_PER_VCPU);
