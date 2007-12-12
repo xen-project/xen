@@ -34,7 +34,6 @@
 #include <xen/xmalloc.h>
 #include <xen/inttypes.h>
 
-#define VTDPREFIX "[VT-D]"
 #define INTEL   0x8086
 #define SEABURG 0x4000
 #define C_STEP  2

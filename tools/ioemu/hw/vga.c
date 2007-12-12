@@ -1742,6 +1742,7 @@ static CPUWriteMemoryFunc *vga_mem_write[3] = {
 static void vga_save(QEMUFile *f, void *opaque)
 {
     VGAState *s = opaque;
+    uint32_t vram_size;
 #ifdef CONFIG_BOCHS_VBE
     int i;
 #endif
@@ -1783,17 +1784,21 @@ static void vga_save(QEMUFile *f, void *opaque)
 #else
     qemu_put_byte(f, 0);
 #endif
+    vram_size = s->vram_size;
+    qemu_put_be32s(f, &vram_size); 
+    qemu_put_buffer(f, s->vram_ptr, s->vram_size); 
 }
 
 static int vga_load(QEMUFile *f, void *opaque, int version_id)
 {
     VGAState *s = opaque;
     int is_vbe, ret;
+    uint32_t vram_size;
 #ifdef CONFIG_BOCHS_VBE
     int i;
 #endif
 
-    if (version_id > 2)
+    if (version_id > 3)
         return -EINVAL;
 
     if (s->pci_dev && version_id >= 2) {
@@ -1839,6 +1844,13 @@ static int vga_load(QEMUFile *f, void *opaque, int version_id)
     if (is_vbe)
         return -EINVAL;
 #endif
+    if (version_id >= 3) {
+	/* people who restore old images may be lucky ... */
+	qemu_get_be32s(f, &vram_size);
+	if (vram_size != s->vram_size)
+	    return -EINVAL;
+	qemu_get_buffer(f, s->vram_ptr, s->vram_size); 
+    }
 
     /* force refresh */
     s->graphic_mode = -1;
@@ -2052,7 +2064,7 @@ static void vga_init(VGAState *s)
 {
     int vga_io_memory;
 
-    register_savevm("vga", 0, 2, vga_save, vga_load, s);
+    register_savevm("vga", 0, 3, vga_save, vga_load, s);
 
     register_ioport_write(0x3c0, 16, 1, vga_ioport_write, s);
 

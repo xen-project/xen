@@ -15,7 +15,6 @@
  * You should have received a copy of the GNU General Public License along with
  * this program; if not, write to the Free Software Foundation, Inc., 59 Temple
  * Place - Suite 330, Boston, MA 02111-1307 USA.
- *
  */
 
 #include <xen/time.h>
@@ -25,6 +24,46 @@
 
 #define mode_is(d, name) \
     ((d)->arch.hvm_domain.params[HVM_PARAM_TIMER_MODE] == HVMPTM_##name)
+
+static int pt_irq_vector(struct periodic_time *pt, enum hvm_intsrc src)
+{
+    struct vcpu *v = pt->vcpu;
+    unsigned int gsi, isa_irq;
+
+    if ( pt->source == PTSRC_lapic )
+        return pt->irq;
+
+    isa_irq = pt->irq;
+    gsi = hvm_isa_irq_to_gsi(isa_irq);
+
+    if ( src == hvm_intsrc_pic )
+        return (v->domain->arch.hvm_domain.vpic[isa_irq >> 3].irq_base
+                + (isa_irq & 7));
+
+    ASSERT(src == hvm_intsrc_lapic);
+    return domain_vioapic(v->domain)->redirtbl[gsi].fields.vector;
+}
+
+static int pt_irq_masked(struct periodic_time *pt)
+{
+    struct vcpu *v = pt->vcpu;
+    unsigned int gsi, isa_irq;
+    uint8_t pic_imr;
+
+    if ( pt->source == PTSRC_lapic )
+    {
+        struct vlapic *vlapic = vcpu_vlapic(v);
+        return (vlapic_enabled(vlapic) &&
+                !(vlapic_get_reg(vlapic, APIC_LVTT) & APIC_LVT_MASKED));
+    }
+
+    isa_irq = pt->irq;
+    gsi = hvm_isa_irq_to_gsi(isa_irq);
+    pic_imr = v->domain->arch.hvm_domain.vpic[isa_irq >> 3].imr;
+
+    return (((pic_imr & (1 << (isa_irq & 7))) || !vlapic_accept_pic_intr(v)) &&
+            domain_vioapic(v->domain)->redirtbl[gsi].fields.mask);
+}
 
 static void pt_lock(struct periodic_time *pt)
 {
@@ -144,29 +183,39 @@ static void pt_timer_fn(void *data)
 void pt_update_irq(struct vcpu *v)
 {
     struct list_head *head = &v->arch.hvm_vcpu.tm_list;
-    struct periodic_time *pt;
+    struct periodic_time *pt, *earliest_pt = NULL;
     uint64_t max_lag = -1ULL;
-    int irq = -1;
+    int irq, is_lapic;
 
     spin_lock(&v->arch.hvm_vcpu.tm_lock);
 
     list_for_each_entry ( pt, head, list )
     {
-        if ( !is_isa_irq_masked(v, pt->irq) && pt->pending_intr_nr &&
+        if ( !pt_irq_masked(pt) && pt->pending_intr_nr &&
              ((pt->last_plt_gtime + pt->period_cycles) < max_lag) )
         {
             max_lag = pt->last_plt_gtime + pt->period_cycles;
-            irq = pt->irq;
+            earliest_pt = pt;
         }
     }
 
+    if ( earliest_pt == NULL )
+    {
+        spin_unlock(&v->arch.hvm_vcpu.tm_lock);
+        return;
+    }
+
+    earliest_pt->irq_issued = 1;
+    irq = earliest_pt->irq;
+    is_lapic = (earliest_pt->source == PTSRC_lapic);
+
     spin_unlock(&v->arch.hvm_vcpu.tm_lock);
 
-    if ( is_lvtt(v, irq) )
+    if ( is_lapic )
     {
         vlapic_set_irq(vcpu_vlapic(v), irq, 0);
     }
-    else if ( irq >= 0 )
+    else
     {
         hvm_isa_irq_deassert(v->domain, irq);
         hvm_isa_irq_assert(v->domain, irq);
@@ -178,29 +227,12 @@ static struct periodic_time *is_pt_irq(
 {
     struct list_head *head = &v->arch.hvm_vcpu.tm_list;
     struct periodic_time *pt;
-    struct RTCState *rtc = &v->domain->arch.hvm_domain.pl_time.vrtc;
-    int vector;
 
     list_for_each_entry ( pt, head, list )
     {
-        if ( !pt->pending_intr_nr )
-            continue;
-
-        if ( is_lvtt(v, pt->irq) )
-        {
-            if ( pt->irq != intack.vector )
-                continue;
+        if ( pt->pending_intr_nr && pt->irq_issued &&
+             (intack.vector == pt_irq_vector(pt, intack.source)) )
             return pt;
-        }
-
-        vector = get_isa_irq_vector(v, pt->irq, intack.source);
-
-        /* RTC irq need special care */
-        if ( (intack.vector != vector) ||
-             ((pt->irq == 8) && !is_rtc_periodic_irq(rtc)) )
-            continue;
-
-        return pt;
     }
 
     return NULL;
@@ -222,11 +254,13 @@ void pt_intr_post(struct vcpu *v, struct hvm_intack intack)
     }
 
     pt->do_not_freeze = 0;
+    pt->irq_issued = 0;
 
     if ( pt->one_shot )
     {
-        pt->enabled = 0;
-        list_del(&pt->list);
+        if ( pt->on_list )
+            list_del(&pt->list);
+        pt->on_list = 0;
     }
     else
     {
@@ -290,13 +324,15 @@ void create_periodic_time(
     struct vcpu *v, struct periodic_time *pt, uint64_t period,
     uint8_t irq, char one_shot, time_cb *cb, void *data)
 {
+    ASSERT(pt->source != 0);
+
     destroy_periodic_time(pt);
 
     spin_lock(&v->arch.hvm_vcpu.tm_lock);
 
-    pt->enabled = 1;
     pt->pending_intr_nr = 0;
     pt->do_not_freeze = 0;
+    pt->irq_issued = 0;
 
     /* Periodic timer must be at least 0.9ms. */
     if ( (period < 900000) && !one_shot )
@@ -319,11 +355,12 @@ void create_periodic_time(
      * LAPIC ticks for process accounting can see long sequences of process
      * ticks incorrectly accounted to interrupt processing.
      */
-    if ( is_lvtt(v, irq) )
+    if ( pt->source == PTSRC_lapic )
         pt->scheduled += period >> 1;
     pt->cb = cb;
     pt->priv = data;
 
+    pt->on_list = 1;
     list_add(&pt->list, &v->arch.hvm_vcpu.tm_list);
 
     init_timer(&pt->timer, pt_timer_fn, pt, v->processor);
@@ -334,12 +371,14 @@ void create_periodic_time(
 
 void destroy_periodic_time(struct periodic_time *pt)
 {
-    if ( !pt->enabled )
+    /* Was this structure previously initialised by create_periodic_time()? */
+    if ( pt->vcpu == NULL )
         return;
 
     pt_lock(pt);
-    pt->enabled = 0;
-    list_del(&pt->list);
+    if ( pt->on_list )
+        list_del(&pt->list);
+    pt->on_list = 0;
     pt_unlock(pt);
 
     /*

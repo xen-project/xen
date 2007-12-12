@@ -26,40 +26,6 @@ from xen.xm.main import server
 from xen.util import xsconstants
 from xen.util.acmpolicy import ACMPolicy
 
-DOM0_UUID = "00000000-0000-0000-0000-000000000000"
-
-DEFAULT_policy_template = \
-"<?xml version=\"1.0\" ?>" +\
-"<SecurityPolicyDefinition xmlns=\"http://www.ibm.com\" xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\" xsi:schemaLocation=\"http://www.ibm.com ../../security_policy.xsd\">" +\
-"  <PolicyHeader>" +\
-"    <PolicyName>DEFAULT</PolicyName>" +\
-"    <Version>1.0</Version>" +\
-"  </PolicyHeader>" +\
-"  <SimpleTypeEnforcement>" +\
-"    <SimpleTypeEnforcementTypes>" +\
-"      <Type>SystemManagement</Type>" +\
-"    </SimpleTypeEnforcementTypes>" +\
-"  </SimpleTypeEnforcement>" +\
-"  <ChineseWall>" +\
-"    <ChineseWallTypes>" +\
-"      <Type>SystemManagement</Type>" +\
-"    </ChineseWallTypes>" +\
-"  </ChineseWall>" +\
-"  <SecurityLabelTemplate>" +\
-"    <SubjectLabels bootstrap=\"SystemManagement\">" +\
-"      <VirtualMachineLabel>" +\
-"        <Name%s>SystemManagement</Name>" +\
-"        <SimpleTypeEnforcementTypes>" +\
-"          <Type>SystemManagement</Type>" +\
-"        </SimpleTypeEnforcementTypes>" +\
-"        <ChineseWallTypes>" +\
-"          <Type/>" +\
-"        </ChineseWallTypes>" +\
-"      </VirtualMachineLabel>" +\
-"    </SubjectLabels>" +\
-"  </SecurityLabelTemplate>" +\
-"</SecurityPolicyDefinition>"
-
 
 def help():
     return """
@@ -69,16 +35,6 @@ def help():
     since otherwise this operation will fail.
     """
 
-def get_reset_policy_xml(dom0_seclab):
-    if dom0_seclab == "":
-        return DEFAULT_policy_template % ""
-    else:
-        poltyp, policy, label = dom0_seclab.split(":")
-        if label != "SystemManagement":
-            return DEFAULT_policy_template % \
-                   (" from=\"%s\"" % label)
-        else:
-            return DEFAULT_policy_template % ""
 
 def resetpolicy():
     msg = None
@@ -99,13 +55,8 @@ def resetpolicy():
            not acmpol.is_default_policy():
             msg = "Old policy not found in bootloader file."
 
-        seclab = server.xenapi.VM.get_security_label(DOM0_UUID)
-        xml = get_reset_policy_xml(seclab)
         try:
-            policystate = server.xenapi.XSPolicy.set_xspolicy(xs_type,
-                                                              xml,
-                                                              flags,
-                                                              True)
+            policystate = server.xenapi.XSPolicy.reset_xspolicy(xs_type)
         except Exception, e:
             raise security.XSMError("An error occurred resetting the "
                                     "policy: %s" % str(e))
@@ -130,14 +81,7 @@ def resetpolicy():
            not acmpol.is_default_policy():
             msg = "Old policy not found in bootloader file."
 
-        seclab = server.xend.security.get_domain_label(0)
-        if seclab[0] == '\'':
-            seclab =  seclab[1:]
-        xml = get_reset_policy_xml(seclab)
-        rc, errors = server.xend.security.set_policy(xs_type,
-                                                     xml,
-                                                     flags,
-                                                     True)
+        rc, errors = server.xend.security.reset_policy()
         if rc != xsconstants.XSERR_SUCCESS:
             raise security.XSMError("Could not reset the system's policy. "
                                     "Try to halt all guests.")

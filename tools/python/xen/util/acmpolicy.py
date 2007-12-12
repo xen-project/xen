@@ -86,7 +86,7 @@ DEFAULT_policy = \
 "  <SecurityLabelTemplate>\n" +\
 "    <SubjectLabels bootstrap=\"SystemManagement\">\n" +\
 "      <VirtualMachineLabel>\n" +\
-"        <Name>SystemManagement</Name>\n" +\
+"        <Name%s>SystemManagement</Name>\n" +\
 "        <SimpleTypeEnforcementTypes>\n" +\
 "          <Type>SystemManagement</Type>\n" +\
 "        </SimpleTypeEnforcementTypes>\n" +\
@@ -99,8 +99,11 @@ DEFAULT_policy = \
 "</SecurityPolicyDefinition>\n"
 
 
-def get_DEFAULT_policy():
-    return DEFAULT_policy
+def get_DEFAULT_policy(dom0label=""):
+    fromnode = ""
+    if dom0label != "":
+        fromnode = " from=\"%s\"" % dom0label
+    return DEFAULT_policy % fromnode
 
 def initialize():
     xoptions = XendOptions.instance()
@@ -374,6 +377,12 @@ class ACMPolicy(XSPolicy):
         return rc, errors, acmpol_new
 
     force_default_policy = classmethod(force_default_policy)
+
+    def get_reset_policy_xml(klass):
+        dom0_label = security.get_ssid(0)[1]
+        return get_DEFAULT_policy(dom0_label)
+
+    get_reset_policy_xml = classmethod(get_reset_policy_xml)
 
     def __do_update_version_check(self, acmpol_new):
         acmpol_old = self

@@ -43,6 +43,7 @@
 #include <xen/smp.h>
 #include <xen/console.h>
 #include <xen/errno.h>
+#include <asm/byteorder.h>
 
 /* Printk isn't particularly safe just after we've trapped to the
    debugger. so avoid it. */
@@ -215,8 +216,7 @@ void
 gdb_write_to_packet_hex(unsigned long x, int int_size, struct gdb_context *ctx)
 {
     char buf[sizeof(unsigned long) * 2 + 1];
-    int i = sizeof(unsigned long) * 2;
-    int width = int_size * 2;
+    int i, width = int_size * 2;
 
     buf[sizeof(unsigned long) * 2] = 0;
 
@@ -233,6 +233,8 @@ gdb_write_to_packet_hex(unsigned long x, int int_size, struct gdb_context *ctx)
         break;
     }
 
+#ifdef __BIG_ENDIAN
+	i = sizeof(unsigned long) * 2
     do {
         buf[--i] = hex2char(x & 15);
         x >>= 4;
@@ -242,6 +244,17 @@ gdb_write_to_packet_hex(unsigned long x, int int_size, struct gdb_context *ctx)
         buf[--i] = '0';
 
     gdb_write_to_packet(&buf[i], width, ctx);
+#elif defined(__LITTLE_ENDIAN)
+	i = 0;
+	while (i < width) {
+		buf[i++] = hex2char(x>>4);
+		buf[i++] = hex2char(x);
+		x >>= 8;
+	}
+	gdb_write_to_packet(buf, width, ctx);
+#else
+# error unknown endian
+#endif
 }
 
 static int
@@ -512,7 +525,7 @@ __trap_to_gdb(struct cpu_user_regs *regs, unsigned long cookie)
 
     if ( gdb_ctx->serhnd < 0 )
     {
-        dbg_printk("Debugger not ready yet.\n");
+        printk("Debugging connection not set up.\n");
         return -EBUSY;
     }
 

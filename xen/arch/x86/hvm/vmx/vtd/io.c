@@ -131,7 +131,7 @@ int pt_irq_create_bind_vtd(
         pirq_guest_bind(d->vcpu[0], machine_gsi, BIND_PIRQ__WILL_SHARE);
     }
 
-    gdprintk(XENLOG_INFO,
+    gdprintk(XENLOG_INFO VTDPREFIX,
              "VT-d irq bind: m_irq = %x device = %x intx = %x\n",
              machine_gsi, device, intx);
     return 0;
@@ -187,7 +187,7 @@ static void hvm_dpci_isairq_eoi(struct domain *d, unsigned int isairq)
                 if ( --dpci->mirq[i].pending == 0 )
                 {
                     spin_unlock(&dpci->dirq_lock);
-                    gdprintk(XENLOG_INFO,
+                    gdprintk(XENLOG_INFO VTDPREFIX,
                              "hvm_dpci_isairq_eoi:: mirq = %x\n", i);
                     stop_timer(&dpci->hvm_timer[irq_to_vector(i)]);
                     pirq_guest_eoi(d, i);
@@ -226,7 +226,8 @@ void hvm_dpci_eoi(struct domain *d, unsigned int guest_gsi,
     {
         spin_unlock(&hvm_irq_dpci->dirq_lock);
 
-        gdprintk(XENLOG_INFO, "hvm_dpci_eoi:: mirq = %x\n", machine_gsi);
+        gdprintk(XENLOG_INFO VTDPREFIX,
+                 "hvm_dpci_eoi:: mirq = %x\n", machine_gsi);
         stop_timer(&hvm_irq_dpci->hvm_timer[irq_to_vector(machine_gsi)]);
         if ( (ent == NULL) || !ent->fields.mask )
             pirq_guest_eoi(d, machine_gsi);

@@ -347,30 +347,6 @@ struct hvm_intack hvm_vcpu_ack_pending_irq(
     return intack;
 }
 
-int get_isa_irq_vector(struct vcpu *v, int isa_irq, enum hvm_intsrc src)
-{
-    unsigned int gsi = hvm_isa_irq_to_gsi(isa_irq);
-
-    if ( src == hvm_intsrc_pic )
-        return (v->domain->arch.hvm_domain.vpic[isa_irq >> 3].irq_base
-                + (isa_irq & 7));
-
-    ASSERT(src == hvm_intsrc_lapic);
-    return domain_vioapic(v->domain)->redirtbl[gsi].fields.vector;
-}
-
-int is_isa_irq_masked(struct vcpu *v, int isa_irq)
-{
-    unsigned int gsi = hvm_isa_irq_to_gsi(isa_irq);
-
-    if ( is_lvtt(v, isa_irq) )
-        return !is_lvtt_enabled(v);
-
-    return ((v->domain->arch.hvm_domain.vpic[isa_irq >> 3].imr &
-             (1 << (isa_irq & 7))) &&
-            domain_vioapic(v->domain)->redirtbl[gsi].fields.mask);
-}
-
 int hvm_local_events_need_delivery(struct vcpu *v)
 {
     struct hvm_intack intack;

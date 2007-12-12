@@ -68,9 +68,6 @@ static unsigned int vlapic_lvt_mask[VLAPIC_LVT_NUM] =
 #define APIC_DEST_NOSHORT                0x0
 #define APIC_DEST_MASK                   0x800
 
-#define vlapic_lvt_enabled(vlapic, lvt_type)                    \
-    (!(vlapic_get_reg(vlapic, lvt_type) & APIC_LVT_MASKED))
-
 #define vlapic_lvt_vector(vlapic, lvt_type)                     \
     (vlapic_get_reg(vlapic, lvt_type) & APIC_VECTOR_MASK)
 
@@ -932,6 +929,8 @@ int vlapic_init(struct vcpu *v)
 
     HVM_DBG_LOG(DBG_LEVEL_VLAPIC, "%d", v->vcpu_id);
 
+    vlapic->pt.source = PTSRC_lapic;
+
 #ifdef __i386__
     /* 32-bit VMX may be limited to 32-bit physical addresses. */
     if ( boot_cpu_data.x86_vendor == X86_VENDOR_INTEL )
@@ -973,19 +972,4 @@ void vlapic_destroy(struct vcpu *v)
     destroy_periodic_time(&vlapic->pt);
     unmap_domain_page_global(vlapic->regs);
     free_domheap_page(vlapic->regs_page);
-}
-
-int is_lvtt(struct vcpu *v, int vector)
-{
-    return vcpu_vlapic(v)->pt.enabled &&
-           vector == vlapic_lvt_vector(vcpu_vlapic(v), APIC_LVTT);
-}
-
-int is_lvtt_enabled(struct vcpu *v)
-{
-    if ( unlikely(!vlapic_enabled(vcpu_vlapic(v))) ||
-            !vlapic_lvt_enabled(vcpu_vlapic(v), APIC_LVTT)) 
-        return 0;
-
-    return 1;
 }

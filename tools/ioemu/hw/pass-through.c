@@ -327,6 +327,7 @@ struct pt_dev * register_real_device(PCIBus *e_bus,
     struct pt_dev *assigned_device = NULL;
     struct pci_dev *pci_dev;
     uint8_t e_device, e_intx;
+    struct pci_config_cf8 machine_bdf;
 
     PT_LOG("Assigning real physical device %02x:%02x.%x ...\n",
         r_bus, r_dev, r_func);
@@ -360,13 +361,22 @@ struct pt_dev * register_real_device(PCIBus *e_bus,
     /* Issue PCIe FLR */
     pdev_flr(pci_dev);
 
+    /* Assign device */
+    machine_bdf.reg = 0;
+    machine_bdf.bus = r_bus;
+    machine_bdf.dev = r_dev;
+    machine_bdf.func = r_func;
+    rc = xc_assign_device(xc_handle, domid, machine_bdf.value);
+    if ( rc < 0 )
+        PT_LOG("Error: xc_assign_device error %d\n", rc);
+
     /* Initialize virtualized PCI configuration (Extended 256 Bytes) */
     for ( i = 0; i < PCI_CONFIG_SIZE; i++ )
         assigned_device->dev.config[i] = pci_read_byte(pci_dev, i);
 
     /* Handle real device's MMIO/PIO BARs */
     pt_register_regions(assigned_device);
-    
+
     /* Bind interrupt */
     e_device = (assigned_device->dev.devfn >> 3) & 0x1f;
     e_intx = assigned_device->dev.config[0x3d]-1;

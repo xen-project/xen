@@ -912,6 +912,14 @@ static int __spurious_page_fault(
     l1_pgentry_t l1e, *l1t;
     unsigned int required_flags, disallowed_flags;
 
+    /*
+     * We do not take spurious page faults in IRQ handlers as we do not
+     * modify page tables in IRQ context. We therefore bail here because
+     * map_domain_page() is not IRQ-safe.
+     */
+    if ( in_irq() )
+        return 0;
+
     /* Reserved bit violations are never spurious faults. */
     if ( regs->error_code & PFEC_reserved_bit )
         return 0;

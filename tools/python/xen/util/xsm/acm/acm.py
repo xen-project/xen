@@ -86,6 +86,7 @@ xmlrpc_exports = [
   'list_labels',
   'get_labeled_resources',
   'set_policy',
+  'reset_policy',
   'get_policy',
   'activate_policy',
   'rm_bootpolicy',
@@ -562,6 +563,20 @@ def set_policy(xs_type, xml, flags, overwrite):
              xspoladmin.add_acmpolicy_to_system(xml,
                                                 int(flags),
                                                 True)
+        return rc, base64.b64encode(errors)
+    except Exception, e:
+        err(str(e))
+
+
+def reset_policy():
+    """
+       Xend exports this function via XML-RPC
+    """
+    from xen.xend import XendXSPolicyAdmin
+    xspoladmin = XendXSPolicyAdmin.XSPolicyAdminInstance()
+    try:
+        acmpol, rc, errors = \
+             xspoladmin.reset_acmpolicy()
         return rc, base64.b64encode(errors)
     except Exception, e:
         err(str(e))

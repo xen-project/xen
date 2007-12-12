@@ -47,6 +47,7 @@ struct mtrr_var_range {
 };
 
 #define NUM_FIXED_RANGES 88
+#define NUM_FIXED_MSR 11
 struct mtrr_state {
 	struct mtrr_var_range *var_ranges;
 	mtrr_type fixed_ranges[NUM_FIXED_RANGES];

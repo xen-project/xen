@@ -613,13 +613,19 @@ class XendDomain:
                 if dom.getName() == DOM0_NAME:
                     continue
                 
-                if dom._stateGet() == DOM_STATE_RUNNING:
-                    shutdownAction = dom.info.get('on_xend_stop', 'ignore')
-                    if shutdownAction == 'shutdown':
-                        log.debug('Shutting down domain: %s' % dom.getName())
-                        dom.shutdown("poweroff")
-                    elif shutdownAction == 'suspend':
-                        self.domain_suspend(dom.getName())
+                try:
+                    if dom._stateGet() == DOM_STATE_RUNNING:
+                        shutdownAction = dom.info.get('on_xend_stop', 'ignore')
+                        if shutdownAction == 'shutdown':
+                            log.debug('Shutting down domain: %s' % dom.getName())
+                            dom.shutdown("poweroff")
+                        elif shutdownAction == 'suspend':
+                            self.domain_suspend(dom.getName())
+                        else:
+                            log.debug('Domain %s continues to run.' % dom.getName())
+                except:
+                    log.exception('Domain %s failed to %s.' % \
+                                  (dom.getName(), shutdownAction))
         finally:
             self.domains_lock.release()
 

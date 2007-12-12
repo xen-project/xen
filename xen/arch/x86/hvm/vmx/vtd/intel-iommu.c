@@ -37,7 +37,6 @@
 
 #define domain_iommu_domid(d) ((d)->arch.hvm_domain.hvm_iommu.iommu_domid)
 
-#define VTDPREFIX
 extern void print_iommu_regs(struct acpi_drhd_unit *drhd);
 extern void print_vtd_entries(struct domain *d, int bus, int devfn,
                               unsigned long gmfn);
@@ -954,7 +953,7 @@ struct iommu *iommu_alloc(void *hw_data)
 
     set_fixmap_nocache(FIX_IOMMU_REGS_BASE_0 + nr_iommus, drhd->address);
     iommu->reg = (void *) fix_to_virt(FIX_IOMMU_REGS_BASE_0 + nr_iommus);
-    dprintk(XENLOG_ERR VTDPREFIX,
+    dprintk(XENLOG_INFO VTDPREFIX,
             "iommu_alloc: iommu->reg = %p drhd->address = %lx\n",
             iommu->reg, drhd->address);
     nr_iommus++;
@@ -1058,7 +1057,7 @@ static int domain_context_mapping_one(
 
     if ( context_present(*context) )
     {
-        gdprintk(XENLOG_INFO VTDPREFIX,
+        gdprintk(XENLOG_WARNING VTDPREFIX,
                  "domain_context_mapping_one:context present:bdf=%x:%x:%x\n",
                  bus, PCI_SLOT(devfn), PCI_FUNC(devfn));
         return 0;
@@ -1097,7 +1096,7 @@ static int domain_context_mapping_one(
     iommu_flush_cache_entry(iommu, context);
 
     gdprintk(XENLOG_INFO VTDPREFIX,
-             "context_mapping_one-%x:%x:%x-*context=%"PRIx64":%"PRIx64
+             "domain_context_mapping_one-%x:%x:%x-*context=%"PRIx64":%"PRIx64
              " hd->pgd=%p\n",
              bus, PCI_SLOT(devfn), PCI_FUNC(devfn),
              context->hi, context->lo, hd->pgd);
@@ -1198,14 +1197,11 @@ static int domain_context_mapping(
             PCI_FUNC(pdev->devfn), PCI_SUBORDINATE_BUS);
 
         if ( sec_bus != sub_bus )
-        {
-            dprintk(XENLOG_INFO VTDPREFIX,
-                    "context_mapping: nested PCI bridge not supported\n");
-            dprintk(XENLOG_INFO VTDPREFIX,
-                    "    bdf = %x:%x:%x sec_bus = %x sub_bus = %x\n",
-                    pdev->bus, PCI_SLOT(pdev->devfn), PCI_FUNC(pdev->devfn),
-                    sec_bus, sub_bus);
-        }
+            gdprintk(XENLOG_WARNING VTDPREFIX,
+                     "context_context_mapping: nested PCI bridge not "
+                     "supported: bdf = %x:%x:%x sec_bus = %x sub_bus = %x\n",
+                     pdev->bus, PCI_SLOT(pdev->devfn), PCI_FUNC(pdev->devfn),
+                     sec_bus, sub_bus);
         break;
     case DEV_TYPE_PCIe_ENDPOINT:
         gdprintk(XENLOG_INFO VTDPREFIX,
@@ -1227,7 +1223,7 @@ static int domain_context_mapping(
             if ( bus2bridge[pdev->bus].bus != 0 )
                 gdprintk(XENLOG_WARNING VTDPREFIX,
                          "domain_context_mapping:bus2bridge"
-                         "[pdev->bus].bus != 0\n");
+                         "[%d].bus != 0\n", pdev->bus);
 
             ret = domain_context_mapping_one(
                 domain, iommu,
@@ -1345,8 +1341,8 @@ static int domain_context_unmap(
         {
             if ( bus2bridge[pdev->bus].bus != 0 )
                 gdprintk(XENLOG_WARNING VTDPREFIX,
-                         "domain_context_mapping:"
-                         "bus2bridge[pdev->bus].bus != 0\n");
+                         "domain_context_unmap:"
+                         "bus2bridge[%d].bus != 0\n", pdev->bus);
 
             ret = domain_context_unmap_one(domain, iommu,
                                            (u8)(bus2bridge[pdev->bus].bus),

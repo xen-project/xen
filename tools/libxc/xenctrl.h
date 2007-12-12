@@ -914,6 +914,10 @@ int xc_assign_device(int xc_handle,
                      uint32_t domid,
                      uint32_t machine_bdf);
 
+int xc_test_assign_device(int xc_handle,
+                          uint32_t domid,
+                          uint32_t machine_bdf);
+
 int xc_domain_memory_mapping(int xc_handle,
                              uint32_t domid,
                              unsigned long first_gfn,

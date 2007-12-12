@@ -14735,6 +14735,45 @@ xs\_policystate
 State information about the policy. In case an error occurred, the 'xs\_err'
 field contains the error code. The 'errors' may contain further information
 about the error.
+ \vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~reset\_xspolicy}
+
+{\bf Overview:}
+Attempt to reset the system's policy by installing the default policy.
+Since this function is implemented as an update to the current policy, it
+underlies the same restrictions. This function may fail if for example
+other domains than Domain-0 are running and use a different label than
+Domain-0
+
+\noindent {\bf Signature:}
+\begin{verbatim} xs_policystate reset_xspolicy (session_id s, xs_type type)
+\end{verbatim}
+
+\noindent{\bf Arguments:}
+
+\vspace{0.3cm}
+
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt xs\_type } & type & the type of policy \\ \hline
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+
+ \noindent {\bf Return Type:}
+{\tt
+xs\_policystate
+}
+
+
+State information about the policy. In case an error occurred, the 'xs\_err'
+field contains the error code. The 'errors' may contain further information
+about the error.
 \vspace{0.3cm}
 \vspace{0.3cm}
 \vspace{0.3cm}

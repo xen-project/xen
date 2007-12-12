@@ -160,7 +160,4 @@ struct hvm_intack hvm_vcpu_has_pending_irq(struct vcpu *v);
 struct hvm_intack hvm_vcpu_ack_pending_irq(struct vcpu *v,
                                            struct hvm_intack intack);
 
-int get_isa_irq_vector(struct vcpu *vcpu, int irq, enum hvm_intsrc src);
-int is_isa_irq_masked(struct vcpu *v, int isa_irq);
-
 #endif /* __ASM_X86_HVM_IRQ_H__ */

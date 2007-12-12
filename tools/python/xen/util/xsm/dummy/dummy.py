@@ -21,6 +21,7 @@ xmlrpc_exports = [
   'list_labels',
   'get_labeled_resources',
   'set_policy',
+  'reset_policy',
   'get_policy',
   'activate_policy',
   'rm_bootpolicy',
@@ -100,6 +101,9 @@ def get_labeled_resources():
     return {}
 
 def set_policy(xs_type, xml, flags, overwrite):
+    err("Command not supported under xsm 'dummy' module.")
+
+def reset_policy():
     err("Command not supported under xsm 'dummy' module.")
 
 def get_policy():
