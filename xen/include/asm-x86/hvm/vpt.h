@@ -72,12 +72,12 @@ typedef void time_cb(struct vcpu *v, void *opaque);
 
 struct periodic_time {
     struct list_head list;
-    char enabled;
-    char one_shot;              /* one shot time */
-    char do_not_freeze;
+    bool_t on_list;
+    bool_t one_shot;
+    bool_t do_not_freeze;
     u8 irq;
     struct vcpu *vcpu;          /* vcpu timer interrupt delivers to */
-    u32 pending_intr_nr;        /* the couner for pending timer interrupts */
+    u32 pending_intr_nr;        /* pending timer interrupts */
     u64 period;                 /* frequency in ns */
     u64 period_cycles;          /* frequency in cpu cycles */
     s_time_t scheduled;         /* scheduled timer interrupt */
@@ -140,6 +140,17 @@ void pt_update_irq(struct vcpu *v);
 void pt_intr_post(struct vcpu *v, struct hvm_intack intack);
 void pt_reset(struct vcpu *v);
 void pt_migrate(struct vcpu *v);
+
+/* Is given periodic timer active? */
+#define pt_active(pt) ((pt)->on_list)
+
+/*
+ * Create/destroy a periodic (or one-shot!) timer.
+ * The given periodic timer structure must be initialised with zero bytes or
+ * have been initialised by a previous invocation of create_periodic_time().
+ * Note that, for a given periodic timer, invocations of these functions MUST
+ * be serialised.
+ */
 void create_periodic_time(
     struct vcpu *v, struct periodic_time *pt, uint64_t period,
     uint8_t irq, char one_shot, time_cb *cb, void *data);

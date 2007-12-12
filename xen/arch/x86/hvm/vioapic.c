@@ -300,7 +300,7 @@ static uint32_t ioapic_get_delivery_bitmask(
 static inline int pit_channel0_enabled(void)
 {
     PITState *pit = &current->domain->arch.hvm_domain.pl_time.vpit;
-    return pit->pt0.enabled;
+    return pt_active(&pit->pt0);
 }
 
 static void vioapic_deliver(struct hvm_hw_vioapic *vioapic, int irq)

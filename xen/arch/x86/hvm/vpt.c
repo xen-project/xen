@@ -225,8 +225,9 @@ void pt_intr_post(struct vcpu *v, struct hvm_intack intack)
 
     if ( pt->one_shot )
     {
-        pt->enabled = 0;
-        list_del(&pt->list);
+        if ( pt->on_list )
+            list_del(&pt->list);
+        pt->on_list = 0;
     }
     else
     {
@@ -294,7 +295,6 @@ void create_periodic_time(
 
     spin_lock(&v->arch.hvm_vcpu.tm_lock);
 
-    pt->enabled = 1;
     pt->pending_intr_nr = 0;
     pt->do_not_freeze = 0;
 
@@ -324,6 +324,7 @@ void create_periodic_time(
     pt->cb = cb;
     pt->priv = data;
 
+    pt->on_list = 1;
     list_add(&pt->list, &v->arch.hvm_vcpu.tm_list);
 
     init_timer(&pt->timer, pt_timer_fn, pt, v->processor);
@@ -334,12 +335,14 @@ void create_periodic_time(
 
 void destroy_periodic_time(struct periodic_time *pt)
 {
-    if ( !pt->enabled )
+    /* Was this structure previously initialised by create_periodic_time()? */
+    if ( pt->vcpu == NULL )
         return;
 
     pt_lock(pt);
-    pt->enabled = 0;
-    list_del(&pt->list);
+    if ( pt->on_list )
+        list_del(&pt->list);
+    pt->on_list = 0;
     pt_unlock(pt);
 
     /*

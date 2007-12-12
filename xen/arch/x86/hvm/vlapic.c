@@ -977,15 +977,12 @@ void vlapic_destroy(struct vcpu *v)
 
 int is_lvtt(struct vcpu *v, int vector)
 {
-    return vcpu_vlapic(v)->pt.enabled &&
-           vector == vlapic_lvt_vector(vcpu_vlapic(v), APIC_LVTT);
+    return (pt_active(&vcpu_vlapic(v)->pt) &&
+            (vector == vlapic_lvt_vector(vcpu_vlapic(v), APIC_LVTT)));
 }
 
 int is_lvtt_enabled(struct vcpu *v)
 {
-    if ( unlikely(!vlapic_enabled(vcpu_vlapic(v))) ||
-            !vlapic_lvt_enabled(vcpu_vlapic(v), APIC_LVTT)) 
-        return 0;
-
-    return 1;
+    return (vlapic_enabled(vcpu_vlapic(v)) &&
+            vlapic_lvt_enabled(vcpu_vlapic(v), APIC_LVTT));
 }
