@@ -1742,6 +1742,8 @@ static CPUWriteMemoryFunc *vga_mem_write[3] = {
 static void vga_save(QEMUFile *f, void *opaque)
 {
     VGAState *s = opaque;
+    unsigned save_format_flags;
+    uint32_t vram_size;
 #ifdef CONFIG_BOCHS_VBE
     int i;
 #endif
@@ -1772,8 +1774,9 @@ static void vga_save(QEMUFile *f, void *opaque)
     qemu_put_buffer(f, s->palette, 768);
 
     qemu_put_be32s(f, &s->bank_offset);
+    save_format_flags = VGA_SAVE_FORMAT_FLAG_VRAM_DATA;
 #ifdef CONFIG_BOCHS_VBE
-    qemu_put_byte(f, 1);
+    qemu_put_byte(f, save_format_flags | VGA_SAVE_FORMAT_FLAG_BOCHS_VBE);
     qemu_put_be16s(f, &s->vbe_index);
     for(i = 0; i < VBE_DISPI_INDEX_NB; i++)
         qemu_put_be16s(f, &s->vbe_regs[i]);
@@ -1781,17 +1784,19 @@ static void vga_save(QEMUFile *f, void *opaque)
     qemu_put_be32s(f, &s->vbe_line_offset);
     qemu_put_be32s(f, &s->vbe_bank_mask);
 #else
-    qemu_put_byte(f, 0);
+    qemu_put_byte(f, save_format_flags);
 #endif
+    vram_size = s->vram_size;
+    qemu_put_be32s(f, &vram_size); 
+    qemu_put_buffer(f, s->vram_ptr, s->vram_size); 
 }
 
 static int vga_load(QEMUFile *f, void *opaque, int version_id)
 {
     VGAState *s = opaque;
-    int is_vbe, ret;
-#ifdef CONFIG_BOCHS_VBE
-    int i;
-#endif
+    int ret;
+    unsigned int save_format_flags;
+    uint32_t vram_size;
 
     if (version_id > 2)
         return -EINVAL;
@@ -1825,9 +1830,9 @@ static int vga_load(QEMUFile *f, void *opaque, int version_id)
     qemu_get_buffer(f, s->palette, 768);
 
     qemu_get_be32s(f, &s->bank_offset);
-    is_vbe = qemu_get_byte(f);
+    save_format_flags = qemu_get_byte(f);
 #ifdef CONFIG_BOCHS_VBE
-    if (!is_vbe)
+    if (!(save_format_flags & VGA_SAVE_FORMAT_FLAG_BOCHS_VBE))
         return -EINVAL;
     qemu_get_be16s(f, &s->vbe_index);
     for(i = 0; i < VBE_DISPI_INDEX_NB; i++)
@@ -1836,9 +1841,16 @@ static int vga_load(QEMUFile *f, void *opaque, int version_id)
     qemu_get_be32s(f, &s->vbe_line_offset);
     qemu_get_be32s(f, &s->vbe_bank_mask);
 #else
-    if (is_vbe)
+    if (save_format_flags & VGA_SAVE_FORMAT_FLAG_BOCHS_VBE)
         return -EINVAL;
 #endif
+    if (save_format_flags & VGA_SAVE_FORMAT_FLAG_VRAM_DATA) {
+	/* people who restore old images may be lucky ... */
+	qemu_get_be32s(f, &vram_size);
+	if (vram_size != s->vram_size)
+	    return -EINVAL;
+	qemu_get_buffer(f, s->vram_ptr, s->vram_size); 
+    }
 
     /* force refresh */
     s->graphic_mode = -1;
