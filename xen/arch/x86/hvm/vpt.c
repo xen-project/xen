@@ -53,8 +53,8 @@ static int pt_irq_masked(struct periodic_time *pt)
     if ( pt->source == PTSRC_lapic )
     {
         struct vlapic *vlapic = vcpu_vlapic(v);
-        return (vlapic_enabled(vlapic) &&
-                !(vlapic_get_reg(vlapic, APIC_LVTT) & APIC_LVT_MASKED));
+        return (!vlapic_enabled(vlapic) ||
+                (vlapic_get_reg(vlapic, APIC_LVTT) & APIC_LVT_MASKED));
     }
 
     isa_irq = pt->irq;
