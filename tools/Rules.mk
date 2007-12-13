@@ -53,6 +53,8 @@ mk-symlinks:
 	( cd xen/xsm && ln -sf ../../$(XEN_ROOT)/xen/include/public/xsm/*.h . )
 	mkdir -p xen/arch-x86
 	( cd xen/arch-x86 && ln -sf ../../$(XEN_ROOT)/xen/include/public/arch-x86/*.h . )
+	mkdir -p xen/arch-ia64
+	( cd xen/arch-ia64 && ln -sf ../../$(XEN_ROOT)/xen/include/public/arch-ia64/*.h . )
 	mkdir -p xen/foreign
 	( cd xen/foreign && ln -sf ../../$(XEN_ROOT)/xen/include/public/foreign/Makefile . )
 	( cd xen/foreign && ln -sf ../../$(XEN_ROOT)/xen/include/public/foreign/reference.size . )

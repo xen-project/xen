@@ -3,7 +3,6 @@ include $(XEN_ROOT)/tools/Rules.mk
 
 #CFLAGS  += -Werror -g -O0
 
-CFLAGS  += -I $(XEN_XC)
 CFLAGS  += -I $(XEN_LIBXC)
 
 HDRS     = $(wildcard *.h)

@@ -37,6 +37,7 @@
 
 #ifdef __HYPERVISOR_ia64_debug_op
 #define HAVE_DEBUG_OP
+#include <xen/arch-ia64/debug_op.h>
 #endif
 
 static int xc_handle = 0;
