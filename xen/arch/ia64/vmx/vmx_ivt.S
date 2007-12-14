@@ -119,11 +119,12 @@ vmx_fault_##n:;                                 \
 (p7)br.sptk.many vmx_dispatch_reflection;           \
     br.sptk.many dispatch_to_fault_handler
 
+#ifdef CONFIG_VMX_PANIC
 GLOBAL_ENTRY(vmx_panic)
     br.sptk.many vmx_panic
     ;;
 END(vmx_panic)
-
+#endif
 
 
 
@@ -1353,6 +1354,7 @@ ENTRY(vmx_dispatch_reflection)
     VMX_SAVE_REST
     mov rp=r14
     ;;
+    P6_BR_CALL_PANIC(.Lvmx_dispatch_reflection_string)
     adds out4=16,r12
     br.call.sptk.many b6=vmx_reflect_interruption
 END(vmx_dispatch_reflection)
@@ -1375,6 +1377,7 @@ ENTRY(vmx_dispatch_virtualization_fault)
     VMX_SAVE_EXTRA
     mov rp=r14
     ;;
+    P6_BR_CALL_PANIC(.Lvmx_dispatch_virtualization_fault_string)
     adds out1=16,sp         //regs
     br.call.sptk.many b6=vmx_emulate
 END(vmx_dispatch_virtualization_fault)
@@ -1396,6 +1399,7 @@ GLOBAL_ENTRY(vmx_dispatch_vexirq)
     movl r14=ia64_leave_hypervisor
     ;;
     mov rp=r14
+    P6_BR_CALL_PANIC(.Lvmx_dispatch_vexirq_string)
     br.call.sptk.many b6=vmx_vexirq
 END(vmx_dispatch_vexirq)
 
@@ -1416,6 +1420,7 @@ ENTRY(vmx_dispatch_tlb_miss)
     VMX_SAVE_REST
     mov rp=r14
     ;;
+    P6_BR_CALL_PANIC(.Lvmx_dispatch_tlb_miss_string)
     adds out2=16,r12
     br.call.sptk.many b6=vmx_hpw_miss
 END(vmx_dispatch_tlb_miss)
@@ -1439,6 +1444,7 @@ ENTRY(vmx_dispatch_break_fault)
     VMX_SAVE_REST
     mov rp=r14
     ;;
+    P6_BR_CALL_PANIC(.Lvmx_dispatch_break_fault_string)
     adds out1=16,sp
     br.call.sptk.many b6=vmx_ia64_handle_break
     ;;
@@ -1463,3 +1469,14 @@ ENTRY(vmx_dispatch_interrupt)
     add out1=16,sp		// pass pointer to pt_regs as second arg
     br.call.sptk.many b6=ia64_handle_irq
 END(vmx_dispatch_interrupt)
+
+.Lvmx_dispatch_reflection_string:
+    .asciz "vmx_dispatch_reflection\n"
+.Lvmx_dispatch_virtualization_fault_string:
+    .asciz "vmx_dispatch_virtualization_fault\n"
+.Lvmx_dispatch_vexirq_string:
+    .asciz "vmx_dispatch_vexirq\n"
+.Lvmx_dispatch_tlb_miss_string:
+    .asciz "vmx_dispatch_tlb_miss\n"
+.Lvmx_dispatch_break_fault_string:
+    .asciz "vmx_dispatch_break_fault\n"

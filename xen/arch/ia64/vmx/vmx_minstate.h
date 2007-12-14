@@ -100,6 +100,8 @@
  *  r11 = FPSR_DEFAULT
  *  r12 = kernel sp (kernel virtual address)
  *  r13 = points to current task_struct (kernel virtual address)
+ *   p6 = (psr.vm || isr.ni)
+ *        panic if not external interrupt (fault in xen VMM)
  *  p15 = TRUE if psr.i is set in cr.ipsr
  *  predicate registers (other than p2, p3, and p15), b6, r3, r14, r15:
  *      preserved
@@ -107,6 +109,16 @@
  * Note that psr.ic is NOT turned on by this macro.  This is so that
  * we can pass interruption state as arguments to a handler.
  */
+
+#ifdef CONFIG_VMX_PANIC
+# define P6_BR_VMX_PANIC        (p6)br.spnt.few vmx_panic;
+#else
+# define P6_BR_VMX_PANIC        /* nothing */
+#endif
+
+#define P6_BR_CALL_PANIC(panic_string)  \
+(p6) movl out0=panic_string;            \
+(p6) br.call.spnt.few b6=panic;
 
 #define VMX_DO_SAVE_MIN(COVER,SAVE_IFS,EXTRA)                                           \
     mov r27=ar.rsc;                     /* M */                                         \
@@ -123,7 +135,7 @@
     ;;                                                                                  \
 (pUStk) tbit.nz.and p6,p0=r18,IA64_ISR_NI_BIT;                                          \
     ;;                                                                                  \
-(p6)br.spnt.few vmx_panic;                                                              \
+    P6_BR_VMX_PANIC                                                                     \
 (pUStk)VMX_MINSTATE_GET_CURRENT(r1);                                                    \
     /*    mov r21=r16;  */                                                              \
     /* switch from user to kernel RBS: */                                               \

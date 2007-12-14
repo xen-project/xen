@@ -7,6 +7,7 @@ HAS_VGA  := y
 xenoprof := y
 no_warns ?= n
 vti_debug ?= n
+vmx_panic ?= n
 xen_ia64_expose_p2m	?= y
 xen_ia64_pervcpu_vhpt	?= y
 xen_ia64_tlb_track	?= y
@@ -39,6 +40,9 @@ CFLAGS	+= -ffixed-r13 -mfixed-range=f2-f5,f12-f127,b2-b5
 CFLAGS	+= -g
 ifeq ($(vti_debug),y)
 CFLAGS  += -DVTI_DEBUG
+endif
+ifeq ($(vmx_panic),y)
+CFLAGS  += -DCONFIG_VMX_PANIC
 endif
 ifeq ($(xen_ia64_expose_p2m),y)
 CFLAGS	+= -DCONFIG_XEN_IA64_EXPOSE_P2M
