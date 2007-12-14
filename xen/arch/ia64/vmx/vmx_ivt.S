@@ -609,151 +609,10 @@ END(vmx_break_fault)
 /////////////////////////////////////////////////////////////////////////////////////////
 // 0x3000 Entry 12 (size 64 bundles) External Interrupt (4)
 ENTRY(vmx_interrupt)
-//    VMX_DBG_FAULT(12)
+    VMX_DBG_FAULT(12)
     mov r31=pr		// prepare to save predicates
     mov r19=12
-    mov r29=cr.ipsr
-    ;;
-    tbit.z p6,p7=r29,IA64_PSR_VM_BIT
-    tbit.z p0,p15=r29,IA64_PSR_I_BIT
-    ;;
-(p7) br.sptk vmx_dispatch_interrupt
-    ;;
-    mov r27=ar.rsc		/* M */
-    mov r20=r1			/* A */
-    mov r25=ar.unat		/* M */
-    mov r26=ar.pfs		/* I */
-    mov r28=cr.iip		/* M */
-    cover			/* B (or nothing) */
-    ;;
-    mov r1=sp
-    ;;
-    invala			/* M */
-    mov r30=cr.ifs
-    ;;
-    addl r1=-IA64_PT_REGS_SIZE,r1
-    ;;
-    adds r17=2*L1_CACHE_BYTES,r1	/* really: biggest cache-line size */
-    adds r16=PT(CR_IPSR),r1
-    ;;
-    lfetch.fault.excl.nt1 [r17],L1_CACHE_BYTES
-    st8 [r16]=r29			/* save cr.ipsr */
-    ;;
-    lfetch.fault.excl.nt1 [r17]
-    mov r29=b0
-    ;;
-    adds r16=PT(R8),r1  	/* initialize first base pointer */
-    adds r17=PT(R9),r1  	/* initialize second base pointer */
-    mov r18=r0      		/* make sure r18 isn't NaT */
-    ;;
-.mem.offset 0,0; st8.spill [r16]=r8,16
-.mem.offset 8,0; st8.spill [r17]=r9,16
-        ;;
-.mem.offset 0,0; st8.spill [r16]=r10,24
-.mem.offset 8,0; st8.spill [r17]=r11,24
-        ;;
-    st8 [r16]=r28,16		/* save cr.iip */
-    st8 [r17]=r30,16		/* save cr.ifs */
-    mov r8=ar.fpsr		/* M */
-    mov r9=ar.csd
-    mov r10=ar.ssd
-    movl r11=FPSR_DEFAULT	/* L-unit */
-    ;;
-    st8 [r16]=r25,16		/* save ar.unat */
-    st8 [r17]=r26,16		/* save ar.pfs */
-    shl r18=r18,16		/* compute ar.rsc to be used for "loadrs" */
-    ;;
-    st8 [r16]=r27,16		/* save ar.rsc */
-    adds r17=16,r17		/* skip over ar_rnat field */
-    ;;
-    st8 [r17]=r31,16		/* save predicates */
-    adds r16=16,r16		/* skip over ar_bspstore field */
-    ;;
-    st8 [r16]=r29,16		/* save b0 */
-    st8 [r17]=r18,16		/* save ar.rsc value for "loadrs" */
-    ;;
-.mem.offset 0,0; st8.spill [r16]=r20,16    /* save original r1 */
-.mem.offset 8,0; st8.spill [r17]=r12,16
-    adds r12=-16,r1    /* switch to kernel memory stack (with 16 bytes of scratch) */
-    ;;
-.mem.offset 0,0; st8.spill [r16]=r13,16
-.mem.offset 8,0; st8.spill [r17]=r8,16 /* save ar.fpsr */
-    MINSTATE_GET_CURRENT(r13)
-    ;;
-.mem.offset 0,0; st8.spill [r16]=r15,16
-.mem.offset 8,0; st8.spill [r17]=r14,16
-    dep r14=-1,r0,60,4
-    ;;
-.mem.offset 0,0; st8.spill [r16]=r2,16
-.mem.offset 8,0; st8.spill [r17]=r3,16
-    adds r2=IA64_PT_REGS_R16_OFFSET,r1
-    ;;
-    mov r8=ar.ccv
-    movl r1=__gp       /* establish kernel global pointer */
-    ;;                                          \
-    bsw.1
-    ;;
-    alloc r14=ar.pfs,0,0,2,0	// must be first in an insn group
-    mov out0=cr.ivr		// pass cr.ivr as first arg
-    add out1=16,sp		// pass pointer to pt_regs as second arg
-
-    ssm psr.ic
-    ;;
-    adds r3=8,r2		// set up second base pointer for SAVE_REST
-    srlz.i			// ensure everybody knows psr.ic is back on
-    ;;
-.mem.offset 0,0; st8.spill [r2]=r16,16
-.mem.offset 8,0; st8.spill [r3]=r17,16
-    ;;
-.mem.offset 0,0; st8.spill [r2]=r18,16
-.mem.offset 8,0; st8.spill [r3]=r19,16
-    ;;
-.mem.offset 0,0; st8.spill [r2]=r20,16
-.mem.offset 8,0; st8.spill [r3]=r21,16
-    mov r18=b6
-    ;;
-.mem.offset 0,0; st8.spill [r2]=r22,16
-.mem.offset 8,0; st8.spill [r3]=r23,16
-    mov r19=b7
-    ;;
-.mem.offset 0,0; st8.spill [r2]=r24,16
-.mem.offset 8,0; st8.spill [r3]=r25,16
-    ;;
-.mem.offset 0,0; st8.spill [r2]=r26,16
-.mem.offset 8,0; st8.spill [r3]=r27,16
-    ;;
-.mem.offset 0,0; st8.spill [r2]=r28,16
-.mem.offset 8,0; st8.spill [r3]=r29,16
-    ;;
-.mem.offset 0,0; st8.spill [r2]=r30,16
-.mem.offset 8,0; st8.spill [r3]=r31,32
-    ;;
-    mov ar.fpsr=r11       /* M-unit */
-    st8 [r2]=r8,8         /* ar.ccv */
-    adds r24=PT(B6)-PT(F7),r3
-    ;;
-    stf.spill [r2]=f6,32
-    stf.spill [r3]=f7,32
-    ;;
-    stf.spill [r2]=f8,32
-    stf.spill [r3]=f9,32
-    ;;
-    stf.spill [r2]=f10
-    stf.spill [r3]=f11
-    adds r25=PT(B7)-PT(F11),r3
-    ;;
-    st8 [r24]=r18,16       /* b6 */
-    st8 [r25]=r19,16       /* b7 */
-    ;;
-    st8 [r24]=r9           /* ar.csd */
-    st8 [r25]=r10          /* ar.ssd */
-    ;;
-    srlz.d		// make sure we see the effect of cr.ivr
-    movl r14=ia64_leave_nested
-    ;;
-    mov rp=r14
-    br.call.sptk.many b6=ia64_handle_irq
-    ;;
+    br.sptk vmx_dispatch_interrupt
 END(vmx_interrupt)
 
     .org vmx_ia64_ivt+0x3400
@@ -1448,21 +1307,20 @@ END(vmx_dispatch_break_fault)
 
 
 ENTRY(vmx_dispatch_interrupt)
-    VMX_SAVE_MIN_WITH_COVER	// uses r31; defines r2 and r3
+    VMX_SAVE_MIN_WITH_COVER_NO_PANIC	// uses r31; defines r2 and r3
     ;;
     alloc r14=ar.pfs,0,0,2,0	// must be first in an insn group
+    ssm psr.ic
     mov out0=cr.ivr		// pass cr.ivr as first arg
     adds r3=8,r2		// set up second base pointer for SAVE_REST
     ;;
-    ssm psr.ic
-    ;;
+(pUStk) movl r14=ia64_leave_hypervisor
     srlz.i
-    movl r14=ia64_leave_hypervisor
     ;;
+(pKStk) movl r14=ia64_leave_nested
     VMX_SAVE_REST
-    mov rp=r14
-    ;;
     add out1=16,sp		// pass pointer to pt_regs as second arg
+    mov rp=r14
     br.call.sptk.many b6=ia64_handle_irq
 END(vmx_dispatch_interrupt)
 
