@@ -22,6 +22,17 @@
 #ifndef _ASM_IA64_VMX_VPD_H_
 #define _ASM_IA64_VMX_VPD_H_
 
+#ifdef VTI_DEBUG
+/*
+ * must be power of 2.
+ * Be carefull to avoid stack over flow keeping
+ * struct arch_vmx_struct(i.e. struct vcpu) small enough.
+ * sizeof(struct ivt_debug) * IVT_DEBUG_MAX = 32 * IVT_DEBUG_MAX
+ */
+//#define IVT_DEBUG_MAX 128     /* 4096 bytes */
+#define IVT_DEBUG_MAX 16        /*  512 bytes */
+#endif
+
 #ifndef __ASSEMBLY__
 
 #include <asm/vtm.h>
@@ -39,7 +50,6 @@ struct ivt_debug{
     unsigned long ifa;
     unsigned long vector;
 };
-#define IVT_DEBUG_MAX 128
 #endif
 
 struct arch_vmx_struct {

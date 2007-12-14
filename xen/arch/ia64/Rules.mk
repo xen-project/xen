@@ -6,6 +6,7 @@ HAS_ACPI := y
 HAS_VGA  := y
 xenoprof := y
 no_warns ?= n
+vti_debug ?= n
 xen_ia64_expose_p2m	?= y
 xen_ia64_pervcpu_vhpt	?= y
 xen_ia64_tlb_track	?= y
@@ -36,7 +37,9 @@ CFLAGS	+= $(CPPFLAGS)
 CFLAGS	+= -DIA64 -DXEN -DLINUX_2_6
 CFLAGS	+= -ffixed-r13 -mfixed-range=f2-f5,f12-f127,b2-b5
 CFLAGS	+= -g
-#CFLAGS  += -DVTI_DEBUG
+ifeq ($(vti_debug),y)
+CFLAGS  += -DVTI_DEBUG
+endif
 ifeq ($(xen_ia64_expose_p2m),y)
 CFLAGS	+= -DCONFIG_XEN_IA64_EXPOSE_P2M
 endif

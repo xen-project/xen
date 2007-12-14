@@ -46,6 +46,7 @@ void foo(void)
 #ifdef   VTI_DEBUG
 	DEFINE(IVT_CUR_OFS, offsetof(struct vcpu, arch.arch_vmx.ivt_current));
 	DEFINE(IVT_DBG_OFS, offsetof(struct vcpu, arch.arch_vmx.ivt_debug));
+	DEFINE(IVT_DEBUG_SIZE, sizeof(struct ivt_debug));
 #endif
 	DEFINE(TI_FLAGS, offsetof(struct thread_info, flags));
 	DEFINE(TI_PRE_COUNT, offsetof(struct thread_info, preempt_count));

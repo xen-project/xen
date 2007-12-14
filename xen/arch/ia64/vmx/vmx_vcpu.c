@@ -111,13 +111,10 @@ vmx_vcpu_set_psr(VCPU *vcpu, unsigned long value)
     }
     new_psr.val=VCPU(vcpu, vpsr);
 #ifdef	VTI_DEBUG    
-    {
-    struct pt_regs *regs = vcpu_regs(vcpu);
     guest_psr_buf[guest_psr_index].ip = regs->cr_iip;
     guest_psr_buf[guest_psr_index].psr = new_psr.val;
     if (++guest_psr_index >= 100)
         guest_psr_index = 0;
-    }
 #endif    
 #if 0
     if (old_psr.i != new_psr.i) {

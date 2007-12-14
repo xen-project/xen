@@ -70,6 +70,7 @@
 
 
 #ifdef VTI_DEBUG
+#define IVT_DEBUG_MASK  (IVT_DEBUG_SIZE * (IVT_DEBUG_MAX - 1))
 #define VMX_DBG_FAULT(i)                \
     add r16=IVT_CUR_OFS,r21;            \
     add r17=IVT_DBG_OFS,r21;;           \
@@ -80,9 +81,9 @@
     mov r22=cr.ifa;                     \
     mov r23=i;;                         \
     st8 [r17]=r19,8;                    \
-    add r18=32,r18;;                    \
+    add r18=IVT_DEBUG_SIZE,r18;;        \
     st8 [r17]=r20,8;                    \
-    mov r19=0xfe0;;                     \
+    mov r19=IVT_DEBUG_MASK;;            \
     st8 [r17]=r22,8;                    \
     and r18=r19,r18;;                   \
     st8 [r17]=r23;                      \
