@@ -672,6 +672,9 @@ bool is_valid_nodename(const char *node)
 	if (strstr(node, "//"))
 		return false;
 
+	if (strlen(node) > XENSTORE_ABS_PATH_MAX)
+		return false;
+
 	return valid_chars(node);
 }
 
@@ -1281,7 +1284,7 @@ static void handle_input(struct connection *conn)
 		if (in->used != sizeof(in->hdr))
 			return;
 
-		if (in->hdr.msg.len > PATH_MAX) {
+		if (in->hdr.msg.len > XENSTORE_PAYLOAD_MAX) {
 			syslog(LOG_ERR, "Client tried to feed us %i",
 			       in->hdr.msg.len);
 			goto bad_client;

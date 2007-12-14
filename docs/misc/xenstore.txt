@@ -38,7 +38,9 @@ The permitted character for paths set is ASCII alphanumerics and plus
 the four punctuation characters -/_@ (hyphen slash underscore atsign).
 @ should be avoided except to specify special watches (see below).
 Doubled slashes and trailing slashes (except to specify the root) are
-forbidden.  The empty path is also forbidden.
+forbidden.  The empty path is also forbidden.  Paths longer than 3072
+bytes are forbidden; clients specifying relative paths should keep
+them to within 2048 bytes.  (See XENSTORE_*_PATH_MAX in xs_wire.h.)
 
 
 Communication with xenstore is via either sockets, or event channel
@@ -55,6 +57,20 @@ A caller who sends several requests may receive the replies in any
 order and must use req_id (and tx_id, if applicable) to match up
 replies to requests.  (The current implementation always replies to
 requests in the order received but this should not be relied on.)
+
+The payload length (len field of the header) is limited to 4096
+(XENSTORE_PAYLOAD_MAX) in both directions.  If a client exceeds the
+limit, its xenstored connection will be immediately killed by
+xenstored, which is usually catastrophic from the client's point of
+view.  Clients (particularly domains, which cannot just reconnect)
+should avoid this.
+
+Existing clients do not always contain defences against overly long
+payloads.  Increasing xenstored's limit is therefore difficult; it
+would require negotiation with the client, and obviously would make
+parts of xenstore inaccessible to some clients.  In any case passing
+bulk data through xenstore is not recommended as the performance
+properties are poor.
 
 
 ---------- Xenstore protocol details - introduction ----------

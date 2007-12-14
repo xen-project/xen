@@ -319,6 +319,11 @@ static void *xs_talkv(struct xs_handle *h, xs_transaction_t t,
 	for (i = 0; i < num_vecs; i++)
 		msg.len += iovec[i].iov_len;
 
+	if (msg.len > XENSTORE_PAYLOAD_MAX) {
+		errno = E2BIG;
+		return 0;
+	}
+
 	ignorepipe.sa_handler = SIG_IGN;
 	sigemptyset(&ignorepipe.sa_mask);
 	ignorepipe.sa_flags = 0;
