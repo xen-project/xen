@@ -133,13 +133,12 @@ struct arch_domain {
     /* Flags.  */
     union {
         unsigned long flags;
-        struct {
-            unsigned int is_vti : 1;
 #ifdef CONFIG_XEN_IA64_PERVCPU_VHPT
+        struct {
             unsigned int has_pervcpu_vhpt : 1;
             unsigned int vhpt_size_log2 : 6;
-#endif
         };
+#endif
     };
 
     /* maximum metaphysical address of conventional memory */

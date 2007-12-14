@@ -516,7 +516,7 @@ int vcpu_late_initialise(struct vcpu *v)
 
 void vcpu_destroy(struct vcpu *v)
 {
-	if (v->domain->arch.is_vti)
+	if (is_hvm_vcpu(v))
 		vmx_relinquish_vcpu_resources(v);
 	else
 		relinquish_vcpu_resources(v);
@@ -988,12 +988,12 @@ void arch_get_info_guest(struct vcpu *v, vcpu_guest_context_u c)
 	c.nat->event_callback_ip = v->arch.event_callback_ip;
 
 	/* If PV and privregs is not set, we can't read mapped registers.  */
- 	if (!v->domain->arch.is_vti && v->arch.privregs == NULL)
+ 	if (!is_hvm_vcpu(v) && v->arch.privregs == NULL)
 		return;
 
 	vcpu_get_dcr(v, &c.nat->regs.cr.dcr);
 
-	c.nat->regs.cr.itm = v->domain->arch.is_vti ?
+	c.nat->regs.cr.itm = is_hvm_vcpu(v) ?
 		vmx_vcpu_get_itm(v) : PSCBX(v, domain_itm);
 	vcpu_get_iva(v, &c.nat->regs.cr.iva);
 	vcpu_get_pta(v, &c.nat->regs.cr.pta);
@@ -1006,7 +1006,7 @@ void arch_get_info_guest(struct vcpu *v, vcpu_guest_context_u c)
 	vcpu_get_iha(v, &c.nat->regs.cr.iha);
 
 	//XXX change irr[] and arch.insvc[]
-	if (v->domain->arch.is_vti)
+	if (is_hvm_vcpu(v))
 		/* c.nat->regs.cr.ivr = vmx_vcpu_get_ivr(v)*/;//XXXnot SMP-safe
 	else
 		vcpu_get_ivr (v, &c.nat->regs.cr.ivr);
@@ -1184,7 +1184,7 @@ int arch_set_info_guest(struct vcpu *v, vcpu_guest_context_u c)
 
 	/* Finish vcpu initialization.  */
 	if (!was_initialised) {
-		if (d->arch.is_vti)
+		if (is_hvm_domain(d))
 			rc = vmx_final_setup_guest(v);
 		else
 			rc = vcpu_late_initialise(v);
@@ -1233,7 +1233,7 @@ int arch_set_info_guest(struct vcpu *v, vcpu_guest_context_u c)
 	uregs->r10 = c.nat->regs.r[10];
 	uregs->r11 = c.nat->regs.r[11];
 
- 	if (!d->arch.is_vti)
+ 	if (!is_hvm_domain(d))
 		vcpu_set_psr(v, c.nat->regs.psr);
 	else
 		vmx_vcpu_set_psr(v, c.nat->regs.psr);
@@ -1472,7 +1472,7 @@ int arch_set_info_guest(struct vcpu *v, vcpu_guest_context_u c)
 			   !!(c.nat->regs.nats & (1UL << 7)));
 	}
 	
- 	if (!d->arch.is_vti) {
+ 	if (!is_hvm_domain(d)) {
  		/* domain runs at PL2/3 */
  		uregs->cr_ipsr = vcpu_pl_adjust(uregs->cr_ipsr,
 		                                IA64_PSR_CPL0_BIT);
@@ -1480,7 +1480,7 @@ int arch_set_info_guest(struct vcpu *v, vcpu_guest_context_u c)
  	}
 
 	for (i = 0; i < IA64_NUM_DBG_REGS; i++) {
-		if (d->arch.is_vti) {
+		if (is_hvm_domain(d)) {
 			vmx_vcpu_set_dbr(v, i, c.nat->regs.dbr[i]);
 			vmx_vcpu_set_ibr(v, i, c.nat->regs.ibr[i]);
 		} else {
@@ -1497,7 +1497,7 @@ int arch_set_info_guest(struct vcpu *v, vcpu_guest_context_u c)
 
 		if (rrval == 0)
 			continue;
-		if (d->arch.is_vti) {
+		if (is_hvm_domain(d)) {
 			//without VGCF_EXTRA_REGS check,
 			//VTi domain doesn't boot.
 			if (c.nat->flags & VGCF_EXTRA_REGS)
@@ -1514,7 +1514,7 @@ int arch_set_info_guest(struct vcpu *v, vcpu_guest_context_u c)
 		for (i = 0;
 		     (i < sizeof(tr->itrs) / sizeof(tr->itrs[0])) && i < NITRS;
 		     i++) {
-			if (d->arch.is_vti)
+			if (is_hvm_domain(d))
 				vmx_vcpu_itr_i(v, i, tr->itrs[i].pte,
 					       tr->itrs[i].itir,
 					       tr->itrs[i].vadr);
@@ -1527,7 +1527,7 @@ int arch_set_info_guest(struct vcpu *v, vcpu_guest_context_u c)
 		for (i = 0;
 		     (i < sizeof(tr->dtrs) / sizeof(tr->dtrs[0])) && i < NDTRS;
 		     i++) {
-			if (d->arch.is_vti)
+			if (is_hvm_domain(d))
 				vmx_vcpu_itr_d(v, i, tr->dtrs[i].pte,
 					       tr->dtrs[i].itir,
 					       tr->dtrs[i].vadr);
@@ -1542,7 +1542,7 @@ int arch_set_info_guest(struct vcpu *v, vcpu_guest_context_u c)
 		vcpu_set_iva(v, c.nat->regs.cr.iva);
 	}
 
-	if (d->arch.is_vti)
+	if (is_hvm_domain(d))
 		rc = vmx_arch_set_info_guest(v, c);
 
 	return rc;
@@ -1628,7 +1628,7 @@ int domain_relinquish_resources(struct domain *d)
 	switch (d->arch.relres) {
 	case RELRES_not_started:
 		/* Relinquish guest resources for VT-i domain. */
-		if (d->arch.is_vti)
+		if (is_hvm_domain(d))
 			vmx_relinquish_guest_resources(d);
 		d->arch.relres = RELRES_mm_teardown;
 		/*fallthrough*/
@@ -1664,7 +1664,7 @@ int domain_relinquish_resources(struct domain *d)
 		BUG();
 	}
 
-	if (d->arch.is_vti && d->arch.sal_data)
+	if (is_hvm_domain(d) && d->arch.sal_data)
 		xfree(d->arch.sal_data);
 
 	/* Free page used by xen oprofile buffer */

@@ -2012,7 +2012,7 @@ unw_unwind_to_user (struct unw_frame_info *info)
 			return 0;
 #else
 		if (unw_is_intr_frame(info) &&
-		    !info->task->domain->arch.is_vti &&
+		    !is_hvm_vcpu(info->task) &&
 		    (pr & (1UL << PRED_USER_STACK)))
 			return 0;
 		/*
@@ -2021,7 +2021,7 @@ unw_unwind_to_user (struct unw_frame_info *info)
 		 * we need to stop unwinding somehow.
 		 */
 		if (unw_is_intr_frame(info) &&
-		    info->task->domain->arch.is_vti &&
+		    is_hvm_vcpu(info->task) &&
 		    info->pr_loc == &vcpu_regs(info->task)->pr)
 			return 0;
 #endif

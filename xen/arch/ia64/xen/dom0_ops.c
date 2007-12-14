@@ -89,7 +89,7 @@ long arch_do_domctl(xen_domctl_t *op, XEN_GUEST_HANDLE(xen_domctl_t) u_domctl)
 
         if (ds->flags & XEN_DOMAINSETUP_query) {
             /* Set flags.  */
-            if (d->arch.is_vti)
+            if (is_hvm_domain(d))
                 ds->flags |= XEN_DOMAINSETUP_hvm_guest;
             /* Set params.  */
             ds->bp = 0;		/* unknown.  */
@@ -104,12 +104,12 @@ long arch_do_domctl(xen_domctl_t *op, XEN_GUEST_HANDLE(xen_domctl_t) u_domctl)
                 ret = -EFAULT;
         }
         else {
-            if (ds->flags & XEN_DOMAINSETUP_hvm_guest) {
+            if (is_hvm_domain(d) || (ds->flags & XEN_DOMAINSETUP_hvm_guest)) {
                 if (!vmx_enabled) {
                     printk("No VMX hardware feature for vmx domain.\n");
                     ret = -EINVAL;
                 } else {
-                    d->arch.is_vti = 1;
+                    d->is_hvm = 1;
                     xen_ia64_set_convmem_end(d, ds->maxmem);
                     ret = vmx_setup_platform(d);
                 }

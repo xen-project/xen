@@ -498,7 +498,7 @@ static void flush_tlb_vhpt_all (struct domain *d)
 void domain_flush_tlb_vhpt(struct domain *d)
 {
 	/* Very heavy...  */
-	if (HAS_PERVCPU_VHPT(d) || d->arch.is_vti)
+	if (HAS_PERVCPU_VHPT(d) || is_hvm_domain(d))
 		on_each_cpu((void (*)(void *))local_flush_tlb_all, NULL, 1, 1);
 	else
 		on_each_cpu((void (*)(void *))flush_tlb_vhpt_all, d, 1, 1);
