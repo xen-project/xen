@@ -99,8 +99,6 @@ GLOBAL_ENTRY(ia64_leave_nested)
 	bsw.0			// switch back to bank 0 (no stop bit required beforehand...)
 	;;
 	ldf.fill f11=[r2]
-//	mov r18=r13
-//    mov r21=r13
 	adds r16=PT(CR_IPSR)+16,r12
 	adds r17=PT(CR_IIP)+16,r12
 	;;
@@ -110,19 +108,26 @@ GLOBAL_ENTRY(ia64_leave_nested)
 	ld8 r30=[r16],16	// load cr.ifs
 	ld8 r25=[r17],16	// load ar.unat
 	;;
+#ifndef XEN
 	ld8 r26=[r16],16	// load ar.pfs
 	ld8 r27=[r17],16	// load ar.rsc
-#ifndef XEN
 	cmp.eq p9,p0=r0,r0	// set p9 to indicate that we should restore cr.ifs
-#endif
 	;;
 	ld8 r24=[r16],16	// load ar.rnat (may be garbage)
-	ld8 r23=[r17],16// load ar.bspstore (may be garbage)
+	ld8 r23=[r17],16	// load ar.bspstore (may be garbage)
 	;;
 	ld8 r31=[r16],16	// load predicates
+#else
+	ld8 r26=[r16],32	// load ar.pfs
+	ld8 r27=[r17],32	// load ar.rsc
+	;;
+	ld8 r31=[r16],32	// load predicates
+#endif
 	ld8 r22=[r17],16	// load b0
 	;;
-	ld8 r19=[r16],16	// load ar.rsc value for "loadrs"
+#ifndef XEN
+	ld8 r19=[r16],16        // load ar.rsc value for "loadrs"
+#endif
 	ld8.fill r1=[r17],16	// load r1
 	;;
 	ld8.fill r12=[r16],16
@@ -135,9 +140,11 @@ GLOBAL_ENTRY(ia64_leave_nested)
 	ld8.fill r2=[r17]
 	;;
 	ld8.fill r3=[r16]
+#ifndef XEN
 	;;
-	mov r16=ar.bsp		// get existing backing store pointer
+	mov r16=ar.bsp          // get existing backing store pointer
 	;;
+#endif
 	mov b0=r22
 	mov ar.pfs=r26
 	mov cr.ifs=r30
