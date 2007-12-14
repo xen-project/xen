@@ -70,28 +70,23 @@
 
 
 #ifdef VTI_DEBUG
-  /*
-   * This lets you track the last eight faults that occurred on the CPU.  Make sure ar.k2 isn't
-   * needed for something else before enabling this...
-   */
-#define VMX_DBG_FAULT(i) \
-    add r16=IVT_CUR_OFS,r21;    \
-    add r17=IVT_DBG_OFS,r21;;   \
-    ld8  r18=[r16];;    \
-    add r17=r18,r17;   \
-    mov r19=cr.iip;     \
-    mov r20=cr.ipsr;    \
-    mov r22=cr.ifa;     \
-    mov r23=i;;          \
-    st8 [r17]=r19,8;   \
-    add r18=32,r18;;     \
-    st8 [r17]=r20,8;    \
-    mov r19=0xfe0;;      \
-    st8 [r17]=r22,8;   \
-    and r18=r19,r18;;   \
-    st8 [r17]=r23;      \
-    st8 [r16]=r18;;     \
-//# define VMX_DBG_FAULT(i)   mov r16=ar.k2;; shl r16=r16,8;; add r16=(i),r16;;mov ar.k2=r16
+#define VMX_DBG_FAULT(i)                \
+    add r16=IVT_CUR_OFS,r21;            \
+    add r17=IVT_DBG_OFS,r21;;           \
+    ld8  r18=[r16];;                    \
+    add r17=r18,r17;                    \
+    mov r19=cr.iip;                     \
+    mov r20=cr.ipsr;                    \
+    mov r22=cr.ifa;                     \
+    mov r23=i;;                         \
+    st8 [r17]=r19,8;                    \
+    add r18=32,r18;;                    \
+    st8 [r17]=r20,8;                    \
+    mov r19=0xfe0;;                     \
+    st8 [r17]=r22,8;                    \
+    and r18=r19,r18;;                   \
+    st8 [r17]=r23;                      \
+    st8 [r16]=r18;;
 #else
 # define VMX_DBG_FAULT(i)
 #endif
@@ -102,22 +97,20 @@
 #include "minstate.h"
 
 
-#define VMX_FAULT(n)    \
-vmx_fault_##n:;          \
-    mov r19=n;           \
-    br.sptk.many dispatch_to_fault_handler;         \
-    ;;                  \
+#define VMX_FAULT(n)                            \
+vmx_fault_##n:;                                 \
+    mov r19=n;                                  \
+    br.sptk.many dispatch_to_fault_handler;     \
+    ;;
 
-
-#define VMX_REFLECT(n)    \
-    mov r31=pr;           \
-    mov r19=n;       /* prepare to save predicates */ \
-    mov r29=cr.ipsr;      \
-    ;;      \
-    tbit.z p6,p7=r29,IA64_PSR_VM_BIT;       \
-(p7)br.sptk.many vmx_dispatch_reflection;        \
+#define VMX_REFLECT(n)                              \
+    mov r31=pr;                                     \
+    mov r19=n;  /* prepare to save predicates */    \
+    mov r29=cr.ipsr;                                \
+    ;;                                              \
+    tbit.z p6,p7=r29,IA64_PSR_VM_BIT;               \
+(p7)br.sptk.many vmx_dispatch_reflection;           \
     br.sptk.many dispatch_to_fault_handler
-
 
 GLOBAL_ENTRY(vmx_panic)
     br.sptk.many vmx_panic
