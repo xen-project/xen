@@ -35,19 +35,21 @@
 #include "entry.h"
 
 #define VMX_MINSTATE_START_SAVE_MIN                                                             \
-    mov ar.rsc=0;       /* set enforced lazy mode, pl 0, little-endian, loadrs=0 */             \
-    ;;                                                                                          \
-    mov.m r28=ar.rnat;                                                                          \
-    addl r22=IA64_RBS_OFFSET,r1;                        /* compute base of RBS */               \
-    ;;                                                                                          \
-    lfetch.fault.excl.nt1 [r22];                                                                \
-    addl r1=IA64_STK_OFFSET-IA64_PT_REGS_SIZE,r1;       /* compute base of memory stack */      \
-    mov r23=ar.bspstore;                                /* save ar.bspstore */                  \
-    ;;                                                                                          \
-    mov ar.bspstore=r22;                                /* switch to kernel RBS */              \
-    ;;                                                                                          \
-    mov r18=ar.bsp;                                                                             \
-    mov ar.rsc=0x3;     /* set eager mode, pl 0, little-endian, loadrs=0 */
+(pUStk) mov ar.rsc=0;           /* set enforced lazy mode, pl 0, little-endian, loadrs=0 */     \
+        ;;                                                                                      \
+(pUStk) mov.m r28=ar.rnat;                                                                      \
+(pUStk) addl r22=IA64_RBS_OFFSET,r1;                    /* compute base of RBS */               \
+(pKStk) mov r1=sp;                                      /* get sp  */                           \
+        ;;                                                                                      \
+(pUStk) lfetch.fault.excl.nt1 [r22];                                                            \
+(pUStk) addl r1=IA64_STK_OFFSET-IA64_PT_REGS_SIZE,r1;   /* compute base of memory stack */      \
+(pUStk) mov r23=ar.bspstore;                            /* save ar.bspstore */                  \
+        ;;                                                                                      \
+(pUStk) mov ar.bspstore=r22;                            /* switch to kernel RBS */              \
+(pKStk) addl r1=-IA64_PT_REGS_SIZE,r1;                  /* if in kernel mode, use sp (r12) */   \
+        ;;                                                                                      \
+(pUStk) mov r18=ar.bsp;                                                                         \
+(pUStk) mov ar.rsc=0x3;         /* set eager mode, pl 0, little-endian, loadrs=0 */
 
 #define VMX_MINSTATE_END_SAVE_MIN                                                               \
     bsw.1;              /* switch back to bank 1 (must be last in insn group) */                \
@@ -55,24 +57,24 @@
 
 #define PAL_VSA_SYNC_READ                               \
     /* begin to call pal vps sync_read */               \
-    add r25=IA64_VPD_BASE_OFFSET, r21;                  \
-    movl r20=__vsa_base;                                \
+(pUStk) add r25=IA64_VPD_BASE_OFFSET, r21;              \
+(pUStk) movl r20=__vsa_base;                            \
     ;;                                                  \
-    ld8 r25=[r25];              /* read vpd base */     \
-    ld8 r20=[r20];              /* read entry point */  \
+(pUStk) ld8 r25=[r25];          /* read vpd base */     \
+(pUStk) ld8 r20=[r20];          /* read entry point */  \
     ;;                                                  \
-    add r20=PAL_VPS_SYNC_READ,r20;                      \
+(pUStk) add r20=PAL_VPS_SYNC_READ,r20;                  \
     ;;                                                  \
 { .mii;                                                 \
-    nop 0x0;                                            \
-    mov r24=ip;                                         \
-    mov b0=r20;                                         \
+(pUStk) nop 0x0;                                        \
+(pUStk) mov r24=ip;                                     \
+(pUStk) mov b0=r20;                                     \
     ;;                                                  \
 };                                                      \
 { .mmb;                                                 \
-    add r24 = 0x20, r24;                                \
-    nop 0x0;                                            \
-    br.cond.sptk b0;        /*  call the service */     \
+(pUStk) add r24 = 0x20, r24;                            \
+(pUStk) nop 0x0;                                        \
+(pUStk) br.cond.sptk b0;        /*  call the service */ \
     ;;                                                  \
 };
 
@@ -115,13 +117,14 @@
     mov r18=cr.isr;                                                                     \
     COVER;                              /* B;; (or nothing) */                          \
     ;;                                                                                  \
-    tbit.z p6,p0=r29,IA64_PSR_VM_BIT;                                                   \
+    cmp.eq p6,p0=r0,r0;                                                                 \
+    tbit.z pKStk,pUStk=r29,IA64_PSR_VM_BIT;                                             \
+    tbit.z p0,p15=r29,IA64_PSR_I_BIT;                                                   \
     ;;                                                                                  \
-    tbit.nz.or p6,p0 = r18,IA64_ISR_NI_BIT;                                             \
+(pUStk) tbit.nz.and p6,p0=r18,IA64_ISR_NI_BIT;                                          \
     ;;                                                                                  \
 (p6)br.spnt.few vmx_panic;                                                              \
-    tbit.z p0,p15=r29,IA64_PSR_I_BIT;                                                   \
-    VMX_MINSTATE_GET_CURRENT(r1);      /* M (or M;;I) */                                \
+(pUStk)VMX_MINSTATE_GET_CURRENT(r1);                                                    \
     /*    mov r21=r16;  */                                                              \
     /* switch from user to kernel RBS: */                                               \
     ;;                                                                                  \
@@ -140,6 +143,7 @@
     ;;                                                                                  \
     adds r16=PT(R8),r1; /* initialize first base pointer */                             \
     adds r17=PT(R9),r1; /* initialize second base pointer */                            \
+(pKStk) mov r18=r0;     /* make sure r18 isn't NaT */                                   \
     ;;                                                                                  \
 .mem.offset 0,0; st8.spill [r16]=r8,16;                                                 \
 .mem.offset 8,0; st8.spill [r17]=r9,16;                                                 \
@@ -152,17 +156,19 @@
     ;;                                                                                  \
     st8 [r16]=r9,16;    /* save cr.iip */                                               \
     st8 [r17]=r30,16;   /* save cr.ifs */                                               \
-    sub r18=r18,r22;    /* r18=RSE.ndirty*8 */                                          \
+(pUStk) sub r18=r18,r22;/* r18=RSE.ndirty*8 */                                          \
     ;;                                                                                  \
     st8 [r16]=r25,16;   /* save ar.unat */                                              \
     st8 [r17]=r26,16;    /* save ar.pfs */                                              \
     shl r18=r18,16;     /* compute ar.rsc to be used for "loadrs" */                    \
     ;;                                                                                  \
     st8 [r16]=r27,16;   /* save ar.rsc */                                               \
-    st8 [r17]=r28,16;   /* save ar.rnat */                                              \
+(pUStk) st8 [r17]=r28,16;/* save ar.rnat */                                             \
+(pKStk) adds r17=16,r17;/* skip over ar_rnat field */                                   \
     ;;                  /* avoid RAW on r16 & r17 */                                    \
-    st8 [r16]=r23,16;   /* save ar.bspstore */                                          \
+(pUStk) st8 [r16]=r23,16;   /* save ar.bspstore */                                      \
     st8 [r17]=r31,16;   /* save predicates */                                           \
+(pKStk) adds r16=16,r16;    /* skip over ar_bspstore field */                           \
     ;;                                                                                  \
     st8 [r16]=r29,16;   /* save b0 */                                                   \
     st8 [r17]=r18,16;   /* save ar.rsc value for "loadrs" */                            \
@@ -174,22 +180,24 @@
     ;;                                                                                  \
 .mem.offset 0,0; st8.spill [r16]=r13,16;                                                \
 .mem.offset 8,0; st8.spill [r17]=r10,16;        /* save ar.fpsr */                      \
-    mov r13=r21;        /* establish `current' */                                       \
+(pUStk) VMX_MINSTATE_GET_CURRENT(r13);          /* establish `current' */               \
+(pKStk) movl r13=THIS_CPU(cpu_kr)+IA64_KR_CURRENT_OFFSET;/* From MINSTATE_GET_CURRENT */\
     ;;                                                                                  \
 .mem.offset 0,0; st8.spill [r16]=r15,16;                                                \
 .mem.offset 8,0; st8.spill [r17]=r14,16;                                                \
+(pKStk) ld8 r13=[r13];                          /* establish `current' */               \
     ;;                                                                                  \
 .mem.offset 0,0; st8.spill [r16]=r2,16;                                                 \
 .mem.offset 8,0; st8.spill [r17]=r3,16;                                                 \
     adds r2=IA64_PT_REGS_R16_OFFSET,r1;                                                 \
     ;;                                                                                  \
-    adds r16=IA64_VCPU_IIPA_OFFSET,r13;                                                 \
-    adds r17=IA64_VCPU_ISR_OFFSET,r13;                                                  \
-    mov r26=cr.iipa;                                                                    \
-    mov r27=cr.isr;                                                                     \
+(pUStk) adds r16=IA64_VCPU_IIPA_OFFSET,r13;                                             \
+(pUStk) adds r17=IA64_VCPU_ISR_OFFSET,r13;                                              \
+(pUStk) mov r26=cr.iipa;                                                                \
+(pUStk) mov r27=cr.isr;                                                                 \
     ;;                                                                                  \
-    st8 [r16]=r26;                                                                      \
-    st8 [r17]=r27;                                                                      \
+(pUStk) st8 [r16]=r26;                                                                  \
+(pUStk) st8 [r17]=r27;                                                                  \
     ;;                                                                                  \
     EXTRA;                                                                              \
     mov r8=ar.ccv;                                                                      \
@@ -263,10 +271,10 @@
     st8 [r24]=r9;       /* ar.csd */    \
     st8 [r25]=r10;      /* ar.ssd */    \
     ;;                                  \
-    mov r18=ar.unat;                    \
-    adds r19=PT(EML_UNAT)-PT(R4),r2;    \
+(pUStk)mov r18=ar.unat;                 \
+(pUStk)adds r19=PT(EML_UNAT)-PT(R4),r2; \
     ;;                                  \
-    st8 [r19]=r18;      /* eml_unat */
+(pUStk)st8 [r19]=r18;      /* eml_unat */
 
 #define VMX_SAVE_EXTRA                  \
 .mem.offset 0,0; st8.spill [r2]=r4,16;  \
