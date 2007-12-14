@@ -702,9 +702,6 @@ ENTRY(vmx_interrupt)
 
     ssm psr.ic
     ;;
-    srlz.i
-    ;;
-    (p15) ssm psr.i
     adds r3=8,r2		// set up second base pointer for SAVE_REST
     srlz.i			// ensure everybody knows psr.ic is back on
     ;;
@@ -1361,7 +1358,7 @@ ENTRY(vmx_dispatch_reflection)
 END(vmx_dispatch_reflection)
 
 ENTRY(vmx_dispatch_virtualization_fault)
-    VMX_SAVE_MIN_WITH_COVER_R19
+    VMX_SAVE_MIN_WITH_COVER
     ;;
     alloc r14=ar.pfs,0,0,2,0        // now it's safe (must be first in insn group!)
     mov out0=r13        //vcpu
@@ -1384,7 +1381,7 @@ END(vmx_dispatch_virtualization_fault)
 
 
 GLOBAL_ENTRY(vmx_dispatch_vexirq)
-    VMX_SAVE_MIN_WITH_COVER_R19
+    VMX_SAVE_MIN_WITH_COVER
     alloc r14=ar.pfs,0,0,1,0
     mov out0=r13
 
@@ -1424,8 +1421,7 @@ ENTRY(vmx_dispatch_tlb_miss)
 END(vmx_dispatch_tlb_miss)
 
 ENTRY(vmx_dispatch_break_fault)
-    VMX_SAVE_MIN_WITH_COVER_R19
-    ;;
+    VMX_SAVE_MIN_WITH_COVER
     ;;
     alloc r14=ar.pfs,0,0,4,0 // now it's safe (must be first in insn group!)
     mov out0=cr.ifa
@@ -1450,17 +1446,15 @@ END(vmx_dispatch_break_fault)
 
 
 ENTRY(vmx_dispatch_interrupt)
-    VMX_SAVE_MIN_WITH_COVER_R19	// uses r31; defines r2 and r3
+    VMX_SAVE_MIN_WITH_COVER	// uses r31; defines r2 and r3
     ;;
-    alloc r14=ar.pfs,0,0,2,0 // must be first in an insn group
+    alloc r14=ar.pfs,0,0,2,0	// must be first in an insn group
     mov out0=cr.ivr		// pass cr.ivr as first arg
     adds r3=8,r2		// set up second base pointer for SAVE_REST
     ;;
     ssm psr.ic
     ;;
     srlz.i
-    ;;
-    (p15) ssm psr.i
     movl r14=ia64_leave_hypervisor
     ;;
     VMX_SAVE_REST
