@@ -72,12 +72,18 @@
 #ifdef VTI_DEBUG
 #define IVT_DEBUG_MASK  (IVT_DEBUG_SIZE * (IVT_DEBUG_MAX - 1))
 #define VMX_DBG_FAULT(i)                \
+    mov r31=pr;                         \
+    mov r20=cr.ipsr;;                   \
+    tbit.z p6,p0=r20,IA64_PSR_VM_BIT;;  \
+(p6)movl r21=THIS_CPU(cpu_kr)+          \
+        IA64_KR_CURRENT_OFFSET;;        \
+(p6)ld8 r21=[r21];                      \
+    mov pr=r31;;                        \
     add r16=IVT_CUR_OFS,r21;            \
     add r17=IVT_DBG_OFS,r21;;           \
     ld8  r18=[r16];;                    \
     add r17=r18,r17;                    \
     mov r19=cr.iip;                     \
-    mov r20=cr.ipsr;                    \
     mov r22=cr.ifa;                     \
     mov r23=i;;                         \
     st8 [r17]=r19,8;                    \
