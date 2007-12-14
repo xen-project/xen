@@ -6,7 +6,6 @@
 # easily updated to future versions of the corresponding Linux files.
 
 acpi.h			-> linux/include/asm-ia64/acpi.h
-asmmacro.h		-> linux/include/asm-ia64/asmmacro.h
 atomic.h		-> linux/include/asm-ia64/atomic.h
 cache.h			-> linux/include/asm-ia64/cache.h
 gcc_intrin.h		-> linux/include/asm-ia64/gcc_intrin.h
