@@ -120,14 +120,9 @@ static void vlapic_clear_irr(int vector, struct vlapic *vlapic)
     vlapic_clear_vector(vector, &vlapic->regs->data[APIC_IRR]);
 }
 
-int vlapic_find_highest_irr(struct vlapic *vlapic)
+static int vlapic_find_highest_irr(struct vlapic *vlapic)
 {
-    int result;
-
-    result = vlapic_find_highest_vector(&vlapic->regs->data[APIC_IRR]);
-    ASSERT((result == -1) || (result >= 16));
-
-    return result;
+    return vlapic_find_highest_vector(&vlapic->regs->data[APIC_IRR]);
 }
 
 int vlapic_set_irq(struct vlapic *vlapic, uint8_t vec, uint8_t trig)
@@ -142,14 +137,9 @@ int vlapic_set_irq(struct vlapic *vlapic, uint8_t vec, uint8_t trig)
     return ret;
 }
 
-int vlapic_find_highest_isr(struct vlapic *vlapic)
+static int vlapic_find_highest_isr(struct vlapic *vlapic)
 {
-    int result;
-
-    result = vlapic_find_highest_vector(&vlapic->regs->data[APIC_ISR]);
-    ASSERT((result == -1) || (result >= 16));
-
-    return result;
+    return vlapic_find_highest_vector(&vlapic->regs->data[APIC_ISR]);
 }
 
 uint32_t vlapic_get_ppr(struct vlapic *vlapic)
@@ -454,11 +444,9 @@ static void vlapic_set_tdcr(struct vlapic *vlapic, unsigned int val)
                 "timer_divisor: %d", vlapic->hw.timer_divisor);
 }
 
-static void vlapic_read_aligned(struct vlapic *vlapic, unsigned int offset,
-                         unsigned int len, unsigned int *result)
+static void vlapic_read_aligned(
+    struct vlapic *vlapic, unsigned int offset, unsigned int *result)
 {
-    ASSERT((len == 4) && (offset >= 0) && (offset <= APIC_TDCR));
-
     switch ( offset )
     {
     case APIC_PROCPRI:
@@ -487,15 +475,9 @@ static unsigned long vlapic_read(struct vcpu *v, unsigned long address,
     if ( offset > APIC_TDCR )
         return 0;
 
-    /* some bugs on kernel cause read this with byte*/
-    if ( len != 4 )
-        HVM_DBG_LOG(DBG_LEVEL_VLAPIC,
-                    "read with len=0x%lx, should be 4 instead",
-                    len);
-
     alignment = offset & 0x3;
 
-    vlapic_read_aligned(vlapic, offset & ~0x3, 4, &tmp);
+    vlapic_read_aligned(vlapic, offset & ~0x3, &tmp);
     switch ( len )
     {
     case 1:
@@ -503,12 +485,14 @@ static unsigned long vlapic_read(struct vcpu *v, unsigned long address,
         break;
 
     case 2:
-        ASSERT( alignment != 3 );
+        if ( alignment == 3 )
+            goto unaligned_exit_and_crash;
         result = *(unsigned short *)((unsigned char *)&tmp + alignment);
         break;
 
     case 4:
-        ASSERT( alignment == 0 );
+        if ( alignment != 0 )
+            goto unaligned_exit_and_crash;
         result = *(unsigned int *)((unsigned char *)&tmp + alignment);
         break;
 
@@ -523,6 +507,9 @@ static unsigned long vlapic_read(struct vcpu *v, unsigned long address,
 
     return result;
 
+ unaligned_exit_and_crash:
+    gdprintk(XENLOG_ERR, "Unaligned LAPIC read len=0x%lx at offset=0x%x.\n",
+             len, offset);
  exit_and_crash:
     domain_crash(v->domain);
     return 0;
@@ -593,7 +580,6 @@ static void vlapic_write(struct vcpu *v, unsigned long address,
     {
     case APIC_TASKPRI:
         vlapic_set_reg(vlapic, APIC_TASKPRI, val & 0xff);
-        hvm_update_vtpr(v, (val >> 4) & 0x0f);
         break;
 
     case APIC_EOI:

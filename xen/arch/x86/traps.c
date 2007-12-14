@@ -1878,7 +1878,7 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
         eax = regs->eax;
         edx = regs->edx;
         res = ((u64)edx << 32) | eax;
-        switch ( regs->ecx )
+        switch ( (u32)regs->ecx )
         {
 #ifdef CONFIG_X86_64
         case MSR_FS_BASE:
@@ -1916,15 +1916,19 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
         case MSR_K8_PSTATE5:
         case MSR_K8_PSTATE6:
         case MSR_K8_PSTATE7:
-            if ( (cpufreq_controller != FREQCTL_dom0_kernel) ||
-                 (boot_cpu_data.x86_vendor != X86_VENDOR_AMD) ||
-                 wrmsr_safe(regs->ecx, eax, edx) )
+            if ( boot_cpu_data.x86_vendor != X86_VENDOR_AMD )
+                goto fail;
+            if ( cpufreq_controller != FREQCTL_dom0_kernel )
+                break;
+            if ( wrmsr_safe(regs->ecx, eax, edx) != 0 )
                 goto fail;
             break;
         case MSR_IA32_PERF_CTL:
-            if ( (cpufreq_controller != FREQCTL_dom0_kernel) ||
-                 (boot_cpu_data.x86_vendor != X86_VENDOR_INTEL) ||
-                 wrmsr_safe(regs->ecx, eax, edx) )
+            if ( boot_cpu_data.x86_vendor != X86_VENDOR_INTEL )
+                goto fail;
+            if ( cpufreq_controller != FREQCTL_dom0_kernel )
+                break;
+            if ( wrmsr_safe(regs->ecx, eax, edx) != 0 )
                 goto fail;
             break;
         default:
@@ -1944,7 +1948,7 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
         break;
 
     case 0x32: /* RDMSR */
-        switch ( regs->ecx )
+        switch ( (u32)regs->ecx )
         {
 #ifdef CONFIG_X86_64
         case MSR_FS_BASE:
@@ -1979,9 +1983,14 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
         case MSR_K8_PSTATE5:
         case MSR_K8_PSTATE6:
         case MSR_K8_PSTATE7:
-            if ( (cpufreq_controller != FREQCTL_dom0_kernel) ||
-                 (boot_cpu_data.x86_vendor != X86_VENDOR_AMD) ||
-                 rdmsr_safe(regs->ecx, regs->eax, regs->edx) )
+            if ( boot_cpu_data.x86_vendor != X86_VENDOR_AMD )
+                goto fail;
+            if ( cpufreq_controller != FREQCTL_dom0_kernel )
+            {
+                regs->eax = regs->edx = 0;
+                break;
+            }
+            if ( rdmsr_safe(regs->ecx, regs->eax, regs->edx) != 0 )
                 goto fail;
             break;
         case MSR_EFER:

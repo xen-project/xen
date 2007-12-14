@@ -2,7 +2,7 @@ Title   : How to do PCI Passthrough with VT-d
 Authors : Allen Kay    <allen.m.kay@intel.com>
           Weidong Han  <weidong.han@intel.com>
 Created : October-24-2007
-Updated : December-11-2007
+Updated : December-13-2007
 
 How to turn on VT-d in Xen
 --------------------------
@@ -39,6 +39,22 @@ VT-d spec specifies that all conventional PCI devices behind a
 PCIe-to-PCI bridge have to be assigned to the same domain.
 
 PCIe devices do not have this restriction.
+
+
+VT-d Works on OS:
+-----------------
+
+1) Host OS: PAE, 64-bit
+2) Guest OS: 32-bit, PAE, 64-bit
+
+Because current Xen doesn't support MSI, for guest OS which uses MSI by default, need to add "pci=nomsi" option on its grub, e.g. RHEL5, FC6.
+
+
+Combinations Tested:
+--------------------
+
+1) 64-bit host: 32/PAE/64 Linux/XP/Win2003/Vista guests
+2) PAE host: 32/PAE Linux/XP/Win2003/Vista guests
 
 
 VT-d Enabled Systems

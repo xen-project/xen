@@ -104,4 +104,4 @@ test:
 
 .PHONY: clean
 clean:
-	rm -rf build *.pyc *.pyo *.o *.a *~ $(CATALOGS) xen/util/xsm/xsm.py
+	rm -rf build *.pyc *.pyo *.o *.a *~ $(CATALOGS) xen/util/xsm/xsm.py xen/util/auxbin.pyc

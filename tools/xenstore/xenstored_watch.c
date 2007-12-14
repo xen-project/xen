@@ -125,6 +125,10 @@ void do_watch(struct connection *conn, struct buffered_data *in)
 
 	if (strstarts(vec[0], "@")) {
 		relative = false;
+		if (strlen(vec[0]) > XENSTORE_REL_PATH_MAX) {
+			send_error(conn, EINVAL);
+			return;
+		}
 		/* check if valid event */
 	} else {
 		relative = !strstarts(vec[0], "/");

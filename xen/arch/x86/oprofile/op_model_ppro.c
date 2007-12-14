@@ -104,6 +104,8 @@ static int ppro_check_ctrs(unsigned int const cpu,
 	int mode = xenoprofile_get_mode(current, regs);
 
 	for (i = 0 ; i < NUM_COUNTERS; ++i) {
+		if (!reset_value[i])
+			continue;
 		CTR_READ(low, high, msrs, i);
 		if (CTR_OVERFLOWED(low)) {
 			xenoprof_log_event(current, regs, eip, mode, i);
@@ -123,18 +125,30 @@ static int ppro_check_ctrs(unsigned int const cpu,
 static void ppro_start(struct op_msrs const * const msrs)
 {
 	unsigned int low,high;
-	CTRL_READ(low, high, msrs, 0);
-	CTRL_SET_ACTIVE(low);
-	CTRL_WRITE(low, high, msrs, 0);
+	int i;
+
+	for (i = 0; i < NUM_COUNTERS; ++i) {
+		if (reset_value[i]) {
+			CTRL_READ(low, high, msrs, i);
+			CTRL_SET_ACTIVE(low);
+			CTRL_WRITE(low, high, msrs, i);
+		}
+	}
 }
 
 
 static void ppro_stop(struct op_msrs const * const msrs)
 {
 	unsigned int low,high;
-	CTRL_READ(low, high, msrs, 0);
-	CTRL_SET_INACTIVE(low);
-	CTRL_WRITE(low, high, msrs, 0);
+	int i;
+
+	for (i = 0; i < NUM_COUNTERS; ++i) {
+		if (!reset_value[i])
+			continue;
+		CTRL_READ(low, high, msrs, i);
+		CTRL_SET_INACTIVE(low);
+		CTRL_WRITE(low, high, msrs, i);
+	}
 }
 
 

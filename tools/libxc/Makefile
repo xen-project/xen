@@ -125,7 +125,8 @@ TAGS:
 clean:
 	rm -rf *.rpm $(LIB) *~ $(DEPS) xen \
             $(CTRL_LIB_OBJS) $(CTRL_PIC_OBJS) \
-            $(GUEST_LIB_OBJS) $(GUEST_PIC_OBJS)
+            $(GUEST_LIB_OBJS) $(GUEST_PIC_OBJS) \
+            $(LIBELF_SRCS) libelf-private.h
 
 .PHONY: rpm
 rpm: build

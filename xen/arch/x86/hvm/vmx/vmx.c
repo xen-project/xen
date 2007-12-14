@@ -1011,13 +1011,6 @@ static enum hvm_intblk vmx_interrupt_blocked(
     if ( !(guest_cpu_user_regs()->eflags & X86_EFLAGS_IF) )
         return hvm_intblk_rflags_ie;
 
-    if ( intack.source == hvm_intsrc_lapic )
-    {
-        uint32_t tpr = vlapic_get_reg(vcpu_vlapic(v), APIC_TASKPRI) & 0xF0;
-        if ( (tpr >> 4) >= (intack.vector >> 4) )
-            return hvm_intblk_tpr;
-    }
-
     return hvm_intblk_none;
 }
 
@@ -1120,11 +1113,6 @@ static void vmx_inject_exception(
     }
 }
 
-static void vmx_update_vtpr(struct vcpu *v, unsigned long value)
-{
-    /* VMX doesn't have a V_TPR field */
-}
-
 static int vmx_event_pending(struct vcpu *v)
 {
     ASSERT(v == current);
@@ -1148,7 +1136,6 @@ static struct hvm_function_table vmx_function_table = {
     .update_guest_cr      = vmx_update_guest_cr,
     .update_guest_efer    = vmx_update_guest_efer,
     .flush_guest_tlbs     = vmx_flush_guest_tlbs,
-    .update_vtpr          = vmx_update_vtpr,
     .stts                 = vmx_stts,
     .set_tsc_offset       = vmx_set_tsc_offset,
     .inject_exception     = vmx_inject_exception,

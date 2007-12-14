@@ -1545,21 +1545,44 @@ def get_security_label(self, xspol=None):
         label = self.info.get('security_label', label)
     return label
 
+
+__cond = threading.Condition()
+__script_runner = None
+__orders = []
+
 def run_resource_label_change_script(resource, label, command):
-    def __run_resource_label_change_script(label, command):
+    global __cond, __orders, __script_runner
+
+    def __run_resource_label_change_script():
+        global __cond, __orders
         script = XendOptions.instance().get_resource_label_change_script()
         if script:
-            parms = {
-                'resource' : resource,
-                'label'    : label,
-                'command'  : command,
-            }
-            log.info("Running resource label change script %s: %s" %
-                     (script, parms))
-            parms.update(os.environ)
-            os.spawnve(os.P_WAIT, script[0], script, parms)
+            parms = {}
+            while True:
+                __cond.acquire()
+                if len(__orders) == 0:
+                    __cond.wait()
+
+                parms['label'], \
+                   parms['command'], \
+                   parms['resource'] = __orders[0]
+
+                __orders = __orders[1:]
+                __cond.release()
+
+                log.info("Running resource label change script %s: %s" %
+                         (script, parms))
+                parms.update(os.environ)
+                os.spawnve(os.P_WAIT, script[0], script, parms)
         else:
             log.info("No script given for relabeling of resources.")
-    thread = threading.Thread(target=__run_resource_label_change_script,
-                              args=(label,command))
-    thread.start()
+    if not __script_runner:
+        __script_runner = \
+                 threading.Thread(target=__run_resource_label_change_script,
+                                  args=())
+        __script_runner.start()
+
+    __cond.acquire()
+    __orders.append((label,command,resource))
+    __cond.notify()
+    __cond.release()

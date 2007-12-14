@@ -12,6 +12,7 @@
 #ifndef COMPAT
 #include <xen/guest_access.h>
 #include <xen/sched.h>
+#include <xen/event.h>
 #include <public/xenoprof.h>
 #include <xen/paging.h>
 #include <xsm/xsm.h>
@@ -747,14 +748,30 @@ int do_xenoprof_op(int op, XEN_GUEST_HANDLE(void) arg)
         break;
 
     case XENOPROF_stop:
+    {
+        struct domain *d;
+        struct vcpu *v;
+        int i;
+
         if ( xenoprof_state != XENOPROF_PROFILING )
         {
             ret = -EPERM;
             break;
         }
         xenoprof_arch_stop();
+
+        /* Flush remaining samples. */
+        for ( i = 0; i < adomains; i++ )
+        {
+            if ( !active_ready[i] )
+                continue;
+            d = active_domains[i];
+            for_each_vcpu(d, v)
+                send_guest_vcpu_virq(v, VIRQ_XENOPROF);
+        }
         xenoprof_state = XENOPROF_READY;
         break;
+    }
 
     case XENOPROF_disable_virq:
     {

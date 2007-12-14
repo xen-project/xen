@@ -38,7 +38,9 @@ The permitted character for paths set is ASCII alphanumerics and plus
 the four punctuation characters -/_@ (hyphen slash underscore atsign).
 @ should be avoided except to specify special watches (see below).
 Doubled slashes and trailing slashes (except to specify the root) are
-forbidden.  The empty path is also forbidden.
+forbidden.  The empty path is also forbidden.  Paths longer than 3072
+bytes are forbidden; clients specifying relative paths should keep
+them to within 2048 bytes.  (See XENSTORE_*_PATH_MAX in xs_wire.h.)
 
 
 Communication with xenstore is via either sockets, or event channel
@@ -55,6 +57,20 @@ A caller who sends several requests may receive the replies in any
 order and must use req_id (and tx_id, if applicable) to match up
 replies to requests.  (The current implementation always replies to
 requests in the order received but this should not be relied on.)
+
+The payload length (len field of the header) is limited to 4096
+(XENSTORE_PAYLOAD_MAX) in both directions.  If a client exceeds the
+limit, its xenstored connection will be immediately killed by
+xenstored, which is usually catastrophic from the client's point of
+view.  Clients (particularly domains, which cannot just reconnect)
+should avoid this.
+
+Existing clients do not always contain defences against overly long
+payloads.  Increasing xenstored's limit is therefore difficult; it
+would require negotiation with the client, and obviously would make
+parts of xenstore inaccessible to some clients.  In any case passing
+bulk data through xenstore is not recommended as the performance
+properties are poor.
 
 
 ---------- Xenstore protocol details - introduction ----------
@@ -174,6 +190,17 @@ WATCH			<wpath>|<token>|?
 	away, with <path> equal to <wpath>.  Watches may be triggered
 	spuriously.  The tx_id in a WATCH request is ignored.
 
+	Watches are supposed to be restricted by the permissions
+	system but in practice the implementation is imperfect.
+	Applications should not rely on being sent a notification for
+	paths that they cannot read; however, an application may rely
+	on being sent a watch when a path which it _is_ able to read
+	is deleted even if that leaves only a nonexistent unreadable
+	parent.  A notification may omitted if a node's permissions
+	are changed so as to make it unreadable, in which case future
+	notifications may be suppressed (and if the node is later made
+	readable, some notifications may have been lost).
+
 WATCH_EVENT					<epath>|<token>|
 	Unsolicited `reply' generated for matching modfication events
 	as described above.  req_id and tx_id are both 0.
@@ -182,7 +209,7 @@ WATCH_EVENT					<epath>|<token>|
 	modifed; however if the event was the recursive removal of an
 	parent of <wpath>, <epath> is just
 	<wpath> (rather than the actual path which was removed).  So
-	<epath> is a child of <epath>, regardless.
+	<epath> is a child of <wpath>, regardless.
 
 	Iff <wpath> for the watch was specified as a relative pathname,
 	the <epath> path will also be relative (with the same base,
@@ -192,7 +219,7 @@ UNWATCH			<wpath>|<token>|?
 
 ---------- Transactions ----------
 
-TRANSACTION_START	??			<transid>|
+TRANSACTION_START	|			<transid>|
 	<transid> is an opaque uint32_t allocated by xenstored
 	represented as unsigned decimal.  After this, transaction may
 	be referenced by using <transid> (as 32-bit binary) in the
@@ -201,11 +228,6 @@ TRANSACTION_START	??			<transid>|
 	It is not legal to send non-0 tx_id in TRANSACTION_START.
 	Currently xenstored has the bug that after 2^32 transactions
 	it will allocate the transid 0 for an actual transaction.
-
-	Clients using the provided xs.c bindings will send a single
-	nul byte for the argument payload.  We recommend that future
-	clients continue to do the same; any future extension will not
-	use that syntax.
 
 TRANSACTION_END		T|
 TRANSACTION_END		F|

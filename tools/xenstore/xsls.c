@@ -8,7 +8,7 @@
 #include <sys/ioctl.h>
 #include <termios.h>
 
-#define STRING_MAX PATH_MAX
+#define STRING_MAX XENSTORE_ABS_PATH_MAX+1024
 static int max_width = 80;
 static int desired_width = 60;
 static int show_whole_path = 0;
