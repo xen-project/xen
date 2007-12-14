@@ -33,7 +33,6 @@ xmlrpc_exports = [
 def err(msg):
     """Raise XSM-dummy exception.
     """
-    sys.stderr.write("XSM-dummyError: " + msg + "\n")
     raise XSMError(msg)
 
 def on():
@@ -123,3 +122,12 @@ def get_domain_label(domain):
 
 def set_domain_label():
     err("Command not supported under xsm 'dummy' module.")
+
+def dump_policy():
+    pass
+
+def dump_policy_file():
+    pass
+
+def get_ssid(domain):
+    err("No ssid has been assigned to any domain under xsm dummy module.")
