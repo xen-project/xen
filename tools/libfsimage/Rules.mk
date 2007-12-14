@@ -27,6 +27,6 @@ $(FSLIB): $(PIC_OBJS)
 	$(CC) $(CFLAGS) $(LDFLAGS) $(SHLIB_CFLAGS) -o $@ $^ -lfsimage $(FS_LIBDEPS)
 
 clean distclean:
-	rm -f $(PIC_OBJS) $(FSLIB)
+	rm -f $(PIC_OBJS) $(FSLIB) $(DEPS)
 
 -include $(DEPS)

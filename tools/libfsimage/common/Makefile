@@ -32,7 +32,7 @@ install: all
 	$(INSTALL_DATA) fsimage_grub.h $(DESTDIR)/usr/include
 
 clean distclean:
-	rm -f $(PIC_OBJS) $(LIB)
+	rm -f $(PIC_OBJS) $(LIB) $(DEPS)
 
 libfsimage.so: libfsimage.so.$(MAJOR)
 	ln -sf $< $@
