@@ -69,17 +69,6 @@ void die_if_kernel(char *str, struct pt_regs *regs, long err)
 	domain_crash_synchronous();
 }
 
-void vmx_die_if_kernel(char *str, struct pt_regs *regs, long err)
-{
-	if (vmx_user_mode(regs))
-		return;
-
-	printk("%s: %s %ld\n", __func__, str, err);
-	debugtrace_dump();
-	show_registers(regs);
-	domain_crash_synchronous();
-}
-
 long
 ia64_peek (struct task_struct *child, struct switch_stack *child_stack,
 	   unsigned long user_rbs_end, unsigned long addr, long *val)

@@ -461,14 +461,10 @@ ENTRY(vmx_break_fault)
     mov r31=pr
     mov r19=11
     mov r17=cr.iim
-    ;;
-#ifdef VTI_DEBUG
-    // break 0 is already handled in vmx_ia64_handle_break.
-    cmp.eq p6,p7=r17,r0
-    (p6) br.sptk vmx_fault_11
-    ;;
-#endif
     mov r29=cr.ipsr
+    ;;
+    tbit.z p6,p0=r29,IA64_PSR_VM_BIT
+(p6)br.sptk.many vmx_dispatch_break_fault /* make sure before access [r21] */
     adds r22=IA64_VCPU_BREAKIMM_OFFSET, r21
     ;;
     ld4 r22=[r22]
@@ -1426,7 +1422,7 @@ ENTRY(vmx_dispatch_tlb_miss)
 END(vmx_dispatch_tlb_miss)
 
 ENTRY(vmx_dispatch_break_fault)
-    VMX_SAVE_MIN_WITH_COVER
+    VMX_SAVE_MIN_WITH_COVER_NO_PANIC
     ;;
     alloc r14=ar.pfs,0,0,4,0 // now it's safe (must be first in insn group!)
     mov out0=cr.ifa
@@ -1439,12 +1435,12 @@ ENTRY(vmx_dispatch_break_fault)
     srlz.i                  // guarantee that interruption collection is on
     ;;
     (p15)ssm psr.i               // restore psr.i
-    movl r14=ia64_leave_hypervisor
+(pUStk)movl r14=ia64_leave_hypervisor
     ;;
+(pKStk)movl r14=ia64_leave_nested
     VMX_SAVE_REST
     mov rp=r14
     ;;
-    P6_BR_CALL_PANIC(.Lvmx_dispatch_break_fault_string)
     adds out1=16,sp
     br.call.sptk.many b6=vmx_ia64_handle_break
     ;;
@@ -1478,5 +1474,3 @@ END(vmx_dispatch_interrupt)
     .asciz "vmx_dispatch_vexirq\n"
 .Lvmx_dispatch_tlb_miss_string:
     .asciz "vmx_dispatch_tlb_miss\n"
-.Lvmx_dispatch_break_fault_string:
-    .asciz "vmx_dispatch_break_fault\n"

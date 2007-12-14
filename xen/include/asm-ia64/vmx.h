@@ -52,7 +52,6 @@ extern void set_rsv_reg_field_isr (struct vcpu *vcpu);
 extern void rsv_reg_field (struct vcpu *vcpu);
 extern void vmx_relinquish_guest_resources(struct domain *d);
 extern void vmx_relinquish_vcpu_resources(struct vcpu *v);
-extern void vmx_die_if_kernel(char *str, struct pt_regs *regs, long err);
 extern void vmx_send_assist_req(struct vcpu *v);
 extern void deliver_pal_init(struct vcpu *vcpu);
 extern void vmx_pend_pal_init(struct domain *d);

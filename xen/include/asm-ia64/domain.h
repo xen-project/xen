@@ -306,6 +306,11 @@ int
 do_perfmon_op(unsigned long cmd,
               XEN_GUEST_HANDLE(void) arg1, unsigned long arg2);
 
+void
+ia64_fault(unsigned long vector, unsigned long isr, unsigned long ifa,
+           unsigned long iim, unsigned long itir, unsigned long arg5,
+           unsigned long arg6, unsigned long arg7, unsigned long stack);
+
 #endif /* __ASM_DOMAIN_H__ */
 
 /*

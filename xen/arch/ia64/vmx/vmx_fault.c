@@ -56,7 +56,6 @@
 #define INITIAL_PSR_VALUE_AT_INTERRUPTION 0x0000001808028034
 
 
-extern void die_if_kernel(char *str, struct pt_regs *regs, long err);
 extern void rnat_consumption (VCPU *vcpu);
 extern void alt_itlb (VCPU *vcpu, u64 vadr);
 extern void itlb_fault (VCPU *vcpu, u64 vadr);
@@ -177,7 +176,7 @@ vmx_ia64_handle_break (unsigned long ifa, struct pt_regs *regs, unsigned long is
 
     perfc_incr(vmx_ia64_handle_break);
 #ifdef CRASH_DEBUG
-    if ((iim == 0 || iim == CDB_BREAK_NUM) && !guest_mode(regs) &&
+    if ((iim == 0 || iim == CDB_BREAK_NUM) && !vmx_user_mode(regs) &&
         IS_VMM_ADDRESS(regs->cr_iip)) {
         if (iim == 0)
             show_registers(regs);
@@ -185,17 +184,20 @@ vmx_ia64_handle_break (unsigned long ifa, struct pt_regs *regs, unsigned long is
     } else
 #endif
     {
-        if (iim == 0) 
-            vmx_die_if_kernel("Break 0 in Hypervisor.", regs, iim);
+        if (!vmx_user_mode(regs)) {
+            show_registers(regs);
+            gdprintk(XENLOG_DEBUG, "%s:%d imm %lx\n", __func__, __LINE__, iim);
+            ia64_fault(11 /* break fault */, isr, ifa, iim,
+                       0 /* cr.itir */, 0, 0, 0, (unsigned long)regs);
+        }
 
         if (ia64_psr(regs)->cpl == 0) {
             /* Allow hypercalls only when cpl = 0.  */
-            if (iim == d->arch.breakimm) {
-                ia64_hypercall(regs);
-                vcpu_increment_iip(v);
-                return IA64_NO_FAULT;
-            }
-            else if (iim == DOMN_PAL_REQUEST) {
+
+            /* normal hypercalls are handled by vmx_break_fault */
+            BUG_ON(iim == d->arch.breakimm);
+
+            if (iim == DOMN_PAL_REQUEST) {
                 pal_emul(v);
                 vcpu_increment_iip(v);
                 return IA64_NO_FAULT;
