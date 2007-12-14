@@ -37,6 +37,7 @@
 #include <xen/softirq.h>
 #include <xen/time.h>
 #include <asm/debugger.h>
+#include <asm/vmx_phy_mode.h>
 
 static DEFINE_SPINLOCK(efi_time_services_lock);
 
@@ -570,6 +571,45 @@ sal_emulator (long index, unsigned long in1, unsigned long in2,
 	return ((struct sal_ret_values) {status, r9, r10, r11});
 }
 
+static int
+safe_copy_to_guest(unsigned long to, void *from, long size)
+{
+	BUG_ON((unsigned)size > PAGE_SIZE);
+
+	if (VMX_DOMAIN(current)) {
+		if (is_virtual_mode(current)) {
+			thash_data_t *data;
+			unsigned long gpa, poff;
+
+			/* The caller must provide a DTR or DTC mapping */
+			data = vtlb_lookup(current, to, DSIDE_TLB);
+			if (data) {
+				gpa = data->page_flags & _PAGE_PPN_MASK;
+			} else {
+				data = vhpt_lookup(to);
+				if (!data)
+					return -1;
+				gpa = __mpa_to_gpa(
+					data->page_flags & _PAGE_PPN_MASK);
+				gpa &= _PAGE_PPN_MASK;
+			}
+			poff = POFFSET(to, data->ps);
+			if (poff + size > PSIZE(data->ps))
+				return -1;
+			to = PAGEALIGN(gpa, data->ps) | poff;
+		}
+		to |= XENCOMM_INLINE_FLAG;
+		if (xencomm_copy_to_guest((void *)to, from, size, 0) != 0)
+			return -1;
+		return 0;
+	} else {
+		/* check for vulnerability */
+		if (IS_VMM_ADDRESS(to) || IS_VMM_ADDRESS(to + size - 1))
+			panic_domain(NULL, "copy to bad address:0x%lx\n", to);
+		return copy_to_user((void __user *)to, from, size);
+	}
+}
+
 cpumask_t cpu_cache_coherent_map;
 
 struct cache_flush_args {
@@ -805,16 +845,13 @@ xen_pal_emulator(unsigned long index, u64 in1, u64 in2, u64 in3)
 					pm_buffer,
 					(pal_perf_mon_info_u_t *) &r9);
 			if (status != 0) {
-				while(1)
 				printk("PAL_PERF_MON_INFO fails ret=%ld\n", status);
 				break;
 			}
-			if (copy_to_user((void __user *)in1,pm_buffer,128)) {
-				while(1)
-				printk("xen_pal_emulator: PAL_PERF_MON_INFO "
-					"can't copy to user!!!!\n");
-				status = PAL_STATUS_UNIMPLEMENTED;
-				break;
+			if (safe_copy_to_guest(
+				in1, pm_buffer, sizeof(pm_buffer))) {
+				status = PAL_STATUS_EINVAL;
+				goto fail_to_copy;
 			}
 		}
 		break;
@@ -837,10 +874,11 @@ xen_pal_emulator(unsigned long index, u64 in1, u64 in2, u64 in3)
 		       consumes 10 mW, implemented and cache/TLB coherent.  */
 		    unsigned long res = 1000UL | (1000UL << 16) | (10UL << 32)
 			    | (1UL << 61) | (1UL << 60);
-		    if (copy_to_user ((void *)in1, &res, sizeof (res)))
+		    if (safe_copy_to_guest (in1, &res, sizeof (res))) {
 			    status = PAL_STATUS_EINVAL;    
-		    else
-			    status = PAL_STATUS_SUCCESS;
+			    goto fail_to_copy;
+		    }
+		    status = PAL_STATUS_SUCCESS;
 	        }
 		break;
 	    case PAL_HALT:
@@ -886,8 +924,13 @@ xen_pal_emulator(unsigned long index, u64 in1, u64 in2, u64 in3)
 		if (in1 == 0) {
 			char brand_info[128];
 			status = ia64_pal_get_brand_info(brand_info);
-			if (status == PAL_STATUS_SUCCESS)
-				copy_to_user((void *)in2, brand_info, 128);
+			if (status != PAL_STATUS_SUCCESS)
+				break;
+			if (safe_copy_to_guest(in2, brand_info,
+					       sizeof(brand_info))) {
+				status = PAL_STATUS_EINVAL;
+				goto fail_to_copy;
+			}
 		} else {
 			status = PAL_STATUS_EINVAL;
 		}
@@ -901,6 +944,12 @@ xen_pal_emulator(unsigned long index, u64 in1, u64 in2, u64 in3)
 		printk("%s: Unimplemented PAL Call %lu\n", __func__, index);
 		break;
 	}
+	return ((struct ia64_pal_retval) {status, r9, r10, r11});
+
+fail_to_copy:
+	gdprintk(XENLOG_WARNING,
+		"PAL(%ld) fail to copy!!! args 0x%lx 0x%lx 0x%lx\n",
+		index, in1, in2, in3);
 	return ((struct ia64_pal_retval) {status, r9, r10, r11});
 }
 
