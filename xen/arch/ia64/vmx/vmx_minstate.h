@@ -107,7 +107,6 @@
  */
 
 #define VMX_DO_SAVE_MIN(COVER,SAVE_IFS,EXTRA)                                           \
-    VMX_MINSTATE_GET_CURRENT(r16);      /* M (or M;;I) */                               \
     mov r27=ar.rsc;                     /* M */                                         \
     mov r20=r1;                         /* A */                                         \
     mov r25=ar.unat;                    /* M */                                         \
@@ -122,7 +121,7 @@
     ;;                                                                                  \
 (p6)br.spnt.few vmx_panic;                                                              \
     tbit.z p0,p15=r29,IA64_PSR_I_BIT;                                                   \
-    mov r1=r16;                                                                         \
+    VMX_MINSTATE_GET_CURRENT(r1);      /* M (or M;;I) */                                \
     /*    mov r21=r16;  */                                                              \
     /* switch from user to kernel RBS: */                                               \
     ;;                                                                                  \
@@ -137,7 +136,6 @@
     st8 [r16]=r29;      /* save cr.ipsr */                                              \
     ;;                                                                                  \
     lfetch.fault.excl.nt1 [r17];                                                        \
-    tbit.nz p15,p0=r29,IA64_PSR_I_BIT;                                                  \
     mov r29=b0                                                                          \
     ;;                                                                                  \
     adds r16=PT(R8),r1; /* initialize first base pointer */                             \
