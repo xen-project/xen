@@ -18,6 +18,9 @@
 #include <asm/vmmu.h>
 #include <public/xen.h>
 
+#ifdef PERF_COUNTERS
+#define PERFC(n) (THIS_CPU(perfcounters) + (IA64_PERFC_ ## n) * 4)
+#endif
 
 #define PAGE_PHYS	(__DIRTY_BITS | _PAGE_PL_PRIV | _PAGE_AR_RWX)
 
