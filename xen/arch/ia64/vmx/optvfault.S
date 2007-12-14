@@ -468,7 +468,7 @@ vmx_asm_thash_back1:
     ld8 r25=[r27]		// get vcpu->arch.arch_vmx.vrr[r23]'s value
     ;;
     // Fall-back to C if VF (long format) is set
-    tbit.nz p7,p0=r17,8
+    tbit.nz p6,p0=r17,8
     mov b0=r24
     (p6) br.cond.dpnt.many vmx_virtualization_fault_back
     extr.u r25=r25,2,6		// get rr.ps
