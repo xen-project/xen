@@ -1405,6 +1405,25 @@ void hvm_cpuid(unsigned int input, unsigned int *eax, unsigned int *ebx,
     }
 }
 
+enum hvm_intblk hvm_interrupt_blocked(struct vcpu *v, struct hvm_intack intack)
+{
+    enum hvm_intblk r;
+    ASSERT(v == current);
+
+    r = hvm_funcs.interrupt_blocked(v, intack);
+    if ( r != hvm_intblk_none )
+        return r;
+
+    if ( intack.source == hvm_intsrc_lapic )
+    {
+        uint32_t tpr = vlapic_get_reg(vcpu_vlapic(v), APIC_TASKPRI) & 0xF0;
+        if ( (tpr >> 4) >= (intack.vector >> 4) )
+            return hvm_intblk_tpr;
+    }
+
+    return r;
+}
+
 static long hvm_grant_table_op(
     unsigned int cmd, XEN_GUEST_HANDLE(void) uop, unsigned int count)
 {

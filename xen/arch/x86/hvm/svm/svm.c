@@ -443,10 +443,6 @@ static enum hvm_intblk svm_interrupt_blocked(
     if ( !(guest_cpu_user_regs()->eflags & X86_EFLAGS_IF) )
         return hvm_intblk_rflags_ie;
 
-    if ( (intack.source == hvm_intsrc_lapic) &&
-         ((vmcb->vintr.fields.tpr & 0xf) >= (intack.vector >> 4)) )
-        return hvm_intblk_tpr;
-
     return hvm_intblk_none;
 }
 
@@ -520,13 +516,6 @@ static void svm_flush_guest_tlbs(void)
      * next VMRUN.  (If ASIDs are disabled, the whole TLB is flushed on
      * VMRUN anyway). */
     svm_asid_inc_generation();
-}
-
-static void svm_update_vtpr(struct vcpu *v, unsigned long value)
-{
-    struct vmcb_struct *vmcb = v->arch.hvm_svm.vmcb;
-
-    vmcb->vintr.fields.tpr = value & 0x0f;
 }
 
 static void svm_sync_vmcb(struct vcpu *v)
@@ -788,6 +777,10 @@ static void svm_do_resume(struct vcpu *v)
         svm_asid_init_vcpu(v);
     }
 
+    /* Reflect the vlapic's TPR in the hardware vtpr */
+    v->arch.hvm_svm.vmcb->vintr.fields.tpr = 
+        (vlapic_get_reg(vcpu_vlapic(v), APIC_TASKPRI) & 0xFF) >> 4;
+
     hvm_do_resume(v);
     reset_stack_and_jump(svm_asm_do_resume);
 }
@@ -885,7 +878,6 @@ static struct hvm_function_table svm_function_table = {
     .update_guest_cr      = svm_update_guest_cr,
     .update_guest_efer    = svm_update_guest_efer,
     .flush_guest_tlbs     = svm_flush_guest_tlbs,
-    .update_vtpr          = svm_update_vtpr,
     .stts                 = svm_stts,
     .set_tsc_offset       = svm_set_tsc_offset,
     .inject_exception     = svm_inject_exception,
@@ -2212,6 +2204,10 @@ asmlinkage void svm_vmexit_handler(struct cpu_user_regs *regs)
         domain_crash(v->domain);
         break;
     }
+
+    /* The exit may have updated the TPR: reflect this in the hardware vtpr */
+    vmcb->vintr.fields.tpr = 
+        (vlapic_get_reg(vcpu_vlapic(v), APIC_TASKPRI) & 0xFF) >> 4;
 }
 
 asmlinkage void svm_trace_vmentry(void)

@@ -580,7 +580,6 @@ static void vlapic_write(struct vcpu *v, unsigned long address,
     {
     case APIC_TASKPRI:
         vlapic_set_reg(vlapic, APIC_TASKPRI, val & 0xff);
-        hvm_update_vtpr(v, (val >> 4) & 0x0f);
         break;
 
     case APIC_EOI:

@@ -106,11 +106,6 @@ struct hvm_function_table {
     void (*flush_guest_tlbs)(void);
 
     /*
-     * Reflect the virtual APIC's value in the guest's V_TPR register
-     */
-    void (*update_vtpr)(struct vcpu *v, unsigned long value);
-
-    /*
      * Update specifics of the guest state:
      * 1) TS bit in guest cr0 
      * 2) TSC offset in guest
@@ -161,12 +156,8 @@ u64 hvm_get_guest_tsc(struct vcpu *v);
 #define hvm_long_mode_enabled(v) (v,0)
 #endif
 
-static inline enum hvm_intblk
-hvm_interrupt_blocked(struct vcpu *v, struct hvm_intack intack)
-{
-    ASSERT(v == current);
-    return hvm_funcs.interrupt_blocked(v, intack);
-}
+enum hvm_intblk
+hvm_interrupt_blocked(struct vcpu *v, struct hvm_intack intack);
 
 static inline int
 hvm_guest_x86_mode(struct vcpu *v)
@@ -182,12 +173,6 @@ static inline void
 hvm_update_host_cr3(struct vcpu *v)
 {
     hvm_funcs.update_host_cr3(v);
-}
-
-static inline void
-hvm_update_vtpr(struct vcpu *v, unsigned long value)
-{
-    hvm_funcs.update_vtpr(v, value);
 }
 
 static inline void hvm_update_guest_cr(struct vcpu *v, unsigned int cr)
