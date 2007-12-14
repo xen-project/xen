@@ -1425,7 +1425,6 @@ static hvm_hypercall_t *hvm_hypercall32_table[NR_hypercalls] = {
     HYPERCALL(memory_op),
     [ __HYPERVISOR_grant_table_op ] = (hvm_hypercall_t *)hvm_grant_table_op,
     HYPERCALL(xen_version),
-    HYPERCALL(grant_table_op),
     HYPERCALL(event_channel_op),
     HYPERCALL(sched_op),
     HYPERCALL(hvm_op)
@@ -1478,7 +1477,6 @@ static hvm_hypercall_t *hvm_hypercall64_table[NR_hypercalls] = {
     HYPERCALL(memory_op),
     [ __HYPERVISOR_grant_table_op ] = (hvm_hypercall_t *)hvm_grant_table_op,
     HYPERCALL(xen_version),
-    HYPERCALL(grant_table_op),
     HYPERCALL(event_channel_op),
     HYPERCALL(sched_op),
     HYPERCALL(hvm_op)
@@ -1488,7 +1486,6 @@ static hvm_hypercall_t *hvm_hypercall32_table[NR_hypercalls] = {
     [ __HYPERVISOR_memory_op ] = (hvm_hypercall_t *)do_memory_op_compat32,
     [ __HYPERVISOR_grant_table_op ] = (hvm_hypercall_t *)hvm_grant_table_op,
     HYPERCALL(xen_version),
-    HYPERCALL(grant_table_op),
     HYPERCALL(event_channel_op),
     HYPERCALL(sched_op),
     HYPERCALL(hvm_op)
