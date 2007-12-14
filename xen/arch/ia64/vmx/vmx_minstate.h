@@ -120,7 +120,7 @@
 (p6) movl out0=panic_string;            \
 (p6) br.call.spnt.few b6=panic;
 
-#define VMX_DO_SAVE_MIN(COVER,SAVE_IFS,EXTRA)                                           \
+#define VMX_DO_SAVE_MIN(COVER,SAVE_IFS,EXTRA,VMX_PANIC)                                 \
     mov r27=ar.rsc;                     /* M */                                         \
     mov r20=r1;                         /* A */                                         \
     mov r25=ar.unat;                    /* M */                                         \
@@ -134,10 +134,8 @@
     tbit.z p0,p15=r29,IA64_PSR_I_BIT;                                                   \
     ;;                                                                                  \
 (pUStk) tbit.nz.and p6,p0=r18,IA64_ISR_NI_BIT;                                          \
-    ;;                                                                                  \
-    P6_BR_VMX_PANIC                                                                     \
 (pUStk)VMX_MINSTATE_GET_CURRENT(r1);                                                    \
-    /*    mov r21=r16;  */                                                              \
+    VMX_PANIC                                                                           \
     /* switch from user to kernel RBS: */                                               \
     ;;                                                                                  \
     invala;                             /* M */                                         \
@@ -299,9 +297,11 @@
     ;;                                  \
     st8 [r2]=r26;       /* eml_unat */
 
-#define VMX_SAVE_MIN_WITH_COVER     VMX_DO_SAVE_MIN(cover, mov r30=cr.ifs,)
-#define VMX_SAVE_MIN_WITH_COVER_R19 VMX_DO_SAVE_MIN(cover, mov r30=cr.ifs, mov r15=r19)
-#define VMX_SAVE_MIN                VMX_DO_SAVE_MIN(     , mov r30=r0, )
+#define VMX_SAVE_MIN_WITH_COVER     VMX_DO_SAVE_MIN(cover, mov r30=cr.ifs,, P6_BR_VMX_PANIC)
+#define VMX_SAVE_MIN_WITH_COVER_NO_PANIC    \
+                                    VMX_DO_SAVE_MIN(cover, mov r30=cr.ifs,, )
+#define VMX_SAVE_MIN_WITH_COVER_R19 VMX_DO_SAVE_MIN(cover, mov r30=cr.ifs, mov r15=r19, P6_BR_VMX_PANIC)
+#define VMX_SAVE_MIN                VMX_DO_SAVE_MIN(     , mov r30=r0,, P6_BR_VMX_PANIC)
 
 /*
  * Local variables:
