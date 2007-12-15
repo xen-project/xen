@@ -61,12 +61,6 @@
  * and if we do flush, re-do the walk.  If anything has changed, then 
  * pause all the other vcpus and do the walk *again*.
  *
- * WP DISABLED
- * Consider how to implement having the WP bit of CR0 set to 0.  
- * Since we need to be able to cause write faults to pagetables, this might
- * end up looking like not having the (guest) pagetables present at all in 
- * HVM guests...
- *
  * PSE disabled / PSE36
  * We don't support any modes other than PSE enabled, PSE36 disabled.
  * Neither of those would be hard to change, but we'd need to be able to 
@@ -219,11 +213,17 @@ static uint32_t mandatory_flags(struct vcpu *v, uint32_t pfec)
         /* 1   1   1   0 */ _PAGE_PRESENT|_PAGE_USER|_PAGE_NX_BIT,
         /* 1   1   1   1 */ _PAGE_PRESENT|_PAGE_RW|_PAGE_USER|_PAGE_NX_BIT,
     };
-    uint32_t f = flags[(pfec & 0x1f) >> 1];
+
     /* Don't demand not-NX if the CPU wouldn't enforce it. */
     if ( !guest_supports_nx(v) )
-        f &= ~_PAGE_NX_BIT;
-    return f;
+        pfec &= ~PFEC_insn_fetch;
+
+    /* Don't demand R/W if the CPU wouldn't enforce it. */
+    if ( is_hvm_vcpu(v) && unlikely(!hvm_wp_enabled(v)) 
+         && !(pfec & PFEC_user_mode) )
+        pfec &= ~PFEC_write_access;
+
+    return flags[(pfec & 0x1f) >> 1];
 }
 
 /* Modify a guest pagetable entry to set the Accessed and Dirty bits.
@@ -262,7 +262,8 @@ static uint32_t set_ad_bits(void *guest_p, void *walk_p, int set_dirty)
  * from any guest PT pages we see, as we will be shadowing them soon
  * and will rely on the contents' not having changed.
  * 
- * Returns 0 for success or non-zero if the walk did not complete.
+ * Returns 0 for success, or the set of permission bits that we failed on 
+ * if the walk did not complete.
  * N.B. This is different from the old return code but almost no callers
  * checked the old return code anyway.
  */
@@ -2717,8 +2718,9 @@ static int sh_page_fault(struct vcpu *v,
     fetch_type_t ft = 0;
     p2m_type_t p2mt;
 
-    SHADOW_PRINTK("d:v=%u:%u va=%#lx err=%u\n",
-                   v->domain->domain_id, v->vcpu_id, va, regs->error_code);
+    SHADOW_PRINTK("d:v=%u:%u va=%#lx err=%u, rip=%lx\n",
+                  v->domain->domain_id, v->vcpu_id, va, regs->error_code,
+                  regs->rip);
 
     perfc_incr(shadow_fault);
     //
@@ -2790,7 +2792,7 @@ static int sh_page_fault(struct vcpu *v,
     shadow_lock(d);
     
     shadow_audit_tables(v);
-                   
+    
     if ( guest_walk_tables(v, va, &gw, regs->error_code, 1) != 0 )
     {
         perfc_incr(shadow_fault_bail_real_fault);
@@ -2882,6 +2884,16 @@ static int sh_page_fault(struct vcpu *v,
         gpa = guest_walk_to_gpa(&gw);
         goto mmio;
     }
+
+    /* In HVM guests, we force CR0.WP always to be set, so that the
+     * pagetables are always write-protected.  If the guest thinks
+     * CR0.WP is clear, we must emulate faulting supervisor writes to
+     * allow the guest to write through read-only PTEs.  Emulate if the 
+     * fault was a non-user write to a present page.  */
+    if ( is_hvm_domain(d) 
+         && unlikely(!hvm_wp_enabled(v)) 
+         && regs->error_code == (PFEC_write_access|PFEC_page_present) )
+        goto emulate;
 
     perfc_incr(shadow_fault_fixed);
     d->arch.paging.log_dirty.fault_count++;
@@ -3968,25 +3980,17 @@ int sh_remove_l3_shadow(struct vcpu *v, mfn_t sl4mfn, mfn_t sl3mfn)
 /**************************************************************************/
 /* Handling HVM guest writes to pagetables  */
 
-/* Check that the user is allowed to perform this write. 
- * Returns a mapped pointer to write to, and the mfn it's on,
- * or NULL for error. */
-static inline void * emulate_map_dest(struct vcpu *v,
-                                      unsigned long vaddr,
-                                      struct sh_emulate_ctxt *sh_ctxt,
-                                      mfn_t *mfnp)
+/* Translate a VA to an MFN, injecting a page-fault if we fail */
+static mfn_t emulate_gva_to_mfn(struct vcpu *v,
+                                unsigned long vaddr,
+                                struct sh_emulate_ctxt *sh_ctxt)
 {
-    uint32_t pfec;
     unsigned long gfn;
     mfn_t mfn;
     p2m_type_t p2mt;
+    uint32_t pfec = PFEC_page_present | PFEC_write_access;
 
-    /* We don't emulate user-mode writes to page tables */
-    if ( ring_3(sh_ctxt->ctxt.regs) ) 
-        return NULL;
-
-    /* Translate the VA, and exit with a page-fault if we fail */
-    pfec = PFEC_page_present | PFEC_write_access;
+    /* Translate the VA to a GFN */
     gfn = sh_gva_to_gfn(v, vaddr, &pfec);
     if ( gfn == INVALID_GFN ) 
     {
@@ -3994,84 +3998,184 @@ static inline void * emulate_map_dest(struct vcpu *v,
             hvm_inject_exception(TRAP_page_fault, pfec, vaddr);
         else
             propagate_page_fault(vaddr, pfec);
-        return NULL;
+        return _mfn(INVALID_MFN);
     }
 
-    /* Translate the GFN */
+    /* Translate the GFN to an MFN */
     mfn = gfn_to_mfn(v->domain, _gfn(gfn), &p2mt);
     if ( p2m_is_ram(p2mt) )
     {
         ASSERT(mfn_valid(mfn));
-        *mfnp = mfn;
         v->arch.paging.last_write_was_pt = !!sh_mfn_is_a_page_table(mfn);
-        return sh_map_domain_page(mfn) + (vaddr & ~PAGE_MASK);
+        return mfn;
+    }
+ 
+    return _mfn(INVALID_MFN);
+}
+
+/* Check that the user is allowed to perform this write. 
+ * Returns a mapped pointer to write to, or NULL for error. */
+static void * emulate_map_dest(struct vcpu *v,
+                               unsigned long vaddr,
+                               u32 bytes,
+                               struct sh_emulate_ctxt *sh_ctxt)
+{
+    unsigned long offset;
+    void *map = NULL;
+
+    /* We don't emulate user-mode writes to page tables */
+    if ( ring_3(sh_ctxt->ctxt.regs) ) 
+        return NULL;
+
+    sh_ctxt->mfn1 = emulate_gva_to_mfn(v, vaddr, sh_ctxt);
+    if ( !mfn_valid(sh_ctxt->mfn1) ) 
+        return NULL;
+
+    /* Unaligned writes mean probably this isn't a pagetable */
+    if ( vaddr & (bytes - 1) )
+        sh_remove_shadows(v, sh_ctxt->mfn1, 0, 0 /* Slow, can fail */ );
+
+    if ( likely(((vaddr + bytes - 1) & PAGE_MASK) == (vaddr & PAGE_MASK)) )
+    {
+        /* Whole write fits on a single page */
+        sh_ctxt->mfn2 = _mfn(INVALID_MFN);
+        map = sh_map_domain_page(sh_ctxt->mfn1) + (vaddr & ~PAGE_MASK);
     }
     else 
-        return NULL;
-}
+    {
+        /* Cross-page emulated writes are only supported for HVM guests; 
+         * PV guests ought to know better */
+        if ( !is_hvm_vcpu(v) )
+            return NULL;
 
-static int safe_not_to_verify_write(mfn_t gmfn, void *dst, void *src, 
-                                    int bytes)
-{
+        /* This write crosses a page boundary.  Translate the second page */
+        sh_ctxt->mfn2 = emulate_gva_to_mfn(v, (vaddr + bytes - 1) & PAGE_MASK,
+                                           sh_ctxt);
+        if ( !mfn_valid(sh_ctxt->mfn2) ) 
+            return NULL;
+
+        /* Cross-page writes mean probably not a pagetable */
+        sh_remove_shadows(v, sh_ctxt->mfn2, 0, 0 /* Slow, can fail */ );
+        
+        /* Hack: we map the pages into the vcpu's LDT space, since we
+         * know that we're not going to need the LDT for HVM guests, 
+         * and only HVM guests are allowed unaligned writes. */
+        ASSERT(is_hvm_vcpu(v));
+        map = (void *)LDT_VIRT_START(v);
+        offset = l1_linear_offset((unsigned long) map);
+        l1e_write(&__linear_l1_table[offset],
+                  l1e_from_pfn(mfn_x(sh_ctxt->mfn1), __PAGE_HYPERVISOR));
+        l1e_write(&__linear_l1_table[offset + 1],
+                  l1e_from_pfn(mfn_x(sh_ctxt->mfn2), __PAGE_HYPERVISOR));
+        flush_tlb_local();
+        map += (vaddr & ~PAGE_MASK);
+    }
+    
 #if (SHADOW_OPTIMIZATIONS & SHOPT_SKIP_VERIFY)
-    struct page_info *pg = mfn_to_page(gmfn);
-    if ( !(pg->shadow_flags & SHF_32) 
-         && ((unsigned long)dst & 7) == 0 )
-    {
-        /* Not shadowed 32-bit: aligned 64-bit writes that leave the
-         * present bit unset are safe to ignore. */
-        if ( (*(u64*)src & _PAGE_PRESENT) == 0 
-             && (*(u64*)dst & _PAGE_PRESENT) == 0 )
-            return 1;
-    }
-    else if ( !(pg->shadow_flags & (SHF_PAE|SHF_64)) 
-              && ((unsigned long)dst & 3) == 0 )
-    {
-        /* Not shadowed PAE/64-bit: aligned 32-bit writes that leave the
-         * present bit unset are safe to ignore. */
-        if ( (*(u32*)src & _PAGE_PRESENT) == 0 
-             && (*(u32*)dst & _PAGE_PRESENT) == 0 )
-            return 1;        
-    }
+    /* Remember if the bottom bit was clear, so we can choose not to run
+     * the change through the verify code if it's still clear afterwards */
+    sh_ctxt->low_bit_was_clear = map != NULL && !(*(u8 *)map & _PAGE_PRESENT);
 #endif
-    return 0;
+
+    return map;
 }
 
+/* Tidy up after the emulated write: mark pages dirty, verify the new
+ * contents, and undo the mapping */
+static void emulate_unmap_dest(struct vcpu *v,
+                               void *addr,
+                               u32 bytes,
+                               struct sh_emulate_ctxt *sh_ctxt)
+{
+    u32 b1 = bytes, b2 = 0, shflags;
+
+    ASSERT(mfn_valid(sh_ctxt->mfn1));
+
+    /* If we are writing lots of PTE-aligned zeros, might want to unshadow */
+    if ( likely(bytes >= 4)
+         && (*(u32 *)addr == 0)
+         && ((unsigned long) addr & ((sizeof (guest_intpte_t)) - 1)) == 0 )
+        check_for_early_unshadow(v, sh_ctxt->mfn1);
+    else
+        reset_early_unshadow(v);
+
+    /* We can avoid re-verifying the page contents after the write if:
+     *  - it was no larger than the PTE type of this pagetable;
+     *  - it was aligned to the PTE boundaries; and
+     *  - _PAGE_PRESENT was clear before and after the write. */
+    shflags = mfn_to_page(sh_ctxt->mfn1)->shadow_flags;
+#if (SHADOW_OPTIMIZATIONS & SHOPT_SKIP_VERIFY)
+    if ( sh_ctxt->low_bit_was_clear
+         && !(*(u8 *)addr & _PAGE_PRESENT)
+         && ((!(shflags & SHF_32)
+              /* Not shadowed 32-bit: aligned 64-bit writes that leave
+               * the present bit unset are safe to ignore. */
+              && ((unsigned long)addr & 7) == 0
+              && bytes <= 8)
+             ||
+             (!(shflags & (SHF_PAE|SHF_64))
+              /* Not shadowed PAE/64-bit: aligned 32-bit writes that
+               * leave the present bit unset are safe to ignore. */
+              && ((unsigned long)addr & 3) == 0
+              && bytes <= 4)) )
+    {
+        /* Writes with this alignment constraint can't possibly cross pages */
+        ASSERT(!mfn_valid(sh_ctxt->mfn2)); 
+    }
+    else 
+#endif /* SHADOW_OPTIMIZATIONS & SHOPT_SKIP_VERIFY */
+    {        
+        if ( unlikely(mfn_valid(sh_ctxt->mfn2)) )
+        {
+            /* Validate as two writes, one to each page */
+            b1 = PAGE_SIZE - (((unsigned long)addr) & ~PAGE_MASK);
+            b2 = bytes - b1;
+            ASSERT(b2 < bytes);
+        }
+        if ( likely(b1 > 0) )
+            sh_validate_guest_pt_write(v, sh_ctxt->mfn1, addr, b1);
+        if ( unlikely(b2 > 0) )
+            sh_validate_guest_pt_write(v, sh_ctxt->mfn2, addr + b1, b2);
+    }
+
+    paging_mark_dirty(v->domain, mfn_x(sh_ctxt->mfn1));
+
+    if ( unlikely(mfn_valid(sh_ctxt->mfn2)) )
+    {
+        unsigned long offset;
+        paging_mark_dirty(v->domain, mfn_x(sh_ctxt->mfn2));
+        /* Undo the hacky two-frame contiguous map. */
+        ASSERT(((unsigned long) addr & PAGE_MASK) == LDT_VIRT_START(v));
+        offset = l1_linear_offset((unsigned long) addr);
+        l1e_write(&__linear_l1_table[offset], l1e_empty());
+        l1e_write(&__linear_l1_table[offset + 1], l1e_empty());
+        flush_tlb_all();
+    }
+    else 
+        sh_unmap_domain_page(addr);
+}
 
 int
 sh_x86_emulate_write(struct vcpu *v, unsigned long vaddr, void *src,
                       u32 bytes, struct sh_emulate_ctxt *sh_ctxt)
 {
-    mfn_t mfn;
     void *addr;
-    int skip;
 
-    if ( vaddr & (bytes-1) )
+    /* Unaligned writes are only acceptable on HVM */
+    if ( (vaddr & (bytes - 1)) && !is_hvm_vcpu(v)  )
         return X86EMUL_UNHANDLEABLE;
 
-    ASSERT(((vaddr & ~PAGE_MASK) + bytes) <= PAGE_SIZE);
     shadow_lock(v->domain);
-
-    addr = emulate_map_dest(v, vaddr, sh_ctxt, &mfn);
+    addr = emulate_map_dest(v, vaddr, bytes, sh_ctxt);
     if ( addr == NULL )
     {
         shadow_unlock(v->domain);
         return X86EMUL_EXCEPTION;
     }
 
-    skip = safe_not_to_verify_write(mfn, addr, src, bytes);
     memcpy(addr, src, bytes);
-    if ( !skip ) sh_validate_guest_pt_write(v, mfn, addr, bytes);
 
-    /* If we are writing zeros to this page, might want to unshadow */
-    if ( likely(bytes >= 4) && (*(u32 *)addr == 0) && is_lo_pte(vaddr) )
-        check_for_early_unshadow(v, mfn);
-    else
-        reset_early_unshadow(v);
-    
-    paging_mark_dirty(v->domain, mfn_x(mfn));
-
-    sh_unmap_domain_page(addr);
+    emulate_unmap_dest(v, addr, bytes, sh_ctxt);
     shadow_audit_tables(v);
     shadow_unlock(v->domain);
     return X86EMUL_OKAY;
@@ -4082,25 +4186,22 @@ sh_x86_emulate_cmpxchg(struct vcpu *v, unsigned long vaddr,
                         unsigned long old, unsigned long new,
                         unsigned int bytes, struct sh_emulate_ctxt *sh_ctxt)
 {
-    mfn_t mfn;
     void *addr;
     unsigned long prev;
-    int rv = X86EMUL_OKAY, skip;
+    int rv = X86EMUL_OKAY;
 
-    ASSERT(bytes <= sizeof(unsigned long));
-    shadow_lock(v->domain);
-
-    if ( vaddr & (bytes-1) )
+    /* Unaligned writes are only acceptable on HVM */
+    if ( (vaddr & (bytes - 1)) && !is_hvm_vcpu(v)  )
         return X86EMUL_UNHANDLEABLE;
 
-    addr = emulate_map_dest(v, vaddr, sh_ctxt, &mfn);
+    shadow_lock(v->domain);
+
+    addr = emulate_map_dest(v, vaddr, bytes, sh_ctxt);
     if ( addr == NULL )
     {
         shadow_unlock(v->domain);
         return X86EMUL_EXCEPTION;
     }
-
-    skip = safe_not_to_verify_write(mfn, &new, &old, bytes);
 
     switch ( bytes )
     {
@@ -4113,26 +4214,14 @@ sh_x86_emulate_cmpxchg(struct vcpu *v, unsigned long vaddr,
         prev = ~old;
     }
 
-    if ( prev == old )
-    {
-        if ( !skip ) sh_validate_guest_pt_write(v, mfn, addr, bytes);
-    }
-    else
+    if ( prev != old ) 
         rv = X86EMUL_CMPXCHG_FAILED;
 
     SHADOW_DEBUG(EMULATE, "va %#lx was %#lx expected %#lx"
                   " wanted %#lx now %#lx bytes %u\n",
                   vaddr, prev, old, new, *(unsigned long *)addr, bytes);
 
-    /* If we are writing zeros to this page, might want to unshadow */
-    if ( likely(bytes >= 4) && (*(u32 *)addr == 0) && is_lo_pte(vaddr) )
-        check_for_early_unshadow(v, mfn);
-    else
-        reset_early_unshadow(v);
-
-    paging_mark_dirty(v->domain, mfn_x(mfn));
-
-    sh_unmap_domain_page(addr);
+    emulate_unmap_dest(v, addr, bytes, sh_ctxt);
     shadow_audit_tables(v);
     shadow_unlock(v->domain);
     return rv;
@@ -4144,17 +4233,17 @@ sh_x86_emulate_cmpxchg8b(struct vcpu *v, unsigned long vaddr,
                           unsigned long new_lo, unsigned long new_hi,
                           struct sh_emulate_ctxt *sh_ctxt)
 {
-    mfn_t mfn;
     void *addr;
     u64 old, new, prev;
-    int rv = X86EMUL_OKAY, skip;
+    int rv = X86EMUL_OKAY;
 
-    if ( vaddr & 7 )
+    /* Unaligned writes are only acceptable on HVM */
+    if ( (vaddr & 7) && !is_hvm_vcpu(v) )
         return X86EMUL_UNHANDLEABLE;
 
     shadow_lock(v->domain);
 
-    addr = emulate_map_dest(v, vaddr, sh_ctxt, &mfn);
+    addr = emulate_map_dest(v, vaddr, 8, sh_ctxt);
     if ( addr == NULL )
     {
         shadow_unlock(v->domain);
@@ -4163,25 +4252,12 @@ sh_x86_emulate_cmpxchg8b(struct vcpu *v, unsigned long vaddr,
 
     old = (((u64) old_hi) << 32) | (u64) old_lo;
     new = (((u64) new_hi) << 32) | (u64) new_lo;
-    skip = safe_not_to_verify_write(mfn, &new, &old, 8);
     prev = cmpxchg(((u64 *)addr), old, new);
 
-    if ( prev == old )
-    {
-        if ( !skip ) sh_validate_guest_pt_write(v, mfn, addr, 8);
-    }
-    else
+    if ( prev != old )
         rv = X86EMUL_CMPXCHG_FAILED;
 
-    /* If we are writing zeros to this page, might want to unshadow */
-    if ( *(u32 *)addr == 0 )
-        check_for_early_unshadow(v, mfn);
-    else
-        reset_early_unshadow(v);
-
-    paging_mark_dirty(v->domain, mfn_x(mfn));
-
-    sh_unmap_domain_page(addr);
+    emulate_unmap_dest(v, addr, 8, sh_ctxt);
     shadow_audit_tables(v);
     shadow_unlock(v->domain);
     return rv;

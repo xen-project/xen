@@ -144,6 +144,8 @@ u64 hvm_get_guest_tsc(struct vcpu *v);
 
 #define hvm_paging_enabled(v) \
     (!!((v)->arch.hvm_vcpu.guest_cr[0] & X86_CR0_PG))
+#define hvm_wp_enabled(v) \
+    (!!((v)->arch.hvm_vcpu.guest_cr[0] & X86_CR0_WP))
 #define hvm_pae_enabled(v) \
     (hvm_paging_enabled(v) && ((v)->arch.hvm_vcpu.guest_cr[4] & X86_CR4_PAE))
 #define hvm_nx_enabled(v) \

@@ -429,13 +429,6 @@ int shadow_cmpxchg_guest_entry(struct vcpu *v, intpte_t *p,
 #undef pagetable_from_page
 #define pagetable_from_page(pg) pagetable_from_mfn(page_to_mfn(pg))
 
-
-#if GUEST_PAGING_LEVELS >= 3
-# define is_lo_pte(_vaddr) (((_vaddr)&0x4)==0)
-#else
-# define is_lo_pte(_vaddr) (1)
-#endif
-
 static inline int
 sh_mfn_is_a_page_table(mfn_t gmfn)
 {
@@ -664,14 +657,23 @@ static inline void sh_unpin(struct vcpu *v, mfn_t smfn)
 struct sh_emulate_ctxt {
     struct x86_emulate_ctxt ctxt;
 
-    /* [HVM] Cache of up to 31 bytes of instruction. */
+    /* Cache of up to 31 bytes of instruction. */
     uint8_t insn_buf[31];
     uint8_t insn_buf_bytes;
     unsigned long insn_buf_eip;
 
-    /* [HVM] Cache of segment registers already gathered for this emulation. */
+    /* Cache of segment registers already gathered for this emulation. */
     unsigned int valid_seg_regs;
     struct segment_register seg_reg[6];
+
+    /* MFNs being written to in write/cmpxchg callbacks */
+    mfn_t mfn1, mfn2;
+
+#if (SHADOW_OPTIMIZATIONS & SHOPT_SKIP_VERIFY)
+    /* Special case for avoiding having to verify writes: remember 
+     * whether the old value had its low bit (_PAGE_PRESENT) clear. */
+    int low_bit_was_clear:1;
+#endif
 };
 
 struct x86_emulate_ops *shadow_init_emulation(
