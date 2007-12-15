@@ -52,7 +52,8 @@ class XendNetwork(XendBase):
 
     def getAttrRO(self):
         attrRO =  ['VIFs',
-                   'PIFs']
+                   'PIFs',
+                   'managed']
         return XendBase.getAttrRO() + attrRO
 
     def getAttrInst(self):
@@ -88,7 +89,8 @@ class XendNetwork(XendBase):
                 'name_description': '',
                 'other_config':     {},
                 'default_gateway':  '',
-                'default_netmask':  ''
+                'default_netmask':  '',
+                'managed':          False,
             }
         network = XendNetwork(record, uuid)
 
@@ -106,7 +108,10 @@ class XendNetwork(XendBase):
 
         # Create network if it doesn't already exist
         if not bridge_exists(network.name_label):
-            Brctl.bridge_create(network.name_label)
+            if network.managed:
+                Brctl.bridge_create(network.name_label)
+            else:
+                log.info("Not recreating missing unmanaged network %s" % network.name_label)
 
         return uuid
 
@@ -143,7 +148,13 @@ class XendNetwork(XendBase):
     create            = classmethod(create)
     get_by_name_label = classmethod(get_by_name_label)
         
-    def __init__(self, record, uuid):       
+    def __init__(self, record, uuid):
+        # This is a read-only attr, so we need to
+        # set it here, as super class won't try to
+        if record.has_key("managed"):
+            self.managed = record["managed"]
+        else:
+            self.managed = True
         XendBase.__init__(self, uuid, record)
         
     #
@@ -176,6 +187,9 @@ class XendNetwork(XendBase):
     def set_name_description(self, new_desc):
         self.name_description = new_desc
         XendNode.instance().save_networks()
+
+    def get_managed(self):
+        return self.managed
 
     def get_VIFs(self):
         result = []
