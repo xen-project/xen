@@ -742,8 +742,8 @@ void __init __start_xen(unsigned long mbi_p)
     kexec_reserve_area(&boot_e820);
 
     /*
-     * With the boot allocator now seeded, we can walk every RAM region and
-     * map it in its entirety (on x86/64, at least) and notify it to the
+     * With the boot allocator now initialised, we can walk every RAM region
+     * and map it in its entirety (on x86/64, at least) and notify it to the
      * boot allocator.
      */
     for ( i = 0; i < boot_e820.nr_map; i++ )
@@ -769,8 +769,7 @@ void __init __start_xen(unsigned long mbi_p)
 #endif
 
         /* Pass mapped memory to allocator /before/ creating new mappings. */
-        if ( s < map_s )
-            init_boot_pages(s, map_s);
+        init_boot_pages(s, min_t(uint64_t, map_s, e));
 
         /* Create new mappings /before/ passing memory to the allocator. */
         if ( map_s < map_e )
@@ -780,8 +779,7 @@ void __init __start_xen(unsigned long mbi_p)
                 PAGE_HYPERVISOR);
 
         /* Pass remainder of this memory chunk to the allocator. */
-        if ( map_s < e )
-            init_boot_pages(map_s, e);
+        init_boot_pages(map_s, e);
     }
 
     memguard_init();
