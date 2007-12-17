@@ -60,7 +60,12 @@ unsigned long guest_psr_index = 0;
 void
 vmx_ia64_set_dcr(VCPU *v)   
 {
-    unsigned long dcr_bits = IA64_DEFAULT_DCR_BITS;
+    /* xenoprof:
+     * don't change psr.pp.
+     * It is manipulated by xenoprof.
+     */
+    unsigned long dcr_bits = (IA64_DEFAULT_DCR_BITS & ~IA64_DCR_PP) |
+        (ia64_getreg(_IA64_REG_CR_DCR) & IA64_DCR_PP);
 
     // if guest is runing on cpl > 0, set dcr.dm=1
     // if geust is runing on cpl = 0, set dcr.dm=0
@@ -128,9 +133,15 @@ vmx_vcpu_set_psr(VCPU *vcpu, unsigned long value)
      * , except for the following bits:
      *  ic/i/dt/si/rt/mc/it/bn/vm
      */
-    mask =  IA64_PSR_IC + IA64_PSR_I + IA64_PSR_DT + IA64_PSR_SI +
-        IA64_PSR_RT + IA64_PSR_MC + IA64_PSR_IT + IA64_PSR_BN +
+    mask =  IA64_PSR_IC | IA64_PSR_I | IA64_PSR_DT | IA64_PSR_SI |
+        IA64_PSR_RT | IA64_PSR_MC | IA64_PSR_IT | IA64_PSR_BN |
         IA64_PSR_VM;
+
+    /* xenoprof:
+     * don't change psr.pp.
+     * It is manipulated by xenoprof.
+     */
+    mask |= IA64_PSR_PP;
 
     regs->cr_ipsr = (regs->cr_ipsr & mask ) | ( value & (~mask) );
 

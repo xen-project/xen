@@ -231,7 +231,13 @@ void context_switch(struct vcpu *prev, struct vcpu *next)
         if (!VMX_DOMAIN(next)) {
             /* VMX domains can change the physical cr.dcr.
              * Restore default to prevent leakage. */
-            ia64_setreg(_IA64_REG_CR_DCR, IA64_DEFAULT_DCR_BITS);
+            uint64_t dcr = ia64_getreg(_IA64_REG_CR_DCR);
+            /* xenoprof:
+             * don't change psr.pp.
+             * It is manipulated by xenoprof.
+             */
+            dcr = (IA64_DEFAULT_DCR_BITS & ~IA64_DCR_PP) | (dcr & IA64_DCR_PP);
+            ia64_setreg(_IA64_REG_CR_DCR, dcr);
         }
     }
     if (VMX_DOMAIN(next))

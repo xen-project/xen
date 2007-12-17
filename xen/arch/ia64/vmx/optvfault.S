@@ -200,7 +200,12 @@ GLOBAL_ENTRY(vmx_asm_rsm)
     dep r26=r28,r26,23,1
     ;;
     ld8 r18=[r17]
-    movl r28=IA64_PSR_IC+IA64_PSR_I+IA64_PSR_DT+IA64_PSR_SI
+	
+    // xenoprof
+    // Don't change mPSR.pp.
+    // It is manipulated by xenoprof.
+    movl r28=IA64_PSR_IC+IA64_PSR_I+IA64_PSR_DT+IA64_PSR_SI+IA64_PSR_PP
+
     ld1 r23=[r22]
     sub r27=-1,r26 // ~r26
     mov r24=b0
@@ -260,6 +265,9 @@ GLOBAL_ENTRY(vmx_asm_ssm)
     ;;  //r19 vpsr
     ld8 r29=[r27]
     mov r24=b0
+    dep r17=0,r26,IA64_PSR_PP_BIT,1 // For xenoprof
+                                    // Don't change mPSR.pp
+                                    // It is maintained by xenoprof.
     ;;
     add r22=IA64_VCPU_MMU_MODE_OFFSET,r21
     mov r20=cr.ipsr
@@ -267,7 +275,7 @@ GLOBAL_ENTRY(vmx_asm_ssm)
     ;;
     ld1 r23=[r22] // mmu_mode
     st8 [r27]=r19 // vpsr
-    or r20=r20,r26
+    or r20=r20,r17
     ;;
     mov cr.ipsr=r20
     movl r28=IA64_PSR_DT+IA64_PSR_RT+IA64_PSR_IT
@@ -379,6 +387,7 @@ vmx_asm_mov_to_psr_1:
     mov r20=cr.ipsr
     movl r28=IA64_PSR_IC+IA64_PSR_I+IA64_PSR_DT+IA64_PSR_SI+IA64_PSR_RT
     ;;
+    tbit.nz p7,p0=r20,IA64_PSR_PP_BIT           // For xenoprof
     or r19=r19,r28
     dep r20=0,r20,0,32
     ;;
@@ -386,6 +395,9 @@ vmx_asm_mov_to_psr_1:
     mov b0=r24
     ;;
     adds r27=IA64_VCPU_FP_PSR_OFFSET,r21
+    (p7) dep r20=-1,r20,IA64_PSR_PP_BIT,1       // For xenoprof
+                                                // Dom't change mPSR.pp
+                                                // It is maintaned by xenoprof
     ;;
     ld8 r27=[r27]
     ;;
