@@ -24,29 +24,58 @@
 #include <xen/sched.h>
 #include <public/xen.h>
 #include <xen/xenoprof.h>
+#include <asm/vmx.h>    /* for vmx_user_mode() */
 
 int
 xenoprofile_get_mode(struct vcpu *v, struct cpu_user_regs * const regs)
 {
     int mode;
 
-    // mode
-    // 0: user, 1: kernel, 2: xen
-    switch (ring(regs))
-    {
+    /*
+     * mode
+     * 0: user, 1: kernel, 2: xen
+     * see linux/driver/oprofile/cpu_buffer.h
+     */
+#define CPU_MODE_USER           0
+#define CPU_MODE_KERNEL         1
+#define CPU_MODE_XEN            2
+    if (VMX_DOMAIN(v)) {
+        if (vmx_user_mode(regs)) {
+            switch (ring(regs)) {
+            case 3:
+                mode = CPU_MODE_USER;
+                break;
+            case 0:
+                mode = CPU_MODE_KERNEL;
+                break;
+            /* case 0: case 1: */
+            default:
+                gdprintk(XENLOG_ERR, "%s:%d ring%d in vmx is used!\n",
+                         __func__, __LINE__, ring(regs));
+                mode = CPU_MODE_KERNEL; /* fall back to kernel mode. */
+                break;
+            }
+        } else {
+            mode = CPU_MODE_XEN;
+            BUG_ON(ring(regs) != 0);
+        }
+    } else {
+        switch (ring(regs)) {
         case 3:
-                mode = 0;
-                break;
+            mode = CPU_MODE_USER;
+            break;
         case CONFIG_CPL0_EMUL:
-                mode = 1;
-                break;
+            mode = CPU_MODE_KERNEL;
+            break;
         case 0:
-                mode = 2;
-                break;
+            mode = CPU_MODE_XEN;
+            break;
         default:
-                gdprintk(XENLOG_ERR, "%s:%d ring%d is used!\n", __func__,
-                         __LINE__, 3 - CONFIG_CPL0_EMUL);
-                mode = 1; /* fall back to kernel mode. */
+            gdprintk(XENLOG_ERR, "%s:%d ring%d in pv is used!\n", __func__,
+                     __LINE__, 3 - CONFIG_CPL0_EMUL);
+            mode = CPU_MODE_KERNEL; /* fall back to kernel mode. */
+            break;
+        }
     }
     return mode;
 }
