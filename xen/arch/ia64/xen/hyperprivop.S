@@ -1099,14 +1099,21 @@ just_do_rfi:
 	// force on psr.ic, i, dt, rt, it, bn
 	movl r20=(IA64_PSR_I|IA64_PSR_IC|IA64_PSR_DT|IA64_PSR_RT| \
 	          IA64_PSR_IT|IA64_PSR_BN)
+	// keep cr.ipsr.pp and set vPSR.pp = vIPSR.pp
+	mov r22=cr.ipsr
 	;;
 	or r21=r21,r20
+	tbit.z p10,p11 = r22, IA64_PSR_PP_BIT
 	;;
 	adds r20=XSI_VPSR_DFH_OFS-XSI_PSR_IC_OFS,r18;;
 	tbit.z p8,p9 = r21, IA64_PSR_DFH_BIT
+	adds r23=XSI_VPSR_PP_OFS-XSI_PSR_IC_OFS,r18
 	;;
 	(p9) mov r27=1;;
 	(p9) st1 [r20]=r27
+	dep r21=r22,r21,IA64_PSR_PP_BIT,1
+	(p10) st1 [r23]=r0
+	(p11) st1 [r23]=r27
 	;;
 	(p8) st1 [r20]=r0
 	(p8) adds r20=XSI_HPSR_DFH_OFS-XSI_PSR_IC_OFS,r18;;
@@ -1484,20 +1491,20 @@ ENTRY(hyper_get_psr)
 	movl r8=0xffffffff | IA64_PSR_MC | IA64_PSR_IT;;
 	// only return PSR{36:35,31:0}
 	and r8=r8,r24
-	// set vpsr.ic
+	// get vpsr.ic
 	ld4 r21=[r18];;
 	dep r8=r21,r8,IA64_PSR_IC_BIT,1
-	// set vpsr.pp
+	// get vpsr.pp
 	adds r20=XSI_VPSR_PP_OFS-XSI_PSR_IC_OFS,r18 ;;
 	ld1 r21=[r20];;
 	dep r8=r21,r8,IA64_PSR_PP_BIT,1
-	// set vpsr.dt
+	// get vpsr.dt
 	adds r20=XSI_METAPHYS_OFS-XSI_PSR_IC_OFS,r18 ;;
 	ld4 r21=[r20];;
 	cmp.ne p6,p0=r21,r0
 	;;
 (p6)	dep.z r8=r8,IA64_PSR_DT_BIT,1
-	// set vpsr.i
+	// get vpsr.i
 	adds r20=XSI_PSR_I_ADDR_OFS-XSI_PSR_IC_OFS,r18 ;;
 	ld8 r20=[r20];;
 	ld1 r21=[r20];;
@@ -1505,7 +1512,7 @@ ENTRY(hyper_get_psr)
 	;;
 (p8)	dep r8=-1,r8,IA64_PSR_I_BIT,1
 (p9)	dep r8=0,r8,IA64_PSR_I_BIT,1
-	// set vpsr.dfh
+	// get vpsr.dfh
 	adds r20=XSI_VPSR_DFH_OFS-XSI_PSR_IC_OFS,r18;;
 	ld1 r21=[r20];;
 	dep r8=r21,r8,IA64_PSR_DFH_BIT,1

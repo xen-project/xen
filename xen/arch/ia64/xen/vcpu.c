@@ -329,8 +329,11 @@ IA64FAULT vcpu_reset_psr_sm(VCPU * vcpu, u64 imm24)
 	if (imm.dfl)
 		ipsr->dfl = 0;
 	if (imm.pp) {
-		ipsr->pp = 1;
-		psr.pp = 1;	// priv perf ctrs always enabled
+		// xenoprof:
+		// Don't change psr.pp and ipsr->pp 
+		// They are manipulated by xenoprof
+		// psr.pp = 1;
+		// ipsr->pp = 1;
 		PSCB(vcpu, vpsr_pp) = 0; // but fool the domain if it gets psr
 	}
 	if (imm.up) {
@@ -391,8 +394,11 @@ IA64FAULT vcpu_set_psr_sm(VCPU * vcpu, u64 imm24)
 	if (imm.dfl)
 		ipsr->dfl = 1;
 	if (imm.pp) {
-		ipsr->pp = 1;
-		psr.pp = 1;
+		// xenoprof:
+		// Don't change psr.pp and ipsr->pp 
+		// They are manipulated by xenoprof
+		// psr.pp = 1;
+		// ipsr->pp = 1;
 		PSCB(vcpu, vpsr_pp) = 1;
 	}
 	if (imm.sp) {
@@ -462,10 +468,16 @@ IA64FAULT vcpu_set_psr_l(VCPU * vcpu, u64 val)
 	if (newpsr.dfl)
 		ipsr->dfl = 1;
 	if (newpsr.pp) {
-		ipsr->pp = 1;
+		// xenoprof:
+		// Don't change ipsr->pp 
+		// It is manipulated by xenoprof
+		// ipsr->pp = 1;
 		PSCB(vcpu, vpsr_pp) = 1;
 	} else {
-		ipsr->pp = 1;
+		// xenoprof:
+		// Don't change ipsr->pp 
+		// It is manipulated by xenoprof
+		// ipsr->pp = 1;
 		PSCB(vcpu, vpsr_pp) = 0;
 	}
 	if (newpsr.up)
@@ -517,7 +529,15 @@ IA64FAULT vcpu_set_psr(VCPU * vcpu, u64 val)
 	newpsr.val |= IA64_PSR_DI;
 
 	newpsr.val |= IA64_PSR_I  | IA64_PSR_IC | IA64_PSR_DT | IA64_PSR_RT |
-		      IA64_PSR_IT | IA64_PSR_BN | IA64_PSR_DI | IA64_PSR_PP;
+		      IA64_PSR_IT | IA64_PSR_BN | IA64_PSR_DI;
+	/*
+	 * xenoprof:
+	 * keep psr.pp unchanged for xenoprof.
+	 */
+	if (regs->cr_ipsr & IA64_PSR_PP)
+		newpsr.val |= IA64_PSR_PP;
+	else
+		newpsr.val &= ~IA64_PSR_PP;
 
 	vpsr.val = val;
 
