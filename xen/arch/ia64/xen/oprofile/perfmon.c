@@ -35,6 +35,7 @@
 #include <xen/xenoprof.h>
 #include <asm/perfmon.h>
 #include <asm/ptrace.h>
+#include <asm/vmx.h>    /* for vmx_user_mode() */
 
 // XXX move them to an appropriate header file
 extern void xenoprof_log_event(struct vcpu *vcpu, struct pt_regs * regs,
@@ -45,24 +46,37 @@ static int allow_virq;
 static int allow_ints;
 
 static int
+xenoprof_is_xen_mode(struct vcpu *v, struct pt_regs *regs)
+{
+    if (VMX_DOMAIN(v))
+        return !vmx_user_mode(regs);
+    return ring_0(regs);
+}
+
+static int
 xenoprof_handler(struct task_struct *task, void *buf, pfm_ovfl_arg_t *arg,
                  struct pt_regs *regs, unsigned long stamp)
 {
-    unsigned long ip = regs->cr_iip;
+    unsigned long ip = profile_pc(regs);
     int event = arg->pmd_eventid;
- 
+    struct vcpu *v = current;
+    int mode = xenoprofile_get_mode(v, regs);
+
+    // see pfm_do_interrupt_handler() in xen/arch/ia64/linux-xen/perfmon.c.
+    // It always passes task as NULL. This is work around
+    BUG_ON(task != NULL);
+
     arg->ovfl_ctrl.bits.reset_ovfl_pmds = 1;
     if (!allow_virq || !allow_ints)
         return 0;
 
     // Note that log event actually expect cpu_user_regs, cast back 
     // appropriately when doing the backtrace implementation in ia64
-    xenoprof_log_event(current, regs, ip, xenoprofile_get_mode(task, regs), 
-					   event);
-    
+    xenoprof_log_event(v, regs, ip, mode, event);
     // send VIRQ_XENOPROF
-    if (is_active(current->domain) && !ring_0(regs))
-        send_guest_vcpu_virq(current, VIRQ_XENOPROF);
+    if (is_active(v->domain) && !xenoprof_is_xen_mode(v, regs) &&
+        !is_idle_vcpu(v))
+        send_guest_vcpu_virq(v, VIRQ_XENOPROF);
 
     return 0;
 }
