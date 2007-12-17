@@ -69,6 +69,35 @@
 #define pid		vcpu_id
 #define thread		arch._thread
 #define task_pt_regs	vcpu_regs
+
+#define PMC_USER		(1UL << 3)
+#define PMC_KERNEL		(1UL << 0)
+#define PMC_XEN_AND_GUEST	((1UL << 0) | (1UL << 1) | (1UL << 2))
+#define PMC_PRIV_MONITOR	(1UL << 6)
+
+#undef ia64_set_pmc
+#define ia64_set_pmc(index, val)					\
+do {									\
+	u64 __index = (index);						\
+	u64 __val = (val);						\
+	/* bad hack!							\
+	 * At this moment Linux perfmon knows only kernel and user	\
+	 * so that it sets only pmc.plm[0] and pmc.plm[3].		\
+	 * On the other hand what we want is to sample on the whole	\
+	 * system. i.e. user, guest kernel and xen VMM.			\
+	 * Thus here we enable pmc.plm[2:1] too for generic pmc/pmd.	\
+	 *								\
+	 * But we can not do it genericly for the implementation	\
+	 * dependent pmc/pmd.						\
+	 * Probably such knowlege should be taught to the oprofiled or	\
+	 * the xenified perfmon.					\
+	 */								\
+	if (pmu_conf != NULL && PMC_IS_COUNTING(__index) &&		\
+	    (__val & PMC_KERNEL))					\
+		__val |= PMC_XEN_AND_GUEST | PMC_PRIV_MONITOR;		\
+	asm volatile ("mov pmc[%0]=%1" ::				\
+		      "r"(__index), "r"(__val) : "memory");		\
+} while (0)
 #endif
 
 #ifdef CONFIG_PERFMON
@@ -1214,7 +1243,7 @@ xenpfm_restore_pmcs(pfm_context_t* ctx)
 {
 	int i;
 	unsigned long mask = ctx->ctx_all_pmcs[0];
-	
+
 	for (i = 0; mask; i++, mask >>= 1) {
 		if ((mask & 0x1) == 0)
 			continue;
@@ -3073,6 +3102,7 @@ pfm_write_pmcs(pfm_context_t *ctx, void *arg, int count, struct pt_regs *regs)
 #else
 	/* XXX FIXME */
 	if (state != PFM_CTX_UNLOADED) {
+		gdprintk(XENLOG_DEBUG, "%s state %d\n", __func__, state);
 		return -EBUSY;
 	}
 #endif
@@ -3334,6 +3364,7 @@ pfm_write_pmds(pfm_context_t *ctx, void *arg, int count, struct pt_regs *regs)
 #else
 	/* XXX FIXME */
 	if (state != PFM_CTX_UNLOADED) {
+		gdprintk(XENLOG_DEBUG, "%s state %d\n", __func__, state);
 		return -EBUSY;
 	}
 #endif
@@ -7387,13 +7418,12 @@ xenpfm_write_pmcs(XEN_GUEST_HANDLE(pfarg_reg_t) req, unsigned long count)
 		spin_lock_irqsave(&xenpfm_context_lock, flags);
 		for_each_online_cpu(cpu) {
 			pfm_context_t* ctx = per_cpu(xenpfm_context, cpu);
+			BUG_ON(ctx == NULL);
 			PROTECT_CTX_NOIRQ(ctx);
 			error |= pfm_write_pmcs(ctx, (void *)&kreq, 1, NULL);
 			UNPROTECT_CTX_NOIRQ(ctx);
 		}
 		spin_unlock_irqrestore(&xenpfm_context_lock, flags);
-		if (error)
-			break;
 	}
 	
 	/* XXX if is loaded, change all physical cpus pmcs. */
@@ -7420,6 +7450,7 @@ xenpfm_write_pmds(XEN_GUEST_HANDLE(pfarg_reg_t) req, unsigned long count)
 		spin_lock_irqsave(&xenpfm_context_lock, flags);
 		for_each_online_cpu(cpu) {
 			pfm_context_t* ctx = per_cpu(xenpfm_context, cpu);
+			BUG_ON(ctx == NULL);
 			PROTECT_CTX_NOIRQ(ctx);
 			error |= pfm_write_pmds(ctx, &kreq, 1, NULL);
 			UNPROTECT_CTX_NOIRQ(ctx);
@@ -7444,6 +7475,8 @@ xenpfm_context_load_cpu(void* info)
 	unsigned long flags;
 	struct xenpfm_context_load_arg* arg = (struct xenpfm_context_load_arg*)info;
 	pfm_context_t* ctx = __get_cpu_var(xenpfm_context);
+
+	BUG_ON(ctx == NULL);
 	PROTECT_CTX(ctx, flags);
 	arg->error[smp_processor_id()] = pfm_context_load(ctx, arg->req, 0, NULL);
 	UNPROTECT_CTX(ctx, flags);
@@ -7490,6 +7523,7 @@ xenpfm_context_unload_cpu(void* info)
 	unsigned long flags;
 	struct xenpfm_context_unload_arg* arg = (struct xenpfm_context_unload_arg*)info;
 	pfm_context_t* ctx = __get_cpu_var(xenpfm_context);
+	BUG_ON(ctx == NULL);
 	PROTECT_CTX(ctx, flags);
 	arg->error[smp_processor_id()] = pfm_context_unload(ctx, NULL, 0, NULL);
 	UNPROTECT_CTX(ctx, flags);
@@ -7500,19 +7534,25 @@ xenpfm_context_unload(void)
 {
 	int cpu;
 	struct xenpfm_context_unload_arg arg;
+	unsigned long flags;
 	int error = 0;
 
 	for_each_online_cpu(cpu)
 		arg.error[cpu] = 0;
 
 	BUG_ON(in_irq());
-	spin_lock(&xenpfm_context_lock);
+	local_irq_save(flags);
+	if (!spin_trylock(&xenpfm_context_lock)) {
+		local_irq_restore(flags);
+		return -EAGAIN;
+	}
 	error = xenpfm_start_stop_locked(0);
+	local_irq_restore(flags);
 	if (error) {
 		spin_unlock(&xenpfm_context_lock);
 		return error;
 	}
-	
+
 	smp_call_function(&xenpfm_context_unload_cpu, &arg, 1, 1);
 	xenpfm_context_unload_cpu(&arg);
 	spin_unlock(&xenpfm_context_lock);
@@ -7533,10 +7573,12 @@ __xenpfm_start(void)
 	int state;
 	int error = 0;
 
+	BUG_ON(ctx == NULL);
 	BUG_ON(local_irq_is_enabled());
 	PROTECT_CTX_NOIRQ(ctx);	
 	state = ctx->ctx_state;
 	if (state != PFM_CTX_LOADED) {
+		gdprintk(XENLOG_DEBUG, "%s state %d\n", __func__, state);
 		error = -EINVAL;
 		goto out;
 	}
@@ -7566,9 +7608,18 @@ __xenpfm_stop(void)
 	int error = 0;
 
 	BUG_ON(local_irq_is_enabled());
+	if (ctx == NULL) {
+		gdprintk(XENLOG_DEBUG, "%s ctx=NULL p:%2d v:%2d\n",
+			 __func__, smp_processor_id(), current->vcpu_id);
+		return 0;
+	}
+	
 	PROTECT_CTX_NOIRQ(ctx);	
 	state = ctx->ctx_state;
 	if (state != PFM_CTX_LOADED) {
+		gdprintk(XENLOG_DEBUG, "%s state %d p:%2d v:%2d\n",
+			 __func__, state,
+			 smp_processor_id(), current->vcpu_id);
 		error = -EINVAL;
 		goto out;
 	}
@@ -7640,7 +7691,7 @@ xenpfm_start_stop_vcpu(struct vcpu* v, int is_start)
 		ia64_psr(regs)->up = 1;
 
 		/* don't allow user level control */
-		ia64_psr(regs)->sp = 0;
+		ia64_psr(regs)->sp = 1;
 	} else {
 		/*
 		 * stop monitoring in the caller
@@ -7656,18 +7707,32 @@ xenpfm_start_stop_vcpu(struct vcpu* v, int is_start)
 		/*
 		 * cancel user level control
 		 */
-		ia64_psr(regs)->sp = 1;
+		ia64_psr(regs)->sp = 0;
 #endif
 	}
 }
 
+/*
+ * This is the trickiest part.
+ * Here we want to enable/disable wide performance monitor including
+ * all xen context and all guest.
+ * For interrupt context and running vcpu, set dcr.pp = 1
+ * For blocked vcpu and idle vcpu, set psr.pp = 1 using timer via softirq.
+ * (Here IPI doesn't work because psr doesn't preserved over interruption
+ *  when VTi domain.
+ *  If IPI is used, we need to unwind the stack to the interrupt frame
+ *  and set cr_ipsr.pp = 1. but using timer via do_softirq() is easier.)
+ * For guest set all vcpu_regs(v)->cr_ipsr.pp = 1.
+ */
 static int
 xenpfm_start_stop_locked(int is_start)
 {
+	/* avoid stack over flow. protected by xenpfm_context_lock */
+	static struct timer xenpfm_timer[NR_CPUS];
+
 	struct xenpfm_start_arg arg;
 	int cpus = num_online_cpus();
 	int cpu;
-	unsigned long flags;
 	struct domain* d;
 	struct vcpu* v;
 	int error = 0;
@@ -7679,8 +7744,14 @@ xenpfm_start_stop_locked(int is_start)
 		arg.error[cpu] = 0;
 
 	BUG_ON(!spin_is_locked(&xenpfm_context_lock));
-	smp_call_function(&xenpfm_start_stop_cpu, &arg, 1, 0);
-	local_irq_save(flags);
+	for_each_online_cpu(cpu) {
+		struct timer* start_stop_timer = &xenpfm_timer[cpu];
+		if (cpu == smp_processor_id())
+			continue;
+		init_timer(start_stop_timer, &xenpfm_start_stop_cpu,
+			   &arg, cpu);
+		set_timer(start_stop_timer, 0);/* fire it ASAP */
+	}
 
 	while (atomic_read(&arg.started) != cpus)
 		cpu_relax();
@@ -7696,9 +7767,13 @@ xenpfm_start_stop_locked(int is_start)
 
 	while (atomic_read(&arg.finished) != cpus)
 		cpu_relax();
-	local_irq_restore(flags);
 
 	for_each_online_cpu(cpu) {
+		if (cpu == smp_processor_id())
+			continue;
+		/* xenpfm_timer[] is global so that we have to wait
+		 * for xen timer subsystem to finish them. */
+		kill_timer(&xenpfm_timer[cpu]);
 		if (arg.error[cpu]) {
 			gdprintk(XENLOG_INFO, "%s: cpu %d error %d\n", 
 				__func__, cpu, arg.error[cpu]);
@@ -7711,12 +7786,22 @@ xenpfm_start_stop_locked(int is_start)
 static int
 xenpfm_start_stop(int is_start)
 {
+	unsigned long flags;
 	int error;
 	
 	BUG_ON(in_irq());
-	spin_lock(&xenpfm_context_lock);
+	local_irq_save(flags);
+	/*
+	 * Avoid dead lock. At this moment xen has only spin locks and
+	 * doesn't have blocking mutex.
+	 */
+	if (!spin_trylock(&xenpfm_context_lock)) {
+		local_irq_restore(flags);
+		gdprintk(XENLOG_DEBUG, "%s EAGAIN\n", __func__);
+		return -EAGAIN;
+	}
 	error = xenpfm_start_stop_locked(is_start);
-	spin_unlock(&xenpfm_context_lock);
+	spin_unlock_irqrestore(&xenpfm_context_lock, flags);
 
 	return error;
 }
