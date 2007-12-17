@@ -48,8 +48,13 @@ static inline void xenoprof_backtrace(
     /* To be implemented */
     return;
 }
-#define xenoprof_shared_gmfn(d, gmaddr, maddr)  \
-    assign_domain_page((d), (gmaddr), (maddr));
+#define xenoprof_shared_gmfn(d, gmaddr, maddr)                      \
+do {                                                                \
+    unsigned long ret;                                              \
+    ret = create_grant_host_mapping((gmaddr),                       \
+                                    (maddr) >> PAGE_SHIFT, 0, 0);   \
+    BUG_ON(ret != GNTST_okay);                                      \
+} while (0)
 
 static inline int
 ring(const struct pt_regs* regs)
