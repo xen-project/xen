@@ -137,7 +137,7 @@ void serial_putc(int handle, char c)
     spin_lock_irqsave(&port->tx_lock, flags);
 
     if ( (c == '\n') && (handle & SERHND_COOKED) )
-        __serial_putc(port, '\r');
+        __serial_putc(port, '\r' | ((handle & SERHND_HI) ? 0x80 : 0x00));
 
     if ( handle & SERHND_HI )
         c |= 0x80;
@@ -167,7 +167,7 @@ void serial_puts(int handle, const char *s)
     while ( (c = *s++) != '\0' )
     {
         if ( (c == '\n') && (handle & SERHND_COOKED) )
-            __serial_putc(port, '\r');
+            __serial_putc(port, '\r' | ((handle & SERHND_HI) ? 0x80 : 0x00));
 
         if ( handle & SERHND_HI )
             c |= 0x80;
