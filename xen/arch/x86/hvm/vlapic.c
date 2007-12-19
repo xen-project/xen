@@ -472,7 +472,7 @@ static unsigned long vlapic_read(struct vcpu *v, unsigned long address,
     struct vlapic *vlapic = vcpu_vlapic(v);
     unsigned int offset = address - vlapic_base_address(vlapic);
 
-    if ( offset > APIC_TDCR )
+    if ( offset > (APIC_TDCR + 0x3) )
         return 0;
 
     alignment = offset & 0x3;
@@ -535,7 +535,7 @@ static void vlapic_write(struct vcpu *v, unsigned long address,
      * According to the IA32 Manual, all accesses should be 32 bits.
      * Some OSes do 8- or 16-byte accesses, however.
      */
-    val &= 0xffffffff;
+    val = (uint32_t)val;
     if ( len != 4 )
     {
         unsigned int tmp;
@@ -549,32 +549,27 @@ static void vlapic_write(struct vcpu *v, unsigned long address,
         switch ( len )
         {
         case 1:
-            val = (tmp & ~(0xff << (8*alignment))) |
-                  ((val & 0xff) << (8*alignment));
+            val = ((tmp & ~(0xff << (8*alignment))) |
+                   ((val & 0xff) << (8*alignment)));
             break;
 
         case 2:
             if ( alignment & 1 )
-            {
-                gdprintk(XENLOG_ERR, "Uneven alignment error for "
-                         "2-byte vlapic access\n");
-                goto exit_and_crash;
-            }
-
-            val = (tmp & ~(0xffff << (8*alignment))) |
-                  ((val & 0xffff) << (8*alignment));
+                goto unaligned_exit_and_crash;
+            val = ((tmp & ~(0xffff << (8*alignment))) |
+                   ((val & 0xffff) << (8*alignment)));
             break;
 
         default:
             gdprintk(XENLOG_ERR, "Local APIC write with len = %lx, "
                      "should be 4 instead\n", len);
-        exit_and_crash:
-            domain_crash(v->domain);
-            return;
+            goto exit_and_crash;
         }
     }
+    else if ( (offset & 0x3) != 0 )
+        goto unaligned_exit_and_crash;
 
-    offset &= 0xff0;
+    offset &= ~0x3;
 
     switch ( offset )
     {
@@ -671,6 +666,14 @@ static void vlapic_write(struct vcpu *v, unsigned long address,
                  "Local APIC Write to read-only register 0x%x\n", offset);
         break;
     }
+
+    return;
+
+ unaligned_exit_and_crash:
+    gdprintk(XENLOG_ERR, "Unaligned LAPIC write len=0x%lx at offset=0x%x.\n",
+             len, offset);
+ exit_and_crash:
+    domain_crash(v->domain);
 }
 
 static int vlapic_range(struct vcpu *v, unsigned long addr)
