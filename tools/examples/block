@@ -327,10 +327,13 @@ mount it read-write in a guest domain."
           fatal 'Failed to find an unused loop device'
         fi
 
-        status=$(losetup "$loopdev" "$file" || echo "failed")
-        if [ -n "$status" ]; then
-          do_or_die losetup -r "$loopdev" "$file"
+        if LANG=C losetup -h 2>&1 | grep read-only >/dev/null
+        then
+          roflag="-$mode"; roflag="${roflag#-w}"
+        else
+          roflag=''
         fi
+        do_or_die losetup $roflag "$loopdev" "$file"
         xenstore_write "$XENBUS_PATH/node" "$loopdev"
         write_dev "$loopdev"
         release_lock "block"
