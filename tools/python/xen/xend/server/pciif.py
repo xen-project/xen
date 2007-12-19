@@ -102,13 +102,13 @@ class PciController(DevController):
         result['uuid'] = self.readBackend(devid, 'uuid')
         return result
 
-    def configuration(self, devid):
+    def configuration(self, devid, transaction = None):
         """Returns SXPR for devices on domain.
 
         @note: we treat this dict especially to convert to
         SXP because it is not a straight dict of strings."""
         
-        configDict = self.getDeviceConfiguration(devid)
+        configDict = self.getDeviceConfiguration(devid, transaction)
         sxpr = [self.deviceClass]
 
         # remove devs

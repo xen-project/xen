@@ -533,55 +533,13 @@ class XendConfig(dict):
             cfg['HVM_boot_policy'] = 'BIOS order'
             cfg['HVM_boot_params'] = { 'order' : boot_order }
 
-        # Parsing the device SXP's. In most cases, the SXP looks
-        # like this:
-        #
-        # [device, [vif, [mac, xx:xx:xx:xx:xx:xx], [ip 1.3.4.5]]]
-        #
-        # However, for PCI devices it looks like this:
-        #
-        # [device, [pci, [dev, [domain, 0], [bus, 0], [slot, 1]]]]
-        #
-        # It seems the reasoning for this difference is because
-        # pciif.py needs all the PCI device configurations at
-        # the same time when creating the devices.
-        #
-        # To further complicate matters, Xen 2.0 configuration format
-        # uses the following for pci device configuration:
-        #
-        # [device, [pci, [domain, 0], [bus, 0], [dev, 1], [func, 2]]]
-        #
-        # Hence we deal with pci device configurations outside of
-        # the regular device parsing.
-        
+       
+        # Parsing the device SXP's.
         cfg['devices'] = {}
         for dev in sxp.children(sxp_cfg, 'device'):
             config = sxp.child0(dev)
             dev_type = sxp.name(config)
-            dev_info = {}
-            
-            if dev_type == 'pci':
-                pci_devs_uuid = sxp.child_value(config, 'uuid',
-                                                uuid.createString())
-                pci_devs = []
-                for pci_dev in sxp.children(config, 'dev'):
-                    pci_dev_info = {}
-                    for opt_val in pci_dev[1:]:
-                        try:
-                            opt, val = opt_val
-                            pci_dev_info[opt] = val
-                        except TypeError:
-                            pass
-                    pci_devs.append(pci_dev_info)
-                
-                cfg['devices'][pci_devs_uuid] = (dev_type,
-                                                 {'devs': pci_devs,
-                                                  'uuid': pci_devs_uuid})
-                
-                log.debug("XendConfig: reading device: %s" % pci_devs)
-            else:
-                self.device_add(dev_type, cfg_sxp = config, target = cfg)
-                log.debug("XendConfig: reading device: %s" % scrub_password(dev_info))
+            self.device_add(dev_type, cfg_sxp = config, target = cfg)
 
         # Extract missing data from configuration entries
         image_sxp = sxp.child_value(sxp_cfg, 'image', [])
@@ -1096,6 +1054,44 @@ class XendConfig(dict):
             dev_type = sxp.name(config)
             dev_info = {}
 
+            # Parsing the device SXP's. In most cases, the SXP looks
+            # like this:
+            #
+            # [device, [vif, [mac, xx:xx:xx:xx:xx:xx], [ip 1.3.4.5]]]
+            #
+            # However, for PCI devices it looks like this:
+            #
+            # [device, [pci, [dev, [domain, 0], [bus, 0], [slot, 1]]]]
+            #
+            # It seems the reasoning for this difference is because
+            # pciif.py needs all the PCI device configurations at
+            # the same time when creating the devices.
+            #
+            # To further complicate matters, Xen 2.0 configuration format
+            # uses the following for pci device configuration:
+            #
+            # [device, [pci, [domain, 0], [bus, 0], [dev, 1], [func, 2]]]
+
+            if dev_type == 'pci':
+                pci_devs_uuid = sxp.child_value(config, 'uuid',
+                                                uuid.createString())
+                pci_devs = []
+                for pci_dev in sxp.children(config, 'dev'):
+                    pci_dev_info = {}
+                    for opt_val in pci_dev[1:]:
+                        try:
+                            opt, val = opt_val
+                            pci_dev_info[opt] = val
+                        except TypeError:
+                            pass
+                    pci_devs.append(pci_dev_info)
+                target['devices'][pci_devs_uuid] = (dev_type,
+                                                    {'devs': pci_devs,
+                                                     'uuid': pci_devs_uuid})
+
+                log.debug("XendConfig: reading device: %s" % pci_devs)
+                return pci_devs_uuid
+
             for opt_val in config[1:]:
                 try:
                     opt, val = opt_val
@@ -1177,6 +1173,7 @@ class XendConfig(dict):
                 if dev_uuid not in target['console_refs']:
                     target['console_refs'].append(dev_uuid)
                     
+            log.debug("XendConfig: reading device: %s" % scrub_password(dev_info))
             return dev_uuid
 
         if cfg_xenapi:
