@@ -913,6 +913,8 @@ class XendDomain:
                 if dominfo._stateGet() != XEN_API_VM_POWER_STATE_SUSPENDED:
                     raise XendError("Cannot resume domain that is not suspended.")
 
+                dominfo.setResume(True)
+
                 dom_uuid = dominfo.get_uuid()
                 chkpath = self._managed_check_point_path(dom_uuid)
                 if not os.path.exists(chkpath):

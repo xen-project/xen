@@ -1178,6 +1178,9 @@ class XendDomainInfo:
     def getResume(self):
         return str(self._resume)
 
+    def setResume(self, isresume):
+        self._resume = isresume
+
     def getCap(self):
         return self.info['vcpus_params']['cap']
 
