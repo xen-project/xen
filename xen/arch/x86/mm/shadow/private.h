@@ -688,8 +688,7 @@ void shadow_continue_emulation(
  *
  * We keep a cache of virtual-to-physical translations that we have seen 
  * since the last TLB flush.  This is safe to use for frame translations, 
- * but callers that use the rights need to re-check the actual guest tables
- * before triggering a fault.
+ * but callers need to re-check the actual guest tables if the lookup fails.
  * 
  * Lookups and updates are protected by a per-vTLB (and hence per-vcpu)
  * lock.  This lock is held *only* while reading or writing the table,
@@ -702,8 +701,9 @@ void shadow_continue_emulation(
 struct shadow_vtlb {
     unsigned long page_number;      /* Guest virtual address >> PAGE_SHIFT  */
     unsigned long frame_number;     /* Guest physical address >> PAGE_SHIFT */
-    uint32_t pfec;  /* Pagefault code for the lookup that filled this entry */
-    uint32_t flags; /* Accumulated guest pte flags, or 0 for an empty slot. */
+    uint32_t pfec;     /* PF error code of the lookup that filled this
+                        * entry.  A pfec of zero means the slot is empty
+                        * (since that would require us to re-try anyway) */
 };
 
 /* Call whenever the guest flushes hit actual TLB */
@@ -720,32 +720,34 @@ static inline int vtlb_hash(unsigned long page_number)
 }
 
 /* Put a translation into the vTLB, potentially clobbering an old one */
-static inline void vtlb_insert(struct vcpu *v, struct shadow_vtlb entry)
+static inline void vtlb_insert(struct vcpu *v, unsigned long page,
+                               unsigned long frame, uint32_t pfec)
 {
+    struct shadow_vtlb entry = 
+        { .page_number = page, .frame_number = frame, .pfec = pfec };
     spin_lock(&v->arch.paging.vtlb_lock);
-    v->arch.paging.vtlb[vtlb_hash(entry.page_number)] = entry;
+    v->arch.paging.vtlb[vtlb_hash(page)] = entry;
     spin_unlock(&v->arch.paging.vtlb_lock);
 }
 
-/* Look a translation up in the vTLB.  Returns 0 if not found. */
-static inline int vtlb_lookup(struct vcpu *v, unsigned long va, uint32_t pfec,
-                              struct shadow_vtlb *result) 
+/* Look a translation up in the vTLB.  Returns INVALID_GFN if not found. */
+static inline unsigned long vtlb_lookup(struct vcpu *v,
+                                        unsigned long va, uint32_t pfec)
 {
     unsigned long page_number = va >> PAGE_SHIFT;
-    int rv = 0;
+    unsigned long frame_number = INVALID_GFN;
     int i = vtlb_hash(page_number);
 
     spin_lock(&v->arch.paging.vtlb_lock);
-    if ( v->arch.paging.vtlb[i].flags != 0 
+    if ( v->arch.paging.vtlb[i].pfec != 0
          && v->arch.paging.vtlb[i].page_number == page_number 
          /* Any successful walk that had at least these pfec bits is OK */
          && (v->arch.paging.vtlb[i].pfec & pfec) == pfec )
     {
-        rv = 1; 
-        result[0] = v->arch.paging.vtlb[i];
+        frame_number = v->arch.paging.vtlb[i].frame_number;
     }
     spin_unlock(&v->arch.paging.vtlb_lock);
-    return rv;
+    return frame_number;
 }
 #endif /* (SHADOW_OPTIMIZATIONS & SHOPT_VIRTUAL_TLB) */
 

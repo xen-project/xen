@@ -527,44 +527,6 @@ struct shadow_walk_t
 #endif
 #endif /* GUEST_PAGING_LEVELS >= 3 */
 
-static inline u32
-accumulate_guest_flags(struct vcpu *v, walk_t *gw)
-{
-    u32 accumulated_flags;
-
-    if ( unlikely(!(guest_l1e_get_flags(gw->l1e) & _PAGE_PRESENT)) )
-        return 0;
-        
-    // We accumulate the permission flags with bitwise ANDing.
-    // This works for the PRESENT bit, RW bit, and USER bit.
-    // For the NX bit, however, the polarity is wrong, so we accumulate the
-    // inverse of the NX bit.
-    //
-    accumulated_flags =  guest_l1e_get_flags(gw->l1e) ^ _PAGE_NX_BIT;
-    accumulated_flags &= guest_l2e_get_flags(gw->l2e) ^ _PAGE_NX_BIT;
-
-    // Note that PAE guests do not have USER or RW or NX bits in their L3s.
-    //
-#if GUEST_PAGING_LEVELS == 3
-    accumulated_flags &=
-        ~_PAGE_PRESENT | (guest_l3e_get_flags(gw->l3e) & _PAGE_PRESENT);
-#elif GUEST_PAGING_LEVELS >= 4
-    accumulated_flags &= guest_l3e_get_flags(gw->l3e) ^ _PAGE_NX_BIT;
-    accumulated_flags &= guest_l4e_get_flags(gw->l4e) ^ _PAGE_NX_BIT;
-#endif
-
-    // Revert the NX bit back to its original polarity
-    accumulated_flags ^= _PAGE_NX_BIT;
-
-    // In 64-bit PV guests, the _PAGE_USER bit is implied in all guest
-    // entries (since even the guest kernel runs in ring 3).
-    //
-    if ( (GUEST_PAGING_LEVELS == 4) && !is_hvm_vcpu(v) )
-        accumulated_flags |= _PAGE_USER;
-
-    return accumulated_flags;
-}
-
 
 #if (SHADOW_OPTIMIZATIONS & SHOPT_FAST_FAULT_PATH) && SHADOW_PAGING_LEVELS > 2
 /******************************************************************************

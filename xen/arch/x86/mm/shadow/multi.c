@@ -2829,6 +2829,12 @@ static int sh_page_fault(struct vcpu *v,
         goto not_a_shadow_fault;
     }
 
+#if (SHADOW_OPTIMIZATIONS & SHOPT_VIRTUAL_TLB)
+    /* Remember this successful VA->GFN translation for later. */
+    vtlb_insert(v, va >> PAGE_SHIFT, gfn_x(gfn), 
+                regs->error_code | PFEC_page_present);
+#endif /* (SHADOW_OPTIMIZATIONS & SHOPT_VIRTUAL_TLB) */
+
     /* Make sure there is enough free shadow memory to build a chain of
      * shadow tables. (We never allocate a top-level shadow on this path,
      * only a 32b l1, pae l1, or 64b l3+2+1. Note that while
@@ -3113,10 +3119,10 @@ sh_gva_to_gfn(struct vcpu *v, unsigned long va, uint32_t *pfec)
     gfn_t gfn;
 
 #if (SHADOW_OPTIMIZATIONS & SHOPT_VIRTUAL_TLB)
-    struct shadow_vtlb t = {0};
     /* Check the vTLB cache first */
-    if ( vtlb_lookup(v, va, pfec[0], &t) ) 
-        return t.frame_number;
+    unsigned long vtlb_gfn = vtlb_lookup(v, va, pfec[0]);
+    if ( VALID_GFN(vtlb_gfn) ) 
+        return vtlb_gfn;
 #endif /* (SHADOW_OPTIMIZATIONS & SHOPT_VIRTUAL_TLB) */
 
     if ( guest_walk_tables(v, va, &gw, pfec[0], 0) != 0 )
@@ -3128,11 +3134,8 @@ sh_gva_to_gfn(struct vcpu *v, unsigned long va, uint32_t *pfec)
     gfn = guest_walk_to_gfn(&gw);
 
 #if (SHADOW_OPTIMIZATIONS & SHOPT_VIRTUAL_TLB)
-    t.page_number = va >> PAGE_SHIFT;
-    t.frame_number = gfn_x(gfn);
-    t.flags = accumulate_guest_flags(v, &gw); 
-    t.pfec = pfec[0];
-    vtlb_insert(v, t);
+    /* Remember this successful VA->GFN translation for later. */
+    vtlb_insert(v, va >> PAGE_SHIFT, gfn_x(gfn), pfec[0]);
 #endif /* (SHADOW_OPTIMIZATIONS & SHOPT_VIRTUAL_TLB) */
 
     return gfn_x(gfn);
