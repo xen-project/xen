@@ -31,7 +31,7 @@ from xen.xend.XendConstants import DOM_STATE_HALTED
 from xen.xend.xenstore.xstransact import xstransact
 from xen.xend.server.BlktapController import blktap_disk_types
 from xen.xend.server.netif import randomMAC
-from xen.util.blkif import blkdev_name_to_number
+from xen.util.blkif import blkdev_name_to_number, blkdev_uname_to_file
 from xen.util import xsconstants
 import xen.util.auxbin
 
@@ -981,7 +981,7 @@ class XendConfig(dict):
     def device_duplicate_check(self, dev_type, dev_info, defined_config):
         defined_devices_sxpr = self.all_devices_sxpr(target = defined_config)
         
-        if dev_type == 'vbd':
+        if dev_type == 'vbd' or dev_type == 'tap':
             dev_uname = dev_info.get('uname')
             blkdev_name = dev_info.get('dev')
             devid = self._blkdev_name_to_number(blkdev_name)
@@ -989,10 +989,13 @@ class XendConfig(dict):
                 return
             
             for o_dev_type, o_dev_info in defined_devices_sxpr:
-                if dev_type == o_dev_type:
-                    if dev_uname == sxp.child_value(o_dev_info, 'uname'):
-                        raise XendConfigError('The uname "%s" is already defined' %
-                                              dev_uname)
+                if o_dev_type == 'vbd' or o_dev_type == 'tap':
+                    blkdev_file = blkdev_uname_to_file(dev_uname)
+                    o_dev_uname = sxp.child_value(o_dev_info, 'uname')
+                    o_blkdev_file = blkdev_uname_to_file(o_dev_uname)
+                    if blkdev_file == o_blkdev_file:
+                        raise XendConfigError('The file "%s" is already used' %
+                                              blkdev_file)
                     o_blkdev_name = sxp.child_value(o_dev_info, 'dev')
                     o_devid = self._blkdev_name_to_number(o_blkdev_name)
                     if o_devid != None and devid == o_devid:
@@ -1004,7 +1007,7 @@ class XendConfig(dict):
             
             for o_dev_type, o_dev_info in defined_devices_sxpr:
                 if dev_type == o_dev_type:
-                    if dev_mac == sxp.child_value(o_dev_info, 'mac'):
+                    if dev_mac.lower() == sxp.child_value(o_dev_info, 'mac').lower():
                         raise XendConfigError('The mac "%s" is already defined' %
                                               dev_mac)
     
