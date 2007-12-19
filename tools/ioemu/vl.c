@@ -66,6 +66,9 @@
 #include <linux/ppdev.h>
 #endif
 #endif
+#if defined(__sun__)
+#include <stropts.h>
+#endif
 #endif
 
 #if defined(CONFIG_SLIRP)
@@ -1801,7 +1804,65 @@ static int store_dev_info(char *devName, int domid,
     return 0;
 }
 
-#if defined(__linux__) || defined(__NetBSD__) || defined(__OpenBSD__)
+#ifdef __sun__
+/* Once Solaris has openpty(), this is going to be removed. */
+int openpty(int *amaster, int *aslave, char *name,
+            struct termios *termp, struct winsize *winp)
+{
+	const char *slave;
+	int mfd = -1, sfd = -1;
+
+	*amaster = *aslave = -1;
+
+	mfd = open("/dev/ptmx", O_RDWR | O_NOCTTY);
+	if (mfd < 0)
+		goto err;
+
+	if (grantpt(mfd) == -1 || unlockpt(mfd) == -1)
+		goto err;
+
+	if ((slave = ptsname(mfd)) == NULL)
+		goto err;
+
+	if ((sfd = open(slave, O_RDONLY | O_NOCTTY)) == -1)
+		goto err;
+
+	if (ioctl(sfd, I_PUSH, "ptem") == -1 ||
+	    (termp != NULL && tcgetattr(sfd, termp) < 0))
+		goto err;
+
+	if (amaster)
+		*amaster = mfd;
+	if (aslave)
+		*aslave = sfd;
+	if (winp)
+		ioctl(sfd, TIOCSWINSZ, winp);
+
+	return 0;
+
+err:
+	if (sfd != -1)
+		close(sfd);
+	close(mfd);
+	return -1;
+}
+
+void cfmakeraw (struct termios *termios_p)
+{
+	termios_p->c_iflag &=
+		~(IGNBRK|BRKINT|PARMRK|ISTRIP|INLCR|IGNCR|ICRNL|IXON);
+	termios_p->c_oflag &= ~OPOST;
+	termios_p->c_lflag &= ~(ECHO|ECHONL|ICANON|ISIG|IEXTEN);
+	termios_p->c_cflag &= ~(CSIZE|PARENB);
+	termios_p->c_cflag |= CS8;
+
+	termios_p->c_cc[VMIN] = 0;
+	termios_p->c_cc[VTIME] = 0;
+}
+
+#endif
+
+#if defined(__linux__) || defined(__NetBSD__) || defined(__OpenBSD__) || defined(__sun__)
 static CharDriverState *qemu_chr_open_pty(void)
 {
     struct termios tty;
@@ -1816,6 +1877,8 @@ static CharDriverState *qemu_chr_open_pty(void)
     cfmakeraw(&tty);
     tcsetattr(slave_fd, TCSAFLUSH, &tty);
     
+    close(slave_fd);
+
     fprintf(stderr, "char device redirected to %s\n", ptsname(master_fd));
 
     return qemu_chr_open_fd(master_fd, master_fd);
@@ -2038,7 +2101,7 @@ static CharDriverState *qemu_chr_open_pty(void)
 {
     return NULL;
 }
-#endif /* __linux__ || __NetBSD__ || __OpenBSD__ */
+#endif /* __linux__ || __NetBSD__ || __OpenBSD__ || __sun__ */
 
 #endif /* !defined(_WIN32) */
 

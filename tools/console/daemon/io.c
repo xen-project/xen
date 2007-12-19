@@ -36,10 +36,14 @@
 #include <stdarg.h>
 #include <sys/mman.h>
 #include <sys/time.h>
+#include <assert.h>
 #if defined(__NetBSD__) || defined(__OpenBSD__)
 #include <util.h>
 #elif defined(__linux__) || defined(__Linux__)
 #include <pty.h>
+#endif
+#if defined(__sun__)
+#include <stropts.h>
 #endif
 
 #define MAX(a, b) (((a) > (b)) ? (a) : (b))
@@ -75,7 +79,8 @@ struct buffer
 struct domain
 {
 	int domid;
-	int tty_fd;
+	int master_fd;
+	int slave_fd;
 	int log_fd;
 	bool is_dead;
 	struct buffer buffer;
@@ -227,77 +232,90 @@ static int create_domain_log(struct domain *dom)
 	return fd;
 }
 
+static void domain_close_tty(struct domain *dom)
+{
+	if (dom->master_fd != -1) {
+		close(dom->master_fd);
+		dom->master_fd = -1;
+	}
+
+	if (dom->slave_fd != -1) {
+		close(dom->slave_fd);
+		dom->slave_fd = -1;
+	}
+}
+
 #ifdef __sun__
 /* Once Solaris has openpty(), this is going to be removed. */
-int openpty(int *amaster, int *aslave, char *name,
-	    struct termios *termp, struct winsize *winp)
+static int openpty(int *amaster, int *aslave, char *name,
+                   struct termios *termp, struct winsize *winp)
 {
-	int mfd, sfd;
+	const char *slave;
+	int mfd = -1, sfd = -1;
 
 	*amaster = *aslave = -1;
-	mfd = sfd = -1;
 
 	mfd = open("/dev/ptmx", O_RDWR | O_NOCTTY);
 	if (mfd < 0)
-		goto err0;
+		goto err;
 
 	if (grantpt(mfd) == -1 || unlockpt(mfd) == -1)
-		goto err1;
+		goto err;
 
-	/* This does not match openpty specification,
-	 * but as long as this does not hurt, this is acceptable.
-	 */
-	mfd = sfd;
+	if ((slave = ptsname(mfd)) == NULL)
+		goto err;
 
-	if (termp != NULL && tcgetattr(sfd, termp) < 0)
-		goto err1;	
+	if ((sfd = open(slave, O_RDONLY | O_NOCTTY)) == -1)
+		goto err;
+
+	if (ioctl(sfd, I_PUSH, "ptem") == -1)
+		goto err;
 
 	if (amaster)
 		*amaster = mfd;
 	if (aslave)
 		*aslave = sfd;
-	if (name)
-		strlcpy(name, ptsname(mfd), sizeof(slave));
 	if (winp)
 		ioctl(sfd, TIOCSWINSZ, winp);
 
+	assert(name == NULL);
+	assert(termp == NULL);
+
 	return 0;
 
-err1:
+err:
+	if (sfd != -1)
+		close(sfd);
 	close(mfd);
-err0:
 	return -1;
 }
 #endif
 
-
 static int domain_create_tty(struct domain *dom)
 {
-	char slave[80];
-	struct termios term;
+	const char *slave;
 	char *path;
-	int master, slavefd;
 	int err;
 	bool success;
 	char *data;
 	unsigned int len;
 
-	if (openpty(&master, &slavefd, slave, &term, NULL) < 0) {
-		master = -1;
+	assert(dom->slave_fd == -1);
+	assert(dom->master_fd == -1);
+
+	if (openpty(&dom->master_fd, &dom->slave_fd, NULL, NULL, NULL) < 0) {
 		err = errno;
 		dolog(LOG_ERR, "Failed to create tty for domain-%d (errno = %i, %s)",
 		      dom->domid, err, strerror(err));
-		return master;
+		return 0;
 	}
 
-	cfmakeraw(&term);
-	if (tcsetattr(master, TCSAFLUSH, &term) < 0) {
+	if ((slave = ptsname(dom->master_fd)) == NULL) {
 		err = errno;
-		dolog(LOG_ERR, "Failed to set tty attribute  for domain-%d (errno = %i, %s)",
+		dolog(LOG_ERR, "Failed to get slave name for domain-%d (errno = %i, %s)",
 		      dom->domid, err, strerror(err));
 		goto out;
 	}
-
 
 	if (dom->use_consolepath) {
 		success = asprintf(&path, "%s/limit", dom->conspath) !=
@@ -340,15 +358,15 @@ static int domain_create_tty(struct domain *dom)
 			goto out;
 	}
 
-	if (fcntl(master, F_SETFL, O_NONBLOCK) == -1)
+	if (fcntl(dom->master_fd, F_SETFL, O_NONBLOCK) == -1)
 		goto out;
 
-	return master;
- out:
-	close(master);
-	return -1;
+	return 1;
+out:
+	domain_close_tty(dom);
+	return 0;
 }
-
+ 
 /* Takes tuples of names, scanf-style args, and void **, NULL terminated. */
 int xs_gather(struct xs_handle *xs, const char *dir, ...)
 {
@@ -454,10 +472,8 @@ static int domain_create_ring(struct domain *dom)
 	dom->local_port = rc;
 	dom->remote_port = remote_port;
 
-	if (dom->tty_fd == -1) {
-		dom->tty_fd = domain_create_tty(dom);
-
-		if (dom->tty_fd == -1) {
+	if (dom->master_fd == -1) {
+		if (!domain_create_tty(dom)) {
 			err = errno;
 			xc_evtchn_close(dom->xce_handle);
 			dom->xce_handle = -1;
@@ -535,7 +551,8 @@ static struct domain *create_domain(int domid)
 	dom->conspath = s;
 	strcat(dom->conspath, "/console");
 
-	dom->tty_fd = -1;
+	dom->master_fd = -1;
+	dom->slave_fd = -1;
 	dom->log_fd = -1;
 
 	dom->is_dead = false;
@@ -597,14 +614,7 @@ static void remove_domain(struct domain *dom)
 
 static void cleanup_domain(struct domain *d)
 {
-	if (d->tty_fd != -1) {
-		close(d->tty_fd);
-		d->tty_fd = -1;
-	}
-	if (d->log_fd != -1) {
-		close(d->log_fd);
-		d->log_fd = -1;
-	}
+	domain_close_tty(d);
 
 	free(d->buffer.data);
 	d->buffer.data = NULL;
@@ -683,13 +693,17 @@ static void handle_tty_read(struct domain *dom)
 	if (len > sizeof(msg))
 		len = sizeof(msg);
 
-	len = read(dom->tty_fd, msg, len);
-	if (len < 1) {
-		close(dom->tty_fd);
-		dom->tty_fd = -1;
+	len = read(dom->master_fd, msg, len);
+	/*
+	 * Note: on Solaris, len == 0 means the slave closed, and this
+	 * is no problem, but Linux can't handle this usefully, so we
+	 * keep the slave open for the duration.
+	 */
+	if (len < 0) {
+		domain_close_tty(dom);
 
 		if (domain_is_valid(dom->domid)) {
-			dom->tty_fd = domain_create_tty(dom);
+			domain_create_tty(dom);
 		} else {
 			shutdown_domain(dom);
 		}
@@ -703,8 +717,7 @@ static void handle_tty_read(struct domain *dom)
 		intf->in_prod = prod;
 		xc_evtchn_notify(dom->xce_handle, dom->local_port);
 	} else {
-		close(dom->tty_fd);
-		dom->tty_fd = -1;
+		domain_close_tty(dom);
 		shutdown_domain(dom);
 	}
 }
@@ -716,17 +729,16 @@ static void handle_tty_write(struct domain *dom)
 	if (dom->is_dead)
 		return;
 
-	len = write(dom->tty_fd, dom->buffer.data + dom->buffer.consumed,
+	len = write(dom->master_fd, dom->buffer.data + dom->buffer.consumed,
 		    dom->buffer.size - dom->buffer.consumed);
  	if (len < 1) {
 		dolog(LOG_DEBUG, "Write failed on domain %d: %zd, %d\n",
 		      dom->domid, len, errno);
 
-		close(dom->tty_fd);
-		dom->tty_fd = -1;
+		domain_close_tty(dom);
 
 		if (domain_is_valid(dom->domid)) {
-			dom->tty_fd = domain_create_tty(dom);
+			domain_create_tty(dom);
 		} else {
 			shutdown_domain(dom);
 		}
@@ -895,13 +907,13 @@ void handle_io(void)
 				max_fd = MAX(evtchn_fd, max_fd);
 			}
 
-			if (d->tty_fd != -1) {
+			if (d->master_fd != -1) {
 				if (!d->is_dead && ring_free_bytes(d))
-					FD_SET(d->tty_fd, &readfds);
+					FD_SET(d->master_fd, &readfds);
 
 				if (!buffer_empty(&d->buffer))
-					FD_SET(d->tty_fd, &writefds);
-				max_fd = MAX(d->tty_fd, max_fd);
+					FD_SET(d->master_fd, &writefds);
+				max_fd = MAX(d->master_fd, max_fd);
 			}
 		}
 
@@ -951,10 +963,10 @@ void handle_io(void)
 					handle_ring_read(d);
 			}
 
-			if (d->tty_fd != -1 && FD_ISSET(d->tty_fd, &readfds))
+			if (d->master_fd != -1 && FD_ISSET(d->master_fd, &readfds))
 				handle_tty_read(d);
 
-			if (d->tty_fd != -1 && FD_ISSET(d->tty_fd, &writefds))
+			if (d->master_fd != -1 && FD_ISSET(d->master_fd, &writefds))
 				handle_tty_write(d);
 
 			if (d->is_dead)
