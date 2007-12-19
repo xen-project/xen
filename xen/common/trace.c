@@ -485,8 +485,8 @@ void __trace_var(u32 event, int cycles, int extra, unsigned char *extra_data)
     local_irq_restore(flags);
 
     /* Notify trace buffer consumer that we've crossed the high water mark. */
-    if ( started_below_highwater
-         && ((buf->prod - buf->cons) > t_buf_highwater) )
+    if ( started_below_highwater &&
+         ((buf->prod - buf->cons) >= t_buf_highwater) )
         raise_softirq(TRACE_SOFTIRQ);
 }
 
