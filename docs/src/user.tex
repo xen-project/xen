@@ -665,7 +665,7 @@ In order to configure Xen serial console output, it is necessary to
 add a boot option to your GRUB config; e.g.\ replace the previous
 example kernel line with:
 \begin{quote} {\small \begin{verbatim}
-   kernel /boot/xen.gz dom0_mem=131072 com1=115200,8n1
+   kernel /boot/xen.gz dom0_mem=131072 com1=115200,8n1 console=com1,vga
 \end{verbatim}}
 \end{quote}
 
