@@ -719,6 +719,7 @@ asmlinkage void do_invalid_op(struct cpu_user_regs *regs)
     struct bug_frame bug;
     struct bug_frame_str bug_str;
     char *filename, *predicate, *eip = (char *)regs->eip;
+    unsigned long fixup;
     int id, lineno;
 
     DEBUGGER_trap_entry(TRAP_invalid_op, regs);
@@ -789,6 +790,11 @@ asmlinkage void do_invalid_op(struct cpu_user_regs *regs)
           predicate, filename, lineno);
 
  die:
+    if ( (fixup = search_exception_table(regs->eip)) != 0 )
+    {
+        regs->eip = fixup;
+        return;
+    }
     DEBUGGER_trap_fatal(TRAP_invalid_op, regs);
     show_execution_state(regs);
     panic("FATAL TRAP: vector = %d (invalid opcode)\n", TRAP_invalid_op);

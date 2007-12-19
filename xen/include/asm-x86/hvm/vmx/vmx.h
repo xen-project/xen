@@ -240,23 +240,31 @@ static inline void __vm_clear_bit(unsigned long field, unsigned int bit)
     __vmwrite(field, __vmread(field) & ~(1UL << bit));
 }
 
-static inline void __vmxoff (void)
+static inline void __vmxoff(void)
 {
-    __asm__ __volatile__ ( VMXOFF_OPCODE
-                           ::: "memory");
+    asm volatile (
+        VMXOFF_OPCODE
+        : : : "memory" );
 }
 
-static inline int __vmxon (u64 addr)
+static inline int __vmxon(u64 addr)
 {
     int rc;
 
-    __asm__ __volatile__ ( VMXON_OPCODE
-                           MODRM_EAX_06
-                           /* CF==1 or ZF==1 --> rc = -1 */
-                           "setna %b0 ; neg %0"
-                           : "=q" (rc)
-                           : "0" (0), "a" (&addr)
-                           : "memory");
+    asm volatile ( 
+        "1: " VMXON_OPCODE MODRM_EAX_06 "\n"
+        "   setna %b0 ; neg %0\n" /* CF==1 or ZF==1 --> rc = -1 */
+        "2:\n"
+        ".section .fixup,\"ax\"\n"
+        "3: not %0 ; jmp 2b\n"    /* #UD --> rc = -1 */
+        ".previous\n"
+        ".section __ex_table,\"a\"\n"
+        "   "__FIXUP_ALIGN"\n"
+        "   "__FIXUP_WORD" 1b,3b\n"
+        ".previous\n"
+        : "=q" (rc)
+        : "0" (0), "a" (&addr)
+        : "memory");
 
     return rc;
 }
