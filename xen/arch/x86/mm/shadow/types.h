@@ -233,6 +233,29 @@ static inline shadow_l4e_t shadow_l4e_from_mfn(mfn_t mfn, u32 flags)
 })
 #endif
 
+
+/* Type of the guest's frame numbers */
+TYPE_SAFE(unsigned long,gfn)
+#define SH_PRI_gfn "05lx"
+
+#define VALID_GFN(m) (m != INVALID_GFN)
+
+static inline int
+valid_gfn(gfn_t m)
+{
+    return VALID_GFN(gfn_x(m));
+}
+
+static inline paddr_t
+gfn_to_paddr(gfn_t gfn)
+{
+    return ((paddr_t)gfn_x(gfn)) << PAGE_SHIFT;
+}
+
+/* Override gfn_to_mfn to work with gfn_t */
+#undef gfn_to_mfn
+#define gfn_to_mfn(d, g, t) _gfn_to_mfn((d), gfn_x(g), (t))
+
 #if GUEST_PAGING_LEVELS == 2
 
 #include "../page-guest32.h"
@@ -241,12 +264,6 @@ static inline shadow_l4e_t shadow_l4e_from_mfn(mfn_t mfn, u32 flags)
 #define GUEST_L2_PAGETABLE_ENTRIES     1024
 #define GUEST_L1_PAGETABLE_SHIFT         12
 #define GUEST_L2_PAGETABLE_SHIFT         22
-
-/* Type of the guest's frame numbers */
-TYPE_SAFE(u32,gfn)
-#undef INVALID_GFN
-#define INVALID_GFN ((u32)(-1u))
-#define SH_PRI_gfn "05x"
 
 /* Types of the guest's page tables */
 typedef l1_pgentry_32_t guest_l1e_t;
@@ -306,12 +323,6 @@ static inline guest_l2e_t guest_l2e_from_gfn(gfn_t gfn, u32 flags)
 #define GUEST_L3_PAGETABLE_SHIFT         30
 #define GUEST_L4_PAGETABLE_SHIFT         39
 #endif
-
-/* Type of the guest's frame numbers */
-TYPE_SAFE(unsigned long,gfn)
-#undef INVALID_GFN
-#define INVALID_GFN ((unsigned long)(-1ul))
-#define SH_PRI_gfn "05lx"
 
 /* Types of the guest's page tables */
 typedef l1_pgentry_t guest_l1e_t;
@@ -399,24 +410,6 @@ static inline guest_l4e_t guest_l4e_from_gfn(gfn_t gfn, u32 flags)
 #endif
 
 #endif /* GUEST_PAGING_LEVELS != 2 */
-
-#define VALID_GFN(m) (m != INVALID_GFN)
-
-static inline int
-valid_gfn(gfn_t m)
-{
-    return VALID_GFN(gfn_x(m));
-}
-
-static inline paddr_t
-gfn_to_paddr(gfn_t gfn)
-{
-    return ((paddr_t)gfn_x(gfn)) << PAGE_SHIFT;
-}
-
-/* Override gfn_to_mfn to work with gfn_t */
-#undef gfn_to_mfn
-#define gfn_to_mfn(d, g, t) _gfn_to_mfn((d), gfn_x(g), (t))
 
 
 /* Type used for recording a walk through guest pagetables.  It is
