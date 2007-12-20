@@ -1876,8 +1876,6 @@ static CharDriverState *qemu_chr_open_pty(void)
     /* Set raw attributes on the pty. */
     cfmakeraw(&tty);
     tcsetattr(slave_fd, TCSAFLUSH, &tty);
-    
-    close(slave_fd);
 
     fprintf(stderr, "char device redirected to %s\n", ptsname(master_fd));
 
