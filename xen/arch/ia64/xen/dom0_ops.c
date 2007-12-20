@@ -354,6 +354,7 @@ long arch_do_domctl(xen_domctl_t *op, XEN_GUEST_HANDLE(xen_domctl_t) u_domctl)
         }
 
         ret = domain_opt_feature(d, optf);
+        put_domain(d);
     }
     break;
 
