@@ -270,11 +270,11 @@ static int create_local_socket(tpmState *s, uint32_t vtpm_instance)
             }
 #ifdef DEBUG_TPM
             if (success)
-                fprintf(logfile,"Successfully connected using local socket "
-                                LOCAL_SOCKET_PATH ".\n");
+                fprintf(logfile," Successfully connected using local socket"
+                                "%s.\n",addr.sun_path);
             else
-                fprintf(logfile,"Could not connect to local socket "
-                                LOCAL_SOCKET_PATH ".\n");
+                fprintf(logfile," Could not connect to local socket "
+                                "%s.\n",addr.sun_path);
 #endif
         } else {
             success = 0;
@@ -905,9 +905,10 @@ void tpm_tis_init(SetIRQFunc *set_irq, void *opaque, int irq)
 
     register_savevm("tpm-tis", 0, 1, tpm_save, tpm_load, s);
 
+    open_vtpm_channel(s);
     for (c = 0; !IS_COMM_WITH_VTPM(s) && (c < 5); c++) {
-       open_vtpm_channel(s);
        sleep(1);
+       open_vtpm_channel(s);
     }
 }
 
