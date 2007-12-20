@@ -985,7 +985,7 @@ class XendConfig(dict):
             dev_uname = dev_info.get('uname')
             blkdev_name = dev_info.get('dev')
             devid = self._blkdev_name_to_number(blkdev_name)
-            if devid == None:
+            if devid == None or dev_uname == None:
                 return
             
             for o_dev_type, o_dev_info in defined_devices_sxpr:
