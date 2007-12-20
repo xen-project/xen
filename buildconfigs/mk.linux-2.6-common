@@ -59,7 +59,7 @@ ifneq ($(XEN_LINUX_ALLOW_INTERFACE_MISMATCH),y)
 	fi
 endif
 	if grep "^CONFIG_MODULES=" $(LINUX_DIR)/.config ; then \
-	    $(MAKE) -C $(LINUX_DIR) ARCH=$(LINUX_ARCH) modules ; \
+	    $(MAKE) -C $(LINUX_DIR) ARCH=$(LINUX_ARCH) modules || exit 1 ; \
 	    $(MAKE) -C $(LINUX_DIR) ARCH=$(LINUX_ARCH) INSTALL_MOD_PATH=$(DESTDIR) modules_install ; \
 	fi
 	$(MAKE) -C $(LINUX_DIR) ARCH=$(LINUX_ARCH) INSTALL_PATH=$(DESTDIR) $(IMAGE_TARGET)
