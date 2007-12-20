@@ -904,6 +904,11 @@ void tpm_tis_init(SetIRQFunc *set_irq, void *opaque, int irq)
     memset(s->buffer.buf,0,sizeof(s->buffer.buf));
 
     register_savevm("tpm-tis", 0, 1, tpm_save, tpm_load, s);
+
+    for (c = 0; !IS_COMM_WITH_VTPM(s) && (c < 5); c++) {
+       open_vtpm_channel(s);
+       sleep(1);
+    }
 }
 
 /****************************************************************************/
