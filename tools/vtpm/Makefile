@@ -49,7 +49,7 @@ $(TPM_EMULATOR_TARFILE):
 # Create vtpm and TPM emulator dirs
 # apply patches for 1) used as dom0 tpm driver 2) used as vtpm device instance
 $(TPM_EMULATOR_DIR): $(TPM_EMULATOR_TARFILE) tpm_emulator.patch 
-	if [ "$(BUILD_EMULATOR)" = "y" ]; then \
+	set -e; if [ "$(BUILD_EMULATOR)" = "y" ]; then \
 		rm -rf $(TPM_EMULATOR_DIR); \
 		tar -xzf $(TPM_EMULATOR_TARFILE); \
 		mv $(TPM_EMULATOR_NAME) $(TPM_EMULATOR_DIR); \
@@ -59,20 +59,20 @@ $(TPM_EMULATOR_DIR): $(TPM_EMULATOR_TARFILE) tpm_emulator.patch
 
 $(VTPM_DIR): $(TPM_EMULATOR_TARFILE) vtpm.patch
 	rm -rf $(VTPM_DIR)
-	tar -xzf $(TPM_EMULATOR_TARFILE);  
-	mv $(TPM_EMULATOR_NAME) $(VTPM_DIR); 
+	tar -xzf $(TPM_EMULATOR_TARFILE)
+	mv $(TPM_EMULATOR_NAME) $(VTPM_DIR)
 
-	cd $(VTPM_DIR); \
+	set -e; cd $(VTPM_DIR); \
 	patch -p1 < ../tpm_emulator.patch; \
 	patch -p1 < ../vtpm.patch
 
 orig: $(TPM_EMULATOR_TARFILE)
 	mkdir $(ORIG_DIR);
-	cd $(ORIG_DIR); \
+	set -e; cd $(ORIG_DIR); \
 	tar -xzf ../$(TPM_EMULATOR_TARFILE);
 
 updatepatches: clean orig
-	if [ "$(BUILD_EMULATOR)" = "y" ]; then \
+	set -e; if [ "$(BUILD_EMULATOR)" = "y" ]; then \
 		find $(TPM_EMULATOR_DIR) -name "*.orig" -print | xargs rm -f; \
 		mv tpm_emulator.patch tpm_emulator.patch.old; \
 		diff -uprN orig/$(TPM_EMULATOR_NAME) $(TPM_EMULATOR_DIR) > tpm_emulator.patch || true; \
@@ -83,7 +83,7 @@ updatepatches: clean orig
 
 .PHONY: build_sub
 build_sub:
-	@if [ -e $(GMP_HEADER) ]; then \
+	set -e; @if [ -e $(GMP_HEADER) ]; then \
 		$(MAKE) -C $(VTPM_DIR); \
 		if [ "$(BUILD_EMULATOR)" = "y" ]; then \
 			$(MAKE) -C $(TPM_EMULATOR_DIR); \

@@ -89,7 +89,7 @@ install: all $(if $(BUILD_DOCS),install-doc)
 #	done
 ifndef CONFIG_WIN32
 	mkdir -p "$(DESTDIR)$(datadir)/keymaps"
-	for x in $(KEYMAPS); do \
+	set -e; for x in $(KEYMAPS); do \
 		$(INSTALL_DATA) -m 644 $(SRC_PATH)/keymaps/$$x "$(DESTDIR)$(datadir)/keymaps"; \
 	done
 endif
@@ -140,12 +140,12 @@ FILE = qemu-$(VERSION)
 tar:
 	rm -rf /tmp/$(FILE)
 	cp -r . /tmp/$(FILE)
-	( cd /tmp ; tar zcvf ~/$(FILE).tar.gz $(FILE) --exclude CVS )
+	cd /tmp && tar zcvf ~/$(FILE).tar.gz $(FILE) --exclude CVS
 	rm -rf /tmp/$(FILE)
 
 # generate a binary distribution
 tarbin:
-	( cd / ; tar zcvf ~/qemu-$(VERSION)-i386.tar.gz \
+	cd / && tar zcvf ~/qemu-$(VERSION)-i386.tar.gz \
 	$(bindir)/qemu \
 	$(bindir)/qemu-system-ppc \
 	$(bindir)/qemu-system-sparc \
@@ -173,7 +173,7 @@ tarbin:
         $(datadir)/pxe-pcnet.bin \
 	$(docdir)/qemu-doc.html \
 	$(docdir)/qemu-tech.html \
-	$(mandir)/man1/qemu.1 $(mandir)/man1/qemu-img.1 )
+	$(mandir)/man1/qemu.1 $(mandir)/man1/qemu-img.1
 
 ifneq ($(wildcard .depend),)
 include .depend

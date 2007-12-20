@@ -59,8 +59,8 @@ $(BR_IMG): $(BR_SRC)
 	cp configs/buildroot-$(BR_ARCH) $(BR_SRC)/.config
 	cp configs/busybox $(BR_SRC)/package/busybox/busybox.config
 	cp configs/uClibc $(BR_SRC)/toolchain/uClibc/uClibc.config
-	(for i in patches/buildroot/*.patch; do \
-	  cd $(BR_SRC) && patch -p1 <../$$i && cd ..; done )
+	set -e; for i in patches/buildroot/*.patch; do \
+	  cd $(BR_SRC) && patch -p1 <../$$i && cd ..; done
 	cd $(BR_SRC) && make oldconfig && make
 
 $(XMTEST_VER_IMG): $(BR_IMG)
@@ -69,8 +69,8 @@ $(XMTEST_VER_IMG): $(BR_IMG)
 	-[ -e "$(BLKDRV)" ] && cp $(BLKDRV) skel/modules
 	-[ -e "$(NETDRV)" ] && cp $(NETDRV) skel/modules
 	-[ -e "$(PKTDRV)" ] && cp $(PKTDRV) skel/modules
-	(cd skel; tar cf - .) \
-		| (cd $(BR_SRC)/$(BR_ROOT); tar xvf -)
+	(cd skel && tar cf - .) \
+		| (cd $(BR_SRC)/$(BR_ROOT) && tar xvf -)
 	cd $(BR_SRC) && make
 	cp $(BR_IMG) $(XMTEST_VER_IMG)
 

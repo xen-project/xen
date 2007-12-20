@@ -76,7 +76,7 @@ install-configs: $(XEN_CONFIGS)
 		$(INSTALL_DIR) $(DESTDIR)$(XEN_CONFIG_DIR)
 	[ -d $(DESTDIR)$(XEN_CONFIG_DIR)/auto ] || \
 		$(INSTALL_DIR) $(DESTDIR)$(XEN_CONFIG_DIR)/auto
-	for i in $(XEN_CONFIGS); \
+	set -e; for i in $(XEN_CONFIGS); \
 	    do [ -e $(DESTDIR)$(XEN_CONFIG_DIR)/$$i ] || \
 	    $(INSTALL_DATA) $$i $(DESTDIR)$(XEN_CONFIG_DIR); \
 	done
@@ -85,11 +85,11 @@ install-configs: $(XEN_CONFIGS)
 install-scripts:
 	[ -d $(DESTDIR)$(XEN_SCRIPT_DIR) ] || \
 		$(INSTALL_DIR) $(DESTDIR)$(XEN_SCRIPT_DIR)
-	for i in $(XEN_SCRIPTS); \
+	set -e; for i in $(XEN_SCRIPTS); \
 	    do \
 	    $(INSTALL_PROG) $$i $(DESTDIR)$(XEN_SCRIPT_DIR); \
 	done
-	for i in $(XEN_SCRIPT_DATA); \
+	set -e; for i in $(XEN_SCRIPT_DATA); \
 	    do \
 	    $(INSTALL_DATA) $$i $(DESTDIR)$(XEN_SCRIPT_DIR); \
 	done
@@ -98,7 +98,7 @@ install-scripts:
 install-hotplug:
 	[ -d $(DESTDIR)$(XEN_HOTPLUG_DIR) ] || \
 		$(INSTALL_DIR) $(DESTDIR)$(XEN_HOTPLUG_DIR)
-	for i in $(XEN_HOTPLUG_SCRIPTS); \
+	set -e; for i in $(XEN_HOTPLUG_SCRIPTS); \
 	    do \
 	    $(INSTALL_PROG) $$i $(DESTDIR)$(XEN_HOTPLUG_DIR); \
 	done
@@ -107,11 +107,10 @@ install-hotplug:
 install-udev:
 	[ -d $(DESTDIR)$(UDEV_RULES_DIR) ] || \
 		$(INSTALL_DIR) $(DESTDIR)$(UDEV_RULES_DIR)/rules.d
-	for i in $(UDEV_RULES); \
+	set -e; for i in $(UDEV_RULES); \
 	    do \
 	    $(INSTALL_DATA) $$i $(DESTDIR)$(UDEV_RULES_DIR); \
-	    ( cd $(DESTDIR)$(UDEV_RULES_DIR)/rules.d ; \
-	        ln -sf ../$$i . ) \
+	    ln -sf ../$$i $(DESTDIR)$(UDEV_RULES_DIR)/rules.d; \
 	done
 
 .PHONY: clean

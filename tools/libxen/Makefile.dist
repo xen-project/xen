@@ -71,7 +71,7 @@ install: all
 	ln -sf libxenapi.so.$(MAJOR).$(MINOR) $(DESTDIR)/usr/$(LIBDIR)/libxenapi.so.$(MAJOR)
 	ln -sf libxenapi.so.$(MAJOR) $(DESTDIR)/usr/$(LIBDIR)/libxenapi.so
 	$(INSTALL_DATA) libxenapi.a $(DESTDIR)/usr/$(LIBDIR)
-	for i in $(LIBXENAPI_HDRS); do \
+	set -e; for i in $(LIBXENAPI_HDRS); do \
 	    $(INSTALL_DATA) $$i $(DESTDIR)/usr/include/xen/api; \
 	done
 

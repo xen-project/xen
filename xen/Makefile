@@ -141,13 +141,13 @@ endef
 
 .PHONY: _TAGS
 _TAGS: 
-	rm -f TAGS; \
+	set -e; rm -f TAGS; \
 	$(call set_exuberant_flags,etags); \
 	$(all_sources) | xargs etags $$exuberant_flags -a
 
 .PHONY: _tags
 _tags: 
-	rm -f tags; \
+	set -e; rm -f tags; \
 	$(call set_exuberant_flags,ctags); \
 	$(all_sources) | xargs ctags $$exuberant_flags -a
 

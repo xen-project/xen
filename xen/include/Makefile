@@ -37,7 +37,7 @@ endif
 all: $(headers-y)
 
 compat/%.h: compat/%.i Makefile
-	id=_$$(echo $@ | tr '[:lower:]-/.' '[:upper:]___'); \
+	set -e; id=_$$(echo $@ | tr '[:lower:]-/.' '[:upper:]___'); \
 	echo "#ifndef $$id" >$@.new; \
 	echo "#define $$id" >>$@.new; \
 	echo "#include <xen/compat.h>" >>$@.new; \

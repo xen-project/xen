@@ -44,7 +44,7 @@ html:
 .PHONY: python-dev-docs
 python-dev-docs:
 	@mkdir -v -p api/tools/python
-	@if which $(DOXYGEN) 1>/dev/null 2>/dev/null; then         \
+	@set -e ; if which $(DOXYGEN) 1>/dev/null 2>/dev/null; then \
         echo "Running doxygen to generate Python tools APIs ... "; \
 	$(DOXYGEN) Doxyfile;                                       \
 	$(MAKE) -C api/tools/python/latex ; else                   \

@@ -51,10 +51,10 @@ install: all $(ACM_CONFIG_FILE)
 	$(INSTALL_DIR) $(DESTDIR)$(ACM_POLICY_DIR)
 	$(INSTALL_DATA) policies/$(ACM_SCHEMA) $(DESTDIR)$(ACM_POLICY_DIR)
 	$(INSTALL_DIR) $(DESTDIR)$(ACM_POLICY_DIR)/example
-	for i in $(ACM_EXAMPLES); do \
+	set -e; for i in $(ACM_EXAMPLES); do \
 		$(INSTALL_DATA) policies/example/$$i-$(ACM_POLICY_SUFFIX) $(DESTDIR)$(ACM_POLICY_DIR)/example/; \
 	done
-	for i in $(ACM_DEF_POLICIES); do \
+	set -e; for i in $(ACM_DEF_POLICIES); do \
 		$(INSTALL_DATA) policies/$$i-$(ACM_POLICY_SUFFIX) $(DESTDIR)$(ACM_POLICY_DIR); \
 	done
 	$(INSTALL_DIR) $(DESTDIR)$(ACM_SCRIPT_DIR)

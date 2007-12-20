@@ -25,7 +25,7 @@ $(LINUX_SRCDIR)/.valid-src: $(__XEN_LINUX_UPDATE)
 	    echo "Pulling changes from $${__parent} into $(LINUX_SRCDIR)." ; \
 	    $(HG) -R $(LINUX_SRCDIR) pull $${__parent} ; \
 	fi
-	if [ -n "$(XEN_LINUX_HGREV)" ] ; then \
+	set -e ; if [ -n "$(XEN_LINUX_HGREV)" ] ; then \
 	    echo "Updating $(LINUX_SRCDIR) to revision $(XEN_LINUX_HGREV)." ; \
 	    ( cd $(LINUX_SRCDIR) && $(HG) update $(XEN_LINUX_HGREV) ); \
 	fi

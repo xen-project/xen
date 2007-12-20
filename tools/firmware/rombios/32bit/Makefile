@@ -19,7 +19,7 @@ MODULES = tcgbios/tcgbiosext.o
 .PHONY: all subdirs clean
 
 subdirs:
-	@for subdir in $(SUBDIRS); do \
+	@set -e; for subdir in $(SUBDIRS); do \
 		$(MAKE) -C $$subdir all; \
 	done;
 

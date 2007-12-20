@@ -25,9 +25,9 @@ tag-archive:
 
 create-archive: tag-archive
 	@rm -rf /tmp/$(NAME)
-	@cd /tmp; cvs -Q -d $(CVSROOT) export -r$(CVSTAG) $(NAME) || echo GRRRrrrrr -- ignore [export aborted]
+	@cd /tmp && cvs -Q -d $(CVSROOT) export -r$(CVSTAG) $(NAME) || echo GRRRrrrrr -- ignore [export aborted]
 	@mv /tmp/$(NAME) /tmp/$(NAME)-$(VERSION)
-	@cd /tmp; tar czSpf $(NAME)-$(VERSION).tar.gz $(NAME)-$(VERSION)
+	@cd /tmp && tar czSpf $(NAME)-$(VERSION).tar.gz $(NAME)-$(VERSION)
 	@rm -rf /tmp/$(NAME)-$(VERSION)
 	@cp /tmp/$(NAME)-$(VERSION).tar.gz .
 	@rm -f /tmp/$(NAME)-$(VERSION).tar.gz 

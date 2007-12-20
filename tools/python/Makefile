@@ -40,7 +40,7 @@ refresh-pot: $(I18NSRCFILES)
 		$(I18NSRCFILES)
 	sed -f remove-potcdate.sed < $(POTFILE) > $(POTFILE)-1
 	sed -f remove-potcdate.sed < $(POTFILE)-tmp > $(POTFILE)-2
-	if cmp -s $(POTFILE)-1 $(POTFILE)-2; then \
+	set -e; if cmp -s $(POTFILE)-1 $(POTFILE)-2; then \
 		rm -f $(POTFILE)-tmp $(POTFILE)-1 $(POTFILE)-2; \
 	else \
 		mv $(POTFILE)-tmp $(POTFILE); \
@@ -48,7 +48,7 @@ refresh-pot: $(I18NSRCFILES)
 	fi
 
 refresh-po: $(POTFILE)
-	for l in $(LINGUAS); do \
+	set -e; for l in $(LINGUAS); do \
 		if $(MSGMERGE) $(PODIR)/$$l.po $(POTFILE) > $(PODIR)/$$l-tmp ; then \
 			mv -f $(PODIR)/$$l-tmp $(PODIR)/$$l.po ; \
 			echo "$(MSGMERGE) of $$l.po succeeded" ; \
@@ -88,7 +88,7 @@ install-dtd: all
 	$(INSTALL_DATA) xen/xm/create.dtd $(DESTDIR)/usr/share/xen
 
 install-messages: all
-	if which $(MSGFMT) >/dev/null ; then \
+	set -e; if which $(MSGFMT) >/dev/null ; then \
 		mkdir -p $(DESTDIR)$(NLSDIR); \
 		for l in $(LINGUAS); do \
 			$(INSTALL_DIR) $(DESTDIR)$(NLSDIR)/$$l; \
