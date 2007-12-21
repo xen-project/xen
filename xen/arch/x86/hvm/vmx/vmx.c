@@ -1613,7 +1613,7 @@ static void vmx_send_str_pio(struct cpu_user_regs *regs,
                              unsigned long inst_len, unsigned int port,
                              int sign, unsigned int size, int dir,
                              int df, unsigned long addr,
-                             unsigned long paddr, unsigned long count)
+                             paddr_t paddr, unsigned long count)
 {
     /*
      * Handle string pio instructions that cross pages or that
@@ -2455,7 +2455,7 @@ static void vmx_free_vlapic_mapping(struct domain *d)
 
 static void vmx_install_vlapic_mapping(struct vcpu *v)
 {
-    unsigned long virt_page_ma, apic_page_ma;
+    paddr_t virt_page_ma, apic_page_ma;
 
     if ( !cpu_has_vmx_virtualize_apic_accesses )
         return;
