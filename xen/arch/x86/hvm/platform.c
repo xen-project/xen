@@ -885,7 +885,7 @@ void send_pio_req(unsigned long port, unsigned long count, int size,
     hvm_send_assist_req(v);
 }
 
-void send_mmio_req(unsigned char type, unsigned long gpa,
+void send_mmio_req(unsigned char type, paddr_t gpa,
                    unsigned long count, int size, paddr_t value,
                    int dir, int df, int value_is_ptr)
 {
@@ -894,8 +894,8 @@ void send_mmio_req(unsigned char type, unsigned long gpa,
     ioreq_t *p;
 
     if ( size == 0 || count == 0 ) {
-        printk("null mmio request? type %d, gpa %lx, "
-               "count %lx, size %d, value %"PRIpaddr"x, dir %d, "
+        printk("null mmio request? type %d, gpa %"PRIpaddr", "
+               "count %lx, size %d, value %"PRIpaddr", dir %d, "
                "value_is_ptr %d.\n",
                type, gpa, count, size, value, dir, value_is_ptr);
     }
@@ -1019,7 +1019,7 @@ static void mmio_operands(int type, unsigned long gpa,
      (mmio_op->flags & REPZ ? (ad_size == WORD ? regs->ecx & 0xFFFF : regs->ecx) : 1)
 
 
-void handle_mmio(unsigned long gpa)
+void handle_mmio(paddr_t gpa)
 {
     unsigned long inst_addr;
     struct hvm_io_op *mmio_op;
@@ -1056,7 +1056,7 @@ void handle_mmio(unsigned long gpa)
         gdprintk(XENLOG_WARNING,
                  "handle_mmio: failed to decode instruction\n");
         gdprintk(XENLOG_WARNING,
-                 "mmio opcode: gpa 0x%lx, len %d:", gpa, inst_len);
+                 "mmio opcode: gpa 0x%"PRIpaddr", len %d:", gpa, inst_len);
         for ( i = 0; i < inst_len; i++ )
             printk(" %02x", inst[i] & 0xFF);
         printk("\n");
