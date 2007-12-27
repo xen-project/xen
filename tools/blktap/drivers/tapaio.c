@@ -30,6 +30,8 @@
 #include "tapaio.h"
 #include "tapdisk.h"
 #include <unistd.h>
+#include <errno.h>
+#include <string.h>
 
 /**
  * We used a kernel patch to return an fd associated with the AIO context
@@ -149,8 +151,22 @@ tap_aio_get_events(tap_aio_context_t *ctx)
         if (!ctx->poll_in_thread)
                 nr_events = io_getevents(ctx->aio_ctx, 1,
                                          ctx->max_aio_events, ctx->aio_events, NULL);
-        else
-                read(ctx->completion_fd[0], &nr_events, sizeof(nr_events));
+        else {
+		int r;
+		r = read(ctx->completion_fd[0], &nr_events, sizeof(nr_events));
+		if (r < 0) {
+			if (errno == EAGAIN || errno == EINTR)
+				return 0;
+			/* This is pretty bad, we'll probably spin */
+			DPRINTF("Aargh, read completion_fd failed: %s",
+				strerror(errno));
+		} else if (r != sizeof(nr_events)) {
+			/* Should never happen because sizeof(nr_events)
+			 * fits in the guaranteed atomic pipe write size.
+			 * Blundering on is slightly nicer than asserting */
+			DPRINTF("Aargh, read completion_fd short read %d", r);
+		}
+	}
 
         return nr_events;
 }
