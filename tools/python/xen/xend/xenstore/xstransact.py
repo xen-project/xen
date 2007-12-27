@@ -7,8 +7,16 @@
 
 from xen.xend.xenstore.xsutil import xshandle
 
-
 class xstransact:
+    """WARNING: Be very careful if you're instantiating an xstransact object
+       yourself (i.e. not using the capitalized static helpers like .Read().
+       It is essential that you clean up the object in place via
+       t.commit/abort(): GC can happen at any time, including contexts where
+       it's not safe to to use the shared xenstore socket fd. In particular,
+       if xend forks, and GC occurs, we can have two processes trying to
+       use the same xenstore fd, and all hell breaks loose.
+       """
+
 
     def __init__(self, path = ""):
         
@@ -22,8 +30,9 @@ class xstransact:
         self.in_transaction = True
 
     def __del__(self):
+        # see above.
         if self.in_transaction:
-            xshandle().transaction_end(self.transaction, True)
+            raise RuntimeError("ERROR: GC of live transaction")
 
     def commit(self):
         if not self.in_transaction:

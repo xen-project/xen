@@ -23,8 +23,6 @@ from xen.xend import sxp
 from xen.xend.XendError import VmError
 from xen.xend.XendLogging import log
 
-from xen.xend.xenstore.xstransact import xstransact
-
 from xen.xend.server.DevController import DevController
 
 import xen.lowlevel.xc

@@ -1525,18 +1525,19 @@ class XendDomainInfo:
 
         log.debug("Releasing devices")
         t = xstransact("%s/device" % self.dompath)
-        for devclass in XendDevices.valid_devices():
-            for dev in t.list(devclass):
-                try:
-                    log.debug("Removing %s", dev);
-                    self.destroyDevice(devclass, dev, False);
-                except:
-                    # Log and swallow any exceptions in removal --
-                    # there's nothing more we can do.
+        try:
+            for devclass in XendDevices.valid_devices():
+                for dev in t.list(devclass):
+                    try:
+                        log.debug("Removing %s", dev);
+                        self.destroyDevice(devclass, dev, False);
+                    except:
+                        # Log and swallow any exceptions in removal --
+                        # there's nothing more we can do.
                         log.exception("Device release failed: %s; %s; %s",
                                       self.info['name_label'], devclass, dev)
-
-            
+        finally:
+            t.abort()
 
     def getDeviceController(self, name):
         """Get the device controller for this domain, and if it
@@ -1848,16 +1849,18 @@ class XendDomainInfo:
         # build list of phantom devices to be removed after normal devices
         plist = []
         if self.domid is not None:
-            from xen.xend.xenstore.xstransact import xstransact
             t = xstransact("%s/device/vbd" % GetDomainPath(self.domid))
-            for dev in t.list():
-                backend_phantom_vbd = xstransact.Read("%s/device/vbd/%s/phantom_vbd" \
-                                      % (self.dompath, dev))
-                if backend_phantom_vbd is not None:
-                    frontend_phantom_vbd =  xstransact.Read("%s/frontend" \
-                                      % backend_phantom_vbd)
-                    plist.append(backend_phantom_vbd)
-                    plist.append(frontend_phantom_vbd)
+            try:
+                for dev in t.list():
+                    backend_phantom_vbd = xstransact.Read("%s/device/vbd/%s/phantom_vbd" \
+                                          % (self.dompath, dev))
+                    if backend_phantom_vbd is not None:
+                        frontend_phantom_vbd =  xstransact.Read("%s/frontend" \
+                                          % backend_phantom_vbd)
+                        plist.append(backend_phantom_vbd)
+                        plist.append(frontend_phantom_vbd)
+            finally:
+                t.abort()
         return plist
 
     def _cleanup_phantom_devs(self, plist):
