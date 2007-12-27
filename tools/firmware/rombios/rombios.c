@@ -2538,7 +2538,10 @@ void ata_detect( )
         case ATA_TYPE_ATA:
           printf("ata%d %s: ",channel,slave?" slave":"master");
           i=0; while(c=read_byte(get_SS(),model+i++)) printf("%c",c);
-          printf(" ATA-%d Hard-Disk (%d MBytes)\n",version,(Bit16u)sizeinmb);
+          if (sizeinmb < 1UL<<16)
+            printf(" ATA-%d Hard-Disk (%04u MBytes)\n",version,(Bit16u)sizeinmb);
+          else
+            printf(" ATA-%d Hard-Disk (%04u GBytes)\n",version,(Bit16u)(sizeinmb>>10));
           break;
         case ATA_TYPE_ATAPI:
           printf("ata%d %s: ",channel,slave?" slave":"master");
@@ -2671,15 +2674,6 @@ Bit32u lba;
   if (mode == ATA_MODE_PIO32) blksize>>=2;
   else blksize>>=1;
 
-  // sector will be 0 only on lba access. Convert to lba-chs
-  if (sector == 0) {
-    sector = (Bit16u) (lba & 0x000000ffL);
-    lba >>= 8;
-    cylinder = (Bit16u) (lba & 0x0000ffffL);
-    lba >>= 16;
-    head = ((Bit16u) (lba & 0x0000000fL)) | 0x40;
-    }
-
   // Reset count of transferred data
   write_word(ebda_seg, &EbdaData->ata.trsfsectors,0);
   write_dword(ebda_seg, &EbdaData->ata.trsfbytes,0L);
@@ -2689,6 +2683,26 @@ Bit32u lba;
   if (status & ATA_CB_STAT_BSY) return 1;
 
   outb(iobase2 + ATA_CB_DC, ATA_CB_DC_HD15 | ATA_CB_DC_NIEN);
+
+  // sector will be 0 only on lba access. Convert to lba-chs
+  if (sector == 0) {
+    if ((count >= 1 << 8) || (lba + count >= 1UL << 28)) {
+      outb(iobase1 + ATA_CB_FR, 0x00);
+      outb(iobase1 + ATA_CB_SC, (count >> 8) & 0xff);
+      outb(iobase1 + ATA_CB_SN, lba >> 24);
+      outb(iobase1 + ATA_CB_CL, 0);
+      outb(iobase1 + ATA_CB_CH, 0);
+      command |= 0x04;
+      count &= (1UL << 8) - 1;
+      lba &= (1UL << 24) - 1;
+      }
+    sector = (Bit16u) (lba & 0x000000ffL);
+    lba >>= 8;
+    cylinder = (Bit16u) (lba & 0x0000ffffL);
+    lba >>= 16;
+    head = ((Bit16u) (lba & 0x0000000fL)) | 0x40;
+    }
+
   outb(iobase1 + ATA_CB_FR, 0x00);
   outb(iobase1 + ATA_CB_SC, count);
   outb(iobase1 + ATA_CB_SN, sector);
@@ -2814,15 +2828,6 @@ Bit32u lba;
   if (mode == ATA_MODE_PIO32) blksize>>=2;
   else blksize>>=1;
 
-  // sector will be 0 only on lba access. Convert to lba-chs
-  if (sector == 0) {
-    sector = (Bit16u) (lba & 0x000000ffL);
-    lba >>= 8;
-    cylinder = (Bit16u) (lba & 0x0000ffffL);
-    lba >>= 16;
-    head = ((Bit16u) (lba & 0x0000000fL)) | 0x40;
-    }
-
   // Reset count of transferred data
   write_word(ebda_seg, &EbdaData->ata.trsfsectors,0);
   write_dword(ebda_seg, &EbdaData->ata.trsfbytes,0L);
@@ -2832,6 +2837,26 @@ Bit32u lba;
   if (status & ATA_CB_STAT_BSY) return 1;
 
   outb(iobase2 + ATA_CB_DC, ATA_CB_DC_HD15 | ATA_CB_DC_NIEN);
+
+  // sector will be 0 only on lba access. Convert to lba-chs
+  if (sector == 0) {
+    if ((count >= 1 << 8) || (lba + count >= 1UL << 28)) {
+      outb(iobase1 + ATA_CB_FR, 0x00);
+      outb(iobase1 + ATA_CB_SC, (count >> 8) & 0xff);
+      outb(iobase1 + ATA_CB_SN, lba >> 24);
+      outb(iobase1 + ATA_CB_CL, 0);
+      outb(iobase1 + ATA_CB_CH, 0);
+      command |= 0x04;
+      count &= (1UL << 8) - 1;
+      lba &= (1UL << 24) - 1;
+      }
+    sector = (Bit16u) (lba & 0x000000ffL);
+    lba >>= 8;
+    cylinder = (Bit16u) (lba & 0x0000ffffL);
+    lba >>= 16;
+    head = ((Bit16u) (lba & 0x0000000fL)) | 0x40;
+    }
+
   outb(iobase1 + ATA_CB_FR, 0x00);
   outb(iobase1 + ATA_CB_SC, count);
   outb(iobase1 + ATA_CB_SN, sector);
