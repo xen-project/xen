@@ -27,7 +27,7 @@ import fsimage
 import grub.GrubConf
 import grub.LiloConf
 
-PYGRUB_VER = 0.5
+PYGRUB_VER = 0.6
 
 def enable_cursor(ison):
     if ison:
@@ -228,15 +228,22 @@ class Grub:
     def fill_entry_list(self):
         self.entry_win.clear()
         self.entry_win.box()
-        for y in range(0, len(self.cf.images)):
+
+        maxy = self.entry_win.getmaxyx()[0]-3 # maxy - 2 for the frame + index
+        if self.selected_image > self.start_image + maxy:
+            self.start_image = self.selected_image
+        if self.selected_image < self.start_image:
+            self.start_image = self.selected_image
+        
+        for y in range(self.start_image, len(self.cf.images)):
             i = self.cf.images[y]
-            if (0, y) > self.entry_win.getmaxyx():
+            if y > self.start_image + maxy:
                 break
             if y == self.selected_image:
                 attr = curses.A_REVERSE
             else:
                 attr = 0
-            self.entry_win.addstr(y + 1, 2, i.title.ljust(70), attr)
+            self.entry_win.addstr(y + 1 - self.start_image, 2, i.title.ljust(70), attr)
         self.entry_win.refresh()
 
     def edit_entry(self, origimg):
@@ -416,6 +423,7 @@ class Grub:
 
         # now loop until we hit the timeout or get a go from the user
         mytime = 0
+        self.start_image = 0
         while (timeout == -1 or mytime < int(timeout)):
             draw()
             if timeout != -1 and mytime != -1: 
