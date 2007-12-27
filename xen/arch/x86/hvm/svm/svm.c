@@ -1468,20 +1468,13 @@ static void svm_io_instruction(struct vcpu *v)
                 if ( hvm_paging_enabled(current) )
                 {
                     int rv = hvm_copy_from_guest_virt(&value, addr, size);
-                    if ( rv != 0 ) 
-                    {
-                        /* Failed on the page-spanning copy.  Inject PF into
-                         * the guest for the address where we failed. */
-                        addr += size - rv;
-                        gdprintk(XENLOG_DEBUG, "Pagefault reading non-io side "
-                                 "of a page-spanning PIO: va=%#lx\n", addr);
-                        svm_inject_exception(TRAP_page_fault, 0, addr);
-                        return;
-                    }
+                    if ( rv == HVMCOPY_bad_gva_to_gfn )
+                        return; /* exception already injected */
                 }
                 else
-                    (void) hvm_copy_from_guest_phys(&value, addr, size);
-            } else /* dir != IOREQ_WRITE */
+                    (void)hvm_copy_from_guest_phys(&value, addr, size);
+            }
+            else /* dir != IOREQ_WRITE */
                 /* Remember where to write the result, as a *VA*.
                  * Must be a VA so we can handle the page overlap 
                  * correctly in hvm_pio_assist() */
@@ -1705,7 +1698,8 @@ static void svm_cr_access(
             offset = ( addr_size == 4 ) ? offset : ( offset & 0xFFFF );
             addr = hvm_get_segment_base(v, seg);
             addr += offset;
-            hvm_copy_to_guest_virt(addr,&value,2);
+            result = (hvm_copy_to_guest_virt(addr, &value, 2)
+                      != HVMCOPY_bad_gva_to_gfn);
         }
         else
         {

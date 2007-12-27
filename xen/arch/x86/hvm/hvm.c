@@ -1251,7 +1251,7 @@ void hvm_task_switch(
         if ( hvm_virtual_to_linear_addr(x86_seg_ss, &reg, regs->esp,
                                         4, hvm_access_write, 32,
                                         &linear_addr) )
-            hvm_copy_to_guest_virt(linear_addr, &errcode, 4);
+            hvm_copy_to_guest_virt_nofault(linear_addr, &errcode, 4);
     }
 
  out:
@@ -1269,24 +1269,26 @@ void hvm_task_switch(
  *  @fetch = copy is an instruction fetch?
  * Returns number of bytes failed to copy (0 == complete success).
  */
-static int __hvm_copy(void *buf, paddr_t addr, int size, int dir, 
-                      int virt, int fetch)
+static enum hvm_copy_result __hvm_copy(
+    void *buf, paddr_t addr, int size, int dir, int virt, int fetch)
 {
-    struct segment_register sreg;
     unsigned long gfn, mfn;
     p2m_type_t p2mt;
     char *p;
     int count, todo;
     uint32_t pfec = PFEC_page_present;
 
-    hvm_get_segment_register(current, x86_seg_ss, &sreg);
-
-    if ( dir ) 
-        pfec |= PFEC_write_access;
-    if ( sreg.attr.fields.dpl == 3 )
-        pfec |= PFEC_user_mode;
-    if ( fetch ) 
-        pfec |= PFEC_insn_fetch;
+    if ( virt )
+    {
+        struct segment_register sreg;
+        hvm_get_segment_register(current, x86_seg_ss, &sreg);
+        if ( sreg.attr.fields.dpl == 3 )
+            pfec |= PFEC_user_mode;
+        if ( dir ) 
+            pfec |= PFEC_write_access;
+        if ( fetch ) 
+            pfec |= PFEC_insn_fetch;
+    }
 
     todo = size;
     while ( todo > 0 )
@@ -1294,14 +1296,24 @@ static int __hvm_copy(void *buf, paddr_t addr, int size, int dir,
         count = min_t(int, PAGE_SIZE - (addr & ~PAGE_MASK), todo);
 
         if ( virt )
+        {
             gfn = paging_gva_to_gfn(current, addr, &pfec);
+            if ( gfn == INVALID_GFN )
+            {
+                if ( virt == 2 ) /* 2 means generate a fault */
+                    hvm_inject_exception(TRAP_page_fault, pfec, addr);
+                return HVMCOPY_bad_gva_to_gfn;
+            }
+        }
         else
+        {
             gfn = addr >> PAGE_SHIFT;
-        
+        }
+
         mfn = mfn_x(gfn_to_mfn_current(gfn, &p2mt));
 
         if ( !p2m_is_ram(p2mt) )
-            return todo;
+            return HVMCOPY_bad_gfn_to_mfn;
         ASSERT(mfn_valid(mfn));
 
         p = (char *)map_domain_page(mfn) + (addr & ~PAGE_MASK);
@@ -1321,30 +1333,53 @@ static int __hvm_copy(void *buf, paddr_t addr, int size, int dir,
         todo -= count;
     }
 
-    return 0;
+    return HVMCOPY_okay;
 }
 
-int hvm_copy_to_guest_phys(paddr_t paddr, void *buf, int size)
+enum hvm_copy_result hvm_copy_to_guest_phys(
+    paddr_t paddr, void *buf, int size)
 {
     return __hvm_copy(buf, paddr, size, 1, 0, 0);
 }
 
-int hvm_copy_from_guest_phys(void *buf, paddr_t paddr, int size)
+enum hvm_copy_result hvm_copy_from_guest_phys(
+    void *buf, paddr_t paddr, int size)
 {
     return __hvm_copy(buf, paddr, size, 0, 0, 0);
 }
 
-int hvm_copy_to_guest_virt(unsigned long vaddr, void *buf, int size)
+enum hvm_copy_result hvm_copy_to_guest_virt(
+    unsigned long vaddr, void *buf, int size)
+{
+    return __hvm_copy(buf, vaddr, size, 1, 2, 0);
+}
+
+enum hvm_copy_result hvm_copy_from_guest_virt(
+    void *buf, unsigned long vaddr, int size)
+{
+    return __hvm_copy(buf, vaddr, size, 0, 2, 0);
+}
+
+enum hvm_copy_result hvm_fetch_from_guest_virt(
+    void *buf, unsigned long vaddr, int size)
+{
+    return __hvm_copy(buf, vaddr, size, 0, 2, hvm_nx_enabled(current));
+}
+
+enum hvm_copy_result hvm_copy_to_guest_virt_nofault(
+    unsigned long vaddr, void *buf, int size)
 {
     return __hvm_copy(buf, vaddr, size, 1, 1, 0);
 }
 
-int hvm_copy_from_guest_virt(void *buf, unsigned long vaddr, int size)
+enum hvm_copy_result hvm_copy_from_guest_virt_nofault(
+    void *buf, unsigned long vaddr, int size)
 {
     return __hvm_copy(buf, vaddr, size, 0, 1, 0);
 }
 
-int hvm_fetch_from_guest_virt(void *buf, unsigned long vaddr, int size)
+enum hvm_copy_result hvm_fetch_from_guest_virt_nofault(
+    void *buf, unsigned long vaddr, int size)
 {
     return __hvm_copy(buf, vaddr, size, 0, 1, hvm_nx_enabled(current));
 }

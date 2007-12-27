@@ -141,9 +141,8 @@ hvm_read(enum x86_segment seg,
          enum hvm_access_type access_type,
          struct sh_emulate_ctxt *sh_ctxt)
 {
-    struct segment_register *sreg;
     unsigned long addr;
-    int rc, errcode;
+    int rc;
 
     rc = hvm_translate_linear_addr(
         seg, offset, bytes, access_type, sh_ctxt, &addr);
@@ -157,19 +156,17 @@ hvm_read(enum x86_segment seg,
     else
         rc = hvm_copy_from_guest_virt(val, addr, bytes);
 
-    if ( rc == 0 ) 
+    switch ( rc )
+    {
+    case HVMCOPY_okay:
         return X86EMUL_OKAY;
+    case HVMCOPY_bad_gva_to_gfn:
+        return X86EMUL_EXCEPTION;
+    default:
+        break;
+    }
 
-    /* If we got here, there was nothing mapped here, or a bad GFN 
-     * was mapped here.  This should never happen: we're here because
-     * of a write fault at the end of the instruction we're emulating. */ 
-    SHADOW_PRINTK("read failed to va %#lx\n", addr);
-    sreg = hvm_get_seg_reg(x86_seg_ss, sh_ctxt);
-    errcode = (sreg->attr.fields.dpl == 3) ? PFEC_user_mode : 0;
-    if ( access_type == hvm_access_insn_fetch )
-        errcode |= PFEC_insn_fetch;
-    hvm_inject_exception(TRAP_page_fault, errcode, addr + bytes - rc);
-    return X86EMUL_EXCEPTION;
+    return X86EMUL_UNHANDLEABLE;
 }
 
 static int
@@ -399,7 +396,7 @@ struct x86_emulate_ops *shadow_init_emulation(
         (!hvm_translate_linear_addr(
             x86_seg_cs, regs->eip, sizeof(sh_ctxt->insn_buf),
             hvm_access_insn_fetch, sh_ctxt, &addr) &&
-         !hvm_fetch_from_guest_virt(
+         !hvm_fetch_from_guest_virt_nofault(
              sh_ctxt->insn_buf, addr, sizeof(sh_ctxt->insn_buf)))
         ? sizeof(sh_ctxt->insn_buf) : 0;
 
@@ -427,7 +424,7 @@ void shadow_continue_emulation(struct sh_emulate_ctxt *sh_ctxt,
                 (!hvm_translate_linear_addr(
                     x86_seg_cs, regs->eip, sizeof(sh_ctxt->insn_buf),
                     hvm_access_insn_fetch, sh_ctxt, &addr) &&
-                 !hvm_fetch_from_guest_virt(
+                 !hvm_fetch_from_guest_virt_nofault(
                      sh_ctxt->insn_buf, addr, sizeof(sh_ctxt->insn_buf)))
                 ? sizeof(sh_ctxt->insn_buf) : 0;
             sh_ctxt->insn_buf_eip = regs->eip;

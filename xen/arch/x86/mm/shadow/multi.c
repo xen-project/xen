@@ -3984,6 +3984,8 @@ int sh_remove_l3_shadow(struct vcpu *v, mfn_t sl4mfn, mfn_t sl3mfn)
 /* Handling HVM guest writes to pagetables  */
 
 /* Translate a VA to an MFN, injecting a page-fault if we fail */
+#define BAD_GVA_TO_GFN (~0UL)
+#define BAD_GFN_TO_MFN (~1UL)
 static mfn_t emulate_gva_to_mfn(struct vcpu *v,
                                 unsigned long vaddr,
                                 struct sh_emulate_ctxt *sh_ctxt)
@@ -4001,7 +4003,7 @@ static mfn_t emulate_gva_to_mfn(struct vcpu *v,
             hvm_inject_exception(TRAP_page_fault, pfec, vaddr);
         else
             propagate_page_fault(vaddr, pfec);
-        return _mfn(INVALID_MFN);
+        return _mfn(BAD_GVA_TO_GFN);
     }
 
     /* Translate the GFN to an MFN */
@@ -4013,11 +4015,14 @@ static mfn_t emulate_gva_to_mfn(struct vcpu *v,
         return mfn;
     }
  
-    return _mfn(INVALID_MFN);
+    return _mfn(BAD_GFN_TO_MFN);
 }
 
 /* Check that the user is allowed to perform this write. 
  * Returns a mapped pointer to write to, or NULL for error. */
+#define MAPPING_UNHANDLEABLE ((void *)0)
+#define MAPPING_EXCEPTION    ((void *)1)
+#define emulate_map_dest_failed(rc) ((unsigned long)(rc) <= 1)
 static void *emulate_map_dest(struct vcpu *v,
                               unsigned long vaddr,
                               u32 bytes,
@@ -4030,11 +4035,12 @@ static void *emulate_map_dest(struct vcpu *v,
     /* We don't emulate user-mode writes to page tables */
     sreg = hvm_get_seg_reg(x86_seg_ss, sh_ctxt);
     if ( sreg->attr.fields.dpl == 3 )
-        return NULL;
+        return MAPPING_UNHANDLEABLE;
 
     sh_ctxt->mfn1 = emulate_gva_to_mfn(v, vaddr, sh_ctxt);
     if ( !mfn_valid(sh_ctxt->mfn1) ) 
-        return NULL;
+        return ((mfn_x(sh_ctxt->mfn1) == BAD_GVA_TO_GFN) ?
+                MAPPING_EXCEPTION : MAPPING_UNHANDLEABLE);
 
     /* Unaligned writes mean probably this isn't a pagetable */
     if ( vaddr & (bytes - 1) )
@@ -4051,13 +4057,14 @@ static void *emulate_map_dest(struct vcpu *v,
         /* Cross-page emulated writes are only supported for HVM guests; 
          * PV guests ought to know better */
         if ( !is_hvm_vcpu(v) )
-            return NULL;
+            return MAPPING_UNHANDLEABLE;
 
         /* This write crosses a page boundary.  Translate the second page */
         sh_ctxt->mfn2 = emulate_gva_to_mfn(v, (vaddr + bytes - 1) & PAGE_MASK,
                                            sh_ctxt);
         if ( !mfn_valid(sh_ctxt->mfn2) ) 
-            return NULL;
+            return ((mfn_x(sh_ctxt->mfn1) == BAD_GVA_TO_GFN) ?
+                    MAPPING_EXCEPTION : MAPPING_UNHANDLEABLE);
 
         /* Cross-page writes mean probably not a pagetable */
         sh_remove_shadows(v, sh_ctxt->mfn2, 0, 0 /* Slow, can fail */ );
@@ -4075,7 +4082,7 @@ static void *emulate_map_dest(struct vcpu *v,
         flush_tlb_local();
         map += (vaddr & ~PAGE_MASK);
     }
-    
+
 #if (SHADOW_OPTIMIZATIONS & SHOPT_SKIP_VERIFY)
     /* Remember if the bottom bit was clear, so we can choose not to run
      * the change through the verify code if it's still clear afterwards */
@@ -4172,10 +4179,11 @@ sh_x86_emulate_write(struct vcpu *v, unsigned long vaddr, void *src,
 
     shadow_lock(v->domain);
     addr = emulate_map_dest(v, vaddr, bytes, sh_ctxt);
-    if ( addr == NULL )
+    if ( emulate_map_dest_failed(addr) )
     {
         shadow_unlock(v->domain);
-        return X86EMUL_EXCEPTION;
+        return ((addr == MAPPING_EXCEPTION) ?
+                X86EMUL_EXCEPTION : X86EMUL_UNHANDLEABLE);
     }
 
     memcpy(addr, src, bytes);
@@ -4202,10 +4210,11 @@ sh_x86_emulate_cmpxchg(struct vcpu *v, unsigned long vaddr,
     shadow_lock(v->domain);
 
     addr = emulate_map_dest(v, vaddr, bytes, sh_ctxt);
-    if ( addr == NULL )
+    if ( emulate_map_dest_failed(addr) )
     {
         shadow_unlock(v->domain);
-        return X86EMUL_EXCEPTION;
+        return ((addr == MAPPING_EXCEPTION) ?
+                X86EMUL_EXCEPTION : X86EMUL_UNHANDLEABLE);
     }
 
     switch ( bytes )
@@ -4249,10 +4258,11 @@ sh_x86_emulate_cmpxchg8b(struct vcpu *v, unsigned long vaddr,
     shadow_lock(v->domain);
 
     addr = emulate_map_dest(v, vaddr, 8, sh_ctxt);
-    if ( addr == NULL )
+    if ( emulate_map_dest_failed(addr) )
     {
         shadow_unlock(v->domain);
-        return X86EMUL_EXCEPTION;
+        return ((addr == MAPPING_EXCEPTION) ?
+                X86EMUL_EXCEPTION : X86EMUL_UNHANDLEABLE);
     }
 
     old = (((u64) old_hi) << 32) | (u64) old_lo;

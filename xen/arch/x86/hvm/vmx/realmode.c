@@ -119,21 +119,12 @@ realmode_read(
     struct realmode_emulate_ctxt *rm_ctxt)
 {
     uint32_t addr = rm_ctxt->seg_reg[seg].base + offset;
-    int todo;
 
     *val = 0;
-    todo = hvm_copy_from_guest_phys(val, addr, bytes);
 
-    if ( todo )
+    if ( hvm_copy_from_guest_phys(val, addr, bytes) )
     {
         struct vcpu *curr = current;
-
-        if ( todo != bytes )
-        {
-            gdprintk(XENLOG_WARNING, "RM: Partial read at %08x (%d/%d)\n",
-                     addr, todo, bytes);
-            return X86EMUL_UNHANDLEABLE;
-        }
 
         if ( curr->arch.hvm_vmx.real_mode_io_in_progress )
             return X86EMUL_UNHANDLEABLE;
@@ -203,20 +194,10 @@ realmode_emulate_write(
     struct realmode_emulate_ctxt *rm_ctxt =
         container_of(ctxt, struct realmode_emulate_ctxt, ctxt);
     uint32_t addr = rm_ctxt->seg_reg[seg].base + offset;
-    int todo;
 
-    todo = hvm_copy_to_guest_phys(addr, &val, bytes);
-
-    if ( todo )
+    if ( hvm_copy_to_guest_phys(addr, &val, bytes) )
     {
         struct vcpu *curr = current;
-
-        if ( todo != bytes )
-        {
-            gdprintk(XENLOG_WARNING, "RM: Partial write at %08x (%d/%d)\n",
-                     addr, todo, bytes);
-            return X86EMUL_UNHANDLEABLE;
-        }
 
         if ( curr->arch.hvm_vmx.real_mode_io_in_progress )
             return X86EMUL_UNHANDLEABLE;

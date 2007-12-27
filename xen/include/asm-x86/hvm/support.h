@@ -82,11 +82,50 @@ extern char hvm_io_bitmap[];
 
 void hvm_enable(struct hvm_function_table *);
 
-int hvm_copy_to_guest_phys(paddr_t paddr, void *buf, int size);
-int hvm_copy_from_guest_phys(void *buf, paddr_t paddr, int size);
-int hvm_copy_to_guest_virt(unsigned long vaddr, void *buf, int size);
-int hvm_copy_from_guest_virt(void *buf, unsigned long vaddr, int size);
-int hvm_fetch_from_guest_virt(void *buf, unsigned long vaddr, int size);
+enum hvm_copy_result {
+    HVMCOPY_okay = 0,
+    HVMCOPY_bad_gva_to_gfn,
+    HVMCOPY_bad_gfn_to_mfn
+};
+
+/*
+ * Copy to/from a guest physical address.
+ * Returns HVMCOPY_okay, else HVMCOPY_bad_gfn_to_mfn if the given physical
+ * address range does not map entirely onto ordinary machine memory.
+ */
+enum hvm_copy_result hvm_copy_to_guest_phys(
+    paddr_t paddr, void *buf, int size);
+enum hvm_copy_result hvm_copy_from_guest_phys(
+    void *buf, paddr_t paddr, int size);
+
+/*
+ * Copy to/from a guest virtual address.
+ * Returns:
+ *  HVMCOPY_okay: Copy was entirely successful.
+ *  HVMCOPY_bad_gfn_to_mfn: Some guest physical address did not map to
+ *                          ordinary machine memory.
+ *  HVMCOPY_bad_gva_to_gfn: Some guest virtual address did not have a valid
+ *                          mapping to a guest physical address. In this case
+ *                          a page fault exception is automatically queued
+ *                          for injection into the current HVM VCPU.
+ */
+enum hvm_copy_result hvm_copy_to_guest_virt(
+    unsigned long vaddr, void *buf, int size);
+enum hvm_copy_result hvm_copy_from_guest_virt(
+    void *buf, unsigned long vaddr, int size);
+enum hvm_copy_result hvm_fetch_from_guest_virt(
+    void *buf, unsigned long vaddr, int size);
+
+/*
+ * As above (copy to/from a guest virtual address), but no fault is generated
+ * when HVMCOPY_bad_gva_to_gfn is returned.
+ */
+enum hvm_copy_result hvm_copy_to_guest_virt_nofault(
+    unsigned long vaddr, void *buf, int size);
+enum hvm_copy_result hvm_copy_from_guest_virt_nofault(
+    void *buf, unsigned long vaddr, int size);
+enum hvm_copy_result hvm_fetch_from_guest_virt_nofault(
+    void *buf, unsigned long vaddr, int size);
 
 void hvm_print_line(struct vcpu *v, const char c);
 void hlt_timer_fn(void *data);

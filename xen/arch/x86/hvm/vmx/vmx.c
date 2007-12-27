@@ -1629,20 +1629,13 @@ static void vmx_send_str_pio(struct cpu_user_regs *regs,
             if ( hvm_paging_enabled(current) )
             {
                 int rv = hvm_copy_from_guest_virt(&value, addr, size);
-                if ( rv != 0 )
-                {
-                    /* Failed on the page-spanning copy.  Inject PF into
-                     * the guest for the address where we failed. */
-                    addr += size - rv;
-                    gdprintk(XENLOG_DEBUG, "Pagefault reading non-io side "
-                             "of a page-spanning PIO: va=%#lx\n", addr);
-                    vmx_inject_exception(TRAP_page_fault, 0, addr);
-                    return;
-                }
+                if ( rv == HVMCOPY_bad_gva_to_gfn )
+                    return; /* exception already injected */
             }
             else
-                (void) hvm_copy_from_guest_phys(&value, addr, size);
-        } else /* dir != IOREQ_WRITE */
+                (void)hvm_copy_from_guest_phys(&value, addr, size);
+        }
+        else /* dir != IOREQ_WRITE */
             /* Remember where to write the result, as a *VA*.
              * Must be a VA so we can handle the page overlap
              * correctly in hvm_pio_assist() */

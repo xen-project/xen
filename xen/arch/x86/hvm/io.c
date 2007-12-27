@@ -435,17 +435,8 @@ static void hvm_pio_assist(struct cpu_user_regs *regs, ioreq_t *p,
                 if ( hvm_paging_enabled(current) )
                 {
                     int rv = hvm_copy_to_guest_virt(addr, &p->data, p->size);
-                    if ( rv != 0 )
-                    {
-                        /* Failed on the page-spanning copy.  Inject PF into
-                         * the guest for the address where we failed. */
-                        addr += p->size - rv;
-                        gdprintk(XENLOG_DEBUG, "Pagefault writing non-io side "
-                                 "of a page-spanning PIO: va=%#lx\n", addr);
-                        hvm_inject_exception(TRAP_page_fault,
-                                             PFEC_write_access, addr);
-                        return;
-                    }
+                    if ( rv == HVMCOPY_bad_gva_to_gfn )
+                        return; /* exception already injected */
                 }
                 else
                     (void)hvm_copy_to_guest_phys(addr, &p->data, p->size);
@@ -569,17 +560,8 @@ static void hvm_mmio_assist(struct cpu_user_regs *regs, ioreq_t *p,
             if (hvm_paging_enabled(current))
             {
                 int rv = hvm_copy_to_guest_virt(addr, &p->data, p->size);
-                if ( rv != 0 )
-                {
-                    /* Failed on the page-spanning copy.  Inject PF into
-                     * the guest for the address where we failed. */
-                    addr += p->size - rv;
-                    gdprintk(XENLOG_DEBUG, "Pagefault writing non-io side of "
-                             "a page-spanning MMIO: va=%#lx\n", addr);
-                    hvm_inject_exception(TRAP_page_fault,
-                                         PFEC_write_access, addr);
-                    return;
-                }
+                if ( rv == HVMCOPY_bad_gva_to_gfn )
+                    return; /* exception already injected */
             }
             else
                 (void)hvm_copy_to_guest_phys(addr, &p->data, p->size);
@@ -812,14 +794,8 @@ static void hvm_mmio_assist(struct cpu_user_regs *regs, ioreq_t *p,
         {
             unsigned long addr = mmio_opp->addr;
             int rv = hvm_copy_to_guest_virt(addr, &p->data, size);
-            if ( rv != 0 )
-            {
-                addr += p->size - rv;
-                gdprintk(XENLOG_DEBUG, "Pagefault emulating PUSH from MMIO:"
-                         " va=%#lx\n", addr);
-                hvm_inject_exception(TRAP_page_fault, PFEC_write_access, addr);
-                return;
-            }
+            if ( rv == HVMCOPY_bad_gva_to_gfn )
+                return; /* exception already injected */
         }
         break;
     }

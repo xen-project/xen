@@ -829,11 +829,12 @@ static int mmio_decode(int address_bytes, unsigned char *opcode,
     }
 }
 
-int inst_copy_from_guest(unsigned char *buf, unsigned long guest_eip, int inst_len)
+int inst_copy_from_guest(
+    unsigned char *buf, unsigned long guest_eip, int inst_len)
 {
     if ( inst_len > MAX_INST_LEN || inst_len <= 0 )
         return 0;
-    if ( hvm_fetch_from_guest_virt(buf, guest_eip, inst_len) )
+    if ( hvm_fetch_from_guest_virt_nofault(buf, guest_eip, inst_len) )
         return 0;
     return inst_len;
 }
@@ -1150,21 +1151,11 @@ void handle_mmio(paddr_t gpa)
                 if ( hvm_paging_enabled(v) )
                 {
                     int rv = hvm_copy_from_guest_virt(&value, addr, size);
-                    if ( rv != 0 ) 
-                    {
-                        /* Failed on the page-spanning copy.  Inject PF into
-                         * the guest for the address where we failed */
-                        regs->eip -= inst_len; /* do not advance %eip */
-                        /* Must set CR2 at the failing address */ 
-                        addr += size - rv;
-                        gdprintk(XENLOG_DEBUG, "Pagefault on non-io side of a "
-                                 "page-spanning MMIO: va=%#lx\n", addr);
-                        hvm_inject_exception(TRAP_page_fault, 0, addr);
-                        return;
-                    }
+                    if ( rv == HVMCOPY_bad_gva_to_gfn ) 
+                        return; /* exception already injected */
                 }
                 else
-                    (void) hvm_copy_from_guest_phys(&value, addr, size);
+                    (void)hvm_copy_from_guest_phys(&value, addr, size);
             } else /* dir != IOREQ_WRITE */
                 /* Remember where to write the result, as a *VA*.
                  * Must be a VA so we can handle the page overlap 
@@ -1325,7 +1316,8 @@ unsigned long copy_to_user_hvm(void *to, const void *from, unsigned len)
         return 0;
     }
 
-    return hvm_copy_to_guest_virt((unsigned long)to, (void *)from, len);
+    return hvm_copy_to_guest_virt_nofault(
+        (unsigned long)to, (void *)from, len);
 }
 
 unsigned long copy_from_user_hvm(void *to, const void *from, unsigned len)
@@ -1336,7 +1328,8 @@ unsigned long copy_from_user_hvm(void *to, const void *from, unsigned len)
         return 0;
     }
 
-    return hvm_copy_from_guest_virt(to, (unsigned long)from, len);
+    return hvm_copy_from_guest_virt_nofault(
+        to, (unsigned long)from, len);
 }
 
 /*
