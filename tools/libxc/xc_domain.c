@@ -786,7 +786,7 @@ int xc_domain_bind_pt_irq(
     uint8_t bus,
     uint8_t device,
     uint8_t intx,
-                                                 uint8_t isa_irq)
+    uint8_t isa_irq)
 {
     int rc;
     xen_domctl_bind_pt_irq_t * bind;
@@ -799,10 +799,14 @@ int xc_domain_bind_pt_irq(
     bind->hvm_domid = domid;
     bind->irq_type = irq_type;
     bind->machine_irq = machine_irq;
-    bind->u.pci.bus = bus;
-    bind->u.pci.device = device;    
-    bind->u.pci.intx = intx;
-    bind->u.isa.isa_irq = isa_irq;
+    if ( irq_type == PT_IRQ_TYPE_PCI )
+    {
+        bind->u.pci.bus = bus;
+        bind->u.pci.device = device;    
+        bind->u.pci.intx = intx;
+    } 
+    else if ( irq_type == PT_IRQ_TYPE_ISA )
+        bind->u.isa.isa_irq = isa_irq;
     
     rc = do_domctl(xc_handle, &domctl);
     return rc;
