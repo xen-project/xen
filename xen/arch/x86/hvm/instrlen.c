@@ -192,15 +192,15 @@ static uint8_t twobyte_table[256] = {
        return -1;                                                         \
    if ( inst_copy_from_guest(&_x, pc, 1) != 1 ) {                         \
        unsigned long err;                                                 \
-       struct segment_register cs;                                        \
+       struct segment_register ss;                                        \
        gdprintk(XENLOG_WARNING,                                           \
                 "Cannot read from address %lx (eip %lx, mode %d)\n",      \
                 pc, org_pc, address_bytes);                               \
        err = 0; /* Must be not-present: we don't enforce reserved bits */ \
        if ( hvm_nx_enabled(current) )                                     \
            err |= PFEC_insn_fetch;                                        \
-       hvm_get_segment_register(current, x86_seg_cs, &cs);                \
-       if ( cs.attr.fields.dpl != 0 )                                     \
+       hvm_get_segment_register(current, x86_seg_ss, &ss);                \
+       if ( ss.attr.fields.dpl == 3 )                                     \
            err |= PFEC_user_mode;                                         \
        hvm_inject_exception(TRAP_page_fault, err, pc);                    \
        return -1;                                                         \

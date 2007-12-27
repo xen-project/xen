@@ -1754,7 +1754,7 @@ static void vmx_do_str_pio(unsigned long exit_qualification,
     pfec = PFEC_page_present;
     if ( dir == IOREQ_READ ) /* Read from PIO --> write to RAM */
         pfec |= PFEC_write_access;
-    if ( ring_3(regs) )
+    if ( ((__vmread(GUEST_SS_AR_BYTES) >> 5) & 3) == 3 )
         pfec |= PFEC_user_mode;
     gfn = paging_gva_to_gfn(current, addr, &pfec);
     if ( gfn == INVALID_GFN )

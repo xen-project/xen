@@ -1272,15 +1272,18 @@ void hvm_task_switch(
 static int __hvm_copy(void *buf, paddr_t addr, int size, int dir, 
                       int virt, int fetch)
 {
+    struct segment_register sreg;
     unsigned long gfn, mfn;
     p2m_type_t p2mt;
     char *p;
     int count, todo;
     uint32_t pfec = PFEC_page_present;
 
+    hvm_get_segment_register(current, x86_seg_ss, &sreg);
+
     if ( dir ) 
         pfec |= PFEC_write_access;
-    if ( ring_3(guest_cpu_user_regs()) )
+    if ( sreg.attr.fields.dpl == 3 )
         pfec |= PFEC_user_mode;
     if ( fetch ) 
         pfec |= PFEC_insn_fetch;
@@ -1514,6 +1517,7 @@ static hvm_hypercall_t *hvm_hypercall32_table[NR_hypercalls] = {
 
 int hvm_do_hypercall(struct cpu_user_regs *regs)
 {
+    struct segment_register sreg;
     int flush, mode = hvm_guest_x86_mode(current);
     uint32_t eax = regs->eax;
 
@@ -1524,7 +1528,8 @@ int hvm_do_hypercall(struct cpu_user_regs *regs)
 #endif
     case 4:
     case 2:
-        if ( unlikely(ring_3(regs)) )
+        hvm_get_segment_register(current, x86_seg_ss, &sreg);
+        if ( unlikely(sreg.attr.fields.dpl == 3) )
         {
     default:
             regs->eax = -EPERM;

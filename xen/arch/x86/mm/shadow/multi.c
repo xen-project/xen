@@ -4018,16 +4018,18 @@ static mfn_t emulate_gva_to_mfn(struct vcpu *v,
 
 /* Check that the user is allowed to perform this write. 
  * Returns a mapped pointer to write to, or NULL for error. */
-static void * emulate_map_dest(struct vcpu *v,
-                               unsigned long vaddr,
-                               u32 bytes,
-                               struct sh_emulate_ctxt *sh_ctxt)
+static void *emulate_map_dest(struct vcpu *v,
+                              unsigned long vaddr,
+                              u32 bytes,
+                              struct sh_emulate_ctxt *sh_ctxt)
 {
+    struct segment_register *sreg;
     unsigned long offset;
     void *map = NULL;
 
     /* We don't emulate user-mode writes to page tables */
-    if ( ring_3(sh_ctxt->ctxt.regs) ) 
+    sreg = hvm_get_seg_reg(x86_seg_ss, sh_ctxt);
+    if ( sreg->attr.fields.dpl == 3 )
         return NULL;
 
     sh_ctxt->mfn1 = emulate_gva_to_mfn(v, vaddr, sh_ctxt);

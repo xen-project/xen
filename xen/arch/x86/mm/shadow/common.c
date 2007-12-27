@@ -101,7 +101,7 @@ int _shadow_mode_refcounts(struct domain *d)
 /* x86 emulator support for the shadow code
  */
 
-static struct segment_register *hvm_get_seg_reg(
+struct segment_register *hvm_get_seg_reg(
     enum x86_segment seg, struct sh_emulate_ctxt *sh_ctxt)
 {
     struct segment_register *seg_reg = &sh_ctxt->seg_reg[seg];
@@ -141,6 +141,7 @@ hvm_read(enum x86_segment seg,
          enum hvm_access_type access_type,
          struct sh_emulate_ctxt *sh_ctxt)
 {
+    struct segment_register *sreg;
     unsigned long addr;
     int rc, errcode;
 
@@ -163,7 +164,8 @@ hvm_read(enum x86_segment seg,
      * was mapped here.  This should never happen: we're here because
      * of a write fault at the end of the instruction we're emulating. */ 
     SHADOW_PRINTK("read failed to va %#lx\n", addr);
-    errcode = ring_3(sh_ctxt->ctxt.regs) ? PFEC_user_mode : 0;
+    sreg = hvm_get_seg_reg(x86_seg_ss, sh_ctxt);
+    errcode = (sreg->attr.fields.dpl == 3) ? PFEC_user_mode : 0;
     if ( access_type == hvm_access_insn_fetch )
         errcode |= PFEC_insn_fetch;
     hvm_inject_exception(TRAP_page_fault, errcode, addr + bytes - rc);

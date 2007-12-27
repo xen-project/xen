@@ -1074,6 +1074,7 @@ void handle_mmio(paddr_t gpa)
 
     case INSTR_MOVS:
     {
+        struct segment_register sreg;
         unsigned long count = GET_REPEAT_COUNT();
         int sign = regs->eflags & X86_EFLAGS_DF ? -1 : 1;
         unsigned long addr, gfn; 
@@ -1089,7 +1090,8 @@ void handle_mmio(paddr_t gpa)
             addr &= 0xFFFF;
         addr += hvm_get_segment_base(v, x86_seg_es);        
         pfec = PFEC_page_present | PFEC_write_access;
-        if ( ring_3(regs) )
+        hvm_get_segment_register(v, x86_seg_ss, &sreg);
+        if ( sreg.attr.fields.dpl == 3 )
             pfec |= PFEC_user_mode;
         gfn = paging_gva_to_gfn(v, addr, &pfec);
         paddr = (paddr_t)gfn << PAGE_SHIFT | (addr & ~PAGE_MASK);

@@ -1440,7 +1440,7 @@ static void svm_io_instruction(struct vcpu *v)
         pfec = PFEC_page_present;
         if ( dir == IOREQ_READ ) /* Read from PIO --> write to RAM */
             pfec |= PFEC_write_access;
-        if ( ring_3(regs) )
+        if ( vmcb->cpl == 3 )
             pfec |= PFEC_user_mode;
         gfn = paging_gva_to_gfn(v, addr, &pfec);
         if ( gfn == INVALID_GFN ) 

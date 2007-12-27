@@ -680,7 +680,8 @@ struct x86_emulate_ops *shadow_init_emulation(
     struct sh_emulate_ctxt *sh_ctxt, struct cpu_user_regs *regs);
 void shadow_continue_emulation(
     struct sh_emulate_ctxt *sh_ctxt, struct cpu_user_regs *regs);
-
+struct segment_register *hvm_get_seg_reg(
+    enum x86_segment seg, struct sh_emulate_ctxt *sh_ctxt);
 
 #if (SHADOW_OPTIMIZATIONS & SHOPT_VIRTUAL_TLB)
 /**************************************************************************/
