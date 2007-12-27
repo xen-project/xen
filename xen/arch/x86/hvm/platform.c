@@ -1310,26 +1310,30 @@ DEFINE_PER_CPU(int, guest_handles_in_xen_space);
    deal with this. */
 unsigned long copy_to_user_hvm(void *to, const void *from, unsigned len)
 {
+    int rc;
+
     if ( this_cpu(guest_handles_in_xen_space) )
     {
         memcpy(to, from, len);
         return 0;
     }
 
-    return hvm_copy_to_guest_virt_nofault(
-        (unsigned long)to, (void *)from, len);
+    rc = hvm_copy_to_guest_virt_nofault((unsigned long)to, (void *)from, len);
+    return rc ? len : 0; /* fake a copy_to_user() return code */
 }
 
 unsigned long copy_from_user_hvm(void *to, const void *from, unsigned len)
 {
+    int rc;
+
     if ( this_cpu(guest_handles_in_xen_space) )
     {
         memcpy(to, from, len);
         return 0;
     }
 
-    return hvm_copy_from_guest_virt_nofault(
-        to, (unsigned long)from, len);
+    rc = hvm_copy_from_guest_virt_nofault(to, (unsigned long)from, len);
+    return rc ? len : 0; /* fake a copy_from_user() return code */
 }
 
 /*
