@@ -113,6 +113,19 @@ svm_trace_done:
         movq VMCB_rflags(%rcx),%rax
         movq %rax,UREGS_eflags(%rsp)
 
+#ifndef NDEBUG
+        movw $0xbeef,%ax
+        movw %ax,UREGS_error_code(%rsp)
+        movw %ax,UREGS_entry_vector(%rsp)
+        movw %ax,UREGS_saved_upcall_mask(%rsp)
+        movw %ax,UREGS_cs(%rsp)
+        movw %ax,UREGS_ds(%rsp)
+        movw %ax,UREGS_es(%rsp)
+        movw %ax,UREGS_fs(%rsp)
+        movw %ax,UREGS_gs(%rsp)
+        movw %ax,UREGS_ss(%rsp)
+#endif
+
         STGI
 .globl svm_stgi_label;
 svm_stgi_label:

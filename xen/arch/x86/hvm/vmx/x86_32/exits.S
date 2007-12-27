@@ -40,7 +40,6 @@
         movl (reg),reg;
 
 #define HVM_SAVE_ALL_NOSEGREGS                                              \
-        movl $0, 0xc(%esp);  /* XXX why do we need to force eflags==0 ?? */ \
         pushl %eax;                                                         \
         pushl %ebp;                                                         \
         pushl %edi;                                                         \
@@ -68,6 +67,19 @@ ENTRY(vmx_asm_vmexit_handler)
         VMREAD(UREGS_esp)
         movl $GUEST_RFLAGS,%eax
         VMREAD(UREGS_eflags)
+
+#ifndef NDEBUG
+        movw $0xbeef,%ax
+        movw %ax,UREGS_error_code(%esp)
+        movw %ax,UREGS_entry_vector(%esp)
+        movw %ax,UREGS_saved_upcall_mask(%esp)
+        movw %ax,UREGS_cs(%esp)
+        movw %ax,UREGS_ds(%esp)
+        movw %ax,UREGS_es(%esp)
+        movw %ax,UREGS_fs(%esp)
+        movw %ax,UREGS_gs(%esp)
+        movw %ax,UREGS_ss(%esp)
+#endif
 
         movl %esp,%eax
         push %eax

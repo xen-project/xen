@@ -86,6 +86,19 @@ ENTRY(vmx_asm_vmexit_handler)
         movl $GUEST_RFLAGS,%eax
         VMREAD(UREGS_eflags)
 
+#ifndef NDEBUG
+        movw $0xbeef,%ax
+        movw %ax,UREGS_error_code(%rsp)
+        movw %ax,UREGS_entry_vector(%rsp)
+        movw %ax,UREGS_saved_upcall_mask(%rsp)
+        movw %ax,UREGS_cs(%rsp)
+        movw %ax,UREGS_ds(%rsp)
+        movw %ax,UREGS_es(%rsp)
+        movw %ax,UREGS_fs(%rsp)
+        movw %ax,UREGS_gs(%rsp)
+        movw %ax,UREGS_ss(%rsp)
+#endif
+
         movq %rsp,%rdi
         call vmx_vmexit_handler
         jmp vmx_asm_do_vmentry
