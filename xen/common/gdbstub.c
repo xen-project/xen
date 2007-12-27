@@ -43,6 +43,7 @@
 #include <xen/smp.h>
 #include <xen/console.h>
 #include <xen/errno.h>
+#include <xen/delay.h>
 #include <asm/byteorder.h>
 
 /* Printk isn't particularly safe just after we've trapped to the
@@ -51,6 +52,18 @@
 /*#define dbg_printk(...)   printk(__VA_ARGS__)*/
 
 #define GDB_RETRY_MAX   10
+
+struct gdb_cpu_info
+{
+    atomic_t paused;
+    atomic_t ack;
+};
+
+static struct gdb_cpu_info gdb_cpu[NR_CPUS];
+static atomic_t gdb_smp_paused_count;
+
+static void gdb_smp_pause(void);
+static void gdb_smp_resume(void);
 
 static char opt_gdb[30] = "none";
 string_param("gdb", opt_gdb);
@@ -234,7 +247,7 @@ gdb_write_to_packet_hex(unsigned long x, int int_size, struct gdb_context *ctx)
     }
 
 #ifdef __BIG_ENDIAN
-	i = sizeof(unsigned long) * 2
+    i = sizeof(unsigned long) * 2
     do {
         buf[--i] = hex2char(x & 15);
         x >>= 4;
@@ -245,13 +258,14 @@ gdb_write_to_packet_hex(unsigned long x, int int_size, struct gdb_context *ctx)
 
     gdb_write_to_packet(&buf[i], width, ctx);
 #elif defined(__LITTLE_ENDIAN)
-	i = 0;
-	while (i < width) {
-		buf[i++] = hex2char(x>>4);
-		buf[i++] = hex2char(x);
-		x >>= 8;
-	}
-	gdb_write_to_packet(buf, width, ctx);
+    i = 0;
+    while ( i < width )
+    {
+        buf[i++] = hex2char(x>>4);
+        buf[i++] = hex2char(x);
+        x >>= 8;
+    }
+    gdb_write_to_packet(buf, width, ctx);
 #else
 # error unknown endian
 #endif
@@ -396,8 +410,9 @@ static int
 process_command(struct cpu_user_regs *regs, struct gdb_context *ctx)
 {
     const char *ptr;
-    unsigned long addr, length;
+    unsigned long addr, length, val;
     int resume = 0;
+    unsigned long type = GDB_CONTINUE;
 
     /* XXX check ctx->in_bytes >= 2 or similar. */
 
@@ -460,30 +475,40 @@ process_command(struct cpu_user_regs *regs, struct gdb_context *ctx)
         }
         gdb_arch_read_reg(addr, regs, ctx);
         break;
+    case 'P': /* write register */
+        addr = simple_strtoul(ctx->in_buf + 1, &ptr, 16);
+        if ( ptr == (ctx->in_buf + 1) )
+        {
+            gdb_send_reply("E03", ctx);
+            return 0;
+        }
+        if ( ptr[0] != '=' )
+        {
+            gdb_send_reply("E04", ctx);
+            return 0;
+        }
+        ptr++;
+        val = str2ulong(ptr, sizeof(unsigned long));
+        gdb_arch_write_reg(addr, val, regs, ctx);
+        break;
     case 'D':
+    case 'k':
         gdbstub_detach(ctx);
         gdb_send_reply("OK", ctx);
-        /* fall through */
-    case 'k':
         ctx->connected = 0;
-        /* fall through */
+        resume = 1;
+        break;
     case 's': /* Single step */
+        type = GDB_STEP;
     case 'c': /* Resume at current address */
-    {
-        unsigned long addr = ~((unsigned long)0);
-        unsigned long type = GDB_CONTINUE;
-        if ( ctx->in_buf[0] == 's' )
-            type = GDB_STEP;
-        if ( ((ctx->in_buf[0] == 's') || (ctx->in_buf[0] == 'c')) &&
-             ctx->in_buf[1] )
+        addr = ~((unsigned long)0);
+
+        if ( ctx->in_buf[1] )
             addr = str2ulong(&ctx->in_buf[1], sizeof(unsigned long));
-        if ( ctx->in_buf[0] != 'D' )
-            gdbstub_attach(ctx);
+        gdbstub_attach(ctx);
         resume = 1;
         gdb_arch_resume(regs, addr, type, ctx);
         break;
-    }
-
     default:
         gdb_send_reply("", ctx);
         break;
@@ -555,10 +580,8 @@ __trap_to_gdb(struct cpu_user_regs *regs, unsigned long cookie)
         gdb_ctx->connected = 1;
     }
 
-    smp_send_stop();
+    gdb_smp_pause();
 
-    /* Try to make things a little more stable by disabling
-       interrupts while we're here. */
     local_irq_save(flags);
 
     watchdog_disable();
@@ -587,6 +610,8 @@ __trap_to_gdb(struct cpu_user_regs *regs, unsigned long cookie)
         }
     } while ( process_command(regs, gdb_ctx) == 0 );
 
+    gdb_smp_resume();
+
     gdb_arch_exit(regs);
     console_end_sync();
     watchdog_enable();
@@ -604,6 +629,84 @@ initialise_gdb(void)
     if ( gdb_ctx->serhnd != -1 )
         printk("GDB stub initialised.\n");
     serial_start_sync(gdb_ctx->serhnd);
+}
+
+static void gdb_pause_this_cpu(void *unused)
+{
+    unsigned long flags;
+
+    local_irq_save(flags);
+
+    atomic_set(&gdb_cpu[smp_processor_id()].ack, 1);
+    atomic_inc(&gdb_smp_paused_count);
+
+    while ( atomic_read(&gdb_cpu[smp_processor_id()].paused) )
+        mdelay(1);
+
+    atomic_dec(&gdb_smp_paused_count);
+    atomic_set(&gdb_cpu[smp_processor_id()].ack, 0);
+
+    /* Restore interrupts */
+    local_irq_restore(flags);
+}
+
+static void gdb_smp_pause(void)
+{
+    int timeout = 100;
+    int cpu;
+
+    for_each_online_cpu(cpu)
+    {
+        atomic_set(&gdb_cpu[cpu].ack, 0);
+        atomic_set(&gdb_cpu[cpu].paused, 1);
+    }
+
+    atomic_set(&gdb_smp_paused_count, 0);
+
+    smp_call_function(gdb_pause_this_cpu, NULL, /* dont wait! */0, 0);
+
+    /* Wait 100ms for all other CPUs to enter pause loop */
+    while ( (atomic_read(&gdb_smp_paused_count) < (num_online_cpus() - 1)) 
+            && (timeout-- > 0) )
+        mdelay(1);
+
+    if ( atomic_read(&gdb_smp_paused_count) < (num_online_cpus() - 1) )
+    {
+        printk("GDB: Not all CPUs have paused, missing CPUs ");
+        for_each_online_cpu(cpu)
+        {
+            if ( (cpu != smp_processor_id()) &&
+                 !atomic_read(&gdb_cpu[cpu].ack) )
+                printk("%d ", cpu);
+        }
+        printk("\n");
+    }
+}
+
+static void gdb_smp_resume(void)
+{
+    int cpu;
+    int timeout = 100;
+
+    for_each_online_cpu(cpu)
+        atomic_set(&gdb_cpu[cpu].paused, 0);
+
+    /* Make sure all CPUs resume */
+    while ( (atomic_read(&gdb_smp_paused_count) > 0)
+            && (timeout-- > 0) )
+        mdelay(1);
+
+    if ( atomic_read(&gdb_smp_paused_count) > 0 )
+    {
+        printk("GDB: Not all CPUs have resumed execution, missing CPUs ");
+        for_each_online_cpu(cpu)
+        {
+            if ( (cpu != smp_processor_id()) &&
+                 atomic_read(&gdb_cpu[cpu].ack) )
+                printk("%d ", cpu);
+        }
+        printk("\n");
+    }
 }
 
 /*

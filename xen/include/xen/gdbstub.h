@@ -69,6 +69,9 @@ void gdb_arch_write_reg_array(
     struct cpu_user_regs *regs, const char* buf, struct gdb_context *ctx);
 void gdb_arch_read_reg(
     unsigned long regnum, struct cpu_user_regs *regs, struct gdb_context *ctx);
+void gdb_arch_write_reg(
+    unsigned long regnum, unsigned long val, struct cpu_user_regs *regs, 
+    struct gdb_context *ctx);
 unsigned int gdb_arch_copy_from_user(
     void *dest, const void *src, unsigned len);
 unsigned int gdb_arch_copy_to_user(

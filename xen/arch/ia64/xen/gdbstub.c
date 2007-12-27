@@ -62,6 +62,13 @@ gdb_arch_read_reg_array(struct cpu_user_regs *regs, struct gdb_context *ctx)
 }
 
 void 
+gdb_arch_write_reg(unsigned long regnum, unsigned long val, 
+                    struct cpu_user_regs *regs, struct gdb_context *ctx)
+{
+    gdb_send_reply("", ctx);
+}
+ 
+void 
 gdb_arch_write_reg_array(struct cpu_user_regs *regs, const char* buf,
                          struct gdb_context *ctx)
 {

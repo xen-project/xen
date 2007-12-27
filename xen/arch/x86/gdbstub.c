@@ -24,51 +24,7 @@
 u16
 gdb_arch_signal_num(struct cpu_user_regs *regs, unsigned long cookie)
 {
-    /* XXX */
-    return 1;
-}
-
-void 
-gdb_arch_read_reg_array(struct cpu_user_regs *regs, struct gdb_context *ctx)
-{
-#define GDB_REG(r) gdb_write_to_packet_hex(r, sizeof(r), ctx);
-    GDB_REG(regs->eax);
-    GDB_REG(regs->ecx);
-    GDB_REG(regs->edx);
-    GDB_REG(regs->ebx);
-    GDB_REG(regs->esp);
-    GDB_REG(regs->ebp);
-    GDB_REG(regs->esi);
-    GDB_REG(regs->edi);
-    GDB_REG(regs->eip);
-    GDB_REG(regs->eflags);
-#undef GDB_REG
-#define GDB_SEG_REG(s)  gdb_write_to_packet_hex(s, sizeof(u32), ctx);
-    /* sizeof(segment) = 16bit */
-    /* but gdb requires its return value as 32bit value */
-    GDB_SEG_REG(regs->cs);
-    GDB_SEG_REG(regs->ss);
-    GDB_SEG_REG(regs->ds);
-    GDB_SEG_REG(regs->es);
-    GDB_SEG_REG(regs->fs);
-    GDB_SEG_REG(regs->gs);
-#undef GDB_SEG_REG
-    gdb_send_packet(ctx);
-}
-
-void 
-gdb_arch_write_reg_array(struct cpu_user_regs *regs, const char* buf,
-                         struct gdb_context *ctx)
-{
-    /* XXX TODO */
-    gdb_send_reply("E02", ctx);
-}
-
-void 
-gdb_arch_read_reg(unsigned long regnum, struct cpu_user_regs *regs,
-                  struct gdb_context *ctx)
-{
-    gdb_send_reply("", ctx);
+    return 5;   /* TRAP signal.  see include/gdb/signals.h */
 }
 
 /*
@@ -87,17 +43,6 @@ gdb_arch_copy_to_user(void *dest, const void *src, unsigned len)
     return __copy_to_user(dest, src, len);
 }
 
-void 
-gdb_arch_resume(struct cpu_user_regs *regs,
-                unsigned long addr, unsigned long type,
-                struct gdb_context *ctx)
-{
-    /* XXX */
-    if (type == GDB_STEP) {
-        gdb_send_reply("S01", ctx);
-    }
-}
-
 void
 gdb_arch_print_state(struct cpu_user_regs *regs)
 {
@@ -114,6 +59,24 @@ void
 gdb_arch_exit(struct cpu_user_regs *regs)
 {
     /* nothing */
+}
+
+void 
+gdb_arch_resume(struct cpu_user_regs *regs,
+                unsigned long addr, unsigned long type,
+                struct gdb_context *ctx)
+{
+    if ( addr != -1UL )
+        regs->eip = addr;
+
+    regs->eflags &= ~X86_EFLAGS_TF;
+
+    /* Set eflags.RF to ensure we do not re-enter. */
+    regs->eflags |= X86_EFLAGS_RF;
+
+    /* Set the trap flag if we are single stepping. */
+    if ( type == GDB_STEP )
+        regs->eflags |= X86_EFLAGS_TF;
 }
 
 /*

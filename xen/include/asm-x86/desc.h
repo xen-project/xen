@@ -213,7 +213,6 @@ extern struct desc_struct compat_gdt_table[];
 #endif
 
 extern void set_intr_gate(unsigned int irq, void * addr);
-extern void set_system_gate(unsigned int n, void *addr);
 extern void set_tss_desc(unsigned int n, void *addr);
 
 #endif /* !__ASSEMBLY__ */

@@ -806,9 +806,8 @@ asmlinkage void do_int3(struct cpu_user_regs *regs)
 
     if ( !guest_mode(regs) )
     {
-        DEBUGGER_trap_fatal(TRAP_int3, regs);
-        show_execution_state(regs);
-        panic("FATAL TRAP: vector = 3 (Int3)\n");
+        debugger_trap_fatal(TRAP_int3, regs);
+        return;
     } 
 
     do_guest_trap(TRAP_int3, regs, 0);
@@ -2690,11 +2689,6 @@ void set_intr_gate(unsigned int n, void *addr)
     _set_gate(&idt_table[n], 14, 0, addr);
 }
 
-void set_system_gate(unsigned int n, void *addr)
-{
-    _set_gate(idt_table+n,14,3,addr);
-}
-
 void set_tss_desc(unsigned int n, void *addr)
 {
     _set_tssldt_desc(
@@ -2759,8 +2753,8 @@ void __init trap_init(void)
     set_intr_gate(TRAP_divide_error,&divide_error);
     set_intr_gate(TRAP_debug,&debug);
     set_intr_gate(TRAP_nmi,&nmi);
-    set_system_gate(TRAP_int3,&int3);         /* usable from all privileges */
-    set_system_gate(TRAP_overflow,&overflow); /* usable from all privileges */
+    set_intr_gate(TRAP_int3,&int3);         /* usable from all privileges */
+    set_intr_gate(TRAP_overflow,&overflow); /* usable from all privileges */
     set_intr_gate(TRAP_bounds,&bounds);
     set_intr_gate(TRAP_invalid_op,&invalid_op);
     set_intr_gate(TRAP_no_device,&device_not_available);
