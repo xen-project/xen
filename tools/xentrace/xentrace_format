@@ -134,7 +134,7 @@ while not interrupted:
             line = sys.stdin.read(struct.calcsize(D1REC))
             if not line:
                 break
-            (d1) = struct.unpack(D1REC, line)
+            d1 = struct.unpack(D1REC, line)[0]
         if n_data == 2:
             line = sys.stdin.read(struct.calcsize(D2REC))
             if not line:
