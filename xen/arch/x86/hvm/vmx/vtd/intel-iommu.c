@@ -1866,14 +1866,17 @@ int assign_device(struct domain *d, u8 bus, u8 devfn)
 
     reassign_device_ownership(dom0, d, bus, devfn);
 
-    /* setup rmrr identify mapping just once per domain */
-    for_each_rmrr_device(rmrr, pdev)
-        ret = iommu_prepare_rmrr_dev(d, rmrr, pdev);
-        if ( ret )
+    /* Setup rmrr identify mapping */
+    for_each_rmrr_device( rmrr, pdev )
+        if ( pdev->bus == bus && pdev->devfn == devfn )
         {
-            gdprintk(XENLOG_ERR VTDPREFIX,
-                     "IOMMU: mapping reserved region failed\n");
-            return ret;
+            ret = iommu_prepare_rmrr_dev(d, rmrr, pdev);
+            if ( ret )
+            {
+                gdprintk(XENLOG_ERR VTDPREFIX,
+                         "IOMMU: mapping reserved region failed\n");
+                return ret;
+            }
         }
     end_for_each_rmrr_device(rmrr, pdev)
 
