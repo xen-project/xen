@@ -426,8 +426,6 @@ int vsnprintf(char *buf, size_t size, const char *fmt, va_list args)
 
 
         case 'n':
-            /* FIXME:
-             * What does C99 say about the overflow case here? */
             if (qualifier == 'l') {
                 long * ip = va_arg(args, long *);
                 *ip = (str - buf);
@@ -446,7 +444,7 @@ int vsnprintf(char *buf, size_t size, const char *fmt, va_list args)
             ++str;
             continue;
 
-                        /* integer number formats - set up the flags and "break" */
+            /* integer number formats - set up the flags and "break" */
         case 'o':
             base = 8;
             break;
