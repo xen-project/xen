@@ -583,10 +583,10 @@ typedef uint8_t xen_domain_handle_t[16];
 #define __mk_unsigned_long(x) x ## UL
 #define mk_unsigned_long(x) __mk_unsigned_long(x)
 
-DEFINE_XEN_GUEST_HANDLE(uint8_t);
-DEFINE_XEN_GUEST_HANDLE(uint16_t);
-DEFINE_XEN_GUEST_HANDLE(uint32_t);
-DEFINE_XEN_GUEST_HANDLE(uint64_t);
+__DEFINE_XEN_GUEST_HANDLE(uint8,  uint8_t);
+__DEFINE_XEN_GUEST_HANDLE(uint16, uint16_t);
+__DEFINE_XEN_GUEST_HANDLE(uint32, uint32_t);
+__DEFINE_XEN_GUEST_HANDLE(uint64, uint64_t);
 
 #else /* __ASSEMBLY__ */
 

@@ -298,8 +298,8 @@ ret_t do_platform_op(XEN_GUEST_HANDLE(xen_platform_op_t) u_xenpf_op)
         struct vcpu *v;
         struct xenctl_cpumap ctlmap;
         cpumask_t cpumap;
-        XEN_GUEST_HANDLE(uint8_t) cpumap_bitmap;
-        XEN_GUEST_HANDLE(uint64_t) idletimes;
+        XEN_GUEST_HANDLE(uint8) cpumap_bitmap;
+        XEN_GUEST_HANDLE(uint64) idletimes;
 
         ret = -ENOSYS;
         if ( cpufreq_controller != FREQCTL_dom0_kernel )

@@ -111,7 +111,7 @@ struct xen_sysctl_physinfo {
      * If the actual @max_cpu_id is smaller than the array then the trailing
      * elements of the array will not be written by the sysctl.
      */
-    XEN_GUEST_HANDLE_64(uint32_t) cpu_to_node;
+    XEN_GUEST_HANDLE_64(uint32) cpu_to_node;
 };
 typedef struct xen_sysctl_physinfo xen_sysctl_physinfo_t;
 DEFINE_XEN_GUEST_HANDLE(xen_sysctl_physinfo_t);

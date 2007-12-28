@@ -53,9 +53,6 @@ struct arch_domain {
     uint foreign_mfn_count;
     uint *foreign_mfns;
 
-    /* I/O-port access bitmap mask. */
-    u8 *iobmp_mask;       /* Address of IO bitmap mask, or NULL.      */
-
     u32 *p2m; /* Array of 32-bit MFNs supports 44 bits of physical memory. */
     ulong p2m_entries;
 
@@ -104,11 +101,6 @@ struct arch_vcpu {
 
     /* Segment Lookaside Buffer */
     struct slb_entry slb_entries[NUM_SLB_ENTRIES];
-
-    /* I/O-port access bitmap. */
-    XEN_GUEST_HANDLE(uint8_t) iobmp; /* Guest kernel virtual address of the bitmap. */
-    int iobmp_limit;  /* Number of ports represented in the bitmap.  */
-    int iopl;         /* Current IOPL for this VCPU. */
 
     u32 dec;
     struct cpu_vcpu cpu; /* CPU-specific bits */

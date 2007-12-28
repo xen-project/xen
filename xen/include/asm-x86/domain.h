@@ -293,7 +293,7 @@ struct arch_vcpu
     struct trap_bounce trap_bounce;
 
     /* I/O-port access bitmap. */
-    XEN_GUEST_HANDLE(uint8_t) iobmp; /* Guest kernel vaddr of the bitmap. */
+    XEN_GUEST_HANDLE(uint8) iobmp; /* Guest kernel vaddr of the bitmap. */
     int iobmp_limit;  /* Number of ports represented in the bitmap.  */
     int iopl;         /* Current IOPL for this VCPU. */
 

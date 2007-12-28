@@ -25,12 +25,14 @@
 #ifndef __XEN_PUBLIC_ARCH_PPC_64_H__
 #define __XEN_PUBLIC_ARCH_PPC_64_H__
 
-#define __DEFINE_XEN_GUEST_HANDLE(name, type) \
+#define ___DEFINE_XEN_GUEST_HANDLE(name, type) \
     typedef struct { \
         int __pad[(sizeof (long long) - sizeof (void *)) / sizeof (int)]; \
         type *p; \
     } __attribute__((__aligned__(8))) __guest_handle_ ## name
 
+#define __DEFINE_XEN_GUEST_HANDLE(name, type) \
+    ___DEFINE_XEN_GUEST_HANDLE(name, type)
 #define DEFINE_XEN_GUEST_HANDLE(name) __DEFINE_XEN_GUEST_HANDLE(name, name)
 #define XEN_GUEST_HANDLE(name)        __guest_handle_ ## name
 #define set_xen_guest_handle(hnd, val) \

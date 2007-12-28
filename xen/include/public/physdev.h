@@ -81,7 +81,7 @@ DEFINE_XEN_GUEST_HANDLE(physdev_set_iopl_t);
 #define PHYSDEVOP_set_iobitmap           7
 struct physdev_set_iobitmap {
     /* IN */
-    XEN_GUEST_HANDLE_00030205(uint8_t) bitmap;
+    XEN_GUEST_HANDLE_00030205(uint8) bitmap;
     uint32_t nr_ports;
 };
 typedef struct physdev_set_iobitmap physdev_set_iobitmap_t;

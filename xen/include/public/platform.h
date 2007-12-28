@@ -146,7 +146,7 @@ struct xenpf_firmware_info {
             uint8_t capabilities;
             uint8_t edid_transfer_time;
             /* must refer to 128-byte buffer */
-            XEN_GUEST_HANDLE(uint8_t) edid;
+            XEN_GUEST_HANDLE(uint8) edid;
         } vbeddc_info; /* XEN_FW_VBEDDC_INFO */
     } u;
 };
@@ -186,12 +186,12 @@ DEFINE_XEN_GUEST_HANDLE(xenpf_change_freq_t);
 struct xenpf_getidletime {
     /* IN/OUT variables */
     /* IN: CPUs to interrogate; OUT: subset of IN which are present */
-    XEN_GUEST_HANDLE(uint8_t) cpumap_bitmap;
+    XEN_GUEST_HANDLE(uint8) cpumap_bitmap;
     /* IN variables */
     /* Size of cpumap bitmap. */
     uint32_t cpumap_nr_cpus;
     /* Must be indexable for every cpu in cpumap_bitmap. */
-    XEN_GUEST_HANDLE(uint64_t) idletime;
+    XEN_GUEST_HANDLE(uint64) idletime;
     /* OUT variables */
     /* System time when the idletime snapshots were taken. */
     uint64_t now;
