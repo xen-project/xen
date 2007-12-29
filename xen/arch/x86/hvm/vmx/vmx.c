@@ -1235,6 +1235,7 @@ void vmx_cpuid_intercept(
     unsigned int *ecx, unsigned int *edx)
 {
     unsigned int input = *eax;
+    unsigned int count = *ecx;
 
 #ifdef VMXASSIST
     if ( input == 0x40000003 )
@@ -1293,7 +1294,7 @@ void vmx_cpuid_intercept(
         break;
 
     case 0x00000004:
-        cpuid_count(input, *ecx, eax, ebx, ecx, edx);
+        cpuid_count(input, count, eax, ebx, ecx, edx);
         *eax &= NUM_CORES_RESET_MASK;
         break;
 
