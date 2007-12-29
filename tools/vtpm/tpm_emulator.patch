@@ -547,6 +547,21 @@ diff -uprN orig/tpm_emulator-0.4/README tpm_emulator/README
  Installation
  --------------------------------------------------------------------------
  The compilation and installation process uses the build environment for 
+diff -uprN orig/tpm_emulator-0.4/tpm/tpm_capability.c tpm_emulator/tpm/tpm_capability.c
+--- orig/tpm_emulator-0.4/tpm/tpm_capability.c	2006-06-23 19:37:07.000000000 +0900
++++ tpm_emulator/tpm/tpm_capability.c	2007-12-28 22:50:19.000000000 +0900
+@@ -701,7 +701,10 @@ TPM_RESULT TPM_GetCapabilityOwner(TPM_VE
+   TPM_RESULT res;
+   
+   info("TPM_GetCapabilityOwner()");
+-  
++ 
++  if (!tpmData.permanent.flags.owned) {
++    return TPM_NOSRK;
++  } 
+   /* Verify owner authorization */
+   res = tpm_verify_auth(auth1, tpmData.permanent.data.ownerAuth, TPM_KH_OWNER);
+   if (res != TPM_SUCCESS) return res;
 diff -uprN orig/tpm_emulator-0.4/tpm/tpm_cmd_handler.c tpm_emulator/tpm/tpm_cmd_handler.c
 --- orig/tpm_emulator-0.4/tpm/tpm_cmd_handler.c	2006-06-23 19:37:07.000000000 +0900
 +++ tpm_emulator/tpm/tpm_cmd_handler.c	2007-09-12 20:23:00.000000000 +0900
