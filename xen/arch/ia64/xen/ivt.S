@@ -714,15 +714,20 @@ fast_hypercall:
 	adds r2=PT(CR_IFS)+16,r12
 	;;
 	st8 [r2]=r20
-	;;   
+	ssm psr.ic | PSR_DEFAULT_BITS
+	;;
+	srlz.i
+	;;
 	br.call.sptk.many b0=reflect_event
 	;;
+	rsm psr.i|psr.ic
 	adds r2=PT(R14)+16,r12
 	adds r3=PT(R8)+16,r12
 	;;
 	//r16 contains ar.bsp before cover
 	ld8 r16=[r2]
 	ld8 r8=[r3]
+	srlz.i
 	;;
 	br.sptk.many ia64_ret_from_syscall
 	;;
