@@ -168,7 +168,8 @@ long arch_do_domctl(xen_domctl_t *op, XEN_GUEST_HANDLE(xen_domctl_t) u_domctl)
         {
             ret = shadow_mode_control(d, &op->u.shadow_op);
             put_domain(d);
-            copy_to_guest(u_domctl, op, 1);
+            if (copy_to_guest(u_domctl, op, 1))
+                ret = -EFAULT;
         } 
     }
     break;
