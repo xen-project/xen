@@ -1779,7 +1779,7 @@ IA64FAULT vcpu_translate(VCPU * vcpu, u64 address, BOOLEAN is_data,
 		struct opt_feature* optf = &(vcpu->domain->arch.opt_feature);
 
 		/* Optimization for identity mapped region 7 OS (linux) */
-		if (optf->mask & XEN_IA64_OPTF_IDENT_MAP_REG7 &&
+		if (optf->mask & XEN_IA64_OPTF_IDENT_MAP_REG7_FLG &&
 		    region == 7 && ia64_psr(regs)->cpl == CONFIG_CPL0_EMUL) {
 			pte.val = address & _PAGE_PPN_MASK;
 			pte.val = pte.val | optf->im_reg7.pgprot;

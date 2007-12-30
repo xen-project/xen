@@ -93,6 +93,29 @@ struct identity_mapping {
         unsigned long key;	/* A protection key. */
 };
 
+/* opt_feature mask */
+/*
+ * If this feature is switched on, the hypervisor inserts the
+ * tlb entries without calling the guests traphandler.
+ * This is useful in guests using region 7 for identity mapping
+ * like the linux kernel does.
+ */
+#define XEN_IA64_OPTF_IDENT_MAP_REG7_FLG_BIT    0
+#define XEN_IA64_OPTF_IDENT_MAP_REG7_FLG        \
+	(1UL << XEN_IA64_OPTF_IDENT_MAP_REG7_FLG_BIT)
+
+/* Identity mapping of region 4 addresses in HVM. */
+#define XEN_IA64_OPTF_IDENT_MAP_REG4_FLG_BIT    \
+        (XEN_IA64_OPTF_IDENT_MAP_REG7_FLG_BIT + 1)
+#define XEN_IA64_OPTF_IDENT_MAP_REG4_FLG        \
+        (1UL << XEN_IA64_OPTF_IDENT_MAP_REG4_FLG_BIT)
+
+/* Identity mapping of region 5 addresses in HVM. */
+#define XEN_IA64_OPTF_IDENT_MAP_REG5_FLG_BIT    \
+        (XEN_IA64_OPTF_IDENT_MAP_REG7_FLG_BIT + 2)
+#define XEN_IA64_OPTF_IDENT_MAP_REG5_FLG        \
+        (1UL << XEN_IA64_OPTF_IDENT_MAP_REG5_FLG_BIT)
+
 /* Central structure for optimzation features used by the hypervisor.  */
 struct opt_feature {
     unsigned long mask;			/* For every feature one bit. */

@@ -253,11 +253,11 @@ static int vmx_identity_mappings_save(struct domain *d,
     const struct opt_feature *optf = &d->arch.opt_feature;
     struct hvm_hw_ia64_identity_mappings im_save;
 
-    __vmx_identity_mapping_save(optf->mask & XEN_IA64_OPTF_IDENT_MAP_REG4,
+    __vmx_identity_mapping_save(optf->mask & XEN_IA64_OPTF_IDENT_MAP_REG4_FLG,
                                 &optf->im_reg4, &im_save.im_reg4);
-    __vmx_identity_mapping_save(optf->mask & XEN_IA64_OPTF_IDENT_MAP_REG5,
+    __vmx_identity_mapping_save(optf->mask & XEN_IA64_OPTF_IDENT_MAP_REG5_FLG,
                                 &optf->im_reg5, &im_save.im_reg5);
-    __vmx_identity_mapping_save(optf->mask & XEN_IA64_OPTF_IDENT_MAP_REG7,
+    __vmx_identity_mapping_save(optf->mask & XEN_IA64_OPTF_IDENT_MAP_REG7_FLG,
                                 &optf->im_reg7, &im_save.im_reg7);
 
     return hvm_save_entry(OPT_FEATURE_IDENTITY_MAPPINGS, 0, h, &im_save);

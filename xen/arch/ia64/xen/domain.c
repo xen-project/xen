@@ -2277,16 +2277,36 @@ custom_param("dom0_mem", parse_dom0_mem);
  * Helper function for the optimization stuff handling the identity mapping
  * feature.
  */
+static inline unsigned long
+optf_identity_mapping_cmd_to_flg(unsigned long cmd)
+{
+	switch(cmd) {
+	case XEN_IA64_OPTF_IDENT_MAP_REG7:
+		return XEN_IA64_OPTF_IDENT_MAP_REG7_FLG;
+	case XEN_IA64_OPTF_IDENT_MAP_REG4:
+		return XEN_IA64_OPTF_IDENT_MAP_REG4_FLG;
+	case XEN_IA64_OPTF_IDENT_MAP_REG5:
+		return XEN_IA64_OPTF_IDENT_MAP_REG5_FLG;
+	default:
+		BUG();
+		return 0;
+	}
+
+	/* NOTREACHED */
+}
+
 static inline void
 optf_set_identity_mapping(unsigned long* mask, struct identity_mapping* im,
 			  struct xen_ia64_opt_feature* f)
 {
+	unsigned long flag = optf_identity_mapping_cmd_to_flg(f->cmd);
+
 	if (f->on) {
-		*mask |= f->cmd;
+		*mask |= flag;
 		im->pgprot = f->pgprot;
 		im->key = f->key;
 	} else {
-		*mask &= ~(f->cmd);
+		*mask &= ~flag;
 		im->pgprot = 0;
 		im->key = 0;
 	}

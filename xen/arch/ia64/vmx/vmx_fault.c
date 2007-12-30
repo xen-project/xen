@@ -392,7 +392,7 @@ try_again:
 
         if (!vhpt_enabled(v, vadr, misr.rs ? RSE_REF : DATA_REF)) {
             /* windows use region 4 and 5 for identity mapping */
-            if ((optf->mask & XEN_IA64_OPTF_IDENT_MAP_REG4) &&
+            if ((optf->mask & XEN_IA64_OPTF_IDENT_MAP_REG4_FLG) &&
                 REGION_NUMBER(vadr) == 4 && !(regs->cr_ipsr & IA64_PSR_CPL) &&
                 REGION_OFFSET(vadr) <= _PAGE_PPN_MASK) {
 
@@ -402,7 +402,7 @@ try_again:
                     goto try_again;
                 return IA64_NO_FAULT;
             }
-            if ((optf->mask & XEN_IA64_OPTF_IDENT_MAP_REG5) &&
+            if ((optf->mask & XEN_IA64_OPTF_IDENT_MAP_REG5_FLG) &&
                 REGION_NUMBER(vadr) == 5 && !(regs->cr_ipsr & IA64_PSR_CPL) &&
                 REGION_OFFSET(vadr) <= _PAGE_PPN_MASK) {
 
@@ -428,8 +428,8 @@ try_again:
         }
 
         /* avoid recursively walking (short format) VHPT */
-        if (!(optf->mask & XEN_IA64_OPTF_IDENT_MAP_REG4) &&
-            !(optf->mask & XEN_IA64_OPTF_IDENT_MAP_REG5) &&
+        if (!(optf->mask & XEN_IA64_OPTF_IDENT_MAP_REG4_FLG) &&
+            !(optf->mask & XEN_IA64_OPTF_IDENT_MAP_REG5_FLG) &&
             (((vadr ^ vpta.val) << 3) >> (vpta.size + 3)) == 0) {
             goto inject_dtlb_fault;
         }
