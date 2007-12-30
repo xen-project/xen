@@ -635,7 +635,7 @@ GLOBAL_ENTRY(vmx_switch_rr7)
     movl loc2=PERCPU_ADDR
     ;;
     tpa loc2 = loc2         // get physical address of per cpu date
-    ;;
+    tpa r3 = r8             // get physical address of ip
     dep loc5 = 0,in1,60,4          // get physical address of guest_vhpt
     dep loc6 = 0,in2,60,4          // get physical address of pal code
     ;;
@@ -672,9 +672,7 @@ GLOBAL_ENTRY(vmx_switch_rr7)
     mov cr.itir=r18
     mov cr.ifa=r17
     mov r16=IA64_TR_KERNEL
-    //mov r3=ip
     movl r25 = PAGE_KERNEL
-    ;;
     dep r2=0,r3,0,KERNEL_TR_PAGE_SHIFT
     ;;
     or r24=r2,r25
