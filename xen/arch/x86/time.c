@@ -971,8 +971,14 @@ unsigned long get_localtime(struct domain *d)
         + d->time_offset_seconds;
 }
 
+/* "cmos_utc_offset" is the difference between UTC time and CMOS time. */
+static long cmos_utc_offset; /* in seconds */
+
 int time_suspend(void)
 {
+    cmos_utc_offset = (wc_sec + (wc_nsec + NOW()) / 1000000000ULL)
+        - get_cmos_time();
+
     /* Better to cancel calibration timer for accuracy. */
     kill_timer(&this_cpu(cpu_time).calibration_timer);
 
@@ -986,7 +992,8 @@ int time_resume(void)
     set_time_scale(&this_cpu(cpu_time).tsc_scale, tmp);
 
     resume_platform_timer();
-    do_settime(get_cmos_time(), 0, read_platform_stime());
+
+    do_settime(get_cmos_time() + cmos_utc_offset, 0, read_platform_stime());
 
     init_percpu_time();
 

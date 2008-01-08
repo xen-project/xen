@@ -1420,6 +1420,7 @@ static void continue_hypercall_on_cpu_helper(struct vcpu *v)
     regs->eax = info->func(info->data);
 
     v->arch.schedule_tail = info->saved_schedule_tail;
+    v->cpu_affinity = info->saved_affinity;
     v->arch.continue_info = NULL;
 
     xfree(info);
