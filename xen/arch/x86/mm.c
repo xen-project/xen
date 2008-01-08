@@ -1851,7 +1851,7 @@ int get_page_type(struct page_info *page, unsigned long type)
                     flush_tlb_mask(mask);
                 }
 
-                /* We lose existing type, back pointer, and validity. */
+                /* We lose existing type and validity. */
                 nx &= ~(PGT_type_mask | PGT_validated);
                 nx |= type;
 
