@@ -58,6 +58,8 @@ typedef struct HPETState {
     struct hpet_registers hpet;
     struct vcpu *vcpu;
     uint64_t tsc_freq;
+    uint64_t hpet_to_ns_scale; /* hpet ticks to ns (multiplied by 2^10) */
+    uint64_t hpet_to_ns_limit; /* max hpet ticks convertable to ns      */
     uint64_t mc_offset;
     struct timer timers[HPET_TIMER_NUM];
     struct HPET_timer_fn_info timer_fn_info[HPET_TIMER_NUM]; 

@@ -71,8 +71,9 @@
 #define HPET_TN_INT_ROUTE_CAP_MASK (0xffffffffULL \
                     << HPET_TN_INT_ROUTE_CAP_SHIFT)
 
-#define hpet_tick_to_ns(h, tick) ((s_time_t)(tick)* \
-                                  (S_TO_NS*TSC_PER_HPET_TICK)/h->tsc_freq)
+#define hpet_tick_to_ns(h, tick)                        \
+    ((s_time_t)((((tick) > (h)->hpet_to_ns_limit) ?     \
+        ~0ULL : (tick) * (h)->hpet_to_ns_scale) >> 10))
 
 #define timer_config(h, n)       (h->hpet.timers[n].config)
 #define timer_is_periodic(h, n)  (timer_config(h, n) & HPET_TN_PERIODIC)
@@ -536,6 +537,9 @@ void hpet_init(struct vcpu *v)
 
     h->vcpu = v;
     h->tsc_freq = ticks_per_sec(v);
+
+    h->hpet_to_ns_scale = ((S_TO_NS * TSC_PER_HPET_TICK) << 10) / h->tsc_freq;
+    h->hpet_to_ns_limit = (~0ULL >> 1) / h->hpet_to_ns_scale;
 
     /* 64-bit main counter; 3 timers supported; LegacyReplacementRoute. */
     h->hpet.capability = 0x8086A201ULL;
