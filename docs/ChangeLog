@@ -1,0 +1,65 @@
+This file contains a list of changes and additions to the API/ABI that
+might affect cross-OS compatibility or otherwise impact OS
+implementations, in particular any changes to hypervisor interfaces and
+the inter-domain protocols. When making such a change you are expected
+to add it here (bonus points for a link to fuller documentation). New
+entries should be part of the patch making the change (so the history of
+this file will give the relevant changeset), added to the top of the
+file, and in a format like:
+
+2008-01-08 Add ChangeLog file
+
+Add a ChangeLog file indicating changes to the API/ABI, as discussed
+here:
+http://lists.xensource.com/archives/html/xen-devel/2008-01/msg00010.html
+
+Xen 3.2 release
+---------------
+
+16592: XEN_DOMCTL_test_assign_device
+http://xenbits.xensource.com/xen-unstable.hg?rev/ef83b50fc4a4
+
+Test VT-d device assignability in xend. If VT-d is not enabled, or the
+device is not exist, or the device has already been assigned to other
+domain, it fails and quits the domain creation.
+
+16549: GNTST_address_too_big
+http://xenbits.xensource.com/xen-unstable.hg?rev/baf90ee3c1da 
+
+32-on-64 related additional error return.
+
+16512: XEN_DOMCTL_set_opt_feature
+http://xenbits.xensource.com/xen-unstable.hg?rev/1de4e5056394
+
+Allows the domain builder to set optimization features for a guest. This
+is currently only used by the IA64 domain builder to identify identity
+mapped regions based on the guest_os_type specified in the domain config
+file. Other architectures may extend this domctl to enable features
+specific to their architecture.
+
+16504: flush cache disk op
+http://xenbits.xensource.com/xen-unstable.hg?rev/ebfb3b26010d 
+
+Adds a BLKIF_OP_FLUSH_DISKCACHE request. The backend is expected to ask
+underlying storage to flush its cache upon receiving this request.
+Backend advertises availability via 'feature-flush-cache' xenstore node.
+Needed for correct behaviour of disk-cache-aware filesystems such as
+ZFS.
+
+16425: multicast notifications
+http://xenbits.xensource.com/xen-unstable.hg?rev/d3041196ae69 
+
+Adds XEN_NETIF_EXTRA_TYPE_MCAST_ADD and XEN_NETIF_EXTRA_TYPE_MCAST_DEL
+operations to the networking driver, which it uses to request multicast
+addresses it's interested in. Available if the backend has
+'feature-multicast-control', requested by the frontend with
+'request-multicast-control'. Used by Solaris: this avoids having to
+always put the backend's underlying networking device into promiscuous
+mode.
+
+16402: gnttab page attributes
+http://xenbits.xensource.com/xen-unstable.hg?rev/2e5d922b7ee3 
+
+Adds new grant tab flags for table entries. 
+
+Older changes are not recorded further.
