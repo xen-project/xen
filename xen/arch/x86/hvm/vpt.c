@@ -167,6 +167,7 @@ static void pt_timer_fn(void *data)
     pt_lock(pt);
 
     pt->pending_intr_nr++;
+    pt->do_not_freeze = 0;
 
     if ( !pt->one_shot )
     {
@@ -253,7 +254,6 @@ void pt_intr_post(struct vcpu *v, struct hvm_intack intack)
         return;
     }
 
-    pt->do_not_freeze = 0;
     pt->irq_issued = 0;
 
     if ( pt->one_shot )
@@ -264,7 +264,8 @@ void pt_intr_post(struct vcpu *v, struct hvm_intack intack)
     }
     else
     {
-        if ( mode_is(v->domain, one_missed_tick_pending) )
+        if ( mode_is(v->domain, one_missed_tick_pending) ||
+             mode_is(v->domain, no_missed_ticks_pending) )
         {
             pt->last_plt_gtime = hvm_get_guest_time(v);
             pt->pending_intr_nr = 0; /* 'collapse' all missed ticks */
