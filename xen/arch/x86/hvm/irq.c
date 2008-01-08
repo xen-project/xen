@@ -125,17 +125,13 @@ void hvm_isa_irq_deassert(
     spin_unlock(&d->arch.hvm_domain.irq_lock);
 }
 
-void hvm_set_callback_irq_level(void)
+static void hvm_set_callback_irq_level(struct vcpu *v)
 {
-    struct vcpu *v = current;
     struct domain *d = v->domain;
     struct hvm_irq *hvm_irq = &d->arch.hvm_domain.irq;
     unsigned int gsi, pdev, pintx, asserted;
 
-    /* Fast lock-free tests. */
-    if ( (v->vcpu_id != 0) ||
-         (hvm_irq->callback_via_type == HVMIRQ_callback_none) )
-        return;
+    ASSERT(v->vcpu_id == 0);
 
     spin_lock(&d->arch.hvm_domain.irq_lock);
 
@@ -175,6 +171,22 @@ void hvm_set_callback_irq_level(void)
 
  out:
     spin_unlock(&d->arch.hvm_domain.irq_lock);
+}
+
+void hvm_maybe_deassert_evtchn_irq(void)
+{
+    struct domain *d = current->domain;
+    struct hvm_irq *hvm_irq = &d->arch.hvm_domain.irq;
+
+    if ( hvm_irq->callback_via_asserted &&
+         !vcpu_info(d->vcpu[0], evtchn_upcall_pending) )
+        hvm_set_callback_irq_level(d->vcpu[0]);
+}
+
+void hvm_assert_evtchn_irq(struct vcpu *v)
+{
+    if ( v->vcpu_id == 0 )
+        hvm_set_callback_irq_level(v);
 }
 
 void hvm_set_pci_link_route(struct domain *d, u8 link, u8 isa_irq)
@@ -349,13 +361,7 @@ struct hvm_intack hvm_vcpu_ack_pending_irq(
 
 int hvm_local_events_need_delivery(struct vcpu *v)
 {
-    struct hvm_intack intack;
-
-    /* TODO: Get rid of event-channel special case. */
-    if ( vcpu_info(v, evtchn_upcall_pending) )
-        intack = hvm_intack_pic(0);
-    else
-        intack = hvm_vcpu_has_pending_irq(v);
+    struct hvm_intack intack = hvm_vcpu_has_pending_irq(v);
 
     if ( likely(intack.source == hvm_intsrc_none) )
         return 0;

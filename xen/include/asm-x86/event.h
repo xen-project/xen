@@ -30,7 +30,12 @@ static inline void vcpu_kick(struct vcpu *v)
 
 static inline void vcpu_mark_events_pending(struct vcpu *v)
 {
-    if ( !test_and_set_bit(0, &vcpu_info(v, evtchn_upcall_pending)) )
+    if ( test_and_set_bit(0, &vcpu_info(v, evtchn_upcall_pending)) )
+        return;
+
+    if ( is_hvm_vcpu(v) )
+        hvm_assert_evtchn_irq(v);
+    else
         vcpu_kick(v);
 }
 
