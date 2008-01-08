@@ -34,4 +34,4 @@ then
 fi
 
 ifconfig $1 0.0.0.0 up
-brctl addif $bridge $1
+brctl addif $bridge $1 || true
