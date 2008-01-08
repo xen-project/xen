@@ -121,7 +121,8 @@ transfer_addrs () {
     ip addr show dev ${src} | egrep '^ *inet ' | sed -e "
 s/inet/ip addr add/
 s@\([0-9]\+\.[0-9]\+\.[0-9]\+\.[0-9]\+/[0-9]\+\)@\1@
-s/${src}/dev ${dst}/
+s/${src}/dev ${dst} label ${dst}/
+s/secondary//
 " | sh -e
     # Remove automatic routes on destination device
     ip route list | sed -ne "
