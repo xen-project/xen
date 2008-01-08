@@ -2899,7 +2899,10 @@ static int sh_page_fault(struct vcpu *v,
     if ( is_hvm_domain(d) 
          && unlikely(!hvm_wp_enabled(v)) 
          && regs->error_code == (PFEC_write_access|PFEC_page_present) )
+    {
+        perfc_incr(shadow_fault_emulate_wp);
         goto emulate;
+    }
 
     perfc_incr(shadow_fault_fixed);
     d->arch.paging.log_dirty.fault_count++;
