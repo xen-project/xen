@@ -75,7 +75,6 @@
                                   (S_TO_NS*TSC_PER_HPET_TICK)/h->tsc_freq)
 
 #define timer_config(h, n)       (h->hpet.timers[n].config)
-#define timer_enabled(h, n)      (timer_config(h, n) & HPET_TN_ENABLE)
 #define timer_is_periodic(h, n)  (timer_config(h, n) & HPET_TN_PERIODIC)
 #define timer_is_32bit(h, n)     (timer_config(h, n) & HPET_TN_32BIT)
 #define hpet_enabled(h)          (h->hpet.config & HPET_CFG_ENABLE)
@@ -195,9 +194,6 @@ static void hpet_set_timer(HPETState *h, unsigned int tn)
     ASSERT(tn < HPET_TIMER_NUM);
     ASSERT(spin_is_locked(&h->lock));
 
-    if ( !hpet_enabled(h) || !timer_enabled(h, tn) )
-        return;
-
     if ( (tn == 0) && (h->hpet.config & HPET_CFG_LEGACY) )
     {
         /* HPET specification requires PIT shouldn't generate
@@ -308,10 +304,6 @@ static void hpet_write(
         if ( new_val & HPET_TN_32BIT )
             h->hpet.timers[tn].cmp = (uint32_t)h->hpet.timers[tn].cmp;
 
-        if ( !(old_val & HPET_TN_ENABLE) && (new_val & HPET_TN_ENABLE) )
-            hpet_set_timer(h, tn);
-        else if ( (old_val & HPET_TN_ENABLE) && !(new_val & HPET_TN_ENABLE) )
-            hpet_stop_timer(h, tn);
         break;
 
     case HPET_T0_CMP:
@@ -326,7 +318,7 @@ static void hpet_write(
         else
             h->hpet.period[tn] = new_val;
         h->hpet.timers[tn].config &= ~HPET_TN_SETVAL;
-        if ( hpet_enabled(h) && timer_enabled(h, tn) )
+        if ( hpet_enabled(h) )
             hpet_set_timer(h, tn);
         break;
 
@@ -397,13 +389,14 @@ static void hpet_timer_fn(void *opaque)
 
     spin_lock(&h->lock);
 
-    if ( !hpet_enabled(h) || !timer_enabled(h, tn) )
+    if ( !hpet_enabled(h) )
     {
         spin_unlock(&h->lock);
         return;
     }
 
-    hpet_route_interrupt(h, tn);
+    if ( timer_config(h, tn) & HPET_TN_ENABLE )
+        hpet_route_interrupt(h, tn);
 
     if ( timer_is_periodic(h, tn) && (h->hpet.period[tn] != 0) )
     {
@@ -522,7 +515,8 @@ static int hpet_load(struct domain *d, hvm_domain_context_t *h)
                 
     /* Restart the timers */
     for ( i = 0; i < HPET_TIMER_NUM; i++ )
-        hpet_set_timer(hp, i);
+        if ( hpet_enabled(hp) )
+            hpet_set_timer(hp, i);
 
     spin_unlock(&hp->lock);
 
