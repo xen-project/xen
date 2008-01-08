@@ -2475,6 +2475,7 @@ class XendAPI(object):
     # Xen API: Class SR
     # ----------------------------------------------------------------
     SR_attr_ro = ['VDIs',
+                  'PBDs',
                   'virtual_allocation',
                   'physical_utilisation',
                   'physical_size',
@@ -2524,6 +2525,9 @@ class XendAPI(object):
     def SR_get_VDIs(self, _, ref):
         return self._get_SR_func(ref, 'list_images')
 
+    def SR_get_PBDs(self, _, ref):
+        return xen_api_success(XendPBD.get_by_SR(ref))
+
     def SR_get_virtual_allocation(self, _, ref):
         return self._get_SR_func(ref, 'virtual_allocation')
 
@@ -2531,7 +2535,7 @@ class XendAPI(object):
         return self._get_SR_func(ref, 'physical_utilisation')
 
     def SR_get_physical_size(self, _, ref):
-        return self._get_SR_func(ref, 'physical_size')
+        return self._get_SR_attr(ref, 'physical_size')
     
     def SR_get_type(self, _, ref):
         return self._get_SR_attr(ref, 'type')
