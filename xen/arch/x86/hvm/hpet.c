@@ -303,7 +303,10 @@ static void hpet_write(
         }
 
         if ( new_val & HPET_TN_32BIT )
+        {
             h->hpet.timers[tn].cmp = (uint32_t)h->hpet.timers[tn].cmp;
+            h->hpet.period[tn] = (uint32_t)h->hpet.period[tn];
+        }
 
         break;
 
@@ -317,7 +320,17 @@ static void hpet_write(
              (h->hpet.timers[tn].config & HPET_TN_SETVAL) )
             h->hpet.timers[tn].cmp = new_val;
         else
+        {
+            /*
+             * Clamp period to reasonable min/max values:
+             *  - minimum is 900us, same as timers controlled by vpt.c
+             *  - maximum is to prevent overflow in time_after() calculations
+             */
+            if ( hpet_tick_to_ns(h, new_val) < MICROSECS(900) )
+                new_val = (MICROSECS(900) << 10) / h->hpet_to_ns_scale;
+            new_val &= (timer_is_32bit(h, tn) ? ~0u : ~0ull) >> 1;
             h->hpet.period[tn] = new_val;
+        }
         h->hpet.timers[tn].config &= ~HPET_TN_SETVAL;
         if ( hpet_enabled(h) )
             hpet_set_timer(h, tn);
@@ -376,7 +389,7 @@ static void hpet_route_interrupt(HPETState *h, unsigned int tn)
         return;
     }
 
-    /* We only support edge-triggered interrupt now  */
+    /* We support only edge-triggered interrupt. */
     spin_lock(&d->arch.hvm_domain.irq_lock);
     vioapic_irq_positive_edge(d, tn_int_route);
     spin_unlock(&d->arch.hvm_domain.irq_lock);
@@ -401,20 +414,19 @@ static void hpet_timer_fn(void *opaque)
 
     if ( timer_is_periodic(h, tn) && (h->hpet.period[tn] != 0) )
     {
-        uint64_t mc = hpet_read_maincounter(h);
+        uint64_t mc = hpet_read_maincounter(h), period = h->hpet.period[tn];
         if ( timer_is_32bit(h, tn) )
         {
             while ( hpet_time_after(mc, h->hpet.timers[tn].cmp) )
                 h->hpet.timers[tn].cmp = (uint32_t)(
-                    h->hpet.timers[tn].cmp + h->hpet.period[tn]);
+                    h->hpet.timers[tn].cmp + period);
         }
         else
         {
             while ( hpet_time_after64(mc, h->hpet.timers[tn].cmp) )
-                h->hpet.timers[tn].cmp += h->hpet.period[tn];
+                h->hpet.timers[tn].cmp += period;
         }
-        set_timer(&h->timers[tn], 
-                  NOW() + hpet_tick_to_ns(h, h->hpet.period[tn]));
+        set_timer(&h->timers[tn], NOW() + hpet_tick_to_ns(h, period));
     }
 
     spin_unlock(&h->lock);
