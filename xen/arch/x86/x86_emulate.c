@@ -103,8 +103,8 @@ static uint8_t opcode_table[256] = {
     ImplicitOps, ImplicitOps, DstReg|SrcMem|ModRM, DstReg|SrcMem16|ModRM|Mov,
     0, 0, 0, 0,
     /* 0x68 - 0x6F */
-    ImplicitOps|Mov, DstMem|SrcImm|ModRM|Mov,
-    ImplicitOps|Mov, DstMem|SrcImmByte|ModRM|Mov,
+    ImplicitOps|Mov, DstReg|SrcImm|ModRM|Mov,
+    ImplicitOps|Mov, DstReg|SrcImmByte|ModRM|Mov,
     ImplicitOps, ImplicitOps, ImplicitOps, ImplicitOps,
     /* 0x70 - 0x77 */
     ImplicitOps, ImplicitOps, ImplicitOps, ImplicitOps,
@@ -1331,34 +1331,37 @@ x86_emulate(
 
     case 0x69: /* imul imm16/32 */
     case 0x6b: /* imul imm8 */ {
-        unsigned long reg = *(long *)decode_register(modrm_reg, &_regs, 0);
+        unsigned long src1; /* ModR/M source operand */
+        if ( ea.type == OP_REG )
+            src1 = *ea.reg;
+        else if ( (rc = ops->read(ea.mem.seg, ea.mem.off,
+                                  &src1, op_bytes, ctxt)) )
+            goto done;
         _regs.eflags &= ~(EFLG_OF|EFLG_CF);
         switch ( dst.bytes )
         {
         case 2:
             dst.val = ((uint32_t)(int16_t)src.val *
-                       (uint32_t)(int16_t)reg);
+                       (uint32_t)(int16_t)src1);
             if ( (int16_t)dst.val != (uint32_t)dst.val )
                 _regs.eflags |= EFLG_OF|EFLG_CF;
             break;
 #ifdef __x86_64__
         case 4:
             dst.val = ((uint64_t)(int32_t)src.val *
-                       (uint64_t)(int32_t)reg);
+                       (uint64_t)(int32_t)src1);
             if ( (int32_t)dst.val != dst.val )
                 _regs.eflags |= EFLG_OF|EFLG_CF;
             break;
 #endif
         default: {
-            unsigned long m[2] = { src.val, reg };
+            unsigned long m[2] = { src.val, src1 };
             if ( imul_dbl(m) )
                 _regs.eflags |= EFLG_OF|EFLG_CF;
             dst.val = m[0];
             break;
         }
         }
-        dst.type = OP_REG;
-        dst.reg  = decode_register(modrm_reg, &_regs, 0);
         break;
     }
 
