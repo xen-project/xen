@@ -1059,12 +1059,12 @@ x86_emulate(
                         ((op_bytes == 8) ? 4 : op_bytes);
                 else if ( (d & SrcMask) == SrcImmByte )
                     ea.mem.off += 1;
-                else if ( ((b == 0xf6) || (b == 0xf7)) &&
+                else if ( !twobyte && ((b & 0xfe) == 0xf6) &&
                           ((modrm_reg & 7) <= 1) )
                     /* Special case in Grp3: test has immediate operand. */
                     ea.mem.off += (d & ByteOp) ? 1
                         : ((op_bytes == 8) ? 4 : op_bytes);
-                else if ( (b == 0xf7) == 0xa4 )
+                else if ( twobyte && ((b & 0xf7) == 0xa4) )
                     /* SHLD/SHRD with immediate byte third operand. */
                     ea.mem.off++;
                 break;
