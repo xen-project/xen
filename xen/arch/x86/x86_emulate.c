@@ -1064,6 +1064,9 @@ x86_emulate(
                     /* Special case in Grp3: test has immediate operand. */
                     ea.mem.off += (d & ByteOp) ? 1
                         : ((op_bytes == 8) ? 4 : op_bytes);
+                else if ( (b == 0xf7) == 0xa4 )
+                    /* SHLD/SHRD with immediate byte third operand. */
+                    ea.mem.off++;
                 break;
             case 1:
                 ea.mem.off += insn_fetch_type(int8_t);
