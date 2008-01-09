@@ -103,7 +103,11 @@ struct acpi_drhd_unit * acpi_find_matched_drhd_unit(struct pci_dev *dev)
     list_for_each_entry ( drhd, &acpi_drhd_units, list )
     {
         if ( drhd->include_all )
+        {
             include_all_drhd = drhd;
+            continue;
+        }
+
         if ( acpi_pci_device_match(drhd->devices,
                                    drhd->devices_cnt, dev) )
         {
@@ -119,7 +123,7 @@ struct acpi_drhd_unit * acpi_find_matched_drhd_unit(struct pci_dev *dev)
         gdprintk(XENLOG_INFO VTDPREFIX, 
                  "acpi_find_matched_drhd_unit:include_all_drhd->addr = %lx\n",
                  include_all_drhd->address);
-        return include_all_drhd;;
+        return include_all_drhd;
     }
 
     return NULL;
@@ -513,7 +517,7 @@ static int __init acpi_parse_dmar(unsigned long phys_addr,
             ret = acpi_parse_one_rmrr(entry_header);
             break;
         case ACPI_DMAR_ATSR:
-            printk(KERN_INFO PREFIX "found ACPI_DMAR_RMRR\n");
+            printk(KERN_INFO PREFIX "found ACPI_DMAR_ATSR\n");
             ret = acpi_parse_one_atsr(entry_header);
             break;
         default:

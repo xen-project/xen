@@ -528,7 +528,6 @@ void iommu_flush_all(void)
 {
     struct acpi_drhd_unit *drhd;
     struct iommu *iommu;
-    int i = 0;
 
     wbinvd();
     for_each_drhd_unit ( drhd )
@@ -536,7 +535,6 @@ void iommu_flush_all(void)
         iommu = drhd->iommu;
         iommu_flush_context_global(iommu, 0);
         iommu_flush_iotlb_global(iommu, 0);
-        i++;
     }
 }
 

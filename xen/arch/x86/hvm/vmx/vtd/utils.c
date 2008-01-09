@@ -154,8 +154,9 @@ void print_vtd_entries(struct domain *d, int bus, int devfn,
     struct iommu *iommu;
     struct context_entry *ctxt_entry;
     struct root_entry *root_entry;
-    u64 *l4 = NULL, *l3, *l2, *l1;
-    u32 l4_index = 0, l3_index, l2_index, l1_index;
+    struct dma_pte pte;
+    u64 *l;
+    u32 l_index;
     u32 i = 0;
     int level = agaw_to_level(hd->agaw);
 
@@ -176,20 +177,17 @@ void print_vtd_entries(struct domain *d, int bus, int devfn,
 
         iommu = drhd->iommu;
         root_entry = iommu->root_entry;
-        printk("    root_entry = %p\n", root_entry);
         if ( root_entry == NULL )
         {
             printk("    root_entry == NULL\n");
             continue;
         }
 
+        printk("    root_entry = %p\n", root_entry);
         printk("    root_entry[%x] = %"PRIx64"\n", bus, root_entry[bus].val);
-        printk("    maddr_to_virt(root_entry[%x]) = %p\n",
-               bus, maddr_to_virt(root_entry[bus].val));
-
-        if ( root_entry[bus].val == 0 )
+        if ( !root_present(root_entry[bus]) )
         {
-            printk("    root_entry[%x].lo == 0\n", bus);
+            printk("    root_entry[%x] not present\n", bus);
             continue;
         }
 
@@ -201,73 +199,44 @@ void print_vtd_entries(struct domain *d, int bus, int devfn,
             continue;
         }
 
-        if ( ctxt_entry[devfn].lo == 0 )
-        {
-            printk("    ctxt_entry[%x].lo == 0\n", devfn);
-            continue;
-        }
-
         printk("    context = %p\n", ctxt_entry);
         printk("    context[%x] = %"PRIx64" %"PRIx64"\n",
                devfn, ctxt_entry[devfn].hi, ctxt_entry[devfn].lo);
-        printk("    maddr_to_virt(context[%x].lo) = %p\n",
-               devfn, maddr_to_virt(ctxt_entry[devfn].lo));
-        printk("    context[%x] = %"PRIx64"\n", devfn, ctxt_entry[devfn].lo);
-
-        switch ( level )
+        if ( !context_present(ctxt_entry[devfn]) )
         {
-        case VTD_PAGE_TABLE_LEVEL_3:
-            l3 = maddr_to_virt(ctxt_entry[devfn].lo);
-            l3 = (u64*)(((unsigned long)l3 >> PAGE_SHIFT_4K) << PAGE_SHIFT_4K);
-            printk("    l3 = %p\n", l3);
-            if ( l3 == NULL )
-                continue;
-            l3_index = get_level_index(gmfn, 3);
-            printk("    l3_index = %x\n", l3_index);
-            printk("    l3[%x] = %"PRIx64"\n", l3_index, l3[l3_index]);
+            printk("    ctxt_entry[%x] not present\n", devfn);
+            continue;
+        }
 
-            break;
-        case VTD_PAGE_TABLE_LEVEL_4:
-            l4 = maddr_to_virt(ctxt_entry[devfn].lo);
-            l4 = (u64*)(((unsigned long)l4 >> PAGE_SHIFT_4K) << PAGE_SHIFT_4K);
-            printk("    l4 = %p\n", l4);
-            if ( l4 == NULL )
-                continue;
-            l4_index = get_level_index(gmfn, 4);
-            printk("    l4_index = %x\n", l4_index);
-            printk("    l4[%x] = %"PRIx64"\n", l4_index, l4[l4_index]);
-
-            l3 = maddr_to_virt(l4[l4_index]);
-            l3 = (u64*)(((unsigned long)l3 >> PAGE_SHIFT_4K) << PAGE_SHIFT_4K);
-            printk("    l3 = %p\n", l3);
-            if ( l3 == NULL )
-                continue;
-            l3_index = get_level_index(gmfn, 3);
-            printk("    l3_index = %x\n", l3_index);
-            printk("    l3[%x] = %"PRIx64"\n", l3_index, l3[l3_index]);
-
-            break;
-        default:
+        if ( level != VTD_PAGE_TABLE_LEVEL_3 &&
+             level != VTD_PAGE_TABLE_LEVEL_4)
+        {
             printk("Unsupported VTD page table level (%d)!\n", level);
             continue;
         }
 
-        l2 = maddr_to_virt(l3[l3_index]);
-        l2 = (u64*)(((unsigned long)l2 >> PAGE_SHIFT_4K) << PAGE_SHIFT_4K);
-        printk("    l2 = %p\n", l2);
-        if ( l2 == NULL )
-            continue;
-        l2_index = get_level_index(gmfn, 2);
-        printk("    l2_index = %x\n", l2_index);
-        printk("    l2[%x] = %"PRIx64"\n", l2_index, l2[l2_index]);
+        l = maddr_to_virt(ctxt_entry[devfn].lo);
+        do
+        {
+            l = (u64*)(((unsigned long)l >> PAGE_SHIFT_4K) << PAGE_SHIFT_4K);
+            printk("    l%d = %p\n", level, l);
+            if ( l == NULL )
+            {
+                printk("    l%d == NULL\n", level);
+                break;
+            }
+            l_index = get_level_index(gmfn, level);
+            printk("    l%d_index = %x\n", level, l_index);
+            printk("    l%d[%x] = %"PRIx64"\n", level, l_index, l[l_index]);
 
-        l1 = maddr_to_virt(l2[l2_index]);
-        l1 = (u64*)(((unsigned long)l1 >> PAGE_SHIFT_4K) << PAGE_SHIFT_4K);
-        printk("    l1 = %p\n", l1);
-        if ( l1 == NULL )
-            continue;
-        l1_index = get_level_index(gmfn, 1);
-        printk("    l1_index = %x\n", l1_index);
-        printk("    l1[%x] = %"PRIx64"\n", l1_index, l1[l1_index]);
-   }
+            pte.val = l[l_index];
+            if ( !dma_pte_present(pte) )
+            {
+                printk("    l%d[%x] not present\n", level, l_index);
+                break;
+            }
+
+            l = maddr_to_virt(l[l_index]);
+        } while ( --level );
+    }
 }
