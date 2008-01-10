@@ -96,12 +96,12 @@ get_ip_info() {
     
 do_ifup() {
     if ! ifup $1 ; then
-        if [ ${addr_pfx} ] ; then
+        if [ -n "$addr_pfx" ] ; then
             # use the info from get_ip_info()
             ip addr flush $1
             ip addr add ${addr_pfx} dev $1
             ip link set dev $1 up
-            [ ${gateway} ] && ip route add default via ${gateway}
+            [ -n "$gateway" ] && ip route add default via ${gateway}
         fi
     fi
 }
