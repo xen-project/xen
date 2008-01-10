@@ -1751,6 +1751,8 @@ x86_emulate(
         case 5: /* jmp (far, absolute indirect) */ {
             unsigned long sel;
 
+            generate_exception_if(dst.type != OP_MEM, EXC_UD);
+
             if ( (rc = ops->read(dst.mem.seg, dst.mem.off+dst.bytes,
                                  &sel, 2, ctxt)) )
                 goto done;
@@ -2981,6 +2983,7 @@ x86_emulate(
     {
         unsigned long old_lo, old_hi;
         generate_exception_if((modrm_reg & 7) != 1, EXC_UD);
+        generate_exception_if(ea.type != OP_MEM, EXC_UD);
         if ( (rc = ops->read(ea.mem.seg, ea.mem.off+0, &old_lo, 4, ctxt)) ||
              (rc = ops->read(ea.mem.seg, ea.mem.off+4, &old_hi, 4, ctxt)) )
             goto done;
@@ -3008,6 +3011,7 @@ x86_emulate(
     {
         unsigned long old, new;
         generate_exception_if((modrm_reg & 7) != 1, EXC_UD);
+        generate_exception_if(ea.type != OP_MEM, EXC_UD);
         if ( (rc = ops->read(ea.mem.seg, ea.mem.off, &old, 8, ctxt)) != 0 )
             goto done;
         if ( ((uint32_t)(old>>0) != (uint32_t)_regs.eax) ||
