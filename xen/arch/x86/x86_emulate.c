@@ -1732,7 +1732,6 @@ x86_emulate(
             break;
         case 2: /* call (near) */
         case 4: /* jmp (near) */
-            dst.type = OP_NONE;
             if ( (dst.bytes != 8) && mode_64bit() )
             {
                 dst.bytes = op_bytes = 8;
@@ -1746,6 +1745,7 @@ x86_emulate(
             _regs.eip = dst.val;
             if ( (modrm_reg & 7) == 2 )
                 goto push; /* call */
+            dst.type = OP_NONE;
             break;
         case 3: /* call (far, absolute indirect) */
         case 5: /* jmp (far, absolute indirect) */ {
