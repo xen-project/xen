@@ -2023,6 +2023,8 @@ asmlinkage void svm_vmexit_handler(struct cpu_user_regs *regs)
 
     perfc_incra(svmexits, exit_reason);
 
+    hvm_maybe_deassert_evtchn_irq();
+
     /* Event delivery caused this intercept? Queue for redelivery. */
     eventinj = vmcb->exitintinfo;
     if ( unlikely(eventinj.fields.v) &&

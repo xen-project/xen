@@ -157,7 +157,6 @@ asmlinkage void vmx_intr_assist(void)
     /* Crank the handle on interrupt state. */
     pt_update_irq(v);
     vmx_dirq_assist(v);
-    hvm_maybe_deassert_evtchn_irq();
 
     do {
         intack = hvm_vcpu_has_pending_irq(v);

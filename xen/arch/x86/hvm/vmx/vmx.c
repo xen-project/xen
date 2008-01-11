@@ -2741,6 +2741,8 @@ asmlinkage void vmx_vmexit_handler(struct cpu_user_regs *regs)
     if ( unlikely(exit_reason & VMX_EXIT_REASONS_FAILED_VMENTRY) )
         return vmx_failed_vmentry(exit_reason, regs);
 
+    hvm_maybe_deassert_evtchn_irq();
+
     /* Event delivery caused this intercept? Queue for redelivery. */
     idtv_info = __vmread(IDT_VECTORING_INFO);
     if ( unlikely(idtv_info & INTR_INFO_VALID_MASK) &&
