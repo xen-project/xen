@@ -1593,6 +1593,9 @@ opcode(struct regs *regs)
 					goto invalid;
 				}
 				break;
+			case 0x06: /* clts */
+				oldctx.cr0 &= ~CR0_TS;
+				return OPC_EMULATED;
 			case 0x09: /* wbinvd */
 				return OPC_EMULATED;
 			case 0x20: /* mov Rd, Cd (1h) */
