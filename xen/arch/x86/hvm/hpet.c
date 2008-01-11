@@ -551,7 +551,7 @@ void hpet_init(struct vcpu *v)
     h->tsc_freq = ticks_per_sec(v);
 
     h->hpet_to_ns_scale = ((S_TO_NS * TSC_PER_HPET_TICK) << 10) / h->tsc_freq;
-    h->hpet_to_ns_limit = (~0ULL >> 1) / h->hpet_to_ns_scale;
+    h->hpet_to_ns_limit = ~0ULL / h->hpet_to_ns_scale;
 
     /* 64-bit main counter; 3 timers supported; LegacyReplacementRoute. */
     h->hpet.capability = 0x8086A201ULL;
