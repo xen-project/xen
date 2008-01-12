@@ -601,14 +601,20 @@ int pv_pit_handler(int port, int data, int write)
         .dir  = write ? IOREQ_WRITE : IOREQ_READ,
         .data = data
     };
-    uint32_t val = data;
 
     if ( (current->domain->domain_id == 0) && dom0_pit_access(&ioreq) )
+    {
         /* nothing to do */;
-    else if ( port == 0x61 )
-        handle_speaker_io(ioreq.dir, port, 1, &val);
+    }
     else
-        handle_pit_io(ioreq.dir, port, 1, &val);
+    {
+        uint32_t val = data;
+        if ( port == 0x61 )
+            handle_speaker_io(ioreq.dir, port, 1, &val);
+        else
+            handle_pit_io(ioreq.dir, port, 1, &val);
+        ioreq.data = val;
+    }
 
     return !write ? ioreq.data : 0;
 }
