@@ -48,8 +48,10 @@
 #define RW_STATE_WORD0 3
 #define RW_STATE_WORD1 4
 
-static int handle_pit_io(ioreq_t *p);
-static int handle_speaker_io(ioreq_t *p);
+static int handle_pit_io(
+    int dir, uint32_t port, uint32_t bytes, uint32_t *val);
+static int handle_speaker_io(
+    int dir, uint32_t port, uint32_t bytes, uint32_t *val);
 
 /* Compute with 96 bit intermediate result: (a*b)/c */
 static uint64_t muldiv64(uint64_t a, uint32_t b, uint32_t c)
@@ -525,24 +527,25 @@ void pit_deinit(struct domain *d)
 }
 
 /* the intercept action for PIT DM retval:0--not handled; 1--handled */  
-static int handle_pit_io(ioreq_t *p)
+static int handle_pit_io(
+    int dir, uint32_t port, uint32_t bytes, uint32_t *val)
 {
     struct PITState *vpit = vcpu_vpit(current);
 
-    if ( (p->size != 1) || p->data_is_ptr || (p->type != IOREQ_TYPE_PIO) )
+    if ( bytes != 1 )
     {
         gdprintk(XENLOG_WARNING, "PIT bad access\n");
         return 1;
     }
 
-    if ( p->dir == IOREQ_WRITE )
+    if ( dir == IOREQ_WRITE )
     {
-        pit_ioport_write(vpit, p->addr, p->data);
+        pit_ioport_write(vpit, port, *val);
     }
     else
     {
-        if ( (p->addr & 3) != 3 )
-            p->data = pit_ioport_read(vpit, p->addr);
+        if ( (port & 3) != 3 )
+            *val = pit_ioport_read(vpit, port);
         else
             gdprintk(XENLOG_WARNING, "PIT: read A1:A0=3!\n");
     }
@@ -566,11 +569,12 @@ static uint32_t speaker_ioport_read(
             (pit_get_out(pit, 2) << 5) | (refresh_clock << 4));
 }
 
-static int handle_speaker_io(ioreq_t *p)
+static int handle_speaker_io(
+    int dir, uint32_t port, uint32_t bytes, uint32_t *val)
 {
     struct PITState *vpit = vcpu_vpit(current);
 
-    if ( (p->size != 1) || p->data_is_ptr || (p->type != IOREQ_TYPE_PIO) )
+    if ( bytes != 1 )
     {
         gdprintk(XENLOG_WARNING, "PIT_SPEAKER bad access\n");
         return 1;
@@ -578,10 +582,10 @@ static int handle_speaker_io(ioreq_t *p)
 
     spin_lock(&vpit->lock);
 
-    if ( p->dir == IOREQ_WRITE )
-        speaker_ioport_write(vpit, p->addr, p->data);
+    if ( dir == IOREQ_WRITE )
+        speaker_ioport_write(vpit, port, *val);
     else
-        p->data = speaker_ioport_read(vpit, p->addr);
+        *val = speaker_ioport_read(vpit, port);
 
     spin_unlock(&vpit->lock);
 
@@ -597,13 +601,14 @@ int pv_pit_handler(int port, int data, int write)
         .dir  = write ? IOREQ_WRITE : IOREQ_READ,
         .data = data
     };
+    uint32_t val = data;
 
     if ( (current->domain->domain_id == 0) && dom0_pit_access(&ioreq) )
         /* nothing to do */;
     else if ( port == 0x61 )
-        handle_speaker_io(&ioreq);
+        handle_speaker_io(ioreq.dir, port, 1, &val);
     else
-        handle_pit_io(&ioreq);
+        handle_pit_io(ioreq.dir, port, 1, &val);
 
     return !write ? ioreq.data : 0;
 }

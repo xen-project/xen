@@ -316,61 +316,45 @@ static uint32_t vpic_ioport_read(struct hvm_hw_vpic *vpic, uint32_t addr)
     return vpic->imr;
 }
 
-static int vpic_intercept_pic_io(ioreq_t *p)
+static int vpic_intercept_pic_io(
+    int dir, uint32_t port, uint32_t bytes, uint32_t *val)
 {
     struct hvm_hw_vpic *vpic;
-    uint32_t data;
 
-    if ( (p->size != 1) || (p->count != 1) )
+    if ( bytes != 1 )
     {
-        gdprintk(XENLOG_WARNING, "PIC_IO bad access size %d\n", (int)p->size);
+        gdprintk(XENLOG_WARNING, "PIC_IO bad access size %d\n", bytes);
         return 1;
     }
 
-    vpic = &current->domain->arch.hvm_domain.vpic[p->addr >> 7];
+    vpic = &current->domain->arch.hvm_domain.vpic[port >> 7];
 
-    if ( p->dir == IOREQ_WRITE )
-    {
-        if ( p->data_is_ptr )
-            (void)hvm_copy_from_guest_phys(&data, p->data, p->size);
-        else
-            data = p->data;
-        vpic_ioport_write(vpic, (uint32_t)p->addr, (uint8_t)data);
-    }
+    if ( dir == IOREQ_WRITE )
+        vpic_ioport_write(vpic, port, (uint8_t)*val);
     else
-    {
-        data = vpic_ioport_read(vpic, (uint32_t)p->addr);
-        if ( p->data_is_ptr )
-            (void)hvm_copy_to_guest_phys(p->data, &data, p->size);
-        else
-            p->data = (u64)data;
-    }
+        *val = (uint8_t)vpic_ioport_read(vpic, port);
 
     return 1;
 }
 
-static int vpic_intercept_elcr_io(ioreq_t *p)
+static int vpic_intercept_elcr_io(
+    int dir, uint32_t port, uint32_t bytes, uint32_t *val)
 {
     struct hvm_hw_vpic *vpic;
     uint32_t data;
 
-    if ( (p->size != 1) || (p->count != 1) )
+    if ( bytes != 1 )
     {
-        gdprintk(XENLOG_WARNING, "PIC_IO bad access size %d\n", (int)p->size);
+        gdprintk(XENLOG_WARNING, "PIC_IO bad access size %d\n", bytes);
         return 1;
     }
 
-    vpic = &current->domain->arch.hvm_domain.vpic[p->addr & 1];
+    vpic = &current->domain->arch.hvm_domain.vpic[port & 1];
 
-    if ( p->dir == IOREQ_WRITE )
+    if ( dir == IOREQ_WRITE )
     {
-        if ( p->data_is_ptr )
-            (void)hvm_copy_from_guest_phys(&data, p->data, p->size);
-        else
-            data = p->data;
-
         /* Some IRs are always edge trig. Slave IR is always level trig. */
-        data &= vpic_elcr_mask(vpic);
+        data = *val & vpic_elcr_mask(vpic);
         if ( vpic->is_master )
             data |= 1 << 2;
         vpic->elcr = data;
@@ -378,12 +362,7 @@ static int vpic_intercept_elcr_io(ioreq_t *p)
     else
     {
         /* Reader should not see hardcoded level-triggered slave IR. */
-        data = vpic->elcr & vpic_elcr_mask(vpic);
-
-        if ( p->data_is_ptr )
-            (void)hvm_copy_to_guest_phys(p->data, &data, p->size);
-        else
-            p->data = data;
+        *val = vpic->elcr & vpic_elcr_mask(vpic);
     }
 
     return 1;

@@ -86,23 +86,26 @@ struct hvm_io_op {
 #define HVM_MMIO                    1
 #define HVM_BUFFERED_IO             2
 
-typedef int (*intercept_action_t)(ioreq_t *);
 typedef unsigned long (*hvm_mmio_read_t)(struct vcpu *v,
                                          unsigned long addr,
                                          unsigned long length);
-
 typedef void (*hvm_mmio_write_t)(struct vcpu *v,
                                unsigned long addr,
                                unsigned long length,
                                unsigned long val);
-
 typedef int (*hvm_mmio_check_t)(struct vcpu *v, unsigned long addr);
 
+typedef int (*portio_action_t)(
+    int dir, uint32_t port, uint32_t bytes, uint32_t *val);
+typedef int (*mmio_action_t)(ioreq_t *);
 struct io_handler {
     int                 type;
     unsigned long       addr;
     unsigned long       size;
-    intercept_action_t  action;
+    union {
+        portio_action_t portio;
+        mmio_action_t   mmio;
+    } action;
 };
 
 struct hvm_io_handler {
@@ -120,7 +123,7 @@ struct hvm_mmio_handler {
 extern int hvm_io_intercept(ioreq_t *p, int type);
 extern int register_io_handler(
     struct domain *d, unsigned long addr, unsigned long size,
-    intercept_action_t action, int type);
+    void *action, int type);
 
 static inline int hvm_portio_intercept(ioreq_t *p)
 {
@@ -137,14 +140,14 @@ extern int hvm_buffered_io_send(ioreq_t *p);
 
 static inline int register_portio_handler(
     struct domain *d, unsigned long addr,
-    unsigned long size, intercept_action_t action)
+    unsigned long size, portio_action_t action)
 {
     return register_io_handler(d, addr, size, action, HVM_PORTIO);
 }
 
 static inline int register_buffered_io_handler(
     struct domain *d, unsigned long addr,
-    unsigned long size, intercept_action_t action)
+    unsigned long size, mmio_action_t action)
 {
     return register_io_handler(d, addr, size, action, HVM_BUFFERED_IO);
 }

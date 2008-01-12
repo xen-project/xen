@@ -395,24 +395,25 @@ static uint32_t rtc_ioport_read(RTCState *s, uint32_t addr)
     return ret;
 }
 
-static int handle_rtc_io(ioreq_t *p)
+static int handle_rtc_io(
+    int dir, uint32_t port, uint32_t bytes, uint32_t *val)
 {
     struct RTCState *vrtc = vcpu_vrtc(current);
 
-    if ( (p->size != 1) || p->data_is_ptr || (p->type != IOREQ_TYPE_PIO) )
+    if ( bytes != 1 )
     {
         gdprintk(XENLOG_WARNING, "HVM_RTC bas access\n");
         return 1;
     }
     
-    if ( p->dir == IOREQ_WRITE )
+    if ( dir == IOREQ_WRITE )
     {
-        if ( rtc_ioport_write(vrtc, p->addr, p->data & 0xFF) )
+        if ( rtc_ioport_write(vrtc, port, (uint8_t)*val) )
             return 1;
     }
     else if ( vrtc->hw.cmos_index < RTC_CMOS_SIZE )
     {
-        p->data = rtc_ioport_read(vrtc, p->addr);
+        *val = rtc_ioport_read(vrtc, port);
         return 1;
     }
 

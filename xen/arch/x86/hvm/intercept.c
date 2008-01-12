@@ -247,6 +247,50 @@ int hvm_mmio_intercept(ioreq_t *p)
     return 0;
 }
 
+static int process_portio_intercept(portio_action_t action, ioreq_t *p)
+{
+    int rc = 1, i, sign = p->df ? -1 : 1;
+    uint32_t data;
+
+    if ( p->dir == IOREQ_READ )
+    {
+        if ( !p->data_is_ptr )
+        {
+            rc = action(IOREQ_READ, p->addr, p->size, &data);
+            p->data = data;
+        }
+        else
+        {
+            for ( i = 0; i < p->count; i++ )
+            {
+                rc = action(IOREQ_READ, p->addr, p->size, &data);
+                (void)hvm_copy_to_guest_phys(p->data + sign*i*p->size,
+                                             &data, p->size);
+            }
+        }
+    }
+    else /* p->dir == IOREQ_WRITE */
+    {
+        if ( !p->data_is_ptr )
+        {
+            data = p->data;
+            rc = action(IOREQ_WRITE, p->addr, p->size, &data);
+        }
+        else
+        {
+            for ( i = 0; i < p->count; i++ )
+            {
+                data = 0;
+                (void)hvm_copy_from_guest_phys(&data, p->data + sign*i*p->size,
+                                               p->size);
+                rc = action(IOREQ_WRITE, p->addr, p->size, &data);
+            }
+        }
+    }
+
+    return rc;
+}
+
 /*
  * Check if the request is handled inside xen
  * return value: 0 --not handled; 1 --handled
@@ -255,28 +299,35 @@ int hvm_io_intercept(ioreq_t *p, int type)
 {
     struct vcpu *v = current;
     struct hvm_io_handler *handler =
-                           &(v->domain->arch.hvm_domain.io_handler);
+        &v->domain->arch.hvm_domain.io_handler;
     int i;
     unsigned long addr, size;
 
     if ( (type == HVM_PORTIO) && (dpci_ioport_intercept(p)) )
         return 1;
 
-    for (i = 0; i < handler->num_slot; i++) {
-        if( type != handler->hdl_list[i].type)
+    for ( i = 0; i < handler->num_slot; i++ )
+    {
+        if ( type != handler->hdl_list[i].type )
             continue;
         addr = handler->hdl_list[i].addr;
         size = handler->hdl_list[i].size;
-        if (p->addr >= addr &&
-            p->addr + p->size <=  addr + size)
-            return handler->hdl_list[i].action(p);
+        if ( (p->addr >= addr) &&
+             ((p->addr + p->size) <= (addr + size)) )
+        {
+            if ( type == HVM_PORTIO )
+                return process_portio_intercept(
+                    handler->hdl_list[i].action.portio, p);
+            return handler->hdl_list[i].action.mmio(p);
+        }
     }
+
     return 0;
 }
 
 int register_io_handler(
     struct domain *d, unsigned long addr, unsigned long size,
-    intercept_action_t action, int type)
+    void *action, int type)
 {
     struct hvm_io_handler *handler = &d->arch.hvm_domain.io_handler;
     int num = handler->num_slot;
@@ -285,8 +336,10 @@ int register_io_handler(
 
     handler->hdl_list[num].addr = addr;
     handler->hdl_list[num].size = size;
-    handler->hdl_list[num].action = action;
-    handler->hdl_list[num].type = type;
+    if ( (handler->hdl_list[num].type = type) == HVM_PORTIO )
+        handler->hdl_list[num].action.portio = action;
+    else
+        handler->hdl_list[num].action.mmio = action;
     handler->num_slot++;
 
     return 1;

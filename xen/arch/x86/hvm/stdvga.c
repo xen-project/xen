@@ -148,42 +148,37 @@ static int stdvga_outb(uint64_t addr, uint8_t val)
     return rc;
 }
 
-static int stdvga_out(ioreq_t *p)
+static void stdvga_out(uint32_t port, uint32_t bytes, uint32_t val)
 {
-    int rc = 1;
-
-    switch ( p->size )
+    switch ( bytes )
     {
     case 1:
-        rc &= stdvga_outb(p->addr, p->data);
+        stdvga_outb(port, val);
         break;
 
     case 2:
-        rc &= stdvga_outb(p->addr + 0, p->data >> 0);
-        rc &= stdvga_outb(p->addr + 1, p->data >> 8);
+        stdvga_outb(port + 0, val >> 0);
+        stdvga_outb(port + 1, val >> 8);
         break;
 
     default:
-        rc = 0;
         break;
     }
-
-    return rc;
 }
 
-int stdvga_intercept_pio(ioreq_t *p)
+int stdvga_intercept_pio(
+    int dir, uint32_t port, uint32_t bytes, uint32_t *val)
 {
     struct hvm_hw_stdvga *s = &current->domain->arch.hvm_domain.stdvga;
-    int rc;
 
-    if ( p->data_is_ptr || (p->dir == IOREQ_READ) )
+    if ( dir == IOREQ_READ )
         return 0;
 
     spin_lock(&s->lock);
-    rc = (stdvga_out(p) && hvm_buffered_io_send(p));
+    stdvga_out(port, bytes, *val);
     spin_unlock(&s->lock);
 
-    return rc;
+    return 0; /* propagate to external ioemu */
 }
 
 #define GET_PLANE(data, p) (((data) >> ((p) * 8)) & 0xff)

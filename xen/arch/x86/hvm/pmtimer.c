@@ -114,7 +114,8 @@ static void pmt_timer_callback(void *opaque)
 }
 
 /* Handle port I/O to the PM1a_STS and PM1a_EN registers */
-static int handle_evt_io(ioreq_t *p)
+static int handle_evt_io(
+    int dir, uint32_t port, uint32_t bytes, uint32_t *val)
 {
     struct vcpu *v = current;
     PMTState *s = &v->domain->arch.hvm_domain.pl_time.vpmt;
@@ -123,10 +124,10 @@ static int handle_evt_io(ioreq_t *p)
 
     spin_lock(&s->lock);
 
-    if ( p->dir == IOREQ_WRITE )
+    if ( dir == IOREQ_WRITE )
     {
         /* Handle this I/O one byte at a time */
-        for ( i = p->size, addr = p->addr, data = p->data;
+        for ( i = bytes, addr = port, data = *val;
               i > 0;
               i--, addr++, data >>= 8 )
         {
@@ -150,9 +151,8 @@ static int handle_evt_io(ioreq_t *p)
                 
             default:
                 gdprintk(XENLOG_WARNING, 
-                         "Bad ACPI PM register write: %"PRIu64
-                         " bytes (%#"PRIx64") at %"PRIx64"\n", 
-                         p->size, p->data, p->addr);
+                         "Bad ACPI PM register write: %x bytes (%x) at %x\n", 
+                         bytes, *val, port);
             }
         }
         /* Fix up the SCI state to match the new register state */
@@ -161,10 +161,10 @@ static int handle_evt_io(ioreq_t *p)
     else /* p->dir == IOREQ_READ */
     {
         data = s->pm.pm1a_sts | (((uint32_t) s->pm.pm1a_en) << 16);
-        data >>= 8 * (p->addr - PM1a_STS_ADDR);
-        if ( p->size == 1 ) data &= 0xff;
-        else if ( p->size == 2 ) data &= 0xffff;
-        p->data = data;
+        data >>= 8 * (port - PM1a_STS_ADDR);
+        if ( bytes == 1 ) data &= 0xff;
+        else if ( bytes == 2 ) data &= 0xffff;
+        *val = data;
     }
 
     spin_unlock(&s->lock);
@@ -174,22 +174,23 @@ static int handle_evt_io(ioreq_t *p)
 
 
 /* Handle port I/O to the TMR_VAL register */
-static int handle_pmt_io(ioreq_t *p)
+static int handle_pmt_io(
+    int dir, uint32_t port, uint32_t bytes, uint32_t *val)
 {
     struct vcpu *v = current;
     PMTState *s = &v->domain->arch.hvm_domain.pl_time.vpmt;
 
-    if ( (p->size != 4) || p->data_is_ptr || (p->type != IOREQ_TYPE_PIO) )
+    if ( bytes != 4 )
     {
         gdprintk(XENLOG_WARNING, "HVM_PMT bad access\n");
         return 1;
     }
     
-    if ( p->dir == IOREQ_READ )
+    if ( dir == IOREQ_READ )
     {
         spin_lock(&s->lock);
         pmt_update_time(s);
-        p->data = s->pm.tmr_val;
+        *val = s->pm.tmr_val;
         spin_unlock(&s->lock);
         return 1;
     }
