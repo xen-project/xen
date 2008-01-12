@@ -1009,6 +1009,12 @@ static void svm_vmexit_do_cpuid(struct vmcb_struct *vmcb,
         __clear_bit(X86_FEATURE_PSE36 & 31, &edx);
 
         /* Filter all other features according to a whitelist. */
+        ecx &= (bitmaskof(X86_FEATURE_LAHF_LM) |
+                bitmaskof(X86_FEATURE_ALTMOVCR) |
+                bitmaskof(X86_FEATURE_ABM) |
+                bitmaskof(X86_FEATURE_SSE4A) |
+                bitmaskof(X86_FEATURE_MISALIGNSSE) |
+                bitmaskof(X86_FEATURE_3DNOWPF));
         edx &= (0x0183f3ff | /* features shared with 0x00000001:EDX */
                 bitmaskof(X86_FEATURE_NX) |
                 bitmaskof(X86_FEATURE_LM) |
