@@ -522,10 +522,14 @@ do_dom0vp_op(unsigned long cmd,
         ret = dom0vp_zap_physmap(d, arg0, (unsigned int)arg1);
         break;
     case IA64_DOM0VP_add_physmap:
+        if (!IS_PRIV(d))
+            return -EPERM;
         ret = dom0vp_add_physmap(d, arg0, arg1, (unsigned int)arg2,
                                  (domid_t)arg3);
         break;
     case IA64_DOM0VP_add_physmap_with_gmfn:
+        if (!IS_PRIV(d))
+            return -EPERM;
         ret = dom0vp_add_physmap_with_gmfn(d, arg0, arg1, (unsigned int)arg2,
                                            (domid_t)arg3);
         break;
