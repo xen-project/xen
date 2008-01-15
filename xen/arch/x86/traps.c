@@ -2679,14 +2679,24 @@ asmlinkage void do_spurious_interrupt_bug(struct cpu_user_regs *regs)
 {
 }
 
-void set_intr_gate(unsigned int n, void *addr)
+static void __set_intr_gate(unsigned int n, uint32_t dpl, void *addr)
 {
     int i;
     /* Keep secondary tables in sync with IRQ updates. */
     for ( i = 1; i < NR_CPUS; i++ )
         if ( idt_tables[i] != NULL )
-            _set_gate(&idt_tables[i][n], 14, 0, addr);
-    _set_gate(&idt_table[n], 14, 0, addr);
+            _set_gate(&idt_tables[i][n], 14, dpl, addr);
+    _set_gate(&idt_table[n], 14, dpl, addr);
+}
+
+static void set_swint_gate(unsigned int n, void *addr)
+{
+    __set_intr_gate(n, 3, addr);
+}
+
+void set_intr_gate(unsigned int n, void *addr)
+{
+    __set_intr_gate(n, 0, addr);
 }
 
 void set_tss_desc(unsigned int n, void *addr)
@@ -2753,8 +2763,8 @@ void __init trap_init(void)
     set_intr_gate(TRAP_divide_error,&divide_error);
     set_intr_gate(TRAP_debug,&debug);
     set_intr_gate(TRAP_nmi,&nmi);
-    set_intr_gate(TRAP_int3,&int3);         /* usable from all privileges */
-    set_intr_gate(TRAP_overflow,&overflow); /* usable from all privileges */
+    set_swint_gate(TRAP_int3,&int3);         /* usable from all privileges */
+    set_swint_gate(TRAP_overflow,&overflow); /* usable from all privileges */
     set_intr_gate(TRAP_bounds,&bounds);
     set_intr_gate(TRAP_invalid_op,&invalid_op);
     set_intr_gate(TRAP_no_device,&device_not_available);
