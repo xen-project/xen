@@ -107,7 +107,7 @@ extern void xen_version_free(xen_version *version);
  * minor, and extraversion of the Xen release with which it was released,
  * plus the library's own version as the patch.
  */
-extern xen_version *xen_get_client_side_version();
+extern xen_version *xen_get_client_side_version(void);
 
 
 extern bool
