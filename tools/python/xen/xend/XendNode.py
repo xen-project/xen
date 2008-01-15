@@ -377,13 +377,7 @@ class XendNode:
     def xen_version(self):
         info = self.xc.xeninfo()
 
-        try:
-            from xen import VERSION
-            info = {'Xen': '%(xen_major)d.%(xen_minor)d' % info,
-                    'Xend': VERSION}
-        except (ImportError, AttributeError):
-            info = {'Xen': '%(xen_major)d.%(xen_minor)d' % info,
-                    'Xend': '3.0.3'}
+        info = {'Xen': '%(xen_major)d.%(xen_minor)d' % info}
 
         # Add xend_config_format
         info.update(self.xendinfo_dict())
