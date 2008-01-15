@@ -13,6 +13,16 @@ Add a ChangeLog file indicating changes to the API/ABI, as discussed
 here:
 http://lists.xensource.com/archives/html/xen-devel/2008-01/msg00010.html
 
+Xen 3.3 release
+---------------
+
+16718: MMU_PT_UPDATE_PRESERVE_AD
+http://xenbits.xensource.com/xen-unstable.hg?rev/fba4e7357744
+
+A subcommand of the x86-only mmu_update() hypercall to allow batched
+updates of pagetable entries, while atomically preserving the current
+status of accessed and dirty bits in each entry.
+
 Xen 3.2 release
 ---------------
 
