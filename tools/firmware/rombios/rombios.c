@@ -2031,6 +2031,229 @@ print_cdromboot_failure( code )
   return;
 }
 
+#define WAIT_HZ 18
+/**
+ * Check for keystroke.
+ * @returns    True if keystroke available, False if not.
+ */
+Bit8u check_for_keystroke()
+{
+ASM_START
+    mov  ax, #0x100
+    int  #0x16
+    jz   no_key
+    mov  al, #1
+    jmp  done
+no_key:
+    xor  al, al
+done:
+ASM_END
+}
+
+/**
+ * Get keystroke.
+ * @returns    BIOS scan code.
+ */
+Bit8u get_keystroke()
+{
+ASM_START
+    mov  ax, #0x0
+    int  #0x16
+    xchg ah, al
+ASM_END
+}
+
+/**
+ * Waits (sleeps) for the given number of ticks.
+ * Checks for keystroke.
+ *
+ * @returns BIOS scan code if available, 0 if not.
+ * @param   ticks       Number of ticks to sleep.
+ * @param   stop_on_key Whether to stop immediately upon keypress.
+ */
+Bit8u wait(ticks, stop_on_key)
+  Bit16u ticks;
+  Bit8u stop_on_key;
+{
+    long ticks_to_wait, delta;
+    Bit32u prev_ticks, t;
+    Bit8u scan_code = 0;
+
+    /*
+     * The 0:046c wraps around at 'midnight' according to a 18.2Hz clock.
+     * We also have to be careful about interrupt storms.
+     */
+    ticks_to_wait = ticks;
+    prev_ticks = read_dword(0x0, 0x46c);
+    do
+    {
+        t = read_dword(0x0, 0x46c);
+        if (t > prev_ticks)
+        {
+            delta = t - prev_ticks;     /* The temp var is required or bcc screws up. */
+            ticks_to_wait -= delta;
+        }
+        else if (t < prev_ticks)
+            ticks_to_wait -= t;         /* wrapped */
+        prev_ticks = t;
+
+        if (check_for_keystroke())
+        {
+            scan_code = get_keystroke();
+            bios_printf(BIOS_PRINTF_DEBUG, "Key pressed: %x\n", scan_code);
+            if (stop_on_key)
+                return scan_code;
+        }
+    } while (ticks_to_wait > 0);
+    return scan_code;
+}
+
+static void clearscreen() {
+    /* Hide cursor, clear screen and move cursor to starting position */
+ASM_START
+        push bx
+        push cx
+        push dx
+
+        mov  ax, #0x100
+        mov  cx, #0x1000
+        int  #0x10
+
+        mov  ax, #0x700
+        mov  bh, #7
+        xor  cx, cx
+        mov  dx, #0x184f
+        int  #0x10
+
+        mov  ax, #0x200
+        xor  bx, bx
+        xor  dx, dx
+        int  #0x10
+
+        pop  dx
+        pop  cx
+        pop  bx
+ASM_END
+}
+
+int bootmenu(selected)
+  int selected;
+{
+    Bit8u scode;
+    int max;
+
+    /* get the number of boot devices */
+    max = read_word(IPL_SEG, IPL_COUNT_OFFSET);
+
+    for(;;) {
+        if (selected > max || selected < 1) selected = 1;
+        clearscreen();
+        bios_printf(BIOS_PRINTF_SCREEN | BIOS_PRINTF_INFO, "\n\n\n\n\n\n\n");
+        bios_printf(BIOS_PRINTF_SCREEN | BIOS_PRINTF_INFO, "          Select boot device\n\n");
+        bios_printf(BIOS_PRINTF_SCREEN | BIOS_PRINTF_INFO, "            1. Floppy\n");
+        bios_printf(BIOS_PRINTF_SCREEN | BIOS_PRINTF_INFO, "            2. Hard drive\n");
+        bios_printf(BIOS_PRINTF_SCREEN | BIOS_PRINTF_INFO, "            3. CD-ROM\n");
+        if (max == 4)
+            bios_printf(BIOS_PRINTF_SCREEN | BIOS_PRINTF_INFO, "            4. Network\n");
+        bios_printf(BIOS_PRINTF_SCREEN | BIOS_PRINTF_INFO, "\n\n          Currently selected: %d\n", selected);
+
+        do {
+            scode = wait(WAIT_HZ, 1);
+        } while (scode == 0);
+        switch(scode) {
+        case 0x02:
+        case 0x03:
+        case 0x04:
+            selected = scode - 1;
+            break;
+        case 0x05:
+            if (max == 4)
+                selected = scode -1 ;
+            else
+                scode = 0;
+            break;
+        case 0x48:
+            selected -= 1;
+            if (selected < 1)
+                selected = 1;
+            scode = 0;
+            break;
+        case 0x50:
+            selected += 1;
+            if (selected > max)
+                selected = max;
+            scode = 0;
+            break;
+        case 0x1c:
+            break;
+        default:
+            scode = 0;
+            break;
+        }
+        if (scode != 0)
+            break;
+    }
+
+    switch (selected) {
+    case 1:
+        return 0x3D;
+    case 2:
+        return 0x3E;
+    case 3:
+        return 0x3F;
+    case 4:
+        return 0x58;
+    default:
+        return 0;
+    }
+}
+
+void interactive_bootkey()
+{
+    Bit16u i;
+    Bit8u scan = 0;
+
+    bios_printf(BIOS_PRINTF_SCREEN | BIOS_PRINTF_INFO, "\n\nPress F10 to select boot device.\n");
+    for (i = 3; i > 0; i--)
+    {
+        scan = wait(WAIT_HZ, 0);
+        switch (scan) {
+        case 0x3D:
+        case 0x3E:
+        case 0x3F:
+        case 0x58:
+            break;
+        case 0x44:
+            scan = bootmenu(inb_cmos(0x3d) & 0x0f);
+            break;
+        default:
+            scan = 0;
+            break;
+        }
+        if (scan != 0)
+            break;
+    }
+
+    /* set the default based on the keypress or menu */
+    switch(scan) {
+    case 0x3D:
+        outb_cmos(0x3d, 0x01);
+        break;
+    case 0x3E:
+        outb_cmos(0x3d, 0x02);
+        break;
+    case 0x3F:
+        outb_cmos(0x3d, 0x03);
+        break;
+    case 0x58:
+        outb_cmos(0x3d, 0x04);
+        break;
+    default:
+        break;
+    }
+}
+
+
 void
 nmi_handler_msg()
 {
@@ -9825,7 +10048,9 @@ post_default_ints:
   call _cdemu_init
   ;;
 #endif // BX_ELTORITO_BOOT
- 
+
+  call _interactive_bootkey
+
 #if BX_TCGBIOS
   call _tcpa_calling_int19h          /* specs: 8.2.3 step 1 */
   call _tcpa_add_event_separators    /* specs: 8.2.3 step 2 */

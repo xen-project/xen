@@ -28,28 +28,29 @@ LIBS      += -L$(XEN_XENSTORE) -lxenstore
 
 AIOLIBS   := $(LIBAIO_DIR)/libaio.a
 
-BLK-OBJS  := block-aio.o
-BLK-OBJS  += block-sync.o
-BLK-OBJS  += block-vmdk.o
-BLK-OBJS  += block-ram.o
-BLK-OBJS  += block-qcow.o
-BLK-OBJS  += aes.o
-BLK-OBJS  += tapaio.o
+BLK-OBJS-y  := block-aio.o
+BLK-OBJS-y  += block-sync.o
+BLK-OBJS-y  += block-vmdk.o
+BLK-OBJS-y  += block-ram.o
+BLK-OBJS-y  += block-qcow.o
+BLK-OBJS-y  += aes.o
+BLK-OBJS-y  += tapaio.o
+BLK-OBJS-$(CONFIG_Linux) += blk_linux.c
 
 all: $(IBIN) qcow-util
 
 blktapctrl: blktapctrl.c
 	$(CC) $(CFLAGS) -o blktapctrl $(LIBS) blktapctrl.c
 
-tapdisk: $(BLK-OBJS) tapdisk.c
-	$(CC) $(CFLAGS) -o tapdisk $(BLK-OBJS) tapdisk.c \
+tapdisk: $(BLK-OBJS-y) tapdisk.c
+	$(CC) $(CFLAGS) -o tapdisk $(BLK-OBJS-y) tapdisk.c \
 		$(AIOLIBS) $(LIBS)
 
 .PHONY: qcow-util
 qcow-util: img2qcow qcow2raw qcow-create
 
-img2qcow qcow2raw qcow-create: %: $(BLK-OBJS)
-	$(CC) $(CFLAGS) -o $* $(BLK-OBJS) $*.c $(AIOLIBS) $(LIBS)
+img2qcow qcow2raw qcow-create: %: $(BLK-OBJS-y)
+	$(CC) $(CFLAGS) -o $* $(BLK-OBJS-y) $*.c $(AIOLIBS) $(LIBS)
 
 install: all
 	$(INSTALL_PROG) $(IBIN) $(QCOW_UTIL) $(VHD_UTIL) $(DESTDIR)$(INST_DIR)

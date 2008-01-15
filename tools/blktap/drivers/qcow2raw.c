@@ -33,18 +33,25 @@
 #include <fcntl.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <inttypes.h>
 #include <unistd.h>
 #include <sys/statvfs.h>
 #include <sys/stat.h>
 #include <sys/ioctl.h>
-#include <linux/fs.h>
 #include <string.h>
 #include "tapdisk.h"
+#include "blk.h"
 
 #if 1
 #define DFPRINTF(_f, _a...) fprintf ( stderr, _f , ## _a )
 #else
 #define DFPRINTF(_f, _a...) ((void)0)
+#endif
+
+
+/* *BSD has no O_LARGEFILE */
+#ifndef O_LARGEFILE
+#define O_LARGEFILE 0
 #endif
 
 #define TAPDISK 1
@@ -142,7 +149,7 @@ static int send_read_responses(struct disk_driver *dd, int res, uint64_t sec,
 int main(int argc, char *argv[])
 {
 	int ret = -1, fd, len,input;
-	long int size;
+	uint64_t size;
 	fd_set readfds;
 	struct timeval timeout;
 	uint64_t i;
@@ -227,16 +234,15 @@ int main(int argc, char *argv[])
 		}
 
 		if (S_ISBLK(finfo.st_mode)) {
-			if(ioctl(fd,BLKGETSIZE,&size)!=0) {
-				DFPRINTF("ERROR: BLKGETSIZE failed, "
-					"couldn't stat image [%s]\n", 
-					argv[1]);
+			if (blk_getimagesize(fd, &size) != 0) {
 				close(fd);
-				exit(-1);
+				return -1;
 			}
+
 			if (size < ddqcow.td_state->size<<9) {
 				DFPRINTF("ERROR: Not enough space on device "
-					"%s (%lu bytes available, %llu bytes required\n",
+					"%s (%"PRIu64" bytes available, "
+					"%llu bytes required\n",
 					argv[1], size, 
 					(long long unsigned)ddqcow.td_state->size<<9);
 				close(fd);

@@ -335,12 +335,6 @@ class Daemon:
             log.info("Xend changeset: %s.", xinfo['xen_changeset'])
             del xc
 
-            try:
-                from xen import VERSION
-                log.info("Xend version: %s", VERSION)
-            except ImportError:
-                log.info("Xend version: Unknown.")
-
             relocate.listenRelocation()
             servers = SrvServer.create()
             servers.start(status)

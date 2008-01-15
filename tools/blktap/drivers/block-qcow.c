@@ -29,7 +29,6 @@
 #include <sys/statvfs.h>
 #include <sys/stat.h>
 #include <sys/ioctl.h>
-#include <linux/fs.h>
 #include <string.h>
 #include <zlib.h>
 #include <inttypes.h>
@@ -39,6 +38,12 @@
 #include "aes.h"
 #include "tapdisk.h"
 #include "tapaio.h"
+#include "blk.h"
+
+/* *BSD has no O_LARGEFILE */
+#ifndef O_LARGEFILE
+#define O_LARGEFILE	0
+#endif
 
 #if 1
 #define ASSERT(_p) \
@@ -284,8 +289,7 @@ static int get_filesize(char *filename, uint64_t *size, struct stat *st)
 		fd = open(filename, O_RDONLY);
 		if (fd < 0)
 			return -1;
-		if (ioctl(fd,BLKGETSIZE,size)!=0) {
-			printf("Unable to get Block device size\n");
+		if (blk_getimagesize(fd, size) != 0) {
 			close(fd);
 			return -1;
 		}
@@ -990,8 +994,8 @@ int tdqcow_open (struct disk_driver *dd, const char *name, td_flag_t flags)
 	if (!final_cluster)
 		s->fd_end = s->l1_table_offset + l1_table_size;
 	else {
-		s->fd_end = lseek64(fd, 0, SEEK_END);
-		if (s->fd_end == (off64_t)-1)
+		s->fd_end = lseek(fd, 0, SEEK_END);
+		if (s->fd_end == (off_t)-1)
 			goto fail;
 	}
 
@@ -1230,7 +1234,7 @@ int qcow_create(const char *filename, uint64_t total_size,
 	DPRINTF("Qcow_create: size %llu\n",(long long unsigned)total_size);
 
 	fd = open(filename, 
-		  O_WRONLY | O_CREAT | O_TRUNC | O_BINARY | O_LARGEFILE, 
+		  O_WRONLY | O_CREAT | O_TRUNC | O_BINARY | O_LARGEFILE,
 		  0644);
 	if (fd < 0)
 		return -1;

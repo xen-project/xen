@@ -42,10 +42,14 @@
 #include <sys/statvfs.h>
 #include <sys/stat.h>
 #include <sys/ioctl.h>
-#include <linux/fs.h>
 #include <string.h>
 #include "tapdisk.h"
 #include "bswap.h"
+
+/* *BSD has no O_LARGEFILE */
+#ifndef O_LARGEFILE
+#define O_LARGEFILE	0
+#endif
 
 #define safer_free(_x)       \
   do {                       \

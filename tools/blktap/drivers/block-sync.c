@@ -37,8 +37,13 @@
 #include <sys/statvfs.h>
 #include <sys/stat.h>
 #include <sys/ioctl.h>
-#include <linux/fs.h>
 #include "tapdisk.h"
+#include "blk.h"
+
+/* *BSD has no O_LARGEFILE */
+#ifndef O_LARGEFILE
+#define O_LARGEFILE	0
+#endif
 
 struct tdsync_state {
 	int fd;
@@ -62,11 +67,8 @@ static int get_image_info(struct td_state *s, int fd)
 
 	if (S_ISBLK(stat.st_mode)) {
 		/*Accessing block device directly*/
-		s->size = 0;
-		if (ioctl(fd,BLKGETSIZE,&s->size)!=0) {
-			DPRINTF("ERR: BLKGETSIZE failed, couldn't stat image");
+		if (blk_getimagesize(fd, &s->size) != 0)
 			return -EINVAL;
-		}
 
 		DPRINTF("Image size: \n\tpre sector_shift  [%llu]\n\tpost "
 			"sector_shift [%llu]\n",
@@ -74,19 +76,8 @@ static int get_image_info(struct td_state *s, int fd)
 			(long long unsigned)s->size);
 
 		/*Get the sector size*/
-#if defined(BLKSSZGET)
-		{
-			int arg;
+		if (blk_getsectorsize(fd, &s->sector_size) != 0)
 			s->sector_size = DEFAULT_SECTOR_SIZE;
-			ioctl(fd, BLKSSZGET, &s->sector_size);
-			
-			if (s->sector_size != DEFAULT_SECTOR_SIZE)
-				DPRINTF("Note: sector size is %ld (not %d)\n",
-					s->sector_size, DEFAULT_SECTOR_SIZE);
-		}
-#else
-		s->sector_size = DEFAULT_SECTOR_SIZE;
-#endif
 
 	} else {
 		/*Local file? try fstat instead*/
