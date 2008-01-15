@@ -57,9 +57,7 @@ define cc-ver-check-closure
     endif
 endef
 
-ifneq ($(debug),y)
-CFLAGS += -DNDEBUG
-else
+ifeq ($(debug),y)
 CFLAGS += -g
 endif
 

@@ -17,6 +17,8 @@ include $(XEN_ROOT)/Config.mk
 ifeq ($(debug),y)
 verbose       := y
 frame_pointer := y
+else
+CFLAGS += -DNDEBUG
 endif
 ifeq ($(perfc_arrays),y)
 perfc := y
