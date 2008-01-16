@@ -246,7 +246,6 @@ static void domain_close_tty(struct domain *dom)
 }
 
 #ifdef __sun__
-/* Once Solaris has openpty(), this is going to be removed. */
 static int openpty(int *amaster, int *aslave, char *name,
                    struct termios *termp, struct winsize *winp)
 {
@@ -278,8 +277,10 @@ static int openpty(int *amaster, int *aslave, char *name,
 	if (winp)
 		ioctl(sfd, TIOCSWINSZ, winp);
 
+	if (termp)
+		tcsetattr(sfd, TCSAFLUSH, termp);
+
 	assert(name == NULL);
-	assert(termp == NULL);
 
 	return 0;
 
@@ -289,7 +290,20 @@ err:
 	close(mfd);
 	return -1;
 }
-#endif
+
+void cfmakeraw(struct termios *termios_p)
+{
+	termios_p->c_iflag &=
+	    ~(IGNBRK|BRKINT|PARMRK|ISTRIP|INLCR|IGNCR|ICRNL|IXON);
+	termios_p->c_oflag &= ~OPOST;
+	termios_p->c_lflag &= ~(ECHO|ECHONL|ICANON|ISIG|IEXTEN);
+	termios_p->c_cflag &= ~(CSIZE|PARENB);
+	termios_p->c_cflag |= CS8;
+
+	termios_p->c_cc[VMIN] = 0;
+	termios_p->c_cc[VTIME] = 0;
+}
+#endif /* __sun__ */
 
 static int domain_create_tty(struct domain *dom)
 {
@@ -299,11 +313,14 @@ static int domain_create_tty(struct domain *dom)
 	bool success;
 	char *data;
 	unsigned int len;
+	struct termios term;
 
 	assert(dom->slave_fd == -1);
 	assert(dom->master_fd == -1);
 
-	if (openpty(&dom->master_fd, &dom->slave_fd, NULL, NULL, NULL) < 0) {
+	cfmakeraw(&term);
+
+	if (openpty(&dom->master_fd, &dom->slave_fd, NULL, &term, NULL) < 0) {
 		err = errno;
 		dolog(LOG_ERR, "Failed to create tty for domain-%d (errno = %i, %s)",
 		      dom->domid, err, strerror(err));
