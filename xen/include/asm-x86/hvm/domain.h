@@ -73,6 +73,10 @@ struct hvm_domain {
 
     /* Pass-through */
     struct hvm_iommu       hvm_iommu;
+
+#if CONFIG_PAGING_LEVELS == 3
+    bool_t                 amd_npt_4gb_warning;
+#endif
 };
 
 #endif /* __ASM_X86_HVM_DOMAIN_H__ */
