@@ -62,6 +62,7 @@
 #include <asm/shared.h>
 #include <asm/x86_emulate.h>
 #include <asm/hvm/vpt.h>
+#include <public/arch-x86/cpuid.h>
 
 /*
  * opt_nmi: one of 'ignore', 'dom0', or 'fatal'.
@@ -610,10 +611,10 @@ int cpuid_hypervisor_leaves(
     switch ( idx )
     {
     case 0:
-        *eax = 0x40000002; /* Largest leaf        */
-        *ebx = 0x566e6558; /* Signature 1: "XenV" */
-        *ecx = 0x65584d4d; /* Signature 2: "MMXe" */
-        *edx = 0x4d4d566e; /* Signature 3: "nVMM" */
+        *eax = 0x40000002; /* Largest leaf */
+        *ebx = XEN_CPUID_SIGNATURE_EBX;
+        *ecx = XEN_CPUID_SIGNATURE_ECX;
+        *edx = XEN_CPUID_SIGNATURE_EDX;
         break;
 
     case 1:
@@ -628,6 +629,8 @@ int cpuid_hypervisor_leaves(
         *ebx = 0x40000000; /* MSR base address */
         *ecx = 0;          /* Features 1 */
         *edx = 0;          /* Features 2 */
+        if ( !is_hvm_vcpu(current) )
+            *ecx |= XEN_CPUID_FEAT1_MMU_PT_UPDATE_PRESERVE_AD;
         break;
 
     default:
