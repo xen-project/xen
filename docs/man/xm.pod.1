@@ -108,7 +108,7 @@ soon as it is run.
  
   xm create /dev/null ramdisk=initrd.img \
      kernel=/boot/vmlinuz-2.6.12.6-xenU \
-     name=ramdisk nics=0 vcpus=1 \
+     name=ramdisk vif='' vcpus=1 \
      memory=64 root=/dev/ram0
 
 This creates the domain without using a config file (more specifically
