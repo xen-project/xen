@@ -482,32 +482,26 @@ ia64_reload_tr:
 	// avoid overlapping with xenheap TR
 	mov r17=ip
 	;;
-	tpa r17=r17
-	;;
 	dep r17=0,r17,0,KERNEL_TR_PAGE_SHIFT
 	;;
 	shr.u r17=r17,IA64_GRANULE_SHIFT
 	;; 
-	GET_THIS_PADDR(r2,cpu_kr);;
-	add r2=IA64_KR_CURRENT_OFFSET,r2;;
-	ld8 r16=[r2];;
-	;;
-#if KERNEL_TR_PAGE_SHIFT < IA64_GRANULE_SHIFT
-# error "KERNEL_TR_PAGE_SHIFT < IA64_GRANULE_SHIFT shouldn't happen"
-#endif
-#if KERNEL_TR_PAGE_SHIFT > IA64_GRANULE_SHIFT
-	dep  r16=0,r16,0,KERNEL_TR_PAGE_SHIFT-IA64_GRANULE_SHIFT
-	;;
-#endif
-	cmp.eq p7,p0=r17,r16
-(p7)	br.cond.sptk	.reload_vhpt
-	
 	// Kernel registers are saved in a per_cpu cpu_kr_ia64_t
 	// to allow the kernel registers themselves to be used by domains.
 	GET_THIS_PADDR(r2, cpu_kr);;
 	add r2=IA64_KR_CURRENT_STACK_OFFSET,r2
 	;;
 	ld8 r16=[r2]
+	;;
+#if KERNEL_TR_PAGE_SHIFT < IA64_GRANULE_SHIFT
+# error "KERNEL_TR_PAGE_SHIFT < IA64_GRANULE_SHIFT shouldn't happen"
+#endif
+#if KERNEL_TR_PAGE_SHIFT > IA64_GRANULE_SHIFT
+	dep  r18=0,r16,0,KERNEL_TR_PAGE_SHIFT-IA64_GRANULE_SHIFT
+	;;
+#endif
+	cmp.eq p7,p0=r17,r18
+(p7)	br.cond.sptk	.reload_vhpt
 #else
 	mov r16=IA64_KR(CURRENT_STACK)
 #endif
@@ -535,6 +529,9 @@ ia64_reload_tr:
 #if VHPT_ENABLED
 	GET_VA_VCPU_VHPT_MADDR(r2,r3);;
 	dep r3=0,r2,0,KERNEL_TR_PAGE_SHIFT
+	;; 
+	dep r3=0,r3,60,4		// physical address of
+	                                // va_vhpt & ~(KERNEL_TR_PAGE_SHIFT - 1)
 	;;
 	shr.u r3=r3,IA64_GRANULE_SHIFT
 	;;
