@@ -75,6 +75,24 @@ unsigned long xenheap_size = XENHEAP_DEFAULT_SIZE;
 unsigned long xen_pstart;
 void *xen_pickle_offset __read_mostly;
 
+static void __init parse_xenheap_megabytes(char *s)
+{
+    unsigned long megabytes = parse_size_and_unit(s, NULL);
+
+#define XENHEAP_MEGABYTES_MIN   16
+    if (megabytes < XENHEAP_MEGABYTES_MIN)
+        megabytes = XENHEAP_MEGABYTES_MIN;
+
+#define XENHEAP_MEGABYTES_MAX   4096    /* need more? If so,
+                                           __pickle()/__unpickle() must be
+                                           revised. */
+    if (megabytes > XENHEAP_MEGABYTES_MAX)
+        megabytes = XENHEAP_MEGABYTES_MAX;
+
+    xenheap_size =  megabytes * 1024 * 1024;
+}
+custom_param("xenheap_megabytes", parse_xenheap_megabytes);
+
 static int __init
 xen_count_pages(u64 start, u64 end, void *arg)
 {
