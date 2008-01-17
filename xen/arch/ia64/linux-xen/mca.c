@@ -184,11 +184,14 @@ static ia64_state_log_t ia64_state_log[IA64_MAX_LOG_TYPES];
 #define IA64_LOG_ALLOCATE(it, size) \
 	do { \
 		unsigned int pageorder; \
+		struct page_info *page;	\
 		pageorder = get_order_from_bytes(size); \
+		page = alloc_domheap_pages(NULL, pageorder, 0); \
 		ia64_state_log[it].isl_log[IA64_LOG_CURR_INDEX(it)] = \
-		  (ia64_err_rec_t *)alloc_xenheap_pages(pageorder); \
+			page? (ia64_err_rec_t *)page_to_virt(page): NULL;  \
+		page = alloc_domheap_pages(NULL, pageorder, 0); \
 		ia64_state_log[it].isl_log[IA64_LOG_NEXT_INDEX(it)] = \
-		  (ia64_err_rec_t *)alloc_xenheap_pages(pageorder); \
+			page? (ia64_err_rec_t *)page_to_virt(page): NULL; \
 	} while(0)
 #endif
 
@@ -240,9 +243,11 @@ ia64_log_init(int sal_info_type)
 #ifdef XEN
 	if (sal_record == NULL) {
 		unsigned int pageorder;
+		struct page_info *page;
 		pageorder  = get_order_from_bytes(max_size);
-		sal_record = (sal_log_record_header_t *)
-		             alloc_xenheap_pages(pageorder);
+		page = alloc_domheap_pages(NULL, pageorder, 0);
+		BUG_ON(page == NULL);
+		sal_record = (sal_log_record_header_t *)page_to_virt(page);
 		BUG_ON(sal_record == NULL);
 	}
 #endif
@@ -1623,7 +1628,9 @@ ia64_mca_cpu_init(void *cpu_data)
 #endif
 		for (cpu = 0; cpu < NR_CPUS; cpu++) {
 #ifdef XEN
-			mca_data = alloc_xenheap_pages(pageorder);
+			struct page_info *page;
+			page = alloc_domheap_pages(NULL, pageorder, 0);
+			mca_data = page? page_to_virt(page): NULL;
 			__per_cpu_mca[cpu] = __pa(mca_data);
 			IA64_MCA_DEBUG("%s: __per_cpu_mca[%d]=%lx"
 			               "(mca_data[%d]=%lx)\n",
