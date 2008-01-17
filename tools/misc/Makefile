@@ -13,6 +13,10 @@ TARGETS-y := xenperf
 TARGETS-$(CONFIG_X86) += xen-detect
 TARGETS := $(TARGETS-y)
 
+SUBDIRS-$(CONFIG_LOMOUNT) += lomount
+SUBDIRS-$(CONFIG_MINITERM) += miniterm
+SUBDIRS := $(SUBDIRS-y)
+
 INSTALL_BIN  = $(TARGETS) xencons
 INSTALL_SBIN = netfix xm xen-bugtool xen-python-path xend xenperf xsview
 
@@ -21,8 +25,7 @@ all: build
 
 .PHONY: build
 build: $(TARGETS)
-	$(MAKE) -C miniterm
-	$(MAKE) -C lomount
+	set -e; for d in $(SUBDIRS); do $(MAKE) -C $$d; done
 
 .PHONY: install
 install: build
@@ -30,15 +33,12 @@ install: build
 	[ -d $(DESTDIR)/usr/sbin ] || $(INSTALL_DIR) $(DESTDIR)/usr/sbin
 	$(INSTALL_PROG) $(INSTALL_BIN) $(DESTDIR)/usr/bin
 	$(INSTALL_PROG) $(INSTALL_SBIN) $(DESTDIR)/usr/sbin
-	$(MAKE) -C lomount install
-#       No sense in installing miniterm on the Xen box.
-#	$(MAKE) -C miniterm install
+	set -e; for d in $(SUBDIRS); do $(MAKE) -C $$d install-recurse; done
 
 .PHONY: clean
 clean:
 	$(RM) *.o $(TARGETS) *~
-	$(MAKE) -C miniterm clean
-	$(MAKE) -C lomount clean
+	set -e; for d in $(SUBDIRS); do $(MAKE) -C $$d clean; done
 
 %.o: %.c $(HDRS) Makefile
 	$(CC) -c $(CFLAGS) -o $@ $<

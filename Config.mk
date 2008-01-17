@@ -88,5 +88,7 @@ XENSTAT_XENTOP     ?= y
 VTPM_TOOLS         ?= n
 LIBXENAPI_BINDINGS ?= n
 PYTHON_TOOLS       ?= y
+CONFIG_MINITERM    ?= n
+CONFIG_LOMOUNT     ?= n
 
 -include $(XEN_ROOT)/.config

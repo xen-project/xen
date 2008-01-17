@@ -15,7 +15,7 @@ all: build
 build: $(BIN)
 
 .PHONY: install
-install: build
+install install-recurse: build
 	$(INSTALL_PROG) $(BIN) $(SCRIPTS) $(DESTDIR)/usr/bin
 
 .PHONY: clean
