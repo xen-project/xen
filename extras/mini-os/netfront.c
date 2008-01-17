@@ -27,20 +27,6 @@ struct net_info {
 } net_info;
 
 
-char* xenbus_printf(xenbus_transaction_t xbt,
-        char* node,char* path,
-        char* fmt,unsigned int arg)
-{
-    char fullpath[256];
-    char val[256];
-
-    sprintf(fullpath,"%s/%s",node,path);
-    sprintf(val,fmt,arg);
-    xenbus_write(xbt,fullpath,val);
-
-    return NULL;
-}
-
 
 #define NET_TX_RING_SIZE __RING_SIZE((struct netif_tx_sring *)0, PAGE_SIZE)
 #define NET_RX_RING_SIZE __RING_SIZE((struct netif_rx_sring *)0, PAGE_SIZE)
