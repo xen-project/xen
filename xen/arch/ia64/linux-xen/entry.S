@@ -228,18 +228,18 @@ GLOBAL_ENTRY(ia64_switch_to)
 	mov IA64_KR(CURRENT)=in0	// update "current" application register
 #endif
 #ifdef XEN          //for VTI domain current is save to 21 of bank0
-    ;;
-    bsw.0
-    ;;
+	;;
+	bsw.0
+	;;
 	mov r8=r13			// return pointer to previously running task
 	mov r13=in0			// set "current" pointer
-    mov r21=in0
-    ;;
-    bsw.1
+	mov r21=in0
+	;;
+	bsw.1
 	;;
 #else
-    mov r8=r13          // return pointer to previously running task
-    mov r13=in0         // set "current" pointer
+	mov r8=r13          // return pointer to previously running task
+	mov r13=in0         // set "current" pointer
 #endif
 	DO_LOAD_SWITCH_STACK
 
