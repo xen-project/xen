@@ -30,6 +30,7 @@
 #include <xen/rcupdate.h>
 #include <xsm/acm/acm_hooks.h>
 #include <asm/sn/simulator.h>
+#include <linux/asm/sal.h>
 
 unsigned long xenheap_phys_end, total_pages;
 
@@ -455,6 +456,16 @@ void __init start_kernel(void)
     init_frametable();
 
     trap_init();
+
+    /* process SAL system table */
+    /* must be before any pal/sal call */
+    ia64_sal_init(efi.sal_systab);
+
+    /* early_setup_arch() maps PAL code. */
+    identify_vmx_feature();
+    /* If vmx feature is on, do necessary initialization for vmx */
+    if (vmx_enabled)
+        xen_heap_start = vmx_init_env(xen_heap_start, xenheap_phys_end);
 
     init_xenheap_pages(__pa(xen_heap_start), xenheap_phys_end);
     printk("Xen heap: %luMB (%lukB)\n",

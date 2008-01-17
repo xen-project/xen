@@ -29,7 +29,7 @@
 
 extern void identify_vmx_feature(void);
 extern unsigned int vmx_enabled;
-extern void vmx_init_env(void);
+extern void *vmx_init_env(void *start, unsigned long end_in_pa);
 extern int vmx_final_setup_guest(struct vcpu *v);
 extern void vmx_save_state(struct vcpu *v);
 extern void vmx_load_state(struct vcpu *v);

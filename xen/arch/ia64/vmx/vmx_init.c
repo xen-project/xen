@@ -56,7 +56,6 @@
 
 /* Global flag to identify whether Intel vmx feature is on */
 u32 vmx_enabled = 0;
-static u32 vm_order;
 static u64 buffer_size;
 static u64 vp_env_info;
 static u64 vm_buffer = 0;	/* Buffer required to bring up VMX feature */
@@ -97,8 +96,7 @@ identify_vmx_feature(void)
 	/* Does xen has ability to decode itself? */
 	if (!(vp_env_info & VP_OPCODE))
 		printk("WARNING: no opcode provided from hardware(%lx)!!!\n", vp_env_info);
-	vm_order = get_order(buffer_size);
-	printk("vm buffer size: %ld, order: %d\n", buffer_size, vm_order);
+	printk("vm buffer size: %ld\n", buffer_size);
 
 	vmx_enabled = 1;
 no_vti:
@@ -110,16 +108,33 @@ no_vti:
  * vsa_base is the indicator whether it's first LP to be initialized
  * for current domain.
  */ 
-void
-vmx_init_env(void)
+void*
+vmx_init_env(void *start, unsigned long end_in_pa)
 {
 	u64 status, tmp_base;
 
 	if (!vm_buffer) {
-		vm_buffer = (unsigned long)alloc_xenheap_pages(vm_order);
-		ASSERT(vm_buffer);
-		vm_buffer = virt_to_xenva((vm_buffer));
-		printk("vm_buffer: 0x%lx\n", vm_buffer);
+		/* VM buffer must must be 4K aligned and 
+		 * must be pinned by both itr and dtr. */
+#define VM_BUFFER_ALIGN		(4 * 1024)
+#define VM_BUFFER_ALIGN_UP(x)	(((x) + (VM_BUFFER_ALIGN - 1)) &    \
+                                 ~(VM_BUFFER_ALIGN - 1))
+		unsigned long s_vm_buffer =
+			VM_BUFFER_ALIGN_UP((unsigned long)start);
+		unsigned long e_vm_buffer = s_vm_buffer + buffer_size;
+		if (__pa(e_vm_buffer) < end_in_pa) {
+			init_xenheap_pages(__pa(start), __pa(s_vm_buffer));
+			start = (void*)e_vm_buffer;
+			vm_buffer = virt_to_xenva(s_vm_buffer);
+			printk("vm_buffer: 0x%lx\n", vm_buffer);
+		} else {
+			printk("Can't allocate vm_buffer "
+			       "start 0x%p end_in_pa 0x%lx "
+			       "buffer_size 0x%lx\n",
+			       start, end_in_pa, buffer_size);
+			vmx_enabled = 0;
+			return start;
+		}
 	}
 
 	status=ia64_pal_vp_init_env(__vsa_base ? VP_INIT_ENV : VP_INIT_ENV_INITALIZE,
@@ -129,7 +144,8 @@ vmx_init_env(void)
 
 	if (status != PAL_STATUS_SUCCESS) {
 		printk("ia64_pal_vp_init_env failed.\n");
-		return ;
+		vmx_enabled = 0;
+		return start;
 	}
 
 	if (!__vsa_base)
@@ -137,6 +153,7 @@ vmx_init_env(void)
 	else
 		ASSERT(tmp_base == __vsa_base);
 
+	return start;
 }
 
 typedef union {

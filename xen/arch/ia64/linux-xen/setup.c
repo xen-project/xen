@@ -561,10 +561,10 @@ late_setup_arch (char **cmdline_p)
 #endif
 #ifndef XEN
 	find_memory();
-#endif
 
 	/* process SAL system table: */
 	ia64_sal_init(efi.sal_systab);
+#endif
 
 #ifdef CONFIG_SMP
 #ifdef XEN
@@ -585,10 +585,6 @@ late_setup_arch (char **cmdline_p)
 		printk(KERN_INFO
 		       "cpu package is Multi-Threading capable: number of siblings=%d\n",
 		       smp_num_siblings);
-#endif
-
-#ifdef XEN
-	identify_vmx_feature();
 #endif
 
 	cpu_init();	/* initialize the bootstrap CPU */
@@ -803,12 +799,6 @@ identify_cpu (struct cpuinfo_ia64 *c)
 	}
 	c->unimpl_va_mask = ~((7L<<61) | ((1L << (impl_va_msb + 1)) - 1));
 	c->unimpl_pa_mask = ~((1L<<63) | ((1L << phys_addr_size) - 1));
-
-#ifdef XEN
-	/* If vmx feature is on, do necessary initialization for vmx */
-	if (vmx_enabled)
-		vmx_init_env();
-#endif
 }
 
 void
