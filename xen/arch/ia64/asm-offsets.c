@@ -253,9 +253,8 @@ void foo(void)
 	DEFINE(IA64_MCA_CPU_RBSTORE_OFFSET,
 	       offsetof(struct ia64_mca_cpu, rbstore));
 
-	DEFINE(IA64_DOMAIN_FLAGS_OFFSET,
-	       offsetof(struct domain, arch.flags));
-
+	DEFINE(IA64_VCPU_VHPT_PAGE_OFFSET,
+	       offsetof(struct vcpu, arch.vhpt_page));
 	DEFINE(IA64_VCPU_VHPT_MADDR_OFFSET,
 	       offsetof(struct vcpu, arch.vhpt_maddr));
 

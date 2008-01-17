@@ -196,13 +196,9 @@
 	add reg=IA64_KR_CURRENT_OFFSET,reg;;			\
 	ld8 reg=[reg];;						\
 	dep tmp=0,reg,60,4;;			/* V to P */	\
-	add tmp=IA64_VCPU_DOMAIN_OFFSET,tmp;;			\
+	add tmp=IA64_VCPU_VHPT_PAGE_OFFSET,tmp;;		\
 	ld8 tmp=[tmp];;						\
-	dep tmp=0,tmp,60,4;;			/* V to P */	\
-	add tmp=IA64_DOMAIN_FLAGS_OFFSET,tmp;;			\
-	ld8 tmp=[tmp];;						\
-	and tmp=HAS_PERVCPU_VHPT_MASK,tmp;;			\
-	cmp.eq p6,p0=tmp,r0;					\
+	cmp.eq p6,p0=tmp,r0;	/* v->arch.vhpt_page == NULL */	\
 (p6)	br.cond.sptk 1f;					\
 	add reg=IA64_VCPU_VHPT_MADDR_OFFSET,reg;;		\
 	dep reg=0,reg,60,4;;			/* V to P */	\
