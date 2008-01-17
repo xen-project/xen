@@ -135,7 +135,7 @@ root = "/dev/hda1 ro"
 # Root device for nfs.
 #root = "/dev/nfs"
 # The nfs server.
-#nfs_server = '169.254.1.0'  
+#nfs_server = '192.0.2.1'  
 # Root directory on the nfs server.
 #nfs_root   = '/full/path/to/root/directory'
 

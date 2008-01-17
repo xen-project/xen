@@ -56,24 +56,24 @@ else
 fi
 
 # Network needs to know ips to use: dhcp or a range of IPs in the form
-# of: 192.168.1.1-192.168.1.100
+# of: 192.0.2.1-192.0.2.100
 # If not dhcp, a netmask and network address must be supplied. Defaults to
-# zeroconf range.
-NET_IP_RANGE="169.254.0.1-169.254.255.255"
+# range allocated in www.ucam.org/cam-grin.
+NET_IP_RANGE="172.30.206.1-172.30.206.254"
 AC_ARG_WITH(net-ip-range,
-	[  --with-net-ip-range=ip-range	Set a range of ip addresses to use for xm-test guest domain networks. Can specify dhcp or a range of IPs: 192.168.1.1-192.168.1.100 [[default="169.254.0.1-169.254.255.255"]]],
+	[  --with-net-ip-range=ip-range	Set a range of ip addresses to use for xm-test guest domain networks. Can specify dhcp or a range of IPs: 192.0.2.1-192.0.2.100 [[default="172.30.206.1-172.30.206.254"]]],
 	[ NET_IP_RANGE="$withval" ])
 
 iprange=`echo $NET_IP_RANGE | perl -e 'while(<>) { print if /\d+\.\d+\.\d+\.\d+-\d+\.\d+\.\d+\.\d+/ }'`
 
-NETWORK_ADDRESS="169.254.0.0"
+NETWORK_ADDRESS="172.30.206.0"
 AC_ARG_WITH(network-address,
-	[ --with-network-address=ip Set network address to use with ip range [[default="169.254.0.0"]]],
+	[ --with-network-address=ip Set network address to use with ip range [[default="172.30.206.0"]]],
 	[ NETWORK_ADDRESS="$withval" ])
 
-NETMASK="255.255.0.0"
+NETMASK="255.255.255.0"
 AC_ARG_WITH(netmask,
-	[ --with-netmask=mask Set netmask to use with ip range [[default="255.255.0.0"]]],
+	[ --with-netmask=mask Set netmask to use with ip range [[default="255.255.255.0"]]],
 	[ NETMASK="$withval" ])
 
 if test "x$NET_IP_RANGE" != "xdhcp" && test -z "$iprange"

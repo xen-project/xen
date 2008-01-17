@@ -39,18 +39,18 @@ if status:
 # Configure IP addresses on two domains
 try:
     # Run 'ls'
-    run = console1.runCmd("ifconfig eth0 192.168.0.1 netmask 255.255.255.0 up")
-    run = console2.runCmd("ifconfig eth0 192.168.0.2 netmask 255.255.255.0 up")
+    run = console1.runCmd("ifconfig eth0 172.30.206.1 netmask 255.255.255.0 up")
+    run = console2.runCmd("ifconfig eth0 172.30.206.2 netmask 255.255.255.0 up")
 except ConsoleError, e:
     saveLog(console.getHistory())
     FAIL(str(e))
 
 # Now ping...
 try:
-    run = console1.runCmd("ping -c 4 192.168.0.2")
+    run = console1.runCmd("ping -c 4 172.30.206.2")
     if run['return'] > 0:
         FAIL("Could not ping other host")
-    run = console2.runCmd("ping -c 4 192.168.0.1")
+    run = console2.runCmd("ping -c 4 172.30.206.1")
     if run['return'] > 0:
         FAIL("Could not pint other host")
 except ConsoleError, e:

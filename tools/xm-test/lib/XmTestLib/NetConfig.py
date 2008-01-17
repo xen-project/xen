@@ -69,12 +69,6 @@ def getXendNetConfig():
     configfile.close()
     return netenv
 
-def checkZeroconfAddresses():
-    # Make sure there aren't existing zeroconf addresses.
-    rc, out = traceCommand("ip addr show |grep \"inet 169.254\" | grep eth0")
-    if rc == 0:
-        raise NetworkError("Zeroconf addresses already used: %s" % out)
-
 class NetConfig:
 
     def __init__(self):
@@ -100,9 +94,6 @@ class NetConfig:
             self.min_ip = ips[0]
 
             self.__setMaxNumberIPs()
-
-            if self.network == "169.254.0.0":
-                checkZeroconfAddresses()
 
             # Clean out any aliases in the network range for dom0's interface.
             # If an alias exists, a test xendevice add command could fail.

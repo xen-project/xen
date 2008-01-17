@@ -68,7 +68,7 @@ vcpus = 4
 disk = ['phy:/dev/virt-blkdev-backend/dom1,sda1,w',
 'phy:/dev/virt-blkdev-backend/usr,sda2,r']
 root = "/dev/sda1 ro"
-extra = " profile=1 GATEWAY=10.0.1.254 NETMASK=255.255.0.0 IPADDR=10.0.134.1 HOSTNAME=dom1"
+extra = " profile=1 GATEWAY=192.0.2.254 NETMASK=255.255.255.0 IPADDR=192.0.2.1 HOSTNAME=dom1"
 on_poweroff = 'destroy'
 on_reboot   = 'destroy'
 on_crash    = 'destroy'
@@ -83,7 +83,7 @@ on_crash    = 'destroy'
                  'vcpus'       : 4,
                  'nics'        : -1,
                  'root'        : '/dev/sda1 ro',
-                 'extra'       : ' profile=1 GATEWAY=10.0.1.254 NETMASK=255.255.0.0 IPADDR=10.0.134.1 HOSTNAME=dom1',
+                 'extra'       : ' profile=1 GATEWAY=192.0.2.254 NETMASK=255.255.255.0 IPADDR=192.0.2.1 HOSTNAME=dom1',
                  'on_poweroff' : 'destroy',
                  'on_reboot'   : 'destroy',
                  'on_crash'    : 'destroy',

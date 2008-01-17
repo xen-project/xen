@@ -48,9 +48,9 @@ The vnet devices are fully-functional network devices, so you can add IP address
 to them and test connectivity without any vms running.
 For example, using vnif0004 on machines A and B:
 
-        A> ifconfig vnif0004 10.0.0.11
-        B> ifconfig vnif0004 10.0.0.12
-        B> ping 10.0.0.11
+        A> ifconfig vnif0004 192.0.2.11
+        B> ifconfig vnif0004 192.0.2.12
+        B> ping 192.0.2.11
 
 If the vnet device is enslaved to a bridge you will have to add the IP address
 to the bridge instead. Use C<brctl show> or C<vn vnets> to see if a vnet

@@ -886,7 +886,7 @@ def preprocess_access_control(vals):
 
 def preprocess_ip(vals):
     if vals.ip or vals.dhcp != 'off':
-        dummy_nfs_server = '1.2.3.4'
+        dummy_nfs_server = '127.0.255.255'
         ip = (vals.ip
           + ':' + (vals.nfs_server or dummy_nfs_server)
           + ':' + vals.gateway

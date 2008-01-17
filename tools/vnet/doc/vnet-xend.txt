@@ -108,19 +108,19 @@ Its bridge and interface should appear in 'ifconfig'.
 It should also show in 'brctl show', with its attached interfaces.
 
 You can 'see into' a vnet from dom0 if you put an IP address on the bridge.
-For example, if you have vnet97 and a vm with ip addr 10.0.0.12 connected to it,
+For example, if you have vnet97 and a vm with ip addr 192.0.2.12 connected to it,
 then
 
-ifconfig vnet97 10.0.0.20 up
+ifconfig vnet97 192.0.2.20 up
 
-should let you ping 10.0.0.12 via the vnet97 bridge.
+should let you ping 192.0.2.12 via the vnet97 bridge.
 
 4) Examples
 -----------
 
 These assume a vnet with a bridge 'vnet97' has been created.
 
-Here's the full config for a vm on vnet 97, using ip addr 10.0.0.12:
+Here's the full config for a vm on vnet 97, using ip addr 192.0.2.12:
 
 (vm
  (name dom12)
@@ -130,7 +130,7 @@ Here's the full config for a vm on vnet 97, using ip addr 10.0.0.12:
  (image
   (linux
    (kernel /boot/vmlinuz-2.6-xenU)
-   (ip 10.0.0.12:1.2.3.4::::eth0:off)
+   (ip 192.0.2.12:192.0.2.4::::eth0:off)
    (root /dev/sda1)
    (args 'rw fastboot 4')
   )
@@ -149,7 +149,7 @@ If you run another vm on the same vnet:
  (image
   (linux
    (kernel /boot/vmlinuz-2.6-xenU)
-   (ip 10.0.0.11:1.2.3.4::::eth0:off)
+   (ip 192.0.2.11:192.0.2.4::::eth0:off)
    (root /dev/sda1)
    (args 'rw fastboot 4')
   )

@@ -104,12 +104,14 @@ routing environments in the future, the current xm-test only supports
 a bridging environment. Xm-test currently only supports a range of
 IPs, the dhcp feature will be added soon.
 
-The network tests will need to know what IPs to use. IPs are configured
-when you build xm-test. Xm-test uses the zeroconf address range by
-default, 169.254.0.1-169.254.255.255. If you'd like to set a new range,
-do so at configure time, a netmask and network address must also be defined:
+The network tests will need to know what IPs to use. IPs are
+configured when you build xm-test. Xm-test by default a range chosen
+at random from the RFC1918 private use space, and published at
+www.ucam.org/cam-grin, 172.30.206.1-172.30.206.254 from
+172.30.206.0/24. If you'd like to set a new range, do so at configure
+time, a netmask and network address must also be defined:
 
-    # ./configure --with-net-ip-range=192.168.1.1-192.168.1.100 --with-network-address=192.168.1.0 --with-netmask=255.255.255.0
+    # ./configure --with-net-ip-range=192.0.2.1-192.0.2.100 --with-network-address=192.0.2.0 --with-netmask=255.255.255.0
 
 The tests will not need to set network information, this is done by 
 the library once it's configured.

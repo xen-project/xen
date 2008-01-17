@@ -43,9 +43,9 @@ fi
 
 function dhcp_start()
 {
-  if ! grep -q "subnet 10.0.0.0" "$dhcpd_conf_file"
+  if ! grep -q "subnet 192.0.2.0" "$dhcpd_conf_file"
   then
-    echo >>"$dhcpd_conf_file" "subnet 10.0.0.0 netmask 255.255.0.0 {}"
+    echo >>"$dhcpd_conf_file" "subnet 192.0.2.0 netmask 255.255.255.0 {}"
   fi
 
   "$dhcpd_init_file" restart
@@ -55,7 +55,7 @@ function dhcp_start()
 function dhcp_stop()
 {
   local tmpfile=$(mktemp)
-  grep -v "subnet 10.0.0.0" "$dhcpd_conf_file" >"$tmpfile"
+  grep -v "subnet 192.0.2.0" "$dhcpd_conf_file" >"$tmpfile"
   if diff "$tmpfile" "$dhcpd_conf_file" >&/dev/null
   then
     rm "$tmpfile"

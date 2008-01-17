@@ -1807,7 +1807,7 @@ network by adding a line to \path{/etc/exports}, for instance:
 \begin{quote}
   \begin{small}
 \begin{verbatim}
-/export/vm1root      1.2.3.4/24 (rw,sync,no_root_squash)
+/export/vm1root      192.0.2.4/24 (rw,sync,no_root_squash)
 \end{verbatim}
   \end{small}
 \end{quote}
@@ -2076,7 +2076,7 @@ iptables -A INPUT -p tcp --destination-port 8002 -j REJECT
 
 # this command enables Xen relocations only from the specific
 # subnet:
-iptables -I INPUT -p tcp -{}-source 192.168.1.1/8 \
+iptables -I INPUT -p tcp -{}-source 192.0.2.0/24 \
     --destination-port 8002 -j ACCEPT
 \end{verbatim}
 
@@ -5121,9 +5121,9 @@ vnets are working by configuring IP addresses on these interfaces
 and trying to ping them across the network. For example, using machines
 hostA and hostB:
 \begin{verbatim}
-hostA# ifconfig vnif0004 10.0.0.100 up
-hostB# ifconfig vnif0004 10.0.0.101 up
-hostB# ping 10.0.0.100
+hostA# ifconfig vnif0004 192.0.2.100 up
+hostB# ifconfig vnif0004 192.0.2.101 up
+hostB# ping 192.0.2.100
 \end{verbatim}
 
 The vnet implementation uses IP multicast to discover vnet interfaces, so
@@ -5144,8 +5144,8 @@ on the vnet UDP port:
 \end{verbatim}
 
 If multicast is not being forwarded between machines you can configure
-multicast forwarding using vn. Suppose we have machines hostA on 10.10.0.100
-and hostB on 10.11.0.100 and that multicast is not forwarded between them.
+multicast forwarding using vn. Suppose we have machines hostA on 192.0.2.200
+and hostB on 192.0.2.211 and that multicast is not forwarded between them.
 We use vn to configure each machine to forward to the other:
 \begin{verbatim}
 hostA# vn peer-add hostB

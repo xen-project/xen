@@ -48,11 +48,11 @@ try:
     if run["return"] != 0:
         FAIL("Unable to write to block device hdb2!")
 
-    run = console.runCmd("ifconfig eth0 169.254.0.1 netmask 255.255.255.0")
+    run = console.runCmd("ifconfig eth0 172.30.206.1 netmask 255.255.255.240")
     if run["return"] != 0:
         FAIL("Unable to configure DomU's eth0")
 
-    run = console.runCmd("ifconfig eth1 169.254.1.1 netmask 255.255.255.0")
+    run = console.runCmd("ifconfig eth1 172.30.206.17 netmask 255.255.255.240")
     if run["return"] != 0:
         FAIL("Unable to configure DomU's eth1")
 
@@ -114,11 +114,11 @@ try:
     run = console.runCmd("ifconfig")
     if not re.search("eth0", run["output"]):
         FAIL("DomU's eth0 disappeared")
-    if not re.search("169.254.0.1", run["output"]):
+    if not re.search("172.30.206.1", run["output"]):
         FAIL("DomU's eth0 lost its IP")
     if not re.search("eth1", run["output"]):
         FAIL("DomU's eth1 disappeared")
-    if not re.search("169.254.1.1", run["output"]):
+    if not re.search("172.30.206.17", run["output"]):
         FAIL("DomU's eth1 lost its IP")
     if not re.search("Loopback", run["output"]):
         FAIL("DomU's lo disappeared")

@@ -103,10 +103,10 @@ class CreatePage4( Sheet ):
         Sheet.__init__( self, urlWriter, "Network settings", 4 )
         self.addControl( ListControl( 'dhcp', [('off', 'No'), ('dhcp', 'Yes')], 'Use DHCP:' ) )
         self.addControl( InputControl( 'hostname', 'hostname', 'VM Hostname:' ) )
-        self.addControl( InputControl( 'ip_addr', '1.2.3.4', 'VM IP Address:' ) )
+        self.addControl( InputControl( 'ip_addr', '192.168.1.1', 'VM IP Address:' ) )
         self.addControl( InputControl( 'ip_subnet', '255.255.255.0', 'VM Subnet Mask:' ) ) 
-        self.addControl( InputControl( 'ip_gateway', '1.2.3.4', 'VM Gateway:' ) )           
-        self.addControl( InputControl( 'ip_nfs', '1.2.3.4', 'NFS Server:' ) )  
+        self.addControl( InputControl( 'ip_gateway', '192.168.1.1', 'VM Gateway:' ) )           
+        self.addControl( InputControl( 'ip_nfs', '192.168.1.1', 'NFS Server:' ) )  
                  
 class CreateFinish( Sheet ):
 
