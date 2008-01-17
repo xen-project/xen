@@ -16,11 +16,6 @@
 #
 
 
-# On SuSE it is necessary to run a command before transfering addresses and
-# routes from the physical interface to the virtual.  This command creates a
-# variable $HWD_CONFIG_0 that specifies the appropriate configuration for
-# ifup.
-
 # Gentoo doesn't have ifup/ifdown, so we define appropriate alternatives.
 
 # Other platforms just use ifup / ifdown directly.
@@ -32,17 +27,7 @@
 #           that the virtual device will take once the physical device has
 #           been renamed.
 
-if [ -e /etc/SuSE-release ]
-then
-  preiftransfer()
-  {
-    eval `/sbin/getcfg -d /etc/sysconfig/network/ -f ifcfg- -- $1`
-  }
-  ifup()
-  {
-    /sbin/ifup ${HWD_CONFIG_0} $1
-  }
-elif ! which ifup >/dev/null 2>/dev/null
+if ! which ifup >/dev/null 2>/dev/null
 then
   preiftransfer()
   {
