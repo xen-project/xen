@@ -335,6 +335,10 @@ vmx_load_state(struct vcpu *v)
 	u64 status;
 
 	BUG_ON(v != current);
+
+	vmx_load_all_rr(v);
+
+	/* vmx_load_all_rr() pins down v->arch.privregs with both dtr/itr*/
 	status = ia64_pal_vp_restore((u64 *)v->arch.privregs, 0);
 	if (status != PAL_STATUS_SUCCESS){
 		panic_domain(vcpu_regs(v),"Restore vp status failed\n");
@@ -350,6 +354,8 @@ vmx_load_state(struct vcpu *v)
 	ia64_set_kr(7, v->arch.arch_vmx.vkr[7]);
 	/* Guest vTLB is not required to be switched explicitly, since
 	 * anchored in vcpu */
+
+	migrate_timer(&v->arch.arch_vmx.vtm.vtm_timer, v->processor);
 }
 
 static int
@@ -602,9 +608,7 @@ void vmx_do_resume(struct vcpu *v)
 {
 	ioreq_t *p;
 
-	vmx_load_all_rr(v);
 	vmx_load_state(v);
-	migrate_timer(&v->arch.arch_vmx.vtm.vtm_timer, v->processor);
 
 	/* stolen from hvm_do_resume() in arch/x86/hvm/hvm.c */
 	/* NB. Optimised for common case (p->state == STATE_IOREQ_NONE). */

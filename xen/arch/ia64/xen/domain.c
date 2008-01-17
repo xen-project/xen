@@ -78,16 +78,6 @@ DEFINE_PER_CPU(struct vcpu *, fp_owner);
 
 #include <xen/sched-if.h>
 
-static void
-ia64_disable_vhpt_walker(void)
-{
-	// disable VHPT. ia64_new_rr7() might cause VHPT
-	// fault without this because it flushes dtr[IA64_TR_VHPT]
-	// (VHPT_SIZE_LOG2 << 2) is just for avoid
-	// Reserved Register/Field fault.
-	ia64_set_pta(VHPT_SIZE_LOG2 << 2);
-}
-
 static void flush_vtlb_for_context_switch(struct vcpu* prev, struct vcpu* next)
 {
 	int cpu = smp_processor_id();
@@ -165,6 +155,21 @@ static void flush_cache_for_context_switch(struct vcpu *next)
 	}
 }
 
+static void set_current_psr_i_addr(struct vcpu* v)
+{
+	__ia64_per_cpu_var(current_psr_i_addr) =
+		(uint8_t*)(v->domain->arch.shared_info_va +
+			   INT_ENABLE_OFFSET(v));
+	__ia64_per_cpu_var(current_psr_ic_addr) = (int *)
+		(v->domain->arch.shared_info_va + XSI_PSR_IC_OFS);
+}
+
+static void clear_current_psr_i_addr(void)
+{
+	__ia64_per_cpu_var(current_psr_i_addr) = NULL;
+	__ia64_per_cpu_var(current_psr_ic_addr) = NULL;
+}
+
 static void lazy_fp_switch(struct vcpu *prev, struct vcpu *next)
 {
 	/*
@@ -196,26 +201,28 @@ static void lazy_fp_switch(struct vcpu *prev, struct vcpu *next)
 	}
 }
 
+static void load_state(struct vcpu *v)
+{
+	load_region_regs(v);
+	ia64_set_pta(vcpu_pta(v));
+	vcpu_load_kernel_regs(v);
+	if (vcpu_pkr_in_use(v))
+		vcpu_pkr_load_regs(v);
+	set_current_psr_i_addr(v);
+}
+
 void schedule_tail(struct vcpu *prev)
 {
 	extern char ia64_ivt;
 
 	context_saved(prev);
-	ia64_disable_vhpt_walker();
 
 	if (VMX_DOMAIN(current))
 		vmx_do_resume(current);
 	else {
 		if (VMX_DOMAIN(prev))
 			ia64_set_iva(&ia64_ivt);
-		load_region_regs(current);
-		ia64_set_pta(vcpu_pta(current));
-		vcpu_load_kernel_regs(current);
-		__ia64_per_cpu_var(current_psr_i_addr) =
-			(uint8_t*)(current->domain->arch.shared_info_va +
-				   INT_ENABLE_OFFSET(current));
-		__ia64_per_cpu_var(current_psr_ic_addr) = (int *)
-		  (current->domain->arch.shared_info_va + XSI_PSR_IC_OFS);
+		load_state(current);
 		migrate_timer(&current->arch.hlt_timer, current->processor);
 	}
 	flush_vtlb_for_context_switch(prev, current);
@@ -242,7 +249,6 @@ void context_switch(struct vcpu *prev, struct vcpu *next)
         }
     }
 
-    ia64_disable_vhpt_walker();
     lazy_fp_switch(prev, current);
 
     if (prev->arch.dbg_used || next->arch.dbg_used) {
@@ -253,37 +259,31 @@ void context_switch(struct vcpu *prev, struct vcpu *next)
         ia64_load_debug_regs(next->arch.dbr);
     }
     
+    /*
+     * disable VHPT walker.
+     * ia64_switch_to() might cause VHPT fault because it flushes
+     * dtr[IA64_TR_VHPT] and reinsert the mapping with dtr[IA64_TR_STACK].
+     * (VHPT_SIZE_LOG2 << 2) is just for avoiding
+     * Reserved Register/Field fault.
+     */
+    ia64_set_pta(VHPT_SIZE_LOG2 << 2);
     prev = ia64_switch_to(next);
 
     /* Note: ia64_switch_to does not return here at vcpu initialization.  */
 
     if (VMX_DOMAIN(current)) {
-        vmx_load_all_rr(current);
         vmx_load_state(current);
-        migrate_timer(&current->arch.arch_vmx.vtm.vtm_timer,
-                      current->processor);
     } else {
-        struct domain *nd;
         extern char ia64_ivt;
 
         if (VMX_DOMAIN(prev))
             ia64_set_iva(&ia64_ivt);
 
-        nd = current->domain;
-        if (!is_idle_domain(nd)) {
-            load_region_regs(current);
-            ia64_set_pta(vcpu_pta(current));
-            vcpu_load_kernel_regs(current);
-            if (vcpu_pkr_in_use(current))
-                vcpu_pkr_load_regs(current);
+        if (!is_idle_vcpu(current)) {
+            load_state(current);
             vcpu_set_next_timer(current);
             if (vcpu_timer_expired(current))
                 vcpu_pend_timer(current);
-	    __ia64_per_cpu_var(current_psr_i_addr) =
-		    (uint8_t*)(nd->arch.shared_info_va +
-			       INT_ENABLE_OFFSET(current));
-            __ia64_per_cpu_var(current_psr_ic_addr) =
-                (int *)(nd->arch.shared_info_va + XSI_PSR_IC_OFS);
             /* steal time accounting */
             if (!guest_handle_is_null(runstate_guest(current)))
                 __copy_to_guest(runstate_guest(current), &current->runstate, 1);
@@ -292,8 +292,7 @@ void context_switch(struct vcpu *prev, struct vcpu *next)
              * walker. Then all accesses happen within idle context will
              * be handled by TR mapping and identity mapping.
              */
-            __ia64_per_cpu_var(current_psr_i_addr) = NULL;
-            __ia64_per_cpu_var(current_psr_ic_addr) = NULL;
+	     clear_current_psr_i_addr();
         }
     }
     local_irq_restore(spsr);
@@ -1710,12 +1709,10 @@ domain_set_shared_info_va (unsigned long va)
 
 	VCPU(v, interrupt_mask_addr) = (unsigned char *)va +
 	                               INT_ENABLE_OFFSET(v);
-
-	__ia64_per_cpu_var(current_psr_i_addr) =
-		(uint8_t*)(va + INT_ENABLE_OFFSET(current));
-	__ia64_per_cpu_var(current_psr_ic_addr) = (int *)(va + XSI_PSR_IC_OFS);
+	set_current_psr_i_addr(v);
 
 	/* Remap the shared pages.  */
+	BUG_ON(VMX_DOMAIN(v));
 	rc = !set_one_rr(7UL << 61, PSCB(v,rrs[7]));
 	BUG_ON(rc);
 
