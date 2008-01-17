@@ -416,13 +416,13 @@ xen_call_(xen_session *s, const char *method_name,
           abstract_value params[], int param_count,
           const abstract_type *result_type, void *value)
 {
+    abstract_value *full_params;
     if (!s->ok)
     {
         return;
     }
 
-    abstract_value *full_params =
-        malloc(sizeof(abstract_value) * (param_count + 1));
+    full_params = malloc(sizeof(abstract_value) * (param_count + 1));
 
     full_params[0].type = &abstract_type_string;
     full_params[0].u.string_val = s->session_id;
@@ -475,13 +475,14 @@ call_raw(xen_session *s, const char *method_name,
 
 static void server_error(xen_session *session, const char *error_string)
 {
+    char **strings;
     if (!session->ok)
     {
         /* Don't wipe out the earlier error message with this one. */
         return;
     }
 
-    char **strings = malloc(2 * sizeof(char *));
+    strings = malloc(2 * sizeof(char *));
 
     strings[0] = xen_strdup_("SERVER_FAULT");
     strings[1] = xen_strdup_(error_string);
@@ -495,13 +496,14 @@ static void server_error(xen_session *session, const char *error_string)
 static void server_error_2(xen_session *session, const char *error_string,
                            const char *param)
 {
+    char **strings;
     if (!session->ok)
     {
         /* Don't wipe out the earlier error message with this one. */
         return;
     }
 
-    char **strings = malloc(3 * sizeof(char *));
+    strings = malloc(3 * sizeof(char *));
 
     strings[0] = xen_strdup_("SERVER_FAULT_2");
     strings[1] = xen_strdup_(error_string);
@@ -791,17 +793,17 @@ static void parse_into(xen_session *s, xmlNode *value_node,
         }
         else
         {
-            xmlNode *data_node = value_node->children->children;
-            int n = count_children(data_node, "value");
+            arbitrary_set *set;
+            xmlNode *cur, *data_node = value_node->children->children;
+            int i, n = count_children(data_node, "value");
 
             const abstract_type *member_type = result_type->child;
             size_t member_size = size_of_member(member_type);
 
-            arbitrary_set *set =
-                calloc(1, sizeof(arbitrary_set) + member_size * n);
+            set = calloc(1, sizeof(arbitrary_set) + member_size * n);
             set->size = n;
-            int i = 0;
-            xmlNode *cur = data_node->children;
+            i = 0;
+            cur = data_node->children;
 
             while (cur != NULL)
             {
@@ -829,24 +831,25 @@ static void parse_into(xen_session *s, xmlNode *value_node,
         }
         else
         {
-            xmlNode *struct_node = value_node->children;
-            int n = count_children(struct_node, "member");
+            arbitrary_map *map;
+            xmlNode *cur, *struct_node = value_node->children;
+            int i, n = count_children(struct_node, "member");
 
             size_t struct_size = result_type->struct_size;
 
             const struct struct_member *key_member = result_type->members;
             const struct struct_member *val_member = result_type->members + 1;
 
-            arbitrary_map *map =
-                calloc(1, sizeof(arbitrary_map) + struct_size * n);
+            map = calloc(1, sizeof(arbitrary_map) + struct_size * n);
             map->size = n;
-            int i = 0;
-            xmlNode *cur = struct_node->children;
+            i = 0;
+            cur = struct_node->children;
 
             while (cur != NULL)
             {
                 if (0 == strcmp((char *)cur->name, "member"))
                 {
+                    xmlChar *name;
                     if (cur->children == NULL || cur->last == cur->children)
                     {
                         server_error(s, "Malformed Map");
@@ -854,7 +857,7 @@ static void parse_into(xen_session *s, xmlNode *value_node,
                         return;
                     }
 
-                    xmlChar *name = string_from_name(cur);
+                    name = string_from_name(cur);
                     if (name == NULL)
                     {
                         server_error(s, "Malformed Map");
@@ -919,6 +922,7 @@ static void parse_into(xen_session *s, xmlNode *value_node,
             {
                 if (0 == strcmp((char *)cur->name, "member"))
                 {
+                    xmlChar *name;
                     if (cur->children == NULL || cur->last == cur->children)
                     {
                         server_error(s, "Malformed Struct");
@@ -927,7 +931,7 @@ static void parse_into(xen_session *s, xmlNode *value_node,
                         return;
                     }
 
-                    xmlChar *name = string_from_name(cur);
+                    name = string_from_name(cur);
                     if (name == NULL)
                     {
                         server_error(s, "Malformed Struct");
@@ -1075,6 +1079,10 @@ static void parse_structmap_value(xen_session *s, xmlNode *n,
 
 static void parse_fault(xen_session *session, xmlXPathContextPtr xpathCtx)
 {
+    xmlNode *fault_node0, *fault_node1;
+    xmlChar *fault_code_str, *fault_string_str;
+    char **strings;
+
     xmlXPathObjectPtr xpathObj = xmlXPathCompiledEval(faultPath, xpathCtx);
     if (xpathObj == NULL)
     {
@@ -1090,10 +1098,10 @@ static void parse_fault(xen_session *session, xmlXPathContextPtr xpathCtx)
         return;
     }
 
-    xmlNode *fault_node0 = xpathObj->nodesetval->nodeTab[0];
-    xmlNode *fault_node1 = xpathObj->nodesetval->nodeTab[1];
+    fault_node0 = xpathObj->nodesetval->nodeTab[0];
+    fault_node1 = xpathObj->nodesetval->nodeTab[1];
 
-    xmlChar *fault_code_str = string_from_value(fault_node0, "int");
+    fault_code_str = string_from_value(fault_node0, "int");
     if (fault_code_str == NULL)
     {
         fault_code_str = string_from_value(fault_node0, "i4");
@@ -1105,7 +1113,7 @@ static void parse_fault(xen_session *session, xmlXPathContextPtr xpathCtx)
         return;
     }
 
-    xmlChar *fault_string_str = string_from_value(fault_node1, "string");
+    fault_string_str = string_from_value(fault_node1, "string");
     if (fault_string_str == NULL)
     {
         xmlFree(fault_code_str);
@@ -1114,7 +1122,7 @@ static void parse_fault(xen_session *session, xmlXPathContextPtr xpathCtx)
         return;
     }
 
-    char **strings = malloc(3 * sizeof(char *));
+    strings = malloc(3 * sizeof(char *));
 
     strings[0] = xen_strdup_("FAULT");
     strings[1] = xen_strdup_((char *)fault_code_str);
@@ -1142,12 +1150,15 @@ static void parse_failure(xen_session *session, xmlNode *node)
 
     if (session->ok)
     {
+        char **c, **strings;
+        int n;
+
         session->ok = false;
 
-        char **c = (char **)error_descriptions->contents;
-        int n = error_descriptions->size;
+        c = (char **)error_descriptions->contents;
+        n = error_descriptions->size;
 
-        char **strings = malloc(n * sizeof(char *));
+        strings = malloc(n * sizeof(char *));
         for (int i = 0; i < n; i++)
         {
             strings[i] = c[i];
@@ -1169,6 +1180,10 @@ static void parse_result(xen_session *session, const char *result,
 {
     xmlDocPtr doc =
         xmlReadMemory(result, strlen(result), "", NULL, XML_PARSE_NONET);
+    xmlXPathContextPtr xpathCtx;
+    xmlXPathObjectPtr xpathObj;
+    xmlNode *node0, *node1;
+    xmlChar *status_code;
 
     if (doc == NULL)
     {
@@ -1176,7 +1191,7 @@ static void parse_result(xen_session *session, const char *result,
         return;
     }
 
-    xmlXPathContextPtr xpathCtx = xmlXPathNewContext(doc);
+    xpathCtx = xmlXPathNewContext(doc);
     if (xpathCtx == NULL)
     {
         xmlFreeDoc(doc);
@@ -1184,8 +1199,7 @@ static void parse_result(xen_session *session, const char *result,
         return;
     }
 
-    xmlXPathObjectPtr xpathObj =
-        xmlXPathCompiledEval(responsePath, xpathCtx);
+    xpathObj = xmlXPathCompiledEval(responsePath, xpathCtx);
     if (xpathObj == NULL)
     {
         parse_fault(session, xpathCtx);
@@ -1206,10 +1220,10 @@ static void parse_result(xen_session *session, const char *result,
         return;
     }
 
-    xmlNode *node0 = xpathObj->nodesetval->nodeTab[0];
-    xmlNode *node1 = xpathObj->nodesetval->nodeTab[1];
+    node0 = xpathObj->nodesetval->nodeTab[0];
+    node1 = xpathObj->nodesetval->nodeTab[1];
 
-    xmlChar *status_code = string_from_value(node0, "string");
+    status_code = string_from_value(node0, "string");
     if (status_code == NULL)
     {
         xmlXPathFreeObject(xpathObj);
@@ -1364,14 +1378,17 @@ static char *
 make_body(const char *method_name, abstract_value params[], int param_count)
 {
     xmlDocPtr doc = xmlNewDoc(BAD_CAST "1.0");
-    xmlNode *methodCall = xmlNewNode(NULL, BAD_CAST "methodCall");
+    xmlNode *params_node, *methodCall = xmlNewNode(NULL, BAD_CAST "methodCall");
+    xmlBufferPtr buffer;
+    xmlSaveCtxtPtr save_ctxt;
+    xmlChar *content;
+
     xmlDocSetRootElement(doc, methodCall);
 
     xmlNewChild(methodCall, NULL, BAD_CAST "methodName",
                 BAD_CAST method_name);
 
-    xmlNode *params_node =
-        xmlNewChild(methodCall, NULL, BAD_CAST "params", NULL);
+    params_node = xmlNewChild(methodCall, NULL, BAD_CAST "params", NULL);
 
     for (int p = 0; p < param_count; p++)
     {
@@ -1379,9 +1396,8 @@ make_body(const char *method_name, abstract_value params[], int param_count)
         make_body_add_type(v->type->typename, v, params_node);
     }
 
-    xmlBufferPtr buffer = xmlBufferCreate();
-    xmlSaveCtxtPtr save_ctxt =
-        xmlSaveToBuffer(buffer, NULL, XML_SAVE_NO_XHTML);
+    buffer = xmlBufferCreate();
+    save_ctxt = xmlSaveToBuffer(buffer, NULL, XML_SAVE_NO_XHTML);
 
     if (xmlSaveDoc(save_ctxt, doc) == -1)
     {
@@ -1390,7 +1406,7 @@ make_body(const char *method_name, abstract_value params[], int param_count)
 
     xmlFreeDoc(doc);
     xmlSaveClose(save_ctxt);
-    xmlChar *content = xmlStrdup(xmlBufferContent(buffer));
+    content = xmlStrdup(xmlBufferContent(buffer));
     xmlBufferFree(buffer);
     return (char *)content;
 }
@@ -1611,11 +1627,12 @@ static xmlNode *
 add_struct_array(xmlNode *struct_node, const char *name)
 {
     xmlNode *member_node = add_container(struct_node, "member");
+    xmlNode *value_node, *array_node;
 
     xmlNewChild(member_node, NULL, BAD_CAST "name", BAD_CAST name);
 
-    xmlNode *value_node = add_container(member_node, "value");
-    xmlNode *array_node = add_container(value_node,  "array");
+    value_node = add_container(member_node, "value");
+    array_node = add_container(value_node,  "array");
 
     return add_container(array_node,  "data");
 }
@@ -1625,10 +1642,11 @@ static xmlNode *
 add_nested_struct(xmlNode *struct_node, const char *name)
 {
     xmlNode *member_node = add_container(struct_node, "member");
+    xmlNode *value_node;
 
     xmlNewChild(member_node, NULL, BAD_CAST "name", BAD_CAST name);
 
-    xmlNode *value_node = add_container(member_node, "value");
+    value_node = add_container(member_node, "value");
 
     return add_container(value_node, "struct");
 }

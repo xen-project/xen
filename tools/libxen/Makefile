@@ -21,13 +21,13 @@ include $(XEN_ROOT)/tools/Rules.mk
 MAJOR = 1.0
 MINOR = 0
 
-CFLAGS = -Iinclude                     \
-         $(shell xml2-config --cflags) \
-         $(shell curl-config --cflags) \
-         -W -Wall -Wmissing-prototypes -Werror -std=c99 -O2 -fPIC
+CFLAGS += -Iinclude                     \
+          $(shell xml2-config --cflags) \
+          $(shell curl-config --cflags) \
+          -fPIC
 
-LDFLAGS = $(shell xml2-config --libs) \
-          $(shell curl-config --libs)
+LDFLAGS += $(shell xml2-config --libs) \
+           $(shell curl-config --libs)
 
 LIBXENAPI_HDRS = $(wildcard include/xen/api/*.h) include/xen/api/xen_all.h
 LIBXENAPI_OBJS = $(patsubst %.c, %.o, $(wildcard src/*.c))

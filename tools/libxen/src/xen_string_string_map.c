@@ -35,12 +35,13 @@ xen_string_string_map_alloc(size_t size)
 void
 xen_string_string_map_free(xen_string_string_map *map)
 {
+    size_t n;
     if (map == NULL)
     {
         return;
     }
 
-    size_t n = map->size;
+    n = map->size;
     for (size_t i = 0; i < n; i++)
     {
         free(map->contents[i].key);

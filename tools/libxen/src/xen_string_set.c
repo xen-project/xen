@@ -33,11 +33,12 @@ xen_string_set_alloc(size_t size)
 void
 xen_string_set_free(xen_string_set *set)
 {
+    size_t n;
     if (set == NULL)
     {
         return;
     }
-    size_t n = set->size;
+    n = set->size;
     for (size_t i = 0; i < n; i++)
     {
        free(set->contents[i]);

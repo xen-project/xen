@@ -36,12 +36,14 @@ xen_int_string_set_map_alloc(size_t size)
 void
 xen_int_string_set_map_free(xen_int_string_set_map *map)
 {
+	size_t n;
+
     if (map == NULL)
     {
         return;
     }
 
-    size_t n = map->size;
+    n = map->size;
     for (size_t i = 0; i < n; i++)
     {
         
