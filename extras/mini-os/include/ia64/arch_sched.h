@@ -82,8 +82,7 @@ void arch_switch_threads(struct thread* prev, struct thread* next);
 
 static inline struct thread* get_current(void)
 {
-	struct thread *current;
-	__asm ("mov %0=r13" : "=r" (current));
+	register struct thread *current asm("r13");
 	return current;
 }
 
