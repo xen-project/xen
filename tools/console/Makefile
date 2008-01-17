@@ -21,11 +21,11 @@ clean:
 	$(RM) client/*.o daemon/*.o
 
 xenconsoled: $(patsubst %.c,%.o,$(wildcard daemon/*.c))
-	$(CC) $(CFLAGS) $^ -o $@ -L$(XEN_LIBXC) -L$(XEN_XENSTORE) \
+	$(CC) $(CFLAGS) $^ -o $@ $(LDFLAGS) -L$(XEN_LIBXC) -L$(XEN_XENSTORE) \
               $(UTIL_LIBS) $(SOCKET_LIBS) -lxenctrl -lxenstore
 
 xenconsole: $(patsubst %.c,%.o,$(wildcard client/*.c))
-	$(CC) $(CFLAGS) $^ -o $@ -L$(XEN_LIBXC) -L$(XEN_XENSTORE) \
+	$(CC) $(CFLAGS) $^ -o $@ $(LDFLAGS) -L$(XEN_LIBXC) -L$(XEN_XENSTORE) \
 	      $(UTIL_LIBS) $(SOCKET_LIBS) -lxenctrl -lxenstore
 
 .PHONY: install

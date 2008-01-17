@@ -52,7 +52,7 @@ clean:
 
 libblktap.a: $(OBJS) 
 	$(CC) $(CFLAGS) -Wl,$(SONAME_LDFLAG) -Wl,$(SONAME) $(SHLIB_CFLAGS) \
-	      -L$(XEN_XENSTORE) -l xenstore                                \
+	      -L$(XEN_XENSTORE) $(LDFLAGS) -l xenstore                                \
 	      -o libblktap.so.$(MAJOR).$(MINOR) $^ $(LIBS)
 	ln -sf libblktap.so.$(MAJOR).$(MINOR) libblktap.so.$(MAJOR)
 	ln -sf libblktap.so.$(MAJOR) libblktap.so

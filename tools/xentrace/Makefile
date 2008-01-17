@@ -52,6 +52,6 @@ clean:
 	$(RM) *.a *.so *.o *.rpm $(BIN) $(LIBBIN)
 
 %: %.c $(HDRS) Makefile
-	$(CC) $(CFLAGS) -o $@ $< -L$(XEN_LIBXC) -lxenctrl
+	$(CC) $(CFLAGS) -o $@ $< -L$(XEN_LIBXC) $(LDFLAGS) -lxenctrl
 xentrace_%: %.c $(HDRS) Makefile
-	$(CC) $(CFLAGS) -o $@ $< -L$(XEN_LIBXC) -lxenctrl
+	$(CC) $(CFLAGS) -o $@ $< -L$(XEN_LIBXC) $(LDFLAGS) -lxenctrl

@@ -44,4 +44,4 @@ clean:
 	$(CC) -c $(CFLAGS) -o $@ $<
 
 xenperf: %: %.o Makefile
-	$(CC) $(CFLAGS) -o $@ $< -L$(XEN_LIBXC) -lxenctrl
+	$(CC) $(CFLAGS) -o $@ $< $(LDFLAGS) -L$(XEN_LIBXC) -lxenctrl
