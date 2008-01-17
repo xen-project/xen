@@ -627,7 +627,6 @@ END(ia64_leave_hypercall)
 #define PSR_BITS_TO_SET    IA64_PSR_BN
 
 //extern void vmx_switch_rr7(unsigned long rid, void *guest_vhpt, void * pal_vaddr );
-
 GLOBAL_ENTRY(vmx_switch_rr7)
        // not sure this unwind statement is correct...
        .prologue ASM_UNW_PRLG_RP|ASM_UNW_PRLG_PFS, ASM_UNW_PRLG_GRSAVE(1)
@@ -679,6 +678,7 @@ GLOBAL_ENTRY(vmx_switch_rr7)
 	mov cr.ifa=r17
 	mov r16=IA64_TR_KERNEL
 	movl r25 = PAGE_KERNEL
+	// r2=KERNEL_TR_PAGE_SHIFT truncated physicall address of ip
 	dep r2=0,r3,0,KERNEL_TR_PAGE_SHIFT
 	;;
 	or r24=r2,r25
@@ -700,6 +700,25 @@ GLOBAL_ENTRY(vmx_switch_rr7)
 	itr.d dtr[r16]=r24
 	;;
 
+	// re-pin mapping for stack (current)
+	// unless overlaps with IA64_TR_XEN_HEAP_REGS
+	mov r26=IA64_GRANULE_SHIFT<<2
+	dep r21=0,r13,60,4              // physical address of "current"
+	;;
+	dep r3=0,r21,0,KERNEL_TR_PAGE_SHIFT
+	;; 
+	cmp.eq p7,p0=r2,r3
+(p7)	br.cond.sptk .stack_overlaps
+	;;
+	ptr.d   r13,r26
+	or r23=r21,r25                  // construct PA | page properties
+	mov cr.itir=r26
+	mov cr.ifa=r13                  // VA of next task...
+	mov r18=IA64_TR_CURRENT_STACK
+	;;
+	itr.d dtr[r18]=r23              // wire in new mapping...
+.stack_overlaps:
+
 	// re-pin mappings for per-cpu data
 	movl r22 = PERCPU_ADDR
 	;;
@@ -716,8 +735,16 @@ GLOBAL_ENTRY(vmx_switch_rr7)
 	;;
 
 	// re-pin mappings for guest_vhpt
+	// unless overlaps with IA64_TR_XEN_HEAP_REGS or IA64_TR_CURRENT_STACK
+	dep r18=0,loc5,0,KERNEL_TR_PAGE_SHIFT
+	dep r21=0,r21,0,IA64_GRANULE_SHIFT 
+	dep r17=0,loc5,0,IA64_GRANULE_SHIFT 
+	;;
+	cmp.eq p6,p0=r18,r2             // check overlap with xen heap
+	cmp.eq p7,p0=r17,r21            // check overlap with current stack
+(p6)	br.cond.sptk .vhpt_overlaps
+(p7)	br.cond.sptk .vhpt_overlaps
 	mov r24=IA64_TR_VHPT
-	movl r25=PAGE_KERNEL
 	;;
 	or loc5 = r25,loc5              // construct PA | page properties
 	mov r23 = IA64_GRANULE_SHIFT <<2
@@ -729,6 +756,7 @@ GLOBAL_ENTRY(vmx_switch_rr7)
 	;;
 	itr.d dtr[r24]=loc5             // wire in new mapping...
 	;;
+.vhpt_overlaps:
 
 	// re-pin mappings for PAL code section
 	mov r24=IA64_TR_PALCODE
