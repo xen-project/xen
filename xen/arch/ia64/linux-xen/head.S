@@ -311,6 +311,10 @@ start_ap:
 #define isAP	p2	// are we an Application Processor?
 #define isBP	p3	// are we the Bootstrap Processor?
 
+#ifdef XEN
+# define init_task	init_task_mem
+#endif
+
 #ifdef CONFIG_SMP
 	/*
 	 * Find the init_task for the currently booting CPU.  At poweron, and in
