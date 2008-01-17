@@ -620,140 +620,136 @@ END(ia64_leave_hypercall)
  * r8: will contain old rid value
  */
 
-
-#define PSR_BITS_TO_CLEAR                      \
-   (IA64_PSR_I | IA64_PSR_IT | IA64_PSR_DT | IA64_PSR_DB |IA64_PSR_RT |     \
-    IA64_PSR_DD | IA64_PSR_SS | IA64_PSR_RI | IA64_PSR_ED |    \
-    IA64_PSR_DFL | IA64_PSR_DFH)
+#define PSR_BITS_TO_CLEAR                                           \
+	(IA64_PSR_I | IA64_PSR_IT | IA64_PSR_DT | IA64_PSR_DB |     \
+	 IA64_PSR_RT | IA64_PSR_DD | IA64_PSR_SS | IA64_PSR_RI |    \
+	 IA64_PSR_ED | IA64_PSR_DFL | IA64_PSR_DFH)
 #define PSR_BITS_TO_SET    IA64_PSR_BN
 
-//extern void vmx_switch_rr7(unsigned long rid,void *shared_info, void *shared_arch_info, void *guest_vhpt, void * pal_vaddr );
+//extern void vmx_switch_rr7(unsigned long rid, void *guest_vhpt, void * pal_vaddr );
 
 GLOBAL_ENTRY(vmx_switch_rr7)
-   // not sure this unwind statement is correct...
-   .prologue ASM_UNW_PRLG_RP|ASM_UNW_PRLG_PFS, ASM_UNW_PRLG_GRSAVE(1)
-   alloc loc1 = ar.pfs, 3, 7, 0, 0
-1: {
-     mov r28  = in0        // copy procedure index
-     mov r8   = ip         // save ip to compute branch
-     mov loc0 = rp         // save rp
-    };;
-    .body
-    movl loc2=PERCPU_ADDR
-    ;;
-    tpa loc2 = loc2         // get physical address of per cpu date
-    tpa r3 = r8             // get physical address of ip
-    dep loc5 = 0,in1,60,4          // get physical address of guest_vhpt
-    dep loc6 = 0,in2,60,4          // get physical address of pal code
-    ;;
-    mov loc4 = psr          // save psr
-    ;;
-    mov loc3 = ar.rsc           // save RSE configuration
-    ;;
-    mov ar.rsc = 0          // put RSE in enforced lazy, LE mode
-    movl r16=PSR_BITS_TO_CLEAR
-    movl r17=PSR_BITS_TO_SET
-    ;;
-    or loc4 = loc4,r17      // add in psr the bits to set
-    ;;
-    andcm r16=loc4,r16      // removes bits to clear from psr
-    br.call.sptk.many rp=ia64_switch_mode_phys
+       // not sure this unwind statement is correct...
+       .prologue ASM_UNW_PRLG_RP|ASM_UNW_PRLG_PFS, ASM_UNW_PRLG_GRSAVE(1)
+       alloc loc1 = ar.pfs, 3, 7, 0, 0
+1:{
+	mov r28  = in0                  // copy procedure index
+	mov r8   = ip                   // save ip to compute branch
+	mov loc0 = rp                   // save rp
+};;
+	.body
+	movl loc2=PERCPU_ADDR
+	;;
+	tpa loc2 = loc2                 // get physical address of per cpu date
+	tpa r3 = r8                     // get physical address of ip
+	dep loc5 = 0,in1,60,4           // get physical address of guest_vhpt
+	dep loc6 = 0,in2,60,4           // get physical address of pal code
+	;;
+	mov loc4 = psr                  // save psr
+	;;
+	mov loc3 = ar.rsc               // save RSE configuration
+	;;
+	mov ar.rsc = 0                  // put RSE in enforced lazy, LE mode
+	movl r16=PSR_BITS_TO_CLEAR
+	movl r17=PSR_BITS_TO_SET
+	;;
+	or loc4 = loc4,r17              // add in psr the bits to set
+	;;
+	andcm r16=loc4,r16              // removes bits to clear from psr
+	br.call.sptk.many rp=ia64_switch_mode_phys
 1:
-   // now in physical mode with psr.i/ic off so do rr7 switch
-    dep r16=-1,r0,61,3
-    ;;
-    mov rr[r16]=in0
-    srlz.d
-    ;;
-    rsm 0x6000
-    ;;
-    srlz.d
+	// now in physical mode with psr.i/ic off so do rr7 switch
+	dep r16=-1,r0,61,3
+	;;
+	mov rr[r16]=in0
+	srlz.d
+	;;
+	rsm 0x6000
+	;;
+	srlz.d
 
-    // re-pin mappings for kernel text and data
-    mov r18=KERNEL_TR_PAGE_SHIFT<<2
-    movl r17=KERNEL_START
-    ;;
-    ptr.i   r17,r18
-    ptr.d   r17,r18
-    ;;
-    mov cr.itir=r18
-    mov cr.ifa=r17
-    mov r16=IA64_TR_KERNEL
-    movl r25 = PAGE_KERNEL
-    dep r2=0,r3,0,KERNEL_TR_PAGE_SHIFT
-    ;;
-    or r24=r2,r25
-    ;;
-   srlz.i
-   ;;
-   itr.i itr[r16]=r24
-   ;;
-   itr.d dtr[r16]=r24
-   ;;
-   /* xen heap is also identity mapped */
-   mov r16 = IA64_TR_XEN_HEAP_REGS
-   dep r17=-1,r3,60,4
-   ;;
-   ptr.d r17, r18
-   ;;
-   mov cr.ifa=r17
-   ;;
-   itr.d dtr[r16]=r24
-   ;;
+	// re-pin mappings for kernel text and data
+	mov r18=KERNEL_TR_PAGE_SHIFT<<2
+	movl r17=KERNEL_START
+	;;
+	ptr.i   r17,r18
+	ptr.d   r17,r18
+	;;
+	mov cr.itir=r18
+	mov cr.ifa=r17
+	mov r16=IA64_TR_KERNEL
+	movl r25 = PAGE_KERNEL
+	dep r2=0,r3,0,KERNEL_TR_PAGE_SHIFT
+	;;
+	or r24=r2,r25
+	;;
+	srlz.i
+	;;
+	itr.i itr[r16]=r24
+	;;
+	itr.d dtr[r16]=r24
+	;;
+	/* xen heap is also identity mapped */
+	mov r16 = IA64_TR_XEN_HEAP_REGS
+	dep r17=-1,r3,60,4
+	;;
+	ptr.d r17, r18
+	;;
+	mov cr.ifa=r17
+	;;
+	itr.d dtr[r16]=r24
+	;;
 
-   // re-pin mappings for per-cpu data
+	// re-pin mappings for per-cpu data
+	movl r22 = PERCPU_ADDR
+	;;
+	mov r24=IA64_TR_PERCPU_DATA
+	or loc2 = r25,loc2              // construct PA | page properties
+	mov r23=PERCPU_PAGE_SHIFT<<2
+	;;
+	ptr.d   r22,r23
+	;;
+	mov cr.itir=r23
+	mov cr.ifa=r22
+	;;
+	itr.d dtr[r24]=loc2             // wire in new mapping...
+	;;
 
-   movl r22 = PERCPU_ADDR
-   ;;
-   mov r24=IA64_TR_PERCPU_DATA
-   or loc2 = r25,loc2          // construct PA | page properties
-   mov r23=PERCPU_PAGE_SHIFT<<2
-   ;;
-   ptr.d   r22,r23
-   ;;
-   mov cr.itir=r23
-   mov cr.ifa=r22
-   ;;
-   itr.d dtr[r24]=loc2     // wire in new mapping...
-   ;;
+	// re-pin mappings for guest_vhpt
+	mov r24=IA64_TR_VHPT
+	movl r25=PAGE_KERNEL
+	;;
+	or loc5 = r25,loc5              // construct PA | page properties
+	mov r23 = IA64_GRANULE_SHIFT <<2
+	;;
+	ptr.d   in1,r23
+	;;
+	mov cr.itir=r23
+	mov cr.ifa=in1
+	;;
+	itr.d dtr[r24]=loc5             // wire in new mapping...
+	;;
 
-   // re-pin mappings for guest_vhpt
+	// re-pin mappings for PAL code section
+	mov r24=IA64_TR_PALCODE
+	or loc6 = r25,loc6              // construct PA | page properties
+	mov r23 = IA64_GRANULE_SHIFT<<2
+	;;
+	ptr.i   in2,r23
+	;;
+	mov cr.itir=r23
+	mov cr.ifa=in2
+	;;
+	itr.i itr[r24]=loc6             // wire in new mapping...
+	;;
 
-   mov r24=IA64_TR_VHPT
-   movl r25=PAGE_KERNEL
-   ;;
-   or loc5 = r25,loc5          // construct PA | page properties
-   mov r23 = IA64_GRANULE_SHIFT <<2
-   ;;
-   ptr.d   in1,r23
-   ;;
-   mov cr.itir=r23
-   mov cr.ifa=in1
-   ;;
-   itr.d dtr[r24]=loc5     // wire in new mapping...
-   ;;
-
-   // re-pin mappings for PAL code section
-
-   mov r24=IA64_TR_PALCODE
-   or loc6 = r25,loc6          // construct PA | page properties
-   mov r23 = IA64_GRANULE_SHIFT<<2
-   ;;
-   ptr.i   in2,r23
-   ;;
-   mov cr.itir=r23
-   mov cr.ifa=in2
-   ;;
-   itr.i itr[r24]=loc6     // wire in new mapping...
-   ;;
-
-   // done, switch back to virtual and return
-   mov r16=loc4            // r16= original psr
-   br.call.sptk.many rp=ia64_switch_mode_virt // return to virtual mode
-   mov ar.pfs = loc1
-   mov rp = loc0
-   ;;
-   mov ar.rsc=loc3         // restore RSE configuration
-   srlz.d              // seralize restoration of psr.l
-   br.ret.sptk.many rp
+	// done, switch back to virtual and return
+	mov r16=loc4                    // r16= original psr
+	br.call.sptk.many rp=ia64_switch_mode_virt // return to virtual mode
+	mov ar.pfs = loc1
+	mov rp = loc0
+	;;
+	mov ar.rsc=loc3                 // restore RSE configuration
+	srlz.d                          // seralize restoration of psr.l
+	br.ret.sptk.many rp
 END(vmx_switch_rr7)
