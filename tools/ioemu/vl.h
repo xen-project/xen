@@ -971,6 +971,9 @@ void pci_piix3_ide_init(PCIBus *bus, BlockDriverState **hd_table, int devfn);
 int pmac_ide_init (BlockDriverState **hd_table,
                    SetIRQFunc *set_irq, void *irq_opaque, int irq);
 
+/* extboot.c */
+void extboot_init(BlockDriverState *bs, int cmd);
+
 /* cdrom.c */
 int cdrom_read_toc(int nb_sectors, uint8_t *buf, int msf, int start_track);
 int cdrom_read_toc_raw(int nb_sectors, uint8_t *buf, int msf, int session_num);

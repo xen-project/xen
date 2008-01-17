@@ -316,6 +316,11 @@ static int must_load_nic(void)
     return ((boot_order & 0xf0) == 0x40);
 }
 
+static int must_load_extboot(void)
+{
+    return (inb(0x404) == 1);
+}
+
 /* Replace possibly erroneous memory-size CMOS fields with correct values. */
 static void cmos_write_memory_size(void)
 {
@@ -354,6 +359,7 @@ static void cmos_write_memory_size(void)
 int main(void)
 {
     int acpi_sz = 0, vgabios_sz = 0, etherboot_sz = 0, rombios_sz, smbios_sz;
+    int extboot_sz = 0;
 
     printf("HVM Loader\n");
 
@@ -398,6 +404,14 @@ int main(void)
         etherboot_sz = sizeof(etherboot);
     }
 
+    if ( must_load_extboot() )
+    {
+        printf("Loading EXTBOOT ...\n");
+        memcpy((void *)EXTBOOT_PHYSICAL_ADDRESS,
+               extboot, sizeof(extboot));
+        extboot_sz = sizeof(extboot);
+    }
+
     if ( get_acpi_enabled() )
     {
         printf("Loading ACPI ...\n");
@@ -416,6 +430,10 @@ int main(void)
         printf(" %05x-%05x: Etherboot ROM\n",
                ETHERBOOT_PHYSICAL_ADDRESS,
                ETHERBOOT_PHYSICAL_ADDRESS + etherboot_sz - 1);
+    if ( extboot_sz )
+        printf(" %05x-%05x: Extboot ROM\n",
+               EXTBOOT_PHYSICAL_ADDRESS,
+               EXTBOOT_PHYSICAL_ADDRESS + extboot_sz - 1);
     if ( use_vmxassist() )
         printf(" %05x-%05x: VMXAssist\n",
                VMXASSIST_PHYSICAL_ADDRESS,

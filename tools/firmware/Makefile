@@ -10,6 +10,7 @@ SUBDIRS :=
 SUBDIRS += rombios rombios/32bit
 SUBDIRS += vgabios
 SUBDIRS += vmxassist
+SUBDIRS += extboot
 SUBDIRS += hvmloader
 
 .PHONY: all

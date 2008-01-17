@@ -403,7 +403,7 @@ VL_OBJS+= ne2000.o rtl8139.o pcnet.o e100.o
 
 ifeq ($(TARGET_BASE_ARCH), i386)
 # Hardware support
-VL_OBJS+= ide.o pckbd.o ps2.o vga.o $(SOUND_HW) dma.o $(AUDIODRV)
+VL_OBJS+= ide.o pckbd.o ps2.o vga.o $(SOUND_HW) dma.o $(AUDIODRV) extboot.o
 ifeq ($(ARCH),ia64)
 VL_OBJS+= fdc.o mc146818rtc.o serial.o pc.o
 else

@@ -55,6 +55,7 @@ roms.h:	../rombios/BIOS-bochs-latest ../vgabios/VGABIOS-lgpl-latest.bin ../vgabi
 	sh ./mkhex vgabios_cirrusvga ../vgabios/VGABIOS-lgpl-latest.cirrus.bin >> roms.h
 	sh ./mkhex vmxassist ../vmxassist/vmxassist.bin >> roms.h
 	cat ../etherboot/eb-rtl8139.zrom.h >> roms.h
+	sh ./mkhex extboot ../extboot/extboot.bin >> roms.h
 
 .PHONY: clean
 clean:
