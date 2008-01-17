@@ -223,3 +223,24 @@ void xfree(const void *p)
     /* spin_unlock_irqrestore(&freelist_lock, flags); */
 }
 
+void *_realloc(void *ptr, size_t size)
+{
+    void *new;
+    struct xmalloc_hdr *hdr;
+
+    if (ptr == NULL)
+        return _xmalloc(size, 4);
+
+    hdr = (struct xmalloc_hdr *)ptr - 1;
+    if (hdr->size >= size) 
+        return ptr;
+    
+    new = _xmalloc(size, 4);
+    if (new == NULL) 
+        return NULL;
+
+    memcpy(new, ptr, hdr->size);
+    xfree(ptr);
+
+    return new;
+}
