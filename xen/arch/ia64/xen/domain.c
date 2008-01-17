@@ -400,7 +400,7 @@ void relinquish_vcpu_resources(struct vcpu *v)
 	if (HAS_PERVCPU_VHPT(v->domain))
 		pervcpu_vhpt_free(v);
 	if (v->arch.privregs != NULL) {
-		free_xenheap_pages(v->arch.privregs,
+		free_domheap_pages(virt_to_page(v->arch.privregs),
 		                   get_order_from_shift(XMAPPEDREGS_SHIFT));
 		v->arch.privregs = NULL;
 	}
@@ -501,6 +501,7 @@ static void vcpu_share_privregs_with_guest(struct vcpu *v)
 int vcpu_late_initialise(struct vcpu *v)
 {
 	struct domain *d = v->domain;
+	struct page_info *page;
 	int rc, order;
 
 	if (HAS_PERVCPU_VHPT(d)) {
@@ -511,7 +512,11 @@ int vcpu_late_initialise(struct vcpu *v)
 
 	/* Create privregs page. */
 	order = get_order_from_shift(XMAPPEDREGS_SHIFT);
-	v->arch.privregs = alloc_xenheap_pages(order);
+	page = alloc_domheap_pages(NULL, order, 0);
+	if (page == NULL)
+		return -ENOMEM;
+	
+	v->arch.privregs = page_to_virt(page);
 	BUG_ON(v->arch.privregs == NULL);
 	memset(v->arch.privregs, 0, 1 << XMAPPEDREGS_SHIFT);
 	vcpu_share_privregs_with_guest(v);
