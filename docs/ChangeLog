@@ -16,6 +16,18 @@ http://lists.xensource.com/archives/html/xen-devel/2008-01/msg00010.html
 Xen 3.3 release
 ---------------
 
+16725: XENFEAT_mmu_pt_update_reserve_ad
+http://xenbits.xensource.com/xen-unstable.hg?rev/847bc9b19c48
+
+New feature flag available via the version hypercall indicates whether the
+Xen host supports MMU_PT_UPDATE_PRESERVE_AD for this guest.
+
+16724: CPUID feature flag for MMU_PT_UPDATE_PRESERVE_AD hypercall
+http://xenbits.xensource.com/xen-unstable.hg?rev/a66bdc82d8fa
+
+The x86 CPUID_4000_0002_ECX[0] flag indicates whether the Xen host
+supports MMU_PT_UPDATE_PRESERVE_AD for this guest.
+
 16718: MMU_PT_UPDATE_PRESERVE_AD
 http://xenbits.xensource.com/xen-unstable.hg?rev/fba4e7357744
 
