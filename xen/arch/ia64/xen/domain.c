@@ -407,6 +407,7 @@ void relinquish_vcpu_resources(struct vcpu *v)
 
 struct vcpu *alloc_vcpu_struct(void)
 {
+	struct page_info *page;
 	struct vcpu *v;
 	struct thread_info *ti;
 	static int first_allocation = 1;
@@ -419,8 +420,10 @@ struct vcpu *alloc_vcpu_struct(void)
 		return idle_vcpu[0];
 	}
 
-	if ((v = alloc_xenheap_pages(KERNEL_STACK_SIZE_ORDER)) == NULL)
+	page = alloc_domheap_pages(NULL, KERNEL_STACK_SIZE_ORDER, 0);
+	if (page == NULL)
 		return NULL;
+	v = page_to_virt(page);
 	memset(v, 0, sizeof(*v)); 
 
 	ti = alloc_thread_info(v);
@@ -435,7 +438,7 @@ struct vcpu *alloc_vcpu_struct(void)
 
 void free_vcpu_struct(struct vcpu *v)
 {
-	free_xenheap_pages(v, KERNEL_STACK_SIZE_ORDER);
+	free_domheap_pages(virt_to_page(v), KERNEL_STACK_SIZE_ORDER);
 }
 
 int vcpu_initialise(struct vcpu *v)
