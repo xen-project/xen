@@ -255,7 +255,7 @@ md_overlap_with_boot_param(const efi_memory_desc_t *md)
 }
 
 #define MD_SIZE(md) (md->num_pages << EFI_PAGE_SHIFT)
-#define MD_END(md) ((md)->phys_addr + ((md)->num_pages << EFI_PAGE_SHIFT))
+#define MD_END(md) ((md)->phys_addr + MD_SIZE(md))
 
 extern char __init_begin[], __init_end[];
 static void noinline init_done(void)
@@ -267,6 +267,41 @@ static void noinline init_done(void)
            (long)(__init_end-__init_begin)>>10);
     
     startup_cpu_idle_loop();
+}
+
+struct xen_heap_desc {
+    void*               xen_heap_start;
+    unsigned long       xenheap_phys_end;
+    efi_memory_desc_t*  kern_md;
+};
+
+static int __init
+init_xenheap_mds(unsigned long start, unsigned long end, void *arg)
+{
+    struct xen_heap_desc *desc = (struct xen_heap_desc*)arg;
+    unsigned long md_end = __pa(desc->xen_heap_start);
+    efi_memory_desc_t* md;
+
+    start = __pa(start);
+    end = __pa(end);
+    
+    for (md = efi_get_md(md_end);
+         md != NULL && md->phys_addr < desc->xenheap_phys_end;
+         md = efi_get_md(md_end)) {
+        md_end = MD_END(md);
+
+        if (md == desc->kern_md ||
+            (md->type == EFI_LOADER_DATA && !md_overlap_with_boot_param(md)) ||
+            ((md->attribute & EFI_MEMORY_WB) &&
+             is_xenheap_usable_memory(md))) {
+            unsigned long s = max(start, max(__pa(desc->xen_heap_start),
+                                             md->phys_addr));
+            unsigned long e = min(end, min(md_end, desc->xenheap_phys_end));
+            init_xenheap_pages(s, e);
+        }
+    }
+
+    return 0;
 }
 
 int running_on_sim;
@@ -305,6 +340,7 @@ void __init start_kernel(void)
     struct vcpu *dom0_vcpu0;
     efi_memory_desc_t *kern_md, *last_md, *md;
     void *xen_heap_start;
+    struct xen_heap_desc heap_desc;
 #ifdef CONFIG_SMP
     int i;
 #endif
@@ -384,8 +420,12 @@ void __init start_kernel(void)
         if (relo_start < md->phys_addr)
             relo_start = md->phys_addr;
         
-        if (!is_xenheap_usable_memory(md))
+        if (!is_xenheap_usable_memory(md)) {
+            /* Skip this area */
+            if (md_end > relo_start)
+                relo_start = md_end;
             continue;
+        }
 
         /*
          * The dom0 kernel or initrd could overlap, reserve space
@@ -488,18 +528,11 @@ skip_move:
     if (vmx_enabled)
         xen_heap_start = vmx_init_env(xen_heap_start, xenheap_phys_end);
 
-    md_end = __pa(xen_heap_start);
-    for (md = efi_get_md(md_end);
-         md != NULL && md->phys_addr < xenheap_phys_end;
-         md = efi_get_md(md_end)) {
-        md_end = MD_END(md);
+    heap_desc.xen_heap_start   = xen_heap_start;
+    heap_desc.xenheap_phys_end = xenheap_phys_end;
+    heap_desc.kern_md          = kern_md;
+    efi_memmap_walk(&init_xenheap_mds, &heap_desc);
 
-        if (md == kern_md ||
-            (md->type == EFI_LOADER_DATA && !md_overlap_with_boot_param(md)) ||
-            (md->attribute & EFI_MEMORY_WB))
-            init_xenheap_pages(max(__pa(xen_heap_start), md->phys_addr),
-                               min(md_end, xenheap_phys_end));
-    }
     printk("Xen heap: %luMB (%lukB)\n",
            (xenheap_phys_end-__pa(xen_heap_start)) >> 20,
            (xenheap_phys_end-__pa(xen_heap_start)) >> 10);
