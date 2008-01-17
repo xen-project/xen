@@ -104,8 +104,7 @@ GLOBAL_ENTRY(ia64_new_rr7)
 	itr.d dtr[r16]=r18
 	;;
 	// re-pin mappings for stack (current)
-
-	// unless overlaps with KERNEL_TR
+	// unless overlaps with IA64_TR_XEN_HEAP_REGS
 	dep r18=0,r13,0,KERNEL_TR_PAGE_SHIFT
 	;;
 	cmp.eq p7,p0=r17,r18
