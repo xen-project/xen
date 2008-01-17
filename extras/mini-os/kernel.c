@@ -82,7 +82,7 @@ static void periodic_thread(void *p)
 
 static void netfront_thread(void *p)
 {
-    init_netfront(&start_info);
+    init_netfront(NULL, NULL, NULL);
 }
 
 /* This should be overridden by the application we are linked against. */

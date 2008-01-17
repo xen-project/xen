@@ -13,19 +13,13 @@
 #include <gnttab.h>
 #include <xmalloc.h>
 #include <time.h>
+#include <netfront.h>
+#include <lib.h>
 #include <semaphore.h>
 
-void init_rx_buffers(void);
+DECLARE_WAIT_QUEUE_HEAD(netfront_queue);
 
-struct net_info {
-    struct netif_tx_front_ring tx;
-    struct netif_rx_front_ring rx;
-    int tx_ring_ref;
-    int rx_ring_ref;
-    unsigned int evtchn, local_port;
-
-} net_info;
-
+#define NETIF_SELECT_RX ((void*)-1)
 
 
 #define NET_TX_RING_SIZE __RING_SIZE((struct netif_tx_sring *)0, PAGE_SIZE)
@@ -33,16 +27,31 @@ struct net_info {
 #define GRANT_INVALID_REF 0
 
 
-unsigned short rx_freelist[NET_RX_RING_SIZE];
-unsigned short tx_freelist[NET_TX_RING_SIZE];
-__DECLARE_SEMAPHORE_GENERIC(tx_sem, NET_TX_RING_SIZE);
-
 struct net_buffer {
     void* page;
-    int gref;
+    grant_ref_t gref;
 };
-struct net_buffer rx_buffers[NET_RX_RING_SIZE];
-struct net_buffer tx_buffers[NET_TX_RING_SIZE];
+
+struct netfront_dev {
+    unsigned short tx_freelist[NET_TX_RING_SIZE];
+    struct semaphore tx_sem;
+
+    struct net_buffer rx_buffers[NET_RX_RING_SIZE];
+    struct net_buffer tx_buffers[NET_TX_RING_SIZE];
+
+    struct netif_tx_front_ring tx;
+    struct netif_rx_front_ring rx;
+    grant_ref_t tx_ring_ref;
+    grant_ref_t rx_ring_ref;
+    evtchn_port_t evtchn, local_port;
+
+    char *nodename;
+    char *backend;
+
+    void (*netif_rx)(unsigned char* data, int len);
+};
+
+void init_rx_buffers(struct netfront_dev *dev);
 
 static inline void add_id_to_freelist(unsigned int id,unsigned short* freelist)
 {
@@ -69,17 +78,16 @@ static inline int xennet_rxidx(RING_IDX idx)
     return idx & (NET_RX_RING_SIZE - 1);
 }
 
-void network_rx(void)
+void network_rx(struct netfront_dev *dev)
 {
-    struct net_info *np = &net_info;
     RING_IDX rp,cons;
     struct netif_rx_response *rx;
 
 
 moretodo:
-    rp = np->rx.sring->rsp_prod;
+    rp = dev->rx.sring->rsp_prod;
     rmb(); /* Ensure we see queued responses up to 'rp'. */
-    cons = np->rx.rsp_cons;
+    cons = dev->rx.rsp_cons;
 
     int nr_consumed=0;
     while ((cons != rp))
@@ -87,7 +95,7 @@ moretodo:
         struct net_buffer* buf;
         unsigned char* page;
 
-        rx = RING_GET_RESPONSE(&np->rx, cons);
+        rx = RING_GET_RESPONSE(&dev->rx, cons);
 
         if (rx->flags & NETRXF_extra_info)
         {
@@ -100,28 +108,26 @@ moretodo:
 
         int id = rx->id;
 
-        buf = &rx_buffers[id];
+        buf = &dev->rx_buffers[id];
         page = (unsigned char*)buf->page;
         gnttab_end_access(buf->gref);
 
         if(rx->status>0)
         {
-            netif_rx(page+rx->offset,rx->status);
+            dev->netif_rx(page+rx->offset,rx->status);
         }
-
-        add_id_to_freelist(id,rx_freelist);
 
         nr_consumed++;
 
         ++cons;
     }
-    np->rx.rsp_cons=rp;
+    dev->rx.rsp_cons=cons;
 
     int more;
-    RING_FINAL_CHECK_FOR_RESPONSES(&np->rx,more);
+    RING_FINAL_CHECK_FOR_RESPONSES(&dev->rx,more);
     if(more) goto moretodo;
 
-    RING_IDX req_prod = np->rx.req_prod_pvt;
+    RING_IDX req_prod = dev->rx.req_prod_pvt;
 
     int i;
     netif_rx_request_t *req;
@@ -129,8 +135,8 @@ moretodo:
     for(i=0; i<nr_consumed; i++)
     {
         int id = xennet_rxidx(req_prod + i);
-        req = RING_GET_REQUEST(&np->rx, req_prod + i);
-        struct net_buffer* buf = &rx_buffers[id];
+        req = RING_GET_REQUEST(&dev->rx, req_prod + i);
+        struct net_buffer* buf = &dev->rx_buffers[id];
         void* page = buf->page;
 
         /* We are sure to have free gnttab entries since they got released above */
@@ -142,45 +148,44 @@ moretodo:
 
     wmb();
 
-    np->rx.req_prod_pvt = req_prod + i;
+    dev->rx.req_prod_pvt = req_prod + i;
     
     int notify;
-    RING_PUSH_REQUESTS_AND_CHECK_NOTIFY(&np->rx, notify);
+    RING_PUSH_REQUESTS_AND_CHECK_NOTIFY(&dev->rx, notify);
     if (notify)
-        notify_remote_via_evtchn(np->evtchn);
+        notify_remote_via_evtchn(dev->evtchn);
 
 }
 
-void network_tx_buf_gc(void)
+void network_tx_buf_gc(struct netfront_dev *dev)
 {
 
 
     RING_IDX cons, prod;
     unsigned short id;
-    struct net_info *np = &net_info;
 
     do {
-        prod = np->tx.sring->rsp_prod;
+        prod = dev->tx.sring->rsp_prod;
         rmb(); /* Ensure we see responses up to 'rp'. */
 
-        for (cons = np->tx.rsp_cons; cons != prod; cons++) 
+        for (cons = dev->tx.rsp_cons; cons != prod; cons++) 
         {
             struct netif_tx_response *txrsp;
 
-            txrsp = RING_GET_RESPONSE(&np->tx, cons);
+            txrsp = RING_GET_RESPONSE(&dev->tx, cons);
             if (txrsp->status == NETIF_RSP_NULL)
                 continue;
 
             id  = txrsp->id;
-            struct net_buffer* buf = &tx_buffers[id];
+            struct net_buffer* buf = &dev->tx_buffers[id];
             gnttab_end_access(buf->gref);
             buf->gref=GRANT_INVALID_REF;
 
-            add_id_to_freelist(id,tx_freelist);
-            up(&tx_sem);
+	    add_id_to_freelist(id,dev->tx_freelist);
+	    up(&dev->tx_sem);
         }
 
-        np->tx.rsp_cons = prod;
+        dev->tx.rsp_cons = prod;
 
         /*
          * Set a new event, then check for race with update of tx_cons.
@@ -190,10 +195,10 @@ void network_tx_buf_gc(void)
          * data is outstanding: in such cases notification from Xen is
          * likely to be the only kick that we'll get.
          */
-        np->tx.sring->rsp_event =
-            prod + ((np->tx.sring->req_prod - prod) >> 1) + 1;
+        dev->tx.sring->rsp_event =
+            prod + ((dev->tx.sring->req_prod - prod) >> 1) + 1;
         mb();
-    } while ((cons == prod) && (prod != np->tx.sring->rsp_prod));
+    } while ((cons == prod) && (prod != dev->tx.sring->rsp_prod));
 
 
 }
@@ -201,24 +206,21 @@ void network_tx_buf_gc(void)
 void netfront_handler(evtchn_port_t port, struct pt_regs *regs, void *data)
 {
     int flags;
+    struct netfront_dev *dev = data;
 
     local_irq_save(flags);
 
-    network_tx_buf_gc();
-    network_rx();
+    network_tx_buf_gc(dev);
+    network_rx(dev);
 
     local_irq_restore(flags);
 }
 
-char* backend;
-
-void init_netfront(void* si)
+struct netfront_dev *init_netfront(char *nodename, void (*thenetif_rx)(unsigned char* data, int len), unsigned char rawmac[6])
 {
     xenbus_transaction_t xbt;
-    struct net_info* info = &net_info;
     char* err;
     char* message=NULL;
-    char nodename[] = "device/vif/0";
     struct netif_tx_sring *txs;
     struct netif_rx_sring *rxs;
     int retry=0;
@@ -226,18 +228,34 @@ void init_netfront(void* si)
     char* mac;
     char* msg;
 
-    printk("************************ NETFRONT **********\n\n\n");
+    struct netfront_dev *dev;
 
+    if (!nodename)
+	nodename = "device/vif/0";
+
+    char path[strlen(nodename) + 1 + 10 + 1];
+
+    if (!thenetif_rx)
+	thenetif_rx = netif_rx;
+
+    printk("************************ NETFRONT for %s **********\n\n\n", nodename);
+
+    dev = malloc(sizeof(*dev));
+    dev->nodename = strdup(nodename);
+
+    printk("net TX ring size %d\n", NET_TX_RING_SIZE);
+    printk("net RX ring size %d\n", NET_RX_RING_SIZE);
+    init_SEMAPHORE(&dev->tx_sem, NET_TX_RING_SIZE);
     for(i=0;i<NET_TX_RING_SIZE;i++)
     {
-        add_id_to_freelist(i,tx_freelist);
-        tx_buffers[i].page = (char*)alloc_page();
+	add_id_to_freelist(i,dev->tx_freelist);
+        dev->tx_buffers[i].page = NULL;
     }
 
     for(i=0;i<NET_RX_RING_SIZE;i++)
     {
-        add_id_to_freelist(i,rx_freelist);
-        rx_buffers[i].page = (char*)alloc_page();
+	/* TODO: that's a lot of memory */
+        dev->rx_buffers[i].page = (char*)alloc_page();
     }
 
     txs = (struct netif_tx_sring*) alloc_page();
@@ -248,20 +266,24 @@ void init_netfront(void* si)
 
     SHARED_RING_INIT(txs);
     SHARED_RING_INIT(rxs);
-    FRONT_RING_INIT(&info->tx, txs, PAGE_SIZE);
-    FRONT_RING_INIT(&info->rx, rxs, PAGE_SIZE);
+    FRONT_RING_INIT(&dev->tx, txs, PAGE_SIZE);
+    FRONT_RING_INIT(&dev->rx, rxs, PAGE_SIZE);
 
-    info->tx_ring_ref = gnttab_grant_access(0,virt_to_mfn(txs),0);
-    info->rx_ring_ref = gnttab_grant_access(0,virt_to_mfn(rxs),0);
+    dev->tx_ring_ref = gnttab_grant_access(0,virt_to_mfn(txs),0);
+    dev->rx_ring_ref = gnttab_grant_access(0,virt_to_mfn(rxs),0);
 
     evtchn_alloc_unbound_t op;
     op.dom = DOMID_SELF;
-    op.remote_dom = 0;
+    snprintf(path, sizeof(path), "%s/backend-id", nodename);
+    op.remote_dom = xenbus_read_integer(path);
     HYPERVISOR_event_channel_op(EVTCHNOP_alloc_unbound, &op);
     clear_evtchn(op.port);        /* Without, handler gets invoked now! */
-    info->local_port = bind_evtchn(op.port, netfront_handler, NULL);
-    info->evtchn=op.port;
+    dev->local_port = bind_evtchn(op.port, netfront_handler, dev);
+    dev->evtchn=op.port;
 
+    dev->netif_rx = thenetif_rx;
+
+    // FIXME: proper frees on failures
 again:
     err = xenbus_transaction_start(&xbt);
     if (err) {
@@ -269,19 +291,19 @@ again:
     }
 
     err = xenbus_printf(xbt, nodename, "tx-ring-ref","%u",
-                info->tx_ring_ref);
+                dev->tx_ring_ref);
     if (err) {
         message = "writing tx ring-ref";
         goto abort_transaction;
     }
     err = xenbus_printf(xbt, nodename, "rx-ring-ref","%u",
-                info->rx_ring_ref);
+                dev->rx_ring_ref);
     if (err) {
         message = "writing rx ring-ref";
         goto abort_transaction;
     }
     err = xenbus_printf(xbt, nodename,
-                "event-channel", "%u", info->evtchn);
+                "event-channel", "%u", dev->evtchn);
     if (err) {
         message = "writing event-channel";
         goto abort_transaction;
@@ -308,40 +330,45 @@ again:
 
 abort_transaction:
     xenbus_transaction_end(xbt, 1, &retry);
+    return NULL;
 
 done:
 
-    msg = xenbus_read(XBT_NIL, "device/vif/0/backend", &backend);
-    msg = xenbus_read(XBT_NIL, "device/vif/0/mac", &mac);
+    snprintf(path, sizeof(path), "%s/backend", nodename);
+    msg = xenbus_read(XBT_NIL, path, &dev->backend);
+    snprintf(path, sizeof(path), "%s/mac", nodename);
+    msg = xenbus_read(XBT_NIL, path, &mac);
 
-    if ((backend == NULL) || (mac == NULL)) {
-        struct evtchn_close op = { info->local_port };
+    if ((dev->backend == NULL) || (mac == NULL)) {
+        struct evtchn_close op = { dev->local_port };
         printk("%s: backend/mac failed\n", __func__);
-        unbind_evtchn(info->local_port);
+        unbind_evtchn(dev->local_port);
         HYPERVISOR_event_channel_op(EVTCHNOP_close, &op);
-        return;
+        return NULL;
     }
 
-    printk("backend at %s\n",backend);
+    printk("backend at %s\n",dev->backend);
     printk("mac is %s\n",mac);
 
-    char path[256];
-    sprintf(path,"%s/state",backend);
+    {
+        char path[strlen(dev->backend) + 1 + 5 + 1];
+        snprintf(path, sizeof(path), "%s/state", dev->backend);
 
-    xenbus_watch_path(XBT_NIL, path);
+        xenbus_watch_path(XBT_NIL, path);
 
-    xenbus_wait_for_value(path,"4");
+        xenbus_wait_for_value(path,"4");
 
-    //free(backend);
+        xenbus_unwatch_path(XBT_NIL, path);
+    }
 
     printk("**************************\n");
 
-    init_rx_buffers();
+    init_rx_buffers(dev);
 
-    unsigned char rawmac[6];
         /* Special conversion specifier 'hh' needed for __ia64__. Without
            this mini-os panics with 'Unaligned reference'. */
-    sscanf(mac,"%hhx:%hhx:%hhx:%hhx:%hhx:%hhx",
+    if (rawmac)
+	sscanf(mac,"%hhx:%hhx:%hhx:%hhx:%hhx:%hhx",
             &rawmac[0],
             &rawmac[1],
             &rawmac[2],
@@ -349,37 +376,35 @@ done:
             &rawmac[4],
             &rawmac[5]);
 
-    net_app_main(si,rawmac);
+    return dev;
 }
 
-void shutdown_netfront(void)
+void shutdown_netfront(struct netfront_dev *dev)
 {
-    //xenbus_transaction_t xbt;
     char* err;
-    char nodename[] = "device/vif/0";
+    char *nodename = dev->nodename;
 
-    char path[256];
+    char path[strlen(dev->backend) + 1 + 5 + 1];
 
-    printk("close network: backend at %s\n",backend);
+    printk("close network: backend at %s\n",dev->backend);
 
-    err = xenbus_printf(XBT_NIL, nodename, "state", "%u", 6); /* closing */
-    sprintf(path,"%s/state",backend);
+    snprintf(path, sizeof(path), "%s/state", dev->backend);
+    err = xenbus_printf(XBT_NIL, nodename, "state", "%u", 5); /* closing */
+    xenbus_wait_for_value(path,"5");
 
+    err = xenbus_printf(XBT_NIL, nodename, "state", "%u", 6);
     xenbus_wait_for_value(path,"6");
 
-    err = xenbus_printf(XBT_NIL, nodename, "state", "%u", 1);
+    unbind_evtchn(dev->local_port);
 
-    xenbus_wait_for_value(path,"2");
-
-    unbind_all_ports();
-
-    free(backend);
+    free(nodename);
+    free(dev->backend);
+    free(dev);
 }
 
 
-void init_rx_buffers(void)
+void init_rx_buffers(struct netfront_dev *dev)
 {
-    struct net_info* np = &net_info;
     int i, requeue_idx;
     netif_rx_request_t *req;
     int notify;
@@ -387,8 +412,8 @@ void init_rx_buffers(void)
     /* Rebuild the RX buffer freelist and the RX ring itself. */
     for (requeue_idx = 0, i = 0; i < NET_RX_RING_SIZE; i++) 
     {
-        struct net_buffer* buf = &rx_buffers[requeue_idx];
-        req = RING_GET_REQUEST(&np->rx, requeue_idx);
+        struct net_buffer* buf = &dev->rx_buffers[requeue_idx];
+        req = RING_GET_REQUEST(&dev->rx, requeue_idx);
 
         buf->gref = req->gref = 
             gnttab_grant_access(0,virt_to_mfn(buf->page),0);
@@ -398,39 +423,40 @@ void init_rx_buffers(void)
         requeue_idx++;
     }
 
-    np->rx.req_prod_pvt = requeue_idx;
+    dev->rx.req_prod_pvt = requeue_idx;
 
-    RING_PUSH_REQUESTS_AND_CHECK_NOTIFY(&np->rx, notify);
+    RING_PUSH_REQUESTS_AND_CHECK_NOTIFY(&dev->rx, notify);
 
     if (notify) 
-        notify_remote_via_evtchn(np->evtchn);
+        notify_remote_via_evtchn(dev->evtchn);
 
-    np->rx.sring->rsp_event = np->rx.rsp_cons + 1;
+    dev->rx.sring->rsp_event = dev->rx.rsp_cons + 1;
 }
 
 
-void netfront_xmit(unsigned char* data,int len)
+void netfront_xmit(struct netfront_dev *dev, unsigned char* data,int len)
 {
     int flags;
-    struct net_info* info = &net_info;
     struct netif_tx_request *tx;
     RING_IDX i;
     int notify;
-    int id;
+    unsigned short id;
     struct net_buffer* buf;
     void* page;
 
-    down(&tx_sem);
+    down(&dev->tx_sem);
 
     local_irq_save(flags);
-    id = get_id_from_freelist(tx_freelist);
+    id = get_id_from_freelist(dev->tx_freelist);
     local_irq_restore(flags);
 
-    buf = &tx_buffers[id];
+    buf = &dev->tx_buffers[id];
     page = buf->page;
+    if (!page)
+	page = buf->page = (char*) alloc_page();
 
-    i = info->tx.req_prod_pvt;
-    tx = RING_GET_REQUEST(&info->tx, i);
+    i = dev->tx.req_prod_pvt;
+    tx = RING_GET_REQUEST(&dev->tx, i);
 
     memcpy(page,data,len);
 
@@ -441,15 +467,15 @@ void netfront_xmit(unsigned char* data,int len)
     tx->size = len;
     tx->flags=0;
     tx->id = id;
-    info->tx.req_prod_pvt = i + 1;
+    dev->tx.req_prod_pvt = i + 1;
 
     wmb();
 
-    RING_PUSH_REQUESTS_AND_CHECK_NOTIFY(&info->tx, notify);
+    RING_PUSH_REQUESTS_AND_CHECK_NOTIFY(&dev->tx, notify);
 
-    if(notify) notify_remote_via_evtchn(info->evtchn);
+    if(notify) notify_remote_via_evtchn(dev->evtchn);
 
     local_irq_save(flags);
-    network_tx_buf_gc();
+    network_tx_buf_gc(dev);
     local_irq_restore(flags);
 }
