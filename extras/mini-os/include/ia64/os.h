@@ -44,7 +44,7 @@ typedef uint64_t caddr_t;		/* rr7/kernel memory address. */
 #include "mm.h"
 
 
-void do_exit(void);
+void do_exit(void) __attribute__((noreturn));
 void arch_init(start_info_t *si);	/* in common.c */
 void arch_print_info(void);		/* in common.c */
 
