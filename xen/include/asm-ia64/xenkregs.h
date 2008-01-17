@@ -4,10 +4,9 @@
 /*
  * Translation registers:
  */
-#define IA64_TR_XEN_HEAP_REGS	3	/* dtr3: xen heap identity mapped regs */
+#define IA64_TR_MAPPED_REGS	3	/* dtr3: vcpu mapped regs */
 #define IA64_TR_SHARED_INFO	4	/* dtr4: page shared with domain */
-#define IA64_TR_MAPPED_REGS	5	/* dtr5: vcpu mapped regs */
-#define	IA64_TR_VHPT		6	/* dtr6: vhpt */
+#define IA64_TR_VHPT		5	/* dtr5: vhpt */
 
 #define IA64_TR_VPD		2	/* itr2: vpd */
 

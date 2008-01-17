@@ -256,33 +256,6 @@ GLOBAL_ENTRY(ia64_switch_to)
 	br.ret.sptk.many rp		// boogie on out in new context
 
 .map:
-#ifdef XEN
-	// in0:	next in virtual address which must be in 
-	//      the xen identity mapping area.
-	// r20:	physical address of next
-	// r22:	ksp offset: used: don't overwrite. will be used later
-	// r24:	= THIS_CPU(cpu_kr)+IA64_KR_CURRENT_STACK_OFFSET
-	// r26:	(physical address of next) >> IA64_GRANULE_SHIFT
-	//
-	// r8: return value
-	// r13:	 thread pointer
-	// r21:	 thread pointer for VTi domain ??? can be removed?
-	
-	// avoid overlapping with xenheap TR
-	mov r28=ip			// get kernel tr area
-	;;
-	tpa r27=r28			// convert to physical address
-	;;
-	dep r25=0,r27,0,KERNEL_TR_PAGE_SHIFT
-	dep r23=0,r20,0,KERNEL_TR_PAGE_SHIFT
-	;;
-	cmp.eq p7,p6=r25,r23
-	mov r28=-1
-	;;
-(p7)	st8 [r24]=r28			// remember we don't map stack.
-(p7)	br.cond.sptk .done
-	;;
-#endif
 	rsm psr.ic			// interrupts (psr.i) are already disabled here
 	movl r25=PAGE_KERNEL
 #ifdef XEN	

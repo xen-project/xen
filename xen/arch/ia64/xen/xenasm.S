@@ -93,22 +93,8 @@ GLOBAL_ENTRY(ia64_new_rr7)
 	;; 
 	itr.d dtr[r16]=r18
 	;;
-	/* xen heap is also identity mapped */
-	mov r16 = IA64_TR_XEN_HEAP_REGS  
-	dep r17=-1,loc6,60,4
-	;;
-	ptr.d r17,r24
-	;;
-	mov cr.ifa=r17
-	;;
-	itr.d dtr[r16]=r18
-	;;
+
 	// re-pin mappings for stack (current)
-	// unless overlaps with IA64_TR_XEN_HEAP_REGS
-	dep r18=0,r13,0,KERNEL_TR_PAGE_SHIFT
-	;;
-	cmp.eq p7,p0=r17,r18
-(p7)	br.cond.sptk	.stack_overlaps
 	mov r25=IA64_GRANULE_SHIFT<<2
 	dep r21=0,r13,60,4		// physical address of "current"
 	;;
@@ -121,7 +107,6 @@ GLOBAL_ENTRY(ia64_new_rr7)
 	itr.d dtr[r21]=r23		// wire in new mapping...
 
 	//  Per-cpu	
-.stack_overlaps:
 	mov r24=PERCPU_PAGE_SHIFT<<2
 	movl r22=PERCPU_ADDR
 	;;
@@ -138,14 +123,11 @@ GLOBAL_ENTRY(ia64_new_rr7)
 #if IA64_GRANULE_SHIFT < VHPT_SIZE_LOG2
 #error "it must be that VHPT_SIZE_LOG2 <= IA64_GRANULE_SHIFT"
 #endif	
-	// unless overlaps with KERNEL_TR and IA64_TR_CURRENT_STACK
-	dep r14=0,in4,0,KERNEL_TR_PAGE_SHIFT
+	// unless overlaps with IA64_TR_CURRENT_STACK
 	dep r15=0,in4,0,IA64_GRANULE_SHIFT
 	dep r21=0,r13,0,IA64_GRANULE_SHIFT
 	;;
-	cmp.eq p7,p0=r17,r14
 	cmp.eq p8,p0=r15,r21
-(p7)	br.cond.sptk	.vhpt_overlaps
 (p8)	br.cond.sptk	.vhpt_overlaps
 	mov r21=IA64_TR_VHPT
 	dep r22=0,r15,60,4		// physical address of

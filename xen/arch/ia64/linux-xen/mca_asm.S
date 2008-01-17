@@ -279,19 +279,6 @@ ia64_do_tlb_purge:
 	;;
 	srlz.d
 	;;
-#ifdef XEN
-	/* xen heap is identity mapped */
-	mov r19=ip
-	;; 
-	dep r17=0,r19,0,KERNEL_TR_PAGE_SHIFT
-	;; 
-	dep r17=-1,r17,60,4
-	;; 
-	ptr.d r17,r18
-	;;
-	srlz.d
-	;; 
-#endif
 	// 2. Purge DTR for PERCPU data.
 	movl r16=PERCPU_ADDR
 	mov r18=PERCPU_PAGE_SHIFT<<2
@@ -427,18 +414,6 @@ ia64_reload_tr:
 	srlz.i
 	srlz.d
 	;;
-#ifdef XEN
-	/* xen heap is identity mapped */
-	mov r16=IA64_TR_XEN_HEAP_REGS  
-	dep r17=-1,r17,60,4
-	;; 
-	mov cr.ifa=r17
-	;;
-	itr.d dtr[r16]=r18
-	;;
-	srlz.d
-	;; 
-#endif
 	// 2. Reload DTR register for PERCPU data.
 	GET_THIS_PADDR(r2, ia64_mca_per_cpu_pte)
 	;;
@@ -475,29 +450,12 @@ ia64_reload_tr:
 	;;
 	// 4. Reload DTR for stack.
 #ifdef XEN
-	// avoid overlapping with xenheap TR
-	mov r17=ip
-	;;
-	dep r17=0,r17,0,KERNEL_TR_PAGE_SHIFT
-	;;
-	shr.u r17=r17,IA64_GRANULE_SHIFT
-	;; 
 	// Kernel registers are saved in a per_cpu cpu_kr_ia64_t
 	// to allow the kernel registers themselves to be used by domains.
 	GET_THIS_PADDR(r2, cpu_kr);;
 	add r2=IA64_KR_CURRENT_STACK_OFFSET,r2
 	;;
 	ld8 r16=[r2]
-	;;
-#if KERNEL_TR_PAGE_SHIFT < IA64_GRANULE_SHIFT
-# error "KERNEL_TR_PAGE_SHIFT < IA64_GRANULE_SHIFT shouldn't happen"
-#endif
-#if KERNEL_TR_PAGE_SHIFT > IA64_GRANULE_SHIFT
-	dep  r18=0,r16,0,KERNEL_TR_PAGE_SHIFT-IA64_GRANULE_SHIFT
-	;;
-#endif
-	cmp.eq p7,p0=r17,r18
-(p7)	br.cond.sptk	.reload_vhpt
 #else
 	mov r16=IA64_KR(CURRENT_STACK)
 #endif
@@ -524,16 +482,6 @@ ia64_reload_tr:
 	// 5. VHPT
 #if VHPT_ENABLED
 	GET_VA_VCPU_VHPT_MADDR(r2,r3);;
-	dep r3=0,r2,0,KERNEL_TR_PAGE_SHIFT
-	;; 
-	dep r3=0,r3,60,4		// physical address of
-	                                // va_vhpt & ~(KERNEL_TR_PAGE_SHIFT - 1)
-	;;
-	shr.u r3=r3,IA64_GRANULE_SHIFT
-	;;
-	cmp.eq p7,p0=r3,r17
-(p7)	br.cond.sptk	.overlap_vhpt
-	;;
 
 	// avoid overlapping with stack TR
 	shr.u r17=r2,IA64_GRANULE_SHIFT

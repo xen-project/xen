@@ -210,13 +210,6 @@ __vmx_vpd_pin(struct vcpu* v)
 	unsigned long privregs = (unsigned long)v->arch.privregs;
 	u64 psr;
 	
-	// check overlapping with xenheap
-	if ((privregs &
-	     ~(KERNEL_TR_PAGE_SIZE - 1)) ==
-	    ((unsigned long)__va(ia64_tpa(current_text_addr())) &
-	     ~(KERNEL_TR_PAGE_SIZE - 1)))
-		return;
-		
 	privregs &= ~(IA64_GRANULE_SIZE - 1);
 
 	// check overlapping with current stack

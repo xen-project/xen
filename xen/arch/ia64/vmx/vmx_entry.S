@@ -693,26 +693,10 @@ GLOBAL_ENTRY(vmx_switch_rr7)
 	;;
 	itr.d dtr[r16]=r24
 	;;
-	/* xen heap is also identity mapped */
-	mov r16 = IA64_TR_XEN_HEAP_REGS
-	dep r17=-1,r3,60,4
-	;;
-	ptr.d r17, r18
-	;;
-	mov cr.ifa=r17
-	;;
-	itr.d dtr[r16]=r24
-	;;
 
 	// re-pin mapping for stack (current)
-	// unless overlaps with IA64_TR_XEN_HEAP_REGS
 	mov r26=IA64_GRANULE_SHIFT<<2
 	dep r21=0,r13,60,4              // physical address of "current"
-	;;
-	dep r3=0,r21,0,KERNEL_TR_PAGE_SHIFT
-	;; 
-	cmp.eq p7,p0=r2,r3
-(p7)	br.cond.sptk .stack_overlaps
 	;;
 	ptr.d   r13,r26
 	or r23=r21,r25                  // construct PA | page properties
@@ -721,7 +705,6 @@ GLOBAL_ENTRY(vmx_switch_rr7)
 	mov r18=IA64_TR_CURRENT_STACK
 	;;
 	itr.d dtr[r18]=r23              // wire in new mapping...
-.stack_overlaps:
 
 	// re-pin mappings for per-cpu data
 	movl r22 = PERCPU_ADDR
@@ -739,16 +722,13 @@ GLOBAL_ENTRY(vmx_switch_rr7)
 	;;
 
 	// re-pin mappings for guest_vhpt
-	// unless overlaps with IA64_TR_XEN_HEAP_REGS or IA64_TR_CURRENT_STACK
-	dep r18=0,loc5,0,KERNEL_TR_PAGE_SHIFT
+	// unless overlaps with IA64_TR_CURRENT_STACK
 	// r21 = (current physical addr) & (IA64_GRANULE_SIZE - 1)
 	dep r21=0,r21,0,IA64_GRANULE_SHIFT 
 	// r17 = (guest_vhpt physical addr) & (IA64_GRANULE_SIZE - 1)
 	dep r17=0,loc5,0,IA64_GRANULE_SHIFT 
 	;;
-	cmp.eq p6,p0=r18,r2             // check overlap with xen heap
 	cmp.eq p7,p0=r17,r21            // check overlap with current stack
-(p6)	br.cond.sptk .vhpt_overlaps
 (p7)	br.cond.sptk .vhpt_overlaps
 	mov r24=IA64_TR_VHPT
 	;;
@@ -780,18 +760,11 @@ GLOBAL_ENTRY(vmx_switch_rr7)
 	// r16, r19, r20 are used by
 	//  ia64_switch_mode_phys()/ia64_switch_mode_virt()
 	// re-pin mappings for privregs
-	// r2   = ia64_tpa(ip) & (KERNEL_TR_PAGE_SIZE - 1)
 	// r21  = (current physical addr) & (IA64_GRANULE_SIZE - 1)
 	// r17  = (guest_vhpt physical addr) & (IA64_GRANULE_SIZE - 1)
-
-	// r24  = (privregs physical addr) & (KERNEL_TR_PAGE_SIZE - 1)
 	// loc6 = (((pal phys addr) & (IA64_GRANULE_SIZE - 1) << 2)) | PAGE_KERNEL
 	// loc7 = (privregs physical addr) & (IA64_GRANULE_SIZE - 1)
-	dep r24 = 0,loc7,0,KERNEL_TR_PAGE_SHIFT
-	;;
-	cmp.ne p6,p0=r24,r2		// check overlap with xen heap
-	;; 
-(p6)	cmp.ne.unc p7,p0=r21,loc7	// check overlap with current stack
+	cmp.ne.unc p7,p0=r21,loc7	// check overlap with current stack
 	;;
 (p7)	cmp.ne.unc p8,p0=r17,loc7	// check overlap with guest_vhpt
 	;;
@@ -812,7 +785,6 @@ GLOBAL_ENTRY(vmx_switch_rr7)
 	;;
 (p8)	itr.d dtr[r24]=loc7         // wire in new mapping...
 	;;
-.privregs_overlaps:
 
 	// done, switch back to virtual and return
 	mov r16=loc4                    // r16= original psr
