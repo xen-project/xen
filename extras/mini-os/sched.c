@@ -198,7 +198,11 @@ void exit_thread(void)
     list_add(&thread->thread_list, &exited_threads);
     local_irq_restore(flags);
     /* Schedule will free the resources */
-    schedule();
+    while(1)
+    {
+        schedule();
+        printk("schedule() returned!  Trying again\n");
+    }
 }
 
 void block(struct thread *thread)

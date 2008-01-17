@@ -39,6 +39,7 @@ struct thread* arch_create_thread(char *name, void (*function)(void *),
 void init_sched(void);
 void run_idle_thread(void);
 struct thread* create_thread(char *name, void (*function)(void *), void *data);
+void exit_thread(void) __attribute__((noreturn));
 void schedule(void);
 
 #define current get_current()
