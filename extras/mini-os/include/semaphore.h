@@ -49,6 +49,19 @@ static inline void init_SEMAPHORE(struct semaphore *sem, int count)
 
 #define init_MUTEX(sem) init_SEMAPHORE(sem, 1)
 
+static inline int trydown(struct semaphore *sem)
+{
+    unsigned long flags;
+    int ret = 0;
+    local_irq_save(flags);
+    if (sem->count > 0) {
+        ret = 1;
+        sem->count--;
+    }
+    local_irq_restore(flags);
+    return ret;
+}
+
 static void inline down(struct semaphore *sem)
 {
     unsigned long flags;
