@@ -85,29 +85,31 @@ static inline void wake_up(struct wait_queue_head *head)
     local_irq_restore(flags);   \
 } while (0)
 
-#define wait_event(wq, condition) do{             \
-    unsigned long flags;                          \
-    if(condition)                                 \
-        break;                                    \
-    DEFINE_WAIT(__wait);                          \
-    for(;;)                                       \
-    {                                             \
-        /* protect the list */                    \
-        local_irq_save(flags);                    \
-        add_wait_queue(&wq, &__wait);             \
-        block(current);                           \
-        local_irq_restore(flags);                 \
-        if(condition)                             \
-            break;                                \
-        schedule();                               \
-    }                                             \
-    local_irq_save(flags);                        \
-    /* need to wake up */                         \
-    wake(current);                                \
-    remove_wait_queue(&__wait);                   \
-    local_irq_restore(flags);                     \
+#define wait_event_deadline(wq, condition, deadline) do {       \
+    unsigned long flags;                                        \
+    if(condition)                                               \
+        break;                                                  \
+    DEFINE_WAIT(__wait);                                        \
+    for(;;)                                                     \
+    {                                                           \
+        /* protect the list */                                  \
+        local_irq_save(flags);                                  \
+        add_wait_queue(&wq, &__wait);                           \
+        current->wakeup_time = deadline;                        \
+        clear_runnable(current);                                \
+        local_irq_restore(flags);                               \
+        if((condition) || (deadline && NOW() >= deadline))      \
+            break;                                              \
+        schedule();                                             \
+    }                                                           \
+    local_irq_save(flags);                                      \
+    /* need to wake up */                                       \
+    wake(current);                                              \
+    remove_wait_queue(&__wait);                                 \
+    local_irq_restore(flags);                                   \
 } while(0) 
 
+#define wait_event(wq, condition) wait_event_deadline(wq, condition, 0) 
 
 
 
