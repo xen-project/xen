@@ -738,13 +738,10 @@ def xm_restore(args):
         err("xm restore: Unable to read file %s" % savefile)
         sys.exit(1)
 
-    try:
-        if serverType == SERVER_XEN_API:
-            server.xenapi.VM.restore(savefile, paused)
-        else:
-            server.xend.domain.restore(savefile, paused)
-    except Exception, ex:
-        err("%s" % ex.faultString)
+    if serverType == SERVER_XEN_API:
+        server.xenapi.VM.restore(savefile, paused)
+    else:
+        server.xend.domain.restore(savefile, paused)
 
 
 def datetime_to_secs(v):
