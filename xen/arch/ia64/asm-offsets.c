@@ -253,8 +253,6 @@ void foo(void)
 	DEFINE(IA64_MCA_CPU_RBSTORE_OFFSET,
 	       offsetof(struct ia64_mca_cpu, rbstore));
 
-	DEFINE(IA64_DOMAIN_SHARED_INFO_OFFSET,
-	       offsetof(struct domain, shared_info));
 	DEFINE(IA64_DOMAIN_SHARED_INFO_VA_OFFSET,
 	       offsetof(struct domain, arch.shared_info_va));
 	DEFINE(IA64_DOMAIN_FLAGS_OFFSET,
