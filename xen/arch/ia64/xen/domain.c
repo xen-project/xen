@@ -211,8 +211,9 @@ void schedule_tail(struct vcpu *prev)
 		load_region_regs(current);
 		ia64_set_pta(vcpu_pta(current));
 		vcpu_load_kernel_regs(current);
-		__ia64_per_cpu_var(current_psr_i_addr) = &current->domain->
-		  shared_info->vcpu_info[current->vcpu_id].evtchn_upcall_mask;
+		__ia64_per_cpu_var(current_psr_i_addr) =
+			(uint8_t*)(current->domain->arch.shared_info_va +
+				   INT_ENABLE_OFFSET(current));
 		__ia64_per_cpu_var(current_psr_ic_addr) = (int *)
 		  (current->domain->arch.shared_info_va + XSI_PSR_IC_OFS);
 		migrate_timer(&current->arch.hlt_timer, current->processor);
@@ -279,8 +280,9 @@ void context_switch(struct vcpu *prev, struct vcpu *next)
             vcpu_set_next_timer(current);
             if (vcpu_timer_expired(current))
                 vcpu_pend_timer(current);
-            __ia64_per_cpu_var(current_psr_i_addr) = &nd->shared_info->
-                vcpu_info[current->vcpu_id].evtchn_upcall_mask;
+	    __ia64_per_cpu_var(current_psr_i_addr) =
+		    (uint8_t*)(nd->arch.shared_info_va +
+			       INT_ENABLE_OFFSET(current));
             __ia64_per_cpu_var(current_psr_ic_addr) =
                 (int *)(nd->arch.shared_info_va + XSI_PSR_IC_OFS);
             /* steal time accounting */
@@ -556,6 +558,7 @@ integer_param("pervcpu_vhpt", opt_pervcpu_vhpt);
 int arch_domain_create(struct domain *d)
 {
 	int i;
+	struct page_info *page = NULL;
 	
 	// the following will eventually need to be negotiated dynamically
 	d->arch.shared_info_va = DEFAULT_SHAREDINFO_ADDR;
@@ -575,9 +578,11 @@ int arch_domain_create(struct domain *d)
 #endif
 	if (tlb_track_create(d) < 0)
 		goto fail_nomem1;
-	d->shared_info = alloc_xenheap_pages(get_order_from_shift(XSI_SHIFT));
-	if (d->shared_info == NULL)
-	    goto fail_nomem;
+	page = alloc_domheap_pages(NULL, get_order_from_shift(XSI_SHIFT), 0);
+	if (page == NULL)
+		goto fail_nomem;
+	d->shared_info = page_to_virt(page);
+	BUG_ON(d->shared_info == NULL);
 	memset(d->shared_info, 0, XSI_SIZE);
 	for (i = 0; i < XSI_SIZE; i += PAGE_SIZE)
 	    share_xen_page_with_guest(virt_to_page((char *)d->shared_info + i),
@@ -619,8 +624,8 @@ fail_nomem:
 fail_nomem1:
 	if (d->arch.mm.pgd != NULL)
 	    pgd_free(d->arch.mm.pgd);
-	if (d->shared_info != NULL)
-	    free_xenheap_pages(d->shared_info, get_order_from_shift(XSI_SHIFT));
+	if (page != NULL)
+	    free_domheap_pages(page, get_order_from_shift(XSI_SHIFT));
 	return -ENOMEM;
 }
 
@@ -629,7 +634,8 @@ void arch_domain_destroy(struct domain *d)
 	mm_final_teardown(d);
 
 	if (d->shared_info != NULL)
-	    free_xenheap_pages(d->shared_info, get_order_from_shift(XSI_SHIFT));
+		free_domheap_pages(virt_to_page(d->shared_info),
+				   get_order_from_shift(XSI_SHIFT));
 
 	tlb_track_destroy(d);
 
@@ -1700,6 +1706,8 @@ domain_set_shared_info_va (unsigned long va)
 	VCPU(v, interrupt_mask_addr) = (unsigned char *)va +
 	                               INT_ENABLE_OFFSET(v);
 
+	__ia64_per_cpu_var(current_psr_i_addr) =
+		(uint8_t*)(va + INT_ENABLE_OFFSET(current));
 	__ia64_per_cpu_var(current_psr_ic_addr) = (int *)(va + XSI_PSR_IC_OFS);
 
 	/* Remap the shared pages.  */
