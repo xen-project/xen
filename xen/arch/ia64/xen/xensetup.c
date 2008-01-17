@@ -77,7 +77,7 @@ void *xen_pickle_offset __read_mostly;
 
 static void __init parse_xenheap_megabytes(char *s)
 {
-    unsigned long megabytes = parse_size_and_unit(s, NULL);
+    unsigned long megabytes = simple_strtoll(s, NULL, 0);
 
 #define XENHEAP_MEGABYTES_MIN   16
     if (megabytes < XENHEAP_MEGABYTES_MIN)
@@ -241,12 +241,21 @@ is_xenheap_usable_memory(efi_memory_desc_t *md)
 }
 
 static inline int __init
-md_overlaps(efi_memory_desc_t *md, unsigned long phys_addr)
+md_overlaps(const efi_memory_desc_t *md, unsigned long phys_addr)
 {
     return (phys_addr - md->phys_addr < (md->num_pages << EFI_PAGE_SHIFT));
 }
 
+static inline int __init
+md_overlap_with_boot_param(const efi_memory_desc_t *md)
+{
+    return md_overlaps(md, __pa(ia64_boot_param)) ||
+        md_overlaps(md, ia64_boot_param->efi_memmap) ||
+        md_overlaps(md, ia64_boot_param->command_line);
+}
+
 #define MD_SIZE(md) (md->num_pages << EFI_PAGE_SHIFT)
+#define MD_END(md) ((md)->phys_addr + ((md)->num_pages << EFI_PAGE_SHIFT))
 
 extern char __init_begin[], __init_end[];
 static void noinline init_done(void)
@@ -366,27 +375,34 @@ void __init start_kernel(void)
     while (relo_start + relo_size >= md_end) {
         md = efi_get_md(md_end);
 
-        BUG_ON(!md);
-        BUG_ON(!is_xenheap_usable_memory(md));
+        if (md == NULL) {
+            printk("no room to move loader data. skip moving loader data\n");
+            goto skip_move;
+        }
+        
+        md_end = MD_END(md);
+        if (relo_start < md->phys_addr)
+            relo_start = md->phys_addr;
+        
+        if (!is_xenheap_usable_memory(md))
+            continue;
 
-        md_end = md->phys_addr + MD_SIZE(md);
         /*
          * The dom0 kernel or initrd could overlap, reserve space
          * at the end to relocate them later.
          */
         if (md->type == EFI_LOADER_DATA) {
             /* Test for ranges we're not prepared to move */
-            BUG_ON(md_overlaps(md, __pa(ia64_boot_param)) ||
-                   md_overlaps(md, ia64_boot_param->efi_memmap) ||
-                   md_overlaps(md, ia64_boot_param->command_line));
+            if (!md_overlap_with_boot_param(md))
+                relo_size += MD_SIZE(md);
 
-            relo_size += MD_SIZE(md);
             /* If range overlaps the end, push out the relocation start */
             if (md_end > relo_start)
                 relo_start = md_end;
         }
     }
     last_md = md;
+    relo_start = md_end - relo_size;
     relo_end = relo_start + relo_size;
 
     md_end = __pa(ia64_imva(&_end));
@@ -397,9 +413,9 @@ void __init start_kernel(void)
      * and set to zero pages.
      */
     for (md = efi_get_md(md_end) ;; md = efi_get_md(md_end)) {
-        md_end = md->phys_addr + MD_SIZE(md);
+        md_end = MD_END(md);
 
-        if (md->type == EFI_LOADER_DATA) {
+        if (md->type == EFI_LOADER_DATA && !md_overlap_with_boot_param(md)) {
             unsigned long relo_offset;
 
             if (md_overlaps(md, ia64_boot_param->domain_start)) {
@@ -421,27 +437,14 @@ void __init start_kernel(void)
             relo_start += MD_SIZE(md);
         }
 
-        if (md == kern_md)
-            continue;
         if (md == last_md)
             break;
-
-        md->phys_addr = relo_end;
-        md->num_pages = 0;
     }
 
     /* Trim the last entry */
-    md->phys_addr = relo_end;
-    md->num_pages = (md_end - relo_end) >> EFI_PAGE_SHIFT;
+    md->num_pages -= (relo_size >> EFI_PAGE_SHIFT);
 
-    /*
-     * Expand the new kernel/xenheap (and maybe dom0/initrd) out to
-     * the full size.  This range will already be type EFI_LOADER_DATA,
-     * therefore the xenheap area is now protected being allocated for
-     * use by find_memmap_space() in efi.c
-     */
-    kern_md->num_pages = (relo_end - kern_md->phys_addr) >> EFI_PAGE_SHIFT;
-
+skip_move:
     reserve_memory();
 
     /* first find highest page frame number */
@@ -485,10 +488,21 @@ void __init start_kernel(void)
     if (vmx_enabled)
         xen_heap_start = vmx_init_env(xen_heap_start, xenheap_phys_end);
 
-    init_xenheap_pages(__pa(xen_heap_start), xenheap_phys_end);
+    md_end = __pa(xen_heap_start);
+    for (md = efi_get_md(md_end);
+         md != NULL && md->phys_addr < xenheap_phys_end;
+         md = efi_get_md(md_end)) {
+        md_end = MD_END(md);
+
+        if (md == kern_md ||
+            (md->type == EFI_LOADER_DATA && !md_overlap_with_boot_param(md)) ||
+            (md->attribute & EFI_MEMORY_WB))
+            init_xenheap_pages(max(__pa(xen_heap_start), md->phys_addr),
+                               min(md_end, xenheap_phys_end));
+    }
     printk("Xen heap: %luMB (%lukB)\n",
-	(xenheap_phys_end-__pa(xen_heap_start)) >> 20,
-	(xenheap_phys_end-__pa(xen_heap_start)) >> 10);
+           (xenheap_phys_end-__pa(xen_heap_start)) >> 20,
+           (xenheap_phys_end-__pa(xen_heap_start)) >> 10);
 
     end_boot_allocator();
 
