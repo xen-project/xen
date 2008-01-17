@@ -111,6 +111,8 @@ do {                                                           \
 	}                                                          \
 } while(0)
 
+#define BUG_ON(x) ASSERT(!(x))
+
 /* Consistency check as much as possible. */
 void sanity_check(void);
 

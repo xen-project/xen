@@ -9,9 +9,6 @@
 #include <xen/io/console.h>
 
 
-/* TODO - need to define BUG_ON for whole mini-os, need crash-dump as well */
-#define BUG_ON(_cond)   do{if(_cond) do_exit();} while(0);
-
 static inline struct xencons_interface *xencons_interface(void)
 {
     return mfn_to_virt(start_info.console.domU.mfn);

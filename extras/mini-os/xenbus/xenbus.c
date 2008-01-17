@@ -28,10 +28,6 @@
 #include <spinlock.h>
 #include <xmalloc.h>
 
-#define BUG_ON(x) do { \
-    if (x) {printk("BUG at %s:%d\n", __FILE__, __LINE__); BUG(); } \
-} while (0)
-
 #define min(x,y) ({                       \
         typeof(x) tmpx = (x);                 \
         typeof(y) tmpy = (y);                 \
