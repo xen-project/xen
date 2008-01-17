@@ -77,13 +77,19 @@ static void build_e820map(void *e820_page, unsigned long long mem_size)
     e820entry[nr_map].type = E820_RESERVED;
     nr_map++;
 
-    /* Low RAM goes here. Remove 3 pages for ioreq, bufioreq, and xenstore. */
+    /*
+     * Low RAM goes here. Remove 4 pages for: ioreq, bufioreq, and xenstore.
+     *  1. Guard page.
+     *  2. Buffered ioreq.
+     *  3. Xenstore.
+     *  4. Normal ioreq.
+     */
     e820entry[nr_map].addr = 0x100000;
-    e820entry[nr_map].size = mem_size - 0x100000 - PAGE_SIZE * 3;
+    e820entry[nr_map].size = mem_size - 0x100000 - PAGE_SIZE * 4;
     e820entry[nr_map].type = E820_RAM;
     nr_map++;
 
-    /* Explicitly reserve space for special pages (ioreq and xenstore). */
+    /* Explicitly reserve space for special pages. */
     e820entry[nr_map].addr = mem_size - PAGE_SIZE * 3;
     e820entry[nr_map].size = PAGE_SIZE * 3;
     e820entry[nr_map].type = E820_RESERVED;
@@ -243,6 +249,15 @@ static int setup_guest(int xc_handle,
         shared_page_nr = (HVM_BELOW_4G_RAM_END >> PAGE_SHIFT) - 1;
     else
         shared_page_nr = (v_end >> PAGE_SHIFT) - 1;
+
+    /* Free the guard page that separates low RAM from special pages. */
+    rc = xc_domain_memory_decrease_reservation(
+            xc_handle, dom, 1, 0, &page_array[shared_page_nr-3]);
+    if ( rc != 0 )
+    {
+        PERROR("Could not deallocate guard page for HVM guest.\n");
+        goto error_out;
+    }
 
     /* Paranoia: clean pages. */
     if ( xc_clear_domain_page(xc_handle, dom, shared_page_nr) ||
