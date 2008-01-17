@@ -195,8 +195,8 @@ GLOBAL_ENTRY(ia64_switch_to)
 
 	adds r22=IA64_TASK_THREAD_KSP_OFFSET,r13
 #ifdef XEN
-	movl r27=THIS_CPU(cpu_kr)+IA64_KR_CURRENT_STACK_OFFSET;;
-	ld8 r27=[r27]
+	movl r24=THIS_CPU(cpu_kr)+IA64_KR_CURRENT_STACK_OFFSET;;
+	ld8 r27=[r24]
 	adds r21=IA64_TASK_THREAD_KSP_OFFSET,in0
 	dep r20=0,in0,60,4		// physical address of "next"
 #else
@@ -231,12 +231,9 @@ GLOBAL_ENTRY(ia64_switch_to)
 (p6)	srlz.d
 	ld8 sp=[r21]			// load kernel stack pointer of new task
 #ifdef XEN
-	movl r8=THIS_CPU(cpu_kr)+IA64_KR_CURRENT_OFFSET;;
-	st8 [r8]=in0
-#else
-	mov IA64_KR(CURRENT)=in0	// update "current" application register
-#endif
-#ifdef XEN          //for VTI domain current is save to 21 of bank0
+	add r25=IA64_KR_CURRENT_OFFSET-IA64_KR_CURRENT_STACK_OFFSET,r24
+	;;
+	st8 [r25]=in0			// update "current" application register
 	;;
 	bsw.0
 	;;
@@ -247,6 +244,7 @@ GLOBAL_ENTRY(ia64_switch_to)
 	bsw.1
 	;;
 #else
+	mov IA64_KR(CURRENT)=in0	// update "current" application register
 	mov r8=r13          // return pointer to previously running task
 	mov r13=in0         // set "current" pointer
 #endif
@@ -259,33 +257,55 @@ GLOBAL_ENTRY(ia64_switch_to)
 
 .map:
 #ifdef XEN
-	// avoid overlapping with kernel TR
-	movl r25=KERNEL_START
-	dep  r23=0,in0,0,KERNEL_TR_PAGE_SHIFT
+	// in0:	next in virtual address which must be in 
+	//      the xen identity mapping area.
+	// r20:	physical address of next
+	// r22:	ksp offset: used: don't overwrite. will be used later
+	// r24:	= THIS_CPU(cpu_kr)+IA64_KR_CURRENT_STACK_OFFSET
+	// r26:	(physical address of next) >> IA64_GRANULE_SHIFT
+	//
+	// r8: return value
+	// r13:	 thread pointer
+	// r21:	 thread pointer for VTi domain ??? can be removed?
+	
+	// avoid overlapping with xenheap TR
+	mov r28=ip			// get kernel tr area
 	;;
-	cmp.eq p7,p0=r25,r23
+	tpa r27=r28			// convert to physical address
 	;;
-(p7)	movl r8=THIS_CPU(cpu_kr)+IA64_KR_CURRENT_STACK_OFFSET;;
-(p7)	st8 [r8]=r26
+	dep r25=0,r27,0,KERNEL_TR_PAGE_SHIFT
+	dep r23=0,r20,0,KERNEL_TR_PAGE_SHIFT
+	;;
+	cmp.eq p7,p6=r25,r23
+	mov r28=-1
+	;;
+(p7)	st8 [r24]=r28			// remember we don't map stack.
 (p7)	br.cond.sptk .done
+	;;
 #endif
 	rsm psr.ic			// interrupts (psr.i) are already disabled here
 	movl r25=PAGE_KERNEL
-	movl r26 = IA64_GRANULE_SHIFT << 2
+#ifdef XEN	
+	movl r27=IA64_GRANULE_SHIFT << 2
+#endif
 	;;
 	srlz.d
 	or r23=r25,r20			// construct PA | page properties
-	ptr.d in0, r26			// to purge dtr[IA64_TR_VHPT]
+#ifdef XEN
+	ptr.d in0,r27			// to purge dtr[IA64_TR_VHPT]
+#else
+	movl r27=IA64_GRANULE_SHIFT << 2	
+#endif
 	;;
-	mov cr.itir=r26
+	mov cr.itir=r27
 	mov cr.ifa=in0			// VA of next task...
+#ifdef XEN
 	srlz.d
+#endif
 	;;
 	mov r25=IA64_TR_CURRENT_STACK
 #ifdef XEN
-	movl r8=THIS_CPU(cpu_kr)+IA64_KR_CURRENT_STACK_OFFSET;;
-	st8 [r8]=r26
-	
+	st8 [r24]=r26			// remember last page we mapped...
 #else
 	mov IA64_KR(CURRENT_STACK)=r26	// remember last page we mapped...
 #endif
