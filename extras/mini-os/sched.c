@@ -139,7 +139,7 @@ void schedule(void)
         if(thread != prev)
         {
             list_del(&thread->thread_list);
-            free_pages(thread->stack, 1);
+            free_pages(thread->stack, STACK_SIZE_PAGE_ORDER);
             xfree(thread);
         }
     }

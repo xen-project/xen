@@ -25,12 +25,15 @@
 #ifndef _ARCH_MM_H_
 #define _ARCH_MM_H_
 
+#ifndef __ASSEMBLY__
+#include <xen/xen.h>
 #if defined(__i386__)
 #include <xen/arch-x86_32.h>
 #elif defined(__x86_64__)
 #include <xen/arch-x86_64.h>
 #else
 #error "Unsupported architecture"
+#endif
 #endif
 
 #define L1_FRAME                1
@@ -53,7 +56,9 @@
 
 #define NOT_L1_FRAMES           1
 #define PRIpte "08lx"
+#ifndef __ASSEMBLY__
 typedef unsigned long pgentry_t;
+#endif
 
 #else /* defined(CONFIG_X86_PAE) */
 
@@ -76,7 +81,9 @@ typedef unsigned long pgentry_t;
  */
 #define NOT_L1_FRAMES           3
 #define PRIpte "016llx"
+#ifndef __ASSEMBLY__
 typedef uint64_t pgentry_t;
+#endif
 
 #endif /* !defined(CONFIG_X86_PAE) */
 
@@ -102,7 +109,9 @@ typedef uint64_t pgentry_t;
 
 #define NOT_L1_FRAMES           3
 #define PRIpte "016lx"
+#ifndef __ASSEMBLY__
 typedef unsigned long pgentry_t;
+#endif
 
 #endif
 
@@ -146,10 +155,14 @@ typedef unsigned long pgentry_t;
 #define L4_PROT (_PAGE_PRESENT|_PAGE_RW|_PAGE_ACCESSED|_PAGE_DIRTY|_PAGE_USER)
 #endif /* __i386__ || __x86_64__ */
 
+#ifdef __ASSEMBLY__
+#define PAGE_SIZE       (1 << L1_PAGETABLE_SHIFT)
+#else
 #ifndef CONFIG_X86_PAE
 #define PAGE_SIZE       (1UL << L1_PAGETABLE_SHIFT)
 #else
 #define PAGE_SIZE       (1ULL << L1_PAGETABLE_SHIFT)
+#endif
 #endif
 #define PAGE_SHIFT      L1_PAGETABLE_SHIFT
 #define PAGE_MASK       (~(PAGE_SIZE-1))
@@ -162,6 +175,10 @@ typedef unsigned long pgentry_t;
 /* to align the pointer to the (next) page boundary */
 #define PAGE_ALIGN(addr)        (((addr)+PAGE_SIZE-1)&PAGE_MASK)
 
+#define STACK_SIZE_PAGE_ORDER  1
+#define STACK_SIZE             (PAGE_SIZE * (1 << STACK_SIZE_PAGE_ORDER))
+
+#ifndef __ASSEMBLY__
 /* Definitions for machine and pseudophysical addresses. */
 #ifdef CONFIG_X86_PAE
 typedef unsigned long long paddr_t;
@@ -188,6 +205,7 @@ static __inline__ paddr_t machine_to_phys(maddr_t machine)
 	phys = (phys << PAGE_SHIFT) | (machine & ~PAGE_MASK);
 	return phys;
 }
+#endif
 
 #define VIRT_START                 ((unsigned long)&_text)
 

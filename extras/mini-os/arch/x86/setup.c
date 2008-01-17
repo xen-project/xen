@@ -45,7 +45,7 @@ union start_info_union start_info_union;
  * Just allocate the kernel stack here. SS:ESP is set up to point here
  * in head.S.
  */
-char stack[2*8192];
+char stack[2*STACK_SIZE];
 
 extern char shared_info[PAGE_SIZE];
 
@@ -102,7 +102,7 @@ arch_init(start_info_t *si)
 void
 arch_print_info(void)
 {
-	printk("  stack:      %p-%p\n", stack, stack + 2*8192);
+	printk("  stack:      %p-%p\n", stack, stack + sizeof(stack));
 }
 
 

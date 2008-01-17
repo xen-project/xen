@@ -57,7 +57,7 @@
 
 void dump_stack(struct thread *thread)
 {
-    unsigned long *bottom = (unsigned long *)(thread->stack + 2*4*1024); 
+    unsigned long *bottom = (unsigned long *)(thread->stack + STACK_SIZE); 
     unsigned long *pointer = (unsigned long *)thread->sp;
     int count;
     if(thread == current)
@@ -98,13 +98,13 @@ struct thread* arch_create_thread(char *name, void (*function)(void *),
     struct thread *thread;
     
     thread = xmalloc(struct thread);
-    /* Allocate 2 pages for stack, stack will be 2pages aligned */
-    thread->stack = (char *)alloc_pages(1);
+    /* We can't use lazy allocation here since the trap handler runs on the stack */
+    thread->stack = (char *)alloc_pages(STACK_SIZE_PAGE_ORDER);
     thread->name = name;
     printk("Thread \"%s\": pointer: 0x%lx, stack: 0x%lx\n", name, thread, 
             thread->stack);
     
-    thread->sp = (unsigned long)thread->stack + 4096 * 2;
+    thread->sp = (unsigned long)thread->stack + STACK_SIZE;
     /* Save pointer to the thread on the stack, used by current macro */
     *((unsigned long *)thread->stack) = (unsigned long)thread;
     

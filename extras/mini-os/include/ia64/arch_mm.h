@@ -33,4 +33,7 @@
 
 #define virt_to_mfn(x)	virt_to_pfn(x)
 
+#define STACK_SIZE_PAGE_ORDER   1
+#define STACK_SIZE              (PAGE_SIZE * (1 << STACK_SIZE_PAGE_ORDER))
+
 #endif /* __ARCH_MM_H__ */

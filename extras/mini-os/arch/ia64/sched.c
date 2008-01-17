@@ -40,11 +40,11 @@ arch_create_thread(char *name, void (*function)(void *), void *data)
 	struct thread* _thread;
 
 	_thread = (struct thread*)_xmalloc(sizeof(struct thread), 16);
-	/* Allocate 2 pages for stack, stack will be 2pages aligned */
-	_thread->stack = (char *)alloc_pages(1);
+	/* Allocate pages for stack, stack will be aligned */
+	_thread->stack = (char *)alloc_pages(STACK_SIZE_PAGE_ORDER);
 	_thread->name = name;
 	memset((void*)&(_thread->regs), 0, sizeof(_thread->regs));
-	_thread->regs.sp = ((uint64_t)_thread->stack) + 2 * PAGE_SIZE - 16;
+	_thread->regs.sp = ((uint64_t)_thread->stack) + STACK_SIZE - 16;
 	_thread->regs.bsp = ((uint64_t)_thread->stack) + 0x10;
 	_thread->regs.rp = FDESC_FUNC(thread_starter);
 	_thread->regs.pfs = 0x82;
