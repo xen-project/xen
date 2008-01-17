@@ -479,14 +479,26 @@ ia64_reload_tr:
 	;;
 	// 4. Reload DTR for stack.
 #ifdef XEN
-	// avoid overlapping with kernel TR
-	movl r17=KERNEL_START
+	// avoid overlapping with xenheap TR
+	mov r17=ip
+	;;
+	tpa r17=r17
+	;;
+	dep r17=0,r17,0,KERNEL_TR_PAGE_SHIFT
+	;;
+	shr.u r17=r17,IA64_GRANULE_SHIFT
+	;; 
 	GET_THIS_PADDR(r2,cpu_kr);;
 	add r2=IA64_KR_CURRENT_OFFSET,r2;;
 	ld8 r16=[r2];;
 	;;
-	dep  r16=0,r16,0,KERNEL_TR_PAGE_SHIFT
+#if KERNEL_TR_PAGE_SHIFT < IA64_GRANULE_SHIFT
+# error "KERNEL_TR_PAGE_SHIFT < IA64_GRANULE_SHIFT shouldn't happen"
+#endif
+#if KERNEL_TR_PAGE_SHIFT > IA64_GRANULE_SHIFT
+	dep  r16=0,r16,0,KERNEL_TR_PAGE_SHIFT-IA64_GRANULE_SHIFT
 	;;
+#endif
 	cmp.eq p7,p0=r17,r16
 (p7)	br.cond.sptk	.reload_vhpt
 	
@@ -522,6 +534,25 @@ ia64_reload_tr:
 	// 5. VHPT
 #if VHPT_ENABLED
 	GET_VA_VCPU_VHPT_MADDR(r2,r3);;
+	dep r3=0,r2,0,KERNEL_TR_PAGE_SHIFT
+	;;
+	shr.u r3=r3,IA64_GRANULE_SHIFT
+	;;
+	cmp.eq p7,p0=r3,r17
+(p7)	br.cond.sptk	.overlap_vhpt
+	;;
+
+	// avoid overlapping with stack TR
+	shr.u r17=r2,IA64_GRANULE_SHIFT
+	GET_THIS_PADDR(r3, cpu_kr);;
+	add r3=IA64_KR_CURRENT_STACK_OFFSET,r3
+	;;
+	ld8 r3=[r3]
+	;;
+	cmp.eq p7,p0=r3,r17
+(p7)	br.cond.sptk	.overlap_vhpt
+	;;
+
 	dep r16=0,r2,0,IA64_GRANULE_SHIFT
 	movl r20=PAGE_KERNEL
 	;;
@@ -538,6 +569,7 @@ ia64_reload_tr:
 	;;
 	srlz.d
 	;;
+.overlap_vhpt:
 #endif
 #endif
 	br.sptk.many done_tlb_purge_and_reload
