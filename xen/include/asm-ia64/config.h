@@ -25,7 +25,11 @@
 #ifdef CONFIG_XEN_SMP
 #define CONFIG_SMP 1
 #define CONFIG_HOTPLUG_CPU 1
+#ifdef MAX_PHYS_CPUS
+#define NR_CPUS MAX_PHYS_CPUS
+#else
 #define NR_CPUS 64
+#endif
 #define CONFIG_NUMA
 #define CONFIG_ACPI_NUMA
 #define NODES_SHIFT 8
