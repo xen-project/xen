@@ -193,8 +193,13 @@ per_cpu_init (void)
 	 */
 	if (smp_processor_id() == 0) {
 #ifdef XEN
-		cpu_data = alloc_xenheap_pages(get_order(NR_CPUS
-							 * PERCPU_PAGE_SIZE));
+		struct page_info *page;
+		page = alloc_domheap_pages(NULL,
+					   get_order(NR_CPUS *
+						     PERCPU_PAGE_SIZE), 0);
+		if (page == NULL) 
+			panic("can't allocate per cpu area.\n");
+		cpu_data = page_to_virt(page);
 #else
 		cpu_data = __alloc_bootmem(PERCPU_PAGE_SIZE * NR_CPUS,
 					   PERCPU_PAGE_SIZE, __pa(MAX_DMA_ADDRESS));
