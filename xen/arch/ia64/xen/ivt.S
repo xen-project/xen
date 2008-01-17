@@ -394,11 +394,7 @@ ENTRY(dirty_bit)
 	;;
 	ld8 r22=[r22]
 	;;
-	add r22=IA64_VCPU_DOMAIN_OFFSET,r22
-	;;
-	ld8 r22=[r22]			// read domain
-	;;
-	add r22=IA64_DOMAIN_SHADOW_BITMAP_OFFSET,r22
+	add r22=IA64_VCPU_SHADOW_BITMAP_OFFSET,r22
 	;;
 	ld8 r22=[r22]
 	;;

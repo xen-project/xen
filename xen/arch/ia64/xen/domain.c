@@ -1745,6 +1745,10 @@ int shadow_mode_control(struct domain *d, xen_domctl_shadow_op_t *sc)
 	case XEN_DOMCTL_SHADOW_OP_OFF:
 		if (shadow_mode_enabled (d)) {
 			u64 *bm = d->arch.shadow_bitmap;
+			struct vcpu *v;
+
+			for_each_vcpu(d, v)
+				v->arch.shadow_bitmap = NULL;
 
 			/* Flush vhpt and tlb to restore dirty bit usage.  */
 			domain_flush_tlb_vhpt(d);
@@ -1780,9 +1784,12 @@ int shadow_mode_control(struct domain *d, xen_domctl_shadow_op_t *sc)
 			rc = -ENOMEM;
 		}
 		else {
+			struct vcpu *v;
 			memset(d->arch.shadow_bitmap, 0, 
 			       d->arch.shadow_bitmap_size / 8);
-			
+
+			for_each_vcpu(d, v)
+				v->arch.shadow_bitmap = d->arch.shadow_bitmap;
 			/* Flush vhtp and tlb to enable dirty bit
 			   virtualization.  */
 			domain_flush_tlb_vhpt(d);

@@ -56,7 +56,6 @@ void foo(void)
 	DEFINE(IA64_TASK_THREAD_KSP_OFFSET, offsetof (struct vcpu, arch._thread.ksp));
 	DEFINE(IA64_TASK_THREAD_ON_USTACK_OFFSET, offsetof (struct vcpu, arch._thread.on_ustack));
 
-	DEFINE(IA64_VCPU_DOMAIN_OFFSET, offsetof (struct vcpu, domain));
 	DEFINE(IA64_VCPU_HYPERCALL_CONTINUATION_OFS, offsetof (struct vcpu, arch.hypercall_continuation));
 	DEFINE(IA64_VCPU_FP_PSR_OFFSET, offsetof (struct vcpu, arch.fp_psr));
 	DEFINE(IA64_VCPU_META_RID_DT_OFFSET, offsetof (struct vcpu, arch.metaphysical_rid_dt));
@@ -79,7 +78,7 @@ void foo(void)
 
 	BLANK();
 
-	DEFINE(IA64_DOMAIN_SHADOW_BITMAP_OFFSET, offsetof (struct domain, arch.shadow_bitmap));
+	DEFINE(IA64_VCPU_SHADOW_BITMAP_OFFSET, offsetof (struct vcpu, arch.shadow_bitmap));
 
 	BLANK();
 
