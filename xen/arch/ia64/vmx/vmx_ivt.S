@@ -566,7 +566,6 @@ ENTRY(vmx_break_fault)
 
     mov.m r25=ar.unat			// M2 (5 cyc)
     dep r29=r8,r29,41,2			// I0   insert new ei into cr.ipsr
-//  adds r15=1024,r15			// A    restore original syscall number
    //
    // If any of the above loads miss in L1D, we'll stall here until
    // the data arrives.
@@ -574,34 +573,43 @@ ENTRY(vmx_break_fault)
 ///////////////////////////////////////////////////////////////////////
 //    st1 [r16]=r0				// M2|3 clear current->thread.on_ustack flag
     mov b6=r30				// I0   setup syscall handler branch reg early
-//    cmp.ne pKStk,pUStk=r0,r0		// A    were we on kernel stacks already?
 
-//  and r9=_TIF_SYSCALL_TRACEAUDIT,r9	// A    mask trace or audit
     mov r18=ar.bsp				// M2 (12 cyc)
    ;;
-//(pUStk) addl r1=IA64_STK_OFFSET-IA64_PT_REGS_SIZE,r1 // A    compute base of memory stack
     addl r1=IA64_STK_OFFSET-IA64_PT_REGS_SIZE,r1 // A    compute base of memory stack
-//  cmp.eq p14,p0=r9,r0			// A    are syscalls being traced/audited?
-//    br.call.sptk.many b7=ia64_syscall_setup	// B
     br.call.sptk.many b7=ia64_hypercall_setup	// B
 1:
     mov ar.rsc=0x3				// M2   set eager mode, pl 0, LE, loadrs=0
-//    nop 0
-//    bsw.1					// B (6 cyc) regs are saved, switch to bank 1
     ;;
     ssm psr.ic | PSR_DEFAULT_BITS		// M2	now it's safe to re-enable intr.-collection
-//    movl r3=ia64_ret_from_syscall		// X
-    movl r3=ia64_leave_hypercall		// X
     ;;
 
     srlz.i					// M0   ensure interruption collection is on
-    mov rp=r3				// I0   set the real return addr
-    //(p10) br.cond.spnt.many ia64_ret_from_syscall	// B    return if bad call-frame or r15 is a NaT
-    (p15)   ssm psr.i				// M2   restore psr.i
-    //(p14) br.call.sptk.many b6=b6			// B    invoke syscall-handker (ignore return addr)
-    br.call.sptk.many b6=b6			// B    invoke syscall-handker (ignore return addr)
-//  br.cond.spnt.many ia64_trace_syscall	// B	do syscall-tracing thingamagic
-   ;;
+(p15)   ssm psr.i				// M2   restore psr.i
+    br.call.sptk.many b0=b6			// B    invoke syscall-handker (ignore return addr)
+	;; 
+	//restore hypercall argument if continuation
+	adds r2=IA64_VCPU_HYPERCALL_CONTINUATION_OFS,r13
+	;;
+	ld1 r20=[r2]
+	;;
+	st1 [r2]=r0
+	cmp.ne p6,p0=r20,r0
+	;;
+(p6)	adds r2=PT(R16)+16,r12
+(p6)	adds r3=PT(R17)+16,r12
+	;;
+(p6)	ld8 r32=[r2],16
+(p6)	ld8 r33=[r3],16
+	;;
+(p6)	ld8 r34=[r2],16
+(p6)	ld8 r35=[r3],16
+	;;
+(p6)	ld8 r36=[r2],16
+	;;
+	br.sptk.many ia64_leave_hypercall
+	;;
+
    VMX_FAULT(11)
 END(vmx_break_fault)
 
