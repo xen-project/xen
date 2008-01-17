@@ -194,13 +194,13 @@ GLOBAL_ENTRY(ia64_switch_to)
 	.body
 
 	adds r22=IA64_TASK_THREAD_KSP_OFFSET,r13
-	movl r25=init_task
 #ifdef XEN
 	movl r27=THIS_CPU(cpu_kr)+IA64_KR_CURRENT_STACK_OFFSET;;
 	ld8 r27=[r27]
 	adds r21=IA64_TASK_THREAD_KSP_OFFSET,in0
 	dep r20=0,in0,60,4		// physical address of "next"
 #else
+	movl r25=init_task
 	mov r27=IA64_KR(CURRENT_STACK)
 	adds r21=IA64_TASK_THREAD_KSP_OFFSET,in0
 	dep r20=0,in0,61,3		// physical address of "next"
@@ -208,6 +208,14 @@ GLOBAL_ENTRY(ia64_switch_to)
 	;;
 	st8 [r22]=sp			// save kernel stack pointer of old task
 	shr.u r26=r20,IA64_GRANULE_SHIFT
+#ifdef XEN
+	;;
+	/*
+	 * If we've already mapped this task's page, we can skip doing it again.
+	 */
+	cmp.eq p7,p6=r26,r27
+	br.cond.dpnt .map
+#else	
 	cmp.eq p7,p6=r25,in0
 	;;
 	/*
@@ -215,6 +223,7 @@ GLOBAL_ENTRY(ia64_switch_to)
 	 */
 (p6)	cmp.eq p7,p6=r26,r27
 (p6)	br.cond.dpnt .map
+#endif	
 	;;
 .done:
 (p6)	ssm psr.ic			// if we had to map, reenable the psr.ic bit FIRST!!!
