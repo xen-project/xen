@@ -331,11 +331,23 @@ start_ap:
 	;;
 	tpa r3=r2		// r3 == phys addr of task struct
 	mov r16=-1
+#ifdef XEN
+	;;
+	dep r2=-1,r3,60,4	// IMVA of task	
+	// XEN:	check overlap with XENHEAP
+	mov r17=ip
+	;;
+	tpa r17=r17
+	;;
+	dep r17=0,r17,0,KERNEL_TR_PAGE_SHIFT
+	dep r18=0,r3,0,KERNEL_TR_PAGE_SHIFT
+	;;
+	cmp.eq p4,p0=r17,r18
+(p4)	br.cond.dpnt .load_current
+#else
 (isBP)	br.cond.dpnt .load_current // BP stack is on region 5 --- no need to map it
+#endif
 
-#ifndef XEN
-	// XEN:	stack is allocated in xenheap, which is currently always
-	//  mapped.
 	// load mapping for stack (virtaddr in r2, physaddr in r3)
 	rsm psr.ic
 	movl r17=PAGE_KERNEL
@@ -344,9 +356,7 @@ start_ap:
 	dep r18=0,r3,0,12
 	;;
 	or r18=r17,r18
-#ifdef XEN
-	dep r2=-1,r3,60,4	// IMVA of task
-#else
+#ifndef XEN
 	dep r2=-1,r3,61,3	// IMVA of task
 #endif
 	;;
@@ -364,7 +374,6 @@ start_ap:
 	;;
 	ssm psr.ic
 	srlz.d
-#endif
   	;;
 	
 .load_current:
