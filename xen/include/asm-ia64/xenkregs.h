@@ -9,6 +9,8 @@
 #define IA64_TR_MAPPED_REGS	5	/* dtr5: vcpu mapped regs */
 #define	IA64_TR_VHPT		6	/* dtr6: vhpt */
 
+#define IA64_TR_VPD		2	/* itr2: vpd */
+
 #define IA64_DTR_GUEST_KERNEL   7
 #define IA64_ITR_GUEST_KERNEL   2
 /* Processor status register bits: */

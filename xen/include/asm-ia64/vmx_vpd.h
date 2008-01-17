@@ -80,6 +80,24 @@ struct arch_vmx_struct {
 
 #define ARCH_VMX_DOMAIN         0       /* Need it to indicate VTi domain */
 
+/* pin/unpin vpd area for PAL call with DTR[] */
+void __vmx_vpd_pin(struct vcpu* v);
+void __vmx_vpd_unpin(struct vcpu* v); 
+
+static inline void vmx_vpd_pin(struct vcpu* v)
+{
+    if (likely(v == current))
+        return;
+    __vmx_vpd_pin(v);
+}
+
+static inline void vmx_vpd_unpin(struct vcpu* v)
+{
+    if (likely(v == current))
+        return;
+    __vmx_vpd_unpin(v);
+}
+
 #endif //__ASSEMBLY__
 
 // VPD field offset

@@ -138,7 +138,6 @@ extern void * pal_vaddr;
 void
 vmx_load_all_rr(VCPU *vcpu)
 {
-	unsigned long psr;
 	unsigned long rr0, rr4;
 
 	switch (vcpu->arch.arch_vmx.mmu_mode) {
@@ -158,8 +157,6 @@ vmx_load_all_rr(VCPU *vcpu)
 		panic_domain(NULL, "bad mmu mode value");
 	}
 
-	psr = ia64_clear_ic();
-
 	ia64_set_rr((VRN0 << VRN_SHIFT), rr0);
 	ia64_dv_serialize_data();
 	ia64_set_rr((VRN4 << VRN_SHIFT), rr4);
@@ -175,13 +172,12 @@ vmx_load_all_rr(VCPU *vcpu)
 	ia64_set_rr((VRN6 << VRN_SHIFT), vrrtomrr(vcpu, VMX(vcpu, vrr[VRN6])));
 	ia64_dv_serialize_data();
 	vmx_switch_rr7(vrrtomrr(vcpu,VMX(vcpu, vrr[VRN7])),
-		       (void *)vcpu->arch.vhpt.hash, pal_vaddr);
+                      (void *)vcpu->arch.vhpt.hash,
+		       pal_vaddr, vcpu->arch.privregs);
 	ia64_set_pta(VMX(vcpu, mpta));
 	vmx_ia64_set_dcr(vcpu);
 
 	ia64_srlz_d();
-	ia64_set_psr(psr);
-	ia64_srlz_i();
 }
 
 void

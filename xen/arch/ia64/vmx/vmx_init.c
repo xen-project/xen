@@ -51,6 +51,7 @@
 #include <asm/viosapic.h>
 #include <xen/event.h>
 #include <asm/vlsapic.h>
+#include <asm/vhpt.h>
 #include "entry.h"
 
 /* Global flag to identify whether Intel vmx feature is on */
@@ -150,20 +151,21 @@ typedef union {
 	};
 } cpuid3_t;
 
-/* Allocate vpd from xenheap */
+/* Allocate vpd from domheap */
 static vpd_t *alloc_vpd(void)
 {
 	int i;
 	cpuid3_t cpuid3;
+	struct page_info *page;
 	vpd_t *vpd;
 	mapped_regs_t *mregs;
 
-	vpd = alloc_xenheap_pages(get_order(VPD_SIZE));
-	if (!vpd) {
+	page = alloc_domheap_pages(NULL, get_order(VPD_SIZE), 0);
+	if (page == NULL) {
 		printk("VPD allocation failed.\n");
 		return NULL;
 	}
-	vpd = (vpd_t *)virt_to_xenva(vpd);
+	vpd = page_to_virt(page);
 
 	printk(XENLOG_DEBUG "vpd base: 0x%p, vpd size:%ld\n",
 	       vpd, sizeof(vpd_t));
@@ -191,12 +193,79 @@ static vpd_t *alloc_vpd(void)
 	return vpd;
 }
 
-/* Free vpd to xenheap */
+/* Free vpd to domheap */
 static void
 free_vpd(struct vcpu *v)
 {
 	if ( v->arch.privregs )
-		free_xenheap_pages(v->arch.privregs, get_order(VPD_SIZE));
+		free_domheap_pages(virt_to_page(v->arch.privregs),
+				   get_order(VPD_SIZE));
+}
+
+// This is used for PAL_VP_CREATE and PAL_VPS_SET_PENDING_INTERRUPT
+// so that we don't have to pin the vpd down with itr[].
+void
+__vmx_vpd_pin(struct vcpu* v)
+{
+	unsigned long privregs = (unsigned long)v->arch.privregs;
+	u64 psr;
+	
+	// check overlapping with xenheap
+	if ((privregs &
+	     ~(KERNEL_TR_PAGE_SIZE - 1)) ==
+	    ((unsigned long)__va(ia64_tpa(current_text_addr())) &
+	     ~(KERNEL_TR_PAGE_SIZE - 1)))
+		return;
+		
+	privregs &= ~(IA64_GRANULE_SIZE - 1);
+
+	// check overlapping with current stack
+	if (privregs ==
+	    ((unsigned long)current & ~(IA64_GRANULE_SIZE - 1)))
+		return;
+
+	if (!VMX_DOMAIN(current)) {
+		// check overlapping with vhpt
+		if (privregs ==
+		    (vcpu_vhpt_maddr(current) & ~(IA64_GRANULE_SHIFT - 1)))
+			return;
+	} else {
+		// check overlapping with vhpt
+		if (privregs ==
+		    ((unsigned long)current->arch.vhpt.hash &
+		     ~(IA64_GRANULE_SHIFT - 1)))
+			return;
+
+		// check overlapping with privregs
+		if (privregs ==
+		    ((unsigned long)current->arch.privregs &
+		     ~(IA64_GRANULE_SHIFT - 1)))
+			return;
+	}
+
+	psr = ia64_clear_ic();
+	ia64_ptr(0x2 /*D*/, privregs, IA64_GRANULE_SIZE);
+	ia64_srlz_d();
+	ia64_itr(0x2 /*D*/, IA64_TR_MAPPED_REGS, privregs,
+		 pte_val(pfn_pte(__pa(privregs) >> PAGE_SHIFT, PAGE_KERNEL)),
+		 IA64_GRANULE_SHIFT);
+	ia64_set_psr(psr);
+	ia64_srlz_d();
+}
+
+void
+__vmx_vpd_unpin(struct vcpu* v)
+{
+	if (!VMX_DOMAIN(current)) {
+		int rc;
+		rc = !set_one_rr(VRN7 << VRN_SHIFT, VCPU(current, rrs[VRN7]));
+		BUG_ON(rc);
+	} else {
+		IA64FAULT fault;
+		fault = vmx_vcpu_set_rr(current, VRN7 << VRN_SHIFT,
+					VMX(current, vrr[VRN7]));
+		BUG_ON(fault != IA64_NO_FAULT);
+	}
 }
 
 /*
@@ -212,7 +281,11 @@ vmx_create_vp(struct vcpu *v)
 	/* ia64_ivt is function pointer, so need this tranlation */
 	ivt_base = (u64) &vmx_ia64_ivt;
 	printk(XENLOG_DEBUG "ivt_base: 0x%lx\n", ivt_base);
+
+	vmx_vpd_pin(v);
 	ret = ia64_pal_vp_create((u64 *)vpd, (u64 *)ivt_base, 0);
+	vmx_vpd_unpin(v);
+	
 	if (ret != PAL_STATUS_SUCCESS){
 		panic_domain(vcpu_regs(v),"ia64_pal_vp_create failed. \n");
 	}
@@ -224,6 +297,7 @@ vmx_save_state(struct vcpu *v)
 {
 	u64 status;
 
+	BUG_ON(v != current);
 	/* FIXME: about setting of pal_proc_vector... time consuming */
 	status = ia64_pal_vp_save((u64 *)v->arch.privregs, 0);
 	if (status != PAL_STATUS_SUCCESS){
@@ -250,6 +324,7 @@ vmx_load_state(struct vcpu *v)
 {
 	u64 status;
 
+	BUG_ON(v != current);
 	status = ia64_pal_vp_restore((u64 *)v->arch.privregs, 0);
 	if (status != PAL_STATUS_SUCCESS){
 		panic_domain(vcpu_regs(v),"Restore vp status failed\n");
@@ -518,6 +593,7 @@ void vmx_do_resume(struct vcpu *v)
 	ioreq_t *p;
 
 	vmx_load_all_rr(v);
+	vmx_load_state(v);
 	migrate_timer(&v->arch.arch_vmx.vtm.vtm_timer, v->processor);
 
 	/* stolen from hvm_do_resume() in arch/x86/hvm/hvm.c */

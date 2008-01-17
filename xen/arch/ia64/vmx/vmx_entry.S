@@ -623,14 +623,14 @@ END(ia64_leave_hypercall)
 #define PSR_BITS_TO_CLEAR                                           \
 	(IA64_PSR_I | IA64_PSR_IT | IA64_PSR_DT | IA64_PSR_DB |     \
 	 IA64_PSR_RT | IA64_PSR_DD | IA64_PSR_SS | IA64_PSR_RI |    \
-	 IA64_PSR_ED | IA64_PSR_DFL | IA64_PSR_DFH)
+	 IA64_PSR_ED | IA64_PSR_DFL | IA64_PSR_DFH | IA64_PSR_IC)
 #define PSR_BITS_TO_SET    IA64_PSR_BN
 
-//extern void vmx_switch_rr7(unsigned long rid, void *guest_vhpt, void * pal_vaddr );
+//extern void vmx_switch_rr7(unsigned long rid, void *guest_vhpt, void * pal_vaddr, void * shared_arch_info );
 GLOBAL_ENTRY(vmx_switch_rr7)
        // not sure this unwind statement is correct...
        .prologue ASM_UNW_PRLG_RP|ASM_UNW_PRLG_PFS, ASM_UNW_PRLG_GRSAVE(1)
-       alloc loc1 = ar.pfs, 3, 7, 0, 0
+	alloc loc1 = ar.pfs, 4, 8, 0, 0
 1:{
 	mov r28  = in0                  // copy procedure index
 	mov r8   = ip                   // save ip to compute branch
@@ -643,7 +643,12 @@ GLOBAL_ENTRY(vmx_switch_rr7)
 	tpa r3 = r8                     // get physical address of ip
 	dep loc5 = 0,in1,60,4           // get physical address of guest_vhpt
 	dep loc6 = 0,in2,60,4           // get physical address of pal code
+	dep loc7 = 0,in3,60,4           // get physical address of privregs
 	;;
+	dep loc6 = 0,loc6,0,IA64_GRANULE_SHIFT
+                                        // mask granule shift
+	dep loc7 = 0,loc7,0,IA64_GRANULE_SHIFT
+                                        // mask granule shift
 	mov loc4 = psr                  // save psr
 	;;
 	mov loc3 = ar.rsc               // save RSE configuration
@@ -661,11 +666,9 @@ GLOBAL_ENTRY(vmx_switch_rr7)
 	dep r16=-1,r0,61,3
 	;;
 	mov rr[r16]=in0
-	srlz.d
-	;;
-	rsm 0x6000
 	;;
 	srlz.d
+	;;
 
 	// re-pin mappings for kernel text and data
 	mov r18=KERNEL_TR_PAGE_SHIFT<<2
@@ -679,6 +682,7 @@ GLOBAL_ENTRY(vmx_switch_rr7)
 	mov r16=IA64_TR_KERNEL
 	movl r25 = PAGE_KERNEL
 	// r2=KERNEL_TR_PAGE_SHIFT truncated physicall address of ip
+	//   = ia64_tpa(ip) & (KERNEL_TR_PAGE_SIZE - 1)
 	dep r2=0,r3,0,KERNEL_TR_PAGE_SHIFT
 	;;
 	or r24=r2,r25
@@ -737,7 +741,9 @@ GLOBAL_ENTRY(vmx_switch_rr7)
 	// re-pin mappings for guest_vhpt
 	// unless overlaps with IA64_TR_XEN_HEAP_REGS or IA64_TR_CURRENT_STACK
 	dep r18=0,loc5,0,KERNEL_TR_PAGE_SHIFT
+	// r21 = (current physical addr) & (IA64_GRANULE_SIZE - 1)
 	dep r21=0,r21,0,IA64_GRANULE_SHIFT 
+	// r17 = (guest_vhpt physical addr) & (IA64_GRANULE_SIZE - 1)
 	dep r17=0,loc5,0,IA64_GRANULE_SHIFT 
 	;;
 	cmp.eq p6,p0=r18,r2             // check overlap with xen heap
@@ -770,6 +776,43 @@ GLOBAL_ENTRY(vmx_switch_rr7)
 	;;
 	itr.i itr[r24]=loc6             // wire in new mapping...
 	;;
+
+	// r16, r19, r20 are used by
+	//  ia64_switch_mode_phys()/ia64_switch_mode_virt()
+	// re-pin mappings for privregs
+	// r2   = ia64_tpa(ip) & (KERNEL_TR_PAGE_SIZE - 1)
+	// r21  = (current physical addr) & (IA64_GRANULE_SIZE - 1)
+	// r17  = (guest_vhpt physical addr) & (IA64_GRANULE_SIZE - 1)
+
+	// r24  = (privregs physical addr) & (KERNEL_TR_PAGE_SIZE - 1)
+	// loc6 = (((pal phys addr) & (IA64_GRANULE_SIZE - 1) << 2)) | PAGE_KERNEL
+	// loc7 = (privregs physical addr) & (IA64_GRANULE_SIZE - 1)
+	dep r24 = 0,loc7,0,KERNEL_TR_PAGE_SHIFT
+	;;
+	cmp.ne p6,p0=r24,r2		// check overlap with xen heap
+	;; 
+(p6)	cmp.ne.unc p7,p0=r21,loc7	// check overlap with current stack
+	;;
+(p7)	cmp.ne.unc p8,p0=r17,loc7	// check overlap with guest_vhpt
+	;;
+	// loc7 = (((privregs phys) & (IA64_GRANULE_SIZE - 1)) << 2) | PAGE_KERNEL
+	or loc7 = r25,loc7          // construct PA | page properties
+	;;
+	cmp.ne p9,p0=loc6,loc7
+	mov r22=IA64_TR_VPD
+	mov r24=IA64_TR_MAPPED_REGS
+	mov r23=IA64_GRANULE_SHIFT<<2
+	;;
+(p9)	ptr.i   in3,r23	
+(p8)	ptr.d   in3,r23
+	mov cr.itir=r23
+	mov cr.ifa=in3
+	;;
+(p9)	itr.i itr[r22]=loc7         // wire in new mapping...
+	;;
+(p8)	itr.d dtr[r24]=loc7         // wire in new mapping...
+	;;
+.privregs_overlaps:
 
 	// done, switch back to virtual and return
 	mov r16=loc4                    // r16= original psr

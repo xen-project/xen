@@ -241,8 +241,6 @@ void context_switch(struct vcpu *prev, struct vcpu *next)
             ia64_setreg(_IA64_REG_CR_DCR, dcr);
         }
     }
-    if (VMX_DOMAIN(next))
-        vmx_load_state(next);
 
     ia64_disable_vhpt_walker();
     lazy_fp_switch(prev, current);
@@ -261,6 +259,7 @@ void context_switch(struct vcpu *prev, struct vcpu *next)
 
     if (VMX_DOMAIN(current)) {
         vmx_load_all_rr(current);
+        vmx_load_state(current);
         migrate_timer(&current->arch.arch_vmx.vtm.vtm_timer,
                       current->processor);
     } else {

@@ -36,6 +36,7 @@
 #include <asm/gcc_intrin.h>
 #include <asm/vmx_mm_def.h>
 #include <asm/vmx.h>
+#include <asm/vmx_vpd.h>
 #include <asm/hw_irq.h>
 #include <asm/vmx_pal_vsa.h>
 #include <asm/kregs.h>
@@ -91,9 +92,12 @@ static void update_vhpi(VCPU *vcpu, int vec)
 
     VCPU(vcpu,vhpi) = vhpi;
     // TODO: Add support for XENO
-    if (VCPU(vcpu,vac).a_int)
+    if (VCPU(vcpu,vac).a_int) {
+        vmx_vpd_pin(vcpu);
         ia64_call_vsa(PAL_VPS_SET_PENDING_INTERRUPT, 
                       (uint64_t)vcpu->arch.privregs, 0, 0, 0, 0, 0, 0);
+        vmx_vpd_unpin(vcpu);
+    }
 }
 
 

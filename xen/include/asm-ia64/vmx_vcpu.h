@@ -114,7 +114,7 @@ extern void memwrite_v(VCPU * vcpu, thash_data_t * vtlb, u64 * src, u64 * dest,
                        size_t s);
 extern void memwrite_p(VCPU * vcpu, u64 * src, u64 * dest, size_t s);
 extern void vcpu_load_kernel_regs(VCPU * vcpu);
-extern void vmx_switch_rr7(unsigned long, void *, void *);
+extern void vmx_switch_rr7(unsigned long, void *, void *, void *);
 
 extern void dtlb_fault(VCPU * vcpu, u64 vadr);
 extern void nested_dtlb(VCPU * vcpu);
