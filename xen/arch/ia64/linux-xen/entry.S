@@ -214,7 +214,7 @@ GLOBAL_ENTRY(ia64_switch_to)
 	 * If we've already mapped this task's page, we can skip doing it again.
 	 */
 	cmp.eq p7,p6=r26,r27
-	br.cond.dpnt .map
+(p6)	br.cond.dpnt .map
 #else	
 	cmp.eq p7,p6=r25,in0
 	;;
