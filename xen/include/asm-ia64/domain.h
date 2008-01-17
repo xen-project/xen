@@ -262,6 +262,7 @@ struct arch_vcpu {
     int breakimm;			// from arch_domain (so is pinned)
     int starting_rid;		/* first RID assigned to domain */
     int ending_rid;		/* one beyond highest RID assigned to domain */
+    unsigned char rid_bits;     // from arch_domain (so is pinned)
 
     /* Bitset for debug register use.  */
     unsigned int dbg_used;

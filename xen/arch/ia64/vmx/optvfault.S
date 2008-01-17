@@ -95,11 +95,10 @@ GLOBAL_ENTRY(vmx_asm_mov_to_rr)
 #ifndef ACCE_MOV_TO_RR
     br.many vmx_virtualization_fault_back
 #endif
-    add r22=IA64_VCPU_DOMAIN_OFFSET,r21
+    add r22=IA64_VCPU_RID_BITS_OFFSET,r21
     extr.u r16=r25,20,7		// r3
     extr.u r17=r25,13,7		// r2
     ;;
-    ld8 r22=[r22]		// Get domain
     movl r20=asm_mov_from_reg
     ;;
     adds r30=vmx_asm_mov_to_rr_back_1-asm_mov_from_reg,r20
@@ -126,7 +125,6 @@ vmx_asm_mov_to_rr_back_1:
 vmx_asm_mov_to_rr_back_2: 
     adds r30=vmx_resume_to_guest-asm_mov_from_reg,r20
     shladd r27=r23,3,r27	// address of VRR
-    add r22=IA64_DOMAIN_RID_BITS_OFFSET,r22
     ;;
     ld1 r22=[r22]		// Load rid_bits from domain
     mov b0=r18			// restore b0

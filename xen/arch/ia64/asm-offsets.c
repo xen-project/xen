@@ -70,6 +70,7 @@ void foo(void)
 	DEFINE(IA64_VCPU_INSVC3_OFFSET, offsetof (struct vcpu, arch.insvc[3]));
 	DEFINE(IA64_VCPU_STARTING_RID_OFFSET, offsetof (struct vcpu, arch.starting_rid));
 	DEFINE(IA64_VCPU_ENDING_RID_OFFSET, offsetof (struct vcpu, arch.ending_rid));
+	DEFINE(IA64_VCPU_RID_BITS_OFFSET, offsetof (struct vcpu, arch.rid_bits));
 	DEFINE(IA64_VCPU_DOMAIN_ITM_OFFSET, offsetof (struct vcpu, arch.domain_itm));
 	DEFINE(IA64_VCPU_DOMAIN_ITM_LAST_OFFSET, offsetof (struct vcpu, arch.domain_itm_last));
 	DEFINE(IA64_VCPU_ITLB_OFFSET, offsetof (struct vcpu, arch.itlb));
@@ -79,7 +80,6 @@ void foo(void)
 	BLANK();
 
 	DEFINE(IA64_DOMAIN_SHADOW_BITMAP_OFFSET, offsetof (struct domain, arch.shadow_bitmap));
-	DEFINE(IA64_DOMAIN_RID_BITS_OFFSET, offsetof (struct domain, arch.rid_bits));
 
 	BLANK();
 
