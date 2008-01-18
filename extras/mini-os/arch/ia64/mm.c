@@ -124,9 +124,14 @@ arch_init_demand_mapping_area(unsigned long max_pfn)
 
 /* Helper function used in gnttab.c. */
 void*
-map_frames(unsigned long* frames, unsigned long n)
+map_frames_ex(unsigned long* frames, unsigned long n, unsigned long stride,
+	unsigned long increment, unsigned long alignment, domid_t id,
+	int may_fail, unsigned long prot)
 {
-	n = n;
+        /* TODO: incomplete! */
+        ASSERT(n == 1 || (stride == 0 && increment == 1));
+        ASSERT(id == DOMID_SELF);
+        ASSERT(prot == 0);
 	return (void*) __va(SWAP(frames[0]) << PAGE_SHIFT);
 }
 

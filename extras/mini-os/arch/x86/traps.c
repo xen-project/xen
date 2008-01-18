@@ -118,6 +118,46 @@ void page_walk(unsigned long virt_address)
 
 }
 
+static int handle_cow(unsigned long addr) {
+        pgentry_t *tab = (pgentry_t *)start_info.pt_base, page;
+	unsigned long new_page;
+	int rc;
+
+#if defined(__x86_64__)
+        page = tab[l4_table_offset(addr)];
+	if (!(page & _PAGE_PRESENT))
+	    return 0;
+        tab = pte_to_virt(page);
+#endif
+#if defined(__x86_64__) || defined(CONFIG_X86_PAE)
+        page = tab[l3_table_offset(addr)];
+	if (!(page & _PAGE_PRESENT))
+	    return 0;
+        tab = pte_to_virt(page);
+#endif
+        page = tab[l2_table_offset(addr)];
+	if (!(page & _PAGE_PRESENT))
+	    return 0;
+        tab = pte_to_virt(page);
+        
+        page = tab[l1_table_offset(addr)];
+	if (!(page & _PAGE_PRESENT))
+	    return 0;
+	/* Only support CoW for the zero page.  */
+	if (PHYS_PFN(page) != mfn_zero)
+	    return 0;
+
+	new_page = alloc_pages(0);
+	memset((void*) new_page, 0, PAGE_SIZE);
+
+	rc = HYPERVISOR_update_va_mapping(addr & PAGE_MASK, __pte(virt_to_mach(new_page) | L1_PROT), UVMF_INVLPG);
+	if (!rc)
+		return 1;
+
+	printk("Map zero page to %lx failed: %d.\n", addr, rc);
+	return 0;
+}
+
 #define read_cr2() \
         (HYPERVISOR_shared_info->vcpu_info[smp_processor_id()].arch.cr2)
 
@@ -126,6 +166,10 @@ static int handling_pg_fault = 0;
 void do_page_fault(struct pt_regs *regs, unsigned long error_code)
 {
     unsigned long addr = read_cr2();
+
+    if ((error_code & TRAP_PF_WRITE) && handle_cow(addr))
+	return;
+
     /* If we are already handling a page fault, and got another one
        that means we faulted in pagetable walk. Continuing here would cause
        a recursive fault */       

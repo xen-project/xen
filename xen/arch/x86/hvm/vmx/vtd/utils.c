@@ -146,12 +146,14 @@ u32 get_level_index(unsigned long gmfn, int level)
     return gmfn & LEVEL_MASK;
 }
 
-void print_vtd_entries(struct domain *d, int bus, int devfn,
-                       unsigned long gmfn)
+void print_vtd_entries(
+    struct domain *d, 
+    struct iommu *iommu,
+    int bus, int devfn,
+    unsigned long gmfn)
 {
     struct hvm_iommu *hd = domain_hvm_iommu(d);
     struct acpi_drhd_unit *drhd;
-    struct iommu *iommu;
     struct context_entry *ctxt_entry;
     struct root_entry *root_entry;
     struct dma_pte pte;
@@ -175,7 +177,6 @@ void print_vtd_entries(struct domain *d, int bus, int devfn,
     {
         printk("---- print_vtd_entries %d ----\n", i++);
 
-        iommu = drhd->iommu;
         root_entry = iommu->root_entry;
         if ( root_entry == NULL )
         {

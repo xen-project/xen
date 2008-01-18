@@ -127,32 +127,34 @@
 #define DMA_TLB_IVA_HINT(x) ((((u64)x) & 1) << 6)
 
 /* GCMD_REG */
-#define DMA_GCMD_TE (((u64)1) << 31)
-#define DMA_GCMD_SRTP (((u64)1) << 30)
-#define DMA_GCMD_SFL (((u64)1) << 29)
-#define DMA_GCMD_EAFL (((u64)1) << 28)
-#define DMA_GCMD_WBF (((u64)1) << 27)
-#define DMA_GCMD_QIE (((u64)1) << 26)
-#define DMA_GCMD_IRE (((u64)1) << 25)
-#define DMA_GCMD_SIRTP (((u64)1) << 24)
+#define DMA_GCMD_TE     (((u64)1) << 31)
+#define DMA_GCMD_SRTP   (((u64)1) << 30)
+#define DMA_GCMD_SFL    (((u64)1) << 29)
+#define DMA_GCMD_EAFL   (((u64)1) << 28)
+#define DMA_GCMD_WBF    (((u64)1) << 27)
+#define DMA_GCMD_QIE    (((u64)1) << 26)
+#define DMA_GCMD_IRE    (((u64)1) << 25)
+#define DMA_GCMD_SIRTP  (((u64)1) << 24)
+#define DMA_GCMD_CFI    (((u64)1) << 23)
 
 /* GSTS_REG */
-#define DMA_GSTS_TES (((u64)1) << 31)
-#define DMA_GSTS_RTPS (((u64)1) << 30)
-#define DMA_GSTS_FLS (((u64)1) << 29)
-#define DMA_GSTS_AFLS (((u64)1) << 28)
-#define DMA_GSTS_WBFS (((u64)1) << 27)
-#define DMA_GSTS_IRTPS (((u64)1) << 24)
+#define DMA_GSTS_TES    (((u64)1) << 31)
+#define DMA_GSTS_RTPS   (((u64)1) << 30)
+#define DMA_GSTS_FLS    (((u64)1) << 29)
+#define DMA_GSTS_AFLS   (((u64)1) << 28)
+#define DMA_GSTS_WBFS   (((u64)1) << 27)
 #define DMA_GSTS_QIES   (((u64)1) <<26)
 #define DMA_GSTS_IRES   (((u64)1) <<25)
+#define DMA_GSTS_SIRTPS (((u64)1) << 24)
+#define DMA_GSTS_CFIS   (((u64)1) <<23)
 
 /* PMEN_REG */
-#define DMA_PMEN_EPM   (((u32)1) << 31)
-#define DMA_PMEN_PRS   (((u32)1) << 0)
+#define DMA_PMEN_EPM    (((u32)1) << 31)
+#define DMA_PMEN_PRS    (((u32)1) << 0)
 
 /* CCMD_REG */
 #define DMA_CCMD_INVL_GRANU_OFFSET  61
-#define DMA_CCMD_ICC (((u64)1) << 63)
+#define DMA_CCMD_ICC   (((u64)1) << 63)
 #define DMA_CCMD_GLOBAL_INVL (((u64)1) << 61)
 #define DMA_CCMD_DOMAIN_INVL (((u64)2) << 61)
 #define DMA_CCMD_DEVICE_INVL (((u64)3) << 61)
@@ -171,8 +173,14 @@
 #define DMA_FECTL_IM (((u64)1) << 31)
 
 /* FSTS_REG */
-#define DMA_FSTS_PPF ((u64)2)
-#define DMA_FSTS_PFO ((u64)1)
+#define DMA_FSTS_PFO ((u64)1 << 0)
+#define DMA_FSTS_PPF ((u64)1 << 1)
+#define DMA_FSTS_AFO ((u64)1 << 2)
+#define DMA_FSTS_APF ((u64)1 << 3)
+#define DMA_FSTS_IQE ((u64)1 << 4)
+#define DMA_FSTS_ICE ((u64)1 << 5)
+#define DMA_FSTS_ITE ((u64)1 << 6)
+#define DMA_FSTS_FAULTS    DMA_FSTS_PFO | DMA_FSTS_PPF | DMA_FSTS_AFO | DMA_FSTS_APF | DMA_FSTS_IQE | DMA_FSTS_ICE | DMA_FSTS_ITE
 #define dma_fsts_fault_record_index(s) (((s) >> 8) & 0xff)
 
 /* FRCD_REG, 32 bits access */
@@ -266,8 +274,10 @@ struct dma_pte {
 
 /* interrupt remap entry */
 struct iremap_entry {
+  union {
+    u64 lo_val;
     struct {
-        u64 present : 1,
+        u64 p       : 1,
             fpd     : 1,
             dm      : 1,
             rh      : 1,
@@ -279,12 +289,16 @@ struct iremap_entry {
             res_2   : 8,
             dst     : 32;
     }lo;
+  };
+  union {
+    u64 hi_val;
     struct {
         u64 sid     : 16,
             sq      : 2,
             svt     : 2,
             res_1   : 44;
     }hi;
+  };
 };
 #define IREMAP_ENTRY_NR (PAGE_SIZE_4K/sizeof(struct iremap_entry))
 #define iremap_present(v) ((v).lo & 1)
@@ -386,11 +400,11 @@ struct poll_info {
 
 #define RESERVED_VAL        0
 
-#define TYPE_INVAL_CONTEXT  1
-#define TYPE_INVAL_IOTLB    2
-#define TYPE_INVAL_DEVICE_IOTLB 3
-#define TYPE_INVAL_IEC          4
-#define TYPE_INVAL_WAIT         5
+#define TYPE_INVAL_CONTEXT      0x1
+#define TYPE_INVAL_IOTLB        0x2
+#define TYPE_INVAL_DEVICE_IOTLB 0x3
+#define TYPE_INVAL_IEC          0x4
+#define TYPE_INVAL_WAIT         0x5
 
 #define NOTIFY_TYPE_POLL        1
 #define NOTIFY_TYPE_INTR        1
@@ -400,6 +414,10 @@ struct poll_info {
 
 #define IEC_GLOBAL_INVL         0
 #define IEC_INDEX_INVL          1
+#define IRTA_REG_EIME_SHIFT     11
+#define IRTA_REG_TABLE_SIZE     7    // 4k page = 256 * 16 byte entries
+                                     // 2^^(IRTA_REG_TABLE_SIZE + 1) = 256
+                                     // IRTA_REG_TABLE_SIZE = 7
 
 #define VTD_PAGE_TABLE_LEVEL_3  3
 #define VTD_PAGE_TABLE_LEVEL_4  4
@@ -413,5 +431,30 @@ typedef paddr_t dma_addr_t;
 extern struct list_head acpi_drhd_units;
 extern struct list_head acpi_rmrr_units;
 extern struct list_head acpi_ioapic_units;
+
+struct qi_ctrl {
+    struct qinval_entry *qinval;         /* queue invalidation page */
+    int qinval_index;                    /* queue invalidation index */
+    spinlock_t qinval_lock;      /* lock for queue invalidation page */
+    spinlock_t qinval_poll_lock; /* lock for queue invalidation poll addr */
+    volatile u32 qinval_poll_status;     /* used by poll methord to sync */
+};
+
+struct ir_ctrl {
+    struct iremap_entry *iremap;         /* interrupt remap table */
+    int iremap_index;                    /* interrupt remap index */
+    spinlock_t iremap_lock;      /* lock for irq remappping table */
+};
+
+struct iommu_flush {
+    int (*context)(void *iommu, u16 did, u16 source_id, u8 function_mask, u64 type, int non_present_entry_flush);
+    int (*iotlb)(void *iommu, u16 did, u64 addr, unsigned int size_order, u64 type, int non_present_entry_flush);
+};
+
+struct intel_iommu {
+    struct qi_ctrl qi_ctrl;
+    struct ir_ctrl ir_ctrl;
+    struct iommu_flush flush; 
+};
 
 #endif

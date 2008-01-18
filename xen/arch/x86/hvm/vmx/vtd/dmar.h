@@ -26,6 +26,20 @@
 
 extern u8 dmar_host_address_width;
 
+/* This one is for interrupt remapping */
+struct acpi_ioapic_unit {
+    struct list_head list;
+    int apic_id;
+    union {
+        u16 info;
+        struct {
+            u16 func: 3,
+                dev:  5,
+                bus:  8;
+        }bdf;
+    }ioapic;
+};
+
 struct acpi_drhd_unit {
     struct list_head list;
     unsigned long    address; /* register base address of the unit */
@@ -33,6 +47,7 @@ struct acpi_drhd_unit {
     int    devices_cnt;
     u8    include_all:1;
     struct iommu *iommu;
+    struct list_head ioapic_list;
 };
 
 struct acpi_rmrr_unit {
@@ -73,19 +88,9 @@ struct acpi_atsr_unit {
 struct acpi_drhd_unit * acpi_find_matched_drhd_unit(struct pci_dev *dev);
 struct acpi_rmrr_unit * acpi_find_matched_rmrr_unit(struct pci_dev *dev);
 
-/* This one is for interrupt remapping */
-struct acpi_ioapic_unit {
-    struct list_head list;
-    int apic_id;
-    union {
-        u16 info;
-        struct {
-            u16 bus: 8,
-                dev: 5,
-                func: 3;
-        }bdf;
-    }ioapic;
-};
+#define DMAR_TYPE 1
+#define RMRR_TYPE 2
+#define ATSR_TYPE 3
 
 #define DMAR_OPERATION_TIMEOUT (HZ*60) /* 1m */
 #define time_after(a,b)         \

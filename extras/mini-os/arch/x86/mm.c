@@ -40,6 +40,7 @@
 #include <types.h>
 #include <lib.h>
 #include <xmalloc.h>
+#include <xen/memory.h>
 
 #ifdef MM_DEBUG
 #define DEBUG(_f, _a...) \
@@ -49,6 +50,7 @@
 #endif
 
 unsigned long *phys_to_machine_mapping;
+unsigned long mfn_zero;
 extern char stack[];
 extern void page_walk(unsigned long virt_addr);
 
@@ -270,12 +272,73 @@ void build_pagetable(unsigned long *start_pfn, unsigned long *max_pfn)
         start_address += PAGE_SIZE;
     }
 
-    if (HYPERVISOR_update_va_mapping(0, (pte_t) {}, UVMF_INVLPG))
-        printk("Unable to unmap page 0\n");
-
     *start_pfn = pt_pfn;
 }
 
+extern void shared_info;
+static void set_readonly(void *text, void *etext)
+{
+    unsigned long start_address = ((unsigned long) text + PAGE_SIZE - 1) & PAGE_MASK;
+    unsigned long end_address = (unsigned long) etext;
+    static mmu_update_t mmu_updates[L1_PAGETABLE_ENTRIES + 1];
+    pgentry_t *tab = (pgentry_t *)start_info.pt_base, page;
+    unsigned long mfn = pfn_to_mfn(virt_to_pfn(start_info.pt_base));
+    unsigned long offset;
+    int count = 0;
+
+    printk("setting %p-%p readonly\n", text, etext);
+
+    while (start_address + PAGE_SIZE <= end_address) {
+        tab = (pgentry_t *)start_info.pt_base;
+        mfn = pfn_to_mfn(virt_to_pfn(start_info.pt_base));
+
+#if defined(__x86_64__)
+        offset = l4_table_offset(start_address);
+        page = tab[offset];
+        mfn = pte_to_mfn(page);
+        tab = to_virt(mfn_to_pfn(mfn) << PAGE_SHIFT);
+#endif
+#if defined(__x86_64__) || defined(CONFIG_X86_PAE)
+        offset = l3_table_offset(start_address);
+        page = tab[offset];
+        mfn = pte_to_mfn(page);
+        tab = to_virt(mfn_to_pfn(mfn) << PAGE_SHIFT);
+#endif
+        offset = l2_table_offset(start_address);        
+        page = tab[offset];
+        mfn = pte_to_mfn(page);
+        tab = to_virt(mfn_to_pfn(mfn) << PAGE_SHIFT);
+
+        offset = l1_table_offset(start_address);
+
+	if (start_address != (unsigned long)&shared_info) {
+	    mmu_updates[count].ptr = ((pgentry_t)mfn << PAGE_SHIFT) + sizeof(pgentry_t) * offset;
+	    mmu_updates[count].val = tab[offset] & ~_PAGE_RW;
+	    count++;
+	} else
+	    printk("skipped %p\n", start_address);
+
+        start_address += PAGE_SIZE;
+
+        if (count == L1_PAGETABLE_ENTRIES || start_address + PAGE_SIZE > end_address)
+        {
+            if(HYPERVISOR_mmu_update(mmu_updates, count, NULL, DOMID_SELF) < 0)
+            {
+                printk("PTE could not be updated\n");
+                do_exit();
+            }
+            count = 0;
+        }
+    }
+
+    {
+	mmuext_op_t op = {
+	    .cmd = MMUEXT_TLB_FLUSH_ALL,
+	};
+	int count;
+	HYPERVISOR_mmuext_op(&op, 1, &count, DOMID_SELF);
+    }
+}
 
 void mem_test(unsigned long *start_add, unsigned long *end_add)
 {
@@ -305,6 +368,7 @@ void mem_test(unsigned long *start_add, unsigned long *end_add)
 
 static pgentry_t *demand_map_pgt;
 static void *demand_map_area_start;
+#define DEMAND_MAP_PAGES 1024
 
 void arch_init_demand_mapping_area(unsigned long max_pfn)
 {
@@ -364,20 +428,19 @@ void arch_init_demand_mapping_area(unsigned long max_pfn)
     printk("Initialised demand area.\n");
 }
 
-void *map_frames(unsigned long *f, unsigned long n)
+#define MAP_BATCH ((STACK_SIZE / 2) / sizeof(mmu_update_t))
+
+void *map_frames_ex(unsigned long *f, unsigned long n, unsigned long stride,
+	unsigned long increment, unsigned long alignment, domid_t id,
+	int may_fail, unsigned long prot)
 {
     unsigned long x;
     unsigned long y = 0;
-    mmu_update_t mmu_updates[16];
     int rc;
-
-    if (n > 16) {
-        printk("Tried to map too many (%ld) frames at once.\n", n);
-        return NULL;
-    }
+    unsigned long done = 0;
 
     /* Find a run of n contiguous frames */
-    for (x = 0; x <= 1024 - n; x += y + 1) {
+    for (x = 0; x <= DEMAND_MAP_PAGES - n; x = (x + y + 1 + alignment - 1) & ~(alignment - 1)) {
         for (y = 0; y < n; y++)
             if (demand_map_pgt[x+y] & _PAGE_PRESENT)
                 break;
@@ -385,26 +448,68 @@ void *map_frames(unsigned long *f, unsigned long n)
             break;
     }
     if (y != n) {
-        printk("Failed to map %ld frames!\n", n);
+        printk("Failed to find %ld frames!\n", n);
         return NULL;
     }
 
     /* Found it at x.  Map it in. */
-    for (y = 0; y < n; y++) {
-        mmu_updates[y].ptr = virt_to_mach(&demand_map_pgt[x + y]);
-        mmu_updates[y].val = (f[y] << PAGE_SHIFT) | L1_PROT;
-    }
 
-    rc = HYPERVISOR_mmu_update(mmu_updates, n, NULL, DOMID_SELF);
-    if (rc < 0) {
-        printk("Map %ld failed: %d.\n", n, rc);
-        return NULL;
-    } else {
-        return (void *)(unsigned long)((unsigned long)demand_map_area_start +
-                x * PAGE_SIZE);
+    while (done < n) {
+	unsigned long todo;
+
+	if (may_fail)
+	    todo = 1;
+	else
+	    todo = n - done;
+
+	if (todo > MAP_BATCH)
+		todo = MAP_BATCH;
+
+	{
+	    mmu_update_t mmu_updates[todo];
+
+	    for (y = 0; y < todo; y++) {
+		mmu_updates[y].ptr = virt_to_mach(&demand_map_pgt[x + done + y]);
+		mmu_updates[y].val = ((f[(done + y) * stride] + (done + y) * increment) << PAGE_SHIFT) | prot;
+	    }
+
+	    rc = HYPERVISOR_mmu_update(mmu_updates, todo, NULL, id);
+	    if (rc < 0) {
+		if (may_fail)
+		    f[done * stride] |= 0xF0000000;
+		else {
+		    printk("Map %ld (%lx, ...) failed: %d.\n", todo, f[done * stride], rc);
+		    return NULL;
+		}
+	    }
+	}
+
+	done += todo;
     }
+    return (void *)(unsigned long)((unsigned long)demand_map_area_start +
+	    x * PAGE_SIZE);
 }
 
+static void clear_bootstrap(void)
+{
+    struct xen_memory_reservation reservation;
+    xen_pfn_t mfns[] = { virt_to_mfn(&shared_info) };
+    int n = sizeof(mfns)/sizeof(*mfns);
+    pte_t nullpte = { };
+
+    /* Use page 0 as the CoW zero page */
+    memset(NULL, 0, PAGE_SIZE);
+    mfn_zero = pfn_to_mfn(0);
+    if (HYPERVISOR_update_va_mapping(0, nullpte, UVMF_INVLPG))
+	printk("Unable to unmap page 0\n");
+
+    set_xen_guest_handle(reservation.extent_start, mfns);
+    reservation.nr_extents = n;
+    reservation.extent_order = 0;
+    reservation.domid = DOMID_SELF;
+    if (HYPERVISOR_memory_op(XENMEM_decrease_reservation, &reservation) != n)
+	printk("Unable to free bootstrap pages\n");
+}
 
 void arch_init_p2m(unsigned long max_pfn)
 {
@@ -455,6 +560,7 @@ void arch_init_mm(unsigned long* start_pfn_p, unsigned long* max_pfn_p)
 
     printk("  _text:        %p\n", &_text);
     printk("  _etext:       %p\n", &_etext);
+    printk("  _erodata:     %p\n", &_erodata);
     printk("  _edata:       %p\n", &_edata);
     printk("  stack start:  %p\n", stack);
     printk("  _end:         %p\n", &_end);
@@ -468,8 +574,9 @@ void arch_init_mm(unsigned long* start_pfn_p, unsigned long* max_pfn_p)
     printk("  max_pfn:      %lx\n", max_pfn);
 
     build_pagetable(&start_pfn, &max_pfn);
+    clear_bootstrap();
+    set_readonly(&_text, &_erodata);
 
     *start_pfn_p = start_pfn;
     *max_pfn_p = max_pfn;
 }
-

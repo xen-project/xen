@@ -2825,7 +2825,7 @@ long unregister_guest_nmi_callback(void)
     return 0;
 }
 
-long do_set_trap_table(XEN_GUEST_HANDLE(trap_info_t) traps)
+long do_set_trap_table(XEN_GUEST_HANDLE(const_trap_info_t) traps)
 {
     struct trap_info cur;
     struct vcpu *curr = current;

@@ -36,4 +36,8 @@
 #define STACK_SIZE_PAGE_ORDER   1
 #define STACK_SIZE              (PAGE_SIZE * (1 << STACK_SIZE_PAGE_ORDER))
 
+#define map_frames(f, n) map_frames_ex(f, n, 1, 0, 1, DOMID_SELF, 0, 0)
+/* TODO */
+#define map_zero(n, a) map_frames_ex(NULL, n, 0, 0, a, DOMID_SELF, 0, 0)
+
 #endif /* __ARCH_MM_H__ */

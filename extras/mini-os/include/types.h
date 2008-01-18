@@ -57,6 +57,13 @@ typedef unsigned long       uintptr_t;
 typedef struct { unsigned long pte; } pte_t;
 #endif /* __i386__ || __x86_64__ */
 
+#if !defined(CONFIG_X86_PAE)
+#define __pte(x) ((pte_t) { (x) } )
+#else
+#define __pte(x) ({ unsigned long long _x = (x);        \
+    ((pte_t) {(unsigned long)(_x), (unsigned long)(_x>>32)}); })
+#endif
+
 typedef  u8 uint8_t;
 typedef  s8 int8_t;
 typedef u16 uint16_t;
@@ -69,4 +76,7 @@ typedef s64 int64_t;
 
 #define INT_MAX         ((int)(~0U>>1))
 #define UINT_MAX            (~0U)
+
+typedef long ssize_t;
+typedef unsigned long size_t;
 #endif /* _TYPES_H_ */
