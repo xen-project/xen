@@ -1650,9 +1650,10 @@ class XendDomainInfo:
         self._recreateDom()
 
         # Set timer configration of domain
-        if hvm:
+        timer_mode = self.info["platform"].get("timer_mode")
+        if hvm and timer_mode is not None:
             xc.hvm_set_param(self.domid, HVM_PARAM_TIMER_MODE,
-                long(self.info["platform"].get("timer_mode")))
+                             long(timer_mode))
 
         # Set maximum number of vcpus in domain
         xc.domain_max_vcpus(self.domid, int(self.info['VCPUs_max']))
