@@ -17,6 +17,7 @@
 #include <asm/vmx_vpd.h>
 #include <asm/vmx_pal_vsa.h>
 #include <asm/asm-offsets.h>
+#include <asm/virt_event.h>
 #include <asm-ia64/vmx_mm_def.h>
 #include <asm-ia64/vmx_phy_mode.h>
 
@@ -467,24 +468,26 @@ GLOBAL_ENTRY(vmx_asm_thash)
     ;;                                                     
 vmx_asm_thash_back1:
     shr.u r23=r19,61		// get RR number
-    adds r25=VCPU_VRR0_OFS,r21	// get vcpu->arch.arch_vmx.vrr[0]'s addr
+    adds r28=VCPU_VRR0_OFS,r21	// get vcpu->arch.arch_vmx.vrr[0]'s addr
     adds r16=IA64_VPD_VPTA_OFFSET,r16	// get virtual pta 
     ;;
-    shladd r27=r23,3,r25	// get vcpu->arch.arch_vmx.vrr[r23]'s addr
+    shladd r27=r23,3,r28	// get vcpu->arch.arch_vmx.vrr[r23]'s addr
     ld8 r17=[r16]		// get virtual PTA
     mov r26=1
     ;;
     extr.u r29=r17,2,6		// get pta.size
-    ld8 r25=[r27]		// get vcpu->arch.arch_vmx.vrr[r23]'s value
+    ld8 r28=[r27]		// get vcpu->arch.arch_vmx.vrr[r23]'s value
     ;;
     // Fall-back to C if VF (long format) is set
     tbit.nz p6,p0=r17,8
     mov b0=r24
-    (p6) br.cond.dpnt.many vmx_virtualization_fault_back
-    extr.u r25=r25,2,6		// get rr.ps
+    ;;
+(p6) mov r24=EVENT_THASH
+(p6) br.cond.dpnt.many vmx_virtualization_fault_back
+    extr.u r28=r28,2,6		// get rr.ps
     shl r22=r26,r29		// 1UL << pta.size
     ;;
-    shr.u r23=r19,r25		// vaddr >> rr.ps
+    shr.u r23=r19,r28		// vaddr >> rr.ps
     adds r26=3,r29		// pta.size + 3 
     shl r27=r17,3		// pta << 3 
     ;;
