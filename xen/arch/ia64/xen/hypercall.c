@@ -34,9 +34,6 @@
 #include <xen/perfc.h>
 #include <public/arch-ia64/debug_op.h>
 
-extern long do_physdev_op(int cmd, XEN_GUEST_HANDLE(void) arg);
-extern long do_callback_op(int cmd, XEN_GUEST_HANDLE(void) arg);
-
 static IA64FAULT
 xen_hypercall (struct pt_regs *regs)
 {
@@ -457,7 +454,7 @@ static long unregister_guest_callback(struct callback_unregister *unreg)
 /* First time to add callback to xen/ia64, so let's just stick to
  * the newer callback interface.
  */
-long do_callback_op(int cmd, XEN_GUEST_HANDLE(void) arg)
+long do_callback_op(int cmd, XEN_GUEST_HANDLE(cvoid) arg)
 {
     long ret;
 
