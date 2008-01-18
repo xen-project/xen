@@ -476,7 +476,7 @@ void cpu_ioreq_timeoffset(CPUState *env, ioreq_t *req)
 {
     char b[64];
 
-    time_offset += (ulong)req->data;
+    time_offset += (unsigned long)req->data;
 
     fprintf(logfile, "Time offset set %ld, added offset %ld\n", time_offset, req->data);
     sprintf(b, "%ld", time_offset);
