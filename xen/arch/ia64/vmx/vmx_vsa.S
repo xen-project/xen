@@ -1,4 +1,4 @@
-/* -*-  Mode:C; c-basic-offset:4; tab-width:4; indent-tabs-mode:nil -*- */
+/* -*-  Mode:ASM; c-basic-offset:4; tab-width:4; indent-tabs-mode:nil -*- */
 /*
  * vmx_vsa.c: Call PAL virtualization services.
  * Copyright (c) 2005, Intel Corporation.
