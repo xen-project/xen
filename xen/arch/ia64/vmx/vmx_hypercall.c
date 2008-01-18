@@ -53,7 +53,7 @@ static int hvmop_set_isa_irq_level(
     if ( op.isa_irq > 15 )
         return -EINVAL;
 
-    d = get_domain_by_id(op.domid);
+    d = rcu_lock_domain_by_id(op.domid);
     if ( d == NULL )
         return -ESRCH;
 
@@ -65,7 +65,7 @@ static int hvmop_set_isa_irq_level(
     viosapic_set_irq(d, op.isa_irq, op.level);
 
  out:
-    put_domain(d);
+    rcu_unlock_domain(d);
     return rc;
 }
 
@@ -85,7 +85,7 @@ static int hvmop_set_pci_intx_level(
     if ( (op.domain > 0) || (op.bus > 0) || (op.device > 31) || (op.intx > 3) )
         return -EINVAL;
 
-    d = get_domain_by_id(op.domid);
+    d = rcu_lock_domain_by_id(op.domid);
     if ( d == NULL )
         return -ESRCH;
 
@@ -97,7 +97,7 @@ static int hvmop_set_pci_intx_level(
     viosapic_set_pci_irq(d, op.device, op.intx, op.level);
 
  out:
-    put_domain(d);
+    rcu_unlock_domain(d);
     return rc;
 }
 
@@ -122,10 +122,10 @@ do_hvm_op(unsigned long op, XEN_GUEST_HANDLE(void) arg)
             return -EINVAL;
 
         if (a.domid == DOMID_SELF) {
-            d = get_current_domain();
+            d = rcu_lock_current_domain();
         }
         else if (IS_PRIV(current->domain)) {
-            d = get_domain_by_id(a.domid);
+            d = rcu_lock_domain_by_id(a.domid);
             if (d == NULL)
                 return -ESRCH;
         }
@@ -167,7 +167,7 @@ do_hvm_op(unsigned long op, XEN_GUEST_HANDLE(void) arg)
             rc = copy_to_guest(arg, &a, 1) ? -EFAULT : 0;
         }
 
-        put_domain(d);
+        rcu_unlock_domain(d);
         break;
     }
 

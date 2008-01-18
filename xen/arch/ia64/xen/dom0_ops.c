@@ -44,7 +44,7 @@ long arch_do_domctl(xen_domctl_t *op, XEN_GUEST_HANDLE(xen_domctl_t) u_domctl)
     case XEN_DOMCTL_getmemlist:
     {
         unsigned long i;
-        struct domain *d = get_domain_by_id(op->domain);
+        struct domain *d = rcu_lock_domain_by_id(op->domain);
         unsigned long start_page = op->u.getmemlist.start_pfn;
         unsigned long nr_pages = op->u.getmemlist.max_pfns;
         uint64_t mfn;
@@ -72,15 +72,14 @@ long arch_do_domctl(xen_domctl_t *op, XEN_GUEST_HANDLE(xen_domctl_t) u_domctl)
         op->u.getmemlist.num_pfns = i;
         if (copy_to_guest(u_domctl, op, 1))
             ret = -EFAULT;
-
-        put_domain(d);
+        rcu_unlock_domain(d);
     }
     break;
 
     case XEN_DOMCTL_arch_setup:
     {
         xen_domctl_arch_setup_t *ds = &op->u.arch_setup;
-        struct domain *d = get_domain_by_id(op->domain);
+        struct domain *d = rcu_lock_domain_by_id(op->domain);
 
         if ( d == NULL) {
             ret = -EINVAL;
@@ -155,7 +154,7 @@ long arch_do_domctl(xen_domctl_t *op, XEN_GUEST_HANDLE(xen_domctl_t) u_domctl)
             }
         }
 
-        put_domain(d);
+        rcu_unlock_domain(d);
     }
     break;
 
@@ -163,11 +162,11 @@ long arch_do_domctl(xen_domctl_t *op, XEN_GUEST_HANDLE(xen_domctl_t) u_domctl)
     {
         struct domain *d; 
         ret = -ESRCH;
-        d = get_domain_by_id(op->domain);
+        d = rcu_lock_domain_by_id(op->domain);
         if ( d != NULL )
         {
             ret = shadow_mode_control(d, &op->u.shadow_op);
-            put_domain(d);
+            rcu_unlock_domain(d);
             if (copy_to_guest(u_domctl, op, 1))
                 ret = -EFAULT;
         } 
@@ -182,7 +181,7 @@ long arch_do_domctl(xen_domctl_t *op, XEN_GUEST_HANDLE(xen_domctl_t) u_domctl)
         unsigned int lp = fp + np - 1;
 
         ret = -ESRCH;
-        d = get_domain_by_id(op->domain);
+        d = rcu_lock_domain_by_id(op->domain);
         if (unlikely(d == NULL))
             break;
 
@@ -195,7 +194,7 @@ long arch_do_domctl(xen_domctl_t *op, XEN_GUEST_HANDLE(xen_domctl_t) u_domctl)
                 ret = ioports_deny_access(d, fp, lp);
         }
 
-        put_domain(d);
+        rcu_unlock_domain(d);
     }
     break;
 
@@ -205,7 +204,7 @@ long arch_do_domctl(xen_domctl_t *op, XEN_GUEST_HANDLE(xen_domctl_t) u_domctl)
         struct vcpu *v;
 
         ret = -ESRCH;
-        d = get_domain_by_id(op->domain);
+        d = rcu_lock_domain_by_id(op->domain);
         if ( d == NULL )
             break;
 
@@ -234,7 +233,7 @@ long arch_do_domctl(xen_domctl_t *op, XEN_GUEST_HANDLE(xen_domctl_t) u_domctl)
         }
 
     sendtrigger_out:
-        put_domain(d);
+        rcu_unlock_domain(d);
     }
     break;
 
@@ -347,7 +346,7 @@ long arch_do_domctl(xen_domctl_t *op, XEN_GUEST_HANDLE(xen_domctl_t) u_domctl)
     case XEN_DOMCTL_set_opt_feature:
     {
         struct xen_ia64_opt_feature *optf = &op->u.set_opt_feature.optf;
-        struct domain *d = get_domain_by_id(op->domain);
+        struct domain *d = rcu_lock_domain_by_id(op->domain);
 
         if (d == NULL) {
             ret = -EINVAL;
@@ -355,7 +354,7 @@ long arch_do_domctl(xen_domctl_t *op, XEN_GUEST_HANDLE(xen_domctl_t) u_domctl)
         }
 
         ret = domain_opt_feature(d, optf);
-        put_domain(d);
+        rcu_unlock_domain(d);
     }
     break;
 

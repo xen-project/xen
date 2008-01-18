@@ -1473,7 +1473,7 @@ __dom0vp_add_physmap(struct domain* d, unsigned long gpfn,
     if (flags & (ASSIGN_nocache | ASSIGN_pgc_allocated))
         return -EINVAL;
 
-    rd = get_domain_by_id(domid);
+    rd = rcu_lock_domain_by_id(domid);
     if (unlikely(rd == NULL)) {
         switch (domid) {
         case DOMID_XEN:
@@ -1489,7 +1489,7 @@ __dom0vp_add_physmap(struct domain* d, unsigned long gpfn,
             return -ESRCH;
         }
         BUG_ON(rd == NULL);
-        get_knownalive_domain(rd);
+        rcu_lock_domain(rd);
     }
 
     if (unlikely(rd == d))
@@ -1512,7 +1512,7 @@ __dom0vp_add_physmap(struct domain* d, unsigned long gpfn,
     //don't update p2m table because this page belongs to rd, not d.
     perfc_incr(dom0vp_add_physmap);
 out1:
-    put_domain(rd);
+    rcu_unlock_domain(rd);
     return error;
 }
 
@@ -2785,17 +2785,16 @@ arch_memory_op(int op, XEN_GUEST_HANDLE(void) arg)
         if (copy_from_guest(&xatp, arg, 1))
             return -EFAULT;
 
-        if (xatp.domid == DOMID_SELF) {
-            d = get_current_domain();
-        }
+        if (xatp.domid == DOMID_SELF)
+            d = rcu_lock_current_domain();
         else if (!IS_PRIV(current->domain))
             return -EPERM;
-        else if ((d = get_domain_by_id(xatp.domid)) == NULL)
+        else if ((d = rcu_lock_domain_by_id(xatp.domid)) == NULL)
             return -ESRCH;
 
         /* This hypercall is used for VT-i domain only */
         if (!VMX_DOMAIN(d->vcpu[0])) {
-            put_domain(d);
+            rcu_unlock_domain(d);
             return -ENOSYS;
         }
 
@@ -2821,7 +2820,7 @@ arch_memory_op(int op, XEN_GUEST_HANDLE(void) arg)
         }
 
         if (mfn == 0) {
-            put_domain(d);
+            rcu_unlock_domain(d);
             return -EINVAL;
         }
 
@@ -2853,7 +2852,7 @@ arch_memory_op(int op, XEN_GUEST_HANDLE(void) arg)
     out:
         UNLOCK_BIGLOCK(d);
         
-        put_domain(d);
+        rcu_unlock_domain(d);
 
         break;
     }
