@@ -69,4 +69,7 @@ typedef s64 int64_t;
 
 #define INT_MAX         ((int)(~0U>>1))
 #define UINT_MAX            (~0U)
+
+typedef long ssize_t;
+typedef unsigned long size_t;
 #endif /* _TYPES_H_ */

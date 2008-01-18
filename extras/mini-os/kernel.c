@@ -38,6 +38,7 @@
 #include <xenbus.h>
 #include <gnttab.h>
 #include <netfront.h>
+#include <fs.h>
 #include <xen/features.h>
 #include <xen/version.h>
 
@@ -85,6 +86,11 @@ static void netfront_thread(void *p)
     init_netfront(NULL, NULL, NULL);
 }
 
+static void fs_thread(void *p)
+{
+    init_fs_frontend();
+}
+
 /* This should be overridden by the application we are linked against. */
 __attribute__((weak)) int app_main(start_info_t *si)
 {
@@ -92,6 +98,7 @@ __attribute__((weak)) int app_main(start_info_t *si)
     create_thread("xenbus_tester", xenbus_tester, si);
     create_thread("periodic_thread", periodic_thread, si);
     create_thread("netfront", netfront_thread, si);
+    create_thread("fs-frontend", fs_thread, si);
     return 0;
 }
 
