@@ -189,7 +189,7 @@ typedef unsigned long maddr_t;
 #endif
 
 extern unsigned long *phys_to_machine_mapping;
-extern char _text, _etext, _edata, _end;
+extern char _text, _etext, _erodata, _edata, _end;
 #define pfn_to_mfn(_pfn) (phys_to_machine_mapping[(_pfn)])
 static __inline__ maddr_t phys_to_machine(paddr_t phys)
 {

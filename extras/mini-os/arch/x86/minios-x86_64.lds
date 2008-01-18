@@ -13,6 +13,8 @@ SECTIONS
   _etext = .;			/* End of text section */
 
   .rodata : { *(.rodata) *(.rodata.*) }
+  . = ALIGN(4096);
+  _erodata = .;
 
   .data : {			/* Data */
 	*(.data)
