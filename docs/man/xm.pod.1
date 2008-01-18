@@ -254,9 +254,12 @@ domain, as it may balloon down its memory to give more back to the OS.
 
 =item B<mem-set> I<domain-id> I<mem>
 
-Set the domain's used memory using the balloon driver.  Because this
-operation requires cooperation from the domain operating system, there
-is no guarantee that it will succeed.
+Set the domain's used memory using the balloon driver.
+
+Because this operation requires cooperation from the domain operating
+system, there is no guarantee that it will succeed.  This command will
+definitely not work unless the domain has the required paravirt
+driver.
 
 B<Warning:> There is no good way to know in advance how small of a
 mem-set will make a domain unstable and cause it to crash.  Be very
@@ -391,6 +394,10 @@ important for pinning purposes.
 Attempting to set the VCPUs to a number larger than the initially
 configured VCPU count is an error.  Trying to set VCPUs to < 1 will be
 quietly ignored.
+
+Because this operation requires cooperation from the domain operating
+system, there is no guarantee that it will succeed.  This command will
+not work with a full virt domain.
 
 =item B<vcpu-list> [I<domain-id>]
 
