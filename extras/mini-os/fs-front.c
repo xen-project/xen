@@ -1121,9 +1121,6 @@ void init_fs_frontend(void)
 
     fs_import = import;
 
-    if (!fs_import) {
+    if (!fs_import)
 	printk("No FS import\n");
-	sleep(1000);
-	do_exit();
-    }
 }
