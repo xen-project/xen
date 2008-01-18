@@ -367,6 +367,7 @@ void mem_test(unsigned long *start_add, unsigned long *end_add)
 
 static pgentry_t *demand_map_pgt;
 static void *demand_map_area_start;
+#define DEMAND_MAP_PAGES 1024
 
 void arch_init_demand_mapping_area(unsigned long max_pfn)
 {
@@ -426,20 +427,19 @@ void arch_init_demand_mapping_area(unsigned long max_pfn)
     printk("Initialised demand area.\n");
 }
 
-void *map_frames(unsigned long *f, unsigned long n)
+#define MAP_BATCH ((STACK_SIZE / 2) / sizeof(mmu_update_t))
+
+void *map_frames_ex(unsigned long *f, unsigned long n, unsigned long stride,
+	unsigned long increment, unsigned long alignment, domid_t id,
+	int may_fail, unsigned long prot)
 {
     unsigned long x;
     unsigned long y = 0;
-    mmu_update_t mmu_updates[16];
     int rc;
-
-    if (n > 16) {
-        printk("Tried to map too many (%ld) frames at once.\n", n);
-        return NULL;
-    }
+    unsigned long done = 0;
 
     /* Find a run of n contiguous frames */
-    for (x = 0; x <= 1024 - n; x += y + 1) {
+    for (x = 0; x <= DEMAND_MAP_PAGES - n; x = (x + y + 1 + alignment - 1) & ~(alignment - 1)) {
         for (y = 0; y < n; y++)
             if (demand_map_pgt[x+y] & _PAGE_PRESENT)
                 break;
@@ -447,24 +447,46 @@ void *map_frames(unsigned long *f, unsigned long n)
             break;
     }
     if (y != n) {
-        printk("Failed to map %ld frames!\n", n);
+        printk("Failed to find %ld frames!\n", n);
         return NULL;
     }
 
     /* Found it at x.  Map it in. */
-    for (y = 0; y < n; y++) {
-        mmu_updates[y].ptr = virt_to_mach(&demand_map_pgt[x + y]);
-        mmu_updates[y].val = (f[y] << PAGE_SHIFT) | L1_PROT;
-    }
 
-    rc = HYPERVISOR_mmu_update(mmu_updates, n, NULL, DOMID_SELF);
-    if (rc < 0) {
-        printk("Map %ld failed: %d.\n", n, rc);
-        return NULL;
-    } else {
-        return (void *)(unsigned long)((unsigned long)demand_map_area_start +
-                x * PAGE_SIZE);
+    while (done < n) {
+	unsigned long todo;
+
+	if (may_fail)
+	    todo = 1;
+	else
+	    todo = n - done;
+
+	if (todo > MAP_BATCH)
+		todo = MAP_BATCH;
+
+	{
+	    mmu_update_t mmu_updates[todo];
+
+	    for (y = 0; y < todo; y++) {
+		mmu_updates[y].ptr = virt_to_mach(&demand_map_pgt[x + done + y]);
+		mmu_updates[y].val = ((f[(done + y) * stride] + (done + y) * increment) << PAGE_SHIFT) | prot;
+	    }
+
+	    rc = HYPERVISOR_mmu_update(mmu_updates, todo, NULL, id);
+	    if (rc < 0) {
+		if (may_fail)
+		    f[done * stride] |= 0xF0000000;
+		else {
+		    printk("Map %ld (%lx, ...) failed: %d.\n", todo, f[done * stride], rc);
+		    return NULL;
+		}
+	    }
+	}
+
+	done += todo;
     }
+    return (void *)(unsigned long)((unsigned long)demand_map_area_start +
+	    x * PAGE_SIZE);
 }
 
 static void clear_bootstrap(void)

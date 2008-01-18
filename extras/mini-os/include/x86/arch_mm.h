@@ -223,5 +223,6 @@ static __inline__ paddr_t machine_to_phys(maddr_t machine)
 #define pte_to_mfn(_pte)           (((_pte) & (PADDR_MASK&PAGE_MASK)) >> L1_PAGETABLE_SHIFT)
 #define pte_to_virt(_pte)          to_virt(mfn_to_pfn(pte_to_mfn(_pte)) << PAGE_SHIFT)
 
+#define map_frames(f, n) map_frames_ex(f, n, 1, 0, 1, DOMID_SELF, 0, L1_PROT)
 
 #endif /* _ARCH_MM_H_ */
