@@ -50,6 +50,7 @@
 #endif
 
 unsigned long *phys_to_machine_mapping;
+unsigned long mfn_zero;
 extern char stack[];
 extern void page_walk(unsigned long virt_addr);
 
@@ -492,10 +493,13 @@ void *map_frames_ex(unsigned long *f, unsigned long n, unsigned long stride,
 static void clear_bootstrap(void)
 {
     struct xen_memory_reservation reservation;
-    xen_pfn_t mfns[] = { virt_to_mfn(0), virt_to_mfn(&shared_info) };
+    xen_pfn_t mfns[] = { virt_to_mfn(&shared_info) };
     int n = sizeof(mfns)/sizeof(*mfns);
     pte_t nullpte = { };
 
+    /* Use page 0 as the CoW zero page */
+    memset(NULL, 0, PAGE_SIZE);
+    mfn_zero = pfn_to_mfn(0);
     if (HYPERVISOR_update_va_mapping(0, nullpte, UVMF_INVLPG))
 	printk("Unable to unmap page 0\n");
 

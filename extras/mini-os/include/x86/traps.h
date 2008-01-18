@@ -70,4 +70,8 @@ struct pt_regs {
 
 void dump_regs(struct pt_regs *regs);
 
+#define TRAP_PF_PROT   0x1
+#define TRAP_PF_WRITE  0x2
+#define TRAP_PF_USER   0x4
+
 #endif /* _TRAPS_H_ */

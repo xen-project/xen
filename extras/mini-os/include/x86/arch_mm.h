@@ -144,12 +144,14 @@ typedef unsigned long pgentry_t;
 
 #if defined(__i386__)
 #define L1_PROT (_PAGE_PRESENT|_PAGE_RW|_PAGE_ACCESSED)
+#define L1_PROT_RO (_PAGE_PRESENT|_PAGE_ACCESSED)
 #define L2_PROT (_PAGE_PRESENT|_PAGE_RW|_PAGE_ACCESSED|_PAGE_DIRTY |_PAGE_USER)
 #if defined(CONFIG_X86_PAE)
 #define L3_PROT (_PAGE_PRESENT)
 #endif /* CONFIG_X86_PAE */
 #elif defined(__x86_64__)
 #define L1_PROT (_PAGE_PRESENT|_PAGE_RW|_PAGE_ACCESSED|_PAGE_USER)
+#define L1_PROT_RO (_PAGE_PRESENT|_PAGE_ACCESSED|_PAGE_USER)
 #define L2_PROT (_PAGE_PRESENT|_PAGE_RW|_PAGE_ACCESSED|_PAGE_DIRTY|_PAGE_USER)
 #define L3_PROT (_PAGE_PRESENT|_PAGE_RW|_PAGE_ACCESSED|_PAGE_DIRTY|_PAGE_USER)
 #define L4_PROT (_PAGE_PRESENT|_PAGE_RW|_PAGE_ACCESSED|_PAGE_DIRTY|_PAGE_USER)
@@ -190,6 +192,7 @@ typedef unsigned long maddr_t;
 
 extern unsigned long *phys_to_machine_mapping;
 extern char _text, _etext, _erodata, _edata, _end;
+extern unsigned long mfn_zero;
 #define pfn_to_mfn(_pfn) (phys_to_machine_mapping[(_pfn)])
 static __inline__ maddr_t phys_to_machine(paddr_t phys)
 {
@@ -224,5 +227,6 @@ static __inline__ paddr_t machine_to_phys(maddr_t machine)
 #define pte_to_virt(_pte)          to_virt(mfn_to_pfn(pte_to_mfn(_pte)) << PAGE_SHIFT)
 
 #define map_frames(f, n) map_frames_ex(f, n, 1, 0, 1, DOMID_SELF, 0, L1_PROT)
+#define map_zero(n, a) map_frames_ex(&mfn_zero, n, 0, 0, a, DOMID_SELF, 0, L1_PROT_RO)
 
 #endif /* _ARCH_MM_H_ */
