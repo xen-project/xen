@@ -47,18 +47,7 @@
 #endif
 
 #ifndef __ASSEMBLY__
-/* Guest handles for primitive C types. */
-__DEFINE_XEN_GUEST_HANDLE(uchar, unsigned char);
-__DEFINE_XEN_GUEST_HANDLE(uint,  unsigned int);
-__DEFINE_XEN_GUEST_HANDLE(ulong, unsigned long);
-__DEFINE_XEN_GUEST_HANDLE(u64,   unsigned long);
-DEFINE_XEN_GUEST_HANDLE(char);
-DEFINE_XEN_GUEST_HANDLE(int);
-DEFINE_XEN_GUEST_HANDLE(long);
-DEFINE_XEN_GUEST_HANDLE(void);
-
 typedef unsigned long xen_pfn_t;
-DEFINE_XEN_GUEST_HANDLE(xen_pfn_t);
 #define PRI_xen_pfn "lx"
 #endif
 

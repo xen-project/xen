@@ -39,6 +39,19 @@
 #error "Unsupported architecture"
 #endif
 
+#ifndef __ASSEMBLY__
+/* Guest handles for primitive C types. */
+DEFINE_XEN_GUEST_HANDLE(char);
+__DEFINE_XEN_GUEST_HANDLE(uchar, unsigned char);
+DEFINE_XEN_GUEST_HANDLE(int);
+__DEFINE_XEN_GUEST_HANDLE(uint,  unsigned int);
+DEFINE_XEN_GUEST_HANDLE(long);
+__DEFINE_XEN_GUEST_HANDLE(ulong, unsigned long);
+DEFINE_XEN_GUEST_HANDLE(void);
+
+DEFINE_XEN_GUEST_HANDLE(xen_pfn_t);
+#endif
+
 /*
  * HYPERCALLS
  */
