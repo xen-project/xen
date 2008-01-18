@@ -34,7 +34,7 @@ do_physdev_op_compat(
 
 extern long
 do_set_trap_table(
-    XEN_GUEST_HANDLE(trap_info_t) traps);
+    XEN_GUEST_HANDLE(const_trap_info_t) traps);
 
 extern int
 do_mmu_update(

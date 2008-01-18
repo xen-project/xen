@@ -454,7 +454,7 @@ static long unregister_guest_callback(struct callback_unregister *unreg)
 /* First time to add callback to xen/ia64, so let's just stick to
  * the newer callback interface.
  */
-long do_callback_op(int cmd, XEN_GUEST_HANDLE(cvoid) arg)
+long do_callback_op(int cmd, XEN_GUEST_HANDLE(const_void) arg)
 {
     long ret;
 

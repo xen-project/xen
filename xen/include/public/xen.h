@@ -48,7 +48,6 @@ __DEFINE_XEN_GUEST_HANDLE(uint,  unsigned int);
 DEFINE_XEN_GUEST_HANDLE(long);
 __DEFINE_XEN_GUEST_HANDLE(ulong, unsigned long);
 DEFINE_XEN_GUEST_HANDLE(void);
-__DEFINE_XEN_GUEST_HANDLE(cvoid, const void);
 
 DEFINE_XEN_GUEST_HANDLE(xen_pfn_t);
 #endif
