@@ -29,6 +29,7 @@ int xc_handle = 0;
 int domid = 0;
 int frame_ptrs = 0;
 int stack_trace = 0;
+int disp_all = 0;
 
 #if defined (__i386__)
 #if defined (__OpenBSD__)
@@ -243,12 +244,23 @@ void print_flags(uint64_t flags)
 {
     int i;
 
-    printf("flags: %08" PRIx64, flags);
+    printf("\nflags: %08" PRIx64, flags);
     for (i = 21; i >= 0; i--) {
         char *s = flag_values[i][(flags >> i) & 1];
         if (s != NULL)
             printf(" %s", s);
     }
+    printf("\n");
+}
+
+void print_special(unsigned long *regs, const char *name, unsigned int mask)
+{
+    unsigned int i;
+
+    printf("\n");
+    for (i = 0; mask; mask >>= 1, ++i)
+        if (mask & 1)
+            printf("%s%u: " FMT_SIZE_T "\n", name, i, (size_t)regs[i]);
 }
 #endif
 
@@ -257,12 +269,10 @@ void print_ctx(vcpu_guest_context_t *ctx1)
 {
     struct cpu_user_regs *regs = &ctx1->user_regs;
 
-    printf("eip: %08x ", regs->eip);
+    printf("cs:eip: %04x:%08x ", regs->cs, regs->eip);
     print_symbol(regs->eip);
     print_flags(regs->eflags);
-    printf("\n");
-
-    printf("esp: %08x\n", regs->esp);
+    printf("ss:esp: %04x:%08x\n", regs->ss, regs->esp);
 
     printf("eax: %08x\t", regs->eax);
     printf("ebx: %08x\t", regs->ebx);
@@ -273,47 +283,59 @@ void print_ctx(vcpu_guest_context_t *ctx1)
     printf("edi: %08x\t", regs->edi);
     printf("ebp: %08x\n", regs->ebp);
 
-    printf(" cs: %08x\t", regs->cs);
-    printf(" ds: %08x\t", regs->ds);
-    printf(" fs: %08x\t", regs->fs);
-    printf(" gs: %08x\n", regs->gs);
+    printf(" ds:     %04x\t", regs->ds);
+    printf(" es:     %04x\t", regs->es);
+    printf(" fs:     %04x\t", regs->fs);
+    printf(" gs:     %04x\n", regs->gs);
 
+    if (disp_all) {
+        print_special(ctx1->ctrlreg, "cr", 0x1d);
+        print_special(ctx1->debugreg, "dr", 0xcf);
+    }
 }
 #elif defined(__x86_64__)
 void print_ctx(vcpu_guest_context_t *ctx1)
 {
     struct cpu_user_regs *regs = &ctx1->user_regs;
 
-    printf("rip: %08lx ", regs->rip);
+    printf("rip: %016lx ", regs->rip);
     print_symbol(regs->rip);
     print_flags(regs->rflags);
-    printf("\n");
-    printf("rsp: %08lx\n", regs->rsp);
+    printf("rsp: %016lx\n", regs->rsp);
 
-    printf("rax: %08lx\t", regs->rax);
-    printf("rbx: %08lx\t", regs->rbx);
-    printf("rcx: %08lx\t", regs->rcx);
-    printf("rdx: %08lx\n", regs->rdx);
+    printf("rax: %016lx\t", regs->rax);
+    printf("rcx: %016lx\t", regs->rcx);
+    printf("rdx: %016lx\n", regs->rdx);
 
-    printf("rsi: %08lx\t", regs->rsi);
-    printf("rdi: %08lx\t", regs->rdi);
-    printf("rbp: %08lx\n", regs->rbp);
+    printf("rbx: %016lx\t", regs->rbx);
+    printf("rsi: %016lx\t", regs->rsi);
+    printf("rdi: %016lx\n", regs->rdi);
 
-    printf(" r8: %08lx\t", regs->r8);
-    printf(" r9: %08lx\t", regs->r9);
-    printf("r10: %08lx\t", regs->r10);
-    printf("r11: %08lx\n", regs->r11);
+    printf("rbp: %016lx\t", regs->rbp);
+    printf(" r8: %016lx\t", regs->r8);
+    printf(" r9: %016lx\n", regs->r9);
 
-    printf("r12: %08lx\t", regs->r12);
-    printf("r13: %08lx\t", regs->r13);
-    printf("r14: %08lx\t", regs->r14);
-    printf("r15: %08lx\n", regs->r15);
+    printf("r10: %016lx\t", regs->r10);
+    printf("r11: %016lx\t", regs->r11);
+    printf("r12: %016lx\n", regs->r12);
 
-    printf(" cs:     %04x\t", regs->cs);
-    printf(" ds:     %04x\t", regs->ds);
-    printf(" fs:     %04x\t", regs->fs);
-    printf(" gs:     %04x\n", regs->gs);
+    printf("r13: %016lx\t", regs->r13);
+    printf("r14: %016lx\t", regs->r14);
+    printf("r15: %016lx\n", regs->r15);
 
+    printf(" cs: %04x\t", regs->cs);
+    printf(" ss: %04x\t", regs->ss);
+    printf(" ds: %04x\t", regs->ds);
+    printf(" es: %04x\n", regs->es);
+
+    printf(" fs: %04x @ %016lx\n", regs->fs, ctx1->fs_base);
+    printf(" gs: %04x @ %016lx/%016lx\n", regs->gs,
+           ctx1->gs_base_kernel, ctx1->gs_base_user);
+
+    if (disp_all) {
+        print_special(ctx1->ctrlreg, "cr", 0x1d);
+        print_special(ctx1->debugreg, "dr", 0xcf);
+    }
 }
 #elif defined(__ia64__)
 
@@ -742,6 +764,8 @@ void usage(void)
 #ifdef __ia64__
     printf("  -r LIST, --regs=LIST  display more registers.\n");
     printf("  -a --all          same as --regs=tlb,cr,ar,br,bk\n");
+#else
+    printf("  -a --all          display more registers\n");
 #endif
 }
 
@@ -810,6 +834,10 @@ int main(int argc, char **argv)
             disp_br_regs = 1;
             disp_bank_regs = 1;
             disp_tlb = 1;
+            break;
+#else
+        case 'a':
+            disp_all = 1;
             break;
 #endif
         case 'h':
