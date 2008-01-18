@@ -43,7 +43,6 @@ boolean_param("vtd", vtd_enabled);
 LIST_HEAD(acpi_drhd_units);
 LIST_HEAD(acpi_rmrr_units);
 LIST_HEAD(acpi_atsr_units);
-LIST_HEAD(acpi_ioapic_units);
 
 u8 dmar_host_address_width;
 
@@ -64,6 +63,47 @@ static int __init acpi_register_rmrr_unit(struct acpi_rmrr_unit *rmrr)
 {
     list_add(&rmrr->list, &acpi_rmrr_units);
     return 0;
+}
+
+static int acpi_ioapic_device_match(
+    struct list_head *ioapic_list, unsigned int apic_id)
+{
+    struct acpi_ioapic_unit *ioapic;
+    list_for_each_entry( ioapic, ioapic_list, list ) {
+        if (ioapic->apic_id == apic_id)
+            return 1;
+    }
+    return 0;
+}
+
+struct acpi_drhd_unit * ioapic_to_drhd(unsigned int apic_id)
+{
+    struct acpi_drhd_unit *drhd;
+    list_for_each_entry( drhd, &acpi_drhd_units, list ) {
+        if ( acpi_ioapic_device_match(&drhd->ioapic_list, apic_id) ) {
+            dprintk(XENLOG_INFO VTDPREFIX,
+                    "ioapic_to_drhd: drhd->address = %lx\n",
+                    drhd->address);
+            return drhd;
+        }
+    }
+    return NULL;
+}
+
+struct iommu * ioapic_to_iommu(unsigned int apic_id)
+{
+    struct acpi_drhd_unit *drhd;
+
+    list_for_each_entry( drhd, &acpi_drhd_units, list ) {
+        if ( acpi_ioapic_device_match(&drhd->ioapic_list, apic_id) ) {
+            dprintk(XENLOG_INFO VTDPREFIX,
+                    "ioapic_to_iommu: drhd->address = %lx\n",
+                    drhd->address);
+            return drhd->iommu;
+        }
+    }
+    dprintk(XENLOG_WARNING VTDPREFIX, "returning NULL\n");
+    return NULL;
 }
 
 static int acpi_pci_device_match(struct pci_dev *devices, int cnt,
@@ -111,18 +151,18 @@ struct acpi_drhd_unit * acpi_find_matched_drhd_unit(struct pci_dev *dev)
         if ( acpi_pci_device_match(drhd->devices,
                                    drhd->devices_cnt, dev) )
         {
-            gdprintk(XENLOG_INFO VTDPREFIX, 
-                     "acpi_find_matched_drhd_unit: drhd->address = %lx\n",
-                     drhd->address);
+            dprintk(XENLOG_INFO VTDPREFIX, 
+                    "acpi_find_matched_drhd_unit: drhd->address = %lx\n",
+                    drhd->address);
             return drhd;
         }
     }
 
     if ( include_all_drhd )
     {
-        gdprintk(XENLOG_INFO VTDPREFIX, 
-                 "acpi_find_matched_drhd_unit:include_all_drhd->addr = %lx\n",
-                 include_all_drhd->address);
+        dprintk(XENLOG_INFO VTDPREFIX, 
+                "acpi_find_matched_drhd_unit:include_all_drhd->addr = %lx\n",
+                include_all_drhd->address);
         return include_all_drhd;
     }
 
@@ -160,8 +200,8 @@ struct acpi_atsr_unit * acpi_find_matched_atsr_unit(struct pci_dev *dev)
 
     if ( all_ports_atsru )
     {
-        gdprintk(XENLOG_INFO VTDPREFIX,
-                 "acpi_find_matched_atsr_unit: all_ports_atsru\n");
+        dprintk(XENLOG_INFO VTDPREFIX,
+                "acpi_find_matched_atsr_unit: all_ports_atsru\n");
         return all_ports_atsru;;
     }
 
@@ -180,9 +220,10 @@ static int scope_device_count(void *start, void *end)
     while ( start < end )
     {
         scope = start;
-        if ( scope->length < MIN_SCOPE_LEN )
+        if ( (scope->length < MIN_SCOPE_LEN) ||
+             (scope->dev_type >= ACPI_DEV_ENTRY_COUNT) )
         {
-            printk(KERN_WARNING PREFIX "Invalid device scope\n");
+            dprintk(XENLOG_WARNING VTDPREFIX, "Invalid device scope\n");
             return -EINVAL;
         }
 
@@ -199,16 +240,16 @@ static int scope_device_count(void *start, void *end)
 
         if ( scope->dev_type == ACPI_DEV_ENDPOINT )
         {
-            printk(KERN_INFO PREFIX
-                   "found endpoint: bdf = %x:%x:%x\n",
-                   bus, path->dev, path->fn);
+            dprintk(XENLOG_INFO VTDPREFIX,
+                    "found endpoint: bdf = %x:%x:%x\n",
+                    bus, path->dev, path->fn);
             count++;
         }
         else if ( scope->dev_type == ACPI_DEV_P2PBRIDGE )
         {
-            printk(KERN_INFO PREFIX
-                   "found bridge: bdf = %x:%x:%x\n",
-                   bus, path->dev, path->fn);
+            dprintk(XENLOG_INFO VTDPREFIX,
+                    "found bridge: bdf = %x:%x:%x\n",
+                    bus, path->dev, path->fn);
             sec_bus = read_pci_config_byte(
                 bus, path->dev, path->fn, PCI_SECONDARY_BUS);
             sub_bus = read_pci_config_byte(
@@ -237,16 +278,16 @@ static int scope_device_count(void *start, void *end)
         }
         else if ( scope->dev_type == ACPI_DEV_IOAPIC )
         {
-            printk(KERN_INFO PREFIX
-                   "found IOAPIC: bdf = %x:%x:%x\n",
-                   bus, path->dev, path->fn);
+            dprintk(XENLOG_INFO VTDPREFIX,
+                    "found IOAPIC: bdf = %x:%x:%x\n",
+                    bus, path->dev, path->fn);
             count++;
         }
         else
         {
-            printk(KERN_INFO PREFIX
-                   "found MSI HPET: bdf = %x:%x:%x\n",
-                   bus, path->dev, path->fn);
+            dprintk(XENLOG_INFO VTDPREFIX,
+                    "found MSI HPET: bdf = %x:%x:%x\n",
+                    bus, path->dev, path->fn);
             count++;
         }
 
@@ -256,8 +297,8 @@ static int scope_device_count(void *start, void *end)
     return count;
 }
 
-static int __init acpi_parse_dev_scope(void *start, void *end, int *cnt,
-                                       struct pci_dev **devices)
+static int __init acpi_parse_dev_scope(
+    void *start, void *end, void *acpi_entry, int type)
 {
     struct acpi_dev_scope *scope;
     u8 bus, sub_bus, sec_bus;
@@ -268,10 +309,33 @@ static int __init acpi_parse_dev_scope(void *start, void *end, int *cnt,
     u8 dev, func;
     u32 l;
 
+    int *cnt = NULL;
+    struct pci_dev **devices = NULL;
+    struct acpi_drhd_unit *dmaru = (struct acpi_drhd_unit *) acpi_entry;
+    struct acpi_rmrr_unit *rmrru = (struct acpi_rmrr_unit *) acpi_entry;
+    struct acpi_atsr_unit *atsru = (struct acpi_atsr_unit *) acpi_entry;
+
+    switch (type) {
+        case DMAR_TYPE:
+            cnt = &(dmaru->devices_cnt);
+            devices = &(dmaru->devices);
+            break;
+        case RMRR_TYPE:
+            cnt = &(rmrru->devices_cnt);
+            devices = &(rmrru->devices);
+            break;
+        case ATSR_TYPE:
+            cnt = &(atsru->devices_cnt);
+            devices = &(atsru->devices);
+            break;
+        default:
+            dprintk(XENLOG_ERR VTDPREFIX, "invalid vt-d acpi entry type\n");
+    }
+
     *cnt = scope_device_count(start, end);
     if ( *cnt == 0 )
     {
-        printk(KERN_INFO PREFIX "acpi_parse_dev_scope: no device\n");
+        dprintk(XENLOG_INFO VTDPREFIX, "acpi_parse_dev_scope: no device\n");
         return 0;
     }
 
@@ -298,18 +362,18 @@ static int __init acpi_parse_dev_scope(void *start, void *end, int *cnt,
 
         if ( scope->dev_type == ACPI_DEV_ENDPOINT )
         {
-            printk(KERN_INFO PREFIX
-                   "found endpoint: bdf = %x:%x:%x\n",
-                   bus, path->dev, path->fn);
+            dprintk(XENLOG_INFO VTDPREFIX,
+                    "found endpoint: bdf = %x:%x:%x\n",
+                    bus, path->dev, path->fn);
             pdev->bus = bus;
             pdev->devfn = PCI_DEVFN(path->dev, path->fn);
             pdev++;
         }
         else if ( scope->dev_type == ACPI_DEV_P2PBRIDGE )
         {
-            printk(KERN_INFO PREFIX
-                   "found bridge: bus = %x dev = %x func = %x\n",
-                   bus, path->dev, path->fn);
+            dprintk(XENLOG_INFO VTDPREFIX,
+                    "found bridge: bus = %x dev = %x func = %x\n",
+                    bus, path->dev, path->fn);
             sec_bus = read_pci_config_byte(
                 bus, path->dev, path->fn, PCI_SECONDARY_BUS);
             sub_bus = read_pci_config_byte(
@@ -348,16 +412,15 @@ static int __init acpi_parse_dev_scope(void *start, void *end, int *cnt,
             acpi_ioapic_unit->ioapic.bdf.bus = bus;
             acpi_ioapic_unit->ioapic.bdf.dev = path->dev;
             acpi_ioapic_unit->ioapic.bdf.func = path->fn;
-            list_add(&acpi_ioapic_unit->list, &acpi_ioapic_units);
-            printk(KERN_INFO PREFIX
-                   "found IOAPIC: bus = %x dev = %x func = %x\n",
-                   bus, path->dev, path->fn);
+            list_add(&acpi_ioapic_unit->list, &dmaru->ioapic_list);
+            dprintk(XENLOG_INFO VTDPREFIX,
+                    "found IOAPIC: bus = %x dev = %x func = %x\n",
+                    bus, path->dev, path->fn);
         }
         else
-            printk(KERN_INFO PREFIX
-                   "found MSI HPET: bus = %x dev = %x func = %x\n",
-                   bus, path->dev, path->fn);
-        
+            dprintk(XENLOG_INFO VTDPREFIX,
+                    "found MSI HPET: bus = %x dev = %x func = %x\n",
+                    bus, path->dev, path->fn);
         start += scope->length;
     }
 
@@ -371,6 +434,7 @@ acpi_parse_one_drhd(struct acpi_dmar_entry_header *header)
     struct acpi_drhd_unit *dmaru;
     int ret = 0;
     static int include_all;
+    void *dev_scope_start, *dev_scope_end;
 
     dmaru = xmalloc(struct acpi_drhd_unit);
     if ( !dmaru )
@@ -379,21 +443,22 @@ acpi_parse_one_drhd(struct acpi_dmar_entry_header *header)
 
     dmaru->address = drhd->address;
     dmaru->include_all = drhd->flags & 1; /* BIT0: INCLUDE_ALL */
-    printk(KERN_INFO PREFIX "dmaru->address = %lx\n", dmaru->address);
+    INIT_LIST_HEAD(&dmaru->ioapic_list);
+    dprintk(XENLOG_INFO VTDPREFIX, "dmaru->address = %lx\n", dmaru->address);
 
-    if ( !dmaru->include_all )
-        ret = acpi_parse_dev_scope(
-            (void *)(drhd + 1),
-            ((void *)drhd) + header->length,
-            &dmaru->devices_cnt, &dmaru->devices);
-    else
+    dev_scope_start = (void *)(drhd + 1);
+    dev_scope_end   = ((void *)drhd) + header->length;
+    ret = acpi_parse_dev_scope(dev_scope_start, dev_scope_end,
+                               dmaru, DMAR_TYPE);
+
+    if ( dmaru->include_all )
     {
-        printk(KERN_INFO PREFIX "found INCLUDE_ALL\n");
+        dprintk(XENLOG_INFO VTDPREFIX, "found INCLUDE_ALL\n");
         /* Only allow one INCLUDE_ALL */
         if ( include_all )
         {
-            printk(KERN_WARNING PREFIX "Only one INCLUDE_ALL "
-                   "device scope is allowed\n");
+            dprintk(XENLOG_WARNING VTDPREFIX,
+                    "Only one INCLUDE_ALL device scope is allowed\n");
             ret = -EINVAL;
         }
         include_all = 1;
@@ -411,6 +476,7 @@ acpi_parse_one_rmrr(struct acpi_dmar_entry_header *header)
 {
     struct acpi_table_rmrr *rmrr = (struct acpi_table_rmrr *)header;
     struct acpi_rmrr_unit *rmrru;
+    void *dev_scope_start, *dev_scope_end;
     int ret = 0;
 
     rmrru = xmalloc(struct acpi_rmrr_unit);
@@ -420,15 +486,10 @@ acpi_parse_one_rmrr(struct acpi_dmar_entry_header *header)
 
     rmrru->base_address = rmrr->base_address;
     rmrru->end_address = rmrr->end_address;
-    printk(KERN_INFO PREFIX
-           "acpi_parse_one_rmrr: base=%"PRIx64" end=%"PRIx64"\n",
-           rmrr->base_address, rmrr->end_address);
-
-    ret = acpi_parse_dev_scope(
-        (void *)(rmrr + 1),
-        ((void*)rmrr) + header->length,
-        &rmrru->devices_cnt, &rmrru->devices);
-
+    dev_scope_start = (void *)(rmrr + 1);
+    dev_scope_end   = ((void *)rmrr) + header->length;
+    ret = acpi_parse_dev_scope(dev_scope_start, dev_scope_end,
+                               rmrru, RMRR_TYPE);
     if ( ret || (rmrru->devices_cnt == 0) )
         xfree(rmrru);
     else
@@ -443,6 +504,7 @@ acpi_parse_one_atsr(struct acpi_dmar_entry_header *header)
     struct acpi_atsr_unit *atsru;
     int ret = 0;
     static int all_ports;
+    void *dev_scope_start, *dev_scope_end;
 
     atsru = xmalloc(struct acpi_atsr_unit);
     if ( !atsru )
@@ -451,18 +513,19 @@ acpi_parse_one_atsr(struct acpi_dmar_entry_header *header)
 
     atsru->all_ports = atsr->flags & 1; /* BIT0: ALL_PORTS */
     if ( !atsru->all_ports )
-        ret = acpi_parse_dev_scope(
-            (void *)(atsr + 1),
-            ((void *)atsr) + header->length,
-            &atsru->devices_cnt, &atsru->devices);
-    else
     {
-        printk(KERN_INFO PREFIX "found ALL_PORTS\n");
+        dev_scope_start = (void *)(atsr + 1);
+        dev_scope_end   = ((void *)atsr) + header->length;
+        ret = acpi_parse_dev_scope(dev_scope_start, dev_scope_end,
+                                   atsru, ATSR_TYPE);
+    }
+    else {
+        dprintk(XENLOG_INFO VTDPREFIX, "found ALL_PORTS\n");
         /* Only allow one ALL_PORTS */
         if ( all_ports )
         {
-            printk(KERN_WARNING PREFIX "Only one ALL_PORTS "
-                   "device scope is allowed\n");
+            dprintk(XENLOG_WARNING VTDPREFIX,
+                    "Only one ALL_PORTS device scope is allowed\n");
             ret = -EINVAL;
         }
         all_ports = 1;
@@ -488,19 +551,19 @@ static int __init acpi_parse_dmar(unsigned long phys_addr,
     dmar = (struct acpi_table_dmar *)__acpi_map_table(phys_addr, size);
     if ( !dmar )
     {
-        printk(KERN_WARNING PREFIX "Unable to map DMAR\n");
+        dprintk(XENLOG_WARNING VTDPREFIX, "Unable to map DMAR\n");
         return -ENODEV;
     }
 
     if ( !dmar->haw )
     {
-        printk(KERN_WARNING PREFIX "Zero: Invalid DMAR haw\n");
+        dprintk(XENLOG_WARNING VTDPREFIX, "Zero: Invalid DMAR haw\n");
         return -EINVAL;
     }
 
     dmar_host_address_width = dmar->haw;
-    printk(KERN_INFO PREFIX "Host address width %d\n",
-           dmar_host_address_width);
+    dprintk(XENLOG_INFO VTDPREFIX, "Host address width %d\n",
+            dmar_host_address_width);
 
     entry_header = (struct acpi_dmar_entry_header *)(dmar + 1);
     while ( ((unsigned long)entry_header) <
@@ -509,19 +572,19 @@ static int __init acpi_parse_dmar(unsigned long phys_addr,
         switch ( entry_header->type )
         {
         case ACPI_DMAR_DRHD:
-            printk(KERN_INFO PREFIX "found ACPI_DMAR_DRHD\n");
+            dprintk(XENLOG_INFO VTDPREFIX, "found ACPI_DMAR_DRHD\n");
             ret = acpi_parse_one_drhd(entry_header);
             break;
         case ACPI_DMAR_RMRR:
-            printk(KERN_INFO PREFIX "found ACPI_DMAR_RMRR\n");
+            dprintk(XENLOG_INFO VTDPREFIX, "found ACPI_DMAR_RMRR\n");
             ret = acpi_parse_one_rmrr(entry_header);
             break;
         case ACPI_DMAR_ATSR:
-            printk(KERN_INFO PREFIX "found ACPI_DMAR_ATSR\n");
+            dprintk(XENLOG_INFO VTDPREFIX, "found ACPI_DMAR_ATSR\n");
             ret = acpi_parse_one_atsr(entry_header);
             break;
         default:
-            printk(KERN_WARNING PREFIX "Unknown DMAR structure type\n");
+            dprintk(XENLOG_WARNING VTDPREFIX, "Unknown DMAR structure type\n");
             ret = -EINVAL;
             break;
         }
@@ -551,7 +614,7 @@ int acpi_dmar_init(void)
 
     if ( list_empty(&acpi_drhd_units) )
     {
-        printk(KERN_ERR PREFIX "No DMAR devices found\n");
+        dprintk(XENLOG_ERR VTDPREFIX, "No DMAR devices found\n");
         vtd_enabled = 0;
         return -ENODEV;
     }
