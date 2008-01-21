@@ -38,8 +38,11 @@
 
 #include<traps.h>
 
+void print(int direct, const char *fmt, va_list args);
 void printk(const char *fmt, ...);
 void xprintk(const char *fmt, ...);
+
+#define tprintk(_fmt, _args...) printk("[%s] " _fmt, current->name, ##_args) 
 
 void xencons_rx(char *buf, unsigned len, struct pt_regs *regs);
 void xencons_tx(void);

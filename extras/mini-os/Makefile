@@ -47,6 +47,13 @@ EXTRA_INC =
 # This must be before include minios.mk!
 include $(TARGET_ARCH_DIR)/arch.mk
 
+ifneq ($(LWIPDIR),)
+lwip=y
+DEF_CFLAGS += -DHAVE_LWIP
+DEF_CFLAGS += -I$(LWIPDIR)/src/include
+DEF_CFLAGS += -I$(LWIPDIR)/src/include/ipv4
+endif
+
 # Include common mini-os makerules.
 include minios.mk
 
@@ -90,6 +97,24 @@ links:	$(ARCH_LINKS)
 arch_lib:
 	$(MAKE) --directory=$(TARGET_ARCH_DIR) || exit 1;
 
+ifeq ($(lwip),y)
+# lwIP library
+LWC	:= $(shell find $(LWIPDIR)/ -type f -name '*.c')
+LWC	:= $(filter-out %6.c %ip6_addr.c %ethernetif.c, $(LWC))
+LWC	+= lwip-arch.c lwip-net.c
+LWO	:= $(patsubst %.c,%.o,$(LWC))
+
+lwip.a: $(LWO)
+	$(RM) $@
+	$(AR) cqs $@ $^
+
+OBJS += lwip.a
+
+OBJS := $(filter-out $(LWO), $(OBJS))
+else
+OBJS := $(filter-out daytime.o lwip%.o, $(OBJS))
+endif
+
 $(TARGET): links $(OBJS) arch_lib
 	$(LD) -r $(LDFLAGS) $(HEAD_OBJ) $(OBJS) $(LDARCHLIB) -o $@.o
 	$(OBJCOPY) -w -G $(GLOBAL_PREFIX)* -G _start $@.o $@.o
@@ -107,6 +132,7 @@ clean:	arch_clean
 	done
 	rm -f *.o *~ core $(TARGET).elf $(TARGET).raw $(TARGET) $(TARGET).gz
 	find . -type l | xargs rm -f
+	$(RM) lwip.a $(LWO)
 	rm -f tags TAGS
 
 
