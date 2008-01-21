@@ -75,7 +75,7 @@ static void periodic_thread(void *p)
     printk("Periodic thread started.\n");
     for(;;)
     {
-        gettimeofday(&tv);
+        gettimeofday(&tv, NULL);
         printk("T(s=%ld us=%ld)\n", tv.tv_sec, tv.tv_usec);
         sleep(1000);
     }

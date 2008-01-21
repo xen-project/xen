@@ -38,20 +38,13 @@ typedef s64 s_time_t;
 #define Time_Max                ((s_time_t) 0x7fffffffffffffffLL)
 #define FOREVER                 Time_Max
 #define NSEC_TO_USEC(_nsec)     ((_nsec) / 1000UL)
+#define NSEC_TO_MSEC(_nsec)     ((_nsec) / 1000000ULL)
 #define NSEC_TO_SEC(_nsec)      ((_nsec) / 1000000000ULL)
 
 /* wall clock time  */
 typedef long time_t;
 typedef long suseconds_t;
-struct timeval {
-	time_t		tv_sec;		/* seconds */
-	suseconds_t	tv_usec;	/* microseconds */
-};
-
-struct timespec {
-    time_t      ts_sec;
-    long        ts_nsec;
-};
+#include <sys/time.h>
 
 
 /* prototypes */
@@ -59,7 +52,6 @@ void     init_time(void);
 s_time_t get_s_time(void);
 s_time_t get_v_time(void);
 u64      monotonic_clock(void);
-void     gettimeofday(struct timeval *tv);
 void     block_domain(s_time_t until);
 
 #endif /* _TIME_H_ */

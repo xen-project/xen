@@ -175,30 +175,32 @@ static void update_wallclock(void)
 	do {
 		shadow_ts_version = s->wc_version;
 		rmb();
-		shadow_ts.ts_sec  = s->wc_sec;
-		shadow_ts.ts_nsec = s->wc_nsec;
+		shadow_ts.tv_sec  = s->wc_sec;
+		shadow_ts.tv_nsec = s->wc_nsec;
 		rmb();
 	}
 	while ((s->wc_version & 1) | (shadow_ts_version ^ s->wc_version));
 }
 
 
-void gettimeofday(struct timeval *tv)
+int gettimeofday(struct timeval *tv, void *tz)
 {
     u64 nsec = monotonic_clock();
-    nsec += shadow_ts.ts_nsec;
+    nsec += shadow_ts.tv_nsec;
     
     
-    tv->tv_sec = shadow_ts.ts_sec;
+    tv->tv_sec = shadow_ts.tv_sec;
     tv->tv_sec += NSEC_TO_SEC(nsec);
     tv->tv_usec = NSEC_TO_USEC(nsec % 1000000000UL);
+
+    return 0;
 }
 
 
 void block_domain(s_time_t until)
 {
     struct timeval tv;
-    gettimeofday(&tv);
+    gettimeofday(&tv, NULL);
     if(monotonic_clock() < until)
     {
         HYPERVISOR_set_timer_op(until);
