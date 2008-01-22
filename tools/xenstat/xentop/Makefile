@@ -18,10 +18,6 @@ ifneq ($(XENSTAT_XENTOP),y)
 all install xentop:
 else
 
-prefix=/usr
-mandir=$(prefix)/share/man
-man1dir=$(mandir)/man1
-
 CFLAGS += -DGCC_PRINTF -Wall -Werror -I$(XEN_LIBXENSTAT)
 LDFLAGS += -L$(XEN_LIBXENSTAT)
 LDLIBS += -lxenstat $(CURSES_LIBS) $(SOCKET_LIBS)
@@ -34,8 +30,8 @@ all: xentop
 install: xentop xentop.1
 	$(INSTALL_DIR) $(DESTDIR)$(SBINDIR)
 	$(INSTALL_PROG) xentop $(DESTDIR)$(SBINDIR)/xentop
-	$(INSTALL_DIR) $(DESTDIR)$(man1dir)
-	$(INSTALL_DATA) xentop.1 $(DESTDIR)$(man1dir)/xentop.1
+	$(INSTALL_DIR) $(DESTDIR)$(MAN1DIR)
+	$(INSTALL_DATA) xentop.1 $(DESTDIR)$(MAN1DIR)/xentop.1
 
 endif
 

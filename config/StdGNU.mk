@@ -22,6 +22,9 @@ BINDIR = $(PREFIX)/bin
 INCLUDEDIR = $(PREFIX)/include
 LIBDIR = $(PREFIX)/lib
 LIBDIR_x86_64 = $(PREFIX)/lib64
+MANDIR = $(PREFIX)/share/man
+MAN1DIR = $(MANDIR)/man1
+MAN8DIR = $(MANDIR)/man8
 SBINDIR = $(PREFIX)/sbin
 
 SOCKET_LIBS =

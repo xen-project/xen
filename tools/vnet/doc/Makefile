@@ -13,8 +13,6 @@ LATEX2HTML	:= latex2html
 DOXYGEN		:= doxygen
 POD2MAN		:= pod2man
 
-MAN_DIR		:= /usr/share/man
-
 DOC_MAN5SRC	:= $(wildcard man/*.pod.5)
 DOC_MAN1SRC	:= $(wildcard man/*.pod.1)
 DOC_MAN1	:= $(patsubst man/%.pod.1,man1/%.1,$(DOC_MAN1SRC))
@@ -47,7 +45,7 @@ clean:
 
 .PHONY:  install
  install: all
-	$(INSTALL_DIR) $(DESTDIR)$(MAN_DIR)
-	$(CP) -dR man1 $(DESTDIR)$(MAN_DIR)
-	$(CP) -dR man5 $(DESTDIR)$(MAN_DIR)
+	$(INSTALL_DIR) $(DESTDIR)$(MANDIR)
+	$(CP) -dR man1 $(DESTDIR)$(MANDIR)
+	$(CP) -dR man5 $(DESTDIR)$(MANDIR)
 

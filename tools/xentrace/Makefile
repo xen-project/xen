@@ -37,14 +37,12 @@ build: $(BIN) $(LIBBIN)
 install: build
 	$(INSTALL_DIR) $(DESTDIR)$(BINDIR)
 	[ -z "$(LIBBIN)" ] || $(INSTALL_DIR) $(DESTDIR)$(LIBDIR)/xen/bin
-	[ -d $(DESTDIR)/usr/share/man/man1 ] || \
-		$(INSTALL_DIR) $(DESTDIR)/usr/share/man/man1
-	[ -d $(DESTDIR)/usr/share/man/man8 ] || \
-		$(INSTALL_DIR) $(DESTDIR)/usr/share/man/man8
+	$(INSTALL_DIR) $(DESTDIR)$(MAN1DIR)
+	$(INSTALL_DIR) $(DESTDIR)$(MAN8DIR)
 	$(INSTALL_PROG) $(BIN) $(SCRIPTS) $(DESTDIR)$(BINDIR)
 	[ -z "$(LIBBIN)" ] || $(INSTALL_PROG) $(LIBBIN) $(DESTDIR)$(LIBDIR)/xen/bin
-	$(INSTALL_DATA) $(MAN1) $(DESTDIR)/usr/share/man/man1
-	$(INSTALL_DATA) $(MAN8) $(DESTDIR)/usr/share/man/man8
+	$(INSTALL_DATA) $(MAN1) $(DESTDIR)$(MAN1DIR)
+	$(INSTALL_DATA) $(MAN8) $(DESTDIR)$(MAN8DIR)
 
 .PHONY: clean
 clean:
