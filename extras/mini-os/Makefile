@@ -57,6 +57,9 @@ endif
 # Include common mini-os makerules.
 include minios.mk
 
+# Set tester flags
+# CFLAGS += -DBLKTEST_WRITE
+
 # Define some default flags for linking.
 LDLIBS := 
 LDARCHLIB := -L$(TARGET_ARCH_DIR) -l$(ARCH_LIB_NAME)

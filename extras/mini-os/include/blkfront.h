@@ -15,7 +15,9 @@ struct blkfront_aiocb
     void (*aio_cb)(struct blkfront_aiocb *aiocb, int ret);
 };
 struct blkfront_dev *init_blkfront(char *nodename, uint64_t *sectors, unsigned *sector_size, int *mode);
+#ifdef HAVE_LIBC
 int blkfront_open(struct blkfront_dev *dev);
+#endif
 void blkfront_aio(struct blkfront_aiocb *aiocbp, int write);
 void blkfront_aio_read(struct blkfront_aiocb *aiocbp);
 void blkfront_aio_write(struct blkfront_aiocb *aiocbp);

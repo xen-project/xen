@@ -38,7 +38,10 @@
 #include <xenbus.h>
 #include <gnttab.h>
 #include <netfront.h>
+#include <blkfront.h>
 #include <fs.h>
+#include <xmalloc.h>
+#include <fcntl.h>
 #include <xen/features.h>
 #include <xen/version.h>
 
@@ -86,6 +89,178 @@ static void netfront_thread(void *p)
     init_netfront(NULL, NULL, NULL);
 }
 
+#define RAND_MIX 2654435769
+
+/* Should be random enough for this use */
+static int rand(void)
+{
+    static unsigned int previous;
+    struct timeval tv;
+    gettimeofday(&tv, NULL);
+    previous += tv.tv_sec + tv.tv_usec;
+    previous *= RAND_MIX;
+    return previous;
+}
+
+static struct blkfront_dev *blk_dev;
+static uint64_t blk_sectors;
+static unsigned blk_sector_size;
+static int blk_mode;
+static uint64_t blk_size_read;
+static uint64_t blk_size_write;
+
+struct blk_req {
+    struct blkfront_aiocb aiocb;
+    int rand_value;
+    struct blk_req *next;
+};
+
+#ifdef BLKTEST_WRITE
+static struct blk_req *blk_to_read;
+#endif
+
+static struct blk_req *blk_alloc_req(uint64_t sector)
+{
+    struct blk_req *req = xmalloc(struct blk_req);
+    req->aiocb.aio_dev = blk_dev;
+    req->aiocb.aio_buf = _xmalloc(blk_sector_size, blk_sector_size);
+    req->aiocb.aio_nbytes = blk_sector_size;
+    req->aiocb.aio_offset = sector * blk_sector_size;
+    req->aiocb.data = req;
+    req->next = NULL;
+    return req;
+}
+
+static void blk_read_completed(struct blkfront_aiocb *aiocb, int ret)
+{
+    struct blk_req *req = aiocb->data;
+    if (ret)
+        printk("got error code %d when reading at offset %ld\n", ret, aiocb->aio_offset);
+    else
+        blk_size_read += blk_sector_size;
+    free(aiocb->aio_buf);
+    free(req);
+}
+
+static void blk_read_sector(uint64_t sector)
+{
+    struct blk_req *req;
+
+    req = blk_alloc_req(sector);
+    req->aiocb.aio_cb = blk_read_completed;
+
+    blkfront_aio_read(&req->aiocb);
+}
+
+#ifdef BLKTEST_WRITE
+static void blk_write_read_completed(struct blkfront_aiocb *aiocb, int ret)
+{
+    struct blk_req *req = aiocb->data;
+    int rand_value;
+    int i;
+    int *buf;
+
+    if (ret) {
+        printk("got error code %d when reading back at offset %ld\n", ret, aiocb->aio_offset);
+        free(aiocb->aio_buf);
+        free(req);
+        return;
+    }
+    blk_size_read += blk_sector_size;
+    buf = (int*) aiocb->aio_buf;
+    rand_value = req->rand_value;
+    for (i = 0; i < blk_sector_size / sizeof(int); i++) {
+        if (buf[i] != rand_value) {
+            printk("bogus data at offset %ld\n", aiocb->aio_offset + i);
+            break;
+        }
+        rand_value *= RAND_MIX;
+    }
+    free(aiocb->aio_buf);
+    free(req);
+}
+
+static void blk_write_completed(struct blkfront_aiocb *aiocb, int ret)
+{
+    struct blk_req *req = aiocb->data;
+    if (ret) {
+        printk("got error code %d when writing at offset %ld\n", ret, aiocb->aio_offset);
+        free(aiocb->aio_buf);
+        free(req);
+        return;
+    }
+    blk_size_write += blk_sector_size;
+    /* Push write check */
+    req->next = blk_to_read;
+    blk_to_read = req;
+}
+
+static void blk_write_sector(uint64_t sector)
+{
+    struct blk_req *req;
+    int rand_value;
+    int i;
+    int *buf;
+
+    req = blk_alloc_req(sector);
+    req->aiocb.aio_cb = blk_write_completed;
+    req->rand_value = rand_value = rand();
+
+    buf = (int*) req->aiocb.aio_buf;
+    for (i = 0; i < blk_sector_size / sizeof(int); i++) {
+        buf[i] = rand_value;
+        rand_value *= RAND_MIX;
+    }
+
+    blkfront_aio_write(&req->aiocb);
+}
+#endif
+
+static void blkfront_thread(void *p)
+{
+    time_t lasttime = 0;
+    blk_dev = init_blkfront(NULL, &blk_sectors, &blk_sector_size, &blk_mode);
+    if (!blk_dev)
+        return;
+
+#ifdef BLKTEST_WRITE
+    if (blk_mode == O_RDWR) {
+        blk_write_sector(0);
+        blk_write_sector(blk_sectors-1);
+    } else
+#endif
+    {
+        blk_read_sector(0);
+        blk_read_sector(blk_sectors-1);
+    }
+
+    while (1) {
+        uint64_t sector = rand() % blk_sectors;
+        struct timeval tv;
+#ifdef BLKTEST_WRITE
+        if (blk_mode == O_RDWR)
+            blk_write_sector(sector);
+        else
+#endif
+            blk_read_sector(sector);
+        blkfront_aio_poll(blk_dev);
+        gettimeofday(&tv, NULL);
+        if (tv.tv_sec > lasttime + 10) {
+            printk("%llu read, %llu write\n", blk_size_read, blk_size_write);
+            lasttime = tv.tv_sec;
+        }
+
+#ifdef BLKTEST_WRITE
+        while (blk_to_read) {
+            struct blk_req *req = blk_to_read;
+            blk_to_read = blk_to_read->next;
+            req->aiocb.aio_cb = blk_write_read_completed;
+            blkfront_aio_read(&req->aiocb);
+        }
+#endif
+    }
+}
+
 static void fs_thread(void *p)
 {
     init_fs_frontend();
@@ -98,6 +273,7 @@ __attribute__((weak)) int app_main(start_info_t *si)
     create_thread("xenbus_tester", xenbus_tester, si);
     create_thread("periodic_thread", periodic_thread, si);
     create_thread("netfront", netfront_thread, si);
+    create_thread("blkfront", blkfront_thread, si);
     create_thread("fs-frontend", fs_thread, si);
     return 0;
 }
