@@ -48,7 +48,10 @@ DefinitionBlock ("DSDT.aml", "DSDT", 2, "Xen", "HVM", 0)
        OperationRegion(BIOS, SystemMemory, 0xEA000, 16)
        Field(BIOS, ByteAcc, NoLock, Preserve) {
            UAR1, 1,
-           UAR2, 1
+           UAR2, 1,
+           Offset(4),
+           PMIN, 32,
+           PLEN, 32
        }
 
         /* Fix HCT test for 0x400 pci memory:
@@ -82,7 +85,7 @@ DefinitionBlock ("DSDT.aml", "DSDT", 2, "Xen", "HVM", 0)
                {
                    /* bus number is from 0 - 255*/
                    WordBusNumber(
-                        ResourceConsumer, MinFixed, MaxFixed, SubDecode,
+                        ResourceProducer, MinFixed, MaxFixed, SubDecode,
                         0x0000,
                         0x0000,
                         0x00FF,
@@ -117,14 +120,25 @@ DefinitionBlock ("DSDT.aml", "DSDT", 2, "Xen", "HVM", 0)
                         0x00020000)
 
                     DWordMemory(
-                        ResourceConsumer, PosDecode, MinFixed, MaxFixed,
+                        ResourceProducer, PosDecode, MinFixed, MaxFixed,
                         Cacheable, ReadWrite,
                         0x00000000,
                         0xF0000000,
                         0xF4FFFFFF,
                         0x00000000,
-                        0x05000000)
+                        0x05000000,
+                        ,, _Y01)
                 })
+
+                CreateDWordField(PRT0, \_SB.PCI0._CRS._Y01._MIN, MMIN)
+                CreateDWordField(PRT0, \_SB.PCI0._CRS._Y01._MAX, MMAX)
+                CreateDWordField(PRT0, \_SB.PCI0._CRS._Y01._LEN, MLEN)
+
+                Store(\_SB.PMIN, MMIN)
+                Store(\_SB.PLEN, MLEN)
+                Add(MMIN, MLEN, MMAX)
+                Subtract(MMAX, One, MMAX)
+
                 Return (PRT0)
             }
 

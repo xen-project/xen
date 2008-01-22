@@ -29,8 +29,6 @@ all: vnetd
 
 INSTALL_PROG ?= $(INSTALL) -m0755 -p
 
-VNETD_INSTALL_DIR = /usr/sbin
-
 INCLUDES += -I$(LIBXUTIL_DIR)
 INCLUDES += -I$(VNET_MODULE_DIR)
 INCLUDES += -I$(shell pwd)
@@ -111,8 +109,8 @@ vnetd: $(VNETD_OBJ)
 
 .PHONY: install
 install: vnetd
-	mkdir -p $(DESTDIR)$(VNETD_INSTALL_DIR)
-	$(INSTALL_PROG) vnetd $(DESTDIR)$(VNETD_INSTALL_DIR)
+	$(INSTALL_DIR) $(DESTDIR)$(SBINDIR)
+	$(INSTALL_PROG) vnetd $(DESTDIR)$(SBINDIR)
 
 .PHONY: clean
 clean:

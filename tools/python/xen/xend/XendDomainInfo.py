@@ -535,6 +535,11 @@ class XendDomainInfo:
                     self._createDevice(dev_type, dev_config_dict)
                 self._waitForDevice(dev_type, devid)
             except VmError, ex:
+                del self.info['devices'][dev_uuid]
+                if dev_type == 'tap':
+                    self.info['vbd_refs'].remove(dev_uuid)
+                else:
+                    self.info['%s_refs' % dev_type].remove(dev_uuid)
                 raise ex
         else:
             devid = None
@@ -1650,9 +1655,10 @@ class XendDomainInfo:
         self._recreateDom()
 
         # Set timer configration of domain
-        if hvm:
+        timer_mode = self.info["platform"].get("timer_mode")
+        if hvm and timer_mode is not None:
             xc.hvm_set_param(self.domid, HVM_PARAM_TIMER_MODE,
-                long(self.info["platform"].get("timer_mode")))
+                             long(timer_mode))
 
         # Set maximum number of vcpus in domain
         xc.domain_max_vcpus(self.domid, int(self.info['VCPUs_max']))

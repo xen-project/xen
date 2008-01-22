@@ -1,15 +1,8 @@
 #!/bin/sh
 # CHECK-BUILD
 
-RC=0
+. funcs.sh
 
-set -e
-test -r /usr/include/X11/keysymdef.h || \
-test -r /usr/X11R6/include/X11/keysymdef.h || RC=1
-
-if test ${RC} -ne 0; then
-	echo
-	echo " *** Check for x11 headers FAILED"
-fi
-
-exit ${RC}
+has_header X11/keysymdef.h || \
+has_header /usr/X11R6/include/X11/keysymdef.h || \
+fail "can't find X11 headers"

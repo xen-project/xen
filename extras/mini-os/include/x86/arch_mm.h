@@ -226,6 +226,35 @@ static __inline__ paddr_t machine_to_phys(maddr_t machine)
 #define pte_to_mfn(_pte)           (((_pte) & (PADDR_MASK&PAGE_MASK)) >> L1_PAGETABLE_SHIFT)
 #define pte_to_virt(_pte)          to_virt(mfn_to_pfn(pte_to_mfn(_pte)) << PAGE_SHIFT)
 
+
+#define PT_BASE			   ((pgentry_t *)start_info.pt_base)
+
+#ifdef __x86_64__
+#define virtual_to_l3(_virt)	   ((pgentry_t *)pte_to_virt(PT_BASE[l4_table_offset(_virt)]))
+#else
+#define virtual_to_l3(_virt)	   PT_BASE
+#endif
+
+#if defined(__x86_64__) || defined(CONFIG_X86_PAE)
+#define virtual_to_l2(_virt)	   ({ \
+	unsigned long __virt2 = (_virt); \
+	(pgentry_t *) pte_to_virt(virtual_to_l3(__virt2)[l3_table_offset(__virt2)]); \
+})
+#else
+#define virtual_to_l2(_virt)	   PT_BASE
+#endif
+
+#define virtual_to_l1(_virt)	   ({ \
+	unsigned long __virt1 = (_virt); \
+	(pgentry_t *) pte_to_virt(virtual_to_l2(__virt1)[l2_table_offset(__virt1)]); \
+})
+
+#define virtual_to_pte(_virt)	   ({ \
+	unsigned long __virt0 = (unsigned long) (_virt); \
+	virtual_to_l1(__virt0)[l1_table_offset(__virt0)]; \
+})
+#define virtual_to_mfn(_virt)	   pte_to_mfn(virtual_to_pte(_virt))
+
 #define map_frames(f, n) map_frames_ex(f, n, 1, 0, 1, DOMID_SELF, 0, L1_PROT)
 #define map_zero(n, a) map_frames_ex(&mfn_zero, n, 0, 0, a, DOMID_SELF, 0, L1_PROT_RO)
 

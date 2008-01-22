@@ -47,6 +47,6 @@ void schedule(void);
 
 void wake(struct thread *thread);
 void block(struct thread *thread);
-void sleep(u32 millisecs);
+void msleep(u32 millisecs);
 
 #endif /* __SCHED_H__ */

@@ -1,38 +1,14 @@
 #!/bin/sh
 # CHECK-BUILD CHECK-INSTALL
 
+. funcs.sh
+
 if [ ! "$LIBXENAPI_BINDINGS" = "y" -a ! "$ACM_SECURITY" = "y" ]
 then
     echo -n "unused, "
     exit 0
 fi
 
-RC=0
-
-XML2_CONFIG="$(which xml2-config)"
-tmpfile=$(mktemp)
-
-if test -z ${XML2_CONFIG}; then
-    RC=1
-else
-    ${XML2_CONFIG} --libs 2>&1 > /dev/null
-    RC=$?
-fi
-
-if test $RC -ne 0; then
-    echo "FAILED"
-	echo " *** xml2-config is missing. "
-    echo " *** Please install libxml2-devel."
-elif ! ld $($XML2_CONFIG --libs) -o $tmpfile >/dev/null 2>&1; then
-    echo "FAILED"
-    echo " *** dependency libraries for xml2 are missing: "
-    RC=1
-    for i in $(ld $($XML2_CONFIG --libs) -o $tmpfile 2>&1 >/dev/null); do
-        case $i in
-        -l*) echo lib${i#-l}
-        esac
-    done
-fi
-rm -f $tmpfile
-
-exit $RC
+has_or_fail xml2-config
+xml2_libs=`xml2-config --libs` || fail "xml2-config --libs failed"
+test_link $xml2_libs || fail "dependency libraries for xml2 are missing"

@@ -56,6 +56,8 @@
 */
 
 #include <types.h>
+#include <lib.h>
+#include <time.h>
 
 	/* On ia64 these functions lead to crashes. These are replaced by
 	 * assembler functions. */
@@ -85,7 +87,9 @@ union uu {
  * These are used for shifting, and also below for halfword extraction
  * and assembly.
  */
+#ifndef HAVE_LIBC
 #define CHAR_BIT        8               /* number of bits in a char */
+#endif
 #define QUAD_BITS       (sizeof(s64) * CHAR_BIT)
 #define LONG_BITS       (sizeof(long) * CHAR_BIT)
 #define HALF_BITS       (sizeof(long) * CHAR_BIT / 2)
@@ -385,3 +389,16 @@ __umoddi3(u_quad_t a, u_quad_t b)
 }
 
 #endif /* !defined(__ia64__) */
+
+#ifndef HAVE_LIBC
+/* Should be random enough for our uses */
+int rand(void)
+{
+    static unsigned int previous;
+    struct timeval tv;
+    gettimeofday(&tv, NULL);
+    previous += tv.tv_sec + tv.tv_usec;
+    previous *= RAND_MIX;
+    return previous;
+}
+#endif

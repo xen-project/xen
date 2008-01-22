@@ -60,7 +60,7 @@ iasl:
 	wget $(IASL_URL)
 	tar xzf $(IASL_VER).tar.gz
 	make -C $(IASL_VER)/compiler
-	$(INSTALL_PROG) $(IASL_VER)/compiler/iasl /usr/bin/iasl
+	$(INSTALL_PROG) $(IASL_VER)/compiler/iasl $(DESTDIR)$(BINDIR)/iasl
 
 acpi.a: $(OBJS)
 	$(AR) rc $@ $(OBJS)

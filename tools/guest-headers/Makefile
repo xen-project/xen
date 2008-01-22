@@ -10,8 +10,8 @@ check:
 .PHONY: install
 
 install:
-	mkdir -p $(DESTDIR)/usr/include/xen/sys
-	$(INSTALL_DATA) $(XEN_ROOT)/tools/include/$(XEN_OS)/*.h $(DESTDIR)/usr/include/xen/sys
+	mkdir -p $(DESTDIR)$(INCLUDEDIR)/xen/sys
+	$(INSTALL_DATA) $(XEN_ROOT)/tools/include/$(XEN_OS)/*.h $(DESTDIR)$(INCLUDEDIR)/xen/sys
 
 .PHONY: clean
 clean:

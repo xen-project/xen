@@ -1,7 +1,7 @@
 #!/bin/sh
 # CHECK-BUILD
 
-RC=0
+. funcs.sh
 
 python -c '
 import os.path, sys
@@ -9,11 +9,4 @@ for p in sys.path:
 	if os.path.exists(p + "/config/Makefile"):
 		sys.exit(0)
 sys.exit(1)
-' || RC=1 
-
-if test ${RC} -ne 0; then
-	echo
-	echo " *** Check for python development environment FAILED"
-fi
-
-exit ${RC}
+' || fail "can't find python devel files"

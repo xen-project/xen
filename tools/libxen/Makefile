@@ -55,14 +55,14 @@ $(TEST_PROGRAMS): test/%: test/%.o libxenapi.so
 
 .PHONY: install
 install: all
-	$(INSTALL_DIR) $(DESTDIR)/usr/include/xen/api
-	$(INSTALL_DIR) $(DESTDIR)/usr/$(LIBDIR)
-	$(INSTALL_PROG) libxenapi.so.$(MAJOR).$(MINOR) $(DESTDIR)/usr/$(LIBDIR)
-	ln -sf libxenapi.so.$(MAJOR).$(MINOR) $(DESTDIR)/usr/$(LIBDIR)/libxenapi.so.$(MAJOR)
-	ln -sf libxenapi.so.$(MAJOR) $(DESTDIR)/usr/$(LIBDIR)/libxenapi.so
-	$(INSTALL_DATA) libxenapi.a $(DESTDIR)/usr/$(LIBDIR)
+	$(INSTALL_DIR) $(DESTDIR)$(INCLUDEDIR)/xen/api
+	$(INSTALL_DIR) $(DESTDIR)$(LIBDIR)
+	$(INSTALL_PROG) libxenapi.so.$(MAJOR).$(MINOR) $(DESTDIR)$(LIBDIR)
+	ln -sf libxenapi.so.$(MAJOR).$(MINOR) $(DESTDIR)$(LIBDIR)/libxenapi.so.$(MAJOR)
+	ln -sf libxenapi.so.$(MAJOR) $(DESTDIR)$(LIBDIR)/libxenapi.so
+	$(INSTALL_DATA) libxenapi.a $(DESTDIR)$(LIBDIR)
 	set -e; for i in $(LIBXENAPI_HDRS); do \
-	    $(INSTALL_DATA) $$i $(DESTDIR)/usr/include/xen/api; \
+	    $(INSTALL_DATA) $$i $(DESTDIR)$(INCLUDEDIR)/xen/api; \
 	done
 
 

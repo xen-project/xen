@@ -11,7 +11,7 @@
 XEN_ROOT	= ../..
 include $(XEN_ROOT)/tools/Rules.mk
 
-PROGRAMS_INSTALL_DIR = /usr/$(LIBDIR)/xen/bin
+PROGRAMS_INSTALL_DIR = $(LIBDIR)/xen/bin
 
 INCLUDES += -I $(XEN_LIBXC) -I $(XEN_XENSTORE)
 

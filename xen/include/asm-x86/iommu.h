@@ -31,6 +31,9 @@ extern int vtd_enabled;
 
 #define domain_hvm_iommu(d)     (&d->arch.hvm_domain.hvm_iommu)
 #define domain_vmx_iommu(d)     (&d->arch.hvm_domain.hvm_iommu.vmx_iommu)
+#define iommu_qi_ctrl(iommu)    (&(iommu->intel.qi_ctrl));
+#define iommu_ir_ctrl(iommu)    (&(iommu->intel.ir_ctrl));
+#define iommu_get_flush(iommu)  (&(iommu->intel.flush));
 
 /*
  * The PCI interface treats multi-function devices as independent
@@ -61,6 +64,7 @@ struct iommu {
     spinlock_t register_lock; /* protect iommu register handling */
     struct root_entry *root_entry; /* virtual address */
     unsigned int vector;
+    struct intel_iommu intel;
 };
 
 int iommu_setup(void);

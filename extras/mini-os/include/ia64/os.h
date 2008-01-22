@@ -38,7 +38,9 @@
 
 
 typedef uint64_t paddr_t;		/* Physical address. */
+#ifndef HAVE_LIBC
 typedef uint64_t caddr_t;		/* rr7/kernel memory address. */
+#endif
 
 #include "page.h"
 #include "mm.h"

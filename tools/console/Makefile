@@ -2,8 +2,7 @@
 XEN_ROOT=../..
 include $(XEN_ROOT)/tools/Rules.mk
 
-DAEMON_INSTALL_DIR = /usr/sbin
-CLIENT_INSTALL_DIR = /usr/$(LIBDIR)/xen/bin
+CLIENT_INSTALL_DIR = $(LIBDIR)/xen/bin
 
 CFLAGS  += -Werror
 
@@ -30,7 +29,7 @@ xenconsole: $(patsubst %.c,%.o,$(wildcard client/*.c))
 
 .PHONY: install
 install: $(BIN)
-	$(INSTALL_DIR) $(DESTDIR)/$(DAEMON_INSTALL_DIR)
-	$(INSTALL_PROG) xenconsoled $(DESTDIR)/$(DAEMON_INSTALL_DIR)
+	$(INSTALL_DIR) $(DESTDIR)/$(SBINDIR)
+	$(INSTALL_PROG) xenconsoled $(DESTDIR)/$(SBINDIR)
 	$(INSTALL_DIR) $(DESTDIR)/$(CLIENT_INSTALL_DIR)
 	$(INSTALL_PROG) xenconsole $(DESTDIR)/$(CLIENT_INSTALL_DIR)

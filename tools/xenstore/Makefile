@@ -81,20 +81,20 @@ tarball: clean
 install: all
 	$(INSTALL_DIR) $(DESTDIR)/var/run/xenstored
 	$(INSTALL_DIR) $(DESTDIR)/var/lib/xenstored
-	$(INSTALL_DIR) $(DESTDIR)/usr/bin
-	$(INSTALL_DIR) $(DESTDIR)/usr/sbin
-	$(INSTALL_DIR) $(DESTDIR)/usr/include
-	$(INSTALL_PROG) xenstored $(DESTDIR)/usr/sbin
-	$(INSTALL_PROG) $(CLIENTS) $(DESTDIR)/usr/bin
-	$(INSTALL_PROG) xenstore-control $(DESTDIR)/usr/bin
-	$(INSTALL_PROG) xenstore-ls $(DESTDIR)/usr/bin
-	$(INSTALL_DIR) $(DESTDIR)/usr/$(LIBDIR)
-	$(INSTALL_PROG) libxenstore.so.$(MAJOR).$(MINOR) $(DESTDIR)/usr/$(LIBDIR)
-	ln -sf libxenstore.so.$(MAJOR).$(MINOR) $(DESTDIR)/usr/$(LIBDIR)/libxenstore.so.$(MAJOR)
-	ln -sf libxenstore.so.$(MAJOR) $(DESTDIR)/usr/$(LIBDIR)/libxenstore.so
-	$(INSTALL_DATA) libxenstore.a $(DESTDIR)/usr/$(LIBDIR)
-	$(INSTALL_DATA) xs.h $(DESTDIR)/usr/include
-	$(INSTALL_DATA) xs_lib.h $(DESTDIR)/usr/include
+	$(INSTALL_DIR) $(DESTDIR)$(BINDIR)
+	$(INSTALL_DIR) $(DESTDIR)$(SBINDIR)
+	$(INSTALL_DIR) $(DESTDIR)$(INCLUDEDIR)
+	$(INSTALL_PROG) xenstored $(DESTDIR)$(SBINDIR)
+	$(INSTALL_PROG) $(CLIENTS) $(DESTDIR)$(BINDIR)
+	$(INSTALL_PROG) xenstore-control $(DESTDIR)$(BINDIR)
+	$(INSTALL_PROG) xenstore-ls $(DESTDIR)$(BINDIR)
+	$(INSTALL_DIR) $(DESTDIR)$(LIBDIR)
+	$(INSTALL_PROG) libxenstore.so.$(MAJOR).$(MINOR) $(DESTDIR)$(LIBDIR)
+	ln -sf libxenstore.so.$(MAJOR).$(MINOR) $(DESTDIR)$(LIBDIR)/libxenstore.so.$(MAJOR)
+	ln -sf libxenstore.so.$(MAJOR) $(DESTDIR)$(LIBDIR)/libxenstore.so
+	$(INSTALL_DATA) libxenstore.a $(DESTDIR)$(LIBDIR)
+	$(INSTALL_DATA) xs.h $(DESTDIR)$(INCLUDEDIR)
+	$(INSTALL_DATA) xs_lib.h $(DESTDIR)$(INCLUDEDIR)
 
 -include $(PROG_DEP)
 

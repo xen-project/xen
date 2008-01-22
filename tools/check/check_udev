@@ -1,34 +1,19 @@
 #!/bin/sh
 # CHECK-INSTALL
 
-RC=0
+. funcs.sh
 
-case ${OS} in
+case $OS in
 OpenBSD|NetBSD|FreeBSD)
-	TOOL="vnconfig"
-	which ${TOOL} 1>/dev/null 2>&1 || RC=1
+	has_or_fail vnconfig
 	;;
 Linux)
-	TOOL="udevinfo"
-	UDEV_VERSION="0"
-	test -x "$(which ${TOOL} 2>/dev/null)" && \
-		UDEV_VERSION=$(${TOOL} -V | sed -e 's/^[^0-9]* \([0-9]\{1,\}\)[^0-9]\{0,\}/\1/')
-	if test "${UDEV_VERSION}" -ge 059; then
-		RC=0
-	else
-		TOOL="hotplug"
-		which ${TOOL} 1>/dev/null 2>&1 || RC=1
-	fi
+	has_or_fail udevinfo
+	[ "`udevinfo -V | awk '{print $NF}'`" -ge 59 ] 2>/dev/null || \
+		has hotplug || \
+		fail "udev is too old, upgrade to version 59 or later"
 	;;
 *)
-	TOOL=""
-	echo "Unknown OS" && RC=1
+	fail "unknown OS"
 	;;
 esac
-
-if test ${RC} -ne 0; then
-	echo
-	echo " *** Check for ${TOOL} FAILED"
-fi
-
-exit ${RC}

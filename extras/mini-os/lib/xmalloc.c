@@ -5,9 +5,11 @@
  *
  *        File: xmaloc.c
  *      Author: Grzegorz Milos (gm281@cam.ac.uk)
+ *              Samuel Thibault (samuel.thibault@eu.citrix.com)
  *     Changes: 
  *              
  *        Date: Aug 2005
+ *              Jan 2008
  * 
  * Environment: Xen Minimal OS
  * Description: simple memory allocator
@@ -39,22 +41,26 @@
 #include <types.h>
 #include <lib.h>
 #include <list.h>
+#include <xmalloc.h>
 
+#ifndef HAVE_LIBC
 static LIST_HEAD(freelist);
 /* static spinlock_t freelist_lock = SPIN_LOCK_UNLOCKED; */
 
 struct xmalloc_hdr
 {
-    /* Total including this hdr. */
+    /* Total including this hdr, unused padding and second hdr. */
     size_t size;
     struct list_head freelist;
-#if defined(__ia64__)
-		// Needed for ia64 as long as the align parameter in _xmalloc()
-		// is not supported.
-    uint64_t pad;
-#endif
-
 } __cacheline_aligned;
+
+/* Unused padding data between the two hdrs. */
+
+struct xmalloc_pad
+{
+    /* Size including both hdrs. */
+    size_t hdr_size;
+};
 
 static void maybe_split(struct xmalloc_hdr *hdr, size_t size, size_t block)
 {
@@ -62,11 +68,13 @@ static void maybe_split(struct xmalloc_hdr *hdr, size_t size, size_t block)
     size_t leftover = block - size;
 
     /* If enough is left to make a block, put it on free list. */
-    if ( leftover >= (2 * sizeof(struct xmalloc_hdr)) )
+    if ( leftover >= (2 * (sizeof(struct xmalloc_hdr) + sizeof(struct xmalloc_pad))) )
     {
         extra = (struct xmalloc_hdr *)((unsigned long)hdr + size);
         extra->size = leftover;
+        /* spin_lock_irqsave(&freelist_lock, flags); */
         list_add(&extra->freelist, &freelist);
+        /* spin_unlock_irqrestore(&freelist_lock, flags); */
     }
     else
     {
@@ -78,7 +86,7 @@ static void maybe_split(struct xmalloc_hdr *hdr, size_t size, size_t block)
     hdr->freelist.next = hdr->freelist.prev = NULL;
 }
 
-static void *xmalloc_new_page(size_t size)
+static struct xmalloc_hdr *xmalloc_new_page(size_t size)
 {
     struct xmalloc_hdr *hdr;
     /* unsigned long flags; */
@@ -87,18 +95,30 @@ static void *xmalloc_new_page(size_t size)
     if ( hdr == NULL )
         return NULL;
 
-    /* spin_lock_irqsave(&freelist_lock, flags); */
     maybe_split(hdr, size, PAGE_SIZE);
-    /* spin_unlock_irqrestore(&freelist_lock, flags); */
 
-    return hdr+1;
+    return hdr;
+}
+
+/* Return size, increased to alignment with align. */
+static inline size_t align_up(size_t size, size_t align)
+{
+    return (size + align - 1) & ~(align - 1);
 }
 
 /* Big object?  Just use the page allocator. */
-static void *xmalloc_whole_pages(size_t size)
+static void *xmalloc_whole_pages(size_t size, size_t align)
 {
     struct xmalloc_hdr *hdr;
-    unsigned int pageorder = get_order(size);
+    struct xmalloc_pad *pad;
+    unsigned int pageorder;
+    void *ret;
+    /* Room for headers */
+    size_t hdr_size = sizeof(struct xmalloc_hdr) + sizeof(struct xmalloc_pad);
+    /* Align for actual beginning of data */
+    hdr_size = align_up(hdr_size, align);
+
+    pageorder = get_order(hdr_size + size);
 
     hdr = (struct xmalloc_hdr *)alloc_pages(pageorder);
     if ( hdr == NULL )
@@ -108,54 +128,82 @@ static void *xmalloc_whole_pages(size_t size)
     /* Debugging aid. */
     hdr->freelist.next = hdr->freelist.prev = NULL;
 
-    return hdr+1;
-}
-
-/* Return size, increased to alignment with align. */
-static inline size_t align_up(size_t size, size_t align)
-{
-    return (size + align - 1) & ~(align - 1);
+    ret = (char*)hdr + hdr_size;
+    pad = (struct xmalloc_pad *) ret - 1;
+    pad->hdr_size = hdr_size;
+    return ret;
 }
 
 void *_xmalloc(size_t size, size_t align)
 {
-    struct xmalloc_hdr *i;
+    struct xmalloc_hdr *i, *hdr = NULL;
+    uintptr_t data_begin;
+    size_t hdr_size;
     /* unsigned long flags; */
 
-    /* Add room for header, pad to align next header. */
-    size += sizeof(struct xmalloc_hdr);
-    size = align_up(size, __alignof__(struct xmalloc_hdr));
+    hdr_size = sizeof(struct xmalloc_hdr) + sizeof(struct xmalloc_pad);
+    /* Align on headers requirements. */
+    align = align_up(align, __alignof__(struct xmalloc_hdr));
+    align = align_up(align, __alignof__(struct xmalloc_pad));
 
     /* For big allocs, give them whole pages. */
-    if ( size >= PAGE_SIZE )
-        return xmalloc_whole_pages(size);
+    if ( size + align_up(hdr_size, align) >= PAGE_SIZE )
+        return xmalloc_whole_pages(size, align);
 
     /* Search free list. */
     /* spin_lock_irqsave(&freelist_lock, flags); */
     list_for_each_entry( i, &freelist, freelist )
     {
-        if ( i->size < size )
-            continue;
-        list_del(&i->freelist);
-        maybe_split(i, size, i->size);
-        /* spin_unlock_irqrestore(&freelist_lock, flags); */
-        return i+1;
-    }
-    /* spin_unlock_irqrestore(&freelist_lock, flags); */
+        data_begin = align_up((uintptr_t)i + hdr_size, align);
 
-    /* Alloc a new page and return from that. */
-    return xmalloc_new_page(size);
+        if ( data_begin + size > (uintptr_t)i + i->size )
+            continue;
+
+        list_del(&i->freelist);
+        /* spin_unlock_irqrestore(&freelist_lock, flags); */
+
+        uintptr_t size_before = (data_begin - hdr_size) - (uintptr_t)i;
+
+        if (size_before >= 2 * hdr_size) {
+            /* Worth splitting the beginning */
+            struct xmalloc_hdr *new_i = (void*)(data_begin - hdr_size);
+            new_i->size = i->size - size_before;
+            i->size = size_before;
+            /* spin_lock_irqsave(&freelist_lock, flags); */
+            list_add(&i->freelist, &freelist);
+            /* spin_unlock_irqrestore(&freelist_lock, flags); */
+            i = new_i;
+        }
+        maybe_split(i, (data_begin + size) - (uintptr_t)i, i->size);
+        hdr = i;
+        break;
+    }
+
+    if (!hdr) {
+        /* spin_unlock_irqrestore(&freelist_lock, flags); */
+
+        /* Alloc a new page and return from that. */
+        hdr = xmalloc_new_page(align_up(hdr_size, align) + size);
+        data_begin = (uintptr_t)hdr + align_up(hdr_size, align);
+    }
+
+    struct xmalloc_pad *pad = (struct xmalloc_pad *) data_begin - 1;
+    pad->hdr_size = data_begin - (uintptr_t)hdr;
+    BUG_ON(data_begin % align);
+    return (void*)data_begin;
 }
 
 void xfree(const void *p)
 {
     /* unsigned long flags; */
     struct xmalloc_hdr *i, *tmp, *hdr;
+    struct xmalloc_pad *pad;
 
     if ( p == NULL )
         return;
 
-    hdr = (struct xmalloc_hdr *)p - 1;
+    pad = (struct xmalloc_pad *)p - 1;
+    hdr = (struct xmalloc_hdr *)((char *)p - pad->hdr_size);
 
     /* We know hdr will be on same page. */
     if(((long)p & PAGE_MASK) != ((long)hdr & PAGE_MASK))
@@ -227,15 +275,19 @@ void *_realloc(void *ptr, size_t size)
 {
     void *new;
     struct xmalloc_hdr *hdr;
+    struct xmalloc_pad *pad;
 
     if (ptr == NULL)
-        return _xmalloc(size, 4);
+        return _xmalloc(size, DEFAULT_ALIGN);
 
-    hdr = (struct xmalloc_hdr *)ptr - 1;
-    if (hdr->size >= size) 
+    pad = (struct xmalloc_pad *)ptr - 1;
+    hdr = (struct xmalloc_hdr *)((char*)ptr - pad->hdr_size);
+    if (hdr->size >= size) {
+        maybe_split(hdr, size, hdr->size);
         return ptr;
+    }
     
-    new = _xmalloc(size, 4);
+    new = _xmalloc(size, DEFAULT_ALIGN);
     if (new == NULL) 
         return NULL;
 
@@ -244,3 +296,4 @@ void *_realloc(void *ptr, size_t size)
 
     return new;
 }
+#endif

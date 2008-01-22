@@ -756,7 +756,9 @@ static void ide_transfer_start(IDEState *s, uint8_t *buf, int size,
     s->end_transfer_func = end_transfer_func;
     s->data_ptr = buf;
     s->data_end = buf + size;
-    s->status |= DRQ_STAT;
+    /* don't violate the HSM */
+    if (!(s->status & ERR_STAT))
+        s->status |= DRQ_STAT;
     buffered_pio_reset(s);
 }
 
@@ -2011,6 +2013,7 @@ static void ide_ioport_write(void *opaque, uint32_t addr, uint32_t val)
             /* overlapping commands not supported */
             if (s->feature & 0x02)
                 goto abort_cmd;
+            s->status = READY_STAT;
             s->atapi_dma = s->feature & 1;
             s->nsector = 1;
             ide_transfer_start(s, s->io_buffer, ATAPI_PACKET_SIZE, 

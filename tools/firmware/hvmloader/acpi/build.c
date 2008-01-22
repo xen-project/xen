@@ -65,14 +65,18 @@ static int uart_exists(uint16_t uart_base)
 static int construct_bios_info_table(uint8_t *buf)
 {
     struct bios_info {
-        uint8_t com1_present:1;
-        uint8_t com2_present:1;
+        uint8_t  com1_present:1;
+        uint8_t  com2_present:1;
+        uint32_t pci_min, pci_len;
     } *bios_info = (struct bios_info *)buf;
 
     memset(bios_info, 0, sizeof(*bios_info));
 
     bios_info->com1_present = uart_exists(0x3f8);
     bios_info->com2_present = uart_exists(0x2f8);
+
+    bios_info->pci_min = 0xf0000000;
+    bios_info->pci_len = 0x0c000000;
 
     return align16(sizeof(*bios_info));
 }

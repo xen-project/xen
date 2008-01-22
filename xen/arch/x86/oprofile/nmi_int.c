@@ -295,17 +295,16 @@ static int __init ppro_init(char ** cpu_type)
 {
 	__u8 cpu_model = current_cpu_data.x86_model;
 
-	if (cpu_model > 15) {
+	if (cpu_model == 15 || cpu_model == 23)
+		*cpu_type = "i386/core_2";
+	else if (cpu_model == 14)
+		*cpu_type = "i386/core";
+	else if (cpu_model > 13) {
 		printk("xenoprof: Initialization failed. "
 		       "Intel processor model %d for P6 class family is not "
 		       "supported\n", cpu_model);
 		return 0;
-	}
-	else if (cpu_model == 15)
-		*cpu_type = "i386/core_2";
-	else if (cpu_model == 14)
-		*cpu_type = "i386/core";
-	else if (cpu_model == 9)
+	} else if (cpu_model == 9)
 		*cpu_type = "i386/p6_mobile";
 	else if (cpu_model > 5)
 		*cpu_type = "i386/piii";

@@ -13,8 +13,6 @@
 XEN_ROOT=../..
 include $(XEN_ROOT)/tools/Rules.mk
 
-sbindir=/usr/sbin
-
 CFLAGS  += -Werror
 CFLAGS  += -I $(XEN_XC)
 CFLAGS  += -I $(XEN_LIBXC)
@@ -31,10 +29,10 @@ build: $(BIN)
 
 .PHONY: install
 install: build
-	[ -d $(DESTDIR)$(sbindir) ] || $(INSTALL_DIR) $(DESTDIR)$(sbindir)
-	$(INSTALL_PROG) xenbaked $(DESTDIR)$(sbindir)/xenbaked
-	$(INSTALL_PROG) xentrace_setmask  $(DESTDIR)$(sbindir)/xentrace_setmask
-	$(INSTALL_PROG) xenmon.py  $(DESTDIR)$(sbindir)/xenmon.py
+	$(INSTALL_DIR) $(DESTDIR)$(SBINDIR)
+	$(INSTALL_PROG) xenbaked $(DESTDIR)$(SBINDIR)/xenbaked
+	$(INSTALL_PROG) xentrace_setmask  $(DESTDIR)$(SBINDIR)/xentrace_setmask
+	$(INSTALL_PROG) xenmon.py  $(DESTDIR)$(SBINDIR)/xenmon.py
 
 .PHONY: clean
 clean:

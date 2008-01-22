@@ -1,14 +1,6 @@
 #!/bin/sh
 # CHECK-BUILD
 
-RC=0
+. funcs.sh
 
-TOOL="xgettext"
-which ${TOOL} 1>/dev/null 2>&1 || RC=1 
-
-if test ${RC} -ne 0; then
-	echo
-	echo " *** Check for the gettext utility (${TOOL}) FAILED"
-fi
-
-exit ${RC} 
+has_or_fail xgettext

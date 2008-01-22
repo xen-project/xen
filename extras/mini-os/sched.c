@@ -211,7 +211,7 @@ void block(struct thread *thread)
     clear_runnable(thread);
 }
 
-void sleep(u32 millisecs)
+void msleep(u32 millisecs)
 {
     struct thread *thread = get_current();
     thread->wakeup_time = NOW()  + MILLISECS(millisecs);
@@ -270,10 +270,10 @@ void th_f1(void *data)
         up(&mutex);
         
         
-        gettimeofday(&tv1);
+        gettimeofday(&tv1, NULL);
         for(;;)
         {
-            gettimeofday(&tv2);
+            gettimeofday(&tv2, NULL);
             if(tv2.tv_sec - tv1.tv_sec > 2) break;
         }
                 

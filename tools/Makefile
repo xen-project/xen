@@ -28,6 +28,12 @@ SUBDIRS-$(PYTHON_TOOLS) += python
 SUBDIRS-$(PYTHON_TOOLS) += pygrub
 endif
 
+# For the sake of linking, set the sys-root
+ifneq ($(CROSS_COMPILE),)
+CROSS_SYS_ROOT ?= /usr/$(CROSS_COMPILE:-=)/sys-root
+export CROSS_SYS_ROOT
+endif
+
 .PHONY: all
 all: check
 	@set -e; for subdir in $(SUBDIRS-y); do \
@@ -65,10 +71,15 @@ check_clean:
 
 .PHONY: ioemu ioemuinstall ioemuclean
 ifeq ($(CONFIG_IOEMU),y)
-export IOEMU_DIR ?= ioemu
+IOEMU_DIR ?= ioemu
+ifneq ($(XEN_COMPILE_ARCH),$(XEN_TARGET_ARCH))
+IOEMU_CONFIGURE_CROSS ?= --cross-prefix=$(CROSS_COMPILE) \
+			 --interp-prefix=$(CROSS_SYS_ROOT)
+endif
 ioemu ioemuinstall:
 	[ -f $(IOEMU_DIR)/config-host.mak ] || \
-	  (cd $(IOEMU_DIR) && sh configure --prefix=/usr)
+	  ( cd $(IOEMU_DIR) && XEN_TARGET_ARCH=$(XEN_TARGET_ARCH) sh configure --prefix=/usr \
+		$(IOEMU_CONFIGURE_CROSS) )
 	$(MAKE) -C $(IOEMU_DIR) $(patsubst ioemu%,%,$@)
 ioemuclean:
 	$(MAKE) -C $(IOEMU_DIR) distclean

@@ -76,7 +76,7 @@ static uint64_t itm_val;
  * will already get problems at other places on 2038-01-19 03:14:08)
  */
 static unsigned long
-mktime(const unsigned int year0, const unsigned int mon0,
+_mktime(const unsigned int year0, const unsigned int mon0,
        const unsigned int day, const unsigned int hour,
        const unsigned int min, const unsigned int sec)
 {
@@ -147,10 +147,10 @@ calculate_time(void)
 		new = itc_new - itc_alt;
 	itc_alt = itc_new;
 	new = ns_from_cycles(new);
-	os_time.ts_nsec += new;
-	if (os_time.ts_nsec > 1000000000) {	/* On overflow. */
-		os_time.ts_sec++;
-		os_time.ts_nsec -= 1000000000;
+	os_time.tv_nsec += new;
+	if (os_time.tv_nsec > 1000000000) {	/* On overflow. */
+		os_time.tv_sec++;
+		os_time.tv_nsec -= 1000000000;
 	}
 }
 
@@ -177,12 +177,13 @@ monotonic_clock(void)
 	return delta;
 }
 
-void
-gettimeofday(struct timeval *tv)
+int
+gettimeofday(struct timeval *tv, void *tz)
 {
 	calculate_time();
-	tv->tv_sec = os_time.ts_sec;			/* seconds */
-	tv->tv_usec = NSEC_TO_USEC(os_time.ts_nsec);	/* microseconds */
+	tv->tv_sec = os_time.tv_sec;			/* seconds */
+	tv->tv_usec = NSEC_TO_USEC(os_time.tv_nsec);	/* microseconds */
+        return 0;
 };
 
 /*
@@ -253,16 +254,16 @@ init_time(void)
 	itm_val = (itc_frequency + HZ/2) / HZ;
 	printk("  itm_val: %ld\n", itm_val);
 
-	os_time.ts_sec = 0;
-	os_time.ts_nsec = 0;
+	os_time.tv_sec = 0;
+	os_time.tv_nsec = 0;
 
 	if (efi_get_time(&tm)) {
 		printk("  EFI-Time: %d.%d.%d   %d:%d:%d\n", tm.Day,
 		       tm.Month, tm.Year, tm.Hour, tm.Minute, tm.Second);
-		os_time.ts_sec = mktime(SWAP(tm.Year), SWAP(tm.Month),
+		os_time.tv_sec = _mktime(SWAP(tm.Year), SWAP(tm.Month),
 					SWAP(tm.Day), SWAP(tm.Hour),
 					SWAP(tm.Minute), SWAP(tm.Second));
-		os_time.ts_nsec = tm.Nanosecond;
+		os_time.tv_nsec = tm.Nanosecond;
 	} else
 		printk("efi_get_time() failed\n");
 

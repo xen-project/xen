@@ -71,8 +71,8 @@ struct blkfront_dev *init_blkfront(char *nodename, uint64_t *sectors, unsigned *
 
     struct blkfront_dev *dev;
 
-    ASSERT(!strncmp(nodename, "/local/domain/", 14));
-    nodename = strchr(nodename + 14, '/') + 1;
+    if (!nodename)
+        nodename = "device/vbd/768";
 
     char path[strlen(nodename) + 1 + 10 + 1];
 
@@ -88,7 +88,7 @@ struct blkfront_dev *init_blkfront(char *nodename, uint64_t *sectors, unsigned *
     SHARED_RING_INIT(s);
     FRONT_RING_INIT(&dev->ring, s, PAGE_SIZE);
 
-    dev->ring_ref = gnttab_grant_access(0,virt_to_mfn(s),0);
+    dev->ring_ref = gnttab_grant_access(0,virtual_to_mfn(s),0);
 
     evtchn_alloc_unbound_t op;
     op.dom = DOMID_SELF;

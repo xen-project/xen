@@ -7,17 +7,16 @@ func_usage ()
     echo
     echo "Check suitability for Xen build or install."
     echo "Exit with 0 if OK, 1 if not."
-    echo "Prints only failed tests."
     echo
     echo "Calling with 'clean' removes generated files."
     exit 1
 }
 
-PATH=${PATH}:/sbin:/usr/sbin
+PATH=$PATH:/sbin:/usr/sbin
 OS=`uname -s`
 export PATH OS
 
-if test "${OS}" = "SunOS"; then
+if [ "$OS" = "SunOS" ]; then
 	exit 0
 fi
 
@@ -38,7 +37,7 @@ esac
 
 failed=0
 
-echo "Xen ${check} " $(date)
+echo "Xen ${check} " `date`
 for f in check_* ; do
     case $f in
         *~)
@@ -50,7 +49,7 @@ for f in check_* ; do
     if ! [ -x $f ] ; then
         continue
     fi
-    if ! grep -q ${check} $f ; then
+    if ! grep -Fq "$check" $f ; then
         continue
     fi
     echo -n "Checking $f: "

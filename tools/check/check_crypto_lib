@@ -1,23 +1,11 @@
 #!/bin/sh
 # CHECK-BUILD CHECK-INSTALL
 
-RC=0
+. funcs.sh
 
-case $(uname -s) in
+case $OS in
 FreeBSD|NetBSD|OpenBSD)
-	exit 0
-	;;
-*)
-	;;
+	exit 0 ;;
 esac
 
-PATH=/sbin:$PATH
-set -e
-ldconfig -p 2>&1 | grep -q libcrypto.so || RC=1
-
-if test ${RC} -ne 0; then
-        echo
-        echo " *** Check for crypto library FAILED"
-fi
-
-exit ${RC}
+has_lib libcrypto.so || fail "missing libcrypto.so"

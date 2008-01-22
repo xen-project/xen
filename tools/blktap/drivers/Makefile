@@ -5,7 +5,6 @@ INCLUDES += -I.. -I../lib
 
 IBIN         = blktapctrl tapdisk
 QCOW_UTIL    = img2qcow qcow2raw qcow-create
-INST_DIR     = /usr/sbin
 LIBAIO_DIR   = ../../libaio/src
 
 CFLAGS   += -Werror
@@ -53,7 +52,7 @@ img2qcow qcow2raw qcow-create: %: $(BLK-OBJS-y)
 	$(CC) $(CFLAGS) -o $* $(BLK-OBJS-y) $*.c $(LDFLAGS) $(AIOLIBS) $(LIBS)
 
 install: all
-	$(INSTALL_PROG) $(IBIN) $(QCOW_UTIL) $(VHD_UTIL) $(DESTDIR)$(INST_DIR)
+	$(INSTALL_PROG) $(IBIN) $(QCOW_UTIL) $(VHD_UTIL) $(DESTDIR)$(SBINDIR)
 
 clean:
 	rm -rf *.o *~ $(DEPS) xen TAGS $(IBIN) $(LIB) $(QCOW_UTIL) $(VHD_UTIL)

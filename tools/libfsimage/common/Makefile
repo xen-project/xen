@@ -22,14 +22,14 @@ all: $(LIB)
 
 .PHONY: install
 install: all
-	[ -d $(DESTDIR)/usr/$(LIBDIR) ] || $(INSTALL_DIR) $(DESTDIR)/usr/$(LIBDIR)
-	[ -d $(DESTDIR)/usr/include ] || $(INSTALL_DIR) $(DESTDIR)/usr/include
-	$(INSTALL_PROG) libfsimage.so.$(MAJOR).$(MINOR) $(DESTDIR)/usr/$(LIBDIR)
-	ln -sf libfsimage.so.$(MAJOR).$(MINOR) $(DESTDIR)/usr/$(LIBDIR)/libfsimage.so.$(MAJOR)
-	ln -sf libfsimage.so.$(MAJOR) $(DESTDIR)/usr/$(LIBDIR)/libfsimage.so
-	$(INSTALL_DATA) fsimage.h $(DESTDIR)/usr/include
-	$(INSTALL_DATA) fsimage_plugin.h $(DESTDIR)/usr/include
-	$(INSTALL_DATA) fsimage_grub.h $(DESTDIR)/usr/include
+	$(INSTALL_DIR) $(DESTDIR)$(LIBDIR)
+	$(INSTALL_DIR) $(DESTDIR)$(INCLUDEDIR)
+	$(INSTALL_PROG) libfsimage.so.$(MAJOR).$(MINOR) $(DESTDIR)$(LIBDIR)
+	ln -sf libfsimage.so.$(MAJOR).$(MINOR) $(DESTDIR)$(LIBDIR)/libfsimage.so.$(MAJOR)
+	ln -sf libfsimage.so.$(MAJOR) $(DESTDIR)$(LIBDIR)/libfsimage.so
+	$(INSTALL_DATA) fsimage.h $(DESTDIR)$(INCLUDEDIR)
+	$(INSTALL_DATA) fsimage_plugin.h $(DESTDIR)$(INCLUDEDIR)
+	$(INSTALL_DATA) fsimage_grub.h $(DESTDIR)$(INCLUDEDIR)
 
 clean distclean:
 	rm -f $(PIC_OBJS) $(LIB) $(DEPS)

@@ -1,26 +1,15 @@
 #!/bin/sh
 # CHECK-INSTALL
 
-RC=0
+. funcs.sh
 
-case ${OS} in
+PATH=/sbin:$PATH
+
+case $OS in
 OpenBSD|NetBSD|FreeBSD)
-	TOOL="ifconfig"
-	eval ${TOOL} -a 1>/dev/null 2>&1 || RC=1 
-	;;
+	has_or_fail ifconfig ;;
 Linux)
-	TOOL="ip addr"
-	eval ${TOOL} list 1>/dev/null 2>&1 || RC=1 
-	;;
+	has_or_fail ip ;;
 *)
-	TOOL=""
-	echo "Unknown OS" && RC=1 
-	;;
+	fail "unknown OS" ;;
 esac
-
-if test ${RC} -ne 0; then
-	echo
-	echo " *** Check for iproute (${TOOL}) FAILED"
-fi
-
-exit ${RC} 
