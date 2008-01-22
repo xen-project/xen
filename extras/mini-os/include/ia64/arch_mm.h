@@ -25,6 +25,7 @@
 #define __ARCH_MM_H__
 
 #include "page.h"
+#include "ia64_cpu.h"
 
 #define PFN_PHYS(x)	(pfn_to_page(x))
 #define PHYS_PFN(x)	(page_to_pfn(x))
@@ -32,6 +33,7 @@
 #define to_phys(x)	__pa(x)
 
 #define virt_to_mfn(x)	virt_to_pfn(x)
+#define virtual_to_mfn(x)      (ia64_tpa((uint64_t)(x)) >> PAGE_SHIFT)
 
 #define STACK_SIZE_PAGE_ORDER   1
 #define STACK_SIZE              (PAGE_SIZE * (1 << STACK_SIZE_PAGE_ORDER))
