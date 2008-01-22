@@ -188,6 +188,12 @@ static void pci_setup(void)
     uint16_t class, vendor_id, device_id;
     unsigned int bar, pin, link, isa_irq;
 
+    /* Create a list of device BARs in descending order of size. */
+    struct bars {
+        uint32_t devfn, bar_reg, bar_sz;
+    } *bars = (struct bars *)0xc0000;
+    unsigned int i, nr_bars = 0;
+
     /* Program PCI-ISA bridge with appropriate link routes. */
     isa_irq = 0;
     for ( link = 0; link < 4; link++ )
@@ -242,44 +248,30 @@ static void pci_setup(void)
                     bar_reg = PCI_ROM_ADDRESS;
 
                 bar_data = pci_readl(devfn, bar_reg);
-
                 pci_writel(devfn, bar_reg, ~0);
                 bar_sz = pci_readl(devfn, bar_reg);
+                pci_writel(devfn, bar_reg, bar_data);
                 if ( bar_sz == 0 )
                     continue;
 
-                if ( (bar_data & PCI_BASE_ADDRESS_SPACE) ==
-                     PCI_BASE_ADDRESS_SPACE_MEMORY )
-                {
-                    base = &mem_base;
-                    bar_sz &= PCI_BASE_ADDRESS_MEM_MASK;
-                    bar_data &= ~PCI_BASE_ADDRESS_MEM_MASK;
-                }
-                else
-                {
-                    base = &io_base;
-                    bar_sz &= PCI_BASE_ADDRESS_IO_MASK & 0xffff;
-                    bar_data &= ~PCI_BASE_ADDRESS_IO_MASK;
-                }
+                bar_sz &= (((bar_data & PCI_BASE_ADDRESS_SPACE) ==
+                           PCI_BASE_ADDRESS_SPACE_MEMORY) ?
+                           PCI_BASE_ADDRESS_MEM_MASK :
+                           (PCI_BASE_ADDRESS_IO_MASK & 0xffff));
                 bar_sz &= ~(bar_sz - 1);
 
-                *base = (*base + bar_sz - 1) & ~(bar_sz - 1);
-                bar_data |= *base;
-                *base += bar_sz;
+                for ( i = 0; i < nr_bars; i++ )
+                    if ( bars[i].bar_sz < bar_sz )
+                        break;
 
-                pci_writel(devfn, bar_reg, bar_data);
-                printf("pci dev %02x:%x bar %02x size %08x: %08x\n",
-                       devfn>>3, devfn&7, bar_reg, bar_sz, bar_data);
+                if ( i != nr_bars )
+                    memmove(&bars[i+1], &bars[i], (nr_bars-i) * sizeof(*bars));
 
-                /* Now enable the memory or I/O mapping. */
-                cmd = pci_readw(devfn, PCI_COMMAND);
-                if ( (bar_reg == PCI_ROM_ADDRESS) ||
-                     ((bar_data & PCI_BASE_ADDRESS_SPACE) ==
-                      PCI_BASE_ADDRESS_SPACE_MEMORY) )
-                    cmd |= PCI_COMMAND_MEMORY;
-                else
-                    cmd |= PCI_COMMAND_IO;
-                pci_writew(devfn, PCI_COMMAND, cmd);
+                bars[i].devfn   = devfn;
+                bars[i].bar_reg = bar_reg;
+                bars[i].bar_sz  = bar_sz;
+
+                nr_bars++;
             }
             break;
         }
@@ -295,6 +287,46 @@ static void pci_setup(void)
             printf("pci dev %02x:%x INT%c->IRQ%u\n",
                    devfn>>3, devfn&7, 'A'+pin-1, isa_irq);
         }
+    }
+
+    /* Assign iomem and ioport resources in descending order of size. */
+    for ( i = 0; i < nr_bars; i++ )
+    {
+        devfn   = bars[i].devfn;
+        bar_reg = bars[i].bar_reg;
+        bar_sz  = bars[i].bar_sz;
+
+        bar_data = pci_readl(devfn, bar_reg);
+
+        if ( (bar_data & PCI_BASE_ADDRESS_SPACE) ==
+             PCI_BASE_ADDRESS_SPACE_MEMORY )
+        {
+            base = &mem_base;
+            bar_data &= ~PCI_BASE_ADDRESS_MEM_MASK;
+        }
+        else
+        {
+            base = &io_base;
+            bar_data &= ~PCI_BASE_ADDRESS_IO_MASK;
+        }
+
+        *base = (*base + bar_sz - 1) & ~(bar_sz - 1);
+        bar_data |= *base;
+        *base += bar_sz;
+
+        pci_writel(devfn, bar_reg, bar_data);
+        printf("pci dev %02x:%x bar %02x size %08x: %08x %08x/%08x\n",
+               devfn>>3, devfn&7, bar_reg, bar_sz, bar_data, i, nr_bars);
+
+        /* Now enable the memory or I/O mapping. */
+        cmd = pci_readw(devfn, PCI_COMMAND);
+        if ( (bar_reg == PCI_ROM_ADDRESS) ||
+             ((bar_data & PCI_BASE_ADDRESS_SPACE) ==
+              PCI_BASE_ADDRESS_SPACE_MEMORY) )
+            cmd |= PCI_COMMAND_MEMORY;
+        else
+            cmd |= PCI_COMMAND_IO;
+        pci_writew(devfn, PCI_COMMAND, cmd);
     }
 }
 
