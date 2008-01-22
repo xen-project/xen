@@ -817,7 +817,7 @@ void test_fs_import(void *data)
     long ret64;
    
     /* Sleep for 1s and then try to open a file */
-    sleep(1000);
+    msleep(1000);
     ret = fs_create(import, "mini-os-created-directory", 1, 0777);
     printk("Directory create: %d\n", ret);
 
@@ -1013,7 +1013,7 @@ done:
             printk("Backend found at %s\n", import->backend);
             break;
         }
-	sleep(WAIT_PERIOD);
+	msleep(WAIT_PERIOD);
     }        
     
     if(!import->backend)

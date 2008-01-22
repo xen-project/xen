@@ -80,26 +80,13 @@ static void periodic_thread(void *p)
     {
         gettimeofday(&tv, NULL);
         printk("T(s=%ld us=%ld)\n", tv.tv_sec, tv.tv_usec);
-        sleep(1000);
+        msleep(1000);
     }
 }
 
 static void netfront_thread(void *p)
 {
     init_netfront(NULL, NULL, NULL);
-}
-
-#define RAND_MIX 2654435769U
-
-/* Should be random enough for this use */
-static int rand(void)
-{
-    static unsigned int previous;
-    struct timeval tv;
-    gettimeofday(&tv, NULL);
-    previous += tv.tv_sec + tv.tv_usec;
-    previous *= RAND_MIX;
-    return previous;
 }
 
 static struct blkfront_dev *blk_dev;

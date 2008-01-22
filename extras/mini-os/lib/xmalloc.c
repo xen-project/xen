@@ -43,6 +43,7 @@
 #include <list.h>
 #include <xmalloc.h>
 
+#ifndef HAVE_LIBC
 static LIST_HEAD(freelist);
 /* static spinlock_t freelist_lock = SPIN_LOCK_UNLOCKED; */
 
@@ -295,3 +296,4 @@ void *_realloc(void *ptr, size_t size)
 
     return new;
 }
+#endif

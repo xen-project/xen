@@ -7,7 +7,7 @@ struct blkfront_aiocb
     struct blkfront_dev *aio_dev;
     uint8_t *aio_buf;
     size_t aio_nbytes;
-    uint64_t aio_offset;
+    off_t aio_offset;
     void *data;
 
     grant_ref_t gref[BLKIF_MAX_SEGMENTS_PER_REQUEST];

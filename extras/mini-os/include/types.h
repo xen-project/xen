@@ -42,7 +42,6 @@ typedef unsigned long       u_long;
 #ifdef __i386__
 typedef long long           quad_t;
 typedef unsigned long long  u_quad_t;
-typedef unsigned int        uintptr_t;
 
 #if !defined(CONFIG_X86_PAE)
 typedef struct { unsigned long pte_low; } pte_t;
@@ -53,7 +52,6 @@ typedef struct { unsigned long pte_low, pte_high; } pte_t;
 #elif defined(__x86_64__) || defined(__ia64__)
 typedef long                quad_t;
 typedef unsigned long       u_quad_t;
-typedef unsigned long       uintptr_t;
 
 typedef struct { unsigned long pte; } pte_t;
 #endif /* __i386__ || __x86_64__ */
@@ -65,18 +63,31 @@ typedef struct { unsigned long pte; } pte_t;
     ((pte_t) {(unsigned long)(_x), (unsigned long)(_x>>32)}); })
 #endif
 
+#ifdef HAVE_LIBC
+#include <limits.h>
+#include <stdint.h>
+#else
+#ifdef __i386__
+typedef unsigned int        uintptr_t;
+typedef int                 intptr_t;
+#elif defined(__x86_64__) || defined(__ia64__)
+typedef unsigned long       uintptr_t;
+typedef long                intptr_t;
+#endif /* __i386__ || __x86_64__ */
 typedef  u8 uint8_t;
 typedef  s8 int8_t;
 typedef u16 uint16_t;
 typedef s16 int16_t;
 typedef u32 uint32_t;
 typedef s32 int32_t;
-typedef u64 uint64_t;
-typedef s64 int64_t;
+typedef u64 uint64_t, uintmax_t;
+typedef s64 int64_t, intmax_t;
+typedef u64 off_t;
 
 
 #define INT_MAX         ((int)(~0U>>1))
 #define UINT_MAX            (~0U)
 
 typedef long ssize_t;
+#endif
 #endif /* _TYPES_H_ */

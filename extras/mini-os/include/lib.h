@@ -59,6 +59,9 @@
 #include <stddef.h>
 #include <console.h>
 
+#ifdef HAVE_LIBC
+#include <stdio.h>
+#else
 /* printing */
 #define _p(_x) ((void *)(unsigned long)(_x))
 int vsnprintf(char *buf, size_t size, const char *fmt, va_list args);
@@ -69,13 +72,16 @@ int vsprintf(char *buf, const char *fmt, va_list args);
 int sprintf(char * buf, const char *fmt, ...);
 int vsscanf(const char * buf, const char * fmt, va_list args);
 int sscanf(const char * buf, const char * fmt, ...);
+#endif
 
 long simple_strtol(const char *cp,char **endp,unsigned int base);
 unsigned long simple_strtoul(const char *cp,char **endp,unsigned int base);
 long long simple_strtoll(const char *cp,char **endp,unsigned int base);
 unsigned long long simple_strtoull(const char *cp,char **endp,unsigned int base);
 
-
+#ifdef HAVE_LIBC
+#include <string.h>
+#else
 /* string and memory manipulation */
 int    memcmp(const void *cs, const void *ct, size_t count);
 void  *memcpy(void *dest, const void *src, size_t count);
@@ -91,7 +97,11 @@ char  *strrchr(const char *s, int c);
 char  *strstr(const char *s1, const char *s2);
 char * strcat(char * dest, const char * src);
 char  *strdup(const char *s);
+#endif
 
+#define RAND_MIX 2654435769U
+
+int rand(void);
 
 #define ARRAY_SIZE(x) (sizeof(x) / sizeof((x)[0]))
 

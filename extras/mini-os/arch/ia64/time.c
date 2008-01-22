@@ -76,7 +76,7 @@ static uint64_t itm_val;
  * will already get problems at other places on 2038-01-19 03:14:08)
  */
 static unsigned long
-mktime(const unsigned int year0, const unsigned int mon0,
+_mktime(const unsigned int year0, const unsigned int mon0,
        const unsigned int day, const unsigned int hour,
        const unsigned int min, const unsigned int sec)
 {
@@ -260,7 +260,7 @@ init_time(void)
 	if (efi_get_time(&tm)) {
 		printk("  EFI-Time: %d.%d.%d   %d:%d:%d\n", tm.Day,
 		       tm.Month, tm.Year, tm.Hour, tm.Minute, tm.Second);
-		os_time.tv_sec = mktime(SWAP(tm.Year), SWAP(tm.Month),
+		os_time.tv_sec = _mktime(SWAP(tm.Year), SWAP(tm.Month),
 					SWAP(tm.Day), SWAP(tm.Hour),
 					SWAP(tm.Minute), SWAP(tm.Second));
 		os_time.tv_nsec = tm.Nanosecond;

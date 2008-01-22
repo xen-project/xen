@@ -211,7 +211,7 @@ void block(struct thread *thread)
     clear_runnable(thread);
 }
 
-void sleep(u32 millisecs)
+void msleep(u32 millisecs)
 {
     struct thread *thread = get_current();
     thread->wakeup_time = NOW()  + MILLISECS(millisecs);
