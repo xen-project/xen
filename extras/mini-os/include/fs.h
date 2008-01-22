@@ -3,6 +3,7 @@
 
 #include <xen/io/fsif.h>
 #include <semaphore.h>
+#include <types.h>
 
 struct fs_import 
 {

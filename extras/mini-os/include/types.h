@@ -19,6 +19,7 @@
 
 #ifndef _TYPES_H_
 #define _TYPES_H_
+#include <stddef.h>
 
 typedef signed char         s8;
 typedef unsigned char       u8;
@@ -78,5 +79,4 @@ typedef s64 int64_t;
 #define UINT_MAX            (~0U)
 
 typedef long ssize_t;
-typedef unsigned long size_t;
 #endif /* _TYPES_H_ */

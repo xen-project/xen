@@ -89,7 +89,7 @@ static void netfront_thread(void *p)
     init_netfront(NULL, NULL, NULL);
 }
 
-#define RAND_MIX 2654435769
+#define RAND_MIX 2654435769U
 
 /* Should be random enough for this use */
 static int rand(void)
