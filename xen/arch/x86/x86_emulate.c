@@ -552,7 +552,7 @@ do {                                                                    \
                      ? (uint16_t)_regs.eip : (uint32_t)_regs.eip);      \
 } while (0)
 
-static int __handle_rep_prefix(
+static unsigned long __get_rep_prefix(
     struct cpu_user_regs *int_regs,
     struct cpu_user_regs *ext_regs,
     int ad_bytes)
@@ -561,11 +561,36 @@ static int __handle_rep_prefix(
                          (ad_bytes == 4) ? (uint32_t)int_regs->ecx :
                          int_regs->ecx);
 
-    if ( ecx-- == 0 )
-    {
+    /* Skip the instruction if no repetitions are required. */
+    if ( ecx == 0 )
         ext_regs->eip = int_regs->eip;
-        return 1;
-    }
+
+    return ecx;
+}
+
+#define get_rep_prefix() ({                                             \
+    unsigned long max_reps = 1;                                         \
+    if ( rep_prefix )                                                   \
+        max_reps = __get_rep_prefix(&_regs, ctxt->regs, ad_bytes);      \
+    if ( max_reps == 0 )                                                \
+        goto done;                                                      \
+   max_reps;                                                            \
+})
+
+static void __put_rep_prefix(
+    struct cpu_user_regs *int_regs,
+    struct cpu_user_regs *ext_regs,
+    int ad_bytes,
+    unsigned long reps_completed)
+{
+    unsigned long ecx = ((ad_bytes == 2) ? (uint16_t)int_regs->ecx :
+                         (ad_bytes == 4) ? (uint32_t)int_regs->ecx :
+                         int_regs->ecx);
+
+    /* Reduce counter appropriately, and repeat instruction if non-zero. */
+    ecx -= reps_completed;
+    if ( ecx != 0 )
+        int_regs->eip = ext_regs->eip;
 
     if ( ad_bytes == 2 )
         *(uint16_t *)&int_regs->ecx = ecx;
@@ -573,15 +598,12 @@ static int __handle_rep_prefix(
         int_regs->ecx = (uint32_t)ecx;
     else
         int_regs->ecx = ecx;
-    int_regs->eip = ext_regs->eip;
-    return 0;
 }
 
-#define handle_rep_prefix()                                                \
-do {                                                                       \
-    if ( rep_prefix && __handle_rep_prefix(&_regs, ctxt->regs, ad_bytes) ) \
-        goto done;                                                         \
-} while (0)
+#define put_rep_prefix(reps_completed) ({                               \
+    if ( rep_prefix )                                                   \
+        __put_rep_prefix(&_regs, ctxt->regs, ad_bytes, reps_completed); \
+})
 
 /*
  * Unsigned multiplication with double-word result.
@@ -2051,35 +2073,63 @@ x86_emulate(
         dst.mem.off = sp_pre_dec(dst.bytes);
         break;
 
-    case 0x6c ... 0x6d: /* ins %dx,%es:%edi */
-        handle_rep_prefix();
+    case 0x6c ... 0x6d: /* ins %dx,%es:%edi */ {
+        unsigned long nr_reps = get_rep_prefix();
         generate_exception_if(!mode_iopl(), EXC_GP);
-        dst.type  = OP_MEM;
         dst.bytes = !(b & 1) ? 1 : (op_bytes == 8) ? 4 : op_bytes;
         dst.mem.seg = x86_seg_es;
         dst.mem.off = truncate_ea(_regs.edi);
-        fail_if(ops->read_io == NULL);
-        if ( (rc = ops->read_io((uint16_t)_regs.edx, dst.bytes,
-                                &dst.val, ctxt)) != 0 )
-            goto done;
+        if ( (nr_reps > 1) && (ops->rep_ins != NULL) )
+        {
+            if ( (rc = ops->rep_ins((uint16_t)_regs.edx, dst.mem.seg,
+                                    dst.mem.off, dst.bytes,
+                                    &nr_reps, ctxt)) != 0 )
+                goto done;
+        }
+        else
+        {
+            fail_if(ops->read_io == NULL);
+            if ( (rc = ops->read_io((uint16_t)_regs.edx, dst.bytes,
+                                    &dst.val, ctxt)) != 0 )
+                goto done;
+            dst.type = OP_MEM;
+            nr_reps = 1;
+        }
         register_address_increment(
-            _regs.edi, (_regs.eflags & EFLG_DF) ? -dst.bytes : dst.bytes);
+            _regs.edi,
+            nr_reps * ((_regs.eflags & EFLG_DF) ? -dst.bytes : dst.bytes));
+        put_rep_prefix(nr_reps);
         break;
+    }
 
-    case 0x6e ... 0x6f: /* outs %esi,%dx */
-        handle_rep_prefix();
+    case 0x6e ... 0x6f: /* outs %esi,%dx */ {
+        unsigned long nr_reps = get_rep_prefix();
         generate_exception_if(!mode_iopl(), EXC_GP);
         dst.bytes = !(b & 1) ? 1 : (op_bytes == 8) ? 4 : op_bytes;
-        if ( (rc = ops->read(ea.mem.seg, truncate_ea(_regs.esi),
-                             &dst.val, dst.bytes, ctxt)) != 0 )
-            goto done;
-        fail_if(ops->write_io == NULL);
-        if ( (rc = ops->write_io((uint16_t)_regs.edx, dst.bytes,
-                                 dst.val, ctxt)) != 0 )
-            goto done;
+        if ( (nr_reps > 1) && (ops->rep_outs != NULL) )
+        {
+            if ( (rc = ops->rep_outs(ea.mem.seg, truncate_ea(_regs.esi),
+                                     (uint16_t)_regs.edx, dst.bytes,
+                                     &nr_reps, ctxt)) != 0 )
+                goto done;
+        }
+        else
+        {
+            if ( (rc = ops->read(ea.mem.seg, truncate_ea(_regs.esi),
+                                 &dst.val, dst.bytes, ctxt)) != 0 )
+                goto done;
+            fail_if(ops->write_io == NULL);
+            if ( (rc = ops->write_io((uint16_t)_regs.edx, dst.bytes,
+                                     dst.val, ctxt)) != 0 )
+                goto done;
+            nr_reps = 1;
+        }
         register_address_increment(
-            _regs.esi, (_regs.eflags & EFLG_DF) ? -dst.bytes : dst.bytes);
+            _regs.esi,
+            nr_reps * ((_regs.eflags & EFLG_DF) ? -dst.bytes : dst.bytes));
+        put_rep_prefix(nr_reps);
         break;
+    }
 
     case 0x70 ... 0x7f: /* jcc (short) */ {
         int rel = insn_fetch_type(int8_t);
@@ -2202,24 +2252,39 @@ x86_emulate(
         dst.val   = (unsigned long)_regs.eax;
         break;
 
-    case 0xa4 ... 0xa5: /* movs */
-        handle_rep_prefix();
-        dst.type  = OP_MEM;
+    case 0xa4 ... 0xa5: /* movs */ {
+        unsigned long nr_reps = get_rep_prefix();
         dst.bytes = (d & ByteOp) ? 1 : op_bytes;
         dst.mem.seg = x86_seg_es;
         dst.mem.off = truncate_ea(_regs.edi);
-        if ( (rc = ops->read(ea.mem.seg, truncate_ea(_regs.esi),
-                             &dst.val, dst.bytes, ctxt)) != 0 )
-            goto done;
+        if ( (nr_reps > 1) && (ops->rep_movs != NULL) )
+        {
+            if ( (rc = ops->rep_movs(ea.mem.seg, truncate_ea(_regs.esi),
+                                     dst.mem.seg, dst.mem.off, dst.bytes,
+                                     &nr_reps, ctxt)) != 0 )
+                goto done;
+        }
+        else
+        {
+            if ( (rc = ops->read(ea.mem.seg, truncate_ea(_regs.esi),
+                                 &dst.val, dst.bytes, ctxt)) != 0 )
+                goto done;
+            dst.type = OP_MEM;
+            nr_reps = 1;
+        }
         register_address_increment(
-            _regs.esi, (_regs.eflags & EFLG_DF) ? -dst.bytes : dst.bytes);
+            _regs.esi,
+            nr_reps * ((_regs.eflags & EFLG_DF) ? -dst.bytes : dst.bytes));
         register_address_increment(
-            _regs.edi, (_regs.eflags & EFLG_DF) ? -dst.bytes : dst.bytes);
+            _regs.edi,
+            nr_reps * ((_regs.eflags & EFLG_DF) ? -dst.bytes : dst.bytes));
+        put_rep_prefix(nr_reps);
         break;
+    }
 
     case 0xa6 ... 0xa7: /* cmps */ {
         unsigned long next_eip = _regs.eip;
-        handle_rep_prefix();
+        get_rep_prefix();
         src.bytes = dst.bytes = (d & ByteOp) ? 1 : op_bytes;
         if ( (rc = ops->read(ea.mem.seg, truncate_ea(_regs.esi),
                              &dst.val, dst.bytes, ctxt)) ||
@@ -2230,6 +2295,7 @@ x86_emulate(
             _regs.esi, (_regs.eflags & EFLG_DF) ? -dst.bytes : dst.bytes);
         register_address_increment(
             _regs.edi, (_regs.eflags & EFLG_DF) ? -src.bytes : src.bytes);
+        put_rep_prefix(1);
         /* cmp: dst - src ==> src=*%%edi,dst=*%%esi ==> *%%esi - *%%edi */
         emulate_2op_SrcV("cmp", src, dst, _regs.eflags);
         if ( ((rep_prefix == REPE_PREFIX) && !(_regs.eflags & EFLG_ZF)) ||
@@ -2238,8 +2304,8 @@ x86_emulate(
         break;
     }
 
-    case 0xaa ... 0xab: /* stos */
-        handle_rep_prefix();
+    case 0xaa ... 0xab: /* stos */ {
+        /* unsigned long max_reps = */get_rep_prefix();
         dst.type  = OP_MEM;
         dst.bytes = (d & ByteOp) ? 1 : op_bytes;
         dst.mem.seg = x86_seg_es;
@@ -2247,10 +2313,12 @@ x86_emulate(
         dst.val   = _regs.eax;
         register_address_increment(
             _regs.edi, (_regs.eflags & EFLG_DF) ? -dst.bytes : dst.bytes);
+        put_rep_prefix(1);
         break;
+    }
 
-    case 0xac ... 0xad: /* lods */
-        handle_rep_prefix();
+    case 0xac ... 0xad: /* lods */ {
+        /* unsigned long max_reps = */get_rep_prefix();
         dst.type  = OP_REG;
         dst.bytes = (d & ByteOp) ? 1 : op_bytes;
         dst.reg   = (unsigned long *)&_regs.eax;
@@ -2259,11 +2327,13 @@ x86_emulate(
             goto done;
         register_address_increment(
             _regs.esi, (_regs.eflags & EFLG_DF) ? -dst.bytes : dst.bytes);
+        put_rep_prefix(1);
         break;
+    }
 
     case 0xae ... 0xaf: /* scas */ {
         unsigned long next_eip = _regs.eip;
-        handle_rep_prefix();
+        get_rep_prefix();
         src.bytes = dst.bytes = (d & ByteOp) ? 1 : op_bytes;
         dst.val = _regs.eax;
         if ( (rc = ops->read(x86_seg_es, truncate_ea(_regs.edi),
@@ -2271,6 +2341,7 @@ x86_emulate(
             goto done;
         register_address_increment(
             _regs.edi, (_regs.eflags & EFLG_DF) ? -src.bytes : src.bytes);
+        put_rep_prefix(1);
         /* cmp: dst - src ==> src=*%%edi,dst=%%eax ==> %%eax - *%%edi */
         emulate_2op_SrcV("cmp", src, dst, _regs.eflags);
         if ( ((rep_prefix == REPE_PREFIX) && !(_regs.eflags & EFLG_ZF)) ||

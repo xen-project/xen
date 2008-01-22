@@ -223,6 +223,64 @@ realmode_emulate_cmpxchg(
     return realmode_emulate_write(seg, offset, new, bytes, ctxt);
 }
 
+static int 
+realmode_rep_ins(
+    uint16_t src_port,
+    enum x86_segment dst_seg,
+    unsigned long dst_offset,
+    unsigned int bytes_per_rep,
+    unsigned long *reps,
+    struct x86_emulate_ctxt *ctxt)
+{
+    struct realmode_emulate_ctxt *rm_ctxt =
+        container_of(ctxt, struct realmode_emulate_ctxt, ctxt);
+    struct vcpu *curr = current;
+    uint32_t paddr = rm_ctxt->seg_reg[dst_seg].base + dst_offset;
+
+    if ( curr->arch.hvm_vmx.real_mode_io_in_progress )
+        return X86EMUL_UNHANDLEABLE;
+
+    if ( !curr->arch.hvm_vmx.real_mode_io_completed )
+    {
+        curr->arch.hvm_vmx.real_mode_io_in_progress = 1;
+        send_pio_req(src_port, *reps, bytes_per_rep,
+                     paddr, IOREQ_READ,
+                     !!(ctxt->regs->eflags & X86_EFLAGS_DF), 1);
+    }
+
+    if ( !curr->arch.hvm_vmx.real_mode_io_completed )
+        return X86EMUL_RETRY;
+
+    curr->arch.hvm_vmx.real_mode_io_completed = 0;
+
+    return X86EMUL_OKAY;
+}
+
+static int 
+realmode_rep_outs(
+    enum x86_segment src_seg,
+    unsigned long src_offset,
+    uint16_t dst_port,
+    unsigned int bytes_per_rep,
+    unsigned long *reps,
+    struct x86_emulate_ctxt *ctxt)
+{
+    struct realmode_emulate_ctxt *rm_ctxt =
+        container_of(ctxt, struct realmode_emulate_ctxt, ctxt);
+    struct vcpu *curr = current;
+    uint32_t paddr = rm_ctxt->seg_reg[src_seg].base + src_offset;
+
+    if ( curr->arch.hvm_vmx.real_mode_io_in_progress )
+        return X86EMUL_UNHANDLEABLE;
+
+    curr->arch.hvm_vmx.real_mode_io_in_progress = 1;
+    send_pio_req(dst_port, *reps, bytes_per_rep,
+                 paddr, IOREQ_WRITE,
+                 !!(ctxt->regs->eflags & X86_EFLAGS_DF), 1);
+
+    return X86EMUL_OKAY;
+}
+
 static int
 realmode_read_segment(
     enum x86_segment seg,
@@ -420,6 +478,8 @@ static struct x86_emulate_ops realmode_emulator_ops = {
     .insn_fetch    = realmode_emulate_insn_fetch,
     .write         = realmode_emulate_write,
     .cmpxchg       = realmode_emulate_cmpxchg,
+    .rep_ins       = realmode_rep_ins,
+    .rep_outs      = realmode_rep_outs,
     .read_segment  = realmode_read_segment,
     .write_segment = realmode_write_segment,
     .read_io       = realmode_read_io,
