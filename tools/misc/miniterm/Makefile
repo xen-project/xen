@@ -8,8 +8,8 @@ all: $(TARGET)
 
 .PHONY: install
 install: all
-	[ -d $(DESTDIR)/usr/bin ] || $(INSTALL_DIR) $(DESTDIR)/usr/bin
-	$(INSTALL_PROG) $(TARGET) $(DESTDIR)/usr/bin
+	$(INSTALL_DIR) $(DESTDIR)$(BINDIR)
+	$(INSTALL_PROG) $(TARGET) $(DESTDIR)$(BINDIR)
 
 .PHONY: install-recurse
 	: No sense in installing miniterm on the Xen box.

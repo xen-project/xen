@@ -81,13 +81,13 @@ tarball: clean
 install: all
 	$(INSTALL_DIR) $(DESTDIR)/var/run/xenstored
 	$(INSTALL_DIR) $(DESTDIR)/var/lib/xenstored
-	$(INSTALL_DIR) $(DESTDIR)/usr/bin
+	$(INSTALL_DIR) $(DESTDIR)$(BINDIR)
 	$(INSTALL_DIR) $(DESTDIR)/usr/sbin
 	$(INSTALL_DIR) $(DESTDIR)$(INCLUDEDIR)
 	$(INSTALL_PROG) xenstored $(DESTDIR)/usr/sbin
-	$(INSTALL_PROG) $(CLIENTS) $(DESTDIR)/usr/bin
-	$(INSTALL_PROG) xenstore-control $(DESTDIR)/usr/bin
-	$(INSTALL_PROG) xenstore-ls $(DESTDIR)/usr/bin
+	$(INSTALL_PROG) $(CLIENTS) $(DESTDIR)$(BINDIR)
+	$(INSTALL_PROG) xenstore-control $(DESTDIR)$(BINDIR)
+	$(INSTALL_PROG) xenstore-ls $(DESTDIR)$(BINDIR)
 	$(INSTALL_DIR) $(DESTDIR)$(LIBDIR)
 	$(INSTALL_PROG) libxenstore.so.$(MAJOR).$(MINOR) $(DESTDIR)$(LIBDIR)
 	ln -sf libxenstore.so.$(MAJOR).$(MINOR) $(DESTDIR)$(LIBDIR)/libxenstore.so.$(MAJOR)
