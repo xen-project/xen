@@ -23,6 +23,7 @@ BINDIR = $(PREFIX)/bin
 INCLUDEDIR = $(PREFIX)/include
 LIBDIR = $(PREFIX)/lib
 LIBDIR_x86_64 = $(PREFIX)/lib/amd64
+SBINDIR = $(PREFIX)/sbin
 
 SunOS_LIBDIR = /usr/sfw/lib
 SunOS_LIBDIR_x86_64 = /usr/sfw/lib/amd64

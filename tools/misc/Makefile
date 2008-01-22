@@ -30,9 +30,9 @@ build: $(TARGETS)
 .PHONY: install
 install: build
 	$(INSTALL_DIR) $(DESTDIR)$(BINDIR)
-	[ -d $(DESTDIR)/usr/sbin ] || $(INSTALL_DIR) $(DESTDIR)/usr/sbin
+	$(INSTALL_DIR) $(DESTDIR)$(SBINDIR)
 	$(INSTALL_PROG) $(INSTALL_BIN) $(DESTDIR)$(BINDIR)
-	$(INSTALL_PROG) $(INSTALL_SBIN) $(DESTDIR)/usr/sbin
+	$(INSTALL_PROG) $(INSTALL_SBIN) $(DESTDIR)$(SBINDIR)
 	set -e; for d in $(SUBDIRS); do $(MAKE) -C $$d install-recurse; done
 
 .PHONY: clean

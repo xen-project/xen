@@ -51,8 +51,8 @@ print-end:
 
 .PHONY: install
 install: all
-	$(INSTALL_DIR) -p $(DESTDIR)/usr/sbin
-	$(INSTALL_PROG) $(CLIENTS) $(DESTDIR)/usr/sbin
+	$(INSTALL_DIR) $(DESTDIR)$(SBINDIR)
+	$(INSTALL_PROG) $(CLIENTS) $(DESTDIR)$(SBINDIR)
 
 -include $(PROG_DEP)
 

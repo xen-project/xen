@@ -5,8 +5,6 @@ MAJOR    = 3.0
 MINOR    = 0
 SONAME   = libblktap.so.$(MAJOR)
 
-BLKTAP_INSTALL_DIR = /usr/sbin
-
 INCLUDES += -I. -I.. -I $(XEN_LIBXC) -I $(XEN_XENSTORE)
 
 LIBS     := -lz

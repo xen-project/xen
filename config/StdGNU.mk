@@ -22,6 +22,7 @@ BINDIR = $(PREFIX)/bin
 INCLUDEDIR = $(PREFIX)/include
 LIBDIR = $(PREFIX)/lib
 LIBDIR_x86_64 = $(PREFIX)/lib64
+SBINDIR = $(PREFIX)/sbin
 
 SOCKET_LIBS =
 CURSES_LIBS = -lncurses

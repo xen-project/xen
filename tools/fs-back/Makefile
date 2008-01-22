@@ -4,7 +4,6 @@ include $(XEN_ROOT)/tools/Rules.mk
 INCLUDES += -I.. -I../lib
 
 IBIN         = fs-backend 
-INST_DIR     = /usr/sbin
 
 CFLAGS   += -Werror
 CFLAGS   += -Wno-unused
@@ -30,7 +29,7 @@ fs-backend: $(OBJS) fs-backend.c
 	$(CC) $(CFLAGS) -o fs-backend $(OBJS) $(LIBS) fs-backend.c
 
 install: all
-	$(INSTALL_PROG) $(IBIN) $(DESTDIR)$(INST_DIR)
+	$(INSTALL_PROG) $(IBIN) $(DESTDIR)$(SBINDIR)
 
 clean:
 	rm -rf *.o *~ $(DEPS) xen $(IBIN) $(LIB)
