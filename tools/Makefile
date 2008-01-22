@@ -78,7 +78,7 @@ IOEMU_CONFIGURE_CROSS ?= --cross-prefix=$(CROSS_COMPILE) \
 endif
 ioemu ioemuinstall:
 	[ -f $(IOEMU_DIR)/config-host.mak ] || \
-	  ( cd $(IOEMU_DIR) && sh configure --prefix=/usr \
+	  ( cd $(IOEMU_DIR) && XEN_TARGET_ARCH=$(XEN_TARGET_ARCH) sh configure --prefix=/usr \
 		$(IOEMU_CONFIGURE_CROSS) )
 	$(MAKE) -C $(IOEMU_DIR) $(patsubst ioemu%,%,$@)
 ioemuclean:

@@ -29,43 +29,15 @@ ar="ar"
 make="make"
 install="install"
 strip="strip"
-cpu=`uname -m`
 target_list=""
-case "$cpu" in
-  i386|i486|i586|i686|i86pc|BePC)
+case "$XEN_TARGET_ARCH" in
+  x86_32)
     cpu="i386"
   ;;
-  armv*b)
-    cpu="armv4b"
-  ;;
-  armv*l)
-    cpu="armv4l"
-  ;;
-  alpha)
-    cpu="alpha"
-  ;;
-  "Power Macintosh"|ppc|ppc64)
+  powerpc)
     cpu="powerpc"
   ;;
-  mips)
-    cpu="mips"
-  ;;
-  s390)
-    cpu="s390"
-  ;;
-  sparc|sun4[muv])
-    cpu="sparc"
-  ;;
-  sparc64)
-    cpu="sparc64"
-  ;;
-  ia64)
-    cpu="ia64"
-  ;;
-  m68k)
-    cpu="m68k"
-  ;;
-  x86_64|amd64)
+  x86_64)
     cpu="x86_64"
     libdir="lib64"
   ;;
