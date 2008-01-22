@@ -11,7 +11,7 @@ xenoprof := y
 #
 pae ?= n
 supervisor_mode_kernel ?= n
-vmxassist ?= y
+vmxassist ?= n
 
 ifeq ($(vmxassist),y)
 CFLAGS += -DVMXASSIST
