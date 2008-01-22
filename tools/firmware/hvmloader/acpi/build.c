@@ -76,7 +76,7 @@ static int construct_bios_info_table(uint8_t *buf)
     bios_info->com2_present = uart_exists(0x2f8);
 
     bios_info->pci_min = 0xf0000000;
-    bios_info->pci_len = 0x05000000;
+    bios_info->pci_len = 0x0c000000;
 
     return align16(sizeof(*bios_info));
 }

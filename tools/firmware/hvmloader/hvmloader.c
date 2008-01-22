@@ -183,10 +183,16 @@ static void apic_setup(void)
 
 static void pci_setup(void)
 {
-    uint32_t devfn, bar_reg, bar_data, bar_sz, cmd;
-    uint32_t *base, io_base = 0xc000, mem_base = HVM_BELOW_4G_MMIO_START;
+    uint32_t base, devfn, bar_reg, bar_data, bar_sz, cmd;
     uint16_t class, vendor_id, device_id;
     unsigned int bar, pin, link, isa_irq;
+
+    /* Resources assignable to PCI devices via BARs. */
+    struct resource {
+        uint32_t base, max;
+    } *resource;
+    struct resource mem_resource = { 0xf0000000, 0xfc000000 };
+    struct resource io_resource  = { 0xc000, 0x10000 };
 
     /* Create a list of device BARs in descending order of size. */
     struct bars {
@@ -301,22 +307,31 @@ static void pci_setup(void)
         if ( (bar_data & PCI_BASE_ADDRESS_SPACE) ==
              PCI_BASE_ADDRESS_SPACE_MEMORY )
         {
-            base = &mem_base;
+            resource = &mem_resource;
             bar_data &= ~PCI_BASE_ADDRESS_MEM_MASK;
         }
         else
         {
-            base = &io_base;
+            resource = &io_resource;
             bar_data &= ~PCI_BASE_ADDRESS_IO_MASK;
         }
 
-        *base = (*base + bar_sz - 1) & ~(bar_sz - 1);
-        bar_data |= *base;
-        *base += bar_sz;
+        base = (resource->base + bar_sz - 1) & ~(bar_sz - 1);
+        bar_data |= base;
+        base += bar_sz;
+
+        if ( (base < resource->base) || (base > resource->max) )
+        {
+            printf("pci dev %02x:%x bar %02x size %08x: no space for "
+                   "resource!\n", devfn>>3, devfn&7, bar_reg, bar_sz);
+            continue;
+        }
+
+        resource->base = base;
 
         pci_writel(devfn, bar_reg, bar_data);
-        printf("pci dev %02x:%x bar %02x size %08x: %08x %08x/%08x\n",
-               devfn>>3, devfn&7, bar_reg, bar_sz, bar_data, i, nr_bars);
+        printf("pci dev %02x:%x bar %02x size %08x: %08x\n",
+               devfn>>3, devfn&7, bar_reg, bar_sz, bar_data);
 
         /* Now enable the memory or I/O mapping. */
         cmd = pci_readw(devfn, PCI_COMMAND);
