@@ -7,7 +7,8 @@
 /* Allocate space for array of typed objects. */
 #define xmalloc_array(_type, _num) ((_type *)_xmalloc_array(sizeof(_type), __alignof__(_type), _num))
 
-#define malloc(size) _xmalloc(size, 4)
+#define DEFAULT_ALIGN (sizeof(unsigned long))
+#define malloc(size) _xmalloc(size, DEFAULT_ALIGN)
 #define free(ptr) xfree(ptr)
 #define realloc(ptr, size) _realloc(ptr, size)
 
