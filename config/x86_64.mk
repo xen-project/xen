@@ -9,7 +9,10 @@ CONFIG_XCUTILS := y
 CONFIG_IOEMU := y
 
 CFLAGS += -m64
-LIBDIR = $(LIB64DIR)
+
+LIBDIR = $(LIBDIR_x86_64)
+
+SunOS_LIBDIR = $(SunOS_LIBDIR_x86_64)
 
 # Use only if calling $(LD) directly.
 ifeq ($(XEN_OS),OpenBSD)

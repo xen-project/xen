@@ -88,11 +88,11 @@ install: all
 	$(INSTALL_PROG) $(CLIENTS) $(DESTDIR)/usr/bin
 	$(INSTALL_PROG) xenstore-control $(DESTDIR)/usr/bin
 	$(INSTALL_PROG) xenstore-ls $(DESTDIR)/usr/bin
-	$(INSTALL_DIR) $(DESTDIR)/usr/$(LIBDIR)
-	$(INSTALL_PROG) libxenstore.so.$(MAJOR).$(MINOR) $(DESTDIR)/usr/$(LIBDIR)
-	ln -sf libxenstore.so.$(MAJOR).$(MINOR) $(DESTDIR)/usr/$(LIBDIR)/libxenstore.so.$(MAJOR)
-	ln -sf libxenstore.so.$(MAJOR) $(DESTDIR)/usr/$(LIBDIR)/libxenstore.so
-	$(INSTALL_DATA) libxenstore.a $(DESTDIR)/usr/$(LIBDIR)
+	$(INSTALL_DIR) $(DESTDIR)$(LIBDIR)
+	$(INSTALL_PROG) libxenstore.so.$(MAJOR).$(MINOR) $(DESTDIR)$(LIBDIR)
+	ln -sf libxenstore.so.$(MAJOR).$(MINOR) $(DESTDIR)$(LIBDIR)/libxenstore.so.$(MAJOR)
+	ln -sf libxenstore.so.$(MAJOR) $(DESTDIR)$(LIBDIR)/libxenstore.so
+	$(INSTALL_DATA) libxenstore.a $(DESTDIR)$(LIBDIR)
 	$(INSTALL_DATA) xs.h $(DESTDIR)/usr/include
 	$(INSTALL_DATA) xs_lib.h $(DESTDIR)/usr/include
 

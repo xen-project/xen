@@ -20,8 +20,8 @@ fs-all: $(FSLIB)
 
 .PHONY: fs-install
 fs-install: fs-all
-	$(INSTALL_DIR) $(DESTDIR)/usr/$(FSDIR)
-	$(INSTALL_PROG) $(FSLIB) $(DESTDIR)/usr/$(FSDIR)
+	$(INSTALL_DIR) $(DESTDIR)$(FSDIR)
+	$(INSTALL_PROG) $(FSLIB) $(DESTDIR)$(FSDIR)
 
 $(FSLIB): $(PIC_OBJS)
 	$(CC) $(CFLAGS) $(LDFLAGS) $(SHLIB_CFLAGS) -o $@ $^ -lfsimage $(FS_LIBDEPS)

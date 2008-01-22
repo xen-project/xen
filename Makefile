@@ -188,10 +188,10 @@ uninstall:
 	rm -rf $(D)/usr/include/xenctrl.h $(D)/usr/include/xenguest.h
 	rm -rf $(D)/usr/include/xs_lib.h $(D)/usr/include/xs.h
 	rm -rf $(D)/usr/include/xen
-	rm -rf $(D)/usr/$(LIBDIR)/libxenctrl* $(D)/usr/$(LIBDIR)/libxenguest*
-	rm -rf $(D)/usr/$(LIBDIR)/libxenstore*
-	rm -rf $(D)/usr/$(LIBDIR)/python/xen $(D)/usr/$(LIBDIR)/python/grub
-	rm -rf $(D)/usr/$(LIBDIR)/xen/
+	rm -rf $(D)$(LIBDIR)/libxenctrl* $(D)$(LIBDIR)/libxenguest*
+	rm -rf $(D)$(LIBDIR)/libxenstore*
+	rm -rf $(D)$(LIBDIR)/python/xen $(D)$(LIBDIR)/python/grub
+	rm -rf $(D)$(LIBDIR)/xen/
 	rm -rf $(D)/usr/lib/xen/
 	rm -rf $(D)/usr/local/sbin/setmask $(D)/usr/local/sbin/xen*
 	rm -rf $(D)/usr/sbin/xen* $(D)/usr/sbin/netfix $(D)/usr/sbin/xm

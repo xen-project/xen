@@ -19,14 +19,17 @@ INSTALL_DATA = $(INSTALL) -m0644 -p
 INSTALL_PROG = $(INSTALL) -m0755 -p
 
 PREFIX ?= /usr
+LIBDIR = $(PREFIX)/lib
+LIBDIR_x86_64 = $(PREFIX)/lib/amd64
 
-LIB64DIR = lib/amd64
+SunOS_LIBDIR = /usr/sfw/lib
+SunOS_LIBDIR_x86_64 = /usr/sfw/lib/amd64
 
 SOCKET_LIBS = -lsocket
 CURSES_LIBS = -lcurses
 UTIL_LIBS =
 SONAME_LDFLAG = -h
-SHLIB_CFLAGS = -R /usr/sfw/$(LIBDIR) -shared
+SHLIB_CFLAGS = -R $(SunOS_LIBDIR) -shared
 
 ifneq ($(debug),y)
 # Optimisation flags are overridable

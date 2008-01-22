@@ -8,7 +8,6 @@ CONFIG_XCUTILS := y
 CONFIG_IOEMU := y
 
 CFLAGS += -m32 -march=i686
-LIBDIR := lib
 
 # Use only if calling $(LD) directly.
 LDFLAGS_DIRECT_OpenBSD = _obsd

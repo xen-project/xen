@@ -40,11 +40,11 @@ build: libblktap.a
 libblktap: libblktap.a
 
 install: all
-	$(INSTALL_DIR) $(DESTDIR)/usr/$(LIBDIR)
+	$(INSTALL_DIR) $(DESTDIR)$(LIBDIR)
 	$(INSTALL_DIR) $(DESTDIR)/usr/include
-	$(INSTALL_DATA) $(LIB) $(DESTDIR)/usr/$(LIBDIR)
-	ln -sf libblktap.so.$(MAJOR).$(MINOR) $(DESTDIR)/usr/$(LIBDIR)/libblktap.so.$(MAJOR)
-	ln -sf libblktap.so.$(MAJOR) $(DESTDIR)/usr/$(LIBDIR)/libblktap.so
+	$(INSTALL_DATA) $(LIB) $(DESTDIR)$(LIBDIR)
+	ln -sf libblktap.so.$(MAJOR).$(MINOR) $(DESTDIR)$(LIBDIR)/libblktap.so.$(MAJOR)
+	ln -sf libblktap.so.$(MAJOR) $(DESTDIR)$(LIBDIR)/libblktap.so
 	$(INSTALL_DATA) blktaplib.h $(DESTDIR)/usr/include
 
 clean:
