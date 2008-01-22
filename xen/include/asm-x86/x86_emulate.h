@@ -175,6 +175,49 @@ struct x86_emulate_ops
         struct x86_emulate_ctxt *ctxt);
 
     /*
+     * rep_ins: Emulate INS: <src_port> -> <dst_seg:dst_offset>.
+     *  @bytes_per_rep: [IN ] Bytes transferred per repetition.
+     *  @reps:  [IN ] Maximum repetitions to be emulated.
+     *          [OUT] Number of repetitions actually emulated.
+     */
+    int (*rep_ins)(
+        uint16_t src_port,
+        enum x86_segment dst_seg,
+        unsigned long dst_offset,
+        unsigned int bytes_per_rep,
+        unsigned long *reps,
+        struct x86_emulate_ctxt *ctxt);
+
+    /*
+     * rep_outs: Emulate OUTS: <src_seg:src_offset> -> <dst_port>.
+     *  @bytes_per_rep: [IN ] Bytes transferred per repetition.
+     *  @reps:  [IN ] Maximum repetitions to be emulated.
+     *          [OUT] Number of repetitions actually emulated.
+     */
+    int (*rep_outs)(
+        enum x86_segment src_seg,
+        unsigned long src_offset,
+        uint16_t dst_port,
+        unsigned int bytes_per_rep,
+        unsigned long *reps,
+        struct x86_emulate_ctxt *ctxt);
+
+    /*
+     * rep_movs: Emulate MOVS: <src_seg:src_offset> -> <dst_seg:dst_offset>.
+     *  @bytes_per_rep: [IN ] Bytes transferred per repetition.
+     *  @reps:  [IN ] Maximum repetitions to be emulated.
+     *          [OUT] Number of repetitions actually emulated.
+     */
+    int (*rep_movs)(
+        enum x86_segment src_seg,
+        unsigned long src_offset,
+        enum x86_segment dst_seg,
+        unsigned long dst_offset,
+        unsigned int bytes_per_rep,
+        unsigned long *reps,
+        struct x86_emulate_ctxt *ctxt);
+
+    /*
      * read_segment: Emulate a read of full context of a segment register.
      *  @reg:   [OUT] Contents of segment register (visible and hidden state).
      */
