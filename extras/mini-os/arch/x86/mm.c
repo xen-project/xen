@@ -497,11 +497,11 @@ static void clear_bootstrap(void)
     int n = sizeof(mfns)/sizeof(*mfns);
     pte_t nullpte = { };
 
-    /* Use page 0 as the CoW zero page */
-    memset(NULL, 0, PAGE_SIZE);
-    mfn_zero = pfn_to_mfn(0);
-    if (HYPERVISOR_update_va_mapping(0, nullpte, UVMF_INVLPG))
-	printk("Unable to unmap page 0\n");
+    /* Use first page as the CoW zero page */
+    memset(&_text, 0, PAGE_SIZE);
+    mfn_zero = pfn_to_mfn((unsigned long) &_text);
+    if (HYPERVISOR_update_va_mapping((unsigned long) &_text, nullpte, UVMF_INVLPG))
+	printk("Unable to unmap first page\n");
 
     set_xen_guest_handle(reservation.extent_start, mfns);
     reservation.nr_extents = n;
