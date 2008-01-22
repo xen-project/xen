@@ -1443,7 +1443,7 @@ zap_domain_page_one(struct domain *d, unsigned long mpaddr,
 
     BUG_ON(clear_PGC_allocate && (page_get_owner(page) == NULL));
     domain_put_page(d, mpaddr, pte, old_pte, clear_PGC_allocate);
-    perfc_incr(zap_dcomain_page_one);
+    perfc_incr(zap_domain_page_one);
 }
 
 unsigned long

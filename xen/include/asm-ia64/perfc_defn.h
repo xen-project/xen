@@ -127,7 +127,7 @@ PERFCOUNTER(flush_vtlb_for_context_switch,  "flush_vtlb_for_context_switch")
 // mm.c
 PERFCOUNTER(assign_domain_page_replace,     "assign_domain_page_replace")
 PERFCOUNTER(assign_domain_pge_cmpxchg_rel,  "assign_domain_pge_cmpxchg_rel")
-PERFCOUNTER(zap_dcomain_page_one,           "zap_dcomain_page_one")
+PERFCOUNTER(zap_domain_page_one,            "zap_domain_page_one")
 PERFCOUNTER(dom0vp_zap_physmap,             "dom0vp_zap_physmap")
 PERFCOUNTER(dom0vp_add_physmap,             "dom0vp_add_physmap")
 PERFCOUNTER(create_grant_host_mapping,      "create_grant_host_mapping")
