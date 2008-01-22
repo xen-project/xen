@@ -153,6 +153,22 @@ void __init vhpt_init(void)
 }
 
 #ifdef CONFIG_XEN_IA64_PERVCPU_VHPT
+void
+domain_set_vhpt_size(struct domain *d, int8_t vhpt_size_log2)
+{
+	if (vhpt_size_log2 == -1) {
+		d->arch.has_pervcpu_vhpt = 0;
+		printk(XENLOG_INFO "XEN_DOMCTL_arch_setup: "
+		       "domain %d VHPT is global.\n", d->domain_id);
+	} else {
+		d->arch.has_pervcpu_vhpt = 1;
+		d->arch.vhpt_size_log2 = vhpt_size_log2;
+		printk(XENLOG_INFO "XEN_DOMCTL_arch_setup: "
+		       "domain %d VHPT is per vcpu. size=2**%d\n",
+		       d->domain_id, vhpt_size_log2);
+	}
+}
+
 int
 pervcpu_vhpt_alloc(struct vcpu *v)
 {

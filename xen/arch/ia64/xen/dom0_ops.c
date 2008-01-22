@@ -20,6 +20,7 @@
 #include <xen/guest_access.h>
 #include <asm/vmx.h>
 #include <asm/dom_fw.h>
+#include <asm/vhpt.h>
 #include <xen/iocap.h>
 #include <xen/errno.h>
 #include <xen/nodemask.h>
@@ -121,20 +122,7 @@ long arch_do_domctl(xen_domctl_t *op, XEN_GUEST_HANDLE(xen_domctl_t) u_domctl)
                     for_each_vcpu (d, v)
                         v->arch.breakimm = d->arch.breakimm;
                 }
-#ifdef CONFIG_XEN_IA64_PERVCPU_VHPT
-                if (ds->vhpt_size_log2 == -1) {
-                    d->arch.has_pervcpu_vhpt = 0;
-                    ds->vhpt_size_log2 = -1;
-                    printk(XENLOG_INFO "XEN_DOMCTL_arch_setup: "
-                           "domain %d VHPT is global.\n", d->domain_id);
-                } else {
-                    d->arch.has_pervcpu_vhpt = 1;
-                    d->arch.vhpt_size_log2 = ds->vhpt_size_log2;
-                    printk(XENLOG_INFO "XEN_DOMCTL_arch_setup: "
-                           "domain %d VHPT is per vcpu. size=2**%d\n",
-                           d->domain_id, ds->vhpt_size_log2);
-                }
-#endif
+                domain_set_vhpt_size(d, ds->vhpt_size_log2);
                 if (ds->xsi_va)
                     d->arch.shared_info_va = ds->xsi_va;
                 ret = dom_fw_setup(d, ds->bp, ds->maxmem);

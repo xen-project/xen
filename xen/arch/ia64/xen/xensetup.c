@@ -22,6 +22,7 @@
 #include <asm/meminit.h>
 #include <asm/page.h>
 #include <asm/setup.h>
+#include <asm/vhpt.h>
 #include <xen/string.h>
 #include <asm/vmx.h>
 #include <linux/efi.h>
@@ -329,6 +330,11 @@ is_platform_hp_ski(void)
     return 1;
 }
 
+#ifdef CONFIG_XEN_IA64_PERVCPU_VHPT
+static int __initdata dom0_vhpt_size_log2;
+integer_param("dom0_vhpt_size_log2", dom0_vhpt_size_log2);
+#endif
+
 void __init start_kernel(void)
 {
     char *cmdline;
@@ -630,6 +636,7 @@ printk("num_online_cpus=%d, max_cpus=%d\n",num_online_cpus(),max_cpus);
     dom0 = domain_create(0, 0, DOM0_SSIDREF);
     if (dom0 == NULL)
         panic("Error creating domain 0\n");
+    domain_set_vhpt_size(dom0, dom0_vhpt_size_log2);
     dom0_vcpu0 = alloc_vcpu(dom0, 0, 0);
     if (dom0_vcpu0 == NULL || vcpu_late_initialise(dom0_vcpu0) != 0)
         panic("Cannot allocate dom0 vcpu 0\n");

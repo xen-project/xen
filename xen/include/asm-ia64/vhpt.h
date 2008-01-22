@@ -55,8 +55,16 @@ DECLARE_PER_CPU (unsigned long, vhpt_pend);
 #endif
 
 #include <xen/sched.h>
+#ifdef CONFIG_XEN_IA64_PERVCPU_VHPT
+void domain_set_vhpt_size(struct domain *d, int8_t vhpt_size_log2);
 int pervcpu_vhpt_alloc(struct vcpu *v);
 void pervcpu_vhpt_free(struct vcpu *v);
+#else
+#define domain_set_vhpt_size(d, vhpt_size_log2) do { } while (0)
+#define pervcpu_vhpt_alloc(v)                   (0)
+#define pervcpu_vhpt_free(v)                    do { } while (0)
+#endif
+
 static inline unsigned long
 vcpu_vhpt_maddr(struct vcpu* v)
 {
