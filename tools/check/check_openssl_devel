@@ -1,14 +1,6 @@
 #!/bin/sh
 # CHECK-BUILD
 
-RC=0
+. funcs.sh
 
-set -e
-test -r /usr/include/openssl/md5.h || RC=1 
-
-if test ${RC} -ne 0; then
-	echo
-	echo " *** Check for openssl headers FAILED"
-fi
-
-exit ${RC}
+has_header openssl/md5.h || fail "missing openssl headers"
