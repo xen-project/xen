@@ -23,13 +23,13 @@ all: $(LIB)
 .PHONY: install
 install: all
 	$(INSTALL_DIR) $(DESTDIR)$(LIBDIR)
-	[ -d $(DESTDIR)/usr/include ] || $(INSTALL_DIR) $(DESTDIR)/usr/include
+	$(INSTALL_DIR) $(DESTDIR)$(INCLUDEDIR)
 	$(INSTALL_PROG) libfsimage.so.$(MAJOR).$(MINOR) $(DESTDIR)$(LIBDIR)
 	ln -sf libfsimage.so.$(MAJOR).$(MINOR) $(DESTDIR)$(LIBDIR)/libfsimage.so.$(MAJOR)
 	ln -sf libfsimage.so.$(MAJOR) $(DESTDIR)$(LIBDIR)/libfsimage.so
-	$(INSTALL_DATA) fsimage.h $(DESTDIR)/usr/include
-	$(INSTALL_DATA) fsimage_plugin.h $(DESTDIR)/usr/include
-	$(INSTALL_DATA) fsimage_grub.h $(DESTDIR)/usr/include
+	$(INSTALL_DATA) fsimage.h $(DESTDIR)$(INCLUDEDIR)
+	$(INSTALL_DATA) fsimage_plugin.h $(DESTDIR)$(INCLUDEDIR)
+	$(INSTALL_DATA) fsimage_grub.h $(DESTDIR)$(INCLUDEDIR)
 
 clean distclean:
 	rm -f $(PIC_OBJS) $(LIB) $(DEPS)

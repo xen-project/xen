@@ -34,12 +34,12 @@ build:
 .PHONY: install
 install: build
 	$(INSTALL_DIR) $(DESTDIR)$(LIBDIR)
-	[ -d $(DESTDIR)/usr/include ] || $(INSTALL_DIR) $(DESTDIR)/usr/include
+	$(INSTALL_DIR) $(DESTDIR)$(INCLUDEDIR)
 	$(INSTALL_PROG) libflask.so.$(MAJOR).$(MINOR) $(DESTDIR)$(LIBDIR)
 	$(INSTALL_DATA) libflask.a $(DESTDIR)$(LIBDIR)
 	ln -sf libflask.so.$(MAJOR).$(MINOR) $(DESTDIR)$(LIBDIR)/libflask.so.$(MAJOR)
 	ln -sf libflask.so.$(MAJOR) $(DESTDIR)$(LIBDIR)/libflask.so
-	$(INSTALL_DATA) include/flask.h $(DESTDIR)/usr/include
+	$(INSTALL_DATA) include/flask.h $(DESTDIR)$(INCLUDEDIR)
 
 .PHONY: TAGS
 TAGS:
