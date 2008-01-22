@@ -71,8 +71,8 @@ struct blkfront_dev *init_blkfront(char *nodename, uint64_t *sectors, unsigned *
 
     struct blkfront_dev *dev;
 
-    ASSERT(!strncmp(nodename, "/local/domain/", 14));
-    nodename = strchr(nodename + 14, '/') + 1;
+    if (!nodename)
+        nodename = "device/vbd/768";
 
     char path[strlen(nodename) + 1 + 10 + 1];
 
