@@ -535,6 +535,11 @@ class XendDomainInfo:
                     self._createDevice(dev_type, dev_config_dict)
                 self._waitForDevice(dev_type, devid)
             except VmError, ex:
+                del self.info['devices'][dev_uuid]
+                if dev_type == 'tap':
+                    self.info['vbd_refs'].remove(dev_uuid)
+                else:
+                    self.info['%s_refs' % dev_type].remove(dev_uuid)
                 raise ex
         else:
             devid = None
