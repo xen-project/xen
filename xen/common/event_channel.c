@@ -130,12 +130,15 @@ static long evtchn_alloc_unbound(evtchn_alloc_unbound_t *alloc)
     long           rc;
 
     if ( dom == DOMID_SELF )
-        dom = current->domain->domain_id;
-    else if ( !IS_PRIV(current->domain) )
-        return -EPERM;
-
-    if ( (d = rcu_lock_domain_by_id(dom)) == NULL )
-        return -ESRCH;
+        d = current->domain;
+    else {
+        if ( (d = rcu_lock_domain_by_id(dom)) == NULL )
+            return -ESRCH;
+        if ( !IS_PRIV_FOR(current->domain, d) ) {
+            rc = -EPERM;
+            goto out2;
+        }
+    }
 
     spin_lock(&d->evtchn_lock);
 
@@ -156,6 +159,7 @@ static long evtchn_alloc_unbound(evtchn_alloc_unbound_t *alloc)
  out:
     spin_unlock(&d->evtchn_lock);
 
+ out2:
     rcu_unlock_domain(d);
 
     return rc;
@@ -197,7 +201,7 @@ static long evtchn_bind_interdomain(evtchn_bind_interdomain_t *bind)
         ERROR_EXIT_DOM(-EINVAL, rd);
     rchn = evtchn_from_port(rd, rport);
     if ( (rchn->state != ECS_UNBOUND) ||
-         (rchn->u.unbound.remote_domid != ld->domain_id) )
+            (rchn->u.unbound.remote_domid != ld->domain_id && !IS_PRIV_FOR(ld, rd)))
         ERROR_EXIT_DOM(-EINVAL, rd);
 
     rc = xsm_evtchn_interdomain(ld, lchn, rd, rchn);
@@ -628,12 +632,15 @@ static long evtchn_status(evtchn_status_t *status)
     long             rc = 0;
 
     if ( dom == DOMID_SELF )
-        dom = current->domain->domain_id;
-    else if ( !IS_PRIV(current->domain) )
-        return -EPERM;
-
-    if ( (d = rcu_lock_domain_by_id(dom)) == NULL )
-        return -ESRCH;
+        d = current->domain;
+    else {
+        if ( (d = rcu_lock_domain_by_id(dom)) == NULL )
+            return -ESRCH;
+        if ( !IS_PRIV_FOR(current->domain, d) ) {
+            rc = -EPERM;
+            goto out2;
+        }
+    }
 
     spin_lock(&d->evtchn_lock);
 
@@ -684,6 +691,7 @@ static long evtchn_status(evtchn_status_t *status)
 
  out:
     spin_unlock(&d->evtchn_lock);
+ out2:
     rcu_unlock_domain(d);
     return rc;
 }
@@ -782,26 +790,28 @@ static long evtchn_reset(evtchn_reset_t *r)
     int rc;
 
     if ( dom == DOMID_SELF )
-        dom = current->domain->domain_id;
-    else if ( !IS_PRIV(current->domain) )
-        return -EPERM;
-
-    if ( (d = rcu_lock_domain_by_id(dom)) == NULL )
-        return -ESRCH;
+        d = current->domain;
+    else {
+        if ( (d = rcu_lock_domain_by_id(dom)) == NULL )
+            return -ESRCH;
+        if ( !IS_PRIV_FOR(current->domain, d) ) {
+            rc = -EPERM;
+            goto out;
+        }
+    }
 
     rc = xsm_evtchn_reset(current->domain, d);
     if ( rc )
-    {
-        rcu_unlock_domain(d);
-        return rc;
-    }
+        goto out;
 
     for ( i = 0; port_is_valid(d, i); i++ )
         (void)__evtchn_close(d, i);
 
+    rc = 0;
+out:
     rcu_unlock_domain(d);
 
-    return 0;
+    return rc;
 }
 
 

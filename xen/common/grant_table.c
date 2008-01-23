@@ -834,19 +834,19 @@ gnttab_setup_table(
     dom = op.dom;
     if ( dom == DOMID_SELF )
     {
-        dom = current->domain->domain_id;
+        d = current->domain;
     }
-    else if ( unlikely(!IS_PRIV(current->domain)) )
-    {
-        op.status = GNTST_permission_denied;
-        goto out;
-    }
-
-    if ( unlikely((d = rcu_lock_domain_by_id(dom)) == NULL) )
-    {
-        gdprintk(XENLOG_INFO, "Bad domid %d.\n", dom);
-        op.status = GNTST_bad_domain;
-        goto out;
+    else {
+        if ( unlikely((d = rcu_lock_domain_by_id(dom)) == NULL) )
+        {
+            gdprintk(XENLOG_INFO, "Bad domid %d.\n", dom);
+            op.status = GNTST_bad_domain;
+            goto out;
+        }
+        if ( unlikely(!IS_PRIV_FOR(current->domain, d)) ) {
+            op.status = GNTST_permission_denied;
+            goto setup_unlock_out2;
+        }
     }
 
     if ( xsm_grant_setup(current->domain, d) )
@@ -880,6 +880,7 @@ gnttab_setup_table(
  setup_unlock_out:
     spin_unlock(&d->grant_table->lock);
 
+ setup_unlock_out2:
     rcu_unlock_domain(d);
 
  out:
@@ -910,27 +911,26 @@ gnttab_query_size(
     dom = op.dom;
     if ( dom == DOMID_SELF )
     {
-        dom = current->domain->domain_id;
+        d = current->domain;
     }
-    else if ( unlikely(!IS_PRIV(current->domain)) )
-    {
-        op.status = GNTST_permission_denied;
-        goto query_out;
-    }
-
-    if ( unlikely((d = rcu_lock_domain_by_id(dom)) == NULL) )
-    {
-        gdprintk(XENLOG_INFO, "Bad domid %d.\n", dom);
-        op.status = GNTST_bad_domain;
-        goto query_out;
+    else {
+        if ( unlikely((d = rcu_lock_domain_by_id(dom)) == NULL) )
+        {
+            gdprintk(XENLOG_INFO, "Bad domid %d.\n", dom);
+            op.status = GNTST_bad_domain;
+            goto query_out;
+        }
+        if ( unlikely(!IS_PRIV_FOR(current->domain, d)) ) {
+            op.status = GNTST_permission_denied;
+            goto query_out_unlock;
+        }
     }
 
     rc = xsm_grant_query_size(current->domain, d);
     if ( rc )
     {
-        rcu_unlock_domain(d);
         op.status = GNTST_permission_denied;
-        goto query_out;
+        goto query_out_unlock;
     }
 
     spin_lock(&d->grant_table->lock);
@@ -941,6 +941,8 @@ gnttab_query_size(
 
     spin_unlock(&d->grant_table->lock);
 
+ 
+ query_out_unlock:
     rcu_unlock_domain(d);
 
  query_out:

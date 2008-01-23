@@ -170,6 +170,7 @@ XENAPI_CFG_TYPES = {
     'platform': dict,
     'tools_version': dict,
     'other_config': dict,
+    'target': int,
     'security_label': str,
     'pci': str,
 }
@@ -336,7 +337,8 @@ class XendConfig(dict):
             'vbd_refs': [],
             'vtpm_refs': [],
             'other_config': {},
-            'platform': {}
+            'platform': {},
+            'target': 0,
         }
         
         return defaults
@@ -1584,6 +1586,9 @@ class XendConfig(dict):
 
     def is_hvm(self):
         return self['HVM_boot_policy'] != ''
+
+    def target(self):
+	return self['target']
 
     def image_type(self):
         stored_type = self['platform'].get('image_type')

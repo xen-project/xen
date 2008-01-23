@@ -959,6 +959,7 @@ void __init __start_xen(unsigned long mbi_p)
         panic("Error creating domain 0\n");
 
     dom0->is_privileged = 1;
+    dom0->target = NULL;
 
     /* Grab the DOM0 command line. */
     cmdline = (char *)(mod[0].string ? __va(mod[0].string) : NULL);

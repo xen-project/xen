@@ -502,6 +502,9 @@ static void complete_domain_destroy(struct rcu_head *head)
         if ( (v = d->vcpu[i]) != NULL )
             free_vcpu_struct(v);
 
+    if (d->target)
+        put_domain(d->target);
+
     free_domain(d);
 
     send_guest_global_virq(dom0, VIRQ_DOM_EXC);

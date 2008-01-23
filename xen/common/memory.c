@@ -232,12 +232,17 @@ static long translate_gpfn_list(
         return -EFAULT;
 
     if ( op.domid == DOMID_SELF )
-        op.domid = current->domain->domain_id;
-    else if ( !IS_PRIV(current->domain) )
-        return -EPERM;
+        d = current->domain;
+    else {
+        d = rcu_lock_domain_by_id(op.domid);
+        if ( d == NULL )
+            return -ESRCH;
+        if ( !IS_PRIV_FOR(current->domain, d) ) {
+            rcu_unlock_domain(d);
+            return -EPERM;
+        }
+    }
 
-    if ( (d = rcu_lock_domain_by_id(op.domid)) == NULL )
-        return -ESRCH;
 
     if ( !paging_mode_translate(d) )
     {
@@ -535,9 +540,15 @@ long do_memory_op(unsigned long cmd, XEN_GUEST_HANDLE(void) arg)
 
         if ( likely(reservation.domid == DOMID_SELF) )
             d = current->domain;
-        else if ( !IS_PRIV(current->domain) ||
-                  ((d = rcu_lock_domain_by_id(reservation.domid)) == NULL) )
-            return start_extent;
+        else {
+            d = rcu_lock_domain_by_id(reservation.domid);
+            if ( d == NULL)
+                return start_extent;
+            if ( !IS_PRIV_FOR(current->domain, d) ) {
+                rcu_unlock_domain(d);
+                return start_extent;
+            }
+        }
         args.domain = d;
 
         rc = xsm_memory_adjust_reservation(current->domain, d);
@@ -589,10 +600,15 @@ long do_memory_op(unsigned long cmd, XEN_GUEST_HANDLE(void) arg)
 
         if ( likely(domid == DOMID_SELF) )
             d = current->domain;
-        else if ( !IS_PRIV(current->domain) )
-            return -EPERM;
-        else if ( (d = rcu_lock_domain_by_id(domid)) == NULL )
-            return -ESRCH;
+        else {
+            d = rcu_lock_domain_by_id(domid);
+            if ( d == NULL )
+                return -ESRCH;
+            if ( !IS_PRIV_FOR(current->domain, d) ) {
+                rcu_unlock_domain(d);
+                return -EPERM;
+            }
+        }
 
         rc = xsm_memory_stat_reservation(current->domain, d);
         if ( rc )

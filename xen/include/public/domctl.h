@@ -554,6 +554,17 @@ struct xen_domctl_set_opt_feature {
 typedef struct xen_domctl_set_opt_feature xen_domctl_set_opt_feature_t;
 DEFINE_XEN_GUEST_HANDLE(xen_domctl_set_opt_feature_t);
 
+/*
+ * Set the target domain for a domain
+ */
+#define XEN_DOMCTL_set_target    46
+struct xen_domctl_set_target {
+    domid_t target;
+};
+typedef struct xen_domctl_set_target xen_domctl_set_target_t;
+DEFINE_XEN_GUEST_HANDLE(xen_domctl_set_target_t);
+
+
 struct xen_domctl {
     uint32_t cmd;
     uint32_t interface_version; /* XEN_DOMCTL_INTERFACE_VERSION */
@@ -590,6 +601,7 @@ struct xen_domctl {
         struct xen_domctl_pin_mem_cacheattr pin_mem_cacheattr;
         struct xen_domctl_ext_vcpucontext   ext_vcpucontext;
         struct xen_domctl_set_opt_feature   set_opt_feature;
+        struct xen_domctl_set_target        set_target;
         uint8_t                             pad[128];
     } u;
 };

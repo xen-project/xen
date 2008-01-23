@@ -375,6 +375,7 @@ static void __init __start_xen(void)
     dom0->vcpu[0]->cpu_affinity = cpumask_of_cpu(0);
 
     dom0->is_privileged = 1;
+    dom0->target = NULL;
 
     /* scrub_heap_pages() requires IRQs enabled, and we're post IRQ setup... */
     local_irq_enable();

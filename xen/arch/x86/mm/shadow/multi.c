@@ -993,11 +993,11 @@ shadow_get_page_from_l1e(shadow_l1e_t sl1e, struct domain *d)
     // not own, we let it succeed anyway.
     //
     if ( unlikely(!res) &&
-         IS_PRIV(d) &&
          !shadow_mode_translate(d) &&
          mfn_valid(mfn = shadow_l1e_get_mfn(sl1e)) &&
          (owner = page_get_owner(mfn_to_page(mfn))) &&
-         (d != owner) )
+         (d != owner) &&
+         IS_PRIV_FOR(d, owner))
     {
         res = get_page_from_l1e(sl1e, owner);
         SHADOW_PRINTK("privileged domain %d installs map of mfn %05lx "

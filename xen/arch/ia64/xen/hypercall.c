@@ -500,13 +500,15 @@ do_ia64_debug_op(unsigned long cmd, unsigned long domain,
     struct domain *d;
     long ret = 0;
 
-    if (!IS_PRIV(current->domain))
-        return -EPERM;
     if (copy_from_guest(op, u_debug_op, 1))
         return -EFAULT;
     d = rcu_lock_domain_by_id(domain);
     if (d == NULL)
         return -ESRCH;
+    if (!IS_PRIV_FOR(current->domain, d)) {
+        ret = -EPERM;
+        goto out;
+    }
 
     switch (cmd) {
     case XEN_IA64_DEBUG_OP_SET_FLAGS:
@@ -520,6 +522,7 @@ do_ia64_debug_op(unsigned long cmd, unsigned long domain,
     default:
         ret = -ENOSYS;
     }
+out:
     rcu_unlock_domain(d);
     return ret;
 }

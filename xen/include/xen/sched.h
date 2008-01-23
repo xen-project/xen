@@ -187,6 +187,8 @@ struct domain
     bool_t           is_hvm;
     /* Is this guest fully privileged (aka dom0)? */
     bool_t           is_privileged;
+    /* Which guest this guest has privileges on */
+    struct domain   *target;
     /* Is this guest being debugged by dom0? */
     bool_t           debugger_attached;
     /* Are any VCPUs polling event channels (SCHEDOP_poll)? */
@@ -493,6 +495,7 @@ static inline void vcpu_unblock(struct vcpu *v)
 }
 
 #define IS_PRIV(_d) ((_d)->is_privileged)
+#define IS_PRIV_FOR(_d, _t) (IS_PRIV(_d) || ((_d)->target && (_d)->target == (_t)))
 
 #ifndef IS_COMPAT
 #define IS_COMPAT(d) 0

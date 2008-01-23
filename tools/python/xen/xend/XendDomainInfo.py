@@ -1640,7 +1640,8 @@ class XendDomainInfo:
                 domid = 0,
                 ssidref = ssidref,
                 handle = uuid.fromString(self.info['uuid']),
-                hvm = int(hvm))
+                hvm = int(hvm),
+                target = self.info.target())
         except Exception, e:
             # may get here if due to ACM the operation is not permitted
             if security.on():

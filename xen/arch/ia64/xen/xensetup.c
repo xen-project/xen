@@ -642,6 +642,7 @@ printk("num_online_cpus=%d, max_cpus=%d\n",num_online_cpus(),max_cpus);
         panic("Cannot allocate dom0 vcpu 0\n");
 
     dom0->is_privileged = 1;
+    dom0->target = NULL;
 
     /*
      * We're going to setup domain0 using the module(s) that we stashed safely

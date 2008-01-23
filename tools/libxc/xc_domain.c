@@ -875,6 +875,20 @@ int xc_domain_ioport_mapping(
     return do_domctl(xc_handle, &domctl);
 }
 
+int xc_domain_set_target(
+    int xc_handle,
+    uint32_t domid,
+    uint32_t target)
+{
+    DECLARE_DOMCTL;
+
+    domctl.cmd = XEN_DOMCTL_set_target;
+    domctl.domain = domid;
+    domctl.u.set_target.target = target;
+
+    return do_domctl(xc_handle, &domctl);
+}
+
 /*
  * Local variables:
  * mode: C

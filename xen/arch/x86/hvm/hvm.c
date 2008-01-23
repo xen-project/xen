@@ -1740,15 +1740,16 @@ static int hvmop_set_pci_intx_level(
     if ( copy_from_guest(&op, uop, 1) )
         return -EFAULT;
 
-    if ( !IS_PRIV(current->domain) )
-        return -EPERM;
-
     if ( (op.domain > 0) || (op.bus > 0) || (op.device > 31) || (op.intx > 3) )
         return -EINVAL;
 
     d = rcu_lock_domain_by_id(op.domid);
     if ( d == NULL )
         return -ESRCH;
+
+    rc = -EPERM;
+    if ( !IS_PRIV_FOR(current->domain, d) )
+        goto out;
 
     rc = -EINVAL;
     if ( !is_hvm_domain(d) )
@@ -1787,15 +1788,16 @@ static int hvmop_set_isa_irq_level(
     if ( copy_from_guest(&op, uop, 1) )
         return -EFAULT;
 
-    if ( !IS_PRIV(current->domain) )
-        return -EPERM;
-
     if ( op.isa_irq > 15 )
         return -EINVAL;
 
     d = rcu_lock_domain_by_id(op.domid);
     if ( d == NULL )
         return -ESRCH;
+
+    rc = -EPERM;
+    if ( !IS_PRIV_FOR(current->domain, d) )
+        goto out;
 
     rc = -EINVAL;
     if ( !is_hvm_domain(d) )
@@ -1834,15 +1836,16 @@ static int hvmop_set_pci_link_route(
     if ( copy_from_guest(&op, uop, 1) )
         return -EFAULT;
 
-    if ( !IS_PRIV(current->domain) )
-        return -EPERM;
-
     if ( (op.link > 3) || (op.isa_irq > 15) )
         return -EINVAL;
 
     d = rcu_lock_domain_by_id(op.domid);
     if ( d == NULL )
         return -ESRCH;
+
+    rc = -EPERM;
+    if ( !IS_PRIV_FOR(current->domain, d) )
+        goto out;
 
     rc = -EINVAL;
     if ( !is_hvm_domain(d) )
@@ -1921,13 +1924,16 @@ long do_hvm_op(unsigned long op, XEN_GUEST_HANDLE(void) arg)
 
         if ( a.domid == DOMID_SELF )
             d = rcu_lock_current_domain();
-        else if ( IS_PRIV(current->domain) )
+        else {
             d = rcu_lock_domain_by_id(a.domid);
-        else
-            return -EPERM;
+            if ( d == NULL )
+                return -ESRCH;
+            if ( !IS_PRIV_FOR(current->domain, d) ) {
+                rc = -EPERM;
+                goto param_fail;
+            }
+        }
 
-        if ( d == NULL )
-            return -ESRCH;
 
         rc = -EINVAL;
         if ( !is_hvm_domain(d) )

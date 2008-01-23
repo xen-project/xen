@@ -2056,38 +2056,35 @@ static int set_foreigndom(domid_t domid)
         MEM_LOG("Cannot mix foreign mappings with translated domains");
         okay = 0;
     }
-    else if ( !IS_PRIV(d) )
+    else switch ( domid )
     {
-        switch ( domid )
-        {
-        case DOMID_IO:
-            info->foreign = rcu_lock_domain(dom_io);
-            break;
-        default:
+    case DOMID_IO:
+        info->foreign = rcu_lock_domain(dom_io);
+        break;
+    case DOMID_XEN:
+        if (!IS_PRIV(d)) {
             MEM_LOG("Cannot set foreign dom");
             okay = 0;
             break;
         }
-    }
-    else
-    {
-        info->foreign = e = rcu_lock_domain_by_id(domid);
+        info->foreign = rcu_lock_domain(dom_xen);
+        break;
+    default:
+        e = rcu_lock_domain_by_id(domid);
         if ( e == NULL )
         {
-            switch ( domid )
-            {
-            case DOMID_XEN:
-                info->foreign = rcu_lock_domain(dom_xen);
-                break;
-            case DOMID_IO:
-                info->foreign = rcu_lock_domain(dom_io);
-                break;
-            default:
-                MEM_LOG("Unknown domain '%u'", domid);
-                okay = 0;
-                break;
-            }
+            MEM_LOG("Unknown domain '%u'", domid);
+            okay = 0;
+            break;
         }
+        if (!IS_PRIV_FOR(d, e)) {
+            MEM_LOG("Cannot set foreign dom");
+            okay = 0;
+            rcu_unlock_domain(e);
+            break;
+        }
+        info->foreign = e;
+        break;
     }
 
  out:
@@ -3043,9 +3040,6 @@ int do_update_va_mapping_otherdomain(unsigned long va, u64 val64,
 {
     int rc;
 
-    if ( unlikely(!IS_PRIV(current->domain)) )
-        return -EPERM;
-
     if ( !set_foreigndom(domid) )
         return -ESRCH;
 
@@ -3222,10 +3216,15 @@ long arch_memory_op(int op, XEN_GUEST_HANDLE(void) arg)
 
         if ( xatp.domid == DOMID_SELF )
             d = rcu_lock_current_domain();
-        else if ( !IS_PRIV(current->domain) )
-            return -EPERM;
-        else if ( (d = rcu_lock_domain_by_id(xatp.domid)) == NULL )
-            return -ESRCH;
+        else {
+            d = rcu_lock_domain_by_id(xatp.domid);
+            if ( d == NULL )
+                return -ESRCH;
+            if ( !IS_PRIV_FOR(current->domain, d) ) {
+                rcu_unlock_domain(d);
+                return -EPERM;
+            }
+        }
 
         if ( xsm_add_to_physmap(current->domain, d) )
         {
@@ -3313,10 +3312,15 @@ long arch_memory_op(int op, XEN_GUEST_HANDLE(void) arg)
 
         if ( fmap.domid == DOMID_SELF )
             d = rcu_lock_current_domain();
-        else if ( !IS_PRIV(current->domain) )
-            return -EPERM;
-        else if ( (d = rcu_lock_domain_by_id(fmap.domid)) == NULL )
-            return -ESRCH;
+        else {
+            d = rcu_lock_domain_by_id(fmap.domid);
+            if ( d == NULL )
+                return -ESRCH;
+            if ( !IS_PRIV_FOR(current->domain, d) ) {
+                rcu_unlock_domain(d);
+                return -EPERM;
+            }
+        }
 
         rc = xsm_domain_memory_map(d);
         if ( rc )

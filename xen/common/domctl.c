@@ -182,9 +182,6 @@ long do_domctl(XEN_GUEST_HANDLE(xen_domctl_t) u_domctl)
     struct xen_domctl curop, *op = &curop;
     static DEFINE_SPINLOCK(domctl_lock);
 
-    if ( !IS_PRIV(current->domain) )
-        return -EPERM;
-
     if ( copy_from_guest(op, u_domctl, 1) )
         return -EFAULT;
 
@@ -206,6 +203,10 @@ long do_domctl(XEN_GUEST_HANDLE(xen_domctl_t) u_domctl)
         ret = -ESRCH;
         if ( d == NULL )
             break;
+
+        ret = -EPERM;
+        if ( !IS_PRIV_FOR(current->domain, d) )
+            goto svc_out;
 
         ret = xsm_setvcpucontext(d);
         if ( ret )
@@ -258,6 +259,10 @@ long do_domctl(XEN_GUEST_HANDLE(xen_domctl_t) u_domctl)
         ret = -ESRCH;
         if ( d != NULL )
         {
+            ret = -EPERM;
+            if ( !IS_PRIV_FOR(current->domain, d) )
+                goto pausedomain_out;
+
             ret = xsm_pausedomain(d);
             if ( ret )
                 goto pausedomain_out;
@@ -282,16 +287,18 @@ long do_domctl(XEN_GUEST_HANDLE(xen_domctl_t) u_domctl)
         if ( d == NULL )
             break;
 
+        ret = -EPERM;
+        if ( !IS_PRIV_FOR(current->domain, d) )
+            goto unpausedomain_out;
+
         ret = xsm_unpausedomain(d);
         if ( ret )
-        {
-            rcu_unlock_domain(d);
-            break;
-        }
+            goto unpausedomain_out;
 
         domain_unpause_by_systemcontroller(d);
-        rcu_unlock_domain(d);
         ret = 0;
+unpausedomain_out:
+        rcu_unlock_domain(d);
     }
     break;
 
@@ -303,16 +310,18 @@ long do_domctl(XEN_GUEST_HANDLE(xen_domctl_t) u_domctl)
         if ( d == NULL )
             break;
 
+        ret = -EPERM;
+        if ( !IS_PRIV_FOR(current->domain, d) )
+            goto resumedomain_out;
+
         ret = xsm_resumedomain(d);
         if ( ret )
-        {
-            rcu_unlock_domain(d);
-            break;
-        }
+            goto resumedomain_out;
 
         domain_resume(d);
-        rcu_unlock_domain(d);
         ret = 0;
+resumedomain_out:
+        rcu_unlock_domain(d);
     }
     break;
 
@@ -322,6 +331,10 @@ long do_domctl(XEN_GUEST_HANDLE(xen_domctl_t) u_domctl)
         domid_t        dom;
         static domid_t rover = 0;
         unsigned int domcr_flags;
+
+        ret = -EPERM;
+        if ( !IS_PRIV(current->domain) )
+            break;
 
         ret = -EINVAL;
         if ( supervisor_mode_kernel ||
@@ -385,12 +398,13 @@ long do_domctl(XEN_GUEST_HANDLE(xen_domctl_t) u_domctl)
         if ( (d = rcu_lock_domain_by_id(op->domain)) == NULL )
             break;
 
+        ret = -EPERM;
+        if ( !IS_PRIV_FOR(current->domain, d) )
+            goto maxvcpu_out2;
+
         ret = xsm_max_vcpus(d);
         if ( ret )
-        {
-            rcu_unlock_domain(d);
-            break;
-        }
+            goto maxvcpu_out2;
 
         /* Needed, for example, to ensure writable p.t. state is synced. */
         domain_pause(d);
@@ -418,6 +432,7 @@ long do_domctl(XEN_GUEST_HANDLE(xen_domctl_t) u_domctl)
 
     maxvcpu_out:
         domain_unpause(d);
+    maxvcpu_out2:
         rcu_unlock_domain(d);
     }
     break;
@@ -428,7 +443,9 @@ long do_domctl(XEN_GUEST_HANDLE(xen_domctl_t) u_domctl)
         ret = -ESRCH;
         if ( d != NULL )
         {
-            ret = xsm_destroydomain(d) ? : domain_kill(d);
+            ret = -EPERM;
+            if ( IS_PRIV_FOR(current->domain, d) )
+                ret = xsm_destroydomain(d) ? : domain_kill(d);
             rcu_unlock_domain(d);
         }
     }
@@ -445,6 +462,10 @@ long do_domctl(XEN_GUEST_HANDLE(xen_domctl_t) u_domctl)
         ret = -ESRCH;
         if ( d == NULL )
             break;
+
+        ret = -EPERM;
+        if ( !IS_PRIV_FOR(current->domain, d) )
+            goto vcpuaffinity_out;
 
         ret = xsm_vcpuaffinity(op->cmd, d);
         if ( ret )
@@ -484,6 +505,10 @@ long do_domctl(XEN_GUEST_HANDLE(xen_domctl_t) u_domctl)
         if ( (d = rcu_lock_domain_by_id(op->domain)) == NULL )
             break;
 
+        ret = -EPERM;
+        if ( !IS_PRIV_FOR(current->domain, d) )
+            goto scheduler_op_out;
+
         ret = xsm_scheduler(d);
         if ( ret )
             goto scheduler_op_out;
@@ -505,7 +530,7 @@ long do_domctl(XEN_GUEST_HANDLE(xen_domctl_t) u_domctl)
         rcu_read_lock(&domlist_read_lock);
 
         for_each_domain ( d )
-            if ( d->domain_id >= dom )
+            if ( d->domain_id >= dom && IS_PRIV_FOR(current->domain, d))
                 break;
 
         if ( d == NULL )
@@ -539,6 +564,10 @@ long do_domctl(XEN_GUEST_HANDLE(xen_domctl_t) u_domctl)
         ret = -ESRCH;
         if ( (d = rcu_lock_domain_by_id(op->domain)) == NULL )
             break;
+
+        ret = -EPERM;
+        if ( !IS_PRIV_FOR(current->domain, d) )
+            goto getvcpucontext_out;
 
         ret = xsm_getvcpucontext(d);
         if ( ret )
@@ -600,6 +629,10 @@ long do_domctl(XEN_GUEST_HANDLE(xen_domctl_t) u_domctl)
         if ( (d = rcu_lock_domain_by_id(op->domain)) == NULL )
             break;
 
+        ret = -EPERM;
+        if ( !IS_PRIV_FOR(current->domain, d) )
+            goto getvcpuinfo_out;
+
         ret = xsm_getvcpuinfo(d);
         if ( ret )
             goto getvcpuinfo_out;
@@ -639,6 +672,10 @@ long do_domctl(XEN_GUEST_HANDLE(xen_domctl_t) u_domctl)
         if ( d == NULL )
             break;
 
+        ret = -EPERM;
+        if ( !IS_PRIV_FOR(current->domain, d) )
+            goto max_mem_out;
+
         ret = xsm_setdomainmaxmem(d);
         if ( ret )
             goto max_mem_out;
@@ -655,6 +692,8 @@ long do_domctl(XEN_GUEST_HANDLE(xen_domctl_t) u_domctl)
             d->max_pages = new_max;
             ret = 0;
         }
+        else
+            printk("new max %ld, tot pages %d\n", new_max, d->tot_pages);
         spin_unlock(&d->page_alloc_lock);
 
     max_mem_out:
@@ -671,17 +710,19 @@ long do_domctl(XEN_GUEST_HANDLE(xen_domctl_t) u_domctl)
         if ( d == NULL )
             break;
 
+        ret = -EPERM;
+        if ( !IS_PRIV_FOR(current->domain, d) )
+            goto setdomainhandle_out;
+
         ret = xsm_setdomainhandle(d);
         if ( ret )
-        {
-            rcu_unlock_domain(d);
-            break;
-        }
+            goto setdomainhandle_out;
 
         memcpy(d->handle, op->u.setdomainhandle.handle,
                sizeof(xen_domain_handle_t));
-        rcu_unlock_domain(d);
         ret = 0;
+setdomainhandle_out:
+        rcu_unlock_domain(d);
     }
     break;
 
@@ -694,18 +735,20 @@ long do_domctl(XEN_GUEST_HANDLE(xen_domctl_t) u_domctl)
         if ( d == NULL )
             break;
 
+        ret = -EPERM;
+        if ( !IS_PRIV_FOR(current->domain, d) )
+            goto setdebugging_out;
+
         ret = xsm_setdebugging(d);
         if ( ret )
-        {
-            rcu_unlock_domain(d);
-            break;
-        }
+            goto setdebugging_out;
 
         domain_pause(d);
         d->debugger_attached = !!op->u.setdebugging.enable;
         domain_unpause(d); /* causes guest to latch new status */
-        rcu_unlock_domain(d);
         ret = 0;
+setdebugging_out:
+        rcu_unlock_domain(d);
     }
     break;
 
@@ -722,6 +765,10 @@ long do_domctl(XEN_GUEST_HANDLE(xen_domctl_t) u_domctl)
         d = rcu_lock_domain_by_id(op->domain);
         if ( d == NULL )
             break;
+
+        ret = -EPERM;
+        if ( !IS_PRIV_FOR(current->domain, d) )
+            goto irq_permission_out;
 
         ret = xsm_irq_permission(d, pirq, op->u.irq_permission.allow_access);
         if ( ret )
@@ -752,6 +799,10 @@ long do_domctl(XEN_GUEST_HANDLE(xen_domctl_t) u_domctl)
         if ( d == NULL )
             break;
 
+        ret = -EPERM;
+        if ( !IS_PRIV_FOR(current->domain, d) )
+            goto iomem_permission_out;
+
         ret = xsm_iomem_permission(d, mfn, op->u.iomem_permission.allow_access);
         if ( ret )
             goto iomem_permission_out;
@@ -772,19 +823,61 @@ long do_domctl(XEN_GUEST_HANDLE(xen_domctl_t) u_domctl)
 
         ret = -ESRCH;
         d = rcu_lock_domain_by_id(op->domain);
-        if ( d != NULL )
-        {
-            ret = xsm_domain_settime(d);
-            if ( ret )
-            {
-                rcu_unlock_domain(d);
-                break;
-            }
+        if ( d == NULL )
+            break;
 
-            d->time_offset_seconds = op->u.settimeoffset.time_offset_seconds;
-            rcu_unlock_domain(d);
-            ret = 0;
+        ret = -EPERM;
+        if ( !IS_PRIV_FOR(current->domain, d) )
+            goto settimeoffset_out;
+
+        ret = xsm_domain_settime(d);
+        if ( ret )
+            goto settimeoffset_out;
+
+        d->time_offset_seconds = op->u.settimeoffset.time_offset_seconds;
+
+        ret = 0;
+settimeoffset_out:
+        rcu_unlock_domain(d);
+    }
+    break;
+
+    case XEN_DOMCTL_set_target:
+    {
+        struct domain *d, *e;
+
+        ret = -ESRCH;
+        d = rcu_lock_domain_by_id(op->domain);
+        if ( d == NULL )
+            break;
+
+        ret = -EPERM;
+        if (!IS_PRIV_FOR(current->domain, d))
+            goto set_target_out;
+
+        ret = -ESRCH;
+        e = get_domain_by_id(op->u.set_target.target);
+        if ( e == NULL )
+            goto set_target_out;
+
+        if ( d == e ) {
+            ret = -EINVAL;
+            put_domain(e);
+            goto set_target_out;
         }
+
+        if (!IS_PRIV_FOR(current->domain, e)) {
+            ret = -EPERM;
+            put_domain(e);
+            goto set_target_out;
+        }
+
+        d->target = e;
+        /* and we keep the reference on e, released when destroying d */
+        ret = 0;
+
+set_target_out:
+        rcu_unlock_domain(d);
     }
     break;
 

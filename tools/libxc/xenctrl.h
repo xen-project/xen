@@ -952,4 +952,9 @@ int xc_domain_bind_pt_isa_irq(int xc_handle,
                               uint32_t domid,
                               uint8_t machine_irq);
 
+/* Set the target domain */
+int xc_domain_set_target(int xc_handle,
+                         uint32_t domid,
+                         uint32_t target);
+
 #endif /* XENCTRL_H */

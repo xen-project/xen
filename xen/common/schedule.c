@@ -461,9 +461,6 @@ ret_t do_sched_op(int cmd, XEN_GUEST_HANDLE(void) arg)
         struct domain *d;
         struct sched_remote_shutdown sched_remote_shutdown;
 
-        if ( !IS_PRIV(current->domain) )
-            return -EPERM;
-
         ret = -EFAULT;
         if ( copy_from_guest(&sched_remote_shutdown, arg, 1) )
             break;
@@ -472,6 +469,12 @@ ret_t do_sched_op(int cmd, XEN_GUEST_HANDLE(void) arg)
         d = rcu_lock_domain_by_id(sched_remote_shutdown.domain_id);
         if ( d == NULL )
             break;
+
+        if ( !IS_PRIV_FOR(current->domain, d) )
+        {
+            rcu_unlock_domain(d);
+            return -EPERM;
+        }
 
         ret = xsm_schedop_shutdown(current->domain, d);
         if ( ret )

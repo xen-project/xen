@@ -2787,10 +2787,14 @@ arch_memory_op(int op, XEN_GUEST_HANDLE(void) arg)
 
         if (xatp.domid == DOMID_SELF)
             d = rcu_lock_current_domain();
-        else if (!IS_PRIV(current->domain))
-            return -EPERM;
-        else if ((d = rcu_lock_domain_by_id(xatp.domid)) == NULL)
-            return -ESRCH;
+        else {
+            if ((d = rcu_lock_domain_by_id(xatp.domid)) == NULL)
+                return -ESRCH;
+            if (!IS_PRIV_FOR(current->domain,d)) {
+                rcu_lock_domain(d);
+                return -EPERM;
+            }
+        }
 
         /* This hypercall is used for VT-i domain only */
         if (!VMX_DOMAIN(d->vcpu[0])) {

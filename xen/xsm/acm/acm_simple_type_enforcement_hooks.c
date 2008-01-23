@@ -817,17 +817,19 @@ ste_pre_grant_setup (domid_t id)
         return ACM_ACCESS_PERMITTED;
     }
     atomic_inc(&ste_bin_pol.gt_eval_count);
-    /* a) check authorization (eventually use specific capabilities) */
-    if ( !IS_PRIV(current->domain) )
-    {
-        printk("%s: Grant table management authorization denied ERROR!\n",
-               __func__);
-        return ACM_ACCESS_DENIED;
-    }
-    /* b) check types */
     subj = current->domain;
     obj = rcu_lock_domain_by_id(id);
 
+    /* a) check authorization (eventually use specific capabilities) */
+    if ( obj && !IS_PRIV_FOR(current->domain, obj) )
+    {
+        printk("%s: Grant table management authorization denied ERROR!\n",
+               __func__);
+        rcu_unlock_domain(obj);
+        return ACM_ACCESS_DENIED;
+    }
+
+    /* b) check types */
     if ( share_common_type(subj, obj) )
     {
         cache_result(subj, obj);

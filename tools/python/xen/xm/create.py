@@ -521,6 +521,10 @@ gopts.var('on_xend_stop', val='ignore|shutdown|suspend',
           - suspend:        Domain is suspended;
           """)
 
+gopts.var('target', val='TARGET',
+          fn=set_int, default=0,
+          use="Set domain target.")
+
 def err(msg):
     """Print an error to stderr and exit.
     """
@@ -748,7 +752,7 @@ def make_config(vals):
     map(add_conf, ['name', 'memory', 'maxmem', 'shadow_memory',
                    'restart', 'on_poweroff',
                    'on_reboot', 'on_crash', 'vcpus', 'vcpu_avail', 'features',
-                   'on_xend_start', 'on_xend_stop'])
+                   'on_xend_start', 'on_xend_stop', 'target'])
 
     if vals.uuid is not None:
         config.append(['uuid', vals.uuid])

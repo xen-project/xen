@@ -37,9 +37,6 @@ long arch_do_domctl(xen_domctl_t *op, XEN_GUEST_HANDLE(xen_domctl_t) u_domctl)
 {
     long ret = 0;
 
-    if ( !IS_PRIV(current->domain) )
-        return -EPERM;
-
     switch ( op->cmd )
     {
     case XEN_DOMCTL_getmemlist:
@@ -54,6 +51,13 @@ long arch_do_domctl(xen_domctl_t *op, XEN_GUEST_HANDLE(xen_domctl_t) u_domctl)
             ret = -EINVAL;
             break;
         }
+
+        if ( !IS_PRIV_FOR(current->domain, d) ) {
+            ret = -EPERM;
+            rcu_unlock_domain(d);
+            break;
+        }
+
         for (i = 0 ; i < nr_pages ; i++) {
             pte_t *pte;
 
@@ -84,6 +88,12 @@ long arch_do_domctl(xen_domctl_t *op, XEN_GUEST_HANDLE(xen_domctl_t) u_domctl)
 
         if ( d == NULL) {
             ret = -EINVAL;
+            break;
+        }
+
+        if ( !IS_PRIV_FOR(current->domain, d) ) {
+            ret = -EPERM;
+            rcu_unlock_domain(d);
             break;
         }
 
@@ -153,6 +163,12 @@ long arch_do_domctl(xen_domctl_t *op, XEN_GUEST_HANDLE(xen_domctl_t) u_domctl)
         d = rcu_lock_domain_by_id(op->domain);
         if ( d != NULL )
         {
+            if ( !IS_PRIV_FOR(current->domain, d) ) {
+                ret = -EPERM;
+                rcu_unlock_domain(d);
+                break;
+            }
+
             ret = shadow_mode_control(d, &op->u.shadow_op);
             rcu_unlock_domain(d);
             if (copy_to_guest(u_domctl, op, 1))
@@ -172,6 +188,12 @@ long arch_do_domctl(xen_domctl_t *op, XEN_GUEST_HANDLE(xen_domctl_t) u_domctl)
         d = rcu_lock_domain_by_id(op->domain);
         if (unlikely(d == NULL))
             break;
+
+        if ( !IS_PRIV_FOR(current->domain, d) ) {
+            ret = -EPERM;
+            rcu_unlock_domain(d);
+            break;
+        }
 
         if (np == 0)
             ret = 0;
@@ -195,6 +217,11 @@ long arch_do_domctl(xen_domctl_t *op, XEN_GUEST_HANDLE(xen_domctl_t) u_domctl)
         d = rcu_lock_domain_by_id(op->domain);
         if ( d == NULL )
             break;
+
+        ret = -EPERM;
+        if ( !IS_PRIV_FOR(current->domain, d) ) {
+            goto sendtrigger_out;
+        }
 
         ret = -EINVAL;
         if ( op->u.sendtrigger.vcpu >= MAX_VIRT_CPUS )
@@ -239,6 +266,10 @@ long arch_do_domctl(xen_domctl_t *op, XEN_GUEST_HANDLE(xen_domctl_t) u_domctl)
         if (d == NULL)
             break;
 
+        ret = -EPERM;
+        if ( !IS_PRIV_FOR(current->domain, d) )
+            goto sethvmcontext_out;
+
 #ifdef CONFIG_X86
         ret = xsm_hvmcontext(d, op->cmd);
         if (ret)
@@ -279,6 +310,10 @@ long arch_do_domctl(xen_domctl_t *op, XEN_GUEST_HANDLE(xen_domctl_t) u_domctl)
         d = rcu_lock_domain_by_id(op->domain);
         if (d == NULL)
             break;
+
+        ret = -EPERM;
+        if ( !IS_PRIV_FOR(current->domain, d) )
+            goto gethvmcontext_out;
 
 #ifdef CONFIG_X86
         ret = xsm_hvmcontext(d, op->cmd);
@@ -341,7 +376,10 @@ long arch_do_domctl(xen_domctl_t *op, XEN_GUEST_HANDLE(xen_domctl_t) u_domctl)
             break;
         }
 
-        ret = domain_opt_feature(d, optf);
+        ret = -EPERM;
+        if ( IS_PRIV_FOR(current->domain, d) )
+            ret = domain_opt_feature(d, optf);
+
         rcu_unlock_domain(d);
     }
     break;
