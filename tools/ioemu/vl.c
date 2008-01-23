@@ -7756,8 +7756,7 @@ int main(int argc, char **argv)
 	int vnc_display_port;
 	char password[20];
 	vnc_display_init(ds);
-	if (xenstore_read_vncpasswd(domid, password, sizeof(password)) < 0)
-	    exit(0);
+	xenstore_read_vncpasswd(domid, password, sizeof(password));
 	vnc_display_password(ds, password);
 	if ((vnc_display_port = vnc_display_open(ds, vnc_display, vncunused)) < 0) 
 	    exit (0);

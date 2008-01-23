@@ -489,19 +489,20 @@ void xenstore_write_vncport(int display)
     free(buf);
 }
 
-int xenstore_read_vncpasswd(int domid, char *pwbuf, size_t pwbuflen)
+void xenstore_read_vncpasswd(int domid, char *pwbuf, size_t pwbuflen)
 {
     char *buf = NULL, *path, *uuid = NULL, *passwd = NULL;
     unsigned int i, len, rc = 0;
 
-    if (xsh == NULL) {
-        return -1;
-    }
+    pwbuf[0] = '\0';
+
+    if (xsh == NULL)
+        return;
 
     path = xs_get_domain_path(xsh, domid);
     if (path == NULL) {
         fprintf(logfile, "xs_get_domain_path() error. domid %d.\n", domid);
-        return -1;
+        return;
     }
 
     pasprintf(&buf, "%s/vm", path);
@@ -509,35 +510,29 @@ int xenstore_read_vncpasswd(int domid, char *pwbuf, size_t pwbuflen)
     if (uuid == NULL) {
         fprintf(logfile, "xs_read(): uuid get error. %s.\n", buf);
         free(path);
-        return -1;
+        return;
     }
 
     pasprintf(&buf, "%s/vncpasswd", uuid);
     passwd = xs_read(xsh, XBT_NULL, buf, &len);
     if (passwd == NULL) {
         fprintf(logfile, "xs_read(): vncpasswd get error. %s.\n", buf);
-        pwbuf[0] = '\0';
         free(uuid);
         free(path);
-        return rc;
+        return;
     }
 
-    for (i=0; i<len && i<pwbuflen; i++) {
+    for (i=0; i<len && i<pwbuflen; i++)
         pwbuf[i] = passwd[i];
-    }
     pwbuf[len < (pwbuflen-1) ? len : (pwbuflen-1)] = '\0';
     passwd[0] = '\0';
     pasprintf(&buf, "%s/vncpasswd", uuid);
-    if (xs_write(xsh, XBT_NULL, buf, passwd, len) == 0) {
+    if (xs_write(xsh, XBT_NULL, buf, passwd, len) == 0)
         fprintf(logfile, "xs_write() vncpasswd failed.\n");
-        rc = -1;
-    }
 
     free(passwd);
     free(uuid);
     free(path);
-
-    return rc;
 }
 
 

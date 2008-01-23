@@ -1463,7 +1463,7 @@ void xenstore_process_event(void *opaque);
 void xenstore_record_dm_state(char *state);
 void xenstore_check_new_media_present(int timeout);
 void xenstore_write_vncport(int vnc_display);
-int xenstore_read_vncpasswd(int domid, char *pwbuf, size_t pwbuflen);
+void xenstore_read_vncpasswd(int domid, char *pwbuf, size_t pwbuflen);
 
 int xenstore_domain_has_devtype(struct xs_handle *handle,
                                 const char *devtype);
