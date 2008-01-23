@@ -85,6 +85,7 @@ void xenstore_parse_domain_config(int domid)
         *dev = NULL, *params = NULL, *type = NULL, *drv = NULL;
     int i, is_scsi, is_hdN = 0;
     unsigned int len, num, hd_index;
+    BlockDriverState *bs;
 
     for(i = 0; i < MAX_DISKS + MAX_SCSI_DISKS; i++)
         media_filename[i] = NULL;
@@ -209,17 +210,17 @@ void xenstore_parse_domain_config(int domid)
             }
         }
 
-        bs_table[hd_index + (is_scsi ? MAX_DISKS : 0)] = bdrv_new(dev);
+        bs = bs_table[hd_index + (is_scsi ? MAX_DISKS : 0)] = bdrv_new(dev);
         /* check if it is a cdrom */
         if (type && !strcmp(type, "cdrom")) {
-            bdrv_set_type_hint(bs_table[hd_index], BDRV_TYPE_CDROM);
+            bdrv_set_type_hint(bs, BDRV_TYPE_CDROM);
             if (pasprintf(&buf, "%s/params", bpath) != -1)
                 xs_watch(xsh, buf, dev);
         }
+
         /* open device now if media present */
         if (params[0]) {
-            if (bdrv_open(bs_table[hd_index + (is_scsi ? MAX_DISKS : 0)],
-                          params, 0 /* snapshot */) < 0)
+            if (bdrv_open(bs, params, 0 /* snapshot */) < 0)
                 fprintf(stderr, "qemu: could not open hard disk image '%s'\n",
                         params);
         }
