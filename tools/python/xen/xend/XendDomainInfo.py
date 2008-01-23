@@ -47,7 +47,7 @@ from xen.xend.XendError import XendError, VmError
 from xen.xend.XendDevices import XendDevices
 from xen.xend.XendTask import XendTask
 from xen.xend.xenstore.xstransact import xstransact, complete
-from xen.xend.xenstore.xsutil import GetDomainPath, IntroduceDomain, ResumeDomain
+from xen.xend.xenstore.xsutil import GetDomainPath, IntroduceDomain, SetTarget, ResumeDomain
 from xen.xend.xenstore.xswatch import xswatch
 from xen.xend.XendConstants import *
 from xen.xend.XendAPIConstants import *
@@ -883,6 +883,9 @@ class XendDomainInfo:
     def storeVm(self, *args):
         return xstransact.Store(self.vmpath, *args)
 
+    def permissionsVm(self, *args):
+        return xstransact.SetPermissions(self.vmpath, *args)
+
 
     def _readVmTxn(self, transaction,  *args):
         paths = map(lambda x: self.vmpath + "/" + x, args)
@@ -903,6 +906,10 @@ class XendDomainInfo:
     def storeVmTxn(self, transaction,  *args):
         paths = map(lambda x: self.vmpath + "/" + x, args)
         return transaction.store(*paths)
+
+    def permissionsVmTxn(self, transaction,  *args):
+        paths = map(lambda x: self.vmpath + "/" + x, args)
+        return transaction.set_permissions(*paths)
 
     #
     # Function to update xenstore /dom/*
@@ -1692,6 +1699,15 @@ class XendDomainInfo:
         except RuntimeError, exn:
             raise XendError(str(exn))
 
+    def _setTarget(self, target):
+        assert self.domid is not None
+
+        try:
+            SetTarget(self.domid, target)
+            self.storeDom('target', target)
+        except RuntimeError, exn:
+            raise XendError(str(exn))
+
 
     def _initDomain(self):
         log.debug('XendDomainInfo.initDomain: %s %s',
@@ -1756,6 +1772,8 @@ class XendDomainInfo:
                 self.native_protocol = channel_details['native_protocol'];
 
             self._introduceDomain()
+            if self.info.target():
+                self._setTarget(self.info.target())
 
             self._createDevices()
 

@@ -34,6 +34,9 @@ void do_release(struct connection *conn, const char *domid_str);
 /* domid */
 void do_resume(struct connection *conn, const char *domid_str);
 
+/* domid, target */
+void do_set_target(struct connection *conn, struct buffered_data *in);
+
 /* domid */
 void do_get_domain_path(struct connection *conn, const char *domid_str);
 

@@ -708,6 +708,25 @@ bool xs_introduce_domain(struct xs_handle *h,
 				ARRAY_SIZE(iov), NULL));
 }
 
+bool xs_set_target(struct xs_handle *h,
+			 unsigned int domid, unsigned int target)
+{
+	char domid_str[MAX_STRLEN(domid)];
+	char target_str[MAX_STRLEN(target)];
+	struct iovec iov[2];
+
+	snprintf(domid_str, sizeof(domid_str), "%u", domid);
+	snprintf(target_str, sizeof(target_str), "%u", target);
+
+	iov[0].iov_base = domid_str;
+	iov[0].iov_len = strlen(domid_str) + 1;
+	iov[1].iov_base = target_str;
+	iov[1].iov_len = strlen(target_str) + 1;
+
+	return xs_bool(xs_talkv(h, XBT_NULL, XS_SET_TARGET, iov,
+				ARRAY_SIZE(iov), NULL));
+}
+
 static void * single_with_domid(struct xs_handle *h,
 				enum xsd_sockmsg_type type,
 				unsigned int domid)

@@ -619,6 +619,36 @@ static PyObject *xspy_introduce_domain(XsHandle *self, PyObject *args)
     return none(result);
 }
 
+#define xspy_set_target_doc "\n"					\
+        "Tell xenstore that a domain is targetting another one so it\n" \
+        "should let it tinker with it.\n"	                        \
+	" dom    [int]   : domain id\n"					\
+	" target [int]   : domain id of the target\n"			\
+	"\n"								\
+	"Returns None on success.\n"					\
+	"Raises xen.lowlevel.xs.Error on error.\n"			\
+	"\n"
+
+static PyObject *xspy_set_target(XsHandle *self, PyObject *args)
+{
+    uint32_t dom;
+    uint32_t target;
+
+    struct xs_handle *xh = xshandle(self);
+    bool result = 0;
+
+    if (!xh)
+        return NULL;
+    if (!PyArg_ParseTuple(args, "ii", &dom, &target))
+        return NULL;
+
+    Py_BEGIN_ALLOW_THREADS
+    result = xs_set_target(xh, dom, target);
+    Py_END_ALLOW_THREADS
+
+    return none(result);
+}
+
 #define xspy_resume_domain_doc "\n"                                \
 	"Tell xenstore to clear its shutdown flag for a domain.\n" \
 	"This ensures that a subsequent shutdown will fire the\n"  \
@@ -817,6 +847,7 @@ static PyMethodDef xshandle_methods[] = {
     XSPY_METH(transaction_start, METH_NOARGS),
     XSPY_METH(transaction_end,   METH_VARARGS | METH_KEYWORDS),
     XSPY_METH(introduce_domain,  METH_VARARGS),
+    XSPY_METH(set_target,        METH_VARARGS),
     XSPY_METH(resume_domain,     METH_VARARGS),
     XSPY_METH(release_domain,    METH_VARARGS),
     XSPY_METH(close,             METH_NOARGS),

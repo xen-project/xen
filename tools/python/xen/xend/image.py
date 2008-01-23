@@ -222,6 +222,7 @@ class ImageHandler:
             vncopts = ""
             if passwd:
                 self.vm.storeVm("vncpasswd", passwd)
+                self.vm.permissionsVm("vncpasswd", { 'dom': self.vm.getDomid(), 'read': True } )
                 vncopts = vncopts + ",password"
                 log.debug("Stored a VNC password for vfb access")
             else:
@@ -280,6 +281,9 @@ class ImageHandler:
             env['XAUTHORITY'] = self.xauthority
         if self.vncconsole:
             args = args + ([ "-vncviewer" ])
+        xstransact.Mkdir("/local/domain/0/device-model/%i" % self.vm.getDomid())
+        xstransact.SetPermissions("/local/domain/0/device-model/%i" % self.vm.getDomid(),
+                        { 'dom': self.vm.getDomid(), 'read': True, 'write': True })
         log.info("spawning device models: %s %s", self.device_model, args)
         # keep track of pid and spawned options to kill it later
         self.pid = os.spawnve(os.P_NOWAIT, self.device_model, args, env)
@@ -422,7 +426,9 @@ class HVMImageHandler(ImageHandler):
         self.vm.storeVm(("image/dmargs", " ".join(self.dmargs)),
                         ("image/device-model", self.device_model),
                         ("image/display", self.display))
+        self.vm.permissionsVm("image/dmargs", { 'dom': self.vm.getDomid(), 'read': True } )
         self.vm.storeVm(("rtc/timeoffset", rtc_timeoffset))
+        self.vm.permissionsVm("rtc/timeoffset", { 'dom': self.vm.getDomid(), 'read': True } )
 
         self.apic = int(vmConfig['platform'].get('apic', 0))
         self.acpi = int(vmConfig['platform'].get('acpi', 0))

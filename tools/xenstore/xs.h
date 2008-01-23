@@ -132,6 +132,15 @@ bool xs_introduce_domain(struct xs_handle *h,
 			 unsigned int domid,
 			 unsigned long mfn,
                          unsigned int eventchn); 
+
+/* Set the target of a domain
+ * This tells the store daemon that a domain is targetting another one, so
+ * it should let it tinker with it.
+ */
+bool xs_set_target(struct xs_handle *h,
+		   unsigned int domid,
+		   unsigned int target);
+
 /* Resume a domain.
  * Clear the shutdown flag for this domain in the store.
  */

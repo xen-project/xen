@@ -22,6 +22,9 @@ def xshandle():
 def IntroduceDomain(domid, page, port):
     return xshandle().introduce_domain(domid, page, port)
 
+def SetTarget(domid, target):
+    return xshandle().set_target(domid, target)
+
 def GetDomainPath(domid):
     return xshandle().get_domain_path(domid)
 

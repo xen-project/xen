@@ -46,7 +46,8 @@ enum xsd_sockmsg_type
     XS_WATCH_EVENT,
     XS_ERROR,
     XS_IS_DOMAIN_INTRODUCED,
-    XS_RESUME
+    XS_RESUME,
+    XS_SET_TARGET
 };
 
 #define XS_WRITE_NONE "NONE"

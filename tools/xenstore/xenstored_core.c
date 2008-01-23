@@ -119,6 +119,7 @@ static char *sockmsg_string(enum xsd_sockmsg_type type)
 	case XS_ERROR: return "ERROR";
 	case XS_IS_DOMAIN_INTRODUCED: return "XS_IS_DOMAIN_INTRODUCED";
 	case XS_RESUME: return "RESUME";
+	case XS_SET_TARGET: return "SET_TARGET";
 	default:
 		return "**UNKNOWN**";
 	}
@@ -283,6 +284,8 @@ static int destroy_conn(void *_conn)
 				break;
 		close(conn->fd);
 	}
+        if (conn->target)
+                talloc_unlink(conn, conn->target);
 	list_del(&conn->list);
 	trace_destroy(conn, "connection");
 	return 0;
@@ -472,11 +475,13 @@ static enum xs_perm_type perm_for_conn(struct connection *conn,
 		mask &= ~XS_PERM_WRITE;
 
 	/* Owners and tools get it all... */
-	if (!conn->id || perms[0].id == conn->id)
+	if (!conn->id || perms[0].id == conn->id
+                || (conn->target && perms[0].id == conn->target->id))
 		return (XS_PERM_READ|XS_PERM_WRITE|XS_PERM_OWNER) & mask;
 
 	for (i = 1; i < num; i++)
-		if (perms[i].id == conn->id)
+		if (perms[i].id == conn->id
+                        || (conn->target && perms[i].id == conn->target->id))
 			return perms[i].perms & mask;
 
 	return perms[0].perms & mask;
@@ -1243,6 +1248,10 @@ static void process_message(struct connection *conn, struct buffered_data *in)
 
 	case XS_RESUME:
 		do_resume(conn, onearg(in));
+		break;
+
+	case XS_SET_TARGET:
+		do_set_target(conn, in);
 		break;
 
 	default:

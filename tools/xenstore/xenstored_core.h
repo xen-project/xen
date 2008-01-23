@@ -84,6 +84,9 @@ struct connection
 	/* The domain I'm associated with, if any. */
 	struct domain *domain;
 
+        /* The target of the domain I'm associated with. */
+        struct connection *target;
+
 	/* My watches. */
 	struct list_head watches;
 

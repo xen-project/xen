@@ -381,6 +381,51 @@ void do_introduce(struct connection *conn, struct buffered_data *in)
 	send_ack(conn, XS_INTRODUCE);
 }
 
+void do_set_target(struct connection *conn, struct buffered_data *in)
+{
+	char *vec[2];
+	unsigned int domid, tdomid;
+        struct domain *domain, *tdomain;
+	if (get_strings(in, vec, ARRAY_SIZE(vec)) < ARRAY_SIZE(vec)) {
+		send_error(conn, EINVAL);
+		return;
+	}
+
+	if (conn->id != 0 || !conn->can_write) {
+		send_error(conn, EACCES);
+		return;
+	}
+
+	domid = atoi(vec[0]);
+	tdomid = atoi(vec[1]);
+
+        domain = find_domain_by_domid(domid);
+	if (!domain) {
+		send_error(conn, ENOENT);
+		return;
+	}
+        if (!domain->conn) {
+		send_error(conn, EINVAL);
+		return;
+	}
+
+        tdomain = find_domain_by_domid(tdomid);
+	if (!tdomain) {
+		send_error(conn, ENOENT);
+		return;
+	}
+
+        if (!tdomain->conn) {
+		send_error(conn, EINVAL);
+		return;
+	}
+
+        talloc_reference(domain->conn, tdomain->conn);
+        domain->conn->target = tdomain->conn;
+
+	send_ack(conn, XS_SET_TARGET);
+}
+
 /* domid */
 void do_release(struct connection *conn, const char *domid_str)
 {
