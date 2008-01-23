@@ -1,7 +1,7 @@
 #!/bin/sh
 # CHECK-BUILD
 
-. funcs.sh
+. ./funcs.sh
 
 has_header X11/keysymdef.h || \
 has_header /usr/X11R6/include/X11/keysymdef.h || \

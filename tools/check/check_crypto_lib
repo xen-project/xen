@@ -1,7 +1,7 @@
 #!/bin/sh
 # CHECK-BUILD CHECK-INSTALL
 
-. funcs.sh
+. ./funcs.sh
 
 case $OS in
 FreeBSD|NetBSD|OpenBSD)
