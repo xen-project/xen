@@ -414,7 +414,7 @@ int iomem_index(target_phys_addr_t addr)
 #if defined(__i386__) || defined(__x86_64__)
 #define phys_ram_addr(x) (qemu_map_cache(x))
 #elif defined(__ia64__)
-#define phys_ram_addr(x) ((addr < ram_size) ? (phys_ram_base + (x)) : NULL)
+#define phys_ram_addr(x) (((x) < ram_size) ? (phys_ram_base + (x)) : NULL)
 #endif
 
 extern unsigned long *logdirty_bitmap;
