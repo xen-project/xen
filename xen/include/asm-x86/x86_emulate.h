@@ -340,6 +340,10 @@ struct x86_emulate_ops
         uint8_t vector,
         uint8_t insn_len,
         struct x86_emulate_ctxt *ctxt);
+
+    /* load_fpu_ctxt: Load emulated environment's FPU state onto processor. */
+    void (*load_fpu_ctxt)(
+        struct x86_emulate_ctxt *ctxt);
 };
 
 struct cpu_user_regs;

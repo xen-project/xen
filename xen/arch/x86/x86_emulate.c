@@ -159,7 +159,7 @@ static uint8_t opcode_table[256] = {
     ByteOp|DstMem|SrcImplicit|ModRM, DstMem|SrcImplicit|ModRM, 
     ImplicitOps, ImplicitOps, ImplicitOps, ImplicitOps,
     /* 0xD8 - 0xDF */
-    0, 0, 0, 0, 0, 0, 0, 0,
+    0, ImplicitOps|ModRM, 0, ImplicitOps|ModRM, 0, ImplicitOps|ModRM, 0, 0,
     /* 0xE0 - 0xE7 */
     ImplicitOps, ImplicitOps, ImplicitOps, ImplicitOps,
     ImplicitOps, ImplicitOps, ImplicitOps, ImplicitOps,
@@ -864,7 +864,7 @@ x86_emulate(
     struct cpu_user_regs _regs = *ctxt->regs;
 
     uint8_t b, d, sib, sib_index, sib_base, twobyte = 0, rex_prefix = 0;
-    uint8_t modrm, modrm_mod = 0, modrm_reg = 0, modrm_rm = 0;
+    uint8_t modrm = 0, modrm_mod = 0, modrm_reg = 0, modrm_rm = 0;
     unsigned int op_bytes, def_op_bytes, ad_bytes, def_ad_bytes;
 #define REPE_PREFIX  1
 #define REPNE_PREFIX 2
@@ -2516,6 +2516,36 @@ x86_emulate(
         *(uint8_t *)&_regs.eax = al;
         break;
     }
+
+    case 0xd9: /* FPU 0xd9 */
+        fail_if(ops->load_fpu_ctxt == NULL);
+        ops->load_fpu_ctxt(ctxt);
+        fail_if((modrm_reg & 7) != 7);
+        fail_if(modrm_reg >= 0xc0);
+        /* fnstcw m2byte */
+        ea.bytes = 2;
+        dst = ea;
+        asm volatile ( "fnstcw %0" : "=m" (dst.val) );
+        break;
+
+    case 0xdb: /* FPU 0xdb */
+        fail_if(ops->load_fpu_ctxt == NULL);
+        ops->load_fpu_ctxt(ctxt);
+        fail_if(modrm != 0xe3);
+        /* fninit */
+        asm volatile ( "fninit" );
+        break;
+
+    case 0xdd: /* FPU 0xdd */
+        fail_if(ops->load_fpu_ctxt == NULL);
+        ops->load_fpu_ctxt(ctxt);
+        fail_if((modrm_reg & 7) != 7);
+        fail_if(modrm_reg >= 0xc0);
+        /* fnstsw m2byte */
+        ea.bytes = 2;
+        dst = ea;
+        asm volatile ( "fnstsw %0" : "=m" (dst.val) );
+        break;
 
     case 0xe0 ... 0xe2: /* loop{,z,nz} */ {
         int rel = insn_fetch_type(int8_t);
