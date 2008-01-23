@@ -33,6 +33,7 @@ void vmx_intr_assist(void);
 void vmx_do_resume(struct vcpu *);
 void set_guest_time(struct vcpu *v, u64 gtime);
 void vmx_vlapic_msr_changed(struct vcpu *v);
+void vmx_do_no_device_fault(void);
 void vmx_cpuid_intercept(
     unsigned int *eax, unsigned int *ebx,
     unsigned int *ecx, unsigned int *edx);

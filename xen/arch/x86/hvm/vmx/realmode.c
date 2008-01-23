@@ -473,6 +473,13 @@ static int realmode_inject_sw_interrupt(
     return X86EMUL_OKAY;
 }
 
+static void realmode_load_fpu_ctxt(
+    struct x86_emulate_ctxt *ctxt)
+{
+    if ( !current->fpu_dirtied )
+        vmx_do_no_device_fault();
+}
+
 static struct x86_emulate_ops realmode_emulator_ops = {
     .read          = realmode_emulate_read,
     .insn_fetch    = realmode_emulate_insn_fetch,
@@ -491,7 +498,8 @@ static struct x86_emulate_ops realmode_emulator_ops = {
     .cpuid         = realmode_cpuid,
     .hlt           = realmode_hlt,
     .inject_hw_exception = realmode_inject_hw_exception,
-    .inject_sw_interrupt = realmode_inject_sw_interrupt
+    .inject_sw_interrupt = realmode_inject_sw_interrupt,
+    .load_fpu_ctxt = realmode_load_fpu_ctxt
 };
 
 void vmx_realmode(struct cpu_user_regs *regs)

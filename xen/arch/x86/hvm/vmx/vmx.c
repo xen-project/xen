@@ -1214,7 +1214,7 @@ static void __update_guest_eip(unsigned long inst_len)
         vmx_inject_exception(TRAP_debug, HVM_DELIVER_NO_ERROR_CODE, 0);
 }
 
-static void vmx_do_no_device_fault(void)
+void vmx_do_no_device_fault(void)
 {
     struct vcpu *v = current;
 
