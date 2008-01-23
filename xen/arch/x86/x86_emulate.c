@@ -177,7 +177,7 @@ static uint8_t opcode_table[256] = {
 
 static uint8_t twobyte_table[256] = {
     /* 0x00 - 0x07 */
-    0, ImplicitOps|ModRM, 0, 0, 0, ImplicitOps, 0, 0,
+    0, ImplicitOps|ModRM, 0, 0, 0, 0, ImplicitOps, 0,
     /* 0x08 - 0x0F */
     ImplicitOps, ImplicitOps, 0, 0, 0, ImplicitOps|ModRM, 0, 0,
     /* 0x10 - 0x17 */
