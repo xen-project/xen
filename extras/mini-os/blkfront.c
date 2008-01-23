@@ -275,7 +275,7 @@ void blkfront_aio(struct blkfront_aiocb *aiocbp, int write)
     for (j = 0; j < n; j++) {
 	uintptr_t data = start + j * PAGE_SIZE;
 	aiocbp->gref[j] = req->seg[j].gref =
-            gnttab_grant_access(0, virt_to_mfn(data), write);
+            gnttab_grant_access(0, virtual_to_mfn(data), write);
 	req->seg[j].first_sect = 0;
 	req->seg[j].last_sect = PAGE_SIZE / dev->sector_size - 1;
     }
