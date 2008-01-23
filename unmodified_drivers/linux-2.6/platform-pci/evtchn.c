@@ -118,8 +118,8 @@ void unmask_evtchn(int port)
 	   ever bind event channels to vcpu 0 in HVM guests. */
 	if (unlikely(cpu != 0)) {
 		evtchn_unmask_t op = { .port = port };
-		(void)HYPERVISOR_event_channel_op(EVTCHNOP_unmask,
-						  &op);
+		VOID(HYPERVISOR_event_channel_op(EVTCHNOP_unmask,
+						 &op));
 		put_cpu();
 		return;
 	}
@@ -227,7 +227,8 @@ void unbind_from_irqhandler(unsigned int irq, void *dev_id)
 		mask_evtchn(evtchn);
 		if (irq_evtchn[irq].close) {
 			struct evtchn_close close = { .port = evtchn };
-			HYPERVISOR_event_channel_op(EVTCHNOP_close, &close);
+			if (HYPERVISOR_event_channel_op(EVTCHNOP_close, &close))
+				BUG();
 		}
 	}
 
@@ -310,7 +311,7 @@ static irqreturn_t evtchn_interrupt(int irq, void *dev_id
 
 void force_evtchn_callback(void)
 {
-	(void)HYPERVISOR_xen_version(0, NULL);
+	VOID(HYPERVISOR_xen_version(0, NULL));
 }
 EXPORT_SYMBOL(force_evtchn_callback);
 

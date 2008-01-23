@@ -58,7 +58,7 @@ static int bp_suspend(void)
 
 	BUG_ON(!irqs_disabled());
 
-	suspend_cancelled = HYPERVISOR_shutdown(SHUTDOWN_suspend);
+	suspend_cancelled = HYPERVISOR_suspend(0);
 
 	if (!suspend_cancelled) {
 		write_lock(&suspend_lock);
