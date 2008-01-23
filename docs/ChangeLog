@@ -16,6 +16,18 @@ http://lists.xensource.com/archives/html/xen-devel/2008-01/msg00010.html
 Xen 3.3 release
 ---------------
 
+16857: XS_SET_TARGET
+http://xenbits.xensource.com/xen-unstable.hg?rev/26fc953a89bb
+
+New xenstore command to allow an arbitrary domain to inherit the
+privileges of another (in addition to its own).
+
+16856: XEN_DOMCTL_set_target
+http://xenbits.xensource.com/xen-unstable.hg?rev/cff4c8a1aa28
+
+New domctl command to give an arbitrary domain dom0-magnitude privileges
+over an arbitrary other.
+
 16725: XENFEAT_mmu_pt_update_reserve_ad
 http://xenbits.xensource.com/xen-unstable.hg?rev/847bc9b19c48
 
