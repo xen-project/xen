@@ -366,93 +366,106 @@ void mem_test(unsigned long *start_add, unsigned long *end_add)
 
 }
 
-static pgentry_t *demand_map_pgt;
-static void *demand_map_area_start;
-#define DEMAND_MAP_PAGES 1024
-
-void arch_init_demand_mapping_area(unsigned long max_pfn)
+static pgentry_t *get_pgt(unsigned long addr)
 {
     unsigned long mfn;
     pgentry_t *tab;
-    unsigned long start_addr;
-    unsigned long pt_pfn;
     unsigned offset;
-
-    /* Round up to four megs.  + 1024 rather than + 1023 since we want
-       to be sure we don't end up in the same place we started. */
-    max_pfn = (max_pfn + L1_PAGETABLE_ENTRIES) & ~(L1_PAGETABLE_ENTRIES - 1);
-    if (max_pfn == 0 ||
-            (unsigned long)pfn_to_virt(max_pfn + L1_PAGETABLE_ENTRIES) >=
-            HYPERVISOR_VIRT_START) {
-        printk("Too much memory; no room for demand map hole.\n");
-        do_exit();
-    }
-
-    demand_map_area_start = pfn_to_virt(max_pfn);
-    printk("Demand map pfns start at %lx (%p).\n", max_pfn,
-            demand_map_area_start);
-    start_addr = (unsigned long)demand_map_area_start;
 
     tab = (pgentry_t *)start_info.pt_base;
     mfn = virt_to_mfn(start_info.pt_base);
-    pt_pfn = virt_to_pfn(alloc_page());
 
 #if defined(__x86_64__)
-    offset = l4_table_offset(start_addr);
-    if (!(tab[offset] & _PAGE_PRESENT)) {
-        new_pt_frame(&pt_pfn, mfn, offset, L3_FRAME);
-        pt_pfn = virt_to_pfn(alloc_page());
-    }
-    ASSERT(tab[offset] & _PAGE_PRESENT);
+    offset = l4_table_offset(addr);
+    if (!(tab[offset] & _PAGE_PRESENT))
+        return NULL;
     mfn = pte_to_mfn(tab[offset]);
-    tab = to_virt(mfn_to_pfn(mfn) << PAGE_SHIFT);
+    tab = mfn_to_virt(mfn);
 #endif
 #if defined(__x86_64__) || defined(CONFIG_X86_PAE)
-    offset = l3_table_offset(start_addr);
+    offset = l3_table_offset(addr);
+    if (!(tab[offset] & _PAGE_PRESENT))
+        return NULL;
+    mfn = pte_to_mfn(tab[offset]);
+    tab = mfn_to_virt(mfn);
+#endif
+    offset = l2_table_offset(addr);
+    if (!(tab[offset] & _PAGE_PRESENT))
+        return NULL;
+    mfn = pte_to_mfn(tab[offset]);
+    tab = mfn_to_virt(mfn);
+    offset = l1_table_offset(addr);
+    return &tab[offset];
+}
+
+static pgentry_t *need_pgt(unsigned long addr)
+{
+    unsigned long mfn;
+    pgentry_t *tab;
+    unsigned long pt_pfn;
+    unsigned offset;
+
+    tab = (pgentry_t *)start_info.pt_base;
+    mfn = virt_to_mfn(start_info.pt_base);
+
+#if defined(__x86_64__)
+    offset = l4_table_offset(addr);
     if (!(tab[offset] & _PAGE_PRESENT)) {
-        new_pt_frame(&pt_pfn, mfn, offset, L2_FRAME);
         pt_pfn = virt_to_pfn(alloc_page());
+        new_pt_frame(&pt_pfn, mfn, offset, L3_FRAME);
     }
     ASSERT(tab[offset] & _PAGE_PRESENT);
     mfn = pte_to_mfn(tab[offset]);
-    tab = to_virt(mfn_to_pfn(mfn) << PAGE_SHIFT);
+    tab = mfn_to_virt(mfn);
 #endif
-    offset = l2_table_offset(start_addr);
-    if (tab[offset] & _PAGE_PRESENT) {
-        printk("Demand map area already has a page table covering it?\n");
-        BUG();
+#if defined(__x86_64__) || defined(CONFIG_X86_PAE)
+    offset = l3_table_offset(addr);
+    if (!(tab[offset] & _PAGE_PRESENT)) {
+        pt_pfn = virt_to_pfn(alloc_page());
+        new_pt_frame(&pt_pfn, mfn, offset, L2_FRAME);
     }
-    demand_map_pgt = pfn_to_virt(pt_pfn);
-    new_pt_frame(&pt_pfn, mfn, offset, L1_FRAME);
     ASSERT(tab[offset] & _PAGE_PRESENT);
-    printk("Initialised demand area.\n");
+    mfn = pte_to_mfn(tab[offset]);
+    tab = mfn_to_virt(mfn);
+#endif
+    offset = l2_table_offset(addr);
+    if (!(tab[offset] & _PAGE_PRESENT)) {
+        pt_pfn = virt_to_pfn(alloc_page());
+	new_pt_frame(&pt_pfn, mfn, offset, L1_FRAME);
+    }
+    ASSERT(tab[offset] & _PAGE_PRESENT);
+    mfn = pte_to_mfn(tab[offset]);
+    tab = mfn_to_virt(mfn);
+
+    offset = l1_table_offset(addr);
+    return &tab[offset];
+}
+
+static unsigned long demand_map_area_start;
+#ifdef __x86_64__
+#define DEMAND_MAP_PAGES ((128ULL << 30) / PAGE_SIZE)
+#else
+#define DEMAND_MAP_PAGES ((2ULL << 30) / PAGE_SIZE)
+#endif
+
+void arch_init_demand_mapping_area(unsigned long cur_pfn)
+{
+    cur_pfn++;
+
+    demand_map_area_start = (unsigned long) pfn_to_virt(cur_pfn);
+    cur_pfn += DEMAND_MAP_PAGES;
+    printk("Demand map pfns at %lx-%lx.\n", demand_map_area_start, pfn_to_virt(cur_pfn));
 }
 
 #define MAP_BATCH ((STACK_SIZE / 2) / sizeof(mmu_update_t))
-
-void *map_frames_ex(unsigned long *f, unsigned long n, unsigned long stride,
-	unsigned long increment, unsigned long alignment, domid_t id,
-	int may_fail, unsigned long prot)
+void do_map_frames(unsigned long addr,
+        unsigned long *f, unsigned long n, unsigned long stride,
+	unsigned long increment, domid_t id, int may_fail, unsigned long prot)
 {
-    unsigned long x;
-    unsigned long y = 0;
-    int rc;
+    pgentry_t *pgt = NULL;
     unsigned long done = 0;
-
-    /* Find a run of n contiguous frames */
-    for (x = 0; x <= DEMAND_MAP_PAGES - n; x = (x + y + 1 + alignment - 1) & ~(alignment - 1)) {
-        for (y = 0; y < n; y++)
-            if (demand_map_pgt[x+y] & _PAGE_PRESENT)
-                break;
-        if (y == n)
-            break;
-    }
-    if (y != n) {
-        printk("Failed to find %ld frames!\n", n);
-        return NULL;
-    }
-
-    /* Found it at x.  Map it in. */
+    unsigned long i;
+    int rc;
 
     while (done < n) {
 	unsigned long todo;
@@ -468,9 +481,11 @@ void *map_frames_ex(unsigned long *f, unsigned long n, unsigned long stride,
 	{
 	    mmu_update_t mmu_updates[todo];
 
-	    for (y = 0; y < todo; y++) {
-		mmu_updates[y].ptr = virt_to_mach(&demand_map_pgt[x + done + y]);
-		mmu_updates[y].val = ((f[(done + y) * stride] + (done + y) * increment) << PAGE_SHIFT) | prot;
+	    for (i = 0; i < todo; i++, addr += PAGE_SIZE, pgt++) {
+                if (!pgt || !(addr & L1_MASK))
+                    pgt = need_pgt(addr);
+		mmu_updates[i].ptr = virt_to_mach(pgt);
+		mmu_updates[i].val = ((f[(done + i) * stride] + (done + i) * increment) << PAGE_SHIFT) | prot;
 	    }
 
 	    rc = HYPERVISOR_mmu_update(mmu_updates, todo, NULL, id);
@@ -478,16 +493,48 @@ void *map_frames_ex(unsigned long *f, unsigned long n, unsigned long stride,
 		if (may_fail)
 		    f[done * stride] |= 0xF0000000;
 		else {
-		    printk("Map %ld (%lx, ...) failed: %d.\n", todo, f[done * stride], rc);
-		    return NULL;
+		    printk("Map %ld (%lx, ...) at %p failed: %d.\n", todo, f[done * stride] + done * increment, addr, rc);
+                    do_exit();
 		}
 	    }
 	}
 
 	done += todo;
     }
-    return (void *)(unsigned long)((unsigned long)demand_map_area_start +
-	    x * PAGE_SIZE);
+}
+
+void *map_frames_ex(unsigned long *f, unsigned long n, unsigned long stride,
+	unsigned long increment, unsigned long alignment, domid_t id,
+	int may_fail, unsigned long prot)
+{
+    unsigned long x;
+    unsigned long y = 0;
+
+    /* Find a properly aligned run of n contiguous frames */
+    for (x = 0; x <= DEMAND_MAP_PAGES - n; x = (x + y + 1 + alignment - 1) & ~(alignment - 1)) {
+        unsigned long addr = demand_map_area_start + x * PAGE_SIZE;
+        pgentry_t *pgt = get_pgt(addr);
+        for (y = 0; y < n; y++, addr += PAGE_SIZE) {
+            if (!(addr & L1_MASK))
+                pgt = get_pgt(addr);
+            if (pgt) {
+                if (*pgt & _PAGE_PRESENT)
+                    break;
+                pgt++;
+            }
+        }
+        if (y == n)
+            break;
+    }
+    if (y != n) {
+        printk("Failed to find %ld frames!\n", n);
+        return NULL;
+    }
+
+    /* Found it at x.  Map it in. */
+    do_map_frames(demand_map_area_start + x * PAGE_SIZE, f, n, stride, increment, id, may_fail, prot);
+
+    return (void *)(unsigned long)(demand_map_area_start + x * PAGE_SIZE);
 }
 
 static void clear_bootstrap(void)
