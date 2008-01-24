@@ -71,9 +71,9 @@ then
 fi
 # some versions of readlink cannot be passed a regular file
 if [ -L "$p" ]; then
-    file=$(readlink -f "$p") || ebusy "$p link does not exist."
+    file=$(readlink -f "$p") || fatal "$p link does not exist."
 else
-    [ -f "$p" ] || { ebusy "$p file does not exist."; }
+    [ -f "$p" ] || { fatal "$p file does not exist."; }
     file="$p"
 fi
 
@@ -85,7 +85,7 @@ fi
 
 if [ "$command" = 'add' ]
 then
-    [ -e "$file" ] || { ebusy $file does not exist; }
+    [ -e "$file" ] || { fatal $file does not exist; }
     success
 fi
 
