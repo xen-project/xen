@@ -28,15 +28,22 @@
 dir=$(dirname "$0")
 . "$dir/vif-common.sh"
 
-dhcp=${dhcp:-no}
+# turn on dhcp feature by default if dhcpd is installed
+if [ -f /etc/dhcpd.conf ]
+then
+	dhcp=${dhcp:-yes}
+else
+	dhcp=${dhcp:-no}
+fi
 
 if [ "$dhcp" != 'no' ]
 then
   dhcpd_conf_file=$(find_dhcpd_conf_file)
   dhcpd_init_file=$(find_dhcpd_init_file)
-  if [ -z "$dhcpd_conf_file" ] || [ -z "$dhcpd_init_file" ]
+  dhcpd_arg_file=$(find_dhcpd_arg_file)
+  if [ -z "$dhcpd_conf_file" ] || [ -z "$dhcpd_init_file" ] || [ -z "$dhcpd_arg_file" ]
   then
-    echo 'Failed to find dhcpd configuration or init file.' >&2
+    echo 'Failed to find dhcpd configuration or init or args file.' >&2
     exit 1
   fi
 fi
@@ -88,6 +95,31 @@ then
   hostname="$hostname-$vifid"
 fi
 
+dhcparg_remove_entry()
+{
+  local tmpfile=$(mktemp)
+  sed -e "s/$vif //" "$dhcpd_arg_file" >"$tmpfile"
+  if diff "$tmpfile" "$dhcpd_arg_file" >/dev/null
+  then
+    rm "$tmpfile"
+  else
+    mv "$tmpfile" "$dhcpd_arg_file"
+  fi
+}
+
+dhcparg_add_entry()
+{
+  dhcparg_remove_entry
+  local tmpfile=$(mktemp)
+  # handle Red Hat, SUSE, and Debian styles, with or without quotes
+  sed -e 's/^DHCPDARGS="*\([^"]*\)"*/DHCPDARGS="\1'"$vif "'"/' \
+     "$dhcpd_arg_file" >"$tmpfile" && mv "$tmpfile" "$dhcpd_arg_file"
+  sed -e 's/^DHCPD_INTERFACE="*\([^"]*\)"*/DHCPD_INTERFACE="\1'"$vif "'"/' \
+     "$dhcpd_arg_file" >"$tmpfile" && mv "$tmpfile" "$dhcpd_arg_file"
+  sed -e 's/^INTERFACES="*\([^"]*\)"*/INTERFACES="\1'"$vif "'"/' \
+     "$dhcpd_arg_file" >"$tmpfile" && mv "$tmpfile" "$dhcpd_arg_file"
+  rm -f "$tmpfile"
+}
 
 dhcp_remove_entry()
 {
@@ -99,6 +131,7 @@ dhcp_remove_entry()
   else
     mv "$tmpfile" "$dhcpd_conf_file"
   fi
+  dhcparg_remove_entry
 }
 
 
@@ -109,6 +142,7 @@ dhcp_up()
   mac=$(xenstore_read "$XENBUS_PATH/mac")
   echo >>"$dhcpd_conf_file" \
 "host $hostname { hardware ethernet $mac; fixed-address $vif_ip; option routers $router_ip; option host-name \"$hostname\"; }"
+  dhcparg_add_entry
   release_lock "vif-nat-dhcp"
   "$dhcpd_init_file" restart || true
 }

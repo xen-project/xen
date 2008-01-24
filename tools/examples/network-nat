@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/bash -x
 #============================================================================
 # Default Xen network start/stop script when using NAT.
 # Xend calls a network script when it starts.
@@ -27,7 +27,15 @@ evalVariables "$@"
 netdev=${netdev:-eth0}
 # antispoofing not yet implemented
 antispoof=${antispoof:-no}
-dhcp=${dhcp:-no}
+
+# turn on dhcp feature by default if dhcpd is installed
+if [ -f /etc/dhcpd.conf ]
+then
+	dhcp=${dhcp:-yes}
+else
+	dhcp=${dhcp:-no}
+fi
+
 
 if [ "$dhcp" != 'no' ]
 then
