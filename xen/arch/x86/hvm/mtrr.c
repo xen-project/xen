@@ -186,7 +186,14 @@ static uint32_t range_to_mtrr(uint32_t reg, struct mtrr_state *m,
                               uint8_t type)
 {
     if ( !range_sizek || (reg >= ((m->mtrr_cap & 0xff) - RESERVED_MTRR)) )
+    {
+        gdprintk(XENLOG_WARNING,
+                "Failed to init var mtrr msr[%d]"
+                "range_size:%x, total available MSR:%d\n",
+                reg, range_sizek,
+                (uint32_t)((m->mtrr_cap & 0xff) - RESERVED_MTRR));
         return reg;
+    }
 
     while ( range_sizek )
     {
@@ -202,7 +209,13 @@ static uint32_t range_to_mtrr(uint32_t reg, struct mtrr_state *m,
         range_sizek  -= sizek;
 
         if ( reg >= ((m->mtrr_cap & 0xff) - RESERVED_MTRR) )
+        {
+            gdprintk(XENLOG_WARNING,
+                    "Failed to init var mtrr msr[%d],"
+                    "total available MSR:%d\n",
+                    reg, (uint32_t)((m->mtrr_cap & 0xff) - RESERVED_MTRR));
             break;
+        }
     }
 
     return reg;
@@ -253,7 +266,7 @@ static void setup_var_mtrrs(struct vcpu *v)
         {
             if ( e820_table[i].addr == 0x100000 )
             {
-                size = e820_table[i].size + 0x100000 + PAGE_SIZE * 3;
+                size = e820_table[i].size + 0x100000 + PAGE_SIZE * 4;
                 addr = 0;
             }
             else
