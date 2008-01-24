@@ -8,8 +8,8 @@ LDFLAGS += -L../common/
 PIC_OBJS := $(patsubst %.c,%.opic,$(LIB_SRCS-y))
 
 FSDIR-$(CONFIG_Linux) = $(LIBDIR)/fs/$(FS)
-FSDIR-$(CONFIG_SunOS)-x86_64 = lib/fs/$(FS)/64
-FSDIR-$(CONFIG_SunOS)-x86_32 = lib/fs/$(FS)/
+FSDIR-$(CONFIG_SunOS)-x86_64 = $(PREFIX)/lib/fs/$(FS)/64
+FSDIR-$(CONFIG_SunOS)-x86_32 = $(PREFIX)/lib/fs/$(FS)/
 FSDIR-$(CONFIG_SunOS) = $(FSDIR-$(CONFIG_SunOS)-$(XEN_TARGET_ARCH))
 FSDIR = $(FSDIR-y)
 
