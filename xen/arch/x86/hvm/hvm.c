@@ -1470,6 +1470,14 @@ static long hvm_grant_table_op(
     return do_grant_table_op(cmd, uop, count);
 }
 
+static long hvm_memory_op(int cmd, XEN_GUEST_HANDLE(void) arg)
+{
+    long rc = do_memory_op(cmd, arg);
+    if ( (cmd & MEMOP_CMD_MASK) == XENMEM_decrease_reservation )
+        current->domain->arch.hvm_domain.qemu_mapcache_invalidate = 1;
+    return rc;
+}
+
 typedef unsigned long hvm_hypercall_t(
     unsigned long, unsigned long, unsigned long, unsigned long, unsigned long);
 
@@ -1479,7 +1487,7 @@ typedef unsigned long hvm_hypercall_t(
 #if defined(__i386__)
 
 static hvm_hypercall_t *hvm_hypercall32_table[NR_hypercalls] = {
-    HYPERCALL(memory_op),
+    [ __HYPERVISOR_memory_op ] = (hvm_hypercall_t *)hvm_memory_op,
     [ __HYPERVISOR_grant_table_op ] = (hvm_hypercall_t *)hvm_grant_table_op,
     HYPERCALL(xen_version),
     HYPERCALL(event_channel_op),
@@ -1489,7 +1497,7 @@ static hvm_hypercall_t *hvm_hypercall32_table[NR_hypercalls] = {
 
 #else /* defined(__x86_64__) */
 
-static long do_memory_op_compat32(int cmd, XEN_GUEST_HANDLE(void) arg)
+static long hvm_memory_op_compat32(int cmd, XEN_GUEST_HANDLE(void) arg)
 {
     extern long do_add_to_physmap(struct xen_add_to_physmap *xatp);
     long rc;
@@ -1515,7 +1523,7 @@ static long do_memory_op_compat32(int cmd, XEN_GUEST_HANDLE(void) arg)
         h.gpfn = u.gpfn;
 
         this_cpu(guest_handles_in_xen_space) = 1;
-        rc = do_memory_op(cmd, guest_handle_from_ptr(&h, void));
+        rc = hvm_memory_op(cmd, guest_handle_from_ptr(&h, void));
         this_cpu(guest_handles_in_xen_space) = 0;
 
         break;
@@ -1531,7 +1539,7 @@ static long do_memory_op_compat32(int cmd, XEN_GUEST_HANDLE(void) arg)
 }
 
 static hvm_hypercall_t *hvm_hypercall64_table[NR_hypercalls] = {
-    HYPERCALL(memory_op),
+    [ __HYPERVISOR_memory_op ] = (hvm_hypercall_t *)hvm_memory_op,
     [ __HYPERVISOR_grant_table_op ] = (hvm_hypercall_t *)hvm_grant_table_op,
     HYPERCALL(xen_version),
     HYPERCALL(event_channel_op),
@@ -1540,7 +1548,7 @@ static hvm_hypercall_t *hvm_hypercall64_table[NR_hypercalls] = {
 };
 
 static hvm_hypercall_t *hvm_hypercall32_table[NR_hypercalls] = {
-    [ __HYPERVISOR_memory_op ] = (hvm_hypercall_t *)do_memory_op_compat32,
+    [ __HYPERVISOR_memory_op ] = (hvm_hypercall_t *)hvm_memory_op_compat32,
     [ __HYPERVISOR_grant_table_op ] = (hvm_hypercall_t *)hvm_grant_table_op,
     HYPERCALL(xen_version),
     HYPERCALL(event_channel_op),
@@ -1552,8 +1560,9 @@ static hvm_hypercall_t *hvm_hypercall32_table[NR_hypercalls] = {
 
 int hvm_do_hypercall(struct cpu_user_regs *regs)
 {
+    struct vcpu *curr = current;
     struct segment_register sreg;
-    int flush, mode = hvm_guest_x86_mode(current);
+    int mode = hvm_guest_x86_mode(curr);
     uint32_t eax = regs->eax;
 
     switch ( mode )
@@ -1563,7 +1572,7 @@ int hvm_do_hypercall(struct cpu_user_regs *regs)
 #endif
     case 4:
     case 2:
-        hvm_get_segment_register(current, x86_seg_ss, &sreg);
+        hvm_get_segment_register(curr, x86_seg_ss, &sreg);
         if ( unlikely(sreg.attr.fields.dpl == 3) )
         {
     default:
@@ -1580,13 +1589,6 @@ int hvm_do_hypercall(struct cpu_user_regs *regs)
         return HVM_HCALL_completed;
     }
 
-    /*
-     * NB. In future flush only on decrease_reservation.
-     * For now we also need to flush when pages are added, as qemu-dm is not
-     * yet capable of faulting pages into an existing valid mapcache bucket.
-     */
-    flush = ((eax == __HYPERVISOR_memory_op) ||
-             (eax == __HYPERVISOR_grant_table_op)); /* needed ? */
     this_cpu(hc_preempted) = 0;
 
 #ifdef __x86_64__
@@ -1619,8 +1621,15 @@ int hvm_do_hypercall(struct cpu_user_regs *regs)
     HVM_DBG_LOG(DBG_LEVEL_HCALL, "hcall%u -> %lx",
                 eax, (unsigned long)regs->eax);
 
-    return (this_cpu(hc_preempted) ? HVM_HCALL_preempted :
-            flush ? HVM_HCALL_invalidate : HVM_HCALL_completed);
+    if ( this_cpu(hc_preempted) )
+        return HVM_HCALL_preempted;
+
+    if ( unlikely(curr->domain->arch.hvm_domain.qemu_mapcache_invalidate) &&
+         test_and_clear_bool(curr->domain->arch.hvm_domain.
+                             qemu_mapcache_invalidate) )
+        return HVM_HCALL_invalidate;
+
+    return HVM_HCALL_completed;
 }
 
 static void hvm_latch_shinfo_size(struct domain *d)

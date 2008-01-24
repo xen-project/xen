@@ -77,6 +77,8 @@ struct hvm_domain {
 #if CONFIG_PAGING_LEVELS == 3
     bool_t                 amd_npt_4gb_warning;
 #endif
+
+    bool_t                 qemu_mapcache_invalidate;
 };
 
 #endif /* __ASM_X86_HVM_DOMAIN_H__ */
