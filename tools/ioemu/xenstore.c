@@ -492,7 +492,7 @@ void xenstore_write_vncport(int display)
 void xenstore_read_vncpasswd(int domid, char *pwbuf, size_t pwbuflen)
 {
     char *buf = NULL, *path, *uuid = NULL, *passwd = NULL;
-    unsigned int i, len, rc = 0;
+    unsigned int i, len;
 
     pwbuf[0] = '\0';
 
@@ -506,33 +506,38 @@ void xenstore_read_vncpasswd(int domid, char *pwbuf, size_t pwbuflen)
     }
 
     pasprintf(&buf, "%s/vm", path);
+    free(path);
     uuid = xs_read(xsh, XBT_NULL, buf, &len);
     if (uuid == NULL) {
         fprintf(logfile, "xs_read(): uuid get error. %s.\n", buf);
-        free(path);
+        free(buf);
         return;
     }
 
     pasprintf(&buf, "%s/vncpasswd", uuid);
+    free(uuid);
     passwd = xs_read(xsh, XBT_NULL, buf, &len);
     if (passwd == NULL) {
         fprintf(logfile, "xs_read(): vncpasswd get error. %s.\n", buf);
-        free(uuid);
-        free(path);
+        free(buf);
         return;
     }
 
-    for (i=0; i<len && i<pwbuflen; i++)
+    if (len >= pwbuflen)
+    {
+        fprintf(logfile, "xenstore_read_vncpasswd(): truncated password to avoid buffer overflow\n");
+        len = pwbuflen - 1;
+    }
+
+    for (i=0; i<len; i++)
         pwbuf[i] = passwd[i];
-    pwbuf[len < (pwbuflen-1) ? len : (pwbuflen-1)] = '\0';
+    pwbuf[len] = '\0';
     passwd[0] = '\0';
-    pasprintf(&buf, "%s/vncpasswd", uuid);
-    if (xs_write(xsh, XBT_NULL, buf, passwd, len) == 0)
+    if (xs_write(xsh, XBT_NULL, buf, passwd, 1) == 0)
         fprintf(logfile, "xs_write() vncpasswd failed.\n");
 
     free(passwd);
-    free(uuid);
-    free(path);
+    free(buf);
 }
 
 
