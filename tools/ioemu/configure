@@ -42,7 +42,7 @@ case "$XEN_TARGET_ARCH" in
   ;;
   x86_64)
     cpu="x86_64"
-    libdir="lib64"
+    [ `uname -s` = "Linux" ] && libdir="lib64"
   ;;
   *)
     cpu="unknown"
