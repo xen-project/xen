@@ -41,6 +41,8 @@ struct realmode_emulate_ctxt {
 
     uint8_t exn_vector;
     uint8_t exn_insn_len;
+
+    uint32_t intr_shadow;
 };
 
 static void realmode_deliver_exception(
@@ -502,13 +504,108 @@ static struct x86_emulate_ops realmode_emulator_ops = {
     .load_fpu_ctxt = realmode_load_fpu_ctxt
 };
 
+static void realmode_emulate_one(struct realmode_emulate_ctxt *rm_ctxt)
+{
+    struct cpu_user_regs *regs = rm_ctxt->ctxt.regs;
+    struct vcpu *curr = current;
+    u32 new_intr_shadow;
+    int rc, io_completed;
+
+    rm_ctxt->insn_buf_eip = regs->eip;
+    (void)hvm_copy_from_guest_phys(
+        rm_ctxt->insn_buf,
+        (uint32_t)(rm_ctxt->seg_reg[x86_seg_cs].base + regs->eip),
+        sizeof(rm_ctxt->insn_buf));
+
+    rm_ctxt->flag_word = 0;
+
+    io_completed = curr->arch.hvm_vmx.real_mode_io_completed;
+    if ( curr->arch.hvm_vmx.real_mode_io_in_progress )
+    {
+        gdprintk(XENLOG_ERR, "I/O in progress before insn is emulated.\n");
+        goto fail;
+    }
+
+    rc = x86_emulate(&rm_ctxt->ctxt, &realmode_emulator_ops);
+
+    if ( curr->arch.hvm_vmx.real_mode_io_completed )
+    {
+        gdprintk(XENLOG_ERR, "I/O completion after insn is emulated.\n");
+        goto fail;
+    }
+
+    if ( io_completed && curr->arch.hvm_vmx.real_mode_io_in_progress )
+    {
+        gdprintk(XENLOG_ERR, "Multiple I/O transactions in a single insn.\n");
+        goto fail;
+    }
+
+    if ( rc == X86EMUL_UNHANDLEABLE )
+    {
+        gdprintk(XENLOG_ERR, "Failed to emulate insn.\n");
+        goto fail;
+    }
+
+    if ( rc == X86EMUL_RETRY )
+        return;
+
+    if ( curr->arch.hvm_vmx.real_mode_io_in_progress &&
+         (get_ioreq(curr)->vp_ioreq.dir == IOREQ_READ) )
+    {
+        gdprintk(XENLOG_ERR, "I/O read in progress but insn is retired.\n");
+        goto fail;
+    }
+
+    new_intr_shadow = rm_ctxt->intr_shadow;
+
+    /* MOV-SS instruction toggles MOV-SS shadow, else we just clear it. */
+    if ( rm_ctxt->flags.mov_ss )
+        new_intr_shadow ^= VMX_INTR_SHADOW_MOV_SS;
+    else
+        new_intr_shadow &= ~VMX_INTR_SHADOW_MOV_SS;
+
+    /* STI instruction toggles STI shadow, else we just clear it. */
+    if ( rm_ctxt->flags.sti )
+        new_intr_shadow ^= VMX_INTR_SHADOW_STI;
+    else
+        new_intr_shadow &= ~VMX_INTR_SHADOW_STI;
+
+    /* Update interrupt shadow information in VMCS only if it changes. */
+    if ( rm_ctxt->intr_shadow != new_intr_shadow )
+    {
+        rm_ctxt->intr_shadow = new_intr_shadow;
+        __vmwrite(GUEST_INTERRUPTIBILITY_INFO, rm_ctxt->intr_shadow);
+    }
+
+    if ( rc == X86EMUL_EXCEPTION )
+    {
+        realmode_deliver_exception(
+            rm_ctxt->exn_vector, rm_ctxt->exn_insn_len, rm_ctxt);
+    }
+    else if ( rm_ctxt->flags.hlt && !hvm_local_events_need_delivery(curr) )
+    {
+        hvm_hlt(regs->eflags);
+    }
+
+    return;
+
+ fail:
+    gdprintk(XENLOG_ERR,
+             "Real-mode emulation failed @ %04x:%08lx: "
+             "%02x %02x %02x %02x %02x %02x\n",
+             rm_ctxt->seg_reg[x86_seg_cs].sel, rm_ctxt->insn_buf_eip,
+             rm_ctxt->insn_buf[0], rm_ctxt->insn_buf[1],
+             rm_ctxt->insn_buf[2], rm_ctxt->insn_buf[3],
+             rm_ctxt->insn_buf[4], rm_ctxt->insn_buf[5]);
+    domain_crash_synchronous();
+}
+
 void vmx_realmode(struct cpu_user_regs *regs)
 {
     struct vcpu *curr = current;
     struct realmode_emulate_ctxt rm_ctxt;
     unsigned long intr_info;
-    int i, rc;
-    u32 intr_shadow, new_intr_shadow;
+    int i;
 
     rm_ctxt.ctxt.regs = regs;
 
@@ -520,77 +617,24 @@ void vmx_realmode(struct cpu_user_regs *regs)
     rm_ctxt.ctxt.sp_size =
         rm_ctxt.seg_reg[x86_seg_ss].attr.fields.db ? 32 : 16;
 
+    rm_ctxt.intr_shadow = __vmread(GUEST_INTERRUPTIBILITY_INFO);
+
+    if ( curr->arch.hvm_vmx.real_mode_io_in_progress ||
+         curr->arch.hvm_vmx.real_mode_io_completed )
+        realmode_emulate_one(&rm_ctxt);
+
     intr_info = __vmread(VM_ENTRY_INTR_INFO);
-    intr_shadow = __vmread(GUEST_INTERRUPTIBILITY_INFO);
-    new_intr_shadow = intr_shadow;
+    if ( intr_info & INTR_INFO_VALID_MASK )
+    {
+        realmode_deliver_exception((uint8_t)intr_info, 0, &rm_ctxt);
+        __vmwrite(VM_ENTRY_INTR_INFO, 0);
+    }
 
     while ( !(curr->arch.hvm_vcpu.guest_cr[0] & X86_CR0_PE) &&
             !softirq_pending(smp_processor_id()) &&
             !hvm_local_events_need_delivery(curr) &&
             !curr->arch.hvm_vmx.real_mode_io_in_progress )
-    {
-        if ( (intr_info & INTR_INFO_VALID_MASK) &&
-             !curr->arch.hvm_vmx.real_mode_io_completed )
-        {
-            realmode_deliver_exception((uint8_t)intr_info, 0, &rm_ctxt);
-            __vmwrite(VM_ENTRY_INTR_INFO, 0);
-            intr_info = 0;
-        }
-
-        rm_ctxt.insn_buf_eip = regs->eip;
-        (void)hvm_copy_from_guest_phys(
-            rm_ctxt.insn_buf,
-            (uint32_t)(rm_ctxt.seg_reg[x86_seg_cs].base + regs->eip),
-            sizeof(rm_ctxt.insn_buf));
-
-        rm_ctxt.flag_word = 0;
-
-        rc = x86_emulate(&rm_ctxt.ctxt, &realmode_emulator_ops);
-
-        if ( rc == X86EMUL_RETRY )
-            continue;
-
-        if ( rc == X86EMUL_UNHANDLEABLE )
-        {
-            gdprintk(XENLOG_ERR,
-                     "Real-mode emulation failed @ %04x:%08lx: "
-                     "%02x %02x %02x %02x %02x %02x\n",
-                     rm_ctxt.seg_reg[x86_seg_cs].sel, rm_ctxt.insn_buf_eip,
-                     rm_ctxt.insn_buf[0], rm_ctxt.insn_buf[1],
-                     rm_ctxt.insn_buf[2], rm_ctxt.insn_buf[3],
-                     rm_ctxt.insn_buf[4], rm_ctxt.insn_buf[5]);
-            domain_crash_synchronous();
-        }
-
-        /* MOV-SS instruction toggles MOV-SS shadow, else we just clear it. */
-        if ( rm_ctxt.flags.mov_ss )
-            new_intr_shadow ^= VMX_INTR_SHADOW_MOV_SS;
-        else
-            new_intr_shadow &= ~VMX_INTR_SHADOW_MOV_SS;
-
-        /* STI instruction toggles STI shadow, else we just clear it. */
-        if ( rm_ctxt.flags.sti )
-            new_intr_shadow ^= VMX_INTR_SHADOW_STI;
-        else
-            new_intr_shadow &= ~VMX_INTR_SHADOW_STI;
-
-        /* Update interrupt shadow information in VMCS only if it changes. */
-        if ( intr_shadow != new_intr_shadow )
-        {
-            intr_shadow = new_intr_shadow;
-            __vmwrite(GUEST_INTERRUPTIBILITY_INFO, intr_shadow);
-        }
-
-        if ( rc == X86EMUL_EXCEPTION )
-        {
-            realmode_deliver_exception(
-                rm_ctxt.exn_vector, rm_ctxt.exn_insn_len, &rm_ctxt);
-        }
-        else if ( rm_ctxt.flags.hlt && !hvm_local_events_need_delivery(curr) )
-        {
-            hvm_hlt(regs->eflags);
-        }
-    }
+        realmode_emulate_one(&rm_ctxt);
 
     /*
      * Cannot enter protected mode with bogus selector RPLs and DPLs. Hence we
