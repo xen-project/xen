@@ -105,6 +105,8 @@
 ^tools/firmware/.*\.bin$
 ^tools/firmware/.*\.sym$
 ^tools/firmware/.*bios/.*bios.*\.txt$
+^tools/firmware/extboot/extboot.img$
+^tools/firmware/extboot/signrom$
 ^tools/firmware/hvmloader/acpi/acpigen$
 ^tools/firmware/hvmloader/hvmloader$
 ^tools/firmware/hvmloader/roms\.h$
