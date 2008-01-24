@@ -56,56 +56,6 @@ static int next_bdf(char **str, int *seg, int *bus, int *dev, int *func)
     return 1;
 }
 
-uint8_t find_cap_offset(struct pci_dev *pci_dev, uint8_t cap)
-{
-    int id;
-    int max_cap = 48;
-    int pos = PCI_CAPABILITY_LIST;
-    int status;
-
-    status = pci_read_byte(pci_dev, PCI_STATUS);
-    if ( (status & PCI_STATUS_CAP_LIST) == 0 )
-        return 0;
-
-    while ( max_cap-- )
-    {
-        pos = pci_read_byte(pci_dev, pos);
-        if ( pos < 0x40 )
-            break;
-
-        pos &= ~3;
-        id = pci_read_byte(pci_dev, pos + PCI_CAP_LIST_ID);
-
-        if ( id == 0xff )
-            break;
-        if ( id == cap )
-            return pos;
-
-        pos += PCI_CAP_LIST_NEXT;
-    }
-    return 0;
-}
-
-void pdev_flr(struct pci_dev *pci_dev)
-{
-    int pos;
-    int dev_cap;
-    int dev_status;
-
-    pos = find_cap_offset(pci_dev, PCI_CAP_ID_EXP);
-    if ( pos )
-    {
-        dev_cap = pci_read_long(pci_dev, pos + PCI_EXP_DEVCAP);
-        if ( dev_cap & PCI_EXP_DEVCAP_FLR )
-        {
-            pci_write_word(pci_dev, pos + PCI_EXP_DEVCTL, PCI_EXP_DEVCTL_FLR);
-            do {
-                dev_status = pci_read_long(pci_dev, pos + PCI_EXP_DEVSTA);
-            } while (dev_status & PCI_EXP_DEVSTA_TRPND);
-        }
-    }
-}
-
 /* Being called each time a mmio region has been updated */
 void pt_iomem_map(PCIDevice *d, int i, uint32_t e_phys, uint32_t e_size,
                   int type)
@@ -273,7 +223,7 @@ static int pt_register_regions(struct pt_dev *assigned_device)
     PCIDevice *d = &assigned_device->dev;
 
     /* Register PIO/MMIO BARs */
-    for ( i=0; i < PCI_BAR_ENTRIES; i++ )
+    for ( i = 0; i < PCI_BAR_ENTRIES; i++ )
     {
         if ( pci_dev->base_addr[i] )
         {
@@ -357,9 +307,6 @@ struct pt_dev * register_real_device(PCIBus *e_bus,
     }
 
     assigned_device->pci_dev = pci_dev;
-
-    /* Issue PCIe FLR */
-    pdev_flr(pci_dev);
 
     /* Assign device */
     machine_bdf.reg = 0;

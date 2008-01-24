@@ -34,6 +34,7 @@ extern struct ir_ctrl *ir_ctrl;
 void print_iommu_regs(struct acpi_drhd_unit *drhd);
 void print_vtd_entries(struct domain *d, struct iommu *iommu,
                        int bus, int devfn, unsigned long gmfn);
+void pdev_flr(u8 bus, u8 devfn);
 
 int qinval_setup(struct iommu *iommu);
 int queue_invalidate_context(struct iommu *iommu,

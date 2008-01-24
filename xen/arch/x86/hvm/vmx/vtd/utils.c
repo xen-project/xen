@@ -22,7 +22,7 @@
 #include <xen/irq.h>
 #include <xen/spinlock.h>
 #include <xen/sched.h>
-#include <asm/delay.h>
+#include <xen/delay.h>
 #include <asm/iommu.h>
 #include <asm/hvm/vmx/intel-iommu.h>
 #include "dmar.h"
@@ -93,6 +93,101 @@ void disable_pmr(struct iommu *iommu)
             "Disabled protected memory registers\n");
 }
 
+static u8 find_cap_offset(u8 bus, u8 dev, u8 func, u8 cap)
+{
+    u8 id;
+    int max_cap = 48;
+    u8 pos = PCI_CAPABILITY_LIST;
+    u16 status;
+
+    status = read_pci_config_16(bus, dev, func, PCI_STATUS);
+    if ( (status & PCI_STATUS_CAP_LIST) == 0 )
+        return 0;
+
+    while ( max_cap-- )
+    {
+        pos = read_pci_config_byte(bus, dev, func, pos);
+        if ( pos < 0x40 )
+            break;
+
+        pos &= ~3;
+        id = read_pci_config_byte(bus, dev, func, pos + PCI_CAP_LIST_ID);
+
+        if ( id == 0xff )
+            break;
+        else if ( id == cap )
+            return pos;
+
+        pos += PCI_CAP_LIST_NEXT;
+    }
+
+    return 0;
+}
+
+#define PCI_D3hot   (3)
+#define PCI_CONFIG_DWORD_SIZE   (64)
+#define PCI_EXP_DEVCAP_FLR      (1 << 28)
+#define PCI_EXP_DEVCTL_FLR      (1 << 15)
+
+void pdev_flr(u8 bus, u8 devfn)
+{
+    u8 pos;
+    u32 dev_cap, dev_status, pm_ctl;
+    int flr = 0;
+    u8 dev = PCI_SLOT(devfn);
+    u8 func = PCI_FUNC(devfn);
+
+    pos = find_cap_offset(bus, dev, func, PCI_CAP_ID_EXP);
+    if ( pos != 0 )
+    {
+        dev_cap = read_pci_config(bus, dev, func, pos + PCI_EXP_DEVCAP);
+        if ( dev_cap & PCI_EXP_DEVCAP_FLR )
+        {
+            write_pci_config(bus, dev, func,
+                             pos + PCI_EXP_DEVCTL, PCI_EXP_DEVCTL_FLR);
+            do {
+                dev_status = read_pci_config(bus, dev, func,
+                                             pos + PCI_EXP_DEVSTA);
+            } while ( dev_status & PCI_EXP_DEVSTA_TRPND );
+
+            flr = 1;
+        }
+    }
+
+    /* If this device doesn't support function level reset,
+     * program device from D0 t0 D3hot, and then return to D0
+     * to implement function level reset
+     */
+    if ( flr == 0 )
+    {
+        pos = find_cap_offset(bus, dev, func, PCI_CAP_ID_PM);
+        if ( pos != 0 )
+        {
+            int i;
+            u32 config[PCI_CONFIG_DWORD_SIZE];
+            for ( i = 0; i < PCI_CONFIG_DWORD_SIZE; i++ )
+                config[i] = read_pci_config(bus, dev, func, i*4);
+
+            /* Enter D3hot without soft reset */
+            pm_ctl = read_pci_config(bus, dev, func, pos + PCI_PM_CTRL);
+            pm_ctl |= PCI_PM_CTRL_NO_SOFT_RESET;
+            pm_ctl &= ~PCI_PM_CTRL_STATE_MASK;
+            pm_ctl |= PCI_D3hot;
+            write_pci_config(bus, dev, func, pos + PCI_PM_CTRL, pm_ctl);
+            mdelay(10);
+
+            /* From D3hot to D0 */
+            write_pci_config(bus, dev, func, pos + PCI_PM_CTRL, 0);
+            mdelay(10);
+
+            /* Write saved configurations to device */
+            for ( i = 0; i < PCI_CONFIG_DWORD_SIZE; i++ )
+                write_pci_config(bus, dev, func, i*4, config[i]);
+
+            flr = 1;
+        }
+    }
+}
 
 void print_iommu_regs(struct acpi_drhd_unit *drhd)
 {
