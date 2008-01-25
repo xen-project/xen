@@ -1119,12 +1119,11 @@ asmlinkage void do_page_fault(struct cpu_user_regs *regs)
 }
 
 /*
- * Early handler to deal with spurious page faults. For example, consider a 
- * routine that uses a mapping immediately after installing it (making it 
- * present). The CPU may speculatively execute the memory access before 
- * executing the PTE write. The instruction will then be marked to cause a 
- * page fault when it is retired, despite the fact that the PTE is present and 
- * correct at that point in time.
+ * Early #PF handler to print CR2, error code, and stack.
+ * 
+ * We also deal with spurious faults here, even though they should never happen
+ * during early boot (an issue was seen once, but was most likely a hardware 
+ * problem).
  */
 asmlinkage void do_early_page_fault(struct cpu_user_regs *regs)
 {
@@ -1143,8 +1142,15 @@ asmlinkage void do_early_page_fault(struct cpu_user_regs *regs)
     }
 
     if ( stuck++ == 1000 )
-        panic("Early fatal page fault at %04x:%p (cr2=%p, ec=%04x)\n", 
-              regs->cs, _p(regs->eip), _p(cr2), regs->error_code);
+    {
+        unsigned long *stk = (unsigned long *)regs;
+        printk("Early fatal page fault at %04x:%p (cr2=%p, ec=%04x)\n", 
+               regs->cs, _p(regs->eip), _p(cr2), regs->error_code);
+        printk("Stack dump: ");
+        while ( ((long)stk & ((PAGE_SIZE - 1) & ~(BYTES_PER_LONG - 1))) != 0 )
+            printk("%p ", _p(*stk++));
+        for ( ; ; ) ;
+    }
 }
 
 long do_fpu_taskswitch(int set)
