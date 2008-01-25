@@ -329,7 +329,7 @@ mount it read-write in a guest domain."
 
         if LANG=C losetup -h 2>&1 | grep read-only >/dev/null
         then
-          roflag="-$mode"; roflag="${roflag#-w}"
+          roflag="-$mode"; roflag="${roflag#-w}"; roflag="${roflag#-!}"
         else
           roflag=''
         fi
