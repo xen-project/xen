@@ -207,7 +207,7 @@ void __init arch_init_memory(void)
 {
     extern void subarch_init_memory(void);
 
-    unsigned long i, pfn, rstart_pfn, rend_pfn;
+    unsigned long i, pfn, rstart_pfn, rend_pfn, ioend_pfn;
 
     /*
      * Initialise our DOMID_XEN domain.
@@ -250,6 +250,20 @@ void __init arch_init_memory(void)
             rend_pfn   = max_t(unsigned long, rstart_pfn,
                                PFN_DOWN(e820.map[i].addr + e820.map[i].size));
         }
+
+        /*
+         * Make sure any Xen mappings are blown away.
+         * In particular this ensures that RAM holes are respected even in
+         * the statically-initialised 0-16MB mapping area.
+         */
+        ioend_pfn = rstart_pfn;
+#if defined(CONFIG_X86_32)
+        ioend_pfn = min_t(unsigned long, ioend_pfn,
+                          DIRECTMAP_MBYTES << (20 - PAGE_SHIFT));
+#endif
+        if ( pfn < ioend_pfn )            
+            destroy_xen_mappings((unsigned long)mfn_to_virt(pfn),
+                                 (unsigned long)mfn_to_virt(ioend_pfn));
 
         /* Mark as I/O up to next RAM region. */
         for ( ; pfn < rstart_pfn; pfn++ )
@@ -3901,13 +3915,13 @@ void destroy_xen_mappings(unsigned long s, unsigned long e)
             {
                 /* Empty: zap the L2E and free the L1 page. */
                 l2e_write_atomic(pl2e, l2e_empty());
-                flush_all(FLUSH_TLB_GLOBAL); /* flush before free */
+                flush_area(NULL, FLUSH_TLB_GLOBAL); /* flush before free */
                 free_xen_pagetable(pl1e);
             }
         }
     }
 
-    flush_all(FLUSH_TLB_GLOBAL);
+    flush_area(NULL, FLUSH_TLB_GLOBAL);
 }
 
 void __set_fixmap(
