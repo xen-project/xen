@@ -1,6 +1,6 @@
 digraph g{
 
-node [shape=box]; "powered down" paused running suspended;
+node [shape=box]; "powered down" paused running suspended crashed;
 
 "powered down" -> paused [label="start(paused=true)"];
 "powered down" -> running [label="start(paused=false)"];
@@ -11,5 +11,7 @@ paused -> suspended [label="suspend"];
 paused -> running [label="resume"];
 running -> "powered down" [label="cleanShutdown /\nhardShutdown"];
 running -> paused [label="pause"];
+running -> crashed [label="guest OS crash"]
+crashed -> "powered down" [label="hardShutdown"]
 
 }

@@ -21,7 +21,10 @@
 \end{figure}
 
 Figure~\ref{fig-vm-lifecycle} shows the states that a VM can be in
-and the API calls that can be used to move the VM between these states.
+and the API calls that can be used to move the VM between these states.  The crashed
+state indicates that the guest OS running within the VM has crashed.  There is no
+API to explicitly move to the crashed state, however a hardShutdown will move the
+VM to the powered down state.
 
 \section{VM boot parameters}
 

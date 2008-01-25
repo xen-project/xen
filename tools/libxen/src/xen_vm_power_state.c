@@ -32,6 +32,7 @@ static const char *lookup_table[] =
     "Paused",
     "Running",
     "Suspended",
+    "Crashed",
     "Unknown"
 };
 

@@ -43,6 +43,7 @@ from xen.xend.XendConstants import XS_VMROOT
 from xen.xend.XendConstants import DOM_STATE_HALTED, DOM_STATE_PAUSED
 from xen.xend.XendConstants import DOM_STATE_RUNNING, DOM_STATE_SUSPENDED
 from xen.xend.XendConstants import DOM_STATE_SHUTDOWN, DOM_STATE_UNKNOWN
+from xen.xend.XendConstants import DOM_STATE_CRASHED
 from xen.xend.XendConstants import TRIGGER_TYPE
 from xen.xend.XendDevices import XendDevices
 from xen.xend.XendAPIConstants import *
@@ -69,6 +70,7 @@ POWER_STATE_NAMES = dict([(x, XEN_API_VM_POWER_STATE[x])
                                     DOM_STATE_RUNNING,
                                     DOM_STATE_SUSPENDED,
                                     DOM_STATE_SHUTDOWN,
+                                    DOM_STATE_CRASHED,
                                     DOM_STATE_UNKNOWN]])
 POWER_STATE_ALL = 'all'
 
@@ -1191,13 +1193,14 @@ class XendDomain:
             if dominfo.getDomid() == DOM0_ID:
                 raise XendError("Cannot pause privileged domain %s" % domid)
             ds = dominfo._stateGet()
-            if ds not in (DOM_STATE_RUNNING, DOM_STATE_PAUSED):
+            if ds not in (DOM_STATE_RUNNING, DOM_STATE_PAUSED, DOM_STATE_CRASHED):
                 raise VMBadState("Domain '%s' is not started" % domid,
                                  POWER_STATE_NAMES[DOM_STATE_RUNNING],
                                  POWER_STATE_NAMES[ds])
             log.info("Domain %s (%d) paused.", dominfo.getName(),
                      int(dominfo.getDomid()))
-            dominfo.pause()
+            if ds == DOM_STATE_RUNNING:
+                dominfo.pause()
             if state:
                 return ds
         except XendInvalidDomain:
@@ -1216,7 +1219,7 @@ class XendDomain:
 
         if dominfo.getDomid() == DOM0_ID:
             raise XendError("Cannot dump core for privileged domain %s" % domid)
-        if dominfo._stateGet() not in (DOM_STATE_PAUSED, DOM_STATE_RUNNING):
+        if dominfo._stateGet() not in (DOM_STATE_PAUSED, DOM_STATE_RUNNING, DOM_STATE_CRASHED):
             raise VMBadState("Domain '%s' is not started" % domid,
                              POWER_STATE_NAMES[DOM_STATE_PAUSED],
                              POWER_STATE_NAMES[dominfo._stateGet()])

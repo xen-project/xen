@@ -414,7 +414,7 @@ class XendDomainInfo:
         """
         from xen.xend import XendDomain
 
-        if self._stateGet() in (XEN_API_VM_POWER_STATE_HALTED, XEN_API_VM_POWER_STATE_SUSPENDED):
+        if self._stateGet() in (XEN_API_VM_POWER_STATE_HALTED, XEN_API_VM_POWER_STATE_SUSPENDED, XEN_API_VM_POWER_STATE_CRASHED):
             try:
                 XendTask.log_progress(0, 30, self._constructDomain)
                 XendTask.log_progress(31, 60, self._initDomain)
@@ -648,7 +648,7 @@ class XendDomainInfo:
         return rc
 
     def getDeviceSxprs(self, deviceClass):
-        if self._stateGet() in (DOM_STATE_RUNNING, DOM_STATE_PAUSED):
+        if self._stateGet() in (DOM_STATE_RUNNING, DOM_STATE_PAUSED, DOM_STATE_CRASHED):
             return self.getDeviceController(deviceClass).sxprs()
         else:
             sxprs = []
@@ -2268,6 +2268,9 @@ class XendDomainInfo:
                 return XEN_API_VM_POWER_STATE_SUSPENDED
             else:
                 return XEN_API_VM_POWER_STATE_HALTED
+        elif info['crashed']:
+            # Crashed
+            return XEN_API_VM_POWER_STATE_CRASHED
         else:
             # We are either RUNNING or PAUSED
             if info['paused']:

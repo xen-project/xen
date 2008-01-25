@@ -46,6 +46,11 @@ enum xen_vm_power_state
     XEN_VM_POWER_STATE_SUSPENDED,
 
     /**
+     * Crashed
+     */
+    XEN_VM_POWER_STATE_CRASHED,
+
+    /**
      * Some other unknown state
      */
     XEN_VM_POWER_STATE_UNKNOWN
