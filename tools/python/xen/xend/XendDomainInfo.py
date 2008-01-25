@@ -1393,9 +1393,10 @@ class XendDomainInfo:
 
         self._writeVm('xend/previous_restart_time', str(now))
 
+        new_dom_info = self.info
         try:
             if rename:
-                self._preserveForRestart()
+                new_dom_info = self._preserveForRestart()
             else:
                 self._unwatchVm()
                 self.destroyDomain()
@@ -1409,7 +1410,7 @@ class XendDomainInfo:
             new_dom = None
             try:
                 new_dom = XendDomain.instance().domain_create_from_dict(
-                    self.info)
+                    new_dom_info)
                 new_dom.waitForDevices()
                 new_dom.unpause()
                 rst_cnt = self._readVm('xend/restart_count')
@@ -1440,11 +1441,15 @@ class XendDomainInfo:
                  new_name, new_uuid)
         self._unwatchVm()
         self._releaseDevices()
+        new_dom_info = self.info.copy()
+        new_dom_info['name_label'] = self.info['name_label']
+        new_dom_info['uuid'] = self.info['uuid']
         self.info['name_label'] = new_name
         self.info['uuid'] = new_uuid
         self.vmpath = XS_VMROOT + new_uuid
         self._storeVmDetails()
         self._preserve()
+        return new_dom_info
 
 
     def _preserve(self):
