@@ -15,9 +15,7 @@
 #(loglevel DEBUG)
 
 
-# The Xen-API server configuration.  (Please note that this server is
-# available as an UNSUPPORTED PREVIEW in Xen 3.0.4, and should not be relied
-# upon).
+# The Xen-API server configuration.
 #
 # This value configures the ports, interfaces, and access controls for the
 # Xen-API server.  Each entry in the list starts with either unix, a port
