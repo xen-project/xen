@@ -976,8 +976,11 @@ static long cmos_utc_offset; /* in seconds */
 
 int time_suspend(void)
 {
-    cmos_utc_offset = (wc_sec + (wc_nsec + NOW()) / 1000000000ULL)
-        - get_cmos_time();
+    if ( smp_processor_id() == 0 )
+    {
+        cmos_utc_offset = -get_cmos_time();
+        cmos_utc_offset += (wc_sec + (wc_nsec + NOW()) / 1000000000ULL);
+    }
 
     /* Better to cancel calibration timer for accuracy. */
     kill_timer(&this_cpu(cpu_time).calibration_timer);
