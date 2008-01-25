@@ -113,6 +113,15 @@
 #include <xsm/xsm.h>
 #include <xen/trace.h>
 
+/*
+ * Mapping of first 2 or 4 megabytes of memory. This is mapped with 4kB
+ * mappings to avoid type conflicts with fixed-range MTRRs covering the
+ * lowest megabyte of physical memory. In any case the VGA hole should be
+ * mapped with type UC.
+ */
+l1_pgentry_t __attribute__ ((__section__ (".bss.page_aligned")))
+    l1_identmap[L1_PAGETABLE_ENTRIES];
+
 #define MEM_LOG(_f, _a...) gdprintk(XENLOG_WARNING , _f "\n" , ## _a)
 
 /*
@@ -3912,16 +3921,18 @@ void __set_fixmap(
 
 void memguard_init(void)
 {
+    unsigned long start = max_t(unsigned long, xen_phys_start, 1UL << 20);
     map_pages_to_xen(
-        (unsigned long)__va(xen_phys_start),
-        xen_phys_start >> PAGE_SHIFT,
-        (xenheap_phys_end - xen_phys_start) >> PAGE_SHIFT,
+        (unsigned long)__va(start),
+        start >> PAGE_SHIFT,
+        (xenheap_phys_end - start) >> PAGE_SHIFT,
         __PAGE_HYPERVISOR|MAP_SMALL_PAGES);
 #ifdef __x86_64__
+    BUG_ON(start != xen_phys_start);
     map_pages_to_xen(
         XEN_VIRT_START,
-        xen_phys_start >> PAGE_SHIFT,
-        (__pa(&_end) + PAGE_SIZE - 1 - xen_phys_start) >> PAGE_SHIFT,
+        start >> PAGE_SHIFT,
+        (__pa(&_end) + PAGE_SIZE - 1 - start) >> PAGE_SHIFT,
         __PAGE_HYPERVISOR|MAP_SMALL_PAGES);
 #endif
 }

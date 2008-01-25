@@ -258,8 +258,10 @@ static void __init srat_detect_node(int cpu)
 static void __init bootstrap_map(unsigned long start, unsigned long end)
 {
     unsigned long mask = (1UL << L2_PAGETABLE_SHIFT) - 1;
-    start = start & ~mask;
+    start = max_t(unsigned long, start & ~mask, 16UL << 20);
     end   = (end + mask) & ~mask;
+    if ( start >= end )
+        return;
     if ( end > BOOTSTRAP_DIRECTMAP_END )
         panic("Cannot access memory beyond end of "
               "bootstrap direct-map area\n");
@@ -642,7 +644,7 @@ void __init __start_xen(unsigned long mbi_p)
             l4_pgentry_t *pl4e;
             l3_pgentry_t *pl3e;
             l2_pgentry_t *pl2e;
-            int i, j;
+            int i, j, k;
 
             /* Select relocation address. */
             e = (e - (opt_xenheap_megabytes << 20)) & ~mask;
@@ -678,12 +680,25 @@ void __init __start_xen(unsigned long mbi_p)
                         continue;
                     *pl3e = l3e_from_intpte(l3e_get_intpte(*pl3e) +
                                             xen_phys_start);
+                    pl2e = l3e_to_l2e(*pl3e);
+                    for ( k = 0; k < L2_PAGETABLE_ENTRIES; k++, pl2e++ )
+                    {
+                        /* Not present, PSE, or already relocated? */
+                        if ( !(l2e_get_flags(*pl2e) & _PAGE_PRESENT) ||
+                             (l2e_get_flags(*pl2e) & _PAGE_PSE) ||
+                             (l2e_get_pfn(*pl2e) > 0x1000) )
+                            continue;
+                        *pl2e = l2e_from_intpte(l2e_get_intpte(*pl2e) +
+                                                xen_phys_start);
+                    }
                 }
             }
 
             /* The only data mappings to be relocated are in the Xen area. */
             pl2e = __va(__pa(l2_xenmap));
-            for ( i = 0; i < L2_PAGETABLE_ENTRIES; i++, pl2e++ )
+            *pl2e++ = l2e_from_pfn(xen_phys_start >> PAGE_SHIFT,
+                                   PAGE_HYPERVISOR | _PAGE_PSE);
+            for ( i = 1; i < L2_PAGETABLE_ENTRIES; i++, pl2e++ )
             {
                 if ( !(l2e_get_flags(*pl2e) & _PAGE_PRESENT) )
                     continue;

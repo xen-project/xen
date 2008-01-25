@@ -126,7 +126,7 @@ __start:
         /* Initialise L3 xen-map page directory entry. */
         mov     $(sym_phys(l2_xenmap)+7),%eax
         mov     %eax,sym_phys(l3_xenmap) + (50*8)
-        /* Hook indentity-map and xen-map L3 tables into PML4. */
+        /* Hook identity-map and xen-map L3 tables into PML4. */
         mov     $(sym_phys(l3_identmap)+7),%eax
         mov     %eax,sym_phys(idle_pg_table) + (  0*8) /* PML4[  0]: 1:1 map */
         mov     %eax,sym_phys(idle_pg_table) + (262*8) /* PML4[262]: 1:1 map */
@@ -160,6 +160,40 @@ __start:
         add     $(1<<L2_PAGETABLE_SHIFT),%eax
         cmp     $(16<<20)+0xe3,%eax
         jne     1b
+#endif
+
+        /* Initialize 4kB mappings of first 2MB or 4MB of memory. */
+        mov     $sym_phys(l1_identmap),%edi
+        mov     $0x263,%eax                  /* PRESENT+RW+A+D+SMALL_PAGES */
+#if defined(__x86_64__)
+        or      $0x100,%eax                  /* GLOBAL */
+#endif
+        xor     %ecx,%ecx
+1:      stosl
+#if CONFIG_PAGING_LEVELS >= 3
+        add     $4,%edi
+#endif
+        add     $PAGE_SIZE,%eax
+        inc     %ecx
+        /* VGA hole (0xa0000-0xc0000) should be mapped UC. */
+        cmp     $0xa0,%ecx
+        jne     2f
+        or      $0x10,%eax                   /* +PCD */
+2:      cmp     $0xc0,%ecx
+        jne     2f
+        and     $~0x10,%eax                  /* -PCD */
+2:      cmp     $L1_PAGETABLE_ENTRIES,%ecx
+        jne     1b
+        sub     $(PAGE_SIZE-0x63),%edi
+#if defined(__x86_64__)
+        mov     %edi,sym_phys(l2_identmap)
+        mov     %edi,sym_phys(l2_xenmap)
+#elif defined(CONFIG_X86_PAE)
+        mov     %edi,sym_phys(idle_pg_table_l2)
+        mov     %edi,sym_phys(idle_pg_table_l2) + (__PAGE_OFFSET>>18)
+#else
+        mov     %edi,sym_phys(idle_pg_table)
+        mov     %edi,sym_phys(idle_pg_table) + (__PAGE_OFFSET>>20)
 #endif
 
         /* Copy bootstrap trampoline to low memory, below 1MB. */

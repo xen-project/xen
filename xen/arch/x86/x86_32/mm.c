@@ -38,6 +38,8 @@ l2_pgentry_t __attribute__ ((__section__ (".bss.page_aligned")))
     idle_pg_table_l2[L2_PAGETABLE_ENTRIES];
 #endif
 
+extern l1_pgentry_t l1_identmap[L1_PAGETABLE_ENTRIES];
+
 unsigned int PAGE_HYPERVISOR         = __PAGE_HYPERVISOR;
 unsigned int PAGE_HYPERVISOR_NOCACHE = __PAGE_HYPERVISOR_NOCACHE;
 
@@ -90,6 +92,8 @@ void __init paging_init(void)
                   (_PAGE_PSE|_PAGE_PRESENT)) == (_PAGE_PSE|_PAGE_PRESENT) )
                 l2e_add_flags(idle_pg_table_l2[l2_linear_offset(v)],
                               _PAGE_GLOBAL);
+        for ( i = 0; i < L1_PAGETABLE_ENTRIES; i++ )
+            l1e_add_flags(l1_identmap[i], _PAGE_GLOBAL);
     }
 
     /*
@@ -150,6 +154,8 @@ void __init zap_low_mappings(l2_pgentry_t *dom0_l2)
             l2e_write(&dom0_l2[i], l2e_empty());
 
     /* Now zap mappings in the idle pagetables. */
+    BUG_ON(l2e_get_pfn(idle_pg_table_l2[0]) != virt_to_mfn(l1_identmap));
+    l2e_write_atomic(&idle_pg_table_l2[0], l2e_empty());
     destroy_xen_mappings(0, HYPERVISOR_VIRT_START);
 
     flush_all(FLUSH_TLB_GLOBAL);
