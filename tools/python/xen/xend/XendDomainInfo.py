@@ -1125,10 +1125,11 @@ class XendDomainInfo:
     def getDomid(self):
         return self.domid
 
-    def setName(self, name):
+    def setName(self, name, to_store = True):
         self._checkName(name)
         self.info['name_label'] = name
-        self.storeVm("name", name)
+        if to_store:
+            self.storeVm("name", name)
 
     def getName(self):
         return self.info['name_label']
@@ -1399,7 +1400,7 @@ class XendDomainInfo:
                 new_dom_info = self._preserveForRestart()
             else:
                 self._unwatchVm()
-                self.destroyDomain()
+                self.destroy()
 
             # new_dom's VM will be the same as this domain's VM, except where
             # the rename flag has instructed us to call preserveForRestart.
@@ -1413,9 +1414,6 @@ class XendDomainInfo:
                     new_dom_info)
                 new_dom.waitForDevices()
                 new_dom.unpause()
-                rst_cnt = self._readVm('xend/restart_count')
-                rst_cnt = int(rst_cnt) + 1
-                self._writeVm('xend/restart_count', str(rst_cnt))
                 new_dom._removeVm(RESTART_IN_PROGRESS)
             except:
                 if new_dom:
@@ -1441,13 +1439,19 @@ class XendDomainInfo:
                  new_name, new_uuid)
         self._unwatchVm()
         self._releaseDevices()
+        # Remove existing vm node in xenstore
+        self._removeVm()
         new_dom_info = self.info.copy()
         new_dom_info['name_label'] = self.info['name_label']
         new_dom_info['uuid'] = self.info['uuid']
         self.info['name_label'] = new_name
         self.info['uuid'] = new_uuid
         self.vmpath = XS_VMROOT + new_uuid
+        # Write out new vm node to xenstore
         self._storeVmDetails()
+        rst_cnt = self._readVm('xend/restart_count')
+        rst_cnt = int(rst_cnt) + 1
+        self._writeVm('xend/restart_count', str(rst_cnt))
         self._preserve()
         return new_dom_info
 

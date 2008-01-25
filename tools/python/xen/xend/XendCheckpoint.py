@@ -125,10 +125,10 @@ def save(fd, dominfo, network, live, dst, checkpoint=False):
         if checkpoint:
             dominfo.resumeDomain()
         else:
-            dominfo.destroyDomain()
+            dominfo.destroy()
             dominfo.testDeviceComplete()
         try:
-            dominfo.setName(domain_name)
+            dominfo.setName(domain_name, False)
         except VmError:
             # Ignore this.  The name conflict (hopefully) arises because we
             # are doing localhost migration; if we are doing a suspend of a
