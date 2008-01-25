@@ -254,6 +254,15 @@ void notify_remote_via_irq(int irq)
 }
 EXPORT_SYMBOL(notify_remote_via_irq);
 
+static DEFINE_PER_CPU(unsigned int, last_processed_l1i) = { BITS_PER_LONG - 1 };
+static DEFINE_PER_CPU(unsigned int, last_processed_l2i) = { BITS_PER_LONG - 1 };
+
+static inline unsigned long active_evtchns(unsigned int cpu, shared_info_t *sh,
+						unsigned int idx)
+{
+	return (sh->evtchn_pending[idx] & ~sh->evtchn_mask[idx]);
+}
+
 static irqreturn_t evtchn_interrupt(int irq, void *dev_id
 #if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,19)
 				    , struct pt_regs *regs
@@ -262,7 +271,8 @@ static irqreturn_t evtchn_interrupt(int irq, void *dev_id
 #endif
 				    )
 {
-	unsigned int l1i, port;
+	unsigned int l1i, l2i, port;
+	unsigned long masked_l1, masked_l2;
 	/* XXX: All events are bound to vcpu0 but irq may be redirected. */
 	int cpu = 0; /*smp_processor_id();*/
 	irq_handler_t handler;
@@ -271,13 +281,42 @@ static irqreturn_t evtchn_interrupt(int irq, void *dev_id
 	unsigned long l1, l2;
 
 	v->evtchn_upcall_pending = 0;
-	/* NB. No need for a barrier here -- XCHG is a barrier on x86. */
+
+#ifndef CONFIG_X86 /* No need for a barrier -- XCHG is a barrier on x86. */
+	/* Clear master flag /before/ clearing selector flag. */
+	rmb();
+#endif
 	l1 = xchg(&v->evtchn_pending_sel, 0);
+
+	l1i = per_cpu(last_processed_l1i, cpu);
+	l2i = per_cpu(last_processed_l2i, cpu);
+
 	while (l1 != 0) {
-		l1i = __ffs(l1);
-		l1 &= ~(1 << l1i);
-		while ((l2 = s->evtchn_pending[l1i] & ~s->evtchn_mask[l1i])) {
-			port = (l1i * BITS_PER_LONG) + __ffs(l2);
+
+		l1i = (l1i + 1) % BITS_PER_LONG;
+		masked_l1 = l1 & ((~0UL) << l1i);
+
+		if (masked_l1 == 0) { /* if we masked out all events, wrap around to the beginning */
+			l1i = BITS_PER_LONG - 1;
+			l2i = BITS_PER_LONG - 1;
+			continue;
+		}
+		l1i = __ffs(masked_l1);
+
+		do {
+			l2 = active_evtchns(cpu, s, l1i);
+
+			l2i = (l2i + 1) % BITS_PER_LONG;
+			masked_l2 = l2 & ((~0UL) << l2i);
+
+			if (masked_l2 == 0) { /* if we masked out all events, move on */
+				l2i = BITS_PER_LONG - 1;
+				break;
+			}
+			l2i = __ffs(masked_l2);
+
+			/* process port */
+			port = (l1i * BITS_PER_LONG) + l2i;
 			synch_clear_bit(port, &s->evtchn_pending[0]);
 
 			irq = evtchn_to_irq[port];
@@ -303,7 +342,16 @@ static irqreturn_t evtchn_interrupt(int irq, void *dev_id
 			spin_lock(&irq_evtchn[irq].lock);
 			irq_evtchn[irq].in_handler = 0;
 			spin_unlock(&irq_evtchn[irq].lock);
-		}
+
+			/* if this is the final port processed, we'll pick up here+1 next time */
+			per_cpu(last_processed_l1i, cpu) = l1i;
+			per_cpu(last_processed_l2i, cpu) = l2i;
+
+		} while (l2i != BITS_PER_LONG - 1);
+
+		l2 = active_evtchns(cpu, s, l1i);
+		if (l2 == 0) /* we handled all ports, so we can clear the selector bit */
+			l1 &= ~(1UL << l1i);
 	}
 
 	return IRQ_HANDLED;
