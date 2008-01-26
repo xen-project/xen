@@ -122,6 +122,8 @@ struct vcpu
     bool_t           defer_shutdown;
     /* VCPU is paused following shutdown request (d->is_shutting_down)? */
     bool_t           paused_for_shutdown;
+    /* VCPU affinity is temporarily locked from controller changes? */
+    bool_t           affinity_locked;
 
     unsigned long    pause_flags;
     atomic_t         pause_count;
@@ -485,6 +487,8 @@ void cpu_init(void);
 
 void vcpu_force_reschedule(struct vcpu *v);
 int vcpu_set_affinity(struct vcpu *v, cpumask_t *affinity);
+int vcpu_lock_affinity(struct vcpu *v, cpumask_t *affinity);
+void vcpu_unlock_affinity(struct vcpu *v, cpumask_t *affinity);
 
 void vcpu_runstate_get(struct vcpu *v, struct vcpu_runstate_info *runstate);
 

@@ -262,12 +262,11 @@ void vcpu_force_reschedule(struct vcpu *v)
     }
 }
 
-int vcpu_set_affinity(struct vcpu *v, cpumask_t *affinity)
+static int __vcpu_set_affinity(
+    struct vcpu *v, cpumask_t *affinity,
+    bool_t old_lock_status, bool_t new_lock_status)
 {
-    cpumask_t online_affinity;
-
-    if ( (v->domain->domain_id == 0) && opt_dom0_vcpus_pin )
-        return -EINVAL;
+    cpumask_t online_affinity, old_affinity;
 
     cpus_and(online_affinity, *affinity, cpu_online_map);
     if ( cpus_empty(online_affinity) )
@@ -275,7 +274,18 @@ int vcpu_set_affinity(struct vcpu *v, cpumask_t *affinity)
 
     vcpu_schedule_lock_irq(v);
 
+    if ( v->affinity_locked != old_lock_status )
+    {
+        BUG_ON(!v->affinity_locked);
+        vcpu_schedule_unlock_irq(v);
+        return -EBUSY;
+    }
+
+    v->affinity_locked = new_lock_status;
+
+    old_affinity = v->cpu_affinity;
     v->cpu_affinity = *affinity;
+    *affinity = old_affinity;
     if ( !cpu_isset(v->processor, v->cpu_affinity) )
         set_bit(_VPF_migrating, &v->pause_flags);
 
@@ -288,6 +298,31 @@ int vcpu_set_affinity(struct vcpu *v, cpumask_t *affinity)
     }
 
     return 0;
+}
+
+int vcpu_set_affinity(struct vcpu *v, cpumask_t *affinity)
+{
+    if ( (v->domain->domain_id == 0) && opt_dom0_vcpus_pin )
+        return -EINVAL;
+    return __vcpu_set_affinity(v, affinity, 0, 0);
+}
+
+int vcpu_lock_affinity(struct vcpu *v, cpumask_t *affinity)
+{
+    return __vcpu_set_affinity(v, affinity, 0, 1);
+}
+
+void vcpu_unlock_affinity(struct vcpu *v, cpumask_t *affinity)
+{
+    cpumask_t online_affinity;
+
+    /* Do not fail if no CPU in old affinity mask is online. */
+    cpus_and(online_affinity, *affinity, cpu_online_map);
+    if ( cpus_empty(online_affinity) )
+        *affinity = cpu_online_map;
+
+    if ( __vcpu_set_affinity(v, affinity, 1, 0) != 0 )
+        BUG();
 }
 
 /* Block the currently-executing domain until a pertinent event occurs. */
