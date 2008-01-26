@@ -14,7 +14,6 @@ SUBDIRS-$(CONFIG_X86) += firmware
 SUBDIRS-$(ACM_SECURITY) += security
 SUBDIRS-y += console
 SUBDIRS-y += xenmon
-SUBDIRS-y += guest-headers
 SUBDIRS-$(VTPM_TOOLS) += vtpm_manager
 SUBDIRS-$(VTPM_TOOLS) += vtpm
 SUBDIRS-y += xenstat
