@@ -28,6 +28,9 @@ MAN1DIR = $(MANDIR)/man1
 MAN8DIR = $(MANDIR)/man8
 SBINDIR = $(PREFIX)/sbin
 
+PRIVATE_PREFIX = $(LIBDIR)/xen
+PRIVATE_BINDIR = $(PRIVATE_PREFIX)/bin
+
 SunOS_LIBDIR = /usr/sfw/lib
 SunOS_LIBDIR_x86_64 = /usr/sfw/lib/amd64
 

@@ -2,8 +2,6 @@
 XEN_ROOT=../..
 include $(XEN_ROOT)/tools/Rules.mk
 
-CLIENT_INSTALL_DIR = $(LIBDIR)/xen/bin
-
 CFLAGS  += -Werror
 
 CFLAGS  += -I $(XEN_LIBXC)
@@ -32,5 +30,5 @@ xenconsole: $(patsubst %.c,%.o,$(wildcard client/*.c))
 install: $(BIN)
 	$(INSTALL_DIR) $(DESTDIR)/$(SBINDIR)
 	$(INSTALL_PROG) xenconsoled $(DESTDIR)/$(SBINDIR)
-	$(INSTALL_DIR) $(DESTDIR)/$(CLIENT_INSTALL_DIR)
-	$(INSTALL_PROG) xenconsole $(DESTDIR)/$(CLIENT_INSTALL_DIR)
+	$(INSTALL_DIR) $(DESTDIR)$(PRIVATE_BINDIR)
+	$(INSTALL_PROG) xenconsole $(DESTDIR)$(PRIVATE_BINDIR)
