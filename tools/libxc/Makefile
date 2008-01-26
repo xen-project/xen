@@ -31,20 +31,11 @@ GUEST_SRCS-y += xg_private.c
 GUEST_SRCS-$(CONFIG_MIGRATE) += xc_domain_restore.c xc_domain_save.c
 GUEST_SRCS-$(CONFIG_HVM) += xc_hvm_build.c
 
-# symlink libelf from xen/common/libelf/
-LIBELF_SRCS := libelf-tools.c libelf-loader.c
-LIBELF_SRCS += libelf-dominfo.c libelf-relocate.c
+VPATH = ../../xen/common/libelf
+CFLAGS += -I../../xen/common/libelf
 
-libelf-tools.o: libelf-tools.c libelf-private.h
-libelf-loader.o: libelf-loader.c libelf-private.h
-libelf-dominfo.o: libelf-dominfo.c libelf-private.h
-libelf-relocate.o: libelf-relocate.c libelf-private.h
-
-$(LIBELF_SRCS) libelf-private.h:
-	ln -s ../../xen/common/libelf/$@ $@
-
-# add libelf bits to libxc
-GUEST_SRCS-y += $(LIBELF_SRCS)
+GUEST_SRCS-y += libelf-tools.c libelf-loader.c
+GUEST_SRCS-y += libelf-dominfo.c libelf-relocate.c
 
 # new domain builder
 GUEST_SRCS-y += xc_dom_core.c xc_dom_boot.c
@@ -125,8 +116,7 @@ TAGS:
 clean:
 	rm -rf *.rpm $(LIB) *~ $(DEPS) xen \
             $(CTRL_LIB_OBJS) $(CTRL_PIC_OBJS) \
-            $(GUEST_LIB_OBJS) $(GUEST_PIC_OBJS) \
-            $(LIBELF_SRCS) libelf-private.h
+            $(GUEST_LIB_OBJS) $(GUEST_PIC_OBJS)
 
 .PHONY: rpm
 rpm: build
