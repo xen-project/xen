@@ -2,17 +2,19 @@ XEN_ROOT = ../..
 include $(XEN_ROOT)/tools/Rules.mk
 
 .PHONY: all
-all:
-	$(MAKE) .dir
+all: xen-foreign xen/.dir
 
-.dir:
+.PHONY: xen-foreign
+xen-foreign:
+	$(MAKE) -C xen-foreign
+
+xen/.dir:
 	@rm -rf xen
 	mkdir xen
 	ln -sf ../$(XEN_ROOT)/xen/include/public/COPYING xen
 	ln -sf $(addprefix ../,$(wildcard $(XEN_ROOT)/xen/include/public/*.h)) xen
 	ln -sf $(addprefix ../$(XEN_ROOT)/xen/include/public/,arch-ia64 arch-x86 hvm io xsm) xen
 	ln -sf ../xen-sys/$(XEN_OS) xen/sys
-	$(MAKE) -C xen-foreign
 	ln -s ../xen-foreign xen/foreign
 	touch $@
 
@@ -37,6 +39,6 @@ install: all
 
 .PHONY: clean
 clean:
-	rm -rf xen .dir
+	rm -rf xen
 	$(MAKE) -C xen-foreign clean
 

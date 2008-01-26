@@ -118,7 +118,7 @@
 ^tools/firmware/vmxassist/offsets\.h$
 ^tools/firmware/vmxassist/vmxassist$
 ^tools/flask/loadpolicy/flask-loadpolicy$
-^tools/include/\.dir$
+^tools/include/xen$
 ^tools/include/xen-foreign/.*\.(c|h|size)$
 ^tools/include/xen-foreign/checker$
 ^tools/ioemu/\.pc/.*$
