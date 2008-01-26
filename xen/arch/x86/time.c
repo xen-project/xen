@@ -732,8 +732,10 @@ int cpu_frequency_change(u64 freq)
     local_irq_disable();
     rdtscll(curr_tsc);
     t->local_tsc_stamp = curr_tsc;
-    t->stime_local_stamp = get_s_time();
     t->stime_master_stamp = read_platform_stime();
+    /* TSC-extrapolated time may be bogus after frequency change. */
+    /*t->stime_local_stamp = get_s_time();*/
+    t->stime_local_stamp = t->stime_master_stamp;
     set_time_scale(&t->tsc_scale, freq);
     local_irq_enable();
 
