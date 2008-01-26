@@ -2,7 +2,6 @@ XEN_ROOT=../../..
 include $(XEN_ROOT)/Config.mk
 
 ROOT = $(XEN_ROOT)/xen/include/public/foreign
-#VPATH = $(ROOT)
 HOSTCFLAGS += -I$(ROOT)
 
 MKHEADER_PY = $(ROOT)/mkheader.py
