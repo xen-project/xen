@@ -37,14 +37,14 @@ endif
 .PHONY: all
 all: check
 	@set -e; for subdir in $(SUBDIRS-y); do \
-		$(MAKE) -C $$subdir $@; \
+		$(MAKE) subdir-$@-$$subdir; \
 	done
 	$(MAKE) ioemu
 
 .PHONY: install
 install: check
 	@set -e; for subdir in $(SUBDIRS-y); do \
-		$(MAKE) -C $$subdir $@; \
+		$(MAKE) subdir-$@-$$subdir; \
 	done
 	$(MAKE) ioemuinstall
 	$(INSTALL_DIR) $(DESTDIR)/var/xen/dump
@@ -54,12 +54,21 @@ install: check
 .PHONY: clean
 clean: check_clean
 	@set -e; for subdir in $(SUBDIRS-y); do \
-		$(MAKE) -C $$subdir $@; \
+		$(MAKE) subdir-$@-$$subdir; \
 	done
 	$(MAKE) ioemuclean
 
 .PHONY: distclean
 distclean: clean
+
+subdir-all-%:
+	$(MAKE) -C $* all
+
+subdir-clean-%:
+	$(MAKE) -C $* clean
+
+subdir-install-%:
+	$(MAKE) -C $* install
 
 .PHONY: check
 check:
