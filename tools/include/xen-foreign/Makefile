@@ -1,14 +1,14 @@
 XEN_ROOT=../../..
 include $(XEN_ROOT)/Config.mk
 
-ROOT = $(XEN_ROOT)/xen/include/public/foreign
-HOSTCFLAGS += -I$(ROOT)
+ROOT = $(XEN_ROOT)/xen/include/public
+HOSTCFLAGS += -I$(ROOT)/foreign
 
-MKHEADER_PY = $(ROOT)/mkheader.py
+MKCHECKER_PY = $(ROOT)/foreign/mkchecker.py
+MKHEADER_PY = $(ROOT)/foreign/mkheader.py
 
 architectures := x86_32 x86_64 ia64
 headers := $(patsubst %, %.h, $(architectures))
-scripts := $(wildcard *.py)
 
 .PHONY: all clean check-headers
 all: $(headers) check-headers
@@ -24,21 +24,21 @@ checker: checker.c $(headers)
 
 check-headers: checker
 	./checker > tmp.size
-	diff -u $(ROOT)/reference.size tmp.size
+	diff -u $(ROOT)/foreign/reference.size tmp.size
 	rm tmp.size
 else
 check-headers:
 	@echo "cross build: skipping check"
 endif
 
-x86_32.h: $(ROOT)/mkheader.py ../xen/arch-x86/xen-x86_32.h ../xen/arch-x86/xen.h ../xen/xen.h
+x86_32.h: $(MKHEADER_PY) $(ROOT)/arch-x86/xen-x86_32.h $(ROOT)/arch-x86/xen.h $(ROOT)/xen.h
 	python $< $* $@ $(filter %.h,$^)
 
-x86_64.h: $(ROOT)/mkheader.py ../xen/arch-x86/xen-x86_64.h ../xen/arch-x86/xen.h ../xen/xen.h
+x86_64.h: $(MKHEADER_PY) $(ROOT)/arch-x86/xen-x86_64.h $(ROOT)/arch-x86/xen.h $(ROOT)/xen.h
 	python $< $* $@ $(filter %.h,$^)
 
-ia64.h: $(ROOT)/mkheader.py ../xen/arch-ia64.h ../xen/xen.h
+ia64.h: $(MKHEADER_PY) $(ROOT)/arch-ia64.h $(ROOT)/xen.h
 	python $< $* $@ $(filter %.h,$^)
 
-checker.c: $(ROOT)/mkchecker.py
+checker.c: $(MKCHECKER_PY)
 	python $< $(XEN_TARGET_ARCH) $@ $(architectures)
