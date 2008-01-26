@@ -2,6 +2,7 @@ XEN_ROOT = ../
 include $(XEN_ROOT)/tools/Rules.mk
 
 SUBDIRS-y :=
+SUBDIRS-y += check
 SUBDIRS-y += include
 SUBDIRS-y += libxc
 SUBDIRS-y += flask
@@ -36,13 +37,13 @@ export CROSS_SYS_ROOT
 endif
 
 .PHONY: all
-all: check
+all:
 	@set -e; for subdir in $(SUBDIRS-y); do \
 		$(MAKE) subdir-$@-$$subdir; \
 	done
 
 .PHONY: install
-install: check
+install:
 	@set -e; for subdir in $(SUBDIRS-y); do \
 		$(MAKE) subdir-$@-$$subdir; \
 	done
@@ -51,7 +52,7 @@ install: check
 	$(INSTALL_DIR) $(DESTDIR)/var/lib/xen
 
 .PHONY: clean
-clean: check_clean
+clean:
 	@set -e; for subdir in $(SUBDIRS-y); do \
 		$(MAKE) subdir-$@-$$subdir; \
 	done
@@ -67,14 +68,6 @@ subdir-clean-%:
 
 subdir-install-%:
 	$(MAKE) -C $* install
-
-.PHONY: check
-check:
-	$(MAKE) -C check
-
-.PHONY: check_clean
-check_clean:
-	$(MAKE) -C check clean
 
 ifneq ($(XEN_COMPILE_ARCH),$(XEN_TARGET_ARCH))
 IOEMU_CONFIGURE_CROSS ?= --cross-prefix=$(CROSS_COMPILE) \
