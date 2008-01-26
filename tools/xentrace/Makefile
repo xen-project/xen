@@ -5,6 +5,7 @@ CFLAGS  += -Werror
 
 CFLAGS  += -I $(XEN_XC)
 CFLAGS  += -I $(XEN_LIBXC)
+CFLAGS  += -I $(XEN_INCLUDE)
 
 HDRS     = $(wildcard *.h)
 OBJS     = $(patsubst %.c,%.o,$(wildcard *.c))

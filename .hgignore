@@ -118,6 +118,9 @@
 ^tools/firmware/vmxassist/offsets\.h$
 ^tools/firmware/vmxassist/vmxassist$
 ^tools/flask/loadpolicy/flask-loadpolicy$
+^tools/include/\.dir$
+^tools/include/xen-foreign/.*\.(c|h|size)$
+^tools/include/xen-foreign/checker$
 ^tools/ioemu/\.pc/.*$
 ^tools/ioemu/config-host\.h$
 ^tools/ioemu/config-host\.mak$
@@ -227,8 +230,6 @@
 ^xen/include/asm-ia64/asm-xsi-offsets\.h$
 ^xen/include/compat/.*$
 ^xen/include/hypervisor-ifs/arch$
-^xen/include/public/foreign/.*\.(c|h|size)$
-^xen/include/public/foreign/checker$
 ^xen/include/public/public$
 ^xen/include/xen/.*\.new$
 ^xen/include/xen/acm_policy\.h$

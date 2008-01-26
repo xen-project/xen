@@ -50,7 +50,7 @@ GUEST_SRCS-$(CONFIG_POWERPC) += xc_dom_powerpc.c
 -include $(XEN_TARGET_ARCH)/Makefile
 
 CFLAGS   += -Werror -Wmissing-prototypes
-CFLAGS   += $(INCLUDES) -I. -I../xenstore
+CFLAGS   += $(INCLUDES) -I. -I../xenstore -I../include
 
 # Needed for posix_fadvise64() in xc_linux.c
 CFLAGS-$(CONFIG_Linux) += -D_GNU_SOURCE
@@ -80,7 +80,7 @@ LIB += libxenguest.so libxenguest.so.$(MAJOR) libxenguest.so.$(MAJOR).$(MINOR)
 all: build
 
 .PHONY: build
-build: check-for-zlib mk-symlinks
+build: check-for-zlib
 	$(MAKE) $(LIB)
 
 .PHONY: check-for-zlib
@@ -114,7 +114,7 @@ TAGS:
 
 .PHONY: clean
 clean:
-	rm -rf *.rpm $(LIB) *~ $(DEPS) xen \
+	rm -rf *.rpm $(LIB) *~ $(DEPS) \
             $(CTRL_LIB_OBJS) $(CTRL_PIC_OBJS) \
             $(GUEST_LIB_OBJS) $(GUEST_PIC_OBJS)
 

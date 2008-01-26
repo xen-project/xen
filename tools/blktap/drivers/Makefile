@@ -1,7 +1,7 @@
 XEN_ROOT = ../../..
 include $(XEN_ROOT)/tools/Rules.mk
 
-INCLUDES += -I.. -I../lib
+INCLUDES += -I.. -I../lib -I$(XEN_INCLUDE)
 
 IBIN         = blktapctrl tapdisk
 QCOW_UTIL    = img2qcow qcow2raw qcow-create

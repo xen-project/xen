@@ -13,7 +13,7 @@ include $(XEN_ROOT)/tools/Rules.mk
 
 PROGRAMS_INSTALL_DIR = $(LIBDIR)/xen/bin
 
-INCLUDES += -I $(XEN_LIBXC) -I $(XEN_XENSTORE)
+INCLUDES += -I $(XEN_LIBXC) -I $(XEN_XENSTORE) -I$(XEN_INCLUDE)
 
 CFLAGS += -Werror
 CFLAGS += $(INCLUDES)

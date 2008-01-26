@@ -8,6 +8,7 @@ extra_compile_args  = [ "-fno-strict-aliasing", "-Werror" ]
 
 include_dirs = [ XEN_ROOT + "/tools/libxc",
                  XEN_ROOT + "/tools/xenstore",
+                 XEN_ROOT + "/tools/include",
                  ]
 
 library_dirs = [ XEN_ROOT + "/tools/libxc",

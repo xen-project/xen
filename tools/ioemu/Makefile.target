@@ -18,6 +18,7 @@ VPATH=$(SRC_PATH):$(TARGET_PATH):$(SRC_PATH)/hw:$(SRC_PATH)/audio
 CPPFLAGS=-I. -I.. -I$(TARGET_PATH) -I$(SRC_PATH)
 CPPFLAGS+= -I$(XEN_ROOT)/tools/libxc
 CPPFLAGS+= -I$(XEN_ROOT)/tools/xenstore
+CPPFLAGS+= -I$(XEN_ROOT)/tools/include
 ifdef CONFIG_DARWIN_USER
 VPATH+=:$(SRC_PATH)/darwin-user
 CPPFLAGS+=-I$(SRC_PATH)/darwin-user -I$(SRC_PATH)/darwin-user/$(TARGET_ARCH)

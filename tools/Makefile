@@ -2,6 +2,7 @@ XEN_ROOT = ../
 include $(XEN_ROOT)/tools/Rules.mk
 
 SUBDIRS-y :=
+SUBDIRS-y += include
 SUBDIRS-y += libxc
 SUBDIRS-y += flask
 SUBDIRS-y += xenstore

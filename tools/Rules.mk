@@ -5,6 +5,7 @@ all:
 
 include $(XEN_ROOT)/Config.mk
 
+XEN_INCLUDE        = $(XEN_ROOT)/tools/include
 XEN_XC             = $(XEN_ROOT)/tools/python/xen/lowlevel/xc
 XEN_LIBXC          = $(XEN_ROOT)/tools/libxc
 XEN_XENSTORE       = $(XEN_ROOT)/tools/xenstore
@@ -37,26 +38,3 @@ $(eval $(check-y))
 %.o: %.cc
 	$(CC) $(CPPFLAGS) $(CXXFLAGS) -c -o $@ $<
 
-.PHONY: mk-symlinks
-
-mk-symlinks:
-	mkdir -p xen/sys
-	( cd xen/sys && \
-	  ln -sf ../../$(XEN_ROOT)/tools/include/$(XEN_OS)/*.h . )
-	mkdir -p xen
-	( cd xen && ln -sf ../$(XEN_ROOT)/xen/include/public/*.h . )
-	mkdir -p xen/hvm
-	( cd xen/hvm && ln -sf ../../$(XEN_ROOT)/xen/include/public/hvm/*.h . )
-	mkdir -p xen/io
-	( cd xen/io && ln -sf ../../$(XEN_ROOT)/xen/include/public/io/*.h . )
-	mkdir -p xen/xsm
-	( cd xen/xsm && ln -sf ../../$(XEN_ROOT)/xen/include/public/xsm/*.h . )
-	mkdir -p xen/arch-x86
-	( cd xen/arch-x86 && ln -sf ../../$(XEN_ROOT)/xen/include/public/arch-x86/*.h . )
-	mkdir -p xen/arch-ia64
-	( cd xen/arch-ia64 && ln -sf ../../$(XEN_ROOT)/xen/include/public/arch-ia64/*.h . )
-	mkdir -p xen/foreign
-	( cd xen/foreign && ln -sf ../../$(XEN_ROOT)/xen/include/public/foreign/Makefile . )
-	( cd xen/foreign && ln -sf ../../$(XEN_ROOT)/xen/include/public/foreign/reference.size . )
-	( cd xen/foreign && ln -sf ../../$(XEN_ROOT)/xen/include/public/foreign/*.py . )
-	$(MAKE) -C xen/foreign

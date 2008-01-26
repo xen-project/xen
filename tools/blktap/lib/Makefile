@@ -5,7 +5,7 @@ MAJOR    = 3.0
 MINOR    = 0
 SONAME   = libblktap.so.$(MAJOR)
 
-INCLUDES += -I. -I.. -I $(XEN_LIBXC) -I $(XEN_XENSTORE)
+INCLUDES += -I. -I.. -I $(XEN_LIBXC) -I $(XEN_XENSTORE) -I$(XEN_INCLUDE)
 
 LIBS     := -lxenstore
 

@@ -22,30 +22,13 @@ build install debug clean distclean cscope TAGS tags MAP::
 _build: $(TARGET).gz
 
 .PHONY: _install
-_install: $(TARGET).gz build-headers
+_install: $(TARGET).gz
 	[ -d $(DESTDIR)/boot ] || $(INSTALL_DIR) $(DESTDIR)/boot
 	$(INSTALL_DATA) $(TARGET).gz $(DESTDIR)/boot/$(notdir $(TARGET))-$(XEN_FULLVERSION).gz
 	ln -f -s $(notdir $(TARGET))-$(XEN_FULLVERSION).gz $(DESTDIR)/boot/$(notdir $(TARGET))-$(XEN_VERSION).$(XEN_SUBVERSION).gz
 	ln -f -s $(notdir $(TARGET))-$(XEN_FULLVERSION).gz $(DESTDIR)/boot/$(notdir $(TARGET))-$(XEN_VERSION).gz
 	ln -f -s $(notdir $(TARGET))-$(XEN_FULLVERSION).gz $(DESTDIR)/boot/$(notdir $(TARGET)).gz
 	$(INSTALL_DATA) $(TARGET)-syms $(DESTDIR)/boot/$(notdir $(TARGET))-syms-$(XEN_FULLVERSION)
-	[ -d $(DESTDIR)/usr/include/xen/arch-x86 ] || \
-		$(INSTALL_DIR) $(DESTDIR)/usr/include/xen/arch-x86
-	[ -d $(DESTDIR)/usr/include/xen/hvm ] || \
-		$(INSTALL_DIR) $(DESTDIR)/usr/include/xen/hvm
-	[ -d $(DESTDIR)/usr/include/xen/io ] || \
-		$(INSTALL_DIR) $(DESTDIR)/usr/include/xen/io
-	[ -d $(DESTDIR)/usr/include/xen/xsm ] || \
-		$(INSTALL_DIR) $(DESTDIR)/usr/include/xen/xsm
-	[ -d $(DESTDIR)/usr/include/xen/foreign ] || \
-		$(INSTALL_DIR) $(DESTDIR)/usr/include/xen/foreign
-	$(INSTALL_DATA) include/public/*.h $(DESTDIR)/usr/include/xen
-	$(INSTALL_DATA) include/public/arch-x86/*.h $(DESTDIR)/usr/include/xen/arch-x86
-	$(INSTALL_DATA) include/public/hvm/*.h $(DESTDIR)/usr/include/xen/hvm
-	$(INSTALL_DATA) include/public/io/*.h $(DESTDIR)/usr/include/xen/io
-	$(INSTALL_DATA) include/public/xsm/*.h $(DESTDIR)/usr/include/xen/xsm
-	$(INSTALL_DATA) include/public/foreign/*.h $(DESTDIR)/usr/include/xen/foreign
-	$(INSTALL_DATA) include/public/COPYING $(DESTDIR)/usr/include/xen
 
 .PHONY: _debug
 _debug:
@@ -54,7 +37,6 @@ _debug:
 .PHONY: _clean
 _clean: delete-unfresh-files
 	$(MAKE) -C tools clean
-	$(MAKE) -C include/public/foreign clean
 	$(MAKE) -f $(BASEDIR)/Rules.mk -C include clean
 	$(MAKE) -f $(BASEDIR)/Rules.mk -C common clean
 	$(MAKE) -f $(BASEDIR)/Rules.mk -C drivers clean
@@ -71,7 +53,7 @@ $(TARGET).gz: $(TARGET)
 	gzip -f -9 < $< > $@.new
 	mv $@.new $@
 
-$(TARGET): delete-unfresh-files build-headers
+$(TARGET): delete-unfresh-files
 	$(MAKE) -C tools
 	$(MAKE) -f $(BASEDIR)/Rules.mk include/xen/compile.h
 	[ -e include/asm ] || ln -sf asm-$(TARGET_ARCH) include/asm
@@ -119,11 +101,6 @@ include/asm-$(TARGET_ARCH)/asm-offsets.h: arch/$(TARGET_ARCH)/asm-offsets.s
 	  sed -ne "/^->/{s:^->\([^ ]*\) [\$$#]*\([^ ]*\) \(.*\):#define \1 \2 /* \3 */:; s:->::; p;}"; \
 	  echo ""; \
 	  echo "#endif") <$< >$@
-
-# generate header files
-.PHONY: build-headers
-build-headers:
-	$(MAKE) -C include/public/foreign
 
 SUBDIRS = xsm arch/$(TARGET_ARCH) common drivers
 define all_sources

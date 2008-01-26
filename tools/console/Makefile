@@ -8,6 +8,7 @@ CFLAGS  += -Werror
 
 CFLAGS  += -I $(XEN_LIBXC)
 CFLAGS  += -I $(XEN_XENSTORE)
+CFLAGS  += -I $(XEN_INCLUDE)
 
 BIN      = xenconsoled xenconsole
 
