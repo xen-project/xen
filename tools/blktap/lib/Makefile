@@ -7,7 +7,7 @@ SONAME   = libblktap.so.$(MAJOR)
 
 INCLUDES += -I. -I.. -I $(XEN_LIBXC) -I $(XEN_XENSTORE)
 
-LIBS     := -lz
+LIBS     := -lxenstore
 
 SRCS     :=
 SRCS     += xenbus.c blkif.c xs_api.c
@@ -50,7 +50,7 @@ clean:
 
 libblktap.a: $(OBJS) 
 	$(CC) $(CFLAGS) -Wl,$(SONAME_LDFLAG) -Wl,$(SONAME) $(SHLIB_CFLAGS) \
-	      -L$(XEN_XENSTORE) $(LDFLAGS) -l xenstore                                \
+	      -L$(XEN_XENSTORE) $(LDFLAGS)                                 \
 	      -o libblktap.so.$(MAJOR).$(MINOR) $^ $(LIBS)
 	ln -sf libblktap.so.$(MAJOR).$(MINOR) libblktap.so.$(MAJOR)
 	ln -sf libblktap.so.$(MAJOR) libblktap.so

@@ -17,15 +17,11 @@ CFLAGS   += -D_GNU_SOURCE
 CFLAGS   += -Wp,-MD,.$(@F).d
 DEPS      = .*.d
 
-THREADLIB := -lpthread -lz
 LIBS      := -L. -L.. -L../lib
 LIBS      += -L$(XEN_LIBXC)
-LIBS      += -lblktap -lxenctrl
-LIBS      += -lcrypto
-LIBS      += -lz
-LIBS      += -L$(XEN_XENSTORE) -lxenstore
+LIBS      += -Wl,-rpath-link,$(XEN_XENSTORE)
 
-AIOLIBS   := $(LIBAIO_DIR)/libaio.a
+LIBS_IMG  := $(LIBAIO_DIR)/libaio.a -lcrypto -lpthread -lz
 
 BLK-OBJS-y  := block-aio.o
 BLK-OBJS-y  += block-sync.o
@@ -39,17 +35,16 @@ BLK-OBJS-$(CONFIG_Linux) += blk_linux.c
 all: $(IBIN) qcow-util
 
 blktapctrl: blktapctrl.c
-	$(CC) $(CFLAGS) -o blktapctrl $(LDFLAGS) $(LIBS) blktapctrl.c
+	$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS) $(LIBS) -lblktap -lxenctrl
 
-tapdisk: $(BLK-OBJS-y) tapdisk.c
-	$(CC) $(CFLAGS) -o tapdisk $(BLK-OBJS-y) tapdisk.c \
-		$(AIOLIBS) $(LDFLAGS) $(LIBS)
+tapdisk: tapdisk.c $(BLK-OBJS-y) tapdisk.c
+	$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS) $(LIBS) $(LIBS_IMG)
 
 .PHONY: qcow-util
 qcow-util: img2qcow qcow2raw qcow-create
 
 img2qcow qcow2raw qcow-create: %: $(BLK-OBJS-y)
-	$(CC) $(CFLAGS) -o $* $(BLK-OBJS-y) $*.c $(LDFLAGS) $(AIOLIBS) $(LIBS)
+	$(CC) $(CFLAGS) -o $* $(BLK-OBJS-y) $*.c $(LDFLAGS) $(LIBS_IMG)
 
 install: all
 	$(INSTALL_PROG) $(IBIN) $(QCOW_UTIL) $(VHD_UTIL) $(DESTDIR)$(SBINDIR)
