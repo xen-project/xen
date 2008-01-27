@@ -16,6 +16,9 @@ CFLAGS_include = -I$(XEN_INCLUDE)
 CFLAGS_libxenctrl = -I$(XEN_LIBXC) $(CFLAGS_include)
 LDFLAGS_libxenctrl = -L$(XEN_LIBXC) -lxenctrl
 
+CFLAGS_libxenguest = -I$(XEN_LIBXC) $(CFLAGS_include)
+LDFLAGS_libxenguest = -L$(XEN_LIBXC) -lxenguest
+
 X11_LDPATH = -L/usr/X11R6/$(LIBDIR)
 
 CFLAGS += -D__XEN_TOOLS__

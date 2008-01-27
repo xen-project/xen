@@ -11,10 +11,8 @@
 XEN_ROOT	= ../..
 include $(XEN_ROOT)/tools/Rules.mk
 
-INCLUDES += $(CFLAGS_libxenctrl) -I $(XEN_XENSTORE) -I$(XEN_INCLUDE)
-
 CFLAGS += -Werror
-CFLAGS += $(INCLUDES)
+CFLAGS += $(CFLAGS_libxenctrl) $(CFLAGS_libxenguest) -I$(XEN_XENSTORE)
 
 # Make gcc generate dependencies.
 CFLAGS += -Wp,-MD,.$(@F).d
@@ -22,7 +20,7 @@ PROG_DEP = .*.d
 
 PROGRAMS = xc_restore xc_save readnotes
 
-LDLIBS   = $(LDFLAGS_libxenctrl) -L$(XEN_XENSTORE) -lxenguest -lxenstore
+LDLIBS   = $(LDFLAGS_libxenctrl) $(LDFLAGS_libxenguest) -L$(XEN_XENSTORE) -lxenstore
 
 .PHONY: all
 all: build
