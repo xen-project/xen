@@ -29,7 +29,7 @@ install: all
 	$(INSTALL_DIR) $(DESTDIR)$(INCLUDEDIR)/xen/xsm
 	$(INSTALL_DATA) xen/COPYING $(DESTDIR)$(INCLUDEDIR)/xen
 	$(INSTALL_DATA) xen/*.h $(DESTDIR)$(INCLUDEDIR)/xen
-	$(INSTALL_DATA) xen/arch-ia64/*.h $(DESTDIR)$(INCLUDEDIR)/xen/arch-x86
+	$(INSTALL_DATA) xen/arch-ia64/*.h $(DESTDIR)$(INCLUDEDIR)/xen/arch-ia64
 	$(INSTALL_DATA) xen/arch-x86/*.h $(DESTDIR)$(INCLUDEDIR)/xen/arch-x86
 	$(INSTALL_DATA) xen/foreign/*.h $(DESTDIR)$(INCLUDEDIR)/xen/foreign
 	$(INSTALL_DATA) xen/hvm/*.h $(DESTDIR)$(INCLUDEDIR)/xen/hvm
