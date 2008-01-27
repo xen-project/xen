@@ -80,8 +80,11 @@ LIB += libxenguest.so libxenguest.so.$(MAJOR) libxenguest.so.$(MAJOR).$(MINOR)
 all: build
 
 .PHONY: build
-build: $(LIB)
-	$(MAKE) $(LIB)
+build:
+	$(MAKE) libs
+
+.PHONY: libs
+libs: $(LIB)
 
 .PHONY: install
 install: build
