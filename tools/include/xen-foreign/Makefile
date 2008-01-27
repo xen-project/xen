@@ -18,7 +18,6 @@ clean:
 	rm -f checker checker.c
 	rm -f *.pyc *.o *~
 
-ifeq ($(CROSS_COMPILE)$(XEN_TARGET_ARCH),$(XEN_COMPILE_ARCH))
 checker: checker.c $(headers)
 	$(HOSTCC) $(HOSTCFLAGS) -o $@ $<
 
@@ -26,10 +25,6 @@ check-headers: checker
 	./checker > tmp.size
 	diff -u $(ROOT)/foreign/reference.size tmp.size
 	rm tmp.size
-else
-check-headers:
-	@echo "cross build: skipping check"
-endif
 
 x86_32.h: $(MKHEADER_PY) $(ROOT)/arch-x86/xen-x86_32.h $(ROOT)/arch-x86/xen.h $(ROOT)/xen.h
 	python $< $* $@ $(filter %.h,$^)
@@ -41,4 +36,4 @@ ia64.h: $(MKHEADER_PY) $(ROOT)/arch-ia64.h $(ROOT)/xen.h
 	python $< $* $@ $(filter %.h,$^)
 
 checker.c: $(MKCHECKER_PY)
-	python $< $(XEN_TARGET_ARCH) $@ $(architectures)
+	python $< $@ $(architectures)

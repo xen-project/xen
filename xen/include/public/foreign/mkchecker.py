@@ -4,9 +4,8 @@ import sys;
 from structs import structs;
 
 # command line arguments
-arch    = sys.argv[1];
-outfile = sys.argv[2];
-archs   = sys.argv[3:];
+outfile = sys.argv[1];
+archs   = sys.argv[2:];
 
 f = open(outfile, "w");
 f.write('''
@@ -38,10 +37,7 @@ f.write('\tprintf("\\n");');
 for struct in structs:
     f.write('\tprintf("%%-25s |", "%s");\n' % struct);
     for a in archs:
-        if a == arch:
-            s = struct; # native
-        else:
-            s = struct + "_" + a;
+        s = struct + "_" + a;
         f.write('#ifdef %s_has_no_%s\n' % (a, struct));
         f.write('\tprintf("%8s", "-");\n');
         f.write("#else\n");
