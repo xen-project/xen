@@ -19,7 +19,7 @@ LDFLAGS_libxenctrl = -L$(XEN_LIBXC) -lxenctrl
 CFLAGS_libxenguest = -I$(XEN_LIBXC) $(CFLAGS_include)
 LDFLAGS_libxenguest = -L$(XEN_LIBXC) -lxenguest
 
-CFLAGS_libxenstore = -I$(XEN_XENSTORE)
+CFLAGS_libxenstore = -I$(XEN_XENSTORE) $(CFLAGS_include)
 LDFLAGS_libxenstore = -L$(XEN_XENSTORE) -lxenstore
 
 X11_LDPATH = -L/usr/X11R6/$(LIBDIR)
