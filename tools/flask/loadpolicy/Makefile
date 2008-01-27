@@ -12,10 +12,9 @@ BASECFLAGS += -Wp,-MD,.$(@F).d
 PROG_DEP = .*.d
 BASECFLAGS+= $(PROFILE)
 #BASECFLAGS+= -I$(XEN_ROOT)/tools
-BASECFLAGS+= -I$(LIBXC_ROOT)
+BASECFLAGS+= $(CFLAGS_libxenctrl)
 BASECFLAGS+= -I$(LIBFLASK_ROOT)/include
 BASECFLAGS+= -I.
-BASECFLAGS+= -I$(XEN_INCLUDE)
 
 CFLAGS  += $(BASECFLAGS)
 LDFLAGS += $(PROFILE) -L$(XEN_LIBXC) -L$(LIBFLASK_ROOT)
@@ -31,7 +30,7 @@ CLIENTS_OBJS := $(patsubst flask-%,%.o,$(CLIENTS))
 all: $(CLIENTS)
 
 $(CLIENTS): flask-%: %.o
-	$(CC) $(CFLAGS) $(LDFLAGS) $< $(LOADLIBES) $(LDLIBS) -L. -lflask -lxenctrl -o $@
+	$(CC) $(CFLAGS) $(LDFLAGS) $< $(LOADLIBES) $(LDLIBS) -L. -lflask $(LDFLAGS_libxenctrl) -o $@
 
 $(CLIENTS_OBJS): $(CLIENTS_SRCS)
 	$(COMPILE.c) -o $@ $<

@@ -4,9 +4,9 @@ include $(XEN_ROOT)/tools/Rules.mk
 
 CFLAGS  += -Werror
 
-CFLAGS  += -I $(XEN_LIBXC)
+CFLAGS  += $(CFLAGS_libxenctrl)
 CFLAGS  += -I $(XEN_XENSTORE)
-CFLAGS  += -I $(XEN_INCLUDE)
+LDFLAGS += $(LDFLAGS_libxenctrl)
 
 BIN      = xenconsoled xenconsole
 
@@ -19,12 +19,12 @@ clean:
 	$(RM) client/*.o daemon/*.o
 
 xenconsoled: $(patsubst %.c,%.o,$(wildcard daemon/*.c))
-	$(CC) $(CFLAGS) $^ -o $@ $(LDFLAGS) -L$(XEN_LIBXC) -L$(XEN_XENSTORE) \
-              $(UTIL_LIBS) $(SOCKET_LIBS) -lxenctrl -lxenstore
+	$(CC) $(CFLAGS) $^ -o $@ $(LDFLAGS) -L$(XEN_XENSTORE) \
+              $(UTIL_LIBS) $(SOCKET_LIBS) -lxenstore
 
 xenconsole: $(patsubst %.c,%.o,$(wildcard client/*.c))
-	$(CC) $(CFLAGS) $^ -o $@ $(LDFLAGS) -L$(XEN_LIBXC) -L$(XEN_XENSTORE) \
-	      $(UTIL_LIBS) $(SOCKET_LIBS) -lxenctrl -lxenstore
+	$(CC) $(CFLAGS) $^ -o $@ $(LDFLAGS) -L$(XEN_XENSTORE) \
+	      $(UTIL_LIBS) $(SOCKET_LIBS) -lxenstore
 
 .PHONY: install
 install: $(BIN)

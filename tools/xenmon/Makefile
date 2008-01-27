@@ -15,9 +15,8 @@ include $(XEN_ROOT)/tools/Rules.mk
 
 CFLAGS  += -Werror
 CFLAGS  += -I $(XEN_XC)
-CFLAGS  += -I $(XEN_LIBXC)
-CFLAGS  += -I $(XEN_INCLUDE)
-LDFLAGS += -L $(XEN_LIBXC)
+CFLAGS  += $(CFLAGS_libxenctrl)
+LDFLAGS += $(LDFLAGS_libxenctrl)
 
 BIN = xentrace_setmask xenbaked
 SCRIPTS = xenmon.py
@@ -41,6 +40,6 @@ clean:
 
 
 %: %.c Makefile
-	$(CC) $(CFLAGS) $(LDFLAGS) -lxenctrl -o $@ $<
+	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $<
 xentrace_%: %.c Makefile
-	$(CC) $(CFLAGS) $(LDFLAGS) -lxenctrl -o $@ $<
+	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $<

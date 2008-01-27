@@ -11,6 +11,11 @@ XEN_LIBXC          = $(XEN_ROOT)/tools/libxc
 XEN_XENSTORE       = $(XEN_ROOT)/tools/xenstore
 XEN_LIBXENSTAT     = $(XEN_ROOT)/tools/xenstat/libxenstat/src
 
+CFLAGS_include = -I$(XEN_INCLUDE)
+
+CFLAGS_libxenctrl = -I$(XEN_LIBXC) $(CFLAGS_include)
+LDFLAGS_libxenctrl = -L$(XEN_LIBXC) -lxenctrl
+
 X11_LDPATH = -L/usr/X11R6/$(LIBDIR)
 
 CFLAGS += -D__XEN_TOOLS__

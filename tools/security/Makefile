@@ -3,7 +3,7 @@ include $(XEN_ROOT)/tools/Rules.mk
 
 CFLAGS   += -Werror
 CFLAGS   += -fno-strict-aliasing
-CFLAGS   += -I. -I $(XEN_LIBXC)
+CFLAGS   += -I. $(CFLAGS_libxenctrl)
 
 CPPFLAGS += -MMD -MF .$*.d
 PROG_DEPS = .*.d
@@ -82,7 +82,7 @@ build: $(ACM_INST_TOOLS) $(ACM_NOINST_TOOLS)
 	chmod 700 $(ACM_SCRIPTS)
 
 xensec_tool: $(OBJS_TOOL)
-	$(CC) -g $(CFLAGS) $(LDFLAGS) -O0 -o $@ $^ -L$(XEN_LIBXC) -lxenctrl
+	$(CC) -g $(CFLAGS) $(LDFLAGS) -O0 -o $@ $^ $(LDFLAGS_libxenctrl)
 
 xensec_gen: xensec_gen.py
 	cp -f $^ $@

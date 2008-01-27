@@ -9,7 +9,7 @@ LIBAIO_DIR   = ../../libaio/src
 
 CFLAGS   += -Werror
 CFLAGS   += -Wno-unused
-CFLAGS   += -I $(XEN_LIBXC) -I $(LIBAIO_DIR)
+CFLAGS   += $(CFLAGS_libxenctrl) -I $(LIBAIO_DIR)
 CFLAGS   += $(INCLUDES) -I. -I../../xenstore 
 CFLAGS   += -D_GNU_SOURCE
 
@@ -18,7 +18,6 @@ CFLAGS   += -Wp,-MD,.$(@F).d
 DEPS      = .*.d
 
 LIBS      := -L. -L.. -L../lib
-LIBS      += -L$(XEN_LIBXC)
 LIBS      += -Wl,-rpath-link,$(XEN_XENSTORE)
 
 LIBS_IMG  := $(LIBAIO_DIR)/libaio.a -lcrypto -lpthread -lz
@@ -35,7 +34,7 @@ BLK-OBJS-$(CONFIG_Linux) += blk_linux.c
 all: $(IBIN) qcow-util
 
 blktapctrl: blktapctrl.c
-	$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS) $(LIBS) -lblktap -lxenctrl
+	$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS) $(LIBS) -lblktap $(LDFLAGS_libxenctrl)
 
 tapdisk: tapdisk.c $(BLK-OBJS-y) tapdisk.c
 	$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS) $(LIBS) $(LIBS_IMG)

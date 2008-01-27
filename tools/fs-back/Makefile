@@ -8,7 +8,7 @@ IBIN         = fs-backend
 CFLAGS   += -Werror
 CFLAGS   += -Wno-unused
 CFLAGS   += -fno-strict-aliasing
-CFLAGS   += -I $(XEN_LIBXC)
+CFLAGS   += $(CFLAGS_libxenctrl)
 CFLAGS   += $(INCLUDES) -I. -I../xenstore 
 CFLAGS   += -D_GNU_SOURCE
 
@@ -17,8 +17,8 @@ CFLAGS   += -Wp,-MD,.$(@F).d
 DEPS      = .*.d
 
 LIBS      := -L. -L.. -L../lib
-LIBS      += -L$(XEN_LIBXC)
-LIBS      += -lxenctrl -lpthread -lrt 
+LIBS      += $(LDFLAGS_libxenctrl)
+LIBS      += -lpthread -lrt 
 LIBS      += -L$(XEN_XENSTORE) -lxenstore
 
 OBJS	  := fs-xenbus.o fs-ops.o

@@ -11,7 +11,7 @@
 XEN_ROOT	= ../..
 include $(XEN_ROOT)/tools/Rules.mk
 
-INCLUDES += -I $(XEN_LIBXC) -I $(XEN_XENSTORE) -I$(XEN_INCLUDE)
+INCLUDES += $(CFLAGS_libxenctrl) -I $(XEN_XENSTORE) -I$(XEN_INCLUDE)
 
 CFLAGS += -Werror
 CFLAGS += $(INCLUDES)
@@ -22,7 +22,7 @@ PROG_DEP = .*.d
 
 PROGRAMS = xc_restore xc_save readnotes
 
-LDLIBS   = -L$(XEN_LIBXC) -L$(XEN_XENSTORE) -lxenguest -lxenctrl -lxenstore
+LDLIBS   = $(LDFLAGS_libxenctrl) -L$(XEN_XENSTORE) -lxenguest -lxenstore
 
 .PHONY: all
 all: build

@@ -11,12 +11,11 @@ BASECFLAGS=-Werror
 BASECFLAGS += -Wp,-MD,.$(@F).d
 PROG_DEP = .*.d
 BASECFLAGS+= $(PROFILE)
-BASECFLAGS+= -I$(XEN_ROOT)/tools/libxc
+BASECFLAGS+= $(CFLAGS_libxenctrl)
 BASECFLAGS+= -I.
-BASECFLAGS+= -I$(XEN_INCLUDE)
 
 CFLAGS  += $(BASECFLAGS)
-LDFLAGS += $(PROFILE) -L$(XEN_LIBXC)
+LDFLAGS += $(PROFILE)
 
 CLIENTS := xenstore-exists xenstore-list xenstore-read xenstore-rm xenstore-chmod
 CLIENTS += xenstore-write
@@ -34,7 +33,7 @@ XENSTORED_OBJS += $(XENSTORED_OBJS_y)
 all: libxenstore.so libxenstore.a xenstored $(CLIENTS) xs_tdb_dump xenstore-control xenstore-ls
 
 xenstored: $(XENSTORED_OBJS)
-	$(CC) $(CFLAGS) $(LDFLAGS) $^ $(LOADLIBES) $(LDLIBS) -lxenctrl $(SOCKET_LIBS) -o $@
+	$(CC) $(CFLAGS) $(LDFLAGS) $^ $(LOADLIBES) $(LDLIBS) $(LDFLAGS_libxenctrl) $(SOCKET_LIBS) -o $@
 
 $(CLIENTS): xenstore-%: xenstore_%.o libxenstore.so
 	$(CC) $(CFLAGS) $(LDFLAGS) $< $(LOADLIBES) $(LDLIBS) -L. -lxenstore $(SOCKET_LIBS) -o $@

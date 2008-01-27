@@ -3,7 +3,7 @@ include $(XEN_ROOT)/tools/Rules.mk
 
 #CFLAGS  += -Werror -g -O0
 
-CFLAGS  += -I $(XEN_LIBXC)
+CFLAGS  += $(CFLAGS_libxenctrl)
 
 HDRS     = $(wildcard *.h)
 OBJS     = $(patsubst %.c,%.o,$(wildcard *.c))
@@ -40,8 +40,8 @@ clean:
 	$(RM) *.a *.so *.o *.rpm $(BIN) $(LIBBIN)
 
 %: %.c $(HDRS) Makefile
-	$(CC) $(CFLAGS) -o $@ $< -L$(XEN_LIBXC) -lxenctrl
+	$(CC) $(CFLAGS) -o $@ $< $(LDFLAGS_libxenctrl)
 
 XENITP_OBJS=xenitp.o ia64-dis.o ia64-opc.o cpu-ia64-opc.o
 xenitp: $(XENITP_OBJS)
-	$(CC) $(CFLAGS) -o $@ $(XENITP_OBJS) -L$(XEN_LIBXC) -lxenctrl
+	$(CC) $(CFLAGS) -o $@ $(XENITP_OBJS) $(LDFLAGS_libxenctrl)
