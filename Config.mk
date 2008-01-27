@@ -21,9 +21,6 @@ SHELL     ?= /bin/sh
 HOSTCC      = gcc
 HOSTCFLAGS  = -Wall -Werror -Wstrict-prototypes -O2 -fomit-frame-pointer
 HOSTCFLAGS += -fno-strict-aliasing
-HOSTCFLAGS_x86_32 = -m32
-HOSTCFLAGS_x86_64 = -m64
-HOSTCFLAGS += $(HOSTCFLAGS_$(XEN_COMPILE_ARCH))
 
 DISTDIR     ?= $(XEN_ROOT)/dist
 DESTDIR     ?= /
