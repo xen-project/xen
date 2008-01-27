@@ -80,17 +80,8 @@ LIB += libxenguest.so libxenguest.so.$(MAJOR) libxenguest.so.$(MAJOR).$(MINOR)
 all: build
 
 .PHONY: build
-build: check-for-zlib
+build: $(LIB)
 	$(MAKE) $(LIB)
-
-.PHONY: check-for-zlib
-check-for-zlib:
-	@if [ ! -e /usr/include/zlib.h ]; then \
-	echo "***********************************************************"; \
-	echo "ERROR: install zlib header files (http://www.gzip.org/zlib)"; \
-	echo "***********************************************************"; \
-	false; \
-	fi
 
 .PHONY: install
 install: build
