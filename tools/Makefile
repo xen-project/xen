@@ -51,14 +51,11 @@ install:
 	$(INSTALL_DIR) $(DESTDIR)/var/log/xen
 	$(INSTALL_DIR) $(DESTDIR)/var/lib/xen
 
-.PHONY: clean
-clean:
+.PHONY: clean distclean
+clean distclean:
 	@set -e; for subdir in $(SUBDIRS-y); do \
-		$(MAKE) subdir-$@-$$subdir; \
+		$(MAKE) subdir-clean-$$subdir; \
 	done
-
-.PHONY: distclean
-distclean: clean
 
 subdir-all-%:
 	$(MAKE) -C $* all
