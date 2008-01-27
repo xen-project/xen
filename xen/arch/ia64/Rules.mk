@@ -14,10 +14,6 @@ xen_ia64_tlb_track	?= y
 xen_ia64_tlb_track_cnt	?= n
 xen_ia64_tlbflush_clock	?= y
 
-ifneq ($(COMPILE_ARCH),$(TARGET_ARCH))
-CROSS_COMPILE ?= /usr/local/sp_env/v2.2.5/i686/bin/ia64-unknown-linux-
-endif
-
 # Used only by linux/Makefile.
 AFLAGS_KERNEL  += -mconstant-gp -nostdinc $(CPPFLAGS)
 

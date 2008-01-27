@@ -28,11 +28,7 @@ CFLAGS := $(shell echo $(CFLAGS) | sed -e 's/-f[^ ]*omit-frame-pointer//g')
 endif
 
 # Set ARCH/SUBARCH appropriately.
-override COMPILE_SUBARCH := $(XEN_COMPILE_ARCH)
 override TARGET_SUBARCH  := $(XEN_TARGET_ARCH)
-override COMPILE_ARCH    := $(shell echo $(XEN_COMPILE_ARCH) | \
-                              sed -e 's/x86.*/x86/' \
-                                  -e 's/powerpc.*/powerpc/')
 override TARGET_ARCH     := $(shell echo $(XEN_TARGET_ARCH) | \
                               sed -e 's/x86.*/x86/' \
                                   -e 's/powerpc.*/powerpc/')
