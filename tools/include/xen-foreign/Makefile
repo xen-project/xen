@@ -2,10 +2,6 @@ XEN_ROOT=../../..
 include $(XEN_ROOT)/Config.mk
 
 ROOT = $(XEN_ROOT)/xen/include/public
-HOSTCFLAGS += -I$(ROOT)/foreign
-
-MKCHECKER_PY = $(ROOT)/foreign/mkchecker.py
-MKHEADER_PY = $(ROOT)/foreign/mkheader.py
 
 architectures := x86_32 x86_64 ia64
 headers := $(patsubst %, %.h, $(architectures))
@@ -23,17 +19,17 @@ checker: checker.c $(headers)
 
 check-headers: checker
 	./checker > tmp.size
-	diff -u $(ROOT)/foreign/reference.size tmp.size
+	diff -u reference.size tmp.size
 	rm tmp.size
 
-x86_32.h: $(MKHEADER_PY) $(ROOT)/arch-x86/xen-x86_32.h $(ROOT)/arch-x86/xen.h $(ROOT)/xen.h
+x86_32.h: mkheader.py $(ROOT)/arch-x86/xen-x86_32.h $(ROOT)/arch-x86/xen.h $(ROOT)/xen.h
 	python $< $* $@ $(filter %.h,$^)
 
-x86_64.h: $(MKHEADER_PY) $(ROOT)/arch-x86/xen-x86_64.h $(ROOT)/arch-x86/xen.h $(ROOT)/xen.h
+x86_64.h: mkheader.py $(ROOT)/arch-x86/xen-x86_64.h $(ROOT)/arch-x86/xen.h $(ROOT)/xen.h
 	python $< $* $@ $(filter %.h,$^)
 
-ia64.h: $(MKHEADER_PY) $(ROOT)/arch-ia64.h $(ROOT)/xen.h
+ia64.h: mkheader.py $(ROOT)/arch-ia64.h $(ROOT)/xen.h
 	python $< $* $@ $(filter %.h,$^)
 
-checker.c: $(MKCHECKER_PY)
+checker.c: mkchecker.py
 	python $< $@ $(architectures)

@@ -19,7 +19,6 @@ f.write('''
 #include <stdlib.h>
 #include <stddef.h>
 #include <inttypes.h>
-#include "../xen.h"
 ''');
 
 for a in archs:
