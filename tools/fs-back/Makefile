@@ -9,7 +9,8 @@ CFLAGS   += -Werror
 CFLAGS   += -Wno-unused
 CFLAGS   += -fno-strict-aliasing
 CFLAGS   += $(CFLAGS_libxenctrl)
-CFLAGS   += $(INCLUDES) -I. -I../xenstore 
+CFLAGS   += $(CFLAGS_libxenstore)
+CFLAGS   += $(INCLUDES) -I.
 CFLAGS   += -D_GNU_SOURCE
 
 # Get gcc to generate the dependencies for us.
@@ -18,8 +19,8 @@ DEPS      = .*.d
 
 LIBS      := -L. -L.. -L../lib
 LIBS      += $(LDFLAGS_libxenctrl)
+LIBS      += $(LDFLAGS_libxenstore)
 LIBS      += -lpthread -lrt 
-LIBS      += -L$(XEN_XENSTORE) -lxenstore
 
 OBJS	  := fs-xenbus.o fs-ops.o
 

@@ -5,9 +5,9 @@ MAJOR    = 3.0
 MINOR    = 0
 SONAME   = libblktap.so.$(MAJOR)
 
-INCLUDES += -I. -I.. -I $(XEN_LIBXC) -I $(XEN_XENSTORE) -I$(XEN_INCLUDE)
+INCLUDES += -I. -I.. -I $(XEN_LIBXC) -I$(XEN_INCLUDE) $(CFLAGS_libxenstore)
 
-LIBS     := -lxenstore
+LDFLAGS  += $(LDFLAGS_libxenstore)
 
 SRCS     :=
 SRCS     += xenbus.c blkif.c xs_api.c
