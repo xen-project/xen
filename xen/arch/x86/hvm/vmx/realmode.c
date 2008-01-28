@@ -534,12 +534,6 @@ static void realmode_emulate_one(struct realmode_emulate_ctxt *rm_ctxt)
         goto fail;
     }
 
-    if ( io_completed && curr->arch.hvm_vmx.real_mode_io_in_progress )
-    {
-        gdprintk(XENLOG_ERR, "Multiple I/O transactions in a single insn.\n");
-        goto fail;
-    }
-
     if ( rc == X86EMUL_UNHANDLEABLE )
     {
         gdprintk(XENLOG_ERR, "Failed to emulate insn.\n");
@@ -547,7 +541,13 @@ static void realmode_emulate_one(struct realmode_emulate_ctxt *rm_ctxt)
     }
 
     if ( rc == X86EMUL_RETRY )
-        return;
+    {
+        BUG_ON(!curr->arch.hvm_vmx.real_mode_io_in_progress);
+        if ( !io_completed )
+            return;
+        gdprintk(XENLOG_ERR, "Multiple I/O reads in a single insn.\n");
+        goto fail;
+    }
 
     if ( curr->arch.hvm_vmx.real_mode_io_in_progress &&
          (get_ioreq(curr)->vp_ioreq.dir == IOREQ_READ) )
