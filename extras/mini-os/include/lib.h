@@ -57,7 +57,6 @@
 
 #include <stdarg.h>
 #include <stddef.h>
-#include <console.h>
 
 #ifdef HAVE_LIBC
 #include <stdio.h>
@@ -98,6 +97,7 @@ char  *strstr(const char *s1, const char *s2);
 char * strcat(char * dest, const char * src);
 char  *strdup(const char *s);
 #endif
+#include <console.h>
 
 #define RAND_MIX 2654435769U
 

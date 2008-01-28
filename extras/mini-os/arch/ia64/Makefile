@@ -36,6 +36,7 @@ ARCH_OBJS += sched.o
 ARCH_OBJS += xencomm.o
 ARCH_OBJS += __umoddi3.o
 ARCH_OBJS += __udivdi3.o
+ARCH_OBJS += __udivsi3.o
 ARCH_OBJS += __divdi3.o
 
 GEN_OFF_SRC := gen_off.c
