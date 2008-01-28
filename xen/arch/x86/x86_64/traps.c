@@ -146,9 +146,11 @@ void show_page_walk(unsigned long addr)
     l3e = l3t[l3_table_offset(addr)];
     mfn = l3e_get_pfn(l3e);
     pfn = mfn_valid(mfn) ? get_gpfn_from_mfn(mfn) : INVALID_M2P_ENTRY;
-    printk(" L3[0x%03lx] = %"PRIpte" %016lx\n",
-           l3_table_offset(addr), l3e_get_intpte(l3e), pfn);
-    if ( !(l3e_get_flags(l3e) & _PAGE_PRESENT) )
+    printk(" L3[0x%03lx] = %"PRIpte" %016lx%s\n",
+           l3_table_offset(addr), l3e_get_intpte(l3e), pfn,
+           (l3e_get_flags(l3e) & _PAGE_PSE) ? " (PSE)" : "");
+    if ( !(l3e_get_flags(l3e) & _PAGE_PRESENT) ||
+         (l3e_get_flags(l3e) & _PAGE_PSE) )
         return;
 
     l2t = mfn_to_virt(mfn);

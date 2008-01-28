@@ -69,30 +69,35 @@ void *alloc_xen_pagetable(void)
     return mfn_to_virt(mfn);
 }
 
-l2_pgentry_t *virt_to_xen_l2e(unsigned long v)
+l3_pgentry_t *virt_to_xen_l3e(unsigned long v)
 {
     l4_pgentry_t *pl4e;
-    l3_pgentry_t *pl3e;
-    l2_pgentry_t *pl2e;
 
     pl4e = &idle_pg_table[l4_table_offset(v)];
     if ( !(l4e_get_flags(*pl4e) & _PAGE_PRESENT) )
     {
-        pl3e = alloc_xen_pagetable();
+        l3_pgentry_t *pl3e = alloc_xen_pagetable();
         clear_page(pl3e);
         l4e_write(pl4e, l4e_from_paddr(__pa(pl3e), __PAGE_HYPERVISOR));
     }
     
-    pl3e = l4e_to_l3e(*pl4e) + l3_table_offset(v);
+    return l4e_to_l3e(*pl4e) + l3_table_offset(v);
+}
+
+l2_pgentry_t *virt_to_xen_l2e(unsigned long v)
+{
+    l3_pgentry_t *pl3e;
+
+    pl3e = virt_to_xen_l3e(v);
     if ( !(l3e_get_flags(*pl3e) & _PAGE_PRESENT) )
     {
-        pl2e = alloc_xen_pagetable();
+        l2_pgentry_t *pl2e = alloc_xen_pagetable();
         clear_page(pl2e);
         l3e_write(pl3e, l3e_from_paddr(__pa(pl2e), __PAGE_HYPERVISOR));
     }
-    
-    pl2e = l3e_to_l2e(*pl3e) + l2_table_offset(v);
-    return pl2e;
+
+    BUG_ON(l3e_get_flags(*pl3e) & _PAGE_PSE);
+    return l3e_to_l2e(*pl3e) + l2_table_offset(v);
 }
 
 void __init paging_init(void)

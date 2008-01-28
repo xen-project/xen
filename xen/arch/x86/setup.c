@@ -674,8 +674,9 @@ void __init __start_xen(unsigned long mbi_p)
                 pl3e = l4e_to_l3e(*pl4e);
                 for ( j = 0; j < L3_PAGETABLE_ENTRIES; j++, pl3e++ )
                 {
-                    /* Not present or already relocated? */
+                    /* Not present, 1GB mapping, or already relocated? */
                     if ( !(l3e_get_flags(*pl3e) & _PAGE_PRESENT) ||
+                         (l3e_get_flags(*pl3e) & _PAGE_PSE) ||
                          (l3e_get_pfn(*pl3e) > 0x1000) )
                         continue;
                     *pl3e = l3e_from_intpte(l3e_get_intpte(*pl3e) +
