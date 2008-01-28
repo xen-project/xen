@@ -133,7 +133,6 @@
 ^tools/ioemu/qemu-tech\.html$
 ^tools/ioemu/qemu\.1$
 ^tools/ioemu/qemu\.pod$
-^tools/libxc/xen/.*$
 ^tools/libxc/ia64/asm/acpi\.h$
 ^tools/libxc/ia64/xen/list\.h$
 ^tools/libxen/libxenapi-
