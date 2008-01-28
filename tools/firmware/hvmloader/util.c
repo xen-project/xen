@@ -22,7 +22,6 @@
 #include "config.h"
 #include "e820.h"
 #include <stdint.h>
-#include <xenctrl.h>
 #include <xen/hvm/hvm_info_table.h>
 
 void outb(uint16_t addr, uint8_t val)

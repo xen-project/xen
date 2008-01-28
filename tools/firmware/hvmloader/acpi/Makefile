@@ -17,7 +17,7 @@
 
 override XEN_TARGET_ARCH = x86_32
 XEN_ROOT = ../../../..
-CFLAGS := -I. -I.. -I$(XEN_ROOT)/tools/libxc
+CFLAGS :=
 include $(XEN_ROOT)/tools/Rules.mk
 
 C_SRC = build.c dsdt.c static_tables.c
@@ -33,6 +33,7 @@ CFLAGS  += $(call cc-option,$(CC),-fno-stack-protector,)
 CFLAGS  += $(call cc-option,$(CC),-fno-stack-protector-all,)
 
 CFLAGS  += -fno-builtin -O2 -msoft-float
+CFLAGS  += -I. -I.. $(CFLAGS_include)
 
 vpath iasl $(PATH)
 all: acpi.a

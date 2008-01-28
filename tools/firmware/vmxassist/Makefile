@@ -23,13 +23,13 @@ CFLAGS :=
 
 override XEN_TARGET_ARCH = x86_32
 XEN_ROOT = ../../..
-include $(XEN_ROOT)/Config.mk
+include $(XEN_ROOT)/tools/Rules.mk
 
 # The emulator code lives in ROM space
 TEXTADDR=0x000D0000
 
 DEFINES=-DDEBUG -DTEXTADDR=$(TEXTADDR)
-XENINC=-I$(XEN_ROOT)/tools/libxc
+XENINC=$(CFLAGS_include)
 
 # Disable PIE/SSP if GCC supports them. They can break us.
 CFLAGS  += $(call cc-option,$(CC),-nopie,)

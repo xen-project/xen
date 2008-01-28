@@ -20,7 +20,7 @@
 
 override XEN_TARGET_ARCH = x86_32
 XEN_ROOT = ../../..
-CFLAGS := -I$(XEN_ROOT)/tools/libxc -I.
+CFLAGS :=
 include $(XEN_ROOT)/tools/Rules.mk
 
 # The HVM loader is started in 32-bit mode at the address below:
@@ -32,6 +32,7 @@ CFLAGS  += $(call cc-option,$(CC),-fno-stack-protector,)
 CFLAGS  += $(call cc-option,$(CC),-fno-stack-protector-all,)
 
 CFLAGS  += -fno-builtin -O2 -msoft-float
+CFLAGS  += $(CFLAGS_include) -I.
 
 SRCS = hvmloader.c mp_tables.c util.c smbios.c 32bitbios_support.c
 OBJS = $(patsubst %.c,%.o,$(SRCS))
