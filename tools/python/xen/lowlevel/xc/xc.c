@@ -1155,23 +1155,13 @@ static PyObject *pyxc_domain_iomem_permission(PyObject *self,
 static PyObject *pyxc_domain_set_time_offset(XcObject *self, PyObject *args)
 {
     uint32_t dom;
-    int32_t time_offset_seconds;
-    time_t calendar_time;
-    struct tm local_time;
-    struct tm utc_time;
+    int32_t offset;
 
-    if (!PyArg_ParseTuple(args, "i", &dom))
+    if (!PyArg_ParseTuple(args, "ii", &dom, &offset))
         return NULL;
 
-    calendar_time = time(NULL);
-    localtime_r(&calendar_time, &local_time);
-    gmtime_r(&calendar_time, &utc_time);
-    /* set up to get calendar time based on utc_time, with local dst setting */
-    utc_time.tm_isdst = local_time.tm_isdst;
-    time_offset_seconds = (int32_t)difftime(calendar_time, mktime(&utc_time));
-
-    if (xc_domain_set_time_offset(self->xc_handle, dom, time_offset_seconds) != 0)
-        return NULL;
+    if (xc_domain_set_time_offset(self->xc_handle, dom, offset) != 0)
+        return pyxc_error_to_exception();
 
     Py_INCREF(zero);
     return zero;
@@ -1620,6 +1610,7 @@ static PyMethodDef pyxc_methods[] = {
       METH_VARARGS, "\n"
       "Set a domain's time offset to Dom0's localtime\n"
       " dom        [int]: Domain whose time offset is being set.\n"
+      " offset     [int]: Time offset from UTC in seconds.\n"
       "Returns: [int] 0 on success; -1 on error.\n" },
 
     { "domain_send_trigger",

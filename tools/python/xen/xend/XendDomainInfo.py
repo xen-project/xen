@@ -1733,10 +1733,14 @@ class XendDomainInfo:
         self._configureBootloader()
 
         try:
-            self.image = image.create(self, self.info)
-
             if self.info['platform'].get('localtime', 0):
-                xc.domain_set_time_offset(self.domid)
+                t = time.time()
+                loc = time.localtime(t)
+                utc = time.gmtime(t)
+                timeoffset = int(time.mktime(loc) - time.mktime(utc))
+                self.info['platform']['rtc_timeoffset'] = timeoffset
+
+            self.image = image.create(self, self.info)
 
             xc.domain_setcpuweight(self.domid, \
                                    self.info['vcpus_params']['weight'])
