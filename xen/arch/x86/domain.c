@@ -1506,7 +1506,12 @@ unsigned long hypercall_create_continuation(
     {
         regs       = guest_cpu_user_regs();
         regs->eax  = op;
-        regs->eip -= 2;  /* re-execute 'syscall' / 'int 0x82' */
+        /*
+         * For PV guest, we update EIP to re-execute 'syscall' / 'int 0x82';
+         * HVM does not need this since 'vmcall' / 'vmmcall' is fault-like.
+         */
+        if ( !is_hvm_vcpu(current) )
+            regs->eip -= 2;  /* re-execute 'syscall' / 'int 0x82' */
 
 #ifdef __x86_64__
         if ( !is_hvm_vcpu(current) ?
