@@ -88,7 +88,7 @@ struct blkfront_dev *init_blkfront(char *nodename, uint64_t *sectors, unsigned *
     SHARED_RING_INIT(s);
     FRONT_RING_INIT(&dev->ring, s, PAGE_SIZE);
 
-    dev->ring_ref = gnttab_grant_access(0,virtual_to_mfn(s),0);
+    dev->ring_ref = gnttab_grant_access(0,virt_to_mfn(s),0);
 
     evtchn_alloc_unbound_t op;
     op.dom = DOMID_SELF;
@@ -274,6 +274,11 @@ void blkfront_aio(struct blkfront_aiocb *aiocbp, int write)
 
     for (j = 0; j < n; j++) {
 	uintptr_t data = start + j * PAGE_SIZE;
+        if (!write) {
+            /* Trigger CoW if needed */
+            *(char*)data = 0;
+            barrier();
+        }
 	aiocbp->gref[j] = req->seg[j].gref =
             gnttab_grant_access(0, virtual_to_mfn(data), write);
 	req->seg[j].first_sect = 0;
