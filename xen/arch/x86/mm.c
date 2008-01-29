@@ -207,7 +207,7 @@ void __init arch_init_memory(void)
 {
     extern void subarch_init_memory(void);
 
-    unsigned long i, pfn, rstart_pfn, rend_pfn, ioend_pfn;
+    unsigned long i, pfn, rstart_pfn, rend_pfn, iostart_pfn, ioend_pfn;
 
     /*
      * Initialise our DOMID_XEN domain.
@@ -252,17 +252,18 @@ void __init arch_init_memory(void)
         }
 
         /*
-         * Make sure any Xen mappings are blown away.
+         * Make sure any Xen mappings of RAM holes above 1MB are blown away.
          * In particular this ensures that RAM holes are respected even in
-         * the statically-initialised 0-16MB mapping area.
+         * the statically-initialised 1-16MB mapping area.
          */
+        iostart_pfn = max_t(unsigned long, pfn, 1UL << (20 - PAGE_SHIFT));
         ioend_pfn = rstart_pfn;
 #if defined(CONFIG_X86_32)
         ioend_pfn = min_t(unsigned long, ioend_pfn,
                           DIRECTMAP_MBYTES << (20 - PAGE_SHIFT));
 #endif
-        if ( pfn < ioend_pfn )            
-            destroy_xen_mappings((unsigned long)mfn_to_virt(pfn),
+        if ( iostart_pfn < ioend_pfn )            
+            destroy_xen_mappings((unsigned long)mfn_to_virt(iostart_pfn),
                                  (unsigned long)mfn_to_virt(ioend_pfn));
 
         /* Mark as I/O up to next RAM region. */

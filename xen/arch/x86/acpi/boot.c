@@ -110,7 +110,8 @@ char *__acpi_map_table(unsigned long phys, unsigned long size)
 	unsigned long base, offset, mapped_size;
 	int idx;
 
-	if (phys + size < 8 * 1024 * 1024)
+	/* XEN: RAM holes above 1MB are not permanently mapped. */
+	if (phys + size < 1 * 1024 * 1024)
 		return __va(phys);
 
 	offset = phys & (PAGE_SIZE - 1);
