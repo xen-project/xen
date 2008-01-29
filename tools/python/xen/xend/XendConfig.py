@@ -1595,4 +1595,4 @@ class XendConfig(dict):
         return stored_type or (self.is_hvm() and 'hvm' or 'linux')
 
     def is_hap(self):
-        return self['platform']['hap']
+        return self['platform'].get('hap', 0)
