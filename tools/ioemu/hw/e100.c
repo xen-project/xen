@@ -851,13 +851,154 @@ static void e100_reset(void *opaque)
 
 static void e100_save(QEMUFile * f, void *opaque)
 {
-    //TODO
-    return;
+    E100State *s = (E100State *)opaque;
+    int i;
+
+    pci_device_save(s->pci_dev, f);
+
+    qemu_put_be32s(f, &s->mmio_index);
+    qemu_put_8s(f, &s->scb_stat);
+    for(i = 0; i < REGION_NUM; i++) {
+        qemu_put_be32s(f, &s->region_base_addr[i]);
+    }
+    qemu_put_buffer(f, s->macaddr, 6);
+    for(i = 0; i < 32; i++) {
+        qemu_put_be16s(f, &s->mdimem[i]);
+    }
+
+    /* Save eeprom. */
+    qemu_put_8s(f, &s->eeprom.start_bit);
+    qemu_put_8s(f, &s->eeprom.opcode);
+    qemu_put_8s(f, &s->eeprom.address);
+    qemu_put_be16s(f, &s->eeprom.data);
+    qemu_put_be32s(f, &s->eeprom.val);
+    qemu_put_be32s(f, &s->eeprom.val);
+    qemu_put_be32s(f, &s->eeprom.val_len);
+    qemu_put_be32s(f, &s->eeprom.val_type);
+    qemu_put_8s(f, &s->eeprom.cs);
+    qemu_put_8s(f, &s->eeprom.sk);
+    qemu_put_be16s(f, &s->eeprom.addr_len);
+    for(i = 0; i < 256; i++) {
+        qemu_put_be16s(f, &s->eeprom.contents[i]);
+    }
+
+    qemu_put_be32s(f, &s->device);
+
+    qemu_put_buffer(f, s->mult_list, 8);
+    qemu_put_be32s(f, &s->is_multcast_enable);
+
+    qemu_put_be32s(f, &s->cu_base);
+    qemu_put_be32s(f, &s->cu_offset);
+    qemu_put_be32s(f, &s->cu_next);
+
+    qemu_put_be32s(f, &s->ru_base);
+    qemu_put_be32s(f, &s->ru_offset);
+
+    qemu_put_be32s(f, &s->statsaddr);
+
+    /* Save statistics. */
+    qemu_put_be32s(f, &s->statistics.tx_good_frames);
+    qemu_put_be32s(f, &s->statistics.tx_max_collisions);
+    qemu_put_be32s(f, &s->statistics.tx_late_collisions);
+    qemu_put_be32s(f, &s->statistics.tx_underruns);
+    qemu_put_be32s(f, &s->statistics.tx_lost_crs);
+    qemu_put_be32s(f, &s->statistics.tx_deferred);
+    qemu_put_be32s(f, &s->statistics.tx_single_collisions);
+    qemu_put_be32s(f, &s->statistics.tx_multiple_collisions);
+    qemu_put_be32s(f, &s->statistics.tx_total_collisions);
+    qemu_put_be32s(f, &s->statistics.rx_good_frames);
+    qemu_put_be32s(f, &s->statistics.rx_crc_errors);
+    qemu_put_be32s(f, &s->statistics.rx_alignment_errors);
+    qemu_put_be32s(f, &s->statistics.rx_resource_errors);
+    qemu_put_be32s(f, &s->statistics.rx_overrun_errors);
+    qemu_put_be32s(f, &s->statistics.rx_short_frame_errors);
+    qemu_put_be32s(f, &s->statistics.complete_word);
+
+    qemu_put_buffer(f, (uint8*)(&s->config), sizeof(s->config));
+
+    qemu_put_buffer(f, s->pkt_buf, MAX_ETH_FRAME_SIZE+4);
+    qemu_put_be32s(f, &s->pkt_buf_len);
+
+    qemu_put_buffer(f, (uint8_t*)(&s->pci_mem), sizeof(s->pci_mem));
 }
 
 static int e100_load(QEMUFile * f, void *opaque, int version_id)
 {
-    //TODO
+    E100State *s = (E100State *)opaque;
+    int i, ret;
+
+    if (version_id > 3)
+        return -EINVAL;
+
+    ret = pci_device_load(s->pci_dev, f);
+    if (ret < 0)
+        return ret;
+
+    qemu_get_be32s(f, &s->mmio_index);
+    qemu_get_8s(f, &s->scb_stat);
+    for(i = 0; i < REGION_NUM; i++) {
+        qemu_get_be32s(f, &s->region_base_addr[i]);
+    }
+    qemu_get_buffer(f, s->macaddr, 6);
+    for(i = 0; i < 32; i++) {
+        qemu_get_be16s(f, &s->mdimem[i]);
+    }
+
+    /* Load eeprom. */
+    qemu_get_8s(f, &s->eeprom.start_bit);
+    qemu_get_8s(f, &s->eeprom.opcode);
+    qemu_get_8s(f, &s->eeprom.address);
+    qemu_get_be16s(f, &s->eeprom.data);
+    qemu_get_be32s(f, &s->eeprom.val);
+    qemu_get_be32s(f, &s->eeprom.val);
+    qemu_get_be32s(f, &s->eeprom.val_len);
+    qemu_get_be32s(f, &s->eeprom.val_type);
+    qemu_get_8s(f, &s->eeprom.cs);
+    qemu_get_8s(f, &s->eeprom.sk);
+    qemu_get_be16s(f, &s->eeprom.addr_len);
+    for(i = 0; i < 256; i++) {
+        qemu_get_be16s(f, &s->eeprom.contents[i]);
+    }
+
+    qemu_get_be32s(f, &s->device);
+
+    qemu_get_buffer(f, s->mult_list, 8);
+    qemu_get_be32s(f, &s->is_multcast_enable);
+
+    qemu_get_be32s(f, &s->cu_base);
+    qemu_get_be32s(f, &s->cu_offset);
+    qemu_get_be32s(f, &s->cu_next);
+
+    qemu_get_be32s(f, &s->ru_base);
+    qemu_get_be32s(f, &s->ru_offset);
+
+    qemu_get_be32s(f, &s->statsaddr);
+
+    /* Load statistics. */
+    qemu_get_be32s(f, &s->statistics.tx_good_frames);
+    qemu_get_be32s(f, &s->statistics.tx_max_collisions);
+    qemu_get_be32s(f, &s->statistics.tx_late_collisions);
+    qemu_get_be32s(f, &s->statistics.tx_underruns);
+    qemu_get_be32s(f, &s->statistics.tx_lost_crs);
+    qemu_get_be32s(f, &s->statistics.tx_deferred);
+    qemu_get_be32s(f, &s->statistics.tx_single_collisions);
+    qemu_get_be32s(f, &s->statistics.tx_multiple_collisions);
+    qemu_get_be32s(f, &s->statistics.tx_total_collisions);
+    qemu_get_be32s(f, &s->statistics.rx_good_frames);
+    qemu_get_be32s(f, &s->statistics.rx_crc_errors);
+    qemu_get_be32s(f, &s->statistics.rx_alignment_errors);
+    qemu_get_be32s(f, &s->statistics.rx_resource_errors);
+    qemu_get_be32s(f, &s->statistics.rx_overrun_errors);
+    qemu_get_be32s(f, &s->statistics.rx_short_frame_errors);
+    qemu_get_be32s(f, &s->statistics.complete_word);
+
+    qemu_put_buffer(f, (uint8*)(&s->config), sizeof(s->config));
+
+    qemu_get_buffer(f, s->pkt_buf, MAX_ETH_FRAME_SIZE+4);
+    qemu_get_be32s(f, &s->pkt_buf_len);
+
+    qemu_get_buffer(f, (uint8_t*)(&s->pci_mem), sizeof(s->pci_mem));
+
     return 0;
 }
 
