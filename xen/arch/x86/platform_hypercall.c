@@ -42,9 +42,11 @@ DEFINE_SPINLOCK(xenpf_lock);
 extern spinlock_t xenpf_lock;
 #endif
 
+static DEFINE_PER_CPU(uint64_t, freq);
+
 static long cpu_frequency_change_helper(void *data)
 {
-    return cpu_frequency_change(*(uint64_t *)data);
+    return cpu_frequency_change(this_cpu(freq));
 }
 
 ret_t do_platform_op(XEN_GUEST_HANDLE(xen_platform_op_t) u_xenpf_op)
@@ -284,11 +286,12 @@ ret_t do_platform_op(XEN_GUEST_HANDLE(xen_platform_op_t) u_xenpf_op)
         if ( cpufreq_controller != FREQCTL_dom0_kernel )
             break;
         ret = -EINVAL;
-        if ( op->u.change_freq.flags != 0 )
+        if ( op->u.change_freq.flags || !cpu_online(op->u.change_freq.cpu) )
             break;
+        per_cpu(freq, op->u.change_freq.cpu) = op->u.change_freq.freq;
         ret = continue_hypercall_on_cpu(op->u.change_freq.cpu,
                                         cpu_frequency_change_helper,
-                                        &op->u.change_freq.freq);
+                                        NULL);
         break;
 
     case XENPF_getidletime:

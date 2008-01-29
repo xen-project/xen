@@ -729,6 +729,14 @@ int cpu_frequency_change(u64 freq)
     struct cpu_time *t = &this_cpu(cpu_time);
     u64 curr_tsc;
 
+    /* Sanity check: CPU frequency allegedly dropping below 1MHz? */
+    if ( freq < 1000000u )
+    {
+        gdprintk(XENLOG_WARNING, "Rejecting CPU frequency change "
+                 "to %"PRIu64" Hz.\n", freq);
+        return -EINVAL;
+    }
+
     local_irq_disable();
     rdtscll(curr_tsc);
     t->local_tsc_stamp = curr_tsc;
