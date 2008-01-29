@@ -3518,8 +3518,18 @@ sh_set_toplevel_shadow(struct vcpu *v,
     v->arch.shadow_table[slot] = new_entry;
 
     /* Decrement the refcount of the old contents of this slot */
-    if ( !pagetable_is_null(old_entry) )
-        sh_put_ref(v, pagetable_get_mfn(old_entry), 0);
+    if ( !pagetable_is_null(old_entry) ) {
+        mfn_t old_smfn = pagetable_get_mfn(old_entry);
+        /* Need to repin the old toplevel shadow if it's been unpinned
+         * by shadow_prealloc(): in PV mode we're still running on this
+         * shadow and it's not safe to free it yet. */
+        if ( !mfn_to_shadow_page(old_smfn)->pinned && !sh_pin(v, old_smfn) )
+        {
+            SHADOW_ERROR("can't re-pin %#lx\n", mfn_x(old_smfn));
+            domain_crash(v->domain);
+        }
+        sh_put_ref(v, old_smfn, 0);
+    }
 }
 
 
