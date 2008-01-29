@@ -53,6 +53,9 @@ struct xen_domctl_createdomain {
  /* Is this an HVM guest (as opposed to a PV guest)? */
 #define _XEN_DOMCTL_CDF_hvm_guest 0
 #define XEN_DOMCTL_CDF_hvm_guest  (1U<<_XEN_DOMCTL_CDF_hvm_guest)
+ /* Use hardware-assisted paging if available? */
+#define _XEN_DOMCTL_CDF_hap       1
+#define XEN_DOMCTL_CDF_hap        (1U<<_XEN_DOMCTL_CDF_hap)
     uint32_t flags;
 };
 typedef struct xen_domctl_createdomain xen_domctl_createdomain_t;

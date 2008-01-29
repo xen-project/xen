@@ -435,7 +435,7 @@ void vcpu_destroy(struct vcpu *v)
         hvm_vcpu_destroy(v);
 }
 
-int arch_domain_create(struct domain *d)
+int arch_domain_create(struct domain *d, unsigned int domcr_flags)
 {
 #ifdef __x86_64__
     struct page_info *pg;
@@ -444,6 +444,11 @@ int arch_domain_create(struct domain *d)
     l1_pgentry_t gdt_l1e;
     int vcpuid, pdpt_order, paging_initialised = 0;
     int rc = -ENOMEM;
+
+    d->arch.hvm_domain.hap_enabled =
+        is_hvm_domain(d) &&
+        hvm_funcs.hap_supported &&
+        (domcr_flags & DOMCRF_hap);
 
     d->arch.relmem = RELMEM_not_started;
     INIT_LIST_HEAD(&d->arch.relmem_list);

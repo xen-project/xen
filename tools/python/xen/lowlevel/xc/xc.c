@@ -97,18 +97,17 @@ static PyObject *pyxc_domain_create(XcObject *self,
                                     PyObject *kwds)
 {
     uint32_t dom = 0, ssidref = 0, flags = 0, target = 0;
-    int      ret, i, hvm = 0;
+    int      ret, i;
     PyObject *pyhandle = NULL;
     xen_domain_handle_t handle = { 
         0xde, 0xad, 0xbe, 0xef, 0xde, 0xad, 0xbe, 0xef,
         0xde, 0xad, 0xbe, 0xef, 0xde, 0xad, 0xbe, 0xef };
 
-    static char *kwd_list[] = { "domid", "ssidref", "handle", "hvm", "target", NULL };
+    static char *kwd_list[] = { "domid", "ssidref", "handle", "flags", "target", NULL };
 
     if ( !PyArg_ParseTupleAndKeywords(args, kwds, "|iiOii", kwd_list,
-				      &dom, &ssidref, &pyhandle, &hvm, &target))
+				      &dom, &ssidref, &pyhandle, &flags, &target))
         return NULL;
-
     if ( pyhandle != NULL )
     {
         if ( !PyList_Check(pyhandle) || 
@@ -123,9 +122,6 @@ static PyObject *pyxc_domain_create(XcObject *self,
             handle[i] = (uint8_t)PyInt_AsLong(p);
         }
     }
-
-    if ( hvm )
-        flags |= XEN_DOMCTL_CDF_hvm_guest;
 
     if ( (ret = xc_domain_create(self->xc_handle, ssidref,
                                  handle, flags, &dom)) < 0 )

@@ -76,7 +76,7 @@ unsigned long hypercall_create_continuation(unsigned int op,
     return XEN_MARK(op);
 }
 
-int arch_domain_create(struct domain *d)
+int arch_domain_create(struct domain *d, unsigned int domcr_flags)
 {
     if (d->domain_id == IDLE_DOMAIN_ID) {
         d->shared_info = (void *)alloc_xenheap_page();

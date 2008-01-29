@@ -40,7 +40,7 @@ void free_vcpu_struct(struct vcpu *v);
 int  vcpu_initialise(struct vcpu *v);
 void vcpu_destroy(struct vcpu *v);
 
-int arch_domain_create(struct domain *d);
+int arch_domain_create(struct domain *d, unsigned int domcr_flags);
 
 void arch_domain_destroy(struct domain *d);
 

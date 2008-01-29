@@ -28,7 +28,7 @@
 #include <asm/guest_access.h>
 #include <xsm/xsm.h>
 
-#define hap_enabled(d) (hvm_funcs.hap_supported && is_hvm_domain(d))
+#define hap_enabled(d) (is_hvm_domain(d) && (d)->arch.hvm_domain.hap_enabled)
 
 /* Printouts */
 #define PAGING_PRINTK(_f, _a...)                                     \

@@ -311,6 +311,8 @@ struct domain *domain_create(
  /* DOMCRF_hvm: Create an HVM domain, as opposed to a PV domain. */
 #define _DOMCRF_hvm 0
 #define DOMCRF_hvm  (1U<<_DOMCRF_hvm)
+#define _DOMCRF_hap 1
+#define DOMCRF_hap  (1U<<_DOMCRF_hap)
 
 int construct_dom0(
     struct domain *d,

@@ -130,7 +130,7 @@ XENAPI_PLATFORM_CFG = [ 'acpi', 'apic', 'boot', 'device_model', 'display',
                         'soundhw','stdvga', 'usb', 'usbdevice', 'vnc',
                         'vncconsole', 'vncdisplay', 'vnclisten', 'timer_mode',
                         'vncpasswd', 'vncunused', 'xauthority', 'pci', 'vhpt',
-                        'guest_os_type' ]
+                        'guest_os_type', 'hap']
 
 # Xen API console 'other_config' keys.
 XENAPI_CONSOLE_OTHER_CFG = ['vncunused', 'vncdisplay', 'vnclisten',
@@ -1593,3 +1593,6 @@ class XendConfig(dict):
     def image_type(self):
         stored_type = self['platform'].get('image_type')
         return stored_type or (self.is_hvm() and 'hvm' or 'linux')
+
+    def is_hap(self):
+        return self['platform']['hap']

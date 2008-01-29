@@ -818,7 +818,7 @@ class sxp2xml:
 
 
     def extract_platform(self, image, document):
-        platform_keys = ['acpi', 'apic', 'pae', 'vhpt', 'timer_mode']
+        platform_keys = ['acpi', 'apic', 'pae', 'vhpt', 'timer_mode', 'hap']
 
         def extract_platform_key(key):
             platform = document.createElement("platform")

@@ -217,7 +217,7 @@ struct domain *domain_create(
         init_status |= INIT_gnttab;
     }
 
-    if ( arch_domain_create(d) != 0 )
+    if ( arch_domain_create(d, domcr_flags) != 0 )
         goto fail;
     init_status |= INIT_arch;
 

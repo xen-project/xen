@@ -1626,11 +1626,18 @@ class XendDomainInfo:
         @raise: VmError on error
         """
 
+        hvm_bit_offset = 0
+
+        hap_bit_offset = 1
+
         log.debug('XendDomainInfo.constructDomain')
 
         self.shutdownStartTime = None
 
         hvm = self.info.is_hvm()
+
+        hap = self.info.is_hap()
+
         if hvm:
             info = xc.xeninfo()
             if 'hvm' not in info['xen_caps']:
@@ -1656,7 +1663,7 @@ class XendDomainInfo:
                 domid = 0,
                 ssidref = ssidref,
                 handle = uuid.fromString(self.info['uuid']),
-                hvm = int(hvm),
+                flags = int((hvm << hvm_bit_offset) | (hap << hap_bit_offset)),
                 target = self.info.target())
         except Exception, e:
             # may get here if due to ACM the operation is not permitted

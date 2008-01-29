@@ -338,7 +338,8 @@ resumedomain_out:
 
         ret = -EINVAL;
         if ( supervisor_mode_kernel ||
-             (op->u.createdomain.flags & ~XEN_DOMCTL_CDF_hvm_guest) )
+             (op->u.createdomain.flags &
+             ~(XEN_DOMCTL_CDF_hvm_guest | XEN_DOMCTL_CDF_hap)) )
             break;
 
         dom = op->domain;
@@ -368,6 +369,8 @@ resumedomain_out:
         domcr_flags = 0;
         if ( op->u.createdomain.flags & XEN_DOMCTL_CDF_hvm_guest )
             domcr_flags |= DOMCRF_hvm;
+        if ( op->u.createdomain.flags & XEN_DOMCTL_CDF_hap )
+            domcr_flags |= DOMCRF_hap;
 
         ret = -ENOMEM;
         d = domain_create(dom, domcr_flags, op->u.createdomain.ssidref);

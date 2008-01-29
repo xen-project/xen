@@ -559,7 +559,7 @@ static int opt_pervcpu_vhpt = 1;
 integer_param("pervcpu_vhpt", opt_pervcpu_vhpt);
 #endif
 
-int arch_domain_create(struct domain *d)
+int arch_domain_create(struct domain *d, unsigned int domcr_flags)
 {
 	int i;
 	struct page_info *page = NULL;

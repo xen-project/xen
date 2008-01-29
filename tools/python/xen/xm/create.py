@@ -525,6 +525,11 @@ gopts.var('target', val='TARGET',
           fn=set_int, default=0,
           use="Set domain target.")
 
+gopts.var('hap', val='HAP',
+          fn=set_int, default=1,
+          use="""Hap status (0=hap is disabled;
+          1=hap is enabled.""")
+
 def err(msg):
     """Print an error to stderr and exit.
     """
@@ -728,7 +733,7 @@ def configure_hvm(config_image, vals):
              'vnc', 'vncdisplay', 'vncunused', 'vncconsole', 'vnclisten',
              'sdl', 'display', 'xauthority', 'rtc_timeoffset', 'monitor',
              'acpi', 'apic', 'usb', 'usbdevice', 'keymap', 'pci',
-             'guest_os_type']
+             'guest_os_type', 'hap']
 
     for a in args:
         if a in vals.__dict__ and vals.__dict__[a] is not None:
