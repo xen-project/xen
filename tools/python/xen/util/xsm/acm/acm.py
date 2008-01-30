@@ -1342,7 +1342,8 @@ def relabel_domains(relabel_list):
 
 
 def change_acm_policy(bin_pol, del_array, chg_array,
-                      vmlabel_map, reslabel_map, cur_acmpol, new_acmpol):
+                      vmlabel_map, reslabel_map, cur_acmpol, new_acmpol,
+                      is_reset):
     """
        Change the ACM policy of the system by relabeling
        domains and resources first and doing some access checks.
@@ -1451,8 +1452,11 @@ def change_acm_policy(bin_pol, del_array, chg_array,
                 continue
 
             new_vmlabel = vmlabel
-            if vmlabel_map.has_key(vmlabel):
-                # renaming of the label
+            if vmlabel_map.has_key(vmlabel) and \
+               (not is_reset or name == "Domain-0") :
+                # renaming of the label; this is only allowed if it's
+                # not a reset of the policy or if it is a reset, then
+                # only for Domain-0
                 new_vmlabel = vmlabel_map[vmlabel]
                 polname = new_policyname
             elif new_vmlabel not in polnew_vmlabels and \

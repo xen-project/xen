@@ -337,7 +337,8 @@ class ACMPolicy(XSPolicy):
             rc, errors = security.change_acm_policy(bin_pol,
                                         del_array, chg_array,
                                         vmlabel_map, reslabel_map,
-                                        self, acmpol_new)
+                                        self, acmpol_new,
+                                        acmpol_new.is_default_policy())
 
             if rc == 0:
                 # Replace the old DOM with the new one and save it
