@@ -103,6 +103,7 @@ static void __init xen_patch_frametable_miss(u64 offset)
 	addr = (u64)&frametable_miss;
 	val = get_imm64(addr) + offset;
 	ia64_patch_imm64(addr, val);
+	ia64_fc(addr);
 #endif
 }
 
