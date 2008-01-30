@@ -419,7 +419,7 @@ void xenstore_record_dm_state(char *state)
 
 void xenstore_process_event(void *opaque)
 {
-    char **vec, *image = NULL;
+    char **vec, *offset, *bpath = NULL, *buf = NULL, *drv = NULL, *image = NULL;
     unsigned int len, num, hd_index;
 
     vec = xs_read_watch(xsh, &num);
@@ -441,8 +441,28 @@ void xenstore_process_event(void *opaque)
         goto out;
     hd_index = vec[XS_WATCH_TOKEN][2] - 'a';
     image = xs_read(xsh, XBT_NULL, vec[XS_WATCH_PATH], &len);
-    if (image == NULL || !strcmp(image, bs_table[hd_index]->filename))
-        goto out;  /* gone or identical */
+    if (image == NULL)
+        goto out;  /* gone */
+
+    /* Strip off blktap sub-type prefix */
+    bpath = strdup(vec[XS_WATCH_PATH]); 
+    if (bpath)
+        goto out;
+    if ((offset = strrchr(bpath, '/')) != NULL) 
+        *offset = '\0';
+    if (pasprintf(&buf, "%s/type", bpath) == -1) 
+        goto out;
+    drv = xs_read(xsh, XBT_NULL, buf, &len);
+    if (drv) {
+        if (!strcmp(drv, "tap")) {
+            offset = strchr(image, ':'); 
+            if (offset) 
+                memmove(image, offset+1, strlen(offset+1)+1 );
+        }
+    }
+
+    if (!strcmp(image, bs_table[hd_index]->filename))
+        goto out;  /* identical */
 
     do_eject(0, vec[XS_WATCH_TOKEN]);
     bs_table[hd_index]->filename[0] = 0;
@@ -457,6 +477,9 @@ void xenstore_process_event(void *opaque)
     }
 
  out:
+    free(drv);
+    free(buf);
+    free(bpath);
     free(image);
     free(vec);
 }
