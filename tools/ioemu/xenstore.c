@@ -446,20 +446,15 @@ void xenstore_process_event(void *opaque)
 
     /* Strip off blktap sub-type prefix */
     bpath = strdup(vec[XS_WATCH_PATH]); 
-    if (bpath)
+    if (bpath == NULL)
         goto out;
     if ((offset = strrchr(bpath, '/')) != NULL) 
         *offset = '\0';
     if (pasprintf(&buf, "%s/type", bpath) == -1) 
         goto out;
     drv = xs_read(xsh, XBT_NULL, buf, &len);
-    if (drv) {
-        if (!strcmp(drv, "tap")) {
-            offset = strchr(image, ':'); 
-            if (offset) 
-                memmove(image, offset+1, strlen(offset+1)+1 );
-        }
-    }
+    if (drv && !strcmp(drv, "tap") && ((offset = strchr(image, ':')) != NULL))
+        memmove(image, offset+1, strlen(offset+1)+1);
 
     if (!strcmp(image, bs_table[hd_index]->filename))
         goto out;  /* identical */
