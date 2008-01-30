@@ -68,13 +68,13 @@ struct vpmu_struct {
 #define VPMU_CONTEXT_LOADED                 0x2
 #define VPMU_RUNNING                        0x4
 
-int inline vpmu_do_wrmsr(struct cpu_user_regs *regs);
-int inline vpmu_do_rdmsr(struct cpu_user_regs *regs);
-int inline vpmu_do_interrupt(struct cpu_user_regs *regs);
-void inline vpmu_initialise(struct vcpu *v);
-void inline vpmu_destroy(struct vcpu *v);
-void inline vpmu_save(struct vcpu *v);
-void inline vpmu_load(struct vcpu *v);
+int vpmu_do_wrmsr(struct cpu_user_regs *regs);
+int vpmu_do_rdmsr(struct cpu_user_regs *regs);
+int vpmu_do_interrupt(struct cpu_user_regs *regs);
+void vpmu_initialise(struct vcpu *v);
+void vpmu_destroy(struct vcpu *v);
+void vpmu_save(struct vcpu *v);
+void vpmu_load(struct vcpu *v);
 
 extern int acquire_pmu_ownership(int pmu_ownership);
 extern void release_pmu_ownership(int pmu_ownership);

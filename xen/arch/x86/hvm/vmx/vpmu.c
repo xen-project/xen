@@ -31,7 +31,7 @@
 #include <public/hvm/save.h>
 #include <asm/hvm/vmx/vpmu.h>
 
-int inline vpmu_do_wrmsr(struct cpu_user_regs *regs)
+int vpmu_do_wrmsr(struct cpu_user_regs *regs)
 {
     struct vpmu_struct *vpmu = vcpu_vpmu(current);
 
@@ -40,7 +40,7 @@ int inline vpmu_do_wrmsr(struct cpu_user_regs *regs)
     return 0;
 }
 
-int inline vpmu_do_rdmsr(struct cpu_user_regs *regs)
+int vpmu_do_rdmsr(struct cpu_user_regs *regs)
 {
     struct vpmu_struct *vpmu = vcpu_vpmu(current);
 
@@ -49,7 +49,7 @@ int inline vpmu_do_rdmsr(struct cpu_user_regs *regs)
     return 0;
 }
 
-int inline vpmu_do_interrupt(struct cpu_user_regs *regs)
+int vpmu_do_interrupt(struct cpu_user_regs *regs)
 {
     struct vpmu_struct *vpmu = vcpu_vpmu(current);
 
@@ -75,13 +75,10 @@ void vpmu_load(struct vcpu *v)
 }
 
 extern struct arch_vpmu_ops core2_vpmu_ops;
-void inline vpmu_initialise(struct vcpu *v)
+void vpmu_initialise(struct vcpu *v)
 {
     struct vpmu_struct *vpmu = vcpu_vpmu(v);
 
-    /* If it is not a fresh initialization, release all resources
-     * before initialise again.
-     */
     if ( vpmu->flags & VPMU_CONTEXT_ALLOCATED )
         vpmu_destroy(v);
 
@@ -98,18 +95,15 @@ void inline vpmu_initialise(struct vcpu *v)
         }
     }
 
-    if ( !vpmu->arch_vpmu_ops )
+    if ( vpmu->arch_vpmu_ops != NULL )
     {
-        dprintk(XENLOG_WARNING, "Unsupport CPU model for guest PMU usage.\n");
-        return;
+        vpmu->flags = 0;
+        vpmu->context = NULL;
+        vpmu->arch_vpmu_ops->arch_vpmu_initialise(v);
     }
-
-    vpmu->flags = 0;
-    vpmu->context = NULL;
-    vpmu->arch_vpmu_ops->arch_vpmu_initialise(v);
 }
 
-void inline vpmu_destroy(struct vcpu *v)
+void vpmu_destroy(struct vcpu *v)
 {
     struct vpmu_struct *vpmu = vcpu_vpmu(v);
 
