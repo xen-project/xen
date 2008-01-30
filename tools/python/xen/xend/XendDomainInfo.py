@@ -1585,7 +1585,7 @@ class XendDomainInfo:
         @raise: XendError for a device that cannot be migrated
         """
         for (n, c) in self.info.all_devices_sxpr():
-            rc = self.migrateDevice(n, c, network, dst, DEV_MIGRATE_TEST)
+            rc = self.migrateDevice(n, c, network, dst, DEV_MIGRATE_TEST, self.getName())
             if rc != 0:
                 raise XendError("Device of type '%s' refuses migration." % n)
 
