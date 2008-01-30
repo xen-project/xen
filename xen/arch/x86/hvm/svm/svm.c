@@ -860,6 +860,11 @@ static int svm_event_pending(struct vcpu *v)
     return vmcb->eventinj.fields.v;
 }
 
+static int svm_do_pmu_interrupt(struct cpu_user_regs *regs)
+{
+    return 0;
+}
+
 static struct hvm_function_table svm_function_table = {
     .name                 = "SVM",
     .cpu_down             = svm_cpu_down,
@@ -882,7 +887,8 @@ static struct hvm_function_table svm_function_table = {
     .set_tsc_offset       = svm_set_tsc_offset,
     .inject_exception     = svm_inject_exception,
     .init_hypercall_page  = svm_init_hypercall_page,
-    .event_pending        = svm_event_pending
+    .event_pending        = svm_event_pending,
+    .do_pmu_interrupt     = svm_do_pmu_interrupt
 };
 
 int start_svm(struct cpuinfo_x86 *c)

@@ -119,6 +119,7 @@ struct hvm_function_table {
     void (*init_hypercall_page)(struct domain *d, void *hypercall_page);
 
     int  (*event_pending)(struct vcpu *v);
+    int  (*do_pmu_interrupt)(struct cpu_user_regs *regs);
 
     int  (*cpu_up)(void);
     void (*cpu_down)(void);
@@ -233,6 +234,11 @@ int hvm_bringup_ap(int vcpuid, int trampoline_vector);
 static inline int hvm_event_pending(struct vcpu *v)
 {
     return hvm_funcs.event_pending(v);
+}
+
+static inline int hvm_do_pmu_interrupt(struct cpu_user_regs *regs)
+{
+    return hvm_funcs.do_pmu_interrupt(regs);
 }
 
 /* These reserved bits in lower 32 remain 0 after any load of CR0 */

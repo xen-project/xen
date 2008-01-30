@@ -94,6 +94,9 @@ void __init apic_intr_init(void)
     set_intr_gate(SPURIOUS_APIC_VECTOR, spurious_interrupt);
     set_intr_gate(ERROR_APIC_VECTOR, error_interrupt);
 
+    /* Performance Counters Interrupt */
+    set_intr_gate(PMU_APIC_VECTOR, pmu_apic_interrupt);
+
     /* thermal monitor LVT interrupt */
 #ifdef CONFIG_X86_MCE_P4THERMAL
     set_intr_gate(THERMAL_APIC_VECTOR, thermal_interrupt);
@@ -1224,6 +1227,16 @@ fastcall void smp_error_interrupt(struct cpu_user_regs *regs)
     printk (KERN_DEBUG "APIC error on CPU%d: %02lx(%02lx)\n",
             smp_processor_id(), v , v1);
     irq_exit();
+}
+
+/*
+ * This interrupt handles performance counters interrupt
+ */
+
+fastcall void smp_pmu_apic_interrupt(struct cpu_user_regs *regs)
+{
+    ack_APIC_irq();
+    hvm_do_pmu_interrupt(regs);
 }
 
 /*

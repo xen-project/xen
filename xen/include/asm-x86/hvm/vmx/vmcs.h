@@ -22,6 +22,7 @@
 #include <asm/config.h>
 #include <asm/hvm/io.h>
 #include <asm/hvm/vmx/cpu.h>
+#include <asm/hvm/vmx/vpmu.h>
 
 #ifdef VMXASSIST
 #include <public/hvm/vmx_assist.h>
@@ -75,6 +76,9 @@ struct arch_vmx_struct {
 
     /* Cache of cpu execution control. */
     u32                  exec_control;
+
+    /* PMU */
+    struct vpmu_struct   vpmu;
 
 #ifdef __x86_64__
     struct vmx_msr_state msr_state;

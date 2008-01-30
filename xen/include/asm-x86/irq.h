@@ -28,6 +28,7 @@ fastcall void invalidate_interrupt(void);
 fastcall void call_function_interrupt(void);
 fastcall void apic_timer_interrupt(void);
 fastcall void error_interrupt(void);
+fastcall void pmu_apic_interrupt(void);
 fastcall void spurious_interrupt(void);
 fastcall void thermal_interrupt(void);
 

@@ -69,4 +69,10 @@ int do_xenoprof_op(int op, XEN_GUEST_HANDLE(void) arg);
 int xenoprof_add_trace(struct domain *d, struct vcpu *v, 
                        unsigned long eip, int mode);
 
+#define PMU_OWNER_NONE          0
+#define PMU_OWNER_XENOPROF      1
+#define PMU_OWNER_HVM           2
+int acquire_pmu_ownship(int pmu_ownership);
+void release_pmu_ownship(int pmu_ownership);
+
 #endif  /* __XEN__XENOPROF_H__ */

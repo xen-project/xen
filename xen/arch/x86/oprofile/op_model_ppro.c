@@ -41,6 +41,7 @@
 #define CTRL_SET_EVENT(val, e) (val |= e)
 
 static unsigned long reset_value[NUM_COUNTERS];
+int ppro_has_global_ctrl = 0;
  
 static void ppro_fill_in_addresses(struct op_msrs * const msrs)
 {
@@ -134,6 +135,11 @@ static void ppro_start(struct op_msrs const * const msrs)
 			CTRL_WRITE(low, high, msrs, i);
 		}
 	}
+    /* Global Control MSR is enabled by default when system power on.
+     * However, this may not hold true when xenoprof starts to run.
+     */
+    if ( ppro_has_global_ctrl )
+        wrmsrl(MSR_CORE_PERF_GLOBAL_CTRL, (1<<NUM_COUNTERS) - 1);
 }
 
 
@@ -149,6 +155,8 @@ static void ppro_stop(struct op_msrs const * const msrs)
 		CTRL_SET_INACTIVE(low);
 		CTRL_WRITE(low, high, msrs, i);
 	}
+    if ( ppro_has_global_ctrl )
+        wrmsrl(MSR_CORE_PERF_GLOBAL_CTRL, 0);
 }
 
 

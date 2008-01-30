@@ -23,6 +23,10 @@
 /* Lock protecting the following global state */
 static DEFINE_SPINLOCK(xenoprof_lock);
 
+static DEFINE_SPINLOCK(pmu_owner_lock);
+int pmu_owner = 0;
+int pmu_hvm_refcount = 0;
+
 static struct domain *active_domains[MAX_OPROF_DOMAINS];
 static int active_ready[MAX_OPROF_DOMAINS];
 static unsigned int adomains;
@@ -43,6 +47,37 @@ static u64 active_samples;
 static u64 passive_samples;
 static u64 idle_samples;
 static u64 others_samples;
+
+int acquire_pmu_ownership(int pmu_ownship)
+{
+    spin_lock(&pmu_owner_lock);
+    if ( pmu_owner == PMU_OWNER_NONE )
+    {
+        pmu_owner = pmu_ownship;
+        goto out;
+    }
+
+    if ( pmu_owner == pmu_ownship )
+        goto out;
+
+    spin_unlock(&pmu_owner_lock);
+    return 0;
+ out:
+    if ( pmu_owner == PMU_OWNER_HVM )
+        pmu_hvm_refcount++;
+    spin_unlock(&pmu_owner_lock);
+    return 1;
+}
+
+void release_pmu_ownship(int pmu_ownship)
+{
+    spin_lock(&pmu_owner_lock);
+    if ( pmu_ownship == PMU_OWNER_HVM )
+        pmu_hvm_refcount--;
+    if ( !pmu_hvm_refcount )
+        pmu_owner = PMU_OWNER_NONE;
+    spin_unlock(&pmu_owner_lock);
+}
 
 int is_active(struct domain *d)
 {
@@ -649,6 +684,11 @@ int do_xenoprof_op(int op, XEN_GUEST_HANDLE(void) arg)
         break;
 
     case XENOPROF_get_buffer:
+        if ( !acquire_pmu_ownership(PMU_OWNER_XENOPROF) )
+        {
+            ret = -EBUSY;
+            break;
+        }
         ret = xenoprof_op_get_buffer(arg);
         break;
 
@@ -786,6 +826,7 @@ int do_xenoprof_op(int op, XEN_GUEST_HANDLE(void) arg)
             break;
         x = current->domain->xenoprof;
         unshare_xenoprof_page_with_guest(x);
+        release_pmu_ownship(PMU_OWNER_XENOPROF);
         break;
     }
 

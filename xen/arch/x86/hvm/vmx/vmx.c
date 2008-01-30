@@ -90,6 +90,8 @@ static int vmx_vcpu_initialise(struct vcpu *v)
         return rc;
     }
 
+    vpmu_initialise(v);
+
     vmx_install_vlapic_mapping(v);
 
 #ifndef VMXASSIST
@@ -104,6 +106,7 @@ static int vmx_vcpu_initialise(struct vcpu *v)
 static void vmx_vcpu_destroy(struct vcpu *v)
 {
     vmx_destroy_vmcs(v);
+    vpmu_destroy(v);
 }
 
 #ifdef __x86_64__
@@ -742,6 +745,7 @@ static void vmx_ctxt_switch_from(struct vcpu *v)
     vmx_save_guest_msrs(v);
     vmx_restore_host_msrs();
     vmx_save_dr(v);
+    vpmu_save(v);
 }
 
 static void vmx_ctxt_switch_to(struct vcpu *v)
@@ -752,6 +756,7 @@ static void vmx_ctxt_switch_to(struct vcpu *v)
 
     vmx_restore_guest_msrs(v);
     vmx_restore_dr(v);
+    vpmu_load(v);
 }
 
 static unsigned long vmx_get_segment_base(struct vcpu *v, enum x86_segment seg)
@@ -1119,6 +1124,11 @@ static int vmx_event_pending(struct vcpu *v)
     return (__vmread(VM_ENTRY_INTR_INFO) & INTR_INFO_VALID_MASK);
 }
 
+static int vmx_do_pmu_interrupt(struct cpu_user_regs *regs)
+{
+    return vpmu_do_interrupt(regs);
+}
+
 static struct hvm_function_table vmx_function_table = {
     .name                 = "VMX",
     .domain_initialise    = vmx_domain_initialise,
@@ -1141,6 +1151,7 @@ static struct hvm_function_table vmx_function_table = {
     .inject_exception     = vmx_inject_exception,
     .init_hypercall_page  = vmx_init_hypercall_page,
     .event_pending        = vmx_event_pending,
+    .do_pmu_interrupt     = vmx_do_pmu_interrupt,
     .cpu_up               = vmx_cpu_up,
     .cpu_down             = vmx_cpu_down,
 };
@@ -1300,7 +1311,6 @@ void vmx_cpuid_intercept(
 
     case 0x00000006:
     case 0x00000009:
-    case 0x0000000A:
         *eax = *ebx = *ecx = *edx = 0;
         break;
 
@@ -2376,7 +2386,15 @@ static int vmx_do_msr_read(struct cpu_user_regs *regs)
         /* No point in letting the guest see real MCEs */
         msr_content = 0;
         break;
+    case MSR_IA32_MISC_ENABLE:
+        rdmsrl(MSR_IA32_MISC_ENABLE, msr_content);
+        /* Debug Trace Store is not supported. */
+        msr_content |= MSR_IA32_MISC_ENABLE_BTS_UNAVAIL |
+                       MSR_IA32_MISC_ENABLE_PEBS_UNAVAIL;
+        break;
     default:
+        if ( vpmu_do_rdmsr(regs) )
+            goto done;
         switch ( long_mode_do_msr_read(regs) )
         {
             case HNDL_unhandled:
@@ -2583,6 +2601,8 @@ static int vmx_do_msr_write(struct cpu_user_regs *regs)
     case MSR_IA32_VMX_BASIC...MSR_IA32_VMX_PROCBASED_CTLS2:
         goto gp_fault;
     default:
+        if ( vpmu_do_wrmsr(regs) )
+            return 1;
         switch ( long_mode_do_msr_write(regs) )
         {
             case HNDL_unhandled:
@@ -2632,6 +2652,7 @@ static void vmx_do_extint(struct cpu_user_regs *regs)
     fastcall void smp_call_function_interrupt(void);
     fastcall void smp_spurious_interrupt(struct cpu_user_regs *regs);
     fastcall void smp_error_interrupt(struct cpu_user_regs *regs);
+    fastcall void smp_pmu_apic_interrupt(struct cpu_user_regs *regs);
 #ifdef CONFIG_X86_MCE_P4THERMAL
     fastcall void smp_thermal_interrupt(struct cpu_user_regs *regs);
 #endif
@@ -2661,6 +2682,9 @@ static void vmx_do_extint(struct cpu_user_regs *regs)
         break;
     case ERROR_APIC_VECTOR:
         smp_error_interrupt(regs);
+        break;
+    case PMU_APIC_VECTOR:
+        smp_pmu_apic_interrupt(regs);
         break;
 #ifdef CONFIG_X86_MCE_P4THERMAL
     case THERMAL_APIC_VECTOR:
