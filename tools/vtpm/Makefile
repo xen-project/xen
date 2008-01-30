@@ -83,7 +83,7 @@ updatepatches: clean orig
 
 .PHONY: build_sub
 build_sub:
-	set -e; @if [ -e $(GMP_HEADER) ]; then \
+	set -e; if [ -e $(GMP_HEADER) ]; then \
 		$(MAKE) -C $(VTPM_DIR); \
 		if [ "$(BUILD_EMULATOR)" = "y" ]; then \
 			$(MAKE) -C $(TPM_EMULATOR_DIR); \
