@@ -1,0 +1,10 @@
+#!/bin/sh
+set -e
+for gcc in gcc-3.4 gcc34 gcc-3.3 gcc33 gcc-3.2 gcc32; do
+	if type -p $gcc >&2; then
+		echo "CC=$gcc"; exit 0
+	fi
+done
+
+echo >&2 'We need GCC 3 for Etherboot.'
+false

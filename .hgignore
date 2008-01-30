@@ -258,3 +258,5 @@
 ^unmodified_drivers/linux-2.6/.*\.ko$
 ^unmodified_drivers/linux-2.6/.*\.mod\.c$
 ^LibVNCServer.*
+^tools/firmware/etherboot/etherboot-build
+^tools/firmware/etherboot/etherboot-5.*
