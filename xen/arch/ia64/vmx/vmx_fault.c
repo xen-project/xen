@@ -181,6 +181,7 @@ vmx_ia64_handle_break (unsigned long ifa, struct pt_regs *regs, unsigned long is
         if (iim == 0)
             show_registers(regs);
         debugger_trap_fatal(0 /* don't care */, regs);
+        regs_increment_iip(regs);
     } else
 #endif
     {

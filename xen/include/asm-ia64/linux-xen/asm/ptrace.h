@@ -281,6 +281,15 @@ struct switch_stack {
 # define guest_mode(regs)		(ia64_psr(regs)->cpl != 0)
 # define guest_kernel_mode(regs)	(ia64_psr(regs)->cpl == CONFIG_CPL0_EMUL)
 # define vmx_guest_kernel_mode(regs)	(ia64_psr(regs)->cpl == 0)
+# define regs_increment_iip(regs)					\
+do {									\
+	struct ia64_psr *ipsr = ia64_psr(regs);				\
+	if (ipsr->ri == 2) {						\
+		ipsr->ri = 0;						\
+		regs->cr_iip += 16;					\
+	} else								\
+		ipsr->ri++;						\
+} while (0)
 #else
 # define user_mode(regs)		(((struct ia64_psr *) &(regs)->cr_ipsr)->cpl != 0)
 #endif

@@ -515,6 +515,7 @@ ia64_handle_break(unsigned long ifa, struct pt_regs *regs, unsigned long isr,
 		if (iim == 0)
 			show_registers(regs);
 		debugger_trap_fatal(0 /* don't care */ , regs);
+		regs_increment_iip(regs);
 	}
 #endif
 	else if (iim == d->arch.breakimm &&
