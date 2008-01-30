@@ -1658,7 +1658,7 @@ class XendDomainInfo:
                 domid = 0,
                 ssidref = ssidref,
                 handle = uuid.fromString(self.info['uuid']),
-                flags = int((hvm << 0) | (hap << 1)),
+                flags = (int(hvm) << 0) | (int(hap) << 1),
                 target = self.info.target())
         except Exception, e:
             # may get here if due to ACM the operation is not permitted
