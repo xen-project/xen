@@ -914,7 +914,7 @@ static void e100_save(QEMUFile * f, void *opaque)
     qemu_put_be32s(f, &s->statistics.rx_short_frame_errors);
     qemu_put_be32s(f, &s->statistics.complete_word);
 
-    qemu_put_buffer(f, (uint8*)(&s->config), sizeof(s->config));
+    qemu_put_buffer(f, (uint8_t*)(&s->config), sizeof(s->config));
 
     qemu_put_buffer(f, s->pkt_buf, MAX_ETH_FRAME_SIZE+4);
     qemu_put_be32s(f, &s->pkt_buf_len);
@@ -992,7 +992,7 @@ static int e100_load(QEMUFile * f, void *opaque, int version_id)
     qemu_get_be32s(f, &s->statistics.rx_short_frame_errors);
     qemu_get_be32s(f, &s->statistics.complete_word);
 
-    qemu_put_buffer(f, (uint8*)(&s->config), sizeof(s->config));
+    qemu_put_buffer(f, (uint8_t*)(&s->config), sizeof(s->config));
 
     qemu_get_buffer(f, s->pkt_buf, MAX_ETH_FRAME_SIZE+4);
     qemu_get_be32s(f, &s->pkt_buf_len);
