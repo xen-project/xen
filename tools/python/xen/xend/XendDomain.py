@@ -1123,7 +1123,7 @@ class XendDomain:
             raise XendError("can't read guest state file %s: %s" %
                             (src, ex[1]))
 
-    def domain_restore_fd(self, fd, paused=False):
+    def domain_restore_fd(self, fd, paused=False, relocating=False):
         """Restore a domain from the given file descriptor.
 
         @param fd: file descriptor of the checkpoint file
@@ -1133,7 +1133,7 @@ class XendDomain:
         """
 
         try:
-            return XendCheckpoint.restore(self, fd, paused=paused)
+            return XendCheckpoint.restore(self, fd, paused=paused, relocating=relocating)
         except XendError, e:
             log.exception("Restore failed")
             raise

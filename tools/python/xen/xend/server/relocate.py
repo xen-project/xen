@@ -108,7 +108,7 @@ class RelocationProtocol(protocol.Protocol):
             self.send_reply(["ready", name])
             try:
                 XendDomain.instance().domain_restore_fd(
-                    self.transport.sock.fileno())
+                    self.transport.sock.fileno(), relocating=True)
             except:
                 self.send_error()
                 self.close()

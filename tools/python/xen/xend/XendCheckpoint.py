@@ -151,7 +151,7 @@ def save(fd, dominfo, network, live, dst, checkpoint=False):
         raise exn
 
 
-def restore(xd, fd, dominfo = None, paused = False):
+def restore(xd, fd, dominfo = None, paused = False, relocating = False):
     signature = read_exact(fd, len(SIGNATURE),
         "not a valid guest state file: signature read")
     if signature != SIGNATURE:
@@ -170,6 +170,14 @@ def restore(xd, fd, dominfo = None, paused = False):
         raise XendError("not a valid guest state file: config parse")
 
     vmconfig = p.get_val()
+
+    if not relocating:
+        domconfig = XendConfig(sxp_obj = vmconfig)
+        othervm = xd.domain_lookup_nr(domconfig["name_label"])
+        if othervm is None or othervm.domid is None:
+            othervm = xd.domain_lookup_nr(domconfig["uuid"])
+        if othervm is not None and othervm.domid is not None: 
+            raise VmError("Domain '%s' already exists with ID '%d'" % (domconfig["name_label"], othervm.domid))
 
     if dominfo:
         dominfo.resume()
