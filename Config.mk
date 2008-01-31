@@ -30,7 +30,7 @@ include $(XEN_ROOT)/config/$(XEN_TARGET_ARCH).mk
 
 ifneq ($(EXTRA_PREFIX),)
 EXTRA_INCLUDES += $(EXTRA_PREFIX)/include
-EXTRA_LIB += $(EXTRA_PREFIX)/$(LIBDIR)
+EXTRA_LIB += $(EXTRA_PREFIX)/$(LIBLEAFDIR)
 endif
 
 # cc-option: Check if compiler supports first option, else fall back to second.
