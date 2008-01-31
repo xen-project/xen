@@ -109,6 +109,13 @@ static void realmode_deliver_exception(
     csr->base = (uint32_t)csr->sel << 4;
     regs->eip = (uint16_t)cs_eip;
     regs->eflags &= ~(X86_EFLAGS_TF | X86_EFLAGS_IF | X86_EFLAGS_RF);
+
+    /* Exception delivery clears STI and MOV-SS blocking. */
+    if ( rm_ctxt->intr_shadow & (VMX_INTR_SHADOW_STI|VMX_INTR_SHADOW_MOV_SS) )
+    {
+        rm_ctxt->intr_shadow &= ~(VMX_INTR_SHADOW_STI|VMX_INTR_SHADOW_MOV_SS);
+        __vmwrite(GUEST_INTERRUPTIBILITY_INFO, rm_ctxt->intr_shadow);
+    }
 }
 
 static int
@@ -655,7 +662,7 @@ void vmx_realmode(struct cpu_user_regs *regs)
 {
     struct vcpu *curr = current;
     struct realmode_emulate_ctxt rm_ctxt;
-    unsigned long intr_info;
+    unsigned long intr_info = __vmread(VM_ENTRY_INTR_INFO);
     int i;
 
     rm_ctxt.ctxt.regs = regs;
@@ -674,7 +681,6 @@ void vmx_realmode(struct cpu_user_regs *regs)
          curr->arch.hvm_vmx.real_mode_io_completed )
         realmode_emulate_one(&rm_ctxt);
 
-    intr_info = __vmread(VM_ENTRY_INTR_INFO);
     if ( intr_info & INTR_INFO_VALID_MASK )
     {
         realmode_deliver_exception((uint8_t)intr_info, 0, &rm_ctxt);
