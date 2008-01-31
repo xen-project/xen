@@ -291,13 +291,15 @@ static int __init p4_init(char ** cpu_type)
 }
 
 
+extern int ppro_has_global_ctrl;
 static int __init ppro_init(char ** cpu_type)
 {
 	__u8 cpu_model = current_cpu_data.x86_model;
 
-	if (cpu_model == 15 || cpu_model == 23)
+	if (cpu_model == 15 || cpu_model == 23) {
 		*cpu_type = "i386/core_2";
-	else if (cpu_model == 14)
+		ppro_has_global_ctrl = 1;
+	} else if (cpu_model == 14)
 		*cpu_type = "i386/core";
 	else if (cpu_model > 13) {
 		printk("xenoprof: Initialization failed. "
