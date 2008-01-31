@@ -2315,7 +2315,7 @@ static int is_last_branch_msr(u32 ecx)
     return 0;
 }
 
-static int vmx_do_msr_read(struct cpu_user_regs *regs)
+int vmx_msr_read_intercept(struct cpu_user_regs *regs)
 {
     u64 msr_content = 0;
     u32 ecx = regs->ecx, eax, edx;
@@ -2507,7 +2507,7 @@ extern bool_t mtrr_fix_range_msr_set(struct mtrr_state *v,
 extern bool_t mtrr_def_type_msr_set(struct mtrr_state *v, u64 msr_content);
 extern bool_t pat_msr_set(u64 *pat, u64 msr);
 
-static int vmx_do_msr_write(struct cpu_user_regs *regs)
+int vmx_msr_write_intercept(struct cpu_user_regs *regs)
 {
     u32 ecx = regs->ecx;
     u64 msr_content;
@@ -2949,12 +2949,12 @@ asmlinkage void vmx_vmexit_handler(struct cpu_user_regs *regs)
         break;
     case EXIT_REASON_MSR_READ:
         inst_len = __get_instruction_length(); /* Safe: RDMSR */
-        if ( vmx_do_msr_read(regs) )
+        if ( vmx_msr_read_intercept(regs) )
             __update_guest_eip(inst_len);
         break;
     case EXIT_REASON_MSR_WRITE:
         inst_len = __get_instruction_length(); /* Safe: WRMSR */
-        if ( vmx_do_msr_write(regs) )
+        if ( vmx_msr_write_intercept(regs) )
             __update_guest_eip(inst_len);
         break;
 

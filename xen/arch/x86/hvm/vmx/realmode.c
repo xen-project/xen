@@ -410,6 +410,52 @@ realmode_write_cr(
     return X86EMUL_OKAY;
 }
 
+static int
+realmode_read_msr(
+    unsigned long reg,
+    uint64_t *val,
+    struct x86_emulate_ctxt *ctxt)
+{
+    struct cpu_user_regs _regs = { .ecx = (uint32_t)reg };
+
+    if ( !vmx_msr_read_intercept(&_regs) )
+    {
+        struct realmode_emulate_ctxt *rm_ctxt =
+            container_of(ctxt, struct realmode_emulate_ctxt, ctxt);
+        rm_ctxt->exn_vector = (uint8_t)__vmread(VM_ENTRY_INTR_INFO);
+        rm_ctxt->exn_insn_len = 0;
+        __vmwrite(VM_ENTRY_INTR_INFO, 0);
+        return X86EMUL_EXCEPTION;
+    }
+
+    *val = ((uint64_t)(uint32_t)_regs.edx << 32) || (uint32_t)_regs.eax;
+    return X86EMUL_OKAY;
+}
+
+static int
+realmode_write_msr(
+    unsigned long reg,
+    uint64_t val,
+    struct x86_emulate_ctxt *ctxt)
+{
+    struct cpu_user_regs _regs = {
+        .edx = (uint32_t)(val >> 32),
+        .eax = (uint32_t)val,
+        .ecx = (uint32_t)reg };
+
+    if ( !vmx_msr_write_intercept(&_regs) )
+    {
+        struct realmode_emulate_ctxt *rm_ctxt =
+            container_of(ctxt, struct realmode_emulate_ctxt, ctxt);
+        rm_ctxt->exn_vector = (uint8_t)__vmread(VM_ENTRY_INTR_INFO);
+        rm_ctxt->exn_insn_len = 0;
+        __vmwrite(VM_ENTRY_INTR_INFO, 0);
+        return X86EMUL_EXCEPTION;
+    }
+
+    return X86EMUL_OKAY;
+}
+
 static int realmode_write_rflags(
     unsigned long val,
     struct x86_emulate_ctxt *ctxt)
@@ -495,6 +541,8 @@ static struct x86_emulate_ops realmode_emulator_ops = {
     .write_io      = realmode_write_io,
     .read_cr       = realmode_read_cr,
     .write_cr      = realmode_write_cr,
+    .read_msr      = realmode_read_msr,
+    .write_msr     = realmode_write_msr,
     .write_rflags  = realmode_write_rflags,
     .wbinvd        = realmode_wbinvd,
     .cpuid         = realmode_cpuid,
