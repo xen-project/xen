@@ -9,16 +9,24 @@ D=etherboot-$(EB_VERSION)
 T=etherboot-$(EB_VERSION).tar.gz
 E=etherboot-build
 
-TARGETS=eb-rtl8139.zrom.h
+NICS = rtl8139 eepro100
 
-all: $(TARGETS)
+ROM_ZHS = $(addprefix eb-, $(addsuffix .zrom.h, $(NICS)))
+
+all: eb-roms.h
 
 eb-%.zrom.h: $E/src/Config
 	$(MAKE) -C $E/src bin/$*.zrom
-	../hvmloader/mkhex etherboot <$E/src/bin/$*.zrom >$@.new
+	../hvmloader/mkhex etherboot_$* <$E/src/bin/$*.zrom >$@.new
 	mv -f $@.new $@
 
-$E/src/Config:	$T Config
+eb-rom-list.h: make-eb-rom-list $E/src/bin/Roms
+	./$^ $(NICS) >$@.new && mv -f $@.new $@
+
+eb-roms.h: eb-rom-list.h $(ROM_ZHS)
+	cat $^ >$@.new && mv -f $@.new $@
+
+$E/src/Config: $T Config
 	rm -rf $D $E
 	tar zxf $T
 	cat Config >>$D/src/Config
@@ -44,7 +52,10 @@ $E/src/Config:	$T Config
 		mv Config.new Config
 	mv $D $E
 
+$E/src/bin/Roms: $E/src/Config
+	$(MAKE) -C $E/src bin/Roms
+
 clean:
-	rm -rf $D $E *.zrom.h *~
+	rm -rf $D $E *.zrom.h eb-rom-list.h eb-roms.h *~
 
 .PHONY: all clean
