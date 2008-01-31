@@ -7593,7 +7593,7 @@ int main(int argc, char **argv)
 #ifdef CONFIG_DM
     bdrv_init();
     xc_handle = xc_interface_open();
-    xenstore_parse_domain_config(domid);
+    xenstore_daemon_open();
 #endif /* CONFIG_DM */
 
 #ifdef USE_KQEMU

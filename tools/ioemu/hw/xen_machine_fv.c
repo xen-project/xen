@@ -205,6 +205,8 @@ static void xen_init_fv(uint64_t ram_size, int vga_ram_size, char *boot_device,
     }
 #endif
 
+    xenstore_parse_domain_config(domid);
+
     xc_get_hvm_param(xc_handle, domid, HVM_PARAM_IOREQ_PFN, &ioreq_pfn);
     fprintf(logfile, "shared page at pfn %lx\n", ioreq_pfn);
     shared_page = xc_map_foreign_range(xc_handle, domid, XC_PAGE_SIZE,
