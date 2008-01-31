@@ -24,7 +24,7 @@ CLIENTS_OBJS := $(patsubst xenstore-%,xenstore_%.o,$(CLIENTS))
 XENSTORED_OBJS = xenstored_core.o xenstored_watch.o xenstored_domain.o xenstored_transaction.o xs_lib.o talloc.o utils.o tdb.o hashtable.o
 
 XENSTORED_OBJS_$(CONFIG_Linux) = xenstored_linux.o
-XENSTORED_OBJS_$(CONFIG_SunOS) = xenstored_solaris.o
+XENSTORED_OBJS_$(CONFIG_SunOS) = xenstored_solaris.o xenstored_probes.o
 XENSTORED_OBJS_$(CONFIG_NetBSD) = xenstored_netbsd.o
 
 XENSTORED_OBJS += $(XENSTORED_OBJS_y)
@@ -32,6 +32,18 @@ XENSTORED_OBJS += $(XENSTORED_OBJS_y)
 .PHONY: all
 all: libxenstore.so libxenstore.a xenstored $(CLIENTS) xs_tdb_dump xenstore-control xenstore-ls
 
+ifeq ($(CONFIG_SunOS),y)
+xenstored_probes.h: xenstored_probes.d
+	dtrace -C -h -s xenstored_probes.d
+
+xenstored_solaris.o: xenstored_probes.h
+
+xenstored_probes.o: xenstored_solaris.o
+	dtrace -C -G -s xenstored_probes.d xenstored_solaris.o 
+
+CFLAGS += -DHAVE_DTRACE=1
+endif
+ 
 xenstored: $(XENSTORED_OBJS)
 	$(CC) $(CFLAGS) $(LDFLAGS) $^ $(LOADLIBES) $(LDLIBS) $(LDFLAGS_libxenctrl) $(SOCKET_LIBS) -o $@
 
@@ -63,7 +75,7 @@ libxenstore.a: xs.o xs_lib.o
 
 .PHONY: clean
 clean:
-	rm -f *.a *.o *.opic *.so*
+	rm -f *.a *.o *.opic *.so* xenstored_probes.h
 	rm -f xenstored xs_random xs_stress xs_crashme
 	rm -f xs_tdb_dump xenstore-control xenstore-ls
 	rm -f $(CLIENTS)

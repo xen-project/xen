@@ -154,12 +154,16 @@ void trace(const char *fmt, ...)
 }
 
 static void trace_io(const struct connection *conn,
-		     const char *prefix,
-		     const struct buffered_data *data)
+		     const struct buffered_data *data,
+		     int out)
 {
 	unsigned int i;
 	time_t now;
 	struct tm *tm;
+
+#ifdef HAVE_DTRACE
+	dtrace_io(conn, data, out);
+#endif
 
 	if (tracefd < 0)
 		return;
@@ -167,7 +171,8 @@ static void trace_io(const struct connection *conn,
 	now = time(NULL);
 	tm = localtime(&now);
 
-	trace("%s %p %04d%02d%02d %02d:%02d:%02d %s (", prefix, conn,
+	trace("%s %p %04d%02d%02d %02d:%02d:%02d %s (",
+	      out ? "OUT" : "IN", conn,
 	      tm->tm_year + 1900, tm->tm_mon + 1,
 	      tm->tm_mday, tm->tm_hour, tm->tm_min, tm->tm_sec,
 	      sockmsg_string(data->hdr.msg.type));
@@ -257,7 +262,7 @@ static bool write_messages(struct connection *conn)
 	if (out->used != out->hdr.msg.len)
 		return true;
 
-	trace_io(conn, "OUT", out);
+	trace_io(conn, out, 1);
 
 	list_del(&out->list);
 	talloc_free(out);
@@ -1316,7 +1321,7 @@ static void handle_input(struct connection *conn)
 	if (in->used != in->hdr.msg.len)
 		return;
 
-	trace_io(conn, "IN ", in);
+	trace_io(conn, in, 0);
 	consider_message(conn);
 	return;
 
