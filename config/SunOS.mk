@@ -8,6 +8,7 @@ NM         = $(CROSS_COMPILE)gnm
 STRIP      = $(CROSS_COMPILE)gstrip
 OBJCOPY    = $(CROSS_COMPILE)gobjcopy
 OBJDUMP    = $(CROSS_COMPILE)gobjdump
+SIZEUTIL   = $(CROSS_COMPILE)gsize
 
 MSGFMT     = gmsgfmt
 

@@ -8,6 +8,7 @@ NM         = $(CROSS_COMPILE)nm
 STRIP      = $(CROSS_COMPILE)strip
 OBJCOPY    = $(CROSS_COMPILE)objcopy
 OBJDUMP    = $(CROSS_COMPILE)objdump
+SIZEUTIL   = $(CROSS_COMPILE)size
 
 MSGFMT     = msgfmt
 MSGMERGE   = msgmerge
