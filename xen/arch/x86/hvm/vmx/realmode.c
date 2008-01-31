@@ -416,7 +416,9 @@ realmode_read_msr(
     uint64_t *val,
     struct x86_emulate_ctxt *ctxt)
 {
-    struct cpu_user_regs _regs = { .ecx = (uint32_t)reg };
+    struct cpu_user_regs _regs;
+
+    _regs.ecx = (uint32_t)reg;
 
     if ( !vmx_msr_read_intercept(&_regs) )
     {
@@ -438,10 +440,11 @@ realmode_write_msr(
     uint64_t val,
     struct x86_emulate_ctxt *ctxt)
 {
-    struct cpu_user_regs _regs = {
-        .edx = (uint32_t)(val >> 32),
-        .eax = (uint32_t)val,
-        .ecx = (uint32_t)reg };
+    struct cpu_user_regs _regs;
+
+    _regs.edx = (uint32_t)(val >> 32);
+    _regs.eax = (uint32_t)val;
+    _regs.ecx = (uint32_t)reg;
 
     if ( !vmx_msr_write_intercept(&_regs) )
     {
