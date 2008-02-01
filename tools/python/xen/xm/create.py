@@ -158,6 +158,10 @@ gopts.var('ramdisk', val='FILE',
           fn=set_value, default='',
           use="Path to ramdisk.")
 
+gopts.var('loader', val='FILE',
+          fn=set_value, default='',
+          use="Path to HVM firmware.")
+
 gopts.var('features', val='FEATURES',
           fn=set_value, default='',
           use="Features to enable in guest kernel")
@@ -561,6 +565,8 @@ def configure_image(vals):
         config_image.append([ 'kernel', os.path.abspath(vals.kernel) ])
     if vals.ramdisk:
         config_image.append([ 'ramdisk', os.path.abspath(vals.ramdisk) ])
+    if vals.loader:
+        config_image.append([ 'loader', os.path.abspath(vals.loader) ])
     if vals.cmdline_ip:
         cmdline_ip = strip('ip=', vals.cmdline_ip)
         config_image.append(['ip', cmdline_ip])

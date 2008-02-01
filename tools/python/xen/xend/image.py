@@ -127,7 +127,7 @@ class ImageHandler:
         """
         # Set params and call buildDomain().
 
-        if not os.path.isfile(self.kernel):
+        if self.kernel and not os.path.isfile(self.kernel):
             raise VmError('Kernel image does not exist: %s' % self.kernel)
         if self.ramdisk and not os.path.isfile(self.ramdisk):
             raise VmError('Kernel ramdisk does not exist: %s' % self.ramdisk)
@@ -186,6 +186,10 @@ class ImageHandler:
     # xm config file
     def parseDeviceModelArgs(self, vmConfig):
         ret = ["-domain-name", str(self.vm.info['name_label'])]
+
+        # Tell QEMU how large the guest's memory allocation is
+        # to help it when loading the initrd (if neccessary)
+        ret += ["-m", str(self.getRequiredInitialReservation() / 1024)]
 
         # Find RFB console device, and if it exists, make QEMU enable
         # the VNC console.
@@ -420,8 +424,7 @@ class HVMImageHandler(ImageHandler):
     def configure(self, vmConfig):
         ImageHandler.configure(self, vmConfig)
 
-        if not self.kernel:
-            self.kernel = '/usr/lib/xen/boot/hvmloader'
+        self.loader = vmConfig['platform'].get('loader')
 
         info = xc.xeninfo()
         if 'hvm' not in info['xen_caps']:
@@ -445,6 +448,17 @@ class HVMImageHandler(ImageHandler):
     def parseDeviceModelArgs(self, vmConfig):
         ret = ImageHandler.parseDeviceModelArgs(self, vmConfig)
         ret = ret + ['-vcpus', str(self.vm.getVCpuCount())]
+
+        if self.kernel and self.kernel != "/usr/lib/xen/boot/hvmloader":
+            log.debug("kernel         = %s", self.kernel)
+            ret = ret + ['-kernel', self.kernel]
+        if self.ramdisk:
+            log.debug("ramdisk        = %s", self.ramdisk)
+            ret = ret + ['-initrd', self.ramdisk]
+        if self.cmdline:
+            log.debug("cmdline        = %s", self.cmdline)
+            ret = ret + ['-append', self.cmdline]
+
 
         dmargs = [ 'boot', 'fda', 'fdb', 'soundhw',
                    'localtime', 'serial', 'stdvga', 'isa',
@@ -521,7 +535,7 @@ class HVMImageHandler(ImageHandler):
         mem_mb = self.getRequiredInitialReservation() / 1024
 
         log.debug("domid          = %d", self.vm.getDomid())
-        log.debug("image          = %s", self.kernel)
+        log.debug("image          = %s", self.loader)
         log.debug("store_evtchn   = %d", store_evtchn)
         log.debug("memsize        = %d", mem_mb)
         log.debug("vcpus          = %d", self.vm.getVCpuCount())
@@ -529,7 +543,7 @@ class HVMImageHandler(ImageHandler):
         log.debug("apic           = %d", self.apic)
 
         rc = xc.hvm_build(domid          = self.vm.getDomid(),
-                          image          = self.kernel,
+                          image          = self.loader,
                           memsize        = mem_mb,
                           vcpus          = self.vm.getVCpuCount(),
                           acpi           = self.acpi,

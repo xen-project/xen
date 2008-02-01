@@ -124,7 +124,7 @@ XENAPI_CFG_TO_LEGACY_CFG = {
 LEGACY_CFG_TO_XENAPI_CFG = reverse_dict(XENAPI_CFG_TO_LEGACY_CFG)
 
 # Platform configuration keys.
-XENAPI_PLATFORM_CFG = [ 'acpi', 'apic', 'boot', 'device_model', 'display', 
+XENAPI_PLATFORM_CFG = [ 'acpi', 'apic', 'boot', 'device_model', 'loader', 'display', 
                         'fda', 'fdb', 'keymap', 'isa', 'localtime', 'monitor', 
                         'nographic', 'pae', 'rtc_timeoffset', 'serial', 'sdl',
                         'soundhw','stdvga', 'usb', 'usbdevice', 'vnc',
@@ -404,6 +404,17 @@ class XendConfig(dict):
                 self['platform']['device_model'] = xen.util.auxbin.pathTo("qemu-dm")
 
         if self.is_hvm():
+            if 'loader' not in self['platform']:
+                log.debug("No loader present")
+                # Old configs may have hvmloder set as PV_kernel param,
+                # so lets migrate them....
+                if self['PV_kernel'] == "/usr/lib/xen/boot/hvmloader":
+                    self['platform']['loader'] = self['PV_kernel']
+                    log.debug("Loader copied from kernel %s" % str(self['platform']['loader']))
+                else:
+                    self['platform']['loader'] = "/usr/lib/xen/boot/hvmloader"
+                    log.debug("Loader %s" % str(self['platform']['loader']))
+
             # Compatibility hack, can go away soon.
             if 'soundhw' not in self['platform'] and \
                self['platform'].get('enable_audio'):
