@@ -672,11 +672,28 @@ int main_loop(void)
         xenstore_record_dm_state("paused");
 
         /* Wait to be allowed to continue */
-        while (suspend_requested) {
+        while (suspend_requested && !shutdown_requested) {
+            /*
+             * Poll for shutdown via SDL every 10ms.
+             * This is needed because SDL steals SIGTERM and only lets us
+             * know about it after gui_update().
+             */
+            struct timeval tv;
+            tv.tv_sec  = 0;
+            tv.tv_usec = 10000;
+
             FD_ZERO(&fds);
             FD_SET(xenstore_fd(), &fds);
-            if (select(xenstore_fd() + 1, &fds, NULL, NULL, NULL) > 0)
+            if (select(xenstore_fd() + 1, &fds, NULL, NULL, &tv) > 0)
                 xenstore_process_event(NULL);
+
+            /* Refresh SDL state and pick up any pending shutdown request. */
+            gui_update();
+        }
+
+        if (shutdown_requested) {
+            ret = EXCP_INTERRUPT;
+            break;
         }
 
         xenstore_record_dm_state("running");
