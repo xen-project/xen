@@ -4076,7 +4076,7 @@ static void *emulate_map_dest(struct vcpu *v,
         sh_ctxt->mfn2 = emulate_gva_to_mfn(v, (vaddr + bytes - 1) & PAGE_MASK,
                                            sh_ctxt);
         if ( !mfn_valid(sh_ctxt->mfn2) ) 
-            return ((mfn_x(sh_ctxt->mfn1) == BAD_GVA_TO_GFN) ?
+            return ((mfn_x(sh_ctxt->mfn2) == BAD_GVA_TO_GFN) ?
                     MAPPING_EXCEPTION : MAPPING_UNHANDLEABLE);
 
         /* Cross-page writes mean probably not a pagetable */
