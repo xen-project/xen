@@ -417,6 +417,90 @@ static void generate_bootsect(uint32_t gpr[8], uint16_t segs[6], uint16_t ip)
     bdrv_set_boot_sector(bs_table[0], bootsect, sizeof(bootsect));
 }
 
+/*
+ * Evil helper for non-relocatable kernels
+ *
+ * So it works out like this:
+ *
+ *  0x100000  - Xen HVM firmware lives here. Kernel wants to boot here
+ *
+ * You can't both live there and HVM firmware is needed first, thus
+ * our plan is
+ *
+ *  0x200000              - kernel is loaded here by QEMU
+ *  0x200000+kernel_size  - helper code is put here by QEMU
+ *
+ * code32_switch in kernel header is set to point at out helper
+ * code at 0x200000+kernel_size
+ *
+ * Our helper basically does memmove(0x100000,0x200000,kernel_size)
+ * and then jmps to  0x1000000.
+ *
+ * So we've overwritten the HVM firmware (which was no longer
+ * needed) and the non-relocatable kernel can happily boot
+ * at its usual address.
+ *
+ * Simple, eh ?
+ *
+ * Well the assembler needed to do this is fairly short:
+ *
+ *  # Load segments
+ *    cld                         
+ *    cli                         
+ *    movl $0x18,%eax
+ *    mov %ax,%ds                 
+ *    mov %ax,%es                 
+ *    mov %ax,%fs                 
+ *    mov %ax,%gs                 
+ *    mov %ax,%ss                 
+ *
+ *  # Move the kernel into position
+ *    xor    %edx,%edx            
+ *_doloop:                        
+ *    movzbl 0x600000(%edx),%eax  
+ *    mov    %al,0x100000(%edx)   
+ *    add    $0x1,%edx            
+ *    cmp    $0x500000,%edx       
+ *    jne    _doloop              
+ *
+ *  # start kernel
+ *    xorl %ebx,%ebx              
+ *    mov    $0x100000,%ecx       
+ *    jmp    *%ecx                
+ *
+ */
+static void setup_relocator(target_phys_addr_t addr, target_phys_addr_t src, target_phys_addr_t dst, size_t len)
+{
+  /* Now this assembler corresponds to follow machine code, with our args from QEMU spliced in :-) */
+  unsigned char buf[] = {
+    /* Load segments */
+    0xfc,                         /* cld               */
+    0xfa,                         /* cli               */ 
+    0xb8, 0x18, 0x00, 0x00, 0x00, /* mov    $0x18,%eax */
+    0x8e, 0xd8,                   /* mov    %eax,%ds   */
+    0x8e, 0xc0,                   /* mov    %eax,%es   */
+    0x8e, 0xe0,                   /* mov    %eax,%fs   */
+    0x8e, 0xe8,                   /* mov    %eax,%gs   */
+    0x8e, 0xd0,                   /* mov    %eax,%ss   */
+    0x31, 0xd2,                   /* xor    %edx,%edx  */
+  
+    /* Move the kernel into position */
+    0x0f, 0xb6, 0x82, (src&0xff), ((src>>8)&0xff), ((src>>16)&0xff), ((src>>24)&0xff), /*   movzbl $src(%edx),%eax */
+    0x88, 0x82, (dst&0xff), ((dst>>8)&0xff), ((dst>>16)&0xff), ((dst>>24)&0xff),       /*   mov    %al,$dst(%edx)  */
+    0x83, 0xc2, 0x01,                                                                  /*   add    $0x1,%edx       */
+    0x81, 0xfa, (len&0xff), ((len>>8)&0xff), ((len>>16)&0xff), ((len>>24)&0xff),       /*   cmp    $len,%edx       */
+    0x75, 0xe8,                                                                        /*   jne    13 <_doloop>    */
+
+    /* Start kernel */
+    0x31, 0xdb,                                                                        /*   xor    %ebx,%ebx       */
+    0xb9, (dst&0xff), ((dst>>8)&0xff), ((dst>>16)&0xff), ((dst>>24)&0xff),             /*   mov    $dst,%ecx  */
+    0xff, 0xe1,                                                                        /*   jmp    *%ecx           */
+  };
+  cpu_physical_memory_rw(addr, buf, sizeof(buf), 1);
+  fprintf(stderr, "qemu: helper at 0x%x of size %d bytes, to move kernel of %d bytes from 0x%x to 0x%x\n",
+	  (int)addr, (int)sizeof(buf), (int)len, (int)src, (int)dst);
+}
+
 
 static long get_file_size(FILE *f)
 {
@@ -597,8 +681,15 @@ static void load_linux(const char *kernel_filename,
 	    stl_p(header+0x214, reloc_prot_addr);
 	    fprintf(stderr, "qemu: kernel is relocatable\n");
 	} else {
-	    fprintf(stderr, "qemu: unable to load non-relocatable kernel\n");
-	    exit(1);
+	    /* Setup a helper which moves  kernel back to
+	     * its expected addr after firmware has got out
+	     * of the way. We put a helper at  reloc_prot_addr+kernel_size.
+	     * It moves kernel from reloc_prot_addr to prot_addr and
+	     * then jumps to prot_addr. Yes this is sick.
+	     */
+	    fprintf(stderr, "qemu: kernel is NOT relocatable\n");
+	    stl_p(header+0x214, reloc_prot_addr + kernel_size);
+	    setup_relocator(reloc_prot_addr + kernel_size, reloc_prot_addr, prot_addr, kernel_size);
 	}
     }
 
