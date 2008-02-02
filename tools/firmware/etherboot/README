@@ -1,9 +1,8 @@
 
 This directory builds Etherboot option ROMs from the etherboot source
-tarball.  (We provide this tarball in our source so that we do not
-distribute binaries without source code, as that would mean we weren't
-sure what the binaries are and in any case would be forbidden by the
-licensing of Etherboot.)
+tarball. We provide this tarball in our source so that the option ROMs
+can be reconstructed from source, allowing easier debugging and
+fulfilling the terms of the GPL.
 
 We make a few non-standard settings, most to do with timeouts and when
 to give up, and for stricter DHCP spec compliance.
