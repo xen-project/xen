@@ -76,7 +76,7 @@ find_dhcpd_init_file()
 
 find_dhcpd_arg_file()
 {
-  first_file -f /etc/sysconfig/dhcpd /etc/defaults/dhcp
+  first_file -f /etc/sysconfig/dhcpd /etc/defaults/dhcp /etc/default/dhcp3-server
 }
 
 # configure interfaces which act as pure bridge ports:
