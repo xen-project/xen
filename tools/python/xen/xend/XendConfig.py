@@ -514,8 +514,8 @@ class XendConfig(dict):
             int(sxp.child_value(sxp_cfg, "cpu_cap", 0))
 
         # Only extract options we know about.
-        extract_keys = LEGACY_UNSUPPORTED_BY_XENAPI_CFG
-        extract_keys += XENAPI_CFG_TO_LEGACY_CFG.values()
+        extract_keys = LEGACY_UNSUPPORTED_BY_XENAPI_CFG + \
+                  XENAPI_CFG_TO_LEGACY_CFG.values()
         
         for key in extract_keys:
             val = sxp.child_value(sxp_cfg, key)
