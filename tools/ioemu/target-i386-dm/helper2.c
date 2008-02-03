@@ -637,7 +637,6 @@ int main_loop(void)
     int evtchn_fd = xce_handle == -1 ? -1 : xc_evtchn_fd(xce_handle);
     char *qemu_file;
     fd_set fds;
-    int ret = 0;
 
     buffered_io_timer = qemu_new_timer(rt_clock, handle_buffered_io,
 				       cpu_single_env);
@@ -648,14 +647,9 @@ int main_loop(void)
 
     xenstore_record_dm_state("running");
     while (1) {
-        while (!((vm_running && suspend_requested) || shutdown_requested))
+        while (!(vm_running && suspend_requested))
             /* Wait up to 10 msec. */
             main_loop_wait(10);
-
-        if (shutdown_requested) {
-            ret = EXCP_INTERRUPT;
-            break;
-        }
 
         fprintf(logfile, "device model saving state\n");
 
@@ -672,34 +666,17 @@ int main_loop(void)
         xenstore_record_dm_state("paused");
 
         /* Wait to be allowed to continue */
-        while (suspend_requested && !shutdown_requested) {
-            /*
-             * Poll for shutdown via SDL every 10ms.
-             * This is needed because SDL steals SIGTERM and only lets us
-             * know about it after gui_update().
-             */
-            struct timeval tv;
-            tv.tv_sec  = 0;
-            tv.tv_usec = 10000;
-
+        while (suspend_requested) {
             FD_ZERO(&fds);
             FD_SET(xenstore_fd(), &fds);
-            if (select(xenstore_fd() + 1, &fds, NULL, NULL, &tv) > 0)
+            if (select(xenstore_fd() + 1, &fds, NULL, NULL, NULL) > 0)
                 xenstore_process_event(NULL);
-
-            /* Refresh SDL state and pick up any pending shutdown request. */
-            gui_update();
-        }
-
-        if (shutdown_requested) {
-            ret = EXCP_INTERRUPT;
-            break;
         }
 
         xenstore_record_dm_state("running");
     }
 
-    return ret;
+    return 0;
 }
 
 void destroy_hvm_domain(void)
