@@ -570,7 +570,9 @@ static int construct_vmcs(struct vcpu *v)
     __vmwrite(VMCS_LINK_POINTER_HIGH, ~0UL);
 #endif
 
-    __vmwrite(EXCEPTION_BITMAP, HVM_TRAP_MASK | (1U << TRAP_page_fault));
+    __vmwrite(EXCEPTION_BITMAP, (HVM_TRAP_MASK |
+                                 (1U << TRAP_page_fault) |
+                                 (1U << TRAP_no_device)));
 
     v->arch.hvm_vcpu.guest_cr[0] = X86_CR0_PE | X86_CR0_ET;
     hvm_update_guest_cr(v, 0);

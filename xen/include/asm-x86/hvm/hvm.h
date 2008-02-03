@@ -105,12 +105,6 @@ struct hvm_function_table {
      */
     void (*flush_guest_tlbs)(void);
 
-    /*
-     * Update specifics of the guest state:
-     * 1) TS bit in guest cr0 
-     * 2) TSC offset in guest
-     */
-    void (*stts)(struct vcpu *v);
     void (*set_tsc_offset)(struct vcpu *v, u64 offset);
 
     void (*inject_exception)(unsigned int trapnr, int errcode,

@@ -212,7 +212,7 @@ static int construct_vmcb(struct vcpu *v)
     vmcb->tr.base = 0;
     vmcb->tr.limit = 0xff;
 
-    v->arch.hvm_vcpu.guest_cr[0] = X86_CR0_PE | X86_CR0_TS;
+    v->arch.hvm_vcpu.guest_cr[0] = X86_CR0_PE | X86_CR0_ET;
     hvm_update_guest_cr(v, 0);
 
     v->arch.hvm_vcpu.guest_cr[4] = 0;
@@ -220,12 +220,13 @@ static int construct_vmcb(struct vcpu *v)
 
     paging_update_paging_modes(v);
 
+    vmcb->exception_intercepts = HVM_TRAP_MASK | (1U << TRAP_no_device);
+
     if ( paging_mode_hap(v->domain) )
     {
         vmcb->np_enable = 1; /* enable nested paging */
         vmcb->g_pat = 0x0007040600070406ULL; /* guest PAT */
         vmcb->h_cr3 = pagetable_get_paddr(v->domain->arch.phys_table);
-        vmcb->exception_intercepts = HVM_TRAP_MASK;
 
         /*
          * No point in intercepting CR3 reads, because the hardware will return
@@ -241,7 +242,7 @@ static int construct_vmcb(struct vcpu *v)
     }
     else
     {
-        vmcb->exception_intercepts = HVM_TRAP_MASK | (1U << TRAP_page_fault);
+        vmcb->exception_intercepts |= (1U << TRAP_page_fault);
     }
 
     return 0;
