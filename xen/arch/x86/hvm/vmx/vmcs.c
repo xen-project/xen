@@ -489,7 +489,8 @@ static int construct_vmcs(struct vcpu *v)
     __vmwrite(HOST_GS_BASE, 0);
 
     /* Host control registers. */
-    __vmwrite(HOST_CR0, read_cr0() | X86_CR0_TS);
+    v->arch.hvm_vmx.host_cr0 = read_cr0() | X86_CR0_TS;
+    __vmwrite(HOST_CR0, v->arch.hvm_vmx.host_cr0);
     __vmwrite(HOST_CR4, mmu_cr4_features);
 
     /* Host CS:RIP. */

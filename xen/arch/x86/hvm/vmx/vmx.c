@@ -742,6 +742,13 @@ static int vmx_load_vmcs_ctxt(struct vcpu *v, struct hvm_hw_cpu *ctxt)
 
 static void vmx_ctxt_switch_from(struct vcpu *v)
 {
+    ASSERT(read_cr0() & X86_CR0_TS);
+    if ( !(v->arch.hvm_vmx.host_cr0 & X86_CR0_TS) )
+    {
+        v->arch.hvm_vmx.host_cr0 |= X86_CR0_TS;
+        __vmwrite(HOST_CR0, v->arch.hvm_vmx.host_cr0);
+    }
+
     vmx_save_guest_msrs(v);
     vmx_restore_host_msrs();
     vmx_save_dr(v);
@@ -1231,6 +1238,10 @@ void vmx_do_no_device_fault(void)
 
     setup_fpu(current);
     __vm_clear_bit(EXCEPTION_BITMAP, TRAP_no_device);
+
+    ASSERT(v->arch.hvm_vmx.host_cr0 & X86_CR0_TS);
+    v->arch.hvm_vmx.host_cr0 &= ~X86_CR0_TS;
+    __vmwrite(HOST_CR0, v->arch.hvm_vmx.host_cr0);
 
     /* Disable TS in guest CR0 unless the guest wants the exception too. */
     if ( !(v->arch.hvm_vcpu.guest_cr[0] & X86_CR0_TS) )

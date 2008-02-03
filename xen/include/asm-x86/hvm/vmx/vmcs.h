@@ -92,6 +92,8 @@ struct arch_vmx_struct {
     unsigned int         host_msr_count;
     struct vmx_msr_entry *host_msr_area;
 
+    unsigned long        host_cr0;
+
 #ifdef VMXASSIST
     unsigned long        vmxassist_enabled:1;
     unsigned long        irqbase_mode:1;
