@@ -77,13 +77,6 @@ static void waitForDevice(char *fn)
     return;
 }
 
-void xenstore_daemon_open(void)
-{
-    xsh = xs_daemon_open();
-    if (xsh == NULL)
-        fprintf(logfile, "Could not contact xenstore for domain config\n");
-}
-
 void xenstore_parse_domain_config(int domid)
 {
     char **e = NULL;
@@ -96,6 +89,12 @@ void xenstore_parse_domain_config(int domid)
 
     for(i = 0; i < MAX_DISKS + MAX_SCSI_DISKS; i++)
         media_filename[i] = NULL;
+
+    xsh = xs_daemon_open();
+    if (xsh == NULL) {
+        fprintf(logfile, "Could not contact xenstore for domain config\n");
+        return;
+    }
 
     path = xs_get_domain_path(xsh, domid);
     if (path == NULL) {

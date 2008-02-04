@@ -1457,7 +1457,6 @@ void readline_start(const char *prompt, int is_password,
                     ReadLineFunc *readline_func, void *opaque);
 
 /* xenstore.c */
-void xenstore_daemon_open(void);
 void xenstore_parse_domain_config(int domid);
 int xenstore_fd(void);
 void xenstore_process_event(void *opaque);
