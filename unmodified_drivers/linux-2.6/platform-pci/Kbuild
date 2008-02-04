@@ -17,5 +17,5 @@ xen-platform-pci-objs += ../xenbus/xen_proc.o
 
 # Can we do better ?
 ifeq ($(ARCH),ia64)
-  xen-platform-pci-objs += xencomm.o xencomm_arch.o xcom_hcall.o
+  xen-platform-pci-objs += xencomm.o xencomm_arch.o xcom_hcall.o xcom_asm.o
 endif
