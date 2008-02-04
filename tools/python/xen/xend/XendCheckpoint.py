@@ -67,6 +67,8 @@ def save(fd, dominfo, network, live, dst, checkpoint=False):
     # thing is useful for debugging.
     dominfo.setName('migrating-' + domain_name)
 
+    done_suspend = 0
+
     try:
         dominfo.migrateDevices(network, dst, DEV_MIGRATE_STEP1, domain_name)
 
@@ -94,6 +96,7 @@ def save(fd, dominfo, network, live, dst, checkpoint=False):
                 log.debug("Suspending %d ...", dominfo.getDomid())
                 dominfo.shutdown('suspend')
                 dominfo.waitForShutdown()
+                done_suspend = 1
                 dominfo.migrateDevices(network, dst, DEV_MIGRATE_STEP2,
                                        domain_name)
                 log.info("Domain %d suspended.", dominfo.getDomid())
@@ -140,9 +143,14 @@ def save(fd, dominfo, network, live, dst, checkpoint=False):
         log.exception("Save failed on domain %s (%s).", domain_name,
                       dominfo.getDomid())
         
-        dominfo.resumeDomain()
-        log.debug("XendCheckpoint.save: resumeDomain")
-
+        # If we didn't get as far as suspending the domain (for
+        # example, we couldn't balloon enough memory for the new
+        # domain), then we don't want to re-plumb the devices, as the
+        # domU will not be expecting it.
+        if done_suspend:
+            log.debug("XendCheckpoint.save: resumeDomain")
+            dominfo.resumeDomain()
+ 
         try:
             dominfo.setName(domain_name)
         except:

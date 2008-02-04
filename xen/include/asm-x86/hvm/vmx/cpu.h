@@ -19,19 +19,6 @@
 #ifndef __ASM_X86_HVM_VMX_CPU_H__
 #define __ASM_X86_HVM_VMX_CPU_H__
 
-/*
- * Virtual CPU
- */
-struct arch_state_struct {
-    unsigned long       mode_flags; /* vm86, 32-bit, 64-bit, etc. */
-    /* debug registers */
-    /* MSRs */
-};
-
-#define VMX_MF_VM86     0
-#define VMX_MF_32       1
-#define VMX_MF_64       2
-
 #define NUM_CORES_RESET_MASK                 0x00003FFF
 #define NUM_THREADS_RESET_MASK               0xFF00FFFF
 

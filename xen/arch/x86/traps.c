@@ -823,6 +823,15 @@ asmlinkage void do_machine_check(struct cpu_user_regs *regs)
     machine_check_vector(regs, regs->error_code);
 }
 
+static void reserved_bit_page_fault(
+    unsigned long addr, struct cpu_user_regs *regs)
+{
+    printk("d%d:v%d: reserved bit in page table (ec=%04X)\n",
+           current->domain->domain_id, current->vcpu_id, regs->error_code);
+    show_page_walk(addr);
+    show_execution_state(regs);
+}
+
 void propagate_page_fault(unsigned long addr, u16 error_code)
 {
     struct trap_info *ti;
@@ -848,10 +857,13 @@ void propagate_page_fault(unsigned long addr, u16 error_code)
         tb->flags |= TBF_INTERRUPT;
     if ( unlikely(null_trap_bounce(v, tb)) )
     {
-        printk("Unhandled page fault in domain %d on VCPU %d (ec=%04X)\n",
+        printk("d%d:v%d: unhandled page fault (ec=%04X)\n",
                v->domain->domain_id, v->vcpu_id, error_code);
         show_page_walk(addr);
     }
+
+    if ( unlikely(error_code & PFEC_reserved_bit) )
+        reserved_bit_page_fault(addr, guest_cpu_user_regs());
 }
 
 static int handle_gdt_ldt_mapping_fault(
@@ -1047,7 +1059,8 @@ static int fixup_page_fault(unsigned long addr, struct cpu_user_regs *regs)
                 trace_trap_two_addr(TRC_PV_PAGING_FIXUP, regs->eip, addr);
             return ret;
         }
-        if ( (addr >= GDT_LDT_VIRT_START) && (addr < GDT_LDT_VIRT_END) )
+        if ( !(regs->error_code & PFEC_reserved_bit) &&
+             (addr >= GDT_LDT_VIRT_START) && (addr < GDT_LDT_VIRT_END) )
             return handle_gdt_ldt_mapping_fault(
                 addr - GDT_LDT_VIRT_START, regs);
         return 0;
@@ -1057,7 +1070,8 @@ static int fixup_page_fault(unsigned long addr, struct cpu_user_regs *regs)
          guest_kernel_mode(v, regs) &&
          /* Do not check if access-protection fault since the page may 
             legitimately be not present in shadow page tables */
-         ((regs->error_code & PFEC_write_access) == PFEC_write_access) &&
+         ((regs->error_code & (PFEC_write_access|PFEC_reserved_bit)) ==
+          PFEC_write_access) &&
          ptwr_do_page_fault(v, addr, regs) )
         return EXCRET_fault_fixed;
 
@@ -1101,6 +1115,8 @@ asmlinkage void do_page_fault(struct cpu_user_regs *regs)
         if ( likely((fixup = search_exception_table(regs->eip)) != 0) )
         {
             perfc_incr(copy_user_faults);
+            if ( unlikely(regs->error_code & PFEC_reserved_bit) )
+                reserved_bit_page_fault(addr, regs);
             regs->eip = fixup;
             return;
         }

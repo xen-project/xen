@@ -345,27 +345,58 @@ static void pci_setup(void)
     }
 }
 
-/*
- * If the network card is in the boot order, load the Etherboot option ROM.
- * Read the boot order bytes from CMOS and check if any of them are 0x4.
- */
-static int must_load_nic(void) 
-{
-    uint8_t boot_order;
-
-    /* Read CMOS register 0x3d (boot choices 0 and 1). */
-    boot_order = cmos_inb(0x3d);
-    if ( ((boot_order & 0xf) == 0x4) || ((boot_order & 0xf0) == 0x40) ) 
-        return 1;
-
-    /* Read CMOS register 0x38 (boot choice 2 and FDD test flag). */
-    boot_order = cmos_inb(0x38);
-    return ((boot_order & 0xf0) == 0x40);
-}
-
 static int must_load_extboot(void)
 {
     return (inb(0x404) == 1);
+}
+
+/*
+ * Scan the PCI bus for the first NIC supported by etherboot, and copy
+ * the corresponding rom data to *copy_rom_dest. Returns the length of the
+ * selected rom, or 0 if no NIC found.
+ */
+static int scan_etherboot_nic(void *copy_rom_dest)
+{
+    static struct etherboots_table_entry {
+        char *name;
+        void *etherboot_rom;
+        int etherboot_sz;
+        uint16_t vendor, device;
+    } etherboots_table[] = {
+#define ETHERBOOT_ROM(name, vendor, device) \
+  { #name, etherboot_##name, sizeof(etherboot_##name), vendor, device },
+        ETHERBOOT_ROM_LIST
+        { 0 }
+    };
+
+    uint32_t devfn;
+    uint16_t class, vendor_id, device_id;
+    struct etherboots_table_entry *eb;
+
+    for ( devfn = 0; devfn < 128; devfn++ )
+    {
+        class     = pci_readw(devfn, PCI_CLASS_DEVICE);
+        vendor_id = pci_readw(devfn, PCI_VENDOR_ID);
+        device_id = pci_readw(devfn, PCI_DEVICE_ID);
+
+        if ( (vendor_id == 0xffff) && (device_id == 0xffff) )
+            continue;
+
+        if ( class != 0x0200 ) /* Not a NIC */
+            continue;
+
+        for ( eb = etherboots_table; eb->name; eb++ )
+            if (eb->vendor == vendor_id &&
+                eb->device == device_id)
+                goto found;
+    }
+
+    return 0;
+
+ found:
+    printf("Loading %s Etherboot PXE ROM ...\n", eb->name);
+    memcpy(copy_rom_dest, eb->etherboot_rom, eb->etherboot_sz);
+    return eb->etherboot_sz;
 }
 
 /* Replace possibly erroneous memory-size CMOS fields with correct values. */
@@ -443,13 +474,7 @@ int main(void)
         vgabios_sz = sizeof(vgabios_stdvga);
     }
 
-    if ( must_load_nic() )
-    {
-        printf("Loading ETHERBOOT ...\n");
-        memcpy((void *)ETHERBOOT_PHYSICAL_ADDRESS,
-               etherboot, sizeof(etherboot));
-        etherboot_sz = sizeof(etherboot);
-    }
+    etherboot_sz = scan_etherboot_nic((void*)ETHERBOOT_PHYSICAL_ADDRESS);
 
     if ( must_load_extboot() )
     {

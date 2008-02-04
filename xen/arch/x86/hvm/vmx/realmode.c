@@ -109,6 +109,13 @@ static void realmode_deliver_exception(
     csr->base = (uint32_t)csr->sel << 4;
     regs->eip = (uint16_t)cs_eip;
     regs->eflags &= ~(X86_EFLAGS_TF | X86_EFLAGS_IF | X86_EFLAGS_RF);
+
+    /* Exception delivery clears STI and MOV-SS blocking. */
+    if ( rm_ctxt->intr_shadow & (VMX_INTR_SHADOW_STI|VMX_INTR_SHADOW_MOV_SS) )
+    {
+        rm_ctxt->intr_shadow &= ~(VMX_INTR_SHADOW_STI|VMX_INTR_SHADOW_MOV_SS);
+        __vmwrite(GUEST_INTERRUPTIBILITY_INFO, rm_ctxt->intr_shadow);
+    }
 }
 
 static int
@@ -410,6 +417,55 @@ realmode_write_cr(
     return X86EMUL_OKAY;
 }
 
+static int
+realmode_read_msr(
+    unsigned long reg,
+    uint64_t *val,
+    struct x86_emulate_ctxt *ctxt)
+{
+    struct cpu_user_regs _regs;
+
+    _regs.ecx = (uint32_t)reg;
+
+    if ( !vmx_msr_read_intercept(&_regs) )
+    {
+        struct realmode_emulate_ctxt *rm_ctxt =
+            container_of(ctxt, struct realmode_emulate_ctxt, ctxt);
+        rm_ctxt->exn_vector = (uint8_t)__vmread(VM_ENTRY_INTR_INFO);
+        rm_ctxt->exn_insn_len = 0;
+        __vmwrite(VM_ENTRY_INTR_INFO, 0);
+        return X86EMUL_EXCEPTION;
+    }
+
+    *val = ((uint64_t)(uint32_t)_regs.edx << 32) || (uint32_t)_regs.eax;
+    return X86EMUL_OKAY;
+}
+
+static int
+realmode_write_msr(
+    unsigned long reg,
+    uint64_t val,
+    struct x86_emulate_ctxt *ctxt)
+{
+    struct cpu_user_regs _regs;
+
+    _regs.edx = (uint32_t)(val >> 32);
+    _regs.eax = (uint32_t)val;
+    _regs.ecx = (uint32_t)reg;
+
+    if ( !vmx_msr_write_intercept(&_regs) )
+    {
+        struct realmode_emulate_ctxt *rm_ctxt =
+            container_of(ctxt, struct realmode_emulate_ctxt, ctxt);
+        rm_ctxt->exn_vector = (uint8_t)__vmread(VM_ENTRY_INTR_INFO);
+        rm_ctxt->exn_insn_len = 0;
+        __vmwrite(VM_ENTRY_INTR_INFO, 0);
+        return X86EMUL_EXCEPTION;
+    }
+
+    return X86EMUL_OKAY;
+}
+
 static int realmode_write_rflags(
     unsigned long val,
     struct x86_emulate_ctxt *ctxt)
@@ -495,6 +551,8 @@ static struct x86_emulate_ops realmode_emulator_ops = {
     .write_io      = realmode_write_io,
     .read_cr       = realmode_read_cr,
     .write_cr      = realmode_write_cr,
+    .read_msr      = realmode_read_msr,
+    .write_msr     = realmode_write_msr,
     .write_rflags  = realmode_write_rflags,
     .wbinvd        = realmode_wbinvd,
     .cpuid         = realmode_cpuid,
@@ -604,7 +662,7 @@ void vmx_realmode(struct cpu_user_regs *regs)
 {
     struct vcpu *curr = current;
     struct realmode_emulate_ctxt rm_ctxt;
-    unsigned long intr_info;
+    unsigned long intr_info = __vmread(VM_ENTRY_INTR_INFO);
     int i;
 
     rm_ctxt.ctxt.regs = regs;
@@ -623,7 +681,6 @@ void vmx_realmode(struct cpu_user_regs *regs)
          curr->arch.hvm_vmx.real_mode_io_completed )
         realmode_emulate_one(&rm_ctxt);
 
-    intr_info = __vmread(VM_ENTRY_INTR_INFO);
     if ( intr_info & INTR_INFO_VALID_MASK )
     {
         realmode_deliver_exception((uint8_t)intr_info, 0, &rm_ctxt);

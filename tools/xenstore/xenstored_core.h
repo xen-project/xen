@@ -160,12 +160,12 @@ struct connection *new_connection(connwritefn_t *write, connreadfn_t *read);
 /* Is this a valid node name? */
 bool is_valid_nodename(const char *node);
 
-
 /* Tracing infrastructure. */
 void trace_create(const void *data, const char *type);
 void trace_destroy(const void *data, const char *type);
 void trace_watch_timeout(const struct connection *conn, const char *node, const char *token);
 void trace(const char *fmt, ...);
+void dtrace_io(const struct connection *conn, const struct buffered_data *data, int out);
 
 extern int event_fd;
 

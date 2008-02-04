@@ -2588,19 +2588,15 @@ sh_map_and_validate_gl1e(struct vcpu *v, mfn_t gl1mfn,
  * easier. */
 
 /* Look to see if this is the second emulated write in a row to this
- * page, and unshadow/unhook if it is */
+ * page, and unshadow if it is */
 static inline void check_for_early_unshadow(struct vcpu *v, mfn_t gmfn)
 {
 #if SHADOW_OPTIMIZATIONS & SHOPT_EARLY_UNSHADOW
     if ( v->arch.paging.shadow.last_emulated_mfn == mfn_x(gmfn) &&
          sh_mfn_is_a_page_table(gmfn) )
     {
-        u32 flags = mfn_to_page(gmfn)->shadow_flags;
-        if ( !(flags & (SHF_L2_32|SHF_L2_PAE|SHF_L2H_PAE|SHF_L4_64)) )
-        {
-            perfc_incr(shadow_early_unshadow);
-            sh_remove_shadows(v, gmfn, 1, 0 /* Fast, can fail to unshadow */ );
-        } 
+        perfc_incr(shadow_early_unshadow);
+        sh_remove_shadows(v, gmfn, 1, 0 /* Fast, can fail to unshadow */ );
     }
     v->arch.paging.shadow.last_emulated_mfn = mfn_x(gmfn);
 #endif
@@ -3487,12 +3483,6 @@ sh_set_toplevel_shadow(struct vcpu *v,
     }
     ASSERT(mfn_valid(smfn));
     
-#if SHADOW_OPTIMIZATIONS & SHOPT_EARLY_UNSHADOW
-    /* Once again OK to unhook entries from this table if we see fork/exit */
-    ASSERT(sh_mfn_is_a_page_table(gmfn));
-    mfn_to_page(gmfn)->shadow_flags &= ~SHF_unhooked_mappings;
-#endif
-
     /* Pin the shadow and put it (back) on the list of pinned shadows */
     if ( sh_pin(v, smfn) == 0 )
     {
@@ -4076,7 +4066,7 @@ static void *emulate_map_dest(struct vcpu *v,
         sh_ctxt->mfn2 = emulate_gva_to_mfn(v, (vaddr + bytes - 1) & PAGE_MASK,
                                            sh_ctxt);
         if ( !mfn_valid(sh_ctxt->mfn2) ) 
-            return ((mfn_x(sh_ctxt->mfn1) == BAD_GVA_TO_GFN) ?
+            return ((mfn_x(sh_ctxt->mfn2) == BAD_GVA_TO_GFN) ?
                     MAPPING_EXCEPTION : MAPPING_UNHANDLEABLE);
 
         /* Cross-page writes mean probably not a pagetable */

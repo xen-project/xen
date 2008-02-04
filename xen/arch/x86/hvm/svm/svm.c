@@ -426,6 +426,34 @@ static int svm_load_vmcb_ctxt(struct vcpu *v, struct hvm_hw_cpu *ctxt)
     return 0;
 }
 
+static void svm_fpu_enter(struct vcpu *v)
+{
+    struct vmcb_struct *vmcb = v->arch.hvm_svm.vmcb;
+
+    setup_fpu(v);
+    vmcb->exception_intercepts &= ~(1U << TRAP_no_device);
+}
+
+static void svm_fpu_leave(struct vcpu *v)
+{
+    struct vmcb_struct *vmcb = v->arch.hvm_svm.vmcb;
+
+    ASSERT(!v->fpu_dirtied);
+    ASSERT(read_cr0() & X86_CR0_TS);
+
+    /*
+     * If the guest does not have TS enabled then we must cause and handle an 
+     * exception on first use of the FPU. If the guest *does* have TS enabled 
+     * then this is not necessary: no FPU activity can occur until the guest 
+     * clears CR0.TS, and we will initialise the FPU when that happens.
+     */
+    if ( !(v->arch.hvm_vcpu.guest_cr[0] & X86_CR0_TS) )
+    {
+        v->arch.hvm_svm.vmcb->exception_intercepts |= 1U << TRAP_no_device;
+        vmcb->cr0 |= X86_CR0_TS;
+    }
+}
+
 static enum hvm_intblk svm_interrupt_blocked(
     struct vcpu *v, struct hvm_intack intack)
 {
@@ -470,19 +498,22 @@ static void svm_update_guest_cr(struct vcpu *v, unsigned int cr)
 
     switch ( cr )
     {
-    case 0:
-        /* TS cleared? Then initialise FPU now. */
-        if ( (v == current) && !(v->arch.hvm_vcpu.guest_cr[0] & X86_CR0_TS) &&
-             (vmcb->cr0 & X86_CR0_TS) )
+    case 0: {
+        unsigned long hw_cr0_mask = 0;
+
+        if ( !(v->arch.hvm_vcpu.guest_cr[0] & X86_CR0_TS) )
         {
-            setup_fpu(v);
-            vmcb->exception_intercepts &= ~(1U << TRAP_no_device);
+            if ( v != current )
+                hw_cr0_mask |= X86_CR0_TS;
+            else if ( vmcb->cr0 & X86_CR0_TS )
+                svm_fpu_enter(v);
         }
 
-        vmcb->cr0 = v->arch.hvm_vcpu.guest_cr[0];
+        vmcb->cr0 = v->arch.hvm_vcpu.guest_cr[0] | hw_cr0_mask;
         if ( !paging_mode_hap(v->domain) )
             vmcb->cr0 |= X86_CR0_PG | X86_CR0_WP;
         break;
+    }
     case 2:
         vmcb->cr2 = v->arch.hvm_vcpu.guest_cr[2];
         break;
@@ -664,24 +695,6 @@ static void svm_set_segment_register(struct vcpu *v, enum x86_segment seg,
         svm_vmload(vmcb);
 }
 
-/* Make sure that xen intercepts any FP accesses from current */
-static void svm_stts(struct vcpu *v) 
-{
-    struct vmcb_struct *vmcb = v->arch.hvm_svm.vmcb;
-
-    /*
-     * If the guest does not have TS enabled then we must cause and handle an 
-     * exception on first use of the FPU. If the guest *does* have TS enabled 
-     * then this is not necessary: no FPU activity can occur until the guest 
-     * clears CR0.TS, and we will initialise the FPU when that happens.
-     */
-    if ( !(v->arch.hvm_vcpu.guest_cr[0] & X86_CR0_TS) )
-    {
-        v->arch.hvm_svm.vmcb->exception_intercepts |= 1U << TRAP_no_device;
-        vmcb->cr0 |= X86_CR0_TS;
-    }
-}
-
 static void svm_set_tsc_offset(struct vcpu *v, u64 offset)
 {
     v->arch.hvm_svm.vmcb->tsc_offset = offset;
@@ -710,6 +723,8 @@ static void svm_init_hypercall_page(struct domain *d, void *hypercall_page)
 static void svm_ctxt_switch_from(struct vcpu *v)
 {
     int cpu = smp_processor_id();
+
+    svm_fpu_leave(v);
 
     svm_save_dr(v);
 
@@ -883,7 +898,6 @@ static struct hvm_function_table svm_function_table = {
     .update_guest_cr      = svm_update_guest_cr,
     .update_guest_efer    = svm_update_guest_efer,
     .flush_guest_tlbs     = svm_flush_guest_tlbs,
-    .stts                 = svm_stts,
     .set_tsc_offset       = svm_set_tsc_offset,
     .inject_exception     = svm_inject_exception,
     .init_hypercall_page  = svm_init_hypercall_page,
@@ -964,12 +978,11 @@ static void svm_do_nested_pgfault(paddr_t gpa, struct cpu_user_regs *regs)
 
 static void svm_do_no_device_fault(struct vmcb_struct *vmcb)
 {
-    struct vcpu *v = current;
+    struct vcpu *curr = current;
 
-    setup_fpu(v);    
-    vmcb->exception_intercepts &= ~(1U << TRAP_no_device);
+    svm_fpu_enter(curr);
 
-    if ( !(v->arch.hvm_vcpu.guest_cr[0] & X86_CR0_TS) )
+    if ( !(curr->arch.hvm_vcpu.guest_cr[0] & X86_CR0_TS) )
         vmcb->cr0 &= ~X86_CR0_TS;
 }
 
@@ -1647,11 +1660,8 @@ static void svm_cr_access(
         break;
 
     case INSTR_CLTS:
-        /* TS being cleared means that it's time to restore fpu state. */
-        setup_fpu(current);
-        vmcb->exception_intercepts &= ~(1U << TRAP_no_device);
-        vmcb->cr0 &= ~X86_CR0_TS; /* clear TS */
-        v->arch.hvm_vcpu.guest_cr[0] &= ~X86_CR0_TS; /* clear TS */
+        v->arch.hvm_vcpu.guest_cr[0] &= ~X86_CR0_TS;
+        svm_update_guest_cr(v, 0);
         HVMTRACE_0D(CLTS, current);
         break;
 

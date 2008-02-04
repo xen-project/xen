@@ -31,10 +31,8 @@
 #define VGABIOS_CIRRUS_FILENAME "vgabios-cirrus.bin"
 #define LINUX_BOOT_FILENAME "linux_boot.bin"
 
-#define KERNEL_LOAD_ADDR     0x00100000
-#define INITRD_LOAD_ADDR     0x00600000
-#define KERNEL_PARAMS_ADDR   0x00090000
-#define KERNEL_CMDLINE_ADDR  0x00099000
+/* Leave a chunk of memory at the top of RAM for the BIOS ACPI tables.  */
+#define ACPI_DATA_SIZE        0x10000
 
 static fdctrl_t *floppy_controller;
 static RTCState *rtc_state;
@@ -363,36 +361,362 @@ void bochs_bios_init(void)
     register_ioport_write(0x503, 1, 1, bochs_bios_write, NULL);
 }
 
-
-int load_kernel(const char *filename, uint8_t *addr, 
-                uint8_t *real_addr)
+/* Generate an initial boot sector which sets state and jump to
+   a specified vector */
+static void generate_bootsect(uint32_t gpr[8], uint16_t segs[6], uint16_t ip)
 {
-    int fd, size;
-    int setup_sects;
+    uint8_t bootsect[512], *p;
+    int i;
 
-    fd = open(filename, O_RDONLY | O_BINARY);
-    if (fd < 0)
-        return -1;
+    if (bs_table[0] == NULL) {
+        fprintf(stderr, "A disk image must be given for 'hda' when booting "
+                "a Linux kernel\n");
+        exit(1);
+    }
 
-    /* load 16 bit code */
-    if (read(fd, real_addr, 512) != 512)
-        goto fail;
-    setup_sects = real_addr[0x1F1];
-    if (!setup_sects)
-        setup_sects = 4;
-    if (read(fd, real_addr + 512, setup_sects * 512) != 
-        setup_sects * 512)
-        goto fail;
-    
-    /* load 32 bit code */
-    size = read(fd, addr, 16 * 1024 * 1024);
-    if (size < 0)
-        goto fail;
-    close(fd);
+    memset(bootsect, 0, sizeof(bootsect));
+
+    /* Copy the MSDOS partition table if possible */
+    bdrv_read(bs_table[0], 0, bootsect, 1);
+
+    /* Make sure we have a partition signature */
+    bootsect[510] = 0x55;
+    bootsect[511] = 0xaa;
+
+    /* Actual code */
+    p = bootsect;
+    *p++ = 0xfa;                /* CLI */
+    *p++ = 0xfc;                /* CLD */
+
+    for (i = 0; i < 6; i++) {
+        if (i == 1)             /* Skip CS */
+            continue;
+
+        *p++ = 0xb8;            /* MOV AX,imm16 */
+        *p++ = segs[i];
+        *p++ = segs[i] >> 8;
+        *p++ = 0x8e;            /* MOV <seg>,AX */
+        *p++ = 0xc0 + (i << 3);
+    }
+
+    for (i = 0; i < 8; i++) {
+        *p++ = 0x66;            /* 32-bit operand size */
+        *p++ = 0xb8 + i;        /* MOV <reg>,imm32 */
+        *p++ = gpr[i];
+        *p++ = gpr[i] >> 8;
+        *p++ = gpr[i] >> 16;
+        *p++ = gpr[i] >> 24;
+    }
+
+    *p++ = 0xea;                /* JMP FAR */
+    *p++ = ip;                  /* IP */
+    *p++ = ip >> 8;
+    *p++ = segs[1];             /* CS */
+    *p++ = segs[1] >> 8;
+
+    bdrv_set_boot_sector(bs_table[0], bootsect, sizeof(bootsect));
+}
+
+/*
+ * Evil helper for non-relocatable kernels
+ *
+ * So it works out like this:
+ *
+ *  0x100000  - Xen HVM firmware lives here. Kernel wants to boot here
+ *
+ * You can't both live there and HVM firmware is needed first, thus
+ * our plan is
+ *
+ *  0x200000              - kernel is loaded here by QEMU
+ *  0x200000+kernel_size  - helper code is put here by QEMU
+ *
+ * code32_switch in kernel header is set to point at out helper
+ * code at 0x200000+kernel_size
+ *
+ * Our helper basically does memmove(0x100000,0x200000,kernel_size)
+ * and then jmps to  0x1000000.
+ *
+ * So we've overwritten the HVM firmware (which was no longer
+ * needed) and the non-relocatable kernel can happily boot
+ * at its usual address.
+ *
+ * Simple, eh ?
+ *
+ * Well the assembler needed to do this is fairly short:
+ *
+ *  # Load segments
+ *    cld                         
+ *    cli                         
+ *    movl $0x18,%eax
+ *    mov %ax,%ds                 
+ *    mov %ax,%es                 
+ *    mov %ax,%fs                 
+ *    mov %ax,%gs                 
+ *    mov %ax,%ss                 
+ *
+ *  # Move the kernel into position
+ *    xor    %edx,%edx            
+ *_doloop:                        
+ *    movzbl 0x600000(%edx),%eax  
+ *    mov    %al,0x100000(%edx)   
+ *    add    $0x1,%edx            
+ *    cmp    $0x500000,%edx       
+ *    jne    _doloop              
+ *
+ *  # start kernel
+ *    xorl %ebx,%ebx              
+ *    mov    $0x100000,%ecx       
+ *    jmp    *%ecx                
+ *
+ */
+static void setup_relocator(target_phys_addr_t addr, target_phys_addr_t src, target_phys_addr_t dst, size_t len)
+{
+  /* Now this assembler corresponds to follow machine code, with our args from QEMU spliced in :-) */
+  unsigned char buf[] = {
+    /* Load segments */
+    0xfc,                         /* cld               */
+    0xfa,                         /* cli               */ 
+    0xb8, 0x18, 0x00, 0x00, 0x00, /* mov    $0x18,%eax */
+    0x8e, 0xd8,                   /* mov    %eax,%ds   */
+    0x8e, 0xc0,                   /* mov    %eax,%es   */
+    0x8e, 0xe0,                   /* mov    %eax,%fs   */
+    0x8e, 0xe8,                   /* mov    %eax,%gs   */
+    0x8e, 0xd0,                   /* mov    %eax,%ss   */
+    0x31, 0xd2,                   /* xor    %edx,%edx  */
+  
+    /* Move the kernel into position */
+    0x0f, 0xb6, 0x82, (src&0xff), ((src>>8)&0xff), ((src>>16)&0xff), ((src>>24)&0xff), /*   movzbl $src(%edx),%eax */
+    0x88, 0x82, (dst&0xff), ((dst>>8)&0xff), ((dst>>16)&0xff), ((dst>>24)&0xff),       /*   mov    %al,$dst(%edx)  */
+    0x83, 0xc2, 0x01,                                                                  /*   add    $0x1,%edx       */
+    0x81, 0xfa, (len&0xff), ((len>>8)&0xff), ((len>>16)&0xff), ((len>>24)&0xff),       /*   cmp    $len,%edx       */
+    0x75, 0xe8,                                                                        /*   jne    13 <_doloop>    */
+
+    /* Start kernel */
+    0x31, 0xdb,                                                                        /*   xor    %ebx,%ebx       */
+    0xb9, (dst&0xff), ((dst>>8)&0xff), ((dst>>16)&0xff), ((dst>>24)&0xff),             /*   mov    $dst,%ecx  */
+    0xff, 0xe1,                                                                        /*   jmp    *%ecx           */
+  };
+  cpu_physical_memory_rw(addr, buf, sizeof(buf), 1);
+  fprintf(stderr, "qemu: helper at 0x%x of size %d bytes, to move kernel of %d bytes from 0x%x to 0x%x\n",
+	  (int)addr, (int)sizeof(buf), (int)len, (int)src, (int)dst);
+}
+
+
+static long get_file_size(FILE *f)
+{
+    long where, size;
+
+    /* XXX: on Unix systems, using fstat() probably makes more sense */
+
+    where = ftell(f);
+    fseek(f, 0, SEEK_END);
+    size = ftell(f);
+    fseek(f, where, SEEK_SET);
+
     return size;
- fail:
-    close(fd);
-    return -1;
+}
+
+static int fread2guest(target_phys_addr_t dst_addr, size_t nbytes, FILE *f)
+{
+    size_t offset = 0;
+    while (nbytes) {
+        uint8_t buf[4096];
+	size_t count = nbytes > sizeof(buf) ? sizeof(buf) : nbytes;
+	if (fread(buf, 1, count, f) != count)
+	    return -1;
+
+	cpu_physical_memory_rw(dst_addr+offset, buf, count, 1);
+	offset += count;
+	nbytes -= count;
+    }
+    return 0;
+}
+
+static void load_linux(const char *kernel_filename,
+                       const char *initrd_filename,
+                       const char *kernel_cmdline)
+{
+    uint16_t protocol;
+    uint32_t gpr[8];
+    uint16_t seg[6];
+    uint16_t real_seg;
+    int setup_size, kernel_size, initrd_size, cmdline_size;
+    uint32_t initrd_max;
+    uint8_t header[1024];
+    target_phys_addr_t real_addr, reloc_prot_addr, prot_addr, cmdline_addr, initrd_addr;
+    size_t ncmdline;
+    FILE *f, *fi;
+
+    /* Align to 16 bytes as a paranoia measure */
+    cmdline_size = (strlen(kernel_cmdline)+16) & ~15;
+
+    /* load the kernel header */
+    f = fopen(kernel_filename, "rb");
+    if (!f || !(kernel_size = get_file_size(f)) ||
+        fread(header, 1, 1024, f) != 1024) {
+        fprintf(stderr, "qemu: could not load kernel '%s'\n",
+                kernel_filename);
+        exit(1);
+    }
+
+    /* kernel protocol version */
+    fprintf(stderr, "header magic: %#x\n", ldl_p(header+0x202));
+    if (ldl_p(header+0x202) == 0x53726448)
+        protocol = lduw_p(header+0x206);
+    else
+        protocol = 0;
+    fprintf(stderr, "header protocol: %x\n", protocol);
+    if (protocol < 0x200 || !(header[0x211] & 0x01)) {
+        /* Low kernel */
+        real_addr    = 0x90000;
+        cmdline_addr = 0x9a000 - cmdline_size;
+        prot_addr    = 0x10000;
+	reloc_prot_addr = prot_addr;
+    } else if (protocol < 0x202) {
+        /* High but ancient kernel */
+        real_addr    = 0x90000;
+        cmdline_addr = 0x9a000 - cmdline_size;
+        prot_addr    = 0x100000;
+	reloc_prot_addr = 0x200000;
+    } else {
+        /* High and recent kernel */
+        real_addr    = 0x10000;
+        cmdline_addr = 0x20000;
+        prot_addr    = 0x100000;
+	reloc_prot_addr = 0x200000;
+    }
+
+    fprintf(stderr,
+            "qemu: real_addr     = %#zx\n"
+            "qemu: cmdline_addr  = %#zx\n"
+            "qemu: prot_addr     = %#zx\n",
+            real_addr,
+            cmdline_addr,
+            prot_addr);
+
+    /* highest address for loading the initrd */
+    if (protocol >= 0x203)
+        initrd_max = ldl_p(header+0x22c);
+    else
+        initrd_max = 0x37ffffff;
+
+    if (initrd_max >= ram_size-ACPI_DATA_SIZE)
+        initrd_max = ram_size-ACPI_DATA_SIZE-1;
+
+
+    /* kernel command line */
+    ncmdline = strlen(kernel_cmdline);
+    if (ncmdline > 4095) {
+        ncmdline = 4095;
+	((uint8_t*)kernel_cmdline)[4095] = '\0';
+    }
+    fprintf(stderr, "qemu: kernel_cmdline: %#zx ('%s')\n", ncmdline, kernel_cmdline);
+    cpu_physical_memory_rw(cmdline_addr, (uint8_t*)kernel_cmdline, ncmdline+1, 1);
+
+    if (protocol >= 0x202) {
+        stl_p(header+0x228, cmdline_addr);
+    } else {
+        stw_p(header+0x20, 0xA33F);
+        stw_p(header+0x22, cmdline_addr-real_addr);
+    }
+
+    /* loader type */
+    /* High nybble = B reserved for Qemu; low nybble is revision number.
+       If this code is substantially changed, you may want to consider
+       incrementing the revision. */
+    if (protocol >= 0x200)
+        header[0x210] = 0xB0;
+
+    /* heap */
+    if (protocol >= 0x201) {
+        header[0x211] |= 0x80;  /* CAN_USE_HEAP */
+        stw_p(header+0x224, cmdline_addr-real_addr-0x200);
+    }
+
+    /* load initrd */
+    if (initrd_filename) {
+        if (protocol < 0x200) {
+            fprintf(stderr, "qemu: linux kernel too old to load a ram disk\n");
+            exit(1);
+        }
+
+        fi = fopen(initrd_filename, "rb");
+        if (!fi) {
+            fprintf(stderr, "qemu: could not load initial ram disk '%s'\n",
+                    initrd_filename);
+            exit(1);
+        }
+
+        initrd_size = get_file_size(fi);
+        initrd_addr = ((initrd_max-initrd_size) & ~4095);
+
+        fprintf(stderr, "qemu: loading initrd (%#x bytes) at %#zx\n",
+                initrd_size, initrd_addr);
+
+	if (fread2guest(initrd_addr, initrd_size, fi) < 0) {
+	    fprintf(stderr, "qemu: read error on initial ram disk '%s'\n",
+		    initrd_filename);
+	    exit(1);
+	}
+        fclose(fi);
+
+        stl_p(header+0x218, initrd_addr);
+        stl_p(header+0x21c, initrd_size);
+    }
+
+
+    setup_size = header[0x1f1];
+    if (setup_size == 0)
+        setup_size = 4;
+
+    setup_size = (setup_size+1)*512;
+    kernel_size -= setup_size;  /* Size of protected-mode code */
+
+    /* Urgh, Xen's HVM firmware lives at 0x100000, but that's also the
+     * address Linux wants to start life at prior to relocatable support
+     */
+    if (prot_addr != reloc_prot_addr) {
+        if (protocol >= 0x205 && (header[0x234] & 1)) {
+	    /* Relocatable automatically */
+	    stl_p(header+0x214, reloc_prot_addr);
+	    fprintf(stderr, "qemu: kernel is relocatable\n");
+	} else {
+	    /* Setup a helper which moves  kernel back to
+	     * its expected addr after firmware has got out
+	     * of the way. We put a helper at  reloc_prot_addr+kernel_size.
+	     * It moves kernel from reloc_prot_addr to prot_addr and
+	     * then jumps to prot_addr. Yes this is sick.
+	     */
+	    fprintf(stderr, "qemu: kernel is NOT relocatable\n");
+	    stl_p(header+0x214, reloc_prot_addr + kernel_size);
+	    setup_relocator(reloc_prot_addr + kernel_size, reloc_prot_addr, prot_addr, kernel_size);
+	}
+    }
+
+
+    fprintf(stderr, "qemu: loading kernel real mode (%#x bytes) at %#zx\n",
+	    setup_size-1024, real_addr);
+    fprintf(stderr, "qemu: loading kernel protected mode (%#x bytes) at %#zx\n",
+	    kernel_size, reloc_prot_addr);
+
+    /* store the finalized header and load the rest of the kernel */
+    cpu_physical_memory_rw(real_addr, header, 1024, 1);
+    if (fread2guest(real_addr+1024, setup_size-1024, f) < 0 ||
+        fread2guest(reloc_prot_addr, kernel_size, f) < 0) {
+	fprintf(stderr, "qemu: loading kernel protected mode (%#x bytes) at %#zx\n",
+		kernel_size, reloc_prot_addr);
+	exit(1);
+    }
+    fclose(f);
+
+    /* generate bootsector to set up the initial register state */
+    real_seg = (real_addr) >> 4;
+    seg[0] = seg[2] = seg[3] = seg[4] = seg[4] = real_seg;
+    seg[1] = real_seg+0x20;     /* CS */
+    memset(gpr, 0, sizeof gpr);
+    gpr[4] = cmdline_addr-real_addr-16; /* SP (-16 is paranoia) */
+
+    generate_bootsect(gpr, seg, 0);
 }
 
 static void main_cpu_reset(void *opaque)
@@ -577,63 +901,8 @@ static void pc_init1(uint64_t ram_size, int vga_ram_size, char *boot_device,
     
     bochs_bios_init();
 
-#ifndef CONFIG_DM
-    if (linux_boot) {
-        uint8_t bootsect[512];
-        uint8_t old_bootsect[512];
-
-        if (bs_table[0] == NULL) {
-            fprintf(stderr, "A disk image must be given for 'hda' when booting a Linux kernel\n");
-            exit(1);
-        }
-        snprintf(buf, sizeof(buf), "%s/%s", bios_dir, LINUX_BOOT_FILENAME);
-        ret = load_image(buf, bootsect);
-        if (ret != sizeof(bootsect)) {
-            fprintf(stderr, "qemu: could not load linux boot sector '%s'\n",
-                    buf);
-            exit(1);
-        }
-
-        if (bdrv_read(bs_table[0], 0, old_bootsect, 1) >= 0) {
-            /* copy the MSDOS partition table */
-            memcpy(bootsect + 0x1be, old_bootsect + 0x1be, 0x40);
-        }
-
-        bdrv_set_boot_sector(bs_table[0], bootsect, sizeof(bootsect));
-
-        /* now we can load the kernel */
-        ret = load_kernel(kernel_filename, 
-                          phys_ram_base + KERNEL_LOAD_ADDR,
-                          phys_ram_base + KERNEL_PARAMS_ADDR);
-        if (ret < 0) {
-            fprintf(stderr, "qemu: could not load kernel '%s'\n", 
-                    kernel_filename);
-            exit(1);
-        }
-        
-        /* load initrd */
-        initrd_size = 0;
-        if (initrd_filename) {
-            initrd_size = load_image(initrd_filename, phys_ram_base + INITRD_LOAD_ADDR);
-            if (initrd_size < 0) {
-                fprintf(stderr, "qemu: could not load initial ram disk '%s'\n", 
-                        initrd_filename);
-                exit(1);
-            }
-        }
-        if (initrd_size > 0) {
-            stl_raw(phys_ram_base + KERNEL_PARAMS_ADDR + 0x218, INITRD_LOAD_ADDR);
-            stl_raw(phys_ram_base + KERNEL_PARAMS_ADDR + 0x21c, initrd_size);
-        }
-        pstrcpy(phys_ram_base + KERNEL_CMDLINE_ADDR, 4096,
-                kernel_cmdline);
-        stw_raw(phys_ram_base + KERNEL_PARAMS_ADDR + 0x20, 0xA33F);
-        stw_raw(phys_ram_base + KERNEL_PARAMS_ADDR + 0x22,
-                KERNEL_CMDLINE_ADDR - KERNEL_PARAMS_ADDR);
-        /* loader type */
-        stw_raw(phys_ram_base + KERNEL_PARAMS_ADDR + 0x210, 0x01);
-    }
-#endif /* !CONFIG_DM */
+    if (linux_boot)
+        load_linux(kernel_filename, initrd_filename, kernel_cmdline);
 
     if (pci_enabled) {
         pci_bus = i440fx_init(&i440fx_state);

@@ -50,12 +50,12 @@ hvmloader: roms.h acpi/acpi.a $(SRCS)
 acpi/acpi.a:
 	$(MAKE) -C acpi
 
-roms.h:	../rombios/BIOS-bochs-latest ../vgabios/VGABIOS-lgpl-latest.bin ../vgabios/VGABIOS-lgpl-latest.cirrus.bin ../vmxassist/vmxassist.bin ../etherboot/eb-rtl8139.zrom.h
+roms.h: ../rombios/BIOS-bochs-latest ../vgabios/VGABIOS-lgpl-latest.bin ../vgabios/VGABIOS-lgpl-latest.cirrus.bin ../vmxassist/vmxassist.bin ../etherboot/eb-roms.h ../extboot/extboot.bin
 	sh ./mkhex rombios ../rombios/BIOS-bochs-latest > roms.h
 	sh ./mkhex vgabios_stdvga ../vgabios/VGABIOS-lgpl-latest.bin >> roms.h
 	sh ./mkhex vgabios_cirrusvga ../vgabios/VGABIOS-lgpl-latest.cirrus.bin >> roms.h
 	sh ./mkhex vmxassist ../vmxassist/vmxassist.bin >> roms.h
-	cat ../etherboot/eb-rtl8139.zrom.h >> roms.h
+	cat ../etherboot/eb-roms.h >> roms.h
 	sh ./mkhex extboot ../extboot/extboot.bin >> roms.h
 
 .PHONY: clean

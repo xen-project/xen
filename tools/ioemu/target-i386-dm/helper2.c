@@ -637,7 +637,6 @@ int main_loop(void)
     int evtchn_fd = xce_handle == -1 ? -1 : xc_evtchn_fd(xce_handle);
     char *qemu_file;
     fd_set fds;
-    int ret = 0;
 
     buffered_io_timer = qemu_new_timer(rt_clock, handle_buffered_io,
 				       cpu_single_env);
@@ -648,14 +647,9 @@ int main_loop(void)
 
     xenstore_record_dm_state("running");
     while (1) {
-        while (!((vm_running && suspend_requested) || shutdown_requested))
+        while (!(vm_running && suspend_requested))
             /* Wait up to 10 msec. */
             main_loop_wait(10);
-
-        if (shutdown_requested) {
-            ret = EXCP_INTERRUPT;
-            break;
-        }
 
         fprintf(logfile, "device model saving state\n");
 
@@ -682,7 +676,7 @@ int main_loop(void)
         xenstore_record_dm_state("running");
     }
 
-    return ret;
+    return 0;
 }
 
 void destroy_hvm_domain(void)

@@ -124,9 +124,6 @@ void hvm_do_resume(struct vcpu *v)
 {
     ioreq_t *p;
 
-    if ( !v->fpu_dirtied )
-        hvm_funcs.stts(v);
-
     pt_restore_timer(v);
 
     /* NB. Optimised for common case (p->state == STATE_IOREQ_NONE). */

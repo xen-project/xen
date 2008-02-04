@@ -740,8 +740,42 @@ static int vmx_load_vmcs_ctxt(struct vcpu *v, struct hvm_hw_cpu *ctxt)
     return 0;
 }
 
+static void vmx_fpu_enter(struct vcpu *v)
+{
+    setup_fpu(v);
+    __vm_clear_bit(EXCEPTION_BITMAP, TRAP_no_device);
+    v->arch.hvm_vmx.host_cr0 &= ~X86_CR0_TS;
+    __vmwrite(HOST_CR0, v->arch.hvm_vmx.host_cr0);
+}
+
+static void vmx_fpu_leave(struct vcpu *v)
+{
+    ASSERT(!v->fpu_dirtied);
+    ASSERT(read_cr0() & X86_CR0_TS);
+
+    if ( !(v->arch.hvm_vmx.host_cr0 & X86_CR0_TS) )
+    {
+        v->arch.hvm_vmx.host_cr0 |= X86_CR0_TS;
+        __vmwrite(HOST_CR0, v->arch.hvm_vmx.host_cr0);
+    }
+
+    /*
+     * If the guest does not have TS enabled then we must cause and handle an
+     * exception on first use of the FPU. If the guest *does* have TS enabled
+     * then this is not necessary: no FPU activity can occur until the guest
+     * clears CR0.TS, and we will initialise the FPU when that happens.
+     */
+    if ( !(v->arch.hvm_vcpu.guest_cr[0] & X86_CR0_TS) )
+    {
+        v->arch.hvm_vcpu.hw_cr[0] |= X86_CR0_TS;
+        __vmwrite(GUEST_CR0, v->arch.hvm_vcpu.hw_cr[0]);
+        __vm_set_bit(EXCEPTION_BITMAP, TRAP_no_device);
+    }
+}
+
 static void vmx_ctxt_switch_from(struct vcpu *v)
 {
+    vmx_fpu_leave(v);
     vmx_save_guest_msrs(v);
     vmx_restore_host_msrs();
     vmx_save_dr(v);
@@ -944,26 +978,6 @@ static void vmx_set_segment_register(struct vcpu *v, enum x86_segment seg,
     vmx_vmcs_exit(v);
 }
 
-/* Make sure that xen intercepts any FP accesses from current */
-static void vmx_stts(struct vcpu *v)
-{
-    /* VMX depends on operating on the current vcpu */
-    ASSERT(v == current);
-
-    /*
-     * If the guest does not have TS enabled then we must cause and handle an
-     * exception on first use of the FPU. If the guest *does* have TS enabled
-     * then this is not necessary: no FPU activity can occur until the guest
-     * clears CR0.TS, and we will initialise the FPU when that happens.
-     */
-    if ( !(v->arch.hvm_vcpu.guest_cr[0] & X86_CR0_TS) )
-    {
-        v->arch.hvm_vcpu.hw_cr[0] |= X86_CR0_TS;
-        __vmwrite(GUEST_CR0, v->arch.hvm_vcpu.hw_cr[0]);
-        __vm_set_bit(EXCEPTION_BITMAP, TRAP_no_device);
-    }
-}
-
 static void vmx_set_tsc_offset(struct vcpu *v, u64 offset)
 {
     vmx_vmcs_enter(v);
@@ -1035,21 +1049,24 @@ static void vmx_update_guest_cr(struct vcpu *v, unsigned int cr)
 
     switch ( cr )
     {
-    case 0:
-        /* TS cleared? Then initialise FPU now. */
-        if ( (v == current) && !(v->arch.hvm_vcpu.guest_cr[0] & X86_CR0_TS) &&
-             (v->arch.hvm_vcpu.hw_cr[0] & X86_CR0_TS) )
+    case 0: {
+        unsigned long hw_cr0_mask =
+            X86_CR0_NE | X86_CR0_PG | X86_CR0_WP | X86_CR0_PE;
+
+        if ( !(v->arch.hvm_vcpu.guest_cr[0] & X86_CR0_TS) )
         {
-            setup_fpu(v);
-            __vm_clear_bit(EXCEPTION_BITMAP, TRAP_no_device);
+            if ( v != current )
+                hw_cr0_mask |= X86_CR0_TS;
+            else if ( v->arch.hvm_vcpu.hw_cr[0] & X86_CR0_TS )
+                vmx_fpu_enter(v);
         }
 
         v->arch.hvm_vcpu.hw_cr[0] =
-            v->arch.hvm_vcpu.guest_cr[0] |
-            X86_CR0_NE | X86_CR0_PG | X86_CR0_WP | X86_CR0_PE;
+            v->arch.hvm_vcpu.guest_cr[0] | hw_cr0_mask;
         __vmwrite(GUEST_CR0, v->arch.hvm_vcpu.hw_cr[0]);
         __vmwrite(CR0_READ_SHADOW, v->arch.hvm_vcpu.guest_cr[0]);
         break;
+    }
     case 2:
         /* CR2 is updated in exit stub. */
         break;
@@ -1146,7 +1163,6 @@ static struct hvm_function_table vmx_function_table = {
     .update_guest_cr      = vmx_update_guest_cr,
     .update_guest_efer    = vmx_update_guest_efer,
     .flush_guest_tlbs     = vmx_flush_guest_tlbs,
-    .stts                 = vmx_stts,
     .set_tsc_offset       = vmx_set_tsc_offset,
     .inject_exception     = vmx_inject_exception,
     .init_hypercall_page  = vmx_init_hypercall_page,
@@ -1227,16 +1243,15 @@ static void __update_guest_eip(unsigned long inst_len)
 
 void vmx_do_no_device_fault(void)
 {
-    struct vcpu *v = current;
+    struct vcpu *curr = current;
 
-    setup_fpu(current);
-    __vm_clear_bit(EXCEPTION_BITMAP, TRAP_no_device);
+    vmx_fpu_enter(curr);
 
     /* Disable TS in guest CR0 unless the guest wants the exception too. */
-    if ( !(v->arch.hvm_vcpu.guest_cr[0] & X86_CR0_TS) )
+    if ( !(curr->arch.hvm_vcpu.guest_cr[0] & X86_CR0_TS) )
     {
-        v->arch.hvm_vcpu.hw_cr[0] &= ~X86_CR0_TS;
-        __vmwrite(GUEST_CR0, v->arch.hvm_vcpu.hw_cr[0]);
+        curr->arch.hvm_vcpu.hw_cr[0] &= ~X86_CR0_TS;
+        __vmwrite(GUEST_CR0, curr->arch.hvm_vcpu.hw_cr[0]);
     }
 }
 
@@ -2215,15 +2230,8 @@ static int vmx_cr_access(unsigned long exit_qualification,
         mov_from_cr(cr, gp, regs);
         break;
     case TYPE_CLTS:
-        /* We initialise the FPU now, to avoid needing another vmexit. */
-        setup_fpu(v);
-        __vm_clear_bit(EXCEPTION_BITMAP, TRAP_no_device);
-
-        v->arch.hvm_vcpu.hw_cr[0] &= ~X86_CR0_TS; /* clear TS */
-        __vmwrite(GUEST_CR0, v->arch.hvm_vcpu.hw_cr[0]);
-
-        v->arch.hvm_vcpu.guest_cr[0] &= ~X86_CR0_TS; /* clear TS */
-        __vmwrite(CR0_READ_SHADOW, v->arch.hvm_vcpu.guest_cr[0]);
+        v->arch.hvm_vcpu.guest_cr[0] &= ~X86_CR0_TS;
+        vmx_update_guest_cr(v, 0);
         HVMTRACE_0D(CLTS, current);
         break;
     case TYPE_LMSW:
@@ -2315,7 +2323,7 @@ static int is_last_branch_msr(u32 ecx)
     return 0;
 }
 
-static int vmx_do_msr_read(struct cpu_user_regs *regs)
+int vmx_msr_read_intercept(struct cpu_user_regs *regs)
 {
     u64 msr_content = 0;
     u32 ecx = regs->ecx, eax, edx;
@@ -2507,7 +2515,7 @@ extern bool_t mtrr_fix_range_msr_set(struct mtrr_state *v,
 extern bool_t mtrr_def_type_msr_set(struct mtrr_state *v, u64 msr_content);
 extern bool_t pat_msr_set(u64 *pat, u64 msr);
 
-static int vmx_do_msr_write(struct cpu_user_regs *regs)
+int vmx_msr_write_intercept(struct cpu_user_regs *regs)
 {
     u32 ecx = regs->ecx;
     u64 msr_content;
@@ -2949,12 +2957,12 @@ asmlinkage void vmx_vmexit_handler(struct cpu_user_regs *regs)
         break;
     case EXIT_REASON_MSR_READ:
         inst_len = __get_instruction_length(); /* Safe: RDMSR */
-        if ( vmx_do_msr_read(regs) )
+        if ( vmx_msr_read_intercept(regs) )
             __update_guest_eip(inst_len);
         break;
     case EXIT_REASON_MSR_WRITE:
         inst_len = __get_instruction_length(); /* Safe: WRMSR */
-        if ( vmx_do_msr_write(regs) )
+        if ( vmx_msr_write_intercept(regs) )
             __update_guest_eip(inst_len);
         break;
 
