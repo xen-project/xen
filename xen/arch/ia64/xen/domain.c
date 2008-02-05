@@ -398,7 +398,7 @@ void relinquish_vcpu_resources(struct vcpu *v)
 	if (HAS_PERVCPU_VHPT(v->domain))
 		pervcpu_vhpt_free(v);
 	if (v->arch.privregs != NULL) {
-		free_domheap_pages(virt_to_page(v->arch.privregs),
+		free_xenheap_pages(v->arch.privregs,
 		                   get_order_from_shift(XMAPPEDREGS_SHIFT));
 		v->arch.privregs = NULL;
 	}
@@ -500,7 +500,6 @@ static void vcpu_share_privregs_with_guest(struct vcpu *v)
 int vcpu_late_initialise(struct vcpu *v)
 {
 	struct domain *d = v->domain;
-	struct page_info *page;
 	int rc, order;
 
 	if (HAS_PERVCPU_VHPT(d)) {
@@ -511,11 +510,9 @@ int vcpu_late_initialise(struct vcpu *v)
 
 	/* Create privregs page. */
 	order = get_order_from_shift(XMAPPEDREGS_SHIFT);
-	page = alloc_domheap_pages(NULL, order, 0);
-	if (page == NULL)
+	v->arch.privregs = alloc_xenheap_pages(order);
+	if (v->arch.privregs == NULL)
 		return -ENOMEM;
-	
-	v->arch.privregs = page_to_virt(page);
 	BUG_ON(v->arch.privregs == NULL);
 	memset(v->arch.privregs, 0, 1 << XMAPPEDREGS_SHIFT);
 	vcpu_share_privregs_with_guest(v);
@@ -562,8 +559,7 @@ integer_param("pervcpu_vhpt", opt_pervcpu_vhpt);
 int arch_domain_create(struct domain *d, unsigned int domcr_flags)
 {
 	int i;
-	struct page_info *page = NULL;
-	
+
 	// the following will eventually need to be negotiated dynamically
 	d->arch.shared_info_va = DEFAULT_SHAREDINFO_ADDR;
 	d->arch.breakimm = 0x1000;
@@ -582,10 +578,9 @@ int arch_domain_create(struct domain *d, unsigned int domcr_flags)
 #endif
 	if (tlb_track_create(d) < 0)
 		goto fail_nomem1;
-	page = alloc_domheap_pages(NULL, get_order_from_shift(XSI_SHIFT), 0);
-	if (page == NULL)
+	d->shared_info = alloc_xenheap_pages(get_order_from_shift(XSI_SHIFT));
+	if (d->shared_info == NULL)
 		goto fail_nomem;
-	d->shared_info = page_to_virt(page);
 	BUG_ON(d->shared_info == NULL);
 	memset(d->shared_info, 0, XSI_SIZE);
 	for (i = 0; i < XSI_SIZE; i += PAGE_SIZE)
@@ -628,8 +623,9 @@ fail_nomem:
 fail_nomem1:
 	if (d->arch.mm.pgd != NULL)
 	    pgd_free(d->arch.mm.pgd);
-	if (page != NULL)
-	    free_domheap_pages(page, get_order_from_shift(XSI_SHIFT));
+	if (d->shared_info != NULL)
+	    free_xenheap_pages(d->shared_info,
+			       get_order_from_shift(XSI_SHIFT));
 	return -ENOMEM;
 }
 
@@ -638,7 +634,7 @@ void arch_domain_destroy(struct domain *d)
 	mm_final_teardown(d);
 
 	if (d->shared_info != NULL)
-		free_domheap_pages(virt_to_page(d->shared_info),
+		free_xenheap_pages(d->shared_info,
 				   get_order_from_shift(XSI_SHIFT));
 
 	tlb_track_destroy(d);
