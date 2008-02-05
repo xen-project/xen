@@ -485,7 +485,7 @@ xc_domain_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
         goto out;
     }
 
-    p2m_size = xc_memory_op(xc_handle, XENMEM_maximum_gpfn, &dom);
+    p2m_size = xc_memory_op(xc_handle, XENMEM_maximum_gpfn, &dom) + 1;
 
     /* This is expected by xm restore.  */
     if (write_exact(io_fd, &p2m_size, sizeof(unsigned long))) {
