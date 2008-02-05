@@ -103,7 +103,7 @@ void __dummy__(void)
     BLANK();
 
     OFFSET(VCPU_vmx_launched, struct vcpu, arch.hvm_vmx.launched);
-    OFFSET(VCPU_hvm_guest_cr0, struct vcpu, arch.hvm_vcpu.guest_cr[0]);
+    OFFSET(VCPU_vmx_emul, struct vcpu, arch.hvm_vmx.vmxemul);
     OFFSET(VCPU_hvm_guest_cr2, struct vcpu, arch.hvm_vcpu.guest_cr[2]);
     BLANK();
 

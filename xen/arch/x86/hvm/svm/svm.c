@@ -578,8 +578,8 @@ static unsigned long svm_get_segment_base(struct vcpu *v, enum x86_segment seg)
     case x86_seg_gdtr: return vmcb->gdtr.base;
     case x86_seg_idtr: return vmcb->idtr.base;
     case x86_seg_ldtr: svm_sync_vmcb(v); return vmcb->ldtr.base;
+    default: BUG();
     }
-    BUG();
     return 0;
 }
 

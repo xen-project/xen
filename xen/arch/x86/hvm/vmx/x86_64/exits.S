@@ -135,8 +135,8 @@ ENTRY(vmx_asm_do_vmentry)
         VMWRITE(UREGS_eflags)
 
 #ifndef VMXASSIST
-        testb $X86_CR0_PE,VCPU_hvm_guest_cr0(%rbx)
-        jz   vmx_goto_realmode
+        testb $0xff,VCPU_vmx_emul(%rbx)
+        jnz  vmx_goto_realmode
 #endif
 
         cmpb $0,VCPU_vmx_launched(%rbx)

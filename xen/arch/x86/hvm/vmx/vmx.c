@@ -1061,6 +1061,10 @@ static void vmx_update_guest_cr(struct vcpu *v, unsigned int cr)
                 vmx_fpu_enter(v);
         }
 
+        v->arch.hvm_vmx.vmxemul &= ~VMXEMUL_REALMODE;
+        if ( !(v->arch.hvm_vcpu.guest_cr[0] & X86_CR0_PE) )
+            v->arch.hvm_vmx.vmxemul |= VMXEMUL_REALMODE;
+
         v->arch.hvm_vcpu.hw_cr[0] =
             v->arch.hvm_vcpu.guest_cr[0] | hw_cr0_mask;
         __vmwrite(GUEST_CR0, v->arch.hvm_vcpu.hw_cr[0]);

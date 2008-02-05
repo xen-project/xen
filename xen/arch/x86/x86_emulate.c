@@ -303,7 +303,11 @@ struct operand {
 #define EXC_OF  4
 #define EXC_BR  5
 #define EXC_UD  6
+#define EXC_TS 10
+#define EXC_NP 11
+#define EXC_SS 12
 #define EXC_GP 13
+#define EXC_PF 14
 
 /*
  * Instruction emulation:
@@ -500,12 +504,12 @@ do {                                                    \
     if ( rc ) goto done;                                \
 } while (0)
 
-#define generate_exception_if(p, e)                                     \
-({  if ( (p) ) {                                                        \
-        fail_if(ops->inject_hw_exception == NULL);                      \
-        rc = ops->inject_hw_exception(e, ctxt) ? : X86EMUL_EXCEPTION;   \
-        goto done;                                                      \
-    }                                                                   \
+#define generate_exception_if(p, e)                                      \
+({  if ( (p) ) {                                                         \
+        fail_if(ops->inject_hw_exception == NULL);                       \
+        rc = ops->inject_hw_exception(e, 0, ctxt) ? : X86EMUL_EXCEPTION; \
+        goto done;                                                       \
+    }                                                                    \
 })
 
 /*
@@ -774,7 +778,7 @@ in_realmode(
 }
 
 static int
-load_seg(
+realmode_load_seg(
     enum x86_segment seg,
     uint16_t sel,
     struct x86_emulate_ctxt *ctxt,
@@ -783,11 +787,6 @@ load_seg(
     struct segment_register reg;
     int rc;
 
-    if ( !in_realmode(ctxt, ops) ||
-         (ops->read_segment == NULL) ||
-         (ops->write_segment == NULL) )
-        return X86EMUL_UNHANDLEABLE;
-
     if ( (rc = ops->read_segment(seg, &reg, ctxt)) != 0 )
         return rc;
 
@@ -795,6 +794,148 @@ load_seg(
     reg.base = (uint32_t)sel << 4;
 
     return ops->write_segment(seg, &reg, ctxt);
+}
+
+static int
+protmode_load_seg(
+    enum x86_segment seg,
+    uint16_t sel,
+    struct x86_emulate_ctxt *ctxt,
+    struct x86_emulate_ops *ops)
+{
+    struct segment_register desctab, cs, segr;
+    struct { uint32_t a, b; } desc;
+    unsigned long val;
+    uint8_t dpl, rpl, cpl;
+    int rc, fault_type = EXC_TS;
+
+    /* NULL selector? */
+    if ( (sel & 0xfffc) == 0 )
+    {
+        if ( (seg == x86_seg_cs) || (seg == x86_seg_ss) )
+            goto raise_exn;
+        memset(&segr, 0, sizeof(segr));
+        return ops->write_segment(seg, &segr, ctxt);
+    }
+
+    /* LDT descriptor must be in the GDT. */
+    if ( (seg == x86_seg_ldtr) && (sel & 4) )
+        goto raise_exn;
+
+    if ( (rc = ops->read_segment(x86_seg_cs, &cs, ctxt)) ||
+         (rc = ops->read_segment((sel & 4) ? x86_seg_ldtr : x86_seg_gdtr,
+                                 &desctab, ctxt)) )
+        return rc;
+
+    /* Check against descriptor table limit. */
+    if ( ((sel & 0xfff8) + 7) > desctab.limit )
+        goto raise_exn;
+
+    do {
+        if ( (rc = ops->read(x86_seg_none, desctab.base + (sel & 0xfff8),
+                             &val, 4, ctxt)) )
+            return rc;
+        desc.a = val;
+        if ( (rc = ops->read(x86_seg_none, desctab.base + (sel & 0xfff8) + 4,
+                             &val, 4, ctxt)) )
+            return rc;
+        desc.b = val;
+
+        /* Segment present in memory? */
+        if ( !(desc.b & (1u<<15)) )
+        {
+            fault_type = EXC_NP;
+            goto raise_exn;
+        }
+
+        /* LDT descriptor is a system segment. All others are code/data. */
+        if ( (desc.b & (1u<<12)) == ((seg == x86_seg_ldtr) << 12) )
+            goto raise_exn;
+
+        dpl = (desc.b >> 13) & 3;
+        rpl = sel & 3;
+        cpl = cs.sel & 3;
+
+        switch ( seg )
+        {
+        case x86_seg_cs:
+            /* Code segment? */
+            if ( !(desc.b & (1u<<11)) )
+                goto raise_exn;
+            /* Non-conforming segment: check DPL against RPL. */
+            if ( ((desc.b & (6u<<9)) != 6) && (dpl != rpl) )
+                goto raise_exn;
+            break;
+        case x86_seg_ss:
+            /* Writable data segment? */
+            if ( (desc.b & (5u<<9)) != (1u<<9) )
+                goto raise_exn;
+            if ( (dpl != cpl) || (dpl != rpl) )
+                goto raise_exn;
+            break;
+        case x86_seg_ldtr:
+            /* LDT system segment? */
+            if ( (desc.b & (15u<<8)) != (2u<<8) )
+                goto raise_exn;
+            goto skip_accessed_flag;
+        default:
+            /* Readable code or data segment? */
+            if ( (desc.b & (5u<<9)) == (4u<<9) )
+                goto raise_exn;
+            /* Non-conforming segment: check DPL against RPL and CPL. */
+            if ( ((desc.b & (6u<<9)) != 6) && ((dpl < cpl) || (dpl < rpl)) )
+                goto raise_exn;
+            break;
+        }
+
+        /* Ensure Accessed flag is set. */
+        rc = ((desc.b & 0x100) ? X86EMUL_OKAY : 
+              ops->cmpxchg(
+                  x86_seg_none, desctab.base + (sel & 0xfff8) + 4, desc.b,
+                  desc.b | 0x100, 4, ctxt));
+    } while ( rc == X86EMUL_CMPXCHG_FAILED );
+
+    if ( rc )
+        return rc;
+
+    /* Force the Accessed flag in our local copy. */
+    desc.b |= 0x100;
+
+ skip_accessed_flag:
+    segr.base = (((desc.b <<  0) & 0xff000000u) |
+                 ((desc.b << 16) & 0x00ff0000u) |
+                 ((desc.a >> 16) & 0x0000ffffu));
+    segr.attr.bytes = (((desc.b >>  8) & 0x00ffu) |
+                       ((desc.b >> 12) & 0x0f00u));
+    segr.limit = (desc.b & 0x000f0000u) | (desc.a & 0x0000ffffu);
+    if ( segr.attr.fields.g )
+        segr.limit = (segr.limit << 12) | 0xfffu;
+    segr.sel = sel;
+    return ops->write_segment(seg, &segr, ctxt);
+
+ raise_exn:
+    if ( ops->inject_hw_exception == NULL )
+        return X86EMUL_UNHANDLEABLE;
+    if ( (rc = ops->inject_hw_exception(fault_type, sel & 0xfffc, ctxt)) )
+        return rc;
+    return X86EMUL_EXCEPTION;
+}
+
+static int
+load_seg(
+    enum x86_segment seg,
+    uint16_t sel,
+    struct x86_emulate_ctxt *ctxt,
+    struct x86_emulate_ops *ops)
+{
+    if ( (ops->read_segment == NULL) ||
+         (ops->write_segment == NULL) )
+        return X86EMUL_UNHANDLEABLE;
+
+    if ( in_realmode(ctxt, ops) )
+        return realmode_load_seg(seg, sel, ctxt, ops);
+
+    return protmode_load_seg(seg, sel, ctxt, ops);
 }
 
 void *
@@ -1858,7 +1999,7 @@ x86_emulate(
     if ( (_regs.eflags & EFLG_TF) &&
          (rc == X86EMUL_OKAY) &&
          (ops->inject_hw_exception != NULL) )
-        rc = ops->inject_hw_exception(EXC_DB, ctxt) ? : X86EMUL_EXCEPTION;
+        rc = ops->inject_hw_exception(EXC_DB, 0, ctxt) ? : X86EMUL_EXCEPTION;
 
  done:
     return rc;
