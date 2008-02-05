@@ -22,6 +22,7 @@ import types
 from xen.xend import sxp, XendOptions
 from xen.xend.XendError import VmError
 from xen.xend.XendLogging import log
+import xen.xend.XendConfig
 
 from xen.xend.xenstore.xstransact import xstransact, complete
 from xen.xend.xenstore.xswatch import xswatch
@@ -113,10 +114,10 @@ class DevController:
                     raise VmError("Device %s is already connected." % dev_str)
 
                 if count == 0:
-                    log.debug('DevController: writing %s to %s.', str(front),
-                              frontpath)
-                    log.debug('DevController: writing %s to %s.', str(back),
-                              backpath)
+                    log.debug('DevController: writing %s to %s.',
+                              str(front), frontpath)
+                    log.debug('DevController: writing %s to %s.',
+                              str(xen.xend.XendConfig.scrub_password(back)), backpath)
                 elif count % 50 == 0:
                     log.debug(
                       'DevController: still waiting to write device entries.')
