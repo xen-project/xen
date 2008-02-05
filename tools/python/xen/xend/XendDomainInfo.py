@@ -879,6 +879,9 @@ class XendDomainInfo:
     def _gatherVm(self, *args):
         return xstransact.Gather(self.vmpath, *args)
 
+    def _listRecursiveVm(self, *args):
+        return xstransact.ListRecursive(self.vmpath, *args)
+
     def storeVm(self, *args):
         return xstransact.Store(self.vmpath, *args)
 
@@ -1393,6 +1396,7 @@ class XendDomainInfo:
 
         self._writeVm('xend/previous_restart_time', str(now))
 
+        prev_vm_xend = self._listRecursiveVm('xend')
         new_dom_info = self.info
         try:
             if rename:
@@ -1411,8 +1415,13 @@ class XendDomainInfo:
             try:
                 new_dom = XendDomain.instance().domain_create_from_dict(
                     new_dom_info)
+                for x in prev_vm_xend[0][1]:
+                    new_dom._writeVm('xend/%s' % x[0], x[1])
                 new_dom.waitForDevices()
                 new_dom.unpause()
+                rst_cnt = new_dom._readVm('xend/restart_count')
+                rst_cnt = int(rst_cnt) + 1
+                new_dom._writeVm('xend/restart_count', str(rst_cnt))
                 new_dom._removeVm(RESTART_IN_PROGRESS)
             except:
                 if new_dom:
@@ -1448,9 +1457,6 @@ class XendDomainInfo:
         self.vmpath = XS_VMROOT + new_uuid
         # Write out new vm node to xenstore
         self._storeVmDetails()
-        rst_cnt = self._readVm('xend/restart_count')
-        rst_cnt = int(rst_cnt) + 1
-        self._writeVm('xend/restart_count', str(rst_cnt))
         self._preserve()
         return new_dom_info
 
