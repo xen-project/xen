@@ -550,7 +550,8 @@ do {                                                                    \
 
 #define jmp_rel(rel)                                                    \
 do {                                                                    \
-    _regs.eip += (int)(rel);                                            \
+    int _rel = (int)(rel);                                              \
+    _regs.eip += _rel;                                                  \
     if ( !mode_64bit() )                                                \
         _regs.eip = ((op_bytes == 2)                                    \
                      ? (uint16_t)_regs.eip : (uint32_t)_regs.eip);      \
@@ -2785,9 +2786,11 @@ x86_emulate(
         break;
     }
 
-    case 0xeb: /* jmp (short) */
-        jmp_rel(insn_fetch_type(int8_t));
+    case 0xeb: /* jmp (short) */ {
+        int rel = insn_fetch_type(int8_t);
+        jmp_rel(rel);
         break;
+    }
 
     case 0xf1: /* int1 (icebp) */
         src.val = EXC_DB;
