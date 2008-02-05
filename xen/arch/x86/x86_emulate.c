@@ -2226,7 +2226,7 @@ x86_emulate(
     }
 
     case 0x9e: /* sahf */
-        *(uint8_t *)_regs.eflags = (((uint8_t *)&_regs.eax)[1] & 0xd7) | 0x02;
+        *(uint8_t *)&_regs.eflags = (((uint8_t *)&_regs.eax)[1] & 0xd7) | 0x02;
         break;
 
     case 0x9f: /* lahf */
