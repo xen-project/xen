@@ -12,3 +12,4 @@ ifeq ($(ARCH),ia64)
 endif
 
 EXTRA_CFLAGS += -include $(objtree)/include/linux/autoconf.h
+EXTRA_AFLAGS += -I$(M)/include -I$(M)/compat-include -DHAVE_XEN_PLATFORM_COMPAT_H
