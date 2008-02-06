@@ -1671,16 +1671,6 @@ int hvm_bringup_ap(int vcpuid, int trampoline_vector)
     ctxt->flags = VGCF_online;
     ctxt->user_regs.eflags = 2;
 
-#ifdef VMXASSIST
-    if ( boot_cpu_data.x86_vendor == X86_VENDOR_INTEL )
-    {
-        ctxt->user_regs.eip = VMXASSIST_BASE;
-        ctxt->user_regs.edx = vcpuid;
-        ctxt->user_regs.ebx = trampoline_vector;
-        goto done;
-    }
-#endif
-
     v->arch.hvm_vcpu.guest_cr[0] = X86_CR0_ET;
     hvm_update_guest_cr(v, 0);
 
@@ -1721,9 +1711,6 @@ int hvm_bringup_ap(int vcpuid, int trampoline_vector)
     hvm_set_segment_register(v, x86_seg_gdtr, &reg);
     hvm_set_segment_register(v, x86_seg_idtr, &reg);
 
-#ifdef VMXASSIST
- done:
-#endif
     /* Sync AP's TSC with BSP's. */
     v->arch.hvm_vcpu.cache_tsc_offset =
         v->domain->vcpu[0]->arch.hvm_vcpu.cache_tsc_offset;

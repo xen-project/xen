@@ -115,10 +115,8 @@ ENTRY(vmx_asm_do_vmentry)
         movl $GUEST_RFLAGS,%eax
         VMWRITE(UREGS_eflags)
 
-#ifndef VMXASSIST
         testb $0xff,VCPU_vmx_emul(%ebx)
         jnz  vmx_goto_realmode
-#endif
 
         cmpb $0,VCPU_vmx_launched(%ebx)
         je   vmx_launch
@@ -138,7 +136,6 @@ vmx_launch:
         call vm_launch_fail
         ud2
 
-#ifndef VMXASSIST
 vmx_goto_realmode:
         sti
         movl %esp,%eax
@@ -146,4 +143,3 @@ vmx_goto_realmode:
         call vmx_realmode
         addl $4,%esp
         jmp vmx_asm_do_vmentry
-#endif

@@ -271,11 +271,6 @@ static void vpic_ioport_write(
             vpic->imr = val;
             break;
         case 1:
-#ifdef VMXASSIST
-            /* Which mode is irqbase programmed in? */
-            current->arch.hvm_vmx.irqbase_mode =
-                current->arch.hvm_vmx.vmxassist_enabled;
-#endif
             /* ICW2 */
             vpic->irq_base = val & 0xf8;
             vpic->init_state++;
