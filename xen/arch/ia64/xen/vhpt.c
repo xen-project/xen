@@ -521,6 +521,31 @@ void domain_flush_tlb_vhpt(struct domain *d)
 	cpus_clear (d->domain_dirty_cpumask);
 }
 
+void flush_tlb_for_log_dirty(struct domain *d)
+{
+	struct vcpu *v;
+
+	/* NB. There is no race because all vcpus are paused. */
+	if (is_hvm_domain(d)) {
+		for_each_vcpu (d, v) {
+			/* XXX: local_flush_tlb_all is called redundantly */
+			thash_purge_all(v);
+		}
+		smp_call_function((void (*)(void *))local_flush_tlb_all, 
+					NULL, 1, 1);
+	} else if (HAS_PERVCPU_VHPT(d)) {
+		for_each_vcpu (d, v) {
+			vcpu_purge_tr_entry(&PSCBX(v,dtlb));
+			vcpu_purge_tr_entry(&PSCBX(v,itlb));
+			vcpu_vhpt_flush(v);
+		}
+		on_each_cpu((void (*)(void *))local_flush_tlb_all, NULL, 1, 1);
+	} else {
+		on_each_cpu((void (*)(void *))flush_tlb_vhpt_all, d, 1, 1);
+	}
+	cpus_clear (d->domain_dirty_cpumask);
+}
+
 void flush_tlb_mask(cpumask_t mask)
 {
     int cpu;

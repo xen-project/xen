@@ -1785,7 +1785,7 @@ int shadow_mode_control(struct domain *d, xen_domctl_shadow_op_t *sc)
 				v->arch.shadow_bitmap = d->arch.shadow_bitmap;
 			/* Flush vhtp and tlb to enable dirty bit
 			   virtualization.  */
-			domain_flush_tlb_vhpt(d);
+			flush_tlb_for_log_dirty(d);
 		}
 		break;
 
@@ -1824,6 +1824,7 @@ int shadow_mode_control(struct domain *d, xen_domctl_shadow_op_t *sc)
 
 			memset((uint8_t *)d->arch.shadow_bitmap + i, 0, size);
 		}
+		flush_tlb_for_log_dirty(d);
 		
 		break;
 	  }

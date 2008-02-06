@@ -34,6 +34,9 @@ void domain_flush_vtlb_track_entry(struct domain* d,
 /* Flush vhpt and mTLB on every dirty cpus.  */
 void domain_flush_tlb_vhpt(struct domain *d);
 
+/* Flush vhpt and mTLB for log-dirty mode.  */
+void flush_tlb_for_log_dirty(struct domain *d);
+
 /* Flush v-tlb on cpus set in mask for current domain.  */
 void flush_tlb_mask(cpumask_t mask);
 
