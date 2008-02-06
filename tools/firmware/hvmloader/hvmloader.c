@@ -107,20 +107,6 @@ cirrus_check(void)
     return inb(0x3C5) == 0x12;
 }
 
-static int
-check_amd(void)
-{
-    char id[12];
-
-    __asm__ __volatile__ (
-        "cpuid" 
-        : "=b" (*(int *)(&id[0])),
-        "=c" (*(int *)(&id[8])),
-        "=d" (*(int *)(&id[4]))
-        : "a" (0) );
-    return __builtin_memcmp(id, "AuthenticAMD", 12) == 0;
-}
-
 static void
 wrmsr(uint32_t idx, uint64_t v)
 {
