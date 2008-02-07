@@ -87,6 +87,11 @@ disk = [ 'file:/var/images/min-el3-i386.img,hda,w', ',hdc:cdrom,r' ]
 #   "rename-restart", meaning that the old domain is not cleaned up, but is
 #                     renamed and a new domain started in its place.
 #
+# In the event a domain stops due to a crash, you have the additional options:
+#
+#   "coredump-destroy", meaning dump the crashed domain's core and then destroy;
+#   "coredump-restart', meaning dump the crashed domain's core and the restart.
+#
 # The default is
 #
 #   on_poweroff = 'destroy'

@@ -39,8 +39,17 @@ enum x86_segment {
     x86_seg_tr,
     x86_seg_ldtr,
     x86_seg_gdtr,
-    x86_seg_idtr
+    x86_seg_idtr,
+    /*
+     * Dummy: used to emulate direct processor accesses to management
+     * structures (TSS, GDT, LDT, IDT, etc.) which use linear addressing
+     * (no segment component) and bypass usual segment- and page-level
+     * protection checks.
+     */
+    x86_seg_none
 };
+
+#define is_x86_user_segment(seg) ((unsigned)(seg) <= x86_seg_gs)
 
 /* 
  * Attribute for segment selector. This is a copy of bit 40:47 & 52:55 of the
@@ -333,6 +342,7 @@ struct x86_emulate_ops
     /* inject_hw_exception */
     int (*inject_hw_exception)(
         uint8_t vector,
+        uint16_t error_code,
         struct x86_emulate_ctxt *ctxt);
 
     /* inject_sw_interrupt */

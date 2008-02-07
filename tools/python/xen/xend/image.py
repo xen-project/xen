@@ -329,7 +329,7 @@ class ImageHandler:
             return
         if self.pid:
             try:
-                os.kill(self.pid, signal.SIGHUP)
+                os.kill(self.pid, signal.SIGKILL)
             except OSError, exn:
                 log.exception(exn)
             try:

@@ -14,12 +14,19 @@
 #define EINTR       WSAEINTR
 #define EINPROGRESS WSAEINPROGRESS
 
+#ifndef NO_UNIX_SOCKETS
+#define NO_UNIX_SOCKETS 1
+#endif
+
 #else
 
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <netinet/tcp.h>
+
+#ifndef NO_UNIX_SOCKETS
 #include <sys/un.h>
+#endif
 
 #define socket_error() errno
 #define closesocket(s) close(s)

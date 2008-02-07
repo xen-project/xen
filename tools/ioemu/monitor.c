@@ -1167,7 +1167,7 @@ static void do_info_profile(void)
 #endif
 
 /* Capture support */
-static LIST_HEAD (capture_list_head, CaptureState) capture_head;
+static QEMU_LIST_HEAD (capture_list_head, CaptureState) capture_head;
 
 static void do_info_capture (void)
 {
@@ -1188,7 +1188,7 @@ static void do_stop_capture (int n)
     for (s = capture_head.lh_first, i = 0; s; s = s->entries.le_next, ++i) {
         if (i == n) {
             s->ops.destroy (s->opaque);
-            LIST_REMOVE (s, entries);
+            QEMU_LIST_REMOVE (s, entries);
             qemu_free (s);
             return;
         }
@@ -1220,7 +1220,7 @@ static void do_wav_capture (const char *path,
         term_printf ("Faied to add wave capture\n");
         qemu_free (s);
     }
-    LIST_INSERT_HEAD (&capture_head, s, entries);
+    QEMU_LIST_INSERT_HEAD (&capture_head, s, entries);
 }
 #endif
 

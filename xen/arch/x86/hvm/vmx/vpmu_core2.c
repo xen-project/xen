@@ -35,60 +35,69 @@
 #include <asm/hvm/vmx/vpmu.h>
 #include <asm/hvm/vmx/vpmu_core2.h>
 
-static int arch_pmc_cnt = 0;
+static int arch_pmc_cnt;
 
 static int core2_get_pmc_count(void)
 {
     u32 eax, ebx, ecx, edx;
 
-    if ( arch_pmc_cnt )
-        return arch_pmc_cnt;
+    if ( arch_pmc_cnt == 0 )
+    {
+        cpuid(0xa, &eax, &ebx, &ecx, &edx);
+        arch_pmc_cnt = (eax & 0xff00) >> 8;
+    }
 
-    cpuid(0xa, &eax, &ebx, &ecx, &edx);
-    return arch_pmc_cnt = (eax & 0xff00) >> 8;
+    return arch_pmc_cnt;
 }
 
 static int is_core2_vpmu_msr(u32 msr_index, int *type, int *index)
 {
     int i;
 
-    for ( i=0; i < core2_counters.num; i++ )
+    for ( i = 0; i < core2_counters.num; i++ )
+    {
         if ( core2_counters.msr[i] == msr_index )
         {
             *type = MSR_TYPE_COUNTER;
             *index = i;
             return 1;
         }
-    for ( i=0; i < core2_ctrls.num; i++ )
+    }
+    
+    for ( i = 0; i < core2_ctrls.num; i++ )
+    {
         if ( core2_ctrls.msr[i] == msr_index )
         {
             *type = MSR_TYPE_CTRL;
             *index = i;
             return 1;
         }
+    }
 
-    if ( msr_index == MSR_CORE_PERF_GLOBAL_CTRL ||
-         msr_index == MSR_CORE_PERF_GLOBAL_STATUS ||
-         msr_index == MSR_CORE_PERF_GLOBAL_OVF_CTRL )
+    if ( (msr_index == MSR_CORE_PERF_GLOBAL_CTRL) ||
+         (msr_index == MSR_CORE_PERF_GLOBAL_STATUS) ||
+         (msr_index == MSR_CORE_PERF_GLOBAL_OVF_CTRL) )
     {
         *type = MSR_TYPE_GLOBAL;
         return 1;
     }
 
-    if ( msr_index >= MSR_IA32_PERFCTR0 &&
-         msr_index < MSR_IA32_PERFCTR0 + core2_get_pmc_count() )
+    if ( (msr_index >= MSR_IA32_PERFCTR0) &&
+         (msr_index < (MSR_IA32_PERFCTR0 + core2_get_pmc_count())) )
     {
         *type = MSR_TYPE_ARCH_COUNTER;
         *index = msr_index - MSR_IA32_PERFCTR0;
         return 1;
     }
-    if ( msr_index >= MSR_P6_EVNTSEL0 &&
-         msr_index < MSR_P6_EVNTSEL0 + core2_get_pmc_count() )
+
+    if ( (msr_index >= MSR_P6_EVNTSEL0) &&
+         (msr_index < (MSR_P6_EVNTSEL0 + core2_get_pmc_count())) )
     {
         *type = MSR_TYPE_ARCH_CTRL;
         *index = msr_index - MSR_P6_EVNTSEL0;
         return 1;
     }
+
     return 0;
 }
 
@@ -97,20 +106,21 @@ static void core2_vpmu_set_msr_bitmap(char *msr_bitmap)
     int i;
 
     /* Allow Read/Write PMU Counters MSR Directly. */
-    for ( i=0; i < core2_counters.num; i++ )
+    for ( i = 0; i < core2_counters.num; i++ )
     {
         clear_bit(msraddr_to_bitpos(core2_counters.msr[i]), msr_bitmap);
-        clear_bit(msraddr_to_bitpos(core2_counters.msr[i]), msr_bitmap + 0x800);
+        clear_bit(msraddr_to_bitpos(core2_counters.msr[i]), msr_bitmap+0x800);
     }
-    for ( i=0; i < core2_get_pmc_count(); i++ )
+    for ( i = 0; i < core2_get_pmc_count(); i++ )
     {
         clear_bit(msraddr_to_bitpos(MSR_IA32_PERFCTR0+i), msr_bitmap);
-        clear_bit(msraddr_to_bitpos(MSR_IA32_PERFCTR0+i), msr_bitmap + 0x800);
+        clear_bit(msraddr_to_bitpos(MSR_IA32_PERFCTR0+i), msr_bitmap+0x800);
     }
+
     /* Allow Read PMU Non-global Controls Directly. */
-    for ( i=0; i < core2_ctrls.num; i++ )
+    for ( i = 0; i < core2_ctrls.num; i++ )
         clear_bit(msraddr_to_bitpos(core2_ctrls.msr[i]), msr_bitmap);
-    for ( i=0; i < core2_get_pmc_count(); i++ )
+    for ( i = 0; i < core2_get_pmc_count(); i++ )
         clear_bit(msraddr_to_bitpos(MSR_P6_EVNTSEL0+i), msr_bitmap);
 }
 
@@ -118,20 +128,19 @@ static void core2_vpmu_unset_msr_bitmap(char *msr_bitmap)
 {
     int i;
 
-    /* Undo all the changes to msr bitmap. */
-    for ( i=0; i < core2_counters.num; i++ )
+    for ( i = 0; i < core2_counters.num; i++ )
     {
         set_bit(msraddr_to_bitpos(core2_counters.msr[i]), msr_bitmap);
-        set_bit(msraddr_to_bitpos(core2_counters.msr[i]), msr_bitmap + 0x800);
+        set_bit(msraddr_to_bitpos(core2_counters.msr[i]), msr_bitmap+0x800);
     }
-    for ( i=0; i < core2_get_pmc_count(); i++ )
+    for ( i = 0; i < core2_get_pmc_count(); i++ )
     {
         set_bit(msraddr_to_bitpos(MSR_IA32_PERFCTR0+i), msr_bitmap);
-        set_bit(msraddr_to_bitpos(MSR_IA32_PERFCTR0+i), msr_bitmap + 0x800);
+        set_bit(msraddr_to_bitpos(MSR_IA32_PERFCTR0+i), msr_bitmap+0x800);
     }
-    for ( i=0; i < core2_ctrls.num; i++ )
+    for ( i = 0; i < core2_ctrls.num; i++ )
         set_bit(msraddr_to_bitpos(core2_ctrls.msr[i]), msr_bitmap);
-    for ( i=0; i < core2_get_pmc_count(); i++ )
+    for ( i = 0; i < core2_get_pmc_count(); i++ )
         set_bit(msraddr_to_bitpos(MSR_P6_EVNTSEL0+i), msr_bitmap);
 }
 
@@ -140,9 +149,9 @@ static inline void __core2_vpmu_save(struct vcpu *v)
     int i;
     struct core2_vpmu_context *core2_vpmu_cxt = vcpu_vpmu(v)->context;
 
-    for ( i=0; i < core2_counters.num; i++ )
+    for ( i = 0; i < core2_counters.num; i++ )
         rdmsrl(core2_counters.msr[i], core2_vpmu_cxt->counters[i]);
-    for ( i=0; i < core2_get_pmc_count(); i++ )
+    for ( i = 0; i < core2_get_pmc_count(); i++ )
         rdmsrl(MSR_IA32_PERFCTR0+i, core2_vpmu_cxt->arch_msr_pair[i].counter);
     core2_vpmu_cxt->hw_lapic_lvtpc = apic_read(APIC_LVTPC);
     apic_write(APIC_LVTPC, LVTPC_HVM_PMU | APIC_LVT_MASKED);
@@ -171,14 +180,14 @@ static inline void __core2_vpmu_load(struct vcpu *v)
     int i;
     struct core2_vpmu_context *core2_vpmu_cxt = vcpu_vpmu(v)->context;
 
-    for ( i=0; i < core2_counters.num; i++ )
+    for ( i = 0; i < core2_counters.num; i++ )
         wrmsrl(core2_counters.msr[i], core2_vpmu_cxt->counters[i]);
-    for ( i=0; i < core2_get_pmc_count(); i++ )
+    for ( i = 0; i < core2_get_pmc_count(); i++ )
         wrmsrl(MSR_IA32_PERFCTR0+i, core2_vpmu_cxt->arch_msr_pair[i].counter);
 
-    for ( i=0; i < core2_ctrls.num; i++ )
+    for ( i = 0; i < core2_ctrls.num; i++ )
         wrmsrl(core2_ctrls.msr[i], core2_vpmu_cxt->ctrls[i]);
-    for ( i=0; i < core2_get_pmc_count(); i++ )
+    for ( i = 0; i < core2_get_pmc_count(); i++ )
         wrmsrl(MSR_P6_EVNTSEL0+i, core2_vpmu_cxt->arch_msr_pair[i].control);
 
     apic_write_around(APIC_LVTPC, core2_vpmu_cxt->hw_lapic_lvtpc);
@@ -233,9 +242,9 @@ static int core2_vpmu_alloc_resource(struct vcpu *v)
  out2:
     xfree(pmu_enable);
  out1:
-    dprintk(XENLOG_WARNING, "Insufficient memory for PMU, PMU feature is \
-            unavailable on domain %d vcpu %d.\n",
-            v->vcpu_id, v->domain->domain_id);
+    gdprintk(XENLOG_WARNING, "Insufficient memory for PMU, PMU feature is "
+             "unavailable on domain %d vcpu %d.\n",
+             v->vcpu_id, v->domain->domain_id);
     return 0;
 }
 
@@ -300,17 +309,17 @@ static int core2_vpmu_do_wrmsr(struct cpu_user_regs *regs)
         core2_vpmu_cxt->global_ovf_status &= ~msr_content;
         return 1;
     case MSR_CORE_PERF_GLOBAL_STATUS:
-        dprintk(XENLOG_INFO, "Can not write readonly MSR: \
-                            MSR_PERF_GLOBAL_STATUS(0x38E)!\n");
+        gdprintk(XENLOG_INFO, "Can not write readonly MSR: "
+                 "MSR_PERF_GLOBAL_STATUS(0x38E)!\n");
         vmx_inject_hw_exception(current, TRAP_gp_fault, 0);
         return 1;
     case MSR_IA32_PEBS_ENABLE:
         if ( msr_content & 1 )
-            dprintk(XENLOG_WARNING, "Guest is trying to enable PEBS, \
-                    which is not supported.\n");
+            gdprintk(XENLOG_WARNING, "Guest is trying to enable PEBS, "
+                     "which is not supported.\n");
         return 1;
     case MSR_IA32_DS_AREA:
-        dprintk(XENLOG_WARNING, "Guest setting of DTS is ignored.\n");
+        gdprintk(XENLOG_WARNING, "Guest setting of DTS is ignored.\n");
         return 1;
     case MSR_CORE_PERF_GLOBAL_CTRL:
         global_ctrl = msr_content;
@@ -466,4 +475,3 @@ struct arch_vpmu_ops core2_vpmu_ops = {
     .arch_vpmu_save = core2_vpmu_save,
     .arch_vpmu_load = core2_vpmu_load
 };
-

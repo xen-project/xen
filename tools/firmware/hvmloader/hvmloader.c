@@ -1,5 +1,5 @@
 /*
- * hvmloader.c: HVM ROMBIOS/VGABIOS/ACPI/VMXAssist image loader.
+ * hvmloader.c: HVM bootloader.
  *
  * Leendert van Doorn, leendert@watson.ibm.com
  * Copyright (c) 2005, International Business Machines Corporation.
@@ -40,7 +40,6 @@ asm(
     "    cli                         \n"
     "    movl $stack_top,%esp        \n"
     "    movl %esp,%ebp              \n"
-    "    movl %eax,initial_eax       \n"
     "    call main                   \n"
     /* Relocate real-mode trampoline to 0x0. */
     "    mov  $trampoline_start,%esi \n"
@@ -98,8 +97,6 @@ asm(
     "stack_top:                      \n"
     );
 
-static unsigned int initial_eax;
-
 void create_mp_tables(void);
 int hvm_write_smbios_tables(void);
 
@@ -108,26 +105,6 @@ cirrus_check(void)
 {
     outw(0x3C4, 0x9206);
     return inb(0x3C5) == 0x12;
-}
-
-static int
-check_amd(void)
-{
-    char id[12];
-
-    __asm__ __volatile__ (
-        "cpuid" 
-        : "=b" (*(int *)(&id[0])),
-        "=c" (*(int *)(&id[8])),
-        "=d" (*(int *)(&id[4]))
-        : "a" (0) );
-    return __builtin_memcmp(id, "AuthenticAMD", 12) == 0;
-}
-
-static int
-use_vmxassist(void)
-{
-    return !check_amd() && !initial_eax;
 }
 
 static void
@@ -506,10 +483,6 @@ int main(void)
         printf(" %05x-%05x: Extboot ROM\n",
                EXTBOOT_PHYSICAL_ADDRESS,
                EXTBOOT_PHYSICAL_ADDRESS + extboot_sz - 1);
-    if ( use_vmxassist() )
-        printf(" %05x-%05x: VMXAssist\n",
-               VMXASSIST_PHYSICAL_ADDRESS,
-               VMXASSIST_PHYSICAL_ADDRESS + sizeof(vmxassist) - 1);
     if ( smbios_sz )
         printf(" %05x-%05x: SMBIOS tables\n",
                SMBIOS_PHYSICAL_ADDRESS,
@@ -522,19 +495,6 @@ int main(void)
         printf(" %05x-%05x: Main BIOS\n",
                ROMBIOS_PHYSICAL_ADDRESS,
                ROMBIOS_PHYSICAL_ADDRESS + rombios_sz - 1);
-
-    if ( use_vmxassist() )
-    {
-        printf("Loading VMXAssist ...\n");
-        memcpy((void *)VMXASSIST_PHYSICAL_ADDRESS,
-               vmxassist, sizeof(vmxassist));
-
-        printf("VMX go ...\n");
-        __asm__ __volatile__(
-            "jmp *%%eax"
-            : : "a" (VMXASSIST_PHYSICAL_ADDRESS), "d" (0)
-            );
-    }
 
     printf("Invoking ROMBIOS ...\n");
     return 0;

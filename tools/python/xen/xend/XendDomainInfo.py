@@ -879,6 +879,9 @@ class XendDomainInfo:
     def _gatherVm(self, *args):
         return xstransact.Gather(self.vmpath, *args)
 
+    def _listRecursiveVm(self, *args):
+        return xstransact.ListRecursive(self.vmpath, *args)
+
     def storeVm(self, *args):
         return xstransact.Store(self.vmpath, *args)
 
@@ -1260,14 +1263,6 @@ class XendDomainInfo:
                          self.info['name_label'], self.domid)
                 self._writeVm(LAST_SHUTDOWN_REASON, 'crash')
 
-                if xoptions.get_enable_dump():
-                    try:
-                        self.dumpCore()
-                    except XendError:
-                        # This error has been logged -- there's nothing more
-                        # we can do in this context.
-                        pass
-
                 restart_reason = 'crash'
                 self._stateSet(DOM_STATE_HALTED)
 
@@ -1335,14 +1330,30 @@ class XendDomainInfo:
     def _clearRestart(self):
         self._removeDom("xend/shutdown_start_time")
 
+    def _maybeDumpCore(self, reason):
+        if reason == 'crash':
+            if xoptions.get_enable_dump() or self.get_on_crash() \
+                   in ['coredump_and_destroy', 'coredump_and_restart']:
+                try:
+                    self.dumpCore()
+                except XendError:
+                    # This error has been logged -- there's nothing more
+                    # we can do in this context.
+                    pass
 
     def _maybeRestart(self, reason):
+        # Before taking configured action, dump core if configured to do so.
+        #
+        self._maybeDumpCore(reason)
+
         # Dispatch to the correct method based upon the configured on_{reason}
         # behaviour.
         actions =  {"destroy"        : self.destroy,
                     "restart"        : self._restart,
                     "preserve"       : self._preserve,
-                    "rename-restart" : self._renameRestart}
+                    "rename-restart" : self._renameRestart,
+                    "coredump-destroy" : self.destroy,
+                    "coredump-restart" : self._restart}
 
         action_conf = {
             'poweroff': 'actions_after_shutdown',
@@ -1393,6 +1404,7 @@ class XendDomainInfo:
 
         self._writeVm('xend/previous_restart_time', str(now))
 
+        prev_vm_xend = self._listRecursiveVm('xend')
         new_dom_info = self.info
         try:
             if rename:
@@ -1411,8 +1423,13 @@ class XendDomainInfo:
             try:
                 new_dom = XendDomain.instance().domain_create_from_dict(
                     new_dom_info)
+                for x in prev_vm_xend[0][1]:
+                    new_dom._writeVm('xend/%s' % x[0], x[1])
                 new_dom.waitForDevices()
                 new_dom.unpause()
+                rst_cnt = new_dom._readVm('xend/restart_count')
+                rst_cnt = int(rst_cnt) + 1
+                new_dom._writeVm('xend/restart_count', str(rst_cnt))
                 new_dom._removeVm(RESTART_IN_PROGRESS)
             except:
                 if new_dom:
@@ -1448,9 +1465,6 @@ class XendDomainInfo:
         self.vmpath = XS_VMROOT + new_uuid
         # Write out new vm node to xenstore
         self._storeVmDetails()
-        rst_cnt = self._readVm('xend/restart_count')
-        rst_cnt = int(rst_cnt) + 1
-        self._writeVm('xend/restart_count', str(rst_cnt))
         self._preserve()
         return new_dom_info
 
@@ -2566,9 +2580,10 @@ class XendDomainInfo:
 
     def get_on_crash(self):
         after_crash = self.info.get('actions_after_crash')
-        if not after_crash or after_crash not in XEN_API_ON_CRASH_BEHAVIOUR:
+        if not after_crash or after_crash not in \
+               XEN_API_ON_CRASH_BEHAVIOUR + restart_modes:
             return XEN_API_ON_CRASH_BEHAVIOUR[0]
-        return after_crash
+        return XEN_API_ON_CRASH_BEHAVIOUR_FILTER[after_crash]
 
     def get_dev_config_by_uuid(self, dev_class, dev_uuid):
         """ Get's a device configuration either from XendConfig or

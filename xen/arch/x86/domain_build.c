@@ -292,9 +292,6 @@ int __init construct_dom0(
             compatible = 1;
         break;
     case 4: /* x86_64 */
-#ifndef CONFIG_COMPAT
-        printk(" Xen  kernel: 64-bit, lsb\n");
-#else
         printk(" Xen  kernel: 64-bit, lsb, compat32\n");
         if (elf_32bit(&elf) && parms.pae == PAEKERN_bimodal)
             parms.pae = PAEKERN_extended_cr3;
@@ -303,7 +300,6 @@ int __init construct_dom0(
             compat32 = 1;
             compatible = 1;
         }
-#endif
         if (elf_64bit(&elf) && machine == EM_X86_64)
             compatible = 1;
         break;
@@ -323,7 +319,7 @@ int __init construct_dom0(
         return -EINVAL;
     }
 
-#ifdef CONFIG_COMPAT
+#if defined(__x86_64__)
     if ( compat32 )
     {
         l1_pgentry_t gdt_l1e;
@@ -346,34 +342,32 @@ int __init construct_dom0(
         flush_tlb_one_local(GDT_LDT_VIRT_START + FIRST_RESERVED_GDT_BYTE);
     }
 #endif
+
     if ( parms.pae == PAEKERN_extended_cr3 )
             set_bit(VMASST_TYPE_pae_extended_cr3, &d->vm_assist);
 
-    if ( UNSET_ADDR != parms.virt_hv_start_low && elf_32bit(&elf) )
+    if ( (parms.virt_hv_start_low != UNSET_ADDR) && elf_32bit(&elf) )
     {
-#if CONFIG_PAGING_LEVELS < 4
         unsigned long mask = (1UL << L2_PAGETABLE_SHIFT) - 1;
-#else
-        unsigned long mask = is_pv_32bit_domain(d)
-                             ? (1UL << L2_PAGETABLE_SHIFT) - 1
-                             : (1UL << L4_PAGETABLE_SHIFT) - 1;
-#endif
-
         value = (parms.virt_hv_start_low + mask) & ~mask;
-#ifdef CONFIG_COMPAT
+        BUG_ON(!is_pv_32bit_domain(d));
+#if defined(__i386__)
+        if ( value > HYPERVISOR_VIRT_START )
+            panic("Domain 0 expects too high a hypervisor start address.\n");
+#else
+        if ( value > __HYPERVISOR_COMPAT_VIRT_START )
+            panic("Domain 0 expects too high a hypervisor start address.\n");
         HYPERVISOR_COMPAT_VIRT_START(d) =
             max_t(unsigned int, m2p_compat_vstart, value);
+#endif
+    }
+
+#if defined(__x86_64__)
+    if ( is_pv_32on64_domain(d) )
         d->arch.physaddr_bitsize =
             fls((1UL << 32) - HYPERVISOR_COMPAT_VIRT_START(d)) - 1
             + (PAGE_SIZE - 2);
-        if ( value > (!is_pv_32on64_domain(d) ?
-                      HYPERVISOR_VIRT_START :
-                      __HYPERVISOR_COMPAT_VIRT_START) )
-#else
-        if ( value > HYPERVISOR_VIRT_START )
 #endif
-            panic("Domain 0 expects too high a hypervisor start address.\n");
-    }
 
     /*
      * Why do we need this? The number of page-table frames depends on the 
@@ -702,7 +696,6 @@ int __init construct_dom0(
         mfn++;
     }
 
-#ifdef CONFIG_COMPAT
     if ( is_pv_32on64_domain(d) )
     {
         /* Ensure the first four L3 entries are all populated. */
@@ -724,7 +717,6 @@ int __init construct_dom0(
                &compat_idle_pg_table_l2[l2_table_offset(HIRO_COMPAT_MPT_VIRT_START)],
                COMPAT_L2_PAGETABLE_XEN_SLOTS(d) * sizeof(*l2tab));
     }
-#endif
 
     /* Pages that are part of page tables must be read only. */
     l4tab = l4start + l4_table_offset(vpt_start);
@@ -885,7 +877,7 @@ int __init construct_dom0(
         si->console.dom0.info_size = sizeof(struct dom0_vga_console_info);
     }
 
-#ifdef CONFIG_COMPAT
+#if defined(__x86_64__)
     if ( is_pv_32on64_domain(d) )
         xlat_start_info(si, XLAT_start_info_console_dom0);
 #endif

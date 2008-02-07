@@ -33,6 +33,8 @@ struct net_buffer {
 };
 
 struct netfront_dev {
+    domid_t dom;
+
     unsigned short tx_freelist[NET_TX_RING_SIZE];
     struct semaphore tx_sem;
 
@@ -141,7 +143,7 @@ moretodo:
 
         /* We are sure to have free gnttab entries since they got released above */
         buf->gref = req->gref = 
-            gnttab_grant_access(0,virt_to_mfn(page),0);
+            gnttab_grant_access(dev->dom,virt_to_mfn(page),0);
 
         req->id = id;
     }
@@ -258,6 +260,15 @@ struct netfront_dev *init_netfront(char *nodename, void (*thenetif_rx)(unsigned 
         dev->rx_buffers[i].page = (char*)alloc_page();
     }
 
+    evtchn_alloc_unbound_t op;
+    op.dom = DOMID_SELF;
+    snprintf(path, sizeof(path), "%s/backend-id", nodename);
+    dev->dom = op.remote_dom = xenbus_read_integer(path);
+    HYPERVISOR_event_channel_op(EVTCHNOP_alloc_unbound, &op);
+    clear_evtchn(op.port);        /* Without, handler gets invoked now! */
+    dev->local_port = bind_evtchn(op.port, netfront_handler, dev);
+    dev->evtchn=op.port;
+
     txs = (struct netif_tx_sring*) alloc_page();
     rxs = (struct netif_rx_sring *) alloc_page();
     memset(txs,0,PAGE_SIZE);
@@ -269,17 +280,8 @@ struct netfront_dev *init_netfront(char *nodename, void (*thenetif_rx)(unsigned 
     FRONT_RING_INIT(&dev->tx, txs, PAGE_SIZE);
     FRONT_RING_INIT(&dev->rx, rxs, PAGE_SIZE);
 
-    dev->tx_ring_ref = gnttab_grant_access(0,virt_to_mfn(txs),0);
-    dev->rx_ring_ref = gnttab_grant_access(0,virt_to_mfn(rxs),0);
-
-    evtchn_alloc_unbound_t op;
-    op.dom = DOMID_SELF;
-    snprintf(path, sizeof(path), "%s/backend-id", nodename);
-    op.remote_dom = xenbus_read_integer(path);
-    HYPERVISOR_event_channel_op(EVTCHNOP_alloc_unbound, &op);
-    clear_evtchn(op.port);        /* Without, handler gets invoked now! */
-    dev->local_port = bind_evtchn(op.port, netfront_handler, dev);
-    dev->evtchn=op.port;
+    dev->tx_ring_ref = gnttab_grant_access(dev->dom,virt_to_mfn(txs),0);
+    dev->rx_ring_ref = gnttab_grant_access(dev->dom,virt_to_mfn(rxs),0);
 
     dev->netif_rx = thenetif_rx;
 
@@ -416,7 +418,7 @@ void init_rx_buffers(struct netfront_dev *dev)
         req = RING_GET_REQUEST(&dev->rx, requeue_idx);
 
         buf->gref = req->gref = 
-            gnttab_grant_access(0,virt_to_mfn(buf->page),0);
+            gnttab_grant_access(dev->dom,virt_to_mfn(buf->page),0);
 
         req->id = requeue_idx;
 
@@ -461,7 +463,7 @@ void netfront_xmit(struct netfront_dev *dev, unsigned char* data,int len)
     memcpy(page,data,len);
 
     buf->gref = 
-        tx->gref = gnttab_grant_access(0,virt_to_mfn(page),0);
+        tx->gref = gnttab_grant_access(dev->dom,virt_to_mfn(page),1);
 
     tx->offset=0;
     tx->size = len;

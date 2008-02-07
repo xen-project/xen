@@ -242,7 +242,8 @@ LEGACY_XENSTORE_VM_PARAMS = [
 ## Config Choices
 ##
 
-CONFIG_RESTART_MODES = ('restart', 'destroy', 'preserve', 'rename-restart')
+CONFIG_RESTART_MODES = ('restart', 'destroy', 'preserve', 'rename-restart',
+                        'coredump-destroy', 'coredump-restart')
 CONFIG_OLD_DOM_STATES = ('running', 'blocked', 'paused', 'shutdown',
                          'crashed', 'dying')
 

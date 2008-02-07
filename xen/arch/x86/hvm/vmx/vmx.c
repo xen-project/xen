@@ -41,7 +41,6 @@
 #include <asm/hvm/support.h>
 #include <asm/hvm/vmx/vmx.h>
 #include <asm/hvm/vmx/vmcs.h>
-#include <asm/hvm/vmx/cpu.h>
 #include <public/sched.h>
 #include <public/hvm/ioreq.h>
 #include <asm/hvm/vpic.h>
@@ -94,11 +93,10 @@ static int vmx_vcpu_initialise(struct vcpu *v)
 
     vmx_install_vlapic_mapping(v);
 
-#ifndef VMXASSIST
+    /* %eax == 1 signals full real-mode support to the guest loader. */
     if ( v->vcpu_id == 0 )
         v->arch.guest_context.user_regs.eax = 1;
     v->arch.hvm_vcpu.io_complete = vmx_realmode_io_complete;
-#endif
 
     return 0;
 }
@@ -710,10 +708,6 @@ static void vmx_load_cpu_state(struct vcpu *v, struct hvm_hw_cpu *data)
     v->arch.hvm_vmx.shadow_gs = data->shadow_gs;
 #endif
 
-#ifdef VMXASSIST
-    v->arch.hvm_vmx.vmxassist_enabled = !(data->cr0 & X86_CR0_PE);
-#endif
-
     hvm_set_guest_time(v, data->tsc);
 
     dump_msr_state(guest_state);
@@ -1061,6 +1055,10 @@ static void vmx_update_guest_cr(struct vcpu *v, unsigned int cr)
                 vmx_fpu_enter(v);
         }
 
+        v->arch.hvm_vmx.vmxemul &= ~VMXEMUL_REALMODE;
+        if ( !(v->arch.hvm_vcpu.guest_cr[0] & X86_CR0_PE) )
+            v->arch.hvm_vmx.vmxemul |= VMXEMUL_REALMODE;
+
         v->arch.hvm_vcpu.hw_cr[0] =
             v->arch.hvm_vcpu.guest_cr[0] | hw_cr0_mask;
         __vmwrite(GUEST_CR0, v->arch.hvm_vcpu.hw_cr[0]);
@@ -1263,65 +1261,18 @@ void vmx_cpuid_intercept(
     unsigned int input = *eax;
     unsigned int count = *ecx;
 
-#ifdef VMXASSIST
-    if ( input == 0x40000003 )
-    {
-        /*
-         * NB. Unsupported interface for private use of VMXASSIST only.
-         * Note that this leaf lives at <max-hypervisor-leaf> + 1.
-         */
-        u64 value = ((u64)*edx << 32) | (u32)*ecx;
-        p2m_type_t p2mt;
-        unsigned long mfn;
-        struct vcpu *v = current;
-        char *p;
-
-        mfn = mfn_x(gfn_to_mfn_current(value >> PAGE_SHIFT, &p2mt));
-
-        gdprintk(XENLOG_INFO, "Input address is 0x%"PRIx64".\n", value);
-
-        /* 8-byte aligned valid pseudophys address from vmxassist, please. */
-        if ( (value & 7) || !p2m_is_ram(p2mt) ||
-             !v->arch.hvm_vmx.vmxassist_enabled )
-        {
-            domain_crash(v->domain);
-            return;
-        }
-        ASSERT(mfn_valid(mfn));
-
-        p = map_domain_page(mfn);
-        value = *((uint64_t *)(p + (value & (PAGE_SIZE - 1))));
-        unmap_domain_page(p);
-
-        gdprintk(XENLOG_INFO, "Output value is 0x%"PRIx64".\n", value);
-        *ecx = (u32)value;
-        *edx = (u32)(value >> 32);
-        return;
-    }
-#endif
-
     hvm_cpuid(input, eax, ebx, ecx, edx);
 
     switch ( input )
     {
     case 0x00000001:
-        *ecx &= ~VMX_VCPU_CPUID_L1_ECX_RESERVED;
-        *ebx &= NUM_THREADS_RESET_MASK;
-        *ecx &= ~(bitmaskof(X86_FEATURE_VMXE) |
-                  bitmaskof(X86_FEATURE_EST)  |
-                  bitmaskof(X86_FEATURE_TM2)  |
-                  bitmaskof(X86_FEATURE_CID)  |
-                  bitmaskof(X86_FEATURE_PDCM) |
-                  bitmaskof(X86_FEATURE_DSCPL));
-        *edx &= ~(bitmaskof(X86_FEATURE_HT)   |
-                  bitmaskof(X86_FEATURE_ACPI) |
-                  bitmaskof(X86_FEATURE_ACC)  |
-                  bitmaskof(X86_FEATURE_DS));
+        /* Mask AMD-only features. */
+        *ecx &= ~(bitmaskof(X86_FEATURE_POPCNT));
         break;
 
     case 0x00000004:
         cpuid_count(input, count, eax, ebx, ecx, edx);
-        *eax &= NUM_CORES_RESET_MASK;
+        *eax &= 0x3FFF; /* one core */
         break;
 
     case 0x00000006:
@@ -1839,256 +1790,6 @@ static void vmx_io_instruction(unsigned long exit_qualification,
     }
 }
 
-#ifdef VMXASSIST
-
-static void vmx_world_save(struct vcpu *v, struct vmx_assist_context *c)
-{
-    struct cpu_user_regs *regs = guest_cpu_user_regs();
-
-    c->eip  = regs->eip;
-    c->eip += __get_instruction_length(); /* Safe: MOV Cn, LMSW, CLTS */
-    c->esp = regs->esp;
-    c->eflags = regs->eflags & ~X86_EFLAGS_RF;
-
-    c->cr0 = v->arch.hvm_vcpu.guest_cr[0];
-    c->cr3 = v->arch.hvm_vcpu.guest_cr[3];
-    c->cr4 = v->arch.hvm_vcpu.guest_cr[4];
-
-    c->idtr_limit = __vmread(GUEST_IDTR_LIMIT);
-    c->idtr_base = __vmread(GUEST_IDTR_BASE);
-
-    c->gdtr_limit = __vmread(GUEST_GDTR_LIMIT);
-    c->gdtr_base = __vmread(GUEST_GDTR_BASE);
-
-    c->cs_sel = __vmread(GUEST_CS_SELECTOR);
-    c->cs_limit = __vmread(GUEST_CS_LIMIT);
-    c->cs_base = __vmread(GUEST_CS_BASE);
-    c->cs_arbytes.bytes = __vmread(GUEST_CS_AR_BYTES);
-
-    c->ds_sel = __vmread(GUEST_DS_SELECTOR);
-    c->ds_limit = __vmread(GUEST_DS_LIMIT);
-    c->ds_base = __vmread(GUEST_DS_BASE);
-    c->ds_arbytes.bytes = __vmread(GUEST_DS_AR_BYTES);
-
-    c->es_sel = __vmread(GUEST_ES_SELECTOR);
-    c->es_limit = __vmread(GUEST_ES_LIMIT);
-    c->es_base = __vmread(GUEST_ES_BASE);
-    c->es_arbytes.bytes = __vmread(GUEST_ES_AR_BYTES);
-
-    c->ss_sel = __vmread(GUEST_SS_SELECTOR);
-    c->ss_limit = __vmread(GUEST_SS_LIMIT);
-    c->ss_base = __vmread(GUEST_SS_BASE);
-    c->ss_arbytes.bytes = __vmread(GUEST_SS_AR_BYTES);
-
-    c->fs_sel = __vmread(GUEST_FS_SELECTOR);
-    c->fs_limit = __vmread(GUEST_FS_LIMIT);
-    c->fs_base = __vmread(GUEST_FS_BASE);
-    c->fs_arbytes.bytes = __vmread(GUEST_FS_AR_BYTES);
-
-    c->gs_sel = __vmread(GUEST_GS_SELECTOR);
-    c->gs_limit = __vmread(GUEST_GS_LIMIT);
-    c->gs_base = __vmread(GUEST_GS_BASE);
-    c->gs_arbytes.bytes = __vmread(GUEST_GS_AR_BYTES);
-
-    c->tr_sel = __vmread(GUEST_TR_SELECTOR);
-    c->tr_limit = __vmread(GUEST_TR_LIMIT);
-    c->tr_base = __vmread(GUEST_TR_BASE);
-    c->tr_arbytes.bytes = __vmread(GUEST_TR_AR_BYTES);
-
-    c->ldtr_sel = __vmread(GUEST_LDTR_SELECTOR);
-    c->ldtr_limit = __vmread(GUEST_LDTR_LIMIT);
-    c->ldtr_base = __vmread(GUEST_LDTR_BASE);
-    c->ldtr_arbytes.bytes = __vmread(GUEST_LDTR_AR_BYTES);
-}
-
-static int vmx_world_restore(struct vcpu *v, struct vmx_assist_context *c)
-{
-    struct cpu_user_regs *regs = guest_cpu_user_regs();
-    int rc;
-
-    rc = vmx_restore_cr0_cr3(v, c->cr0, c->cr3);
-    if ( rc )
-        return rc;
-
-    regs->eip = c->eip;
-    regs->esp = c->esp;
-    regs->eflags = c->eflags | 2;
-
-    v->arch.hvm_vcpu.guest_cr[4] = c->cr4;
-    vmx_update_guest_cr(v, 0);
-    vmx_update_guest_cr(v, 4);
-
-    __vmwrite(GUEST_IDTR_LIMIT, c->idtr_limit);
-    __vmwrite(GUEST_IDTR_BASE, c->idtr_base);
-
-    __vmwrite(GUEST_GDTR_LIMIT, c->gdtr_limit);
-    __vmwrite(GUEST_GDTR_BASE, c->gdtr_base);
-
-    __vmwrite(GUEST_CS_SELECTOR, c->cs_sel);
-    __vmwrite(GUEST_CS_LIMIT, c->cs_limit);
-    __vmwrite(GUEST_CS_BASE, c->cs_base);
-    __vmwrite(GUEST_CS_AR_BYTES, c->cs_arbytes.bytes);
-
-    __vmwrite(GUEST_DS_SELECTOR, c->ds_sel);
-    __vmwrite(GUEST_DS_LIMIT, c->ds_limit);
-    __vmwrite(GUEST_DS_BASE, c->ds_base);
-    __vmwrite(GUEST_DS_AR_BYTES, c->ds_arbytes.bytes);
-
-    __vmwrite(GUEST_ES_SELECTOR, c->es_sel);
-    __vmwrite(GUEST_ES_LIMIT, c->es_limit);
-    __vmwrite(GUEST_ES_BASE, c->es_base);
-    __vmwrite(GUEST_ES_AR_BYTES, c->es_arbytes.bytes);
-
-    __vmwrite(GUEST_SS_SELECTOR, c->ss_sel);
-    __vmwrite(GUEST_SS_LIMIT, c->ss_limit);
-    __vmwrite(GUEST_SS_BASE, c->ss_base);
-    __vmwrite(GUEST_SS_AR_BYTES, c->ss_arbytes.bytes);
-
-    __vmwrite(GUEST_FS_SELECTOR, c->fs_sel);
-    __vmwrite(GUEST_FS_LIMIT, c->fs_limit);
-    __vmwrite(GUEST_FS_BASE, c->fs_base);
-    __vmwrite(GUEST_FS_AR_BYTES, c->fs_arbytes.bytes);
-
-    __vmwrite(GUEST_GS_SELECTOR, c->gs_sel);
-    __vmwrite(GUEST_GS_LIMIT, c->gs_limit);
-    __vmwrite(GUEST_GS_BASE, c->gs_base);
-    __vmwrite(GUEST_GS_AR_BYTES, c->gs_arbytes.bytes);
-
-    __vmwrite(GUEST_TR_SELECTOR, c->tr_sel);
-    __vmwrite(GUEST_TR_LIMIT, c->tr_limit);
-    __vmwrite(GUEST_TR_BASE, c->tr_base);
-    __vmwrite(GUEST_TR_AR_BYTES, c->tr_arbytes.bytes);
-
-    __vmwrite(GUEST_LDTR_SELECTOR, c->ldtr_sel);
-    __vmwrite(GUEST_LDTR_LIMIT, c->ldtr_limit);
-    __vmwrite(GUEST_LDTR_BASE, c->ldtr_base);
-    __vmwrite(GUEST_LDTR_AR_BYTES, c->ldtr_arbytes.bytes);
-
-    paging_update_paging_modes(v);
-    return 0;
-}
-
-enum { VMX_ASSIST_INVOKE = 0, VMX_ASSIST_RESTORE };
-
-static int vmx_assist(struct vcpu *v, int mode)
-{
-    struct vmx_assist_context c;
-    struct hvm_hw_vpic *vpic = v->domain->arch.hvm_domain.vpic;
-    u32 magic, cp;
-
-    if ( hvm_copy_from_guest_phys(&magic, VMXASSIST_MAGIC_OFFSET,
-                                  sizeof(magic)) )
-    {
-        gdprintk(XENLOG_ERR, "No vmxassist: can't execute real mode code\n");
-        domain_crash(v->domain);
-        return 0;
-    }
-
-    if ( magic != VMXASSIST_MAGIC )
-    {
-        gdprintk(XENLOG_ERR, "vmxassist magic number not match\n");
-        domain_crash(v->domain);
-        return 0;
-    }
-
-    switch ( mode ) {
-        /*
-         * Transfer control to vmxassist.
-         * Store the current context in VMXASSIST_OLD_CONTEXT and load
-         * the new VMXASSIST_NEW_CONTEXT context. This context was created
-         * by vmxassist and will transfer control to it.
-         */
-    case VMX_ASSIST_INVOKE:
-        /* save the old context */
-        if ( hvm_copy_from_guest_phys(&cp, VMXASSIST_OLD_CONTEXT, sizeof(cp)) )
-            goto error;
-        if ( cp != 0 ) {
-            vmx_world_save(v, &c);
-            if ( hvm_copy_to_guest_phys(cp, &c, sizeof(c)) )
-                goto error;
-        }
-
-        /* restore the new context, this should activate vmxassist */
-        if ( hvm_copy_from_guest_phys(&cp, VMXASSIST_NEW_CONTEXT, sizeof(cp)) )
-            goto error;
-        if ( cp != 0 ) {
-            if ( hvm_copy_from_guest_phys(&c, cp, sizeof(c)) )
-                goto error;
-            if ( vmx_world_restore(v, &c) != 0 )
-                goto error;
-            v->arch.hvm_vmx.pm_irqbase[0] = vpic[0].irq_base;
-            v->arch.hvm_vmx.pm_irqbase[1] = vpic[1].irq_base;
-            vpic[0].irq_base = NR_EXCEPTION_HANDLER;
-            vpic[1].irq_base = NR_EXCEPTION_HANDLER + 8;
-            v->arch.hvm_vmx.vmxassist_enabled = 1;
-            return 1;
-        }
-        break;
-
-        /*
-         * Restore the VMXASSIST_OLD_CONTEXT that was saved by
-         * VMX_ASSIST_INVOKE above.
-         */
-    case VMX_ASSIST_RESTORE:
-        /* save the old context */
-        if ( hvm_copy_from_guest_phys(&cp, VMXASSIST_OLD_CONTEXT, sizeof(cp)) )
-            goto error;
-        if ( cp != 0 ) {
-            if ( hvm_copy_from_guest_phys(&c, cp, sizeof(c)) )
-                goto error;
-            if ( vmx_world_restore(v, &c) != 0 )
-                goto error;
-            if ( v->arch.hvm_vmx.irqbase_mode ) {
-                vpic[0].irq_base = c.rm_irqbase[0] & 0xf8;
-                vpic[1].irq_base = c.rm_irqbase[1] & 0xf8;
-            } else {
-                vpic[0].irq_base = v->arch.hvm_vmx.pm_irqbase[0];
-                vpic[1].irq_base = v->arch.hvm_vmx.pm_irqbase[1];
-            }
-            v->arch.hvm_vmx.vmxassist_enabled = 0;
-            return 1;
-        }
-        break;
-    }
-
- error:
-    gdprintk(XENLOG_ERR, "Failed to transfer to vmxassist\n");
-    domain_crash(v->domain);
-    return 0;
-}
-
-static int vmx_set_cr0(unsigned long value)
-{
-    struct vcpu *v = current;
-
-    if ( hvm_set_cr0(value) == 0 )
-        return 0;
-
-    /*
-     * VMX does not implement real-mode virtualization. We emulate
-     * real-mode by performing a world switch to VMXAssist whenever
-     * a partition disables the CR0.PE bit.
-     */
-    if ( !(value & X86_CR0_PE) )
-    {
-        if ( vmx_assist(v, VMX_ASSIST_INVOKE) )
-            return 0; /* do not update eip! */
-    }
-    else if ( v->arch.hvm_vmx.vmxassist_enabled )
-    {
-        if ( vmx_assist(v, VMX_ASSIST_RESTORE) )
-            return 0; /* do not update eip! */
-    }
-
-    return 1;
-}
-
-#else /* !defined(VMXASSIST) */
-
-#define vmx_set_cr0(v) hvm_set_cr0(v)
-
-#endif
-
 #define CASE_SET_REG(REG, reg)      \
     case REG_ ## REG: regs->reg = value; break
 #define CASE_GET_REG(REG, reg)      \
@@ -2142,7 +1843,7 @@ static int mov_to_cr(int gp, int cr, struct cpu_user_regs *regs)
     switch ( cr )
     {
     case 0:
-        return vmx_set_cr0(value);
+        return hvm_set_cr0(value);
 
     case 3:
         return hvm_set_cr3(value);
@@ -2239,7 +1940,7 @@ static int vmx_cr_access(unsigned long exit_qualification,
         value = (value & ~0xF) |
             (((exit_qualification & LMSW_SOURCE_DATA) >> 16) & 0xF);
         HVMTRACE_1D(LMSW, current, value);
-        return vmx_set_cr0(value);
+        return hvm_set_cr0(value);
     default:
         BUG();
     }

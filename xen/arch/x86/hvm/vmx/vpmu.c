@@ -89,8 +89,6 @@ void vpmu_initialise(struct vcpu *v)
         case 15:
         case 23:
             vpmu->arch_vpmu_ops = &core2_vpmu_ops;
-            dprintk(XENLOG_INFO,
-                   "Core 2 duo CPU detected for guest PMU usage.\n");
             break;
         }
     }

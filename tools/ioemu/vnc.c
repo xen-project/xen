@@ -2401,7 +2401,7 @@ int vnc_display_open(DisplayState *ds, const char *display, int find_unused)
 	}
 #endif
     }
-#ifndef _WIN32
+#ifndef NO_UNIX_SOCKETS
     if (strstart(display, "unix:", &p)) {
 	addr = (struct sockaddr *)&uaddr;
 	addrlen = sizeof(uaddr);

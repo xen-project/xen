@@ -24,6 +24,8 @@ from opts import *
 from main import server, serverType, SERVER_XEN_API, get_single_vm
 from xen.xend.XendAPIConstants import *
 
+RECREATING_TIMEOUT = 30
+
 gopts = Opts(use="""[options] [DOM]
 
 Shutdown one or more domains gracefully.
@@ -53,6 +55,7 @@ def wait_reboot(opts, doms, rcs):
     if serverType == SERVER_XEN_API:
         opts.err("Cannot wait for reboot w/ XenAPI (yet)")
 
+    recreating = {}
     while doms:
         alive = server.xend.domains(0)
         reboot = []
@@ -61,9 +64,17 @@ def wait_reboot(opts, doms, rcs):
                 rc = server.xend.domain.getRestartCount(d)
                 if rc == rcs[d]: continue
                 reboot.append(d)
+
+            # Probably the domain is being recreated now.
+            # We have to wait just a bit for recreating the domain.
+            elif not recreating.has_key(d):
+                recreating[d] = 0
             else:
-                opts.info("Domain %s destroyed for failed in rebooting" % d)
-                doms.remove(d)
+                recreating[d] += 1
+                if recreating[d] > RECREATING_TIMEOUT:
+                    opts.info("Domain %s destroyed for failing to reboot" % d)
+                    doms.remove(d)
+
         for d in reboot:
             opts.info("Domain %s rebooted" % d)
             doms.remove(d)

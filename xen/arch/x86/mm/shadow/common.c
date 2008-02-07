@@ -176,6 +176,8 @@ hvm_emulate_read(enum x86_segment seg,
                  unsigned int bytes,
                  struct x86_emulate_ctxt *ctxt)
 {
+    if ( !is_x86_user_segment(seg) )
+        return X86EMUL_UNHANDLEABLE;
     return hvm_read(seg, offset, val, bytes, hvm_access_read,
                     container_of(ctxt, struct sh_emulate_ctxt, ctxt));
 }
@@ -190,6 +192,8 @@ hvm_emulate_insn_fetch(enum x86_segment seg,
     struct sh_emulate_ctxt *sh_ctxt =
         container_of(ctxt, struct sh_emulate_ctxt, ctxt);
     unsigned int insn_off = offset - sh_ctxt->insn_buf_eip;
+
+    ASSERT(seg == x86_seg_cs);
 
     /* Fall back if requested bytes are not in the prefetch cache. */
     if ( unlikely((insn_off + bytes) > sh_ctxt->insn_buf_bytes) )
@@ -214,6 +218,9 @@ hvm_emulate_write(enum x86_segment seg,
     struct vcpu *v = current;
     unsigned long addr;
     int rc;
+
+    if ( !is_x86_user_segment(seg) )
+        return X86EMUL_UNHANDLEABLE;
 
     /* How many emulations could we save if we unshadowed on stack writes? */
     if ( seg == x86_seg_ss )
@@ -242,6 +249,9 @@ hvm_emulate_cmpxchg(enum x86_segment seg,
     unsigned long addr;
     int rc;
 
+    if ( !is_x86_user_segment(seg) )
+        return X86EMUL_UNHANDLEABLE;
+
     rc = hvm_translate_linear_addr(
         seg, offset, bytes, hvm_access_write, sh_ctxt, &addr);
     if ( rc )
@@ -265,6 +275,9 @@ hvm_emulate_cmpxchg8b(enum x86_segment seg,
     struct vcpu *v = current;
     unsigned long addr;
     int rc;
+
+    if ( !is_x86_user_segment(seg) )
+        return X86EMUL_UNHANDLEABLE;
 
     rc = hvm_translate_linear_addr(
         seg, offset, 8, hvm_access_write, sh_ctxt, &addr);
@@ -292,6 +305,9 @@ pv_emulate_read(enum x86_segment seg,
 {
     unsigned int rc;
 
+    if ( !is_x86_user_segment(seg) )
+        return X86EMUL_UNHANDLEABLE;
+
     *val = 0;
     if ( (rc = copy_from_user((void *)val, (void *)offset, bytes)) != 0 )
     {
@@ -312,6 +328,8 @@ pv_emulate_write(enum x86_segment seg,
     struct sh_emulate_ctxt *sh_ctxt =
         container_of(ctxt, struct sh_emulate_ctxt, ctxt);
     struct vcpu *v = current;
+    if ( !is_x86_user_segment(seg) )
+        return X86EMUL_UNHANDLEABLE;
     return v->arch.paging.mode->shadow.x86_emulate_write(
         v, offset, &val, bytes, sh_ctxt);
 }
@@ -327,6 +345,8 @@ pv_emulate_cmpxchg(enum x86_segment seg,
     struct sh_emulate_ctxt *sh_ctxt =
         container_of(ctxt, struct sh_emulate_ctxt, ctxt);
     struct vcpu *v = current;
+    if ( !is_x86_user_segment(seg) )
+        return X86EMUL_UNHANDLEABLE;
     return v->arch.paging.mode->shadow.x86_emulate_cmpxchg(
         v, offset, old, new, bytes, sh_ctxt);
 }
@@ -343,6 +363,8 @@ pv_emulate_cmpxchg8b(enum x86_segment seg,
     struct sh_emulate_ctxt *sh_ctxt =
         container_of(ctxt, struct sh_emulate_ctxt, ctxt);
     struct vcpu *v = current;
+    if ( !is_x86_user_segment(seg) )
+        return X86EMUL_UNHANDLEABLE;
     return v->arch.paging.mode->shadow.x86_emulate_cmpxchg8b(
         v, offset, old_lo, old_hi, new_lo, new_hi, sh_ctxt);
 }

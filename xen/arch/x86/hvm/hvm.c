@@ -1400,6 +1400,7 @@ void hvm_print_line(struct vcpu *v, const char c)
     spin_unlock(&hd->pbuf_lock);
 }
 
+#define bitmaskof(idx)  (1U << ((idx) & 31))
 void hvm_cpuid(unsigned int input, unsigned int *eax, unsigned int *ebx,
                                    unsigned int *ecx, unsigned int *edx)
 {
@@ -1413,16 +1414,44 @@ void hvm_cpuid(unsigned int input, unsigned int *eax, unsigned int *ebx,
     switch ( input )
     {
     case 0x00000001:
-        __clear_bit(X86_FEATURE_MWAIT & 31, ecx);
+        /* Clear #threads count and poke initial VLAPIC ID. */
+        *ebx &= 0x0000FFFFu;
+        *ebx |= (current->vcpu_id * 2) << 24;
 
+        *ecx &= (bitmaskof(X86_FEATURE_XMM3) |
+                 bitmaskof(X86_FEATURE_SSSE3) |
+                 bitmaskof(X86_FEATURE_CX16) |
+                 bitmaskof(X86_FEATURE_SSE4_1) |
+                 bitmaskof(X86_FEATURE_SSE4_2) |
+                 bitmaskof(X86_FEATURE_POPCNT));
+
+        *edx &= (bitmaskof(X86_FEATURE_FPU) |
+                 bitmaskof(X86_FEATURE_VME) |
+                 bitmaskof(X86_FEATURE_DE) |
+                 bitmaskof(X86_FEATURE_PSE) |
+                 bitmaskof(X86_FEATURE_TSC) |
+                 bitmaskof(X86_FEATURE_MSR) |
+                 bitmaskof(X86_FEATURE_PAE) |
+                 bitmaskof(X86_FEATURE_MCE) |
+                 bitmaskof(X86_FEATURE_CX8) |
+                 bitmaskof(X86_FEATURE_APIC) |
+                 bitmaskof(X86_FEATURE_SEP) |
+                 bitmaskof(X86_FEATURE_MTRR) |
+                 bitmaskof(X86_FEATURE_PGE) |
+                 bitmaskof(X86_FEATURE_MCA) |
+                 bitmaskof(X86_FEATURE_CMOV) |
+                 bitmaskof(X86_FEATURE_PAT) |
+                 bitmaskof(X86_FEATURE_CLFLSH) |
+                 bitmaskof(X86_FEATURE_MMX) |
+                 bitmaskof(X86_FEATURE_FXSR) |
+                 bitmaskof(X86_FEATURE_XMM) |
+                 bitmaskof(X86_FEATURE_XMM2));
         if ( vlapic_hw_disabled(vcpu_vlapic(v)) )
             __clear_bit(X86_FEATURE_APIC & 31, edx);
-
 #if CONFIG_PAGING_LEVELS >= 3
         if ( !v->domain->arch.hvm_domain.params[HVM_PARAM_PAE_ENABLED] )
 #endif
             __clear_bit(X86_FEATURE_PAE & 31, edx);
-        __clear_bit(X86_FEATURE_PSE36 & 31, edx);
         break;
 
     case 0x80000001:
@@ -1671,16 +1700,6 @@ int hvm_bringup_ap(int vcpuid, int trampoline_vector)
     ctxt->flags = VGCF_online;
     ctxt->user_regs.eflags = 2;
 
-#ifdef VMXASSIST
-    if ( boot_cpu_data.x86_vendor == X86_VENDOR_INTEL )
-    {
-        ctxt->user_regs.eip = VMXASSIST_BASE;
-        ctxt->user_regs.edx = vcpuid;
-        ctxt->user_regs.ebx = trampoline_vector;
-        goto done;
-    }
-#endif
-
     v->arch.hvm_vcpu.guest_cr[0] = X86_CR0_ET;
     hvm_update_guest_cr(v, 0);
 
@@ -1721,9 +1740,6 @@ int hvm_bringup_ap(int vcpuid, int trampoline_vector)
     hvm_set_segment_register(v, x86_seg_gdtr, &reg);
     hvm_set_segment_register(v, x86_seg_idtr, &reg);
 
-#ifdef VMXASSIST
- done:
-#endif
     /* Sync AP's TSC with BSP's. */
     v->arch.hvm_vcpu.cache_tsc_offset =
         v->domain->vcpu[0]->arch.hvm_vcpu.cache_tsc_offset;

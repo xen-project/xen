@@ -298,6 +298,22 @@ it holds, so that the new one may take them.
 
 =back
 
+=over 4
+
+Additionally, the "on_crash" event can also take:
+
+=item B<coredump-destroy>
+
+Dump the crashed domain's core and then destroy it.
+
+=back
+
+=item B<coredump-restart>
+
+Dump the crashed domain's core and then restart it.
+
+=back
+
 =head1 EXAMPLES
 
 The following are quick examples of ways that domains might be
