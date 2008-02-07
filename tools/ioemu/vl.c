@@ -3127,7 +3127,7 @@ int parse_host_port(struct sockaddr_in *saddr, const char *str)
     return 0;
 }
 
-#ifndef _WIN32
+#ifndef NO_UNIX_SOCKETS
 static int parse_unix_path(struct sockaddr_un *uaddr, const char *str)
 {
     const char *p;
