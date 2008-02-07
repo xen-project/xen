@@ -1688,7 +1688,7 @@ vcpu_get_domain_bundle(VCPU * vcpu, REGS * regs, u64 gip,
 IA64FAULT vcpu_translate(VCPU * vcpu, u64 address, BOOLEAN is_data,
 			 u64 * pteval, u64 * itir, u64 * iha)
 {
-	unsigned long region = address >> 61;
+	unsigned long region = REGION_NUMBER(address);
 	unsigned long pta, rid, rr, key = 0;
 	union pte_flags pte;
 	TR_ENTRY *trp;
@@ -1775,7 +1775,8 @@ IA64FAULT vcpu_translate(VCPU * vcpu, u64 address, BOOLEAN is_data,
 
 		/* Optimization for identity mapped region 7 OS (linux) */
 		if (optf->mask & XEN_IA64_OPTF_IDENT_MAP_REG7_FLG &&
-		    region == 7 && ia64_psr(regs)->cpl == CONFIG_CPL0_EMUL) {
+		    region == 7 && ia64_psr(regs)->cpl == CONFIG_CPL0_EMUL &&
+		    REGION_OFFSET(address) < _PAGE_PPN_MASK) {
 			pte.val = address & _PAGE_PPN_MASK;
 			pte.val = pte.val | optf->im_reg7.pgprot;
 			key = optf->im_reg7.key;
