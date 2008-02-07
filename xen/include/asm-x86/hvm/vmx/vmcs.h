@@ -21,7 +21,6 @@
 
 #include <asm/config.h>
 #include <asm/hvm/io.h>
-#include <asm/hvm/vmx/cpu.h>
 #include <asm/hvm/vmx/vpmu.h>
 
 extern void start_vmx(void);

@@ -18,7 +18,6 @@
 #include <asm/hvm/support.h>
 #include <asm/hvm/vmx/vmx.h>
 #include <asm/hvm/vmx/vmcs.h>
-#include <asm/hvm/vmx/cpu.h>
 #include <asm/x86_emulate.h>
 
 struct realmode_emulate_ctxt {

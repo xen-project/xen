@@ -986,11 +986,6 @@ static void svm_do_no_device_fault(struct vmcb_struct *vmcb)
         vmcb->cr0 &= ~X86_CR0_TS;
 }
 
-/* Reserved bits ECX: [31:14], [12:4], [2:1]*/
-#define SVM_VCPU_CPUID_L1_ECX_RESERVED 0xffffdff6
-/* Reserved bits EDX: [31:29], [27], [22:20], [18], [10] */
-#define SVM_VCPU_CPUID_L1_EDX_RESERVED 0xe8740400
-
 #define bitmaskof(idx)  (1U << ((idx) & 31))
 static void svm_vmexit_do_cpuid(struct vmcb_struct *vmcb,
                                 struct cpu_user_regs *regs)
@@ -1005,16 +1000,10 @@ static void svm_vmexit_do_cpuid(struct vmcb_struct *vmcb,
     switch ( input )
     {
     case 0x00000001:
-        /* Clear out reserved bits. */
-        ecx &= ~SVM_VCPU_CPUID_L1_ECX_RESERVED;
-        edx &= ~SVM_VCPU_CPUID_L1_EDX_RESERVED;
-
-        /* Guest should only see one logical processor.
-         * See details on page 23 of AMD CPUID Specification.
-         */
-        __clear_bit(X86_FEATURE_HT & 31, &edx);
-        ebx &= 0xFF00FFFF;  /* clear the logical processor count when HTT=0 */
-        ebx |= 0x00010000;  /* set to 1 just for precaution */
+        /* Mask Intel-only features. */
+        ecx &= ~(bitmaskof(X86_FEATURE_SSSE3) |
+                 bitmaskof(X86_FEATURE_SSE4_1) |
+                 bitmaskof(X86_FEATURE_SSE4_2));
         break;
 
     case 0x80000001:

@@ -41,7 +41,6 @@
 #include <asm/hvm/support.h>
 #include <asm/hvm/vmx/vmx.h>
 #include <asm/hvm/vmx/vmcs.h>
-#include <asm/hvm/vmx/cpu.h>
 #include <public/sched.h>
 #include <public/hvm/ioreq.h>
 #include <asm/hvm/vpic.h>
@@ -1267,23 +1266,13 @@ void vmx_cpuid_intercept(
     switch ( input )
     {
     case 0x00000001:
-        *ecx &= ~VMX_VCPU_CPUID_L1_ECX_RESERVED;
-        *ebx &= NUM_THREADS_RESET_MASK;
-        *ecx &= ~(bitmaskof(X86_FEATURE_VMXE) |
-                  bitmaskof(X86_FEATURE_EST)  |
-                  bitmaskof(X86_FEATURE_TM2)  |
-                  bitmaskof(X86_FEATURE_CID)  |
-                  bitmaskof(X86_FEATURE_PDCM) |
-                  bitmaskof(X86_FEATURE_DSCPL));
-        *edx &= ~(bitmaskof(X86_FEATURE_HT)   |
-                  bitmaskof(X86_FEATURE_ACPI) |
-                  bitmaskof(X86_FEATURE_ACC)  |
-                  bitmaskof(X86_FEATURE_DS));
+        /* Mask AMD-only features. */
+        *ecx &= ~(bitmaskof(X86_FEATURE_POPCNT));
         break;
 
     case 0x00000004:
         cpuid_count(input, count, eax, ebx, ecx, edx);
-        *eax &= NUM_CORES_RESET_MASK;
+        *eax &= 0x3FFF; /* one core */
         break;
 
     case 0x00000006:
