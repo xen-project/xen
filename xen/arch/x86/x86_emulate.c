@@ -1755,6 +1755,7 @@ x86_emulate(
                            (uint16_t)(int8_t)dst.val);
                 if ( (int8_t)dst.val != (uint16_t)dst.val )
                     _regs.eflags |= EFLG_OF|EFLG_CF;
+                dst.bytes = 2;
                 break;
             case 2:
                 dst.val = ((uint32_t)(int16_t)src.val *
