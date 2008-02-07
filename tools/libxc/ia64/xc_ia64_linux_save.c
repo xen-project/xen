@@ -652,6 +652,9 @@ xc_domain_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
                         skip_this_iter++;
                     if (test_bit(N, to_skip) || !test_bit(N, to_send))
                         continue;
+                } else if (live) {
+                    if (!test_bit(N, to_send))
+                        continue;
                 }
 
                 if (debug)
