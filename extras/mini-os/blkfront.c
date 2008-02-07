@@ -35,6 +35,8 @@ struct blk_buffer {
 };
 
 struct blkfront_dev {
+    domid_t dom;
+
     struct blkif_front_ring ring;
     grant_ref_t ring_ref;
     evtchn_port_t evtchn, local_port;
@@ -81,6 +83,15 @@ struct blkfront_dev *init_blkfront(char *nodename, uint64_t *sectors, unsigned *
     dev = malloc(sizeof(*dev));
     dev->nodename = strdup(nodename);
 
+    evtchn_alloc_unbound_t op;
+    op.dom = DOMID_SELF;
+    snprintf(path, sizeof(path), "%s/backend-id", nodename);
+    dev->dom = op.remote_dom = xenbus_read_integer(path); 
+    HYPERVISOR_event_channel_op(EVTCHNOP_alloc_unbound, &op);
+    clear_evtchn(op.port);        /* Without, handler gets invoked now! */
+    dev->local_port = bind_evtchn(op.port, blkfront_handler, dev);
+    dev->evtchn=op.port;
+
     s = (struct blkif_sring*) alloc_page();
     memset(s,0,PAGE_SIZE);
 
@@ -88,16 +99,7 @@ struct blkfront_dev *init_blkfront(char *nodename, uint64_t *sectors, unsigned *
     SHARED_RING_INIT(s);
     FRONT_RING_INIT(&dev->ring, s, PAGE_SIZE);
 
-    dev->ring_ref = gnttab_grant_access(0,virt_to_mfn(s),0);
-
-    evtchn_alloc_unbound_t op;
-    op.dom = DOMID_SELF;
-    snprintf(path, sizeof(path), "%s/backend-id", nodename);
-    op.remote_dom = xenbus_read_integer(path); 
-    HYPERVISOR_event_channel_op(EVTCHNOP_alloc_unbound, &op);
-    clear_evtchn(op.port);        /* Without, handler gets invoked now! */
-    dev->local_port = bind_evtchn(op.port, blkfront_handler, dev);
-    dev->evtchn=op.port;
+    dev->ring_ref = gnttab_grant_access(dev->dom,virt_to_mfn(s),0);
 
     // FIXME: proper frees on failures
 again:
@@ -280,7 +282,7 @@ void blkfront_aio(struct blkfront_aiocb *aiocbp, int write)
             barrier();
         }
 	aiocbp->gref[j] = req->seg[j].gref =
-            gnttab_grant_access(0, virtual_to_mfn(data), write);
+            gnttab_grant_access(dev->dom, virtual_to_mfn(data), write);
 	req->seg[j].first_sect = 0;
 	req->seg[j].last_sect = PAGE_SIZE / dev->sector_size - 1;
     }
