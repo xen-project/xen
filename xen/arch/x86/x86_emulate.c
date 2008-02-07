@@ -1710,11 +1710,14 @@ x86_emulate(
             switch ( src.bytes )
             {
             case 1:
+                dst.val = (uint8_t)dst.val;
                 dst.val *= src.val;
                 if ( (uint8_t)dst.val != (uint16_t)dst.val )
                     _regs.eflags |= EFLG_OF|EFLG_CF;
+                dst.bytes = 2;
                 break;
             case 2:
+                dst.val = (uint16_t)dst.val;
                 dst.val *= src.val;
                 if ( (uint16_t)dst.val != (uint32_t)dst.val )
                     _regs.eflags |= EFLG_OF|EFLG_CF;
@@ -1722,6 +1725,7 @@ x86_emulate(
                 break;
 #ifdef __x86_64__
             case 4:
+                dst.val = (uint32_t)dst.val;
                 dst.val *= src.val;
                 if ( (uint32_t)dst.val != dst.val )
                     _regs.eflags |= EFLG_OF|EFLG_CF;
