@@ -13,6 +13,7 @@
 #include <xen/init.h>
 #include <xen/lib.h>
 #include <xen/sched.h>
+#include <xen/paging.h>
 #include <asm/event.h>
 #include <asm/hvm/hvm.h>
 #include <asm/hvm/support.h>
@@ -313,6 +314,57 @@ realmode_rep_outs(
     return X86EMUL_OKAY;
 }
 
+static int 
+realmode_rep_movs(
+   enum x86_segment src_seg,
+   unsigned long src_offset,
+   enum x86_segment dst_seg,
+   unsigned long dst_offset,
+   unsigned int bytes_per_rep,
+   unsigned long *reps,
+   struct x86_emulate_ctxt *ctxt)
+{
+    struct realmode_emulate_ctxt *rm_ctxt =
+        container_of(ctxt, struct realmode_emulate_ctxt, ctxt);
+    struct vcpu *curr = current;
+    uint32_t saddr = virtual_to_linear(src_seg, src_offset, rm_ctxt);
+    uint32_t daddr = virtual_to_linear(dst_seg, dst_offset, rm_ctxt);
+    p2m_type_t p2mt;
+
+    if ( (curr->arch.hvm_vcpu.guest_cr[0] & X86_CR0_PE) ||
+         curr->arch.hvm_vmx.real_mode_io_in_progress )
+        return X86EMUL_UNHANDLEABLE;
+
+    mfn_x(gfn_to_mfn_current(saddr >> PAGE_SHIFT, &p2mt));
+    if ( !p2m_is_ram(p2mt) )
+    {
+        if ( !curr->arch.hvm_vmx.real_mode_io_completed )
+        {
+            curr->arch.hvm_vmx.real_mode_io_in_progress = 1;
+            send_mmio_req(IOREQ_TYPE_COPY, saddr, *reps, bytes_per_rep,
+                      daddr, IOREQ_READ,
+                      !!(ctxt->regs->eflags & X86_EFLAGS_DF), 1);
+        }
+
+        if ( !curr->arch.hvm_vmx.real_mode_io_completed )
+            return X86EMUL_RETRY;
+
+        curr->arch.hvm_vmx.real_mode_io_completed = 0;
+    }
+    else
+    {
+        mfn_x(gfn_to_mfn_current(daddr >> PAGE_SHIFT, &p2mt));
+        if ( p2m_is_ram(p2mt) )
+            return X86EMUL_UNHANDLEABLE;
+        curr->arch.hvm_vmx.real_mode_io_in_progress = 1;
+        send_mmio_req(IOREQ_TYPE_COPY, daddr, *reps, bytes_per_rep,
+                      saddr, IOREQ_WRITE,
+                      !!(ctxt->regs->eflags & X86_EFLAGS_DF), 1);
+    }
+
+    return X86EMUL_OKAY;
+}
+
 static int
 realmode_read_segment(
     enum x86_segment seg,
@@ -600,6 +652,7 @@ static struct x86_emulate_ops realmode_emulator_ops = {
     .cmpxchg       = realmode_emulate_cmpxchg,
     .rep_ins       = realmode_rep_ins,
     .rep_outs      = realmode_rep_outs,
+    .rep_movs      = realmode_rep_movs,
     .read_segment  = realmode_read_segment,
     .write_segment = realmode_write_segment,
     .read_io       = realmode_read_io,
