@@ -52,7 +52,9 @@ restart_modes = [
     "restart",
     "destroy",
     "preserve",
-    "rename-restart"
+    "rename-restart",
+    "coredump-destroy",
+    "coredump-restart"
     ]
 
 DOM_STATES = [

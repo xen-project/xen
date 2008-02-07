@@ -264,15 +264,17 @@ gopts.var('on_reboot', val='destroy|restart|preserve|rename-restart',
                             renamed and a new domain started in its place.
           """)
 
-gopts.var('on_crash', val='destroy|restart|preserve|rename-restart',
+gopts.var('on_crash', val='destroy|restart|preserve|rename-restart|coredump-destroy|ciredump-restart',
           fn=set_value, default=None,
-          use="""Behaviour  when a domain exits with reason 'crash'.
-          - destroy:        the domain is cleaned up as normal;
-          - restart:        a new domain is started in place of the old one;
-          - preserve:       no clean-up is done until the domain is manually
-                            destroyed (using xm destroy, for example);
-          - rename-restart: the old domain is not cleaned up, but is
-                            renamed and a new domain started in its place.
+          use="""Behaviour when a domain exits with reason 'crash'.
+          - destroy:          the domain is cleaned up as normal;
+          - restart:          a new domain is started in place of the old one;
+          - preserve:         no clean-up is done until the domain is manually
+                              destroyed (using xm destroy, for example);
+          - rename-restart:   the old domain is not cleaned up, but is
+                              renamed and a new domain started in its place.
+          - coredump-destroy: dump the domain's core, followed by destroy
+          - coredump-restart: dump the domain's core, followed by restart
           """)
 
 gopts.var('blkif', val='no|yes',
