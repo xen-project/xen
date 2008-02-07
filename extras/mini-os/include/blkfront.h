@@ -11,6 +11,7 @@ struct blkfront_aiocb
     void *data;
 
     grant_ref_t gref[BLKIF_MAX_SEGMENTS_PER_REQUEST];
+    int n;
 
     void (*aio_cb)(struct blkfront_aiocb *aiocb, int ret);
 };

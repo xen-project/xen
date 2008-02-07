@@ -258,7 +258,7 @@ void blkfront_aio(struct blkfront_aiocb *aiocbp, int write)
 
     start = (uintptr_t)aiocbp->aio_buf & PAGE_MASK;
     end = ((uintptr_t)aiocbp->aio_buf + aiocbp->aio_nbytes + PAGE_SIZE - 1) & PAGE_MASK;
-    n = (end - start) / PAGE_SIZE;
+    aiocbp->n = n = (end - start) / PAGE_SIZE;
 
     /* qemu's IDE max multsect is 16 (8KB) and SCSI max DMA was set to 32KB,
      * so max 44KB can't happen */
@@ -327,8 +327,8 @@ moretodo:
         case BLKIF_OP_WRITE:
         {
             struct blkfront_aiocb *aiocbp = (void*) (uintptr_t) rsp->id;
-            int n = (aiocbp->aio_nbytes + PAGE_SIZE - 1) / PAGE_SIZE, j;
-            for (j = 0; j < n; j++)
+            int j;
+            for (j = 0; j < aiocbp->n; j++)
                 gnttab_end_access(aiocbp->gref[j]);
 
             /* Nota: callback frees aiocbp itself */
