@@ -81,6 +81,10 @@ int hvm_do_IRQ_dpci(struct domain *d, unsigned int irq);
 int dpci_ioport_intercept(ioreq_t *p);
 int pt_irq_create_bind_vtd(struct domain *d,
                            xen_domctl_bind_pt_irq_t *pt_irq_bind);
+unsigned int io_apic_read_remap_rte(
+    unsigned int apic, unsigned int reg);
+void io_apic_write_remap_rte(unsigned int apic,
+    unsigned int reg, unsigned int value);
 
 #define PT_IRQ_TIME_OUT MILLISECS(8)
 #define VTDPREFIX "[VT-D]"

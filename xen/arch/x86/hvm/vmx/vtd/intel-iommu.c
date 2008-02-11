@@ -1816,9 +1816,13 @@ static int init_vtd_hw(void)
         flush->context = flush_context_reg;
         flush->iotlb = flush_iotlb_reg;
 
-        if ( qinval_setup(iommu) != 0);
+        if ( qinval_setup(iommu) != 0 )
             dprintk(XENLOG_ERR VTDPREFIX,
                     "Queued Invalidation hardware not found\n");
+
+        if ( intremap_setup(iommu) != 0 )
+            dprintk(XENLOG_ERR VTDPREFIX,
+                    "Interrupt Remapping hardware not found\n");
     }
     return 0;
 }
