@@ -227,17 +227,29 @@ void default_ioport_writeb(void *opaque, uint32_t address, uint32_t data)
 uint32_t default_ioport_readw(void *opaque, uint32_t address)
 {
     uint32_t data;
-    data = ioport_read_table[0][address](ioport_opaque[address], address);
+    IOPortReadFunc *func = ioport_read_table[0][address];
+    if (!func)
+	    func = default_ioport_readb;
+    data = func(ioport_opaque[address], address);
     address = (address + 1) & (MAX_IOPORTS - 1);
-    data |= ioport_read_table[0][address](ioport_opaque[address], address) << 8;
+    func = ioport_read_table[0][address];
+    if (!func)
+	    func = default_ioport_readb;
+    data |= func(ioport_opaque[address], address) << 8;
     return data;
 }
 
 void default_ioport_writew(void *opaque, uint32_t address, uint32_t data)
 {
-    ioport_write_table[0][address](ioport_opaque[address], address, data & 0xff);
+    IOPortWriteFunc *func = ioport_write_table[0][address];
+    if (!func)
+	    func = default_ioport_writeb;
+    func(ioport_opaque[address], address, data & 0xff);
     address = (address + 1) & (MAX_IOPORTS - 1);
-    ioport_write_table[0][address](ioport_opaque[address], address, (data >> 8) & 0xff);
+    func = ioport_write_table[0][address];
+    if (!func)
+	    func = default_ioport_writeb;
+    func(ioport_opaque[address], address, (data >> 8) & 0xff);
 }
 
 uint32_t default_ioport_readl(void *opaque, uint32_t address)
@@ -257,16 +269,6 @@ void default_ioport_writel(void *opaque, uint32_t address, uint32_t data)
 
 void init_ioports(void)
 {
-    int i;
-
-    for(i = 0; i < MAX_IOPORTS; i++) {
-        ioport_read_table[0][i] = default_ioport_readb;
-        ioport_write_table[0][i] = default_ioport_writeb;
-        ioport_read_table[1][i] = default_ioport_readw;
-        ioport_write_table[1][i] = default_ioport_writew;
-        ioport_read_table[2][i] = default_ioport_readl;
-        ioport_write_table[2][i] = default_ioport_writel;
-    }
 }
 
 /* size is the word size in byte */
@@ -338,11 +340,14 @@ void isa_unassign_ioport(int start, int length)
 
 void cpu_outb(CPUState *env, int addr, int val)
 {
+    IOPortWriteFunc *func = ioport_write_table[0][addr];
+    if (!func)
+	    func = default_ioport_writeb;
 #ifdef DEBUG_IOPORT
     if (loglevel & CPU_LOG_IOPORT)
         fprintf(logfile, "outb: %04x %02x\n", addr, val);
 #endif    
-    ioport_write_table[0][addr](ioport_opaque[addr], addr, val);
+    func(ioport_opaque[addr], addr, val);
 #ifdef USE_KQEMU
     if (env)
         env->last_io_time = cpu_get_time_fast();
@@ -351,11 +356,14 @@ void cpu_outb(CPUState *env, int addr, int val)
 
 void cpu_outw(CPUState *env, int addr, int val)
 {
+    IOPortWriteFunc *func = ioport_write_table[1][addr];
+    if (!func)
+	    func = default_ioport_writew;
 #ifdef DEBUG_IOPORT
     if (loglevel & CPU_LOG_IOPORT)
         fprintf(logfile, "outw: %04x %04x\n", addr, val);
 #endif    
-    ioport_write_table[1][addr](ioport_opaque[addr], addr, val);
+    func(ioport_opaque[addr], addr, val);
 #ifdef USE_KQEMU
     if (env)
         env->last_io_time = cpu_get_time_fast();
@@ -364,11 +372,14 @@ void cpu_outw(CPUState *env, int addr, int val)
 
 void cpu_outl(CPUState *env, int addr, int val)
 {
+    IOPortWriteFunc *func = ioport_write_table[2][addr];
+    if (!func)
+	    func = default_ioport_writel;
 #ifdef DEBUG_IOPORT
     if (loglevel & CPU_LOG_IOPORT)
         fprintf(logfile, "outl: %04x %08x\n", addr, val);
 #endif
-    ioport_write_table[2][addr](ioport_opaque[addr], addr, val);
+    func(ioport_opaque[addr], addr, val);
 #ifdef USE_KQEMU
     if (env)
         env->last_io_time = cpu_get_time_fast();
@@ -378,7 +389,10 @@ void cpu_outl(CPUState *env, int addr, int val)
 int cpu_inb(CPUState *env, int addr)
 {
     int val;
-    val = ioport_read_table[0][addr](ioport_opaque[addr], addr);
+    IOPortReadFunc *func = ioport_read_table[0][addr];
+    if (!func)
+	    func = default_ioport_readb;
+    val = func(ioport_opaque[addr], addr);
 #ifdef DEBUG_IOPORT
     if (loglevel & CPU_LOG_IOPORT)
         fprintf(logfile, "inb : %04x %02x\n", addr, val);
@@ -393,7 +407,10 @@ int cpu_inb(CPUState *env, int addr)
 int cpu_inw(CPUState *env, int addr)
 {
     int val;
-    val = ioport_read_table[1][addr](ioport_opaque[addr], addr);
+    IOPortReadFunc *func = ioport_read_table[1][addr];
+    if (!func)
+	    func = default_ioport_readw;
+    val = func(ioport_opaque[addr], addr);
 #ifdef DEBUG_IOPORT
     if (loglevel & CPU_LOG_IOPORT)
         fprintf(logfile, "inw : %04x %04x\n", addr, val);
@@ -408,7 +425,10 @@ int cpu_inw(CPUState *env, int addr)
 int cpu_inl(CPUState *env, int addr)
 {
     int val;
-    val = ioport_read_table[2][addr](ioport_opaque[addr], addr);
+    IOPortReadFunc *func = ioport_read_table[2][addr];
+    if (!func)
+	    func = default_ioport_readl;
+    val = func(ioport_opaque[addr], addr);
 #ifdef DEBUG_IOPORT
     if (loglevel & CPU_LOG_IOPORT)
         fprintf(logfile, "inl : %04x %08x\n", addr, val);
