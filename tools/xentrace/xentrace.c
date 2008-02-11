@@ -362,9 +362,18 @@ int monitor_tbufs(int outfd)
             if ( cons == prod )
                 continue;
            
-            assert(prod > cons);
+            assert(cons < 2*data_size);
+            assert(prod < 2*data_size);
 
-            window_size = prod - cons;
+            // NB: if (prod<cons), then (prod-cons)%data_size will not yield
+            // the correct answer because data_size is not a power of 2.
+            if ( prod < cons )
+                window_size = (prod + 2*data_size) - cons;
+            else
+                window_size = prod - cons;
+            assert(window_size > 0);
+            assert(window_size <= data_size);
+
             start_offset = cons % data_size;
             end_offset = prod % data_size;
 
