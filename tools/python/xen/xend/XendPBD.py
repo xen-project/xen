@@ -20,6 +20,7 @@ import uuid
 from XendLogging import log
 from xen.xend.XendBase import XendBase
 from xen.xend import XendAPIStore
+from xen.xend import uuid as genuuid
 
 class XendPBD(XendBase):
     """Physical block devices."""
@@ -39,8 +40,7 @@ class XendPBD(XendBase):
         return XendBase.getAttrRW() + attrRW
 
     def getAttrInst(self):
-        return ['uuid',
-                'host',
+        return ['host',
                 'SR',
                 'device_config']
 
@@ -61,31 +61,31 @@ class XendPBD(XendBase):
     getFuncs    = classmethod(getFuncs)
 
     def recreate(uuid, record):
-        pbd = XendPBD(uuid, record)
+        pbd = XendPBD(record, uuid)
         return uuid
     
     def create(cls, record):
         uuid = genuuid.createString()
-        pbd = XendPBD(uuid, record)
-        return uuid       
+        pbd = XendPBD(record, uuid)
+        return uuid
 
     create = classmethod(create)
     
-    def __init__(self, uuid, record):
+    def __init__(self, record,  uuid):
         XendBase.__init__(self, uuid, record)
-        this.currently_attached = True
+        self.currently_attached = True
 
     def get_host(self):
-        return this.host
+        return self.host
     
     def get_SR(self):
-        return this.SR
+        return self.SR
 
     def get_device_config(self):
-        return this.device_config
+        return self.device_config
 
     def get_currently_attached(self):
-        return this.currently_attached
+        return self.currently_attached
 
     def destroy(self):
         pass
