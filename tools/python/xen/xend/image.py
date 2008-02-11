@@ -455,7 +455,7 @@ class HVMImageHandler(ImageHandler):
         ret = ImageHandler.parseDeviceModelArgs(self, vmConfig)
         ret = ret + ['-vcpus', str(self.vm.getVCpuCount())]
 
-        if self.kernel and self.kernel != "/usr/lib/xen/boot/hvmloader":
+        if self.kernel:
             log.debug("kernel         = %s", self.kernel)
             ret = ret + ['-kernel', self.kernel]
         if self.ramdisk:

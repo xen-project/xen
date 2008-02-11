@@ -406,15 +406,13 @@ class XendConfig(dict):
 
         if self.is_hvm():
             if 'loader' not in self['platform']:
-                log.debug("No loader present")
-                # Old configs may have hvmloder set as PV_kernel param,
-                # so lets migrate them....
-                if self['PV_kernel'] == "/usr/lib/xen/boot/hvmloader":
+                # Old configs may have hvmloader set as PV_kernel param
+                if self.has_key('PV_kernel') and re.search('hvmloader', self['PV_kernel']):
                     self['platform']['loader'] = self['PV_kernel']
-                    log.debug("Loader copied from kernel %s" % str(self['platform']['loader']))
+                    self['PV_kernel'] = ''
                 else:
                     self['platform']['loader'] = "/usr/lib/xen/boot/hvmloader"
-                    log.debug("Loader %s" % str(self['platform']['loader']))
+                log.debug("Loader is %s" % str(self['platform']['loader']))
 
             # Compatibility hack, can go away soon.
             if 'soundhw' not in self['platform'] and \
