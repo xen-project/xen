@@ -39,7 +39,7 @@ void __trace_var(u32 event, int cycles, int extra, unsigned char *extra_data);
 static inline void trace_var(u32 event, int cycles, int extra,
                                unsigned char *extra_data)
 {
-    if( unlikely(tb_init_done) )
+    if ( unlikely(tb_init_done) )
         __trace_var(event, cycles, extra, extra_data);
 }
 
@@ -49,49 +49,64 @@ static inline void trace_var(u32 event, int cycles, int extra,
         trace_var(_e, 1, 0, NULL);              \
     } while ( 0 )
   
-#define TRACE_1D(_e,_d)                                         \
+#define TRACE_1D(_e,d1)                                         \
     do {                                                        \
-        u32 _d1;                                                \
-        _d1 = _d;                                               \
-        trace_var(_e, 1, sizeof(_d1), (unsigned char *)&_d1);	\
+        if ( unlikely(tb_init_done) )                           \
+        {                                                       \
+            u32 _d[1];                                          \
+            _d[0] = d1;                                         \
+            __trace_var(_e, 1, sizeof(*_d), (unsigned char *)_d); \
+        }                                                       \
     } while ( 0 )
  
 #define TRACE_2D(_e,d1,d2)                                      \
-    do {							\
-        u32 _d[2];						\
-        _d[0]=d1;						\
-        _d[1]=d2;						\
-        trace_var(_e, 1, sizeof(*_d)*2, (unsigned char *)_d);	\
+    do {                                                        \
+        if ( unlikely(tb_init_done) )                           \
+        {                                                       \
+            u32 _d[2];                                          \
+            _d[0] = d1;                                         \
+            _d[1] = d2;                                         \
+            __trace_var(_e, 1, sizeof(*_d)*2, (unsigned char *)_d); \
+        }                                                       \
     } while ( 0 )
  
 #define TRACE_3D(_e,d1,d2,d3)                                   \
     do {                                                        \
-        u32 _d[3];                                              \
-        _d[0]=d1;                                               \
-        _d[1]=d2;                                               \
-        _d[2]=d3;                                               \
-        trace_var(_e, 1, sizeof(*_d)*3, (unsigned char *)_d);	\
+        if ( unlikely(tb_init_done) )                           \
+        {                                                       \
+            u32 _d[3];                                          \
+            _d[0] = d1;                                         \
+            _d[1] = d2;                                         \
+            _d[2] = d3;                                         \
+            __trace_var(_e, 1, sizeof(*_d)*3, (unsigned char *)_d); \
+        }                                                       \
     } while ( 0 )
  
 #define TRACE_4D(_e,d1,d2,d3,d4)                                \
     do {                                                        \
-        u32 _d[4];                                              \
-        _d[0]=d1;                                               \
-        _d[1]=d2;                                               \
-        _d[2]=d3;                                               \
-        _d[3]=d4;                                               \
-        trace_var(_e, 1, sizeof(*_d)*4, (unsigned char *)_d);	\
+        if ( unlikely(tb_init_done) )                           \
+        {                                                       \
+            u32 _d[4];                                          \
+            _d[0] = d1;                                         \
+            _d[1] = d2;                                         \
+            _d[2] = d3;                                         \
+            _d[3] = d4;                                         \
+            __trace_var(_e, 1, sizeof(*_d)*4, (unsigned char *)_d); \
+        }                                                       \
     } while ( 0 )
  
 #define TRACE_5D(_e,d1,d2,d3,d4,d5)                             \
-    do {							\
-        u32 _d[5];						\
-        _d[0]=d1;						\
-        _d[1]=d2;						\
-        _d[2]=d3;						\
-        _d[3]=d4;						\
-        _d[4]=d5;						\
-        trace_var(_e, 1, sizeof(*_d)*5, (unsigned char *)_d);	\
+    do {                                                        \
+        if ( unlikely(tb_init_done) )                           \
+        {                                                       \
+            u32 _d[5];                                          \
+            _d[0] = d1;                                         \
+            _d[1] = d2;                                         \
+            _d[2] = d3;                                         \
+            _d[3] = d4;                                         \
+            _d[4] = d5;                                         \
+            __trace_var(_e, 1, sizeof(*_d)*5, (unsigned char *)_d); \
+        }                                                       \
     } while ( 0 )
 
 #endif /* __XEN_TRACE_H__ */

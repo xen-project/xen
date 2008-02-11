@@ -15,9 +15,6 @@ asmlinkage void trace_hypercall(void)
 {
     struct cpu_user_regs *regs = guest_cpu_user_regs();
 
-    if ( !tb_init_done )
-        return;
-
 #ifdef __x86_64__
     if ( is_pv_32on64_vcpu(current) )
     {
@@ -52,9 +49,6 @@ asmlinkage void trace_hypercall(void)
 void __trace_pv_trap(int trapnr, unsigned long eip,
                      int use_error_code, unsigned error_code)
 {
-    if ( !tb_init_done )
-        return;
-
 #ifdef __x86_64__
     if ( is_pv_32on64_vcpu(current) )
     {
@@ -99,9 +93,6 @@ void __trace_pv_page_fault(unsigned long addr, unsigned error_code)
 {
     unsigned long eip = guest_cpu_user_regs()->eip;
 
-    if ( !tb_init_done )
-        return;
-
 #ifdef __x86_64__
     if ( is_pv_32on64_vcpu(current) )
     {
@@ -135,9 +126,6 @@ void __trace_pv_page_fault(unsigned long addr, unsigned error_code)
 
 void __trace_trap_one_addr(unsigned event, unsigned long va)
 {
-    if ( !tb_init_done )
-        return;
-
 #ifdef __x86_64__
     if ( is_pv_32on64_vcpu(current) )
     {
@@ -155,9 +143,6 @@ void __trace_trap_one_addr(unsigned event, unsigned long va)
 void __trace_trap_two_addr(unsigned event, unsigned long va1,
                            unsigned long va2)
 {
-    if ( !tb_init_done )
-        return;
-
 #ifdef __x86_64__
     if ( is_pv_32on64_vcpu(current) )
     {
@@ -184,9 +169,6 @@ void __trace_trap_two_addr(unsigned event, unsigned long va1,
 void __trace_ptwr_emulation(unsigned long addr, l1_pgentry_t npte)
 {
     unsigned long eip = guest_cpu_user_regs()->eip;
-
-    if ( !tb_init_done )
-        return;
 
     /* We have a couple of different modes to worry about:
      * - 32-on-32: 32-bit pte, 32-bit virtual addresses
