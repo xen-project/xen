@@ -82,7 +82,6 @@ static void default_idle(void)
 
 static void play_dead(void)
 {
-    __cpu_disable();
     /* This must be done before dead CPU ack */
     cpu_exit_clear();
     hvm_cpu_down();
@@ -101,7 +100,7 @@ void idle_loop(void)
 {
     for ( ; ; )
     {
-        if (cpu_is_offline(smp_processor_id()))
+        if ( cpu_is_offline(smp_processor_id()) )
             play_dead();
         page_scrub_schedule_work();
         default_idle();

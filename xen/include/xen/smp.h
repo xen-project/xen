@@ -112,4 +112,21 @@ static inline int on_each_cpu(
 
 #define smp_processor_id() raw_smp_processor_id()
 
+#ifdef CONFIG_HOTPLUG_CPU
+extern spinlock_t cpu_add_remove_lock;
+/*
+ * FIXME: need a better lock mechanism when real cpu hotplug is later
+ * supported, since spinlock may cause dead lock:
+ *     cpu0: in stop_machine with lock held. Wait for cpu1 to respond
+ *           to stop request
+ *     cpu1: spin loop on lock upon cpu hotplug request from guest,
+ *           without chance to handle softirq
+ * ...
+ */
+#define lock_cpu_hotplug() spin_lock(&cpu_add_remove_lock);
+#define unlock_cpu_hotplug() spin_unlock(&cpu_add_remove_lock);
+#else
+#define lock_cpu_hotplug() do { } while ( 0 )
+#define unlock_cpu_hotplug() do { } while ( 0 )
+#endif
 #endif

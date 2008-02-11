@@ -16,6 +16,7 @@ obj-y += sched_sedf.o
 obj-y += schedule.o
 obj-y += shutdown.o
 obj-y += softirq.o
+obj-y += stop_machine.o
 obj-y += string.o
 obj-y += symbols.o
 obj-y += sysctl.o

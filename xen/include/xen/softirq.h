@@ -10,8 +10,9 @@
 #define PAGE_SCRUB_SOFTIRQ                5
 #define TRACE_SOFTIRQ                     6
 #define RCU_SOFTIRQ                       7
+#define STOPMACHINE_SOFTIRQ               8
 
-#define NR_COMMON_SOFTIRQS                8
+#define NR_COMMON_SOFTIRQS                9
 
 #include <asm/softirq.h>
 

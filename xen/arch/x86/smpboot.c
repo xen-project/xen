@@ -54,6 +54,7 @@
 #include <mach_apic.h>
 #include <mach_wakecpu.h>
 #include <smpboot_hooks.h>
+#include <xen/stop_machine.h>
 
 #define set_kernel_exec(x, y) (0)
 #define setup_trampoline()    (bootsym_phys(trampoline_realmode_entry))
@@ -1208,6 +1209,15 @@ int __cpu_disable(void)
 	if (cpu == 0)
 		return -EBUSY;
 
+	/*
+	 * Only S3 is using this path, and thus idle vcpus are running on all
+	 * APs when we are called. To support full cpu hotplug, other 
+	 * notification mechanisms should be introduced (e.g., migrate vcpus
+	 * off this physical cpu before rendezvous point).
+	 */
+	if (!is_idle_vcpu(current))
+		return -EINVAL;
+
 	local_irq_disable();
 	clear_local_APIC();
 	/* Allow any queued timer interrupts to get serviced */
@@ -1244,6 +1254,11 @@ void __cpu_die(unsigned int cpu)
  	printk(KERN_ERR "CPU %u didn't die...\n", cpu);
 }
 
+static int take_cpu_down(void *unused)
+{
+    return __cpu_disable();
+}
+
 /* 
  * XXX: One important thing missed here is to migrate vcpus
  * from dead cpu to other online ones and then put whole
@@ -1269,7 +1284,6 @@ void __cpu_die(unsigned int cpu)
 int cpu_down(unsigned int cpu)
 {
 	int err = 0;
-	cpumask_t mask;
 
 	spin_lock(&cpu_add_remove_lock);
 	if (num_online_cpus() == 1) {
@@ -1283,11 +1297,10 @@ int cpu_down(unsigned int cpu)
 	}
 
 	printk("Prepare to bring CPU%d down...\n", cpu);
-	/* Send notification to remote idle vcpu */
-	cpus_clear(mask);
-	cpu_set(cpu, mask);
-	per_cpu(cpu_state, cpu) = CPU_DYING;
-	smp_send_event_check_mask(mask);
+
+	err = __stop_machine_run(take_cpu_down, NULL, cpu);
+	if ( err < 0 )
+		goto out;
 
 	__cpu_die(cpu);
 
