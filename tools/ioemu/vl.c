@@ -2532,7 +2532,7 @@ static void udp_chr_update_read_handler(CharDriverState *chr)
 }
 
 int parse_host_port(struct sockaddr_in *saddr, const char *str);
-#ifndef _WIN32
+#ifndef NO_UNIX_SOCKETS
 static int parse_unix_path(struct sockaddr_un *uaddr, const char *str);
 #endif
 int parse_host_src_port(struct sockaddr_in *haddr,
@@ -2740,7 +2740,7 @@ static void tcp_chr_accept(void *opaque)
     CharDriverState *chr = opaque;
     TCPCharDriver *s = chr->opaque;
     struct sockaddr_in saddr;
-#ifndef _WIN32
+#ifndef NO_UNIX_SOCKETS
     struct sockaddr_un uaddr;
 #endif
     struct sockaddr *addr;
@@ -2748,7 +2748,7 @@ static void tcp_chr_accept(void *opaque)
     int fd;
 
     for(;;) {
-#ifndef _WIN32
+#ifndef NO_UNIX_SOCKETS
 	if (s->is_unix) {
 	    len = sizeof(uaddr);
 	    addr = (struct sockaddr *)&uaddr;
@@ -2797,13 +2797,13 @@ static CharDriverState *qemu_chr_open_tcp(const char *host_str,
     int do_nodelay = 0;
     const char *ptr;
     struct sockaddr_in saddr;
-#ifndef _WIN32
+#ifndef NO_UNIX_SOCKETS
     struct sockaddr_un uaddr;
 #endif
     struct sockaddr *addr;
     socklen_t addrlen;
 
-#ifndef _WIN32
+#ifndef NO_UNIX_SOCKETS
     if (is_unix) {
 	addr = (struct sockaddr *)&uaddr;
 	addrlen = sizeof(uaddr);
@@ -2842,7 +2842,7 @@ static CharDriverState *qemu_chr_open_tcp(const char *host_str,
     if (!s)
         goto fail;
 
-#ifndef _WIN32
+#ifndef NO_UNIX_SOCKETS
     if (is_unix)
 	fd = socket(PF_UNIX, SOCK_STREAM, 0);
     else
@@ -2867,7 +2867,7 @@ static CharDriverState *qemu_chr_open_tcp(const char *host_str,
 
     if (is_listen) {
         /* allow fast reuse */
-#ifndef _WIN32
+#ifndef NO_UNIX_SOCKETS
 	if (is_unix) {
 	    char path[109];
 	    strncpy(path, uaddr.sun_path, 108);

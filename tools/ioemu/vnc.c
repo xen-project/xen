@@ -2297,7 +2297,7 @@ int vnc_display_open(DisplayState *ds, const char *display, int find_unused)
 {
     struct sockaddr *addr;
     struct sockaddr_in iaddr;
-#ifndef _WIN32
+#ifndef NO_UNIX_SOCKETS
     struct sockaddr_un uaddr;
 #endif
     int reuse_addr, ret;
