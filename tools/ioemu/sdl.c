@@ -508,6 +508,7 @@ void sdl_display_init(DisplayState *ds, int full_screen)
     ds->dpy_update = sdl_update;
     ds->dpy_resize = sdl_resize;
     ds->dpy_refresh = sdl_refresh;
+    ds->dpy_colourdepth = NULL;
 
     sdl_resize(ds, 640, 400);
     sdl_update_caption();

@@ -169,16 +169,12 @@ static unsigned int vga_get_color(DisplayState *ds, unsigned int rgba)
     unsigned int r, g, b, color;
 
     switch(ds->depth) {
-#if 0
     case 8:
         r = (rgba >> 16) & 0xff;
         g = (rgba >> 8) & 0xff;
         b = (rgba) & 0xff;
-        color = (rgb_to_index[r] * 6 * 6) + 
-            (rgb_to_index[g] * 6) + 
-            (rgb_to_index[b]);
+        color = ((r >> 5) << 5 | (g >> 5) << 2 | (b >> 6));
         break;
-#endif
     case 15:
         r = (rgba >> 16) & 0xff;
         g = (rgba >> 8) & 0xff;
