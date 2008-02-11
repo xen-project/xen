@@ -127,7 +127,7 @@ LEGACY_CFG_TO_XENAPI_CFG = reverse_dict(XENAPI_CFG_TO_LEGACY_CFG)
 XENAPI_PLATFORM_CFG = [ 'acpi', 'apic', 'boot', 'device_model', 'loader', 'display', 
                         'fda', 'fdb', 'keymap', 'isa', 'localtime', 'monitor', 
                         'nographic', 'pae', 'rtc_timeoffset', 'serial', 'sdl',
-                        'soundhw','stdvga', 'usb', 'usbdevice', 'vnc',
+                        'soundhw','stdvga', 'usb', 'usbdevice', 'hpet', 'vnc',
                         'vncconsole', 'vncdisplay', 'vnclisten', 'timer_mode',
                         'vncpasswd', 'vncunused', 'xauthority', 'pci', 'vhpt',
                         'guest_os_type', 'hap']

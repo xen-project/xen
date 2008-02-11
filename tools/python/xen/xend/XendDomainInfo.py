@@ -1692,6 +1692,12 @@ class XendDomainInfo:
             xc.hvm_set_param(self.domid, HVM_PARAM_TIMER_MODE,
                              long(timer_mode))
 
+        # Optionally enable virtual HPET
+        hpet = self.info["platform"].get("hpet")
+        if hvm and hpet is not None:
+            xc.hvm_set_param(self.domid, HVM_PARAM_HPET_ENABLED,
+                             long(hpet))
+
         # Set maximum number of vcpus in domain
         xc.domain_max_vcpus(self.domid, int(self.info['VCPUs_max']))
 

@@ -353,7 +353,8 @@ static void hpet_write(
 
 static int hpet_range(struct vcpu *v, unsigned long addr)
 {
-    return ((addr >= HPET_BASE_ADDRESS) &&
+    return (v->domain->arch.hvm_domain.params[HVM_PARAM_HPET_ENABLED] &&
+            (addr >= HPET_BASE_ADDRESS) &&
             (addr < (HPET_BASE_ADDRESS + HPET_MMAP_SIZE)));
 }
 
