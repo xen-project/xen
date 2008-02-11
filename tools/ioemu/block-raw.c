@@ -169,10 +169,16 @@ static int raw_pread(BlockDriverState *bs, int64_t offset,
     }
     s->lseek_err_cnt=0;
 
-    ret = read(s->fd, buf, count);
-    if (ret == count) 
-        goto label__raw_read__success;
+    uint64_t done;
+    for (done = 0; done < count; done += ret) {
+	ret = read(s->fd, buf + done, count - done);
+	if (ret == -1) 
+	    goto label__raw_read__error;
+    }
+    ret = count;
+    goto label__raw_read__success;
     
+label__raw_read__error:
     DEBUG_BLOCK_PRINT("raw_read(%d:%s, %" PRId64 ", %p, %d) [%" PRId64 "] read failed %d : %d = %s\n", 
         s->fd, 
         bs->filename, 
@@ -234,9 +240,16 @@ static int raw_pwrite(BlockDriverState *bs, int64_t offset,
     }
     s->lseek_err_cnt = 0;
 
-    ret = write(s->fd, buf, count);
-    if (ret == count) 
-        goto label__raw_write__success;
+    uint64_t done;
+    for (done = 0; done < count; done += ret) {
+	ret = write(s->fd, buf + done, count - done);
+	if (ret == -1) 
+	    goto label__raw_write__error;
+    }
+    ret = count;
+    goto label__raw_write__success;
+
+label__raw_write__error:
     
     DEBUG_BLOCK_PRINT("raw_write(%d:%s, %" PRId64 ", %p, %d) [%" PRId64 "] write failed %d : %d = %s\n", 
         s->fd, 
