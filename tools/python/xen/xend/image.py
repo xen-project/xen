@@ -91,12 +91,12 @@ class ImageHandler:
                         ("image/cmdline", self.cmdline),
                         ("image/ramdisk", self.ramdisk))
 
-        self.dmargs = self.parseDeviceModelArgs(vmConfig)
         self.device_model = vmConfig['platform'].get('device_model')
 
         self.display = vmConfig['platform'].get('display')
         self.xauthority = vmConfig['platform'].get('xauthority')
         self.vncconsole = vmConfig['platform'].get('vncconsole')
+        self.dmargs = self.parseDeviceModelArgs(vmConfig)
         self.pid = None
 
 
@@ -204,8 +204,14 @@ class ImageHandler:
         for dev_uuid in vmConfig['console_refs']:
             dev_type, dev_info = vmConfig['devices'][dev_uuid]
             if dev_type == 'vfb':
-                vnc_config = dev_info.get('other_config', {})
-                has_vnc = True
+                vfb_type = dev_info.get('type', {})
+                if vfb_type == 'sdl':
+                    self.display = dev_info.get('display', {})
+                    self.xauthority = dev_info.get('xauthority', {})
+                    has_sdl = True
+                else:
+                    vnc_config = dev_info.get('other_config', {})
+                    has_vnc = True
                 break
 
         keymap = vmConfig['platform'].get("keymap")
