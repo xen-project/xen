@@ -1013,8 +1013,10 @@ static void pc_init1(uint64_t ram_size, int vga_ram_size, char *boot_device,
         }
     }
 
+#ifdef HAS_TPM
     if (has_tpm_device())
         tpm_tis_init(&pic_set_irq_new, isa_pic, 11);
+#endif
 
     kbd_init();
     DMA_init(0);

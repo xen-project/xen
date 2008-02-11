@@ -420,6 +420,7 @@ VL_OBJS+= xen_machine_pv.o
 VL_OBJS+= xenfb.o
 VL_OBJS+= xen_console.o
 VL_OBJS+= tpm_tis.o
+CPPFLAGS += -DHAS_TPM
 CPPFLAGS += -DHAS_AUDIO
 endif
 ifeq ($(TARGET_BASE_ARCH), ppc)
