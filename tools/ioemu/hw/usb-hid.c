@@ -224,15 +224,37 @@ static const uint8_t qemu_tablet_hid_report_descriptor[] = {
         0xC0,       /* End Collection */
 };
 
+static int currentbutton = 0;
+typedef struct _mouseclick {
+    int button_state;
+    struct _mouseclick *next;
+} mouseclick; 
+static mouseclick mousequeue[20];
+static mouseclick *head = mousequeue;
+static mouseclick *tail = mousequeue;
+
 static void usb_mouse_event(void *opaque,
                             int dx1, int dy1, int dz1, int buttons_state)
 {
     USBMouseState *s = opaque;
 
+    if (s->status_changed == 1){
+        //A mouse event is lost
+        if (buttons_state != currentbutton && tail->next != head) {
+            //A left click event is lost: let's add it to the queue
+            //counter++;
+            tail->button_state = buttons_state;
+            tail = tail->next;
+        }
+    }
+    else {
+        s->buttons_state = buttons_state;
+    }
+
     s->dx += dx1;
     s->dy += dy1;
     s->dz += dz1;
-    s->buttons_state = buttons_state;
+    currentbutton = buttons_state;
     s->status_changed = 1;
 }
 
@@ -240,11 +262,24 @@ static void usb_tablet_event(void *opaque,
 			     int x, int y, int dz, int buttons_state)
 {
     USBMouseState *s = opaque;
+    
+    if (s->status_changed == 1){
+        //A mouse event is lost
+        if (buttons_state != currentbutton && tail->next != head) {
+            //A left click event is lost: let's add it to the queue
+            //counter++;
+            tail->button_state = buttons_state;
+            tail = tail->next;
+        }
+    }
+    else {
+        s->buttons_state = buttons_state;
+    }
 
     s->x = x;
     s->y = y;
     s->dz += dz;
-    s->buttons_state = buttons_state;
+    currentbutton = buttons_state;
     s->status_changed = 1;
 }
 
@@ -493,10 +528,17 @@ static int usb_mouse_handle_data(USBDevice *dev, USBPacket *p)
             else if (s->kind == USB_TABLET)
                 ret = usb_tablet_poll(s, p->data, p->len);
 
-            if (!s->status_changed)
+            if (!s->status_changed) {
                 ret = USB_RET_NAK;
-            else
-                s->status_changed = 0;
+            } else {
+                if (head != tail) {
+                    s->buttons_state = head->button_state;
+                    head = head->next;
+                }
+                else {
+                    s->status_changed = 0;
+                }
+            }
 
         } else {
             goto fail;
@@ -567,6 +609,14 @@ int usb_mouse_load(QEMUFile *f, void *opaque, int version_id)
 USBDevice *usb_tablet_init(void)
 {
     USBMouseState *s;
+    int i;
+    
+    for (i = 0; i < 19; i++) {
+        mousequeue[i].button_state = 0;
+        mousequeue[i].next = &(mousequeue[i + 1]);
+    }
+    mousequeue[i].button_state = 0;
+    mousequeue[i].next = mousequeue;
 
     s = qemu_mallocz(sizeof(USBMouseState));
     if (!s)
@@ -591,6 +641,14 @@ USBDevice *usb_tablet_init(void)
 USBDevice *usb_mouse_init(void)
 {
     USBMouseState *s;
+    int i;
+    
+    for (i = 0; i < 19; i++) {
+        mousequeue[i].button_state = 0;
+        mousequeue[i].next = &(mousequeue[i + 1]);
+    }
+    mousequeue[i].button_state = 0;
+    mousequeue[i].next = mousequeue;
 
     s = qemu_mallocz(sizeof(USBMouseState));
     if (!s)

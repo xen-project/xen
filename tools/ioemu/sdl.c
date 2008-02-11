@@ -259,11 +259,9 @@ static void sdl_grab_end(void)
     sdl_update_caption();
 }
 
-static void sdl_send_mouse_event(int dz)
+static void sdl_send_mouse_event(int dx, int dy, int dz, int state)
 {
-    int dx, dy, state, buttons;
-    state = SDL_GetRelativeMouseState(&dx, &dy);
-    buttons = 0;
+    int buttons = 0;
     if (state & SDL_BUTTON(SDL_BUTTON_LEFT))
         buttons |= MOUSE_EVENT_LBUTTON;
     if (state & SDL_BUTTON(SDL_BUTTON_RIGHT))
@@ -425,11 +423,19 @@ static void sdl_refresh(DisplayState *ds)
         case SDL_MOUSEMOTION:
             if (gui_grab || kbd_mouse_is_absolute() ||
                 absolute_enabled) {
-                sdl_send_mouse_event(0);
+                int dx, dy, state;
+                state = SDL_GetRelativeMouseState(&dx, &dy);
+                sdl_send_mouse_event(dx, dy, 0, state);
+            }
+            break;
+        case SDL_MOUSEBUTTONUP:
+            if (gui_grab || kbd_mouse_is_absolute()) {
+                int dx, dy, state;
+                state = SDL_GetRelativeMouseState(&dx, &dy);
+                sdl_send_mouse_event(dx, dy, 0, state);
             }
             break;
         case SDL_MOUSEBUTTONDOWN:
-        case SDL_MOUSEBUTTONUP:
             {
                 SDL_MouseButtonEvent *bev = &ev->button;
                 if (!gui_grab && !kbd_mouse_is_absolute()) {
@@ -439,16 +445,19 @@ static void sdl_refresh(DisplayState *ds)
                         sdl_grab_start();
                     }
                 } else {
-                    int dz;
+                    int dx, dy, dz, state;
                     dz = 0;
+                    state = SDL_GetRelativeMouseState(&dx, &dy);
 #ifdef SDL_BUTTON_WHEELUP
-                    if (bev->button == SDL_BUTTON_WHEELUP && ev->type == SDL_MOUSEBUTTONDOWN) {
+                    if (bev->button == SDL_BUTTON_WHEELUP) {
                         dz = -1;
-                    } else if (bev->button == SDL_BUTTON_WHEELDOWN && ev->type == SDL_MOUSEBUTTONDOWN) {
+                    } else if (bev->button == SDL_BUTTON_WHEELDOWN) {
                         dz = 1;
+                    } else {
+                        state = bev->button | state;
                     }
 #endif               
-                    sdl_send_mouse_event(dz);
+                    sdl_send_mouse_event(dx, dy, dz, state);
                 }
             }
             break;
