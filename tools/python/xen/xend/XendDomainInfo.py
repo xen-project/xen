@@ -1750,9 +1750,6 @@ class XendDomainInfo:
 
             self.image = image.create(self, self.info)
 
-            xc.domain_setcpuweight(self.domid, \
-                                   self.info['vcpus_params']['weight'])
-
             # repin domain vcpus if a restricted cpus list is provided
             # this is done prior to memory allocation to aide in memory
             # distribution for NUMA systems.

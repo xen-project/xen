@@ -380,9 +380,6 @@ int xc_vcpu_getinfo(int xc_handle,
                     uint32_t vcpu,
                     xc_vcpuinfo_t *info);
 
-int xc_domain_setcpuweight(int xc_handle,
-                           uint32_t domid,
-                           float weight);
 long long xc_domain_get_cpu_usage(int xc_handle,
                                   domid_t domid,
                                   int vcpu);
