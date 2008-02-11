@@ -486,6 +486,7 @@ static void audit_p2m(struct domain *d)
     mfn_t p2mfn;
     unsigned long orphans_d = 0, orphans_i = 0, mpbad = 0, pmbad = 0;
     int test_linear;
+    p2m_type_t type;
 
     if ( !paging_mode_translate(d) )
         return;
@@ -534,7 +535,7 @@ static void audit_p2m(struct domain *d)
             continue;
         }
 
-        p2mfn = gfn_to_mfn_foreign(d, gfn);
+        p2mfn = gfn_to_mfn_foreign(d, gfn, &type);
         if ( mfn_x(p2mfn) != mfn )
         {
             mpbad++;
@@ -547,12 +548,12 @@ static void audit_p2m(struct domain *d)
             /* This m2p entry is stale: the domain has another frame in
              * this physical slot.  No great disaster, but for neatness,
              * blow away the m2p entry. */
-            set_gpfn_from_mfn(mfn, INVALID_M2P_ENTRY, __PAGE_HYPERVISOR|_PAGE_USER);
+            set_gpfn_from_mfn(mfn, INVALID_M2P_ENTRY);
         }
 
         if ( test_linear && (gfn <= d->arch.p2m.max_mapped_pfn) )
         {
-            lp2mfn = mfn_x(gfn_to_mfn_current(gfn));
+            lp2mfn = mfn_x(gfn_to_mfn_current(gfn, &type));
             if ( lp2mfn != mfn_x(p2mfn) )
             {
                 P2M_PRINTK("linear mismatch gfn %#lx -> mfn %#lx "
