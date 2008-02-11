@@ -425,25 +425,18 @@ void __trace_var(u32 event, int cycles, int extra, unsigned char *extra_data)
             total_size += bytes_to_wrap;
             bytes_to_wrap = data_size;
         } 
-        else
-        {
-            bytes_to_wrap -= LOST_REC_SIZE;
-            if ( bytes_to_wrap == 0 )
-                bytes_to_wrap = data_size;
-        }
         total_size += LOST_REC_SIZE;
+        bytes_to_wrap -= LOST_REC_SIZE;
+
+        /* LOST_REC might line up perfectly with the buffer wrap */
+        if ( bytes_to_wrap == 0 )
+            bytes_to_wrap = data_size;
     }
 
     if ( rec_size > bytes_to_wrap )
     {
         total_size += bytes_to_wrap;
-        bytes_to_wrap = data_size;
     } 
-    else
-    {
-        bytes_to_wrap -= rec_size;
-    }
-
     total_size += rec_size;
 
     /* Do we have enough space for everything? */
@@ -466,14 +459,12 @@ void __trace_var(u32 event, int cycles, int extra, unsigned char *extra_data)
             insert_wrap_record(buf, LOST_REC_SIZE);
             bytes_to_wrap = data_size;
         } 
-        else
-        {
-            bytes_to_wrap -= LOST_REC_SIZE;
-            /* LOST_REC might line up perfectly with the buffer wrap */
-            if ( bytes_to_wrap == 0 )
-                bytes_to_wrap = data_size;
-        }
         insert_lost_records(buf);
+        bytes_to_wrap -= LOST_REC_SIZE;
+
+        /* LOST_REC might line up perfectly with the buffer wrap */
+        if ( bytes_to_wrap == 0 )
+            bytes_to_wrap = data_size;
     }
 
     if ( rec_size > bytes_to_wrap )
