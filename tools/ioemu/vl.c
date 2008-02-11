@@ -80,6 +80,7 @@
 #include <windows.h>
 #define getopt_long_only getopt_long
 #define memalign(align, size) malloc(size)
+#define NO_DAEMONIZE 1
 #endif
 
 #include "qemu_socket.h"
@@ -186,7 +187,9 @@ const char *vnc_display;
 int acpi_enabled = 0;
 int fd_bootchk = 1;
 int no_reboot = 0;
+#ifndef NO_DAEMONIZE
 int daemonize = 0;
+#endif
 const char *option_rom[MAX_OPTION_ROMS];
 int nb_option_roms;
 int semihosting_enabled = 0;
@@ -6510,7 +6513,7 @@ void help(void)
 	   "-vnc display    start a VNC server on display\n"
            "-vncviewer      start a vncviewer process for this domain\n"
            "-vncunused      bind the VNC server to an unused port\n"
-#ifndef _WIN32
+#ifndef NO_DAEMONIZE
 	   "-daemonize      daemonize QEMU after initializing\n"
 #endif
 	   "-option-rom rom load a file, rom, into the option ROM space\n"
@@ -6600,7 +6603,9 @@ enum {
     QEMU_OPTION_vnc,
     QEMU_OPTION_no_acpi,
     QEMU_OPTION_no_reboot,
+#ifndef NO_DAEMONIZE
     QEMU_OPTION_daemonize,
+#endif
     QEMU_OPTION_option_rom,
     QEMU_OPTION_semihosting
     ,
@@ -6698,7 +6703,9 @@ const QEMUOption qemu_options[] = {
     { "cirrusvga", 0, QEMU_OPTION_cirrusvga },
     { "no-acpi", 0, QEMU_OPTION_no_acpi },
     { "no-reboot", 0, QEMU_OPTION_no_reboot },
+#ifndef NO_DAEMONIZE
     { "daemonize", 0, QEMU_OPTION_daemonize },
+#endif
     { "option-rom", HAS_ARG, QEMU_OPTION_option_rom },
 #if defined(TARGET_ARM)
     { "semihosting", 0, QEMU_OPTION_semihosting },
@@ -7496,9 +7503,11 @@ int main(int argc, char **argv)
             case QEMU_OPTION_no_reboot:
                 no_reboot = 1;
                 break;
+#ifndef NO_DAEMONIZE
 	    case QEMU_OPTION_daemonize:
 		daemonize = 1;
 		break;
+#endif
 	    case QEMU_OPTION_option_rom:
 		if (nb_option_roms >= MAX_OPTION_ROMS) {
 		    fprintf(stderr, "Too many option ROMs\n");
@@ -7542,7 +7551,7 @@ int main(int argc, char **argv)
     sprintf(qemu_dm_logfilename, "/var/log/xen/qemu-dm-%d.log", domid);
     cpu_set_log_filename(qemu_dm_logfilename);
 
-#ifndef _WIN32
+#ifndef NO_DAEMONIZE
     if (daemonize && !nographic && vnc_display == NULL && vncunused == 0) {
 	fprintf(stderr, "Can only daemonize if using -nographic or -vnc\n");
 	daemonize = 0;
@@ -7863,6 +7872,7 @@ int main(int argc, char **argv)
         }
     }
 
+#ifndef NO_DAEMONIZE
     if (daemonize) {
 	uint8_t status = 0;
 	ssize_t len;
@@ -7886,6 +7896,7 @@ int main(int argc, char **argv)
 
 	close(fd);
     }
+#endif
 
     /* Unblock SIGTERM, which may have been blocked by the caller */
     sigemptyset(&set);
