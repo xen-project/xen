@@ -1,6 +1,6 @@
 #!/bin/sh
 
-set -ex
+set -e
 
 if [ $# -ne 1 ] ; then
 	echo "Usage $(basename $0) <config-file>" 1>&2
@@ -26,6 +26,7 @@ setopt()
 }
 
 setopt CONFIG_PARAVIRT y
+setopt CONFIG_PARAVIRT_GUEST y
 setopt CONFIG_XEN y
 setopt CONFIG_VMI y
 setopt CONFIG_KVM y
@@ -36,5 +37,11 @@ setopt CONFIG_XEN_BLKDEV_FRONTEND y
 setopt CONFIG_XEN_NETDEV_FRONTEND y
 setopt CONFIG_HVC_XEN y
 setopt CONFIG_NUMA n
+
+case ${XEN_TARGET_ARCH} in
+    x86_32) setopt CONFIG_64BIT n ;;
+    x86_64) setopt CONFIG_64BIT y ;;
+    *) ;;
+esac
 
 exit 0
