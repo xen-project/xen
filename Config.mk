@@ -28,14 +28,6 @@ DESTDIR     ?= /
 include $(XEN_ROOT)/config/$(XEN_OS).mk
 include $(XEN_ROOT)/config/$(XEN_TARGET_ARCH).mk
 
-ifeq ($(stubdom),y)
-include $(XEN_ROOT)/extras/mini-os/Config.mk
-CFLAGS += $(DEF_CFLAGS) $(ARCH_CFLAGS)
-CPPFLAGS += $(DEF_CPPFLAGS) $(ARCH_CPPFLAGS) $(extra_incl)
-ASFLAGS += $(DEF_ASFLAGS) $(ARCH_ASFLAGS)
-LDFLAGS += $(DEF_LDFLAGS) $(ARCH_LDFLAGS)
-endif
-
 ifneq ($(EXTRA_PREFIX),)
 EXTRA_INCLUDES += $(EXTRA_PREFIX)/include
 EXTRA_LIB += $(EXTRA_PREFIX)/$(LIBLEAFDIR)

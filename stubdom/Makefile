@@ -1,5 +1,7 @@
 XEN_ROOT = ..
 
+export XEN_OS=MiniOS
+
 include $(XEN_ROOT)/Config.mk
 export stubdom=y
 export debug=y
