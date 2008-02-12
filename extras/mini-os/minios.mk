@@ -9,7 +9,7 @@ debug = y
 DEF_CFLAGS += -fno-builtin -Wall -Werror -Wredundant-decls -Wno-format
 DEF_CFLAGS += $(call cc-option,$(CC),-fno-stack-protector,)
 DEF_CFLAGS += -Wstrict-prototypes -Wnested-externs -Wpointer-arith -Winline
-DEF_CFLAGS += -D__XEN_INTERFACE_VERSION__=$(XEN_INTERFACE_VERSION)
+DEF_CPPFLAGS += -D__XEN_INTERFACE_VERSION__=$(XEN_INTERFACE_VERSION)
 
 DEF_ASFLAGS = -D__ASSEMBLY__
 DEF_LDFLAGS =
@@ -24,11 +24,9 @@ endif
 # DEF_... flags are the common mini-os flags,
 # ARCH_... flags may be defined in arch/$(TARGET_ARCH_FAM/rules.mk
 CFLAGS := $(DEF_CFLAGS) $(ARCH_CFLAGS)
+CPPFLAGS := $(DEF_CPPFLAGS) $(ARCH_CPPFLAGS)
 ASFLAGS := $(DEF_ASFLAGS) $(ARCH_ASFLAGS)
 LDFLAGS := $(DEF_LDFLAGS) $(ARCH_LDFLAGS)
-
-# The path pointing to the architecture specific header files.
-ARCH_INC := $(MINI-OS_ROOT)/include/$(TARGET_ARCH_FAM)
 
 # Special build dependencies.
 # Rebuild all after touching this/these file(s)
@@ -44,18 +42,17 @@ extra_heads := $(foreach dir,$(EXTRA_INC),$(wildcard $(dir)/*.h))
 HDRS += $(extra_heads)
 
 # Add the special header directories to the include paths.
-extra_incl := $(foreach dir,$(EXTRA_INC),-I$(MINI-OS_ROOT)/include/$(dir))
-override CPPFLAGS := -I$(MINI-OS_ROOT)/include $(CPPFLAGS) -I$(ARCH_INC)	$(extra_incl)
+override CPPFLAGS := $(CPPFLAGS) $(extra_incl)
 
 # The name of the architecture specific library.
 # This is on x86_32: libx86_32.a
 # $(ARCH_LIB) has to built in the architecture specific directory.
-ARCH_LIB_NAME = $(TARGET_ARCH)
+ARCH_LIB_NAME = $(XEN_TARGET_ARCH)
 ARCH_LIB := lib$(ARCH_LIB_NAME).a
 
 # This object contains the entrypoint for startup from Xen.
 # $(HEAD_ARCH_OBJ) has to be built in the architecture specific directory.
-HEAD_ARCH_OBJ := $(TARGET_ARCH).o
+HEAD_ARCH_OBJ := $(XEN_TARGET_ARCH).o
 HEAD_OBJ := $(TARGET_ARCH_DIR)/$(HEAD_ARCH_OBJ)
 
 

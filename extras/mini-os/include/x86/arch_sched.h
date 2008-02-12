@@ -2,7 +2,7 @@
 #ifndef __ARCH_SCHED_H__
 #define __ARCH_SCHED_H__
 
-#include <arch_mm.h>
+#include <arch_limits.h>
 
 static inline struct thread* get_current(void)
 {
@@ -12,7 +12,7 @@ static inline struct thread* get_current(void)
 #else
     register unsigned long sp asm("rsp");
 #endif 
-    current = (void *)(unsigned long)(sp & ~(STACK_SIZE-1));
+    current = (void *)(unsigned long)(sp & ~(__STACK_SIZE-1));
     return *current;
 }
 

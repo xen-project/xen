@@ -5,6 +5,8 @@
 XEN_ROOT = ../../../..
 include $(XEN_ROOT)/Config.mk
 
+include ../../Config.mk
+
 include arch.mk
 include ../../minios.mk
 
@@ -41,7 +43,7 @@ ARCH_OBJS += __divdi3.o
 
 GEN_OFF_SRC := gen_off.c
 GEN_OFF_ASM := gen_off.s
-GEN_OFF_H   := $(ARCH_INC)/offsets.h
+GEN_OFF_H   := $(MINI-OS_ROOT)/include/$(ARCH_INC)/offsets.h
 
 all: $(ARCH_LIB)
 

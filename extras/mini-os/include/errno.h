@@ -107,4 +107,11 @@
 #define	EOWNERDEAD	130	/* Owner died */
 #define	ENOTRECOVERABLE	131	/* State not recoverable */
 
+#ifdef HAVE_LIBC
+#include <sched.h>
+extern int errno;
+#define ERRNO
+#define errno (get_current()->reent._errno)
+#endif
+
 #endif

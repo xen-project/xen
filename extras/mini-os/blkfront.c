@@ -15,6 +15,10 @@
 #include <lib.h>
 #include <fcntl.h>
 
+#ifndef HAVE_LIBC
+#define strtoul simple_strtoul
+#endif
+
 /* Note: we generally don't need to disable IRQs since we hardly do anything in
  * the interrupt handler.  */
 
@@ -49,6 +53,10 @@ struct blkfront_dev {
     int mode;
     int barrier;
     int flush;
+
+#ifdef HAVE_LIBC
+    int fd;
+#endif
 };
 
 static inline int xenblk_rxidx(RING_IDX idx)
@@ -58,6 +66,12 @@ static inline int xenblk_rxidx(RING_IDX idx)
 
 void blkfront_handler(evtchn_port_t port, struct pt_regs *regs, void *data)
 {
+#ifdef HAVE_LIBC
+    struct blkfront_dev *dev = data;
+    int fd = dev->fd;
+
+    files[fd].read = 1;
+#endif
     wake_up(&blkfront_queue);
 }
 
@@ -148,7 +162,7 @@ done:
 
     printk("backend at %s\n", dev->backend);
 
-    dev->handle = simple_strtoul(strrchr(nodename, '/')+1, NULL, 0);
+    dev->handle = strtoul(strrchr(nodename, '/')+1, NULL, 0);
 
     {
         char path[strlen(dev->backend) + 1 + 19 + 1];
@@ -322,12 +336,16 @@ moretodo:
     {
 	rsp = RING_GET_RESPONSE(&dev->ring, cons);
 
+        if (rsp->status != BLKIF_RSP_OKAY)
+            printk("block error %d for op %d\n", rsp->status, rsp->operation);
+
         switch (rsp->operation) {
         case BLKIF_OP_READ:
         case BLKIF_OP_WRITE:
         {
             struct blkfront_aiocb *aiocbp = (void*) (uintptr_t) rsp->id;
             int j;
+
             for (j = 0; j < aiocbp->n; j++)
                 gnttab_end_access(aiocbp->gref[j]);
 
@@ -365,6 +383,12 @@ static void blkfront_push_operation(struct blkfront_dev *dev, uint8_t op)
     i = dev->ring.req_prod_pvt;
     req = RING_GET_REQUEST(&dev->ring, i);
     req->operation = op;
+    req->nr_segments = 0;
+    req->handle = dev->handle;
+    /* Not used */
+    req->id = 0;
+    /* Not needed anyway, but the backend will check it */
+    req->sector_number = 0;
     dev->ring.req_prod_pvt = i + 1;
     wmb();
     RING_PUSH_REQUESTS_AND_CHECK_NOTIFY(&dev->ring, notify);
@@ -375,11 +399,13 @@ void blkfront_sync(struct blkfront_dev *dev)
 {
     unsigned long flags;
 
-    if (dev->barrier == 1)
-        blkfront_push_operation(dev, BLKIF_OP_WRITE_BARRIER);
+    if (dev->mode == O_RDWR) {
+        if (dev->barrier == 1)
+            blkfront_push_operation(dev, BLKIF_OP_WRITE_BARRIER);
 
-    if (dev->flush == 1)
-        blkfront_push_operation(dev, BLKIF_OP_FLUSH_DISKCACHE);
+        if (dev->flush == 1)
+            blkfront_push_operation(dev, BLKIF_OP_FLUSH_DISKCACHE);
+    }
 
     /* Note: This won't finish if another thread enqueues requests.  */
     local_irq_save(flags);
@@ -397,3 +423,13 @@ void blkfront_sync(struct blkfront_dev *dev)
     remove_waiter(w);
     local_irq_restore(flags);
 }
+
+#ifdef HAVE_LIBC
+int blkfront_open(struct blkfront_dev *dev)
+{
+    dev->fd = alloc_fd(FTYPE_BLK);
+    printk("blk_open(%s) -> %d\n", dev->nodename, dev->fd);
+    files[dev->fd].blk.dev = dev;
+    return dev->fd;
+}
+#endif

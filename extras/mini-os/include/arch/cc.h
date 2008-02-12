@@ -54,7 +54,14 @@ extern void lwip_die(char *fmt, ...);
 #include <errno.h>
 
 /*   Not required by the docs, but needed for network-order calculations */
+#ifdef HAVE_LIBC
+#include <machine/endian.h>
+#ifndef BIG_ENDIAN
+#error endian.h does not define byte order
+#endif
+#else
 #include <endian.h>
+#endif
 
 #include <inttypes.h>
 #define S16_F PRIi16

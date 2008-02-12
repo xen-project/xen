@@ -5,10 +5,12 @@ MAJOR    = 3.2
 MINOR    = 0
 
 CTRL_SRCS-y       :=
+ifneq ($(stubdom),y)
 CTRL_SRCS-y       += xc_core.c
 CTRL_SRCS-$(CONFIG_X86) += xc_core_x86.c
 CTRL_SRCS-$(CONFIG_IA64) += xc_core_ia64.c
 CTRL_SRCS-$(CONFIG_POWERPC) += xc_core_powerpc.c
+endif
 CTRL_SRCS-y       += xc_domain.c
 CTRL_SRCS-y       += xc_evtchn.c
 CTRL_SRCS-y       += xc_misc.c
@@ -19,21 +21,29 @@ CTRL_SRCS-y       += xc_private.c
 CTRL_SRCS-y       += xc_sedf.c
 CTRL_SRCS-y       += xc_csched.c
 CTRL_SRCS-y       += xc_tbuf.c
+ifneq ($(stubdom),y)
 CTRL_SRCS-y       += xc_resume.c
+endif
 CTRL_SRCS-$(CONFIG_X86) += xc_pagetab.c
+ifneq ($(stubdom),y)
 CTRL_SRCS-$(CONFIG_Linux) += xc_linux.c
 CTRL_SRCS-$(CONFIG_SunOS) += xc_solaris.c
 CTRL_SRCS-$(CONFIG_X86_Linux) += xc_ptrace.c xc_ptrace_core.c
 CTRL_SRCS-$(CONFIG_NetBSD) += xc_netbsd.c
+endif
+CTRL_SRCS-$(stubdom) += xc_minios.c
 
 GUEST_SRCS-y :=
 GUEST_SRCS-y += xg_private.c
+ifneq ($(stubdom),y)
 GUEST_SRCS-$(CONFIG_MIGRATE) += xc_domain_restore.c xc_domain_save.c
 GUEST_SRCS-$(CONFIG_HVM) += xc_hvm_build.c
+endif
 
 VPATH = ../../xen/common/libelf
 CFLAGS += -I../../xen/common/libelf
 
+ifneq ($(stubdom),y)
 GUEST_SRCS-y += libelf-tools.c libelf-loader.c
 GUEST_SRCS-y += libelf-dominfo.c libelf-relocate.c
 
@@ -46,6 +56,7 @@ GUEST_SRCS-y += xc_dom_compat_linux.c
 GUEST_SRCS-$(CONFIG_X86)     += xc_dom_x86.c
 GUEST_SRCS-$(CONFIG_IA64)    += xc_dom_ia64.c
 GUEST_SRCS-$(CONFIG_POWERPC) += xc_dom_powerpc.c
+endif
 
 -include $(XEN_TARGET_ARCH)/Makefile
 
@@ -64,6 +75,10 @@ CFLAGS   += -Wp,-MD,.$(@F).d
 LDFLAGS  += -L.
 DEPS     = .*.d
 
+ifneq ($(stubdom),y)
+LDLIBS   = -lpthread
+endif
+
 CTRL_LIB_OBJS := $(patsubst %.c,%.o,$(CTRL_SRCS-y))
 CTRL_PIC_OBJS := $(patsubst %.c,%.opic,$(CTRL_SRCS-y))
 
@@ -71,10 +86,14 @@ GUEST_LIB_OBJS := $(patsubst %.c,%.o,$(GUEST_SRCS-y))
 GUEST_PIC_OBJS := $(patsubst %.c,%.opic,$(GUEST_SRCS-y))
 
 LIB := libxenctrl.a
+ifneq ($(stubdom),y)
 LIB += libxenctrl.so libxenctrl.so.$(MAJOR) libxenctrl.so.$(MAJOR).$(MINOR)
+endif
 
 LIB += libxenguest.a
+ifneq ($(stubdom),y)
 LIB += libxenguest.so libxenguest.so.$(MAJOR) libxenguest.so.$(MAJOR).$(MINOR)
+endif
 
 .PHONY: all
 all: build
@@ -133,7 +152,7 @@ libxenctrl.so.$(MAJOR): libxenctrl.so.$(MAJOR).$(MINOR)
 	ln -sf $< $@
 
 libxenctrl.so.$(MAJOR).$(MINOR): $(CTRL_PIC_OBJS)
-	$(CC) $(CFLAGS) $(LDFLAGS) -Wl,$(SONAME_LDFLAG) -Wl,libxenctrl.so.$(MAJOR) $(SHLIB_CFLAGS) -o $@ $^ -lpthread
+	$(CC) $(CFLAGS) $(LDFLAGS) -Wl,$(SONAME_LDFLAG) -Wl,libxenctrl.so.$(MAJOR) $(SHLIB_CFLAGS) -o $@ $^ $(LDLIBS)
 
 # libxenguest
 
@@ -146,7 +165,7 @@ libxenguest.so.$(MAJOR): libxenguest.so.$(MAJOR).$(MINOR)
 	ln -sf $< $@
 
 libxenguest.so.$(MAJOR).$(MINOR): $(GUEST_PIC_OBJS) libxenctrl.so
-	$(CC) $(CFLAGS) $(LDFLAGS) -Wl,$(SONAME_LDFLAG) -Wl,libxenguest.so.$(MAJOR) $(SHLIB_CFLAGS) -o $@ $(GUEST_PIC_OBJS) -lz -lxenctrl -lpthread
+	$(CC) $(CFLAGS) $(LDFLAGS) -Wl,$(SONAME_LDFLAG) -Wl,libxenguest.so.$(MAJOR) $(SHLIB_CFLAGS) -o $@ $(GUEST_PIC_OBJS) -lz -lxenctrl $(LDLIBS)
 
 -include $(DEPS)
 

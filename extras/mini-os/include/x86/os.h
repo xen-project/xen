@@ -563,6 +563,7 @@ static __inline__ int synch_var_test_bit(int nr, volatile void * addr)
  synch_var_test_bit((nr),(addr)))
 
 
+#undef ADDR
 
 #endif /* not assembly */
 #endif /* _OS_H_ */

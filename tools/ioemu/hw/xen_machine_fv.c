@@ -24,6 +24,9 @@
  */
 
 #include "vl.h"
+#ifdef CONFIG_STUBDOM
+#include <xenbus.h>
+#endif
 #include <xen/hvm/params.h>
 #include <sys/mman.h>
 

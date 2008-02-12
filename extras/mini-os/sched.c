@@ -56,6 +56,7 @@
 
 struct thread *idle_thread = NULL;
 LIST_HEAD(exited_threads);
+static int threads_started;
 
 void inline print_runqueue(void)
 {
@@ -172,6 +173,9 @@ struct thread* create_thread(char *name, void (*function)(void *), void *data)
     /* Not runable, not exited, not sleeping */
     thread->flags = 0;
     thread->wakeup_time = 0LL;
+#ifdef HAVE_LIBC
+    _REENT_INIT_PTR((&thread->reent))
+#endif
     set_runnable(thread);
     local_irq_save(flags);
     if(idle_thread != NULL) {
@@ -184,6 +188,42 @@ struct thread* create_thread(char *name, void (*function)(void *), void *data)
     local_irq_restore(flags);
     return thread;
 }
+
+#ifdef HAVE_LIBC
+static struct _reent callback_reent;
+struct _reent *__getreent(void)
+{
+    struct _reent *_reent;
+
+    if (!threads_started)
+	_reent = _impure_ptr;
+    else if (in_callback)
+	_reent = &callback_reent;
+    else
+	_reent = &get_current()->reent;
+
+#ifndef NDEBUG
+#if defined(__x86_64__) || defined(__x86__)
+    {
+#ifdef __x86_64__
+	register unsigned long sp asm ("rsp");
+#else
+	register unsigned long sp asm ("esp");
+#endif
+	if ((sp & (STACK_SIZE-1)) < STACK_SIZE / 16) {
+	    static int overflowing;
+	    if (!overflowing) {
+		overflowing = 1;
+		printk("stack overflow\n");
+		BUG();
+	    }
+	}
+    }
+#endif
+#endif
+    return _reent;
+}
+#endif
 
 void exit_thread(void)
 {
@@ -228,6 +268,7 @@ void wake(struct thread *thread)
 void idle_thread_fn(void *unused)
 {
     s_time_t until;
+    threads_started = 1;
     unsigned long flags;
     struct list_head *iterator;
     struct thread *next, *thread;
@@ -297,6 +338,9 @@ void init_sched(void)
 {
     printk("Initialising scheduler\n");
 
+#ifdef HAVE_LIBC
+    _REENT_INIT_PTR((&callback_reent))
+#endif
     idle_thread = create_thread("Idle", idle_thread_fn, NULL);
     INIT_LIST_HEAD(&idle_thread->thread_list);
 }

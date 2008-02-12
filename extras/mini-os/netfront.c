@@ -19,7 +19,10 @@
 
 DECLARE_WAIT_QUEUE_HEAD(netfront_queue);
 
+#ifdef HAVE_LIBC
 #define NETIF_SELECT_RX ((void*)-1)
+#endif
+
 
 
 #define NET_TX_RING_SIZE __RING_SIZE((struct netif_tx_sring *)0, PAGE_SIZE)
@@ -49,6 +52,13 @@ struct netfront_dev {
 
     char *nodename;
     char *backend;
+
+#ifdef HAVE_LIBC
+    int fd;
+    unsigned char *data;
+    size_t len;
+    size_t rlen;
+#endif
 
     void (*netif_rx)(unsigned char* data, int len);
 };
@@ -92,7 +102,8 @@ moretodo:
     cons = dev->rx.rsp_cons;
 
     int nr_consumed=0;
-    while ((cons != rp))
+    int some = 0;
+    while ((cons != rp) && !some)
     {
         struct net_buffer* buf;
         unsigned char* page;
@@ -116,7 +127,18 @@ moretodo:
 
         if(rx->status>0)
         {
-            dev->netif_rx(page+rx->offset,rx->status);
+#ifdef HAVE_LIBC
+	    if (dev->netif_rx == NETIF_SELECT_RX) {
+		int len = rx->status;
+		ASSERT(current == main_thread);
+		if (len > dev->len)
+		    len = dev->len;
+		memcpy(dev->data, page+rx->offset, len);
+		dev->rlen = len;
+		some = 1;
+	    } else
+#endif
+		dev->netif_rx(page+rx->offset,rx->status);
         }
 
         nr_consumed++;
@@ -127,7 +149,7 @@ moretodo:
 
     int more;
     RING_FINAL_CHECK_FOR_RESPONSES(&dev->rx,more);
-    if(more) goto moretodo;
+    if(more && !some) goto moretodo;
 
     RING_IDX req_prod = dev->rx.req_prod_pvt;
 
@@ -178,6 +200,9 @@ void network_tx_buf_gc(struct netfront_dev *dev)
             if (txrsp->status == NETIF_RSP_NULL)
                 continue;
 
+            if (txrsp->status == NETIF_RSP_ERROR)
+                printk("packet error\n");
+
             id  = txrsp->id;
             struct net_buffer* buf = &dev->tx_buffers[id];
             gnttab_end_access(buf->gref);
@@ -217,6 +242,22 @@ void netfront_handler(evtchn_port_t port, struct pt_regs *regs, void *data)
 
     local_irq_restore(flags);
 }
+
+#ifdef HAVE_LIBC
+void netfront_select_handler(evtchn_port_t port, struct pt_regs *regs, void *data)
+{
+    int flags;
+    struct netfront_dev *dev = data;
+    int fd = dev->fd;
+
+    local_irq_save(flags);
+    network_tx_buf_gc(dev);
+    local_irq_restore(flags);
+
+    files[fd].read = 1;
+    wake_up(&netfront_queue);
+}
+#endif
 
 struct netfront_dev *init_netfront(char *nodename, void (*thenetif_rx)(unsigned char* data, int len), unsigned char rawmac[6])
 {
@@ -266,7 +307,12 @@ struct netfront_dev *init_netfront(char *nodename, void (*thenetif_rx)(unsigned 
     dev->dom = op.remote_dom = xenbus_read_integer(path);
     HYPERVISOR_event_channel_op(EVTCHNOP_alloc_unbound, &op);
     clear_evtchn(op.port);        /* Without, handler gets invoked now! */
-    dev->local_port = bind_evtchn(op.port, netfront_handler, dev);
+#ifdef HAVE_LIBC
+    if (thenetif_rx == NETIF_SELECT_RX)
+	dev->local_port = bind_evtchn(op.port, netfront_select_handler, dev);
+    else
+#endif
+	dev->local_port = bind_evtchn(op.port, netfront_handler, dev);
     dev->evtchn=op.port;
 
     txs = (struct netif_tx_sring*) alloc_page();
@@ -381,6 +427,23 @@ done:
     return dev;
 }
 
+#ifdef HAVE_LIBC
+int netfront_tap_open(char *nodename) {
+    struct netfront_dev *dev;
+
+    dev = init_netfront(nodename, NETIF_SELECT_RX, NULL);
+    if (!dev) {
+	printk("TAP open failed\n");
+	errno = EIO;
+	return -1;
+    }
+    dev->fd = alloc_fd(FTYPE_TAP);
+    printk("tap_open(%s) -> %d\n", nodename, dev->fd);
+    files[dev->fd].tap.dev = dev;
+    return dev->fd;
+}
+#endif
+
 void shutdown_netfront(struct netfront_dev *dev)
 {
     char* err;
@@ -481,3 +544,30 @@ void netfront_xmit(struct netfront_dev *dev, unsigned char* data,int len)
     network_tx_buf_gc(dev);
     local_irq_restore(flags);
 }
+
+#ifdef HAVE_LIBC
+ssize_t netfront_receive(struct netfront_dev *dev, unsigned char *data, size_t len)
+{
+    unsigned long flags;
+    int fd = dev->fd;
+    ASSERT(current == main_thread);
+
+    dev->rlen = 0;
+    dev->data = data;
+    dev->len = len;
+
+    local_irq_save(flags);
+    network_rx(dev);
+    if (!dev->rlen)
+	/* No data for us, make select stop returning */
+	files[fd].read = 0;
+    /* Before re-enabling the interrupts, in case a packet just arrived in the
+     * meanwhile. */
+    local_irq_restore(flags);
+
+    dev->data = NULL;
+    dev->len = 0;
+
+    return dev->rlen;
+}
+#endif

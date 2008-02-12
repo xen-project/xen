@@ -17,8 +17,9 @@
  ****************************************************************************
  */
 
-#ifndef _TIME_H_
-#define _TIME_H_
+#ifndef _MINIOS_TIME_H_
+#define _MINIOS_TIME_H_
+#include <types.h>
 
 /*
  * System Time
@@ -44,8 +45,12 @@ typedef s64 s_time_t;
 /* wall clock time  */
 typedef long time_t;
 typedef long suseconds_t;
+
 #include <sys/time.h>
 
+#ifdef HAVE_LIBC
+#include_next <time.h>
+#endif
 
 /* prototypes */
 void     init_time(void);
@@ -54,4 +59,4 @@ s_time_t get_v_time(void);
 u64      monotonic_clock(void);
 void     block_domain(s_time_t until);
 
-#endif /* _TIME_H_ */
+#endif /* _MINIOS_TIME_H_ */

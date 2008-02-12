@@ -43,9 +43,9 @@
 /* The efi-pal page size for text and data. */
 #define PAL_TR_PAGE_SIZE	PTE_PS_1M
 
-/* Commonly 16K pages are used. */
-#define PAGE_SHIFT	14	/* 16K pages */
-#define PAGE_SIZE	(1<<(PAGE_SHIFT))
+#include "arch_limits.h"
+#define PAGE_SHIFT	__PAGE_SHIFT
+#define PAGE_SIZE	__PAGE_SIZE
 #define PAGE_MASK	(~(PAGE_SIZE-1))
 
 #define KSTACK_PAGES	4	/* 4 pages for the kernel stack + bsp */

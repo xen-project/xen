@@ -43,6 +43,14 @@ extern uint64_t _text[], _etext[], _end[], kstack[], phys_start[];
 
 uint64_t kernstart, kernend, kernsize, kernpstart, kernpend;
 
+#ifdef HAVE_LIBC
+uint8_t _heap[512 * 1024];
+unsigned long heap = (unsigned long)_heap,
+              brk = (unsigned long)_heap,
+              heap_mapped = (unsigned long)_heap + sizeof(_heap),
+              heap_end = (unsigned long)_heap + sizeof(_heap);
+#endif
+
 /* Print the available memory chunks. */
 static void
 print_phys_avail(void)

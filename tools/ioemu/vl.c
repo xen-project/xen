@@ -36,22 +36,29 @@
 #include <sys/times.h>
 #include <sys/wait.h>
 #include <termios.h>
+#ifndef CONFIG_STUBDOM
 #include <sys/poll.h>
+#endif
 #include <sys/mman.h>
 #include <sys/ioctl.h>
 #include <sys/resource.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
+#ifndef CONFIG_STUBDOM
 #include <net/if.h>
+#endif
 #if defined(__NetBSD__)
 #include <net/if_tap.h>
 #endif
 #if defined(__linux__) || defined(__Linux__)
 #include <linux/if_tun.h>
 #endif
+#ifndef CONFIG_STUBDOM
 #include <arpa/inet.h>
 #include <dirent.h>
+#endif
 #include <netdb.h>
+#ifndef CONFIG_STUBDOM
 #ifdef _BSD
 #include <sys/stat.h>
 #ifndef _BSD
@@ -68,6 +75,7 @@
 #endif
 #if defined(__sun__)
 #include <stropts.h>
+#endif
 #endif
 #endif
 
@@ -132,10 +140,9 @@
 #define MAX_IOPORTS 65536
 
 const char *bios_dir = CONFIG_QEMU_SHAREDIR;
-char phys_ram_file[1024];
-void *ioport_opaque[MAX_IOPORTS];
-IOPortReadFunc *ioport_read_table[3][MAX_IOPORTS];
-IOPortWriteFunc *ioport_write_table[3][MAX_IOPORTS];
+void **ioport_opaque;
+IOPortReadFunc *(*ioport_read_table)[MAX_IOPORTS];
+IOPortWriteFunc *(*ioport_write_table)[MAX_IOPORTS];
 /* Note: bs_table[MAX_DISKS] is a dummy block driver if none available
    to store the VM snapshots */
 BlockDriverState *bs_table[MAX_DISKS + MAX_SCSI_DISKS + 1], *fd_table[MAX_FD];
@@ -270,6 +277,9 @@ void default_ioport_writel(void *opaque, uint32_t address, uint32_t data)
 
 void init_ioports(void)
 {
+    ioport_opaque = malloc(MAX_IOPORTS * sizeof(*ioport_opaque));
+    ioport_read_table = malloc(3 * MAX_IOPORTS * sizeof(**ioport_read_table));
+    ioport_write_table = malloc(3 * MAX_IOPORTS * sizeof(**ioport_write_table));
 }
 
 /* size is the word size in byte */
@@ -797,9 +807,6 @@ static QEMUTimer *active_timers[2];
 static MMRESULT timerID;
 static HANDLE host_alarm = NULL;
 static unsigned int period = 1;
-#else
-/* frequency of the times() clock tick */
-static int timer_freq;
 #endif
 
 QEMUClock *qemu_new_clock(int type)
@@ -1136,9 +1143,6 @@ static void init_timer_alarm(void)
         struct sigaction act;
         struct itimerval itv;
 #endif
-        
-        /* get times() syscall frequency */
-        timer_freq = sysconf(_SC_CLK_TCK);
         
 #ifndef CONFIG_DM
         /* timer signal */
@@ -1497,6 +1501,7 @@ static CharDriverState *qemu_chr_open_file_out(const char *file_out)
     return qemu_chr_open_fd(-1, fd_out);
 }
 
+#ifndef CONFIG_STUBDOM
 static CharDriverState *qemu_chr_open_pipe(const char *filename)
 {
     int fd_in, fd_out;
@@ -1742,6 +1747,7 @@ static CharDriverState *qemu_chr_open_stdio(void)
     }
     return chr;
 }
+#endif
 
 /*
  * Create a store entry for a device (e.g., monitor, serial/parallel lines).
@@ -1751,6 +1757,9 @@ static CharDriverState *qemu_chr_open_stdio(void)
 static int store_dev_info(char *devName, int domid,
                           CharDriverState *cState, char *storeString)
 {
+#ifdef CONFIG_STUBDOM
+    return 0;
+#else
     int xc_handle;
     struct xs_handle *xs;
     char *path;
@@ -1826,8 +1835,10 @@ static int store_dev_info(char *devName, int domid,
     close(xc_handle);
 
     return 0;
+#endif
 }
 
+#ifndef CONFIG_STUBDOM
 #ifdef __sun__
 /* Once Solaris has openpty(), this is going to be removed. */
 int openpty(int *amaster, int *aslave, char *name,
@@ -2486,6 +2497,7 @@ static CharDriverState *qemu_chr_open_win_file_out(const char *file_out)
     return qemu_chr_open_win_file(fd_out);
 }
 #endif
+#endif
 
 /***********************************************************/
 /* UDP Net console */
@@ -2978,12 +2990,14 @@ CharDriverState *qemu_chr_open(const char *filename)
 	return qemu_chr_open_tcp(p, 0, 1);
     } else if (strstart(filename, "file:", &p)) {
         return qemu_chr_open_file_out(p);
+#ifndef CONFIG_STUBDOM
     } else if (strstart(filename, "pipe:", &p)) {
         return qemu_chr_open_pipe(p);
     } else if (!strcmp(filename, "pty")) {
         return qemu_chr_open_pty();
     } else if (!strcmp(filename, "stdio")) {
         return qemu_chr_open_stdio();
+#endif
     } else 
 #endif
 #if defined(__linux__)
@@ -3473,7 +3487,16 @@ static TAPState *net_tap_fd_init(VLANState *vlan, int fd)
     return s;
 }
 
-#ifdef _BSD
+#ifdef CONFIG_STUBDOM
+#include <netfront.h>
+static int tap_open(char *ifname, int ifname_size)
+{
+    char nodename[64];
+    static int num = 1; // 0 is for our own TCP/IP networking
+    snprintf(nodename, sizeof(nodename), "device/vif/%d", num++);
+    return netfront_tap_open(nodename);
+}
+#elif defined(_BSD)
 static int tap_open(char *ifname, int ifname_size)
 {
     int fd;
@@ -3561,6 +3584,7 @@ static int net_tap_init(VLANState *vlan, const char *ifname1,
     if (fd < 0)
         return -1;
 
+#ifndef CONFIG_STUBDOM
     if (!setup_script || !strcmp(setup_script, "no"))
         setup_script = "";
     if (setup_script[0] != '\0') {
@@ -3593,6 +3617,7 @@ static int net_tap_init(VLANState *vlan, const char *ifname1,
             }
         }
     }
+#endif
     s = net_tap_fd_init(vlan, fd);
     if (!s)
         return -1;
@@ -7041,12 +7066,14 @@ int main(int argc, char **argv)
     char usb_devices[MAX_USB_CMDLINE][128];
     int usb_devices_index;
     int fds[2];
+#ifndef CONFIG_STUBDOM
     struct rlimit rl;
+#endif
     sigset_t set;
     char qemu_dm_logfilename[128];
     const char *direct_pci = NULL;
 
-#ifndef __sun__
+#if !defined(__sun__) && !defined(CONFIG_STUBDOM)
     /* Maximise rlimits. Needed where default constraints are tight (*BSD). */
     if (getrlimit(RLIMIT_STACK, &rl) != 0) {
        perror("getrlimit(RLIMIT_STACK)");
@@ -7072,6 +7099,7 @@ int main(int argc, char **argv)
        perror("setrlimit(RLIMIT_MEMLOCK)");
 #endif
 
+#ifndef CONFIG_STUBDOM
     /* Ensure that SIGUSR2 is blocked by default when a new thread is created,
        then only the threads that use the signal unblock it -- this fixes a
        race condition in Qcow support where the AIO signal is misdelivered.  */
@@ -7113,6 +7141,7 @@ int main(int argc, char **argv)
             }
         }
     }
+#endif
 #endif
 
     register_machines();
@@ -7631,7 +7660,15 @@ int main(int argc, char **argv)
 #ifdef CONFIG_DM
     bdrv_init();
     xc_handle = xc_interface_open();
+#ifdef CONFIG_STUBDOM
+    char *domid_s, *msg;
+    if ((msg = xenbus_read(XBT_NIL, "domid", &domid_s)))
+        fprintf(stderr,"Can not read our own domid\n", msg);
+    else
+        xenstore_parse_domain_config(atoi(domid_s));
+#else /* CONFIG_STUBDOM */
     xenstore_parse_domain_config(domid);
+#endif /* CONFIG_STUBDOM */
 #endif /* CONFIG_DM */
 
 #ifdef USE_KQEMU
@@ -7799,8 +7836,10 @@ int main(int argc, char **argv)
 	vnc_display_password(ds, password);
 	if ((vnc_display_port = vnc_display_open(ds, vnc_display, vncunused)) < 0) 
 	    exit (0);
+#ifndef CONFIG_STUBDOM	    
  	if (vncviewer)
 	    vnc_start_viewer(vnc_display_port);
+#endif
 	xenstore_write_vncport(vnc_display_port);
     } else {
 #if defined(CONFIG_SDL)
@@ -7928,6 +7967,7 @@ int main(int argc, char **argv)
     }
 #endif
 
+#ifndef CONFIG_STUBDOM
     /* Unblock SIGTERM and SIGHUP, which may have been blocked by the caller */
     signal(SIGHUP, SIG_DFL);
     sigemptyset(&set);
@@ -7935,6 +7975,7 @@ int main(int argc, char **argv)
     sigaddset(&set, SIGHUP);
     if (sigprocmask(SIG_UNBLOCK, &set, NULL) == -1)
         fprintf(stderr, "Failed to unblock SIGTERM and SIGHUP\n");
+#endif
 
     main_loop();
     quit_timers();

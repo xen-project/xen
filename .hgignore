@@ -80,6 +80,17 @@
 ^pristine-.*$
 ^ref-.*$
 ^tmp-.*$
+^stubdom/binutils.*$
+^stubdom/cross-root.*$
+^stubdom/gcc.*$
+^stubdom/include.*$
+^stubdom/ioemu.*$
+^stubdom/libxc.*$
+^stubdom/lwip.*$
+^stubdom/mini-os.*$
+^stubdom/newlib.*$
+^stubdom/pciutils.*$
+^stubdom/zlib.*$
 ^tools/.*/TAGS$
 ^tools/.*/build/lib.*/.*\.py$
 ^tools/blktap/Makefile\.smh$

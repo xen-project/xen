@@ -57,6 +57,8 @@
 
 #include <stdarg.h>
 #include <stddef.h>
+#include <xen/xen.h>
+#include <xen/event_channel.h>
 
 #ifdef HAVE_LIBC
 #include <stdio.h>
@@ -103,6 +105,8 @@ char  *strdup(const char *s);
 
 int rand(void);
 
+#include <xenbus.h>
+
 #define ARRAY_SIZE(x) (sizeof(x) / sizeof((x)[0]))
 
 struct kvec {
@@ -125,5 +129,60 @@ do {                                                           \
 
 /* Consistency check as much as possible. */
 void sanity_check(void);
+
+#ifdef HAVE_LIBC
+enum fd_type {
+    FTYPE_NONE = 0,
+    FTYPE_CONSOLE,
+    FTYPE_FILE,
+    FTYPE_XENBUS,
+    FTYPE_EVTCHN,
+    FTYPE_SOCKET,
+    FTYPE_TAP,
+    FTYPE_BLK,
+};
+
+#define MAX_EVTCHN_PORTS 16
+
+extern struct file {
+    enum fd_type type;
+    union {
+	struct {
+            /* lwIP fd */
+	    int fd;
+	} socket;
+	struct {
+            /* FS import fd */
+	    int fd;
+	    off_t offset;
+	} file;
+	struct {
+            /* To each event channel FD is associated a series of ports which
+             * wakes select for this FD. */
+            struct {
+                evtchn_port_t port;
+                volatile unsigned long pending;
+                int bound;
+            } ports[MAX_EVTCHN_PORTS];
+	} evtchn;
+	struct {
+	    struct netfront_dev *dev;
+	} tap;
+	struct {
+	    struct blkfront_dev *dev;
+	} blk;
+        struct {
+            /* To each xenbus FD is associated a queue of watch events for this
+             * FD.  */
+            struct xenbus_event *volatile events;
+        } xenbus;
+    };
+    volatile int read;	/* maybe available for read */
+} files[];
+
+int alloc_fd(enum fd_type type);
+void close_all_files(void);
+extern struct thread *main_thread;
+#endif
 
 #endif /* _LIB_H_ */

@@ -33,9 +33,11 @@
 #define NDEBUG
 #include <assert.h>
 
+#ifndef CONFIG_STUBDOM
 typedef uint32_t u32;
 typedef uint16_t u16;
 typedef uint8_t u8;
+#endif
 
 #define MAXKC   (256/32)
 #define MAXKB   (256/8)

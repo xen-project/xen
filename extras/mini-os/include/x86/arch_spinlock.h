@@ -4,6 +4,7 @@
 #define __ARCH_ASM_SPINLOCK_H
 
 #include <lib.h>
+#include "os.h"
 
 
 #define ARCH_SPIN_LOCK_UNLOCKED (spinlock_t) { 1 }

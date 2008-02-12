@@ -27,10 +27,12 @@
 #include <sys/stat.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
-#include <arpa/inet.h>
 #include "vl.h"
 #include "qemu_socket.h"
 #include <assert.h>
+#ifdef CONFIG_STUBDOM
+#include <netfront.h>
+#endif
 
 /* The refresh interval starts at BASE.  If we scan the buffer and
    find no change, we increase by INC, up to MAX.  If the mouse moves
@@ -2407,7 +2409,9 @@ int vnc_display_open(DisplayState *ds, const char *display, int find_unused)
 #ifndef NO_UNIX_SOCKETS
     struct sockaddr_un uaddr;
 #endif
+#ifndef CONFIG_STUBDOM
     int reuse_addr, ret;
+#endif
     socklen_t addrlen;
     const char *p;
     VncState *vs = ds ? (VncState *)ds->opaque : vnc_state;
@@ -2539,6 +2543,15 @@ int vnc_display_open(DisplayState *ds, const char *display, int find_unused)
 	    return -1;
 	}
 
+#ifdef CONFIG_STUBDOM
+        {
+            struct ip_addr ipaddr = { iaddr.sin_addr.s_addr };
+            struct ip_addr netmask = { 0 };
+            struct ip_addr gw = { 0 };
+            networking_set_addr(&ipaddr, &netmask, &gw);
+        }
+#endif
+
 	iaddr.sin_port = htons(ntohs(iaddr.sin_port) + 5900);
 
 	vs->lsock = socket(PF_INET, SOCK_STREAM, 0);
@@ -2549,6 +2562,7 @@ int vnc_display_open(DisplayState *ds, const char *display, int find_unused)
 	    return -1;
 	}
 
+#ifndef CONFIG_STUBDOM
 	reuse_addr = 1;
 	ret = setsockopt(vs->lsock, SOL_SOCKET, SO_REUSEADDR,
 			 (const char *)&reuse_addr, sizeof(reuse_addr));
@@ -2560,6 +2574,7 @@ int vnc_display_open(DisplayState *ds, const char *display, int find_unused)
 	    vs->display = NULL;
 	    return -1;
 	}
+#endif
     }
 
     while (bind(vs->lsock, addr, addrlen) == -1) {
@@ -2590,6 +2605,7 @@ int vnc_display_open(DisplayState *ds, const char *display, int find_unused)
     return ntohs(iaddr.sin_port);
 }
 
+#ifndef CONFIG_STUBDOM
 int vnc_start_viewer(int port)
 {
     int pid, i, open_max;
@@ -2617,4 +2633,5 @@ int vnc_start_viewer(int port)
 	return pid;
     }
 }
+#endif
 

@@ -1,0 +1,41 @@
+To compile
+==========
+
+Just run make -j 4, that will download / patch / compile
+Then make install to install the result.
+
+Also, run make and make install in $XEN_ROOT/tools/fs-back
+
+To run
+======
+
+mkdir -p /exports/usr/share/qemu
+ln -s /usr/share/qemu/keymaps /exports/usr/share/qemu
+/usr/sbin/fs-backend &
+
+
+In your HVM config "hvmconfig",
+
+- use VNC, set vnclisten to "172.30.206.1" for instance:
+
+vnc=1 
+vnclisten="172.30.206.1" 
+
+- use /usr/lib/xen/bin/stubdom-dm as dm script
+
+device_model = '/usr/lib/xen/bin/stubdom-dm'
+
+- comment the disk statement:
+#disk = [  'file:/tmp/install.iso,hdc:cdrom,r', 'phy:/dev/sda6,hda,w', 'file:/tmp/test,hdb,r' ]
+
+Create /etc/xen/stubdom-hvmconfig ("hvmconfig" must match your main config file)
+with
+
+kernel="/usr/lib/xen/boot/stubdom.gz"
+vif=[ 'ip=172.30.206.1', 'ip=10.0.1.1,mac=aa:00:00:12:23:34']
+disk = [  'file:/tmp/install.iso,hdc:cdrom,r', 'phy:/dev/sda6,hda,w', 'file:/tmp/test,hdb,r' ]
+
+where
+- 172.30.206.1 is the IP for vnc,
+- 'ip=10.0.1.1,mac=' is the same net configuration as in the hvmconfig script,
+- and disk = is the same block configuration as in the hvmconfig script.

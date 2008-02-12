@@ -574,6 +574,9 @@ typedef struct BlockDriver BlockDriver;
 
 extern BlockDriver bdrv_raw;
 extern BlockDriver bdrv_host_device;
+#ifdef CONFIG_STUBDOM
+extern BlockDriver bdrv_vbd;
+#endif
 extern BlockDriver bdrv_cow;
 extern BlockDriver bdrv_qcow;
 extern BlockDriver bdrv_vmdk;

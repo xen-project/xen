@@ -1,0 +1,2 @@
+LIBZ=-lz
+LDLIBS+=$(LIBZ)
