@@ -14,6 +14,12 @@ else
 __XEN_LINUX_UPDATE =
 endif
 
+ifeq ($(XEN_LINUX_NONINTERACTIVE_CONFIG),y)
+__NONINT_CONFIG = yes $$'\n' |
+else
+__NONINT_CONFIG =
+endif
+
 # Let XEN_TARGET_ARCH override ARCH.
 ifeq ($(XEN_TARGET_ARCH),x86_32)
 LINUX_ARCH	?= i386
@@ -102,7 +108,7 @@ endif
 ifneq ($(EXTRAVERSION),)
 	echo "$(EXTRAVERSION)" >$(LINUX_DIR)/localversion-xen
 endif
-	$(MAKE) -C $(LINUX_SRCDIR) ARCH=$(LINUX_ARCH) oldconfig O=$$(/bin/pwd)/$(LINUX_DIR)
+	$(__NONINT_CONFIG) $(MAKE) -C $(LINUX_SRCDIR) ARCH=$(LINUX_ARCH) oldconfig O=$$(/bin/pwd)/$(LINUX_DIR)
 	@set -e ; if [ ! -f $(LINUX_DIR)/Makefile ] ; then \
 	    echo "***********************************"; \
 	    echo "oldconfig did not create a Makefile"; \
