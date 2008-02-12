@@ -7928,11 +7928,13 @@ int main(int argc, char **argv)
     }
 #endif
 
-    /* Unblock SIGTERM, which may have been blocked by the caller */
+    /* Unblock SIGTERM and SIGHUP, which may have been blocked by the caller */
+    signal(SIGHUP, SIG_DFL);
     sigemptyset(&set);
     sigaddset(&set, SIGTERM);
+    sigaddset(&set, SIGHUP);
     if (sigprocmask(SIG_UNBLOCK, &set, NULL) == -1)
-        fprintf(stderr, "Failed to unblock SIGTERM\n");
+        fprintf(stderr, "Failed to unblock SIGTERM and SIGHUP\n");
 
     main_loop();
     quit_timers();

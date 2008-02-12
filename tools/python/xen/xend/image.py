@@ -335,16 +335,27 @@ class ImageHandler:
             return
         if self.pid:
             try:
-                os.kill(self.pid, signal.SIGKILL)
+                os.kill(self.pid, signal.SIGHUP)
             except OSError, exn:
                 log.exception(exn)
             try:
-                os.waitpid(self.pid, 0)
+                # Try to reap the child every 100ms for 10s. Then SIGKILL it.
+                for i in xrange(100):
+                    (p, rv) = os.waitpid(self.pid, os.WNOHANG)
+                    if p == self.pid:
+                        break
+                    time.sleep(0.1)
+                else:
+                    log.warning("DeviceModel %d took more than 10s "
+                                "to terminate: sending SIGKILL" % self.pid)
+                    os.kill(self.pid, signal.SIGKILL)
+                    os.waitpid(self.pid, 0)
             except OSError, exn:
                 # This is expected if Xend has been restarted within the
                 # life of this domain.  In this case, we can kill the process,
                 # but we can't wait for it because it's not our child.
-                pass
+                # We just make really sure it's going away (SIGKILL) first.
+                os.kill(self.pid, signal.SIGKILL)
             self.pid = None
             state = xstransact.Remove("/local/domain/0/device-model/%i"
                                       % self.vm.getDomid())
