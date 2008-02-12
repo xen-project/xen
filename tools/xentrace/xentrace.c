@@ -384,8 +384,8 @@ int monitor_tbufs(int outfd)
             /* Read window information only once. */
             cons = meta[i]->cons;
             prod = meta[i]->prod;
-            rmb(); /* read prod, then read item. */
-            
+            xen_rmb(); /* read prod, then read item. */
+
             if ( cons == prod )
                 continue;
            
@@ -428,7 +428,7 @@ int monitor_tbufs(int outfd)
                              outfd);
             }
 
-            mb(); /* read buffer, then update cons. */
+            xen_mb(); /* read buffer, then update cons. */
             meta[i]->cons = prod;
         }
 

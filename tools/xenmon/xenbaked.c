@@ -511,10 +511,10 @@ int monitor_tbufs(void)
         {
             while ( meta[i]->cons != meta[i]->prod )
             {
-                rmb(); /* read prod, then read item. */
+                xen_rmb(); /* read prod, then read item. */
                 rec_size = process_record(
                     i, (struct t_rec *)(data[i] + meta[i]->cons % data_size));
-                mb(); /* read item, then update cons. */
+                xen_mb(); /* read item, then update cons. */
                 meta[i]->cons += rec_size;
             }
         }

@@ -485,7 +485,7 @@ static void xenfb_on_fb_event(struct xenfb *xenfb)
 	prod = page->out_prod;
 	if (prod == page->out_cons)
 		return;
-	rmb();			/* ensure we see ring contents up to prod */
+	xen_rmb();		/* ensure we see ring contents up to prod */
 	for (cons = page->out_cons; cons != prod; cons++) {
 		union xenfb_out_event *event = &XENFB_OUT_RING_REF(page, cons);
 		int x, y, w, h;
@@ -512,7 +512,7 @@ static void xenfb_on_fb_event(struct xenfb *xenfb)
 			break;
 		}
 	}
-	mb();			/* ensure we're done with ring contents */
+	xen_mb();		/* ensure we're done with ring contents */
 	page->out_cons = cons;
 	xc_evtchn_notify(xenfb->evt_xch, xenfb->fb.port);
 }
@@ -571,9 +571,9 @@ static int xenfb_kbd_event(struct xenfb *xenfb,
 		return -1;
 	}
 
-	mb();			/* ensure ring space available */
+	xen_mb();		/* ensure ring space available */
 	XENKBD_IN_RING_REF(page, prod) = *event;
-	wmb();			/* ensure ring contents visible */
+	xen_wmb();		/* ensure ring contents visible */
 	page->in_prod = prod + 1;
 	return xc_evtchn_notify(xenfb->evt_xch, xenfb->kbd.port);
 }

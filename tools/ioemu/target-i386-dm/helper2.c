@@ -218,7 +218,7 @@ static ioreq_t *__cpu_get_ioreq(int vcpu)
         return NULL;
     }
 
-    rmb(); /* see IOREQ_READY /then/ read contents of ioreq */
+    xen_rmb(); /* see IOREQ_READY /then/ read contents of ioreq */
 
     req->state = STATE_IOREQ_INPROCESS;
     return req;
@@ -568,7 +568,7 @@ void __handle_buffered_iopage(CPUState *env)
 
         __handle_ioreq(env, &req);
 
-        mb();
+        xen_mb();
         buffered_io_page->read_pointer += qw ? 2 : 1;
     }
 }
@@ -603,7 +603,7 @@ void cpu_handle_ioreq(void *opaque)
             return;
         }
 
-        wmb(); /* Update ioreq contents /then/ update state. */
+        xen_wmb(); /* Update ioreq contents /then/ update state. */
 
 	/*
          * We do this before we send the response so that the tools

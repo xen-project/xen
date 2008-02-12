@@ -112,7 +112,7 @@ static int writechn(struct connection *conn,
 	/* Must read indexes once, and before anything else, and verified. */
 	cons = intf->rsp_cons;
 	prod = intf->rsp_prod;
-	mb();
+	xen_mb();
 
 	if (!check_indexes(cons, prod)) {
 		errno = EIO;
@@ -124,7 +124,7 @@ static int writechn(struct connection *conn,
 		len = avail;
 
 	memcpy(dest, data, len);
-	mb();
+	xen_mb();
 	intf->rsp_prod += len;
 
 	xc_evtchn_notify(xce_handle, conn->domain->port);
@@ -142,7 +142,7 @@ static int readchn(struct connection *conn, void *data, unsigned int len)
 	/* Must read indexes once, and before anything else, and verified. */
 	cons = intf->req_cons;
 	prod = intf->req_prod;
-	mb();
+	xen_mb();
 
 	if (!check_indexes(cons, prod)) {
 		errno = EIO;
@@ -154,7 +154,7 @@ static int readchn(struct connection *conn, void *data, unsigned int len)
 		len = avail;
 
 	memcpy(data, src, len);
-	mb();
+	xen_mb();
 	intf->req_cons += len;
 
 	xc_evtchn_notify(xce_handle, conn->domain->port);
