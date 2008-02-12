@@ -707,9 +707,6 @@ class XendDomainInfo:
         log.debug("Setting memory maximum of domain %s (%s) to %d MiB.",
                   self.info['name_label'], str(self.domid), limit)
 
-        if limit <= 0:
-            raise XendError('Invalid memory size')
-
         MiB = 1024 * 1024
         self._safe_set_memory('memory_static_max', limit * MiB)
 
