@@ -1,0 +1,14 @@
+It looks like binutils has troubles with makeinfo and the doc generation.
+We don't need it anyway
+
+--- binutils-2.18/bfd/Makefile.inorig	2008-01-16 16:17:43.004484000 +0000
++++ binutils-2.18/bfd/Makefile.in	2008-01-16 16:17:50.505526000 +0000
+@@ -271,7 +271,7 @@
+ INCDIR = $(srcdir)/../include
+ CSEARCH = -I. -I$(srcdir) -I$(INCDIR)
+ MKDEP = gcc -MM
+-SUBDIRS = doc po
++SUBDIRS = po
+ bfddocdir = doc
+ bfdlib_LTLIBRARIES = libbfd.la
+ AM_CFLAGS = $(WARN_CFLAGS)

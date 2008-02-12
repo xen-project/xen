@@ -1,0 +1,31 @@
+Backported from later versions
+
+--- gcc-4.2.2/gcc/config.gcc       2007-11-22 16:27:45.000000000 +0000
++++ gcc-4.2.2/gcc/config.gcc       2007-11-22 16:23:00.000000000 +0000
+@@ -1033,6 +1033,11 @@
+ 	tmake_file="i386/t-i386elf t-svr4"
+ 	use_fixproto=yes
+ 	;;
++x86_64-*-elf*)
++	tm_file="${tm_file} i386/unix.h i386/att.h dbxelf.h elfos.h i386/i386elf.h i386/x86-64.h"
++	tmake_file="i386/t-i386elf t-svr4"
++	use_fixproto=yes
++	;;
+ i[34567]86-sequent-ptx4* | i[34567]86-sequent-sysv4*)
+ 	if test x$gas = xyes
+ 	then
+
+We don't have a libc yet at this stage. Unused anyway
+
+--- gcc-4.2.2/gcc/unwind-generic.h.orig 2008-01-11 18:54:40.000000000 +0100
++++ gcc-4.2.2/gcc/unwind-generic.h      2008-01-11 18:54:31.000000000 +0100
+@@ -203,7 +203,6 @@
+    compatible with the standard ABI for IA-64, we inline these.  */
+ 
+ #ifdef __ia64__
+-#include <stdlib.h>
+ 
+ static inline _Unwind_Ptr
+ _Unwind_GetDataRelBase (struct _Unwind_Context *_C)
+Backported from later versions
+

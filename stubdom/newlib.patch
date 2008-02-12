@@ -1,0 +1,203 @@
+There is a mix between longs and long longs.
+
+Index: newlib/libc/include/inttypes.h
+===================================================================
+RCS file: /cvs/src/src/newlib/libc/include/inttypes.h,v
+retrieving revision 1.3
+diff -u -p -r1.3 inttypes.h
+--- newlib/libc/include/inttypes.h	16 Dec 2005 19:03:12 -0000	1.3
++++ newlib/libc/include/inttypes.h	8 Nov 2007 16:32:44 -0000
+@@ -163,12 +163,12 @@
+ 
+ 
+ /* 64-bit types */
+-#if __have_longlong64
+-#define __PRI64(x) __STRINGIFY(ll##x)
+-#define __SCN64(x) __STRINGIFY(ll##x)
+-#elif __have_long64
++#if __have_long64
+ #define __PRI64(x) __STRINGIFY(l##x)
+ #define __SCN64(x) __STRINGIFY(l##x)
++#elif __have_longlong64
++#define __PRI64(x) __STRINGIFY(ll##x)
++#define __SCN64(x) __STRINGIFY(ll##x)
+ #else
+ #define __PRI64(x) __STRINGIFY(x)
+ #define __SCN64(x) __STRINGIFY(x)
+@@ -217,12 +217,12 @@
+ #endif
+ 
+ /* max-bit types */
+-#if __have_longlong64
+-#define __PRIMAX(x) __STRINGIFY(ll##x)
+-#define __SCNMAX(x) __STRINGIFY(ll##x)
+-#elif __have_long64
++#if __have_long64
+ #define __PRIMAX(x) __STRINGIFY(l##x)
+ #define __SCNMAX(x) __STRINGIFY(l##x)
++#elif __have_longlong64
++#define __PRIMAX(x) __STRINGIFY(ll##x)
++#define __SCNMAX(x) __STRINGIFY(ll##x)
+ #else
+ #define __PRIMAX(x) __STRINGIFY(x)
+ #define __SCNMAX(x) __STRINGIFY(x)
+@@ -242,12 +242,12 @@
+ #define SCNxMAX		__SCNMAX(x)
+ 
+ /* ptr types */
+-#if __have_longlong64
+-#define __PRIPTR(x) __STRINGIFY(ll##x)
+-#define __SCNPTR(x) __STRINGIFY(ll##x)
+-#elif __have_long64
++#if __have_long64
+ #define __PRIPTR(x) __STRINGIFY(l##x)
+ #define __SCNPTR(x) __STRINGIFY(l##x)
++#elif __have_longlong64
++#define __PRIPTR(x) __STRINGIFY(ll##x)
++#define __SCNPTR(x) __STRINGIFY(ll##x)
+ #else
+ #define __PRIPTR(x) __STRINGIFY(x)
+ #define __SCNPTR(x) __STRINGIFY(x)
+
+We don't want u?int32_t to be long as our code assume in a lot of places to be
+int.
+
+Index: newlib/libc/include/stdint.h
+===================================================================
+RCS file: /cvs/src/src/newlib/libc/include/stdint.h,v
+retrieving revision 1.10
+diff -u -p -r1.10 stdint.h
+--- newlib/libc/include/stdint.h	16 Aug 2006 21:39:43 -0000	1.10
++++ newlib/libc/include/stdint.h	12 Feb 2008 13:07:52 -0000
+@@ -38,7 +38,7 @@ extern "C" {
+ #if __STDINT_EXP(LONG_MAX) > 0x7fffffff
+ #define __have_long64 1
+ #elif __STDINT_EXP(LONG_MAX) == 0x7fffffff && !defined(__SPU__)
+-#define __have_long32 1
++/* #define __have_long32 1 */
+ #endif
+ 
+ #if __STDINT_EXP(SCHAR_MAX) == 0x7f
+
+Define the basic ia64 jump buffer
+
+Index: newlib/libc/include/machine/setjmp.h
+===================================================================
+RCS file: /cvs/src/src/newlib/libc/include/machine/setjmp.h,v
+retrieving revision 1.34
+diff -u -p -r1.34 setjmp.h
+--- newlib/libc/include/machine/setjmp.h	7 Nov 2007 21:42:24 -0000	1.34
++++ newlib/libc/include/machine/setjmp.h	11 Jan 2008 18:10:43 -0000
+@@ -72,6 +72,11 @@ _BEGIN_STD_C
+ #define _JBLEN  8
+ #endif
+ 
++#ifdef __ia64__
++#define _JBTYPE long
++#define _JBLEN 70
++#endif
++
+ #ifdef __i960__
+ #define _JBLEN 35
+ #endif
+
+In mini-os we use a dynamic reentrency buffer.
+
+Index: newlib/libc/include/sys/config.h
+===================================================================
+RCS file: /cvs/src/src/newlib/libc/include/sys/config.h,v
+retrieving revision 1.47
+diff -u -p -r1.47 config.h
+--- newlib/libc/include/sys/config.h	15 Mar 2007 21:32:12 -0000	1.47
++++ newlib/libc/include/sys/config.h	8 Nov 2007 16:32:44 -0000
+@@ -71,6 +71,10 @@
+ #endif
+ #endif
+ 
++#ifndef __DYNAMIC_REENT__
++#define __DYNAMIC_REENT__
++#endif
++
+ #ifdef __mn10200__
+ #define __SMALL_BITFIELDS
+ #endif
+
+Dynamic pointer to our reentrancy zone
+
+Index: newlib/libc/reent/getreent.c
+===================================================================
+RCS file: /cvs/src/src/newlib/libc/reent/getreent.c,v
+retrieving revision 1.2
+diff -u -p -r1.2 getreent.c
+--- newlib/libc/reent/getreent.c	7 Sep 2007 00:45:55 -0000	1.2
++++ newlib/libc/reent/getreent.c	8 Nov 2007 16:32:44 -0000
+@@ -3,12 +3,20 @@
+ #include <_ansi.h>
+ #include <reent.h>
+ 
++#define weak_alias(name, aliasname) \
++  extern __typeof (name) aliasname __attribute__ ((weak, alias (#name)));
++
+ #ifdef __getreent
+ #undef __getreent
+ #endif
++#ifdef __libc_getreent
++#undef __libc_getreent
++#endif
+ 
+ struct _reent *
+-_DEFUN_VOID(__getreent)
++__libc_getreent (void)
+ {
+   return _impure_ptr;
+ }
++weak_alias(__libc_getreent,__getreent)
++
+
+We can't provide a red zone in mini-os.
+
+Index: newlib/libc/machine/x86_64/memcpy.S
+===================================================================
+RCS file: /cvs/src/src/newlib/libc/machine/x86_64/memcpy.S,v
+retrieving revision 1.1
+diff -u -p -r1.1 memcpy.S
+--- newlib/libc/machine/x86_64/memcpy.S	28 Aug 2007 21:56:49 -0000	1.1
++++ newlib/libc/machine/x86_64/memcpy.S	8 Nov 2007 16:32:44 -0000
+@@ -30,10 +30,18 @@ quadword_aligned:
+   cmpq    $256, rdx
+   jb      quadword_copy
+ 
++#if 1
++  subq    $32, rsp
++  movq    rax, 24 (rsp)
++  movq    r12, 16 (rsp)
++  movq    r13, 8  (rsp)
++  movq    r14, 0  (rsp)
++#else
+   movq    rax, -8  (rsp)
+   movq    r12, -16 (rsp)
+   movq    r13, -24 (rsp)
+   movq    r14, -32 (rsp)
++#endif
+ 
+   movq    rdx, rcx                /* Copy 128 bytes at a time with minimum cache polution */
+   shrq    $7, rcx
+@@ -89,10 +97,18 @@ loop:
+   movq    rdx, rcx
+   andq    $127, rcx
+   rep     movsb
++#if 1
++  movq    24 (rsp), rax
++  movq    16 (rsp), r12
++  movq    8  (rsp), r13
++  movq    0  (rsp), r14
++  addq    $32, rsp
++#else
+   movq    -8  (rsp), rax
+   movq    -16 (rsp), r12
+   movq    -24 (rsp), r13
+   movq    -32 (rsp), r14
++#endif
+   ret
+ 
+ 

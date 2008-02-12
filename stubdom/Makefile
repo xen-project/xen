@@ -54,8 +54,8 @@ BINUTILS_STAMPFILE=$(CROSS_ROOT)/bin/$(GNU_TARGET_ARCH)-xen-elf-ar
 .PHONY: cross-binutils
 cross-binutils: $(BINUTILS_STAMPFILE)
 $(BINUTILS_STAMPFILE): binutils-$(BINUTILS_VERSION)
-	mkdir -p binutils.build
-	( cd binutils.build && \
+	mkdir -p binutils-build
+	( cd binutils-build && \
 	  ../binutils-$(BINUTILS_VERSION)/configure --prefix=$(CROSS_PREFIX) --verbose --target=$(GNU_TARGET_ARCH)-xen-elf && \
 	  $(MAKE) && \
 	  $(MAKE) check && \
@@ -76,8 +76,8 @@ GCC_STAMPFILE=$(CROSS_ROOT)/bin/$(GNU_TARGET_ARCH)-xen-elf-gcc-$(GCC_VERSION)
 .PHONY: cross-gcc
 cross-gcc: $(GCC_STAMPFILE)
 $(GCC_STAMPFILE): gcc-$(GCC_VERSION) $(BINUTILS_STAMPFILE)
-	mkdir -p gcc.build
-	( cd gcc.build && \
+	mkdir -p gcc-build
+	( cd gcc-build && \
 	  ../gcc-$(GCC_VERSION)/configure --prefix=$(CROSS_PREFIX) --verbose --target=$(GNU_TARGET_ARCH)-xen-elf --enable-languages=c --disable-libssp --with-gnu-as --with-gnu-ld && \
 	  $(MAKE) GCC_FOR_TARGET='$$$$r/gcc/xgcc -B$$$$r/gcc/ '"$(TARGET_CFLAGS)"' $$(FLAGS_FOR_TARGET)' && \
 	  $(MAKE) install )
@@ -88,16 +88,16 @@ $(GCC_STAMPFILE): gcc-$(GCC_VERSION) $(BINUTILS_STAMPFILE)
 
 newlib:
 	cvs -z 9 -d :pserver:anoncvs@sources.redhat.com:/cvs/src co -D $(NEWLIB_DATE) newlib
-	mv src newlib
-	( cd newlib && patch -p0 < ../newlib.patch)
+	mv src newlib-cvs
+	( cd newlib-cvs && patch -p0 < ../newlib.patch)
 
 NEWLIB_STAMPFILE=$(CROSS_ROOT)/$(GNU_TARGET_ARCH)-xen-elf/lib/libc.a
 .PHONY: cross-newlib
 cross-newlib: $(NEWLIB_STAMPFILE)
 $(NEWLIB_STAMPFILE): newlib $(GCC_STAMPFILE)
-	mkdir -p newlib.build
-	( cd newlib.build && \
-	  CC_FOR_TARGET="$(GNU_TARGET_ARCH)-xen-elf-gcc $(TARGET_CFLAGS)" ../newlib/configure --prefix=$(CROSS_PREFIX) --verbose --target=$(GNU_TARGET_ARCH)-xen-elf --enable-newlib-io-long-long && \
+	mkdir -p newlib-build
+	( cd newlib-build && \
+	  CC_FOR_TARGET="$(GNU_TARGET_ARCH)-xen-elf-gcc $(TARGET_CFLAGS)" ../newlib-cvs/configure --prefix=$(CROSS_PREFIX) --verbose --target=$(GNU_TARGET_ARCH)-xen-elf --enable-newlib-io-long-long && \
 	  $(MAKE) && \
 	  $(MAKE) install )
 
@@ -144,8 +144,9 @@ $(LIBPCI_STAMPFILE): pciutils-$(LIBPCI_VERSION).tar.bz2 $(NEWLIB_STAMPFILE) $(ZL
 # lwIP
 ######
 
-lwip:
+lwip-cvs:
 	cvs -z 9 -d :pserver:anonymous@cvs.savannah.nongnu.org:/sources/lwip co -D $(LWIP_DATE) lwip
+	mv lwip lwip-cvs
 
 #######
 # Links
@@ -190,7 +191,7 @@ libxc: cross-zlib mk-symlinks
 ioemu: cross-zlib cross-libpci mk-symlinks libxc
 	[ -f ioemu/config-host.mak ] || \
 	  ( cd ioemu ; XEN_TARGET_ARCH=$(XEN_TARGET_ARCH) sh configure --prefix=/usr --enable-stubdom $(IOEMU_OPTIONS))
-	$(MAKE) -C ioemu LWIPDIR=$(CURDIR)/lwip
+	$(MAKE) -C ioemu LWIPDIR=$(CURDIR)/lwip-cvs
 
 ######
 # caml
@@ -205,12 +206,12 @@ caml:
 ########
 
 .PHONY: qemu-stubdom
-qemu-stubdom: mk-symlinks lwip libxc ioemu
-	$(MAKE) -C mini-os LWIPDIR=$(CURDIR)/lwip QEMUDIR=$(CURDIR)/ioemu
+qemu-stubdom: mk-symlinks lwip-cvs libxc ioemu
+	$(MAKE) -C mini-os LWIPDIR=$(CURDIR)/lwip-cvs QEMUDIR=$(CURDIR)/ioemu
 
 .PHONY: caml-stubdom
-caml-stubdom: mk-symlinks lwip libxc cross-libpci caml
-	$(MAKE) -C mini-os LWIPDIR=$(CURDIR)/lwip CAMLDIR=$(CURDIR)/caml
+caml-stubdom: mk-symlinks lwip-cvs libxc cross-libpci caml
+	$(MAKE) -C mini-os LWIPDIR=$(CURDIR)/lwia-cvs CAMLDIR=$(CURDIR)/caml
 
 #########
 # install
@@ -227,7 +228,7 @@ install: mini-os/mini-os.gz
 # Only clean the libxc/ioemu/mini-os part
 .PHONY: clean
 clean:
-	-$(MAKE) -C mini-os LWIPDIR=$(CURDIR)/lwip clean
+	-$(MAKE) -C mini-os LWIPDIR=$(CURDIR)/lwip-cvs clean
 	$(MAKE) -C caml clean
 	rm -fr libxc ioemu mini-os include
 
@@ -235,7 +236,7 @@ clean:
 .PHONY: crossclean
 crossclean: clean
 	rm -fr $(CROSS_ROOT)
-	rm -fr binutils.build gcc.build newlib.build
+	rm -fr binutils-build gcc-build newlib-build
 	rm -fr zlib-$(ZLIB_VERSION) pciutils-$(LIBPCI_VERSION)
 
 # clean patched sources
@@ -243,8 +244,8 @@ crossclean: clean
 patchclean: crossclean
 	rm -fr binutils-$(BINUTILS_VERSION)
 	rm -fr gcc-$(GCC_VERSION)
-	rm -fr newlib
-	rm -fr lwip
+	rm -fr newlib-cvs
+	rm -fr lwip-cvs
 
 # clean downloads
 .PHONY: downloadclean
