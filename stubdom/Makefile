@@ -86,7 +86,7 @@ $(GCC_STAMPFILE): gcc-$(GCC_VERSION) $(BINUTILS_STAMPFILE)
 # Cross-newlib
 ##############
 
-newlib:
+newlib-cvs:
 	cvs -z 9 -d :pserver:anoncvs@sources.redhat.com:/cvs/src co -D $(NEWLIB_DATE) newlib
 	mv src newlib-cvs
 	( cd newlib-cvs && patch -p0 < ../newlib.patch)
@@ -94,7 +94,7 @@ newlib:
 NEWLIB_STAMPFILE=$(CROSS_ROOT)/$(GNU_TARGET_ARCH)-xen-elf/lib/libc.a
 .PHONY: cross-newlib
 cross-newlib: $(NEWLIB_STAMPFILE)
-$(NEWLIB_STAMPFILE): newlib $(GCC_STAMPFILE)
+$(NEWLIB_STAMPFILE): newlib-cvs $(GCC_STAMPFILE)
 	mkdir -p newlib-build
 	( cd newlib-build && \
 	  CC_FOR_TARGET="$(GNU_TARGET_ARCH)-xen-elf-gcc $(TARGET_CFLAGS)" ../newlib-cvs/configure --prefix=$(CROSS_PREFIX) --verbose --target=$(GNU_TARGET_ARCH)-xen-elf --enable-newlib-io-long-long && \
