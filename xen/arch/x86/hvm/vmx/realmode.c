@@ -781,7 +781,7 @@ void vmx_realmode(struct cpu_user_regs *regs)
     struct vcpu *curr = current;
     struct realmode_emulate_ctxt rm_ctxt;
     unsigned long intr_info = __vmread(VM_ENTRY_INTR_INFO);
-    int i;
+    unsigned int i, emulations = 0;
 
     rm_ctxt.ctxt.regs = regs;
 
@@ -804,11 +804,19 @@ void vmx_realmode(struct cpu_user_regs *regs)
 
     while ( curr->arch.hvm_vmx.vmxemul &&
             !softirq_pending(smp_processor_id()) &&
-            !curr->arch.hvm_vmx.real_mode_io_in_progress &&
-            /* Check for pending interrupts only in proper real mode. */
-            ((curr->arch.hvm_vcpu.guest_cr[0] & X86_CR0_PE) ||
-             !hvm_local_events_need_delivery(curr)) )
+            !curr->arch.hvm_vmx.real_mode_io_in_progress )
+    {
+        /*
+         * Check for pending interrupts only every 16 instructions, because
+         * hvm_local_events_need_delivery() is moderately expensive, and only
+         * in real mode, because we don't emulate protected-mode IDT vectoring.
+         */
+        if ( unlikely(!(++emulations & 15)) &&
+             !(curr->arch.hvm_vcpu.guest_cr[0] & X86_CR0_PE) &&
+             hvm_local_events_need_delivery(curr) )
+            break;
         realmode_emulate_one(&rm_ctxt);
+    }
 
     if ( !curr->arch.hvm_vmx.vmxemul )
     {
