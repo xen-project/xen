@@ -917,6 +917,14 @@ static enum hvm_intblk vmx_interrupt_blocked(
 {
     unsigned long intr_shadow;
 
+    /*
+     * Test EFLAGS.IF first. It is often the most likely reason for interrupt
+     * blockage, and is the cheapest to test (because no VMREAD is required).
+     */
+    if ( (intack.source != hvm_intsrc_nmi) &&
+         !(guest_cpu_user_regs()->eflags & X86_EFLAGS_IF) )
+        return hvm_intblk_rflags_ie;
+
     intr_shadow = __vmread(GUEST_INTERRUPTIBILITY_INFO);
 
     if ( intr_shadow & (VMX_INTR_SHADOW_STI|VMX_INTR_SHADOW_MOV_SS) )
@@ -928,9 +936,6 @@ static enum hvm_intblk vmx_interrupt_blocked(
 
     ASSERT((intack.source == hvm_intsrc_pic) ||
            (intack.source == hvm_intsrc_lapic));
-
-    if ( !(guest_cpu_user_regs()->eflags & X86_EFLAGS_IF) )
-        return hvm_intblk_rflags_ie;
 
     return hvm_intblk_none;
 }
