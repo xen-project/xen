@@ -251,7 +251,7 @@ static xen_pfn_t *load_p2m_frame_list(
 
     /* Now that we know the guest's word-size, can safely allocate 
      * the p2m frame list */
-    if ( (p2m_frame_list = malloc(P2M_FL_SIZE)) == NULL )
+    if ( (p2m_frame_list = malloc(P2M_TOOLS_FL_SIZE)) == NULL )
     {
         ERROR("Couldn't allocate p2m_frame_list array");
         return NULL;
@@ -1040,7 +1040,7 @@ int xc_domain_restore(int xc_handle, int io_fd, uint32_t dom,
             SET_FIELD(&ctxt, gdt_frames[j], p2m[pfn]);
         }
         /* Uncanonicalise the page table base pointer. */
-        pfn = xen_cr3_to_pfn(GET_FIELD(&ctxt, ctrlreg[3]));
+        pfn = UNFOLD_CR3(GET_FIELD(&ctxt, ctrlreg[3]));
 
         if ( pfn >= p2m_size )
         {
@@ -1057,12 +1057,12 @@ int xc_domain_restore(int xc_handle, int io_fd, uint32_t dom,
                   (unsigned long)pt_levels<<XEN_DOMCTL_PFINFO_LTAB_SHIFT);
             goto out;
         }
-        SET_FIELD(&ctxt, ctrlreg[3], xen_pfn_to_cr3(p2m[pfn]));
+        SET_FIELD(&ctxt, ctrlreg[3], FOLD_CR3(p2m[pfn]));
 
         /* Guest pagetable (x86/64) stored in otherwise-unused CR1. */
         if ( (pt_levels == 4) && (ctxt.x64.ctrlreg[1] & 1) )
         {
-            pfn = xen_cr3_to_pfn(ctxt.x64.ctrlreg[1] & ~1);
+            pfn = UNFOLD_CR3(ctxt.x64.ctrlreg[1] & ~1);
             if ( pfn >= p2m_size )
             {
                 ERROR("User PT base is bad: pfn=%lu p2m_size=%lu",
@@ -1077,7 +1077,7 @@ int xc_domain_restore(int xc_handle, int io_fd, uint32_t dom,
                       (unsigned long)pt_levels<<XEN_DOMCTL_PFINFO_LTAB_SHIFT);
                 goto out;
             }
-            ctxt.x64.ctrlreg[1] = xen_pfn_to_cr3(p2m[pfn]);
+            ctxt.x64.ctrlreg[1] = FOLD_CR3(p2m[pfn]);
         }
         domctl.cmd = XEN_DOMCTL_setvcpucontext;
         domctl.domain = (domid_t)dom;
@@ -1158,7 +1158,7 @@ int xc_domain_restore(int xc_handle, int io_fd, uint32_t dom,
     if ( guest_width > sizeof (xen_pfn_t) )
         for ( i = p2m_size - 1; i >= 0; i-- )
             ((uint64_t *)p2m)[i] = p2m[i];
-    else if ( guest_width > sizeof (xen_pfn_t) )
+    else if ( guest_width < sizeof (xen_pfn_t) )
         for ( i = 0; i < p2m_size; i++ )   
             ((uint32_t *)p2m)[i] = p2m[i];
 

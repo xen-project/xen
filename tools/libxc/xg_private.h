@@ -155,7 +155,9 @@ typedef l4_pgentry_64_t l4_pgentry_t;
 #define P2M_FL_ENTRIES  (((p2m_size)+FPP-1)/FPP)
 
 /* Size in bytes of the pfn_to_mfn_frame_list     */
-#define P2M_FL_SIZE     ((P2M_FL_ENTRIES)*(guest_width))
+#define P2M_GUEST_FL_SIZE ((P2M_FL_ENTRIES) * (guest_width))
+#define P2M_TOOLS_FL_SIZE ((P2M_FL_ENTRIES) *                           \
+                           MAX((sizeof (xen_pfn_t)), guest_width))
 
 /* Masks for PTE<->PFN conversions */
 #define MADDR_BITS_X86  ((guest_width == 8) ? 52 : 44)
