@@ -52,33 +52,6 @@ static inline void set_bit(int nr, volatile void * addr)
     BITMAP_ENTRY(nr, addr) |= (1UL << BITMAP_SHIFT(nr));
 }
 
-static int xc_ia64_shadow_control(int xc_handle,
-                                  uint32_t domid,
-                                  unsigned int sop,
-                                  unsigned long *dirty_bitmap,
-                                  unsigned long pages,
-                                  xc_shadow_op_stats_t *stats)
-{
-    if (dirty_bitmap != NULL && pages > 0) {
-        int i;
-        unsigned char *bmap = (unsigned char *)dirty_bitmap;
-        unsigned long bmap_bytes =
-            ((pages + BITS_PER_LONG - 1) & ~(BITS_PER_LONG - 1)) / 8;
-        unsigned int bmap_pages = (bmap_bytes + PAGE_SIZE - 1) / PAGE_SIZE;
-
-        /* Touch the page so that it is in the TC.
-           FIXME: use a more reliable method.  */
-        for (i = 0 ; i < bmap_pages ; i++)
-            bmap[i * PAGE_SIZE] = 0;
-        /* Because bmap is not page aligned (allocated by malloc), be sure the
-           last page is touched.  */
-        bmap[bmap_bytes - 1] = 0;
-    }
-
-    return xc_shadow_control(xc_handle, domid, sop,
-                             dirty_bitmap, pages, NULL, 0, stats);
-}
-
 static int
 suspend_and_state(int (*suspend)(int), int xc_handle, int io_fd,
                   int dom, xc_dominfo_t *info)
@@ -523,9 +496,9 @@ xc_domain_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
     /* Domain is still running at this point */
     if (live) {
 
-        if (xc_ia64_shadow_control(xc_handle, dom,
-                                   XEN_DOMCTL_SHADOW_OP_ENABLE_LOGDIRTY,
-                                   NULL, 0, NULL ) < 0) {
+        if (xc_shadow_control(xc_handle, dom,
+                              XEN_DOMCTL_SHADOW_OP_ENABLE_LOGDIRTY,
+                              NULL, 0, NULL, 0, NULL ) < 0) {
             ERROR("Couldn't enable shadow mode");
             goto out;
         }
@@ -621,9 +594,10 @@ xc_domain_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
            slightly wasteful to peek the whole array evey time,
            but this is fast enough for the moment. */
         if (!last_iter) {
-            if (xc_ia64_shadow_control(xc_handle, dom,
-                                       XEN_DOMCTL_SHADOW_OP_PEEK,
-                                       to_skip, p2m_size, NULL) != p2m_size) {
+            if (xc_shadow_control(xc_handle, dom,
+                                  XEN_DOMCTL_SHADOW_OP_PEEK,
+                                  to_skip, p2m_size,
+                                  NULL, 0, NULL) != p2m_size) {
                 ERROR("Error peeking shadow bitmap");
                 goto out;
             }
@@ -711,9 +685,10 @@ xc_domain_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
             }
 
             /* Pages to be sent are pages which were dirty.  */
-            if (xc_ia64_shadow_control(xc_handle, dom,
-                                       XEN_DOMCTL_SHADOW_OP_CLEAN,
-                                       to_send, p2m_size, NULL ) != p2m_size) {
+            if (xc_shadow_control(xc_handle, dom,
+                                  XEN_DOMCTL_SHADOW_OP_CLEAN,
+                                  to_send, p2m_size,
+                                  NULL, 0, NULL ) != p2m_size) {
                 ERROR("Error flushing shadow PT");
                 goto out;
             }
@@ -771,8 +746,9 @@ xc_domain_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
  out:
 
     if (live) {
-        if (xc_ia64_shadow_control(xc_handle, dom, XEN_DOMCTL_SHADOW_OP_OFF,
-                                   NULL, 0, NULL ) < 0) {
+        if (xc_shadow_control(xc_handle, dom,
+                              XEN_DOMCTL_SHADOW_OP_OFF,
+                              NULL, 0, NULL, 0, NULL ) < 0) {
             DPRINTF("Warning - couldn't disable shadow mode");
         }
     }
