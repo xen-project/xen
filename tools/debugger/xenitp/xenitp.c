@@ -1577,6 +1577,7 @@ void xenitp (int vcpu)
         int len;
 
         printf ("XenITP> ");
+        fflush (stdout);
 
         if (fgets (buf, sizeof (buf), stdin) == NULL)
             break;
