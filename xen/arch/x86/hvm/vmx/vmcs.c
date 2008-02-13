@@ -338,8 +338,6 @@ void vmx_vmcs_enter(struct vcpu *v)
     if ( likely(v == current) )
         return;
 
-    BUG_ON(vcpu_runnable(v));
-
     fv = &this_cpu(foreign_vmcs);
 
     if ( fv->v == v )
@@ -369,8 +367,6 @@ void vmx_vmcs_exit(struct vcpu *v)
 
     if ( likely(v == current) )
         return;
-
-    BUG_ON(vcpu_runnable(v));
 
     fv = &this_cpu(foreign_vmcs);
     BUG_ON(fv->v != v);
