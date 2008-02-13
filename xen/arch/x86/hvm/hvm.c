@@ -1386,6 +1386,7 @@ void hvm_task_switch(
 static enum hvm_copy_result __hvm_copy(
     void *buf, paddr_t addr, int size, int dir, int virt, int fetch)
 {
+    struct vcpu *curr = current;
     unsigned long gfn, mfn;
     p2m_type_t p2mt;
     char *p;
@@ -1394,12 +1395,22 @@ static enum hvm_copy_result __hvm_copy(
 
     if ( virt )
     {
-        struct segment_register sreg;
-        hvm_get_segment_register(current, x86_seg_ss, &sreg);
-        if ( sreg.attr.fields.dpl == 3 )
-            pfec |= PFEC_user_mode;
+        /*
+         * We cannot use hvm_get_segment_register() while executing in
+         * vmx_realmode() as segment register state is cached. Furthermore,
+         * VMREADs on every data access hurts emulation performance.
+         */
+        if ( !curr->arch.hvm_vmx.vmxemul )
+        {
+            struct segment_register sreg;
+            hvm_get_segment_register(curr, x86_seg_ss, &sreg);
+            if ( sreg.attr.fields.dpl == 3 )
+                pfec |= PFEC_user_mode;
+        }
+
         if ( dir ) 
             pfec |= PFEC_write_access;
+
         if ( fetch ) 
             pfec |= PFEC_insn_fetch;
     }
@@ -1411,7 +1422,7 @@ static enum hvm_copy_result __hvm_copy(
 
         if ( virt )
         {
-            gfn = paging_gva_to_gfn(current, addr, &pfec);
+            gfn = paging_gva_to_gfn(curr, addr, &pfec);
             if ( gfn == INVALID_GFN )
             {
                 if ( virt == 2 ) /* 2 means generate a fault */
@@ -1435,7 +1446,7 @@ static enum hvm_copy_result __hvm_copy(
         if ( dir )
         {
             memcpy(p, buf, count); /* dir == TRUE:  *to* guest */
-            paging_mark_dirty(current->domain, mfn);
+            paging_mark_dirty(curr->domain, mfn);
         }
         else
             memcpy(buf, p, count); /* dir == FALSE: *from guest */
