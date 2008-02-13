@@ -16,15 +16,4 @@
  * grabbing every spinlock in the kernel. */
 int stop_machine_run(int (*fn)(void *), void *data, unsigned int cpu);
 
-/**
- * __stop_machine_run: freeze the machine on all CPUs and run this function
- * @fn: the function to run
- * @data: the data ptr for the @fn
- * @cpu: the cpu to run @fn on (or any, if @cpu == NR_CPUS.
- *
- * Description: This is a special version of the above, without explicit
- * lock acquisition. Used by hotplug cpu.
- */
-int __stop_machine_run(int (*fn)(void *), void *data, unsigned int cpu);
-
 #endif /* __XEN_STOP_MACHINE_H__ */

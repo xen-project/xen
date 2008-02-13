@@ -112,7 +112,7 @@ static void map_cpu_to_logical_apicid(void);
 DEFINE_PER_CPU(int, cpu_state) = { 0 };
 
 static void *stack_base[NR_CPUS] __cacheline_aligned;
-spinlock_t cpu_add_remove_lock;
+static DEFINE_SPINLOCK(cpu_add_remove_lock);
 
 /*
  * The bootstrap kernel entry code has set these up. Save them for
@@ -1164,7 +1164,6 @@ void __devinit smp_prepare_boot_cpu(void)
 	cpu_set(smp_processor_id(), cpu_present_map);
 	cpu_set(smp_processor_id(), cpu_possible_map);
 	per_cpu(cpu_state, smp_processor_id()) = CPU_ONLINE;
-	spin_lock_init(&cpu_add_remove_lock);
 }
 
 #ifdef CONFIG_HOTPLUG_CPU
@@ -1298,7 +1297,7 @@ int cpu_down(unsigned int cpu)
 
 	printk("Prepare to bring CPU%d down...\n", cpu);
 
-	err = __stop_machine_run(take_cpu_down, NULL, cpu);
+	err = stop_machine_run(take_cpu_down, NULL, cpu);
 	if ( err < 0 )
 		goto out;
 

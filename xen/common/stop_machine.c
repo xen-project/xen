@@ -22,12 +22,13 @@
 
 #include <xen/config.h>
 #include <xen/init.h>
+#include <xen/sched.h>
 #include <xen/spinlock.h>
-#include <asm/smp.h>
-#include <asm/current.h>
 #include <xen/softirq.h>
-#include <asm/processor.h>
 #include <xen/errno.h>
+#include <xen/smp.h>
+#include <asm/current.h>
+#include <asm/processor.h>
 
 enum stopmachine_state {
     STOPMACHINE_START,
@@ -61,7 +62,7 @@ static void stopmachine_set_state(enum stopmachine_state state)
         cpu_relax();
 }
 
-int __stop_machine_run(int (*fn)(void *), void *data, unsigned int cpu)
+int stop_machine_run(int (*fn)(void *), void *data, unsigned int cpu)
 {
     cpumask_t allbutself;
     unsigned int i, nr_cpus;
@@ -112,17 +113,6 @@ int __stop_machine_run(int (*fn)(void *), void *data, unsigned int cpu)
     local_irq_enable();
 
     spin_unlock(&stopmachine_lock);
-
-    return ret;
-}
-
-int stop_machine_run(int (*fn)(void *), void *data, unsigned int cpu)
-{
-    int ret;
-
-    lock_cpu_hotplug();
-    ret = __stop_machine_run(fn, data, cpu);
-    unlock_cpu_hotplug();
 
     return ret;
 }
