@@ -51,37 +51,6 @@ static void __init parse_vhpt_size(char *s)
 custom_param("vti_vtlb_size", parse_vtlb_size);
 custom_param("vti_vhpt_size", parse_vhpt_size);
 
-/*
- * Get the machine page frame number in 16KB unit
- * Input:
- *  d: 
- */
-static u64 get_mfn(struct domain *d, u64 gpfn)
-{
-//    struct domain *d;
-    u64    xen_gppn, xen_mppn, mpfn;
-/*
-    if ( domid == DOMID_SELF ) {
-        d = current->domain;
-    }
-    else {
-        d = get_domain_by_id(domid);
-    }
- */
-    xen_gppn = arch_to_xen_ppn(gpfn);
-    xen_mppn = gmfn_to_mfn(d, xen_gppn);
-/*
-    for (i=0; i<pages; i++) {
-        if ( gmfn_to_mfn(d, gpfn+i) == INVALID_MFN ) {
-            return INVALID_MFN;
-        }
-    }
-*/
-    mpfn= xen_to_arch_ppn(xen_mppn);
-    mpfn = mpfn | (((1UL <<(PAGE_SHIFT-ARCH_PAGE_SHIFT))-1)&gpfn);
-    return mpfn;
-    
-}
 
 static int init_domain_vhpt(struct vcpu *v)
 {
@@ -131,51 +100,6 @@ void free_domain_tlb(struct vcpu *v)
     free_domain_vhpt(v);
 }
 
-/*
- * Insert guest TLB to machine TLB.
- *  data:   In TLB format
- */
-void machine_tlb_insert(struct vcpu *v, thash_data_t *tlb)
-{
-    u64     psr;
-    thash_data_t    mtlb;
-    unsigned int    cl = tlb->cl;
-    unsigned long mtlb_ppn;
-    mtlb.ifa = tlb->vadr;
-    mtlb.itir = tlb->itir & ~ITIR_RV_MASK;
-    mtlb.page_flags = tlb->page_flags & ~PAGE_FLAGS_RV_MASK;
-    mtlb.ppn = get_mfn(v->domain, tlb->ppn);
-    mtlb_ppn=mtlb.ppn;
-
-#if 0
-    if (mtlb_ppn == INVALID_MFN)
-        panic_domain(vcpu_regs(v), "Machine tlb insert with invalid mfn number.\n");
-#endif
-
-    psr = ia64_clear_ic();
-    if ( cl == ISIDE_TLB ) {
-        ia64_itc(1, mtlb.ifa, mtlb.page_flags, IA64_ITIR_PS_KEY(mtlb.ps, 0));
-    }
-    else {
-        ia64_itc(2, mtlb.ifa, mtlb.page_flags, IA64_ITIR_PS_KEY(mtlb.ps, 0));
-    }
-    ia64_set_psr(psr);
-    ia64_srlz_i();
-    return;
-}
-
-/*
- *  Purge machine tlb.
- *  INPUT
- *      rr:     guest rr.
- *      va:     only bits 0:60 is valid
- *      size:   bits format (1<<size) for the address range to purge.
- *
- */
-void machine_tlb_purge(u64 va, u64 ps)
-{
-    ia64_ptcl(va, ps << 2);
-}
 
 int vhpt_enabled(VCPU *vcpu, uint64_t vadr, vhpt_ref_t ref)
 {

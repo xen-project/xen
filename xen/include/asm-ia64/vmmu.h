@@ -50,6 +50,10 @@ enum {
 #define VTLB_PTE_IO         (1UL<<VTLB_PTE_IO_BIT)
 #define VTLB_PTE_P         (1UL<<VTLB_PTE_P_BIT)
 
+#define ITIR_RV_MASK            (((1UL<<32)-1)<<32 | 0x3)
+#define PAGE_FLAGS_RV_MASK      (0x2 | (0x3UL<<50)|(((1UL<<11)-1)<<53))
+#define PAGE_FLAGS_AR_PL_MASK   ((0x7UL<<9)|(0x3UL<<7))
+
 #ifndef __ASSEMBLY__
 typedef struct thash_data {
     union {
@@ -126,20 +130,6 @@ typedef struct thash_data {
 #define INVALID_ENTRY(hcb, hdata)       INVALID_VHPT(hdata)
 
 
-/*
- * Architecture ppn is in 4KB unit while XEN
- * page may be different(1<<PAGE_SHIFT).
- */
-static inline u64 arch_to_xen_ppn(u64 appn)
-{
-    return (appn >>(PAGE_SHIFT-ARCH_PAGE_SHIFT));
-}
-
-static inline u64 xen_to_arch_ppn(u64 xppn)
-{
-    return (xppn <<(PAGE_SHIFT- ARCH_PAGE_SHIFT));
-}
-
 typedef struct thash_cb {
     /* THASH base information */
     thash_data_t    *hash; // hash table pointer, aligned at thash_sz.
@@ -202,17 +192,9 @@ extern void thash_purge_all(struct vcpu *v);
 extern thash_data_t *vtlb_lookup(struct vcpu *v,u64 va,int is_data);
 
 
-#define   ITIR_RV_MASK      (((1UL<<32)-1)<<32 | 0x3)
-#define   PAGE_FLAGS_RV_MASK    (0x2 | (0x3UL<<50)|(((1UL<<11)-1)<<53))
-#define   PAGE_FLAGS_AR_PL_MASK ((0x7UL<<9)|(0x3UL<<7))
-extern u64 machine_ttag(PTA pta, u64 va);
-extern u64 machine_thash(PTA pta, u64 va);
-extern void machine_tlb_insert(struct vcpu *v, thash_data_t *tlb);
-extern ia64_rr vmmu_get_rr(struct vcpu *vcpu, u64 va);
 extern int init_domain_tlb(struct vcpu *v);
 extern void free_domain_tlb(struct vcpu *v);
 extern thash_data_t * vhpt_lookup(u64 va);
-extern void machine_tlb_purge(u64 va, u64 ps);
 extern unsigned long fetch_code(struct vcpu *vcpu, u64 gip, IA64_BUNDLE *pbundle);
 extern void emulate_io_inst(struct vcpu *vcpu, u64 padr, u64 ma);
 extern int vhpt_enabled(struct vcpu *vcpu, uint64_t vadr, vhpt_ref_t ref);
@@ -221,6 +203,19 @@ extern void thash_vhpt_insert(struct vcpu *v, u64 pte, u64 itir, u64 ifa,
                               int type);
 extern u64 guest_vhpt_lookup(u64 iha, u64 *pte);
 extern int vhpt_access_rights_fixup(struct vcpu *v, u64 ifa, int is_data);
+
+/*
+ *  Purge machine tlb.
+ *  INPUT
+ *      rr:     guest rr.
+ *      va:     only bits 0:60 is valid
+ *      size:   bits format (1<<size) for the address range to purge.
+ *
+ */
+static inline void machine_tlb_purge(u64 va, u64 ps)
+{
+    ia64_ptcl(va, ps << 2);
+}
 
 static inline void vmx_vcpu_set_tr (thash_data_t *trp, u64 pte, u64 itir, u64 va, u64 rid)
 {
