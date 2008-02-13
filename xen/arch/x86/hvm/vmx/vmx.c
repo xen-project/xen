@@ -450,7 +450,7 @@ static void vmx_restore_dr(struct vcpu *v)
         __restore_debug_registers(v);
 }
 
-void vmx_vmcs_save(struct vcpu *v, struct hvm_hw_cpu *c)
+static void vmx_vmcs_save(struct vcpu *v, struct hvm_hw_cpu *c)
 {
     uint32_t ev;
 
@@ -462,52 +462,6 @@ void vmx_vmcs_save(struct vcpu *v, struct hvm_hw_cpu *c)
     c->cr4 = v->arch.hvm_vcpu.guest_cr[4];
 
     c->msr_efer = v->arch.hvm_vcpu.guest_efer;
-
-    c->idtr_limit = __vmread(GUEST_IDTR_LIMIT);
-    c->idtr_base = __vmread(GUEST_IDTR_BASE);
-
-    c->gdtr_limit = __vmread(GUEST_GDTR_LIMIT);
-    c->gdtr_base = __vmread(GUEST_GDTR_BASE);
-
-    c->cs_sel = __vmread(GUEST_CS_SELECTOR);
-    c->cs_limit = __vmread(GUEST_CS_LIMIT);
-    c->cs_base = __vmread(GUEST_CS_BASE);
-    c->cs_arbytes = __vmread(GUEST_CS_AR_BYTES);
-
-    c->ds_sel = __vmread(GUEST_DS_SELECTOR);
-    c->ds_limit = __vmread(GUEST_DS_LIMIT);
-    c->ds_base = __vmread(GUEST_DS_BASE);
-    c->ds_arbytes = __vmread(GUEST_DS_AR_BYTES);
-
-    c->es_sel = __vmread(GUEST_ES_SELECTOR);
-    c->es_limit = __vmread(GUEST_ES_LIMIT);
-    c->es_base = __vmread(GUEST_ES_BASE);
-    c->es_arbytes = __vmread(GUEST_ES_AR_BYTES);
-
-    c->ss_sel = __vmread(GUEST_SS_SELECTOR);
-    c->ss_limit = __vmread(GUEST_SS_LIMIT);
-    c->ss_base = __vmread(GUEST_SS_BASE);
-    c->ss_arbytes = __vmread(GUEST_SS_AR_BYTES);
-
-    c->fs_sel = __vmread(GUEST_FS_SELECTOR);
-    c->fs_limit = __vmread(GUEST_FS_LIMIT);
-    c->fs_base = __vmread(GUEST_FS_BASE);
-    c->fs_arbytes = __vmread(GUEST_FS_AR_BYTES);
-
-    c->gs_sel = __vmread(GUEST_GS_SELECTOR);
-    c->gs_limit = __vmread(GUEST_GS_LIMIT);
-    c->gs_base = __vmread(GUEST_GS_BASE);
-    c->gs_arbytes = __vmread(GUEST_GS_AR_BYTES);
-
-    c->tr_sel = __vmread(GUEST_TR_SELECTOR);
-    c->tr_limit = __vmread(GUEST_TR_LIMIT);
-    c->tr_base = __vmread(GUEST_TR_BASE);
-    c->tr_arbytes = __vmread(GUEST_TR_AR_BYTES);
-
-    c->ldtr_sel = __vmread(GUEST_LDTR_SELECTOR);
-    c->ldtr_limit = __vmread(GUEST_LDTR_LIMIT);
-    c->ldtr_base = __vmread(GUEST_LDTR_BASE);
-    c->ldtr_arbytes = __vmread(GUEST_LDTR_AR_BYTES);
 
     c->sysenter_cs = __vmread(GUEST_SYSENTER_CS);
     c->sysenter_esp = __vmread(GUEST_SYSENTER_ESP);
@@ -552,7 +506,7 @@ static int vmx_restore_cr0_cr3(
     return 0;
 }
 
-int vmx_vmcs_restore(struct vcpu *v, struct hvm_hw_cpu *c)
+static int vmx_vmcs_restore(struct vcpu *v, struct hvm_hw_cpu *c)
 {
     int rc;
 
@@ -584,52 +538,6 @@ int vmx_vmcs_restore(struct vcpu *v, struct hvm_hw_cpu *c)
 
     v->arch.hvm_vcpu.guest_efer = c->msr_efer;
     vmx_update_guest_efer(v);
-
-    __vmwrite(GUEST_IDTR_LIMIT, c->idtr_limit);
-    __vmwrite(GUEST_IDTR_BASE, c->idtr_base);
-
-    __vmwrite(GUEST_GDTR_LIMIT, c->gdtr_limit);
-    __vmwrite(GUEST_GDTR_BASE, c->gdtr_base);
-
-    __vmwrite(GUEST_CS_SELECTOR, c->cs_sel);
-    __vmwrite(GUEST_CS_LIMIT, c->cs_limit);
-    __vmwrite(GUEST_CS_BASE, c->cs_base);
-    __vmwrite(GUEST_CS_AR_BYTES, c->cs_arbytes);
-
-    __vmwrite(GUEST_DS_SELECTOR, c->ds_sel);
-    __vmwrite(GUEST_DS_LIMIT, c->ds_limit);
-    __vmwrite(GUEST_DS_BASE, c->ds_base);
-    __vmwrite(GUEST_DS_AR_BYTES, c->ds_arbytes);
-
-    __vmwrite(GUEST_ES_SELECTOR, c->es_sel);
-    __vmwrite(GUEST_ES_LIMIT, c->es_limit);
-    __vmwrite(GUEST_ES_BASE, c->es_base);
-    __vmwrite(GUEST_ES_AR_BYTES, c->es_arbytes);
-
-    __vmwrite(GUEST_SS_SELECTOR, c->ss_sel);
-    __vmwrite(GUEST_SS_LIMIT, c->ss_limit);
-    __vmwrite(GUEST_SS_BASE, c->ss_base);
-    __vmwrite(GUEST_SS_AR_BYTES, c->ss_arbytes);
-
-    __vmwrite(GUEST_FS_SELECTOR, c->fs_sel);
-    __vmwrite(GUEST_FS_LIMIT, c->fs_limit);
-    __vmwrite(GUEST_FS_BASE, c->fs_base);
-    __vmwrite(GUEST_FS_AR_BYTES, c->fs_arbytes);
-
-    __vmwrite(GUEST_GS_SELECTOR, c->gs_sel);
-    __vmwrite(GUEST_GS_LIMIT, c->gs_limit);
-    __vmwrite(GUEST_GS_BASE, c->gs_base);
-    __vmwrite(GUEST_GS_AR_BYTES, c->gs_arbytes);
-
-    __vmwrite(GUEST_TR_SELECTOR, c->tr_sel);
-    __vmwrite(GUEST_TR_LIMIT, c->tr_limit);
-    __vmwrite(GUEST_TR_BASE, c->tr_base);
-    __vmwrite(GUEST_TR_AR_BYTES, c->tr_arbytes);
-
-    __vmwrite(GUEST_LDTR_SELECTOR, c->ldtr_sel);
-    __vmwrite(GUEST_LDTR_LIMIT, c->ldtr_limit);
-    __vmwrite(GUEST_LDTR_BASE, c->ldtr_base);
-    __vmwrite(GUEST_LDTR_AR_BYTES, c->ldtr_arbytes);
 
     __vmwrite(GUEST_SYSENTER_CS, c->sysenter_cs);
     __vmwrite(GUEST_SYSENTER_ESP, c->sysenter_esp);
@@ -821,7 +729,7 @@ static void vmx_get_segment_register(struct vcpu *v, enum x86_segment seg,
 {
     uint32_t attr = 0;
 
-    ASSERT(v == current);
+    vmx_vmcs_enter(v);
 
     switch ( seg )
     {
@@ -885,6 +793,8 @@ static void vmx_get_segment_register(struct vcpu *v, enum x86_segment seg,
         BUG();
     }
 
+    vmx_vmcs_exit(v);
+
     reg->attr.bytes = (attr & 0xff) | ((attr >> 4) & 0xf00);
     /* Unusable flag is folded into Present flag. */
     if ( attr & (1u<<16) )
@@ -895,8 +805,6 @@ static void vmx_set_segment_register(struct vcpu *v, enum x86_segment seg,
                                      struct segment_register *reg)
 {
     uint32_t attr;
-
-    ASSERT((v == current) || !vcpu_runnable(v));
 
     attr = reg->attr.bytes;
     attr = ((attr & 0xf00) << 4) | (attr & 0xff);
@@ -1029,7 +937,6 @@ static enum hvm_intblk vmx_interrupt_blocked(
 
 static void vmx_update_host_cr3(struct vcpu *v)
 {
-    ASSERT((v == current) || !vcpu_runnable(v));
     vmx_vmcs_enter(v);
     __vmwrite(HOST_CR3, v->arch.cr3);
     vmx_vmcs_exit(v);
@@ -1037,8 +944,6 @@ static void vmx_update_host_cr3(struct vcpu *v)
 
 static void vmx_update_guest_cr(struct vcpu *v, unsigned int cr)
 {
-    ASSERT((v == current) || !vcpu_runnable(v));
-
     vmx_vmcs_enter(v);
 
     switch ( cr )
@@ -1088,8 +993,6 @@ static void vmx_update_guest_efer(struct vcpu *v)
 {
 #ifdef __x86_64__
     unsigned long vm_entry_value;
-
-    ASSERT((v == current) || !vcpu_runnable(v));
 
     vmx_vmcs_enter(v);
 
