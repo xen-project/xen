@@ -327,6 +327,11 @@ int blkfront_aio_poll(struct blkfront_dev *dev)
     struct blkif_response *rsp;
 
 moretodo:
+#ifdef HAVE_LIBC
+    files[dev->fd].read = 0;
+    mb(); /* Make sure to let the handler set read to 1 before we start looking at the ring */
+#endif
+
     rp = dev->ring.sring->rsp_prod;
     rmb(); /* Ensure we see queued responses up to 'rp'. */
     cons = dev->ring.rsp_cons;

@@ -67,6 +67,12 @@ static int vbd_probe(const uint8_t *buf, int buf_size, const char *filename)
     return 100;
 }
 
+static void vbd_io_completed(void *opaque)
+{
+    BDRVVbdState *s = opaque;
+    blkfront_aio_poll(s->dev);
+}
+
 static int vbd_open(BlockDriverState *bs, const char *filename, int flags)
 {
     BDRVVbdState *s = bs->opaque;
@@ -85,6 +91,7 @@ static int vbd_open(BlockDriverState *bs, const char *filename, int flags)
     }
 
     s->fd = blkfront_open(s->dev);
+    qemu_set_fd_handler(s->fd, vbd_io_completed, NULL, s);
 
     QEMU_LIST_INSERT_HEAD(&vbds, s, list);
 
@@ -102,9 +109,6 @@ void qemu_aio_init(void)
 
 void qemu_aio_poll(void)
 {
-    BDRVVbdState *s;
-    for (s = vbds.lh_first; s; s = s->list.le_next)
-	blkfront_aio_poll(s->dev);
 }
 
 /* Wait for all IO requests to complete.  */
