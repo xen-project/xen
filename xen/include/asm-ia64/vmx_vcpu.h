@@ -57,8 +57,6 @@ extern u64 set_isr_for_na_inst(VCPU * vcpu, int op);
 
 /* next all for VTI domain APIs definition */
 extern void vmx_vcpu_set_psr(VCPU * vcpu, unsigned long value);
-extern u64 vmx_vcpu_sync_mpsr(u64 mipsr, u64 value);
-extern void vmx_vcpu_set_psr_sync_mpsr(VCPU * vcpu, u64 value);
 extern IA64FAULT vmx_vcpu_cover(VCPU * vcpu);
 extern IA64FAULT vmx_vcpu_set_rr(VCPU * vcpu, u64 reg, u64 val);
 extern u64 vmx_vcpu_get_pkr(VCPU * vcpu, u64 reg);
@@ -97,34 +95,16 @@ extern uint64_t vtm_get_itc(VCPU * vcpu);
 extern void vtm_set_itc(VCPU * vcpu, uint64_t new_itc);
 extern void vtm_set_itv(VCPU * vcpu, uint64_t val);
 extern void vtm_set_itm(VCPU * vcpu, uint64_t val);
-extern void vtm_interruption_update(VCPU * vcpu, vtime_t * vtm);
-//extern void vtm_domain_out(VCPU *vcpu);
-//extern void vtm_domain_in(VCPU *vcpu);
 extern void vlsapic_reset(VCPU * vcpu);
 extern int vmx_check_pending_irq(VCPU * vcpu);
 extern void guest_write_eoi(VCPU * vcpu);
 extern int is_unmasked_irq(VCPU * vcpu);
 extern uint64_t guest_read_vivr(VCPU * vcpu);
-extern void vmx_inject_vhpi(VCPU * vcpu, u8 vec);
 extern int vmx_vcpu_pend_interrupt(VCPU * vcpu, uint8_t vector);
-extern void memread_p(VCPU * vcpu, u64 * src, u64 * dest, size_t s);
-extern void memread_v(VCPU * vcpu, thash_data_t * vtlb, u64 * src, u64 * dest,
-                      size_t s);
-extern void memwrite_v(VCPU * vcpu, thash_data_t * vtlb, u64 * src, u64 * dest,
-                       size_t s);
-extern void memwrite_p(VCPU * vcpu, u64 * src, u64 * dest, size_t s);
 extern void vcpu_load_kernel_regs(VCPU * vcpu);
 extern void vmx_switch_rr7(unsigned long, void *, void *, void *);
-
-extern void dtlb_fault(VCPU * vcpu, u64 vadr);
-extern void nested_dtlb(VCPU * vcpu);
-extern void alt_dtlb(VCPU * vcpu, u64 vadr);
-extern void dvhpt_fault(VCPU * vcpu, u64 vadr);
-extern void dnat_page_consumption(VCPU * vcpu, uint64_t vadr);
-extern void data_page_not_present(VCPU * vcpu, u64 vadr);
-extern void inst_page_not_present(VCPU * vcpu, u64 vadr);
-extern void data_access_rights(VCPU * vcpu, u64 vadr);
 extern void vmx_ia64_set_dcr(VCPU * v);
+extern void inject_guest_interruption(struct vcpu *vcpu, u64 vec);
 
 /**************************************************************************
  VCPU control register access routines
@@ -409,4 +389,309 @@ static inline thash_cb_t *vcpu_get_vhpt(VCPU * vcpu)
 	return &vcpu->arch.vhpt;
 }
 
+
+/**************************************************************************
+ VCPU fault injection routines
+**************************************************************************/
+
+/*
+ * Set vIFA & vITIR & vIHA, when vPSR.ic =1
+ * Parameter:
+ *  set_ifa: if true, set vIFA
+ *  set_itir: if true, set vITIR
+ *  set_iha: if true, set vIHA
+ */
+static inline void
+set_ifa_itir_iha (VCPU *vcpu, u64 vadr,
+		  int set_ifa, int set_itir, int set_iha)
+{
+	IA64_PSR vpsr;
+	u64 value;
+	vpsr.val = VCPU(vcpu, vpsr);
+	/* Vol2, Table 8-1 */
+	if (vpsr.ic) {
+		if (set_ifa){
+			vcpu_set_ifa(vcpu, vadr);
+		}
+		if (set_itir) {
+			value = vmx_vcpu_get_itir_on_fault(vcpu, vadr);
+			vcpu_set_itir(vcpu, value);
+		}
+		if (set_iha) {
+			value = vmx_vcpu_thash(vcpu, vadr);
+			vcpu_set_iha(vcpu, value);
+		}
+	}
+}
+
+/*
+ * Data TLB Fault
+ *  @ Data TLB vector
+ * Refer to SDM Vol2 Table 5-6 & 8-1
+ */
+static inline void
+dtlb_fault (VCPU *vcpu, u64 vadr)
+{
+	/* If vPSR.ic, IFA, ITIR, IHA */
+	set_ifa_itir_iha(vcpu, vadr, 1, 1, 1);
+	inject_guest_interruption(vcpu, IA64_DATA_TLB_VECTOR);
+}
+
+/*
+ * Instruction TLB Fault
+ *  @ Instruction TLB vector
+ * Refer to SDM Vol2 Table 5-6 & 8-1
+ */
+static inline void
+itlb_fault (VCPU *vcpu, u64 vadr)
+{
+	/* If vPSR.ic, IFA, ITIR, IHA */
+	set_ifa_itir_iha(vcpu, vadr, 1, 1, 1);
+	inject_guest_interruption(vcpu, IA64_INST_TLB_VECTOR);
+}
+
+/*
+ * Data Nested TLB Fault
+ *  @ Data Nested TLB Vector
+ * Refer to SDM Vol2 Table 5-6 & 8-1
+ */
+static inline void
+nested_dtlb (VCPU *vcpu)
+{
+	inject_guest_interruption(vcpu, IA64_DATA_NESTED_TLB_VECTOR);
+}
+
+/*
+ * Alternate Data TLB Fault
+ *  @ Alternate Data TLB vector
+ * Refer to SDM Vol2 Table 5-6 & 8-1
+ */
+static inline void
+alt_dtlb (VCPU *vcpu, u64 vadr)
+{
+	set_ifa_itir_iha(vcpu, vadr, 1, 1, 0);
+	inject_guest_interruption(vcpu, IA64_ALT_DATA_TLB_VECTOR);
+}
+
+/*
+ * Data TLB Fault
+ *  @ Data TLB vector
+ * Refer to SDM Vol2 Table 5-6 & 8-1
+ */
+static inline void
+alt_itlb (VCPU *vcpu, u64 vadr)
+{
+	set_ifa_itir_iha(vcpu, vadr, 1, 1, 0);
+	inject_guest_interruption(vcpu, IA64_ALT_INST_TLB_VECTOR);
+}
+
+/*
+ * Deal with:
+ *  VHPT Translation Vector
+ */
+static inline void
+_vhpt_fault(VCPU *vcpu, u64 vadr)
+{
+	/* If vPSR.ic, IFA, ITIR, IHA*/
+	set_ifa_itir_iha(vcpu, vadr, 1, 1, 1);
+	inject_guest_interruption(vcpu, IA64_VHPT_TRANS_VECTOR);
+}
+
+/*
+ * VHPT Instruction Fault
+ *  @ VHPT Translation vector
+ * Refer to SDM Vol2 Table 5-6 & 8-1
+ */
+static inline void
+ivhpt_fault (VCPU *vcpu, u64 vadr)
+{
+	_vhpt_fault(vcpu, vadr);
+}
+
+/*
+ * VHPT Data Fault
+ *  @ VHPT Translation vector
+ * Refer to SDM Vol2 Table 5-6 & 8-1
+ */
+static inline void
+dvhpt_fault (VCPU *vcpu, u64 vadr)
+{
+	_vhpt_fault(vcpu, vadr);
+}
+
+/*
+ * Deal with:
+ *  General Exception vector
+ */
+static inline void
+_general_exception (VCPU *vcpu)
+{
+	inject_guest_interruption(vcpu, IA64_GENEX_VECTOR);
+}
+
+/*
+ * Illegal Operation Fault
+ *  @ General Exception Vector
+ * Refer to SDM Vol2 Table 5-6 & 8-1
+ */
+static inline void
+illegal_op (VCPU *vcpu)
+{
+	_general_exception(vcpu);
+}
+
+/*
+ * Illegal Dependency Fault
+ *  @ General Exception Vector
+ * Refer to SDM Vol2 Table 5-6 & 8-1
+ */
+static inline void
+illegal_dep (VCPU *vcpu)
+{
+	_general_exception(vcpu);
+}
+
+/*
+ * Reserved Register/Field Fault
+ *  @ General Exception Vector
+ * Refer to SDM Vol2 Table 5-6 & 8-1
+ */
+static inline void
+rsv_reg_field (VCPU *vcpu)
+{
+	_general_exception(vcpu);
+}
+
+/*
+ * Privileged Operation Fault
+ *  @ General Exception Vector
+ * Refer to SDM Vol2 Table 5-6 & 8-1
+ */
+static inline void
+privilege_op (VCPU *vcpu)
+{
+	_general_exception(vcpu);
+}
+
+/*
+ * Unimplement Data Address Fault
+ *  @ General Exception Vector
+ * Refer to SDM Vol2 Table 5-6 & 8-1
+ */
+static inline void
+unimpl_daddr (VCPU *vcpu)
+{
+	_general_exception(vcpu);
+}
+
+/*
+ * Privileged Register Fault
+ *  @ General Exception Vector
+ * Refer to SDM Vol2 Table 5-6 & 8-1
+ */
+static inline void
+privilege_reg (VCPU *vcpu)
+{
+	_general_exception(vcpu);
+}
+
+/*
+ * Deal with
+ *  Nat consumption vector
+ * Parameter:
+ *  vaddr: Optional, if t == REGISTER
+ */
+static inline void
+_nat_consumption_fault(VCPU *vcpu, u64 vadr, miss_type t)
+{
+	/* If vPSR.ic && t == DATA/INST, IFA */
+	if ( t == DATA || t == INSTRUCTION ) {
+		/* IFA */
+		set_ifa_itir_iha(vcpu, vadr, 1, 0, 0);
+	}
+
+	inject_guest_interruption(vcpu, IA64_NAT_CONSUMPTION_VECTOR);
+}
+
+/*
+ * IR Data Nat Page Consumption Fault
+ *  @ Nat Consumption Vector
+ * Refer to SDM Vol2 Table 5-6 & 8-1
+ */
+#if 0
+static inline void
+ir_nat_page_consumption (VCPU *vcpu, u64 vadr)
+{
+	_nat_consumption_fault(vcpu, vadr, DATA);
+}
+#endif //shadow it due to no use currently 
+
+/*
+ * Instruction Nat Page Consumption Fault
+ *  @ Nat Consumption Vector
+ * Refer to SDM Vol2 Table 5-6 & 8-1
+ */
+static inline void
+inat_page_consumption (VCPU *vcpu, u64 vadr)
+{
+	_nat_consumption_fault(vcpu, vadr, INSTRUCTION);
+}
+
+/*
+ * Register Nat Consumption Fault
+ *  @ Nat Consumption Vector
+ * Refer to SDM Vol2 Table 5-6 & 8-1
+ */
+static inline void
+rnat_consumption (VCPU *vcpu)
+{
+	_nat_consumption_fault(vcpu, 0, REGISTER);
+}
+
+/*
+ * Data Nat Page Consumption Fault
+ *  @ Nat Consumption Vector
+ * Refer to SDM Vol2 Table 5-6 & 8-1
+ */
+static inline void
+dnat_page_consumption (VCPU *vcpu, uint64_t vadr)
+{
+	_nat_consumption_fault(vcpu, vadr, DATA);
+}
+
+/*
+ * Deal with
+ *  Page not present vector
+ */
+static inline void
+__page_not_present(VCPU *vcpu, u64 vadr)
+{
+	/* If vPSR.ic, IFA, ITIR */
+	set_ifa_itir_iha(vcpu, vadr, 1, 1, 0);
+	inject_guest_interruption(vcpu, IA64_PAGE_NOT_PRESENT_VECTOR);
+}
+
+static inline void
+data_page_not_present(VCPU *vcpu, u64 vadr)
+{
+	__page_not_present(vcpu, vadr);
+}
+
+static inline void
+inst_page_not_present(VCPU *vcpu, u64 vadr)
+{
+	__page_not_present(vcpu, vadr);
+}
+
+/*
+ * Deal with
+ *  Data access rights vector
+ */
+static inline void
+data_access_rights(VCPU *vcpu, u64 vadr)
+{
+	/* If vPSR.ic, IFA, ITIR */
+	set_ifa_itir_iha(vcpu, vadr, 1, 1, 0);
+	inject_guest_interruption(vcpu, IA64_DATA_ACCESS_RIGHTS_VECTOR);
+}
 #endif

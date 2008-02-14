@@ -38,16 +38,8 @@ extern void vmx_do_resume(struct vcpu *v);
 extern void vmx_io_assist(struct vcpu *v);
 extern int ia64_hypercall (struct pt_regs *regs);
 extern unsigned long __gpfn_to_mfn_foreign(struct domain *d, unsigned long gpfn);
-extern void sync_split_caches(void);
 extern void set_privileged_operation_isr (struct vcpu *vcpu,int inst);
-extern void privilege_op (struct vcpu *vcpu);
-extern void set_ifa_itir_iha (struct vcpu *vcpu, u64 vadr,
-          int set_ifa, int set_itir, int set_iha);
-extern void inject_guest_interruption(struct vcpu *vcpu, u64 vec);
-extern void set_illegal_op_isr (struct vcpu *vcpu);
-extern void illegal_op (struct vcpu *vcpu);
 extern void set_rsv_reg_field_isr (struct vcpu *vcpu);
-extern void rsv_reg_field (struct vcpu *vcpu);
 extern void vmx_relinquish_guest_resources(struct domain *d);
 extern void vmx_relinquish_vcpu_resources(struct vcpu *v);
 extern void vmx_send_assist_req(struct vcpu *v);

@@ -56,11 +56,6 @@
 /* reset all PSR field to 0, except up,mfl,mfh,pk,dt,rt,mc,it */
 #define INITIAL_PSR_VALUE_AT_INTERRUPTION 0x0000001808028034
 
-
-extern void rnat_consumption (VCPU *vcpu);
-extern void alt_itlb (VCPU *vcpu, u64 vadr);
-extern void itlb_fault (VCPU *vcpu, u64 vadr);
-extern void ivhpt_fault (VCPU *vcpu, u64 vadr);
 extern unsigned long handle_fpu_swa (int fp_fault, struct pt_regs *regs, unsigned long isr);
 
 #define DOMN_PAL_REQUEST    0x110000
