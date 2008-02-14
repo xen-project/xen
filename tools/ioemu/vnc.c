@@ -157,6 +157,7 @@ struct VncState
     int has_resize;
     int has_hextile;
     int has_pointer_type_change;
+    int has_WMVi;
     int absolute;
     int last_x;
     int last_y;
@@ -1310,6 +1311,7 @@ static void set_encodings(VncState *vs, int32_t *encodings, size_t n_encodings)
     vs->has_hextile = 0;
     vs->has_resize = 0;
     vs->has_pointer_type_change = 0;
+    vs->has_WMVi = 0;
     vs->absolute = -1;
     vs->ds->dpy_copy = NULL;
 
@@ -1330,6 +1332,8 @@ static void set_encodings(VncState *vs, int32_t *encodings, size_t n_encodings)
 	case -257:
 	    vs->has_pointer_type_change = 1;
 	    break;
+        case 0x574D5669:
+            vs->has_WMVi = 1;
 	default:
 	    break;
 	}
@@ -1410,6 +1414,57 @@ static void set_pixel_format(VncState *vs,
     vga_hw_update();
 }
 
+static void pixel_format_message (VncState *vs) {
+    char pad[3] = { 0, 0, 0 };
+
+    vnc_write_u8(vs, vs->depth * 8); /* bits-per-pixel */
+    if (vs->depth == 4) vnc_write_u8(vs, 24); /* depth */
+    else vnc_write_u8(vs, vs->depth * 8); /* depth */
+
+#ifdef WORDS_BIGENDIAN
+    vnc_write_u8(vs, 1);             /* big-endian-flag */
+#else
+    vnc_write_u8(vs, 0);             /* big-endian-flag */
+#endif
+    vnc_write_u8(vs, 1);             /* true-color-flag */
+    if (vs->depth == 4) {
+        vnc_write_u16(vs, 0xFF);     /* red-max */
+        vnc_write_u16(vs, 0xFF);     /* green-max */
+        vnc_write_u16(vs, 0xFF);     /* blue-max */
+        vnc_write_u8(vs, 16);        /* red-shift */
+        vnc_write_u8(vs, 8);         /* green-shift */
+        vnc_write_u8(vs, 0);         /* blue-shift */
+        vs->send_hextile_tile = send_hextile_tile_32;
+    } else if (vs->depth == 2) {
+        vnc_write_u16(vs, 31);       /* red-max */
+        vnc_write_u16(vs, 63);       /* green-max */
+        vnc_write_u16(vs, 31);       /* blue-max */
+        vnc_write_u8(vs, 11);        /* red-shift */
+        vnc_write_u8(vs, 5);         /* green-shift */
+        vnc_write_u8(vs, 0);         /* blue-shift */
+        vs->send_hextile_tile = send_hextile_tile_16;
+    } else if (vs->depth == 1) {
+        /* XXX: change QEMU pixel 8 bit pixel format to match the VNC one ? */
+        vnc_write_u16(vs, 7);        /* red-max */
+        vnc_write_u16(vs, 7);        /* green-max */
+        vnc_write_u16(vs, 3);        /* blue-max */
+        vnc_write_u8(vs, 5);         /* red-shift */
+        vnc_write_u8(vs, 2);         /* green-shift */
+        vnc_write_u8(vs, 0);         /* blue-shift */
+        vs->send_hextile_tile = send_hextile_tile_8;
+    }
+    vs->red_max = vs->red_max1;
+    vs->green_max = vs->green_max1;
+    vs->blue_max = vs->blue_max1;
+    vs->red_shift = vs->red_shift1;
+    vs->green_shift = vs->green_shift1;
+    vs->blue_shift = vs->blue_shift1;
+    vs->pix_bpp = vs->depth * 8;
+    vs->write_pixels = vnc_write_pixels_copy;
+        
+    vnc_write(vs, pad, 3);           /* padding */
+}
+
 static void vnc_dpy_colourdepth(DisplayState *ds, int depth)
 {
     int host_big_endian_flag;
@@ -1457,6 +1512,14 @@ static void vnc_dpy_colourdepth(DisplayState *ds, int depth)
     }
     if (ds->switchbpp) {
         vnc_client_error(vs);
+    } else if (vs->csock != -1 && vs->has_WMVi) {
+        /* Sending a WMVi message to notify the client*/
+        vnc_write_u8(vs, 0);  /* msg id */
+        vnc_write_u8(vs, 0);
+        vnc_write_u16(vs, 1); /* number of rects */
+        vnc_framebuffer_update(vs, 0, 0, ds->width, ds->height, 0x574D5669);
+        pixel_format_message(vs);
+        vnc_flush(vs);
     } else {
         if (vs->pix_bpp == 4 && vs->depth == 4 &&
             host_big_endian_flag == vs->pix_big_endian &&
@@ -1578,7 +1641,6 @@ static int protocol_client_msg(VncState *vs, uint8_t *data, size_t len)
 static int protocol_client_init(VncState *vs, uint8_t *data, size_t len)
 {
     size_t l;
-    char pad[3] = { 0, 0, 0 };
 
     vga_hw_update();
 
@@ -1587,45 +1649,7 @@ static int protocol_client_init(VncState *vs, uint8_t *data, size_t len)
     vnc_write_u16(vs, vs->ds->width);
     vnc_write_u16(vs, vs->ds->height);
 
-    vnc_write_u8(vs, vs->depth * 8); /* bits-per-pixel */
-    if (vs->depth == 4) vnc_write_u8(vs, 24); /* depth */
-    else vnc_write_u8(vs, vs->depth * 8); /* depth */
-
-#ifdef WORDS_BIGENDIAN
-    vnc_write_u8(vs, 1);             /* big-endian-flag */
-#else
-    vnc_write_u8(vs, 0);             /* big-endian-flag */
-#endif
-    vnc_write_u8(vs, 1);             /* true-color-flag */
-    if (vs->depth == 4) {
-	vnc_write_u16(vs, 0xFF);     /* red-max */
-	vnc_write_u16(vs, 0xFF);     /* green-max */
-	vnc_write_u16(vs, 0xFF);     /* blue-max */
-	vnc_write_u8(vs, 16);        /* red-shift */
-	vnc_write_u8(vs, 8);         /* green-shift */
-	vnc_write_u8(vs, 0);         /* blue-shift */
-        vs->send_hextile_tile = send_hextile_tile_32;
-    } else if (vs->depth == 2) {
-	vnc_write_u16(vs, 31);       /* red-max */
-	vnc_write_u16(vs, 63);       /* green-max */
-	vnc_write_u16(vs, 31);       /* blue-max */
-	vnc_write_u8(vs, 11);        /* red-shift */
-	vnc_write_u8(vs, 5);         /* green-shift */
-	vnc_write_u8(vs, 0);         /* blue-shift */
-        vs->send_hextile_tile = send_hextile_tile_16;
-    } else if (vs->depth == 1) {
-        /* XXX: change QEMU pixel 8 bit pixel format to match the VNC one ? */
-	vnc_write_u16(vs, 7);        /* red-max */
-	vnc_write_u16(vs, 7);        /* green-max */
-	vnc_write_u16(vs, 3);        /* blue-max */
-	vnc_write_u8(vs, 5);         /* red-shift */
-	vnc_write_u8(vs, 2);         /* green-shift */
-	vnc_write_u8(vs, 0);         /* blue-shift */
-        vs->send_hextile_tile = send_hextile_tile_8;
-    }
-    vs->write_pixels = vnc_write_pixels_copy;
-	
-    vnc_write(vs, pad, 3);           /* padding */
+    pixel_format_message(vs);
 
     l = strlen(domain_name); 
     vnc_write_u32(vs, l);        
@@ -2436,6 +2460,8 @@ int vnc_display_open(DisplayState *ds, const char *display, int find_unused)
 	options++;
 	if (strncmp(options, "password", 8) == 0) {
 	    password = 1; /* Require password auth */
+        } else if (strncmp(options, "switchbpp", 9) == 0) {
+            ds->switchbpp = 1;
 #if CONFIG_VNC_TLS
 	} else if (strncmp(options, "tls", 3) == 0) {
 	    tls = 1; /* Require TLS */

@@ -154,7 +154,6 @@ static DisplayState display_state;
 int nographic;
 int vncviewer;
 int vncunused;
-int vncswitchbpp;
 const char* keyboard_layout = NULL;
 int64_t ticks_per_sec;
 char *boot_device = NULL;
@@ -6560,7 +6559,6 @@ void help(void)
 	   "-vnc display    start a VNC server on display\n"
            "-vncviewer      start a vncviewer process for this domain\n"
            "-vncunused      bind the VNC server to an unused port\n"
-           "-vnc-switch-bpp VNC server closes connections when the guest OS changes colour depth\n"
 #ifndef NO_DAEMONIZE
 	   "-daemonize      daemonize QEMU after initializing\n"
 #endif
@@ -6662,7 +6660,6 @@ enum {
     QEMU_OPTION_acpi,
     QEMU_OPTION_vncviewer,
     QEMU_OPTION_vncunused,
-    QEMU_OPTION_vncswitchbpp,
     QEMU_OPTION_pci,
 };
 
@@ -6746,7 +6743,6 @@ const QEMUOption qemu_options[] = {
     { "vnc", HAS_ARG, QEMU_OPTION_vnc },
     { "vncviewer", 0, QEMU_OPTION_vncviewer },
     { "vncunused", 0, QEMU_OPTION_vncunused },
-    { "vnc-switch-bpp", 0, QEMU_OPTION_vncswitchbpp },
 
     /* temporary options */
     { "usb", 0, QEMU_OPTION_usb },
@@ -7164,7 +7160,6 @@ int main(int argc, char **argv)
     nographic = 0;
     vncviewer = 0;
     vncunused = 0;
-    vncswitchbpp = 0;
     kernel_filename = NULL;
     kernel_cmdline = "";
 #ifndef CONFIG_DM
@@ -7595,9 +7590,6 @@ int main(int argc, char **argv)
             case QEMU_OPTION_vncunused:
                 vncunused++;
                 break;
-            case QEMU_OPTION_vncswitchbpp:
-                vncswitchbpp++;
-                break;
             case QEMU_OPTION_pci:
                 direct_pci = optarg;
                 break;
@@ -7830,7 +7822,6 @@ int main(int argc, char **argv)
     } else if (vnc_display != NULL || vncunused != 0) {
 	int vnc_display_port;
 	char password[20];
-        ds->switchbpp = vncswitchbpp;
 	vnc_display_init(ds);
 	xenstore_read_vncpasswd(domid, password, sizeof(password));
 	vnc_display_password(ds, password);
