@@ -52,6 +52,7 @@
 #include <asm/vmx_phy_mode.h>
 #include <xen/mm.h>
 #include <asm/vmx_pal.h>
+#include <asm/shadow.h>
 /* reset all PSR field to 0, except up,mfl,mfh,pk,dt,rt,mc,it */
 #define INITIAL_PSR_VALUE_AT_INTERRUPTION 0x0000001808028034
 
@@ -519,4 +520,48 @@ try_again:
     vcpu_set_isr(v, misr.val);
     itlb_fault(v, vadr);
     return IA64_FAULT;
+}
+
+void
+vmx_ia64_shadow_fault(u64 ifa, u64 isr, u64 mpa, REGS *regs)
+{
+    struct vcpu *v = current;
+    struct domain *d = v->domain;
+    u64 gpfn, pte;
+    thash_data_t *data;
+
+    if (!shadow_mode_enabled(d))
+        goto inject_dirty_bit;
+
+    gpfn = get_gpfn_from_mfn(mpa >> PAGE_SHIFT);
+    data = vhpt_lookup(ifa);
+    if (data) {
+        pte = data->page_flags;
+        // BUG_ON((pte ^ mpa) & (_PAGE_PPN_MASK & PAGE_MASK));
+        if (!(pte & _PAGE_VIRT_D))
+            goto inject_dirty_bit;
+        data->page_flags = pte | _PAGE_D;
+    } else {
+        data = vtlb_lookup(v, ifa, DSIDE_TLB);
+        if (data) {
+            if (!(data->page_flags & _PAGE_VIRT_D))
+                goto inject_dirty_bit;
+        }
+        pte = 0;
+    }
+
+    /* Set the dirty bit in the bitmap.  */
+    shadow_mark_page_dirty(d, gpfn);
+
+    /* Retry */
+    atomic64_inc(&d->arch.shadow_fault_count);
+    ia64_ptcl(ifa, PAGE_SHIFT << 2);
+    return;
+
+inject_dirty_bit:
+    /* Reflect. no need to purge.  */
+    VCPU(v, isr) = isr;
+    set_ifa_itir_iha (v, ifa, 1, 1, 1);
+    inject_guest_interruption(v, IA64_DIRTY_BIT_VECTOR);
+    return;
 }

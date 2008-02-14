@@ -433,8 +433,16 @@ END(vmx_dkey_miss)
 /////////////////////////////////////////////////////////////////////////////////////////
 // 0x2000 Entry 8 (size 64 bundles) Dirty-bit (54)
 ENTRY(vmx_dirty_bit)
-    VMX_DBG_FAULT(8)
-    VMX_REFLECT(8)
+    mov r29=cr.ipsr
+    mov r31=pr
+    ;;
+    mov r19=cr.ifa
+    tbit.z p6,p0=r29,IA64_PSR_VM_BIT
+(p6)br.spnt.many vmx_fault_8
+    ;;
+    tpa r19=r19
+    br.sptk vmx_dispatch_shadow_fault
+    VMX_FAULT(8)
 END(vmx_dirty_bit)
 
     .org vmx_ia64_ivt+0x2400
@@ -1332,6 +1340,30 @@ ENTRY(vmx_dispatch_interrupt)
     br.call.sptk.many b6=ia64_handle_irq
 END(vmx_dispatch_interrupt)
 
+
+ENTRY(vmx_dispatch_shadow_fault)
+    VMX_SAVE_MIN_WITH_COVER_R19
+    alloc r14=ar.pfs,0,0,4,0
+    mov out0=cr.ifa
+    mov out1=cr.isr
+    mov out2=r15
+    adds r3=8,r2                // set up second base pointer
+    ;;
+    ssm psr.ic
+    ;;
+    srlz.i                  // guarantee that interruption collection is on
+    ;;
+    (p15) ssm psr.i               // restore psr.i
+    movl r14=ia64_leave_hypervisor
+    ;;
+    VMX_SAVE_REST
+    mov rp=r14
+    ;;
+    P6_BR_CALL_PANIC(.Lvmx_dispatch_shadow_fault_string)
+    adds out3=16,r12
+    br.call.sptk.many b6=vmx_ia64_shadow_fault
+END(vmx_dispatch_shadow_fault)
+
 .Lvmx_dispatch_reflection_string:
     .asciz "vmx_dispatch_reflection\n"
 .Lvmx_dispatch_virtualization_fault_string:
@@ -1340,3 +1372,5 @@ END(vmx_dispatch_interrupt)
     .asciz "vmx_dispatch_vexirq\n"
 .Lvmx_dispatch_tlb_miss_string:
     .asciz "vmx_dispatch_tlb_miss\n"
+.Lvmx_dispatch_shadow_fault_string:
+    .asciz "vmx_dispatch_shadow_fault\n"

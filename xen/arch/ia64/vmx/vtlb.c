@@ -22,6 +22,7 @@
 
 #include <asm/vmx_vcpu.h>
 #include <asm/vmx_phy_mode.h>
+#include <asm/shadow.h>
 
 static thash_data_t *__alloc_chain(thash_cb_t *);
 
@@ -132,7 +133,7 @@ static void vmx_vhpt_insert(thash_cb_t *hcb, u64 pte, u64 itir, u64 ifa)
     ia64_rr rr;
     thash_data_t *head, *cch;
 
-    pte = pte & ~PAGE_FLAGS_RV_MASK;
+    pte &= ((~PAGE_FLAGS_RV_MASK)|_PAGE_VIRT_D);
     rr.rrval = ia64_get_rr(ifa);
     head = (thash_data_t *)ia64_thash(ifa);
     tag = ia64_ttag(ifa);
@@ -514,13 +515,14 @@ u64 translate_phy_pte(VCPU *v, u64 *pte, u64 itir, u64 va)
     u64 ps, ps_mask, paddr, maddr;
 //    ia64_rr rr;
     union pte_flags phy_pte;
+    struct domain *d = v->domain;
 
     ps = itir_ps(itir);
     ps_mask = ~((1UL << ps) - 1);
     phy_pte.val = *pte;
     paddr = *pte;
     paddr = ((paddr & _PAGE_PPN_MASK) & ps_mask) | (va & ~ps_mask);
-    maddr = lookup_domain_mpa(v->domain, paddr, NULL);
+    maddr = lookup_domain_mpa(d, paddr, NULL);
     if (maddr & GPFN_IO_MASK) {
         *pte |= VTLB_PTE_IO;
         return -1;
@@ -536,6 +538,18 @@ u64 translate_phy_pte(VCPU *v, u64 *pte, u64 itir, u64 va)
 //    ps = rr.ps;
     maddr = ((maddr & _PAGE_PPN_MASK) & PAGE_MASK) | (paddr & ~PAGE_MASK);
     phy_pte.ppn = maddr >> ARCH_PAGE_SHIFT;
+
+    /* If shadow mode is enabled, virtualize dirty bit.  */
+    if (shadow_mode_enabled(d) && phy_pte.d) {
+        u64 gpfn = paddr >> PAGE_SHIFT;
+        phy_pte.val |= _PAGE_VIRT_D;
+
+        /* If the page is not already dirty, don't set the dirty bit! */
+        if (gpfn < d->arch.shadow_bitmap_size * 8
+            && !test_bit(gpfn, d->arch.shadow_bitmap))
+            phy_pte.d = 0;
+    }
+
     return phy_pte.val;
 }
 
