@@ -155,6 +155,13 @@ trampoline_boot_cpu_entry:
         lidt    bootsym(rm_idt)
         sti
 
+#if defined(__x86_64__)
+        /* Declare that our target operating mode is long mode. */
+        movw    $0xec00,%ax      # declare target operating mode
+        movw    $0x0002,%bx      # long mode
+        int     $0x15
+#endif
+
         /*
          * Do real-mode work:
          *  1. Get memory map.
