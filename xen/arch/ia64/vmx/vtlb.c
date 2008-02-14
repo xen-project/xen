@@ -24,6 +24,7 @@
 #include <asm/vmx_phy_mode.h>
 #include <asm/shadow.h>
 
+static u64 translate_phy_pte(VCPU *v, u64 pte, u64 itir, u64 va);
 static thash_data_t *__alloc_chain(thash_cb_t *);
 
 static inline void cch_mem_init(thash_cb_t *hcb)
@@ -183,7 +184,7 @@ void thash_vhpt_insert(VCPU *v, u64 pte, u64 itir, u64 va, int type)
     u64 phy_pte, psr;
     ia64_rr mrr;
 
-    phy_pte = translate_phy_pte(v, &pte, itir, va);
+    phy_pte = translate_phy_pte(v, pte, itir, va);
     mrr.rrval = ia64_get_rr(va);
 
     if (itir_ps(itir) >= mrr.ps && VMX_MMU_MODE(v) != VMX_MMU_PHY_D) {
@@ -510,23 +511,20 @@ void thash_purge_entries_remote(VCPU *v, u64 va, u64 ps)
     vhpt_purge(v, va, ps);
 }
 
-u64 translate_phy_pte(VCPU *v, u64 *pte, u64 itir, u64 va)
+static u64 translate_phy_pte(VCPU *v, u64 pte, u64 itir, u64 va)
 {
     u64 ps, ps_mask, paddr, maddr;
-//    ia64_rr rr;
     union pte_flags phy_pte;
     struct domain *d = v->domain;
 
     ps = itir_ps(itir);
     ps_mask = ~((1UL << ps) - 1);
-    phy_pte.val = *pte;
-    paddr = *pte;
-    paddr = ((paddr & _PAGE_PPN_MASK) & ps_mask) | (va & ~ps_mask);
+    phy_pte.val = pte;
+    paddr = ((pte & _PAGE_PPN_MASK) & ps_mask) | (va & ~ps_mask);
     maddr = lookup_domain_mpa(d, paddr, NULL);
-    if (maddr & GPFN_IO_MASK) {
-        *pte |= VTLB_PTE_IO;
+    if (maddr & GPFN_IO_MASK)
         return -1;
-    }
+
     /* Ensure WB attribute if pte is related to a normal mem page,
      * which is required by vga acceleration since qemu maps shared
      * vram buffer with WB.
@@ -534,8 +532,6 @@ u64 translate_phy_pte(VCPU *v, u64 *pte, u64 itir, u64 va)
     if (phy_pte.ma != VA_MATTR_NATPAGE)
         phy_pte.ma = VA_MATTR_WB;
 
-//    rr.rrval = ia64_get_rr(va);
-//    ps = rr.ps;
     maddr = ((maddr & _PAGE_PPN_MASK) & PAGE_MASK) | (paddr & ~PAGE_MASK);
     phy_pte.ppn = maddr >> ARCH_PAGE_SHIFT;
 
@@ -567,12 +563,12 @@ int thash_purge_and_insert(VCPU *v, u64 pte, u64 itir, u64 ifa, int type)
     ps = itir_ps(itir);
     mrr.rrval = ia64_get_rr(ifa);
 
-    phy_pte = translate_phy_pte(v, &pte, itir, ifa);
+    phy_pte = translate_phy_pte(v, pte, itir, ifa);
 
     vtlb_purge(v, ifa, ps);
     vhpt_purge(v, ifa, ps);
 
-    if (pte & VTLB_PTE_IO) {
+    if (phy_pte == -1) {
         vtlb_insert(v, pte, itir, ifa);
         return 1;
     }
