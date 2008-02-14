@@ -89,12 +89,14 @@ int __init get_iommu_capabilities(u8 bus, u8 dev, u8 func, u8 cap_ptr,
     u32 cap_header, cap_range;
     u64 mmio_bar;
 
+#if HACK_BIOS_SETTINGS
     /* remove it when BIOS available */
     write_pci_config(bus, dev, func,
         cap_ptr + PCI_CAP_MMIO_BAR_HIGH_OFFSET, 0x00000000);
     write_pci_config(bus, dev, func,
         cap_ptr + PCI_CAP_MMIO_BAR_LOW_OFFSET, 0x40000001);
     /* remove it when BIOS available */
+#endif
 
     mmio_bar = (u64)read_pci_config(bus, dev, func,
              cap_ptr + PCI_CAP_MMIO_BAR_HIGH_OFFSET) << 32;

@@ -141,7 +141,7 @@ int hvm_do_IRQ_dpci(struct domain *d, unsigned int mirq)
 {
     struct hvm_irq *hvm_irq = &d->arch.hvm_domain.irq;
 
-    if ( !vtd_enabled || (d == dom0) || (hvm_irq->dpci == NULL) ||
+    if ( !iommu_enabled || (d == dom0) || (hvm_irq->dpci == NULL) ||
          !hvm_irq->dpci->mirq[mirq].valid )
         return 0;
 
@@ -167,7 +167,7 @@ static void hvm_dpci_isairq_eoi(struct domain *d, unsigned int isairq)
     int i;
 
     ASSERT(isairq < NR_ISAIRQS);
-    if ( !vtd_enabled || !dpci ||
+    if ( !iommu_enabled || !dpci ||
          !test_bit(isairq, dpci->isairq_map) )
         return;
 
@@ -205,7 +205,7 @@ void hvm_dpci_eoi(struct domain *d, unsigned int guest_gsi,
     struct hvm_irq_dpci *hvm_irq_dpci = d->arch.hvm_domain.irq.dpci;
     uint32_t device, intx, machine_gsi;
 
-    if ( !vtd_enabled || (hvm_irq_dpci == NULL) ||
+    if ( !iommu_enabled || (hvm_irq_dpci == NULL) ||
          (guest_gsi >= NR_ISAIRQS &&
           !hvm_irq_dpci->girq[guest_gsi].valid) )
         return;
@@ -234,51 +234,4 @@ void hvm_dpci_eoi(struct domain *d, unsigned int guest_gsi,
     }
     else
         spin_unlock(&hvm_irq_dpci->dirq_lock);
-}
-
-void iommu_domain_destroy(struct domain *d)
-{
-    struct hvm_irq_dpci *hvm_irq_dpci = d->arch.hvm_domain.irq.dpci;
-    uint32_t i;
-    struct hvm_iommu *hd  = domain_hvm_iommu(d);
-    struct list_head *ioport_list, *digl_list, *tmp;
-    struct g2m_ioport *ioport;
-    struct dev_intx_gsi_link *digl;
-
-    if ( !vtd_enabled )
-        return;
-
-    if ( hvm_irq_dpci != NULL )
-    {
-        for ( i = 0; i < NR_IRQS; i++ )
-            if ( hvm_irq_dpci->mirq[i].valid )
-            {
-                pirq_guest_unbind(d, i);
-                kill_timer(&hvm_irq_dpci->hvm_timer[irq_to_vector(i)]);
-
-                list_for_each_safe ( digl_list, tmp,
-                                     &hvm_irq_dpci->mirq[i].digl_list )
-                {
-                    digl = list_entry(digl_list,
-                                      struct dev_intx_gsi_link, list);
-                    list_del(&digl->list);
-                    xfree(digl);
-                }
-            }
-
-        d->arch.hvm_domain.irq.dpci = NULL;
-        xfree(hvm_irq_dpci);
-    }
-
-    if ( hd )
-    {
-        list_for_each_safe ( ioport_list, tmp, &hd->g2m_ioport_list )
-        {
-            ioport = list_entry(ioport_list, struct g2m_ioport, list);
-            list_del(&ioport->list);
-            xfree(ioport);
-        }
-    }
-
-    iommu_domain_teardown(d);
 }

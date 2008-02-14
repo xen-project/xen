@@ -255,8 +255,21 @@ set_p2m_entry(struct domain *d, unsigned long gfn, mfn_t mfn, p2m_type_t p2mt)
     /* level 1 entry */
     paging_write_p2m_entry(d, gfn, p2m_entry, table_mfn, entry_content, 1);
 
-    if ( vtd_enabled && (p2mt == p2m_mmio_direct) && is_hvm_domain(d) )
-        iommu_flush(d, gfn, (u64*)p2m_entry);
+    if ( iommu_enabled && is_hvm_domain(d) )
+    {
+        if ( boot_cpu_data.x86_vendor == X86_VENDOR_INTEL )
+        {
+            if ( (p2mt == p2m_mmio_direct) )
+                iommu_flush(d, gfn, (u64*)p2m_entry);
+        }
+        else if ( boot_cpu_data.x86_vendor == X86_VENDOR_AMD )
+        {
+            if ( p2mt == p2m_ram_rw )
+                iommu_map_page(d, gfn, mfn_x(mfn));
+            else
+                iommu_unmap_page(d, gfn);
+        }
+    }
 
     /* Success */
     rv = 1;

@@ -530,7 +530,7 @@ long arch_do_domctl(
         u8 bus, devfn;
 
         ret = -EINVAL;
-        if ( !vtd_enabled )
+        if ( !iommu_enabled )
             break;
 
         bus = (domctl->u.assign_device.machine_bdf >> 16) & 0xff;
@@ -553,7 +553,7 @@ long arch_do_domctl(
         u8 bus, devfn;
 
         ret = -EINVAL;
-        if ( !vtd_enabled )
+        if ( !iommu_enabled )
             break;
 
         if ( unlikely((d = get_domain_by_id(domctl->domain)) == NULL) )
@@ -589,9 +589,9 @@ long arch_do_domctl(
         if ( (d = rcu_lock_domain_by_id(domctl->domain)) == NULL )
             break;
         bind = &(domctl->u.bind_pt_irq);
-        if (vtd_enabled)
+        if ( iommu_enabled )
             ret = pt_irq_create_bind_vtd(d, bind);
-        if (ret < 0)
+        if ( ret < 0 )
             gdprintk(XENLOG_ERR, "pt_irq_create_bind failed!\n");
         rcu_unlock_domain(d);
     }
