@@ -27,13 +27,15 @@
     list_for_each_entry(amd_iommu, \
         &amd_iommu_head, list)
 
+#define for_each_pdev(domain, pdev) \
+    list_for_each_entry(pdev, \
+         &(domain->arch.hvm_domain.hvm_iommu.pdev_list), list)
+
 #define DMA_32BIT_MASK  0x00000000ffffffffULL
 #define PAGE_ALIGN(addr)    (((addr) + PAGE_SIZE - 1) & PAGE_MASK)
-#define PAGE_SHIFT_4K                   (12)
-#define PAGE_SIZE_4K                    (1UL << PAGE_SHIFT_4K)
-#define PAGE_MASK_4K                    (((u64)-1) << PAGE_SHIFT_4K)
 
-typedef int (*iommu_detect_callback_ptr_t)(u8 bus, u8 dev, u8 func, u8 cap_ptr);
+typedef int (*iommu_detect_callback_ptr_t)(
+    u8 bus, u8 dev, u8 func, u8 cap_ptr);
 
 /* amd-iommu-detect functions */
 int __init scan_for_iommu(iommu_detect_callback_ptr_t iommu_detect_callback);
@@ -49,16 +51,20 @@ void __init register_iommu_cmd_buffer_in_mmio_space(struct amd_iommu *iommu);
 void __init enable_iommu(struct amd_iommu *iommu);
 
 /* mapping functions */
-int amd_iommu_map_page(struct domain *d, unsigned long gfn,
-        unsigned long mfn);
+int amd_iommu_map_page(struct domain *d, unsigned long gfn, unsigned long mfn);
 int amd_iommu_unmap_page(struct domain *d, unsigned long gfn);
+void *amd_iommu_get_vptr_from_page_table_entry(u32 *entry);
 
 /* device table functions */
 void amd_iommu_set_dev_table_entry(u32 *dte,
         u64 root_ptr, u16 domain_id, u8 paging_mode);
+int amd_iommu_is_dte_page_translation_valid(u32 *entry);
+void invalidate_dev_table_entry(struct amd_iommu *iommu,
+            u16 devic_id);
 
 /* send cmd to iommu */
 int send_iommu_command(struct amd_iommu *iommu, u32 cmd[]);
+void flush_command_buffer(struct amd_iommu *iommu);
 
 /* iommu domain funtions */
 int amd_iommu_domain_init(struct domain *domain);

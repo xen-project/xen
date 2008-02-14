@@ -1235,6 +1235,9 @@ void bdrv_init(void)
 {
     bdrv_register(&bdrv_raw);
     bdrv_register(&bdrv_host_device);
+#ifdef CONFIG_STUBDOM
+    bdrv_register(&bdrv_vbd);
+#endif
 #ifndef _WIN32
     bdrv_register(&bdrv_cow);
 #endif

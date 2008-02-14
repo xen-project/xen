@@ -51,12 +51,11 @@ extern u8 x86_cpu_to_apicid[];
 
 /* State of each CPU. */
 #define CPU_ONLINE	0x0002	/* CPU is up */
-#define CPU_DYING	0x0003	/* CPU is requested to die */
 #define CPU_DEAD	0x0004	/* CPU is dead */
 DECLARE_PER_CPU(int, cpu_state);
 
 #ifdef CONFIG_HOTPLUG_CPU
-#define cpu_is_offline(cpu) unlikely(per_cpu(cpu_state,cpu) == CPU_DYING)
+#define cpu_is_offline(cpu) unlikely(!cpu_online(cpu))
 extern int cpu_down(unsigned int cpu);
 extern int cpu_up(unsigned int cpu);
 extern void cpu_exit_clear(void);

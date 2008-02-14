@@ -54,6 +54,7 @@
 #include <mach_apic.h>
 #include <mach_wakecpu.h>
 #include <smpboot_hooks.h>
+#include <xen/stop_machine.h>
 
 #define set_kernel_exec(x, y) (0)
 #define setup_trampoline()    (bootsym_phys(trampoline_realmode_entry))
@@ -111,7 +112,7 @@ static void map_cpu_to_logical_apicid(void);
 DEFINE_PER_CPU(int, cpu_state) = { 0 };
 
 static void *stack_base[NR_CPUS] __cacheline_aligned;
-spinlock_t cpu_add_remove_lock;
+static DEFINE_SPINLOCK(cpu_add_remove_lock);
 
 /*
  * The bootstrap kernel entry code has set these up. Save them for
@@ -1163,7 +1164,6 @@ void __devinit smp_prepare_boot_cpu(void)
 	cpu_set(smp_processor_id(), cpu_present_map);
 	cpu_set(smp_processor_id(), cpu_possible_map);
 	per_cpu(cpu_state, smp_processor_id()) = CPU_ONLINE;
-	spin_lock_init(&cpu_add_remove_lock);
 }
 
 #ifdef CONFIG_HOTPLUG_CPU
@@ -1208,6 +1208,15 @@ int __cpu_disable(void)
 	if (cpu == 0)
 		return -EBUSY;
 
+	/*
+	 * Only S3 is using this path, and thus idle vcpus are running on all
+	 * APs when we are called. To support full cpu hotplug, other 
+	 * notification mechanisms should be introduced (e.g., migrate vcpus
+	 * off this physical cpu before rendezvous point).
+	 */
+	if (!is_idle_vcpu(current))
+		return -EINVAL;
+
 	local_irq_disable();
 	clear_local_APIC();
 	/* Allow any queued timer interrupts to get serviced */
@@ -1244,6 +1253,11 @@ void __cpu_die(unsigned int cpu)
  	printk(KERN_ERR "CPU %u didn't die...\n", cpu);
 }
 
+static int take_cpu_down(void *unused)
+{
+    return __cpu_disable();
+}
+
 /* 
  * XXX: One important thing missed here is to migrate vcpus
  * from dead cpu to other online ones and then put whole
@@ -1269,7 +1283,6 @@ void __cpu_die(unsigned int cpu)
 int cpu_down(unsigned int cpu)
 {
 	int err = 0;
-	cpumask_t mask;
 
 	spin_lock(&cpu_add_remove_lock);
 	if (num_online_cpus() == 1) {
@@ -1283,11 +1296,10 @@ int cpu_down(unsigned int cpu)
 	}
 
 	printk("Prepare to bring CPU%d down...\n", cpu);
-	/* Send notification to remote idle vcpu */
-	cpus_clear(mask);
-	cpu_set(cpu, mask);
-	per_cpu(cpu_state, cpu) = CPU_DYING;
-	smp_send_event_check_mask(mask);
+
+	err = stop_machine_run(take_cpu_down, NULL, cpu);
+	if ( err < 0 )
+		goto out;
 
 	__cpu_die(cpu);
 

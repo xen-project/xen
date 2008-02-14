@@ -28,7 +28,9 @@
 #include <public/domctl.h>
 
 extern int vtd_enabled;
+extern int amd_iommu_enabled;
 
+#define iommu_enabled ( amd_iommu_enabled || vtd_enabled )
 #define domain_hvm_iommu(d)     (&d->arch.hvm_domain.hvm_iommu)
 #define domain_vmx_iommu(d)     (&d->arch.hvm_domain.hvm_iommu.vmx_iommu)
 #define iommu_qi_ctrl(iommu)    (&(iommu->intel.qi_ctrl));
@@ -72,17 +74,29 @@ int iommu_domain_init(struct domain *d);
 void iommu_domain_destroy(struct domain *d);
 int device_assigned(u8 bus, u8 devfn);
 int assign_device(struct domain *d, u8 bus, u8 devfn);
-int iommu_map_page(struct domain *d, dma_addr_t gfn, dma_addr_t mfn);
-int iommu_unmap_page(struct domain *d, dma_addr_t gfn);
-void iommu_flush(struct domain *d, dma_addr_t gfn, u64 *p2m_entry);
+int iommu_map_page(struct domain *d, unsigned long gfn, unsigned long mfn);
+int iommu_unmap_page(struct domain *d, unsigned long gfn);
+void iommu_flush(struct domain *d, unsigned long gfn, u64 *p2m_entry);
 void iommu_set_pgd(struct domain *d);
 void iommu_domain_teardown(struct domain *d);
 int hvm_do_IRQ_dpci(struct domain *d, unsigned int irq);
 int dpci_ioport_intercept(ioreq_t *p);
 int pt_irq_create_bind_vtd(struct domain *d,
                            xen_domctl_bind_pt_irq_t *pt_irq_bind);
+unsigned int io_apic_read_remap_rte(
+    unsigned int apic, unsigned int reg);
+void io_apic_write_remap_rte(unsigned int apic,
+    unsigned int reg, unsigned int value);
 
 #define PT_IRQ_TIME_OUT MILLISECS(8)
 #define VTDPREFIX "[VT-D]"
+
+struct iommu_ops {
+    int (*init)(struct domain *d);
+    int (*assign_device)(struct domain *d, u8 bus, u8 devfn);
+    void (*teardown)(struct domain *d);
+    int (*map_page)(struct domain *d, unsigned long gfn, unsigned long mfn);
+    int (*unmap_page)(struct domain *d, unsigned long gfn);
+};
 
 #endif /* _IOMMU_H_ */

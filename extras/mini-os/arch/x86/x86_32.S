@@ -1,5 +1,5 @@
 #include <os.h>
-#include <arch_mm.h>
+#include <arch_limits.h>
 #include <xen/arch-x86_32.h>
 
 .section __xen_guest
@@ -22,12 +22,12 @@
 _start:
         cld
         lss stack_start,%esp
-        andl $(~(STACK_SIZE-1)), %esp
+        andl $(~(__STACK_SIZE-1)), %esp
         push %esi 
         call start_kernel
 
 stack_start:
-	.long stack+(2*STACK_SIZE), __KERNEL_SS
+	.long stack+(2*__STACK_SIZE), __KERNEL_SS
 
         /* Unpleasant -- the PTE that maps this page is actually overwritten */
         /* to map the real shared-info page! :-)                             */

@@ -116,6 +116,7 @@ static inline void tswap64s(uint64_t *s)
 #define bswaptls(s) bswap64s(s)
 #endif
 
+#ifdef CONFIG_SOFTFLOAT
 /* NOTE: arm FPA is horrible as double 32 bit words are stored in big
    endian ! */
 typedef union {
@@ -134,6 +135,7 @@ typedef union {
 #endif
     uint64_t ll;
 } CPU_DoubleU;
+#endif
 
 /* CPU memory access without any memory or io remapping */
 
@@ -267,6 +269,7 @@ static inline void stq_le_p(void *ptr, uint64_t v)
     stl_le_p(p + 4, v >> 32);
 }
 
+#ifdef CONFIG_SOFTFLOAT
 /* float access */
 
 static inline float32 ldfl_le_p(void *ptr)
@@ -304,6 +307,7 @@ static inline void stfq_le_p(void *ptr, float64 v)
     stl_le_p(ptr, u.l.lower);
     stl_le_p(ptr + 4, u.l.upper);
 }
+#endif
 
 #else
 
@@ -342,6 +346,7 @@ static inline void stq_le_p(void *ptr, uint64_t v)
     *(uint64_t *)ptr = v;
 }
 
+#ifdef CONFIG_SOFTFLOAT
 /* float access */
 
 static inline float32 ldfl_le_p(void *ptr)
@@ -363,6 +368,7 @@ static inline void stfq_le_p(void *ptr, float64 v)
 {
     *(float64 *)ptr = v;
 }
+#endif
 #endif
 
 #if !defined(WORDS_BIGENDIAN) || defined(WORDS_ALIGNED)
@@ -456,6 +462,7 @@ static inline void stq_be_p(void *ptr, uint64_t v)
     stl_be_p(ptr + 4, v);
 }
 
+#ifdef CONFIG_SOFTFLOAT
 /* float access */
 
 static inline float32 ldfl_be_p(void *ptr)
@@ -493,6 +500,7 @@ static inline void stfq_be_p(void *ptr, float64 v)
     stl_be_p(ptr, u.l.upper);
     stl_be_p(ptr + 4, u.l.lower);
 }
+#endif
 
 #else
 
@@ -531,6 +539,7 @@ static inline void stq_be_p(void *ptr, uint64_t v)
     *(uint64_t *)ptr = v;
 }
 
+#ifdef CONFIG_SOFTFLOAT
 /* float access */
 
 static inline float32 ldfl_be_p(void *ptr)
@@ -552,6 +561,7 @@ static inline void stfq_be_p(void *ptr, float64 v)
 {
     *(float64 *)ptr = v;
 }
+#endif
 
 #endif
 

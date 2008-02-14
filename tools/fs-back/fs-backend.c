@@ -140,8 +140,8 @@ void* handle_mount(void *data)
         handle_aio_events(mount);
 moretodo:
         rp = mount->ring.sring->req_prod;
-        rmb(); /* Ensure we see queued requests up to 'rp'. */
-                
+        xen_rmb(); /* Ensure we see queued requests up to 'rp'. */
+
         while ((cons = mount->ring.req_cons) != rp)
         {
             int i;

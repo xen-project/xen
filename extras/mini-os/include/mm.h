@@ -36,7 +36,12 @@
 #endif
 
 #include <lib.h>
+
+#include <arch_limits.h>
 #include <arch_mm.h>
+
+#define STACK_SIZE_PAGE_ORDER __STACK_SIZE_PAGE_ORDER
+#define STACK_SIZE __STACK_SIZE
 
 
 void init_mm(void);
@@ -61,5 +66,8 @@ void arch_init_p2m(unsigned long max_pfn_p);
 void *map_frames_ex(unsigned long *f, unsigned long n, unsigned long stride,
 	unsigned long increment, unsigned long alignment, domid_t id,
 	int may_fail, unsigned long prot);
+#ifdef HAVE_LIBC
+extern unsigned long heap, brk, heap_mapped, heap_end;
+#endif
 
 #endif /* _MM_H_ */

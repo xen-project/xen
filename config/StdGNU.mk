@@ -35,6 +35,7 @@ PRIVATE_BINDIR = $(PRIVATE_PREFIX)/bin
 
 SOCKET_LIBS =
 CURSES_LIBS = -lncurses
+PTHREAD_LIBS = -lpthread
 UTIL_LIBS = -lutil
 SONAME_LDFLAG = -soname
 SHLIB_CFLAGS = -shared

@@ -458,7 +458,7 @@ void vioapic_update_EOI(struct domain *d, int vector)
 
     ent->fields.remote_irr = 0;
 
-    if ( vtd_enabled )
+    if ( iommu_enabled )
     {
         spin_unlock(&d->arch.hvm_domain.irq_lock);
         hvm_dpci_eoi(current->domain, gsi, ent);

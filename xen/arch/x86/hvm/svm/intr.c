@@ -94,6 +94,46 @@ static void enable_intr_window(struct vcpu *v, struct hvm_intack intack)
     vmcb->general1_intercepts |= GENERAL1_INTERCEPT_VINTR;
 }
 
+static void svm_dirq_assist(struct vcpu *v)
+{
+    unsigned int irq;
+    uint32_t device, intx;
+    struct domain *d = v->domain;
+    struct hvm_irq_dpci *hvm_irq_dpci = d->arch.hvm_domain.irq.dpci;
+    struct dev_intx_gsi_link *digl;
+
+    if ( !amd_iommu_enabled || (v->vcpu_id != 0) || (hvm_irq_dpci == NULL) )
+        return;
+
+    for ( irq = find_first_bit(hvm_irq_dpci->dirq_mask, NR_IRQS);
+          irq < NR_IRQS;
+          irq = find_next_bit(hvm_irq_dpci->dirq_mask, NR_IRQS, irq + 1) )
+    {
+        stop_timer(&hvm_irq_dpci->hvm_timer[irq_to_vector(irq)]);
+        clear_bit(irq, &hvm_irq_dpci->dirq_mask);
+
+        list_for_each_entry ( digl, &hvm_irq_dpci->mirq[irq].digl_list, list )
+        {
+            device = digl->device;
+            intx = digl->intx;
+            hvm_pci_intx_assert(d, device, intx);
+            spin_lock(&hvm_irq_dpci->dirq_lock);
+            hvm_irq_dpci->mirq[irq].pending++;
+            spin_unlock(&hvm_irq_dpci->dirq_lock);
+        }
+
+        /*
+         * Set a timer to see if the guest can finish the interrupt or not. For
+         * example, the guest OS may unmask the PIC during boot, before the
+         * guest driver is loaded. hvm_pci_intx_assert() may succeed, but the
+         * guest will never deal with the irq, then the physical interrupt line
+         * will never be deasserted.
+         */
+        set_timer(&hvm_irq_dpci->hvm_timer[irq_to_vector(irq)],
+                  NOW() + PT_IRQ_TIME_OUT);
+    }
+}
+
 asmlinkage void svm_intr_assist(void) 
 {
     struct vcpu *v = current;
@@ -102,6 +142,7 @@ asmlinkage void svm_intr_assist(void)
 
     /* Crank the handle on interrupt state. */
     pt_update_irq(v);
+    svm_dirq_assist(v);
 
     do {
         intack = hvm_vcpu_has_pending_irq(v);

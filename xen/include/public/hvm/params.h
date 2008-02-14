@@ -81,6 +81,9 @@
 #define HVMPTM_no_missed_ticks_pending   2
 #define HVMPTM_one_missed_tick_pending   3
 
-#define HVM_NR_PARAMS          11
+/* Boolean: Enable virtual HPET (high-precision event timer)? (x86-only) */
+#define HVM_PARAM_HPET_ENABLED 11
+
+#define HVM_NR_PARAMS          12
 
 #endif /* __XEN_PUBLIC_HVM_PARAMS_H__ */

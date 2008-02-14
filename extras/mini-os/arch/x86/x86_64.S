@@ -1,5 +1,5 @@
 #include <os.h>
-#include <arch_mm.h>
+#include <arch_limits.h>
 #include <xen/features.h>
 
 .section __xen_guest
@@ -19,12 +19,12 @@
 _start:
         cld
         movq stack_start(%rip),%rsp
-        andq $(~(STACK_SIZE-1)), %rsp
+        andq $(~(__STACK_SIZE-1)), %rsp
         movq %rsi,%rdi
         call start_kernel
 
 stack_start:
-        .quad stack+(2*STACK_SIZE)
+        .quad stack+(2*__STACK_SIZE)
 
         /* Unpleasant -- the PTE that maps this page is actually overwritten */
         /* to map the real shared-info page! :-)                             */

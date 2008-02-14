@@ -11,8 +11,10 @@
 #include "vl.h"
 #include "block_int.h"
 #include <unistd.h>
+#ifndef CONFIG_STUBDOM
 #include <sys/ipc.h>
 #include <sys/shm.h>
+#endif
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
@@ -219,10 +221,18 @@ void xenstore_parse_domain_config(int domid)
         }
 
         /* open device now if media present */
+#ifdef CONFIG_STUBDOM
+        if (pasprintf(&buf, "%s/device/vbd/%s", path, e[i]) == -1)
+            continue;
+	if (bdrv_open2(bs, buf, 0 /* snapshot */, &bdrv_vbd) == 0) {
+	    pstrcpy(bs->filename, sizeof(bs->filename), params);
+	    continue;
+	}
+#endif
+
         if (params[0]) {
             if (bdrv_open(bs, params, 0 /* snapshot */) < 0)
-                fprintf(stderr, "qemu: could not open hard disk image '%s'\n",
-                        params);
+                fprintf(stderr, "qemu: could not open vbd '%s' or hard disk image '%s'\n", buf, params);
         }
     }
 
@@ -265,6 +275,10 @@ extern int vga_ram_size, bios_size;
 
 void xenstore_process_logdirty_event(void)
 {
+#ifdef CONFIG_STUBDOM
+    /* XXX we just can't use shm. */
+    return;
+#else
     char *act;
     static char *active_path = NULL;
     static char *next_active_path = NULL;
@@ -367,6 +381,7 @@ void xenstore_process_logdirty_event(void)
     /* Ack that we've switched */
     xs_write(xsh, XBT_NULL, active_path, act, len);
     free(act);
+#endif
 }
 
 

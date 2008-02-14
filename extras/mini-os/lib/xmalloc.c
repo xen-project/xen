@@ -62,10 +62,19 @@ struct xmalloc_pad
     size_t hdr_size;
 };
 
+/* Return size, increased to alignment with align. */
+static inline size_t align_up(size_t size, size_t align)
+{
+    return (size + align - 1) & ~(align - 1);
+}
+
 static void maybe_split(struct xmalloc_hdr *hdr, size_t size, size_t block)
 {
     struct xmalloc_hdr *extra;
-    size_t leftover = block - size;
+    size_t leftover;
+    size = align_up(size, __alignof__(struct xmalloc_hdr));
+    size = align_up(size, __alignof__(struct xmalloc_pad));
+    leftover = block - size;
 
     /* If enough is left to make a block, put it on free list. */
     if ( leftover >= (2 * (sizeof(struct xmalloc_hdr) + sizeof(struct xmalloc_pad))) )
@@ -98,12 +107,6 @@ static struct xmalloc_hdr *xmalloc_new_page(size_t size)
     maybe_split(hdr, size, PAGE_SIZE);
 
     return hdr;
-}
-
-/* Return size, increased to alignment with align. */
-static inline size_t align_up(size_t size, size_t align)
-{
-    return (size + align - 1) & ~(align - 1);
 }
 
 /* Big object?  Just use the page allocator. */

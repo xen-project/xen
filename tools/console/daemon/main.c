@@ -35,6 +35,8 @@
 int log_reload = 0;
 int log_guest = 0;
 int log_hv = 0;
+int log_time_hv = 0;
+int log_time_guest = 0;
 char *log_dir = NULL;
 
 static void handle_hup(int sig)
@@ -44,7 +46,7 @@ static void handle_hup(int sig)
 
 static void usage(char *name)
 {
-	printf("Usage: %s [-h] [-V] [-v] [-i] [--log=none|guest|hv|all] [--log-dir=DIR] [--pid-file=PATH]\n", name);
+	printf("Usage: %s [-h] [-V] [-v] [-i] [--log=none|guest|hv|all] [--log-dir=DIR] [--pid-file=PATH] [-t, --timestamp=none|guest|hv|all]\n", name);
 }
 
 static void version(char *name)
@@ -54,7 +56,7 @@ static void version(char *name)
 
 int main(int argc, char **argv)
 {
-	const char *sopts = "hVvi";
+	const char *sopts = "hVvit:";
 	struct option lopts[] = {
 		{ "help", 0, 0, 'h' },
 		{ "version", 0, 0, 'V' },
@@ -63,6 +65,7 @@ int main(int argc, char **argv)
 		{ "log", 1, 0, 'l' },
 		{ "log-dir", 1, 0, 'r' },
 		{ "pid-file", 1, 0, 'p' },
+		{ "timestamp", 1, 0, 't' },
 		{ 0 },
 	};
 	bool is_interactive = false;
@@ -102,6 +105,19 @@ int main(int argc, char **argv)
 			break;
 		case 'p':
 		        pidfile = strdup(optarg);
+			break;
+		case 't':
+			if (!strcmp(optarg, "all")) {
+				log_time_hv = 1;
+				log_time_guest = 1;
+			} else if (!strcmp(optarg, "hv")) {
+				log_time_hv = 1;
+			} else if (!strcmp(optarg, "guest")) {
+				log_time_guest = 1;
+			} else if (!strcmp(optarg, "none")) {
+				log_time_guest = 0;
+				log_time_hv = 0;
+			}
 			break;
 		case '?':
 			fprintf(stderr,

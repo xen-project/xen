@@ -1071,7 +1071,7 @@ static const uint8_t cursor_glyph[32 * 4] = {
  */
 static void vga_draw_text(VGAState *s, int full_update)
 {
-    int cx, cy, cheight, cw, ch, cattr, height, width, ch_attr;
+    int cx, cy, cheight, cw, ch, cattr, height, width, ch_attr, depth;
     int cx_min, cx_max, linesize, x_incr;
     uint32_t offset, fgcol, bgcol, v, cursor_offset;
     uint8_t *d1, *d, *src, *s1, *dest, *cursor_ptr;
@@ -1134,6 +1134,11 @@ static void vga_draw_text(VGAState *s, int full_update)
         return;
     }
 
+    depth = s->get_bpp(s);
+    if (depth == 24)
+        depth = 32;
+    if (s->ds->dpy_colourdepth != NULL && s->ds->depth != depth)
+        s->ds->dpy_colourdepth(s->ds, depth);
     if (width != s->last_width || height != s->last_height ||
         cw != s->last_cw || cheight != s->last_ch) {
         s->last_scr_width = width * cw;
@@ -1477,7 +1482,7 @@ void check_sse2(void)
  */
 static void vga_draw_graphic(VGAState *s, int full_update)
 {
-    int y1, y, update, linesize, y_start, double_scan, mask;
+    int y1, y, update, linesize, y_start, double_scan, mask, depth;
     int width, height, shift_control, line_offset, bwidth;
     ram_addr_t page0, page1;
     int disp_width, multi_scan, multi_run;
@@ -1551,6 +1556,11 @@ static void vga_draw_graphic(VGAState *s, int full_update)
     }
     vga_draw_line = vga_draw_line_table[v * NB_DEPTHS + get_depth_index(s->ds)];
 
+    depth = s->get_bpp(s);
+    if (depth == 24)
+        depth = 32;
+    if (s->ds->dpy_colourdepth != NULL && s->ds->depth != depth)
+        s->ds->dpy_colourdepth(s->ds, depth);
     if (disp_width != s->last_width ||
         height != s->last_height) {
         dpy_resize(s->ds, disp_width, height);

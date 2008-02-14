@@ -422,8 +422,6 @@ struct poll_info {
 #define VTD_PAGE_TABLE_LEVEL_3  3
 #define VTD_PAGE_TABLE_LEVEL_4  4
 
-typedef paddr_t dma_addr_t;
-
 #define DEFAULT_DOMAIN_ADDRESS_WIDTH 48
 #define MAX_IOMMUS 32
 #define MAX_IOMMU_REGS 0xc0
@@ -447,8 +445,10 @@ struct ir_ctrl {
 };
 
 struct iommu_flush {
-    int (*context)(void *iommu, u16 did, u16 source_id, u8 function_mask, u64 type, int non_present_entry_flush);
-    int (*iotlb)(void *iommu, u16 did, u64 addr, unsigned int size_order, u64 type, int non_present_entry_flush);
+    int (*context)(void *iommu, u16 did, u16 source_id,
+                   u8 function_mask, u64 type, int non_present_entry_flush);
+    int (*iotlb)(void *iommu, u16 did, u64 addr, unsigned int size_order,
+                 u64 type, int non_present_entry_flush);
 };
 
 struct intel_iommu {

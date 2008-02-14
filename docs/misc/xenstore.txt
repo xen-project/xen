@@ -296,6 +296,16 @@ RESUME			<domid>|
 
 	xenstored prevents the use of RESUME other than by dom0.
 
+SET_TARGET		<domid>|<tdomid>|
+	Notifies xenstored that domain <domid> is targeting domain
+	<tdomid>. This grants domain <domid> full access to paths
+	owned by <tdomid>. Domain <domid> also inherits all
+	permissions granted to <tdomid> on all other paths. This
+	allows <domid> to behave as if it were dom0 when modifying
+	paths related to <tdomid>.
+
+	xenstored prevents the use of SET_TARGET other than by dom0.
+
 ---------- Miscellaneous ----------
 
 DEBUG			print|<string>|??	    sends <string> to debug log

@@ -74,6 +74,7 @@ softmmu="yes"
 linux_user="no"
 darwin_user="no"
 build_docs="no"
+stubdom="no"
 uname_release=""
 
 # OS specific
@@ -230,6 +231,8 @@ for opt do
   --enable-darwin-user) darwin_user="yes"
   ;;
   --enable-uname-release=*) uname_release="$optarg"
+  ;;
+  --enable-stubdom) stubdom="yes"
   ;;
   esac
 done
@@ -416,7 +419,11 @@ if test -z "$target_list" ; then
         target_list="i386-darwin-user ppc-darwin-user $target_list"
     fi
 # the i386-dm target
-    target_list="i386-dm"
+    if test "$stubdom" = "yes"; then
+        target_list="i386-dm-stubdom"
+    else
+        target_list="i386-dm"
+    fi
 else
     target_list=`echo "$target_list" | sed -e 's/,/ /g'`
 fi
@@ -573,6 +580,11 @@ datadir="$prefix/share/xen/qemu"
 docdir="$prefix/share/doc/qemu"
 bindir="$prefix/$libdir/xen/bin"
 configdir="/etc/xen"
+fi
+
+if test "$stubdom" = "yes"; then
+    oss="no"
+    sdl="no"
 fi
 
 echo "Install prefix    $prefix"
@@ -941,6 +953,14 @@ if test "$target_darwin_user" = "yes" ; then
 fi
 if expr $target : '.*-dm' > /dev/null ; then
   echo "#define CONFIG_DM 1" >> $config_h
+fi
+
+if test "$stubdom" = "yes" ; then
+  echo "CONFIG_STUBDOM=yes" >> $config_mak
+  echo "#define CONFIG_STUBDOM 1" >> $config_h
+  echo "#define NO_UNIX_SOCKETS 1" >> $config_h
+  echo "#define NO_DAEMONIZE 1" >> $config_h
+  echo "#define NO_AIO 1" >> $config_h
 fi
 
 if test "$target_cpu" = "arm" -o "$target_cpu" = "armeb" -o "$target_cpu" = "sparc" -o "$target_cpu" = "sparc64" -o "$target_cpu" = "m68k"; then

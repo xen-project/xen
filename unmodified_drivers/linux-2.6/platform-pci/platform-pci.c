@@ -249,6 +249,7 @@ static int set_callback_via(uint64_t via)
 int xen_irq_init(struct pci_dev *pdev);
 int xenbus_init(void);
 int xen_reboot_init(void);
+int xen_panic_handler_init(void);
 int gnttab_init(void);
 
 static int __devinit platform_pci_init(struct pci_dev *pdev,
@@ -315,6 +316,9 @@ static int __devinit platform_pci_init(struct pci_dev *pdev,
 		goto out;
 
 	if ((ret = xen_reboot_init()))
+		goto out;
+
+	if ((ret = xen_panic_handler_init()))
 		goto out;
 
  out:

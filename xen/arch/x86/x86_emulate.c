@@ -1710,11 +1710,14 @@ x86_emulate(
             switch ( src.bytes )
             {
             case 1:
+                dst.val = (uint8_t)dst.val;
                 dst.val *= src.val;
                 if ( (uint8_t)dst.val != (uint16_t)dst.val )
                     _regs.eflags |= EFLG_OF|EFLG_CF;
+                dst.bytes = 2;
                 break;
             case 2:
+                dst.val = (uint16_t)dst.val;
                 dst.val *= src.val;
                 if ( (uint16_t)dst.val != (uint32_t)dst.val )
                     _regs.eflags |= EFLG_OF|EFLG_CF;
@@ -1722,6 +1725,7 @@ x86_emulate(
                 break;
 #ifdef __x86_64__
             case 4:
+                dst.val = (uint32_t)dst.val;
                 dst.val *= src.val;
                 if ( (uint32_t)dst.val != dst.val )
                     _regs.eflags |= EFLG_OF|EFLG_CF;
@@ -1751,6 +1755,7 @@ x86_emulate(
                            (uint16_t)(int8_t)dst.val);
                 if ( (int8_t)dst.val != (uint16_t)dst.val )
                     _regs.eflags |= EFLG_OF|EFLG_CF;
+                dst.bytes = 2;
                 break;
             case 2:
                 dst.val = ((uint32_t)(int16_t)src.val *
@@ -2221,11 +2226,12 @@ x86_emulate(
         dst.bytes = !(b & 1) ? 1 : (op_bytes == 8) ? 4 : op_bytes;
         dst.mem.seg = x86_seg_es;
         dst.mem.off = truncate_ea(_regs.edi);
-        if ( (nr_reps > 1) && (ops->rep_ins != NULL) )
+        if ( (nr_reps > 1) && (ops->rep_ins != NULL) &&
+             ((rc = ops->rep_ins((uint16_t)_regs.edx, dst.mem.seg,
+                                 dst.mem.off, dst.bytes,
+                                 &nr_reps, ctxt)) != X86EMUL_UNHANDLEABLE) )
         {
-            if ( (rc = ops->rep_ins((uint16_t)_regs.edx, dst.mem.seg,
-                                    dst.mem.off, dst.bytes,
-                                    &nr_reps, ctxt)) != 0 )
+            if ( rc != 0 )
                 goto done;
         }
         else
@@ -2248,11 +2254,12 @@ x86_emulate(
         unsigned long nr_reps = get_rep_prefix();
         generate_exception_if(!mode_iopl(), EXC_GP);
         dst.bytes = !(b & 1) ? 1 : (op_bytes == 8) ? 4 : op_bytes;
-        if ( (nr_reps > 1) && (ops->rep_outs != NULL) )
+        if ( (nr_reps > 1) && (ops->rep_outs != NULL) &&
+             ((rc = ops->rep_outs(ea.mem.seg, truncate_ea(_regs.esi),
+                                  (uint16_t)_regs.edx, dst.bytes,
+                                  &nr_reps, ctxt)) != X86EMUL_UNHANDLEABLE) )
         {
-            if ( (rc = ops->rep_outs(ea.mem.seg, truncate_ea(_regs.esi),
-                                     (uint16_t)_regs.edx, dst.bytes,
-                                     &nr_reps, ctxt)) != 0 )
+            if ( rc != 0 )
                 goto done;
         }
         else
@@ -2399,11 +2406,12 @@ x86_emulate(
         dst.bytes = (d & ByteOp) ? 1 : op_bytes;
         dst.mem.seg = x86_seg_es;
         dst.mem.off = truncate_ea(_regs.edi);
-        if ( (nr_reps > 1) && (ops->rep_movs != NULL) )
+        if ( (nr_reps > 1) && (ops->rep_movs != NULL) &&
+             ((rc = ops->rep_movs(ea.mem.seg, truncate_ea(_regs.esi),
+                                  dst.mem.seg, dst.mem.off, dst.bytes,
+                                  &nr_reps, ctxt)) != X86EMUL_UNHANDLEABLE) )
         {
-            if ( (rc = ops->rep_movs(ea.mem.seg, truncate_ea(_regs.esi),
-                                     dst.mem.seg, dst.mem.off, dst.bytes,
-                                     &nr_reps, ctxt)) != 0 )
+            if ( rc != 0 )
                 goto done;
         }
         else

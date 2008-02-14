@@ -19,6 +19,9 @@ struct thread
     struct list_head thread_list;
     u32 flags;
     s_time_t wakeup_time;
+#ifdef HAVE_LIBC
+    struct _reent reent;
+#endif
 };
 
 extern struct thread *idle_thread;

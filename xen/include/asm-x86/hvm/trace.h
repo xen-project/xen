@@ -31,14 +31,15 @@
 #define DO_TRC_HVM_CLTS        1
 #define DO_TRC_HVM_LMSW        1
 
-
-
 static inline void hvmtrace_vmexit(struct vcpu *v,
                                    unsigned long rip,
                                    unsigned long exit_reason)
 {
+    if ( likely(!tb_init_done) )
+        return;
+
 #ifdef __x86_64__
-    if(hvm_long_mode_enabled(v))
+    if ( hvm_long_mode_enabled(v) )
     {
         struct {
             unsigned did:16, vid:16;
@@ -50,9 +51,12 @@ static inline void hvmtrace_vmexit(struct vcpu *v,
         d.vid = v->vcpu_id;
         d.exit_reason = exit_reason;
         d.rip = rip;
-        trace_var(TRC_HVM_VMEXIT64, 1/*cycles*/, sizeof(d), (unsigned char *)&d);
-    } else {
+        __trace_var(TRC_HVM_VMEXIT64, 1/*cycles*/, sizeof(d),
+                    (unsigned char *)&d);
+    }
+    else
 #endif
+    {
         struct {
             unsigned did:16, vid:16;
             unsigned exit_reason:32;
@@ -63,10 +67,9 @@ static inline void hvmtrace_vmexit(struct vcpu *v,
         d.vid = v->vcpu_id;
         d.exit_reason = exit_reason;
         d.eip = rip;
-        trace_var(TRC_HVM_VMEXIT, 1/*cycles*/, sizeof(d), (unsigned char *)&d);
-#ifdef __x86_64__
+        __trace_var(TRC_HVM_VMEXIT, 1/*cycles*/, sizeof(d),
+                    (unsigned char *)&d);
     }
-#endif
 }
 
 
@@ -75,9 +78,13 @@ static inline void hvmtrace_vmentry(struct vcpu *v)
     struct {
         unsigned did:16, vid:16;
     } d;
+
+    if ( likely(!tb_init_done) )
+        return;
+
     d.did = v->domain->domain_id;
     d.vid = v->vcpu_id;
-    trace_var(TRC_HVM_VMENTRY, 1/*cycles*/, sizeof(d), (unsigned char *)&d);
+    __trace_var(TRC_HVM_VMENTRY, 1/*cycles*/, sizeof(d), (unsigned char *)&d);
 }
 
 static inline void hvmtrace_msr_read(struct vcpu *v, u32 ecx, u64 msr_content)
@@ -87,11 +94,16 @@ static inline void hvmtrace_msr_read(struct vcpu *v, u32 ecx, u64 msr_content)
         u32 ecx;
         u64 msr_content;
     } d;
+
+    if ( likely(!tb_init_done) )
+        return;
+
     d.did = v->domain->domain_id;
     d.vid = v->vcpu_id;
     d.ecx = ecx;
     d.msr_content = msr_content;
-    trace_var(TRC_HVM_MSR_READ, 0/*!cycles*/, sizeof(d), (unsigned char *)&d);
+    __trace_var(TRC_HVM_MSR_READ, 0/*!cycles*/, sizeof(d),
+                (unsigned char *)&d);
 }
 
 static inline void hvmtrace_msr_write(struct vcpu *v, u32 ecx, u64 msr_content)
@@ -101,18 +113,26 @@ static inline void hvmtrace_msr_write(struct vcpu *v, u32 ecx, u64 msr_content)
         u32 ecx;
         u64 msr_content;
     } d;
+
+    if ( likely(!tb_init_done) )
+        return;
+
     d.did = v->domain->domain_id;
     d.vid = v->vcpu_id;
     d.ecx = ecx;
     d.msr_content = msr_content;
-    trace_var(TRC_HVM_MSR_WRITE, 0/*!cycles*/,sizeof(d), (unsigned char *)&d);
+    __trace_var(TRC_HVM_MSR_WRITE, 0/*!cycles*/,sizeof(d),
+                (unsigned char *)&d);
 }
 
 static inline void hvmtrace_pf_xen(struct vcpu *v, unsigned long va,
                                    u32 error_code)
 {
+    if ( likely(!tb_init_done) )
+        return;
+
 #ifdef __x86_64__
-    if(hvm_long_mode_enabled(v))
+    if( hvm_long_mode_enabled(v) )
     {
         struct {
             unsigned did:16, vid:16;
@@ -123,10 +143,12 @@ static inline void hvmtrace_pf_xen(struct vcpu *v, unsigned long va,
         d.vid = v->vcpu_id;
         d.error_code = error_code;
         d.va = va;
-        trace_var(TRC_HVM_PF_XEN64, 0/*!cycles*/,sizeof(d),
-                  (unsigned char *)&d);
-    } else {
+        __trace_var(TRC_HVM_PF_XEN64, 0/*!cycles*/,sizeof(d),
+                    (unsigned char *)&d);
+    }
+    else
 #endif
+    {
         struct {
             unsigned did:16, vid:16;
             u32 error_code;
@@ -136,15 +158,14 @@ static inline void hvmtrace_pf_xen(struct vcpu *v, unsigned long va,
         d.vid = v->vcpu_id;
         d.error_code = error_code;
         d.va = va;
-        trace_var(TRC_HVM_PF_XEN, 0/*!cycles*/,sizeof(d), (unsigned char *)&d);
-#ifdef __x86_64__
+        __trace_var(TRC_HVM_PF_XEN, 0/*!cycles*/,sizeof(d),
+                    (unsigned char *)&d);
     }
-#endif
 }
 
 #define HVMTRACE_ND(evt, vcpu, count, d1, d2, d3, d4)                   \
     do {                                                                \
-        if (DO_TRC_HVM_ ## evt)                                         \
+        if ( unlikely(tb_init_done) && DO_TRC_HVM_ ## evt )             \
         {                                                               \
             struct {                                                    \
                 unsigned did:16, vid:16;                                \
@@ -156,8 +177,8 @@ static inline void hvmtrace_pf_xen(struct vcpu *v, unsigned long va,
             _d.d[1]=(d2);                                               \
             _d.d[2]=(d3);                                               \
             _d.d[3]=(d4);                                               \
-            trace_var(TRC_HVM_ ## evt, 0/*!cycles*/,                    \
-                      sizeof(u32)*count+1, (unsigned char *)&_d);       \
+            __trace_var(TRC_HVM_ ## evt, 0/*!cycles*/,                  \
+                        sizeof(u32)*count+1, (unsigned char *)&_d);     \
         }                                                               \
     } while(0)
 
@@ -167,7 +188,8 @@ static inline void hvmtrace_pf_xen(struct vcpu *v, unsigned long va,
 #define HVMTRACE_1D(evt, vcpu, d1)               HVMTRACE_ND(evt, vcpu, 1, d1,  0,  0,  0)
 #define HVMTRACE_0D(evt, vcpu)                   HVMTRACE_ND(evt, vcpu, 0, 0,  0,  0,  0)
 
-#endif //__ASM_X86_HVM_TRACE_H__
+#endif /* __ASM_X86_HVM_TRACE_H__ */
+
 /*
  * Local variables:
  * mode: C

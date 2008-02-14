@@ -36,22 +36,29 @@
 #include <sys/times.h>
 #include <sys/wait.h>
 #include <termios.h>
+#ifndef CONFIG_STUBDOM
 #include <sys/poll.h>
+#endif
 #include <sys/mman.h>
 #include <sys/ioctl.h>
 #include <sys/resource.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
+#ifndef CONFIG_STUBDOM
 #include <net/if.h>
+#endif
 #if defined(__NetBSD__)
 #include <net/if_tap.h>
 #endif
 #if defined(__linux__) || defined(__Linux__)
 #include <linux/if_tun.h>
 #endif
+#ifndef CONFIG_STUBDOM
 #include <arpa/inet.h>
 #include <dirent.h>
+#endif
 #include <netdb.h>
+#ifndef CONFIG_STUBDOM
 #ifdef _BSD
 #include <sys/stat.h>
 #ifndef _BSD
@@ -70,6 +77,7 @@
 #include <stropts.h>
 #endif
 #endif
+#endif
 
 #if defined(CONFIG_SLIRP)
 #include "libslirp.h"
@@ -80,6 +88,7 @@
 #include <windows.h>
 #define getopt_long_only getopt_long
 #define memalign(align, size) malloc(size)
+#define NO_DAEMONIZE 1
 #endif
 
 #include "qemu_socket.h"
@@ -131,10 +140,9 @@
 #define MAX_IOPORTS 65536
 
 const char *bios_dir = CONFIG_QEMU_SHAREDIR;
-char phys_ram_file[1024];
-void *ioport_opaque[MAX_IOPORTS];
-IOPortReadFunc *ioport_read_table[3][MAX_IOPORTS];
-IOPortWriteFunc *ioport_write_table[3][MAX_IOPORTS];
+void **ioport_opaque;
+IOPortReadFunc *(*ioport_read_table)[MAX_IOPORTS];
+IOPortWriteFunc *(*ioport_write_table)[MAX_IOPORTS];
 /* Note: bs_table[MAX_DISKS] is a dummy block driver if none available
    to store the VM snapshots */
 BlockDriverState *bs_table[MAX_DISKS + MAX_SCSI_DISKS + 1], *fd_table[MAX_FD];
@@ -186,7 +194,9 @@ const char *vnc_display;
 int acpi_enabled = 0;
 int fd_bootchk = 1;
 int no_reboot = 0;
+#ifndef NO_DAEMONIZE
 int daemonize = 0;
+#endif
 const char *option_rom[MAX_OPTION_ROMS];
 int nb_option_roms;
 int semihosting_enabled = 0;
@@ -224,17 +234,29 @@ void default_ioport_writeb(void *opaque, uint32_t address, uint32_t data)
 uint32_t default_ioport_readw(void *opaque, uint32_t address)
 {
     uint32_t data;
-    data = ioport_read_table[0][address](ioport_opaque[address], address);
+    IOPortReadFunc *func = ioport_read_table[0][address];
+    if (!func)
+	    func = default_ioport_readb;
+    data = func(ioport_opaque[address], address);
     address = (address + 1) & (MAX_IOPORTS - 1);
-    data |= ioport_read_table[0][address](ioport_opaque[address], address) << 8;
+    func = ioport_read_table[0][address];
+    if (!func)
+	    func = default_ioport_readb;
+    data |= func(ioport_opaque[address], address) << 8;
     return data;
 }
 
 void default_ioport_writew(void *opaque, uint32_t address, uint32_t data)
 {
-    ioport_write_table[0][address](ioport_opaque[address], address, data & 0xff);
+    IOPortWriteFunc *func = ioport_write_table[0][address];
+    if (!func)
+	    func = default_ioport_writeb;
+    func(ioport_opaque[address], address, data & 0xff);
     address = (address + 1) & (MAX_IOPORTS - 1);
-    ioport_write_table[0][address](ioport_opaque[address], address, (data >> 8) & 0xff);
+    func = ioport_write_table[0][address];
+    if (!func)
+	    func = default_ioport_writeb;
+    func(ioport_opaque[address], address, (data >> 8) & 0xff);
 }
 
 uint32_t default_ioport_readl(void *opaque, uint32_t address)
@@ -254,16 +276,9 @@ void default_ioport_writel(void *opaque, uint32_t address, uint32_t data)
 
 void init_ioports(void)
 {
-    int i;
-
-    for(i = 0; i < MAX_IOPORTS; i++) {
-        ioport_read_table[0][i] = default_ioport_readb;
-        ioport_write_table[0][i] = default_ioport_writeb;
-        ioport_read_table[1][i] = default_ioport_readw;
-        ioport_write_table[1][i] = default_ioport_writew;
-        ioport_read_table[2][i] = default_ioport_readl;
-        ioport_write_table[2][i] = default_ioport_writel;
-    }
+    ioport_opaque = malloc(MAX_IOPORTS * sizeof(*ioport_opaque));
+    ioport_read_table = malloc(3 * MAX_IOPORTS * sizeof(**ioport_read_table));
+    ioport_write_table = malloc(3 * MAX_IOPORTS * sizeof(**ioport_write_table));
 }
 
 /* size is the word size in byte */
@@ -335,11 +350,14 @@ void isa_unassign_ioport(int start, int length)
 
 void cpu_outb(CPUState *env, int addr, int val)
 {
+    IOPortWriteFunc *func = ioport_write_table[0][addr];
+    if (!func)
+	    func = default_ioport_writeb;
 #ifdef DEBUG_IOPORT
     if (loglevel & CPU_LOG_IOPORT)
         fprintf(logfile, "outb: %04x %02x\n", addr, val);
 #endif    
-    ioport_write_table[0][addr](ioport_opaque[addr], addr, val);
+    func(ioport_opaque[addr], addr, val);
 #ifdef USE_KQEMU
     if (env)
         env->last_io_time = cpu_get_time_fast();
@@ -348,11 +366,14 @@ void cpu_outb(CPUState *env, int addr, int val)
 
 void cpu_outw(CPUState *env, int addr, int val)
 {
+    IOPortWriteFunc *func = ioport_write_table[1][addr];
+    if (!func)
+	    func = default_ioport_writew;
 #ifdef DEBUG_IOPORT
     if (loglevel & CPU_LOG_IOPORT)
         fprintf(logfile, "outw: %04x %04x\n", addr, val);
 #endif    
-    ioport_write_table[1][addr](ioport_opaque[addr], addr, val);
+    func(ioport_opaque[addr], addr, val);
 #ifdef USE_KQEMU
     if (env)
         env->last_io_time = cpu_get_time_fast();
@@ -361,11 +382,14 @@ void cpu_outw(CPUState *env, int addr, int val)
 
 void cpu_outl(CPUState *env, int addr, int val)
 {
+    IOPortWriteFunc *func = ioport_write_table[2][addr];
+    if (!func)
+	    func = default_ioport_writel;
 #ifdef DEBUG_IOPORT
     if (loglevel & CPU_LOG_IOPORT)
         fprintf(logfile, "outl: %04x %08x\n", addr, val);
 #endif
-    ioport_write_table[2][addr](ioport_opaque[addr], addr, val);
+    func(ioport_opaque[addr], addr, val);
 #ifdef USE_KQEMU
     if (env)
         env->last_io_time = cpu_get_time_fast();
@@ -375,7 +399,10 @@ void cpu_outl(CPUState *env, int addr, int val)
 int cpu_inb(CPUState *env, int addr)
 {
     int val;
-    val = ioport_read_table[0][addr](ioport_opaque[addr], addr);
+    IOPortReadFunc *func = ioport_read_table[0][addr];
+    if (!func)
+	    func = default_ioport_readb;
+    val = func(ioport_opaque[addr], addr);
 #ifdef DEBUG_IOPORT
     if (loglevel & CPU_LOG_IOPORT)
         fprintf(logfile, "inb : %04x %02x\n", addr, val);
@@ -390,7 +417,10 @@ int cpu_inb(CPUState *env, int addr)
 int cpu_inw(CPUState *env, int addr)
 {
     int val;
-    val = ioport_read_table[1][addr](ioport_opaque[addr], addr);
+    IOPortReadFunc *func = ioport_read_table[1][addr];
+    if (!func)
+	    func = default_ioport_readw;
+    val = func(ioport_opaque[addr], addr);
 #ifdef DEBUG_IOPORT
     if (loglevel & CPU_LOG_IOPORT)
         fprintf(logfile, "inw : %04x %04x\n", addr, val);
@@ -405,7 +435,10 @@ int cpu_inw(CPUState *env, int addr)
 int cpu_inl(CPUState *env, int addr)
 {
     int val;
-    val = ioport_read_table[2][addr](ioport_opaque[addr], addr);
+    IOPortReadFunc *func = ioport_read_table[2][addr];
+    if (!func)
+	    func = default_ioport_readl;
+    val = func(ioport_opaque[addr], addr);
 #ifdef DEBUG_IOPORT
     if (loglevel & CPU_LOG_IOPORT)
         fprintf(logfile, "inl : %04x %08x\n", addr, val);
@@ -773,9 +806,6 @@ static QEMUTimer *active_timers[2];
 static MMRESULT timerID;
 static HANDLE host_alarm = NULL;
 static unsigned int period = 1;
-#else
-/* frequency of the times() clock tick */
-static int timer_freq;
 #endif
 
 QEMUClock *qemu_new_clock(int type)
@@ -1112,9 +1142,6 @@ static void init_timer_alarm(void)
         struct sigaction act;
         struct itimerval itv;
 #endif
-        
-        /* get times() syscall frequency */
-        timer_freq = sysconf(_SC_CLK_TCK);
         
 #ifndef CONFIG_DM
         /* timer signal */
@@ -1473,6 +1500,7 @@ static CharDriverState *qemu_chr_open_file_out(const char *file_out)
     return qemu_chr_open_fd(-1, fd_out);
 }
 
+#ifndef CONFIG_STUBDOM
 static CharDriverState *qemu_chr_open_pipe(const char *filename)
 {
     int fd_in, fd_out;
@@ -1718,6 +1746,7 @@ static CharDriverState *qemu_chr_open_stdio(void)
     }
     return chr;
 }
+#endif
 
 /*
  * Create a store entry for a device (e.g., monitor, serial/parallel lines).
@@ -1727,6 +1756,9 @@ static CharDriverState *qemu_chr_open_stdio(void)
 static int store_dev_info(char *devName, int domid,
                           CharDriverState *cState, char *storeString)
 {
+#ifdef CONFIG_STUBDOM
+    return 0;
+#else
     int xc_handle;
     struct xs_handle *xs;
     char *path;
@@ -1802,8 +1834,10 @@ static int store_dev_info(char *devName, int domid,
     close(xc_handle);
 
     return 0;
+#endif
 }
 
+#ifndef CONFIG_STUBDOM
 #ifdef __sun__
 /* Once Solaris has openpty(), this is going to be removed. */
 int openpty(int *amaster, int *aslave, char *name,
@@ -2462,6 +2496,7 @@ static CharDriverState *qemu_chr_open_win_file_out(const char *file_out)
     return qemu_chr_open_win_file(fd_out);
 }
 #endif
+#endif
 
 /***********************************************************/
 /* UDP Net console */
@@ -2532,7 +2567,7 @@ static void udp_chr_update_read_handler(CharDriverState *chr)
 }
 
 int parse_host_port(struct sockaddr_in *saddr, const char *str);
-#ifndef _WIN32
+#ifndef NO_UNIX_SOCKETS
 static int parse_unix_path(struct sockaddr_un *uaddr, const char *str);
 #endif
 int parse_host_src_port(struct sockaddr_in *haddr,
@@ -2740,7 +2775,7 @@ static void tcp_chr_accept(void *opaque)
     CharDriverState *chr = opaque;
     TCPCharDriver *s = chr->opaque;
     struct sockaddr_in saddr;
-#ifndef _WIN32
+#ifndef NO_UNIX_SOCKETS
     struct sockaddr_un uaddr;
 #endif
     struct sockaddr *addr;
@@ -2748,7 +2783,7 @@ static void tcp_chr_accept(void *opaque)
     int fd;
 
     for(;;) {
-#ifndef _WIN32
+#ifndef NO_UNIX_SOCKETS
 	if (s->is_unix) {
 	    len = sizeof(uaddr);
 	    addr = (struct sockaddr *)&uaddr;
@@ -2797,13 +2832,13 @@ static CharDriverState *qemu_chr_open_tcp(const char *host_str,
     int do_nodelay = 0;
     const char *ptr;
     struct sockaddr_in saddr;
-#ifndef _WIN32
+#ifndef NO_UNIX_SOCKETS
     struct sockaddr_un uaddr;
 #endif
     struct sockaddr *addr;
     socklen_t addrlen;
 
-#ifndef _WIN32
+#ifndef NO_UNIX_SOCKETS
     if (is_unix) {
 	addr = (struct sockaddr *)&uaddr;
 	addrlen = sizeof(uaddr);
@@ -2842,7 +2877,7 @@ static CharDriverState *qemu_chr_open_tcp(const char *host_str,
     if (!s)
         goto fail;
 
-#ifndef _WIN32
+#ifndef NO_UNIX_SOCKETS
     if (is_unix)
 	fd = socket(PF_UNIX, SOCK_STREAM, 0);
     else
@@ -2867,7 +2902,7 @@ static CharDriverState *qemu_chr_open_tcp(const char *host_str,
 
     if (is_listen) {
         /* allow fast reuse */
-#ifndef _WIN32
+#ifndef NO_UNIX_SOCKETS
 	if (is_unix) {
 	    char path[109];
 	    strncpy(path, uaddr.sun_path, 108);
@@ -2954,12 +2989,14 @@ CharDriverState *qemu_chr_open(const char *filename)
 	return qemu_chr_open_tcp(p, 0, 1);
     } else if (strstart(filename, "file:", &p)) {
         return qemu_chr_open_file_out(p);
+#ifndef CONFIG_STUBDOM
     } else if (strstart(filename, "pipe:", &p)) {
         return qemu_chr_open_pipe(p);
     } else if (!strcmp(filename, "pty")) {
         return qemu_chr_open_pty();
     } else if (!strcmp(filename, "stdio")) {
         return qemu_chr_open_stdio();
+#endif
     } else 
 #endif
 #if defined(__linux__)
@@ -3449,7 +3486,16 @@ static TAPState *net_tap_fd_init(VLANState *vlan, int fd)
     return s;
 }
 
-#ifdef _BSD
+#ifdef CONFIG_STUBDOM
+#include <netfront.h>
+static int tap_open(char *ifname, int ifname_size)
+{
+    char nodename[64];
+    static int num = 1; // 0 is for our own TCP/IP networking
+    snprintf(nodename, sizeof(nodename), "device/vif/%d", num++);
+    return netfront_tap_open(nodename);
+}
+#elif defined(_BSD)
 static int tap_open(char *ifname, int ifname_size)
 {
     int fd;
@@ -3537,6 +3583,7 @@ static int net_tap_init(VLANState *vlan, const char *ifname1,
     if (fd < 0)
         return -1;
 
+#ifndef CONFIG_STUBDOM
     if (!setup_script || !strcmp(setup_script, "no"))
         setup_script = "";
     if (setup_script[0] != '\0') {
@@ -3569,6 +3616,7 @@ static int net_tap_init(VLANState *vlan, const char *ifname1,
             }
         }
     }
+#endif
     s = net_tap_fd_init(vlan, fd);
     if (!s)
         return -1;
@@ -4397,6 +4445,7 @@ void dumb_display_init(DisplayState *ds)
     ds->depth = 0;
     ds->dpy_update = dumb_update;
     ds->dpy_resize = dumb_resize;
+    ds->dpy_colourdepth = NULL;
     ds->dpy_refresh = dumb_refresh;
 }
 
@@ -6510,7 +6559,7 @@ void help(void)
 	   "-vnc display    start a VNC server on display\n"
            "-vncviewer      start a vncviewer process for this domain\n"
            "-vncunused      bind the VNC server to an unused port\n"
-#ifndef _WIN32
+#ifndef NO_DAEMONIZE
 	   "-daemonize      daemonize QEMU after initializing\n"
 #endif
 	   "-option-rom rom load a file, rom, into the option ROM space\n"
@@ -6600,7 +6649,9 @@ enum {
     QEMU_OPTION_vnc,
     QEMU_OPTION_no_acpi,
     QEMU_OPTION_no_reboot,
+#ifndef NO_DAEMONIZE
     QEMU_OPTION_daemonize,
+#endif
     QEMU_OPTION_option_rom,
     QEMU_OPTION_semihosting
     ,
@@ -6698,7 +6749,9 @@ const QEMUOption qemu_options[] = {
     { "cirrusvga", 0, QEMU_OPTION_cirrusvga },
     { "no-acpi", 0, QEMU_OPTION_no_acpi },
     { "no-reboot", 0, QEMU_OPTION_no_reboot },
+#ifndef NO_DAEMONIZE
     { "daemonize", 0, QEMU_OPTION_daemonize },
+#endif
     { "option-rom", HAS_ARG, QEMU_OPTION_option_rom },
 #if defined(TARGET_ARM)
     { "semihosting", 0, QEMU_OPTION_semihosting },
@@ -7009,12 +7062,14 @@ int main(int argc, char **argv)
     char usb_devices[MAX_USB_CMDLINE][128];
     int usb_devices_index;
     int fds[2];
+#ifndef CONFIG_STUBDOM
     struct rlimit rl;
+#endif
     sigset_t set;
     char qemu_dm_logfilename[128];
     const char *direct_pci = NULL;
 
-#ifndef __sun__
+#if !defined(__sun__) && !defined(CONFIG_STUBDOM)
     /* Maximise rlimits. Needed where default constraints are tight (*BSD). */
     if (getrlimit(RLIMIT_STACK, &rl) != 0) {
        perror("getrlimit(RLIMIT_STACK)");
@@ -7040,6 +7095,7 @@ int main(int argc, char **argv)
        perror("setrlimit(RLIMIT_MEMLOCK)");
 #endif
 
+#ifndef CONFIG_STUBDOM
     /* Ensure that SIGUSR2 is blocked by default when a new thread is created,
        then only the threads that use the signal unblock it -- this fixes a
        race condition in Qcow support where the AIO signal is misdelivered.  */
@@ -7081,6 +7137,7 @@ int main(int argc, char **argv)
             }
         }
     }
+#endif
 #endif
 
     register_machines();
@@ -7496,9 +7553,11 @@ int main(int argc, char **argv)
             case QEMU_OPTION_no_reboot:
                 no_reboot = 1;
                 break;
+#ifndef NO_DAEMONIZE
 	    case QEMU_OPTION_daemonize:
 		daemonize = 1;
 		break;
+#endif
 	    case QEMU_OPTION_option_rom:
 		if (nb_option_roms >= MAX_OPTION_ROMS) {
 		    fprintf(stderr, "Too many option ROMs\n");
@@ -7542,7 +7601,7 @@ int main(int argc, char **argv)
     sprintf(qemu_dm_logfilename, "/var/log/xen/qemu-dm-%d.log", domid);
     cpu_set_log_filename(qemu_dm_logfilename);
 
-#ifndef _WIN32
+#ifndef NO_DAEMONIZE
     if (daemonize && !nographic && vnc_display == NULL && vncunused == 0) {
 	fprintf(stderr, "Can only daemonize if using -nographic or -vnc\n");
 	daemonize = 0;
@@ -7593,7 +7652,15 @@ int main(int argc, char **argv)
 #ifdef CONFIG_DM
     bdrv_init();
     xc_handle = xc_interface_open();
+#ifdef CONFIG_STUBDOM
+    char *domid_s, *msg;
+    if ((msg = xenbus_read(XBT_NIL, "domid", &domid_s)))
+        fprintf(stderr,"Can not read our own domid\n", msg);
+    else
+        xenstore_parse_domain_config(atoi(domid_s));
+#else /* CONFIG_STUBDOM */
     xenstore_parse_domain_config(domid);
+#endif /* CONFIG_STUBDOM */
 #endif /* CONFIG_DM */
 
 #ifdef USE_KQEMU
@@ -7760,8 +7827,10 @@ int main(int argc, char **argv)
 	vnc_display_password(ds, password);
 	if ((vnc_display_port = vnc_display_open(ds, vnc_display, vncunused)) < 0) 
 	    exit (0);
+#ifndef CONFIG_STUBDOM	    
  	if (vncviewer)
 	    vnc_start_viewer(vnc_display_port);
+#endif
 	xenstore_write_vncport(vnc_display_port);
     } else {
 #if defined(CONFIG_SDL)
@@ -7863,6 +7932,7 @@ int main(int argc, char **argv)
         }
     }
 
+#ifndef NO_DAEMONIZE
     if (daemonize) {
 	uint8_t status = 0;
 	ssize_t len;
@@ -7886,12 +7956,17 @@ int main(int argc, char **argv)
 
 	close(fd);
     }
+#endif
 
-    /* Unblock SIGTERM, which may have been blocked by the caller */
+#ifndef CONFIG_STUBDOM
+    /* Unblock SIGTERM and SIGHUP, which may have been blocked by the caller */
+    signal(SIGHUP, SIG_DFL);
     sigemptyset(&set);
     sigaddset(&set, SIGTERM);
+    sigaddset(&set, SIGHUP);
     if (sigprocmask(SIG_UNBLOCK, &set, NULL) == -1)
-        fprintf(stderr, "Failed to unblock SIGTERM\n");
+        fprintf(stderr, "Failed to unblock SIGTERM and SIGHUP\n");
+#endif
 
     main_loop();
     quit_timers();

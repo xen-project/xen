@@ -239,14 +239,46 @@ static inline int calc_rec_size(int cycles, int extra)
     return rec_size;
 }
 
-static inline int calc_bytes_to_wrap(struct t_buf *buf)
+static inline int calc_unconsumed_bytes(struct t_buf *buf)
 {
-    return data_size - (buf->prod % data_size);
+    int x = buf->prod - buf->cons;
+    if ( x < 0 )
+        x += 2*data_size;
+
+    ASSERT(x >= 0);
+    ASSERT(x <= data_size);
+
+    return x;
 }
 
-static inline unsigned calc_bytes_avail(struct t_buf *buf)
+static inline int calc_bytes_to_wrap(struct t_buf *buf)
 {
-    return data_size - (buf->prod - buf->cons);
+    int x = data_size - buf->prod;
+    if ( x <= 0 )
+        x += data_size;
+
+    ASSERT(x > 0);
+    ASSERT(x <= data_size);
+
+    return x;
+}
+
+static inline int calc_bytes_avail(struct t_buf *buf)
+{
+    return data_size - calc_unconsumed_bytes(buf);
+}
+
+static inline struct t_rec *
+next_record(struct t_buf *buf)
+{
+    int x = buf->prod;
+    if ( x >= data_size )
+        x -= data_size;
+
+    ASSERT(x >= 0);
+    ASSERT(x < data_size);
+
+    return (struct t_rec *)&this_cpu(t_data)[x];
 }
 
 static inline int __insert_record(struct t_buf *buf,
@@ -260,24 +292,25 @@ static inline int __insert_record(struct t_buf *buf,
     unsigned char *dst;
     unsigned long extra_word = extra/sizeof(u32);
     int local_rec_size = calc_rec_size(cycles, extra);
+    uint32_t next;
 
     BUG_ON(local_rec_size != rec_size);
+    BUG_ON(extra & 3);
 
     /* Double-check once more that we have enough space.
      * Don't bugcheck here, in case the userland tool is doing
      * something stupid. */
     if ( calc_bytes_avail(buf) < rec_size )
     {
-        printk("%s: %u bytes left (%u - (%u - %u)) recsize %u.\n",
+        printk("%s: %u bytes left (%u - ((%u - %u) %% %u) recsize %u.\n",
                __func__,
-               data_size - (buf->prod - buf->cons),
-               data_size,
-               buf->prod, buf->cons, rec_size);
+               calc_bytes_avail(buf),
+               data_size, buf->prod, buf->cons, data_size, rec_size);
         return 0;
     }
     rmb();
 
-    rec = (struct t_rec *)&this_cpu(t_data)[buf->prod % data_size];
+    rec = next_record(buf);
     rec->event = event;
     rec->extra_u32 = extra_word;
     dst = (unsigned char *)rec->u.nocycles.extra_u32;
@@ -293,7 +326,13 @@ static inline int __insert_record(struct t_buf *buf,
         memcpy(dst, extra_data, extra);
 
     wmb();
-    buf->prod += rec_size;
+
+    next = buf->prod + rec_size;
+    if ( next >= 2*data_size )
+        next -= 2*data_size;
+    ASSERT(next >= 0);
+    ASSERT(next < 2*data_size);
+    buf->prod = next;
 
     return rec_size;
 }
@@ -395,7 +434,7 @@ void __trace_var(u32 event, int cycles, int extra, unsigned char *extra_data)
 
     local_irq_save(flags);
 
-    started_below_highwater = ((buf->prod - buf->cons) < t_buf_highwater);
+    started_below_highwater = (calc_unconsumed_bytes(buf) < t_buf_highwater);
 
     /* Calculate the record size */
     rec_size = calc_rec_size(cycles, extra);
@@ -413,10 +452,6 @@ void __trace_var(u32 event, int cycles, int extra, unsigned char *extra_data)
     total_size = 0;
 
     /* First, check to see if we need to include a lost_record.
-     *
-     * calc_bytes_to_wrap() involves integer division, which we'd like to
-     * avoid if we can.  So do the math, check it in debug versions, and
-     * do a final check always if we happen to write a record.
      */
     if ( this_cpu(lost_records) )
     {
@@ -425,25 +460,18 @@ void __trace_var(u32 event, int cycles, int extra, unsigned char *extra_data)
             total_size += bytes_to_wrap;
             bytes_to_wrap = data_size;
         } 
-        else
-        {
-            bytes_to_wrap -= LOST_REC_SIZE;
-            if ( bytes_to_wrap == 0 )
-                bytes_to_wrap = data_size;
-        }
         total_size += LOST_REC_SIZE;
+        bytes_to_wrap -= LOST_REC_SIZE;
+
+        /* LOST_REC might line up perfectly with the buffer wrap */
+        if ( bytes_to_wrap == 0 )
+            bytes_to_wrap = data_size;
     }
 
     if ( rec_size > bytes_to_wrap )
     {
         total_size += bytes_to_wrap;
-        bytes_to_wrap = data_size;
     } 
-    else
-    {
-        bytes_to_wrap -= rec_size;
-    }
-
     total_size += rec_size;
 
     /* Do we have enough space for everything? */
@@ -466,14 +494,12 @@ void __trace_var(u32 event, int cycles, int extra, unsigned char *extra_data)
             insert_wrap_record(buf, LOST_REC_SIZE);
             bytes_to_wrap = data_size;
         } 
-        else
-        {
-            bytes_to_wrap -= LOST_REC_SIZE;
-            /* LOST_REC might line up perfectly with the buffer wrap */
-            if ( bytes_to_wrap == 0 )
-                bytes_to_wrap = data_size;
-        }
         insert_lost_records(buf);
+        bytes_to_wrap -= LOST_REC_SIZE;
+
+        /* LOST_REC might line up perfectly with the buffer wrap */
+        if ( bytes_to_wrap == 0 )
+            bytes_to_wrap = data_size;
     }
 
     if ( rec_size > bytes_to_wrap )
@@ -486,7 +512,7 @@ void __trace_var(u32 event, int cycles, int extra, unsigned char *extra_data)
 
     /* Notify trace buffer consumer that we've crossed the high water mark. */
     if ( started_below_highwater &&
-         ((buf->prod - buf->cons) >= t_buf_highwater) )
+         (calc_unconsumed_bytes(buf) >= t_buf_highwater) )
         raise_softirq(TRACE_SOFTIRQ);
 }
 

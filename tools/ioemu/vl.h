@@ -574,6 +574,9 @@ typedef struct BlockDriver BlockDriver;
 
 extern BlockDriver bdrv_raw;
 extern BlockDriver bdrv_host_device;
+#ifdef CONFIG_STUBDOM
+extern BlockDriver bdrv_vbd;
+#endif
 extern BlockDriver bdrv_cow;
 extern BlockDriver bdrv_qcow;
 extern BlockDriver bdrv_vmdk;
@@ -912,8 +915,11 @@ struct DisplayState {
     int height;
     void *opaque;
 
+    int switchbpp;
+    
     void (*dpy_update)(struct DisplayState *s, int x, int y, int w, int h);
     void (*dpy_resize)(struct DisplayState *s, int w, int h);
+    void (*dpy_colourdepth)(struct DisplayState *s, int depth);
     void (*dpy_refresh)(struct DisplayState *s);
     void (*dpy_copy)(struct DisplayState *s, int src_x, int src_y, int dst_x, int dst_y, int w, int h);
 };

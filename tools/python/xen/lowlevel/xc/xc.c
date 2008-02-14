@@ -237,26 +237,6 @@ static PyObject *pyxc_vcpu_setaffinity(XcObject *self,
     return zero;
 }
 
-static PyObject *pyxc_domain_setcpuweight(XcObject *self,
-                                          PyObject *args,
-                                          PyObject *kwds)
-{
-    uint32_t dom;
-    float cpuweight = 1;
-
-    static char *kwd_list[] = { "domid", "cpuweight", NULL };
-
-    if ( !PyArg_ParseTupleAndKeywords(args, kwds, "i|f", kwd_list, 
-                                      &dom, &cpuweight) )
-        return NULL;
-
-    if ( xc_domain_setcpuweight(self->xc_handle, dom, cpuweight) != 0 )
-        return pyxc_error_to_exception();
-    
-    Py_INCREF(zero);
-    return zero;
-}
-
 static PyObject *pyxc_domain_sethandle(XcObject *self, PyObject *args)
 {
     int i;
@@ -1323,14 +1303,6 @@ static PyMethodDef pyxc_methods[] = {
       " dom [int]:     Identifier of domain to which VCPU belongs.\n"
       " vcpu [int, 0]: VCPU being pinned.\n"
       " cpumap [list, []]: list of usable CPUs.\n\n"
-      "Returns: [int] 0 on success; -1 on error.\n" },
-
-    { "domain_setcpuweight", 
-      (PyCFunction)pyxc_domain_setcpuweight, 
-      METH_VARARGS | METH_KEYWORDS, "\n"
-      "Set cpuweight scheduler parameter for domain.\n"
-      " dom [int]:            Identifier of domain to be changed.\n"
-      " cpuweight [float, 1]: VCPU being pinned.\n"
       "Returns: [int] 0 on success; -1 on error.\n" },
 
     { "domain_sethandle", 

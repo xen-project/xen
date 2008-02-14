@@ -141,6 +141,14 @@ struct t_rec {
  * field, indexes into an array of struct t_rec's.
  */
 struct t_buf {
+    /* Assume the data buffer size is X.  X is generally not a power of 2.
+     * CONS and PROD are incremented modulo (2*X):
+     *     0 <= cons < 2*X
+     *     0 <= prod < 2*X
+     * This is done because addition modulo X breaks at 2^32 when X is not a
+     * power of 2:
+     *     (((2^32 - 1) % X) + 1) % X != (2^32) % X
+     */
     uint32_t cons;   /* Offset of next item to be consumed by control tools. */
     uint32_t prod;   /* Offset of next item to be produced by Xen.           */
     /*  Records follow immediately after the meta-data header.    */

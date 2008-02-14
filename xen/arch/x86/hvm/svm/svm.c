@@ -181,7 +181,7 @@ static void svm_restore_dr(struct vcpu *v)
         __restore_debug_registers(v);
 }
 
-int svm_vmcb_save(struct vcpu *v, struct hvm_hw_cpu *c)
+static int svm_vmcb_save(struct vcpu *v, struct hvm_hw_cpu *c)
 {
     struct vmcb_struct *vmcb = v->arch.hvm_svm.vmcb;
 
@@ -189,52 +189,6 @@ int svm_vmcb_save(struct vcpu *v, struct hvm_hw_cpu *c)
     c->cr2 = v->arch.hvm_vcpu.guest_cr[2];
     c->cr3 = v->arch.hvm_vcpu.guest_cr[3];
     c->cr4 = v->arch.hvm_vcpu.guest_cr[4];
-
-    c->idtr_limit = vmcb->idtr.limit;
-    c->idtr_base  = vmcb->idtr.base;
-
-    c->gdtr_limit = vmcb->gdtr.limit;
-    c->gdtr_base  = vmcb->gdtr.base; 
-
-    c->cs_sel = vmcb->cs.sel;
-    c->cs_limit = vmcb->cs.limit;
-    c->cs_base = vmcb->cs.base;
-    c->cs_arbytes = vmcb->cs.attr.bytes;
-
-    c->ds_sel = vmcb->ds.sel;
-    c->ds_limit = vmcb->ds.limit;
-    c->ds_base = vmcb->ds.base;
-    c->ds_arbytes = vmcb->ds.attr.bytes;
-
-    c->es_sel = vmcb->es.sel;
-    c->es_limit = vmcb->es.limit;
-    c->es_base = vmcb->es.base;
-    c->es_arbytes = vmcb->es.attr.bytes;
-
-    c->ss_sel = vmcb->ss.sel;
-    c->ss_limit = vmcb->ss.limit;
-    c->ss_base = vmcb->ss.base;
-    c->ss_arbytes = vmcb->ss.attr.bytes;
-
-    c->fs_sel = vmcb->fs.sel;
-    c->fs_limit = vmcb->fs.limit;
-    c->fs_base = vmcb->fs.base;
-    c->fs_arbytes = vmcb->fs.attr.bytes;
-
-    c->gs_sel = vmcb->gs.sel;
-    c->gs_limit = vmcb->gs.limit;
-    c->gs_base = vmcb->gs.base;
-    c->gs_arbytes = vmcb->gs.attr.bytes;
-
-    c->tr_sel = vmcb->tr.sel;
-    c->tr_limit = vmcb->tr.limit;
-    c->tr_base = vmcb->tr.base;
-    c->tr_arbytes = vmcb->tr.attr.bytes;
-
-    c->ldtr_sel = vmcb->ldtr.sel;
-    c->ldtr_limit = vmcb->ldtr.limit;
-    c->ldtr_base = vmcb->ldtr.base;
-    c->ldtr_arbytes = vmcb->ldtr.attr.bytes;
 
     c->sysenter_cs = vmcb->sysenter_cs;
     c->sysenter_esp = vmcb->sysenter_esp;
@@ -253,8 +207,7 @@ int svm_vmcb_save(struct vcpu *v, struct hvm_hw_cpu *c)
     return 1;
 }
 
-
-int svm_vmcb_restore(struct vcpu *v, struct hvm_hw_cpu *c)
+static int svm_vmcb_restore(struct vcpu *v, struct hvm_hw_cpu *c)
 {
     unsigned long mfn = 0;
     p2m_type_t p2mt;
@@ -300,53 +253,6 @@ int svm_vmcb_restore(struct vcpu *v, struct hvm_hw_cpu *c)
     printk("%s: cr3=0x%"PRIx64", cr0=0x%"PRIx64", cr4=0x%"PRIx64".\n",
            __func__, c->cr3, c->cr0, c->cr4);
 #endif
-
-    vmcb->idtr.limit = c->idtr_limit;
-    vmcb->idtr.base  = c->idtr_base;
-
-    vmcb->gdtr.limit = c->gdtr_limit;
-    vmcb->gdtr.base  = c->gdtr_base;
-
-    vmcb->cs.sel        = c->cs_sel;
-    vmcb->cs.limit      = c->cs_limit;
-    vmcb->cs.base       = c->cs_base;
-    vmcb->cs.attr.bytes = c->cs_arbytes;
-
-    vmcb->ds.sel        = c->ds_sel;
-    vmcb->ds.limit      = c->ds_limit;
-    vmcb->ds.base       = c->ds_base;
-    vmcb->ds.attr.bytes = c->ds_arbytes;
-
-    vmcb->es.sel        = c->es_sel;
-    vmcb->es.limit      = c->es_limit;
-    vmcb->es.base       = c->es_base;
-    vmcb->es.attr.bytes = c->es_arbytes;
-
-    vmcb->ss.sel        = c->ss_sel;
-    vmcb->ss.limit      = c->ss_limit;
-    vmcb->ss.base       = c->ss_base;
-    vmcb->ss.attr.bytes = c->ss_arbytes;
-    vmcb->cpl           = vmcb->ss.attr.fields.dpl;
-
-    vmcb->fs.sel        = c->fs_sel;
-    vmcb->fs.limit      = c->fs_limit;
-    vmcb->fs.base       = c->fs_base;
-    vmcb->fs.attr.bytes = c->fs_arbytes;
-
-    vmcb->gs.sel        = c->gs_sel;
-    vmcb->gs.limit      = c->gs_limit;
-    vmcb->gs.base       = c->gs_base;
-    vmcb->gs.attr.bytes = c->gs_arbytes;
-
-    vmcb->tr.sel        = c->tr_sel;
-    vmcb->tr.limit      = c->tr_limit;
-    vmcb->tr.base       = c->tr_base;
-    vmcb->tr.attr.bytes = c->tr_arbytes;
-
-    vmcb->ldtr.sel        = c->ldtr_sel;
-    vmcb->ldtr.limit      = c->ldtr_limit;
-    vmcb->ldtr.base       = c->ldtr_base;
-    vmcb->ldtr.attr.bytes = c->ldtr_arbytes;
 
     vmcb->sysenter_cs =  c->sysenter_cs;
     vmcb->sysenter_esp = c->sysenter_esp;

@@ -350,21 +350,6 @@ int xc_shadow_control(int xc_handle,
     return (rc == 0) ? domctl.u.shadow_op.pages : rc;
 }
 
-int xc_domain_setcpuweight(int xc_handle,
-                           uint32_t domid,
-                           float weight)
-{
-    int sched_id;
-    int ret;
-
-    /* Figure out which scheduler is currently used: */
-    if ( (ret = xc_sched_id(xc_handle, &sched_id)) != 0 )
-        return ret;
-
-    /* No-op. */
-    return 0;
-}
-
 int xc_domain_setmaxmem(int xc_handle,
                         uint32_t domid,
                         unsigned int max_memkb)

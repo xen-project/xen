@@ -6,6 +6,7 @@
 #include <asm/mpspec.h>
 #include <asm/apicdef.h>
 #include <asm/fixmap.h>
+#include <asm/iommu.h>
 
 /*
  * Intel IO-APIC support for SMP and UP systems.
@@ -124,12 +125,16 @@ extern int mpc_default_type;
 
 static inline unsigned int io_apic_read(unsigned int apic, unsigned int reg)
 {
+	if (vtd_enabled)
+		return io_apic_read_remap_rte(apic, reg);
 	*IO_APIC_BASE(apic) = reg;
 	return *(IO_APIC_BASE(apic)+4);
 }
 
 static inline void io_apic_write(unsigned int apic, unsigned int reg, unsigned int value)
 {
+	if (vtd_enabled)
+		return io_apic_write_remap_rte(apic, reg, value);
 	*IO_APIC_BASE(apic) = reg;
 	*(IO_APIC_BASE(apic)+4) = value;
 }

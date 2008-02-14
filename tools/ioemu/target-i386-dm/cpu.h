@@ -37,16 +37,20 @@
 
 #include "cpu-defs.h"
 
+#ifdef CONFIG_SOFTFLOAT
 #include "softfloat.h"
+#endif
 
 #if defined(__i386__) && !defined(CONFIG_SOFTMMU)
 #define USE_CODE_COPY
 #endif
 
+#ifdef CONFIG_SOFTFLOAT
 #ifdef USE_X86LDOUBLE
 typedef floatx80 CPU86_LDouble;
 #else
 typedef float64 CPU86_LDouble;
+#endif
 #endif
 
 /* Empty for now */

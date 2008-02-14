@@ -127,7 +127,7 @@ LEGACY_CFG_TO_XENAPI_CFG = reverse_dict(XENAPI_CFG_TO_LEGACY_CFG)
 XENAPI_PLATFORM_CFG = [ 'acpi', 'apic', 'boot', 'device_model', 'loader', 'display', 
                         'fda', 'fdb', 'keymap', 'isa', 'localtime', 'monitor', 
                         'nographic', 'pae', 'rtc_timeoffset', 'serial', 'sdl',
-                        'soundhw','stdvga', 'usb', 'usbdevice', 'vnc',
+                        'soundhw','stdvga', 'usb', 'usbdevice', 'hpet', 'vnc',
                         'vncconsole', 'vncdisplay', 'vnclisten', 'timer_mode',
                         'vncpasswd', 'vncunused', 'xauthority', 'pci', 'vhpt',
                         'guest_os_type', 'hap']
@@ -406,15 +406,13 @@ class XendConfig(dict):
 
         if self.is_hvm():
             if 'loader' not in self['platform']:
-                log.debug("No loader present")
-                # Old configs may have hvmloder set as PV_kernel param,
-                # so lets migrate them....
-                if self['PV_kernel'] == "/usr/lib/xen/boot/hvmloader":
+                # Old configs may have hvmloader set as PV_kernel param
+                if self.has_key('PV_kernel') and re.search('hvmloader', self['PV_kernel']):
                     self['platform']['loader'] = self['PV_kernel']
-                    log.debug("Loader copied from kernel %s" % str(self['platform']['loader']))
+                    self['PV_kernel'] = ''
                 else:
                     self['platform']['loader'] = "/usr/lib/xen/boot/hvmloader"
-                    log.debug("Loader %s" % str(self['platform']['loader']))
+                log.debug("Loader is %s" % str(self['platform']['loader']))
 
             # Compatibility hack, can go away soon.
             if 'soundhw' not in self['platform'] and \

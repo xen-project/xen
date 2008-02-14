@@ -361,6 +361,7 @@ void bochs_bios_init(void)
     register_ioport_write(0x503, 1, 1, bochs_bios_write, NULL);
 }
 
+#if defined(__i386__) || defined(__x86_64__)
 /* Generate an initial boot sector which sets state and jump to
    a specified vector */
 static void generate_bootsect(uint32_t gpr[8], uint16_t segs[6], uint16_t ip)
@@ -718,6 +719,14 @@ static void load_linux(const char *kernel_filename,
 
     generate_bootsect(gpr, seg, 0);
 }
+#else /* __ia64__ */
+static void load_linux(const char *kernel_filename,
+                       const char *initrd_filename,
+                       const char *kernel_cmdline)
+{
+    /* Direct Linux boot is unsupported. */
+}
+#endif
 
 static void main_cpu_reset(void *opaque)
 {
@@ -1013,8 +1022,10 @@ static void pc_init1(uint64_t ram_size, int vga_ram_size, char *boot_device,
         }
     }
 
+#ifdef HAS_TPM
     if (has_tpm_device())
         tpm_tis_init(&pic_set_irq_new, isa_pic, 11);
+#endif
 
     kbd_init();
     DMA_init(0);

@@ -22,6 +22,7 @@
  * THE SOFTWARE.
  */
 #include "vl.h"
+#include <malloc.h>
 
 /* debug IDE devices */
 //#define DEBUG_IDE
@@ -347,7 +348,7 @@ typedef struct IDEState {
     EndTransferFunc *end_transfer_func;
     uint8_t *data_ptr;
     uint8_t *data_end;
-    uint8_t io_buffer[MAX_MULT_SECTORS*512 + 4];
+    uint8_t *io_buffer;
     QEMUTimer *sector_write_timer; /* only used for win2k instal hack */
     uint32_t irq_count; /* counts IRQs when using win2k install hack */
 } IDEState;
@@ -2305,6 +2306,7 @@ static void ide_init2(IDEState *ide_state,
 
     for(i = 0; i < 2; i++) {
         s = ide_state + i;
+        s->io_buffer = qemu_memalign(getpagesize(), MAX_MULT_SECTORS*512 + 4);
         if (i == 0)
             s->bs = hd0;
         else

@@ -481,6 +481,9 @@ static inline int testandset (int *p)
 }
 #endif
 
+#ifdef CONFIG_STUBDOM
+#include <spinlock.h>
+#else
 typedef int spinlock_t;
 
 #define SPIN_LOCK_UNLOCKED 0
@@ -513,6 +516,7 @@ static inline int spin_trylock(spinlock_t *lock)
 {
     return 1;
 }
+#endif
 #endif
 
 extern spinlock_t tb_lock;

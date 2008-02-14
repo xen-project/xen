@@ -30,6 +30,9 @@
 #include "vl.h"
 #include "qemu_socket.h"
 #include <assert.h>
+#ifdef CONFIG_STUBDOM
+#include <netfront.h>
+#endif
 
 /* The refresh interval starts at BASE.  If we scan the buffer and
    find no change, we increase by INC, up to MAX.  If the mouse moves
@@ -85,8 +88,8 @@ typedef void VncWritePixels(VncState *vs, void *data, int size);
 
 typedef void VncSendHextileTile(VncState *vs,
                                 int x, int y, int w, int h,
-                                uint32_t *last_bg, 
-                                uint32_t *last_fg,
+                                void *last_bg, 
+                                void *last_fg,
                                 int *has_bg, int *has_fg);
 
 #if 0
@@ -154,6 +157,7 @@ struct VncState
     int has_resize;
     int has_hextile;
     int has_pointer_type_change;
+    int has_WMVi;
     int absolute;
     int last_x;
     int last_y;
@@ -187,9 +191,9 @@ struct VncState
     VncWritePixels *write_pixels;
     VncSendHextileTile *send_hextile_tile;
     int pix_bpp, pix_big_endian;
-    int red_shift, red_max, red_shift1;
-    int green_shift, green_max, green_shift1;
-    int blue_shift, blue_max, blue_shift1;
+    int red_shift, red_max, red_shift1, red_max1;
+    int green_shift, green_max, green_shift1, green_max1;
+    int blue_shift, blue_max, blue_shift1, blue_max1;
 
     VncReadEvent *read_handler;
     size_t read_handler_expect;
@@ -379,54 +383,67 @@ static void vnc_write_pixels_copy(VncState *vs, void *pixels, int size)
 /* slowest but generic code. */
 static void vnc_convert_pixel(VncState *vs, uint8_t *buf, uint32_t v)
 {
-    unsigned int r, g, b;
+    uint8_t r, g, b;
 
-    r = (v >> vs->red_shift1) & vs->red_max;
-    g = (v >> vs->green_shift1) & vs->green_max;
-    b = (v >> vs->blue_shift1) & vs->blue_max;
-    v = (r << vs->red_shift) | 
-        (g << vs->green_shift) | 
-        (b << vs->blue_shift);
+    r = ((v >> vs->red_shift1) & vs->red_max1) * (vs->red_max + 1) / (vs->red_max1 + 1);
+    g = ((v >> vs->green_shift1) & vs->green_max1) * (vs->green_max + 1) / (vs->green_max1 + 1);
+    b = ((v >> vs->blue_shift1) & vs->blue_max1) * (vs->blue_max + 1) / (vs->blue_max1 + 1);
     switch(vs->pix_bpp) {
     case 1:
-        buf[0] = v;
+        buf[0] = (r << vs->red_shift) | (g << vs->green_shift) | (b << vs->blue_shift);
         break;
     case 2:
+    {
+        uint16_t *p = (uint16_t *) buf;
+        *p = (r << vs->red_shift) | (g << vs->green_shift) | (b << vs->blue_shift);
         if (vs->pix_big_endian) {
-            buf[0] = v >> 8;
-            buf[1] = v;
-        } else {
-            buf[1] = v >> 8;
-            buf[0] = v;
+            *p = htons(*p);
         }
+    }
         break;
     default:
     case 4:
+    {
+        uint32_t *p = (uint32_t *) buf;
+        *p = (r << vs->red_shift) | (g << vs->green_shift) | (b << vs->blue_shift);
         if (vs->pix_big_endian) {
-            buf[0] = v >> 24;
-            buf[1] = v >> 16;
-            buf[2] = v >> 8;
-            buf[3] = v;
-        } else {
-            buf[3] = v >> 24;
-            buf[2] = v >> 16;
-            buf[1] = v >> 8;
-            buf[0] = v;
+            *p = htonl(*p);
         }
         break;
+    }
     }
 }
 
 static void vnc_write_pixels_generic(VncState *vs, void *pixels1, int size)
 {
-    uint32_t *pixels = pixels1;
     uint8_t buf[4];
-    int n, i;
 
-    n = size >> 2;
-    for(i = 0; i < n; i++) {
-        vnc_convert_pixel(vs, buf, pixels[i]);
-        vnc_write(vs, buf, vs->pix_bpp);
+    if (vs->depth == 4) {
+        uint32_t *pixels = pixels1;
+        int n, i;
+        n = size >> 2;
+        for(i = 0; i < n; i++) {
+            vnc_convert_pixel(vs, buf, pixels[i]);
+            vnc_write(vs, buf, vs->pix_bpp);
+        }
+    } else if (vs->depth == 2) {
+        uint16_t *pixels = pixels1;
+        int n, i;
+        n = size >> 1;
+        for(i = 0; i < n; i++) {
+            vnc_convert_pixel(vs, buf, pixels[i]);
+            vnc_write(vs, buf, vs->pix_bpp);
+        }
+    } else if (vs->depth == 1) {
+        uint8_t *pixels = pixels1;
+        int n, i;
+        n = size;
+        for(i = 0; i < n; i++) {
+            vnc_convert_pixel(vs, buf, pixels[i]);
+            vnc_write(vs, buf, vs->pix_bpp);
+        }
+    } else {
+        fprintf(stderr, "vnc_write_pixels_generic: VncState color depth not supported\n");
     }
 }
 
@@ -463,6 +480,18 @@ static void hextile_enc_cord(uint8_t *ptr, int x, int y, int w, int h)
 #undef BPP
 
 #define GENERIC
+#define BPP 8
+#include "vnchextile.h"
+#undef BPP
+#undef GENERIC
+
+#define GENERIC
+#define BPP 16
+#include "vnchextile.h"
+#undef BPP
+#undef GENERIC
+
+#define GENERIC
 #define BPP 32
 #include "vnchextile.h"
 #undef BPP
@@ -472,18 +501,22 @@ static void send_framebuffer_update_hextile(VncState *vs, int x, int y, int w, i
 {
     int i, j;
     int has_fg, has_bg;
-    uint32_t last_fg32, last_bg32;
+    void *last_fg, *last_bg;
 
     vnc_framebuffer_update(vs, x, y, w, h, 5);
 
+    last_fg = (void *) malloc(vs->depth);
+    last_bg = (void *) malloc(vs->depth);
     has_fg = has_bg = 0;
     for (j = y; j < (y + h); j += 16) {
 	for (i = x; i < (x + w); i += 16) {
             vs->send_hextile_tile(vs, i, j, 
                                   MIN(16, x + w - i), MIN(16, y + h - j),
-                                  &last_bg32, &last_fg32, &has_bg, &has_fg);
+                                  last_bg, last_fg, &has_bg, &has_fg);
 	}
     }
+    free(last_fg);
+    free(last_bg);    
 }
 
 static void send_framebuffer_update(VncState *vs, int x, int y, int w, int h)
@@ -1278,6 +1311,7 @@ static void set_encodings(VncState *vs, int32_t *encodings, size_t n_encodings)
     vs->has_hextile = 0;
     vs->has_resize = 0;
     vs->has_pointer_type_change = 0;
+    vs->has_WMVi = 0;
     vs->absolute = -1;
     vs->ds->dpy_copy = NULL;
 
@@ -1298,23 +1332,14 @@ static void set_encodings(VncState *vs, int32_t *encodings, size_t n_encodings)
 	case -257:
 	    vs->has_pointer_type_change = 1;
 	    break;
+        case 0x574D5669:
+            vs->has_WMVi = 1;
 	default:
 	    break;
 	}
     }
 
     check_pointer_type_change(vs, kbd_mouse_is_absolute());
-}
-
-static int compute_nbits(unsigned int val)
-{
-    int n;
-    n = 0;
-    while (val != 0) {
-        n++;
-        val >>= 1;
-    }
-    return n;
 }
 
 static void set_pixel_format(VncState *vs,
@@ -1335,23 +1360,24 @@ static void set_pixel_format(VncState *vs,
 	vnc_client_error(vs);
         return;
     }
-    if (bits_per_pixel == 32 && 
+    if (bits_per_pixel == 32 &&
+        bits_per_pixel == vs->depth * 8 && 
         host_big_endian_flag == big_endian_flag &&
         red_max == 0xff && green_max == 0xff && blue_max == 0xff &&
         red_shift == 16 && green_shift == 8 && blue_shift == 0) {
-        vs->depth = 4;
         vs->write_pixels = vnc_write_pixels_copy;
         vs->send_hextile_tile = send_hextile_tile_32;
     } else 
-    if (bits_per_pixel == 16 && 
+    if (bits_per_pixel == 16 &&
+        bits_per_pixel == vs->depth * 8 && 
         host_big_endian_flag == big_endian_flag &&
         red_max == 31 && green_max == 63 && blue_max == 31 &&
         red_shift == 11 && green_shift == 5 && blue_shift == 0) {
-        vs->depth = 2;
         vs->write_pixels = vnc_write_pixels_copy;
         vs->send_hextile_tile = send_hextile_tile_16;
     } else 
     if (bits_per_pixel == 8 && 
+        bits_per_pixel == vs->depth * 8 &&
         red_max == 7 && green_max == 7 && blue_max == 3 &&
         red_shift == 5 && green_shift == 2 && blue_shift == 0) {
         vs->depth = 1;
@@ -1364,26 +1390,168 @@ static void set_pixel_format(VncState *vs,
             bits_per_pixel != 16 &&
             bits_per_pixel != 32)
             goto fail;
-        vs->depth = 4;
-        vs->red_shift = red_shift;
-        vs->red_max = red_max;
-        vs->red_shift1 = 24 - compute_nbits(red_max);
-        vs->green_shift = green_shift;
-        vs->green_max = green_max;
-        vs->green_shift1 = 16 - compute_nbits(green_max);
-        vs->blue_shift = blue_shift;
-        vs->blue_max = blue_max;
-        vs->blue_shift1 = 8 - compute_nbits(blue_max);
-        vs->pix_bpp = bits_per_pixel / 8;
+        if (vs->depth == 4) {
+            vs->send_hextile_tile = send_hextile_tile_generic_32;
+        } else if (vs->depth == 2) {
+            vs->send_hextile_tile = send_hextile_tile_generic_16;
+        } else {
+            vs->send_hextile_tile = send_hextile_tile_generic_8;
+        }
+            
         vs->pix_big_endian = big_endian_flag;
         vs->write_pixels = vnc_write_pixels_generic;
-        vs->send_hextile_tile = send_hextile_tile_generic;
     }
-
-    vnc_dpy_resize(vs->ds, vs->ds->width, vs->ds->height);
+ 
+    vs->red_shift = red_shift;
+    vs->red_max = red_max;
+    vs->green_shift = green_shift;
+    vs->green_max = green_max;
+    vs->blue_shift = blue_shift;
+    vs->blue_max = blue_max;
+    vs->pix_bpp = bits_per_pixel / 8;
 
     vga_hw_invalidate();
     vga_hw_update();
+}
+
+static void pixel_format_message (VncState *vs) {
+    char pad[3] = { 0, 0, 0 };
+
+    vnc_write_u8(vs, vs->depth * 8); /* bits-per-pixel */
+    if (vs->depth == 4) vnc_write_u8(vs, 24); /* depth */
+    else vnc_write_u8(vs, vs->depth * 8); /* depth */
+
+#ifdef WORDS_BIGENDIAN
+    vnc_write_u8(vs, 1);             /* big-endian-flag */
+#else
+    vnc_write_u8(vs, 0);             /* big-endian-flag */
+#endif
+    vnc_write_u8(vs, 1);             /* true-color-flag */
+    if (vs->depth == 4) {
+        vnc_write_u16(vs, 0xFF);     /* red-max */
+        vnc_write_u16(vs, 0xFF);     /* green-max */
+        vnc_write_u16(vs, 0xFF);     /* blue-max */
+        vnc_write_u8(vs, 16);        /* red-shift */
+        vnc_write_u8(vs, 8);         /* green-shift */
+        vnc_write_u8(vs, 0);         /* blue-shift */
+        vs->send_hextile_tile = send_hextile_tile_32;
+    } else if (vs->depth == 2) {
+        vnc_write_u16(vs, 31);       /* red-max */
+        vnc_write_u16(vs, 63);       /* green-max */
+        vnc_write_u16(vs, 31);       /* blue-max */
+        vnc_write_u8(vs, 11);        /* red-shift */
+        vnc_write_u8(vs, 5);         /* green-shift */
+        vnc_write_u8(vs, 0);         /* blue-shift */
+        vs->send_hextile_tile = send_hextile_tile_16;
+    } else if (vs->depth == 1) {
+        /* XXX: change QEMU pixel 8 bit pixel format to match the VNC one ? */
+        vnc_write_u16(vs, 7);        /* red-max */
+        vnc_write_u16(vs, 7);        /* green-max */
+        vnc_write_u16(vs, 3);        /* blue-max */
+        vnc_write_u8(vs, 5);         /* red-shift */
+        vnc_write_u8(vs, 2);         /* green-shift */
+        vnc_write_u8(vs, 0);         /* blue-shift */
+        vs->send_hextile_tile = send_hextile_tile_8;
+    }
+    vs->red_max = vs->red_max1;
+    vs->green_max = vs->green_max1;
+    vs->blue_max = vs->blue_max1;
+    vs->red_shift = vs->red_shift1;
+    vs->green_shift = vs->green_shift1;
+    vs->blue_shift = vs->blue_shift1;
+    vs->pix_bpp = vs->depth * 8;
+    vs->write_pixels = vnc_write_pixels_copy;
+        
+    vnc_write(vs, pad, 3);           /* padding */
+}
+
+static void vnc_dpy_colourdepth(DisplayState *ds, int depth)
+{
+    int host_big_endian_flag;
+    struct VncState *vs;
+    
+    if (!depth) return;
+    
+#ifdef WORDS_BIGENDIAN
+    host_big_endian_flag = 1;
+#else
+    host_big_endian_flag = 0;
+#endif
+    vs = ds->opaque;   
+    
+    switch (depth) {
+        case 8:
+            vs->depth = depth / 8;
+            vs->red_max1 = 7;
+            vs->green_max1 = 7;
+            vs->blue_max1 = 3;
+            vs->red_shift1 = 5;
+            vs->green_shift1 = 2;
+            vs->blue_shift1 = 0;
+            break;
+        case 16:
+            vs->depth = depth / 8;
+            vs->red_max1 = 31;
+            vs->green_max1 = 63;
+            vs->blue_max1 = 31;
+            vs->red_shift1 = 11;
+            vs->green_shift1 = 5;
+            vs->blue_shift1 = 0;
+            break;
+        case 32:
+            vs->depth = 4;
+            vs->red_max1 = 255;
+            vs->green_max1 = 255;
+            vs->blue_max1 = 255;
+            vs->red_shift1 = 16;
+            vs->green_shift1 = 8;
+            vs->blue_shift1 = 0;
+            break;
+        default:
+            return;
+    }
+    if (ds->switchbpp) {
+        vnc_client_error(vs);
+    } else if (vs->csock != -1 && vs->has_WMVi) {
+        /* Sending a WMVi message to notify the client*/
+        vnc_write_u8(vs, 0);  /* msg id */
+        vnc_write_u8(vs, 0);
+        vnc_write_u16(vs, 1); /* number of rects */
+        vnc_framebuffer_update(vs, 0, 0, ds->width, ds->height, 0x574D5669);
+        pixel_format_message(vs);
+        vnc_flush(vs);
+    } else {
+        if (vs->pix_bpp == 4 && vs->depth == 4 &&
+            host_big_endian_flag == vs->pix_big_endian &&
+            vs->red_max == 0xff && vs->green_max == 0xff && vs->blue_max == 0xff &&
+            vs->red_shift == 16 && vs->green_shift == 8 && vs->blue_shift == 0) {
+            vs->write_pixels = vnc_write_pixels_copy;
+            vs->send_hextile_tile = send_hextile_tile_32;
+        } else if (vs->pix_bpp == 2 && vs->depth == 2 &&
+            host_big_endian_flag == vs->pix_big_endian &&
+            vs->red_max == 31 && vs->green_max == 63 && vs->blue_max == 31 &&
+            vs->red_shift == 11 && vs->green_shift == 5 && vs->blue_shift == 0) {
+            vs->write_pixels = vnc_write_pixels_copy;
+            vs->send_hextile_tile = send_hextile_tile_16;
+        } else if (vs->pix_bpp == 1 && vs->depth == 1 &&
+            host_big_endian_flag == vs->pix_big_endian &&
+            vs->red_max == 7 && vs->green_max == 7 && vs->blue_max == 3 &&
+            vs->red_shift == 5 && vs->green_shift == 2 && vs->blue_shift == 0) {
+            vs->write_pixels = vnc_write_pixels_copy;
+            vs->send_hextile_tile = send_hextile_tile_8;
+        } else {
+            if (vs->depth == 4) {
+                vs->send_hextile_tile = send_hextile_tile_generic_32;
+            } else if (vs->depth == 2) {
+                vs->send_hextile_tile = send_hextile_tile_generic_16;
+            } else {
+                vs->send_hextile_tile = send_hextile_tile_generic_8;
+            }
+            vs->write_pixels = vnc_write_pixels_generic;
+        }
+    }
+
+    vnc_dpy_resize(ds, ds->width, ds->height);
 }
 
 static int protocol_client_msg(VncState *vs, uint8_t *data, size_t len)
@@ -1473,7 +1641,6 @@ static int protocol_client_msg(VncState *vs, uint8_t *data, size_t len)
 static int protocol_client_init(VncState *vs, uint8_t *data, size_t len)
 {
     size_t l;
-    char pad[3] = { 0, 0, 0 };
 
     vga_hw_update();
 
@@ -1482,43 +1649,7 @@ static int protocol_client_init(VncState *vs, uint8_t *data, size_t len)
     vnc_write_u16(vs, vs->ds->width);
     vnc_write_u16(vs, vs->ds->height);
 
-    vnc_write_u8(vs, vs->depth * 8); /* bits-per-pixel */
-    vnc_write_u8(vs, vs->depth * 8); /* depth */
-#ifdef WORDS_BIGENDIAN
-    vnc_write_u8(vs, 1);             /* big-endian-flag */
-#else
-    vnc_write_u8(vs, 0);             /* big-endian-flag */
-#endif
-    vnc_write_u8(vs, 1);             /* true-color-flag */
-    if (vs->depth == 4) {
-	vnc_write_u16(vs, 0xFF);     /* red-max */
-	vnc_write_u16(vs, 0xFF);     /* green-max */
-	vnc_write_u16(vs, 0xFF);     /* blue-max */
-	vnc_write_u8(vs, 16);        /* red-shift */
-	vnc_write_u8(vs, 8);         /* green-shift */
-	vnc_write_u8(vs, 0);         /* blue-shift */
-        vs->send_hextile_tile = send_hextile_tile_32;
-    } else if (vs->depth == 2) {
-	vnc_write_u16(vs, 31);       /* red-max */
-	vnc_write_u16(vs, 63);       /* green-max */
-	vnc_write_u16(vs, 31);       /* blue-max */
-	vnc_write_u8(vs, 11);        /* red-shift */
-	vnc_write_u8(vs, 5);         /* green-shift */
-	vnc_write_u8(vs, 0);         /* blue-shift */
-        vs->send_hextile_tile = send_hextile_tile_16;
-    } else if (vs->depth == 1) {
-        /* XXX: change QEMU pixel 8 bit pixel format to match the VNC one ? */
-	vnc_write_u16(vs, 7);        /* red-max */
-	vnc_write_u16(vs, 7);        /* green-max */
-	vnc_write_u16(vs, 3);        /* blue-max */
-	vnc_write_u8(vs, 5);         /* red-shift */
-	vnc_write_u8(vs, 2);         /* green-shift */
-	vnc_write_u8(vs, 0);         /* blue-shift */
-        vs->send_hextile_tile = send_hextile_tile_8;
-    }
-    vs->write_pixels = vnc_write_pixels_copy;
-	
-    vnc_write(vs, pad, 3);           /* padding */
+    pixel_format_message(vs);
 
     l = strlen(domain_name); 
     vnc_write_u32(vs, l);        
@@ -2160,7 +2291,6 @@ void vnc_display_init(DisplayState *ds)
 
     vs->lsock = -1;
     vs->csock = -1;
-    vs->depth = 4;
     vs->last_x = -1;
     vs->last_y = -1;
 
@@ -2177,9 +2307,12 @@ void vnc_display_init(DisplayState *ds)
     vs->ds->data = NULL;
     vs->ds->dpy_update = vnc_dpy_update;
     vs->ds->dpy_resize = vnc_dpy_resize;
+    vs->ds->dpy_colourdepth = vnc_dpy_colourdepth;
     vs->ds->dpy_refresh = vnc_dpy_refresh;
 
-    vnc_dpy_resize(vs->ds, 640, 400);
+    vs->ds->width = 640;
+    vs->ds->height = 400;
+    vnc_dpy_colourdepth(vs->ds, 32);
 }
 
 #if CONFIG_VNC_TLS
@@ -2297,10 +2430,12 @@ int vnc_display_open(DisplayState *ds, const char *display, int find_unused)
 {
     struct sockaddr *addr;
     struct sockaddr_in iaddr;
-#ifndef _WIN32
+#ifndef NO_UNIX_SOCKETS
     struct sockaddr_un uaddr;
 #endif
+#ifndef CONFIG_STUBDOM
     int reuse_addr, ret;
+#endif
     socklen_t addrlen;
     const char *p;
     VncState *vs = ds ? (VncState *)ds->opaque : vnc_state;
@@ -2325,6 +2460,8 @@ int vnc_display_open(DisplayState *ds, const char *display, int find_unused)
 	options++;
 	if (strncmp(options, "password", 8) == 0) {
 	    password = 1; /* Require password auth */
+        } else if (strncmp(options, "switchbpp", 9) == 0) {
+            ds->switchbpp = 1;
 #if CONFIG_VNC_TLS
 	} else if (strncmp(options, "tls", 3) == 0) {
 	    tls = 1; /* Require TLS */
@@ -2432,6 +2569,15 @@ int vnc_display_open(DisplayState *ds, const char *display, int find_unused)
 	    return -1;
 	}
 
+#ifdef CONFIG_STUBDOM
+        {
+            struct ip_addr ipaddr = { iaddr.sin_addr.s_addr };
+            struct ip_addr netmask = { 0 };
+            struct ip_addr gw = { 0 };
+            networking_set_addr(&ipaddr, &netmask, &gw);
+        }
+#endif
+
 	iaddr.sin_port = htons(ntohs(iaddr.sin_port) + 5900);
 
 	vs->lsock = socket(PF_INET, SOCK_STREAM, 0);
@@ -2442,6 +2588,7 @@ int vnc_display_open(DisplayState *ds, const char *display, int find_unused)
 	    return -1;
 	}
 
+#ifndef CONFIG_STUBDOM
 	reuse_addr = 1;
 	ret = setsockopt(vs->lsock, SOL_SOCKET, SO_REUSEADDR,
 			 (const char *)&reuse_addr, sizeof(reuse_addr));
@@ -2453,6 +2600,7 @@ int vnc_display_open(DisplayState *ds, const char *display, int find_unused)
 	    vs->display = NULL;
 	    return -1;
 	}
+#endif
     }
 
     while (bind(vs->lsock, addr, addrlen) == -1) {
@@ -2483,6 +2631,7 @@ int vnc_display_open(DisplayState *ds, const char *display, int find_unused)
     return ntohs(iaddr.sin_port);
 }
 
+#ifndef CONFIG_STUBDOM
 int vnc_start_viewer(int port)
 {
     int pid, i, open_max;
@@ -2510,4 +2659,5 @@ int vnc_start_viewer(int port)
 	return pid;
     }
 }
+#endif
 

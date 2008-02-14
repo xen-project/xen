@@ -68,6 +68,13 @@ static inline int get_platform_info(int xc_handle, uint32_t dom,
 
     *guest_width = domctl.u.address_size.size / 8;
 
+    /* 64-bit tools will see the 64-bit hvirt_start, but 32-bit guests 
+     * will be using the compat one. */
+    if ( *guest_width < sizeof (unsigned long) )
+        /* XXX need to fix up a way of extracting this value from Xen if
+         * XXX it becomes variable for domU */
+        *hvirt_start = 0xf5800000;
+
     if (strstr(xen_caps, "xen-3.0-x86_64"))
         /* Depends on whether it's a compat 32-on-64 guest */
         *pt_levels = ( (*guest_width == 8) ? 4 : 3 );
@@ -135,6 +142,16 @@ typedef union
     else                                        \
         (_p)->x32._f = (_v);                    \
 } while (0)
+
+#define UNFOLD_CR3(_c)                                                  \
+  ((uint64_t)((guest_width == 8)                                        \
+              ? ((_c) >> 12)                                            \
+              : (((uint32_t)(_c) >> 12) | ((uint32_t)(_c) << 20))))
+
+#define FOLD_CR3(_c)                                                    \
+  ((uint64_t)((guest_width == 8)                                        \
+              ? ((uint64_t)(_c)) << 12                                  \
+              : (((uint32_t)(_c) << 12) | ((uint32_t)(_c) >> 20))))
 
 #define MEMCPY_FIELD(_d, _s, _f) do {                              \
     if (guest_width == 8)                                          \

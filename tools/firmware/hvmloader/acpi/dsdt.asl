@@ -49,6 +49,7 @@ DefinitionBlock ("DSDT.aml", "DSDT", 2, "Xen", "HVM", 0)
        Field(BIOS, ByteAcc, NoLock, Preserve) {
            UAR1, 1,
            UAR2, 1,
+           HPET, 1,
            Offset(4),
            PMIN, 32,
            PLEN, 32
@@ -296,6 +297,13 @@ DefinitionBlock ("DSDT.aml", "DSDT", 2, "Xen", "HVM", 0)
             Device(HPET) {
                 Name(_HID,  EISAID("PNP0103"))
                 Name(_UID, 0)
+                Method (_STA, 0, NotSerialized) {
+                    If(LEqual(\_SB.HPET, 0)) {
+                        Return(0x00)
+                    } Else {
+                        Return(0x0F)
+                    }
+                }
                 Name(_CRS, ResourceTemplate() {
                     DWordMemory(
                         ResourceConsumer, PosDecode, MinFixed, MaxFixed,

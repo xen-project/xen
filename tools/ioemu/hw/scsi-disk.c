@@ -26,13 +26,18 @@ do { printf("scsi-disk: " fmt , ##args); } while (0)
 do { fprintf(stderr, "scsi-disk: " fmt , ##args); } while (0)
 
 #include "vl.h"
+#include <malloc.h>
 
 #define SENSE_NO_SENSE        0
 #define SENSE_NOT_READY       2
 #define SENSE_HARDWARE_ERROR  4
 #define SENSE_ILLEGAL_REQUEST 5
 
+#ifdef CONFIG_STUBDOM
+#define SCSI_DMA_BUF_SIZE    32768
+#else
 #define SCSI_DMA_BUF_SIZE    65536
+#endif
 
 typedef struct SCSIRequest {
     SCSIDevice *dev;
@@ -44,7 +49,7 @@ typedef struct SCSIRequest {
     int sector_count;
     /* The amounnt of data in the buffer.  */
     int buf_len;
-    uint8_t dma_buf[SCSI_DMA_BUF_SIZE];
+    uint8_t *dma_buf;
     BlockDriverAIOCB *aiocb;
     struct SCSIRequest *next;
 } SCSIRequest;
@@ -76,6 +81,7 @@ static SCSIRequest *scsi_new_request(SCSIDevice *s, uint32_t tag)
         free_requests = r->next;
     } else {
         r = qemu_malloc(sizeof(SCSIRequest));
+	r->dma_buf = qemu_memalign(getpagesize(), SCSI_DMA_BUF_SIZE);
     }
     r->dev = s;
     r->tag = tag;

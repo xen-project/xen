@@ -91,12 +91,12 @@ class ImageHandler:
                         ("image/cmdline", self.cmdline),
                         ("image/ramdisk", self.ramdisk))
 
-        self.dmargs = self.parseDeviceModelArgs(vmConfig)
         self.device_model = vmConfig['platform'].get('device_model')
 
         self.display = vmConfig['platform'].get('display')
         self.xauthority = vmConfig['platform'].get('xauthority')
         self.vncconsole = vmConfig['platform'].get('vncconsole')
+        self.dmargs = self.parseDeviceModelArgs(vmConfig)
         self.pid = None
 
 
@@ -204,8 +204,14 @@ class ImageHandler:
         for dev_uuid in vmConfig['console_refs']:
             dev_type, dev_info = vmConfig['devices'][dev_uuid]
             if dev_type == 'vfb':
-                vnc_config = dev_info.get('other_config', {})
-                has_vnc = True
+                vfb_type = dev_info.get('type', {})
+                if vfb_type == 'sdl':
+                    self.display = dev_info.get('display', {})
+                    self.xauthority = dev_info.get('xauthority', {})
+                    has_sdl = True
+                else:
+                    vnc_config = dev_info.get('other_config', {})
+                    has_vnc = True
                 break
 
         keymap = vmConfig['platform'].get("keymap")
@@ -329,16 +335,27 @@ class ImageHandler:
             return
         if self.pid:
             try:
-                os.kill(self.pid, signal.SIGKILL)
+                os.kill(self.pid, signal.SIGHUP)
             except OSError, exn:
                 log.exception(exn)
             try:
-                os.waitpid(self.pid, 0)
+                # Try to reap the child every 100ms for 10s. Then SIGKILL it.
+                for i in xrange(100):
+                    (p, rv) = os.waitpid(self.pid, os.WNOHANG)
+                    if p == self.pid:
+                        break
+                    time.sleep(0.1)
+                else:
+                    log.warning("DeviceModel %d took more than 10s "
+                                "to terminate: sending SIGKILL" % self.pid)
+                    os.kill(self.pid, signal.SIGKILL)
+                    os.waitpid(self.pid, 0)
             except OSError, exn:
                 # This is expected if Xend has been restarted within the
                 # life of this domain.  In this case, we can kill the process,
                 # but we can't wait for it because it's not our child.
-                pass
+                # We just make really sure it's going away (SIGKILL) first.
+                os.kill(self.pid, signal.SIGKILL)
             self.pid = None
             state = xstransact.Remove("/local/domain/0/device-model/%i"
                                       % self.vm.getDomid())
@@ -449,7 +466,7 @@ class HVMImageHandler(ImageHandler):
         ret = ImageHandler.parseDeviceModelArgs(self, vmConfig)
         ret = ret + ['-vcpus', str(self.vm.getVCpuCount())]
 
-        if self.kernel and self.kernel != "/usr/lib/xen/boot/hvmloader":
+        if self.kernel:
             log.debug("kernel         = %s", self.kernel)
             ret = ret + ['-kernel', self.kernel]
         if self.ramdisk:

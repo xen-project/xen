@@ -707,9 +707,6 @@ class XendDomainInfo:
         log.debug("Setting memory maximum of domain %s (%s) to %d MiB.",
                   self.info['name_label'], str(self.domid), limit)
 
-        if limit <= 0:
-            raise XendError('Invalid memory size')
-
         MiB = 1024 * 1024
         self._safe_set_memory('memory_static_max', limit * MiB)
 
@@ -1692,6 +1689,12 @@ class XendDomainInfo:
             xc.hvm_set_param(self.domid, HVM_PARAM_TIMER_MODE,
                              long(timer_mode))
 
+        # Optionally enable virtual HPET
+        hpet = self.info["platform"].get("hpet")
+        if hvm and hpet is not None:
+            xc.hvm_set_param(self.domid, HVM_PARAM_HPET_ENABLED,
+                             long(hpet))
+
         # Set maximum number of vcpus in domain
         xc.domain_max_vcpus(self.domid, int(self.info['VCPUs_max']))
 
@@ -1749,9 +1752,6 @@ class XendDomainInfo:
                 self.info['platform']['rtc_timeoffset'] = timeoffset
 
             self.image = image.create(self, self.info)
-
-            xc.domain_setcpuweight(self.domid, \
-                                   self.info['vcpus_params']['weight'])
 
             # repin domain vcpus if a restricted cpus list is provided
             # this is done prior to memory allocation to aide in memory

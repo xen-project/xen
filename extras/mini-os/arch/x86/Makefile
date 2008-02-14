@@ -5,13 +5,14 @@
 
 XEN_ROOT = ../../../..
 include $(XEN_ROOT)/Config.mk
+include ../../Config.mk
 
 # include arch.mk has to be before mini-os.mk!
 
 include arch.mk
 include ../../minios.mk
 
-# Sources here are all *.c *.S without $(TARGET_ARCH).S
+# Sources here are all *.c *.S without $(XEN_TARGET_ARCH).S
 # This is handled in $(HEAD_ARCH_OBJ)
 ARCH_SRCS := $(wildcard *.c)
 

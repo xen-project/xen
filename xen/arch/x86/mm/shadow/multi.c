@@ -1470,10 +1470,14 @@ void sh_install_xen_entries_in_l4(struct vcpu *v, mfn_t gl4mfn, mfn_t sl4mfn)
         shadow_l4e_from_mfn(page_to_mfn(virt_to_page(d->arch.mm_perdomain_l3)),
                             __PAGE_HYPERVISOR);
 
-    /* Linear mapping */
+    /* Shadow linear mapping for 4-level shadows.  N.B. for 3-level
+     * shadows on 64-bit xen, this linear mapping is later replaced by the
+     * monitor pagetable structure, which is built in make_monitor_table
+     * and maintained by sh_update_linear_entries. */
     sl4e[shadow_l4_table_offset(SH_LINEAR_PT_VIRT_START)] =
         shadow_l4e_from_mfn(sl4mfn, __PAGE_HYPERVISOR);
 
+    /* Self linear mapping.  */
     if ( shadow_mode_translate(v->domain) && !shadow_mode_external(v->domain) )
     {
         // linear tables may not be used with translated PV guests
@@ -1745,7 +1749,7 @@ sh_make_monitor_table(struct vcpu *v)
     ASSERT(pagetable_get_pfn(v->arch.monitor_table) == 0);
     
     /* Guarantee we can get the memory we need */
-    shadow_prealloc(d, SH_type_monitor_table, CONFIG_PAGING_LEVELS - 1);
+    shadow_prealloc(d, SH_type_monitor_table, CONFIG_PAGING_LEVELS);
 
 #if CONFIG_PAGING_LEVELS == 4    
     {
@@ -1755,22 +1759,34 @@ sh_make_monitor_table(struct vcpu *v)
         /* Remember the level of this table */
         mfn_to_page(m4mfn)->shadow_flags = 4;
 #if SHADOW_PAGING_LEVELS < 4
-        // Install a monitor l3 table in slot 0 of the l4 table.
-        // This is used for shadow linear maps.
         {
-            mfn_t m3mfn; 
+            mfn_t m3mfn, m2mfn;
             l4_pgentry_t *l4e;
+            l3_pgentry_t *l3e;
+            /* Install an l3 table and an l2 table that will hold the shadow 
+             * linear map entries.  This overrides the linear map entry that 
+             * was installed by sh_install_xen_entries_in_l4. */
+            l4e = sh_map_domain_page(m4mfn);
+
             m3mfn = shadow_alloc(d, SH_type_monitor_table, 0);
             mfn_to_page(m3mfn)->shadow_flags = 3;
-            l4e = sh_map_domain_page(m4mfn);
-            l4e[0] = l4e_from_pfn(mfn_x(m3mfn), __PAGE_HYPERVISOR);
-            sh_unmap_domain_page(l4e);
+            l4e[shadow_l4_table_offset(SH_LINEAR_PT_VIRT_START)]
+                = l4e_from_pfn(mfn_x(m3mfn), __PAGE_HYPERVISOR);
+
+            m2mfn = shadow_alloc(d, SH_type_monitor_table, 0);
+            mfn_to_page(m2mfn)->shadow_flags = 2;
+            l3e = sh_map_domain_page(m3mfn);
+            l3e[0] = l3e_from_pfn(mfn_x(m2mfn), __PAGE_HYPERVISOR);
+            sh_unmap_domain_page(l3e);
+
             if ( is_pv_32on64_vcpu(v) )
             {
-                // Install a monitor l2 table in slot 3 of the l3 table.
-                // This is used for all Xen entries.
-                mfn_t m2mfn;
-                l3_pgentry_t *l3e;
+                /* For 32-on-64 PV guests, we need to map the 32-bit Xen
+                 * area into its usual VAs in the monitor tables */
+                m3mfn = shadow_alloc(d, SH_type_monitor_table, 0);
+                mfn_to_page(m3mfn)->shadow_flags = 3;
+                l4e[0] = l4e_from_pfn(mfn_x(m3mfn), __PAGE_HYPERVISOR);
+                
                 m2mfn = shadow_alloc(d, SH_type_monitor_table, 0);
                 mfn_to_page(m2mfn)->shadow_flags = 2;
                 l3e = sh_map_domain_page(m3mfn);
@@ -1778,6 +1794,8 @@ sh_make_monitor_table(struct vcpu *v)
                 sh_install_xen_entries_in_l2h(v, m2mfn);
                 sh_unmap_domain_page(l3e);
             }
+
+            sh_unmap_domain_page(l4e);
         }
 #endif /* SHADOW_PAGING_LEVELS < 4 */
         return m4mfn;
@@ -2181,21 +2199,34 @@ void sh_destroy_monitor_table(struct vcpu *v, mfn_t mmfn)
     ASSERT(mfn_to_shadow_page(mmfn)->type == SH_type_monitor_table);
 
 #if (CONFIG_PAGING_LEVELS == 4) && (SHADOW_PAGING_LEVELS != 4)
-    /* Need to destroy the l3 monitor page in slot 0 too */
     {
         mfn_t m3mfn;
         l4_pgentry_t *l4e = sh_map_domain_page(mmfn);
-        ASSERT(l4e_get_flags(l4e[0]) & _PAGE_PRESENT);
-        m3mfn = _mfn(l4e_get_pfn(l4e[0]));
+        l3_pgentry_t *l3e;
+        int linear_slot = shadow_l4_table_offset(SH_LINEAR_PT_VIRT_START);
+ 
+        /* Need to destroy the l3 and l2 monitor pages used 
+         * for the linear map */
+        ASSERT(l4e_get_flags(l4e[linear_slot]) & _PAGE_PRESENT);
+        m3mfn = _mfn(l4e_get_pfn(l4e[linear_slot]));
+        l3e = sh_map_domain_page(m3mfn);
+        ASSERT(l3e_get_flags(l3e[0]) & _PAGE_PRESENT);
+        shadow_free(d, _mfn(l3e_get_pfn(l3e[0])));
+        sh_unmap_domain_page(l3e);
+        shadow_free(d, m3mfn);
+
         if ( is_pv_32on64_vcpu(v) )
         {
-            /* Need to destroy the l2 monitor page in slot 3 too */
-            l3_pgentry_t *l3e = sh_map_domain_page(m3mfn);
+            /* Need to destroy the l3 and l2 monitor pages that map the
+             * Xen VAs at 3GB-4GB */
+            ASSERT(l4e_get_flags(l4e[0]) & _PAGE_PRESENT);
+            m3mfn = _mfn(l4e_get_pfn(l4e[0]));
+            l3e = sh_map_domain_page(m3mfn);
             ASSERT(l3e_get_flags(l3e[3]) & _PAGE_PRESENT);
             shadow_free(d, _mfn(l3e_get_pfn(l3e[3])));
             sh_unmap_domain_page(l3e);
+            shadow_free(d, m3mfn);
         }
-        shadow_free(d, m3mfn);
         sh_unmap_domain_page(l4e);
     }
 #elif CONFIG_PAGING_LEVELS == 3
@@ -3222,28 +3253,33 @@ sh_update_linear_entries(struct vcpu *v)
 
     if ( shadow_mode_external(d) )
     {
-        /* Install copies of the shadow l3es into the monitor l3 table.
-         * The monitor l3 table is hooked into slot 0 of the monitor
-         * l4 table, so we use l3 linear indices 0 to 3 */
+        /* Install copies of the shadow l3es into the monitor l2 table
+         * that maps SH_LINEAR_PT_VIRT_START. */
         shadow_l3e_t *sl3e;
-        l3_pgentry_t *ml3e;
-        mfn_t l3mfn;
+        l2_pgentry_t *ml2e;
         int i;
 
         /* Use linear mappings if we can; otherwise make new mappings */
-        if ( v == current ) 
-        {
-            ml3e = __linear_l3_table;
-            l3mfn = _mfn(l4e_get_pfn(__linear_l4_table[0]));
-        }
+        if ( v == current )
+            ml2e = __linear_l2_table
+                + l2_linear_offset(SH_LINEAR_PT_VIRT_START);
         else 
         {   
+            mfn_t l3mfn, l2mfn;
             l4_pgentry_t *ml4e;
+            l3_pgentry_t *ml3e;
+            int linear_slot = shadow_l4_table_offset(SH_LINEAR_PT_VIRT_START);
             ml4e = sh_map_domain_page(pagetable_get_mfn(v->arch.monitor_table));
-            ASSERT(l4e_get_flags(ml4e[0]) & _PAGE_PRESENT);
-            l3mfn = _mfn(l4e_get_pfn(ml4e[0]));
+
+            ASSERT(l4e_get_flags(ml4e[linear_slot]) & _PAGE_PRESENT);
+            l3mfn = _mfn(l4e_get_pfn(ml4e[linear_slot]));
             ml3e = sh_map_domain_page(l3mfn);
             sh_unmap_domain_page(ml4e);
+
+            ASSERT(l3e_get_flags(ml3e[0]) & _PAGE_PRESENT);
+            l2mfn = _mfn(l3e_get_pfn(ml3e[0]));
+            ml2e = sh_map_domain_page(l2mfn);
+            sh_unmap_domain_page(ml3e);
         }
 
         /* Shadow l3 tables are made up by sh_update_cr3 */
@@ -3251,15 +3287,15 @@ sh_update_linear_entries(struct vcpu *v)
 
         for ( i = 0; i < SHADOW_L3_PAGETABLE_ENTRIES; i++ )
         {
-            ml3e[i] = 
+            ml2e[i] = 
                 (shadow_l3e_get_flags(sl3e[i]) & _PAGE_PRESENT) 
-                ? l3e_from_pfn(mfn_x(shadow_l3e_get_mfn(sl3e[i])), 
+                ? l2e_from_pfn(mfn_x(shadow_l3e_get_mfn(sl3e[i])),
                                __PAGE_HYPERVISOR) 
-                : l3e_empty();
+                : l2e_empty();
         }
 
         if ( v != current ) 
-            sh_unmap_domain_page(ml3e);
+            sh_unmap_domain_page(ml2e);
     }
     else
         domain_crash(d); /* XXX */
@@ -4180,15 +4216,12 @@ sh_x86_emulate_write(struct vcpu *v, unsigned long vaddr, void *src,
     if ( (vaddr & (bytes - 1)) && !is_hvm_vcpu(v)  )
         return X86EMUL_UNHANDLEABLE;
 
-    shadow_lock(v->domain);
     addr = emulate_map_dest(v, vaddr, bytes, sh_ctxt);
     if ( emulate_map_dest_failed(addr) )
-    {
-        shadow_unlock(v->domain);
         return ((addr == MAPPING_EXCEPTION) ?
                 X86EMUL_EXCEPTION : X86EMUL_UNHANDLEABLE);
-    }
 
+    shadow_lock(v->domain);
     memcpy(addr, src, bytes);
 
     emulate_unmap_dest(v, addr, bytes, sh_ctxt);
@@ -4210,16 +4243,12 @@ sh_x86_emulate_cmpxchg(struct vcpu *v, unsigned long vaddr,
     if ( (vaddr & (bytes - 1)) && !is_hvm_vcpu(v)  )
         return X86EMUL_UNHANDLEABLE;
 
-    shadow_lock(v->domain);
-
     addr = emulate_map_dest(v, vaddr, bytes, sh_ctxt);
     if ( emulate_map_dest_failed(addr) )
-    {
-        shadow_unlock(v->domain);
         return ((addr == MAPPING_EXCEPTION) ?
                 X86EMUL_EXCEPTION : X86EMUL_UNHANDLEABLE);
-    }
 
+    shadow_lock(v->domain);
     switch ( bytes )
     {
     case 1: prev = cmpxchg(((u8 *)addr), old, new);  break;
@@ -4258,18 +4287,15 @@ sh_x86_emulate_cmpxchg8b(struct vcpu *v, unsigned long vaddr,
     if ( (vaddr & 7) && !is_hvm_vcpu(v) )
         return X86EMUL_UNHANDLEABLE;
 
-    shadow_lock(v->domain);
-
     addr = emulate_map_dest(v, vaddr, 8, sh_ctxt);
     if ( emulate_map_dest_failed(addr) )
-    {
-        shadow_unlock(v->domain);
         return ((addr == MAPPING_EXCEPTION) ?
                 X86EMUL_EXCEPTION : X86EMUL_UNHANDLEABLE);
-    }
 
     old = (((u64) old_hi) << 32) | (u64) old_lo;
     new = (((u64) new_hi) << 32) | (u64) new_lo;
+
+    shadow_lock(v->domain);
     prev = cmpxchg(((u64 *)addr), old, new);
 
     if ( prev != old )

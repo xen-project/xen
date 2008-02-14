@@ -255,8 +255,21 @@ set_p2m_entry(struct domain *d, unsigned long gfn, mfn_t mfn, p2m_type_t p2mt)
     /* level 1 entry */
     paging_write_p2m_entry(d, gfn, p2m_entry, table_mfn, entry_content, 1);
 
-    if ( vtd_enabled && (p2mt == p2m_mmio_direct) && is_hvm_domain(d) )
-        iommu_flush(d, gfn, (u64*)p2m_entry);
+    if ( iommu_enabled && is_hvm_domain(d) )
+    {
+        if ( boot_cpu_data.x86_vendor == X86_VENDOR_INTEL )
+        {
+            if ( (p2mt == p2m_mmio_direct) )
+                iommu_flush(d, gfn, (u64*)p2m_entry);
+        }
+        else if ( boot_cpu_data.x86_vendor == X86_VENDOR_AMD )
+        {
+            if ( p2mt == p2m_ram_rw )
+                iommu_map_page(d, gfn, mfn_x(mfn));
+            else
+                iommu_unmap_page(d, gfn);
+        }
+    }
 
     /* Success */
     rv = 1;
@@ -486,6 +499,7 @@ static void audit_p2m(struct domain *d)
     mfn_t p2mfn;
     unsigned long orphans_d = 0, orphans_i = 0, mpbad = 0, pmbad = 0;
     int test_linear;
+    p2m_type_t type;
 
     if ( !paging_mode_translate(d) )
         return;
@@ -534,7 +548,7 @@ static void audit_p2m(struct domain *d)
             continue;
         }
 
-        p2mfn = gfn_to_mfn_foreign(d, gfn);
+        p2mfn = gfn_to_mfn_foreign(d, gfn, &type);
         if ( mfn_x(p2mfn) != mfn )
         {
             mpbad++;
@@ -547,12 +561,12 @@ static void audit_p2m(struct domain *d)
             /* This m2p entry is stale: the domain has another frame in
              * this physical slot.  No great disaster, but for neatness,
              * blow away the m2p entry. */
-            set_gpfn_from_mfn(mfn, INVALID_M2P_ENTRY, __PAGE_HYPERVISOR|_PAGE_USER);
+            set_gpfn_from_mfn(mfn, INVALID_M2P_ENTRY);
         }
 
         if ( test_linear && (gfn <= d->arch.p2m.max_mapped_pfn) )
         {
-            lp2mfn = mfn_x(gfn_to_mfn_current(gfn));
+            lp2mfn = mfn_x(gfn_to_mfn_current(gfn, &type));
             if ( lp2mfn != mfn_x(p2mfn) )
             {
                 P2M_PRINTK("linear mismatch gfn %#lx -> mfn %#lx "

@@ -36,7 +36,9 @@
 #ifndef _LIB_CONSOLE_H_
 #define _LIB_CONSOLE_H_
 
+#include<os.h>
 #include<traps.h>
+#include<stdarg.h>
 
 void print(int direct, const char *fmt, va_list args);
 void printk(const char *fmt, ...);
@@ -48,5 +50,6 @@ void xencons_rx(char *buf, unsigned len, struct pt_regs *regs);
 void xencons_tx(void);
 
 void init_console(void);
+void console_print(char *data, int length);
 
 #endif /* _LIB_CONSOLE_H_ */

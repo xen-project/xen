@@ -61,10 +61,11 @@ unsigned int guest_width;
 
 #define mfn_to_pfn(_mfn)  (live_m2p[(_mfn)])
 
-#define pfn_to_mfn(_pfn)                                \
-  ((xen_pfn_t) ((guest_width==8)                       \
-                ? (((uint64_t *)live_p2m)[(_pfn)])      \
-                : (((uint32_t *)live_p2m)[(_pfn)])))
+#define pfn_to_mfn(_pfn)                                            \
+  ((xen_pfn_t) ((guest_width==8)                                    \
+                ? (((uint64_t *)live_p2m)[(_pfn)])                  \
+                : ((((uint32_t *)live_p2m)[(_pfn)]) == 0xffffffffU  \
+                   ? (-1UL) : (((uint32_t *)live_p2m)[(_pfn)]))))
 
 /*
  * Returns TRUE if the given machine frame number has a unique mapping
@@ -496,10 +497,9 @@ static int canonicalize_pagetable(unsigned long type, unsigned long pfn,
         xen_start = L3_PAGETABLE_ENTRIES_PAE;
 
     /*
-    ** in PAE only the L2 mapping the top 1GB contains Xen mappings.
-    ** We can spot this by looking for the guest linear mapping which
-    ** Xen always ensures is present in that L2. Guests must ensure
-    ** that this check will fail for other L2s.
+    ** In PAE only the L2 mapping the top 1GB contains Xen mappings.
+    ** We can spot this by looking for the guest's mappingof the m2p.
+    ** Guests must ensure that this check will fail for other L2s.
     */
     if ( (pt_levels == 3) && (type == XEN_DOMCTL_PFINFO_L2TAB) )
     {
@@ -555,7 +555,13 @@ static int canonicalize_pagetable(unsigned long type, unsigned long pfn,
                 /* This will happen if the type info is stale which
                    is quite feasible under live migration */
                 pfn  = 0;  /* zap it - we'll retransmit this page later */
-                race = 1;  /* inform the caller of race; fatal if !live */ 
+                /* XXX: We can't spot Xen mappings in compat-mode L2es 
+                 * from 64-bit tools, but the only thing in them is the
+                 * compat m2p, so we quietly zap them.  This doesn't
+                 * count as a race, so don't report it. */
+                if ( !(type == XEN_DOMCTL_PFINFO_L2TAB 
+                       && sizeof (unsigned long) > guest_width) )
+                     race = 1;  /* inform the caller; fatal if !live */ 
             }
             else
                 pfn = mfn_to_pfn(mfn);
@@ -690,7 +696,7 @@ static xen_pfn_t *map_and_save_p2m_table(int xc_handle,
             else
                 p2m_frame_list_list[i] = 0;
     else if ( guest_width < sizeof(unsigned long) )
-        for ( i = PAGE_SIZE/sizeof(unsigned long) - 1; i >= 0; i++ )
+        for ( i = PAGE_SIZE/sizeof(unsigned long) - 1; i >= 0; i-- )
             p2m_frame_list_list[i] = ((uint32_t *)p2m_frame_list_list)[i];
 
     live_p2m_frame_list =
@@ -704,19 +710,20 @@ static xen_pfn_t *map_and_save_p2m_table(int xc_handle,
     }
 
     /* Get a local copy of the live_P2M_frame_list */
-    if ( !(p2m_frame_list = malloc(P2M_FL_SIZE)) )
+    if ( !(p2m_frame_list = malloc(P2M_TOOLS_FL_SIZE)) )
     {
         ERROR("Couldn't allocate p2m_frame_list array");
         goto out;
     }
-    memcpy(p2m_frame_list, live_p2m_frame_list, P2M_FL_SIZE);
+    memset(p2m_frame_list, 0, P2M_TOOLS_FL_SIZE);
+    memcpy(p2m_frame_list, live_p2m_frame_list, P2M_GUEST_FL_SIZE);
 
     /* Canonicalize guest's unsigned long vs ours */
     if ( guest_width > sizeof(unsigned long) )
         for ( i = 0; i < P2M_FL_ENTRIES; i++ )
             p2m_frame_list[i] = ((uint64_t *)p2m_frame_list)[i];
     else if ( guest_width < sizeof(unsigned long) )
-        for ( i = P2M_FL_ENTRIES - 1; i >= 0; i++ )
+        for ( i = P2M_FL_ENTRIES - 1; i >= 0; i-- )
             p2m_frame_list[i] = ((uint32_t *)p2m_frame_list)[i];
 
 
@@ -1559,31 +1566,26 @@ int xc_domain_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
         }
 
         /* Canonicalise the page table base pointer. */
-        if ( !MFN_IS_IN_PSEUDOPHYS_MAP(xen_cr3_to_pfn(
-                                          GET_FIELD(&ctxt, ctrlreg[3]))) )
+        if ( !MFN_IS_IN_PSEUDOPHYS_MAP(UNFOLD_CR3(
+                                           GET_FIELD(&ctxt, ctrlreg[3]))) )
         {
             ERROR("PT base is not in range of pseudophys map");
             goto out;
         }
         SET_FIELD(&ctxt, ctrlreg[3], 
-            xen_pfn_to_cr3(
-                mfn_to_pfn(
-                    xen_cr3_to_pfn(
-                        GET_FIELD(&ctxt, ctrlreg[3])))));
+            FOLD_CR3(mfn_to_pfn(UNFOLD_CR3(GET_FIELD(&ctxt, ctrlreg[3])))));
 
         /* Guest pagetable (x86/64) stored in otherwise-unused CR1. */
         if ( (pt_levels == 4) && ctxt.x64.ctrlreg[1] )
         {
-            if ( !MFN_IS_IN_PSEUDOPHYS_MAP(
-                     xen_cr3_to_pfn(ctxt.x64.ctrlreg[1])) )
+            if ( !MFN_IS_IN_PSEUDOPHYS_MAP(UNFOLD_CR3(ctxt.x64.ctrlreg[1])) )
             {
                 ERROR("PT base is not in range of pseudophys map");
                 goto out;
             }
             /* Least-significant bit means 'valid PFN'. */
             ctxt.x64.ctrlreg[1] = 1 |
-                xen_pfn_to_cr3(
-                    mfn_to_pfn(xen_cr3_to_pfn(ctxt.x64.ctrlreg[1])));
+                FOLD_CR3(mfn_to_pfn(UNFOLD_CR3(ctxt.x64.ctrlreg[1])));
         }
 
         if ( write_exact(io_fd, &ctxt, ((guest_width==8) 

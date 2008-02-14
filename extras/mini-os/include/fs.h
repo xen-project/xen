@@ -22,6 +22,7 @@ struct fs_import
     struct semaphore reqs_sem;      /* Accounts requests resource           */
 };
 
+extern struct fs_import *fs_import;
 
 void init_fs_frontend(void);
 

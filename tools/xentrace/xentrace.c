@@ -23,6 +23,7 @@
 #include <string.h>
 #include <getopt.h>
 #include <assert.h>
+#include <sys/poll.h>
 
 #include <xen/xen.h>
 #include <xen/trace.h>
@@ -40,9 +41,6 @@ do {                                                            \
 
 /***** Compile time configuration of defaults ********************************/
 
-/* when we've got more records than this waiting, we log it to the output */
-#define NEW_DATA_THRESH 1
-
 /* sleep for this long (milliseconds) between checking the trace buffers */
 #define POLL_SLEEP_MILLIS 100
 
@@ -51,8 +49,7 @@ do {                                                            \
 
 typedef struct settings_st {
     char *outfile;
-    struct timespec poll_sleep;
-    unsigned long new_data_thresh;
+    unsigned long poll_sleep; /* milliseconds to sleep between polls */
     uint32_t evt_mask;
     uint32_t cpu_mask;
     unsigned long tbuf_size;
@@ -63,23 +60,13 @@ settings_t opts;
 
 int interrupted = 0; /* gets set if we get a SIGHUP */
 
+static int xc_handle = -1;
+static int event_fd = -1;
+static int virq_port = -1;
+
 void close_handler(int signal)
 {
     interrupted = 1;
-}
-
-/**
- * millis_to_timespec - convert a time in milliseconds to a struct timespec
- * @millis:             time interval in milliseconds
- */
-struct timespec millis_to_timespec(unsigned long millis)
-{
-    struct timespec spec;
-    
-    spec.tv_sec = millis / 1000;
-    spec.tv_nsec = (millis % 1000) * 1000;
-
-    return spec;
 }
 
 /**
@@ -143,13 +130,7 @@ void write_buffer(unsigned int cpu, unsigned char *start, int size,
 
 static void get_tbufs(unsigned long *mfn, unsigned long *size)
 {
-    int xc_handle = xc_interface_open();
     int ret;
-
-    if ( xc_handle < 0 ) 
-    {
-        exit(EXIT_FAILURE);
-    }
 
     if(!opts.tbuf_size)
       opts.tbuf_size = DEFAULT_TBUF_SIZE;
@@ -161,8 +142,6 @@ static void get_tbufs(unsigned long *mfn, unsigned long *size)
         perror("Couldn't enable trace buffers");
         exit(1);
     }
-
-    xc_interface_close(xc_handle);
 }
 
 /**
@@ -176,21 +155,11 @@ static void get_tbufs(unsigned long *mfn, unsigned long *size)
 struct t_buf *map_tbufs(unsigned long tbufs_mfn, unsigned int num,
                         unsigned long size)
 {
-    int xc_handle;
     struct t_buf *tbufs_mapped;
-
-    xc_handle = xc_interface_open();
-
-    if ( xc_handle < 0 ) 
-    {
-        exit(EXIT_FAILURE);
-    }
 
     tbufs_mapped = xc_map_foreign_range(xc_handle, DOMID_XEN,
                                         size * num, PROT_READ | PROT_WRITE,
                                         tbufs_mfn);
-
-    xc_interface_close(xc_handle);
 
     if ( tbufs_mapped == 0 ) 
     {
@@ -210,7 +179,6 @@ struct t_buf *map_tbufs(unsigned long tbufs_mfn, unsigned int num,
 void set_mask(uint32_t mask, int type)
 {
     int ret = 0;
-    int xc_handle = xc_interface_open(); /* for accessing control interface */
 
     if (type == 1) {
         ret = xc_tbuf_set_cpu_mask(xc_handle, mask);
@@ -219,8 +187,6 @@ void set_mask(uint32_t mask, int type)
         ret = xc_tbuf_set_evt_mask(xc_handle, mask);
         fprintf(stderr, "change evtmask to 0x%x\n", mask);
     }
-
-    xc_interface_close(xc_handle);
 
     if ( ret != 0 )
     {
@@ -295,7 +261,6 @@ unsigned char **init_rec_ptrs(struct t_buf **meta, unsigned int num)
 unsigned int get_num_cpus(void)
 {
     xc_physinfo_t physinfo = { 0 };
-    int xc_handle = xc_interface_open();
     int ret;
     
     ret = xc_physinfo(xc_handle, &physinfo);
@@ -306,9 +271,68 @@ unsigned int get_num_cpus(void)
         exit(EXIT_FAILURE);
     }
 
-    xc_interface_close(xc_handle);
-
     return physinfo.nr_cpus;
+}
+
+/**
+ * event_init - setup to receive the VIRQ_TBUF event
+ */
+void event_init(void)
+{
+    int rc;
+
+    rc = xc_evtchn_open();
+    if (rc < 0) {
+        perror(xc_get_last_error()->message);
+        exit(EXIT_FAILURE);
+    }
+    event_fd = rc;
+
+    rc = xc_evtchn_bind_virq(event_fd, VIRQ_TBUF);
+    if (rc == -1) {
+        PERROR("failed to bind to VIRQ port");
+        exit(EXIT_FAILURE);
+    }
+    virq_port = rc;
+}
+
+/**
+ * wait_for_event_or_timeout - sleep for the specified number of milliseconds,
+ *                             or until an VIRQ_TBUF event occurs
+ */
+void wait_for_event_or_timeout(unsigned long milliseconds)
+{
+    int rc;
+    struct pollfd fd = { .fd = event_fd,
+                         .events = POLLIN | POLLERR };
+    int port;
+
+    rc = poll(&fd, 1, milliseconds);
+    if (rc == -1) {
+        if (errno == EINTR)
+            return;
+        PERROR("poll exitted with an error");
+        exit(EXIT_FAILURE);
+    }
+
+    if (rc == 1) {
+        port = xc_evtchn_pending(event_fd);
+        if (port == -1) {
+            PERROR("failed to read port from evtchn");
+            exit(EXIT_FAILURE);
+        }
+        if (port != virq_port) {
+            fprintf(stderr,
+                    "unexpected port returned from evtchn (got %d vs expected %d)\n",
+                    port, virq_port);
+            exit(EXIT_FAILURE);
+        }
+        rc = xc_evtchn_unmask(event_fd, port);
+        if (rc == -1) {
+            PERROR("failed to write port to evtchn");
+            exit(EXIT_FAILURE);
+        }
+    }
 }
 
 
@@ -329,6 +353,9 @@ int monitor_tbufs(int outfd)
     unsigned long size;          /* size of a single trace buffer            */
 
     unsigned long data_size;
+
+    /* prepare to listen for VIRQ_TBUF */
+    event_init();
 
     /* get number of logical CPUs (and therefore number of trace buffers) */
     num = get_num_cpus();
@@ -357,14 +384,23 @@ int monitor_tbufs(int outfd)
             /* Read window information only once. */
             cons = meta[i]->cons;
             prod = meta[i]->prod;
-            rmb(); /* read prod, then read item. */
-            
+            xen_rmb(); /* read prod, then read item. */
+
             if ( cons == prod )
                 continue;
            
-            assert(prod > cons);
+            assert(cons < 2*data_size);
+            assert(prod < 2*data_size);
 
-            window_size = prod - cons;
+            // NB: if (prod<cons), then (prod-cons)%data_size will not yield
+            // the correct answer because data_size is not a power of 2.
+            if ( prod < cons )
+                window_size = (prod + 2*data_size) - cons;
+            else
+                window_size = prod - cons;
+            assert(window_size > 0);
+            assert(window_size <= data_size);
+
             start_offset = cons % data_size;
             end_offset = prod % data_size;
 
@@ -392,11 +428,11 @@ int monitor_tbufs(int outfd)
                              outfd);
             }
 
-            mb(); /* read buffer, then update cons. */
+            xen_mb(); /* read buffer, then update cons. */
             meta[i]->cons = prod;
         }
 
-        nanosleep(&opts.poll_sleep, NULL);
+        wait_for_event_or_timeout(opts.poll_sleep);
     }
 
     /* cleanup */
@@ -416,7 +452,7 @@ int monitor_tbufs(int outfd)
 #define xstr(x) str(x)
 #define str(x) #x
 
-const char *program_version     = "xentrace v1.1";
+const char *program_version     = "xentrace v1.2";
 const char *program_bug_address = "<mark.a.williamson@intel.com>";
 
 void usage(void)
@@ -435,9 +471,6 @@ void usage(void)
 "                          N.B. that the trace buffer cannot be resized.\n" \
 "                          if it has already been set this boot cycle,\n" \
 "                          this argument will be ignored.\n" \
-"  -t, --log-thresh=l      Set number, l, of new records required to\n" \
-"                          trigger a write to output (default " \
-                           xstr(NEW_DATA_THRESH) ").\n" \
 "  -?, --help              Show this message\n" \
 "  -V, --version           Print program version\n" \
 "\n" \
@@ -516,12 +549,8 @@ void parse_args(int argc, char **argv)
     {
         switch ( option )
         {
-        case 't': /* set new records threshold for logging */
-            opts.new_data_thresh = argtol(optarg, 0);
-            break;
-
         case 's': /* set sleep time (given in milliseconds) */
-            opts.poll_sleep = millis_to_timespec(argtol(optarg, 0));
+            opts.poll_sleep = argtol(optarg, 0);
             break;
 
         case 'c': /* set new cpu mask for filtering*/
@@ -565,13 +594,19 @@ int main(int argc, char **argv)
     struct sigaction act;
 
     opts.outfile = 0;
-    opts.poll_sleep = millis_to_timespec(POLL_SLEEP_MILLIS);
-    opts.new_data_thresh = NEW_DATA_THRESH;
+    opts.poll_sleep = POLL_SLEEP_MILLIS;
     opts.evt_mask = 0;
     opts.cpu_mask = 0;
 
     parse_args(argc, argv);
-    
+
+    xc_handle = xc_interface_open();
+    if ( xc_handle < 0 ) 
+    {
+        perror(xc_get_last_error()->message);
+        exit(EXIT_FAILURE);
+    }
+
     if ( opts.evt_mask != 0 )
         set_mask(opts.evt_mask, 0);
 

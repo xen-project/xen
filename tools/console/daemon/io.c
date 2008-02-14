@@ -60,6 +60,8 @@
 extern int log_reload;
 extern int log_guest;
 extern int log_hv;
+extern int log_time_hv;
+extern int log_time_guest;
 extern char *log_dir;
 
 static int log_hv_fd = -1;
@@ -99,6 +101,50 @@ struct domain
 
 static struct domain *dom_head;
 
+static int write_all(int fd, const char* buf, size_t len)
+{
+	while (len) {
+		ssize_t ret = write(fd, buf, len);
+		if (ret == -1 && errno == EINTR)
+			continue;
+		if (ret <= 0)
+			return -1;
+		len -= ret;
+		buf += ret;
+	}
+
+	return 0;
+}
+
+static int write_with_timestamp(int fd, const char *data, size_t sz)
+{
+	char buf[sz+1];
+	char ts[32];
+	time_t now = time(NULL);
+	const struct tm *tmnow = localtime(&now);
+	size_t tslen = strftime(ts, sizeof(ts), "[%d-%m-%Y %H:%M:%S] ", tmnow);
+
+	memcpy(buf, data, sz);
+	while (sz > 0 && buf[sz-1] == '\r')
+		sz--;		    // Don't print trailing \r's
+	if (sz > 0 && buf[sz-1] != '\n')
+		buf[sz++] = '\n';   // Force ending newline
+	data = buf;
+
+	while (sz > 0) {
+		const char *nl = strchr(data, '\n') + 1;
+		size_t towrite = nl - data;
+		if (write_all(fd, ts, tslen) < 0)
+			return -1;
+		if (write_all(fd, data, towrite))
+			return -1;
+		sz -= towrite;
+		data = nl;
+	}
+
+	return 0;
+}
+
 static void buffer_append(struct domain *dom)
 {
 	struct buffer *buffer = &dom->buffer;
@@ -107,7 +153,7 @@ static void buffer_append(struct domain *dom)
 
 	cons = intf->out_cons;
 	prod = intf->out_prod;
-	mb();
+	xen_mb();
 
 	size = prod - cons;
 	if ((size == 0) || (size > sizeof(intf->out)))
@@ -126,7 +172,7 @@ static void buffer_append(struct domain *dom)
 		buffer->data[buffer->size++] = intf->out[
 			MASK_XENCONS_IDX(cons++, intf->out)];
 
-	mb();
+	xen_mb();
 	intf->out_cons = cons;
 	xc_evtchn_notify(dom->xce_handle, dom->local_port);
 
@@ -135,10 +181,13 @@ static void buffer_append(struct domain *dom)
 	 * and handle_tty_write will stop being called.
 	 */
 	if (dom->log_fd != -1) {
-		int len = write(dom->log_fd,
-				buffer->data + buffer->size - size,
-				size);
-		if (len < 0)
+		int logret;
+		if (log_time_guest) {
+			logret = write_with_timestamp(dom->log_fd, buffer->data + buffer->size - size, size);
+		} else {
+			logret = write_all(dom->log_fd, buffer->data + buffer->size - size, size);
+        }
+		if (logret < 0)
 			dolog(LOG_ERR, "Write to log failed on domain %d: %d (%s)\n",
 			      dom->domid, errno, strerror(errno));
 	}
@@ -195,6 +244,15 @@ static int create_hv_log(void)
 	if (fd == -1)
 		dolog(LOG_ERR, "Failed to open log %s: %d (%s)",
 		      logfile, errno, strerror(errno));
+	if (fd != -1 && log_time_hv) {
+		if (write_with_timestamp(fd, "Logfile Opened",
+					 strlen("Logfile Opened")) < 0) {
+			dolog(LOG_ERR, "Failed to log opening timestamp "
+				       "in %s: %d (%s)", logfile, errno,
+				       strerror(errno));
+			return -1;
+		}
+	}
 	return fd;
 }
 
@@ -229,6 +287,15 @@ static int create_domain_log(struct domain *dom)
 	if (fd == -1)
 		dolog(LOG_ERR, "Failed to open log %s: %d (%s)",
 		      logfile, errno, strerror(errno));
+	if (fd != -1 && log_time_guest) {
+		if (write_with_timestamp(fd, "Logfile Opened",
+					 strlen("Logfile Opened")) < 0) {
+			dolog(LOG_ERR, "Failed to log opening timestamp "
+				       "in %s: %d (%s)", logfile, errno,
+				       strerror(errno));
+			return -1;
+		}
+	}
 	return fd;
 }
 
@@ -683,7 +750,7 @@ static int ring_free_bytes(struct domain *dom)
 
 	cons = intf->in_cons;
 	prod = intf->in_prod;
-	mb();
+	xen_mb();
 
 	space = prod - cons;
 	if (space > sizeof(intf->in))
@@ -730,7 +797,7 @@ static void handle_tty_read(struct domain *dom)
 			intf->in[MASK_XENCONS_IDX(prod++, intf->in)] =
 				msg[i];
 		}
-		wmb();
+		xen_wmb();
 		intf->in_prod = prod;
 		xc_evtchn_notify(dom->xce_handle, dom->local_port);
 	} else {
@@ -817,11 +884,16 @@ static void handle_hv_logs(void)
 	if ((port = xc_evtchn_pending(xce_handle)) == -1)
 		return;
 
-	if (xc_readconsolering(xc_handle, &bufptr, &size, 0, 1, &index) == 0) {
-		int len = write(log_hv_fd, buffer, size);
-		if (len < 0)
-			dolog(LOG_ERR, "Failed to write hypervisor log: %d (%s)",
-			      errno, strerror(errno));
+	if (xc_readconsolering(xc_handle, &bufptr, &size, 0, 1, &index) == 0 && size > 0) {
+		int logret;
+		if (log_time_guest)
+			logret = write_with_timestamp(log_hv_fd, buffer, size);
+		else
+			logret = write_all(log_hv_fd, buffer, size);
+
+		if (logret < 0)
+			dolog(LOG_ERR, "Failed to write hypervisor log: "
+				       "%d (%s)", errno, strerror(errno));
 	}
 
 	(void)xc_evtchn_unmask(xce_handle, port);

@@ -46,8 +46,6 @@
 #define DEFINE_MUTEX(_m) DEFINE_SPINLOCK(_m)
 #define mutex_lock(_m) spin_lock(_m)
 #define mutex_unlock(_m) spin_unlock(_m)
-#define lock_cpu_hotplug() ((void)0)
-#define unlock_cpu_hotplug() ((void)0)
 #define dump_stack() ((void)0)
 #define	get_cpu()	smp_processor_id()
 #define put_cpu()	do {} while(0)

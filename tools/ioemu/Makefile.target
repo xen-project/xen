@@ -15,7 +15,7 @@ TARGET_BASE_ARCH:=sparc
 endif
 TARGET_PATH=$(SRC_PATH)/target-$(TARGET_BASE_ARCH)$(TARGET_SUB)
 VPATH=$(SRC_PATH):$(TARGET_PATH):$(SRC_PATH)/hw:$(SRC_PATH)/audio
-CPPFLAGS=-I. -I.. -I$(TARGET_PATH) -I$(SRC_PATH)
+CPPFLAGS+=-I. -I.. -I$(TARGET_PATH) -I$(SRC_PATH)
 CPPFLAGS+= -I$(XEN_ROOT)/tools/libxc
 CPPFLAGS+= -I$(XEN_ROOT)/tools/xenstore
 CPPFLAGS+= -I$(XEN_ROOT)/tools/include
@@ -66,7 +66,11 @@ else
 QEMU_SYSTEM=qemu-fast
 endif
 
+ifdef CONFIG_STUBDOM
+QEMU_SYSTEM=qemu.a
+else
 QEMU_SYSTEM=qemu-dm
+endif
 
 ifdef CONFIG_USER_ONLY
 PROGS=$(QEMU_USER)
@@ -345,14 +349,25 @@ VL_OBJS=vl.o osdep.o readline.o monitor.o pci.o console.o isa_mmio.o
 VL_OBJS+=cutils.o
 VL_OBJS+=block.o block-raw.o
 VL_OBJS+=block-cow.o block-qcow.o aes.o block-vmdk.o block-cloop.o block-dmg.o block-bochs.o block-vpc.o block-vvfat.o block-qcow2.o
+ifdef CONFIG_STUBDOM
+VL_OBJS+=block-vbd.o
+endif
 ifdef CONFIG_WIN32
 VL_OBJS+=tap-win32.o
 endif
 
-ifeq (,$(wildcard /usr/include/pci))
+ifdef CONFIG_STUBDOM
+CONFIG_PASSTHROUGH=1
+else
+  ifeq (,$(wildcard /usr/include/pci))
 $(warning *** pciutils-devl package not found - missing /usr/include/pci)
 $(warning *** PCI passthrough capability has been disabled)
-else
+  else
+CONFIG_PASSTHROUGH=1
+  endif
+endif
+
+ifdef CONFIG_PASSTHROUGH
 LIBS+=-lpci
 VL_OBJS+= pass-through.o
 CFLAGS += -DCONFIG_PASSTHROUGH
@@ -404,13 +419,13 @@ VL_OBJS+= ne2000.o rtl8139.o pcnet.o e100.o
 
 ifeq ($(TARGET_BASE_ARCH), i386)
 # Hardware support
-VL_OBJS+= ide.o pckbd.o ps2.o vga.o $(SOUND_HW) dma.o $(AUDIODRV) extboot.o
+VL_OBJS+= ide.o pckbd.o ps2.o vga.o dma.o extboot.o
 ifeq ($(ARCH),ia64)
 VL_OBJS+= fdc.o mc146818rtc.o serial.o pc.o
 else
 VL_OBJS+= fdc.o serial.o pc.o
 endif
-VL_OBJS+= cirrus_vga.o mixeng.o parallel.o acpi.o
+VL_OBJS+= cirrus_vga.o parallel.o acpi.o
 VL_OBJS+= usb-uhci.o smbus_eeprom.o
 VL_OBJS+= piix4acpi.o
 VL_OBJS+= xenstore.o
@@ -419,21 +434,31 @@ VL_OBJS+= xen_machine_fv.o
 VL_OBJS+= xen_machine_pv.o
 VL_OBJS+= xenfb.o
 VL_OBJS+= xen_console.o
+ifndef CONFIG_STUBDOM
 VL_OBJS+= tpm_tis.o
+VL_OBJS+= $(SOUND_HW) $(AUDIODRV) mixeng.o 
+CPPFLAGS += -DHAS_TPM
 CPPFLAGS += -DHAS_AUDIO
 endif
+endif
 ifeq ($(TARGET_BASE_ARCH), ppc)
-VL_OBJS+= ppc.o ide.o pckbd.o ps2.o vga.o $(SOUND_HW) dma.o $(AUDIODRV)
+VL_OBJS+= ppc.o ide.o pckbd.o ps2.o vga.o dma.o
 VL_OBJS+= mc146818rtc.o serial.o i8259.o i8254.o fdc.o m48t59.o
 VL_OBJS+= ppc_prep.o ppc_chrp.o cuda.o adb.o openpic.o heathrow_pic.o mixeng.o
 VL_OBJS+= grackle_pci.o prep_pci.o unin_pci.o
+ifndef CONFIG_STUBDOM
+VL_OBJS+= $(SOUND_HW) $(AUDIODRV) 
 CPPFLAGS += -DHAS_AUDIO
+endif
 endif
 ifeq ($(TARGET_ARCH), mips)
 VL_OBJS+= mips_r4k.o mips_malta.o mips_timer.o mips_int.o dma.o vga.o serial.o i8254.o i8259.o
 VL_OBJS+= ide.o gt64xxx.o pckbd.o ps2.o fdc.o mc146818rtc.o usb-uhci.o acpi.o
-VL_OBJS+= piix_pci.o parallel.o mixeng.o cirrus_vga.o $(SOUND_HW) $(AUDIODRV)
+VL_OBJS+= piix_pci.o parallel.o mixeng.o cirrus_vga.o
+ifndef CONFIG_STUBDOM
+VL_OBJS+= $(SOUND_HW) $(AUDIODRV) 
 DEFINES += -DHAS_AUDIO
+endif
 endif
 ifeq ($(TARGET_BASE_ARCH), sparc)
 ifeq ($(TARGET_ARCH), sparc64)
@@ -512,7 +537,11 @@ SDL_LIBS := $(filter-out -mwindows, $(SDL_LIBS)) -mconsole
 endif
 
 $(QEMU_SYSTEM): $(VL_OBJS) libqemu.a
+ifdef CONFIG_STUBDOM
+	$(AR) rcs $@ $(VL_OBJS)
+else
 	$(CC) $(VL_LDFLAGS) -o $@ $^ $(LIBS) $(SDL_LIBS) $(COCOA_LIBS) $(VL_LIBS)
+endif
 
 cocoa.o: cocoa.m
 	$(CC) $(CFLAGS) $(CPPFLAGS) $(BASE_CFLAGS) -c -o $@ $<

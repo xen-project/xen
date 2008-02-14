@@ -25,7 +25,9 @@
 #include "block_int.h"
 #include <assert.h>
 #ifndef _WIN32
+#ifndef NO_AIO
 #include <aio.h>
+#endif
 
 #ifndef QEMU_TOOL
 #include "exec-all.h"
@@ -167,10 +169,16 @@ static int raw_pread(BlockDriverState *bs, int64_t offset,
     }
     s->lseek_err_cnt=0;
 
-    ret = read(s->fd, buf, count);
-    if (ret == count) 
-        goto label__raw_read__success;
+    uint64_t done;
+    for (done = 0; done < count; done += ret) {
+	ret = read(s->fd, buf + done, count - done);
+	if (ret == -1) 
+	    goto label__raw_read__error;
+    }
+    ret = count;
+    goto label__raw_read__success;
     
+label__raw_read__error:
     DEBUG_BLOCK_PRINT("raw_read(%d:%s, %" PRId64 ", %p, %d) [%" PRId64 "] read failed %d : %d = %s\n", 
         s->fd, 
         bs->filename, 
@@ -232,9 +240,16 @@ static int raw_pwrite(BlockDriverState *bs, int64_t offset,
     }
     s->lseek_err_cnt = 0;
 
-    ret = write(s->fd, buf, count);
-    if (ret == count) 
-        goto label__raw_write__success;
+    uint64_t done;
+    for (done = 0; done < count; done += ret) {
+	ret = write(s->fd, buf + done, count - done);
+	if (ret == -1) 
+	    goto label__raw_write__error;
+    }
+    ret = count;
+    goto label__raw_write__success;
+
+label__raw_write__error:
     
     DEBUG_BLOCK_PRINT("raw_write(%d:%s, %" PRId64 ", %p, %d) [%" PRId64 "] write failed %d : %d = %s\n", 
         s->fd, 
@@ -255,6 +270,7 @@ label__raw_write__success:
 /***********************************************************/
 /* Unix AIO using POSIX AIO */
 
+#ifndef NO_AIO
 typedef struct RawAIOCB {
     BlockDriverAIOCB common;
     struct aiocb aiocb;
@@ -480,6 +496,7 @@ static void raw_aio_cancel(BlockDriverAIOCB *blockacb)
         pacb = &acb->next;
     }
 }
+#endif
 
 static void raw_close(BlockDriverState *bs)
 {
@@ -600,10 +617,12 @@ BlockDriver bdrv_raw = {
     raw_create,
     raw_flush,
     
+#ifndef NO_AIO
     .bdrv_aio_read = raw_aio_read,
     .bdrv_aio_write = raw_aio_write,
     .bdrv_aio_cancel = raw_aio_cancel,
     .aiocb_size = sizeof(RawAIOCB),
+#endif
     .protocol_name = "file",
     .bdrv_pread = raw_pread,
     .bdrv_pwrite = raw_pwrite,
@@ -936,10 +955,12 @@ BlockDriver bdrv_host_device = {
     NULL,
     raw_flush,
     
+#ifndef NO_AIO
     .bdrv_aio_read = raw_aio_read,
     .bdrv_aio_write = raw_aio_write,
     .bdrv_aio_cancel = raw_aio_cancel,
     .aiocb_size = sizeof(RawAIOCB),
+#endif
     .bdrv_pread = raw_pread,
     .bdrv_pwrite = raw_pwrite,
     .bdrv_getlength = raw_getlength,

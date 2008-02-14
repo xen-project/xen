@@ -157,16 +157,9 @@ typedef unsigned long pgentry_t;
 #define L4_PROT (_PAGE_PRESENT|_PAGE_RW|_PAGE_ACCESSED|_PAGE_DIRTY|_PAGE_USER)
 #endif /* __i386__ || __x86_64__ */
 
-#ifdef __ASSEMBLY__
-#define PAGE_SIZE       (1 << L1_PAGETABLE_SHIFT)
-#else
-#ifndef CONFIG_X86_PAE
-#define PAGE_SIZE       (1UL << L1_PAGETABLE_SHIFT)
-#else
-#define PAGE_SIZE       (1ULL << L1_PAGETABLE_SHIFT)
-#endif
-#endif
-#define PAGE_SHIFT      L1_PAGETABLE_SHIFT
+#include "arch_limits.h"
+#define PAGE_SIZE       __PAGE_SIZE
+#define PAGE_SHIFT      __PAGE_SHIFT
 #define PAGE_MASK       (~(PAGE_SIZE-1))
 
 #define PFN_UP(x)	(((x) + PAGE_SIZE-1) >> L1_PAGETABLE_SHIFT)
@@ -176,9 +169,6 @@ typedef unsigned long pgentry_t;
 
 /* to align the pointer to the (next) page boundary */
 #define PAGE_ALIGN(addr)        (((addr)+PAGE_SIZE-1)&PAGE_MASK)
-
-#define STACK_SIZE_PAGE_ORDER  1
-#define STACK_SIZE             (PAGE_SIZE * (1 << STACK_SIZE_PAGE_ORDER))
 
 #ifndef __ASSEMBLY__
 /* Definitions for machine and pseudophysical addresses. */
@@ -257,5 +247,11 @@ static __inline__ paddr_t machine_to_phys(maddr_t machine)
 
 #define map_frames(f, n) map_frames_ex(f, n, 1, 0, 1, DOMID_SELF, 0, L1_PROT)
 #define map_zero(n, a) map_frames_ex(&mfn_zero, n, 0, 0, a, DOMID_SELF, 0, L1_PROT_RO)
+#ifndef __ASSEMBLY__
+void do_map_frames(unsigned long addr,
+        unsigned long *f, unsigned long n, unsigned long stride,
+	unsigned long increment, domid_t id, int may_fail, unsigned long prot);
+#endif
+#define do_map_zero(start, n) do_map_frames(start, &mfn_zero, n, 0, 0, DOMID_SELF, 0, L1_PROT_RO)
 
 #endif /* _ARCH_MM_H_ */

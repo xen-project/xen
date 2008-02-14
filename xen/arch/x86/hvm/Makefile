@@ -6,6 +6,7 @@ obj-y += i8254.o
 obj-y += instrlen.o
 obj-y += intercept.o
 obj-y += io.o
+obj-y += iommu.o
 obj-y += irq.o
 obj-y += mtrr.o
 obj-y += platform.o

@@ -14,22 +14,15 @@ else
 __XEN_LINUX_UPDATE =
 endif
 
-# Let XEN_TARGET_ARCH override ARCH.
-ifeq ($(XEN_TARGET_ARCH),x86_32)
-LINUX_ARCH	?= i386
+ifeq ($(XEN_LINUX_NONINTERACTIVE_CONFIG),y)
+__NONINT_CONFIG = yes $$'\n' |
 else
-LINUX_ARCH	?= $(XEN_TARGET_ARCH)
+__NONINT_CONFIG =
 endif
 
 LINUX_DIR     = build-linux-$(LINUX_VER)$(EXTRAVERSION)_$(XEN_TARGET_ARCH)
 
 IMAGE_TARGET ?= vmlinuz
-ifneq ($(XEN_TARGET_ARCH),ia64)
-IMAGE_PATH ?= arch/$(LINUX_ARCH)/boot/$(firstword $(IMAGE_TARGET))
-else
-IMAGE_PATH ?= arch/ia64/hp/sim/boot/vmlinux.gz
-endif
-INSTALL_BOOT_PATH := $(DESTDIR)/boot
 
 LINUX_VER3  := $(LINUX_SERIES).$(word 3, $(subst ., ,$(LINUX_VER)))
 
@@ -37,6 +30,11 @@ LINUX_VER3  := $(LINUX_SERIES).$(word 3, $(subst ., ,$(LINUX_VER)))
 _build: build
 
 include buildconfigs/src.$(XEN_LINUX_SOURCE)
+
+LINUX_ARCH = $$(sh buildconfigs/select-linux-arch $(LINUX_SRCDIR))
+IMAGE_PATH = $$(sh buildconfigs/select-linux-image $(LINUX_DIR) $(LINUX_ARCH) $(IMAGE_TARGET))
+
+INSTALL_BOOT_PATH := $(DESTDIR)/boot
 
 # Default to allowing interface mismatch
 ifndef XEN_LINUX_ALLOW_INTERFACE_MISMATCH
@@ -64,9 +62,9 @@ endif
 	fi
 	$(MAKE) -C $(LINUX_DIR) ARCH=$(LINUX_ARCH) INSTALL_PATH=$(DESTDIR) $(IMAGE_TARGET)
 	mkdir -p $(INSTALL_BOOT_PATH)
-	cp $(LINUX_DIR)/$(IMAGE_PATH) $(INSTALL_BOOT_PATH)/vmlinuz-$(KERNELRELEASE)
-	cp $(LINUX_DIR)/.config $(INSTALL_BOOT_PATH)/config-$(KERNELRELEASE)
-	cp $(LINUX_DIR)/System.map $(INSTALL_BOOT_PATH)/System.map-$(KERNELRELEASE)
+	@cp -v $(IMAGE_PATH) $(INSTALL_BOOT_PATH)/vmlinuz-$(KERNELRELEASE)
+	@cp -v $(LINUX_DIR)/.config $(INSTALL_BOOT_PATH)/config-$(KERNELRELEASE)
+	@cp -v $(LINUX_DIR)/System.map $(INSTALL_BOOT_PATH)/System.map-$(KERNELRELEASE)
 
 $(LINUX_DIR)/include/linux/autoconf.h: CONFIG_FILE=$(CURDIR)/$(LINUX_DIR)/.config
 $(LINUX_DIR)/include/linux/autoconf.h: $(LINUX_SRCDIR)/.valid-src
@@ -102,7 +100,7 @@ endif
 ifneq ($(EXTRAVERSION),)
 	echo "$(EXTRAVERSION)" >$(LINUX_DIR)/localversion-xen
 endif
-	$(MAKE) -C $(LINUX_SRCDIR) ARCH=$(LINUX_ARCH) oldconfig O=$$(/bin/pwd)/$(LINUX_DIR)
+	$(__NONINT_CONFIG) $(MAKE) -C $(LINUX_SRCDIR) ARCH=$(LINUX_ARCH) oldconfig O=$$(/bin/pwd)/$(LINUX_DIR)
 	@set -e ; if [ ! -f $(LINUX_DIR)/Makefile ] ; then \
 	    echo "***********************************"; \
 	    echo "oldconfig did not create a Makefile"; \

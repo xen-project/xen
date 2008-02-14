@@ -641,7 +641,7 @@ static void get_io_request(struct td_state *s)
 	if (!run) return; /*We have received signal to close*/
 
 	rp = info->fe_ring.sring->req_prod; 
-	rmb();
+	xen_rmb();
 	for (j = info->fe_ring.req_cons; j != rp; j++)
 	{
 		int done = 0, start_seg = 0; 

@@ -75,7 +75,7 @@ static void buffer_append(struct domain *dom)
 
 	cons = intf->out_cons;
 	prod = intf->out_prod;
-	mb();
+	xen_mb();
 
 	size = prod - cons;
 	if ((size == 0) || (size > sizeof(intf->out)))
@@ -94,7 +94,7 @@ static void buffer_append(struct domain *dom)
 		buffer->data[buffer->size++] = intf->out[
 			MASK_XENCONS_IDX(cons++, intf->out)];
 
-	mb();
+	xen_mb();
 	intf->out_cons = cons;
 	xc_evtchn_notify(dom->xce_handle, dom->local_port);
 
@@ -289,7 +289,7 @@ static int ring_free_bytes(struct domain *dom)
 
 	cons = intf->in_cons;
 	prod = intf->in_prod;
-	mb();
+	xen_mb();
 
 	space = prod - cons;
 	if (space > sizeof(intf->in))
@@ -322,7 +322,7 @@ static void xencons_receive(void *opaque, const uint8_t *buf, int len)
 		intf->in[MASK_XENCONS_IDX(prod++, intf->in)] =
 			buf[i];
 	}
-	wmb();
+	xen_wmb();
 	intf->in_prod = prod;
 	xc_evtchn_notify(dom->xce_handle, dom->local_port);
 }

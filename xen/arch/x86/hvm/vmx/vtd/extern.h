@@ -23,11 +23,6 @@
 
 #include "dmar.h"
 
-extern int iommu_setup_done;
-extern int vtd2_thurley_enabled;
-extern int vtd2_qinval_enabled;
-
-extern spinlock_t ioapic_lock;
 extern struct qi_ctrl *qi_ctrl;
 extern struct ir_ctrl *ir_ctrl;
 
@@ -37,6 +32,7 @@ void print_vtd_entries(struct domain *d, struct iommu *iommu,
 void pdev_flr(u8 bus, u8 devfn);
 
 int qinval_setup(struct iommu *iommu);
+int intremap_setup(struct iommu *iommu);
 int queue_invalidate_context(struct iommu *iommu,
     u16 did, u16 source_id, u8 function_mask, u8 granu);
 int queue_invalidate_iotlb(struct iommu *iommu,
@@ -46,7 +42,6 @@ int queue_invalidate_iec(struct iommu *iommu,
 int invalidate_sync(struct iommu *iommu);
 int iommu_flush_iec_global(struct iommu *iommu);
 int iommu_flush_iec_index(struct iommu *iommu, u8 im, u16 iidx);
-void gsi_remapping(unsigned int gsi);
 void print_iommu_regs(struct acpi_drhd_unit *drhd);
 int vtd_hw_check(void);
 struct iommu * ioapic_to_iommu(unsigned int apic_id);

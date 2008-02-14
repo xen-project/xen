@@ -198,6 +198,10 @@ gopts.var('pae', val='PAE',
           fn=set_int, default=1,
           use="Disable or enable PAE of HVM domain.")
 
+gopts.var('hpet', val='HPET',
+          fn=set_int, default=0,
+          use="Enable virtual high-precision event timer.")
+
 gopts.var('timer_mode', val='TIMER_MODE',
           fn=set_int, default=0,
           use="""Timer mode (0=delay virtual time when ticks are missed;
@@ -740,7 +744,7 @@ def configure_hvm(config_image, vals):
              'localtime', 'serial', 'stdvga', 'isa', 'nographic', 'soundhw',
              'vnc', 'vncdisplay', 'vncunused', 'vncconsole', 'vnclisten',
              'sdl', 'display', 'xauthority', 'rtc_timeoffset', 'monitor',
-             'acpi', 'apic', 'usb', 'usbdevice', 'keymap', 'pci',
+             'acpi', 'apic', 'usb', 'usbdevice', 'keymap', 'pci', 'hpet',
              'guest_os_type', 'hap']
 
     for a in args:

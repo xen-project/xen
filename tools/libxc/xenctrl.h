@@ -43,22 +43,21 @@
  */
 
 #if defined(__i386__)
-#define mb()  __asm__ __volatile__ ( "lock; addl $0,0(%%esp)" : : : "memory" )
-#define rmb() __asm__ __volatile__ ( "lock; addl $0,0(%%esp)" : : : "memory" )
-#define wmb() __asm__ __volatile__ ( "" : : : "memory")
+#define xen_mb()  asm volatile ( "lock; addl $0,0(%%esp)" : : : "memory" )
+#define xen_rmb() asm volatile ( "lock; addl $0,0(%%esp)" : : : "memory" )
+#define xen_wmb() asm volatile ( "" : : : "memory")
 #elif defined(__x86_64__)
-#define mb()  __asm__ __volatile__ ( "mfence" : : : "memory")
-#define rmb() __asm__ __volatile__ ( "lfence" : : : "memory")
-#define wmb() __asm__ __volatile__ ( "" : : : "memory")
+#define xen_mb()  asm volatile ( "mfence" : : : "memory")
+#define xen_rmb() asm volatile ( "lfence" : : : "memory")
+#define xen_wmb() asm volatile ( "" : : : "memory")
 #elif defined(__ia64__)
-#define mb()   __asm__ __volatile__ ("mf" ::: "memory")
-#define rmb()  __asm__ __volatile__ ("mf" ::: "memory")
-#define wmb()  __asm__ __volatile__ ("mf" ::: "memory")
+#define xen_mb()   asm volatile ("mf" ::: "memory")
+#define xen_rmb()  asm volatile ("mf" ::: "memory")
+#define xen_wmb()  asm volatile ("mf" ::: "memory")
 #elif defined(__powerpc__)
-/* XXX loosen these up later */
-#define mb()   __asm__ __volatile__ ("sync" : : : "memory")
-#define rmb()  __asm__ __volatile__ ("sync" : : : "memory") /* lwsync? */
-#define wmb()  __asm__ __volatile__ ("sync" : : : "memory") /* eieio? */
+#define xen_mb()   asm volatile ("sync" : : : "memory")
+#define xen_rmb()  asm volatile ("sync" : : : "memory") /* lwsync? */
+#define xen_wmb()  asm volatile ("sync" : : : "memory") /* eieio? */
 #else
 #error "Define barriers"
 #endif
@@ -380,9 +379,6 @@ int xc_vcpu_getinfo(int xc_handle,
                     uint32_t vcpu,
                     xc_vcpuinfo_t *info);
 
-int xc_domain_setcpuweight(int xc_handle,
-                           uint32_t domid,
-                           float weight);
 long long xc_domain_get_cpu_usage(int xc_handle,
                                   domid_t domid,
                                   int vcpu);
