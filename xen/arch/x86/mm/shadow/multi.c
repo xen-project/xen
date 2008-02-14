@@ -4216,15 +4216,12 @@ sh_x86_emulate_write(struct vcpu *v, unsigned long vaddr, void *src,
     if ( (vaddr & (bytes - 1)) && !is_hvm_vcpu(v)  )
         return X86EMUL_UNHANDLEABLE;
 
-    shadow_lock(v->domain);
     addr = emulate_map_dest(v, vaddr, bytes, sh_ctxt);
     if ( emulate_map_dest_failed(addr) )
-    {
-        shadow_unlock(v->domain);
         return ((addr == MAPPING_EXCEPTION) ?
                 X86EMUL_EXCEPTION : X86EMUL_UNHANDLEABLE);
-    }
 
+    shadow_lock(v->domain);
     memcpy(addr, src, bytes);
 
     emulate_unmap_dest(v, addr, bytes, sh_ctxt);
@@ -4246,16 +4243,12 @@ sh_x86_emulate_cmpxchg(struct vcpu *v, unsigned long vaddr,
     if ( (vaddr & (bytes - 1)) && !is_hvm_vcpu(v)  )
         return X86EMUL_UNHANDLEABLE;
 
-    shadow_lock(v->domain);
-
     addr = emulate_map_dest(v, vaddr, bytes, sh_ctxt);
     if ( emulate_map_dest_failed(addr) )
-    {
-        shadow_unlock(v->domain);
         return ((addr == MAPPING_EXCEPTION) ?
                 X86EMUL_EXCEPTION : X86EMUL_UNHANDLEABLE);
-    }
 
+    shadow_lock(v->domain);
     switch ( bytes )
     {
     case 1: prev = cmpxchg(((u8 *)addr), old, new);  break;
@@ -4294,18 +4287,15 @@ sh_x86_emulate_cmpxchg8b(struct vcpu *v, unsigned long vaddr,
     if ( (vaddr & 7) && !is_hvm_vcpu(v) )
         return X86EMUL_UNHANDLEABLE;
 
-    shadow_lock(v->domain);
-
     addr = emulate_map_dest(v, vaddr, 8, sh_ctxt);
     if ( emulate_map_dest_failed(addr) )
-    {
-        shadow_unlock(v->domain);
         return ((addr == MAPPING_EXCEPTION) ?
                 X86EMUL_EXCEPTION : X86EMUL_UNHANDLEABLE);
-    }
 
     old = (((u64) old_hi) << 32) | (u64) old_lo;
     new = (((u64) new_hi) << 32) | (u64) new_lo;
+
+    shadow_lock(v->domain);
     prev = cmpxchg(((u64 *)addr), old, new);
 
     if ( prev != old )
