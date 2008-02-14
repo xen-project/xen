@@ -227,7 +227,7 @@ static int vbd_read(BlockDriverState *bs,
      * copying */
     if (!((uintptr_t)buf & (SECTOR_SIZE-1)))
 	return vbd_aligned_io(bs, sector_num, buf, nb_sectors, 0);
-    iobuf = memalign(PAGE_SIZE, nb_sectors * SECTOR_SIZE);
+    iobuf = qemu_memalign(PAGE_SIZE, nb_sectors * SECTOR_SIZE);
     ret = vbd_aligned_io(bs, sector_num, iobuf, nb_sectors, 0);
     memcpy(buf, iobuf, nb_sectors * SECTOR_SIZE);
     free(iobuf);
@@ -246,7 +246,7 @@ static int vbd_write(BlockDriverState *bs,
     int ret;
     if (!((uintptr_t)buf & (SECTOR_SIZE-1)))
 	return vbd_aligned_io(bs, sector_num, (uint8_t*) buf, nb_sectors, 1);
-    iobuf = memalign(PAGE_SIZE, nb_sectors * SECTOR_SIZE);
+    iobuf = qemu_memalign(PAGE_SIZE, nb_sectors * SECTOR_SIZE);
     memcpy(iobuf, buf, nb_sectors * SECTOR_SIZE);
     ret = vbd_aligned_io(bs, sector_num, iobuf, nb_sectors, 1);
     free(iobuf);

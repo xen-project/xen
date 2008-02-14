@@ -2306,7 +2306,7 @@ static void ide_init2(IDEState *ide_state,
 
     for(i = 0; i < 2; i++) {
         s = ide_state + i;
-        s->io_buffer = memalign(getpagesize(), MAX_MULT_SECTORS*512 + 4);
+        s->io_buffer = qemu_memalign(getpagesize(), MAX_MULT_SECTORS*512 + 4);
         if (i == 0)
             s->bs = hd0;
         else

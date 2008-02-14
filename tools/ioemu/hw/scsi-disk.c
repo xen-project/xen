@@ -81,7 +81,7 @@ static SCSIRequest *scsi_new_request(SCSIDevice *s, uint32_t tag)
         free_requests = r->next;
     } else {
         r = qemu_malloc(sizeof(SCSIRequest));
-	r->dma_buf = memalign(getpagesize(), SCSI_DMA_BUF_SIZE);
+	r->dma_buf = qemu_memalign(getpagesize(), SCSI_DMA_BUF_SIZE);
     }
     r->dev = s;
     r->tag = tag;
