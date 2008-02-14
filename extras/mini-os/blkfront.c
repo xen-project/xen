@@ -59,11 +59,6 @@ struct blkfront_dev {
 #endif
 };
 
-static inline int xenblk_rxidx(RING_IDX idx)
-{
-    return idx & (BLK_RING_SIZE - 1);
-}
-
 void blkfront_handler(evtchn_port_t port, struct pt_regs *regs, void *data)
 {
 #ifdef HAVE_LIBC
