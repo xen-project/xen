@@ -94,7 +94,7 @@ static int piix4acpi_load(QEMUFile *f, void *opaque, int version_id)
         return -EINVAL;
     ret = pci_device_load(&s->dev, f);
     if (ret < 0)
-	return ret;
+        return ret;
     qemu_get_be16s(f, &s->pm1_control);
     return 0;
 }
@@ -114,11 +114,10 @@ static uint32_t acpiPm1Control_readb(void *opaque, uint32_t addr)
 
 static void acpi_shutdown(uint32_t val)
 {
-    if ( !(val & SLP_EN) )
+    if (!(val & SLP_EN))
         return;
 
-    switch ( val & SLP_TYP_Sx )
-    {
+    switch (val & SLP_TYP_Sx) {
     case SLP_TYP_S4:
     case SLP_TYP_S5:
         qemu_system_shutdown_request();
@@ -162,7 +161,7 @@ static uint32_t acpiPm1Control_readw(void *opaque, uint32_t addr)
 }
 
 static void acpi_map(PCIDevice *pci_dev, int region_num,
-                    uint32_t addr, uint32_t size, int type)
+                     uint32_t addr, uint32_t size, int type)
 {
     PCIAcpiState *d = (PCIAcpiState *)pci_dev;
 
@@ -176,6 +175,8 @@ static void acpi_map(PCIDevice *pci_dev, int region_num,
     register_ioport_write(addr + 4, 2, 2, acpiPm1Control_writew, d);
     register_ioport_read(addr + 4, 2, 2, acpiPm1Control_readw, d);
 }
+
+#ifdef CONFIG_PASSTHROUGH
 
 static inline int test_bit(uint8_t *map, int bit)
 {
@@ -217,15 +218,17 @@ static uint32_t acpi_php_readb(void *opaque, uint32_t addr)
 
     switch (addr)
     {
-        case ACPI_PHP_IO_ADDR:
-            val = hotplug_slots->plug_evt;
-            break;
-        default:
-            num = addr - ACPI_PHP_IO_ADDR - 1;
-            val = hotplug_slots->slot[num].status;
+    case ACPI_PHP_IO_ADDR:
+        val = hotplug_slots->plug_evt;
+        break;
+    default:
+        num = addr - ACPI_PHP_IO_ADDR - 1;
+        val = hotplug_slots->slot[num].status;
     }
 
-    fprintf(logfile, "ACPI PCI hotplug: read addr=0x%x, val=0x%x.\n", addr, val);
+    fprintf(logfile, "ACPI PCI hotplug: read addr=0x%x, val=0x%x.\n",
+            addr, val);
+
     return val;
 }
 
@@ -233,27 +236,29 @@ static void acpi_php_writeb(void *opaque, uint32_t addr, uint32_t val)
 {
     PHPSlots *hotplug_slots = opaque;
     int php_slot;
-    fprintf(logfile, "ACPI PCI hotplug: write addr=0x%x, val=0x%x.\n", addr, val);
+
+    fprintf(logfile, "ACPI PCI hotplug: write addr=0x%x, val=0x%x.\n",
+            addr, val);
 
     switch (addr)
     {
-        case ACPI_PHP_IO_ADDR:
-            break;
-        default:
-            php_slot = addr - ACPI_PHP_IO_ADDR - 1;
-            if ( val == 0x1 ) { /* Eject command */
-                /* make _STA of the slot 0 */
-                hotplug_slots->slot[php_slot].status = 0;
+    case ACPI_PHP_IO_ADDR:
+        break;
+    default:
+        php_slot = addr - ACPI_PHP_IO_ADDR - 1;
+        if ( val == 0x1 ) { /* Eject command */
+            /* make _STA of the slot 0 */
+            hotplug_slots->slot[php_slot].status = 0;
 
-                /* clear the hotplug event */
-                hotplug_slots->plug_evt = 0;
+            /* clear the hotplug event */
+            hotplug_slots->plug_evt = 0;
 
-                /* power off the slot */
-                power_off_php_slot(php_slot);
+            /* power off the slot */
+            power_off_php_slot(php_slot);
 
-                /* signal the CP ACPI hot remove done. */
-                xenstore_record_dm_state("pci-removed");
-            }
+            /* signal the CP ACPI hot remove done. */
+            xenstore_record_dm_state("pci-removed");
+        }
     }
 }
 
@@ -346,8 +351,8 @@ static void gpe_en_write(void *opaque, uint32_t addr, uint32_t val)
      * need deassert the intr to avoid redundant intrs
      */
     if ( s->sci_asserted &&
-            reg_count == (ACPI_PHP_GPE_BIT / 8) &&
-            !(val & (1 << (ACPI_PHP_GPE_BIT % 8))) ) {
+         reg_count == (ACPI_PHP_GPE_BIT / 8) &&
+         !(val & (1 << (ACPI_PHP_GPE_BIT % 8))) ) {
         fprintf(logfile, "deassert due to disable GPE bit.\n");
         s->sci_asserted = 0;
         pic_set_irq(ACPI_SCI_IRQ, 0);
@@ -393,26 +398,26 @@ static void gpe_acpi_init(void)
     memset(s, 0, sizeof(GPEState));
 
     register_ioport_read(ACPI_GPE0_BLK_ADDRESS,
-            ACPI_GPE0_BLK_LEN / 2,
-            1,
-            gpe_sts_read,
-            s);
+                         ACPI_GPE0_BLK_LEN / 2,
+                         1,
+                         gpe_sts_read,
+                         s);
     register_ioport_read(ACPI_GPE0_BLK_ADDRESS + ACPI_GPE0_BLK_LEN / 2,
-            ACPI_GPE0_BLK_LEN / 2,
-            1,
-            gpe_en_read,
-            s);
+                         ACPI_GPE0_BLK_LEN / 2,
+                         1,
+                         gpe_en_read,
+                         s);
 
     register_ioport_write(ACPI_GPE0_BLK_ADDRESS,
-            ACPI_GPE0_BLK_LEN / 2,
-            1,
-            gpe_sts_write,
-            s);
+                          ACPI_GPE0_BLK_LEN / 2,
+                          1,
+                          gpe_sts_write,
+                          s);
     register_ioport_write(ACPI_GPE0_BLK_ADDRESS + ACPI_GPE0_BLK_LEN / 2,
-            ACPI_GPE0_BLK_LEN / 2,
-            1,
-            gpe_en_write,
-            s);
+                          ACPI_GPE0_BLK_LEN / 2,
+                          1,
+                          gpe_en_write,
+                          s);
 
     register_savevm("gpe", 0, 1, gpe_save, gpe_load, s);
 }
@@ -420,7 +425,7 @@ static void gpe_acpi_init(void)
 static void acpi_sci_intr(GPEState *s)
 {
     if ( !test_bit(&s->gpe0_sts[0], ACPI_PHP_GPE_BIT) &&
-            test_bit(&s->gpe0_en[0], ACPI_PHP_GPE_BIT) ) {
+         test_bit(&s->gpe0_en[0], ACPI_PHP_GPE_BIT) ) {
 
         set_bit(&s->gpe0_sts[0], ACPI_PHP_GPE_BIT);
         s->sci_asserted = 1;
@@ -489,6 +494,8 @@ void acpi_php_add(int pci_slot)
     acpi_sci_intr(s);
 }
 
+#endif /* CONFIG_PASSTHROUGH */
+
 /* PIIX4 acpi pci configuration space, func 2 */
 void pci_piix4_acpi_init(PCIBus *bus, int devfn)
 {
@@ -528,12 +535,11 @@ void pci_piix4_acpi_init(PCIBus *bus, int devfn)
 
     acpi_map((PCIDevice *)d, 0, 0x1f40, 0x10, PCI_ADDRESS_SPACE_IO);
 
+#ifdef CONFIG_PASSTHROUGH
     gpe_acpi_init();
-
     php_slots_init();
-
-    /* for ACPI debug */
     register_ioport_write(ACPI_DBG_IO_ADDR, 4, 4, acpi_dbg_writel, d);
+#endif
 
     register_savevm("piix4acpi", 0, 1, piix4acpi_save, piix4acpi_load, d);
 }

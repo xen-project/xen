@@ -4384,19 +4384,18 @@ void usb_info(void)
 
 void do_pci_del(char *devname)
 {
-    int pci_slot;
-    pci_slot = bdf_to_slot(devname);
-
+#ifdef CONFIG_PASSTHROUGH
+    int pci_slot = bdf_to_slot(devname);
     acpi_php_del(pci_slot);
+#endif
 }
 
 void do_pci_add(char *devname)
 {
-    int pci_slot;
-
-    pci_slot = insert_to_pci_slot(devname);
-
+#ifdef CONFIG_PASSTHROUGH
+    int pci_slot = insert_to_pci_slot(devname);
     acpi_php_add(pci_slot);
+#endif
 }
 
 
@@ -7985,6 +7984,5 @@ int main(int argc, char **argv)
 
     main_loop();
     quit_timers();
-    pt_uninit();
     return 0;
 }

@@ -692,15 +692,3 @@ int pt_init(PCIBus *e_bus, char *direct_pci)
     /* Success */
     return 0;
 }
-
-void pt_uninit(void)
-{
-    struct pci_access *access;
-
-    /* clean up the libpci */
-    access = dpci_infos.pci_access;
-    if ( access ) {
-        pci_cleanup(access);
-    }
-
-}
