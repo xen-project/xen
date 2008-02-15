@@ -817,10 +817,14 @@ struct PCIDevice {
     int irq_state[4];
 };
 
+extern char direct_pci_str[];
+
 PCIDevice *pci_register_device(PCIBus *bus, const char *name,
                                int instance_size, int devfn,
                                PCIConfigReadFunc *config_read, 
                                PCIConfigWriteFunc *config_write);
+
+void pci_hide_device(PCIDevice *pci_dev);
 
 void pci_register_io_region(PCIDevice *pci_dev, int region_num, 
                             uint32_t size, int type, 
@@ -849,6 +853,22 @@ void pci_for_each_device(int bus_num, void (*fn)(PCIDevice *d));
 void pci_info(void);
 PCIBus *pci_bridge_init(PCIBus *bus, int devfn, uint32_t id,
                         pci_map_irq_fn map_irq, const char *name);
+
+/* PCI slot 6~7 support ACPI PCI hot plug */
+#define PHP_SLOT_START  (6)
+#define PHP_SLOT_END    (8)
+#define PHP_SLOT_LEN    (PHP_SLOT_END - PHP_SLOT_START)
+#define PHP_TO_PCI_SLOT(x) (x + PHP_SLOT_START)
+#define PCI_TO_PHP_SLOT(x) (x - PHP_SLOT_START)
+#define PHP_DEVFN_START (PHP_SLOT_START << 3)
+#define PHP_DEVFN_END   (PHP_SLOT_END << 3)
+
+int insert_to_pci_slot(char*);
+int test_pci_slot(int);
+int bdf_to_slot(char*);
+int power_on_php_slot(int);
+int power_off_php_slot(int);
+void pt_uninit(void);
 
 /* prep_pci.c */
 PCIBus *pci_prep_init(void);
@@ -1120,6 +1140,9 @@ void tpm_tis_init(SetIRQFunc *set_irq, void *irq_opaque, int irq);
 
 /* piix4acpi.c */
 extern void pci_piix4_acpi_init(PCIBus *bus, int devfn);
+void acpi_php_add(int);
+void acpi_php_del(int);
+
 
 /* pc.c */
 extern QEMUMachine pc_machine;
@@ -1320,6 +1343,9 @@ void do_usb_add(const char *devname);
 void do_usb_del(const char *devname);
 void usb_info(void);
 
+void do_pci_add(char *devname);
+void do_pci_del(char *devname);
+
 /* scsi-disk.c */
 enum scsi_reason {
     SCSI_REASON_DONE, /* Command complete.  */
@@ -1466,10 +1492,12 @@ void readline_start(const char *prompt, int is_password,
 void xenstore_parse_domain_config(int domid);
 int xenstore_fd(void);
 void xenstore_process_event(void *opaque);
+void xenstore_record_dm(char *subpath, char *state);
 void xenstore_record_dm_state(char *state);
 void xenstore_check_new_media_present(int timeout);
 void xenstore_write_vncport(int vnc_display);
 void xenstore_read_vncpasswd(int domid, char *pwbuf, size_t pwbuflen);
+void xenstore_write_vslots(char *vslots);
 
 int xenstore_domain_has_devtype(struct xs_handle *handle,
                                 const char *devtype);

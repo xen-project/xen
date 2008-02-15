@@ -175,6 +175,12 @@ SUBCOMMAND_HELP = {
     'vnet-delete'   :  ('<VnetId>', 'Delete a Vnet.'),
     'vnet-list'     :  ('[-l|--long]', 'List Vnets.'),
     'vtpm-list'     :  ('<Domain> [--long]', 'List virtual TPM devices.'),
+    'pci-attach '   :  ('<Domain> <dom> <bus> <slot> <func> [virtual slot]',
+                        'Insert a new pass-through pci device.'),
+    'pci-detach '   :  ('<Domain> <virtual slot>',
+                        'Remove a domain\'s pass-through pci device.'),
+    'pci-list'     :  ('<Domain>',
+                        'List pass-through pci devices for a domain.'),
 
     # security
 
@@ -335,6 +341,9 @@ device_commands = [
     "network-detach",
     "network-list",
     "vtpm-list",
+    "pci-attach",
+    "pci-detach",
+    "pci-list",
     ]
 
 vnet_commands = [
@@ -2051,6 +2060,31 @@ def xm_vtpm_list(args):
                    % ni)
 
 
+def xm_pci_list(args):
+    (use_long, params) = arg_check_for_resource_list(args, "pci-list")
+
+    dom = params[0]
+
+    devs = server.xend.domain.getDeviceSxprs(dom, 'pci')
+
+    if len(devs) == 0:
+        return
+
+    has_vslt = devs[0].has_key('vslt')
+    if has_vslt:
+        hdr_str = 'VSlt domain   bus   slot   func'
+        fmt_str =  "%(vslt)-3s    %(domain)-3s  %(bus)-3s   %(slot)-3s    %(func)-3s    "
+    else:
+        hdr_str = 'domain   bus   slot   func'
+        fmt_str =  "%(domain)-3s  %(bus)-3s   %(slot)-3s    %(func)-3s    "
+    hdr = 0
+
+    for x in devs:
+        if hdr == 0:
+            print (hdr_str)
+            hdr = 1
+        print ( fmt_str % x )
+
 def parse_block_configuration(args):
     dom = args[0]
 
@@ -2198,6 +2232,29 @@ def xm_network_attach(args):
             vif.append(vif_param)
         server.xend.domain.device_create(dom, vif)
 
+def parse_pci_configuration(args):
+    dom = args[0]
+
+    if len(args) == 6:
+        vslt = args[5]
+    else:
+        vslt = '0x0' #chose a free virtual PCI slot
+
+    pci = ['pci',
+          ['devs',
+            [{'domain': "0x%x" % int(args[1], 16),
+              'bus':    "0x%x" % int(args[2], 16),
+              'slot':   "0x%x" % int(args[3], 16),
+              'func':   "0x%x" % int(args[4], 16),
+              'vslt':   "0x%x" % int(vslt,    16)}]
+          ]]
+
+    return (dom, pci)
+
+def xm_pci_attach(args):
+    arg_check(args, 'xm_pci_attach', 5, 6)
+    (dom, pci) = parse_pci_configuration(args)
+    server.xend.domain.device_create(dom, pci)
 
 def detach(args, deviceClass):
     rm_cfg = True
@@ -2262,6 +2319,12 @@ def xm_network_detach(args):
         arg_check(args, 'network-detach', 2, 3)
         detach(args, 'vif')
 
+
+def xm_pci_detach(args):
+    arg_check(args, 'xm_pci_detach', 2, 2)
+    dom = args[0]
+    dev = args[1]
+    server.xend.domain.destroyDevice(dom, 'dpci', dev)
 
 def xm_vnet_list(args):
     xenapi_unsupported()
@@ -2452,6 +2515,10 @@ commands = {
     "vnet-delete": xm_vnet_delete,
     # vtpm
     "vtpm-list": xm_vtpm_list,
+    #pci
+    "pci-attach": xm_pci_attach,
+    "pci-detach": xm_pci_detach,
+    "pci-list": xm_pci_list,
     }
 
 ## The commands supported by a separate argument parser in xend.xm.

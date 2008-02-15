@@ -86,7 +86,7 @@ DefinitionBlock ("DSDT.aml", "DSDT", 2, "Xen", "HVM", 0)
            Name (_UID, 0x00)
            Name (_ADR, 0x00)
            Name (_BBN, 0x00)
- 
+
            Method (_CRS, 0, NotSerialized)
            {
                Name (PRT0, ResourceTemplate ()
@@ -719,6 +719,121 @@ DefinitionBlock ("DSDT.aml", "DSDT", 2, "Xen", "HVM", 0)
                         IRQNoFlags () {7}
                     })
                 } 
+            }
+
+            /******************************************************************
+             * Each PCI hotplug slot needs at least two methods to handle
+             * the ACPI event:
+             *  _EJ0: eject a device
+             *  _STA: return a device's status, e.g. enabled or removed
+             * Other methods are optional: 
+             *  _PS0/3: put them here for debug purpose
+             * 
+             * Eject button would generate a general-purpose event, then the
+             * control method for this event uses Notify() to inform OSPM which
+             * action happened and on which device.
+             *
+             * Pls. refer "6.3 Device Insertion, Removal, and Status Objects"
+             * in ACPI spec 3.0b for details.
+             *
+             * QEMU provides a simple hotplug controller with some I/O to
+             * handle the hotplug action and status, which is beyond the ACPI
+             * scope.
+             */
+
+            Device (S1F0)
+            {
+                Name (_ADR, 0x00060000) /* Dev 6, Func 0 */
+                Name (_SUN, 0x00000001)
+
+                Method (_PS0, 0)
+                {
+                    Store (0x80, \_GPE.DPT2)
+                }
+
+                Method (_PS3, 0)
+                {
+                    Store (0x83, \_GPE.DPT2)
+                }
+
+                Method (_EJ0, 1)
+                {
+                    Store (0x88, \_GPE.DPT2)
+                    Store (0x1, \_GPE.PHP1) /* eject php slot 1*/
+                }
+
+                Method (_STA, 0)
+                {
+                    Store (0x89, \_GPE.DPT2)
+                    Return ( \_GPE.PHP1 )   /* IN status as the _STA */
+                }
+            }
+
+            Device (S2F0)
+            {
+                Name (_ADR, 0x00070000) /* Dev 7, Func 0 */
+                Name (_SUN, 0x00000002)
+
+                Method (_PS0, 0)
+                {
+                    Store (0x90, \_GPE.DPT2)
+                }
+
+                Method (_PS3, 0)
+                {
+                    Store (0x93, \_GPE.DPT2)
+                }
+
+                Method (_EJ0, 1)
+                {
+                    Store (0x98, \_GPE.DPT2)
+                    Store (0x1, \_GPE.PHP2) /* eject php slot 1*/
+                }
+
+                Method (_STA, 0)
+                {
+                    Store (0x99, \_GPE.DPT2)
+                    Return ( \_GPE.PHP2 )   /* IN status as the _STA */
+                }
+            }
+        }
+    }
+
+    Scope (\_GPE)
+    {
+        OperationRegion (PHP, SystemIO, 0x10c0, 0x03)
+        Field (PHP, ByteAcc, NoLock, Preserve)
+        {
+            PSTA,   8, /* hotplug controller status reg */
+            PHP1,   8, /* hotplug slot 1 control reg */
+            PHP2,   8  /* hotplug slot 2 control reg */
+        }
+        OperationRegion (DG1, SystemIO, 0xb044, 0x04)
+        Field (DG1, ByteAcc, NoLock, Preserve)
+        {
+            DPT1,   8,
+            DPT2,   8
+        }
+        Method (_L03, 0, NotSerialized)
+        {
+            /* detect slot and event(remove/add) */
+            Name (SLT, 0x0)
+            Name (EVT, 0x0)
+            Store (PSTA, Local1)
+            ShiftRight (Local1, 0x4, SLT)
+            And (Local1, 0xf, EVT)
+
+            /* debug */
+            Store (SLT, DPT1)
+            Store (EVT, DPT2)
+
+            If ( LEqual(SLT, 0x1) )
+            {
+                Notify (\_SB.PCI0.S1F0, EVT)
+            }
+            ElseIf ( LEqual(SLT, 0x2) )
+            {
+                Notify (\_SB.PCI0.S2F0, EVT)
             }
         }
     }

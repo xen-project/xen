@@ -107,7 +107,8 @@ PCIDevice *pci_register_device(PCIBus *bus, const char *name,
     
     if (devfn < 0) {
         for(devfn = bus->devfn_min ; devfn < 256; devfn += 8) {
-            if (!bus->devices[devfn])
+            if ( !bus->devices[devfn] &&
+                 !( devfn >= PHP_DEVFN_START && devfn < PHP_DEVFN_END ) )
                 goto found;
         }
         return NULL;
@@ -130,6 +131,12 @@ PCIDevice *pci_register_device(PCIBus *bus, const char *name,
     pci_dev->irq_index = pci_irq_index++;
     bus->devices[devfn] = pci_dev;
     return pci_dev;
+}
+
+void pci_hide_device(PCIDevice *pci_dev)
+{
+    PCIBus *bus = pci_dev->bus;
+    bus->devices[pci_dev->devfn] = NULL;
 }
 
 void pci_register_io_region(PCIDevice *pci_dev, int region_num, 

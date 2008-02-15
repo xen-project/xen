@@ -1441,6 +1441,8 @@ void reassign_device_ownership(
              bus, PCI_SLOT(devfn), PCI_FUNC(devfn),
              source->domain_id, target->domain_id);
 
+    pdev_flr(bus, devfn);
+
     for_each_pdev( source, pdev )
     {
         if ( (pdev->bus != bus) || (pdev->devfn != devfn) )
@@ -1476,7 +1478,6 @@ void return_devices_to_dom0(struct domain *d)
         dprintk(XENLOG_INFO VTDPREFIX,
                 "return_devices_to_dom0: bdf = %x:%x:%x\n",
                 pdev->bus, PCI_SLOT(pdev->devfn), PCI_FUNC(pdev->devfn));
-        pdev_flr(pdev->bus, pdev->devfn);
         reassign_device_ownership(d, dom0, pdev->bus, pdev->devfn);
     }
 
@@ -1941,7 +1942,6 @@ int intel_iommu_assign_device(struct domain *d, u8 bus, u8 devfn)
              "assign_device: bus = %x dev = %x func = %x\n",
              bus, PCI_SLOT(devfn), PCI_FUNC(devfn));
 
-    pdev_flr(bus, devfn);
     reassign_device_ownership(dom0, d, bus, devfn);
 
     /* Setup rmrr identify mapping */

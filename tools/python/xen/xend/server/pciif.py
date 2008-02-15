@@ -18,6 +18,7 @@
 
 
 import types
+import time
 
 from xen.xend import sxp
 from xen.xend.XendError import VmError
@@ -62,25 +63,62 @@ class PciController(DevController):
             
         back = {}
         pcidevid = 0
+        vslots = ""
         for pci_config in config.get('devs', []):
             domain = parse_hex(pci_config.get('domain', 0))
             bus = parse_hex(pci_config.get('bus', 0))
             slot = parse_hex(pci_config.get('slot', 0))
             func = parse_hex(pci_config.get('func', 0))            
+
+            vslt = pci_config.get('vslt')
+            if vslt is not None:
+                vslots = vslots + vslt + ";"
+
             self.setupDevice(domain, bus, slot, func)
             back['dev-%i' % pcidevid] = "%04x:%02x:%02x.%02x" % \
                                         (domain, bus, slot, func)
             pcidevid += 1
 
+        if vslots != "":
+            back['vslots'] = vslots
+
         back['num_devs']=str(pcidevid)
         back['uuid'] = config.get('uuid','')
         return (0, back, {})
+
+    def reconfigureDevice(self, _, config):
+        """@see DevController.reconfigureDevice"""
+        #currently only support config changes by hot insert/remove pass-through dev
+        #delete all the devices in xenstore
+        (devid, new_back, new_front) = self.getDeviceDetails(config)
+        num_devs = self.readBackend(devid, 'num_devs')
+        for i in range(int(num_devs)):
+            self.removeBackend(devid, 'dev-%d' % i)
+        self.removeBackend(devid, 'num_devs')
+
+        #create new devices config
+        num_devs = new_back['num_devs']
+        for i in range(int(num_devs)):
+            dev_no = 'dev-%d' % i
+            self.writeBackend(devid, dev_no, new_back[dev_no])
+        self.writeBackend(devid, 'num_devs', num_devs)
+
+        if new_back['vslots'] is not None:
+            self.writeBackend(devid, 'vslots', new_back['vslots'])
+
+        return new_back.get('uuid')
 
     def getDeviceConfiguration(self, devid, transaction = None):
         result = DevController.getDeviceConfiguration(self, devid, transaction)
         num_devs = self.readBackend(devid, 'num_devs')
         pci_devs = []
         
+        vslots = self.readBackend(devid, 'vslots')
+        if vslots is not None:
+            if vslots[-1] == ";":
+                vslots = vslots[:-1]
+            slot_list = vslots.split(';')
+
         for i in range(int(num_devs)):
             dev_config = self.readBackend(devid, 'dev-%d' % i)
 
@@ -91,10 +129,16 @@ class PciController(DevController):
             
             if pci_match!=None:
                 pci_dev_info = pci_match.groupdict()
-                pci_devs.append({'domain': '0x%(domain)s' % pci_dev_info,
+                dev_dict = {'domain': '0x%(domain)s' % pci_dev_info,
                                  'bus': '0x%(bus)s' % pci_dev_info,
                                  'slot': '0x%(slot)s' % pci_dev_info,
-                                 'func': '0x%(func)s' % pci_dev_info})
+                                 'func': '0x%(func)s' % pci_dev_info}
+
+                #append vslot info
+                if vslots is not None:
+                    dev_dict['vslt'] = slot_list[i]
+
+                pci_devs.append(dev_dict)
 
         result['devs'] = pci_devs
         result['uuid'] = self.readBackend(devid, 'uuid')

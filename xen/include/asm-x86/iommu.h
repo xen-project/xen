@@ -74,6 +74,9 @@ int iommu_domain_init(struct domain *d);
 void iommu_domain_destroy(struct domain *d);
 int device_assigned(u8 bus, u8 devfn);
 int assign_device(struct domain *d, u8 bus, u8 devfn);
+void reassign_device_ownership(struct domain *source,
+                               struct domain *target,
+                               u8 bus, u8 devfn);
 int iommu_map_page(struct domain *d, unsigned long gfn, unsigned long mfn);
 int iommu_unmap_page(struct domain *d, unsigned long gfn);
 void iommu_flush(struct domain *d, unsigned long gfn, u64 *p2m_entry);
@@ -83,6 +86,8 @@ int hvm_do_IRQ_dpci(struct domain *d, unsigned int irq);
 int dpci_ioport_intercept(ioreq_t *p);
 int pt_irq_create_bind_vtd(struct domain *d,
                            xen_domctl_bind_pt_irq_t *pt_irq_bind);
+int pt_irq_destroy_bind_vtd(struct domain *d,
+                            xen_domctl_bind_pt_irq_t *pt_irq_bind);
 unsigned int io_apic_read_remap_rte(
     unsigned int apic, unsigned int reg);
 void io_apic_write_remap_rte(unsigned int apic,

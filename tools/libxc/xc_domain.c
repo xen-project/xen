@@ -762,6 +762,20 @@ int xc_test_assign_device(
     return do_domctl(xc_handle, &domctl);
 }
 
+int xc_deassign_device(
+    int xc_handle,
+    uint32_t domid,
+    uint32_t machine_bdf)
+{
+    DECLARE_DOMCTL;
+
+    domctl.cmd = XEN_DOMCTL_deassign_device;
+    domctl.domain = domid;
+    domctl.u.assign_device.machine_bdf = machine_bdf;
+ 
+    return do_domctl(xc_handle, &domctl);
+}
+
 /* Pass-through: binds machine irq to guests irq */
 int xc_domain_bind_pt_irq(
     int xc_handle,
@@ -792,6 +806,36 @@ int xc_domain_bind_pt_irq(
     } 
     else if ( irq_type == PT_IRQ_TYPE_ISA )
         bind->u.isa.isa_irq = isa_irq;
+    
+    rc = do_domctl(xc_handle, &domctl);
+    return rc;
+}
+
+int xc_domain_unbind_pt_irq(
+    int xc_handle,
+    uint32_t domid,
+    uint8_t machine_irq,
+    uint8_t irq_type,
+    uint8_t bus,
+    uint8_t device,
+    uint8_t intx,
+    uint8_t isa_irq)
+{
+    int rc;
+    xen_domctl_bind_pt_irq_t * bind;
+    DECLARE_DOMCTL;
+
+    domctl.cmd = XEN_DOMCTL_unbind_pt_irq;
+    domctl.domain = (domid_t)domid;
+
+    bind = &(domctl.u.bind_pt_irq);
+    bind->hvm_domid = domid;
+    bind->irq_type = irq_type;
+    bind->machine_irq = machine_irq;
+    bind->u.pci.bus = bus;
+    bind->u.pci.device = device;    
+    bind->u.pci.intx = intx;
+    bind->u.isa.isa_irq = isa_irq;
     
     rc = do_domctl(xc_handle, &domctl);
     return rc;

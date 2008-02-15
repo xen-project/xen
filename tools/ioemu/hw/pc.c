@@ -945,8 +945,10 @@ static void pc_init1(uint64_t ram_size, int vga_ram_size, char *boot_device,
     }
 
 #ifdef CONFIG_PASSTHROUGH
-    /* Pass-through Initialization */
-    if ( pci_enabled && direct_pci )
+    /* Pass-through Initialization
+     * init libpci even direct_pci is null, as can hotplug a dev runtime
+     */
+    if ( pci_enabled )
     {
         rc = pt_init(pci_bus, direct_pci); 
         if ( rc < 0 )

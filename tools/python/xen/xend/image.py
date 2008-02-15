@@ -300,23 +300,42 @@ class ImageHandler:
         self.vm.storeDom("image/device-model-pid", self.pid)
         log.info("device model pid: %d", self.pid)
 
-    def saveDeviceModel(self):
+    def signalDeviceModel(self, cmd, ret, par = None):
         if self.device_model is None:
             return
-        # Signal the device model to pause itself and save its state
+        # Signal the device model to for action
+        if cmd is '' or ret is '':
+            raise VmError('need valid command and result when signal device model')
+
+        orig_state = xstransact.Read("/local/domain/0/device-model/%i/state"
+                                % self.vm.getDomid())
+
+        if par is not None:
+            xstransact.Store("/local/domain/0/device-model/%i"
+                             % self.vm.getDomid(), ('parameter', par))
+
         xstransact.Store("/local/domain/0/device-model/%i"
-                         % self.vm.getDomid(), ('command', 'save'))
+                         % self.vm.getDomid(), ('command', cmd))
         # Wait for confirmation.  Could do this with a watch but we'd
         # still end up spinning here waiting for the watch to fire. 
         state = ''
         count = 0
-        while state != 'paused':
+        while state != ret:
             state = xstransact.Read("/local/domain/0/device-model/%i/state"
                                     % self.vm.getDomid())
             time.sleep(0.1)
             count += 1
             if count > 100:
-                raise VmError('Timed out waiting for device model to save')
+                raise VmError('Timed out waiting for device model action')
+
+        #resotre orig state
+        xstransact.Store("/local/domain/0/device-model/%i"
+                         % self.vm.getDomid(), ('state', orig_state))
+        log.info("signalDeviceModel:restore dm state to %s", orig_state)
+
+    def saveDeviceModel(self):
+        # Signal the device model to pause itself and save its state
+        self.signalDeviceModel('save', 'paused')
 
     def resumeDeviceModel(self):
         if self.device_model is None:
@@ -479,7 +498,7 @@ class HVMImageHandler(ImageHandler):
 
         dmargs = [ 'boot', 'fda', 'fdb', 'soundhw',
                    'localtime', 'serial', 'stdvga', 'isa',
-                   'acpi', 'usb', 'usbdevice', 'pci' ]
+                   'acpi', 'usb', 'usbdevice' ]
 
         for a in dmargs:
             v = vmConfig['platform'].get(a)
