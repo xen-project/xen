@@ -1811,7 +1811,18 @@ static int init_vtd_hw(void)
         flush = iommu_get_flush(iommu);
         flush->context = flush_context_reg;
         flush->iotlb = flush_iotlb_reg;
+    }
+    return 0;
+}
 
+static int init_vtd2_hw(void)
+{
+    struct acpi_drhd_unit *drhd;
+    struct iommu *iommu;
+
+    for_each_drhd_unit ( drhd )
+    {
+        iommu = drhd->iommu;
         if ( qinval_setup(iommu) != 0 )
             dprintk(XENLOG_ERR VTDPREFIX,
                     "Queued Invalidation hardware not found\n");
@@ -1883,12 +1894,12 @@ int iommu_setup(void)
     for ( i = 0; i < max_page; i++ )
         iommu_map_page(dom0, i, i);
 
-    enable_vtd_translation();
-    if ( init_vtd_hw() )
-        goto error;
+    init_vtd_hw();
     setup_dom0_devices();
     setup_dom0_rmrr();
     iommu_flush_all();
+    enable_vtd_translation();
+    init_vtd2_hw();
 
     return 0;
 
