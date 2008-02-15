@@ -62,8 +62,9 @@ extern int shadow_audit_enable;
 #define SHOPT_LINUX_L3_TOPLEVEL   0x10  /* Pin l3es on early 64bit linux */
 #define SHOPT_SKIP_VERIFY         0x20  /* Skip PTE v'fy when safe to do so */
 #define SHOPT_VIRTUAL_TLB         0x40  /* Cache guest v->p translations */
+#define SHOPT_FAST_EMULATION      0x80  /* Fast write emulation */
 
-#define SHADOW_OPTIMIZATIONS      0x7f
+#define SHADOW_OPTIMIZATIONS      0xff
 
 
 /******************************************************************************

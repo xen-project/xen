@@ -108,10 +108,14 @@ struct shadow_vcpu {
 #endif
     /* Non-PAE guests: pointer to guest top-level pagetable */
     void *guest_vtable;
-    /* Last MFN that we emulated a write to. */
-    unsigned long last_emulated_mfn;
+    /* Last MFN that we emulated a write to as unshadow heuristics. */
+    unsigned long last_emulated_mfn_for_unshadow;
     /* MFN of the last shadow that we shot a writeable mapping in */
     unsigned long last_writeable_pte_smfn;
+    /* Last frame number that we emulated a write to. */
+    unsigned long last_emulated_frame;
+    /* Last MFN that we emulated a write successfully */
+    unsigned long last_emulated_mfn;
 };
 
 /************************************************/
@@ -189,6 +193,8 @@ struct paging_vcpu {
     struct paging_mode *mode;
     /* HVM guest: last emulate was to a pagetable */
     unsigned int last_write_was_pt:1;
+    /* HVM guest: last write emulation succeeds */
+    unsigned int last_write_emul_ok:1;
     /* Translated guest: virtual TLB */
     struct shadow_vtlb *vtlb;
     spinlock_t          vtlb_lock;
