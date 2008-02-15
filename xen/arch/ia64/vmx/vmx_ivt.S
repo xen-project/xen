@@ -410,6 +410,11 @@ END(vmx_alt_dtlb_miss)
 // 0x1400 Entry 5 (size 64 bundles) Data nested TLB (6,45)
 ENTRY(vmx_nested_dtlb_miss)
     VMX_DBG_FAULT(5)
+    mov r29=cr.ipsr
+    mov b0=r30
+    ;;
+    tbit.z p6,p0=r29,IA64_PSR_VM_BIT
+(p6)br.sptk b0		// return to the continuation point
     VMX_FAULT(5)
 END(vmx_nested_dtlb_miss)
 
@@ -433,16 +438,42 @@ END(vmx_dkey_miss)
 /////////////////////////////////////////////////////////////////////////////////////////
 // 0x2000 Entry 8 (size 64 bundles) Dirty-bit (54)
 ENTRY(vmx_dirty_bit)
-    mov r29=cr.ipsr
+    VMX_DBG_FAULT(8)
+    mov r28=cr.ipsr
     mov r31=pr
     ;;
     mov r19=cr.ifa
-    tbit.z p6,p0=r29,IA64_PSR_VM_BIT
-(p6)br.spnt.many vmx_fault_8
+    tbit.z p6,p0=r28,IA64_PSR_VM_BIT
+(p6)br.spnt.few vmx_fault_8
+    // Prepare for nested dtlb miss
+    mov r22=b0
+    dep.z r29=r28,IA64_PSR_VM_BIT,1
     ;;
-    tpa r19=r19
+    mov cr.ipsr=r29	// ipsr.vm=0
+    movl r30=dirty_bit_tpa_fail
+    ;;
+    tpa r19=r19		// possibly nested dtlb miss?
+    mov cr.ipsr=r28	// ipsr.vm=1
     br.sptk vmx_dispatch_shadow_fault
     VMX_FAULT(8)
+dirty_bit_tpa_fail:
+    // Resume & Retry
+    mov cr.ipsr=r28	// ipsr.vm=1
+    mov r17=cr.isr
+    mov r23=r31
+//  mov r22=b0		// b0 is clobbered in vmx_nested_dtlb_miss
+    adds r16=IA64_VPD_BASE_OFFSET,r21
+    ;;
+    ld8 r18=[r16]
+    ;;
+    adds r19=VPD(VPSR),r18
+    movl r20=__vsa_base
+    ;;
+    ld8 r19=[r19]
+    ld8 r20=[r20]
+    ;;
+    br.sptk ia64_vmm_entry
+    ;;
 END(vmx_dirty_bit)
 
     .org vmx_ia64_ivt+0x2400
