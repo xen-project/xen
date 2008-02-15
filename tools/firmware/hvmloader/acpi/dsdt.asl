@@ -27,7 +27,14 @@ DefinitionBlock ("DSDT.aml", "DSDT", 2, "Xen", "HVM", 0)
     Name (\APCL, 0x00010000)
     Name (\PUID, 0x00)
 
-    /* S5 (power-off) type codes: must match with piix4 emulation! */
+    /* S4 (STD) and S5 (power-off) type codes: must match piix4 emulation. */
+    Name (\_S4, Package (0x04)
+    {
+        0x06,  /* PM1a_CNT.SLP_TYP */
+        0x06,  /* PM1b_CNT.SLP_TYP */
+        0x00,  /* reserved */
+        0x00   /* reserved */
+    })
     Name (\_S5, Package (0x04)
     {
         0x07,  /* PM1a_CNT.SLP_TYP */
