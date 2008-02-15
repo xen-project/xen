@@ -2768,7 +2768,7 @@ static int sh_page_fault(struct vcpu *v,
         if ( regs->error_code == (PFEC_write_access | PFEC_page_present) )
         {
             fast_emul = 1;
-            gmfn = v->arch.paging.shadow.last_emulated_mfn;
+            gmfn = _mfn(v->arch.paging.shadow.last_emulated_mfn);
             perfc_incr(shadow_fault_fast_emulate);
             goto early_emulation;
         }
@@ -3068,7 +3068,7 @@ static int sh_page_fault(struct vcpu *v,
         if ( !fast_emul )
         {
             v->arch.paging.shadow.last_emulated_frame = va >> PAGE_SHIFT;
-            v->arch.paging.shadow.last_emulated_mfn = gmfn;
+            v->arch.paging.shadow.last_emulated_mfn = mfn_x(gmfn);
             v->arch.paging.last_write_emul_ok = 1;
         }
     }
