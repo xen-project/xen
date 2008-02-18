@@ -74,6 +74,7 @@ int iommu_domain_init(struct domain *d);
 void iommu_domain_destroy(struct domain *d);
 int device_assigned(u8 bus, u8 devfn);
 int assign_device(struct domain *d, u8 bus, u8 devfn);
+void deassign_device(struct domain *d, u8 bus, u8 devfn);
 void reassign_device_ownership(struct domain *source,
                                struct domain *target,
                                u8 bus, u8 devfn);
@@ -102,6 +103,7 @@ struct iommu_ops {
     void (*teardown)(struct domain *d);
     int (*map_page)(struct domain *d, unsigned long gfn, unsigned long mfn);
     int (*unmap_page)(struct domain *d, unsigned long gfn);
+    void (*reassign_device)(struct domain *s, struct domain *t, u8 bus, u8 devfn);
 };
 
 #endif /* _IOMMU_H_ */

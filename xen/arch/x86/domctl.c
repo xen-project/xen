@@ -601,7 +601,7 @@ long arch_do_domctl(
         if ( !device_assigned(bus, devfn) )
             break;
 
-        reassign_device_ownership(d, dom0, bus, devfn);
+        deassign_device(d, bus, devfn);
         gdprintk(XENLOG_INFO, "XEN_DOMCTL_deassign_device: bdf = %x:%x:%x\n",
             bus, PCI_SLOT(devfn), PCI_FUNC(devfn));
         put_domain(d);

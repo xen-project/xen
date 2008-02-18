@@ -562,10 +562,17 @@ void amd_iommu_domain_destroy(struct domain *d)
     release_domain_devices(d);
 }
 
+void amd_iommu_return_device(struct domain *s, struct domain *t, u8 bus, u8 devfn)
+{
+    pdev_flr(bus, devfn);
+    reassign_device(s, t, bus, devfn);
+}
+
 struct iommu_ops amd_iommu_ops = {
     .init = amd_iommu_domain_init,
     .assign_device  = amd_iommu_assign_device,
     .teardown = amd_iommu_domain_destroy,
     .map_page = amd_iommu_map_page,
     .unmap_page = amd_iommu_unmap_page,
+    .reassign_device = amd_iommu_return_device,
 };

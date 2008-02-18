@@ -2164,6 +2164,7 @@ struct iommu_ops intel_iommu_ops = {
     .teardown = iommu_domain_teardown,
     .map_page = intel_iommu_map_page,
     .unmap_page = intel_iommu_unmap_page,
+    .reassign_device = reassign_device_ownership,
 };
 
 /*
