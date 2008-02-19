@@ -1744,7 +1744,7 @@ int shadow_mode_control(struct domain *d, xen_domctl_shadow_op_t *sc)
 				v->arch.shadow_bitmap = NULL;
 
 			/* Flush vhpt and tlb to restore dirty bit usage.  */
-			domain_flush_tlb_vhpt(d);
+			flush_tlb_for_log_dirty(d);
 
 			/* Free bitmap.  */
 			d->arch.shadow_bitmap_size = 0;
