@@ -901,8 +901,6 @@ void arch_get_info_guest(struct vcpu *v, vcpu_guest_context_u c)
 		 * uregs->r[4-7] and memory stack or only in memory stack.
 		 * So it is ok to get them from memory stack.
 		 */
-		c.nat->regs.nats = uregs->eml_unat;
-
 		if (vcpu_has_not_run(v)) {
 			c.nat->regs.r[4] = sw->r4;
 			c.nat->regs.r[5] = sw->r5;
