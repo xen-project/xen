@@ -197,6 +197,7 @@ extern void free_domain_tlb(struct vcpu *v);
 extern thash_data_t * vhpt_lookup(u64 va);
 extern unsigned long fetch_code(struct vcpu *vcpu, u64 gip, IA64_BUNDLE *pbundle);
 extern void emulate_io_inst(struct vcpu *vcpu, u64 padr, u64 ma);
+extern void emulate_io_update(struct vcpu *vcpu, u64 word, u64 d, u64 d1);
 extern int vhpt_enabled(struct vcpu *vcpu, uint64_t vadr, vhpt_ref_t ref);
 extern void thash_vhpt_insert(struct vcpu *v, u64 pte, u64 itir, u64 ifa,
                               int type);

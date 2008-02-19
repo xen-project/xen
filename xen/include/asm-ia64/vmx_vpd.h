@@ -74,6 +74,9 @@ struct arch_vmx_struct {
     unsigned long  ivt_current;
     struct ivt_debug ivt_debug[IVT_DEBUG_MAX];
 #endif
+    unsigned long stub_saved[16];
+    unsigned long stub_buffer;
+    unsigned int  stub_nats;
 };
 
 #define VMX_DOMAIN(v)   v->arch.arch_vmx.flags

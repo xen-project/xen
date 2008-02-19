@@ -21,3 +21,4 @@ obj-y += optvfault.o
 obj-y += vacpi.o
 obj-y += vmx_vcpu_save.o
 obj-y += save.o
+obj-y += sioemu.o

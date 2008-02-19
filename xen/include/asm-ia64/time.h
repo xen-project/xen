@@ -7,4 +7,6 @@
 struct tm;
 struct tm wallclock_time(void);
 
+void get_wallclock(uint64_t *sec, uint64_t *nsec);
+
 #endif /* _ASM_TIME_H_ */

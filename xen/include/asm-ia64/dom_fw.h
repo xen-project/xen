@@ -168,6 +168,9 @@
 /* Set the shared_info base virtual address.  */
 #define FW_HYPERCALL_SET_SHARED_INFO_VA			0x600UL
 
+/* Hvmstub hypercalls.  See details in hvm_stub.h  */
+#define FW_HYPERCALL_SIOEMU				0x800UL
+
 /* Hypercalls index bellow _FIRST_ARCH are reserved by Xen, while those above
    are for the architecture.
    Note: this limit was defined by Xen/ia64 (and not by Xen).

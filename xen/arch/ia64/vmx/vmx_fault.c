@@ -42,7 +42,6 @@
 #include <asm/privop.h>
 #include <asm/ia64_int.h>
 #include <asm/debugger.h>
-//#include <asm/hpsim_ssc.h>
 #include <asm/dom_fw.h>
 #include <asm/vmx_vcpu.h>
 #include <asm/kregs.h>
@@ -53,6 +52,9 @@
 #include <xen/mm.h>
 #include <asm/vmx_pal.h>
 #include <asm/shadow.h>
+#include <asm/sioemu.h>
+#include <public/arch-ia64/sioemu.h>
+
 /* reset all PSR field to 0, except up,mfl,mfh,pk,dt,rt,mc,it */
 #define INITIAL_PSR_VALUE_AT_INTERRUPTION 0x0000001808028034
 
@@ -178,34 +180,44 @@ vmx_ia64_handle_break (unsigned long ifa, struct pt_regs *regs, unsigned long is
             show_registers(regs);
         debugger_trap_fatal(0 /* don't care */, regs);
         regs_increment_iip(regs);
-    } else
-#endif
-    {
-        if (!vmx_user_mode(regs)) {
-            show_registers(regs);
-            gdprintk(XENLOG_DEBUG, "%s:%d imm %lx\n", __func__, __LINE__, iim);
-            ia64_fault(11 /* break fault */, isr, ifa, iim,
-                       0 /* cr.itir */, 0, 0, 0, (unsigned long)regs);
-        }
-
-        if (ia64_psr(regs)->cpl == 0) {
-            /* Allow hypercalls only when cpl = 0.  */
-
-            /* normal hypercalls are handled by vmx_break_fault */
-            BUG_ON(iim == d->arch.breakimm);
-
-            if (iim == DOMN_PAL_REQUEST) {
-                pal_emul(v);
-                vcpu_increment_iip(v);
-                return IA64_NO_FAULT;
-            } else if (iim == DOMN_SAL_REQUEST) {
-                sal_emul(v);
-                vcpu_increment_iip(v);
-                return IA64_NO_FAULT;
-            }
-        }
-        vmx_reflect_interruption(ifa, isr, iim, 11, regs);
+        return IA64_NO_FAULT;
     }
+#endif
+    if (!vmx_user_mode(regs)) {
+        show_registers(regs);
+        gdprintk(XENLOG_DEBUG, "%s:%d imm %lx\n", __func__, __LINE__, iim);
+        ia64_fault(11 /* break fault */, isr, ifa, iim,
+                   0 /* cr.itir */, 0, 0, 0, (unsigned long)regs);
+    }
+
+    if (ia64_psr(regs)->cpl == 0) {
+        /* Allow hypercalls only when cpl = 0.  */
+
+        /* Only common hypercalls are handled by vmx_break_fault. */
+        if (iim == d->arch.breakimm) {
+            ia64_hypercall(regs);
+            vcpu_increment_iip(v);
+            return IA64_NO_FAULT;
+        }
+
+        /* normal hypercalls are handled by vmx_break_fault */
+        BUG_ON(iim == d->arch.breakimm);
+        
+        if (iim == DOMN_PAL_REQUEST) {
+            pal_emul(v);
+            vcpu_increment_iip(v);
+            return IA64_NO_FAULT;
+        } else if (iim == DOMN_SAL_REQUEST) {
+            sal_emul(v);
+            vcpu_increment_iip(v);
+            return IA64_NO_FAULT;
+        } else if (d->arch.is_sioemu
+                   && iim == SIOEMU_HYPERPRIVOP_CALLBACK_RETURN) {
+            sioemu_callback_return ();
+            return IA64_NO_FAULT;
+        }
+    }
+    vmx_reflect_interruption(ifa, isr, iim, 11, regs);
     return IA64_NO_FAULT;
 }
 
@@ -214,10 +226,11 @@ void save_banked_regs_to_vpd(VCPU *v, REGS *regs)
 {
     unsigned long i=0UL, * src,* dst, *sunat, *dunat;
     IA64_PSR vpsr;
-    src=&regs->r16;
-    sunat=&regs->eml_unat;
+
+    src = &regs->r16;
+    sunat = &regs->eml_unat;
     vpsr.val = VCPU(v, vpsr);
-    if(vpsr.bn){
+    if (vpsr.bn) {
         dst = &VCPU(v, vgr[0]);
         dunat =&VCPU(v, vnat);
         __asm__ __volatile__ (";;extr.u %0 = %1,%4,16;; \
@@ -225,7 +238,7 @@ void save_banked_regs_to_vpd(VCPU *v, REGS *regs)
                             st8 [%3] = %2;;"
        ::"r"(i),"r"(*sunat),"r"(*dunat),"r"(dunat),"i"(IA64_PT_REGS_R16_SLOT):"memory");
 
-    }else{
+    } else {
         dst = &VCPU(v, vbgr[0]);
 //        dunat =&VCPU(v, vbnat);
 //        __asm__ __volatile__ (";;extr.u %0 = %1,%4,16;;
@@ -234,7 +247,7 @@ void save_banked_regs_to_vpd(VCPU *v, REGS *regs)
 //       ::"r"(i),"r"(*sunat),"r"(*dunat),"r"(dunat),"i"(IA64_PT_REGS_R16_SLOT):"memory");
 
     }
-    for(i=0; i<16; i++)
+    for (i = 0; i < 16; i++)
         *dst++ = *src++;
 }
 
@@ -247,58 +260,61 @@ void leave_hypervisor_tail(void)
     struct domain *d = current->domain;
     struct vcpu *v = current;
 
+    /* FIXME: can this happen ?  */
+    if (is_idle_domain(current->domain))
+        return;
+
+    // A softirq may generate an interrupt.  So call softirq early.
+    local_irq_enable();
+    do_softirq();
+    local_irq_disable();
+
     // FIXME: Will this work properly if doing an RFI???
-    if (!is_idle_domain(d) ) {	// always comes from guest
-//        struct pt_regs *user_regs = vcpu_regs(current);
-        local_irq_enable();
-        do_softirq();
-        local_irq_disable();
-
-        if (v->vcpu_id == 0) {
-            unsigned long callback_irq =
-                d->arch.hvm_domain.params[HVM_PARAM_CALLBACK_IRQ];
-
-            if ( v->arch.arch_vmx.pal_init_pending ) {
-                /*inject INIT interruption to guest pal*/
-                v->arch.arch_vmx.pal_init_pending = 0;
-                deliver_pal_init(v);
-                return;
-            }
-
-            /*
-             * val[63:56] == 1: val[55:0] is a delivery PCI INTx line:
-             *                  Domain = val[47:32], Bus  = val[31:16],
-             *                  DevFn  = val[15: 8], IntX = val[ 1: 0]
-             * val[63:56] == 0: val[55:0] is a delivery as GSI
-             */
-            if (callback_irq != 0 && local_events_need_delivery()) {
-                /* change level for para-device callback irq */
-                /* use level irq to send discrete event */
-                if ((uint8_t)(callback_irq >> 56) == 1) {
-                    /* case of using PCI INTx line as callback irq */
-                    int pdev = (callback_irq >> 11) & 0x1f;
-                    int pintx = callback_irq & 3;
-                    viosapic_set_pci_irq(d, pdev, pintx, 1);
-                    viosapic_set_pci_irq(d, pdev, pintx, 0);
-                } else {
-                    /* case of using GSI as callback irq */
-                    viosapic_set_irq(d, callback_irq, 1);
-                    viosapic_set_irq(d, callback_irq, 0);
-                }
-            }
+    if (d->arch.is_sioemu) {
+        if (local_events_need_delivery()) {
+            sioemu_deliver_event();
         }
-
-        rmb();
-        if (xchg(&v->arch.irq_new_pending, 0)) {
-            v->arch.irq_new_condition = 0;
-            vmx_check_pending_irq(v);
+    } else if (v->vcpu_id == 0) {
+        unsigned long callback_irq =
+            d->arch.hvm_domain.params[HVM_PARAM_CALLBACK_IRQ];
+        
+        if (v->arch.arch_vmx.pal_init_pending) {
+            /* inject INIT interruption to guest pal */
+            v->arch.arch_vmx.pal_init_pending = 0;
+            deliver_pal_init(v);
             return;
         }
 
-        if (v->arch.irq_new_condition) {
-            v->arch.irq_new_condition = 0;
-            vhpi_detection(v);
+        /*
+         * val[63:56] == 1: val[55:0] is a delivery PCI INTx line:
+         *                  Domain = val[47:32], Bus  = val[31:16],
+         *                  DevFn  = val[15: 8], IntX = val[ 1: 0]
+         * val[63:56] == 0: val[55:0] is a delivery as GSI
+         */
+        if (callback_irq != 0 && local_events_need_delivery()) {
+            /* change level for para-device callback irq */
+            /* use level irq to send discrete event */
+            if ((uint8_t)(callback_irq >> 56) == 1) {
+                /* case of using PCI INTx line as callback irq */
+                int pdev = (callback_irq >> 11) & 0x1f;
+                int pintx = callback_irq & 3;
+                viosapic_set_pci_irq(d, pdev, pintx, 1);
+                viosapic_set_pci_irq(d, pdev, pintx, 0);
+            } else {
+                /* case of using GSI as callback irq */
+                viosapic_set_irq(d, callback_irq, 1);
+                viosapic_set_irq(d, callback_irq, 0);
+            }
         }
+    }
+
+    rmb();
+    if (xchg(&v->arch.irq_new_pending, 0)) {
+        v->arch.irq_new_condition = 0;
+        vmx_check_pending_irq(v);
+    } else if (v->arch.irq_new_condition) {
+        v->arch.irq_new_condition = 0;
+        vhpi_detection(v);
     }
 }
 

@@ -494,9 +494,11 @@ vmx_final_setup_guest(struct vcpu *v)
 	if (rc)
 		return rc;
 
-	rc = vmx_create_event_channels(v);
-	if (rc)
-		return rc;
+	if (!v->domain->arch.is_sioemu) {
+		rc = vmx_create_event_channels(v);
+		if (rc)
+			return rc;
+	}
 
 	/* v->arch.schedule_tail = arch_vmx_do_launch; */
 	vmx_create_vp(v);
@@ -523,6 +525,9 @@ void
 vmx_relinquish_guest_resources(struct domain *d)
 {
 	struct vcpu *v;
+
+	if (d->arch.is_sioemu)
+		return;
 
 	for_each_vcpu(d, v)
 		vmx_release_assist_channel(v);
@@ -579,12 +584,13 @@ int vmx_setup_platform(struct domain *d)
 {
 	ASSERT(d != dom0); /* only for non-privileged vti domain */
 
-	vmx_build_io_physmap_table(d);
+	if (!d->arch.is_sioemu) {
+		vmx_build_io_physmap_table(d);
 
-	vmx_init_ioreq_page(d, &d->arch.vmx_platform.ioreq);
-	vmx_init_ioreq_page(d, &d->arch.vmx_platform.buf_ioreq);
-	vmx_init_ioreq_page(d, &d->arch.vmx_platform.buf_pioreq);
-
+		vmx_init_ioreq_page(d, &d->arch.vmx_platform.ioreq);
+		vmx_init_ioreq_page(d, &d->arch.vmx_platform.buf_ioreq);
+		vmx_init_ioreq_page(d, &d->arch.vmx_platform.buf_pioreq);
+	}
 	/* TEMP */
 	d->arch.vmx_platform.pib_base = 0xfee00000UL;
 
@@ -599,7 +605,14 @@ int vmx_setup_platform(struct domain *d)
 	/* Initialize iosapic model within hypervisor */
 	viosapic_init(d);
 
-	vacpi_init(d);
+	if (!d->arch.is_sioemu)
+		vacpi_init(d);
+
+	if (d->arch.is_sioemu) {
+		int i;
+		for (i = 1; i < MAX_VIRT_CPUS; i++)
+			d->shared_info->vcpu_info[i].evtchn_upcall_mask = 1;
+	}
 
 	return 0;
 }
@@ -609,6 +622,9 @@ void vmx_do_resume(struct vcpu *v)
 	ioreq_t *p;
 
 	vmx_load_state(v);
+
+	if (v->domain->arch.is_sioemu)
+		return;
 
 	/* stolen from hvm_do_resume() in arch/x86/hvm/hvm.c */
 	/* NB. Optimised for common case (p->state == STATE_IOREQ_NONE). */

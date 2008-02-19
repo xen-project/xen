@@ -33,6 +33,8 @@
 #include <xen/event.h>
 #include <xen/perfc.h>
 #include <public/arch-ia64/debug_op.h>
+#include <asm/sioemu.h>
+#include <public/arch-ia64/sioemu.h>
 
 static IA64FAULT
 xen_hypercall (struct pt_regs *regs)
@@ -222,7 +224,8 @@ ia64_hypercall(struct pt_regs *regs)
 		regs->r10 = fpswa_ret.err1;
 		regs->r11 = fpswa_ret.err2;
 		break;
-	case __HYPERVISOR_opt_feature: {
+	case __HYPERVISOR_opt_feature:
+	{
 		XEN_GUEST_HANDLE(void) arg;
 		struct xen_ia64_opt_feature optf;
 		set_xen_guest_handle(arg, (void*)(vcpu_get_gr(v, 32)));
@@ -232,6 +235,9 @@ ia64_hypercall(struct pt_regs *regs)
 			regs->r8 = -EFAULT;
 		break;
 	}
+	case FW_HYPERCALL_SIOEMU:
+		sioemu_hypercall(regs);
+		break;
 	default:
 		printk("unknown ia64 fw hypercall %lx\n", regs->r2);
 		regs->r8 = do_ni_hypercall();

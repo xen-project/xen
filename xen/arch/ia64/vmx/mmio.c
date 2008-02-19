@@ -39,6 +39,8 @@
 #include <asm/hvm/vacpi.h>
 #include <asm/hvm/support.h>
 #include <public/hvm/save.h>
+#include <public/arch-ia64/sioemu.h>
+#include <asm/sioemu.h>
 
 #define HVM_BUFFERED_IO_RANGE_NR 1
 
@@ -388,6 +390,8 @@ static void mmio_access(VCPU *vcpu, u64 src_pa, u64 *dest, size_t s, int ma, int
     return;
 }
 
+enum inst_type_en { SL_INTEGER, SL_FLOATING, SL_FLOATING_FP8 };
+
 /*
    dir 1: read 0:write
  */
@@ -396,11 +400,12 @@ void emulate_io_inst(VCPU *vcpu, u64 padr, u64 ma)
     REGS *regs;
     IA64_BUNDLE bundle;
     int slot, dir=0;
-    enum { SL_INTEGER, SL_FLOATING, SL_FLOATING_FP8 } inst_type;
+    enum inst_type_en inst_type;
     size_t size;
     u64 data, data1, temp, update_reg;
     s32 imm;
     INST64 inst;
+    unsigned long update_word;
 
     regs = vcpu_regs(vcpu);
     if (IA64_RETRY == __vmx_get_domain_bundle(regs->cr_iip, &bundle)) {
@@ -523,24 +528,53 @@ void emulate_io_inst(VCPU *vcpu, u64 padr, u64 ma)
              inst.inst, regs->cr_iip);
     }
 
+    update_word = size | (dir << 7) | (ma << 8) | (inst_type << 12);
+    if (dir == IOREQ_READ) {
+        if (inst_type == SL_INTEGER)
+            update_word |= (inst.M1.r1 << 16);
+        else if (inst_type == SL_FLOATING_FP8)
+            update_word |= (inst.M12.f1 << 16) | (inst.M12.f2 << 24);
+    }
+
+    if (vcpu->domain->arch.is_sioemu) {
+        unsigned long iot = __gpfn_is_io(vcpu->domain, padr >> PAGE_SHIFT);
+
+        if (iot != GPFN_PIB && iot != GPFN_IOSAPIC) {
+            sioemu_io_emulate(padr, data, data1, update_word);
+            return;
+        }
+    }
+
     if (size == 4) {
         mmio_access(vcpu, padr + 8, &data1, 1 << 3, ma, dir);
         size = 3;
     }
     mmio_access(vcpu, padr, &data, 1 << size, ma, dir);
 
+    emulate_io_update(vcpu, update_word, data, data1);
+}
+
+void
+emulate_io_update(VCPU *vcpu, u64 word, u64 data, u64 data1)
+{
+    int dir = (word >> 7) & 1;
+
     if (dir == IOREQ_READ) {
+        int r1 = (word >> 16) & 0xff;
+        int r2 = (word >> 24) & 0xff;
+        enum inst_type_en inst_type = (word >> 12) & 0x0f;
+
         if (inst_type == SL_INTEGER) {
-            vcpu_set_gr(vcpu, inst.M1.r1, data, 0);
+            vcpu_set_gr(vcpu, r1, data, 0);
         } else if (inst_type == SL_FLOATING_FP8) {
             struct ia64_fpreg v;
 
             v.u.bits[0] = data;
             v.u.bits[1] = 0x1003E;
-            vcpu_set_fpreg(vcpu, inst.M12.f1, &v);
+            vcpu_set_fpreg(vcpu, r1, &v);
             v.u.bits[0] = data1;
             v.u.bits[1] = 0x1003E;
-            vcpu_set_fpreg(vcpu, inst.M12.f2, &v);
+            vcpu_set_fpreg(vcpu, r2, &v);
         } else {
             panic_domain(NULL, "Don't support ldfd now !");
         }

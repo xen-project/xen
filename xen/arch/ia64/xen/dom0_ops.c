@@ -114,12 +114,16 @@ long arch_do_domctl(xen_domctl_t *op, XEN_GUEST_HANDLE(xen_domctl_t) u_domctl)
                 ret = -EFAULT;
         }
         else {
-            if (is_hvm_domain(d) || (ds->flags & XEN_DOMAINSETUP_hvm_guest)) {
+            if (is_hvm_domain(d)
+                || (ds->flags & (XEN_DOMAINSETUP_hvm_guest
+                                 | XEN_DOMAINSETUP_sioemu_guest))) {
                 if (!vmx_enabled) {
                     printk("No VMX hardware feature for vmx domain.\n");
                     ret = -EINVAL;
                 } else {
                     d->is_hvm = 1;
+                    if (ds->flags & XEN_DOMAINSETUP_sioemu_guest)
+                        d->arch.is_sioemu = 1;
                     xen_ia64_set_convmem_end(d, ds->maxmem);
                     ret = vmx_setup_platform(d);
                 }
