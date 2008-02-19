@@ -1441,6 +1441,8 @@ void reassign_device_ownership(
              bus, PCI_SLOT(devfn), PCI_FUNC(devfn),
              source->domain_id, target->domain_id);
 
+    pdev_flr(bus, devfn);
+
     for_each_pdev( source, pdev )
     {
         if ( (pdev->bus != bus) || (pdev->devfn != devfn) )
@@ -1476,7 +1478,6 @@ void return_devices_to_dom0(struct domain *d)
         dprintk(XENLOG_INFO VTDPREFIX,
                 "return_devices_to_dom0: bdf = %x:%x:%x\n",
                 pdev->bus, PCI_SLOT(pdev->devfn), PCI_FUNC(pdev->devfn));
-        pdev_flr(pdev->bus, pdev->devfn);
         reassign_device_ownership(d, dom0, pdev->bus, pdev->devfn);
     }
 
@@ -1811,7 +1812,18 @@ static int init_vtd_hw(void)
         flush = iommu_get_flush(iommu);
         flush->context = flush_context_reg;
         flush->iotlb = flush_iotlb_reg;
+    }
+    return 0;
+}
 
+static int init_vtd2_hw(void)
+{
+    struct acpi_drhd_unit *drhd;
+    struct iommu *iommu;
+
+    for_each_drhd_unit ( drhd )
+    {
+        iommu = drhd->iommu;
         if ( qinval_setup(iommu) != 0 )
             dprintk(XENLOG_ERR VTDPREFIX,
                     "Queued Invalidation hardware not found\n");
@@ -1883,12 +1895,12 @@ int iommu_setup(void)
     for ( i = 0; i < max_page; i++ )
         iommu_map_page(dom0, i, i);
 
-    enable_vtd_translation();
-    if ( init_vtd_hw() )
-        goto error;
+    init_vtd_hw();
     setup_dom0_devices();
     setup_dom0_rmrr();
     iommu_flush_all();
+    enable_vtd_translation();
+    init_vtd2_hw();
 
     return 0;
 
@@ -1930,7 +1942,6 @@ int intel_iommu_assign_device(struct domain *d, u8 bus, u8 devfn)
              "assign_device: bus = %x dev = %x func = %x\n",
              bus, PCI_SLOT(devfn), PCI_FUNC(devfn));
 
-    pdev_flr(bus, devfn);
     reassign_device_ownership(dom0, d, bus, devfn);
 
     /* Setup rmrr identify mapping */
@@ -2153,6 +2164,7 @@ struct iommu_ops intel_iommu_ops = {
     .teardown = iommu_domain_teardown,
     .map_page = intel_iommu_map_page,
     .unmap_page = intel_iommu_unmap_page,
+    .reassign_device = reassign_device_ownership,
 };
 
 /*

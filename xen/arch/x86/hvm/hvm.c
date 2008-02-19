@@ -1393,20 +1393,18 @@ static enum hvm_copy_result __hvm_copy(
     int count, todo;
     uint32_t pfec = PFEC_page_present;
 
-    if ( virt )
+    /*
+     * We cannot use hvm_get_segment_register() while executing in
+     * vmx_realmode() as segment register state is cached. Furthermore,
+     * VMREADs on every data access hurts emulation performance.
+     * Hence we do not gather extra PFEC flags if CR0.PG == 0.
+     */
+    if ( virt && (curr->arch.hvm_vcpu.guest_cr[0] & X86_CR0_PG) )
     {
-        /*
-         * We cannot use hvm_get_segment_register() while executing in
-         * vmx_realmode() as segment register state is cached. Furthermore,
-         * VMREADs on every data access hurts emulation performance.
-         */
-        if ( !curr->arch.hvm_vmx.vmxemul )
-        {
-            struct segment_register sreg;
-            hvm_get_segment_register(curr, x86_seg_ss, &sreg);
-            if ( sreg.attr.fields.dpl == 3 )
-                pfec |= PFEC_user_mode;
-        }
+        struct segment_register sreg;
+        hvm_get_segment_register(curr, x86_seg_ss, &sreg);
+        if ( sreg.attr.fields.dpl == 3 )
+            pfec |= PFEC_user_mode;
 
         if ( dir ) 
             pfec |= PFEC_write_access;

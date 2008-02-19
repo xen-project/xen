@@ -580,6 +580,34 @@ long arch_do_domctl(
     }
     break;
 
+    case XEN_DOMCTL_deassign_device:
+    {
+        struct domain *d;
+        u8 bus, devfn;
+
+        ret = -EINVAL;
+        if ( !iommu_enabled )
+            break;
+
+        if ( unlikely((d = get_domain_by_id(domctl->domain)) == NULL) )
+        {
+            gdprintk(XENLOG_ERR,
+                "XEN_DOMCTL_deassign_device: get_domain_by_id() failed\n"); 
+            break;
+        }
+        bus = (domctl->u.assign_device.machine_bdf >> 16) & 0xff;
+        devfn = (domctl->u.assign_device.machine_bdf >> 8) & 0xff;
+
+        if ( !device_assigned(bus, devfn) )
+            break;
+
+        deassign_device(d, bus, devfn);
+        gdprintk(XENLOG_INFO, "XEN_DOMCTL_deassign_device: bdf = %x:%x:%x\n",
+            bus, PCI_SLOT(devfn), PCI_FUNC(devfn));
+        put_domain(d);
+    }
+    break;
+
     case XEN_DOMCTL_bind_pt_irq:
     {
         struct domain * d;
@@ -593,6 +621,23 @@ long arch_do_domctl(
             ret = pt_irq_create_bind_vtd(d, bind);
         if ( ret < 0 )
             gdprintk(XENLOG_ERR, "pt_irq_create_bind failed!\n");
+        rcu_unlock_domain(d);
+    }
+    break;    
+
+    case XEN_DOMCTL_unbind_pt_irq:
+    {
+        struct domain * d;
+        xen_domctl_bind_pt_irq_t * bind;
+
+        ret = -ESRCH;
+        if ( (d = rcu_lock_domain_by_id(domctl->domain)) == NULL )
+            break;
+        bind = &(domctl->u.bind_pt_irq);
+        if ( iommu_enabled )
+            ret = pt_irq_destroy_bind_vtd(d, bind);
+        if ( ret < 0 )
+            gdprintk(XENLOG_ERR, "pt_irq_destroy_bind failed!\n");
         rcu_unlock_domain(d);
     }
     break;

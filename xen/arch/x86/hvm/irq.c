@@ -211,8 +211,7 @@ void hvm_set_pci_link_route(struct domain *d, u8 link, u8 isa_irq)
             clear_bit(old_isa_irq, &hvm_irq->dpci->isairq_map);
 
         for ( i = 0; i < NR_LINK; i++ )
-            if ( test_bit(i, &hvm_irq->dpci->link_map) &&
-                 hvm_irq->pci_link.route[i] )
+            if ( hvm_irq->dpci->link_cnt[i] && hvm_irq->pci_link.route[i] )
                 set_bit(hvm_irq->pci_link.route[i],
                         &hvm_irq->dpci->isairq_map);
     }

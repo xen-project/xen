@@ -101,7 +101,7 @@ int pt_irq_create_bind_vtd(
     intx = pt_irq_bind->u.pci.intx;
     guest_gsi = hvm_pci_intx_gsi(device, intx);
     link = hvm_pci_intx_link(device, intx);
-    set_bit(link, hvm_irq_dpci->link_map);
+    hvm_irq_dpci->link_cnt[link]++;
 
     digl = xmalloc(struct dev_intx_gsi_link);
     if ( !digl )
@@ -134,6 +134,65 @@ int pt_irq_create_bind_vtd(
     gdprintk(XENLOG_INFO VTDPREFIX,
              "VT-d irq bind: m_irq = %x device = %x intx = %x\n",
              machine_gsi, device, intx);
+    return 0;
+}
+
+int pt_irq_destroy_bind_vtd(
+    struct domain *d, xen_domctl_bind_pt_irq_t *pt_irq_bind)
+{
+    struct hvm_irq_dpci *hvm_irq_dpci = d->arch.hvm_domain.irq.dpci;
+    uint32_t machine_gsi, guest_gsi;
+    uint32_t device, intx, link;
+    struct list_head *digl_list, *tmp;
+    struct dev_intx_gsi_link *digl;
+
+    if ( hvm_irq_dpci == NULL )
+        return 0;
+
+    machine_gsi = pt_irq_bind->machine_irq;
+    device = pt_irq_bind->u.pci.device;
+    intx = pt_irq_bind->u.pci.intx;
+    guest_gsi = hvm_pci_intx_gsi(device, intx);
+    link = hvm_pci_intx_link(device, intx);
+    hvm_irq_dpci->link_cnt[link]--;
+
+    gdprintk(XENLOG_INFO,
+            "pt_irq_destroy_bind_vtd: machine_gsi=%d, guest_gsi=%d, device=%d, intx=%d.\n",
+            machine_gsi, guest_gsi, device, intx);
+    memset(&hvm_irq_dpci->girq[guest_gsi], 0, sizeof(struct hvm_girq_dpci_mapping));
+
+    /* clear the mirq info */
+    if ( hvm_irq_dpci->mirq[machine_gsi].valid )
+    {
+
+        list_for_each_safe ( digl_list, tmp,
+                &hvm_irq_dpci->mirq[machine_gsi].digl_list )
+        {
+            digl = list_entry(digl_list,
+                    struct dev_intx_gsi_link, list);
+            if ( digl->device == device &&
+                 digl->intx   == intx &&
+                 digl->link   == link &&
+                 digl->gsi    == guest_gsi )
+            {
+                list_del(&digl->list);
+                xfree(digl);
+            }
+        }
+
+        if ( list_empty(&hvm_irq_dpci->mirq[machine_gsi].digl_list) )
+        {
+            pirq_guest_unbind(d, machine_gsi);
+            kill_timer(&hvm_irq_dpci->hvm_timer[irq_to_vector(machine_gsi)]);
+            hvm_irq_dpci->mirq[machine_gsi].dom   = NULL;
+            hvm_irq_dpci->mirq[machine_gsi].valid = 0;
+        }
+    }
+
+    gdprintk(XENLOG_INFO,
+             "XEN_DOMCTL_irq_unmapping: m_irq = %x device = %x intx = %x\n",
+             machine_gsi, device, intx);
+
     return 0;
 }
 

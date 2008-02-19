@@ -914,6 +914,10 @@ int xc_test_assign_device(int xc_handle,
                           uint32_t domid,
                           uint32_t machine_bdf);
 
+int xc_deassign_device(int xc_handle,
+                     uint32_t domid,
+                     uint32_t machine_bdf);
+
 int xc_domain_memory_mapping(int xc_handle,
                              uint32_t domid,
                              unsigned long first_gfn,
@@ -929,6 +933,15 @@ int xc_domain_ioport_mapping(int xc_handle,
                              uint32_t add_mapping);
 
 int xc_domain_bind_pt_irq(int xc_handle,
+                          uint32_t domid,
+                          uint8_t machine_irq,
+                          uint8_t irq_type,
+                          uint8_t bus,
+                          uint8_t device,
+                          uint8_t intx,
+                          uint8_t isa_irq);
+
+int xc_domain_unbind_pt_irq(int xc_handle,
                           uint32_t domid,
                           uint8_t machine_irq,
                           uint8_t irq_type,

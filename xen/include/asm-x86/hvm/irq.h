@@ -64,7 +64,7 @@ struct hvm_irq_dpci {
     /* Record of mapped ISA IRQs */
     DECLARE_BITMAP(isairq_map, NR_ISAIRQS);
     /* Record of mapped Links */
-    DECLARE_BITMAP(link_map, NR_LINK);
+    uint8_t link_cnt[NR_LINK];
     struct timer hvm_timer[NR_IRQS];
 };
 

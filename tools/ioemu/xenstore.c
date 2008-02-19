@@ -79,6 +79,8 @@ static void waitForDevice(char *fn)
     return;
 }
 
+#define DIRECT_PCI_STR_LEN 160
+char direct_pci_str[DIRECT_PCI_STR_LEN];
 void xenstore_parse_domain_config(int domid)
 {
     char **e = NULL;
@@ -86,7 +88,7 @@ void xenstore_parse_domain_config(int domid)
     char *fpath = NULL, *bpath = NULL,
         *dev = NULL, *params = NULL, *type = NULL, *drv = NULL;
     int i, is_scsi, is_hdN = 0;
-    unsigned int len, num, hd_index;
+    unsigned int len, num, hd_index, pci_devid = 0;
     BlockDriverState *bs;
 
     for(i = 0; i < MAX_DISKS + MAX_SCSI_DISKS; i++)
@@ -250,6 +252,38 @@ void xenstore_parse_domain_config(int domid)
         fprintf(logfile, "Watching %s\n", buf);
     }
 
+    /* get the pci pass-through parameter */
+    if (pasprintf(&buf, "/local/domain/0/backend/pci/%u/%u/num_devs",
+                  domid, pci_devid) == -1)
+        goto out;
+
+    free(params);
+    params = xs_read(xsh, XBT_NULL, buf, &len);
+    if (params == NULL)
+        goto out;
+    num = atoi(params);
+
+    for ( i = 0; i < num; i++ ) {
+        if (pasprintf(&buf, "/local/domain/0/backend/pci/%u/%u/dev-%d",
+                    domid, pci_devid, i) != -1) {
+            free(dev);
+            dev = xs_read(xsh, XBT_NULL, buf, &len);
+
+            if ( strlen(dev) + strlen(direct_pci_str) > DIRECT_PCI_STR_LEN ) {
+                fprintf(stderr, "qemu: too many pci pass-through devices\n");
+                memset(direct_pci_str, 0, DIRECT_PCI_STR_LEN);
+                goto out;
+            }
+
+            /* append to direct_pci_str */
+            if ( dev ) {
+                strcat(direct_pci_str, dev);
+                strcat(direct_pci_str, "-");
+            }
+        }
+    }
+
+
  out:
     free(type);
     free(params);
@@ -388,7 +422,7 @@ void xenstore_process_logdirty_event(void)
 /* Accept state change commands from the control tools */
 static void xenstore_process_dm_command_event(void)
 {
-    char *path = NULL, *command = NULL;
+    char *path = NULL, *command = NULL, *par = NULL;
     unsigned int len;
     extern int suspend_requested;
 
@@ -407,6 +441,34 @@ static void xenstore_process_dm_command_event(void)
     } else if (!strncmp(command, "continue", len)) {
         fprintf(logfile, "dm-command: continue after state save\n");
         suspend_requested = 0;
+    } else if (!strncmp(command, "pci-rem", len)) {
+        fprintf(logfile, "dm-command: hot remove pass-through pci dev \n");
+
+        if (pasprintf(&path, 
+                      "/local/domain/0/device-model/%u/parameter", domid) == -1) {
+            fprintf(logfile, "out of memory reading dm command parameter\n");
+            goto out;
+        }
+        par = xs_read(xsh, XBT_NULL, path, &len);
+        if (!par)
+            goto out;
+
+        do_pci_del(par);
+        free(par);
+    } else if (!strncmp(command, "pci-ins", len)) {
+        fprintf(logfile, "dm-command: hot insert pass-through pci dev \n");
+
+        if (pasprintf(&path, 
+                      "/local/domain/0/device-model/%u/parameter", domid) == -1) {
+            fprintf(logfile, "out of memory reading dm command parameter\n");
+            goto out;
+        }
+        par = xs_read(xsh, XBT_NULL, path, &len);
+        if (!par)
+            goto out;
+
+        do_pci_add(par);
+        free(par);
     } else {
         fprintf(logfile, "dm-command: unknown command\"%*s\"\n", len, command);
     }
@@ -416,20 +478,25 @@ static void xenstore_process_dm_command_event(void)
     free(command);
 }
 
-void xenstore_record_dm_state(char *state)
+void xenstore_record_dm(char *subpath, char *state)
 {
     char *path = NULL;
 
     if (pasprintf(&path, 
-                  "/local/domain/0/device-model/%u/state", domid) == -1) {
-        fprintf(logfile, "out of memory recording dm state\n");
+                  "/local/domain/0/device-model/%u/%s", domid, subpath) == -1) {
+        fprintf(logfile, "out of memory recording dm \n");
         goto out;
     }
     if (!xs_write(xsh, XBT_NULL, path, state, strlen(state)))
-        fprintf(logfile, "error recording dm state\n");
+        fprintf(logfile, "error recording dm \n");
 
  out:
     free(path);
+}
+
+void xenstore_record_dm_state(char *state)
+{
+    xenstore_record_dm("state", state);
 }
 
 void xenstore_process_event(void *opaque)
@@ -520,6 +587,23 @@ void xenstore_write_vncport(int display)
  out:
     free(portstr);
     free(buf);
+}
+
+void xenstore_write_vslots(char *vslots)
+{
+    char *path = NULL;
+    int pci_devid = 0;
+
+    if (pasprintf(&path, 
+                  "/local/domain/0/backend/pci/%u/%u/vslots", domid, pci_devid) == -1) {
+        fprintf(logfile, "out of memory when updating vslots.\n");
+        goto out;
+    }
+    if (!xs_write(xsh, XBT_NULL, path, vslots, strlen(vslots)))
+        fprintf(logfile, "error updating vslots \n");
+
+ out:
+    free(path);
 }
 
 void xenstore_read_vncpasswd(int domid, char *pwbuf, size_t pwbuflen)

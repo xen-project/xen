@@ -122,7 +122,7 @@ static int write_with_timestamp(int fd, const char *data, size_t sz)
 	char ts[32];
 	time_t now = time(NULL);
 	const struct tm *tmnow = localtime(&now);
-	size_t tslen = strftime(ts, sizeof(ts), "[%d-%m-%Y %H:%M:%S] ", tmnow);
+	size_t tslen = strftime(ts, sizeof(ts), "[%Y-%m-%d %H:%M:%S] ", tmnow);
 
 	memcpy(buf, data, sz);
 	while (sz > 0 && buf[sz-1] == '\r')

@@ -114,11 +114,11 @@ struct buffered_piopage {
 };
 #endif /* defined(__ia64__) */
 
-#if defined(__i386__) || defined(__x86_64__)
 #define ACPI_PM1A_EVT_BLK_ADDRESS           0x0000000000001f40
 #define ACPI_PM1A_CNT_BLK_ADDRESS           (ACPI_PM1A_EVT_BLK_ADDRESS + 0x04)
 #define ACPI_PM_TMR_BLK_ADDRESS             (ACPI_PM1A_EVT_BLK_ADDRESS + 0x08)
-#endif /* defined(__i386__) || defined(__x86_64__) */
+#define ACPI_GPE0_BLK_ADDRESS               (ACPI_PM_TMR_BLK_ADDRESS + 0x20)
+#define ACPI_GPE0_BLK_LEN                   0x08
 
 #endif /* _IOREQ_H_ */
 

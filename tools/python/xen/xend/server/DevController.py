@@ -412,6 +412,14 @@ class DevController:
         return result
 
 
+    def removeBackend(self, devid, *args):
+        frontpath = self.frontendPath(devid)
+        backpath = xstransact.Read(frontpath, "backend")
+        if backpath:
+            return xstransact.Remove(backpath, *args)
+        else:
+            raise VmError("Device %s not connected" % devid)
+
     def readBackend(self, devid, *args):
         frontpath = self.frontendPath(devid)
         backpath = xstransact.Read(frontpath, "backend")

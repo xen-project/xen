@@ -441,6 +441,7 @@ DEFINE_XEN_GUEST_HANDLE(xen_domctl_sendtrigger_t);
 /* Assign PCI device to HVM guest. Sets up IOMMU structures. */
 #define XEN_DOMCTL_assign_device      37
 #define XEN_DOMCTL_test_assign_device 45
+#define XEN_DOMCTL_deassign_device 47
 struct xen_domctl_assign_device {
     uint32_t  machine_bdf;   /* machine PCI ID of assigned device */
 };
@@ -450,6 +451,7 @@ DEFINE_XEN_GUEST_HANDLE(xen_domctl_assign_device_t);
 
 /* Pass-through interrupts: bind real irq -> hvm devfn. */
 #define XEN_DOMCTL_bind_pt_irq       38
+#define XEN_DOMCTL_unbind_pt_irq     48
 typedef enum pt_irq_type_e {
     PT_IRQ_TYPE_PCI,
     PT_IRQ_TYPE_ISA

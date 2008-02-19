@@ -1039,13 +1039,18 @@ void shadow_free(struct domain *d, mfn_t smfn)
 
     for ( i = 0; i < 1<<order; i++ ) 
     {
-#if SHADOW_OPTIMIZATIONS & SHOPT_WRITABLE_HEURISTIC
+#if SHADOW_OPTIMIZATIONS & (SHOPT_WRITABLE_HEURISTIC | SHOPT_FAST_EMULATION)
         struct vcpu *v;
         for_each_vcpu(d, v) 
         {
+#if SHADOW_OPTIMIZATIONS & SHOPT_WRITABLE_HEURISTIC
             /* No longer safe to look for a writeable mapping in this shadow */
             if ( v->arch.paging.shadow.last_writeable_pte_smfn == mfn_x(smfn) + i ) 
                 v->arch.paging.shadow.last_writeable_pte_smfn = 0;
+#endif
+#if SHADOW_OPTIMIZATIONS & SHOPT_FAST_EMULATION
+            v->arch.paging.last_write_emul_ok = 0;
+#endif
         }
 #endif
         /* Strip out the type: this is now a free shadow page */

@@ -2623,13 +2623,13 @@ sh_map_and_validate_gl1e(struct vcpu *v, mfn_t gl1mfn,
 static inline void check_for_early_unshadow(struct vcpu *v, mfn_t gmfn)
 {
 #if SHADOW_OPTIMIZATIONS & SHOPT_EARLY_UNSHADOW
-    if ( v->arch.paging.shadow.last_emulated_mfn == mfn_x(gmfn) &&
-         sh_mfn_is_a_page_table(gmfn) )
+    if ( v->arch.paging.shadow.last_emulated_mfn_for_unshadow == mfn_x(gmfn)
+         && sh_mfn_is_a_page_table(gmfn) )
     {
         perfc_incr(shadow_early_unshadow);
         sh_remove_shadows(v, gmfn, 1, 0 /* Fast, can fail to unshadow */ );
     }
-    v->arch.paging.shadow.last_emulated_mfn = mfn_x(gmfn);
+    v->arch.paging.shadow.last_emulated_mfn_for_unshadow = mfn_x(gmfn);
 #endif
 }
 
@@ -2637,7 +2637,7 @@ static inline void check_for_early_unshadow(struct vcpu *v, mfn_t gmfn)
 static inline void reset_early_unshadow(struct vcpu *v)
 {
 #if SHADOW_OPTIMIZATIONS & SHOPT_EARLY_UNSHADOW
-    v->arch.paging.shadow.last_emulated_mfn = INVALID_MFN;
+    v->arch.paging.shadow.last_emulated_mfn_for_unshadow = INVALID_MFN;
 #endif
 }
 
@@ -2744,12 +2744,39 @@ static int sh_page_fault(struct vcpu *v,
     int r;
     fetch_type_t ft = 0;
     p2m_type_t p2mt;
+#if SHADOW_OPTIMIZATIONS & SHOPT_FAST_EMULATION
+    int fast_emul = 0;
+#endif
 
     SHADOW_PRINTK("d:v=%u:%u va=%#lx err=%u, rip=%lx\n",
                   v->domain->domain_id, v->vcpu_id, va, regs->error_code,
                   regs->rip);
 
     perfc_incr(shadow_fault);
+
+#if SHADOW_OPTIMIZATIONS & SHOPT_FAST_EMULATION
+    /* If faulting frame is successfully emulated in last shadow fault
+     * it's highly likely to reach same emulation action for this frame.
+     * Then try to emulate early to avoid lock aquisition.
+     */
+    if ( v->arch.paging.last_write_emul_ok
+         && v->arch.paging.shadow.last_emulated_frame == (va >> PAGE_SHIFT) ) 
+    {
+        /* check whether error code is 3, or else fall back to normal path
+         * in case of some validation is required
+         */
+        if ( regs->error_code == (PFEC_write_access | PFEC_page_present) )
+        {
+            fast_emul = 1;
+            gmfn = _mfn(v->arch.paging.shadow.last_emulated_mfn);
+            perfc_incr(shadow_fault_fast_emulate);
+            goto early_emulation;
+        }
+        else
+            v->arch.paging.last_write_emul_ok = 0;
+    }
+#endif
+
     //
     // XXX: Need to think about eventually mapping superpages directly in the
     //      shadow (when possible), as opposed to splintering them into a
@@ -2960,6 +2987,17 @@ static int sh_page_fault(struct vcpu *v,
         goto done;
     }
 
+    /*
+     * We don't need to hold the lock for the whole emulation; we will
+     * take it again when we write to the pagetables.
+     */
+    sh_audit_gw(v, &gw);
+    shadow_audit_tables(v);
+    shadow_unlock(d);
+
+#if SHADOW_OPTIMIZATIONS & SHOPT_FAST_EMULATION
+ early_emulation:
+#endif
     if ( is_hvm_domain(d) )
     {
         /*
@@ -2971,6 +3009,13 @@ static int sh_page_fault(struct vcpu *v,
          */
         if ( unlikely(hvm_event_pending(v)) )
         {
+#if SHADOW_OPTIMIZATIONS & SHOPT_FAST_EMULATION
+            if ( fast_emul )
+            {
+                perfc_incr(shadow_fault_fast_emulate_fail);
+                v->arch.paging.last_write_emul_ok = 0;
+            }
+#endif
             gdprintk(XENLOG_DEBUG, "write to pagetable during event "
                      "injection: cr2=%#lx, mfn=%#lx\n", 
                      va, mfn_x(gmfn));
@@ -2981,14 +3026,6 @@ static int sh_page_fault(struct vcpu *v,
 
     SHADOW_PRINTK("emulate: eip=%#lx esp=%#lx\n", 
                   (unsigned long)regs->eip, (unsigned long)regs->esp);
-
-    /*
-     * We don't need to hold the lock for the whole emulation; we will
-     * take it again when we write to the pagetables.
-     */
-    sh_audit_gw(v, &gw);
-    shadow_audit_tables(v);
-    shadow_unlock(d);
 
     emul_ops = shadow_init_emulation(&emul_ctxt, regs);
 
@@ -3001,14 +3038,43 @@ static int sh_page_fault(struct vcpu *v,
      */
     if ( r == X86EMUL_UNHANDLEABLE )
     {
+        perfc_incr(shadow_fault_emulate_failed);
+#if SHADOW_OPTIMIZATIONS & SHOPT_FAST_EMULATION
+        if ( fast_emul )
+        {
+            perfc_incr(shadow_fault_fast_emulate_fail);
+            v->arch.paging.last_write_emul_ok = 0;
+        }
+#endif
         SHADOW_PRINTK("emulator failure, unshadowing mfn %#lx\n", 
                        mfn_x(gmfn));
-        perfc_incr(shadow_fault_emulate_failed);
         /* If this is actually a page table, then we have a bug, and need 
          * to support more operations in the emulator.  More likely, 
          * though, this is a hint that this page should not be shadowed. */
         shadow_remove_all_shadows(v, gmfn);
     }
+
+#if SHADOW_OPTIMIZATIONS & SHOPT_FAST_EMULATION
+    /* Record successfully emulated information as heuristics to next
+     * fault on same frame for acceleration. But be careful to verify
+     * its attribute still as page table, or else unshadow triggered
+     * in write emulation normally requires a re-sync with guest page
+     * table to recover r/w permission. Incorrect record for such case
+     * will cause unexpected more shadow faults due to propagation is
+     * skipped.
+     */
+    if ( (r == X86EMUL_OKAY) && sh_mfn_is_a_page_table(gmfn) )
+    {
+        if ( !fast_emul )
+        {
+            v->arch.paging.shadow.last_emulated_frame = va >> PAGE_SHIFT;
+            v->arch.paging.shadow.last_emulated_mfn = mfn_x(gmfn);
+            v->arch.paging.last_write_emul_ok = 1;
+        }
+    }
+    else if ( fast_emul )
+        v->arch.paging.last_write_emul_ok = 0;
+#endif
 
 #if GUEST_PAGING_LEVELS == 3 /* PAE guest */
     if ( r == X86EMUL_OKAY ) {
@@ -3077,6 +3143,10 @@ sh_invlpg(struct vcpu *v, unsigned long va)
 #if (SHADOW_OPTIMIZATIONS & SHOPT_VIRTUAL_TLB)
     /* No longer safe to use cached gva->gfn translations */
     vtlb_flush(v);
+#endif
+
+#if SHADOW_OPTIMIZATIONS & SHOPT_FAST_EMULATION
+    v->arch.paging.last_write_emul_ok = 0;
 #endif
 
     /* First check that we can safely read the shadow l2e.  SMP/PAE linux can
@@ -3813,6 +3883,10 @@ sh_update_cr3(struct vcpu *v, int do_locking)
 #if (SHADOW_OPTIMIZATIONS & SHOPT_VIRTUAL_TLB)
     /* No longer safe to use cached gva->gfn translations */
     vtlb_flush(v);
+#endif
+
+#if SHADOW_OPTIMIZATIONS & SHOPT_FAST_EMULATION
+    v->arch.paging.last_write_emul_ok = 0;
 #endif
 
     /* Release the lock, if we took it (otherwise it's the caller's problem) */

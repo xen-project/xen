@@ -133,3 +133,13 @@ int iommu_unmap_page(struct domain *d, unsigned long gfn)
 
     return hd->platform_ops->unmap_page(d, gfn);
 }
+
+void deassign_device(struct domain *d, u8 bus, u8 devfn)
+{
+    struct hvm_iommu *hd = domain_hvm_iommu(d);
+
+    if ( !iommu_enabled || !hd->platform_ops)
+        return;
+
+    return hd->platform_ops->reassign_device(d, dom0, bus, devfn);
+}

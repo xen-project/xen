@@ -4382,6 +4382,23 @@ void usb_info(void)
     }
 }
 
+void do_pci_del(char *devname)
+{
+#ifdef CONFIG_PASSTHROUGH
+    int pci_slot = bdf_to_slot(devname);
+    acpi_php_del(pci_slot);
+#endif
+}
+
+void do_pci_add(char *devname)
+{
+#ifdef CONFIG_PASSTHROUGH
+    int pci_slot = insert_to_pci_slot(devname);
+    acpi_php_add(pci_slot);
+#endif
+}
+
+
 /***********************************************************/
 /* pid file */
 
@@ -7067,7 +7084,7 @@ int main(int argc, char **argv)
 #endif
     sigset_t set;
     char qemu_dm_logfilename[128];
-    const char *direct_pci = NULL;
+    const char *direct_pci = direct_pci_str;
 
 #if !defined(__sun__) && !defined(CONFIG_STUBDOM)
     /* Maximise rlimits. Needed where default constraints are tight (*BSD). */
@@ -7589,9 +7606,6 @@ int main(int argc, char **argv)
                 break;
             case QEMU_OPTION_vncunused:
                 vncunused++;
-                break;
-            case QEMU_OPTION_pci:
-                direct_pci = optarg;
                 break;
             }
         }

@@ -29,31 +29,159 @@
 
 extern FILE *logfile;
 
+struct php_dev {
+    struct pt_dev *pt_dev;
+    uint8_t valid;
+    uint8_t r_bus;
+    uint8_t r_dev;
+    uint8_t r_func;
+};
+struct dpci_infos {
+
+    struct php_dev php_devs[PHP_SLOT_LEN];
+
+    PCIBus *e_bus;
+    struct pci_access *pci_access;
+
+} dpci_infos;
+
 static int token_value(char *token)
 {
-    token = strchr(token, 'x') + 1;
     return strtol(token, NULL, 16);
 }
 
 static int next_bdf(char **str, int *seg, int *bus, int *dev, int *func)
 {
-    char *token;
+    char *token, *delim = ":.-";
 
-    if ( !(*str) || !strchr(*str, ',') )
+    if ( !(*str) ||
+          ( !strchr(*str, ':') && !strchr(*str, '.')) )
         return 0;
 
-    token = *str;
-    *seg  = token_value(token);
-    token = strchr(token, ',') + 1;
+    token  = strsep(str, delim);
+    *seg = token_value(token);
+
+    token  = strsep(str, delim);
     *bus  = token_value(token);
-    token = strchr(token, ',') + 1;
+
+    token  = strsep(str, delim);
     *dev  = token_value(token);
-    token = strchr(token, ',') + 1;
+
+    token  = strsep(str, delim);
     *func  = token_value(token);
-    token = strchr(token, ',');
-    *str = token ? token + 1 : NULL;
 
     return 1;
+}
+
+/* Insert a new pass-through device into a specific pci slot.
+ * input  dom:bus:dev.func@slot, chose free one if slot == 0
+ * return -1: required slot not available
+ *         0: no free hotplug slots, but normal slot should okay
+ *        >0: the new hotplug slot
+ */
+static int __insert_to_pci_slot(int bus, int dev, int func, int slot)
+{
+    int i, php_slot;
+
+    /* preferred virt pci slot */
+    if ( slot >= PHP_SLOT_START && slot < PHP_SLOT_END )
+    {
+        php_slot = PCI_TO_PHP_SLOT(slot);
+        if ( !dpci_infos.php_devs[php_slot].valid )
+        {
+            goto found;
+        }
+        else
+            return -1;
+    }
+
+    if ( slot != 0 )
+        return -1;
+
+    /* slot == 0, pick up a free one */
+    for ( i = 0; i < PHP_SLOT_LEN; i++ )
+    {
+        if ( !dpci_infos.php_devs[i].valid )
+        {
+            php_slot = i;
+            goto found;
+        }
+    }
+
+    /* not found */
+    return 0;
+
+found:
+    dpci_infos.php_devs[php_slot].valid  = 1;
+    dpci_infos.php_devs[php_slot].r_bus  = bus;
+    dpci_infos.php_devs[php_slot].r_dev  = dev;
+    dpci_infos.php_devs[php_slot].r_func = func;
+    return PHP_TO_PCI_SLOT(php_slot);
+}
+
+/* Insert a new pass-through device into a specific pci slot.
+ * input  dom:bus:dev.func@slot
+ */
+int insert_to_pci_slot(char *bdf_slt)
+{
+    int seg, bus, dev, func, slot;
+    char *bdf_str, *slt_str, *delim="@";
+
+    bdf_str = strsep(&bdf_slt, delim);
+    slt_str = bdf_slt;
+    slot = token_value(slt_str);
+
+    if ( !next_bdf(&bdf_str, &seg, &bus, &dev, &func))
+    {
+        return -1;
+    }
+
+    return __insert_to_pci_slot(bus, dev, func, slot);
+
+}
+
+/* Test if a pci slot has a device
+ * 1:  present
+ * 0:  not present
+ * -1: invalide pci slot input
+ */
+int test_pci_slot(int slot)
+{
+    int php_slot;
+
+    if ( slot < PHP_SLOT_START || slot >= PHP_SLOT_END )
+        return -1;
+
+    php_slot = PCI_TO_PHP_SLOT(slot);
+    if ( dpci_infos.php_devs[php_slot].valid )
+        return 1;
+    else
+        return 0;
+}
+
+/* find the pci slot for pass-through dev with specified BDF */
+int bdf_to_slot(char *bdf_str)
+{
+    int seg, bus, dev, func, i;
+
+    if ( !next_bdf(&bdf_str, &seg, &bus, &dev, &func))
+    {
+        return -1;
+    }
+
+    /* locate the virtual pci slot for this VTd device */
+    for ( i = 0; i < PHP_SLOT_LEN; i++ )
+    {
+        if ( dpci_infos.php_devs[i].valid &&
+           dpci_infos.php_devs[i].r_bus == bus &&
+           dpci_infos.php_devs[i].r_dev  == dev &&
+           dpci_infos.php_devs[i].r_func == func )
+        {
+            return PHP_TO_PCI_SLOT(i);
+        }
+    }
+
+    return -1;
 }
 
 /* Being called each time a mmio region has been updated */
@@ -269,15 +397,64 @@ static int pt_register_regions(struct pt_dev *assigned_device)
     return 0;
 }
 
+static int pt_unregister_regions(struct pt_dev *assigned_device)
+{
+    int i, type, ret;
+    uint32_t e_size;
+    PCIDevice *d = (PCIDevice*)assigned_device;
+
+    for ( i = 0; i < PCI_NUM_REGIONS; i++ )
+    {
+        e_size = assigned_device->bases[i].e_size;
+        if ( e_size == 0 )
+            continue;
+
+        type = d->io_regions[i].type;
+
+        if ( type == PCI_ADDRESS_SPACE_MEM ||
+             type == PCI_ADDRESS_SPACE_MEM_PREFETCH )
+        {
+            ret = xc_domain_memory_mapping(xc_handle, domid,
+                    assigned_device->bases[i].e_physbase >> XC_PAGE_SHIFT,
+                    assigned_device->bases[i].access.maddr >> XC_PAGE_SHIFT,
+                    (e_size+XC_PAGE_SIZE-1) >> XC_PAGE_SHIFT,
+                    DPCI_REMOVE_MAPPING);
+            if ( ret != 0 )
+            {
+                PT_LOG("Error: remove old mem mapping failed!\n");
+                continue;
+            }
+
+        }
+        else if ( type == PCI_ADDRESS_SPACE_IO )
+        {
+            ret = xc_domain_ioport_mapping(xc_handle, domid,
+                        assigned_device->bases[i].e_physbase,
+                        assigned_device->bases[i].access.pio_base,
+                        e_size,
+                        DPCI_REMOVE_MAPPING);
+            if ( ret != 0 )
+            {
+                PT_LOG("Error: remove old io mapping failed!\n");
+                continue;
+            }
+
+        }
+        
+    }
+
+}
+
 struct pt_dev * register_real_device(PCIBus *e_bus,
         const char *e_dev_name, int e_devfn, uint8_t r_bus, uint8_t r_dev,
         uint8_t r_func, uint32_t machine_irq, struct pci_access *pci_access)
 {
-    int rc, i;
+    int rc = -1, i;
     struct pt_dev *assigned_device = NULL;
     struct pci_dev *pci_dev;
     uint8_t e_device, e_intx;
     struct pci_config_cf8 machine_bdf;
+    int free_pci_slot = -1;
 
     PT_LOG("Assigning real physical device %02x:%02x.%x ...\n",
         r_bus, r_dev, r_func);
@@ -296,6 +473,15 @@ struct pt_dev * register_real_device(PCIBus *e_bus,
         return NULL;
     }
 
+    if ( e_devfn == PT_VIRT_DEVFN_AUTO ) {
+        /*indicate a static assignment(not hotplug), so find a free PCI hot plug slot */
+        free_pci_slot = __insert_to_pci_slot(r_bus, r_dev, r_func, 0);
+        if ( free_pci_slot > 0 )
+            e_devfn = free_pci_slot  << 3;
+        else
+            PT_LOG("Error: no free virtual PCI hot plug slot, thus no live migration.\n");
+    }
+
     /* Register device */
     assigned_device = (struct pt_dev *) pci_register_device(e_bus, e_dev_name,
                                 sizeof(struct pt_dev), e_devfn,
@@ -306,7 +492,11 @@ struct pt_dev * register_real_device(PCIBus *e_bus,
         return NULL;
     }
 
+    if ( free_pci_slot > 0 )
+        dpci_infos.php_devs[PCI_TO_PHP_SLOT(free_pci_slot)].pt_dev = assigned_device;
+
     assigned_device->pci_dev = pci_dev;
+
 
     /* Assign device */
     machine_bdf.reg = 0;
@@ -355,11 +545,96 @@ struct pt_dev * register_real_device(PCIBus *e_bus,
     return assigned_device;
 }
 
+int unregister_real_device(int php_slot)
+{
+    struct php_dev *php_dev;
+    struct pci_dev *pci_dev;
+    uint8_t e_device, e_intx;
+    struct pt_dev *assigned_device = NULL;
+    uint32_t machine_irq;
+    uint32_t bdf = 0;
+    int rc = -1;
+
+    if ( php_slot < 0 || php_slot >= PHP_SLOT_LEN )
+       return -1;
+
+    php_dev = &dpci_infos.php_devs[php_slot];
+    assigned_device = php_dev->pt_dev;
+
+    if ( !assigned_device || !php_dev->valid )
+        return -1;
+
+    pci_dev = assigned_device->pci_dev;
+
+    /* hide pci dev from qemu */
+    pci_hide_device((PCIDevice*)assigned_device);
+
+    /* Unbind interrupt */
+    e_device = (assigned_device->dev.devfn >> 3) & 0x1f;
+    e_intx = assigned_device->dev.config[0x3d]-1;
+    machine_irq = pci_dev->irq;
+
+    if ( machine_irq != 0 ) {
+        rc = xc_domain_unbind_pt_irq(xc_handle, domid, machine_irq, PT_IRQ_TYPE_PCI, 0,
+                                       e_device, e_intx, 0);
+        if ( rc < 0 )
+        {
+            /* TBD: unregister device in case of an error */
+            PT_LOG("Error: Unbinding of interrupt failed! rc=%d\n", rc);
+        }
+    }
+
+    /* unregister real device's MMIO/PIO BARs */
+    pt_unregister_regions(assigned_device);
+    
+    /* deassign the dev to dom0 */
+    bdf |= (pci_dev->bus  & 0xff) << 16;
+    bdf |= (pci_dev->dev  & 0x1f) << 11;
+    bdf |= (pci_dev->func & 0x1f) << 8;
+    if ( (rc = xc_deassign_device(xc_handle, domid, bdf)) != 0)
+        PT_LOG("Error: Revoking the device failed! rc=%d\n", rc);
+
+    /* mark this slot as free */
+    php_dev->valid = 0;
+    php_dev->pt_dev = NULL;
+    qemu_free(assigned_device);
+
+    return 0;
+}
+
+int power_on_php_slot(int php_slot)
+{
+    struct php_dev *php_dev = &dpci_infos.php_devs[php_slot];
+    int pci_slot = php_slot + PHP_SLOT_START;
+    struct pt_dev *pt_dev;
+    pt_dev = 
+        register_real_device(dpci_infos.e_bus,
+            "DIRECT PCI",
+            pci_slot << 3,
+            php_dev->r_bus,
+            php_dev->r_dev,
+            php_dev->r_func,
+            PT_MACHINE_IRQ_AUTO,
+            dpci_infos.pci_access);
+
+    php_dev->pt_dev = pt_dev;
+
+    return 0;
+
+}
+
+int power_off_php_slot(int php_slot)
+{
+    return unregister_real_device(php_slot);
+}
+
 int pt_init(PCIBus *e_bus, char *direct_pci)
 {
-    int seg, b, d, f;
+    int seg, b, d, f, php_slot = 0;
     struct pt_dev *pt_dev;
     struct pci_access *pci_access;
+    char *vslots;
+    char slot_str[8];
 
     /* Initialize libpci */
     pci_access = pci_alloc();
@@ -370,6 +645,19 @@ int pt_init(PCIBus *e_bus, char *direct_pci)
     }
     pci_init(pci_access);
     pci_scan_bus(pci_access);
+
+    memset(&dpci_infos, 0, sizeof(struct dpci_infos));
+    dpci_infos.pci_access = pci_access;
+    dpci_infos.e_bus      = e_bus;
+
+    if ( strlen(direct_pci) == 0 ) {
+        return 0;
+    }
+
+    /* the virtual pci slots of all pass-through devs
+     * with hex format: xx;xx...;
+     */
+    vslots = qemu_mallocz ( strlen(direct_pci) / 3 );
 
     /* Assign given devices to guest */
     while ( next_bdf(&direct_pci, &seg, &b, &d, &f) )
@@ -382,7 +670,24 @@ int pt_init(PCIBus *e_bus, char *direct_pci)
             PT_LOG("Error: Registration failed (%02x:%02x.%x)\n", b, d, f);
             return -1;
         }
+
+        /* Record the virtual slot info */
+        if ( php_slot < PHP_SLOT_LEN &&
+              dpci_infos.php_devs[php_slot].pt_dev == pt_dev )
+        {
+            sprintf(slot_str, "0x%x;", PHP_TO_PCI_SLOT(php_slot));
+        }
+        else
+            sprintf(slot_str, "0x%x;", 0);
+
+        strcat(vslots, slot_str);
+        php_slot++;
     }
+
+    /* Write virtual slots info to xenstore for Control panel use */
+    xenstore_write_vslots(vslots);
+
+    qemu_free(vslots);
 
     /* Success */
     return 0;

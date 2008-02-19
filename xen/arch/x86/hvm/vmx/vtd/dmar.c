@@ -102,7 +102,7 @@ struct iommu * ioapic_to_iommu(unsigned int apic_id)
             return drhd->iommu;
         }
     }
-    dprintk(XENLOG_WARNING VTDPREFIX, "returning NULL\n");
+    dprintk(XENLOG_INFO VTDPREFIX, "returning NULL\n");
     return NULL;
 }
 
