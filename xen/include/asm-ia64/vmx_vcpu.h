@@ -54,6 +54,7 @@ extern u64 cr_igfld_mask(int index, u64 value);
 extern int check_indirect_reg_rsv_fields(int type, int index, u64 value);
 extern u64 set_isr_ei_ni(VCPU * vcpu);
 extern u64 set_isr_for_na_inst(VCPU * vcpu, int op);
+extern void set_illegal_op_isr (VCPU *vcpu);
 
 /* next all for VTI domain APIs definition */
 extern void vmx_vcpu_set_psr(VCPU * vcpu, unsigned long value);
