@@ -37,7 +37,7 @@ static int alloc_magic_pages(struct xc_dom_image *dom)
     return 0;
 }
 
-static int start_info_ia64(struct xc_dom_image *dom)
+int start_info_ia64(struct xc_dom_image *dom)
 {
     start_info_ia64_t *start_info =
         xc_dom_pfn_to_ptr(dom, dom->start_info_pfn, 1);
@@ -79,7 +79,7 @@ static int start_info_ia64(struct xc_dom_image *dom)
     return 0;
 }
 
-static int shared_info_ia64(struct xc_dom_image *dom, void *ptr)
+int shared_info_ia64(struct xc_dom_image *dom, void *ptr)
 {
     shared_info_ia64_t *shared_info = ptr;
     int i;
@@ -153,15 +153,27 @@ int arch_setup_meminit(struct xc_dom_image *dom)
 {
     xen_pfn_t pfn;
     int rc;
+    unsigned long start;
+    unsigned long nbr;
 
     /* setup initial p2m */
-    dom->p2m_host = xc_dom_malloc(dom, sizeof(xen_pfn_t) * dom->total_pages);
-    for ( pfn = 0; pfn < dom->total_pages; pfn++ )
-        dom->p2m_host[pfn] = pfn;
+    if (dom->guest_type && strcmp(dom->guest_type,
+                                  "hvm-3.0-ia64-sioemu") == 0) {
+        start = FW_MEM_BASE >> PAGE_SHIFT_IA64;
+        nbr = FW_MEM_SIZE >> PAGE_SHIFT_IA64;
+    } else {
+        start = 0;
+        nbr = dom->total_pages;
+    }
+
+    /* setup initial p2m */
+    dom->p2m_host = xc_dom_malloc(dom, sizeof(xen_pfn_t) * nbr);
+    for ( pfn = 0; pfn < nbr; pfn++ )
+        dom->p2m_host[pfn] = start + pfn;
 
     /* allocate guest memory */
     rc = xc_domain_memory_populate_physmap(dom->guest_xc, dom->guest_domid,
-                                           dom->total_pages, 0, 0,
+                                           nbr, 0, 0,
                                            dom->p2m_host);
     return rc;
 }
@@ -232,7 +244,20 @@ int arch_setup_bootearly(struct xc_dom_image *dom)
     DECLARE_DOMCTL;
     int rc;
 
-    xc_dom_printf("%s: setup firmware\n", __FUNCTION__);
+    xc_dom_printf("%s: setup firmware for %s\n", __FUNCTION__, dom->guest_type);
+
+    if (dom->guest_type && strcmp(dom->guest_type,
+                                  "hvm-3.0-ia64-sioemu") == 0) {
+        memset(&domctl, 0, sizeof(domctl));
+        domctl.u.arch_setup.flags = XEN_DOMAINSETUP_sioemu_guest;
+        domctl.u.arch_setup.bp = 0;
+        domctl.u.arch_setup.maxmem = 0;
+        domctl.cmd = XEN_DOMCTL_arch_setup;
+        domctl.domain = dom->guest_domid;
+        rc = xc_domctl(dom->guest_xc, &domctl);
+        xc_dom_printf("%s: hvm-3.0-ia64-sioemu: %d\n", __FUNCTION__, rc);
+        return rc;
+    }
 
     rc = ia64_setup_memmap(dom);
     if (rc)

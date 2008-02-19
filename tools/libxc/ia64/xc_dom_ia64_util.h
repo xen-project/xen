@@ -16,4 +16,11 @@ xen_ia64_dom_fw_setup(struct xc_dom_image *d, uint64_t brkimm,
 #define efi_systable_init_dom0(tables)	assert(0)
 #define complete_dom0_memmap(d, tables) ({assert(0);0;})
 
+/* Defined in xc_dom_ia64.c  */
+extern int start_info_ia64(struct xc_dom_image *dom);
+extern int shared_info_ia64(struct xc_dom_image *dom, void *ptr);
+
+#define FW_MEM_BASE 0xff000000UL
+#define FW_MEM_SIZE 0x01000000UL
+
 #endif /* XC_IA64_DOM_IA64_UTIL_H */
