@@ -272,9 +272,10 @@ thash_data_t * vhpt_lookup(u64 va)
 
 u64 guest_vhpt_lookup(u64 iha, u64 *pte)
 {
-    u64 ret;
+    u64 ret, tmp;
     thash_data_t * data;
 
+    /* Try to fill mTLB for the gVHPT entry.  */
     data = vhpt_lookup(iha);
     if (data == NULL) {
         data = __vtr_lookup(current, iha, DSIDE_TLB);
@@ -285,17 +286,18 @@ u64 guest_vhpt_lookup(u64 iha, u64 *pte)
 
     asm volatile ("rsm psr.ic|psr.i;;"
                   "srlz.d;;"
-                  "ld8.s r9=[%1];;"
-                  "tnat.nz p6,p7=r9;;"
-                  "(p6) mov %0=1;"
-                  "(p6) mov r9=r0;"
-                  "(p7) extr.u r9=r9,0,53;;"
-                  "(p7) mov %0=r0;"
-                  "(p7) st8 [%2]=r9;;"
+                  "ld8.s %1=[%2];;"		/* Read VHPT entry.  */
+                  "tnat.nz p6,p7=%1;;"		/* Success ?  */
+                  "(p6) mov %0=1;"		/* No -> ret = 1.  */
+                  "(p6) mov %1=r0;"
+                  "(p7) extr.u %1=%1,0,53;;"	/* Yes -> mask ig bits.  */
+                  "(p7) mov %0=r0;"		/*     -> ret = 0.  */
+                  "(p7) st8 [%3]=%1;;"		/*     -> save.  */
                   "ssm psr.ic;;"
                   "srlz.d;;"
                   "ssm psr.i;;"
-                  : "=r"(ret) : "r"(iha), "r"(pte):"memory");
+                  : "=r"(ret), "=r"(tmp)
+                  : "r"(iha), "r"(pte):"memory","p6","p7");
     return ret;
 }
 
