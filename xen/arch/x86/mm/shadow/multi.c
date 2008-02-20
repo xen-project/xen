@@ -3019,7 +3019,7 @@ static int sh_page_fault(struct vcpu *v,
                      "injection: cr2=%#lx, mfn=%#lx\n", 
                      va, mfn_x(gmfn));
             sh_remove_shadows(v, gmfn, 0 /* thorough */, 1 /* must succeed */);
-            goto done;
+            return EXCRET_fault_fixed;
         }
     }
 
