@@ -227,7 +227,16 @@ static PyObject *pyxc_vcpu_setaffinity(XcObject *self,
     {
         cpumap = 0ULL;
         for ( i = 0; i < PyList_Size(cpulist); i++ ) 
-            cpumap |= (uint64_t)1 << PyInt_AsLong(PyList_GetItem(cpulist, i));
+        {
+            long cpu = PyInt_AsLong(PyList_GetItem(cpulist, i));
+            if ( cpu >= 64 )
+            {
+                errno = EINVAL;
+                PyErr_SetFromErrno(xc_error_obj);
+                return NULL;
+            }
+            cpumap |= (uint64_t)1 << cpu;
+        }
     }
   
     if ( xc_vcpu_setaffinity(self->xc_handle, dom, vcpu, cpumap) != 0 )
