@@ -194,18 +194,8 @@ int compat_mmuext_op(XEN_GUEST_HANDLE(mmuext_op_compat_t) cmp_uops,
     for ( ; count; count -= i )
     {
         mmuext_op_t *nat_op = nat_ops.p;
-        unsigned int limit;
+        unsigned int limit = COMPAT_ARG_XLAT_SIZE / sizeof(*nat_op);
         int err;
-
-        if ( hypercall_preempt_check() )
-        {
-            rc = hypercall_create_continuation(
-                __HYPERVISOR_mmuext_op, "hihi",
-                cmp_uops, count | MMU_UPDATE_PREEMPTED, pdone, foreigndom);
-            break;
-        }
-
-        limit = COMPAT_ARG_XLAT_SIZE / sizeof(*nat_op);
 
         for ( i = 0; i < min(limit, count); ++i )
         {
