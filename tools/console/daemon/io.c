@@ -64,13 +64,14 @@ extern int log_time_hv;
 extern int log_time_guest;
 extern char *log_dir;
 
+static int log_time_hv_needts = 1;
+static int log_time_guest_needts = 1;
 static int log_hv_fd = -1;
 static evtchn_port_or_error_t log_hv_evtchn = -1;
 static int xc_handle = -1;
 static int xce_handle = -1;
 
-struct buffer
-{
+struct buffer {
 	char *data;
 	size_t consumed;
 	size_t size;
@@ -78,8 +79,7 @@ struct buffer
 	size_t max_capacity;
 };
 
-struct domain
-{
+struct domain {
 	int domid;
 	int master_fd;
 	int slave_fd;
@@ -116,30 +116,32 @@ static int write_all(int fd, const char* buf, size_t len)
 	return 0;
 }
 
-static int write_with_timestamp(int fd, const char *data, size_t sz)
+static int write_with_timestamp(int fd, const char *data, size_t sz,
+				int *needts)
 {
-	char buf[sz+1];
 	char ts[32];
 	time_t now = time(NULL);
 	const struct tm *tmnow = localtime(&now);
 	size_t tslen = strftime(ts, sizeof(ts), "[%Y-%m-%d %H:%M:%S] ", tmnow);
+	const char *last_byte = data + sz - 1;
 
-	memcpy(buf, data, sz);
-	while (sz > 0 && buf[sz-1] == '\r')
-		sz--;		    // Don't print trailing \r's
-	if (sz > 0 && buf[sz-1] != '\n')
-		buf[sz++] = '\n';   // Force ending newline
-	data = buf;
+	while (data <= last_byte) {
+		const char *nl = memchr(data, '\n', sz);
+		int found_nl = (nl != NULL);
+		if (!found_nl)
+			nl = last_byte;
 
-	while (sz > 0) {
-		const char *nl = strchr(data, '\n') + 1;
-		size_t towrite = nl - data;
-		if (write_all(fd, ts, tslen) < 0)
+		if ((*needts && write_all(fd, ts, tslen))
+		    || write_all(fd, data, nl + 1 - data))
 			return -1;
-		if (write_all(fd, data, towrite))
-			return -1;
-		sz -= towrite;
-		data = nl;
+
+		*needts = found_nl;
+		data = nl + 1;
+		if (found_nl) {
+			// If we printed a newline, strip all \r following it
+			while (data <= last_byte && *data == '\r')
+				data++;
+		}
 	}
 
 	return 0;
@@ -183,12 +185,19 @@ static void buffer_append(struct domain *dom)
 	if (dom->log_fd != -1) {
 		int logret;
 		if (log_time_guest) {
-			logret = write_with_timestamp(dom->log_fd, buffer->data + buffer->size - size, size);
+			logret = write_with_timestamp(
+				dom->log_fd,
+				buffer->data + buffer->size - size,
+				size, &log_time_guest_needts);
 		} else {
-			logret = write_all(dom->log_fd, buffer->data + buffer->size - size, size);
-        }
+			logret = write_all(
+				dom->log_fd,
+				buffer->data + buffer->size - size,
+				size);
+		}
 		if (logret < 0)
-			dolog(LOG_ERR, "Write to log failed on domain %d: %d (%s)\n",
+			dolog(LOG_ERR, "Write to log failed "
+			      "on domain %d: %d (%s)\n",
 			      dom->domid, errno, strerror(errno));
 	}
 
@@ -246,7 +255,8 @@ static int create_hv_log(void)
 		      logfile, errno, strerror(errno));
 	if (fd != -1 && log_time_hv) {
 		if (write_with_timestamp(fd, "Logfile Opened",
-					 strlen("Logfile Opened")) < 0) {
+					 strlen("Logfile Opened"),
+					 &log_time_hv_needts) < 0) {
 			dolog(LOG_ERR, "Failed to log opening timestamp "
 				       "in %s: %d (%s)", logfile, errno,
 				       strerror(errno));
@@ -289,7 +299,8 @@ static int create_domain_log(struct domain *dom)
 		      logfile, errno, strerror(errno));
 	if (fd != -1 && log_time_guest) {
 		if (write_with_timestamp(fd, "Logfile Opened",
-					 strlen("Logfile Opened")) < 0) {
+					 strlen("Logfile Opened"),
+					 &log_time_guest_needts) < 0) {
 			dolog(LOG_ERR, "Failed to log opening timestamp "
 				       "in %s: %d (%s)", logfile, errno,
 				       strerror(errno));
@@ -314,7 +325,7 @@ static void domain_close_tty(struct domain *dom)
 
 #ifdef __sun__
 static int openpty(int *amaster, int *aslave, char *name,
-                   struct termios *termp, struct winsize *winp)
+		   struct termios *termp, struct winsize *winp)
 {
 	const char *slave;
 	int mfd = -1, sfd = -1;
@@ -389,14 +400,16 @@ static int domain_create_tty(struct domain *dom)
 
 	if (openpty(&dom->master_fd, &dom->slave_fd, NULL, &term, NULL) < 0) {
 		err = errno;
-		dolog(LOG_ERR, "Failed to create tty for domain-%d (errno = %i, %s)",
+		dolog(LOG_ERR, "Failed to create tty for domain-%d "
+		      "(errno = %i, %s)",
 		      dom->domid, err, strerror(err));
 		return 0;
 	}
 
 	if ((slave = ptsname(dom->master_fd)) == NULL) {
 		err = errno;
-		dolog(LOG_ERR, "Failed to get slave name for domain-%d (errno = %i, %s)",
+		dolog(LOG_ERR, "Failed to get slave name for domain-%d "
+		      "(errno = %i, %s)",
 		      dom->domid, err, strerror(err));
 		goto out;
 	}
@@ -886,8 +899,9 @@ static void handle_hv_logs(void)
 
 	if (xc_readconsolering(xc_handle, &bufptr, &size, 0, 1, &index) == 0 && size > 0) {
 		int logret;
-		if (log_time_guest)
-			logret = write_with_timestamp(log_hv_fd, buffer, size);
+		if (log_time_hv)
+			logret = write_with_timestamp(log_hv_fd, buffer, size,
+						      &log_time_hv_needts);
 		else
 			logret = write_all(log_hv_fd, buffer, size);
 
@@ -1048,14 +1062,17 @@ void handle_io(void)
 			n = d->next;
 			if (d->event_count < RATE_LIMIT_ALLOWANCE) {
 				if (d->xce_handle != -1 &&
-				    FD_ISSET(xc_evtchn_fd(d->xce_handle), &readfds))
+				    FD_ISSET(xc_evtchn_fd(d->xce_handle),
+					     &readfds))
 					handle_ring_read(d);
 			}
 
-			if (d->master_fd != -1 && FD_ISSET(d->master_fd, &readfds))
+			if (d->master_fd != -1 && FD_ISSET(d->master_fd,
+							   &readfds))
 				handle_tty_read(d);
 
-			if (d->master_fd != -1 && FD_ISSET(d->master_fd, &writefds))
+			if (d->master_fd != -1 && FD_ISSET(d->master_fd,
+							   &writefds))
 				handle_tty_write(d);
 
 			if (d->is_dead)
