@@ -935,6 +935,7 @@ struct DisplayState {
     void *opaque;
 
     int switchbpp;
+    int shared_buf;
     
     void (*dpy_update)(struct DisplayState *s, int x, int y, int w, int h);
     void (*dpy_resize)(struct DisplayState *s, int w, int h);

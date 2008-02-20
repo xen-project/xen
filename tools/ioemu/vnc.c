@@ -336,11 +336,21 @@ static void vnc_framebuffer_update(VncState *vs, int x, int y, int w, int h,
 
 static void vnc_dpy_resize(DisplayState *ds, int w, int h)
 {
+    static int allocated;
     int size_changed;
     VncState *vs = ds->opaque;
     int o;
 
-    ds->data = realloc(ds->data, w * h * vs->depth);
+    if (!ds->shared_buf) {
+        if (allocated)
+            ds->data = realloc(ds->data, w * h * vs->depth);
+        else
+            ds->data = malloc(w * h * vs->depth);
+        allocated = 1;
+    } else if (allocated) {
+        free(ds->data);
+        allocated = 0;
+    }
     vs->old_data = realloc(vs->old_data, w * h * vs->depth);
     vs->dirty_row = realloc(vs->dirty_row, h * sizeof(vs->dirty_row[0]));
     vs->update_row = realloc(vs->update_row, h * sizeof(vs->dirty_row[0]));
@@ -537,6 +547,11 @@ static void vnc_copy(DisplayState *ds, int src_x, int src_y, int dst_x, int dst_
     int pitch = ds->linesize;
     VncState *vs = ds->opaque;
     int updating_client = 1;
+
+    if (ds->shared_buf) {
+        framebuffer_set_updated(vs, dst_x, dst_y, w, h);
+        return;
+    }
 
     if (src_x < vs->visible_x || src_y < vs->visible_y ||
 	dst_x < vs->visible_x || dst_y < vs->visible_y ||
@@ -1409,9 +1424,6 @@ static void set_pixel_format(VncState *vs,
     vs->blue_shift = blue_shift;
     vs->blue_max = blue_max;
     vs->pix_bpp = bits_per_pixel / 8;
-
-    vga_hw_invalidate();
-    vga_hw_update();
 }
 
 static void pixel_format_message (VncState *vs) {
@@ -1468,16 +1480,26 @@ static void pixel_format_message (VncState *vs) {
 static void vnc_dpy_colourdepth(DisplayState *ds, int depth)
 {
     int host_big_endian_flag;
-    struct VncState *vs;
-    
-    if (!depth) return;
-    
+    struct VncState *vs = ds->opaque;
+
+    switch (depth) {
+        case 24:
+            ds->shared_buf = 0;
+            depth = 32;
+            break;
+        case 0:
+            ds->shared_buf = 0;
+            return;
+        default:
+            ds->shared_buf = 1;
+            break;
+    }
+
 #ifdef WORDS_BIGENDIAN
     host_big_endian_flag = 1;
 #else
     host_big_endian_flag = 0;
-#endif
-    vs = ds->opaque;   
+#endif   
     
     switch (depth) {
         case 8:
@@ -2312,7 +2334,7 @@ void vnc_display_init(DisplayState *ds)
 
     vs->ds->width = 640;
     vs->ds->height = 400;
-    vnc_dpy_colourdepth(vs->ds, 32);
+    vnc_dpy_colourdepth(vs->ds, 24);
 }
 
 #if CONFIG_VNC_TLS

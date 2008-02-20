@@ -1135,8 +1135,6 @@ static void vga_draw_text(VGAState *s, int full_update)
     }
 
     depth = s->get_bpp(s);
-    if (depth == 24)
-        depth = 32;
     if (s->ds->dpy_colourdepth != NULL && s->ds->depth != depth)
         s->ds->dpy_colourdepth(s->ds, depth);
     if (width != s->last_width || height != s->last_height ||
@@ -1557,10 +1555,10 @@ static void vga_draw_graphic(VGAState *s, int full_update)
     vga_draw_line = vga_draw_line_table[v * NB_DEPTHS + get_depth_index(s->ds)];
 
     depth = s->get_bpp(s);
-    if (depth == 24)
-        depth = 32;
-    if (s->ds->dpy_colourdepth != NULL && s->ds->depth != depth)
-        s->ds->dpy_colourdepth(s->ds, depth);
+    if (s->ds->dpy_colourdepth != NULL && s->ds->depth != depth) {
+        if (depth != 24 || s->ds->depth != 32)
+            s->ds->dpy_colourdepth(s->ds, depth);
+    }
     if (disp_width != s->last_width ||
         height != s->last_height) {
         dpy_resize(s->ds, disp_width, height);
@@ -1570,7 +1568,9 @@ static void vga_draw_graphic(VGAState *s, int full_update)
         s->last_height = height;
         full_update = 1;
     }
-    if (s->cursor_invalidate)
+    if (s->ds->shared_buf && s->ds->data != s->vram_ptr + (s->start_addr * 4))
+        s->ds->data = s->vram_ptr + (s->start_addr * 4);
+    if (!s->ds->shared_buf && s->cursor_invalidate)
         s->cursor_invalidate(s);
     
     line_offset = s->line_offset;
@@ -1621,9 +1621,11 @@ static void vga_draw_graphic(VGAState *s, int full_update)
                 page_min = page0;
             if (page_max == 0 || page1 > page_max)
                 page_max = page1;
-            vga_draw_line(s, d, s->vram_ptr + addr, width);
-            if (s->cursor_draw_line)
-                s->cursor_draw_line(s, d, y);
+            if (!s->ds->shared_buf) {
+                vga_draw_line(s, d, s->vram_ptr + addr, width);
+                if (s->cursor_draw_line)
+                    s->cursor_draw_line(s, d, y);
+            }
         } else {
             if (y_start >= 0) {
                 /* flush to display */
