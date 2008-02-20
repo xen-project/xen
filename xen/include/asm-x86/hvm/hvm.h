@@ -117,6 +117,15 @@ struct hvm_function_table {
 
     int  (*cpu_up)(void);
     void (*cpu_down)(void);
+
+    /* Instruction intercepts: non-void return values are X86EMUL codes. */
+    void (*cpuid_intercept)(
+        unsigned int *eax, unsigned int *ebx,
+        unsigned int *ecx, unsigned int *edx);
+    void (*wbinvd_intercept)(void);
+    void (*fpu_dirty_intercept)(void);
+    int (*msr_read_intercept)(struct cpu_user_regs *regs);
+    int (*msr_write_intercept)(struct cpu_user_regs *regs);
 };
 
 extern struct hvm_function_table hvm_funcs;
@@ -162,9 +171,6 @@ hvm_guest_x86_mode(struct vcpu *v)
     ASSERT(v == current);
     return hvm_funcs.guest_x86_mode(v);
 }
-
-int hvm_instruction_fetch(unsigned long pc, int address_bytes,
-                          unsigned char *buf);
 
 static inline void
 hvm_update_host_cr3(struct vcpu *v)

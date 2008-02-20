@@ -1,9 +1,9 @@
 subdir-y += svm
 subdir-y += vmx
 
+obj-y += emulate.o
 obj-y += hvm.o
 obj-y += i8254.o
-obj-y += instrlen.o
 obj-y += intercept.o
 obj-y += io.o
 obj-y += iommu.o

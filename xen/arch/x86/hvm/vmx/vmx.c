@@ -60,6 +60,13 @@ static void vmx_free_vlapic_mapping(struct domain *d);
 static void vmx_install_vlapic_mapping(struct vcpu *v);
 static void vmx_update_guest_cr(struct vcpu *v, unsigned int cr);
 static void vmx_update_guest_efer(struct vcpu *v);
+static void vmx_cpuid_intercept(
+    unsigned int *eax, unsigned int *ebx,
+    unsigned int *ecx, unsigned int *edx);
+static void vmx_wbinvd_intercept(void);
+static void vmx_fpu_dirty_intercept(void);
+static int vmx_msr_read_intercept(struct cpu_user_regs *regs);
+static int vmx_msr_write_intercept(struct cpu_user_regs *regs);
 
 static int vmx_domain_initialise(struct domain *d)
 {
@@ -96,7 +103,6 @@ static int vmx_vcpu_initialise(struct vcpu *v)
     /* %eax == 1 signals full real-mode support to the guest loader. */
     if ( v->vcpu_id == 0 )
         v->arch.guest_context.user_regs.eax = 1;
-    v->arch.hvm_vcpu.io_complete = vmx_realmode_io_complete;
 
     return 0;
 }
@@ -204,7 +210,7 @@ static enum handler_return long_mode_do_msr_write(struct cpu_user_regs *regs)
     switch ( ecx )
     {
     case MSR_EFER:
-        if ( !hvm_set_efer(msr_content) )
+        if ( hvm_set_efer(msr_content) )
             goto exception_raised;
         break;
 
@@ -375,7 +381,7 @@ static enum handler_return long_mode_do_msr_write(struct cpu_user_regs *regs)
     switch ( regs->ecx )
     {
     case MSR_EFER:
-        if ( !hvm_set_efer(msr_content) )
+        if ( hvm_set_efer(msr_content) )
             return HNDL_exception_raised;
         break;
 
@@ -1076,6 +1082,11 @@ static struct hvm_function_table vmx_function_table = {
     .do_pmu_interrupt     = vmx_do_pmu_interrupt,
     .cpu_up               = vmx_cpu_up,
     .cpu_down             = vmx_cpu_down,
+    .cpuid_intercept      = vmx_cpuid_intercept,
+    .wbinvd_intercept     = vmx_wbinvd_intercept,
+    .fpu_dirty_intercept  = vmx_fpu_dirty_intercept,
+    .msr_read_intercept   = vmx_msr_read_intercept,
+    .msr_write_intercept  = vmx_msr_write_intercept
 };
 
 void start_vmx(void)
@@ -1147,7 +1158,7 @@ static void __update_guest_eip(unsigned long inst_len)
         vmx_inject_exception(TRAP_debug, HVM_DELIVER_NO_ERROR_CODE, 0);
 }
 
-void vmx_do_no_device_fault(void)
+static void vmx_fpu_dirty_intercept(void)
 {
     struct vcpu *curr = current;
 
@@ -1162,7 +1173,7 @@ void vmx_do_no_device_fault(void)
 }
 
 #define bitmaskof(idx)  (1U << ((idx) & 31))
-void vmx_cpuid_intercept(
+static void vmx_cpuid_intercept(
     unsigned int *eax, unsigned int *ebx,
     unsigned int *ecx, unsigned int *edx)
 {
@@ -1751,13 +1762,13 @@ static int mov_to_cr(int gp, int cr, struct cpu_user_regs *regs)
     switch ( cr )
     {
     case 0:
-        return hvm_set_cr0(value);
+        return !hvm_set_cr0(value);
 
     case 3:
-        return hvm_set_cr3(value);
+        return !hvm_set_cr3(value);
 
     case 4:
-        return hvm_set_cr4(value);
+        return !hvm_set_cr4(value);
 
     case 8:
         vlapic_set_reg(vlapic, APIC_TASKPRI, ((value & 0x0F) << 4));
@@ -1848,7 +1859,7 @@ static int vmx_cr_access(unsigned long exit_qualification,
         value = (value & ~0xF) |
             (((exit_qualification & LMSW_SOURCE_DATA) >> 16) & 0xF);
         HVMTRACE_1D(LMSW, current, value);
-        return hvm_set_cr0(value);
+        return !hvm_set_cr0(value);
     default:
         BUG();
     }
@@ -1932,7 +1943,7 @@ static int is_last_branch_msr(u32 ecx)
     return 0;
 }
 
-int vmx_msr_read_intercept(struct cpu_user_regs *regs)
+static int vmx_msr_read_intercept(struct cpu_user_regs *regs)
 {
     u64 msr_content = 0;
     u32 ecx = regs->ecx, eax, edx;
@@ -2017,7 +2028,7 @@ int vmx_msr_read_intercept(struct cpu_user_regs *regs)
             case HNDL_unhandled:
                 break;
             case HNDL_exception_raised:
-                return 0;
+                return X86EMUL_EXCEPTION;
             case HNDL_done:
                 goto done;
         }
@@ -2050,11 +2061,11 @@ done:
     HVM_DBG_LOG(DBG_LEVEL_1, "returns: ecx=%x, eax=%lx, edx=%lx",
                 ecx, (unsigned long)regs->eax,
                 (unsigned long)regs->edx);
-    return 1;
+    return X86EMUL_OKAY;
 
 gp_fault:
     vmx_inject_hw_exception(v, TRAP_gp_fault, 0);
-    return 0;
+    return X86EMUL_EXCEPTION;
 }
 
 static int vmx_alloc_vlapic_mapping(struct domain *d)
@@ -2124,7 +2135,7 @@ extern bool_t mtrr_fix_range_msr_set(struct mtrr_state *v,
 extern bool_t mtrr_def_type_msr_set(struct mtrr_state *v, u64 msr_content);
 extern bool_t pat_msr_set(u64 *pat, u64 msr);
 
-int vmx_msr_write_intercept(struct cpu_user_regs *regs)
+static int vmx_msr_write_intercept(struct cpu_user_regs *regs)
 {
     u32 ecx = regs->ecx;
     u64 msr_content;
@@ -2219,7 +2230,7 @@ int vmx_msr_write_intercept(struct cpu_user_regs *regs)
         goto gp_fault;
     default:
         if ( vpmu_do_wrmsr(regs) )
-            return 1;
+            return X86EMUL_OKAY;
         switch ( long_mode_do_msr_write(regs) )
         {
             case HNDL_unhandled:
@@ -2228,18 +2239,18 @@ int vmx_msr_write_intercept(struct cpu_user_regs *regs)
                     wrmsr_hypervisor_regs(ecx, regs->eax, regs->edx);
                 break;
             case HNDL_exception_raised:
-                return 0;
+                return X86EMUL_EXCEPTION;
             case HNDL_done:
                 break;
         }
         break;
     }
 
-    return 1;
+    return X86EMUL_OKAY;
 
 gp_fault:
     vmx_inject_hw_exception(v, TRAP_gp_fault, 0);
-    return 0;
+    return X86EMUL_EXCEPTION;
 }
 
 static void vmx_do_hlt(struct cpu_user_regs *regs)
@@ -2320,7 +2331,7 @@ static void wbinvd_ipi(void *info)
     wbinvd();
 }
 
-void vmx_wbinvd_intercept(void)
+static void vmx_wbinvd_intercept(void)
 {
     if ( list_empty(&(domain_hvm_iommu(current->domain)->pdev_list)) )
         return;
@@ -2447,7 +2458,7 @@ asmlinkage void vmx_vmexit_handler(struct cpu_user_regs *regs)
             domain_pause_for_debugger();
             break;
         case TRAP_no_device:
-            vmx_do_no_device_fault();
+            vmx_fpu_dirty_intercept();
             break;
         case TRAP_page_fault:
             exit_qualification = __vmread(EXIT_QUALIFICATION);
@@ -2566,12 +2577,12 @@ asmlinkage void vmx_vmexit_handler(struct cpu_user_regs *regs)
         break;
     case EXIT_REASON_MSR_READ:
         inst_len = __get_instruction_length(); /* Safe: RDMSR */
-        if ( vmx_msr_read_intercept(regs) )
+        if ( vmx_msr_read_intercept(regs) == X86EMUL_OKAY )
             __update_guest_eip(inst_len);
         break;
     case EXIT_REASON_MSR_WRITE:
         inst_len = __get_instruction_length(); /* Safe: WRMSR */
-        if ( vmx_msr_write_intercept(regs) )
+        if ( vmx_msr_write_intercept(regs) == X86EMUL_OKAY )
             __update_guest_eip(inst_len);
         break;
 
@@ -2597,7 +2608,8 @@ asmlinkage void vmx_vmexit_handler(struct cpu_user_regs *regs)
         unsigned long offset;
         exit_qualification = __vmread(EXIT_QUALIFICATION);
         offset = exit_qualification & 0x0fffUL;
-        handle_mmio(APIC_DEFAULT_PHYS_BASE | offset);
+        if ( !handle_mmio() )
+            hvm_inject_exception(TRAP_gp_fault, 0, 0);
         break;
     }
 

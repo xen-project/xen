@@ -59,9 +59,6 @@ struct hvm_vcpu {
     bool_t              flag_dr_dirty;
     bool_t              debug_state_latch;
 
-    /* Callback function for I/O completion. */
-    int                 (*io_complete)(void);
-
     union {
         struct arch_vmx_struct vmx;
         struct arch_svm_struct svm;
@@ -72,6 +69,12 @@ struct hvm_vcpu {
 
     /* Which cache mode is this VCPU in (CR0:CD/NW)? */
     u8                  cache_mode;
+
+    /* I/O request in flight to device model. */
+    bool_t              mmio_in_progress;
+    bool_t              io_in_progress;
+    bool_t              io_completed;
+    unsigned long       io_data;
 };
 
 #define ARCH_HVM_IO_WAIT         1   /* Waiting for I/O completion */

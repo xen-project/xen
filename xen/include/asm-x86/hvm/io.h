@@ -120,8 +120,8 @@ struct hvm_mmio_handler {
 };
 
 /* global io interception point in HV */
-extern int hvm_io_intercept(ioreq_t *p, int type);
-extern int register_io_handler(
+int hvm_io_intercept(ioreq_t *p, int type);
+int register_io_handler(
     struct domain *d, unsigned long addr, unsigned long size,
     void *action, int type);
 
@@ -135,8 +135,8 @@ static inline int hvm_buffered_io_intercept(ioreq_t *p)
     return hvm_io_intercept(p, HVM_BUFFERED_IO);
 }
 
-extern int hvm_mmio_intercept(ioreq_t *p);
-extern int hvm_buffered_io_send(ioreq_t *p);
+int hvm_mmio_intercept(ioreq_t *p);
+int hvm_buffered_io_send(ioreq_t *p);
 
 static inline int register_portio_handler(
     struct domain *d, unsigned long addr,
@@ -159,11 +159,11 @@ void send_pio_req(unsigned long port, unsigned long count, int size,
                   paddr_t value, int dir, int df, int value_is_ptr);
 void send_timeoffset_req(unsigned long timeoff);
 void send_invalidate_req(void);
-extern void handle_mmio(paddr_t gpa);
-extern void hvm_interrupt_post(struct vcpu *v, int vector, int type);
-extern void hvm_io_assist(void);
-extern void hvm_dpci_eoi(struct domain *d, unsigned int guest_irq,
-                         union vioapic_redir_entry *ent);
+int handle_mmio(void);
+void hvm_interrupt_post(struct vcpu *v, int vector, int type);
+void hvm_io_assist(void);
+void hvm_dpci_eoi(struct domain *d, unsigned int guest_irq,
+                  union vioapic_redir_entry *ent);
 
 struct hvm_hw_stdvga {
     uint8_t sr_index;

@@ -34,14 +34,8 @@
 
 #define IOREQ_TYPE_PIO          0 /* pio */
 #define IOREQ_TYPE_COPY         1 /* mmio ops */
-#define IOREQ_TYPE_AND          2
-#define IOREQ_TYPE_OR           3
-#define IOREQ_TYPE_XOR          4
-#define IOREQ_TYPE_XCHG         5
-#define IOREQ_TYPE_ADD          6
 #define IOREQ_TYPE_TIMEOFFSET   7
 #define IOREQ_TYPE_INVALIDATE   8 /* mapcache */
-#define IOREQ_TYPE_SUB          9
 
 /*
  * VMExit dispatcher should cooperate with instruction decoder to

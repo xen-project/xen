@@ -458,33 +458,6 @@ static int mmio_move(struct hvm_hw_stdvga *s, ioreq_t *p)
     return 1;
 }
 
-static uint32_t op_and(uint32_t a, uint32_t b) { return a & b; }
-static uint32_t op_or (uint32_t a, uint32_t b) { return a | b; }
-static uint32_t op_xor(uint32_t a, uint32_t b) { return a ^ b; }
-static uint32_t op_add(uint32_t a, uint32_t b) { return a + b; }
-static uint32_t op_sub(uint32_t a, uint32_t b) { return a - b; }
-static uint32_t (*op_array[])(uint32_t, uint32_t) = {
-    [IOREQ_TYPE_AND] = op_and,
-    [IOREQ_TYPE_OR ] = op_or,
-    [IOREQ_TYPE_XOR] = op_xor,
-    [IOREQ_TYPE_ADD] = op_add,
-    [IOREQ_TYPE_SUB] = op_sub
-};
-
-static int mmio_op(struct hvm_hw_stdvga *s, ioreq_t *p)
-{
-    uint32_t orig, mod = 0;
-    orig = stdvga_mem_read(p->addr, p->size);
-
-    if ( p->dir == IOREQ_WRITE )
-    {
-        mod = (op_array[p->type])(orig, p->data);
-        stdvga_mem_write(p->addr, mod, p->size);
-    }
-
-    return 0; /* Don't try to buffer these operations */
-}
-
 int stdvga_intercept_mmio(ioreq_t *p)
 {
     struct domain *d = current->domain;
@@ -505,13 +478,6 @@ int stdvga_intercept_mmio(ioreq_t *p)
         {
         case IOREQ_TYPE_COPY:
             buf = mmio_move(s, p);
-            break;
-        case IOREQ_TYPE_AND:
-        case IOREQ_TYPE_OR:
-        case IOREQ_TYPE_XOR:
-        case IOREQ_TYPE_ADD:
-        case IOREQ_TYPE_SUB:
-            buf = mmio_op(s, p);
             break;
         default:
             gdprintk(XENLOG_WARNING, "unsupported mmio request type:%d "

@@ -729,7 +729,7 @@ int hvm_set_efer(uint64_t value)
         gdprintk(XENLOG_WARNING, "Trying to set reserved bit in "
                  "EFER: %"PRIx64"\n", value);
         hvm_inject_exception(TRAP_gp_fault, 0, 0);
-        return 0;
+        return X86EMUL_EXCEPTION;
     }
 
     if ( ((value ^ v->arch.hvm_vcpu.guest_efer) & EFER_LME) &&
@@ -738,14 +738,14 @@ int hvm_set_efer(uint64_t value)
         gdprintk(XENLOG_WARNING,
                  "Trying to change EFER.LME with paging enabled\n");
         hvm_inject_exception(TRAP_gp_fault, 0, 0);
-        return 0;
+        return X86EMUL_EXCEPTION;
     }
 
     value |= v->arch.hvm_vcpu.guest_efer & EFER_LMA;
     v->arch.hvm_vcpu.guest_efer = value;
     hvm_update_guest_efer(v);
 
-    return 1;
+    return X86EMUL_OKAY;
 }
 
 extern void shadow_blow_tables_per_domain(struct domain *d);
@@ -787,8 +787,7 @@ int hvm_set_cr0(unsigned long value)
         HVM_DBG_LOG(DBG_LEVEL_1,
                     "Guest attempts to set upper 32 bits in CR0: %lx",
                     value);
-        hvm_inject_exception(TRAP_gp_fault, 0, 0);
-        return 0;
+        goto gpf;
     }
 
     value &= ~HVM_CR0_GUEST_RESERVED_BITS;
@@ -797,10 +796,7 @@ int hvm_set_cr0(unsigned long value)
     value |= X86_CR0_ET;
 
     if ( (value & (X86_CR0_PE | X86_CR0_PG)) == X86_CR0_PG )
-    {
-        hvm_inject_exception(TRAP_gp_fault, 0, 0);
-        return 0;
-    }
+        goto gpf;
 
     if ( (value & X86_CR0_PG) && !(old_value & X86_CR0_PG) )
     {
@@ -809,8 +805,7 @@ int hvm_set_cr0(unsigned long value)
             if ( !(v->arch.hvm_vcpu.guest_cr[4] & X86_CR4_PAE) )
             {
                 HVM_DBG_LOG(DBG_LEVEL_1, "Enable paging before PAE enable");
-                hvm_inject_exception(TRAP_gp_fault, 0, 0);
-                return 0;
+                goto gpf;
             }
             HVM_DBG_LOG(DBG_LEVEL_1, "Enabling long mode");
             v->arch.hvm_vcpu.guest_efer |= EFER_LMA;
@@ -828,7 +823,7 @@ int hvm_set_cr0(unsigned long value)
                 gdprintk(XENLOG_ERR, "Invalid CR3 value = %lx (mfn=%lx)\n",
                          v->arch.hvm_vcpu.guest_cr[3], mfn);
                 domain_crash(v->domain);
-                return 0;
+                return X86EMUL_UNHANDLEABLE;
             }
 
             /* Now arch.guest_table points to machine physical. */
@@ -895,7 +890,11 @@ int hvm_set_cr0(unsigned long value)
     if ( (value ^ old_value) & X86_CR0_PG )
         paging_update_paging_modes(v);
 
-    return 1;
+    return X86EMUL_OKAY;
+
+ gpf:
+    hvm_inject_exception(TRAP_gp_fault, 0, 0);
+    return X86EMUL_EXCEPTION;
 }
 
 int hvm_set_cr3(unsigned long value)
@@ -922,12 +921,12 @@ int hvm_set_cr3(unsigned long value)
 
     v->arch.hvm_vcpu.guest_cr[3] = value;
     paging_update_cr3(v);
-    return 1;
+    return X86EMUL_OKAY;
 
  bad_cr3:
     gdprintk(XENLOG_ERR, "Invalid CR3\n");
     domain_crash(v->domain);
-    return 0;
+    return X86EMUL_UNHANDLEABLE;
 }
 
 int hvm_set_cr4(unsigned long value)
@@ -958,11 +957,11 @@ int hvm_set_cr4(unsigned long value)
     if ( (old_cr ^ value) & (X86_CR4_PSE | X86_CR4_PGE | X86_CR4_PAE) )
         paging_update_paging_modes(v);
 
-    return 1;
+    return X86EMUL_OKAY;
 
  gpf:
     hvm_inject_exception(TRAP_gp_fault, 0, 0);
-    return 0;
+    return X86EMUL_EXCEPTION;
 }
 
 int hvm_virtual_to_linear_addr(
@@ -977,7 +976,15 @@ int hvm_virtual_to_linear_addr(
     unsigned long addr = offset;
     uint32_t last_byte;
 
-    if ( addr_size != 64 )
+    if ( !(current->arch.hvm_vcpu.guest_cr[0] & X86_CR0_PE) )
+    {
+        /*
+         * REAL MODE: Don't bother with segment access checks.
+         * Certain of them are not done in native real mode anyway.
+         */
+        addr = (uint32_t)(addr + reg->base);
+    }
+    else if ( addr_size != 64 )
     {
         /*
          * COMPATIBILITY MODE: Apply segment checks and add base.
@@ -1304,7 +1311,7 @@ void hvm_task_switch(
     if ( ptss == NULL )
         goto out;
 
-    if ( !hvm_set_cr3(ptss->cr3) )
+    if ( hvm_set_cr3(ptss->cr3) )
     {
         hvm_unmap(ptss);
         goto out;
@@ -1399,7 +1406,10 @@ static enum hvm_copy_result __hvm_copy(
      * VMREADs on every data access hurts emulation performance.
      * Hence we do not gather extra PFEC flags if CR0.PG == 0.
      */
-    if ( virt && (curr->arch.hvm_vcpu.guest_cr[0] & X86_CR0_PG) )
+    if ( !(curr->arch.hvm_vcpu.guest_cr[0] & X86_CR0_PG) )
+        virt = 0;
+
+    if ( virt )
     {
         struct segment_register sreg;
         hvm_get_segment_register(curr, x86_seg_ss, &sreg);

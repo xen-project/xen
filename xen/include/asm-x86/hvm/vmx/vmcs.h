@@ -94,11 +94,6 @@ struct arch_vmx_struct {
 #define VMXEMUL_BAD_CS   2  /* Yes, because CS.RPL != CPL */
 #define VMXEMUL_BAD_SS   4  /* Yes, because SS.RPL != CPL */
     uint8_t              vmxemul;
-
-    /* I/O request in flight to device model. */
-    bool_t               real_mode_io_in_progress;
-    bool_t               real_mode_io_completed;
-    unsigned long        real_mode_io_data;
 };
 
 int vmx_create_vmcs(struct vcpu *v);

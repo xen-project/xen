@@ -31,7 +31,6 @@
 #include <xen/event.h>
 #include <asm/iommu.h>
 
-
 extern struct hvm_mmio_handler hpet_mmio_handler;
 extern struct hvm_mmio_handler vlapic_mmio_handler;
 extern struct hvm_mmio_handler vioapic_mmio_handler;
@@ -50,12 +49,11 @@ static inline void hvm_mmio_access(struct vcpu *v,
                                    hvm_mmio_read_t read_handler,
                                    hvm_mmio_write_t write_handler)
 {
-    unsigned int tmp1, tmp2;
     unsigned long data;
 
-    switch ( p->type ) {
-    case IOREQ_TYPE_COPY:
+    switch ( p->type )
     {
+    case IOREQ_TYPE_COPY:
         if ( !p->data_is_ptr ) {
             if ( p->dir == IOREQ_READ )
                 p->data = read_handler(v, p->addr, p->size);
@@ -86,62 +84,6 @@ static inline void hvm_mmio_access(struct vcpu *v,
                 }
             }
         }
-        break;
-    }
-
-    case IOREQ_TYPE_AND:
-        tmp1 = read_handler(v, p->addr, p->size);
-        if ( p->dir == IOREQ_WRITE ) {
-            tmp2 = tmp1 & (unsigned long) p->data;
-            write_handler(v, p->addr, p->size, tmp2);
-        }
-        p->data = tmp1;
-        break;
-
-    case IOREQ_TYPE_ADD:
-        tmp1 = read_handler(v, p->addr, p->size);
-        if (p->dir == IOREQ_WRITE) {
-            tmp2 = tmp1 + (unsigned long) p->data;
-            write_handler(v, p->addr, p->size, tmp2);
-        }
-        p->data = tmp1;
-        break;
-
-    case IOREQ_TYPE_OR:
-        tmp1 = read_handler(v, p->addr, p->size);
-        if ( p->dir == IOREQ_WRITE ) {
-            tmp2 = tmp1 | (unsigned long) p->data;
-            write_handler(v, p->addr, p->size, tmp2);
-        }
-        p->data = tmp1;
-        break;
-
-    case IOREQ_TYPE_XOR:
-        tmp1 = read_handler(v, p->addr, p->size);
-        if ( p->dir == IOREQ_WRITE ) {
-            tmp2 = tmp1 ^ (unsigned long) p->data;
-            write_handler(v, p->addr, p->size, tmp2);
-        }
-        p->data = tmp1;
-        break;
-
-    case IOREQ_TYPE_XCHG:
-        /*
-         * Note that we don't need to be atomic here since VCPU is accessing
-         * its own local APIC.
-         */
-        tmp1 = read_handler(v, p->addr, p->size);
-        write_handler(v, p->addr, p->size, (unsigned long) p->data);
-        p->data = tmp1;
-        break;
-
-    case IOREQ_TYPE_SUB:
-        tmp1 = read_handler(v, p->addr, p->size);
-        if ( p->dir == IOREQ_WRITE ) {
-            tmp2 = tmp1 - (unsigned long) p->data;
-            write_handler(v, p->addr, p->size, tmp2);
-        }
-        p->data = tmp1;
         break;
 
     default:

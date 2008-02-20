@@ -66,6 +66,13 @@ static void svm_update_guest_cr(struct vcpu *v, unsigned int cr);
 static void svm_update_guest_efer(struct vcpu *v);
 static void svm_inject_exception(
     unsigned int trapnr, int errcode, unsigned long cr2);
+static void svm_cpuid_intercept(
+    unsigned int *eax, unsigned int *ebx,
+    unsigned int *ecx, unsigned int *edx);
+static void svm_wbinvd_intercept(void);
+static void svm_fpu_dirty_intercept(void);
+static int svm_msr_read_intercept(struct cpu_user_regs *regs);
+static int svm_msr_write_intercept(struct cpu_user_regs *regs);
 
 /* va of hardware host save area     */
 static void *hsa[NR_CPUS] __read_mostly;
@@ -112,7 +119,7 @@ static enum handler_return long_mode_do_msr_write(struct cpu_user_regs *regs)
     switch ( ecx )
     {
     case MSR_EFER:
-        if ( !hvm_set_efer(msr_content) )
+        if ( hvm_set_efer(msr_content) )
             return HNDL_exception_raised;
         break;
 
@@ -808,7 +815,12 @@ static struct hvm_function_table svm_function_table = {
     .inject_exception     = svm_inject_exception,
     .init_hypercall_page  = svm_init_hypercall_page,
     .event_pending        = svm_event_pending,
-    .do_pmu_interrupt     = svm_do_pmu_interrupt
+    .do_pmu_interrupt     = svm_do_pmu_interrupt,
+    .cpuid_intercept      = svm_cpuid_intercept,
+    .wbinvd_intercept     = svm_wbinvd_intercept,
+    .fpu_dirty_intercept  = svm_fpu_dirty_intercept,
+    .msr_read_intercept   = svm_msr_read_intercept,
+    .msr_write_intercept  = svm_msr_write_intercept
 };
 
 int start_svm(struct cpuinfo_x86 *c)
@@ -873,7 +885,8 @@ static void svm_do_nested_pgfault(paddr_t gpa, struct cpu_user_regs *regs)
     mfn = gfn_to_mfn_current(gfn, &p2mt);
     if ( p2mt == p2m_mmio_dm )
     {
-        handle_mmio(gpa);
+        if ( !handle_mmio() )
+            hvm_inject_exception(TRAP_gp_fault, 0, 0);
         return;
     }
 
@@ -882,9 +895,10 @@ static void svm_do_nested_pgfault(paddr_t gpa, struct cpu_user_regs *regs)
     p2m_change_type(current->domain, gfn, p2m_ram_logdirty, p2m_ram_rw);
 }
 
-static void svm_do_no_device_fault(struct vmcb_struct *vmcb)
+static void svm_fpu_dirty_intercept(void)
 {
     struct vcpu *curr = current;
+    struct vmcb_struct *vmcb = curr->arch.hvm_svm.vmcb;
 
     svm_fpu_enter(curr);
 
@@ -893,72 +907,83 @@ static void svm_do_no_device_fault(struct vmcb_struct *vmcb)
 }
 
 #define bitmaskof(idx)  (1U << ((idx) & 31))
-static void svm_vmexit_do_cpuid(struct vmcb_struct *vmcb,
-                                struct cpu_user_regs *regs)
+static void svm_cpuid_intercept(
+    unsigned int *eax, unsigned int *ebx,
+    unsigned int *ecx, unsigned int *edx)
 {
-    unsigned long input = regs->eax;
-    unsigned int eax, ebx, ecx, edx;
+    unsigned int input = *eax;
     struct vcpu *v = current;
-    int inst_len;
 
-    hvm_cpuid(input, &eax, &ebx, &ecx, &edx);
+    hvm_cpuid(input, eax, ebx, ecx, edx);
 
     switch ( input )
     {
     case 0x00000001:
         /* Mask Intel-only features. */
-        ecx &= ~(bitmaskof(X86_FEATURE_SSSE3) |
-                 bitmaskof(X86_FEATURE_SSE4_1) |
-                 bitmaskof(X86_FEATURE_SSE4_2));
+        *ecx &= ~(bitmaskof(X86_FEATURE_SSSE3) |
+                  bitmaskof(X86_FEATURE_SSE4_1) |
+                  bitmaskof(X86_FEATURE_SSE4_2));
         break;
 
     case 0x80000001:
         /* Filter features which are shared with 0x00000001:EDX. */
         if ( vlapic_hw_disabled(vcpu_vlapic(v)) )
-            __clear_bit(X86_FEATURE_APIC & 31, &edx);
+            __clear_bit(X86_FEATURE_APIC & 31, edx);
 #if CONFIG_PAGING_LEVELS >= 3
         if ( !v->domain->arch.hvm_domain.params[HVM_PARAM_PAE_ENABLED] )
 #endif
-            __clear_bit(X86_FEATURE_PAE & 31, &edx);
-        __clear_bit(X86_FEATURE_PSE36 & 31, &edx);
+            __clear_bit(X86_FEATURE_PAE & 31, edx);
+        __clear_bit(X86_FEATURE_PSE36 & 31, edx);
 
         /* Filter all other features according to a whitelist. */
-        ecx &= (bitmaskof(X86_FEATURE_LAHF_LM) |
-                bitmaskof(X86_FEATURE_ALTMOVCR) |
-                bitmaskof(X86_FEATURE_ABM) |
-                bitmaskof(X86_FEATURE_SSE4A) |
-                bitmaskof(X86_FEATURE_MISALIGNSSE) |
-                bitmaskof(X86_FEATURE_3DNOWPF));
-        edx &= (0x0183f3ff | /* features shared with 0x00000001:EDX */
-                bitmaskof(X86_FEATURE_NX) |
-                bitmaskof(X86_FEATURE_LM) |
-                bitmaskof(X86_FEATURE_SYSCALL) |
-                bitmaskof(X86_FEATURE_MP) |
-                bitmaskof(X86_FEATURE_MMXEXT) |
-                bitmaskof(X86_FEATURE_FFXSR));
+        *ecx &= (bitmaskof(X86_FEATURE_LAHF_LM) |
+                 bitmaskof(X86_FEATURE_ALTMOVCR) |
+                 bitmaskof(X86_FEATURE_ABM) |
+                 bitmaskof(X86_FEATURE_SSE4A) |
+                 bitmaskof(X86_FEATURE_MISALIGNSSE) |
+                 bitmaskof(X86_FEATURE_3DNOWPF));
+        *edx &= (0x0183f3ff | /* features shared with 0x00000001:EDX */
+                 bitmaskof(X86_FEATURE_NX) |
+                 bitmaskof(X86_FEATURE_LM) |
+                 bitmaskof(X86_FEATURE_SYSCALL) |
+                 bitmaskof(X86_FEATURE_MP) |
+                 bitmaskof(X86_FEATURE_MMXEXT) |
+                 bitmaskof(X86_FEATURE_FFXSR));
         break;
 
     case 0x80000007:
     case 0x8000000A:
         /* Mask out features of power management and SVM extension. */
-        eax = ebx = ecx = edx = 0;
+        *eax = *ebx = *ecx = *edx = 0;
         break;
 
     case 0x80000008:
         /* Make sure Number of CPU core is 1 when HTT=0 */
-        ecx &= 0xFFFFFF00;
+        *ecx &= 0xFFFFFF00;
         break;
     }
+
+    HVMTRACE_3D(CPUID, v, input,
+                ((uint64_t)*eax << 32) | *ebx, ((uint64_t)*ecx << 32) | *edx);
+}
+
+static void svm_vmexit_do_cpuid(struct cpu_user_regs *regs)
+{
+    unsigned int eax, ebx, ecx, edx, inst_len;
+
+    eax = regs->eax;
+    ebx = regs->ebx;
+    ecx = regs->ecx;
+    edx = regs->edx;
+
+    svm_cpuid_intercept(&eax, &ebx, &ecx, &edx);
 
     regs->eax = eax;
     regs->ebx = ebx;
     regs->ecx = ecx;
     regs->edx = edx;
 
-    HVMTRACE_3D(CPUID, v, input,
-                ((uint64_t)eax << 32) | ebx, ((uint64_t)ecx << 32) | edx);
-
-    inst_len = __get_instruction_length(v, INSTR_CPUID, NULL);
+    inst_len = __get_instruction_length(current, INSTR_CPUID, NULL);
     __update_guest_eip(regs, inst_len);
 }
 
@@ -1484,11 +1509,11 @@ static int mov_to_cr(int gpreg, int cr, struct cpu_user_regs *regs)
     switch ( cr )
     {
     case 0: 
-        return hvm_set_cr0(value);
+        return !hvm_set_cr0(value);
     case 3:
-        return hvm_set_cr3(value);
+        return !hvm_set_cr3(value);
     case 4:
-        return hvm_set_cr4(value);
+        return !hvm_set_cr4(value);
     default:
         gdprintk(XENLOG_ERR, "invalid cr: %d\n", cr);
         domain_crash(v->domain);
@@ -1564,7 +1589,7 @@ static void svm_cr_access(
         gpreg = decode_src_reg(prefix, buffer[index+2]);
         value = get_reg(gpreg, regs, vmcb) & 0xF;
         value = (v->arch.hvm_vcpu.guest_cr[0] & ~0xF) | value;
-        result = hvm_set_cr0(value);
+        result = !hvm_set_cr0(value);
         HVMTRACE_1D(LMSW, current, value);
         break;
 
@@ -1635,176 +1660,197 @@ static void svm_cr_access(
         __update_guest_eip(regs, inst_len);
 }
 
-static void svm_do_msr_access(
-    struct vcpu *v, struct cpu_user_regs *regs)
+static int svm_msr_read_intercept(struct cpu_user_regs *regs)
 {
-    struct vmcb_struct *vmcb = v->arch.hvm_svm.vmcb;
-    int  inst_len;
-    u64 msr_content=0;
+    u64 msr_content = 0;
     u32 ecx = regs->ecx, eax, edx;
+    struct vcpu *v = current;
+    struct vmcb_struct *vmcb = v->arch.hvm_svm.vmcb;
 
-    HVM_DBG_LOG(DBG_LEVEL_1, "ecx=%x, eax=%x, edx=%x, exitinfo = %lx",
-                ecx, (u32)regs->eax, (u32)regs->edx,
-                (unsigned long)vmcb->exitinfo1);
-
-    /* is it a read? */
-    if (vmcb->exitinfo1 == 0)
+    switch ( ecx )
     {
-        switch (ecx) {
-        case MSR_IA32_TSC:
-            msr_content = hvm_get_guest_time(v);
-            break;
+    case MSR_IA32_TSC:
+        msr_content = hvm_get_guest_time(v);
+        break;
 
-        case MSR_IA32_APICBASE:
-            msr_content = vcpu_vlapic(v)->hw.apic_base_msr;
-            break;
+    case MSR_IA32_APICBASE:
+        msr_content = vcpu_vlapic(v)->hw.apic_base_msr;
+        break;
 
-        case MSR_EFER:
-            msr_content = v->arch.hvm_vcpu.guest_efer;
-            break;
+    case MSR_EFER:
+        msr_content = v->arch.hvm_vcpu.guest_efer;
+        break;
 
-        case MSR_IA32_MC4_MISC: /* Threshold register */
-        case MSR_F10_MC4_MISC1 ... MSR_F10_MC4_MISC3:
-            /*
-             * MCA/MCE: We report that the threshold register is unavailable
-             * for OS use (locked by the BIOS).
-             */
-            msr_content = 1ULL << 61; /* MC4_MISC.Locked */
-            break;
+    case MSR_IA32_MC4_MISC: /* Threshold register */
+    case MSR_F10_MC4_MISC1 ... MSR_F10_MC4_MISC3:
+        /*
+         * MCA/MCE: We report that the threshold register is unavailable
+         * for OS use (locked by the BIOS).
+         */
+        msr_content = 1ULL << 61; /* MC4_MISC.Locked */
+        break;
 
-        case MSR_IA32_EBC_FREQUENCY_ID:
-            /*
-             * This Intel-only register may be accessed if this HVM guest
-             * has been migrated from an Intel host. The value zero is not
-             * particularly meaningful, but at least avoids the guest crashing!
-             */
-            msr_content = 0;
-            break;
+    case MSR_IA32_EBC_FREQUENCY_ID:
+        /*
+         * This Intel-only register may be accessed if this HVM guest
+         * has been migrated from an Intel host. The value zero is not
+         * particularly meaningful, but at least avoids the guest crashing!
+         */
+        msr_content = 0;
+        break;
 
-        case MSR_K8_VM_HSAVE_PA:
-            svm_inject_exception(TRAP_gp_fault, 0, 0);
-            break;
+    case MSR_K8_VM_HSAVE_PA:
+        goto gpf;
 
-        case MSR_IA32_MCG_CAP:
-        case MSR_IA32_MCG_STATUS:
-        case MSR_IA32_MC0_STATUS:
-        case MSR_IA32_MC1_STATUS:
-        case MSR_IA32_MC2_STATUS:
-        case MSR_IA32_MC3_STATUS:
-        case MSR_IA32_MC4_STATUS:
-        case MSR_IA32_MC5_STATUS:
-            /* No point in letting the guest see real MCEs */
-            msr_content = 0;
-            break;
+    case MSR_IA32_MCG_CAP:
+    case MSR_IA32_MCG_STATUS:
+    case MSR_IA32_MC0_STATUS:
+    case MSR_IA32_MC1_STATUS:
+    case MSR_IA32_MC2_STATUS:
+    case MSR_IA32_MC3_STATUS:
+    case MSR_IA32_MC4_STATUS:
+    case MSR_IA32_MC5_STATUS:
+        /* No point in letting the guest see real MCEs */
+        msr_content = 0;
+        break;
 
-        case MSR_IA32_DEBUGCTLMSR:
-            msr_content = vmcb->debugctlmsr;
-            break;
+    case MSR_IA32_DEBUGCTLMSR:
+        msr_content = vmcb->debugctlmsr;
+        break;
 
-        case MSR_IA32_LASTBRANCHFROMIP:
-            msr_content = vmcb->lastbranchfromip;
-            break;
+    case MSR_IA32_LASTBRANCHFROMIP:
+        msr_content = vmcb->lastbranchfromip;
+        break;
 
-        case MSR_IA32_LASTBRANCHTOIP:
-            msr_content = vmcb->lastbranchtoip;
-            break;
+    case MSR_IA32_LASTBRANCHTOIP:
+        msr_content = vmcb->lastbranchtoip;
+        break;
 
-        case MSR_IA32_LASTINTFROMIP:
-            msr_content = vmcb->lastintfromip;
-            break;
+    case MSR_IA32_LASTINTFROMIP:
+        msr_content = vmcb->lastintfromip;
+        break;
 
-        case MSR_IA32_LASTINTTOIP:
-            msr_content = vmcb->lastinttoip;
-            break;
+    case MSR_IA32_LASTINTTOIP:
+        msr_content = vmcb->lastinttoip;
+        break;
 
-        default:
-            if ( rdmsr_hypervisor_regs(ecx, &eax, &edx) ||
-                 rdmsr_safe(ecx, eax, edx) == 0 )
-            {
-                regs->eax = eax;
-                regs->edx = edx;
-                goto done;
-            }
-            svm_inject_exception(TRAP_gp_fault, 0, 0);
-            return;
+    default:
+        if ( rdmsr_hypervisor_regs(ecx, &eax, &edx) ||
+             rdmsr_safe(ecx, eax, edx) == 0 )
+        {
+            regs->eax = eax;
+            regs->edx = edx;
+            goto done;
         }
-        regs->eax = msr_content & 0xFFFFFFFF;
-        regs->edx = msr_content >> 32;
+        goto gpf;
+    }
+    regs->eax = msr_content & 0xFFFFFFFF;
+    regs->edx = msr_content >> 32;
 
  done:
-        hvmtrace_msr_read(v, ecx, msr_content);
-        HVM_DBG_LOG(DBG_LEVEL_1, "returns: ecx=%x, eax=%lx, edx=%lx",
-                    ecx, (unsigned long)regs->eax, (unsigned long)regs->edx);
+    hvmtrace_msr_read(v, ecx, msr_content);
+    HVM_DBG_LOG(DBG_LEVEL_1, "returns: ecx=%x, eax=%lx, edx=%lx",
+                ecx, (unsigned long)regs->eax, (unsigned long)regs->edx);
+    return X86EMUL_OKAY;
 
+ gpf:
+    svm_inject_exception(TRAP_gp_fault, 0, 0);
+    return X86EMUL_EXCEPTION;
+}
+
+static int svm_msr_write_intercept(struct cpu_user_regs *regs)
+{
+    u64 msr_content = 0;
+    u32 ecx = regs->ecx;
+    struct vcpu *v = current;
+    struct vmcb_struct *vmcb = v->arch.hvm_svm.vmcb;
+
+    msr_content = (u32)regs->eax | ((u64)regs->edx << 32);
+
+    hvmtrace_msr_write(v, ecx, msr_content);
+
+    switch ( ecx )
+    {
+    case MSR_IA32_TSC:
+        hvm_set_guest_time(v, msr_content);
+        pt_reset(v);
+        break;
+
+    case MSR_IA32_APICBASE:
+        vlapic_msr_set(vcpu_vlapic(v), msr_content);
+        break;
+
+    case MSR_K8_VM_HSAVE_PA:
+        goto gpf;
+
+    case MSR_IA32_DEBUGCTLMSR:
+        vmcb->debugctlmsr = msr_content;
+        if ( !msr_content || !cpu_has_svm_lbrv )
+            break;
+        vmcb->lbr_control.fields.enable = 1;
+        svm_disable_intercept_for_msr(v, MSR_IA32_DEBUGCTLMSR);
+        svm_disable_intercept_for_msr(v, MSR_IA32_LASTBRANCHFROMIP);
+        svm_disable_intercept_for_msr(v, MSR_IA32_LASTBRANCHTOIP);
+        svm_disable_intercept_for_msr(v, MSR_IA32_LASTINTFROMIP);
+        svm_disable_intercept_for_msr(v, MSR_IA32_LASTINTTOIP);
+        break;
+
+    case MSR_IA32_LASTBRANCHFROMIP:
+        vmcb->lastbranchfromip = msr_content;
+        break;
+
+    case MSR_IA32_LASTBRANCHTOIP:
+        vmcb->lastbranchtoip = msr_content;
+        break;
+
+    case MSR_IA32_LASTINTFROMIP:
+        vmcb->lastintfromip = msr_content;
+        break;
+
+    case MSR_IA32_LASTINTTOIP:
+        vmcb->lastinttoip = msr_content;
+        break;
+
+    default:
+        switch ( long_mode_do_msr_write(regs) )
+        {
+        case HNDL_unhandled:
+            wrmsr_hypervisor_regs(ecx, regs->eax, regs->edx);
+            break;
+        case HNDL_exception_raised:
+            return X86EMUL_EXCEPTION;
+        case HNDL_done:
+            break;
+        }
+        break;
+    }
+
+    return X86EMUL_OKAY;
+
+ gpf:
+    svm_inject_exception(TRAP_gp_fault, 0, 0);
+    return X86EMUL_EXCEPTION;
+}
+
+static void svm_do_msr_access(struct cpu_user_regs *regs)
+{
+    int rc, inst_len;
+    struct vcpu *v = current;
+    struct vmcb_struct *vmcb = v->arch.hvm_svm.vmcb;
+
+    if ( vmcb->exitinfo1 == 0 )
+    {
+        rc = svm_msr_read_intercept(regs);
         inst_len = __get_instruction_length(v, INSTR_RDMSR, NULL);
     }
     else
     {
-        msr_content = (u32)regs->eax | ((u64)regs->edx << 32);
-
-        hvmtrace_msr_write(v, ecx, msr_content);
-
-        switch (ecx)
-        {
-        case MSR_IA32_TSC:
-            hvm_set_guest_time(v, msr_content);
-            pt_reset(v);
-            break;
-
-        case MSR_IA32_APICBASE:
-            vlapic_msr_set(vcpu_vlapic(v), msr_content);
-            break;
-
-        case MSR_K8_VM_HSAVE_PA:
-            svm_inject_exception(TRAP_gp_fault, 0, 0);
-            break;
-
-        case MSR_IA32_DEBUGCTLMSR:
-            vmcb->debugctlmsr = msr_content;
-            if ( !msr_content || !cpu_has_svm_lbrv )
-                break;
-            vmcb->lbr_control.fields.enable = 1;
-            svm_disable_intercept_for_msr(v, MSR_IA32_DEBUGCTLMSR);
-            svm_disable_intercept_for_msr(v, MSR_IA32_LASTBRANCHFROMIP);
-            svm_disable_intercept_for_msr(v, MSR_IA32_LASTBRANCHTOIP);
-            svm_disable_intercept_for_msr(v, MSR_IA32_LASTINTFROMIP);
-            svm_disable_intercept_for_msr(v, MSR_IA32_LASTINTTOIP);
-            break;
-
-        case MSR_IA32_LASTBRANCHFROMIP:
-            vmcb->lastbranchfromip = msr_content;
-            break;
-
-        case MSR_IA32_LASTBRANCHTOIP:
-            vmcb->lastbranchtoip = msr_content;
-            break;
-
-        case MSR_IA32_LASTINTFROMIP:
-            vmcb->lastintfromip = msr_content;
-            break;
-
-        case MSR_IA32_LASTINTTOIP:
-            vmcb->lastinttoip = msr_content;
-            break;
-
-        default:
-            switch ( long_mode_do_msr_write(regs) )
-            {
-            case HNDL_unhandled:
-                wrmsr_hypervisor_regs(ecx, regs->eax, regs->edx);
-                break;
-            case HNDL_exception_raised:
-                return;
-            case HNDL_done:
-                break;
-            }
-            break;
-        }
-
+        rc = svm_msr_write_intercept(regs);
         inst_len = __get_instruction_length(v, INSTR_WRMSR, NULL);
     }
 
-    __update_guest_eip(regs, inst_len);
+    if ( rc == X86EMUL_OKAY )
+        __update_guest_eip(regs, inst_len);
 }
 
 static void svm_vmexit_do_hlt(struct vmcb_struct *vmcb,
@@ -1830,21 +1876,26 @@ static void svm_vmexit_do_hlt(struct vmcb_struct *vmcb,
     hvm_hlt(regs->eflags);
 }
 
+static void wbinvd_ipi(void *info)
+{
+    wbinvd();
+}
+
+static void svm_wbinvd_intercept(void)
+{
+    if ( !list_empty(&(domain_hvm_iommu(current->domain)->pdev_list)) )
+        on_each_cpu(wbinvd_ipi, NULL, 1, 1);
+}
+
 static void svm_vmexit_do_invalidate_cache(struct cpu_user_regs *regs)
 {
     enum instruction_index list[] = { INSTR_INVD, INSTR_WBINVD };
-    struct vcpu *curr = current;
-    struct vmcb_struct *vmcb = curr->arch.hvm_svm.vmcb;
     int inst_len;
 
-    if ( !list_empty(&(domain_hvm_iommu(curr->domain)->pdev_list)) )
-    {
-        vmcb->general2_intercepts &= ~GENERAL2_INTERCEPT_WBINVD;
-        wbinvd();
-    }
+    svm_wbinvd_intercept();
 
     inst_len = __get_instruction_length_from_list(
-        curr, list, ARRAY_SIZE(list), NULL, NULL);
+        current, list, ARRAY_SIZE(list), NULL, NULL);
     __update_guest_eip(regs, inst_len);
 }
 
@@ -1982,7 +2033,7 @@ asmlinkage void svm_vmexit_handler(struct cpu_user_regs *regs)
         break;
 
     case VMEXIT_EXCEPTION_NM:
-        svm_do_no_device_fault(vmcb);
+        svm_fpu_dirty_intercept();
         break;  
 
     case VMEXIT_EXCEPTION_PF: {
@@ -2036,7 +2087,7 @@ asmlinkage void svm_vmexit_handler(struct cpu_user_regs *regs)
     }
 
     case VMEXIT_CPUID:
-        svm_vmexit_do_cpuid(vmcb, regs);
+        svm_vmexit_do_cpuid(regs);
         break;
 
     case VMEXIT_HLT:
@@ -2083,7 +2134,7 @@ asmlinkage void svm_vmexit_handler(struct cpu_user_regs *regs)
         break;
 
     case VMEXIT_MSR:
-        svm_do_msr_access(v, regs);
+        svm_do_msr_access(regs);
         break;
 
     case VMEXIT_SHUTDOWN:
