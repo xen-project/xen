@@ -24,10 +24,9 @@
 #include <xen/sched.h>
 #include <xen/delay.h>
 #include <asm/iommu.h>
-#include <asm/hvm/vmx/intel-iommu.h>
 #include "dmar.h"
-#include "pci-direct.h"
-#include "pci_regs.h"
+#include "../pci-direct.h"
+#include "../pci_regs.h"
 #include "msi.h"
 
 #include <xen/mm.h>

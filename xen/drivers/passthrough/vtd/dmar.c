@@ -27,8 +27,8 @@
 #include <xen/xmalloc.h>
 #include <asm/string.h>
 #include "dmar.h"
-#include "pci-direct.h"
-#include "pci_regs.h"
+#include "../pci-direct.h"
+#include "../pci_regs.h"
 
 int vtd_enabled;
 boolean_param("vtd", vtd_enabled);

@@ -23,8 +23,8 @@
 #include <asm/iommu.h>
 #include <asm/amd-iommu.h>
 #include <asm/hvm/svm/amd-iommu-proto.h>
-#include "pci-direct.h"
-#include "pci_regs.h"
+#include "../pci-direct.h"
+#include "../pci_regs.h"
 
 static int __init valid_bridge_bus_config(int bus, int dev, int func,
             int *sec_bus, int *sub_bus)

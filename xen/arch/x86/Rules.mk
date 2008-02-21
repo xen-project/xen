@@ -39,7 +39,9 @@ ifeq ($(supervisor_mode_kernel),y)
 CFLAGS += -DCONFIG_X86_SUPERVISOR_MODE_KERNEL=1
 endif
 
-ifeq ($(XEN_TARGET_ARCH),x86_32)
+x86 := y
+
+ifeq ($(TARGET_SUBARCH),x86_32)
 x86_32 := y
 x86_64 := n
 endif

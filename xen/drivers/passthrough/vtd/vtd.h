@@ -24,7 +24,7 @@
 #include <xen/list.h>
 #include <asm/iommu.h>
 
-#define VTDPREFIX "[VT-D]" 
+#define VTDPREFIX "[VT-D]"
 
 #define DMAR_OPERATION_TIMEOUT (HZ*60) /* 1m */
 #define time_after(a,b)         \
