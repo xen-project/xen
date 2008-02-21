@@ -1,6 +1,8 @@
 #ifndef QEMU_AES_H
 #define QEMU_AES_H
 
+#include <stdint.h>
+
 #define AES_MAXNR 14
 #define AES_BLOCK_SIZE 16
 

@@ -27,6 +27,7 @@ BLK-OBJS-y  += block-sync.o
 BLK-OBJS-y  += block-vmdk.o
 BLK-OBJS-y  += block-ram.o
 BLK-OBJS-y  += block-qcow.o
+BLK-OBJS-y  += block-qcow2.o
 BLK-OBJS-y  += aes.o
 BLK-OBJS-y  += tapaio.o
 BLK-OBJS-$(CONFIG_Linux) += blk_linux.c

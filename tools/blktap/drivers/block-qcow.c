@@ -890,8 +890,20 @@ int tdqcow_open (struct disk_driver *dd, const char *name, td_flag_t flags)
 	be32_to_cpus(&header->crypt_method);
 	be64_to_cpus(&header->l1_table_offset);
 
-	if (header->magic != QCOW_MAGIC || header->version > QCOW_VERSION)
+	if (header->magic != QCOW_MAGIC)
 		goto fail;
+
+	switch (header->version) {
+	case QCOW_VERSION:
+		break;
+	case 2:
+		close(fd);
+		dd->drv = &tapdisk_qcow2;
+		return dd->drv->td_open(dd, name, flags);
+	default:
+		goto fail;
+	}
+
 	if (header->size <= 1 || header->cluster_bits < 9)
 		goto fail;
 	if (header->crypt_method > QCOW_CRYPT_AES)

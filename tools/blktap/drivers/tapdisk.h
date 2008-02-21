@@ -58,11 +58,12 @@
 
 #include <stdint.h>
 #include <syslog.h>
+#include <stdio.h>
 #include "blktaplib.h"
 
 /*If enabled, log all debug messages to syslog*/
 #if 1
-#define DPRINTF(_f, _a...) syslog( LOG_DEBUG, _f , ## _a )
+#define DPRINTF(_f, _a...) syslog( LOG_DEBUG, __FILE__ ":%d: " _f , __LINE__, ## _a )
 #else
 #define DPRINTF(_f, _a...) ((void)0)
 #endif
@@ -156,6 +157,7 @@ extern struct tap_disk tapdisk_sync;
 extern struct tap_disk tapdisk_vmdk;
 extern struct tap_disk tapdisk_ram;
 extern struct tap_disk tapdisk_qcow;
+extern struct tap_disk tapdisk_qcow2;
 
 #define MAX_DISK_TYPES     20
 
@@ -164,6 +166,7 @@ extern struct tap_disk tapdisk_qcow;
 #define DISK_TYPE_VMDK     2
 #define DISK_TYPE_RAM      3
 #define DISK_TYPE_QCOW     4
+#define DISK_TYPE_QCOW2    5
 
 
 /*Define Individual Disk Parameters here */
@@ -217,6 +220,16 @@ static disk_info_t qcow_disk = {
 #endif
 };
 
+static disk_info_t qcow2_disk = {
+	DISK_TYPE_QCOW2,
+	"qcow2 disk (qcow2)",
+	"qcow2",
+	0,
+#ifdef TAPDISK
+	&tapdisk_qcow2,
+#endif
+};
+
 /*Main disk info array */
 static disk_info_t *dtypes[] = {
 	&aio_disk,
@@ -224,6 +237,7 @@ static disk_info_t *dtypes[] = {
 	&vmdk_disk,
 	&ram_disk,
 	&qcow_disk,
+	&qcow2_disk,
 };
 
 typedef struct driver_list_entry {

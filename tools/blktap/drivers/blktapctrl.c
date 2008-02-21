@@ -181,27 +181,29 @@ static int test_path(char *path, char **dev, int *type, blkif_t **blkif)
 {
 	char *ptr, handle[10];
 	int i, size, found = 0;
+	size_t handle_len;
 
 	size = sizeof(dtypes)/sizeof(disk_info_t *);
 	*type = MAX_DISK_TYPES + 1;
         *blkif = NULL;
 
 	if ( (ptr = strstr(path, ":"))!=NULL) {
-		memcpy(handle, path, (ptr - path));
+		handle_len = (ptr - path);
+		memcpy(handle, path, handle_len);
 		*dev = ptr + 1;
-		ptr = handle + (ptr - path);
+		ptr = handle + handle_len;
 		*ptr = '\0';
 		DPRINTF("Detected handle: [%s]\n",handle);
 
-		for (i = 0; i < size; i++) 
-			if (strncmp(handle, dtypes[i]->handle, 
-                                    (ptr - path)) ==0) {
+		for (i = 0; i < size; i++) {
+			if ((strlen(dtypes[i]->handle) == handle_len) &&
+					strncmp(handle, dtypes[i]->handle,
+					handle_len) == 0) {
                                 found = 1;
-                                break;
                         }
 
-                if (found) {
-                        *type = dtypes[i]->idnum;
+			if (found) {
+				*type = dtypes[i]->idnum;
                         
                         if (dtypes[i]->single_handler == 1) {
                                 /* Check whether tapdisk process 
@@ -214,6 +216,7 @@ static int test_path(char *path, char **dev, int *type, blkif_t **blkif)
                         }
                         return 0;
                 }
+            }
         }
 
         /* Fall-through case, we didn't find a disk driver. */

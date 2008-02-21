@@ -12,7 +12,8 @@ blktap_disk_types = [
     'sync',
     'vmdk',
     'ram',
-    'qcow'
+    'qcow',
+    'qcow2'
     ]
 
 class BlktapController(BlkifController):
