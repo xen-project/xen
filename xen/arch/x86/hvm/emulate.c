@@ -722,6 +722,7 @@ void hvm_emulate_prepare(
     struct cpu_user_regs *regs)
 {
     hvmemul_ctxt->ctxt.regs = regs;
+    hvmemul_ctxt->ctxt.force_writeback = 1;
     hvmemul_ctxt->seg_reg_accessed = 0;
     hvmemul_ctxt->seg_reg_dirty = 0;
     hvmemul_get_seg_reg(x86_seg_cs, hvmemul_ctxt);

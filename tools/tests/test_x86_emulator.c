@@ -118,6 +118,7 @@ int main(int argc, char **argv)
 #endif
 
     ctxt.regs = &regs;
+    ctxt.force_writeback = 0;
     ctxt.addr_size = 32;
     ctxt.sp_size   = 32;
 

@@ -24,6 +24,7 @@
 #ifndef __XEN__
 #include <stddef.h>
 #include <stdint.h>
+#include <string.h>
 #include <public/xen.h>
 #else
 #include <xen/config.h>
@@ -1983,7 +1984,8 @@ x86_emulate(
         }
         break;
     case OP_MEM:
-        if ( !(d & Mov) && (dst.orig_val == dst.val) )
+        if ( !(d & Mov) && (dst.orig_val == dst.val) &&
+             !ctxt->force_writeback )
             /* nothing to do */;
         else if ( lock_prefix )
             rc = ops->cmpxchg(

@@ -385,6 +385,7 @@ struct x86_emulate_ops *shadow_init_emulation(
     unsigned long addr;
 
     sh_ctxt->ctxt.regs = regs;
+    sh_ctxt->ctxt.force_writeback = 0;
 
     if ( !is_hvm_vcpu(v) )
     {

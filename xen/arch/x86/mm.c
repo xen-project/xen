@@ -3671,6 +3671,7 @@ int ptwr_do_page_fault(struct vcpu *v, unsigned long addr,
         goto bail;
 
     ptwr_ctxt.ctxt.regs = regs;
+    ptwr_ctxt.ctxt.force_writeback = 0;
     ptwr_ctxt.ctxt.addr_size = ptwr_ctxt.ctxt.sp_size =
         is_pv_32on64_domain(d) ? 32 : BITS_PER_LONG;
     ptwr_ctxt.cr2 = addr;

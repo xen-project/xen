@@ -56,17 +56,17 @@ enum x86_segment {
  * segment descriptor. It happens to match the format of an AMD SVM VMCB.
  */
 typedef union segment_attributes {
-    u16 bytes;
+    uint16_t bytes;
     struct
     {
-        u16 type:4;    /* 0;  Bit 40-43 */
-        u16 s:   1;    /* 4;  Bit 44 */
-        u16 dpl: 2;    /* 5;  Bit 45-46 */
-        u16 p:   1;    /* 7;  Bit 47 */
-        u16 avl: 1;    /* 8;  Bit 52 */
-        u16 l:   1;    /* 9;  Bit 53 */
-        u16 db:  1;    /* 10; Bit 54 */
-        u16 g:   1;    /* 11; Bit 55 */
+        uint16_t type:4;    /* 0;  Bit 40-43 */
+        uint16_t s:   1;    /* 4;  Bit 44 */
+        uint16_t dpl: 2;    /* 5;  Bit 45-46 */
+        uint16_t p:   1;    /* 7;  Bit 47 */
+        uint16_t avl: 1;    /* 8;  Bit 52 */
+        uint16_t l:   1;    /* 9;  Bit 53 */
+        uint16_t db:  1;    /* 10; Bit 54 */
+        uint16_t g:   1;    /* 11; Bit 55 */
     } fields;
 } __attribute__ ((packed)) segment_attributes_t;
 
@@ -75,10 +75,10 @@ typedef union segment_attributes {
  * Again, this happens to match the format of an AMD SVM VMCB.
  */
 struct segment_register {
-    u16        sel;
+    uint16_t   sel;
     segment_attributes_t attr;
-    u32        limit;
-    u64        base;
+    uint32_t   limit;
+    uint64_t   base;
 } __attribute__ ((packed));
 
 /*
@@ -368,6 +368,9 @@ struct x86_emulate_ctxt
 
     /* Stack pointer width in bits (16, 32 or 64). */
     unsigned int sp_size;
+
+    /* Set this if writes may have side effects. */
+    int force_writeback;
 };
 
 /*
