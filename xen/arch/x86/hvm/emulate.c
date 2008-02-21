@@ -666,6 +666,25 @@ static void hvmemul_load_fpu_ctxt(
         hvm_funcs.fpu_dirty_intercept();
 }
 
+static int hvmemul_invlpg(
+    enum x86_segment seg,
+    unsigned long offset,
+    struct x86_emulate_ctxt *ctxt)
+{
+    struct hvm_emulate_ctxt *hvmemul_ctxt =
+        container_of(ctxt, struct hvm_emulate_ctxt, ctxt);
+    unsigned long addr;
+    int rc;
+
+    rc = hvmemul_virtual_to_linear(
+        seg, offset, 1, hvm_access_none, hvmemul_ctxt, &addr);
+
+    if ( rc == X86EMUL_OKAY )
+        hvm_funcs.invlpg_intercept(addr);
+
+    return rc;
+}
+
 static struct x86_emulate_ops hvm_emulate_ops = {
     .read          = hvmemul_read,
     .insn_fetch    = hvmemul_insn_fetch,
@@ -688,7 +707,8 @@ static struct x86_emulate_ops hvm_emulate_ops = {
     .hlt           = hvmemul_hlt,
     .inject_hw_exception = hvmemul_inject_hw_exception,
     .inject_sw_interrupt = hvmemul_inject_sw_interrupt,
-    .load_fpu_ctxt = hvmemul_load_fpu_ctxt
+    .load_fpu_ctxt = hvmemul_load_fpu_ctxt,
+    .invlpg        = hvmemul_invlpg
 };
 
 int hvm_emulate_one(

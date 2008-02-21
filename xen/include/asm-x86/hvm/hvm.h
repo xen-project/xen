@@ -81,7 +81,6 @@ struct hvm_function_table {
      */
     enum hvm_intblk (*interrupt_blocked)(struct vcpu *v, struct hvm_intack);
     int (*guest_x86_mode)(struct vcpu *v);
-    unsigned long (*get_segment_base)(struct vcpu *v, enum x86_segment seg);
     void (*get_segment_register)(struct vcpu *v, enum x86_segment seg,
                                  struct segment_register *reg);
     void (*set_segment_register)(struct vcpu *v, enum x86_segment seg,
@@ -126,6 +125,7 @@ struct hvm_function_table {
     void (*fpu_dirty_intercept)(void);
     int (*msr_read_intercept)(struct cpu_user_regs *regs);
     int (*msr_write_intercept)(struct cpu_user_regs *regs);
+    void (*invlpg_intercept)(unsigned long vaddr);
 };
 
 extern struct hvm_function_table hvm_funcs;
@@ -197,12 +197,6 @@ hvm_flush_guest_tlbs(void)
 
 void hvm_hypercall_page_initialise(struct domain *d,
                                    void *hypercall_page);
-
-static inline unsigned long
-hvm_get_segment_base(struct vcpu *v, enum x86_segment seg)
-{
-    return hvm_funcs.get_segment_base(v, seg);
-}
 
 static inline void
 hvm_get_segment_register(struct vcpu *v, enum x86_segment seg,
@@ -321,7 +315,10 @@ void hvm_task_switch(
     int32_t errcode);
 
 enum hvm_access_type {
-    hvm_access_insn_fetch, hvm_access_read, hvm_access_write
+    hvm_access_insn_fetch,
+    hvm_access_none,
+    hvm_access_read,
+    hvm_access_write
 };
 int hvm_virtual_to_linear_addr(
     enum x86_segment seg,

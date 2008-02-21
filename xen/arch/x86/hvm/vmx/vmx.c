@@ -67,6 +67,7 @@ static void vmx_wbinvd_intercept(void);
 static void vmx_fpu_dirty_intercept(void);
 static int vmx_msr_read_intercept(struct cpu_user_regs *regs);
 static int vmx_msr_write_intercept(struct cpu_user_regs *regs);
+static void vmx_invlpg_intercept(unsigned long vaddr);
 
 static int vmx_domain_initialise(struct domain *d)
 {
@@ -701,35 +702,6 @@ static void vmx_ctxt_switch_to(struct vcpu *v)
     vpmu_load(v);
 }
 
-static unsigned long vmx_get_segment_base(struct vcpu *v, enum x86_segment seg)
-{
-    unsigned long base = 0;
-    int long_mode = 0;
-
-    ASSERT(v == current);
-
-    if ( hvm_long_mode_enabled(v) &&
-         (__vmread(GUEST_CS_AR_BYTES) & X86_SEG_AR_CS_LM_ACTIVE) )
-        long_mode = 1;
-
-    switch ( seg )
-    {
-    case x86_seg_cs: if ( !long_mode ) base = __vmread(GUEST_CS_BASE); break;
-    case x86_seg_ds: if ( !long_mode ) base = __vmread(GUEST_DS_BASE); break;
-    case x86_seg_es: if ( !long_mode ) base = __vmread(GUEST_ES_BASE); break;
-    case x86_seg_fs: base = __vmread(GUEST_FS_BASE); break;
-    case x86_seg_gs: base = __vmread(GUEST_GS_BASE); break;
-    case x86_seg_ss: if ( !long_mode ) base = __vmread(GUEST_SS_BASE); break;
-    case x86_seg_tr: base = __vmread(GUEST_TR_BASE); break;
-    case x86_seg_gdtr: base = __vmread(GUEST_GDTR_BASE); break;
-    case x86_seg_idtr: base = __vmread(GUEST_IDTR_BASE); break;
-    case x86_seg_ldtr: base = __vmread(GUEST_LDTR_BASE); break;
-    default: BUG(); break;
-    }
-
-    return base;
-}
-
 static void vmx_get_segment_register(struct vcpu *v, enum x86_segment seg,
                                      struct segment_register *reg)
 {
@@ -1068,7 +1040,6 @@ static struct hvm_function_table vmx_function_table = {
     .load_cpu_ctxt        = vmx_load_vmcs_ctxt,
     .interrupt_blocked    = vmx_interrupt_blocked,
     .guest_x86_mode       = vmx_guest_x86_mode,
-    .get_segment_base     = vmx_get_segment_base,
     .get_segment_register = vmx_get_segment_register,
     .set_segment_register = vmx_set_segment_register,
     .update_host_cr3      = vmx_update_host_cr3,
@@ -1086,7 +1057,8 @@ static struct hvm_function_table vmx_function_table = {
     .wbinvd_intercept     = vmx_wbinvd_intercept,
     .fpu_dirty_intercept  = vmx_fpu_dirty_intercept,
     .msr_read_intercept   = vmx_msr_read_intercept,
-    .msr_write_intercept  = vmx_msr_write_intercept
+    .msr_write_intercept  = vmx_msr_write_intercept,
+    .invlpg_intercept     = vmx_invlpg_intercept
 };
 
 void start_vmx(void)
@@ -1261,452 +1233,11 @@ static void vmx_dr_access(unsigned long exit_qualification,
     __vmwrite(CPU_BASED_VM_EXEC_CONTROL, v->arch.hvm_vmx.exec_control);
 }
 
-/*
- * Invalidate the TLB for va. Invalidate the shadow page corresponding
- * the address va.
- */
-static void vmx_do_invlpg(unsigned long va)
+static void vmx_invlpg_intercept(unsigned long vaddr)
 {
-    struct vcpu *v = current;
-
-    HVMTRACE_2D(INVLPG, v, /*invlpga=*/ 0, va);
-
-    /*
-     * We do the safest things first, then try to update the shadow
-     * copying from guest
-     */
-    paging_invlpg(v, va);
-}
-
-/* Get segment for OUTS according to guest instruction. */
-static enum x86_segment vmx_outs_get_segment(
-    int long_mode, unsigned long eip, int inst_len)
-{
-    unsigned char inst[MAX_INST_LEN];
-    enum x86_segment seg = x86_seg_ds;
-    int i;
-    extern int inst_copy_from_guest(unsigned char *, unsigned long, int);
-
-    if ( likely(cpu_has_vmx_ins_outs_instr_info) )
-    {
-        unsigned int instr_info = __vmread(VMX_INSTRUCTION_INFO);
-
-        /* Get segment register according to bits 17:15. */
-        switch ( (instr_info >> 15) & 7 )
-        {
-        case 0: seg = x86_seg_es; break;
-        case 1: seg = x86_seg_cs; break;
-        case 2: seg = x86_seg_ss; break;
-        case 3: seg = x86_seg_ds; break;
-        case 4: seg = x86_seg_fs; break;
-        case 5: seg = x86_seg_gs; break;
-        default: BUG();
-        }
-
-        goto out;
-    }
-
-    if ( !long_mode )
-        eip += __vmread(GUEST_CS_BASE);
-
-    memset(inst, 0, MAX_INST_LEN);
-    if ( inst_copy_from_guest(inst, eip, inst_len) != inst_len )
-    {
-        gdprintk(XENLOG_ERR, "Get guest instruction failed\n");
-        domain_crash(current->domain);
-        goto out;
-    }
-
-    for ( i = 0; i < inst_len; i++ )
-    {
-        switch ( inst[i] )
-        {
-        case 0xf3: /* REPZ */
-        case 0xf2: /* REPNZ */
-        case 0xf0: /* LOCK */
-        case 0x66: /* data32 */
-        case 0x67: /* addr32 */
-#ifdef __x86_64__
-        case 0x40 ... 0x4f: /* REX */
-#endif
-            continue;
-        case 0x2e: /* CS */
-            seg = x86_seg_cs;
-            continue;
-        case 0x36: /* SS */
-            seg = x86_seg_ss;
-            continue;
-        case 0x26: /* ES */
-            seg = x86_seg_es;
-            continue;
-        case 0x64: /* FS */
-            seg = x86_seg_fs;
-            continue;
-        case 0x65: /* GS */
-            seg = x86_seg_gs;
-            continue;
-        case 0x3e: /* DS */
-            seg = x86_seg_ds;
-            continue;
-        }
-    }
-
- out:
-    return seg;
-}
-
-static int vmx_str_pio_check_descriptor(int long_mode, unsigned long eip,
-                                        int inst_len, enum x86_segment seg,
-                                        unsigned long *base, u32 *limit,
-                                        u32 *ar_bytes)
-{
-    enum vmcs_field ar_field, base_field, limit_field;
-
-    *base = 0;
-    *limit = 0;
-    if ( seg != x86_seg_es )
-        seg = vmx_outs_get_segment(long_mode, eip, inst_len);
-
-    switch ( seg )
-    {
-    case x86_seg_cs:
-        ar_field = GUEST_CS_AR_BYTES;
-        base_field = GUEST_CS_BASE;
-        limit_field = GUEST_CS_LIMIT;
-        break;
-    case x86_seg_ds:
-        ar_field = GUEST_DS_AR_BYTES;
-        base_field = GUEST_DS_BASE;
-        limit_field = GUEST_DS_LIMIT;
-        break;
-    case x86_seg_es:
-        ar_field = GUEST_ES_AR_BYTES;
-        base_field = GUEST_ES_BASE;
-        limit_field = GUEST_ES_LIMIT;
-        break;
-    case x86_seg_fs:
-        ar_field = GUEST_FS_AR_BYTES;
-        base_field = GUEST_FS_BASE;
-        limit_field = GUEST_FS_LIMIT;
-        break;
-    case x86_seg_gs:
-        ar_field = GUEST_GS_AR_BYTES;
-        base_field = GUEST_GS_BASE;
-        limit_field = GUEST_GS_LIMIT;
-        break;
-    case x86_seg_ss:
-        ar_field = GUEST_SS_AR_BYTES;
-        base_field = GUEST_SS_BASE;
-        limit_field = GUEST_SS_LIMIT;
-        break;
-    default:
-        BUG();
-        return 0;
-    }
-
-    if ( !long_mode || seg == x86_seg_fs || seg == x86_seg_gs )
-    {
-        *base = __vmread(base_field);
-        *limit = __vmread(limit_field);
-    }
-    *ar_bytes = __vmread(ar_field);
-
-    return !(*ar_bytes & X86_SEG_AR_SEG_UNUSABLE);
-}
-
-
-static int vmx_str_pio_check_limit(u32 limit, unsigned int size,
-                                   u32 ar_bytes, unsigned long addr,
-                                   unsigned long base, int df,
-                                   unsigned long *count)
-{
-    unsigned long ea = addr - base;
-
-    /* Offset must be within limits. */
-    ASSERT(ea == (u32)ea);
-    if ( (u32)(ea + size - 1) < (u32)ea ||
-         (ar_bytes & 0xc) != 0x4 ? ea + size - 1 > limit
-                                 : ea <= limit )
-        return 0;
-
-    /* Check the limit for repeated instructions, as above we checked
-       only the first instance. Truncate the count if a limit violation
-       would occur. Note that the checking is not necessary for page
-       granular segments as transfers crossing page boundaries will be
-       broken up anyway. */
-    if ( !(ar_bytes & X86_SEG_AR_GRANULARITY) && *count > 1 )
-    {
-        if ( (ar_bytes & 0xc) != 0x4 )
-        {
-            /* expand-up */
-            if ( !df )
-            {
-                if ( ea + *count * size - 1 < ea ||
-                     ea + *count * size - 1 > limit )
-                    *count = (limit + 1UL - ea) / size;
-            }
-            else
-            {
-                if ( *count - 1 > ea / size )
-                    *count = ea / size + 1;
-            }
-        }
-        else
-        {
-            /* expand-down */
-            if ( !df )
-            {
-                if ( *count - 1 > -(s32)ea / size )
-                    *count = -(s32)ea / size + 1UL;
-            }
-            else
-            {
-                if ( ea < (*count - 1) * size ||
-                     ea - (*count - 1) * size <= limit )
-                    *count = (ea - limit - 1) / size + 1;
-            }
-        }
-        ASSERT(*count);
-    }
-
-    return 1;
-}
-
-#ifdef __x86_64__
-static int vmx_str_pio_lm_check_limit(struct cpu_user_regs *regs,
-                                      unsigned int size,
-                                      unsigned long addr,
-                                      unsigned long *count)
-{
-    if ( !is_canonical_address(addr) ||
-         !is_canonical_address(addr + size - 1) )
-        return 0;
-
-    if ( *count > (1UL << 48) / size )
-        *count = (1UL << 48) / size;
-
-    if ( !(regs->eflags & EF_DF) )
-    {
-        if ( addr + *count * size - 1 < addr ||
-             !is_canonical_address(addr + *count * size - 1) )
-            *count = (addr & ~((1UL << 48) - 1)) / size;
-    }
-    else
-    {
-        if ( (*count - 1) * size > addr ||
-             !is_canonical_address(addr + (*count - 1) * size) )
-            *count = (addr & ~((1UL << 48) - 1)) / size + 1;
-    }
-
-    ASSERT(*count);
-
-    return 1;
-}
-#endif
-
-static void vmx_send_str_pio(struct cpu_user_regs *regs,
-                             struct hvm_io_op *pio_opp,
-                             unsigned long inst_len, unsigned int port,
-                             int sign, unsigned int size, int dir,
-                             int df, unsigned long addr,
-                             paddr_t paddr, unsigned long count)
-{
-    /*
-     * Handle string pio instructions that cross pages or that
-     * are unaligned. See the comments in hvm_domain.c/handle_mmio()
-     */
-    if ( (addr & PAGE_MASK) != ((addr + size - 1) & PAGE_MASK) ) {
-        unsigned long value = 0;
-
-        pio_opp->flags |= OVERLAP;
-
-        if ( dir == IOREQ_WRITE )   /* OUTS */
-        {
-            if ( hvm_paging_enabled(current) )
-            {
-                int rv = hvm_copy_from_guest_virt(&value, addr, size);
-                if ( rv == HVMCOPY_bad_gva_to_gfn )
-                    return; /* exception already injected */
-            }
-            else
-                (void)hvm_copy_from_guest_phys(&value, addr, size);
-        }
-        else /* dir != IOREQ_WRITE */
-            /* Remember where to write the result, as a *VA*.
-             * Must be a VA so we can handle the page overlap
-             * correctly in hvm_pio_assist() */
-            pio_opp->addr = addr;
-
-        if ( count == 1 )
-            regs->eip += inst_len;
-
-        send_pio_req(port, 1, size, value, dir, df, 0);
-    } else {
-        unsigned long last_addr = sign > 0 ? addr + count * size - 1
-                                           : addr - (count - 1) * size;
-
-        if ( (addr & PAGE_MASK) != (last_addr & PAGE_MASK) )
-        {
-            if ( sign > 0 )
-                count = (PAGE_SIZE - (addr & ~PAGE_MASK)) / size;
-            else
-                count = (addr & ~PAGE_MASK) / size + 1;
-        } else
-            regs->eip += inst_len;
-
-        send_pio_req(port, count, size, paddr, dir, df, 1);
-    }
-}
-
-static void vmx_do_str_pio(unsigned long exit_qualification,
-                           unsigned long inst_len,
-                           struct cpu_user_regs *regs,
-                           struct hvm_io_op *pio_opp)
-{
-    unsigned int port, size;
-    int dir, df, vm86;
-    unsigned long addr, count = 1, base;
-    paddr_t paddr;
-    unsigned long gfn;
-    u32 ar_bytes, limit, pfec;
-    int sign;
-    int long_mode = 0;
-
-    vm86 = regs->eflags & X86_EFLAGS_VM ? 1 : 0;
-    df = regs->eflags & X86_EFLAGS_DF ? 1 : 0;
-
-    if ( test_bit(6, &exit_qualification) )
-        port = (exit_qualification >> 16) & 0xFFFF;
-    else
-        port = regs->edx & 0xffff;
-
-    size = (exit_qualification & 7) + 1;
-    dir = test_bit(3, &exit_qualification); /* direction */
-
-    if ( dir == IOREQ_READ )
-        HVMTRACE_2D(IO_READ,  current, port, size);
-    else
-        HVMTRACE_2D(IO_WRITE, current, port, size);
-
-    sign = regs->eflags & X86_EFLAGS_DF ? -1 : 1;
-    ar_bytes = __vmread(GUEST_CS_AR_BYTES);
-    if ( hvm_long_mode_enabled(current) &&
-         (ar_bytes & X86_SEG_AR_CS_LM_ACTIVE) )
-        long_mode = 1;
-    addr = __vmread(GUEST_LINEAR_ADDRESS);
-
-    if ( test_bit(5, &exit_qualification) ) { /* "rep" prefix */
-        pio_opp->flags |= REPZ;
-        count = regs->ecx;
-        if ( !long_mode &&
-            (vm86 || !(ar_bytes & X86_SEG_AR_DEF_OP_SIZE)) )
-            count &= 0xFFFF;
-    }
-
-    /*
-     * In protected mode, guest linear address is invalid if the
-     * selector is null.
-     */
-    if ( !vmx_str_pio_check_descriptor(long_mode, regs->eip, inst_len,
-                                       dir==IOREQ_WRITE ? x86_seg_ds :
-                                       x86_seg_es, &base, &limit,
-                                       &ar_bytes) ) {
-        if ( !long_mode ) {
-            vmx_inject_hw_exception(current, TRAP_gp_fault, 0);
-            return;
-        }
-        addr = dir == IOREQ_WRITE ? base + regs->esi : regs->edi;
-    }
-
-    if ( !long_mode )
-    {
-        /* Segment must be readable for outs and writeable for ins. */
-        if ( ((dir == IOREQ_WRITE)
-              ? ((ar_bytes & 0xa) == 0x8)
-              : ((ar_bytes & 0xa) != 0x2)) ||
-             !vmx_str_pio_check_limit(limit, size, ar_bytes,
-                                      addr, base, df, &count) )
-        {
-            vmx_inject_hw_exception(current, TRAP_gp_fault, 0);
-            return;
-        }
-    }
-#ifdef __x86_64__
-    else if ( !vmx_str_pio_lm_check_limit(regs, size, addr, &count) )
-    {
-        vmx_inject_hw_exception(current, TRAP_gp_fault, 0);
-        return;
-    }
-#endif
-
-    /* Translate the address to a physical address */
-    pfec = PFEC_page_present;
-    if ( dir == IOREQ_READ ) /* Read from PIO --> write to RAM */
-        pfec |= PFEC_write_access;
-    if ( ((__vmread(GUEST_SS_AR_BYTES) >> 5) & 3) == 3 )
-        pfec |= PFEC_user_mode;
-    gfn = paging_gva_to_gfn(current, addr, &pfec);
-    if ( gfn == INVALID_GFN )
-    {
-        /* The guest does not have the RAM address mapped.
-         * Need to send in a page fault */
-        vmx_inject_exception(TRAP_page_fault, pfec, addr);
-        return;
-    }
-    paddr = (paddr_t)gfn << PAGE_SHIFT | (addr & ~PAGE_MASK);
-
-    vmx_send_str_pio(regs, pio_opp, inst_len, port, sign,
-                     size, dir, df, addr, paddr, count);
-}
-
-static void vmx_io_instruction(unsigned long exit_qualification,
-                               unsigned long inst_len)
-{
-    struct cpu_user_regs *regs;
-    struct hvm_io_op *pio_opp;
-
-    pio_opp = &current->arch.hvm_vcpu.io_op;
-    pio_opp->instr = INSTR_PIO;
-    pio_opp->flags = 0;
-
-    regs = &pio_opp->io_context;
-
-    /* Copy current guest state into io instruction state structure. */
-    memcpy(regs, guest_cpu_user_regs(), HVM_CONTEXT_STACK_BYTES);
-
-    HVM_DBG_LOG(DBG_LEVEL_IO, "vm86 %d, eip=%x:%lx, "
-                "exit_qualification = %lx",
-                regs->eflags & X86_EFLAGS_VM ? 1 : 0,
-                regs->cs, (unsigned long)regs->eip, exit_qualification);
-
-    if ( test_bit(4, &exit_qualification) ) /* string instrucation */
-        vmx_do_str_pio(exit_qualification, inst_len, regs, pio_opp);
-    else
-    {
-        unsigned int port, size;
-        int dir, df;
-
-        df = regs->eflags & X86_EFLAGS_DF ? 1 : 0;
-
-        if ( test_bit(6, &exit_qualification) )
-            port = (exit_qualification >> 16) & 0xFFFF;
-        else
-            port = regs->edx & 0xffff;
-
-        size = (exit_qualification & 7) + 1;
-        dir = test_bit(3, &exit_qualification); /* direction */
-
-        if ( dir == IOREQ_READ )
-            HVMTRACE_2D(IO_READ,  current, port, size);
-        else
-            HVMTRACE_3D(IO_WRITE, current, port, size, regs->eax);
-
-        if ( port == 0xe9 && dir == IOREQ_WRITE && size == 1 )
-            hvm_print_line(current, regs->eax); /* guest debug output */
-
-        regs->eip += inst_len;
-        send_pio_req(port, 1, size, regs->eax, dir, df, 0);
-    }
+    struct vcpu *curr = current;
+    HVMTRACE_2D(INVLPG, curr, /*invlpga=*/ 0, vaddr);
+    paging_invlpg(curr, vaddr);
 }
 
 #define CASE_SET_REG(REG, reg)      \
@@ -2541,7 +2072,7 @@ asmlinkage void vmx_vmexit_handler(struct cpu_user_regs *regs)
         inst_len = __get_instruction_length(); /* Safe: INVLPG */
         __update_guest_eip(inst_len);
         exit_qualification = __vmread(EXIT_QUALIFICATION);
-        vmx_do_invlpg(exit_qualification);
+        vmx_invlpg_intercept(exit_qualification);
         break;
     }
     case EXIT_REASON_VMCALL:
@@ -2569,11 +2100,6 @@ asmlinkage void vmx_vmexit_handler(struct cpu_user_regs *regs)
     case EXIT_REASON_DR_ACCESS:
         exit_qualification = __vmread(EXIT_QUALIFICATION);
         vmx_dr_access(exit_qualification, regs);
-        break;
-    case EXIT_REASON_IO_INSTRUCTION:
-        exit_qualification = __vmread(EXIT_QUALIFICATION);
-        inst_len = __get_instruction_length(); /* Safe: IN, INS, OUT, OUTS */
-        vmx_io_instruction(exit_qualification, inst_len);
         break;
     case EXIT_REASON_MSR_READ:
         inst_len = __get_instruction_length(); /* Safe: RDMSR */
@@ -2603,15 +2129,11 @@ asmlinkage void vmx_vmexit_handler(struct cpu_user_regs *regs)
     case EXIT_REASON_TPR_BELOW_THRESHOLD:
         break;
 
+    case EXIT_REASON_IO_INSTRUCTION:
     case EXIT_REASON_APIC_ACCESS:
-    {
-        unsigned long offset;
-        exit_qualification = __vmread(EXIT_QUALIFICATION);
-        offset = exit_qualification & 0x0fffUL;
         if ( !handle_mmio() )
             hvm_inject_exception(TRAP_gp_fault, 0, 0);
         break;
-    }
 
     case EXIT_REASON_INVD:
     case EXIT_REASON_WBINVD:
@@ -2632,9 +2154,7 @@ asmlinkage void vmx_vmexit_handler(struct cpu_user_regs *regs)
 
 asmlinkage void vmx_trace_vmentry(void)
 {
-    struct vcpu *v = current;
-    
-    hvmtrace_vmentry(v);
+    hvmtrace_vmentry(current);
 }
 
 /*

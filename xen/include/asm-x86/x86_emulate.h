@@ -354,6 +354,12 @@ struct x86_emulate_ops
     /* load_fpu_ctxt: Load emulated environment's FPU state onto processor. */
     void (*load_fpu_ctxt)(
         struct x86_emulate_ctxt *ctxt);
+
+    /* invlpg: Invalidate paging structures which map addressed byte. */
+    int (*invlpg)(
+        enum x86_segment seg,
+        unsigned long offset,
+        struct x86_emulate_ctxt *ctxt);
 };
 
 struct cpu_user_regs;

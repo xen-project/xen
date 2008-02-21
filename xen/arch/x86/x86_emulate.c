@@ -3036,6 +3036,17 @@ x86_emulate(
         struct segment_register reg;
         unsigned long base, limit, cr0, cr0w;
 
+        if ( modrm == 0xdf ) /* invlpga */
+        {
+            generate_exception_if(in_realmode(ctxt, ops), EXC_UD);
+            generate_exception_if(!mode_ring0(), EXC_GP);
+            fail_if(ops->invlpg == NULL);
+            if ( (rc = ops->invlpg(x86_seg_none, truncate_ea(_regs.eax),
+                                   ctxt)) )
+                goto done;
+            break;
+        }
+
         switch ( modrm_reg & 7 )
         {
         case 0: /* sgdt */
@@ -3094,6 +3105,13 @@ x86_emulate(
             cr0 &= 0xffff0000;
             cr0 |= (uint16_t)cr0w;
             if ( (rc = ops->write_cr(0, cr0, ctxt)) )
+                goto done;
+            break;
+        case 7: /* invlpg */
+            generate_exception_if(!mode_ring0(), EXC_GP);
+            generate_exception_if(ea.type != OP_MEM, EXC_UD);
+            fail_if(ops->invlpg == NULL);
+            if ( (rc = ops->invlpg(ea.mem.seg, ea.mem.off, ctxt)) )
                 goto done;
             break;
         default:
