@@ -246,12 +246,18 @@ static void xen_init_fv(uint64_t ram_size, int vga_ram_size, char *boot_device,
 
     for (i = 0; i < nr_pages; i++)
         page_array[i] = i;
-	
+
     /* VTI will not use memory between 3G~4G, so we just pass a legal pfn
        to make QEMU map continuous virtual memory space */
-    if (ram_size > MMIO_START) {	
+    if (ram_size > MMIO_START) {
         for (i = 0 ; i < (MEM_G >> XC_PAGE_SHIFT); i++)
             page_array[(MMIO_START >> XC_PAGE_SHIFT) + i] =
+                (STORE_PAGE_START >> XC_PAGE_SHIFT); 
+    }
+    /* skipping VGA hole, same as above */
+    if (ram_size > VGA_IO_START) {
+        for (i = 0 ; i < (VGA_IO_SIZE >> XC_PAGE_SHIFT); i++)
+            page_array[(VGA_IO_START >> XC_PAGE_SHIFT) + i] =
                 (STORE_PAGE_START >> XC_PAGE_SHIFT); 
     }
 

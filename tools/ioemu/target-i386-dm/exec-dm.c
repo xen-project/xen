@@ -350,12 +350,13 @@ CPUReadMemoryFunc **cpu_get_io_memory_read(int io_index)
  * So to emulate right behavior that guest OS is assumed, we need to flush
  * I/D cache here.
  */
-static void sync_icache(unsigned long address, int len)
+static void sync_icache(uint8_t *address, int len)
 {
-    int l;
+    unsigned long addr = (unsigned long)address;
+    unsigned long end = addr + len;
 
-    for(l = 0; l < (len + 32); l += 32)
-        __ia64_fc(address + l);
+    for (addr &= ~(32UL-1); addr < end; addr += 32UL)
+        __ia64_fc(addr);
 
     ia64_sync_i();
     ia64_srlz_i();
