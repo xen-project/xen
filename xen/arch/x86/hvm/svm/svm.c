@@ -366,24 +366,17 @@ static void svm_fpu_leave(struct vcpu *v)
     }
 }
 
-static enum hvm_intblk svm_interrupt_blocked(
-    struct vcpu *v, struct hvm_intack intack)
+static unsigned int svm_get_interrupt_shadow(struct vcpu *v)
 {
     struct vmcb_struct *vmcb = v->arch.hvm_svm.vmcb;
+    return (vmcb->interrupt_shadow ? HVM_INTR_SHADOW_MOV_SS : 0);
+}
 
-    if ( vmcb->interrupt_shadow )
-        return hvm_intblk_shadow;
-
-    if ( intack.source == hvm_intsrc_nmi )
-        return hvm_intblk_none;
-
-    ASSERT((intack.source == hvm_intsrc_pic) ||
-           (intack.source == hvm_intsrc_lapic));
-
-    if ( !(guest_cpu_user_regs()->eflags & X86_EFLAGS_IF) )
-        return hvm_intblk_rflags_ie;
-
-    return hvm_intblk_none;
+static void svm_set_interrupt_shadow(struct vcpu *v, unsigned int intr_shadow)
+{
+    struct vmcb_struct *vmcb = v->arch.hvm_svm.vmcb;
+    vmcb->interrupt_shadow = !!(vmcb->interrupt_shadow &
+                                (HVM_INTR_SHADOW_MOV_SS|HVM_INTR_SHADOW_STI));
 }
 
 static int svm_guest_x86_mode(struct vcpu *v)
@@ -779,7 +772,8 @@ static struct hvm_function_table svm_function_table = {
     .vcpu_destroy         = svm_vcpu_destroy,
     .save_cpu_ctxt        = svm_save_vmcb_ctxt,
     .load_cpu_ctxt        = svm_load_vmcb_ctxt,
-    .interrupt_blocked    = svm_interrupt_blocked,
+    .get_interrupt_shadow = svm_get_interrupt_shadow,
+    .set_interrupt_shadow = svm_set_interrupt_shadow,
     .guest_x86_mode       = svm_guest_x86_mode,
     .get_segment_register = svm_get_segment_register,
     .set_segment_register = svm_set_segment_register,
@@ -1176,7 +1170,7 @@ static void svm_vmexit_do_hlt(struct vmcb_struct *vmcb,
     /* Check for pending exception or new interrupt. */
     if ( vmcb->eventinj.fields.v ||
          ((intack.source != hvm_intsrc_none) &&
-          !svm_interrupt_blocked(current, intack)) )
+          !hvm_interrupt_blocked(current, intack)) )
     {
         HVMTRACE_1D(HLT, curr, /*int pending=*/ 1);
         return;

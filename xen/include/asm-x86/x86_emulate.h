@@ -318,11 +318,6 @@ struct x86_emulate_ops
         uint64_t val,
         struct x86_emulate_ctxt *ctxt);
 
-    /* write_rflags: Modify privileged bits in RFLAGS. */
-    int (*write_rflags)(
-        unsigned long val,
-        struct x86_emulate_ctxt *ctxt);
-
     /* wbinvd: Write-back and invalidate cache contents. */
     int (*wbinvd)(
         struct x86_emulate_ctxt *ctxt);
@@ -335,14 +330,10 @@ struct x86_emulate_ops
         unsigned int *edx,
         struct x86_emulate_ctxt *ctxt);
 
-    /* hlt: Emulate HLT. */
-    int (*hlt)(
-        struct x86_emulate_ctxt *ctxt);
-
     /* inject_hw_exception */
     int (*inject_hw_exception)(
         uint8_t vector,
-        uint16_t error_code,
+        int32_t error_code,
         struct x86_emulate_ctxt *ctxt);
 
     /* inject_sw_interrupt */
@@ -376,7 +367,17 @@ struct x86_emulate_ctxt
     unsigned int sp_size;
 
     /* Set this if writes may have side effects. */
-    int force_writeback;
+    uint8_t force_writeback;
+
+    /* Retirement state, set by the emulator (valid only on X86EMUL_OKAY). */
+    union {
+        struct {
+            uint8_t hlt:1;          /* Instruction HLTed. */
+            uint8_t mov_ss:1;       /* Instruction sets MOV-SS irq shadow. */
+            uint8_t sti:1;          /* Instruction sets STI irq shadow. */
+        } flags;
+        uint8_t byte;
+    } retire;
 };
 
 /*

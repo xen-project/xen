@@ -1640,12 +1640,22 @@ void hvm_cpuid(unsigned int input, unsigned int *eax, unsigned int *ebx,
 
 enum hvm_intblk hvm_interrupt_blocked(struct vcpu *v, struct hvm_intack intack)
 {
-    enum hvm_intblk r;
+    unsigned long intr_shadow;
+
     ASSERT(v == current);
 
-    r = hvm_funcs.interrupt_blocked(v, intack);
-    if ( r != hvm_intblk_none )
-        return r;
+    if ( (intack.source != hvm_intsrc_nmi) &&
+         !(guest_cpu_user_regs()->eflags & X86_EFLAGS_IF) )
+        return hvm_intblk_rflags_ie;
+
+    intr_shadow = hvm_funcs.get_interrupt_shadow(v);
+
+    if ( intr_shadow & (HVM_INTR_SHADOW_STI|HVM_INTR_SHADOW_MOV_SS) )
+        return hvm_intblk_shadow;
+
+    if ( intack.source == hvm_intsrc_nmi )
+        return ((intr_shadow & HVM_INTR_SHADOW_NMI) ?
+                hvm_intblk_nmi_iret : hvm_intblk_none);
 
     if ( intack.source == hvm_intsrc_lapic )
     {
@@ -1654,7 +1664,7 @@ enum hvm_intblk hvm_interrupt_blocked(struct vcpu *v, struct hvm_intack intack)
             return hvm_intblk_tpr;
     }
 
-    return r;
+    return hvm_intblk_none;
 }
 
 static long hvm_grant_table_op(

@@ -124,8 +124,9 @@ static int hvmemul_virtual_to_linear(
 
     if ( !okay )
     {
-        hvmemul_ctxt->flags.exn_pending = 1;
+        hvmemul_ctxt->exn_pending = 1;
         hvmemul_ctxt->exn_vector = TRAP_gp_fault;
+        hvmemul_ctxt->exn_error_code = 0;
         hvmemul_ctxt->exn_insn_len = 0;
         return X86EMUL_EXCEPTION;
     }
@@ -439,9 +440,6 @@ static int hvmemul_write_segment(
         container_of(ctxt, struct hvm_emulate_ctxt, ctxt);
     struct segment_register *sreg = hvmemul_get_seg_reg(seg, hvmemul_ctxt);
 
-    if ( seg == x86_seg_ss )
-        hvmemul_ctxt->flags.mov_ss = 1;
-
     memcpy(sreg, reg, sizeof(struct segment_register));
     __set_bit(seg, &hvmemul_ctxt->seg_reg_dirty);
 
@@ -571,17 +569,6 @@ static int hvmemul_write_msr(
     return hvm_funcs.msr_write_intercept(&_regs);
 }
 
-static int hvmemul_write_rflags(
-    unsigned long val,
-    struct x86_emulate_ctxt *ctxt)
-{
-    struct hvm_emulate_ctxt *hvmemul_ctxt =
-        container_of(ctxt, struct hvm_emulate_ctxt, ctxt);
-    if ( (val & X86_EFLAGS_IF) && !(ctxt->regs->eflags & X86_EFLAGS_IF) )
-        hvmemul_ctxt->flags.sti = 1;
-    return X86EMUL_OKAY;
-}
-
 static int hvmemul_wbinvd(
     struct x86_emulate_ctxt *ctxt)
 {
@@ -600,28 +587,17 @@ static int hvmemul_cpuid(
     return X86EMUL_OKAY;
 }
 
-static int hvmemul_hlt(
-    struct x86_emulate_ctxt *ctxt)
-{
-    struct hvm_emulate_ctxt *hvmemul_ctxt =
-        container_of(ctxt, struct hvm_emulate_ctxt, ctxt);
-    hvmemul_ctxt->flags.hlt = 1;
-    return X86EMUL_OKAY;
-}
-
 static int hvmemul_inject_hw_exception(
     uint8_t vector,
-    uint16_t error_code,
+    int32_t error_code,
     struct x86_emulate_ctxt *ctxt)
 {
     struct hvm_emulate_ctxt *hvmemul_ctxt =
         container_of(ctxt, struct hvm_emulate_ctxt, ctxt);
 
-    if ( error_code != 0 )
-        return X86EMUL_UNHANDLEABLE;
-
-    hvmemul_ctxt->flags.exn_pending = 1;
+    hvmemul_ctxt->exn_pending = 1;
     hvmemul_ctxt->exn_vector = vector;
+    hvmemul_ctxt->exn_error_code = error_code;
     hvmemul_ctxt->exn_insn_len = 0;
 
     return X86EMUL_OKAY;
@@ -635,8 +611,9 @@ static int hvmemul_inject_sw_interrupt(
     struct hvm_emulate_ctxt *hvmemul_ctxt =
         container_of(ctxt, struct hvm_emulate_ctxt, ctxt);
 
-    hvmemul_ctxt->flags.exn_pending = 1;
+    hvmemul_ctxt->exn_pending = 1;
     hvmemul_ctxt->exn_vector = vector;
+    hvmemul_ctxt->exn_error_code = -1;
     hvmemul_ctxt->exn_insn_len = insn_len;
 
     return X86EMUL_OKAY;
@@ -684,10 +661,8 @@ static struct x86_emulate_ops hvm_emulate_ops = {
     .write_cr      = hvmemul_write_cr,
     .read_msr      = hvmemul_read_msr,
     .write_msr     = hvmemul_write_msr,
-    .write_rflags  = hvmemul_write_rflags,
     .wbinvd        = hvmemul_wbinvd,
     .cpuid         = hvmemul_cpuid,
-    .hlt           = hvmemul_hlt,
     .inject_hw_exception = hvmemul_inject_hw_exception,
     .inject_sw_interrupt = hvmemul_inject_sw_interrupt,
     .load_fpu_ctxt = hvmemul_load_fpu_ctxt,
@@ -698,7 +673,9 @@ int hvm_emulate_one(
     struct hvm_emulate_ctxt *hvmemul_ctxt)
 {
     struct cpu_user_regs *regs = hvmemul_ctxt->ctxt.regs;
+    uint32_t new_intr_shadow;
     unsigned long addr;
+    int rc;
 
     hvmemul_ctxt->ctxt.addr_size =
         hvmemul_ctxt->seg_reg[x86_seg_cs].attr.fields.db ? 32 : 16;
@@ -715,15 +692,46 @@ int hvm_emulate_one(
              hvmemul_ctxt->insn_buf, addr, sizeof(hvmemul_ctxt->insn_buf)))
         ? sizeof(hvmemul_ctxt->insn_buf) : 0;
 
-    hvmemul_ctxt->flag_word = 0;
+    hvmemul_ctxt->exn_pending = 0;
 
-    return x86_emulate(&hvmemul_ctxt->ctxt, &hvm_emulate_ops);
+    rc = x86_emulate(&hvmemul_ctxt->ctxt, &hvm_emulate_ops);
+    if ( rc != X86EMUL_OKAY )
+        return rc;
+
+    new_intr_shadow = hvmemul_ctxt->intr_shadow;
+
+    /* MOV-SS instruction toggles MOV-SS shadow, else we just clear it. */
+    if ( hvmemul_ctxt->ctxt.retire.flags.mov_ss )
+        new_intr_shadow ^= HVM_INTR_SHADOW_MOV_SS;
+    else
+        new_intr_shadow &= ~HVM_INTR_SHADOW_MOV_SS;
+
+    /* STI instruction toggles STI shadow, else we just clear it. */
+    if ( hvmemul_ctxt->ctxt.retire.flags.sti )
+        new_intr_shadow ^= HVM_INTR_SHADOW_STI;
+    else
+        new_intr_shadow &= ~HVM_INTR_SHADOW_STI;
+
+    if ( hvmemul_ctxt->intr_shadow != new_intr_shadow )
+    {
+        hvmemul_ctxt->intr_shadow = new_intr_shadow;
+        hvm_funcs.set_interrupt_shadow(current, new_intr_shadow);
+    }
+
+    if ( hvmemul_ctxt->ctxt.retire.flags.hlt &&
+         !hvm_local_events_need_delivery(current) )
+    {
+        hvm_hlt(regs->eflags);
+    }
+
+    return X86EMUL_OKAY;
 }
 
 void hvm_emulate_prepare(
     struct hvm_emulate_ctxt *hvmemul_ctxt,
     struct cpu_user_regs *regs)
 {
+    hvmemul_ctxt->intr_shadow = hvm_funcs.get_interrupt_shadow(current);
     hvmemul_ctxt->ctxt.regs = regs;
     hvmemul_ctxt->ctxt.force_writeback = 1;
     hvmemul_ctxt->seg_reg_accessed = 0;

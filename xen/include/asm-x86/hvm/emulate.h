@@ -27,18 +27,12 @@ struct hvm_emulate_ctxt {
     unsigned long seg_reg_accessed;
     unsigned long seg_reg_dirty;
 
-    union {
-        struct {
-            unsigned int hlt:1;
-            unsigned int mov_ss:1;
-            unsigned int sti:1;
-            unsigned int exn_pending:1;
-        } flags;
-        unsigned int flag_word;
-    };
-
+    bool_t exn_pending;
     uint8_t exn_vector;
     uint8_t exn_insn_len;
+    int32_t exn_error_code;
+
+    uint32_t intr_shadow;
 };
 
 int hvm_emulate_one(
