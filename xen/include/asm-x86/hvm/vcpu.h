@@ -42,7 +42,6 @@ struct hvm_vcpu {
      */
     unsigned long       hw_cr[5];
 
-    struct hvm_io_op    io_op;
     struct vlapic       vlapic;
     s64                 cache_tsc_offset;
     u64                 guest_time;
@@ -76,10 +75,6 @@ struct hvm_vcpu {
     bool_t              io_completed;
     unsigned long       io_data;
 };
-
-#define ARCH_HVM_IO_WAIT         1   /* Waiting for I/O completion */
-
-#define HVM_CONTEXT_STACK_BYTES  (offsetof(struct cpu_user_regs, ss))
 
 #endif /* __ASM_X86_HVM_VCPU_H__ */
 

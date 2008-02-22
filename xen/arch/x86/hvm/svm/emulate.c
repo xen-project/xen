@@ -27,8 +27,17 @@
 #include <asm/hvm/svm/vmcb.h>
 #include <asm/hvm/svm/emulate.h>
 
-int inst_copy_from_guest(
-    unsigned char *buf, unsigned long guest_eip, int inst_len);
+#define MAX_INST_LEN 15
+
+static int inst_copy_from_guest(
+    unsigned char *buf, unsigned long guest_eip, int inst_len)
+{
+    if ( (inst_len > MAX_INST_LEN) || (inst_len <= 0) )
+        return 0;
+    if ( hvm_fetch_from_guest_virt_nofault(buf, guest_eip, inst_len) )
+        return 0;
+    return inst_len;
+}
 
 static unsigned int is_prefix(u8 opc)
 {

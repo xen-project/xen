@@ -9,7 +9,6 @@ obj-y += io.o
 obj-y += iommu.o
 obj-y += irq.o
 obj-y += mtrr.o
-obj-y += platform.o
 obj-y += pmtimer.o
 obj-y += rtc.o
 obj-y += hpet.o

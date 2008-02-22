@@ -221,8 +221,7 @@ void vmx_realmode(struct cpu_user_regs *regs)
     hvm_emulate_prepare(&rm_ctxt.hvm, regs);
     rm_ctxt.intr_shadow = __vmread(GUEST_INTERRUPTIBILITY_INFO);
 
-    if ( curr->arch.hvm_vcpu.io_in_progress ||
-         curr->arch.hvm_vcpu.io_completed )
+    if ( curr->arch.hvm_vcpu.io_completed )
         realmode_emulate_one(&rm_ctxt);
 
     /* Only deliver interrupts into emulated real mode. */

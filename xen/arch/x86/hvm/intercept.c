@@ -2,6 +2,7 @@
  * intercept.c: Handle performance critical I/O packets in hypervisor space
  *
  * Copyright (c) 2004, Intel Corporation.
+ * Copyright (c) 2008, Citrix Systems, Inc.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,
@@ -91,83 +92,6 @@ static inline void hvm_mmio_access(struct vcpu *v,
         domain_crash_synchronous();
         break;
     }
-}
-
-int hvm_buffered_io_send(ioreq_t *p)
-{
-    struct vcpu *v = current;
-    struct hvm_ioreq_page *iorp = &v->domain->arch.hvm_domain.buf_ioreq;
-    buffered_iopage_t *pg = iorp->va;
-    buf_ioreq_t bp;
-    /* Timeoffset sends 64b data, but no address. Use two consecutive slots. */
-    int qw = 0;
-
-    /* Ensure buffered_iopage fits in a page */
-    BUILD_BUG_ON(sizeof(buffered_iopage_t) > PAGE_SIZE);
-
-    /*
-     * Return 0 for the cases we can't deal with:
-     *  - 'addr' is only a 20-bit field, so we cannot address beyond 1MB
-     *  - we cannot buffer accesses to guest memory buffers, as the guest
-     *    may expect the memory buffer to be synchronously accessed
-     *  - the count field is usually used with data_is_ptr and since we don't
-     *    support data_is_ptr we do not waste space for the count field either
-     */
-    if ( (p->addr > 0xffffful) || p->data_is_ptr || (p->count != 1) )
-        return 0;
-
-    bp.type = p->type;
-    bp.dir  = p->dir;
-    switch ( p->size )
-    {
-    case 1:
-        bp.size = 0;
-        break;
-    case 2:
-        bp.size = 1;
-        break;
-    case 4:
-        bp.size = 2;
-        break;
-    case 8:
-        bp.size = 3;
-        qw = 1;
-        break;
-    default:
-        gdprintk(XENLOG_WARNING, "unexpected ioreq size:%"PRId64"\n", p->size);
-        return 0;
-    }
-    
-    bp.data = p->data;
-    bp.addr = p->addr;
-    
-    spin_lock(&iorp->lock);
-
-    if ( (pg->write_pointer - pg->read_pointer) >=
-         (IOREQ_BUFFER_SLOT_NUM - qw) )
-    {
-        /* The queue is full: send the iopacket through the normal path. */
-        spin_unlock(&iorp->lock);
-        return 0;
-    }
-    
-    memcpy(&pg->buf_ioreq[pg->write_pointer % IOREQ_BUFFER_SLOT_NUM],
-           &bp, sizeof(bp));
-    
-    if ( qw )
-    {
-        bp.data = p->data >> 32;
-        memcpy(&pg->buf_ioreq[(pg->write_pointer+1) % IOREQ_BUFFER_SLOT_NUM],
-               &bp, sizeof(bp));
-    }
-
-    /* Make the ioreq_t visible /before/ write_pointer. */
-    wmb();
-    pg->write_pointer += qw ? 2 : 1;
-
-    spin_unlock(&iorp->lock);
-    
-    return 1;
 }
 
 int hvm_mmio_intercept(ioreq_t *p)

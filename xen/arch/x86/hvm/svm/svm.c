@@ -58,8 +58,6 @@ u32 svm_feature_flags;
 
 enum handler_return { HNDL_done, HNDL_unhandled, HNDL_exception_raised };
 
-int inst_copy_from_guest(unsigned char *buf, unsigned long guest_eip,
-                         int inst_len);
 asmlinkage void do_IRQ(struct cpu_user_regs *);
 
 static void svm_update_guest_cr(struct vcpu *v, unsigned int cr);

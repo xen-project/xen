@@ -3,7 +3,8 @@
  *
  * Copyright (c) 2004, Intel Corporation.
  * Copyright (c) 2005, International Business Machines Corporation.
- *
+ * Copyright (c) 2008, Citrix Systems, Inc.
+ * 
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,
  * version 2, as published by the Free Software Foundation.
@@ -1517,6 +1518,38 @@ enum hvm_copy_result hvm_fetch_from_guest_virt_nofault(
     return __hvm_copy(buf, vaddr, size, 0, 1, hvm_nx_enabled(current));
 }
 
+DEFINE_PER_CPU(int, guest_handles_in_xen_space);
+
+/* Note that copy_{to,from}_user_hvm require the PTE to be writable even
+   when they're only trying to read from it.  The guest is expected to
+   deal with this. */
+unsigned long copy_to_user_hvm(void *to, const void *from, unsigned len)
+{
+    int rc;
+
+    if ( this_cpu(guest_handles_in_xen_space) )
+    {
+        memcpy(to, from, len);
+        return 0;
+    }
+
+    rc = hvm_copy_to_guest_virt_nofault((unsigned long)to, (void *)from, len);
+    return rc ? len : 0; /* fake a copy_to_user() return code */
+}
+
+unsigned long copy_from_user_hvm(void *to, const void *from, unsigned len)
+{
+    int rc;
+
+    if ( this_cpu(guest_handles_in_xen_space) )
+    {
+        memcpy(to, from, len);
+        return 0;
+    }
+
+    rc = hvm_copy_from_guest_virt_nofault(to, (unsigned long)from, len);
+    return rc ? len : 0; /* fake a copy_from_user() return code */
+}
 
 /* HVM specific printbuf. Mostly used for hvmloader chit-chat. */
 void hvm_print_line(struct vcpu *v, const char c)

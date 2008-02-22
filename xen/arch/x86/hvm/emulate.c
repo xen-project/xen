@@ -3,7 +3,7 @@
  * 
  * HVM instruction emulation. Used for MMIO and VMX real mode.
  * 
- * Copyright (c) 2008 Citrix Systems, Inc.
+ * Copyright (c) 2008, Citrix Systems, Inc.
  * 
  * Authors:
  *    Keir Fraser <keir.fraser@citrix.com>
@@ -310,18 +310,9 @@ static int hvmemul_rep_ins(
     if ( curr->arch.hvm_vcpu.io_in_progress )
         return X86EMUL_UNHANDLEABLE;
 
-    if ( !curr->arch.hvm_vcpu.io_completed )
-    {
-        curr->arch.hvm_vcpu.io_in_progress = 1;
-        send_pio_req(src_port, *reps, bytes_per_rep,
-                     gpa, IOREQ_READ,
-                     !!(ctxt->regs->eflags & X86_EFLAGS_DF), 1);
-    }
-
-    if ( !curr->arch.hvm_vcpu.io_completed )
-        return X86EMUL_RETRY;
-
-    curr->arch.hvm_vcpu.io_completed = 0;
+    curr->arch.hvm_vcpu.io_in_progress = 1;
+    send_pio_req(src_port, *reps, bytes_per_rep, gpa, IOREQ_READ,
+                 !!(ctxt->regs->eflags & X86_EFLAGS_DF), 1);
 
     return X86EMUL_OKAY;
 }
@@ -408,18 +399,10 @@ static int hvmemul_rep_movs(
     (void)gfn_to_mfn_current(sgpa >> PAGE_SHIFT, &p2mt);
     if ( !p2m_is_ram(p2mt) )
     {
-        if ( !curr->arch.hvm_vcpu.io_completed )
-        {
-            curr->arch.hvm_vcpu.io_in_progress = 1;
-            send_mmio_req(IOREQ_TYPE_COPY, sgpa, *reps, bytes_per_rep,
+        curr->arch.hvm_vcpu.io_in_progress = 1;
+        send_mmio_req(IOREQ_TYPE_COPY, sgpa, *reps, bytes_per_rep,
                       dgpa, IOREQ_READ,
                       !!(ctxt->regs->eflags & X86_EFLAGS_DF), 1);
-        }
-
-        if ( !curr->arch.hvm_vcpu.io_completed )
-            return X86EMUL_RETRY;
-
-        curr->arch.hvm_vcpu.io_completed = 0;
     }
     else
     {
