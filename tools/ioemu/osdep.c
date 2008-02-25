@@ -178,7 +178,7 @@ void kqemu_vfree(void *ptr)
 
 void *qemu_memalign(size_t alignment, size_t size)
 {
-#if defined(_POSIX_C_SOURCE)
+#if defined(_POSIX_C_SOURCE) && !defined(__sun__)
     int ret;
     void *ptr;
     ret = posix_memalign(&ptr, alignment, size);
