@@ -369,14 +369,15 @@ static void svm_fpu_leave(struct vcpu *v)
 static unsigned int svm_get_interrupt_shadow(struct vcpu *v)
 {
     struct vmcb_struct *vmcb = v->arch.hvm_svm.vmcb;
-    return (vmcb->interrupt_shadow ? HVM_INTR_SHADOW_MOV_SS : 0);
+    return (vmcb->interrupt_shadow ?
+            (HVM_INTR_SHADOW_MOV_SS|HVM_INTR_SHADOW_STI) : 0);
 }
 
 static void svm_set_interrupt_shadow(struct vcpu *v, unsigned int intr_shadow)
 {
     struct vmcb_struct *vmcb = v->arch.hvm_svm.vmcb;
-    vmcb->interrupt_shadow = !!(vmcb->interrupt_shadow &
-                                (HVM_INTR_SHADOW_MOV_SS|HVM_INTR_SHADOW_STI));
+    vmcb->interrupt_shadow =
+        !!(intr_shadow & (HVM_INTR_SHADOW_MOV_SS|HVM_INTR_SHADOW_STI));
 }
 
 static int svm_guest_x86_mode(struct vcpu *v)
