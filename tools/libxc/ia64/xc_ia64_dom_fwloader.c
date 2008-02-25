@@ -58,9 +58,11 @@ static int xc_dom_load_fw_kernel(struct xc_dom_image *dom)
 static int alloc_magic_pages(struct xc_dom_image *dom)
 {
     /* allocate special pages */
-    dom->console_pfn = 0;
-    dom->xenstore_pfn = 1;
-    dom->start_info_pfn = 2;
+    /* Note: do not use 0 for console or xenstore otherwise clear_page won't
+       clear the page.  */
+    dom->start_info_pfn = 0;
+    dom->console_pfn = 1;
+    dom->xenstore_pfn = 2;
     return 0;
 }
 
