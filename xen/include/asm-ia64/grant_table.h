@@ -65,8 +65,10 @@ static inline void gnttab_clear_flag(unsigned long nr, uint16_t *addr)
 	clear_bit(nr, addr);
 }
 
-#define gnttab_release_put_page(page)           put_page((page))
-#define gnttab_release_put_page_and_type(page)  put_page_and_type((page))
+#define gnttab_host_mapping_get_page_type(op, ld, rd)   \
+    (!((op)->flags & GNTMAP_readonly))
+
+#define gnttab_release_host_mappings 1
 
 static inline int replace_grant_supported(void)
 {

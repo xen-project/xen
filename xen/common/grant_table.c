@@ -350,10 +350,10 @@ __gnttab_map_grant_ref(
     else
     {
         if ( unlikely(!mfn_valid(frame)) ||
-             unlikely(!((op->flags & GNTMAP_readonly) ?
-                        get_page(mfn_to_page(frame), rd) :
+             unlikely(!(gnttab_host_mapping_get_page_type(op, ld, rd) ?
                         get_page_and_type(mfn_to_page(frame), rd,
-                                          PGT_writable_page))) )
+                                          PGT_writable_page) :
+                        get_page(mfn_to_page(frame), rd))) )
         {
             if ( !rd->is_dying )
                 gdprintk(XENLOG_WARNING, "Could not pin grant frame %lx\n",
@@ -367,7 +367,7 @@ __gnttab_map_grant_ref(
             rc = create_grant_host_mapping(op->host_addr, frame, op->flags, 0);
             if ( rc != GNTST_okay )
             {
-                if ( !(op->flags & GNTMAP_readonly) )
+                if ( gnttab_host_mapping_get_page_type(op, ld, rd) )
                     put_page_type(mfn_to_page(frame));
                 put_page(mfn_to_page(frame));
                 goto undo_out;
@@ -604,7 +604,7 @@ __gnttab_unmap_common_complete(struct gnttab_unmap_common *op)
 
         if ( !is_iomem_page(op->frame) ) 
         {
-            if ( !(op->flags & GNTMAP_readonly) )
+            if ( gnttab_host_mapping_get_page_type(op, ld, rd) )
                 put_page_type(mfn_to_page(op->frame));
             put_page(mfn_to_page(op->frame));
         }
@@ -1662,8 +1662,9 @@ gnttab_release_mappings(
             {
                 BUG_ON(!(act->pin & GNTPIN_hstr_mask));
                 act->pin -= GNTPIN_hstr_inc;
-                if ( !is_iomem_page(act->frame) )
-                    gnttab_release_put_page(mfn_to_page(act->frame));
+                if ( gnttab_release_host_mappings &&
+                     !is_iomem_page(act->frame) )
+                    put_page(mfn_to_page(act->frame));
             }
         }
         else
@@ -1680,8 +1681,13 @@ gnttab_release_mappings(
             {
                 BUG_ON(!(act->pin & GNTPIN_hstw_mask));
                 act->pin -= GNTPIN_hstw_inc;
-                if ( !is_iomem_page(act->frame) )
-                    gnttab_release_put_page_and_type(mfn_to_page(act->frame));
+                if ( gnttab_release_host_mappings &&
+                     !is_iomem_page(act->frame) )
+                {
+                    if ( gnttab_host_mapping_get_page_type(map, d, rd) )
+                        put_page_type(mfn_to_page(act->frame));
+                    put_page(mfn_to_page(act->frame));
+                }
             }
 
             if ( (act->pin & (GNTPIN_devw_mask|GNTPIN_hstw_mask)) == 0 )
