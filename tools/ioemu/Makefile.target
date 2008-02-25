@@ -523,10 +523,6 @@ vl.o: BASE_CFLAGS+=-p
 VL_LDFLAGS+=-p
 endif
 
-ifeq ($(ARCH),ia64)
-VL_LDFLAGS+=-Wl,-G0 -Wl,-T,$(SRC_PATH)/ia64.ld
-endif
-
 ifeq ($(ARCH),sparc64)
 VL_LDFLAGS+=-m64
 VL_LDFLAGS+=-Wl,-T,$(SRC_PATH)/sparc64.ld
