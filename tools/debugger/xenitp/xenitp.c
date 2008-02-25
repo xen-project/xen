@@ -1081,6 +1081,36 @@ cmd_disassemble (char *args)
 }
 
 static enum cmd_status
+cmd_dump (char *args)
+{
+    static unsigned long addr;
+    unsigned long end_addr = addr + 256;
+    unsigned long p;
+
+    if (*args != 0) {
+        if (parse_expr (&args, &addr, 0) < 0)
+            return CMD_ERROR;
+        if (*args != 0) {
+            if (parse_expr (&args, &end_addr, 0) < 0)
+                return CMD_ERROR;
+        }
+        else 
+            end_addr = addr + 256;
+    }
+    for (p = addr; p < end_addr; p += 16) {
+        int i;
+        printf ("%016lx:", p);
+        for (i = 0; i < 16; i++) {
+            unsigned char *m = target_map_memory (p + i);
+            printf ("%c%02x", i == 8 ? '-' : ' ', *m);
+        }
+        printf ("\n");
+    }
+    addr = end_addr;
+    return CMD_REPEAT;
+}
+
+static enum cmd_status
 cmd_break (char *args)
 {
     unsigned long addr;
@@ -1461,6 +1491,7 @@ const struct command_desc commands[] = {
     { "quit", "quit debugger", cmd_quit },
     { "echo", "display parameters", cmd_echo },
     { "disassemble", "disassemble memory", cmd_disassemble },
+    { "dump", "dump memory", cmd_dump },
     { "break", "set a break point", cmd_break },
     { "watch", "set a watch point", cmd_watch },
     { "cb", "resume until branch", cmd_cb },
