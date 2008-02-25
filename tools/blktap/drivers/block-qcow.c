@@ -59,15 +59,7 @@
         (l + (s - 1)) - ((l + (s - 1)) % s)); \
 })
 
-struct pending_aio {
-        td_callback_t cb;
-        int id;
-        void *private;
-	int nb_sectors;
-	char *buf;
-	uint64_t sector;
-};
-
+#undef IOCB_IDX
 #define IOCB_IDX(_s, _io) ((_io) - (_s)->iocb_list)
 
 #define ZERO_TEST(_b) (_b | 0x00)
@@ -140,109 +132,18 @@ struct tdqcow_state {
 	uint32_t l2_cache_counts[L2_CACHE_SIZE];      /*Cache access record*/
 	uint8_t *cluster_cache;          
 	uint8_t *cluster_data;
-	uint8_t *sector_lock;          /*Locking bitmap for AIO reads/writes*/
 	uint64_t cluster_cache_offset; /**/
 	uint32_t crypt_method;         /*current crypt method, 0 if no 
 					*key yet */
 	uint32_t crypt_method_header;  /**/
 	AES_KEY aes_encrypt_key;       /*AES key*/
 	AES_KEY aes_decrypt_key;       /*AES key*/
-        /* libaio state */
-        tap_aio_context_t   aio_ctx;
-        int                 max_aio_reqs;
-        struct iocb        *iocb_list;
-        struct iocb       **iocb_free;
-        struct pending_aio *pending_aio;
-        int                 iocb_free_count;
-        struct iocb       **iocb_queue;
-        int                 iocb_queued;
-        struct io_event    *aio_events;
+        
+	/* libaio state */
+	tap_aio_context_t	aio;
 };
 
 static int decompress_cluster(struct tdqcow_state *s, uint64_t cluster_offset);
-
-static void free_aio_state(struct disk_driver *dd)
-{
-        struct tdqcow_state *s = (struct tdqcow_state *)dd->private;
-
-        if (s->sector_lock)
-                free(s->sector_lock);
-        if (s->iocb_list)
-                free(s->iocb_list);
-        if (s->pending_aio)
-                free(s->pending_aio);
-        if (s->aio_events)
-                free(s->aio_events);
-        if (s->iocb_free)
-                free(s->iocb_free);
-        if (s->iocb_queue)
-                free(s->iocb_queue);
-}
-
-static int init_aio_state(struct disk_driver *dd)
-{
-	int i, ret;
-	struct td_state     *bs = dd->td_state;
-	struct tdqcow_state  *s = (struct tdqcow_state *)dd->private;
-        long     ioidx;
-
-        s->iocb_list = NULL;
-        s->pending_aio = NULL;
-        s->aio_events = NULL;
-        s->iocb_free = NULL;
-        s->iocb_queue = NULL;
-
-        /*Initialize Locking bitmap*/
-	s->sector_lock = calloc(1, bs->size);
-	
-	if (!s->sector_lock) {
-		DPRINTF("Failed to allocate sector lock\n");
-		goto fail;
-	}
-
-        /* A segment (i.e. a page) can span multiple clusters */
-        s->max_aio_reqs = ((getpagesize() / s->cluster_size) + 1) *
-            MAX_SEGMENTS_PER_REQ * MAX_REQUESTS;
-
-        /* Initialize AIO */
-        s->iocb_free_count = s->max_aio_reqs;
-        s->iocb_queued     = 0;
-
-        if (!(s->iocb_list = malloc(sizeof(struct iocb) * s->max_aio_reqs)) ||
-            !(s->pending_aio = malloc(sizeof(struct pending_aio) * s->max_aio_reqs)) ||
-            !(s->aio_events = malloc(sizeof(struct io_event) * s->max_aio_reqs)) ||
-            !(s->iocb_free = malloc(sizeof(struct iocb *) * s->max_aio_reqs)) ||
-            !(s->iocb_queue = malloc(sizeof(struct iocb *) * s->max_aio_reqs))) {
-                DPRINTF("Failed to allocate AIO structs (max_aio_reqs = %d)\n",
-                        s->max_aio_reqs);
-                goto fail;
-        }
-
-	ret = tap_aio_setup(&s->aio_ctx, s->aio_events, s->max_aio_reqs);
-	if (ret < 0) {
-                if (ret == -EAGAIN) {
-                        DPRINTF("Couldn't setup AIO context.  If you are "
-                                "trying to concurrently use a large number "
-                                "of blktap-based disks, you may need to "
-                                "increase the system-wide aio request limit. "
-                                "(e.g. 'echo echo 1048576 > /proc/sys/fs/"
-                                "aio-max-nr')\n");
-                } else {
-                        DPRINTF("Couldn't setup AIO context.\n");
-                }
-		goto fail;
-	}
-
-        for (i=0;i<s->max_aio_reqs;i++)
-                s->iocb_free[i] = &s->iocb_list[i];
-
-        DPRINTF("AIO state initialised\n");
-
-        return 0;
-
- fail:
-	return -1;
-}
 
 static uint32_t gen_cksum(char *ptr, int len)
 {
@@ -337,79 +238,6 @@ static int qcow_set_key(struct tdqcow_state *s, const char *key)
 	}
 #endif
 	return 0;
-}
-
-static int async_read(struct tdqcow_state *s, int size, 
-		      uint64_t offset, char *buf, td_callback_t cb,
-		      int id, uint64_t sector, void *private)
-{
-        struct   iocb *io;
-        struct   pending_aio *pio;
-	long     ioidx;
-
-        io = s->iocb_free[--s->iocb_free_count];
-
-        ioidx = IOCB_IDX(s, io);
-        pio = &s->pending_aio[ioidx];
-        pio->cb = cb;
-        pio->id = id;
-        pio->private = private;
-	pio->nb_sectors = size/512;
-	pio->buf = buf;
-	pio->sector = sector;
-
-        io_prep_pread(io, s->fd, buf, size, offset);
-        io->data = (void *)ioidx;
-
-        s->iocb_queue[s->iocb_queued++] = io;
-
-        return 1;
-}
-
-static int async_write(struct tdqcow_state *s, int size,
-		       uint64_t offset, char *buf, td_callback_t cb,
-		       int id, uint64_t sector, void *private)
-{
-        struct   iocb *io;
-        struct   pending_aio *pio;
-	long     ioidx;
-
-        io = s->iocb_free[--s->iocb_free_count];
-
-        ioidx = IOCB_IDX(s, io);
-        pio = &s->pending_aio[ioidx];
-        pio->cb = cb;
-        pio->id = id;
-        pio->private = private;
-	pio->nb_sectors = size/512;
-	pio->buf = buf;
-	pio->sector = sector;
-
-        io_prep_pwrite(io, s->fd, buf, size, offset);
-        io->data = (void *)ioidx;
-
-        s->iocb_queue[s->iocb_queued++] = io;
-
-        return 1;
-}
-
-/*TODO: Fix sector span!*/
-static int aio_can_lock(struct tdqcow_state *s, uint64_t sector)
-{
-	return (s->sector_lock[sector] ? 0 : 1);
-}
-
-static int aio_lock(struct tdqcow_state *s, uint64_t sector)
-{
-	return ++s->sector_lock[sector];
-}
-
-static void aio_unlock(struct tdqcow_state *s, uint64_t sector)
-{
-	if (!s->sector_lock[sector]) return;
-
-	--s->sector_lock[sector];
-	return;
 }
 
 /* 
@@ -841,13 +669,14 @@ static inline void init_fds(struct disk_driver *dd)
 	for(i = 0; i < MAX_IOFD; i++) 
 		dd->io_fd[i] = 0;
 
-	dd->io_fd[0] = s->aio_ctx.pollfd;
+	dd->io_fd[0] = s->aio.aio_ctx.pollfd;
 }
 
 /* Open the disk file and initialize qcow state. */
 int tdqcow_open (struct disk_driver *dd, const char *name, td_flag_t flags)
 {
 	int fd, len, i, shift, ret, size, l1_table_size, o_flags;
+	int max_aio_reqs;
 	struct td_state     *bs = dd->td_state;
 	struct tdqcow_state *s  = (struct tdqcow_state *)dd->private;
 	char *buf;
@@ -996,9 +825,14 @@ int tdqcow_open (struct disk_driver *dd, const char *name, td_flag_t flags)
 	}
 
  end_xenhdr:
-	if (init_aio_state(dd)!=0) {
+ 	
+	/* A segment (i.e. a page) can span multiple clusters */
+	max_aio_reqs = ((getpagesize() / s->cluster_size) + 1) *
+		MAX_SEGMENTS_PER_REQ * MAX_REQUESTS;
+
+	if (tap_aio_init(&s->aio, bs->size, max_aio_reqs)!=0) {
 		DPRINTF("Unable to initialise AIO state\n");
-                free_aio_state(dd);
+                tap_aio_free(&s->aio);
 		goto fail;
 	}
 	init_fds(dd);
@@ -1015,7 +849,7 @@ int tdqcow_open (struct disk_driver *dd, const char *name, td_flag_t flags)
 	
 fail:
 	DPRINTF("QCOW Open failed\n");
-	free_aio_state(dd);
+	tap_aio_free(&s->aio);
 	free(s->l1_table);
 	free(s->l2_cache);
 	free(s->cluster_cache);
@@ -1037,7 +871,7 @@ int tdqcow_queue_read(struct disk_driver *dd, uint64_t sector,
 
 	/*Check we can get a lock*/
 	for (i = 0; i < nb_sectors; i++) 
-		if (!aio_can_lock(s, sector + i)) 
+		if (!tap_aio_can_lock(&s->aio, sector + i)) 
 			return cb(dd, -EBUSY, sector, nb_sectors, id, private);
 
 	/*We store a local record of the request*/
@@ -1049,11 +883,11 @@ int tdqcow_queue_read(struct disk_driver *dd, uint64_t sector,
 		if (n > nb_sectors)
 			n = nb_sectors;
 
-		if (s->iocb_free_count == 0 || !aio_lock(s, sector)) 
+		if (s->aio.iocb_free_count == 0 || !tap_aio_lock(&s->aio, sector)) 
 			return cb(dd, -EBUSY, sector, nb_sectors, id, private);
 		
 		if(!cluster_offset) {
-			aio_unlock(s, sector);
+			tap_aio_unlock(&s->aio, sector);
 			ret = cb(dd, BLK_NOT_ALLOCATED, 
 				 sector, n, id, private);
 			if (ret == -EBUSY) {
@@ -1064,7 +898,7 @@ int tdqcow_queue_read(struct disk_driver *dd, uint64_t sector,
 			} else
 				rsp += ret;
 		} else if (cluster_offset & QCOW_OFLAG_COMPRESSED) {
-			aio_unlock(s, sector);
+			tap_aio_unlock(&s->aio, sector);
 			if (decompress_cluster(s, cluster_offset) < 0) {
 				rsp += cb(dd, -EIO, sector, 
 					  nb_sectors, id, private);
@@ -1074,7 +908,7 @@ int tdqcow_queue_read(struct disk_driver *dd, uint64_t sector,
 			       512 * n);
 			rsp += cb(dd, 0, sector, n, id, private);
 		} else {
-			async_read(s, n * 512, 
+			tap_aio_read(&s->aio, s->fd, n * 512, 
 				   (cluster_offset + index_in_cluster * 512),
 				   buf, cb, id, sector, private);
 		}
@@ -1099,7 +933,7 @@ int tdqcow_queue_write(struct disk_driver *dd, uint64_t sector,
 
 	/*Check we can get a lock*/
 	for (i = 0; i < nb_sectors; i++)
-		if (!aio_can_lock(s, sector + i))  
+		if (!tap_aio_can_lock(&s->aio, sector + i))  
 			return cb(dd, -EBUSY, sector, nb_sectors, id, private);
 		   
 	/*We store a local record of the request*/
@@ -1109,7 +943,7 @@ int tdqcow_queue_write(struct disk_driver *dd, uint64_t sector,
 		if (n > nb_sectors)
 			n = nb_sectors;
 
-		if (s->iocb_free_count == 0 || !aio_lock(s, sector))
+		if (s->aio.iocb_free_count == 0 || !tap_aio_lock(&s->aio, sector))
 			return cb(dd, -EBUSY, sector, nb_sectors, id, private);
 
 		cluster_offset = get_cluster_offset(s, sector << 9, 1, 0,
@@ -1117,7 +951,7 @@ int tdqcow_queue_write(struct disk_driver *dd, uint64_t sector,
 						    index_in_cluster+n);
 		if (!cluster_offset) {
 			DPRINTF("Ooops, no write cluster offset!\n");
-			aio_unlock(s, sector);
+			tap_aio_unlock(&s->aio, sector);
 			return cb(dd, -EIO, sector, nb_sectors, id, private);
 		}
 
@@ -1125,12 +959,12 @@ int tdqcow_queue_write(struct disk_driver *dd, uint64_t sector,
 			encrypt_sectors(s, sector, s->cluster_data, 
 					(unsigned char *)buf, n, 1,
 					&s->aes_encrypt_key);
-			async_write(s, n * 512, 
+			tap_aio_write(&s->aio, s->fd, n * 512, 
 				    (cluster_offset + index_in_cluster*512),
 				    (char *)s->cluster_data, cb, id, sector, 
 				    private);
 		} else {
-			async_write(s, n * 512, 
+			tap_aio_write(&s->aio, s->fd, n * 512, 
 				    (cluster_offset + index_in_cluster*512),
 				    buf, cb, id, sector, private);
 		}
@@ -1146,20 +980,9 @@ int tdqcow_queue_write(struct disk_driver *dd, uint64_t sector,
  		
 int tdqcow_submit(struct disk_driver *dd)
 {
-        int ret;
-        struct   tdqcow_state *prv = (struct tdqcow_state *)dd->private;
+        struct tdqcow_state *prv = (struct tdqcow_state *)dd->private;
 
-	if (!prv->iocb_queued)
-		return 0;
-
-	ret = io_submit(prv->aio_ctx.aio_ctx, prv->iocb_queued, prv->iocb_queue);
-
-        /* XXX: TODO: Handle error conditions here. */
-
-        /* Success case: */
-        prv->iocb_queued = 0;
-
-        return 0;
+	return tap_aio_submit(&prv->aio);
 }
 
 int tdqcow_close(struct disk_driver *dd)
@@ -1180,7 +1003,7 @@ int tdqcow_close(struct disk_driver *dd)
 		close(fd);
 	}
 
-	io_destroy(s->aio_ctx.aio_ctx);
+	io_destroy(s->aio.aio_ctx.aio_ctx);
 	free(s->name);
 	free(s->l1_table);
 	free(s->l2_cache);
@@ -1198,15 +1021,15 @@ int tdqcow_do_callbacks(struct disk_driver *dd, int sid)
 
         if (sid > MAX_IOFD) return 1;
 
-        nr_events = tap_aio_get_events(&prv->aio_ctx);
+        nr_events = tap_aio_get_events(&prv->aio.aio_ctx);
 repeat:
-        for (ep = prv->aio_events, i = nr_events; i-- > 0; ep++) {
+        for (ep = prv->aio.aio_events, i = nr_events; i-- > 0; ep++) {
                 struct iocb        *io  = ep->obj;
                 struct pending_aio *pio;
 
-                pio = &prv->pending_aio[(long)io->data];
+                pio = &prv->aio.pending_aio[(long)io->data];
 
-		aio_unlock(prv, pio->sector);
+		tap_aio_unlock(&prv->aio, pio->sector);
 
 		if (prv->crypt_method)
 			encrypt_sectors(prv, pio->sector, 
@@ -1219,15 +1042,15 @@ repeat:
 			       pio->sector, pio->nb_sectors,
 			       pio->id, pio->private);
 
-                prv->iocb_free[prv->iocb_free_count++] = io;
+                prv->aio.iocb_free[prv->aio.iocb_free_count++] = io;
         }
 
         if (nr_events) {
-                nr_events = tap_aio_more_events(&prv->aio_ctx);
+                nr_events = tap_aio_more_events(&prv->aio.aio_ctx);
                 goto repeat;
         }
 
-        tap_aio_continue(&prv->aio_ctx);
+        tap_aio_continue(&prv->aio.aio_ctx);
 
         return rsp;
 }

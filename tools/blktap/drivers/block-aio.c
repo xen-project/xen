@@ -52,28 +52,11 @@
 #define O_LARGEFILE	0
 #endif
 
-struct pending_aio {
-	td_callback_t cb;
-	int id;
-	void *private;
-	uint64_t lsec;
-};
-
 struct tdaio_state {
 	int fd;
-	
-	/* libaio state */
-	tap_aio_context_t  aio_ctx;
-	struct iocb        iocb_list  [MAX_AIO_REQS];
-	struct iocb       *iocb_free  [MAX_AIO_REQS];
-	struct pending_aio pending_aio[MAX_AIO_REQS];
-	int                iocb_free_count;
-	struct iocb       *iocb_queue[MAX_AIO_REQS];
-	int                iocb_queued;
-	struct io_event    aio_events[MAX_AIO_REQS];
+	tap_aio_context_t aio;
 };
 
-#define IOCB_IDX(_s, _io) ((_io) - (_s)->iocb_list)
 
 /*Get Image size, secsize*/
 static int get_image_info(struct td_state *s, int fd)
@@ -131,7 +114,7 @@ static inline void init_fds(struct disk_driver *dd)
 	for(i = 0; i < MAX_IOFD; i++) 
 		dd->io_fd[i] = 0;
 
-	dd->io_fd[0] = prv->aio_ctx.pollfd;
+	dd->io_fd[0] = prv->aio.aio_ctx.pollfd;
 }
 
 /* Open the disk file and initialize aio state. */
@@ -142,27 +125,11 @@ int tdaio_open (struct disk_driver *dd, const char *name, td_flag_t flags)
 	struct tdaio_state *prv = (struct tdaio_state *)dd->private;
 
 	DPRINTF("block-aio open('%s')", name);
+
 	/* Initialize AIO */
-	prv->iocb_free_count = MAX_AIO_REQS;
-	prv->iocb_queued     = 0;
-
-	ret = tap_aio_setup(&prv->aio_ctx, prv->aio_events, MAX_AIO_REQS);
-	if (ret < 0) {
-                if (ret == -EAGAIN) {
-                        DPRINTF("Couldn't setup AIO context.  If you are "
-                                "trying to concurrently use a large number "
-                                "of blktap-based disks, you may need to "
-                                "increase the system-wide aio request limit. "
-                                "(e.g. 'echo echo 1048576 > /proc/sys/fs/"
-                                "aio-max-nr')\n");
-                } else {
-                        DPRINTF("Couldn't setup AIO context.\n");
-                }
-		goto done;
-	}
-
-	for (i=0;i<MAX_AIO_REQS;i++)
-		prv->iocb_free[i] = &prv->iocb_list[i];
+	ret = tap_aio_init(&prv->aio, 0, MAX_AIO_REQS);
+	if (ret != 0)
+		return ret;
 
 	/* Open the file */
 	o_flags = O_DIRECT | O_LARGEFILE | 
@@ -198,87 +165,40 @@ int tdaio_queue_read(struct disk_driver *dd, uint64_t sector,
 		     int nb_sectors, char *buf, td_callback_t cb,
 		     int id, void *private)
 {
-	struct   iocb *io;
-	struct   pending_aio *pio;
 	struct   td_state    *s   = dd->td_state;
 	struct   tdaio_state *prv = (struct tdaio_state *)dd->private;
 	int      size    = nb_sectors * s->sector_size;
 	uint64_t offset  = sector * (uint64_t)s->sector_size;
-	long     ioidx;
-	
-	if (prv->iocb_free_count == 0)
-		return -ENOMEM;
-	io = prv->iocb_free[--prv->iocb_free_count];
-	
-	ioidx = IOCB_IDX(prv, io);
-	pio = &prv->pending_aio[ioidx];
-	pio->cb = cb;
-	pio->id = id;
-	pio->private = private;
-	pio->lsec = sector;
-	
-	io_prep_pread(io, prv->fd, buf, size, offset);
-	io->data = (void *)ioidx;
-	
-	prv->iocb_queue[prv->iocb_queued++] = io;
 
-	return 0;
+	return tap_aio_read(&prv->aio, prv->fd, size, offset, buf, 
+		cb, id, sector, private);
 }
 			
 int tdaio_queue_write(struct disk_driver *dd, uint64_t sector,
 		      int nb_sectors, char *buf, td_callback_t cb,
 		      int id, void *private)
 {
-	struct   iocb *io;
-	struct   pending_aio *pio;
 	struct   td_state    *s   = dd->td_state;
 	struct   tdaio_state *prv = (struct tdaio_state *)dd->private;
 	int      size    = nb_sectors * s->sector_size;
 	uint64_t offset  = sector * (uint64_t)s->sector_size;
-	long     ioidx;
-	
-	if (prv->iocb_free_count == 0)
-		return -ENOMEM;
-	io = prv->iocb_free[--prv->iocb_free_count];
-	
-	ioidx = IOCB_IDX(prv, io);
-	pio = &prv->pending_aio[ioidx];
-	pio->cb = cb;
-	pio->id = id;
-	pio->private = private;
-	pio->lsec = sector;
-	
-	io_prep_pwrite(io, prv->fd, buf, size, offset);
-	io->data = (void *)ioidx;
-	
-	prv->iocb_queue[prv->iocb_queued++] = io;
 
-	return 0;
+	return tap_aio_write(&prv->aio, prv->fd, size, offset, buf,
+		cb, id, sector, private);
 }
-			
+
 int tdaio_submit(struct disk_driver *dd)
 {
-	int ret;
 	struct tdaio_state *prv = (struct tdaio_state *)dd->private;
 
-	if (!prv->iocb_queued)
-		return 0;
-
-	ret = io_submit(prv->aio_ctx.aio_ctx, prv->iocb_queued, prv->iocb_queue);
-	
-	/* XXX: TODO: Handle error conditions here. */
-	
-	/* Success case: */
-	prv->iocb_queued = 0;
-	
-	return 0;
+	return tap_aio_submit(&prv->aio);
 }
-
+			
 int tdaio_close(struct disk_driver *dd)
 {
 	struct tdaio_state *prv = (struct tdaio_state *)dd->private;
 	
-	io_destroy(prv->aio_ctx.aio_ctx);
+	io_destroy(prv->aio.aio_ctx.aio_ctx);
 	close(prv->fd);
 
 	return 0;
@@ -290,26 +210,26 @@ int tdaio_do_callbacks(struct disk_driver *dd, int sid)
 	struct io_event *ep;
 	struct tdaio_state *prv = (struct tdaio_state *)dd->private;
 
-	nr_events = tap_aio_get_events(&prv->aio_ctx);
+	nr_events = tap_aio_get_events(&prv->aio.aio_ctx);
 repeat:
-	for (ep = prv->aio_events, i = nr_events; i-- > 0; ep++) {
+	for (ep = prv->aio.aio_events, i = nr_events; i-- > 0; ep++) {
 		struct iocb        *io  = ep->obj;
 		struct pending_aio *pio;
 		
-		pio = &prv->pending_aio[(long)io->data];
+		pio = &prv->aio.pending_aio[(long)io->data];
 		rsp += pio->cb(dd, ep->res == io->u.c.nbytes ? 0 : 1,
-			       pio->lsec, io->u.c.nbytes >> 9, 
+			       pio->sector, io->u.c.nbytes >> 9, 
 			       pio->id, pio->private);
 
-		prv->iocb_free[prv->iocb_free_count++] = io;
+		prv->aio.iocb_free[prv->aio.iocb_free_count++] = io;
 	}
 
 	if (nr_events) {
-		nr_events = tap_aio_more_events(&prv->aio_ctx);
+		nr_events = tap_aio_more_events(&prv->aio.aio_ctx);
 		goto repeat;
 	}
 
-	tap_aio_continue(&prv->aio_ctx);
+	tap_aio_continue(&prv->aio.aio_ctx);
 
 	return rsp;
 }
