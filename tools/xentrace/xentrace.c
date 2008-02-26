@@ -55,6 +55,7 @@ typedef struct settings_st {
     uint32_t cpu_mask;
     unsigned long tbuf_size;
     unsigned long disk_rsvd;
+    unsigned long timeout;
     uint8_t discard:1,
         disable_tracing:1;
 } settings_t;
@@ -534,6 +535,7 @@ void usage(void)
 "                          it exits. Selecting this option will tell it to\n" \
 "                          keep tracing on.  Traces will be collected in\n" \
 "                          Xen's trace buffers until they become full.\n" \
+"  -T  --time-interval=s   Run xentrace for s seconds and quit.\n" \
 "  -?, --help              Show this message\n" \
 "  -V, --version           Print program version\n" \
 "\n" \
@@ -603,6 +605,7 @@ void parse_args(int argc, char **argv)
         { "evt-mask",       required_argument, 0, 'e' },
         { "trace-buf-size", required_argument, 0, 'S' },
         { "reserve-disk-space", required_argument, 0, 'r' },
+        { "time-interval",  required_argument, 0, 'T' },
         { "discard-buffers", no_argument,      0, 'D' },
         { "dont-disable-tracing", no_argument, 0, 'x' },
         { "help",           no_argument,       0, '?' },
@@ -648,6 +651,10 @@ void parse_args(int argc, char **argv)
             opts.disable_tracing = 0;
             break;
 
+        case 'T':
+            opts.timeout = argtol(optarg, 0);
+            break;
+
         default:
             usage();
         }
@@ -659,7 +666,6 @@ void parse_args(int argc, char **argv)
 
     opts.outfile = argv[optind];
 }
-
 
 /* *BSD has no O_LARGEFILE */
 #ifndef O_LARGEFILE
@@ -677,6 +683,7 @@ int main(int argc, char **argv)
     opts.cpu_mask = 0;
     opts.disk_rsvd = 0;
     opts.disable_tracing = 1;
+    opts.timeout = 0;
 
     parse_args(argc, argv);
 
@@ -692,6 +699,9 @@ int main(int argc, char **argv)
 
     if ( opts.cpu_mask != 0 )
         set_mask(opts.cpu_mask, 1);
+
+    if ( opts.timeout != 0 ) 
+        alarm(opts.timeout);
 
     if ( opts.outfile )
         outfd = open(opts.outfile,
@@ -717,6 +727,7 @@ int main(int argc, char **argv)
     sigaction(SIGHUP,  &act, NULL);
     sigaction(SIGTERM, &act, NULL);
     sigaction(SIGINT,  &act, NULL);
+    sigaction(SIGALRM, &act, NULL);
 
     ret = monitor_tbufs(outfd);
 
