@@ -390,7 +390,7 @@ class LinuxImageHandler(ImageHandler):
         ImageHandler.configure(self, vmConfig)
         rtc_timeoffset = vmConfig['platform'].get('rtc_timeoffset')
         if rtc_timeoffset is not None:
-            xc.domain_set_time_offset(self.vm.getDomid(), rtc_timeoffset)
+            xc.domain_set_time_offset(self.vm.getDomid(), int(rtc_timeoffset))
 
     def buildDomain(self):
         store_evtchn = self.vm.getStorePort()
