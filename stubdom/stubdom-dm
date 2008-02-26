@@ -62,11 +62,12 @@ done
 
 creation="xm create -c stubdom-$domname target=$domid memory=32"
 
-(while true ; do sleep 60 ; done) | $creation &
+(while true ; do sleep 60 ; done) | $creation > /var/log/xen/qemu-dm-$domid.log &
 #xterm -geometry +0+0 -e /bin/sh -c "$creation ; echo ; echo press ENTER to shut down ; read" &
 consolepid=$!
 
 
+# Wait for vnc server to appear
 while ! vnc_port=`xenstore-read /local/domain/$domid/console/vnc-port`
 do
         # Check that the stubdom job is still alive
