@@ -1055,6 +1055,11 @@ void pci_pcnet_init(PCIBus *bus, NICInfo *nd, int devfn);
 void pcnet_h_reset(void *opaque);
 void *lance_init(NICInfo *nd, uint32_t leaddr, void *dma_opaque);
 
+/* e100.c */
+void pci_e100_init(PCIBus *bus, NICInfo *nd);
+
+/* e1000.c */
+void pci_e1000_init(PCIBus *bus, NICInfo *nd, int devfn);
 
 /* pckbd.c */
 
