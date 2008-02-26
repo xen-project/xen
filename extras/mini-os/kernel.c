@@ -39,6 +39,7 @@
 #include <gnttab.h>
 #include <netfront.h>
 #include <blkfront.h>
+#include <fbfront.h>
 #include <fs.h>
 #include <xmalloc.h>
 #include <fcntl.h>
@@ -248,6 +249,152 @@ static void blkfront_thread(void *p)
     }
 }
 
+#define WIDTH 800
+#define HEIGHT 600
+#define DEPTH 32
+
+static uint32_t *fb;
+static struct fbfront_dev *fb_dev;
+static struct semaphore fbfront_sem = __SEMAPHORE_INITIALIZER(fbfront_sem, 0);
+
+static void fbfront_drawvert(int x, int y1, int y2, uint32_t color)
+{
+    int y;
+    if (x < 0)
+        return;
+    if (x >= WIDTH)
+        return;
+    if (y1 < 0)
+        y1 = 0;
+    if (y2 >= HEIGHT)
+        y2 = HEIGHT-1;
+    for (y = y1; y <= y2; y++)
+        fb[x + y*WIDTH] ^= color;
+}
+
+static void fbfront_drawhoriz(int x1, int x2, int y, uint32_t color)
+{
+    int x;
+    if (y < 0)
+        return;
+    if (y >= HEIGHT)
+        return;
+    if (x1 < 0)
+        x1 = 0;
+    if (x2 >= WIDTH)
+        x2 = WIDTH-1;
+    for (x = x1; x <= x2; x++)
+        fb[x + y*WIDTH] ^= color;
+}
+
+static void fbfront_thread(void *p)
+{
+    size_t line_length = WIDTH * (DEPTH / 8);
+    size_t memsize = HEIGHT * line_length;
+
+    fb = _xmalloc(memsize, PAGE_SIZE);
+    fb_dev = init_fbfront(NULL, fb, WIDTH, HEIGHT, DEPTH, line_length, memsize);
+    if (!fb_dev) {
+        xfree(fb);
+        return;
+    }
+    up(&fbfront_sem);
+}
+
+static void clip_cursor(int *x, int *y)
+{
+    if (*x < 0)
+        *x = 0;
+    if (*x >= WIDTH)
+        *x = WIDTH - 1;
+    if (*y < 0)
+        *y = 0;
+    if (*y >= HEIGHT)
+        *y = HEIGHT - 1;
+}
+
+static void refresh_cursor(int new_x, int new_y)
+{
+    static int old_x = -1, old_y = -1;
+    if (old_x != -1 && old_y != -1) {
+        fbfront_drawvert(old_x, old_y + 1, old_y + 8, 0xffffffff);
+        fbfront_drawhoriz(old_x + 1, old_x + 8, old_y, 0xffffffff);
+        fbfront_update(fb_dev, old_x, old_y, 9, 9);
+    }
+    old_x = new_x;
+    old_y = new_y;
+    fbfront_drawvert(new_x, new_y + 1, new_y + 8, 0xffffffff);
+    fbfront_drawhoriz(new_x + 1, new_x + 8, new_y, 0xffffffff);
+    fbfront_update(fb_dev, new_x, new_y, 9, 9);
+}
+
+static void kbdfront_thread(void *p)
+{
+    struct kbdfront_dev *kbd_dev;
+    DEFINE_WAIT(w);
+    int x = WIDTH / 2, y = HEIGHT / 2, z;
+
+    kbd_dev = init_kbdfront(NULL, 1);
+    if (!kbd_dev)
+        return;
+
+    down(&fbfront_sem);
+    refresh_cursor(x, y);
+    while (1) {
+        union xenkbd_in_event event;
+
+        add_waiter(w, kbdfront_queue);
+
+        if (kbdfront_receive(kbd_dev, &event, 1) == 0)
+            schedule();
+        else switch(event.type) {
+            case XENKBD_TYPE_MOTION:
+                printk("motion x:%d y:%d z:%d\n",
+                        event.motion.rel_x,
+                        event.motion.rel_y,
+                        event.motion.rel_z);
+                x += event.motion.rel_x;
+                y += event.motion.rel_y;
+                z += event.motion.rel_z;
+                clip_cursor(&x, &y);
+                refresh_cursor(x, y);
+                break;
+            case XENKBD_TYPE_POS:
+                printk("pos x:%d y:%d z:%d\n",
+                        event.pos.abs_x,
+                        event.pos.abs_y,
+                        event.pos.abs_z);
+                x = event.pos.abs_x;
+                y = event.pos.abs_y;
+                z = event.pos.abs_z;
+                clip_cursor(&x, &y);
+                refresh_cursor(x, y);
+                break;
+            case XENKBD_TYPE_KEY:
+                printk("key %d %s\n",
+                        event.key.keycode,
+                        event.key.pressed ? "pressed" : "released");
+                if (event.key.keycode == BTN_LEFT) {
+                    printk("mouse %s at (%d,%d,%d)\n",
+                            event.key.pressed ? "clic" : "release", x, y, z);
+                    if (event.key.pressed) {
+                        uint32_t color = rand();
+                        fbfront_drawvert(x - 16, y - 16, y + 15, color);
+                        fbfront_drawhoriz(x - 16, x + 15, y + 16, color);
+                        fbfront_drawvert(x + 16, y - 15, y + 16, color);
+                        fbfront_drawhoriz(x - 15, x + 16, y - 16, color);
+                        fbfront_update(fb_dev, x - 16, y - 16, 33, 33);
+                    }
+                } else if (event.key.keycode == KEY_Q) {
+                    struct sched_shutdown sched_shutdown = { .reason = SHUTDOWN_poweroff };
+                    HYPERVISOR_sched_op(SCHEDOP_shutdown, &sched_shutdown);
+                    do_exit();
+                }
+                break;
+        }
+    }
+}
+
 static void fs_thread(void *p)
 {
     init_fs_frontend();
@@ -261,6 +408,8 @@ __attribute__((weak)) int app_main(start_info_t *si)
     create_thread("periodic_thread", periodic_thread, si);
     create_thread("netfront", netfront_thread, si);
     create_thread("blkfront", blkfront_thread, si);
+    create_thread("fbfront", fbfront_thread, si);
+    create_thread("kbdfront", kbdfront_thread, si);
     create_thread("fs-frontend", fs_thread, si);
     return 0;
 }

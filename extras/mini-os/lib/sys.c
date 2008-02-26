@@ -26,6 +26,7 @@
 #include <wait.h>
 #include <netfront.h>
 #include <blkfront.h>
+#include <fbfront.h>
 #include <xenbus.h>
 #include <xs.h>
 
@@ -221,6 +222,16 @@ int read(int fd, void *buf, size_t nbytes)
 	    }
 	    return ret;
 	}
+        case FTYPE_KBD: {
+            int ret, n;
+            n = nbytes / sizeof(union xenkbd_in_event);
+            ret = kbdfront_receive(files[fd].kbd.dev, buf, n);
+	    if (ret <= 0) {
+		errno = EAGAIN;
+		return -1;
+	    }
+	    return ret * sizeof(union xenkbd_in_event);
+        }
 	case FTYPE_NONE:
 	case FTYPE_XENBUS:
 	case FTYPE_EVTCHN:
@@ -261,6 +272,7 @@ int write(int fd, const void *buf, size_t nbytes)
 	case FTYPE_XENBUS:
 	case FTYPE_EVTCHN:
 	case FTYPE_BLK:
+	case FTYPE_KBD:
 	    break;
     }
     printk("write(%d): Bad descriptor\n", fd);
@@ -318,6 +330,7 @@ int fsync(int fd) {
 	case FTYPE_EVTCHN:
 	case FTYPE_TAP:
 	case FTYPE_BLK:
+	case FTYPE_KBD:
 	    break;
     }
     printk("fsync(%d): Bad descriptor\n", fd);
@@ -360,6 +373,10 @@ int close(int fd)
             shutdown_blkfront(files[fd].blk.dev);
 	    files[fd].type = FTYPE_NONE;
 	    return 0;
+	case FTYPE_KBD:
+            shutdown_kbdfront(files[fd].kbd.dev);
+            files[fd].type = FTYPE_NONE;
+            return 0;
 	case FTYPE_NONE:
 	    break;
     }
@@ -450,6 +467,7 @@ int fstat(int fd, struct stat *buf)
 	case FTYPE_EVTCHN:
 	case FTYPE_TAP:
 	case FTYPE_BLK:
+	case FTYPE_KBD:
 	    break;
     }
 
@@ -477,6 +495,7 @@ int ftruncate(int fd, off_t length)
 	case FTYPE_EVTCHN:
 	case FTYPE_TAP:
 	case FTYPE_BLK:
+	case FTYPE_KBD:
 	    break;
     }
 
@@ -587,6 +606,7 @@ static const char file_types[] = {
     [FTYPE_SOCKET]	= 'S',
     [FTYPE_TAP]		= 'T',
     [FTYPE_BLK]		= 'B',
+    [FTYPE_KBD]		= 'K',
 };
 #ifdef LIBC_DEBUG
 static void dump_set(int nfds, fd_set *readfds, fd_set *writefds, fd_set *exceptfds, struct timeval *timeout)
@@ -694,6 +714,7 @@ static int select_poll(int nfds, fd_set *readfds, fd_set *writefds, fd_set *exce
 	case FTYPE_EVTCHN:
 	case FTYPE_TAP:
 	case FTYPE_BLK:
+	case FTYPE_KBD:
 	    if (FD_ISSET(i, readfds)) {
 		if (files[i].read)
 		    n++;
@@ -775,6 +796,7 @@ int select(int nfds, fd_set *readfds, fd_set *writefds, fd_set *exceptfds,
     DEFINE_WAIT(w2);
     DEFINE_WAIT(w3);
     DEFINE_WAIT(w4);
+    DEFINE_WAIT(w5);
 
     assert(thread == main_thread);
 
@@ -795,6 +817,7 @@ int select(int nfds, fd_set *readfds, fd_set *writefds, fd_set *exceptfds,
     add_waiter(w2, event_queue);
     add_waiter(w3, blkfront_queue);
     add_waiter(w4, xenbus_watch_queue);
+    add_waiter(w5, kbdfront_queue);
 
     myread = *readfds;
     mywrite = *writefds;
@@ -860,6 +883,7 @@ out:
     remove_waiter(w2);
     remove_waiter(w3);
     remove_waiter(w4);
+    remove_waiter(w5);
     return ret;
 }
 
