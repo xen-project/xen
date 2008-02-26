@@ -906,6 +906,7 @@ class XendDomainInfo:
         log.debug("Setting memory maximum of domain %s (%s) to %d MiB.",
                   self.info['name_label'], str(self.domid), limit)
 
+        maxmem_cur = self.get_memory_static_max()
         MiB = 1024 * 1024
         self._safe_set_memory('memory_static_max', limit * MiB)
 
@@ -914,6 +915,7 @@ class XendDomainInfo:
             try:
                 return xc.domain_setmaxmem(self.domid, maxmem)
             except Exception, ex:
+                self._safe_set_memory('memory_static_max', maxmem_cur)
                 raise XendError(str(ex))
         xen.xend.XendDomain.instance().managed_config_save(self)
 
