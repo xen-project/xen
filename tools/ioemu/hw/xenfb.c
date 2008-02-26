@@ -1160,7 +1160,7 @@ static int xenfb_register_console(struct xenfb *xenfb) {
 			     xenfb);
 	dpy_resize(xenfb->ds, xenfb->width, xenfb->height);
 
-	if (qemu_set_fd_handler2(xenfb->evt_xch, NULL, xenfb_dispatch_channel, NULL, xenfb) < 0)
+	if (qemu_set_fd_handler2(xc_evtchn_fd(xenfb->evt_xch), NULL, xenfb_dispatch_channel, NULL, xenfb) < 0)
 	        return -1;
 	if (qemu_set_fd_handler2(xs_fileno(xenfb->xsh), NULL, xenfb_dispatch_store, NULL, xenfb) < 0)
 		return -1;

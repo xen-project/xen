@@ -381,7 +381,7 @@ static void xencons_startup(void *opaque)
 	qemu_set_fd_handler2(xs_fileno(dom->xsh), NULL, NULL, NULL, NULL);
 
 	fprintf(stderr, "Console: connected to guest frontend\n");
-	if (qemu_set_fd_handler2(dom->xce_handle, NULL, xencons_ring_read, NULL, dom) < 0)
+	if (qemu_set_fd_handler2(xc_evtchn_fd(dom->xce_handle), NULL, xencons_ring_read, NULL, dom) < 0)
 		return;
 
 	qemu_chr_add_handlers(dom->chr, xencons_can_receive, xencons_receive,
