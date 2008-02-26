@@ -2671,7 +2671,7 @@ x86_emulate(
         fail_if(ops->load_fpu_ctxt == NULL);
         ops->load_fpu_ctxt(ctxt);
         fail_if((modrm_reg & 7) != 7);
-        fail_if(modrm_reg >= 0xc0);
+        fail_if(modrm >= 0xc0);
         /* fnstcw m2byte */
         ea.bytes = 2;
         dst = ea;
@@ -2690,7 +2690,7 @@ x86_emulate(
         fail_if(ops->load_fpu_ctxt == NULL);
         ops->load_fpu_ctxt(ctxt);
         fail_if((modrm_reg & 7) != 7);
-        fail_if(modrm_reg >= 0xc0);
+        fail_if(modrm >= 0xc0);
         /* fnstsw m2byte */
         ea.bytes = 2;
         dst = ea;
