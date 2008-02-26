@@ -764,7 +764,8 @@ static PyObject *pyxc_physinfo(XcObject *self)
     xc_physinfo_t info;
     char cpu_cap[128], *p=cpu_cap, *q=cpu_cap;
     int i, j, max_cpu_id;
-    PyObject *ret_obj, *node_to_cpu_obj;
+    uint64_t free_heap;
+    PyObject *ret_obj, *node_to_cpu_obj, *node_to_memory_obj;
     xc_cpu_to_node_t map[MAX_CPU_ID + 1];
 
     set_xen_guest_handle(info.cpu_to_node, map);
@@ -812,7 +813,17 @@ static PyObject *pyxc_physinfo(XcObject *self)
         PyList_Append(node_to_cpu_obj, cpus); 
     }
 
+    node_to_memory_obj = PyList_New(0);
+
+    for ( i = 0; i < info.nr_nodes; i++ )
+    {
+	xc_availheap(self->xc_handle, 0, 0, i, &free_heap);
+	PyList_Append(node_to_memory_obj,
+	    PyInt_FromLong(free_heap / 1024));
+    }
+	
     PyDict_SetItemString(ret_obj, "node_to_cpu", node_to_cpu_obj);
+    PyDict_SetItemString(ret_obj, "node_to_memory", node_to_memory_obj);
  
     return ret_obj;
 #undef MAX_CPU_ID
