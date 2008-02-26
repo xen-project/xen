@@ -15,6 +15,7 @@
 #include <sys/mman.h>
 #include <sys/stat.h>
 #include <sys/types.h>
+#include <sys/vfs.h>
 #include <fcntl.h>
 #include <unistd.h>
 #include <errno.h>
@@ -53,6 +54,7 @@ typedef struct settings_st {
     uint32_t evt_mask;
     uint32_t cpu_mask;
     unsigned long tbuf_size;
+    unsigned long disk_rsvd;
     uint8_t discard:1;
 } settings_t;
 
@@ -83,8 +85,36 @@ void close_handler(int signal)
 void write_buffer(unsigned int cpu, unsigned char *start, int size,
                int total_size, int outfd)
 {
+    struct statfs stat;
     size_t written = 0;
     
+    if ( opts.disk_rsvd != 0 )
+    {
+        unsigned long long freespace;
+
+        /* Check that filesystem has enough space. */
+        if ( fstatfs (outfd, &stat) )
+        {
+                fprintf(stderr, "Statfs failed!\n");
+                goto fail;
+        }
+
+        freespace = stat.f_bsize * (unsigned long long)stat.f_bfree;
+
+        if ( total_size )
+            freespace -= total_size;
+        else
+            freespace -= size;
+
+        freespace >>= 20; /* Convert to MB */
+
+        if ( freespace <= opts.disk_rsvd )
+        {
+                fprintf(stderr, "Disk space limit reached (free space: %lluMB, limit: %luMB).\n", freespace, opts.disk_rsvd);
+                exit (EXIT_FAILURE);
+        }
+    }
+
     /* Write a CPU_BUF record on each buffer "window" written.  Wrapped
      * windows may involve two writes, so only write the record on the
      * first write. */
@@ -541,6 +571,7 @@ void parse_args(int argc, char **argv)
         { "cpu-mask",       required_argument, 0, 'c' },
         { "evt-mask",       required_argument, 0, 'e' },
         { "trace-buf-size", required_argument, 0, 'S' },
+        { "reserve-disk-space", required_argument, 0, 'r' },
         { "discard-buffers", no_argument,      0, 'D' },
         { "help",           no_argument,       0, '?' },
         { "version",        no_argument,       0, 'V' },
@@ -572,11 +603,15 @@ void parse_args(int argc, char **argv)
             printf("%s\n", program_version);
             exit(EXIT_SUCCESS);
             break;
-            
+
         case 'D': /* Discard traces currently in buffer */
             opts.discard = 1;
             break;
- 
+
+        case 'r': /* Disk-space reservation */
+            opts.disk_rsvd = argtol(optarg, 0);
+            break;
+
         default:
             usage();
         }
@@ -604,6 +639,7 @@ int main(int argc, char **argv)
     opts.poll_sleep = POLL_SLEEP_MILLIS;
     opts.evt_mask = 0;
     opts.cpu_mask = 0;
+    opts.disk_rsvd = 0;
 
     parse_args(argc, argv);
 
