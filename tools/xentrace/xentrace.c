@@ -55,7 +55,8 @@ typedef struct settings_st {
     uint32_t cpu_mask;
     unsigned long tbuf_size;
     unsigned long disk_rsvd;
-    uint8_t discard:1;
+    uint8_t discard:1,
+        disable_tracing:1;
 } settings_t;
 
 settings_t opts;
@@ -156,6 +157,28 @@ void write_buffer(unsigned int cpu, unsigned char *start, int size,
  fail:
     PERROR("Failed to write trace data");
     exit(EXIT_FAILURE);
+}
+
+static void disable_tbufs(void)
+{
+    int xc_handle = xc_interface_open();
+    int ret;
+
+    if ( xc_handle < 0 ) 
+    {
+        perror("Couldn't open xc handle to disable tbufs.");
+        goto out;
+    }
+
+    ret = xc_tbuf_disable(xc_handle);
+
+    if ( ret != 0 )
+    {
+        perror("Couldn't disable trace buffers");
+    }
+
+out:
+    xc_interface_close(xc_handle);
 }
 
 static void get_tbufs(unsigned long *mfn, unsigned long *size)
@@ -465,6 +488,9 @@ int monitor_tbufs(int outfd)
         wait_for_event_or_timeout(opts.poll_sleep);
     }
 
+    if(opts.disable_tracing)
+        disable_tbufs();
+
     /* cleanup */
     free(meta);
     free(data);
@@ -503,6 +529,11 @@ void usage(void)
 "                          this argument will be ignored.\n" \
 "  -D  --discard-buffers   Discard all records currently in the trace\n" \
 "                          buffers before beginning.\n" \
+"  -x  --dont-disable-tracing\n" \
+"                          By default, xentrace will disable tracing when\n" \
+"                          it exits. Selecting this option will tell it to\n" \
+"                          keep tracing on.  Traces will be collected in\n" \
+"                          Xen's trace buffers until they become full.\n" \
 "  -?, --help              Show this message\n" \
 "  -V, --version           Print program version\n" \
 "\n" \
@@ -573,6 +604,7 @@ void parse_args(int argc, char **argv)
         { "trace-buf-size", required_argument, 0, 'S' },
         { "reserve-disk-space", required_argument, 0, 'r' },
         { "discard-buffers", no_argument,      0, 'D' },
+        { "dont-disable-tracing", no_argument, 0, 'x' },
         { "help",           no_argument,       0, '?' },
         { "version",        no_argument,       0, 'V' },
         { 0, 0, 0, 0 }
@@ -612,6 +644,10 @@ void parse_args(int argc, char **argv)
             opts.disk_rsvd = argtol(optarg, 0);
             break;
 
+        case 'x': /* Don't disable tracing */
+            opts.disable_tracing = 0;
+            break;
+
         default:
             usage();
         }
@@ -640,6 +676,7 @@ int main(int argc, char **argv)
     opts.evt_mask = 0;
     opts.cpu_mask = 0;
     opts.disk_rsvd = 0;
+    opts.disable_tracing = 1;
 
     parse_args(argc, argv);
 
