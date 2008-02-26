@@ -407,7 +407,7 @@ function vtpm_domid_from_name () {
 	local id name ids
 	ids=$(xenstore-list /local/domain)
 	for id in $ids; do
-		name=$(xenstore_read /local/domain/$id/name)
+		name=$(xenstore-read /local/domain/$id/name)
 		if [ "$name" == "$1" ]; then
 			echo "$id"
 			return
@@ -416,16 +416,33 @@ function vtpm_domid_from_name () {
 	echo "-1"
 }
 
+#Determine the virtual TPM's instance number using the domain ID.
+#1st parm: domain ID
+function vtpm_uuid_by_domid() {
+	echo $(xenstore-read /local/domain/0/backend/vtpm/$1/0/uuid)
+}
+
+
+# Determine the vTPM's UUID by the name of the VM
+function vtpm_uuid_from_vmname() {
+	local domid=$(vtpm_domid_from_name $1)
+	if [ "$domid" != "-1" ]; then
+		echo $(vtpm_uuid_by_domid $domid)
+		return
+	fi
+	echo ""
+}
 
 #Add a virtual TPM instance number and its associated domain name
 #to the VTPMDB file and activate usage of this virtual TPM instance
 #by writing the instance number into the xenstore
 #1st parm: name of virtual machine
-#2nd parm: instance of assoicate virtual TPM
+#2nd parm: instance of associated virtual TPM
 function vtpm_add_and_activate() {
 	local domid=$(vtpm_domid_from_name $1)
-	if [ "$domid" != "-1" ]; then
-		vtpmdb_add_instance $1 $2
+	local vtpm_uuid=$(vtpm_uuid_from_vmname $1)
+	if [ "$vtpm_uuid" != "" -a "$domid" != "-1" ]; then
+		vtpmdb_add_instance $vtpm_uuid $2
 		xenstore-write backend/vtpm/$domid/0/instance $2
 	fi
 }
