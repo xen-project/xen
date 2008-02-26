@@ -49,6 +49,12 @@ enum hvm_intblk {
     hvm_intblk_nmi_iret   /* NMI blocked until IRET */
 };
 
+/* These happen to be the same as the VMX interrupt shadow definitions. */
+#define HVM_INTR_SHADOW_STI    0x00000001
+#define HVM_INTR_SHADOW_MOV_SS 0x00000002
+#define HVM_INTR_SHADOW_SMI    0x00000004
+#define HVM_INTR_SHADOW_NMI    0x00000008
+
 /*
  * The hardware virtual machine (HVM) interface abstracts away from the
  * x86/x86_64 CPU virtualization assist specifics. Currently this interface
@@ -72,14 +78,9 @@ struct hvm_function_table {
     void (*save_cpu_ctxt)(struct vcpu *v, struct hvm_hw_cpu *ctxt);
     int (*load_cpu_ctxt)(struct vcpu *v, struct hvm_hw_cpu *ctxt);
 
-    /*
-     * Examine specifics of the guest state:
-     * 1) determine whether interrupts are enabled or not
-     * 2) determine the mode the guest is running in
-     * 3) return the current guest segment descriptor base
-     * 4) return the current guest segment descriptor
-     */
-    enum hvm_intblk (*interrupt_blocked)(struct vcpu *v, struct hvm_intack);
+    /* Examine specifics of the guest state. */
+    unsigned int (*get_interrupt_shadow)(struct vcpu *v);
+    void (*set_interrupt_shadow)(struct vcpu *v, unsigned int intr_shadow);
     int (*guest_x86_mode)(struct vcpu *v);
     void (*get_segment_register)(struct vcpu *v, enum x86_segment seg,
                                  struct segment_register *reg);

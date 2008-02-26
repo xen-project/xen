@@ -137,6 +137,23 @@ enum {
 
 #endif /* CONFIG_VNC_TLS */
 
+#define QUEUE_ALLOC_UNIT 10
+
+typedef struct _QueueItem
+{
+    int x, y, w, h;
+    int32_t enc;
+    struct _QueueItem *next;
+} QueueItem;
+
+typedef struct _Queue
+{
+    QueueItem *queue_start;
+    int start_count;
+    QueueItem *queue_end;
+    int end_count;
+} Queue;
+
 struct VncState
 {
     QEMUTimer *timer;
@@ -152,6 +169,9 @@ struct VncState
     uint64_t *update_row;	/* outstanding updates */
     int has_update;		/* there's outstanding updates in the
 				 * visible area */
+
+    int update_requested;       /* the client requested an update */
+
     uint8_t *old_data;
     int depth; /* internal VNC frame buffer byte per pixel */
     int has_resize;
@@ -186,6 +206,9 @@ struct VncState
 
     Buffer output;
     Buffer input;
+    
+    Queue upqueue;
+
     kbd_layout_t *kbd_layout;
     /* current output mode information */
     VncWritePixels *write_pixels;
@@ -248,6 +271,11 @@ static void _vnc_update_client(void *opaque);
 static void vnc_update_client(void *opaque);
 static void vnc_client_read(void *opaque);
 static void framebuffer_set_updated(VncState *vs, int x, int y, int w, int h);
+static void pixel_format_message (VncState *vs);
+static void enqueue_framebuffer_update(VncState *vs, int x, int y, int w, int h, int32_t encoding);
+static void dequeue_framebuffer_update(VncState *vs);
+static int is_empty_queue(VncState *vs);
+static void free_queue(VncState *vs);
 
 #if 0
 static inline void vnc_set_bit(uint32_t *d, int k)
@@ -370,13 +398,18 @@ static void vnc_dpy_resize(DisplayState *ds, int w, int h)
     ds->height = h;
     ds->linesize = w * vs->depth;
     if (vs->csock != -1 && vs->has_resize && size_changed) {
-	vnc_write_u8(vs, 0);  /* msg id */
-	vnc_write_u8(vs, 0);
-	vnc_write_u16(vs, 1); /* number of rects */
-	vnc_framebuffer_update(vs, 0, 0, ds->width, ds->height, -223);
-	vnc_flush(vs);
-	vs->width = ds->width;
-	vs->height = ds->height;
+        vs->width = ds->width;
+        vs->height = ds->height;
+        if (vs->update_requested) {
+	    vnc_write_u8(vs, 0);  /* msg id */
+	    vnc_write_u8(vs, 0);
+	    vnc_write_u16(vs, 1); /* number of rects */
+	    vnc_framebuffer_update(vs, 0, 0, ds->width, ds->height, -223);
+	    vnc_flush(vs);
+            vs->update_requested--;
+        } else {
+            enqueue_framebuffer_update(vs, 0, 0, ds->width, ds->height, -223);
+        }
     }
     vs->dirty_pixel_shift = 0;
     for (o = DIRTY_PIXEL_BITS; o < ds->width; o *= 2)
@@ -553,7 +586,8 @@ static void vnc_copy(DisplayState *ds, int src_x, int src_y, int dst_x, int dst_
         return;
     }
 
-    if (src_x < vs->visible_x || src_y < vs->visible_y ||
+    if (!vs->update_requested ||
+        src_x < vs->visible_x || src_y < vs->visible_y ||
 	dst_x < vs->visible_x || dst_y < vs->visible_y ||
 	(src_x + w) > (vs->visible_x + vs->visible_w) ||
 	(src_y + h) > (vs->visible_y + vs->visible_h) ||
@@ -592,6 +626,7 @@ static void vnc_copy(DisplayState *ds, int src_x, int src_y, int dst_x, int dst_
 	vnc_write_u16(vs, src_x);
 	vnc_write_u16(vs, src_y);
 	vnc_flush(vs);
+        vs->update_requested--;
     } else
 	framebuffer_set_updated(vs, dst_x, dst_y, w, h);
 }
@@ -624,8 +659,21 @@ static void _vnc_update_client(void *opaque)
     int maxx, maxy;
     int tile_bytes = vs->depth * DP2X(vs, 1);
 
-    if (vs->csock == -1)
+    if (!vs->update_requested || vs->csock == -1)
 	return;
+    while (!is_empty_queue(vs) && vs->update_requested) {
+        int enc = vs->upqueue.queue_end->enc; 
+        dequeue_framebuffer_update(vs);
+        switch (enc) {
+            case 0x574D5669:
+                pixel_format_message(vs);
+                break;
+            default:
+                break;
+        }
+        vs->update_requested--;
+    }
+    if (!vs->update_requested) return;
 
     now = qemu_get_clock(rt_clock);
 
@@ -717,8 +765,11 @@ static void _vnc_update_client(void *opaque)
     vs->output.buffer[saved_offset] = (n_rectangles >> 8) & 0xFF;
     vs->output.buffer[saved_offset + 1] = n_rectangles & 0xFF;
 
-    if (n_rectangles == 0)
+    if (n_rectangles == 0) {
+        vs->output.offset = saved_offset - 2;
 	goto backoff;
+    } else
+        vs->update_requested--;
 
     vs->has_update = 0;
     vnc_flush(vs);
@@ -735,7 +786,8 @@ static void _vnc_update_client(void *opaque)
     vs->timer_interval += VNC_REFRESH_INTERVAL_INC;
     if (vs->timer_interval > VNC_REFRESH_INTERVAL_MAX) {
 	vs->timer_interval = VNC_REFRESH_INTERVAL_MAX;
-	if (now - vs->last_update_time >= VNC_MAX_UPDATE_INTERVAL) {
+	if (now - vs->last_update_time >= VNC_MAX_UPDATE_INTERVAL &&
+            vs->update_requested) {
 	    /* Send a null update.  If the client is no longer
 	       interested (e.g. minimised) it'll ignore this, and we
 	       can stop scanning the buffer until it sends another
@@ -752,6 +804,7 @@ static void _vnc_update_client(void *opaque)
 	    send_framebuffer_update(vs, 0, 0, 1, 1);
 	    vnc_flush(vs);
 	    vs->last_update_time = now;
+            vs->update_requested--;
 	    return;
 	}
     }
@@ -821,6 +874,88 @@ static void buffer_append(Buffer *buffer, const void *data, size_t len)
     buffer->offset += len;
 }
 
+static void enqueue_framebuffer_update(VncState *vs, int x, int y, int w, int h,
+                                   int32_t encoding)
+{
+    Queue *q = &vs->upqueue; 
+    if (q->queue_end != NULL) {
+        if (q->queue_end != q->queue_start || q->start_count != q->end_count) {
+            if (q->queue_end->next == NULL) {
+                q->queue_end->next = (QueueItem *) qemu_mallocz (sizeof(QueueItem) * QUEUE_ALLOC_UNIT);
+                q->end_count = QUEUE_ALLOC_UNIT;
+            }
+            q->queue_end = q->queue_end->next;
+        }
+    } else {
+        q->queue_end = (QueueItem *) qemu_mallocz (sizeof(QueueItem) * QUEUE_ALLOC_UNIT);
+        q->queue_start = q->queue_end;
+        q->start_count = QUEUE_ALLOC_UNIT;
+        q->end_count = QUEUE_ALLOC_UNIT;
+    }
+    q->end_count--;
+
+    q->queue_end->x = x;
+    q->queue_end->y = y;
+    q->queue_end->w = w;
+    q->queue_end->h = h;
+    q->queue_end->enc = encoding;
+    q->queue_end->next = (q->end_count > 0) ? (q->queue_end + 1) : NULL;
+}
+
+static void dequeue_framebuffer_update(VncState *vs)
+{
+    Queue *q = &vs->upqueue;
+    if (q->queue_start == NULL || 
+            (q->queue_end == q->queue_start && q->start_count == q->end_count))
+        return;
+
+    vnc_write_u8(vs, 0);
+    vnc_write_u8(vs, 0);
+    vnc_write_u16(vs, 1);
+    vnc_framebuffer_update(vs, q->queue_start->x, q->queue_start->y,
+            q->queue_start->w, q->queue_start->h, q->queue_start->enc);
+
+    q->start_count--;
+    if (q->queue_end != q->queue_start) {
+        if (!q->start_count) {
+            QueueItem *i = q->queue_start;
+            q->queue_start = q->queue_start->next;
+            q->start_count = QUEUE_ALLOC_UNIT;
+            free (i - QUEUE_ALLOC_UNIT + 1);
+        } else
+            q->queue_start = q->queue_start->next;
+    } else {
+        q->queue_end = q->queue_end - QUEUE_ALLOC_UNIT + q->end_count + 1;
+        q->queue_start = q->queue_end;
+        q->end_count = QUEUE_ALLOC_UNIT;
+        q->start_count = QUEUE_ALLOC_UNIT;
+    }
+}
+
+static int is_empty_queue(VncState *vs)
+{
+    Queue *q = &vs->upqueue;
+    if (q->queue_end == NULL) return 1;
+    if (q->queue_end == q->queue_start && q->start_count == q->end_count) return 1;
+    return 0;
+}
+
+static void free_queue(VncState *vs)
+{
+    Queue *q = &vs->upqueue;
+    while (q->queue_start != NULL) {
+        QueueItem *i;
+        q->queue_start = q->queue_start + q->start_count - 1;
+        i = q->queue_start;
+        q->queue_start = q->queue_start->next;
+        free(i - QUEUE_ALLOC_UNIT + 1);
+        q->start_count = QUEUE_ALLOC_UNIT;
+    }
+    q->queue_end = NULL;
+    q->start_count = 0;
+    q->end_count = 0;
+}
+
 static int vnc_client_io_error(VncState *vs, int ret, int last_errno)
 {
     if (ret == 0 || ret == -1) {
@@ -833,6 +968,8 @@ static int vnc_client_io_error(VncState *vs, int ret, int last_errno)
 	vs->csock = -1;
 	buffer_reset(&vs->input);
 	buffer_reset(&vs->output);
+        free_queue(vs);
+        vs->update_requested = 0;
 #if CONFIG_VNC_TLS
 	if (vs->tls_session) {
 	    gnutls_deinit(vs->tls_session);
@@ -1044,12 +1181,18 @@ static void client_cut_text(VncState *vs, size_t len, char *text)
 static void check_pointer_type_change(VncState *vs, int absolute)
 {
     if (vs->has_pointer_type_change && vs->absolute != absolute) {
-	vnc_write_u8(vs, 0);
-	vnc_write_u8(vs, 0);
-	vnc_write_u16(vs, 1);
-	vnc_framebuffer_update(vs, absolute, 0,
+        if (vs->update_requested) {
+	    vnc_write_u8(vs, 0);
+	    vnc_write_u8(vs, 0);
+	    vnc_write_u16(vs, 1);
+	    vnc_framebuffer_update(vs, absolute, 0,
 			       vs->ds->width, vs->ds->height, -257);
-	vnc_flush(vs);
+	    vnc_flush(vs);
+            vs->update_requested--;
+        } else {
+            enqueue_framebuffer_update(vs, absolute, 0,
+                               vs->ds->width, vs->ds->height, -257);
+        }
     }
     vs->absolute = absolute;
 }
@@ -1316,6 +1459,7 @@ static void framebuffer_update_request(VncState *vs, int incremental,
     vs->visible_w = w;
     vs->visible_h = h;
 
+    vs->update_requested++;
     qemu_mod_timer(vs->timer, qemu_get_clock(rt_clock));
 }
 
@@ -1536,12 +1680,17 @@ static void vnc_dpy_colourdepth(DisplayState *ds, int depth)
         vnc_client_error(vs);
     } else if (vs->csock != -1 && vs->has_WMVi) {
         /* Sending a WMVi message to notify the client*/
-        vnc_write_u8(vs, 0);  /* msg id */
-        vnc_write_u8(vs, 0);
-        vnc_write_u16(vs, 1); /* number of rects */
-        vnc_framebuffer_update(vs, 0, 0, ds->width, ds->height, 0x574D5669);
-        pixel_format_message(vs);
-        vnc_flush(vs);
+        if (vs->update_requested) {
+            vnc_write_u8(vs, 0);  /* msg id */
+            vnc_write_u8(vs, 0);
+            vnc_write_u16(vs, 1); /* number of rects */
+            vnc_framebuffer_update(vs, 0, 0, ds->width, ds->height, 0x574D5669);
+            pixel_format_message(vs);
+            vnc_flush(vs);
+            vs->update_requested--;
+        } else {
+            enqueue_framebuffer_update(vs, 0, 0, ds->width, ds->height, 0x574D5669);
+        }
     } else {
         if (vs->pix_bpp == 4 && vs->depth == 4 &&
             host_big_endian_flag == vs->pix_big_endian &&
@@ -2291,6 +2440,7 @@ static void vnc_listen_read(void *opaque)
 	framebuffer_set_updated(vs, 0, 0, vs->ds->width, vs->ds->height);
 	vs->has_resize = 0;
 	vs->has_hextile = 0;
+        vs->update_requested = 0;
 	vs->ds->dpy_copy = NULL;
 	vnc_timer_init(vs);
     }
@@ -2413,6 +2563,8 @@ void vnc_display_close(DisplayState *ds)
 	vs->csock = -1;
 	buffer_reset(&vs->input);
 	buffer_reset(&vs->output);
+        free_queue(vs);
+        vs->update_requested = 0;
 #if CONFIG_VNC_TLS
 	if (vs->tls_session) {
 	    gnutls_deinit(vs->tls_session);

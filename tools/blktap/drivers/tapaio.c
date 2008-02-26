@@ -32,6 +32,7 @@
 #include <unistd.h>
 #include <errno.h>
 #include <string.h>
+#include <stdlib.h>
 
 /**
  * We used a kernel patch to return an fd associated with the AIO context
@@ -62,7 +63,7 @@
 static void *
 tap_aio_completion_thread(void *arg)
 {
-	tap_aio_context_t *ctx = (tap_aio_context_t *) arg;
+	tap_aio_internal_context_t *ctx = (tap_aio_internal_context_t *) arg;
 	int command;
 	int nr_events;
 	int rc;
@@ -84,7 +85,7 @@ tap_aio_completion_thread(void *arg)
 }
 
 void
-tap_aio_continue(tap_aio_context_t *ctx)
+tap_aio_continue(tap_aio_internal_context_t *ctx)
 {
         int cmd = 0;
 
@@ -95,8 +96,8 @@ tap_aio_continue(tap_aio_context_t *ctx)
                 DPRINTF("Cannot write to command pipe\n");
 }
 
-int
-tap_aio_setup(tap_aio_context_t *ctx,
+static int
+tap_aio_setup(tap_aio_internal_context_t *ctx,
               struct io_event *aio_events,
               int max_aio_events)
 {
@@ -144,7 +145,7 @@ tap_aio_setup(tap_aio_context_t *ctx,
 }
 
 int
-tap_aio_get_events(tap_aio_context_t *ctx)
+tap_aio_get_events(tap_aio_internal_context_t *ctx)
 {
         int nr_events = 0;
 
@@ -171,10 +172,185 @@ tap_aio_get_events(tap_aio_context_t *ctx)
         return nr_events;
 }
 
-int tap_aio_more_events(tap_aio_context_t *ctx)
+int tap_aio_more_events(tap_aio_internal_context_t *ctx)
 {
         return io_getevents(ctx->aio_ctx, 0,
                             ctx->max_aio_events, ctx->aio_events, NULL);
 }
 
+int tap_aio_init(tap_aio_context_t *ctx, uint64_t sectors,
+		int max_aio_reqs)
+{
+	int i, ret;
+	long ioidx;
+
+	ctx->iocb_list = NULL;
+	ctx->pending_aio = NULL;
+	ctx->aio_events = NULL;
+	ctx->iocb_free = NULL;
+	ctx->iocb_queue = NULL;
+
+	/*Initialize Locking bitmap*/
+	ctx->sector_lock = calloc(1, sectors);
+		
+	if (!ctx->sector_lock) {
+		DPRINTF("Failed to allocate sector lock\n");
+		goto fail;
+	}
+
+
+	/* Initialize AIO */
+	ctx->max_aio_reqs = max_aio_reqs;
+	ctx->iocb_free_count = ctx->max_aio_reqs;
+	ctx->iocb_queued	 = 0;
+
+	if (!(ctx->iocb_list = malloc(sizeof(struct iocb) * ctx->max_aio_reqs)) ||
+		!(ctx->pending_aio = malloc(sizeof(struct pending_aio) * ctx->max_aio_reqs)) ||
+		!(ctx->aio_events = malloc(sizeof(struct io_event) * ctx->max_aio_reqs)) ||
+		!(ctx->iocb_free = malloc(sizeof(struct iocb *) * ctx->max_aio_reqs)) ||
+		!(ctx->iocb_queue = malloc(sizeof(struct iocb *) * ctx->max_aio_reqs))) 
+	{
+		DPRINTF("Failed to allocate AIO structs (max_aio_reqs = %d)\n",
+				ctx->max_aio_reqs);
+		goto fail;
+	}
+
+	ret = tap_aio_setup(&ctx->aio_ctx, ctx->aio_events, ctx->max_aio_reqs);
+	if (ret < 0) {
+		if (ret == -EAGAIN) {
+			DPRINTF("Couldn't setup AIO context.  If you are "
+				"trying to concurrently use a large number "
+				"of blktap-based disks, you may need to "
+				"increase the system-wide aio request limit. "
+				"(e.g. 'echo echo 1048576 > /proc/sys/fs/"
+				"aio-max-nr')\n");
+		} else {
+			DPRINTF("Couldn't setup AIO context.\n");
+		}
+		goto fail;
+	}
+
+	for (i=0;i<ctx->max_aio_reqs;i++)
+		ctx->iocb_free[i] = &ctx->iocb_list[i];
+
+	DPRINTF("AIO state initialised\n");
+
+	return 0;
+
+fail:
+	return -1;
+}
+
+void tap_aio_free(tap_aio_context_t *ctx)
+{
+	if (ctx->sector_lock)
+		free(ctx->sector_lock);
+	if (ctx->iocb_list)
+		free(ctx->iocb_list);
+	if (ctx->pending_aio)
+		free(ctx->pending_aio);
+	if (ctx->aio_events)
+		free(ctx->aio_events);
+	if (ctx->iocb_free)
+		free(ctx->iocb_free);
+	if (ctx->iocb_queue)
+		free(ctx->iocb_queue);
+}
+
+/*TODO: Fix sector span!*/
+int tap_aio_can_lock(tap_aio_context_t *ctx, uint64_t sector)
+{
+	return (ctx->sector_lock[sector] ? 0 : 1);
+}
+
+int tap_aio_lock(tap_aio_context_t *ctx, uint64_t sector)
+{
+	return ++ctx->sector_lock[sector];
+}
+
+void tap_aio_unlock(tap_aio_context_t *ctx, uint64_t sector)
+{
+	if (!ctx->sector_lock[sector]) return;
+
+	--ctx->sector_lock[sector];
+	return;
+}
+
+
+int tap_aio_read(tap_aio_context_t *ctx, int fd, int size, 
+		uint64_t offset, char *buf, td_callback_t cb,
+		int id, uint64_t sector, void *private)
+{
+	struct	 iocb *io;
+	struct	 pending_aio *pio;
+	long	 ioidx;
+
+	if (ctx->iocb_free_count == 0)
+		return -ENOMEM;
+
+	io = ctx->iocb_free[--ctx->iocb_free_count];
+
+	ioidx = IOCB_IDX(ctx, io);
+	pio = &ctx->pending_aio[ioidx];
+	pio->cb = cb;
+	pio->id = id;
+	pio->private = private;
+	pio->nb_sectors = size/512;
+	pio->buf = buf;
+	pio->sector = sector;
+
+	io_prep_pread(io, fd, buf, size, offset);
+	io->data = (void *)ioidx;
+
+	ctx->iocb_queue[ctx->iocb_queued++] = io;
+
+	return 0;
+}
+
+int tap_aio_write(tap_aio_context_t *ctx, int fd, int size,
+		uint64_t offset, char *buf, td_callback_t cb,
+		int id, uint64_t sector, void *private)
+{
+	struct	 iocb *io;
+	struct	 pending_aio *pio;
+	long	 ioidx;
+
+	if (ctx->iocb_free_count == 0)
+		return -ENOMEM;
+
+	io = ctx->iocb_free[--ctx->iocb_free_count];
+
+	ioidx = IOCB_IDX(ctx, io);
+	pio = &ctx->pending_aio[ioidx];
+	pio->cb = cb;
+	pio->id = id;
+	pio->private = private;
+	pio->nb_sectors = size/512;
+	pio->buf = buf;
+	pio->sector = sector;
+
+	io_prep_pwrite(io, fd, buf, size, offset);
+	io->data = (void *)ioidx;
+
+	ctx->iocb_queue[ctx->iocb_queued++] = io;
+
+	return 0;
+}
+
+int tap_aio_submit(tap_aio_context_t *ctx)
+{
+	int ret;
+
+	if (!ctx->iocb_queued)
+		return 0;
+
+	ret = io_submit(ctx->aio_ctx.aio_ctx, ctx->iocb_queued, ctx->iocb_queue);
+
+	/* XXX: TODO: Handle error conditions here. */
+
+	/* Success case: */
+	ctx->iocb_queued = 0;
+
+	return 0;
+}
 

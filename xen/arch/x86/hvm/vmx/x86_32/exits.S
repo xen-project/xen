@@ -89,7 +89,7 @@ ENTRY(vmx_asm_vmexit_handler)
 
         ALIGN
 vmx_process_softirqs:
-        sti       
+        sti
         call do_softirq
         jmp vmx_asm_do_vmentry
 
@@ -104,6 +104,10 @@ ENTRY(vmx_asm_do_vmentry)
         jnz  vmx_process_softirqs
 
         call vmx_intr_assist
+
+        testb $0xff,VCPU_vmx_emul(%ebx)
+        jnz  vmx_goto_realmode
+
         movl VCPU_hvm_guest_cr2(%ebx),%eax
         movl %eax,%cr2
         call vmx_trace_vmentry
@@ -114,9 +118,6 @@ ENTRY(vmx_asm_do_vmentry)
         VMWRITE(UREGS_esp)
         movl $GUEST_RFLAGS,%eax
         VMWRITE(UREGS_eflags)
-
-        testb $0xff,VCPU_vmx_emul(%ebx)
-        jnz  vmx_goto_realmode
 
         cmpb $0,VCPU_vmx_launched(%ebx)
         je   vmx_launch

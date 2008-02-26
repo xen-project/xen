@@ -189,80 +189,6 @@ static int construct_hpet(struct acpi_20_hpet *hpet)
     return offset;
 }
 
-static int construct_processor_objects(uint8_t *buf)
-{
-    static const char pdat[13] = { 0x5b, 0x83, 0x0b, 0x50, 0x52 };
-    static const char hex[] = "0123456789ABCDEF";
-    static const char pr_scope[] = "\\_PR_";
-    unsigned int i, length, nr_cpus = get_vcpu_nr();
-    struct acpi_header *hdr;
-    uint8_t *p = buf;
-
-    /*
-     * 1. Table Header.
-     */
-
-    hdr = (struct acpi_header *)p;
-    hdr->signature = ASCII32('S','S','D','T');
-    hdr->revision  = 2;
-    fixed_strcpy(hdr->oem_id, ACPI_OEM_ID);
-    fixed_strcpy(hdr->oem_table_id, ACPI_OEM_TABLE_ID);
-    hdr->oem_revision = ACPI_OEM_REVISION;
-    hdr->creator_id = ACPI_CREATOR_ID;
-    hdr->creator_revision = ACPI_CREATOR_REVISION;
-    p += sizeof(*hdr);
-
-    /*
-     * 2. Scope Definition.
-     */
-
-    /* ScopeOp */
-    *p++ = 0x10;
-
-    /* PkgLength (includes length bytes!). */
-    length = 1 + strlen(pr_scope) + (nr_cpus * sizeof(pdat));
-    if ( length <= 0x3f )
-    {
-        *p++ = length;
-    }
-    else if ( ++length <= 0xfff )
-    {
-        *p++ = 0x40 | (length & 0xf);
-        *p++ = length >> 4;
-    }
-    else
-    {
-        length++;
-        *p++ = 0x80 | (length & 0xf);
-        *p++ = (length >>  4) & 0xff;
-        *p++ = (length >> 12) & 0xff;
-    }
-
-    /* NameString */
-    strncpy((char *)p, pr_scope, strlen(pr_scope));
-    p += strlen(pr_scope);
-
-    /*
-     * 3. Processor Objects.
-     */
-
-    for ( i = 0; i < nr_cpus; i++ )
-    {
-        memcpy(p, pdat, sizeof(pdat));
-        /* ProcessorName */
-        p[5] = hex[(i>>4)&15];
-        p[6] = hex[(i>>0)&15];
-        /* ProcessorID */
-        p[7] = i;
-        p += sizeof(pdat);
-    }
-
-    hdr->length = p - buf;
-    set_checksum(hdr, offsetof(struct acpi_header, checksum), hdr->length);
-
-    return hdr->length;
-}
-
 static int construct_secondary_tables(uint8_t *buf, unsigned long *table_ptrs)
 {
     int offset = 0, nr_tables = 0;
@@ -287,10 +213,6 @@ static int construct_secondary_tables(uint8_t *buf, unsigned long *table_ptrs)
         offset += construct_hpet(hpet);
         table_ptrs[nr_tables++] = (unsigned long)hpet;
     }
-
-    /* Processor Object SSDT. */
-    table_ptrs[nr_tables++] = (unsigned long)&buf[offset];
-    offset += construct_processor_objects(&buf[offset]);
 
     /* TPM TCPA and SSDT. */
     tis_hdr = (uint16_t *)0xFED40F00;

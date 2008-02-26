@@ -65,10 +65,6 @@
  * Injecting a virtual NMI sets the NMI-blocking interruptibility flag only
  * if the 'virtual NMIs' control is set. Injecting *any* kind of event clears
  * the STI- and MOV-SS-blocking interruptibility-state flags.
- * 
- * If MOV/POP SS is executed while MOV-SS-blocking is in effect, the effect
- * is cleared. If STI is executed while MOV-SS- or STI-blocking is in effect,
- * the effect is cleared. (i.e., MOV-SS-blocking 'dominates' STI-blocking).
  */
 
 static void enable_intr_window(struct vcpu *v, struct hvm_intack intack)

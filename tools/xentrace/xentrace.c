@@ -15,6 +15,7 @@
 #include <sys/mman.h>
 #include <sys/stat.h>
 #include <sys/types.h>
+#include <sys/vfs.h>
 #include <fcntl.h>
 #include <unistd.h>
 #include <errno.h>
@@ -53,7 +54,10 @@ typedef struct settings_st {
     uint32_t evt_mask;
     uint32_t cpu_mask;
     unsigned long tbuf_size;
-    uint8_t discard:1;
+    unsigned long disk_rsvd;
+    unsigned long timeout;
+    uint8_t discard:1,
+        disable_tracing:1;
 } settings_t;
 
 settings_t opts;
@@ -83,8 +87,36 @@ void close_handler(int signal)
 void write_buffer(unsigned int cpu, unsigned char *start, int size,
                int total_size, int outfd)
 {
+    struct statfs stat;
     size_t written = 0;
     
+    if ( opts.disk_rsvd != 0 )
+    {
+        unsigned long long freespace;
+
+        /* Check that filesystem has enough space. */
+        if ( fstatfs (outfd, &stat) )
+        {
+                fprintf(stderr, "Statfs failed!\n");
+                goto fail;
+        }
+
+        freespace = stat.f_bsize * (unsigned long long)stat.f_bfree;
+
+        if ( total_size )
+            freespace -= total_size;
+        else
+            freespace -= size;
+
+        freespace >>= 20; /* Convert to MB */
+
+        if ( freespace <= opts.disk_rsvd )
+        {
+                fprintf(stderr, "Disk space limit reached (free space: %lluMB, limit: %luMB).\n", freespace, opts.disk_rsvd);
+                exit (EXIT_FAILURE);
+        }
+    }
+
     /* Write a CPU_BUF record on each buffer "window" written.  Wrapped
      * windows may involve two writes, so only write the record on the
      * first write. */
@@ -126,6 +158,28 @@ void write_buffer(unsigned int cpu, unsigned char *start, int size,
  fail:
     PERROR("Failed to write trace data");
     exit(EXIT_FAILURE);
+}
+
+static void disable_tbufs(void)
+{
+    int xc_handle = xc_interface_open();
+    int ret;
+
+    if ( xc_handle < 0 ) 
+    {
+        perror("Couldn't open xc handle to disable tbufs.");
+        goto out;
+    }
+
+    ret = xc_tbuf_disable(xc_handle);
+
+    if ( ret != 0 )
+    {
+        perror("Couldn't disable trace buffers");
+    }
+
+out:
+    xc_interface_close(xc_handle);
 }
 
 static void get_tbufs(unsigned long *mfn, unsigned long *size)
@@ -435,6 +489,9 @@ int monitor_tbufs(int outfd)
         wait_for_event_or_timeout(opts.poll_sleep);
     }
 
+    if(opts.disable_tracing)
+        disable_tbufs();
+
     /* cleanup */
     free(meta);
     free(data);
@@ -471,6 +528,14 @@ void usage(void)
 "                          N.B. that the trace buffer cannot be resized.\n" \
 "                          if it has already been set this boot cycle,\n" \
 "                          this argument will be ignored.\n" \
+"  -D  --discard-buffers   Discard all records currently in the trace\n" \
+"                          buffers before beginning.\n" \
+"  -x  --dont-disable-tracing\n" \
+"                          By default, xentrace will disable tracing when\n" \
+"                          it exits. Selecting this option will tell it to\n" \
+"                          keep tracing on.  Traces will be collected in\n" \
+"                          Xen's trace buffers until they become full.\n" \
+"  -T  --time-interval=s   Run xentrace for s seconds and quit.\n" \
 "  -?, --help              Show this message\n" \
 "  -V, --version           Print program version\n" \
 "\n" \
@@ -539,6 +604,10 @@ void parse_args(int argc, char **argv)
         { "cpu-mask",       required_argument, 0, 'c' },
         { "evt-mask",       required_argument, 0, 'e' },
         { "trace-buf-size", required_argument, 0, 'S' },
+        { "reserve-disk-space", required_argument, 0, 'r' },
+        { "time-interval",  required_argument, 0, 'T' },
+        { "discard-buffers", no_argument,      0, 'D' },
+        { "dont-disable-tracing", no_argument, 0, 'x' },
         { "help",           no_argument,       0, '?' },
         { "version",        no_argument,       0, 'V' },
         { 0, 0, 0, 0 }
@@ -569,7 +638,23 @@ void parse_args(int argc, char **argv)
             printf("%s\n", program_version);
             exit(EXIT_SUCCESS);
             break;
-            
+
+        case 'D': /* Discard traces currently in buffer */
+            opts.discard = 1;
+            break;
+
+        case 'r': /* Disk-space reservation */
+            opts.disk_rsvd = argtol(optarg, 0);
+            break;
+
+        case 'x': /* Don't disable tracing */
+            opts.disable_tracing = 0;
+            break;
+
+        case 'T':
+            opts.timeout = argtol(optarg, 0);
+            break;
+
         default:
             usage();
         }
@@ -581,7 +666,6 @@ void parse_args(int argc, char **argv)
 
     opts.outfile = argv[optind];
 }
-
 
 /* *BSD has no O_LARGEFILE */
 #ifndef O_LARGEFILE
@@ -597,6 +681,9 @@ int main(int argc, char **argv)
     opts.poll_sleep = POLL_SLEEP_MILLIS;
     opts.evt_mask = 0;
     opts.cpu_mask = 0;
+    opts.disk_rsvd = 0;
+    opts.disable_tracing = 1;
+    opts.timeout = 0;
 
     parse_args(argc, argv);
 
@@ -612,6 +699,9 @@ int main(int argc, char **argv)
 
     if ( opts.cpu_mask != 0 )
         set_mask(opts.cpu_mask, 1);
+
+    if ( opts.timeout != 0 ) 
+        alarm(opts.timeout);
 
     if ( opts.outfile )
         outfd = open(opts.outfile,
@@ -637,6 +727,7 @@ int main(int argc, char **argv)
     sigaction(SIGHUP,  &act, NULL);
     sigaction(SIGTERM, &act, NULL);
     sigaction(SIGINT,  &act, NULL);
+    sigaction(SIGALRM, &act, NULL);
 
     ret = monitor_tbufs(outfd);
 

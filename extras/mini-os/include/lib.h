@@ -140,6 +140,7 @@ enum fd_type {
     FTYPE_SOCKET,
     FTYPE_TAP,
     FTYPE_BLK,
+    FTYPE_KBD,
 };
 
 #define MAX_EVTCHN_PORTS 16
@@ -171,6 +172,9 @@ extern struct file {
 	struct {
 	    struct blkfront_dev *dev;
 	} blk;
+	struct {
+	    struct kbdfront_dev *dev;
+	} kbd;
         struct {
             /* To each xenbus FD is associated a queue of watch events for this
              * FD.  */

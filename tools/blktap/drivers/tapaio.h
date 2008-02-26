@@ -32,8 +32,13 @@
 
 #include <pthread.h>
 #include <libaio.h>
+#include <stdint.h>
 
-struct tap_aio_context {
+#include "tapdisk.h"
+
+#define IOCB_IDX(_ctx, _io) ((_io) - (_ctx)->iocb_list)
+
+struct tap_aio_internal_context {
         io_context_t     aio_ctx;
 
         struct io_event *aio_events;
@@ -45,14 +50,59 @@ struct tap_aio_context {
         int              pollfd;
         unsigned int     poll_in_thread : 1;
 };
+	
+
+typedef struct tap_aio_internal_context tap_aio_internal_context_t;
+
+
+struct pending_aio {
+	td_callback_t cb;
+	int id;
+	void *private;
+	int nb_sectors;
+	char *buf;
+	uint64_t sector;
+};
+
+	
+struct tap_aio_context {
+	tap_aio_internal_context_t    aio_ctx;
+
+	int                  max_aio_reqs;
+	struct iocb         *iocb_list;
+	struct iocb        **iocb_free;
+	struct pending_aio  *pending_aio;
+	int                  iocb_free_count;
+	struct iocb        **iocb_queue;
+	int	             iocb_queued;
+	struct io_event     *aio_events;
+
+	/* Locking bitmap for AIO reads/writes */
+	uint8_t *sector_lock;		   
+};
 
 typedef struct tap_aio_context tap_aio_context_t;
 
-int  tap_aio_setup      (tap_aio_context_t *ctx,
-                         struct io_event *aio_events,
-                         int max_aio_events);
-void tap_aio_continue   (tap_aio_context_t *ctx);
-int  tap_aio_get_events (tap_aio_context_t *ctx);
-int  tap_aio_more_events(tap_aio_context_t *ctx);
+void tap_aio_continue   (tap_aio_internal_context_t *ctx);
+int  tap_aio_get_events (tap_aio_internal_context_t *ctx);
+int  tap_aio_more_events(tap_aio_internal_context_t *ctx);
+
+
+int tap_aio_init(tap_aio_context_t *ctx, uint64_t sectors,
+		int max_aio_reqs);
+void tap_aio_free(tap_aio_context_t *ctx);
+
+int tap_aio_can_lock(tap_aio_context_t *ctx, uint64_t sector);
+int tap_aio_lock(tap_aio_context_t *ctx, uint64_t sector);
+void tap_aio_unlock(tap_aio_context_t *ctx, uint64_t sector);
+
+
+int tap_aio_read(tap_aio_context_t *ctx, int fd, int size, 
+		uint64_t offset, char *buf, td_callback_t cb,
+		int id, uint64_t sector, void *private);
+int tap_aio_write(tap_aio_context_t *ctx, int fd, int size,
+		uint64_t offset, char *buf, td_callback_t cb,
+		int id, uint64_t sector, void *private);
+int tap_aio_submit(tap_aio_context_t *ctx);
 
 #endif /* __TAPAIO_H__ */

@@ -14,6 +14,7 @@ CHECK_oprof_init;
 
 #define xenoprof_get_buffer compat_oprof_get_buffer
 #define xenoprof_op_get_buffer compat_oprof_op_get_buffer
+#define xenoprof_arch_counter compat_oprof_arch_counter
 
 #define xen_domid_t domid_t
 #define compat_domid_t domid_compat_t

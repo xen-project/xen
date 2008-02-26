@@ -761,7 +761,7 @@ _sh_propagate(struct vcpu *v,
             sflags |= get_pat_flags(v,
                                     gflags,
                                     gfn_to_paddr(target_gfn),
-                                    mfn_x(target_mfn) << PAGE_SHIFT);
+                                    ((paddr_t)mfn_x(target_mfn)) << PAGE_SHIFT);
     }
 
     // Set the A&D bits for higher level shadows.
