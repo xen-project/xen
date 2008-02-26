@@ -388,6 +388,29 @@ __umoddi3(u_quad_t a, u_quad_t b)
         return (r);
 }
 
+/*
+ * Return remainder after dividing two signed quads.
+ *
+ * XXX
+ * If -1/2 should produce -1 on this machine, this code is wrong.
+ */
+quad_t
+__moddi3(quad_t a, quad_t b)
+{
+	u_quad_t ua, ub, ur;
+	int neg;
+
+	if (a < 0)
+		ua = -(u_quad_t)a, neg = 1;
+	else
+		ua = a, neg = 0;
+	if (b < 0)
+		ub = -(u_quad_t)b;
+	else
+		ub = b;
+	(void)__qdivrem(ua, ub, &ur);
+	return (neg ? -ur : ur);
+}
 #endif /* !defined(__ia64__) */
 
 #ifndef HAVE_LIBC
