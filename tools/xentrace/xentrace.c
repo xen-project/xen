@@ -471,6 +471,8 @@ void usage(void)
 "                          N.B. that the trace buffer cannot be resized.\n" \
 "                          if it has already been set this boot cycle,\n" \
 "                          this argument will be ignored.\n" \
+"  -D  --discard-buffers   Discard all records currently in the trace\n" \
+"                          buffers before beginning.\n" \
 "  -?, --help              Show this message\n" \
 "  -V, --version           Print program version\n" \
 "\n" \
@@ -539,6 +541,7 @@ void parse_args(int argc, char **argv)
         { "cpu-mask",       required_argument, 0, 'c' },
         { "evt-mask",       required_argument, 0, 'e' },
         { "trace-buf-size", required_argument, 0, 'S' },
+        { "discard-buffers", no_argument,      0, 'D' },
         { "help",           no_argument,       0, '?' },
         { "version",        no_argument,       0, 'V' },
         { 0, 0, 0, 0 }
@@ -570,6 +573,10 @@ void parse_args(int argc, char **argv)
             exit(EXIT_SUCCESS);
             break;
             
+        case 'D': /* Discard traces currently in buffer */
+            opts.discard = 1;
+            break;
+ 
         default:
             usage();
         }
