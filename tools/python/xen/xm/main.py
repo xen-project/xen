@@ -699,9 +699,6 @@ def xm_save(args):
         err(opterr)
         sys.exit(1)
 
-    dom = params[0]
-    savefile = params[1]
-
     checkpoint = False
     for (k, v) in options:
         if k in ['-c', '--checkpoint']:
@@ -710,9 +707,9 @@ def xm_save(args):
     if len(params) != 2:
         err("Wrong number of parameters")
         usage('save')
-        sys.exit(1)
 
-    savefile = os.path.abspath(savefile)
+    dom = params[0]
+    savefile = os.path.abspath(params[1])
 
     if not os.access(os.path.dirname(savefile), os.W_OK):
         err("xm save: Unable to create file %s" % savefile)
