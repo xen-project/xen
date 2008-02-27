@@ -113,49 +113,23 @@ static void xenstat_uninit_devs(xenstat_handle *handle, int type)
 	priv->kc = NULL;
 }
 
-static int parse_nic(const char *nic, char *module, int *instance)
-{
-	const char *c;
-
-	for (c = &nic[strlen(nic) - 1]; c != nic && isdigit(*c); c--)
-		;
-
-	if (c == nic)
-		return 0;
-
-	c++;
-
-	if (sscanf(c, "%d", instance) != 1)
-		return 0;
-
-	strncpy(module, nic, c - nic);
-	module[c - nic] = '\0';
-	return 1;
-}
-
 static int update_dev_stats(priv_data_t *priv, stdevice_t *dev)
 {
-	char mod[256];
-	const char *name;
-	int inst;
 	kstat_t *ksp;
-
-	if (dev->type == DEVICE_NIC) {
-		if (!parse_nic(dev->name, mod, &inst))
-			return 0;
-		name = "mac";
-	} else {
-		strcpy(mod, "xdb");
-		inst = dev->instance;
-		name = "req_statistics";
-	}
 
 	if (kstat_chain_update(priv->kc) == -1)
 		return 0;
 
-	ksp = kstat_lookup(priv->kc, mod, inst, (char *)name);
+	if (dev->type == DEVICE_NIC) {
+		ksp = kstat_lookup(priv->kc, "link", 0, (char *)dev->name);
+	} else {
+		ksp = kstat_lookup(priv->kc, "xdb", dev->instance,
+		    (char *)"req_statistics");
+	}
+
 	if (ksp == NULL)
 		return 0;
+
 	if (kstat_read(priv->kc, ksp, NULL) == -1)
 		return 0;
 
