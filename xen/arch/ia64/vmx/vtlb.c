@@ -112,25 +112,19 @@ static thash_data_t *__vtr_lookup(VCPU *vcpu, u64 va, int is_data)
     return NULL;
 }
 
-static void thash_recycle_cch(thash_cb_t *hcb, thash_data_t *hash)
+static void thash_recycle_cch(thash_cb_t *hcb, thash_data_t *hash,
+                              thash_data_t *tail)
 {
-    thash_data_t *p, *q;
-    int i = 0;
-     
-    p = hash;
-    for (i = 0; i < MAX_CCN_DEPTH; i++) {
-        p = p->next;
-    }
-    q = hash->next;
-    hash->len = 0;
+    thash_data_t *head = hash->next;
+
     hash->next = 0;
-    p->next = hcb->cch_freelist;
-    hcb->cch_freelist = q;
+    tail->next = hcb->cch_freelist;
+    hcb->cch_freelist = head;
 }
 
 static void vmx_vhpt_insert(thash_cb_t *hcb, u64 pte, u64 itir, u64 ifa)
 {
-    u64 tag;
+    u64 tag, len;
     ia64_rr rr;
     thash_data_t *head, *cch;
 
@@ -139,39 +133,35 @@ static void vmx_vhpt_insert(thash_cb_t *hcb, u64 pte, u64 itir, u64 ifa)
     head = (thash_data_t *)ia64_thash(ifa);
     tag = ia64_ttag(ifa);
 
-    /* Find a free (ie invalid) entry.  */
-    cch = head;
-    while (cch) {    
-        if (INVALID_VHPT(cch))
-            break;
-        cch = cch->next;
-    }
-    if (cch) {
+    if (!INVALID_VHPT(head)) {
+        /* Find a free (ie invalid) entry.  */
+        len = 0;
+        cch = head;
+        do {
+            ++len;
+            if (cch->next == NULL) {
+                if (len >= MAX_CCN_DEPTH) {
+                    thash_recycle_cch(hcb, head, cch);
+                    cch = cch_alloc(hcb);
+                } else {
+                    cch = __alloc_chain(hcb);
+                }
+                cch->next = head->next;
+                head->next = cch;
+                break;
+            }
+            cch = cch->next;
+        } while (!INVALID_VHPT(cch));
+
         /* As we insert in head, copy head.  */
-        if (cch != head) {
-            local_irq_disable();
-            cch->page_flags = head->page_flags;
-            cch->itir = head->itir;
-            cch->etag = head->etag;
-            head->ti = 1;
-            local_irq_enable();
-        }
-    } else {
-        if (head->len >= MAX_CCN_DEPTH) {
-            thash_recycle_cch(hcb, head);
-            cch = cch_alloc(hcb);
-        } else {
-            cch = __alloc_chain(hcb);
-        }
         local_irq_disable();
-        *cch = *head;
+        cch->page_flags = head->page_flags;
+        cch->itir = head->itir;
+        cch->etag = head->etag;
         head->ti = 1;
-        head->next = cch;
-        head->len = cch->len + 1;
-        cch->len = 0;
         local_irq_enable();
     }
-    //here head is invalid
+    /* here head is invalid. */
     wmb();
     head->page_flags=pte;
     head->itir = rr.ps << 2;
@@ -263,8 +253,6 @@ thash_data_t * vhpt_lookup(u64 va)
         hash->itir = head->itir;
         head->itir = itir;
 
-        head->len = hash->len;
-        hash->len = 0;
         return head;
     }
     return hash;
@@ -387,7 +375,6 @@ void thash_recycle_cch_all(thash_cb_t *hcb)
     head = hcb->hash;
     num = (hcb->hash_sz/sizeof(thash_data_t));
     do {
-        head->len = 0;
         head->next = 0;
         head++;
         num--;
@@ -419,7 +406,7 @@ static thash_data_t *__alloc_chain(thash_cb_t *hcb)
  */
 static void vtlb_insert(VCPU *v, u64 pte, u64 itir, u64 va)
 {
-    thash_data_t *hash_table, *cch;
+    thash_data_t *hash_table, *cch, *tail;
     /* int flag; */
     ia64_rr vrr;
     /* u64 gppn, ppns, ppne; */
@@ -432,20 +419,21 @@ static void vtlb_insert(VCPU *v, u64 pte, u64 itir, u64 va)
     vrr.ps = itir_ps(itir);
     VMX(v, psbits[va >> 61]) |= (1UL << vrr.ps);
     hash_table = vtlb_thash(hcb->pta, va, vrr.rrval, &tag);
+    len = 0;
     cch = hash_table;
-    while (cch) {
+    do {
         if (INVALID_TLB(cch)) {
-            len = cch->len;
             cch->page_flags = pte;
-            cch->len = len;
             cch->itir = itir;
             cch->etag = tag;
             return;
         }
+        ++len;
+        tail = cch;
         cch = cch->next;
-    }
-    if (hash_table->len >= MAX_CCN_DEPTH) {
-        thash_recycle_cch(hcb, hash_table);
+    } while(cch);
+    if (len >= MAX_CCN_DEPTH) {
+        thash_recycle_cch(hcb, hash_table, tail);
         cch = cch_alloc(hcb);
     }
     else {
@@ -457,7 +445,6 @@ static void vtlb_insert(VCPU *v, u64 pte, u64 itir, u64 va)
     cch->next = hash_table->next;
     wmb();
     hash_table->next = cch;
-    hash_table->len += 1;
     return;
 }
 

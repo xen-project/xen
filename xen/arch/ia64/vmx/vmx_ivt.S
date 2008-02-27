@@ -181,25 +181,22 @@ vmx_itlb_loop:
     // Swap the first entry with the entry found in the collision chain
     // to speed up next hardware search (and keep LRU).
     // In comments 1 stands for the first entry and 2 for the found entry.
-    ld8 r25 = [r17] // Read value of 2
-    ld8 r27 = [r18] // Read value of 1
     ld8 r29 = [r28] // Read tag of 1
     dep r22 = -1,r24,63,1    // set ti=1 of 2 (to disable it during the swap)
     ;;
+    ld8 r25 = [r17] // Read value of 2
+    ld8 r27 = [r18] // Read value of 1
     st8 [r16] = r29, VLE_ITIR_OFFSET - VLE_TITAG_OFFSET // Write tag of 2
     st8 [r28] = r22, VLE_ITIR_OFFSET - VLE_TITAG_OFFSET // Write tag of 1
-    extr.u r19 = r27, 56, 4 // Extract collision chain length
     mf
     ;;
     ld8 r29 = [r16] // read itir of 2
     ld8 r22 = [r28] // read itir of 1
-    dep r27 = r0, r27, 56, 4 // Clear collision chain length for 2
-    dep r25 = r19, r25, 56, 4 // Write collision chain length for 1
+    st8 [r18] = r25 // Write value of 1
+    st8 [r17] = r27 // Write value of 2
     ;;
     st8 [r16] = r22 // Write itir of 2
     st8 [r28] = r29, VLE_TITAG_OFFSET - VLE_ITIR_OFFSET // write itir of 1
-    st8 [r18] = r25 // Write value of 1
-    st8 [r17] = r27 // Write value of 2
     ;;
     st8.rel [r28] = r24 // Write tag of 1 (with ti=0)
     // Insert the translation entry
@@ -264,25 +261,22 @@ vmx_dtlb_loop:
 (p7)mov r17 = r23;
 (p7)br.sptk vmx_dtlb_loop
     ;;
-    ld8 r25 = [r17]
-    ld8 r27 = [r18]
     ld8 r29 = [r28]
     dep r22 = -1,r24,63,1    //set ti=1
     ;;
+    ld8 r25 = [r17]
+    ld8 r27 = [r18]
     st8 [r16] = r29, VLE_ITIR_OFFSET - VLE_TITAG_OFFSET
     st8 [r28] = r22, VLE_ITIR_OFFSET - VLE_TITAG_OFFSET
-    extr.u r19 = r27, 56, 4
     mf
     ;;
     ld8 r29 = [r16]
     ld8 r22 = [r28]
-    dep r27 = r0, r27, 56, 4
-    dep r25 = r19, r25, 56, 4
+    st8 [r18] = r25
+    st8 [r17] = r27
     ;;
     st8 [r16] = r22
     st8 [r28] = r29, VLE_TITAG_OFFSET - VLE_ITIR_OFFSET
-    st8 [r18] = r25
-    st8 [r17] = r27
     ;;
     st8.rel [r28] = r24 
     itc.d r25

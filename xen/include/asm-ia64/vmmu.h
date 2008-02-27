@@ -70,17 +70,6 @@ typedef struct thash_data {
             u64 ed   :  1; // 52
             u64 ig1  :  3; // 53-63
         };
-        struct {
-            u64 __rv1 : 53;     // 0-52
-            u64 contiguous : 1; //53
-            u64 tc : 1;         // 54 TR or TC
-            u64 cl : 1;         // 55 I side or D side cache line
-            u64 len  :  4;      // 56-59
-            u64 io  : 1;	// 60 entry is for io or not
-            u64 nomap : 1;      // 61 entry cann't be inserted into machine TLB.
-            u64 checked : 1;    // 62 for VTLB/VHPT sanity check
-            u64 invalid : 1;    // 63 invalid entry
-        };
         u64 page_flags;
     };                  // same for VHPT and TLB
 
