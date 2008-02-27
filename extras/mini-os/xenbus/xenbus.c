@@ -637,9 +637,7 @@ char* xenbus_printf(xenbus_transaction_t xbt,
     va_start(args, fmt);
     vsprintf(val, fmt, args);
     va_end(args);
-    xenbus_write(xbt,fullpath,val);
-
-    return NULL;
+    return xenbus_write(xbt,fullpath,val);
 }
 
 static void do_ls_test(const char *pre)
