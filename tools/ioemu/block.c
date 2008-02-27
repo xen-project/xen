@@ -123,20 +123,23 @@ void path_combine(char *dest, int dest_size,
 static int bdrv_rw_badreq_sectors(BlockDriverState *bs,
 				int64_t sector_num, int nb_sectors)
 {
-    return
+    return (
 	nb_sectors < 0 ||
 	nb_sectors > bs->total_sectors ||
-	sector_num > bs->total_sectors - nb_sectors;
+	sector_num > bs->total_sectors - nb_sectors
+	) && !bs->extendable;
 }
 
 static int bdrv_rw_badreq_bytes(BlockDriverState *bs,
 				  int64_t offset, int count)
 {
     int64_t size = bs->total_sectors << SECTOR_BITS;
-    return
+    return (
 	count < 0 ||
 	count > size ||
-	offset > size - count;
+	offset > size - count
+	) && !bs->extendable;
+    
 }
 
 void bdrv_register(BlockDriver *bdrv)
@@ -346,6 +349,12 @@ int bdrv_open2(BlockDriverState *bs, const char *filename, int flags,
     bs->read_only = 0;
     bs->is_temporary = 0;
     bs->encrypted = 0;
+
+    if (flags & BDRV_O_EXTENDABLE) {
+	if (!(drv->bdrv_flags & BLOCK_DRIVER_FLAG_EXTENDABLE))
+	    return -ENOSYS;
+	bs->extendable = 1;
+    }
 
     if (flags & BDRV_O_SNAPSHOT) {
         BlockDriverState *bs1;

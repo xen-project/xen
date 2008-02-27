@@ -24,6 +24,8 @@
 #ifndef BLOCK_INT_H
 #define BLOCK_INT_H
 
+#define BLOCK_DRIVER_FLAG_EXTENDABLE  0x0001u
+
 struct BlockDriver {
     const char *format_name;
     int instance_size;
@@ -76,6 +78,7 @@ struct BlockDriver {
     int (*bdrv_eject)(BlockDriverState *bs, int eject_flag);
     int (*bdrv_set_locked)(BlockDriverState *bs, int locked);
     
+    unsigned bdrv_flags;
     BlockDriverAIOCB *free_aiocb;
     struct BlockDriver *next;
 };
@@ -87,6 +90,7 @@ struct BlockDriverState {
     int removable; /* if true, the media can be removed */
     int locked;    /* if true, the media cannot temporarily be ejected */
     int encrypted; /* if true, the media is encrypted */
+    int extendable;/* if true, we may write out of original range */
     /* event callback when inserting/removing */
     void (*change_cb)(void *opaque);
     void *change_opaque;

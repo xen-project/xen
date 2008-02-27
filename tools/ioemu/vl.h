@@ -614,6 +614,8 @@ typedef struct QEMUSnapshotInfo {
                                      use a disk image format on top of
                                      it (default for
                                      bdrv_file_open()) */
+#define BDRV_O_EXTENDABLE  0x0080 /* allow writes out of original size range;
+				     only effective for some drivers */
 
 void bdrv_init(void);
 BlockDriver *bdrv_find_format(const char *format_name);
