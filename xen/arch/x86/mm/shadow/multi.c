@@ -4515,29 +4515,13 @@ static char * sh_audit_flags(struct vcpu *v, int level,
     return NULL;
 }
 
-static inline mfn_t
-audit_gfn_to_mfn(struct vcpu *v, gfn_t gfn, mfn_t gmfn)
-/* Convert this gfn to an mfn in the manner appropriate for the
- * guest pagetable it's used in (gmfn) */ 
-{
-    p2m_type_t p2mt;
-    if ( !shadow_mode_translate(v->domain) )
-        return _mfn(gfn_x(gfn));
-    
-    if ( (mfn_to_page(gmfn)->u.inuse.type_info & PGT_type_mask)
-         != PGT_writable_page ) 
-        return _mfn(gfn_x(gfn)); /* This is a paging-disabled shadow */
-    else 
-        return gfn_to_mfn(v->domain, gfn, &p2mt);
-} 
-
-
 int sh_audit_l1_table(struct vcpu *v, mfn_t sl1mfn, mfn_t x)
 {
     guest_l1e_t *gl1e, *gp;
     shadow_l1e_t *sl1e;
     mfn_t mfn, gmfn, gl1mfn;
     gfn_t gfn;
+    p2m_type_t p2mt;
     char *s;
     int done = 0;
     
@@ -4576,7 +4560,7 @@ int sh_audit_l1_table(struct vcpu *v, mfn_t sl1mfn, mfn_t x)
             {
                 gfn = guest_l1e_get_gfn(*gl1e);
                 mfn = shadow_l1e_get_mfn(*sl1e);
-                gmfn = audit_gfn_to_mfn(v, gfn, gl1mfn);
+                gmfn = gfn_to_mfn(v->domain, gfn, &p2mt);
                 if ( mfn_x(gmfn) != mfn_x(mfn) )
                     AUDIT_FAIL(1, "bad translation: gfn %" SH_PRI_gfn
                                " --> %" PRI_mfn " != mfn %" PRI_mfn,
@@ -4617,6 +4601,7 @@ int sh_audit_l2_table(struct vcpu *v, mfn_t sl2mfn, mfn_t x)
     shadow_l2e_t *sl2e;
     mfn_t mfn, gmfn, gl2mfn;
     gfn_t gfn;
+    p2m_type_t p2mt;
     char *s;
     int done = 0;
 
@@ -4635,7 +4620,7 @@ int sh_audit_l2_table(struct vcpu *v, mfn_t sl2mfn, mfn_t x)
             mfn = shadow_l2e_get_mfn(*sl2e);
             gmfn = (guest_l2e_get_flags(*gl2e) & _PAGE_PSE)  
                 ? get_fl1_shadow_status(v, gfn)
-                : get_shadow_status(v, audit_gfn_to_mfn(v, gfn, gl2mfn), 
+                : get_shadow_status(v, gfn_to_mfn(v->domain, gfn, &p2mt), 
                                     SH_type_l1_shadow);
             if ( mfn_x(gmfn) != mfn_x(mfn) )
                 AUDIT_FAIL(2, "bad translation: gfn %" SH_PRI_gfn
@@ -4643,7 +4628,7 @@ int sh_audit_l2_table(struct vcpu *v, mfn_t sl2mfn, mfn_t x)
                            " --> %" PRI_mfn " != mfn %" PRI_mfn,
                            gfn_x(gfn), 
                            (guest_l2e_get_flags(*gl2e) & _PAGE_PSE) ? 0
-                           : mfn_x(audit_gfn_to_mfn(v, gfn, gl2mfn)),
+                           : mfn_x(gfn_to_mfn(v->domain, gfn, &p2mt)),
                            mfn_x(gmfn), mfn_x(mfn));
         }
     });
@@ -4658,6 +4643,7 @@ int sh_audit_l3_table(struct vcpu *v, mfn_t sl3mfn, mfn_t x)
     shadow_l3e_t *sl3e;
     mfn_t mfn, gmfn, gl3mfn;
     gfn_t gfn;
+    p2m_type_t p2mt;
     char *s;
     int done = 0;
 
@@ -4674,7 +4660,7 @@ int sh_audit_l3_table(struct vcpu *v, mfn_t sl3mfn, mfn_t x)
         {
             gfn = guest_l3e_get_gfn(*gl3e);
             mfn = shadow_l3e_get_mfn(*sl3e);
-            gmfn = get_shadow_status(v, audit_gfn_to_mfn(v, gfn, gl3mfn), 
+            gmfn = get_shadow_status(v, gfn_to_mfn(v->domain, gfn, &p2mt), 
                                      ((GUEST_PAGING_LEVELS == 3 ||
                                        is_pv_32on64_vcpu(v))
                                       && !shadow_mode_external(v->domain)
@@ -4697,6 +4683,7 @@ int sh_audit_l4_table(struct vcpu *v, mfn_t sl4mfn, mfn_t x)
     shadow_l4e_t *sl4e;
     mfn_t mfn, gmfn, gl4mfn;
     gfn_t gfn;
+    p2m_type_t p2mt;
     char *s;
     int done = 0;
 
@@ -4713,7 +4700,7 @@ int sh_audit_l4_table(struct vcpu *v, mfn_t sl4mfn, mfn_t x)
         {
             gfn = guest_l4e_get_gfn(*gl4e);
             mfn = shadow_l4e_get_mfn(*sl4e);
-            gmfn = get_shadow_status(v, audit_gfn_to_mfn(v, gfn, gl4mfn), 
+            gmfn = get_shadow_status(v, gfn_to_mfn(v->domain, gfn, &p2mt), 
                                      SH_type_l3_shadow);
             if ( mfn_x(gmfn) != mfn_x(mfn) )
                 AUDIT_FAIL(4, "bad translation: gfn %" SH_PRI_gfn
