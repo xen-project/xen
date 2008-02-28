@@ -20,6 +20,7 @@
 
 #include <asm/amd-iommu.h>
 #include <asm/hvm/svm/amd-iommu-proto.h>
+#include <asm/hvm/svm/amd-iommu-acpi.h>
 #include <xen/sched.h>
 #include <asm/mm.h>
 #include "../pci-direct.h"
@@ -29,6 +30,9 @@ struct list_head amd_iommu_head;
 long amd_iommu_poll_comp_wait = COMPLETION_WAIT_DEFAULT_POLLING_COUNT;
 static long amd_iommu_cmd_buffer_entries = IOMMU_CMD_BUFFER_DEFAULT_ENTRIES;
 int nr_amd_iommus = 0;
+
+unsigned short ivrs_bdf_entries = 0;
+struct ivrs_mappings *ivrs_mappings = NULL;
 
 /* will set if amd-iommu HW is found */
 int amd_iommu_enabled = 0;
@@ -82,13 +86,12 @@ static void __init detect_cleanup(void)
         deallocate_iommu_resources(iommu);
         xfree(iommu);
     }
-}
 
-static int requestor_id_from_bdf(int bdf)
-{
-    /* HACK - HACK */
-    /* account for possible 'aliasing' by parent device */
-    return bdf;
+    if ( ivrs_mappings )
+    {
+        xfree(ivrs_mappings);
+        ivrs_mappings = NULL;
+    }
 }
 
 static int __init allocate_iommu_table_struct(struct table_struct *table,
@@ -179,10 +182,21 @@ static int __init amd_iommu_init(void)
 {
     struct amd_iommu *iommu;
     unsigned long flags;
+    u16 bdf;
 
     for_each_amd_iommu ( iommu )
     {
         spin_lock_irqsave(&iommu->lock, flags);
+
+        /* assign default IOMMU values */
+        iommu->coherent = IOMMU_CONTROL_ENABLED;
+        iommu->isochronous = IOMMU_CONTROL_ENABLED;
+        iommu->res_pass_pw = IOMMU_CONTROL_ENABLED;
+        iommu->pass_pw = IOMMU_CONTROL_ENABLED;
+        iommu->ht_tunnel_enable = iommu->ht_tunnel_support ?
+            IOMMU_CONTROL_ENABLED : IOMMU_CONTROL_DISABLED;
+        iommu->exclusion_enable = IOMMU_CONTROL_DISABLED;
+        iommu->exclusion_allow_all = IOMMU_CONTROL_DISABLED;
 
         /* register IOMMU data strucures in MMIO space */
         if ( map_iommu_mmio_region(iommu) != 0 )
@@ -190,10 +204,30 @@ static int __init amd_iommu_init(void)
         register_iommu_dev_table_in_mmio_space(iommu);
         register_iommu_cmd_buffer_in_mmio_space(iommu);
 
+        spin_unlock_irqrestore(&iommu->lock, flags);
+    }
+
+    /* assign default values for device entries */
+    for ( bdf = 0; bdf < ivrs_bdf_entries; ++bdf )
+    {
+        ivrs_mappings[bdf].dte_requestor_id = bdf;
+        ivrs_mappings[bdf].dte_sys_mgt_enable =
+            IOMMU_DEV_TABLE_SYS_MGT_MSG_FORWARDED;
+        ivrs_mappings[bdf].dte_allow_exclusion =
+            IOMMU_CONTROL_DISABLED;
+        ivrs_mappings[bdf].unity_map_enable =
+            IOMMU_CONTROL_DISABLED;
+    }
+
+    if ( acpi_table_parse(ACPI_IVRS, parse_ivrs_table) != 0 )
+        dprintk(XENLOG_INFO, "AMD IOMMU: Did not find IVRS table!\n");
+
+    for_each_amd_iommu ( iommu )
+    {
+        spin_lock_irqsave(&iommu->lock, flags);
         /* enable IOMMU translation services */
         enable_iommu(iommu);
         nr_amd_iommus++;
-
         spin_unlock_irqrestore(&iommu->lock, flags);
     }
 
@@ -229,31 +263,38 @@ struct amd_iommu *find_iommu_for_device(int bus, int devfn)
 }
 
 void amd_iommu_setup_domain_device(
-    struct domain *domain, struct amd_iommu *iommu, int requestor_id)
+    struct domain *domain, struct amd_iommu *iommu, int bdf)
 {
     void *dte;
     u64 root_ptr;
     unsigned long flags;
+    int req_id;
+    u8 sys_mgt, dev_ex;
     struct hvm_iommu *hd = domain_hvm_iommu(domain);
 
-    BUG_ON( !hd->root_table||!hd->paging_mode );
+    BUG_ON( !hd->root_table || !hd->paging_mode );
 
     root_ptr = (u64)virt_to_maddr(hd->root_table);
+    /* get device-table entry */
+    req_id = ivrs_mappings[bdf].dte_requestor_id;
     dte = iommu->dev_table.buffer +
-        (requestor_id * IOMMU_DEV_TABLE_ENTRY_SIZE);
+        (req_id * IOMMU_DEV_TABLE_ENTRY_SIZE);
 
     if ( !amd_iommu_is_dte_page_translation_valid((u32 *)dte) )
     {
         spin_lock_irqsave(&iommu->lock, flags); 
 
-        amd_iommu_set_dev_table_entry(
-            (u32 *)dte,
-            root_ptr, hd->domain_id, hd->paging_mode);
-        invalidate_dev_table_entry(iommu, requestor_id);
+        /* bind DTE to domain page-tables */
+        sys_mgt = ivrs_mappings[req_id].dte_sys_mgt_enable;
+        dev_ex = ivrs_mappings[req_id].dte_allow_exclusion;
+        amd_iommu_set_dev_table_entry((u32 *)dte, root_ptr,
+            req_id, sys_mgt, dev_ex, hd->paging_mode);
+
+        invalidate_dev_table_entry(iommu, req_id);
         flush_command_buffer(iommu);
         dprintk(XENLOG_INFO, "AMD IOMMU: Set DTE req_id:%x, "
                 "root_ptr:%"PRIx64", domain_id:%d, paging_mode:%d\n",
-                requestor_id, root_ptr, hd->domain_id, hd->paging_mode);
+                req_id, root_ptr, hd->domain_id, hd->paging_mode);
 
         spin_unlock_irqrestore(&iommu->lock, flags);
     }
@@ -266,7 +307,7 @@ void __init amd_iommu_setup_dom0_devices(void)
     struct pci_dev *pdev;
     int bus, dev, func;
     u32 l;
-    int req_id, bdf;
+    int bdf;
 
     for ( bus = 0; bus < 256; bus++ )
     {
@@ -286,11 +327,12 @@ void __init amd_iommu_setup_dom0_devices(void)
                 list_add_tail(&pdev->list, &hd->pdev_list);
 
                 bdf = (bus << 8) | pdev->devfn;
-                req_id = requestor_id_from_bdf(bdf);
-                iommu = find_iommu_for_device(bus, pdev->devfn);
+                /* supported device? */
+                iommu = (bdf < ivrs_bdf_entries) ?
+                    find_iommu_for_device(bus, pdev->devfn) : NULL;
 
                 if ( iommu )
-                    amd_iommu_setup_domain_device(dom0, iommu, req_id);
+                    amd_iommu_setup_domain_device(dom0, iommu, bdf);
             }
         }
     }
@@ -299,6 +341,8 @@ void __init amd_iommu_setup_dom0_devices(void)
 int amd_iommu_detect(void)
 {
     unsigned long i;
+    int last_bus;
+    struct amd_iommu *iommu;
 
     if ( !enable_amd_iommu )
     {
@@ -318,6 +362,28 @@ int amd_iommu_detect(void)
     {
         printk("AMD IOMMU: Not found!\n");
         return 0;
+    }
+    else
+    {
+        /* allocate 'ivrs mappings' table */
+        /* note: the table has entries to accomodate all IOMMUs */
+        last_bus = 0;
+        for_each_amd_iommu (iommu)
+           if (iommu->last_downstream_bus > last_bus)
+               last_bus = iommu->last_downstream_bus;
+
+        ivrs_bdf_entries = (last_bus + 1) *
+                IOMMU_DEV_TABLE_ENTRIES_PER_BUS;
+        ivrs_mappings = xmalloc_array( struct ivrs_mappings, ivrs_bdf_entries);
+
+        if ( !ivrs_mappings )
+        {
+            dprintk(XENLOG_ERR, "AMD IOMMU:"
+                        " Error allocating IVRS DevMappings table\n");
+            goto error_out;
+        }
+        memset(ivrs_mappings, 0,
+            ivrs_bdf_entries * sizeof(struct ivrs_mappings));
     }
 
     if ( amd_iommu_init() != 0 )
@@ -407,23 +473,25 @@ int amd_iommu_domain_init(struct domain *domain)
 }
 
 static void amd_iommu_disable_domain_device(
-    struct domain *domain, struct amd_iommu *iommu, u16 requestor_id)
+    struct domain *domain, struct amd_iommu *iommu, int bdf)
 {
     void *dte;
     unsigned long flags;
+    int req_id;
 
+    req_id = ivrs_mappings[bdf].dte_requestor_id;
     dte = iommu->dev_table.buffer +
-        (requestor_id * IOMMU_DEV_TABLE_ENTRY_SIZE);
+        (req_id * IOMMU_DEV_TABLE_ENTRY_SIZE);
 
     if ( amd_iommu_is_dte_page_translation_valid((u32 *)dte) )
     {
         spin_lock_irqsave(&iommu->lock, flags); 
         memset (dte, 0, IOMMU_DEV_TABLE_ENTRY_SIZE);
-        invalidate_dev_table_entry(iommu, requestor_id);
+        invalidate_dev_table_entry(iommu, req_id);
         flush_command_buffer(iommu);
         dprintk(XENLOG_INFO , "AMD IOMMU: disable DTE 0x%x,"
                 " domain_id:%d, paging_mode:%d\n",
-                requestor_id,  domain_hvm_iommu(domain)->domain_id,
+                req_id,  domain_hvm_iommu(domain)->domain_id,
                 domain_hvm_iommu(domain)->paging_mode);
         spin_unlock_irqrestore(&iommu->lock, flags);
     }
@@ -438,7 +506,7 @@ static int reassign_device( struct domain *source, struct domain *target,
     struct hvm_iommu *target_hd = domain_hvm_iommu(target);
     struct pci_dev *pdev;
     struct amd_iommu *iommu;
-    int req_id, bdf;
+    int bdf;
     unsigned long flags;
 
     for_each_pdev( source, pdev )
@@ -450,12 +518,13 @@ static int reassign_device( struct domain *source, struct domain *target,
         pdev->devfn = devfn;
 
         bdf = (bus << 8) | devfn;
-        req_id = requestor_id_from_bdf(bdf);
-        iommu = find_iommu_for_device(bus, devfn);
+        /* supported device? */
+        iommu = (bdf < ivrs_bdf_entries) ?
+            find_iommu_for_device(bus, pdev->devfn) : NULL;
 
         if ( iommu )
         {
-            amd_iommu_disable_domain_device(source, iommu, req_id);
+            amd_iommu_disable_domain_device(source, iommu, bdf);
             /* Move pci device from the source domain to target domain. */
             spin_lock_irqsave(&source_hd->iommu_list_lock, flags);
             spin_lock_irqsave(&target_hd->iommu_list_lock, flags);
@@ -463,7 +532,7 @@ static int reassign_device( struct domain *source, struct domain *target,
             spin_unlock_irqrestore(&target_hd->iommu_list_lock, flags);
             spin_unlock_irqrestore(&source_hd->iommu_list_lock, flags);
 
-            amd_iommu_setup_domain_device(target, iommu, req_id);
+            amd_iommu_setup_domain_device(target, iommu, bdf);
             gdprintk(XENLOG_INFO ,
                      "AMD IOMMU: reassign %x:%x.%x domain %d -> domain %d\n",
                      bus, PCI_SLOT(devfn), PCI_FUNC(devfn),
@@ -484,6 +553,19 @@ static int reassign_device( struct domain *source, struct domain *target,
 
 int amd_iommu_assign_device(struct domain *d, u8 bus, u8 devfn)
 {
+    int bdf = (bus << 8) | devfn;
+    int req_id;
+    req_id = ivrs_mappings[bdf].dte_requestor_id;
+
+    if (ivrs_mappings[req_id].unity_map_enable)
+    {
+        amd_iommu_reserve_domain_unity_map(d,
+            ivrs_mappings[req_id].addr_range_start,
+            ivrs_mappings[req_id].addr_range_length,
+            ivrs_mappings[req_id].write_permission,
+            ivrs_mappings[req_id].read_permission);
+    }
+
     pdev_flr(bus, devfn);
     return reassign_device(dom0, d, bus, devfn);
 }

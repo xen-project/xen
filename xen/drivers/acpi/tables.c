@@ -60,6 +60,7 @@ static char *acpi_table_signatures[ACPI_TABLE_COUNT] = {
 	[ACPI_HPET] = "HPET",
 	[ACPI_MCFG] = "MCFG",
 	[ACPI_DMAR] = "DMAR",
+	[ACPI_IVRS] = "IVRS",
 };
 
 static char *mps_inti_flags_polarity[] = { "dfl", "high", "res", "low" };

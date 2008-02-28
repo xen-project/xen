@@ -21,6 +21,7 @@
 #ifndef _ASM_X86_64_AMD_IOMMU_PROTO_H
 #define _ASM_X86_64_AMD_IOMMU_PROTO_H
 
+#include <xen/sched.h>
 #include <asm/amd-iommu.h>
 
 #define for_each_amd_iommu(amd_iommu) \
@@ -54,10 +55,12 @@ void __init enable_iommu(struct amd_iommu *iommu);
 int amd_iommu_map_page(struct domain *d, unsigned long gfn, unsigned long mfn);
 int amd_iommu_unmap_page(struct domain *d, unsigned long gfn);
 void *amd_iommu_get_vptr_from_page_table_entry(u32 *entry);
+int amd_iommu_reserve_domain_unity_map(struct domain *domain,
+        unsigned long phys_addr, unsigned long size, int iw, int ir);
 
 /* device table functions */
-void amd_iommu_set_dev_table_entry(u32 *dte,
-        u64 root_ptr, u16 domain_id, u8 paging_mode);
+void amd_iommu_set_dev_table_entry(u32 *dte, u64 root_ptr,
+        u16 domain_id, u8 sys_mgt, u8 dev_ex, u8 paging_mode);
 int amd_iommu_is_dte_page_translation_valid(u32 *entry);
 void invalidate_dev_table_entry(struct amd_iommu *iommu,
             u16 devic_id);
@@ -69,10 +72,13 @@ void flush_command_buffer(struct amd_iommu *iommu);
 /* iommu domain funtions */
 int amd_iommu_domain_init(struct domain *domain);
 void amd_iommu_setup_domain_device(struct domain *domain,
-    struct amd_iommu *iommu, int requestor_id);
+    struct amd_iommu *iommu, int bdf);
 
 /* find iommu for bdf */
 struct amd_iommu *find_iommu_for_device(int bus, int devfn);
+
+/* amd-iommu-acpi functions */
+int __init parse_ivrs_table(unsigned long phys_addr, unsigned long size);
 
 static inline u32 get_field_from_reg_u32(u32 reg_value, u32 mask, u32 shift)
 {
@@ -89,6 +95,18 @@ static inline u32 set_field_in_reg_u32(u32 field, u32 reg_value,
     if (reg)
         *reg = reg_value;
     return reg_value;
+}
+
+static inline u8 get_field_from_byte(u8 value, u8 mask, u8 shift)
+{
+    u8 field;
+    field = (value & mask) >> shift;
+    return field;
+}
+
+static inline unsigned long region_to_pages(unsigned long addr, unsigned long size)
+{
+    return (PAGE_ALIGN(addr + size) - (addr & PAGE_MASK)) >> PAGE_SHIFT;
 }
 
 #endif /* _ASM_X86_64_AMD_IOMMU_PROTO_H */

@@ -137,8 +137,49 @@ static void __init set_iommu_command_buffer_control(struct amd_iommu *iommu,
     writel(entry, iommu->mmio_base+IOMMU_CONTROL_MMIO_OFFSET);
 }
 
+static void __init register_iommu_exclusion_range(struct amd_iommu *iommu)
+{
+    u64 addr_lo, addr_hi;
+    u32 entry;
+
+    addr_lo = iommu->exclusion_limit & DMA_32BIT_MASK;
+    addr_hi = iommu->exclusion_limit >> 32;
+
+    set_field_in_reg_u32((u32)addr_hi, 0,
+        IOMMU_EXCLUSION_LIMIT_HIGH_MASK,
+        IOMMU_EXCLUSION_LIMIT_HIGH_SHIFT, &entry);
+    writel(entry, iommu->mmio_base+IOMMU_EXCLUSION_LIMIT_HIGH_OFFSET);
+
+    set_field_in_reg_u32((u32)addr_lo >> PAGE_SHIFT, 0,
+        IOMMU_EXCLUSION_LIMIT_LOW_MASK,
+        IOMMU_EXCLUSION_LIMIT_LOW_SHIFT, &entry);
+    writel(entry, iommu->mmio_base+IOMMU_EXCLUSION_LIMIT_LOW_OFFSET);
+
+    addr_lo = iommu->exclusion_base & DMA_32BIT_MASK;
+    addr_hi = iommu->exclusion_base >> 32;
+
+    set_field_in_reg_u32((u32)addr_hi, 0,
+        IOMMU_EXCLUSION_BASE_HIGH_MASK,
+        IOMMU_EXCLUSION_BASE_HIGH_SHIFT, &entry);
+    writel(entry, iommu->mmio_base+IOMMU_EXCLUSION_BASE_HIGH_OFFSET);
+
+    set_field_in_reg_u32((u32)addr_lo >> PAGE_SHIFT, 0,
+        IOMMU_EXCLUSION_BASE_LOW_MASK,
+        IOMMU_EXCLUSION_BASE_LOW_SHIFT, &entry);
+
+    set_field_in_reg_u32(iommu->exclusion_allow_all, entry,
+        IOMMU_EXCLUSION_ALLOW_ALL_MASK,
+        IOMMU_EXCLUSION_ALLOW_ALL_SHIFT, &entry);
+
+    set_field_in_reg_u32(iommu->exclusion_enable, entry,
+        IOMMU_EXCLUSION_RANGE_ENABLE_MASK,
+        IOMMU_EXCLUSION_RANGE_ENABLE_SHIFT, &entry);
+    writel(entry, iommu->mmio_base+IOMMU_EXCLUSION_BASE_LOW_OFFSET);
+}
+
 void __init enable_iommu(struct amd_iommu *iommu)
 {
+    register_iommu_exclusion_range(iommu);
     set_iommu_command_buffer_control(iommu, IOMMU_CONTROL_ENABLED);
     set_iommu_translation_control(iommu, IOMMU_CONTROL_ENABLED);
     printk("AMD IOMMU %d: Enabled\n", nr_amd_iommus);

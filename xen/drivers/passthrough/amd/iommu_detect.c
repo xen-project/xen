@@ -86,30 +86,24 @@ int __init get_iommu_last_downstream_bus(struct amd_iommu *iommu)
 int __init get_iommu_capabilities(u8 bus, u8 dev, u8 func, u8 cap_ptr,
             struct amd_iommu *iommu)
 {
-    u32 cap_header, cap_range;
+    u32 cap_header, cap_range, misc_info;
     u64 mmio_bar;
 
-#if HACK_BIOS_SETTINGS
-    /* remove it when BIOS available */
-    write_pci_config(bus, dev, func,
-        cap_ptr + PCI_CAP_MMIO_BAR_HIGH_OFFSET, 0x00000000);
-    write_pci_config(bus, dev, func,
-        cap_ptr + PCI_CAP_MMIO_BAR_LOW_OFFSET, 0x40000001);
-    /* remove it when BIOS available */
-#endif
-
     mmio_bar = (u64)read_pci_config(bus, dev, func,
-             cap_ptr + PCI_CAP_MMIO_BAR_HIGH_OFFSET) << 32;
+            cap_ptr + PCI_CAP_MMIO_BAR_HIGH_OFFSET) << 32;
     mmio_bar |= read_pci_config(bus, dev, func,
-            cap_ptr + PCI_CAP_MMIO_BAR_LOW_OFFSET) &
-            PCI_CAP_MMIO_BAR_LOW_MASK;
-    iommu->mmio_base_phys = (unsigned long)mmio_bar;
+            cap_ptr + PCI_CAP_MMIO_BAR_LOW_OFFSET); 
+    iommu->mmio_base_phys = mmio_bar & (u64)~0x3FFF;
 
-    if ( (mmio_bar == 0) || ( (mmio_bar & 0x3FFF) != 0 ) ) {
+    if ( (mmio_bar & 0x1) == 0 || iommu->mmio_base_phys == 0 )
+    {
         dprintk(XENLOG_ERR ,
                 "AMD IOMMU: Invalid MMIO_BAR = 0x%"PRIx64"\n", mmio_bar);
         return -ENODEV;
     }
+
+    iommu->bdf = (bus << 8) | PCI_DEVFN(dev, func);
+    iommu->cap_offset = cap_ptr;
 
     cap_header = read_pci_config(bus, dev, func, cap_ptr);
     iommu->revision = get_field_from_reg_u32(cap_header,
@@ -119,12 +113,15 @@ int __init get_iommu_capabilities(u8 bus, u8 dev, u8 func, u8 cap_ptr,
     iommu->ht_tunnel_support = get_field_from_reg_u32(cap_header,
                     PCI_CAP_HT_TUNNEL_MASK,
                     PCI_CAP_HT_TUNNEL_SHIFT);
-    iommu->not_present_cached = get_field_from_reg_u32(cap_header,
+    iommu->pte_not_present_cached = get_field_from_reg_u32(cap_header,
                     PCI_CAP_NP_CACHE_MASK,
                     PCI_CAP_NP_CACHE_SHIFT);
 
     cap_range = read_pci_config(bus, dev, func,
             cap_ptr + PCI_CAP_RANGE_OFFSET);
+    iommu->unit_id = get_field_from_reg_u32(cap_range,
+                PCI_CAP_UNIT_ID_MASK,
+                PCI_CAP_UNIT_ID_SHIFT);
     iommu->root_bus = get_field_from_reg_u32(cap_range,
                 PCI_CAP_BUS_NUMBER_MASK,
                 PCI_CAP_BUS_NUMBER_SHIFT);
@@ -135,6 +132,11 @@ int __init get_iommu_capabilities(u8 bus, u8 dev, u8 func, u8 cap_ptr,
                 PCI_CAP_LAST_DEVICE_MASK,
                 PCI_CAP_LAST_DEVICE_SHIFT);
 
+    misc_info = read_pci_config(bus, dev, func,
+            cap_ptr + PCI_MISC_INFO_OFFSET);
+    iommu->msi_number = get_field_from_reg_u32(misc_info,
+                PCI_CAP_MSI_NUMBER_MASK,
+                PCI_CAP_MSI_NUMBER_SHIFT);
     return 0;
 }
 
