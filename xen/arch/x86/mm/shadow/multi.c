@@ -2952,8 +2952,6 @@ static int sh_page_fault(struct vcpu *v,
 #endif /* (SHADOW_OPTIMIZATIONS & SHOPT_VIRTUAL_TLB) */
 
     shadow_lock(d);
-    shadow_audit_tables(v);
-    sh_audit_gw(v, &gw);
 
     if ( gw_remove_write_accesses(v, va, &gw) )
     {
@@ -2971,6 +2969,9 @@ static int sh_page_fault(struct vcpu *v,
         shadow_unlock(d);
         return EXCRET_fault_fixed;
     }
+
+    shadow_audit_tables(v);
+    sh_audit_gw(v, &gw);
 
     /* Make sure there is enough free shadow memory to build a chain of
      * shadow tables. (We never allocate a top-level shadow on this path,
