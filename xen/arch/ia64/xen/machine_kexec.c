@@ -165,6 +165,21 @@ void machine_reboot_kexec(xen_kexec_image_t *image)
 	machine_kexec(image);
 }
 
+static int machine_kexec_get_xen(xen_kexec_range_t *range)
+{
+	range->start = virt_to_maddr(_start);
+	range->size = (unsigned long)xenheap_phys_end -
+		      (unsigned long)range->start;
+	return 0;
+}
+
+int machine_kexec_get(xen_kexec_range_t *range)
+{
+	if (range->range != KEXEC_RANGE_MA_XEN)
+		return -EINVAL;
+	return machine_kexec_get_xen(range);
+}
+
 /*
  * Local variables:
  * mode: C

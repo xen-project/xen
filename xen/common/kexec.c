@@ -20,6 +20,7 @@
 #include <xen/spinlock.h>
 #include <xen/version.h>
 #include <xen/console.h>
+#include <xen/kexec.h>
 #include <public/elfnote.h>
 #include <xsm/xsm.h>
 
@@ -164,17 +165,6 @@ static int kexec_get_reserve(xen_kexec_range_t *range)
     return 0;
 }
 
-static int kexec_get_xen(xen_kexec_range_t *range)
-{
-#ifdef CONFIG_X86_64
-    range->start = xenheap_phys_start;
-#else
-    range->start = virt_to_maddr(_start);
-#endif
-    range->size = (unsigned long)xenheap_phys_end - (unsigned long)range->start;
-    return 0;
-}
-
 static int kexec_get_cpu(xen_kexec_range_t *range)
 {
     int nr = range->nr;
@@ -228,11 +218,11 @@ static int kexec_get_range_internal(xen_kexec_range_t *range)
     case KEXEC_RANGE_MA_CRASH:
         ret = kexec_get_reserve(range);
         break;
-    case KEXEC_RANGE_MA_XEN:
-        ret = kexec_get_xen(range);
-        break;
     case KEXEC_RANGE_MA_CPU:
         ret = kexec_get_cpu(range);
+        break;
+    default:
+        ret = machine_kexec_get(range);
         break;
     }
 
