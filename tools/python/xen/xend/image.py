@@ -296,7 +296,34 @@ class ImageHandler:
                         { 'dom': self.vm.getDomid(), 'read': True, 'write': True })
         log.info("spawning device models: %s %s", self.device_model, args)
         # keep track of pid and spawned options to kill it later
-        self.pid = os.spawnve(os.P_NOWAIT, self.device_model, args, env)
+
+        logfile = "/var/log/xen/qemu-dm-%s.log" %  str(self.vm.info['name_label'])
+        if os.path.exists(logfile):
+            if os.path.exists(logfile + ".1"):
+                os.unlink(logfile + ".1")
+            os.rename(logfile, logfile + ".1")
+
+        null = os.open("/dev/null", os.O_RDONLY)
+        logfd = os.open(logfile, os.O_WRONLY|os.O_CREAT|os.O_TRUNC)
+        
+        pid = os.fork()
+        if pid == 0: #child
+            try:
+                os.dup2(null, 0)
+                os.dup2(logfd, 1)
+                os.dup2(logfd, 2)
+                os.close(null)
+                os.close(logfd)
+                try:
+                    os.execve(self.device_model, args, env)
+                except:
+                    os._exit(127)
+            except:
+                os._exit(127)
+        else:
+            self.pid = pid
+            os.close(null)
+            os.close(logfd)
         self.vm.storeDom("image/device-model-pid", self.pid)
         log.info("device model pid: %d", self.pid)
 

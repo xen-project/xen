@@ -7611,9 +7611,7 @@ int main(int argc, char **argv)
         }
     }
 
-    /* Now send logs to our named config */
-    sprintf(qemu_dm_logfilename, "/var/log/xen/qemu-dm-%d.log", domid);
-    cpu_set_log_filename(qemu_dm_logfilename);
+    cpu_set_log(0);
 
 #ifndef NO_DAEMONIZE
     if (daemonize && !nographic && vnc_display == NULL && vncunused == 0) {

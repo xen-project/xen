@@ -126,11 +126,11 @@ static kbd_layout_t *parse_keyboard_layout(const char *language,
 		    if (rest && strstr(rest, "numlock")) {
 			add_to_key_range(&k->keypad_range, keycode);
 			add_to_key_range(&k->numlock_range, keysym);
-			fprintf(stderr, "keypad keysym %04x keycode %d\n", keysym, keycode);
+			//fprintf(stderr, "keypad keysym %04x keycode %d\n", keysym, keycode);
 		    }
 		    if (rest && strstr(rest, "shift")) {
 			add_to_key_range(&k->shift_range, keysym);
-			fprintf(stderr, "shift keysym %04x keycode %d\n", keysym, keycode);
+			//fprintf(stderr, "shift keysym %04x keycode %d\n", keysym, keycode);
 		    }
 
 		    /* if(keycode&0x80)
