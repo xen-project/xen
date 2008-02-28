@@ -62,32 +62,23 @@ done
 
 creation="xm create -c stubdom-$domname target=$domid memory=32"
 
-(while true ; do sleep 60 ; done) | $creation > /var/log/xen/qemu-dm-$domid.log &
+(while true ; do sleep 60 ; done) | $creation &
 #xterm -geometry +0+0 -e /bin/sh -c "$creation ; echo ; echo press ENTER to shut down ; read" &
 consolepid=$!
 
-
-# Wait for vnc server to appear
-while ! vnc_port=`xenstore-read /local/domain/$domid/console/vnc-port`
-do
-        # Check that the stubdom job is still alive
-        kill -0 $consolepid || term
-	sleep 1
-done
-
-################
-# DEBUG: tcpdump
-#while ! stubdomid=`xm domid stubdom-$domname`
-#do
-#        sleep 1
-#done
-#xterm -geometry 160x25+0+$height -e /bin/sh -c "tcpdump -n -i vif$stubdomid.0" &
-#xterm -geometry 160x25+0+$((2 * $height)) -e /bin/sh -c "tcpdump -n -i vif$stubdomid.1" &
 
 ###########
 # vncviewer
 if [ "$vncviewer" = 1 ]
 then
+    # Wait for vnc server to appear
+    while ! vnc_port=`xenstore-read /local/domain/$domid/console/vnc-port`
+    do
+        # Check that the stubdom job is still alive
+        kill -0 $consolepid || term
+	sleep 1
+    done
+
     vncviewer $ip:$vnc_port &
     vncpid=$!
 fi
