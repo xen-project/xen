@@ -40,8 +40,8 @@ static struct amd_iommu * __init find_iommu_from_bdf_cap(
     return NULL;
 }
 
-static void __init reserve_iommu_exclusion_range(struct amd_iommu *iommu,
-           unsigned long base, unsigned long limit)
+static void __init reserve_iommu_exclusion_range(
+    struct amd_iommu *iommu, uint64_t base, uint64_t limit)
 {
     /* need to extend exclusion range? */
     if ( iommu->exclusion_enable )
