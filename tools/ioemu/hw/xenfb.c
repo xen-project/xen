@@ -598,7 +598,8 @@ static int xenfb_send_key(struct xenfb *xenfb, bool down, int keycode)
 }
 
 /* Send a relative mouse movement event */
-static int xenfb_send_motion(struct xenfb *xenfb, int rel_x, int rel_y, int rel_z)
+static int xenfb_send_motion(struct xenfb *xenfb,
+			     int rel_x, int rel_y, int rel_z)
 {
 	union xenkbd_in_event event;
 
@@ -612,7 +613,8 @@ static int xenfb_send_motion(struct xenfb *xenfb, int rel_x, int rel_y, int rel_
 }
 
 /* Send an absolute mouse movement event */
-static int xenfb_send_position(struct xenfb *xenfb, int abs_x, int abs_y, int abs_z)
+static int xenfb_send_position(struct xenfb *xenfb,
+			       int abs_x, int abs_y, int rel_z)
 {
 	union xenkbd_in_event event;
 
@@ -620,7 +622,7 @@ static int xenfb_send_position(struct xenfb *xenfb, int abs_x, int abs_y, int ab
 	event.type = XENKBD_TYPE_POS;
 	event.pos.abs_x = abs_x;
 	event.pos.abs_y = abs_y;
-	event.pos.abs_z = abs_z;
+	event.pos.rel_z = rel_z;
 
 	return xenfb_kbd_event(xenfb, &event);
 }
