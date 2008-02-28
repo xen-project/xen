@@ -88,6 +88,11 @@ PERFCOUNTER(shadow_up_pointer,     "shadow unshadow by up-pointer")
 PERFCOUNTER(shadow_unshadow_bf,    "shadow unshadow brute-force")
 PERFCOUNTER(shadow_get_page_fail,  "shadow_get_page_from_l1e failed")
 PERFCOUNTER(shadow_guest_walk,     "shadow walks guest tables")
+PERFCOUNTER(shadow_check_gwalk,    "shadow checks gwalk")
+PERFCOUNTER(shadow_inconsistent_gwalk, "shadow check inconsistent gwalk")
+PERFCOUNTER(shadow_rm_write_flush_tlb,
+                                   "shadow flush tlb by removing write perm")
+
 PERFCOUNTER(shadow_invlpg,         "shadow emulates invlpg")
 PERFCOUNTER(shadow_invlpg_fault,   "shadow invlpg faults")
 
