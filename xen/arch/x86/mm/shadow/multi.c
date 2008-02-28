@@ -256,6 +256,7 @@ shadow_check_gwalk(struct vcpu *v, unsigned long va, walk_t *gw)
     guest_l3e_t *l3p;
     guest_l4e_t *l4p;
 #endif
+    int mismatch = 0;
 
     ASSERT(shadow_locked_by_me(d));
 
@@ -277,33 +278,30 @@ shadow_check_gwalk(struct vcpu *v, unsigned long va, walk_t *gw)
 #if GUEST_PAGING_LEVELS >= 3 /* PAE or 64... */
 #if GUEST_PAGING_LEVELS >= 4 /* 64-bit only... */
     l4p = (guest_l4e_t *)v->arch.paging.shadow.guest_vtable;
-    if ( gw->l4e.l4 != l4p[guest_l4_table_offset(va)].l4 )
-        return 0;
+    mismatch |= (gw->l4e.l4 != l4p[guest_l4_table_offset(va)].l4);
     l3p = sh_map_domain_page(gw->l3mfn);
-    if ( gw->l3e.l3 != l3p[guest_l3_table_offset(va)].l3 )
-        return 0; 
+    mismatch |= (gw->l3e.l3 != l3p[guest_l3_table_offset(va)].l3);
+    sh_unmap_domain_page(l3p);
 #else
-    if ( gw->l3e.l3 !=
-         v->arch.paging.shadow.gl3e[guest_l3_table_offset(va)].l3 )
-        return 0;
+    mismatch |= (gw->l3e.l3 !=
+                 v->arch.paging.shadow.gl3e[guest_l3_table_offset(va)].l3);
 #endif
     l2p = sh_map_domain_page(gw->l2mfn);
-    if ( gw->l2e.l2 != l2p[guest_l2_table_offset(va)].l2 )
-        return 0;
+    mismatch |= (gw->l2e.l2 != l2p[guest_l2_table_offset(va)].l2);
+    sh_unmap_domain_page(l2p);
 #else
     l2p = (guest_l2e_t *)v->arch.paging.shadow.guest_vtable;
-    if ( gw->l2e.l2 != l2p[guest_l2_table_offset(va)].l2 )
-        return 0;
+    mismatch |= (gw->l2e.l2 != l2p[guest_l2_table_offset(va)].l2);
 #endif
     if ( !(guest_supports_superpages(v) &&
            (guest_l2e_get_flags(gw->l2e) & _PAGE_PSE)) )
     {
         l1p = sh_map_domain_page(gw->l1mfn);
-        if ( gw->l1e.l1 != l1p[guest_l1_table_offset(va)].l1 )
-            return 0;
+        mismatch |= (gw->l1e.l1 != l1p[guest_l1_table_offset(va)].l1);
+        sh_unmap_domain_page(l1p);
     }
 
-    return 1;
+    return !mismatch;
 }
 
 /* Remove write access permissions from a gwalk_t in a batch, and
