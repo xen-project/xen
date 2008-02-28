@@ -19,6 +19,12 @@
 
 #include "xenfb.h"
 
+#ifdef CONFIG_STUBDOM
+#include <semaphore.h>
+#include <sched.h>
+#include <fbfront.h>
+#endif
+
 #ifndef BTN_LEFT
 #define BTN_LEFT 0x110 /* from <linux/input.h> */
 #endif
@@ -1124,12 +1130,10 @@ static void xenfb_guest_copy(struct xenfb *xenfb, int x, int y, int w, int h)
     dpy_update(xenfb->ds, x, y, w, h);
 }
 
-/* QEMU display state changed, so refresh the framebuffer copy */
-/* XXX - can we optimize this, or the next func at all ? */ 
+/* Periodic update of display, no need for any in our case */
 static void xenfb_update(void *opaque)
 {
     struct xenfb *xenfb = opaque;
-    xenfb_guest_copy(xenfb, 0, 0, xenfb->width, xenfb->height);
 }
 
 /* QEMU display state changed, so refresh the framebuffer copy */
@@ -1168,6 +1172,206 @@ static int xenfb_register_console(struct xenfb *xenfb) {
         fprintf(stderr, "Xen Framebuffer registered\n");
         return 0;
 }
+
+#ifdef CONFIG_STUBDOM
+static struct semaphore kbd_sem = __SEMAPHORE_INITIALIZER(kbd_sem, 0);
+static struct kbdfront_dev *kbd_dev;
+static char *kbd_path, *fb_path;
+
+static unsigned char linux2scancode[KEY_MAX + 1];
+
+#define WIDTH 1024
+#define HEIGHT 768
+#define DEPTH 32
+#define LINESIZE (1280 * (DEPTH / 8))
+#define MEMSIZE (LINESIZE * HEIGHT)
+
+int xenfb_connect_vkbd(const char *path)
+{
+    kbd_path = strdup(path);
+    return 0;
+}
+
+int xenfb_connect_vfb(const char *path)
+{
+    fb_path = strdup(path);
+    return 0;
+}
+
+static void xenfb_pv_update(DisplayState *s, int x, int y, int w, int h)
+{
+    struct fbfront_dev *fb_dev = s->opaque;
+    fbfront_update(fb_dev, x, y, w, h);
+}
+
+static void xenfb_pv_resize(DisplayState *s, int w, int h)
+{
+    struct fbfront_dev *fb_dev = s->opaque;
+    fprintf(stderr,"resize to %dx%d required\n", w, h);
+    s->width = w;
+    s->height = h;
+    /* TODO: send resize event if supported */
+    memset(s->data, 0, MEMSIZE);
+    fbfront_update(fb_dev, 0, 0, WIDTH, HEIGHT);
+}
+
+static void xenfb_pv_colourdepth(DisplayState *s, int depth)
+{
+    /* TODO: send redepth event if supported */
+    fprintf(stderr,"redepth to %d required\n", depth);
+}
+
+static void xenfb_kbd_handler(void *opaque)
+{
+#define KBD_NUM_BATCH 64
+    union xenkbd_in_event buf[KBD_NUM_BATCH];
+    int n, i;
+    DisplayState *s = opaque;
+    static int buttons;
+    static int x, y, z;
+
+    n = kbdfront_receive(kbd_dev, buf, KBD_NUM_BATCH);
+    for (i = 0; i < n; i++) {
+        switch (buf[i].type) {
+
+            case XENKBD_TYPE_MOTION:
+                fprintf(stderr, "FB backend sent us relative mouse motion event!\n");
+                break;
+
+            case XENKBD_TYPE_POS:
+            {
+                int new_x = buf[i].pos.abs_x;
+                int new_y = buf[i].pos.abs_y;
+                int new_z = buf[i].pos.abs_z;
+                if (new_x >= s->width)
+                    new_x = s->width - 1;
+                if (new_y >= s->height)
+                    new_y = s->height - 1;
+                if (kbd_mouse_is_absolute()) {
+                    kbd_mouse_event(
+                            new_x * 0x7FFF / (s->width - 1),
+                            new_y * 0x7FFF / (s->height - 1),
+                            new_z,
+                            buttons);
+                } else {
+                    kbd_mouse_event(
+                            new_x - x,
+                            new_y - y,
+                            new_z - z,
+                            buttons);
+                }
+                x = new_x;
+                y = new_y;
+                z = new_z;
+                break;
+            }
+
+            case XENKBD_TYPE_KEY:
+            {
+                int keycode = buf[i].key.keycode;
+                int button = 0;
+
+                if (keycode == BTN_LEFT)
+                    button = MOUSE_EVENT_LBUTTON;
+                else if (keycode == BTN_RIGHT)
+                    button = MOUSE_EVENT_RBUTTON;
+                else if (keycode == BTN_MIDDLE)
+                    button = MOUSE_EVENT_MBUTTON;
+
+                if (button) {
+                    if (buf[i].key.pressed)
+                        buttons |=  button;
+                    else
+                        buttons &= ~button;
+                    if (kbd_mouse_is_absolute())
+                        kbd_mouse_event(
+                                x * 0x7FFF / s->width,
+                                y * 0x7FFF / s->height,
+                                z,
+                                buttons);
+                    else
+                        kbd_mouse_event(0, 0, 0, buttons);
+                } else {
+                    int scancode = linux2scancode[keycode];
+                    if (!scancode) {
+                        fprintf(stderr, "Can't convert keycode %x to scancode\n", keycode);
+                        break;
+                    }
+                    if (scancode & 0x80) {
+                        kbd_put_keycode(0xe0);
+                        scancode &= 0x7f;
+                    }
+                    if (!buf[i].key.pressed)
+                        scancode |= 0x80;
+                    kbd_put_keycode(scancode);
+                }
+                break;
+            }
+        }
+    }
+}
+
+static void xenfb_pv_refresh(DisplayState *ds)
+{
+    vga_hw_update();
+}
+
+static void kbdfront_thread(void *p)
+{
+    int scancode, keycode;
+    kbd_dev = init_kbdfront(p, 1);
+    if (!kbd_dev) {
+        fprintf(stderr,"can't open keyboard\n");
+        exit(1);
+    }
+    up(&kbd_sem);
+    for (scancode = 0; scancode < 128; scancode++) {
+        keycode = atkbd_set2_keycode[atkbd_unxlate_table[scancode]];
+        linux2scancode[keycode] = scancode;
+        keycode = atkbd_set2_keycode[atkbd_unxlate_table[scancode] | 0x80];
+        linux2scancode[keycode] = scancode | 0x80;
+    }
+}
+
+int xenfb_pv_display_init(DisplayState *ds)
+{
+    void *data;
+    struct fbfront_dev *fb_dev;
+    int kbd_fd;
+
+    if (!fb_path || !kbd_path)
+        return -1;
+
+    create_thread("kbdfront", kbdfront_thread, (void*) kbd_path);
+
+    data = qemu_memalign(PAGE_SIZE, VGA_RAM_SIZE);
+    fb_dev = init_fbfront(fb_path, data, WIDTH, HEIGHT, DEPTH, LINESIZE, MEMSIZE);
+    if (!fb_dev) {
+        fprintf(stderr,"can't open frame buffer\n");
+        exit(1);
+    }
+    free(fb_path);
+
+    down(&kbd_sem);
+    free(kbd_path);
+
+    kbd_fd = kbdfront_open(kbd_dev);
+    qemu_set_fd_handler(kbd_fd, xenfb_kbd_handler, NULL, ds);
+
+    ds->data = data;
+    ds->linesize = LINESIZE;
+    ds->depth = DEPTH;
+    ds->bgr = 0;
+    ds->width = WIDTH;
+    ds->height = HEIGHT;
+    ds->dpy_update = xenfb_pv_update;
+    ds->dpy_resize = xenfb_pv_resize;
+    ds->dpy_colourdepth = NULL; //xenfb_pv_colourdepth;
+    ds->dpy_refresh = xenfb_pv_refresh;
+    ds->opaque = fb_dev;
+    return 0;
+}
+#endif
 
 /*
  * Local variables:

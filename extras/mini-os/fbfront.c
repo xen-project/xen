@@ -31,13 +31,6 @@ struct kbdfront_dev {
     char *nodename;
     char *backend;
 
-    char *data;
-    int width;
-    int height;
-    int depth;
-    int line_length;
-    int mem_length;
-
 #ifdef HAVE_LIBC
     int fd;
 #endif
@@ -316,7 +309,10 @@ struct fbfront_dev *init_fbfront(char *nodename, void *data, int width, int heig
     for (i = 0; mapped < mem_length && i < max_pd; i++) {
         unsigned long *pd = (unsigned long *) alloc_page();
         for (j = 0; mapped < mem_length && j < PAGE_SIZE / sizeof(unsigned long); j++) {
-            pd[j] = virt_to_mfn((unsigned long) data + mapped);
+            /* Trigger CoW */
+            * ((char *)data + mapped) = 0;
+            barrier();
+            pd[j] = virtual_to_mfn((unsigned long) data + mapped);
             mapped += PAGE_SIZE;
         }
         for ( ; j < PAGE_SIZE / sizeof(unsigned long); j++)

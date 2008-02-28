@@ -238,6 +238,37 @@ void xenstore_parse_domain_config(int domid)
         }
     }
 
+#ifdef CONFIG_STUBDOM
+    if (pasprintf(&buf, "%s/device/vkbd", path) == -1)
+        goto out;
+
+    free(e);
+    e = xs_directory(xsh, XBT_NULL, buf, &num);
+
+    if (e) {
+        for (i = 0; i < num; i++) {
+            if (pasprintf(&buf, "%s/device/vkbd/%s", path, e[i]) == -1)
+                continue;
+            xenfb_connect_vkbd(buf);
+        }
+    }
+
+    if (pasprintf(&buf, "%s/device/vfb", path) == -1)
+        goto out;
+
+    free(e);
+    e = xs_directory(xsh, XBT_NULL, buf, &num);
+
+    if (e) {
+        for (i = 0; i < num; i++) {
+            if (pasprintf(&buf, "%s/device/vfb/%s", path, e[i]) == -1)
+                continue;
+            xenfb_connect_vfb(buf);
+        }
+    }
+#endif
+
+
     /* Set a watch for log-dirty requests from the migration tools */
     if (pasprintf(&buf, "/local/domain/0/device-model/%u/logdirty/next-active",
                   domid) != -1) {

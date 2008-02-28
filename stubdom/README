@@ -6,6 +6,73 @@ Then make install to install the result.
 
 Also, run make and make install in $XEN_ROOT/tools/fs-back
 
+General Configuration
+=====================
+
+In your HVM config "hvmconfig",
+
+- use /usr/lib/xen/bin/stubdom-dm as dm script
+
+device_model = '/usr/lib/xen/bin/stubdom-dm'
+
+- comment the disk statement:
+
+#disk = [  'file:/tmp/install.iso,hdc:cdrom,r', 'phy:/dev/sda6,hda,w', 'file:/tmp/test,hdb,r' ]
+
+
+Create /etc/xen/stubdom-hvmconfig (where "hvmconfig" is the name of your HVM
+guest) with
+
+kernel = "/usr/lib/xen/boot/stubdom.gz"
+vif = [ '', 'ip=10.0.1.1,mac=aa:00:00:12:23:34']
+disk = [  'file:/tmp/install.iso,hdc:cdrom,r', 'phy:/dev/sda6,hda,w', 'file:/tmp/test,hdb,r' ]
+
+where
+- the first vif ('') is reserved for VNC (see below)
+- 'ip=10.0.1.1,mac= etc...' is the same net configuration as in the hvmconfig
+script,
+- and disk = is the same block configuration as in the hvmconfig script.
+
+Display Configuration
+=====================
+
+There are three posibilities
+
+* Using SDL
+
+In hvmconfig, disable vnc:
+
+vnc = 0
+
+In stubdom-hvmconfig, set a vfb:
+
+vfb = [ 'type=sdl' ]
+
+* Using a VNC server in the stub domain
+
+In hvmconfig, set vnclisten to "172.30.206.1" for instance.  Do not use a host
+name as Mini-OS does not have a name resolver.  Do not use 127.0.0.1 since then
+you will not be able to connect to it.
+
+vnc = 1
+vnclisten = "172.30.206.1"
+
+In stubdom-hvmconfig, fill the reserved vif with the same IP, for instance:
+
+vif = [ 'ip=172.30.206.1', 'ip=10.0.1.1,mac=aa:00:00:12:23:34']
+
+* Using a VNC server in dom0
+
+In hvmconfig, disable vnc:
+
+vnc = 0
+
+In stubdom-hvmconfig, set a vfb:
+
+vfb = [ 'type=vnc' ]
+
+and any other parameter as wished.
+
 To run
 ======
 
@@ -13,32 +80,4 @@ mkdir -p /exports/usr/share/qemu
 ln -s /usr/share/qemu/keymaps /exports/usr/share/qemu
 /usr/sbin/fs-backend &
 
-
-In your HVM config "hvmconfig",
-
-- use VNC, set vnclisten to "172.30.206.1" for instance.  Do not use a host name
-as Mini-OS does not have a name resolver.  Do not use 127.0.0.1 since then you
-will not be able to connect to it.
-
-vnc = 1
-vnclisten = "172.30.206.1"
-
-- use /usr/lib/xen/bin/stubdom-dm as dm script
-
-device_model = '/usr/lib/xen/bin/stubdom-dm'
-
-- comment the disk statement:
-#disk = [  'file:/tmp/install.iso,hdc:cdrom,r', 'phy:/dev/sda6,hda,w', 'file:/tmp/test,hdb,r' ]
-
-Create /etc/xen/stubdom-hvmconfig (where "hvmconfig" is your HVM guest domain
-name) with
-
-kernel = "/usr/lib/xen/boot/stubdom.gz"
-vif = [ 'ip=172.30.206.1', 'ip=10.0.1.1,mac=aa:00:00:12:23:34']
-disk = [  'file:/tmp/install.iso,hdc:cdrom,r', 'phy:/dev/sda6,hda,w', 'file:/tmp/test,hdb,r' ]
-
-where
-- 172.30.206.1 is the IP for vnc,
-- 'ip=10.0.1.1,mac= etc...' is the same net configuration as in the hvmconfig
-script,
-- and disk = is the same block configuration as in the hvmconfig script.
+xm create hvmconfig

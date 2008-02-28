@@ -7831,6 +7831,10 @@ int main(int argc, char **argv)
     init_ioports();
 
     /* terminal init */
+#ifdef CONFIG_STUBDOM
+    if (xenfb_pv_display_init(ds) == 0) {
+    } else
+#endif
     if (nographic) {
         dumb_display_init(ds);
     } else if (vnc_display != NULL || vncunused != 0) {

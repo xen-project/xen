@@ -1527,6 +1527,11 @@ int xenstore_unsubscribe_from_hotplug_status(struct xs_handle *handle,
 int xenstore_vm_write(int domid, char *key, char *val);
 char *xenstore_vm_read(int domid, char *key, unsigned int *len);
 
+/* xenfb.c */
+int xenfb_pv_display_init(DisplayState *ds);
+int xenfb_connect_vkbd(const char *path);
+int xenfb_connect_vfb(const char *path);
+
 /* helper2.c */
 extern long time_offset;
 void timeoffset_get(void);
