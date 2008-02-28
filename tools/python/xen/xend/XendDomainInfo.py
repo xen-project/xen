@@ -1406,9 +1406,6 @@ class XendDomainInfo:
     def setWeight(self, cpu_weight):
         self.info['vcpus_params']['weight'] = cpu_weight
 
-    def setResume(self, state):
-        self._resume = state
-
     def getRestartCount(self):
         return self._readVm('xend/restart_count')
 
