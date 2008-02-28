@@ -865,7 +865,7 @@ class XendDomain:
                 raise XendInvalidDomain(domname)
 
             if dominfo.getDomid() == DOM0_ID:
-                raise XendError("Cannot save privileged domain %s" % domname)
+                raise XendError("Cannot suspend privileged domain %s" % domname)
 
             if dominfo._stateGet() != DOM_STATE_RUNNING:
                 raise VMBadState("Domain is not running",
@@ -910,7 +910,7 @@ class XendDomain:
                     raise XendInvalidDomain(domname)
 
                 if dominfo.getDomid() == DOM0_ID:
-                    raise XendError("Cannot save privileged domain %s" % domname)
+                    raise XendError("Cannot resume privileged domain %s" % domname)
 
                 if dominfo._stateGet() != XEN_API_VM_POWER_STATE_SUSPENDED:
                     raise XendError("Cannot resume domain that is not suspended.")
