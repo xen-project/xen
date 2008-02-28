@@ -15,7 +15,6 @@
 #include <sys/mman.h>
 #include <sys/stat.h>
 #include <sys/types.h>
-#include <sys/vfs.h>
 #include <fcntl.h>
 #include <unistd.h>
 #include <errno.h>
@@ -25,6 +24,7 @@
 #include <getopt.h>
 #include <assert.h>
 #include <sys/poll.h>
+#include <sys/statvfs.h>
 
 #include <xen/xen.h>
 #include <xen/trace.h>
@@ -87,7 +87,7 @@ void close_handler(int signal)
 void write_buffer(unsigned int cpu, unsigned char *start, int size,
                int total_size, int outfd)
 {
-    struct statfs stat;
+    struct statvfs stat;
     size_t written = 0;
     
     if ( opts.disk_rsvd != 0 )
@@ -95,13 +95,13 @@ void write_buffer(unsigned int cpu, unsigned char *start, int size,
         unsigned long long freespace;
 
         /* Check that filesystem has enough space. */
-        if ( fstatfs (outfd, &stat) )
+        if ( fstatvfs (outfd, &stat) )
         {
                 fprintf(stderr, "Statfs failed!\n");
                 goto fail;
         }
 
-        freespace = stat.f_bsize * (unsigned long long)stat.f_bfree;
+        freespace = stat.f_frsize * (unsigned long long)stat.f_bfree;
 
         if ( total_size )
             freespace -= total_size;
