@@ -1258,7 +1258,7 @@ class XendDomain:
 
         return val       
 
-    def domain_migrate(self, domid, dst, live=False, resource=0, port=0):
+    def domain_migrate(self, domid, dst, live=False, resource=0, port=0, node=-1):
         """Start domain migration.
         
         @param domid: Domain ID or Name
@@ -1271,6 +1271,8 @@ class XendDomain:
         @type live: bool
         @keyword resource: not used??
         @rtype: None
+        @keyword node: use node number for target
+        @rtype: int 
         @raise XendError: Failed to migrate
         @raise XendInvalidDomain: Domain is not valid        
         """
@@ -1299,7 +1301,7 @@ class XendDomain:
 
         sock.send("receive\n")
         sock.recv(80)
-        XendCheckpoint.save(sock.fileno(), dominfo, True, live, dst)
+        XendCheckpoint.save(sock.fileno(), dominfo, True, live, dst, node=node)
         sock.close()
 
     def domain_save(self, domid, dst, checkpoint=False):

@@ -1761,9 +1761,10 @@ class XendAPI(object):
 
         resource = other_config.get("resource", 0)
         port = other_config.get("port", 0)
+        node = other_config.get("node", 0)
         
         xendom.domain_migrate(xeninfo.getDomid(), destination_url,
-                              bool(live), resource, port)
+                              bool(live), resource, port, node)
         return xen_api_success_void()
 
     def VM_save(self, _, vm_ref, dest, checkpoint):
