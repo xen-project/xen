@@ -360,13 +360,13 @@ static void kbdfront_thread(void *p)
                 refresh_cursor(x, y);
                 break;
             case XENKBD_TYPE_POS:
-                printk("pos x:%d y:%d z:%d\n",
+                printk("pos x:%d y:%d dz:%d\n",
                         event.pos.abs_x,
                         event.pos.abs_y,
-                        event.pos.abs_z);
+                        event.pos.rel_z);
                 x = event.pos.abs_x;
                 y = event.pos.abs_y;
-                z = event.pos.abs_z;
+                z = event.pos.rel_z;
                 clip_cursor(&x, &y);
                 refresh_cursor(x, y);
                 break;

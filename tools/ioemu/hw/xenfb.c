@@ -1230,7 +1230,7 @@ static void xenfb_kbd_handler(void *opaque)
     int n, i;
     DisplayState *s = opaque;
     static int buttons;
-    static int x, y, z;
+    static int x, y;
 
     n = kbdfront_receive(kbd_dev, buf, KBD_NUM_BATCH);
     for (i = 0; i < n; i++) {
@@ -1244,7 +1244,6 @@ static void xenfb_kbd_handler(void *opaque)
             {
                 int new_x = buf[i].pos.abs_x;
                 int new_y = buf[i].pos.abs_y;
-                int new_z = buf[i].pos.abs_z;
                 if (new_x >= s->width)
                     new_x = s->width - 1;
                 if (new_y >= s->height)
@@ -1253,18 +1252,17 @@ static void xenfb_kbd_handler(void *opaque)
                     kbd_mouse_event(
                             new_x * 0x7FFF / (s->width - 1),
                             new_y * 0x7FFF / (s->height - 1),
-                            new_z,
+                            buf[i].pos.rel_z,
                             buttons);
                 } else {
                     kbd_mouse_event(
                             new_x - x,
                             new_y - y,
-                            new_z - z,
+                            buf[i].pos.rel_z,
                             buttons);
                 }
                 x = new_x;
                 y = new_y;
-                z = new_z;
                 break;
             }
 
@@ -1289,7 +1287,7 @@ static void xenfb_kbd_handler(void *opaque)
                         kbd_mouse_event(
                                 x * 0x7FFF / s->width,
                                 y * 0x7FFF / s->height,
-                                z,
+                                0,
                                 buttons);
                     else
                         kbd_mouse_event(0, 0, 0, buttons);
