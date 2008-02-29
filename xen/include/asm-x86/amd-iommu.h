@@ -43,14 +43,25 @@ struct amd_iommu {
     struct list_head list;
     spinlock_t lock; /* protect iommu */
 
-    int iotlb_support;
-    int ht_tunnel_support;
-    int not_present_cached;
+    u16 bdf;
+    u8  cap_offset;
     u8  revision;
+    u8  unit_id;
+    u8  msi_number;
 
     u8  root_bus;
     u8  first_devfn;
     u8  last_devfn;
+
+    u8 pte_not_present_cached;
+    u8 ht_tunnel_support;
+    u8 iotlb_support;
+
+    u8 isochronous;
+    u8 coherent;
+    u8 res_pass_pw;
+    u8 pass_pw;
+    u8 ht_tunnel_enable;
 
     int last_downstream_bus;
     int downstream_bus_present[PCI_MAX_BUS_COUNT];
@@ -61,10 +72,23 @@ struct amd_iommu {
     struct table_struct dev_table;
     struct table_struct cmd_buffer;
     u32 cmd_buffer_tail;
+    struct table_struct event_log;
+    u32 event_log_head;
 
-    int exclusion_enabled;
-    unsigned long exclusion_base;
-    unsigned long exclusion_limit;
+    int exclusion_enable;
+    int exclusion_allow_all;
+    uint64_t exclusion_base;
+    uint64_t exclusion_limit;
 };
 
+struct ivrs_mappings {
+    u16 dte_requestor_id;
+    u8 dte_sys_mgt_enable;
+    u8 dte_allow_exclusion;
+    u8 unity_map_enable;
+    u8 write_permission;
+    u8 read_permission;
+    unsigned long addr_range_start;
+    unsigned long addr_range_length;
+};
 #endif /* _ASM_X86_64_AMD_IOMMU_H */

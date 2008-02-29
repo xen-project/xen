@@ -24,6 +24,9 @@ typedef void (*relocate_new_kernel_t)(
                 unsigned long *page_list,
                 unsigned long start_address);
 
+extern int machine_kexec_get_xen(xen_kexec_range_t *range);
+
+
 int machine_kexec_load(int type, int slot, xen_kexec_image_t *image)
 {
     unsigned long prev_ma = 0;
@@ -133,6 +136,13 @@ void machine_kexec(xen_kexec_image_t *image)
         (*rnk)(image->indirection_page, image->page_list,
                image->start_address);
     }
+}
+
+int machine_kexec_get(xen_kexec_range_t *range)
+{
+	if (range->range != KEXEC_RANGE_MA_XEN)
+		return -EINVAL;
+	return machine_kexec_get_xen(range);
 }
 
 /*

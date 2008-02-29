@@ -1406,9 +1406,6 @@ class XendDomainInfo:
     def setWeight(self, cpu_weight):
         self.info['vcpus_params']['weight'] = cpu_weight
 
-    def setResume(self, state):
-        self._resume = state
-
     def getRestartCount(self):
         return self._readVm('xend/restart_count')
 
@@ -1963,6 +1960,39 @@ class XendDomainInfo:
             if self.info['cpus'] is not None and len(self.info['cpus']) > 0:
                 for v in range(0, self.info['VCPUs_max']):
                     xc.vcpu_setaffinity(self.domid, v, self.info['cpus'])
+            else:
+                info = xc.physinfo()
+                if info['nr_nodes'] > 1:
+                    node_memory_list = info['node_to_memory']
+                    needmem = self.image.getRequiredAvailableMemory(self.info['memory_dynamic_max']) / 1024
+                    candidate_node_list = []
+                    for i in range(0, info['nr_nodes']):
+                        if node_memory_list[i] >= needmem:
+                            candidate_node_list.append(i)
+                    if candidate_node_list is None or len(candidate_node_list) == 1:
+                        index = node_memory_list.index( max(node_memory_list) )
+                        cpumask = info['node_to_cpu'][index]
+                    else:
+                        nodeload = [0]
+                        nodeload = nodeload * info['nr_nodes']
+                        from xen.xend import XendDomain
+                        doms = XendDomain.instance().list('all')
+                        for dom in doms:
+                            cpuinfo = dom.getVCPUInfo()
+                            for vcpu in sxp.children(cpuinfo, 'vcpu'):
+                                def vinfo(n, t):
+                                    return t(sxp.child_value(vcpu, n))
+                                cpumap = vinfo('cpumap', list)
+                                for i in candidate_node_list:
+                                    node_cpumask = info['node_to_cpu'][i]
+                                    for j in node_cpumask:
+                                        if j in cpumap:
+                                            nodeload[i] += 1
+                                            break
+                        index = nodeload.index( min(nodeload) )
+                        cpumask = info['node_to_cpu'][index]
+                    for v in range(0, self.info['VCPUs_max']):
+                        xc.vcpu_setaffinity(self.domid, v, cpumask)
 
             # Use architecture- and image-specific calculations to determine
             # the various headrooms necessary, given the raw configured

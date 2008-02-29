@@ -31,6 +31,7 @@ void kexec_disable_iosapic(void);
 void kexec_crash_save_cpu(void);
 crash_xen_info_t *kexec_crash_save_info(void);
 void machine_crash_shutdown(void);
+int machine_kexec_get(xen_kexec_range_t *range);
 
 #endif /* __XEN_KEXEC_H__ */
 

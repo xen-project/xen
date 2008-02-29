@@ -22,6 +22,7 @@ from xen.xend.XendError import XendError, VmError
 from xen.xend.XendLogging import log
 from xen.xend.XendConfig import XendConfig
 from xen.xend.XendConstants import *
+from xen.xend import XendNode
 
 SIGNATURE = "LinuxGuestRecord"
 QEMU_SIGNATURE = "QemuDeviceModelRecord"
@@ -56,10 +57,23 @@ def read_exact(fd, size, errmsg):
     return buf
 
 
-def save(fd, dominfo, network, live, dst, checkpoint=False):
+def insert_after(list, pred, value):
+    for i,k in enumerate(list):
+        if type(k) == type([]):
+           if k[0] == pred:
+              list.insert (i+1, value)
+    return
+
+
+def save(fd, dominfo, network, live, dst, checkpoint=False, node=-1):
     write_exact(fd, SIGNATURE, "could not write guest state file: signature")
 
-    config = sxp.to_string(dominfo.sxpr())
+    sxprep = dominfo.sxpr()
+
+    if node > -1:
+        insert_after(sxprep,'vcpus',['node', str(node)])
+
+    config = sxp.to_string(sxprep)
 
     domain_name = dominfo.getName()
     # Rename the domain temporarily, so that we don't get a name clash if this
@@ -191,6 +205,21 @@ def restore(xd, fd, dominfo = None, paused = False, relocating = False):
         dominfo.resume()
     else:
         dominfo = xd.restore_(vmconfig)
+
+    # repin domain vcpus if a target node number was specified 
+    # this is done prior to memory allocation to aide in memory
+    # distribution for NUMA systems.
+    nodenr = -1
+    for i,l in enumerate(vmconfig):
+        if type(l) == type([]):
+            if l[0] == 'node':
+                nodenr = int(l[1])
+
+    if nodenr >= 0:
+        node_to_cpu = XendNode.instance().xc.physinfo()['node_to_cpu']
+        if nodenr < len(node_to_cpu):
+            for v in range(0, dominfo.info['VCPUs_max']):
+                 xc.vcpu_setaffinity(dominfo.domid, v, node_to_cpu[nodenr])
 
     store_port   = dominfo.getStorePort()
     console_port = dominfo.getConsolePort()

@@ -7611,9 +7611,7 @@ int main(int argc, char **argv)
         }
     }
 
-    /* Now send logs to our named config */
-    sprintf(qemu_dm_logfilename, "/var/log/xen/qemu-dm-%d.log", domid);
-    cpu_set_log_filename(qemu_dm_logfilename);
+    cpu_set_log(0);
 
 #ifndef NO_DAEMONIZE
     if (daemonize && !nographic && vnc_display == NULL && vncunused == 0) {
@@ -7831,6 +7829,10 @@ int main(int argc, char **argv)
     init_ioports();
 
     /* terminal init */
+#ifdef CONFIG_STUBDOM
+    if (xenfb_pv_display_init(ds) == 0) {
+    } else
+#endif
     if (nographic) {
         dumb_display_init(ds);
     } else if (vnc_display != NULL || vncunused != 0) {

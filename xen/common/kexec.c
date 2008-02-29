@@ -20,6 +20,7 @@
 #include <xen/spinlock.h>
 #include <xen/version.h>
 #include <xen/console.h>
+#include <xen/kexec.h>
 #include <public/elfnote.h>
 #include <xsm/xsm.h>
 
@@ -153,11 +154,7 @@ static int sizeof_note(const char *name, int descsz)
             ELFNOTE_ALIGN(descsz));
 }
 
-#define kexec_get(x)      kexec_get_##x
-
-#endif
-
-static int kexec_get(reserve)(xen_kexec_range_t *range)
+static int kexec_get_reserve(xen_kexec_range_t *range)
 {
     if ( kexec_crash_area.size > 0 && kexec_crash_area.start > 0) {
         range->start = kexec_crash_area.start;
@@ -168,18 +165,7 @@ static int kexec_get(reserve)(xen_kexec_range_t *range)
     return 0;
 }
 
-static int kexec_get(xen)(xen_kexec_range_t *range)
-{
-#ifdef CONFIG_X86_64
-    range->start = xenheap_phys_start;
-#else
-    range->start = virt_to_maddr(_start);
-#endif
-    range->size = (unsigned long)xenheap_phys_end - (unsigned long)range->start;
-    return 0;
-}
-
-static int kexec_get(cpu)(xen_kexec_range_t *range)
+static int kexec_get_cpu(xen_kexec_range_t *range)
 {
     int nr = range->nr;
     int nr_bytes = 0;
@@ -223,7 +209,27 @@ static int kexec_get(cpu)(xen_kexec_range_t *range)
     return 0;
 }
 
-static int kexec_get(range)(XEN_GUEST_HANDLE(void) uarg)
+static int kexec_get_range_internal(xen_kexec_range_t *range)
+{
+    int ret = -EINVAL;
+
+    switch ( range->range )
+    {
+    case KEXEC_RANGE_MA_CRASH:
+        ret = kexec_get_reserve(range);
+        break;
+    case KEXEC_RANGE_MA_CPU:
+        ret = kexec_get_cpu(range);
+        break;
+    default:
+        ret = machine_kexec_get(range);
+        break;
+    }
+
+    return ret;
+}
+
+static int kexec_get_range(XEN_GUEST_HANDLE(void) uarg)
 {
     xen_kexec_range_t range;
     int ret = -EINVAL;
@@ -231,24 +237,49 @@ static int kexec_get(range)(XEN_GUEST_HANDLE(void) uarg)
     if ( unlikely(copy_from_guest(&range, uarg, 1)) )
         return -EFAULT;
 
-    switch ( range.range )
-    {
-    case KEXEC_RANGE_MA_CRASH:
-        ret = kexec_get(reserve)(&range);
-        break;
-    case KEXEC_RANGE_MA_XEN:
-        ret = kexec_get(xen)(&range);
-        break;
-    case KEXEC_RANGE_MA_CPU:
-        ret = kexec_get(cpu)(&range);
-        break;
-    }
+    ret = kexec_get_range_internal(&range);
 
     if ( ret == 0 && unlikely(copy_to_guest(uarg, &range, 1)) )
         return -EFAULT;
 
     return ret;
 }
+
+#else /* COMPAT */
+
+#ifdef CONFIG_COMPAT
+static int kexec_get_range_compat(XEN_GUEST_HANDLE(void) uarg)
+{
+    xen_kexec_range_t range;
+    compat_kexec_range_t compat_range;
+    int ret = -EINVAL;
+
+    if ( unlikely(copy_from_guest(&compat_range, uarg, 1)) )
+        return -EFAULT;
+
+    range.range = compat_range.range;
+    range.nr = compat_range.nr;
+    range.size = compat_range.size;
+    range.start = compat_range.start;
+
+    ret = kexec_get_range_internal(&range);
+
+    if ( ret == 0 ) {
+        range.range = compat_range.range;
+        range.nr = compat_range.nr;
+        range.size = compat_range.size;
+        range.start = compat_range.start;
+
+        if ( unlikely(copy_to_guest(uarg, &compat_range, 1)) )
+             return -EFAULT;
+    }
+
+    return ret;
+}
+#endif /* CONFIG_COMPAT */
+
+#endif /* COMPAT */
+
 
 #ifndef COMPAT
 
@@ -375,7 +406,11 @@ ret_t do_kexec_op(unsigned long op, XEN_GUEST_HANDLE(void) uarg)
     switch ( op )
     {
     case KEXEC_CMD_kexec_get_range:
-        ret = kexec_get(range)(uarg);
+#ifndef COMPAT
+        ret = kexec_get_range(uarg);
+#else
+        ret = kexec_get_range_compat(uarg);
+#endif
         break;
     case KEXEC_CMD_kexec_load:
     case KEXEC_CMD_kexec_unload:

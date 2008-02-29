@@ -65,7 +65,7 @@ struct xenkbd_position
     uint8_t type;        /* XENKBD_TYPE_POS */
     int32_t abs_x;       /* absolute X position (in FB pixels) */
     int32_t abs_y;       /* absolute Y position (in FB pixels) */
-    int32_t abs_z;       /* absolute Z position (wheel) */
+    int32_t rel_z;       /* relative Z motion (wheel) */
 };
 
 #define XENKBD_IN_EVENT_SIZE 40

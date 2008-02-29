@@ -614,6 +614,8 @@ typedef struct QEMUSnapshotInfo {
                                      use a disk image format on top of
                                      it (default for
                                      bdrv_file_open()) */
+#define BDRV_O_EXTENDABLE  0x0080 /* allow writes out of original size range;
+				     only effective for some drivers */
 
 void bdrv_init(void);
 BlockDriver *bdrv_find_format(const char *format_name);
@@ -1524,6 +1526,11 @@ int xenstore_unsubscribe_from_hotplug_status(struct xs_handle *handle,
 
 int xenstore_vm_write(int domid, char *key, char *val);
 char *xenstore_vm_read(int domid, char *key, unsigned int *len);
+
+/* xenfb.c */
+int xenfb_pv_display_init(DisplayState *ds);
+int xenfb_connect_vkbd(const char *path);
+int xenfb_connect_vfb(const char *path);
 
 /* helper2.c */
 extern long time_offset;

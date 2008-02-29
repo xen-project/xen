@@ -126,9 +126,18 @@ typedef struct xen_kexec_load {
     xen_kexec_image_t image;
 } xen_kexec_load_t;
 
-#define KEXEC_RANGE_MA_CRASH 0   /* machine address and size of crash area */
-#define KEXEC_RANGE_MA_XEN   1   /* machine address and size of Xen itself */
-#define KEXEC_RANGE_MA_CPU   2   /* machine address and size of a CPU note */
+#define KEXEC_RANGE_MA_CRASH      0 /* machine address and size of crash area */
+#define KEXEC_RANGE_MA_XEN        1 /* machine address and size of Xen itself */
+#define KEXEC_RANGE_MA_CPU        2 /* machine address and size of a CPU note */
+#define KEXEC_RANGE_MA_XENHEAP    3 /* machine address and size of xenheap
+                                     * Note that although this is adjacent
+                                     * to Xen it exists in a separate EFI
+                                     * region on ia64, and thus needs to be
+                                     * inserted into iomem_machine separately */
+#define KEXEC_RANGE_MA_BOOT_PARAM 4 /* machine address and size of
+                                     * the ia64_boot_param */
+#define KEXEC_RANGE_MA_EFI_MEMMAP 5 /* machine address and size of
+                                     * of the EFI Memory Map */
 
 /*
  * Find the address and size of certain memory areas

@@ -435,6 +435,7 @@ struct shadow_walk_t
 #endif
     mfn_t l2mfn;                /* MFN that the level 2 entry was in */
     mfn_t l1mfn;                /* MFN that the level 1 entry was in */
+    int version;                /* Saved guest dirty version */
 };
 
 /* macros for dealing with the naming of the internal function names of the

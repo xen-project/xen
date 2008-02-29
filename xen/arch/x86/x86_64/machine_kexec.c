@@ -1,0 +1,32 @@
+/******************************************************************************
+ * machine_kexec.c
+ *
+ * Xen port written by:
+ * - Simon 'Horms' Horman <horms@verge.net.au>
+ * - Magnus Damm <magnus@valinux.co.jp>
+ */
+
+#ifndef CONFIG_COMPAT
+
+#include <xen/types.h>
+#include <asm/page.h>
+#include <public/kexec.h>
+
+int machine_kexec_get_xen(xen_kexec_range_t *range)
+{
+        range->start = xenheap_phys_start;
+        range->size = (unsigned long)xenheap_phys_end -
+                      (unsigned long)range->start;
+        return 0;
+}
+#endif
+
+/*
+ * Local variables:
+ * mode: C
+ * c-set-style: "BSD"
+ * c-basic-offset: 4
+ * tab-width: 4
+ * indent-tabs-mode: nil
+ * End:
+ */

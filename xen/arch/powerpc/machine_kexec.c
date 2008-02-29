@@ -24,6 +24,12 @@ void machine_kexec(xen_kexec_image_t *image)
     printk("STUB: " __FILE__ ": %s: not implemented\n", __FUNCTION__);
 }
 
+int machine_kexec_get(xen_kexec_image_t *image)
+{
+    printk("STUB: " __FILE__ ": %s: not implemented\n", __FUNCTION__);
+    return -1;
+}
+
 /*
  * Local variables:
  * mode: C

@@ -24,6 +24,7 @@
 #include <linux/cpu.h>
 #include <linux/notifier.h>
 #include <asm/dom_fw_dom0.h>
+#include <asm-generic/sections.h>
 
 #define kexec_flush_icache_page(page)					\
 do {									\
@@ -142,6 +143,54 @@ void machine_kexec(xen_kexec_image_t *image)
 void machine_reboot_kexec(xen_kexec_image_t *image)
 {
 	machine_kexec(image);
+}
+
+static int machine_kexec_get_xen(xen_kexec_range_t *range)
+{
+	range->start = range->start = ia64_tpa(_text);
+	range->size = (unsigned long)_end - (unsigned long)_text;
+	return 0;
+}
+
+#define ELF_PAGE_SHIFT 16
+#define ELF_PAGE_SIZE  (__IA64_UL_CONST(1) << ELF_PAGE_SHIFT)
+#define ELF_PAGE_MASK  (~(ELF_PAGE_SIZE - 1))
+
+static int machine_kexec_get_xenheap(xen_kexec_range_t *range)
+{
+	range->start = (ia64_tpa(_end) + (ELF_PAGE_SIZE - 1)) & ELF_PAGE_MASK;
+	range->size = (unsigned long)xenheap_phys_end -
+		      (unsigned long)range->start;
+	return 0;
+}
+
+static int machine_kexec_get_boot_param(xen_kexec_range_t *range)
+{
+	range->start = __pa(ia64_boot_param);
+	range->size = sizeof(*ia64_boot_param);
+	return 0;
+}
+
+static int machine_kexec_get_efi_memmap(xen_kexec_range_t *range)
+{
+	range->start = ia64_boot_param->efi_memmap;
+	range->size = ia64_boot_param->efi_memmap_size;
+	return 0;
+}
+
+int machine_kexec_get(xen_kexec_range_t *range)
+{
+	switch (range->range) {
+	case KEXEC_RANGE_MA_XEN:
+		return machine_kexec_get_xen(range);
+	case KEXEC_RANGE_MA_XENHEAP:
+		return machine_kexec_get_xenheap(range);
+	case KEXEC_RANGE_MA_BOOT_PARAM:
+		return machine_kexec_get_boot_param(range);
+	case KEXEC_RANGE_MA_EFI_MEMMAP:
+		return machine_kexec_get_efi_memmap(range);
+	}
+	return -EINVAL;
 }
 
 /*

@@ -97,6 +97,11 @@ struct shadow_domain {
 
     /* Fast MMIO path heuristic */
     int has_fast_mmio_entries;
+
+    /* reflect guest table dirty status, incremented by write
+     * emulation and remove write permission
+     */
+    atomic_t          gtable_dirty_version;
 };
 
 struct shadow_vcpu {

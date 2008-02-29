@@ -14,6 +14,9 @@
 #ifndef KEY_Q
 #define KEY_Q 16
 #endif
+#ifndef KEY_MAX
+#define KEY_MAX 0x1ff
+#endif
 
 
 struct kbdfront_dev;

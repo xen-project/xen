@@ -865,7 +865,7 @@ class XendDomain:
                 raise XendInvalidDomain(domname)
 
             if dominfo.getDomid() == DOM0_ID:
-                raise XendError("Cannot save privileged domain %s" % domname)
+                raise XendError("Cannot suspend privileged domain %s" % domname)
 
             if dominfo._stateGet() != DOM_STATE_RUNNING:
                 raise VMBadState("Domain is not running",
@@ -910,7 +910,7 @@ class XendDomain:
                     raise XendInvalidDomain(domname)
 
                 if dominfo.getDomid() == DOM0_ID:
-                    raise XendError("Cannot save privileged domain %s" % domname)
+                    raise XendError("Cannot resume privileged domain %s" % domname)
 
                 if dominfo._stateGet() != XEN_API_VM_POWER_STATE_SUSPENDED:
                     raise XendError("Cannot resume domain that is not suspended.")
@@ -1258,7 +1258,7 @@ class XendDomain:
 
         return val       
 
-    def domain_migrate(self, domid, dst, live=False, resource=0, port=0):
+    def domain_migrate(self, domid, dst, live=False, resource=0, port=0, node=-1):
         """Start domain migration.
         
         @param domid: Domain ID or Name
@@ -1271,6 +1271,8 @@ class XendDomain:
         @type live: bool
         @keyword resource: not used??
         @rtype: None
+        @keyword node: use node number for target
+        @rtype: int 
         @raise XendError: Failed to migrate
         @raise XendInvalidDomain: Domain is not valid        
         """
@@ -1299,7 +1301,7 @@ class XendDomain:
 
         sock.send("receive\n")
         sock.recv(80)
-        XendCheckpoint.save(sock.fileno(), dominfo, True, live, dst)
+        XendCheckpoint.save(sock.fileno(), dominfo, True, live, dst, node=node)
         sock.close()
 
     def domain_save(self, domid, dst, checkpoint=False):

@@ -4,6 +4,7 @@ obj-y += entry.o
 obj-y += gpr_switch.o
 obj-y += mm.o
 obj-y += traps.o
+obj-y += machine_kexec.o
 
 obj-$(crash_debug)   += gdbstub.o
 obj-$(CONFIG_COMPAT) += compat.o

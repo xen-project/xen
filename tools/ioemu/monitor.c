@@ -2520,7 +2520,7 @@ static void monitor_handle_command1(void *opaque, const char *cmdline)
 
 static void monitor_start_input(void)
 {
-    readline_start("(HVMXen) ", 0, monitor_handle_command1, NULL);
+    readline_start("(qemu) ", 0, monitor_handle_command1, NULL);
 }
 
 static void term_event(void *opaque, int event)

@@ -234,16 +234,19 @@ static void amd_iommu_set_page_directory_entry(u32 *pde,
 }
 
 void amd_iommu_set_dev_table_entry(u32 *dte, u64 root_ptr, u16 domain_id,
-                                   u8 paging_mode)
+           u8 sys_mgt, u8 dev_ex, u8 paging_mode)
 {
     u64 addr_hi, addr_lo;
     u32 entry;
 
-    dte[6] = dte[5] = dte[4] = 0;
+    dte[7] = dte[6] = dte[5] = dte[4] = 0;
 
-    set_field_in_reg_u32(IOMMU_DEV_TABLE_SYS_MGT_MSG_FORWARDED, 0,
+    set_field_in_reg_u32(sys_mgt, 0,
                          IOMMU_DEV_TABLE_SYS_MGT_MSG_ENABLE_MASK,
                          IOMMU_DEV_TABLE_SYS_MGT_MSG_ENABLE_SHIFT, &entry);
+    set_field_in_reg_u32(dev_ex, entry,
+                         IOMMU_DEV_TABLE_ALLOW_EXCLUSION_MASK,
+                         IOMMU_DEV_TABLE_ALLOW_EXCLUSION_SHIFT, &entry);
     dte[3] = entry;
 
     set_field_in_reg_u32(domain_id, 0,
@@ -446,5 +449,36 @@ int amd_iommu_unmap_page(struct domain *d, unsigned long gfn)
         spin_unlock_irqrestore(&iommu->lock, flags);
     }
 
+    return 0;
+}
+
+int amd_iommu_reserve_domain_unity_map(
+           struct domain *domain,
+           unsigned long phys_addr,
+           unsigned long size, int iw, int ir)
+{
+    unsigned long flags, npages, i;
+    void *pte;
+    struct hvm_iommu *hd = domain_hvm_iommu(domain);
+
+    npages = region_to_pages(phys_addr, size);
+
+    spin_lock_irqsave(&hd->mapping_lock, flags);
+    for ( i = 0; i < npages; ++i )
+    {
+        pte = get_pte_from_page_tables(hd->root_table,
+           hd->paging_mode, phys_addr>>PAGE_SHIFT);
+        if ( pte == 0 )
+        {
+            dprintk(XENLOG_ERR,
+                    "AMD IOMMU: Invalid IO pagetable entry phys_addr = %lx\n", phys_addr);
+            spin_unlock_irqrestore(&hd->mapping_lock, flags);
+            return -EFAULT;
+        }
+        set_page_table_entry_present((u32 *)pte,
+           phys_addr, iw, ir);
+        phys_addr += PAGE_SIZE;
+    }
+    spin_unlock_irqrestore(&hd->mapping_lock, flags);
     return 0;
 }
