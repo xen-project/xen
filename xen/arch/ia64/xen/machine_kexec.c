@@ -25,17 +25,6 @@
 #include <linux/notifier.h>
 #include <asm/dom_fw_dom0.h>
 
-typedef asmlinkage NORET_TYPE void (*relocate_new_kernel_t)(
-					unsigned long indirection_page,
-					unsigned long start_address,
-					struct ia64_boot_param *boot_param,
-					unsigned long pal_addr,
-					unsigned long cpu_data_pa,
-					unsigned long kernel_start,
-					unsigned long page_offset,
-					unsigned long vhpt)
-					ATTRIB_NORET;
-
 #define kexec_flush_icache_page(page)					\
 do {									\
 	unsigned long page_addr = (unsigned long)page_address(page);	\
@@ -54,12 +43,6 @@ void machine_kexec_unload(int type, int slot, xen_kexec_image_t *image)
 static void ia64_machine_kexec(struct unw_frame_info *info, void *arg)
 {
 	xen_kexec_image_t *image = arg;
-	relocate_new_kernel_t rnk;
-	unsigned long code_addr = (unsigned long)
-				  __va(image->reboot_code_buffer);
-	unsigned long cpu_data_pa = (unsigned long)
-				  __pa(cpu_data(smp_processor_id()));
-	unsigned long vhpt;
 	int ii;
 
 	/* Interrupts aren't acceptable while we reboot */
@@ -84,12 +67,8 @@ static void ia64_machine_kexec(struct unw_frame_info *info, void *arg)
 	while (ia64_get_ivr() != IA64_SPURIOUS_INT_VECTOR)
 		ia64_eoi();
 	platform_kernel_launch_event();
-	vhpt = __va_ul(vcpu_vhpt_maddr(current));
-	BUG_ON(!vhpt);
-	rnk = (relocate_new_kernel_t)&code_addr;
-	(*rnk)(image->indirection_page, image->start_address, ia64_boot_param,
-	       GRANULEROUNDDOWN((unsigned long) pal_vaddr), cpu_data_pa,
-	       KERNEL_START, PAGE_OFFSET, vhpt);
+	relocate_new_kernel(image->indirection_page, image->start_address,
+			    __pa(ia64_boot_param), image->reboot_code_buffer);
 	BUG();
 }
 

@@ -16,6 +16,57 @@
 #include <asm/pgtable.h>
 #include <asm/mca_asm.h>
 
+/* relocate_new_kernel
+ *
+ * Do all the unpinning here, as the hypervisor has all the relevant
+ * variables and constants. Then go into the reboot_code_buffer to
+ * relocaate the new kernel and then branch into purgatory.
+ *
+ * Based on ia64_jump_to_sal
+ *
+ * in0: indirection_page
+ * in1: start_address
+ * in2: boot_param
+ * in2: dom0_relocate_new_kernel
+ */
+GLOBAL_ENTRY(relocate_new_kernel)
+	.prologue
+	alloc r31=ar.pfs,4,0,4,0
+	.body
+	rsm psr.i  | psr.ic
+{
+	flushrs
+	srlz.i
+}
+	movl r18=tlb_purge_done;;
+	DATA_VA_TO_PA(r18);;
+	mov b1=r18	// Return location
+	movl r18=ia64_do_tlb_purge;;
+	DATA_VA_TO_PA(r18);;
+	mov b2=r18	// doing tlb_flush work
+	mov ar.rsc=0	// Put RSE  in enforced lazy, LE mode
+	movl r17=1f;;
+	DATA_VA_TO_PA(r17);;
+	mov cr.iip=r17
+	movl r16=IA64_PSR_AC|IA64_PSR_BN|IA64_PSR_IC;;
+	mov cr.ipsr=r16
+	mov cr.ifs=r0;;
+	rfi;;
+1:
+        /* Invalidate all TLB data/inst */
+	br.sptk.many b2;; // jump to tlb purge code
+
+tlb_purge_done:
+	mov out0=in0	// out3 is ignored and thus can be garbage
+	mov out1=in1
+	mov out2=in2
+	mov b1=in3
+	;;
+	br.sptk.many b1;; // jump to dom0-supplied relocate_new_kernel
+
+	/* We should never get here */
+END(relocate_new_kernel)
+
 GLOBAL_ENTRY(ia64_dump_cpu_regs)
         .prologue
         alloc loc0=ar.pfs,1,2,0,0
