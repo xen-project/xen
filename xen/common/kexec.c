@@ -258,19 +258,12 @@ static int kexec_get_range_compat(XEN_GUEST_HANDLE(void) uarg)
     if ( unlikely(copy_from_guest(&compat_range, uarg, 1)) )
         return -EFAULT;
 
-    range.range = compat_range.range;
-    range.nr = compat_range.nr;
-    range.size = compat_range.size;
-    range.start = compat_range.start;
+    XLAT_kexec_range(&range, &compat_range);
 
     ret = kexec_get_range_internal(&range);
 
     if ( ret == 0 ) {
-        range.range = compat_range.range;
-        range.nr = compat_range.nr;
-        range.size = compat_range.size;
-        range.start = compat_range.start;
-
+        XLAT_kexec_range(&compat_range, &range);
         if ( unlikely(copy_to_guest(uarg, &compat_range, 1)) )
              return -EFAULT;
     }
