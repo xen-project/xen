@@ -673,14 +673,23 @@ int hvm_emulate_one(
     struct hvm_emulate_ctxt *hvmemul_ctxt)
 {
     struct cpu_user_regs *regs = hvmemul_ctxt->ctxt.regs;
+    struct vcpu *curr = current;
     uint32_t new_intr_shadow;
     unsigned long addr;
     int rc;
 
-    hvmemul_ctxt->ctxt.addr_size =
-        hvmemul_ctxt->seg_reg[x86_seg_cs].attr.fields.db ? 32 : 16;
-    hvmemul_ctxt->ctxt.sp_size =
-        hvmemul_ctxt->seg_reg[x86_seg_ss].attr.fields.db ? 32 : 16;
+    if ( hvm_long_mode_enabled(curr) &&
+         hvmemul_ctxt->seg_reg[x86_seg_cs].attr.fields.l )
+    {
+        hvmemul_ctxt->ctxt.addr_size = hvmemul_ctxt->ctxt.sp_size = 64;
+    }
+    else
+    {
+        hvmemul_ctxt->ctxt.addr_size =
+            hvmemul_ctxt->seg_reg[x86_seg_cs].attr.fields.db ? 32 : 16;
+        hvmemul_ctxt->ctxt.sp_size =
+            hvmemul_ctxt->seg_reg[x86_seg_ss].attr.fields.db ? 32 : 16;
+    }
 
     hvmemul_ctxt->insn_buf_eip = regs->eip;
     hvmemul_ctxt->insn_buf_bytes =
@@ -715,11 +724,11 @@ int hvm_emulate_one(
     if ( hvmemul_ctxt->intr_shadow != new_intr_shadow )
     {
         hvmemul_ctxt->intr_shadow = new_intr_shadow;
-        hvm_funcs.set_interrupt_shadow(current, new_intr_shadow);
+        hvm_funcs.set_interrupt_shadow(curr, new_intr_shadow);
     }
 
     if ( hvmemul_ctxt->ctxt.retire.flags.hlt &&
-         !hvm_local_events_need_delivery(current) )
+         !hvm_local_events_need_delivery(curr) )
     {
         hvm_hlt(regs->eflags);
     }

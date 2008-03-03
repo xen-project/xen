@@ -402,10 +402,6 @@ struct x86_emulate_ops *shadow_init_emulation(
     {
         sh_ctxt->ctxt.addr_size = sh_ctxt->ctxt.sp_size = 64;
     }
-    else if ( regs->eflags & X86_EFLAGS_VM )
-    {
-        sh_ctxt->ctxt.addr_size = sh_ctxt->ctxt.sp_size = 16;
-    }
     else
     {
         sreg = hvm_get_seg_reg(x86_seg_ss, sh_ctxt);
