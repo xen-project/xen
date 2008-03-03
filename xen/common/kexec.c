@@ -27,8 +27,6 @@
 #include <compat/kexec.h>
 #endif
 
-#ifndef COMPAT
-
 static DEFINE_PER_CPU(void *, crash_notes);
 
 static Elf_Note *xen_crash_note;
@@ -453,12 +451,6 @@ int compat_kexec_op(unsigned long op, XEN_GUEST_HANDLE(void) uarg)
 {
     return do_kexec_op_internal(op, uarg, 1);
 }
-#endif
-
-#endif /* COMPAT */
-
-#if defined(CONFIG_COMPAT) && !defined(COMPAT)
-#include "compat/kexec.c"
 #endif
 
 /*
