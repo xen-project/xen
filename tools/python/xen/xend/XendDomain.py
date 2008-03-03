@@ -1364,13 +1364,23 @@ class XendDomain:
        
         # set the same cpumask for all vcpus
         rc = 0
-        for v in vcpus:
-            try:
-                rc = xc.vcpu_setaffinity(dominfo.getDomid(), int(v), cpumap)
-            except Exception, ex:
-                log.exception(ex)
-                raise XendError("Cannot pin vcpu: %s to cpu: %s - %s" % \
-                                (v, cpumap, str(ex)))
+        if dominfo._stateGet() in (DOM_STATE_RUNNING, DOM_STATE_PAUSED):
+            for v in vcpus:
+                try:
+                    rc = xc.vcpu_setaffinity(dominfo.getDomid(), int(v), cpumap)
+                except Exception, ex:
+                    log.exception(ex)
+                    raise XendError("Cannot pin vcpu: %s to cpu: %s - %s" % \
+                                    (v, cpumap, str(ex)))
+        else:
+            # FIXME: if we could define cpu affinity definitions to
+            #        each vcpu, reprogram the following processing.
+            if str(vcpu).lower() != "all":
+                raise XendError("Must specify 'all' to VCPU "
+                                "for inactive managed domains")
+            dominfo.setCpus(cpumap)
+            self.managed_config_save(dominfo)
+
         return rc
 
     def domain_cpu_sedf_set(self, domid, period, slice_, latency, extratime,

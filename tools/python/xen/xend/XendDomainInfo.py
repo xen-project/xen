@@ -1394,6 +1394,12 @@ class XendDomainInfo:
     def setResume(self, isresume):
         self._resume = isresume
 
+    def getCpus(self):
+        return self.info['cpus']
+
+    def setCpus(self, cpumap):
+        self.info['cpus'] = cpumap
+
     def getCap(self):
         return self.info['vcpus_params']['cap']
 
