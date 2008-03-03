@@ -245,6 +245,7 @@ struct fbfront_dev {
 
     char *nodename;
     char *backend;
+    int request_update;
 
     char *data;
     int width;
@@ -379,7 +380,7 @@ done:
     printk("backend at %s\n", dev->backend);
 
     {
-        char path[strlen(dev->backend) + 1 + 6 + 1];
+        char path[strlen(dev->backend) + 1 + 14 + 1];
 
         snprintf(path, sizeof(path), "%s/state", dev->backend);
 
@@ -390,6 +391,9 @@ done:
         printk("%s connected\n", dev->backend);
 
         xenbus_unwatch_path(XBT_NIL, path);
+
+        snprintf(path, sizeof(path), "%s/request-update", dev->backend);
+        dev->request_update = xenbus_read_integer(path);
 
         err = xenbus_printf(XBT_NIL, nodename, "state", "%u", 4); /* connected */
     }
@@ -404,6 +408,9 @@ void fbfront_update(struct fbfront_dev *dev, int x, int y, int width, int height
     struct xenfb_page *page = dev->page;
     uint32_t prod;
     DEFINE_WAIT(w);
+
+    if (dev->request_update <= 0)
+        return;
 
     if (x < 0) {
         width += x;
