@@ -23,6 +23,9 @@
 #include <xen/kexec.h>
 #include <public/elfnote.h>
 #include <xsm/xsm.h>
+#ifdef CONFIG_COMPAT
+#include <compat/kexec.h>
+#endif
 
 #ifndef COMPAT
 
@@ -244,8 +247,6 @@ static int kexec_get_range(XEN_GUEST_HANDLE(void) uarg)
 
     return ret;
 }
-
-#else /* COMPAT */
 
 #ifdef CONFIG_COMPAT
 static int kexec_get_range_compat(XEN_GUEST_HANDLE(void) uarg)
