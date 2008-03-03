@@ -24,8 +24,6 @@
 #ifndef BLOCK_INT_H
 #define BLOCK_INT_H
 
-#define BLOCK_DRIVER_FLAG_EXTENDABLE  0x0001u
-
 struct BlockDriver {
     const char *format_name;
     int instance_size;
@@ -78,7 +76,6 @@ struct BlockDriver {
     int (*bdrv_eject)(BlockDriverState *bs, int eject_flag);
     int (*bdrv_set_locked)(BlockDriverState *bs, int locked);
     
-    unsigned bdrv_flags;
     BlockDriverAIOCB *free_aiocb;
     struct BlockDriver *next;
 };

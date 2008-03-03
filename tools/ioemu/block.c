@@ -350,11 +350,8 @@ int bdrv_open2(BlockDriverState *bs, const char *filename, int flags,
     bs->is_temporary = 0;
     bs->encrypted = 0;
 
-    if (flags & BDRV_O_EXTENDABLE) {
-	if (!(drv->bdrv_flags & BLOCK_DRIVER_FLAG_EXTENDABLE))
-	    return -ENOSYS;
+    if (flags & BDRV_O_EXTENDABLE)
 	bs->extendable = 1;
-    }
 
     if (flags & BDRV_O_SNAPSHOT) {
         BlockDriverState *bs1;
