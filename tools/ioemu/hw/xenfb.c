@@ -1071,8 +1071,8 @@ static void xenfb_mouse_event(void *opaque,
 }
 
 /* A convenient function for munging pixels between different depths */
-#define BLT(SRC_T,DST_T,RLS,GLS,BLS,RRS,GRS,BRS,RM,GM,BM)               \
-    for (line = y ; line < h ; line++) {                                \
+#define BLT(SRC_T,DST_T,RSB,GSB,BSB,RDB,GDB,BDB)                        \
+    for (line = y ; line < (y+h) ; line++) {                            \
         SRC_T *src = (SRC_T *)(xenfb->pixels                            \
                                + (line * xenfb->row_stride)             \
                                + (x * xenfb->depth / 8));               \
@@ -1080,12 +1080,25 @@ static void xenfb_mouse_event(void *opaque,
                                + (line * xenfb->ds->linesize)                  \
                                + (x * xenfb->ds->depth / 8));                  \
         int col;                                                        \
-        for (col = x ; col < w ; col++) {                               \
-            *dst = (((*src >> RRS) & RM) << RLS) |                      \
-                (((*src >> GRS) & GM) << GLS) |                         \
-                (((*src >> GRS) & BM) << BLS);                          \
-            src++;                                                      \
-            dst++;                                                      \
+        const int RSS = 32 - (RSB + GSB + BSB);                         \
+        const int GSS = 32 - (GSB + BSB);                               \
+        const int BSS = 32 - (BSB);                                     \
+        const uint32_t RSM = (~0U) << (32 - RSB);                       \
+        const uint32_t GSM = (~0U) << (32 - GSB);                       \
+        const uint32_t BSM = (~0U) << (32 - BSB);                       \
+        const int RDS = 32 - (RDB + GDB + BDB);                         \
+        const int GDS = 32 - (GDB + BDB);                               \
+        const int BDS = 32 - (BDB);                                     \
+        const uint32_t RDM = (~0U) << (32 - RDB);                       \
+        const uint32_t GDM = (~0U) << (32 - GDB);                       \
+        const uint32_t BDM = (~0U) << (32 - BDB);                       \
+        for (col = x ; col < (x+w) ; col++) {                           \
+            uint32_t spix = *src;                                       \
+            *dst = (((spix << RSS) & RSM & RDM) >> RDS) |               \
+                   (((spix << GSS) & GSM & GDM) >> GDS) |               \
+                   (((spix << BSS) & BSM & BDM) >> BDS);                \
+            src = (SRC_T *) ((unsigned long) src + xenfb->depth / 8);   \
+            dst = (DST_T *) ((unsigned long) dst + xenfb->ds->depth / 8); \
         }                                                               \
     }
 
@@ -1106,26 +1119,29 @@ static void xenfb_guest_copy(struct xenfb *xenfb, int x, int y, int w, int h)
                    w * xenfb->depth / 8);
         }
     } else { /* Mismatch requires slow pixel munging */
+        /* 8 bit == r:3 g:3 b:2 */
+        /* 16 bit == r:5 g:6 b:5 */
+        /* 24 bit == r:8 g:8 b:8 */
+        /* 32 bit == r:8 g:8 b:8 (padding:8) */
         if (xenfb->depth == 8) {
-            /* 8 bit source == r:3 g:3 b:2 */
             if (xenfb->ds->depth == 16) {
-                BLT(uint8_t, uint16_t,   5, 2, 0,   11, 5, 0,   7, 7, 3);
+                BLT(uint8_t, uint16_t,   3, 3, 2,   5, 6, 5);
             } else if (xenfb->ds->depth == 32) {
-                BLT(uint8_t, uint32_t,   5, 2, 0,   16, 8, 0,   7, 7, 3);
+                BLT(uint8_t, uint32_t,   3, 3, 2,   8, 8, 8);
             }
         } else if (xenfb->depth == 16) {
-            /* 16 bit source == r:5 g:6 b:5 */
             if (xenfb->ds->depth == 8) {
-                BLT(uint16_t, uint8_t,    11, 5, 0,   5, 2, 0,    31, 63, 31);
+                BLT(uint16_t, uint8_t,   5, 6, 5,   3, 3, 2);
             } else if (xenfb->ds->depth == 32) {
-                BLT(uint16_t, uint32_t,   11, 5, 0,   16, 8, 0,   31, 63, 31);
+                BLT(uint16_t, uint32_t,  5, 6, 5,   8, 8, 8);
             }
-        } else if (xenfb->depth == 32) {
-            /* 32 bit source == r:8 g:8 b:8 (padding:8) */
+        } else if (xenfb->depth == 24 || xenfb->depth == 32) {
             if (xenfb->ds->depth == 8) {
-                BLT(uint32_t, uint8_t,    16, 8, 0,   5, 2, 0,    255, 255, 255);
+                BLT(uint32_t, uint8_t,   8, 8, 8,   3, 3, 2);
             } else if (xenfb->ds->depth == 16) {
-                BLT(uint32_t, uint16_t,   16, 8, 0,   11, 5, 0,   255, 255, 255);
+                BLT(uint32_t, uint16_t,  8, 8, 8,   5, 6, 5);
+            } else if (xenfb->ds->depth == 32) {
+                BLT(uint32_t, uint32_t,  8, 8, 8,   8, 8, 8);
             }
         }
     }
