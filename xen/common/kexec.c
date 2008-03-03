@@ -29,8 +29,6 @@
 
 #ifndef COMPAT
 
-typedef long ret_t;
-
 static DEFINE_PER_CPU(void *, crash_notes);
 
 static Elf_Note *xen_crash_note;
@@ -248,9 +246,9 @@ static int kexec_get_range(XEN_GUEST_HANDLE(void) uarg)
     return ret;
 }
 
-#ifdef CONFIG_COMPAT
 static int kexec_get_range_compat(XEN_GUEST_HANDLE(void) uarg)
 {
+#ifdef CONFIG_COMPAT
     xen_kexec_range_t range;
     compat_kexec_range_t compat_range;
     int ret = -EINVAL;
@@ -269,13 +267,10 @@ static int kexec_get_range_compat(XEN_GUEST_HANDLE(void) uarg)
     }
 
     return ret;
-}
+#else /* CONFIG_COMPAT */
+    return 0;
 #endif /* CONFIG_COMPAT */
-
-#endif /* COMPAT */
-
-
-#ifndef COMPAT
+}
 
 static int kexec_load_get_bits(int type, int *base, int *bit)
 {
@@ -295,19 +290,13 @@ static int kexec_load_get_bits(int type, int *base, int *bit)
     return 0;
 }
 
-#endif
-
-static int kexec_load_unload(unsigned long op, XEN_GUEST_HANDLE(void) uarg)
+static int kexec_load_unload_internal(unsigned long op, xen_kexec_load_t *load)
 {
-    xen_kexec_load_t load;
     xen_kexec_image_t *image;
     int base, bit, pos;
     int ret = 0;
 
-    if ( unlikely(copy_from_guest(&load, uarg, 1)) )
-        return -EFAULT;
-
-    if ( kexec_load_get_bits(load.type, &base, &bit) )
+    if ( kexec_load_get_bits(load->type, &base, &bit) )
         return -EINVAL;
 
     pos = (test_bit(bit, &kexec_flags) != 0);
@@ -319,13 +308,9 @@ static int kexec_load_unload(unsigned long op, XEN_GUEST_HANDLE(void) uarg)
 
         BUG_ON(test_bit((base + !pos), &kexec_flags)); /* must be free */
 
-#ifndef COMPAT
-        memcpy(image, &load.image, sizeof(*image));
-#else
-        XLAT_kexec_image(image, &load.image);
-#endif
+        memcpy(image, &load->image, sizeof(*image));
 
-        if ( !(ret = machine_kexec_load(load.type, base + !pos, image)) )
+        if ( !(ret = machine_kexec_load(load->type, base + !pos, image)) )
         {
             /* Set image present bit */
             set_bit((base + !pos), &kexec_flags);
@@ -341,14 +326,48 @@ static int kexec_load_unload(unsigned long op, XEN_GUEST_HANDLE(void) uarg)
         if ( test_and_clear_bit((base + pos), &kexec_flags) )
         {
             image = &kexec_image[base + pos];
-            machine_kexec_unload(load.type, base + pos, image);
+            machine_kexec_unload(load->type, base + pos, image);
         }
     }
 
     return ret;
 }
 
-#ifndef COMPAT
+static int kexec_load_unload(unsigned long op, XEN_GUEST_HANDLE(void) uarg)
+{
+    xen_kexec_load_t load;
+
+    if ( unlikely(copy_from_guest(&load, uarg, 1)) )
+        return -EFAULT;
+
+    return kexec_load_unload_internal(op, &load);
+}
+
+static int kexec_load_unload_compat(unsigned long op,
+                                    XEN_GUEST_HANDLE(void) uarg)
+{
+#ifdef CONFIG_COMPAT
+    compat_kexec_load_t compat_load;
+    xen_kexec_load_t load;
+
+    if ( unlikely(copy_from_guest(&compat_load, uarg, 1)) )
+        return -EFAULT;
+
+    /* This is a bit dodgy, load.image is inside load,
+     * but XLAT_kexec_load (which is automatically generated)
+     * doesn't translate load.image (correctly)
+     * Just copy load->type, the only other member, manually instead.
+     *
+     * XLAT_kexec_load(&load, &compat_load);
+     */
+    load.type = compat_load.type;
+    XLAT_kexec_image(&load.image, &compat_load.image);
+
+    return kexec_load_unload_internal(op, &load);
+#else /* CONFIG_COMPAT */
+    return 0;
+#endif /* CONFIG_COMPAT */
+}
 
 static int kexec_exec(XEN_GUEST_HANDLE(void) uarg)
 {
@@ -383,9 +402,8 @@ static int kexec_exec(XEN_GUEST_HANDLE(void) uarg)
     return -EINVAL; /* never reached */
 }
 
-#endif
-
-ret_t do_kexec_op(unsigned long op, XEN_GUEST_HANDLE(void) uarg)
+int do_kexec_op_internal(unsigned long op, XEN_GUEST_HANDLE(void) uarg,
+                           int compat)
 {
     unsigned long flags;
     int ret = -EINVAL;
@@ -400,18 +418,20 @@ ret_t do_kexec_op(unsigned long op, XEN_GUEST_HANDLE(void) uarg)
     switch ( op )
     {
     case KEXEC_CMD_kexec_get_range:
-#ifndef COMPAT
-        ret = kexec_get_range(uarg);
-#else
-        ret = kexec_get_range_compat(uarg);
-#endif
+        if (compat)
+                ret = kexec_get_range_compat(uarg);
+        else
+                ret = kexec_get_range(uarg);
         break;
     case KEXEC_CMD_kexec_load:
     case KEXEC_CMD_kexec_unload:
         spin_lock_irqsave(&kexec_lock, flags);
         if (!test_bit(KEXEC_FLAG_IN_PROGRESS, &kexec_flags))
         {
-            ret = kexec_load_unload(op, uarg);
+                if (compat)
+                        ret = kexec_load_unload_compat(op, uarg);
+                else
+                        ret = kexec_load_unload(op, uarg);
         }
         spin_unlock_irqrestore(&kexec_lock, flags);
         break;
@@ -422,6 +442,20 @@ ret_t do_kexec_op(unsigned long op, XEN_GUEST_HANDLE(void) uarg)
 
     return ret;
 }
+
+long do_kexec_op(unsigned long op, XEN_GUEST_HANDLE(void) uarg)
+{
+    return do_kexec_op_internal(op, uarg, 0);
+}
+
+#ifdef CONFIG_COMPAT
+int compat_kexec_op(unsigned long op, XEN_GUEST_HANDLE(void) uarg)
+{
+    return do_kexec_op_internal(op, uarg, 1);
+}
+#endif
+
+#endif /* COMPAT */
 
 #if defined(CONFIG_COMPAT) && !defined(COMPAT)
 #include "compat/kexec.c"
