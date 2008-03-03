@@ -518,7 +518,7 @@ int blktapctrl_new_blkif(blkif_t *blkif)
 		if (test_path(blk->params, &ptr, &type, &exist) != 0) {
                         DPRINTF("Error in blktap device string(%s).\n",
                                 blk->params);
-                        return -1;
+                        goto fail;
                 }
 		blkif->drivertype = type;
 		blkif->cookie = next_cookie++;
@@ -527,11 +527,11 @@ int blktapctrl_new_blkif(blkif_t *blkif)
 			DPRINTF("Process does not exist:\n");
 			if (asprintf(&rdctldev,
 				     "%s/tapctrlread%d", BLKTAP_CTRL_DIR, minor) == -1)
-				return -1;
+				goto fail;
 			if (asprintf(&wrctldev,
 				     "%s/tapctrlwrite%d", BLKTAP_CTRL_DIR, minor) == -1) {
 				free(rdctldev);
-				return -1;
+				goto fail;
 			}
 			blkif->fds[READ] = open_ctrl_socket(rdctldev);
 			blkif->fds[WRITE] = open_ctrl_socket(wrctldev);
@@ -543,7 +543,7 @@ int blktapctrl_new_blkif(blkif_t *blkif)
  			DPRINTF("Launching process, CMDLINE [tapdisk %s %s]\n",wrctldev, rdctldev);
  			if (launch_tapdisk(wrctldev, rdctldev) == -1) {
  				DPRINTF("Unable to fork, cmdline: [tapdisk %s %s]\n",wrctldev, rdctldev);
-				return -1;
+				goto fail;
 			}
 
 			free(rdctldev);
