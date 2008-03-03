@@ -106,7 +106,7 @@ static uint8_t opcode_table[256] = {
     /* 0x68 - 0x6F */
     ImplicitOps|Mov, DstReg|SrcImm|ModRM|Mov,
     ImplicitOps|Mov, DstReg|SrcImmByte|ModRM|Mov,
-    ImplicitOps, ImplicitOps, ImplicitOps, ImplicitOps,
+    ImplicitOps|Mov, ImplicitOps|Mov, ImplicitOps|Mov, ImplicitOps|Mov,
     /* 0x70 - 0x77 */
     ImplicitOps, ImplicitOps, ImplicitOps, ImplicitOps,
     ImplicitOps, ImplicitOps, ImplicitOps, ImplicitOps,
@@ -2862,8 +2862,6 @@ x86_emulate(
         src.orig_val = src.val;
         src.val = _regs.eax;
         emulate_2op_SrcV("cmp", src, dst, _regs.eflags);
-        /* Always write back. The question is: where to? */
-        d |= Mov;
         if ( _regs.eflags & EFLG_ZF )
         {
             /* Success: write back to memory. */
