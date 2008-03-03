@@ -942,6 +942,7 @@ struct DisplayState {
     void (*dpy_update)(struct DisplayState *s, int x, int y, int w, int h);
     void (*dpy_resize)(struct DisplayState *s, int w, int h);
     void (*dpy_colourdepth)(struct DisplayState *s, int depth);
+    void (*dpy_setdata)(DisplayState *ds, void *pixels);
     void (*dpy_refresh)(struct DisplayState *s);
     void (*dpy_copy)(struct DisplayState *s, int src_x, int src_y, int dst_x, int dst_y, int w, int h);
 };

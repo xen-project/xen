@@ -1621,6 +1621,11 @@ static void pixel_format_message (VncState *vs) {
     vnc_write(vs, pad, 3);           /* padding */
 }
 
+static void vnc_dpy_setdata(DisplayState *ds, void *pixels)
+{
+    ds->data = pixels;
+}
+
 static void vnc_dpy_colourdepth(DisplayState *ds, int depth)
 {
     int host_big_endian_flag;
@@ -1628,6 +1633,7 @@ static void vnc_dpy_colourdepth(DisplayState *ds, int depth)
 
     switch (depth) {
         case 24:
+            if (ds->depth == 32) return;
             ds->shared_buf = 0;
             depth = 32;
             break;
@@ -2480,6 +2486,7 @@ void vnc_display_init(DisplayState *ds)
     vs->ds->dpy_update = vnc_dpy_update;
     vs->ds->dpy_resize = vnc_dpy_resize;
     vs->ds->dpy_colourdepth = vnc_dpy_colourdepth;
+    vs->ds->dpy_setdata = vnc_dpy_setdata;
     vs->ds->dpy_refresh = vnc_dpy_refresh;
 
     vs->ds->width = 640;

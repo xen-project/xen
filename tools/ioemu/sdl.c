@@ -30,6 +30,7 @@
 #endif
 
 static SDL_Surface *screen;
+static SDL_Surface *shared = NULL;
 static int gui_grab; /* if true, all keyboard/mouse events are grabbed */
 static int last_vm_running;
 static int gui_saved_grab;
@@ -47,7 +48,46 @@ static int absolute_enabled = 0;
 static void sdl_update(DisplayState *ds, int x, int y, int w, int h)
 {
     //    printf("updating x=%d y=%d w=%d h=%d\n", x, y, w, h);
-    SDL_UpdateRect(screen, x, y, w, h);
+    if (shared) {
+        SDL_Rect rec;
+        rec.x = x;
+        rec.y = y;
+        rec.w = w;
+        rec.h = h;
+        SDL_BlitSurface(shared, &rec, screen, &rec);
+    }
+    SDL_Flip(screen);
+}
+
+static void sdl_setdata(DisplayState *ds, void *pixels)
+{
+    uint32_t rmask, gmask, bmask, amask = 0;
+    switch (ds->depth) {
+        case 8:
+            rmask = 0x000000E0;
+            gmask = 0x0000001C;
+            bmask = 0x00000003;
+            break;
+        case 16:
+            rmask = 0x0000F800;
+            gmask = 0x000007E0;
+            bmask = 0x0000001F;
+            break;
+        case 24:
+            rmask = 0x00FF0000;
+            gmask = 0x0000FF00;
+            bmask = 0x000000FF;
+            break;
+        case 32:
+            rmask = 0x00FF0000;
+            gmask = 0x0000FF00;
+            bmask = 0x000000FF;
+            break;
+        default:
+            return;
+    }
+    shared = SDL_CreateRGBSurfaceFrom(pixels, width, height, ds->depth, ds->linesize, rmask , gmask, bmask, amask);
+    ds->data = pixels;
 }
 
 static void sdl_resize(DisplayState *ds, int w, int h)
@@ -56,7 +96,7 @@ static void sdl_resize(DisplayState *ds, int w, int h)
 
     //    printf("resizing to %d %d\n", w, h);
 
-    flags = SDL_HWSURFACE|SDL_ASYNCBLIT|SDL_HWACCEL;
+    flags = SDL_HWSURFACE|SDL_ASYNCBLIT|SDL_HWACCEL|SDL_DOUBLEBUF|SDL_HWPALETTE;
     if (gui_fullscreen)
         flags |= SDL_FULLSCREEN;
 
@@ -78,16 +118,28 @@ static void sdl_resize(DisplayState *ds, int w, int h)
         fprintf(stderr, "Could not open SDL display\n");
         exit(1);
     }
-    ds->data = screen->pixels;
-    ds->linesize = screen->pitch;
-    ds->depth = screen->format->BitsPerPixel;
-    if (ds->depth == 32 && screen->format->Rshift == 0) {
-        ds->bgr = 1;
-    } else {
-        ds->bgr = 0;
-    }
     ds->width = w;
     ds->height = h;
+    if (!ds->shared_buf) {
+        ds->depth = screen->format->BitsPerPixel;
+        if (ds->depth == 32 && screen->format->Rshift == 0) {
+            ds->bgr = 1;
+        } else {
+            ds->bgr = 0;
+        }
+        ds->data = screen->pixels;
+        ds->linesize = screen->pitch;
+    } else {
+        ds->linesize = (ds->depth / 8) * w;
+    }
+}
+
+static void sdl_colourdepth(DisplayState *ds, int depth)
+{
+    if (!depth || !ds->depth) return;
+    ds->shared_buf = 1;
+    ds->depth = depth;
+    ds->linesize = width * depth / 8; 
 }
 
 /* generic keyboard conversion */
@@ -508,7 +560,8 @@ void sdl_display_init(DisplayState *ds, int full_screen)
     ds->dpy_update = sdl_update;
     ds->dpy_resize = sdl_resize;
     ds->dpy_refresh = sdl_refresh;
-    ds->dpy_colourdepth = NULL;
+    ds->dpy_colourdepth = sdl_colourdepth;
+    ds->dpy_setdata = sdl_setdata;
 
     sdl_resize(ds, 640, 400);
     sdl_update_caption();

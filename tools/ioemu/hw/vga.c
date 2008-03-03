@@ -1481,7 +1481,7 @@ void check_sse2(void)
 static void vga_draw_graphic(VGAState *s, int full_update)
 {
     int y1, y, update, linesize, y_start, double_scan, mask, depth;
-    int width, height, shift_control, line_offset, bwidth;
+    int width, height, shift_control, line_offset, bwidth, changed_flag;
     ram_addr_t page0, page1;
     int disp_width, multi_scan, multi_run;
     uint8_t *d;
@@ -1554,10 +1554,12 @@ static void vga_draw_graphic(VGAState *s, int full_update)
     }
     vga_draw_line = vga_draw_line_table[v * NB_DEPTHS + get_depth_index(s->ds)];
 
+    changed_flag = 0;
     depth = s->get_bpp(s);
-    if (s->ds->dpy_colourdepth != NULL && s->ds->depth != depth) {
-        if (depth != 24 || s->ds->depth != 32)
-            s->ds->dpy_colourdepth(s->ds, depth);
+    if (s->ds->dpy_colourdepth != NULL && 
+            (s->ds->depth != depth || !s->ds->shared_buf)) {
+        s->ds->dpy_colourdepth(s->ds, depth);
+        changed_flag = 1;
     }
     if (disp_width != s->last_width ||
         height != s->last_height) {
@@ -1567,9 +1569,10 @@ static void vga_draw_graphic(VGAState *s, int full_update)
         s->last_width = disp_width;
         s->last_height = height;
         full_update = 1;
+        changed_flag = 1;
     }
-    if (s->ds->shared_buf && s->ds->data != s->vram_ptr + (s->start_addr * 4))
-        s->ds->data = s->vram_ptr + (s->start_addr * 4);
+    if (s->ds->shared_buf && (changed_flag || s->ds->data != s->vram_ptr + (s->start_addr * 4)))
+        s->ds->dpy_setdata(s->ds, s->vram_ptr + (s->start_addr * 4));
     if (!s->ds->shared_buf && s->cursor_invalidate)
         s->cursor_invalidate(s);
     
