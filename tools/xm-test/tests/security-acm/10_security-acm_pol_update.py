@@ -51,7 +51,7 @@ try:
     domain_ul.start(noConsole=True)
     FAIL("Could start unlabeled domain.")
 except DomainError, e:
-    pass
+    domain_ul.destroy()   # delete if xend-managed domain
 
 
 config = {"access_control":"policy=%s,label=%s" % (testpolicy,testlabel1)}
@@ -246,7 +246,7 @@ try:
     domain_red.start(noConsole=True)
     FAIL("Could start 'red' domain.")
 except DomainError, e:
-    pass
+    domain_red.destroy()  # delete if xend-managed domain
 
 # Terminate GREEN domain
 domain_green.destroy()
