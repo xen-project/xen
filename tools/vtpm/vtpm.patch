@@ -125,9 +125,32 @@ diff -uprN tpm_emulator/tpm/tpm_capability.c vtpm/tpm/tpm_capability.c
        return TPM_FAIL;
  
      case TPM_CAP_PROP_ACTIVE_COUNTER:
+diff -uprN tpm_emulator/tpm/tpm_cmd_handler.c vtpm/tpm/tpm_cmd_handler.c
+--- tpm_emulator/tpm/tpm_cmd_handler.c	2008-02-27 16:35:41.000000000 -0500
++++ vtpm/tpm/tpm_cmd_handler.c	2008-02-28 14:43:28.000000000 -0500
+@@ -94,12 +94,18 @@ void tpm_compute_out_param_digest(TPM_CO
+   sha1_ctx_t sha1;
+   UINT32 res = CPU_TO_BE32(rsp->result);
+   UINT32 ord = CPU_TO_BE32(ordinal);
++  UINT32 offset = 0;
+ 
+   /* compute SHA1 hash */
+   sha1_init(&sha1);
+   sha1_update(&sha1, (BYTE*)&res, 4);
+   sha1_update(&sha1, (BYTE*)&ord, 4);
+-  sha1_update(&sha1, rsp->param, rsp->paramSize);
++  if (ordinal == TPM_ORD_LoadKey2) {
++      offset = 4;
++  }
++  if (rsp->paramSize - offset > 0) {
++      sha1_update(&sha1, rsp->param + offset, rsp->paramSize - offset);
++  }
+   sha1_final(&sha1, rsp->auth1->digest);
+   if (rsp->auth2 != NULL) memcpy(rsp->auth2->digest, 
+     rsp->auth1->digest, sizeof(rsp->auth1->digest));
 diff -uprN tpm_emulator/tpm/tpm_data.c vtpm/tpm/tpm_data.c
---- tpm_emulator/tpm/tpm_data.c	2006-12-08 12:51:29.000000000 -0800
-+++ vtpm/tpm/tpm_data.c	2006-12-13 16:38:52.000000000 -0800
+--- tpm_emulator/tpm/tpm_data.c	2008-02-27 16:35:41.000000000 -0500
++++ vtpm/tpm/tpm_data.c	2008-02-27 16:35:40.000000000 -0500
 @@ -1,6 +1,7 @@
  /* Software-Based Trusted Platform Module (TPM) Emulator for Linux
   * Copyright (C) 2004 Mario Strasser <mast@gmx.net>,
