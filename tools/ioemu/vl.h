@@ -942,7 +942,7 @@ struct DisplayState {
     void (*dpy_update)(struct DisplayState *s, int x, int y, int w, int h);
     void (*dpy_resize)(struct DisplayState *s, int w, int h);
     void (*dpy_colourdepth)(struct DisplayState *s, int depth);
-    void (*dpy_setdata)(DisplayState *ds, void *pixels);
+    void (*dpy_setdata)(DisplayState *s, void *pixels);
     void (*dpy_refresh)(struct DisplayState *s);
     void (*dpy_copy)(struct DisplayState *s, int src_x, int src_y, int dst_x, int dst_y, int w, int h);
 };
@@ -956,6 +956,17 @@ static inline void dpy_resize(DisplayState *s, int w, int h)
 {
     s->dpy_resize(s, w, h);
 }
+
+static inline void dpy_colourdepth(struct DisplayState *s, int depth)
+{
+    s->dpy_colourdepth(s, depth);
+}
+
+static inline void dpy_setdata(DisplayState *s, void *pixels)
+{
+    s->dpy_setdata(s, pixels);
+}
+
 
 int isa_vga_init(DisplayState *ds, uint8_t *vga_ram_base, 
                  unsigned long vga_ram_offset, int vga_ram_size);

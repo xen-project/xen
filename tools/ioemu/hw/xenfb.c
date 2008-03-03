@@ -1112,36 +1112,38 @@ static void xenfb_guest_copy(struct xenfb *xenfb, int x, int y, int w, int h)
 {
     int line;
 
-    if (xenfb->depth == xenfb->ds->depth) { /* Perfect match can use fast path */
-        for (line = y ; line < (y+h) ; line++) {
-            memcpy(xenfb->ds->data + (line * xenfb->ds->linesize) + (x * xenfb->ds->depth / 8),
-                   xenfb->pixels + (line * xenfb->row_stride) + (x * xenfb->depth / 8),
-                   w * xenfb->depth / 8);
-        }
-    } else { /* Mismatch requires slow pixel munging */
-        /* 8 bit == r:3 g:3 b:2 */
-        /* 16 bit == r:5 g:6 b:5 */
-        /* 24 bit == r:8 g:8 b:8 */
-        /* 32 bit == r:8 g:8 b:8 (padding:8) */
-        if (xenfb->depth == 8) {
-            if (xenfb->ds->depth == 16) {
-                BLT(uint8_t, uint16_t,   3, 3, 2,   5, 6, 5);
-            } else if (xenfb->ds->depth == 32) {
-                BLT(uint8_t, uint32_t,   3, 3, 2,   8, 8, 8);
+    if (!xenfb->ds->shared_buf) {
+        if (xenfb->depth == xenfb->ds->depth) { /* Perfect match can use fast path */
+            for (line = y ; line < (y+h) ; line++) {
+                memcpy(xenfb->ds->data + (line * xenfb->ds->linesize) + (x * xenfb->ds->depth / 8),
+                        xenfb->pixels + (line * xenfb->row_stride) + (x * xenfb->depth / 8),
+                        w * xenfb->depth / 8);
             }
-        } else if (xenfb->depth == 16) {
-            if (xenfb->ds->depth == 8) {
-                BLT(uint16_t, uint8_t,   5, 6, 5,   3, 3, 2);
-            } else if (xenfb->ds->depth == 32) {
-                BLT(uint16_t, uint32_t,  5, 6, 5,   8, 8, 8);
-            }
-        } else if (xenfb->depth == 24 || xenfb->depth == 32) {
-            if (xenfb->ds->depth == 8) {
-                BLT(uint32_t, uint8_t,   8, 8, 8,   3, 3, 2);
-            } else if (xenfb->ds->depth == 16) {
-                BLT(uint32_t, uint16_t,  8, 8, 8,   5, 6, 5);
-            } else if (xenfb->ds->depth == 32) {
-                BLT(uint32_t, uint32_t,  8, 8, 8,   8, 8, 8);
+        } else { /* Mismatch requires slow pixel munging */
+            /* 8 bit == r:3 g:3 b:2 */
+            /* 16 bit == r:5 g:6 b:5 */
+            /* 24 bit == r:8 g:8 b:8 */
+            /* 32 bit == r:8 g:8 b:8 (padding:8) */
+            if (xenfb->depth == 8) {
+                if (xenfb->ds->depth == 16) {
+                    BLT(uint8_t, uint16_t,   3, 3, 2,   5, 6, 5);
+                } else if (xenfb->ds->depth == 32) {
+                    BLT(uint8_t, uint32_t,   3, 3, 2,   8, 8, 8);
+                }
+            } else if (xenfb->depth == 16) {
+                if (xenfb->ds->depth == 8) {
+                    BLT(uint16_t, uint8_t,   5, 6, 5,   3, 3, 2);
+                } else if (xenfb->ds->depth == 32) {
+                    BLT(uint16_t, uint32_t,  5, 6, 5,   8, 8, 8);
+                }
+            } else if (xenfb->depth == 24 || xenfb->depth == 32) {
+                if (xenfb->ds->depth == 8) {
+                    BLT(uint32_t, uint8_t,   8, 8, 8,   3, 3, 2);
+                } else if (xenfb->ds->depth == 16) {
+                    BLT(uint32_t, uint16_t,  8, 8, 8,   5, 6, 5);
+                } else if (xenfb->ds->depth == 32) {
+                    BLT(uint32_t, uint32_t,  8, 8, 8,   8, 8, 8);
+                }
             }
         }
     }
@@ -1180,7 +1182,10 @@ static int xenfb_register_console(struct xenfb *xenfb) {
 			     xenfb_invalidate,
 			     xenfb_screen_dump,
 			     xenfb);
+	dpy_colourdepth(xenfb->ds, xenfb->depth);
 	dpy_resize(xenfb->ds, xenfb->width, xenfb->height);
+	if (xenfb->ds->shared_buf)
+	    dpy_setdata(xenfb->ds, xenfb->pixels);
 
 	if (qemu_set_fd_handler2(xc_evtchn_fd(xenfb->evt_xch), NULL, xenfb_dispatch_channel, NULL, xenfb) < 0)
 	        return -1;
