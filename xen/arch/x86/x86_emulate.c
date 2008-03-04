@@ -2383,6 +2383,8 @@ x86_emulate(
     }
 
     case 0x9b:  /* wait/fwait */
+        fail_if(ops->load_fpu_ctxt == NULL);
+        ops->load_fpu_ctxt(ctxt);
         __emulate_fpu_insn("fwait");
         break;
 
