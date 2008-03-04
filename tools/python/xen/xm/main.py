@@ -2249,7 +2249,7 @@ def parse_pci_configuration(args):
     return (dom, pci)
 
 def xm_pci_attach(args):
-    arg_check(args, 'xm_pci_attach', 5, 6)
+    arg_check(args, 'pci-attach', 5, 6)
     (dom, pci) = parse_pci_configuration(args)
     server.xend.domain.device_create(dom, pci)
 
@@ -2270,7 +2270,7 @@ def detach(args, deviceClass):
 
 def xm_block_detach(args):
     if serverType == SERVER_XEN_API:
-        arg_check(args, "xm_block_detach", 2, 3)
+        arg_check(args, "block-detach", 2, 3)
         dom = args[0]
         dev = args[1]
         vbd_refs = server.xenapi.VM.get_VBDs(get_single_vm(dom))
@@ -2299,7 +2299,7 @@ def xm_block_detach(args):
 
 def xm_network_detach(args):
     if serverType == SERVER_XEN_API:
-        arg_check(args, "xm_network_detach", 2, 3)
+        arg_check(args, "network-detach", 2, 3)
         dom = args[0]
         devid = args[1]
         vif_refs = server.xenapi.VM.get_VIFs(get_single_vm(dom))
@@ -2318,7 +2318,7 @@ def xm_network_detach(args):
 
 
 def xm_pci_detach(args):
-    arg_check(args, 'xm_pci_detach', 2, 2)
+    arg_check(args, 'pci-detach', 2)
     dom = args[0]
     dev = args[1]
     server.xend.domain.destroyDevice(dom, 'dpci', dev)
