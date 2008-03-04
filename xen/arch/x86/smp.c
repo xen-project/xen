@@ -306,15 +306,26 @@ int on_selected_cpus(
     return 0;
 }
 
-static void stop_this_cpu (void *dummy)
+static void __stop_this_cpu(void)
 {
     ASSERT(!local_irq_is_enabled());
 
     disable_local_APIC();
+
     hvm_cpu_down();
 
-    cpu_clear(smp_processor_id(), cpu_online_map);
+    /*
+     * Clear FPU, zapping any pending exceptions. Needed for warm reset with
+     * some BIOSes.
+     */
+    clts();
+    asm volatile ( "fninit" );
+}
 
+static void stop_this_cpu(void *dummy)
+{
+    __stop_this_cpu();
+    cpu_clear(smp_processor_id(), cpu_online_map);
     for ( ; ; )
         halt();
 }
@@ -334,9 +345,8 @@ void smp_send_stop(void)
         mdelay(1);
 
     local_irq_disable();
-    disable_local_APIC();
+    __stop_this_cpu();
     disable_IO_APIC();
-    hvm_cpu_down();
     local_irq_enable();
 }
 
