@@ -2703,17 +2703,17 @@ x86_emulate(
         ops->load_fpu_ctxt(ctxt);
         switch ( modrm )
         {
-        case 0xc0: __emulate_fpu_insn("fld %%st(0)"); break;
-        case 0xc1: __emulate_fpu_insn("fld %%st(1)"); break;
-        case 0xc2: __emulate_fpu_insn("fld %%st(2)"); break;
-        case 0xc3: __emulate_fpu_insn("fld %%st(3)"); break;
-        case 0xc4: __emulate_fpu_insn("fld %%st(4)"); break;
-        case 0xc5: __emulate_fpu_insn("fld %%st(5)"); break;
-        case 0xc6: __emulate_fpu_insn("fld %%st(6)"); break;
-        case 0xc7: __emulate_fpu_insn("fld %%st(7)"); break;
-        case 0xe0: __emulate_fpu_insn("fchs"); break;
-        case 0xe8: __emulate_fpu_insn("fld1"); break;
-        case 0xee: __emulate_fpu_insn("fldz"); break;
+        case 0xc0: __emulate_fpu_insn(".byte 0xd9,0xc0"); break;
+        case 0xc1: __emulate_fpu_insn(".byte 0xd9,0xc1"); break;
+        case 0xc2: __emulate_fpu_insn(".byte 0xd9,0xc2"); break;
+        case 0xc3: __emulate_fpu_insn(".byte 0xd9,0xc3"); break;
+        case 0xc4: __emulate_fpu_insn(".byte 0xd9,0xc4"); break;
+        case 0xc5: __emulate_fpu_insn(".byte 0xd9,0xc5"); break;
+        case 0xc6: __emulate_fpu_insn(".byte 0xd9,0xc6"); break;
+        case 0xc7: __emulate_fpu_insn(".byte 0xd9,0xc7"); break;
+        case 0xe0: __emulate_fpu_insn(".byte 0xd9,0xe0"); break;
+        case 0xe8: __emulate_fpu_insn(".byte 0xd9,0xe8"); break;
+        case 0xee: __emulate_fpu_insn(".byte 0xd9,0xee"); break;
         default:
             fail_if((modrm_reg & 7) != 7);
             fail_if(modrm >= 0xc0);
@@ -2748,15 +2748,15 @@ x86_emulate(
         ops->load_fpu_ctxt(ctxt);
         switch ( modrm )
         {
-        case 0xd9: __emulate_fpu_insn("fcompp"); break;
-        case 0xf8: __emulate_fpu_insn("fdivp %%st(0),%%st(0)"); break;
-        case 0xf9: __emulate_fpu_insn("fdivp %%st(1),%%st(0)"); break;
-        case 0xfa: __emulate_fpu_insn("fdivp %%st(2),%%st(0)"); break;
-        case 0xfb: __emulate_fpu_insn("fdivp %%st(3),%%st(0)"); break;
-        case 0xfc: __emulate_fpu_insn("fdivp %%st(4),%%st(0)"); break;
-        case 0xfd: __emulate_fpu_insn("fdivp %%st(5),%%st(0)"); break;
-        case 0xfe: __emulate_fpu_insn("fdivp %%st(6),%%st(0)"); break;
-        case 0xff: __emulate_fpu_insn("fdivp %%st(7),%%st(0)"); break;
+        case 0xd9: __emulate_fpu_insn(".byte 0xde,0xd9"); break;
+        case 0xf8: __emulate_fpu_insn(".byte 0xde,0xf8"); break;
+        case 0xf9: __emulate_fpu_insn(".byte 0xde,0xf9"); break;
+        case 0xfa: __emulate_fpu_insn(".byte 0xde,0xfa"); break;
+        case 0xfb: __emulate_fpu_insn(".byte 0xde,0xfb"); break;
+        case 0xfc: __emulate_fpu_insn(".byte 0xde,0xfc"); break;
+        case 0xfd: __emulate_fpu_insn(".byte 0xde,0xfd"); break;
+        case 0xfe: __emulate_fpu_insn(".byte 0xde,0xfe"); break;
+        case 0xff: __emulate_fpu_insn(".byte 0xde,0xff"); break;
         default: goto cannot_emulate;
         }
         break;
