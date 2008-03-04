@@ -18,7 +18,7 @@
 
 void init_fpu(void)
 {
-    __asm__ __volatile__ ( "fninit" );
+    asm volatile ( "fninit" );
     if ( cpu_has_xmm )
         load_mxcsr(0x1f80);
     current->fpu_initialised = 1;
@@ -36,7 +36,7 @@ void save_init_fpu(struct vcpu *v)
     if ( cpu_has_fxsr )
     {
 #ifdef __i386__
-        __asm__ __volatile__ (
+        asm volatile (
             "fxsave %0"
             : "=m" (*fpu_ctxt) );
 #else /* __x86_64__ */
@@ -45,14 +45,14 @@ void save_init_fpu(struct vcpu *v)
          * older versions the rex64 prefix works only if we force an
          * addressing mode that doesn't require extended registers.
          */
-        __asm__ __volatile__ (
+        asm volatile (
             REX64_PREFIX "fxsave (%1)"
             : "=m" (*fpu_ctxt) : "cdaSDb" (fpu_ctxt) );
 #endif
 
         /* Clear exception flags if FSW.ES is set. */
         if ( unlikely(fpu_ctxt[2] & 0x80) )
-            __asm__ __volatile__ ("fnclex");
+            asm volatile ("fnclex");
 
         /*
          * AMD CPUs don't save/restore FDP/FIP/FOP unless an exception
@@ -63,7 +63,7 @@ void save_init_fpu(struct vcpu *v)
          */
         if ( boot_cpu_data.x86_vendor == X86_VENDOR_AMD )
         {
-            __asm__ __volatile__ (
+            asm volatile (
                 "emms\n\t"  /* clear stack tags */
                 "fildl %0"  /* load to clear state */
                 : : "m" (*fpu_ctxt) );
@@ -71,9 +71,8 @@ void save_init_fpu(struct vcpu *v)
     }
     else
     {
-        __asm__ __volatile__ (
-            "fnsave %0 ; fwait"
-            : "=m" (*fpu_ctxt) );
+        /* FWAIT is required to make FNSAVE synchronous. */
+        asm volatile ( "fnsave %0 ; fwait" : "=m" (*fpu_ctxt) );
     }
 
     v->fpu_dirtied = 0;
@@ -91,7 +90,7 @@ void restore_fpu(struct vcpu *v)
      */
     if ( cpu_has_fxsr )
     {
-        __asm__ __volatile__ (
+        asm volatile (
 #ifdef __i386__
             "1: fxrstor %0            \n"
 #else /* __x86_64__ */
@@ -125,9 +124,7 @@ void restore_fpu(struct vcpu *v)
     }
     else
     {
-        __asm__ __volatile__ (
-            "frstor %0"
-            : : "m" (v->arch.guest_context.fpu_ctxt) );
+        asm volatile ( "frstor %0" : : "m" (v->arch.guest_context.fpu_ctxt) );
     }
 }
 
