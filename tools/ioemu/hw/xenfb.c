@@ -1238,10 +1238,16 @@ static void xenfb_pv_resize(DisplayState *s, int w, int h)
     fbfront_update(fb_dev, 0, 0, WIDTH, HEIGHT);
 }
 
-static void xenfb_pv_colourdepth(DisplayState *s, int depth)
+static void xenfb_pv_colourdepth(DisplayState *ds, int depth)
 {
     /* TODO: send redepth event if supported */
-    fprintf(stderr,"redepth to %d required\n", depth);
+    static int lastdepth = -1;
+    if (depth != lastdepth) {
+        fprintf(stderr,"redepth to %d required\n", depth);
+        lastdepth = depth;
+    }
+    /* We can't redepth for now */
+    ds->depth = DEPTH;
 }
 
 static void xenfb_kbd_handler(void *opaque)
@@ -1334,6 +1340,8 @@ static void xenfb_kbd_handler(void *opaque)
 
 static void xenfb_pv_refresh(DisplayState *ds)
 {
+    /* always request negociation */
+    ds->depth = -1;
     vga_hw_update();
 }
 
@@ -1387,7 +1395,7 @@ int xenfb_pv_display_init(DisplayState *ds)
     ds->height = HEIGHT;
     ds->dpy_update = xenfb_pv_update;
     ds->dpy_resize = xenfb_pv_resize;
-    ds->dpy_colourdepth = NULL; //xenfb_pv_colourdepth;
+    ds->dpy_colourdepth = xenfb_pv_colourdepth;
     ds->dpy_refresh = xenfb_pv_refresh;
     ds->opaque = fb_dev;
     return 0;

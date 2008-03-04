@@ -1061,6 +1061,10 @@ static const uint8_t cursor_glyph[32 * 4] = {
     0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
 };    
 
+typedef unsigned int rgb_to_pixel_dup_func(unsigned int r, unsigned int g, unsigned b);
+
+static rgb_to_pixel_dup_func *rgb_to_pixel_dup_table[NB_DEPTHS];
+
 /* 
  * Text mode update 
  * Missing:
@@ -1081,6 +1085,12 @@ static void vga_draw_text(VGAState *s, int full_update)
     uint32_t *ch_attr_ptr;
     vga_draw_glyph8_func *vga_draw_glyph8;
     vga_draw_glyph9_func *vga_draw_glyph9;
+
+    depth = s->get_bpp(s);
+    if (s->ds->dpy_colourdepth != NULL && s->ds->depth != depth)
+        s->ds->dpy_colourdepth(s->ds, depth);
+    s->rgb_to_pixel = 
+        rgb_to_pixel_dup_table[get_depth_index(s->ds)];
 
     full_update |= update_palette16(s);
     palette = s->last_palette;
@@ -1134,9 +1144,6 @@ static void vga_draw_text(VGAState *s, int full_update)
         return;
     }
 
-    depth = s->get_bpp(s);
-    if (s->ds->dpy_colourdepth != NULL && s->ds->depth != depth)
-        s->ds->dpy_colourdepth(s->ds, depth);
     if (width != s->last_width || height != s->last_height ||
         cw != s->last_cw || cheight != s->last_ch) {
         s->last_scr_width = width * cw;
@@ -1319,8 +1326,6 @@ static vga_draw_line_func *vga_draw_line_table[NB_DEPTHS * VGA_DRAW_LINE_NB] = {
     vga_draw_line32_32bgr,
 };
 
-typedef unsigned int rgb_to_pixel_dup_func(unsigned int r, unsigned int g, unsigned b);
-
 static rgb_to_pixel_dup_func *rgb_to_pixel_dup_table[NB_DEPTHS] = {
     rgb_to_pixel8_dup,
     rgb_to_pixel15_dup,
@@ -1494,6 +1499,16 @@ static void vga_draw_graphic(VGAState *s, int full_update)
     s->get_resolution(s, &width, &height);
     disp_width = width;
 
+    changed_flag = 0;
+    depth = s->get_bpp(s);
+    if (s->ds->dpy_colourdepth != NULL && 
+            (s->ds->depth != depth || !s->ds->shared_buf)) {
+        s->ds->dpy_colourdepth(s->ds, depth);
+        changed_flag = 1;
+    }
+    s->rgb_to_pixel = 
+        rgb_to_pixel_dup_table[get_depth_index(s->ds)];
+
     shift_control = (s->gr[0x05] >> 5) & 3;
     double_scan = (s->cr[0x09] >> 7);
     if (shift_control != 1) {
@@ -1552,15 +1567,8 @@ static void vga_draw_graphic(VGAState *s, int full_update)
             break;
         }
     }
-    vga_draw_line = vga_draw_line_table[v * NB_DEPTHS + get_depth_index(s->ds)];
 
-    changed_flag = 0;
-    depth = s->get_bpp(s);
-    if (s->ds->dpy_colourdepth != NULL && 
-            (s->ds->depth != depth || !s->ds->shared_buf)) {
-        s->ds->dpy_colourdepth(s->ds, depth);
-        changed_flag = 1;
-    }
+    vga_draw_line = vga_draw_line_table[v * NB_DEPTHS + get_depth_index(s->ds)];
     if (disp_width != s->last_width ||
         height != s->last_height) {
         dpy_resize(s->ds, disp_width, height);
@@ -1673,6 +1681,8 @@ static void vga_draw_blank(VGAState *s, int full_update)
         return;
     if (s->last_scr_width <= 0 || s->last_scr_height <= 0)
         return;
+    s->rgb_to_pixel = 
+        rgb_to_pixel_dup_table[get_depth_index(s->ds)];
     if (s->ds->depth == 8) 
         val = s->rgb_to_pixel(0, 0, 0);
     else
@@ -1699,9 +1709,6 @@ static void vga_update_display(void *opaque)
     if (s->ds->depth == 0) {
         /* nothing to do */
     } else {
-        s->rgb_to_pixel = 
-            rgb_to_pixel_dup_table[get_depth_index(s->ds)];
-        
         full_update = 0;
         if (!(s->ar_index & 0x20)) {
             graphic_mode = GMODE_BLANK;
