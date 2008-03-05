@@ -362,12 +362,15 @@ static void vnc_framebuffer_update(VncState *vs, int x, int y, int w, int h,
     vnc_write_s32(vs, encoding);
 }
 
-static void vnc_dpy_resize(DisplayState *ds, int w, int h)
+static void vnc_dpy_resize(DisplayState *ds, int w, int h, int linesize)
 {
     static int allocated;
     int size_changed;
     VncState *vs = ds->opaque;
     int o;
+
+    if (linesize != w * vs->depth)
+        ds->shared_buf = 0;
 
     if (!ds->shared_buf) {
         if (allocated)
@@ -1728,7 +1731,7 @@ static void vnc_dpy_colourdepth(DisplayState *ds, int depth)
         }
     }
 
-    vnc_dpy_resize(ds, ds->width, ds->height);
+    vnc_dpy_resize(ds, ds->width, ds->height, ds->linesize);
 }
 
 static int protocol_client_msg(VncState *vs, uint8_t *data, size_t len)

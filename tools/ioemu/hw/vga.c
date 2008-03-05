@@ -1148,7 +1148,7 @@ static void vga_draw_text(VGAState *s, int full_update)
         cw != s->last_cw || cheight != s->last_ch) {
         s->last_scr_width = width * cw;
         s->last_scr_height = height * cheight;
-        dpy_resize(s->ds, s->last_scr_width, s->last_scr_height);
+        dpy_resize(s->ds, s->last_scr_width, s->last_scr_height, s->last_scr_width * (depth / 8));
         s->last_width = width;
         s->last_height = height;
         s->last_ch = cheight;
@@ -1571,7 +1571,7 @@ static void vga_draw_graphic(VGAState *s, int full_update)
     vga_draw_line = vga_draw_line_table[v * NB_DEPTHS + get_depth_index(s->ds)];
     if (disp_width != s->last_width ||
         height != s->last_height) {
-        dpy_resize(s->ds, disp_width, height);
+        dpy_resize(s->ds, disp_width, height, disp_width * (depth / 8));
         s->last_scr_width = disp_width;
         s->last_scr_height = height;
         s->last_width = disp_width;
@@ -2235,7 +2235,7 @@ static void vga_save_dpy_update(DisplayState *s,
 {
 }
 
-static void vga_save_dpy_resize(DisplayState *s, int w, int h)
+static void vga_save_dpy_resize(DisplayState *s, int w, int h, int linesize)
 {
     s->linesize = w * 4;
     s->data = qemu_malloc(h * s->linesize);

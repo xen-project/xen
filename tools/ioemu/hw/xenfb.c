@@ -1183,7 +1183,7 @@ static int xenfb_register_console(struct xenfb *xenfb) {
 			     xenfb_screen_dump,
 			     xenfb);
 	dpy_colourdepth(xenfb->ds, xenfb->depth);
-	dpy_resize(xenfb->ds, xenfb->width, xenfb->height);
+        dpy_resize(xenfb->ds, xenfb->width, xenfb->height, xenfb->row_stride);
 	if (xenfb->ds->shared_buf)
 	    dpy_setdata(xenfb->ds, xenfb->pixels);
 
@@ -1227,7 +1227,7 @@ static void xenfb_pv_update(DisplayState *s, int x, int y, int w, int h)
     fbfront_update(fb_dev, x, y, w, h);
 }
 
-static void xenfb_pv_resize(DisplayState *s, int w, int h)
+static void xenfb_pv_resize(DisplayState *s, int w, int h, int linesize)
 {
     struct fbfront_dev *fb_dev = s->opaque;
     fprintf(stderr,"resize to %dx%d required\n", w, h);

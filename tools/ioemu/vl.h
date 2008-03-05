@@ -941,7 +941,7 @@ struct DisplayState {
     int shared_buf;
     
     void (*dpy_update)(struct DisplayState *s, int x, int y, int w, int h);
-    void (*dpy_resize)(struct DisplayState *s, int w, int h);
+    void (*dpy_resize)(struct DisplayState *s, int w, int h, int linesize);
     void (*dpy_colourdepth)(struct DisplayState *s, int depth);
     void (*dpy_setdata)(DisplayState *s, void *pixels);
     void (*dpy_refresh)(struct DisplayState *s);
@@ -953,9 +953,9 @@ static inline void dpy_update(DisplayState *s, int x, int y, int w, int h)
     s->dpy_update(s, x, y, w, h);
 }
 
-static inline void dpy_resize(DisplayState *s, int w, int h)
+static inline void dpy_resize(DisplayState *s, int w, int h, int linesize)
 {
-    s->dpy_resize(s, w, h);
+    s->dpy_resize(s, w, h, linesize);
 }
 
 static inline void dpy_colourdepth(struct DisplayState *s, int depth)

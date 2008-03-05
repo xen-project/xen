@@ -90,7 +90,7 @@ static void sdl_setdata(DisplayState *ds, void *pixels)
     ds->data = pixels;
 }
 
-static void sdl_resize(DisplayState *ds, int w, int h)
+static void sdl_resize(DisplayState *ds, int w, int h, int linesize)
 {
     int flags;
 
@@ -130,7 +130,7 @@ static void sdl_resize(DisplayState *ds, int w, int h)
         ds->data = screen->pixels;
         ds->linesize = screen->pitch;
     } else {
-        ds->linesize = (ds->depth / 8) * w;
+        ds->linesize = linesize;
     }
 }
 
@@ -344,7 +344,7 @@ static void sdl_send_mouse_event(int dx, int dy, int dz, int state)
 static void toggle_full_screen(DisplayState *ds)
 {
     gui_fullscreen = !gui_fullscreen;
-    sdl_resize(ds, screen->w, screen->h);
+    sdl_resize(ds, screen->w, screen->h, ds->linesize);
     if (gui_fullscreen) {
         gui_saved_grab = gui_grab;
         sdl_grab_start();
@@ -572,7 +572,7 @@ void sdl_display_init(DisplayState *ds, int full_screen)
     ds->dpy_colourdepth = sdl_colourdepth;
     ds->dpy_setdata = sdl_setdata;
 
-    sdl_resize(ds, 640, 400);
+    sdl_resize(ds, 640, 400, 640 * 4);
     sdl_update_caption();
     SDL_EnableKeyRepeat(250, 50);
     SDL_EnableUNICODE(1);

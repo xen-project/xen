@@ -262,7 +262,7 @@ static void pl110_resize(pl110_state *s, int width, int height)
 {
     if (width != s->cols || height != s->rows) {
         if (pl110_enabled(s)) {
-            dpy_resize(s->ds, width, height);
+            dpy_resize(s->ds, width, height, width * 4);
         }
     }
     s->cols = width;
@@ -375,7 +375,7 @@ static void pl110_write(void *opaque, target_phys_addr_t offset,
         s->cr = val;
         s->bpp = (val >> 1) & 7;
         if (pl110_enabled(s)) {
-            dpy_resize(s->ds, s->cols, s->rows);
+            dpy_resize(s->ds, s->cols, s->rows, s->cols * 4);
         }
         break;
     case 10: /* LCDICR */
