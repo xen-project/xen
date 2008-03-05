@@ -199,6 +199,8 @@ struct domain
     enum { DOMDYING_alive, DOMDYING_dying, DOMDYING_dead } is_dying;
     /* Domain is paused by controller software? */
     bool_t           is_paused_by_controller;
+    /* Domain's VCPUs are pinned 1:1 to physical CPUs? */
+    bool_t           is_pinned;
 
     /* Guest has shut down (inc. reason code)? */
     spinlock_t       shutdown_lock;

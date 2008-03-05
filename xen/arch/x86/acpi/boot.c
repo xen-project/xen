@@ -1029,3 +1029,17 @@ int __init acpi_boot_init(void)
 
 	return 0;
 }
+
+unsigned int acpi_get_processor_id(unsigned int cpu)
+{
+	unsigned int acpiid, apicid;
+
+	if ((apicid = x86_cpu_to_apicid[cpu]) == 0xff)
+		return 0xff;
+
+	for (acpiid = 0; acpiid < ARRAY_SIZE(x86_acpiid_to_apicid); acpiid++)
+		if (x86_acpiid_to_apicid[acpiid] == apicid)
+			return acpiid;
+
+	return 0xff;
+}

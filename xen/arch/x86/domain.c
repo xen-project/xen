@@ -29,6 +29,7 @@
 #include <xen/console.h>
 #include <xen/percpu.h>
 #include <xen/compat.h>
+#include <xen/acpi.h>
 #include <asm/regs.h>
 #include <asm/mc146818rtc.h>
 #include <asm/system.h>
@@ -949,6 +950,25 @@ arch_do_vcpu_op(
         rc = map_vcpu_info(v, info.mfn, info.offset);
         UNLOCK_BIGLOCK(d);
 
+        break;
+    }
+
+    case VCPUOP_get_physid:
+    {
+        struct vcpu_get_physid cpu_id;
+
+        rc = -EINVAL;
+        if ( !v->domain->is_pinned )
+            break;
+
+        cpu_id.phys_id = (x86_cpu_to_apicid[v->vcpu_id] |
+                          (acpi_get_processor_id(v->vcpu_id) << 8));
+
+        rc = -EFAULT;
+        if ( copy_to_guest(arg, &cpu_id, 1) )
+            break;
+
+        rc = 0;
         break;
     }
 

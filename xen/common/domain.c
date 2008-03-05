@@ -30,6 +30,21 @@
 #include <public/vcpu.h>
 #include <xsm/xsm.h>
 
+/* opt_dom0_vcpus_pin: If true, dom0 VCPUs are pinned. */
+static unsigned int opt_dom0_vcpus_pin;
+boolean_param("dom0_vcpus_pin", opt_dom0_vcpus_pin);
+
+enum cpufreq_controller cpufreq_controller;
+static void __init setup_cpufreq_option(char *str)
+{
+    if ( !strcmp(str, "dom0-kernel") )
+    {
+        cpufreq_controller = FREQCTL_dom0_kernel;
+        opt_dom0_vcpus_pin = 1;
+    }
+}
+custom_param("cpufreq", setup_cpufreq_option);
+
 /* Protect updates/reads (resp.) of domain_list and domain_hash. */
 DEFINE_SPINLOCK(domlist_update_lock);
 DEFINE_RCU_READ_LOCK(domlist_read_lock);
@@ -197,6 +212,9 @@ struct domain *domain_create(
 
     if ( domcr_flags & DOMCRF_hvm )
         d->is_hvm = 1;
+
+    if ( (domid == 0) && opt_dom0_vcpus_pin )
+        d->is_pinned = 1;
 
     rangeset_domain_initialise(d);
 

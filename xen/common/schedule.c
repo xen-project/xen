@@ -38,21 +38,6 @@
 static char opt_sched[10] = "credit";
 string_param("sched", opt_sched);
 
-/* opt_dom0_vcpus_pin: If true, dom0 VCPUs are pinned. */
-static unsigned int opt_dom0_vcpus_pin;
-boolean_param("dom0_vcpus_pin", opt_dom0_vcpus_pin);
-
-enum cpufreq_controller cpufreq_controller;
-static void __init setup_cpufreq_option(char *str)
-{
-    if ( !strcmp(str, "dom0-kernel") )
-    {
-        cpufreq_controller = FREQCTL_dom0_kernel;
-        opt_dom0_vcpus_pin = 1;
-    }
-}
-custom_param("cpufreq", setup_cpufreq_option);
-
 #define TIME_SLOP      (s32)MICROSECS(50)     /* allow time to slip a bit */
 
 /* Various timer handlers. */
@@ -117,7 +102,7 @@ int sched_init_vcpu(struct vcpu *v, unsigned int processor)
      * domain-0 VCPUs, are pinned onto their respective physical CPUs.
      */
     v->processor = processor;
-    if ( is_idle_domain(d) || ((d->domain_id == 0) && opt_dom0_vcpus_pin) )
+    if ( is_idle_domain(d) || d->is_pinned )
         v->cpu_affinity = cpumask_of_cpu(processor);
     else
         cpus_setall(v->cpu_affinity);
@@ -302,7 +287,7 @@ static int __vcpu_set_affinity(
 
 int vcpu_set_affinity(struct vcpu *v, cpumask_t *affinity)
 {
-    if ( (v->domain->domain_id == 0) && opt_dom0_vcpus_pin )
+    if ( v->domain->is_pinned )
         return -EINVAL;
     return __vcpu_set_affinity(v, affinity, 0, 0);
 }

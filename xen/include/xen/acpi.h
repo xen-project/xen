@@ -447,6 +447,7 @@ extern acpi_table_handler acpi_table_ops[ACPI_TABLE_COUNT];
 
 typedef int (*acpi_madt_entry_handler) (acpi_table_entry_header *header, const unsigned long end);
 
+unsigned int acpi_get_processor_id (unsigned int cpu);
 char * __acpi_map_table (unsigned long phys_addr, unsigned long size);
 unsigned long acpi_find_rsdp (void);
 int acpi_boot_init (void);
