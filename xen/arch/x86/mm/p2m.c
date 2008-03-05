@@ -724,8 +724,7 @@ guest_physmap_add_entry(struct domain *d, unsigned long gfn,
     {
         if ( !test_and_set_bool(d->arch.hvm_domain.amd_npt_4gb_warning) )
             dprintk(XENLOG_WARNING, "Dom%d failed to populate memory beyond"
-                    " 4GB: specify 'nohap' Xen boot parameter, or 'hap=0' "
-                    "domain config option.\n",
+                    " 4GB: specify 'hap=0' domain config option.\n",
                     d->domain_id);
         return -EINVAL;
     }

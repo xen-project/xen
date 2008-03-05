@@ -51,16 +51,6 @@
 #include <public/version.h>
 #include <public/memory.h>
 
-/*
- * Xen command-line option to allow/disallow hardware-assisted paging.
- * Since the phys-to-machine table of AMD NPT is in host format, 32-bit Xen
- * can only support guests using NPT with up to a 4GB memory map. Therefore
- * we disallow HAP by default on PAE Xen (by default we want to support an
- * 8GB pseudophysical memory map for HVM guests on a PAE host).
- */
-static int opt_hap_permitted = (CONFIG_PAGING_LEVELS != 3);
-boolean_param("hap", opt_hap_permitted);
-
 int hvm_enabled __read_mostly;
 
 unsigned int opt_hvm_debug_level __read_mostly;
@@ -88,12 +78,7 @@ void hvm_enable(struct hvm_function_table *fns)
     hvm_enabled = 1;
 
     if ( hvm_funcs.hap_supported )
-    {
-        if ( !opt_hap_permitted )
-            hvm_funcs.hap_supported = 0;
-        printk("HVM: Hardware Assisted Paging detected %s.\n",
-               hvm_funcs.hap_supported ? "and enabled" : "but disabled");
-    }
+        printk("HVM: Hardware Assisted Paging detected.\n");
 }
 
 void hvm_set_guest_tsc(struct vcpu *v, u64 guest_tsc)
