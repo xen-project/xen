@@ -6125,7 +6125,11 @@ QEMUMachine *find_machine(const char *name)
 void gui_update(void *opaque)
 {
     display_state.dpy_refresh(&display_state);
-    qemu_mod_timer(gui_timer, GUI_REFRESH_INTERVAL + qemu_get_clock(rt_clock));
+    qemu_mod_timer(gui_timer,
+            (display_state.gui_timer_interval ?
+                display_state.gui_timer_interval :
+                GUI_REFRESH_INTERVAL)
+            + qemu_get_clock(rt_clock));
 }
 
 struct vm_change_state_entry {
