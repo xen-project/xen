@@ -331,8 +331,8 @@ static void sdl_send_mouse_event(int dx, int dy, int dz, int state)
 	}
 
 	SDL_GetMouseState(&dx, &dy);
-	dx = dx * 0x7FFF / width;
-	dy = dy * 0x7FFF / height;
+        dx = dx * 0x7FFF / (width - 1);
+        dy = dy * 0x7FFF / (height - 1);
     } else if (absolute_enabled) {
 	sdl_show_cursor();
 	absolute_enabled = 0;

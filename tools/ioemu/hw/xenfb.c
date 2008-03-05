@@ -1052,8 +1052,8 @@ static void xenfb_mouse_event(void *opaque,
     struct xenfb *xenfb = opaque;
     if (xenfb->abs_pointer_wanted)
 	    xenfb_send_position(xenfb,
-				dx * xenfb->ds->width / 0x7fff,
-				dy * xenfb->ds->height / 0x7fff,
+                                dx * (xenfb->ds->width - 1) / 0x7fff,
+                                dy * (xenfb->ds->height - 1) / 0x7fff,
 				dz);
     else
 	    xenfb_send_motion(xenfb, dx, dy, dz);
@@ -1312,8 +1312,8 @@ static void xenfb_kbd_handler(void *opaque)
                         buttons &= ~button;
                     if (kbd_mouse_is_absolute())
                         kbd_mouse_event(
-                                x * 0x7FFF / s->width,
-                                y * 0x7FFF / s->height,
+                                x * 0x7FFF / (s->width - 1),
+                                y * 0x7FFF / (s->height - 1),
                                 0,
                                 buttons);
                     else
