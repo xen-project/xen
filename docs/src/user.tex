@@ -4209,10 +4209,6 @@ writing to the VGA console after domain 0 starts booting (e.g., `vga=text-80x50,
 \item [ dma\_emergency\_pool=xxx ] Specify lower bound on size of DMA
   pool below which ordinary allocations will fail rather than fall
   back to allocating from the DMA pool.
-\item [ hap ] Instruct Xen to detect hardware-assisted paging support, such
-  as AMD-V's nested paging or Intel\textregistered VT's extended paging. If 
-  available, Xen will use hardware-assisted paging instead of shadow paging 
-  for guest memory management.
 \end{description}
 
 In addition, the following options may be specified on the Xen command
