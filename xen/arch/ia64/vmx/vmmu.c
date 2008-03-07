@@ -160,7 +160,7 @@ fetch_code(VCPU *vcpu, u64 gip, IA64_BUNDLE *pbundle)
 
  again:
     if ( !(VCPU(vcpu, vpsr) & IA64_PSR_IT) ) {   // I-side physical mode
-        gpip = gip;
+        gpip = gip & ~(1UL << 63);	// clear UC bit
     }
     else {
         tlb = vtlb_lookup(vcpu, gip, ISIDE_TLB);
