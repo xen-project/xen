@@ -67,19 +67,18 @@
 //	r19 == ipsr.cpl
 //	r31 == pr
 GLOBAL_ENTRY(fast_hyperprivop)
+	adds r20=XSI_PSR_I_ADDR_OFS-XSI_PSR_IC_OFS,r18
 	// HYPERPRIVOP_SSM_I?
 	// assumes domain interrupts pending, so just do it
 	cmp.eq p7,p6=HYPERPRIVOP_SSM_I,r17
 (p7)	br.sptk.many hyper_ssm_i;;
 
 	// Check pending event indication
-	adds r20=XSI_PSR_I_ADDR_OFS-XSI_PSR_IC_OFS, r18;;
-	ld8 r20=[r20]
+	ld8 r20=[r20]		// interrupt_mask_addr
 	;;
 	ld1 r22=[r20],-1	// evtchn_upcall_mask
 	;;
 	ld1 r20=[r20]		// evtchn_upcall_pending
-	;;
 
 	// HYPERPRIVOP_RFI?
 	cmp.eq p7,p6=HYPERPRIVOP_RFI,r17
@@ -210,9 +209,8 @@ ENTRY(hyper_ssm_i)
 	// give up for now if: ipsr.be==1, ipsr.pp==1
 	mov r30=cr.ipsr
 	mov r29=cr.iip;;
-	extr.u r21=r30,IA64_PSR_PP_BIT,1 ;;
-	cmp.ne p7,p0=r21,r0
-(p7)	br.sptk.many dispatch_break_fault ;;
+	tbit.nz p7,p0=r30,IA64_PSR_PP_BIT
+(p7)	br.spnt.many dispatch_break_fault ;;
 #ifdef FAST_HYPERPRIVOP_CNT
 	movl r20=FAST_HYPERPRIVOP_PERFC(HYPERPRIVOP_SSM_I);;
 	ld4 r21=[r20];;
@@ -220,8 +218,7 @@ ENTRY(hyper_ssm_i)
 	st4 [r20]=r21;;
 #endif
 	// set shared_mem iip to instruction after HYPER_SSM_I
-	extr.u r20=r30,IA64_PSR_RI_BIT,2 ;;
-	cmp.eq p6,p7=2,r20 ;;
+	tbit.nz p6,p7=r30,IA64_PSR_RI_BIT+1 ;;	// cr.ipsr.ri >= 2 ?
 (p6)	mov r20=0
 (p6)	adds r29=16,r29
 (p7)	adds r20=1,r20 ;;
@@ -346,8 +343,7 @@ GLOBAL_ENTRY(fast_tick_reflect)
 (p6)	br.cond.spnt.few rp;;
 	mov r17=cr.ipsr;;
 	// slow path if: ipsr.pp==1
-	extr.u r21=r17,IA64_PSR_PP_BIT,1 ;;
-	cmp.ne p6,p0=r21,r0
+	tbit.nz p6,p0=r17,IA64_PSR_PP_BIT
 (p6)	br.cond.spnt.few rp;;
 	// definitely have a domain tick
 	mov cr.eoi=r0
@@ -537,8 +533,7 @@ GLOBAL_ENTRY(fast_break_reflect)
 #endif
 	mov r30=cr.ipsr
 	mov r29=cr.iip;;
-	extr.u r21=r30,IA64_PSR_PP_BIT,1 ;;
-	cmp.ne p7,p0=r21,r0
+	tbit.nz p7,p0=r30,IA64_PSR_PP_BIT
 (p7)	br.spnt.few dispatch_break_fault ;;
         movl r20=IA64_PSR_CPL ;; 
         and r22=r20,r30 ;;
@@ -722,8 +717,7 @@ GLOBAL_ENTRY(fast_access_reflect)
 #endif
 	mov r30=cr.ipsr
 	mov r29=cr.iip;;
-	extr.u r21=r30,IA64_PSR_PP_BIT,1 ;;
-	cmp.ne p7,p0=r21,r0
+	tbit.nz p7,p0=r30,IA64_PSR_PP_BIT
 (p7)	br.spnt.few dispatch_reflection ;;
 	extr.u r21=r30,IA64_PSR_CPL0_BIT,2 ;;
 	cmp.eq p7,p0=r21,r0
@@ -769,8 +763,7 @@ GLOBAL_ENTRY(fast_tlb_miss_reflect)
 	cmp.eq p7,p0=r21,r0
 (p7)	br.spnt.few page_fault ;;
 	// slow path if strange ipsr or isr bits set
-	extr.u r21=r30,IA64_PSR_PP_BIT,1 ;;
-	cmp.ne p7,p0=r21,r0
+	tbit.nz p7,p0=r30,IA64_PSR_PP_BIT,1
 (p7)	br.spnt.few page_fault ;;
 	movl r21=IA64_ISR_IR|IA64_ISR_SP|IA64_ISR_NA ;;
 	and r21=r16,r21;;
@@ -1023,45 +1016,27 @@ ENTRY(hyper_rfi)
 #ifndef FAST_RFI
 	br.spnt.few slow_vcpu_rfi ;;
 #endif
-	// if no interrupts pending, proceed
-	mov r30=r0
-	cmp.eq p7,p0=r20,r0
-(p7)	br.sptk.many 1f
-	;;
-	adds r20=XSI_IPSR_OFS-XSI_PSR_IC_OFS,r18 ;;
-	ld8 r21=[r20];;		// r21 = vcr.ipsr
-	extr.u r22=r21,IA64_PSR_I_BIT,1 ;;
-	mov r30=r22;;
-	// r30 determines whether we might deliver an immediate extint
-#ifndef RFI_TO_INTERRUPT // see beginning of file
-	cmp.ne p6,p0=r30,r0
-(p6)	br.cond.spnt.few slow_vcpu_rfi ;;
-#endif
-1:
-	adds r20=XSI_IPSR_OFS-XSI_PSR_IC_OFS,r18 ;;
-	ld8 r21=[r20];;		// r21 = vcr.ipsr
+	// if interrupts pending and vcr.ipsr.i=1, do it the slow way
+	adds r19=XSI_IPSR_OFS-XSI_PSR_IC_OFS,r18
+	adds r23=XSI_METAPHYS_OFS-XSI_PSR_IC_OFS,r18
+	cmp.ne p8,p0=r20,r0;;	// evtchn_upcall_pending != 0
 	// if (!(vpsr.dt && vpsr.rt && vpsr.it)), do it the slow way
-	movl r20=(IA64_PSR_DT|IA64_PSR_RT|IA64_PSR_IT);;
-	and r22=r20,r21
-	;;
-	cmp.ne p7,p0=r22,r20
-(p7)	br.spnt.few slow_vcpu_rfi ;;
-	// if was in metaphys mode, do it the slow way (FIXME later?)
-	adds r20=XSI_METAPHYS_OFS-XSI_PSR_IC_OFS,r18 ;;
-	ld4 r20=[r20];;
-	cmp.ne p7,p0=r20,r0
-(p7)	br.spnt.few slow_vcpu_rfi ;;
-#if 0
-	// if domain hasn't already done virtual bank switch
-	//  do it the slow way (FIXME later?)
-	adds r20=XSI_BANKNUM_OFS-XSI_PSR_IC_OFS,r18 ;;
-	ld4 r20=[r20];;
-	cmp.eq p7,p0=r20,r0
-(p7)	br.spnt.few slow_vcpu_rfi ;;
+	ld8 r21=[r19],XSI_IIP_OFS-XSI_IPSR_OFS // r21=vcr.ipsr
+	movl r20=~(IA64_PSR_DT|IA64_PSR_RT|IA64_PSR_IT);;
+	or r20=r20,r21
+	// p8 determines whether we might deliver an immediate extint
+(p8)	tbit.nz p8,p0=r21,IA64_PSR_I_BIT;;
+	cmp.ne p7,p0=-1,r20
+	ld4 r23=[r23]	// r23=metaphysical_mode
+#ifndef RFI_TO_INTERRUPT	// see beginning of file
+(p8)	br.cond.spnt.few slow_vcpu_rfi
 #endif
-	adds r20=XSI_IIP_OFS-XSI_PSR_IC_OFS,r18 ;;
-	ld8 r22=[r20];;
-1:	// OK now, let's do an rfi.
+(p7)	br.spnt.few slow_vcpu_rfi;;
+	// if was in metaphys mode, do it the slow way (FIXME later?)
+	cmp.ne p7,p0=r23,r0
+	ld8 r22=[r19]	// r22=vcr.iip
+(p7)	br.spnt.few slow_vcpu_rfi;;
+	// OK now, let's do an rfi.
 #ifdef FAST_HYPERPRIVOP_CNT
 	movl r20=FAST_HYPERPRIVOP_PERFC(HYPERPRIVOP_RFI);;
 	ld4 r23=[r20];;
@@ -1070,8 +1045,7 @@ ENTRY(hyper_rfi)
 #endif
 #ifdef RFI_TO_INTERRUPT
 	// maybe do an immediate interrupt delivery?
-	cmp.ne p6,p0=r30,r0
-(p6)	br.cond.spnt.few rfi_check_extint;;
+(p8)	br.cond.spnt.few rfi_check_extint;;
 #endif
 
 just_do_rfi:
@@ -1090,15 +1064,13 @@ just_do_rfi:
 	// vpsr.i = vcr.ipsr.i; vpsr.ic = vcr.ipsr.ic
 	ld8 r20=[r20]
 	mov r19=1 
-	extr.u r23=r21,IA64_PSR_I_BIT,1 ;;
-	cmp.ne p7,p6=r23,r0 ;;
+	tbit.nz p7,p6=r21,IA64_PSR_I_BIT
+	tbit.nz p9,p8=r21,IA64_PSR_IC_BIT;;
 	// not done yet
 (p7)	st1 [r20]=r0
-(p6)	st1 [r20]=r19;;
-	extr.u r23=r21,IA64_PSR_IC_BIT,1 ;;
-	cmp.ne p7,p6=r23,r0 ;;
-(p7)	st4 [r18]=r19;;
-(p6)	st4 [r18]=r0;;
+(p6)	st1 [r20]=r19
+(p9)	st4 [r18]=r19
+(p8)	st4 [r18]=r0
 	// force on psr.ic, i, dt, rt, it, bn
 	movl r20=(IA64_PSR_I|IA64_PSR_IC|IA64_PSR_DT|IA64_PSR_RT| \
 	          IA64_PSR_IT|IA64_PSR_BN)
@@ -1228,9 +1200,8 @@ ENTRY(rfi_check_extint)
 	// r26 now contains the vector [0..255]
 	adds r20=XSI_TPR_OFS-XSI_PSR_IC_OFS,r18 ;;
 	ld8 r20=[r20] ;;
-	extr.u r28=r20,16,1
-	extr.u r29=r20,4,4 ;;
-	cmp.ne p6,p0=r28,r0	// if tpr.mmi is set, just rfi
+	extr.u r29=r20,4,4
+	tbit.nz p6,p0=r20,16	// if tpr.mmi is set, just rfi
 (p6)	br.cond.spnt.few just_do_rfi;;
 	shl r29=r29,4;;
 	adds r29=15,r29;;
