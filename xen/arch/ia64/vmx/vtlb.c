@@ -324,8 +324,10 @@ static void vtlb_purge(VCPU *v, u64 va, u64 ps)
         while (num) {
             cur = vtlb_thash(hcb->pta, curadr, vrr.rrval, &tag);
             while (cur) {
-                if (cur->etag == tag && cur->ps == rr_ps)
+                if (cur->etag == tag && cur->ps == rr_ps) {
                     cur->etag = 1UL << 63;
+                    break;
+                }
                 cur = cur->next;
             }
             curadr += size;
@@ -353,8 +355,10 @@ static void vhpt_purge(VCPU *v, u64 va, u64 ps)
         cur = (thash_data_t *)ia64_thash(start);
         tag = ia64_ttag(start);
         while (cur) {
-            if (cur->etag == tag)
+            if (cur->etag == tag) {
                 cur->etag = 1UL << 63; 
+                break;
+            }
             cur = cur->next;
         }
         start += size;
