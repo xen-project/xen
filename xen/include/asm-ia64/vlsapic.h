@@ -70,9 +70,9 @@ extern void vtm_set_itm(struct vcpu *vcpu, uint64_t val);
 extern void vtm_set_itv(struct vcpu *vcpu, uint64_t val);
 extern void vmx_vexirq(struct vcpu  *vcpu);
 extern void vhpi_detection(struct vcpu *vcpu);
-extern int vmx_vcpu_pend_interrupt(VCPU * vcpu, uint8_t vector);
-extern struct vcpu * vlsapic_lid_to_vcpu(struct domain *d, uint16_t dest);
+extern int vlsapic_deliver_int(struct domain *d,
+			       uint16_t dest, uint64_t dm, uint64_t vector);
+
 extern uint64_t vlsapic_read(struct vcpu *v, uint64_t addr, uint64_t s);
 extern void vlsapic_write(struct vcpu *v, uint64_t addr, uint64_t s, uint64_t val);
-#define vlsapic_set_irq vmx_vcpu_pend_interrupt
 #endif

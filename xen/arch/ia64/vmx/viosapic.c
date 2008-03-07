@@ -49,36 +49,14 @@ static void viosapic_deliver(struct viosapic *viosapic, int irq)
     uint16_t dest = viosapic->redirtbl[irq].dest_id;
     uint8_t delivery_mode = viosapic->redirtbl[irq].delivery_mode;
     uint8_t vector = viosapic->redirtbl[irq].vector;
-    struct vcpu *v;
 
     ASSERT(spin_is_locked(&viosapic->lock));
-    switch ( delivery_mode )
-    {
-    case SAPIC_FIXED:
-    {
-        v = vlsapic_lid_to_vcpu(viosapic_domain(viosapic), dest);
-        vlsapic_set_irq(v, vector);
-        vcpu_kick(v);
-        break;
-    }
-    case SAPIC_LOWEST_PRIORITY:
-    {
-        v = vlsapic_lid_to_vcpu(viosapic_domain(viosapic), dest);
-        if (viosapic->lowest_vcpu)
-            v = viosapic->lowest_vcpu;
-        vlsapic_set_irq(v, vector);
-        vcpu_kick(v);
-        break;
-    }
-    case SAPIC_PMI:
-    case SAPIC_NMI:
-    case SAPIC_INIT:
-    case SAPIC_EXTINT:
-    default:
-        gdprintk(XENLOG_WARNING, "Unsupported delivery mode %d\n",
-                 delivery_mode);
-        break;
-    }
+
+    if (vlsapic_deliver_int(viosapic_domain (viosapic),
+                            dest, delivery_mode, vector) < 0)
+        gdprintk(XENLOG_WARNING,
+                 "viosapic: can't deliver int %u to %u (dm=%u)\n",
+                 vector, dest, delivery_mode);
 }
 
 

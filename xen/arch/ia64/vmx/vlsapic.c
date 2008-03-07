@@ -107,7 +107,6 @@ static void update_vhpi(VCPU *vcpu, int vec)
  */
 static int vmx_vcpu_unpend_interrupt(VCPU *vcpu, uint8_t vector)
 {
-    uint64_t spsr;
     int ret;
 
     if (vector & ~0xff) {
@@ -115,9 +114,7 @@ static int vmx_vcpu_unpend_interrupt(VCPU *vcpu, uint8_t vector)
         return -1;
     }
 
-    local_irq_save(spsr);
     ret = test_and_clear_bit(vector, &VCPU(vcpu, irr[0]));
-    local_irq_restore(spsr);
 
     if (ret) {
         vcpu->arch.irq_new_pending = 1;
@@ -422,16 +419,13 @@ static int irq_masked(VCPU *vcpu, int h_pending, int h_inservice)
  */
 int vmx_vcpu_pend_interrupt(VCPU *vcpu, uint8_t vector)
 {
-    uint64_t    spsr;
     int ret;
 
     if (vector & ~0xff) {
         gdprintk(XENLOG_INFO, "vmx_vcpu_pend_interrupt: bad vector\n");
         return -1;
     }
-    local_irq_save(spsr);
     ret = test_and_set_bit(vector, &VCPU(vcpu, irr[0]));
-    local_irq_restore(spsr);
 
     if (!ret) {
         vcpu->arch.irq_new_pending = 1;
@@ -605,16 +599,15 @@ void vmx_vexirq(VCPU *vcpu)
     generate_exirq (vcpu);
 }
 
-struct vcpu * vlsapic_lid_to_vcpu(struct domain *d, uint16_t dest)
+struct vcpu *lid_to_vcpu(struct domain *d, uint16_t dest)
 {
-    struct vcpu * v;
-    for_each_vcpu ( d, v ) {
-        if ( (v->arch.privregs->lid >> 16) == dest )
-            return v;
-    }
+    int id = dest >> 8;
+
+    /* Fast look: assume EID=0 ID=vcpu_id.  */
+    if ((dest & 0xff) == 0 && id < MAX_VIRT_CPUS)
+        return d->vcpu[id];
     return NULL;
 }
-
 
 /*
  * To inject INIT to guest, we must set the PAL_INIT entry 
@@ -641,14 +634,25 @@ static void vmx_inject_guest_pal_init(VCPU *vcpu)
  *  offset: address offset to IPI space.
  *  value:  deliver value.
  */
-static void vlsapic_deliver_ipi(VCPU *vcpu, uint64_t dm, uint64_t vector)
+static int vcpu_deliver_int(VCPU *vcpu, uint64_t dm, uint64_t vector)
 {
-    IPI_DPRINTK("deliver_ipi %lx %lx\n", dm, vector);
+    int running = vcpu->is_running;
+
+    IPI_DPRINTK("deliver_int %lx %lx\n", dm, vector);
 
     switch (dm) {
     case SAPIC_FIXED:     // INT
         vmx_vcpu_pend_interrupt(vcpu, vector);
         break;
+    case SAPIC_LOWEST_PRIORITY:
+    {
+        struct vcpu *lowest = vcpu_viosapic(vcpu)->lowest_vcpu;
+
+        if (lowest == NULL)
+            lowest = vcpu;
+        vmx_vcpu_pend_interrupt(lowest, vector);
+        break;
+    }
     case SAPIC_PMI:
         // TODO -- inject guest PMI
         panic_domain(NULL, "Inject guest PMI!\n");
@@ -663,9 +667,30 @@ static void vlsapic_deliver_ipi(VCPU *vcpu, uint64_t dm, uint64_t vector)
         vmx_vcpu_pend_interrupt(vcpu, 0);
         break;
     default:
-        panic_domain(NULL, "Deliver reserved IPI!\n");
-        break;
+        return -EINVAL;
     }
+
+    /* Kick vcpu.  */
+    vcpu_unblock(vcpu);
+    if (running)
+        smp_send_event_check_cpu(vcpu->processor);
+
+    return 0;
+}
+
+int vlsapic_deliver_int(struct domain *d,
+			uint16_t dest, uint64_t dm, uint64_t vector)
+{
+    VCPU *vcpu;
+
+    vcpu = lid_to_vcpu(d, dest);
+    if (vcpu == NULL)
+        return -ESRCH;
+
+    if (!vcpu->is_initialised || test_bit(_VPF_down, &vcpu->pause_flags))
+        return -ENOEXEC;
+
+    return vcpu_deliver_int (vcpu, dm, vector);
 }
 
 /*
@@ -673,25 +698,8 @@ static void vlsapic_deliver_ipi(VCPU *vcpu, uint64_t dm, uint64_t vector)
  */
 void deliver_pal_init(VCPU *vcpu)
 {
-    vlsapic_deliver_ipi(vcpu, SAPIC_INIT, 0);
+    vcpu_deliver_int(vcpu, SAPIC_INIT, 0);
 }
-
-/*
- * TODO: Use hash table for the lookup.
- */
-static inline VCPU *lid_to_vcpu(struct domain *d, uint8_t id, uint8_t eid)
-{
-    VCPU  *v;
-    LID   lid; 
-
-    for_each_vcpu(d, v) {
-        lid.val = VCPU_LID(v);
-        if (lid.id == id && lid.eid == eid)
-            return v;
-    }
-    return NULL;
-}
-
 
 /*
  * execute write IPI op.
@@ -701,7 +709,8 @@ static void vlsapic_write_ipi(VCPU *vcpu, uint64_t addr, uint64_t value)
     VCPU   *targ;
     struct domain *d = vcpu->domain; 
 
-    targ = lid_to_vcpu(vcpu->domain, ((ipi_a_t)addr).id, ((ipi_a_t)addr).eid);
+    targ = lid_to_vcpu(vcpu->domain,
+                       (((ipi_a_t)addr).id << 8) | ((ipi_a_t)addr).eid);
     if (targ == NULL)
         panic_domain(NULL, "Unknown IPI cpu\n");
 
@@ -727,12 +736,10 @@ static void vlsapic_write_ipi(VCPU *vcpu, uint64_t addr, uint64_t value)
             printk("arch_boot_vcpu: huh, already awake!");
         }
     } else {
-        int running = targ->is_running;
-        vlsapic_deliver_ipi(targ, ((ipi_d_t)value).dm, 
-                            ((ipi_d_t)value).vector);
-        vcpu_unblock(targ);
-        if (running)
-            smp_send_event_check_cpu(targ->processor);
+        if (((ipi_d_t)value).dm == SAPIC_LOWEST_PRIORITY ||
+            vcpu_deliver_int(targ, ((ipi_d_t)value).dm, 
+                             ((ipi_d_t)value).vector) < 0)
+            panic_domain(NULL, "Deliver reserved interrupt!\n");
     }
     return;
 }
