@@ -726,8 +726,6 @@ ____lookup_domain_mpa(struct domain *d, unsigned long mpaddr)
 
     if (pte_present(*pte))
         return (pte->pte & _PFN_MASK);
-    else if (VMX_DOMAIN(d->vcpu[0]))
-        return GPFN_INV_MASK;
     return INVALID_MFN;
 }
 
@@ -742,8 +740,8 @@ unsigned long lookup_domain_mpa(struct domain *d, unsigned long mpaddr,
             if (entry != NULL)
                 p2m_entry_set(entry, pte, tmp_pte);
             return pte_val(tmp_pte);
-        } else if (VMX_DOMAIN(d->vcpu[0]))
-            return GPFN_INV_MASK;
+        } else if (is_hvm_domain(d))
+            return INVALID_MFN;
     }
 
     if (mpaddr < d->arch.convmem_end && !d->is_dying) {
@@ -2797,7 +2795,7 @@ arch_memory_op(int op, XEN_GUEST_HANDLE(void) arg)
         }
 
         /* This hypercall is used for VT-i domain only */
-        if (!VMX_DOMAIN(d->vcpu[0])) {
+        if (!is_hvm_domain(d)) {
             rcu_unlock_domain(d);
             return -ENOSYS;
         }

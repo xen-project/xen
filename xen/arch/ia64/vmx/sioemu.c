@@ -166,8 +166,7 @@ sioemu_add_io_physmap (struct domain *d, unsigned long start,
 
     /* Check area is currently unassigned.  */
     for (i = start; i < start + size; i += PAGE_SIZE) {
-        unsigned long mpa = ____lookup_domain_mpa(d, i);
-        if (mpa != GPFN_INV_MASK && mpa != INVALID_MFN)
+        if (____lookup_domain_mpa(d, i) != INVALID_MFN)
             return -EBUSY;
     }
 
