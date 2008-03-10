@@ -22,6 +22,9 @@
 #ifndef __XEN_PUBLIC_IA64_SIOEMU_H__
 #define __XEN_PUBLIC_IA64_SIOEMU_H__
 
+/* SIOEMU specific hypercalls.
+   The numbers are the minor part of FW_HYPERCALL_SIOEMU.  */
+
 /* Defines the callback entry point.  r8=ip, r9=data.
    Must be called per-vcpu.  */
 #define SIOEMU_HYPERCALL_SET_CALLBACK 0x01
@@ -34,6 +37,39 @@
 
 /* Get wallclock time.  */
 #define SIOEMU_HYPERCALL_GET_TIME 0x04
+
+/* Get/Set shadow registers.  */
+#define SIOEMU_HYPERCALL_GET_REGS 0x05
+#define SIOEMU_HYPERCALL_SET_REGS 0x06
+
+/* Flush cache.  */
+#define SIOEMU_HYPERCALL_FLUSH_CACHE 0x07
+
+/* Get freq base.  */
+#define SIOEMU_HYPERCALL_FREQ_BASE 0x08
+
+/* Return from callback.  */
+#define SIOEMU_HYPERCALL_CALLBACK_RETURN 0x09
+
+/* Deliver an interrupt.  */
+#define SIOEMU_HYPERCALL_DELIVER_INT 0x0a
+
+/* SIOEMU callback reason.  */
+
+/* An event (from event channel) has to be delivered.  */
+#define SIOEMU_CB_EVENT       0x00
+
+/* Emulate an IO access.  */
+#define SIOEMU_CB_IO_EMULATE  0x01
+
+/* An IPI is sent to a dead vcpu.  */
+#define SIOEMU_CB_WAKEUP_VCPU 0x02
+
+/* A SAL hypercall is executed.  */
+#define SIOEMU_CB_SAL_ASSIST  0x03
+
+
+/* SIOEMU firmware mode hypercalls.  */
 
 /* Return from callback.  r16=0.
    Unmask vcpu events.  */

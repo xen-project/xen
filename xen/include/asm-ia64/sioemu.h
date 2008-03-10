@@ -26,5 +26,6 @@ extern void sioemu_deliver_event (void);
 extern void sioemu_callback_return (void);
 extern void sioemu_io_emulate (unsigned long padr, unsigned long data,
                               unsigned long data1, unsigned long word);
-
+extern void sioemu_wakeup_vcpu (int vcpu_id);
+extern void sioemu_sal_assist (struct vcpu *v);
 #endif /* __ASM_SIOEMU_H_ */

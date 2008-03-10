@@ -208,8 +208,12 @@ vmx_ia64_handle_break (unsigned long ifa, struct pt_regs *regs, unsigned long is
             vcpu_increment_iip(v);
             return IA64_NO_FAULT;
         } else if (iim == DOMN_SAL_REQUEST) {
-            sal_emul(v);
-            vcpu_increment_iip(v);
+            if (d->arch.is_sioemu)
+                sioemu_sal_assist(v);
+            else {
+                sal_emul(v);
+                vcpu_increment_iip(v);
+            }
             return IA64_NO_FAULT;
         } else if (d->arch.is_sioemu
                    && iim == SIOEMU_HYPERPRIVOP_CALLBACK_RETURN) {
