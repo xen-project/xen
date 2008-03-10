@@ -80,11 +80,11 @@ static void __init parse_xenheap_megabytes(char *s)
 {
     unsigned long megabytes = simple_strtoll(s, NULL, 0);
 
-#define XENHEAP_MEGABYTES_MIN   16
+#define XENHEAP_MEGABYTES_MIN   16UL
     if (megabytes < XENHEAP_MEGABYTES_MIN)
         megabytes = XENHEAP_MEGABYTES_MIN;
 
-#define XENHEAP_MEGABYTES_MAX   4096    /* need more? If so,
+#define XENHEAP_MEGABYTES_MAX   4096UL  /* need more? If so,
                                            __pickle()/__unpickle() must be
                                            revised. */
     if (megabytes > XENHEAP_MEGABYTES_MAX)
@@ -258,6 +258,26 @@ md_overlap_with_boot_param(const efi_memory_desc_t *md)
 #define MD_SIZE(md) (md->num_pages << EFI_PAGE_SHIFT)
 #define MD_END(md) ((md)->phys_addr + MD_SIZE(md))
 
+static unsigned long __init
+efi_get_max_addr (void)
+{
+    void *efi_map_start, *efi_map_end, *p;
+    efi_memory_desc_t *md;
+    u64 efi_desc_size;
+    unsigned long max_addr = 0;
+
+    efi_map_start = __va(ia64_boot_param->efi_memmap);
+    efi_map_end   = efi_map_start + ia64_boot_param->efi_memmap_size;
+    efi_desc_size = ia64_boot_param->efi_memdesc_size;
+
+    for (p = efi_map_start; p < efi_map_end; p += efi_desc_size) {
+        md = p;
+        if (is_xenheap_usable_memory(md) && MD_END(md) > max_addr)
+            max_addr = MD_END(md);
+    }
+    return max_addr;
+}
+
 extern char __init_begin[], __init_end[];
 static void noinline init_done(void)
 {
@@ -398,6 +418,17 @@ void __init start_kernel(void)
     }
 
     printk("Xen command line: %s\n", saved_command_line);
+
+    /*
+     * Test if the boot allocator bitmap will overflow xenheap_size.  If
+     * so, continue to bump it up until we have at least a minimum space
+     * for the actual xenheap.
+     */
+    max_page = efi_get_max_addr() >> PAGE_SHIFT;
+    while ((max_page >> 3) > xenheap_size - (XENHEAP_MEGABYTES_MIN << 20))
+        xenheap_size <<= 1;
+
+    BUG_ON(xenheap_size > (XENHEAP_MEGABYTES_MAX << 20));
 
     xenheap_phys_end = xen_pstart + xenheap_size;
     printk("xen image pstart: 0x%lx, xenheap pend: 0x%lx\n",
