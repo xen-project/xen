@@ -1082,7 +1082,7 @@ xc_hvm_build(int xc_handle, uint32_t domid, int memsize, const char *image_name)
     memset(ctxt, 0, sizeof(*ctxt));
     ctxt->regs.ip = 0x80000000ffffffb0UL;
     ctxt->regs.ar.fpsr = xc_ia64_fpsr_default();
-    ctxt->regs.cr.isr = 1UL << 63;
+    ctxt->regs.cr.itir = 14 << 2;
     ctxt->regs.psr = IA64_PSR_AC | IA64_PSR_BN;
     ctxt->regs.cr.dcr = 0;
     ctxt->regs.cr.pta = 15 << 2;
