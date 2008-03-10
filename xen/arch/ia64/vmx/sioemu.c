@@ -248,9 +248,10 @@ sioemu_hypercall (struct pt_regs *regs)
         break;
     case SIOEMU_HYPERCALL_GET_TIME:
     {
-        uint64_t sec, nsec;
-        get_wallclock(&sec, &nsec);
+        uint64_t sec, nsec, now;
+        get_wallclock(&sec, &nsec, &now);
         regs->r8 = (sec << 30) + nsec;
+        regs->r9 = now;
         break;
     }
     case SIOEMU_HYPERCALL_GET_REGS:
@@ -272,6 +273,7 @@ sioemu_hypercall (struct pt_regs *regs)
     case SIOEMU_HYPERCALL_CALLBACK_RETURN:
         regs->r2 = regs->r27;
         sioemu_callback_return ();
+        vcpu_decrement_iip(current);
         break;
     default:
         panic_domain (NULL, "bad sioemu hypercall %lx\n", regs->r2);

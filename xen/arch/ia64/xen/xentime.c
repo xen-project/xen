@@ -253,9 +253,11 @@ struct tm wallclock_time(void)
     return gmtime(seconds);
 }
 
-void get_wallclock(uint64_t *sec, uint64_t *nsec)
+void get_wallclock(uint64_t *sec, uint64_t *nsec, uint64_t *now)
 {
-    uint64_t nano = NOW() + wc_nsec;
+    uint64_t n = NOW();
+    uint64_t nano = n + wc_nsec;
     *sec = wc_sec + nano / NSEC_PER_SEC;
     *nsec = nano % NSEC_PER_SEC;
+    *now = n;
 }
