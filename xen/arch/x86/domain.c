@@ -961,8 +961,9 @@ arch_do_vcpu_op(
         if ( !v->domain->is_pinned )
             break;
 
-        cpu_id.phys_id = (x86_cpu_to_apicid[v->vcpu_id] |
-                          (acpi_get_processor_id(v->vcpu_id) << 8));
+        cpu_id.phys_id =
+            (uint64_t)x86_cpu_to_apicid[v->vcpu_id] |
+            ((uint64_t)acpi_get_processor_id(v->vcpu_id) << 32);
 
         rc = -EFAULT;
         if ( copy_to_guest(arg, &cpu_id, 1) )
