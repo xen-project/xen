@@ -38,6 +38,8 @@ extern u64 __vsa_base;
 #define PAL_VPS_SET_PENDING_INTERRUPT       0x1000
 #define PAL_VPS_THASH               0x1400
 #define PAL_VPS_TTAG                0x1800
+#define PAL_VPS_RESTORE             0x1c00
+#define PAL_VPS_SAVE                0x2000
 
 #endif /* _PAL_VSA_H_ */
 
