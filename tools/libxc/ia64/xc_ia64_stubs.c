@@ -92,7 +92,6 @@ xc_ia64_map_foreign_p2m(int xc_handle, uint32_t dom,
     hypercall.arg[2] = dom;
     hypercall.arg[3] = (unsigned long)memmap_info;
     hypercall.arg[4] = flags;
-    hypercall.arg[5] = 0;
 
     if (lock_pages(memmap_info,
                    sizeof(*memmap_info) + memmap_info->efi_memmap_size) != 0) {
