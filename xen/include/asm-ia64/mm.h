@@ -483,24 +483,6 @@ extern u64 translate_domain_pte(u64 pteval, u64 address, u64 itir__,
 
 #define __gmfn_valid(_d, gpfn)	!__gpfn_invalid(_d, gpfn)
 
-/* Return I/O type if trye */
-#define __gpfn_is_io(_d, gpfn)				\
-({                                          \
-    u64 pte, ret=0;                                \
-    pte = lookup_domain_mpa((_d), ((gpfn)<<PAGE_SHIFT), NULL);	\
-    ret = (pte != INVALID_MFN) ? pte & GPFN_IO_MASK : 0;        \
-    ret;                \
-})
-
-#define __gpfn_is_mem(_d, gpfn)				\
-({                                          \
-    u64 pte, ret=0;                                \
-    pte = lookup_domain_mpa((_d), ((gpfn)<<PAGE_SHIFT), NULL);		   \
-    ret = (pte != INVALID_MFN) && (pte & GPFN_IO_MASK) == GPFN_MEM;        \
-    ret;                \
-})
-
-
 #define __gpa_to_mpa(_d, gpa)   \
     ((gmfn_to_mfn((_d),(gpa)>>PAGE_SHIFT)<<PAGE_SHIFT)|((gpa)&~PAGE_MASK))
 

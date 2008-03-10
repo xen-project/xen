@@ -83,6 +83,11 @@ static inline int get_order_from_shift(unsigned long shift)
 #define virt_to_xenva(va)	((unsigned long)va - PAGE_OFFSET - \
 				 xen_pstart + KERNEL_START)
 
+/* Clear bit 63 (UC bit in physical addresses).  */
+static inline u64 pa_clear_uc(u64 paddr)
+{
+    return (paddr << 1) >> 1;
+}
 
 #undef __pa
 #undef __va
