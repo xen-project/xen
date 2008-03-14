@@ -328,6 +328,11 @@ static int vmx_handle_lds(REGS* regs)
     return IA64_FAULT;
 }
 
+static inline int unimpl_phys_addr (u64 paddr)
+{
+    return (pa_clear_uc(paddr) >> MAX_PHYS_ADDR_BITS) != 0;
+}
+
 /* We came here because the H/W VHPT walker failed to find an entry */
 IA64FAULT
 vmx_hpw_miss(u64 vadr, u64 vec, REGS* regs)
@@ -361,10 +366,18 @@ vmx_hpw_miss(u64 vadr, u64 vec, REGS* regs)
             /* DTLB miss.  */
             if (misr.sp) /* Refer to SDM Vol2 Table 4-11,4-12 */
                 return vmx_handle_lds(regs);
+            if (unlikely(unimpl_phys_addr(vadr))) {
+                unimpl_daddr(v);
+                return IA64_FAULT;
+            }
             pte = lookup_domain_mpa(v->domain, pa_clear_uc(vadr), NULL);
-            /* Clear UC bit in vadr with the shifts.  */
             if (v->domain != dom0 && (pte & GPFN_IO_MASK)) {
                 emulate_io_inst(v, pa_clear_uc(vadr), 4, pte);
+                return IA64_FAULT;
+            }
+        } else {
+            if (unlikely(unimpl_phys_addr(vadr))) {
+                unimpl_iaddr_trap(v, vadr);
                 return IA64_FAULT;
             }
         }

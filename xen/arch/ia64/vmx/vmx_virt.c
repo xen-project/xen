@@ -277,9 +277,6 @@ static IA64FAULT vmx_emul_ptc_l(VCPU *vcpu, INST64 inst)
     }
 #ifdef  VMAL_NO_FAULT_CHECK
     if (unimplemented_gva(vcpu,r3) ) {
-        isr.val = set_isr_ei_ni(vcpu);
-        isr.code = IA64_RESERVED_REG_FAULT;
-        vcpu_set_isr(vcpu, isr.val);
         unimpl_daddr(vcpu);
         return IA64_FAULT;
     }
@@ -338,9 +335,6 @@ static IA64FAULT vmx_emul_ptc_g(VCPU *vcpu, INST64 inst)
     }
 #ifdef  VMAL_NO_FAULT_CHECK
     if (unimplemented_gva(vcpu,r3) ) {
-        isr.val = set_isr_ei_ni(vcpu);
-        isr.code = IA64_RESERVED_REG_FAULT;
-        vcpu_set_isr(vcpu, isr.val);
         unimpl_daddr(vcpu);
         return IA64_FAULT;
     }
@@ -374,9 +368,6 @@ static IA64FAULT vmx_emul_ptc_ga(VCPU *vcpu, INST64 inst)
     }
 #ifdef  VMAL_NO_FAULT_CHECK
     if (unimplemented_gva(vcpu,r3) ) {
-        isr.val = set_isr_ei_ni(vcpu);
-        isr.code = IA64_RESERVED_REG_FAULT;
-        vcpu_set_isr(vcpu, isr.val);
         unimpl_daddr(vcpu);
         return IA64_FAULT;
     }
@@ -411,9 +402,6 @@ static IA64FAULT ptr_fault_check(VCPU *vcpu, INST64 inst, u64 *pr2, u64 *pr3)
         return IA64_FAULT;
     }
     if (unimplemented_gva(vcpu,r3) ) {
-        isr.val = set_isr_ei_ni(vcpu);
-        isr.code = IA64_RESERVED_REG_FAULT;
-        vcpu_set_isr(vcpu, isr.val);
         unimpl_daddr(vcpu);
         return IA64_FAULT;
    }
@@ -635,9 +623,6 @@ static IA64FAULT vmx_emul_itr_d(VCPU *vcpu, INST64 inst)
     	return IA64_FAULT;
     }
     if (unimplemented_gva(vcpu, ifa)) {
-        isr.val = set_isr_ei_ni(vcpu);
-        isr.code = IA64_RESERVED_REG_FAULT;
-        vcpu_set_isr(vcpu, isr.val);
         unimpl_daddr(vcpu);
         return IA64_FAULT;
    }
@@ -703,9 +688,6 @@ static IA64FAULT vmx_emul_itr_i(VCPU *vcpu, INST64 inst)
     	return IA64_FAULT;
     }
     if (unimplemented_gva(vcpu, ifa)) {
-        isr.val = set_isr_ei_ni(vcpu);
-        isr.code = IA64_RESERVED_REG_FAULT;
-        vcpu_set_isr(vcpu, isr.val);
         unimpl_daddr(vcpu);
         return IA64_FAULT;
     }
@@ -764,9 +746,6 @@ static IA64FAULT itc_fault_check(VCPU *vcpu, INST64 inst,
     }
 #ifdef  VMAL_NO_FAULT_CHECK
     if (unimplemented_gva(vcpu,ifa) ) {
-        isr.val = set_isr_ei_ni(vcpu);
-        isr.code = IA64_RESERVED_REG_FAULT;
-        vcpu_set_isr(vcpu, isr.val);
         unimpl_daddr(vcpu);
         return IA64_FAULT;
     }

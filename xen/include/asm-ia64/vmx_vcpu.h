@@ -582,6 +582,11 @@ privilege_op (VCPU *vcpu)
 static inline void
 unimpl_daddr (VCPU *vcpu)
 {
+	ISR isr;
+
+	isr.val = set_isr_ei_ni(vcpu);
+	isr.code = IA64_UNIMPL_DADDR_FAULT;
+	vcpu_set_isr(vcpu, isr.val);
 	_general_exception(vcpu);
 }
 
@@ -694,5 +699,22 @@ data_access_rights(VCPU *vcpu, u64 vadr)
 	/* If vPSR.ic, IFA, ITIR */
 	set_ifa_itir_iha(vcpu, vadr, 1, 1, 0);
 	inject_guest_interruption(vcpu, IA64_DATA_ACCESS_RIGHTS_VECTOR);
+}
+
+/*
+ * Unimplement Instruction Address Trap
+ *  @ Lower-Privilege Transfer Trap Vector
+ * Refer to SDM Vol2 Table 5-6 & 8-1
+ */
+static inline void
+unimpl_iaddr_trap (VCPU *vcpu, u64 vadr)
+{
+	ISR isr;
+
+	isr.val = set_isr_ei_ni(vcpu);
+	isr.code = IA64_UNIMPL_IADDR_TRAP;
+	vcpu_set_isr(vcpu, isr.val);
+	vcpu_set_ifa(vcpu, vadr);
+	inject_guest_interruption(vcpu, IA64_LOWERPRIV_TRANSFER_TRAP_VECTOR);
 }
 #endif
