@@ -524,38 +524,33 @@ ENTRY(vmx_break_fault)
     * to prevent leaking bits from kernel to user level.
     */
    
-//  mov.m r16=IA64_KR(CURRENT)		// M2 r16 <- current task (12 cyc)
-    mov r14=r21
-    bsw.1					// B (6 cyc) regs are saved, switch to bank 1
+    mov r14=r21				// save r21 before bsw.1
+    bsw.1				// B (6 cyc) switch to bank 1
     ;;   
-    mov r29=cr.ipsr				// M2 (12 cyc)
+    mov r29=cr.ipsr			// M2 (12 cyc)
     mov r31=pr				// I0 (2 cyc)
     mov r16=r14
     mov r15=r2
 
-    mov r17=cr.iim				// M2 (2 cyc)
+    mov r17=cr.iim			// M2 (2 cyc)
     mov.m r27=ar.rsc			// M2 (12 cyc)
-//  mov r18=__IA64_BREAK_SYSCALL		// A
 
-    mov.m ar.rsc=0				// M2
+    mov.m ar.rsc=0			// M2
     mov.m r21=ar.fpsr			// M2 (12 cyc)
     mov r19=b6				// I0 (2 cyc)
     ;;
-    mov.m r23=ar.bspstore			// M2 (12 cyc)
+    mov.m r23=ar.bspstore		// M2 (12 cyc)
     mov.m r24=ar.rnat			// M2 (5 cyc)
     mov.i r26=ar.pfs			// I0 (2 cyc)
 
-    invala					// M0|1
-    nop.m 0					// M
+    invala				// M0|1
+    nop.m 0				// M
     mov r20=r1				// A			save r1
 
     nop.m 0
-//  movl r30=sys_call_table			// X
-    movl r30=ia64_hypercall_table			// X
+    movl r30=ia64_hypercall_table	// X
 
-    mov r28=cr.iip				// M2 (2 cyc)
-//  cmp.eq p0,p7=r18,r17			// I0 is this a system call?
-//(p7)  br.cond.spnt non_syscall		// B  no ->
+    mov r28=cr.iip			// M2 (2 cyc)
    //
    // From this point on, we are definitely on the syscall-path
    // and we can use (non-banked) scratch registers.
@@ -563,37 +558,30 @@ ENTRY(vmx_break_fault)
 ///////////////////////////////////////////////////////////////////////
     mov r1=r16				// A    move task-pointer to "addl"-addressable reg
     mov r2=r16				// A    setup r2 for ia64_syscall_setup
-//  add r9=TI_FLAGS+IA64_TASK_SIZE,r16	// A	r9 = &current_thread_info()->flags
 
-//  adds r16=IA64_TASK_THREAD_ON_USTACK_OFFSET,r16
-//  adds r15=-1024,r15			// A    subtract 1024 from syscall number
-//  mov r3=NR_syscalls - 1
     mov r3=NR_hypercalls - 1
     ;;
-//  ld1.bias r17=[r16]			// M0|1 r17 = current->thread.on_ustack flag
-//  ld4 r9=[r9]				// M0|1 r9 = current_thread_info()->flags
-    mov r9=r0               // force flags = 0
+    mov r9=r0               		// force flags = 0
     extr.u r8=r29,41,2			// I0   extract ei field from cr.ipsr
 
-    shladd r30=r15,3,r30			// A    r30 = sys_call_table + 8*(syscall-1024)
+    shladd r30=r15,3,r30		// A    r30 = hcall_table + 8*syscall
     addl r22=IA64_RBS_OFFSET,r1		// A    compute base of RBS
-    cmp.leu p6,p7=r15,r3			// A    syscall number in range?
+    cmp.leu p6,p7=r15,r3		// A    syscall number in range?
     ;;
 
     lfetch.fault.excl.nt1 [r22]		// M0|1 prefetch RBS
-(p6) ld8 r30=[r30]				// M0|1 load address of syscall entry point
-    tnat.nz.or p7,p0=r15			// I0	is syscall nr a NaT?
+(p6) ld8 r30=[r30]			// M0|1 load address of syscall entry point
+    tnat.nz.or p7,p0=r15		// I0	is syscall nr a NaT?
 
-    mov.m ar.bspstore=r22			// M2   switch to kernel RBS
+    mov.m ar.bspstore=r22		// M2   switch to kernel RBS
     cmp.eq p8,p9=2,r8			// A    isr.ei==2?
     ;;
 
 (p8) mov r8=0				// A    clear ei to 0
-//(p7)  movl r30=sys_ni_syscall			// X
-(p7) movl r30=do_ni_hypercall			// X
+(p7) movl r30=do_ni_hypercall		// X
 
-(p8) adds r28=16,r28				// A    switch cr.iip to next bundle
-(p9) adds r8=1,r8				// A    increment ei to next slot
+(p8) adds r28=16,r28			// A    switch cr.iip to next bundle
+(p9) adds r8=1,r8			// A    increment ei to next slot
     nop.i 0
     ;;
 
@@ -604,7 +592,6 @@ ENTRY(vmx_break_fault)
    // the data arrives.
    //
 ///////////////////////////////////////////////////////////////////////
-//    st1 [r16]=r0				// M2|3 clear current->thread.on_ustack flag
     mov b6=r30				// I0   setup syscall handler branch reg early
 
     mov r18=ar.bsp				// M2 (12 cyc)
@@ -720,7 +707,7 @@ END(vmx_virtual_exirq)
      *	- ar.fpsr: set to kernel settings
      *	-  b6: preserved (same as on entry)
      */
-GLOBAL_ENTRY(ia64_hypercall_setup)
+ENTRY(ia64_hypercall_setup)
 #if PT(B6) != 0
 # error This code assumes that b6 is the first field in pt_regs.
 #endif
