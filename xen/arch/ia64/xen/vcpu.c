@@ -497,8 +497,6 @@ IA64FAULT vcpu_set_psr_l(VCPU * vcpu, u64 val)
 		ipsr->mfh = 1;
 	if (newpsr.ac)
 		ipsr->ac = 1;
-	if (newpsr.up)
-		ipsr->up = 1;
 	if (newpsr.dt && newpsr.rt)
 		vcpu_set_metaphysical_mode(vcpu, FALSE);
 	else
