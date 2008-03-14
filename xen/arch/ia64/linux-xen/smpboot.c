@@ -64,6 +64,7 @@
 #ifdef XEN
 #include <xen/domain.h>
 #include <asm/hw_irq.h>
+#include <asm/vmx.h>
 #ifndef CONFIG_SMP
 cpumask_t cpu_online_map = CPU_MASK_CPU0;
 EXPORT_SYMBOL(cpu_online_map);
@@ -442,6 +443,9 @@ start_secondary (void *unused)
 	smp_callin();
 
 #ifdef XEN
+	if (vmx_enabled)
+		vmx_init_env(0, 0);
+
 	startup_cpu_idle_loop();
 #else
 	cpu_idle();

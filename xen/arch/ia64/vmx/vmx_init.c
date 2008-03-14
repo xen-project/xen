@@ -105,6 +105,8 @@ no_vti:
 }
 
 /*
+ *  ** This function must be called on every processor **
+ *
  * Init virtual environment on current LP
  * vsa_base is the indicator whether it's first LP to be initialized
  * for current domain.
