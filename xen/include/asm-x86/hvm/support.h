@@ -78,7 +78,7 @@ extern unsigned int opt_hvm_debug_level;
 #define HVM_DBG_LOG(level, _f, _a...)
 #endif
 
-extern char hvm_io_bitmap[];
+extern unsigned long hvm_io_bitmap[];
 
 void hvm_enable(struct hvm_function_table *);
 

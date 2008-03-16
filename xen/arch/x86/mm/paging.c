@@ -114,7 +114,8 @@ static mfn_t paging_new_log_dirty_page(struct domain *d, void **mapping_p)
     return mfn;
 }
 
-static mfn_t paging_new_log_dirty_leaf(struct domain *d, uint8_t **leaf_p)
+static mfn_t paging_new_log_dirty_leaf(
+    struct domain *d, unsigned long **leaf_p)
 {
     mfn_t mfn = paging_new_log_dirty_page(d, (void **)leaf_p);
     if ( mfn_valid(mfn) )
@@ -264,7 +265,7 @@ void paging_mark_dirty(struct domain *d, unsigned long guest_mfn)
     mfn_t gmfn;
     int changed;
     mfn_t mfn, *l4, *l3, *l2;
-    uint8_t *l1;
+    unsigned long *l1;
     int i1, i2, i3, i4;
 
     gmfn = _mfn(guest_mfn);
@@ -341,7 +342,7 @@ int paging_log_dirty_op(struct domain *d, struct xen_domctl_shadow_op *sc)
     int rv = 0, clean = 0, peek = 1;
     unsigned long pages = 0;
     mfn_t *l4, *l3, *l2;
-    uint8_t *l1;
+    unsigned long *l1;
     int i4, i3, i2;
 
     domain_pause(d);
@@ -399,7 +400,7 @@ int paging_log_dirty_op(struct domain *d, struct xen_domctl_shadow_op *sc)
                   (pages < sc->pages) && (i2 < LOGDIRTY_NODE_ENTRIES);
                   i2++ )
             {
-                static uint8_t zeroes[PAGE_SIZE];
+                static unsigned long zeroes[PAGE_SIZE/BYTES_PER_LONG];
                 unsigned int bytes = PAGE_SIZE;
                 l1 = ((l2 && mfn_valid(l2[i2])) ?
                       map_domain_page(mfn_x(l2[i2])) : zeroes);
@@ -408,7 +409,7 @@ int paging_log_dirty_op(struct domain *d, struct xen_domctl_shadow_op *sc)
                 if ( likely(peek) )
                 {
                     if ( copy_to_guest_offset(sc->dirty_bitmap, pages >> 3,
-                                              l1, bytes) != 0 )
+                                              (uint8_t *)l1, bytes) != 0 )
                     {
                         rv = -EFAULT;
                         goto out;

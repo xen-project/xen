@@ -830,7 +830,7 @@ unmap_vcpu_info(struct vcpu *v)
     mfn = v->arch.vcpu_info_mfn;
     unmap_domain_page_global(v->vcpu_info);
 
-    v->vcpu_info = shared_info_addr(d, vcpu_info[v->vcpu_id]);
+    v->vcpu_info = (void *)&shared_info(d, vcpu_info[v->vcpu_id]);
     v->arch.vcpu_info_mfn = INVALID_MFN;
 
     put_page_and_type(mfn_to_page(mfn));
@@ -888,7 +888,7 @@ map_vcpu_info(struct vcpu *v, unsigned long mfn, unsigned offset)
      */
     vcpu_info(v, evtchn_upcall_pending) = 1;
     for ( i = 0; i < BITS_PER_GUEST_LONG(d); i++ )
-        set_bit(i, vcpu_info_addr(v, evtchn_pending_sel));
+        set_bit(i, &vcpu_info(v, evtchn_pending_sel));
 
     /*
      * Only bother to update time for the current vcpu.  If we're

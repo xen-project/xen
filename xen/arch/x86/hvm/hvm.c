@@ -59,8 +59,8 @@ integer_param("hvm_debug", opt_hvm_debug_level);
 struct hvm_function_table hvm_funcs __read_mostly;
 
 /* I/O permission bitmap is globally shared by all HVM guests. */
-char __attribute__ ((__section__ (".bss.page_aligned")))
-    hvm_io_bitmap[3*PAGE_SIZE];
+unsigned long __attribute__ ((__section__ (".bss.page_aligned")))
+    hvm_io_bitmap[3*PAGE_SIZE/BYTES_PER_LONG];
 
 void hvm_enable(struct hvm_function_table *fns)
 {

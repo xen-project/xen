@@ -154,7 +154,7 @@ struct vcpu *alloc_vcpu(
     if ( !is_idle_domain(d) )
     {
         set_bit(_VPF_down, &v->pause_flags);
-        v->vcpu_info = shared_info_addr(d, vcpu_info[vcpu_id]);
+        v->vcpu_info = (void *)&shared_info(d, vcpu_info[vcpu_id]);
     }
 
     if ( sched_init_vcpu(v, cpu_id) != 0 )

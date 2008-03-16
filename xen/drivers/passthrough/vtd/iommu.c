@@ -39,8 +39,8 @@
 #define domain_iommu_domid(d) ((d)->arch.hvm_domain.hvm_iommu.iommu_domid)
 
 static spinlock_t domid_bitmap_lock;    /* protect domain id bitmap */
-static int domid_bitmap_size;           /* domain id bitmap size in bit */
-static void *domid_bitmap;              /* iommu domain id bitmap */
+static int domid_bitmap_size;           /* domain id bitmap size in bits */
+static unsigned long *domid_bitmap;     /* iommu domain id bitmap */
 
 #define DID_FIELD_WIDTH 16
 #define DID_HIGH_OFFSET 8
@@ -1885,7 +1885,8 @@ int iommu_setup(void)
 
     /* Allocate domain id bitmap, and set bit 0 as reserved */
     domid_bitmap_size = cap_ndoms(iommu->cap);
-    domid_bitmap = xmalloc_bytes(domid_bitmap_size / 8);
+    domid_bitmap = xmalloc_array(unsigned long,
+                                 BITS_TO_LONGS(domid_bitmap_size));
     if ( domid_bitmap == NULL )
         goto error;
     memset(domid_bitmap, 0, domid_bitmap_size / 8);

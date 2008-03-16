@@ -362,13 +362,12 @@ int pirq_guest_eoi(struct domain *d, int irq)
 int pirq_guest_unmask(struct domain *d)
 {
     unsigned int   irq;
-    shared_info_t *s = d->shared_info;
 
     for ( irq = find_first_bit(d->pirq_mask, NR_IRQS);
           irq < NR_IRQS;
           irq = find_next_bit(d->pirq_mask, NR_IRQS, irq+1) )
     {
-        if ( !test_bit(d->pirq_to_evtchn[irq], __shared_info_addr(d, s, evtchn_mask)) )
+        if ( !test_bit(d->pirq_to_evtchn[irq], &shared_info(d, evtchn_mask)) )
             __pirq_guest_eoi(d, irq);
     }
 
@@ -660,13 +659,13 @@ static void dump_irqs(unsigned char key)
                 printk("%u(%c%c%c%c)",
                        d->domain_id,
                        (test_bit(d->pirq_to_evtchn[irq],
-                                 shared_info_addr(d, evtchn_pending)) ?
+                                 &shared_info(d, evtchn_pending)) ?
                         'P' : '-'),
                        (test_bit(d->pirq_to_evtchn[irq]/BITS_PER_GUEST_LONG(d),
-                                 vcpu_info_addr(d->vcpu[0], evtchn_pending_sel)) ?
+                                 &vcpu_info(d->vcpu[0], evtchn_pending_sel)) ?
                         'S' : '-'),
                        (test_bit(d->pirq_to_evtchn[irq],
-                                 shared_info_addr(d, evtchn_mask)) ?
+                                 &shared_info(d, evtchn_mask)) ?
                         'M' : '-'),
                        (test_bit(irq, d->pirq_mask) ?
                         'M' : '-'));

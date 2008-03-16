@@ -81,7 +81,7 @@ struct arch_vmx_struct {
     unsigned long        cstar;
 #endif
 
-    char                *msr_bitmap;
+    unsigned long       *msr_bitmap;
     unsigned int         msr_count;
     struct vmx_msr_entry *msr_area;
     unsigned int         host_msr_count;

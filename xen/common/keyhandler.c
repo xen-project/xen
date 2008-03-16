@@ -201,12 +201,12 @@ static void dump_domains(unsigned char key)
             printk("    Notifying guest (virq %d, port %d, stat %d/%d/%d)\n",
                    VIRQ_DEBUG, v->virq_to_evtchn[VIRQ_DEBUG],
                    test_bit(v->virq_to_evtchn[VIRQ_DEBUG], 
-                            shared_info_addr(d, evtchn_pending)),
+                            &shared_info(d, evtchn_pending)),
                    test_bit(v->virq_to_evtchn[VIRQ_DEBUG], 
-                            shared_info_addr(d, evtchn_mask)),
+                            &shared_info(d, evtchn_mask)),
                    test_bit(v->virq_to_evtchn[VIRQ_DEBUG] /
                             BITS_PER_GUEST_LONG(d),
-                            vcpu_info_addr(v, evtchn_pending_sel)));
+                            &vcpu_info(v, evtchn_pending_sel)));
             send_guest_vcpu_virq(v, VIRQ_DEBUG);
         }
     }

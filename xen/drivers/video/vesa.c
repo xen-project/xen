@@ -219,7 +219,7 @@ static void vesa_show_line(
                      ((font->width + 7) >> 3));
             for ( b = font->width; b--; )
             {
-                pixel = test_bit(b, bits) ? pixel_on : 0;
+                pixel = (*bits & (1u<<b)) ? pixel_on : 0;
                 memcpy(ptr, &pixel, bpp);
                 ptr += bpp;
             }

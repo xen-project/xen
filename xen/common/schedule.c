@@ -365,7 +365,7 @@ static long do_poll(struct sched_poll *sched_poll)
             goto out;
 
         rc = 0;
-        if ( test_bit(port, shared_info_addr(d, evtchn_pending)) )
+        if ( test_bit(port, &shared_info(d, evtchn_pending)) )
             goto out;
     }
 

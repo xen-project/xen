@@ -539,7 +539,6 @@ out:
 void evtchn_set_pending(struct vcpu *v, int port)
 {
     struct domain *d = v->domain;
-    shared_info_t *s = d->shared_info;
 
     /*
      * The following bit operations must happen in strict order.
@@ -548,12 +547,12 @@ void evtchn_set_pending(struct vcpu *v, int port)
      * others may require explicit memory barriers.
      */
 
-    if ( test_and_set_bit(port, __shared_info_addr(d, s, evtchn_pending)) )
+    if ( test_and_set_bit(port, &shared_info(d, evtchn_pending)) )
         return;
 
-    if ( !test_bit        (port, __shared_info_addr(d, s, evtchn_mask)) &&
+    if ( !test_bit        (port, &shared_info(d, evtchn_mask)) &&
          !test_and_set_bit(port / BITS_PER_GUEST_LONG(d),
-                           vcpu_info_addr(v, evtchn_pending_sel)) )
+                           &vcpu_info(v, evtchn_pending_sel)) )
     {
         vcpu_mark_events_pending(v);
     }
@@ -750,7 +749,6 @@ long evtchn_bind_vcpu(unsigned int port, unsigned int vcpu_id)
 static long evtchn_unmask(evtchn_unmask_t *unmask)
 {
     struct domain *d = current->domain;
-    shared_info_t *s = d->shared_info;
     int            port = unmask->port;
     struct vcpu   *v;
 
@@ -768,10 +766,10 @@ static long evtchn_unmask(evtchn_unmask_t *unmask)
      * These operations must happen in strict order. Based on
      * include/xen/event.h:evtchn_set_pending(). 
      */
-    if ( test_and_clear_bit(port, __shared_info_addr(d, s, evtchn_mask)) &&
-         test_bit          (port, __shared_info_addr(d, s, evtchn_pending)) &&
+    if ( test_and_clear_bit(port, &shared_info(d, evtchn_mask)) &&
+         test_bit          (port, &shared_info(d, evtchn_pending)) &&
          !test_and_set_bit (port / BITS_PER_GUEST_LONG(d),
-                            vcpu_info_addr(v, evtchn_pending_sel)) )
+                            &vcpu_info(v, evtchn_pending_sel)) )
     {
         vcpu_mark_events_pending(v);
     }

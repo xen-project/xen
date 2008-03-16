@@ -413,7 +413,7 @@ static void vmx_set_host_env(struct vcpu *v)
 
 void vmx_disable_intercept_for_msr(struct vcpu *v, u32 msr)
 {
-    char *msr_bitmap = v->arch.hvm_vmx.msr_bitmap;
+    unsigned long *msr_bitmap = v->arch.hvm_vmx.msr_bitmap;
 
     /* VMX MSR bitmap supported? */
     if ( msr_bitmap == NULL )
@@ -426,14 +426,14 @@ void vmx_disable_intercept_for_msr(struct vcpu *v, u32 msr)
      */
     if ( msr <= 0x1fff )
     {
-        __clear_bit(msr, msr_bitmap + 0x000); /* read-low */
-        __clear_bit(msr, msr_bitmap + 0x800); /* write-low */
+        __clear_bit(msr, msr_bitmap + 0x000/BYTES_PER_LONG); /* read-low */
+        __clear_bit(msr, msr_bitmap + 0x800/BYTES_PER_LONG); /* write-low */
     }
     else if ( (msr >= 0xc0000000) && (msr <= 0xc0001fff) )
     {
         msr &= 0x1fff;
-        __clear_bit(msr, msr_bitmap + 0x400); /* read-high */
-        __clear_bit(msr, msr_bitmap + 0xc00); /* write-high */
+        __clear_bit(msr, msr_bitmap + 0x400/BYTES_PER_LONG); /* read-high */
+        __clear_bit(msr, msr_bitmap + 0xc00/BYTES_PER_LONG); /* write-high */
     }
 }
 
@@ -456,7 +456,7 @@ static int construct_vmcs(struct vcpu *v)
     /* MSR access bitmap. */
     if ( cpu_has_vmx_msr_bitmap )
     {
-        char *msr_bitmap = alloc_xenheap_page();
+        unsigned long *msr_bitmap = alloc_xenheap_page();
 
         if ( msr_bitmap == NULL )
             return -ENOMEM;
