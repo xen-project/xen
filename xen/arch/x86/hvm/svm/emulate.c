@@ -117,7 +117,9 @@ int __get_instruction_length_from_list(struct vcpu *v,
     }
     else
     {
-        inst_copy_from_guest(buffer, svm_rip2pointer(v), MAX_INST_LEN);
+        if ( inst_copy_from_guest(buffer, svm_rip2pointer(v), MAX_INST_LEN)
+             != MAX_INST_LEN )
+            return 0;
         buf = buffer;
     }
 
