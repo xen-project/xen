@@ -779,8 +779,8 @@ typedef struct {
     Bit32u  sector_count1;
     Bit32u  sector_count2;
     Bit16u  blksize;
-    Bit16u  dpte_segment;
     Bit16u  dpte_offset;
+    Bit16u  dpte_segment;
     Bit16u  key;
     Bit8u   dpi_length;
     Bit8u   reserved1;
