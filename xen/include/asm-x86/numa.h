@@ -52,7 +52,7 @@ struct node_data {
 
 extern struct node_data node_data[];
 
-static inline __attribute__((pure)) int phys_to_nid(unsigned long addr) 
+static inline __attribute__((pure)) int phys_to_nid(paddr_t addr) 
 { 
 	unsigned nid; 
 	VIRTUAL_BUG_ON((addr >> memnode_shift) >= NODEMAPSIZE);

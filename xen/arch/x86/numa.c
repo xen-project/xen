@@ -57,7 +57,7 @@ populate_memnodemap(const struct node *nodes, int numnodes, int shift)
 {
 	int i; 
 	int res = -1;
-	unsigned long addr, end;
+	paddr_t addr, end;
 
 	if (shift >= 64)
 		return -1;
@@ -286,13 +286,13 @@ static void dump_numa(unsigned char key)
 		  (u32)(now>>32), (u32)now);
 
 	for_each_online_node(i) {
-		unsigned long pa = (NODE_DATA(i)->node_start_pfn + 1)<< PAGE_SHIFT;
+		paddr_t pa = (NODE_DATA(i)->node_start_pfn + 1)<< PAGE_SHIFT;
 		printk("idx%d -> NODE%d start->%lu size->%lu\n",
 			  i, NODE_DATA(i)->node_id,
 			  NODE_DATA(i)->node_start_pfn,
 			  NODE_DATA(i)->node_spanned_pages);
 		/* sanity check phys_to_nid() */
-		printk("phys_to_nid(%lx) -> %d should be %d\n", pa, phys_to_nid(pa),
+		printk("phys_to_nid(%"PRIpaddr") -> %d should be %d\n", pa, phys_to_nid(pa),
 			  NODE_DATA(i)->node_id);
 	}
 	for_each_online_cpu(i)
