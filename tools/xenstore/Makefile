@@ -1,21 +1,16 @@
 XEN_ROOT=../..
 include $(XEN_ROOT)/tools/Rules.mk
-XEN_LIBXC          = $(XEN_ROOT)/tools/libxc
 
 MAJOR = 3.0
 MINOR = 0
 
-PROFILE=#-pg
-BASECFLAGS=-Werror
-# Make gcc generate dependencies.
-BASECFLAGS += -Wp,-MD,.$(@F).d
-PROG_DEP = .*.d
-BASECFLAGS+= $(PROFILE)
-BASECFLAGS+= $(CFLAGS_libxenctrl)
-BASECFLAGS+= -I.
+CFLAGS += -Werror
+CFLAGS += -I.
+CFLAGS += $(CFLAGS_libxenctrl)
 
-CFLAGS  += $(BASECFLAGS)
-LDFLAGS += $(PROFILE)
+# Make gcc generate dependencies.
+CFLAGS += -Wp,-MD,.$(@F).d
+DEP    = .*.d
 
 CLIENTS := xenstore-exists xenstore-list xenstore-read xenstore-rm xenstore-chmod
 CLIENTS += xenstore-write
@@ -45,22 +40,22 @@ CFLAGS += -DHAVE_DTRACE=1
 endif
  
 xenstored: $(XENSTORED_OBJS)
-	$(CC) $(CFLAGS) $(LDFLAGS) $^ $(LOADLIBES) $(LDLIBS) $(LDFLAGS_libxenctrl) $(SOCKET_LIBS) -o $@
+	$(CC) $(CFLAGS) $(LDFLAGS) $^ $(LDFLAGS_libxenctrl) $(SOCKET_LIBS) -o $@
 
 $(CLIENTS): xenstore-%: xenstore_%.o libxenstore.so
-	$(CC) $(CFLAGS) $(LDFLAGS) $< $(LOADLIBES) $(LDLIBS) -L. -lxenstore $(SOCKET_LIBS) -o $@
+	$(CC) $(CFLAGS) $(LDFLAGS) $< -L. -lxenstore $(SOCKET_LIBS) -o $@
 
 $(CLIENTS_OBJS): xenstore_%.o: xenstore_client.c
 	$(COMPILE.c) -DCLIENT_$(*F) -o $@ $<
 
 xenstore-control: xenstore_control.o libxenstore.so
-	$(CC) $(CFLAGS) $(LDFLAGS) $< $(LOADLIBES) $(LDLIBS) -L. -lxenstore $(SOCKET_LIBS) -o $@
+	$(CC) $(CFLAGS) $(LDFLAGS) $< -L. -lxenstore $(SOCKET_LIBS) -o $@
 
 xenstore-ls: xsls.o libxenstore.so
-	$(CC) $(CFLAGS) $(LDFLAGS) $< $(LOADLIBES) $(LDLIBS) -L. -lxenstore $(SOCKET_LIBS) -o $@
+	$(CC) $(CFLAGS) $(LDFLAGS) $< -L. -lxenstore $(SOCKET_LIBS) -o $@
 
 xs_tdb_dump: xs_tdb_dump.o utils.o tdb.o talloc.o
-	$(CC) $(CFLAGS) $(LDFLAGS) $^ $(LOADLIBES) $(LDLIBS) -o $@
+	$(CC) $(CFLAGS) $(LDFLAGS) $^ -o $@
 
 libxenstore.so: libxenstore.so.$(MAJOR)
 	ln -sf $< $@
@@ -71,7 +66,7 @@ libxenstore.so.$(MAJOR).$(MINOR): xs.opic xs_lib.opic
 	$(CC) $(CFLAGS) $(LDFLAGS) -Wl,$(SONAME_LDFLAG) -Wl,libxenstore.so.$(MAJOR) $(SHLIB_CFLAGS) -o $@ $^ $(SOCKET_LIBS) -lpthread
 
 libxenstore.a: xs.o xs_lib.o
-	$(AR) rcs libxenstore.a $^
+	$(AR) rcs $@ $^
 
 .PHONY: clean
 clean:
@@ -79,7 +74,7 @@ clean:
 	rm -f xenstored xs_random xs_stress xs_crashme
 	rm -f xs_tdb_dump xenstore-control xenstore-ls
 	rm -f $(CLIENTS)
-	$(RM) $(PROG_DEP)
+	$(RM) $(DEP)
 
 .PHONY: TAGS
 TAGS:
@@ -108,7 +103,7 @@ install: all
 	$(INSTALL_DATA) xs.h $(DESTDIR)$(INCLUDEDIR)
 	$(INSTALL_DATA) xs_lib.h $(DESTDIR)$(INCLUDEDIR)
 
--include $(PROG_DEP)
+-include $(DEP)
 
 # never delete any intermediate files.
 .SECONDARY:
