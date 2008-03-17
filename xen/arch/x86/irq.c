@@ -15,7 +15,7 @@
 #include <xen/keyhandler.h>
 #include <xen/compat.h>
 #include <asm/current.h>
-#include <asm/iommu.h>
+#include <xen/iommu.h>
 
 /* opt_noirqbalance: If true, software IRQ balancing/affinity is disabled. */
 int opt_noirqbalance = 0;

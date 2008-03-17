@@ -46,7 +46,7 @@
 #include <asm/debugreg.h>
 #include <asm/msr.h>
 #include <asm/nmi.h>
-#include <asm/iommu.h>
+#include <xen/iommu.h>
 #ifdef CONFIG_COMPAT
 #include <compat/vcpu.h>
 #endif

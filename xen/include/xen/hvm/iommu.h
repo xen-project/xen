@@ -20,7 +20,7 @@
 #ifndef __ASM_X86_HVM_IOMMU_H__
 #define __ASM_X86_HVM_IOMMU_H__
 
-#include <asm/iommu.h>
+#include <xen/iommu.h>
 #include <asm/hvm/irq.h>
 #include <asm/hvm/vpt.h>
 #include <asm/hvm/vlapic.h>

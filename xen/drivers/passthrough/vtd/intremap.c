@@ -18,28 +18,10 @@
  * Copyright (C) Xiaohui Xin <xiaohui.xin@intel.com>
  */
 
-#include <xen/config.h>
-#include <xen/lib.h>
-#include <xen/init.h>
 #include <xen/irq.h>
-#include <xen/delay.h>
 #include <xen/sched.h>
-#include <xen/acpi.h>
-#include <xen/keyhandler.h>
-#include <xen/spinlock.h>
-#include <asm/io.h>
-#include <asm/mc146818rtc.h>
-#include <asm/smp.h>
-#include <asm/desc.h>
-#include <mach_apic.h>
-#include <io_ports.h>
-
-#include <xen/spinlock.h>
-#include <xen/xmalloc.h>
-#include <xen/domain_page.h>
-#include <asm/delay.h>
-#include <asm/string.h>
-#include <asm/iommu.h>
+#include <xen/iommu.h>
+#include "iommu.h"
 #include "dmar.h"
 #include "vtd.h"
 #include "../pci-direct.h"
@@ -172,7 +154,7 @@ io_apic_read_remap_rte(
     struct iommu *iommu = ioapic_to_iommu(mp_ioapics[apic].mpc_apicid);
     struct ir_ctrl *ir_ctrl = iommu_ir_ctrl(iommu);
 
-    if ( !iommu || !(ir_ctrl->iremap) )
+    if ( !iommu || !ir_ctrl || !(ir_ctrl->iremap) )
     {
         *IO_APIC_BASE(apic) = reg;
         return *(IO_APIC_BASE(apic)+4);
@@ -218,7 +200,7 @@ io_apic_write_remap_rte(
     struct iommu *iommu = ioapic_to_iommu(mp_ioapics[apic].mpc_apicid);
     struct ir_ctrl *ir_ctrl = iommu_ir_ctrl(iommu);
 
-    if ( !iommu || !(ir_ctrl->iremap) )
+    if ( !iommu || !ir_ctrl || !(ir_ctrl->iremap) )
     {
         *IO_APIC_BASE(apic) = reg;
         *(IO_APIC_BASE(apic)+4) = value;

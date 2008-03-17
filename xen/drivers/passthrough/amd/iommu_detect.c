@@ -20,7 +20,7 @@
 
 #include <xen/config.h>
 #include <xen/errno.h>
-#include <asm/iommu.h>
+#include <xen/iommu.h>
 #include <asm/amd-iommu.h>
 #include <asm/hvm/svm/amd-iommu-proto.h>
 #include "../pci-direct.h"

@@ -17,21 +17,14 @@
  * Copyright (C) Allen Kay <allen.m.kay@intel.com>
  */
 
-#include <xen/init.h>
-#include <xen/bitmap.h>
-#include <xen/irq.h>
-#include <xen/spinlock.h>
 #include <xen/sched.h>
 #include <xen/delay.h>
-#include <asm/iommu.h>
+#include <xen/iommu.h>
+#include "iommu.h"
 #include "dmar.h"
 #include "../pci-direct.h"
 #include "../pci_regs.h"
 #include "msi.h"
-
-#include <xen/mm.h>
-#include <xen/xmalloc.h>
-#include <xen/inttypes.h>
 
 #define INTEL   0x8086
 #define SEABURG 0x4000

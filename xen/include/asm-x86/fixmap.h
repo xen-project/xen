@@ -17,7 +17,7 @@
 #include <asm/acpi.h>
 #include <asm/page.h>
 #include <xen/kexec.h>
-#include <asm/iommu.h>
+#include <xen/iommu.h>
 #include <asm/amd-iommu.h>
 
 /*

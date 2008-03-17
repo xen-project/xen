@@ -23,7 +23,6 @@
 #include <xen/init.h>
 #include <xen/list.h>
 #include <xen/spinlock.h>
-#include <asm/hvm/vmx/intel-iommu.h>
 #include <public/hvm/ioreq.h>
 #include <public/domctl.h>
 
@@ -33,9 +32,13 @@ extern int amd_iommu_enabled;
 #define iommu_enabled ( amd_iommu_enabled || vtd_enabled )
 #define domain_hvm_iommu(d)     (&d->arch.hvm_domain.hvm_iommu)
 #define domain_vmx_iommu(d)     (&d->arch.hvm_domain.hvm_iommu.vmx_iommu)
-#define iommu_qi_ctrl(iommu)    (&(iommu->intel.qi_ctrl));
-#define iommu_ir_ctrl(iommu)    (&(iommu->intel.ir_ctrl));
-#define iommu_get_flush(iommu)  (&(iommu->intel.flush));
+
+#define MAX_IOMMUS 32
+
+#define PAGE_SHIFT_4K       (12)
+#define PAGE_SIZE_4K        (1UL << PAGE_SHIFT_4K)
+#define PAGE_MASK_4K        (((u64)-1) << PAGE_SHIFT_4K)
+#define PAGE_ALIGN_4K(addr) (((addr) + PAGE_SIZE_4K - 1) & PAGE_MASK_4K)
 
 /*
  * The PCI interface treats multi-function devices as independent
@@ -66,7 +69,7 @@ struct iommu {
     spinlock_t register_lock; /* protect iommu register handling */
     struct root_entry *root_entry; /* virtual address */
     unsigned int vector;
-    struct intel_iommu intel;
+    struct intel_iommu *intel;
 };
 
 int iommu_setup(void);
@@ -89,10 +92,12 @@ int pt_irq_create_bind_vtd(struct domain *d,
                            xen_domctl_bind_pt_irq_t *pt_irq_bind);
 int pt_irq_destroy_bind_vtd(struct domain *d,
                             xen_domctl_bind_pt_irq_t *pt_irq_bind);
-unsigned int io_apic_read_remap_rte(
-    unsigned int apic, unsigned int reg);
+unsigned int io_apic_read_remap_rte(unsigned int apic, unsigned int reg);
 void io_apic_write_remap_rte(unsigned int apic,
-    unsigned int reg, unsigned int value);
+                             unsigned int reg, unsigned int value);
+struct qi_ctrl *iommu_qi_ctrl(struct iommu *iommu);
+struct ir_ctrl *iommu_ir_ctrl(struct iommu *iommu);
+struct iommu_flush *iommu_get_flush(struct iommu *iommu);
 
 #define PT_IRQ_TIME_OUT MILLISECS(8)
 #define VTDPREFIX "[VT-D]"
@@ -103,7 +108,8 @@ struct iommu_ops {
     void (*teardown)(struct domain *d);
     int (*map_page)(struct domain *d, unsigned long gfn, unsigned long mfn);
     int (*unmap_page)(struct domain *d, unsigned long gfn);
-    void (*reassign_device)(struct domain *s, struct domain *t, u8 bus, u8 devfn);
+    void (*reassign_device)(struct domain *s, struct domain *t,
+                            u8 bus, u8 devfn);
 };
 
 #endif /* _IOMMU_H_ */

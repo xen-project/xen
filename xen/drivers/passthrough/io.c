@@ -18,32 +18,8 @@
  * Copyright (C) Xiaohui Xin <xiaohui.xin@intel.com>
  */
 
-#include <xen/init.h>
-#include <xen/config.h>
-#include <xen/init.h>
-#include <xen/mm.h>
-#include <xen/lib.h>
-#include <xen/errno.h>
-#include <xen/trace.h>
 #include <xen/event.h>
-#include <xen/hypercall.h>
-#include <asm/current.h>
-#include <asm/cpufeature.h>
-#include <asm/processor.h>
-#include <asm/msr.h>
-#include <asm/apic.h>
-#include <asm/paging.h>
-#include <asm/shadow.h>
-#include <asm/p2m.h>
-#include <asm/hvm/hvm.h>
-#include <asm/hvm/support.h>
-#include <asm/hvm/vpt.h>
-#include <asm/hvm/vpic.h>
-#include <asm/hvm/vlapic.h>
-#include <public/sched.h>
-#include <xen/iocap.h>
-#include <public/hvm/ioreq.h>
-#include <public/domctl.h>
+#include <xen/iommu.h>
 
 static void pt_irq_time_out(void *data)
 {

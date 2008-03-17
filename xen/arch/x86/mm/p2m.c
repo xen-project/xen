@@ -27,7 +27,7 @@
 #include <asm/page.h>
 #include <asm/paging.h>
 #include <asm/p2m.h>
-#include <asm/iommu.h>
+#include <xen/iommu.h>
 
 /* Debugging and auditing of the P2M code? */
 #define P2M_AUDIT     0

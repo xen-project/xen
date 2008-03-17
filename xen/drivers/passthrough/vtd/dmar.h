@@ -22,7 +22,7 @@
 #define _DMAR_H_
 
 #include <xen/list.h>
-#include <asm/iommu.h>
+#include <xen/iommu.h>
 
 extern u8 dmar_host_address_width;
 

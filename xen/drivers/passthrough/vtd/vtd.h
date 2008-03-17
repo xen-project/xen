@@ -21,16 +21,7 @@
 #ifndef _VTD_H_
 #define _VTD_H_
 
-#include <xen/list.h>
-#include <asm/iommu.h>
-
-#define VTDPREFIX "[VT-D]"
-
-#define DMAR_OPERATION_TIMEOUT (HZ*60) /* 1m */
-#define time_after(a,b)         \
-        (typecheck(unsigned long, a) && \
-         typecheck(unsigned long, b) && \
-         ((long)(b) - (long)(a) < 0))
+#include <xen/iommu.h>
 
 struct IO_APIC_route_remap_entry {
     union {

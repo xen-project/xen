@@ -19,7 +19,7 @@
  */
 
 #include <xen/sched.h>
-#include <asm/hvm/iommu.h>
+#include <xen/hvm/iommu.h>
 #include <asm/amd-iommu.h>
 #include <asm/hvm/svm/amd-iommu-proto.h>
 

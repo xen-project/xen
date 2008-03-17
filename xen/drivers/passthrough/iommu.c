@@ -13,17 +13,8 @@
  * Place - Suite 330, Boston, MA 02111-1307 USA.
  */
 
-#include <xen/init.h>
-#include <xen/irq.h>
-#include <xen/spinlock.h>
 #include <xen/sched.h>
-#include <xen/xmalloc.h>
-#include <xen/domain_page.h>
-#include <asm/delay.h>
-#include <asm/string.h>
-#include <asm/mm.h>
-#include <asm/iommu.h>
-#include <asm/hvm/vmx/intel-iommu.h>
+#include <xen/iommu.h>
 
 extern struct iommu_ops intel_iommu_ops;
 extern struct iommu_ops amd_iommu_ops;

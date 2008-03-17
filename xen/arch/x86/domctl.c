@@ -26,7 +26,7 @@
 #include <asm/hvm/cacheattr.h>
 #include <asm/processor.h>
 #include <xsm/xsm.h>
-#include <asm/iommu.h>
+#include <xen/iommu.h>
 
 long arch_do_domctl(
     struct xen_domctl *domctl,
