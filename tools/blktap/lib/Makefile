@@ -5,8 +5,9 @@ MAJOR    = 3.0
 MINOR    = 0
 SONAME   = libblktap.so.$(MAJOR)
 
-INCLUDES += -I. -I.. -I $(XEN_LIBXC) -I$(XEN_INCLUDE) $(CFLAGS_libxenstore)
-
+CFLAGS   += -I.
+CFLAGS   += $(CFLAGS_libxenctrl)
+CFLAGS   += $(CFLAGS_libxenstore)
 LDFLAGS  += $(LDFLAGS_libxenstore)
 
 SRCS     :=
@@ -20,23 +21,18 @@ CFLAGS   += -D _GNU_SOURCE
 
 # Get gcc to generate the dependencies for us.
 CFLAGS   += -Wp,-MD,.$(@F).d
-CFLAGS   += $(INCLUDES) 
 DEPS     = .*.d
 
-OBJS     = $(patsubst %.c,%.o,$(SRCS))
+OBJS     = $(SRCS:.c=.o)
+OBJS_PIC = $(SRCS:.c=.opic)
 IBINS   :=
 
 LIB      = libblktap.a libblktap.so.$(MAJOR).$(MINOR)
 
 .PHONY: all
-all: build
+all: $(LIB)
 
-.PHONY: build
-build: libblktap.a
-
-.PHONY: libblktap
-libblktap: libblktap.a
-
+.PHONY: install
 install: all
 	$(INSTALL_DIR) $(DESTDIR)$(LIBDIR)
 	$(INSTALL_DIR) $(DESTDIR)$(INCLUDEDIR)
@@ -45,19 +41,20 @@ install: all
 	ln -sf libblktap.so.$(MAJOR) $(DESTDIR)$(LIBDIR)/libblktap.so
 	$(INSTALL_DATA) blktaplib.h $(DESTDIR)$(INCLUDEDIR)
 
+.PHONY: clean
 clean:
 	rm -rf *.a *.so* *.o *.rpm $(LIB) *~ $(DEPS) xen TAGS
 
-libblktap.a: $(OBJS) 
+libblktap.so.$(MAJOR).$(MINOR): $(OBJS_PIC) 
 	$(CC) $(CFLAGS) -Wl,$(SONAME_LDFLAG) -Wl,$(SONAME) $(SHLIB_CFLAGS) \
-	      -L$(XEN_XENSTORE) $(LDFLAGS)                                 \
-	      -o libblktap.so.$(MAJOR).$(MINOR) $^ $(LIBS)
+	      $(LDFLAGS) -o $@ $^
 	ln -sf libblktap.so.$(MAJOR).$(MINOR) libblktap.so.$(MAJOR)
 	ln -sf libblktap.so.$(MAJOR) libblktap.so
-	$(AR) rc $@ libblktap.so
 
-.PHONY: TAGS all build clean install libblktap
+libblktap.a: $(OBJS) 
+	$(AR) rc $@ $^
 
+.PHONY: TAGS
 TAGS:
 	etags -t $(SRCS) *.h
 
