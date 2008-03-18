@@ -870,7 +870,7 @@ void vmcs_dump_vcpu(struct vcpu *v)
     x  = (unsigned long long)vmr(TSC_OFFSET_HIGH) << 32;
     x |= (uint32_t)vmr(TSC_OFFSET);
     printk("TSC Offset = %016llx\n", x);
-    x  = (unsigned long long)vmr(GUEST_IA32_DEBUGCTL) << 32;
+    x  = (unsigned long long)vmr(GUEST_IA32_DEBUGCTL_HIGH) << 32;
     x |= (uint32_t)vmr(GUEST_IA32_DEBUGCTL);
     printk("DebugCtl=%016llx DebugExceptions=%016llx\n", x,
            (unsigned long long)vmr(GUEST_PENDING_DBG_EXCEPTIONS));
