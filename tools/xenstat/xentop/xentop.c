@@ -1121,6 +1121,7 @@ int main(int argc, char **argv)
 		do {
 			gettimeofday(&curtime, NULL);
 			top();
+			fflush(stdout);
 			oldtime = curtime;
 			if ((!loop) && !(--iterations))
 				break;
