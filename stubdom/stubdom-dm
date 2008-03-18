@@ -14,18 +14,30 @@ domid=
 domname=
 vncviewer=0
 vncpid=
+extra=
 while [ "$#" -gt 0 ];
 do
     if [ "$#" -ge 2 ];
     then
 	case "$1" in
-	    -d) domid=$2; shift ;;
-	    -domain-name) domname=$2; shift ;;
+	    -d)
+                domid=$2;
+                extra="$extra -d $domid";
+                shift
+                ;;
+	    -domain-name)
+                domname=$2;
+                shift
+                ;;
 	    -vnc)
 		ip=${2%:*};
 		vnc_port=${2#*:};
 		shift
 		;;
+            -loadvm)
+                extra="$extra -loadvm $2";
+                shift
+                ;;
 	esac
     fi
     case "$1" in
@@ -60,7 +72,7 @@ do
 	sleep 1
 done
 
-creation="xm create -c stubdom-$domname target=$domid memory=32"
+creation="xm create -c stubdom-$domname target=$domid memory=32 extra=\"$extra\""
 
 (while true ; do sleep 60 ; done) | $creation &
 #xterm -geometry +0+0 -e /bin/sh -c "$creation ; echo ; echo press ENTER to shut down ; read" &

@@ -81,7 +81,7 @@ static void waitForDevice(char *fn)
 
 #define DIRECT_PCI_STR_LEN 160
 char direct_pci_str[DIRECT_PCI_STR_LEN];
-void xenstore_parse_domain_config(int domid)
+void xenstore_parse_domain_config(int hvm_domid)
 {
     char **e = NULL;
     char *buf = NULL, *path;
@@ -100,7 +100,7 @@ void xenstore_parse_domain_config(int domid)
         return;
     }
 
-    path = xs_get_domain_path(xsh, domid);
+    path = xs_get_domain_path(xsh, hvm_domid);
     if (path == NULL) {
         fprintf(logfile, "xs_get_domain_path() error\n");
         goto out;
