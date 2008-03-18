@@ -90,6 +90,7 @@ class ImageHandler:
                         ("image/kernel", self.kernel),
                         ("image/cmdline", self.cmdline),
                         ("image/ramdisk", self.ramdisk))
+        self.vm.permissionsVm("image/cmdline", { 'dom': self.vm.getDomid(), 'read': True } )
 
         self.device_model = vmConfig['platform'].get('device_model')
 
