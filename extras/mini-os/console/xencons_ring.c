@@ -86,6 +86,7 @@ int xencons_ring_init(void)
 		printk("XEN console request chn bind failed %i\n", err);
 		return err;
 	}
+        unmask_evtchn(start_info.console.domU.evtchn);
 
 	/* In case we have in-flight data after save/restore... */
 	notify_daemon();

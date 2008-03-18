@@ -165,14 +165,6 @@ static int port_alloc(int xce_handle) {
     return i;
 }
 
-static void poke_port(int xce_handle, evtchn_port_t port)
-{
-    shared_info_t *s = HYPERVISOR_shared_info;
-    printk("poking port %d\n", port);
-    synch_set_bit(port, &s->evtchn_pending[0]);
-    xc_evtchn_unmask(xce_handle, port);
-}
-
 static void evtchn_handler(evtchn_port_t port, struct pt_regs *regs, void *data)
 {
     int xce_handle = (intptr_t) data;
@@ -211,6 +203,7 @@ evtchn_port_or_error_t xc_evtchn_bind_unbound_port(int xce_handle, int domid)
     }
     files[xce_handle].evtchn.ports[i].bound = 1;
     files[xce_handle].evtchn.ports[i].port = port;
+    unmask_evtchn(port);
     return port;
 }
 
@@ -235,9 +228,7 @@ evtchn_port_or_error_t xc_evtchn_bind_interdomain(int xce_handle, int domid,
     }
     files[xce_handle].evtchn.ports[i].bound = 1;
     files[xce_handle].evtchn.ports[i].port = local_port;
-/* Poke port on start: HVM won't send an event for the very first request since
- * we were not ready yet */
-    poke_port(xce_handle, local_port);
+    unmask_evtchn(local_port);
     return local_port;
 }
 
@@ -275,6 +266,7 @@ evtchn_port_or_error_t xc_evtchn_bind_virq(int xce_handle, unsigned int virq)
     }
     files[xce_handle].evtchn.ports[i].bound = 1;
     files[xce_handle].evtchn.ports[i].port = port;
+    unmask_evtchn(port);
     return port;
 }
 

@@ -257,6 +257,7 @@ void init_xenbus(void)
     err = bind_evtchn(start_info.store_evtchn,
 		      xenbus_evtchn_handler,
               NULL);
+    unmask_evtchn(start_info.store_evtchn);
     DEBUG("xenbus on irq %d\n", err);
 }
 

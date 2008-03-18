@@ -943,6 +943,7 @@ static int init_fs_import(struct fs_import *import)
                                 //ANY_CPU, 
                                 import, 
                                 &import->local_port));
+    unmask_evtchn(import->local_port);
 
     
     self_id = get_self_id(); 

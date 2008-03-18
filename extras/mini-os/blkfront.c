@@ -43,7 +43,7 @@ struct blkfront_dev {
 
     struct blkif_front_ring ring;
     grant_ref_t ring_ref;
-    evtchn_port_t evtchn, local_port;
+    evtchn_port_t evtchn;
     blkif_vdev_t handle;
 
     char *nodename;
@@ -92,14 +92,9 @@ struct blkfront_dev *init_blkfront(char *nodename, uint64_t *sectors, unsigned *
     dev = malloc(sizeof(*dev));
     dev->nodename = strdup(nodename);
 
-    evtchn_alloc_unbound_t op;
-    op.dom = DOMID_SELF;
     snprintf(path, sizeof(path), "%s/backend-id", nodename);
-    dev->dom = op.remote_dom = xenbus_read_integer(path); 
-    HYPERVISOR_event_channel_op(EVTCHNOP_alloc_unbound, &op);
-    clear_evtchn(op.port);        /* Without, handler gets invoked now! */
-    dev->local_port = bind_evtchn(op.port, blkfront_handler, dev);
-    dev->evtchn=op.port;
+    dev->dom = xenbus_read_integer(path); 
+    evtchn_alloc_unbound(dev->dom, blkfront_handler, dev, &dev->evtchn);
 
     s = (struct blkif_sring*) alloc_page();
     memset(s,0,PAGE_SIZE);
@@ -194,6 +189,7 @@ done:
         snprintf(path, sizeof(path), "%s/feature-flush-cache", dev->backend);
         dev->flush = xenbus_read_integer(path);
     }
+    unmask_evtchn(dev->evtchn);
 
     printk("%u sectors of %u bytes\n", dev->sectors, dev->sector_size);
     printk("**************************\n");
@@ -219,7 +215,7 @@ void shutdown_blkfront(struct blkfront_dev *dev)
     err = xenbus_printf(XBT_NIL, nodename, "state", "%u", 6);
     xenbus_wait_for_value(path,"6");
 
-    unbind_evtchn(dev->local_port);
+    unbind_evtchn(dev->evtchn);
 
     free(nodename);
     free(dev->backend);

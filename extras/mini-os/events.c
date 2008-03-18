@@ -87,9 +87,6 @@ evtchn_port_t bind_evtchn(evtchn_port_t port, evtchn_handler_t handler,
 	wmb();
 	ev_actions[port].handler = handler;
 
-	/* Finally unmask the port */
-	unmask_evtchn(port);
-
 	return port;
 }
 
@@ -191,8 +188,7 @@ int evtchn_bind_interdomain(domid_t pal, evtchn_port_t remote_port,
     if (err)
 		return err;
     set_bit(op.local_port,bound_ports);
-	evtchn_port_t port = op.local_port;
-    clear_evtchn(port);	      /* Without, handler gets invoked now! */
+    evtchn_port_t port = op.local_port;
     *local_port = bind_evtchn(port, handler, data);
     return err;
 }

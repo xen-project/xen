@@ -26,7 +26,7 @@ struct kbdfront_dev {
     domid_t dom;
 
     struct xenkbd_page *page;
-    evtchn_port_t evtchn, local_port;
+    evtchn_port_t evtchn;
 
     char *nodename;
     char *backend;
@@ -68,14 +68,9 @@ struct kbdfront_dev *init_kbdfront(char *nodename, int abs_pointer)
     dev = malloc(sizeof(*dev));
     dev->nodename = strdup(nodename);
 
-    evtchn_alloc_unbound_t op;
-    op.dom = DOMID_SELF;
     snprintf(path, sizeof(path), "%s/backend-id", nodename);
-    dev->dom = op.remote_dom = xenbus_read_integer(path); 
-    HYPERVISOR_event_channel_op(EVTCHNOP_alloc_unbound, &op);
-    clear_evtchn(op.port);        /* Without, handler gets invoked now! */
-    dev->local_port = bind_evtchn(op.port, kbdfront_handler, dev);
-    dev->evtchn=op.port;
+    dev->dom = xenbus_read_integer(path); 
+    evtchn_alloc_unbound(dev->dom, kbdfront_handler, dev, &dev->evtchn);
 
     dev->page = s = (struct xenkbd_page*) alloc_page();
     memset(s,0,PAGE_SIZE);
@@ -151,6 +146,7 @@ done:
 
         err = xenbus_printf(XBT_NIL, nodename, "state", "%u", 4); /* connected */
     }
+    unmask_evtchn(dev->evtchn);
 
     printk("************************** KBDFRONT\n");
 
@@ -208,7 +204,7 @@ void shutdown_kbdfront(struct kbdfront_dev *dev)
     err = xenbus_printf(XBT_NIL, nodename, "state", "%u", 6);
     xenbus_wait_for_value(path,"6");
 
-    unbind_evtchn(dev->local_port);
+    unbind_evtchn(dev->evtchn);
 
     free_pages(dev->page,0);
     free(nodename);
@@ -241,7 +237,7 @@ struct fbfront_dev {
     domid_t dom;
 
     struct xenfb_page *page;
-    evtchn_port_t evtchn, local_port;
+    evtchn_port_t evtchn;
 
     char *nodename;
     char *backend;
@@ -281,14 +277,9 @@ struct fbfront_dev *init_fbfront(char *nodename, void *data, int width, int heig
     dev = malloc(sizeof(*dev));
     dev->nodename = strdup(nodename);
 
-    evtchn_alloc_unbound_t op;
-    op.dom = DOMID_SELF;
     snprintf(path, sizeof(path), "%s/backend-id", nodename);
-    dev->dom = op.remote_dom = xenbus_read_integer(path); 
-    HYPERVISOR_event_channel_op(EVTCHNOP_alloc_unbound, &op);
-    clear_evtchn(op.port);        /* Without, handler gets invoked now! */
-    dev->local_port = bind_evtchn(op.port, fbfront_handler, dev);
-    dev->evtchn=op.port;
+    dev->dom = xenbus_read_integer(path); 
+    evtchn_alloc_unbound(dev->dom, fbfront_handler, dev, &dev->evtchn);
 
     dev->page = s = (struct xenfb_page*) alloc_page();
     memset(s,0,PAGE_SIZE);
@@ -397,6 +388,7 @@ done:
 
         err = xenbus_printf(XBT_NIL, nodename, "state", "%u", 4); /* connected */
     }
+    unmask_evtchn(dev->evtchn);
 
     printk("************************** FBFRONT\n");
 
@@ -462,7 +454,7 @@ void shutdown_fbfront(struct fbfront_dev *dev)
     err = xenbus_printf(XBT_NIL, nodename, "state", "%u", 6);
     xenbus_wait_for_value(path,"6");
 
-    unbind_evtchn(dev->local_port);
+    unbind_evtchn(dev->evtchn);
 
     free_pages(dev->page,0);
     free(nodename);
