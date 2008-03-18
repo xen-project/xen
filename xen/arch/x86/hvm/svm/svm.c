@@ -1170,7 +1170,7 @@ static void svm_vmexit_do_hlt(struct vmcb_struct *vmcb,
 
     inst_len = __get_instruction_length(curr, INSTR_HLT, NULL);
     if ( inst_len == 0 )
-        return 0;
+        return;
     __update_guest_eip(regs, inst_len);
 
     /* Check for pending exception or new interrupt. */
