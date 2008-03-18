@@ -430,7 +430,9 @@ VL_OBJS+= cirrus_vga.o parallel.o acpi.o
 VL_OBJS+= usb-uhci.o smbus_eeprom.o
 VL_OBJS+= piix4acpi.o
 VL_OBJS+= xenstore.o
+ifndef CONFIG_STUBDOM
 VL_OBJS+= xen_blktap.o
+endif
 VL_OBJS+= xen_platform.o
 VL_OBJS+= xen_machine_fv.o
 VL_OBJS+= xen_machine_pv.o

@@ -45,8 +45,10 @@ static void xen_init_pv(uint64_t ram_size, int vga_ram_size, char *boot_device,
     extern int domid;
 
 
+#ifndef CONFIG_STUBDOM
     /* Initialize tapdisk client */
     init_blktap();
+#endif
 
     /* Connect to text console */
     if (serial_hds[0]) {
