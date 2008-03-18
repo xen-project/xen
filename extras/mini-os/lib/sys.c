@@ -837,9 +837,19 @@ int select(int nfds, fd_set *readfds, fd_set *writefds, fd_set *exceptfds,
     add_waiter(w4, xenbus_watch_queue);
     add_waiter(w5, kbdfront_queue);
 
-    myread = *readfds;
-    mywrite = *writefds;
-    myexcept = *exceptfds;
+    if (readfds)
+        myread = *readfds;
+    else
+        FD_ZERO(&myread);
+    if (writefds)
+        mywrite = *writefds;
+    else
+        FD_ZERO(&mywrite);
+    if (exceptfds)
+        myexcept = *exceptfds;
+    else
+        FD_ZERO(&myexcept);
+
     DEBUG("polling ");
     dump_set(nfds, &myread, &mywrite, &myexcept, timeout);
     DEBUG("\n");
@@ -878,9 +888,19 @@ int select(int nfds, fd_set *readfds, fd_set *writefds, fd_set *exceptfds,
 	thread->wakeup_time = stop;
     schedule();
 
-    myread = *readfds;
-    mywrite = *writefds;
-    myexcept = *exceptfds;
+    if (readfds)
+        myread = *readfds;
+    else
+        FD_ZERO(&myread);
+    if (writefds)
+        mywrite = *writefds;
+    else
+        FD_ZERO(&mywrite);
+    if (exceptfds)
+        myexcept = *exceptfds;
+    else
+        FD_ZERO(&myexcept);
+
     n = select_poll(nfds, &myread, &mywrite, &myexcept);
 
     if (n) {
