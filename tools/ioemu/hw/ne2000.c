@@ -834,6 +834,10 @@ void pci_ne2000_init(PCIBus *bus, NICInfo *nd, int devfn)
     pci_conf[0x0a] = 0x00; // ethernet network controller 
     pci_conf[0x0b] = 0x02;
     pci_conf[0x0e] = 0x00; // header_type
+    pci_conf[0x2c] = 0x53; /* subsystem vendor: XenSource */
+    pci_conf[0x2d] = 0x58;
+    pci_conf[0x2e] = 0x01; /* subsystem device */
+    pci_conf[0x2f] = 0x00;
     pci_conf[0x3d] = 1; // interrupt pin 0
     
     pci_register_io_region(&d->dev, 0, 0x100, 
