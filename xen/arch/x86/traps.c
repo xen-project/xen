@@ -677,32 +677,75 @@ static int emulate_forced_invalid_op(struct cpu_user_regs *regs)
         : "=a" (a), "=b" (b), "=c" (c), "=d" (d)
         : "0" (a), "1" (b), "2" (c), "3" (d) );
 
-    if ( regs->eax == 1 )
+    if ( (regs->eax & 0x7fffffff) == 1 )
     {
         /* Modify Feature Information. */
         __clear_bit(X86_FEATURE_VME, &d);
         __clear_bit(X86_FEATURE_PSE, &d);
         __clear_bit(X86_FEATURE_PGE, &d);
+        __clear_bit(X86_FEATURE_MCE, &d);
+        __clear_bit(X86_FEATURE_MCA, &d);
+        if ( !IS_PRIV(current->domain) )
+            __clear_bit(X86_FEATURE_MTRR, &d);
+        __clear_bit(X86_FEATURE_PSE36, &d);
+    }
+    switch ( (uint32_t)regs->eax )
+    {
+    case 1:
+        /* Modify Feature Information. */
         if ( !cpu_has_sep )
             __clear_bit(X86_FEATURE_SEP, &d);
 #ifdef __i386__
         if ( !supervisor_mode_kernel )
             __clear_bit(X86_FEATURE_SEP, &d);
 #endif
-        if ( !IS_PRIV(current->domain) )
-            __clear_bit(X86_FEATURE_MTRR, &d);
-    }
-    else if ( regs->eax == 0x80000001 )
-    {
+        __clear_bit(X86_FEATURE_DS, &d);
+        __clear_bit(X86_FEATURE_ACC, &d);
+        __clear_bit(X86_FEATURE_PBE, &d);
+
+        __clear_bit(X86_FEATURE_DTES64 % 32, &c);
+        __clear_bit(X86_FEATURE_MWAIT % 32, &c);
+        __clear_bit(X86_FEATURE_DSCPL % 32, &c);
+        __clear_bit(X86_FEATURE_VMXE % 32, &c);
+        __clear_bit(X86_FEATURE_SMXE % 32, &c);
+        __clear_bit(X86_FEATURE_EST % 32, &c);
+        __clear_bit(X86_FEATURE_TM2 % 32, &c);
+        if ( is_pv_32bit_vcpu(current) )
+            __clear_bit(X86_FEATURE_CX16 % 32, &c);
+        __clear_bit(X86_FEATURE_XTPR % 32, &c);
+        __clear_bit(X86_FEATURE_PDCM % 32, &c);
+        __clear_bit(X86_FEATURE_DCA % 32, &c);
+        break;
+    case 0x80000001:
         /* Modify Feature Information. */
-#ifdef __i386__
-        __clear_bit(X86_FEATURE_SYSCALL % 32, &d);
+        if ( is_pv_32bit_vcpu(current) )
+        {
+            __clear_bit(X86_FEATURE_LM % 32, &d);
+            __clear_bit(X86_FEATURE_LAHF_LM % 32, &c);
+        }
+#ifndef __i386__
+        if ( is_pv_32on64_vcpu(current) &&
+             boot_cpu_data.x86_vendor != X86_VENDOR_AMD )
 #endif
+            __clear_bit(X86_FEATURE_SYSCALL % 32, &d);
+        __clear_bit(X86_FEATURE_PAGE1GB % 32, &d);
         __clear_bit(X86_FEATURE_RDTSCP % 32, &d);
-    }
-    else
-    {
+
+        __clear_bit(X86_FEATURE_SVME % 32, &c);
+        __clear_bit(X86_FEATURE_OSVW % 32, &c);
+        __clear_bit(X86_FEATURE_IBS % 32, &c);
+        __clear_bit(X86_FEATURE_SKINIT % 32, &c);
+        __clear_bit(X86_FEATURE_WDT % 32, &c);
+        break;
+    case 5: /* MONITOR/MWAIT */
+    case 0xa: /* Architectural Performance Monitor Features */
+    case 0x8000000a: /* SVM revision and features */
+    case 0x8000001b: /* Instruction Based Sampling */
+        a = b = c = d = 0;
+        break;
+    default:
         (void)cpuid_hypervisor_leaves(regs->eax, &a, &b, &c, &d);
+        break;
     }
 
     regs->eax = a;
@@ -2034,6 +2077,15 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
         case MSR_EFER:
             if ( rdmsr_safe(regs->ecx, regs->eax, regs->edx) )
                 goto fail;
+            break;
+        case MSR_IA32_MISC_ENABLE:
+            if ( rdmsr_safe(regs->ecx, regs->eax, regs->edx) )
+                goto fail;
+            regs->eax &= ~(MSR_IA32_MISC_ENABLE_PERF_AVAIL |
+                           MSR_IA32_MISC_ENABLE_MONITOR_ENABLE);
+            regs->eax |= MSR_IA32_MISC_ENABLE_BTS_UNAVAIL |
+                         MSR_IA32_MISC_ENABLE_PEBS_UNAVAIL |
+                         MSR_IA32_MISC_ENABLE_XTPR_DISABLE;
             break;
         default:
             if ( rdmsr_hypervisor_regs(regs->ecx, &l, &h) )
