@@ -47,7 +47,7 @@
 #define ACPI_USE_SYSTEM_CLIBRARY
 #define ACPI_USE_DO_WHILE_0
 
-#if 1/*def __KERNEL__*/
+#ifdef __XEN__
 
 #include <xen/config.h>
 #include <xen/string.h>
@@ -71,7 +71,7 @@
 /* Full namespace pathname length limit - arbitrary */
 #define ACPI_PATHNAME_MAX              256
 
-#else				/* !__KERNEL__ */
+#else				/* !__XEN__ */
 
 #include <stdarg.h>
 #include <string.h>
@@ -95,7 +95,7 @@
 #endif
 
 #define ACPI_FLUSH_CPU_CACHE()
-#endif				/* __KERNEL__ */
+#endif				/* __XEN__ */
 
 /* Linux uses GCC */
 

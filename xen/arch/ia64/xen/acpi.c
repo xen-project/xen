@@ -74,7 +74,7 @@ acpi_get_sysname (void)
 {
 /* #ifdef CONFIG_IA64_GENERIC */
 	unsigned long rsdp_phys;
-	struct acpi20_table_rsdp *rsdp;
+	struct acpi_table_rsdp *rsdp;
 	struct acpi_table_xsdt *xsdt;
 	struct acpi_table_header *hdr;
 
@@ -84,15 +84,15 @@ acpi_get_sysname (void)
 		return "dig";
 	}
 
-	rsdp = (struct acpi20_table_rsdp *) __va(rsdp_phys);
-	if (strncmp(rsdp->signature, RSDP_SIG, sizeof(RSDP_SIG) - 1)) {
+	rsdp = (struct acpi_table_rsdp *) __va(rsdp_phys);
+	if (strncmp(rsdp->signature, ACPI_SIG_RSDP, sizeof(ACPI_SIG_RSDP) - 1)) {
 		printk(KERN_ERR "ACPI 2.0 RSDP signature incorrect, default to \"dig\"\n");
 		return "dig";
 	}
 
-	xsdt = (struct acpi_table_xsdt *) __va(rsdp->xsdt_address);
+	xsdt = (struct acpi_table_xsdt *) __va(rsdp->xsdt_physical_address);
 	hdr = &xsdt->header;
-	if (strncmp(hdr->signature, XSDT_SIG, sizeof(XSDT_SIG) - 1)) {
+	if (strncmp(hdr->signature, ACPI_SIG_XSDT, sizeof(ACPI_SIG_XSDT) - 1)) {
 		printk(KERN_ERR "ACPI 2.0 XSDT signature incorrect, default to \"dig\"\n");
 		return "dig";
 	}
@@ -356,14 +356,14 @@ acpi_parse_madt (unsigned long phys_addr, unsigned long size)
 #ifdef CONFIG_ITANIUM
 	has_8259 = 1; /* Firmware on old Itanium systems is broken */
 #else
-	has_8259 = acpi_madt->flags.pcat_compat;
+	has_8259 = acpi_madt->flags & ACPI_MADT_PCAT_COMPAT;
 #endif
 	iosapic_system_init(has_8259);
 
 	/* Get base address of IPI Message Block */
 
-	if (acpi_madt->lapic_address)
-		ipi_base_addr = (void __iomem *) ioremap(acpi_madt->lapic_address, 0);
+	if (acpi_madt->address)
+		ipi_base_addr = (void __iomem *)ioremap(acpi_madt->address, 0);
 
 	printk(KERN_INFO PREFIX "Local APIC address %p\n", ipi_base_addr);
 
@@ -416,7 +416,7 @@ acpi_numa_slit_init (struct acpi_table_slit *slit)
 	u32 len;
 
 	len = sizeof(struct acpi_table_header) + 8
-		+ slit->localities * slit->localities;
+		+ slit->locality_count * slit->locality_count;
 	if (slit->header.length != len) {
 		printk(KERN_ERR "ACPI 2.0 SLIT: size mismatch: %d expected, %d actual\n",
 		       len, slit->header.length);
@@ -519,21 +519,24 @@ acpi_numa_arch_fixup (void)
 	for (i = 0; i < srat_num_cpus; i++)
 		node_cpuid[i].nid = pxm_to_nid_map[node_cpuid[i].nid];
 
-	printk(KERN_INFO "Number of logical nodes in system = %d\n", numnodes);
-	printk(KERN_INFO "Number of memory chunks in system = %d\n", num_node_memblks);
+	printk(KERN_INFO "Number of logical nodes in system = %d\n",
+	       numnodes);
+	printk(KERN_INFO "Number of memory chunks in system = %d\n",
+	       num_node_memblks);
 
-	if (!slit_table) return;
+	if (!slit_table)
+		return;
 	memset(numa_slit, -1, sizeof(numa_slit));
-	for (i=0; i<slit_table->localities; i++) {
+	for (i = 0; i < slit_table->locality_count; i++) {
 		if (!pxm_bit_test(i))
 			continue;
 		node_from = pxm_to_nid_map[i];
-		for (j=0; j<slit_table->localities; j++) {
+		for (j=0; j < slit_table->locality_count; j++) {
 			if (!pxm_bit_test(j))
 				continue;
 			node_to = pxm_to_nid_map[j];
 			node_distance(node_from, node_to) =
-				slit_table->entry[i*slit_table->localities + j];
+			    slit_table->entry[i * slit_table->locality_count + j];
 		}
 	}
 
