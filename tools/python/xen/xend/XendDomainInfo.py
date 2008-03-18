@@ -558,18 +558,17 @@ class XendDomainInfo:
             count += 1
 
 
-    def pci_device_create(self, dev_config):
-        log.debug("XendDomainInfo.pci_device_create: %s" % scrub_password(dev_config))
+    def hvm_pci_device_create(self, dev_config):
+        log.debug("XendDomainInfo.hvm_pci_device_create: %s"
+                  % scrub_password(dev_config))
 
         if not self.info.is_hvm():
-            raise VmError("only HVM guest support pci attach")
+            raise VmError("hvm_pci_device_create called on non-HVM guest")
 
         #all the PCI devs share one conf node
         devid = '0'
 
-        dev_type = sxp.name(dev_config)
-        new_devs = sxp.child_value(dev_config, 'devs')
-        new_dev = new_devs[0]
+        new_dev = dev_config['devs'][0]
         dev_info = self._getDeviceInfo_pci(devid)#from self.info['devices']
 
         #check conflict before trigger hotplug event
@@ -611,35 +610,6 @@ class XendDomainInfo:
                 new_dev['vslt'])
         self.image.signalDeviceModel('pci-ins', 'pci-inserted', bdf_str)
 
-        # update the virtual pci slot
-        vslt = xstransact.Read("/local/domain/0/device-model/%i/parameter"
-                          % self.getDomid())
-        new_dev['vslt'] = vslt
-
-        if dev_info is None:
-            # create a new one from scrach
-            dev_cfg_sxp = [dev_type,
-                ['dev',
-                  ['domain', new_dev['domain']],
-                  ['bus',    new_dev['bus']],
-                  ['slot',   new_dev['slot']],
-                  ['func',   new_dev['func']],
-                  ['vslt',   new_dev['vslt']]
-                ]]
-            dev_uuid = self.info.device_add(dev_type, cfg_sxp = dev_cfg_sxp)
-            dev_config_dict = self.info['devices'][dev_uuid][1]
-            try:
-                dev_config_dict['devid'] = devid = \
-                    self._createDevice(dev_type, dev_config_dict)
-                self._waitForDevice(dev_type, devid)
-            except VmError, ex:
-                raise ex
-        else:
-            # update the pci config to add the new dev
-            pci_devs.extend(new_devs)
-            self._reconfigureDevice('pci', devid, pci_conf)
-
-        return self.getDeviceController('pci').sxpr(devid)
 
     def device_create(self, dev_config):
         """Create a new device.
@@ -649,11 +619,6 @@ class XendDomainInfo:
         """
         log.debug("XendDomainInfo.device_create: %s" % scrub_password(dev_config))
         dev_type = sxp.name(dev_config)
-
-        if dev_type == 'pci':
-            rc = self.pci_device_create(dev_config)
-            return rc
-
         dev_uuid = self.info.device_add(dev_type, cfg_sxp = dev_config)
         dev_config_dict = self.info['devices'][dev_uuid][1]
         log.debug("XendDomainInfo.device_create: %s" % scrub_password(dev_config_dict))
@@ -676,6 +641,151 @@ class XendDomainInfo:
         xen.xend.XendDomain.instance().managed_config_save(self)
         return self.getDeviceController(dev_type).sxpr(devid)
 
+    def pci_convert_sxp_to_dict(self, dev_sxp):
+        """Convert pci device sxp to dict
+        @param dev_sxp: device configuration
+        @type  dev_sxp: SXP object (parsed config)
+        @return: dev_config
+        @rtype: dictionary
+        """
+        # In reconfigure phase, config of PCI device looks like below:
+        #
+        # sxp:
+        # [device, [pci, [dev, [domain, '0x0'], [bus, '0x0'], [slot, '0x0'],
+        #                      [func, '0x0'], [vslt, '0x0']],
+        #                [state, 'Initialising']]]
+        #
+        # dict:
+        # {devs: [{domain: '0x0', bus: '0x0', slot: '0x0', func: '0x0',
+        #          vslt: '0x0'}],
+        #  states: ['Initialising']}
+        #
+        # state 'Initialising' means the device is being attached.
+        # state 'Closing' means the device is being detached.
+
+        dev_config = {}
+        pci_devs = []
+        for pci_dev in sxp.children(dev_sxp, 'dev'):
+            pci_dev_info = {}
+            for opt_val in pci_dev[1:]:
+                try:
+                    opt, val = opt_val
+                    pci_dev_info[opt] = val
+                except TypeError:
+                    pass
+            pci_devs.append(pci_dev_info)
+        dev_config['devs'] = pci_devs 
+        pci_states = []
+        for pci_state in sxp.children(dev_sxp, 'state'):
+            try:
+                pci_states.append(pci_state[1])
+            except IndexError:
+                raise XendError("Error reading state while parsing pci sxp")
+        dev_config['states'] = pci_states
+        
+        return dev_config
+ 
+    def pci_device_configure(self, dev_sxp, devid = 0):
+        """Configure an existing pci device.
+        
+        @param dev_sxp: device configuration
+        @type  dev_sxp: SXP object (parsed config)
+        @param devid:      device id
+        @type  devid:      int
+        @return: Returns True if successfully updated device
+        @rtype: boolean
+        """
+        log.debug("XendDomainInfo.pci_device_configure: %s"
+                  % scrub_password(dev_sxp))
+
+        dev_class = sxp.name(dev_sxp)
+
+        if dev_class != 'pci':
+            return False
+
+        pci_state = sxp.child_value(dev_sxp, 'state')
+        existing_dev_info = self._getDeviceInfo_pci(devid)
+
+        if existing_dev_info is None and pci_state != 'Initialising':
+            raise XendError("Cannot detach when pci platform does not exist")
+
+        pci_dev = sxp.children(dev_sxp, 'dev')[0]
+        dev_config = self.pci_convert_sxp_to_dict(dev_sxp)
+        dev = dev_config['devs'][0]
+                
+        # Do HVM specific processing
+        if self.info.is_hvm():
+            if pci_state == 'Initialising':
+                # HVM PCI device attachment
+                self.hvm_pci_device_create(dev_config)
+                # Update vslt
+                vslt = xstransact.Read("/local/domain/0/device-model/%i/parameter"
+                                       % self.getDomid())
+                dev['vslt'] = vslt
+                for n in sxp.children(pci_dev):
+                    if(n[0] == 'vslt'):
+                        n[1] = vslt
+            else:
+                # HVM PCI device detachment
+                existing_dev_uuid = sxp.child_value(existing_dev_info, 'uuid')
+                existing_pci_conf = self.info['devices'][existing_dev_uuid][1]
+                existing_pci_devs = existing_pci_conf['devs']
+                vslt = '0x0'
+                for x in existing_pci_devs:
+                    if ( int(x['domain'], 16) == int(dev['domain'], 16) and
+                         int(x['bus'], 16) == int(dev['bus'], 16) and
+                         int(x['slot'], 16) == int(dev['slot'], 16) and
+                         int(x['func'], 16) == int(dev['func'], 16) ):
+                        vslt = x['vslt']
+                        break
+                if vslt == '0x0':
+                    raise VmError("Device %04x:%02x:%02x.%02x is not connected"
+                                  % (int(dev['domain'],16), int(dev['bus'],16),
+                                     int(dev['slot'],16), int(dev['func'],16)))
+                self.hvm_destroyPCIDevice(int(vslt, 16))
+                # Update vslt
+                dev['vslt'] = vslt
+                for n in sxp.children(pci_dev):
+                    if(n[0] == 'vslt'):
+                        n[1] = vslt
+
+        # If pci platform does not exist, create and exit.
+        if existing_dev_info is None:
+            self.device_create(dev_sxp)
+            return True
+
+        # use DevController.reconfigureDevice to change device config
+        dev_control = self.getDeviceController(dev_class)
+        dev_uuid = dev_control.reconfigureDevice(devid, dev_config)
+        if not self.info.is_hvm():
+            # in PV case, wait until backend state becomes connected.
+            dev_control.waitForDevice_reconfigure(devid)
+        num_devs = dev_control.cleanupDevice(devid)
+
+        # update XendConfig with new device info
+        if dev_uuid:
+            new_dev_sxp = dev_control.configuration(devid)
+            self.info.device_update(dev_uuid, new_dev_sxp)
+
+        # If there is no device left, destroy pci and remove config.
+        if num_devs == 0:
+            if self.info.is_hvm():
+                self.destroyDevice('pci', devid, True)
+                del self.info['devices'][dev_uuid]
+                platform = self.info['platform']
+                orig_dev_num = len(platform['pci'])
+                # TODO: can use this to keep some info to ask high level
+                # management tools to hot insert a new passthrough dev
+                # after migration
+                if orig_dev_num != 0:
+                    #platform['pci'] = ["%dDEVs" % orig_dev_num]
+                    platform['pci'] = []
+            else:
+                self.destroyDevice('pci', devid)
+                del self.info['devices'][dev_uuid]
+
+        return True
+
     def device_configure(self, dev_sxp, devid = None):
         """Configure an existing device.
         
@@ -690,6 +800,10 @@ class XendDomainInfo:
         # convert device sxp to a dict
         dev_class = sxp.name(dev_sxp)
         dev_config = {}
+
+        if dev_class == 'pci':
+            return self.pci_device_configure(dev_sxp)
+
         for opt_val in dev_sxp[1:]:
             try:
                 dev_config[opt_val[0]] = opt_val[1]
@@ -714,11 +828,11 @@ class XendDomainInfo:
         for devclass in XendDevices.valid_devices():
             self.getDeviceController(devclass).waitForDevices()
 
-    def destroyPCIDevice(self, vslot):
-        log.debug("destroyPCIDevice called %s", vslot)
+    def hvm_destroyPCIDevice(self, vslot):
+        log.debug("hvm_destroyPCIDevice called %s", vslot)
 
         if not self.info.is_hvm():
-            raise VmError("only HVM guest support pci detach")
+            raise VmError("hvm_destroyPCIDevice called on non-HVM guest")
 
         #all the PCI devs share one conf node
         devid = '0'
@@ -744,34 +858,15 @@ class XendDomainInfo:
             raise VmError("Device @ vslot 0x%x do not support hotplug." % (vslot))
 
         bdf_str = "%s:%s:%s.%s" % (x['domain'], x['bus'], x['slot'], x['func'])
-        log.info("destroyPCIDevice:%s:%s!", x, bdf_str)
+        log.info("hvm_destroyPCIDevice:%s:%s!", x, bdf_str)
 
         self.image.signalDeviceModel('pci-rem', 'pci-removed', bdf_str)
-
-        if pci_len > 1:
-            del pci_conf['devs'][devnum]
-            self._reconfigureDevice('pci', devid, pci_conf)
-        else:
-            self.getDeviceController('pci').destroyDevice(devid, True)
-            del self.info['devices'][dev_uuid]
-            platform = self.info['platform']
-            orig_dev_num = len(platform['pci'])
-
-            #need remove the pci config
-            #TODO:can use this to keep some info to ask high level management tools to hot insert a new passthrough dev after migration
-            if orig_dev_num != 0:
-#                platform['pci'] = ["%dDEVs" % orig_dev_num]
-                platform['pci'] = []
 
         return 0
 
     def destroyDevice(self, deviceClass, devid, force = False, rm_cfg = False):
         log.debug("XendDomainInfo.destroyDevice: deviceClass = %s, device = %s",
                   deviceClass, devid)
-
-        if deviceClass == 'dpci':
-            rc = self.destroyPCIDevice(devid)
-            return rc
 
         if rm_cfg:
             # Convert devid to device number.  A device number is

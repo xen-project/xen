@@ -51,6 +51,8 @@ xenbusState = {
     'Connected'    : 4,
     'Closing'      : 5,
     'Closed'       : 6,
+    'Reconfiguring': 7,
+    'Reconfigured' : 8,
     }
 
 xoptions = XendOptions.instance()
@@ -88,6 +90,8 @@ class DevController:
         (devid, back, front) = self.getDeviceDetails(config)
         if devid is None:
             return 0
+
+        self.setupDevice(config)
 
         (backpath, frontpath) = self.addStoreEntries(config, devid, back,
                                                      front)
@@ -198,6 +202,15 @@ class DevController:
 
         if status == Timeout:
             raise VmError("Device %s (%s) could not be disconnected. " %
+                          (devid, self.deviceClass))
+
+    def waitForDevice_reconfigure(self, devid):
+        log.debug("Waiting for %s - reconfigureDevice.", devid)
+
+        (status, err) = self.waitForBackend_reconfigure(devid)
+
+        if status == Timeout:
+            raise VmError("Device %s (%s) could not be reconfigured. " %
                           (devid, self.deviceClass))
 
 
@@ -325,6 +338,11 @@ class DevController:
         """
 
         raise NotImplementedError()
+
+    def setupDevice(self, config):
+        """ Setup device from config.
+        """
+        return
 
     def migrate(self, deviceConfig, network, dst, step, domName):
         """ Migration of a device. The 'network' parameter indicates
@@ -569,6 +587,22 @@ class DevController:
 
         return result['status']
 
+    def waitForBackend_reconfigure(self, devid):
+        frontpath = self.frontendPath(devid)
+        backpath = xstransact.Read(frontpath, "backend")
+        if backpath:
+            statusPath = backpath + '/' + "state"
+            ev = Event()
+            result = { 'status': Timeout }
+
+            xswatch(statusPath, xenbusStatusCallback, ev, result)
+
+            ev.wait(DEVICE_CREATE_TIMEOUT)
+
+            return (result['status'], None)
+        else:
+            return (Missing, None)
+
 
     def backendPath(self, backdom, devid):
         """Construct backend path given the backend domain and device id.
@@ -631,6 +665,22 @@ def deviceDestroyCallback(statusPath, ev, result):
         return 1
 
     log.debug("deviceDestroyCallback %d.", result['status'])
+
+    ev.set()
+    return 0
+
+
+def xenbusStatusCallback(statusPath, ev, result):
+    log.debug("xenbusStatusCallback %s.", statusPath)
+
+    status = xstransact.Read(statusPath)
+
+    if status == str(xenbusState['Connected']):
+        result['status'] = Connected
+    else:
+        return 1
+
+    log.debug("xenbusStatusCallback %d.", result['status'])
 
     ev.set()
     return 0

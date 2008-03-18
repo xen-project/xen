@@ -175,11 +175,11 @@ SUBCOMMAND_HELP = {
     'vnet-delete'   :  ('<VnetId>', 'Delete a Vnet.'),
     'vnet-list'     :  ('[-l|--long]', 'List Vnets.'),
     'vtpm-list'     :  ('<Domain> [--long]', 'List virtual TPM devices.'),
-    'pci-attach '   :  ('<Domain> <dom> <bus> <slot> <func> [virtual slot]',
+    'pci-attach'    :  ('<Domain> <domain:bus:slot.func> [virtual slot]',
                         'Insert a new pass-through pci device.'),
-    'pci-detach '   :  ('<Domain> <virtual slot>',
+    'pci-detach'    :  ('<Domain> <domain:bus:slot.func>',
                         'Remove a domain\'s pass-through pci device.'),
-    'pci-list'     :  ('<Domain>',
+    'pci-list'      :  ('<Domain>',
                         'List pass-through pci devices for a domain.'),
 
     # security
@@ -2232,29 +2232,37 @@ def xm_network_attach(args):
             vif.append(vif_param)
         server.xend.domain.device_create(dom, vif)
 
-def parse_pci_configuration(args):
+def parse_pci_configuration(args, state):
     dom = args[0]
-
-    if len(args) == 6:
-        vslt = args[5]
+    pci_dev_str = args[1]
+    if len(args) == 3:
+        vslt = args[2]
     else:
         vslt = '0x0' #chose a free virtual PCI slot
-
-    pci = ['pci',
-          ['devs',
-            [{'domain': "0x%x" % int(args[1], 16),
-              'bus':    "0x%x" % int(args[2], 16),
-              'slot':   "0x%x" % int(args[3], 16),
-              'func':   "0x%x" % int(args[4], 16),
-              'vslt':   "0x%x" % int(vslt,    16)}]
-          ]]
+    pci=['pci']
+    pci_match = re.match(r"((?P<domain>[0-9a-fA-F]{1,4})[:,])?" + \
+            r"(?P<bus>[0-9a-fA-F]{1,2})[:,]" + \
+            r"(?P<slot>[0-9a-fA-F]{1,2})[.,]" + \
+            r"(?P<func>[0-7])$", pci_dev_str)
+    if pci_match == None:
+        raise OptionError("Invalid argument: %s %s" % (pci_dev_str,vslt))
+    pci_dev_info = pci_match.groupdict('0')
+    try:
+        pci.append(['dev', ['domain', '0x'+ pci_dev_info['domain']], \
+                ['bus', '0x'+ pci_dev_info['bus']],
+                ['slot', '0x'+ pci_dev_info['slot']],
+                ['func', '0x'+ pci_dev_info['func']],
+                ['vslt', '0x%x' % int(vslt, 16)]])
+    except:
+        raise OptionError("Invalid argument: %s %s" % (pci_dev_str,vslt))
+    pci.append(['state', state])
 
     return (dom, pci)
 
 def xm_pci_attach(args):
-    arg_check(args, 'pci-attach', 5, 6)
-    (dom, pci) = parse_pci_configuration(args)
-    server.xend.domain.device_create(dom, pci)
+    arg_check(args, 'pci-attach', 2, 3)
+    (dom, pci) = parse_pci_configuration(args, 'Initialising')
+    server.xend.domain.device_configure(dom, pci)
 
 def detach(args, deviceClass):
     rm_cfg = True
@@ -2319,12 +2327,11 @@ def xm_network_detach(args):
         arg_check(args, 'network-detach', 2, 3)
         detach(args, 'vif')
 
-
 def xm_pci_detach(args):
     arg_check(args, 'pci-detach', 2)
-    dom = args[0]
-    dev = args[1]
-    server.xend.domain.destroyDevice(dom, 'dpci', dev)
+    (dom, pci) = parse_pci_configuration(args, 'Closing')
+    server.xend.domain.device_configure(dom, pci)
+
 
 def xm_vnet_list(args):
     xenapi_unsupported()

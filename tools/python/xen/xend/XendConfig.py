@@ -1461,6 +1461,23 @@ class XendConfig(dict):
                 config = cfg_sxp
 
             dev_type, dev_info = self['devices'][dev_uuid]
+
+            if dev_type == 'pci': # Special case for pci
+                pci_devs = []
+                for pci_dev in sxp.children(config, 'dev'):
+                    pci_dev_info = {}
+                    for opt_val in pci_dev[1:]:
+                        try:
+                            opt, val = opt_val
+                            pci_dev_info[opt] = val
+                        except TypeError:
+                            pass
+                    pci_devs.append(pci_dev_info)
+                self['devices'][dev_uuid] = (dev_type,
+                                             {'devs': pci_devs,
+                                              'uuid': dev_uuid})
+                return True
+                
             for opt_val in config[1:]:
                 try:
                     opt, val = opt_val
