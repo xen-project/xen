@@ -580,7 +580,8 @@ class HVMImageHandler(ImageHandler):
             ret.append("nic,vlan=%d,macaddr=%s,model=%s" %
                        (nics, mac, model))
             ret.append("-net")
-            ret.append("tap,vlan=%d,bridge=%s" % (nics, bridge))
+            ret.append("tap,vlan=%d,ifname=tap%d.%d,bridge=%s" %
+                       (nics, self.vm.getDomid(), nics-1, bridge))
 
         return ret
 
