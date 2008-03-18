@@ -1801,6 +1801,8 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
 
     case 0x20: /* MOV CR?,<reg> */
         opcode = insn_fetch(u8, code_base, eip, code_limit);
+        if ( opcode < 0xc0 )
+            goto fail;
         modrm_reg += ((opcode >> 3) & 7) + (lock << 3);
         modrm_rm  |= (opcode >> 0) & 7;
         reg = decode_register(modrm_rm, regs, 0);
@@ -1841,6 +1843,8 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
 
     case 0x21: /* MOV DR?,<reg> */
         opcode = insn_fetch(u8, code_base, eip, code_limit);
+        if ( opcode < 0xc0 )
+            goto fail;
         modrm_reg += ((opcode >> 3) & 7) + (lock << 3);
         modrm_rm  |= (opcode >> 0) & 7;
         reg = decode_register(modrm_rm, regs, 0);
@@ -1851,6 +1855,8 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
 
     case 0x22: /* MOV <reg>,CR? */
         opcode = insn_fetch(u8, code_base, eip, code_limit);
+        if ( opcode < 0xc0 )
+            goto fail;
         modrm_reg += ((opcode >> 3) & 7) + (lock << 3);
         modrm_rm  |= (opcode >> 0) & 7;
         reg = decode_register(modrm_rm, regs, 0);
@@ -1897,6 +1903,8 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
 
     case 0x23: /* MOV <reg>,DR? */
         opcode = insn_fetch(u8, code_base, eip, code_limit);
+        if ( opcode < 0xc0 )
+            goto fail;
         modrm_reg += ((opcode >> 3) & 7) + (lock << 3);
         modrm_rm  |= (opcode >> 0) & 7;
         reg = decode_register(modrm_rm, regs, 0);

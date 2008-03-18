@@ -3219,8 +3219,8 @@ x86_emulate(
     case 0x21: /* mov dr,reg */
     case 0x22: /* mov reg,cr */
     case 0x23: /* mov reg,dr */
+        generate_exception_if(ea.type != OP_REG, EXC_UD, -1);
         generate_exception_if(!mode_ring0(), EXC_GP, 0);
-        modrm_rm  |= (rex_prefix & 1) << 3;
         modrm_reg |= lock_prefix << 3;
         if ( b & 2 )
         {
