@@ -36,7 +36,6 @@
 #include <acpi/acpi_drivers.h>
 #include <asm/acpi.h>
 
-
 #ifdef CONFIG_ACPI_BOOT
 
 enum acpi_irq_model_id {
@@ -48,67 +47,10 @@ enum acpi_irq_model_id {
 
 extern enum acpi_irq_model_id	acpi_irq_model;
 
-
-/* Root System Description Pointer (RSDP) */
-
-struct acpi_table_rsdp {
-	char			signature[8];
-	u8			checksum;
-	char			oem_id[6];
-	u8			revision;
-	u32			rsdt_address;
-} __attribute__ ((packed));
-
-struct acpi20_table_rsdp {
-	char			signature[8];
-	u8			checksum;
-	char			oem_id[6];
-	u8			revision;
-	u32			rsdt_address;
-	u32			length;
-	u64			xsdt_address;
-	u8			ext_checksum;
-	u8			reserved[3];
-} __attribute__ ((packed));
-
 typedef struct {
 	u8			type;
 	u8			length;
 } __attribute__ ((packed)) acpi_table_entry_header;
-
-/* Root System Description Table (RSDT) */
-
-struct acpi_table_rsdt {
-	struct acpi_table_header header;
-	u32			entry[8];
-} __attribute__ ((packed));
-
-/* Extended System Description Table (XSDT) */
-
-struct acpi_table_xsdt {
-	struct acpi_table_header header;
-	u64			entry[1];
-} __attribute__ ((packed));
-
-/* Fixed ACPI Description Table (FADT) */
-
-struct acpi_table_fadt {
-	struct acpi_table_header header;
-	u32 facs_addr;
-	u32 dsdt_addr;
-	/* ... */
-} __attribute__ ((packed));
-
-/* Multiple APIC Description Table (MADT) */
-
-struct acpi_table_madt {
-	struct acpi_table_header header;
-	u32			lapic_address;
-	struct {
-		u32			pcat_compat:1;
-		u32			reserved:31;
-	}			flags;
-} __attribute__ ((packed));
 
 enum acpi_madt_entry_id {
 	ACPI_MADT_LAPIC = 0,
@@ -214,24 +156,6 @@ enum acpi_interrupt_id {
 
 #define	ACPI_SPACE_MEM		0
 
-struct acpi_gen_regaddr {
-	u8  space_id;
-	u8  bit_width;
-	u8  bit_offset;
-	u8  resv;
-	u32 addrl;
-	u32 addrh;
-} __attribute__ ((packed));
-
-struct acpi_table_hpet {
-	struct acpi_table_header header;
-	u32 id;
-	struct acpi_gen_regaddr addr;
-	u8 number;
-	u16 min_tick;
-	u8 page_protect;
-} __attribute__ ((packed));
-
 /*
  * Simple Boot Flags
  * http://www.microsoft.com/whdc/hwdev/resources/specs/simp_bios.mspx
@@ -249,17 +173,6 @@ struct acpi_table_sbf
 	u8 sbf_crearev[4];
 	u8 sbf_cmos;
 	u8 sbf_spare[3];
-} __attribute__ ((packed));
-
-/*
- * System Resource Affinity Table (SRAT)
- * http://www.microsoft.com/whdc/hwdev/platform/proc/SRAT.mspx
- */
-
-struct acpi_table_srat {
-	struct acpi_table_header header;
-	u32			table_revision;
-	u64			reserved;
 } __attribute__ ((packed));
 
 enum acpi_srat_entry_id {
@@ -305,46 +218,6 @@ enum acpi_address_range_id {
 	ACPI_ADDRESS_RANGE_COUNT
 };
 
-/*
- * System Locality Information Table (SLIT)
- *   see http://devresource.hp.com/devresource/docs/techpapers/ia64/slit.pdf
- */
-
-struct acpi_table_slit {
-	struct acpi_table_header header;
-	u64			localities;
-	u8			entry[1];	/* real size = localities^2 */
-} __attribute__ ((packed));
-
-/* Smart Battery Description Table (SBST) */
-
-struct acpi_table_sbst {
-	struct acpi_table_header header;
-	u32			warning;	/* Warn user */
-	u32			low;		/* Critical sleep */
-	u32			critical;	/* Critical shutdown */
-} __attribute__ ((packed));
-
-/* Embedded Controller Boot Resources Table (ECDT) */
-
-struct acpi_table_ecdt {
-	struct acpi_table_header 	header;
-	struct acpi_generic_address	ec_control;
-	struct acpi_generic_address	ec_data;
-	u32				uid;
-	u8				gpe_bit;
-	char				ec_id[0];
-} __attribute__ ((packed));
-
-/* PCI MMCONFIG */
-
-struct acpi_table_mcfg {
-	struct acpi_table_header	header;
-	u8				reserved[8];
-	u32				base_address;
-	u32				base_reserved;
-} __attribute__ ((packed));
-
 /* Table Handlers */
 
 enum acpi_table_id {
@@ -375,12 +248,6 @@ enum acpi_table_id {
 /* DMA Remapping Reporting Table (DMAR) */
 
 #define DMAR_FLAGS_INTR_REMAP 0x1       /* intr remap supported */
-struct acpi_table_dmar {
-	struct acpi_table_header	header;
-	u8				haw;	/* Host address Width */
-	u8				flags;
-	u8				reserved[10];
-} __attribute__ ((packed));
 
 struct acpi_dmar_entry_header {
 	u16	type;

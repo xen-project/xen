@@ -560,7 +560,7 @@ static int __init
 acpi_parse_fadt (unsigned long phys_addr, unsigned long size)
 {
 	struct acpi_table_header *fadt_header;
-	struct fadt_descriptor_rev2 *fadt;
+	struct acpi_table_fadt *fadt;
 
 	if (!phys_addr || !size)
 		return -EINVAL;
@@ -569,16 +569,16 @@ acpi_parse_fadt (unsigned long phys_addr, unsigned long size)
 	if (fadt_header->revision != 3)
 		return -ENODEV;		/* Only deal with ACPI 2.0 FADT */
 
-	fadt = (struct fadt_descriptor_rev2 *) fadt_header;
+	fadt = (struct acpi_table_fadt *) fadt_header;
 
-	if (!(fadt->iapc_boot_arch & BAF_8042_KEYBOARD_CONTROLLER))
+	if (!(fadt->boot_flags & BAF_8042_KEYBOARD_CONTROLLER))
 		acpi_kbd_controller_present = 0;
 
-	if (fadt->iapc_boot_arch & BAF_LEGACY_DEVICES)
+	if (fadt->boot_flags & BAF_LEGACY_DEVICES)
 		acpi_legacy_devices = 1;
 
 #if 0
-	acpi_register_gsi(fadt->sci_int, ACPI_ACTIVE_LOW, ACPI_LEVEL_SENSITIVE);
+	acpi_register_gsi(fadt->sci_interrupt, ACPI_ACTIVE_LOW, ACPI_LEVEL_SENSITIVE);
 #endif
 	return 0;
 }

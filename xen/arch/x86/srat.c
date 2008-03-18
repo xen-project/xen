@@ -106,7 +106,7 @@ static __init inline int srat_disabled(void)
 static __init int slit_valid(struct acpi_table_slit *slit)
 {
 	int i, j;
-	int d = slit->localities;
+	int d = slit->locality_count;
 	for (i = 0; i < d; i++) {
 		for (j = 0; j < d; j++)  {
 			u8 val = slit->entry[d*i + j];
@@ -308,7 +308,7 @@ int __node_distance(int a, int b)
 
 	if (!acpi_slit)
 		return a == b ? 10 : 20;
-	index = acpi_slit->localities * node_to_pxm(a);
+	index = acpi_slit->locality_count * node_to_pxm(a);
 	return acpi_slit->entry[index + node_to_pxm(b)];
 }
 

@@ -5,7 +5,7 @@
  *****************************************************************************/
 
 /*
- * Copyright (C) 2000 - 2005, R. Byron Moore
+ * Copyright (C) 2000 - 2007, R. Byron Moore
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -44,40 +44,57 @@
 #ifndef __ACENV_H__
 #define __ACENV_H__
 
-
 /*
  * Configuration for ACPI tools and utilities
  */
 
-#ifdef _ACPI_DUMP_APP
+#ifdef ACPI_LIBRARY
+/*
+ * Note: The non-debug version of the acpi_library does not contain any
+ * debug support, for minimimal size. The debug version uses ACPI_FULL_DEBUG
+ */
+#define ACPI_USE_LOCAL_CACHE
+#endif
+
+#ifdef ACPI_ASL_COMPILER
+#define ACPI_DEBUG_OUTPUT
+#define ACPI_APPLICATION
+#define ACPI_DISASSEMBLER
+#define ACPI_CONSTANT_EVAL_ONLY
+#define ACPI_LARGE_NAMESPACE_NODE
+#define ACPI_DATA_TABLE_DISASSEMBLY
+#endif
+
+#ifdef ACPI_EXEC_APP
+#undef DEBUGGER_THREADING
+#define DEBUGGER_THREADING      DEBUGGER_SINGLE_THREADED
+#define ACPI_FULL_DEBUG
+#define ACPI_APPLICATION
+#define ACPI_DEBUGGER
+#define ACPI_MUTEX_DEBUG
+#define ACPI_DBG_TRACK_ALLOCATIONS
+#endif
+
+#ifdef ACPI_DASM_APP
 #ifndef MSDOS
 #define ACPI_DEBUG_OUTPUT
 #endif
 #define ACPI_APPLICATION
 #define ACPI_DISASSEMBLER
 #define ACPI_NO_METHOD_EXECUTION
-#define ACPI_USE_SYSTEM_CLIBRARY
-#define ACPI_ENABLE_OBJECT_CACHE
+#define ACPI_LARGE_NAMESPACE_NODE
+#define ACPI_DATA_TABLE_DISASSEMBLY
 #endif
 
-#ifdef _ACPI_EXEC_APP
-#undef DEBUGGER_THREADING
-#define DEBUGGER_THREADING      DEBUGGER_SINGLE_THREADED
-#define ACPI_DEBUG_OUTPUT
-#define ACPI_APPLICATION
+#ifdef ACPI_APPLICATION
+#define ACPI_USE_SYSTEM_CLIBRARY
+#define ACPI_USE_LOCAL_CACHE
+#endif
+
+#ifdef ACPI_FULL_DEBUG
 #define ACPI_DEBUGGER
-#define ACPI_DISASSEMBLER
-#define ACPI_USE_SYSTEM_CLIBRARY
-#define ACPI_ENABLE_OBJECT_CACHE
-#endif
-
-#ifdef _ACPI_ASL_COMPILER
 #define ACPI_DEBUG_OUTPUT
-#define ACPI_APPLICATION
 #define ACPI_DISASSEMBLER
-#define ACPI_CONSTANT_EVAL_ONLY
-#define ACPI_USE_SYSTEM_CLIBRARY
-#define ACPI_ENABLE_OBJECT_CACHE
 #endif
 
 /*
@@ -119,7 +136,7 @@
 
 /*! [Begin] no source code translation */
 
-#if 1 /*defined(__linux__)*/ /* XEN: suitable for all supported build OSes */
+#if 1/*defined(_LINUX) || defined(__linux__)*/
 #include "aclinux.h"
 
 #elif defined(_AED_EFI)
@@ -131,10 +148,10 @@
 #elif defined(WIN64)
 #include "acwin64.h"
 
-#elif defined(MSDOS)        /* Must appear after WIN32 and WIN64 check */
+#elif defined(MSDOS)		/* Must appear after WIN32 and WIN64 check */
 #include "acdos16.h"
 
-#elif defined(__FreeBSD__)
+#elif defined(__FreeBSD__) || defined(__FreeBSD_kernel__)
 #include "acfreebsd.h"
 
 #elif defined(__NetBSD__)
@@ -146,6 +163,9 @@
 #elif defined(NETWARE)
 #include "acnetware.h"
 
+#elif defined(__sun)
+#include "acsolaris.h"
+
 #else
 
 /* All other environments */
@@ -155,28 +175,9 @@
 #define COMPILER_DEPENDENT_INT64   long long
 #define COMPILER_DEPENDENT_UINT64  unsigned long long
 
-/*
- * This macro is used to tag functions as "printf-like" because
- * some compilers can catch printf format string problems. MSVC
- * doesn't, so this is proprocessed away.
- */
-#define ACPI_PRINTF_LIKE_FUNC
-
-#endif
-
-/*
- * Memory allocation tracking.  Used only if
- * 1) This is the debug version
- * 2) This is NOT a 16-bit version of the code (not enough real-mode memory)
- */
-#ifdef ACPI_DEBUG_OUTPUT
-#if ACPI_MACHINE_WIDTH != 16
-#define ACPI_DBG_TRACK_ALLOCATIONS
-#endif
 #endif
 
 /*! [End] no source code translation !*/
-
 
 /*
  * Debugger threading model
@@ -196,7 +197,7 @@
 #else
 #define DEBUGGER_THREADING          DEBUGGER_MULTI_THREADED
 #endif
-#endif /* !DEBUGGER_THREADING */
+#endif				/* !DEBUGGER_THREADING */
 
 /******************************************************************************
  *
@@ -204,12 +205,13 @@
  *
  *****************************************************************************/
 
+#define ACPI_IS_ASCII(c)  ((c) < 0x80)
+
 #ifdef ACPI_USE_SYSTEM_CLIBRARY
 /*
  * Use the standard C library headers.
  * We want to keep these to a minimum.
  */
-
 #ifdef ACPI_USE_STANDARD_HEADERS
 /*
  * Use the standard headers from the standard locations
@@ -219,18 +221,13 @@
 #include <string.h>
 #include <ctype.h>
 
-#endif /* ACPI_USE_STANDARD_HEADERS */
+#endif				/* ACPI_USE_STANDARD_HEADERS */
 
 /*
  * We will be linking to the standard Clib functions
  */
-
 #define ACPI_STRSTR(s1,s2)      strstr((s1), (s2))
-
-#ifdef ACPI_FUTURE_USAGE
-#define ACPI_STRUPR(s)          (void) acpi_ut_strupr ((s))
-#endif
-
+#define ACPI_STRCHR(s1,c)       strchr((s1), (c))
 #define ACPI_STRLEN(s)          (acpi_size) strlen((s))
 #define ACPI_STRCPY(d,s)        (void) strcpy((d), (s))
 #define ACPI_STRNCPY(d,s,n)     (void) strncpy((d), (s), (acpi_size)(n))
@@ -239,66 +236,59 @@
 #define ACPI_STRCAT(d,s)        (void) strcat((d), (s))
 #define ACPI_STRNCAT(d,s,n)     strncat((d), (s), (acpi_size)(n))
 #define ACPI_STRTOUL(d,s,n)     strtoul((d), (s), (acpi_size)(n))
-#define ACPI_MEMCMP(s1,s2,n)    memcmp((s1), (s2), (acpi_size)(n))
+#define ACPI_MEMCMP(s1,s2,n)    memcmp((const char *)(s1), (const char *)(s2), (acpi_size)(n))
 #define ACPI_MEMCPY(d,s,n)      (void) memcpy((d), (s), (acpi_size)(n))
 #define ACPI_MEMSET(d,s,n)      (void) memset((d), (s), (acpi_size)(n))
 
-#define ACPI_TOUPPER            toupper
-#define ACPI_TOLOWER            tolower
-#define ACPI_IS_XDIGIT          isxdigit
-#define ACPI_IS_DIGIT           isdigit
-#define ACPI_IS_SPACE           isspace
-#define ACPI_IS_UPPER           isupper
-#define ACPI_IS_PRINT           isprint
-#define ACPI_IS_ALPHA           isalpha
-#define ACPI_IS_ASCII           isascii
+#define ACPI_TOUPPER(i)         toupper((int) (i))
+#define ACPI_TOLOWER(i)         tolower((int) (i))
+#define ACPI_IS_XDIGIT(i)       isxdigit((int) (i))
+#define ACPI_IS_DIGIT(i)        isdigit((int) (i))
+#define ACPI_IS_SPACE(i)        isspace((int) (i))
+#define ACPI_IS_UPPER(i)        isupper((int) (i))
+#define ACPI_IS_PRINT(i)        isprint((int) (i))
+#define ACPI_IS_ALPHA(i)        isalpha((int) (i))
+
+#else
 
 /******************************************************************************
  *
  * Not using native C library, use local implementations
  *
  *****************************************************************************/
-#else
 
-/*
- * Use local definitions of C library macros and functions
- * NOTE: The function implementations may not be as efficient
- * as an inline or assembly code implementation provided by a
- * native C library.
- */
+ /*
+  * Use local definitions of C library macros and functions
+  * NOTE: The function implementations may not be as efficient
+  * as an inline or assembly code implementation provided by a
+  * native C library.
+  */
 
 #ifndef va_arg
 
 #ifndef _VALIST
 #define _VALIST
 typedef char *va_list;
-#endif /* _VALIST */
+#endif				/* _VALIST */
 
 /*
  * Storage alignment properties
  */
-
 #define  _AUPBND                (sizeof (acpi_native_int) - 1)
 #define  _ADNBND                (sizeof (acpi_native_int) - 1)
 
 /*
  * Variable argument list macro definitions
  */
-
 #define _bnd(X, bnd)            (((sizeof (X)) + (bnd)) & (~(bnd)))
 #define va_arg(ap, T)           (*(T *)(((ap) += (_bnd (T, _AUPBND))) - (_bnd (T,_ADNBND))))
 #define va_end(ap)              (void) 0
 #define va_start(ap, A)         (void) ((ap) = (((char *) &(A)) + (_bnd (A,_AUPBND))))
 
-#endif /* va_arg */
-
+#endif				/* va_arg */
 
 #define ACPI_STRSTR(s1,s2)      acpi_ut_strstr ((s1), (s2))
-
-#ifdef ACPI_FUTURE_USAGE
-#define ACPI_STRUPR(s)          (void) acpi_ut_strupr ((s))
-#endif
-
+#define ACPI_STRCHR(s1,c)       acpi_ut_strchr ((s1), (c))
 #define ACPI_STRLEN(s)          (acpi_size) acpi_ut_strlen ((s))
 #define ACPI_STRCPY(d,s)        (void) acpi_ut_strcpy ((d), (s))
 #define ACPI_STRNCPY(d,s,n)     (void) acpi_ut_strncpy ((d), (s), (acpi_size)(n))
@@ -307,14 +297,13 @@ typedef char *va_list;
 #define ACPI_STRCAT(d,s)        (void) acpi_ut_strcat ((d), (s))
 #define ACPI_STRNCAT(d,s,n)     acpi_ut_strncat ((d), (s), (acpi_size)(n))
 #define ACPI_STRTOUL(d,s,n)     acpi_ut_strtoul ((d), (s), (acpi_size)(n))
-#define ACPI_MEMCMP(s1,s2,n)    acpi_ut_memcmp((s1), (s2), (acpi_size)(n))
+#define ACPI_MEMCMP(s1,s2,n)    acpi_ut_memcmp((const char *)(s1), (const char *)(s2), (acpi_size)(n))
 #define ACPI_MEMCPY(d,s,n)      (void) acpi_ut_memcpy ((d), (s), (acpi_size)(n))
 #define ACPI_MEMSET(d,v,n)      (void) acpi_ut_memset ((d), (v), (acpi_size)(n))
 #define ACPI_TOUPPER            acpi_ut_to_upper
 #define ACPI_TOLOWER            acpi_ut_to_lower
 
-#endif /* ACPI_USE_SYSTEM_CLIBRARY */
-
+#endif				/* ACPI_USE_SYSTEM_CLIBRARY */
 
 /******************************************************************************
  *
@@ -355,8 +344,7 @@ typedef char *va_list;
 #define ACPI_ACQUIRE_GLOBAL_LOCK(Glptr, acq)
 #define ACPI_RELEASE_GLOBAL_LOCK(Glptr, acq)
 
-#endif /* ACPI_ASM_MACROS */
-
+#endif				/* ACPI_ASM_MACROS */
 
 #ifdef ACPI_APPLICATION
 
@@ -366,11 +354,10 @@ typedef char *va_list;
 #define BREAKPOINT3
 #endif
 
-
 /******************************************************************************
  *
  * Compiler-specific information is contained in the compiler-specific
  * headers.
  *
  *****************************************************************************/
-#endif /* __ACENV_H__ */
+#endif				/* __ACENV_H__ */

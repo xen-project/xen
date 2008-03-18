@@ -555,13 +555,13 @@ static int __init acpi_parse_dmar(unsigned long phys_addr,
         return -ENODEV;
     }
 
-    if ( !dmar->haw )
+    if ( !dmar->width )
     {
-        dprintk(XENLOG_WARNING VTDPREFIX, "Zero: Invalid DMAR haw\n");
+        dprintk(XENLOG_WARNING VTDPREFIX, "Zero: Invalid DMAR width\n");
         return -EINVAL;
     }
 
-    dmar_host_address_width = dmar->haw;
+    dmar_host_address_width = dmar->width;
     dprintk(XENLOG_INFO VTDPREFIX, "Host address width %d\n",
             dmar_host_address_width);
 

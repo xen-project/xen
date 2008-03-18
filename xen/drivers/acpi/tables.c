@@ -295,15 +295,15 @@ acpi_get_table_header_early(enum acpi_table_id id,
 
 	/* Map the DSDT header via the pointer in the FADT */
 	if (id == ACPI_DSDT) {
-		struct fadt_descriptor_rev2 *fadt =
-		    (struct fadt_descriptor_rev2 *)*header;
+		struct acpi_table_fadt *fadt =
+			(struct acpi_table_fadt *)*header;
 
-		if (fadt->revision == 3 && fadt->Xdsdt) {
+		if (fadt->header.revision == 3 && fadt->Xdsdt) {
 			*header = (void *)__acpi_map_table(fadt->Xdsdt,
 							   sizeof(struct
 								  acpi_table_header));
-		} else if (fadt->V1_dsdt) {
-			*header = (void *)__acpi_map_table(fadt->V1_dsdt,
+		} else if (fadt->dsdt) {
+			*header = (void *)__acpi_map_table(fadt->dsdt,
 							   sizeof(struct
 								  acpi_table_header));
 		} else
@@ -424,12 +424,11 @@ static int __init acpi_table_get_sdt(struct acpi_table_rsdp *rsdp)
 
 	/* First check XSDT (but only on ACPI 2.0-compatible systems) */
 
-	if ((rsdp->revision >= 2) &&
-	    (((struct acpi20_table_rsdp *)rsdp)->xsdt_address)) {
+	if ((rsdp->revision >= 2) && rsdp->xsdt_physical_address) {
 
 		struct acpi_table_xsdt *mapped_xsdt = NULL;
 
-		sdt_pa = ((struct acpi20_table_rsdp *)rsdp)->xsdt_address;
+		sdt_pa = rsdp->xsdt_physical_address;
 
 		/* map in just the header */
 		header = (struct acpi_table_header *)
@@ -471,16 +470,16 @@ static int __init acpi_table_get_sdt(struct acpi_table_rsdp *rsdp)
 		}
 
 		for (i = 0; i < sdt_count; i++)
-			sdt_entry[i].pa = (unsigned long)mapped_xsdt->entry[i];
+			sdt_entry[i].pa = (unsigned long)mapped_xsdt->table_offset_entry[i];
 	}
 
 	/* Then check RSDT */
 
-	else if (rsdp->rsdt_address) {
+	else if (rsdp->rsdt_physical_address) {
 
 		struct acpi_table_rsdt *mapped_rsdt = NULL;
 
-		sdt_pa = rsdp->rsdt_address;
+		sdt_pa = rsdp->rsdt_physical_address;
 
 		/* map in just the header */
 		header = (struct acpi_table_header *)
@@ -521,7 +520,7 @@ static int __init acpi_table_get_sdt(struct acpi_table_rsdp *rsdp)
 		}
 
 		for (i = 0; i < sdt_count; i++)
-			sdt_entry[i].pa = (unsigned long)mapped_rsdt->entry[i];
+			sdt_entry[i].pa = (unsigned long)mapped_rsdt->table_offset_entry[i];
 	}
 
 	else {
@@ -613,13 +612,10 @@ int __init acpi_table_init(void)
 
 	if (rsdp->revision < 2)
 		result =
-		    acpi_table_compute_checksum(rsdp,
-						sizeof(struct acpi_table_rsdp));
+		    acpi_table_compute_checksum(rsdp, 20);
 	else
 		result =
-		    acpi_table_compute_checksum(rsdp,
-						((struct acpi20_table_rsdp *)
-						 rsdp)->length);
+		    acpi_table_compute_checksum(rsdp, rsdp->length);
 
 	if (result) {
 		printk(KERN_WARNING "  >>> ERROR: Invalid checksum\n");
@@ -663,12 +659,11 @@ acpi_table_disable(enum acpi_table_id table_id)
 
 	/* First check XSDT (but only on ACPI 2.0-compatible systems) */
 
-	if ((rsdp->revision >= 2) &&
-	    (((struct acpi20_table_rsdp *)rsdp)->xsdt_address)) {
+	if ((rsdp->revision >= 2) && rsdp->xsdt_physical_address) {
 
 		struct acpi_table_xsdt *mapped_xsdt = NULL;
 
-		sdt_pa = ((struct acpi20_table_rsdp *)rsdp)->xsdt_address;
+		sdt_pa = rsdp->xsdt_physical_address;
 
 		/* map in just the header */
 		header = (struct acpi_table_header *)
@@ -702,7 +697,7 @@ acpi_table_disable(enum acpi_table_id table_id)
 
 		if (id < sdt_count) {
 			header = (struct acpi_table_header *)
-			   __acpi_map_table(mapped_xsdt->entry[id], sizeof(struct acpi_table_header));
+			   __acpi_map_table(mapped_xsdt->table_offset_entry[id], sizeof(struct acpi_table_header));
 		} else {
 			printk(KERN_WARNING PREFIX
 			       "Unable to disable entry %d\n",
@@ -713,11 +708,11 @@ acpi_table_disable(enum acpi_table_id table_id)
 
 	/* Then check RSDT */
 
-	else if (rsdp->rsdt_address) {
+	else if (rsdp->rsdt_physical_address) {
 
 		struct acpi_table_rsdt *mapped_rsdt = NULL;
 
-		sdt_pa = rsdp->rsdt_address;
+		sdt_pa = rsdp->rsdt_physical_address;
 
 		/* map in just the header */
 		header = (struct acpi_table_header *)
@@ -749,7 +744,7 @@ acpi_table_disable(enum acpi_table_id table_id)
 		}
 		if (id < sdt_count) {
 			header = (struct acpi_table_header *)
-			   __acpi_map_table(mapped_rsdt->entry[id], sizeof(struct acpi_table_header));
+			   __acpi_map_table(mapped_rsdt->table_offset_entry[id], sizeof(struct acpi_table_header));
 		} else {
 			printk(KERN_WARNING PREFIX
 			       "Unable to disable entry %d\n",

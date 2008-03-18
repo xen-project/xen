@@ -3,6 +3,7 @@
 
 #include <xen/config.h>
 #include <asm/apicdef.h>
+#include <asm/fixmap.h>
 #include <asm/system.h>
 
 #define Dprintk(x...)
