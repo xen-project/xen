@@ -229,7 +229,7 @@ set_p2m_entry(struct domain *d, unsigned long gfn, mfn_t mfn, p2m_type_t p2mt)
     if ( !p2m_next_level(d, &table_mfn, &table, &gfn_remainder, gfn,
                          L3_PAGETABLE_SHIFT - PAGE_SHIFT,
                          ((CONFIG_PAGING_LEVELS == 3)
-                          ? (hvm_funcs.hap_supported ? 4 : 8)
+                          ? (d->arch.hvm_domain.hap_enabled ? 4 : 8)
                           : L3_PAGETABLE_ENTRIES),
                          PGT_l2_page_table) )
         goto out;
