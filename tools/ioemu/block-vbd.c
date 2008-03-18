@@ -271,6 +271,7 @@ static void vbd_close(BlockDriverState *bs)
     BDRVVbdState *s = bs->opaque;
     bs->total_sectors = 0;
     if (s->fd >= 0) {
+        qemu_set_fd_handler(s->fd, NULL, NULL, NULL);
         close(s->fd);
         s->fd = -1;
     }
