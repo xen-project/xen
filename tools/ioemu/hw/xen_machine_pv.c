@@ -26,6 +26,9 @@
 #include "xen_console.h"
 #include "xenfb.h"
 
+extern void init_blktap(void);
+
+
 /* The Xen PV machine currently provides
  *   - a virtual framebuffer
  *   - ....
@@ -40,6 +43,10 @@ static void xen_init_pv(uint64_t ram_size, int vga_ram_size, char *boot_device,
 {
     struct xenfb *xenfb;
     extern int domid;
+
+
+    /* Initialize tapdisk client */
+    init_blktap();
 
     /* Connect to text console */
     if (serial_hds[0]) {

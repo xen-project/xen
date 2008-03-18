@@ -167,6 +167,7 @@ extern struct tap_disk tapdisk_qcow2;
 #define DISK_TYPE_RAM      3
 #define DISK_TYPE_QCOW     4
 #define DISK_TYPE_QCOW2    5
+#define DISK_TYPE_IOEMU    6
 
 
 /*Define Individual Disk Parameters here */
@@ -230,6 +231,16 @@ static disk_info_t qcow2_disk = {
 #endif
 };
 
+static disk_info_t ioemu_disk = {
+	DISK_TYPE_IOEMU,
+	"ioemu disk",
+	"ioemu",
+	0,
+#ifdef TAPDISK
+	NULL
+#endif
+};
+
 /*Main disk info array */
 static disk_info_t *dtypes[] = {
 	&aio_disk,
@@ -238,6 +249,7 @@ static disk_info_t *dtypes[] = {
 	&ram_disk,
 	&qcow_disk,
 	&qcow2_disk,
+	&ioemu_disk,
 };
 
 typedef struct driver_list_entry {

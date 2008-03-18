@@ -501,6 +501,80 @@ int launch_tapdisk(char *wrctldev, char *rdctldev)
 	return 0;
 }
 
+/* Connect to qemu-dm */
+static int connect_qemu(blkif_t *blkif)
+{
+	char *rdctldev, *wrctldev;
+	
+	if (asprintf(&rdctldev, BLKTAP_CTRL_DIR "/qemu-read-%d", 
+			blkif->domid) < 0)
+		return -1;
+
+	if (asprintf(&wrctldev, BLKTAP_CTRL_DIR "/qemu-write-%d", 
+			blkif->domid) < 0) {
+		free(rdctldev);
+		return -1;
+	}
+
+	DPRINTF("Using qemu blktap pipe: %s\n", rdctldev);
+	
+	blkif->fds[READ] = open_ctrl_socket(wrctldev);
+	blkif->fds[WRITE] = open_ctrl_socket(rdctldev);
+	
+	free(rdctldev);
+	free(wrctldev);
+	
+	if (blkif->fds[READ] == -1 || blkif->fds[WRITE] == -1)
+		return -1;
+
+	DPRINTF("Attached to qemu blktap pipes\n");
+	return 0;
+}
+
+/* Launch tapdisk instance */
+static int connect_tapdisk(blkif_t *blkif, int minor)
+{
+	char *rdctldev = NULL, *wrctldev = NULL;
+	int ret = -1;
+
+	DPRINTF("tapdisk process does not exist:\n");
+
+	if (asprintf(&rdctldev,
+		     "%s/tapctrlread%d", BLKTAP_CTRL_DIR, minor) == -1)
+		goto fail;
+
+	if (asprintf(&wrctldev,
+		     "%s/tapctrlwrite%d", BLKTAP_CTRL_DIR, minor) == -1)
+		goto fail;
+	
+	blkif->fds[READ] = open_ctrl_socket(rdctldev);
+	blkif->fds[WRITE] = open_ctrl_socket(wrctldev);
+	
+	if (blkif->fds[READ] == -1 || blkif->fds[WRITE] == -1)
+		goto fail;
+
+	/*launch the new process*/
+	DPRINTF("Launching process, CMDLINE [tapdisk %s %s]\n",
+			wrctldev, rdctldev);
+
+	if (launch_tapdisk(wrctldev, rdctldev) == -1) {
+		DPRINTF("Unable to fork, cmdline: [tapdisk %s %s]\n",
+				wrctldev, rdctldev);
+		goto fail;
+	}
+
+	ret = 0;
+	
+fail:
+	if (rdctldev)
+		free(rdctldev);
+
+	if (wrctldev)
+		free(wrctldev);
+
+	return ret;
+}
+
 int blktapctrl_new_blkif(blkif_t *blkif)
 {
 	blkif_info_t *blk;
@@ -524,30 +598,14 @@ int blktapctrl_new_blkif(blkif_t *blkif)
 		blkif->cookie = next_cookie++;
 
 		if (!exist) {
-			DPRINTF("Process does not exist:\n");
-			if (asprintf(&rdctldev,
-				     "%s/tapctrlread%d", BLKTAP_CTRL_DIR, minor) == -1)
-				goto fail;
-			if (asprintf(&wrctldev,
-				     "%s/tapctrlwrite%d", BLKTAP_CTRL_DIR, minor) == -1) {
-				free(rdctldev);
-				goto fail;
-			}
-			blkif->fds[READ] = open_ctrl_socket(rdctldev);
-			blkif->fds[WRITE] = open_ctrl_socket(wrctldev);
-			
-			if (blkif->fds[READ] == -1 || blkif->fds[WRITE] == -1) 
-				goto fail;
-
-			/*launch the new process*/
- 			DPRINTF("Launching process, CMDLINE [tapdisk %s %s]\n",wrctldev, rdctldev);
- 			if (launch_tapdisk(wrctldev, rdctldev) == -1) {
- 				DPRINTF("Unable to fork, cmdline: [tapdisk %s %s]\n",wrctldev, rdctldev);
-				goto fail;
+			if (type == DISK_TYPE_IOEMU) {
+				if (connect_qemu(blkif))
+					goto fail;
+			} else {
+				if (connect_tapdisk(blkif, minor))
+					goto fail;
 			}
 
-			free(rdctldev);
-			free(wrctldev);
 		} else {
 			DPRINTF("Process exists!\n");
 			blkif->fds[READ] = exist->fds[READ];

@@ -17,6 +17,7 @@ TARGET_PATH=$(SRC_PATH)/target-$(TARGET_BASE_ARCH)$(TARGET_SUB)
 VPATH=$(SRC_PATH):$(TARGET_PATH):$(SRC_PATH)/hw:$(SRC_PATH)/audio
 CPPFLAGS+=-I. -I.. -I$(TARGET_PATH) -I$(SRC_PATH)
 CPPFLAGS+= -I$(XEN_ROOT)/tools/libxc
+CPPFLAGS+= -I$(XEN_ROOT)/tools/blktap/lib
 CPPFLAGS+= -I$(XEN_ROOT)/tools/xenstore
 CPPFLAGS+= -I$(XEN_ROOT)/tools/include
 ifdef CONFIG_DARWIN_USER
@@ -429,6 +430,7 @@ VL_OBJS+= cirrus_vga.o parallel.o acpi.o
 VL_OBJS+= usb-uhci.o smbus_eeprom.o
 VL_OBJS+= piix4acpi.o
 VL_OBJS+= xenstore.o
+VL_OBJS+= xen_blktap.o
 VL_OBJS+= xen_platform.o
 VL_OBJS+= xen_machine_fv.o
 VL_OBJS+= xen_machine_pv.o

@@ -13,7 +13,9 @@ blktap_disk_types = [
     'vmdk',
     'ram',
     'qcow',
-    'qcow2'
+    'qcow2',
+
+    'ioemu'
     ]
 
 class BlktapController(BlkifController):

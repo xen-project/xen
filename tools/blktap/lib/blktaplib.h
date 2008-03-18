@@ -221,15 +221,5 @@ int xs_fire_next_watch(struct xs_handle *h);
      ((_req) * BLKIF_MAX_SEGMENTS_PER_REQUEST * getpagesize()) +    \
      ((_seg) * getpagesize()))
 
-/* Defines that are only used by library clients */
-
-#ifndef __COMPILING_BLKTAP_LIB
-
-static char *blkif_op_name[] = {
-	[BLKIF_OP_READ]       = "READ",
-	[BLKIF_OP_WRITE]      = "WRITE",
-};
-
-#endif /* __COMPILING_BLKTAP_LIB */
 
 #endif /* __BLKTAPLIB_H__ */
