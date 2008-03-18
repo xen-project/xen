@@ -22,6 +22,7 @@ xen/.dir:
 install: all
 	$(INSTALL_DIR) $(DESTDIR)$(INCLUDEDIR)/xen/arch-ia64
 	$(INSTALL_DIR) $(DESTDIR)$(INCLUDEDIR)/xen/arch-x86
+	$(INSTALL_DIR) $(DESTDIR)$(INCLUDEDIR)/xen/arch-x86/hvm
 	$(INSTALL_DIR) $(DESTDIR)$(INCLUDEDIR)/xen/foreign
 	$(INSTALL_DIR) $(DESTDIR)$(INCLUDEDIR)/xen/hvm
 	$(INSTALL_DIR) $(DESTDIR)$(INCLUDEDIR)/xen/io
@@ -31,6 +32,7 @@ install: all
 	$(INSTALL_DATA) xen/*.h $(DESTDIR)$(INCLUDEDIR)/xen
 	$(INSTALL_DATA) xen/arch-ia64/*.h $(DESTDIR)$(INCLUDEDIR)/xen/arch-ia64
 	$(INSTALL_DATA) xen/arch-x86/*.h $(DESTDIR)$(INCLUDEDIR)/xen/arch-x86
+	$(INSTALL_DATA) xen/arch-x86/hvm/*.h $(DESTDIR)$(INCLUDEDIR)/xen/arch-x86/hvm
 	$(INSTALL_DATA) xen/foreign/*.h $(DESTDIR)$(INCLUDEDIR)/xen/foreign
 	$(INSTALL_DATA) xen/hvm/*.h $(DESTDIR)$(INCLUDEDIR)/xen/hvm
 	$(INSTALL_DATA) xen/io/*.h $(DESTDIR)$(INCLUDEDIR)/xen/io
