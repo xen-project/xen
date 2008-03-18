@@ -1282,6 +1282,12 @@ class XendConfig(dict):
                     target['devices'][dev_uuid] = ('vfb', dev_info)
                     target['console_refs'].append(dev_uuid)
 
+                    # if console is rfb, set device_model ensuring qemu
+                    # is invoked for pvfb services
+                    if 'device_model' not in target['platform']:
+                        target['platform']['device_model'] = \
+                            xen.util.auxbin.pathTo("qemu-dm")
+
                     # Finally, if we are a pvfb, we need to make a vkbd
                     # as well that is not really exposed to Xen API
                     vkbd_uuid = uuid.createString()
