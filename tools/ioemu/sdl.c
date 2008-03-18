@@ -29,6 +29,10 @@
 #include <signal.h>
 #endif
 
+#ifdef CONFIG_OPENGL
+#include <SDL_opengl.h>
+#endif
+
 static SDL_Surface *screen;
 static SDL_Surface *shared = NULL;
 static int gui_grab; /* if true, all keyboard/mouse events are grabbed */
@@ -44,6 +48,99 @@ static int width, height;
 static SDL_Cursor *sdl_cursor_normal;
 static SDL_Cursor *sdl_cursor_hidden;
 static int absolute_enabled = 0;
+static int opengl_enabled;
+
+#ifdef CONFIG_OPENGL
+static GLint tex_format;
+static GLint tex_type;
+static GLuint texture_ref = 0;
+static GLint gl_format;
+
+static void opengl_setdata(DisplayState *ds, void *pixels)
+{
+    glEnable(GL_TEXTURE_RECTANGLE_ARB);
+    glTexEnvi(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_REPLACE);
+    glClearColor(0, 0, 0, 0);
+    glDisable(GL_BLEND);
+    glDisable(GL_LIGHTING);
+    glDisable(GL_DEPTH_TEST);
+    glDepthMask(GL_FALSE);
+    glDisable(GL_CULL_FACE);
+    glViewport( 0, 0, screen->w, screen->h);
+    glMatrixMode(GL_PROJECTION);
+    glLoadIdentity();
+    glOrtho(0, screen->w, screen->h, 0, -1,1);
+    glMatrixMode(GL_MODELVIEW);
+    glLoadIdentity();
+    glClear(GL_COLOR_BUFFER_BIT);
+    ds->data = pixels;
+
+    if (texture_ref) {
+        glDeleteTextures(1, &texture_ref);
+        texture_ref = 0;
+    }
+
+    glGenTextures(1, &texture_ref);
+    glBindTexture(GL_TEXTURE_RECTANGLE_ARB, texture_ref);
+    glPixelStorei(GL_UNPACK_LSB_FIRST, 1);
+    switch (ds->depth) {
+        case 8:
+            tex_format = GL_RGB;
+            tex_type = GL_UNSIGNED_BYTE_3_3_2;
+            glPixelStorei (GL_UNPACK_ALIGNMENT, 1);
+            break;
+        case 16:
+            tex_format = GL_RGB;
+            tex_type = GL_UNSIGNED_SHORT_5_6_5;
+            glPixelStorei (GL_UNPACK_ALIGNMENT, 2);
+            break;
+        case 24:
+            tex_format = GL_BGR;
+            tex_type = GL_UNSIGNED_BYTE;
+            glPixelStorei (GL_UNPACK_ALIGNMENT, 1);
+            break;
+        case 32:
+            if (!ds->bgr) {
+                tex_format = GL_BGRA;
+                tex_type = GL_UNSIGNED_BYTE;
+            } else {
+                tex_format = GL_RGBA;
+                tex_type = GL_UNSIGNED_BYTE;                
+            }
+            glPixelStorei (GL_UNPACK_ALIGNMENT, 4);
+            break;
+    }   
+    glPixelStorei(GL_UNPACK_ROW_LENGTH, (ds->linesize * 8 / ds->depth) - ds->width);
+    glTexImage2D(GL_TEXTURE_RECTANGLE_ARB, 0, gl_format, ds->width, ds->height, 0, tex_format, tex_type, pixels);
+    glTexParameterf(GL_TEXTURE_RECTANGLE_ARB, GL_TEXTURE_PRIORITY, 1.0);
+    glTexParameteri(GL_TEXTURE_RECTANGLE_ARB, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_RECTANGLE_ARB, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_RECTANGLE_ARB, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_RECTANGLE_ARB, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    glBindTexture(GL_TEXTURE_RECTANGLE_ARB, 0);
+}
+
+static void opengl_update(DisplayState *ds, int x, int y, int w, int h)
+{  
+    int bpp = ds->depth / 8;
+    GLvoid *pixels = ds->data + y * ds->linesize + x * bpp;
+    glBindTexture(GL_TEXTURE_RECTANGLE_ARB, texture_ref);
+    glPixelStorei(GL_UNPACK_ROW_LENGTH, (ds->linesize / bpp) - w);
+    glTexSubImage2D(GL_TEXTURE_RECTANGLE_ARB, 0, x, y, w, h, tex_format, tex_type, pixels);
+    glBegin(GL_QUADS);
+        glTexCoord2d(0, 0);
+        glVertex2d(0, 0);
+        glTexCoord2d(ds->width, 0);
+        glVertex2d(screen->w, 0);
+        glTexCoord2d(ds->width, ds->height);
+        glVertex2d(screen->w, screen->h);
+        glTexCoord2d(0, ds->height);
+        glVertex2d(0, screen->h);
+    glEnd();
+    glBindTexture(GL_TEXTURE_RECTANGLE_ARB, 0);
+    SDL_GL_SwapBuffers();
+}
+#endif
 
 static void sdl_update(DisplayState *ds, int x, int y, int w, int h)
 {
@@ -96,17 +193,26 @@ static void sdl_resize(DisplayState *ds, int w, int h, int linesize)
 
     //    printf("resizing to %d %d\n", w, h);
 
-    flags = SDL_HWSURFACE|SDL_ASYNCBLIT|SDL_HWACCEL|SDL_DOUBLEBUF|SDL_HWPALETTE;
-    if (gui_fullscreen)
-        flags |= SDL_FULLSCREEN;
+#ifdef CONFIG_OPENGL
+    if (ds->shared_buf && opengl_enabled)
+        flags = SDL_OPENGL|SDL_RESIZABLE;
+    else
+#endif
+        flags = SDL_HWSURFACE|SDL_ASYNCBLIT|SDL_HWACCEL|SDL_DOUBLEBUF|SDL_HWPALETTE;
 
+    if (gui_fullscreen) {
+        flags |= SDL_FULLSCREEN;
+        flags &= ~SDL_RESIZABLE;
+    }
+    
     width = w;
     height = h;
 
  again:
     screen = SDL_SetVideoMode(w, h, 0, flags);
+#ifndef CONFIG_OPENGL
     if (!screen) {
-        fprintf(stderr, "Could not open SDL display\n");
+        fprintf(stderr, "Could not open SDL display: %s\n", SDL_GetError());
         exit(1);
     }
     if (!screen->pixels && (flags & SDL_HWSURFACE) && (flags & SDL_FULLSCREEN)) {
@@ -115,9 +221,10 @@ static void sdl_resize(DisplayState *ds, int w, int h, int linesize)
     }
 
     if (!screen->pixels) {
-        fprintf(stderr, "Could not open SDL display\n");
+        fprintf(stderr, "Could not open SDL display: %s\n", SDL_GetError());
         exit(1);
     }
+#endif
     ds->width = w;
     ds->height = h;
     if (!ds->shared_buf) {
@@ -131,6 +238,25 @@ static void sdl_resize(DisplayState *ds, int w, int h, int linesize)
         ds->linesize = screen->pitch;
     } else {
         ds->linesize = linesize;
+#ifdef CONFIG_OPENGL
+        switch(screen->format->BitsPerPixel) {
+        case 8:
+            gl_format = GL_RGB;
+            break;
+        case 16:
+            gl_format = GL_RGB;
+            break;
+        case 24:
+            gl_format = GL_RGB;
+            break;
+        case 32:
+            if (!screen->format->Rshift)
+                gl_format = GL_BGRA;
+            else
+                gl_format = GL_RGBA;
+            break;
+        };
+#endif
     }
 }
 
@@ -139,7 +265,13 @@ static void sdl_colourdepth(DisplayState *ds, int depth)
     if (!depth || !ds->depth) return;
     ds->shared_buf = 1;
     ds->depth = depth;
-    ds->linesize = width * depth / 8; 
+    ds->linesize = width * depth / 8;
+#ifdef CONFIG_OPENGL
+    if (opengl_enabled) {
+        ds->dpy_update = opengl_update;
+        ds->dpy_setdata = opengl_setdata;
+    }
+#endif
 }
 
 /* generic keyboard conversion */
@@ -331,8 +463,8 @@ static void sdl_send_mouse_event(int dx, int dy, int dz, int state)
 	}
 
 	SDL_GetMouseState(&dx, &dy);
-        dx = dx * 0x7FFF / (width - 1);
-        dy = dy * 0x7FFF / (height - 1);
+        dx = dx * 0x7FFF / (screen->w - 1);
+        dy = dy * 0x7FFF / (screen->h - 1);
     } else if (absolute_enabled) {
 	sdl_show_cursor();
 	absolute_enabled = 0;
@@ -371,7 +503,7 @@ static void sdl_refresh(DisplayState *ds)
     while (SDL_PollEvent(ev)) {
         switch (ev->type) {
         case SDL_VIDEOEXPOSE:
-            sdl_update(ds, 0, 0, screen->w, screen->h);
+            sdl_update(ds, 0, 0, ds->width, ds->height);
             break;
         case SDL_KEYDOWN:
         case SDL_KEYUP:
@@ -528,6 +660,16 @@ static void sdl_refresh(DisplayState *ds)
 		}
 	    }
             break;
+#ifdef CONFIG_OPENGL
+        case SDL_VIDEORESIZE:
+        {
+            SDL_ResizeEvent *rev = &ev->resize;
+            screen = SDL_SetVideoMode(rev->w, rev->h, 0, SDL_OPENGL|SDL_RESIZABLE);
+            opengl_setdata(ds, ds->data);
+            opengl_update(ds, 0, 0, ds->width, ds->height);
+            break;
+        }
+#endif
         default:
             break;
         }
@@ -536,13 +678,17 @@ static void sdl_refresh(DisplayState *ds)
 
 static void sdl_cleanup(void) 
 {
+#ifdef CONFIG_OPENGL
+    if (texture_ref) glDeleteTextures(1, &texture_ref);
+#endif
     SDL_Quit();
 }
 
-void sdl_display_init(DisplayState *ds, int full_screen)
+void sdl_display_init(DisplayState *ds, int full_screen, int opengl)
 {
     int flags;
     uint8_t data = 0;
+    opengl_enabled = opengl;
 
 #if defined(__APPLE__)
     /* always use generic keymaps */

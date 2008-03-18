@@ -190,6 +190,8 @@ for opt do
   ;;
   --disable-sdl) sdl="no"
   ;;
+  --disable-opengl) opengl="no"
+  ;;
   --enable-coreaudio) coreaudio="yes"
   ;;
   --enable-alsa) alsa="yes"
@@ -539,6 +541,26 @@ else
 fi # -z $sdl
 
 ##########################################
+# OpenGL test
+
+if test -z "$opengl" && test "$sdl" = "yes"
+then
+cat > $TMPC << EOF
+#include <GL/gl.h>
+#ifndef GL_TEXTURE_RECTANGLE_ARB
+#error "Opengl doesn't support GL_TEXTURE_RECTANGLE_ARB"
+#endif
+int main( void ) { return (int) glGetString(GL_EXTENSIONS); }
+EOF
+if $cc -o $TMPE $TMPC -lGL 2> /dev/null
+then
+opengl="yes"
+else
+opengl="no"
+fi
+fi
+
+##########################################
 # alsa sound support libraries
 
 if test "$alsa" = "yes" ; then
@@ -612,6 +634,7 @@ echo "SDL support       $sdl"
 if test "$sdl" != "no" ; then
     echo "SDL static link   $sdl_static"
 fi
+echo "OpenGL support    $opengl"
 echo "mingw32 support   $mingw32"
 echo "Adlib support     $adlib"
 echo "CoreAudio support $coreaudio"
@@ -993,6 +1016,15 @@ if test "$target_user_only" = "no"; then
             echo "SDL_CFLAGS=`$sdl_config --cflags`" >> $config_mak
         fi
     fi
+fi
+
+if test $opengl = "yes"
+then
+    echo "#define CONFIG_OPENGL 1" >> $config_h
+    echo "CONFIG_OPENGL=yes" >> $config_mak
+    echo "SDL_CFLAGS+=-I/usr/include/GL" >> $config_mak
+    echo "SDL_LIBS+=-lXext" >> $config_mak
+    echo "SDL_LIBS+=-lGL" >> $config_mak
 fi
 
 if test "$cocoa" = "yes" ; then

@@ -504,6 +504,10 @@ gopts.var('sdl', val='',
           fn=set_value, default=None,
           use="""Should the device model use SDL?""")
 
+gopts.var('opengl', val='',
+          fn=set_value, default=None,
+          use="""Enable\Disable OpenGL""")
+
 gopts.var('display', val='DISPLAY',
           fn=set_value, default=None,
           use="X11 display to use")
@@ -745,7 +749,7 @@ def configure_hvm(config_image, vals):
              'vnc', 'vncdisplay', 'vncunused', 'vncconsole', 'vnclisten',
              'sdl', 'display', 'xauthority', 'rtc_timeoffset', 'monitor',
              'acpi', 'apic', 'usb', 'usbdevice', 'keymap', 'pci', 'hpet',
-             'guest_os_type', 'hap']
+             'guest_os_type', 'hap', 'opengl']
 
     for a in args:
         if a in vals.__dict__ and vals.__dict__[a] is not None:

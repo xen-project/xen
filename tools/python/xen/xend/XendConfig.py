@@ -142,6 +142,7 @@ XENAPI_PLATFORM_CFG_TYPES = {
     'rtc_timeoffset': int,
     'serial': str,
     'sdl': int,
+    'opengl': int,
     'soundhw': str,
     'stdvga': int,
     'usb': int,

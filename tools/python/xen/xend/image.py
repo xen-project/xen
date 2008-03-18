@@ -263,7 +263,8 @@ class ImageHandler:
 
         elif has_sdl:
             # SDL is default in QEMU.
-            pass
+            if int(vmConfig['platform'].get('opengl', 1)) != 1 :
+                ret.append('-disable-opengl')
         else:
             ret.append('-nographic')
 

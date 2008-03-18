@@ -174,6 +174,11 @@ int graphic_height = 600;
 #endif
 int graphic_depth = 15;
 int full_screen = 0;
+#ifdef CONFIG_OPENGL
+int opengl_enabled = 1;
+#else
+int opengl_enabled = 0;
+#endif
 int no_quit = 0;
 CharDriverState *serial_hds[MAX_SERIAL_PORTS];
 CharDriverState *parallel_hds[MAX_PARALLEL_PORTS];
@@ -6488,6 +6493,9 @@ void help(void)
 #ifdef CONFIG_SDL
            "-no-quit        disable SDL window close capability\n"
 #endif
+#ifdef CONFIG_OPENGL
+           "-disable-opengl disable OpenGL rendering, using SDL"
+#endif
 #ifdef TARGET_I386
            "-no-fd-bootchk  disable boot signature checking for floppy disks\n"
 #endif
@@ -6666,6 +6674,7 @@ enum {
     QEMU_OPTION_loadvm,
     QEMU_OPTION_full_screen,
     QEMU_OPTION_no_quit,
+    QEMU_OPTION_disable_opengl,
     QEMU_OPTION_pidfile,
     QEMU_OPTION_no_kqemu,
     QEMU_OPTION_kernel_kqemu,
@@ -6763,6 +6772,7 @@ const QEMUOption qemu_options[] = {
 #ifdef CONFIG_SDL
     { "no-quit", 0, QEMU_OPTION_no_quit },
 #endif
+    { "disable-opengl", 0, QEMU_OPTION_disable_opengl },
     { "pidfile", HAS_ARG, QEMU_OPTION_pidfile },
     { "win2k-hack", 0, QEMU_OPTION_win2k_hack },
     { "usbdevice", HAS_ARG, QEMU_OPTION_usbdevice },
@@ -7534,6 +7544,9 @@ int main(int argc, char **argv)
                 no_quit = 1;
                 break;
 #endif
+            case QEMU_OPTION_disable_opengl:
+                opengl_enabled = 0;
+                break;
             case QEMU_OPTION_pidfile:
                 create_pidfile(optarg);
                 break;
@@ -7860,7 +7873,7 @@ int main(int argc, char **argv)
 	xenstore_write_vncport(vnc_display_port);
     } else {
 #if defined(CONFIG_SDL)
-        sdl_display_init(ds, full_screen);
+        sdl_display_init(ds, full_screen, opengl_enabled);
 #elif defined(CONFIG_COCOA)
         cocoa_display_init(ds, full_screen);
 #else
