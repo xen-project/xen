@@ -405,6 +405,12 @@ class XendConfig(dict):
                 self['platform']['device_model'] = xen.util.auxbin.pathTo("qemu-dm")
 
         if self.is_hvm():
+            if 'timer_mode' not in self['platform']:
+                self['platform']['timer_mode'] = 0
+            if 'rtc_timeoffset' not in self['platform']:
+                self['platform']['rtc_timeoffset'] = 0
+            if 'hpet' not in self['platform']:
+                self['platform']['hpet'] = 0
             if 'loader' not in self['platform']:
                 # Old configs may have hvmloader set as PV_kernel param
                 if self.has_key('PV_kernel') and re.search('hvmloader', self['PV_kernel']):
