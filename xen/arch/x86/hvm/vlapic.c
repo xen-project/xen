@@ -114,14 +114,12 @@ static int vlapic_find_highest_vector(void *bitmap)
 
 static int vlapic_test_and_set_irr(int vector, struct vlapic *vlapic)
 {
-    return vlapic_test_and_set_vector(
-        vector, (unsigned long *)&vlapic->regs->data[APIC_IRR]);
+    return vlapic_test_and_set_vector(vector, &vlapic->regs->data[APIC_IRR]);
 }
 
 static void vlapic_clear_irr(int vector, struct vlapic *vlapic)
 {
-    vlapic_clear_vector(
-        vector, (unsigned long *)&vlapic->regs->data[APIC_IRR]);
+    vlapic_clear_vector(vector, &vlapic->regs->data[APIC_IRR]);
 }
 
 static int vlapic_find_highest_irr(struct vlapic *vlapic)

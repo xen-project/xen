@@ -26,7 +26,7 @@
 #define CONST_ADDR (*(const volatile long *) addr)
 
 extern void __bitop_bad_size(void);
-#define bitop_bad_size(addr) (min(sizeof(*(addr)), __alignof__(*(addr))) < 4)
+#define bitop_bad_size(addr) (sizeof(*(addr)) < 4)
 
 /**
  * set_bit - Atomically set a bit in memory
