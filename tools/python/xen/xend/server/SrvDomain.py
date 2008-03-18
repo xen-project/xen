@@ -187,7 +187,9 @@ class SrvDomain(SrvDir):
     def op_device_destroy(self, _, req):
         return self.call(self.dom.destroyDevice,
                          [['type', 'str'],
-                          ['dev',  'str']],
+                          ['dev',  'str'],
+                          ['force',  'int'],
+                          ['rm_cfg',  'int']],
                          req)
                 
     def op_device_configure(self, _, req):
