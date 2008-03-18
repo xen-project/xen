@@ -2104,7 +2104,7 @@ class XendDomainInfo:
         self.state_updated.acquire()
         try:
             while self._stateGet() in (DOM_STATE_RUNNING,DOM_STATE_PAUSED):
-                self.state_updated.wait()
+                self.state_updated.wait(timeout=1.0)
         finally:
             self.state_updated.release()
 
