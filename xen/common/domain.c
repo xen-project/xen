@@ -110,10 +110,6 @@ static void __domain_finalise_shutdown(struct domain *d)
             return;
 
     d->is_shut_down = 1;
-
-    for_each_vcpu ( d, v )
-        vcpu_sleep_nosync(v);
-
     send_guest_global_virq(dom0, VIRQ_DOM_EXC);
 }
 
@@ -126,7 +122,7 @@ static void vcpu_check_shutdown(struct vcpu *v)
     if ( d->is_shutting_down )
     {
         if ( !v->paused_for_shutdown )
-            atomic_inc(&v->pause_count);
+            vcpu_pause_nosync(v);
         v->paused_for_shutdown = 1;
         v->defer_shutdown = 0;
         __domain_finalise_shutdown(d);
@@ -426,7 +422,7 @@ void domain_shutdown(struct domain *d, u8 reason)
     {
         if ( v->defer_shutdown )
             continue;
-        atomic_inc(&v->pause_count);
+        vcpu_pause_nosync(v);
         v->paused_for_shutdown = 1;
     }
 
