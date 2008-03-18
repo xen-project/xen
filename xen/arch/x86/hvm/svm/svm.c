@@ -495,6 +495,7 @@ static void svm_get_segment_register(struct vcpu *v, enum x86_segment seg,
         break;
     case x86_seg_ss:
         memcpy(reg, &vmcb->ss, sizeof(*reg));
+        reg->attr.fields.dpl = vmcb->cpl;
         break;
     case x86_seg_tr:
         svm_sync_vmcb(v);
