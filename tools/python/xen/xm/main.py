@@ -626,8 +626,11 @@ class Shell(cmd.Cmd):
 
     def preloop(self):
         cmd.Cmd.preloop(self)
-        import readline
-        readline.set_completer_delims(' ')
+        try:
+            import readline
+            readline.set_completer_delims(' ')
+        except ImportError:
+            pass
 
     def default(self, line):
         words = shlex.split(line)
