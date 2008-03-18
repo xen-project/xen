@@ -165,7 +165,7 @@ XENAPI_PLATFORM_CFG_TYPES = {
 # Xen API console 'other_config' keys.
 XENAPI_CONSOLE_OTHER_CFG = ['vncunused', 'vncdisplay', 'vnclisten',
                             'vncpasswd', 'type', 'display', 'xauthority',
-                            'keymap']
+                            'keymap', 'opengl']
 
 # List of XendConfig configuration keys that have no direct equivalent
 # in the old world.
