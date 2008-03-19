@@ -125,24 +125,6 @@ static inline int count_bits ( int nr, volatile void *addr)
     return count;
 }
 
-static inline int permute(unsigned long i, unsigned long order_nr)
-{
-    /* Need a simple permutation function so that we scan pages in a
-       pseudo random order, enabling us to get a better estimate of
-       the domain's page dirtying rate as we go (there are often
-       contiguous ranges of pfns that have similar behaviour, and we
-       want to mix them up. */
-  
-  unsigned char keep = 9; /* chunk of 2 MB */
-  unsigned char shift_low = (order_nr - keep) / 2 + ((order_nr - keep) / 2) % 2;
-  unsigned char shift_high = order_nr - keep - shift_low;
-
-  unsigned long high = (i >> (keep + shift_low));
-  unsigned long low = (i >> keep) & ((1 << shift_low) - 1);
-
-  return (i & ((1 << keep) - 1)) | (low << (shift_high + keep)) | (high << keep);
-}
-
 static uint64_t tv_to_us(struct timeval *new)
 {
     return (new->tv_sec * 1000000) + new->tv_usec;
@@ -847,9 +829,6 @@ int xc_domain_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
     /* base of the region in which domain memory is mapped */
     unsigned char *region_base = NULL;
 
-    /* power of 2 order of p2m_size */
-    int order_nr;
-
     /* bitmap of pages:
        - that should be sent this iteration (unless later marked as skip);
        - to skip this iteration because already dirty;
@@ -958,11 +937,6 @@ int xc_domain_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
 
     /* pretend we sent all the pages last iteration */
     sent_last_iter = p2m_size;
-
-    /* calculate the power of 2 order of p2m_size, e.g.
-       15->4 16->4 17->5 */
-    for ( i = p2m_size-1, order_nr = 0; i ; i >>= 1, order_nr++ )
-        continue;
 
     /* Setup to_send / to_fix and to_skip bitmaps */
     to_send = malloc(BITMAP_SIZE);
@@ -1114,7 +1088,7 @@ int xc_domain_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
                    (batch < MAX_BATCH_SIZE) && (N < p2m_size);
                    N++ )
             {
-                int n = permute(N, order_nr);
+                int n = N;
 
                 if ( debug )
                 {
