@@ -645,7 +645,7 @@ get_page_from_l1e(
     struct page_info *page = mfn_to_page(mfn);
     uint32_t l1f = l1e_get_flags(l1e);
     struct vcpu *curr = current;
-    struct domain *owner = page_get_owner(page);
+    struct domain *owner;
     int okay;
 
     if ( !(l1f & _PAGE_PRESENT) )
@@ -680,6 +680,7 @@ get_page_from_l1e(
      * until pvfb supports granted mappings. At that time this minor hack
      * can go away.
      */
+    owner = page_get_owner(page);
     if ( unlikely(d != owner) && (owner != NULL) &&
          (d != curr->domain) && IS_PRIV_FOR(d, owner) )
         d = owner;
