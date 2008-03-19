@@ -546,13 +546,13 @@ fi # -z $sdl
 if test -z "$opengl" && test "$sdl" = "yes"
 then
 cat > $TMPC << EOF
-#include <GL/gl.h>
+#include <SDL_opengl.h>
 #ifndef GL_TEXTURE_RECTANGLE_ARB
 #error "Opengl doesn't support GL_TEXTURE_RECTANGLE_ARB"
 #endif
 int main( void ) { return (int) glGetString(GL_EXTENSIONS); }
 EOF
-if $cc -o $TMPE $TMPC -lGL 2> /dev/null
+if $cc -o $TMPE `$sdl_config --cflags --libs 2> /dev/null` -I/usr/include/GL $TMPC -lXext -lGL 2> /dev/null
 then
 opengl="yes"
 else
