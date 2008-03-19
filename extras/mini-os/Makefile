@@ -88,6 +88,11 @@ OBJS += $(QEMUDIR)/i386-dm-stubdom/qemu.a $(QEMUDIR)/i386-dm-stubdom/libqemu.a
 CFLAGS += -DCONFIG_QEMU
 endif
 
+ifneq ($(CDIR),)
+OBJS += $(CDIR)/main.a
+LDLIBS += 
+endif
+
 ifeq ($(libc),y)
 LDLIBS += -L$(XEN_ROOT)/stubdom/libxc -lxenctrl -lxenguest
 LDLIBS += -lpci
@@ -95,7 +100,7 @@ LDLIBS += -lz
 LDLIBS += -lc
 endif
 
-ifneq ($(caml)-$(qemu)-$(lwip),--y)
+ifneq ($(caml)-$(qemu)-$(CDIR)-$(lwip),---y)
 OBJS := $(filter-out daytime.o, $(OBJS))
 endif
 

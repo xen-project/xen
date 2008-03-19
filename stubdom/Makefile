@@ -201,6 +201,14 @@ ioemu: cross-zlib cross-libpci mk-symlinks libxc
 caml:
 	$(MAKE) -C $@
 
+###
+# C
+###
+
+.PHONY: c
+c:
+	$(MAKE) -C $@
+
 ########
 # minios
 ########
@@ -211,7 +219,11 @@ qemu-stubdom: mk-symlinks lwip-cvs libxc ioemu
 
 .PHONY: caml-stubdom
 caml-stubdom: mk-symlinks lwip-cvs libxc cross-libpci caml
-	$(MAKE) -C mini-os LWIPDIR=$(CURDIR)/lwia-cvs CAMLDIR=$(CURDIR)/caml
+	$(MAKE) -C mini-os LWIPDIR=$(CURDIR)/lwip-cvs CAMLDIR=$(CURDIR)/caml
+
+.PHONY: c-stubdom
+c-stubdom: mk-symlinks lwip-cvs libxc cross-libpci c
+	$(MAKE) -C mini-os LWIPDIR=$(CURDIR)/lwip-cvs CDIR=$(CURDIR)/c
 
 #########
 # install
