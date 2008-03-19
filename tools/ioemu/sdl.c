@@ -110,7 +110,7 @@ static void opengl_setdata(DisplayState *ds, void *pixels)
             glPixelStorei (GL_UNPACK_ALIGNMENT, 4);
             break;
     }   
-    glPixelStorei(GL_UNPACK_ROW_LENGTH, (ds->linesize * 8 / ds->depth) - ds->width);
+    glPixelStorei(GL_UNPACK_ROW_LENGTH, (ds->linesize * 8) / ds->depth);
     glTexImage2D(GL_TEXTURE_RECTANGLE_ARB, 0, gl_format, ds->width, ds->height, 0, tex_format, tex_type, pixels);
     glTexParameterf(GL_TEXTURE_RECTANGLE_ARB, GL_TEXTURE_PRIORITY, 1.0);
     glTexParameteri(GL_TEXTURE_RECTANGLE_ARB, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
@@ -125,7 +125,7 @@ static void opengl_update(DisplayState *ds, int x, int y, int w, int h)
     int bpp = ds->depth / 8;
     GLvoid *pixels = ds->data + y * ds->linesize + x * bpp;
     glBindTexture(GL_TEXTURE_RECTANGLE_ARB, texture_ref);
-    glPixelStorei(GL_UNPACK_ROW_LENGTH, (ds->linesize / bpp) - w);
+    glPixelStorei(GL_UNPACK_ROW_LENGTH, ds->linesize / bpp);
     glTexSubImage2D(GL_TEXTURE_RECTANGLE_ARB, 0, x, y, w, h, tex_format, tex_type, pixels);
     glBegin(GL_QUADS);
         glTexCoord2d(0, 0);
@@ -476,7 +476,8 @@ static void sdl_send_mouse_event(int dx, int dy, int dz, int state)
 static void toggle_full_screen(DisplayState *ds)
 {
     gui_fullscreen = !gui_fullscreen;
-    sdl_resize(ds, screen->w, screen->h, ds->linesize);
+    sdl_resize(ds, ds->width, ds->height, ds->linesize);
+    ds->dpy_setdata(ds, ds->data);
     if (gui_fullscreen) {
         gui_saved_grab = gui_grab;
         sdl_grab_start();
@@ -503,7 +504,7 @@ static void sdl_refresh(DisplayState *ds)
     while (SDL_PollEvent(ev)) {
         switch (ev->type) {
         case SDL_VIDEOEXPOSE:
-            sdl_update(ds, 0, 0, ds->width, ds->height);
+            ds->dpy_update(ds, 0, 0, ds->width, ds->height);
             break;
         case SDL_KEYDOWN:
         case SDL_KEYUP:
