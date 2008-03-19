@@ -29,12 +29,12 @@ extern unsigned short ivrs_bdf_entries;
 extern struct ivrs_mappings *ivrs_mappings;
 
 static struct amd_iommu * __init find_iommu_from_bdf_cap(
-           u16 bdf, u8 cap_offset)
+    u16 bdf, u8 cap_offset)
 {
     struct amd_iommu *iommu;
 
-    for_each_amd_iommu( iommu )
-        if ( iommu->bdf == bdf && iommu->cap_offset == cap_offset )
+    for_each_amd_iommu ( iommu )
+        if ( (iommu->bdf == bdf) && (iommu->cap_offset == cap_offset) )
             return iommu;
 
     return NULL;
@@ -57,15 +57,17 @@ static void __init reserve_iommu_exclusion_range(
     iommu->exclusion_limit = limit;
 }
 
-static void __init reserve_iommu_exclusion_range_all(struct amd_iommu *iommu,
-           unsigned long base, unsigned long limit)
+static void __init reserve_iommu_exclusion_range_all(
+    struct amd_iommu *iommu,
+    unsigned long base, unsigned long limit)
 {
     reserve_iommu_exclusion_range(iommu, base, limit);
     iommu->exclusion_allow_all = IOMMU_CONTROL_ENABLED;
 }
 
-static void __init reserve_unity_map_for_device(u16 bdf, unsigned long base,
-           unsigned long length, u8 iw, u8 ir)
+static void __init reserve_unity_map_for_device(
+    u16 bdf, unsigned long base,
+    unsigned long length, u8 iw, u8 ir)
 {
     unsigned long old_top, new_top;
 
@@ -80,7 +82,7 @@ static void __init reserve_unity_map_for_device(u16 bdf, unsigned long base,
         if ( ivrs_mappings[bdf].addr_range_start < base )
             base = ivrs_mappings[bdf].addr_range_start;
         length = new_top - base;
-   }
+    }
 
     /* extend r/w permissioms and keep aggregate */
     if ( iw )
@@ -93,7 +95,7 @@ static void __init reserve_unity_map_for_device(u16 bdf, unsigned long base,
 }
 
 static int __init register_exclusion_range_for_all_devices(
-           unsigned long base, unsigned long limit, u8 iw, u8 ir)
+    unsigned long base, unsigned long limit, u8 iw, u8 ir)
 {
     unsigned long range_top, iommu_top, length;
     struct amd_iommu *iommu;
@@ -105,7 +107,7 @@ static int __init register_exclusion_range_for_all_devices(
     iommu_top = max_page * PAGE_SIZE;
     if ( base < iommu_top )
     {
-        if (range_top > iommu_top)
+        if ( range_top > iommu_top )
             range_top = iommu_top;
         length = range_top - base;
         /* reserve r/w unity-mapped page entries for devices */
@@ -116,7 +118,7 @@ static int __init register_exclusion_range_for_all_devices(
         base = iommu_top;
     }
     /* register IOMMU exclusion range settings */
-    if (limit >= iommu_top)
+    if ( limit >= iommu_top )
     {
         for_each_amd_iommu( iommu )
             reserve_iommu_exclusion_range_all(iommu, base, limit);
@@ -125,8 +127,8 @@ static int __init register_exclusion_range_for_all_devices(
     return 0;
 }
 
-static int __init register_exclusion_range_for_device(u16 bdf,
-           unsigned long base, unsigned long limit, u8 iw, u8 ir)
+static int __init register_exclusion_range_for_device(
+    u16 bdf, unsigned long base, unsigned long limit, u8 iw, u8 ir)
 {
     unsigned long range_top, iommu_top, length;
     struct amd_iommu *iommu;
@@ -147,7 +149,7 @@ static int __init register_exclusion_range_for_device(u16 bdf,
     iommu_top = max_page * PAGE_SIZE;
     if ( base < iommu_top )
     {
-        if (range_top > iommu_top)
+        if ( range_top > iommu_top )
             range_top = iommu_top;
         length = range_top - base;
         /* reserve unity-mapped page entries for device */
@@ -159,8 +161,8 @@ static int __init register_exclusion_range_for_device(u16 bdf,
         base = iommu_top;
     }
 
-   /* register IOMMU exclusion range settings for device */
-   if ( limit >= iommu_top  )
+    /* register IOMMU exclusion range settings for device */
+    if ( limit >= iommu_top  )
     {
         reserve_iommu_exclusion_range(iommu, base, limit);
         ivrs_mappings[bdf].dte_allow_exclusion = IOMMU_CONTROL_ENABLED;
@@ -171,8 +173,8 @@ static int __init register_exclusion_range_for_device(u16 bdf,
 }
 
 static int __init register_exclusion_range_for_iommu_devices(
-           struct amd_iommu *iommu,
-           unsigned long base, unsigned long limit, u8 iw, u8 ir)
+    struct amd_iommu *iommu,
+    unsigned long base, unsigned long limit, u8 iw, u8 ir)
 {
     unsigned long range_top, iommu_top, length;
     u16 bus, devfn, bdf, req;
@@ -183,7 +185,7 @@ static int __init register_exclusion_range_for_iommu_devices(
     iommu_top = max_page * PAGE_SIZE;
     if ( base < iommu_top )
     {
-        if (range_top > iommu_top)
+        if ( range_top > iommu_top )
             range_top = iommu_top;
         length = range_top - base;
         /* reserve r/w unity-mapped page entries for devices */
@@ -205,19 +207,19 @@ static int __init register_exclusion_range_for_iommu_devices(
     }
 
     /* register IOMMU exclusion range settings */
-    if (limit >= iommu_top)
+    if ( limit >= iommu_top )
         reserve_iommu_exclusion_range_all(iommu, base, limit);
     return 0;
 }
 
 static int __init parse_ivmd_device_select(
-           struct acpi_ivmd_block_header *ivmd_block,
-           unsigned long base, unsigned long limit, u8 iw, u8 ir)
+    struct acpi_ivmd_block_header *ivmd_block,
+    unsigned long base, unsigned long limit, u8 iw, u8 ir)
 {
     u16 bdf;
 
     bdf = ivmd_block->header.dev_id;
-    if (bdf >= ivrs_bdf_entries)
+    if ( bdf >= ivrs_bdf_entries )
     {
         dprintk(XENLOG_ERR, "IVMD Error: Invalid Dev_Id 0x%x\n", bdf);
         return -ENODEV;
@@ -227,44 +229,41 @@ static int __init parse_ivmd_device_select(
 }
 
 static int __init parse_ivmd_device_range(
-           struct acpi_ivmd_block_header *ivmd_block,
-           unsigned long base, unsigned long limit, u8 iw, u8 ir)
+    struct acpi_ivmd_block_header *ivmd_block,
+    unsigned long base, unsigned long limit, u8 iw, u8 ir)
 {
     u16 first_bdf, last_bdf, bdf;
     int error;
 
     first_bdf = ivmd_block->header.dev_id;
-    if (first_bdf >= ivrs_bdf_entries)
-    {
-       dprintk(XENLOG_ERR, "IVMD Error: "
-                    "Invalid Range_First Dev_Id 0x%x\n", first_bdf);
-       return -ENODEV;
-    }
-
-    last_bdf = ivmd_block->last_dev_id;
-    if (last_bdf >= ivrs_bdf_entries || last_bdf <= first_bdf)
+    if ( first_bdf >= ivrs_bdf_entries )
     {
         dprintk(XENLOG_ERR, "IVMD Error: "
-                    "Invalid Range_Last Dev_Id 0x%x\n", last_bdf);
+                "Invalid Range_First Dev_Id 0x%x\n", first_bdf);
         return -ENODEV;
     }
 
-      dprintk(XENLOG_ERR, " Dev_Id Range: 0x%x -> 0x%x\n",
-                    first_bdf, last_bdf);
-
-    for ( bdf = first_bdf, error = 0;
-       bdf <= last_bdf && !error; ++bdf )
+    last_bdf = ivmd_block->last_dev_id;
+    if ( (last_bdf >= ivrs_bdf_entries) || (last_bdf <= first_bdf) )
     {
-       error = register_exclusion_range_for_device(
-                     bdf, base, limit, iw, ir);
+        dprintk(XENLOG_ERR, "IVMD Error: "
+                "Invalid Range_Last Dev_Id 0x%x\n", last_bdf);
+        return -ENODEV;
     }
 
-   return error;
+    dprintk(XENLOG_ERR, " Dev_Id Range: 0x%x -> 0x%x\n",
+            first_bdf, last_bdf);
+
+    for ( bdf = first_bdf, error = 0; (bdf <= last_bdf) && !error; bdf++ )
+        error = register_exclusion_range_for_device(
+            bdf, base, limit, iw, ir);
+
+    return error;
 }
 
 static int __init parse_ivmd_device_iommu(
-           struct acpi_ivmd_block_header *ivmd_block,
-           unsigned long base, unsigned long limit, u8 iw, u8 ir)
+    struct acpi_ivmd_block_header *ivmd_block,
+    unsigned long base, unsigned long limit, u8 iw, u8 ir)
 {
     struct amd_iommu *iommu;
 
@@ -273,14 +272,14 @@ static int __init parse_ivmd_device_iommu(
                                     ivmd_block->cap_offset);
     if ( !iommu )
     {
-       dprintk(XENLOG_ERR,
-           "IVMD Error: No IOMMU for Dev_Id 0x%x  Cap 0x%x\n",
-            ivmd_block->header.dev_id, ivmd_block->cap_offset);
-       return -ENODEV;
+        dprintk(XENLOG_ERR,
+                "IVMD Error: No IOMMU for Dev_Id 0x%x  Cap 0x%x\n",
+                ivmd_block->header.dev_id, ivmd_block->cap_offset);
+        return -ENODEV;
     }
 
     return register_exclusion_range_for_iommu_devices(
-                 iommu, base, limit, iw, ir);
+        iommu, base, limit, iw, ir);
 }
 
 static int __init parse_ivmd_block(struct acpi_ivmd_block_header *ivmd_block)
@@ -288,11 +287,11 @@ static int __init parse_ivmd_block(struct acpi_ivmd_block_header *ivmd_block)
     unsigned long start_addr, mem_length, base, limit;
     u8 iw, ir;
 
-    if (ivmd_block->header.length <
-       sizeof(struct acpi_ivmd_block_header))
+    if ( ivmd_block->header.length <
+         sizeof(struct acpi_ivmd_block_header) )
     {
-       dprintk(XENLOG_ERR, "IVMD Error: Invalid Block Length!\n");
-       return -ENODEV;
+        dprintk(XENLOG_ERR, "IVMD Error: Invalid Block Length!\n");
+        return -ENODEV;
     }
 
     start_addr = (unsigned long)ivmd_block->start_addr;
@@ -301,7 +300,7 @@ static int __init parse_ivmd_block(struct acpi_ivmd_block_header *ivmd_block)
     limit = (start_addr + mem_length - 1) & PAGE_MASK;
 
     dprintk(XENLOG_INFO, "IVMD Block: Type 0x%x\n",
-                  ivmd_block->header.type);
+            ivmd_block->header.type);
     dprintk(XENLOG_INFO, " Start_Addr_Phys 0x%lx\n", start_addr);
     dprintk(XENLOG_INFO, " Mem_Length 0x%lx\n", mem_length);
 
@@ -322,27 +321,27 @@ static int __init parse_ivmd_block(struct acpi_ivmd_block_header *ivmd_block)
     }
     else
     {
-       dprintk(KERN_ERR, "IVMD Error: Invalid Flag Field!\n");
-       return -ENODEV;
+        dprintk(KERN_ERR, "IVMD Error: Invalid Flag Field!\n");
+        return -ENODEV;
     }
 
     switch( ivmd_block->header.type )
     {
     case AMD_IOMMU_ACPI_IVMD_ALL_TYPE:
         return register_exclusion_range_for_all_devices(
-           base, limit, iw, ir);
+            base, limit, iw, ir);
 
     case AMD_IOMMU_ACPI_IVMD_ONE_TYPE:
         return parse_ivmd_device_select(ivmd_block,
-           base, limit, iw, ir);
+                                        base, limit, iw, ir);
 
     case AMD_IOMMU_ACPI_IVMD_RANGE_TYPE:
         return parse_ivmd_device_range(ivmd_block,
-            base, limit, iw, ir);
+                                       base, limit, iw, ir);
 
     case AMD_IOMMU_ACPI_IVMD_IOMMU_TYPE:
         return parse_ivmd_device_iommu(ivmd_block,
-           base, limit, iw, ir);
+                                       base, limit, iw, ir);
 
     default:
         dprintk(XENLOG_ERR, "IVMD Error: Invalid Block Type!\n");
@@ -350,8 +349,8 @@ static int __init parse_ivmd_block(struct acpi_ivmd_block_header *ivmd_block)
     }
 }
 
-static u16 __init parse_ivhd_device_padding(u16 pad_length,
-           u16 header_length, u16 block_length)
+static u16 __init parse_ivhd_device_padding(
+    u16 pad_length, u16 header_length, u16 block_length)
 {
     if ( header_length < (block_length + pad_length) )
     {
@@ -363,7 +362,7 @@ static u16 __init parse_ivhd_device_padding(u16 pad_length,
 }
 
 static u16 __init parse_ivhd_device_select(
-           union acpi_ivhd_device *ivhd_device)
+    union acpi_ivhd_device *ivhd_device)
 {
     u16 bdf;
 
@@ -385,8 +384,8 @@ static u16 __init parse_ivhd_device_select(
 }
 
 static u16 __init parse_ivhd_device_range(
-           union acpi_ivhd_device *ivhd_device,
-           u16 header_length, u16 block_length)
+    union acpi_ivhd_device *ivhd_device,
+    u16 header_length, u16 block_length)
 {
     u16 dev_length, first_bdf, last_bdf, bdf;
     u8 sys_mgt;
@@ -399,7 +398,8 @@ static u16 __init parse_ivhd_device_range(
     }
 
     if ( ivhd_device->range.trailer.type !=
-        AMD_IOMMU_ACPI_IVHD_DEV_RANGE_END) {
+         AMD_IOMMU_ACPI_IVHD_DEV_RANGE_END )
+    {
         dprintk(XENLOG_ERR, "IVHD Error: "
                 "Invalid Range: End_Type 0x%x\n",
                 ivhd_device->range.trailer.type);
@@ -409,35 +409,35 @@ static u16 __init parse_ivhd_device_range(
     first_bdf = ivhd_device->header.dev_id;
     if ( first_bdf >= ivrs_bdf_entries )
     {
-       dprintk(XENLOG_ERR, "IVHD Error: "
-           "Invalid Range: First Dev_Id 0x%x\n", first_bdf);
-       return 0;
+        dprintk(XENLOG_ERR, "IVHD Error: "
+                "Invalid Range: First Dev_Id 0x%x\n", first_bdf);
+        return 0;
     }
 
     last_bdf = ivhd_device->range.trailer.dev_id;
-    if ( last_bdf >= ivrs_bdf_entries || last_bdf <= first_bdf )
+    if ( (last_bdf >= ivrs_bdf_entries) || (last_bdf <= first_bdf) )
     {
-       dprintk(XENLOG_ERR, "IVHD Error: "
-           "Invalid Range: Last Dev_Id 0x%x\n", last_bdf);
-       return 0;
+        dprintk(XENLOG_ERR, "IVHD Error: "
+                "Invalid Range: Last Dev_Id 0x%x\n", last_bdf);
+        return 0;
     }
 
     dprintk(XENLOG_INFO, " Dev_Id Range: 0x%x -> 0x%x\n",
-        first_bdf, last_bdf);
+            first_bdf, last_bdf);
 
     /* override flags for range of devices */
     sys_mgt = get_field_from_byte(ivhd_device->header.flags,
-                                 AMD_IOMMU_ACPI_SYS_MGT_MASK,
-                                 AMD_IOMMU_ACPI_SYS_MGT_SHIFT);
-    for ( bdf = first_bdf; bdf <= last_bdf; ++bdf )
+                                  AMD_IOMMU_ACPI_SYS_MGT_MASK,
+                                  AMD_IOMMU_ACPI_SYS_MGT_SHIFT);
+    for ( bdf = first_bdf; bdf <= last_bdf; bdf++ )
         ivrs_mappings[bdf].dte_sys_mgt_enable = sys_mgt;
 
     return dev_length;
 }
 
 static u16 __init parse_ivhd_device_alias(
-           union acpi_ivhd_device *ivhd_device,
-           u16 header_length, u16 block_length)
+    union acpi_ivhd_device *ivhd_device,
+    u16 header_length, u16 block_length)
 {
     u16 dev_length, alias_id, bdf;
 
@@ -445,7 +445,7 @@ static u16 __init parse_ivhd_device_alias(
     if ( header_length < (block_length + dev_length) )
     {
         dprintk(XENLOG_ERR, "IVHD Error: "
-            "Invalid Device_Entry Length!\n");
+                "Invalid Device_Entry Length!\n");
         return 0;
     }
 
@@ -460,9 +460,9 @@ static u16 __init parse_ivhd_device_alias(
     alias_id = ivhd_device->alias.dev_id;
     if ( alias_id >= ivrs_bdf_entries )
     {
-       dprintk(XENLOG_ERR, "IVHD Error: "
-               "Invalid Alias Dev_Id 0x%x\n", alias_id);
-       return 0;
+        dprintk(XENLOG_ERR, "IVHD Error: "
+                "Invalid Alias Dev_Id 0x%x\n", alias_id);
+        return 0;
     }
 
     dprintk(XENLOG_INFO, " Dev_Id Alias: 0x%x\n", alias_id);
@@ -470,18 +470,18 @@ static u16 __init parse_ivhd_device_alias(
     /* override requestor_id and flags for device */
     ivrs_mappings[bdf].dte_requestor_id = alias_id;
     ivrs_mappings[bdf].dte_sys_mgt_enable =
-            get_field_from_byte(ivhd_device->header.flags,
-                                AMD_IOMMU_ACPI_SYS_MGT_MASK,
-                                AMD_IOMMU_ACPI_SYS_MGT_SHIFT);
+        get_field_from_byte(ivhd_device->header.flags,
+                            AMD_IOMMU_ACPI_SYS_MGT_MASK,
+                            AMD_IOMMU_ACPI_SYS_MGT_SHIFT);
     ivrs_mappings[alias_id].dte_sys_mgt_enable =
-            ivrs_mappings[bdf].dte_sys_mgt_enable;
+        ivrs_mappings[bdf].dte_sys_mgt_enable;
 
     return dev_length;
 }
 
 static u16 __init parse_ivhd_device_alias_range(
-           union acpi_ivhd_device *ivhd_device,
-           u16 header_length, u16 block_length)
+    union acpi_ivhd_device *ivhd_device,
+    u16 header_length, u16 block_length)
 {
 
     u16 dev_length, first_bdf, last_bdf, alias_id, bdf;
@@ -496,7 +496,7 @@ static u16 __init parse_ivhd_device_alias_range(
     }
 
     if ( ivhd_device->alias_range.trailer.type !=
-       AMD_IOMMU_ACPI_IVHD_DEV_RANGE_END )
+         AMD_IOMMU_ACPI_IVHD_DEV_RANGE_END )
     {
         dprintk(XENLOG_ERR, "IVHD Error: "
                 "Invalid Range: End_Type 0x%x\n",
@@ -536,7 +536,7 @@ static u16 __init parse_ivhd_device_alias_range(
     sys_mgt = get_field_from_byte(ivhd_device->header.flags,
                                   AMD_IOMMU_ACPI_SYS_MGT_MASK,
                                   AMD_IOMMU_ACPI_SYS_MGT_SHIFT);
-    for ( bdf = first_bdf; bdf <= last_bdf; ++bdf )
+    for ( bdf = first_bdf; bdf <= last_bdf; bdf++ )
     {
         ivrs_mappings[bdf].dte_requestor_id = alias_id;
         ivrs_mappings[bdf].dte_sys_mgt_enable = sys_mgt;
@@ -547,8 +547,8 @@ static u16 __init parse_ivhd_device_alias_range(
 }
 
 static u16 __init parse_ivhd_device_extended(
-           union acpi_ivhd_device *ivhd_device,
-           u16 header_length, u16 block_length)
+    union acpi_ivhd_device *ivhd_device,
+    u16 header_length, u16 block_length)
 {
     u16 dev_length, bdf;
 
@@ -578,8 +578,8 @@ static u16 __init parse_ivhd_device_extended(
 }
 
 static u16 __init parse_ivhd_device_extended_range(
-           union acpi_ivhd_device *ivhd_device,
-           u16 header_length, u16 block_length)
+    union acpi_ivhd_device *ivhd_device,
+    u16 header_length, u16 block_length)
 {
     u16 dev_length, first_bdf, last_bdf, bdf;
     u8 sys_mgt;
@@ -593,7 +593,7 @@ static u16 __init parse_ivhd_device_extended_range(
     }
 
     if ( ivhd_device->extended_range.trailer.type !=
-        AMD_IOMMU_ACPI_IVHD_DEV_RANGE_END )
+         AMD_IOMMU_ACPI_IVHD_DEV_RANGE_END )
     {
         dprintk(XENLOG_ERR, "IVHD Error: "
                 "Invalid Range: End_Type 0x%x\n",
@@ -604,13 +604,13 @@ static u16 __init parse_ivhd_device_extended_range(
     first_bdf = ivhd_device->header.dev_id;
     if ( first_bdf >= ivrs_bdf_entries )
     {
-       dprintk(XENLOG_ERR, "IVHD Error: "
-           "Invalid Range: First Dev_Id 0x%x\n", first_bdf);
-       return 0;
+        dprintk(XENLOG_ERR, "IVHD Error: "
+                "Invalid Range: First Dev_Id 0x%x\n", first_bdf);
+        return 0;
     }
 
     last_bdf = ivhd_device->extended_range.trailer.dev_id;
-    if ( last_bdf >= ivrs_bdf_entries || last_bdf <= first_bdf )
+    if ( (last_bdf >= ivrs_bdf_entries) || (last_bdf <= first_bdf) )
     {
         dprintk(XENLOG_ERR, "IVHD Error: "
                 "Invalid Range: Last Dev_Id 0x%x\n", last_bdf);
@@ -624,7 +624,7 @@ static u16 __init parse_ivhd_device_extended_range(
     sys_mgt = get_field_from_byte(ivhd_device->header.flags,
                                   AMD_IOMMU_ACPI_SYS_MGT_MASK,
                                   AMD_IOMMU_ACPI_SYS_MGT_SHIFT);
-    for ( bdf = first_bdf; bdf <= last_bdf; ++bdf )
+    for ( bdf = first_bdf; bdf <= last_bdf; bdf++ )
         ivrs_mappings[bdf].dte_sys_mgt_enable = sys_mgt;
 
     return dev_length;
@@ -637,20 +637,20 @@ static int __init parse_ivhd_block(struct acpi_ivhd_block_header *ivhd_block)
     struct amd_iommu *iommu;
 
     if ( ivhd_block->header.length <
-        sizeof(struct acpi_ivhd_block_header) )
+         sizeof(struct acpi_ivhd_block_header) )
     {
         dprintk(XENLOG_ERR, "IVHD Error: Invalid Block Length!\n");
         return -ENODEV;
     }
 
     iommu = find_iommu_from_bdf_cap(ivhd_block->header.dev_id,
-            ivhd_block->cap_offset);
+                                    ivhd_block->cap_offset);
     if ( !iommu )
     {
         dprintk(XENLOG_ERR,
                 "IVHD Error: No IOMMU for Dev_Id 0x%x  Cap 0x%x\n",
                 ivhd_block->header.dev_id, ivhd_block->cap_offset);
-       return -ENODEV;
+        return -ENODEV;
     }
 
     dprintk(XENLOG_INFO, "IVHD Block:\n");
@@ -668,29 +668,29 @@ static int __init parse_ivhd_block(struct acpi_ivhd_block_header *ivhd_block)
                                           AMD_IOMMU_ACPI_COHERENT_MASK,
                                           AMD_IOMMU_ACPI_COHERENT_SHIFT);
     iommu->iotlb_support = get_field_from_byte(ivhd_block->header.flags,
-                                          AMD_IOMMU_ACPI_IOTLB_SUP_MASK,
-                                          AMD_IOMMU_ACPI_IOTLB_SUP_SHIFT);
+                                               AMD_IOMMU_ACPI_IOTLB_SUP_MASK,
+                                               AMD_IOMMU_ACPI_IOTLB_SUP_SHIFT);
     iommu->isochronous = get_field_from_byte(ivhd_block->header.flags,
-                                          AMD_IOMMU_ACPI_ISOC_MASK,
-                                          AMD_IOMMU_ACPI_ISOC_SHIFT);
+                                             AMD_IOMMU_ACPI_ISOC_MASK,
+                                             AMD_IOMMU_ACPI_ISOC_SHIFT);
     iommu->res_pass_pw = get_field_from_byte(ivhd_block->header.flags,
-                                          AMD_IOMMU_ACPI_RES_PASS_PW_MASK,
-                                          AMD_IOMMU_ACPI_RES_PASS_PW_SHIFT);
+                                             AMD_IOMMU_ACPI_RES_PASS_PW_MASK,
+                                             AMD_IOMMU_ACPI_RES_PASS_PW_SHIFT);
     iommu->pass_pw = get_field_from_byte(ivhd_block->header.flags,
-                                          AMD_IOMMU_ACPI_PASS_PW_MASK,
-                                          AMD_IOMMU_ACPI_PASS_PW_SHIFT);
+                                         AMD_IOMMU_ACPI_PASS_PW_MASK,
+                                         AMD_IOMMU_ACPI_PASS_PW_SHIFT);
     iommu->ht_tunnel_enable = get_field_from_byte(
-                                          ivhd_block->header.flags,
-                                          AMD_IOMMU_ACPI_HT_TUN_ENB_MASK,
-                                          AMD_IOMMU_ACPI_HT_TUN_ENB_SHIFT);
+        ivhd_block->header.flags,
+        AMD_IOMMU_ACPI_HT_TUN_ENB_MASK,
+        AMD_IOMMU_ACPI_HT_TUN_ENB_SHIFT);
 
     /* parse Device Entries */
     block_length = sizeof(struct acpi_ivhd_block_header);
-    while( ivhd_block->header.length >=
-       (block_length + sizeof(struct acpi_ivhd_device_header)) )
+    while ( ivhd_block->header.length >=
+            (block_length + sizeof(struct acpi_ivhd_device_header)) )
     {
         ivhd_device = (union acpi_ivhd_device *)
-                ((u8 *)ivhd_block + block_length);
+            ((u8 *)ivhd_block + block_length);
 
         dprintk(XENLOG_INFO, "IVHD Device Entry:\n");
         dprintk(XENLOG_INFO, " Type 0x%x\n",
@@ -700,7 +700,7 @@ static int __init parse_ivhd_block(struct acpi_ivhd_block_header *ivhd_block)
         dprintk(XENLOG_INFO, " Flags 0x%x\n",
                 ivhd_device->header.flags);
 
-        switch( ivhd_device->header.type )
+        switch ( ivhd_device->header.type )
         {
         case AMD_IOMMU_ACPI_IVHD_DEV_U32_PAD:
             dev_length = parse_ivhd_device_padding(
@@ -716,7 +716,8 @@ static int __init parse_ivhd_block(struct acpi_ivhd_block_header *ivhd_block)
             dev_length = parse_ivhd_device_select(ivhd_device);
             break;
         case AMD_IOMMU_ACPI_IVHD_DEV_RANGE_START:
-            dev_length = parse_ivhd_device_range(ivhd_device,
+            dev_length = parse_ivhd_device_range(
+                ivhd_device,
                 ivhd_block->header.length, block_length);
             break;
         case AMD_IOMMU_ACPI_IVHD_DEV_ALIAS_SELECT:
@@ -741,7 +742,7 @@ static int __init parse_ivhd_block(struct acpi_ivhd_block_header *ivhd_block)
             break;
         default:
             dprintk(XENLOG_ERR, "IVHD Error: "
-                "Invalid Device Type!\n");
+                    "Invalid Device Type!\n");
             dev_length = 0;
             break;
         }
@@ -759,7 +760,7 @@ static int __init parse_ivrs_block(struct acpi_ivrs_block_header *ivrs_block)
     struct acpi_ivhd_block_header *ivhd_block;
     struct acpi_ivmd_block_header *ivmd_block;
 
-    switch(ivrs_block->type)
+    switch ( ivrs_block->type )
     {
     case AMD_IOMMU_ACPI_IVHD_TYPE:
         ivhd_block = (struct acpi_ivhd_block_header *)ivrs_block;
@@ -786,7 +787,7 @@ void __init dump_acpi_table_header(struct acpi_table_header *table)
 
     printk(XENLOG_INFO "AMD IOMMU: ACPI Table:\n");
     printk(XENLOG_INFO " Signature ");
-    for ( i = 0; i < ACPI_NAME_SIZE; ++i )
+    for ( i = 0; i < ACPI_NAME_SIZE; i++ )
         printk("%c", table->signature[i]);
     printk("\n");
 
@@ -795,28 +796,27 @@ void __init dump_acpi_table_header(struct acpi_table_header *table)
     printk(" CheckSum 0x%x\n", table->checksum);
 
     printk(" OEM_Id ");
-    for ( i = 0; i < ACPI_OEM_ID_SIZE; ++i )
+    for ( i = 0; i < ACPI_OEM_ID_SIZE; i++ )
         printk("%c", table->oem_id[i]);
     printk("\n");
 
     printk(" OEM_Table_Id ");
-    for ( i = 0; i < ACPI_OEM_TABLE_ID_SIZE; ++i )
+    for ( i = 0; i < ACPI_OEM_TABLE_ID_SIZE; i++ )
         printk("%c", table->oem_table_id[i]);
     printk("\n");
 
     printk(" OEM_Revision 0x%x\n", table->oem_revision);
 
     printk(" Creator_Id ");
-    for ( i = 0; i < ACPI_NAME_SIZE; ++i )
+    for ( i = 0; i < ACPI_NAME_SIZE; i++ )
         printk("%c", table->asl_compiler_id[i]);
     printk("\n");
 
     printk(" Creator_Revision 0x%x\n",
-       table->asl_compiler_revision);
+           table->asl_compiler_revision);
 }
 
-int __init parse_ivrs_table(unsigned long phys_addr,
-                                  unsigned long size)
+int __init parse_ivrs_table(unsigned long phys_addr, unsigned long size)
 {
     struct acpi_ivrs_block_header *ivrs_block;
     unsigned long length, i;
@@ -834,7 +834,7 @@ int __init parse_ivrs_table(unsigned long phys_addr,
     /* validate checksum: sum of entire table == 0 */
     checksum = 0;
     raw_table = (u8 *)table;
-    for ( i = 0; i < table->length; ++i )
+    for ( i = 0; i < table->length; i++ )
         checksum += raw_table[i];
     if ( checksum )
     {
@@ -845,11 +845,10 @@ int __init parse_ivrs_table(unsigned long phys_addr,
 
     /* parse IVRS blocks */
     length = sizeof(struct acpi_ivrs_table_header);
-    while( error == 0 && table->length >
-       (length + sizeof(struct acpi_ivrs_block_header)) )
+    while ( (error == 0) && (table->length > (length + sizeof(*ivrs_block))) )
     {
         ivrs_block = (struct acpi_ivrs_block_header *)
-                ((u8 *)table + length);
+            ((u8 *)table + length);
 
         dprintk(XENLOG_INFO, "IVRS Block:\n");
         dprintk(XENLOG_INFO, " Type 0x%x\n", ivrs_block->type);
@@ -857,16 +856,16 @@ int __init parse_ivrs_table(unsigned long phys_addr,
         dprintk(XENLOG_INFO, " Length 0x%x\n", ivrs_block->length);
         dprintk(XENLOG_INFO, " Dev_Id 0x%x\n", ivrs_block->dev_id);
 
-        if (table->length >= (length + ivrs_block->length))
-           error = parse_ivrs_block(ivrs_block);
-        else
+        if ( table->length < (length + ivrs_block->length) )
         {
-           dprintk(XENLOG_ERR, "IVRS Error: "
-               "Table Length Exceeded: 0x%x -> 0x%lx\n",
-               table->length,
-               (length + ivrs_block->length));
-           return -ENODEV;
+            dprintk(XENLOG_ERR, "IVRS Error: "
+                    "Table Length Exceeded: 0x%x -> 0x%lx\n",
+                    table->length,
+                    (length + ivrs_block->length));
+            return -ENODEV;
         }
+
+        error = parse_ivrs_block(ivrs_block);
         length += ivrs_block->length;
     }
 

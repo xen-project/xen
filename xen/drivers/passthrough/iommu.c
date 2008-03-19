@@ -50,7 +50,7 @@ int assign_device(struct domain *d, u8 bus, u8 devfn)
 {
     struct hvm_iommu *hd = domain_hvm_iommu(d);
 
-    if ( !iommu_enabled || !hd->platform_ops)
+    if ( !iommu_enabled || !hd->platform_ops )
         return 0;
 
     return hd->platform_ops->assign_device(d, bus, devfn);
@@ -65,7 +65,7 @@ void iommu_domain_destroy(struct domain *d)
     struct g2m_ioport *ioport;
     struct dev_intx_gsi_link *digl;
 
-    if ( !iommu_enabled || !hd->platform_ops)
+    if ( !iommu_enabled || !hd->platform_ops )
         return;
 
     if ( hvm_irq_dpci != NULL )
@@ -109,7 +109,7 @@ int iommu_map_page(struct domain *d, unsigned long gfn, unsigned long mfn)
 {
     struct hvm_iommu *hd = domain_hvm_iommu(d);
 
-    if ( !iommu_enabled || !hd->platform_ops)
+    if ( !iommu_enabled || !hd->platform_ops )
         return 0;
 
     return hd->platform_ops->map_page(d, gfn, mfn);
@@ -119,7 +119,7 @@ int iommu_unmap_page(struct domain *d, unsigned long gfn)
 {
     struct hvm_iommu *hd = domain_hvm_iommu(d);
 
-    if ( !iommu_enabled || !hd->platform_ops)
+    if ( !iommu_enabled || !hd->platform_ops )
         return 0;
 
     return hd->platform_ops->unmap_page(d, gfn);
@@ -129,7 +129,7 @@ void deassign_device(struct domain *d, u8 bus, u8 devfn)
 {
     struct hvm_iommu *hd = domain_hvm_iommu(d);
 
-    if ( !iommu_enabled || !hd->platform_ops)
+    if ( !iommu_enabled || !hd->platform_ops )
         return;
 
     return hd->platform_ops->reassign_device(d, dom0, bus, devfn);
