@@ -2062,36 +2062,44 @@ class XendDomainInfo:
                 for v in range(0, self.info['VCPUs_max']):
                     xc.vcpu_setaffinity(self.domid, v, self.info['cpus'])
             else:
+                def find_relaxed_node(node_list):
+                    import sys 
+                    if node_list is None:
+                        node_list = range(0, info['nr_nodes'])
+                    nodeload = [0]
+                    nodeload = nodeload * info['nr_nodes']
+                    from xen.xend import XendDomain
+                    doms = XendDomain.instance().list('all')
+                    for dom in doms:
+                        cpuinfo = dom.getVCPUInfo()
+                        for vcpu in sxp.children(cpuinfo, 'vcpu'):
+                            def vinfo(n, t):
+                                return t(sxp.child_value(vcpu, n))
+                            cpumap = vinfo('cpumap', list)
+                            for i in node_list:
+                                node_cpumask = info['node_to_cpu'][i]
+                                for j in node_cpumask:
+                                    if j in cpumap:
+                                        nodeload[i] += 1
+                                        break
+                    for i in node_list:
+                        if len(info['node_to_cpu'][i]) > 0:
+                            nodeload[i] = int(nodeload[i] / len(info['node_to_cpu'][i]))
+                        else:
+                            nodeload[i] = sys.maxint
+                    index = nodeload.index( min(nodeload) )    
+                    return index
+
                 info = xc.physinfo()
                 if info['nr_nodes'] > 1:
                     node_memory_list = info['node_to_memory']
                     needmem = self.image.getRequiredAvailableMemory(self.info['memory_dynamic_max']) / 1024
                     candidate_node_list = []
                     for i in range(0, info['nr_nodes']):
-                        if node_memory_list[i] >= needmem:
+                        if node_memory_list[i] >= needmem and len(info['node_to_cpu'][i]) > 0:
                             candidate_node_list.append(i)
-                    if candidate_node_list is None or len(candidate_node_list) == 1:
-                        index = node_memory_list.index( max(node_memory_list) )
-                        cpumask = info['node_to_cpu'][index]
-                    else:
-                        nodeload = [0]
-                        nodeload = nodeload * info['nr_nodes']
-                        from xen.xend import XendDomain
-                        doms = XendDomain.instance().list('all')
-                        for dom in doms:
-                            cpuinfo = dom.getVCPUInfo()
-                            for vcpu in sxp.children(cpuinfo, 'vcpu'):
-                                def vinfo(n, t):
-                                    return t(sxp.child_value(vcpu, n))
-                                cpumap = vinfo('cpumap', list)
-                                for i in candidate_node_list:
-                                    node_cpumask = info['node_to_cpu'][i]
-                                    for j in node_cpumask:
-                                        if j in cpumap:
-                                            nodeload[i] += 1
-                                            break
-                        index = nodeload.index( min(nodeload) )
-                        cpumask = info['node_to_cpu'][index]
+                    index = find_relaxed_node(candidate_node_list)
+                    cpumask = info['node_to_cpu'][index]
                     for v in range(0, self.info['VCPUs_max']):
                         xc.vcpu_setaffinity(self.domid, v, cpumask)
 
