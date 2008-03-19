@@ -188,7 +188,6 @@ int open(const char *pathname, int flags, ...)
         }
         default:
             printk(" unsupported flags\n");
-            stack_walk();
             do_exit();
     }
     if (fs_fd < 0) {
