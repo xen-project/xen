@@ -259,7 +259,7 @@ void netfront_select_handler(evtchn_port_t port, struct pt_regs *regs, void *dat
 }
 #endif
 
-struct netfront_dev *init_netfront(char *nodename, void (*thenetif_rx)(unsigned char* data, int len), unsigned char rawmac[6])
+struct netfront_dev *init_netfront(char *nodename, void (*thenetif_rx)(unsigned char* data, int len), unsigned char rawmac[6], char **ip)
 {
     xenbus_transaction_t xbt;
     char* err;
@@ -402,6 +402,11 @@ done:
         xenbus_wait_for_value(path,"4");
 
         xenbus_unwatch_path(XBT_NIL, path);
+
+        if (ip) {
+            snprintf(path, sizeof(path), "%s/ip", dev->backend);
+            xenbus_read(XBT_NIL, path, ip);
+        }
     }
 
     printk("**************************\n");
@@ -427,7 +432,7 @@ done:
 int netfront_tap_open(char *nodename) {
     struct netfront_dev *dev;
 
-    dev = init_netfront(nodename, NETIF_SELECT_RX, NULL);
+    dev = init_netfront(nodename, NETIF_SELECT_RX, NULL, NULL);
     if (!dev) {
 	printk("TAP open failed\n");
 	errno = EIO;

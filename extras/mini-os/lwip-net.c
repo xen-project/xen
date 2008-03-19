@@ -339,10 +339,25 @@ void start_networking(void)
   struct ip_addr ipaddr = { htonl(IF_IPADDR) };
   struct ip_addr netmask = { htonl(IF_NETMASK) };
   struct ip_addr gw = { 0 };
+  char *ip;
 
   tprintk("Waiting for network.\n");
 
-  dev = init_netfront(NULL, NULL, rawmac);
+  dev = init_netfront(NULL, NULL, rawmac, &ip);
+  
+  if (ip) {
+    ipaddr.addr = inet_addr(ip);
+    if (IN_CLASSA(ntohl(ipaddr.addr)))
+      netmask.addr = htonl(IN_CLASSA_NET);
+    else if (IN_CLASSB(ntohl(ipaddr.addr)))
+      netmask.addr = htonl(IN_CLASSB_NET);
+    else if (IN_CLASSC(ntohl(ipaddr.addr)))
+      netmask.addr = htonl(IN_CLASSC_NET);
+    else
+      tprintk("Strange IP %s, leaving netmask to 0.\n", ip);
+  }
+  tprintk("IP %x netmask %x gateway %x.\n",
+          ntohl(ipaddr.addr), ntohl(netmask.addr), ntohl(gw.addr));
   
   tprintk("TCP/IP bringup begins.\n");
   

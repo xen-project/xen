@@ -87,7 +87,7 @@ static void periodic_thread(void *p)
 
 static void netfront_thread(void *p)
 {
-    init_netfront(NULL, NULL, NULL);
+    init_netfront(NULL, NULL, NULL, NULL);
 }
 
 static struct blkfront_dev *blk_dev;

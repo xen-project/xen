@@ -15,16 +15,19 @@ static char message[29];
 void run_server(void *p)
 {
     struct ip_addr listenaddr = { 0 };
-    struct ip_addr ipaddr = { htonl(0x0a000001) };
-    struct ip_addr netmask = { htonl(0xff000000) };
-    struct ip_addr gw = { 0 };
     struct netconn *listener;
     struct netconn *session;
     struct timeval tv;
     err_t rc;
 
     start_networking();
-    networking_set_addr(&ipaddr, &netmask, &gw);
+
+    if (0) {
+        struct ip_addr ipaddr = { htonl(0x0a000001) };
+        struct ip_addr netmask = { htonl(0xff000000) };
+        struct ip_addr gw = { 0 };
+        networking_set_addr(&ipaddr, &netmask, &gw);
+    }
 
     tprintk("Opening connection\n");
 
