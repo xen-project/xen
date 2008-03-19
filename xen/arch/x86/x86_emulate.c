@@ -785,11 +785,21 @@ _mode_iopl(
     struct x86_emulate_ops  *ops)
 {
     int cpl = get_cpl(ctxt, ops);
+    if ( cpl == -1 )
+        return -1;
     return ((cpl >= 0) && (cpl <= ((ctxt->regs->eflags >> 12) & 3)));
 }
 
-#define mode_ring0() (get_cpl(ctxt, ops) == 0)
-#define mode_iopl()  _mode_iopl(ctxt, ops)
+#define mode_ring0() ({                         \
+    int _cpl = get_cpl(ctxt, ops);              \
+    fail_if(_cpl < 0);                          \
+    (_cpl == 0);                                \
+})
+#define mode_iopl() ({                          \
+    int _iopl = _mode_iopl(ctxt, ops);          \
+    fail_if(_iopl < 0);                         \
+    _iopl;                                      \
+})
 
 static int
 in_realmode(
@@ -2394,8 +2404,10 @@ x86_emulate(
 
     case 0x9d: /* popf */ {
         uint32_t mask = EFLG_VIP | EFLG_VIF | EFLG_VM;
-        if ( !mode_iopl() )
+        if ( !mode_ring0() )
             mask |= EFLG_IOPL;
+        if ( !mode_iopl() )
+            mask |= EFLG_IF;
         /* 64-bit mode: POP defaults to a 64-bit operand. */
         if ( mode_64bit() && (op_bytes == 4) )
             op_bytes = 8;
@@ -2640,8 +2652,10 @@ x86_emulate(
     case 0xcf: /* iret */ {
         unsigned long cs, eip, eflags;
         uint32_t mask = EFLG_VIP | EFLG_VIF | EFLG_VM;
-        if ( !mode_iopl() )
+        if ( !mode_ring0() )
             mask |= EFLG_IOPL;
+        if ( !mode_iopl() )
+            mask |= EFLG_IF;
         fail_if(!in_realmode(ctxt, ops));
         if ( (rc = ops->read(x86_seg_ss, sp_post_inc(op_bytes),
                              &eip, op_bytes, ctxt)) ||
