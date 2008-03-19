@@ -304,7 +304,7 @@ gopts.var('disk', val='phy:DEV,VDEV,MODE[,DOM]',
 gopts.var('pci', val='BUS:DEV.FUNC',
           fn=append_value, default=[],
           use="""Add a PCI device to a domain, using given params (in hex).
-         For example 'pci=c0:02.1a'.
+         For example 'pci=c0:02.1'.
          The option may be repeated to add more than one pci device.""")
 
 gopts.var('ioports', val='FROM[-TO]',
@@ -844,7 +844,7 @@ def preprocess_pci(vals):
         pci_match = re.match(r"((?P<domain>[0-9a-fA-F]{1,4})[:,])?" + \
                 r"(?P<bus>[0-9a-fA-F]{1,2})[:,]" + \
                 r"(?P<slot>[0-9a-fA-F]{1,2})[.,]" + \
-                r"(?P<func>[0-9a-fA-F])", pci_dev_str)
+                r"(?P<func>[0-7])$", pci_dev_str)
         if pci_match!=None:
             pci_dev_info = pci_match.groupdict('0')
             try:

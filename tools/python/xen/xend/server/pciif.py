@@ -177,7 +177,7 @@ class PciController(DevController):
             pci_match = re.match(r"((?P<domain>[0-9a-fA-F]{1,4})[:,])?" +
                                  r"(?P<bus>[0-9a-fA-F]{1,2})[:,]" + 
                                  r"(?P<slot>[0-9a-fA-F]{1,2})[.,]" + 
-                                 r"(?P<func>[0-9a-fA-F]{1,2})", dev_config)
+                                 r"(?P<func>[0-7]{1,2})$", dev_config)
             
             if pci_match!=None:
                 pci_dev_info = pci_match.groupdict()
