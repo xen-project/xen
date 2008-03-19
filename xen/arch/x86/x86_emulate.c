@@ -2265,7 +2265,6 @@ x86_emulate(
 
     case 0x6c ... 0x6d: /* ins %dx,%es:%edi */ {
         unsigned long nr_reps = get_rep_prefix();
-        generate_exception_if(!mode_iopl(), EXC_GP, 0);
         dst.bytes = !(b & 1) ? 1 : (op_bytes == 8) ? 4 : op_bytes;
         dst.mem.seg = x86_seg_es;
         dst.mem.off = truncate_ea(_regs.edi);
@@ -2295,7 +2294,6 @@ x86_emulate(
 
     case 0x6e ... 0x6f: /* outs %esi,%dx */ {
         unsigned long nr_reps = get_rep_prefix();
-        generate_exception_if(!mode_iopl(), EXC_GP, 0);
         dst.bytes = !(b & 1) ? 1 : (op_bytes == 8) ? 4 : op_bytes;
         if ( (nr_reps > 1) && (ops->rep_outs != NULL) &&
              ((rc = ops->rep_outs(ea.mem.seg, truncate_ea(_regs.esi),
@@ -2832,7 +2830,6 @@ x86_emulate(
         unsigned int port = ((b < 0xe8)
                              ? insn_fetch_type(uint8_t)
                              : (uint16_t)_regs.edx);
-        generate_exception_if(!mode_iopl(), EXC_GP, 0);
         op_bytes = !(b & 1) ? 1 : (op_bytes == 8) ? 4 : op_bytes;
         if ( b & 2 )
         {
