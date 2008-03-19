@@ -45,6 +45,11 @@
 #define O_BINARY 0
 #endif
 
+/* *BSD has no O_LARGEFILE */
+#ifndef O_LARGEFILE
+#define O_LARGEFILE     0 
+#endif
+
 #define BLOCK_FLAG_ENCRYPT 1
 
 /*
