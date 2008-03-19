@@ -2019,6 +2019,12 @@ int intel_iommu_assign_device(struct domain *d, u8 bus, u8 devfn)
     for_each_rmrr_device( rmrr, pdev )
         if ( pdev->bus == bus && pdev->devfn == devfn )
         {
+            /* FIXME: Because USB RMRR conflicts with guest bios region,
+             * ignore USB RMRR temporarily.
+             */
+            if ( is_usb_device(pdev) )
+                return 0;
+
             ret = iommu_prepare_rmrr_dev(d, rmrr, pdev);
             if ( ret )
             {
