@@ -121,10 +121,10 @@ class SrvDomain(SrvDir):
 
     def op_pincpu(self, _, req):
         fn = FormFn(self.xd.domain_pincpu,
-                    [['dom', 'int'],
+                    [['dom', 'str'],
                      ['vcpu', 'str'],
                      ['cpumap', 'str']])
-        val = fn(req.args, {'dom': self.dom.domid})
+        val = fn(req.args, {'dom': self.dom.getName()})
         return val
 
     def op_cpu_sedf_get(self, _, req):
@@ -147,17 +147,17 @@ class SrvDomain(SrvDir):
     
     def op_domain_sched_credit_get(self, _, req):
         fn = FormFn(self.xd.domain_sched_credit_get,
-                    [['dom', 'int']])
-        val = fn(req.args, {'dom': self.dom.domid})
+                    [['dom', 'str']])
+        val = fn(req.args, {'dom': self.dom.getName()})
         return val
 
 
     def op_domain_sched_credit_set(self, _, req):
         fn = FormFn(self.xd.domain_sched_credit_set,
-                    [['dom', 'int'],
+                    [['dom', 'str'],
                      ['weight', 'int'],
                      ['cap', 'int']])
-        val = fn(req.args, {'dom': self.dom.domid})
+        val = fn(req.args, {'dom': self.dom.getName()})
         return val
 
     def op_maxmem_set(self, _, req):
