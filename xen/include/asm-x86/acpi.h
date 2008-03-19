@@ -26,6 +26,8 @@
 
 #include <xen/config.h>
 #include <acpi/pdc_intel.h>
+#include <acpi/acconfig.h>
+#include <acpi/actbl.h>
 
 #define COMPILER_DEPENDENT_INT64   long long
 #define COMPILER_DEPENDENT_UINT64  unsigned long long
@@ -146,10 +148,10 @@ extern int acpi_enter_sleep(struct xenpf_enter_acpi_sleep *sleep);
 extern int acpi_enter_state(u32 state);
 
 struct acpi_sleep_info {
-    uint16_t pm1a_cnt;
-    uint16_t pm1b_cnt;
-    uint16_t pm1a_evt;
-    uint16_t pm1b_evt;
+    struct acpi_generic_address pm1a_cnt_blk;
+    struct acpi_generic_address pm1b_cnt_blk;
+    struct acpi_generic_address pm1a_evt_blk;
+    struct acpi_generic_address pm1b_evt_blk;
     uint16_t pm1a_cnt_val;
     uint16_t pm1b_cnt_val;
     uint32_t sleep_state;
