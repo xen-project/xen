@@ -810,7 +810,7 @@ class sxp2xml:
                 get_child_by_name(image, "vxauthority", "127.0.0.1"),
                 document))
             console.appendChild(self.mk_other_config(
-                "vncpasswd", get_child_by_name(image, "vncpasswd", ""),
+                "opengl", get_child_by_name(image, "opengl", "1"),
                 document))
             consoles.append(console)
             

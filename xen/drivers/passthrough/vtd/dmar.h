@@ -22,7 +22,7 @@
 #define _DMAR_H_
 
 #include <xen/list.h>
-#include <asm/iommu.h>
+#include <xen/iommu.h>
 
 extern u8 dmar_host_address_width;
 
@@ -100,5 +100,6 @@ struct acpi_rmrr_unit * acpi_find_matched_rmrr_unit(struct pci_dev *dev);
 
 int vtd_hw_check(void);
 void disable_pmr(struct iommu *iommu);
+int is_usb_device(struct pci_dev *pdev);
 
 #endif // _DMAR_H_

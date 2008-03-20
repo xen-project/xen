@@ -222,6 +222,8 @@ static void timer_handler(evtchn_port_t ev, struct pt_regs *regs, void *ign)
 
 void init_time(void)
 {
+    evtchn_port_t port;
     printk("Initialising timer interface\n");
-    bind_virq(VIRQ_TIMER, &timer_handler, NULL);
+    port = bind_virq(VIRQ_TIMER, &timer_handler, NULL);
+    unmask_evtchn(port);
 }

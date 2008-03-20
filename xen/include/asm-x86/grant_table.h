@@ -35,7 +35,7 @@ int replace_grant_host_mapping(
 
 static inline void gnttab_clear_flag(unsigned long nr, uint16_t *addr)
 {
-    clear_bit(nr, addr);
+    clear_bit(nr, (unsigned long *)addr);
 }
 
 /* Foreign mappings of HHVM-guest pages do not modify the type count. */

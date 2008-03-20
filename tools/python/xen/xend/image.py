@@ -90,6 +90,7 @@ class ImageHandler:
                         ("image/kernel", self.kernel),
                         ("image/cmdline", self.cmdline),
                         ("image/ramdisk", self.ramdisk))
+        self.vm.permissionsVm("image/cmdline", { 'dom': self.vm.getDomid(), 'read': True } )
 
         self.device_model = vmConfig['platform'].get('device_model')
 
@@ -201,6 +202,7 @@ class ImageHandler:
         vnc_config = {}
         has_vnc = int(vmConfig['platform'].get('vnc', 0)) != 0
         has_sdl = int(vmConfig['platform'].get('sdl', 0)) != 0
+        opengl = 1
         for dev_uuid in vmConfig['console_refs']:
             dev_type, dev_info = vmConfig['devices'][dev_uuid]
             if dev_type == 'vfb':
@@ -208,6 +210,7 @@ class ImageHandler:
                 if vfb_type == 'sdl':
                     self.display = dev_info.get('display', {})
                     self.xauthority = dev_info.get('xauthority', {})
+                    opengl = int(dev_info.get('opengl', opengl))
                     has_sdl = True
                 else:
                     vnc_config = dev_info.get('other_config', {})
@@ -262,7 +265,8 @@ class ImageHandler:
 
         elif has_sdl:
             # SDL is default in QEMU.
-            pass
+            if int(vmConfig['platform'].get('opengl', opengl)) != 1 :
+                ret.append('-disable-opengl')
         else:
             ret.append('-nographic')
 
@@ -580,7 +584,8 @@ class HVMImageHandler(ImageHandler):
             ret.append("nic,vlan=%d,macaddr=%s,model=%s" %
                        (nics, mac, model))
             ret.append("-net")
-            ret.append("tap,vlan=%d,bridge=%s" % (nics, bridge))
+            ret.append("tap,vlan=%d,ifname=tap%d.%d,bridge=%s" %
+                       (nics, self.vm.getDomid(), nics-1, bridge))
 
         return ret
 

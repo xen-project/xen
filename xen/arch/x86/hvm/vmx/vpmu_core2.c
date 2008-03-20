@@ -101,7 +101,7 @@ static int is_core2_vpmu_msr(u32 msr_index, int *type, int *index)
     return 0;
 }
 
-static void core2_vpmu_set_msr_bitmap(char *msr_bitmap)
+static void core2_vpmu_set_msr_bitmap(unsigned long *msr_bitmap)
 {
     int i;
 
@@ -109,12 +109,14 @@ static void core2_vpmu_set_msr_bitmap(char *msr_bitmap)
     for ( i = 0; i < core2_counters.num; i++ )
     {
         clear_bit(msraddr_to_bitpos(core2_counters.msr[i]), msr_bitmap);
-        clear_bit(msraddr_to_bitpos(core2_counters.msr[i]), msr_bitmap+0x800);
+        clear_bit(msraddr_to_bitpos(core2_counters.msr[i]),
+                  msr_bitmap + 0x800/BYTES_PER_LONG);
     }
     for ( i = 0; i < core2_get_pmc_count(); i++ )
     {
         clear_bit(msraddr_to_bitpos(MSR_IA32_PERFCTR0+i), msr_bitmap);
-        clear_bit(msraddr_to_bitpos(MSR_IA32_PERFCTR0+i), msr_bitmap+0x800);
+        clear_bit(msraddr_to_bitpos(MSR_IA32_PERFCTR0+i),
+                  msr_bitmap + 0x800/BYTES_PER_LONG);
     }
 
     /* Allow Read PMU Non-global Controls Directly. */
@@ -124,19 +126,21 @@ static void core2_vpmu_set_msr_bitmap(char *msr_bitmap)
         clear_bit(msraddr_to_bitpos(MSR_P6_EVNTSEL0+i), msr_bitmap);
 }
 
-static void core2_vpmu_unset_msr_bitmap(char *msr_bitmap)
+static void core2_vpmu_unset_msr_bitmap(unsigned long *msr_bitmap)
 {
     int i;
 
     for ( i = 0; i < core2_counters.num; i++ )
     {
         set_bit(msraddr_to_bitpos(core2_counters.msr[i]), msr_bitmap);
-        set_bit(msraddr_to_bitpos(core2_counters.msr[i]), msr_bitmap+0x800);
+        set_bit(msraddr_to_bitpos(core2_counters.msr[i]),
+                msr_bitmap + 0x800/BYTES_PER_LONG);
     }
     for ( i = 0; i < core2_get_pmc_count(); i++ )
     {
         set_bit(msraddr_to_bitpos(MSR_IA32_PERFCTR0+i), msr_bitmap);
-        set_bit(msraddr_to_bitpos(MSR_IA32_PERFCTR0+i), msr_bitmap+0x800);
+        set_bit(msraddr_to_bitpos(MSR_IA32_PERFCTR0+i),
+                msr_bitmap + 0x800/BYTES_PER_LONG);
     }
     for ( i = 0; i < core2_ctrls.num; i++ )
         set_bit(msraddr_to_bitpos(core2_ctrls.msr[i]), msr_bitmap);

@@ -23,4 +23,8 @@ extern int shared_info_ia64(struct xc_dom_image *dom, void *ptr);
 #define FW_MEM_BASE 0xff000000UL
 #define FW_MEM_SIZE 0x01000000UL
 
+#ifdef __XEN_TOOLS__
+/* Necessary for including the acpi header chain when not in kernel context */
+typedef struct { } spinlock_t;
+#endif
 #endif /* XC_IA64_DOM_IA64_UTIL_H */

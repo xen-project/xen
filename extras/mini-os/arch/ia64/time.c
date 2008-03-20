@@ -246,7 +246,7 @@ init_time(void)
 {
 	uint64_t new;
 	efi_time_t tm;
-	int err = 0;
+	evtchn_port_t port = 0;
 
 	printk("Initialising time\n");
 	calculate_frequencies();
@@ -267,11 +267,12 @@ init_time(void)
 	} else
 		printk("efi_get_time() failed\n");
 
-	err = bind_virq(VIRQ_ITC, timer_interrupt, NULL);
-	if (err == -1) {
-		printk("XEN timer request chn bind failed %i\n", err);
+	port = bind_virq(VIRQ_ITC, timer_interrupt, NULL);
+	if (port == -1) {
+		printk("XEN timer request chn bind failed %i\n", port);
 		return;
 	}
+        unmask_evtchn(port);
 	itc_alt = ia64_get_itc();
 	itc_at_boot = itc_alt;
 	new = ia64_get_itc() + itm_val;

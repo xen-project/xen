@@ -495,6 +495,7 @@ static void svm_get_segment_register(struct vcpu *v, enum x86_segment seg,
         break;
     case x86_seg_ss:
         memcpy(reg, &vmcb->ss, sizeof(*reg));
+        reg->attr.fields.dpl = vmcb->cpl;
         break;
     case x86_seg_tr:
         svm_sync_vmcb(v);
@@ -943,6 +944,10 @@ static void svm_vmexit_do_cpuid(struct cpu_user_regs *regs)
 {
     unsigned int eax, ebx, ecx, edx, inst_len;
 
+    inst_len = __get_instruction_length(current, INSTR_CPUID, NULL);
+    if ( inst_len == 0 ) 
+        return;
+
     eax = regs->eax;
     ebx = regs->ebx;
     ecx = regs->ecx;
@@ -955,7 +960,6 @@ static void svm_vmexit_do_cpuid(struct cpu_user_regs *regs)
     regs->ecx = ecx;
     regs->edx = edx;
 
-    inst_len = __get_instruction_length(current, INSTR_CPUID, NULL);
     __update_guest_eip(regs, inst_len);
 }
 
@@ -1166,6 +1170,8 @@ static void svm_vmexit_do_hlt(struct vmcb_struct *vmcb,
     unsigned int inst_len;
 
     inst_len = __get_instruction_length(curr, INSTR_HLT, NULL);
+    if ( inst_len == 0 )
+        return;
     __update_guest_eip(regs, inst_len);
 
     /* Check for pending exception or new interrupt. */
@@ -1354,6 +1360,8 @@ asmlinkage void svm_vmexit_handler(struct cpu_user_regs *regs)
 
     case VMEXIT_VMMCALL:
         inst_len = __get_instruction_length(v, INSTR_VMCALL, NULL);
+        if ( inst_len == 0 )
+            break;
         HVMTRACE_1D(VMMCALL, v, regs->eax);
         rc = hvm_do_hypercall(regs);
         if ( rc != HVM_HCALL_preempted )

@@ -46,7 +46,7 @@
 #include <asm/debugreg.h>
 #include <asm/msr.h>
 #include <asm/nmi.h>
-#include <asm/iommu.h>
+#include <xen/iommu.h>
 #ifdef CONFIG_COMPAT
 #include <compat/vcpu.h>
 #endif
@@ -830,7 +830,7 @@ unmap_vcpu_info(struct vcpu *v)
     mfn = v->arch.vcpu_info_mfn;
     unmap_domain_page_global(v->vcpu_info);
 
-    v->vcpu_info = shared_info_addr(d, vcpu_info[v->vcpu_id]);
+    v->vcpu_info = (void *)&shared_info(d, vcpu_info[v->vcpu_id]);
     v->arch.vcpu_info_mfn = INVALID_MFN;
 
     put_page_and_type(mfn_to_page(mfn));
@@ -888,7 +888,7 @@ map_vcpu_info(struct vcpu *v, unsigned long mfn, unsigned offset)
      */
     vcpu_info(v, evtchn_upcall_pending) = 1;
     for ( i = 0; i < BITS_PER_GUEST_LONG(d); i++ )
-        set_bit(i, vcpu_info_addr(v, evtchn_pending_sel));
+        set_bit(i, &vcpu_info(v, evtchn_pending_sel));
 
     /*
      * Only bother to update time for the current vcpu.  If we're
@@ -961,8 +961,9 @@ arch_do_vcpu_op(
         if ( !v->domain->is_pinned )
             break;
 
-        cpu_id.phys_id = (x86_cpu_to_apicid[v->vcpu_id] |
-                          (acpi_get_processor_id(v->vcpu_id) << 8));
+        cpu_id.phys_id =
+            (uint64_t)x86_cpu_to_apicid[v->vcpu_id] |
+            ((uint64_t)acpi_get_processor_id(v->vcpu_id) << 32);
 
         rc = -EFAULT;
         if ( copy_to_guest(arg, &cpu_id, 1) )

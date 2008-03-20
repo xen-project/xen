@@ -42,6 +42,7 @@
 #define X86_FEATURE_HT		(0*32+28) /* Hyper-Threading */
 #define X86_FEATURE_ACC		(0*32+29) /* Automatic clock control */
 #define X86_FEATURE_IA64	(0*32+30) /* IA-64 processor */
+#define X86_FEATURE_PBE		(0*32+31) /* Pending Break Enable */
 
 /* AMD-defined CPU features, CPUID level 0x80000001, word 1 */
 /* Don't duplicate feature flags which are redundant with Intel! */
@@ -76,6 +77,7 @@
 
 /* Intel-defined CPU features, CPUID level 0x00000001 (ecx), word 4 */
 #define X86_FEATURE_XMM3	(4*32+ 0) /* Streaming SIMD Extensions-3 */
+#define X86_FEATURE_DTES64	(4*32+ 2) /* 64-bit Debug Store */
 #define X86_FEATURE_MWAIT	(4*32+ 3) /* Monitor/Mwait support */
 #define X86_FEATURE_DSCPL	(4*32+ 4) /* CPL Qualified Debug Store */
 #define X86_FEATURE_VMXE	(4*32+ 5) /* Virtual Machine Extensions */
@@ -115,6 +117,8 @@
 #define X86_FEATURE_MISALIGNSSE	(6*32+ 7) /* Misaligned SSE Access */
 #define X86_FEATURE_3DNOWPF	(6*32+ 8) /* 3DNow! Prefetch */
 #define X86_FEATURE_OSVW	(6*32+ 9) /* OS Visible Workaround */
+#define X86_FEATURE_IBS		(6*32+ 10) /* Instruction Based Sampling */
+#define X86_FEATURE_SSE5	(6*32+ 11) /* AMD Streaming SIMD Extensions-5 */
 #define X86_FEATURE_SKINIT	(6*32+ 12) /* SKINIT, STGI/CLGI, DEV */
 #define X86_FEATURE_WDT		(6*32+ 13) /* Watchdog Timer */
 

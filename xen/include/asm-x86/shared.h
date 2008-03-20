@@ -3,9 +3,9 @@
 
 #ifdef CONFIG_COMPAT
 
-#define nmi_reason(d) (!has_32bit_shinfo(d) ?                              \
-                       (void *)&(d)->shared_info->native.arch.nmi_reason : \
-                       (void *)&(d)->shared_info->compat.arch.nmi_reason)
+#define nmi_reason(d) (!has_32bit_shinfo(d) ?                             \
+                       (u32 *)&(d)->shared_info->native.arch.nmi_reason : \
+                       (u32 *)&(d)->shared_info->compat.arch.nmi_reason)
 
 #define GET_SET_SHARED(type, field)                             \
 static inline type arch_get_##field(const struct domain *d)     \
@@ -41,7 +41,7 @@ static inline void arch_set_##field(struct vcpu *v,             \
 
 #else
 
-#define nmi_reason(d) ((void *)&(d)->shared_info->arch.nmi_reason)
+#define nmi_reason(d) ((u32 *)&(d)->shared_info->arch.nmi_reason)
 
 #define GET_SET_SHARED(type, field)                             \
 static inline type arch_get_##field(const struct domain *d)     \

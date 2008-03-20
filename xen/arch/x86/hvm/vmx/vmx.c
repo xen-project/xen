@@ -1512,8 +1512,10 @@ static int vmx_msr_read_intercept(struct cpu_user_regs *regs)
         msr_content = var_range_base[index];
         break;
     case MSR_IA32_DEBUGCTLMSR:
-        if ( vmx_read_guest_msr(v, ecx, &msr_content) != 0 )
-            msr_content = 0;
+        msr_content = __vmread(GUEST_IA32_DEBUGCTL);
+#ifdef __i386__
+        msr_content |= (u64)__vmread(GUEST_IA32_DEBUGCTL_HIGH) << 32;
+#endif
         break;
     case MSR_IA32_VMX_BASIC...MSR_IA32_VMX_PROCBASED_CTLS2:
         goto gp_fault;
@@ -1732,11 +1734,15 @@ static int vmx_msr_write_intercept(struct cpu_user_regs *regs)
         }
 
         if ( (rc < 0) ||
-             (vmx_add_guest_msr(v, ecx) < 0) ||
              (vmx_add_host_load_msr(v, ecx) < 0) )
             vmx_inject_hw_exception(v, TRAP_machine_check, 0);
         else
-            vmx_write_guest_msr(v, ecx, msr_content);
+        {
+            __vmwrite(GUEST_IA32_DEBUGCTL, msr_content);
+#ifdef __i386__
+            __vmwrite(GUEST_IA32_DEBUGCTL_HIGH, msr_content >> 32);
+#endif
+        }
 
         break;
     }

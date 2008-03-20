@@ -5,7 +5,7 @@
  *****************************************************************************/
 
 /*
- * Copyright (C) 2000 - 2005, R. Byron Moore
+ * Copyright (C) 2000 - 2007, R. Byron Moore
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -50,7 +50,7 @@
  * component basis and a per-exception-type basis.
  */
 
-/* Component IDs are used in the global "debug_layer" */
+/* Component IDs are used in the global "DebugLayer" */
 
 #define ACPI_UTILITIES              0x00000001
 #define ACPI_HARDWARE               0x00000002
@@ -73,11 +73,9 @@
 #define ACPI_ALL_COMPONENTS         0x00003FFF
 #define ACPI_COMPONENT_DEFAULT      (ACPI_ALL_COMPONENTS)
 
-
 /* Component IDs reserved for ACPI drivers */
 
 #define ACPI_ALL_DRIVERS            0xFFFF0000
-
 
 /*
  * Raw debug output levels, do not use these in the DEBUG_PRINT macros
@@ -123,7 +121,7 @@
 #define ACPI_LV_INTERRUPTS          0x08000000
 #define ACPI_LV_VERBOSITY3          0x0F000000 | ACPI_LV_VERBOSITY2
 
-/* Exceptionally verbose output -- also used in the global "debug_level" */
+/* Exceptionally verbose output -- also used in the global "DebugLevel"  */
 
 #define ACPI_LV_AML_DISASSEMBLE     0x10000000
 #define ACPI_LV_VERBOSE_INFO        0x20000000
@@ -132,23 +130,27 @@
 
 #define ACPI_LV_VERBOSE             0xF0000000
 
-
 /*
  * Debug level macros that are used in the DEBUG_PRINT macros
  */
-#define ACPI_DEBUG_LEVEL(dl)        (u32) dl,__LINE__,&_debug_info
+#define ACPI_DEBUG_LEVEL(dl)        (u32) dl,ACPI_DEBUG_PARAMETERS
 
-/* Exception level -- used in the global "debug_level" */
+/* Exception level -- used in the global "DebugLevel" */
 
-#define ACPI_DB_ERROR               ACPI_DEBUG_LEVEL (ACPI_LV_ERROR)
-#define ACPI_DB_WARN                ACPI_DEBUG_LEVEL (ACPI_LV_WARN)
 #define ACPI_DB_INIT                ACPI_DEBUG_LEVEL (ACPI_LV_INIT)
 #define ACPI_DB_DEBUG_OBJECT        ACPI_DEBUG_LEVEL (ACPI_LV_DEBUG_OBJECT)
 #define ACPI_DB_INFO                ACPI_DEBUG_LEVEL (ACPI_LV_INFO)
 #define ACPI_DB_ALL_EXCEPTIONS      ACPI_DEBUG_LEVEL (ACPI_LV_ALL_EXCEPTIONS)
 
+/*
+ * These two levels are essentially obsolete, all instances in the
+ * ACPICA core code have been replaced by ACPI_ERROR and ACPI_WARNING
+ * (Kept here because some drivers may still use them)
+ */
+#define ACPI_DB_ERROR               ACPI_DEBUG_LEVEL (ACPI_LV_ERROR)
+#define ACPI_DB_WARN                ACPI_DEBUG_LEVEL (ACPI_LV_WARN)
 
-/* Trace level -- also used in the global "debug_level" */
+/* Trace level -- also used in the global "DebugLevel" */
 
 #define ACPI_DB_INIT_NAMES          ACPI_DEBUG_LEVEL (ACPI_LV_INIT_NAMES)
 #define ACPI_DB_THREADS             ACPI_DEBUG_LEVEL (ACPI_LV_THREADS)
@@ -174,12 +176,10 @@
 
 #define ACPI_DB_ALL                 ACPI_DEBUG_LEVEL (ACPI_LV_ALL)
 
-
 /* Defaults for debug_level, debug and normal */
 
-#define ACPI_DEBUG_DEFAULT          (ACPI_LV_INIT | ACPI_LV_WARN | ACPI_LV_ERROR | ACPI_LV_DEBUG_OBJECT)
-#define ACPI_NORMAL_DEFAULT         (ACPI_LV_INIT | ACPI_LV_WARN | ACPI_LV_ERROR | ACPI_LV_DEBUG_OBJECT)
+#define ACPI_DEBUG_DEFAULT          (ACPI_LV_INIT | ACPI_LV_WARN | ACPI_LV_ERROR)
+#define ACPI_NORMAL_DEFAULT         (ACPI_LV_INIT | ACPI_LV_WARN | ACPI_LV_ERROR)
 #define ACPI_DEBUG_ALL              (ACPI_LV_AML_DISASSEMBLE | ACPI_LV_ALL_EXCEPTIONS | ACPI_LV_ALL)
 
-
-#endif /* __ACOUTPUT_H__ */
+#endif				/* __ACOUTPUT_H__ */

@@ -42,6 +42,9 @@ void _fini(void)
 static void call_main(void *p)
 {
     char *args, /**path,*/ *msg, *c;
+#ifdef CONFIG_QEMU
+    char *domargs;
+#endif
     int argc;
     char **argv;
     char *envp[] = { NULL };
@@ -63,14 +66,12 @@ static void call_main(void *p)
     }
 
     /* Fetch argc, argv from XenStore */
-    char domid_s[10];
     int domid;
     domid = xenbus_read_integer("target");
     if (domid == -1) {
         printk("Couldn't read target\n");
         do_exit();
     }
-    snprintf(domid_s, sizeof(domid_s), "%d", domid);
 
     snprintf(path, sizeof(path), "/local/domain/%d/vm", domid);
     msg = xenbus_read(XBT_NIL, path, &vm);
@@ -78,59 +79,64 @@ static void call_main(void *p)
         printk("Couldn't read vm path\n");
         do_exit();
     }
-    printk("vm is at %s\n", vm);
-#else
+    printk("dom vm is at %s\n", vm);
+
+    snprintf(path, sizeof(path), "%s/image/dmargs", vm);
+    free(vm);
+    msg = xenbus_read(XBT_NIL, path, &domargs);
+
+    if (msg) {
+        printk("Couldn't get stubdom args: %s\n", msg);
+        domargs = strdup("");
+    }
+#endif
+
     msg = xenbus_read(XBT_NIL, "vm", &vm);
     if (msg) {
         printk("Couldn't read vm path\n");
         do_exit();
     }
-#endif
 
-    snprintf(path, sizeof(path), "%s/image/dmargs", vm);
+    printk("my vm is at %s\n", vm);
+    snprintf(path, sizeof(path), "%s/image/cmdline", vm);
     free(vm);
     msg = xenbus_read(XBT_NIL, path, &args);
 
     if (msg) {
-        printk("Couldn't get stubdom args: %s\n", msg);
+        printk("Couldn't get my args: %s\n", msg);
         args = strdup("");
     }
 
     argc = 1;
-#ifdef CONFIG_QEMU
-    argc += 2;
-#endif
-    c = args;
-    while (*c) {
-	if (*c != ' ') {
-	    argc++;
-	    while (*c && *c != ' ')
-		c++;
-	} else {
-	    while (*c == ' ')
-		c++;
-	}
+
+#define PARSE_ARGS(ARGS,START,END) \
+    c = ARGS; \
+    while (*c) { \
+	if (*c != ' ') { \
+	    START; \
+	    while (*c && *c != ' ') \
+		c++; \
+	} else { \
+            END; \
+	    while (*c == ' ') \
+		c++; \
+	} \
     }
+
+    PARSE_ARGS(args, argc++, );
+#ifdef CONFIG_QEMU
+    PARSE_ARGS(domargs, argc++, );
+#endif
+
     argv = alloca((argc + 1) * sizeof(char *));
     argv[0] = "main";
     argc = 1;
+
+    PARSE_ARGS(args, argv[argc++] = c, *c++ = 0)
 #ifdef CONFIG_QEMU
-    argv[1] = "-d";
-    argv[2] = domid_s;
-    argc += 2;
+    PARSE_ARGS(domargs, argv[argc++] = c, *c++ = 0)
 #endif
-    c = args;
-    while (*c) {
-	if (*c != ' ') {
-	    argv[argc++] = c;
-	    while (*c && *c != ' ')
-		c++;
-	} else {
-	    *c++ = 0;
-	    while (*c == ' ')
-		c++;
-	}
-    }
+
     argv[argc] = NULL;
 
     for (i = 0; i < argc; i++)

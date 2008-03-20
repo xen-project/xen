@@ -32,26 +32,28 @@ int __init map_iommu_mmio_region(struct amd_iommu *iommu)
 {
     unsigned long mfn;
 
-    if ( nr_amd_iommus > MAX_AMD_IOMMUS ) {
+    if ( nr_amd_iommus > MAX_AMD_IOMMUS )
+    {
         gdprintk(XENLOG_ERR,
-            "IOMMU: nr_amd_iommus %d > MAX_IOMMUS\n", nr_amd_iommus);
+                 "IOMMU: nr_amd_iommus %d > MAX_IOMMUS\n", nr_amd_iommus);
         return -ENOMEM;
     }
 
-    iommu->mmio_base = (void *) fix_to_virt(FIX_IOMMU_MMIO_BASE_0 +
-                       nr_amd_iommus * MMIO_PAGES_PER_IOMMU);
-    mfn = (unsigned long)iommu->mmio_base_phys >> PAGE_SHIFT;
+    iommu->mmio_base = (void *)fix_to_virt(
+        FIX_IOMMU_MMIO_BASE_0 + nr_amd_iommus * MMIO_PAGES_PER_IOMMU);
+    mfn = (unsigned long)(iommu->mmio_base_phys >> PAGE_SHIFT);
     map_pages_to_xen((unsigned long)iommu->mmio_base, mfn,
-                    MMIO_PAGES_PER_IOMMU, PAGE_HYPERVISOR_NOCACHE);
+                     MMIO_PAGES_PER_IOMMU, PAGE_HYPERVISOR_NOCACHE);
 
-    memset((u8*)iommu->mmio_base, 0, IOMMU_MMIO_REGION_LENGTH);
+    memset(iommu->mmio_base, 0, IOMMU_MMIO_REGION_LENGTH);
 
     return 0;
 }
 
 void __init unmap_iommu_mmio_region(struct amd_iommu *iommu)
 {
-    if ( iommu->mmio_base ) {
+    if ( iommu->mmio_base )
+    {
         iounmap(iommu->mmio_base);
         iommu->mmio_base = NULL;
     }
@@ -67,16 +69,16 @@ void __init register_iommu_dev_table_in_mmio_space(struct amd_iommu *iommu)
     addr_hi = addr_64 >> 32;
 
     set_field_in_reg_u32((u32)addr_lo >> PAGE_SHIFT, 0,
-        IOMMU_DEV_TABLE_BASE_LOW_MASK,
-        IOMMU_DEV_TABLE_BASE_LOW_SHIFT, &entry);
+                         IOMMU_DEV_TABLE_BASE_LOW_MASK,
+                         IOMMU_DEV_TABLE_BASE_LOW_SHIFT, &entry);
     set_field_in_reg_u32((iommu->dev_table.alloc_size / PAGE_SIZE) - 1,
-        entry, IOMMU_DEV_TABLE_SIZE_MASK,
-        IOMMU_DEV_TABLE_SIZE_SHIFT, &entry);
+                         entry, IOMMU_DEV_TABLE_SIZE_MASK,
+                         IOMMU_DEV_TABLE_SIZE_SHIFT, &entry);
     writel(entry, iommu->mmio_base + IOMMU_DEV_TABLE_BASE_LOW_OFFSET);
 
     set_field_in_reg_u32((u32)addr_hi, 0,
-        IOMMU_DEV_TABLE_BASE_HIGH_MASK,
-        IOMMU_DEV_TABLE_BASE_HIGH_SHIFT, &entry);
+                         IOMMU_DEV_TABLE_BASE_HIGH_MASK,
+                         IOMMU_DEV_TABLE_BASE_HIGH_SHIFT, &entry);
     writel(entry, iommu->mmio_base + IOMMU_DEV_TABLE_BASE_HIGH_OFFSET);
 }
 
@@ -91,49 +93,49 @@ void __init register_iommu_cmd_buffer_in_mmio_space(struct amd_iommu *iommu)
     addr_hi = addr_64 >> 32;
 
     set_field_in_reg_u32((u32)addr_lo >> PAGE_SHIFT, 0,
-        IOMMU_CMD_BUFFER_BASE_LOW_MASK,
-        IOMMU_CMD_BUFFER_BASE_LOW_SHIFT, &entry);
+                         IOMMU_CMD_BUFFER_BASE_LOW_MASK,
+                         IOMMU_CMD_BUFFER_BASE_LOW_SHIFT, &entry);
     writel(entry, iommu->mmio_base + IOMMU_CMD_BUFFER_BASE_LOW_OFFSET);
 
     power_of2_entries = get_order_from_bytes(iommu->cmd_buffer.alloc_size) +
         IOMMU_CMD_BUFFER_POWER_OF2_ENTRIES_PER_PAGE;
 
     set_field_in_reg_u32((u32)addr_hi, 0,
-        IOMMU_CMD_BUFFER_BASE_HIGH_MASK,
-        IOMMU_CMD_BUFFER_BASE_HIGH_SHIFT, &entry);
+                         IOMMU_CMD_BUFFER_BASE_HIGH_MASK,
+                         IOMMU_CMD_BUFFER_BASE_HIGH_SHIFT, &entry);
     set_field_in_reg_u32(power_of2_entries, entry,
-        IOMMU_CMD_BUFFER_LENGTH_MASK,
-        IOMMU_CMD_BUFFER_LENGTH_SHIFT, &entry);
+                         IOMMU_CMD_BUFFER_LENGTH_MASK,
+                         IOMMU_CMD_BUFFER_LENGTH_SHIFT, &entry);
     writel(entry, iommu->mmio_base+IOMMU_CMD_BUFFER_BASE_HIGH_OFFSET);
 }
 
 static void __init set_iommu_translation_control(struct amd_iommu *iommu,
-            int enable)
+                                                 int enable)
 {
     u32 entry;
 
     entry = readl(iommu->mmio_base+IOMMU_CONTROL_MMIO_OFFSET);
     set_field_in_reg_u32(iommu->ht_tunnel_support ? IOMMU_CONTROL_ENABLED :
-        IOMMU_CONTROL_ENABLED, entry,
-        IOMMU_CONTROL_HT_TUNNEL_TRANSLATION_MASK,
-        IOMMU_CONTROL_HT_TUNNEL_TRANSLATION_SHIFT, &entry);
+                         IOMMU_CONTROL_ENABLED, entry,
+                         IOMMU_CONTROL_HT_TUNNEL_TRANSLATION_MASK,
+                         IOMMU_CONTROL_HT_TUNNEL_TRANSLATION_SHIFT, &entry);
     set_field_in_reg_u32(enable ? IOMMU_CONTROL_ENABLED :
-        IOMMU_CONTROL_ENABLED, entry,
-        IOMMU_CONTROL_TRANSLATION_ENABLE_MASK,
-        IOMMU_CONTROL_TRANSLATION_ENABLE_SHIFT, &entry);
+                         IOMMU_CONTROL_ENABLED, entry,
+                         IOMMU_CONTROL_TRANSLATION_ENABLE_MASK,
+                         IOMMU_CONTROL_TRANSLATION_ENABLE_SHIFT, &entry);
     writel(entry, iommu->mmio_base+IOMMU_CONTROL_MMIO_OFFSET);
 }
 
 static void __init set_iommu_command_buffer_control(struct amd_iommu *iommu,
-            int enable)
+                                                    int enable)
 {
     u32 entry;
 
     entry = readl(iommu->mmio_base+IOMMU_CONTROL_MMIO_OFFSET);
     set_field_in_reg_u32(enable ? IOMMU_CONTROL_ENABLED :
-        IOMMU_CONTROL_ENABLED, entry,
-        IOMMU_CONTROL_COMMAND_BUFFER_ENABLE_MASK,
-        IOMMU_CONTROL_COMMAND_BUFFER_ENABLE_SHIFT, &entry);
+                         IOMMU_CONTROL_ENABLED, entry,
+                         IOMMU_CONTROL_COMMAND_BUFFER_ENABLE_MASK,
+                         IOMMU_CONTROL_COMMAND_BUFFER_ENABLE_SHIFT, &entry);
     writel(entry, iommu->mmio_base+IOMMU_CONTROL_MMIO_OFFSET);
 }
 
@@ -146,34 +148,34 @@ static void __init register_iommu_exclusion_range(struct amd_iommu *iommu)
     addr_hi = iommu->exclusion_limit >> 32;
 
     set_field_in_reg_u32((u32)addr_hi, 0,
-        IOMMU_EXCLUSION_LIMIT_HIGH_MASK,
-        IOMMU_EXCLUSION_LIMIT_HIGH_SHIFT, &entry);
+                         IOMMU_EXCLUSION_LIMIT_HIGH_MASK,
+                         IOMMU_EXCLUSION_LIMIT_HIGH_SHIFT, &entry);
     writel(entry, iommu->mmio_base+IOMMU_EXCLUSION_LIMIT_HIGH_OFFSET);
 
     set_field_in_reg_u32((u32)addr_lo >> PAGE_SHIFT, 0,
-        IOMMU_EXCLUSION_LIMIT_LOW_MASK,
-        IOMMU_EXCLUSION_LIMIT_LOW_SHIFT, &entry);
+                         IOMMU_EXCLUSION_LIMIT_LOW_MASK,
+                         IOMMU_EXCLUSION_LIMIT_LOW_SHIFT, &entry);
     writel(entry, iommu->mmio_base+IOMMU_EXCLUSION_LIMIT_LOW_OFFSET);
 
     addr_lo = iommu->exclusion_base & DMA_32BIT_MASK;
     addr_hi = iommu->exclusion_base >> 32;
 
     set_field_in_reg_u32((u32)addr_hi, 0,
-        IOMMU_EXCLUSION_BASE_HIGH_MASK,
-        IOMMU_EXCLUSION_BASE_HIGH_SHIFT, &entry);
+                         IOMMU_EXCLUSION_BASE_HIGH_MASK,
+                         IOMMU_EXCLUSION_BASE_HIGH_SHIFT, &entry);
     writel(entry, iommu->mmio_base+IOMMU_EXCLUSION_BASE_HIGH_OFFSET);
 
     set_field_in_reg_u32((u32)addr_lo >> PAGE_SHIFT, 0,
-        IOMMU_EXCLUSION_BASE_LOW_MASK,
-        IOMMU_EXCLUSION_BASE_LOW_SHIFT, &entry);
+                         IOMMU_EXCLUSION_BASE_LOW_MASK,
+                         IOMMU_EXCLUSION_BASE_LOW_SHIFT, &entry);
 
     set_field_in_reg_u32(iommu->exclusion_allow_all, entry,
-        IOMMU_EXCLUSION_ALLOW_ALL_MASK,
-        IOMMU_EXCLUSION_ALLOW_ALL_SHIFT, &entry);
+                         IOMMU_EXCLUSION_ALLOW_ALL_MASK,
+                         IOMMU_EXCLUSION_ALLOW_ALL_SHIFT, &entry);
 
     set_field_in_reg_u32(iommu->exclusion_enable, entry,
-        IOMMU_EXCLUSION_RANGE_ENABLE_MASK,
-        IOMMU_EXCLUSION_RANGE_ENABLE_SHIFT, &entry);
+                         IOMMU_EXCLUSION_RANGE_ENABLE_MASK,
+                         IOMMU_EXCLUSION_RANGE_ENABLE_SHIFT, &entry);
     writel(entry, iommu->mmio_base+IOMMU_EXCLUSION_BASE_LOW_OFFSET);
 }
 
@@ -184,5 +186,3 @@ void __init enable_iommu(struct amd_iommu *iommu)
     set_iommu_translation_control(iommu, IOMMU_CONTROL_ENABLED);
     printk("AMD IOMMU %d: Enabled\n", nr_amd_iommus);
 }
-
-

@@ -82,6 +82,7 @@ tap_aio_completion_thread(void *arg)
 			}
 		} while (!rc);
 	}
+	return NULL;
 }
 
 void

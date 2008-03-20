@@ -21,13 +21,13 @@
 #ifndef __ASM_X86_HVM_DOMAIN_H__
 #define __ASM_X86_HVM_DOMAIN_H__
 
-#include <asm/iommu.h>
+#include <xen/iommu.h>
 #include <asm/hvm/irq.h>
 #include <asm/hvm/vpt.h>
 #include <asm/hvm/vlapic.h>
 #include <asm/hvm/vioapic.h>
 #include <asm/hvm/io.h>
-#include <asm/hvm/iommu.h>
+#include <xen/hvm/iommu.h>
 #include <public/hvm/params.h>
 #include <public/hvm/save.h>
 

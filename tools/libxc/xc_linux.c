@@ -4,7 +4,7 @@
  * Use is subject to license terms.
  *
  * xc_gnttab functions:
- * Copyright (c) 2007, D G Murray <Derek.Murray@cl.cam.ac.uk>
+ * Copyright (c) 2007-2008, D G Murray <Derek.Murray@cl.cam.ac.uk>
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License as
@@ -500,6 +500,19 @@ int xc_gnttab_munmap(int xcg_handle,
     unmap_grant.index = get_offset.offset;
     unmap_grant.count = count;
     if ( (rc = ioctl(xcg_handle, IOCTL_GNTDEV_UNMAP_GRANT_REF, &unmap_grant)) )
+        return rc;
+
+    return 0;
+}
+
+int xc_gnttab_set_max_grants(int xcg_handle,
+                             uint32_t count)
+{
+    struct ioctl_gntdev_set_max_grants set_max;
+    int rc;
+
+    set_max.count = count;
+    if ( (rc = ioctl(xcg_handle, IOCTL_GNTDEV_SET_MAX_GRANTS, &set_max)) )
         return rc;
 
     return 0;

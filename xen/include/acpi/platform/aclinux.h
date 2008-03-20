@@ -5,7 +5,7 @@
  *****************************************************************************/
 
 /*
- * Copyright (C) 2000 - 2005, R. Byron Moore
+ * Copyright (C) 2000 - 2007, R. Byron Moore
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -47,22 +47,31 @@
 #define ACPI_USE_SYSTEM_CLIBRARY
 #define ACPI_USE_DO_WHILE_0
 
-#if 1 /*def __KERNEL__*/
+#ifdef __XEN__
 
 #include <xen/config.h>
 #include <xen/string.h>
 #include <xen/kernel.h>
 #include <xen/ctype.h>
+#include <xen/spinlock.h>
 #include <asm/system.h>
 #include <asm/atomic.h>
 #include <asm/div64.h>
 #include <asm/acpi.h>
+#include <asm/current.h>
 
-#define strtoul simple_strtoul
+/* Host-dependent types and defines */
 
-#define ACPI_MACHINE_WIDTH  BITS_PER_LONG
+#define ACPI_MACHINE_WIDTH          BITS_PER_LONG
+#define acpi_cache_t                        void /*struct kmem_cache*/
+#define acpi_spinlock                   spinlock_t *
+#define ACPI_EXPORT_SYMBOL(symbol)  EXPORT_SYMBOL(symbol);
+#define strtoul                     simple_strtoul
 
-#else /* !__KERNEL__ */
+/* Full namespace pathname length limit - arbitrary */
+#define ACPI_PATHNAME_MAX              256
+
+#else				/* !__XEN__ */
 
 #include <stdarg.h>
 #include <string.h>
@@ -81,12 +90,52 @@
 #define ACPI_USE_NATIVE_DIVIDE
 #endif
 
+#ifndef __cdecl
 #define __cdecl
+#endif
+
 #define ACPI_FLUSH_CPU_CACHE()
-#endif /* __KERNEL__ */
+#endif				/* __XEN__ */
 
 /* Linux uses GCC */
 
 #include "acgcc.h"
 
-#endif /* __ACLINUX_H__ */
+#define acpi_cpu_flags unsigned long
+
+#define acpi_thread_id struct vcpu *
+
+static inline acpi_thread_id acpi_os_get_thread_id(void)
+{
+	return current;
+}
+
+#if 0
+/*
+ * The irqs_disabled() check is for resume from RAM.
+ * Interrupts are off during resume, just like they are for boot.
+ * However, boot has  (system_state != SYSTEM_RUNNING)
+ * to quiet __might_sleep() in kmalloc() and resume does not.
+ */
+#include <acpi/actypes.h>
+static inline void *acpi_os_allocate(acpi_size size)
+{
+	return kmalloc(size, irqs_disabled()? GFP_ATOMIC : GFP_KERNEL);
+}
+static inline void *acpi_os_allocate_zeroed(acpi_size size)
+{
+	return kzalloc(size, irqs_disabled()? GFP_ATOMIC : GFP_KERNEL);
+}
+
+static inline void *acpi_os_acquire_object(acpi_cache_t * cache)
+{
+	return kmem_cache_zalloc(cache,
+				 irqs_disabled()? GFP_ATOMIC : GFP_KERNEL);
+}
+
+#define ACPI_ALLOCATE(a)	acpi_os_allocate(a)
+#define ACPI_ALLOCATE_ZEROED(a)	acpi_os_allocate_zeroed(a)
+#define ACPI_FREE(a)		kfree(a)
+#endif /* 0 */
+
+#endif				/* __ACLINUX_H__ */

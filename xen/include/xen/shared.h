@@ -12,44 +12,36 @@ typedef union {
     struct compat_shared_info compat;
 } shared_info_t;
 
-#define __shared_info(d, s, field)      (*(!has_32bit_shinfo(d) ?       \
-                                           &(s)->native.field :         \
-                                           &(s)->compat.field))
-#define __shared_info_addr(d, s, field) (!has_32bit_shinfo(d) ?         \
-                                         (void *)&(s)->native.field :   \
-                                         (void *)&(s)->compat.field)
-
+/*
+ * Compat field is never larger than native field, so cast to that as it
+ * is the largest memory range it is safe for the caller to modify without
+ * further discrimination between compat and native cases.
+ */
+#define __shared_info(d, s, field)                      \
+    (*(!has_32bit_shinfo(d) ?                           \
+       (typeof(&(s)->compat.field))&(s)->native.field : \
+       (typeof(&(s)->compat.field))&(s)->compat.field))
 #define shared_info(d, field)                   \
     __shared_info(d, (d)->shared_info, field)
-#define shared_info_addr(d, field)                      \
-    __shared_info_addr(d, (d)->shared_info, field)
 
 typedef union {
     struct vcpu_info native;
     struct compat_vcpu_info compat;
 } vcpu_info_t;
 
-#define vcpu_info(v, field)      (*(!has_32bit_shinfo((v)->domain) ?    \
-                                    &(v)->vcpu_info->native.field :     \
-                                    &(v)->vcpu_info->compat.field))
-#define vcpu_info_addr(v, field) (!has_32bit_shinfo((v)->domain) ?        \
-                                  (void *)&(v)->vcpu_info->native.field : \
-                                  (void *)&(v)->vcpu_info->compat.field)
+/* As above, cast to compat field type. */
+#define vcpu_info(v, field)                                                   \
+    (*(!has_32bit_shinfo((v)->domain) ?                                       \
+       (typeof(&(v)->vcpu_info->compat.field))&(v)->vcpu_info->native.field : \
+       (typeof(&(v)->vcpu_info->compat.field))&(v)->vcpu_info->compat.field))
 
 #else
 
 typedef struct shared_info shared_info_t;
-
-#define __shared_info(d, s, field)      ((s)->field)
-#define __shared_info_addr(d, s, field) ((void *)&(s)->field)
-
 #define shared_info(d, field)           ((d)->shared_info->field)
-#define shared_info_addr(d, field)      ((void *)&(d)->shared_info->field)
 
 typedef struct vcpu_info vcpu_info_t;
-
 #define vcpu_info(v, field)             ((v)->vcpu_info->field)
-#define vcpu_info_addr(v, field)        ((void *)&(v)->vcpu_info->field)
 
 #endif
 

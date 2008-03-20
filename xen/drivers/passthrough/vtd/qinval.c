@@ -19,15 +19,9 @@
  */
 
 
-#include <xen/init.h>
-#include <xen/irq.h>
-#include <xen/spinlock.h>
 #include <xen/sched.h>
-#include <xen/xmalloc.h>
-#include <xen/domain_page.h>
-#include <asm/delay.h>
-#include <asm/string.h>
-#include <asm/iommu.h>
+#include <xen/iommu.h>
+#include "iommu.h"
 #include "dmar.h"
 #include "vtd.h"
 #include "../pci-direct.h"

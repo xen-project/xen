@@ -1,4 +1,5 @@
 #include <inttypes.h>
+#include "xc_dom_ia64_util.h"
 #include <xen/acpi.h>
 
 uint8_t

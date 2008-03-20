@@ -304,7 +304,7 @@ gopts.var('disk', val='phy:DEV,VDEV,MODE[,DOM]',
 gopts.var('pci', val='BUS:DEV.FUNC',
           fn=append_value, default=[],
           use="""Add a PCI device to a domain, using given params (in hex).
-         For example 'pci=c0:02.1a'.
+         For example 'pci=c0:02.1'.
          The option may be repeated to add more than one pci device.""")
 
 gopts.var('ioports', val='FROM[-TO]',
@@ -319,7 +319,7 @@ gopts.var('irq', val='IRQ',
          For example 'irq=7'.
          This option may be repeated to add more than one IRQ.""")
 
-gopts.var('vfb', val="type={vnc,sdl},vncunused=1,vncdisplay=N,vnclisten=ADDR,display=DISPLAY,xauthority=XAUTHORITY,vncpasswd=PASSWORD",
+gopts.var('vfb', val="type={vnc,sdl},vncunused=1,vncdisplay=N,vnclisten=ADDR,display=DISPLAY,xauthority=XAUTHORITY,vncpasswd=PASSWORD,opengl=1",
           fn=append_value, default=[],
           use="""Make the domain a framebuffer backend.
           The backend type should be either sdl or vnc.
@@ -330,7 +330,7 @@ gopts.var('vfb', val="type={vnc,sdl},vncunused=1,vncdisplay=N,vnclisten=ADDR,dis
           default password.
           For type=sdl, a viewer will be started automatically using the
           given DISPLAY and XAUTHORITY, which default to the current user's
-          ones.""")
+          ones.  OpenGL will be used by default unless opengl is set to 0.""")
 
 gopts.var('vif', val="type=TYPE,mac=MAC,bridge=BRIDGE,ip=IPADDR,script=SCRIPT," + \
           "backend=DOM,vifname=NAME,rate=RATE,model=MODEL,accel=ACCEL",
@@ -504,6 +504,10 @@ gopts.var('sdl', val='',
           fn=set_value, default=None,
           use="""Should the device model use SDL?""")
 
+gopts.var('opengl', val='',
+          fn=set_value, default=None,
+          use="""Enable\Disable OpenGL""")
+
 gopts.var('display', val='DISPLAY',
           fn=set_value, default=None,
           use="X11 display to use")
@@ -641,7 +645,7 @@ def configure_vfbs(config_devs, vals):
             d['type'] = 'sdl'
         for (k,v) in d.iteritems():
             if not k in [ 'vnclisten', 'vncunused', 'vncdisplay', 'display',
-                          'xauthority', 'type', 'vncpasswd' ]:
+                          'xauthority', 'type', 'vncpasswd', 'opengl' ]:
                 err("configuration option %s unknown to vfbs" % k)
             config.append([k,v])
         if not d.has_key("keymap"):
@@ -745,7 +749,7 @@ def configure_hvm(config_image, vals):
              'vnc', 'vncdisplay', 'vncunused', 'vncconsole', 'vnclisten',
              'sdl', 'display', 'xauthority', 'rtc_timeoffset', 'monitor',
              'acpi', 'apic', 'usb', 'usbdevice', 'keymap', 'pci', 'hpet',
-             'guest_os_type', 'hap']
+             'guest_os_type', 'hap', 'opengl']
 
     for a in args:
         if a in vals.__dict__ and vals.__dict__[a] is not None:
@@ -840,7 +844,7 @@ def preprocess_pci(vals):
         pci_match = re.match(r"((?P<domain>[0-9a-fA-F]{1,4})[:,])?" + \
                 r"(?P<bus>[0-9a-fA-F]{1,2})[:,]" + \
                 r"(?P<slot>[0-9a-fA-F]{1,2})[.,]" + \
-                r"(?P<func>[0-9a-fA-F])", pci_dev_str)
+                r"(?P<func>[0-7])$", pci_dev_str)
         if pci_match!=None:
             pci_dev_info = pci_match.groupdict('0')
             try:

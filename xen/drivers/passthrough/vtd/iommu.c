@@ -19,17 +19,12 @@
  * Copyright (C) Allen Kay <allen.m.kay@intel.com> - adapted to xen
  */
 
-#include <xen/init.h>
 #include <xen/irq.h>
-#include <xen/spinlock.h>
 #include <xen/sched.h>
 #include <xen/xmalloc.h>
 #include <xen/domain_page.h>
-#include <asm/delay.h>
-#include <asm/string.h>
-#include <asm/mm.h>
-#include <asm/iommu.h>
-#include <asm/hvm/vmx/intel-iommu.h>
+#include <xen/iommu.h>
+#include "iommu.h"
 #include "dmar.h"
 #include "../pci-direct.h"
 #include "../pci_regs.h"
@@ -39,8 +34,8 @@
 #define domain_iommu_domid(d) ((d)->arch.hvm_domain.hvm_iommu.iommu_domid)
 
 static spinlock_t domid_bitmap_lock;    /* protect domain id bitmap */
-static int domid_bitmap_size;           /* domain id bitmap size in bit */
-static void *domid_bitmap;              /* iommu domain id bitmap */
+static int domid_bitmap_size;           /* domain id bitmap size in bits */
+static unsigned long *domid_bitmap;     /* iommu domain id bitmap */
 
 #define DID_FIELD_WIDTH 16
 #define DID_HIGH_OFFSET 8
@@ -72,6 +67,93 @@ static void iommu_domid_release(struct domain *d)
         d->arch.hvm_domain.hvm_iommu.iommu_domid = 0;
         clear_bit(iommu_domid, domid_bitmap);
     }
+}
+
+static struct intel_iommu *alloc_intel_iommu(void)
+{
+    struct intel_iommu *intel;
+
+    intel = xmalloc(struct intel_iommu);
+    if ( !intel )
+    {
+        gdprintk(XENLOG_ERR VTDPREFIX,
+                 "Allocate intel_iommu failed.\n");
+        return NULL;
+    }
+    memset(intel, 0, sizeof(struct intel_iommu));
+
+    spin_lock_init(&intel->qi_ctrl.qinval_lock);
+    spin_lock_init(&intel->qi_ctrl.qinval_poll_lock);
+
+    spin_lock_init(&intel->ir_ctrl.iremap_lock);
+
+    return intel;
+}
+
+static void free_intel_iommu(struct intel_iommu *intel)
+{
+    if ( intel )
+    {
+        xfree(intel);
+        intel = NULL;
+    }
+}
+
+struct qi_ctrl *iommu_qi_ctrl(struct iommu *iommu)
+{
+    if ( !iommu )
+        return NULL;
+
+    if ( !iommu->intel )
+    {
+        iommu->intel = alloc_intel_iommu();
+        if ( !iommu->intel )
+        {
+            dprintk(XENLOG_ERR VTDPREFIX,
+                    "iommu_qi_ctrl: Allocate iommu->intel failed.\n");
+            return NULL;
+        }
+    }
+
+    return &(iommu->intel->qi_ctrl);
+}
+
+struct ir_ctrl *iommu_ir_ctrl(struct iommu *iommu)
+{
+    if ( !iommu )
+        return NULL;
+
+    if ( !iommu->intel )
+    {
+        iommu->intel = alloc_intel_iommu();
+        if ( !iommu->intel )
+        {
+            dprintk(XENLOG_ERR VTDPREFIX,
+                    "iommu_ir_ctrl: Allocate iommu->intel failed.\n");
+            return NULL;
+        }
+    }
+
+    return &(iommu->intel->ir_ctrl);
+}
+
+struct iommu_flush *iommu_get_flush(struct iommu *iommu)
+{
+    if ( !iommu )
+        return NULL;
+
+    if ( !iommu->intel )
+    {
+        iommu->intel = alloc_intel_iommu();
+        if ( !iommu->intel )
+        {
+            dprintk(XENLOG_ERR VTDPREFIX,
+                    "iommu_get_flush: Allocate iommu->intel failed.\n");
+            return NULL;
+        }
+    }
+
+    return &(iommu->intel->flush);
 }
 
 unsigned int x86_clflush_size;
@@ -756,40 +838,34 @@ static int iommu_page_fault_do_one(struct iommu *iommu, int type,
             PCI_SLOT(source_id & 0xFF), PCI_FUNC(source_id & 0xFF), addr,
             fault_reason, iommu->reg);
 
-    if (fault_reason < 0x20) 
+    if ( fault_reason < 0x20 )
         print_vtd_entries(current->domain, iommu, (source_id >> 8),
-                          (source_id & 0xff), (addr >> PAGE_SHIFT)); 
+                          (source_id & 0xff), (addr >> PAGE_SHIFT));
 
     return 0;
 }
 
 static void iommu_fault_status(u32 fault_status)
 {
-    if (fault_status & DMA_FSTS_PFO)
+    if ( fault_status & DMA_FSTS_PFO )
         dprintk(XENLOG_ERR VTDPREFIX,
             "iommu_fault_status: Fault Overflow\n");
-    else
-    if (fault_status & DMA_FSTS_PPF)
+    else if ( fault_status & DMA_FSTS_PPF )
         dprintk(XENLOG_ERR VTDPREFIX,
             "iommu_fault_status: Primary Pending Fault\n");
-    else
-    if (fault_status & DMA_FSTS_AFO)
+    else if ( fault_status & DMA_FSTS_AFO )
         dprintk(XENLOG_ERR VTDPREFIX,
             "iommu_fault_status: Advanced Fault Overflow\n");
-    else
-    if (fault_status & DMA_FSTS_APF)
+    else if ( fault_status & DMA_FSTS_APF )
         dprintk(XENLOG_ERR VTDPREFIX,
             "iommu_fault_status: Advanced Pending Fault\n");
-    else
-    if (fault_status & DMA_FSTS_IQE)
+    else if ( fault_status & DMA_FSTS_IQE )
         dprintk(XENLOG_ERR VTDPREFIX,
             "iommu_fault_status: Invalidation Queue Error\n");
-    else
-    if (fault_status & DMA_FSTS_ICE)
+    else if ( fault_status & DMA_FSTS_ICE )
         dprintk(XENLOG_ERR VTDPREFIX,
             "iommu_fault_status: Invalidation Completion Error\n");
-    else
-    if (fault_status & DMA_FSTS_ITE)
+    else if ( fault_status & DMA_FSTS_ITE )
         dprintk(XENLOG_ERR VTDPREFIX,
             "iommu_fault_status: Invalidation Time-out Error\n");
 }
@@ -976,8 +1052,6 @@ struct iommu *iommu_alloc(void *hw_data)
 {
     struct acpi_drhd_unit *drhd = (struct acpi_drhd_unit *) hw_data;
     struct iommu *iommu;
-    struct qi_ctrl *qi_ctrl;
-    struct ir_ctrl *ir_ctrl;
 
     if ( nr_iommus > MAX_IOMMUS )
     {
@@ -1014,12 +1088,7 @@ struct iommu *iommu_alloc(void *hw_data)
     spin_lock_init(&iommu->lock);
     spin_lock_init(&iommu->register_lock);
 
-    qi_ctrl = iommu_qi_ctrl(iommu);
-    spin_lock_init(&qi_ctrl->qinval_lock);
-    spin_lock_init(&qi_ctrl->qinval_poll_lock);
-
-    ir_ctrl = iommu_ir_ctrl(iommu);
-    spin_lock_init(&ir_ctrl->iremap_lock);
+    iommu->intel = alloc_intel_iommu();
 
     drhd->iommu = iommu;
     return iommu;
@@ -1036,6 +1105,7 @@ static void free_iommu(struct iommu *iommu)
         free_xenheap_page((void *)iommu->root_entry);
     if ( iommu->reg )
         iounmap(iommu->reg);
+    free_intel_iommu(iommu->intel);
     free_irq(iommu->vector);
     xfree(iommu);
 }
@@ -1063,7 +1133,7 @@ int intel_iommu_domain_init(struct domain *domain)
         iommu = drhd->iommu ? : iommu_alloc(drhd);
 
     /* calculate AGAW */
-    if (guest_width > cap_mgaw(iommu->cap))
+    if ( guest_width > cap_mgaw(iommu->cap) )
         guest_width = cap_mgaw(iommu->cap);
     adjust_width = guestwidth_to_adjustwidth(guest_width);
     agaw = width_to_agaw(adjust_width);
@@ -1885,7 +1955,8 @@ int iommu_setup(void)
 
     /* Allocate domain id bitmap, and set bit 0 as reserved */
     domid_bitmap_size = cap_ndoms(iommu->cap);
-    domid_bitmap = xmalloc_bytes(domid_bitmap_size / 8);
+    domid_bitmap = xmalloc_array(unsigned long,
+                                 BITS_TO_LONGS(domid_bitmap_size));
     if ( domid_bitmap == NULL )
         goto error;
     memset(domid_bitmap, 0, domid_bitmap_size / 8);
@@ -1948,6 +2019,12 @@ int intel_iommu_assign_device(struct domain *d, u8 bus, u8 devfn)
     for_each_rmrr_device( rmrr, pdev )
         if ( pdev->bus == bus && pdev->devfn == devfn )
         {
+            /* FIXME: Because USB RMRR conflicts with guest bios region,
+             * ignore USB RMRR temporarily.
+             */
+            if ( is_usb_device(pdev) )
+                return 0;
+
             ret = iommu_prepare_rmrr_dev(d, rmrr, pdev);
             if ( ret )
             {

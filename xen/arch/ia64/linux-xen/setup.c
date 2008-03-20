@@ -358,7 +358,7 @@ acpi_oem_console_setup(void)
 	extern struct ns16550_defaults ns16550_com1;
 	efi_system_table_t *systab;
 	efi_config_table_t *tables;
-	struct acpi20_table_rsdp *rsdp = NULL;
+	struct acpi_table_rsdp *rsdp = NULL;
 	struct acpi_table_xsdt *xsdt;
 	struct acpi_table_header *hdr;
 	int i;
@@ -378,16 +378,17 @@ acpi_oem_console_setup(void)
 	for (i = 0 ; i < (int)systab->nr_tables && !rsdp ; i++) {
 		if (efi_guidcmp(tables[i].guid, ACPI_20_TABLE_GUID) == 0)
 			rsdp =
-			     (struct acpi20_table_rsdp *)__va(tables[i].table);
+			     (struct acpi_table_rsdp *)__va(tables[i].table);
 	}
 
-	if (!rsdp || strncmp(rsdp->signature, RSDP_SIG, sizeof(RSDP_SIG) - 1))
+	if (!rsdp ||
+	    strncmp(rsdp->signature, ACPI_SIG_RSDP, sizeof(ACPI_SIG_RSDP) - 1))
 		return -ENODEV;
 
-	xsdt = (struct acpi_table_xsdt *)__va(rsdp->xsdt_address);
+	xsdt = (struct acpi_table_xsdt *)__va(rsdp->xsdt_physical_address);
 	hdr = &xsdt->header;
 
-	if (strncmp(hdr->signature, XSDT_SIG, sizeof(XSDT_SIG) - 1))
+	if (strncmp(hdr->signature, ACPI_SIG_XSDT, sizeof(ACPI_SIG_XSDT) - 1))
 		return -ENODEV;
 
 	/* Looking for Fujitsu PRIMEQUEST systems */

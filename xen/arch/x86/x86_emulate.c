@@ -785,11 +785,21 @@ _mode_iopl(
     struct x86_emulate_ops  *ops)
 {
     int cpl = get_cpl(ctxt, ops);
+    if ( cpl == -1 )
+        return -1;
     return ((cpl >= 0) && (cpl <= ((ctxt->regs->eflags >> 12) & 3)));
 }
 
-#define mode_ring0() (get_cpl(ctxt, ops) == 0)
-#define mode_iopl()  _mode_iopl(ctxt, ops)
+#define mode_ring0() ({                         \
+    int _cpl = get_cpl(ctxt, ops);              \
+    fail_if(_cpl < 0);                          \
+    (_cpl == 0);                                \
+})
+#define mode_iopl() ({                          \
+    int _iopl = _mode_iopl(ctxt, ops);          \
+    fail_if(_iopl < 0);                         \
+    _iopl;                                      \
+})
 
 static int
 in_realmode(
@@ -2255,7 +2265,6 @@ x86_emulate(
 
     case 0x6c ... 0x6d: /* ins %dx,%es:%edi */ {
         unsigned long nr_reps = get_rep_prefix();
-        generate_exception_if(!mode_iopl(), EXC_GP, 0);
         dst.bytes = !(b & 1) ? 1 : (op_bytes == 8) ? 4 : op_bytes;
         dst.mem.seg = x86_seg_es;
         dst.mem.off = truncate_ea(_regs.edi);
@@ -2285,7 +2294,6 @@ x86_emulate(
 
     case 0x6e ... 0x6f: /* outs %esi,%dx */ {
         unsigned long nr_reps = get_rep_prefix();
-        generate_exception_if(!mode_iopl(), EXC_GP, 0);
         dst.bytes = !(b & 1) ? 1 : (op_bytes == 8) ? 4 : op_bytes;
         if ( (nr_reps > 1) && (ops->rep_outs != NULL) &&
              ((rc = ops->rep_outs(ea.mem.seg, truncate_ea(_regs.esi),
@@ -2394,8 +2402,10 @@ x86_emulate(
 
     case 0x9d: /* popf */ {
         uint32_t mask = EFLG_VIP | EFLG_VIF | EFLG_VM;
-        if ( !mode_iopl() )
+        if ( !mode_ring0() )
             mask |= EFLG_IOPL;
+        if ( !mode_iopl() )
+            mask |= EFLG_IF;
         /* 64-bit mode: POP defaults to a 64-bit operand. */
         if ( mode_64bit() && (op_bytes == 4) )
             op_bytes = 8;
@@ -2640,8 +2650,10 @@ x86_emulate(
     case 0xcf: /* iret */ {
         unsigned long cs, eip, eflags;
         uint32_t mask = EFLG_VIP | EFLG_VIF | EFLG_VM;
-        if ( !mode_iopl() )
+        if ( !mode_ring0() )
             mask |= EFLG_IOPL;
+        if ( !mode_iopl() )
+            mask |= EFLG_IF;
         fail_if(!in_realmode(ctxt, ops));
         if ( (rc = ops->read(x86_seg_ss, sp_post_inc(op_bytes),
                              &eip, op_bytes, ctxt)) ||
@@ -2818,7 +2830,6 @@ x86_emulate(
         unsigned int port = ((b < 0xe8)
                              ? insn_fetch_type(uint8_t)
                              : (uint16_t)_regs.edx);
-        generate_exception_if(!mode_iopl(), EXC_GP, 0);
         op_bytes = !(b & 1) ? 1 : (op_bytes == 8) ? 4 : op_bytes;
         if ( b & 2 )
         {
@@ -3219,8 +3230,8 @@ x86_emulate(
     case 0x21: /* mov dr,reg */
     case 0x22: /* mov reg,cr */
     case 0x23: /* mov reg,dr */
+        generate_exception_if(ea.type != OP_REG, EXC_UD, -1);
         generate_exception_if(!mode_ring0(), EXC_GP, 0);
-        modrm_rm  |= (rex_prefix & 1) << 3;
         modrm_reg |= lock_prefix << 3;
         if ( b & 2 )
         {

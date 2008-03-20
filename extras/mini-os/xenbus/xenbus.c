@@ -257,6 +257,7 @@ void init_xenbus(void)
     err = bind_evtchn(start_info.store_evtchn,
 		      xenbus_evtchn_handler,
               NULL);
+    unmask_evtchn(start_info.store_evtchn);
     DEBUG("xenbus on irq %d\n", err);
 }
 
@@ -452,7 +453,7 @@ char *xenbus_write(xenbus_transaction_t xbt, const char *path, const char *value
 {
     struct write_req req[] = { 
 	{path, strlen(path) + 1},
-	{value, strlen(value) + 1},
+	{value, strlen(value)},
     };
     struct xsd_sockmsg *rep;
     rep = xenbus_msg_reply(XS_WRITE, xbt, req, ARRAY_SIZE(req));

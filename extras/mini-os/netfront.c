@@ -48,7 +48,7 @@ struct netfront_dev {
     struct netif_rx_front_ring rx;
     grant_ref_t tx_ring_ref;
     grant_ref_t rx_ring_ref;
-    evtchn_port_t evtchn, local_port;
+    evtchn_port_t evtchn;
 
     char *nodename;
     char *backend;
@@ -259,7 +259,7 @@ void netfront_select_handler(evtchn_port_t port, struct pt_regs *regs, void *dat
 }
 #endif
 
-struct netfront_dev *init_netfront(char *nodename, void (*thenetif_rx)(unsigned char* data, int len), unsigned char rawmac[6])
+struct netfront_dev *init_netfront(char *nodename, void (*thenetif_rx)(unsigned char* data, int len), unsigned char rawmac[6], char **ip)
 {
     xenbus_transaction_t xbt;
     char* err;
@@ -301,19 +301,14 @@ struct netfront_dev *init_netfront(char *nodename, void (*thenetif_rx)(unsigned 
         dev->rx_buffers[i].page = (char*)alloc_page();
     }
 
-    evtchn_alloc_unbound_t op;
-    op.dom = DOMID_SELF;
     snprintf(path, sizeof(path), "%s/backend-id", nodename);
-    dev->dom = op.remote_dom = xenbus_read_integer(path);
-    HYPERVISOR_event_channel_op(EVTCHNOP_alloc_unbound, &op);
-    clear_evtchn(op.port);        /* Without, handler gets invoked now! */
+    dev->dom = xenbus_read_integer(path);
 #ifdef HAVE_LIBC
     if (thenetif_rx == NETIF_SELECT_RX)
-	dev->local_port = bind_evtchn(op.port, netfront_select_handler, dev);
+        evtchn_alloc_unbound(dev->dom, netfront_select_handler, dev, &dev->evtchn);
     else
 #endif
-	dev->local_port = bind_evtchn(op.port, netfront_handler, dev);
-    dev->evtchn=op.port;
+        evtchn_alloc_unbound(dev->dom, netfront_handler, dev, &dev->evtchn);
 
     txs = (struct netif_tx_sring*) alloc_page();
     rxs = (struct netif_rx_sring *) alloc_page();
@@ -388,9 +383,9 @@ done:
     msg = xenbus_read(XBT_NIL, path, &mac);
 
     if ((dev->backend == NULL) || (mac == NULL)) {
-        struct evtchn_close op = { dev->local_port };
+        struct evtchn_close op = { dev->evtchn };
         printk("%s: backend/mac failed\n", __func__);
-        unbind_evtchn(dev->local_port);
+        unbind_evtchn(dev->evtchn);
         HYPERVISOR_event_channel_op(EVTCHNOP_close, &op);
         return NULL;
     }
@@ -407,11 +402,17 @@ done:
         xenbus_wait_for_value(path,"4");
 
         xenbus_unwatch_path(XBT_NIL, path);
+
+        if (ip) {
+            snprintf(path, sizeof(path), "%s/ip", dev->backend);
+            xenbus_read(XBT_NIL, path, ip);
+        }
     }
 
     printk("**************************\n");
 
     init_rx_buffers(dev);
+    unmask_evtchn(dev->evtchn);
 
         /* Special conversion specifier 'hh' needed for __ia64__. Without
            this mini-os panics with 'Unaligned reference'. */
@@ -431,7 +432,7 @@ done:
 int netfront_tap_open(char *nodename) {
     struct netfront_dev *dev;
 
-    dev = init_netfront(nodename, NETIF_SELECT_RX, NULL);
+    dev = init_netfront(nodename, NETIF_SELECT_RX, NULL, NULL);
     if (!dev) {
 	printk("TAP open failed\n");
 	errno = EIO;
@@ -460,7 +461,7 @@ void shutdown_netfront(struct netfront_dev *dev)
     err = xenbus_printf(XBT_NIL, nodename, "state", "%u", 6);
     xenbus_wait_for_value(path,"6");
 
-    unbind_evtchn(dev->local_port);
+    unbind_evtchn(dev->evtchn);
 
     free(nodename);
     free(dev->backend);

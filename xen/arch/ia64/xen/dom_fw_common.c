@@ -208,18 +208,18 @@ print_md(efi_memory_desc_t *md)
 }
 
 struct fake_acpi_tables {
-	struct acpi20_table_rsdp rsdp;
-	struct xsdt_descriptor_rev2 xsdt;
+	struct acpi_table_rsdp rsdp;
+	struct acpi_table_xsdt xsdt;
 	uint64_t madt_ptr;
-	struct fadt_descriptor_rev2 fadt;
-	struct facs_descriptor_rev2 facs;
+	struct acpi_table_fadt fadt;
+	struct acpi_table_facs facs;
 	struct acpi_table_header dsdt;
 	uint8_t aml[8 + 11 * MAX_VIRT_CPUS];
 	struct acpi_table_madt madt;
 	struct acpi_table_lsapic lsapic[MAX_VIRT_CPUS];
-	uint8_t pm1a_evt_blk[4];
-	uint8_t pm1a_cnt_blk[1];
-	uint8_t pm_tmr_blk[4];
+	uint8_t pm1a_event_block[4];
+	uint8_t pm1a_control_block[1];
+	uint8_t pm_timer_block[4];
 };
 #define ACPI_TABLE_MPA(field)                                       \
     FW_ACPI_BASE_PADDR + offsetof(struct fake_acpi_tables, field);
@@ -228,10 +228,10 @@ struct fake_acpi_tables {
 void
 dom_fw_fake_acpi(domain_t *d, struct fake_acpi_tables *tables)
 {
-	struct acpi20_table_rsdp *rsdp = &tables->rsdp;
-	struct xsdt_descriptor_rev2 *xsdt = &tables->xsdt;
-	struct fadt_descriptor_rev2 *fadt = &tables->fadt;
-	struct facs_descriptor_rev2 *facs = &tables->facs;
+	struct acpi_table_rsdp *rsdp = &tables->rsdp;
+	struct acpi_table_xsdt *xsdt = &tables->xsdt;
+	struct acpi_table_fadt *fadt = &tables->fadt;
+	struct acpi_table_facs *facs = &tables->facs;
 	struct acpi_table_header *dsdt = &tables->dsdt;
 	struct acpi_table_madt *madt = &tables->madt;
 	struct acpi_table_lsapic *lsapic = tables->lsapic;
@@ -245,34 +245,37 @@ dom_fw_fake_acpi(domain_t *d, struct fake_acpi_tables *tables)
 	memset(tables, 0, sizeof(struct fake_acpi_tables));
 
 	/* setup XSDT (64bit version of RSDT) */
-	memcpy(xsdt->signature, XSDT_SIG, sizeof(xsdt->signature));
+	memcpy(xsdt->header.signature, ACPI_SIG_XSDT,
+	       sizeof(xsdt->header.signature));
 	/* XSDT points to both the FADT and the MADT, so add one entry */
-	xsdt->length = sizeof(struct xsdt_descriptor_rev2) + sizeof(uint64_t);
-	xsdt->revision = 1;
-	memcpy(xsdt->oem_id, "XEN", 3);
-	memcpy(xsdt->oem_table_id, "Xen/ia64", 8);
-	memcpy(xsdt->asl_compiler_id, "XEN", 3);
-	xsdt->asl_compiler_revision = xen_ia64_version(d);
+	xsdt->header.length = sizeof(struct acpi_table_xsdt) + sizeof(uint64_t);
+	xsdt->header.revision = 1;
+	memcpy(xsdt->header.oem_id, "XEN", 3);
+	memcpy(xsdt->header.oem_table_id, "Xen/ia64", 8);
+	memcpy(xsdt->header.asl_compiler_id, "XEN", 3);
+	xsdt->header.asl_compiler_revision = xen_ia64_version(d);
 
 	xsdt->table_offset_entry[0] = ACPI_TABLE_MPA(fadt);
 	tables->madt_ptr = ACPI_TABLE_MPA(madt);
 
-	xsdt->checksum = generate_acpi_checksum(xsdt, xsdt->length);
+	xsdt->header.checksum = generate_acpi_checksum(xsdt,
+	                                               xsdt->header.length);
 
 	/* setup FADT */
-	memcpy(fadt->signature, FADT_SIG, sizeof(fadt->signature));
-	fadt->length = sizeof(struct fadt_descriptor_rev2);
-	fadt->revision = FADT2_REVISION_ID;
-	memcpy(fadt->oem_id, "XEN", 3);
-	memcpy(fadt->oem_table_id, "Xen/ia64", 8);
-	memcpy(fadt->asl_compiler_id, "XEN", 3);
-	fadt->asl_compiler_revision = xen_ia64_version(d);
+	memcpy(fadt->header.signature, ACPI_SIG_FADT,
+	       sizeof(fadt->header.signature));
+	fadt->header.length = sizeof(struct acpi_table_fadt);
+	fadt->header.revision = FADT2_REVISION_ID;
+	memcpy(fadt->header.oem_id, "XEN", 3);
+	memcpy(fadt->header.oem_table_id, "Xen/ia64", 8);
+	memcpy(fadt->header.asl_compiler_id, "XEN", 3);
+	fadt->header.asl_compiler_revision = xen_ia64_version(d);
 
-	memcpy(facs->signature, FACS_SIG, sizeof(facs->signature));
+	memcpy(facs->signature, ACPI_SIG_FACS, sizeof(facs->signature));
 	facs->version = 1;
-	facs->length = sizeof(struct facs_descriptor_rev2);
+	facs->length = sizeof(struct acpi_table_facs);
 
-	fadt->xfirmware_ctrl = ACPI_TABLE_MPA(facs);
+	fadt->Xfacs = ACPI_TABLE_MPA(facs);
 	fadt->Xdsdt = ACPI_TABLE_MPA(dsdt);
 
 	/*
@@ -280,34 +283,35 @@ dom_fw_fake_acpi(domain_t *d, struct fake_acpi_tables *tables)
 	 * from sanity checks in the ACPI CA.  Emulate required ACPI hardware
 	 * registers in system memory.
 	 */
-	fadt->pm1_evt_len = 4;
-	fadt->xpm1a_evt_blk.address_space_id = ACPI_ADR_SPACE_SYSTEM_MEMORY;
-	fadt->xpm1a_evt_blk.register_bit_width = 8;
-	fadt->xpm1a_evt_blk.address = ACPI_TABLE_MPA(pm1a_evt_blk);
-	fadt->pm1_cnt_len = 1;
-	fadt->xpm1a_cnt_blk.address_space_id = ACPI_ADR_SPACE_SYSTEM_MEMORY;
-	fadt->xpm1a_cnt_blk.register_bit_width = 8;
-	fadt->xpm1a_cnt_blk.address = ACPI_TABLE_MPA(pm1a_cnt_blk);
-	fadt->pm_tm_len = 4;
-	fadt->xpm_tmr_blk.address_space_id = ACPI_ADR_SPACE_SYSTEM_MEMORY;
-	fadt->xpm_tmr_blk.register_bit_width = 8;
-	fadt->xpm_tmr_blk.address = ACPI_TABLE_MPA(pm_tmr_blk);
+	fadt->pm1_event_length = 4;
+	fadt->xpm1a_event_block.space_id = ACPI_ADR_SPACE_SYSTEM_MEMORY;
+	fadt->xpm1a_event_block.bit_width = 8;
+	fadt->xpm1a_event_block.address = ACPI_TABLE_MPA(pm1a_event_block);
+	fadt->pm1_control_length = 1;
+	fadt->xpm1a_control_block.space_id = ACPI_ADR_SPACE_SYSTEM_MEMORY;
+	fadt->xpm1a_control_block.bit_width = 8;
+	fadt->xpm1a_control_block.address = ACPI_TABLE_MPA(pm1a_control_block);
+	fadt->pm_timer_length = 4;
+	fadt->xpm_timer_block.space_id = ACPI_ADR_SPACE_SYSTEM_MEMORY;
+	fadt->xpm_timer_block.bit_width = 8;
+	fadt->xpm_timer_block.address = ACPI_TABLE_MPA(pm_timer_block);
 
-	fadt->checksum = generate_acpi_checksum(fadt, fadt->length);
+	fadt->header.checksum = generate_acpi_checksum(fadt,
+	                                               fadt->header.length);
 
 	/* setup RSDP */
-	memcpy(rsdp->signature, RSDP_SIG, strlen(RSDP_SIG));
+	memcpy(rsdp->signature, ACPI_SIG_RSDP, strlen(ACPI_SIG_RSDP));
 	memcpy(rsdp->oem_id, "XEN", 3);
 	rsdp->revision = 2; /* ACPI 2.0 includes XSDT */
-	rsdp->length = sizeof(struct acpi20_table_rsdp);
-	rsdp->xsdt_address = ACPI_TABLE_MPA(xsdt);
+	rsdp->length = sizeof(struct acpi_table_rsdp);
+	rsdp->xsdt_physical_address = ACPI_TABLE_MPA(xsdt);
 
 	rsdp->checksum = generate_acpi_checksum(rsdp,
 	                                        ACPI_RSDP_CHECKSUM_LENGTH);
-	rsdp->ext_checksum = generate_acpi_checksum(rsdp, rsdp->length);
+	rsdp->extended_checksum = generate_acpi_checksum(rsdp, rsdp->length);
 
 	/* setup DSDT with trivial namespace. */ 
-	memcpy(dsdt->signature, DSDT_SIG, strlen(DSDT_SIG));
+	memcpy(dsdt->signature, ACPI_SIG_DSDT, strlen(ACPI_SIG_DSDT));
 	dsdt->revision = 1;
 	memcpy(dsdt->oem_id, "XEN", 3);
 	memcpy(dsdt->oem_table_id, "Xen/ia64", 8);
@@ -346,7 +350,8 @@ dom_fw_fake_acpi(domain_t *d, struct fake_acpi_tables *tables)
 	dsdt->checksum = generate_acpi_checksum(dsdt, dsdt->length);
 
 	/* setup MADT */
-	memcpy(madt->header.signature, APIC_SIG, sizeof(madt->header.signature));
+	memcpy(madt->header.signature, ACPI_SIG_MADT,
+	       sizeof(madt->header.signature));
 	madt->header.revision = 2;
 	memcpy(madt->header.oem_id, "XEN", 3);
 	memcpy(madt->header.oem_table_id, "Xen/ia64", 8);

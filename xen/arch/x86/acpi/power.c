@@ -106,7 +106,7 @@ static void acpi_sleep_prepare(u32 state)
             *(uint64_t *)wakeup_vector_va =
                 tboot_in_measured_env() ?
                 (uint64_t)g_tboot_shared->s3_tb_wakeup_entry :
-	        (uint64_t)bootsym_phys(wakeup_start);
+                (uint64_t)bootsym_phys(wakeup_start);
     }
 }
 
@@ -198,7 +198,7 @@ static long enter_state_helper(void *data)
  */
 int acpi_enter_sleep(struct xenpf_enter_acpi_sleep *sleep)
 {
-    if ( !IS_PRIV(current->domain) || !acpi_sinfo.pm1a_cnt )
+    if ( !IS_PRIV(current->domain) || !acpi_sinfo.pm1a_cnt_blk.address )
         return -EPERM;
 
     /* Sanity check */
@@ -222,10 +222,14 @@ int acpi_enter_sleep(struct xenpf_enter_acpi_sleep *sleep)
 
 static int acpi_get_wake_status(void)
 {
-    uint16_t val;
+    uint32_t val;
+    acpi_status status;
 
     /* Wake status is the 15th bit of PM1 status register. (ACPI spec 3.0) */
-    val = inw(acpi_sinfo.pm1a_evt) | inw(acpi_sinfo.pm1b_evt);
+    status = acpi_hw_register_read(ACPI_REGISTER_PM1_STATUS, &val);
+    if ( ACPI_FAILURE(status) )
+        return 0;
+
     val &= ACPI_BITMASK_WAKE_STATUS;
     val >>= ACPI_BITPOSITION_WAKE_STATUS;
     return val;
@@ -243,7 +247,7 @@ static void tboot_sleep(u8 sleep_state)
        case ACPI_STATE_S3:
            shutdown_type = TB_SHUTDOWN_S3;
            g_tboot_shared->s3_k_wakeup_entry =
-	       (uint32_t)bootsym_phys(wakeup_start);
+               (uint32_t)bootsym_phys(wakeup_start);
            break;
        case ACPI_STATE_S4:
            shutdown_type = TB_SHUTDOWN_S4;
@@ -261,6 +265,8 @@ static void tboot_sleep(u8 sleep_state)
 /* System is really put into sleep state by this stub */
 acpi_status asmlinkage acpi_enter_sleep_state(u8 sleep_state)
 {
+    acpi_status status;
+
     if ( tboot_in_measured_env() )
     {
         tboot_sleep(sleep_state);
@@ -270,9 +276,18 @@ acpi_status asmlinkage acpi_enter_sleep_state(u8 sleep_state)
 
     ACPI_FLUSH_CPU_CACHE();
 
-    outw((u16)acpi_sinfo.pm1a_cnt_val, acpi_sinfo.pm1a_cnt);
-    if ( acpi_sinfo.pm1b_cnt )
-        outw((u16)acpi_sinfo.pm1b_cnt_val, acpi_sinfo.pm1b_cnt);
+    status = acpi_hw_register_write(ACPI_REGISTER_PM1A_CONTROL, 
+                                    acpi_sinfo.pm1a_cnt_val);
+    if ( ACPI_FAILURE(status) )
+        return_ACPI_STATUS(AE_ERROR);
+
+    if ( acpi_sinfo.pm1b_cnt_blk.address )
+    {
+        status = acpi_hw_register_write(ACPI_REGISTER_PM1B_CONTROL, 
+                                        acpi_sinfo.pm1b_cnt_val);
+        if ( ACPI_FAILURE(status) )
+            return_ACPI_STATUS(AE_ERROR);
+    }
 
     /* Wait until we enter sleep state, and spin until we wake */
     while ( !acpi_get_wake_status() )

@@ -7,7 +7,7 @@ import os
 
 CONFIG_ENTRIES = ['type', 'vncdisplay', 'vnclisten', 'vncpasswd', 'vncunused',
                   'display', 'xauthority', 'keymap',
-                  'uuid', 'location', 'protocol']
+                  'uuid', 'location', 'protocol', 'opengl']
 
 class VfbifController(DevController):
     """Virtual frame buffer controller. Handles all vfb devices for a domain.

@@ -80,27 +80,27 @@ struct host_save_area *alloc_host_save_area(void)
 
 void svm_disable_intercept_for_msr(struct vcpu *v, u32 msr)
 {
-    char *msr_bitmap = v->arch.hvm_svm.msrpm;
+    unsigned long *msr_bitmap = v->arch.hvm_svm.msrpm;
 
     /*
      * See AMD64 Programmers Manual, Vol 2, Section 15.10 (MSR-Bitmap Address).
      */
     if ( msr <= 0x1fff )
     {
-        __clear_bit(msr*2, msr_bitmap + 0x000); 
-        __clear_bit(msr*2+1, msr_bitmap + 0x000); 
+        __clear_bit(msr*2, msr_bitmap + 0x000/BYTES_PER_LONG); 
+        __clear_bit(msr*2+1, msr_bitmap + 0x000/BYTES_PER_LONG); 
     }
     else if ( (msr >= 0xc0000000) && (msr <= 0xc0001fff) )
     {
         msr &= 0x1fff;
-        __clear_bit(msr*2, msr_bitmap + 0x800);
-        __clear_bit(msr*2+1, msr_bitmap + 0x800);
+        __clear_bit(msr*2, msr_bitmap + 0x800/BYTES_PER_LONG);
+        __clear_bit(msr*2+1, msr_bitmap + 0x800/BYTES_PER_LONG);
     } 
     else if ( (msr >= 0xc001000) && (msr <= 0xc0011fff) )
     {
         msr &= 0x1fff;
-        __clear_bit(msr*2, msr_bitmap + 0x1000);
-        __clear_bit(msr*2+1, msr_bitmap + 0x1000);
+        __clear_bit(msr*2, msr_bitmap + 0x1000/BYTES_PER_LONG);
+        __clear_bit(msr*2+1, msr_bitmap + 0x1000/BYTES_PER_LONG);
     }
 }
 

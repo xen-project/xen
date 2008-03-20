@@ -42,8 +42,6 @@ int queue_invalidate_iec(struct iommu *iommu,
 int invalidate_sync(struct iommu *iommu);
 int iommu_flush_iec_global(struct iommu *iommu);
 int iommu_flush_iec_index(struct iommu *iommu, u8 im, u16 iidx);
-void print_iommu_regs(struct acpi_drhd_unit *drhd);
-int vtd_hw_check(void);
 struct iommu * ioapic_to_iommu(unsigned int apic_id);
 struct acpi_drhd_unit * ioapic_to_drhd(unsigned int apic_id);
 void clear_fault_bits(struct iommu *iommu);

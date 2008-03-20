@@ -483,7 +483,7 @@ sh_mfn_is_dirty(struct domain *d, mfn_t gmfn)
 {
     unsigned long pfn;
     mfn_t mfn, *l4, *l3, *l2;
-    uint8_t *l1;
+    unsigned long *l1;
     int rv;
 
     ASSERT(shadow_mode_log_dirty(d));

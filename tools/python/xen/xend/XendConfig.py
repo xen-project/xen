@@ -123,19 +123,49 @@ XENAPI_CFG_TO_LEGACY_CFG = {
 
 LEGACY_CFG_TO_XENAPI_CFG = reverse_dict(XENAPI_CFG_TO_LEGACY_CFG)
 
-# Platform configuration keys.
-XENAPI_PLATFORM_CFG = [ 'acpi', 'apic', 'boot', 'device_model', 'loader', 'display', 
-                        'fda', 'fdb', 'keymap', 'isa', 'localtime', 'monitor', 
-                        'nographic', 'pae', 'rtc_timeoffset', 'serial', 'sdl',
-                        'soundhw','stdvga', 'usb', 'usbdevice', 'hpet', 'vnc',
-                        'vncconsole', 'vncdisplay', 'vnclisten', 'timer_mode',
-                        'vncpasswd', 'vncunused', 'xauthority', 'pci', 'vhpt',
-                        'guest_os_type', 'hap']
+# Platform configuration keys and their types.
+XENAPI_PLATFORM_CFG_TYPES = {
+    'acpi': int,
+    'apic': int,
+    'boot': str,
+    'device_model': str,
+    'loader': str,
+    'display' : str,
+    'fda': str,
+    'fdb': str,
+    'keymap': str,
+    'isa' : int,
+    'localtime': int,
+    'monitor': int,
+    'nographic': int,
+    'pae' : int,
+    'rtc_timeoffset': int,
+    'serial': str,
+    'sdl': int,
+    'opengl': int,
+    'soundhw': str,
+    'stdvga': int,
+    'usb': int,
+    'usbdevice': str,
+    'hpet': int,
+    'vnc': int,
+    'vncconsole': int,
+    'vncdisplay': int,
+    'vnclisten': str,
+    'timer_mode': int,
+    'vncpasswd': str,
+    'vncunused': int,
+    'xauthority': str,
+    'pci': str,
+    'vhpt': int,
+    'guest_os_type': str,
+    'hap': int,
+}
 
 # Xen API console 'other_config' keys.
 XENAPI_CONSOLE_OTHER_CFG = ['vncunused', 'vncdisplay', 'vnclisten',
                             'vncpasswd', 'type', 'display', 'xauthority',
-                            'keymap']
+                            'keymap', 'opengl']
 
 # List of XendConfig configuration keys that have no direct equivalent
 # in the old world.
@@ -405,6 +435,12 @@ class XendConfig(dict):
                 self['platform']['device_model'] = xen.util.auxbin.pathTo("qemu-dm")
 
         if self.is_hvm():
+            if 'timer_mode' not in self['platform']:
+                self['platform']['timer_mode'] = 0
+            if 'rtc_timeoffset' not in self['platform']:
+                self['platform']['rtc_timeoffset'] = 0
+            if 'hpet' not in self['platform']:
+                self['platform']['hpet'] = 0
             if 'loader' not in self['platform']:
                 # Old configs may have hvmloader set as PV_kernel param
                 if self.has_key('PV_kernel') and re.search('hvmloader', self['PV_kernel']):
@@ -534,7 +570,7 @@ class XendConfig(dict):
             cfg['platform']['localtime'] = localtime
 
         # Compatibility hack -- can go soon.
-        for key in XENAPI_PLATFORM_CFG:
+        for key in XENAPI_PLATFORM_CFG_TYPES.keys():
             val = sxp.child_value(sxp_cfg, "platform_" + key, None)
             if val is not None:
                 self['platform'][key] = val
@@ -713,7 +749,7 @@ class XendConfig(dict):
             self.update_with_image_sxp(image_sxp)
 
         # Convert Legacy HVM parameters to Xen API configuration
-        for key in XENAPI_PLATFORM_CFG:
+        for key in XENAPI_PLATFORM_CFG_TYPES.keys():
             if key in cfg:
                 self['platform'][key] = cfg[key]
 
@@ -763,7 +799,7 @@ class XendConfig(dict):
             if image_type != 'hvm' and image_type != 'linux':
                 self['platform']['image_type'] = image_type
             
-            for key in XENAPI_PLATFORM_CFG:
+            for key in XENAPI_PLATFORM_CFG_TYPES.keys():
                 val = sxp.child_value(image_sxp, key, None)
                 if val is not None and val != '':
                     self['platform'][key] = val
@@ -847,6 +883,19 @@ class XendConfig(dict):
                 self[key] = type_conv(val)
             else:
                 self[key] = val
+
+        # XenAPI defines platform as a string-string map.  If platform
+        # configuration exists, convert values to appropriate type.
+        if 'platform' in xapi:
+            for key, val in xapi['platform'].items():
+                type_conv = XENAPI_PLATFORM_CFG_TYPES.get(key)
+                if type_conv is None:
+                    key = key.lower()
+                    type_conv = XENAPI_PLATFORM_CFG_TYPES.get(key)
+                    if callable(type_conv):
+                        self['platform'][key] = type_conv(val)
+                    else:
+                        self['platform'][key] = val
                 
         self['vcpus_params']['weight'] = \
             int(self['vcpus_params'].get('weight', 256))
@@ -942,6 +991,7 @@ class XendConfig(dict):
                                     dev_type, dev_cfg = self['devices'][dev_uuid]
                                     is_bootable = dev_cfg.get('bootable', 0)
                                     config.append(['bootable', int(is_bootable)])
+                                    config.append(['VDI', dev_cfg.get('VDI', '')])
 
                                 sxpr.append(['device', config])
 
@@ -1276,6 +1326,12 @@ class XendConfig(dict):
                     target['devices'][dev_uuid] = ('vfb', dev_info)
                     target['console_refs'].append(dev_uuid)
 
+                    # if console is rfb, set device_model ensuring qemu
+                    # is invoked for pvfb services
+                    if 'device_model' not in target['platform']:
+                        target['platform']['device_model'] = \
+                            xen.util.auxbin.pathTo("qemu-dm")
+
                     # Finally, if we are a pvfb, we need to make a vkbd
                     # as well that is not really exposed to Xen API
                     vkbd_uuid = uuid.createString()
@@ -1407,6 +1463,23 @@ class XendConfig(dict):
                 config = cfg_sxp
 
             dev_type, dev_info = self['devices'][dev_uuid]
+
+            if dev_type == 'pci': # Special case for pci
+                pci_devs = []
+                for pci_dev in sxp.children(config, 'dev'):
+                    pci_dev_info = {}
+                    for opt_val in pci_dev[1:]:
+                        try:
+                            opt, val = opt_val
+                            pci_dev_info[opt] = val
+                        except TypeError:
+                            pass
+                    pci_devs.append(pci_dev_info)
+                self['devices'][dev_uuid] = (dev_type,
+                                             {'devs': pci_devs,
+                                              'uuid': dev_uuid})
+                return True
+                
             for opt_val in config[1:]:
                 try:
                     opt, val = opt_val
@@ -1519,7 +1592,7 @@ class XendConfig(dict):
         if self.has_key('PV_args') and self['PV_args']:
             image.append(['args', self['PV_args']])
 
-        for key in XENAPI_PLATFORM_CFG:
+        for key in XENAPI_PLATFORM_CFG_TYPES.keys():
             if key in self['platform']:
                 image.append([key, self['platform'][key]])
 
@@ -1555,7 +1628,7 @@ class XendConfig(dict):
             self['PV_ramdisk'] = sxp.child_value(image_sxp, 'ramdisk','')
             self['PV_args'] = kernel_args
 
-        for key in XENAPI_PLATFORM_CFG:
+        for key in XENAPI_PLATFORM_CFG_TYPES.keys():
             val = sxp.child_value(image_sxp, key, None)
             if val is not None and val != '':
                 self['platform'][key] = val

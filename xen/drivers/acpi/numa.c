@@ -104,7 +104,7 @@ static int __init acpi_parse_slit(unsigned long phys_addr, unsigned long size)
 	slit = (struct acpi_table_slit *)__acpi_map_table(phys_addr, size);
 
 	/* downcast just for %llu vs %lu for i386/ia64  */
-	localities = (u32) slit->localities;
+	localities = (u32) slit->locality_count;
 
 	acpi_numa_slit_init(slit);
 

@@ -83,15 +83,17 @@ static unsigned int vlapic_lvt_mask[VLAPIC_LVT_NUM] =
  */
 
 #define VEC_POS(v) ((v)%32)
-#define REG_POS(v) (((v)/32)* 0x10)
-#define vlapic_test_and_set_vector(vec, bitmap)                 \
-    test_and_set_bit(VEC_POS(vec), (bitmap) + REG_POS(vec))
-#define vlapic_test_and_clear_vector(vec, bitmap)               \
-    test_and_clear_bit(VEC_POS(vec), (bitmap) + REG_POS(vec))
-#define vlapic_set_vector(vec, bitmap)                          \
-    set_bit(VEC_POS(vec), (bitmap) + REG_POS(vec))
-#define vlapic_clear_vector(vec, bitmap)                        \
-    clear_bit(VEC_POS(vec), (bitmap) + REG_POS(vec))
+#define REG_POS(v) (((v)/32) * 0x10)
+#define vlapic_test_and_set_vector(vec, bitmap)                         \
+    test_and_set_bit(VEC_POS(vec),                                      \
+                     (unsigned long *)((bitmap) + REG_POS(vec)))
+#define vlapic_test_and_clear_vector(vec, bitmap)                       \
+    test_and_clear_bit(VEC_POS(vec),                                    \
+                       (unsigned long *)((bitmap) + REG_POS(vec)))
+#define vlapic_set_vector(vec, bitmap)                                  \
+    set_bit(VEC_POS(vec), (unsigned long *)((bitmap) + REG_POS(vec)))
+#define vlapic_clear_vector(vec, bitmap)                                \
+    clear_bit(VEC_POS(vec), (unsigned long *)((bitmap) + REG_POS(vec)))
 
 static int vlapic_find_highest_vector(void *bitmap)
 {

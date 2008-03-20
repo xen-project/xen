@@ -369,20 +369,21 @@ static void vnc_dpy_resize(DisplayState *ds, int w, int h, int linesize)
     VncState *vs = ds->opaque;
     int o;
 
-    if (linesize != w * vs->depth)
-        ds->shared_buf = 0;
-
     if (!ds->shared_buf) {
+        ds->linesize = w * vs->depth;
         if (allocated)
-            ds->data = realloc(ds->data, w * h * vs->depth);
+            ds->data = realloc(ds->data,  h * ds->linesize);
         else
-            ds->data = malloc(w * h * vs->depth);
+            ds->data = malloc(h * ds->linesize);
         allocated = 1;
-    } else if (allocated) {
-        free(ds->data);
-        allocated = 0;
+    } else {
+        ds->linesize = linesize;
+        if (allocated) {
+            free(ds->data);
+            allocated = 0;
+        }
     }
-    vs->old_data = realloc(vs->old_data, w * h * vs->depth);
+    vs->old_data = realloc(vs->old_data, h * ds->linesize);
     vs->dirty_row = realloc(vs->dirty_row, h * sizeof(vs->dirty_row[0]));
     vs->update_row = realloc(vs->update_row, h * sizeof(vs->dirty_row[0]));
 
@@ -399,7 +400,6 @@ static void vnc_dpy_resize(DisplayState *ds, int w, int h, int linesize)
     size_changed = ds->width != w || ds->height != h;
     ds->width = w;
     ds->height = h;
-    ds->linesize = w * vs->depth;
     if (vs->csock != -1 && vs->has_resize && size_changed) {
         vs->width = ds->width;
         vs->height = ds->height;
@@ -2494,6 +2494,7 @@ void vnc_display_init(DisplayState *ds)
 
     vs->ds->width = 640;
     vs->ds->height = 400;
+    vs->ds->linesize = 640 * 4;
     vnc_dpy_colourdepth(vs->ds, 24);
 }
 

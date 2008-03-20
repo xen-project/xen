@@ -17,25 +17,27 @@
  * Copyright (C) Allen Kay <allen.m.kay@intel.com>
  */
 
-#include <xen/init.h>
-#include <xen/bitmap.h>
-#include <xen/irq.h>
-#include <xen/spinlock.h>
 #include <xen/sched.h>
 #include <xen/delay.h>
-#include <asm/iommu.h>
+#include <xen/iommu.h>
+#include "iommu.h"
 #include "dmar.h"
 #include "../pci-direct.h"
 #include "../pci_regs.h"
 #include "msi.h"
 
-#include <xen/mm.h>
-#include <xen/xmalloc.h>
-#include <xen/inttypes.h>
-
 #define INTEL   0x8086
 #define SEABURG 0x4000
 #define C_STEP  2
+
+int is_usb_device(struct pci_dev *pdev)
+{
+    u8 bus = pdev->bus;
+    u8 dev = PCI_SLOT(pdev->devfn);
+    u8 func = PCI_FUNC(pdev->devfn);
+    u16 class = read_pci_config_16(bus, dev, func, PCI_CLASS_DEVICE);
+    return (class == 0xc03);
+}
 
 int vtd_hw_check(void)
 {

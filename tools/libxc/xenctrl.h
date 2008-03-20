@@ -6,7 +6,7 @@
  * Copyright (c) 2003-2004, K A Fraser.
  *
  * xc_gnttab functions:
- * Copyright (c) 2007, D G Murray <Derek.Murray@cl.cam.ac.uk>
+ * Copyright (c) 2007-2008, D G Murray <Derek.Murray@cl.cam.ac.uk>
  */
 
 #ifndef XENCTRL_H
@@ -831,6 +831,20 @@ void *xc_gnttab_map_grant_refs(int xcg_handle,
 int xc_gnttab_munmap(int xcg_handle,
                      void *start_address,
                      uint32_t count);
+
+/*
+ * Sets the maximum number of grants that may be mapped by the given instance
+ * to @count.
+ *
+ * N.B. This function must be called after opening the handle, and before any
+ *      other functions are invoked on it.
+ *
+ * N.B. When variable-length grants are mapped, fragmentation may be observed,
+ *      and it may not be possible to satisfy requests up to the maximum number
+ *      of grants.
+ */
+int xc_gnttab_set_max_grants(int xcg_handle,
+			     uint32_t count);
 
 int xc_hvm_set_pci_intx_level(
     int xc_handle, domid_t dom,

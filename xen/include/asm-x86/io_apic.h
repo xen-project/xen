@@ -6,7 +6,7 @@
 #include <asm/mpspec.h>
 #include <asm/apicdef.h>
 #include <asm/fixmap.h>
-#include <asm/iommu.h>
+#include <xen/iommu.h>
 
 /*
  * Intel IO-APIC support for SMP and UP systems.

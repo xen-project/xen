@@ -102,4 +102,18 @@ struct ioctl_gntdev_get_offset_for_vaddr {
 	uint32_t pad;
 };
 
+/*
+ * Sets the maximum number of grants that may mapped at once by this gntdev
+ * instance.
+ *
+ * N.B. This must be called before any other ioctl is performed on the device.
+ */
+#define IOCTL_GNTDEV_SET_MAX_GRANTS \
+_IOC(_IOC_NONE, 'G', 3, sizeof(struct ioctl_gntdev_set_max_grants))
+struct ioctl_gntdev_set_max_grants {
+	/* IN parameter */
+	/* The maximum number of grants that may be mapped at once. */
+	uint32_t count;
+};
+
 #endif /* __LINUX_PUBLIC_GNTDEV_H__ */

@@ -171,8 +171,25 @@ int open(const char *pathname, int flags, ...)
         printk("open(%s) -> %d\n", pathname, fd);
         return fd;
     }
-    printk("open(%s)", pathname);
-    fs_fd = fs_open(fs_import, (void *) pathname);
+    printk("open(%s, %x)", pathname, flags);
+    switch (flags & ~O_ACCMODE) {
+        case 0:
+            fs_fd = fs_open(fs_import, (void *) pathname);
+            break;
+        case O_CREAT|O_TRUNC:
+        {
+            va_list ap;
+            mode_t mode;
+            va_start(ap, flags);
+            mode = va_arg(ap, mode_t);
+            va_end(ap);
+            fs_fd = fs_create(fs_import, (void *) pathname, 0, mode);
+            break;
+        }
+        default:
+            printk(" unsupported flags\n");
+            do_exit();
+    }
     if (fs_fd < 0) {
 	errno = EIO;
 	return -1;
@@ -819,9 +836,19 @@ int select(int nfds, fd_set *readfds, fd_set *writefds, fd_set *exceptfds,
     add_waiter(w4, xenbus_watch_queue);
     add_waiter(w5, kbdfront_queue);
 
-    myread = *readfds;
-    mywrite = *writefds;
-    myexcept = *exceptfds;
+    if (readfds)
+        myread = *readfds;
+    else
+        FD_ZERO(&myread);
+    if (writefds)
+        mywrite = *writefds;
+    else
+        FD_ZERO(&mywrite);
+    if (exceptfds)
+        myexcept = *exceptfds;
+    else
+        FD_ZERO(&myexcept);
+
     DEBUG("polling ");
     dump_set(nfds, &myread, &mywrite, &myexcept, timeout);
     DEBUG("\n");
@@ -860,9 +887,19 @@ int select(int nfds, fd_set *readfds, fd_set *writefds, fd_set *exceptfds,
 	thread->wakeup_time = stop;
     schedule();
 
-    myread = *readfds;
-    mywrite = *writefds;
-    myexcept = *exceptfds;
+    if (readfds)
+        myread = *readfds;
+    else
+        FD_ZERO(&myread);
+    if (writefds)
+        mywrite = *writefds;
+    else
+        FD_ZERO(&mywrite);
+    if (exceptfds)
+        myexcept = *exceptfds;
+    else
+        FD_ZERO(&myexcept);
+
     n = select_poll(nfds, &myread, &mywrite, &myexcept);
 
     if (n) {

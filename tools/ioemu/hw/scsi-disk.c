@@ -34,9 +34,10 @@ do { fprintf(stderr, "scsi-disk: " fmt , ##args); } while (0)
 #define SENSE_ILLEGAL_REQUEST 5
 
 #ifdef CONFIG_STUBDOM
-#define SCSI_DMA_BUF_SIZE    32768
+#include <xen/io/blkif.h>
+#define SCSI_DMA_BUF_SIZE    (BLKIF_MAX_SEGMENTS_PER_REQUEST * TARGET_PAGE_SIZE)
 #else
-#define SCSI_DMA_BUF_SIZE    65536
+#define SCSI_DMA_BUF_SIZE    131072
 #endif
 
 typedef struct SCSIRequest {

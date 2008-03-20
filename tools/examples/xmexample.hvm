@@ -135,6 +135,11 @@ device_model = '/usr/' + arch_libdir + '/xen/bin/qemu-dm'
 sdl=0
 
 #----------------------------------------------------------------------------
+# enable OpenGL for texture rendering inside the SDL window, default = 1
+# valid only if sdl is enabled.
+opengl=1
+
+#----------------------------------------------------------------------------
 # enable VNC library for graphics, default = 1
 vnc=1
 

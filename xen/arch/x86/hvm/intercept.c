@@ -30,7 +30,7 @@
 #include <asm/current.h>
 #include <io_ports.h>
 #include <xen/event.h>
-#include <asm/iommu.h>
+#include <xen/iommu.h>
 
 extern struct hvm_mmio_handler hpet_mmio_handler;
 extern struct hvm_mmio_handler vlapic_mmio_handler;

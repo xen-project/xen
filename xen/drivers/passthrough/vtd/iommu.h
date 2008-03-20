@@ -105,11 +105,6 @@
 #define ecap_cache_hints(e)      ((e >> 5) & 0x1)
 #define ecap_pass_thru(e)        ((e >> 6) & 0x1)
 
-#define PAGE_SHIFT_4K        (12)
-#define PAGE_SIZE_4K        (1UL << PAGE_SHIFT_4K)
-#define PAGE_MASK_4K        (((u64)-1) << PAGE_SHIFT_4K)
-#define PAGE_ALIGN_4K(addr)    (((addr) + PAGE_SIZE_4K - 1) & PAGE_MASK_4K)
-
 /* IOTLB_REG */
 #define DMA_TLB_FLUSH_GRANU_OFFSET  60
 #define DMA_TLB_GLOBAL_FLUSH (((u64)1) << 60)
@@ -423,7 +418,6 @@ struct poll_info {
 #define VTD_PAGE_TABLE_LEVEL_4  4
 
 #define DEFAULT_DOMAIN_ADDRESS_WIDTH 48
-#define MAX_IOMMUS 32
 #define MAX_IOMMU_REGS 0xc0
 
 extern struct list_head acpi_drhd_units;
@@ -439,8 +433,8 @@ struct qi_ctrl {
 };
 
 struct ir_ctrl {
-    struct iremap_entry *iremap;         /* interrupt remap table */
-    int iremap_index;                    /* interrupt remap index */
+    struct iremap_entry *iremap; /* interrupt remap table */
+    int iremap_index;            /* interrupt remap index */
     spinlock_t iremap_lock;      /* lock for irq remappping table */
 };
 
@@ -454,7 +448,7 @@ struct iommu_flush {
 struct intel_iommu {
     struct qi_ctrl qi_ctrl;
     struct ir_ctrl ir_ctrl;
-    struct iommu_flush flush; 
+    struct iommu_flush flush;
 };
 
 #endif

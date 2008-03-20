@@ -51,6 +51,7 @@ typedef struct BDRVVbdState {
     int fd;
     int type;
     int mode;
+    int info;
     uint64_t sectors;
     unsigned sector_size;
     QEMU_LIST_ENTRY(BDRVVbdState) list;
@@ -80,7 +81,7 @@ static int vbd_open(BlockDriverState *bs, const char *filename, int flags)
     //handy to test posix access
     //return -EIO;
 
-    s->dev = init_blkfront((char *) filename, &s->sectors, &s->sector_size, &s->mode);
+    s->dev = init_blkfront((char *) filename, &s->sectors, &s->sector_size, &s->mode, &s->info);
 
     if (!s->dev)
 	return -EIO;
@@ -271,6 +272,7 @@ static void vbd_close(BlockDriverState *bs)
     BDRVVbdState *s = bs->opaque;
     bs->total_sectors = 0;
     if (s->fd >= 0) {
+        qemu_set_fd_handler(s->fd, NULL, NULL, NULL);
         close(s->fd);
         s->fd = -1;
     }

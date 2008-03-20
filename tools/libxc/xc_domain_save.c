@@ -125,36 +125,6 @@ static inline int count_bits ( int nr, volatile void *addr)
     return count;
 }
 
-static inline int permute( int i, int nr, int order_nr  )
-{
-    /* Need a simple permutation function so that we scan pages in a
-       pseudo random order, enabling us to get a better estimate of
-       the domain's page dirtying rate as we go (there are often
-       contiguous ranges of pfns that have similar behaviour, and we
-       want to mix them up. */
-
-    /* e.g. nr->oder 15->4 16->4 17->5 */
-    /* 512MB domain, 128k pages, order 17 */
-
-    /*
-      QPONMLKJIHGFEDCBA
-             QPONMLKJIH
-      GFEDCBA
-     */
-
-    /*
-      QPONMLKJIHGFEDCBA
-                  EDCBA
-             QPONM
-      LKJIHGF
-      */
-
-    do { i = ((i>>(order_nr-10)) | ( i<<10 ) ) & ((1<<order_nr)-1); }
-    while ( i >= nr ); /* this won't ever loop if nr is a power of 2 */
-
-    return i;
-}
-
 static uint64_t tv_to_us(struct timeval *new)
 {
     return (new->tv_sec * 1000000) + new->tv_usec;
@@ -859,9 +829,6 @@ int xc_domain_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
     /* base of the region in which domain memory is mapped */
     unsigned char *region_base = NULL;
 
-    /* power of 2 order of p2m_size */
-    int order_nr;
-
     /* bitmap of pages:
        - that should be sent this iteration (unless later marked as skip);
        - to skip this iteration because already dirty;
@@ -970,11 +937,6 @@ int xc_domain_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
 
     /* pretend we sent all the pages last iteration */
     sent_last_iter = p2m_size;
-
-    /* calculate the power of 2 order of p2m_size, e.g.
-       15->4 16->4 17->5 */
-    for ( i = p2m_size-1, order_nr = 0; i ; i >>= 1, order_nr++ )
-        continue;
 
     /* Setup to_send / to_fix and to_skip bitmaps */
     to_send = malloc(BITMAP_SIZE);
@@ -1126,7 +1088,7 @@ int xc_domain_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
                    (batch < MAX_BATCH_SIZE) && (N < p2m_size);
                    N++ )
             {
-                int n = permute(N, p2m_size, order_nr);
+                int n = N;
 
                 if ( debug )
                 {
