@@ -281,9 +281,9 @@ void default_ioport_writel(void *opaque, uint32_t address, uint32_t data)
 
 void init_ioports(void)
 {
-    ioport_opaque = malloc(MAX_IOPORTS * sizeof(*ioport_opaque));
-    ioport_read_table = malloc(3 * MAX_IOPORTS * sizeof(**ioport_read_table));
-    ioport_write_table = malloc(3 * MAX_IOPORTS * sizeof(**ioport_write_table));
+    ioport_opaque = calloc(MAX_IOPORTS, sizeof(*ioport_opaque));
+    ioport_read_table = calloc(3 * MAX_IOPORTS, sizeof(**ioport_read_table));
+    ioport_write_table = calloc(3 * MAX_IOPORTS, sizeof(**ioport_write_table));
 }
 
 /* size is the word size in byte */
