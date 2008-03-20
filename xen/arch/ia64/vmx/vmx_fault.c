@@ -339,7 +339,6 @@ vmx_hpw_miss(u64 vadr, u64 vec, REGS* regs)
 {
     IA64_PSR vpsr;
     int type;
-    unsigned int mmu_mode;
     u64 vhpt_adr, gppa, pteval, rr, itir;
     ISR misr;
     PTA vpta;
@@ -356,33 +355,44 @@ vmx_hpw_miss(u64 vadr, u64 vec, REGS* regs)
     else
         panic_domain(regs, "wrong vec:%lx\n", vec);
 
-    /* Physical mode and region is 0 or 4.  */
-    mmu_mode = VMX_MMU_MODE(v);
-    if ((mmu_mode == VMX_MMU_PHY_DT
-         || (mmu_mode == VMX_MMU_PHY_D && type == DSIDE_TLB))
-        && (REGION_NUMBER(vadr) & 3) == 0) {
-        if (type == DSIDE_TLB) {
-            u64 pte;
-            /* DTLB miss.  */
-            if (misr.sp) /* Refer to SDM Vol2 Table 4-11,4-12 */
-                return vmx_handle_lds(regs);
-            if (unlikely(unimpl_phys_addr(vadr))) {
-                unimpl_daddr(v);
-                return IA64_FAULT;
-            }
-            pte = lookup_domain_mpa(v->domain, pa_clear_uc(vadr), NULL);
-            if (v->domain != dom0 && (pte & GPFN_IO_MASK)) {
-                emulate_io_inst(v, pa_clear_uc(vadr), 4, pte);
-                return IA64_FAULT;
-            }
-        } else {
+    /* Physical mode. */
+    if (type == ISIDE_TLB) {
+        if (!vpsr.it) {
             if (unlikely(unimpl_phys_addr(vadr))) {
                 unimpl_iaddr_trap(v, vadr);
                 return IA64_FAULT;
             }
+            physical_tlb_miss(v, vadr, type);
+            return IA64_FAULT;
         }
-        physical_tlb_miss(v, vadr, type);
-        return IA64_FAULT;
+    } else { /* DTLB miss. */
+        if (!misr.rs) {
+            if (!vpsr.dt) {
+                u64 pte;
+                if (misr.sp) /* Refer to SDM Vol2 Table 4-11,4-12 */
+                    return vmx_handle_lds(regs);
+                if (unlikely(unimpl_phys_addr(vadr))) {
+                    unimpl_daddr(v);
+                    return IA64_FAULT;
+                }
+                pte = lookup_domain_mpa(v->domain, pa_clear_uc(vadr), NULL);
+                if (v->domain != dom0 && (pte & GPFN_IO_MASK)) {
+                    emulate_io_inst(v, pa_clear_uc(vadr), 4, pte);
+                    return IA64_FAULT;
+                }
+                physical_tlb_miss(v, vadr, type);
+                return IA64_FAULT;
+            }
+        } else { /* RSE fault. */
+            if (!vpsr.rt) {
+                if (unlikely(unimpl_phys_addr(vadr))) {
+                    unimpl_daddr(v);
+                    return IA64_FAULT;
+                }
+                physical_tlb_miss(v, vadr, type);
+                return IA64_FAULT;
+            }
+        }
     }
     
 try_again:
@@ -498,7 +508,7 @@ try_again:
         /* Don't bother with PHY_D mode (will require rr0+rr4 switches,
            and certainly used only within nested TLB handler (hence TR mapped
            and ic=0).  */
-        if (mmu_mode == VMX_MMU_PHY_D)
+        if (!vpsr.dt)
             goto inject_itlb_fault;
 
         if (!vhpt_enabled(v, vadr, INST_REF)) {
