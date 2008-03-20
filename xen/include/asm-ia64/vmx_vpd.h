@@ -40,6 +40,8 @@
 #include <public/xen.h>
 #include <xen/spinlock.h>
 
+struct sioemu_callback_info;
+
 #define VPD_SHIFT	16
 #define VPD_SIZE	(1 << VPD_SHIFT)
 
@@ -74,9 +76,9 @@ struct arch_vmx_struct {
     unsigned long  ivt_current;
     struct ivt_debug ivt_debug[IVT_DEBUG_MAX];
 #endif
-    unsigned long stub_saved[16];
-    unsigned long stub_buffer;
-    unsigned int  stub_nats;
+    /* sioemu info buffer.  */
+    unsigned long sioemu_info_gpa;
+    struct sioemu_callback_info *sioemu_info_mva;
 };
 
 #define VMX_DOMAIN(v)   v->arch.arch_vmx.flags

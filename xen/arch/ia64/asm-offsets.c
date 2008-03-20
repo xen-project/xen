@@ -150,6 +150,8 @@ void foo(void)
 	DEFINE(IA64_VCPU_OPCODE_OFFSET, offsetof (struct vcpu, arch.arch_vmx.opcode));
 	DEFINE(SWITCH_MPTA_OFFSET,offsetof(struct vcpu ,arch.arch_vmx.mpta));
 	DEFINE(IA64_PT_REGS_R16_SLOT, (((offsetof(struct pt_regs, r16)-sizeof(struct pt_regs))>>3)&0x3f));
+	DEFINE(IA64_PT_REGS_R2_SLOT, (((offsetof(struct pt_regs, r16)-sizeof(struct pt_regs))>>3)&0x3f));
+	DEFINE(IA64_PT_REGS_R8_SLOT, (((offsetof(struct pt_regs, r16)-sizeof(struct pt_regs))>>3)&0x3f));
 	DEFINE(IA64_VCPU_FLAGS_OFFSET,offsetof(struct vcpu ,arch.arch_vmx.flags));
 	DEFINE(IA64_VCPU_MMU_MODE_OFFSET,offsetof(struct vcpu, arch.arch_vmx.mmu_mode));
 

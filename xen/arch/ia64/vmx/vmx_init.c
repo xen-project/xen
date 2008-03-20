@@ -540,6 +540,10 @@ vmx_relinquish_vcpu_resources(struct vcpu *v)
 
 	kill_timer(&vtm->vtm_timer);
 
+	if (v->arch.arch_vmx.sioemu_info_mva)
+		put_page(virt_to_page((unsigned long)
+		                      v->arch.arch_vmx.sioemu_info_mva));
+
 	free_domain_tlb(v);
 	free_vpd(v);
 }

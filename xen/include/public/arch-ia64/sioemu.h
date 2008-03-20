@@ -38,10 +38,6 @@
 /* Get wallclock time.  */
 #define SIOEMU_HYPERCALL_GET_TIME 0x04
 
-/* Get/Set shadow registers.  */
-#define SIOEMU_HYPERCALL_GET_REGS 0x05
-#define SIOEMU_HYPERCALL_SET_REGS 0x06
-
 /* Flush cache.  */
 #define SIOEMU_HYPERCALL_FLUSH_CACHE 0x07
 
@@ -68,11 +64,26 @@
 /* A SAL hypercall is executed.  */
 #define SIOEMU_CB_SAL_ASSIST  0x03
 
+#ifndef __ASSEMBLY__
+struct sioemu_callback_info {
+    /* Saved registers.  */
+    unsigned long ip;
+    unsigned long psr;
+    unsigned long ifs;
+    unsigned long nats;
+    unsigned long r8;
+    unsigned long r9;
+    unsigned long r10;
+    unsigned long r11;
 
-/* SIOEMU firmware mode hypercalls.  */
-
-/* Return from callback.  r16=0.
-   Unmask vcpu events.  */
-#define SIOEMU_HYPERPRIVOP_CALLBACK_RETURN 0x01
-
+    /* Callback parameters.  */
+    unsigned long cause;
+    unsigned long arg0;
+    unsigned long arg1;
+    unsigned long arg2;
+    unsigned long arg3;
+    unsigned long _pad2[2];
+    unsigned long r2;
+};
+#endif /* __ASSEMBLY__ */
 #endif /* __XEN_PUBLIC_IA64_SIOEMU_H__ */
