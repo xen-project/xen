@@ -370,16 +370,20 @@ static void vnc_dpy_resize(DisplayState *ds, int w, int h, int linesize)
     int o;
 
     if (!ds->shared_buf) {
+        ds->linesize = w * vs->depth;
         if (allocated)
-            ds->data = realloc(ds->data,  h * linesize);
+            ds->data = realloc(ds->data,  h * ds->linesize);
         else
-            ds->data = malloc(h * linesize);
+            ds->data = malloc(h * ds->linesize);
         allocated = 1;
-    } else if (allocated) {
-        free(ds->data);
-        allocated = 0;
+    } else {
+        ds->linesize = linesize;
+        if (allocated) {
+            free(ds->data);
+            allocated = 0;
+        }
     }
-    vs->old_data = realloc(vs->old_data, h * linesize);
+    vs->old_data = realloc(vs->old_data, h * ds->linesize);
     vs->dirty_row = realloc(vs->dirty_row, h * sizeof(vs->dirty_row[0]));
     vs->update_row = realloc(vs->update_row, h * sizeof(vs->dirty_row[0]));
 
@@ -396,7 +400,6 @@ static void vnc_dpy_resize(DisplayState *ds, int w, int h, int linesize)
     size_changed = ds->width != w || ds->height != h;
     ds->width = w;
     ds->height = h;
-    ds->linesize = linesize;
     if (vs->csock != -1 && vs->has_resize && size_changed) {
         vs->width = ds->width;
         vs->height = ds->height;
