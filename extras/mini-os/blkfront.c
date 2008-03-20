@@ -70,7 +70,7 @@ void blkfront_handler(evtchn_port_t port, struct pt_regs *regs, void *data)
     wake_up(&blkfront_queue);
 }
 
-struct blkfront_dev *init_blkfront(char *nodename, uint64_t *sectors, unsigned *sector_size, int *mode)
+struct blkfront_dev *init_blkfront(char *nodename, uint64_t *sectors, unsigned *sector_size, int *mode, int *info)
 {
     xenbus_transaction_t xbt;
     char* err;
@@ -175,6 +175,9 @@ done:
         xenbus_wait_for_value(path,"4");
 
         xenbus_unwatch_path(XBT_NIL, path);
+
+        snprintf(path, sizeof(path), "%s/info", dev->backend);
+        *info = xenbus_read_integer(path);
 
         snprintf(path, sizeof(path), "%s/sectors", dev->backend);
         // FIXME: read_integer returns an int, so disk size limited to 1TB for now

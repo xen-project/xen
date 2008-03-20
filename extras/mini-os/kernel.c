@@ -207,9 +207,18 @@ static void blk_write_sector(uint64_t sector)
 static void blkfront_thread(void *p)
 {
     time_t lasttime = 0;
-    blk_dev = init_blkfront(NULL, &blk_sectors, &blk_sector_size, &blk_mode);
+    int blk_info;
+
+    blk_dev = init_blkfront(NULL, &blk_sectors, &blk_sector_size, &blk_mode, &blk_info);
     if (!blk_dev)
         return;
+
+    if (blk_info & VDISK_CDROM)
+        printk("Block device is a CDROM\n");
+    if (blk_info & VDISK_REMOVABLE)
+        printk("Block device is removable\n");
+    if (blk_info & VDISK_READONLY)
+        printk("Block device is read-only\n");
 
 #ifdef BLKTEST_WRITE
     if (blk_mode == O_RDWR) {
