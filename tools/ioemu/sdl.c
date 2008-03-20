@@ -664,10 +664,12 @@ static void sdl_refresh(DisplayState *ds)
 #ifdef CONFIG_OPENGL
         case SDL_VIDEORESIZE:
         {
-            SDL_ResizeEvent *rev = &ev->resize;
-            screen = SDL_SetVideoMode(rev->w, rev->h, 0, SDL_OPENGL|SDL_RESIZABLE);
-            opengl_setdata(ds, ds->data);
-            opengl_update(ds, 0, 0, ds->width, ds->height);
+            if (ds->shared_buf && opengl_enabled) {
+                SDL_ResizeEvent *rev = &ev->resize;
+                screen = SDL_SetVideoMode(rev->w, rev->h, 0, SDL_OPENGL|SDL_RESIZABLE);
+                opengl_setdata(ds, ds->data);
+                opengl_update(ds, 0, 0, ds->width, ds->height);
+            }
             break;
         }
 #endif
