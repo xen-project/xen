@@ -1943,10 +1943,10 @@ static void __init calc_dom0_size(void)
 	 * for DMA and PCI mapping from the available domheap pages. The
 	 * chunk for DMA, PCI, etc., is a guestimate, as xen doesn't seem
 	 * to have a good idea of what those requirements might be ahead
-	 * of time, calculated at 1MB per 4GB of system memory */
+	 * of time, calculated at 128MB + 1MB per 4GB of system memory */
 	domheap_pages = avail_domheap_pages();
 	p2m_pages = domheap_pages / PTRS_PER_PTE;
-	spare_hv_pages = domheap_pages / 4096;
+	spare_hv_pages = 8192 + (domheap_pages / 4096);
 	max_dom0_size = (domheap_pages - (p2m_pages + spare_hv_pages))
 			 * PAGE_SIZE;
 	printk("Maximum permitted dom0 size: %luMB\n",
