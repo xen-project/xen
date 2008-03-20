@@ -991,7 +991,7 @@ class XendConfig(dict):
                                     dev_type, dev_cfg = self['devices'][dev_uuid]
                                     is_bootable = dev_cfg.get('bootable', 0)
                                     config.append(['bootable', int(is_bootable)])
-                                    config.append(['VDI'], dev_cfg.get('VDI', ''))
+                                    config.append(['VDI', dev_cfg.get('VDI', '')])
 
                                 sxpr.append(['device', config])
 
