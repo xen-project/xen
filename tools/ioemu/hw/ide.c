@@ -1823,7 +1823,6 @@ static void ide_ioport_write(void *opaque, uint32_t addr, uint32_t val)
             break;
         case WIN_SETMULT:
             if (s->nsector > MAX_MULT_SECTORS || 
-                s->nsector == 0 ||
                 (s->nsector & (s->nsector - 1)) != 0) {
                 ide_abort_command(s);
             } else {
