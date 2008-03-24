@@ -454,63 +454,41 @@ IA64FAULT vcpu_set_psr_l(VCPU * vcpu, u64 val)
 
 	newpsr = *(struct ia64_psr *)&val;
 	ipsr = (struct ia64_psr *)&regs->cr_ipsr;
-	// just handle psr.up and psr.pp for now
-	//if (val & ~(IA64_PSR_PP | IA64_PSR_UP | IA64_PSR_SP))
-	//	return IA64_ILLOP_FAULT;
-	// however trying to set other bits can't be an error as it is in ssm
-	if (newpsr.dfh) {
-		ipsr->dfh = 1;
-		PSCB(vcpu, vpsr_dfh) = 1;
-	} else {
-		ipsr->dfh = PSCB(vcpu, hpsr_dfh);
-		PSCB(vcpu, vpsr_dfh) = 0;
-	}       
-	if (newpsr.dfl)
-		ipsr->dfl = 1;
-	if (newpsr.pp) {
-		// xenoprof:
-		// Don't change ipsr->pp 
-		// It is manipulated by xenoprof
-		// ipsr->pp = 1;
-		PSCB(vcpu, vpsr_pp) = 1;
-	} else {
-		// xenoprof:
-		// Don't change ipsr->pp 
-		// It is manipulated by xenoprof
-		// ipsr->pp = 1;
-		PSCB(vcpu, vpsr_pp) = 0;
-	}
-	if (newpsr.up)
-		ipsr->up = 1;
-	if (newpsr.sp)
-		ipsr->sp = 1;
-	if (newpsr.i) {
-		if (vcpu->vcpu_info->evtchn_upcall_mask)
-			enabling_interrupts = 1;
-		vcpu->vcpu_info->evtchn_upcall_mask = 0;
-	}
-	if (newpsr.ic)
-		PSCB(vcpu, interrupt_collection_enabled) = 1;
-	if (newpsr.mfl)
-		ipsr->mfl = 1;
-	if (newpsr.mfh)
-		ipsr->mfh = 1;
-	if (newpsr.ac)
-		ipsr->ac = 1;
-	if (newpsr.dt && newpsr.rt)
-		vcpu_set_metaphysical_mode(vcpu, FALSE);
-	else
-		vcpu_set_metaphysical_mode(vcpu, TRUE);
-	if (newpsr.be)
-		ipsr->be = 1;
+
+	ipsr->be = newpsr.be;
+	ipsr->up = newpsr.up;
+	ipsr->ac = newpsr.ac;
+	ipsr->mfl = newpsr.mfl;
+	ipsr->mfh = newpsr.mfh;
+
+	PSCB(vcpu, interrupt_collection_enabled) = newpsr.ic;
+
+	if (newpsr.i && vcpu->vcpu_info->evtchn_upcall_mask)
+		enabling_interrupts = 1;
+
+	vcpu->vcpu_info->evtchn_upcall_mask = !(newpsr.i);
+
 	if (newpsr.pk) {
 		vcpu_pkr_set_psr_handling(vcpu);
 		ipsr->pk = 1;
 	} else
 		vcpu_pkr_use_unset(vcpu);
+
+	vcpu_set_metaphysical_mode(vcpu, !(newpsr.dt && newpsr.rt));
+
+	ipsr->dfl = newpsr.dfl;
+	PSCB(vcpu, vpsr_dfh) = newpsr.dfh;
+	ipsr->dfh = newpsr.dfh ? 1 : PSCB(vcpu, hpsr_dfh);
+
+	ipsr->sp = newpsr.sp;
+
+	/* xenoprof: Don't change ipsr->pp, it is manipulated by xenoprof */
+	PSCB(vcpu, vpsr_pp) = newpsr.pp;
+
 	if (enabling_interrupts &&
 	    vcpu_check_pending_interrupts(vcpu) != SPURIOUS_VECTOR)
 		PSCB(vcpu, pending_interruption) = 1;
+
 	return IA64_NO_FAULT;
 }
 
