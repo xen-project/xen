@@ -459,7 +459,7 @@ class XendDomainInfo:
                 self.destroy()
                 raise
         else:
-            raise XendError('VM is not susupened; it is %s'
+            raise XendError('VM is not suspended; it is %s'
                             % XEN_API_VM_POWER_STATE[state])
 
     def shutdown(self, reason):
