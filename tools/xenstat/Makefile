@@ -13,7 +13,4 @@ endif
 
 .PHONY: all install clean
 
-all install clean:
-	@set -e; for subdir in $(SUBDIRS); do \
-		$(MAKE) -C $$subdir $@; \
-	done
+all install clean: %: subdirs-%
