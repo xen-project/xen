@@ -40,9 +40,9 @@ SRCS = hvmloader.c mp_tables.c util.c smbios.c 32bitbios_support.c
 OBJS = $(patsubst %.c,%.o,$(SRCS))
 
 .PHONY: all
-all: subdirs-all hvmloader
+all: hvmloader
 
-hvmloader: roms.h acpi/acpi.a $(SRCS)
+hvmloader: roms.h subdirs-all $(SRCS)
 	$(CC) $(CFLAGS) -c $(SRCS)
 	$(LD) $(LDFLAGS_DIRECT) -N -Ttext $(LOADADDR) -o hvmloader.tmp $(OBJS) acpi/acpi.a
 	$(OBJCOPY) hvmloader.tmp hvmloader
