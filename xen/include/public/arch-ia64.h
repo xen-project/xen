@@ -64,6 +64,8 @@ typedef unsigned long xen_pfn_t;
 
 #ifndef __ASSEMBLY__
 
+#define __anonymous_union __extension__ union
+
 typedef unsigned long xen_ulong_t;
 
 #ifdef __XEN_TOOLS__
@@ -165,11 +167,11 @@ struct mapped_regs {
     unsigned long  reserved1[29];
     unsigned long  vhpi;
     unsigned long  reserved2[95];
-    union {
+    __anonymous_union {
         unsigned long  vgr[16];
         unsigned long bank1_regs[16]; // bank1 regs (r16-r31) when bank0 active
     };
-    union {
+    __anonymous_union {
         unsigned long  vbgr[16];
         unsigned long bank0_regs[16]; // bank0 regs (r16-r31) when bank1 active
     };
@@ -180,7 +182,7 @@ struct mapped_regs {
     unsigned long  vpsr;
     unsigned long  vpr;
     unsigned long  reserved4[76];
-    union {
+    __anonymous_union {
         unsigned long  vcr[128];
         struct {
             unsigned long dcr;  // CR0
@@ -214,7 +216,7 @@ struct mapped_regs {
             unsigned long rsv6[46];
         };
     };
-    union {
+    __anonymous_union {
         unsigned long  reserved5[128];
         struct {
             unsigned long precover_ifs;
@@ -608,7 +610,7 @@ struct xen_ia64_boot_param {
 struct xen_ia64_opt_feature {
 	unsigned long cmd;		/* Which feature */
 	unsigned char on;		/* Switch feature on/off */
-	union {
+	__anonymous_union {
 		struct {
 				/* The page protection bit mask of the pte.
 			 	 * This will be or'ed with the pte. */
