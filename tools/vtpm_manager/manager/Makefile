@@ -21,11 +21,12 @@ install: build
 
 .PHONY: clean
 clean:
+	rm -f $(BIN)
 	rm -f *.a *.so *.o *.rpm $(DEP_FILES)
 
 .PHONY: mrproper
 mrproper: clean
-	rm -f $(BIN) *~
+	rm -f *~
 
 $(BIN): $(OBJS)
 	$(CC) $(CFLAGS) $(LDFLAGS) $^ $(LIBS) -o $@
