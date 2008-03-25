@@ -37,34 +37,16 @@ export CROSS_SYS_ROOT
 endif
 
 .PHONY: all
-all:
-	@set -e; for subdir in $(SUBDIRS-y); do \
-		$(MAKE) subdir-$@-$$subdir; \
-	done
+all: subdirs-all
 
 .PHONY: install
-install:
-	@set -e; for subdir in $(SUBDIRS-y); do \
-		$(MAKE) subdir-$@-$$subdir; \
-	done
+install: subdirs-install
 	$(INSTALL_DIR) $(DESTDIR)/var/xen/dump
 	$(INSTALL_DIR) $(DESTDIR)/var/log/xen
 	$(INSTALL_DIR) $(DESTDIR)/var/lib/xen
 
 .PHONY: clean distclean
-clean distclean:
-	@set -e; for subdir in $(SUBDIRS-y); do \
-		$(MAKE) subdir-clean-$$subdir; \
-	done
-
-subdir-all-%:
-	$(MAKE) -C $* all
-
-subdir-clean-%:
-	$(MAKE) -C $* clean
-
-subdir-install-%:
-	$(MAKE) -C $* install
+clean distclean: subdirs-clean
 
 ifneq ($(XEN_COMPILE_ARCH),$(XEN_TARGET_ARCH))
 IOEMU_CONFIGURE_CROSS ?= --cross-prefix=$(CROSS_COMPILE) \
