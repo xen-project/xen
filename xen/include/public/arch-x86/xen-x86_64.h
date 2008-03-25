@@ -142,7 +142,7 @@ struct iret_context {
 
 #ifdef __GNUC__
 /* Anonymous union includes both 32- and 64-bit names (e.g., eax/rax). */
-#define __DECL_REG(name) union { \
+#define __DECL_REG(name) __extension__ union { \
     uint64_t r ## name, e ## name; \
     uint32_t _e ## name; \
 }

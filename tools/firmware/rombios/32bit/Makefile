@@ -16,22 +16,14 @@ SUBDIRS = tcgbios
 
 MODULES = tcgbios/tcgbiosext.o
 
-.PHONY: all subdirs clean
-
-subdirs:
-	@set -e; for subdir in $(SUBDIRS); do \
-		$(MAKE) -C $$subdir all; \
-	done;
-
+.PHONY: all
 all: $(TARGET)
 
-clean:
+.PHONY: clean
+clean: subdirs-clean
 	rm -rf *.o $(TARGET)
-	@for subdir in $(SUBDIRS); do \
-		$(MAKE) -C $$subdir $@; \
-	done;
 
-$(TARGET): subdirs 32bitbios.o util.o
+$(TARGET): subdirs-all 32bitbios.o util.o
 	$(LD) $(LDFLAGS_DIRECT) -s -r 32bitbios.o $(MODULES) util.o -o 32bitbios_all.o
 	@nm 32bitbios_all.o |                                \
 	  egrep '^ +U ' >/dev/null && {                      \

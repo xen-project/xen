@@ -58,6 +58,7 @@
 ^docs/user/user\.html$
 ^docs/xen-api/vm_lifecycle.eps$
 ^docs/xen-api/xenapi-datamodel-graph.eps$
+^docs/xen-api/xenapi.out$
 ^extras/mini-os/h/hypervisor-ifs$
 ^extras/mini-os/h/xen-public$
 ^extras/mini-os/mini-os.*$
@@ -139,6 +140,7 @@
 ^tools/ioemu/\.pc/.*$
 ^tools/ioemu/config-host\.h$
 ^tools/ioemu/config-host\.mak$
+^tools/ioemu/i386-dm/Makefile$
 ^tools/ioemu/i386-dm/config\.h$
 ^tools/ioemu/i386-dm/config\.mak$
 ^tools/ioemu/i386-dm/qemu-dm$

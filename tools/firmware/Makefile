@@ -7,7 +7,7 @@ TARGET      := hvmloader/hvmloader
 INST_DIR := $(DESTDIR)/usr/lib/xen/boot
 
 SUBDIRS :=
-SUBDIRS += rombios rombios/32bit
+SUBDIRS += rombios
 SUBDIRS += vgabios
 SUBDIRS += extboot
 #SUBDIRS += etherboot
@@ -21,9 +21,7 @@ all:
 	echo "(visit http://www.cix.co.uk/~mayday for more information)"; \
 	echo "***********************************************************"; \
 	else \
-	for subdir in $(SUBDIRS); do \
-		$(MAKE) -C $$subdir $@; \
-	done; \
+	$(MAKE) subdirs-$@; \
 	fi
 
 
@@ -33,7 +31,4 @@ install: all
 	[ ! -e $(TARGET) ] || $(INSTALL_DATA) $(TARGET) $(INST_DIR)
 
 .PHONY: clean
-clean: 
-	@set -e; for subdir in $(SUBDIRS); do \
-		$(MAKE) -C $$subdir $@; \
-	done
+clean: subdirs-clean

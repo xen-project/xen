@@ -25,6 +25,9 @@ HOSTCFLAGS += -fno-strict-aliasing
 DISTDIR     ?= $(XEN_ROOT)/dist
 DESTDIR     ?= /
 
+# Allow phony attribute to be listed as dependency rather than fake target
+.PHONY: .phony
+
 include $(XEN_ROOT)/config/$(XEN_OS).mk
 include $(XEN_ROOT)/config/$(XEN_TARGET_ARCH).mk
 

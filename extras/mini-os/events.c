@@ -118,9 +118,7 @@ evtchn_port_t bind_virq(uint32_t virq, evtchn_handler_t handler, void *data)
 }
 
 #if defined(__x86_64__)
-/* Allocate 4 pages for the irqstack */
-#define STACK_PAGES 4
-char irqstack[1024 * 4 * STACK_PAGES];
+char irqstack[2 * STACK_SIZE];
 
 static struct pda
 {
@@ -139,9 +137,9 @@ void init_events(void)
     asm volatile("movl %0,%%fs ; movl %0,%%gs" :: "r" (0));
     wrmsrl(0xc0000101, &cpu0_pda); /* 0xc0000101 is MSR_GS_BASE */
     cpu0_pda.irqcount = -1;
-    cpu0_pda.irqstackptr = irqstack + 1024 * 4 * STACK_PAGES;
+    cpu0_pda.irqstackptr = (void*) (((unsigned long)irqstack + 2 * STACK_SIZE) & ~(STACK_SIZE - 1));
 #endif
-    /* inintialise event handler */
+    /* initialize event handler */
     for ( i = 0; i < NR_EVS; i++ )
 	{
         ev_actions[i].handler = default_handler;

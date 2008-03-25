@@ -206,13 +206,16 @@ netfront_input(struct netif *netif, unsigned char* data, int len)
     /* skip Ethernet header */
     pbuf_header(p, -(s16)sizeof(struct eth_hdr));
     /* pass to network layer */
-    tcpip_input(p, netif);
+    if (tcpip_input(p, netif) == ERR_MEM)
+      /* Could not store it, drop */
+      pbuf_free(p);
     break;
       
   case ETHTYPE_ARP:
     /* pass p to ARP module  */
     etharp_arp_input(netif, (struct eth_addr *) netif->hwaddr, p);
     break;
+
   default:
     pbuf_free(p);
     p = NULL;

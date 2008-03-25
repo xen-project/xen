@@ -41,4 +41,4 @@ xenapi-datamodel-graph.eps: xenapi-datamodel-graph.dot
 
 .PHONY: clean
 clean:
-	rm -f *.pdf *.ps *.dvi *.aux *.log $(EPSDOT)
+	rm -f *.pdf *.ps *.dvi *.aux *.log *.out $(EPSDOT)

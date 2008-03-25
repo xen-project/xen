@@ -49,3 +49,11 @@ $(eval $(check-y))
 %.o: %.cc
 	$(CC) $(CPPFLAGS) $(CXXFLAGS) -c -o $@ $<
 
+subdirs-all subdirs-clean subdirs-install: .phony
+	@set -e; for subdir in $(SUBDIRS) $(SUBDIRS-y); do \
+		$(MAKE) subdir-$(patsubst subdirs-%,%,$@)-$$subdir; \
+	done
+
+subdir-all-% subdir-clean-% subdir-install-%: .phony
+	$(MAKE) -C $* $(patsubst subdir-%-$*,%,$@)
+

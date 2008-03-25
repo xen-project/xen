@@ -1,12 +1,13 @@
+XEN_ROOT = ../../..
+include $(XEN_ROOT)/tools/Rules.mk
+
+SUBDIRS := 32bit
 
 .PHONY: all
-all: bios
-
-.PHONY: bios
-bios: biossums BIOS-bochs-latest
+all: subdirs-all BIOS-bochs-latest
 
 .PHONY: clean
-clean:
+clean: subdirs-clean
 	rm -f  *.o *.a *.s rombios.bin _rombios*_.c
 	rm -f  as86-sym.txt ld86-sym.txt 
 	rm -f  rombios*.txt rombios*.sym usage biossums

@@ -1,6 +1,8 @@
 XEN_ROOT = ../../..
 include $(XEN_ROOT)/tools/vtpm_manager/Rules.mk
 
+VPATH = ../manager
+
 BIND		= vtpm_migratord
 BINC		= vtpm_migrator
 
@@ -23,11 +25,12 @@ install: build
 
 .PHONY: clean
 clean:
+	rm -f $(BINC) $(BIND)
 	rm -f *.a *.so *.o *.rpm $(DEP_FILES)
 
 .PHONY: mrproper
 mrproper: clean
-	rm -f $(BINC) $(BIND) *~
+	rm -f *~
 
 $(BIND): $(OBJSD)
 	$(CC) $(CFLAGS) $(LDFLAGS) $^ $(LIBS) -o $@

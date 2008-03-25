@@ -473,8 +473,8 @@ static int construct_vmcs(struct vcpu *v)
     }
 
     /* I/O access bitmap. */
-    __vmwrite(IO_BITMAP_A, virt_to_maddr(hvm_io_bitmap));
-    __vmwrite(IO_BITMAP_B, virt_to_maddr(hvm_io_bitmap + PAGE_SIZE));
+    __vmwrite(IO_BITMAP_A, virt_to_maddr((char *)hvm_io_bitmap + 0));
+    __vmwrite(IO_BITMAP_B, virt_to_maddr((char *)hvm_io_bitmap + PAGE_SIZE));
 
     /* Host GDTR base. */
     __vmwrite(HOST_GDTR_BASE, GDT_VIRT_START(v));
