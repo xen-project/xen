@@ -23,6 +23,8 @@ XEN_ROOT = ../../..
 CFLAGS :=
 include $(XEN_ROOT)/tools/Rules.mk
 
+SUBDIRS := acpi
+
 # The HVM loader is started in 32-bit mode at the address below:
 LOADADDR = 0x100000
 
@@ -38,17 +40,13 @@ SRCS = hvmloader.c mp_tables.c util.c smbios.c 32bitbios_support.c
 OBJS = $(patsubst %.c,%.o,$(SRCS))
 
 .PHONY: all
-all: hvmloader
+all: subdirs-all hvmloader
 
 hvmloader: roms.h acpi/acpi.a $(SRCS)
 	$(CC) $(CFLAGS) -c $(SRCS)
 	$(LD) $(LDFLAGS_DIRECT) -N -Ttext $(LOADADDR) -o hvmloader.tmp $(OBJS) acpi/acpi.a
 	$(OBJCOPY) hvmloader.tmp hvmloader
 	rm -f hvmloader.tmp
-
-.PHONY: acpi/acpi.a
-acpi/acpi.a:
-	$(MAKE) -C acpi
 
 roms.h: ../rombios/BIOS-bochs-latest ../vgabios/VGABIOS-lgpl-latest.bin ../vgabios/VGABIOS-lgpl-latest.cirrus.bin ../etherboot/eb-roms.h ../extboot/extboot.bin
 	sh ./mkhex rombios ../rombios/BIOS-bochs-latest > roms.h
@@ -58,7 +56,6 @@ roms.h: ../rombios/BIOS-bochs-latest ../vgabios/VGABIOS-lgpl-latest.bin ../vgabi
 	sh ./mkhex extboot ../extboot/extboot.bin >> roms.h
 
 .PHONY: clean
-clean:
+clean: subdirs-clean
 	rm -f roms.h acpi.h
 	rm -f hvmloader hvmloader.tmp *.o
-	$(MAKE) -C acpi clean
