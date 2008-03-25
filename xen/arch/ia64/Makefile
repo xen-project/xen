@@ -70,3 +70,5 @@ clean::
 	rm -f *.o *~ core  xen.lds.s $(BASEDIR)/include/asm-ia64/.offsets.h.stamp asm-offsets.s map.out
 	rm -f asm-xsi-offsets.s $(BASEDIR)/include/asm-ia64/asm-xsi-offsets.h
 	rm -f $(BASEDIR)/System.map
+	rm -f $(BASEDIR)/include/linux
+	rm -f $(BASEDIR)/include/asm-ia64/xen

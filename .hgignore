@@ -148,8 +148,13 @@
 ^tools/ioemu/qemu-tech\.html$
 ^tools/ioemu/qemu\.1$
 ^tools/ioemu/qemu\.pod$
-^tools/libxc/ia64/asm/acpi\.h$
-^tools/libxc/ia64/xen/list\.h$
+^tools/libxc/ia64/asm/.*\.h$
+^tools/libxc/ia64/acpi/.*\.h$
+^tools/libxc/ia64/acpi/platform/.*\.h$
+^tools/libxc/ia64/dom_fw_asm.S$
+^tools/libxc/ia64/dom_fw_common\.c$
+^tools/libxc/ia64/dom_fw_domu\.c$
+^tools/libxc/ia64/xen/.*\.h$
 ^tools/libxen/libxenapi-
 ^tools/libxen/test/test_bindings$
 ^tools/libxen/test/test_event_handling$
@@ -242,8 +247,11 @@
 ^xen/include/asm$
 ^xen/include/asm-.*/asm-offsets\.h$
 ^xen/include/asm-ia64/asm-xsi-offsets\.h$
+^xen/include/asm-ia64/.offsets.h.stamp$
+^xen/include/asm-ia64/xen$
 ^xen/include/compat/.*$
 ^xen/include/hypervisor-ifs/arch$
+^xen/include/linux$
 ^xen/include/public/public$
 ^xen/include/xen/.*\.new$
 ^xen/include/xen/acm_policy\.h$
