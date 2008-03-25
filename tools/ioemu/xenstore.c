@@ -189,6 +189,13 @@ void xenstore_parse_domain_config(int hvm_domid)
             memmove(params, offset+1, strlen(offset+1)+1 );
             fprintf(logfile, "Strip off blktap sub-type prefix to %s\n", params); 
         }
+        /* Prefix with /dev/ if needed */
+        if (!strcmp(drv, "phy") && params[0] != '/') {
+            char *newparams = malloc(5 + strlen(params) + 1);
+            sprintf(newparams, "/dev/%s", params);
+            free(params);
+            params = newparams;
+        }
 
         /* 
          * check if device has a phantom vbd; the phantom is hooked
