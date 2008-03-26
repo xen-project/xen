@@ -6,7 +6,7 @@ import xen.xend
 import os
 
 CONFIG_ENTRIES = ['type', 'vncdisplay', 'vnclisten', 'vncpasswd', 'vncunused',
-                  'display', 'xauthority', 'keymap',
+                  'videoram', 'display', 'xauthority', 'keymap',
                   'uuid', 'location', 'protocol', 'opengl']
 
 class VfbifController(DevController):

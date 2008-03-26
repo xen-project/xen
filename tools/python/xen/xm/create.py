@@ -500,6 +500,11 @@ gopts.var('vncunused', val='',
           use="""Try to find an unused port for the VNC server.
           Only valid when vnc=1.""")
 
+gopts.var('videoram', val='',
+          fn=set_value, default=None,
+          use="""Maximum amount of videoram PV guest can allocate
+          for frame buffer.""")
+
 gopts.var('sdl', val='',
           fn=set_value, default=None,
           use="""Should the device model use SDL?""")
@@ -645,7 +650,8 @@ def configure_vfbs(config_devs, vals):
             d['type'] = 'sdl'
         for (k,v) in d.iteritems():
             if not k in [ 'vnclisten', 'vncunused', 'vncdisplay', 'display',
-                          'xauthority', 'type', 'vncpasswd', 'opengl' ]:
+                          'videoram', 'xauthority', 'type', 'vncpasswd',
+                          'opengl' ]:
                 err("configuration option %s unknown to vfbs" % k)
             config.append([k,v])
         if not d.has_key("keymap"):
