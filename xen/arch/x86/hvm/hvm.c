@@ -81,6 +81,58 @@ void hvm_enable(struct hvm_function_table *fns)
         printk("HVM: Hardware Assisted Paging detected.\n");
 }
 
+/*
+ * Need to re-inject a given event? We avoid re-injecting software exceptions
+ * and interrupts because the faulting/trapping instruction can simply be
+ * re-executed (neither VMX nor SVM update RIP when they VMEXIT during
+ * INT3/INTO/INTn).
+ */
+int hvm_event_needs_reinjection(uint8_t type, uint8_t vector)
+{
+    switch ( type )
+    {
+    case X86_EVENTTYPE_EXT_INTR:
+    case X86_EVENTTYPE_NMI:
+        return 1;
+    case X86_EVENTTYPE_HW_EXCEPTION:
+        /*
+         * SVM uses type 3 ("HW Exception") for #OF and #BP. We explicitly
+         * check for these vectors, as they are really SW Exceptions. SVM has
+         * not updated RIP to point after the trapping instruction (INT3/INTO).
+         */
+        return (vector != 3) && (vector != 4);
+    default:
+        /* Software exceptions/interrupts can be re-executed (e.g., INT n). */
+        break;
+    }
+    return 0;
+}
+
+/*
+ * Combine two hardware exceptions: @vec2 was raised during delivery of @vec1.
+ * This means we can assume that @vec2 is contributory or a page fault.
+ */
+uint8_t hvm_combine_hw_exceptions(uint8_t vec1, uint8_t vec2)
+{
+    /* Exception during double-fault delivery always causes a triple fault. */
+    if ( vec1 == TRAP_double_fault )
+    {
+        hvm_triple_fault();
+        return TRAP_double_fault; /* dummy return */
+    }
+
+    /* Exception during page-fault delivery always causes a double fault. */
+    if ( vec1 == TRAP_page_fault )
+        return TRAP_double_fault;
+
+    /* Discard the first exception if it's benign or if we now have a #PF. */
+    if ( !((1u << vec1) & 0x7c01u) || (vec2 == TRAP_page_fault) )
+        return vec2;
+
+    /* Cannot combine the exceptions: double fault. */
+    return TRAP_double_fault;
+}
+
 void hvm_set_guest_tsc(struct vcpu *v, u64 guest_tsc)
 {
     u64 host_tsc;

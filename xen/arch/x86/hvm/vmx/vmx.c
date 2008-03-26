@@ -983,6 +983,62 @@ static void vmx_flush_guest_tlbs(void)
      * because VMRESUME will flush it for us. */
 }
 
+
+
+static void __vmx_inject_exception(
+    struct vcpu *v, int trap, int type, int error_code)
+{
+    unsigned long intr_fields;
+
+    /*
+     * NB. Callers do not need to worry about clearing STI/MOV-SS blocking:
+     *  "If the VM entry is injecting, there is no blocking by STI or by
+     *   MOV SS following the VM entry, regardless of the contents of the
+     *   interruptibility-state field [in the guest-state area before the
+     *   VM entry]", PRM Vol. 3, 22.6.1 (Interruptibility State).
+     */
+
+    intr_fields = (INTR_INFO_VALID_MASK | (type<<8) | trap);
+    if ( error_code != HVM_DELIVER_NO_ERROR_CODE ) {
+        __vmwrite(VM_ENTRY_EXCEPTION_ERROR_CODE, error_code);
+        intr_fields |= INTR_INFO_DELIVER_CODE_MASK;
+    }
+
+    __vmwrite(VM_ENTRY_INTR_INFO, intr_fields);
+
+    if ( trap == TRAP_page_fault )
+        HVMTRACE_2D(PF_INJECT, v, v->arch.hvm_vcpu.guest_cr[2], error_code);
+    else
+        HVMTRACE_2D(INJ_EXC, v, trap, error_code);
+}
+
+void vmx_inject_hw_exception(struct vcpu *v, int trap, int error_code)
+{
+    unsigned long intr_info = __vmread(VM_ENTRY_INTR_INFO);
+
+    if ( unlikely(intr_info & INTR_INFO_VALID_MASK) &&
+         (((intr_info >> 8) & 7) == X86_EVENTTYPE_HW_EXCEPTION) )
+    {
+        trap = hvm_combine_hw_exceptions((uint8_t)intr_info, trap);
+        if ( trap == TRAP_double_fault )
+            error_code = 0;
+    }
+
+    __vmx_inject_exception(v, trap, X86_EVENTTYPE_HW_EXCEPTION, error_code);
+}
+
+void vmx_inject_extint(struct vcpu *v, int trap)
+{
+    __vmx_inject_exception(v, trap, X86_EVENTTYPE_EXT_INTR,
+                           HVM_DELIVER_NO_ERROR_CODE);
+}
+
+void vmx_inject_nmi(struct vcpu *v)
+{
+    __vmx_inject_exception(v, 2, X86_EVENTTYPE_NMI,
+                           HVM_DELIVER_NO_ERROR_CODE);
+}
+
 static void vmx_inject_exception(
     unsigned int trapnr, int errcode, unsigned long cr2)
 {
