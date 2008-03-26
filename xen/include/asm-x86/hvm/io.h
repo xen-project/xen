@@ -96,11 +96,6 @@ static inline int register_buffered_io_handler(
     return register_io_handler(d, addr, size, action, HVM_BUFFERED_IO);
 }
 
-void send_mmio_req(unsigned char type, paddr_t gpa,
-                   unsigned long count, int size, paddr_t value,
-                   int dir, int df, int value_is_ptr);
-void send_pio_req(unsigned long port, unsigned long count, int size,
-                  paddr_t value, int dir, int df, int value_is_ptr);
 void send_timeoffset_req(unsigned long timeoff);
 void send_invalidate_req(void);
 int handle_mmio(void);
