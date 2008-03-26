@@ -109,7 +109,7 @@ DECLARE_HVM_SAVE_TYPE(VTIME, 5, struct hvm_hw_ia64_vtime);
 union viosapic_rte
 {
     uint64_t bits;
-    struct {
+    __anonymous_struct {
         uint8_t vector;
 
         uint8_t delivery_mode  : 3;
@@ -143,8 +143,8 @@ DECLARE_HVM_SAVE_TYPE(VIOSAPIC, 6, struct hvm_hw_ia64_viosapic);
  * PM timer
  */
 struct vacpi_regs {
-    union {
-        struct {
+    __anonymous_union {
+        __anonymous_struct {
             uint32_t pm1a_sts:16;/* PM1a_EVT_BLK.PM1a_STS: status register */
             uint32_t pm1a_en:16; /* PM1a_EVT_BLK.PM1a_EN: enable register */
         };

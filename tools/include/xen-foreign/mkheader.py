@@ -38,7 +38,7 @@ inttypes["x86_64"] = {
 };
 header["x86_64"] = """
 #ifdef __GNUC__
-# define __DECL_REG(name) __extension__ union { uint64_t r ## name, e ## name; }
+# define __DECL_REG(name) __anonymous_union { uint64_t r ## name, e ## name; }
 # define __align8__ __attribute__((aligned (8)))
 #else
 # define __DECL_REG(name) uint64_t r ## name

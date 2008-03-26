@@ -64,8 +64,6 @@ typedef unsigned long xen_pfn_t;
 
 #ifndef __ASSEMBLY__
 
-#define __anonymous_union __extension__ union
-
 typedef unsigned long xen_ulong_t;
 
 #ifdef __XEN_TOOLS__
@@ -133,7 +131,7 @@ struct pt_fpreg {
 
 union vac {
     unsigned long value;
-    struct {
+    __anonymous_struct {
         int a_int:1;
         int a_from_int_cr:1;
         int a_to_int_cr:1;
@@ -148,7 +146,7 @@ typedef union vac vac_t;
 
 union vdc {
     unsigned long value;
-    struct {
+    __anonymous_struct {
         int d_vmsw:1;
         int d_extint:1;
         int d_ibr_dbr:1;
@@ -184,7 +182,7 @@ struct mapped_regs {
     unsigned long  reserved4[76];
     __anonymous_union {
         unsigned long  vcr[128];
-        struct {
+        __anonymous_struct {
             unsigned long dcr;  // CR0
             unsigned long itm;
             unsigned long iva;
@@ -218,7 +216,7 @@ struct mapped_regs {
     };
     __anonymous_union {
         unsigned long  reserved5[128];
-        struct {
+        __anonymous_struct {
             unsigned long precover_ifs;
             unsigned long unat;  // not sure if this is needed until NaT arch is done
             int interrupt_collection_enabled; // virtual psr.ic
@@ -304,7 +302,7 @@ struct vcpu_tr_regs {
 
 union vcpu_ar_regs {
     unsigned long ar[128];
-    struct {
+    __anonymous_struct {
         unsigned long kr[8];
         unsigned long rsv1[8];
         unsigned long rsc;
@@ -341,7 +339,7 @@ union vcpu_ar_regs {
 
 union vcpu_cr_regs {
     unsigned long cr[128];
-    struct {
+    __anonymous_struct {
         unsigned long dcr;  // CR0
         unsigned long itm;
         unsigned long iva;
@@ -611,7 +609,7 @@ struct xen_ia64_opt_feature {
 	unsigned long cmd;		/* Which feature */
 	unsigned char on;		/* Switch feature on/off */
 	__anonymous_union {
-		struct {
+		__anonymous_struct {
 				/* The page protection bit mask of the pte.
 			 	 * This will be or'ed with the pte. */
 			unsigned long pgprot;

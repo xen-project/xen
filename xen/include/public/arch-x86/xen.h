@@ -140,9 +140,9 @@ struct vcpu_guest_context {
     unsigned long event_callback_eip;
     unsigned long failsafe_callback_eip;
 #ifdef __XEN__
-    union {
+    __anonymous_union {
         unsigned long syscall_callback_eip;
-        struct {
+        __anonymous_struct {
             unsigned int event_callback_cs;    /* compat CS of event cb     */
             unsigned int failsafe_callback_cs; /* compat CS of failsafe cb  */
         };

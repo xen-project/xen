@@ -19,6 +19,9 @@ f.write('''
 #include <stdlib.h>
 #include <stddef.h>
 #include <inttypes.h>
+
+#define __anonymous_struct __extension__ struct
+#define __anonymous_union __extension__ union
 ''');
 
 for a in archs:

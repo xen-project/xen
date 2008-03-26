@@ -144,9 +144,9 @@ struct hvm_hw_cpu {
     uint64_t tsc;
 
     /* pending event, if any */
-    union {
+    __anonymous_union {
         uint32_t pending_event;
-        struct {
+        __anonymous_struct {
             uint8_t  pending_vector:8;
             uint8_t  pending_type:3;
             uint8_t  pending_error_valid:1;
@@ -286,7 +286,7 @@ struct hvm_hw_pci_irqs {
      * Virtual interrupt wires for a single PCI bus.
      * Indexed by: device*4 + INTx#.
      */
-    union {
+    __anonymous_union {
         DECLARE_BITMAP(i, 32*4);
         uint64_t pad[2];
     };
@@ -299,7 +299,7 @@ struct hvm_hw_isa_irqs {
      * Virtual interrupt wires for ISA devices.
      * Indexed by ISA IRQ (assumes no ISA-device IRQ sharing).
      */
-    union {
+    __anonymous_union {
         DECLARE_BITMAP(i, 16);
         uint64_t pad[1];
     };
