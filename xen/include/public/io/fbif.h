@@ -63,6 +63,7 @@ struct xenfb_resize
     int32_t height;  /* height in pixels */
     int32_t stride;  /* stride in bytes */
     int32_t depth;   /* depth in bits */
+    int32_t offset;  /* offset of the framebuffer in bytes */
 };
 
 #define XENFB_OUT_EVENT_SIZE 40
