@@ -74,18 +74,19 @@ static int hvmemul_linear_to_phys(
     for ( i = 1; done < todo; i++ )
     {
         /* Get the next PFN in the range. */
-        if ( (npfn = paging_gva_to_gfn(curr, addr, &pfec)) == INVALID_GFN )
-        {
-            hvm_inject_exception(TRAP_page_fault, pfec, addr);
-            return X86EMUL_EXCEPTION;
-        }
+        npfn = paging_gva_to_gfn(curr, addr, &pfec);
 
         /* Is it contiguous with the preceding PFNs? If not then we're done. */
-        if ( npfn != (pfn + i) )
+        if ( (npfn == INVALID_GFN) || (npfn != (pfn + i)) )
         {
             done /= bytes_per_rep;
             if ( done == 0 )
-                return X86EMUL_UNHANDLEABLE;
+            {
+                if ( npfn != INVALID_GFN )
+                    return X86EMUL_UNHANDLEABLE;
+                hvm_inject_exception(TRAP_page_fault, pfec, addr);
+                return X86EMUL_EXCEPTION;
+            }
             *reps = done;
             break;
         }
