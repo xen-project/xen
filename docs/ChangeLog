@@ -16,6 +16,13 @@ http://lists.xensource.com/archives/html/xen-devel/2008-01/msg00010.html
 Xen 3.3 release
 ---------------
 
+17289: PV framebuffer dynamic resolution facility
+http://xenbits.xensource.com/xen-unstable.hg?rev/d97e61001d81
+
+Guest may send XENFB_TYPE_RESIZE if feature-resize=1 in
+xenstore of the backend VNC server. VNC server code sets
+feature-resize if it can handle the resize request.
+
 16857: XS_SET_TARGET
 http://xenbits.xensource.com/xen-unstable.hg?rev/26fc953a89bb
 
