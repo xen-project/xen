@@ -11,6 +11,7 @@ FSDIR-$(CONFIG_Linux) = $(LIBDIR)/fs/$(FS)
 FSDIR-$(CONFIG_SunOS)-x86_64 = $(PREFIX)/lib/fs/$(FS)/64
 FSDIR-$(CONFIG_SunOS)-x86_32 = $(PREFIX)/lib/fs/$(FS)/
 FSDIR-$(CONFIG_SunOS) = $(FSDIR-$(CONFIG_SunOS)-$(XEN_TARGET_ARCH))
+FSDIR-$(CONFIG_NetBSD) = $(LIBDIR)/fs/$(FS)
 FSDIR = $(FSDIR-y)
 
 FSLIB = fsimage.so
