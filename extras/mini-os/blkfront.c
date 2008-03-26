@@ -319,6 +319,7 @@ int blkfront_aio_poll(struct blkfront_dev *dev)
 {
     RING_IDX rp, cons;
     struct blkif_response *rsp;
+    int more;
 
 moretodo:
 #ifdef HAVE_LIBC
@@ -334,6 +335,7 @@ moretodo:
     while ((cons != rp))
     {
 	rsp = RING_GET_RESPONSE(&dev->ring, cons);
+	nr_consumed++;
 
         if (rsp->status != BLKIF_RSP_OKAY)
             printk("block error %d for op %d\n", rsp->status, rsp->operation);
@@ -343,29 +345,30 @@ moretodo:
         case BLKIF_OP_WRITE:
         {
             struct blkfront_aiocb *aiocbp = (void*) (uintptr_t) rsp->id;
+            int status = rsp->status;
             int j;
 
             for (j = 0; j < aiocbp->n; j++)
                 gnttab_end_access(aiocbp->gref[j]);
 
+            dev->ring.rsp_cons = ++cons;
             /* Nota: callback frees aiocbp itself */
-            aiocbp->aio_cb(aiocbp, rsp->status ? -EIO : 0);
+            aiocbp->aio_cb(aiocbp, status ? -EIO : 0);
+            if (dev->ring.rsp_cons != cons)
+                /* We reentered, we must not continue here */
+                goto out;
             break;
         }
-        case BLKIF_OP_WRITE_BARRIER:
-        case BLKIF_OP_FLUSH_DISKCACHE:
-            break;
         default:
             printk("unrecognized block operation %d response\n", rsp->operation);
+        case BLKIF_OP_WRITE_BARRIER:
+        case BLKIF_OP_FLUSH_DISKCACHE:
+            dev->ring.rsp_cons = ++cons;
             break;
         }
-
-	nr_consumed++;
-	++cons;
     }
-    dev->ring.rsp_cons = cons;
 
-    int more;
+out:
     RING_FINAL_CHECK_FOR_RESPONSES(&dev->ring, more);
     if (more) goto moretodo;
 
