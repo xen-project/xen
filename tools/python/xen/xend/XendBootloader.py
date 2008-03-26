@@ -12,7 +12,7 @@
 # Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
 #
 
-import os, select, errno, stat, signal
+import os, select, errno, stat, signal, tty
 import random
 import shlex
 from xen.xend import sxp
@@ -43,6 +43,9 @@ def bootloader(blexec, disk, dom, quiet = False, blargs = '', kernel = '',
         log.error(msg)
         raise VmError(msg)
 
+    if os.uname()[0] == "NetBSD" and disk.startswith('/dev/'):
+       disk = disk.replace("/dev/", "/dev/r")
+
     mkdir.parents("/var/run/xend/boot/", stat.S_IRWXU)
 
     while True:
@@ -63,12 +66,9 @@ def bootloader(blexec, disk, dom, quiet = False, blargs = '', kernel = '',
     # where we copy characters between the two master fds, as well as
     # listening on the bootloader's fifo for the results.
 
-    # Termios runes for very raw access to the pty master fds.
-    attr = [ 0, 0, termios.CS8 | termios.CREAD | termios.CLOCAL,
-             0, 0, 0, [0] * 32 ]
-
     (m1, s1) = pty.openpty()
     termios.tcsetattr(m1, termios.TCSANOW, attr)
+    tty.setraw(m1);
     fcntl.fcntl(m1, fcntl.F_SETFL, os.O_NDELAY);
     os.close(s1)
     slavename = ptsname.ptsname(m1)
@@ -109,7 +109,7 @@ def bootloader(blexec, disk, dom, quiet = False, blargs = '', kernel = '',
     # record that this domain is bootloading
     dom.bootloader_pid = child
 
-    termios.tcsetattr(m2, termios.TCSANOW, attr)
+    tty.setraw(m2);
     fcntl.fcntl(m2, fcntl.F_SETFL, os.O_NDELAY);
     while True:
         try:

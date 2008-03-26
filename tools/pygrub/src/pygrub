@@ -240,10 +240,10 @@ class Grub:
             if y > self.start_image + maxy:
                 break
             if y == self.selected_image:
-                attr = curses.A_REVERSE
-            else:
-                attr = 0
-            self.entry_win.addstr(y + 1 - self.start_image, 2, i.title.ljust(70), attr)
+                self.entry_win.attron(curses.A_REVERSE)
+            self.entry_win.addstr(y + 1 - self.start_image, 2, i.title.ljust(70))
+            if y == self.selected_image:
+                self.entry_win.attroff(curses.A_REVERSE)
         self.entry_win.refresh()
 
     def edit_entry(self, origimg):
@@ -269,16 +269,17 @@ class Grub:
             self.entry_win.box()
             for idx in range(1, len(img.lines)):
                 # current line should be highlighted
-                attr = 0
                 if idx == curline:
-                    attr = curses.A_REVERSE
+                    self.entry_win.attron(curses.A_REVERSE)
 
                 # trim the line
                 l = img.lines[idx].ljust(70)
                 if len(l) > 70:
                     l = l[:69] + ">"
                     
-                self.entry_win.addstr(idx, 2, l, attr)
+                self.entry_win.addstr(idx, 2, l)
+                if idx == curline:
+                    self.entry_win.attroff(curses.A_REVERSE)
             self.entry_win.refresh()
 
             c = self.screen.getch()
