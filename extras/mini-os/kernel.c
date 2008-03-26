@@ -341,7 +341,7 @@ static void kbdfront_thread(void *p)
 {
     struct kbdfront_dev *kbd_dev;
     DEFINE_WAIT(w);
-    int x = WIDTH / 2, y = HEIGHT / 2, z;
+    int x = WIDTH / 2, y = HEIGHT / 2, z = 0;
 
     kbd_dev = init_kbdfront(NULL, 1);
     if (!kbd_dev)
