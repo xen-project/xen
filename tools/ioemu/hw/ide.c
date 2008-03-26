@@ -2723,6 +2723,7 @@ static void pci_ide_save(QEMUFile* f, void *opaque)
         if (s->identify_set) {
             qemu_put_buffer(f, (const uint8_t *)s->identify_data, 512);
         }
+        qemu_put_8s(f, &s->write_cache);
         qemu_put_8s(f, &s->feature);
         qemu_put_8s(f, &s->error);
         qemu_put_be32s(f, &s->nsector);
@@ -2749,7 +2750,7 @@ static int pci_ide_load(QEMUFile* f, void *opaque, int version_id)
     PCIIDEState *d = opaque;
     int ret, i;
 
-    if (version_id != 1)
+    if (version_id != 1 && version_id != 2)
         return -EINVAL;
     ret = pci_device_load(&d->dev, f);
     if (ret < 0)
@@ -2780,6 +2781,8 @@ static int pci_ide_load(QEMUFile* f, void *opaque, int version_id)
         if (s->identify_set) {
             qemu_get_buffer(f, (uint8_t *)s->identify_data, 512);
         }
+        if (version_id >= 2)
+            qemu_get_8s(f, &s->write_cache);
         qemu_get_8s(f, &s->feature);
         qemu_get_8s(f, &s->error);
         qemu_get_be32s(f, &s->nsector);
@@ -2854,7 +2857,7 @@ void pci_piix_ide_init(PCIBus *bus, BlockDriverState **hd_table, int devfn)
 
     buffered_pio_init();
 
-    register_savevm("ide", 0, 1, pci_ide_save, pci_ide_load, d);
+    register_savevm("ide", 0, 2, pci_ide_save, pci_ide_load, d);
 }
 
 /* hd_table must contain 4 block drivers */
@@ -2895,7 +2898,7 @@ void pci_piix3_ide_init(PCIBus *bus, BlockDriverState **hd_table, int devfn)
 
     buffered_pio_init();
 
-    register_savevm("ide", 0, 1, pci_ide_save, pci_ide_load, d);
+    register_savevm("ide", 0, 2, pci_ide_save, pci_ide_load, d);
 }
 
 /***********************************************************/
