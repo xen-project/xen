@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/sh
 
 cat >ext2-test.c <<EOF
 #include <ext2fs/ext2fs.h>
