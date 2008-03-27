@@ -1839,6 +1839,13 @@ int main(int argc, char *argv[])
 		}
 	}
 
+	if (dofork) {
+		openlog("xenstored", 0, LOG_DAEMON);
+		daemonize();
+	}
+	if (pidfile)
+		write_pidfile(pidfile);
+
 	/* Talloc leak reports go to stderr, which is closed if we fork. */
 	if (!dofork)
 		talloc_enable_leak_report_full();
@@ -1892,30 +1899,22 @@ int main(int argc, char *argv[])
 	/* Restore existing connections. */
 	restore_existing_connections();
 
+	if (outputpid) {
+		printf("%ld\n", (long)getpid());
+		fflush(stdout);
+	}
+
 	/* redirect to /dev/null now we're ready to accept connections */
 	if (dofork) {
 		int devnull = open("/dev/null", O_RDWR);
 		if (devnull == -1)
 			barf_perror("Could not open /dev/null\n");
-
-		openlog("xenstored", 0, LOG_DAEMON);
-
-		daemonize();
-
-		if (outputpid) {
-			printf("%ld\n", (long)getpid());
-			fflush(stdout);
-		}
-
 		dup2(devnull, STDIN_FILENO);
 		dup2(devnull, STDOUT_FILENO);
 		dup2(devnull, STDERR_FILENO);
 		close(devnull);
 		xprintf = trace;
 	}
-
-	if (pidfile)
-		write_pidfile(pidfile);
 
 	signal(SIGHUP, trigger_reopen_log);
 

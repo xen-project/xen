@@ -95,17 +95,11 @@ def start_xenstored():
         f.close()
     except:
         pass
-    args = ['xenstored', "--pid-file", pidfname]
-    if os.getenv("XENSTORED_TRACE"):
-        args.extend(["-T", "/var/log/xen/xenstored-trace.log"])
-    pid = os.fork()
-    if pid == 0:
-        os.execvp('xenstored', args)
-    p, status = os.waitpid(pid, 0)
-    if os.WIFEXITED(status):
-        status = os.WEXITSTATUS(status)
-        if status:
-            raise RuntimeError("Failed to start xenstored: %d" % status)
+    XENSTORED_TRACE = os.getenv("XENSTORED_TRACE")
+    cmd = "xenstored --pid-file /var/run/xenstore.pid"
+    if XENSTORED_TRACE:
+        cmd += " -T /var/log/xen/xenstored-trace.log"
+    s,o = commands.getstatusoutput(cmd)
 
 def start_consoled():
     if os.fork() == 0:
