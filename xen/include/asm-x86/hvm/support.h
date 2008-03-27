@@ -99,7 +99,11 @@ enum hvm_copy_result hvm_copy_from_guest_phys(
     void *buf, paddr_t paddr, int size);
 
 /*
- * Copy to/from a guest virtual address.
+ * Copy to/from a guest virtual address. @pfec should include PFEC_user_mode
+ * if emulating a user-mode access (CPL=3). All other flags in @pfec are
+ * managed by the called function: it is therefore optional for the caller
+ * to set them.
+ * 
  * Returns:
  *  HVMCOPY_okay: Copy was entirely successful.
  *  HVMCOPY_bad_gfn_to_mfn: Some guest physical address did not map to
@@ -110,22 +114,22 @@ enum hvm_copy_result hvm_copy_from_guest_phys(
  *                          for injection into the current HVM VCPU.
  */
 enum hvm_copy_result hvm_copy_to_guest_virt(
-    unsigned long vaddr, void *buf, int size);
+    unsigned long vaddr, void *buf, int size, uint32_t pfec);
 enum hvm_copy_result hvm_copy_from_guest_virt(
-    void *buf, unsigned long vaddr, int size);
+    void *buf, unsigned long vaddr, int size, uint32_t pfec);
 enum hvm_copy_result hvm_fetch_from_guest_virt(
-    void *buf, unsigned long vaddr, int size);
+    void *buf, unsigned long vaddr, int size, uint32_t pfec);
 
 /*
  * As above (copy to/from a guest virtual address), but no fault is generated
  * when HVMCOPY_bad_gva_to_gfn is returned.
  */
 enum hvm_copy_result hvm_copy_to_guest_virt_nofault(
-    unsigned long vaddr, void *buf, int size);
+    unsigned long vaddr, void *buf, int size, uint32_t pfec);
 enum hvm_copy_result hvm_copy_from_guest_virt_nofault(
-    void *buf, unsigned long vaddr, int size);
+    void *buf, unsigned long vaddr, int size, uint32_t pfec);
 enum hvm_copy_result hvm_fetch_from_guest_virt_nofault(
-    void *buf, unsigned long vaddr, int size);
+    void *buf, unsigned long vaddr, int size, uint32_t pfec);
 
 void hvm_print_line(struct vcpu *v, const char c);
 void hlt_timer_fn(void *data);

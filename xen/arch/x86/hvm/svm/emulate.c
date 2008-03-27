@@ -32,9 +32,11 @@
 static int inst_copy_from_guest(
     unsigned char *buf, unsigned long guest_eip, int inst_len)
 {
+    struct vmcb_struct *vmcb = current->arch.hvm_svm.vmcb;
+    uint32_t pfec = (vmcb->cpl == 3) ? PFEC_user_mode : 0;
     if ( (inst_len > MAX_INST_LEN) || (inst_len <= 0) )
         return 0;
-    if ( hvm_fetch_from_guest_virt_nofault(buf, guest_eip, inst_len) )
+    if ( hvm_fetch_from_guest_virt_nofault(buf, guest_eip, inst_len, pfec) )
         return 0;
     return inst_len;
 }

@@ -787,7 +787,7 @@ _mode_iopl(
     int cpl = get_cpl(ctxt, ops);
     if ( cpl == -1 )
         return -1;
-    return ((cpl >= 0) && (cpl <= ((ctxt->regs->eflags >> 12) & 3)));
+    return (cpl <= ((ctxt->regs->eflags >> 12) & 3));
 }
 
 #define mode_ring0() ({                         \
@@ -800,6 +800,50 @@ _mode_iopl(
     fail_if(_iopl < 0);                         \
     _iopl;                                      \
 })
+
+static int ioport_access_check(
+    unsigned int first_port,
+    unsigned int bytes,
+    struct x86_emulate_ctxt *ctxt,
+    struct x86_emulate_ops *ops)
+{
+    unsigned long iobmp;
+    struct segment_register tr;
+    int rc = X86EMUL_OKAY;
+
+    if ( !(ctxt->regs->eflags & EFLG_VM) && mode_iopl() )
+        return X86EMUL_OKAY;
+
+    fail_if(ops->read_segment == NULL);
+    if ( (rc = ops->read_segment(x86_seg_tr, &tr, ctxt)) != 0 )
+        return rc;
+
+    /* Ensure that the TSS is valid and has an io-bitmap-offset field. */
+    if ( !tr.attr.fields.p ||
+         ((tr.attr.fields.type & 0xd) != 0x9) ||
+         (tr.limit < 0x67) )
+        goto raise_exception;
+
+    if ( (rc = ops->read(x86_seg_none, tr.base + 0x66, &iobmp, 2, ctxt)) )
+        return rc;
+
+    /* Ensure TSS includes two bytes including byte containing first port. */
+    iobmp += first_port / 8;
+    if ( tr.limit <= iobmp )
+        goto raise_exception;
+
+    if ( (rc = ops->read(x86_seg_none, tr.base + iobmp, &iobmp, 2, ctxt)) )
+        return rc;
+    if ( (iobmp & (((1<<bytes)-1) << (first_port&7))) != 0 )
+        goto raise_exception;
+
+ done:
+    return rc;
+
+ raise_exception:
+    fail_if(ops->inject_hw_exception == NULL);
+    return ops->inject_hw_exception(EXC_GP, 0, ctxt) ? : X86EMUL_EXCEPTION;
+}
 
 static int
 in_realmode(
@@ -2265,12 +2309,14 @@ x86_emulate(
 
     case 0x6c ... 0x6d: /* ins %dx,%es:%edi */ {
         unsigned long nr_reps = get_rep_prefix();
+        unsigned int port = (uint16_t)_regs.edx;
         dst.bytes = !(b & 1) ? 1 : (op_bytes == 8) ? 4 : op_bytes;
         dst.mem.seg = x86_seg_es;
         dst.mem.off = truncate_ea(_regs.edi);
+        if ( (rc = ioport_access_check(port, dst.bytes, ctxt, ops)) != 0 )
+            goto done;
         if ( (nr_reps > 1) && (ops->rep_ins != NULL) &&
-             ((rc = ops->rep_ins((uint16_t)_regs.edx, dst.mem.seg,
-                                 dst.mem.off, dst.bytes,
+             ((rc = ops->rep_ins(port, dst.mem.seg, dst.mem.off, dst.bytes,
                                  &nr_reps, ctxt)) != X86EMUL_UNHANDLEABLE) )
         {
             if ( rc != 0 )
@@ -2279,8 +2325,7 @@ x86_emulate(
         else
         {
             fail_if(ops->read_io == NULL);
-            if ( (rc = ops->read_io((uint16_t)_regs.edx, dst.bytes,
-                                    &dst.val, ctxt)) != 0 )
+            if ( (rc = ops->read_io(port, dst.bytes, &dst.val, ctxt)) != 0 )
                 goto done;
             dst.type = OP_MEM;
             nr_reps = 1;
@@ -2294,10 +2339,13 @@ x86_emulate(
 
     case 0x6e ... 0x6f: /* outs %esi,%dx */ {
         unsigned long nr_reps = get_rep_prefix();
+        unsigned int port = (uint16_t)_regs.edx;
         dst.bytes = !(b & 1) ? 1 : (op_bytes == 8) ? 4 : op_bytes;
+        if ( (rc = ioport_access_check(port, dst.bytes, ctxt, ops)) != 0 )
+            goto done;
         if ( (nr_reps > 1) && (ops->rep_outs != NULL) &&
              ((rc = ops->rep_outs(ea.mem.seg, truncate_ea(_regs.esi),
-                                  (uint16_t)_regs.edx, dst.bytes,
+                                  port, dst.bytes,
                                   &nr_reps, ctxt)) != X86EMUL_UNHANDLEABLE) )
         {
             if ( rc != 0 )
@@ -2309,8 +2357,7 @@ x86_emulate(
                                  &dst.val, dst.bytes, ctxt)) != 0 )
                 goto done;
             fail_if(ops->write_io == NULL);
-            if ( (rc = ops->write_io((uint16_t)_regs.edx, dst.bytes,
-                                     dst.val, ctxt)) != 0 )
+            if ( (rc = ops->write_io(port, dst.bytes, dst.val, ctxt)) != 0 )
                 goto done;
             nr_reps = 1;
         }
@@ -2831,6 +2878,8 @@ x86_emulate(
                              ? insn_fetch_type(uint8_t)
                              : (uint16_t)_regs.edx);
         op_bytes = !(b & 1) ? 1 : (op_bytes == 8) ? 4 : op_bytes;
+        if ( (rc = ioport_access_check(port, op_bytes, ctxt, ops)) != 0 )
+            goto done;
         if ( b & 2 )
         {
             /* out */

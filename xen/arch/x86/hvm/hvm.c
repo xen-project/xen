@@ -1302,7 +1302,7 @@ void hvm_task_switch(
         goto out;
     }
 
-    if ( !tr.attr.fields.g && (tr.limit < (sizeof(tss)-1)) )
+    if ( tr.limit < (sizeof(tss)-1) )
     {
         hvm_inject_exception(TRAP_invalid_tss, tss_sel & 0xfff8, 0);
         goto out;
@@ -1410,7 +1410,7 @@ void hvm_task_switch(
         if ( hvm_virtual_to_linear_addr(x86_seg_ss, &reg, regs->esp,
                                         4, hvm_access_write, 32,
                                         &linear_addr) )
-            hvm_copy_to_guest_virt_nofault(linear_addr, &errcode, 4);
+            hvm_copy_to_guest_virt_nofault(linear_addr, &errcode, 4, 0);
     }
 
  out:
@@ -1418,60 +1418,31 @@ void hvm_task_switch(
     hvm_unmap(nptss_desc);
 }
 
-/*
- * __hvm_copy():
- *  @buf  = hypervisor buffer
- *  @addr = guest address to copy to/from
- *  @size = number of bytes to copy
- *  @dir  = copy *to* guest (TRUE) or *from* guest (FALSE)?
- *  @virt = addr is *virtual* (TRUE) or *guest physical* (FALSE)?
- *  @fetch = copy is an instruction fetch?
- * Returns number of bytes failed to copy (0 == complete success).
- */
+#define HVMCOPY_from_guest (0u<<0)
+#define HVMCOPY_to_guest   (1u<<0)
+#define HVMCOPY_no_fault   (0u<<1)
+#define HVMCOPY_fault      (1u<<1)
+#define HVMCOPY_phys       (0u<<2)
+#define HVMCOPY_virt       (1u<<2)
 static enum hvm_copy_result __hvm_copy(
-    void *buf, paddr_t addr, int size, int dir, int virt, int fetch)
+    void *buf, paddr_t addr, int size, unsigned int flags, uint32_t pfec)
 {
     struct vcpu *curr = current;
     unsigned long gfn, mfn;
     p2m_type_t p2mt;
     char *p;
-    int count, todo;
-    uint32_t pfec = PFEC_page_present;
+    int count, todo = size;
 
-    /*
-     * We cannot use hvm_get_segment_register() while executing in
-     * vmx_realmode() as segment register state is cached. Furthermore,
-     * VMREADs on every data access hurts emulation performance.
-     * Hence we do not gather extra PFEC flags if CR0.PG == 0.
-     */
-    if ( !(curr->arch.hvm_vcpu.guest_cr[0] & X86_CR0_PG) )
-        virt = 0;
-
-    if ( virt )
-    {
-        struct segment_register sreg;
-        hvm_get_segment_register(curr, x86_seg_ss, &sreg);
-        if ( sreg.attr.fields.dpl == 3 )
-            pfec |= PFEC_user_mode;
-
-        if ( dir ) 
-            pfec |= PFEC_write_access;
-
-        if ( fetch ) 
-            pfec |= PFEC_insn_fetch;
-    }
-
-    todo = size;
     while ( todo > 0 )
     {
         count = min_t(int, PAGE_SIZE - (addr & ~PAGE_MASK), todo);
 
-        if ( virt )
+        if ( flags & HVMCOPY_virt )
         {
             gfn = paging_gva_to_gfn(curr, addr, &pfec);
             if ( gfn == INVALID_GFN )
             {
-                if ( virt == 2 ) /* 2 means generate a fault */
+                if ( flags & HVMCOPY_fault )
                     hvm_inject_exception(TRAP_page_fault, pfec, addr);
                 return HVMCOPY_bad_gva_to_gfn;
             }
@@ -1489,16 +1460,18 @@ static enum hvm_copy_result __hvm_copy(
 
         p = (char *)map_domain_page(mfn) + (addr & ~PAGE_MASK);
 
-        if ( dir )
+        if ( flags & HVMCOPY_to_guest )
         {
-            memcpy(p, buf, count); /* dir == TRUE:  *to* guest */
+            memcpy(p, buf, count);
             paging_mark_dirty(curr->domain, mfn);
         }
         else
-            memcpy(buf, p, count); /* dir == FALSE: *from guest */
+        {
+            memcpy(buf, p, count);
+        }
 
         unmap_domain_page(p);
-        
+
         addr += count;
         buf  += count;
         todo -= count;
@@ -1510,56 +1483,73 @@ static enum hvm_copy_result __hvm_copy(
 enum hvm_copy_result hvm_copy_to_guest_phys(
     paddr_t paddr, void *buf, int size)
 {
-    return __hvm_copy(buf, paddr, size, 1, 0, 0);
+    return __hvm_copy(buf, paddr, size,
+                      HVMCOPY_to_guest | HVMCOPY_fault | HVMCOPY_phys,
+                      0);
 }
 
 enum hvm_copy_result hvm_copy_from_guest_phys(
     void *buf, paddr_t paddr, int size)
 {
-    return __hvm_copy(buf, paddr, size, 0, 0, 0);
+    return __hvm_copy(buf, paddr, size,
+                      HVMCOPY_from_guest | HVMCOPY_fault | HVMCOPY_phys,
+                      0);
 }
 
 enum hvm_copy_result hvm_copy_to_guest_virt(
-    unsigned long vaddr, void *buf, int size)
+    unsigned long vaddr, void *buf, int size, uint32_t pfec)
 {
-    return __hvm_copy(buf, vaddr, size, 1, 2, 0);
+    return __hvm_copy(buf, vaddr, size,
+                      HVMCOPY_to_guest | HVMCOPY_fault | HVMCOPY_virt,
+                      PFEC_page_present | PFEC_write_access | pfec);
 }
 
 enum hvm_copy_result hvm_copy_from_guest_virt(
-    void *buf, unsigned long vaddr, int size)
+    void *buf, unsigned long vaddr, int size, uint32_t pfec)
 {
-    return __hvm_copy(buf, vaddr, size, 0, 2, 0);
+    return __hvm_copy(buf, vaddr, size,
+                      HVMCOPY_from_guest | HVMCOPY_fault | HVMCOPY_virt,
+                      PFEC_page_present | pfec);
 }
 
 enum hvm_copy_result hvm_fetch_from_guest_virt(
-    void *buf, unsigned long vaddr, int size)
+    void *buf, unsigned long vaddr, int size, uint32_t pfec)
 {
-    return __hvm_copy(buf, vaddr, size, 0, 2, hvm_nx_enabled(current));
+    if ( hvm_nx_enabled(current) )
+        pfec |= PFEC_insn_fetch;
+    return __hvm_copy(buf, vaddr, size,
+                      HVMCOPY_from_guest | HVMCOPY_fault | HVMCOPY_virt,
+                      PFEC_page_present | pfec);
 }
 
 enum hvm_copy_result hvm_copy_to_guest_virt_nofault(
-    unsigned long vaddr, void *buf, int size)
+    unsigned long vaddr, void *buf, int size, uint32_t pfec)
 {
-    return __hvm_copy(buf, vaddr, size, 1, 1, 0);
+    return __hvm_copy(buf, vaddr, size,
+                      HVMCOPY_to_guest | HVMCOPY_no_fault | HVMCOPY_virt,
+                      PFEC_page_present | PFEC_write_access | pfec);
 }
 
 enum hvm_copy_result hvm_copy_from_guest_virt_nofault(
-    void *buf, unsigned long vaddr, int size)
+    void *buf, unsigned long vaddr, int size, uint32_t pfec)
 {
-    return __hvm_copy(buf, vaddr, size, 0, 1, 0);
+    return __hvm_copy(buf, vaddr, size,
+                      HVMCOPY_from_guest | HVMCOPY_no_fault | HVMCOPY_virt,
+                      PFEC_page_present | pfec);
 }
 
 enum hvm_copy_result hvm_fetch_from_guest_virt_nofault(
-    void *buf, unsigned long vaddr, int size)
+    void *buf, unsigned long vaddr, int size, uint32_t pfec)
 {
-    return __hvm_copy(buf, vaddr, size, 0, 1, hvm_nx_enabled(current));
+    if ( hvm_nx_enabled(current) )
+        pfec |= PFEC_insn_fetch;
+    return __hvm_copy(buf, vaddr, size,
+                      HVMCOPY_from_guest | HVMCOPY_no_fault | HVMCOPY_virt,
+                      PFEC_page_present | pfec);
 }
 
 DEFINE_PER_CPU(int, guest_handles_in_xen_space);
 
-/* Note that copy_{to,from}_user_hvm require the PTE to be writable even
-   when they're only trying to read from it.  The guest is expected to
-   deal with this. */
 unsigned long copy_to_user_hvm(void *to, const void *from, unsigned len)
 {
     int rc;
@@ -1570,7 +1560,8 @@ unsigned long copy_to_user_hvm(void *to, const void *from, unsigned len)
         return 0;
     }
 
-    rc = hvm_copy_to_guest_virt_nofault((unsigned long)to, (void *)from, len);
+    rc = hvm_copy_to_guest_virt_nofault((unsigned long)to, (void *)from,
+                                        len, 0);
     return rc ? len : 0; /* fake a copy_to_user() return code */
 }
 
@@ -1584,7 +1575,7 @@ unsigned long copy_from_user_hvm(void *to, const void *from, unsigned len)
         return 0;
     }
 
-    rc = hvm_copy_from_guest_virt_nofault(to, (unsigned long)from, len);
+    rc = hvm_copy_from_guest_virt_nofault(to, (unsigned long)from, len, 0);
     return rc ? len : 0; /* fake a copy_from_user() return code */
 }
 
