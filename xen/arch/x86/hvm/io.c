@@ -221,35 +221,34 @@ int handle_mmio_with_translation(unsigned long gva, unsigned long gpfn)
 
 void hvm_io_assist(void)
 {
-    struct vcpu *v = current;
-    ioreq_t *p = &get_ioreq(v)->vp_ioreq;
+    struct vcpu *curr = current;
+    ioreq_t *p = &get_ioreq(curr)->vp_ioreq;
     enum hvm_io_state io_state;
 
     if ( p->state != STATE_IORESP_READY )
     {
         gdprintk(XENLOG_ERR, "Unexpected HVM iorequest state %d.\n", p->state);
-        domain_crash(v->domain);
-        goto out;
+        domain_crash_synchronous();
     }
 
     rmb(); /* see IORESP_READY /then/ read contents of ioreq */
 
     p->state = STATE_IOREQ_NONE;
 
-    io_state = v->arch.hvm_vcpu.io_state;
-    v->arch.hvm_vcpu.io_state = HVMIO_none;
+    io_state = curr->arch.hvm_vcpu.io_state;
+    curr->arch.hvm_vcpu.io_state = HVMIO_none;
 
     if ( (io_state == HVMIO_awaiting_completion) ||
          (io_state == HVMIO_handle_mmio_awaiting_completion) )
     {
-        v->arch.hvm_vcpu.io_state = HVMIO_completed;
-        v->arch.hvm_vcpu.io_data = p->data;
+        curr->arch.hvm_vcpu.io_state = HVMIO_completed;
+        curr->arch.hvm_vcpu.io_data = p->data;
         if ( io_state == HVMIO_handle_mmio_awaiting_completion )
             (void)handle_mmio();
     }
 
- out:
-    vcpu_end_shutdown_deferral(v);
+    if ( p->state == STATE_IOREQ_NONE )
+        vcpu_end_shutdown_deferral(curr);
 }
 
 void dpci_ioport_read(uint32_t mport, ioreq_t *p)
