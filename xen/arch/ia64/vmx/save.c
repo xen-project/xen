@@ -21,6 +21,7 @@
  */
 
 #include <xen/types.h>
+#include <public/xen.h>
 #include <xen/hvm/save.h>
 
 void arch_hvm_save(struct domain *d, struct hvm_save_header *hdr)
