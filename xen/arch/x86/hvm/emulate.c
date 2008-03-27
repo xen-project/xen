@@ -214,7 +214,9 @@ static int __hvmemul_read(
     enum hvm_access_type access_type,
     struct hvm_emulate_ctxt *hvmemul_ctxt)
 {
+    struct vcpu *curr = current;
     unsigned long addr;
+    paddr_t gpa;
     int rc;
 
     rc = hvmemul_virtual_to_linear(
@@ -223,6 +225,17 @@ static int __hvmemul_read(
         return rc;
 
     *val = 0;
+
+    if ( unlikely(curr->arch.hvm_vcpu.mmio_gva == (addr & PAGE_MASK)) &&
+         curr->arch.hvm_vcpu.mmio_gva )
+    {
+        unsigned int off = addr & (PAGE_SIZE - 1);
+        if ( access_type == hvm_access_insn_fetch )
+            return X86EMUL_UNHANDLEABLE;
+        gpa = (((paddr_t)curr->arch.hvm_vcpu.mmio_gpfn << PAGE_SHIFT) | off);
+        if ( (off + bytes) <= PAGE_SIZE )
+            return hvmemul_do_mmio(gpa, 1, bytes, 0, IOREQ_READ, 0, 0, val);
+    }
 
     rc = ((access_type == hvm_access_insn_fetch) ?
           hvm_fetch_from_guest_virt(val, addr, bytes) :
@@ -233,7 +246,6 @@ static int __hvmemul_read(
     if ( rc == HVMCOPY_bad_gfn_to_mfn )
     {
         unsigned long reps = 1;
-        paddr_t gpa;
 
         if ( access_type == hvm_access_insn_fetch )
             return X86EMUL_UNHANDLEABLE;
@@ -293,13 +305,25 @@ static int hvmemul_write(
 {
     struct hvm_emulate_ctxt *hvmemul_ctxt =
         container_of(ctxt, struct hvm_emulate_ctxt, ctxt);
+    struct vcpu *curr = current;
     unsigned long addr;
+    paddr_t gpa;
     int rc;
 
     rc = hvmemul_virtual_to_linear(
         seg, offset, bytes, hvm_access_write, hvmemul_ctxt, &addr);
     if ( rc != X86EMUL_OKAY )
         return rc;
+
+    if ( unlikely(curr->arch.hvm_vcpu.mmio_gva == (addr & PAGE_MASK)) &&
+         curr->arch.hvm_vcpu.mmio_gva )
+    {
+        unsigned int off = addr & (PAGE_SIZE - 1);
+        gpa = (((paddr_t)curr->arch.hvm_vcpu.mmio_gpfn << PAGE_SHIFT) | off);
+        if ( (off + bytes) <= PAGE_SIZE )
+            return hvmemul_do_mmio(gpa, 1, bytes, val, IOREQ_WRITE,
+                                   0, 0, NULL);
+    }
 
     rc = hvm_copy_to_guest_virt(addr, &val, bytes);
     if ( rc == HVMCOPY_bad_gva_to_gfn )
@@ -308,7 +332,6 @@ static int hvmemul_write(
     if ( rc == HVMCOPY_bad_gfn_to_mfn )
     {
         unsigned long reps = 1;
-        paddr_t gpa;
 
         rc = hvmemul_linear_to_phys(
             addr, &gpa, bytes, &reps, hvm_access_write, hvmemul_ctxt);

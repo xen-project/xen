@@ -183,7 +183,9 @@ int handle_mmio(void)
     rc = hvm_emulate_one(&ctxt);
 
     if ( curr->arch.hvm_vcpu.io_state == HVMIO_awaiting_completion )
-       curr->arch.hvm_vcpu.io_state = HVMIO_handle_mmio_awaiting_completion;
+        curr->arch.hvm_vcpu.io_state = HVMIO_handle_mmio_awaiting_completion;
+    else
+        curr->arch.hvm_vcpu.mmio_gva = 0;
 
     switch ( rc )
     {
@@ -208,6 +210,13 @@ int handle_mmio(void)
     hvm_emulate_writeback(&ctxt);
 
     return 1;
+}
+
+int handle_mmio_with_translation(unsigned long gva, unsigned long gpfn)
+{
+    current->arch.hvm_vcpu.mmio_gva = gva & PAGE_MASK;
+    current->arch.hvm_vcpu.mmio_gpfn = gpfn;
+    return handle_mmio();
 }
 
 void hvm_io_assist(void)

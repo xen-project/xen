@@ -99,6 +99,7 @@ static inline int register_buffered_io_handler(
 void send_timeoffset_req(unsigned long timeoff);
 void send_invalidate_req(void);
 int handle_mmio(void);
+int handle_mmio_with_translation(unsigned long gva, unsigned long gpfn);
 void hvm_interrupt_post(struct vcpu *v, int vector, int type);
 void hvm_io_assist(void);
 void hvm_dpci_eoi(struct domain *d, unsigned int guest_irq,
