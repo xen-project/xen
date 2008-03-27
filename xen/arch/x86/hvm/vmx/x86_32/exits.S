@@ -60,6 +60,7 @@
         ALIGN
 ENTRY(vmx_asm_vmexit_handler)
         HVM_SAVE_ALL_NOSEGREGS
+        GET_CURRENT(%ebx)
 
         movl $GUEST_RIP,%eax
         VMREAD(UREGS_eip)
@@ -67,6 +68,9 @@ ENTRY(vmx_asm_vmexit_handler)
         VMREAD(UREGS_esp)
         movl $GUEST_RFLAGS,%eax
         VMREAD(UREGS_eflags)
+
+        movl %cr2,%eax
+        movl %eax,VCPU_hvm_guest_cr2(%ebx)
 
 #ifndef NDEBUG
         movw $0xbeef,%ax
