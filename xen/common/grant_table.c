@@ -828,32 +828,34 @@ gnttab_setup_table(
                 " per domain.\n",
                 max_nr_grant_frames);
         op.status = GNTST_general_error;
-        goto out;
+        goto out1;
     }
 
     dom = op.dom;
     if ( dom == DOMID_SELF )
     {
-        d = current->domain;
+        d = rcu_lock_current_domain();
     }
-    else {
+    else
+    {
         if ( unlikely((d = rcu_lock_domain_by_id(dom)) == NULL) )
         {
             gdprintk(XENLOG_INFO, "Bad domid %d.\n", dom);
             op.status = GNTST_bad_domain;
-            goto out;
+            goto out1;
         }
-        if ( unlikely(!IS_PRIV_FOR(current->domain, d)) ) {
+
+        if ( unlikely(!IS_PRIV_FOR(current->domain, d)) )
+        {
             op.status = GNTST_permission_denied;
-            goto setup_unlock_out2;
+            goto out2;
         }
     }
 
     if ( xsm_grant_setup(current->domain, d) )
     {
-        rcu_unlock_domain(d);
         op.status = GNTST_permission_denied;
-        goto out;
+        goto out2;
     }
 
     spin_lock(&d->grant_table->lock);
@@ -867,7 +869,7 @@ gnttab_setup_table(
                 nr_grant_frames(d->grant_table),
                 max_nr_grant_frames);
         op.status = GNTST_general_error;
-        goto setup_unlock_out;
+        goto out3;
     }
  
     op.status = GNTST_okay;
@@ -877,13 +879,11 @@ gnttab_setup_table(
         (void)copy_to_guest_offset(op.frame_list, i, &gmfn, 1);
     }
 
- setup_unlock_out:
+ out3:
     spin_unlock(&d->grant_table->lock);
-
- setup_unlock_out2:
+ out2:
     rcu_unlock_domain(d);
-
- out:
+ out1:
     if ( unlikely(copy_to_guest(uop, &op, 1)) )
         return -EFAULT;
 
@@ -911,16 +911,19 @@ gnttab_query_size(
     dom = op.dom;
     if ( dom == DOMID_SELF )
     {
-        d = current->domain;
+        d = rcu_lock_current_domain();
     }
-    else {
+    else
+    {
         if ( unlikely((d = rcu_lock_domain_by_id(dom)) == NULL) )
         {
             gdprintk(XENLOG_INFO, "Bad domid %d.\n", dom);
             op.status = GNTST_bad_domain;
             goto query_out;
         }
-        if ( unlikely(!IS_PRIV_FOR(current->domain, d)) ) {
+
+        if ( unlikely(!IS_PRIV_FOR(current->domain, d)) )
+        {
             op.status = GNTST_permission_denied;
             goto query_out_unlock;
         }

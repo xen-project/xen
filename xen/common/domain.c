@@ -522,7 +522,7 @@ static void complete_domain_destroy(struct rcu_head *head)
         if ( (v = d->vcpu[i]) != NULL )
             free_vcpu_struct(v);
 
-    if (d->target)
+    if ( d->target != NULL )
         put_domain(d->target);
 
     free_domain(d);

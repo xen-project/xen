@@ -2160,12 +2160,15 @@ long do_hvm_op(unsigned long op, XEN_GUEST_HANDLE(void) arg)
             return -EINVAL;
 
         if ( a.domid == DOMID_SELF )
+        {
             d = rcu_lock_current_domain();
-        else {
-            d = rcu_lock_domain_by_id(a.domid);
-            if ( d == NULL )
+        }
+        else
+        {
+            if ( (d = rcu_lock_domain_by_id(a.domid)) == NULL )
                 return -ESRCH;
-            if ( !IS_PRIV_FOR(current->domain, d) ) {
+            if ( !IS_PRIV_FOR(current->domain, d) )
+            {
                 rc = -EPERM;
                 goto param_fail;
             }

@@ -2114,14 +2114,14 @@ static int set_foreigndom(domid_t domid)
         info->foreign = rcu_lock_domain(dom_xen);
         break;
     default:
-        e = rcu_lock_domain_by_id(domid);
-        if ( e == NULL )
+        if ( (e = rcu_lock_domain_by_id(domid)) == NULL )
         {
             MEM_LOG("Unknown domain '%u'", domid);
             okay = 0;
             break;
         }
-        if (!IS_PRIV_FOR(d, e)) {
+        if ( !IS_PRIV_FOR(d, e) )
+        {
             MEM_LOG("Cannot set foreign dom");
             okay = 0;
             rcu_unlock_domain(e);
@@ -3259,12 +3259,15 @@ long arch_memory_op(int op, XEN_GUEST_HANDLE(void) arg)
             return -EFAULT;
 
         if ( xatp.domid == DOMID_SELF )
+        {
             d = rcu_lock_current_domain();
-        else {
-            d = rcu_lock_domain_by_id(xatp.domid);
-            if ( d == NULL )
+        }
+        else
+        {
+            if ( (d = rcu_lock_domain_by_id(xatp.domid)) == NULL )
                 return -ESRCH;
-            if ( !IS_PRIV_FOR(current->domain, d) ) {
+            if ( !IS_PRIV_FOR(current->domain, d) )
+            {
                 rcu_unlock_domain(d);
                 return -EPERM;
             }
@@ -3355,12 +3358,15 @@ long arch_memory_op(int op, XEN_GUEST_HANDLE(void) arg)
             return -EINVAL;
 
         if ( fmap.domid == DOMID_SELF )
+        {
             d = rcu_lock_current_domain();
-        else {
-            d = rcu_lock_domain_by_id(fmap.domid);
-            if ( d == NULL )
+        }
+        else
+        {
+            if ( (d = rcu_lock_domain_by_id(fmap.domid)) == NULL )
                 return -ESRCH;
-            if ( !IS_PRIV_FOR(current->domain, d) ) {
+            if ( !IS_PRIV_FOR(current->domain, d) )
+            {
                 rcu_unlock_domain(d);
                 return -EPERM;
             }
