@@ -255,6 +255,30 @@ static int hvm_set_ioreq_page(
     return 0;
 }
 
+static int hvm_print_line(
+    int dir, uint32_t port, uint32_t bytes, uint32_t *val)
+{
+    struct vcpu *curr = current;
+    struct hvm_domain *hd = &curr->domain->arch.hvm_domain;
+    char c = *val;
+
+    BUG_ON(bytes != 1);
+
+    spin_lock(&hd->pbuf_lock);
+    hd->pbuf[hd->pbuf_idx++] = c;
+    if ( (hd->pbuf_idx == (sizeof(hd->pbuf) - 2)) || (c == '\n') )
+    {
+        if ( c != '\n' )
+            hd->pbuf[hd->pbuf_idx++] = '\n';
+        hd->pbuf[hd->pbuf_idx] = '\0';
+        printk(XENLOG_G_DEBUG "HVM%u: %s", curr->domain->domain_id, hd->pbuf);
+        hd->pbuf_idx = 0;
+    }
+    spin_unlock(&hd->pbuf_lock);
+
+    return 1;
+}
+
 int hvm_domain_initialise(struct domain *d)
 {
     int rc;
@@ -288,6 +312,8 @@ int hvm_domain_initialise(struct domain *d)
 
     hvm_init_ioreq_page(d, &d->arch.hvm_domain.ioreq);
     hvm_init_ioreq_page(d, &d->arch.hvm_domain.buf_ioreq);
+
+    register_portio_handler(d, 0xe9, 1, hvm_print_line);
 
     rc = hvm_funcs.domain_initialise(d);
     if ( rc != 0 )
@@ -1577,24 +1603,6 @@ unsigned long copy_from_user_hvm(void *to, const void *from, unsigned len)
 
     rc = hvm_copy_from_guest_virt_nofault(to, (unsigned long)from, len, 0);
     return rc ? len : 0; /* fake a copy_from_user() return code */
-}
-
-/* HVM specific printbuf. Mostly used for hvmloader chit-chat. */
-void hvm_print_line(struct vcpu *v, const char c)
-{
-    struct hvm_domain *hd = &v->domain->arch.hvm_domain;
-
-    spin_lock(&hd->pbuf_lock);
-    hd->pbuf[hd->pbuf_idx++] = c;
-    if ( (hd->pbuf_idx == (sizeof(hd->pbuf) - 2)) || (c == '\n') )
-    {
-        if ( c != '\n' )
-            hd->pbuf[hd->pbuf_idx++] = '\n';
-        hd->pbuf[hd->pbuf_idx] = '\0';
-        printk(XENLOG_G_DEBUG "HVM%u: %s", v->domain->domain_id, hd->pbuf);
-        hd->pbuf_idx = 0;
-    }
-    spin_unlock(&hd->pbuf_lock);
 }
 
 #define bitmaskof(idx)  (1U << ((idx) & 31))

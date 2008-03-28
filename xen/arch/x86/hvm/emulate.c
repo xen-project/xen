@@ -522,12 +522,6 @@ static int hvmemul_write_io(
     unsigned long val,
     struct x86_emulate_ctxt *ctxt)
 {
-    if ( port == 0xe9 )
-    {
-        hvm_print_line(current, val);
-        return X86EMUL_OKAY;
-    }
-
     return hvmemul_do_pio(port, 1, bytes, val, IOREQ_WRITE, 0, 0, NULL);
 }
 

@@ -95,35 +95,32 @@ void vmx_realmode(struct cpu_user_regs *regs);
 /*
  * Exit Qualifications for MOV for Control Register Access
  */
-#define CONTROL_REG_ACCESS_NUM          0xf     /* 3:0, number of control register */
-#define CONTROL_REG_ACCESS_TYPE         0x30    /* 5:4, access type */
-#define CONTROL_REG_ACCESS_REG          0xf00   /* 10:8, general purpose register */
-#define LMSW_SOURCE_DATA                (0xFFFF << 16)  /* 16:31 lmsw source */
-#define REG_EAX                         (0 << 8)
-#define REG_ECX                         (1 << 8)
-#define REG_EDX                         (2 << 8)
-#define REG_EBX                         (3 << 8)
-#define REG_ESP                         (4 << 8)
-#define REG_EBP                         (5 << 8)
-#define REG_ESI                         (6 << 8)
-#define REG_EDI                         (7 << 8)
-#define REG_R8                          (8 << 8)
-#define REG_R9                          (9 << 8)
-#define REG_R10                         (10 << 8)
-#define REG_R11                         (11 << 8)
-#define REG_R12                         (12 << 8)
-#define REG_R13                         (13 << 8)
-#define REG_R14                         (14 << 8)
-#define REG_R15                         (15 << 8)
-
-/*
- * Exit Qualifications for MOV for Debug Register Access
- */
-#define DEBUG_REG_ACCESS_NUM            0x7     /* 2:0, number of debug register */
-#define DEBUG_REG_ACCESS_TYPE           0x10    /* 4, direction of access */
-#define TYPE_MOV_TO_DR                  (0 << 4)
-#define TYPE_MOV_FROM_DR                (1 << 4)
-#define DEBUG_REG_ACCESS_REG            0xf00   /* 11:8, general purpose register */
+ /* 3:0 - control register number (CRn) */
+#define VMX_CONTROL_REG_ACCESS_NUM      0xf
+ /* 5:4 - access type (CR write, CR read, CLTS, LMSW) */
+#define VMX_CONTROL_REG_ACCESS_TYPE     0x30
+ /* 10:8 - general purpose register operand */
+#define VMX_CONTROL_REG_ACCESS_GPR      0xf00
+#define VMX_CONTROL_REG_ACCESS_TYPE_MOV_TO_CR   (0 << 4)
+#define VMX_CONTROL_REG_ACCESS_TYPE_MOV_FROM_CR (1 << 4)
+#define VMX_CONTROL_REG_ACCESS_TYPE_CLTS        (2 << 4)
+#define VMX_CONTROL_REG_ACCESS_TYPE_LMSW        (3 << 4)
+#define VMX_CONTROL_REG_ACCESS_GPR_EAX  (0 << 8)
+#define VMX_CONTROL_REG_ACCESS_GPR_ECX  (1 << 8)
+#define VMX_CONTROL_REG_ACCESS_GPR_EDX  (2 << 8)
+#define VMX_CONTROL_REG_ACCESS_GPR_EBX  (3 << 8)
+#define VMX_CONTROL_REG_ACCESS_GPR_ESP  (4 << 8)
+#define VMX_CONTROL_REG_ACCESS_GPR_EBP  (5 << 8)
+#define VMX_CONTROL_REG_ACCESS_GPR_ESI  (6 << 8)
+#define VMX_CONTROL_REG_ACCESS_GPR_EDI  (7 << 8)
+#define VMX_CONTROL_REG_ACCESS_GPR_R8   (8 << 8)
+#define VMX_CONTROL_REG_ACCESS_GPR_R9   (9 << 8)
+#define VMX_CONTROL_REG_ACCESS_GPR_R10  (10 << 8)
+#define VMX_CONTROL_REG_ACCESS_GPR_R11  (11 << 8)
+#define VMX_CONTROL_REG_ACCESS_GPR_R12  (12 << 8)
+#define VMX_CONTROL_REG_ACCESS_GPR_R13  (13 << 8)
+#define VMX_CONTROL_REG_ACCESS_GPR_R14  (14 << 8)
+#define VMX_CONTROL_REG_ACCESS_GPR_R15  (15 << 8)
 
 /*
  * Access Rights
@@ -155,72 +152,72 @@ void vmx_realmode(struct cpu_user_regs *regs);
 
 static inline void __vmptrld(u64 addr)
 {
-    __asm__ __volatile__ ( VMPTRLD_OPCODE
-                           MODRM_EAX_06
-                           /* CF==1 or ZF==1 --> crash (ud2) */
-                           "ja 1f ; ud2 ; 1:\n"
-                           :
-                           : "a" (&addr)
-                           : "memory");
+    asm volatile ( VMPTRLD_OPCODE
+                   MODRM_EAX_06
+                   /* CF==1 or ZF==1 --> crash (ud2) */
+                   "ja 1f ; ud2 ; 1:\n"
+                   :
+                   : "a" (&addr)
+                   : "memory");
 }
 
 static inline void __vmptrst(u64 addr)
 {
-    __asm__ __volatile__ ( VMPTRST_OPCODE
-                           MODRM_EAX_07
-                           :
-                           : "a" (&addr)
-                           : "memory");
+    asm volatile ( VMPTRST_OPCODE
+                   MODRM_EAX_07
+                   :
+                   : "a" (&addr)
+                   : "memory");
 }
 
 static inline void __vmpclear(u64 addr)
 {
-    __asm__ __volatile__ ( VMCLEAR_OPCODE
-                           MODRM_EAX_06
-                           /* CF==1 or ZF==1 --> crash (ud2) */
-                           "ja 1f ; ud2 ; 1:\n"
-                           :
-                           : "a" (&addr)
-                           : "memory");
+    asm volatile ( VMCLEAR_OPCODE
+                   MODRM_EAX_06
+                   /* CF==1 or ZF==1 --> crash (ud2) */
+                   "ja 1f ; ud2 ; 1:\n"
+                   :
+                   : "a" (&addr)
+                   : "memory");
 }
 
 static inline unsigned long __vmread(unsigned long field)
 {
     unsigned long ecx;
 
-    __asm__ __volatile__ ( VMREAD_OPCODE
-                           MODRM_EAX_ECX
-                           /* CF==1 or ZF==1 --> crash (ud2) */
-                           "ja 1f ; ud2 ; 1:\n"
-                           : "=c" (ecx)
-                           : "a" (field)
-                           : "memory");
+    asm volatile ( VMREAD_OPCODE
+                   MODRM_EAX_ECX
+                   /* CF==1 or ZF==1 --> crash (ud2) */
+                   "ja 1f ; ud2 ; 1:\n"
+                   : "=c" (ecx)
+                   : "a" (field)
+                   : "memory");
 
     return ecx;
 }
 
 static inline void __vmwrite(unsigned long field, unsigned long value)
 {
-    __asm__ __volatile__ ( VMWRITE_OPCODE
-                           MODRM_EAX_ECX
-                           /* CF==1 or ZF==1 --> crash (ud2) */
-                           "ja 1f ; ud2 ; 1:\n"
-                           : 
-                           : "a" (field) , "c" (value)
-                           : "memory");
+    asm volatile ( VMWRITE_OPCODE
+                   MODRM_EAX_ECX
+                   /* CF==1 or ZF==1 --> crash (ud2) */
+                   "ja 1f ; ud2 ; 1:\n"
+                   : 
+                   : "a" (field) , "c" (value)
+                   : "memory");
 }
 
 static inline unsigned long __vmread_safe(unsigned long field, int *error)
 {
     unsigned long ecx;
 
-    __asm__ __volatile__ ( VMREAD_OPCODE
-                           MODRM_EAX_ECX
-                           /* CF==1 or ZF==1 --> rc = -1 */
-                           "setna %b0 ; neg %0"
-                           : "=q" (*error), "=c" (ecx)
-                           : "0" (0), "a" (field)
-                           : "memory");
+    asm volatile ( VMREAD_OPCODE
+                   MODRM_EAX_ECX
+                   /* CF==1 or ZF==1 --> rc = -1 */
+                   "setna %b0 ; neg %0"
+                   : "=q" (*error), "=c" (ecx)
+                   : "0" (0), "a" (field)
+                   : "memory");
 
     return ecx;
 }

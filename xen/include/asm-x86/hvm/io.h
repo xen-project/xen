@@ -25,10 +25,9 @@
 #include <public/hvm/ioreq.h>
 #include <public/event_channel.h>
 
-#define MAX_IO_HANDLER             12
+#define MAX_IO_HANDLER             16
 
 #define HVM_PORTIO                  0
-#define HVM_MMIO                    1
 #define HVM_BUFFERED_IO             2
 
 typedef unsigned long (*hvm_mmio_read_t)(struct vcpu *v,
