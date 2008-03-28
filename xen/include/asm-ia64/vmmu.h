@@ -118,6 +118,11 @@ typedef struct thash_data {
 #define INVALID_TR(hdata)      (!(hdata)->p)
 #define INVALID_ENTRY(hcb, hdata)       INVALID_VHPT(hdata)
 
+static inline u64 thash_translate(thash_data_t *hdata, u64 vadr)
+{
+    int ps = hdata->ps;
+    return (hdata->ppn >> (ps - 12) << ps) | (vadr & ((1UL << ps) - 1));
+}
 
 typedef struct thash_cb {
     /* THASH base information */

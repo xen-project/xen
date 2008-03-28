@@ -167,7 +167,7 @@ fetch_code(VCPU *vcpu, u64 gip, IA64_BUNDLE *pbundle)
 //        if( tlb == NULL )
 //             tlb = vtlb_lookup(vcpu, gip, DSIDE_TLB );
         if (tlb)
-            gpip = (tlb->ppn >>(tlb->ps-12)<<tlb->ps) | ( gip & (PSIZE(tlb->ps)-1) );
+            gpip = thash_translate(tlb, gip);
     }
     if( gpip){
         mfn = gmfn_to_mfn(vcpu->domain, gpip >>PAGE_SHIFT);
@@ -180,8 +180,7 @@ fetch_code(VCPU *vcpu, u64 gip, IA64_BUNDLE *pbundle)
             ia64_ptcl(gip, ARCH_PAGE_SHIFT << 2);
             return IA64_RETRY;
         }
-        maddr = (tlb->ppn >> (tlb->ps - 12) << tlb->ps) |
-                (gip & (PSIZE(tlb->ps) - 1));
+        maddr = thash_translate(tlb, gip);
         mfn = maddr >> PAGE_SHIFT;
     }
 
@@ -536,8 +535,7 @@ IA64FAULT vmx_vcpu_tpa(VCPU *vcpu, u64 vadr, u64 *padr)
             dnat_page_consumption(vcpu, vadr);
             return IA64_FAULT;
         } else {
-            *padr = ((data->ppn >> (data->ps - 12)) << data->ps) |
-                    (vadr & (PSIZE(data->ps) - 1));
+            *padr = thash_translate(data, vadr);
             return IA64_NO_FAULT;
         }
     }
@@ -554,8 +552,7 @@ IA64FAULT vmx_vcpu_tpa(VCPU *vcpu, u64 vadr, u64 *padr)
             dnat_page_consumption(vcpu, vadr);
             return IA64_FAULT;
         } else {
-            madr = (data->ppn >> (data->ps - 12) << data->ps) |
-                   (vadr & (PSIZE(data->ps) - 1));
+            madr = thash_translate(data, vadr);
             *padr = __mpa_to_gpa(madr);
             return IA64_NO_FAULT;
         }

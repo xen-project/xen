@@ -402,8 +402,7 @@ try_again:
                 if ((data->ma == VA_MATTR_UC) || (data->ma == VA_MATTR_UCE))
                     return vmx_handle_lds(regs);
             }
-            gppa = (vadr & ((1UL << data->ps) - 1)) +
-                   (data->ppn >> (data->ps - 12) << data->ps);
+            gppa = thash_translate(data, vadr);
             pte = lookup_domain_mpa(v->domain, gppa, NULL);
             if (pte & GPFN_IO_MASK) {
                 if (misr.sp)
