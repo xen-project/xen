@@ -210,21 +210,32 @@ static void sdl_resize(DisplayState *ds, int w, int h, int linesize)
 
  again:
     screen = SDL_SetVideoMode(w, h, 0, flags);
-#ifndef CONFIG_OPENGL
+
     if (!screen) {
         fprintf(stderr, "Could not open SDL display: %s\n", SDL_GetError());
+        if (opengl_enabled) {
+            /* Fallback to SDL */
+            opengl_enabled = 0;
+            ds->dpy_update = sdl_update;
+            ds->dpy_setdata = sdl_setdata;
+            sdl_resize(ds, w, h, linesize);
+            return;
+        }
         exit(1);
-    }
-    if (!screen->pixels && (flags & SDL_HWSURFACE) && (flags & SDL_FULLSCREEN)) {
-        flags &= ~SDL_HWSURFACE;
-        goto again;
     }
 
-    if (!screen->pixels) {
-        fprintf(stderr, "Could not open SDL display: %s\n", SDL_GetError());
-        exit(1);
+    if (!opengl_enabled) {
+        if (!screen->pixels && (flags & SDL_HWSURFACE) && (flags & SDL_FULLSCREEN)) {
+            flags &= ~SDL_HWSURFACE;
+            goto again;
+        }
+
+        if (!screen->pixels) {
+            fprintf(stderr, "Could not open SDL display: %s\n", SDL_GetError());
+            exit(1);
+        }
     }
-#endif
+
     ds->width = w;
     ds->height = h;
     if (!ds->shared_buf) {
