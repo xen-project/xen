@@ -1706,7 +1706,7 @@ enum hvm_intblk hvm_interrupt_blocked(struct vcpu *v, struct hvm_intack intack)
 static long hvm_grant_table_op(
     unsigned int cmd, XEN_GUEST_HANDLE(void) uop, unsigned int count)
 {
-    if ( cmd != GNTTABOP_query_size )
+    if ( (cmd != GNTTABOP_query_size) && (cmd != GNTTABOP_setup_table) )
         return -ENOSYS; /* all other commands need auditing */
     return do_grant_table_op(cmd, uop, count);
 }
