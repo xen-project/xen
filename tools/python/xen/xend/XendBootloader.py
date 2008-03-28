@@ -67,7 +67,6 @@ def bootloader(blexec, disk, dom, quiet = False, blargs = '', kernel = '',
     # listening on the bootloader's fifo for the results.
 
     (m1, s1) = pty.openpty()
-    termios.tcsetattr(m1, termios.TCSANOW, attr)
     tty.setraw(m1);
     fcntl.fcntl(m1, fcntl.F_SETFL, os.O_NDELAY);
     os.close(s1)
