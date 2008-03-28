@@ -49,7 +49,6 @@ static inline void
 show_execution_state(struct cpu_user_regs *regs)
 {
     show_registers(regs);
-    dump_stack();
 }
 
 // NOTE: on xen struct pt_regs = struct cpu_user_regs
