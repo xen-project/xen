@@ -496,6 +496,21 @@ static void raw_aio_cancel(BlockDriverAIOCB *blockacb)
         pacb = &acb->next;
     }
 }
+
+static BlockDriverAIOCB *raw_aio_flush(BlockDriverState *bs,
+        BlockDriverCompletionFunc *cb, void *opaque)
+{
+    RawAIOCB *acb;
+
+    acb = raw_aio_setup(bs, 0, NULL, 0, cb, opaque);
+    if (!acb)
+        return NULL;
+    if (aio_fsync(O_SYNC, &acb->aiocb) < 0) {
+        qemu_aio_release(acb);
+        return NULL;
+    }
+    return &acb->common;
+}
 #endif
 
 static void raw_close(BlockDriverState *bs)
@@ -621,6 +636,7 @@ BlockDriver bdrv_raw = {
     .bdrv_aio_read = raw_aio_read,
     .bdrv_aio_write = raw_aio_write,
     .bdrv_aio_cancel = raw_aio_cancel,
+    .bdrv_aio_flush = raw_aio_flush,
     .aiocb_size = sizeof(RawAIOCB),
 #endif
     .protocol_name = "file",
@@ -959,6 +975,7 @@ BlockDriver bdrv_host_device = {
     .bdrv_aio_read = raw_aio_read,
     .bdrv_aio_write = raw_aio_write,
     .bdrv_aio_cancel = raw_aio_cancel,
+    .bdrv_aio_flush = raw_aio_flush,
     .aiocb_size = sizeof(RawAIOCB),
 #endif
     .bdrv_pread = raw_pread,

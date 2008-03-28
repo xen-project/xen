@@ -48,6 +48,8 @@ static BlockDriverAIOCB *bdrv_aio_write_em(BlockDriverState *bs,
         int64_t sector_num, const uint8_t *buf, int nb_sectors,
         BlockDriverCompletionFunc *cb, void *opaque);
 static void bdrv_aio_cancel_em(BlockDriverAIOCB *acb);
+static BlockDriverAIOCB *bdrv_aio_flush_em(BlockDriverState *bs,
+        BlockDriverCompletionFunc *cb, void *opaque);
 static int bdrv_read_em(BlockDriverState *bs, int64_t sector_num, 
                         uint8_t *buf, int nb_sectors);
 static int bdrv_write_em(BlockDriverState *bs, int64_t sector_num,
@@ -155,6 +157,8 @@ void bdrv_register(BlockDriver *bdrv)
         bdrv->bdrv_read = bdrv_read_em;
         bdrv->bdrv_write = bdrv_write_em;
     }
+    if (!bdrv->bdrv_aio_flush)
+        bdrv->bdrv_aio_flush = bdrv_aio_flush_em;
     bdrv->next = first_drv;
     first_drv = bdrv;
 }
@@ -1138,6 +1142,17 @@ void bdrv_aio_cancel(BlockDriverAIOCB *acb)
     drv->bdrv_aio_cancel(acb);
 }
 
+BlockDriverAIOCB *bdrv_aio_flush(BlockDriverState *bs, 
+                                 BlockDriverCompletionFunc *cb, void *opaque)
+{
+    BlockDriver *drv = bs->drv;
+
+    if (!drv)
+        return NULL;
+
+    return drv->bdrv_aio_flush(bs, cb, opaque);
+}
+
 
 /**************************************************************/
 /* async block device emulation */
@@ -1213,6 +1228,14 @@ static void bdrv_aio_cancel_em(BlockDriverAIOCB *blockacb)
     qemu_aio_release(acb);
 }
 #endif /* !QEMU_TOOL */
+
+static BlockDriverAIOCB *bdrv_aio_flush_em(BlockDriverState *bs,
+        BlockDriverCompletionFunc *cb, void *opaque)
+{
+    bdrv_flush(bs);
+    cb(opaque, 0);
+    return NULL;
+}
 
 /**************************************************************/
 /* sync block device emulation */

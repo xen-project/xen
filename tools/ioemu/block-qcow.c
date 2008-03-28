@@ -783,6 +783,13 @@ static void qcow_aio_cancel(BlockDriverAIOCB *blockacb)
     qemu_aio_release(acb);
 }
 
+static BlockDriverAIOCB *qcow_aio_flush(BlockDriverState *bs,
+        BlockDriverCompletionFunc *cb, void *opaque)
+{
+    BDRVQcowState *s = bs->opaque;
+    return bdrv_aio_flush(s->hd, cb, opaque);
+}
+
 static void qcow_close(BlockDriverState *bs)
 {
     BDRVQcowState *s = bs->opaque;
@@ -957,6 +964,7 @@ BlockDriver bdrv_qcow = {
     .bdrv_aio_read = qcow_aio_read,
     .bdrv_aio_write = qcow_aio_write,
     .bdrv_aio_cancel = qcow_aio_cancel,
+    .bdrv_aio_flush = qcow_aio_flush,
     .aiocb_size = sizeof(QCowAIOCB),
     .bdrv_write_compressed = qcow_write_compressed,
     .bdrv_get_info = qcow_get_info,

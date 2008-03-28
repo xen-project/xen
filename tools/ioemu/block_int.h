@@ -49,6 +49,8 @@ struct BlockDriver {
         int64_t sector_num, const uint8_t *buf, int nb_sectors,
         BlockDriverCompletionFunc *cb, void *opaque);
     void (*bdrv_aio_cancel)(BlockDriverAIOCB *acb);
+    BlockDriverAIOCB *(*bdrv_aio_flush)(BlockDriverState *bs,
+        BlockDriverCompletionFunc *cb, void *opaque);
     int aiocb_size;
 
     const char *protocol_name;
