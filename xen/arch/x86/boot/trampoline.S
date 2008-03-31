@@ -156,9 +156,12 @@ trampoline_boot_cpu_entry:
         sti
 
 #if defined(__x86_64__)
-        /* Declare that our target operating mode is long mode. */
-        movw    $0xec00,%ax      # declare target operating mode
-        movw    $0x0002,%bx      # long mode
+        /*
+         * Declare that our target operating mode is long mode.
+         * Initialise 32-bit registers since some buggy BIOSes depend on it.
+         */
+        movl    $0xec00,%eax      # declare target operating mode
+        movl    $0x0002,%ebx      # long mode
         int     $0x15
 #endif
 
