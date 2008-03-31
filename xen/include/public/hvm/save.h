@@ -39,6 +39,10 @@
  * Internal mechanisms should be kept in Xen-private headers.
  */
 
+#if !defined(__GNUC__) || defined(__STRICT_ANSI__)
+#error "Anonymous structs/unions are a GNU extension."
+#endif
+
 /* 
  * Each entry is preceded by a descriptor giving its type and length
  */

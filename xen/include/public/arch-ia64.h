@@ -28,6 +28,10 @@
 #ifndef __HYPERVISOR_IF_IA64_H__
 #define __HYPERVISOR_IF_IA64_H__
 
+#if !defined(__GNUC__) || defined(__STRICT_ANSI__)
+#error "Anonymous structs/unions are a GNU extension."
+#endif
+
 /* Structural guest handles introduced in 0x00030201. */
 #if __XEN_INTERFACE_VERSION__ >= 0x00030201
 #define ___DEFINE_XEN_GUEST_HANDLE(name, type) \
