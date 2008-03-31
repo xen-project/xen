@@ -179,6 +179,7 @@
 ^tools/tests/blowfish\.bin$
 ^tools/tests/blowfish\.h$
 ^tools/tests/test_x86_emulator$
+^tools/tests/x86_emulate$
 ^tools/vnet/Make.local$
 ^tools/vnet/build/.*$
 ^tools/vnet/gc$

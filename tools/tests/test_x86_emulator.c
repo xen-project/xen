@@ -1,20 +1,11 @@
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <stdint.h>
-typedef uint8_t            u8;
-typedef uint16_t           u16;
-typedef uint32_t           u32;
-typedef uint64_t           u64;
-typedef int8_t             s8;
-typedef int16_t            s16;
-typedef int32_t            s32;
-typedef int64_t            s64;
 #include <public/xen.h>
-#include <asm-x86/x86_emulate.h>
 #include <sys/mman.h>
 
+#include "x86_emulate/x86_emulate.h"
 #include "blowfish.h"
 
 #define MMAP_SZ 16384
@@ -38,9 +29,9 @@ static int read(
     unsigned long addr = offset;
     switch ( bytes )
     {
-    case 1: *val = *(u8 *)addr; break;
-    case 2: *val = *(u16 *)addr; break;
-    case 4: *val = *(u32 *)addr; break;
+    case 1: *val = *(uint8_t *)addr; break;
+    case 2: *val = *(uint16_t *)addr; break;
+    case 4: *val = *(uint32_t *)addr; break;
     case 8: *val = *(unsigned long *)addr; break;
     }
     return X86EMUL_OKAY;
@@ -56,9 +47,9 @@ static int write(
     unsigned long addr = offset;
     switch ( bytes )
     {
-    case 1: *(u8 *)addr = (u8)val; break;
-    case 2: *(u16 *)addr = (u16)val; break;
-    case 4: *(u32 *)addr = (u32)val; break;
+    case 1: *(uint8_t *)addr = (uint8_t)val; break;
+    case 2: *(uint16_t *)addr = (uint16_t)val; break;
+    case 4: *(uint32_t *)addr = (uint32_t)val; break;
     case 8: *(unsigned long *)addr = val; break;
     }
     return X86EMUL_OKAY;
@@ -75,9 +66,9 @@ static int cmpxchg(
     unsigned long addr = offset;
     switch ( bytes )
     {
-    case 1: *(u8 *)addr = (u8)new; break;
-    case 2: *(u16 *)addr = (u16)new; break;
-    case 4: *(u32 *)addr = (u32)new; break;
+    case 1: *(uint8_t *)addr = (uint8_t)new; break;
+    case 2: *(uint16_t *)addr = (uint16_t)new; break;
+    case 4: *(uint32_t *)addr = (uint32_t)new; break;
     case 8: *(unsigned long *)addr = new; break;
     }
     return X86EMUL_OKAY;
