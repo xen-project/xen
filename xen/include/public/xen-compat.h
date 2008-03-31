@@ -41,4 +41,8 @@
 #error "These header files do not support the requested interface version."
 #endif
 
+#if defined(__GNUC__) && defined(__STRICT_ANSI__)
+#error "These headers files use GNU extensions when built with GCC."
+#endif
+
 #endif /* __XEN_PUBLIC_XEN_COMPAT_H__ */

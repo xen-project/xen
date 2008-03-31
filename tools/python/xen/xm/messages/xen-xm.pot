@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: PACKAGE VERSION\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2007-04-05 14:17-0400\n"
+"POT-Creation-Date: 2008-03-31 17:40+0100\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -60,4 +60,9 @@ msgstr ""
 msgid ""
 "The network you specified already has a PIF attached to it, and so another "
 "one may not be attached."
+msgstr ""
+
+#: xen/xm/XenAPI.py:67
+#, python-format
+msgid "%(2)s"
 msgstr ""

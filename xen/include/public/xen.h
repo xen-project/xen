@@ -29,11 +29,6 @@
 
 #include "xen-compat.h"
 
-#ifdef __GNUC__
-#define __anonymous_union __extension__ union
-#define __anonymous_struct __extension__ union
-#endif
-
 #if defined(__i386__) || defined(__x86_64__)
 #include "arch-x86/xen.h"
 #elif defined(__ia64__)

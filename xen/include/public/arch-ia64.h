@@ -23,6 +23,8 @@
  *
  */
 
+#include "xen.h"
+
 #ifndef __HYPERVISOR_IF_IA64_H__
 #define __HYPERVISOR_IF_IA64_H__
 
@@ -131,7 +133,7 @@ struct pt_fpreg {
 
 union vac {
     unsigned long value;
-    __anonymous_struct {
+    struct {
         int a_int:1;
         int a_from_int_cr:1;
         int a_to_int_cr:1;
@@ -146,7 +148,7 @@ typedef union vac vac_t;
 
 union vdc {
     unsigned long value;
-    __anonymous_struct {
+    struct {
         int d_vmsw:1;
         int d_extint:1;
         int d_ibr_dbr:1;
@@ -165,11 +167,11 @@ struct mapped_regs {
     unsigned long  reserved1[29];
     unsigned long  vhpi;
     unsigned long  reserved2[95];
-    __anonymous_union {
+    union {
         unsigned long  vgr[16];
         unsigned long bank1_regs[16]; // bank1 regs (r16-r31) when bank0 active
     };
-    __anonymous_union {
+    union {
         unsigned long  vbgr[16];
         unsigned long bank0_regs[16]; // bank0 regs (r16-r31) when bank1 active
     };
@@ -180,9 +182,9 @@ struct mapped_regs {
     unsigned long  vpsr;
     unsigned long  vpr;
     unsigned long  reserved4[76];
-    __anonymous_union {
+    union {
         unsigned long  vcr[128];
-        __anonymous_struct {
+        struct {
             unsigned long dcr;  // CR0
             unsigned long itm;
             unsigned long iva;
@@ -214,9 +216,9 @@ struct mapped_regs {
             unsigned long rsv6[46];
         };
     };
-    __anonymous_union {
+    union {
         unsigned long  reserved5[128];
-        __anonymous_struct {
+        struct {
             unsigned long precover_ifs;
             unsigned long unat;  // not sure if this is needed until NaT arch is done
             int interrupt_collection_enabled; // virtual psr.ic
@@ -302,7 +304,7 @@ struct vcpu_tr_regs {
 
 union vcpu_ar_regs {
     unsigned long ar[128];
-    __anonymous_struct {
+    struct {
         unsigned long kr[8];
         unsigned long rsv1[8];
         unsigned long rsc;
@@ -339,7 +341,7 @@ union vcpu_ar_regs {
 
 union vcpu_cr_regs {
     unsigned long cr[128];
-    __anonymous_struct {
+    struct {
         unsigned long dcr;  // CR0
         unsigned long itm;
         unsigned long iva;
@@ -608,8 +610,8 @@ struct xen_ia64_boot_param {
 struct xen_ia64_opt_feature {
 	unsigned long cmd;		/* Which feature */
 	unsigned char on;		/* Switch feature on/off */
-	__anonymous_union {
-		__anonymous_struct {
+	union {
+		struct {
 				/* The page protection bit mask of the pte.
 			 	 * This will be or'ed with the pte. */
 			unsigned long pgprot;

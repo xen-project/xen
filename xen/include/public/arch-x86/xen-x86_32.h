@@ -108,10 +108,10 @@
 /* 32-/64-bit invariability for control interfaces (domctl/sysctl). */
 #if defined(__XEN__) || defined(__XEN_TOOLS__)
 #undef ___DEFINE_XEN_GUEST_HANDLE
-#define ___DEFINE_XEN_GUEST_HANDLE(name, type)                              \
-    typedef struct { type *p; }                                             \
-        __guest_handle_ ## name;                                            \
-    typedef struct { __anonymous_union { type *p; uint64_aligned_t q; }; }  \
+#define ___DEFINE_XEN_GUEST_HANDLE(name, type)                  \
+    typedef struct { type *p; }                                 \
+        __guest_handle_ ## name;                                \
+    typedef struct { union { type *p; uint64_aligned_t q; }; }  \
         __guest_handle_64_ ## name
 #undef set_xen_guest_handle
 #define set_xen_guest_handle(hnd, val)                      \

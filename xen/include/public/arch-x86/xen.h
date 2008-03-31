@@ -24,6 +24,8 @@
  * Copyright (c) 2004-2006, K A Fraser
  */
 
+#include "../xen.h"
+
 #ifndef __XEN_PUBLIC_ARCH_X86_XEN_H__
 #define __XEN_PUBLIC_ARCH_X86_XEN_H__
 
@@ -140,9 +142,9 @@ struct vcpu_guest_context {
     unsigned long event_callback_eip;
     unsigned long failsafe_callback_eip;
 #ifdef __XEN__
-    __anonymous_union {
+    union {
         unsigned long syscall_callback_eip;
-        __anonymous_struct {
+        struct {
             unsigned int event_callback_cs;    /* compat CS of event cb     */
             unsigned int failsafe_callback_cs; /* compat CS of failsafe cb  */
         };
