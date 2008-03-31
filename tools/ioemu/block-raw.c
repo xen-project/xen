@@ -615,10 +615,12 @@ static int raw_create(const char *filename, int64_t total_size,
     return 0;
 }
 
-static void raw_flush(BlockDriverState *bs)
+static int raw_flush(BlockDriverState *bs)
 {
     BDRVRawState *s = bs->opaque;
-    fsync(s->fd);
+    if (fsync(s->fd))
+        return errno;
+    return 0;
 }
 
 BlockDriver bdrv_raw = {

@@ -889,12 +889,14 @@ const char *bdrv_get_device_name(BlockDriverState *bs)
     return bs->device_name;
 }
 
-void bdrv_flush(BlockDriverState *bs)
+int bdrv_flush(BlockDriverState *bs)
 {
-    if (bs->drv->bdrv_flush)
-        bs->drv->bdrv_flush(bs);
-    if (bs->backing_hd)
-        bdrv_flush(bs->backing_hd);
+    int ret = 0;
+    if (bs->drv->bdrv_flush) 
+        ret = bs->drv->bdrv_flush(bs);
+    if (!ret && bs->backing_hd)
+        ret = bdrv_flush(bs->backing_hd);
+    return ret;
 }
 
 void bdrv_info(void)
@@ -1232,8 +1234,9 @@ static void bdrv_aio_cancel_em(BlockDriverAIOCB *blockacb)
 static BlockDriverAIOCB *bdrv_aio_flush_em(BlockDriverState *bs,
         BlockDriverCompletionFunc *cb, void *opaque)
 {
-    bdrv_flush(bs);
-    cb(opaque, 0);
+    int ret;
+    ret = bdrv_flush(bs);
+    cb(opaque, ret);
     return NULL;
 }
 
