@@ -899,8 +899,10 @@ struct acm_operations acm_simple_type_enforcement_ops = {
     .fail_grant_map_ref     = NULL,
     .pre_grant_setup        = ste_pre_grant_setup,
     .fail_grant_setup       = NULL,
+    /* generic domain-requested decision hooks */
     .sharing                = ste_sharing,
     .authorization          = ste_authorization,
+    .conflictset            = NULL,
 
     .is_default_policy      = ste_is_default_policy,
 };

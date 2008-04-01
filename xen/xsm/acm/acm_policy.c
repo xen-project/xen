@@ -446,6 +446,9 @@ acm_get_decision(ssidref_t ssidref1, ssidref_t ssidref2, u32 hook)
         ret = acm_authorization(ssidref1, ssidref2);
         break;
 
+    case ACMHOOK_conflictset:
+        ret = acm_conflictset(ssidref1);
+
     default:
         /* deny */
         break;

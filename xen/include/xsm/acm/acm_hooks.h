@@ -116,6 +116,7 @@ struct acm_operations {
                                         ssidref_t ssidref2);
     int (*authorization)               (ssidref_t ssidref1,
                                         ssidref_t ssidref2);
+    int (*conflictset)                 (ssidref_t ssidref1);
     /* determine whether the default policy is installed */
     int (*is_default_policy)           (void);
 };
@@ -150,6 +151,8 @@ static inline int acm_is_policy(char *buf, unsigned long len)
 static inline int acm_sharing(ssidref_t ssidref1, ssidref_t ssidref2)
 { return 0; }
 static inline int acm_authorization(ssidref_t ssidref1, ssidref_t ssidref2)
+{ return 0; }
+static inline int acm_conflictset(ssidref_t ssidref1)
 { return 0; }
 static inline int acm_domain_create(struct domain *d, ssidref_t ssidref)
 { return 0; }
@@ -328,6 +331,17 @@ static inline int acm_authorization(ssidref_t ssidref1, ssidref_t ssidref2)
         return acm_sharing(ssidref1, ssidref2);
 }
 
+
+static inline int acm_conflictset(ssidref_t ssidref1)
+{
+    if ((acm_primary_ops->conflictset != NULL) &&
+        acm_primary_ops->conflictset(ssidref1))
+        return ACM_ACCESS_DENIED;
+    else if ((acm_secondary_ops->conflictset != NULL) &&
+             acm_secondary_ops->conflictset(ssidref1))
+        return ACM_ACCESS_DENIED;
+    return ACM_ACCESS_PERMITTED;
+}
 
 /* Return true iff buffer has an acm policy magic number.  */
 extern int acm_is_policy(char *buf, unsigned long len);

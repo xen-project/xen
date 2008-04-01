@@ -102,6 +102,7 @@ typedef uint32_t ssidref_t;
 #define ACMHOOK_none          0
 #define ACMHOOK_sharing       1
 #define ACMHOOK_authorization 2
+#define ACMHOOK_conflictset   3
 
 /* -------security policy relevant type definitions-------- */
 
