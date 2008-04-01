@@ -1486,7 +1486,7 @@ void check_sse2(void)
 static void vga_draw_graphic(VGAState *s, int full_update)
 {
     int y1, y, update, linesize, y_start, double_scan, mask, depth;
-    int width, height, shift_control, line_offset, bwidth, changed_flag;
+    int width, height, shift_control, line_offset, bwidth, ds_depth;
     ram_addr_t page0, page1;
     int disp_width, multi_scan, multi_run;
     uint8_t *d;
@@ -1499,13 +1499,13 @@ static void vga_draw_graphic(VGAState *s, int full_update)
     s->get_resolution(s, &width, &height);
     disp_width = width;
 
-    changed_flag = 0;
+    ds_depth = s->ds->depth;
     depth = s->get_bpp(s);
     if (s->ds->dpy_colourdepth != NULL && 
-            (s->ds->depth != depth || !s->ds->shared_buf)) {
+            (ds_depth != depth || !s->ds->shared_buf))
         s->ds->dpy_colourdepth(s->ds, depth);
-        changed_flag = 1;
-    }
+    if (ds_depth != s->ds->depth) full_update = 1;
+
     s->rgb_to_pixel = 
         rgb_to_pixel_dup_table[get_depth_index(s->ds)];
 
@@ -1569,17 +1569,18 @@ static void vga_draw_graphic(VGAState *s, int full_update)
     }
 
     vga_draw_line = vga_draw_line_table[v * NB_DEPTHS + get_depth_index(s->ds)];
-    if (disp_width != s->last_width ||
+    if (s->line_offset != s->last_line_offset || 
+        disp_width != s->last_width ||
         height != s->last_height) {
         dpy_resize(s->ds, disp_width, height, s->line_offset);
         s->last_scr_width = disp_width;
         s->last_scr_height = height;
         s->last_width = disp_width;
         s->last_height = height;
+        s->last_line_offset = s->line_offset; 
         full_update = 1;
-        changed_flag = 1;
     }
-    if (s->ds->shared_buf && (changed_flag || s->ds->data != s->vram_ptr + (s->start_addr * 4)))
+    if (s->ds->shared_buf && (full_update || s->ds->data != s->vram_ptr + (s->start_addr * 4)))
         s->ds->dpy_setdata(s->ds, s->vram_ptr + (s->start_addr * 4));
     if (!s->ds->shared_buf && s->cursor_invalidate)
         s->cursor_invalidate(s);
@@ -2072,6 +2073,7 @@ void vga_common_init(VGAState *s, DisplayState *ds, uint8_t *vga_ram_base,
     s->vram_offset = vga_ram_offset;
     s->vram_size = vga_ram_size;
     s->ds = ds;
+    ds->palette = s->last_palette;
     s->get_bpp = vga_get_bpp;
     s->get_offsets = vga_get_offsets;
     s->get_resolution = vga_get_resolution;

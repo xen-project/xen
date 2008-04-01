@@ -85,19 +85,33 @@ static void opengl_setdata(DisplayState *ds, void *pixels)
     glPixelStorei(GL_UNPACK_LSB_FIRST, 1);
     switch (ds->depth) {
         case 8:
-            tex_format = GL_RGB;
-            tex_type = GL_UNSIGNED_BYTE_3_3_2;
-            glPixelStorei (GL_UNPACK_ALIGNMENT, 1);
+            if (ds->palette == NULL) {
+                tex_format = GL_RGB;
+                tex_type = GL_UNSIGNED_BYTE_3_3_2;
+            } else {
+                int i;
+                GLushort paletter[256], paletteg[256], paletteb[256];
+                for (i = 0; i < 256; i++) {
+                    uint8_t rgb = ds->palette[i] >> 16;
+                    paletter[i] = ((rgb & 0xe0) >> 5) * 65535 / 7;
+                    paletteg[i] = ((rgb & 0x1c) >> 2) * 65535 / 7;
+                    paletteb[i] = (rgb & 0x3) * 65535 / 3;
+                }
+                glPixelMapusv(GL_PIXEL_MAP_I_TO_R, 256, paletter);
+                glPixelMapusv(GL_PIXEL_MAP_I_TO_G, 256, paletteg);
+                glPixelMapusv(GL_PIXEL_MAP_I_TO_B, 256, paletteb);
+
+                tex_format = GL_COLOR_INDEX;
+                tex_type = GL_UNSIGNED_BYTE;
+            }
             break;
         case 16:
             tex_format = GL_RGB;
             tex_type = GL_UNSIGNED_SHORT_5_6_5;
-            glPixelStorei (GL_UNPACK_ALIGNMENT, 2);
             break;
         case 24:
             tex_format = GL_BGR;
             tex_type = GL_UNSIGNED_BYTE;
-            glPixelStorei (GL_UNPACK_ALIGNMENT, 1);
             break;
         case 32:
             if (!ds->bgr) {
@@ -107,7 +121,6 @@ static void opengl_setdata(DisplayState *ds, void *pixels)
                 tex_format = GL_RGBA;
                 tex_type = GL_UNSIGNED_BYTE;                
             }
-            glPixelStorei (GL_UNPACK_ALIGNMENT, 4);
             break;
     }   
     glPixelStorei(GL_UNPACK_ROW_LENGTH, (ds->linesize * 8) / ds->depth);
@@ -184,6 +197,17 @@ static void sdl_setdata(DisplayState *ds, void *pixels)
             return;
     }
     shared = SDL_CreateRGBSurfaceFrom(pixels, width, height, ds->depth, ds->linesize, rmask , gmask, bmask, amask);
+    if (ds->depth == 8 && ds->palette != NULL) {
+        SDL_Color palette[256];
+        int i;
+        for (i = 0; i < 256; i++) {
+            uint8_t rgb = ds->palette[i] >> 16;
+            palette[i].r = ((rgb & 0xe0) >> 5) * 255 / 7;
+            palette[i].g = ((rgb & 0x1c) >> 2) * 255 / 7;
+            palette[i].b = (rgb & 0x3) * 255 / 3;
+        }
+        SDL_SetColors(shared, palette, 0, 256);
+    }
     ds->data = pixels;
 }
 
@@ -273,7 +297,10 @@ static void sdl_resize(DisplayState *ds, int w, int h, int linesize)
 
 static void sdl_colourdepth(DisplayState *ds, int depth)
 {
-    if (!depth || !ds->depth) return;
+    if (!depth || !ds->depth) {
+        ds->shared_buf = 0;
+        return;
+    }
     ds->shared_buf = 1;
     ds->depth = depth;
     ds->linesize = width * depth / 8;
