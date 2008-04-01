@@ -2881,7 +2881,8 @@ static int sh_page_fault(struct vcpu *v,
             perfc_incr(shadow_fault_fast_mmio);
             SHADOW_PRINTK("fast path mmio %#"PRIpaddr"\n", gpa);
             reset_early_unshadow(v);
-            return handle_mmio() ? EXCRET_fault_fixed : 0;
+            return (handle_mmio_with_translation(va, gpa >> PAGE_SHIFT)
+                    ? EXCRET_fault_fixed : 0);
         }
         else
         {
@@ -3199,7 +3200,8 @@ static int sh_page_fault(struct vcpu *v,
     shadow_audit_tables(v);
     reset_early_unshadow(v);
     shadow_unlock(d);
-    return handle_mmio() ? EXCRET_fault_fixed : 0;
+    return (handle_mmio_with_translation(va, gpa >> PAGE_SHIFT)
+            ? EXCRET_fault_fixed : 0);
 
  not_a_shadow_fault:
     sh_audit_gw(v, &gw);

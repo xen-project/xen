@@ -81,6 +81,58 @@ void hvm_enable(struct hvm_function_table *fns)
         printk("HVM: Hardware Assisted Paging detected.\n");
 }
 
+/*
+ * Need to re-inject a given event? We avoid re-injecting software exceptions
+ * and interrupts because the faulting/trapping instruction can simply be
+ * re-executed (neither VMX nor SVM update RIP when they VMEXIT during
+ * INT3/INTO/INTn).
+ */
+int hvm_event_needs_reinjection(uint8_t type, uint8_t vector)
+{
+    switch ( type )
+    {
+    case X86_EVENTTYPE_EXT_INTR:
+    case X86_EVENTTYPE_NMI:
+        return 1;
+    case X86_EVENTTYPE_HW_EXCEPTION:
+        /*
+         * SVM uses type 3 ("HW Exception") for #OF and #BP. We explicitly
+         * check for these vectors, as they are really SW Exceptions. SVM has
+         * not updated RIP to point after the trapping instruction (INT3/INTO).
+         */
+        return (vector != 3) && (vector != 4);
+    default:
+        /* Software exceptions/interrupts can be re-executed (e.g., INT n). */
+        break;
+    }
+    return 0;
+}
+
+/*
+ * Combine two hardware exceptions: @vec2 was raised during delivery of @vec1.
+ * This means we can assume that @vec2 is contributory or a page fault.
+ */
+uint8_t hvm_combine_hw_exceptions(uint8_t vec1, uint8_t vec2)
+{
+    /* Exception during double-fault delivery always causes a triple fault. */
+    if ( vec1 == TRAP_double_fault )
+    {
+        hvm_triple_fault();
+        return TRAP_double_fault; /* dummy return */
+    }
+
+    /* Exception during page-fault delivery always causes a double fault. */
+    if ( vec1 == TRAP_page_fault )
+        return TRAP_double_fault;
+
+    /* Discard the first exception if it's benign or if we now have a #PF. */
+    if ( !((1u << vec1) & 0x7c01u) || (vec2 == TRAP_page_fault) )
+        return vec2;
+
+    /* Cannot combine the exceptions: double fault. */
+    return TRAP_double_fault;
+}
+
 void hvm_set_guest_tsc(struct vcpu *v, u64 guest_tsc)
 {
     u64 host_tsc;
@@ -203,6 +255,30 @@ static int hvm_set_ioreq_page(
     return 0;
 }
 
+static int hvm_print_line(
+    int dir, uint32_t port, uint32_t bytes, uint32_t *val)
+{
+    struct vcpu *curr = current;
+    struct hvm_domain *hd = &curr->domain->arch.hvm_domain;
+    char c = *val;
+
+    BUG_ON(bytes != 1);
+
+    spin_lock(&hd->pbuf_lock);
+    hd->pbuf[hd->pbuf_idx++] = c;
+    if ( (hd->pbuf_idx == (sizeof(hd->pbuf) - 2)) || (c == '\n') )
+    {
+        if ( c != '\n' )
+            hd->pbuf[hd->pbuf_idx++] = '\n';
+        hd->pbuf[hd->pbuf_idx] = '\0';
+        printk(XENLOG_G_DEBUG "HVM%u: %s", curr->domain->domain_id, hd->pbuf);
+        hd->pbuf_idx = 0;
+    }
+    spin_unlock(&hd->pbuf_lock);
+
+    return 1;
+}
+
 int hvm_domain_initialise(struct domain *d)
 {
     int rc;
@@ -236,6 +312,8 @@ int hvm_domain_initialise(struct domain *d)
 
     hvm_init_ioreq_page(d, &d->arch.hvm_domain.ioreq);
     hvm_init_ioreq_page(d, &d->arch.hvm_domain.buf_ioreq);
+
+    register_portio_handler(d, 0xe9, 1, hvm_print_line);
 
     rc = hvm_funcs.domain_initialise(d);
     if ( rc != 0 )
@@ -1250,7 +1328,7 @@ void hvm_task_switch(
         goto out;
     }
 
-    if ( !tr.attr.fields.g && (tr.limit < (sizeof(tss)-1)) )
+    if ( tr.limit < (sizeof(tss)-1) )
     {
         hvm_inject_exception(TRAP_invalid_tss, tss_sel & 0xfff8, 0);
         goto out;
@@ -1358,7 +1436,7 @@ void hvm_task_switch(
         if ( hvm_virtual_to_linear_addr(x86_seg_ss, &reg, regs->esp,
                                         4, hvm_access_write, 32,
                                         &linear_addr) )
-            hvm_copy_to_guest_virt_nofault(linear_addr, &errcode, 4);
+            hvm_copy_to_guest_virt_nofault(linear_addr, &errcode, 4, 0);
     }
 
  out:
@@ -1366,60 +1444,31 @@ void hvm_task_switch(
     hvm_unmap(nptss_desc);
 }
 
-/*
- * __hvm_copy():
- *  @buf  = hypervisor buffer
- *  @addr = guest address to copy to/from
- *  @size = number of bytes to copy
- *  @dir  = copy *to* guest (TRUE) or *from* guest (FALSE)?
- *  @virt = addr is *virtual* (TRUE) or *guest physical* (FALSE)?
- *  @fetch = copy is an instruction fetch?
- * Returns number of bytes failed to copy (0 == complete success).
- */
+#define HVMCOPY_from_guest (0u<<0)
+#define HVMCOPY_to_guest   (1u<<0)
+#define HVMCOPY_no_fault   (0u<<1)
+#define HVMCOPY_fault      (1u<<1)
+#define HVMCOPY_phys       (0u<<2)
+#define HVMCOPY_virt       (1u<<2)
 static enum hvm_copy_result __hvm_copy(
-    void *buf, paddr_t addr, int size, int dir, int virt, int fetch)
+    void *buf, paddr_t addr, int size, unsigned int flags, uint32_t pfec)
 {
     struct vcpu *curr = current;
     unsigned long gfn, mfn;
     p2m_type_t p2mt;
     char *p;
-    int count, todo;
-    uint32_t pfec = PFEC_page_present;
+    int count, todo = size;
 
-    /*
-     * We cannot use hvm_get_segment_register() while executing in
-     * vmx_realmode() as segment register state is cached. Furthermore,
-     * VMREADs on every data access hurts emulation performance.
-     * Hence we do not gather extra PFEC flags if CR0.PG == 0.
-     */
-    if ( !(curr->arch.hvm_vcpu.guest_cr[0] & X86_CR0_PG) )
-        virt = 0;
-
-    if ( virt )
-    {
-        struct segment_register sreg;
-        hvm_get_segment_register(curr, x86_seg_ss, &sreg);
-        if ( sreg.attr.fields.dpl == 3 )
-            pfec |= PFEC_user_mode;
-
-        if ( dir ) 
-            pfec |= PFEC_write_access;
-
-        if ( fetch ) 
-            pfec |= PFEC_insn_fetch;
-    }
-
-    todo = size;
     while ( todo > 0 )
     {
         count = min_t(int, PAGE_SIZE - (addr & ~PAGE_MASK), todo);
 
-        if ( virt )
+        if ( flags & HVMCOPY_virt )
         {
             gfn = paging_gva_to_gfn(curr, addr, &pfec);
             if ( gfn == INVALID_GFN )
             {
-                if ( virt == 2 ) /* 2 means generate a fault */
+                if ( flags & HVMCOPY_fault )
                     hvm_inject_exception(TRAP_page_fault, pfec, addr);
                 return HVMCOPY_bad_gva_to_gfn;
             }
@@ -1437,16 +1486,18 @@ static enum hvm_copy_result __hvm_copy(
 
         p = (char *)map_domain_page(mfn) + (addr & ~PAGE_MASK);
 
-        if ( dir )
+        if ( flags & HVMCOPY_to_guest )
         {
-            memcpy(p, buf, count); /* dir == TRUE:  *to* guest */
+            memcpy(p, buf, count);
             paging_mark_dirty(curr->domain, mfn);
         }
         else
-            memcpy(buf, p, count); /* dir == FALSE: *from guest */
+        {
+            memcpy(buf, p, count);
+        }
 
         unmap_domain_page(p);
-        
+
         addr += count;
         buf  += count;
         todo -= count;
@@ -1458,56 +1509,73 @@ static enum hvm_copy_result __hvm_copy(
 enum hvm_copy_result hvm_copy_to_guest_phys(
     paddr_t paddr, void *buf, int size)
 {
-    return __hvm_copy(buf, paddr, size, 1, 0, 0);
+    return __hvm_copy(buf, paddr, size,
+                      HVMCOPY_to_guest | HVMCOPY_fault | HVMCOPY_phys,
+                      0);
 }
 
 enum hvm_copy_result hvm_copy_from_guest_phys(
     void *buf, paddr_t paddr, int size)
 {
-    return __hvm_copy(buf, paddr, size, 0, 0, 0);
+    return __hvm_copy(buf, paddr, size,
+                      HVMCOPY_from_guest | HVMCOPY_fault | HVMCOPY_phys,
+                      0);
 }
 
 enum hvm_copy_result hvm_copy_to_guest_virt(
-    unsigned long vaddr, void *buf, int size)
+    unsigned long vaddr, void *buf, int size, uint32_t pfec)
 {
-    return __hvm_copy(buf, vaddr, size, 1, 2, 0);
+    return __hvm_copy(buf, vaddr, size,
+                      HVMCOPY_to_guest | HVMCOPY_fault | HVMCOPY_virt,
+                      PFEC_page_present | PFEC_write_access | pfec);
 }
 
 enum hvm_copy_result hvm_copy_from_guest_virt(
-    void *buf, unsigned long vaddr, int size)
+    void *buf, unsigned long vaddr, int size, uint32_t pfec)
 {
-    return __hvm_copy(buf, vaddr, size, 0, 2, 0);
+    return __hvm_copy(buf, vaddr, size,
+                      HVMCOPY_from_guest | HVMCOPY_fault | HVMCOPY_virt,
+                      PFEC_page_present | pfec);
 }
 
 enum hvm_copy_result hvm_fetch_from_guest_virt(
-    void *buf, unsigned long vaddr, int size)
+    void *buf, unsigned long vaddr, int size, uint32_t pfec)
 {
-    return __hvm_copy(buf, vaddr, size, 0, 2, hvm_nx_enabled(current));
+    if ( hvm_nx_enabled(current) )
+        pfec |= PFEC_insn_fetch;
+    return __hvm_copy(buf, vaddr, size,
+                      HVMCOPY_from_guest | HVMCOPY_fault | HVMCOPY_virt,
+                      PFEC_page_present | pfec);
 }
 
 enum hvm_copy_result hvm_copy_to_guest_virt_nofault(
-    unsigned long vaddr, void *buf, int size)
+    unsigned long vaddr, void *buf, int size, uint32_t pfec)
 {
-    return __hvm_copy(buf, vaddr, size, 1, 1, 0);
+    return __hvm_copy(buf, vaddr, size,
+                      HVMCOPY_to_guest | HVMCOPY_no_fault | HVMCOPY_virt,
+                      PFEC_page_present | PFEC_write_access | pfec);
 }
 
 enum hvm_copy_result hvm_copy_from_guest_virt_nofault(
-    void *buf, unsigned long vaddr, int size)
+    void *buf, unsigned long vaddr, int size, uint32_t pfec)
 {
-    return __hvm_copy(buf, vaddr, size, 0, 1, 0);
+    return __hvm_copy(buf, vaddr, size,
+                      HVMCOPY_from_guest | HVMCOPY_no_fault | HVMCOPY_virt,
+                      PFEC_page_present | pfec);
 }
 
 enum hvm_copy_result hvm_fetch_from_guest_virt_nofault(
-    void *buf, unsigned long vaddr, int size)
+    void *buf, unsigned long vaddr, int size, uint32_t pfec)
 {
-    return __hvm_copy(buf, vaddr, size, 0, 1, hvm_nx_enabled(current));
+    if ( hvm_nx_enabled(current) )
+        pfec |= PFEC_insn_fetch;
+    return __hvm_copy(buf, vaddr, size,
+                      HVMCOPY_from_guest | HVMCOPY_no_fault | HVMCOPY_virt,
+                      PFEC_page_present | pfec);
 }
 
 DEFINE_PER_CPU(int, guest_handles_in_xen_space);
 
-/* Note that copy_{to,from}_user_hvm require the PTE to be writable even
-   when they're only trying to read from it.  The guest is expected to
-   deal with this. */
 unsigned long copy_to_user_hvm(void *to, const void *from, unsigned len)
 {
     int rc;
@@ -1518,7 +1586,8 @@ unsigned long copy_to_user_hvm(void *to, const void *from, unsigned len)
         return 0;
     }
 
-    rc = hvm_copy_to_guest_virt_nofault((unsigned long)to, (void *)from, len);
+    rc = hvm_copy_to_guest_virt_nofault((unsigned long)to, (void *)from,
+                                        len, 0);
     return rc ? len : 0; /* fake a copy_to_user() return code */
 }
 
@@ -1532,26 +1601,8 @@ unsigned long copy_from_user_hvm(void *to, const void *from, unsigned len)
         return 0;
     }
 
-    rc = hvm_copy_from_guest_virt_nofault(to, (unsigned long)from, len);
+    rc = hvm_copy_from_guest_virt_nofault(to, (unsigned long)from, len, 0);
     return rc ? len : 0; /* fake a copy_from_user() return code */
-}
-
-/* HVM specific printbuf. Mostly used for hvmloader chit-chat. */
-void hvm_print_line(struct vcpu *v, const char c)
-{
-    struct hvm_domain *hd = &v->domain->arch.hvm_domain;
-
-    spin_lock(&hd->pbuf_lock);
-    hd->pbuf[hd->pbuf_idx++] = c;
-    if ( (hd->pbuf_idx == (sizeof(hd->pbuf) - 2)) || (c == '\n') )
-    {
-        if ( c != '\n' )
-            hd->pbuf[hd->pbuf_idx++] = '\n';
-        hd->pbuf[hd->pbuf_idx] = '\0';
-        printk(XENLOG_G_DEBUG "HVM%u: %s", v->domain->domain_id, hd->pbuf);
-        hd->pbuf_idx = 0;
-    }
-    spin_unlock(&hd->pbuf_lock);
 }
 
 #define bitmaskof(idx)  (1U << ((idx) & 31))
@@ -1655,7 +1706,7 @@ enum hvm_intblk hvm_interrupt_blocked(struct vcpu *v, struct hvm_intack intack)
 static long hvm_grant_table_op(
     unsigned int cmd, XEN_GUEST_HANDLE(void) uop, unsigned int count)
 {
-    if ( cmd != GNTTABOP_query_size )
+    if ( (cmd != GNTTABOP_query_size) && (cmd != GNTTABOP_setup_table) )
         return -ENOSYS; /* all other commands need auditing */
     return do_grant_table_op(cmd, uop, count);
 }
@@ -2109,12 +2160,15 @@ long do_hvm_op(unsigned long op, XEN_GUEST_HANDLE(void) arg)
             return -EINVAL;
 
         if ( a.domid == DOMID_SELF )
+        {
             d = rcu_lock_current_domain();
-        else {
-            d = rcu_lock_domain_by_id(a.domid);
-            if ( d == NULL )
+        }
+        else
+        {
+            if ( (d = rcu_lock_domain_by_id(a.domid)) == NULL )
                 return -ESRCH;
-            if ( !IS_PRIV_FOR(current->domain, d) ) {
+            if ( !IS_PRIV_FOR(current->domain, d) )
+            {
                 rc = -EPERM;
                 goto param_fail;
             }

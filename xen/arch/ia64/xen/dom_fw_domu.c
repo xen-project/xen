@@ -37,7 +37,7 @@
 #include <errno.h>
 #include <inttypes.h>
 
-#include <xen/arch-ia64.h>
+#include <xen/xen.h>
 
 #include "xg_private.h"
 #include "xc_dom.h"

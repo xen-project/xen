@@ -32,6 +32,9 @@
 
 static grant_entry_t *gnttab_table;
 static grant_ref_t gnttab_list[NR_GRANT_ENTRIES];
+#ifdef GNT_DEBUG
+static char inuse[NR_GRANT_ENTRIES];
+#endif
 static __DECLARE_SEMAPHORE_GENERIC(gnttab_sem, NR_GRANT_ENTRIES);
 
 static void
@@ -39,6 +42,10 @@ put_free_entry(grant_ref_t ref)
 {
     unsigned long flags;
     local_irq_save(flags);
+#ifdef GNT_DEBUG
+    BUG_ON(!inuse[ref]);
+    inuse[ref] = 0;
+#endif
     gnttab_list[ref] = gnttab_list[0];
     gnttab_list[0]  = ref;
     local_irq_restore(flags);
@@ -54,6 +61,10 @@ get_free_entry(void)
     local_irq_save(flags);
     ref = gnttab_list[0];
     gnttab_list[0] = gnttab_list[ref];
+#ifdef GNT_DEBUG
+    BUG_ON(inuse[ref]);
+    inuse[ref] = 1;
+#endif
     local_irq_restore(flags);
     return ref;
 }
@@ -92,10 +103,12 @@ gnttab_end_access(grant_ref_t ref)
 {
     u16 flags, nflags;
 
+    BUG_ON(ref >= NR_GRANT_ENTRIES || ref < NR_RESERVED_ENTRIES);
+
     nflags = gnttab_table[ref].flags;
     do {
         if ((flags = nflags) & (GTF_reading|GTF_writing)) {
-            printk("WARNING: g.e. still in use!\n");
+            printk("WARNING: g.e. still in use! (%x)\n", flags);
             return 0;
         }
     } while ((nflags = synch_cmpxchg(&gnttab_table[ref].flags, flags, 0)) !=
@@ -110,6 +123,8 @@ gnttab_end_transfer(grant_ref_t ref)
 {
     unsigned long frame;
     u16 flags;
+
+    BUG_ON(ref >= NR_GRANT_ENTRIES || ref < NR_RESERVED_ENTRIES);
 
     while (!((flags = gnttab_table[ref].flags) & GTF_transfer_committed)) {
         if (synch_cmpxchg(&gnttab_table[ref].flags, flags, 0) == flags) {
@@ -164,6 +179,9 @@ init_gnttab(void)
     unsigned long frames[NR_GRANT_FRAMES];
     int i;
 
+#ifdef GNT_DEBUG
+    memset(inuse, 1, sizeof(inuse));
+#endif
     for (i = NR_RESERVED_ENTRIES; i < NR_GRANT_ENTRIES; i++)
         put_free_entry(i);
 

@@ -641,6 +641,41 @@ static int chwall_is_default_policy(void)
              (chwall_bin_pol.max_ssidrefs == 2 ) );
 }
 
+
+static int chwall_is_in_conflictset(ssidref_t ssidref1)
+{
+    /* is ssidref1 in conflict with any running domains ? */
+    int rc = 0;
+    int i, j;
+    ssidref_t ssid_chwall;
+
+    read_lock(&acm_bin_pol_rwlock);
+
+    ssid_chwall = GET_SSIDREF(ACM_CHINESE_WALL_POLICY, ssidref1);
+
+    if ( ssid_chwall >= 0 && ssid_chwall < chwall_bin_pol.max_ssidrefs ) {
+        for ( i = 0; i < chwall_bin_pol.max_conflictsets && rc == 0; i++ ) {
+            for ( j = 0; j < chwall_bin_pol.max_types; j++ ) {
+                if ( chwall_bin_pol.conflict_aggregate_set
+                                 [i * chwall_bin_pol.max_types + j] &&
+                     chwall_bin_pol.ssidrefs
+                                 [ssid_chwall * chwall_bin_pol.max_types + j])
+                {
+                    rc = 1;
+                    break;
+                }
+            }
+        }
+    } else {
+        rc = 1;
+    }
+
+    read_unlock(&acm_bin_pol_rwlock);
+
+    return rc;
+}
+
+
 struct acm_operations acm_chinesewall_ops = {
     /* policy management services */
     .init_domain_ssid = chwall_init_domain_ssid,
@@ -666,6 +701,7 @@ struct acm_operations acm_chinesewall_ops = {
     /* generic domain-requested decision hooks */
     .sharing = NULL,
     .authorization = NULL,
+    .conflictset = chwall_is_in_conflictset,
 
     .is_default_policy = chwall_is_default_policy,
 };

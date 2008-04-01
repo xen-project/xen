@@ -2047,11 +2047,10 @@ class XendDomainInfo:
 
         try:
             if self.info['platform'].get('localtime', 0):
-                t = time.time()
-                loc = time.localtime(t)
-                utc = time.gmtime(t)
-                timeoffset = int(time.mktime(loc) - time.mktime(utc))
-                self.info['platform']['rtc_timeoffset'] = timeoffset
+                if time.localtime(time.time())[8]:
+                    self.info['platform']['rtc_timeoffset'] = -time.altzone
+                else:
+                    self.info['platform']['rtc_timeoffset'] = -time.timezone
 
             self.image = image.create(self, self.info)
 

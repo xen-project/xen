@@ -281,7 +281,7 @@ static int xc_dom_load_elf_kernel(struct xc_dom_image *dom)
 
 /* ------------------------------------------------------------------------ */
 
-static struct xc_dom_loader elf_loader = {
+struct xc_dom_loader elf_loader = {
     .name = "ELF-generic",
     .probe = xc_dom_probe_elf_kernel,
     .parser = xc_dom_parse_elf_kernel,

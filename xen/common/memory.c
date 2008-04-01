@@ -232,12 +232,15 @@ static long translate_gpfn_list(
         return -EFAULT;
 
     if ( op.domid == DOMID_SELF )
-        d = current->domain;
-    else {
-        d = rcu_lock_domain_by_id(op.domid);
-        if ( d == NULL )
+    {
+        d = rcu_lock_current_domain();
+    }
+    else
+    {
+        if ( (d = rcu_lock_domain_by_id(op.domid)) == NULL )
             return -ESRCH;
-        if ( !IS_PRIV_FOR(current->domain, d) ) {
+        if ( !IS_PRIV_FOR(current->domain, d) )
+        {
             rcu_unlock_domain(d);
             return -EPERM;
         }
@@ -539,12 +542,15 @@ long do_memory_op(unsigned long cmd, XEN_GUEST_HANDLE(void) arg)
         }
 
         if ( likely(reservation.domid == DOMID_SELF) )
-            d = current->domain;
-        else {
-            d = rcu_lock_domain_by_id(reservation.domid);
-            if ( d == NULL)
+        {
+            d = rcu_lock_current_domain();
+        }
+        else
+        {
+            if ( (d = rcu_lock_domain_by_id(reservation.domid)) == NULL )
                 return start_extent;
-            if ( !IS_PRIV_FOR(current->domain, d) ) {
+            if ( !IS_PRIV_FOR(current->domain, d) )
+            {
                 rcu_unlock_domain(d);
                 return start_extent;
             }
@@ -554,8 +560,7 @@ long do_memory_op(unsigned long cmd, XEN_GUEST_HANDLE(void) arg)
         rc = xsm_memory_adjust_reservation(current->domain, d);
         if ( rc )
         {
-            if ( reservation.domid != DOMID_SELF )
-                rcu_unlock_domain(d);
+            rcu_unlock_domain(d);
             return rc;
         }
 
@@ -572,8 +577,7 @@ long do_memory_op(unsigned long cmd, XEN_GUEST_HANDLE(void) arg)
             break;
         }
 
-        if ( unlikely(reservation.domid != DOMID_SELF) )
-            rcu_unlock_domain(d);
+        rcu_unlock_domain(d);
 
         rc = args.nr_done;
 
@@ -599,12 +603,15 @@ long do_memory_op(unsigned long cmd, XEN_GUEST_HANDLE(void) arg)
             return -EFAULT;
 
         if ( likely(domid == DOMID_SELF) )
-            d = current->domain;
-        else {
-            d = rcu_lock_domain_by_id(domid);
-            if ( d == NULL )
+        {
+            d = rcu_lock_current_domain();
+        }
+        else
+        {
+            if ( (d = rcu_lock_domain_by_id(domid)) == NULL )
                 return -ESRCH;
-            if ( !IS_PRIV_FOR(current->domain, d) ) {
+            if ( !IS_PRIV_FOR(current->domain, d) )
+            {
                 rcu_unlock_domain(d);
                 return -EPERM;
             }
@@ -613,8 +620,7 @@ long do_memory_op(unsigned long cmd, XEN_GUEST_HANDLE(void) arg)
         rc = xsm_memory_stat_reservation(current->domain, d);
         if ( rc )
         {
-            if ( domid != DOMID_SELF )
-                rcu_unlock_domain(d);
+            rcu_unlock_domain(d);
             return rc;
         }
 
@@ -632,8 +638,7 @@ long do_memory_op(unsigned long cmd, XEN_GUEST_HANDLE(void) arg)
             break;
         }
 
-        if ( unlikely(domid != DOMID_SELF) )
-            rcu_unlock_domain(d);
+        rcu_unlock_domain(d);
 
         break;
 

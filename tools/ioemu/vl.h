@@ -653,6 +653,8 @@ BlockDriverAIOCB *bdrv_aio_write(BlockDriverState *bs, int64_t sector_num,
                                  const uint8_t *buf, int nb_sectors,
                                  BlockDriverCompletionFunc *cb, void *opaque);
 void bdrv_aio_cancel(BlockDriverAIOCB *acb);
+BlockDriverAIOCB *bdrv_aio_flush(BlockDriverState *bs, 
+                                 BlockDriverCompletionFunc *cb, void *opaque);
 
 void qemu_aio_init(void);
 void qemu_aio_poll(void);
@@ -662,7 +664,7 @@ void qemu_aio_wait(void);
 void qemu_aio_wait_end(void);
 
 /* Ensure contents are flushed to disk.  */
-void bdrv_flush(BlockDriverState *bs);
+int bdrv_flush(BlockDriverState *bs);
 
 #define BDRV_TYPE_HD     0
 #define BDRV_TYPE_CDROM  1
@@ -935,6 +937,7 @@ struct DisplayState {
     int width;
     int height;
     void *opaque;
+    uint32_t *palette;
     uint64_t gui_timer_interval;
 
     int switchbpp;

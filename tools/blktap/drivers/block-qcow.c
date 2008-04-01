@@ -76,6 +76,7 @@
 
 #define QCOW_OFLAG_COMPRESSED (1LL << 63)
 #define SPARSE_FILE 0x01
+#define EXTHDR_L1_BIG_ENDIAN 0x02
 
 #ifndef O_BINARY
 #define O_BINARY 0
@@ -147,19 +148,30 @@ static int decompress_cluster(struct tdqcow_state *s, uint64_t cluster_offset);
 
 static uint32_t gen_cksum(char *ptr, int len)
 {
+	int i;
 	unsigned char *md;
 	uint32_t ret;
 
 	md = malloc(MD5_DIGEST_LENGTH);
 
 	if(!md) return 0;
-
-	if (MD5((unsigned char *)ptr, len, md) != md) {
-		free(md);
-		return 0;
+	
+	/* Convert L1 table to big endian */
+	for(i = 0; i < len / sizeof(uint64_t); i++) {
+		cpu_to_be64s(&((uint64_t*) ptr)[i]);
 	}
 
-	memcpy(&ret, md, sizeof(uint32_t));
+	/* Generate checksum */
+	if (MD5((unsigned char *)ptr, len, md) != md)
+		ret = 0;
+	else
+		memcpy(&ret, md, sizeof(uint32_t));
+
+	/* Convert L1 table back to native endianess */
+	for(i = 0; i < len / sizeof(uint64_t); i++) {
+		be64_to_cpus(&((uint64_t*) ptr)[i]);
+	}
+
 	free(md);
 	return ret;
 }
@@ -354,7 +366,8 @@ static uint64_t get_cluster_offset(struct tdqcow_state *s,
                                    int n_start, int n_end)
 {
 	int min_index, i, j, l1_index, l2_index, l2_sector, l1_sector;
-	char *tmp_ptr, *tmp_ptr2, *l2_ptr, *l1_ptr;
+	char *tmp_ptr2, *l2_ptr, *l1_ptr;
+	uint64_t *tmp_ptr;
 	uint64_t l2_offset, *l2_table, cluster_offset, tmp;
 	uint32_t min_count;
 	int new_l2_table;
@@ -400,6 +413,11 @@ static uint64_t get_cluster_offset(struct tdqcow_state *s,
 			DPRINTF("ERROR allocating memory for L1 table\n");
 		}
 		memcpy(tmp_ptr, l1_ptr, 4096);
+
+		/* Convert block to write to big endian */
+		for(i = 0; i < 4096 / sizeof(uint64_t); i++) {
+			cpu_to_be64s(&tmp_ptr[i]);
+		}
 
 		/*
 		 * Issue non-asynchronous L1 write.
@@ -777,7 +795,7 @@ int tdqcow_open (struct disk_driver *dd, const char *name, td_flag_t flags)
 		goto fail;
 
 	for(i = 0; i < s->l1_size; i++) {
-		//be64_to_cpus(&s->l1_table[i]);
+		be64_to_cpus(&s->l1_table[i]);
 		//DPRINTF("L1[%d] => %llu\n", i, s->l1_table[i]);
 		if (s->l1_table[i] > final_cluster)
 			final_cluster = s->l1_table[i];
@@ -810,6 +828,38 @@ int tdqcow_open (struct disk_driver *dd, const char *name, td_flag_t flags)
 		be32_to_cpus(&exthdr->xmagic);
 		if(exthdr->xmagic != XEN_MAGIC) 
 			goto end_xenhdr;
+    
+		/* Try to detect old tapdisk images. They have to be fixed because 
+		 * they don't use big endian but native endianess for the L1 table */
+		if ((exthdr->flags & EXTHDR_L1_BIG_ENDIAN) == 0) {
+
+			/* 
+			   The image is broken. Fix it. The L1 table has already been 
+			   byte-swapped, so we can write it to the image file as it is
+			   currently in memory. Then swap it back to native endianess
+			   for operation.
+			 */
+
+			DPRINTF("qcow: Converting image to big endian L1 table\n");
+
+			lseek(fd, s->l1_table_offset, SEEK_SET);
+			if (write(fd, s->l1_table, l1_table_size) != l1_table_size) {
+				DPRINTF("qcow: Failed to write new L1 table\n");
+				goto fail;
+			}
+
+			for(i = 0;i < s->l1_size; i++) {
+				cpu_to_be64s(&s->l1_table[i]);
+			}
+
+			/* Write the big endian flag to the extended header */
+			exthdr->flags |= EXTHDR_L1_BIG_ENDIAN;
+
+			if (write(fd, buf, 512) != 512) {
+				DPRINTF("qcow: Failed to write extended header\n");
+				goto fail;
+			}
+		}
 
 		/*Finally check the L1 table cksum*/
 		be32_to_cpus(&exthdr->cksum);

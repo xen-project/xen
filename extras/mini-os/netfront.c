@@ -120,6 +120,7 @@ moretodo:
         if (rx->status == NETIF_RSP_NULL) continue;
 
         int id = rx->id;
+        BUG_ON(id >= NET_TX_RING_SIZE);
 
         buf = &dev->rx_buffers[id];
         page = (unsigned char*)buf->page;
@@ -204,6 +205,7 @@ void network_tx_buf_gc(struct netfront_dev *dev)
                 printk("packet error\n");
 
             id  = txrsp->id;
+            BUG_ON(id >= NET_TX_RING_SIZE);
             struct net_buffer* buf = &dev->tx_buffers[id];
             gnttab_end_access(buf->gref);
             buf->gref=GRANT_INVALID_REF;
@@ -509,6 +511,8 @@ void netfront_xmit(struct netfront_dev *dev, unsigned char* data,int len)
     unsigned short id;
     struct net_buffer* buf;
     void* page;
+
+    BUG_ON(len > PAGE_SIZE);
 
     down(&dev->tx_sem);
 

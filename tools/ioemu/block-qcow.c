@@ -37,6 +37,11 @@
 
 #define QCOW_OFLAG_COMPRESSED (1LL << 63)
 
+#define XEN_MAGIC  (('X' << 24) | ('E' << 16) | ('N' << 8) | 0xfb)
+
+#define EXTHDR_SPARSE_FILE      0x01
+#define EXTHDR_L1_BIG_ENDIAN    0x02
+
 typedef struct QCowHeader {
     uint32_t magic;
     uint32_t version;
@@ -49,6 +54,14 @@ typedef struct QCowHeader {
     uint32_t crypt_method;
     uint64_t l1_table_offset;
 } QCowHeader;
+
+/*Extended header for Xen enhancements*/
+typedef struct QCowHeader_ext {
+    uint32_t xmagic;
+    uint32_t cksum;
+    uint32_t min_cluster_alloc;
+    uint32_t flags;
+} QCowHeader_ext;
 
 #define L2_CACHE_SIZE 16
 
@@ -137,6 +150,51 @@ static int qcow_open(BlockDriverState *bs, const char *filename, int flags)
     if (bdrv_pread(s->hd, s->l1_table_offset, s->l1_table, s->l1_size * sizeof(uint64_t)) != 
         s->l1_size * sizeof(uint64_t))
         goto fail;
+
+    /* Try to detect old tapdisk images. They have to be fixed because they
+     * don't use big endian but native endianess for the L1 table */
+    if (header.backing_file_offset == 0 && s->l1_table_offset % 4096 == 0) {
+
+        QCowHeader_ext exthdr;
+        uint64_t l1_bytes = s->l1_size * sizeof(uint64_t);
+
+        if (bdrv_pread(s->hd, sizeof(header), &exthdr, sizeof(exthdr)) 
+                != sizeof(exthdr))
+            goto end_xenhdr;
+
+        be32_to_cpus(&exthdr.xmagic);
+        if (exthdr.xmagic != XEN_MAGIC) 
+            goto end_xenhdr;
+
+        be32_to_cpus(&exthdr.flags);
+        if (exthdr.flags & EXTHDR_L1_BIG_ENDIAN)
+            goto end_xenhdr;
+
+        /* The image is broken. Fix it. */
+        fprintf(stderr, "qcow: Converting image to big endian L1 table\n");
+
+        for(i = 0;i < s->l1_size; i++) {
+            cpu_to_be64s(&s->l1_table[i]);
+        }
+    
+        if (bdrv_pwrite(s->hd, s->l1_table_offset, s->l1_table, 
+                l1_bytes) != l1_bytes) {
+            fprintf(stderr, "qcow: Failed to write new L1 table\n");
+            goto fail;
+        }
+
+        exthdr.flags |= EXTHDR_L1_BIG_ENDIAN;
+        cpu_to_be32s(&exthdr.flags);
+        
+        if (bdrv_pwrite(s->hd, sizeof(header), &exthdr, sizeof(exthdr)) 
+                != sizeof(exthdr)) {
+            fprintf(stderr, "qcow: Failed to write extended header\n");
+            goto fail;
+        }
+    }
+end_xenhdr:
+
+    /* L1 table is big endian now */
     for(i = 0;i < s->l1_size; i++) {
         be64_to_cpus(&s->l1_table[i]);
     }
@@ -725,6 +783,13 @@ static void qcow_aio_cancel(BlockDriverAIOCB *blockacb)
     qemu_aio_release(acb);
 }
 
+static BlockDriverAIOCB *qcow_aio_flush(BlockDriverState *bs,
+        BlockDriverCompletionFunc *cb, void *opaque)
+{
+    BDRVQcowState *s = bs->opaque;
+    return bdrv_aio_flush(s->hd, cb, opaque);
+}
+
 static void qcow_close(BlockDriverState *bs)
 {
     BDRVQcowState *s = bs->opaque;
@@ -869,10 +934,10 @@ static int qcow_write_compressed(BlockDriverState *bs, int64_t sector_num,
     return 0;
 }
 
-static void qcow_flush(BlockDriverState *bs)
+static int qcow_flush(BlockDriverState *bs)
 {
     BDRVQcowState *s = bs->opaque;
-    bdrv_flush(s->hd);
+    return bdrv_flush(s->hd);
 }
 
 static int qcow_get_info(BlockDriverState *bs, BlockDriverInfo *bdi)
@@ -899,6 +964,7 @@ BlockDriver bdrv_qcow = {
     .bdrv_aio_read = qcow_aio_read,
     .bdrv_aio_write = qcow_aio_write,
     .bdrv_aio_cancel = qcow_aio_cancel,
+    .bdrv_aio_flush = qcow_aio_flush,
     .aiocb_size = sizeof(QCowAIOCB),
     .bdrv_write_compressed = qcow_write_compressed,
     .bdrv_get_info = qcow_get_info,

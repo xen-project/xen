@@ -734,10 +734,10 @@ static void vmdk_close(BlockDriverState *bs)
     vmdk_parent_close(s->hd);
 }
 
-static void vmdk_flush(BlockDriverState *bs)
+static int vmdk_flush(BlockDriverState *bs)
 {
     BDRVVmdkState *s = bs->opaque;
-    bdrv_flush(s->hd);
+    return bdrv_flush(s->hd);
 }
 
 BlockDriver bdrv_vmdk = {

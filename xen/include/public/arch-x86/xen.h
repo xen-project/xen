@@ -24,6 +24,8 @@
  * Copyright (c) 2004-2006, K A Fraser
  */
 
+#include "../xen.h"
+
 #ifndef __XEN_PUBLIC_ARCH_X86_XEN_H__
 #define __XEN_PUBLIC_ARCH_X86_XEN_H__
 

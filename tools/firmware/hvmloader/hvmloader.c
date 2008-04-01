@@ -420,6 +420,8 @@ int main(void)
 
     init_hypercalls();
 
+    printf("CPU speed is %u MHz\n", get_cpu_mhz());
+
     printf("Writing SMBIOS tables ...\n");
     smbios_sz = hvm_write_smbios_tables();
 

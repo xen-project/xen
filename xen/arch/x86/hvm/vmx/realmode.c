@@ -190,7 +190,7 @@ void vmx_realmode(struct cpu_user_regs *regs)
 
     hvm_emulate_prepare(&hvmemul_ctxt, regs);
 
-    if ( curr->arch.hvm_vcpu.io_completed )
+    if ( curr->arch.hvm_vcpu.io_state == HVMIO_completed )
         realmode_emulate_one(&hvmemul_ctxt);
 
     /* Only deliver interrupts into emulated real mode. */
@@ -203,7 +203,7 @@ void vmx_realmode(struct cpu_user_regs *regs)
 
     while ( curr->arch.hvm_vmx.vmxemul &&
             !softirq_pending(smp_processor_id()) &&
-            !curr->arch.hvm_vcpu.io_in_progress )
+            (curr->arch.hvm_vcpu.io_state == HVMIO_none) )
     {
         /*
          * Check for pending interrupts only every 16 instructions, because

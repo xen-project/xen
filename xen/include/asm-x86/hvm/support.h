@@ -27,12 +27,6 @@
 #include <asm/regs.h>
 #include <asm/processor.h>
 
-#ifndef NDEBUG
-#define HVM_DEBUG 1
-#else
-#define HVM_DEBUG 1
-#endif
-
 static inline vcpu_iodata_t *get_ioreq(struct vcpu *v)
 {
     struct domain *d = v->domain;
@@ -42,17 +36,9 @@ static inline vcpu_iodata_t *get_ioreq(struct vcpu *v)
     return &p->vcpu_iodata[v->vcpu_id];
 }
 
-/* XXX these are really VMX specific */
-#define TYPE_MOV_TO_DR          (0 << 4)
-#define TYPE_MOV_FROM_DR        (1 << 4)
-#define TYPE_MOV_TO_CR          (0 << 4)
-#define TYPE_MOV_FROM_CR        (1 << 4)
-#define TYPE_CLTS               (2 << 4)
-#define TYPE_LMSW               (3 << 4)
-
 #define HVM_DELIVER_NO_ERROR_CODE  -1
 
-#if HVM_DEBUG
+#ifndef NDEBUG
 #define DBG_LEVEL_0                 (1 << 0)
 #define DBG_LEVEL_1                 (1 << 1)
 #define DBG_LEVEL_2                 (1 << 2)
@@ -99,7 +85,11 @@ enum hvm_copy_result hvm_copy_from_guest_phys(
     void *buf, paddr_t paddr, int size);
 
 /*
- * Copy to/from a guest virtual address.
+ * Copy to/from a guest virtual address. @pfec should include PFEC_user_mode
+ * if emulating a user-mode access (CPL=3). All other flags in @pfec are
+ * managed by the called function: it is therefore optional for the caller
+ * to set them.
+ * 
  * Returns:
  *  HVMCOPY_okay: Copy was entirely successful.
  *  HVMCOPY_bad_gfn_to_mfn: Some guest physical address did not map to
@@ -110,25 +100,22 @@ enum hvm_copy_result hvm_copy_from_guest_phys(
  *                          for injection into the current HVM VCPU.
  */
 enum hvm_copy_result hvm_copy_to_guest_virt(
-    unsigned long vaddr, void *buf, int size);
+    unsigned long vaddr, void *buf, int size, uint32_t pfec);
 enum hvm_copy_result hvm_copy_from_guest_virt(
-    void *buf, unsigned long vaddr, int size);
+    void *buf, unsigned long vaddr, int size, uint32_t pfec);
 enum hvm_copy_result hvm_fetch_from_guest_virt(
-    void *buf, unsigned long vaddr, int size);
+    void *buf, unsigned long vaddr, int size, uint32_t pfec);
 
 /*
  * As above (copy to/from a guest virtual address), but no fault is generated
  * when HVMCOPY_bad_gva_to_gfn is returned.
  */
 enum hvm_copy_result hvm_copy_to_guest_virt_nofault(
-    unsigned long vaddr, void *buf, int size);
+    unsigned long vaddr, void *buf, int size, uint32_t pfec);
 enum hvm_copy_result hvm_copy_from_guest_virt_nofault(
-    void *buf, unsigned long vaddr, int size);
+    void *buf, unsigned long vaddr, int size, uint32_t pfec);
 enum hvm_copy_result hvm_fetch_from_guest_virt_nofault(
-    void *buf, unsigned long vaddr, int size);
-
-void hvm_print_line(struct vcpu *v, const char c);
-void hlt_timer_fn(void *data);
+    void *buf, unsigned long vaddr, int size, uint32_t pfec);
 
 #define HVM_HCALL_completed  0 /* hypercall completed - no further action */
 #define HVM_HCALL_preempted  1 /* hypercall preempted - re-execute VMCALL */

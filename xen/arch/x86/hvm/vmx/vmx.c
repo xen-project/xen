@@ -983,6 +983,62 @@ static void vmx_flush_guest_tlbs(void)
      * because VMRESUME will flush it for us. */
 }
 
+
+
+static void __vmx_inject_exception(
+    struct vcpu *v, int trap, int type, int error_code)
+{
+    unsigned long intr_fields;
+
+    /*
+     * NB. Callers do not need to worry about clearing STI/MOV-SS blocking:
+     *  "If the VM entry is injecting, there is no blocking by STI or by
+     *   MOV SS following the VM entry, regardless of the contents of the
+     *   interruptibility-state field [in the guest-state area before the
+     *   VM entry]", PRM Vol. 3, 22.6.1 (Interruptibility State).
+     */
+
+    intr_fields = (INTR_INFO_VALID_MASK | (type<<8) | trap);
+    if ( error_code != HVM_DELIVER_NO_ERROR_CODE ) {
+        __vmwrite(VM_ENTRY_EXCEPTION_ERROR_CODE, error_code);
+        intr_fields |= INTR_INFO_DELIVER_CODE_MASK;
+    }
+
+    __vmwrite(VM_ENTRY_INTR_INFO, intr_fields);
+
+    if ( trap == TRAP_page_fault )
+        HVMTRACE_2D(PF_INJECT, v, v->arch.hvm_vcpu.guest_cr[2], error_code);
+    else
+        HVMTRACE_2D(INJ_EXC, v, trap, error_code);
+}
+
+void vmx_inject_hw_exception(struct vcpu *v, int trap, int error_code)
+{
+    unsigned long intr_info = __vmread(VM_ENTRY_INTR_INFO);
+
+    if ( unlikely(intr_info & INTR_INFO_VALID_MASK) &&
+         (((intr_info >> 8) & 7) == X86_EVENTTYPE_HW_EXCEPTION) )
+    {
+        trap = hvm_combine_hw_exceptions((uint8_t)intr_info, trap);
+        if ( trap == TRAP_double_fault )
+            error_code = 0;
+    }
+
+    __vmx_inject_exception(v, trap, X86_EVENTTYPE_HW_EXCEPTION, error_code);
+}
+
+void vmx_inject_extint(struct vcpu *v, int trap)
+{
+    __vmx_inject_exception(v, trap, X86_EVENTTYPE_EXT_INTR,
+                           HVM_DELIVER_NO_ERROR_CODE);
+}
+
+void vmx_inject_nmi(struct vcpu *v)
+{
+    __vmx_inject_exception(v, 2, X86_EVENTTYPE_NMI,
+                           HVM_DELIVER_NO_ERROR_CODE);
+}
+
 static void vmx_inject_exception(
     unsigned int trapnr, int errcode, unsigned long cr2)
 {
@@ -1184,23 +1240,6 @@ static void vmx_do_cpuid(struct cpu_user_regs *regs)
     regs->edx = edx;
 }
 
-#define CASE_GET_REG_P(REG, reg)    \
-    case REG_ ## REG: reg_p = (unsigned long *)&(regs->reg); break
-
-#ifdef __i386__
-#define CASE_EXTEND_GET_REG_P
-#else
-#define CASE_EXTEND_GET_REG_P       \
-    CASE_GET_REG_P(R8, r8);         \
-    CASE_GET_REG_P(R9, r9);         \
-    CASE_GET_REG_P(R10, r10);       \
-    CASE_GET_REG_P(R11, r11);       \
-    CASE_GET_REG_P(R12, r12);       \
-    CASE_GET_REG_P(R13, r13);       \
-    CASE_GET_REG_P(R14, r14);       \
-    CASE_GET_REG_P(R15, r15)
-#endif
-
 static void vmx_dr_access(unsigned long exit_qualification,
                           struct cpu_user_regs *regs)
 {
@@ -1224,9 +1263,9 @@ static void vmx_invlpg_intercept(unsigned long vaddr)
 }
 
 #define CASE_SET_REG(REG, reg)      \
-    case REG_ ## REG: regs->reg = value; break
+    case VMX_CONTROL_REG_ACCESS_GPR_ ## REG: regs->reg = value; break
 #define CASE_GET_REG(REG, reg)      \
-    case REG_ ## REG: value = regs->reg; break
+    case VMX_CONTROL_REG_ACCESS_GPR_ ## REG: value = regs->reg; break
 
 #define CASE_EXTEND_SET_REG         \
     CASE_EXTEND_REG(S)
@@ -1352,26 +1391,25 @@ static int vmx_cr_access(unsigned long exit_qualification,
     unsigned long value;
     struct vcpu *v = current;
 
-    switch ( exit_qualification & CONTROL_REG_ACCESS_TYPE )
+    switch ( exit_qualification & VMX_CONTROL_REG_ACCESS_TYPE )
     {
-    case TYPE_MOV_TO_CR:
-        gp = exit_qualification & CONTROL_REG_ACCESS_REG;
-        cr = exit_qualification & CONTROL_REG_ACCESS_NUM;
+    case VMX_CONTROL_REG_ACCESS_TYPE_MOV_TO_CR:
+        gp = exit_qualification & VMX_CONTROL_REG_ACCESS_GPR;
+        cr = exit_qualification & VMX_CONTROL_REG_ACCESS_NUM;
         return mov_to_cr(gp, cr, regs);
-    case TYPE_MOV_FROM_CR:
-        gp = exit_qualification & CONTROL_REG_ACCESS_REG;
-        cr = exit_qualification & CONTROL_REG_ACCESS_NUM;
+    case VMX_CONTROL_REG_ACCESS_TYPE_MOV_FROM_CR:
+        gp = exit_qualification & VMX_CONTROL_REG_ACCESS_GPR;
+        cr = exit_qualification & VMX_CONTROL_REG_ACCESS_NUM;
         mov_from_cr(cr, gp, regs);
         break;
-    case TYPE_CLTS:
+    case VMX_CONTROL_REG_ACCESS_TYPE_CLTS:
         v->arch.hvm_vcpu.guest_cr[0] &= ~X86_CR0_TS;
         vmx_update_guest_cr(v, 0);
         HVMTRACE_0D(CLTS, current);
         break;
-    case TYPE_LMSW:
+    case VMX_CONTROL_REG_ACCESS_TYPE_LMSW:
         value = v->arch.hvm_vcpu.guest_cr[0];
-        value = (value & ~0xF) |
-            (((exit_qualification & LMSW_SOURCE_DATA) >> 16) & 0xF);
+        value = (value & ~0xFFFF) | ((exit_qualification >> 16) & 0xFFFF);
         HVMTRACE_1D(LMSW, current, value);
         return !hvm_set_cr0(value);
     default:

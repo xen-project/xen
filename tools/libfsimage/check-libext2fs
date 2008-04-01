@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/sh
 
 cat >ext2-test.c <<EOF
 #include <ext2fs/ext2fs.h>
@@ -9,7 +9,7 @@ int main()
 }
 EOF
 
-${CC:-gcc} -o ext2-test ext2-test.c -lext2fs >/dev/null 2>&1
+${CC-gcc} -o ext2-test ext2-test.c -lext2fs >/dev/null 2>&1
 if [ $? = 0 ]; then
 	echo ext2fs-lib
 else

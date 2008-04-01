@@ -410,6 +410,7 @@ long arch_do_sysctl(xen_sysctl_t *op, XEN_GUEST_HANDLE(xen_sysctl_t) u_sysctl)
 
         xen_sysctl_physinfo_t *pi = &op->u.physinfo;
 
+        memset(pi, 0, sizeof(*pi));
         pi->threads_per_core = cpus_weight(cpu_sibling_map[0]);
         pi->cores_per_socket =
             cpus_weight(cpu_core_map[0]) / pi->threads_per_core;
@@ -419,7 +420,6 @@ long arch_do_sysctl(xen_sysctl_t *op, XEN_GUEST_HANDLE(xen_sysctl_t) u_sysctl)
         pi->free_pages       = avail_domheap_pages();
         pi->scrub_pages      = avail_scrub_pages();
         pi->cpu_khz          = local_cpu_data->proc_freq / 1000;
-        memset(pi->hw_cap, 0, sizeof(pi->hw_cap));
 
         max_array_ent = pi->max_cpu_id;
         pi->max_cpu_id = last_cpu(cpu_online_map);

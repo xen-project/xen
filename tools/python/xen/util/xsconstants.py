@@ -57,7 +57,9 @@ XSERR_POLICY_NOT_LOADED        = 22 + XSERR_BASE
 XSERR_RESOURCE_ACCESS          = 23 + XSERR_BASE
 XSERR_HV_OP_FAILED             = 24 + XSERR_BASE
 XSERR_BOOTPOLICY_INSTALL_ERROR = 25 + XSERR_BASE
-XSERR_LAST                     = 25 + XSERR_BASE ## KEEP LAST
+XSERR_VM_NOT_AUTHORIZED        = 26 + XSERR_BASE
+XSERR_VM_IN_CONFLICT           = 27 + XSERR_BASE
+XSERR_LAST                     = 27 + XSERR_BASE ## KEEP LAST
 
 XSERR_MESSAGES = [
     '',
@@ -85,7 +87,9 @@ XSERR_MESSAGES = [
     'The policy is not loaded',
     'Error accessing resource',
     'Operation failed in hypervisor',
-    'Boot policy installation error'
+    'Boot policy installation error',
+    'VM is not authorized to run',
+    'VM label conflicts with another VM'
 ]
 
 def xserr2string(err):

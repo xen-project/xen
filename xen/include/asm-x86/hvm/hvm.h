@@ -270,32 +270,9 @@ static inline int hvm_do_pmu_interrupt(struct cpu_user_regs *regs)
 #define X86_EVENTTYPE_SW_INTERRUPT          4    /* software interrupt */
 #define X86_EVENTTYPE_SW_EXCEPTION          6    /* software exception */
 
-/*
- * Need to re-inject a given event? We avoid re-injecting software exceptions
- * and interrupts because the faulting/trapping instruction can simply be
- * re-executed (neither VMX nor SVM update RIP when they VMEXIT during
- * INT3/INTO/INTn).
- */
-static inline int hvm_event_needs_reinjection(uint8_t type, uint8_t vector)
-{
-    switch ( type )
-    {
-    case X86_EVENTTYPE_EXT_INTR:
-    case X86_EVENTTYPE_NMI:
-        return 1;
-    case X86_EVENTTYPE_HW_EXCEPTION:
-        /*
-         * SVM uses type 3 ("HW Exception") for #OF and #BP. We explicitly
-         * check for these vectors, as they are really SW Exceptions. SVM has
-         * not updated RIP to point after the trapping instruction (INT3/INTO).
-         */
-        return (vector != 3) && (vector != 4);
-    default:
-        /* Software exceptions/interrupts can be re-executed (e.g., INT n). */
-        break;
-    }
-    return 0;
-}
+int hvm_event_needs_reinjection(uint8_t type, uint8_t vector);
+
+uint8_t hvm_combine_hw_exceptions(uint8_t vec1, uint8_t vec2);
 
 static inline int hvm_cpu_up(void)
 {

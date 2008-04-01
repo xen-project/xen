@@ -29,6 +29,14 @@
 #define HVM_VCPU_INIT_SIPI_SIPI_STATE_NORM          0
 #define HVM_VCPU_INIT_SIPI_SIPI_STATE_WAIT_SIPI     1
 
+enum hvm_io_state {
+    HVMIO_none = 0,
+    HVMIO_dispatched,
+    HVMIO_awaiting_completion,
+    HVMIO_handle_mmio_awaiting_completion,
+    HVMIO_completed
+};
+
 struct hvm_vcpu {
     /* Guest control-register and EFER values, just as the guest sees them. */
     unsigned long       guest_cr[5];
@@ -70,10 +78,17 @@ struct hvm_vcpu {
     u8                  cache_mode;
 
     /* I/O request in flight to device model. */
-    bool_t              mmio_in_progress;
-    bool_t              io_in_progress;
-    bool_t              io_completed;
+    enum hvm_io_state   io_state;
     unsigned long       io_data;
+
+    /*
+     * HVM emulation:
+     *  Virtual address @mmio_gva maps to MMIO physical frame @mmio_gpfn.
+     *  The latter is known to be an MMIO frame (not RAM).
+     *  This translation is only valid if @mmio_gva is non-zero.
+     */
+    unsigned long       mmio_gva;
+    unsigned long       mmio_gpfn;
 };
 
 #endif /* __ASM_X86_HVM_VCPU_H__ */

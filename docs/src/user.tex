@@ -1618,9 +1618,9 @@ if a virtual machine uses only half of its disk space then the file
 really takes up half of the size allocated.
 
 For example, to create a 2GB sparse file-backed virtual block device
-(actually only consumes 1KB of disk):
+(actually only consumes no disk space at all):
 \begin{quote}
-  \verb_# dd if=/dev/zero of=vm1disk bs=1k seek=2048k count=1_
+  \verb_# dd if=/dev/zero of=vm1disk bs=1k seek=2048k count=0_
 \end{quote}
 
 Make a file system in the disk file:
@@ -4306,14 +4306,22 @@ mailing lists and subscription information can be found at \begin{quote}
 
 \appendix
 
-\chapter{Unmodified (VMX) guest domains in Xen with Intel\textregistered Virtualization Technology (VT)}
+\chapter{Unmodified (HVM) guest domains in Xen with Hardware support for Virtualization}
 
-Xen supports guest domains running unmodified Guest operating systems using Virtualization Technology (VT) available on recent Intel Processors. More information about the Intel Virtualization Technology implementing Virtual Machine Extensions (VMX) in the processor is available on the Intel website at \\
+Xen supports guest domains running unmodified guest operating systems using
+virtualization extensions available on recent processors. Currently processors
+featuring the Intel Virtualization Extension (Intel-VT) or the AMD extension
+(AMD-V) are supported. The technology covering both implementations is
+called HVM (for Hardware Virtual Machine) in Xen. More information about the
+virtualization extensions are available on the respective websites:
  {\small {\tt http://www.intel.com/technology/computing/vptech}}
 
-\section{Building Xen with VT support}
 
-The following packages need to be installed in order to build Xen with VT support. Some Linux distributions do not provide these packages by default.
+ {\small {\tt http://www.amd.com/us-en/assets/content\_type/white\_papers\_and\_tech\_docs/24593.pdf}}
+
+\section{Building Xen with HVM support}
+
+The following packages need to be installed in order to build Xen with HVM support. Some Linux distributions do not provide these packages by default.
 
 \begin{tabular}{lp{11.0cm}}
 {\bfseries Package} & {\bfseries Description} \\
@@ -4322,70 +4330,75 @@ dev86 & The dev86 package provides an assembler and linker for real mode 80x86 i
 
 If the dev86 package is not available on the x86\_64 distribution, you can install the i386 version of it. The dev86 rpm package for various distributions can be found at {\scriptsize {\tt http://www.rpmfind.net/linux/rpm2html/search.php?query=dev86\&submit=Search}} \\
 
-LibVNCServer & The unmodified guest's VGA display, keyboard, and mouse can be virtualized by the vncserver library. You can get the sources of libvncserver from {\small {\tt http://sourceforge.net/projects/libvncserver}}. Build and install the sources on the build system to get the libvncserver library. There is a significant performance degradation in 0.8 version. The current sources in the CVS tree have fixed this degradation. So it is highly recommended to download the latest CVS sources and install them.\\
-
 SDL-devel, SDL & Simple DirectMedia Layer (SDL) is another way of virtualizing the unmodified guest console. It provides an X window for the guest console. 
 
 If the SDL and SDL-devel packages are not installed by default on the build system, they can be obtained from  {\scriptsize {\tt http://www.rpmfind.net/linux/rpm2html/search.php?query=SDL\&amp;submit=Search}}
-, {\scriptsize {\tt http://www.rpmfind.net/linux/rpm2html/search.php?query=SDL-devel\&submit=Search}} \\
+
+
+{\scriptsize {\tt http://www.rpmfind.net/linux/rpm2html/search.php?query=SDL-devel\&submit=Search}} \\
 
 \end{tabular}
 
-\section{Configuration file for unmodified VMX guests}
+\section{Configuration file for unmodified HVM guests}
 
-The Xen installation includes a sample configuration file, {\small {\tt /etc/xen/xmexample.vmx}}. There are comments describing all the options. In addition to the common options that are the same as those for paravirtualized guest configurations, VMX guest configurations have the following settings:
+The Xen installation includes a sample configuration file, {\small {\tt /etc/xen/xmexample.hvm}}. There are comments describing all the options. In addition to the common options that are the same as those for paravirtualized guest configurations, HVM guest configurations have the following settings:
 
 \begin{tabular}{lp{11.0cm}}
 
 {\bfseries Parameter} & {\bfseries Description} \\
 
-kernel &        The VMX firmware loader, {\small {\tt /usr/lib/xen/boot/vmxloader}}\\
+kernel &        The HVM firmware loader, {\small {\tt /usr/lib/xen/boot/hvmloader}}\\
 
-builder &       The domain build function. The VMX domain uses the vmx builder.\\
+builder &       The domain build function. The HVM domain uses the 'hvm' builder.\\
 
-acpi & Enable VMX guest ACPI, default=0 (disabled)\\
+acpi & Enable HVM guest ACPI, default=1 (enabled)\\
 
-apic & Enable VMX guest APIC, default=0 (disabled)\\
+apic & Enable HVM guest APIC, default=1 (enabled)\\
 
-pae & Enable VMX guest PAE, default=0 (disabled)\\
+pae & Enable HVM guest PAE, default=1 (enabled)\\
 
-vif     & Optionally defines MAC address and/or bridge for the network interfaces. Random MACs are assigned if not given. {\small {\tt type=ioemu}} means ioemu is used to virtualize the VMX NIC. If no type is specified, vbd is used, as with paravirtualized guests.\\
+hap & Enable hardware-assisted paging support, such as AMD-V's nested paging
+or Intel\textregistered VT's extended paging. If available, Xen will
+use hardware-assisted paging instead of shadow paging for this guest's memory
+management.\\
 
-disk & Defines the disk devices you want the domain to have access to, and what you want them accessible as. If using a physical device as the VMX guest's disk, each disk entry is of the form 
+vif     & Optionally defines MAC address and/or bridge for the network interfaces. Random MACs are assigned if not given. {\small {\tt type=ioemu}} means ioemu is used to virtualize the HVM NIC. If no type is specified, vbd is used, as with paravirtualized guests.\\
+
+disk & Defines the disk devices you want the domain to have access to, and what you want them accessible as. If using a physical device as the HVM guest's disk, each disk entry is of the form 
 
 {\small {\tt phy:UNAME,ioemu:DEV,MODE,}}
 
-where UNAME is the device, DEV is the device name the domain will see, and MODE is r for read-only, w for read-write. ioemu means the disk will use ioemu to virtualize the VMX disk. If not adding ioemu, it uses vbd like paravirtualized guests.
+where UNAME is the host device file, DEV is the device name the domain will see, and MODE is r for read-only, w for read-write. ioemu means the disk will use ioemu to virtualize the HVM disk. If not adding ioemu, it uses vbd like paravirtualized guests.
 
 If using disk image file, its form should be like 
 
 {\small {\tt file:FILEPATH,ioemu:DEV,MODE}}
 
+Optical devices can be emulated by appending cdrom to the device type
+
+{\small {\tt ',hdc:cdrom,r'}}
+
 If using more than one disk, there should be a comma between each disk entry. For example:
 
-{\scriptsize {\tt disk = ['file:/var/images/image1.img,ioemu:hda,w', 'file:/var/images/image2.img,ioemu:hdb,w']}}\\
+{\scriptsize {\tt disk = ['file:/var/images/image1.img,ioemu:hda,w', 'phy:hda1,hdb1,w', 'file:/var/images/install1.iso,hdc:cdrom,r']}}\\
 
-cdrom   & Disk image for CD-ROM. The default is {\small {\tt /dev/cdrom}} for Domain0. Inside the VMX domain, the CD-ROM will available as device {\small {\tt /dev/hdc}}. The entry can also point to an ISO file.\\
+boot & Boot from floppy (a), hard disk (c) or CD-ROM (d). For example, to boot from CD-ROM and fallback to HD, the entry should be:
 
-boot & Boot from floppy (a), hard disk (c) or CD-ROM (d). For example, to boot from CD-ROM, the entry should be:
+boot='dc'\\
 
-boot='d'\\
-
-device\_model & The device emulation tool for VMX guests. This parameter should not be changed.\\
+device\_model & The device emulation tool for HVM guests. This parameter should not be changed.\\
 
 sdl &   Enable SDL library for graphics, default = 0 (disabled)\\
 
 vnc &   Enable VNC library for graphics, default = 1 (enabled)\\
 
-vncviewer &     Enable spawning of the vncviewer (only valid when vnc=1), default = 1 (enabled)
+vncconsole &     Enable spawning of the vncviewer (only valid when vnc=1), default = 0 (disabled)
 
-If vnc=1 and vncviewer=0, user can use vncviewer to manually connect VMX from remote. For example:
+If vnc=1 and vncconsole=0, user can use vncviewer to manually connect HVM from remote. For example:
 
-{\small {\tt vncviewer domain0\_IP\_address:VMX\_domain\_id}} \\
+{\small {\tt vncviewer domain0\_IP\_address:HVM\_domain\_id}} \\
 
-ne2000 &        Enable ne2000, default = 0 (disabled; use pcnet)\\
-
-serial &        Enable redirection of VMX serial output to pty device\\
+serial &        Enable redirection of HVM serial output to pty device\\
 
 \end{tabular}
 
@@ -4416,9 +4429,9 @@ Details about mouse emulation are provided in section \textbf{A.4.3}.\\
 
 localtime &     Set the real time clock to local time [default=0, that is, set to UTC].\\
 
-enable-audio &  Enable audio support. This is under development.\\
+soundhw   &     Enable sound card support and specify the hardware to emulate. Values can be sb16, es1370 or all. Default is none.\\
 
-full-screen     & Start in full screen. This is under development.\\
+full-screen   & Start in full screen.\\
 
 nographic &     Another way to redirect serial output. If enabled, no 'sdl' or 'vnc' can work. Not recommended.\\
 
@@ -4430,18 +4443,18 @@ nographic &     Another way to redirect serial output. If enabled, no 'sdl' or '
 If you are using a physical disk or physical disk partition, you need to install a Linux OS on the disk first. Then the boot loader should be installed in the correct place. For example {\small {\tt dev/sda}} for booting from the whole disk, or {\small {\tt /dev/sda1}} for booting from partition 1.
 
 \subsection{Using disk image files}
-You need to create a large empty disk image file first; then, you need to install a Linux OS onto it. There are two methods you can choose. One is directly installing it using a VMX guest while booting from the OS installation CD-ROM. The other is copying an installed OS into it. The boot loader will also need to be installed.
+You need to create a large empty disk image file first; then, you need to install a Linux OS onto it. There are two methods you can choose. One is directly installing it using a HVM guest while booting from the OS installation CD-ROM. The other is copying an installed OS into it. The boot loader will also need to be installed.
 
 \subsubsection*{To create the image file:}
 The image size should be big enough to accommodate the entire OS. This example assumes the size is 1G (which is probably too small for most OSes).
 
-{\small {\tt \# dd if=/dev/zero of=hd.img bs=1M count=1 seek=1023}}
+{\small {\tt \# dd if=/dev/zero of=hd.img bs=1M count=0 seek=1024}}
 
-\subsubsection*{To directly install Linux OS into an image file using a VMX guest:}
+\subsubsection*{To directly install Linux OS into an image file using a HVM guest:}
 
-Install Xen and create VMX with the original image file with booting from CD-ROM. Then it is just like a normal Linux OS installation. The VMX configuration file should have these two entries before creating:
+Install Xen and create HVM with the original image file with booting from CD-ROM. Then it is just like a normal Linux OS installation. The HVM configuration file should have a stanza for the CD-ROM as well as a boot device specification:
 
-{\small {\tt cdrom='/dev/cdrom'
+{\small {\tt disk=['file:/var/images/your-hd.img,hda,w', ',hdc:cdrom,r' ]
 boot='d'}}
 
 If this method does not succeed, you can choose the following method of copying an installed Linux OS into an image file.
@@ -4509,31 +4522,28 @@ none            /sys            sysfs           efaults 0 0}}
 
 Now, the guest OS image {\small {\tt hd.img}} is ready. You can also reference {\small {\tt http://free.oszoo.org}} for quickstart images. But make sure to install the boot loader.
 
-\subsection{Install Windows into an Image File using a VMX guest}
-In order to install a Windows OS, you should keep {\small {\tt acpi=0}} in your VMX configuration file.
+\section{HVM Guests}
+\subsection{Editing the Xen HVM config file}
+Make a copy of the example HVM configuration file {\small {\tt /etc/xen/xmexample.hvm}} and edit the line that reads
 
-\section{VMX Guests}
-\subsection{Editing the Xen VMX config file}
-Make a copy of the example VMX configuration file {\small {\tt /etc/xen/xmeaxmple.vmx}} and edit the line that reads
+{\small {\tt disk = [ 'file:/var/images/\emph{min-el3-i386.img},hda,w' ]}}
 
-{\small {\tt disk = [ 'file:/var/images/\emph{guest.img},ioemu:hda,w' ]}}
+replacing \emph{min-el3-i386.img} with the name of the guest OS image file you just made.
 
-replacing \emph{guest.img} with the name of the guest OS image file you just made.
-
-\subsection{Creating VMX guests}
-Simply follow the usual method of creating the guest, using the -f parameter and providing the filename of your VMX configuration file:\\
+\subsection{Creating HVM guests}
+Simply follow the usual method of creating the guest, providing the filename of your HVM configuration file:\\
 
 {\small {\tt \# xend start\\
-\# xm create /etc/xen/vmxguest.vmx}}
+\# xm create /etc/xen/hvmguest.hvm}}
 
-In the default configuration, VNC is on and SDL is off. Therefore VNC windows will open when VMX guests are created. If you want to use SDL to create VMX guests, set {\small {\tt sdl=1}} in your VMX configuration file. You can also turn off VNC by setting {\small {\tt vnc=0}}.
+In the default configuration, VNC is on and SDL is off. Therefore VNC windows will open when HVM guests are created. If you want to use SDL to create HVM guests, set {\small {\tt sdl=1}} in your HVM configuration file. You can also turn off VNC by setting {\small {\tt vnc=0}}.
  
 \subsection{Mouse issues, especially under VNC}
 Mouse handling when using VNC is a little problematic.
 The problem is that the VNC viewer provides a virtual pointer which is
 located at an absolute location in the VNC window and only absolute
 coordinates are provided.
-The VMX device model converts these absolute mouse coordinates
+The HVM device model converts these absolute mouse coordinates
 into the relative motion deltas that are expected by the PS/2
 mouse driver running in the guest.
 Unfortunately,
@@ -4550,7 +4560,7 @@ there are no longer any left mouse deltas that
 can be provided by the device model emulation code.)
 
 To deal with these mouse issues there are 4 different
-mouse emulations available from the VMX device model:
+mouse emulations available from the HVM device model:
 
 \begin{description}
 \item[PS/2 mouse over the PS/2 port.]
@@ -4845,7 +4855,7 @@ vendor id
 and product id
 \textbf{310b}.
 This device could be made available
-to the VMX guest by including the
+to the HVM guest by including the
 config file entry
 {\small
 \begin{verbatim}
@@ -4959,7 +4969,7 @@ not the guest can see a USB mouse.}
 will remove the USB mouse
 driver from the Dom0 kernel
 and the mouse will now be
-accessible by the VMX guest.
+accessible by the HVM guest.
 
 Be aware the the Linux USB
 hotplug system will reload
@@ -4981,26 +4991,25 @@ just to make sure it doesn't get
 reloaded.
 \end{description}
 
-\subsection{Destroy VMX guests}
-VMX guests can be destroyed in the same way as can paravirtualized guests. We recommend that you type the command 
+\subsection{Destroy HVM guests}
+HVM guests can be destroyed in the same way as can paravirtualized guests. We recommend that you shut-down the guest using the guest OS' provided method, for Linux, type the command
 
 {\small {\tt poweroff}} 
 
-in the VMX guest's console first to prevent data loss. Then execute the command 
+in the HVM guest's console, for Windows use Start -> Shutdown first to prevent
+data loss. Depending on the configuration the guest will be automatically
+destroyed, otherwise execute the command 
 
 {\small {\tt xm destroy \emph{vmx\_guest\_id} }} 
 
 at the Domain0 console.
 
-\subsection{VMX window (X or VNC) Hot Key}
-If you are running in the X environment after creating a VMX guest, an X window is created. There are several hot keys for control of the VMX guest that can be used in the window.
+\subsection{HVM window (X or VNC) Hot Key}
+If you are running in the X environment after creating a HVM guest, an X window is created. There are several hot keys for control of the HVM guest that can be used in the window.
  
-{\bfseries Ctrl+Alt+2} switches from guest VGA window to the control window. Typing {\small {\tt help }} shows the control commands help. For example, 'q' is the command to destroy the VMX guest.\\
-{\bfseries Ctrl+Alt+1} switches back to VMX guest's VGA.\\
-{\bfseries Ctrl+Alt+3} switches to serial port output. It captures serial output from the VMX guest. It works only if the VMX guest was configured to use the serial port. \\
-
-\subsection{Save/Restore and Migration}
-VMX guests currently cannot be saved and restored, nor migrated. These features are currently under active development.
+{\bfseries Ctrl+Alt+2} switches from guest VGA window to the control window. Typing {\small {\tt help }} shows the control commands help. For example, 'q' is the command to destroy the HVM guest.\\
+{\bfseries Ctrl+Alt+1} switches back to HVM guest's VGA.\\
+{\bfseries Ctrl+Alt+3} switches to serial port output. It captures serial output from the HVM guest. It works only if the HVM guest was configured to use the serial port. \\
 
 \chapter{Vnets - Domain Virtual Networking}
 

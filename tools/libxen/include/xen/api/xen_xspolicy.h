@@ -68,6 +68,8 @@ enum xs_instantiationflags {
 #define XSERR_RESOURCE_ACCESS           23 + XSERR_BASE
 #define XSERR_HV_OP_FAILED              24 + XSERR_BASE
 #define XSERR_BOOTPOLICY_INSTALL_ERROR  25 + XSERR_BASE
+#define XSERR_VM_NOT_AUTHORIZED         26 + XSERR_BASE
+#define XSERR_VM_IN_CONFLICT            27 + XSERR_BASE
 
 
 /**
@@ -179,28 +181,28 @@ typedef struct xen_xs_policystate
     char *errors;
 } xen_xs_policystate;
 
-void
+extern void
 xen_xs_policystate_free(xen_xs_policystate *state);
 
 
 /**
  * Get the referenced policy's record.
  */
-bool
+extern bool
 xen_xspolicy_get_record(xen_session *session, xen_xspolicy_record **result,
                         xen_xspolicy xspolicy);
 
 /**
  * Get the UUID field of the given policy.
  */
-bool
+extern bool
 xen_xspolicy_get_uuid(xen_session *session, char **result,
                       xen_xspolicy xspolicy);
 
 /**
  * Get a policy given it's UUID
  */
-bool
+extern bool
 xen_xspolicy_get_by_uuid(xen_session *session, xen_xspolicy *result,
                          char *uuid);
 
@@ -208,7 +210,7 @@ xen_xspolicy_get_by_uuid(xen_session *session, xen_xspolicy *result,
 /**
  * Get the types of policies supported by the system.
  */
-bool
+extern bool
 xen_xspolicy_get_xstype(xen_session *session, xs_type *result);
 
 
@@ -216,13 +218,13 @@ xen_xspolicy_get_xstype(xen_session *session, xs_type *result);
  * Get information about the currently managed policy.
  * (The API allows only one policy to be on the system.)
  */
-bool
+extern bool
 xen_xspolicy_get_xspolicy(xen_session *session, xen_xs_policystate **result);
 
 /**
  * Activate the referenced policy by loading it into the hypervisor.
  */
-bool
+extern bool
 xen_xspolicy_activate_xspolicy(xen_session *session, int64_t *result,
                                xen_xspolicy xspolicy,
                                xs_instantiationflags flags);
@@ -234,7 +236,7 @@ xen_xspolicy_activate_xspolicy(xen_session *session, int64_t *result,
  * on whether to load the policy immediately and whether to overwrite
  * an existing policy on the system.
  */
-bool
+extern bool
 xen_xspolicy_set_xspolicy(xen_session *session, xen_xs_policystate **result,
                           xs_type type, char *repr, int64_t flags,
                           bool overwrite);
@@ -248,7 +250,7 @@ xen_xspolicy_set_xspolicy(xen_session *session, xen_xs_policystate **result,
  * for example fail if other domains than Domain-0 are running and have
  * different labels than Domain-0.
  */
-bool
+extern bool
 xen_xspolicy_reset_xspolicy(xen_session *session, xen_xs_policystate **result,
                             xs_type type);
 
@@ -280,5 +282,12 @@ xen_xspolicy_set_resource_label(xen_session *session,
 extern bool
 xen_xspolicy_get_resource_label(xen_session *session, char **label,
                                 char *resource);
+
+/**
+ * Check whether a VM with the given VM-label could run.
+ */
+extern bool
+xen_xspolicy_can_run(xen_session *session, int64_t *result,
+                     char *security_label);
 
 #endif

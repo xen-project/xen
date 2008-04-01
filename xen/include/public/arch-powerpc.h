@@ -22,6 +22,8 @@
  * Authors: Hollis Blanchard <hollisb@us.ibm.com>
  */
 
+#include "xen.h"
+
 #ifndef __XEN_PUBLIC_ARCH_PPC_64_H__
 #define __XEN_PUBLIC_ARCH_PPC_64_H__
 

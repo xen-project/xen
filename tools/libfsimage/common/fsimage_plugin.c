@@ -131,7 +131,10 @@ static int load_plugins(void)
 	int err;
 	int ret = -1;
 
-#ifdef __sun__
+#if defined(FSIMAGE_FSDIR)
+	if (fsdir == NULL)
+		fsdir = FSIMAGE_FSDIR;
+#elif defined(__sun__)
 	if (fsdir == NULL)
 		fsdir = "/usr/lib/fs";
 

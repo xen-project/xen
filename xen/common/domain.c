@@ -393,6 +393,8 @@ void __domain_crash_synchronous(void)
         this_cpu(mc_state).flags = 0;
     }
 
+    vcpu_end_shutdown_deferral(current);
+
     for ( ; ; )
         do_softirq();
 }
@@ -459,10 +461,14 @@ void domain_resume(struct domain *d)
 
 int vcpu_start_shutdown_deferral(struct vcpu *v)
 {
+    if ( v->defer_shutdown )
+        return 1;
+
     v->defer_shutdown = 1;
     smp_mb(); /* set deferral status /then/ check for shutdown */
     if ( unlikely(v->domain->is_shutting_down) )
         vcpu_check_shutdown(v);
+
     return v->defer_shutdown;
 }
 
@@ -516,7 +522,7 @@ static void complete_domain_destroy(struct rcu_head *head)
         if ( (v = d->vcpu[i]) != NULL )
             free_vcpu_struct(v);
 
-    if (d->target)
+    if ( d->target != NULL )
         put_domain(d->target);
 
     free_domain(d);

@@ -44,7 +44,7 @@ typedef struct fsig_plugin_ops {
 } fsig_plugin_ops_t;
 
 #define	STAGE1_5
-#define FSYS_BUFLEN 0x8000
+#define FSYS_BUFLEN 0x40000
 #define	SECTOR_BITS 9
 #define	SECTOR_SIZE 0x200
 

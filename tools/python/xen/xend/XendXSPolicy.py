@@ -48,7 +48,8 @@ class XendXSPolicy(XendBase):
                   'rm_xsbootpolicy',
                   'get_resource_label',
                   'set_resource_label',
-                  'get_labeled_resources' ]
+                  'get_labeled_resources',
+                  'can_run' ]
         return XendBase.getFuncs() + funcs
 
     getClass    = classmethod(getClass)
@@ -190,6 +191,12 @@ class XendXSPolicy(XendBase):
         res = security.get_resource_label_xapi(resource)
         return res
 
+    def can_run(self, sec_label):
+        irc = security.validate_label_xapi(sec_label, 'dom')
+        if irc != xsconstants.XSERR_SUCCESS:
+            raise SecurityError(irc)
+        return security.check_can_run(sec_label)
+
     get_xstype      = classmethod(get_xstype)
     get_xspolicy    = classmethod(get_xspolicy)
     set_xspolicy    = classmethod(set_xspolicy)
@@ -198,6 +205,7 @@ class XendXSPolicy(XendBase):
     set_resource_label = classmethod(set_resource_label)
     get_resource_label = classmethod(get_resource_label)
     get_labeled_resources = classmethod(get_labeled_resources)
+    can_run = classmethod(can_run)
 
 
 class XendACMPolicy(XendXSPolicy):

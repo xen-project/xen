@@ -56,6 +56,7 @@ struct xenfb {
 	int depth;              /* colour depth of guest framebuffer */
 	int width;              /* pixel width of guest framebuffer */
 	int height;             /* pixel height of guest framebuffer */
+	int offset;             /* offset of the framebuffer */
 	int abs_pointer_wanted; /* Whether guest supports absolute pointer */
 	int button_state;       /* Last seen pointer button state */
 	char protocol[64];	/* frontend protocol */
@@ -516,6 +517,18 @@ static void xenfb_on_fb_event(struct xenfb *xenfb)
 			}
 			xenfb_guest_copy(xenfb, x, y, w, h);
 			break;
+		case XENFB_TYPE_RESIZE:
+			xenfb->width  = event->resize.width;
+			xenfb->height = event->resize.height;
+			xenfb->depth = event->resize.depth;
+			xenfb->row_stride = event->resize.stride;
+			xenfb->offset = event->resize.offset;
+			dpy_colourdepth(xenfb->ds, xenfb->depth);
+			dpy_resize(xenfb->ds, xenfb->width, xenfb->height, xenfb->row_stride);
+			if (xenfb->ds->shared_buf)
+				dpy_setdata(xenfb->ds, xenfb->pixels + xenfb->offset);
+			xenfb_invalidate(xenfb);
+			break;
 		}
 	}
 	xen_mb();		/* ensure we're done with ring contents */
@@ -680,6 +693,7 @@ static void xenfb_dispatch_store(void *opaque)
 static int xenfb_read_frontend_fb_config(struct xenfb *xenfb) {
 	struct xenfb_page *fb_page;
 	int val;
+	int videoram;
 
         if (xenfb_xs_scanf1(xenfb->xsh, xenfb->fb.otherend, "feature-update",
                             "%d", &val) < 0)
@@ -702,10 +716,30 @@ static int xenfb_read_frontend_fb_config(struct xenfb *xenfb) {
         /* TODO check for consistency with the above */
         xenfb->fb_len = fb_page->mem_length;
         xenfb->row_stride = fb_page->line_length;
+
+        /* Protect against hostile frontend, limit fb_len to max allowed */
+        if (xenfb_xs_scanf1(xenfb->xsh, xenfb->fb.nodename, "videoram", "%d",
+                            &videoram) < 0)
+                videoram = 0;
+        videoram = videoram * 1024 * 1024;
+        if (videoram && xenfb->fb_len > videoram) {
+                fprintf(stderr, "Framebuffer requested length of %zd exceeded allowed %d\n",
+                        xenfb->fb_len, videoram);
+                xenfb->fb_len = videoram;
+                if (xenfb->row_stride * xenfb->height > xenfb->fb_len)
+                        xenfb->height = xenfb->fb_len / xenfb->row_stride;
+        }
         fprintf(stderr, "Framebuffer depth %d width %d height %d line %d\n",
                 fb_page->depth, fb_page->width, fb_page->height, fb_page->line_length);
         if (xenfb_map_fb(xenfb, xenfb->fb.otherend_id) < 0)
 		return -1;
+
+        /* Indicate we have the frame buffer resize feature */
+        xenfb_xs_printf(xenfb->xsh, xenfb->fb.nodename, "feature-resize", "1");
+
+        /* Tell kbd pointer the screen geometry */
+        xenfb_xs_printf(xenfb->xsh, xenfb->kbd.nodename, "width", "%d", xenfb->width);
+        xenfb_xs_printf(xenfb->xsh, xenfb->kbd.nodename, "height", "%d", xenfb->height);
 
         if (xenfb_switch_state(&xenfb->fb, XenbusStateConnected))
                 return -1;
@@ -1074,6 +1108,7 @@ static void xenfb_mouse_event(void *opaque,
 #define BLT(SRC_T,DST_T,RSB,GSB,BSB,RDB,GDB,BDB)                        \
     for (line = y ; line < (y+h) ; line++) {                            \
         SRC_T *src = (SRC_T *)(xenfb->pixels                            \
+                               + xenfb->offset                          \
                                + (line * xenfb->row_stride)             \
                                + (x * xenfb->depth / 8));               \
         DST_T *dst = (DST_T *)(xenfb->ds->data                                 \
@@ -1116,7 +1151,7 @@ static void xenfb_guest_copy(struct xenfb *xenfb, int x, int y, int w, int h)
         if (xenfb->depth == xenfb->ds->depth) { /* Perfect match can use fast path */
             for (line = y ; line < (y+h) ; line++) {
                 memcpy(xenfb->ds->data + (line * xenfb->ds->linesize) + (x * xenfb->ds->depth / 8),
-                        xenfb->pixels + (line * xenfb->row_stride) + (x * xenfb->depth / 8),
+                        xenfb->pixels + xenfb->offset + (line * xenfb->row_stride) + (x * xenfb->depth / 8),
                         w * xenfb->depth / 8);
             }
         } else { /* Mismatch requires slow pixel munging */

@@ -18,6 +18,7 @@
 #ifndef __XEN_HVM_SAVE_H__
 #define __XEN_HVM_SAVE_H__
 
+#include <public/xen.h>
 #include <public/hvm/save.h>
 #include <asm/types.h>
 

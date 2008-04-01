@@ -64,6 +64,7 @@ errormap = {
     "HANDLE_INVALID": N_("The %(1)s handle %(2)s is invalid."),
     "OPERATION_NOT_ALLOWED": N_("You attempted an operation that was not allowed."),
     "NETWORK_ALREADY_CONNECTED": N_("The network you specified already has a PIF attached to it, and so another one may not be attached."),
+    "SECURITY_ERROR": N_("%(2)s"),
     }
 
 translation = gettext.translation('xen-xm', fallback = True)

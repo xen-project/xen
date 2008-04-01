@@ -1007,6 +1007,13 @@ static void qcow_aio_cancel(BlockDriverAIOCB *blockacb)
     qemu_aio_release(acb);
 }
 
+static BlockDriverAIOCB *qcow_aio_flush(BlockDriverState *bs,
+        BlockDriverCompletionFunc *cb, void *opaque)
+{
+    BDRVQcowState *s = bs->opaque;
+    return bdrv_aio_flush(s->hd, cb, opaque);
+}
+
 static void qcow_close(BlockDriverState *bs)
 {
     BDRVQcowState *s = bs->opaque;
@@ -1228,10 +1235,10 @@ static int qcow_write_compressed(BlockDriverState *bs, int64_t sector_num,
     return 0;
 }
 
-static void qcow_flush(BlockDriverState *bs)
+static int qcow_flush(BlockDriverState *bs)
 {
     BDRVQcowState *s = bs->opaque;
-    bdrv_flush(s->hd);
+    return bdrv_flush(s->hd);
 }
 
 static int qcow_get_info(BlockDriverState *bs, BlockDriverInfo *bdi)
@@ -1886,6 +1893,8 @@ static int grow_refcount_table(BlockDriverState *bs, int min_size)
     int64_t table_offset;
     uint64_t data64;
     uint32_t data32;
+    int old_table_size;
+    int64_t old_table_offset;
 
     if (min_size <= s->refcount_table_size)
         return 0;
@@ -1931,10 +1940,14 @@ static int grow_refcount_table(BlockDriverState *bs, int min_size)
                     &data32, sizeof(data32)) != sizeof(data32))
         goto fail;
     qemu_free(s->refcount_table);
+    old_table_offset = s->refcount_table_offset;
+    old_table_size = s->refcount_table_size;
     s->refcount_table = new_table;
     s->refcount_table_size = new_table_size;
+    s->refcount_table_offset = table_offset;
 
     update_refcount(bs, table_offset, new_table_size2, 1);
+    free_clusters(bs, old_table_offset, old_table_size * sizeof(uint64_t));
     return 0;
  fail:
     free_clusters(bs, table_offset, new_table_size2);
@@ -2235,6 +2248,7 @@ BlockDriver bdrv_qcow2 = {
     .bdrv_aio_read = qcow_aio_read,
     .bdrv_aio_write = qcow_aio_write,
     .bdrv_aio_cancel = qcow_aio_cancel,
+    .bdrv_aio_flush = qcow_aio_flush,
     .aiocb_size = sizeof(QCowAIOCB),
     .bdrv_write_compressed = qcow_write_compressed,
 

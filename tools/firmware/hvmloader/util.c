@@ -21,7 +21,10 @@
 #include "util.h"
 #include "config.h"
 #include "e820.h"
+#include "hypercall.h"
 #include <stdint.h>
+#include <xen/xen.h>
+#include <xen/memory.h>
 #include <xen/hvm/hvm_info_table.h>
 
 void outb(uint16_t addr, uint8_t val)
@@ -583,6 +586,56 @@ int get_apic_mode(void)
 {
     struct hvm_info_table *t = get_hvm_info_table();
     return (t ? t->apic_mode : 1);
+}
+
+uint16_t get_cpu_mhz(void)
+{
+    struct xen_add_to_physmap xatp;
+    struct shared_info *shared_info = (struct shared_info *)0xa0000;
+    struct vcpu_time_info *info = &shared_info->vcpu_info[0].time;
+    uint64_t cpu_khz;
+    uint32_t tsc_to_nsec_mul, version;
+    int8_t tsc_shift;
+
+    static uint16_t cpu_mhz;
+    if ( cpu_mhz != 0 )
+        return cpu_mhz;
+
+    /* Map shared-info page to 0xa0000 (i.e., overlap VGA hole). */
+    xatp.domid = DOMID_SELF;
+    xatp.space = XENMAPSPACE_shared_info;
+    xatp.idx   = 0;
+    xatp.gpfn  = (unsigned long)shared_info >> 12;
+    if ( hypercall_memory_op(XENMEM_add_to_physmap, &xatp) != 0 )
+        BUG();
+
+    /* Get a consistent snapshot of scale factor (multiplier and shift). */
+    do {
+        version = info->version;
+        rmb();
+        tsc_to_nsec_mul = info->tsc_to_system_mul;
+        tsc_shift       = info->tsc_shift;
+        rmb();
+    } while ((version & 1) | (version ^ info->version));
+
+    /* Compute CPU speed in kHz. */
+    cpu_khz = 1000000ull << 32;
+    do_div(cpu_khz, tsc_to_nsec_mul);
+    if ( tsc_shift < 0 )
+        cpu_khz = cpu_khz << -tsc_shift;
+    else
+        cpu_khz = cpu_khz >> tsc_shift;
+
+    /* Get the VGA MMIO hole back by remapping shared info to scratch. */
+    xatp.domid = DOMID_SELF;
+    xatp.space = XENMAPSPACE_shared_info;
+    xatp.idx   = 0;
+    xatp.gpfn  = 0xfffff; /* scratch pfn */
+    if ( hypercall_memory_op(XENMEM_add_to_physmap, &xatp) != 0 )
+        BUG();
+
+    cpu_mhz = (uint16_t)(((uint32_t)cpu_khz + 500) / 1000);
+    return cpu_mhz;
 }
 
 /*

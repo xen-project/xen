@@ -25,10 +25,9 @@
 #include <public/hvm/ioreq.h>
 #include <public/event_channel.h>
 
-#define MAX_IO_HANDLER             12
+#define MAX_IO_HANDLER             16
 
 #define HVM_PORTIO                  0
-#define HVM_MMIO                    1
 #define HVM_BUFFERED_IO             2
 
 typedef unsigned long (*hvm_mmio_read_t)(struct vcpu *v,
@@ -96,14 +95,10 @@ static inline int register_buffered_io_handler(
     return register_io_handler(d, addr, size, action, HVM_BUFFERED_IO);
 }
 
-void send_mmio_req(unsigned char type, paddr_t gpa,
-                   unsigned long count, int size, paddr_t value,
-                   int dir, int df, int value_is_ptr);
-void send_pio_req(unsigned long port, unsigned long count, int size,
-                  paddr_t value, int dir, int df, int value_is_ptr);
 void send_timeoffset_req(unsigned long timeoff);
 void send_invalidate_req(void);
 int handle_mmio(void);
+int handle_mmio_with_translation(unsigned long gva, unsigned long gpfn);
 void hvm_interrupt_post(struct vcpu *v, int vector, int type);
 void hvm_io_assist(void);
 void hvm_dpci_eoi(struct domain *d, unsigned int guest_irq,

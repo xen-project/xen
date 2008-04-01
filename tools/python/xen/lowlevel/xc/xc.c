@@ -762,11 +762,12 @@ static PyObject *pyxc_physinfo(XcObject *self)
 {
 #define MAX_CPU_ID 255
     xc_physinfo_t info;
-    char cpu_cap[128], *p=cpu_cap, *q=cpu_cap;
+    char cpu_cap[128], virt_caps[128], *p;
     int i, j, max_cpu_id;
     uint64_t free_heap;
     PyObject *ret_obj, *node_to_cpu_obj, *node_to_memory_obj;
     xc_cpu_to_node_t map[MAX_CPU_ID + 1];
+    const char *virtcap_names[] = { "hvm", "hvm_directio" };
 
     set_xen_guest_handle(info.cpu_to_node, map);
     info.max_cpu_id = MAX_CPU_ID;
@@ -774,17 +775,21 @@ static PyObject *pyxc_physinfo(XcObject *self)
     if ( xc_physinfo(self->xc_handle, &info) != 0 )
         return pyxc_error_to_exception();
 
-    *q = 0;
+    p = cpu_cap;
+    *p = '\0';
     for ( i = 0; i < sizeof(info.hw_cap)/4; i++ )
-    {
         p += sprintf(p, "%08x:", info.hw_cap[i]);
-        if ( info.hw_cap[i] )
-            q = p;
-    }
-    if ( q > cpu_cap )
-        *(q-1) = 0;
+    *(p-1) = 0;
 
-    ret_obj = Py_BuildValue("{s:i,s:i,s:i,s:i,s:i,s:l,s:l,s:l,s:i,s:s}",
+    p = virt_caps;
+    *p = '\0';
+    for ( i = 0; i < 2; i++ )
+        if ( (info.capabilities >> i) & 1 )
+          p += sprintf(p, "%s ", virtcap_names[i]);
+    if ( p != virt_caps )
+      *(p-1) = '\0';
+
+    ret_obj = Py_BuildValue("{s:i,s:i,s:i,s:i,s:i,s:l,s:l,s:l,s:i,s:s:s:s}",
                             "nr_nodes",         info.nr_nodes,
                             "max_cpu_id",       info.max_cpu_id,
                             "threads_per_core", info.threads_per_core,
@@ -794,7 +799,8 @@ static PyObject *pyxc_physinfo(XcObject *self)
                             "free_memory",      pages_to_kib(info.free_pages),
                             "scrub_memory",     pages_to_kib(info.scrub_pages),
                             "cpu_khz",          info.cpu_khz,
-                            "hw_caps",          cpu_cap);
+                            "hw_caps",          cpu_cap,
+                            "virt_caps",        virt_caps);
 
     max_cpu_id = info.max_cpu_id;
     if ( max_cpu_id > MAX_CPU_ID )

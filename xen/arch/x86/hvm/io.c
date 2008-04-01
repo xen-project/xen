@@ -123,73 +123,6 @@ int hvm_buffered_io_send(ioreq_t *p)
     return 1;
 }
 
-void send_pio_req(unsigned long port, unsigned long count, int size,
-                  paddr_t value, int dir, int df, int value_is_ptr)
-{
-    struct vcpu *v = current;
-    vcpu_iodata_t *vio = get_ioreq(v);
-    ioreq_t *p = &vio->vp_ioreq;
-
-    if ( p->state != STATE_IOREQ_NONE )
-        gdprintk(XENLOG_WARNING,
-                 "WARNING: send pio with something already pending (%d)?\n",
-                 p->state);
-
-    p->dir = dir;
-    p->data_is_ptr = value_is_ptr;
-    p->type = IOREQ_TYPE_PIO;
-    p->size = size;
-    p->addr = port;
-    p->count = count;
-    p->df = df;
-    p->data = value;
-    p->io_count++;
-
-    if ( hvm_portio_intercept(p) )
-    {
-        p->state = STATE_IORESP_READY;
-        hvm_io_assist();
-    }
-    else
-    {
-        hvm_send_assist_req(v);
-    }
-}
-
-void send_mmio_req(unsigned char type, paddr_t gpa,
-                   unsigned long count, int size, paddr_t value,
-                   int dir, int df, int value_is_ptr)
-{
-    struct vcpu *v = current;
-    vcpu_iodata_t *vio = get_ioreq(v);
-    ioreq_t *p = &vio->vp_ioreq;
-
-    if ( p->state != STATE_IOREQ_NONE )
-        gdprintk(XENLOG_WARNING,
-                 "WARNING: send mmio with something already pending (%d)?\n",
-                 p->state);
-
-    p->dir = dir;
-    p->data_is_ptr = value_is_ptr;
-    p->type = type;
-    p->size = size;
-    p->addr = gpa;
-    p->count = count;
-    p->df = df;
-    p->data = value;
-    p->io_count++;
-
-    if ( hvm_mmio_intercept(p) || hvm_buffered_io_intercept(p) )
-    {
-        p->state = STATE_IORESP_READY;
-        hvm_io_assist();
-    }
-    else
-    {
-        hvm_send_assist_req(v);
-    }
-}
-
 void send_timeoffset_req(unsigned long timeoff)
 {
     ioreq_t p[1];
@@ -249,6 +182,11 @@ int handle_mmio(void)
 
     rc = hvm_emulate_one(&ctxt);
 
+    if ( curr->arch.hvm_vcpu.io_state == HVMIO_awaiting_completion )
+        curr->arch.hvm_vcpu.io_state = HVMIO_handle_mmio_awaiting_completion;
+    else
+        curr->arch.hvm_vcpu.mmio_gva = 0;
+
     switch ( rc )
     {
     case X86EMUL_UNHANDLEABLE:
@@ -271,41 +209,46 @@ int handle_mmio(void)
 
     hvm_emulate_writeback(&ctxt);
 
-    curr->arch.hvm_vcpu.mmio_in_progress = curr->arch.hvm_vcpu.io_in_progress;
-
     return 1;
+}
+
+int handle_mmio_with_translation(unsigned long gva, unsigned long gpfn)
+{
+    current->arch.hvm_vcpu.mmio_gva = gva & PAGE_MASK;
+    current->arch.hvm_vcpu.mmio_gpfn = gpfn;
+    return handle_mmio();
 }
 
 void hvm_io_assist(void)
 {
-    struct vcpu *v = current;
-    ioreq_t *p = &get_ioreq(v)->vp_ioreq;
+    struct vcpu *curr = current;
+    ioreq_t *p = &get_ioreq(curr)->vp_ioreq;
+    enum hvm_io_state io_state;
 
     if ( p->state != STATE_IORESP_READY )
     {
         gdprintk(XENLOG_ERR, "Unexpected HVM iorequest state %d.\n", p->state);
-        domain_crash(v->domain);
-        goto out;
+        domain_crash_synchronous();
     }
 
     rmb(); /* see IORESP_READY /then/ read contents of ioreq */
 
     p->state = STATE_IOREQ_NONE;
 
-    if ( v->arch.hvm_vcpu.io_in_progress )
+    io_state = curr->arch.hvm_vcpu.io_state;
+    curr->arch.hvm_vcpu.io_state = HVMIO_none;
+
+    if ( (io_state == HVMIO_awaiting_completion) ||
+         (io_state == HVMIO_handle_mmio_awaiting_completion) )
     {
-        v->arch.hvm_vcpu.io_in_progress = 0;
-        if ( (p->dir == IOREQ_READ) && !p->data_is_ptr )
-        {
-            v->arch.hvm_vcpu.io_completed = 1;
-            v->arch.hvm_vcpu.io_data = p->data;
-            if ( v->arch.hvm_vcpu.mmio_in_progress )
-                (void)handle_mmio();
-        }
+        curr->arch.hvm_vcpu.io_state = HVMIO_completed;
+        curr->arch.hvm_vcpu.io_data = p->data;
+        if ( io_state == HVMIO_handle_mmio_awaiting_completion )
+            (void)handle_mmio();
     }
 
- out:
-    vcpu_end_shutdown_deferral(v);
+    if ( p->state == STATE_IOREQ_NONE )
+        vcpu_end_shutdown_deferral(curr);
 }
 
 void dpci_ioport_read(uint32_t mport, ioreq_t *p)

@@ -152,9 +152,9 @@ hvm_read(enum x86_segment seg,
     *val = 0;
 
     if ( access_type == hvm_access_insn_fetch )
-        rc = hvm_fetch_from_guest_virt(val, addr, bytes);
+        rc = hvm_fetch_from_guest_virt(val, addr, bytes, 0);
     else
-        rc = hvm_copy_from_guest_virt(val, addr, bytes);
+        rc = hvm_copy_from_guest_virt(val, addr, bytes, 0);
 
     switch ( rc )
     {
@@ -416,7 +416,7 @@ struct x86_emulate_ops *shadow_init_emulation(
             x86_seg_cs, regs->eip, sizeof(sh_ctxt->insn_buf),
             hvm_access_insn_fetch, sh_ctxt, &addr) &&
          !hvm_fetch_from_guest_virt_nofault(
-             sh_ctxt->insn_buf, addr, sizeof(sh_ctxt->insn_buf)))
+             sh_ctxt->insn_buf, addr, sizeof(sh_ctxt->insn_buf), 0))
         ? sizeof(sh_ctxt->insn_buf) : 0;
 
     return &hvm_shadow_emulator_ops;
@@ -444,7 +444,7 @@ void shadow_continue_emulation(struct sh_emulate_ctxt *sh_ctxt,
                     x86_seg_cs, regs->eip, sizeof(sh_ctxt->insn_buf),
                     hvm_access_insn_fetch, sh_ctxt, &addr) &&
                  !hvm_fetch_from_guest_virt_nofault(
-                     sh_ctxt->insn_buf, addr, sizeof(sh_ctxt->insn_buf)))
+                     sh_ctxt->insn_buf, addr, sizeof(sh_ctxt->insn_buf), 0))
                 ? sizeof(sh_ctxt->insn_buf) : 0;
             sh_ctxt->insn_buf_eip = regs->eip;
         }

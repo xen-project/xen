@@ -1640,6 +1640,7 @@ static void vnc_dpy_colourdepth(DisplayState *ds, int depth)
             if (ds->depth == 32) return;
             depth = 32;
             break;
+        case 8:
         case 0:
             ds->shared_buf = 0;
             return;

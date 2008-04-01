@@ -204,19 +204,47 @@ int
 fsig_devread(fsi_file_t *ffi, unsigned int sector, unsigned int offset,
     unsigned int bufsize, char *buf)
 {
-	uint64_t off = ffi->ff_fsi->f_off + ((uint64_t)sector * 512) + offset;
-	ssize_t bytes_read = 0;
+	off_t off;
+	ssize_t ret;
+	int n, r;
+	char tmp[SECTOR_SIZE];
 
-	while (bufsize) {
-		ssize_t ret = pread(ffi->ff_fsi->f_fd, buf + bytes_read,
-		    bufsize, (off_t)off);
-		if (ret == -1)
-			return (0);
-		if (ret == 0)
-			return (0);
+	off = ffi->ff_fsi->f_off + ((off_t)sector * SECTOR_SIZE) + offset;
 
-		bytes_read += ret;
-		bufsize -= ret;
+	/*
+	 * Make reads from a raw disk sector-aligned. This is a requirement
+	 * for NetBSD. Split the read up into to three parts to meet this
+	 * requirement.
+	 */
+
+	n = (off & (SECTOR_SIZE - 1));
+	if (n > 0) {
+		r = SECTOR_SIZE - n;
+		if (r > bufsize)
+			r = bufsize;
+		ret = pread(ffi->ff_fsi->f_fd, tmp, SECTOR_SIZE, off - n);
+		if (ret < n + r)
+			return (0);
+		memcpy(buf, tmp + n, r);
+		buf += r;
+		bufsize -= r;
+		off += r;
+	}
+
+	n = (bufsize & ~(SECTOR_SIZE - 1));
+	if (n > 0) {
+		ret = pread(ffi->ff_fsi->f_fd, buf, n, off);
+		if (ret < n)
+			return (0);
+		buf += n;
+		bufsize -= n;
+		off += n;
+	}
+	if (bufsize > 0) {
+		ret = pread(ffi->ff_fsi->f_fd, tmp, SECTOR_SIZE, off);
+		if (ret < bufsize)
+			return (0);
+		memcpy(buf, tmp, bufsize);
 	}
 
 	return (1);

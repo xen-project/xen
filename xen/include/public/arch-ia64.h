@@ -23,8 +23,14 @@
  *
  */
 
+#include "xen.h"
+
 #ifndef __HYPERVISOR_IF_IA64_H__
 #define __HYPERVISOR_IF_IA64_H__
+
+#if !defined(__GNUC__) || defined(__STRICT_ANSI__)
+#error "Anonymous structs/unions are a GNU extension."
+#endif
 
 /* Structural guest handles introduced in 0x00030201. */
 #if __XEN_INTERFACE_VERSION__ >= 0x00030201
@@ -67,8 +73,6 @@ typedef unsigned long xen_pfn_t;
 #define IO_PORTS_SIZE           0x0000000004000000UL
 
 #ifndef __ASSEMBLY__
-
-#define __anonymous_union __extension__ union
 
 typedef unsigned long xen_ulong_t;
 
@@ -123,11 +127,11 @@ struct mapped_regs {
     unsigned long  reserved1[29];
     unsigned long  vhpi;
     unsigned long  reserved2[95];
-    __anonymous_union {
+    union {
         unsigned long  vgr[16];
         unsigned long bank1_regs[16]; // bank1 regs (r16-r31) when bank0 active
     };
-    __anonymous_union {
+    union {
         unsigned long  vbgr[16];
         unsigned long bank0_regs[16]; // bank0 regs (r16-r31) when bank1 active
     };
@@ -138,7 +142,7 @@ struct mapped_regs {
     unsigned long  vpsr;
     unsigned long  vpr;
     unsigned long  reserved4[76];
-    __anonymous_union {
+    union {
         unsigned long  vcr[128];
         struct {
             unsigned long dcr;  // CR0
@@ -172,7 +176,7 @@ struct mapped_regs {
             unsigned long rsv6[46];
         };
     };
-    __anonymous_union {
+    union {
         unsigned long  reserved5[128];
         struct {
             unsigned long precover_ifs;
@@ -569,7 +573,7 @@ struct xen_ia64_boot_param {
 struct xen_ia64_opt_feature {
 	unsigned long cmd;		/* Which feature */
 	unsigned char on;		/* Switch feature on/off */
-	__anonymous_union {
+	union {
 		struct {
 				/* The page protection bit mask of the pte.
 			 	 * This will be or'ed with the pte. */

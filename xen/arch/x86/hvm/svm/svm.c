@@ -725,7 +725,15 @@ static void svm_inject_exception(
 {
     struct vcpu *curr = current;
     struct vmcb_struct *vmcb = curr->arch.hvm_svm.vmcb;
-    eventinj_t event;
+    eventinj_t event = vmcb->eventinj;
+
+    if ( unlikely(event.fields.v) &&
+         (event.fields.type == X86_EVENTTYPE_HW_EXCEPTION) )
+    {
+        trapnr = hvm_combine_hw_exceptions(event.fields.vector, trapnr);
+        if ( trapnr == TRAP_double_fault )
+            errcode = 0;
+    }
 
     event.bytes = 0;
     event.fields.v = 1;
