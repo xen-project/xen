@@ -39,6 +39,7 @@
 #include <asm/hvm/vacpi.h>
 #include <asm/hvm/support.h>
 #include <public/hvm/save.h>
+#include <public/arch-ia64/hvm/memmap.h>
 #include <public/arch-ia64/sioemu.h>
 #include <asm/sioemu.h>
 
@@ -352,11 +353,9 @@ static void legacy_io_access(VCPU *vcpu, u64 pa, u64 *val, size_t s, int dir)
     return;
 }
 
-static void mmio_access(VCPU *vcpu, u64 src_pa, u64 *dest, size_t s, int ma, int dir, u64 pte)
+static void mmio_access(VCPU *vcpu, u64 src_pa, u64 *dest, size_t s, int ma, int dir, u64 iot)
 {
-    unsigned long iot = pte & GPFN_IO_MASK;
-
-    perfc_incra(vmx_mmio_access, iot >> 56);
+    perfc_incra(vmx_mmio_access, iot & 0x7);
     switch (iot) {
     case GPFN_PIB:       
         if (ma != 4)
@@ -366,8 +365,6 @@ static void mmio_access(VCPU *vcpu, u64 src_pa, u64 *dest, size_t s, int ma, int
             vlsapic_write(vcpu, src_pa, s, *dest);
         else
             *dest = vlsapic_read(vcpu, src_pa, s);
-        break;
-    case GPFN_GFW:
         break;
     case GPFN_IOSAPIC:
         if (!dir)
@@ -394,7 +391,7 @@ enum inst_type_en { SL_INTEGER, SL_FLOATING, SL_FLOATING_FP8 };
 /*
    dir 1: read 0:write
  */
-void emulate_io_inst(VCPU *vcpu, u64 padr, u64 ma, u64 pte)
+void emulate_io_inst(VCPU *vcpu, u64 padr, u64 ma, u64 iot)
 {
     REGS *regs;
     IA64_BUNDLE bundle;
@@ -536,8 +533,6 @@ void emulate_io_inst(VCPU *vcpu, u64 padr, u64 ma, u64 pte)
     }
 
     if (vcpu->domain->arch.is_sioemu) {
-        unsigned long iot = pte & GPFN_IO_MASK;
-
         if (iot != GPFN_PIB && iot != GPFN_IOSAPIC) {
             sioemu_io_emulate(padr, data, data1, update_word);
             return;
@@ -545,10 +540,10 @@ void emulate_io_inst(VCPU *vcpu, u64 padr, u64 ma, u64 pte)
     }
 
     if (size == 4) {
-        mmio_access(vcpu, padr + 8, &data1, 1 << 3, ma, dir, pte);
+        mmio_access(vcpu, padr + 8, &data1, 1 << 3, ma, dir, iot);
         size = 3;
     }
-    mmio_access(vcpu, padr, &data, 1 << size, ma, dir, pte);
+    mmio_access(vcpu, padr, &data, 1 << size, ma, dir, iot);
 
     emulate_io_update(vcpu, update_word, data, data1);
 }

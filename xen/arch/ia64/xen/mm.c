@@ -886,6 +886,7 @@ flags_to_prot (unsigned long flags)
     res |= flags & ASSIGN_tlb_track ? _PAGE_TLB_TRACKING: 0;
 #endif
     res |= flags & ASSIGN_pgc_allocated ? _PAGE_PGC_ALLOCATED: 0;
+    res |= flags & ASSIGN_io ? _PAGE_IO: 0;
     
     return res;
 }
@@ -966,7 +967,7 @@ assign_domain_page(struct domain *d,
 {
     struct page_info* page = mfn_to_page(physaddr >> PAGE_SHIFT);
 
-    BUG_ON((physaddr & GPFN_IO_MASK) != GPFN_MEM);
+    BUG_ON((physaddr & _PAGE_PPN_MASK) != physaddr);
     BUG_ON(page->count_info != (PGC_allocated | 1));
     set_gpfn_from_mfn(physaddr >> PAGE_SHIFT, mpaddr >> PAGE_SHIFT);
     // because __assign_domain_page() uses set_pte_rel() which has

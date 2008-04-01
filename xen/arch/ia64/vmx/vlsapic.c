@@ -47,6 +47,7 @@
 #include <xen/domain.h>
 #include <asm/hvm/support.h>
 #include <public/hvm/save.h>
+#include <public/arch-ia64/hvm/memmap.h>
 
 #ifdef IPI_DEBUG
 #define IPI_DPRINTK(x...) printk(x)

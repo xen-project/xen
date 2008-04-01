@@ -44,6 +44,7 @@
 #include <public/xen.h>
 #include <public/hvm/ioreq.h>
 #include <public/event_channel.h>
+#include <public/arch-ia64/hvm/memmap.h>
 #include <asm/vmx_phy_mode.h>
 #include <asm/processor.h>
 #include <asm/vmx.h>
@@ -553,11 +554,11 @@ typedef struct io_range {
 } io_range_t;
 
 static const io_range_t io_ranges[] = {
-	{VGA_IO_START, VGA_IO_SIZE, GPFN_FRAME_BUFFER},
-	{MMIO_START, MMIO_SIZE, GPFN_LOW_MMIO},
-	{LEGACY_IO_START, LEGACY_IO_SIZE, GPFN_LEGACY_IO},
-	{IO_SAPIC_START, IO_SAPIC_SIZE, GPFN_IOSAPIC},
-	{PIB_START, PIB_SIZE, GPFN_PIB},
+	{VGA_IO_START, VGA_IO_SIZE, GPFN_FRAME_BUFFER << PAGE_SHIFT},
+	{MMIO_START, MMIO_SIZE, GPFN_LOW_MMIO << PAGE_SHIFT},
+	{LEGACY_IO_START, LEGACY_IO_SIZE, GPFN_LEGACY_IO << PAGE_SHIFT},
+	{IO_SAPIC_START, IO_SAPIC_SIZE, GPFN_IOSAPIC << PAGE_SHIFT},
+	{PIB_START, PIB_SIZE, GPFN_PIB << PAGE_SHIFT},
 };
 
 // The P2M table is built in libxc/ia64/xc_ia64_hvm_build.c @ setup_guest()
@@ -571,7 +572,7 @@ static void vmx_build_io_physmap_table(struct domain *d)
 		for (j = io_ranges[i].start;
 		     j < io_ranges[i].start + io_ranges[i].size; j += PAGE_SIZE)
 			(void)__assign_domain_page(d, j, io_ranges[i].type,
-			                           ASSIGN_writable);
+			                           ASSIGN_writable | ASSIGN_io);
 	}
 
 }

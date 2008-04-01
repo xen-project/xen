@@ -314,7 +314,7 @@ IA64FAULT vmx_vcpu_itr_d(VCPU *vcpu, u64 slot, u64 pte, u64 itir, u64 ifa)
         thash_purge_entries(vcpu, va, ps);
     gpfn = (pte & _PAGE_PPN_MASK)>> PAGE_SHIFT;
     gpte = lookup_domain_mpa(vcpu->domain, gpfn, NULL);
-    if (gpte & GPFN_IO_MASK)
+    if (gpte & _PAGE_IO)
         pte |= VTLB_PTE_IO;
     vcpu_get_rr(vcpu, va, &rid);
     rid &= RR_RID_MASK;

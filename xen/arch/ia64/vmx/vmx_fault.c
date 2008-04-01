@@ -372,8 +372,9 @@ vmx_hpw_miss(u64 vadr, u64 vec, REGS* regs)
                     return IA64_FAULT;
                 }
                 pte = lookup_domain_mpa(v->domain, pa_clear_uc(vadr), NULL);
-                if (v->domain != dom0 && (pte & GPFN_IO_MASK)) {
-                    emulate_io_inst(v, pa_clear_uc(vadr), 4, pte);
+                if (v->domain != dom0 && (pte & _PAGE_IO)) {
+                    emulate_io_inst(v, pa_clear_uc(vadr), 4,
+                                    (pte & _PFN_MASK) >> PAGE_SHIFT);
                     return IA64_FAULT;
                 }
                 physical_tlb_miss(v, vadr, type);
@@ -404,12 +405,13 @@ try_again:
             }
             gppa = thash_translate(data, vadr);
             pte = lookup_domain_mpa(v->domain, gppa, NULL);
-            if (pte & GPFN_IO_MASK) {
+            if (pte & _PAGE_IO) {
                 if (misr.sp)
                     panic_domain(NULL, "ld.s on I/O page not with UC attr."
                                  " pte=0x%lx\n", data->page_flags);
                 if (data->pl >= ((regs->cr_ipsr >> IA64_PSR_CPL0_BIT) & 3))
-                    emulate_io_inst(v, gppa, data->ma, pte);
+                    emulate_io_inst(v, gppa, data->ma, 
+                                    (pte & _PFN_MASK) >> PAGE_SHIFT);
                 else {
                     vcpu_set_isr(v, misr.val);
                     data_access_rights(v, vadr);

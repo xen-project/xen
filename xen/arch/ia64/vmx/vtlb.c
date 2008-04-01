@@ -515,7 +515,7 @@ static u64 translate_phy_pte(VCPU *v, u64 pte, u64 itir, u64 va)
     phy_pte.val = pte;
     paddr = ((pte & _PAGE_PPN_MASK) & ps_mask) | (va & ~ps_mask);
     maddr = lookup_domain_mpa(d, paddr, NULL);
-    if (maddr & GPFN_IO_MASK)
+    if (maddr & _PAGE_IO)
         return -1;
 
     /* Ensure WB attribute if pte is related to a normal mem page,

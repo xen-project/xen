@@ -97,17 +97,9 @@
 
 #define _PAGE_PGC_ALLOCATED_BIT	59	/* _PGC_allocated */
 #define _PAGE_PGC_ALLOCATED	(__IA64_UL(1) << _PAGE_PGC_ALLOCATED_BIT)
-/* domVTI */
-#define GPFN_MEM		(0UL << 60)	/* Guest pfn is normal mem */
-#define GPFN_FRAME_BUFFER	(1UL << 60)	/* VGA framebuffer */
-#define GPFN_LOW_MMIO		(2UL << 60)	/* Low MMIO range */
-#define GPFN_PIB		(3UL << 60)	/* PIB base */
-#define GPFN_IOSAPIC		(4UL << 60)	/* IOSAPIC base */
-#define GPFN_LEGACY_IO		(5UL << 60)	/* Legacy I/O base */
-#define GPFN_GFW		(6UL << 60)	/* Guest Firmware */
-#define GPFN_HIGH_MMIO		(7UL << 60)	/* High MMIO range */
 
-#define GPFN_IO_MASK		(7UL << 60)	/* Guest pfn is I/O type */
+#define _PAGE_IO_BIT		60
+#define _PAGE_IO		(__IA64_UL(1) << _PAGE_IO_BIT)
 
 #else
 #define _PAGE_PROTNONE		(__IA64_UL(1) << 63)
@@ -341,7 +333,7 @@ set_pte_rel(volatile pte_t* ptep, pte_t pteval)
 #define pte_file(pte)		((pte_val(pte) & _PAGE_FILE) != 0)
 #ifdef XEN
 #define pte_pgc_allocated(pte)	((pte_val(pte) & _PAGE_PGC_ALLOCATED) != 0)
-#define pte_mem(pte)	(!(pte_val(pte) & GPFN_IO_MASK) && !pte_none(pte))
+#define pte_mem(pte)	(!(pte_val(pte) & _PAGE_IO) && !pte_none(pte))
 #endif
 /*
  * Note: we convert AR_RWX to AR_RX and AR_RW to AR_R by clearing the 2nd bit in the

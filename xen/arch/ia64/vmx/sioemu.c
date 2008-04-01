@@ -166,8 +166,11 @@ sioemu_add_io_physmap (struct domain *d, unsigned long start,
     unsigned long i;
     int res;
 
+    /* Convert to ppn.  */
+    type <<= PAGE_SHIFT;
+
     /* Check type.  */
-    if (type == 0 || (type & GPFN_IO_MASK) != type)
+    if (type == 0 || (type & _PAGE_PPN_MASK) != type)
         return -EINVAL;
     if ((start & (PAGE_SIZE -1)) || (size & (PAGE_SIZE - 1)))
         return -EINVAL;
@@ -180,7 +183,7 @@ sioemu_add_io_physmap (struct domain *d, unsigned long start,
 
     /* Set.  */
     for (i = start; i < start + size; i += PAGE_SIZE) {
-        res = __assign_domain_page(d, i, type, ASSIGN_writable);
+        res = __assign_domain_page(d, i, type, ASSIGN_writable | ASSIGN_io);
         if (res != 0)
             return res;
     }
