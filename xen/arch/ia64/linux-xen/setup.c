@@ -405,16 +405,21 @@ acpi_oem_console_setup(void)
 	 * Tiger 2: SR870BH2
 	 * Tiger 4: SR870BN4
 	 */
-	if (strncmp(hdr->oem_id, "INTEL", 5) ||
-	    (!strncmp(hdr->oem_table_id, "SR870BH2", 8) &&
-	     !strncmp(hdr->oem_table_id, "SR870BN4", 8)))
-		return -ENODEV;
-
-	ns16550_com1.baud = BAUD_AUTO;
-	ns16550_com1.io_base = 0x2f8;
-	ns16550_com1.irq = 3;
-
-	return 0;
+	if (!strncmp(hdr->oem_id, "INTEL", 5)) {
+		if (!strncmp(hdr->oem_table_id, "SR870BH2", 8) ||
+		    !strncmp(hdr->oem_table_id, "SR870BN4", 8)) {
+			ns16550_com1.baud = BAUD_AUTO;
+			ns16550_com1.io_base = 0x2f8;
+			ns16550_com1.irq = 3;
+			return 0;
+		} else {
+			ns16550_com1.baud = BAUD_AUTO;
+			ns16550_com1.io_base = 0x3f8;
+			ns16550_com1.irq = ns16550_com1_gsi = 4;
+			return 0;
+		}
+	}
+	return -ENODEV;
 }
 #endif
 
