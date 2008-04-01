@@ -16,6 +16,9 @@ http://lists.xensource.com/archives/html/xen-devel/2008-01/msg00010.html
 Xen 3.3 release
 ---------------
 
+17336: Add platform capabilities field to XEN_SYSCTL_physinfo
+http://xenbits.xensource.com/xen-unstable.hg?rev/250606290439
+
 17289: PV framebuffer dynamic resolution facility
 http://xenbits.xensource.com/xen-unstable.hg?rev/d97e61001d81
 
