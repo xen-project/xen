@@ -47,18 +47,22 @@ long arch_do_sysctl(
         if ( ret )
             break;
 
+        memset(pi, 0, sizeof(*pi));
         pi->threads_per_core =
             cpus_weight(cpu_sibling_map[0]);
         pi->cores_per_socket =
             cpus_weight(cpu_core_map[0]) / pi->threads_per_core;
         pi->nr_cpus = (u32)num_online_cpus();
         pi->nr_nodes = num_online_nodes();
-        pi->total_pages      = total_pages;
-        pi->free_pages       = avail_domheap_pages();
-        pi->scrub_pages      = avail_scrub_pages();
-        pi->cpu_khz          = cpu_khz;
-        memset(pi->hw_cap, 0, sizeof(pi->hw_cap));
+        pi->total_pages = total_pages;
+        pi->free_pages = avail_domheap_pages();
+        pi->scrub_pages = avail_scrub_pages();
+        pi->cpu_khz = cpu_khz;
         memcpy(pi->hw_cap, boot_cpu_data.x86_capability, NCAPINTS*4);
+        if ( hvm_enabled )
+            pi->capabilities |= XEN_SYSCTL_PHYSCAP_hvm;
+        if ( iommu_enabled )
+            pi->capabilities |= XEN_SYSCTL_PHYSCAP_hvm_directio;
 
         max_array_ent = pi->max_cpu_id;
         pi->max_cpu_id = last_cpu(cpu_online_map);

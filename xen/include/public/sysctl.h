@@ -84,8 +84,13 @@ DEFINE_XEN_GUEST_HANDLE(xen_sysctl_tbuf_op_t);
  * Get physical information about the host machine
  */
 #define XEN_SYSCTL_physinfo          3
+ /* (x86) The platform supports HVM guests. */
+#define _XEN_SYSCTL_PHYSCAP_hvm          0
+#define XEN_SYSCTL_PHYSCAP_hvm           (1u<<_XEN_SYSCTL_PHYSCAP_hvm)
+ /* (x86) The platform supports HVM-guest direct access to I/O devices. */
+#define _XEN_SYSCTL_PHYSCAP_hvm_directio 1
+#define XEN_SYSCTL_PHYSCAP_hvm_directio  (1u<<_XEN_SYSCTL_PHYSCAP_hvm_directio)
 struct xen_sysctl_physinfo {
-    /* IN variables. */
     uint32_t threads_per_core;
     uint32_t cores_per_socket;
     uint32_t nr_cpus;
@@ -96,7 +101,6 @@ struct xen_sysctl_physinfo {
     uint64_aligned_t scrub_pages;
     uint32_t hw_cap[8];
 
-    /* IN/OUT variables. */
     /*
      * IN: maximum addressable entry in the caller-provided cpu_to_node array.
      * OUT: largest cpu identifier in the system.
@@ -112,6 +116,9 @@ struct xen_sysctl_physinfo {
      * elements of the array will not be written by the sysctl.
      */
     XEN_GUEST_HANDLE_64(uint32) cpu_to_node;
+
+    /* XEN_SYSCTL_PHYSCAP_??? */
+    uint32_t capabilities;
 };
 typedef struct xen_sysctl_physinfo xen_sysctl_physinfo_t;
 DEFINE_XEN_GUEST_HANDLE(xen_sysctl_physinfo_t);

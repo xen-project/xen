@@ -41,6 +41,7 @@ long arch_do_sysctl(struct xen_sysctl *sysctl,
     {
         xen_sysctl_physinfo_t *pi = &sysctl->u.physinfo;
 
+        memset(pi, 0, sizeof(*pi));
         pi->threads_per_core =
             cpus_weight(cpu_sibling_map[0]);
         pi->cores_per_socket =
@@ -50,10 +51,7 @@ long arch_do_sysctl(struct xen_sysctl *sysctl,
         pi->total_pages      = total_pages;
         pi->free_pages       = avail_domheap_pages();
         pi->cpu_khz          = cpu_khz;
-        memset(pi->hw_cap, 0, sizeof(pi->hw_cap));
-        ret = 0;
-        if ( copy_to_guest(u_sysctl, sysctl, 1) )
-            ret = -EFAULT;
+        ret = copy_to_guest(u_sysctl, sysctl, 1) ? -EFAULT : 0;
     }
     break;
 

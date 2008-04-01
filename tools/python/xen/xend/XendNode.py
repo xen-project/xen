@@ -92,6 +92,7 @@ class XendNode:
         physinfo = self.physinfo_dict()
         cpu_count = physinfo['nr_cpus']
         cpu_features = physinfo['hw_caps']
+        virt_caps = physinfo['virt_caps']
 
         # If the number of CPUs don't match, we should just reinitialise 
         # the CPU UUIDs.
@@ -112,6 +113,7 @@ class XendNode:
                 self.cpus[u].update(
                     { 'host'     : self.uuid,
                       'features' : cpu_features,
+                      'virt_caps': virt_caps,
                       'speed'    : int(float(cpuinfo[number]['cpu MHz'])),
                       'vendor'   : cpuinfo[number]['vendor_id'],
                       'modelname': cpuinfo[number]['model name'],
@@ -605,6 +607,7 @@ class XendNode:
                       'threads_per_core',
                       'cpu_mhz',
                       'hw_caps',
+                      'virt_caps',
                       'total_memory',
                       'free_memory',
                       'node_to_cpu',
