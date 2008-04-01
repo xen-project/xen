@@ -21,6 +21,7 @@
  */
 
 #include <stdint.h>
+#include <xen/xen.h>
 #include <xen/version.h>
 #include "smbios_types.h"
 #include "util.h"
@@ -246,13 +247,14 @@ smbios_entry_point_init(void *start,
     int i;
     struct smbios_entry_point *ep = (struct smbios_entry_point *)start;
 
+    memset(ep, 0, sizeof(*ep));
+
     strncpy(ep->anchor_string, "_SM_", 4);
     ep->length = 0x1f;
     ep->smbios_major_version = 2;
     ep->smbios_minor_version = 4;
     ep->max_structure_size = max_structure_size;
     ep->entry_point_revision = 0;
-    memset(ep->formatted_area, 0, 5);
     strncpy(ep->intermediate_anchor_string, "_DMI_", 5);
     
     ep->structure_table_length = structure_table_length;
@@ -260,9 +262,6 @@ smbios_entry_point_init(void *start,
     ep->number_of_structures = number_of_structures;
     ep->smbios_bcd_revision = 0x24;
 
-    ep->checksum = 0;
-    ep->intermediate_checksum = 0;
-    
     sum = 0;
     for ( i = 0; i < 0x10; i++ )
         sum += ((int8_t *)start)[i];
@@ -280,22 +279,27 @@ smbios_type_0_init(void *start, const char *xen_version,
                    uint32_t xen_major_version, uint32_t xen_minor_version)
 {
     struct smbios_type_0 *p = (struct smbios_type_0 *)start;
-    
+    static const char *smbios_release_date = __SMBIOS_DATE__;
+
+    memset(p, 0, sizeof(*p));
+
     p->header.type = 0;
     p->header.length = sizeof(struct smbios_type_0);
     p->header.handle = 0;
-    
+
     p->vendor_str = 1;
     p->version_str = 2;
     p->starting_address_segment = 0xe800;
-    p->release_date_str = 0;
+    p->release_date_str = 3;
     p->rom_size = 0;
-    
-    memset(p->characteristics, 0, 8);
-    p->characteristics[7] = 0x08; /* BIOS characteristics not supported */
-    p->characteristics_extension_bytes[0] = 0;
-    p->characteristics_extension_bytes[1] = 0;
-    
+
+    /* BIOS Characteristics. */
+    p->characteristics[0] = 0x80; /* PCI is supported */
+    p->characteristics[2] = 0x08; /* EDD is supported */
+
+    /* Extended Characteristics: Enable Targeted Content Distribution. */
+    p->characteristics_extension_bytes[1] = 0x04;
+
     p->major_release = (uint8_t) xen_major_version;
     p->minor_release = (uint8_t) xen_minor_version;
     p->embedded_controller_major = 0xff;
@@ -306,6 +310,8 @@ smbios_type_0_init(void *start, const char *xen_version,
     start += strlen("Xen") + 1;
     strcpy((char *)start, xen_version);
     start += strlen(xen_version) + 1;
+    strcpy((char *)start, smbios_release_date);
+    start += strlen(smbios_release_date) + 1;
 
     *((uint8_t *)start) = 0;
     return start + 1;
@@ -318,6 +324,9 @@ smbios_type_1_init(void *start, const char *xen_version,
 {
     char uuid_str[37];
     struct smbios_type_1 *p = (struct smbios_type_1 *)start;
+
+    memset(p, 0, sizeof(*p));
+
     p->header.type = 1;
     p->header.length = sizeof(struct smbios_type_1);
     p->header.handle = 0x100;
@@ -355,6 +364,8 @@ smbios_type_3_init(void *start)
 {
     struct smbios_type_3 *p = (struct smbios_type_3 *)start;
     
+    memset(p, 0, sizeof(*p));
+
     p->header.type = 3;
     p->header.length = sizeof(struct smbios_type_3);
     p->header.handle = 0x300;
@@ -379,11 +390,14 @@ smbios_type_3_init(void *start)
 
 /* Type 4 -- Processor Information */
 static void *
-smbios_type_4_init(void *start, unsigned int cpu_number, char *cpu_manufacturer)
+smbios_type_4_init(
+    void *start, unsigned int cpu_number, char *cpu_manufacturer)
 {
     char buf[80]; 
     struct smbios_type_4 *p = (struct smbios_type_4 *)start;
     uint32_t eax, ebx, ecx, edx;
+
+    memset(p, 0, sizeof(*p));
 
     p->header.type = 4;
     p->header.length = sizeof(struct smbios_type_4);
@@ -403,8 +417,7 @@ smbios_type_4_init(void *start, unsigned int cpu_number, char *cpu_manufacturer)
     p->voltage = 0;
     p->external_clock = 0;
 
-    p->max_speed = 0; /* unknown */
-    p->current_speed = 0; /* unknown */
+    p->max_speed = p->current_speed = get_cpu_mhz();
 
     p->status = 0x41; /* socket populated, CPU enabled */
     p->upgrade = 0x01; /* other */
@@ -431,6 +444,8 @@ smbios_type_16_init(void *start, uint32_t memsize)
 {
     struct smbios_type_16 *p = (struct smbios_type_16*)start;
 
+    memset(p, 0, sizeof(*p));
+
     p->header.type = 16;
     p->header.handle = 0x1000;
     p->header.length = sizeof(struct smbios_type_16);
@@ -453,6 +468,8 @@ smbios_type_17_init(void *start, uint32_t memory_size_mb)
 {
     struct smbios_type_17 *p = (struct smbios_type_17 *)start;
     
+    memset(p, 0, sizeof(*p));
+
     p->header.type = 17;
     p->header.length = sizeof(struct smbios_type_17);
     p->header.handle = 0x1100;
@@ -484,6 +501,8 @@ smbios_type_19_init(void *start, uint32_t memory_size_mb)
 {
     struct smbios_type_19 *p = (struct smbios_type_19 *)start;
     
+    memset(p, 0, sizeof(*p));
+
     p->header.type = 19;
     p->header.length = sizeof(struct smbios_type_19);
     p->header.handle = 0x1300;
@@ -503,6 +522,8 @@ static void *
 smbios_type_20_init(void *start, uint32_t memory_size_mb)
 {
     struct smbios_type_20 *p = (struct smbios_type_20 *)start;
+
+    memset(p, 0, sizeof(*p));
 
     p->header.type = 20;
     p->header.length = sizeof(struct smbios_type_20);
@@ -528,6 +549,8 @@ smbios_type_32_init(void *start)
 {
     struct smbios_type_32 *p = (struct smbios_type_32 *)start;
 
+    memset(p, 0, sizeof(*p));
+
     p->header.type = 32;
     p->header.length = sizeof(struct smbios_type_32);
     p->header.handle = 0x2000;
@@ -544,6 +567,8 @@ static void *
 smbios_type_127_init(void *start)
 {
     struct smbios_type_127 *p = (struct smbios_type_127 *)start;
+
+    memset(p, 0, sizeof(*p));
 
     p->header.type = 127;
     p->header.length = sizeof(struct smbios_type_127);

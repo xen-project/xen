@@ -10,11 +10,11 @@
 #undef NULL
 #define NULL ((void*)0)
 
-extern void __assert_failed(char *assertion, char *file, int line)
+void __assert_failed(char *assertion, char *file, int line)
     __attribute__((noreturn));
 #define ASSERT(p) \
     do { if (!(p)) __assert_failed(#p, __FILE__, __LINE__); } while (0)
-extern void __bug(char *file, int line) __attribute__((noreturn));
+void __bug(char *file, int line) __attribute__((noreturn));
 #define BUG() __bug(__FILE__, __LINE__)
 #define BUG_ON(p) do { if (p) BUG(); } while (0)
 #define BUILD_BUG_ON(p) ((void)sizeof(char[1 - 2 * !!(p)]))
@@ -49,9 +49,53 @@ void pci_write(uint32_t devfn, uint32_t reg, uint32_t len, uint32_t val);
 #define pci_writew(devfn, reg, val) (pci_write(devfn, reg, 2, (uint16_t)val))
 #define pci_writel(devfn, reg, val) (pci_write(devfn, reg, 4, (uint32_t)val))
 
+/* Get CPU speed in MHz. */
+uint16_t get_cpu_mhz(void);
+
 /* Do cpuid instruction, with operation 'idx' */
 void cpuid(uint32_t idx, uint32_t *eax, uint32_t *ebx,
            uint32_t *ecx, uint32_t *edx);
+
+/* Read the TSC register. */
+static inline uint64_t rdtsc(void)
+{
+    uint64_t tsc;
+    asm volatile ( "rdtsc" : "=A" (tsc) );
+    return tsc;
+}
+
+/* Relax the CPU and let the compiler know that time passes. */
+static inline void cpu_relax(void)
+{
+    asm volatile ( "rep ; nop" : : : "memory" );
+}
+
+/* Memory barriers. */
+#define barrier() asm volatile ( "" : : : "memory" )
+#define rmb()     barrier()
+#define wmb()     barrier()
+
+/*
+ * Divide a 64-bit dividend by a 32-bit divisor.
+ * (1) Overwrites the 64-bit dividend _in_place_ with the quotient
+ * (2) Returns the 32-bit remainder
+ */
+#define do_div(n, base) ({                                      \
+    unsigned long __upper, __low, __high, __mod, __base;        \
+    __base = (base);                                            \
+    asm ( "" : "=a" (__low), "=d" (__high) : "A" (n) );         \
+    __upper = __high;                                           \
+    if ( __high )                                               \
+    {                                                           \
+        __upper = __high % (__base);                            \
+        __high = __high / (__base);                             \
+    }                                                           \
+    asm ( "divl %2"                                             \
+          : "=a" (__low), "=d" (__mod)                          \
+          : "rm" (__base), "0" (__low), "1" (__upper) );        \
+    asm ( "" : "=A" (n) : "a" (__low), "d" (__high) );          \
+    __mod;                                                      \
+})
 
 /* HVM-builder info. */
 int get_vcpu_nr(void);
