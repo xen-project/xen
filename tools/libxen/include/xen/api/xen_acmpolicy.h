@@ -74,7 +74,7 @@ xen_acm_header_free(xen_acm_header *hdr);
 /**
  * Get the referenced policy's record.
  */
-bool
+extern bool
 xen_acmpolicy_get_record(xen_session *session, xen_acmpolicy_record **result,
                          xen_xspolicy xspolicy);
 
@@ -118,14 +118,14 @@ xen_acmpolicy_get_enforced_binary(xen_session *session, char **binary,
 /**
  * Get the ACM ssidref of the given VM.
  */
-bool
+extern bool
 xen_acmpolicy_get_VM_ssidref(xen_session *session, int64_t *result,
                              xen_vm vm);
 
 /**
  * Get the UUID field of the given policy.
  */
-bool
+extern bool
 xen_acmpolicy_get_uuid(xen_session *session, char **result,
                        xen_xspolicy xspolicy);
 

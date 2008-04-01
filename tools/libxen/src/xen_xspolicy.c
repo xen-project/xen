@@ -343,3 +343,21 @@ xen_xspolicy_activate_xspolicy(xen_session *session,
     XEN_CALL_("XSPolicy.activate_xspolicy");
     return session->ok;
 }
+
+
+bool
+xen_xspolicy_can_run(xen_session *session, int64_t *result,
+                     char *security_label)
+{
+    abstract_value param_values[] =
+        {
+            { .type = &abstract_type_string,
+              .u.string_val = security_label }
+        };
+
+    abstract_type result_type = abstract_type_int;
+
+    *result = 0;
+    XEN_CALL_("XSPolicy.can_run");
+    return session->ok;
+}
