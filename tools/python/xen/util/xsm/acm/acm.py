@@ -68,6 +68,7 @@ policy_name_re = re.compile(".*[chwall|ste|chwall_ste].*", re.IGNORECASE)
 #decision hooks known to the hypervisor
 ACMHOOK_sharing = 1
 ACMHOOK_authorization = 2
+ACMHOOK_conflictset = 3
 
 #other global variables
 NULL_SSIDREF = 0
@@ -373,7 +374,7 @@ def label2ssidref(labelname, policyname, typ):
         else:
             return (sec_ssid[0] << 16) | pri_ssid[0]
     finally:
-       mapfile_unlock()
+        mapfile_unlock()
 
 
 def refresh_ssidref(config):
@@ -550,6 +551,18 @@ def hv_get_policy():
     if len(bin_pol) == 0:
         bin_pol = None
     return rc, bin_pol
+
+
+def is_in_conflict(ssidref):
+    """ Check whether the given ssidref is in conflict with any running
+        domain.
+    """
+    decision = acm.getdecision('ssidref', str(ssidref),
+                               'ssidref', str(ssidref),
+                               ACMHOOK_conflictset)
+    if decision == "DENIED":
+        return True
+    return False
 
 
 def set_policy(xs_type, xml, flags, overwrite):
@@ -1548,6 +1561,33 @@ def get_security_label(self, xspol=None):
     if domid != 0:
         label = self.info.get('security_label', label)
     return label
+
+
+def check_can_run(sec_label):
+    """ Check whether a VM could run, given its vm label. A VM can run if
+       - it is authorized
+       - is not in conflict with any running domain
+    """
+    try:
+        mapfile_lock()
+
+        if sec_label == None or sec_label == "":
+            vm_label = ACM_LABEL_UNLABELED
+        else:
+            poltype, policy, vm_label = sec_label.split(':')
+            if policy != get_active_policy_name():
+                return -xsconstants.XSERR_BAD_POLICY_NAME
+        ssidref = label2ssidref(vm_label, policy, 'dom')
+        if ssidref != xsconstants.INVALID_SSIDREF:
+            if not has_authorization(ssidref):
+                return -xsconstants.XSERR_VM_NOT_AUTHORIZED
+            if is_in_conflict(ssidref):
+                return -xsconstants.XSERR_VM_IN_CONFLICT
+            return -xsconstants.XSERR_SUCCESS
+        else:
+            return -xsconstants.XSERR_BAD_LABEL
+    finally:
+        mapfile_unlock()
 
 
 __cond = threading.Condition()
