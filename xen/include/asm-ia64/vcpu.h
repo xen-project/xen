@@ -8,6 +8,7 @@
 #include <asm/fpu.h>
 #include <asm/tlb.h>
 #include <asm/ia64_int.h>
+#include <asm/privop_stat.h>
 #include <xen/types.h>
 #include <public/xen.h>
 #include <linux/acpi.h>
@@ -51,41 +52,228 @@ extern IA64FAULT vcpu_set_psr_l(VCPU * vcpu, u64 val);
 extern IA64FAULT vcpu_set_psr_i(VCPU * vcpu);
 extern IA64FAULT vcpu_reset_psr_dt(VCPU * vcpu);
 extern IA64FAULT vcpu_set_psr_dt(VCPU * vcpu);
+
+/**************************************************************************
+ VCPU control register access routines
+**************************************************************************/
+
+static inline IA64FAULT vcpu_get_dcr(VCPU * vcpu, u64 * pval)
+{
+	*pval = PSCB(vcpu, dcr);
+	return IA64_NO_FAULT;
+}
+
+static inline IA64FAULT vcpu_get_iva(VCPU * vcpu, u64 * pval)
+{
+	if (VMX_DOMAIN(vcpu))
+		*pval = PSCB(vcpu, iva) & ~0x7fffL;
+	else
+		*pval = PSCBX(vcpu, iva) & ~0x7fffL;
+
+	return IA64_NO_FAULT;
+}
+
+static inline IA64FAULT vcpu_get_pta(VCPU * vcpu, u64 * pval)
+{
+	*pval = PSCB(vcpu, pta);
+	return IA64_NO_FAULT;
+}
+
+static inline IA64FAULT vcpu_get_ipsr(VCPU * vcpu, u64 * pval)
+{
+	*pval = PSCB(vcpu, ipsr);
+	return IA64_NO_FAULT;
+}
+
+static inline IA64FAULT vcpu_get_isr(VCPU * vcpu, u64 * pval)
+{
+	*pval = PSCB(vcpu, isr);
+	return IA64_NO_FAULT;
+}
+
+static inline IA64FAULT vcpu_get_iip(VCPU * vcpu, u64 * pval)
+{
+	*pval = PSCB(vcpu, iip);
+	return IA64_NO_FAULT;
+}
+
+static inline IA64FAULT vcpu_get_ifa(VCPU * vcpu, u64 * pval)
+{
+	PRIVOP_COUNT_ADDR(vcpu_regs(vcpu), privop_inst_get_ifa);
+	*pval = PSCB(vcpu, ifa);
+	return IA64_NO_FAULT;
+}
+
+static inline unsigned long vcpu_get_rr_ps(VCPU * vcpu, u64 vadr)
+{
+	ia64_rr rr;
+
+	rr.rrval = PSCB(vcpu, rrs)[vadr >> 61];
+	return rr.ps;
+}
+
+static inline unsigned long vcpu_get_rr_rid(VCPU * vcpu, u64 vadr)
+{
+	ia64_rr rr;
+
+	rr.rrval = PSCB(vcpu, rrs)[vadr >> 61];
+	return rr.rid;
+}
+
+static inline unsigned long vcpu_get_itir_on_fault(VCPU * vcpu, u64 ifa)
+{
+	ia64_rr rr;
+
+	rr.rrval = 0;
+	rr.ps = vcpu_get_rr_ps(vcpu, ifa);
+	rr.rid = vcpu_get_rr_rid(vcpu, ifa);
+	return rr.rrval;
+}
+
+static inline IA64FAULT vcpu_get_itir(VCPU * vcpu, u64 * pval)
+{
+	u64 val = PSCB(vcpu, itir);
+	*pval = val;
+	return IA64_NO_FAULT;
+}
+
+static inline IA64FAULT vcpu_get_iipa(VCPU * vcpu, u64 * pval)
+{
+	u64 val = PSCB(vcpu, iipa);
+	*pval = val;
+	return IA64_NO_FAULT;
+}
+
+static inline IA64FAULT vcpu_get_ifs(VCPU * vcpu, u64 * pval)
+{
+	*pval = PSCB(vcpu, ifs);
+	return IA64_NO_FAULT;
+}
+
+static inline IA64FAULT vcpu_get_iim(VCPU * vcpu, u64 * pval)
+{
+	u64 val = PSCB(vcpu, iim);
+	*pval = val;
+	return IA64_NO_FAULT;
+}
+
+static inline IA64FAULT vcpu_get_iha(VCPU * vcpu, u64 * pval)
+{
+	PRIVOP_COUNT_ADDR(vcpu_regs(vcpu), privop_inst_thash);
+	*pval = PSCB(vcpu, iha);
+	return IA64_NO_FAULT;
+}
+
+static inline IA64FAULT vcpu_set_dcr(VCPU * vcpu, u64 val)
+{
+	PSCB(vcpu, dcr) = val;
+	return IA64_NO_FAULT;
+}
+
+static inline IA64FAULT vcpu_set_iva(VCPU * vcpu, u64 val)
+{
+	if (VMX_DOMAIN(vcpu))
+		PSCB(vcpu, iva) = val & ~0x7fffL;
+	else
+		PSCBX(vcpu, iva) = val & ~0x7fffL;
+
+	return IA64_NO_FAULT;
+}
+
+static inline IA64FAULT vcpu_set_pta(VCPU * vcpu, u64 val)
+{
+	if (val & (0x3f << 9))	/* reserved fields */
+		return IA64_RSVDREG_FAULT;
+	if (val & 2)		/* reserved fields */
+		return IA64_RSVDREG_FAULT;
+	PSCB(vcpu, pta) = val;
+	return IA64_NO_FAULT;
+}
+
+static inline IA64FAULT vcpu_set_ipsr(VCPU * vcpu, u64 val)
+{
+	PSCB(vcpu, ipsr) = val;
+	return IA64_NO_FAULT;
+}
+
+static inline IA64FAULT vcpu_set_isr(VCPU * vcpu, u64 val)
+{
+	PSCB(vcpu, isr) = val;
+	return IA64_NO_FAULT;
+}
+
+static inline IA64FAULT vcpu_set_iip(VCPU * vcpu, u64 val)
+{
+	PSCB(vcpu, iip) = val;
+	return IA64_NO_FAULT;
+}
+
+static inline IA64FAULT vcpu_increment_iip(VCPU * vcpu)
+{
+	REGS *regs = vcpu_regs(vcpu);
+	regs_increment_iip(regs);
+	return IA64_NO_FAULT;
+}
+
+static inline IA64FAULT vcpu_decrement_iip(VCPU * vcpu)
+{
+	REGS *regs = vcpu_regs(vcpu);
+	struct ia64_psr *ipsr = (struct ia64_psr *)&regs->cr_ipsr;
+
+	if (ipsr->ri == 0) {
+		ipsr->ri = 2;
+		regs->cr_iip -= 16;
+	} else
+		ipsr->ri--;
+
+	return IA64_NO_FAULT;
+}
+
+static inline IA64FAULT vcpu_set_ifa(VCPU * vcpu, u64 val)
+{
+	PSCB(vcpu, ifa) = val;
+	return IA64_NO_FAULT;
+}
+
+static inline IA64FAULT vcpu_set_itir(VCPU * vcpu, u64 val)
+{
+	PSCB(vcpu, itir) = val;
+	return IA64_NO_FAULT;
+}
+
+static inline IA64FAULT vcpu_set_iipa(VCPU * vcpu, u64 val)
+{
+	PSCB(vcpu, iipa) = val;
+	return IA64_NO_FAULT;
+}
+
+static inline IA64FAULT vcpu_set_ifs(VCPU * vcpu, u64 val)
+{
+	PSCB(vcpu, ifs) = val;
+	return IA64_NO_FAULT;
+}
+
+static inline IA64FAULT vcpu_set_iim(VCPU * vcpu, u64 val)
+{
+	PSCB(vcpu, iim) = val;
+	return IA64_NO_FAULT;
+}
+
+static inline IA64FAULT vcpu_set_iha(VCPU * vcpu, u64 val)
+{
+	PSCB(vcpu, iha) = val;
+	return IA64_NO_FAULT;
+}
+
 /* control registers */
-extern IA64FAULT vcpu_set_dcr(VCPU * vcpu, u64 val);
 extern IA64FAULT vcpu_set_itm(VCPU * vcpu, u64 val);
-extern IA64FAULT vcpu_set_iva(VCPU * vcpu, u64 val);
-extern IA64FAULT vcpu_set_pta(VCPU * vcpu, u64 val);
-extern IA64FAULT vcpu_set_ipsr(VCPU * vcpu, u64 val);
-extern IA64FAULT vcpu_set_isr(VCPU * vcpu, u64 val);
-extern IA64FAULT vcpu_set_iip(VCPU * vcpu, u64 val);
-extern IA64FAULT vcpu_set_ifa(VCPU * vcpu, u64 val);
-extern IA64FAULT vcpu_set_itir(VCPU * vcpu, u64 val);
-extern IA64FAULT vcpu_set_iipa(VCPU * vcpu, u64 val);
-extern IA64FAULT vcpu_set_ifs(VCPU * vcpu, u64 val);
-extern IA64FAULT vcpu_set_iim(VCPU * vcpu, u64 val);
-extern IA64FAULT vcpu_set_iha(VCPU * vcpu, u64 val);
 extern IA64FAULT vcpu_set_lid(VCPU * vcpu, u64 val);
 extern IA64FAULT vcpu_set_tpr(VCPU * vcpu, u64 val);
 extern IA64FAULT vcpu_set_eoi(VCPU * vcpu, u64 val);
 extern IA64FAULT vcpu_set_lrr0(VCPU * vcpu, u64 val);
 extern IA64FAULT vcpu_set_lrr1(VCPU * vcpu, u64 val);
-extern IA64FAULT vcpu_get_dcr(VCPU * vcpu, u64 * pval);
 extern IA64FAULT vcpu_get_itm(VCPU * vcpu, u64 * pval);
-extern IA64FAULT vcpu_get_iva(VCPU * vcpu, u64 * pval);
-extern IA64FAULT vcpu_get_pta(VCPU * vcpu, u64 * pval);
-extern IA64FAULT vcpu_get_ipsr(VCPU * vcpu, u64 * pval);
-extern IA64FAULT vcpu_get_isr(VCPU * vcpu, u64 * pval);
-extern IA64FAULT vcpu_get_iip(VCPU * vcpu, u64 * pval);
-extern IA64FAULT vcpu_increment_iip(VCPU * vcpu);
-extern IA64FAULT vcpu_decrement_iip(VCPU * vcpu);
-extern IA64FAULT vcpu_get_ifa(VCPU * vcpu, u64 * pval);
 extern IA64FAULT vcpu_get_itir(VCPU * vcpu, u64 * pval);
-extern unsigned long vcpu_get_itir_on_fault(VCPU * vcpu, u64 ifa);
-extern IA64FAULT vcpu_get_iipa(VCPU * vcpu, u64 * pval);
-extern IA64FAULT vcpu_get_ifs(VCPU * vcpu, u64 * pval);
-extern IA64FAULT vcpu_get_iim(VCPU * vcpu, u64 * pval);
-extern IA64FAULT vcpu_get_iha(VCPU * vcpu, u64 * pval);
 extern IA64FAULT vcpu_get_lid(VCPU * vcpu, u64 * pval);
 extern IA64FAULT vcpu_get_tpr(VCPU * vcpu, u64 * pval);
 extern IA64FAULT vcpu_get_irr0(VCPU * vcpu, u64 * pval);
