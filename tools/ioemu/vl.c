@@ -1762,7 +1762,8 @@ static int store_dev_info(char *devName, int domid,
                           CharDriverState *cState, char *storeString)
 {
 #ifdef CONFIG_STUBDOM
-    return 0;
+    fprintf(logfile, "can't store dev %s name for domid %d in %s from a stub domain\n", devName, domid, storeString);
+    return ENOSYS;
 #else
     int xc_handle;
     struct xs_handle *xs;
