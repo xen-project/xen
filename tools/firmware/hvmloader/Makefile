@@ -42,9 +42,10 @@ OBJS = $(patsubst %.c,%.o,$(SRCS))
 .PHONY: all
 all: hvmloader
 
+hvmloader.o: roms.h
 smbios.o: CFLAGS += -D__SMBIOS_DATE__="\"$(shell date +%m/%d/%Y)\""
 
-hvmloader: roms.h subdirs-all $(OBJS)
+hvmloader: subdirs-all $(OBJS)
 	$(LD) $(LDFLAGS_DIRECT) -N -Ttext $(LOADADDR) \
 		-o hvmloader.tmp $(OBJS) acpi/acpi.a
 	$(OBJCOPY) hvmloader.tmp hvmloader
