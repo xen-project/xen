@@ -1,7 +1,9 @@
-
+# Firmware is a 32-bit target
 override XEN_TARGET_ARCH = x86_32
-XEN_ROOT = ../..
+
+# User-supplied CFLAGS are not useful here.
 CFLAGS :=
+
 include $(XEN_ROOT)/tools/Rules.mk
 
 # Disable PIE/SSP if GCC supports them. They can break us.
@@ -9,13 +11,5 @@ CFLAGS += $(call cc-option,$(CC),-nopie,)
 CFLAGS += $(call cc-option,$(CC),-fno-stack-protector,)
 CFLAGS += $(call cc-option,$(CC),-fno-stack-protector-all,)
 
+# Extra CFLAGS suitable for an embedded type of environment.
 CFLAGS += -fno-builtin -msoft-float
-
-.PHONY: all
-all: blowfish.bin
-
-blowfish.bin: blowfish.c
-	$(CC) $(CFLAGS) -c blowfish.c
-	$(LD) $(LDFLAGS_DIRECT) -N -Ttext 0x100000 -o blowfish.tmp blowfish.o
-	$(OBJCOPY) -O binary blowfish.tmp blowfish.bin
-	rm -f blowfish.tmp

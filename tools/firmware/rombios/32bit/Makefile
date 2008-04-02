@@ -1,16 +1,10 @@
-
-override XEN_TARGET_ARCH = x86_32
 XEN_ROOT = ../../../..
-CFLAGS :=
-include $(XEN_ROOT)/tools/Rules.mk
+include $(XEN_ROOT)/tools/firmware/Rules.mk
 
 SOURCES = util.c
 TARGET = 32bitbios_flat.h
 
-CFLAGS += -fno-builtin -O2 -msoft-float -nostdlib
 CFLAGS += -I../ -DGCC_PROTOS
-CFLAGS += $(call cc-option,$(CC),-fno-stack-protector,)
-CFLAGS += $(call cc-option,$(CC),-fno-stack-protector-all,)
 
 SUBDIRS = tcgbios
 
