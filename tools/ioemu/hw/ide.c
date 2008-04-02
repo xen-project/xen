@@ -660,7 +660,7 @@ static void ide_identify(IDEState *s)
     put_le16(p + 83, (1 << 14) | (1 << 13) | (1 <<12) | (1 << 10));
     put_le16(p + 84, (1 << 14));
     /* 14=nop 5=write_cache */
-    put_le16(p + 85, (1 << 14) | (1 << 5));
+    put_le16(p + 85, (1 << 14) | (s->write_cache << 5));
     /* 13=flush_cache_ext,12=flush_cache,10=lba48 */
     put_le16(p + 86, (1 << 14) | (1 << 13) | (1 <<12) | (1 << 10));
     put_le16(p + 87, (1 << 14));
