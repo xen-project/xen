@@ -28,6 +28,7 @@
 #include "apic_regs.h"
 #include "pci_regs.h"
 #include "e820.h"
+#include "option_rom.h"
 #include <xen/version.h>
 #include <xen/hvm/params.h>
 
@@ -334,21 +335,13 @@ static int must_load_extboot(void)
  */
 static int scan_etherboot_nic(void *copy_rom_dest)
 {
-    static struct etherboots_table_entry {
-        char *name;
-        void *etherboot_rom;
-        int etherboot_sz;
-        uint16_t vendor, device;
-    } etherboots_table[] = {
-#define ETHERBOOT_ROM(name, vendor, device) \
-  { #name, etherboot_##name, sizeof(etherboot_##name), vendor, device },
-        ETHERBOOT_ROM_LIST
-        { 0 }
-    };
-
+    struct option_rom_header *rom;
+    struct option_rom_pnp_header *pnph;
+    struct option_rom_pci_header *pcih;
     uint32_t devfn;
     uint16_t class, vendor_id, device_id;
-    struct etherboots_table_entry *eb;
+    uint8_t csum;
+    int i;
 
     for ( devfn = 0; devfn < 128; devfn++ )
     {
@@ -359,21 +352,61 @@ static int scan_etherboot_nic(void *copy_rom_dest)
         if ( (vendor_id == 0xffff) && (device_id == 0xffff) )
             continue;
 
-        if ( class != 0x0200 ) /* Not a NIC */
+        /* We're only interested in NICs. */
+        if ( class != 0x0200 )
             continue;
 
-        for ( eb = etherboots_table; eb->name; eb++ )
-            if (eb->vendor == vendor_id &&
-                eb->device == device_id)
-                goto found;
+        rom = (struct option_rom_header *)etherboot;
+        for ( ; ; )
+        {
+            /* Invalid signature means we're out of option ROMs. */
+            if ( strncmp(rom->signature, "\x55\xaa", 2) ||
+                 (rom->rom_size == 0) )
+                break;
+
+            /* Invalid checksum means we're out of option ROMs. */
+            csum = 0;
+            for ( i = 0; i < (rom->rom_size * 512); i++ )
+                csum += ((uint8_t *)rom)[i];
+            if ( csum != 0 )
+                break;
+
+            /* Check the PCI PnP header (if any) for a match. */
+            pcih = (struct option_rom_pci_header *)
+                ((char *)rom + rom->pci_header_offset);
+            if ( (rom->pci_header_offset == 0) ||
+                 strncmp(pcih->signature, "PCIR", 4) ||
+                 (pcih->vendor_id != vendor_id) ||
+                 (pcih->device_id != device_id) )
+                continue;
+
+            /* Find the PnP expansion header (if any). */
+            pnph = ((rom->expansion_header_offset != 0)
+                    ? ((struct option_rom_pnp_header *)
+                       ((char *)rom + rom->expansion_header_offset))
+                    : ((struct option_rom_pnp_header *)NULL));
+            while ( (pnph != NULL) && strncmp(pnph->signature, "$PnP", 4) )
+                pnph = ((pnph->next_header_offset != 0)
+                        ? ((struct option_rom_pnp_header *)
+                           ((char *)rom + pnph->next_header_offset))
+                        : ((struct option_rom_pnp_header *)NULL));
+
+            goto found;
+        }
     }
 
     return 0;
 
  found:
-    printf("Loading %s Etherboot PXE ROM ...\n", eb->name);
-    memcpy(copy_rom_dest, eb->etherboot_rom, eb->etherboot_sz);
-    return eb->etherboot_sz;
+    printf("Loading PXE ROM ...\n");
+    if ( (pnph != NULL) && (pnph->manufacturer_name_offset != 0) )
+        printf(" - Manufacturer: %s\n",
+               (char *)rom + pnph->manufacturer_name_offset);
+    if ( (pnph != NULL) && (pnph->product_name_offset != 0) )
+        printf(" - Product name: %s\n",
+               (char *)rom + pnph->product_name_offset);
+    memcpy(copy_rom_dest, rom, rom->rom_size * 512);
+    return rom->rom_size * 512;
 }
 
 /* Replace possibly erroneous memory-size CMOS fields with correct values. */

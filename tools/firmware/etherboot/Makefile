@@ -10,21 +10,16 @@ D=etherboot-$(EB_VERSION)
 T=etherboot-$(EB_VERSION).tar.gz
 E=etherboot-build
 
-ROM_ZHS = $(addprefix eb-, $(addsuffix .zrom.h, $(NICS)))
+ROMS = $(addprefix $E/src/bin/, $(addsuffix .zrom, $(NICS)))
 
 .PHONY: all
 all: eb-roms.h
 
-eb-%.zrom.h: $E/src/Config
-	$(MAKE) -C $E/src bin/$*.zrom
-	../hvmloader/mkhex etherboot_$* <$E/src/bin/$*.zrom >$@.new
-	mv -f $@.new $@
+%.zrom: $E/src/Config
+	$(MAKE) -C $E/src bin/$(*F).zrom
 
-eb-rom-list.h: make-eb-rom-list $E/src/bin/Roms
-	./$^ $(NICS) >$@.new && mv -f $@.new $@
-
-eb-roms.h.new: eb-rom-list.h $(ROM_ZHS)
-	cat $^ >$@
+eb-roms.h.new: $(ROMS)
+	cat $^ | ../hvmloader/mkhex etherboot >$@
 
 eb-roms.h: Config
 	$(MAKE) $@.new
