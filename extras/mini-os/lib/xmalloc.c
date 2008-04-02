@@ -208,6 +208,13 @@ void xfree(const void *p)
     pad = (struct xmalloc_pad *)p - 1;
     hdr = (struct xmalloc_hdr *)((char *)p - pad->hdr_size);
 
+    /* Big allocs free directly. */
+    if ( hdr->size >= PAGE_SIZE )
+    {
+        free_pages(hdr, get_order(hdr->size));
+        return;
+    }
+
     /* We know hdr will be on same page. */
     if(((long)p & PAGE_MASK) != ((long)hdr & PAGE_MASK))
     {
@@ -220,13 +227,6 @@ void xfree(const void *p)
     {
         printk("Should not be previously freed\n");
         *(int*)0=0;
-    }
-
-    /* Big allocs free directly. */
-    if ( hdr->size >= PAGE_SIZE )
-    {
-        free_pages(hdr, get_order(hdr->size));
-        return;
     }
 
     /* Merge with other free block, or put in list. */
