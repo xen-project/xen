@@ -211,7 +211,7 @@ struct acpi_atsr_unit * acpi_find_matched_atsr_unit(struct pci_dev *dev)
 static int scope_device_count(void *start, void *end)
 {
     struct acpi_dev_scope *scope;
-    u8 bus, sub_bus, sec_bus;
+    u16 bus, sub_bus, sec_bus;
     struct acpi_pci_path *path;
     int depth, count = 0;
     u8 dev, func;
@@ -231,7 +231,7 @@ static int scope_device_count(void *start, void *end)
         bus = scope->start_bus;
         depth = (scope->length - sizeof(struct acpi_dev_scope))
 		    / sizeof(struct acpi_pci_path);
-        while ( --depth )
+        while ( --depth >= 0 )
         {
             bus = read_pci_config_byte(
                 bus, path->dev, path->fn, PCI_SECONDARY_BUS);
@@ -301,7 +301,7 @@ static int __init acpi_parse_dev_scope(
     void *start, void *end, void *acpi_entry, int type)
 {
     struct acpi_dev_scope *scope;
-    u8 bus, sub_bus, sec_bus;
+    u16 bus, sub_bus, sec_bus;
     struct acpi_pci_path *path;
     struct acpi_ioapic_unit *acpi_ioapic_unit = NULL;
     int depth;
@@ -353,7 +353,7 @@ static int __init acpi_parse_dev_scope(
 		    / sizeof(struct acpi_pci_path);
         bus = scope->start_bus;
 
-        while ( --depth )
+        while ( --depth >= 0 )
         {
             bus = read_pci_config_byte(
                 bus, path->dev, path->fn, PCI_SECONDARY_BUS);
