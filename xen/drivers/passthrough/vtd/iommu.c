@@ -1897,7 +1897,11 @@ static int init_vtd2_hw(void)
         if ( qinval_setup(iommu) != 0 )
             dprintk(XENLOG_ERR VTDPREFIX,
                     "Queued Invalidation hardware not found\n");
+    }
 
+    for_each_drhd_unit ( drhd )
+    {
+        iommu = drhd->iommu;
         if ( intremap_setup(iommu) != 0 )
             dprintk(XENLOG_ERR VTDPREFIX,
                     "Interrupt Remapping hardware not found\n");
