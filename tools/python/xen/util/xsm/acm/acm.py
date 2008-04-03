@@ -1220,6 +1220,9 @@ def set_resource_label(resource, policytype, policyref, reslabel, \
                 return -xsconstants.XSERR_BAD_LABEL
             if tmp[2] != oreslabel:
                 return -xsconstants.XSERR_BAD_LABEL
+        if resource.startswith('vlan:'):
+            if tuple([policytype, policyref, reslabel]) in access_control.values():
+                return -xsconstants.XSERR_BAD_LABEL
         if reslabel != "":
             new_entry = { resource : tuple([policytype, policyref, reslabel])}
             access_control.update(new_entry)
