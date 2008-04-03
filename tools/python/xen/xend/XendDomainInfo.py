@@ -1792,10 +1792,13 @@ class XendDomainInfo:
                 raise XendError("Cannot dump core in a directory: %s" %
                                 corefile)
             
+            self._writeVm(DUMPCORE_IN_PROGRESS, 'True')
             xc.domain_dumpcore(self.domid, corefile)
+            self._removeVm(DUMPCORE_IN_PROGRESS)
         except RuntimeError, ex:
             corefile_incomp = corefile+'-incomplete'
             os.rename(corefile, corefile_incomp)
+            self._removeVm(DUMPCORE_IN_PROGRESS)
             log.exception("XendDomainInfo.dumpCore failed: id = %s name = %s",
                           self.domid, self.info['name_label'])
             raise XendError("Failed to dump core: %s" %  str(ex))

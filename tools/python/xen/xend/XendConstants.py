@@ -96,6 +96,7 @@ ZOMBIE_PREFIX = 'Zombie-'
 MINIMUM_RESTART_TIME = 20
 
 RESTART_IN_PROGRESS = 'xend/restart_in_progress'
+DUMPCORE_IN_PROGRESS = 'xend/dumpcore_in_progress'
 LAST_SHUTDOWN_REASON = 'xend/last_shutdown_reason'
 
 TRIGGER_NMI   = 0
