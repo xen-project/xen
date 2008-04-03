@@ -129,7 +129,7 @@ The following are the actual type values, including the request and
 reply payloads as applicable:
 
 
----------- Database read, write and permissions operatons ----------
+---------- Database read, write and permissions operations ----------
 
 READ			<path>|			<value|>
 WRITE			<path>|<value|>
@@ -206,7 +206,7 @@ WATCH_EVENT					<epath>|<token>|
 	as described above.  req_id and tx_id are both 0.
 
 	<epath> is the event's path, ie the actual path that was
-	modifed; however if the event was the recursive removal of an
+	modified; however if the event was the recursive removal of an
 	parent of <wpath>, <epath> is just
 	<wpath> (rather than the actual path which was removed).  So
 	<epath> is a child of <wpath>, regardless.

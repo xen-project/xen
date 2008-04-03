@@ -470,7 +470,7 @@ typedef struct shared_info {
      * are delivered by this mechanism:
      *  1. Bi-directional inter- and intra-domain connections. Domains must
      *     arrange out-of-band to set up a connection (usually by allocating
-     *     an unbound 'listener' port and avertising that via a storage service
+     *     an unbound 'listener' port and advertising that via a storage service
      *     such as xenstore).
      *  2. Physical interrupts. A domain with suitable hardware-access
      *     privileges can bind an event-channel port to a physical interrupt
@@ -915,7 +915,7 @@ These activities include:
   (e.g. performance-related statistics, etc).
 \end{itemize}
 
-The store is arranged as a hierachical collection of key-value pairs.
+The store is arranged as a hierarchical collection of key-value pairs.
 Each domain has a directory hierarchy containing data related to its
 configuration.  Domains are permitted to register for notifications
 about changes in subtrees of the store, and to apply changes to the
@@ -1114,9 +1114,9 @@ This path contains:
           \end{description}
         \end{description}
 	
-      \item[device-misc/] miscellanous information for devices 
+      \item[device-misc/] miscellaneous information for devices 
 	\begin{description}
-	\item[vif/] miscellanous information for vif devices
+	\item[vif/] miscellaneous information for vif devices
 	  \begin{description}
 	  \item[nextDeviceID] the next device id to use 
 	  \end{description}
@@ -1511,7 +1511,7 @@ Otherwise an error message is automatically sent back by the device driver.
 The virtual TPM implementation listens for TPM request on /dev/vtpm. Since
 it must be able to apply the TPM request packet to the virtual TPM instance
 associated with the virtual machine, a 4-byte virtual TPM instance
-identifier is prepended to each packet by the backend driver (in network
+identifier is pretended to each packet by the backend driver (in network
 byte order) for internal routing of the request.
 
 \subsection{Virtual TPM ring interface}
