@@ -1146,11 +1146,13 @@ def __resources_compatible_with_vmlabel(xspol, dominfo, vmlabel,
     for key, value in resources.items():
         if key in [ 'vbd', 'tap' ]:
             for res in resources[key]:
-                try:
+                if not res in access_control:
+                    label = [xsconstants.ACM_POLICY_ID,
+                             xspol.get_name(),
+                             ACM_LABEL_UNLABELED]
+                else:
                     label = access_control[res]
-                    if not collect_labels(reslabels, label, polname):
-                        return False
-                except:
+                if not collect_labels(reslabels, label, polname):
                     return False
         elif key in [ 'vif' ]:
             for xapi_label in value:
