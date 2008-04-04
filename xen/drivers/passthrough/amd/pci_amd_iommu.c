@@ -553,8 +553,9 @@ static int reassign_device( struct domain *source, struct domain *target,
 int amd_iommu_assign_device(struct domain *d, u8 bus, u8 devfn)
 {
     int bdf = (bus << 8) | devfn;
-    int req_id;
-    req_id = ivrs_mappings[bdf].dte_requestor_id;
+    int req_id = ivrs_mappings[bdf].dte_requestor_id;
+
+    amd_iommu_sync_p2m(d);
 
     if ( ivrs_mappings[req_id].unity_map_enable )
     {
