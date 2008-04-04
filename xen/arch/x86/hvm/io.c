@@ -148,20 +148,19 @@ void send_timeoffset_req(unsigned long timeoff)
 void send_invalidate_req(void)
 {
     struct vcpu *v = current;
-    vcpu_iodata_t *vio;
+    vcpu_iodata_t *vio = get_ioreq(v);
     ioreq_t *p;
 
-    vio = get_ioreq(v);
-    if ( vio == NULL )
-    {
-        printk("bad shared page: %lx\n", (unsigned long) vio);
-        domain_crash_synchronous();
-    }
+    BUG_ON(vio == NULL);
 
     p = &vio->vp_ioreq;
     if ( p->state != STATE_IOREQ_NONE )
-        printk("WARNING: send invalidate req with something "
-               "already pending (%d)?\n", p->state);
+    {
+        gdprintk(XENLOG_ERR, "WARNING: send invalidate req with something "
+                 "already pending (%d)?\n", p->state);
+        domain_crash(v->domain);
+        return;
+    }
 
     p->type = IOREQ_TYPE_INVALIDATE;
     p->size = 4;
@@ -224,12 +223,6 @@ void hvm_io_assist(void)
     struct vcpu *curr = current;
     ioreq_t *p = &get_ioreq(curr)->vp_ioreq;
     enum hvm_io_state io_state;
-
-    if ( p->state != STATE_IORESP_READY )
-    {
-        gdprintk(XENLOG_ERR, "Unexpected HVM iorequest state %d.\n", p->state);
-        domain_crash_synchronous();
-    }
 
     rmb(); /* see IORESP_READY /then/ read contents of ioreq */
 

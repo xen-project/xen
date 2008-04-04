@@ -52,45 +52,45 @@ static inline void hvm_mmio_access(struct vcpu *v,
 {
     unsigned long data;
 
-    switch ( p->type )
+    if ( !p->data_is_ptr )
     {
-    case IOREQ_TYPE_COPY:
-        if ( !p->data_is_ptr ) {
-            if ( p->dir == IOREQ_READ )
-                p->data = read_handler(v, p->addr, p->size);
-            else    /* p->dir == IOREQ_WRITE */
-                write_handler(v, p->addr, p->size, p->data);
-        } else {    /* p->data_is_ptr */
-            int i, sign = (p->df) ? -1 : 1;
+        if ( p->dir == IOREQ_READ )
+            p->data = read_handler(v, p->addr, p->size);
+        else    /* p->dir == IOREQ_WRITE */
+            write_handler(v, p->addr, p->size, p->data);
+    }
+    else
+    {
+        int i, sign = (p->df) ? -1 : 1;
 
-            if ( p->dir == IOREQ_READ ) {
-                for ( i = 0; i < p->count; i++ ) {
-                    data = read_handler(v,
-                        p->addr + (sign * i * p->size),
-                        p->size);
-                    (void)hvm_copy_to_guest_phys(
-                        p->data + (sign * i * p->size),
-                        &data,
-                        p->size);
-                }
-            } else {/* p->dir == IOREQ_WRITE */
-                for ( i = 0; i < p->count; i++ ) {
-                    (void)hvm_copy_from_guest_phys(
-                        &data,
-                        p->data + (sign * i * p->size),
-                        p->size);
-                    write_handler(v,
-                        p->addr + (sign * i * p->size),
-                        p->size, data);
-                }
+        if ( p->dir == IOREQ_READ )
+        {
+            for ( i = 0; i < p->count; i++ )
+            {
+                data = read_handler(
+                    v,
+                    p->addr + (sign * i * p->size),
+                    p->size);
+                (void)hvm_copy_to_guest_phys(
+                    p->data + (sign * i * p->size),
+                    &data,
+                    p->size);
             }
         }
-        break;
-
-    default:
-        printk("hvm_mmio_access: error ioreq type %x\n", p->type);
-        domain_crash_synchronous();
-        break;
+        else
+        {
+            for ( i = 0; i < p->count; i++ )
+            {
+                (void)hvm_copy_from_guest_phys(
+                    &data,
+                    p->data + (sign * i * p->size),
+                    p->size);
+                write_handler(
+                    v,
+                    p->addr + (sign * i * p->size),
+                    p->size, data);
+            }
+        }
     }
 }
 

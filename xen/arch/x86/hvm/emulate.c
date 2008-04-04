@@ -41,12 +41,15 @@ static int hvmemul_do_io(
         return X86EMUL_UNHANDLEABLE;
     }
 
-    curr->arch.hvm_vcpu.io_state =
-        (val == NULL) ? HVMIO_dispatched : HVMIO_awaiting_completion;
-
     if ( p->state != STATE_IOREQ_NONE )
+    {
         gdprintk(XENLOG_WARNING, "WARNING: io already pending (%d)?\n",
                  p->state);
+        return X86EMUL_UNHANDLEABLE;
+    }
+
+    curr->arch.hvm_vcpu.io_state =
+        (val == NULL) ? HVMIO_dispatched : HVMIO_awaiting_completion;
 
     p->dir = dir;
     p->data_is_ptr = value_is_ptr;

@@ -181,7 +181,8 @@ void hvm_do_resume(struct vcpu *v)
             break;
         default:
             gdprintk(XENLOG_ERR, "Weird HVM iorequest state %d.\n", p->state);
-            domain_crash_synchronous();
+            domain_crash(v->domain);
+            return; /* bail */
         }
     }
 }
@@ -742,9 +743,10 @@ void hvm_send_assist_req(struct vcpu *v)
     p = &get_ioreq(v)->vp_ioreq;
     if ( unlikely(p->state != STATE_IOREQ_NONE) )
     {
-        /* This indicates a bug in the device model.  Crash the domain. */
+        /* This indicates a bug in the device model. Crash the domain. */
         gdprintk(XENLOG_ERR, "Device model set bad IO state %d.\n", p->state);
-        domain_crash_synchronous();
+        domain_crash(v->domain);
+        return;
     }
 
     prepare_wait_on_xen_event_channel(v->arch.hvm_vcpu.xen_port);

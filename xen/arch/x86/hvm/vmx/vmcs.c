@@ -729,14 +729,14 @@ void vmx_destroy_vmcs(struct vcpu *v)
     arch_vmx->vmcs = NULL;
 }
 
-void vm_launch_fail(unsigned long eflags)
+void vm_launch_fail(void)
 {
     unsigned long error = __vmread(VM_INSTRUCTION_ERROR);
     printk("<vm_launch_fail> error code %lx\n", error);
     domain_crash_synchronous();
 }
 
-void vm_resume_fail(unsigned long eflags)
+void vm_resume_fail(void)
 {
     unsigned long error = __vmread(VM_INSTRUCTION_ERROR);
     printk("<vm_resume_fail> error code %lx\n", error);
