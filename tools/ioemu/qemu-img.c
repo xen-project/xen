@@ -594,8 +594,8 @@ static int img_info(int argc, char **argv)
     BlockDriverState *bs;
     char fmt_name[128], size_buf[128], dsize_buf[128];
     int64_t total_sectors, allocated_size;
-    char backing_filename[1024];
-    char backing_filename2[1024];
+    char backing_filename[PATH_MAX];
+    char backing_filename2[PATH_MAX];
     BlockDriverInfo bdi;
 
     fmt = NULL;

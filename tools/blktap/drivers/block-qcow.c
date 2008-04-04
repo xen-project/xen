@@ -1112,7 +1112,7 @@ int qcow_create(const char *filename, uint64_t total_size,
 	int shift, length, adjust, flags = 0, ret = 0;
 	QCowHeader header;
 	QCowHeader_ext exthdr;
-	char backing_filename[1024], *ptr;
+	char backing_filename[PATH_MAX], *ptr;
 	uint64_t tmp, size, total_length;
 	struct stat st;
 
