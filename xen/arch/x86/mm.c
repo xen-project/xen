@@ -476,7 +476,7 @@ static void invalidate_shadow_ldt(struct vcpu *v)
         if ( pfn == 0 ) continue;
         l1e_write(&v->arch.perdomain_ptes[i], l1e_empty());
         page = mfn_to_page(pfn);
-        ASSERT_PAGE_IS_TYPE(page, PGT_ldt_page);
+        ASSERT_PAGE_IS_TYPE(page, PGT_seg_desc_page);
         ASSERT_PAGE_IS_DOMAIN(page, v->domain);
         put_page_and_type(page);
     }
@@ -530,7 +530,7 @@ int map_ldt_shadow_page(unsigned int off)
     if ( unlikely(!mfn_valid(mfn)) )
         return 0;
 
-    okay = get_page_and_type(mfn_to_page(mfn), d, PGT_ldt_page);
+    okay = get_page_and_type(mfn_to_page(mfn), d, PGT_seg_desc_page);
     if ( unlikely(!okay) )
         return 0;
 
@@ -924,7 +924,7 @@ void put_page_from_l1e(l1_pgentry_t l1e, struct domain *d)
     {
         /* We expect this is rare so we blow the entire shadow LDT. */
         if ( unlikely(((page->u.inuse.type_info & PGT_type_mask) == 
-                       PGT_ldt_page)) &&
+                       PGT_seg_desc_page)) &&
              unlikely(((page->u.inuse.type_info & PGT_count_mask) != 0)) &&
              (d == e) )
         {
@@ -1748,8 +1748,7 @@ static int alloc_page_type(struct page_info *page, unsigned long type)
         return alloc_l3_table(page);
     case PGT_l4_page_table:
         return alloc_l4_table(page);
-    case PGT_gdt_page:
-    case PGT_ldt_page:
+    case PGT_seg_desc_page:
         return alloc_segdesc_page(page);
     default:
         printk("Bad type in alloc_page_type %lx t=%" PRtype_info " c=%x\n", 
@@ -3134,7 +3133,7 @@ long set_gdt(struct vcpu *v,
     {
         mfn = frames[i] = gmfn_to_mfn(d, frames[i]);
         if ( !mfn_valid(mfn) ||
-             !get_page_and_type(mfn_to_page(mfn), d, PGT_gdt_page) )
+             !get_page_and_type(mfn_to_page(mfn), d, PGT_seg_desc_page) )
             goto fail;
     }
 
@@ -3211,12 +3210,8 @@ long do_update_descriptor(u64 pa, u64 desc)
     /* Check if the given frame is in use in an unsafe context. */
     switch ( page->u.inuse.type_info & PGT_type_mask )
     {
-    case PGT_gdt_page:
-        if ( unlikely(!get_page_type(page, PGT_gdt_page)) )
-            goto out;
-        break;
-    case PGT_ldt_page:
-        if ( unlikely(!get_page_type(page, PGT_ldt_page)) )
+    case PGT_seg_desc_page:
+        if ( unlikely(!get_page_type(page, PGT_seg_desc_page)) )
             goto out;
         break;
     default:
