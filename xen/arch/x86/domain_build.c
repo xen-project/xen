@@ -630,7 +630,7 @@ int __init construct_dom0(
     }
     else
     {
-        page = alloc_domheap_page(NULL);
+        page = alloc_domheap_page(NULL, 0);
         if ( !page )
             panic("Not enough RAM for domain 0 PML4.\n");
         l4start = l4tab = page_to_virt(page);

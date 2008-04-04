@@ -36,6 +36,7 @@
 #include <xen/numa.h>
 #include <xen/nodemask.h>
 #include <asm/page.h>
+#include <asm/numa.h>
 #include <asm/flushtlb.h>
 
 /*
@@ -328,13 +329,16 @@ static void init_node_heap(int node)
 /* Allocate 2^@order contiguous pages. */
 static struct page_info *alloc_heap_pages(
     unsigned int zone_lo, unsigned int zone_hi,
-    unsigned int cpu, unsigned int order)
+    unsigned int node, unsigned int order)
 {
     unsigned int i, j, zone;
-    unsigned int node = cpu_to_node(cpu), num_nodes = num_online_nodes();
+    unsigned int num_nodes = num_online_nodes();
     unsigned long request = 1UL << order;
     cpumask_t extra_cpus_mask, mask;
     struct page_info *pg;
+
+    if ( node == NUMA_NO_NODE )
+        node = cpu_to_node(smp_processor_id());
 
     ASSERT(node >= 0);
     ASSERT(node < num_nodes);
@@ -670,7 +674,8 @@ void *alloc_xenheap_pages(unsigned int order)
 
     ASSERT(!in_irq());
 
-    pg = alloc_heap_pages(MEMZONE_XEN, MEMZONE_XEN, smp_processor_id(), order);
+    pg = alloc_heap_pages(
+        MEMZONE_XEN, MEMZONE_XEN, cpu_to_node(smp_processor_id()), order);
     if ( unlikely(pg == NULL) )
         goto no_memory;
 
@@ -778,12 +783,12 @@ int assign_pages(
 }
 
 
-struct page_info *__alloc_domheap_pages(
-    struct domain *d, unsigned int cpu, unsigned int order, 
-    unsigned int memflags)
+struct page_info *alloc_domheap_pages(
+    struct domain *d, unsigned int order, unsigned int memflags)
 {
     struct page_info *pg = NULL;
     unsigned int bits = memflags >> _MEMF_bits, zone_hi = NR_ZONES - 1;
+    unsigned int node = (uint8_t)((memflags >> _MEMF_node) - 1);
 
     ASSERT(!in_irq());
 
@@ -797,7 +802,7 @@ struct page_info *__alloc_domheap_pages(
 
     if ( (zone_hi + PAGE_SHIFT) >= dma_bitsize )
     {
-        pg = alloc_heap_pages(dma_bitsize - PAGE_SHIFT, zone_hi, cpu, order);
+        pg = alloc_heap_pages(dma_bitsize - PAGE_SHIFT, zone_hi, node, order);
 
         /* Failure? Then check if we can fall back to the DMA pool. */
         if ( unlikely(pg == NULL) &&
@@ -811,7 +816,7 @@ struct page_info *__alloc_domheap_pages(
 
     if ( (pg == NULL) &&
          ((pg = alloc_heap_pages(MEMZONE_XEN + 1, zone_hi,
-                                 cpu, order)) == NULL) )
+                                 node, order)) == NULL) )
          return NULL;
 
     if ( (d != NULL) && assign_pages(d, pg, order, memflags) )
@@ -821,12 +826,6 @@ struct page_info *__alloc_domheap_pages(
     }
     
     return pg;
-}
-
-struct page_info *alloc_domheap_pages(
-    struct domain *d, unsigned int order, unsigned int flags)
-{
-    return __alloc_domheap_pages(d, smp_processor_id(), order, flags);
 }
 
 void free_domheap_pages(struct page_info *pg, unsigned int order)

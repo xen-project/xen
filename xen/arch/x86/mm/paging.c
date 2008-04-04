@@ -26,6 +26,7 @@
 #include <asm/p2m.h>
 #include <asm/hap.h>
 #include <asm/guest_access.h>
+#include <xen/numa.h>
 #include <xsm/xsm.h>
 
 #define hap_enabled(d) (is_hvm_domain(d) && (d)->arch.hvm_domain.hap_enabled)
@@ -99,8 +100,9 @@
 static mfn_t paging_new_log_dirty_page(struct domain *d, void **mapping_p)
 {
     mfn_t mfn;
-    struct page_info *page = alloc_domheap_page(NULL);
+    struct page_info *page;
 
+    page = alloc_domheap_page(NULL, MEMF_node(domain_to_node(d)));
     if ( unlikely(page == NULL) )
     {
         d->arch.paging.log_dirty.failed_allocs++;

@@ -54,14 +54,11 @@ void free_xenheap_pages(void *v, unsigned int order);
 void init_domheap_pages(paddr_t ps, paddr_t pe);
 struct page_info *alloc_domheap_pages(
     struct domain *d, unsigned int order, unsigned int memflags);
-struct page_info *__alloc_domheap_pages(
-    struct domain *d, unsigned int cpu, unsigned int order, 
-    unsigned int memflags);
 void free_domheap_pages(struct page_info *pg, unsigned int order);
 unsigned long avail_domheap_pages_region(
     unsigned int node, unsigned int min_width, unsigned int max_width);
 unsigned long avail_domheap_pages(void);
-#define alloc_domheap_page(d) (alloc_domheap_pages(d,0,0))
+#define alloc_domheap_page(d,f) (alloc_domheap_pages(d,0,f))
 #define free_domheap_page(p)  (free_domheap_pages(p,0))
 
 void scrub_heap_pages(void);
@@ -75,6 +72,8 @@ int assign_pages(
 /* memflags: */
 #define _MEMF_no_refcount 0
 #define  MEMF_no_refcount (1U<<_MEMF_no_refcount)
+#define _MEMF_node        8
+#define  MEMF_node(n)     ((((n)+1)&0xff)<<_MEMF_node)
 #define _MEMF_bits        24
 #define  MEMF_bits(n)     ((n)<<_MEMF_bits)
 

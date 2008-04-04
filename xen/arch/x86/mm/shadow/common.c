@@ -36,6 +36,7 @@
 #include <asm/current.h>
 #include <asm/flushtlb.h>
 #include <asm/shadow.h>
+#include <xen/numa.h>
 #include "private.h"
 
 
@@ -1249,7 +1250,7 @@ static unsigned int sh_set_allocation(struct domain *d,
         {
             /* Need to allocate more memory from domheap */
             sp = (struct shadow_page_info *)
-                alloc_domheap_pages(NULL, order, 0);
+                alloc_domheap_pages(NULL, order, MEMF_node(domain_to_node(d)));
             if ( sp == NULL ) 
             { 
                 SHADOW_PRINTK("failed to allocate shadow pages.\n");

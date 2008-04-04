@@ -1102,7 +1102,7 @@ gnttab_transfer(
             struct page_info *new_page;
             void *sp, *dp;
 
-            new_page = alloc_domheap_pages(NULL, 0, MEMF_bits(max_bitsize));
+            new_page = alloc_domheap_page(NULL, MEMF_bits(max_bitsize));
             if ( new_page == NULL )
             {
                 gop.status = GNTST_address_too_big;

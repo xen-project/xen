@@ -24,6 +24,7 @@
 #include <xen/xmalloc.h>
 #include <xen/domain_page.h>
 #include <xen/iommu.h>
+#include <xen/numa.h>
 #include "iommu.h"
 #include "dmar.h"
 #include "../pci-direct.h"
@@ -269,7 +270,8 @@ static struct page_info *addr_to_dma_page(struct domain *domain, u64 addr)
 
         if ( dma_pte_addr(*pte) == 0 )
         {
-            pg = alloc_domheap_page(NULL);
+            pg = alloc_domheap_page(
+                NULL, MEMF_node(domain_to_node(domain)));
             vaddr = map_domain_page(page_to_mfn(pg));
             if ( !vaddr )
             {

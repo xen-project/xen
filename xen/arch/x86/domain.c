@@ -46,6 +46,7 @@
 #include <asm/debugreg.h>
 #include <asm/msr.h>
 #include <asm/nmi.h>
+#include <xen/numa.h>
 #include <xen/iommu.h>
 #ifdef CONFIG_COMPAT
 #include <compat/vcpu.h>
@@ -171,7 +172,7 @@ int setup_arg_xlat_area(struct vcpu *v, l4_pgentry_t *l4tab)
 
     if ( !d->arch.mm_arg_xlat_l3 )
     {
-        pg = alloc_domheap_page(NULL);
+        pg = alloc_domheap_page(NULL, 0);
         if ( !pg )
             return -ENOMEM;
         d->arch.mm_arg_xlat_l3 = page_to_virt(pg);
@@ -189,7 +190,7 @@ int setup_arg_xlat_area(struct vcpu *v, l4_pgentry_t *l4tab)
 
         if ( !l3e_get_intpte(d->arch.mm_arg_xlat_l3[l3_table_offset(va)]) )
         {
-            pg = alloc_domheap_page(NULL);
+            pg = alloc_domheap_page(NULL, 0);
             if ( !pg )
                 return -ENOMEM;
             clear_page(page_to_virt(pg));
@@ -198,7 +199,7 @@ int setup_arg_xlat_area(struct vcpu *v, l4_pgentry_t *l4tab)
         l2tab = l3e_to_l2e(d->arch.mm_arg_xlat_l3[l3_table_offset(va)]);
         if ( !l2e_get_intpte(l2tab[l2_table_offset(va)]) )
         {
-            pg = alloc_domheap_page(NULL);
+            pg = alloc_domheap_page(NULL, 0);
             if ( !pg )
                 return -ENOMEM;
             clear_page(page_to_virt(pg));
@@ -206,7 +207,7 @@ int setup_arg_xlat_area(struct vcpu *v, l4_pgentry_t *l4tab)
         }
         l1tab = l2e_to_l1e(l2tab[l2_table_offset(va)]);
         BUG_ON(l1e_get_intpte(l1tab[l1_table_offset(va)]));
-        pg = alloc_domheap_page(NULL);
+        pg = alloc_domheap_page(NULL, 0);
         if ( !pg )
             return -ENOMEM;
         l1tab[l1_table_offset(va)] = l1e_from_page(pg, PAGE_HYPERVISOR);
@@ -252,7 +253,7 @@ static void release_arg_xlat_area(struct domain *d)
 
 static int setup_compat_l4(struct vcpu *v)
 {
-    struct page_info *pg = alloc_domheap_page(NULL);
+    struct page_info *pg = alloc_domheap_page(NULL, 0);
     l4_pgentry_t *l4tab;
     int rc;
 
@@ -477,7 +478,8 @@ int arch_domain_create(struct domain *d, unsigned int domcr_flags)
 
 #else /* __x86_64__ */
 
-    if ( (pg = alloc_domheap_page(NULL)) == NULL )
+    pg = alloc_domheap_page(NULL, MEMF_node(domain_to_node(d)));
+    if ( pg == NULL )
         goto fail;
     d->arch.mm_perdomain_l2 = page_to_virt(pg);
     clear_page(d->arch.mm_perdomain_l2);
@@ -486,7 +488,8 @@ int arch_domain_create(struct domain *d, unsigned int domcr_flags)
             l2e_from_page(virt_to_page(d->arch.mm_perdomain_pt)+i,
                           __PAGE_HYPERVISOR);
 
-    if ( (pg = alloc_domheap_page(NULL)) == NULL )
+    pg = alloc_domheap_page(NULL, MEMF_node(domain_to_node(d)));
+    if ( pg == NULL )
         goto fail;
     d->arch.mm_perdomain_l3 = page_to_virt(pg);
     clear_page(d->arch.mm_perdomain_l3);

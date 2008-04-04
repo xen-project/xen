@@ -38,6 +38,7 @@
 #include <asm/hap.h>
 #include <asm/paging.h>
 #include <asm/domain.h>
+#include <xen/numa.h>
 
 #include "private.h"
 
@@ -135,7 +136,8 @@ static struct page_info *hap_alloc_p2m_page(struct domain *d)
          && mfn_x(page_to_mfn(pg)) >= (1UL << (32 - PAGE_SHIFT)) )
     {
         free_domheap_page(pg);
-        pg = alloc_domheap_pages(NULL, 0, MEMF_bits(32));
+        pg = alloc_domheap_page(
+            NULL, MEMF_bits(32) | MEMF_node(domain_to_node(d)));
         if ( likely(pg != NULL) )
         {
             void *p = hap_map_domain_page(page_to_mfn(pg));
@@ -199,7 +201,7 @@ hap_set_allocation(struct domain *d, unsigned int pages, int *preempted)
         if ( d->arch.paging.hap.total_pages < pages )
         {
             /* Need to allocate more memory from domheap */
-            pg = alloc_domheap_page(NULL);
+            pg = alloc_domheap_page(NULL, MEMF_node(domain_to_node(d)));
             if ( pg == NULL )
             {
                 HAP_PRINTK("failed to allocate hap pages.\n");

@@ -32,6 +32,7 @@
 #include <xen/sched.h>
 #include <xen/domain_page.h>
 #include <asm/hvm/support.h>
+#include <xen/numa.h>
 
 #define PAT(x) (x)
 static const uint32_t mask16[16] = {
@@ -513,7 +514,8 @@ void stdvga_init(struct domain *d)
     
     for ( i = 0; i != ARRAY_SIZE(s->vram_page); i++ )
     {
-        if ( (pg = alloc_domheap_page(NULL)) == NULL )
+        pg = alloc_domheap_page(NULL, MEMF_node(domain_to_node(d)));
+        if ( pg == NULL )
             break;
         s->vram_page[i] = pg;
         p = map_domain_page(page_to_mfn(pg));

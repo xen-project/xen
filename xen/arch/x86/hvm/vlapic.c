@@ -33,6 +33,7 @@
 #include <xen/sched.h>
 #include <asm/current.h>
 #include <asm/hvm/vmx/vmx.h>
+#include <xen/numa.h>
 #include <public/hvm/ioreq.h>
 #include <public/hvm/params.h>
 
@@ -916,7 +917,7 @@ HVM_REGISTER_SAVE_RESTORE(LAPIC_REGS, lapic_save_regs, lapic_load_regs,
 int vlapic_init(struct vcpu *v)
 {
     struct vlapic *vlapic = vcpu_vlapic(v);
-    unsigned int memflags = 0;
+    unsigned int memflags = MEMF_node(vcpu_to_node(v));
 
     HVM_DBG_LOG(DBG_LEVEL_VLAPIC, "%d", v->vcpu_id);
 
@@ -925,10 +926,10 @@ int vlapic_init(struct vcpu *v)
 #ifdef __i386__
     /* 32-bit VMX may be limited to 32-bit physical addresses. */
     if ( boot_cpu_data.x86_vendor == X86_VENDOR_INTEL )
-        memflags = MEMF_bits(32);
+        memflags |= MEMF_bits(32);
 #endif
 
-    vlapic->regs_page = alloc_domheap_pages(NULL, 0, memflags);
+    vlapic->regs_page = alloc_domheap_page(NULL, memflags);
     if ( vlapic->regs_page == NULL )
     {
         dprintk(XENLOG_ERR, "alloc vlapic regs error: %d/%d\n",
@@ -941,7 +942,7 @@ int vlapic_init(struct vcpu *v)
     {
         dprintk(XENLOG_ERR, "map vlapic regs error: %d/%d\n",
                 v->domain->domain_id, v->vcpu_id);
-	return -ENOMEM;
+        return -ENOMEM;
     }
 
     clear_page(vlapic->regs);
