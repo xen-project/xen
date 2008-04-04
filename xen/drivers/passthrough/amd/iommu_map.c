@@ -505,7 +505,7 @@ int amd_iommu_sync_p2m(struct domain *d)
     int ir = IOMMU_IO_READ_ENABLED;
 
     if ( !is_hvm_domain(d) )
-        return;
+        return 0;
 
     hd = domain_hvm_iommu(d);
 
