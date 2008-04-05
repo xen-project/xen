@@ -7689,11 +7689,13 @@ int main(int argc, char **argv)
     bdrv_init();
     xc_handle = xc_interface_open();
 #ifdef CONFIG_STUBDOM
-    char *domid_s, *msg;
-    if ((msg = xenbus_read(XBT_NIL, "domid", &domid_s)))
-        fprintf(stderr,"Can not read our own domid\n", msg);
-    else
-        xenstore_parse_domain_config(atoi(domid_s));
+    {
+        char *domid_s, *msg;
+        if ((msg = xenbus_read(XBT_NIL, "domid", &domid_s)))
+            fprintf(stderr,"Can not read our own domid: %s\n", msg);
+        else
+            xenstore_parse_domain_config(atoi(domid_s));
+    }
 #else /* CONFIG_STUBDOM */
     xenstore_parse_domain_config(domid);
 #endif /* CONFIG_STUBDOM */
