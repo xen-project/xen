@@ -7018,25 +7018,11 @@ int unset_mm_mapping(int xc_handle, uint32_t domid,
                      xen_pfn_t *extent_start)
 {
     int err = 0;
-    xc_dominfo_t info;
-
-    xc_domain_getinfo(xc_handle, domid, 1, &info);
-    if ((info.nr_pages - nr_pages) <= 0) {
-        fprintf(stderr, "unset_mm_mapping: error nr_pages\n");
-        err = -1;
-    }
 
     err = xc_domain_memory_decrease_reservation(xc_handle, domid,
                                                 nr_pages, 0, extent_start);
     if (err)
         fprintf(stderr, "Failed to decrease physmap\n");
-
-
-    if (xc_domain_setmaxmem(xc_handle, domid, (info.nr_pages - nr_pages) *
-                            PAGE_SIZE/1024) != 0) {
-        fprintf(logfile, "set maxmem returned error %d\n", errno);
-        err = -1;
-    }
 
     return err;
 }
@@ -7045,16 +7031,7 @@ int set_mm_mapping(int xc_handle, uint32_t domid,
                    unsigned long nr_pages, unsigned int address_bits,
                    xen_pfn_t *extent_start)
 {
-    xc_dominfo_t info;
     int err = 0;
-
-    xc_domain_getinfo(xc_handle, domid, 1, &info);
-
-    if (xc_domain_setmaxmem(xc_handle, domid, info.max_memkb +
-                            nr_pages * PAGE_SIZE/1024) != 0) {
-        fprintf(logfile, "set maxmem returned error %d\n", errno);
-        return -1;
-    }
 
     err = xc_domain_memory_populate_physmap(xc_handle, domid, nr_pages, 0,
                                             address_bits, extent_start);
