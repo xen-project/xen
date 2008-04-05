@@ -12,7 +12,7 @@
 
 #define MAX_NUMNODES    (1 << NODES_SHIFT)
 
-#define vcpu_to_node(v) (cpu_to_node[(v)->processor])
+#define vcpu_to_node(v) (cpu_to_node((v)->processor))
 
 #define domain_to_node(d) \
   (((d)->vcpu[0] != NULL) ? vcpu_to_node((d)->vcpu[0]) : NUMA_NO_NODE)
