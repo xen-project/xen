@@ -15,13 +15,23 @@ struct blkfront_aiocb
 
     void (*aio_cb)(struct blkfront_aiocb *aiocb, int ret);
 };
-struct blkfront_dev *init_blkfront(char *nodename, uint64_t *sectors, unsigned *sector_size, int *mode, int *info);
+struct blkfront_info
+{
+    uint64_t sectors;
+    unsigned sector_size;
+    int mode;
+    int info;
+    int barrier;
+    int flush;
+};
+struct blkfront_dev *init_blkfront(char *nodename, struct blkfront_info *info);
 #ifdef HAVE_LIBC
 int blkfront_open(struct blkfront_dev *dev);
 #endif
 void blkfront_aio(struct blkfront_aiocb *aiocbp, int write);
 void blkfront_aio_read(struct blkfront_aiocb *aiocbp);
 void blkfront_aio_write(struct blkfront_aiocb *aiocbp);
+void blkfront_aio_push_operation(struct blkfront_aiocb *aiocbp, uint8_t op);
 int blkfront_aio_poll(struct blkfront_dev *dev);
 void blkfront_sync(struct blkfront_dev *dev);
 void shutdown_blkfront(struct blkfront_dev *dev);

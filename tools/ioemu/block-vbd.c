@@ -49,11 +49,7 @@
 typedef struct BDRVVbdState {
     struct blkfront_dev *dev;
     int fd;
-    int type;
-    int mode;
-    int info;
-    uint64_t sectors;
-    unsigned sector_size;
+    struct blkfront_info info;
     QEMU_LIST_ENTRY(BDRVVbdState) list;
 } BDRVVbdState;
 
@@ -81,13 +77,13 @@ static int vbd_open(BlockDriverState *bs, const char *filename, int flags)
     //handy to test posix access
     //return -EIO;
 
-    s->dev = init_blkfront((char *) filename, &s->sectors, &s->sector_size, &s->mode, &s->info);
+    s->dev = init_blkfront((char *) filename, &s->info);
 
     if (!s->dev)
 	return -EIO;
 
-    if (SECTOR_SIZE % s->sector_size) {
-	printf("sector size is %d, we only support sector sizes that divide %d\n", s->sector_size, SECTOR_SIZE);
+    if (SECTOR_SIZE % s->info.sector_size) {
+	printf("sector size is %d, we only support sector sizes that divide %d\n", s->info.sector_size, SECTOR_SIZE);
 	return -EIO;
     }
 
@@ -267,6 +263,32 @@ static void vbd_aio_cancel(BlockDriverAIOCB *blockacb)
     // Try to cancel. If can't, wait for it, drop the callback and call qemu_aio_release(acb)
 }
 
+static void vbd_nop_cb(void *opaque, int ret)
+{
+}
+
+static BlockDriverAIOCB *vbd_aio_flush(BlockDriverState *bs,
+        BlockDriverCompletionFunc *cb, void *opaque)
+{
+    BDRVVbdState *s = bs->opaque;
+    VbdAIOCB *acb = NULL;
+
+    if (s->info.barrier == 1) {
+        acb = vbd_aio_setup(bs, 0, NULL, 0,
+                s->info.flush == 1 ? vbd_nop_cb : cb, opaque);
+        if (!acb)
+            return NULL;
+        blkfront_aio_push_operation(&acb->aiocb, BLKIF_OP_WRITE_BARRIER);
+    }
+    if (s->info.flush == 1) {
+        acb = vbd_aio_setup(bs, 0, NULL, 0, cb, opaque);
+        if (!acb)
+            return NULL;
+        blkfront_aio_push_operation(&acb->aiocb, BLKIF_OP_FLUSH_DISKCACHE);
+    }
+    return &acb->common;
+}
+
 static void vbd_close(BlockDriverState *bs)
 {
     BDRVVbdState *s = bs->opaque;
@@ -282,13 +304,14 @@ static void vbd_close(BlockDriverState *bs)
 static int64_t  vbd_getlength(BlockDriverState *bs)
 {
     BDRVVbdState *s = bs->opaque;
-    return s->sectors * s->sector_size;
+    return s->info.sectors * s->info.sector_size;
 }
 
-static void vbd_flush(BlockDriverState *bs)
+static int vbd_flush(BlockDriverState *bs)
 {
     BDRVVbdState *s = bs->opaque;
     blkfront_sync(s->dev);
+    return 0;
 }
 
 /***********************************************/
@@ -333,6 +356,7 @@ BlockDriver bdrv_vbd = {
     .bdrv_aio_read = vbd_aio_read,
     .bdrv_aio_write = vbd_aio_write,
     .bdrv_aio_cancel = vbd_aio_cancel,
+    .bdrv_aio_flush = vbd_aio_flush,
     .aiocb_size = sizeof(VbdAIOCB),
     .bdrv_read = vbd_read,
     .bdrv_write = vbd_write,
