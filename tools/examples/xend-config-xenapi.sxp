@@ -167,11 +167,14 @@
 #(network-script network-nat)
 #(vif-script     vif-nat)
 
-
-# Dom0 will balloon out when needed to free memory for domU.
-# dom0-min-mem is the lowest memory level (in MB) dom0 will get down to.
-# If dom0-min-mem=0, dom0 will never balloon out.
+# dom0-min-mem is the lowest permissible memory level (in MB) for dom0.
+# This is a minimum both for auto-ballooning (as enabled by
+# enable-dom0-ballooning below) and for xm mem-set when applied to dom0.
 (dom0-min-mem 196)
+
+# Whether to enable auto-ballooning of dom0 to allow domUs to be created.
+# If enable-dom0-ballooning = no, dom0 will never balloon out.
+(enable-dom0-ballooning yes)
 
 # In SMP system, dom0 will use dom0-cpus # of CPUS
 # If dom0-cpus = 0, dom0 will take all cpus available

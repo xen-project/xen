@@ -279,6 +279,13 @@ class XendOptions:
     def get_dom0_min_mem(self):
         return self.get_config_int('dom0-min-mem', self.dom0_min_mem_default)
 
+    def get_enable_dom0_ballooning(self):
+        enable_dom0_ballooning_default = 'yes'
+        if self.get_dom0_min_mem() == 0:
+            enable_dom0_ballooning_default = 'no'
+        return self.get_config_bool('enable-dom0-ballooning',
+                                    enable_dom0_ballooning_default)
+
     def get_dom0_vcpus(self):
         return self.get_config_int('dom0-cpus', self.dom0_vcpus_default)
 

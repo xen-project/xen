@@ -81,8 +81,8 @@ def free(need_mem):
     # needs to balloon.  No matter where we expect the free memory to come
     # from, we need to wait for it to become available.
     #
-    # We are not allowed to balloon below dom0_min_mem, or if dom0_min_mem
-    # is 0, we cannot balloon at all.  Memory can still become available
+    # We are not allowed to balloon below dom0_min_mem, or if dom0_ballooning
+    # is False, we cannot balloon at all.  Memory can still become available
     # through a rebooting domain, however.
     #
     # Eventually, we time out (presumably because there really isn't enough
@@ -100,6 +100,7 @@ def free(need_mem):
 
     try:
         dom0_min_mem = xoptions.get_dom0_min_mem() * 1024
+        dom0_ballooning = xoptions.get_enable_dom0_ballooning()
         dom0_alloc = get_dom0_current_alloc()
 
         retries = 0
@@ -115,7 +116,7 @@ def free(need_mem):
         free_mem = physinfo['free_memory']
         scrub_mem = physinfo['scrub_memory']
         total_mem = physinfo['total_memory']
-        if dom0_min_mem > 0:
+        if dom0_ballooning:
             max_free_mem = total_mem - dom0_min_mem
         else:
             max_free_mem = total_mem - dom0_alloc
@@ -137,7 +138,7 @@ def free(need_mem):
                 log.debug("Balloon: %d KiB free; %d to scrub; need %d; retries: %d.",
                           free_mem, scrub_mem, need_mem, rlimit)
 
-            if dom0_min_mem > 0:
+            if dom0_ballooning:
                 dom0_alloc = get_dom0_current_alloc()
                 new_alloc = dom0_alloc - (need_mem - free_mem - scrub_mem)
 
@@ -163,10 +164,10 @@ def free(need_mem):
             last_free = free_mem + scrub_mem
 
         # Not enough memory; diagnose the problem.
-        if dom0_min_mem == 0:
-            raise VmError(('Not enough free memory and dom0_min_mem is 0, so '
-                           'I cannot release any more.  I need %d KiB but '
-                           'only have %d.') %
+        if not dom0_ballooning:
+            raise VmError(('Not enough free memory and enable-dom0-ballooning '
+                           'is False, so I cannot release any more.  '
+                           'I need %d KiB but only have %d.') %
                           (need_mem, free_mem))
         elif new_alloc < dom0_min_mem:
             raise VmError(
