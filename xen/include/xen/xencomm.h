@@ -114,4 +114,12 @@ static inline unsigned long xencomm_inline_addr(const void *handle)
     xencomm_copy_from_guest(_d, _s, sizeof(*_d), _off);             \
 })
 
+#ifdef CONFIG_XENCOMM_MARK_DIRTY
+extern void xencomm_mark_dirty(unsigned long addr, unsigned int len);
+#else
+static inline void xencomm_mark_dirty(unsigned long addr, unsigned int len)
+{
+}
+#endif
+
 #endif /* __XENCOMM_H__ */
