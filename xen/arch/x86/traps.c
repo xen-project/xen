@@ -1305,23 +1305,24 @@ static int read_gate_descriptor(unsigned int gate_sel,
     const struct desc_struct *pdesc;
 
 
-    pdesc = (const struct desc_struct *)(!(gate_sel & 4) ?
-                                         GDT_VIRT_START(v) :
-                                         LDT_VIRT_START(v))
-            + (gate_sel >> 3);
-    if ( gate_sel < 4 ||
-         (gate_sel >= FIRST_RESERVED_GDT_BYTE && !(gate_sel & 4)) ||
+    pdesc = (const struct desc_struct *)
+        (!(gate_sel & 4) ? GDT_VIRT_START(v) : LDT_VIRT_START(v))
+        + (gate_sel >> 3);
+    if ( (gate_sel < 4) ||
+         ((gate_sel >= FIRST_RESERVED_GDT_BYTE) && !(gate_sel & 4)) ||
          __get_user(desc, pdesc) )
         return 0;
 
     *sel = (desc.a >> 16) & 0x0000fffc;
     *off = (desc.a & 0x0000ffff) | (desc.b & 0xffff0000);
     *ar = desc.b & 0x0000ffff;
+
     /*
      * check_descriptor() clears the DPL field and stores the
      * guest requested DPL in the selector's RPL field.
      */
-    ASSERT(!(*ar & _SEGMENT_DPL));
+    if ( *ar & _SEGMENT_DPL )
+        return 0;
     *ar |= (desc.a >> (16 - 13)) & _SEGMENT_DPL;
 
     if ( !is_pv_32bit_vcpu(v) )
@@ -2137,8 +2138,8 @@ static void emulate_gate_op(struct cpu_user_regs *regs)
 
     /* Check whether this fault is due to the use of a call gate. */
     if ( !read_gate_descriptor(regs->error_code, v, &sel, &off, &ar) ||
-         ((ar >> 13) & 3) < (regs->cs & 3) ||
-         (ar & _SEGMENT_TYPE) != 0xc00 )
+         (((ar >> 13) & 3) < (regs->cs & 3)) ||
+         ((ar & _SEGMENT_TYPE) != 0xc00) )
     {
         do_guest_trap(TRAP_gp_fault, regs, 1);
         return;
@@ -2232,15 +2233,18 @@ static void emulate_gate_op(struct cpu_user_regs *regs)
                     {
                         if ( (modrm & 7) == 4 )
                         {
-                            unsigned int sib = insn_fetch(u8, base, eip, limit);
+                            unsigned int sib;
+                            sib = insn_fetch(u8, base, eip, limit);
 
                             modrm = (modrm & ~7) | (sib & 7);
                             if ( (sib >>= 3) != 4 )
-                                opnd_off = *(unsigned long *)decode_register(sib & 7, regs, 0);
+                                opnd_off = *(unsigned long *)
+                                    decode_register(sib & 7, regs, 0);
                             opnd_off <<= sib >> 3;
                         }
                         if ( (modrm & 7) != 5 || (modrm & 0xc0) )
-                            opnd_off += *(unsigned long *)decode_register(modrm & 7, regs, 0);
+                            opnd_off += *(unsigned long *)
+                                decode_register(modrm & 7, regs, 0);
                         else
                             modrm |= 0x87;
                         if ( !opnd_sel )
