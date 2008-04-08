@@ -32,7 +32,6 @@
 #include <sys/statvfs.h>
 #endif
 
-#include "cpu.h"
 #if defined(USE_KQEMU)
 #include "vl.h"
 #endif
