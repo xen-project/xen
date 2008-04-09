@@ -939,9 +939,9 @@ int xc_domain_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
     sent_last_iter = p2m_size;
 
     /* Setup to_send / to_fix and to_skip bitmaps */
-    to_send = malloc(BITMAP_SIZE);
+    to_send = xg_memalign(PAGE_SIZE, ROUNDUP(BITMAP_SIZE, PAGE_SHIFT)); 
     to_fix  = calloc(1, BITMAP_SIZE);
-    to_skip = malloc(BITMAP_SIZE);
+    to_skip = xg_memalign(PAGE_SIZE, ROUNDUP(BITMAP_SIZE, PAGE_SHIFT)); 
 
     if ( !to_send || !to_fix || !to_skip )
     {
@@ -983,8 +983,8 @@ int xc_domain_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
 
     analysis_phase(xc_handle, dom, p2m_size, to_skip, 0);
 
-    /* We want zeroed memory so use calloc rather than malloc. */
-    pfn_type   = calloc(MAX_BATCH_SIZE, sizeof(*pfn_type));
+    pfn_type   = xg_memalign(PAGE_SIZE, ROUNDUP(
+                              MAX_BATCH_SIZE * sizeof(*pfn_type), PAGE_SHIFT));
     pfn_batch  = calloc(MAX_BATCH_SIZE, sizeof(*pfn_batch));
     if ( (pfn_type == NULL) || (pfn_batch == NULL) )
     {
@@ -992,10 +992,12 @@ int xc_domain_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
         errno = ENOMEM;
         goto out;
     }
+    memset(pfn_type, 0,
+           ROUNDUP(MAX_BATCH_SIZE * sizeof(*pfn_type), PAGE_SHIFT));
 
     if ( lock_pages(pfn_type, MAX_BATCH_SIZE * sizeof(*pfn_type)) )
     {
-        ERROR("Unable to lock");
+        ERROR("Unable to lock pfn_type array");
         goto out;
     }
 

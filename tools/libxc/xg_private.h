@@ -7,6 +7,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <malloc.h>
 #include <sys/mman.h>
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -175,5 +176,22 @@ int xc_copy_to_domain_page(int xc_handle, uint32_t domid,
 
 int pin_table(int xc_handle, unsigned int type, unsigned long mfn,
               domid_t dom);
+
+/* Grrr portability */
+static inline void *xg_memalign(size_t alignment, size_t size)
+{
+#if defined(_POSIX_C_SOURCE) && !defined(__sun__)
+    int ret;
+    void *ptr;
+    ret = posix_memalign(&ptr, alignment, size);
+    if (ret != 0)
+        return NULL;
+    return ptr;
+#elif defined(_BSD)
+    return valloc(size);
+#else
+    return memalign(alignment, size);
+#endif
+}
 
 #endif /* XG_PRIVATE_H */
