@@ -58,7 +58,7 @@ int assign_device(struct domain *d, u8 bus, u8 devfn)
 
 void iommu_domain_destroy(struct domain *d)
 {
-    struct hvm_irq_dpci *hvm_irq_dpci = domain_get_irq_dpci(d);
+    struct hvm_irq_dpci *hvm_irq_dpci = d->arch.hvm_domain.irq.dpci;
     uint32_t i;
     struct hvm_iommu *hd  = domain_hvm_iommu(d);
     struct list_head *ioport_list, *digl_list, *tmp;

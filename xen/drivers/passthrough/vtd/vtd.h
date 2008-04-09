@@ -42,13 +42,4 @@ struct IO_APIC_route_remap_entry {
     };
 };
 
-unsigned int get_clflush_size(void);
-u64 alloc_pgtable_maddr(void);
-void free_pgtable_maddr(u64 maddr);
-void *map_vtd_domain_page(u64 maddr);
-void unmap_vtd_domain_page(void *va);
-
-void iommu_flush_cache_entry(struct iommu *iommu, void *addr);
-void iommu_flush_cache_page(struct iommu *iommu, void *addr);
-
 #endif // _VTD_H_
