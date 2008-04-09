@@ -58,7 +58,7 @@ struct vmx_msr_state {
 
 struct vmx_domain {
     unsigned long apic_access_mfn;
-
+    unsigned long vpid_base;
     union {
         struct {
             u64 etmt :3,
@@ -89,6 +89,8 @@ struct arch_vmx_struct {
     /* Cache of cpu execution control. */
     u32                  exec_control;
     u32                  secondary_exec_control;
+
+    u16                  vpid;
 
     /* PMU */
     struct vpmu_struct   vpmu;
@@ -157,6 +159,7 @@ extern u32 vmx_vmentry_control;
 
 #define SECONDARY_EXEC_VIRTUALIZE_APIC_ACCESSES 0x00000001
 #define SECONDARY_EXEC_ENABLE_EPT               0x00000002
+#define SECONDARY_EXEC_ENABLE_VPID              0x00000020
 #define SECONDARY_EXEC_WBINVD_EXITING           0x00000040
 extern u32 vmx_secondary_exec_control;
 
@@ -176,6 +179,8 @@ extern bool_t cpu_has_vmx_ins_outs_instr_info;
     (vmx_cpu_based_exec_control & CPU_BASED_ACTIVATE_SECONDARY_CONTROLS)
 #define cpu_has_vmx_ept \
     (vmx_secondary_exec_control & SECONDARY_EXEC_ENABLE_EPT)
+#define cpu_has_vmx_vpid \
+    (vmx_secondary_exec_control & SECONDARY_EXEC_ENABLE_VPID)
 
 /* GUEST_INTERRUPTIBILITY_INFO flags. */
 #define VMX_INTR_SHADOW_STI             0x00000001
@@ -185,6 +190,7 @@ extern bool_t cpu_has_vmx_ins_outs_instr_info;
 
 /* VMCS field encodings. */
 enum vmcs_field {
+    VIRTUAL_PROCESSOR_ID            = 0x00000000,
     GUEST_ES_SELECTOR               = 0x00000800,
     GUEST_CS_SELECTOR               = 0x00000802,
     GUEST_SS_SELECTOR               = 0x00000804,
@@ -323,6 +329,8 @@ enum vmcs_field {
     HOST_RSP                        = 0x00006c14,
     HOST_RIP                        = 0x00006c16,
 };
+
+#define VMCS_VPID_WIDTH 16
 
 void vmx_disable_intercept_for_msr(struct vcpu *v, u32 msr);
 int vmx_read_guest_msr(struct vcpu *v, u32 msr, u64 *val);

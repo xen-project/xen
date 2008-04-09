@@ -38,6 +38,9 @@
 #include <asm/shadow.h>
 #include <asm/tboot.h>
 
+static int opt_vpid_enabled = 1;
+boolean_param("vpid", opt_vpid_enabled);
+
 /* Dynamic (run-time adjusted) execution control flags. */
 u32 vmx_pin_based_exec_control __read_mostly;
 u32 vmx_cpu_based_exec_control __read_mostly;
@@ -111,6 +114,8 @@ static void vmx_init_vmcs_config(void)
         opt = (SECONDARY_EXEC_VIRTUALIZE_APIC_ACCESSES |
                SECONDARY_EXEC_WBINVD_EXITING |
                SECONDARY_EXEC_ENABLE_EPT);
+        if ( opt_vpid_enabled )
+            opt |= SECONDARY_EXEC_ENABLE_VPID;
         _vmx_secondary_exec_control = adjust_vmx_controls(
             min, opt, MSR_IA32_VMX_PROCBASED_CTLS2);
     }
@@ -316,6 +321,8 @@ int vmx_cpu_up(void)
     }
 
     ept_sync_all();
+
+    vpid_sync_all();
 
     return 1;
 }
@@ -629,6 +636,13 @@ static int construct_vmcs(struct vcpu *v)
 #endif
     }
 
+    if ( cpu_has_vmx_vpid )
+    {
+        v->arch.hvm_vmx.vpid =
+            v->domain->arch.hvm_domain.vmx.vpid_base + v->vcpu_id;
+        __vmwrite(VIRTUAL_PROCESSOR_ID, v->arch.hvm_vmx.vpid);
+    }
+
     vmx_vmcs_exit(v);
 
     paging_update_paging_modes(v); /* will update HOST & GUEST_CR3 as reqd */
@@ -822,6 +836,7 @@ void vmx_do_resume(struct vcpu *v)
         vmx_load_vmcs(v);
         hvm_migrate_timers(v);
         vmx_set_host_env(v);
+        vpid_sync_vcpu_all(v);
     }
 
     debug_state = v->domain->debugger_attached;
@@ -976,6 +991,8 @@ void vmcs_dump_vcpu(struct vcpu *v)
            (uint32_t)vmr(TPR_THRESHOLD));
     printk("EPT pointer = 0x%08x%08x\n",
            (uint32_t)vmr(EPT_POINTER_HIGH), (uint32_t)vmr(EPT_POINTER));
+    printk("Virtual processor ID = 0x%04x\n",
+           (uint32_t)vmr(VIRTUAL_PROCESSOR_ID));
 
     vmx_vmcs_exit(v);
 }

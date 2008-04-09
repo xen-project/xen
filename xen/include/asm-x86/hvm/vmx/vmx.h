@@ -164,6 +164,7 @@ void vmx_realmode(struct cpu_user_regs *regs);
 #define VMRESUME_OPCODE ".byte 0x0f,0x01,0xc3\n"
 #define VMWRITE_OPCODE  ".byte 0x0f,0x79\n"
 #define INVEPT_OPCODE   ".byte 0x66,0x0f,0x38,0x80\n"   /* m128,r64/32 */
+#define INVVPID_OPCODE  ".byte 0x66,0x0f,0x38,0x81\n"   /* m128,r64/32 */
 #define VMXOFF_OPCODE   ".byte 0x0f,0x01,0xc4\n"
 #define VMXON_OPCODE    ".byte 0xf3,0x0f,0xc7\n"
 
@@ -260,13 +261,30 @@ static inline void __invept(int ext, u64 eptp, u64 gpa)
         u64 eptp, gpa;
     } operand = {eptp, gpa};
 
-    __asm__ __volatile__ ( INVEPT_OPCODE
-                           MODRM_EAX_08
-                           /* CF==1 or ZF==1 --> rc = -1 */
-                           "ja 1f ; ud2 ; 1:\n"
-                           :
-                           : "a" (&operand), "c" (ext)
-                           : "memory");
+    asm volatile ( INVEPT_OPCODE
+                   MODRM_EAX_08
+                   /* CF==1 or ZF==1 --> rc = -1 */
+                   "ja 1f ; ud2 ; 1:\n"
+                   :
+                   : "a" (&operand), "c" (ext)
+                   : "memory" );
+}
+
+static inline void __invvpid(int ext, u16 vpid, u64 gva)
+{
+    struct {
+        u64 vpid:16;
+        u64 rsvd:48;
+        u64 gva;
+    } __attribute__ ((packed)) operand = {vpid, 0, gva};
+
+    asm volatile ( INVVPID_OPCODE
+                   MODRM_EAX_08
+                   /* CF==1 or ZF==1 --> rc = -1 */
+                   "ja 1f ; ud2 ; 1:\n"
+                   :
+                   : "a" (&operand), "c" (ext)
+                   : "memory" );
 }
 
 static inline void ept_sync_all(void)
@@ -278,6 +296,18 @@ static inline void ept_sync_all(void)
 }
 
 void ept_sync_domain(struct domain *d);
+
+static inline void vpid_sync_vcpu_all(struct vcpu *v)
+{
+    if ( cpu_has_vmx_vpid )
+        __invvpid(1, v->arch.hvm_vmx.vpid, 0);
+}
+
+static inline void vpid_sync_all(void)
+{
+    if ( cpu_has_vmx_vpid )
+        __invvpid(2, 0, 0);
+}
 
 static inline void __vmxoff(void)
 {

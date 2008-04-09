@@ -57,6 +57,8 @@ static void vmx_ctxt_switch_to(struct vcpu *v);
 
 static int  vmx_alloc_vlapic_mapping(struct domain *d);
 static void vmx_free_vlapic_mapping(struct domain *d);
+static int  vmx_alloc_vpid(struct domain *d);
+static void vmx_free_vpid(struct domain *d);
 static void vmx_install_vlapic_mapping(struct vcpu *v);
 static void vmx_update_guest_cr(struct vcpu *v, unsigned int cr);
 static void vmx_update_guest_efer(struct vcpu *v);
@@ -71,18 +73,30 @@ static void vmx_invlpg_intercept(unsigned long vaddr);
 
 static int vmx_domain_initialise(struct domain *d)
 {
+    int rc;
+
     d->arch.hvm_domain.vmx.ept_control.etmt = EPT_DEFAULT_MT;
     d->arch.hvm_domain.vmx.ept_control.gaw  = EPT_DEFAULT_GAW;
     d->arch.hvm_domain.vmx.ept_control.asr  =
         pagetable_get_pfn(d->arch.phys_table);
 
-    return vmx_alloc_vlapic_mapping(d);
+    if ( (rc = vmx_alloc_vpid(d)) != 0 )
+        return rc;
+
+    if ( (rc = vmx_alloc_vlapic_mapping(d)) != 0 )
+    {
+        vmx_free_vpid(d);
+        return rc;
+    }
+
+    return 0;
 }
 
 static void vmx_domain_destroy(struct domain *d)
 {
     ept_sync_domain(d);
     vmx_free_vlapic_mapping(d);
+    vmx_free_vpid(d);
 }
 
 static int vmx_vcpu_initialise(struct vcpu *v)
@@ -1024,6 +1038,7 @@ static void vmx_update_guest_cr(struct vcpu *v, unsigned int cr)
         }
  
         __vmwrite(GUEST_CR3, v->arch.hvm_vcpu.hw_cr[3]);
+        vpid_sync_vcpu_all(v);
         break;
     case 4:
         v->arch.hvm_vcpu.hw_cr[4] = HVM_CR4_HOST_MASK;
@@ -1069,9 +1084,15 @@ static void vmx_update_guest_efer(struct vcpu *v)
 
 static void vmx_flush_guest_tlbs(void)
 {
-    /* No tagged TLB support on VMX yet.  The fact that we're in Xen
-     * at all means any guest will have a clean TLB when it's next run,
-     * because VMRESUME will flush it for us. */
+    /*
+     * If VPID (i.e. tagged TLB support) is not enabled, the fact that
+     * we're in Xen at all means any guest will have a clean TLB when
+     * it's next run, because VMRESUME will flush it for us.
+     *
+     * If enabled, we invalidate all translations associated with all
+     * VPID values.
+     */
+    vpid_sync_all();
 }
 
 static void __ept_sync_domain(void *info)
@@ -1202,6 +1223,9 @@ static struct hvm_function_table vmx_function_table = {
     .invlpg_intercept     = vmx_invlpg_intercept
 };
 
+static unsigned long *vpid_bitmap;
+#define VPID_BITMAP_SIZE ((1u << VMCS_VPID_WIDTH) / MAX_VIRT_CPUS)
+
 void start_vmx(void)
 {
     static int bootstrapped;
@@ -1239,6 +1263,19 @@ void start_vmx(void)
     {
         printk("VMX: EPT is available.\n");
         vmx_function_table.hap_supported = 1;
+    }
+
+    if ( cpu_has_vmx_vpid )
+    {
+        printk("VMX: VPID is available.\n");
+
+        vpid_bitmap = xmalloc_array(
+            unsigned long, BITS_TO_LONGS(VPID_BITMAP_SIZE));
+        BUG_ON(vpid_bitmap == NULL);
+        memset(vpid_bitmap, 0, BITS_TO_LONGS(VPID_BITMAP_SIZE) * sizeof(long));
+
+        /* VPID 0 is used by VMX root mode (the hypervisor). */
+        __set_bit(0, vpid_bitmap);
     }
 
     setup_vmcs_dump();
@@ -1753,6 +1790,35 @@ static void vmx_free_vlapic_mapping(struct domain *d)
     unsigned long mfn = d->arch.hvm_domain.vmx.apic_access_mfn;
     if ( mfn != 0 )
         free_xenheap_page(mfn_to_virt(mfn));
+}
+
+static int vmx_alloc_vpid(struct domain *d)
+{
+    int idx;
+
+    if ( !cpu_has_vmx_vpid )
+        return 0;
+
+    do {
+        idx = find_first_zero_bit(vpid_bitmap, VPID_BITMAP_SIZE);
+        if ( idx >= VPID_BITMAP_SIZE )
+        {
+            dprintk(XENLOG_WARNING, "VMX VPID space exhausted.\n");
+            return -EBUSY;
+        }
+    }
+    while ( test_and_set_bit(idx, vpid_bitmap) );
+
+    d->arch.hvm_domain.vmx.vpid_base = idx * MAX_VIRT_CPUS;
+    return 0;
+}
+
+static void vmx_free_vpid(struct domain *d)
+{
+    if ( !cpu_has_vmx_vpid )
+        return;
+
+    clear_bit(d->arch.hvm_domain.vmx.vpid_base / MAX_VIRT_CPUS, vpid_bitmap);
 }
 
 static void vmx_install_vlapic_mapping(struct vcpu *v)
