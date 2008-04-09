@@ -24,8 +24,18 @@ XENSTORED_OBJS_$(CONFIG_NetBSD) = xenstored_netbsd.o
 
 XENSTORED_OBJS += $(XENSTORED_OBJS_y)
 
+ifneq ($(XENSTORE_STATIC_CLIENTS),y)
+LIBXENSTORE := libxenstore.so
+else
+LIBXENSTORE := libxenstore.a
+$(CLIENTS) xenstore-control xenstore-ls: CFLAGS += -static
+endif
+
 .PHONY: all
-all: libxenstore.so libxenstore.a xenstored $(CLIENTS) xs_tdb_dump xenstore-control xenstore-ls
+all: libxenstore.so libxenstore.a xenstored clients xs_tdb_dump 
+
+.PHONY: clients
+clients: $(CLIENTS) xenstore-control xenstore-ls
 
 ifeq ($(CONFIG_SunOS),y)
 xenstored_probes.h: xenstored_probes.d
@@ -42,16 +52,16 @@ endif
 xenstored: $(XENSTORED_OBJS)
 	$(CC) $(CFLAGS) $(LDFLAGS) $^ $(LDFLAGS_libxenctrl) $(SOCKET_LIBS) -o $@
 
-$(CLIENTS): xenstore-%: xenstore_%.o libxenstore.so
+$(CLIENTS): xenstore-%: xenstore_%.o $(LIBXENSTORE)
 	$(CC) $(CFLAGS) $(LDFLAGS) $< -L. -lxenstore $(SOCKET_LIBS) -o $@
 
 $(CLIENTS_OBJS): xenstore_%.o: xenstore_client.c
 	$(COMPILE.c) -DCLIENT_$(*F) -o $@ $<
 
-xenstore-control: xenstore_control.o libxenstore.so
+xenstore-control: xenstore_control.o $(LIBXENSTORE)
 	$(CC) $(CFLAGS) $(LDFLAGS) $< -L. -lxenstore $(SOCKET_LIBS) -o $@
 
-xenstore-ls: xsls.o libxenstore.so
+xenstore-ls: xsls.o $(LIBXENSTORE)
 	$(CC) $(CFLAGS) $(LDFLAGS) $< -L. -lxenstore $(SOCKET_LIBS) -o $@
 
 xs_tdb_dump: xs_tdb_dump.o utils.o tdb.o talloc.o
@@ -61,6 +71,8 @@ libxenstore.so: libxenstore.so.$(MAJOR)
 	ln -sf $< $@
 libxenstore.so.$(MAJOR): libxenstore.so.$(MAJOR).$(MINOR)
 	ln -sf $< $@
+
+xs.opic: CFLAGS += -DUSE_PTHREAD
 
 libxenstore.so.$(MAJOR).$(MINOR): xs.opic xs_lib.opic
 	$(CC) $(CFLAGS) $(LDFLAGS) -Wl,$(SONAME_LDFLAG) -Wl,libxenstore.so.$(MAJOR) $(SHLIB_CFLAGS) -o $@ $^ $(SOCKET_LIBS) -lpthread
