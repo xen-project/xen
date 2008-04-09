@@ -1416,12 +1416,28 @@ static uint32_t rtl8139_ChipCmd_read(RTL8139State *s)
 
 static void rtl8139_CpCmd_write(RTL8139State *s, uint32_t val)
 {
+    int i;
+
     val &= 0xffff;
 
     DEBUG_PRINT(("RTL8139C+ command register write(w) val=0x%04x\n", val));
 
     /* mask unwriteable bits */
     val = SET_MASKED(val, 0xff84, s->CpCmd);
+
+    if (  (s->CpCmd & CPlusTxEnb) &&
+         !(val      & CPlusTxEnb) )
+    {
+        /* Reset TX status when the transmitter drops from C+ to
+           non-C+ mode.  Windows has a habit of turning off C+ and
+           then waiting for the TX requests to clear as part of shut
+           down, and you get stuck forever if there are old DTCRs in
+           the registers. */
+        for (i = 0; i < 4; i++)
+        {
+            s->TxStatus[i] = TxHostOwns;
+        }
+    }
 
     s->CpCmd = val;
 }
@@ -1765,6 +1781,7 @@ static int rtl8139_transmit_one(RTL8139State *s, int descriptor)
     {
         DEBUG_PRINT(("RTL8139: +++ cannot transmit from descriptor %d: transmitter disabled\n",
                      descriptor));
+        s->TxStatus[descriptor] = TxAborted | TxHostOwns;
         return 0;
     }
 
@@ -1772,6 +1789,7 @@ static int rtl8139_transmit_one(RTL8139State *s, int descriptor)
     {
         DEBUG_PRINT(("RTL8139: +++ cannot transmit from descriptor %d: owned by host (%08x)\n",
                      descriptor, s->TxStatus[descriptor]));
+        s->TxStatus[descriptor] = TxAborted | TxHostOwns;
         return 0;
     }
 
