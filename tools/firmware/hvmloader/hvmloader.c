@@ -374,30 +374,31 @@ static int scan_etherboot_nic(void *copy_rom_dest)
             /* Check the PCI PnP header (if any) for a match. */
             pcih = (struct option_rom_pci_header *)
                 ((char *)rom + rom->pci_header_offset);
-            if ( (rom->pci_header_offset == 0) ||
-                 strncmp(pcih->signature, "PCIR", 4) ||
-                 (pcih->vendor_id != vendor_id) ||
-                 (pcih->device_id != device_id) )
-                continue;
+            if ( (rom->pci_header_offset != 0) &&
+                 !strncmp(pcih->signature, "PCIR", 4) &&
+                 (pcih->vendor_id == vendor_id) &&
+                 (pcih->device_id == device_id) )
+                goto found;
 
-            /* Find the PnP expansion header (if any). */
-            pnph = ((rom->expansion_header_offset != 0)
-                    ? ((struct option_rom_pnp_header *)
-                       ((char *)rom + rom->expansion_header_offset))
-                    : ((struct option_rom_pnp_header *)NULL));
-            while ( (pnph != NULL) && strncmp(pnph->signature, "$PnP", 4) )
-                pnph = ((pnph->next_header_offset != 0)
-                        ? ((struct option_rom_pnp_header *)
-                           ((char *)rom + pnph->next_header_offset))
-                        : ((struct option_rom_pnp_header *)NULL));
-
-            goto found;
+            rom = (struct option_rom_header *)
+                ((char *)rom + rom->rom_size * 512);
         }
     }
 
     return 0;
 
  found:
+    /* Find the PnP expansion header (if any). */
+    pnph = ((rom->expansion_header_offset != 0)
+            ? ((struct option_rom_pnp_header *)
+               ((char *)rom + rom->expansion_header_offset))
+            : ((struct option_rom_pnp_header *)NULL));
+    while ( (pnph != NULL) && strncmp(pnph->signature, "$PnP", 4) )
+        pnph = ((pnph->next_header_offset != 0)
+                ? ((struct option_rom_pnp_header *)
+                   ((char *)rom + pnph->next_header_offset))
+                : ((struct option_rom_pnp_header *)NULL));
+
     printf("Loading PXE ROM ...\n");
     if ( (pnph != NULL) && (pnph->manufacturer_name_offset != 0) )
         printf(" - Manufacturer: %s\n",
