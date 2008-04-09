@@ -158,7 +158,7 @@ static int setup_guest(int xc_handle,
 {
     xen_pfn_t *page_array = NULL;
     unsigned long i, nr_pages = (unsigned long)memsize << (20 - PAGE_SHIFT);
-    unsigned long special_page_nr, entry_eip;
+    unsigned long special_page_nr, entry_eip, cur_pages;
     struct xen_add_to_physmap xatp;
     struct shared_info *shared_info;
     void *e820_page;
@@ -209,12 +209,23 @@ static int setup_guest(int xc_handle,
     for ( i = HVM_BELOW_4G_RAM_END >> PAGE_SHIFT; i < nr_pages; i++ )
         page_array[i] += HVM_BELOW_4G_MMIO_LENGTH >> PAGE_SHIFT;
 
-    /* Allocate memory for HVM guest, skipping VGA hole 0xA0000-0xC0000. */
+    /*
+     * Allocate memory for HVM guest, skipping VGA hole 0xA0000-0xC0000.
+     * We allocate pages in batches of no more than 2048 to ensure that
+     * we can be preempted and hence dom0 remains responsive.
+     */
     rc = xc_domain_memory_populate_physmap(
         xc_handle, dom, 0xa0, 0, 0, &page_array[0x00]);
-    if ( rc == 0 )
+    cur_pages = 0xc0;
+    while ( (rc == 0) && (nr_pages > cur_pages) )
+    {
+        unsigned long count = nr_pages - cur_pages;
+        if ( count > 2048 )
+            count = 2048;
         rc = xc_domain_memory_populate_physmap(
-            xc_handle, dom, nr_pages - 0xc0, 0, 0, &page_array[0xc0]);
+            xc_handle, dom, count, 0, 0, &page_array[cur_pages]);
+        cur_pages += count;
+    }
     if ( rc != 0 )
     {
         PERROR("Could not allocate memory for HVM guest.\n");
