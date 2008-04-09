@@ -789,6 +789,8 @@ void vlapic_reset(struct vlapic *vlapic)
 
     vlapic_set_reg(vlapic, APIC_SPIV, 0xff);
     vlapic->hw.disabled |= VLAPIC_SW_DISABLED;
+
+    destroy_periodic_time(&vlapic->pt);
 }
 
 /* rearm the actimer if needed, after a HVM restore */
