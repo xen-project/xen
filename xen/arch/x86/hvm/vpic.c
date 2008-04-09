@@ -363,32 +363,6 @@ static int vpic_intercept_elcr_io(
     return 1;
 }
 
-#ifdef HVM_DEBUG_SUSPEND
-static void vpic_info(struct hvm_hw_vpic *s)
-{
-    printk("*****pic state:*****\n");
-    printk("pic 0x%x.\n", s->irr);
-    printk("pic 0x%x.\n", s->imr);
-    printk("pic 0x%x.\n", s->isr);
-    printk("pic 0x%x.\n", s->irq_base);
-    printk("pic 0x%x.\n", s->init_state);
-    printk("pic 0x%x.\n", s->priority_add);
-    printk("pic 0x%x.\n", s->readsel_isr);
-    printk("pic 0x%x.\n", s->poll);
-    printk("pic 0x%x.\n", s->auto_eoi);
-    printk("pic 0x%x.\n", s->rotate_on_auto_eoi);
-    printk("pic 0x%x.\n", s->special_fully_nested_mode);
-    printk("pic 0x%x.\n", s->special_mask_mode);
-    printk("pic 0x%x.\n", s->elcr);
-    printk("pic 0x%x.\n", s->int_output);
-    printk("pic 0x%x.\n", s->is_master);
-}
-#else
-static void vpic_info(struct hvm_hw_vpic *s)
-{
-}
-#endif
-
 static int vpic_save(struct domain *d, hvm_domain_context_t *h)
 {
     struct hvm_hw_vpic *s;
@@ -398,7 +372,6 @@ static int vpic_save(struct domain *d, hvm_domain_context_t *h)
     for ( i = 0; i < 2 ; i++ )
     {
         s = &d->arch.hvm_domain.vpic[i];
-        vpic_info(s);
         if ( hvm_save_entry(PIC, i, h, s) )
             return 1;
     }
@@ -421,7 +394,6 @@ static int vpic_load(struct domain *d, hvm_domain_context_t *h)
     if ( hvm_load_entry(PIC, h, s) != 0 )
         return -EINVAL;
 
-    vpic_info(s);
     return 0;
 }
 

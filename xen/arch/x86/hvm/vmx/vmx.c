@@ -561,11 +561,6 @@ static int vmx_vmcs_restore(struct vcpu *v, struct hvm_hw_cpu *c)
     vmx_update_guest_cr(v, 2);
     vmx_update_guest_cr(v, 4);
 
-#ifdef HVM_DEBUG_SUSPEND
-    printk("%s: cr3=0x%"PRIx64", cr0=0x%"PRIx64", cr4=0x%"PRIx64".\n",
-           __func__, c->cr3, c->cr0, c->cr4);
-#endif
-
     v->arch.hvm_vcpu.guest_efer = c->msr_efer;
     vmx_update_guest_efer(v);
 
@@ -596,20 +591,6 @@ static int vmx_vmcs_restore(struct vcpu *v, struct hvm_hw_cpu *c)
     return 0;
 }
 
-#if defined(__x86_64__) && defined(HVM_DEBUG_SUSPEND)
-static void dump_msr_state(struct vmx_msr_state *m)
-{
-    int i = 0;
-    printk("**** msr state ****\n");
-    printk("shadow_gs=0x%lx, flags=0x%lx, msr_items:", m->shadow_gs, m->flags);
-    for ( i = 0; i < VMX_MSR_COUNT; i++ )
-        printk("0x%lx,", m->msrs[i]);
-    printk("\n");
-}
-#else
-#define dump_msr_state(m) ((void)0)
-#endif
-
 static void vmx_save_cpu_state(struct vcpu *v, struct hvm_hw_cpu *data)
 {
 #ifdef __x86_64__
@@ -627,8 +608,6 @@ static void vmx_save_cpu_state(struct vcpu *v, struct hvm_hw_cpu *data)
 #endif
 
     data->tsc = hvm_get_guest_time(v);
-
-    dump_msr_state(guest_state);
 }
 
 static void vmx_load_cpu_state(struct vcpu *v, struct hvm_hw_cpu *data)
@@ -647,8 +626,6 @@ static void vmx_load_cpu_state(struct vcpu *v, struct hvm_hw_cpu *data)
 #endif
 
     hvm_set_guest_time(v, data->tsc);
-
-    dump_msr_state(guest_state);
 }
 
 

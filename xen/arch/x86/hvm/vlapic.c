@@ -791,75 +791,54 @@ void vlapic_reset(struct vlapic *vlapic)
     vlapic->hw.disabled |= VLAPIC_SW_DISABLED;
 }
 
-#ifdef HVM_DEBUG_SUSPEND
-static void lapic_info(struct vlapic *s)
-{
-    printk("*****lapic state:*****\n");
-    printk("lapic 0x%"PRIx64".\n", s->hw.apic_base_msr);
-    printk("lapic 0x%x.\n", s->hw.disabled);
-    printk("lapic 0x%x.\n", s->hw.timer_divisor);
-}
-#else
-static void lapic_info(struct vlapic *s)
-{
-}
-#endif
-
 /* rearm the actimer if needed, after a HVM restore */
 static void lapic_rearm(struct vlapic *s)
 {
-    unsigned long tmict;
+    unsigned long tmict = vlapic_get_reg(s, APIC_TMICT);
+    uint64_t period;
 
-    tmict = vlapic_get_reg(s, APIC_TMICT);
-    if ( tmict > 0 )
-    {
-        uint64_t period = (uint64_t)APIC_BUS_CYCLE_NS *
-                            (uint32_t)tmict * s->hw.timer_divisor;
-        uint32_t lvtt = vlapic_get_reg(s, APIC_LVTT);
+    if ( (tmict = vlapic_get_reg(s, APIC_TMICT)) == 0 )
+        return;
 
-        s->pt.irq = lvtt & APIC_VECTOR_MASK;
-        create_periodic_time(vlapic_vcpu(s), &s->pt, period, s->pt.irq,
-                             !vlapic_lvtt_period(s), vlapic_pt_cb,
-                             &s->timer_last_update);
-        s->timer_last_update = s->pt.last_plt_gtime;
-
-        printk("lapic_load to rearm the actimer:"
-               "bus cycle is %uns, "
-               "saved tmict count %lu, period %"PRIu64"ns, irq=%"PRIu8"\n",
-               APIC_BUS_CYCLE_NS, tmict, period, s->pt.irq);
-    }
-
-    lapic_info(s);
+    period = ((uint64_t)APIC_BUS_CYCLE_NS *
+              (uint32_t)tmict * s->hw.timer_divisor);
+    s->pt.irq = vlapic_get_reg(s, APIC_LVTT) & APIC_VECTOR_MASK;
+    create_periodic_time(vlapic_vcpu(s), &s->pt, period, s->pt.irq,
+                         !vlapic_lvtt_period(s), vlapic_pt_cb,
+                         &s->timer_last_update);
+    s->timer_last_update = s->pt.last_plt_gtime;
 }
 
 static int lapic_save_hidden(struct domain *d, hvm_domain_context_t *h)
 {
     struct vcpu *v;
     struct vlapic *s;
+    int rc = 0;
 
-    for_each_vcpu(d, v)
+    for_each_vcpu ( d, v )
     {
         s = vcpu_vlapic(v);
-        lapic_info(s);
-
-        if ( hvm_save_entry(LAPIC, v->vcpu_id, h, &s->hw) != 0 )
-            return 1; 
+        if ( (rc = hvm_save_entry(LAPIC, v->vcpu_id, h, &s->hw)) != 0 )
+            break;
     }
-    return 0;
+
+    return rc;
 }
 
 static int lapic_save_regs(struct domain *d, hvm_domain_context_t *h)
 {
     struct vcpu *v;
     struct vlapic *s;
+    int rc = 0;
 
-    for_each_vcpu(d, v)
+    for_each_vcpu ( d, v )
     {
         s = vcpu_vlapic(v);
-        if ( hvm_save_entry(LAPIC_REGS, v->vcpu_id, h, s->regs) != 0 )
-            return 1; 
+        if ( (rc = hvm_save_entry(LAPIC_REGS, v->vcpu_id, h, s->regs)) != 0 )
+            break;
     }
-    return 0;
+
+    return rc;
 }
 
 static int lapic_load_hidden(struct domain *d, hvm_domain_context_t *h)
@@ -879,8 +858,6 @@ static int lapic_load_hidden(struct domain *d, hvm_domain_context_t *h)
     
     if ( hvm_load_entry(LAPIC, h, &s->hw) != 0 ) 
         return -EINVAL;
-
-    lapic_info(s);
 
     vmx_vlapic_msr_changed(v);
 
