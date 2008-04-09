@@ -14,6 +14,7 @@
 #include <fcntl.h>
 #include <unistd.h>
 #include <stdlib.h>
+#include <stdarg.h>
 #include <sys/mman.h>
 #include <strings.h>
 #include <ucred.h>
