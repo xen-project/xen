@@ -427,9 +427,9 @@ perform(enum mode mode, int optind, int argc, char **argv, struct xs_handle *xsh
             break;
         }
         }
-
-        return 0;
     }
+
+    return 0;
 }
 
 static enum mode lookup_mode(const char *m)
