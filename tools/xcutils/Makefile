@@ -18,7 +18,7 @@ CFLAGS += $(CFLAGS_libxenctrl) $(CFLAGS_libxenguest) $(CFLAGS_libxenstore)
 CFLAGS += -Wp,-MD,.$(@F).d
 PROG_DEP = .*.d
 
-PROGRAMS = xc_restore xc_save readnotes
+PROGRAMS = xc_restore xc_save readnotes lsevtchn
 
 LDLIBS   = $(LDFLAGS_libxenctrl) $(LDFLAGS_libxenguest) $(LDFLAGS_libxenstore)
 
