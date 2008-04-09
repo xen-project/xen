@@ -2172,13 +2172,12 @@ void sh_remove_shadows(struct vcpu *v, mfn_t gmfn, int fast, int all)
 #undef DO_UNSHADOW
 
     /* If that didn't catch the shadows, something is wrong */
-    if ( !fast && (pg->count_info & PGC_page_table) )
+    if ( !fast && all && (pg->count_info & PGC_page_table) )
     {
         SHADOW_ERROR("can't find all shadows of mfn %05lx "
                      "(shadow_flags=%08lx)\n",
                       mfn_x(gmfn), pg->shadow_flags);
-        if ( all ) 
-            domain_crash(v->domain);
+        domain_crash(v->domain);
     }
 
     /* Need to flush TLBs now, so that linear maps are safe next time we 
