@@ -180,7 +180,7 @@ int pin_table(int xc_handle, unsigned int type, unsigned long mfn,
 /* Grrr portability */
 static inline void *xg_memalign(size_t alignment, size_t size)
 {
-#if defined(_POSIX_C_SOURCE) && !defined(__sun__)
+#if (_POSIX_C_SOURCE - 0) >= 200112L || (_XOPEN_SOURCE - 0) >= 600
     int ret;
     void *ptr;
     ret = posix_memalign(&ptr, alignment, size);
