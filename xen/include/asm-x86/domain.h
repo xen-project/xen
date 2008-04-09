@@ -138,27 +138,6 @@ struct hap_domain {
 };
 
 /************************************************/
-/*       p2m handling                           */
-/************************************************/
-struct p2m_domain {
-    /* Lock that protects updates to the p2m */
-    spinlock_t         lock;
-    int                locker;   /* processor which holds the lock */
-    const char        *locker_function; /* Func that took it */
-
-    /* Pages used to construct the p2m */
-    struct list_head   pages;
-
-    /* Functions to call to get or free pages for the p2m */
-    struct page_info * (*alloc_page  )(struct domain *d);
-    void               (*free_page   )(struct domain *d,
-                                       struct page_info *pg);
-
-    /* Highest guest frame that's ever been mapped in the p2m */
-    unsigned long max_mapped_pfn;
-};
-
-/************************************************/
 /*       common paging data structure           */
 /************************************************/
 struct log_dirty_domain {
@@ -208,6 +187,8 @@ struct paging_vcpu {
     struct shadow_vcpu shadow;
 };
 
+struct p2m_domain;
+
 struct arch_domain
 {
     l1_pgentry_t *mm_perdomain_pt;
@@ -232,7 +213,7 @@ struct arch_domain
     struct hvm_domain hvm_domain;
 
     struct paging_domain paging;
-    struct p2m_domain p2m ;
+    struct p2m_domain *p2m;
 
     /* Shadow translated domain: P2M mapping */
     pagetable_t phys_table;

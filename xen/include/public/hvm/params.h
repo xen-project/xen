@@ -83,7 +83,8 @@
 
 /* Boolean: Enable virtual HPET (high-precision event timer)? (x86-only) */
 #define HVM_PARAM_HPET_ENABLED 11
+#define HVM_PARAM_IDENT_PT     12
 
-#define HVM_NR_PARAMS          12
+#define HVM_NR_PARAMS          13
 
 #endif /* __XEN_PUBLIC_HVM_PARAMS_H__ */

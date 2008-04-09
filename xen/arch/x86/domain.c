@@ -503,13 +503,15 @@ int arch_domain_create(struct domain *d, unsigned int domcr_flags)
     HYPERVISOR_COMPAT_VIRT_START(d) = __HYPERVISOR_COMPAT_VIRT_START;
 #endif
 
-    paging_domain_init(d);
+    if ( (rc = paging_domain_init(d)) != 0 )
+        goto fail;
     paging_initialised = 1;
 
     if ( !is_idle_domain(d) )
     {
         d->arch.ioport_caps = 
             rangeset_new(d, "I/O Ports", RANGESETF_prettyprint_hex);
+        rc = -ENOMEM;
         if ( d->arch.ioport_caps == NULL )
             goto fail;
 

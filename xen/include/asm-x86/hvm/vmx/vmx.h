@@ -23,9 +23,27 @@
 #include <asm/types.h>
 #include <asm/regs.h>
 #include <asm/processor.h>
-#include <asm/hvm/vmx/vmcs.h>
 #include <asm/i387.h>
+#include <asm/hvm/support.h>
 #include <asm/hvm/trace.h>
+#include <asm/hvm/vmx/vmcs.h>
+
+typedef union {
+    struct {
+        u64 r       :   1,
+        w           :   1,
+        x           :   1,
+        emt         :   4,
+        sp_avail    :   1,
+        avail1      :   4,
+        mfn         :   45,
+        rsvd        :   5,
+        avail2      :   2;
+    };
+    u64 epte;
+} ept_entry_t;
+
+#define EPT_TABLE_ORDER     9
 
 void vmx_asm_vmexit_handler(struct cpu_user_regs);
 void vmx_asm_do_vmentry(void);
@@ -80,6 +98,8 @@ void vmx_realmode(struct cpu_user_regs *regs);
 #define EXIT_REASON_MACHINE_CHECK       41
 #define EXIT_REASON_TPR_BELOW_THRESHOLD 43
 #define EXIT_REASON_APIC_ACCESS         44
+#define EXIT_REASON_EPT_VIOLATION       48
+#define EXIT_REASON_EPT_MISCONFIG       49
 #define EXIT_REASON_WBINVD              54
 
 /*
@@ -143,12 +163,14 @@ void vmx_realmode(struct cpu_user_regs *regs);
 #define VMREAD_OPCODE   ".byte 0x0f,0x78\n"
 #define VMRESUME_OPCODE ".byte 0x0f,0x01,0xc3\n"
 #define VMWRITE_OPCODE  ".byte 0x0f,0x79\n"
+#define INVEPT_OPCODE   ".byte 0x66,0x0f,0x38,0x80\n"   /* m128,r64/32 */
 #define VMXOFF_OPCODE   ".byte 0x0f,0x01,0xc4\n"
 #define VMXON_OPCODE    ".byte 0xf3,0x0f,0xc7\n"
 
+#define MODRM_EAX_08    ".byte 0x08\n" /* ECX, [EAX] */
 #define MODRM_EAX_06    ".byte 0x30\n" /* [EAX], with reg/opcode: /6 */
 #define MODRM_EAX_07    ".byte 0x38\n" /* [EAX], with reg/opcode: /7 */
-#define MODRM_EAX_ECX   ".byte 0xc1\n" /* [EAX], [ECX] */
+#define MODRM_EAX_ECX   ".byte 0xc1\n" /* EAX, ECX */
 
 static inline void __vmptrld(u64 addr)
 {
@@ -232,6 +254,31 @@ static inline void __vm_clear_bit(unsigned long field, unsigned int bit)
     __vmwrite(field, __vmread(field) & ~(1UL << bit));
 }
 
+static inline void __invept(int ext, u64 eptp, u64 gpa)
+{
+    struct {
+        u64 eptp, gpa;
+    } operand = {eptp, gpa};
+
+    __asm__ __volatile__ ( INVEPT_OPCODE
+                           MODRM_EAX_08
+                           /* CF==1 or ZF==1 --> rc = -1 */
+                           "ja 1f ; ud2 ; 1:\n"
+                           :
+                           : "a" (&operand), "c" (ext)
+                           : "memory");
+}
+
+static inline void ept_sync_all(void)
+{
+    if ( !current->domain->arch.hvm_domain.hap_enabled )
+        return;
+
+    __invept(2, 0, 0);
+}
+
+void ept_sync_domain(struct domain *d);
+
 static inline void __vmxoff(void)
 {
     asm volatile (
@@ -264,5 +311,7 @@ static inline int __vmxon(u64 addr)
 void vmx_inject_hw_exception(struct vcpu *v, int trap, int error_code);
 void vmx_inject_extint(struct vcpu *v, int trap);
 void vmx_inject_nmi(struct vcpu *v);
+
+void ept_p2m_init(struct domain *d);
 
 #endif /* __ASM_X86_HVM_VMX_VMX_H__ */

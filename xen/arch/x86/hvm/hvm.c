@@ -2212,6 +2212,33 @@ long do_hvm_op(unsigned long op, XEN_GUEST_HANDLE(void) arg)
                 if ( a.value > HVMPTM_one_missed_tick_pending )
                     goto param_fail;
                 break;
+            case HVM_PARAM_IDENT_PT:
+                rc = -EPERM;
+                if ( current->domain->domain_id != 0 )
+                    goto param_fail;
+
+                rc = -EINVAL;
+                if ( d->arch.hvm_domain.params[a.index] != 0 )
+                    goto param_fail;
+
+                if ( !paging_mode_hap(d) )
+                    break;
+
+                domain_pause(d);
+
+                /*
+                 * Update GUEST_CR3 in each VMCS to point at identity map.
+                 * All foreign updates to guest state must synchronise on
+                 * the domctl_lock.
+                 */
+                spin_lock(&domctl_lock);
+                d->arch.hvm_domain.params[a.index] = a.value;
+                for_each_vcpu ( d, v )
+                    paging_update_cr3(v);
+                spin_unlock(&domctl_lock);
+
+                domain_unpause(d);
+                break;
             }
             d->arch.hvm_domain.params[a.index] = a.value;
             rc = 0;

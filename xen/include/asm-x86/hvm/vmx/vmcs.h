@@ -53,6 +53,23 @@ struct vmx_msr_state {
     unsigned long msrs[VMX_MSR_COUNT];
 };
 
+#define EPT_DEFAULT_MT      6
+#define EPT_DEFAULT_GAW     3
+
+struct vmx_domain {
+    unsigned long apic_access_mfn;
+
+    union {
+        struct {
+            u64 etmt :3,
+                gaw  :3,
+                rsvd :6,
+                asr  :52;
+        };
+        u64 eptp;
+    } ept_control;
+};
+
 struct arch_vmx_struct {
     /* Virtual address of VMCS. */
     struct vmcs_struct  *vmcs;
@@ -71,6 +88,7 @@ struct arch_vmx_struct {
 
     /* Cache of cpu execution control. */
     u32                  exec_control;
+    u32                  secondary_exec_control;
 
     /* PMU */
     struct vpmu_struct   vpmu;
@@ -108,6 +126,8 @@ void vmx_vmcs_exit(struct vcpu *v);
 #define CPU_BASED_MWAIT_EXITING               0x00000400
 #define CPU_BASED_RDPMC_EXITING               0x00000800
 #define CPU_BASED_RDTSC_EXITING               0x00001000
+#define CPU_BASED_CR3_LOAD_EXITING            0x00008000
+#define CPU_BASED_CR3_STORE_EXITING           0x00010000
 #define CPU_BASED_CR8_LOAD_EXITING            0x00080000
 #define CPU_BASED_CR8_STORE_EXITING           0x00100000
 #define CPU_BASED_TPR_SHADOW                  0x00200000
@@ -136,6 +156,7 @@ extern u32 vmx_vmexit_control;
 extern u32 vmx_vmentry_control;
 
 #define SECONDARY_EXEC_VIRTUALIZE_APIC_ACCESSES 0x00000001
+#define SECONDARY_EXEC_ENABLE_EPT               0x00000002
 #define SECONDARY_EXEC_WBINVD_EXITING           0x00000040
 extern u32 vmx_secondary_exec_control;
 
@@ -151,6 +172,10 @@ extern bool_t cpu_has_vmx_ins_outs_instr_info;
     (vmx_pin_based_exec_control & PIN_BASED_VIRTUAL_NMIS)
 #define cpu_has_vmx_msr_bitmap \
     (vmx_cpu_based_exec_control & CPU_BASED_ACTIVATE_MSR_BITMAP)
+#define cpu_has_vmx_secondary_exec_control \
+    (vmx_cpu_based_exec_control & CPU_BASED_ACTIVATE_SECONDARY_CONTROLS)
+#define cpu_has_vmx_ept \
+    (vmx_secondary_exec_control & SECONDARY_EXEC_ENABLE_EPT)
 
 /* GUEST_INTERRUPTIBILITY_INFO flags. */
 #define VMX_INTR_SHADOW_STI             0x00000001
@@ -192,11 +217,23 @@ enum vmcs_field {
     VIRTUAL_APIC_PAGE_ADDR          = 0x00002012,
     VIRTUAL_APIC_PAGE_ADDR_HIGH     = 0x00002013,
     APIC_ACCESS_ADDR                = 0x00002014,
-    APIC_ACCESS_ADDR_HIGH           = 0x00002015, 
+    APIC_ACCESS_ADDR_HIGH           = 0x00002015,
+    EPT_POINTER                     = 0x0000201a,
+    EPT_POINTER_HIGH                = 0x0000201b,
+    GUEST_PHYSICAL_ADDRESS          = 0x00002400,
+    GUEST_PHYSICAL_ADDRESS_HIGH     = 0x00002401,
     VMCS_LINK_POINTER               = 0x00002800,
     VMCS_LINK_POINTER_HIGH          = 0x00002801,
     GUEST_IA32_DEBUGCTL             = 0x00002802,
     GUEST_IA32_DEBUGCTL_HIGH        = 0x00002803,
+    GUEST_PDPTR0                    = 0x0000280a,
+    GUEST_PDPTR0_HIGH               = 0x0000280b,
+    GUEST_PDPTR1                    = 0x0000280c,
+    GUEST_PDPTR1_HIGH               = 0x0000280d,
+    GUEST_PDPTR2                    = 0x0000280e,
+    GUEST_PDPTR2_HIGH               = 0x0000280f,
+    GUEST_PDPTR3                    = 0x00002810,
+    GUEST_PDPTR3_HIGH               = 0x00002811,
     PIN_BASED_VM_EXEC_CONTROL       = 0x00004000,
     CPU_BASED_VM_EXEC_CONTROL       = 0x00004002,
     EXCEPTION_BITMAP                = 0x00004004,

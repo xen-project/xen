@@ -84,14 +84,16 @@ static void vmx_init_vmcs_config(void)
 
     min = (CPU_BASED_HLT_EXITING |
            CPU_BASED_INVLPG_EXITING |
+           CPU_BASED_CR3_LOAD_EXITING |
+           CPU_BASED_CR3_STORE_EXITING |
            CPU_BASED_MONITOR_EXITING |
            CPU_BASED_MWAIT_EXITING |
            CPU_BASED_MOV_DR_EXITING |
            CPU_BASED_ACTIVATE_IO_BITMAP |
            CPU_BASED_USE_TSC_OFFSETING);
-    opt  = CPU_BASED_ACTIVATE_MSR_BITMAP;
-    opt |= CPU_BASED_TPR_SHADOW;
-    opt |= CPU_BASED_ACTIVATE_SECONDARY_CONTROLS;
+    opt = (CPU_BASED_ACTIVATE_MSR_BITMAP |
+           CPU_BASED_TPR_SHADOW |
+           CPU_BASED_ACTIVATE_SECONDARY_CONTROLS);
     _vmx_cpu_based_exec_control = adjust_vmx_controls(
         min, opt, MSR_IA32_VMX_PROCBASED_CTLS);
 #ifdef __x86_64__
@@ -107,9 +109,21 @@ static void vmx_init_vmcs_config(void)
     {
         min = 0;
         opt = (SECONDARY_EXEC_VIRTUALIZE_APIC_ACCESSES |
-               SECONDARY_EXEC_WBINVD_EXITING);
+               SECONDARY_EXEC_WBINVD_EXITING |
+               SECONDARY_EXEC_ENABLE_EPT);
         _vmx_secondary_exec_control = adjust_vmx_controls(
             min, opt, MSR_IA32_VMX_PROCBASED_CTLS2);
+    }
+
+    if ( _vmx_secondary_exec_control & SECONDARY_EXEC_ENABLE_EPT )
+    {
+        /* To use EPT we expect to be able to clear certain intercepts. */
+        uint32_t must_be_one, must_be_zero;
+        rdmsr(MSR_IA32_VMX_PROCBASED_CTLS, must_be_one, must_be_zero);
+        if ( must_be_one & (CPU_BASED_INVLPG_EXITING |
+                            CPU_BASED_CR3_LOAD_EXITING |
+                            CPU_BASED_CR3_STORE_EXITING) )
+            _vmx_secondary_exec_control &= ~SECONDARY_EXEC_ENABLE_EPT;
     }
 
 #if defined(__i386__)
@@ -301,6 +315,8 @@ int vmx_cpu_up(void)
         return 0;
     }
 
+    ept_sync_all();
+
     return 1;
 }
 
@@ -439,6 +455,7 @@ void vmx_disable_intercept_for_msr(struct vcpu *v, u32 msr)
 
 static int construct_vmcs(struct vcpu *v)
 {
+    struct domain *d = v->domain;
     uint16_t sysenter_cs;
     unsigned long sysenter_eip;
 
@@ -448,10 +465,25 @@ static int construct_vmcs(struct vcpu *v)
     __vmwrite(PIN_BASED_VM_EXEC_CONTROL, vmx_pin_based_exec_control);
     __vmwrite(VM_EXIT_CONTROLS, vmx_vmexit_control);
     __vmwrite(VM_ENTRY_CONTROLS, vmx_vmentry_control);
-    __vmwrite(CPU_BASED_VM_EXEC_CONTROL, vmx_cpu_based_exec_control);
+
     v->arch.hvm_vmx.exec_control = vmx_cpu_based_exec_control;
-    if ( vmx_cpu_based_exec_control & CPU_BASED_ACTIVATE_SECONDARY_CONTROLS )
-        __vmwrite(SECONDARY_VM_EXEC_CONTROL, vmx_secondary_exec_control);
+    v->arch.hvm_vmx.secondary_exec_control = vmx_secondary_exec_control;
+
+    if ( paging_mode_hap(d) )
+    {
+        v->arch.hvm_vmx.exec_control &= ~(CPU_BASED_INVLPG_EXITING |
+                                          CPU_BASED_CR3_LOAD_EXITING |
+                                          CPU_BASED_CR3_STORE_EXITING);
+    }
+    else
+    {
+        v->arch.hvm_vmx.secondary_exec_control &= ~SECONDARY_EXEC_ENABLE_EPT;
+    }
+
+    __vmwrite(CPU_BASED_VM_EXEC_CONTROL, v->arch.hvm_vmx.exec_control);
+    if ( cpu_has_vmx_secondary_exec_control )
+        __vmwrite(SECONDARY_VM_EXEC_CONTROL,
+                  v->arch.hvm_vmx.secondary_exec_control);
 
     /* MSR access bitmap. */
     if ( cpu_has_vmx_msr_bitmap )
@@ -570,9 +602,10 @@ static int construct_vmcs(struct vcpu *v)
     __vmwrite(VMCS_LINK_POINTER_HIGH, ~0UL);
 #endif
 
-    __vmwrite(EXCEPTION_BITMAP, (HVM_TRAP_MASK |
-                                 (1U << TRAP_page_fault) |
-                                 (1U << TRAP_no_device)));
+    __vmwrite(EXCEPTION_BITMAP,
+              HVM_TRAP_MASK
+              | (paging_mode_hap(d) ? 0 : (1U << TRAP_page_fault))
+              | (1U << TRAP_no_device));
 
     v->arch.hvm_vcpu.guest_cr[0] = X86_CR0_PE | X86_CR0_ET;
     hvm_update_guest_cr(v, 0);
@@ -585,6 +618,15 @@ static int construct_vmcs(struct vcpu *v)
         __vmwrite(VIRTUAL_APIC_PAGE_ADDR,
                   page_to_maddr(vcpu_vlapic(v)->regs_page));
         __vmwrite(TPR_THRESHOLD, 0);
+    }
+
+    if ( paging_mode_hap(d) )
+    {
+        __vmwrite(EPT_POINTER, d->arch.hvm_domain.vmx.ept_control.eptp);
+#ifdef CONFIG_X86_PAE
+        __vmwrite(EPT_POINTER_HIGH,
+                  d->arch.hvm_domain.vmx.ept_control.eptp >> 32);
+#endif
     }
 
     vmx_vmcs_exit(v);
@@ -932,6 +974,8 @@ void vmcs_dump_vcpu(struct vcpu *v)
            (uint32_t)vmr(IDT_VECTORING_ERROR_CODE));
     printk("TPR Threshold = 0x%02x\n",
            (uint32_t)vmr(TPR_THRESHOLD));
+    printk("EPT pointer = 0x%08x%08x\n",
+           (uint32_t)vmr(EPT_POINTER_HIGH), (uint32_t)vmr(EPT_POINTER));
 
     vmx_vmcs_exit(v);
 }

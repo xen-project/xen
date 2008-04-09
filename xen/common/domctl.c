@@ -25,6 +25,8 @@
 #include <public/domctl.h>
 #include <xsm/xsm.h>
 
+DEFINE_SPINLOCK(domctl_lock);
+
 extern long arch_do_domctl(
     struct xen_domctl *op, XEN_GUEST_HANDLE(xen_domctl_t) u_domctl);
 
@@ -180,7 +182,6 @@ long do_domctl(XEN_GUEST_HANDLE(xen_domctl_t) u_domctl)
 {
     long ret = 0;
     struct xen_domctl curop, *op = &curop;
-    static DEFINE_SPINLOCK(domctl_lock);
 
     if ( !IS_PRIV(current->domain) )
         return -EPERM;

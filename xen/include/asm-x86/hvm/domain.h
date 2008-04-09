@@ -28,6 +28,8 @@
 #include <asm/hvm/vioapic.h>
 #include <asm/hvm/io.h>
 #include <xen/hvm/iommu.h>
+#include <asm/hvm/vmx/vmcs.h>
+#include <asm/hvm/svm/vmcb.h>
 #include <public/hvm/params.h>
 #include <public/hvm/save.h>
 
@@ -60,8 +62,6 @@ struct hvm_domain {
 
     uint64_t               params[HVM_NR_PARAMS];
 
-    unsigned long          vmx_apic_access_mfn;
-
     /* Memory ranges with pinned cache attributes. */
     struct list_head       pinned_cacheattr_ranges;
 
@@ -74,11 +74,13 @@ struct hvm_domain {
     /* Pass-through */
     struct hvm_iommu       hvm_iommu;
 
-#if CONFIG_PAGING_LEVELS == 3
-    bool_t                 amd_npt_4gb_warning;
-#endif
     bool_t                 hap_enabled;
     bool_t                 qemu_mapcache_invalidate;
+
+    union {
+        struct vmx_domain vmx;
+        struct svm_domain svm;
+    };
 };
 
 #endif /* __ASM_X86_HVM_DOMAIN_H__ */

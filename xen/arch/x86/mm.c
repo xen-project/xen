@@ -299,7 +299,7 @@ int memory_is_conventional_ram(paddr_t p)
 unsigned long domain_get_maximum_gpfn(struct domain *d)
 {
     if ( is_hvm_domain(d) )
-        return d->arch.p2m.max_mapped_pfn;
+        return d->arch.p2m->max_mapped_pfn;
     /* NB. PV guests specify nr_pfns rather than max_pfn so we adjust here. */
     return arch_get_max_pfn(d) - 1;
 }

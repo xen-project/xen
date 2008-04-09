@@ -484,9 +484,12 @@ void paging_log_dirty_teardown(struct domain*d)
 /*           CODE FOR PAGING SUPPORT            */
 /************************************************/
 /* Domain paging struct initialization. */
-void paging_domain_init(struct domain *d)
+int paging_domain_init(struct domain *d)
 {
-    p2m_init(d);
+    int rc;
+
+    if ( (rc = p2m_init(d)) != 0 )
+        return rc;
 
     /* The order of the *_init calls below is important, as the later
      * ones may rewrite some common fields.  Shadow pagetables are the
@@ -496,6 +499,8 @@ void paging_domain_init(struct domain *d)
     /* ... but we will use hardware assistance if it's available. */
     if ( hap_enabled(d) )
         hap_domain_init(d);
+
+    return 0;
 }
 
 /* vcpu paging struct initialization goes here */
@@ -589,6 +594,8 @@ void paging_final_teardown(struct domain *d)
         hap_final_teardown(d);
     else
         shadow_final_teardown(d);
+
+    p2m_final_teardown(d);
 }
 
 /* Enable an arbitrary paging-assistance mode.  Call once at domain

@@ -23,6 +23,7 @@
 #include <xen/sched.h>
 #include <xen/xmalloc.h>
 #include <xen/domain_page.h>
+#include <asm/paging.h>
 #include <xen/iommu.h>
 #include <xen/numa.h>
 #include "iommu.h"
@@ -2057,9 +2058,42 @@ void iommu_set_pgd(struct domain *d)
     }
     p2m_table = mfn_x(pagetable_get_mfn(d->arch.phys_table));
 
-#if CONFIG_PAGING_LEVELS == 3
-    if ( !hd->pgd )
+    if ( paging_mode_hap(d) )
     {
+        int level = agaw_to_level(hd->agaw);
+        struct dma_pte *dpte = NULL;
+        mfn_t pgd_mfn;
+
+        switch ( level )
+        {
+        case VTD_PAGE_TABLE_LEVEL_3:
+            dpte = map_domain_page(p2m_table);
+            if ( !dma_pte_present(*dpte) )
+            {
+                gdprintk(XENLOG_ERR VTDPREFIX,
+                         "iommu_set_pgd: second level wasn't there\n");
+                unmap_domain_page(dpte);
+                return;
+            }
+            pgd_mfn = _mfn(dma_pte_addr(*dpte) >> PAGE_SHIFT_4K);
+            unmap_domain_page(dpte);
+            hd->pgd = maddr_to_virt(pagetable_get_paddr(
+                pagetable_from_mfn(pgd_mfn)));
+            break;
+        case VTD_PAGE_TABLE_LEVEL_4:
+            pgd_mfn = _mfn(p2m_table);
+            hd->pgd = maddr_to_virt(pagetable_get_paddr(
+                pagetable_from_mfn(pgd_mfn)));
+            break;
+        default:
+            gdprintk(XENLOG_ERR VTDPREFIX,
+                     "iommu_set_pgd:Unsupported p2m table sharing level!\n");
+            break;
+        }
+    }
+    else
+    {
+#if CONFIG_PAGING_LEVELS == 3
         int level = agaw_to_level(hd->agaw);
         struct dma_pte *pmd = NULL;
         struct dma_pte *pgd = NULL;
@@ -2125,10 +2159,7 @@ void iommu_set_pgd(struct domain *d)
         }
         unmap_domain_page(l3e);
         spin_unlock_irqrestore(&hd->mapping_lock, flags);
-    }
 #elif CONFIG_PAGING_LEVELS == 4
-    if ( !hd->pgd )
-    {
         int level = agaw_to_level(hd->agaw);
         l3_pgentry_t *l3e;
         mfn_t pgd_mfn;
@@ -2160,8 +2191,8 @@ void iommu_set_pgd(struct domain *d)
                      "iommu_set_pgd:Unsupported p2m table sharing level!\n");
             break;
         }
-    }
 #endif
+    }
     gdprintk(XENLOG_INFO VTDPREFIX,
              "iommu_set_pgd: hd->pgd = %p\n", hd->pgd);
 }

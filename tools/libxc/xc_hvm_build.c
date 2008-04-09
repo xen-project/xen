@@ -21,6 +21,13 @@
 
 #define SCRATCH_PFN 0xFFFFF
 
+#define SPECIALPAGE_GUARD    0
+#define SPECIALPAGE_BUFIOREQ 1
+#define SPECIALPAGE_XENSTORE 2
+#define SPECIALPAGE_IOREQ    3
+#define SPECIALPAGE_IDENT_PT 4
+#define NR_SPECIAL_PAGES     5
+
 static void build_e820map(void *e820_page, unsigned long long mem_size)
 {
     struct e820entry *e820entry =
@@ -77,21 +84,16 @@ static void build_e820map(void *e820_page, unsigned long long mem_size)
     e820entry[nr_map].type = E820_RESERVED;
     nr_map++;
 
-    /*
-     * Low RAM goes here. Remove 4 pages for: ioreq, bufioreq, and xenstore.
-     *  1. Guard page.
-     *  2. Buffered ioreq.
-     *  3. Xenstore.
-     *  4. Normal ioreq.
-     */
+    /* Low RAM goes here. Reserve space for special pages. */
     e820entry[nr_map].addr = 0x100000;
-    e820entry[nr_map].size = mem_size - 0x100000 - PAGE_SIZE * 4;
+    e820entry[nr_map].size = (mem_size - 0x100000 -
+                              PAGE_SIZE * NR_SPECIAL_PAGES);
     e820entry[nr_map].type = E820_RAM;
     nr_map++;
 
-    /* Explicitly reserve space for special pages. */
-    e820entry[nr_map].addr = mem_size - PAGE_SIZE * 3;
-    e820entry[nr_map].size = PAGE_SIZE * 3;
+    /* Explicitly reserve space for special pages (excluding guard page). */
+    e820entry[nr_map].addr = mem_size - PAGE_SIZE * (NR_SPECIAL_PAGES - 1);
+    e820entry[nr_map].size = PAGE_SIZE * (NR_SPECIAL_PAGES - 1);
     e820entry[nr_map].type = E820_RESERVED;
     nr_map++;
 
@@ -156,10 +158,11 @@ static int setup_guest(int xc_handle,
 {
     xen_pfn_t *page_array = NULL;
     unsigned long i, nr_pages = (unsigned long)memsize << (20 - PAGE_SHIFT);
-    unsigned long shared_page_nr, entry_eip;
+    unsigned long special_page_nr, entry_eip;
     struct xen_add_to_physmap xatp;
     struct shared_info *shared_info;
     void *e820_page;
+    uint32_t *ident_pt;
     struct elf_binary elf;
     uint64_t v_start, v_end;
     int rc;
@@ -245,29 +248,46 @@ static int setup_guest(int xc_handle,
            sizeof(shared_info->evtchn_mask));
     munmap(shared_info, PAGE_SIZE);
 
-    if ( v_end > HVM_BELOW_4G_RAM_END )
-        shared_page_nr = (HVM_BELOW_4G_RAM_END >> PAGE_SHIFT) - 1;
-    else
-        shared_page_nr = (v_end >> PAGE_SHIFT) - 1;
+    special_page_nr = (((v_end > HVM_BELOW_4G_RAM_END)
+                        ? (HVM_BELOW_4G_RAM_END >> PAGE_SHIFT)
+                        : (v_end >> PAGE_SHIFT))
+                       - NR_SPECIAL_PAGES);
+
+    /* Paranoia: clean special pages. */
+    for ( i = 0; i < NR_SPECIAL_PAGES; i++ )
+        if ( xc_clear_domain_page(xc_handle, dom, special_page_nr + i) )
+            goto error_out;
 
     /* Free the guard page that separates low RAM from special pages. */
     rc = xc_domain_memory_decrease_reservation(
-            xc_handle, dom, 1, 0, &page_array[shared_page_nr-3]);
+        xc_handle, dom, 1, 0, &page_array[special_page_nr]);
     if ( rc != 0 )
     {
         PERROR("Could not deallocate guard page for HVM guest.\n");
         goto error_out;
     }
 
-    /* Paranoia: clean pages. */
-    if ( xc_clear_domain_page(xc_handle, dom, shared_page_nr) ||
-         xc_clear_domain_page(xc_handle, dom, shared_page_nr-1) ||
-         xc_clear_domain_page(xc_handle, dom, shared_page_nr-2) )
-        goto error_out;
+    xc_set_hvm_param(xc_handle, dom, HVM_PARAM_STORE_PFN,
+                     special_page_nr + SPECIALPAGE_XENSTORE);
+    xc_set_hvm_param(xc_handle, dom, HVM_PARAM_BUFIOREQ_PFN,
+                     special_page_nr + SPECIALPAGE_BUFIOREQ);
+    xc_set_hvm_param(xc_handle, dom, HVM_PARAM_IOREQ_PFN,
+                     special_page_nr + SPECIALPAGE_IOREQ);
 
-    xc_set_hvm_param(xc_handle, dom, HVM_PARAM_STORE_PFN, shared_page_nr-1);
-    xc_set_hvm_param(xc_handle, dom, HVM_PARAM_BUFIOREQ_PFN, shared_page_nr-2);
-    xc_set_hvm_param(xc_handle, dom, HVM_PARAM_IOREQ_PFN, shared_page_nr);
+    /*
+     * Identity-map page table is required for running with CR0.PG=0 when
+     * using Intel EPT. Create a 32-bit non-PAE page directory of superpages.
+     */
+    if ( (ident_pt = xc_map_foreign_range(
+              xc_handle, dom, PAGE_SIZE, PROT_READ | PROT_WRITE,
+              special_page_nr + SPECIALPAGE_IDENT_PT)) == NULL )
+        goto error_out;
+    for ( i = 0; i < PAGE_SIZE / sizeof(*ident_pt); i++ )
+        ident_pt[i] = ((i << 22) | _PAGE_PRESENT | _PAGE_RW | _PAGE_USER |
+                       _PAGE_ACCESSED | _PAGE_DIRTY | _PAGE_PSE);
+    munmap(ident_pt, PAGE_SIZE);
+    xc_set_hvm_param(xc_handle, dom, HVM_PARAM_IDENT_PT,
+                     special_page_nr + SPECIALPAGE_IDENT_PT);
 
     /* Insert JMP <rel32> instruction at address 0x0 to reach entry point. */
     entry_eip = elf_uval(&elf, elf.ehdr, e_entry);

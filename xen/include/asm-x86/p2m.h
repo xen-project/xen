@@ -26,6 +26,8 @@
 #ifndef _XEN_P2M_H
 #define _XEN_P2M_H
 
+#include <xen/config.h>
+#include <xen/paging.h>
 
 /*
  * The phys_to_machine_mapping maps guest physical frame numbers 
@@ -86,54 +88,49 @@ typedef enum {
 #define p2m_is_readonly(_t) (p2m_to_mask(_t) & P2M_RO_TYPES)
 #define p2m_is_valid(_t) (p2m_to_mask(_t) & (P2M_RAM_TYPES | P2M_MMIO_TYPES))
 
+struct p2m_domain {
+    /* Lock that protects updates to the p2m */
+    spinlock_t         lock;
+    int                locker;   /* processor which holds the lock */
+    const char        *locker_function; /* Func that took it */
+
+    /* Pages used to construct the p2m */
+    struct list_head   pages;
+
+    /* Functions to call to get or free pages for the p2m */
+    struct page_info * (*alloc_page  )(struct domain *d);
+    void               (*free_page   )(struct domain *d,
+                                       struct page_info *pg);
+    int                (*set_entry   )(struct domain *d, unsigned long gfn,
+                                       mfn_t mfn, p2m_type_t p2mt);
+    mfn_t              (*get_entry   )(struct domain *d, unsigned long gfn,
+                                       p2m_type_t *p2mt);
+    mfn_t              (*get_entry_current)(unsigned long gfn,
+                                            p2m_type_t *p2mt);
+
+    /* Highest guest frame that's ever been mapped in the p2m */
+    unsigned long max_mapped_pfn;
+};
+
 /* Extract the type from the PTE flags that store it */
 static inline p2m_type_t p2m_flags_to_type(unsigned long flags)
 {
     /* Type is stored in the "available" bits, 9, 10 and 11 */
     return (flags >> 9) & 0x7;
 }
- 
-/* Read the current domain's p2m table (through the linear mapping). */
+
+/* Read the current domain's p2m table. */
 static inline mfn_t gfn_to_mfn_current(unsigned long gfn, p2m_type_t *t)
 {
-    mfn_t mfn = _mfn(INVALID_MFN);
-    p2m_type_t p2mt = p2m_mmio_dm;
-    /* XXX This is for compatibility with the old model, where anything not 
-     * XXX marked as RAM was considered to be emulated MMIO space.
-     * XXX Once we start explicitly registering MMIO regions in the p2m 
-     * XXX we will return p2m_invalid for unmapped gfns */
-
-    if ( gfn <= current->domain->arch.p2m.max_mapped_pfn )
-    {
-        l1_pgentry_t l1e = l1e_empty();
-        int ret;
-
-        ASSERT(gfn < (RO_MPT_VIRT_END - RO_MPT_VIRT_START) 
-               / sizeof(l1_pgentry_t));
-
-        /* Need to __copy_from_user because the p2m is sparse and this
-         * part might not exist */
-        ret = __copy_from_user(&l1e,
-                               &phys_to_machine_mapping[gfn],
-                               sizeof(l1e));
-
-        if ( ret == 0 ) {
-            p2mt = p2m_flags_to_type(l1e_get_flags(l1e));
-            ASSERT(l1e_get_pfn(l1e) != INVALID_MFN || !p2m_is_ram(p2mt));
-            if ( p2m_is_valid(p2mt) )
-                mfn = _mfn(l1e_get_pfn(l1e));
-            else 
-                /* XXX see above */
-                p2mt = p2m_mmio_dm;
-        }
-    }
-
-    *t = p2mt;
-    return mfn;
+    return current->domain->arch.p2m->get_entry_current(gfn, t);
 }
 
 /* Read another domain's P2M table, mapping pages as we go */
-mfn_t gfn_to_mfn_foreign(struct domain *d, unsigned long gfn, p2m_type_t *t);
+static inline
+mfn_t gfn_to_mfn_foreign(struct domain *d, unsigned long gfn, p2m_type_t *t)
+{
+    return d->arch.p2m->get_entry(d, gfn, t);
+}
 
 /* General conversion function from gfn to mfn */
 #define gfn_to_mfn(d, g, t) _gfn_to_mfn((d), (g), (t))
@@ -149,7 +146,7 @@ static inline mfn_t _gfn_to_mfn(struct domain *d,
     }
     if ( likely(current->domain == d) )
         return gfn_to_mfn_current(gfn, t);
-    else 
+    else
         return gfn_to_mfn_foreign(d, gfn, t);
 }
 
@@ -185,7 +182,7 @@ gl1e_to_ml1e(struct domain *d, l1_pgentry_t l1e)
 
 
 /* Init the datastructures for later use by the p2m code */
-void p2m_init(struct domain *d);
+int p2m_init(struct domain *d);
 
 /* Allocate a new p2m table for a domain. 
  *
@@ -199,6 +196,7 @@ int p2m_alloc_table(struct domain *d,
 
 /* Return all the p2m resources to Xen. */
 void p2m_teardown(struct domain *d);
+void p2m_final_teardown(struct domain *d);
 
 /* Add a page to a domain's p2m table */
 int guest_physmap_add_entry(struct domain *d, unsigned long gfn,
