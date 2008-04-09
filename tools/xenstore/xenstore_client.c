@@ -18,10 +18,24 @@
 #include <string.h>
 #include <xs.h>
 
+#define PATH_SEP '/'
+#define MAX_PATH_LEN 256
+
+#define MAX_PERMS 16
+
+enum mode {
+    MODE_unknown,
+    MODE_chmod,
+    MODE_exists,
+    MODE_list,
+    MODE_read,
+    MODE_rm,
+    MODE_write,
+};
+
 static char *output_buf = NULL;
 static int output_pos = 0;
 
-#if defined(CLIENT_read) || defined(CLIENT_list)
 static int output_size = 0;
 
 static void
@@ -47,26 +61,36 @@ output(const char *fmt, ...) {
     va_end(ap);
     output_pos += len;
 }
-#endif
 
 static void
-usage(const char *progname)
+usage(enum mode mode, int incl_mode, const char *progname)
 {
-#if defined(CLIENT_read)
-    errx(1, "Usage: %s [-h] [-p] [-s] key [...]", progname);
-#elif defined(CLIENT_write)
-    errx(1, "Usage: %s [-h] [-s] key value [...]", progname);
-#elif defined(CLIENT_rm)
-    errx(1, "Usage: %s [-h] [-s] [-t] key [...]", progname);
-#elif defined(CLIENT_exists) || defined(CLIENT_list)
-    errx(1, "Usage: %s [-h] [-s] key [...]", progname);
-#elif defined(CLIENT_chmod)
-    errx(1, "Usage: %s [-h] [-s] key <mode [modes...]>", progname);
-#endif
+    const char *mstr = NULL;
+
+    switch (mode) {
+    case MODE_unknown:
+	errx(1, "Usage: %s <mode> [-h] [...]", progname);
+    case MODE_read:
+	mstr = incl_mode ? "read " : "";
+	errx(1, "Usage: %s %s[-h] [-p] [-s] key [...]", progname, mstr);
+    case MODE_write:
+	mstr = incl_mode ? "write " : "";
+	errx(1, "Usage: %s %s[-h] [-s] key value [...]", progname, mstr);
+    case MODE_rm:
+	mstr = incl_mode ? "rm " : "";
+	errx(1, "Usage: %s %s[-h] [-s] [-t] key [...]", progname, mstr);
+    case MODE_exists:
+	mstr = incl_mode ? "exists " : "";
+    case MODE_list:
+	mstr = mstr ? : incl_mode ? "list " : "";
+	errx(1, "Usage: %s %s[-h] [-s] key [...]", progname, mstr);
+    case MODE_chmod:
+	mstr = incl_mode ? "chmod " : "";
+	errx(1, "Usage: %s %s[-h] [-s] key <mode [modes...]>", progname, mstr);
+    }
 }
 
 
-#if defined(CLIENT_rm)
 static int
 do_rm(char *path, struct xs_handle *xsh, xs_transaction_t xth)
 {
@@ -78,11 +102,6 @@ do_rm(char *path, struct xs_handle *xsh, xs_transaction_t xth)
         return 1;
     }
 }
-#endif
-
-#if defined(CLIENT_chmod)
-#define PATH_SEP '/'
-#define MAX_PATH_LEN 256
 
 static void
 do_chmod(char *path, struct xs_permissions *perms, int nperms, int upto,
@@ -130,145 +149,177 @@ do_chmod(char *path, struct xs_permissions *perms, int nperms, int upto,
 	}
     }
 }
-#endif
 
 static int
-perform(int optind, int argc, char **argv, struct xs_handle *xsh,
+perform(enum mode mode, int optind, int argc, char **argv, struct xs_handle *xsh,
         xs_transaction_t xth, int prefix, int tidy, int upto, int recurse)
 {
     while (optind < argc) {
-#if defined(CLIENT_read)
-	static struct expanding_buffer ebuf;
-	unsigned len;
-	char *val = xs_read(xsh, xth, argv[optind], &len);
-	if (val == NULL) {
-	    warnx("couldn't read path %s", argv[optind]);
-	    return 1;
-	}
-	if (prefix)
-	    output("%s: ", argv[optind]);
-	output("%s\n", sanitise_value(&ebuf, val, len));
-	free(val);
-	optind++;
-#elif defined(CLIENT_write)
-	static struct expanding_buffer ebuf;
-	char *val_spec = argv[optind + 1];
-	unsigned len;
-	expanding_buffer_ensure(&ebuf, strlen(val_spec)+1);
-	unsanitise_value(ebuf.buf, &len, val_spec);
-	if (!xs_write(xsh, xth, argv[optind], ebuf.buf, len)) {
-	    warnx("could not write path %s", argv[optind]);
-	    return 1;
-	}
-	optind += 2;
-#elif defined(CLIENT_rm)
-        /* Remove the specified path.  If the tidy flag is set, then also
-           remove any containing directories that are both empty and have no
-           value attached, and repeat, recursing all the way up to the root if
-           necessary.
-        */
-
-        char *slash, *path = argv[optind];
-
-        if (tidy) {
-            /* Copy path, because we can't modify argv because we will need it
-               again if xs_transaction_end gives us EAGAIN. */
-            char *p = malloc(strlen(path) + 1);
-            strcpy(p, path);
-            path = p;
-
-        again:
-            if (do_rm(path, xsh, xth)) {
+        switch (mode) {
+        case MODE_unknown:
+            /* CANNOT BE REACHED */
+            errx(1, "invalid mode %d", mode);
+        case MODE_read: {
+            static struct expanding_buffer ebuf;
+            unsigned len;
+            char *val = xs_read(xsh, xth, argv[optind], &len);
+            if (val == NULL) {
+                warnx("couldn't read path %s", argv[optind]);
                 return 1;
             }
+            if (prefix)
+                output("%s: ", argv[optind]);
+            output("%s\n", sanitise_value(&ebuf, val, len));
+            free(val);
+            optind++;
+            break;
+        }
+        case MODE_write: {
+            static struct expanding_buffer ebuf;
+            char *val_spec = argv[optind + 1];
+            unsigned len;
+            expanding_buffer_ensure(&ebuf, strlen(val_spec)+1);
+            unsanitise_value(ebuf.buf, &len, val_spec);
+            if (!xs_write(xsh, xth, argv[optind], ebuf.buf, len)) {
+                warnx("could not write path %s", argv[optind]);
+                return 1;
+            }
+            optind += 2;
+        } break;
+        case MODE_rm: {
+            /* Remove the specified path.  If the tidy flag is set, then also
+               remove any containing directories that are both empty and have no
+               value attached, and repeat, recursing all the way up to the root if
+               necessary.
+            */
 
-            slash = strrchr(p, '/');
-            if (slash) {
-                char *val;
-                unsigned len;
-                *slash = '\0';
-                val = xs_read(xsh, xth, p, &len);
-                if (val && len == 0) {
-                    unsigned int num;
-                    char ** list = xs_directory(xsh, xth, p, &num);
+            char *slash, *path = argv[optind];
 
-                    if (list && num == 0) {
-                        goto again;
+            if (tidy) {
+                /* Copy path, because we can't modify argv because we will need it
+                   again if xs_transaction_end gives us EAGAIN. */
+                char *p = malloc(strlen(path) + 1);
+                strcpy(p, path);
+                path = p;
+
+            again:
+                if (do_rm(path, xsh, xth)) {
+                    return 1;
+                }
+
+                slash = strrchr(p, '/');
+                if (slash) {
+                    char *val;
+                    unsigned len;
+                    *slash = '\0';
+                    val = xs_read(xsh, xth, p, &len);
+                    if (val && len == 0) {
+                        unsigned int num;
+                        char ** list = xs_directory(xsh, xth, p, &num);
+
+                        if (list && num == 0) {
+                            goto again;
+                        }
                     }
+                }
+
+                free(path);
+            }
+            else {
+                if (do_rm(path, xsh, xth)) {
+                    return 1;
                 }
             }
 
-            free(path);
+            optind++;
+            break;
         }
-        else {
-            if (do_rm(path, xsh, xth)) {
+        case MODE_exists: {
+            char *val = xs_read(xsh, xth, argv[optind], NULL);
+            if (val == NULL) {
                 return 1;
             }
+            free(val);
+            optind++;
+            break;
+        }
+        case MODE_list: {
+            unsigned int i, num;
+            char **list = xs_directory(xsh, xth, argv[optind], &num);
+            if (list == NULL) {
+                warnx("could not list path %s", argv[optind]);
+                return 1;
+            }
+            for (i = 0; i < num; i++) {
+                if (prefix)
+                    output("%s/", argv[optind]);
+                output("%s\n", list[i]);
+            }
+            free(list);
+            optind++;
+            break;
+        }
+        case MODE_chmod: {
+            struct xs_permissions perms[MAX_PERMS];
+            int nperms = 0;
+            /* save path pointer: */
+            char *path = argv[optind++];
+            for (; argv[optind]; optind++, nperms++)
+            {
+                if (MAX_PERMS <= nperms)
+                    errx(1, "Too many permissions specified.  "
+			 "Maximum per invocation is %d.", MAX_PERMS);
+
+                perms[nperms].id = atoi(argv[optind]+1);
+
+                switch (argv[optind][0])
+                {
+                case 'n':
+                    perms[nperms].perms = XS_PERM_NONE;
+                    break;
+                case 'r':
+                    perms[nperms].perms = XS_PERM_READ;
+                    break;
+                case 'w':
+                    perms[nperms].perms = XS_PERM_WRITE;
+                    break;
+                case 'b':
+                    perms[nperms].perms = XS_PERM_READ | XS_PERM_WRITE;
+                    break;
+                default:
+                    errx(1, "Invalid permission specification: '%c'",
+			 argv[optind][0]);
+                }
+            }
+
+            do_chmod(path, perms, nperms, upto, recurse, xsh, xth);
+            break;
+        }
         }
 
-	optind++;
-#elif defined(CLIENT_exists)
-	char *val = xs_read(xsh, xth, argv[optind], NULL);
-	if (val == NULL) {
-	    return 1;
-	}
-	free(val);
-	optind++;
-#elif defined(CLIENT_list)
-	unsigned int i, num;
-	char **list = xs_directory(xsh, xth, argv[optind], &num);
-	if (list == NULL) {
-	    warnx("could not list path %s", argv[optind]);
-	    return 1;
-	}
-	for (i = 0; i < num; i++) {
-	    if (prefix)
-		output("%s/", argv[optind]);
-	    output("%s\n", list[i]);
-	}
-	free(list);
-	optind++;
-#elif defined(CLIENT_chmod)
-#define MAX_PERMS 16
-	struct xs_permissions perms[MAX_PERMS];
-	int nperms = 0;
-	/* save path pointer: */
-	char *path = argv[optind++];
-	for (; argv[optind]; optind++, nperms++)
-	{
-	    if (MAX_PERMS <= nperms)
-		errx(1, "Too many permissions specified.  "
-		     "Maximum per invocation is %d.", MAX_PERMS);
-
-	    perms[nperms].id = atoi(argv[optind]+1);
-
-	    switch (argv[optind][0])
-	    {
-	    case 'n':
-		perms[nperms].perms = XS_PERM_NONE;
-		break;
-	    case 'r':
-		perms[nperms].perms = XS_PERM_READ;
-		break;
-	    case 'w':
-		perms[nperms].perms = XS_PERM_WRITE;
-		break;
-	    case 'b':
-		perms[nperms].perms = XS_PERM_READ | XS_PERM_WRITE;
-		break;
-	    default:
-		errx(1, "Invalid permission specification: '%c'",
-		     argv[optind][0]);
-	    }
-	}
-
-	do_chmod(path, perms, nperms, upto, recurse, xsh, xth);
-#endif
+        return 0;
     }
-
-    return 0;
 }
 
+static enum mode lookup_mode(const char *m)
+{
+    if (strcmp(m, "read") == 0)
+	return MODE_read;
+    else if (strcmp(m, "chmod") == 0)
+	return MODE_chmod;
+    else if (strcmp(m, "exists") == 0)
+	return MODE_exists;
+    else if (strcmp(m, "list") == 0)
+	return MODE_list;
+    else if (strcmp(m, "rm") == 0)
+	return MODE_rm;
+    else if (strcmp(m, "write") == 0)
+	return MODE_write;
+    else if (strcmp(m, "read") == 0)
+	return MODE_read;
+    else
+	errx(1, "unknown mode %s\n", m);
+}
 
 int
 main(int argc, char **argv)
@@ -281,92 +332,111 @@ main(int argc, char **argv)
     int upto = 0;
     int recurse = 0;
     int transaction;
+    enum mode mode;
+
+    const char *_command = strrchr(argv[0], '/');
+    const char *command = _command ? &_command[1] : argv[0];
+    int switch_argv = -1; /* which element of argv did we switch on */
+
+    if (strncmp(command, "xenstore-", strlen("xenstore-")) == 0)
+    {
+	switch_argv = 0;
+	command = command + strlen("xenstore-");
+    }
+    else if (argc < 2)
+	usage(MODE_unknown, 0, argv[0]);
+    else
+    {
+	command = argv[1];
+	switch_argv = 1;
+    }
+
+    mode = lookup_mode(command);
 
     while (1) {
 	int c, index = 0;
 	static struct option long_options[] = {
-	    {"help", 0, 0, 'h'},
-            {"socket", 0, 0, 's'},
-#if defined(CLIENT_read) || defined(CLIENT_list)
-	    {"prefix", 0, 0, 'p'},
-#elif defined(CLIENT_rm)
-            {"tidy",   0, 0, 't'},
-#elif defined(CLIENT_chmod)
-	    {"upto",    0, 0, 'u'},
-	    {"recurse", 0, 0, 'r'},
-#endif
+	    {"help",    0, 0, 'h'},
+	    {"socket",  0, 0, 's'},
+	    {"prefix",  0, 0, 'p'}, /* MODE_read || MODE_list */
+	    {"tidy",    0, 0, 't'}, /* MODE_rm */
+	    {"upto",    0, 0, 'u'}, /* MODE_chmod */
+	    {"recurse", 0, 0, 'r'}, /* MODE_chmod */
 	    {0, 0, 0, 0}
 	};
 
-	c = getopt_long(argc, argv, "hs"
-#if defined(CLIENT_read) || defined(CLIENT_list)
-			"p"
-#elif defined(CLIENT_rm)
-                        "t"
-#elif defined(CLIENT_chmod)
-			"ur"
-#endif
-			, long_options, &index);
+	c = getopt_long(argc - switch_argv, argv + switch_argv, "hsptur",
+			long_options, &index);
 	if (c == -1)
 	    break;
 
 	switch (c) {
 	case 'h':
-	    usage(argv[0]);
+	    usage(mode, switch_argv, argv[0]);
 	    /* NOTREACHED */
         case 's':
             socket = 1;
             break;
-#if defined(CLIENT_read) || defined(CLIENT_list)
 	case 'p':
-	    prefix = 1;
+	    if ( mode == MODE_read || mode == MODE_list )
+		prefix = 1;
+	    else
+		usage(mode, switch_argv, argv[0]);
 	    break;
-#elif defined(CLIENT_rm)
 	case 't':
-	    tidy = 1;
+	    if ( mode == MODE_rm )
+		tidy = 1;
+	    else
+		usage(mode, switch_argv, argv[0]);
 	    break;
-#elif defined(CLIENT_chmod)
 	case 'u':
-	    upto = 1;
+	    if ( mode == MODE_chmod )
+		upto = 1;
+	    else
+		usage(mode, switch_argv, argv[0]);
 	    break;
 	case 'r':
-	    recurse = 1;
+	    if ( mode == MODE_chmod )
+		recurse = 1;
+	    else
+		usage(mode, switch_argv, argv[0]);
 	    break;
-#endif
 	}
     }
 
     if (optind == argc) {
-	usage(argv[0]);
+	usage(mode, switch_argv, argv[0]);
 	/* NOTREACHED */
     }
-#if defined(CLIENT_write)
-    if ((argc - optind) % 2 == 1) {
-	usage(argv[0]);
+    if (mode == MODE_write && (argc - switch_argv - optind) % 2 == 1) {
+	usage(mode, switch_argv, argv[0]);
 	/* NOTREACHED */
     }
-#endif
 
-#if defined(CLIENT_read)
-    transaction = (argc - optind) > 1;
-#elif defined(CLIENT_write)
-    transaction = (argc - optind) > 2;
-#else
-    transaction = 1;
-#endif
+    switch (mode) {
+    case MODE_read:
+	transaction = (argc - switch_argv - optind) > 1;
+	break;
+    case MODE_write:
+	transaction = (argc - switch_argv - optind) > 2;
+	break;
+    default:
+	transaction = 1;
+	break;
+    }
 
     xsh = socket ? xs_daemon_open() : xs_domain_open();
     if (xsh == NULL)
 	err(1, socket ? "xs_daemon_open" : "xs_domain_open");
 
-  again:
+again:
     if (transaction) {
 	xth = xs_transaction_start(xsh);
 	if (xth == XBT_NULL)
 	    errx(1, "couldn't start transaction");
     }
 
-    ret = perform(optind, argc, argv, xsh, xth, prefix, tidy, upto, recurse);
+    ret = perform(mode, optind, argc - switch_argv, argv + switch_argv, xsh, xth, prefix, tidy, upto, recurse);
 
     if (transaction && !xs_transaction_end(xsh, xth, ret)) {
 	if (ret == 0 && errno == EAGAIN) {

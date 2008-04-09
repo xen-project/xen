@@ -209,6 +209,7 @@
 ^tools/xenstat/xentop/xentop$
 ^tools/xenstore/testsuite/tmp/.*$
 ^tools/xenstore/xen$
+^tools/xenstore/xenstore$
 ^tools/xenstore/xenstore-chmod$
 ^tools/xenstore/xenstore-exists$
 ^tools/xenstore/xenstore-list$
