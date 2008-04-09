@@ -8,6 +8,8 @@
 #include <unistd.h>
 #include <zlib.h>
 #include <strings.h>
+#include <stdlib.h>
+#include <malloc.h>
 
 #include "xg_private.h"
 
@@ -196,6 +198,22 @@ __attribute__((weak))
 {
     errno = ENOSYS;
     return -1;
+}
+
+void *xg_memalign(size_t alignment, size_t size)
+{
+#if defined(_POSIX_C_SOURCE) && !defined(__sun__)
+    int ret;
+    void *ptr;
+    ret = posix_memalign(&ptr, alignment, size);
+    if (ret != 0)
+        return NULL;
+    return ptr;
+#elif defined(_BSD)
+    return valloc(size);
+#else
+    return memalign(alignment, size);
+#endif
 }
 
 /*
