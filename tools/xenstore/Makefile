@@ -13,7 +13,7 @@ CFLAGS += -Wp,-MD,.$(@F).d
 DEP    = .*.d
 
 CLIENTS := xenstore-exists xenstore-list xenstore-read xenstore-rm xenstore-chmod
-CLIENTS += xenstore-write
+CLIENTS += xenstore-write xenstore-ls
 
 XENSTORED_OBJS = xenstored_core.o xenstored_watch.o xenstored_domain.o xenstored_transaction.o xs_lib.o talloc.o utils.o tdb.o hashtable.o
 
@@ -27,14 +27,14 @@ ifneq ($(XENSTORE_STATIC_CLIENTS),y)
 LIBXENSTORE := libxenstore.so
 else
 LIBXENSTORE := libxenstore.a
-xenstore xenstore-control xenstore-ls: CFLAGS += -static
+xenstore xenstore-control: CFLAGS += -static
 endif
 
 .PHONY: all
 all: libxenstore.so libxenstore.a xenstored clients xs_tdb_dump 
 
 .PHONY: clients
-clients: xenstore $(CLIENTS) xenstore-control xenstore-ls
+clients: xenstore $(CLIENTS) xenstore-control
 
 ifeq ($(CONFIG_SunOS),y)
 xenstored_probes.h: xenstored_probes.d
@@ -60,9 +60,6 @@ xenstore: xenstore_client.o $(LIBXENSTORE)
 xenstore-control: xenstore_control.o $(LIBXENSTORE)
 	$(CC) $(CFLAGS) $(LDFLAGS) $< -L. -lxenstore $(SOCKET_LIBS) -o $@
 
-xenstore-ls: xsls.o $(LIBXENSTORE)
-	$(CC) $(CFLAGS) $(LDFLAGS) $< -L. -lxenstore $(SOCKET_LIBS) -o $@
-
 xs_tdb_dump: xs_tdb_dump.o utils.o tdb.o talloc.o
 	$(CC) $(CFLAGS) $(LDFLAGS) $^ -o $@
 
@@ -83,7 +80,7 @@ libxenstore.a: xs.o xs_lib.o
 clean:
 	rm -f *.a *.o *.opic *.so* xenstored_probes.h
 	rm -f xenstored xs_random xs_stress xs_crashme
-	rm -f xs_tdb_dump xenstore-control xenstore-ls
+	rm -f xs_tdb_dump xenstore-control
 	rm -f xenstore $(CLIENTS)
 	$(RM) $(DEP)
 
@@ -108,7 +105,6 @@ install: all
 	set -e ; for c in $(CLIENTS) ; do \
 		ln -f $(DESTDIR)/usr/bin/xenstore $(DESTDIR)/usr/bin/$${c} ; \
 	done
-	$(INSTALL_PROG) xenstore-ls $(DESTDIR)$(BINDIR)
 	$(INSTALL_DIR) $(DESTDIR)$(LIBDIR)
 	$(INSTALL_PROG) libxenstore.so.$(MAJOR).$(MINOR) $(DESTDIR)$(LIBDIR)
 	ln -sf libxenstore.so.$(MAJOR).$(MINOR) $(DESTDIR)$(LIBDIR)/libxenstore.so.$(MAJOR)

@@ -16,7 +16,11 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <termios.h>
+#include <unistd.h>
 #include <xs.h>
+
+#include <sys/ioctl.h>
 
 #define PATH_SEP '/'
 #define MAX_PATH_LEN 256
@@ -28,6 +32,7 @@ enum mode {
     MODE_chmod,
     MODE_exists,
     MODE_list,
+    MODE_ls,
     MODE_read,
     MODE_rm,
     MODE_write,
@@ -84,6 +89,9 @@ usage(enum mode mode, int incl_mode, const char *progname)
     case MODE_list:
 	mstr = mstr ? : incl_mode ? "list " : "";
 	errx(1, "Usage: %s %s[-h] [-s] key [...]", progname, mstr);
+    case MODE_ls:
+	mstr = mstr ? : incl_mode ? "ls " : "";
+	errx(1, "Usage: %s %s[-h] [-s] [path]", progname, mstr);
     case MODE_chmod:
 	mstr = incl_mode ? "chmod " : "";
 	errx(1, "Usage: %s %s[-h] [-s] key <mode [modes...]>", progname, mstr);
@@ -101,6 +109,111 @@ do_rm(char *path, struct xs_handle *xsh, xs_transaction_t xth)
         warnx("could not remove path %s", path);
         return 1;
     }
+}
+
+#define STRING_MAX XENSTORE_ABS_PATH_MAX+1024
+static int max_width = 80;
+static int desired_width = 60;
+static int show_whole_path = 0;
+
+#define TAG " = \"...\""
+#define TAG_LEN strlen(TAG)
+
+#define MIN(a, b) (((a) < (b))? (a) : (b))
+
+void do_ls(struct xs_handle *h, char *path, int cur_depth, int show_perms)
+{
+    static struct expanding_buffer ebuf;
+    char **e;
+    char newpath[STRING_MAX], *val;
+    int newpath_len;
+    int i;
+    unsigned int num, len;
+
+    e = xs_directory(h, XBT_NULL, path, &num);
+    if (e == NULL)
+        err(1, "xs_directory (%s)", path);
+
+    for (i = 0; i<num; i++) {
+        char buf[MAX_STRLEN(unsigned int)+1];
+        struct xs_permissions *perms;
+        unsigned int nperms;
+        int linewid;
+
+        /* Compose fullpath */
+        newpath_len = snprintf(newpath, sizeof(newpath), "%s%s%s", path, 
+                path[strlen(path)-1] == '/' ? "" : "/", 
+                e[i]);
+
+        /* Print indent and path basename */
+        linewid = 0;
+        if (show_whole_path) {
+            fputs(newpath, stdout);
+        } else {
+            for (; linewid<cur_depth; linewid++) {
+                putchar(' ');
+            }
+            linewid += printf("%.*s",
+                              (int) (max_width - TAG_LEN - linewid), e[i]);
+        }
+
+	/* Fetch value */
+        if ( newpath_len < sizeof(newpath) ) {
+            val = xs_read(h, XBT_NULL, newpath, &len);
+        }
+        else {
+            /* Path was truncated and thus invalid */
+            val = NULL;
+            len = 0;
+        }
+
+        /* Print value */
+        if (val == NULL) {
+            printf(":\n");
+        }
+        else {
+            if (max_width < (linewid + len + TAG_LEN)) {
+                printf(" = \"%.*s\\...\"",
+                       (int)(max_width - TAG_LEN - linewid),
+		       sanitise_value(&ebuf, val, len));
+            }
+            else {
+                linewid += printf(" = \"%s\"",
+				  sanitise_value(&ebuf, val, len));
+                if (show_perms) {
+                    putchar(' ');
+                    for (linewid++;
+                         linewid < MIN(desired_width, max_width);
+                         linewid++)
+                        putchar((linewid & 1)? '.' : ' ');
+                }
+            }
+        }
+        free(val);
+
+        if (show_perms) {
+            perms = xs_get_permissions(h, XBT_NULL, newpath, &nperms);
+            if (perms == NULL) {
+                warn("\ncould not access permissions for %s", e[i]);
+            }
+            else {
+                int i;
+                fputs("  (", stdout);
+                for (i = 0; i < nperms; i++) {
+                    if (i)
+                        putchar(',');
+                    xs_perm_to_string(perms+i, buf, sizeof(buf));
+                    fputs(buf, stdout);
+                }
+                putchar(')');
+            }
+        }
+
+        putchar('\n');
+            
+        do_ls(h, newpath, cur_depth+1, show_perms); 
+    }
+    free(e);
 }
 
 static void
@@ -154,6 +267,19 @@ static int
 perform(enum mode mode, int optind, int argc, char **argv, struct xs_handle *xsh,
         xs_transaction_t xth, int prefix, int tidy, int upto, int recurse)
 {
+    switch (mode) {
+    case MODE_ls:
+	if (optind == argc)
+	{
+	    optind=0;
+	    argc=1;
+	    argv[0] = "/";
+	}
+	break;
+    default:
+	break;
+    }
+
     while (optind < argc) {
         switch (mode) {
         case MODE_unknown:
@@ -256,8 +382,13 @@ perform(enum mode mode, int optind, int argc, char **argv, struct xs_handle *xsh
                 output("%s\n", list[i]);
             }
             free(list);
-            optind++;
-            break;
+	    optind++;
+	    break;
+	}
+	case MODE_ls: {
+	    do_ls(xsh, argv[optind], 0, prefix);
+ 	    optind++;
+ 	    break;
         }
         case MODE_chmod: {
             struct xs_permissions perms[MAX_PERMS];
@@ -311,6 +442,8 @@ static enum mode lookup_mode(const char *m)
 	return MODE_exists;
     else if (strcmp(m, "list") == 0)
 	return MODE_list;
+    else if (strcmp(m, "ls") == 0)
+	return MODE_ls;
     else if (strcmp(m, "rm") == 0)
 	return MODE_rm;
     else if (strcmp(m, "write") == 0)
@@ -332,6 +465,7 @@ main(int argc, char **argv)
     int upto = 0;
     int recurse = 0;
     int transaction;
+    struct winsize ws;
     enum mode mode;
 
     const char *_command = strrchr(argv[0], '/');
@@ -365,7 +499,7 @@ main(int argc, char **argv)
 	    {0, 0, 0, 0}
 	};
 
-	c = getopt_long(argc - switch_argv, argv + switch_argv, "hsptur",
+	c = getopt_long(argc - switch_argv, argv + switch_argv, "fhsptur",
 			long_options, &index);
 	if (c == -1)
 	    break;
@@ -374,11 +508,20 @@ main(int argc, char **argv)
 	case 'h':
 	    usage(mode, switch_argv, argv[0]);
 	    /* NOTREACHED */
+        case 'f':
+	    if ( mode == MODE_read || mode == MODE_list || mode == MODE_ls ) {
+		max_width = INT_MAX/2;
+		desired_width = 0;
+		show_whole_path = 1;
+	    } else {
+		usage(mode, switch_argv, argv[0]);
+	    }
+            break;
         case 's':
             socket = 1;
             break;
 	case 'p':
-	    if ( mode == MODE_read || mode == MODE_list )
+	    if ( mode == MODE_read || mode == MODE_list || mode == MODE_ls )
 		prefix = 1;
 	    else
 		usage(mode, switch_argv, argv[0]);
@@ -404,13 +547,20 @@ main(int argc, char **argv)
 	}
     }
 
-    if (optind == argc) {
-	usage(mode, switch_argv, argv[0]);
-	/* NOTREACHED */
-    }
-    if (mode == MODE_write && (argc - switch_argv - optind) % 2 == 1) {
-	usage(mode, switch_argv, argv[0]);
-	/* NOTREACHED */
+    switch (mode) {
+    case MODE_ls:
+	break;
+    case MODE_write:
+	if ((argc - switch_argv - optind) % 2 == 1) {
+	    usage(mode, switch_argv, argv[0]);
+	    /* NOTREACHED */
+	}
+	/* DROP-THRU */
+    default:
+	if (optind == argc - switch_argv) {
+	    usage(mode, switch_argv, argv[0]);
+	    /* NOTREACHED */
+	}
     }
 
     switch (mode) {
@@ -420,9 +570,20 @@ main(int argc, char **argv)
     case MODE_write:
 	transaction = (argc - switch_argv - optind) > 2;
 	break;
+    case MODE_ls:
+	transaction = 0;
+	break;
     default:
 	transaction = 1;
 	break;
+    }
+
+    if ( mode == MODE_ls )
+    {
+	memset(&ws, 0, sizeof(ws));
+	ret = ioctl(STDOUT_FILENO, TIOCGWINSZ, &ws);
+	if (!ret)
+	    max_width = ws.ws_col - 2;
     }
 
     xsh = socket ? xs_daemon_open() : xs_domain_open();
