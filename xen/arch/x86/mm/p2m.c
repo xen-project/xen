@@ -941,7 +941,7 @@ void p2m_change_type_global(struct domain *d, p2m_type_t ot, p2m_type_t nt)
                     mfn = l1e_get_pfn(l1e[i1]);
                     gfn = get_gpfn_from_mfn(mfn);
                     /* create a new 1le entry with the new type */
-                    flags = p2m_flags_to_type(nt);
+                    flags = p2m_type_to_flags(nt);
                     l1e_content = l1e_from_pfn(mfn, flags);
                     paging_write_p2m_entry(d, gfn, &l1e[i1],
                                            l1mfn, l1e_content, 1);
