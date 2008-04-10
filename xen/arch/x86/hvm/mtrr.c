@@ -266,7 +266,7 @@ static void setup_var_mtrrs(struct vcpu *v)
         {
             if ( e820_table[i].addr == 0x100000 )
             {
-                size = e820_table[i].size + 0x100000 + PAGE_SIZE * 4;
+                size = e820_table[i].size + 0x100000 + PAGE_SIZE * 5;
                 addr = 0;
             }
             else
