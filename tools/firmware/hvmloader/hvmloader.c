@@ -360,7 +360,7 @@ static int scan_etherboot_nic(void *copy_rom_dest)
         for ( ; ; )
         {
             /* Invalid signature means we're out of option ROMs. */
-            if ( strncmp(rom->signature, "\x55\xaa", 2) ||
+            if ( strncmp((char *)rom->signature, "\x55\xaa", 2) ||
                  (rom->rom_size == 0) )
                 break;
 
@@ -375,7 +375,7 @@ static int scan_etherboot_nic(void *copy_rom_dest)
             pcih = (struct option_rom_pci_header *)
                 ((char *)rom + rom->pci_header_offset);
             if ( (rom->pci_header_offset != 0) &&
-                 !strncmp(pcih->signature, "PCIR", 4) &&
+                 !strncmp((char *)pcih->signature, "PCIR", 4) &&
                  (pcih->vendor_id == vendor_id) &&
                  (pcih->device_id == device_id) )
                 goto found;
@@ -393,7 +393,7 @@ static int scan_etherboot_nic(void *copy_rom_dest)
             ? ((struct option_rom_pnp_header *)
                ((char *)rom + rom->expansion_header_offset))
             : ((struct option_rom_pnp_header *)NULL));
-    while ( (pnph != NULL) && strncmp(pnph->signature, "$PnP", 4) )
+    while ( (pnph != NULL) && strncmp((char *)pnph->signature, "$PnP", 4) )
         pnph = ((pnph->next_header_offset != 0)
                 ? ((struct option_rom_pnp_header *)
                    ((char *)rom + pnph->next_header_offset))
