@@ -62,7 +62,7 @@ int hap_enable_log_dirty(struct domain *d)
     hap_unlock(d);
 
     /* set l1e entries of P2M table to be read-only. */
-    p2m_change_type_global(d, p2m_ram_rw, p2m_ram_logdirty);
+    p2m_change_entry_type_global(d, p2m_ram_rw, p2m_ram_logdirty);
     flush_tlb_mask(d->domain_dirty_cpumask);
     return 0;
 }
@@ -74,14 +74,14 @@ int hap_disable_log_dirty(struct domain *d)
     hap_unlock(d);
 
     /* set l1e entries of P2M table with normal mode */
-    p2m_change_type_global(d, p2m_ram_logdirty, p2m_ram_rw);
+    p2m_change_entry_type_global(d, p2m_ram_logdirty, p2m_ram_rw);
     return 0;
 }
 
 void hap_clean_dirty_bitmap(struct domain *d)
 {
     /* set l1e entries of P2M table to be read-only. */
-    p2m_change_type_global(d, p2m_ram_rw, p2m_ram_logdirty);
+    p2m_change_entry_type_global(d, p2m_ram_rw, p2m_ram_logdirty);
     flush_tlb_mask(d->domain_dirty_cpumask);
 }
 

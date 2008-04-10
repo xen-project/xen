@@ -2053,13 +2053,47 @@ static void vmx_wbinvd_intercept(void)
 
 static void ept_handle_violation(unsigned long qualification, paddr_t gpa)
 {
-    if ( unlikely(((qualification >> 7) & 0x3) != 0x3) )
+    unsigned long gla_validity = qualification & EPT_GLA_VALIDITY_MASK;
+    struct domain *d = current->domain;
+    unsigned long gfn = gpa >> PAGE_SHIFT;
+    mfn_t mfn;
+    p2m_type_t t;
+
+    if ( unlikely(qualification & EPT_GAW_VIOLATION) )
     {
-        domain_crash(current->domain);
+        gdprintk(XENLOG_ERR, "EPT violation: guest physical address %"PRIpaddr
+                 " exceeded its width limit.\n", gpa);
+        goto crash;
+    }
+
+    if ( unlikely(gla_validity == EPT_GLA_VALIDITY_RSVD) ||
+         unlikely(gla_validity == EPT_GLA_VALIDITY_PDPTR_LOAD) )
+    {
+        gdprintk(XENLOG_ERR, "EPT violation: reserved bit or "
+                 "pdptr load violation.\n");
+        goto crash;
+    }
+
+    mfn = gfn_to_mfn(d, gfn, &t);
+    if ( p2m_is_ram(t) && paging_mode_log_dirty(d) )
+    {
+        paging_mark_dirty(d, mfn_x(mfn));
+        p2m_change_type(d, gfn, p2m_ram_logdirty, p2m_ram_rw);
+        flush_tlb_mask(d->domain_dirty_cpumask);
         return;
     }
 
+    /* This can only happen in log-dirty mode, writing back A/D bits. */
+    if ( unlikely(gla_validity == EPT_GLA_VALIDITY_GPT_WALK) )
+        goto crash;
+
+    ASSERT(gla_validity == EPT_GLA_VALIDITY_MATCH);
     handle_mmio();
+
+    return;
+
+ crash:
+    domain_crash(d);
 }
 
 static void vmx_failed_vmentry(unsigned int exit_reason,

@@ -71,6 +71,8 @@
         spin_unlock(&(_p2m)->lock);                     \
     } while (0)
 
+#define p2m_locked_by_me(_p2m)                            \
+    (current->processor == (_p2m)->locker)
 
 /* Printouts */
 #define P2M_PRINTK(_f, _a...)                                \
@@ -418,12 +420,23 @@ int p2m_init(struct domain *d)
     p2m->set_entry = p2m_set_entry;
     p2m->get_entry = p2m_gfn_to_mfn;
     p2m->get_entry_current = p2m_gfn_to_mfn_current;
+    p2m->change_entry_type_global = p2m_change_type_global;
 
     if ( is_hvm_domain(d) && d->arch.hvm_domain.hap_enabled &&
          (boot_cpu_data.x86_vendor == X86_VENDOR_INTEL) )
         ept_p2m_init(d);
 
     return 0;
+}
+
+void p2m_change_entry_type_global(struct domain *d,
+                                  p2m_type_t ot, p2m_type_t nt)
+{
+    struct p2m_domain *p2m = d->arch.p2m;
+
+    p2m_lock(p2m);
+    p2m->change_entry_type_global(d, ot, nt);
+    p2m_unlock(p2m);
 }
 
 static inline
@@ -880,7 +893,7 @@ void p2m_change_type_global(struct domain *d, p2m_type_t ot, p2m_type_t nt)
     if ( pagetable_get_pfn(d->arch.phys_table) == 0 )
         return;
 
-    p2m_lock(d->arch.p2m);
+    ASSERT(p2m_locked_by_me(d->arch.p2m));
 
 #if CONFIG_PAGING_LEVELS == 4
     l4e = map_domain_page(mfn_x(pagetable_get_mfn(d->arch.phys_table)));
@@ -952,7 +965,6 @@ void p2m_change_type_global(struct domain *d, p2m_type_t ot, p2m_type_t nt)
     unmap_domain_page(l2e);
 #endif
 
-    p2m_unlock(d->arch.p2m);
 }
 
 /* Modify the p2m type of a single gfn from ot to nt, returning the 

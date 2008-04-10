@@ -107,6 +107,9 @@ struct p2m_domain {
                                        p2m_type_t *p2mt);
     mfn_t              (*get_entry_current)(unsigned long gfn,
                                             p2m_type_t *p2mt);
+    void               (*change_entry_type_global)(struct domain *d,
+                                                   p2m_type_t ot,
+                                                   p2m_type_t nt);
 
     /* Highest guest frame that's ever been mapped in the p2m */
     unsigned long max_mapped_pfn;
@@ -218,6 +221,7 @@ void guest_physmap_remove_page(struct domain *d, unsigned long gfn,
 
 /* Change types across all p2m entries in a domain */
 void p2m_change_type_global(struct domain *d, p2m_type_t ot, p2m_type_t nt);
+void p2m_change_entry_type_global(struct domain *d, p2m_type_t ot, p2m_type_t nt);
 
 /* Compare-exchange the type of a single p2m entry */
 p2m_type_t p2m_change_type(struct domain *d, unsigned long gfn,

@@ -26,6 +26,26 @@
 #include <asm/hvm/vmx/vmx.h>
 #include <xen/iommu.h>
 
+static void ept_p2m_type_to_flags(ept_entry_t *entry, p2m_type_t type)
+{
+    switch(type)
+    {
+        case p2m_invalid:
+        case p2m_mmio_dm:
+        default:
+            return;
+        case p2m_ram_rw:
+        case p2m_mmio_direct:
+             entry->r = entry->w = entry->x = 1;
+            return;
+        case p2m_ram_logdirty:
+        case p2m_ram_ro:
+             entry->r = entry->x = 1;
+             entry->w = 0;
+            return;
+    }
+}
+
 static int ept_next_level(struct domain *d, bool_t read_only,
                           ept_entry_t **table, unsigned long *gfn_remainder,
                           u32 shift)
@@ -104,6 +124,7 @@ ept_set_entry(struct domain *d, unsigned long gfn, mfn_t mfn, p2m_type_t p2mt)
         ept_entry->avail2 = 0;
         /* last step */
         ept_entry->r = ept_entry->w = ept_entry->x = 1;
+        ept_p2m_type_to_flags(ept_entry, p2mt);
     }
     else
         ept_entry->epte = 0;
@@ -150,13 +171,10 @@ static mfn_t ept_get_entry(struct domain *d, unsigned long gfn, p2m_type_t *t)
     index = gfn_remainder;
     ept_entry = table + index;
 
-    if ( (ept_entry->epte & 0x7) == 0x7 )
+    if ( ept_entry->avail1 != p2m_invalid )
     {
-        if ( ept_entry->avail1 != p2m_invalid )
-        {
-            *t = ept_entry->avail1;
-            mfn = _mfn(ept_entry->mfn);
-        }
+        *t = ept_entry->avail1;
+        mfn = _mfn(ept_entry->mfn);
     }
 
  out:
@@ -169,11 +187,63 @@ static mfn_t ept_get_entry_current(unsigned long gfn, p2m_type_t *t)
     return ept_get_entry(current->domain, gfn, t);
 }
 
+/* Walk the whole p2m table, changing any entries of the old type
+ * to the new type.  This is used in hardware-assisted paging to
+ * quickly enable or diable log-dirty tracking */
+
+static void ept_change_entry_type_global(struct domain *d,
+                                            p2m_type_t ot, p2m_type_t nt)
+{
+    ept_entry_t *l4e, *l3e, *l2e, *l1e;
+    int i4, i3, i2, i1;
+
+    if ( pagetable_get_pfn(d->arch.phys_table) == 0 )
+        return;
+
+    BUG_ON(EPT_DEFAULT_GAW != 3);
+
+    l4e = map_domain_page(mfn_x(pagetable_get_mfn(d->arch.phys_table)));
+    for (i4 = 0; i4 < EPT_PAGETABLE_ENTRIES; i4++ )
+    {
+        if ( !l4e[i4].epte || l4e[i4].sp_avail )
+            continue;
+        l3e = map_domain_page(l4e[i4].mfn);
+        for ( i3 = 0; i3 < EPT_PAGETABLE_ENTRIES; i3++ )
+        {
+            if ( !l3e[i3].epte || l3e[i3].sp_avail )
+                continue;
+            l2e = map_domain_page(l3e[i3].mfn);
+            for ( i2 = 0; i2 < EPT_PAGETABLE_ENTRIES; i2++ )
+            {
+                if ( !l2e[i2].epte || l2e[i2].sp_avail )
+                    continue;
+                l1e = map_domain_page(l2e[i2].mfn);
+                for ( i1  = 0; i1 < EPT_PAGETABLE_ENTRIES; i1++ )
+                {
+                    if ( !l1e[i1].epte )
+                        continue;
+                    if ( l1e[i1].avail1 != ot )
+                        continue;
+                    l1e[i1].avail1 = nt;
+                    ept_p2m_type_to_flags(l1e+i1, nt);
+                }
+                unmap_domain_page(l1e);
+            }
+            unmap_domain_page(l2e);
+        }
+        unmap_domain_page(l3e);
+    }
+    unmap_domain_page(l4e);
+
+    ept_sync_domain(d);
+}
+
 void ept_p2m_init(struct domain *d)
 {
     d->arch.p2m->set_entry = ept_set_entry;
     d->arch.p2m->get_entry = ept_get_entry;
     d->arch.p2m->get_entry_current = ept_get_entry_current;
+    d->arch.p2m->change_entry_type_global = ept_change_entry_type_global;
 }
 
 /*
