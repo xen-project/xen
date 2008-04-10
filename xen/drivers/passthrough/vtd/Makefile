@@ -1,3 +1,5 @@
+subdir-$(x86) += x86
+
 obj-y += iommu.o
 obj-y += dmar.o
 obj-y += utils.o

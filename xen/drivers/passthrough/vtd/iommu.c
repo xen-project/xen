@@ -32,6 +32,7 @@
 #include "../pci_regs.h"
 #include "msi.h"
 #include "extern.h"
+#include "vtd.h"
 
 #define domain_iommu_domid(d) ((d)->arch.hvm_domain.hvm_iommu.iommu_domid)
 
@@ -158,11 +159,11 @@ struct iommu_flush *iommu_get_flush(struct iommu *iommu)
     return &(iommu->intel->flush);
 }
 
-unsigned int x86_clflush_size;
+unsigned int clflush_size;
 void clflush_cache_range(void *adr, int size)
 {
     int i;
-    for ( i = 0; i < size; i += x86_clflush_size )
+    for ( i = 0; i < size; i += clflush_size )
         clflush(adr + i);
 }
 
@@ -172,10 +173,15 @@ static void __iommu_flush_cache(struct iommu *iommu, void *addr, int size)
         clflush_cache_range(addr, size);
 }
 
-#define iommu_flush_cache_entry(iommu, addr) \
-       __iommu_flush_cache(iommu, addr, 8)
-#define iommu_flush_cache_page(iommu, addr) \
-       __iommu_flush_cache(iommu, addr, PAGE_SIZE_4K)
+void iommu_flush_cache_entry(struct iommu *iommu, void *addr)
+{
+    __iommu_flush_cache(iommu, addr, 8);
+}
+
+void iommu_flush_cache_page(struct iommu *iommu, void *addr)
+{
+    __iommu_flush_cache(iommu, addr, PAGE_SIZE_4K);
+}
 
 int nr_iommus;
 /* context entry handling */
@@ -1954,7 +1960,7 @@ int iommu_setup(void)
     INIT_LIST_HEAD(&hd->pdev_list);
 
     /* setup clflush size */
-    x86_clflush_size = ((cpuid_ebx(1) >> 8) & 0xff) * 8;
+    clflush_size = get_clflush_size();
 
     /* Allocate IO page directory page for the domain. */
     drhd = list_entry(acpi_drhd_units.next, typeof(*drhd), list);

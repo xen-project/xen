@@ -98,6 +98,9 @@ void io_apic_write_remap_rte(unsigned int apic,
 struct qi_ctrl *iommu_qi_ctrl(struct iommu *iommu);
 struct ir_ctrl *iommu_ir_ctrl(struct iommu *iommu);
 struct iommu_flush *iommu_get_flush(struct iommu *iommu);
+void hvm_dpci_isairq_eoi(struct domain *d, unsigned int isairq);
+struct hvm_irq_dpci *domain_get_irq_dpci(struct domain *domain);
+int domain_set_irq_dpci(struct domain *domain, struct hvm_irq_dpci *dpci);
 
 #define PT_IRQ_TIME_OUT MILLISECS(8)
 #define VTDPREFIX "[VT-D]"
