@@ -26,6 +26,7 @@
 #include <asm/paging.h>
 #include <xen/iommu.h>
 #include <xen/numa.h>
+#include <xen/time.h>
 #include "iommu.h"
 #include "dmar.h"
 #include "../pci-direct.h"
@@ -356,7 +357,7 @@ static void iommu_flush_write_buffer(struct iommu *iommu)
 {
     u32 val;
     unsigned long flag;
-    unsigned long start_time;
+    s_time_t start_time;
 
     if ( !cap_rwbf(iommu->cap) )
         return;
@@ -366,13 +367,13 @@ static void iommu_flush_write_buffer(struct iommu *iommu)
     dmar_writel(iommu->reg, DMAR_GCMD_REG, val);
 
     /* Make sure hardware complete it */
-    start_time = jiffies;
+    start_time = NOW();
     for ( ; ; )
     {
         val = dmar_readl(iommu->reg, DMAR_GSTS_REG);
         if ( !(val & DMA_GSTS_WBFS) )
             break;
-        if ( time_after(jiffies, start_time + DMAR_OPERATION_TIMEOUT) )
+        if ( NOW() > start_time + DMAR_OPERATION_TIMEOUT )
             panic("DMAR hardware is malfunctional,"
                   " please disable IOMMU\n");
         cpu_relax();
@@ -389,7 +390,7 @@ static int flush_context_reg(
     struct iommu *iommu = (struct iommu *) _iommu;
     u64 val = 0;
     unsigned long flag;
-    unsigned long start_time;
+    s_time_t start_time;
 
     /*
      * In the non-present entry flush case, if hardware doesn't cache
@@ -427,13 +428,13 @@ static int flush_context_reg(
     dmar_writeq(iommu->reg, DMAR_CCMD_REG, val);
 
     /* Make sure hardware complete it */
-    start_time = jiffies;
+    start_time = NOW();
     for ( ; ; )
     {
         val = dmar_readq(iommu->reg, DMAR_CCMD_REG);
         if ( !(val & DMA_CCMD_ICC) )
             break;
-        if ( time_after(jiffies, start_time + DMAR_OPERATION_TIMEOUT) )
+        if ( NOW() > start_time + DMAR_OPERATION_TIMEOUT )
             panic("DMAR hardware is malfunctional, please disable IOMMU\n");
         cpu_relax();
     }
@@ -477,7 +478,7 @@ static int flush_iotlb_reg(void *_iommu, u16 did,
     int tlb_offset = ecap_iotlb_offset(iommu->ecap);
     u64 val = 0, val_iva = 0;
     unsigned long flag;
-    unsigned long start_time;
+    s_time_t start_time;
 
     /*
      * In the non-present entry flush case, if hardware doesn't cache
@@ -524,13 +525,13 @@ static int flush_iotlb_reg(void *_iommu, u16 did,
     dmar_writeq(iommu->reg, tlb_offset + 8, val);
 
     /* Make sure hardware complete it */
-    start_time = jiffies;
+    start_time = NOW();
     for ( ; ; )
     {
         val = dmar_readq(iommu->reg, tlb_offset + 8);
         if ( !(val & DMA_TLB_IVT) )
             break;
-        if ( time_after(jiffies, start_time + DMAR_OPERATION_TIMEOUT) )
+        if ( NOW() > start_time + DMAR_OPERATION_TIMEOUT )
             panic("DMAR hardware is malfunctional, please disable IOMMU\n");
         cpu_relax();
     }

@@ -21,6 +21,7 @@
 
 #include <xen/sched.h>
 #include <xen/iommu.h>
+#include <xen/time.h>
 #include "iommu.h"
 #include "dmar.h"
 #include "vtd.h"
@@ -183,7 +184,7 @@ static int queue_invalidate_wait(struct iommu *iommu,
     u8 iflag, u8 sw, u8 fn, u32 sdata, volatile u32 *saddr)
 {
     unsigned long flags;
-    unsigned long start_time;
+    s_time_t start_time;
     int index = -1;
     int ret = -1;
     struct qi_ctrl *qi_ctrl = iommu_qi_ctrl(iommu);
@@ -201,10 +202,10 @@ static int queue_invalidate_wait(struct iommu *iommu,
     if ( sw )
     {
         /* In case all wait descriptor writes to same addr with same data */
-        start_time = jiffies;
+        start_time = NOW();
         while ( *saddr != 1 )
         {
-            if ( time_after(jiffies, start_time + DMAR_OPERATION_TIMEOUT) )
+            if ( NOW() > (start_time + DMAR_OPERATION_TIMEOUT) )
             {
                 print_qi_regs(iommu);
                 panic("queue invalidate wait descriptor was not executed\n");
@@ -414,7 +415,7 @@ static int flush_iotlb_qi(
 
 int qinval_setup(struct iommu *iommu)
 {
-    unsigned long start_time;
+    s_time_t start_time;
     u32 status = 0;
     struct qi_ctrl *qi_ctrl;
     struct iommu_flush *flush;
@@ -448,13 +449,13 @@ int qinval_setup(struct iommu *iommu)
     dmar_writel(iommu->reg, DMAR_GCMD_REG, iommu->gcmd);
 
     /* Make sure hardware complete it */
-    start_time = jiffies;
-    while ( 1 )
+    start_time = NOW();
+    for ( ; ; )
     {
         status = dmar_readl(iommu->reg, DMAR_GSTS_REG);
         if ( status & DMA_GSTS_QIES )
             break;
-        if ( time_after(jiffies, start_time + DMAR_OPERATION_TIMEOUT) )
+        if ( NOW() > (start_time + DMAR_OPERATION_TIMEOUT) )
             panic("Cannot set QIE field for queue invalidation\n");
         cpu_relax();
     }

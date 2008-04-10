@@ -20,6 +20,7 @@
 #include <xen/sched.h>
 #include <xen/delay.h>
 #include <xen/iommu.h>
+#include <xen/time.h>
 #include "iommu.h"
 #include "dmar.h"
 #include "../pci-direct.h"
@@ -69,7 +70,7 @@ int vtd_hw_check(void)
 /* Disable vt-d protected memory registers. */
 void disable_pmr(struct iommu *iommu)
 {
-    unsigned long start_time;
+    s_time_t start_time;
     unsigned int val;
 
     val = dmar_readl(iommu->reg, DMAR_PMEN_REG);
@@ -77,7 +78,7 @@ void disable_pmr(struct iommu *iommu)
         return;
 
     dmar_writel(iommu->reg, DMAR_PMEN_REG, val & ~DMA_PMEN_EPM);
-    start_time = jiffies;
+    start_time = NOW();
 
     for ( ; ; )
     {
@@ -85,7 +86,7 @@ void disable_pmr(struct iommu *iommu)
         if ( (val & DMA_PMEN_PRS) == 0 )
             break;
 
-        if ( time_after(jiffies, start_time + DMAR_OPERATION_TIMEOUT) )
+        if ( NOW() > start_time + DMAR_OPERATION_TIMEOUT )
             panic("Disable PMRs timeout\n");
 
         cpu_relax();

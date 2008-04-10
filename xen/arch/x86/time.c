@@ -40,7 +40,7 @@ string_param("clocksource", opt_clocksource);
 unsigned long cpu_khz;  /* CPU clock frequency in kHz. */
 unsigned long hpet_address;
 DEFINE_SPINLOCK(rtc_lock);
-volatile unsigned long jiffies;
+unsigned long pit0_ticks;
 static u32 wc_sec, wc_nsec; /* UTC time at last 'time update'. */
 static DEFINE_SPINLOCK(wc_lock);
 
@@ -150,8 +150,7 @@ void timer_interrupt(int irq, void *dev_id, struct cpu_user_regs *regs)
 {
     ASSERT(local_irq_is_enabled());
 
-    /* Update jiffies counter. */
-    (*(volatile unsigned long *)&jiffies)++;
+    (*(volatile unsigned long *)&pit0_ticks)++;
 
     /* Rough hack to allow accurate timers to sort-of-work with no APIC. */
     if ( !cpu_has_apic )

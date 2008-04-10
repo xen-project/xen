@@ -25,8 +25,6 @@
 DEFINE_XEN_GUEST_HANDLE(vcpu_runstate_info_compat_t);
 #endif
 
-extern unsigned long volatile jiffies;
-
 /* A global pointer to the initial domain (DOM0). */
 extern struct domain *dom0;
 

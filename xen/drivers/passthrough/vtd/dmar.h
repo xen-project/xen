@@ -92,14 +92,10 @@ struct acpi_rmrr_unit * acpi_find_matched_rmrr_unit(struct pci_dev *dev);
 #define RMRR_TYPE 2
 #define ATSR_TYPE 3
 
-#define DMAR_OPERATION_TIMEOUT (HZ*60) /* 1m */
-#define time_after(a,b)         \
-        (typecheck(unsigned long, a) && \
-         typecheck(unsigned long, b) && \
-         ((long)(b) - (long)(a) < 0))
+#define DMAR_OPERATION_TIMEOUT MILLISECS(1000)
 
 int vtd_hw_check(void);
 void disable_pmr(struct iommu *iommu);
 int is_usb_device(struct pci_dev *pdev);
 
-#endif // _DMAR_H_
+#endif /* _DMAR_H_ */

@@ -21,6 +21,7 @@
 #include <xen/irq.h>
 #include <xen/sched.h>
 #include <xen/iommu.h>
+#include <xen/time.h>
 #include "iommu.h"
 #include "dmar.h"
 #include "vtd.h"
@@ -244,7 +245,7 @@ io_apic_write_remap_rte(
 int intremap_setup(struct iommu *iommu)
 {
     struct ir_ctrl *ir_ctrl;
-    unsigned long start_time;
+    s_time_t start_time;
 
     if ( !ecap_intr_remap(iommu->ecap) )
         return -ENODEV;
@@ -275,10 +276,10 @@ int intremap_setup(struct iommu *iommu)
     dmar_writel(iommu->reg, DMAR_GCMD_REG, iommu->gcmd);
 
     /* Make sure hardware complete it */
-    start_time = jiffies;
+    start_time = NOW();
     while ( !(dmar_readl(iommu->reg, DMAR_GSTS_REG) & DMA_GSTS_SIRTPS) )
     {
-        if ( time_after(jiffies, start_time + DMAR_OPERATION_TIMEOUT) )
+        if ( NOW() > (start_time + DMAR_OPERATION_TIMEOUT) )
         {
             dprintk(XENLOG_ERR VTDPREFIX,
                     "Cannot set SIRTP field for interrupt remapping\n");
@@ -291,10 +292,10 @@ int intremap_setup(struct iommu *iommu)
     iommu->gcmd |= DMA_GCMD_CFI;
     dmar_writel(iommu->reg, DMAR_GCMD_REG, iommu->gcmd);
 
-    start_time = jiffies;
+    start_time = NOW();
     while ( !(dmar_readl(iommu->reg, DMAR_GSTS_REG) & DMA_GSTS_CFIS) )
     {
-        if ( time_after(jiffies, start_time + DMAR_OPERATION_TIMEOUT) )
+        if ( NOW() > (start_time + DMAR_OPERATION_TIMEOUT) )
         {
             dprintk(XENLOG_ERR VTDPREFIX,
                     "Cannot set CFI field for interrupt remapping\n");
@@ -307,10 +308,10 @@ int intremap_setup(struct iommu *iommu)
     iommu->gcmd |= DMA_GCMD_IRE;
     dmar_writel(iommu->reg, DMAR_GCMD_REG, iommu->gcmd);
 
-    start_time = jiffies;
+    start_time = NOW();
     while ( !(dmar_readl(iommu->reg, DMAR_GSTS_REG) & DMA_GSTS_IRES) )
     {
-        if ( time_after(jiffies, start_time + DMAR_OPERATION_TIMEOUT) )
+        if ( NOW() > (start_time + DMAR_OPERATION_TIMEOUT) ) 
         {
             dprintk(XENLOG_ERR VTDPREFIX,
                     "Cannot set IRE field for interrupt remapping\n");

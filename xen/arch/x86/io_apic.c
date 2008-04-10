@@ -1244,7 +1244,11 @@ static void __init setup_ioapic_ids_from_mpc(void) { }
  */
 static int __init timer_irq_works(void)
 {
-    unsigned long t1 = jiffies;
+    extern unsigned long pit0_ticks;
+    unsigned long t1;
+
+    t1 = pit0_ticks;
+    mb();
 
     local_irq_enable();
     /* Let ten ticks pass... */
@@ -1257,7 +1261,8 @@ static int __init timer_irq_works(void)
      * might have cached one ExtINT interrupt.  Finally, at
      * least one tick may be lost due to delays.
      */
-    if (jiffies - t1 > 4)
+    mb();
+    if (pit0_ticks - t1 > 4)
         return 1;
 
     return 0;
