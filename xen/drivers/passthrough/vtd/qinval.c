@@ -63,13 +63,14 @@ static int qinval_update_qtail(struct iommu *iommu, int index)
 static int gen_cc_inv_dsc(struct iommu *iommu, int index,
     u16 did, u16 source_id, u8 function_mask, u8 granu)
 {
-    u64 *ptr64;
     unsigned long flags;
-    struct qinval_entry * qinval_entry = NULL;
+    struct qinval_entry *qinval_entry = NULL, *qinval_entries;
     struct qi_ctrl *qi_ctrl = iommu_qi_ctrl(iommu);
 
     spin_lock_irqsave(&qi_ctrl->qinval_lock, flags);
-    qinval_entry = &qi_ctrl->qinval[index];
+    qinval_entries =
+        (struct qinval_entry *)map_vtd_domain_page(qi_ctrl->qinval_maddr);
+    qinval_entry = &qinval_entries[index];
     qinval_entry->q.cc_inv_dsc.lo.type = TYPE_INVAL_CONTEXT;
     qinval_entry->q.cc_inv_dsc.lo.granu = granu;
     qinval_entry->q.cc_inv_dsc.lo.res_1 = 0;
@@ -78,9 +79,10 @@ static int gen_cc_inv_dsc(struct iommu *iommu, int index,
     qinval_entry->q.cc_inv_dsc.lo.fm = function_mask;
     qinval_entry->q.cc_inv_dsc.lo.res_2 = 0;
     qinval_entry->q.cc_inv_dsc.hi.res = 0;
+
+    unmap_vtd_domain_page(qinval_entries);
     spin_unlock_irqrestore(&qi_ctrl->qinval_lock, flags);
 
-    ptr64 = (u64 *)qinval_entry;
     return 0;
 }
 
@@ -93,7 +95,7 @@ int queue_invalidate_context(struct iommu *iommu,
 
     spin_lock_irqsave(&iommu->register_lock, flags);
     index = qinval_next_index(iommu);
-    if (index == -1)
+    if ( index == -1 )
         return -EBUSY;
     ret = gen_cc_inv_dsc(iommu, index, did, source_id,
                          function_mask, granu);
@@ -106,14 +108,16 @@ static int gen_iotlb_inv_dsc(struct iommu *iommu, int index,
     u8 granu, u8 dr, u8 dw, u16 did, u8 am, u8 ih, u64 addr)
 {
     unsigned long flags;
-    struct qinval_entry * qinval_entry = NULL;
+    struct qinval_entry *qinval_entry = NULL, *qinval_entries;
     struct qi_ctrl *qi_ctrl = iommu_qi_ctrl(iommu);
 
     if ( index == -1 )
         return -1;
     spin_lock_irqsave(&qi_ctrl->qinval_lock, flags);
 
-    qinval_entry = &qi_ctrl->qinval[index];
+    qinval_entries =
+        (struct qinval_entry *)map_vtd_domain_page(qi_ctrl->qinval_maddr);
+    qinval_entry = &qinval_entries[index];
     qinval_entry->q.iotlb_inv_dsc.lo.type = TYPE_INVAL_IOTLB;
     qinval_entry->q.iotlb_inv_dsc.lo.granu = granu;
     qinval_entry->q.iotlb_inv_dsc.lo.dr = 0;
@@ -127,6 +131,7 @@ static int gen_iotlb_inv_dsc(struct iommu *iommu, int index,
     qinval_entry->q.iotlb_inv_dsc.hi.res_1 = 0;
     qinval_entry->q.iotlb_inv_dsc.hi.addr = addr;
 
+    unmap_vtd_domain_page(qinval_entries);
     spin_unlock_irqrestore(&qi_ctrl->qinval_lock, flags);
     return 0;
 }
@@ -151,15 +156,16 @@ int queue_invalidate_iotlb(struct iommu *iommu,
 static int gen_wait_dsc(struct iommu *iommu, int index,
     u8 iflag, u8 sw, u8 fn, u32 sdata, volatile u32 *saddr)
 {
-    u64 *ptr64;
     unsigned long flags;
-    struct qinval_entry * qinval_entry = NULL;
+    struct qinval_entry *qinval_entry = NULL, *qinval_entries;
     struct qi_ctrl *qi_ctrl = iommu_qi_ctrl(iommu);
 
     if ( index == -1 )
         return -1;
     spin_lock_irqsave(&qi_ctrl->qinval_lock, flags);
-    qinval_entry = &qi_ctrl->qinval[index];
+    qinval_entries =
+        (struct qinval_entry *)map_vtd_domain_page(qi_ctrl->qinval_maddr);
+    qinval_entry = &qinval_entries[index];
     qinval_entry->q.inv_wait_dsc.lo.type = TYPE_INVAL_WAIT;
     qinval_entry->q.inv_wait_dsc.lo.iflag = iflag;
     qinval_entry->q.inv_wait_dsc.lo.sw = sw;
@@ -168,8 +174,8 @@ static int gen_wait_dsc(struct iommu *iommu, int index,
     qinval_entry->q.inv_wait_dsc.lo.sdata = sdata;
     qinval_entry->q.inv_wait_dsc.hi.res_1 = 0;
     qinval_entry->q.inv_wait_dsc.hi.saddr = virt_to_maddr(saddr) >> 2;
+    unmap_vtd_domain_page(qinval_entries);
     spin_unlock_irqrestore(&qi_ctrl->qinval_lock, flags);
-    ptr64 = (u64 *)qinval_entry;
     return 0;
 }
 
@@ -185,7 +191,7 @@ static int queue_invalidate_wait(struct iommu *iommu,
     spin_lock_irqsave(&qi_ctrl->qinval_poll_lock, flags);
     spin_lock_irqsave(&iommu->register_lock, flags);
     index = qinval_next_index(iommu);
-    if (*saddr == 1)
+    if ( *saddr == 1 )
         *saddr = 0;
     ret = gen_wait_dsc(iommu, index, iflag, sw, fn, sdata, saddr);
     ret |= qinval_update_qtail(iommu, index);
@@ -196,8 +202,10 @@ static int queue_invalidate_wait(struct iommu *iommu,
     {
         /* In case all wait descriptor writes to same addr with same data */
         start_time = jiffies;
-        while ( *saddr != 1 ) {
-            if (time_after(jiffies, start_time + DMAR_OPERATION_TIMEOUT)) {
+        while ( *saddr != 1 )
+        {
+            if ( time_after(jiffies, start_time + DMAR_OPERATION_TIMEOUT) )
+            {
                 print_qi_regs(iommu);
                 panic("queue invalidate wait descriptor was not executed\n");
             }
@@ -213,7 +221,7 @@ int invalidate_sync(struct iommu *iommu)
     int ret = -1;
     struct qi_ctrl *qi_ctrl = iommu_qi_ctrl(iommu);
 
-    if (qi_ctrl->qinval)
+    if ( qi_ctrl->qinval_maddr == 0 )
     {
         ret = queue_invalidate_wait(iommu,
             0, 1, 1, 1, &qi_ctrl->qinval_poll_status);
@@ -226,14 +234,16 @@ static int gen_dev_iotlb_inv_dsc(struct iommu *iommu, int index,
     u32 max_invs_pend, u16 sid, u16 size, u64 addr)
 {
     unsigned long flags;
-    struct qinval_entry * qinval_entry = NULL;
+    struct qinval_entry *qinval_entry = NULL, *qinval_entries;
     struct qi_ctrl *qi_ctrl = iommu_qi_ctrl(iommu);
 
     if ( index == -1 )
         return -1;
     spin_lock_irqsave(&qi_ctrl->qinval_lock, flags);
 
-    qinval_entry = &qi_ctrl->qinval[index];
+    qinval_entries =
+        (struct qinval_entry *)map_vtd_domain_page(qi_ctrl->qinval_maddr);
+    qinval_entry = &qinval_entries[index];
     qinval_entry->q.dev_iotlb_inv_dsc.lo.type = TYPE_INVAL_DEVICE_IOTLB;
     qinval_entry->q.dev_iotlb_inv_dsc.lo.res_1 = 0;
     qinval_entry->q.dev_iotlb_inv_dsc.lo.max_invs_pend = max_invs_pend;
@@ -244,6 +254,7 @@ static int gen_dev_iotlb_inv_dsc(struct iommu *iommu, int index,
     qinval_entry->q.dev_iotlb_inv_dsc.hi.size = size;
     qinval_entry->q.dev_iotlb_inv_dsc.hi.addr = addr;
 
+    unmap_vtd_domain_page(qinval_entries);
     spin_unlock_irqrestore(&qi_ctrl->qinval_lock, flags);
     return 0;
 }
@@ -268,14 +279,16 @@ static int gen_iec_inv_dsc(struct iommu *iommu, int index,
     u8 granu, u8 im, u16 iidx)
 {
     unsigned long flags;
-    struct qinval_entry * qinval_entry = NULL;
+    struct qinval_entry *qinval_entry = NULL, *qinval_entries;
     struct qi_ctrl *qi_ctrl = iommu_qi_ctrl(iommu);
 
     if ( index == -1 )
         return -1;
     spin_lock_irqsave(&qi_ctrl->qinval_lock, flags);
 
-    qinval_entry = &qi_ctrl->qinval[index];
+    qinval_entries =
+        (struct qinval_entry *)map_vtd_domain_page(qi_ctrl->qinval_maddr);
+    qinval_entry = &qinval_entries[index];
     qinval_entry->q.iec_inv_dsc.lo.type = TYPE_INVAL_IEC;
     qinval_entry->q.iec_inv_dsc.lo.granu = granu;
     qinval_entry->q.iec_inv_dsc.lo.res_1 = 0;
@@ -284,6 +297,7 @@ static int gen_iec_inv_dsc(struct iommu *iommu, int index,
     qinval_entry->q.iec_inv_dsc.lo.res_2 = 0;
     qinval_entry->q.iec_inv_dsc.hi.res = 0;
 
+    unmap_vtd_domain_page(qinval_entries);
     spin_unlock_irqrestore(&qi_ctrl->qinval_lock, flags);
     return 0;
 }
@@ -349,7 +363,7 @@ static int flush_context_qi(
             did = 0;
     }
 
-    if (qi_ctrl->qinval)
+    if ( qi_ctrl->qinval_maddr != 0 )
     {
         ret = queue_invalidate_context(iommu, did, sid, fm,
                                        type >> DMA_CCMD_INVL_GRANU_OFFSET);
@@ -382,7 +396,8 @@ static int flush_iotlb_qi(
             did = 0;
     }
 
-    if (qi_ctrl->qinval) {
+    if ( qi_ctrl->qinval_maddr != 0 )
+    {
         /* use queued invalidation */
         if (cap_write_drain(iommu->cap))
             dw = 1;
@@ -400,7 +415,6 @@ static int flush_iotlb_qi(
 int qinval_setup(struct iommu *iommu)
 {
     unsigned long start_time;
-    u64 paddr;
     u32 status = 0;
     struct qi_ctrl *qi_ctrl;
     struct iommu_flush *flush;
@@ -411,15 +425,14 @@ int qinval_setup(struct iommu *iommu)
     if ( !ecap_queued_inval(iommu->ecap) )
         return -ENODEV;
 
-    if (qi_ctrl->qinval == NULL) {
-        qi_ctrl->qinval = alloc_xenheap_page();
-        if (qi_ctrl->qinval == NULL)
-            panic("Cannot allocate memory for qi_ctrl->qinval\n");
-        memset((u8*)qi_ctrl->qinval, 0, PAGE_SIZE_4K);
+    if ( qi_ctrl->qinval_maddr == 0 )
+    {
+        qi_ctrl->qinval_maddr = alloc_pgtable_maddr();
+        if ( qi_ctrl->qinval_maddr == 0 )
+            panic("Cannot allocate memory for qi_ctrl->qinval_maddr\n");
         flush->context = flush_context_qi;
         flush->iotlb = flush_iotlb_qi;
     }
-    paddr = virt_to_maddr(qi_ctrl->qinval);
 
     /* Setup Invalidation Queue Address(IQA) register with the
      * address of the page we just allocated.  QS field at
@@ -428,7 +441,7 @@ int qinval_setup(struct iommu *iommu)
      * registers are automatically reset to 0 with write
      * to IQA register.
      */
-    dmar_writeq(iommu->reg, DMAR_IQA_REG, paddr);
+    dmar_writeq(iommu->reg, DMAR_IQA_REG, qi_ctrl->qinval_maddr);
 
     /* enable queued invalidation hardware */
     iommu->gcmd |= DMA_GCMD_QIE;
@@ -436,11 +449,12 @@ int qinval_setup(struct iommu *iommu)
 
     /* Make sure hardware complete it */
     start_time = jiffies;
-    while (1) {
+    while ( 1 )
+    {
         status = dmar_readl(iommu->reg, DMAR_GSTS_REG);
-        if (status & DMA_GSTS_QIES)
+        if ( status & DMA_GSTS_QIES )
             break;
-        if (time_after(jiffies, start_time + DMAR_OPERATION_TIMEOUT))
+        if ( time_after(jiffies, start_time + DMAR_OPERATION_TIMEOUT) )
             panic("Cannot set QIE field for queue invalidation\n");
         cpu_relax();
     }

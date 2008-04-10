@@ -425,7 +425,7 @@ extern struct list_head acpi_rmrr_units;
 extern struct list_head acpi_ioapic_units;
 
 struct qi_ctrl {
-    struct qinval_entry *qinval;         /* queue invalidation page */
+    u64 qinval_maddr;  /* queue invalidation page machine address */
     int qinval_index;                    /* queue invalidation index */
     spinlock_t qinval_lock;      /* lock for queue invalidation page */
     spinlock_t qinval_poll_lock; /* lock for queue invalidation poll addr */
@@ -433,7 +433,7 @@ struct qi_ctrl {
 };
 
 struct ir_ctrl {
-    struct iremap_entry *iremap; /* interrupt remap table */
+    u64 iremap_maddr;            /* interrupt remap table machine address */
     int iremap_index;            /* interrupt remap index */
     spinlock_t iremap_lock;      /* lock for irq remappping table */
 };

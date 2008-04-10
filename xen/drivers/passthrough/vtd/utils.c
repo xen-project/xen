@@ -25,6 +25,7 @@
 #include "../pci-direct.h"
 #include "../pci_regs.h"
 #include "msi.h"
+#include "vtd.h"
 
 #define INTEL   0x8086
 #define SEABURG 0x4000
@@ -243,7 +244,7 @@ u32 get_level_index(unsigned long gmfn, int level)
 }
 
 void print_vtd_entries(
-    struct domain *d, 
+    struct domain *d,
     struct iommu *iommu,
     int bus, int devfn,
     unsigned long gmfn)
@@ -261,37 +262,40 @@ void print_vtd_entries(
     printk("print_vtd_entries: domain_id = %x bdf = %x:%x:%x gmfn = %lx\n",
            d->domain_id, bus, PCI_SLOT(devfn), PCI_FUNC(devfn), gmfn);
 
-    if ( hd->pgd == NULL )
+    if ( hd->pgd_maddr == 0 )
     {
-        printk("    hg->pgd == NULL\n");
+        printk("    hd->pgd_maddr == 0\n");
         return;
     }
-    printk("    d->pgd = %p virt_to_maddr(hd->pgd) = %lx\n",
-           hd->pgd, virt_to_maddr(hd->pgd));
+    printk("    hd->pgd_maddr = %"PRIx64"\n", hd->pgd_maddr);
 
     for_each_drhd_unit ( drhd )
     {
         printk("---- print_vtd_entries %d ----\n", i++);
 
-        root_entry = iommu->root_entry;
-        if ( root_entry == NULL )
+        if ( iommu->root_maddr == 0 )
         {
-            printk("    root_entry == NULL\n");
+            printk("    iommu->root_maddr = 0\n");
             continue;
         }
 
+        root_entry =
+            (struct root_entry *)map_vtd_domain_page(iommu->root_maddr);
+ 
         printk("    root_entry = %p\n", root_entry);
         printk("    root_entry[%x] = %"PRIx64"\n", bus, root_entry[bus].val);
         if ( !root_present(root_entry[bus]) )
         {
+            unmap_vtd_domain_page(root_entry);
             printk("    root_entry[%x] not present\n", bus);
             continue;
         }
 
         ctxt_entry =
-            maddr_to_virt((root_entry[bus].val >> PAGE_SHIFT) << PAGE_SHIFT);
+            (struct context_entry *)map_vtd_domain_page(root_entry[bus].val);
         if ( ctxt_entry == NULL )
         {
+            unmap_vtd_domain_page(root_entry);
             printk("    ctxt_entry == NULL\n");
             continue;
         }
@@ -301,6 +305,8 @@ void print_vtd_entries(
                devfn, ctxt_entry[devfn].hi, ctxt_entry[devfn].lo);
         if ( !context_present(ctxt_entry[devfn]) )
         {
+            unmap_vtd_domain_page(ctxt_entry);
+            unmap_vtd_domain_page(root_entry);
             printk("    ctxt_entry[%x] not present\n", devfn);
             continue;
         }
@@ -308,6 +314,8 @@ void print_vtd_entries(
         if ( level != VTD_PAGE_TABLE_LEVEL_3 &&
              level != VTD_PAGE_TABLE_LEVEL_4)
         {
+            unmap_vtd_domain_page(ctxt_entry);
+            unmap_vtd_domain_page(root_entry);
             printk("Unsupported VTD page table level (%d)!\n", level);
             continue;
         }
@@ -319,6 +327,8 @@ void print_vtd_entries(
             printk("    l%d = %p\n", level, l);
             if ( l == NULL )
             {
+                unmap_vtd_domain_page(ctxt_entry);
+                unmap_vtd_domain_page(root_entry);
                 printk("    l%d == NULL\n", level);
                 break;
             }
@@ -329,6 +339,8 @@ void print_vtd_entries(
             pte.val = l[l_index];
             if ( !dma_pte_present(pte) )
             {
+                unmap_vtd_domain_page(ctxt_entry);
+                unmap_vtd_domain_page(root_entry);
                 printk("    l%d[%x] not present\n", level, l_index);
                 break;
             }

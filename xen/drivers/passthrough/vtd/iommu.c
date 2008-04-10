@@ -185,71 +185,70 @@ void iommu_flush_cache_page(struct iommu *iommu, void *addr)
 
 int nr_iommus;
 /* context entry handling */
-static struct context_entry * device_to_context_entry(struct iommu *iommu,
-                                                      u8 bus, u8 devfn)
+static u64 bus_to_context_maddr(struct iommu *iommu, u8 bus)
 {
-    struct root_entry *root;
-    struct context_entry *context;
-    unsigned long phy_addr;
+    struct root_entry *root, *root_entries;
     unsigned long flags;
+    u64 maddr;
 
     spin_lock_irqsave(&iommu->lock, flags);
-    root = &iommu->root_entry[bus];
+    root_entries = (struct root_entry *)map_vtd_domain_page(iommu->root_maddr);
+    root = &root_entries[bus];
     if ( !root_present(*root) )
     {
-        phy_addr = (unsigned long) alloc_xenheap_page();
-        if ( !phy_addr )
+        maddr = alloc_pgtable_maddr();
+        if ( maddr == 0 )
         {
             spin_unlock_irqrestore(&iommu->lock, flags);
-            return NULL;
+            return 0;
         }
-        memset((void *) phy_addr, 0, PAGE_SIZE);
-        iommu_flush_cache_page(iommu, (void *)phy_addr);
-        phy_addr = virt_to_maddr((void *)phy_addr);
-        set_root_value(*root, phy_addr);
+        set_root_value(*root, maddr);
         set_root_present(*root);
         iommu_flush_cache_entry(iommu, root);
     }
-    phy_addr = (unsigned long) get_context_addr(*root);
-    context = (struct context_entry *)maddr_to_virt(phy_addr);
+    maddr = (u64) get_context_addr(*root);
+    unmap_vtd_domain_page(root_entries);
     spin_unlock_irqrestore(&iommu->lock, flags);
-    return &context[devfn];
+    return maddr;
 }
 
 static int device_context_mapped(struct iommu *iommu, u8 bus, u8 devfn)
 {
-    struct root_entry *root;
+    struct root_entry *root, *root_entries;
     struct context_entry *context;
-    unsigned long phy_addr;
+    u64 context_maddr;
     int ret;
     unsigned long flags;
 
     spin_lock_irqsave(&iommu->lock, flags);
-    root = &iommu->root_entry[bus];
+    root_entries = (struct root_entry *)map_vtd_domain_page(iommu->root_maddr);
+    root = &root_entries[bus];
     if ( !root_present(*root) )
     {
         ret = 0;
         goto out;
     }
-    phy_addr = get_context_addr(*root);
-    context = (struct context_entry *)maddr_to_virt(phy_addr);
+    context_maddr = get_context_addr(*root);
+    context = (struct context_entry *)map_vtd_domain_page(context_maddr);
     ret = context_present(context[devfn]);
+    unmap_vtd_domain_page(context);
  out:
+    unmap_vtd_domain_page(root_entries);
     spin_unlock_irqrestore(&iommu->lock, flags);
     return ret;
 }
 
-static struct page_info *addr_to_dma_page(struct domain *domain, u64 addr)
+static u64 addr_to_dma_page_maddr(struct domain *domain, u64 addr)
 {
     struct hvm_iommu *hd = domain_hvm_iommu(domain);
     struct acpi_drhd_unit *drhd;
     struct iommu *iommu;
     int addr_width = agaw_to_width(hd->agaw);
-    struct dma_pte *parent, *pte = NULL, *pgd;
+    struct dma_pte *parent, *pte = NULL;
     int level = agaw_to_level(hd->agaw);
     int offset;
     unsigned long flags;
-    struct page_info *pg = NULL;
+    u64 pte_maddr = 0;
     u64 *vaddr = NULL;
 
     drhd = list_entry(acpi_drhd_units.next, typeof(*drhd), list);
@@ -257,19 +256,14 @@ static struct page_info *addr_to_dma_page(struct domain *domain, u64 addr)
 
     addr &= (((u64)1) << addr_width) - 1;
     spin_lock_irqsave(&hd->mapping_lock, flags);
-    if ( !hd->pgd )
+    if ( hd->pgd_maddr == 0 )
     {
-        pgd = (struct dma_pte *)alloc_xenheap_page();
-        if ( !pgd )
-        {
-            spin_unlock_irqrestore(&hd->mapping_lock, flags);
-            return NULL;
-        }
-        memset(pgd, 0, PAGE_SIZE);
-        hd->pgd = pgd;
+        hd->pgd_maddr = alloc_pgtable_maddr();
+        if ( hd->pgd_maddr == 0 )
+            return 0;
     }
 
-    parent = hd->pgd;
+    parent = (struct dma_pte *)map_vtd_domain_page(hd->pgd_maddr);
     while ( level > 1 )
     {
         offset = address_level_offset(addr, level);
@@ -277,18 +271,15 @@ static struct page_info *addr_to_dma_page(struct domain *domain, u64 addr)
 
         if ( dma_pte_addr(*pte) == 0 )
         {
-            pg = alloc_domheap_page(
-                NULL, MEMF_node(domain_to_node(domain)));
-            vaddr = map_domain_page(page_to_mfn(pg));
+            u64 maddr = alloc_pgtable_maddr();
+            dma_set_pte_addr(*pte, maddr);
+            vaddr = map_vtd_domain_page(maddr);
             if ( !vaddr )
             {
+                unmap_vtd_domain_page(parent);
                 spin_unlock_irqrestore(&hd->mapping_lock, flags);
-                return NULL;
+                return 0;
             }
-            memset(vaddr, 0, PAGE_SIZE);
-            iommu_flush_cache_page(iommu, vaddr);
-
-            dma_set_pte_addr(*pte, page_to_maddr(pg));
 
             /*
              * high level table always sets r/w, last level
@@ -300,21 +291,20 @@ static struct page_info *addr_to_dma_page(struct domain *domain, u64 addr)
         }
         else
         {
-            pg = maddr_to_page(pte->val);
-            vaddr = map_domain_page(page_to_mfn(pg));
+            vaddr = map_vtd_domain_page(pte->val);
             if ( !vaddr )
             {
+                unmap_vtd_domain_page(parent);
                 spin_unlock_irqrestore(&hd->mapping_lock, flags);
-                return NULL;
+                return 0;
             }
         }
 
-        if ( parent != hd->pgd )
-            unmap_domain_page(parent);
-
-        if ( level == 2 && vaddr )
+        unmap_vtd_domain_page(parent);
+        if ( level == 2 )
         {
-            unmap_domain_page(vaddr);
+            pte_maddr = pte->val & PAGE_MASK_4K;
+            unmap_vtd_domain_page(vaddr);
             break;
         }
 
@@ -324,43 +314,42 @@ static struct page_info *addr_to_dma_page(struct domain *domain, u64 addr)
     }
 
     spin_unlock_irqrestore(&hd->mapping_lock, flags);
-    return pg;
+    return pte_maddr;
 }
 
 /* return address's page at specific level */
-static struct page_info *dma_addr_level_page(struct domain *domain,
-                                             u64 addr, int level)
+static u64 dma_addr_level_page_maddr(
+    struct domain *domain, u64 addr, int level)
 {
     struct hvm_iommu *hd = domain_hvm_iommu(domain);
     struct dma_pte *parent, *pte = NULL;
     int total = agaw_to_level(hd->agaw);
     int offset;
-    struct page_info *pg = NULL;
+    u64 pg_maddr = hd->pgd_maddr;
 
-    parent = hd->pgd;
+    if ( pg_maddr == 0 )
+        return 0;
+
+    parent = (struct dma_pte *)map_vtd_domain_page(pg_maddr);
     while ( level <= total )
     {
         offset = address_level_offset(addr, total);
         pte = &parent[offset];
         if ( dma_pte_addr(*pte) == 0 )
-        {
-            if ( parent != hd->pgd )
-                unmap_domain_page(parent);
             break;
-        }
 
-        pg = maddr_to_page(pte->val);
-        if ( parent != hd->pgd )
-            unmap_domain_page(parent);
+        pg_maddr = pte->val & PAGE_MASK_4K;
+        unmap_vtd_domain_page(parent);
 
         if ( level == total )
-            return pg;
+            return pg_maddr;
 
-        parent = map_domain_page(page_to_mfn(pg));
+        parent = map_vtd_domain_page(pte->val);
         total--;
     }
 
-    return NULL;
+    unmap_vtd_domain_page(parent);
+    return 0;
 }
 
 static void iommu_flush_write_buffer(struct iommu *iommu)
@@ -639,17 +628,17 @@ static void dma_pte_clear_one(struct domain *domain, u64 addr)
 {
     struct acpi_drhd_unit *drhd;
     struct iommu *iommu;
-    struct dma_pte *pte = NULL;
-    struct page_info *pg = NULL;
+    struct dma_pte *page = NULL, *pte = NULL;
+    u64 pg_maddr;
 
     drhd = list_entry(acpi_drhd_units.next, typeof(*drhd), list);
 
     /* get last level pte */
-    pg = dma_addr_level_page(domain, addr, 1);
-    if ( !pg )
+    pg_maddr = dma_addr_level_page_maddr(domain, addr, 1);
+    if ( pg_maddr == 0 )
         return;
-    pte = (struct dma_pte *)map_domain_page(page_to_mfn(pg));
-    pte += address_level_offset(addr, 1);
+    page = (struct dma_pte *)map_vtd_domain_page(pg_maddr);
+    pte = page + address_level_offset(addr, 1);
     if ( pte )
     {
         dma_clear_pte(*pte);
@@ -665,7 +654,7 @@ static void dma_pte_clear_one(struct domain *domain, u64 addr)
                 iommu_flush_write_buffer(iommu);
         }
     }
-    unmap_domain_page(pte);
+    unmap_vtd_domain_page(page);
 }
 
 /* clear last level pte, a tlb flush should be followed */
@@ -695,11 +684,11 @@ void dma_pte_free_pagetable(struct domain *domain, u64 start, u64 end)
     struct hvm_iommu *hd = domain_hvm_iommu(domain);
     struct iommu *iommu;
     int addr_width = agaw_to_width(hd->agaw);
-    struct dma_pte *pte;
+    struct dma_pte *page, *pte;
     int total = agaw_to_level(hd->agaw);
     int level;
     u32 tmp;
-    struct page_info *pg = NULL;
+    u64 pg_maddr;
 
     drhd = list_entry(acpi_drhd_units.next, typeof(*drhd), list);
     iommu = drhd->iommu;
@@ -717,15 +706,15 @@ void dma_pte_free_pagetable(struct domain *domain, u64 start, u64 end)
 
         while ( tmp < end )
         {
-            pg = dma_addr_level_page(domain, tmp, level);
-            if ( !pg )
+            pg_maddr = dma_addr_level_page_maddr(domain, tmp, level);
+            if ( pg_maddr == 0 )
                 return;
-            pte = (struct dma_pte *)map_domain_page(page_to_mfn(pg));
-            pte += address_level_offset(tmp, level);
+            page = (struct dma_pte *)map_vtd_domain_page(pg_maddr);
+            pte = page + address_level_offset(tmp, level);
             dma_clear_pte(*pte);
             iommu_flush_cache_entry(iommu, pte);
-            unmap_domain_page(pte);
-            free_domheap_page(pg);
+            unmap_vtd_domain_page(page);
+            free_pgtable_maddr(pg_maddr);
 
             tmp += level_size(level);
         }
@@ -735,17 +724,15 @@ void dma_pte_free_pagetable(struct domain *domain, u64 start, u64 end)
     /* free pgd */
     if ( start == 0 && end == ((((u64)1) << addr_width) - 1) )
     {
-        free_xenheap_page((void *)hd->pgd);
-        hd->pgd = NULL;
+        free_pgtable_maddr(hd->pgd_maddr);
+        hd->pgd_maddr = 0;
     }
 }
 
 /* iommu handling */
 static int iommu_set_root_entry(struct iommu *iommu)
 {
-    void *addr;
     u32 cmd, sts;
-    struct root_entry *root;
     unsigned long flags;
 
     if ( iommu == NULL )
@@ -755,25 +742,19 @@ static int iommu_set_root_entry(struct iommu *iommu)
         return -EINVAL;
     }
 
-    if ( unlikely(!iommu->root_entry) )
+    if ( iommu->root_maddr != 0 )
     {
-        root = (struct root_entry *)alloc_xenheap_page();
-        if ( root == NULL )
-            return -ENOMEM;
-
-        memset((u8*)root, 0, PAGE_SIZE);
-        iommu_flush_cache_page(iommu, root);
-
-        if ( cmpxchg((unsigned long *)&iommu->root_entry,
-                     0, (unsigned long)root) != 0 )
-            free_xenheap_page((void *)root);
+        free_pgtable_maddr(iommu->root_maddr);
+        iommu->root_maddr = 0;
     }
-
-    addr = iommu->root_entry;
 
     spin_lock_irqsave(&iommu->register_lock, flags);
 
-    dmar_writeq(iommu->reg, DMAR_RTADDR_REG, virt_to_maddr(addr));
+    iommu->root_maddr = alloc_pgtable_maddr();
+    if ( iommu->root_maddr == 0 )
+        return -ENOMEM;
+
+    dmar_writeq(iommu->reg, DMAR_RTADDR_REG, iommu->root_maddr);
     cmd = iommu->gcmd | DMA_GCMD_SRTP;
     dmar_writel(iommu->reg, DMAR_GCMD_REG, cmd);
 
@@ -1110,8 +1091,11 @@ static void free_iommu(struct iommu *iommu)
 {
     if ( !iommu )
         return;
-    if ( iommu->root_entry )
-        free_xenheap_page((void *)iommu->root_entry);
+    if ( iommu->root_maddr != 0 )
+    {
+        free_pgtable_maddr(iommu->root_maddr);
+        iommu->root_maddr = 0;
+    }
     if ( iommu->reg )
         iounmap(iommu->reg);
     free_intel_iommu(iommu->intel);
@@ -1166,13 +1150,17 @@ static int domain_context_mapping_one(
     u8 bus, u8 devfn)
 {
     struct hvm_iommu *hd = domain_hvm_iommu(domain);
-    struct context_entry *context;
+    struct context_entry *context, *context_entries;
     unsigned long flags;
     int ret = 0;
+    u64 maddr;
 
-    context = device_to_context_entry(iommu, bus, devfn);
+    maddr = bus_to_context_maddr(iommu, bus);
+    context_entries = (struct context_entry *)map_vtd_domain_page(maddr);
+    context = &context_entries[devfn];
     if ( !context )
     {
+        unmap_vtd_domain_page(context_entries);
         gdprintk(XENLOG_ERR VTDPREFIX,
                  "domain_context_mapping_one:context == NULL:"
                  "bdf = %x:%x:%x\n",
@@ -1182,6 +1170,7 @@ static int domain_context_mapping_one(
 
     if ( context_present(*context) )
     {
+        unmap_vtd_domain_page(context_entries);
         gdprintk(XENLOG_WARNING VTDPREFIX,
                  "domain_context_mapping_one:context present:bdf=%x:%x:%x\n",
                  bus, PCI_SLOT(devfn), PCI_FUNC(devfn));
@@ -1202,19 +1191,8 @@ static int domain_context_mapping_one(
     else
     {
 #endif
-        if ( !hd->pgd )
-        {
-            struct dma_pte *pgd = (struct dma_pte *)alloc_xenheap_page();
-            if ( !pgd )
-            {
-                spin_unlock_irqrestore(&hd->mapping_lock, flags);
-                return -ENOMEM;
-            }
-            memset(pgd, 0, PAGE_SIZE);
-            hd->pgd = pgd;
-        }
- 
-        context_set_address_root(*context, virt_to_maddr(hd->pgd));
+        ASSERT(hd->pgd_maddr != 0);
+        context_set_address_root(*context, hd->pgd_maddr);
         context_set_translation_type(*context, CONTEXT_TT_MULTI_LEVEL);
 #ifdef CONTEXT_PASSTHRU
     }
@@ -1226,9 +1204,11 @@ static int domain_context_mapping_one(
 
     gdprintk(XENLOG_INFO VTDPREFIX,
              "domain_context_mapping_one-%x:%x:%x-*context=%"PRIx64":%"PRIx64
-             " hd->pgd=%p\n",
+             " hd->pgd_maddr=%"PRIx64"\n",
              bus, PCI_SLOT(devfn), PCI_FUNC(devfn),
-             context->hi, context->lo, hd->pgd);
+             context->hi, context->lo, hd->pgd_maddr);
+
+    unmap_vtd_domain_page(context_entries);
 
     if ( iommu_flush_context_device(iommu, domain_iommu_domid(domain),
                                     (((u16)bus) << 8) | devfn,
@@ -1389,12 +1369,16 @@ static int domain_context_unmap_one(
     struct iommu *iommu,
     u8 bus, u8 devfn)
 {
-    struct context_entry *context;
+    struct context_entry *context, *context_entries;
     unsigned long flags;
+    u64 maddr;
 
-    context = device_to_context_entry(iommu, bus, devfn);
+    maddr = bus_to_context_maddr(iommu, bus);
+    context_entries = (struct context_entry *)map_vtd_domain_page(maddr);
+    context = &context_entries[devfn];
     if ( !context )
     {
+        unmap_vtd_domain_page(context_entries);
         gdprintk(XENLOG_ERR VTDPREFIX,
                  "domain_context_unmap_one-%x:%x:%x- context == NULL:return\n",
                  bus, PCI_SLOT(devfn), PCI_FUNC(devfn));
@@ -1403,6 +1387,7 @@ static int domain_context_unmap_one(
 
     if ( !context_present(*context) )
     {
+        unmap_vtd_domain_page(context_entries);
         gdprintk(XENLOG_WARNING VTDPREFIX,
                  "domain_context_unmap_one-%x:%x:%x- "
                  "context NOT present:return\n",
@@ -1420,6 +1405,7 @@ static int domain_context_unmap_one(
     iommu_flush_cache_entry(iommu, context);
     iommu_flush_context_global(iommu, 0);
     iommu_flush_iotlb_global(iommu, 0);
+    unmap_vtd_domain_page(context_entries);
     spin_unlock_irqrestore(&iommu->lock, flags);
 
     return 0;
@@ -1575,36 +1561,7 @@ void iommu_domain_teardown(struct domain *d)
         return;
 
     iommu_domid_release(d);
-
-#if CONFIG_PAGING_LEVELS == 3
-    {
-        struct hvm_iommu *hd  = domain_hvm_iommu(d);
-        int level = agaw_to_level(hd->agaw);
-        struct dma_pte *pgd = NULL;
-
-        switch ( level )
-        {
-        case VTD_PAGE_TABLE_LEVEL_3:
-            if ( hd->pgd )
-                free_xenheap_page((void *)hd->pgd);
-            break;
-        case VTD_PAGE_TABLE_LEVEL_4:
-            if ( hd->pgd )
-            {
-                pgd = hd->pgd;
-                if ( pgd[0].val != 0 )
-                    free_xenheap_page((void*)maddr_to_virt(
-                        dma_pte_addr(pgd[0])));
-                free_xenheap_page((void *)hd->pgd);
-            }
-            break;
-        default:
-            gdprintk(XENLOG_ERR VTDPREFIX,
-                     "Unsupported p2m table sharing level!\n");
-            break;
-        }
-    }
-#endif
+    iommu_free_pgd(d);
     return_devices_to_dom0(d);
 }
 
@@ -1630,8 +1587,8 @@ int intel_iommu_map_page(
 {
     struct acpi_drhd_unit *drhd;
     struct iommu *iommu;
-    struct dma_pte *pte = NULL;
-    struct page_info *pg = NULL;
+    struct dma_pte *page = NULL, *pte = NULL;
+    u64 pg_maddr;
 
     drhd = list_entry(acpi_drhd_units.next, typeof(*drhd), list);
     iommu = drhd->iommu;
@@ -1642,15 +1599,15 @@ int intel_iommu_map_page(
         return 0;
 #endif
 
-    pg = addr_to_dma_page(d, (paddr_t)gfn << PAGE_SHIFT_4K);
-    if ( !pg )
+    pg_maddr = addr_to_dma_page_maddr(d, gfn << PAGE_SHIFT_4K);
+    if ( pg_maddr == 0 )
         return -ENOMEM;
-    pte = (struct dma_pte *)map_domain_page(page_to_mfn(pg));
-    pte += gfn & LEVEL_MASK;
+    page = (struct dma_pte *)map_vtd_domain_page(pg_maddr);
+    pte = page + (gfn & LEVEL_MASK);
     dma_set_pte_addr(*pte, (paddr_t)mfn << PAGE_SHIFT_4K);
     dma_set_pte_prot(*pte, DMA_PTE_READ | DMA_PTE_WRITE);
     iommu_flush_cache_entry(iommu, pte);
-    unmap_domain_page(pte);
+    unmap_vtd_domain_page(page);
 
     for_each_drhd_unit ( drhd )
     {
@@ -1690,9 +1647,9 @@ int iommu_page_mapping(struct domain *domain, paddr_t iova,
     struct acpi_drhd_unit *drhd;
     struct iommu *iommu;
     unsigned long start_pfn, end_pfn;
-    struct dma_pte *pte = NULL;
+    struct dma_pte *page = NULL, *pte = NULL;
     int index;
-    struct page_info *pg = NULL;
+    u64 pg_maddr;
 
     drhd = list_entry(acpi_drhd_units.next, typeof(*drhd), list);
     iommu = drhd->iommu;
@@ -1705,15 +1662,15 @@ int iommu_page_mapping(struct domain *domain, paddr_t iova,
     index = 0;
     while ( start_pfn < end_pfn )
     {
-        pg = addr_to_dma_page(domain, iova + PAGE_SIZE_4K * index);
-        if ( !pg )
+        pg_maddr = addr_to_dma_page_maddr(domain, iova + PAGE_SIZE_4K * index);
+        if ( pg_maddr == 0 )
             return -ENOMEM;
-        pte = (struct dma_pte *)map_domain_page(page_to_mfn(pg));
-        pte += start_pfn & LEVEL_MASK;
+        page = (struct dma_pte *)map_vtd_domain_page(pg_maddr);
+        pte = page + (start_pfn & LEVEL_MASK);
         dma_set_pte_addr(*pte, start_pfn << PAGE_SHIFT_4K);
         dma_set_pte_prot(*pte, prot);
         iommu_flush_cache_entry(iommu, pte);
-        unmap_domain_page(pte);
+        unmap_vtd_domain_page(page);
         start_pfn++;
         index++;
     }
@@ -2050,159 +2007,6 @@ int intel_iommu_assign_device(struct domain *d, u8 bus, u8 devfn)
 
     return ret;
 }
-
-void iommu_set_pgd(struct domain *d)
-{
-    struct hvm_iommu *hd  = domain_hvm_iommu(d);
-    unsigned long p2m_table;
-
-    if ( hd->pgd )
-    {
-        gdprintk(XENLOG_INFO VTDPREFIX,
-                 "iommu_set_pgd_1: hd->pgd = %p\n", hd->pgd);
-        hd->pgd = NULL;
-    }
-    p2m_table = mfn_x(pagetable_get_mfn(d->arch.phys_table));
-
-    if ( paging_mode_hap(d) )
-    {
-        int level = agaw_to_level(hd->agaw);
-        struct dma_pte *dpte = NULL;
-        mfn_t pgd_mfn;
-
-        switch ( level )
-        {
-        case VTD_PAGE_TABLE_LEVEL_3:
-            dpte = map_domain_page(p2m_table);
-            if ( !dma_pte_present(*dpte) )
-            {
-                gdprintk(XENLOG_ERR VTDPREFIX,
-                         "iommu_set_pgd: second level wasn't there\n");
-                unmap_domain_page(dpte);
-                return;
-            }
-            pgd_mfn = _mfn(dma_pte_addr(*dpte) >> PAGE_SHIFT_4K);
-            unmap_domain_page(dpte);
-            hd->pgd = maddr_to_virt(pagetable_get_paddr(
-                pagetable_from_mfn(pgd_mfn)));
-            break;
-        case VTD_PAGE_TABLE_LEVEL_4:
-            pgd_mfn = _mfn(p2m_table);
-            hd->pgd = maddr_to_virt(pagetable_get_paddr(
-                pagetable_from_mfn(pgd_mfn)));
-            break;
-        default:
-            gdprintk(XENLOG_ERR VTDPREFIX,
-                     "iommu_set_pgd:Unsupported p2m table sharing level!\n");
-            break;
-        }
-    }
-    else
-    {
-#if CONFIG_PAGING_LEVELS == 3
-        int level = agaw_to_level(hd->agaw);
-        struct dma_pte *pmd = NULL;
-        struct dma_pte *pgd = NULL;
-        struct dma_pte *pte = NULL;
-        l3_pgentry_t *l3e;
-        unsigned long flags;
-        int i;
-
-        spin_lock_irqsave(&hd->mapping_lock, flags);
-        if ( !hd->pgd )
-        {
-            pgd = (struct dma_pte *)alloc_xenheap_page();
-            if ( !pgd )
-            {
-                spin_unlock_irqrestore(&hd->mapping_lock, flags);
-                gdprintk(XENLOG_ERR VTDPREFIX,
-                         "Allocate pgd memory failed!\n");
-                return;
-            }
-            memset(pgd, 0, PAGE_SIZE);
-            hd->pgd = pgd;
-       }
-
-        l3e = map_domain_page(p2m_table);
-        switch ( level )
-        {
-        case VTD_PAGE_TABLE_LEVEL_3:        /* Weybridge */
-            /* We only support 8 entries for the PAE L3 p2m table */
-            for ( i = 0; i < 8 ; i++ )
-            {
-                /* Don't create new L2 entry, use ones from p2m table */
-                pgd[i].val = l3e[i].l3 | _PAGE_PRESENT | _PAGE_RW;
-            }
-            break;
-
-        case VTD_PAGE_TABLE_LEVEL_4:        /* Stoakley */
-            /* We allocate one more page for the top vtd page table. */
-            pmd = (struct dma_pte *)alloc_xenheap_page();
-            if ( !pmd )
-            {
-                unmap_domain_page(l3e);
-                spin_unlock_irqrestore(&hd->mapping_lock, flags);
-                gdprintk(XENLOG_ERR VTDPREFIX,
-                         "Allocate pmd memory failed!\n");
-                return;
-            }
-            memset((u8*)pmd, 0, PAGE_SIZE);
-            pte = &pgd[0];
-            dma_set_pte_addr(*pte, virt_to_maddr(pmd));
-            dma_set_pte_readable(*pte);
-            dma_set_pte_writable(*pte);
-
-            for ( i = 0; i < 8; i++ )
-            {
-                /* Don't create new L2 entry, use ones from p2m table */
-                pmd[i].val = l3e[i].l3 | _PAGE_PRESENT | _PAGE_RW;
-            }
-            break;
-        default:
-            gdprintk(XENLOG_ERR VTDPREFIX,
-                     "iommu_set_pgd:Unsupported p2m table sharing level!\n");
-            break;
-        }
-        unmap_domain_page(l3e);
-        spin_unlock_irqrestore(&hd->mapping_lock, flags);
-#elif CONFIG_PAGING_LEVELS == 4
-        int level = agaw_to_level(hd->agaw);
-        l3_pgentry_t *l3e;
-        mfn_t pgd_mfn;
-
-        switch ( level )
-        {
-        case VTD_PAGE_TABLE_LEVEL_3:
-            l3e = map_domain_page(p2m_table);
-            if ( (l3e_get_flags(*l3e) & _PAGE_PRESENT) == 0 )
-            {
-                gdprintk(XENLOG_ERR VTDPREFIX,
-                         "iommu_set_pgd: second level wasn't there\n");
-                unmap_domain_page(l3e);
-                return;
-            }
-            pgd_mfn = _mfn(l3e_get_pfn(*l3e));
-            unmap_domain_page(l3e);
-            hd->pgd = maddr_to_virt(pagetable_get_paddr(
-                pagetable_from_mfn(pgd_mfn)));
-            break;
-
-        case VTD_PAGE_TABLE_LEVEL_4:
-            pgd_mfn = _mfn(p2m_table);
-            hd->pgd = maddr_to_virt(pagetable_get_paddr(
-                pagetable_from_mfn(pgd_mfn)));
-            break;
-        default:
-            gdprintk(XENLOG_ERR VTDPREFIX,
-                     "iommu_set_pgd:Unsupported p2m table sharing level!\n");
-            break;
-        }
-#endif
-    }
-    gdprintk(XENLOG_INFO VTDPREFIX,
-             "iommu_set_pgd: hd->pgd = %p\n", hd->pgd);
-}
-
 
 u8 iommu_state[MAX_IOMMU_REGS * MAX_IOMMUS];
 int iommu_suspend(void)
