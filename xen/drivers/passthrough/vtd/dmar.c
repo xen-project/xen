@@ -231,7 +231,7 @@ static int scope_device_count(void *start, void *end)
         bus = scope->start_bus;
         depth = (scope->length - sizeof(struct acpi_dev_scope))
 		    / sizeof(struct acpi_pci_path);
-        while ( --depth >= 0 )
+        while ( --depth > 0 )
         {
             bus = read_pci_config_byte(
                 bus, path->dev, path->fn, PCI_SECONDARY_BUS);
@@ -353,7 +353,7 @@ static int __init acpi_parse_dev_scope(
 		    / sizeof(struct acpi_pci_path);
         bus = scope->start_bus;
 
-        while ( --depth >= 0 )
+        while ( --depth > 0 )
         {
             bus = read_pci_config_byte(
                 bus, path->dev, path->fn, PCI_SECONDARY_BUS);
