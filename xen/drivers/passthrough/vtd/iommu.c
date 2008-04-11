@@ -23,13 +23,13 @@
 #include <xen/sched.h>
 #include <xen/xmalloc.h>
 #include <xen/domain_page.h>
-#include <asm/paging.h>
 #include <xen/iommu.h>
 #include <xen/numa.h>
 #include <xen/time.h>
+#include <xen/pci.h>
+#include <asm/paging.h>
 #include "iommu.h"
 #include "dmar.h"
-#include "../pci-direct.h"
 #include "../pci_regs.h"
 #include "msi.h"
 #include "extern.h"
@@ -1228,13 +1228,13 @@ static int __pci_find_next_cap(u8 bus, unsigned int devfn, u8 pos, int cap)
 
     while ( ttl-- )
     {
-        pos = read_pci_config_byte(bus, PCI_SLOT(devfn), PCI_FUNC(devfn), pos);
+        pos = pci_conf_read8(bus, PCI_SLOT(devfn), PCI_FUNC(devfn), pos);
         if ( pos < 0x40 )
             break;
 
         pos &= ~3;
-        id = read_pci_config_byte(bus, PCI_SLOT(devfn), PCI_FUNC(devfn),
-                                  pos + PCI_CAP_LIST_ID);
+        id = pci_conf_read8(bus, PCI_SLOT(devfn), PCI_FUNC(devfn),
+                            pos + PCI_CAP_LIST_ID);
 
         if ( id == 0xff )
             break;
@@ -1258,13 +1258,13 @@ int pdev_type(struct pci_dev *dev)
     u16 class_device;
     u16 status;
 
-    class_device = read_pci_config_16(dev->bus, PCI_SLOT(dev->devfn),
-                                      PCI_FUNC(dev->devfn), PCI_CLASS_DEVICE);
+    class_device = pci_conf_read16(dev->bus, PCI_SLOT(dev->devfn),
+                                   PCI_FUNC(dev->devfn), PCI_CLASS_DEVICE);
     if ( class_device == PCI_CLASS_BRIDGE_PCI )
         return DEV_TYPE_PCI_BRIDGE;
 
-    status = read_pci_config_16(dev->bus, PCI_SLOT(dev->devfn),
-                                PCI_FUNC(dev->devfn), PCI_STATUS);
+    status = pci_conf_read16(dev->bus, PCI_SLOT(dev->devfn),
+                             PCI_FUNC(dev->devfn), PCI_STATUS);
 
     if ( !(status & PCI_STATUS_CAP_LIST) )
         return DEV_TYPE_PCI;
@@ -1292,7 +1292,7 @@ static int domain_context_mapping(
     switch ( type )
     {
     case DEV_TYPE_PCI_BRIDGE:
-        sec_bus = read_pci_config_byte(
+        sec_bus = pci_conf_read8(
             pdev->bus, PCI_SLOT(pdev->devfn),
             PCI_FUNC(pdev->devfn), PCI_SECONDARY_BUS);
 
@@ -1302,7 +1302,7 @@ static int domain_context_mapping(
             bus2bridge[sec_bus].devfn =  pdev->devfn;
         }
 
-        sub_bus = read_pci_config_byte(
+        sub_bus = pci_conf_read8(
             pdev->bus, PCI_SLOT(pdev->devfn),
             PCI_FUNC(pdev->devfn), PCI_SUBORDINATE_BUS);
 
@@ -1425,10 +1425,10 @@ static int domain_context_unmap(
     switch ( type )
     {
     case DEV_TYPE_PCI_BRIDGE:
-        sec_bus = read_pci_config_byte(
+        sec_bus = pci_conf_read8(
             pdev->bus, PCI_SLOT(pdev->devfn),
             PCI_FUNC(pdev->devfn), PCI_SECONDARY_BUS);
-        sub_bus = read_pci_config_byte(
+        sub_bus = pci_conf_read8(
             pdev->bus, PCI_SLOT(pdev->devfn),
             PCI_FUNC(pdev->devfn), PCI_SUBORDINATE_BUS);
 
@@ -1781,7 +1781,7 @@ void __init setup_dom0_devices(void)
         {
             for ( func = 0; func < 8; func++ )
             {
-                l = read_pci_config(bus, dev, func, PCI_VENDOR_ID);
+                l = pci_conf_read32(bus, dev, func, PCI_VENDOR_ID);
                 /* some broken boards return 0 or ~0 if a slot is empty: */
                 if ( (l == 0xffffffff) || (l == 0x00000000) ||
                      (l == 0x0000ffff) || (l == 0xffff0000) )

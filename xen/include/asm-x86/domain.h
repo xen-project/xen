@@ -209,6 +209,7 @@ struct arch_domain
 
     /* I/O-port admin-specified access capabilities. */
     struct rangeset *ioport_caps;
+    uint32_t pci_cf8;
 
     struct hvm_domain hvm_domain;
 

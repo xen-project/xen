@@ -21,9 +21,9 @@
 #include <xen/config.h>
 #include <xen/errno.h>
 #include <xen/iommu.h>
+#include <xen/pci.h>
 #include <asm/amd-iommu.h>
 #include <asm/hvm/svm/amd-iommu-proto.h>
-#include "../pci-direct.h"
 #include "../pci_regs.h"
 
 static int __init valid_bridge_bus_config(
@@ -31,9 +31,9 @@ static int __init valid_bridge_bus_config(
 {
     int pri_bus;
 
-    pri_bus = read_pci_config_byte(bus, dev, func, PCI_PRIMARY_BUS);
-    *sec_bus = read_pci_config_byte(bus, dev, func, PCI_SECONDARY_BUS);
-    *sub_bus = read_pci_config_byte(bus, dev, func, PCI_SUBORDINATE_BUS);
+    pri_bus = pci_conf_read8(bus, dev, func, PCI_PRIMARY_BUS);
+    *sec_bus = pci_conf_read8(bus, dev, func, PCI_SECONDARY_BUS);
+    *sub_bus = pci_conf_read8(bus, dev, func, PCI_SUBORDINATE_BUS);
 
     return ((pri_bus == bus) && (*sec_bus > bus) && (*sub_bus >= *sec_bus));
 }
@@ -59,12 +59,11 @@ int __init get_iommu_last_downstream_bus(struct amd_iommu *iommu)
         }
         func = PCI_FUNC(devfn);
  
-        if ( !VALID_PCI_VENDOR_ID(
-            read_pci_config_16(bus, dev, func, PCI_VENDOR_ID)) )
+        if ( !VALID_PCI_VENDOR_ID(pci_conf_read16(bus, dev, func,
+                                                  PCI_VENDOR_ID)) )
             continue;
 
-        hdr_type = read_pci_config_byte(bus, dev, func,
-                                        PCI_HEADER_TYPE);
+        hdr_type = pci_conf_read8(bus, dev, func, PCI_HEADER_TYPE);
         if ( func == 0 )
             multi_func = IS_PCI_MULTI_FUNCTION(hdr_type);
 
@@ -92,9 +91,9 @@ int __init get_iommu_capabilities(u8 bus, u8 dev, u8 func, u8 cap_ptr,
     u32 cap_header, cap_range, misc_info;
     u64 mmio_bar;
 
-    mmio_bar = (u64)read_pci_config(
+    mmio_bar = (u64)pci_conf_read32(
         bus, dev, func, cap_ptr + PCI_CAP_MMIO_BAR_HIGH_OFFSET) << 32;
-    mmio_bar |= read_pci_config(bus, dev, func,
+    mmio_bar |= pci_conf_read32(bus, dev, func,
                                 cap_ptr + PCI_CAP_MMIO_BAR_LOW_OFFSET);
     iommu->mmio_base_phys = mmio_bar & (u64)~0x3FFF;
 
@@ -108,7 +107,7 @@ int __init get_iommu_capabilities(u8 bus, u8 dev, u8 func, u8 cap_ptr,
     iommu->bdf = (bus << 8) | PCI_DEVFN(dev, func);
     iommu->cap_offset = cap_ptr;
 
-    cap_header = read_pci_config(bus, dev, func, cap_ptr);
+    cap_header = pci_conf_read32(bus, dev, func, cap_ptr);
     iommu->revision = get_field_from_reg_u32(
         cap_header, PCI_CAP_REV_MASK, PCI_CAP_REV_SHIFT);
     iommu->iotlb_support = get_field_from_reg_u32(
@@ -118,7 +117,7 @@ int __init get_iommu_capabilities(u8 bus, u8 dev, u8 func, u8 cap_ptr,
     iommu->pte_not_present_cached = get_field_from_reg_u32(
         cap_header, PCI_CAP_NP_CACHE_MASK, PCI_CAP_NP_CACHE_SHIFT);
 
-    cap_range = read_pci_config(bus, dev, func,
+    cap_range = pci_conf_read32(bus, dev, func,
                                 cap_ptr + PCI_CAP_RANGE_OFFSET);
     iommu->unit_id = get_field_from_reg_u32(
         cap_range, PCI_CAP_UNIT_ID_MASK, PCI_CAP_UNIT_ID_SHIFT);
@@ -129,7 +128,7 @@ int __init get_iommu_capabilities(u8 bus, u8 dev, u8 func, u8 cap_ptr,
     iommu->last_devfn = get_field_from_reg_u32(
         cap_range, PCI_CAP_LAST_DEVICE_MASK, PCI_CAP_LAST_DEVICE_SHIFT);
 
-    misc_info = read_pci_config(bus, dev, func,
+    misc_info = pci_conf_read32(bus, dev, func,
                                 cap_ptr + PCI_MISC_INFO_OFFSET);
     iommu->msi_number = get_field_from_reg_u32(
         misc_info, PCI_CAP_MSI_NUMBER_MASK, PCI_CAP_MSI_NUMBER_SHIFT);
@@ -146,14 +145,13 @@ static int __init scan_caps_for_iommu(
     int count, error = 0;
 
     count = 0;
-    cap_ptr = read_pci_config_byte(bus, dev, func,
-                                   PCI_CAPABILITY_LIST);
+    cap_ptr = pci_conf_read8(bus, dev, func, PCI_CAPABILITY_LIST);
     while ( (cap_ptr >= PCI_MIN_CAP_OFFSET) &&
             (count < PCI_MAX_CAP_BLOCKS) &&
             !error )
     {
         cap_ptr &= PCI_CAP_PTR_MASK;
-        cap_header = read_pci_config(bus, dev, func, cap_ptr);
+        cap_header = pci_conf_read32(bus, dev, func, cap_ptr);
         cap_id = get_field_from_reg_u32(
             cap_header, PCI_CAP_ID_MASK, PCI_CAP_ID_SHIFT);
 
@@ -182,12 +180,11 @@ static int __init scan_functions_for_iommu(
 
     func = 0;
     count = 1;
-    while ( VALID_PCI_VENDOR_ID(read_pci_config_16(bus, dev, func,
-                                                   PCI_VENDOR_ID)) &&
+    while ( VALID_PCI_VENDOR_ID(pci_conf_read16(bus, dev, func,
+                                                PCI_VENDOR_ID)) &&
             !error && (func < count) )
     {
-        hdr_type = read_pci_config_byte(bus, dev, func,
-                                        PCI_HEADER_TYPE);
+        hdr_type = pci_conf_read8(bus, dev, func, PCI_HEADER_TYPE);
 
         if ( func == 0 && IS_PCI_MULTI_FUNCTION(hdr_type) )
             count = PCI_MAX_FUNC_COUNT;

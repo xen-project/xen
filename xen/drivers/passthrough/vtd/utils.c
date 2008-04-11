@@ -21,9 +21,9 @@
 #include <xen/delay.h>
 #include <xen/iommu.h>
 #include <xen/time.h>
+#include <xen/pci.h>
 #include "iommu.h"
 #include "dmar.h"
-#include "../pci-direct.h"
 #include "../pci_regs.h"
 #include "msi.h"
 #include "vtd.h"
@@ -37,7 +37,7 @@ int is_usb_device(struct pci_dev *pdev)
     u8 bus = pdev->bus;
     u8 dev = PCI_SLOT(pdev->devfn);
     u8 func = PCI_FUNC(pdev->devfn);
-    u16 class = read_pci_config_16(bus, dev, func, PCI_CLASS_DEVICE);
+    u16 class = pci_conf_read16(bus, dev, func, PCI_CLASS_DEVICE);
     return (class == 0xc03);
 }
 
@@ -46,9 +46,9 @@ int vtd_hw_check(void)
     u16 vendor, device;
     u8 revision, stepping;
 
-    vendor   = read_pci_config_16(0, 0, 0, PCI_VENDOR_ID);
-    device   = read_pci_config_16(0, 0, 0, PCI_DEVICE_ID);
-    revision = read_pci_config_byte(0, 0, 0, PCI_REVISION_ID);
+    vendor   = pci_conf_read16(0, 0, 0, PCI_VENDOR_ID);
+    device   = pci_conf_read16(0, 0, 0, PCI_DEVICE_ID);
+    revision = pci_conf_read8(0, 0, 0, PCI_REVISION_ID);
     stepping = revision & 0xf;
 
     if ( (vendor == INTEL) && (device == SEABURG) )
@@ -103,18 +103,18 @@ static u8 find_cap_offset(u8 bus, u8 dev, u8 func, u8 cap)
     u8 pos = PCI_CAPABILITY_LIST;
     u16 status;
 
-    status = read_pci_config_16(bus, dev, func, PCI_STATUS);
+    status = pci_conf_read16(bus, dev, func, PCI_STATUS);
     if ( (status & PCI_STATUS_CAP_LIST) == 0 )
         return 0;
 
     while ( max_cap-- )
     {
-        pos = read_pci_config_byte(bus, dev, func, pos);
+        pos = pci_conf_read8(bus, dev, func, pos);
         if ( pos < 0x40 )
             break;
 
         pos &= ~3;
-        id = read_pci_config_byte(bus, dev, func, pos + PCI_CAP_LIST_ID);
+        id = pci_conf_read8(bus, dev, func, pos + PCI_CAP_LIST_ID);
 
         if ( id == 0xff )
             break;
@@ -143,13 +143,13 @@ void pdev_flr(u8 bus, u8 devfn)
     pos = find_cap_offset(bus, dev, func, PCI_CAP_ID_EXP);
     if ( pos != 0 )
     {
-        dev_cap = read_pci_config(bus, dev, func, pos + PCI_EXP_DEVCAP);
+        dev_cap = pci_conf_read32(bus, dev, func, pos + PCI_EXP_DEVCAP);
         if ( dev_cap & PCI_EXP_DEVCAP_FLR )
         {
-            write_pci_config(bus, dev, func,
+            pci_conf_write32(bus, dev, func,
                              pos + PCI_EXP_DEVCTL, PCI_EXP_DEVCTL_FLR);
             do {
-                dev_status = read_pci_config(bus, dev, func,
+                dev_status = pci_conf_read32(bus, dev, func,
                                              pos + PCI_EXP_DEVSTA);
             } while ( dev_status & PCI_EXP_DEVSTA_TRPND );
 
@@ -169,23 +169,23 @@ void pdev_flr(u8 bus, u8 devfn)
             int i;
             u32 config[PCI_CONFIG_DWORD_SIZE];
             for ( i = 0; i < PCI_CONFIG_DWORD_SIZE; i++ )
-                config[i] = read_pci_config(bus, dev, func, i*4);
+                config[i] = pci_conf_read32(bus, dev, func, i*4);
 
             /* Enter D3hot without soft reset */
-            pm_ctl = read_pci_config(bus, dev, func, pos + PCI_PM_CTRL);
+            pm_ctl = pci_conf_read32(bus, dev, func, pos + PCI_PM_CTRL);
             pm_ctl |= PCI_PM_CTRL_NO_SOFT_RESET;
             pm_ctl &= ~PCI_PM_CTRL_STATE_MASK;
             pm_ctl |= PCI_D3hot;
-            write_pci_config(bus, dev, func, pos + PCI_PM_CTRL, pm_ctl);
+            pci_conf_write32(bus, dev, func, pos + PCI_PM_CTRL, pm_ctl);
             mdelay(10);
 
             /* From D3hot to D0 */
-            write_pci_config(bus, dev, func, pos + PCI_PM_CTRL, 0);
+            pci_conf_write32(bus, dev, func, pos + PCI_PM_CTRL, 0);
             mdelay(10);
 
             /* Write saved configurations to device */
             for ( i = 0; i < PCI_CONFIG_DWORD_SIZE; i++ )
-                write_pci_config(bus, dev, func, i*4, config[i]);
+                pci_conf_write32(bus, dev, func, i*4, config[i]);
 
             flr = 1;
         }

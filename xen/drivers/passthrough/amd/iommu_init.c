@@ -20,10 +20,10 @@
 
 #include <xen/config.h>
 #include <xen/errno.h>
+#include <xen/pci.h>
 #include <asm/amd-iommu.h>
 #include <asm/hvm/svm/amd-iommu-proto.h>
 #include <asm-x86/fixmap.h>
-#include "../pci-direct.h"
 #include "../pci_regs.h"
 
 extern int nr_amd_iommus;

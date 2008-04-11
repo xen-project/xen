@@ -1353,7 +1353,7 @@ static int read_gate_descriptor(unsigned int gate_sel,
 #endif
 
 /* Has the guest requested sufficient permission for this I/O access? */
-static inline int guest_io_okay(
+static int guest_io_okay(
     unsigned int port, unsigned int bytes,
     struct vcpu *v, struct cpu_user_regs *regs)
 {
@@ -1395,19 +1395,130 @@ static inline int guest_io_okay(
 }
 
 /* Has the administrator granted sufficient permission for this I/O access? */
-static inline int admin_io_okay(
+static int admin_io_okay(
     unsigned int port, unsigned int bytes,
     struct vcpu *v, struct cpu_user_regs *regs)
 {
     return ioports_access_permitted(v->domain, port, port + bytes - 1);
 }
 
-#define guest_inb_okay(_p, _d, _r) admin_io_okay(_p, 1, _d, _r)
-#define guest_inw_okay(_p, _d, _r) admin_io_okay(_p, 2, _d, _r)
-#define guest_inl_okay(_p, _d, _r) admin_io_okay(_p, 4, _d, _r)
-#define guest_outb_okay(_p, _d, _r) admin_io_okay(_p, 1, _d, _r)
-#define guest_outw_okay(_p, _d, _r) admin_io_okay(_p, 2, _d, _r)
-#define guest_outl_okay(_p, _d, _r) admin_io_okay(_p, 4, _d, _r)
+static uint32_t guest_io_read(
+    unsigned int port, unsigned int bytes,
+    struct vcpu *v, struct cpu_user_regs *regs)
+{
+    extern uint32_t pci_conf_read(
+        uint32_t cf8, uint8_t offset, uint8_t bytes);
+
+    uint32_t data = 0;
+    unsigned int shift = 0;
+
+    if ( admin_io_okay(port, bytes, v, regs) )
+    {
+        switch ( bytes )
+        {
+        case 1: return inb(port);
+        case 2: return inw(port);
+        case 4: return inl(port);
+        }
+    }
+
+    while ( bytes != 0 )
+    {
+        unsigned int size = 1;
+        uint32_t sub_data = 0xff;
+
+        if ( (port == 0x42) || (port == 0x43) || (port == 0x61) )
+        {
+            sub_data = pv_pit_handler(port, 0, 0);
+        }
+        else if ( (port & 0xfffc) == 0xcf8 )
+        {
+            size = min(bytes, 4 - (port & 3));
+            sub_data = v->domain->arch.pci_cf8 >> ((port & 3) * 8);
+        }
+        else if ( ((port & 0xfffc) == 0xcfc) && IS_PRIV(v->domain) )
+        {
+            size = min(bytes, 4 - (port & 3));
+            if ( size == 3 )
+                size = 2;
+            sub_data = pci_conf_read(v->domain->arch.pci_cf8, port & 3, size);
+        }
+
+        if ( size == 4 )
+            return sub_data;
+
+        data |= (sub_data & ((1u << (size * 8)) - 1)) << shift;
+        shift += size * 8;
+        port += size;
+        bytes -= size;
+    }
+
+    return data;
+}
+
+static void guest_io_write(
+    unsigned int port, unsigned int bytes, uint32_t data,
+    struct vcpu *v, struct cpu_user_regs *regs)
+{
+    extern void pci_conf_write(
+        uint32_t cf8, uint8_t offset, uint8_t bytes, uint32_t data);
+
+    if ( admin_io_okay(port, bytes, v, regs) )
+    {
+        switch ( bytes ) {
+        case 1:
+            outb((uint8_t)data, port);
+            if ( pv_post_outb_hook )
+                pv_post_outb_hook(port, (uint8_t)data);
+            break;
+        case 2:
+            outw((uint16_t)data, port);
+            break;
+        case 4:
+            outl(data, port);
+            break;
+        }
+        return;
+    }
+
+    while ( bytes != 0 )
+    {
+        unsigned int size = 1;
+
+        if ( (port == 0x42) || (port == 0x43) || (port == 0x61) )
+        {
+            pv_pit_handler(port, (uint8_t)data, 1);
+        }
+        else if ( (port & 0xfffc) == 0xcf8 )
+        {
+            size = min(bytes, 4 - (port & 3));
+            if ( size == 4 )
+            {
+                v->domain->arch.pci_cf8 = data;
+            }
+            else
+            {
+                uint32_t mask = ((1u << (size * 8)) - 1) << ((port & 3) * 8);
+                v->domain->arch.pci_cf8 &= ~mask;
+                v->domain->arch.pci_cf8 |= (data << ((port & 3) * 8)) & mask;
+            }
+        }
+        else if ( ((port & 0xfffc) == 0xcfc) && IS_PRIV(v->domain) )
+        {
+            size = min(bytes, 4 - (port & 3));
+            if ( size == 3 )
+                size = 2;
+            pci_conf_write(v->domain->arch.pci_cf8, port & 3, size, data);
+        }
+
+        if ( size == 4 )
+            return;
+
+        port += size;
+        bytes -= size;
+        data >>= size * 8;
+    }
+}
 
 /* I/O emulation support. Helper routines for, and type of, the stack stub.*/
 void host_to_guest_gpr_switch(struct cpu_user_regs *)
@@ -1526,7 +1637,7 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
 
     /* REX prefix. */
     if ( rex & 8 ) /* REX.W */
-        op_bytes = 4; /* emulating only opcodes not supporting 64-bit operands */
+        op_bytes = 4; /* emulate only opcodes not supporting 64-bit operands */
     modrm_reg = (rex & 4) << 1;  /* REX.R */
     /* REX.X does not need to be decoded. */
     modrm_rm  = (rex & 1) << 3;  /* REX.B */
@@ -1555,7 +1666,8 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
         {
             if ( !read_descriptor(data_sel, v, regs,
                                   &data_base, &data_limit, &ar,
-                                  _SEGMENT_WR|_SEGMENT_S|_SEGMENT_DPL|_SEGMENT_P) )
+                                  _SEGMENT_WR|_SEGMENT_S|_SEGMENT_DPL|
+                                  _SEGMENT_P) )
                 goto fail;
             if ( !(ar & _SEGMENT_S) ||
                  !(ar & _SEGMENT_P) ||
@@ -1602,69 +1714,39 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
         case 0x6c: /* INSB */
             op_bytes = 1;
         case 0x6d: /* INSW/INSL */
-            if ( data_limit < op_bytes - 1 ||
-                 rd_ad(edi) > data_limit - (op_bytes - 1) ||
+            if ( (data_limit < (op_bytes - 1)) ||
+                 (rd_ad(edi) > (data_limit - (op_bytes - 1))) ||
                  !guest_io_okay(port, op_bytes, v, regs) )
                 goto fail;
-            switch ( op_bytes )
-            {
-            case 1:
-                /* emulate PIT counter 2 */
-                data = (u8)(guest_inb_okay(port, v, regs) ? inb(port) : 
-                       ((port == 0x42 || port == 0x43 || port == 0x61) ?
-                       pv_pit_handler(port, 0, 0) : ~0)); 
-                break;
-            case 2:
-                data = (u16)(guest_inw_okay(port, v, regs) ? inw(port) : ~0);
-                break;
-            case 4:
-                data = (u32)(guest_inl_okay(port, v, regs) ? inl(port) : ~0);
-                break;
-            }
-            if ( (rc = copy_to_user((void *)data_base + rd_ad(edi), &data, op_bytes)) != 0 )
+            data = guest_io_read(port, op_bytes, v, regs);
+            if ( (rc = copy_to_user((void *)data_base + rd_ad(edi),
+                                    &data, op_bytes)) != 0 )
             {
                 propagate_page_fault(data_base + rd_ad(edi) + op_bytes - rc,
                                      PFEC_write_access);
                 return EXCRET_fault_fixed;
             }
-            wr_ad(edi, regs->edi + (int)((regs->eflags & EF_DF) ? -op_bytes : op_bytes));
+            wr_ad(edi, regs->edi + (int)((regs->eflags & EF_DF)
+                                         ? -op_bytes : op_bytes));
             break;
 
         case 0x6e: /* OUTSB */
             op_bytes = 1;
         case 0x6f: /* OUTSW/OUTSL */
-            if ( data_limit < op_bytes - 1 ||
-                 rd_ad(esi) > data_limit - (op_bytes - 1) ||
-                 !guest_io_okay(port, op_bytes, v, regs) )
+            if ( (data_limit < (op_bytes - 1)) ||
+                 (rd_ad(esi) > (data_limit - (op_bytes - 1))) ||
+                  !guest_io_okay(port, op_bytes, v, regs) )
                 goto fail;
-            rc = copy_from_user(&data, (void *)data_base + rd_ad(esi), op_bytes);
-            if ( rc != 0 )
+            if ( (rc = copy_from_user(&data, (void *)data_base + rd_ad(esi),
+                                      op_bytes)) != 0 )
             {
-                propagate_page_fault(data_base + rd_ad(esi) + op_bytes - rc, 0);
+                propagate_page_fault(data_base + rd_ad(esi)
+                                     + op_bytes - rc, 0);
                 return EXCRET_fault_fixed;
             }
-            switch ( op_bytes )
-            {
-            case 1:
-                if ( guest_outb_okay(port, v, regs) )
-                {
-                    outb((u8)data, port);
-                    if ( pv_post_outb_hook )
-                        pv_post_outb_hook(port, data);
-                }
-                else if ( port == 0x42 || port == 0x43 || port == 0x61 )
-                    pv_pit_handler(port, data, 1);
-                break;
-            case 2:
-                if ( guest_outw_okay(port, v, regs) )
-                    outw((u16)data, port);
-                break;
-            case 4:
-                if ( guest_outl_okay(port, v, regs) )
-                    outl((u32)data, port);
-                break;
-            }
-            wr_ad(esi, regs->esi + (int)((regs->eflags & EF_DF) ? -op_bytes : op_bytes));
+            guest_io_write(port, op_bytes, data, v, regs);
+            wr_ad(esi, regs->esi + (int)((regs->eflags & EF_DF)
+                                         ? -op_bytes : op_bytes));
             break;
         }
 
@@ -1728,31 +1810,17 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
     exec_in:
         if ( !guest_io_okay(port, op_bytes, v, regs) )
             goto fail;
-        switch ( op_bytes )
+        if ( admin_io_okay(port, op_bytes, v, regs) )
         {
-        case 1:
-            if ( guest_inb_okay(port, v, regs) )
-                io_emul(regs);
-            else if ( port == 0x42 || port == 0x43 || port == 0x61 )
-            {
-                regs->eax &= ~0xffUL;
-                regs->eax |= pv_pit_handler(port, 0, 0);
-            } 
+            io_emul(regs);            
+        }
+        else
+        {
+            if ( op_bytes == 4 )
+                regs->eax = 0;
             else
-                regs->eax |= (u8)~0;
-            break;
-        case 2:
-            if ( guest_inw_okay(port, v, regs) )
-                io_emul(regs);
-            else
-                regs->eax |= (u16)~0;
-            break;
-        case 4:
-            if ( guest_inl_okay(port, v, regs) )
-                io_emul(regs);
-            else
-                regs->eax = (u32)~0;
-            break;
+                regs->eax &= ~((1u << (op_bytes * 8)) - 1);
+            regs->eax |= guest_io_read(port, op_bytes, v, regs);
         }
         bpmatch = check_guest_io_breakpoint(v, port, op_bytes);
         goto done;
@@ -1771,26 +1839,15 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
     exec_out:
         if ( !guest_io_okay(port, op_bytes, v, regs) )
             goto fail;
-        switch ( op_bytes )
+        if ( admin_io_okay(port, op_bytes, v, regs) )
         {
-        case 1:
-            if ( guest_outb_okay(port, v, regs) )
-            {
-                io_emul(regs);
-                if ( pv_post_outb_hook )
-                    pv_post_outb_hook(port, regs->eax);
-            }
-            else if ( port == 0x42 || port == 0x43 || port == 0x61 )
-                pv_pit_handler(port, regs->eax, 1);
-            break;
-        case 2:
-            if ( guest_outw_okay(port, v, regs) )
-                io_emul(regs);
-            break;
-        case 4:
-            if ( guest_outl_okay(port, v, regs) )
-                io_emul(regs);
-            break;
+            io_emul(regs);            
+            if ( (op_bytes == 1) && pv_post_outb_hook )
+                pv_post_outb_hook(port, regs->eax);
+        }
+        else
+        {
+            guest_io_write(port, op_bytes, regs->eax, v, regs);
         }
         bpmatch = check_guest_io_breakpoint(v, port, op_bytes);
         goto done;
