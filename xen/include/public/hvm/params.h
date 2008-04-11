@@ -83,8 +83,13 @@
 
 /* Boolean: Enable virtual HPET (high-precision event timer)? (x86-only) */
 #define HVM_PARAM_HPET_ENABLED 11
+
+/* Identity-map page directory used by Intel EPT when CR0.PG=0. */
 #define HVM_PARAM_IDENT_PT     12
 
-#define HVM_NR_PARAMS          13
+/* Device Model domain, defaults to 0. */
+#define HVM_PARAM_DM_DOMAIN    13
+
+#define HVM_NR_PARAMS          14
 
 #endif /* __XEN_PUBLIC_HVM_PARAMS_H__ */

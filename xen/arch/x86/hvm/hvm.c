@@ -2187,13 +2187,16 @@ long do_hvm_op(unsigned long op, XEN_GUEST_HANDLE(void) arg)
 
         if ( op == HVMOP_set_param )
         {
+            rc = 0;
+
             switch ( a.index )
             {
             case HVM_PARAM_IOREQ_PFN:
                 iorp = &d->arch.hvm_domain.ioreq;
-                rc = hvm_set_ioreq_page(d, iorp, a.value);
+                if ( (rc = hvm_set_ioreq_page(d, iorp, a.value)) != 0 )
+                    break;
                 spin_lock(&iorp->lock);
-                if ( (rc == 0) && (iorp->va != NULL) )
+                if ( iorp->va != NULL )
                     /* Initialise evtchn port info if VCPUs already created. */
                     for_each_vcpu ( d, v )
                         get_ioreq(v)->vp_eport = v->arch.hvm_vcpu.xen_port;
@@ -2208,19 +2211,19 @@ long do_hvm_op(unsigned long op, XEN_GUEST_HANDLE(void) arg)
                 hvm_latch_shinfo_size(d);
                 break;
             case HVM_PARAM_TIMER_MODE:
-                rc = -EINVAL;
                 if ( a.value > HVMPTM_one_missed_tick_pending )
-                    goto param_fail;
+                    rc = -EINVAL;
                 break;
             case HVM_PARAM_IDENT_PT:
                 rc = -EPERM;
-                if ( current->domain->domain_id != 0 )
-                    goto param_fail;
+                if ( !IS_PRIV(current->domain) )
+                    break;
 
                 rc = -EINVAL;
                 if ( d->arch.hvm_domain.params[a.index] != 0 )
-                    goto param_fail;
+                    break;
 
+                rc = 0;
                 if ( !paging_mode_hap(d) )
                     break;
 
@@ -2239,9 +2242,41 @@ long do_hvm_op(unsigned long op, XEN_GUEST_HANDLE(void) arg)
 
                 domain_unpause(d);
                 break;
+            case HVM_PARAM_DM_DOMAIN:
+                /* Privileged domains only, as we must domain_pause(d). */
+                rc = -EPERM;
+                if ( !IS_PRIV_FOR(current->domain, d) )
+                    break;
+
+                if ( a.value == DOMID_SELF )
+                    a.value = current->domain->domain_id;
+
+                rc = 0;
+                domain_pause(d); /* safe to change per-vcpu xen_port */
+                iorp = &d->arch.hvm_domain.ioreq;
+                for_each_vcpu ( d, v )
+                {
+                    int old_port, new_port;
+                    new_port = alloc_unbound_xen_event_channel(v, a.value);
+                    if ( new_port < 0 )
+                    {
+                        rc = new_port;
+                        break;
+                    }
+                    /* xchg() ensures that only we free_xen_event_channel() */
+                    old_port = xchg(&v->arch.hvm_vcpu.xen_port, new_port);
+                    free_xen_event_channel(v, old_port);
+                    spin_lock(&iorp->lock);
+                    if ( iorp->va != NULL )
+                        get_ioreq(v)->vp_eport = v->arch.hvm_vcpu.xen_port;
+                    spin_unlock(&iorp->lock);
+                }
+                domain_unpause(d);
+                break;
             }
-            d->arch.hvm_domain.params[a.index] = a.value;
-            rc = 0;
+
+            if ( rc == 0 )
+                d->arch.hvm_domain.params[a.index] = a.value;
         }
         else
         {
