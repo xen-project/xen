@@ -109,12 +109,24 @@ int compat_grant_table_op(unsigned int cmd,
                 rc = -EFAULT;
             else
             {
-                BUG_ON((COMPAT_ARG_XLAT_SIZE - sizeof(*nat.setup)) / sizeof(*nat.setup->frame_list.p) < max_nr_grant_frames);
+                unsigned int max_frame_list_size_in_page =
+                    (COMPAT_ARG_XLAT_SIZE - sizeof(*nat.setup)) /
+                    sizeof(*nat.setup->frame_list.p);
+                if ( max_frame_list_size_in_page < max_nr_grant_frames )
+                {
+                    gdprintk(XENLOG_WARNING,
+                             "max_nr_grant_frames is too large (%u,%u)\n",
+                             max_nr_grant_frames, max_frame_list_size_in_page);
+                    rc = -EINVAL;
+                }
+                else
+                {
 #define XLAT_gnttab_setup_table_HNDL_frame_list(_d_, _s_) \
-                set_xen_guest_handle((_d_)->frame_list, (unsigned long *)(nat.setup + 1))
-                XLAT_gnttab_setup_table(nat.setup, &cmp.setup);
+                    set_xen_guest_handle((_d_)->frame_list, (unsigned long *)(nat.setup + 1))
+                    XLAT_gnttab_setup_table(nat.setup, &cmp.setup);
 #undef XLAT_gnttab_setup_table_HNDL_frame_list
-                rc = gnttab_setup_table(guest_handle_cast(nat.uop, gnttab_setup_table_t), 1);
+                    rc = gnttab_setup_table(guest_handle_cast(nat.uop, gnttab_setup_table_t), 1);
+                }
             }
             if ( rc == 0 )
             {
