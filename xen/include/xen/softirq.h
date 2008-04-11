@@ -1,24 +1,20 @@
-#ifndef __XEN_SOFTIRQ_H__
+#if !defined(__XEN_SOFTIRQ_H__) && !defined(__ASSEMBLY__)
 #define __XEN_SOFTIRQ_H__
 
-/* Common softirqs come first in the following list. */
-#define TIMER_SOFTIRQ                     0
-#define SCHEDULE_SOFTIRQ                  1
-#define NEW_TLBFLUSH_CLOCK_PERIOD_SOFTIRQ 2
-#define KEYPRESS_SOFTIRQ                  3
-#define NMI_SOFTIRQ                       4
-#define PAGE_SCRUB_SOFTIRQ                5
-#define TRACE_SOFTIRQ                     6
-#define RCU_SOFTIRQ                       7
-#define STOPMACHINE_SOFTIRQ               8
-
-#define NR_COMMON_SOFTIRQS                9
-
-#include <asm/softirq.h>
-
-#define NR_SOFTIRQS (NR_COMMON_SOFTIRQS + NR_ARCH_SOFTIRQS)
-
-#ifndef __ASSEMBLY__
+/* Low-latency softirqs come first in the following list. */
+enum {
+    TIMER_SOFTIRQ = 0,
+    SCHEDULE_SOFTIRQ,
+    NEW_TLBFLUSH_CLOCK_PERIOD_SOFTIRQ,
+    KEYPRESS_SOFTIRQ,
+    NMI_SOFTIRQ,
+    PAGE_SCRUB_SOFTIRQ,
+    TRACE_SOFTIRQ,
+    RCU_SOFTIRQ,
+    STOPMACHINE_SOFTIRQ,
+    TASKLET_SOFTIRQ,
+    NR_COMMON_SOFTIRQS
+};
 
 #include <xen/config.h>
 #include <xen/lib.h>
@@ -26,11 +22,15 @@
 #include <asm/bitops.h>
 #include <asm/current.h>
 #include <asm/hardirq.h>
+#include <asm/softirq.h>
+
+#define NR_SOFTIRQS (NR_COMMON_SOFTIRQS + NR_ARCH_SOFTIRQS)
 
 typedef void (*softirq_handler)(void);
 
 asmlinkage void do_softirq(void);
-extern void open_softirq(int nr, softirq_handler handler);
+void open_softirq(int nr, softirq_handler handler);
+void softirq_init(void);
 
 static inline void cpumask_raise_softirq(cpumask_t mask, unsigned int nr)
 {
@@ -56,6 +56,25 @@ static inline void raise_softirq(unsigned int nr)
     set_bit(nr, &softirq_pending(smp_processor_id()));
 }
 
-#endif /* __ASSEMBLY__ */
+/*
+ * TASKLETS -- dynamically-allocatable tasks run in softirq context
+ * on at most one CPU at a time.
+ */
+struct tasklet
+{
+    struct tasklet *next;
+    bool_t is_scheduled;
+    bool_t is_running;
+    void (*func)(unsigned long);
+    unsigned long data;
+};
+
+#define DECLARE_TASKLET(name, func, data) \
+    struct tasklet name = { NULL, 0, 0, func, data }
+
+void tasklet_schedule(struct tasklet *t);
+void tasklet_kill(struct tasklet *t);
+void tasklet_init(
+    struct tasklet *t, void (*func)(unsigned long), unsigned long data);
 
 #endif /* __XEN_SOFTIRQ_H__ */

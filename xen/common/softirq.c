@@ -52,6 +52,80 @@ void open_softirq(int nr, softirq_handler handler)
     softirq_handlers[nr] = handler;
 }
 
+static DEFINE_PER_CPU(struct tasklet *, tasklet_list);
+
+void tasklet_schedule(struct tasklet *t)
+{
+    unsigned long flags;
+
+    if ( test_and_set_bool(t->is_scheduled) )
+        return;
+
+    local_irq_save(flags);
+    t->next = this_cpu(tasklet_list);
+    this_cpu(tasklet_list) = t;
+    local_irq_restore(flags);
+
+    raise_softirq(TASKLET_SOFTIRQ);
+}
+
+static void tasklet_action(void)
+{
+    struct tasklet *list, *t;
+
+    local_irq_disable();
+    list = this_cpu(tasklet_list);
+    this_cpu(tasklet_list) = NULL;
+    local_irq_enable();
+
+    while ( (t = list) != NULL )
+    {
+        list = list->next;
+
+        BUG_ON(t->is_running);
+        t->is_running = 1;
+        smp_wmb();
+
+        BUG_ON(!t->is_scheduled);
+        t->is_scheduled = 0;
+
+        smp_mb();
+        t->func(t->data);
+        smp_mb();
+
+        t->is_running = 0;
+    }
+}
+
+void tasklet_kill(struct tasklet *t)
+{
+    /* Prevent tasklet from re-scheduling itself. */
+    while ( t->is_scheduled || test_and_set_bool(t->is_scheduled) )
+        cpu_relax();
+    smp_mb();
+
+    /* Wait for tasklet to complete. */
+    while ( t->is_running )
+        cpu_relax();
+    smp_mb();
+
+    /* Clean up and we're done. */
+    t->is_scheduled = 0;
+}
+
+void tasklet_init(
+    struct tasklet *t, void (*func)(unsigned long), unsigned long data)
+{
+    memset(t, 0, sizeof(*t));
+    t->func = func;
+    t->data = data;
+}
+
+void __init softirq_init(void)
+{
+    open_softirq(TASKLET_SOFTIRQ, tasklet_action);
+}
+
 /*
  * Local variables:
  * mode: C

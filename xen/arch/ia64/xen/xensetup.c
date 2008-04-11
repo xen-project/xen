@@ -576,6 +576,8 @@ skip_move:
 
     end_boot_allocator();
 
+    softirq_init();
+
     late_setup_arch(&cmdline);
 
     scheduler_init();
