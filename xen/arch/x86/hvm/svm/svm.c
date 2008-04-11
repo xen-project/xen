@@ -467,7 +467,7 @@ static void svm_get_segment_register(struct vcpu *v, enum x86_segment seg,
 {
     struct vmcb_struct *vmcb = v->arch.hvm_svm.vmcb;
 
-    ASSERT(v == current);
+    ASSERT((v == current) || !vcpu_runnable(v));
 
     switch ( seg )
     {
