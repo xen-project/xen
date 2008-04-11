@@ -223,7 +223,7 @@ static int ratewrite(int io_fd, int live, void *buf, int n)
                 {
                     budget += BURST_BUDGET;
                     last_put.tv_usec += burst_time_us;
-                    if ( last_put.tv_usec > 1000000 
+                    if ( last_put.tv_usec > 1000000 )
                     {
                         last_put.tv_usec -= 1000000;
                         last_put.tv_sec++;
