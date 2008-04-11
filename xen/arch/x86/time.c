@@ -990,7 +990,7 @@ void __init early_time_init(void)
     setup_irq(0, &irq0);
 }
 
-static int __init late_time_init(void)
+static int __init disable_pit_irq(void)
 {
     if ( !using_pit && cpu_has_apic )
     {
@@ -1001,7 +1001,7 @@ static int __init late_time_init(void)
     }
     return 0;
 }
-__initcall(late_time_init);
+__initcall(disable_pit_irq);
 
 void send_timer_event(struct vcpu *v)
 {
@@ -1035,6 +1035,8 @@ int time_suspend(void)
 int time_resume(void)
 {
     u64 tmp = init_pit_and_calibrate_tsc();
+
+    disable_pit_irq();
 
     set_time_scale(&this_cpu(cpu_time).tsc_scale, tmp);
 
