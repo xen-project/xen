@@ -626,8 +626,6 @@ ia64_handle_reflection(unsigned long ifa, struct pt_regs *regs,
 		if (((isr >> 4L) & 0xfL) == 1) {
 			/* Fault is due to a register NaT consumption fault. */
 			//regs->eml_unat = 0;  FIXME: DO WE NEED THIS??
-			printk("ia64_handle_reflection: handling regNaT "
-			       "fault\n");
 			vector = IA64_NAT_CONSUMPTION_VECTOR;
 			break;
 		}
