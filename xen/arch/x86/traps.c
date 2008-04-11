@@ -2637,11 +2637,13 @@ asmlinkage void do_general_protection(struct cpu_user_regs *regs)
     panic("GENERAL PROTECTION FAULT\n[error_code=%04x]\n", regs->error_code);
 }
 
-static void nmi_softirq(void)
+static void nmi_action(unsigned long unused)
 {
     /* Only used to defer wakeup of dom0,vcpu0 to a safe (non-NMI) context. */
     vcpu_kick(dom0->vcpu[0]);
 }
+
+static DECLARE_TASKLET(nmi_tasklet, nmi_action, 0);
 
 static void nmi_dom0_report(unsigned int reason_idx)
 {
@@ -2654,7 +2656,7 @@ static void nmi_dom0_report(unsigned int reason_idx)
     set_bit(reason_idx, nmi_reason(d));
 
     if ( !test_and_set_bool(v->nmi_pending) )
-        raise_softirq(NMI_SOFTIRQ); /* not safe to wake up a vcpu here */
+        tasklet_schedule(&nmi_tasklet); /* not safe to wake a vcpu here */
 }
 
 asmlinkage void mem_parity_error(struct cpu_user_regs *regs)
@@ -2932,8 +2934,6 @@ void __init trap_init(void)
     percpu_traps_init();
 
     cpu_init();
-
-    open_softirq(NMI_SOFTIRQ, nmi_softirq);
 }
 
 long register_guest_nmi_callback(unsigned long address)

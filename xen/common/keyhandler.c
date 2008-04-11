@@ -32,7 +32,7 @@ static struct {
 
 static unsigned char keypress_key;
 
-static void keypress_softirq(void)
+static void keypress_action(unsigned long unused)
 {
     keyhandler_t *h;
     unsigned char key = keypress_key;
@@ -41,6 +41,8 @@ static void keypress_softirq(void)
         (*h)(key);
     console_end_log_everything();
 }
+
+static DECLARE_TASKLET(keypress_tasklet, keypress_action, 0);
 
 void handle_keypress(unsigned char key, struct cpu_user_regs *regs)
 {
@@ -56,7 +58,7 @@ void handle_keypress(unsigned char key, struct cpu_user_regs *regs)
     else
     {
         keypress_key = key;
-        raise_softirq(KEYPRESS_SOFTIRQ);
+        tasklet_schedule(&keypress_tasklet);
     }
 }
 
@@ -284,8 +286,6 @@ static void do_debug_key(unsigned char key, struct cpu_user_regs *regs)
 
 void __init initialize_keytable(void)
 {
-    open_softirq(KEYPRESS_SOFTIRQ, keypress_softirq);
-
     register_irq_keyhandler(
         'd', dump_registers, "dump registers");
     register_keyhandler(
