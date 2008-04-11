@@ -99,7 +99,9 @@ class ImageHandler:
         self.vncconsole = vmConfig['platform'].get('vncconsole')
         self.dmargs = self.parseDeviceModelArgs(vmConfig)
         self.pid = None
-
+        rtc_timeoffset = vmConfig['platform'].get('rtc_timeoffset')
+        if rtc_timeoffset is not None:
+            xc.domain_set_time_offset(self.vm.getDomid(), int(rtc_timeoffset))
 
 
     def cleanupBootloading(self):
@@ -419,9 +421,6 @@ class LinuxImageHandler(ImageHandler):
 
     def configure(self, vmConfig):
         ImageHandler.configure(self, vmConfig)
-        rtc_timeoffset = vmConfig['platform'].get('rtc_timeoffset')
-        if rtc_timeoffset is not None:
-            xc.domain_set_time_offset(self.vm.getDomid(), int(rtc_timeoffset))
 
     def buildDomain(self):
         store_evtchn = self.vm.getStorePort()
