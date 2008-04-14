@@ -109,14 +109,6 @@ cirrus_check(void)
 }
 
 static void
-wrmsr(uint32_t idx, uint64_t v)
-{
-    __asm__ __volatile__ (
-        "wrmsr"
-        : : "c" (idx), "a" ((uint32_t)v), "d" ((uint32_t)(v>>32)) );
-}
-
-static void
 init_hypercalls(void)
 {
     uint32_t eax, ebx, ecx, edx;
@@ -131,11 +123,7 @@ init_hypercalls(void)
     *(uint32_t *)(signature + 8) = edx;
     signature[12] = '\0';
 
-    if ( strcmp("XenVMMXenVMM", signature) || (eax < 0x40000002) )
-    {
-        printf("FATAL: Xen hypervisor not detected\n");
-        __asm__ __volatile__( "ud2" );
-    }
+    BUG_ON(strcmp("XenVMMXenVMM", signature) || (eax < 0x40000002));
 
     /* Fill in hypercall transfer pages. */
     cpuid(0x40000002, &eax, &ebx, &ecx, &edx);

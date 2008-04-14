@@ -19,6 +19,10 @@ void __bug(char *file, int line) __attribute__((noreturn));
 #define BUG_ON(p) do { if (p) BUG(); } while (0)
 #define BUILD_BUG_ON(p) ((void)sizeof(char[1 - 2 * !!(p)]))
 
+/* MSR access */
+void wrmsr(uint32_t idx, uint64_t v);
+uint64_t rdmsr(uint32_t idx);
+
 /* I/O output */
 void outb(uint16_t addr, uint8_t  val);
 void outw(uint16_t addr, uint16_t val);
