@@ -2188,7 +2188,7 @@ int do_mmuext_op(
         goto out;
     }
 
-    LOCK_BIGLOCK(d);
+    domain_lock(d);
 
     for ( i = 0; i < count; i++ )
     {
@@ -2437,7 +2437,7 @@ int do_mmuext_op(
 
     process_deferred_ops();
 
-    UNLOCK_BIGLOCK(d);
+    domain_unlock(d);
 
     perfc_add(num_mmuext_ops, i);
 
@@ -2492,7 +2492,7 @@ int do_mmu_update(
 
     domain_mmap_cache_init(&mapcache);
 
-    LOCK_BIGLOCK(d);
+    domain_lock(d);
 
     for ( i = 0; i < count; i++ )
     {
@@ -2664,7 +2664,7 @@ int do_mmu_update(
 
     process_deferred_ops();
 
-    UNLOCK_BIGLOCK(d);
+    domain_unlock(d);
 
     domain_mmap_cache_destroy(&mapcache);
 
@@ -2693,7 +2693,7 @@ static int create_grant_pte_mapping(
     l1_pgentry_t ol1e;
     struct domain *d = v->domain;
 
-    ASSERT(spin_is_locked(&d->big_lock));
+    ASSERT(domain_is_locked(d));
 
     adjust_guest_l1e(nl1e, d);
 
@@ -2816,7 +2816,7 @@ static int create_grant_va_mapping(
     unsigned long gl1mfn;
     int okay;
     
-    ASSERT(spin_is_locked(&d->big_lock));
+    ASSERT(domain_is_locked(d));
 
     adjust_guest_l1e(nl1e, d);
 
@@ -3014,7 +3014,7 @@ int do_update_va_mapping(unsigned long va, u64 val64,
     if ( rc )
         return rc;
 
-    LOCK_BIGLOCK(d);
+    domain_lock(d);
 
     pl1e = guest_map_l1e(v, va, &gl1mfn);
 
@@ -3027,7 +3027,7 @@ int do_update_va_mapping(unsigned long va, u64 val64,
 
     process_deferred_ops();
 
-    UNLOCK_BIGLOCK(d);
+    domain_unlock(d);
 
     switch ( flags & UVMF_FLUSHTYPE_MASK )
     {
@@ -3172,12 +3172,12 @@ long do_set_gdt(XEN_GUEST_HANDLE(ulong) frame_list, unsigned int entries)
     if ( copy_from_guest(frames, frame_list, nr_pages) )
         return -EFAULT;
 
-    LOCK_BIGLOCK(curr->domain);
+    domain_lock(curr->domain);
 
     if ( (ret = set_gdt(curr, frames, entries)) == 0 )
         flush_tlb_local();
 
-    UNLOCK_BIGLOCK(curr->domain);
+    domain_unlock(curr->domain);
 
     return ret;
 }
@@ -3311,7 +3311,7 @@ long arch_memory_op(int op, XEN_GUEST_HANDLE(void) arg)
             return -EINVAL;
         }
 
-        LOCK_BIGLOCK(d);
+        domain_lock(d);
 
         /* Remove previously mapped page if it was present. */
         prev_mfn = gmfn_to_mfn(d, xatp.gpfn);
@@ -3333,7 +3333,7 @@ long arch_memory_op(int op, XEN_GUEST_HANDLE(void) arg)
         /* Map at new location. */
         guest_physmap_add_page(d, xatp.gpfn, mfn);
 
-        UNLOCK_BIGLOCK(d);
+        domain_unlock(d);
 
         rcu_unlock_domain(d);
 
@@ -3669,7 +3669,7 @@ int ptwr_do_page_fault(struct vcpu *v, unsigned long addr,
     struct ptwr_emulate_ctxt ptwr_ctxt;
     int rc;
 
-    LOCK_BIGLOCK(d);
+    domain_lock(d);
 
     /* Attempt to read the PTE that maps the VA being accessed. */
     guest_get_eff_l1e(v, addr, &pte);
@@ -3694,12 +3694,12 @@ int ptwr_do_page_fault(struct vcpu *v, unsigned long addr,
     if ( rc == X86EMUL_UNHANDLEABLE )
         goto bail;
 
-    UNLOCK_BIGLOCK(d);
+    domain_unlock(d);
     perfc_incr(ptwr_emulations);
     return EXCRET_fault_fixed;
 
  bail:
-    UNLOCK_BIGLOCK(d);
+    domain_unlock(d);
     return 0;
 }
 

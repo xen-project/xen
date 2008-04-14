@@ -2827,7 +2827,7 @@ arch_memory_op(int op, XEN_GUEST_HANDLE(void) arg)
             return -EINVAL;
         }
 
-        LOCK_BIGLOCK(d);
+        domain_lock(d);
 
         /* Check remapping necessity */
         prev_mfn = gmfn_to_mfn(d, xatp.gpfn);
@@ -2853,7 +2853,7 @@ arch_memory_op(int op, XEN_GUEST_HANDLE(void) arg)
         guest_physmap_add_page(d, xatp.gpfn, mfn);
 
     out:
-        UNLOCK_BIGLOCK(d);
+        domain_unlock(d);
         
         rcu_unlock_domain(d);
 

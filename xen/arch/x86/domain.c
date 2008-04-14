@@ -951,9 +951,9 @@ arch_do_vcpu_op(
         if ( copy_from_guest(&info, arg, 1) )
             break;
 
-        LOCK_BIGLOCK(d);
+        domain_lock(d);
         rc = map_vcpu_info(v, info.mfn, info.offset);
-        UNLOCK_BIGLOCK(d);
+        domain_unlock(d);
 
         break;
     }

@@ -1979,14 +1979,14 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
             break;
 
         case 3: /* Write CR3 */
-            LOCK_BIGLOCK(v->domain);
+            domain_lock(v->domain);
             if ( !is_pv_32on64_vcpu(v) )
                 rc = new_guest_cr3(gmfn_to_mfn(v->domain, xen_cr3_to_pfn(*reg)));
 #ifdef CONFIG_COMPAT
             else
                 rc = new_guest_cr3(gmfn_to_mfn(v->domain, compat_cr3_to_pfn(*reg)));
 #endif
-            UNLOCK_BIGLOCK(v->domain);
+            domain_unlock(v->domain);
             if ( rc == 0 ) /* not okay */
                 goto fail;
             break;

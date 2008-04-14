@@ -479,11 +479,11 @@ static int hvm_load_cpu_ctxt(struct domain *d, hvm_domain_context_t *h)
     vc = &v->arch.guest_context;
 
     /* Need to init this vcpu before loading its contents */
-    LOCK_BIGLOCK(d);
+    domain_lock(d);
     if ( !v->is_initialised )
         if ( (rc = boot_vcpu(d, vcpuid, vc)) != 0 )
             return rc;
-    UNLOCK_BIGLOCK(d);
+    domain_unlock(d);
 
     if ( hvm_load_entry(CPU, h, &ctxt) != 0 ) 
         return -EINVAL;
@@ -719,11 +719,11 @@ static void hvm_vcpu_down(void)
     vcpu_sleep_nosync(v);
 
     /* Any other VCPUs online? ... */
-    LOCK_BIGLOCK(d);
+    domain_lock(d);
     for_each_vcpu ( d, v )
         if ( !test_bit(_VPF_down, &v->pause_flags) )
             online_count++;
-    UNLOCK_BIGLOCK(d);
+    domain_unlock(d);
 
     /* ... Shut down the domain if not. */
     if ( online_count == 0 )

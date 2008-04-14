@@ -1445,7 +1445,7 @@ do_grant_table_op(
     if ( count > 512 )
         return -EINVAL;
     
-    LOCK_BIGLOCK(d);
+    domain_lock(d);
     
     rc = -EFAULT;
     switch ( cmd )
@@ -1516,7 +1516,7 @@ do_grant_table_op(
     }
     
   out:
-    UNLOCK_BIGLOCK(d);
+    domain_unlock(d);
     
     return rc;
 }

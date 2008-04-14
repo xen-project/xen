@@ -80,7 +80,7 @@ struct domain *alloc_domain(domid_t domid)
     }
 
     atomic_set(&d->refcnt, 1);
-    spin_lock_init(&d->big_lock);
+    spin_lock_init(&d->domain_lock);
     spin_lock_init(&d->page_alloc_lock);
     spin_lock_init(&d->shutdown_lock);
     spin_lock_init(&d->hypercall_deadlock_mutex);
@@ -629,7 +629,7 @@ int vcpu_reset(struct vcpu *v)
     int rc;
 
     domain_pause(d);
-    LOCK_BIGLOCK(d);
+    domain_lock(d);
 
     rc = arch_vcpu_reset(v);
     if ( rc != 0 )
@@ -646,7 +646,7 @@ int vcpu_reset(struct vcpu *v)
     clear_bit(_VPF_blocked, &v->pause_flags);
 
  out:
-    UNLOCK_BIGLOCK(v->domain);
+    domain_unlock(v->domain);
     domain_unpause(d);
 
     return rc;
@@ -678,11 +678,11 @@ long do_vcpu_op(int cmd, int vcpuid, XEN_GUEST_HANDLE(void) arg)
             return -EFAULT;
         }
 
-        LOCK_BIGLOCK(d);
+        domain_lock(d);
         rc = -EEXIST;
         if ( !v->is_initialised )
             rc = boot_vcpu(d, vcpuid, ctxt);
-        UNLOCK_BIGLOCK(d);
+        domain_unlock(d);
 
         xfree(ctxt);
         break;

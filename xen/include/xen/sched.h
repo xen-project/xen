@@ -138,8 +138,9 @@ struct vcpu
 };
 
 /* Per-domain lock can be recursively acquired in fault handlers. */
-#define LOCK_BIGLOCK(_d) spin_lock_recursive(&(_d)->big_lock)
-#define UNLOCK_BIGLOCK(_d) spin_unlock_recursive(&(_d)->big_lock)
+#define domain_lock(d) spin_lock_recursive(&(d)->domain_lock)
+#define domain_unlock(d) spin_unlock_recursive(&(d)->domain_lock)
+#define domain_is_locked(d) spin_is_locked(&(d)->domain_lock)
 
 struct domain
 {
@@ -147,7 +148,7 @@ struct domain
 
     shared_info_t   *shared_info;     /* shared data area */
 
-    spinlock_t       big_lock;
+    spinlock_t       domain_lock;
 
     spinlock_t       page_alloc_lock; /* protects all the following fields  */
     struct list_head page_list;       /* linked list, of size tot_pages     */
