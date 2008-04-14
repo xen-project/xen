@@ -31,6 +31,72 @@
 
 // Inputs are: r21 (= current), r24 (= cause), r25 (= insn), r31 (=saved pr)
 
+ENTRY(vmx_dummy_function)
+    br.sptk.many vmx_dummy_function
+END(vmx_dummy_function)
+
+/*
+ *	Inputs:
+ *		r24 : return address
+ *  	r25 : vpd
+ *		r29 : scratch
+ *
+ */
+GLOBAL_ENTRY(vmx_vps_sync_read)
+    movl r29 = vmx_dummy_function
+    ;;
+    mov b0=r29
+    br.sptk.many b0
+END(vmx_vps_sync_read)
+
+/*
+ *	Inputs:
+ *		r24 : return address
+ *  	r25 : vpd
+ *		r29 : scratch
+ *
+ */
+GLOBAL_ENTRY(vmx_vps_sync_write)
+    movl r29 = vmx_dummy_function
+    ;;
+    mov b0=r29
+    br.sptk.many b0
+END(vmx_vps_sync_write)
+
+/*
+ *	Inputs:
+ *		r23 : pr
+ *		r24 : guest b0
+ *  	r25 : vpd
+ *
+ */
+GLOBAL_ENTRY(vmx_vps_resume_normal)
+    movl r29 = vmx_dummy_function
+    ;;
+    mov b0=r29
+    mov pr=r23,-2
+    br.sptk.many b0
+END(vmx_vps_resume_normal)
+
+/*
+ *	Inputs:
+ *		r23 : pr
+ *		r24 : guest b0
+ *  	r25 : vpd
+ *		r17 : isr
+ */
+GLOBAL_ENTRY(vmx_vps_resume_handler)
+    movl r29 = vmx_dummy_function
+    ;;
+    ld8 r26=[r25]
+    shr r17=r17,IA64_ISR_IR_BIT
+    ;;
+    dep r26=r17,r26,63,1   // bit 63 of r26 indicate whether enable CFLE
+    mov b0=r29
+    mov pr=r23,-2
+    br.sptk.many b0
+END(vmx_vps_resume_handler)
+
 
 //mov r1=ar3 (only itc is virtualized)
 GLOBAL_ENTRY(vmx_asm_mov_from_ar)
@@ -185,6 +251,7 @@ GLOBAL_ENTRY(vmx_asm_rsm)
 #ifndef ACCE_RSM
     br.many vmx_virtualization_fault_back
 #endif
+    mov r23=r31
     add r16=IA64_VPD_BASE_OFFSET,r21
     extr.u r26=r25,6,21 // Imm21
     extr.u r27=r25,31,2 // I2d
@@ -194,47 +261,62 @@ GLOBAL_ENTRY(vmx_asm_rsm)
     dep r26=r27,r26,21,2
     ;;
     add r17=VPD_VPSR_START_OFFSET,r16
-    add r22=IA64_VCPU_MMU_MODE_OFFSET,r21
-    //r26 is imm24
-    dep r26=r28,r26,23,1
+    //r18 is imm24
+    dep r18=r28,r26,23,1
     ;;
-    ld8 r18=[r17]
-	
+    //sync read
+    mov r25=r16
+    movl r24=vmx_asm_rsm_sync_read_return
+    mov r20=b0
+    br.sptk.many vmx_vps_sync_read
+    ;;
+vmx_asm_rsm_sync_read_return:
+    ld8 r26=[r17]
     // xenoprof
     // Don't change mPSR.pp.
     // It is manipulated by xenoprof.
     movl r28=IA64_PSR_IC+IA64_PSR_I+IA64_PSR_DT+IA64_PSR_SI+IA64_PSR_PP
 
-    ld1 r23=[r22]
-    sub r27=-1,r26 // ~r26
-    mov r24=b0
+    sub r27=-1,r18 // ~imm24
     ;;
-    mov r20=cr.ipsr
     or r28=r27,r28 // Keep IC,I,DT,SI
-    and r19=r18,r27 // Update vpsr
-    ;;   
+    and r19=r26,r27 // Update vpsr
+    ;;
     st8 [r17]=r19
-    and r20=r20,r28 // Update ipsr
+    mov r24=cr.ipsr
+    ;;
+    and r24=r24,r28 // Update ipsr
     adds r27=IA64_VCPU_FP_PSR_OFFSET,r21
     ;;
     ld8 r27=[r27]
     ;;
     tbit.nz p8,p0=r27,IA64_PSR_DFH_BIT
     ;;
-    (p8) dep r20=-1,r20,IA64_PSR_DFH_BIT,1  // Keep dfh
+    (p8) dep r24=-1,r24,IA64_PSR_DFH_BIT,1  // Keep dfh
     ;;
-    mov cr.ipsr=r20
-    cmp.ne p6,p0=VMX_MMU_VIRTUAL,r23
+    mov cr.ipsr=r24
+    //sync write
+    mov r25=r16
+    movl r24=vmx_asm_rsm_sync_write_return
+    br.sptk.many vmx_vps_sync_write
     ;;
-    tbit.z.or p6,p0=r26,IA64_PSR_DT_BIT
-    (p6) br.dptk vmx_resume_to_guest  // DT not cleared or already in phy mode
+vmx_asm_rsm_sync_write_return:
+    add r29=IA64_VCPU_MMU_MODE_OFFSET,r21
+    ;;
+    ld1 r27=[r29]
+    ;;
+    cmp.ne p6,p0=VMX_MMU_VIRTUAL,r27
+    ;;
+    tbit.z.or p6,p0=r18,IA64_PSR_DT_BIT
+    (p6) br.dptk vmx_asm_rsm_out
+    // DT not cleared or already in phy mode
     ;;
     // Switch to meta physical mode D.
     add r26=IA64_VCPU_META_RID_D_OFFSET,r21
-    mov r23=VMX_MMU_PHY_D
+    mov r27=VMX_MMU_PHY_D
     ;;
     ld8 r26=[r26]
-    st1 [r22]=r23 
+    st1 [r29]=r27 
     dep.z r28=4,61,3
     ;;
     mov rr[r0]=r26
@@ -242,6 +324,9 @@ GLOBAL_ENTRY(vmx_asm_rsm)
     mov rr[r28]=r26
     ;;
     srlz.d
+vmx_asm_rsm_out:	
+    mov r31=r23
+    mov r24=r20
     br.many vmx_resume_to_guest
 END(vmx_asm_rsm)
 
@@ -251,6 +336,7 @@ GLOBAL_ENTRY(vmx_asm_ssm)
 #ifndef ACCE_SSM
     br.many vmx_virtualization_fault_back
 #endif
+    mov r23=r31
     add r16=IA64_VPD_BASE_OFFSET,r21
     extr.u r26=r25,6,21
     extr.u r27=r25,31,2
@@ -258,40 +344,55 @@ GLOBAL_ENTRY(vmx_asm_ssm)
     ld8 r16=[r16]
     extr.u r28=r25,36,1
     dep r26=r27,r26,21,2
-    ;;  //r26 is imm24
+    ;;  //r18 is imm24
+    dep r18=r28,r26,23,1
+    ;;  
+    //sync read
+    mov r25=r16
+    movl r24=vmx_asm_ssm_sync_read_return
+    mov r20=b0
+    br.sptk.many vmx_vps_sync_read
+    ;;
+vmx_asm_ssm_sync_read_return:
     add r27=VPD_VPSR_START_OFFSET,r16
-    dep r26=r28,r26,23,1
-    ;;  //r19 vpsr
-    ld8 r29=[r27]
-    mov r24=b0
-    dep r17=0,r26,IA64_PSR_PP_BIT,1 // For xenoprof
+    ;;
+    ld8 r17=[r27]		//r17 old vpsr
+    dep r28=0,r18,IA64_PSR_PP_BIT,1 // For xenoprof
                                     // Don't change mPSR.pp
                                     // It is maintained by xenoprof.
     ;;
-    add r22=IA64_VCPU_MMU_MODE_OFFSET,r21
-    mov r20=cr.ipsr
-    or r19=r29,r26
+    or r19=r17,r18		//r19 new vpsr
     ;;
-    ld1 r23=[r22] // mmu_mode
-    st8 [r27]=r19 // vpsr
-    or r20=r20,r17
+    st8 [r27]=r19 // update vpsr
+    mov r24=cr.ipsr
     ;;
-    mov cr.ipsr=r20
+    or r24=r24,r28
+    ;;
+    mov cr.ipsr=r24
+    //sync_write
+    mov r25=r16
+    movl r24=vmx_asm_ssm_sync_write_return
+    br.sptk.many vmx_vps_sync_write
+    ;;
+vmx_asm_ssm_sync_write_return:	
+    add r29=IA64_VCPU_MMU_MODE_OFFSET,r21
     movl r28=IA64_PSR_DT+IA64_PSR_RT+IA64_PSR_IT
     ;;
-    and r19=r28,r19
-    cmp.eq p6,p0=VMX_MMU_VIRTUAL,r23
+    ld1 r30=[r29] // mmu_mode
     ;;
-    cmp.ne.or p6,p0=r28,r19 // (vpsr & (it+dt+rt)) /= (it+dt+rt) ie stay in phy
+    and r27=r28,r19
+    cmp.eq p6,p0=VMX_MMU_VIRTUAL,r30
+    ;;
+    cmp.ne.or p6,p0=r28,r27 // (vpsr & (it+dt+rt)) /= (it+dt+rt) ie stay in phy
     (p6) br.dptk vmx_asm_ssm_1
     ;;
     add r26=IA64_VCPU_META_SAVED_RR0_OFFSET,r21
     add r27=IA64_VCPU_META_SAVED_RR0_OFFSET+8,r21
-    mov r23=VMX_MMU_VIRTUAL
+    mov r30=VMX_MMU_VIRTUAL
     ;;
     ld8 r26=[r26]
     ld8 r27=[r27]
-    st1 [r22]=r23
+    st1 [r29]=r30
     dep.z r28=4,61,3
     ;;
     mov rr[r0]=r26
@@ -301,10 +402,10 @@ GLOBAL_ENTRY(vmx_asm_ssm)
     srlz.d
     ;;
 vmx_asm_ssm_1:
-    tbit.nz p6,p0=r29,IA64_PSR_I_BIT
+    tbit.nz p6,p0=r17,IA64_PSR_I_BIT
     ;;
     tbit.z.or p6,p0=r19,IA64_PSR_I_BIT
-    (p6) br.dptk vmx_resume_to_guest
+    (p6) br.dptk vmx_asm_ssm_out
     ;;
     add r29=VPD_VTPR_START_OFFSET,r16
     add r30=VPD_VHPI_START_OFFSET,r16
@@ -316,9 +417,14 @@ vmx_asm_ssm_1:
     extr.u r18=r29,16,1
     ;;
     dep r17=r18,r17,4,1
+    mov r31=r23
+    mov b0=r20
     ;;
     cmp.gt p6,p0=r30,r17
     (p6) br.dpnt.few vmx_asm_dispatch_vexirq
+vmx_asm_ssm_out:	
+    mov r31=r23
+    mov r24=r20
     br.many vmx_resume_to_guest
 END(vmx_asm_ssm)
 
@@ -328,33 +434,47 @@ GLOBAL_ENTRY(vmx_asm_mov_to_psr)
 #ifndef ACCE_MOV_TO_PSR
     br.many vmx_virtualization_fault_back
 #endif
+    mov r23=r31
     add r16=IA64_VPD_BASE_OFFSET,r21
     extr.u r26=r25,13,7 //r2
     ;;
     ld8 r16=[r16]
-    movl r20=asm_mov_from_reg
+    movl r24=asm_mov_from_reg
     ;;
-    adds r30=vmx_asm_mov_to_psr_back-asm_mov_from_reg,r20
-    shladd r26=r26,4,r20
-    mov r24=b0
+    adds r30=vmx_asm_mov_to_psr_back-asm_mov_from_reg,r24
+    shladd r26=r26,4,r24
+    mov r20=b0
     ;;
-    add r27=VPD_VPSR_START_OFFSET,r16
     mov b0=r26
     br.many b0
     ;;   
 vmx_asm_mov_to_psr_back:
-    ld8 r17=[r27] // vpsr
-    add r22=IA64_VCPU_MMU_MODE_OFFSET,r21
+    //sync read
+    mov r25=r16
+    movl r24=vmx_asm_mov_to_psr_sync_read_return
+    br.sptk.many vmx_vps_sync_read
+    ;;
+vmx_asm_mov_to_psr_sync_read_return:
+    add r27=VPD_VPSR_START_OFFSET,r16
+    ;;
+    ld8 r17=[r27] // r17 old vpsr
     dep r19=0,r19,32,32 // Clear bits 32-63
     ;;   
-    ld1 r23=[r22] // mmu_mode
     dep r18=0,r17,0,32
     ;; 
-    or r30=r18,r19
+    or r18=r18,r19 //r18 new vpsr
+    ;;
+    st8 [r27]=r18 // set vpsr
+    //sync write
+    mov r25=r16
+    movl r24=vmx_asm_mov_to_psr_sync_write_return
+    br.sptk.many vmx_vps_sync_write
+    ;;
+vmx_asm_mov_to_psr_sync_write_return:
+    add r22=IA64_VCPU_MMU_MODE_OFFSET,r21
     movl r28=IA64_PSR_DT+IA64_PSR_RT+IA64_PSR_IT
     ;;
-    st8 [r27]=r30 // set vpsr
-    and r27=r28,r30
+    and r27=r28,r18
     and r29=r28,r17
     ;;
     cmp.eq p5,p0=r29,r27 // (old_vpsr & (dt+rt+it)) == (new_vpsr & (dt+rt+it))
@@ -364,16 +484,16 @@ vmx_asm_mov_to_psr_back:
     //virtual to physical D
     (p7) add r26=IA64_VCPU_META_RID_D_OFFSET,r21
     (p7) add r27=IA64_VCPU_META_RID_D_OFFSET,r21
-    (p7) mov r23=VMX_MMU_PHY_D
+    (p7) mov r30=VMX_MMU_PHY_D
     ;;
     //physical to virtual
     (p6) add r26=IA64_VCPU_META_SAVED_RR0_OFFSET,r21
     (p6) add r27=IA64_VCPU_META_SAVED_RR0_OFFSET+8,r21
-    (p6) mov r23=VMX_MMU_VIRTUAL
+    (p6) mov r30=VMX_MMU_VIRTUAL
     ;;
     ld8 r26=[r26]
     ld8 r27=[r27]
-    st1 [r22]=r23
+    st1 [r22]=r30
     dep.z r28=4,61,3
     ;;
     mov rr[r0]=r26
@@ -383,18 +503,17 @@ vmx_asm_mov_to_psr_back:
     srlz.d
     ;;
 vmx_asm_mov_to_psr_1:
-    mov r20=cr.ipsr
+    mov r24=cr.ipsr
     movl r28=IA64_PSR_IC+IA64_PSR_I+IA64_PSR_DT+IA64_PSR_SI+IA64_PSR_RT
     ;;
-    tbit.nz p7,p0=r20,IA64_PSR_PP_BIT           // For xenoprof
-    or r19=r19,r28
-    dep r20=0,r20,0,32
+    tbit.nz p7,p0=r24,IA64_PSR_PP_BIT           // For xenoprof
+    or r27=r19,r28
+    dep r24=0,r24,0,32
     ;;
-    add r20=r19,r20
-    mov b0=r24
+    add r24=r27,r24
     ;;
     adds r27=IA64_VCPU_FP_PSR_OFFSET,r21
-    (p7) dep r20=-1,r20,IA64_PSR_PP_BIT,1       // For xenoprof
+    (p7) dep r24=-1,r24,IA64_PSR_PP_BIT,1       // For xenoprof
                                                 // Dom't change mPSR.pp
                                                 // It is maintaned by xenoprof
     ;;
@@ -402,14 +521,13 @@ vmx_asm_mov_to_psr_1:
     ;;
     tbit.nz p8,p0=r27,IA64_PSR_DFH_BIT
     ;;
-    (p8) dep r20=-1,r20,IA64_PSR_DFH_BIT,1
+    (p8) dep r24=-1,r24,IA64_PSR_DFH_BIT,1
     ;;
-    mov cr.ipsr=r20
-    cmp.ne p6,p0=r0,r0
+    mov cr.ipsr=r24
+    tbit.nz p6,p0=r17,IA64_PSR_I_BIT
     ;;
-    tbit.nz.or p6,p0=r17,IA64_PSR_I_BIT
-    tbit.z.or p6,p0=r30,IA64_PSR_I_BIT
-    (p6) br.dpnt.few vmx_resume_to_guest
+    tbit.z.or p6,p0=r18,IA64_PSR_I_BIT
+    (p6) br.dpnt.few vmx_asm_mov_to_psr_out
     ;;
     add r29=VPD_VTPR_START_OFFSET,r16
     add r30=VPD_VHPI_START_OFFSET,r16
@@ -421,9 +539,14 @@ vmx_asm_mov_to_psr_1:
     extr.u r18=r29,16,1
     ;;
     dep r17=r18,r17,4,1
+    mov r31=r23
+    mov b0=r20
     ;;
     cmp.gt p6,p0=r30,r17
     (p6) br.dpnt.few vmx_asm_dispatch_vexirq
+vmx_asm_mov_to_psr_out:
+    mov r31=r23
+    mov r24=r20
     br.many vmx_resume_to_guest
 END(vmx_asm_mov_to_psr)
 
@@ -767,40 +890,25 @@ END(asm_mov_from_reg)
  */
 ENTRY(vmx_resume_to_guest)
     mov r16=cr.ipsr
-    movl r20=__vsa_base
     ;;
-    ld8 r20=[r20]
     adds r19=IA64_VPD_BASE_OFFSET,r21
+    extr.u r17=r16,IA64_PSR_RI_BIT,2
     ;;
     ld8 r25=[r19]
-    extr.u r17=r16,IA64_PSR_RI_BIT,2
-    tbit.nz p6,p7=r16,IA64_PSR_RI_BIT+1
-    ;;	
-    (p6) mov r18=cr.iip
-    (p6) mov r17=r0
-    ;;    
-    (p6) add r18=0x10,r18
-    (p7) add r17=1,r17
-    ;;		
-    (p6) mov cr.iip=r18
+    add r17=1,r17
+    ;;
+    adds r19= VPD_VPSR_START_OFFSET,r25
     dep r16=r17,r16,IA64_PSR_RI_BIT,2
     ;;
     mov cr.ipsr=r16
-    adds r19= VPD_VPSR_START_OFFSET,r25
-    add r28=PAL_VPS_RESUME_NORMAL,r20
-    add r29=PAL_VPS_RESUME_HANDLER,r20
-    ;;
     ld8 r19=[r19]
-    mov b0=r29
-    cmp.ne p6,p7 = r0,r0
     ;;
+    mov r23=r31
+    mov r17=r0
+    //vps_resume_normal/handler
     tbit.z p6,p7 = r19,IA64_PSR_IC_BIT		// p1=vpsr.ic
-    ;;
-    (p6) ld8 r26=[r25]
-    (p7) mov b0=r28
-    mov pr=r31,-2
-    br.sptk.many b0             // call pal service
-    ;;
+    (p6) br.cond.sptk.many vmx_vps_resume_handler
+    (p7) br.cond.sptk.few vmx_vps_resume_normal
 END(vmx_resume_to_guest)
 
 

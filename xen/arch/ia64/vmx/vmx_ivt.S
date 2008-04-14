@@ -211,11 +211,8 @@ vmx_itlb_loop:
     ld8 r18=[r16]
     ;;
     adds r19=VPD(VPSR),r18
-    movl r20=__vsa_base
     ;;
     ld8 r19=[r19]
-    ld8 r20=[r20]
-    ;;
     br.sptk ia64_vmm_entry
     ;;
 vmx_itlb_out:
@@ -289,11 +286,8 @@ vmx_dtlb_loop:
     ld8 r18=[r16]
     ;;
     adds r19=VPD(VPSR),r18
-    movl r20=__vsa_base
     ;;
     ld8 r19=[r19]
-    ld8 r20=[r20]
-    ;;
     br.sptk ia64_vmm_entry
     ;;
 vmx_dtlb_out:
@@ -461,11 +455,8 @@ dirty_bit_tpa_fail:
     ld8 r18=[r16]
     ;;
     adds r19=VPD(VPSR),r18
-    movl r20=__vsa_base
     ;;
     ld8 r19=[r19]
-    ld8 r20=[r20]
-    ;;
     br.sptk ia64_vmm_entry
     ;;
 END(vmx_dirty_bit)

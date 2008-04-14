@@ -57,24 +57,16 @@
 
 #define PAL_VSA_SYNC_READ                               \
     /* begin to call pal vps sync_read */               \
-(pUStk) add r25=IA64_VPD_BASE_OFFSET, r21;              \
-(pUStk) movl r20=__vsa_base;                            \
-    ;;                                                  \
-(pUStk) ld8 r25=[r25];          /* read vpd base */     \
-(pUStk) ld8 r20=[r20];          /* read entry point */  \
-    ;;                                                  \
-(pUStk) add r20=PAL_VPS_SYNC_READ,r20;                  \
-    ;;                                                  \
 { .mii;                                                 \
+(pUStk) add r25=IA64_VPD_BASE_OFFSET, r21;              \
 (pUStk) nop 0x0;                                        \
 (pUStk) mov r24=ip;                                     \
-(pUStk) mov b0=r20;                                     \
     ;;                                                  \
 };                                                      \
 { .mmb;                                                 \
 (pUStk) add r24 = 0x20, r24;                            \
-(pUStk) nop 0x0;                                        \
-(pUStk) br.cond.sptk b0;        /*  call the service */ \
+(pUStk) ld8 r25=[r25];          /* read vpd base */     \
+(pUStk) br.cond.sptk vmx_vps_sync_read;        /*  call the service */ \
     ;;                                                  \
 };
 

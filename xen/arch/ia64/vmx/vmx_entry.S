@@ -370,20 +370,16 @@ vmx_rse_clear_invalid:
     adds r19=VPD(VPSR),r18
     ;;
     ld8 r19=[r19]        //vpsr
-    movl r20=__vsa_base
     ;;
 //vsa_sync_write_start
-    ld8 r20=[r20]       // read entry point
-    mov r25=r18
-    ;;
     movl r24=ia64_vmm_entry  // calculate return address
-    add r16=PAL_VPS_SYNC_WRITE,r20
-    ;;
-    mov b0=r16
-    br.cond.sptk b0         // call the service
+    mov r25=r18
+    br.sptk.many vmx_vps_sync_write        // call the service
     ;;
 END(ia64_leave_hypervisor)
 // fall through
+
+
 GLOBAL_ENTRY(ia64_vmm_entry)
 /*
  *  must be at bank 0
@@ -391,30 +387,16 @@ GLOBAL_ENTRY(ia64_vmm_entry)
  *  r17:cr.isr
  *  r18:vpd
  *  r19:vpsr
- *  r20:__vsa_base
  *  r22:b0
  *  r23:predicate
  */
     mov r24=r22
     mov r25=r18
     tbit.nz p1,p2 = r19,IA64_PSR_IC_BIT        // p1=vpsr.ic
+    (p1) br.cond.sptk.few vmx_vps_resume_normal
+    (p2) br.cond.sptk.many vmx_vps_resume_handler
     ;;
-    (p1) add r29=PAL_VPS_RESUME_NORMAL,r20
-    (p1) br.sptk.many ia64_vmm_entry_out
-    ;;
-    tbit.nz p1,p2 = r17,IA64_ISR_IR_BIT		//p1=cr.isr.ir
-    ;;
-    (p1) add r29=PAL_VPS_RESUME_NORMAL,r20
-    (p2) add r29=PAL_VPS_RESUME_HANDLER,r20
-    (p2) ld8 r26=[r25]
-    ;;
-ia64_vmm_entry_out:    
-    mov pr=r23,-2
-    mov b0=r29
-    ;;
-    br.cond.sptk b0             // call pal service
 END(ia64_vmm_entry)
-
 
 
 /*

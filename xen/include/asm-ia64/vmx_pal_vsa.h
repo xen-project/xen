@@ -28,6 +28,14 @@
 #ifndef __ASSEMBLY__
 extern u64 ia64_call_vsa(u64 proc, u64 arg1, u64 arg2, u64 arg3,
                          u64 arg4, u64 arg5, u64 arg6, u64 arg7);
+
+/* entry points in assembly code for calling vps services */
+
+extern char vmx_vps_sync_read;
+extern char vmx_vps_sync_write;
+extern char vmx_vps_resume_normal;
+extern char vmx_vps_resume_handler;
+
 extern u64 __vsa_base;
 #endif  /* __ASSEMBLY__ */
 
