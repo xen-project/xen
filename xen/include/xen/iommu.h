@@ -67,7 +67,7 @@ struct iommu {
     u64	ecap;
     spinlock_t lock; /* protect context, domain ids */
     spinlock_t register_lock; /* protect iommu register handling */
-    struct root_entry *root_entry; /* virtual address */
+    u64 root_maddr; /* root entry machine address */
     unsigned int vector;
     struct intel_iommu *intel;
 };
@@ -85,6 +85,7 @@ int iommu_map_page(struct domain *d, unsigned long gfn, unsigned long mfn);
 int iommu_unmap_page(struct domain *d, unsigned long gfn);
 void iommu_flush(struct domain *d, unsigned long gfn, u64 *p2m_entry);
 void iommu_set_pgd(struct domain *d);
+void iommu_free_pgd(struct domain *d);
 void iommu_domain_teardown(struct domain *d);
 int hvm_do_IRQ_dpci(struct domain *d, unsigned int irq);
 int dpci_ioport_intercept(ioreq_t *p);
@@ -98,6 +99,9 @@ void io_apic_write_remap_rte(unsigned int apic,
 struct qi_ctrl *iommu_qi_ctrl(struct iommu *iommu);
 struct ir_ctrl *iommu_ir_ctrl(struct iommu *iommu);
 struct iommu_flush *iommu_get_flush(struct iommu *iommu);
+void hvm_dpci_isairq_eoi(struct domain *d, unsigned int isairq);
+struct hvm_irq_dpci *domain_get_irq_dpci(struct domain *domain);
+int domain_set_irq_dpci(struct domain *domain, struct hvm_irq_dpci *dpci);
 
 #define PT_IRQ_TIME_OUT MILLISECS(8)
 #define VTDPREFIX "[VT-D]"

@@ -630,7 +630,7 @@ int __init construct_dom0(
     }
     else
     {
-        page = alloc_domheap_page(NULL);
+        page = alloc_domheap_page(NULL, 0);
         if ( !page )
             panic("Not enough RAM for domain 0 PML4.\n");
         l4start = l4tab = page_to_virt(page);
@@ -957,6 +957,8 @@ int __init construct_dom0(
     rc |= ioports_deny_access(dom0, 0x40, 0x43);
     /* PIT Channel 2 / PC Speaker Control. */
     rc |= ioports_deny_access(dom0, 0x61, 0x61);
+    /* PCI configuration spaces. */
+    rc |= ioports_deny_access(dom0, 0xcf8, 0xcff);
     /* Command-line I/O ranges. */
     process_dom0_ioports_disable();
 

@@ -40,7 +40,7 @@ string_param("clocksource", opt_clocksource);
 unsigned long cpu_khz;  /* CPU clock frequency in kHz. */
 unsigned long hpet_address;
 DEFINE_SPINLOCK(rtc_lock);
-volatile unsigned long jiffies;
+unsigned long pit0_ticks;
 static u32 wc_sec, wc_nsec; /* UTC time at last 'time update'. */
 static DEFINE_SPINLOCK(wc_lock);
 
@@ -67,19 +67,16 @@ struct platform_timesource {
 static DEFINE_PER_CPU(struct cpu_time, cpu_time);
 
 /*
- * Protected by platform_timer_lock, which must be acquired with interrupts
- * disabled because plt_overflow() is called from PIT ch0 interrupt context.
+ * We simulate a 32-bit platform timer from the 16-bit PIT ch2 counter.
+ * Otherwise overflow happens too quickly (~50ms) for us to guarantee that
+ * softirq handling will happen in time.
+ * 
+ * The pit_lock protects the 16- and 32-bit stamp fields as well as the 
  */
-static s_time_t stime_platform_stamp;
-static u64 platform_timer_stamp;
-static DEFINE_SPINLOCK(platform_timer_lock);
-
-/*
- * Folding platform timer into 64-bit software counter is a really critical
- * operation! We therefore do it directly in PIT ch0 interrupt handler.
- */
-static u32 plt_overflow_jiffies;
-static void plt_overflow(void);
+static DEFINE_SPINLOCK(pit_lock);
+static u16 pit_stamp16;
+static u32 pit_stamp32;
+static int using_pit;
 
 /*
  * 32-bit division of integer dividend and integer divisor yielding
@@ -146,22 +143,36 @@ static inline u64 scale_delta(u64 delta, struct time_scale *scale)
     return product;
 }
 
-void timer_interrupt(int irq, void *dev_id, struct cpu_user_regs *regs)
+static void timer_interrupt(int irq, void *dev_id, struct cpu_user_regs *regs)
 {
     ASSERT(local_irq_is_enabled());
 
-    /* Update jiffies counter. */
-    (*(volatile unsigned long *)&jiffies)++;
+    /* Only for start-of-day interruopt tests in io_apic.c. */
+    (*(volatile unsigned long *)&pit0_ticks)++;
 
     /* Rough hack to allow accurate timers to sort-of-work with no APIC. */
     if ( !cpu_has_apic )
         raise_softirq(TIMER_SOFTIRQ);
 
-    if ( --plt_overflow_jiffies == 0 )
-        plt_overflow();
+    /* Emulate a 32-bit PIT counter. */
+    if ( using_pit )
+    {
+        u16 count;
+
+        spin_lock_irq(&pit_lock);
+
+        outb(0x80, PIT_MODE);
+        count  = inb(PIT_CH2);
+        count |= inb(PIT_CH2) << 8;
+
+        pit_stamp32 += (u16)(pit_stamp16 - count);
+        pit_stamp16 = count;
+
+        spin_unlock_irq(&pit_lock);
+    }
 }
 
-static struct irqaction irq0 = { timer_interrupt, "timer", NULL};
+static struct irqaction irq0 = { timer_interrupt, "timer", NULL };
 
 /* ------ Calibrate the TSC ------- 
  * Return processor ticks per second / CALIBRATE_FRAC.
@@ -295,12 +306,21 @@ static char *freq_string(u64 freq)
 
 static u32 read_pit_count(void)
 {
-    u16 count;
-    ASSERT(spin_is_locked(&platform_timer_lock));
+    u16 count16;
+    u32 count32;
+    unsigned long flags;
+
+    spin_lock_irqsave(&pit_lock, flags);
+
     outb(0x80, PIT_MODE);
-    count  = inb(PIT_CH2);
-    count |= inb(PIT_CH2) << 8;
-    return ~count;
+    count16  = inb(PIT_CH2);
+    count16 |= inb(PIT_CH2) << 8;
+
+    count32 = pit_stamp32 + (u16)(pit_stamp16 - count16);
+
+    spin_unlock_irqrestore(&pit_lock, flags);
+
+    return count32;
 }
 
 static void init_pit(struct platform_timesource *pts)
@@ -308,7 +328,8 @@ static void init_pit(struct platform_timesource *pts)
     pts->name = "PIT";
     pts->frequency = CLOCK_TICK_RATE;
     pts->read_counter = read_pit_count;
-    pts->counter_bits = 16;
+    pts->counter_bits = 32;
+    using_pit = 1;
 }
 
 /************************************************************
@@ -466,24 +487,28 @@ static int init_pmtimer(struct platform_timesource *pts)
 
 static struct platform_timesource plt_src; /* details of chosen timesource  */
 static u32 plt_mask;             /* hardware-width mask                     */
-static u32 plt_overflow_period;  /* jiffies between calls to plt_overflow() */
+static u64 plt_overflow_period;  /* ns between calls to plt_overflow()      */
 static struct time_scale plt_scale; /* scale: platform counter -> nanosecs  */
 
 /* Protected by platform_timer_lock. */
-static u64 plt_count64;          /* 64-bit platform counter stamp           */
-static u32 plt_count;            /* hardware-width platform counter stamp   */
+static DEFINE_SPINLOCK(platform_timer_lock);
+static s_time_t stime_platform_stamp; /* System time at below platform time */
+static u64 platform_timer_stamp;      /* Platform time at above system time */
+static u64 plt_stamp64;          /* 64-bit platform counter stamp           */
+static u32 plt_stamp;            /* hardware-width platform counter stamp   */
+static struct timer plt_overflow_timer;
 
-static void plt_overflow(void)
+static void plt_overflow(void *unused)
 {
     u32 count;
-    unsigned long flags;
 
-    spin_lock_irqsave(&platform_timer_lock, flags);
+    spin_lock(&platform_timer_lock);
     count = plt_src.read_counter();
-    plt_count64 += (count - plt_count) & plt_mask;
-    plt_count = count;
-    plt_overflow_jiffies = plt_overflow_period;
-    spin_unlock_irqrestore(&platform_timer_lock, flags);
+    plt_stamp64 += (count - plt_stamp) & plt_mask;
+    plt_stamp = count;
+    spin_unlock(&platform_timer_lock);
+
+    set_timer(&plt_overflow_timer, NOW() + plt_overflow_period);
 }
 
 static s_time_t __read_platform_stime(u64 platform_time)
@@ -497,12 +522,11 @@ static s_time_t read_platform_stime(void)
 {
     u64 count;
     s_time_t stime;
-    unsigned long flags;
 
-    spin_lock_irqsave(&platform_timer_lock, flags);
-    count = plt_count64 + ((plt_src.read_counter() - plt_count) & plt_mask);
+    spin_lock(&platform_timer_lock);
+    count = plt_stamp64 + ((plt_src.read_counter() - plt_stamp) & plt_mask);
     stime = __read_platform_stime(count);
-    spin_unlock_irqrestore(&platform_timer_lock, flags);
+    spin_unlock(&platform_timer_lock);
 
     return stime;
 }
@@ -511,27 +535,25 @@ static void platform_time_calibration(void)
 {
     u64 count;
     s_time_t stamp;
-    unsigned long flags;
 
-    spin_lock_irqsave(&platform_timer_lock, flags);
-    count = plt_count64 + ((plt_src.read_counter() - plt_count) & plt_mask);
+    spin_lock(&platform_timer_lock);
+    count = plt_stamp64 + ((plt_src.read_counter() - plt_stamp) & plt_mask);
     stamp = __read_platform_stime(count);
     stime_platform_stamp = stamp;
     platform_timer_stamp = count;
-    spin_unlock_irqrestore(&platform_timer_lock, flags);
+    spin_unlock(&platform_timer_lock);
 }
 
 static void resume_platform_timer(void)
 {
     /* No change in platform_stime across suspend/resume. */
-    platform_timer_stamp = plt_count64;
-    plt_count = plt_src.read_counter();
+    platform_timer_stamp = plt_stamp64;
+    plt_stamp = plt_src.read_counter();
 }
 
 static void init_platform_timer(void)
 {
     struct platform_timesource *pts = &plt_src;
-    u64 overflow_period;
     int rc = -1;
 
     if ( opt_clocksource[0] != '\0' )
@@ -561,13 +583,12 @@ static void init_platform_timer(void)
 
     set_time_scale(&plt_scale, pts->frequency);
 
-    overflow_period = scale_delta(1ull << (pts->counter_bits-1), &plt_scale);
-    do_div(overflow_period, MILLISECS(1000/HZ));
-    plt_overflow_period = overflow_period;
-    plt_overflow();
-    printk("Platform timer overflows in %d jiffies.\n", plt_overflow_period);
+    plt_overflow_period = scale_delta(
+        1ull << (pts->counter_bits-1), &plt_scale);
+    init_timer(&plt_overflow_timer, plt_overflow, NULL, 0);
+    plt_overflow(NULL);
 
-    platform_timer_stamp = plt_count64;
+    platform_timer_stamp = plt_stamp64;
 
     printk("Platform timer is %s %s\n",
            freq_string(pts->frequency), pts->name);
@@ -969,6 +990,19 @@ void __init early_time_init(void)
     setup_irq(0, &irq0);
 }
 
+static int __init disable_pit_irq(void)
+{
+    if ( !using_pit && cpu_has_apic )
+    {
+        /* Disable PIT CH0 timer interrupt. */
+        outb_p(0x30, PIT_MODE);
+        outb_p(0, PIT_CH0);
+        outb_p(0, PIT_CH0);
+    }
+    return 0;
+}
+__initcall(disable_pit_irq);
+
 void send_timer_event(struct vcpu *v)
 {
     send_guest_vcpu_virq(v, VIRQ_TIMER);
@@ -1002,6 +1036,8 @@ int time_resume(void)
 {
     u64 tmp = init_pit_and_calibrate_tsc();
 
+    disable_pit_irq();
+
     set_time_scale(&this_cpu(cpu_time).tsc_scale, tmp);
 
     resume_platform_timer();
@@ -1019,7 +1055,7 @@ int time_resume(void)
 int dom0_pit_access(struct ioreq *ioreq)
 {
     /* Is Xen using Channel 2? Then disallow direct dom0 access. */
-    if ( plt_src.read_counter == read_pit_count )
+    if ( using_pit )
         return 0;
 
     switch ( ioreq->addr )

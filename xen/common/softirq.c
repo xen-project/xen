@@ -52,6 +52,108 @@ void open_softirq(int nr, softirq_handler handler)
     softirq_handlers[nr] = handler;
 }
 
+static LIST_HEAD(tasklet_list);
+static DEFINE_SPINLOCK(tasklet_lock);
+
+void tasklet_schedule(struct tasklet *t)
+{
+    unsigned long flags;
+
+    spin_lock_irqsave(&tasklet_lock, flags);
+
+    if ( !t->is_dead )
+    {
+        if ( !t->is_scheduled && !t->is_running )
+        {
+            BUG_ON(!list_empty(&t->list));
+            list_add_tail(&t->list, &tasklet_list);
+        }
+        t->is_scheduled = 1;
+        raise_softirq(TASKLET_SOFTIRQ);
+    }
+
+    spin_unlock_irqrestore(&tasklet_lock, flags);
+}
+
+static void tasklet_action(void)
+{
+    struct tasklet *t;
+
+    spin_lock_irq(&tasklet_lock);
+
+    if ( list_empty(&tasklet_list) )
+    {
+        spin_unlock_irq(&tasklet_lock);
+        return;
+    }
+
+    t = list_entry(tasklet_list.next, struct tasklet, list);
+    list_del_init(&t->list);
+
+    BUG_ON(t->is_dead || t->is_running || !t->is_scheduled);
+    t->is_scheduled = 0;
+    t->is_running = 1;
+
+    spin_unlock_irq(&tasklet_lock);
+    t->func(t->data);
+    spin_lock_irq(&tasklet_lock);
+
+    t->is_running = 0;
+
+    if ( t->is_scheduled )
+    {
+        BUG_ON(t->is_dead || !list_empty(&t->list));
+        list_add_tail(&t->list, &tasklet_list);
+    }
+
+    /*
+     * If there is more work to do then reschedule. We don't grab more work
+     * immediately as we want to allow other softirq work to happen first.
+     */
+    if ( !list_empty(&tasklet_list) )
+        raise_softirq(TASKLET_SOFTIRQ);
+
+    spin_unlock_irq(&tasklet_lock);
+}
+
+void tasklet_kill(struct tasklet *t)
+{
+    unsigned long flags;
+
+    spin_lock_irqsave(&tasklet_lock, flags);
+
+    if ( !list_empty(&t->list) )
+    {
+        BUG_ON(t->is_dead || t->is_running || !t->is_scheduled);
+        list_del_init(&t->list);
+    }
+    t->is_scheduled = 0;
+    t->is_dead = 1;
+
+    while ( t->is_running )
+    {
+        spin_unlock_irqrestore(&tasklet_lock, flags);
+        cpu_relax();
+        spin_lock_irqsave(&tasklet_lock, flags);
+    }
+
+    spin_unlock_irqrestore(&tasklet_lock, flags);
+}
+
+void tasklet_init(
+    struct tasklet *t, void (*func)(unsigned long), unsigned long data)
+{
+    memset(t, 0, sizeof(*t));
+    INIT_LIST_HEAD(&t->list);
+    t->func = func;
+    t->data = data;
+}
+
+void __init softirq_init(void)
+{
+    open_softirq(TASKLET_SOFTIRQ, tasklet_action);
+}
+
 /*
  * Local variables:
  * mode: C

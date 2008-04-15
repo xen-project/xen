@@ -319,7 +319,7 @@ static int vpic_intercept_pic_io(
     if ( bytes != 1 )
     {
         gdprintk(XENLOG_WARNING, "PIC_IO bad access size %d\n", bytes);
-        return 1;
+        return X86EMUL_OKAY;
     }
 
     vpic = &current->domain->arch.hvm_domain.vpic[port >> 7];
@@ -329,7 +329,7 @@ static int vpic_intercept_pic_io(
     else
         *val = (uint8_t)vpic_ioport_read(vpic, port);
 
-    return 1;
+    return X86EMUL_OKAY;
 }
 
 static int vpic_intercept_elcr_io(
@@ -338,11 +338,7 @@ static int vpic_intercept_elcr_io(
     struct hvm_hw_vpic *vpic;
     uint32_t data;
 
-    if ( bytes != 1 )
-    {
-        gdprintk(XENLOG_WARNING, "PIC_IO bad access size %d\n", bytes);
-        return 1;
-    }
+    BUG_ON(bytes != 1);
 
     vpic = &current->domain->arch.hvm_domain.vpic[port & 1];
 
@@ -360,34 +356,8 @@ static int vpic_intercept_elcr_io(
         *val = vpic->elcr & vpic_elcr_mask(vpic);
     }
 
-    return 1;
+    return X86EMUL_OKAY;
 }
-
-#ifdef HVM_DEBUG_SUSPEND
-static void vpic_info(struct hvm_hw_vpic *s)
-{
-    printk("*****pic state:*****\n");
-    printk("pic 0x%x.\n", s->irr);
-    printk("pic 0x%x.\n", s->imr);
-    printk("pic 0x%x.\n", s->isr);
-    printk("pic 0x%x.\n", s->irq_base);
-    printk("pic 0x%x.\n", s->init_state);
-    printk("pic 0x%x.\n", s->priority_add);
-    printk("pic 0x%x.\n", s->readsel_isr);
-    printk("pic 0x%x.\n", s->poll);
-    printk("pic 0x%x.\n", s->auto_eoi);
-    printk("pic 0x%x.\n", s->rotate_on_auto_eoi);
-    printk("pic 0x%x.\n", s->special_fully_nested_mode);
-    printk("pic 0x%x.\n", s->special_mask_mode);
-    printk("pic 0x%x.\n", s->elcr);
-    printk("pic 0x%x.\n", s->int_output);
-    printk("pic 0x%x.\n", s->is_master);
-}
-#else
-static void vpic_info(struct hvm_hw_vpic *s)
-{
-}
-#endif
 
 static int vpic_save(struct domain *d, hvm_domain_context_t *h)
 {
@@ -398,7 +368,6 @@ static int vpic_save(struct domain *d, hvm_domain_context_t *h)
     for ( i = 0; i < 2 ; i++ )
     {
         s = &d->arch.hvm_domain.vpic[i];
-        vpic_info(s);
         if ( hvm_save_entry(PIC, i, h, s) )
             return 1;
     }
@@ -421,7 +390,6 @@ static int vpic_load(struct domain *d, hvm_domain_context_t *h)
     if ( hvm_load_entry(PIC, h, s) != 0 )
         return -EINVAL;
 
-    vpic_info(s);
     return 0;
 }
 

@@ -91,9 +91,7 @@ static void netfront_thread(void *p)
 }
 
 static struct blkfront_dev *blk_dev;
-static uint64_t blk_sectors;
-static unsigned blk_sector_size;
-static int blk_mode;
+static struct blkfront_info blk_info;
 static uint64_t blk_size_read;
 static uint64_t blk_size_write;
 
@@ -111,9 +109,9 @@ static struct blk_req *blk_alloc_req(uint64_t sector)
 {
     struct blk_req *req = xmalloc(struct blk_req);
     req->aiocb.aio_dev = blk_dev;
-    req->aiocb.aio_buf = _xmalloc(blk_sector_size, blk_sector_size);
-    req->aiocb.aio_nbytes = blk_sector_size;
-    req->aiocb.aio_offset = sector * blk_sector_size;
+    req->aiocb.aio_buf = _xmalloc(blk_info.sector_size, blk_info.sector_size);
+    req->aiocb.aio_nbytes = blk_info.sector_size;
+    req->aiocb.aio_offset = sector * blk_info.sector_size;
     req->aiocb.data = req;
     req->next = NULL;
     return req;
@@ -125,7 +123,7 @@ static void blk_read_completed(struct blkfront_aiocb *aiocb, int ret)
     if (ret)
         printk("got error code %d when reading at offset %ld\n", ret, aiocb->aio_offset);
     else
-        blk_size_read += blk_sector_size;
+        blk_size_read += blk_info.sector_size;
     free(aiocb->aio_buf);
     free(req);
 }
@@ -154,10 +152,10 @@ static void blk_write_read_completed(struct blkfront_aiocb *aiocb, int ret)
         free(req);
         return;
     }
-    blk_size_read += blk_sector_size;
+    blk_size_read += blk_info.sector_size;
     buf = (int*) aiocb->aio_buf;
     rand_value = req->rand_value;
-    for (i = 0; i < blk_sector_size / sizeof(int); i++) {
+    for (i = 0; i < blk_info.sector_size / sizeof(int); i++) {
         if (buf[i] != rand_value) {
             printk("bogus data at offset %ld\n", aiocb->aio_offset + i);
             break;
@@ -177,7 +175,7 @@ static void blk_write_completed(struct blkfront_aiocb *aiocb, int ret)
         free(req);
         return;
     }
-    blk_size_write += blk_sector_size;
+    blk_size_write += blk_info.sector_size;
     /* Push write check */
     req->next = blk_to_read;
     blk_to_read = req;
@@ -195,7 +193,7 @@ static void blk_write_sector(uint64_t sector)
     req->rand_value = rand_value = rand();
 
     buf = (int*) req->aiocb.aio_buf;
-    for (i = 0; i < blk_sector_size / sizeof(int); i++) {
+    for (i = 0; i < blk_info.sector_size / sizeof(int); i++) {
         buf[i] = rand_value;
         rand_value *= RAND_MIX;
     }
@@ -207,35 +205,34 @@ static void blk_write_sector(uint64_t sector)
 static void blkfront_thread(void *p)
 {
     time_t lasttime = 0;
-    int blk_info;
 
-    blk_dev = init_blkfront(NULL, &blk_sectors, &blk_sector_size, &blk_mode, &blk_info);
+    blk_dev = init_blkfront(NULL, &blk_info);
     if (!blk_dev)
         return;
 
-    if (blk_info & VDISK_CDROM)
+    if (blk_info.info & VDISK_CDROM)
         printk("Block device is a CDROM\n");
-    if (blk_info & VDISK_REMOVABLE)
+    if (blk_info.info & VDISK_REMOVABLE)
         printk("Block device is removable\n");
-    if (blk_info & VDISK_READONLY)
+    if (blk_info.info & VDISK_READONLY)
         printk("Block device is read-only\n");
 
 #ifdef BLKTEST_WRITE
-    if (blk_mode == O_RDWR) {
+    if (blk_info.mode == O_RDWR) {
         blk_write_sector(0);
-        blk_write_sector(blk_sectors-1);
+        blk_write_sector(blk_info.sectors-1);
     } else
 #endif
     {
         blk_read_sector(0);
-        blk_read_sector(blk_sectors-1);
+        blk_read_sector(blk_info.sectors-1);
     }
 
     while (1) {
-        uint64_t sector = rand() % blk_sectors;
+        uint64_t sector = rand() % blk_info.sectors;
         struct timeval tv;
 #ifdef BLKTEST_WRITE
-        if (blk_mode == O_RDWR)
+        if (blk_info.mode == O_RDWR)
             blk_write_sector(sector);
         else
 #endif

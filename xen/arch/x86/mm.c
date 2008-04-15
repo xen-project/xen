@@ -299,7 +299,7 @@ int memory_is_conventional_ram(paddr_t p)
 unsigned long domain_get_maximum_gpfn(struct domain *d)
 {
     if ( is_hvm_domain(d) )
-        return d->arch.p2m.max_mapped_pfn;
+        return d->arch.p2m->max_mapped_pfn;
     /* NB. PV guests specify nr_pfns rather than max_pfn so we adjust here. */
     return arch_get_max_pfn(d) - 1;
 }
@@ -476,7 +476,7 @@ static void invalidate_shadow_ldt(struct vcpu *v)
         if ( pfn == 0 ) continue;
         l1e_write(&v->arch.perdomain_ptes[i], l1e_empty());
         page = mfn_to_page(pfn);
-        ASSERT_PAGE_IS_TYPE(page, PGT_ldt_page);
+        ASSERT_PAGE_IS_TYPE(page, PGT_seg_desc_page);
         ASSERT_PAGE_IS_DOMAIN(page, v->domain);
         put_page_and_type(page);
     }
@@ -530,7 +530,7 @@ int map_ldt_shadow_page(unsigned int off)
     if ( unlikely(!mfn_valid(mfn)) )
         return 0;
 
-    okay = get_page_and_type(mfn_to_page(mfn), d, PGT_ldt_page);
+    okay = get_page_and_type(mfn_to_page(mfn), d, PGT_seg_desc_page);
     if ( unlikely(!okay) )
         return 0;
 
@@ -924,7 +924,7 @@ void put_page_from_l1e(l1_pgentry_t l1e, struct domain *d)
     {
         /* We expect this is rare so we blow the entire shadow LDT. */
         if ( unlikely(((page->u.inuse.type_info & PGT_type_mask) == 
-                       PGT_ldt_page)) &&
+                       PGT_seg_desc_page)) &&
              unlikely(((page->u.inuse.type_info & PGT_count_mask) != 0)) &&
              (d == e) )
         {
@@ -1748,8 +1748,7 @@ static int alloc_page_type(struct page_info *page, unsigned long type)
         return alloc_l3_table(page);
     case PGT_l4_page_table:
         return alloc_l4_table(page);
-    case PGT_gdt_page:
-    case PGT_ldt_page:
+    case PGT_seg_desc_page:
         return alloc_segdesc_page(page);
     default:
         printk("Bad type in alloc_page_type %lx t=%" PRtype_info " c=%x\n", 
@@ -2189,7 +2188,7 @@ int do_mmuext_op(
         goto out;
     }
 
-    LOCK_BIGLOCK(d);
+    domain_lock(d);
 
     for ( i = 0; i < count; i++ )
     {
@@ -2438,7 +2437,7 @@ int do_mmuext_op(
 
     process_deferred_ops();
 
-    UNLOCK_BIGLOCK(d);
+    domain_unlock(d);
 
     perfc_add(num_mmuext_ops, i);
 
@@ -2493,7 +2492,7 @@ int do_mmu_update(
 
     domain_mmap_cache_init(&mapcache);
 
-    LOCK_BIGLOCK(d);
+    domain_lock(d);
 
     for ( i = 0; i < count; i++ )
     {
@@ -2665,7 +2664,7 @@ int do_mmu_update(
 
     process_deferred_ops();
 
-    UNLOCK_BIGLOCK(d);
+    domain_unlock(d);
 
     domain_mmap_cache_destroy(&mapcache);
 
@@ -2694,7 +2693,7 @@ static int create_grant_pte_mapping(
     l1_pgentry_t ol1e;
     struct domain *d = v->domain;
 
-    ASSERT(spin_is_locked(&d->big_lock));
+    ASSERT(domain_is_locked(d));
 
     adjust_guest_l1e(nl1e, d);
 
@@ -2817,7 +2816,7 @@ static int create_grant_va_mapping(
     unsigned long gl1mfn;
     int okay;
     
-    ASSERT(spin_is_locked(&d->big_lock));
+    ASSERT(domain_is_locked(d));
 
     adjust_guest_l1e(nl1e, d);
 
@@ -3015,7 +3014,7 @@ int do_update_va_mapping(unsigned long va, u64 val64,
     if ( rc )
         return rc;
 
-    LOCK_BIGLOCK(d);
+    domain_lock(d);
 
     pl1e = guest_map_l1e(v, va, &gl1mfn);
 
@@ -3028,7 +3027,7 @@ int do_update_va_mapping(unsigned long va, u64 val64,
 
     process_deferred_ops();
 
-    UNLOCK_BIGLOCK(d);
+    domain_unlock(d);
 
     switch ( flags & UVMF_FLUSHTYPE_MASK )
     {
@@ -3134,7 +3133,7 @@ long set_gdt(struct vcpu *v,
     {
         mfn = frames[i] = gmfn_to_mfn(d, frames[i]);
         if ( !mfn_valid(mfn) ||
-             !get_page_and_type(mfn_to_page(mfn), d, PGT_gdt_page) )
+             !get_page_and_type(mfn_to_page(mfn), d, PGT_seg_desc_page) )
             goto fail;
     }
 
@@ -3173,12 +3172,12 @@ long do_set_gdt(XEN_GUEST_HANDLE(ulong) frame_list, unsigned int entries)
     if ( copy_from_guest(frames, frame_list, nr_pages) )
         return -EFAULT;
 
-    LOCK_BIGLOCK(curr->domain);
+    domain_lock(curr->domain);
 
     if ( (ret = set_gdt(curr, frames, entries)) == 0 )
         flush_tlb_local();
 
-    UNLOCK_BIGLOCK(curr->domain);
+    domain_unlock(curr->domain);
 
     return ret;
 }
@@ -3211,12 +3210,8 @@ long do_update_descriptor(u64 pa, u64 desc)
     /* Check if the given frame is in use in an unsafe context. */
     switch ( page->u.inuse.type_info & PGT_type_mask )
     {
-    case PGT_gdt_page:
-        if ( unlikely(!get_page_type(page, PGT_gdt_page)) )
-            goto out;
-        break;
-    case PGT_ldt_page:
-        if ( unlikely(!get_page_type(page, PGT_ldt_page)) )
+    case PGT_seg_desc_page:
+        if ( unlikely(!get_page_type(page, PGT_seg_desc_page)) )
             goto out;
         break;
     default:
@@ -3316,7 +3311,7 @@ long arch_memory_op(int op, XEN_GUEST_HANDLE(void) arg)
             return -EINVAL;
         }
 
-        LOCK_BIGLOCK(d);
+        domain_lock(d);
 
         /* Remove previously mapped page if it was present. */
         prev_mfn = gmfn_to_mfn(d, xatp.gpfn);
@@ -3338,7 +3333,7 @@ long arch_memory_op(int op, XEN_GUEST_HANDLE(void) arg)
         /* Map at new location. */
         guest_physmap_add_page(d, xatp.gpfn, mfn);
 
-        UNLOCK_BIGLOCK(d);
+        domain_unlock(d);
 
         rcu_unlock_domain(d);
 
@@ -3674,7 +3669,7 @@ int ptwr_do_page_fault(struct vcpu *v, unsigned long addr,
     struct ptwr_emulate_ctxt ptwr_ctxt;
     int rc;
 
-    LOCK_BIGLOCK(d);
+    domain_lock(d);
 
     /* Attempt to read the PTE that maps the VA being accessed. */
     guest_get_eff_l1e(v, addr, &pte);
@@ -3699,12 +3694,12 @@ int ptwr_do_page_fault(struct vcpu *v, unsigned long addr,
     if ( rc == X86EMUL_UNHANDLEABLE )
         goto bail;
 
-    UNLOCK_BIGLOCK(d);
+    domain_unlock(d);
     perfc_incr(ptwr_emulations);
     return EXCRET_fault_fixed;
 
  bail:
-    UNLOCK_BIGLOCK(d);
+    domain_unlock(d);
     return 0;
 }
 

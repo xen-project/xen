@@ -79,7 +79,7 @@ Changes to the existing code:
 
     * include/asm-x86/processor.h: struct arch_vmx_struct arch_vmx has
       been added to the thread_struct data structure. The arch_vmx has
-      the addtional VMX-related CPU context.
+      the additional VMX-related CPU context.
 
     * arch/x86/io_apic.c: reverse mapping between vector and irq has
       been added. We will revisit this code when considering MSI

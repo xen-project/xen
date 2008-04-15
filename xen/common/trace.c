@@ -69,12 +69,6 @@ static cpumask_t tb_cpu_mask = CPU_MASK_ALL;
 /* which tracing events are enabled */
 static u32 tb_event_mask = TRC_ALL;
 
-static void trace_notify_guest(void)
-{
-    send_guest_global_virq(dom0, VIRQ_TBUF);
-}
-
-
 /**
  * alloc_trace_bufs - performs initialization of the per-cpu trace buffers.
  *
@@ -120,7 +114,6 @@ static int alloc_trace_bufs(void)
     }
 
     t_buf_highwater = data_size >> 1; /* 50% high water */
-    open_softirq(TRACE_SOFTIRQ, trace_notify_guest);
 
     return 0;
 }
@@ -513,7 +506,7 @@ void __trace_var(u32 event, int cycles, int extra, unsigned char *extra_data)
     /* Notify trace buffer consumer that we've crossed the high water mark. */
     if ( started_below_highwater &&
          (calc_unconsumed_bytes(buf) >= t_buf_highwater) )
-        raise_softirq(TRACE_SOFTIRQ);
+        send_guest_global_virq(dom0, VIRQ_TBUF);
 }
 
 /*

@@ -28,12 +28,12 @@ int compat_set_gdt(XEN_GUEST_HANDLE(uint) frame_list, unsigned int entries)
         guest_handle_add_offset(frame_list, 1);
     }
 
-    LOCK_BIGLOCK(current->domain);
+    domain_lock(current->domain);
 
     if ( (ret = set_gdt(current, frames, entries)) == 0 )
         flush_tlb_local();
 
-    UNLOCK_BIGLOCK(current->domain);
+    domain_unlock(current->domain);
 
     return ret;
 }

@@ -172,7 +172,7 @@ static void realmode_emulate_one(struct hvm_emulate_ctxt *hvmemul_ctxt)
              hvmemul_ctxt->insn_buf[0], hvmemul_ctxt->insn_buf[1],
              hvmemul_ctxt->insn_buf[2], hvmemul_ctxt->insn_buf[3],
              hvmemul_ctxt->insn_buf[4], hvmemul_ctxt->insn_buf[5]);
-    domain_crash_synchronous();
+    domain_crash(curr->domain);
 }
 
 void vmx_realmode(struct cpu_user_regs *regs)

@@ -25,9 +25,9 @@
 #include <xen/acpi.h>
 #include <xen/mm.h>
 #include <xen/xmalloc.h>
+#include <xen/pci.h>
 #include <asm/string.h>
 #include "dmar.h"
-#include "../pci-direct.h"
 #include "../pci_regs.h"
 
 int vtd_enabled;
@@ -211,7 +211,7 @@ struct acpi_atsr_unit * acpi_find_matched_atsr_unit(struct pci_dev *dev)
 static int scope_device_count(void *start, void *end)
 {
     struct acpi_dev_scope *scope;
-    u8 bus, sub_bus, sec_bus;
+    u16 bus, sub_bus, sec_bus;
     struct acpi_pci_path *path;
     int depth, count = 0;
     u8 dev, func;
@@ -231,9 +231,9 @@ static int scope_device_count(void *start, void *end)
         bus = scope->start_bus;
         depth = (scope->length - sizeof(struct acpi_dev_scope))
 		    / sizeof(struct acpi_pci_path);
-        while ( --depth )
+        while ( --depth > 0 )
         {
-            bus = read_pci_config_byte(
+            bus = pci_conf_read8(
                 bus, path->dev, path->fn, PCI_SECONDARY_BUS);
             path++;
         }
@@ -250,9 +250,9 @@ static int scope_device_count(void *start, void *end)
             dprintk(XENLOG_INFO VTDPREFIX,
                     "found bridge: bdf = %x:%x:%x\n",
                     bus, path->dev, path->fn);
-            sec_bus = read_pci_config_byte(
+            sec_bus = pci_conf_read8(
                 bus, path->dev, path->fn, PCI_SECONDARY_BUS);
-            sub_bus = read_pci_config_byte(
+            sub_bus = pci_conf_read8(
                 bus, path->dev, path->fn, PCI_SUBORDINATE_BUS);
 
             while ( sec_bus <= sub_bus )
@@ -261,7 +261,7 @@ static int scope_device_count(void *start, void *end)
                 {
                     for ( func = 0; func < 8; func++ )
                     {
-                        l = read_pci_config(
+                        l = pci_conf_read32(
                             sec_bus, dev, func, PCI_VENDOR_ID);
 
                         /* some broken boards return 0 or
@@ -301,7 +301,7 @@ static int __init acpi_parse_dev_scope(
     void *start, void *end, void *acpi_entry, int type)
 {
     struct acpi_dev_scope *scope;
-    u8 bus, sub_bus, sec_bus;
+    u16 bus, sub_bus, sec_bus;
     struct acpi_pci_path *path;
     struct acpi_ioapic_unit *acpi_ioapic_unit = NULL;
     int depth;
@@ -353,9 +353,9 @@ static int __init acpi_parse_dev_scope(
 		    / sizeof(struct acpi_pci_path);
         bus = scope->start_bus;
 
-        while ( --depth )
+        while ( --depth > 0 )
         {
-            bus = read_pci_config_byte(
+            bus = pci_conf_read8(
                 bus, path->dev, path->fn, PCI_SECONDARY_BUS);
             path++;
         }
@@ -374,9 +374,9 @@ static int __init acpi_parse_dev_scope(
             dprintk(XENLOG_INFO VTDPREFIX,
                     "found bridge: bus = %x dev = %x func = %x\n",
                     bus, path->dev, path->fn);
-            sec_bus = read_pci_config_byte(
+            sec_bus = pci_conf_read8(
                 bus, path->dev, path->fn, PCI_SECONDARY_BUS);
-            sub_bus = read_pci_config_byte(
+            sub_bus = pci_conf_read8(
                 bus, path->dev, path->fn, PCI_SUBORDINATE_BUS);
 
             while ( sec_bus <= sub_bus )
@@ -385,7 +385,7 @@ static int __init acpi_parse_dev_scope(
                 {
                     for ( func = 0; func < 8; func++ )
                     {
-                        l = read_pci_config(
+                        l = pci_conf_read32(
                             sec_bus, dev, func, PCI_VENDOR_ID);
 
                         /* some broken boards return 0 or

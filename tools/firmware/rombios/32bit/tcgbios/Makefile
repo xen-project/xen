@@ -1,16 +1,10 @@
-
-override XEN_TARGET_ARCH = x86_32
 XEN_ROOT = ../../../../..
-CFLAGS :=
-include $(XEN_ROOT)/tools/Rules.mk
+include $(XEN_ROOT)/tools/firmware/Rules.mk
 
 TARGET  = tcgbiosext.o
 FILES   = tcgbios tpm_drivers
 OBJECTS = $(foreach f,$(FILES),$(f).o)
 
-CFLAGS += -fno-builtin -O2 -msoft-float -nostdlib
-CFLAGS += $(call cc-option,$(CC),-fno-stack-protector,)
-CFLAGS += $(call cc-option,$(CC),-fno-stack-protector-all,)
 CFLAGS += -I../ -I../../ -DGCC_PROTOS
 
 .PHONY: all clean

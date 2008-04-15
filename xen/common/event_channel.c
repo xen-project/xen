@@ -109,9 +109,7 @@ static int get_free_port(struct domain *d)
         if ( xsm_alloc_security_evtchn(&chn[i]) )
         {
             for ( j = 0; j < i; j++ )
-            {
                 xsm_free_security_evtchn(&chn[j]);
-            }        
             xfree(chn);
             return -ENOMEM;
         }
@@ -971,9 +969,18 @@ void free_xen_event_channel(
     struct domain *d = local_vcpu->domain;
 
     spin_lock(&d->evtchn_lock);
+
+    if ( unlikely(d->is_dying) )
+    {
+        spin_unlock(&d->evtchn_lock);
+        return;
+    }
+
+    BUG_ON(!port_is_valid(d, port));
     chn = evtchn_from_port(d, port);
     BUG_ON(!chn->consumer_is_xen);
     chn->consumer_is_xen = 0;
+
     spin_unlock(&d->evtchn_lock);
 
     (void)__evtchn_close(d, port);
@@ -1035,6 +1042,7 @@ void evtchn_destroy(struct domain *d)
     {
         xsm_free_security_evtchn(d->evtchn[i]);
         xfree(d->evtchn[i]);
+        d->evtchn[i] = NULL;
     }
     spin_unlock(&d->evtchn_lock);
 }

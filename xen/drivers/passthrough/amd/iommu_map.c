@@ -388,17 +388,17 @@ int amd_iommu_map_page(struct domain *d, unsigned long gfn, unsigned long mfn)
     unsigned long flags;
     u64 maddr;
     struct hvm_iommu *hd = domain_hvm_iommu(d);
-    int iw, ir;
+    int iw = IOMMU_IO_WRITE_ENABLED;
+    int ir = IOMMU_IO_READ_ENABLED;
 
     BUG_ON( !hd->root_table );
 
-    maddr = (u64)mfn << PAGE_SHIFT;
-
-    iw = IOMMU_IO_WRITE_ENABLED;
-    ir = IOMMU_IO_READ_ENABLED;
-
     spin_lock_irqsave(&hd->mapping_lock, flags);
 
+    if ( is_hvm_domain(d) && !hd->p2m_synchronized )
+        goto out;
+
+    maddr = (u64)mfn << PAGE_SHIFT;
     pte = get_pte_from_page_tables(hd->root_table, hd->paging_mode, gfn);
     if ( pte == NULL )
     {
@@ -409,7 +409,7 @@ int amd_iommu_map_page(struct domain *d, unsigned long gfn, unsigned long mfn)
     }
 
     set_page_table_entry_present((u32 *)pte, maddr, iw, ir);
-
+out:
     spin_unlock_irqrestore(&hd->mapping_lock, flags);
     return 0;
 }
@@ -425,10 +425,16 @@ int amd_iommu_unmap_page(struct domain *d, unsigned long gfn)
 
     BUG_ON( !hd->root_table );
 
+    spin_lock_irqsave(&hd->mapping_lock, flags);
+
+    if ( is_hvm_domain(d) && !hd->p2m_synchronized )
+    {
+        spin_unlock_irqrestore(&hd->mapping_lock, flags);
+        return 0;
+    }
+
     requestor_id = hd->domain_id;
     io_addr = (u64)gfn << PAGE_SHIFT;
-
-    spin_lock_irqsave(&hd->mapping_lock, flags);
 
     pte = get_pte_from_page_tables(hd->root_table, hd->paging_mode, gfn);
     if ( pte == NULL )
@@ -483,6 +489,56 @@ int amd_iommu_reserve_domain_unity_map(
                                      phys_addr, iw, ir);
         phys_addr += PAGE_SIZE;
     }
+    spin_unlock_irqrestore(&hd->mapping_lock, flags);
+    return 0;
+}
+
+int amd_iommu_sync_p2m(struct domain *d)
+{
+    unsigned long mfn, gfn, flags;
+    void *pte;
+    u64 maddr;
+    struct list_head *entry;
+    struct page_info *page;
+    struct hvm_iommu *hd;
+    int iw = IOMMU_IO_WRITE_ENABLED;
+    int ir = IOMMU_IO_READ_ENABLED;
+
+    if ( !is_hvm_domain(d) )
+        return 0;
+
+    hd = domain_hvm_iommu(d);
+
+    spin_lock_irqsave(&hd->mapping_lock, flags);
+
+    if ( hd->p2m_synchronized )
+        goto out;
+
+    for ( entry = d->page_list.next; entry != &d->page_list;
+            entry = entry->next )
+    {
+        page = list_entry(entry, struct page_info, list);
+        mfn = page_to_mfn(page);
+        gfn = get_gpfn_from_mfn(mfn);
+
+        if ( gfn == INVALID_M2P_ENTRY )
+            continue;
+
+        maddr = (u64)mfn << PAGE_SHIFT;
+        pte = get_pte_from_page_tables(hd->root_table, hd->paging_mode, gfn);
+        if ( pte == NULL )
+        {
+            dprintk(XENLOG_ERR,
+                    "AMD IOMMU: Invalid IO pagetable entry gfn = %lx\n", gfn);
+            spin_unlock_irqrestore(&hd->mapping_lock, flags);
+            return -EFAULT;
+        }
+        set_page_table_entry_present((u32 *)pte, maddr, iw, ir);
+    }
+
+    hd->p2m_synchronized = 1;
+
+out:
     spin_unlock_irqrestore(&hd->mapping_lock, flags);
     return 0;
 }

@@ -76,6 +76,7 @@ DEFAULT_policy = \
 "  <SimpleTypeEnforcement>\n" +\
 "    <SimpleTypeEnforcementTypes>\n" +\
 "      <Type>SystemManagement</Type>\n" +\
+"      <Type>__UNLABELED__</Type>\n" +\
 "    </SimpleTypeEnforcementTypes>\n" +\
 "  </SimpleTypeEnforcement>\n" +\
 "  <ChineseWall>\n" +\
@@ -89,12 +90,30 @@ DEFAULT_policy = \
 "        <Name%s>SystemManagement</Name>\n" +\
 "        <SimpleTypeEnforcementTypes>\n" +\
 "          <Type>SystemManagement</Type>\n" +\
+"          <Type>__UNLABELED__</Type>\n" +\
+"        </SimpleTypeEnforcementTypes>\n" +\
+"        <ChineseWallTypes>\n" +\
+"          <Type/>\n" +\
+"        </ChineseWallTypes>\n" +\
+"      </VirtualMachineLabel>\n" +\
+"      <VirtualMachineLabel>\n" +\
+"        <Name>__UNLABELED__</Name>\n" +\
+"        <SimpleTypeEnforcementTypes>\n" +\
+"          <Type>__UNLABELED__</Type>\n" +\
 "        </SimpleTypeEnforcementTypes>\n" +\
 "        <ChineseWallTypes>\n" +\
 "          <Type/>\n" +\
 "        </ChineseWallTypes>\n" +\
 "      </VirtualMachineLabel>\n" +\
 "    </SubjectLabels>\n" +\
+"    <ObjectLabels>\n" +\
+"      <ResourceLabel>\n" +\
+"        <Name>__UNLABELED__</Name>\n" +\
+"        <SimpleTypeEnforcementTypes>\n" +\
+"          <Type>__UNLABELED__</Type>\n" +\
+"        </SimpleTypeEnforcementTypes>\n" +\
+"      </ResourceLabel>\n" +\
+"    </ObjectLabels>\n" +\
 "  </SecurityLabelTemplate>\n" +\
 "</SecurityPolicyDefinition>\n"
 
@@ -231,13 +250,14 @@ class ACMPolicy(XSPolicy):
         """
            Determine whether this is the default policy
         """
-        default = ['SystemManagement']
+        default = ['SystemManagement', ACM_LABEL_UNLABELED ]
         if self.policy_get_virtualmachinelabel_names() == default and \
            self.policy_get_bootstrap_vmlabel() == default[0] and \
            self.policy_get_stetypes_types() == default and \
            self.policy_get_stes_of_vmlabel(default[0]) == default and \
-           self.policy_get_resourcelabel_names() == [] and \
-           self.policy_get_chwall_types() == default and \
+           self.policy_get_stes_of_vmlabel(default[1]) == [default[1]] and \
+           self.policy_get_resourcelabel_names() == [default[1]] and \
+           self.policy_get_chwall_types() == [ default[0] ] and \
            self.get_name() == "DEFAULT":
             return True
         return False

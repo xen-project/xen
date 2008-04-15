@@ -165,6 +165,11 @@ do_hvm_op(unsigned long op, XEN_GUEST_HANDLE(void) arg)
                 iorp = &d->arch.hvm_domain.buf_pioreq;
                 rc = vmx_set_ioreq_page(d, iorp, a.value);
                 break;
+            case HVM_PARAM_DM_DOMAIN:
+                if (a.value == DOMID_SELF)
+                    a.value = current->domain->domain_id;
+                rc = a.value ? -EINVAL : 0; /* no stub domain support */
+                break;
             default:
                 /* nothing */
                 break;

@@ -21,6 +21,7 @@
 #include <xen/errno.h>
 #include <asm/current.h>
 #include <asm/hardirq.h>
+#include <xen/numa.h>
 #include <public/memory.h>
 #include <xsm/xsm.h>
 
@@ -37,19 +38,13 @@ struct memop_args {
     int          preempted;  /* Was the hypercall preempted? */
 };
 
-static unsigned int select_local_cpu(struct domain *d)
-{
-    struct vcpu *v = d->vcpu[0];
-    return (v ? v->processor : 0);
-}
-
 static void increase_reservation(struct memop_args *a)
 {
     struct page_info *page;
     unsigned long i;
     xen_pfn_t mfn;
     struct domain *d = a->domain;
-    unsigned int cpu = select_local_cpu(d);
+    unsigned int node = domain_to_node(d);
 
     if ( !guest_handle_is_null(a->extent_list) &&
          !guest_handle_okay(a->extent_list, a->nr_extents) )
@@ -67,7 +62,8 @@ static void increase_reservation(struct memop_args *a)
             goto out;
         }
 
-        page = __alloc_domheap_pages(d, cpu, a->extent_order, a->memflags);
+        page = alloc_domheap_pages(
+            d, a->extent_order, a->memflags | MEMF_node(node));
         if ( unlikely(page == NULL) ) 
         {
             gdprintk(XENLOG_INFO, "Could not allocate order=%d extent: "
@@ -96,7 +92,7 @@ static void populate_physmap(struct memop_args *a)
     unsigned long i, j;
     xen_pfn_t gpfn, mfn;
     struct domain *d = a->domain;
-    unsigned int cpu = select_local_cpu(d);
+    unsigned int node = domain_to_node(d);
 
     if ( !guest_handle_okay(a->extent_list, a->nr_extents) )
         return;
@@ -116,7 +112,8 @@ static void populate_physmap(struct memop_args *a)
         if ( unlikely(__copy_from_guest_offset(&gpfn, a->extent_list, i, 1)) )
             goto out;
 
-        page = __alloc_domheap_pages(d, cpu, a->extent_order, a->memflags);
+        page = alloc_domheap_pages(
+            d, a->extent_order, a->memflags | MEMF_node(node));
         if ( unlikely(page == NULL) ) 
         {
             gdprintk(XENLOG_INFO, "Could not allocate order=%d extent: "
@@ -296,7 +293,7 @@ static long memory_exchange(XEN_GUEST_HANDLE(xen_memory_exchange_t) arg)
     unsigned long in_chunk_order, out_chunk_order;
     xen_pfn_t     gpfn, gmfn, mfn;
     unsigned long i, j, k;
-    unsigned int  memflags = 0, cpu;
+    unsigned int  memflags = 0;
     long          rc = 0;
     struct domain *d;
     struct page_info *page;
@@ -351,8 +348,7 @@ static long memory_exchange(XEN_GUEST_HANDLE(xen_memory_exchange_t) arg)
 
     memflags |= MEMF_bits(domain_clamp_alloc_bitsize(
         d, exch.out.address_bits ? : (BITS_PER_LONG+PAGE_SHIFT)));
-
-    cpu = select_local_cpu(d);
+    memflags |= MEMF_node(domain_to_node(d));
 
     for ( i = (exch.nr_exchanged >> in_chunk_order);
           i < (exch.in.nr_extents >> in_chunk_order);
@@ -401,8 +397,7 @@ static long memory_exchange(XEN_GUEST_HANDLE(xen_memory_exchange_t) arg)
         /* Allocate a chunk's worth of anonymous output pages. */
         for ( j = 0; j < (1UL << out_chunk_order); j++ )
         {
-            page = __alloc_domheap_pages(
-                NULL, cpu, exch.out.extent_order, memflags);
+            page = alloc_domheap_pages(NULL, exch.out.extent_order, memflags);
             if ( unlikely(page == NULL) )
             {
                 rc = -ENOMEM;

@@ -861,6 +861,8 @@ void __init __start_xen(unsigned long mbi_p)
 
     early_boot = 0;
 
+    softirq_init();
+
     early_cpu_init();
 
     paging_init();

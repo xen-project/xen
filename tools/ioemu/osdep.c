@@ -21,6 +21,8 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
  * THE SOFTWARE.
  */
+
+#include "config-host.h"
 #include <stdlib.h>
 #include <stdio.h>
 #include <stdarg.h>
@@ -32,7 +34,6 @@
 #include <sys/statvfs.h>
 #endif
 
-#include "cpu.h"
 #if defined(USE_KQEMU)
 #include "vl.h"
 #endif

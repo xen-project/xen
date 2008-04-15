@@ -48,11 +48,7 @@ struct blkfront_dev {
 
     char *nodename;
     char *backend;
-    unsigned sector_size;
-    unsigned sectors;
-    int mode;
-    int barrier;
-    int flush;
+    struct blkfront_info info;
 
 #ifdef HAVE_LIBC
     int fd;
@@ -70,7 +66,7 @@ void blkfront_handler(evtchn_port_t port, struct pt_regs *regs, void *data)
     wake_up(&blkfront_queue);
 }
 
-struct blkfront_dev *init_blkfront(char *nodename, uint64_t *sectors, unsigned *sector_size, int *mode, int *info)
+struct blkfront_dev *init_blkfront(char *nodename, struct blkfront_info *info)
 {
     xenbus_transaction_t xbt;
     char* err;
@@ -163,9 +159,9 @@ done:
             return NULL;
         }
         if (*c == 'w')
-            *mode = dev->mode = O_RDWR;
+            dev->info.mode = O_RDWR;
         else
-            *mode = dev->mode = O_RDONLY;
+            dev->info.mode = O_RDONLY;
         free(c);
 
         snprintf(path, sizeof(path), "%s/state", dev->backend);
@@ -177,24 +173,26 @@ done:
         xenbus_unwatch_path(XBT_NIL, path);
 
         snprintf(path, sizeof(path), "%s/info", dev->backend);
-        *info = xenbus_read_integer(path);
+        dev->info.info = xenbus_read_integer(path);
 
         snprintf(path, sizeof(path), "%s/sectors", dev->backend);
         // FIXME: read_integer returns an int, so disk size limited to 1TB for now
-        *sectors = dev->sectors = xenbus_read_integer(path);
+        dev->info.sectors = xenbus_read_integer(path);
 
         snprintf(path, sizeof(path), "%s/sector-size", dev->backend);
-        *sector_size = dev->sector_size = xenbus_read_integer(path);
+        dev->info.sector_size = xenbus_read_integer(path);
 
         snprintf(path, sizeof(path), "%s/feature-barrier", dev->backend);
-        dev->barrier = xenbus_read_integer(path);
+        dev->info.barrier = xenbus_read_integer(path);
 
         snprintf(path, sizeof(path), "%s/feature-flush-cache", dev->backend);
-        dev->flush = xenbus_read_integer(path);
+        dev->info.flush = xenbus_read_integer(path);
+
+        *info = dev->info;
     }
     unmask_evtchn(dev->evtchn);
 
-    printk("%u sectors of %u bytes\n", dev->sectors, dev->sector_size);
+    printk("%u sectors of %u bytes\n", dev->info.sectors, dev->info.sector_size);
     printk("**************************\n");
 
     return dev;
@@ -258,11 +256,11 @@ void blkfront_aio(struct blkfront_aiocb *aiocbp, int write)
     uintptr_t start, end;
 
     // Can't io at non-sector-aligned location
-    ASSERT(!(aiocbp->aio_offset & (dev->sector_size-1)));
+    ASSERT(!(aiocbp->aio_offset & (dev->info.sector_size-1)));
     // Can't io non-sector-sized amounts
-    ASSERT(!(aiocbp->aio_nbytes & (dev->sector_size-1)));
+    ASSERT(!(aiocbp->aio_nbytes & (dev->info.sector_size-1)));
     // Can't io non-sector-aligned buffer
-    ASSERT(!((uintptr_t) aiocbp->aio_buf & (dev->sector_size-1)));
+    ASSERT(!((uintptr_t) aiocbp->aio_buf & (dev->info.sector_size-1)));
 
     start = (uintptr_t)aiocbp->aio_buf & PAGE_MASK;
     end = ((uintptr_t)aiocbp->aio_buf + aiocbp->aio_nbytes + PAGE_SIZE - 1) & PAGE_MASK;
@@ -280,7 +278,7 @@ void blkfront_aio(struct blkfront_aiocb *aiocbp, int write)
     req->nr_segments = n;
     req->handle = dev->handle;
     req->id = (uintptr_t) aiocbp;
-    req->sector_number = aiocbp->aio_offset / dev->sector_size;
+    req->sector_number = aiocbp->aio_offset / dev->info.sector_size;
 
     for (j = 0; j < n; j++) {
 	uintptr_t data = start + j * PAGE_SIZE;
@@ -292,10 +290,10 @@ void blkfront_aio(struct blkfront_aiocb *aiocbp, int write)
 	aiocbp->gref[j] = req->seg[j].gref =
             gnttab_grant_access(dev->dom, virtual_to_mfn(data), write);
 	req->seg[j].first_sect = 0;
-	req->seg[j].last_sect = PAGE_SIZE / dev->sector_size - 1;
+	req->seg[j].last_sect = PAGE_SIZE / dev->info.sector_size - 1;
     }
-    req->seg[0].first_sect = ((uintptr_t)aiocbp->aio_buf & ~PAGE_MASK) / dev->sector_size;
-    req->seg[n-1].last_sect = (((uintptr_t)aiocbp->aio_buf + aiocbp->aio_nbytes - 1) & ~PAGE_MASK) / dev->sector_size;
+    req->seg[0].first_sect = ((uintptr_t)aiocbp->aio_buf & ~PAGE_MASK) / dev->info.sector_size;
+    req->seg[n-1].last_sect = (((uintptr_t)aiocbp->aio_buf + aiocbp->aio_nbytes - 1) & ~PAGE_MASK) / dev->info.sector_size;
 
     dev->ring.req_prod_pvt = i + 1;
 
@@ -313,6 +311,62 @@ void blkfront_aio_write(struct blkfront_aiocb *aiocbp)
 void blkfront_aio_read(struct blkfront_aiocb *aiocbp)
 {
     blkfront_aio(aiocbp, 0);
+}
+
+static void blkfront_push_operation(struct blkfront_dev *dev, uint8_t op, uint64_t id)
+{
+    int i;
+    struct blkif_request *req;
+    int notify;
+
+    blkfront_wait_slot(dev);
+    i = dev->ring.req_prod_pvt;
+    req = RING_GET_REQUEST(&dev->ring, i);
+    req->operation = op;
+    req->nr_segments = 0;
+    req->handle = dev->handle;
+    req->id = id;
+    /* Not needed anyway, but the backend will check it */
+    req->sector_number = 0;
+    dev->ring.req_prod_pvt = i + 1;
+    wmb();
+    RING_PUSH_REQUESTS_AND_CHECK_NOTIFY(&dev->ring, notify);
+    if (notify) notify_remote_via_evtchn(dev->evtchn);
+}
+
+void blkfront_aio_push_operation(struct blkfront_aiocb *aiocbp, uint8_t op)
+{
+    struct blkfront_dev *dev = aiocbp->aio_dev;
+    blkfront_push_operation(dev, op, (uintptr_t) aiocbp);
+}
+
+void blkfront_sync(struct blkfront_dev *dev)
+{
+    unsigned long flags;
+
+    if (dev->info.mode == O_RDWR) {
+        if (dev->info.barrier == 1)
+            blkfront_push_operation(dev, BLKIF_OP_WRITE_BARRIER, 0);
+
+        if (dev->info.flush == 1)
+            blkfront_push_operation(dev, BLKIF_OP_FLUSH_DISKCACHE, 0);
+    }
+
+    /* Note: This won't finish if another thread enqueues requests.  */
+    local_irq_save(flags);
+    DEFINE_WAIT(w);
+    while (1) {
+	blkfront_aio_poll(dev);
+	if (RING_FREE_REQUESTS(&dev->ring) == RING_SIZE(&dev->ring))
+	    break;
+
+	add_waiter(w, blkfront_queue);
+	local_irq_restore(flags);
+	schedule();
+	local_irq_save(flags);
+    }
+    remove_waiter(w);
+    local_irq_restore(flags);
 }
 
 int blkfront_aio_poll(struct blkfront_dev *dev)
@@ -337,93 +391,45 @@ moretodo:
 	rsp = RING_GET_RESPONSE(&dev->ring, cons);
 	nr_consumed++;
 
-        if (rsp->status != BLKIF_RSP_OKAY)
-            printk("block error %d for op %d\n", rsp->status, rsp->operation);
+        struct blkfront_aiocb *aiocbp = (void*) (uintptr_t) rsp->id;
+        int status = rsp->status;
+
+        if (status != BLKIF_RSP_OKAY)
+            printk("block error %d for op %d\n", status, rsp->operation);
 
         switch (rsp->operation) {
         case BLKIF_OP_READ:
         case BLKIF_OP_WRITE:
         {
-            struct blkfront_aiocb *aiocbp = (void*) (uintptr_t) rsp->id;
-            int status = rsp->status;
             int j;
 
             for (j = 0; j < aiocbp->n; j++)
                 gnttab_end_access(aiocbp->gref[j]);
 
-            dev->ring.rsp_cons = ++cons;
-            /* Nota: callback frees aiocbp itself */
-            aiocbp->aio_cb(aiocbp, status ? -EIO : 0);
-            if (dev->ring.rsp_cons != cons)
-                /* We reentered, we must not continue here */
-                goto out;
             break;
         }
-        default:
-            printk("unrecognized block operation %d response\n", rsp->operation);
+
         case BLKIF_OP_WRITE_BARRIER:
         case BLKIF_OP_FLUSH_DISKCACHE:
-            dev->ring.rsp_cons = ++cons;
             break;
+
+        default:
+            printk("unrecognized block operation %d response\n", rsp->operation);
         }
+
+        dev->ring.rsp_cons = ++cons;
+        /* Nota: callback frees aiocbp itself */
+        if (aiocbp && aiocbp->aio_cb)
+            aiocbp->aio_cb(aiocbp, status ? -EIO : 0);
+        if (dev->ring.rsp_cons != cons)
+            /* We reentered, we must not continue here */
+            break;
     }
 
-out:
     RING_FINAL_CHECK_FOR_RESPONSES(&dev->ring, more);
     if (more) goto moretodo;
 
     return nr_consumed;
-}
-
-static void blkfront_push_operation(struct blkfront_dev *dev, uint8_t op)
-{
-    int i;
-    struct blkif_request *req;
-    int notify;
-
-    blkfront_wait_slot(dev);
-    i = dev->ring.req_prod_pvt;
-    req = RING_GET_REQUEST(&dev->ring, i);
-    req->operation = op;
-    req->nr_segments = 0;
-    req->handle = dev->handle;
-    /* Not used */
-    req->id = 0;
-    /* Not needed anyway, but the backend will check it */
-    req->sector_number = 0;
-    dev->ring.req_prod_pvt = i + 1;
-    wmb();
-    RING_PUSH_REQUESTS_AND_CHECK_NOTIFY(&dev->ring, notify);
-    if (notify) notify_remote_via_evtchn(dev->evtchn);
-}
-
-void blkfront_sync(struct blkfront_dev *dev)
-{
-    unsigned long flags;
-
-    if (dev->mode == O_RDWR) {
-        if (dev->barrier == 1)
-            blkfront_push_operation(dev, BLKIF_OP_WRITE_BARRIER);
-
-        if (dev->flush == 1)
-            blkfront_push_operation(dev, BLKIF_OP_FLUSH_DISKCACHE);
-    }
-
-    /* Note: This won't finish if another thread enqueues requests.  */
-    local_irq_save(flags);
-    DEFINE_WAIT(w);
-    while (1) {
-	blkfront_aio_poll(dev);
-	if (RING_FREE_REQUESTS(&dev->ring) == RING_SIZE(&dev->ring))
-	    break;
-
-	add_waiter(w, blkfront_queue);
-	local_irq_restore(flags);
-	schedule();
-	local_irq_save(flags);
-    }
-    remove_waiter(w);
-    local_irq_restore(flags);
 }
 
 #ifdef HAVE_LIBC

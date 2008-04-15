@@ -27,39 +27,57 @@
 #include <xen/memory.h>
 #include <xen/hvm/hvm_info_table.h>
 
+void wrmsr(uint32_t idx, uint64_t v)
+{
+    asm volatile (
+        "wrmsr"
+        : : "c" (idx), "a" ((uint32_t)v), "d" ((uint32_t)(v>>32)) );
+}
+
+uint64_t rdmsr(uint32_t idx)
+{
+    uint32_t lo, hi;
+
+    asm volatile (
+        "rdmsr"
+        : "=a" (lo), "=d" (hi) : "c" (idx) );
+
+    return (lo | ((uint64_t)hi << 32));
+}
+
 void outb(uint16_t addr, uint8_t val)
 {
-    __asm__ __volatile__ ( "outb %%al, %%dx" : : "d" (addr), "a" (val) );
+    asm volatile ( "outb %%al, %%dx" : : "d" (addr), "a" (val) );
 }
 
 void outw(uint16_t addr, uint16_t val)
 {
-    __asm__ __volatile__ ( "outw %%ax, %%dx" : : "d" (addr), "a" (val) );
+    asm volatile ( "outw %%ax, %%dx" : : "d" (addr), "a" (val) );
 }
 
 void outl(uint16_t addr, uint32_t val)
 {
-    __asm__ __volatile__ ( "outl %%eax, %%dx" : : "d" (addr), "a" (val) );
+    asm volatile ( "outl %%eax, %%dx" : : "d" (addr), "a" (val) );
 }
 
 uint8_t inb(uint16_t addr)
 {
     uint8_t val;
-    __asm__ __volatile__ ( "inb %%dx,%%al" : "=a" (val) : "d" (addr) );
+    asm volatile ( "inb %%dx,%%al" : "=a" (val) : "d" (addr) );
     return val;
 }
 
 uint16_t inw(uint16_t addr)
 {
     uint16_t val;
-    __asm__ __volatile__ ( "inw %%dx,%%ax" : "=a" (val) : "d" (addr) );
+    asm volatile ( "inw %%dx,%%ax" : "=a" (val) : "d" (addr) );
     return val;
 }
 
 uint32_t inl(uint16_t addr)
 {
     uint32_t val;
-    __asm__ __volatile__ ( "inl %%dx,%%eax" : "=a" (val) : "d" (addr) );
+    asm volatile ( "inl %%dx,%%eax" : "=a" (val) : "d" (addr) );
     return val;
 }
 
@@ -118,7 +136,7 @@ void *memcpy(void *dest, const void *src, unsigned n)
 {
     int t0, t1, t2;
 
-    __asm__ __volatile__ (
+    asm volatile (
         "cld\n"
         "rep; movsl\n"
         "testb $2,%b4\n"
@@ -219,7 +237,7 @@ memcmp(const void *s1, const void *s2, unsigned n)
 void
 cpuid(uint32_t idx, uint32_t *eax, uint32_t *ebx, uint32_t *ecx, uint32_t *edx)
 {
-    __asm__ __volatile__ (
+    asm volatile (
         "cpuid"
         : "=a" (*eax), "=b" (*ebx), "=c" (*ecx), "=d" (*edx)
         : "0" (idx) );
@@ -516,14 +534,14 @@ void __assert_failed(char *assertion, char *file, int line)
     printf("HVMLoader assertion '%s' failed at %s:%d\n",
            assertion, file, line);
     for ( ; ; )
-        __asm__ __volatile__ ( "ud2" );
+        asm volatile ( "ud2" );
 }
 
 void __bug(char *file, int line)
 {
     printf("HVMLoader bug at %s:%d\n", file, line);
     for ( ; ; )
-        __asm__ __volatile__ ( "ud2" );
+        asm volatile ( "ud2" );
 }
 
 static int validate_hvm_info(struct hvm_info_table *t)

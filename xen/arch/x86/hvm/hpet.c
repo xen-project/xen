@@ -150,8 +150,9 @@ static inline uint64_t hpet_read_maincounter(HPETState *h)
         return h->hpet.mc64;
 }
 
-static unsigned long hpet_read(
-    struct vcpu *v, unsigned long addr, unsigned long length)
+static int hpet_read(
+    struct vcpu *v, unsigned long addr, unsigned long length,
+    unsigned long *pval)
 {
     HPETState *h = &v->domain->arch.hvm_domain.pl_time.vhpet;
     unsigned long result;
@@ -160,7 +161,10 @@ static unsigned long hpet_read(
     addr &= HPET_MMAP_SIZE-1;
 
     if ( hpet_check_access_length(addr, length) != 0 )
-        return ~0UL;
+    {
+        result = ~0ul;
+        goto out;
+    }
 
     spin_lock(&h->lock);
 
@@ -174,7 +178,9 @@ static unsigned long hpet_read(
 
     spin_unlock(&h->lock);
 
-    return result;
+ out:
+    *pval = result;
+    return X86EMUL_OKAY;
 }
 
 static void hpet_stop_timer(HPETState *h, unsigned int tn)
@@ -234,7 +240,7 @@ static inline uint64_t hpet_fixup_reg(
     return new;
 }
 
-static void hpet_write(
+static int hpet_write(
     struct vcpu *v, unsigned long addr,
     unsigned long length, unsigned long val)
 {
@@ -245,7 +251,7 @@ static void hpet_write(
     addr &= HPET_MMAP_SIZE-1;
 
     if ( hpet_check_access_length(addr, length) != 0 )
-        return;
+        goto out;
 
     spin_lock(&h->lock);
 
@@ -349,6 +355,9 @@ static void hpet_write(
     }
 
     spin_unlock(&h->lock);
+
+ out:
+    return X86EMUL_OKAY;
 }
 
 static int hpet_range(struct vcpu *v, unsigned long addr)

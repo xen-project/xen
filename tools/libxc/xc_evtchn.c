@@ -9,7 +9,8 @@
 #include "xc_private.h"
 
 
-static int do_evtchn_op(int xc_handle, int cmd, void *arg, size_t arg_size)
+static int do_evtchn_op(int xc_handle, int cmd, void *arg,
+                        size_t arg_size, int silently_fail)
 {
     int ret = -1;
     DECLARE_HYPERCALL;
@@ -24,7 +25,7 @@ static int do_evtchn_op(int xc_handle, int cmd, void *arg, size_t arg_size)
         goto out;
     }
 
-    if ((ret = do_xen_hypercall(xc_handle, &hypercall)) < 0)
+    if ((ret = do_xen_hypercall(xc_handle, &hypercall)) < 0 && !silently_fail)
         ERROR("do_evtchn_op: HYPERVISOR_event_channel_op failed: %d", ret);
 
     unlock_pages(arg, arg_size);
@@ -44,7 +45,7 @@ xc_evtchn_alloc_unbound(int xc_handle,
         .remote_dom = (domid_t)remote_dom
     };
 
-    rc = do_evtchn_op(xc_handle, EVTCHNOP_alloc_unbound, &arg, sizeof(arg));
+    rc = do_evtchn_op(xc_handle, EVTCHNOP_alloc_unbound, &arg, sizeof(arg), 0);
     if ( rc == 0 )
         rc = arg.port;
 
@@ -55,5 +56,20 @@ int xc_evtchn_reset(int xc_handle,
                     uint32_t dom)
 {
     struct evtchn_reset arg = { .dom = (domid_t)dom };
-    return do_evtchn_op(xc_handle, EVTCHNOP_reset, &arg, sizeof(arg));
+    return do_evtchn_op(xc_handle, EVTCHNOP_reset, &arg, sizeof(arg), 0);
+}
+
+int xc_evtchn_status(int xc_handle,
+                     uint32_t dom,
+                     uint32_t port)
+{
+    int rc;
+    struct evtchn_status arg = { .dom = (domid_t)dom,
+                                 .port = (evtchn_port_t)port };
+
+    rc = do_evtchn_op(xc_handle, EVTCHNOP_status, &arg, sizeof(arg), 1);
+    if ( rc == 0 )
+        rc = arg.status;
+
+    return rc;
 }

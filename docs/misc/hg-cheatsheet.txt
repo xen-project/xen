@@ -12,7 +12,7 @@ control.  This note aims to provide a quick guide to getting up and
 running with the new tools as quickly as possible, and is written from
 the perspective of someone who has been using BK.
 
-For a more detailed exposition, see the mecurial tutorial:
+For a more detailed exposition, see the mercurial tutorial:
  http://www.serpentine.com/mercurial/index.cgi?Tutorial
 
 The Hg manpage is available at:
@@ -69,7 +69,7 @@ descendent in one repository -- something BK won't allow. This is
 actually pretty neat. For example, it would in principle enable you to
 have both the 2.0-testing and unstable trees in a single
 repository. We shyed away from doing this as we thought the risk of
-commiting to the wrong head was too great.
+committing to the wrong head was too great.
 
 One slightly confusing aspect of Hg is that many of the commands have
 aliases, and hence when looking things up in the man page its not
@@ -81,7 +81,7 @@ more sense, at least to RCS refugees like me.
 Getting Xen
 -----------
 
-The URL for the mainline Xen mercurial respository is:
+The URL for the mainline Xen mercurial repository is:
 
    http://xenbits.xensource.com/xen-unstable.hg
    (similarly for xen-2.0 and xen-2.0-testing)
@@ -273,9 +273,9 @@ Pushing changesets to a parent repository
 
 Pushes changes up to a parent. You can't push if you pulled the
 repository off the web interface. In fact, you can currently only push
-to an ssh target -- filesystem drectory targets don't work, but this
+to an ssh target -- filesystem directory targets don't work, but this
 will be fixed soon.
-For now it is possible to set up assymetric pull/push paths. Pulls can
+For now it is possible to set up asymmetric pull/push paths. Pulls can
 be done via web interface while pushes via ssh. Example of .hg/hgrc config
 file:
   | [paths]
@@ -332,7 +332,7 @@ by other checked-out versions. This can confuse the Xen build
 system. Hg will probably get fixed soon, but in the meantime you can
 cleanup with "find -depth -type d -print | xargs -r rmdir".
 
-You can return to the tip by ommiting an explicit changeset id.
+You can return to the tip by omitting an explicit changeset id.
    
 The manifest command lets you see the contents of the repository for 
 the current changeset.
@@ -347,7 +347,7 @@ This will print a bunch of records of the form:
    | 7fc869aae2945a9f4626fad96552db3103e61cb9 644 README
    | ...
 
-This lists the hash of each file, its 1-bit 'executable' atribute
+This lists the hash of each file, its 1-bit 'executable' attribute
 (either file permission mode 644 or 755), and the file name.  So, to
 determine the files that change across two changesets, you would dump
 the respective manifests to files, and use diff.

@@ -18,6 +18,8 @@ struct p2m_entry;
 struct tlb_track;
 #endif
 
+extern unsigned long volatile jiffies;
+
 struct vcpu;
 extern void relinquish_vcpu_resources(struct vcpu *v);
 extern int vcpu_late_initialise(struct vcpu *v);

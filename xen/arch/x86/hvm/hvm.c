@@ -181,7 +181,8 @@ void hvm_do_resume(struct vcpu *v)
             break;
         default:
             gdprintk(XENLOG_ERR, "Weird HVM iorequest state %d.\n", p->state);
-            domain_crash_synchronous();
+            domain_crash(v->domain);
+            return; /* bail */
         }
     }
 }
@@ -276,7 +277,7 @@ static int hvm_print_line(
     }
     spin_unlock(&hd->pbuf_lock);
 
-    return 1;
+    return X86EMUL_OKAY;
 }
 
 int hvm_domain_initialise(struct domain *d)
@@ -478,11 +479,11 @@ static int hvm_load_cpu_ctxt(struct domain *d, hvm_domain_context_t *h)
     vc = &v->arch.guest_context;
 
     /* Need to init this vcpu before loading its contents */
-    LOCK_BIGLOCK(d);
+    domain_lock(d);
     if ( !v->is_initialised )
         if ( (rc = boot_vcpu(d, vcpuid, vc)) != 0 )
             return rc;
-    UNLOCK_BIGLOCK(d);
+    domain_unlock(d);
 
     if ( hvm_load_entry(CPU, h, &ctxt) != 0 ) 
         return -EINVAL;
@@ -687,47 +688,26 @@ void hvm_vcpu_destroy(struct vcpu *v)
     /*free_xen_event_channel(v, v->arch.hvm_vcpu.xen_port);*/
 }
 
-
-void hvm_vcpu_reset(struct vcpu *v)
+void hvm_vcpu_down(struct vcpu *v)
 {
-    vcpu_pause(v);
-
-    vlapic_reset(vcpu_vlapic(v));
-
-    hvm_funcs.vcpu_initialise(v);
-
-    set_bit(_VPF_down, &v->pause_flags);
-    clear_bit(_VPF_blocked, &v->pause_flags);
-    v->fpu_initialised = 0;
-    v->fpu_dirtied     = 0;
-    v->is_initialised  = 0;
-
-    vcpu_unpause(v);
-}
-
-static void hvm_vcpu_down(void)
-{
-    struct vcpu *v = current;
     struct domain *d = v->domain;
     int online_count = 0;
-
-    gdprintk(XENLOG_INFO, "VCPU%d: going offline.\n", v->vcpu_id);
 
     /* Doesn't halt us immediately, but we'll never return to guest context. */
     set_bit(_VPF_down, &v->pause_flags);
     vcpu_sleep_nosync(v);
 
     /* Any other VCPUs online? ... */
-    LOCK_BIGLOCK(d);
+    domain_lock(d);
     for_each_vcpu ( d, v )
         if ( !test_bit(_VPF_down, &v->pause_flags) )
             online_count++;
-    UNLOCK_BIGLOCK(d);
+    domain_unlock(d);
 
     /* ... Shut down the domain if not. */
     if ( online_count == 0 )
     {
-        gdprintk(XENLOG_INFO, "all CPUs offline -- powering off.\n");
+        gdprintk(XENLOG_INFO, "All CPUs offline -- powering off.\n");
         domain_shutdown(d, SHUTDOWN_poweroff);
     }
 }
@@ -742,9 +722,10 @@ void hvm_send_assist_req(struct vcpu *v)
     p = &get_ioreq(v)->vp_ioreq;
     if ( unlikely(p->state != STATE_IOREQ_NONE) )
     {
-        /* This indicates a bug in the device model.  Crash the domain. */
+        /* This indicates a bug in the device model. Crash the domain. */
         gdprintk(XENLOG_ERR, "Device model set bad IO state %d.\n", p->state);
-        domain_crash_synchronous();
+        domain_crash(v->domain);
+        return;
     }
 
     prepare_wait_on_xen_event_channel(v->arch.hvm_vcpu.xen_port);
@@ -765,7 +746,7 @@ void hvm_hlt(unsigned long rflags)
      * out of this.
      */
     if ( unlikely(!(rflags & X86_EFLAGS_IF)) )
-        return hvm_vcpu_down();
+        return hvm_vcpu_down(current);
 
     do_sched_op_compat(SCHEDOP_block, 0);
 }
@@ -1894,79 +1875,6 @@ void hvm_hypercall_page_initialise(struct domain *d,
     hvm_funcs.init_hypercall_page(d, hypercall_page);
 }
 
-int hvm_bringup_ap(int vcpuid, int trampoline_vector)
-{
-    struct domain *d = current->domain;
-    struct vcpu *v;
-    struct vcpu_guest_context *ctxt;
-    struct segment_register reg;
-
-    ASSERT(is_hvm_domain(d));
-
-    if ( (v = d->vcpu[vcpuid]) == NULL )
-        return -ENOENT;
-
-    v->fpu_initialised = 0;
-    v->arch.flags |= TF_kernel_mode;
-    v->is_initialised = 1;
-
-    ctxt = &v->arch.guest_context;
-    memset(ctxt, 0, sizeof(*ctxt));
-    ctxt->flags = VGCF_online;
-    ctxt->user_regs.eflags = 2;
-
-    v->arch.hvm_vcpu.guest_cr[0] = X86_CR0_ET;
-    hvm_update_guest_cr(v, 0);
-
-    v->arch.hvm_vcpu.guest_cr[2] = 0;
-    hvm_update_guest_cr(v, 2);
-
-    v->arch.hvm_vcpu.guest_cr[3] = 0;
-    hvm_update_guest_cr(v, 3);
-
-    v->arch.hvm_vcpu.guest_cr[4] = 0;
-    hvm_update_guest_cr(v, 4);
-
-    v->arch.hvm_vcpu.guest_efer = 0;
-    hvm_update_guest_efer(v);
-
-    reg.sel = trampoline_vector << 8;
-    reg.base = (uint32_t)reg.sel << 4;
-    reg.limit = 0xffff;
-    reg.attr.bytes = 0x89b;
-    hvm_set_segment_register(v, x86_seg_cs, &reg);
-
-    reg.sel = reg.base = 0;
-    reg.limit = 0xffff;
-    reg.attr.bytes = 0x893;
-    hvm_set_segment_register(v, x86_seg_ds, &reg);
-    hvm_set_segment_register(v, x86_seg_es, &reg);
-    hvm_set_segment_register(v, x86_seg_fs, &reg);
-    hvm_set_segment_register(v, x86_seg_gs, &reg);
-    hvm_set_segment_register(v, x86_seg_ss, &reg);
-
-    reg.attr.bytes = 0x82; /* LDT */
-    hvm_set_segment_register(v, x86_seg_ldtr, &reg);
-
-    reg.attr.bytes = 0x8b; /* 32-bit TSS (busy) */
-    hvm_set_segment_register(v, x86_seg_tr, &reg);
-
-    reg.attr.bytes = 0;
-    hvm_set_segment_register(v, x86_seg_gdtr, &reg);
-    hvm_set_segment_register(v, x86_seg_idtr, &reg);
-
-    /* Sync AP's TSC with BSP's. */
-    v->arch.hvm_vcpu.cache_tsc_offset =
-        v->domain->vcpu[0]->arch.hvm_vcpu.cache_tsc_offset;
-    hvm_funcs.set_tsc_offset(v, v->arch.hvm_vcpu.cache_tsc_offset);
-
-    if ( test_and_clear_bit(_VPF_down, &v->pause_flags) )
-        vcpu_wake(v);
-
-    gdprintk(XENLOG_INFO, "AP %d bringup succeeded.\n", vcpuid);
-    return 0;
-}
-
 static int hvmop_set_pci_intx_level(
     XEN_GUEST_HANDLE(xen_hvm_set_pci_intx_level_t) uop)
 {
@@ -2185,13 +2093,16 @@ long do_hvm_op(unsigned long op, XEN_GUEST_HANDLE(void) arg)
 
         if ( op == HVMOP_set_param )
         {
+            rc = 0;
+
             switch ( a.index )
             {
             case HVM_PARAM_IOREQ_PFN:
                 iorp = &d->arch.hvm_domain.ioreq;
-                rc = hvm_set_ioreq_page(d, iorp, a.value);
+                if ( (rc = hvm_set_ioreq_page(d, iorp, a.value)) != 0 )
+                    break;
                 spin_lock(&iorp->lock);
-                if ( (rc == 0) && (iorp->va != NULL) )
+                if ( iorp->va != NULL )
                     /* Initialise evtchn port info if VCPUs already created. */
                     for_each_vcpu ( d, v )
                         get_ioreq(v)->vp_eport = v->arch.hvm_vcpu.xen_port;
@@ -2206,13 +2117,72 @@ long do_hvm_op(unsigned long op, XEN_GUEST_HANDLE(void) arg)
                 hvm_latch_shinfo_size(d);
                 break;
             case HVM_PARAM_TIMER_MODE:
-                rc = -EINVAL;
                 if ( a.value > HVMPTM_one_missed_tick_pending )
-                    goto param_fail;
+                    rc = -EINVAL;
+                break;
+            case HVM_PARAM_IDENT_PT:
+                rc = -EPERM;
+                if ( !IS_PRIV(current->domain) )
+                    break;
+
+                rc = -EINVAL;
+                if ( d->arch.hvm_domain.params[a.index] != 0 )
+                    break;
+
+                rc = 0;
+                if ( !paging_mode_hap(d) )
+                    break;
+
+                domain_pause(d);
+
+                /*
+                 * Update GUEST_CR3 in each VMCS to point at identity map.
+                 * All foreign updates to guest state must synchronise on
+                 * the domctl_lock.
+                 */
+                spin_lock(&domctl_lock);
+                d->arch.hvm_domain.params[a.index] = a.value;
+                for_each_vcpu ( d, v )
+                    paging_update_cr3(v);
+                spin_unlock(&domctl_lock);
+
+                domain_unpause(d);
+                break;
+            case HVM_PARAM_DM_DOMAIN:
+                /* Privileged domains only, as we must domain_pause(d). */
+                rc = -EPERM;
+                if ( !IS_PRIV_FOR(current->domain, d) )
+                    break;
+
+                if ( a.value == DOMID_SELF )
+                    a.value = current->domain->domain_id;
+
+                rc = 0;
+                domain_pause(d); /* safe to change per-vcpu xen_port */
+                iorp = &d->arch.hvm_domain.ioreq;
+                for_each_vcpu ( d, v )
+                {
+                    int old_port, new_port;
+                    new_port = alloc_unbound_xen_event_channel(v, a.value);
+                    if ( new_port < 0 )
+                    {
+                        rc = new_port;
+                        break;
+                    }
+                    /* xchg() ensures that only we free_xen_event_channel() */
+                    old_port = xchg(&v->arch.hvm_vcpu.xen_port, new_port);
+                    free_xen_event_channel(v, old_port);
+                    spin_lock(&iorp->lock);
+                    if ( iorp->va != NULL )
+                        get_ioreq(v)->vp_eport = v->arch.hvm_vcpu.xen_port;
+                    spin_unlock(&iorp->lock);
+                }
+                domain_unpause(d);
                 break;
             }
-            d->arch.hvm_domain.params[a.index] = a.value;
-            rc = 0;
+
+            if ( rc == 0 )
+                d->arch.hvm_domain.params[a.index] = a.value;
         }
         else
         {

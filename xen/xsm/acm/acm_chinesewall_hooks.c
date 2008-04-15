@@ -637,8 +637,12 @@ static void chwall_domain_destroy(void *object_ssid, struct domain *d)
 
 static int chwall_is_default_policy(void)
 {
-    return ( (chwall_bin_pol.max_types    == 1 ) &&
-             (chwall_bin_pol.max_ssidrefs == 2 ) );
+    static const domaintype_t def_policy[2] = { 0x0, 0x0 };
+    return ( ( chwall_bin_pol.max_types    == 1 ) &&
+             ( chwall_bin_pol.max_ssidrefs == 2 ) &&
+             ( memcmp(chwall_bin_pol.ssidrefs,
+                      def_policy,
+                      sizeof(def_policy)) == 0 ) );
 }
 
 

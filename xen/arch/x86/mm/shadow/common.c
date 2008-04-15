@@ -36,6 +36,7 @@
 #include <asm/current.h>
 #include <asm/flushtlb.h>
 #include <asm/shadow.h>
+#include <xen/numa.h>
 #include "private.h"
 
 
@@ -1249,7 +1250,7 @@ static unsigned int sh_set_allocation(struct domain *d,
         {
             /* Need to allocate more memory from domheap */
             sp = (struct shadow_page_info *)
-                alloc_domheap_pages(NULL, order, 0);
+                alloc_domheap_pages(NULL, order, MEMF_node(domain_to_node(d)));
             if ( sp == NULL ) 
             { 
                 SHADOW_PRINTK("failed to allocate shadow pages.\n");
@@ -2171,13 +2172,12 @@ void sh_remove_shadows(struct vcpu *v, mfn_t gmfn, int fast, int all)
 #undef DO_UNSHADOW
 
     /* If that didn't catch the shadows, something is wrong */
-    if ( !fast && (pg->count_info & PGC_page_table) )
+    if ( !fast && all && (pg->count_info & PGC_page_table) )
     {
         SHADOW_ERROR("can't find all shadows of mfn %05lx "
                      "(shadow_flags=%08lx)\n",
                       mfn_x(gmfn), pg->shadow_flags);
-        if ( all ) 
-            domain_crash(v->domain);
+        domain_crash(v->domain);
     }
 
     /* Need to flush TLBs now, so that linear maps are safe next time we 

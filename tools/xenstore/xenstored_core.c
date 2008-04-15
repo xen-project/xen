@@ -722,7 +722,7 @@ char *canonicalize(struct connection *conn, const char *node)
 {
 	const char *prefix;
 
-	if (!node || strstarts(node, "/"))
+	if (!node || (node[0] == '/') || (node[0] == '@'))
 		return (char *)node;
 	prefix = get_implicit_path(conn);
 	if (prefix)

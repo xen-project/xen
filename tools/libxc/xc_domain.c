@@ -7,6 +7,7 @@
  */
 
 #include "xc_private.h"
+#include "xg_save_restore.h"
 #include <xen/memory.h>
 #include <xen/hvm/hvm_op.h>
 
@@ -301,18 +302,27 @@ int xc_vcpu_getcontext(int xc_handle,
 {
     int rc;
     DECLARE_DOMCTL;
+    size_t sz = sizeof(vcpu_guest_context_either_t);
 
     domctl.cmd = XEN_DOMCTL_getvcpucontext;
     domctl.domain = (domid_t)domid;
     domctl.u.vcpucontext.vcpu   = (uint16_t)vcpu;
     set_xen_guest_handle(domctl.u.vcpucontext.ctxt, ctxt);
 
-    if ( (rc = lock_pages(ctxt, sizeof(*ctxt))) != 0 )
-        return rc;
+    /*
+     * We may be asked to lock either a 32-bit or a 64-bit context. Lock the
+     * larger of the two if possible, otherwise fall back to native size.
+     */
+    if ( (rc = lock_pages(ctxt, sz)) != 0 )
+    {
+        sz = sizeof(*ctxt);
+        if ( (rc = lock_pages(ctxt, sz)) != 0 )
+            return rc;
+    }
 
     rc = do_domctl(xc_handle, &domctl);
 
-    unlock_pages(ctxt, sizeof(*ctxt));
+    unlock_pages(ctxt, sz);
 
     return rc;
 }
@@ -620,19 +630,28 @@ int xc_vcpu_setcontext(int xc_handle,
 {
     DECLARE_DOMCTL;
     int rc;
+    size_t sz = sizeof(vcpu_guest_context_either_t);
 
     domctl.cmd = XEN_DOMCTL_setvcpucontext;
     domctl.domain = domid;
     domctl.u.vcpucontext.vcpu = vcpu;
     set_xen_guest_handle(domctl.u.vcpucontext.ctxt, ctxt);
 
-    if ( (ctxt != NULL) && ((rc = lock_pages(ctxt, sizeof(*ctxt))) != 0) )
-        return rc;
+    /*
+     * We may be asked to lock either a 32-bit or a 64-bit context. Lock the
+     * larger of the two if possible, otherwise fall back to native size.
+     */
+    if ( (ctxt != NULL) && (rc = lock_pages(ctxt, sz)) != 0 )
+    {
+        sz = sizeof(*ctxt);
+        if ( (rc = lock_pages(ctxt, sz)) != 0 )
+            return rc;
+    }
 
     rc = do_domctl(xc_handle, &domctl);
 
     if ( ctxt != NULL )
-        unlock_pages(ctxt, sizeof(*ctxt));
+        unlock_pages(ctxt, sz);
 
     return rc;
 }

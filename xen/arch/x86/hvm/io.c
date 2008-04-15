@@ -148,20 +148,19 @@ void send_timeoffset_req(unsigned long timeoff)
 void send_invalidate_req(void)
 {
     struct vcpu *v = current;
-    vcpu_iodata_t *vio;
+    vcpu_iodata_t *vio = get_ioreq(v);
     ioreq_t *p;
 
-    vio = get_ioreq(v);
-    if ( vio == NULL )
-    {
-        printk("bad shared page: %lx\n", (unsigned long) vio);
-        domain_crash_synchronous();
-    }
+    BUG_ON(vio == NULL);
 
     p = &vio->vp_ioreq;
     if ( p->state != STATE_IOREQ_NONE )
-        printk("WARNING: send invalidate req with something "
-               "already pending (%d)?\n", p->state);
+    {
+        gdprintk(XENLOG_ERR, "WARNING: send invalidate req with something "
+                 "already pending (%d)?\n", p->state);
+        domain_crash(v->domain);
+        return;
+    }
 
     p->type = IOREQ_TYPE_INVALIDATE;
     p->size = 4;
@@ -225,12 +224,6 @@ void hvm_io_assist(void)
     ioreq_t *p = &get_ioreq(curr)->vp_ioreq;
     enum hvm_io_state io_state;
 
-    if ( p->state != STATE_IORESP_READY )
-    {
-        gdprintk(XENLOG_ERR, "Unexpected HVM iorequest state %d.\n", p->state);
-        domain_crash_synchronous();
-    }
-
     rmb(); /* see IORESP_READY /then/ read contents of ioreq */
 
     p->state = STATE_IOREQ_NONE;
@@ -253,74 +246,59 @@ void hvm_io_assist(void)
 
 void dpci_ioport_read(uint32_t mport, ioreq_t *p)
 {
-    uint64_t i;
-    uint64_t z_data;
-    uint64_t length = (p->count * p->size);
+    int i, sign = p->df ? -1 : 1;
+    uint32_t data = 0;
 
-    for ( i = 0; i < length; i += p->size )
+    for ( i = 0; i < p->count; i++ )
     {
-        z_data = ~0ULL;
-        
         switch ( p->size )
         {
         case 1:
-            z_data = (uint64_t)inb(mport);
+            data = inb(mport);
             break;
         case 2:
-            z_data = (uint64_t)inw(mport);
+            data = inw(mport);
             break;
         case 4:
-            z_data = (uint64_t)inl(mport);
+            data = inl(mport);
             break;
         default:
-            gdprintk(XENLOG_ERR, "Error: unable to handle size: %"
-                     PRId64 "\n", p->size);
-            return;
+            BUG();
         }
 
-        p->data = z_data;
-        if ( p->data_is_ptr &&
-             hvm_copy_to_guest_phys(p->data + i, (void *)&z_data,
-                                    (int)p->size) )
-        {
-            gdprintk(XENLOG_ERR, "Error: couldn't copy to hvm phys\n");
-            return;
-        }
+        if ( p->data_is_ptr )
+            (void)hvm_copy_to_guest_phys(
+                p->data + (sign * i * p->size), &data, p->size);
+        else
+            p->data = data;
     }
 }
 
 void dpci_ioport_write(uint32_t mport, ioreq_t *p)
 {
-    uint64_t i;
-    uint64_t z_data = 0;
-    uint64_t length = (p->count * p->size);
+    int i, sign = p->df ? -1 : 1;
+    uint32_t data;
 
-    for ( i = 0; i < length; i += p->size )
+    for ( i = 0; i < p->count; i++ )
     {
-        z_data = p->data;
-        if ( p->data_is_ptr &&
-             hvm_copy_from_guest_phys((void *)&z_data,
-                                      p->data + i, (int)p->size) )
-        {
-            gdprintk(XENLOG_ERR, "Error: couldn't copy from hvm phys\n");
-            return;
-        }
+        data = p->data;
+        if ( p->data_is_ptr )
+            (void)hvm_copy_from_guest_phys(
+                &data, p->data + (sign * i & p->size), p->size);
 
         switch ( p->size )
         {
         case 1:
-            outb((uint8_t) z_data, mport);
+            outb(data, mport);
             break;
         case 2:
-            outw((uint16_t) z_data, mport);
+            outw(data, mport);
             break;
         case 4:
-            outl((uint32_t) z_data, mport);
+            outl(data, mport);
             break;
         default:
-            gdprintk(XENLOG_ERR, "Error: unable to handle size: %"
-                     PRId64 "\n", p->size);
-            break;
+            BUG();
         }
     }
 }

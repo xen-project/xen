@@ -26,9 +26,6 @@
 #include <asm/hvm/svm/vmcb.h>
 #include <asm/mtrr.h>
 
-#define HVM_VCPU_INIT_SIPI_SIPI_STATE_NORM          0
-#define HVM_VCPU_INIT_SIPI_SIPI_STATE_WAIT_SIPI     1
-
 enum hvm_io_state {
     HVMIO_none = 0,
     HVMIO_dispatched,
@@ -57,9 +54,6 @@ struct hvm_vcpu {
     /* Lock and list for virtual platform timers. */
     spinlock_t          tm_lock;
     struct list_head    tm_list;
-
-    /* For AP startup */
-    unsigned long       init_sipi_sipi_state;
 
     int                 xen_port;
 

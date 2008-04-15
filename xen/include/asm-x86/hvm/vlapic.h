@@ -21,6 +21,7 @@
 #ifndef __ASM_X86_HVM_VLAPIC_H__
 #define __ASM_X86_HVM_VLAPIC_H__
 
+#include <xen/softirq.h>
 #include <asm/msr.h>
 #include <public/hvm/ioreq.h>
 #include <asm/hvm/vpt.h>
@@ -58,6 +59,7 @@ struct vlapic {
     struct periodic_time     pt;
     s_time_t                 timer_last_update;
     struct page_info         *regs_page;
+    struct tasklet           init_tasklet;
 };
 
 static inline uint32_t vlapic_get_reg(struct vlapic *vlapic, uint32_t reg)

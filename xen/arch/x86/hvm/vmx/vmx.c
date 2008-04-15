@@ -57,6 +57,8 @@ static void vmx_ctxt_switch_to(struct vcpu *v);
 
 static int  vmx_alloc_vlapic_mapping(struct domain *d);
 static void vmx_free_vlapic_mapping(struct domain *d);
+static int  vmx_alloc_vpid(struct domain *d);
+static void vmx_free_vpid(struct domain *d);
 static void vmx_install_vlapic_mapping(struct vcpu *v);
 static void vmx_update_guest_cr(struct vcpu *v, unsigned int cr);
 static void vmx_update_guest_efer(struct vcpu *v);
@@ -71,12 +73,30 @@ static void vmx_invlpg_intercept(unsigned long vaddr);
 
 static int vmx_domain_initialise(struct domain *d)
 {
-    return vmx_alloc_vlapic_mapping(d);
+    int rc;
+
+    d->arch.hvm_domain.vmx.ept_control.etmt = EPT_DEFAULT_MT;
+    d->arch.hvm_domain.vmx.ept_control.gaw  = EPT_DEFAULT_GAW;
+    d->arch.hvm_domain.vmx.ept_control.asr  =
+        pagetable_get_pfn(d->arch.phys_table);
+
+    if ( (rc = vmx_alloc_vpid(d)) != 0 )
+        return rc;
+
+    if ( (rc = vmx_alloc_vlapic_mapping(d)) != 0 )
+    {
+        vmx_free_vpid(d);
+        return rc;
+    }
+
+    return 0;
 }
 
 static void vmx_domain_destroy(struct domain *d)
 {
+    ept_sync_domain(d);
     vmx_free_vlapic_mapping(d);
+    vmx_free_vpid(d);
 }
 
 static int vmx_vcpu_initialise(struct vcpu *v)
@@ -492,20 +512,23 @@ static int vmx_restore_cr0_cr3(
     unsigned long mfn = 0;
     p2m_type_t p2mt;
 
-    if ( cr0 & X86_CR0_PG )
+    if ( paging_mode_shadow(v->domain) )
     {
-        mfn = mfn_x(gfn_to_mfn(v->domain, cr3 >> PAGE_SHIFT, &p2mt));
-        if ( !p2m_is_ram(p2mt) || !get_page(mfn_to_page(mfn), v->domain) )
+        if ( cr0 & X86_CR0_PG )
         {
-            gdprintk(XENLOG_ERR, "Invalid CR3 value=0x%lx\n", cr3);
-            return -EINVAL;
+            mfn = mfn_x(gfn_to_mfn(v->domain, cr3 >> PAGE_SHIFT, &p2mt));
+            if ( !p2m_is_ram(p2mt) || !get_page(mfn_to_page(mfn), v->domain) )
+            {
+                gdprintk(XENLOG_ERR, "Invalid CR3 value=0x%lx\n", cr3);
+                return -EINVAL;
+            }
         }
+
+        if ( hvm_paging_enabled(v) )
+            put_page(pagetable_get_page(v->arch.guest_table));
+
+        v->arch.guest_table = pagetable_from_pfn(mfn);
     }
-
-    if ( v->arch.hvm_vcpu.guest_cr[0] & X86_CR0_PG )
-        put_page(pagetable_get_page(v->arch.guest_table));
-
-    v->arch.guest_table = pagetable_from_pfn(mfn);
 
     v->arch.hvm_vcpu.guest_cr[0] = cr0 | X86_CR0_ET;
     v->arch.hvm_vcpu.guest_cr[3] = cr3;
@@ -538,11 +561,6 @@ static int vmx_vmcs_restore(struct vcpu *v, struct hvm_hw_cpu *c)
     vmx_update_guest_cr(v, 2);
     vmx_update_guest_cr(v, 4);
 
-#ifdef HVM_DEBUG_SUSPEND
-    printk("%s: cr3=0x%"PRIx64", cr0=0x%"PRIx64", cr4=0x%"PRIx64".\n",
-           __func__, c->cr3, c->cr0, c->cr4);
-#endif
-
     v->arch.hvm_vcpu.guest_efer = c->msr_efer;
     vmx_update_guest_efer(v);
 
@@ -573,20 +591,6 @@ static int vmx_vmcs_restore(struct vcpu *v, struct hvm_hw_cpu *c)
     return 0;
 }
 
-#if defined(__x86_64__) && defined(HVM_DEBUG_SUSPEND)
-static void dump_msr_state(struct vmx_msr_state *m)
-{
-    int i = 0;
-    printk("**** msr state ****\n");
-    printk("shadow_gs=0x%lx, flags=0x%lx, msr_items:", m->shadow_gs, m->flags);
-    for ( i = 0; i < VMX_MSR_COUNT; i++ )
-        printk("0x%lx,", m->msrs[i]);
-    printk("\n");
-}
-#else
-#define dump_msr_state(m) ((void)0)
-#endif
-
 static void vmx_save_cpu_state(struct vcpu *v, struct hvm_hw_cpu *data)
 {
 #ifdef __x86_64__
@@ -604,8 +608,6 @@ static void vmx_save_cpu_state(struct vcpu *v, struct hvm_hw_cpu *data)
 #endif
 
     data->tsc = hvm_get_guest_time(v);
-
-    dump_msr_state(guest_state);
 }
 
 static void vmx_load_cpu_state(struct vcpu *v, struct hvm_hw_cpu *data)
@@ -624,8 +626,6 @@ static void vmx_load_cpu_state(struct vcpu *v, struct hvm_hw_cpu *data)
 #endif
 
     hvm_set_guest_time(v, data->tsc);
-
-    dump_msr_state(guest_state);
 }
 
 
@@ -900,6 +900,56 @@ static void vmx_set_interrupt_shadow(struct vcpu *v, unsigned int intr_shadow)
     __vmwrite(GUEST_INTERRUPTIBILITY_INFO, intr_shadow);
 }
 
+static void vmx_load_pdptrs(struct vcpu *v)
+{
+    unsigned long cr3 = v->arch.hvm_vcpu.guest_cr[3], mfn;
+    uint64_t *guest_pdptrs;
+    p2m_type_t p2mt;
+    char *p;
+
+    /* EPT needs to load PDPTRS into VMCS for PAE. */
+    if ( !hvm_pae_enabled(v) || (v->arch.hvm_vcpu.guest_efer & EFER_LMA) )
+        return;
+
+    if ( cr3 & 0x1fUL )
+        goto crash;
+
+    mfn = mfn_x(gfn_to_mfn(v->domain, cr3 >> PAGE_SHIFT, &p2mt));
+    if ( !p2m_is_ram(p2mt) )
+        goto crash;
+
+    p = map_domain_page(mfn);
+
+    guest_pdptrs = (uint64_t *)(p + (cr3 & ~PAGE_MASK));
+
+    /*
+     * We do not check the PDPTRs for validity. The CPU will do this during
+     * vm entry, and we can handle the failure there and crash the guest.
+     * The only thing we could do better here is #GP instead.
+     */
+
+    vmx_vmcs_enter(v);
+
+    __vmwrite(GUEST_PDPTR0, guest_pdptrs[0]);
+    __vmwrite(GUEST_PDPTR1, guest_pdptrs[1]);
+    __vmwrite(GUEST_PDPTR2, guest_pdptrs[2]);
+    __vmwrite(GUEST_PDPTR3, guest_pdptrs[3]);
+#ifdef CONFIG_X86_PAE
+    __vmwrite(GUEST_PDPTR0_HIGH, guest_pdptrs[0] >> 32);
+    __vmwrite(GUEST_PDPTR1_HIGH, guest_pdptrs[1] >> 32);
+    __vmwrite(GUEST_PDPTR2_HIGH, guest_pdptrs[2] >> 32);
+    __vmwrite(GUEST_PDPTR3_HIGH, guest_pdptrs[3] >> 32);
+#endif
+
+    vmx_vmcs_exit(v);
+
+    unmap_domain_page(p);
+    return;
+
+ crash:
+    domain_crash(v->domain);
+}
+
 static void vmx_update_host_cr3(struct vcpu *v)
 {
     vmx_vmcs_enter(v);
@@ -915,7 +965,24 @@ static void vmx_update_guest_cr(struct vcpu *v, unsigned int cr)
     {
     case 0: {
         unsigned long hw_cr0_mask =
-            X86_CR0_NE | X86_CR0_PG | X86_CR0_WP | X86_CR0_PE;
+            X86_CR0_NE | X86_CR0_PG | X86_CR0_PE;
+
+        if ( paging_mode_shadow(v->domain) )
+           hw_cr0_mask |= X86_CR0_WP;
+
+        if ( paging_mode_hap(v->domain) )
+        {
+            /* We manage GUEST_CR3 when guest CR0.PE is zero. */
+            uint32_t cr3_ctls = (CPU_BASED_CR3_LOAD_EXITING |
+                                 CPU_BASED_CR3_STORE_EXITING);
+            v->arch.hvm_vmx.exec_control &= ~cr3_ctls;
+            if ( !hvm_paging_enabled(v) )
+                v->arch.hvm_vmx.exec_control |= cr3_ctls;
+            __vmwrite(CPU_BASED_VM_EXEC_CONTROL, v->arch.hvm_vmx.exec_control);
+
+            /* Changing CR0.PE can change some bits in real CR4. */
+            vmx_update_guest_cr(v, 4);
+        }
 
         if ( !(v->arch.hvm_vcpu.guest_cr[0] & X86_CR0_TS) )
         {
@@ -939,11 +1006,27 @@ static void vmx_update_guest_cr(struct vcpu *v, unsigned int cr)
         /* CR2 is updated in exit stub. */
         break;
     case 3:
+        if ( paging_mode_hap(v->domain) )
+        {
+            if ( !hvm_paging_enabled(v) )
+                v->arch.hvm_vcpu.hw_cr[3] =
+                    v->domain->arch.hvm_domain.params[HVM_PARAM_IDENT_PT];
+            vmx_load_pdptrs(v);
+        }
+ 
         __vmwrite(GUEST_CR3, v->arch.hvm_vcpu.hw_cr[3]);
+        vpid_sync_vcpu_all(v);
         break;
     case 4:
-        v->arch.hvm_vcpu.hw_cr[4] =
-            v->arch.hvm_vcpu.guest_cr[4] | HVM_CR4_HOST_MASK;
+        v->arch.hvm_vcpu.hw_cr[4] = HVM_CR4_HOST_MASK;
+        if ( paging_mode_hap(v->domain) )
+            v->arch.hvm_vcpu.hw_cr[4] &= ~X86_CR4_PAE;
+        v->arch.hvm_vcpu.hw_cr[4] |= v->arch.hvm_vcpu.guest_cr[4];
+        if ( paging_mode_hap(v->domain) && !hvm_paging_enabled(v) )
+        {
+            v->arch.hvm_vcpu.hw_cr[4] |= X86_CR4_PSE;
+            v->arch.hvm_vcpu.hw_cr[4] &= ~X86_CR4_PAE;
+        }
         __vmwrite(GUEST_CR4, v->arch.hvm_vcpu.hw_cr[4]);
         __vmwrite(CR4_READ_SHADOW, v->arch.hvm_vcpu.guest_cr[4]);
         break;
@@ -978,12 +1061,29 @@ static void vmx_update_guest_efer(struct vcpu *v)
 
 static void vmx_flush_guest_tlbs(void)
 {
-    /* No tagged TLB support on VMX yet.  The fact that we're in Xen
-     * at all means any guest will have a clean TLB when it's next run,
-     * because VMRESUME will flush it for us. */
+    /*
+     * If VPID (i.e. tagged TLB support) is not enabled, the fact that
+     * we're in Xen at all means any guest will have a clean TLB when
+     * it's next run, because VMRESUME will flush it for us.
+     *
+     * If enabled, we invalidate all translations associated with all
+     * VPID values.
+     */
+    vpid_sync_all();
 }
 
+static void __ept_sync_domain(void *info)
+{
+    struct domain *d = info;
+    __invept(1, d->arch.hvm_domain.vmx.ept_control.eptp, 0);
+}
 
+void ept_sync_domain(struct domain *d)
+{
+    /* Only if using EPT and this domain has some VCPUs to dirty. */
+    if ( d->arch.hvm_domain.hap_enabled && d->vcpu[0] )
+        on_each_cpu(__ept_sync_domain, d, 1, 1);
+}
 
 static void __vmx_inject_exception(
     struct vcpu *v, int trap, int type, int error_code)
@@ -1100,6 +1200,9 @@ static struct hvm_function_table vmx_function_table = {
     .invlpg_intercept     = vmx_invlpg_intercept
 };
 
+static unsigned long *vpid_bitmap;
+#define VPID_BITMAP_SIZE ((1u << VMCS_VPID_WIDTH) / MAX_VIRT_CPUS)
+
 void start_vmx(void)
 {
     static int bootstrapped;
@@ -1131,6 +1234,25 @@ void start_vmx(void)
     {
         printk("VMX: failed to initialise.\n");
         return;
+    }
+
+    if ( cpu_has_vmx_ept )
+    {
+        printk("VMX: EPT is available.\n");
+        vmx_function_table.hap_supported = 1;
+    }
+
+    if ( cpu_has_vmx_vpid )
+    {
+        printk("VMX: VPID is available.\n");
+
+        vpid_bitmap = xmalloc_array(
+            unsigned long, BITS_TO_LONGS(VPID_BITMAP_SIZE));
+        BUG_ON(vpid_bitmap == NULL);
+        memset(vpid_bitmap, 0, BITS_TO_LONGS(VPID_BITMAP_SIZE) * sizeof(long));
+
+        /* VPID 0 is used by VMX root mode (the hypervisor). */
+        __set_bit(0, vpid_bitmap);
     }
 
     setup_vmcs_dump();
@@ -1635,16 +1757,45 @@ static int vmx_alloc_vlapic_mapping(struct domain *d)
     share_xen_page_with_guest(virt_to_page(apic_va), d, XENSHARE_writable);
     set_mmio_p2m_entry(
         d, paddr_to_pfn(APIC_DEFAULT_PHYS_BASE), _mfn(virt_to_mfn(apic_va)));
-    d->arch.hvm_domain.vmx_apic_access_mfn = virt_to_mfn(apic_va);
+    d->arch.hvm_domain.vmx.apic_access_mfn = virt_to_mfn(apic_va);
 
     return 0;
 }
 
 static void vmx_free_vlapic_mapping(struct domain *d)
 {
-    unsigned long mfn = d->arch.hvm_domain.vmx_apic_access_mfn;
+    unsigned long mfn = d->arch.hvm_domain.vmx.apic_access_mfn;
     if ( mfn != 0 )
         free_xenheap_page(mfn_to_virt(mfn));
+}
+
+static int vmx_alloc_vpid(struct domain *d)
+{
+    int idx;
+
+    if ( !cpu_has_vmx_vpid )
+        return 0;
+
+    do {
+        idx = find_first_zero_bit(vpid_bitmap, VPID_BITMAP_SIZE);
+        if ( idx >= VPID_BITMAP_SIZE )
+        {
+            dprintk(XENLOG_WARNING, "VMX VPID space exhausted.\n");
+            return -EBUSY;
+        }
+    }
+    while ( test_and_set_bit(idx, vpid_bitmap) );
+
+    d->arch.hvm_domain.vmx.vpid_base = idx * MAX_VIRT_CPUS;
+    return 0;
+}
+
+static void vmx_free_vpid(struct domain *d)
+{
+    if ( !cpu_has_vmx_vpid )
+        return;
+
+    clear_bit(d->arch.hvm_domain.vmx.vpid_base / MAX_VIRT_CPUS, vpid_bitmap);
 }
 
 static void vmx_install_vlapic_mapping(struct vcpu *v)
@@ -1655,7 +1806,7 @@ static void vmx_install_vlapic_mapping(struct vcpu *v)
         return;
 
     virt_page_ma = page_to_maddr(vcpu_vlapic(v)->regs_page);
-    apic_page_ma = v->domain->arch.hvm_domain.vmx_apic_access_mfn;
+    apic_page_ma = v->domain->arch.hvm_domain.vmx.apic_access_mfn;
     apic_page_ma <<= PAGE_SHIFT;
 
     vmx_vmcs_enter(v);
@@ -1900,6 +2051,51 @@ static void vmx_wbinvd_intercept(void)
         wbinvd();
 }
 
+static void ept_handle_violation(unsigned long qualification, paddr_t gpa)
+{
+    unsigned long gla_validity = qualification & EPT_GLA_VALIDITY_MASK;
+    struct domain *d = current->domain;
+    unsigned long gfn = gpa >> PAGE_SHIFT;
+    mfn_t mfn;
+    p2m_type_t t;
+
+    if ( unlikely(qualification & EPT_GAW_VIOLATION) )
+    {
+        gdprintk(XENLOG_ERR, "EPT violation: guest physical address %"PRIpaddr
+                 " exceeded its width limit.\n", gpa);
+        goto crash;
+    }
+
+    if ( unlikely(gla_validity == EPT_GLA_VALIDITY_RSVD) ||
+         unlikely(gla_validity == EPT_GLA_VALIDITY_PDPTR_LOAD) )
+    {
+        gdprintk(XENLOG_ERR, "EPT violation: reserved bit or "
+                 "pdptr load violation.\n");
+        goto crash;
+    }
+
+    mfn = gfn_to_mfn(d, gfn, &t);
+    if ( p2m_is_ram(t) && paging_mode_log_dirty(d) )
+    {
+        paging_mark_dirty(d, mfn_x(mfn));
+        p2m_change_type(d, gfn, p2m_ram_logdirty, p2m_ram_rw);
+        flush_tlb_mask(d->domain_dirty_cpumask);
+        return;
+    }
+
+    /* This can only happen in log-dirty mode, writing back A/D bits. */
+    if ( unlikely(gla_validity == EPT_GLA_VALIDITY_GPT_WALK) )
+        goto crash;
+
+    ASSERT(gla_validity == EPT_GLA_VALIDITY_MATCH);
+    handle_mmio();
+
+    return;
+
+ crash:
+    domain_crash(d);
+}
+
 static void vmx_failed_vmentry(unsigned int exit_reason,
                                struct cpu_user_regs *regs)
 {
@@ -1938,6 +2134,10 @@ asmlinkage void vmx_vmexit_handler(struct cpu_user_regs *regs)
     unsigned int exit_reason, idtv_info;
     unsigned long exit_qualification, inst_len = 0;
     struct vcpu *v = current;
+
+    if ( paging_mode_hap(v->domain) && hvm_paging_enabled(v) )
+        v->arch.hvm_vcpu.guest_cr[3] = v->arch.hvm_vcpu.hw_cr[3] =
+            __vmread(GUEST_CR3);
 
     exit_reason = __vmread(VM_EXIT_REASON);
 
@@ -2168,6 +2368,17 @@ asmlinkage void vmx_vmexit_handler(struct cpu_user_regs *regs)
         inst_len = __get_instruction_length(); /* Safe: INVD, WBINVD */
         __update_guest_eip(inst_len);
         vmx_wbinvd_intercept();
+        break;
+    }
+
+    case EXIT_REASON_EPT_VIOLATION:
+    {
+        paddr_t gpa = __vmread(GUEST_PHYSICAL_ADDRESS);
+#ifdef CONFIG_X86_PAE
+        gpa |= (paddr_t)__vmread(GUEST_PHYSICAL_ADDRESS_HIGH) << 32;
+#endif
+        exit_qualification = __vmread(EXIT_QUALIFICATION);
+        ept_handle_violation(exit_qualification, gpa);
         break;
     }
 

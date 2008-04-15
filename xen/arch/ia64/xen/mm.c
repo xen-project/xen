@@ -820,7 +820,7 @@ __assign_new_domain_page(struct domain *d, unsigned long mpaddr,
 
     BUG_ON(!pte_none(*pte));
 
-    p = alloc_domheap_page(d);
+    p = alloc_domheap_page(d, 0);
     if (unlikely(!p)) {
         printk("assign_new_domain_page: Can't alloc!!!! Aaaargh!\n");
         return(p);
@@ -2315,7 +2315,7 @@ steal_page(struct domain *d, struct page_info *page, unsigned int memflags)
         unsigned long new_mfn;
         int ret;
 
-        new = alloc_domheap_page(d);
+        new = alloc_domheap_page(d, 0);
         if (new == NULL) {
             gdprintk(XENLOG_INFO, "alloc_domheap_page() failed\n");
             return -1;
@@ -2602,7 +2602,7 @@ void *pgtable_quicklist_alloc(void)
 
     BUG_ON(dom_p2m == NULL);
     if (!opt_p2m_xenheap) {
-        struct page_info *page = alloc_domheap_page(dom_p2m);
+        struct page_info *page = alloc_domheap_page(dom_p2m, 0);
         if (page == NULL)
             return NULL;
         p = page_to_virt(page);
@@ -2827,7 +2827,7 @@ arch_memory_op(int op, XEN_GUEST_HANDLE(void) arg)
             return -EINVAL;
         }
 
-        LOCK_BIGLOCK(d);
+        domain_lock(d);
 
         /* Check remapping necessity */
         prev_mfn = gmfn_to_mfn(d, xatp.gpfn);
@@ -2853,7 +2853,7 @@ arch_memory_op(int op, XEN_GUEST_HANDLE(void) arg)
         guest_physmap_add_page(d, xatp.gpfn, mfn);
 
     out:
-        UNLOCK_BIGLOCK(d);
+        domain_unlock(d);
         
         rcu_unlock_domain(d);
 

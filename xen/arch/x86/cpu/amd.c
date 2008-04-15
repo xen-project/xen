@@ -3,6 +3,7 @@
 #include <xen/bitops.h>
 #include <xen/mm.h>
 #include <xen/smp.h>
+#include <xen/pci.h>
 #include <asm/io.h>
 #include <asm/msr.h>
 #include <asm/processor.h>
@@ -66,19 +67,6 @@ static int c1_ramping_may_cause_clock_drift(struct cpuinfo_x86 *c)
 	return 1;
 }
 
-/* PCI access functions. Should be safe to use 0xcf8/0xcfc port accesses here. */
-static u8 pci_read_byte(u32 bus, u32 dev, u32 fn, u32 reg)
-{
-	outl((1U<<31) | (bus << 16) | (dev << 11) | (fn << 8) | (reg & ~3), 0xcf8);
-	return inb(0xcfc + (reg & 3));
-}
-
-static void pci_write_byte(u32 bus, u32 dev, u32 fn, u32 reg, u8 val)
-{
-	outl((1U<<31) | (bus << 16) | (dev << 11) | (fn << 8) | (reg & ~3), 0xcf8);
-	outb(val, 0xcfc + (reg & 3));
-}
-
 /*
  * Disable C1-Clock ramping if enabled in PMM7.CpuLowPwrEnh on 8th-generation
  * cores only. Assume BIOS has setup all Northbridges equivalently.
@@ -90,12 +78,12 @@ static void disable_c1_ramping(void)
 
 	for (node=0; node < NR_CPUS; node++) {
 		/* PMM7: bus=0, dev=0x18+node, function=0x3, register=0x87. */
-		pmm7 = pci_read_byte(0, 0x18+node, 0x3, 0x87);
+		pmm7 = pci_conf_read8(0, 0x18+node, 0x3, 0x87);
 		/* Invalid read means we've updated every Northbridge. */
 		if (pmm7 == 0xFF)
 			break;
 		pmm7 &= 0xFC; /* clear pmm7[1:0] */
-		pci_write_byte(0, 0x18+node, 0x3, 0x87, pmm7);
+		pci_conf_write8(0, 0x18+node, 0x3, 0x87, pmm7);
 		printk ("AMD: Disabling C1 Clock Ramping Node #%x\n", node);
 	}
 }

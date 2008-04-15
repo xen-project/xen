@@ -8,7 +8,11 @@
 #ifndef _ASM_IA64_SN_PCI_PCIDEV_H
 #define _ASM_IA64_SN_PCI_PCIDEV_H
 
+#ifdef XEN
+#include <linux/linux-pci.h>
+#else
 #include <linux/pci.h>
+#endif
 
 /*
  * In ia64, pci_dev->sysdata must be a *pci_controller. To provide access to

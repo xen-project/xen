@@ -25,6 +25,8 @@
 #include <public/domctl.h>
 #include <xsm/xsm.h>
 
+DEFINE_SPINLOCK(domctl_lock);
+
 extern long arch_do_domctl(
     struct xen_domctl *op, XEN_GUEST_HANDLE(xen_domctl_t) u_domctl);
 
@@ -90,7 +92,7 @@ static inline int is_free_domid(domid_t dom)
 
 void getdomaininfo(struct domain *d, struct xen_domctl_getdomaininfo *info)
 {
-    struct vcpu   *v;
+    struct vcpu *v;
     u64 cpu_time = 0;
     int flags = XEN_DOMINF_blocked;
     struct vcpu_runstate_info runstate;
@@ -119,7 +121,7 @@ void getdomaininfo(struct domain *d, struct xen_domctl_getdomaininfo *info)
 
     info->cpu_time = cpu_time;
 
-    info->flags = flags |
+    info->flags = (info->nr_online_vcpus ? flags : 0) |
         ((d->is_dying == DOMDYING_dead) ? XEN_DOMINF_dying    : 0) |
         (d->is_shut_down                ? XEN_DOMINF_shutdown : 0) |
         (d->is_paused_by_controller     ? XEN_DOMINF_paused   : 0) |
@@ -180,7 +182,6 @@ long do_domctl(XEN_GUEST_HANDLE(xen_domctl_t) u_domctl)
 {
     long ret = 0;
     struct xen_domctl curop, *op = &curop;
-    static DEFINE_SPINLOCK(domctl_lock);
 
     if ( !IS_PRIV(current->domain) )
         return -EPERM;

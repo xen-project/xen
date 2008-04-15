@@ -444,6 +444,12 @@ struct vmcb_struct {
     u64 res16[301];
 } __attribute__ ((packed));
 
+struct svm_domain {
+#if CONFIG_PAGING_LEVELS == 3
+    bool_t npt_4gb_warning;
+#endif
+};
+
 struct arch_svm_struct {
     struct vmcb_struct *vmcb;
     u64    vmcb_pa;

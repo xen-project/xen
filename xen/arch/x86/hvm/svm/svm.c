@@ -255,11 +255,6 @@ static int svm_vmcb_restore(struct vcpu *v, struct hvm_hw_cpu *c)
     svm_update_guest_cr(v, 2);
     svm_update_guest_cr(v, 4);
 
-#ifdef HVM_DEBUG_SUSPEND
-    printk("%s: cr3=0x%"PRIx64", cr0=0x%"PRIx64", cr4=0x%"PRIx64".\n",
-           __func__, c->cr3, c->cr0, c->cr4);
-#endif
-
     vmcb->sysenter_cs =  c->sysenter_cs;
     vmcb->sysenter_esp = c->sysenter_esp;
     vmcb->sysenter_eip = c->sysenter_eip;
@@ -472,7 +467,7 @@ static void svm_get_segment_register(struct vcpu *v, enum x86_segment seg,
 {
     struct vmcb_struct *vmcb = v->arch.hvm_svm.vmcb;
 
-    ASSERT(v == current);
+    ASSERT((v == current) || !vcpu_runnable(v));
 
     switch ( seg )
     {

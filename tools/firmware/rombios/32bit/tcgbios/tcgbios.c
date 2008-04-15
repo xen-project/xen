@@ -923,7 +923,7 @@ uint32_t HashLogExtendEvent32(struct hleei_short *hleei_s, struct hleeo *hleeo,
 	struct hlei hlei ; /* HashLogEventInput block */
 	struct hleo hleo;  /* HashLogEventOutput block */
 	struct hleei_long *hleei_l = (struct hleei_long *)hleei_s;
-	int sh;
+	int sh = 0;
 	uint32_t logdataptr;
 
 	if (TCG_IsShutdownPreBootInterface() != 0) {

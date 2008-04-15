@@ -185,7 +185,7 @@ you must login and initiate a session. For example:
 Where {\tt uname} and {\tt password} refer to your username and password
 respectively, as defined by the Xen administrator.
 The {\tt session\_id} returned by {\tt session.login\_with\_password} is passed
-to subequent RPC calls as an authentication token.
+to subsequent RPC calls as an authentication token.
 
 A session can be terminated with the {\tt session.logout} function:
 \begin{verbatim}
@@ -210,7 +210,7 @@ Async.VM.clone(...)}, that is non-blocking.
 
 Instead of returning its result directly, an asynchronous RPC call
 returns a {\tt task-id}; this identifier is subsequently used
-to track the status of a running asynchronous RPC. Note that an asychronous
+to track the status of a running asynchronous RPC. Note that an asynchronous
 call may fail immediately, before a {\tt task-id} has even been created---to
 represent this eventuality, the returned {\tt task-id}
 is wrapped in an XML-RPC struct with a {\tt Status}, {\tt ErrorDescription} and
@@ -248,7 +248,7 @@ Create a python object referencing the remote server:
 \end{verbatim}
 
 Acquire a session token by logging in with a username and password
-(error-handling ommitted for brevity; the session token is pointed to by the
+(error-handling omitted for brevity; the session token is pointed to by the
 key {\tt 'Value'} in the returned dictionary)
 
 \begin{verbatim}

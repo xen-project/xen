@@ -108,7 +108,7 @@ static int share_common_type(struct domain *subj, struct domain *obj)
 int acm_init_ste_policy(void)
 {
     /* minimal startup policy; policy write-locked already */
-    ste_bin_pol.max_types = 1;
+    ste_bin_pol.max_types = 2;
     ste_bin_pol.max_ssidrefs = 1 + dom0_ste_ssidref;
     ste_bin_pol.ssidrefs =
             (domaintype_t *)xmalloc_array(domaintype_t,
@@ -123,7 +123,9 @@ int acm_init_ste_policy(void)
                                     ste_bin_pol.max_ssidrefs);
 
     /* initialize state so that dom0 can start up and communicate with itself */
+    ste_bin_pol.ssidrefs[ste_bin_pol.max_types - 1 ] = 1;
     ste_bin_pol.ssidrefs[ste_bin_pol.max_types * dom0_ste_ssidref] = 1;
+    ste_bin_pol.ssidrefs[ste_bin_pol.max_types * dom0_ste_ssidref + 1] = 1;
 
     /* init stats */
     atomic_set(&(ste_bin_pol.ec_eval_count), 0);
@@ -868,8 +870,12 @@ ste_authorization(ssidref_t ssidref1, ssidref_t ssidref2)
 static int
 ste_is_default_policy(void)
 {
-    return ((ste_bin_pol.max_types    == 1) &&
-            (ste_bin_pol.max_ssidrefs == 2));
+    const static domaintype_t def_policy[4] = { 0x0, 0x1, 0x1, 0x1};
+    return ((ste_bin_pol.max_types    == 2) &&
+            (ste_bin_pol.max_ssidrefs == 2) &&
+            (memcmp(ste_bin_pol.ssidrefs,
+                    def_policy,
+                    sizeof(def_policy)) == 0));
 }
 
 /* now define the hook structure similarly to LSM */

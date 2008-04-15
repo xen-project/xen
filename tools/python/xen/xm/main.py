@@ -1294,13 +1294,13 @@ def xm_dump_core(args):
     try:
         print "Dumping core of domain: %s ..." % str(dom)
         server.xend.domain.dump(dom, filename, live, crash)
-    finally:
-        if not live and ds == DOM_STATE_RUNNING:
-            server.xend.domain.unpause(dom)
 
-    if crash:
-        print "Destroying domain: %s ..." % str(dom)
-        server.xend.domain.destroy(dom)
+        if crash:
+            print "Destroying domain: %s ..." % str(dom)
+            server.xend.domain.destroy(dom)
+    finally:
+        if not live and not crash and ds == DOM_STATE_RUNNING:
+            server.xend.domain.unpause(dom)
 
 def xm_rename(args):
     arg_check(args, "rename", 2)

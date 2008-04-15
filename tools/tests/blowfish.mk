@@ -5,11 +5,11 @@ CFLAGS :=
 include $(XEN_ROOT)/tools/Rules.mk
 
 # Disable PIE/SSP if GCC supports them. They can break us.
-CFLAGS  += $(call cc-option,$(CC),-nopie,)
-CFLAGS  += $(call cc-option,$(CC),-fno-stack-protector,)
-CFLAGS  += $(call cc-option,$(CC),-fno-stack-protector-all,)
+CFLAGS += $(call cc-option,$(CC),-nopie,)
+CFLAGS += $(call cc-option,$(CC),-fno-stack-protector,)
+CFLAGS += $(call cc-option,$(CC),-fno-stack-protector-all,)
 
-CFLAGS  += -fno-builtin -O2 -msoft-float
+CFLAGS += -fno-builtin -msoft-float
 
 .PHONY: all
 all: blowfish.bin

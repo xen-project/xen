@@ -284,7 +284,8 @@ int xc_domain_restore(int xc_handle, int io_fd, uint32_t dom,
     /* The new domain's shared-info frame number. */
     unsigned long shared_info_frame;
     unsigned char shared_info_page[PAGE_SIZE]; /* saved contents from file */
-    shared_info_either_t *old_shared_info = (shared_info_either_t *)shared_info_page;
+    shared_info_either_t *old_shared_info = 
+        (shared_info_either_t *)shared_info_page;
     shared_info_either_t *new_shared_info;
 
     /* A copy of the CPU context of the guest. */
@@ -349,13 +350,6 @@ int xc_domain_restore(int xc_handle, int io_fd, uint32_t dom,
     guest_width = sizeof(unsigned long);
     pt_levels = (guest_width == 8) ? 4 : (pt_levels == 2) ? 2 : 3; 
     
-    if ( lock_pages(&ctxt, sizeof(ctxt)) )
-    {
-        /* needed for build domctl, but might as well do early */
-        ERROR("Unable to lock ctxt");
-        return 1;
-    }
-
     if ( !hvm ) 
     {
         /* Load the p2m frame list, plus potential extended info chunk */
@@ -380,8 +374,11 @@ int xc_domain_restore(int xc_handle, int io_fd, uint32_t dom,
     /* We want zeroed memory so use calloc rather than malloc. */
     p2m        = calloc(p2m_size, MAX(guest_width, sizeof (xen_pfn_t))); 
     pfn_type   = calloc(p2m_size, sizeof(unsigned long));
-    region_mfn = calloc(MAX_BATCH_SIZE, sizeof(xen_pfn_t));
-    p2m_batch  = calloc(MAX_BATCH_SIZE, sizeof(xen_pfn_t));
+
+    region_mfn = xg_memalign(PAGE_SIZE, ROUNDUP(
+                              MAX_BATCH_SIZE * sizeof(xen_pfn_t), PAGE_SHIFT));
+    p2m_batch  = xg_memalign(PAGE_SIZE, ROUNDUP(
+                              MAX_BATCH_SIZE * sizeof(xen_pfn_t), PAGE_SHIFT));
 
     if ( (p2m == NULL) || (pfn_type == NULL) ||
          (region_mfn == NULL) || (p2m_batch == NULL) )
@@ -390,6 +387,11 @@ int xc_domain_restore(int xc_handle, int io_fd, uint32_t dom,
         errno = ENOMEM;
         goto out;
     }
+
+    memset(region_mfn, 0,
+           ROUNDUP(MAX_BATCH_SIZE * sizeof(xen_pfn_t), PAGE_SHIFT)); 
+    memset(p2m_batch, 0,
+           ROUNDUP(MAX_BATCH_SIZE * sizeof(xen_pfn_t), PAGE_SHIFT)); 
 
     if ( lock_pages(region_mfn, sizeof(xen_pfn_t) * MAX_BATCH_SIZE) )
     {
@@ -974,6 +976,12 @@ int xc_domain_restore(int xc_handle, int io_fd, uint32_t dom,
             else
                 DPRINTF("Decreased reservation by %d pages\n", count);
         }
+    }
+
+    if ( lock_pages(&ctxt, sizeof(ctxt)) )
+    {
+        ERROR("Unable to lock ctxt");
+        return 1;
     }
 
     for ( i = 0; i <= max_vcpu_id; i++ )

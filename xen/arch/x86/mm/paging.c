@@ -26,6 +26,7 @@
 #include <asm/p2m.h>
 #include <asm/hap.h>
 #include <asm/guest_access.h>
+#include <xen/numa.h>
 #include <xsm/xsm.h>
 
 #define hap_enabled(d) (is_hvm_domain(d) && (d)->arch.hvm_domain.hap_enabled)
@@ -99,8 +100,9 @@
 static mfn_t paging_new_log_dirty_page(struct domain *d, void **mapping_p)
 {
     mfn_t mfn;
-    struct page_info *page = alloc_domheap_page(NULL);
+    struct page_info *page;
 
+    page = alloc_domheap_page(NULL, MEMF_node(domain_to_node(d)));
     if ( unlikely(page == NULL) )
     {
         d->arch.paging.log_dirty.failed_allocs++;
@@ -482,9 +484,12 @@ void paging_log_dirty_teardown(struct domain*d)
 /*           CODE FOR PAGING SUPPORT            */
 /************************************************/
 /* Domain paging struct initialization. */
-void paging_domain_init(struct domain *d)
+int paging_domain_init(struct domain *d)
 {
-    p2m_init(d);
+    int rc;
+
+    if ( (rc = p2m_init(d)) != 0 )
+        return rc;
 
     /* The order of the *_init calls below is important, as the later
      * ones may rewrite some common fields.  Shadow pagetables are the
@@ -494,6 +499,8 @@ void paging_domain_init(struct domain *d)
     /* ... but we will use hardware assistance if it's available. */
     if ( hap_enabled(d) )
         hap_domain_init(d);
+
+    return 0;
 }
 
 /* vcpu paging struct initialization goes here */
@@ -587,6 +594,8 @@ void paging_final_teardown(struct domain *d)
         hap_final_teardown(d);
     else
         shadow_final_teardown(d);
+
+    p2m_final_teardown(d);
 }
 
 /* Enable an arbitrary paging-assistance mode.  Call once at domain

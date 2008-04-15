@@ -223,7 +223,7 @@ static int ratewrite(int io_fd, int live, void *buf, int n)
                 {
                     budget += BURST_BUDGET;
                     last_put.tv_usec += burst_time_us;
-                    if ( last_put.tv_usec > 1000000 
+                    if ( last_put.tv_usec > 1000000 )
                     {
                         last_put.tv_usec -= 1000000;
                         last_put.tv_sec++;
@@ -939,9 +939,9 @@ int xc_domain_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
     sent_last_iter = p2m_size;
 
     /* Setup to_send / to_fix and to_skip bitmaps */
-    to_send = malloc(BITMAP_SIZE);
+    to_send = xg_memalign(PAGE_SIZE, ROUNDUP(BITMAP_SIZE, PAGE_SHIFT)); 
     to_fix  = calloc(1, BITMAP_SIZE);
-    to_skip = malloc(BITMAP_SIZE);
+    to_skip = xg_memalign(PAGE_SIZE, ROUNDUP(BITMAP_SIZE, PAGE_SHIFT)); 
 
     if ( !to_send || !to_fix || !to_skip )
     {
@@ -983,8 +983,8 @@ int xc_domain_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
 
     analysis_phase(xc_handle, dom, p2m_size, to_skip, 0);
 
-    /* We want zeroed memory so use calloc rather than malloc. */
-    pfn_type   = calloc(MAX_BATCH_SIZE, sizeof(*pfn_type));
+    pfn_type   = xg_memalign(PAGE_SIZE, ROUNDUP(
+                              MAX_BATCH_SIZE * sizeof(*pfn_type), PAGE_SHIFT));
     pfn_batch  = calloc(MAX_BATCH_SIZE, sizeof(*pfn_batch));
     if ( (pfn_type == NULL) || (pfn_batch == NULL) )
     {
@@ -992,10 +992,12 @@ int xc_domain_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
         errno = ENOMEM;
         goto out;
     }
+    memset(pfn_type, 0,
+           ROUNDUP(MAX_BATCH_SIZE * sizeof(*pfn_type), PAGE_SHIFT));
 
     if ( lock_pages(pfn_type, MAX_BATCH_SIZE * sizeof(*pfn_type)) )
     {
-        ERROR("Unable to lock");
+        ERROR("Unable to lock pfn_type array");
         goto out;
     }
 
@@ -1048,7 +1050,7 @@ int xc_domain_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
     /* Now write out each data page, canonicalising page tables as we go... */
     for ( ; ; )
     {
-        unsigned int prev_pc, sent_this_iter, N, batch;
+        unsigned int prev_pc, sent_this_iter, N, batch, run;
 
         iter++;
         sent_this_iter = 0;
@@ -1225,6 +1227,7 @@ int xc_domain_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
             }
 
             /* entering this loop, pfn_type is now in pfns (Not mfns) */
+            run = 0;
             for ( j = 0; j < batch; j++ )
             {
                 unsigned long pfn, pagetype;
@@ -1233,7 +1236,25 @@ int xc_domain_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
                 pfn      = pfn_type[j] & ~XEN_DOMCTL_PFINFO_LTAB_MASK;
                 pagetype = pfn_type[j] &  XEN_DOMCTL_PFINFO_LTAB_MASK;
 
-                /* write out pages in batch */
+                if ( pagetype != 0 )
+                {
+                    /* If the page is not a normal data page, write out any
+                       run of pages we may have previously acumulated */
+                    if ( run )
+                    {
+                        if ( ratewrite(io_fd, live, 
+                                       (char*)region_base+(PAGE_SIZE*(j-run)), 
+                                       PAGE_SIZE*run) != PAGE_SIZE*run )
+                        {
+                            ERROR("Error when writing to state file (4a)"
+                                  " (errno %d)", errno);
+                            goto out;
+                        }                        
+                        run = 0;
+                    }
+                }
+
+                /* skip pages that aren't present */
                 if ( pagetype == XEN_DOMCTL_PFINFO_XTAB )
                     continue;
 
@@ -1255,23 +1276,30 @@ int xc_domain_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
 
                     if ( ratewrite(io_fd, live, page, PAGE_SIZE) != PAGE_SIZE )
                     {
-                        ERROR("Error when writing to state file (4)"
+                        ERROR("Error when writing to state file (4b)"
                               " (errno %d)", errno);
                         goto out;
                     }
                 }
                 else
                 {
-                    /* We have a normal page: just write it directly. */
-                    if ( ratewrite(io_fd, live, spage, PAGE_SIZE) !=
-                         PAGE_SIZE )
-                    {
-                        ERROR("Error when writing to state file (5)"
-                              " (errno %d)", errno);
-                        goto out;
-                    }
+                    /* We have a normal page: accumulate it for writing. */
+                    run++;
                 }
             } /* end of the write out for this batch */
+
+            if ( run )
+            {
+                /* write out the last accumulated run of pages */
+                if ( ratewrite(io_fd, live, 
+                               (char*)region_base+(PAGE_SIZE*(j-run)), 
+                               PAGE_SIZE*run) != PAGE_SIZE*run )
+                {
+                    ERROR("Error when writing to state file (4c)"
+                          " (errno %d)", errno);
+                    goto out;
+                }                        
+            }
 
             sent_this_iter += batch;
 

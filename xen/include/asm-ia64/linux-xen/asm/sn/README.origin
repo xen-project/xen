@@ -12,5 +12,6 @@ intr.h			-> linux/include/asm-ia64/sn/intr.h
 io.h			-> linux/include/asm-ia64/sn/io.h
 nodepda.h		-> linux/include/asm-ia64/sn/nodepda.h
 pcibr_provider.h	-> linux/include/asm-ia64/sn/pcibr_provider.h
+pcidev.h		-> linux/include/asm-ia64/sn/pcidev.h
 rw_mmr.h		-> linux/include/asm-ia64/sn/rw_mmr.h
 types.h			-> linux/include/asm-ia64/sn/types.h

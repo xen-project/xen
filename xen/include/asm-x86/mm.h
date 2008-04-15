@@ -69,8 +69,7 @@ struct page_info
 #define PGT_l2_page_table   (2U<<29) /* using this page as an L2 page table? */
 #define PGT_l3_page_table   (3U<<29) /* using this page as an L3 page table? */
 #define PGT_l4_page_table   (4U<<29) /* using this page as an L4 page table? */
-#define PGT_gdt_page        (5U<<29) /* using this page in a GDT? */
-#define PGT_ldt_page        (6U<<29) /* using this page in an LDT? */
+#define PGT_seg_desc_page   (5U<<29) /* using this page in a GDT/LDT? */
 #define PGT_writable_page   (7U<<29) /* has writable mappings of this page? */
 #define PGT_type_mask       (7U<<29) /* Bits 29-31. */
 

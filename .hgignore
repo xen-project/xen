@@ -150,6 +150,7 @@
 ^tools/ioemu/qemu-tech\.html$
 ^tools/ioemu/qemu\.1$
 ^tools/ioemu/qemu\.pod$
+^tools/ioemu/tapdisk-ioemu$
 ^tools/libxc/ia64/asm/.*\.h$
 ^tools/libxc/ia64/acpi/.*\.h$
 ^tools/libxc/ia64/acpi/platform/.*\.h$
@@ -198,6 +199,7 @@
 ^tools/vtpm/tpm_emulator/.*$
 ^tools/vtpm/vtpm/.*$
 ^tools/vtpm_manager/manager/vtpm_managerd$
+^tools/xcutils/lsevtchn$
 ^tools/xcutils/xc_restore$
 ^tools/xcutils/xc_save$
 ^tools/xcutils/readnotes$
@@ -208,6 +210,7 @@
 ^tools/xenstat/xentop/xentop$
 ^tools/xenstore/testsuite/tmp/.*$
 ^tools/xenstore/xen$
+^tools/xenstore/xenstore$
 ^tools/xenstore/xenstore-chmod$
 ^tools/xenstore/xenstore-exists$
 ^tools/xenstore/xenstore-list$

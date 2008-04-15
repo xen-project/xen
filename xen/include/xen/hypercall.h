@@ -30,6 +30,7 @@ do_sched_op(
     int cmd,
     XEN_GUEST_HANDLE(void) arg);
 
+extern spinlock_t domctl_lock;
 extern long
 do_domctl(
     XEN_GUEST_HANDLE(xen_domctl_t) u_domctl);

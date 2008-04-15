@@ -38,7 +38,7 @@ struct g2m_ioport {
 struct hvm_iommu {
     spinlock_t iommu_list_lock;    /* protect iommu specific lists */
     struct list_head pdev_list;    /* direct accessed pci devices */
-    struct dma_pte *pgd;           /* io page directory root */
+    u64 pgd_maddr;                 /* io page directory machine address */
     spinlock_t mapping_lock;       /* io page table lock */
     int agaw;     /* adjusted guest address width, 0 is level 2 30-bit */
     struct list_head g2m_ioport_list;  /* guest to machine ioport mapping */
@@ -48,9 +48,10 @@ struct hvm_iommu {
     int domain_id;
     int paging_mode;
     void *root_table;
+    bool_t p2m_synchronized;
 
     /* iommu_ops */
     struct iommu_ops *platform_ops;
 };
 
-#endif // __ASM_X86_HVM_IOMMU_H__
+#endif /* __ASM_X86_HVM_IOMMU_H__ */

@@ -32,7 +32,6 @@
 #include <signal.h>
 #include <stdint.h>
 #include <errno.h>
-#include <pthread.h>
 #include "xs.h"
 #include "list.h"
 #include "utils.h"
@@ -42,6 +41,10 @@ struct xs_stored_msg {
 	struct xsd_sockmsg hdr;
 	char *body;
 };
+
+#ifdef USE_PTHREAD
+
+#include <pthread.h>
 
 struct xs_handle {
 	/* Communications channel to xenstore daemon. */
@@ -78,14 +81,37 @@ struct xs_handle {
 	pthread_mutex_t request_mutex;
 };
 
-static int read_message(struct xs_handle *h);
+#define mutex_lock(m)		pthread_mutex_lock(m)
+#define mutex_unlock(m)		pthread_mutex_unlock(m)
+#define condvar_signal(c)	pthread_cond_signal(c)
+#define condvar_wait(c,m,hnd)	pthread_cond_wait(c,m)
+
 static void *read_thread(void *arg);
+
+#else /* !defined(USE_PTHREAD) */
+
+struct xs_handle {
+	int fd;
+	struct list_head reply_list;
+	struct list_head watch_list;
+	/* Clients can select() on this pipe to wait for a watch to fire. */
+	int watch_pipe[2];
+};
+
+#define mutex_lock(m)		((void)0)
+#define mutex_unlock(m)		((void)0)
+#define condvar_signal(c)	((void)0)
+#define condvar_wait(c,m,hnd)	read_message(hnd)
+
+#endif
+
+static int read_message(struct xs_handle *h);
 
 int xs_fileno(struct xs_handle *h)
 {
 	char c = 0;
 
-	pthread_mutex_lock(&h->watch_mutex);
+	mutex_lock(&h->watch_mutex);
 
 	if ((h->watch_pipe[0] == -1) && (pipe(h->watch_pipe) != -1)) {
 		/* Kick things off if the watch list is already non-empty. */
@@ -94,7 +120,7 @@ int xs_fileno(struct xs_handle *h)
 				continue;
 	}
 
-	pthread_mutex_unlock(&h->watch_mutex);
+	mutex_unlock(&h->watch_mutex);
 
 	return h->watch_pipe[0];
 }
@@ -163,18 +189,21 @@ static struct xs_handle *get_handle(const char *connect_to)
 
 	h->fd = fd;
 
+	INIT_LIST_HEAD(&h->reply_list);
+	INIT_LIST_HEAD(&h->watch_list);
+
 	/* Watch pipe is allocated on demand in xs_fileno(). */
 	h->watch_pipe[0] = h->watch_pipe[1] = -1;
 
-	INIT_LIST_HEAD(&h->watch_list);
+#ifdef USE_PTHREAD
 	pthread_mutex_init(&h->watch_mutex, NULL);
 	pthread_cond_init(&h->watch_condvar, NULL);
 
-	INIT_LIST_HEAD(&h->reply_list);
 	pthread_mutex_init(&h->reply_mutex, NULL);
 	pthread_cond_init(&h->reply_condvar, NULL);
 
 	pthread_mutex_init(&h->request_mutex, NULL);
+#endif
 
 	return h;
 }
@@ -198,15 +227,17 @@ void xs_daemon_close(struct xs_handle *h)
 {
 	struct xs_stored_msg *msg, *tmsg;
 
-	pthread_mutex_lock(&h->request_mutex);
-	pthread_mutex_lock(&h->reply_mutex);
-	pthread_mutex_lock(&h->watch_mutex);
+	mutex_lock(&h->request_mutex);
+	mutex_lock(&h->reply_mutex);
+	mutex_lock(&h->watch_mutex);
 
+#ifdef USE_PTHREAD
 	if (h->read_thr_exists) {
 		/* XXX FIXME: May leak an unpublished message buffer. */
 		pthread_cancel(h->read_thr);
 		pthread_join(h->read_thr, NULL);
 	}
+#endif
 
 	list_for_each_entry_safe(msg, tmsg, &h->reply_list, list) {
 		free(msg->body);
@@ -218,9 +249,9 @@ void xs_daemon_close(struct xs_handle *h)
 		free(msg);
 	}
 
-	pthread_mutex_unlock(&h->request_mutex);
-	pthread_mutex_unlock(&h->reply_mutex);
-	pthread_mutex_unlock(&h->watch_mutex);
+	mutex_unlock(&h->request_mutex);
+	mutex_unlock(&h->reply_mutex);
+	mutex_unlock(&h->watch_mutex);
 
 	if (h->watch_pipe[0] != -1) {
 		close(h->watch_pipe[0]);
@@ -277,17 +308,19 @@ static void *read_reply(
 	struct xs_stored_msg *msg;
 	char *body;
 
+#ifdef USE_PTHREAD
 	/* Read from comms channel ourselves if there is no reader thread. */
 	if (!h->read_thr_exists && (read_message(h) == -1))
 		return NULL;
+#endif
 
-	pthread_mutex_lock(&h->reply_mutex);
+	mutex_lock(&h->reply_mutex);
 	while (list_empty(&h->reply_list))
-		pthread_cond_wait(&h->reply_condvar, &h->reply_mutex);
+		condvar_wait(&h->reply_condvar, &h->reply_mutex, h);
 	msg = list_top(&h->reply_list, struct xs_stored_msg, list);
 	list_del(&msg->list);
 	assert(list_empty(&h->reply_list));
-	pthread_mutex_unlock(&h->reply_mutex);
+	mutex_unlock(&h->reply_mutex);
 
 	*type = msg->hdr.type;
 	if (len)
@@ -329,7 +362,7 @@ static void *xs_talkv(struct xs_handle *h, xs_transaction_t t,
 	ignorepipe.sa_flags = 0;
 	sigaction(SIGPIPE, &ignorepipe, &oldact);
 
-	pthread_mutex_lock(&h->request_mutex);
+	mutex_lock(&h->request_mutex);
 
 	if (!xs_write_all(h->fd, &msg, sizeof(msg)))
 		goto fail;
@@ -342,7 +375,7 @@ static void *xs_talkv(struct xs_handle *h, xs_transaction_t t,
 	if (!ret)
 		goto fail;
 
-	pthread_mutex_unlock(&h->request_mutex);
+	mutex_unlock(&h->request_mutex);
 
 	sigaction(SIGPIPE, &oldact, NULL);
 	if (msg.type == XS_ERROR) {
@@ -362,7 +395,7 @@ static void *xs_talkv(struct xs_handle *h, xs_transaction_t t,
 fail:
 	/* We're in a bad state, so close fd. */
 	saved_errno = errno;
-	pthread_mutex_unlock(&h->request_mutex);
+	mutex_unlock(&h->request_mutex);
 	sigaction(SIGPIPE, &oldact, NULL);
 close_fd:
 	close(h->fd);
@@ -556,16 +589,18 @@ bool xs_watch(struct xs_handle *h, const char *path, const char *token)
 {
 	struct iovec iov[2];
 
+#ifdef USE_PTHREAD
 	/* We dynamically create a reader thread on demand. */
-	pthread_mutex_lock(&h->request_mutex);
+	mutex_lock(&h->request_mutex);
 	if (!h->read_thr_exists) {
 		if (pthread_create(&h->read_thr, NULL, read_thread, h) != 0) {
-			pthread_mutex_unlock(&h->request_mutex);
+			mutex_unlock(&h->request_mutex);
 			return false;
 		}
 		h->read_thr_exists = 1;
 	}
-	pthread_mutex_unlock(&h->request_mutex);
+	mutex_unlock(&h->request_mutex);
+#endif
 
 	iov[0].iov_base = (void *)path;
 	iov[0].iov_len = strlen(path) + 1;
@@ -586,11 +621,11 @@ char **xs_read_watch(struct xs_handle *h, unsigned int *num)
 	char **ret, *strings, c = 0;
 	unsigned int num_strings, i;
 
-	pthread_mutex_lock(&h->watch_mutex);
+	mutex_lock(&h->watch_mutex);
 
 	/* Wait on the condition variable for a watch to fire. */
 	while (list_empty(&h->watch_list))
-		pthread_cond_wait(&h->watch_condvar, &h->watch_mutex);
+		condvar_wait(&h->watch_condvar, &h->watch_mutex, h);
 	msg = list_top(&h->watch_list, struct xs_stored_msg, list);
 	list_del(&msg->list);
 
@@ -599,7 +634,7 @@ char **xs_read_watch(struct xs_handle *h, unsigned int *num)
 		while (read(h->watch_pipe[0], &c, 1) != 1)
 			continue;
 
-	pthread_mutex_unlock(&h->watch_mutex);
+	mutex_unlock(&h->watch_mutex);
 
 	assert(msg->hdr.type == XS_WATCH_EVENT);
 
@@ -801,7 +836,7 @@ static int read_message(struct xs_handle *h)
 	body[msg->hdr.len] = '\0';
 
 	if (msg->hdr.type == XS_WATCH_EVENT) {
-		pthread_mutex_lock(&h->watch_mutex);
+		mutex_lock(&h->watch_mutex);
 
 		/* Kick users out of their select() loop. */
 		if (list_empty(&h->watch_list) &&
@@ -810,22 +845,23 @@ static int read_message(struct xs_handle *h)
 				continue;
 
 		list_add_tail(&msg->list, &h->watch_list);
-		pthread_cond_signal(&h->watch_condvar);
 
-		pthread_mutex_unlock(&h->watch_mutex);
+		condvar_signal(&h->watch_condvar);
+
+		mutex_unlock(&h->watch_mutex);
 	} else {
-		pthread_mutex_lock(&h->reply_mutex);
+		mutex_lock(&h->reply_mutex);
 
 		/* There should only ever be one response pending! */
 		if (!list_empty(&h->reply_list)) {
-			pthread_mutex_unlock(&h->reply_mutex);
+			mutex_unlock(&h->reply_mutex);
 			goto error;
 		}
 
 		list_add_tail(&msg->list, &h->reply_list);
-		pthread_cond_signal(&h->reply_condvar);
+		condvar_signal(&h->reply_condvar);
 
-		pthread_mutex_unlock(&h->reply_mutex);
+		mutex_unlock(&h->reply_mutex);
 	}
 
 	return 0;
@@ -838,6 +874,7 @@ static int read_message(struct xs_handle *h)
 	return -1;
 }
 
+#ifdef USE_PTHREAD
 static void *read_thread(void *arg)
 {
 	struct xs_handle *h = arg;
@@ -847,6 +884,7 @@ static void *read_thread(void *arg)
 
 	return NULL;
 }
+#endif
 
 /*
  * Local variables:

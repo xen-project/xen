@@ -18,33 +18,26 @@
 # Place - Suite 330, Boston, MA 02111-1307 USA.
 #
 
-override XEN_TARGET_ARCH = x86_32
 XEN_ROOT = ../../..
-CFLAGS :=
-include $(XEN_ROOT)/tools/Rules.mk
+include $(XEN_ROOT)/tools/firmware/Rules.mk
 
 SUBDIRS := acpi
 
 # The HVM loader is started in 32-bit mode at the address below:
 LOADADDR = 0x100000
 
-# Disable PIE/SSP if GCC supports them. They can break us.
-CFLAGS  += $(call cc-option,$(CC),-nopie,)
-CFLAGS  += $(call cc-option,$(CC),-fno-stack-protector,)
-CFLAGS  += $(call cc-option,$(CC),-fno-stack-protector-all,)
+CFLAGS += $(CFLAGS_include) -I.
 
-CFLAGS  += -fno-builtin -O2 -msoft-float
-CFLAGS  += $(CFLAGS_include) -I.
-
-SRCS = hvmloader.c mp_tables.c util.c smbios.c 32bitbios_support.c
+SRCS = hvmloader.c mp_tables.c util.c smbios.c 32bitbios_support.c smp.c
 OBJS = $(patsubst %.c,%.o,$(SRCS))
 
 .PHONY: all
 all: hvmloader
 
+hvmloader.o: roms.h
 smbios.o: CFLAGS += -D__SMBIOS_DATE__="\"$(shell date +%m/%d/%Y)\""
 
-hvmloader: roms.h subdirs-all $(OBJS)
+hvmloader: subdirs-all $(OBJS)
 	$(LD) $(LDFLAGS_DIRECT) -N -Ttext $(LOADADDR) \
 		-o hvmloader.tmp $(OBJS) acpi/acpi.a
 	$(OBJCOPY) hvmloader.tmp hvmloader

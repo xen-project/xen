@@ -401,50 +401,6 @@ void pit_stop_channel0_irq(PITState *pit)
     spin_unlock(&pit->lock);
 }
 
-#ifdef HVM_DEBUG_SUSPEND
-static void pit_info(PITState *pit)
-{
-    struct hvm_hw_pit_channel *s;
-    struct periodic_time *pt;
-    int i;
-
-    for ( i = 0; i < 3; i++ )
-    {
-        printk("*****pit channel %d's state:*****\n", i);
-        s = &pit->hw.channels[i];
-        printk("pit 0x%x.\n", s->count);
-        printk("pit 0x%x.\n", s->latched_count);
-        printk("pit 0x%x.\n", s->count_latched);
-        printk("pit 0x%x.\n", s->status_latched);
-        printk("pit 0x%x.\n", s->status);
-        printk("pit 0x%x.\n", s->read_state);
-        printk("pit 0x%x.\n", s->write_state);
-        printk("pit 0x%x.\n", s->write_latch);
-        printk("pit 0x%x.\n", s->rw_mode);
-        printk("pit 0x%x.\n", s->mode);
-        printk("pit 0x%x.\n", s->bcd);
-        printk("pit 0x%x.\n", s->gate);
-        printk("pit %"PRId64"\n", pit->count_load_time[i]);
-
-    }
-
-    pt = &pit->pt0;
-    printk("pit channel 0 periodic timer:\n", i);
-    printk("pt %d.\n", pt->enabled);
-    printk("pt %d.\n", pt->one_shot);
-    printk("pt %d.\n", pt->irq);
-    printk("pt %d.\n", pt->first_injected);
-    printk("pt %d.\n", pt->pending_intr_nr);
-    printk("pt %d.\n", pt->period);
-    printk("pt %"PRId64"\n", pt->period_cycles);
-    printk("pt %"PRId64"\n", pt->last_plt_gtime);
-}
-#else
-static void pit_info(PITState *pit)
-{
-}
-#endif
-
 static int pit_save(struct domain *d, hvm_domain_context_t *h)
 {
     PITState *pit = domain_vpit(d);
@@ -452,9 +408,6 @@ static int pit_save(struct domain *d, hvm_domain_context_t *h)
 
     spin_lock(&pit->lock);
     
-    pit_info(pit);
-
-    /* Save the PIT hardware state */
     rc = hvm_save_entry(PIT, 0, h, &pit->hw);
 
     spin_unlock(&pit->lock);
@@ -469,21 +422,20 @@ static int pit_load(struct domain *d, hvm_domain_context_t *h)
 
     spin_lock(&pit->lock);
 
-    /* Restore the PIT hardware state */
     if ( hvm_load_entry(PIT, h, &pit->hw) )
     {
         spin_unlock(&pit->lock);
         return 1;
     }
     
-    /* Recreate platform timers from hardware state.  There will be some 
+    /*
+     * Recreate platform timers from hardware state.  There will be some 
      * time jitter here, but the wall-clock will have jumped massively, so 
-     * we hope the guest can handle it. */
+     * we hope the guest can handle it.
+     */
     pit->pt0.last_plt_gtime = hvm_get_guest_time(d->vcpu[0]);
     for ( i = 0; i < 3; i++ )
         pit_load_count(pit, i, pit->hw.channels[i].count);
-
-    pit_info(pit);
 
     spin_unlock(&pit->lock);
 
@@ -535,7 +487,7 @@ static int handle_pit_io(
     if ( bytes != 1 )
     {
         gdprintk(XENLOG_WARNING, "PIT bad access\n");
-        return 1;
+        return X86EMUL_OKAY;
     }
 
     if ( dir == IOREQ_WRITE )
@@ -550,7 +502,7 @@ static int handle_pit_io(
             gdprintk(XENLOG_WARNING, "PIT: read A1:A0=3!\n");
     }
 
-    return 1;
+    return X86EMUL_OKAY;
 }
 
 static void speaker_ioport_write(
@@ -574,11 +526,7 @@ static int handle_speaker_io(
 {
     struct PITState *vpit = vcpu_vpit(current);
 
-    if ( bytes != 1 )
-    {
-        gdprintk(XENLOG_WARNING, "PIT_SPEAKER bad access\n");
-        return 1;
-    }
+    BUG_ON(bytes != 1);
 
     spin_lock(&vpit->lock);
 
@@ -589,7 +537,7 @@ static int handle_speaker_io(
 
     spin_unlock(&vpit->lock);
 
-    return 1;
+    return X86EMUL_OKAY;
 }
 
 int pv_pit_handler(int port, int data, int write)

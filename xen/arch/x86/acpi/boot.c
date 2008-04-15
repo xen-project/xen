@@ -374,6 +374,18 @@ extern u32 pmtmr_ioport;
 #endif
 
 #ifdef CONFIG_ACPI_SLEEP
+#define acpi_fadt_copy_address(dst, src, len) do {			\
+	if (fadt->header.revision >= FADT2_REVISION_ID)			\
+		acpi_sinfo.dst##_blk = fadt->x##src##_block;		\
+	if (!acpi_sinfo.dst##_blk.address) {				\
+		acpi_sinfo.dst##_blk.address      = fadt->src##_block;	\
+		acpi_sinfo.dst##_blk.space_id     = ACPI_ADR_SPACE_SYSTEM_IO; \
+		acpi_sinfo.dst##_blk.bit_width    = fadt->len##_length << 3; \
+		acpi_sinfo.dst##_blk.bit_offset   = 0;			\
+		acpi_sinfo.dst##_blk.access_width = 0;			\
+	} \
+} while (0)
+
 /* Get pm1x_cnt and pm1x_evt information for ACPI sleep */
 static void __init
 acpi_fadt_parse_sleep_info(struct acpi_table_fadt *fadt)
@@ -388,37 +400,18 @@ acpi_fadt_parse_sleep_info(struct acpi_table_fadt *fadt)
 		goto bad;
 	rsdp = __va(rsdp_phys);
 
-	if (fadt->header.revision >= FADT2_REVISION_ID) {
-		memcpy(&acpi_sinfo.pm1a_cnt_blk, &fadt->xpm1a_control_block,
-			sizeof(struct acpi_generic_address));
-		memcpy(&acpi_sinfo.pm1b_cnt_blk, &fadt->xpm1b_control_block,
-			sizeof(struct acpi_generic_address));
-		memcpy(&acpi_sinfo.pm1a_evt_blk, &fadt->xpm1a_event_block,
-			sizeof(struct acpi_generic_address));
-		memcpy(&acpi_sinfo.pm1b_evt_blk, &fadt->xpm1b_event_block,
-			sizeof(struct acpi_generic_address));
-	} else {
-		acpi_sinfo.pm1a_cnt_blk.address = fadt->pm1a_control_block;
-		acpi_sinfo.pm1b_cnt_blk.address = fadt->pm1b_control_block;
-		acpi_sinfo.pm1a_evt_blk.address = fadt->pm1a_event_block;
-		acpi_sinfo.pm1b_evt_blk.address = fadt->pm1b_event_block;
-		acpi_sinfo.pm1a_cnt_blk.space_id = ACPI_ADR_SPACE_SYSTEM_IO;
-		acpi_sinfo.pm1b_cnt_blk.space_id = ACPI_ADR_SPACE_SYSTEM_IO;
-		acpi_sinfo.pm1a_evt_blk.space_id = ACPI_ADR_SPACE_SYSTEM_IO;
-		acpi_sinfo.pm1b_evt_blk.space_id = ACPI_ADR_SPACE_SYSTEM_IO;
-		acpi_sinfo.pm1a_cnt_blk.bit_width = 16;
-		acpi_sinfo.pm1b_cnt_blk.bit_width = 16;
-		acpi_sinfo.pm1a_evt_blk.bit_width = 16;
-		acpi_sinfo.pm1b_evt_blk.bit_width = 16;
-		acpi_sinfo.pm1a_cnt_blk.bit_offset = 0;
-		acpi_sinfo.pm1b_cnt_blk.bit_offset = 0;
-		acpi_sinfo.pm1a_evt_blk.bit_offset = 0;
-		acpi_sinfo.pm1b_evt_blk.bit_offset = 0;
-		acpi_sinfo.pm1a_cnt_blk.access_width = 0;
-		acpi_sinfo.pm1b_cnt_blk.access_width = 0;
-		acpi_sinfo.pm1a_evt_blk.access_width = 0;
-		acpi_sinfo.pm1b_evt_blk.access_width = 0;
-	}
+	acpi_fadt_copy_address(pm1a_cnt, pm1a_control, pm1_control);
+	acpi_fadt_copy_address(pm1b_cnt, pm1b_control, pm1_control);
+	acpi_fadt_copy_address(pm1a_evt, pm1a_event, pm1_event);
+	acpi_fadt_copy_address(pm1b_evt, pm1b_event, pm1_event);
+
+	printk(KERN_INFO PREFIX
+	       "ACPI SLEEP INFO: pm1x_cnt[%"PRIx64",%"PRIx64"], "
+	       "pm1x_evt[%"PRIx64",%"PRIx64"]\n",
+	       acpi_sinfo.pm1a_cnt_blk.address,
+	       acpi_sinfo.pm1b_cnt_blk.address,
+	       acpi_sinfo.pm1a_evt_blk.address,
+	       acpi_sinfo.pm1b_evt_blk.address);
 
 	/* Now FACS... */
 	if (fadt->header.revision >= FADT2_REVISION_ID)
@@ -460,13 +453,6 @@ acpi_fadt_parse_sleep_info(struct acpi_table_fadt *fadt)
 		acpi_sinfo.vector_width = 64;
 	}
 
-	printk(KERN_INFO PREFIX
-	       "ACPI SLEEP INFO: pm1x_cnt[%"PRIx64",%"PRIx64"], "
-	       "pm1x_evt[%"PRIx64",%"PRIx64"]\n",
-	       acpi_sinfo.pm1a_cnt_blk.address,
-	       acpi_sinfo.pm1b_cnt_blk.address,
-	       acpi_sinfo.pm1a_evt_blk.address,
-	       acpi_sinfo.pm1b_evt_blk.address);
 	printk(KERN_INFO PREFIX
 	       "                 wakeup_vec[%"PRIx64"], vec_size[%x]\n",
 	       acpi_sinfo.wakeup_vector, acpi_sinfo.vector_width);

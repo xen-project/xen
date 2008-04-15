@@ -74,7 +74,7 @@ done
 
 creation="xm create -c stubdom-$domname target=$domid memory=32 extra=\"$extra\""
 
-(while true ; do sleep 60 ; done) | $creation &
+(while true ; do sleep 60 ; done) | /bin/sh -c "$creation" &
 #xterm -geometry +0+0 -e /bin/sh -c "$creation ; echo ; echo press ENTER to shut down ; read" &
 consolepid=$!
 

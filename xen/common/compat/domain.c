@@ -42,11 +42,11 @@ int compat_vcpu_op(int cmd, int vcpuid, XEN_GUEST_HANDLE(void) arg)
             break;
         }
 
-        LOCK_BIGLOCK(d);
+        domain_lock(d);
         rc = -EEXIST;
         if ( !v->is_initialised )
             rc = boot_vcpu(d, vcpuid, cmp_ctxt);
-        UNLOCK_BIGLOCK(d);
+        domain_unlock(d);
 
         xfree(cmp_ctxt);
         break;

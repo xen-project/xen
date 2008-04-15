@@ -1102,7 +1102,7 @@ gnttab_transfer(
             struct page_info *new_page;
             void *sp, *dp;
 
-            new_page = alloc_domheap_pages(NULL, 0, MEMF_bits(max_bitsize));
+            new_page = alloc_domheap_page(NULL, MEMF_bits(max_bitsize));
             if ( new_page == NULL )
             {
                 gop.status = GNTST_address_too_big;
@@ -1445,7 +1445,7 @@ do_grant_table_op(
     if ( count > 512 )
         return -EINVAL;
     
-    LOCK_BIGLOCK(d);
+    domain_lock(d);
     
     rc = -EFAULT;
     switch ( cmd )
@@ -1516,7 +1516,7 @@ do_grant_table_op(
     }
     
   out:
-    UNLOCK_BIGLOCK(d);
+    domain_unlock(d);
     
     return rc;
 }

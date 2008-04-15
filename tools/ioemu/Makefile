@@ -35,7 +35,7 @@ endif
 endif
 endif
 
-TOOLS=
+TOOLS=tapdisk-ioemu
 
 all: $(TOOLS) $(DOCS) recurse-all
 
@@ -43,6 +43,13 @@ subdir-%:
 	$(MAKE) -C $(subst subdir-,,$@) all
 
 recurse-all: $(patsubst %,subdir-%, $(TARGET_DIRS))
+
+tapdisk-ioemu: CPPFLAGS += -I$(XEN_ROOT)/tools/libxc
+tapdisk-ioemu: CPPFLAGS += -I$(XEN_ROOT)/tools/blktap/lib
+tapdisk-ioemu: CPPFLAGS += -I$(XEN_ROOT)/tools/xenstore
+tapdisk-ioemu: CPPFLAGS += -I$(XEN_ROOT)/tools/include
+tapdisk-ioemu: tapdisk-ioemu.c cutils.c block.c block-raw.c block-cow.c block-qcow.c aes.c block-vmdk.c block-cloop.c block-dmg.c block-bochs.c block-vpc.c block-vvfat.c block-qcow2.c hw/xen_blktap.c osdep.c
+	$(CC) -DQEMU_TOOL $(CFLAGS) $(CPPFLAGS) $(BASE_CFLAGS) $(LDFLAGS) $(BASE_LDFLAGS) -o $@ $^ -lz $(LIBS)
 
 qemu-img$(EXESUF): qemu-img.c cutils.c block.c block-raw.c block-cow.c block-qcow.c aes.c block-vmdk.c block-cloop.c block-dmg.c block-bochs.c block-vpc.c block-vvfat.c block-qcow2.c
 	$(CC) -DQEMU_TOOL $(CFLAGS) $(CPPFLAGS) $(BASE_CFLAGS) $(LDFLAGS) $(BASE_LDFLAGS) -o $@ $^ -lz $(LIBS)
@@ -80,7 +87,7 @@ endif
 
 install: all $(if $(BUILD_DOCS),install-doc)
 	mkdir -p "$(DESTDIR)$(bindir)"
-#	$(INSTALL) -m 755 -s $(TOOLS) "$(DESTDIR)$(bindir)"
+	$(INSTALL) -m 755 -s $(TOOLS) "$(DESTDIR)$(prefix)/sbin"
 #	mkdir -p "$(DESTDIR)$(datadir)"
 #	for x in bios.bin vgabios.bin vgabios-cirrus.bin ppc_rom.bin \
 #		video.x openbios-sparc32 linux_boot.bin pxe-ne2k_pci.bin \

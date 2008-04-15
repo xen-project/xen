@@ -169,7 +169,7 @@ static int handle_evt_io(
 
     spin_unlock(&s->lock);
 
-    return 1;
+    return X86EMUL_OKAY;
 }
 
 
@@ -183,7 +183,7 @@ static int handle_pmt_io(
     if ( bytes != 4 )
     {
         gdprintk(XENLOG_WARNING, "HVM_PMT bad access\n");
-        return 1;
+        return X86EMUL_OKAY;
     }
     
     if ( dir == IOREQ_READ )
@@ -192,10 +192,10 @@ static int handle_pmt_io(
         pmt_update_time(s);
         *val = s->pm.tmr_val;
         spin_unlock(&s->lock);
-        return 1;
+        return X86EMUL_OKAY;
     }
 
-    return 0;
+    return X86EMUL_UNHANDLEABLE;
 }
 
 static int pmtimer_save(struct domain *d, hvm_domain_context_t *h)

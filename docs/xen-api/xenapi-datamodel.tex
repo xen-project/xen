@@ -75,7 +75,7 @@ host.host\_CPUs & host\_cpu.host & many-to-one\\
 \hline
 \end{tabular}\end{center}
 
-The following represents bound fields (as specified above) diagramatically, using crows-foot notation to specify one-to-one, one-to-many or many-to-many
+The following represents bound fields (as specified above) diagrammatically, using crows-foot notation to specify one-to-one, one-to-many or many-to-many
                    relationships:
 
 \begin{center}\resizebox{0.8\textwidth}{!}{
@@ -444,7 +444,7 @@ returned.  Also returned is a developer-only diagnostic reason.
 
 \subsubsection{VLAN\_TAG\_INVALID}
 
-You tried to create a VLAN, but the tag you gave was invalid -- it mmust be
+You tried to create a VLAN, but the tag you gave was invalid -- it must be
 between 0 and 4095.  The parameter echoes the VLAN tag you gave.
 
 \vspace{0.3cm}
@@ -1390,7 +1390,7 @@ $\mathit{RO}_\mathit{run}$ &  {\tt resident\_on} & host ref & the host the VM is
 $\mathit{RW}$ &  {\tt memory/static\_max} & int & Statically-set (i.e. absolute) maximum (bytes) \\
 $\mathit{RW}$ &  {\tt memory/dynamic\_max} & int & Dynamic maximum (bytes) \\
 $\mathit{RW}$ &  {\tt memory/dynamic\_min} & int & Dynamic minimum (bytes) \\
-$\mathit{RW}$ &  {\tt memory/static\_min} & int & Statically-set (i.e. absolute) mininum (bytes) \\
+$\mathit{RW}$ &  {\tt memory/static\_min} & int & Statically-set (i.e. absolute) minimum (bytes) \\
 $\mathit{RW}$ &  {\tt VCPUs/params} & (string $\rightarrow$ string) Map & configuration parameters for the selected VCPU policy \\
 $\mathit{RW}$ &  {\tt VCPUs/max} & int & Max number of VCPUs \\
 $\mathit{RW}$ &  {\tt VCPUs/at\_startup} & int & Boot number of VCPUs \\
@@ -14954,7 +14954,7 @@ Check whether a VM with the given security label could run on the system.
 \begin{tabular}{|c|c|p{7cm}|}
  \hline
 {\bf type} & {\bf name} & {\bf description} \\ \hline
-{\tt string } & security_label & reference to the object \\ \hline
+{\tt string } & security\_label & reference to the object \\ \hline
 
 \end{tabular}
 

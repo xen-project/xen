@@ -48,7 +48,7 @@ tlb_track_allocate_entries(struct tlb_track* tlb_track)
                 __func__, tlb_track->num_entries, tlb_track->limit);
         return -ENOMEM;
     }
-    entry_page = alloc_domheap_page(NULL);
+    entry_page = alloc_domheap_page(NULL, 0);
     if (entry_page == NULL) {
         dprintk(XENLOG_WARNING,
                 "%s: domheap page failed. num_entries %d limit %d\n",
@@ -84,7 +84,7 @@ tlb_track_create(struct domain* d)
     if (tlb_track == NULL)
         goto out;
 
-    hash_page = alloc_domheap_page(NULL);
+    hash_page = alloc_domheap_page(NULL, 0);
     if (hash_page == NULL)
         goto out;
 

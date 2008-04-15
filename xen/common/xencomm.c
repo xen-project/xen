@@ -323,6 +323,7 @@ xencomm_copy_chunk_to(
                (unsigned long)xencomm_vaddr(paddr, page));
 
     memcpy(xencomm_vaddr(paddr, page), (void *)from, len);
+    xencomm_mark_dirty(xencomm_vaddr(paddr, page), len);
     put_page(page);
 
     return 0;

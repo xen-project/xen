@@ -1146,11 +1146,13 @@ def __resources_compatible_with_vmlabel(xspol, dominfo, vmlabel,
     for key, value in resources.items():
         if key in [ 'vbd', 'tap' ]:
             for res in resources[key]:
-                try:
+                if not res in access_control:
+                    label = [xsconstants.ACM_POLICY_ID,
+                             xspol.get_name(),
+                             ACM_LABEL_UNLABELED]
+                else:
                     label = access_control[res]
-                    if not collect_labels(reslabels, label, polname):
-                        return False
-                except:
+                if not collect_labels(reslabels, label, polname):
                     return False
         elif key in [ 'vif' ]:
             for xapi_label in value:
@@ -1220,6 +1222,11 @@ def set_resource_label(resource, policytype, policyref, reslabel, \
                 return -xsconstants.XSERR_BAD_LABEL
             if tmp[2] != oreslabel:
                 return -xsconstants.XSERR_BAD_LABEL
+        if resource.startswith('vlan:'):
+            for key, value in access_control.items():
+                if value == tuple([policytype, policyref, reslabel]) and \
+                   key.startswith('vlan:'):
+                    return -xsconstants.XSERR_BAD_LABEL
         if reslabel != "":
             new_entry = { resource : tuple([policytype, policyref, reslabel])}
             access_control.update(new_entry)
@@ -1402,6 +1409,8 @@ def change_acm_policy(bin_pol, del_array, chg_array,
         dominfos = XendDomain.instance().list('all')
 
         log.info("----------------------------------------------")
+
+        label_changes = []
         # relabel resources
 
         access_control = {}
@@ -1433,7 +1442,7 @@ def change_acm_policy(bin_pol, del_array, chg_array,
             elif label not in polnew_reslabels:
                 # label been removed
                 policytype = xsconstants.INVALID_POLICY_PREFIX + policytype
-                run_resource_label_change_script(key, "", "remove")
+                label_changes.append(key)
                 polname = policy
             else:
                 # no change to label
@@ -1501,6 +1510,8 @@ def change_acm_policy(bin_pol, del_array, chg_array,
 
         rc, errors = hv_chg_policy(bin_pol, del_array, chg_array)
         if rc == 0:
+            for key in label_changes:
+                run_resource_label_change_script(key, "", "remove")
             # Write the relabeled resources back into the file
             dictio.dict_write(access_control, "resources", res_label_filename)
             # Properly update all VMs to their new labels

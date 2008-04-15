@@ -15,10 +15,8 @@
 # Place - Suite 330, Boston, MA 02111-1307 USA.
 #
 
-override XEN_TARGET_ARCH = x86_32
 XEN_ROOT = ../../../..
-CFLAGS :=
-include $(XEN_ROOT)/tools/Rules.mk
+include $(XEN_ROOT)/tools/firmware/Rules.mk
 
 C_SRC = build.c dsdt.c static_tables.c
 H_SRC = $(wildcard *.h)
@@ -27,13 +25,7 @@ OBJS  = $(patsubst %.c,%.o,$(C_SRC))
 IASL_VER = acpica-unix-20060707
 IASL_URL = http://developer.intel.com/technology/iapc/acpi/downloads/$(IASL_VER).tar.gz
 
-# Disable PIE/SSP if GCC supports them. They can break us.
-CFLAGS  += $(call cc-option,$(CC),-nopie,)
-CFLAGS  += $(call cc-option,$(CC),-fno-stack-protector,)
-CFLAGS  += $(call cc-option,$(CC),-fno-stack-protector-all,)
-
-CFLAGS  += -fno-builtin -O2 -msoft-float
-CFLAGS  += -I. -I.. $(CFLAGS_include)
+CFLAGS += -I. -I.. $(CFLAGS_include)
 
 vpath iasl $(PATH)
 all: acpi.a

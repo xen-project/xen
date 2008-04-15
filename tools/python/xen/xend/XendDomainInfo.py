@@ -986,6 +986,13 @@ class XendDomainInfo:
                   self.info['name_label'], str(self.domid), target)
         
         MiB = 1024 * 1024
+
+        if self.domid == 0:
+            dom0_min_mem = xoptions.get_dom0_min_mem()
+            memory_cur = self.get_memory_dynamic_max() / MiB
+            if target < memory_cur and dom0_min_mem > target:
+                raise XendError("memory_dynamic_max too small")
+
         self._safe_set_memory('memory_dynamic_min', target * MiB)
         self._safe_set_memory('memory_dynamic_max', target * MiB)
 
@@ -1792,10 +1799,13 @@ class XendDomainInfo:
                 raise XendError("Cannot dump core in a directory: %s" %
                                 corefile)
             
+            self._writeVm(DUMPCORE_IN_PROGRESS, 'True')
             xc.domain_dumpcore(self.domid, corefile)
+            self._removeVm(DUMPCORE_IN_PROGRESS)
         except RuntimeError, ex:
             corefile_incomp = corefile+'-incomplete'
             os.rename(corefile, corefile_incomp)
+            self._removeVm(DUMPCORE_IN_PROGRESS)
             log.exception("XendDomainInfo.dumpCore failed: id = %s name = %s",
                           self.domid, self.info['name_label'])
             raise XendError("Failed to dump core: %s" %  str(ex))

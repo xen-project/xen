@@ -45,53 +45,63 @@ static struct hvm_mmio_handler *hvm_mmio_handlers[HVM_MMIO_HANDLER_NR] =
     &vioapic_mmio_handler
 };
 
-static inline void hvm_mmio_access(struct vcpu *v,
-                                   ioreq_t *p,
-                                   hvm_mmio_read_t read_handler,
-                                   hvm_mmio_write_t write_handler)
+static int hvm_mmio_access(struct vcpu *v,
+                           ioreq_t *p,
+                           hvm_mmio_read_t read_handler,
+                           hvm_mmio_write_t write_handler)
 {
     unsigned long data;
+    int rc = X86EMUL_OKAY, i, sign = p->df ? -1 : 1;
 
-    switch ( p->type )
+    if ( !p->data_is_ptr )
     {
-    case IOREQ_TYPE_COPY:
-        if ( !p->data_is_ptr ) {
-            if ( p->dir == IOREQ_READ )
-                p->data = read_handler(v, p->addr, p->size);
-            else    /* p->dir == IOREQ_WRITE */
-                write_handler(v, p->addr, p->size, p->data);
-        } else {    /* p->data_is_ptr */
-            int i, sign = (p->df) ? -1 : 1;
-
-            if ( p->dir == IOREQ_READ ) {
-                for ( i = 0; i < p->count; i++ ) {
-                    data = read_handler(v,
-                        p->addr + (sign * i * p->size),
-                        p->size);
-                    (void)hvm_copy_to_guest_phys(
-                        p->data + (sign * i * p->size),
-                        &data,
-                        p->size);
-                }
-            } else {/* p->dir == IOREQ_WRITE */
-                for ( i = 0; i < p->count; i++ ) {
-                    (void)hvm_copy_from_guest_phys(
-                        &data,
-                        p->data + (sign * i * p->size),
-                        p->size);
-                    write_handler(v,
-                        p->addr + (sign * i * p->size),
-                        p->size, data);
-                }
-            }
+        if ( p->dir == IOREQ_READ )
+        {
+            rc = read_handler(v, p->addr, p->size, &data);
+            p->data = data;
         }
-        break;
-
-    default:
-        printk("hvm_mmio_access: error ioreq type %x\n", p->type);
-        domain_crash_synchronous();
-        break;
+        else /* p->dir == IOREQ_WRITE */
+            rc = write_handler(v, p->addr, p->size, p->data);
+        return rc;
     }
+
+    if ( p->dir == IOREQ_READ )
+    {
+        for ( i = 0; i < p->count; i++ )
+        {
+            rc = read_handler(
+                v,
+                p->addr + (sign * i * p->size),
+                p->size, &data);
+            if ( rc != X86EMUL_OKAY )
+                break;
+            (void)hvm_copy_to_guest_phys(
+                p->data + (sign * i * p->size),
+                &data,
+                p->size);
+        }
+    }
+    else
+    {
+        for ( i = 0; i < p->count; i++ )
+        {
+            (void)hvm_copy_from_guest_phys(
+                &data,
+                p->data + (sign * i * p->size),
+                p->size);
+            rc = write_handler(
+                v,
+                p->addr + (sign * i * p->size),
+                p->size, data);
+            if ( rc != X86EMUL_OKAY )
+                break;
+        }
+    }
+
+    if ( (p->count = i) != 0 )
+        rc = X86EMUL_OKAY;
+
+    return rc;
 }
 
 int hvm_mmio_intercept(ioreq_t *p)
@@ -100,59 +110,61 @@ int hvm_mmio_intercept(ioreq_t *p)
     int i;
 
     for ( i = 0; i < HVM_MMIO_HANDLER_NR; i++ )
-    {
         if ( hvm_mmio_handlers[i]->check_handler(v, p->addr) )
-        {
-            hvm_mmio_access(v, p,
-                            hvm_mmio_handlers[i]->read_handler,
-                            hvm_mmio_handlers[i]->write_handler);
-            return 1;
-        }
-    }
+            return hvm_mmio_access(
+                v, p,
+                hvm_mmio_handlers[i]->read_handler,
+                hvm_mmio_handlers[i]->write_handler);
 
-    return 0;
+    return X86EMUL_UNHANDLEABLE;
 }
 
 static int process_portio_intercept(portio_action_t action, ioreq_t *p)
 {
-    int rc = 1, i, sign = p->df ? -1 : 1;
+    int rc = X86EMUL_OKAY, i, sign = p->df ? -1 : 1;
     uint32_t data;
 
-    if ( p->dir == IOREQ_READ )
+    if ( !p->data_is_ptr )
     {
-        if ( !p->data_is_ptr )
+        if ( p->dir == IOREQ_READ )
         {
             rc = action(IOREQ_READ, p->addr, p->size, &data);
             p->data = data;
         }
         else
         {
-            for ( i = 0; i < p->count; i++ )
-            {
-                rc = action(IOREQ_READ, p->addr, p->size, &data);
-                (void)hvm_copy_to_guest_phys(p->data + sign*i*p->size,
-                                             &data, p->size);
-            }
+            data = p->data;
+            rc = action(IOREQ_WRITE, p->addr, p->size, &data);
+        }
+        return rc;
+    }
+
+    if ( p->dir == IOREQ_READ )
+    {
+        for ( i = 0; i < p->count; i++ )
+        {
+            rc = action(IOREQ_READ, p->addr, p->size, &data);
+            if ( rc != X86EMUL_OKAY )
+                break;
+            (void)hvm_copy_to_guest_phys(p->data + sign*i*p->size,
+                                         &data, p->size);
         }
     }
     else /* p->dir == IOREQ_WRITE */
     {
-        if ( !p->data_is_ptr )
+        for ( i = 0; i < p->count; i++ )
         {
-            data = p->data;
+            data = 0;
+            (void)hvm_copy_from_guest_phys(&data, p->data + sign*i*p->size,
+                                           p->size);
             rc = action(IOREQ_WRITE, p->addr, p->size, &data);
-        }
-        else
-        {
-            for ( i = 0; i < p->count; i++ )
-            {
-                data = 0;
-                (void)hvm_copy_from_guest_phys(&data, p->data + sign*i*p->size,
-                                               p->size);
-                rc = action(IOREQ_WRITE, p->addr, p->size, &data);
-            }
+            if ( rc != X86EMUL_OKAY )
+                break;
         }
     }
+
+    if ( (p->count = i) != 0 )
+        rc = X86EMUL_OKAY;
 
     return rc;
 }
@@ -170,7 +182,7 @@ int hvm_io_intercept(ioreq_t *p, int type)
     unsigned long addr, size;
 
     if ( (type == HVM_PORTIO) && (dpci_ioport_intercept(p)) )
-        return 1;
+        return X86EMUL_OKAY;
 
     for ( i = 0; i < handler->num_slot; i++ )
     {
@@ -188,10 +200,10 @@ int hvm_io_intercept(ioreq_t *p, int type)
         }
     }
 
-    return 0;
+    return X86EMUL_UNHANDLEABLE;
 }
 
-int register_io_handler(
+void register_io_handler(
     struct domain *d, unsigned long addr, unsigned long size,
     void *action, int type)
 {
@@ -207,9 +219,8 @@ int register_io_handler(
     else
         handler->hdl_list[num].action.mmio = action;
     handler->num_slot++;
-
-    return 1;
 }
+
 /*
  * Local variables:
  * mode: C

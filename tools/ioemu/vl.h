@@ -159,7 +159,7 @@ extern void *shared_vram;
 extern FILE *logfile;
 
 
-#if defined(__i386__) || defined(__x86_64__)
+#if (defined(__i386__) || defined(__x86_64__)) && !defined(QEMU_TOOL)
 #define MAPCACHE
 uint8_t *qemu_map_cache(target_phys_addr_t phys_addr);
 void     qemu_invalidate_map_cache(void);
@@ -1553,7 +1553,9 @@ extern long time_offset;
 void timeoffset_get(void);
 
 /* xen_platform.c */
+#ifndef QEMU_TOOL
 void pci_xen_platform_init(PCIBus *bus);
+#endif
 
 
 void kqemu_record_dump(void);

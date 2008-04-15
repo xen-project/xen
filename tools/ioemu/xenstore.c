@@ -347,10 +347,6 @@ extern int vga_ram_size, bios_size;
 
 void xenstore_process_logdirty_event(void)
 {
-#ifdef CONFIG_STUBDOM
-    /* XXX we just can't use shm. */
-    return;
-#else
     char *act;
     static char *active_path = NULL;
     static char *next_active_path = NULL;
@@ -392,6 +388,12 @@ void xenstore_process_logdirty_event(void)
         /* Map the shared-memory segment */
         fprintf(logfile, "%s: key=%16.16llx size=%lu\n", __FUNCTION__,
                 (unsigned long long)key, logdirty_bitmap_size);
+
+#ifdef CONFIG_STUBDOM
+        /* XXX we just can't use shm. */
+        fprintf(logfile, "Log dirty is not implemented in stub domains!\n");
+        return;
+#else
         shmid = shmget(key, 2 * logdirty_bitmap_size, S_IRUSR|S_IWUSR);
         if (shmid == -1) {
             fprintf(logfile, "Log-dirty: shmget failed: segment %16.16llx "
@@ -417,6 +419,7 @@ void xenstore_process_logdirty_event(void)
             seg = NULL;
             return;
         }
+#endif
 
         /* Remember the paths for the next-active and active entries */
         if (pasprintf(&active_path, 
@@ -453,7 +456,6 @@ void xenstore_process_logdirty_event(void)
     /* Ack that we've switched */
     xs_write(xsh, XBT_NULL, active_path, act, len);
     free(act);
-#endif
 }
 
 

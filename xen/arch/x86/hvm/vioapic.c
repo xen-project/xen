@@ -88,9 +88,9 @@ static unsigned long vioapic_read_indirect(struct hvm_hw_vioapic *vioapic,
     return result;
 }
 
-static unsigned long vioapic_read(struct vcpu *v,
-                                  unsigned long addr,
-                                  unsigned long length)
+static int vioapic_read(
+    struct vcpu *v, unsigned long addr,
+    unsigned long length, unsigned long *pval)
 {
     struct hvm_hw_vioapic *vioapic = domain_vioapic(v->domain);
     uint32_t result;
@@ -114,11 +114,13 @@ static unsigned long vioapic_read(struct vcpu *v,
         break;
     }
 
-    return result;
+    *pval = result;
+    return X86EMUL_OKAY;
 }
 
 static void vioapic_write_redirent(
-    struct hvm_hw_vioapic *vioapic, unsigned int idx, int top_word, uint32_t val)
+    struct hvm_hw_vioapic *vioapic, unsigned int idx,
+    int top_word, uint32_t val)
 {
     struct domain *d = vioapic_domain(vioapic);
     struct hvm_irq *hvm_irq = &d->arch.hvm_domain.irq;
@@ -196,10 +198,9 @@ static void vioapic_write_indirect(
     }
 }
 
-static void vioapic_write(struct vcpu *v,
-                          unsigned long addr,
-                          unsigned long length,
-                          unsigned long val)
+static int vioapic_write(
+    struct vcpu *v, unsigned long addr,
+    unsigned long length, unsigned long val)
 {
     struct hvm_hw_vioapic *vioapic = domain_vioapic(v->domain);
 
@@ -224,6 +225,8 @@ static void vioapic_write(struct vcpu *v,
     default:
         break;
     }
+
+    return X86EMUL_OKAY;
 }
 
 static int vioapic_range(struct vcpu *v, unsigned long addr)
@@ -477,45 +480,16 @@ void vioapic_update_EOI(struct domain *d, int vector)
     spin_unlock(&d->arch.hvm_domain.irq_lock);
 }
 
-#ifdef HVM_DEBUG_SUSPEND
-static void ioapic_info(struct hvm_hw_vioapic *s)
-{
-    int i;
-    printk("*****ioapic state:*****\n");
-    printk("ioapic 0x%x.\n", s->ioregsel);
-    printk("ioapic 0x%x.\n", s->id);
-    printk("ioapic 0x%lx.\n", s->base_address);
-    for (i = 0; i < VIOAPIC_NUM_PINS; i++) {
-        printk("ioapic redirtbl[%d]:0x%"PRIx64"\n", i, s->redirtbl[i].bits);
-    }
-
-}
-#else
-static void ioapic_info(struct hvm_hw_vioapic *s)
-{
-}
-#endif
-
-
 static int ioapic_save(struct domain *d, hvm_domain_context_t *h)
 {
     struct hvm_hw_vioapic *s = domain_vioapic(d);
-    ioapic_info(s);
-
-    /* save io-apic state*/
-    return ( hvm_save_entry(IOAPIC, 0, h, s) );
+    return hvm_save_entry(IOAPIC, 0, h, s);
 }
 
 static int ioapic_load(struct domain *d, hvm_domain_context_t *h)
 {
     struct hvm_hw_vioapic *s = domain_vioapic(d);
-    
-    /* restore ioapic state */
-    if ( hvm_load_entry(IOAPIC, h, s) != 0 )
-        return -EINVAL;
-
-    ioapic_info(s);
-    return 0;
+    return hvm_load_entry(IOAPIC, h, s);
 }
 
 HVM_REGISTER_SAVE_RESTORE(IOAPIC, ioapic_save, ioapic_load, 1, HVMSR_PER_DOM);

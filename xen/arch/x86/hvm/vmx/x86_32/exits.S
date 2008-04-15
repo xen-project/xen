@@ -129,7 +129,6 @@ ENTRY(vmx_asm_do_vmentry)
 /*vmx_resume:*/
         HVM_RESTORE_ALL_NOSEGREGS
         VMRESUME
-        pushf
         call vm_resume_fail
         ud2
 
@@ -137,7 +136,6 @@ vmx_launch:
         movb $1,VCPU_vmx_launched(%ebx)
         HVM_RESTORE_ALL_NOSEGREGS
         VMLAUNCH
-        pushf
         call vm_launch_fail
         ud2
 

@@ -1762,7 +1762,8 @@ static int store_dev_info(char *devName, int domid,
                           CharDriverState *cState, char *storeString)
 {
 #ifdef CONFIG_STUBDOM
-    return 0;
+    fprintf(logfile, "can't store dev %s name for domid %d in %s from a stub domain\n", devName, domid, storeString);
+    return ENOSYS;
 #else
     int xc_handle;
     struct xs_handle *xs;
@@ -7017,25 +7018,11 @@ int unset_mm_mapping(int xc_handle, uint32_t domid,
                      xen_pfn_t *extent_start)
 {
     int err = 0;
-    xc_dominfo_t info;
-
-    xc_domain_getinfo(xc_handle, domid, 1, &info);
-    if ((info.nr_pages - nr_pages) <= 0) {
-        fprintf(stderr, "unset_mm_mapping: error nr_pages\n");
-        err = -1;
-    }
 
     err = xc_domain_memory_decrease_reservation(xc_handle, domid,
                                                 nr_pages, 0, extent_start);
     if (err)
         fprintf(stderr, "Failed to decrease physmap\n");
-
-
-    if (xc_domain_setmaxmem(xc_handle, domid, (info.nr_pages - nr_pages) *
-                            PAGE_SIZE/1024) != 0) {
-        fprintf(logfile, "set maxmem returned error %d\n", errno);
-        err = -1;
-    }
 
     return err;
 }
@@ -7044,16 +7031,7 @@ int set_mm_mapping(int xc_handle, uint32_t domid,
                    unsigned long nr_pages, unsigned int address_bits,
                    xen_pfn_t *extent_start)
 {
-    xc_dominfo_t info;
     int err = 0;
-
-    xc_domain_getinfo(xc_handle, domid, 1, &info);
-
-    if (xc_domain_setmaxmem(xc_handle, domid, info.max_memkb +
-                            nr_pages * PAGE_SIZE/1024) != 0) {
-        fprintf(logfile, "set maxmem returned error %d\n", errno);
-        return -1;
-    }
 
     err = xc_domain_memory_populate_physmap(xc_handle, domid, nr_pages, 0,
                                             address_bits, extent_start);
@@ -7688,11 +7666,13 @@ int main(int argc, char **argv)
     bdrv_init();
     xc_handle = xc_interface_open();
 #ifdef CONFIG_STUBDOM
-    char *domid_s, *msg;
-    if ((msg = xenbus_read(XBT_NIL, "domid", &domid_s)))
-        fprintf(stderr,"Can not read our own domid\n", msg);
-    else
-        xenstore_parse_domain_config(atoi(domid_s));
+    {
+        char *domid_s, *msg;
+        if ((msg = xenbus_read(XBT_NIL, "domid", &domid_s)))
+            fprintf(stderr,"Can not read our own domid: %s\n", msg);
+        else
+            xenstore_parse_domain_config(atoi(domid_s));
+    }
 #else /* CONFIG_STUBDOM */
     xenstore_parse_domain_config(domid);
 #endif /* CONFIG_STUBDOM */

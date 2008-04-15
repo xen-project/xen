@@ -18,12 +18,12 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307 USA
  */
 
+#include <xen/sched.h>
+#include <xen/pci.h>
 #include <asm/amd-iommu.h>
 #include <asm/hvm/svm/amd-iommu-proto.h>
 #include <asm/hvm/svm/amd-iommu-acpi.h>
-#include <xen/sched.h>
 #include <asm/mm.h>
-#include "../pci-direct.h"
 #include "../pci_regs.h"
 
 struct list_head amd_iommu_head;
@@ -316,7 +316,7 @@ void __init amd_iommu_setup_dom0_devices(void)
         {
             for ( func = 0; func < 8; func++ )
             {
-                l = read_pci_config(bus, dev, func, PCI_VENDOR_ID);
+                l = pci_conf_read32(bus, dev, func, PCI_VENDOR_ID);
                 /* some broken boards return 0 or ~0 if a slot is empty: */
                 if ( (l == 0xffffffff) || (l == 0x00000000) ||
                      (l == 0x0000ffff) || (l == 0xffff0000) )
@@ -553,8 +553,9 @@ static int reassign_device( struct domain *source, struct domain *target,
 int amd_iommu_assign_device(struct domain *d, u8 bus, u8 devfn)
 {
     int bdf = (bus << 8) | devfn;
-    int req_id;
-    req_id = ivrs_mappings[bdf].dte_requestor_id;
+    int req_id = ivrs_mappings[bdf].dte_requestor_id;
+
+    amd_iommu_sync_p2m(d);
 
     if ( ivrs_mappings[req_id].unity_map_enable )
     {
