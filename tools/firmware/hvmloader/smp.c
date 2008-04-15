@@ -66,6 +66,7 @@ asm (
     "stack:                          \n"
     "    .skip    0x4000             \n"
     "stack_top:                      \n"
+    "    .text                       \n"
     );
 
 /*static*/ void ap_start(void)

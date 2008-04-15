@@ -96,6 +96,7 @@ asm (
     "stack:                          \n"
     "    .skip    0x4000             \n"
     "stack_top:                      \n"
+    "    .text                       \n"
     );
 
 void smp_initialise(void);
