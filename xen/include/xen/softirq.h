@@ -62,12 +62,13 @@ struct tasklet
     struct list_head list;
     bool_t is_scheduled;
     bool_t is_running;
+    bool_t is_dead;
     void (*func)(unsigned long);
     unsigned long data;
 };
 
 #define DECLARE_TASKLET(name, func, data) \
-    struct tasklet name = { LIST_HEAD_INIT(name.list), 0, 0, func, data }
+    struct tasklet name = { LIST_HEAD_INIT(name.list), 0, 0, 0, func, data }
 
 void tasklet_schedule(struct tasklet *t);
 void tasklet_kill(struct tasklet *t);

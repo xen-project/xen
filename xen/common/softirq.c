@@ -61,15 +61,18 @@ void tasklet_schedule(struct tasklet *t)
 
     spin_lock_irqsave(&tasklet_lock, flags);
 
-    if ( !t->is_scheduled )
+    if ( !t->is_dead )
     {
-        list_add(&t->list, &tasklet_list);
+        if ( !t->is_scheduled && !t->is_running )
+        {
+            BUG_ON(!list_empty(&t->list));
+            list_add_tail(&t->list, &tasklet_list);
+        }
         t->is_scheduled = 1;
+        raise_softirq(TASKLET_SOFTIRQ);
     }
 
     spin_unlock_irqrestore(&tasklet_lock, flags);
-
-    raise_softirq(TASKLET_SOFTIRQ);
 }
 
 static void tasklet_action(void)
@@ -78,23 +81,37 @@ static void tasklet_action(void)
 
     spin_lock_irq(&tasklet_lock);
 
-    while ( !list_empty(&tasklet_list) )
+    if ( list_empty(&tasklet_list) )
     {
-        t = list_entry(tasklet_list.next, struct tasklet, list);
-        list_del(&t->list);
-
-        BUG_ON(!t->is_scheduled);
-        t->is_scheduled = 0;
-
-        BUG_ON(t->is_running);
-        t->is_running = 1;
-
         spin_unlock_irq(&tasklet_lock);
-        t->func(t->data);
-        spin_lock_irq(&tasklet_lock);
-
-        t->is_running = 0;
+        return;
     }
+
+    t = list_entry(tasklet_list.next, struct tasklet, list);
+    list_del_init(&t->list);
+
+    BUG_ON(t->is_dead || t->is_running || !t->is_scheduled);
+    t->is_scheduled = 0;
+    t->is_running = 1;
+
+    spin_unlock_irq(&tasklet_lock);
+    t->func(t->data);
+    spin_lock_irq(&tasklet_lock);
+
+    t->is_running = 0;
+
+    if ( t->is_scheduled )
+    {
+        BUG_ON(t->is_dead || !list_empty(&t->list));
+        list_add_tail(&t->list, &tasklet_list);
+    }
+
+    /*
+     * If there is more work to do then reschedule. We don't grab more work
+     * immediately as we want to allow other softirq work to happen first.
+     */
+    if ( !list_empty(&tasklet_list) )
+        raise_softirq(TASKLET_SOFTIRQ);
 
     spin_unlock_irq(&tasklet_lock);
 }
@@ -105,21 +122,20 @@ void tasklet_kill(struct tasklet *t)
 
     spin_lock_irqsave(&tasklet_lock, flags);
 
-    /* De-schedule the tasklet and prevent it from re-scheduling itself. */
     if ( !list_empty(&t->list) )
-        list_del(&t->list);
-    t->is_scheduled = 1;
+    {
+        BUG_ON(t->is_dead || t->is_running || !t->is_scheduled);
+        list_del_init(&t->list);
+    }
+    t->is_scheduled = 0;
+    t->is_dead = 1;
 
-    /* Wait for tasklet to complete. */
     while ( t->is_running )
     {
         spin_unlock_irqrestore(&tasklet_lock, flags);
         cpu_relax();
         spin_lock_irqsave(&tasklet_lock, flags);
     }
-
-    /* Clean up and we're done. */
-    t->is_scheduled = 0;
 
     spin_unlock_irqrestore(&tasklet_lock, flags);
 }
@@ -128,6 +144,7 @@ void tasklet_init(
     struct tasklet *t, void (*func)(unsigned long), unsigned long data)
 {
     memset(t, 0, sizeof(*t));
+    INIT_LIST_HEAD(&t->list);
     t->func = func;
     t->data = data;
 }
