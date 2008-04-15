@@ -1223,8 +1223,10 @@ def set_resource_label(resource, policytype, policyref, reslabel, \
             if tmp[2] != oreslabel:
                 return -xsconstants.XSERR_BAD_LABEL
         if resource.startswith('vlan:'):
-            if tuple([policytype, policyref, reslabel]) in access_control.values():
-                return -xsconstants.XSERR_BAD_LABEL
+            for key, value in access_control.items():
+                if value == tuple([policytype, policyref, reslabel]) and \
+                   key.startswith('vlan:'):
+                    return -xsconstants.XSERR_BAD_LABEL
         if reslabel != "":
             new_entry = { resource : tuple([policytype, policyref, reslabel])}
             access_control.update(new_entry)
@@ -1407,6 +1409,8 @@ def change_acm_policy(bin_pol, del_array, chg_array,
         dominfos = XendDomain.instance().list('all')
 
         log.info("----------------------------------------------")
+
+        label_changes = []
         # relabel resources
 
         access_control = {}
@@ -1438,7 +1442,7 @@ def change_acm_policy(bin_pol, del_array, chg_array,
             elif label not in polnew_reslabels:
                 # label been removed
                 policytype = xsconstants.INVALID_POLICY_PREFIX + policytype
-                run_resource_label_change_script(key, "", "remove")
+                label_changes.append(key)
                 polname = policy
             else:
                 # no change to label
@@ -1506,6 +1510,8 @@ def change_acm_policy(bin_pol, del_array, chg_array,
 
         rc, errors = hv_chg_policy(bin_pol, del_array, chg_array)
         if rc == 0:
+            for key in label_changes:
+                run_resource_label_change_script(key, "", "remove")
             # Write the relabeled resources back into the file
             dictio.dict_write(access_control, "resources", res_label_filename)
             # Properly update all VMs to their new labels
