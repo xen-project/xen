@@ -10,7 +10,7 @@
 
 #ifdef XEN
 #include <linux/spinlock.h>
-#include <linux/pci.h>
+#include <linux/linux-pci.h>
 #endif
 #include <asm/sn/intr.h>
 #include <asm/sn/pcibus_provider_defs.h>

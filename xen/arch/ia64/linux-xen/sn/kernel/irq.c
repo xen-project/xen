@@ -12,7 +12,7 @@
 #include <linux/spinlock.h>
 #include <linux/init.h>
 #ifdef XEN
-#include <linux/pci.h>
+#include <linux/linux-pci.h>
 #include <asm/hw_irq.h>
 #endif
 #include <asm/sn/addrs.h>

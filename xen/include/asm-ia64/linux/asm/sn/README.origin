@@ -10,7 +10,6 @@ l1.h			-> linux/include/asm-ia64/sn/l1.h
 leds.h			-> linux/include/asm-ia64/sn/leds.h
 module.h		-> linux/include/asm-ia64/sn/module.h
 pcibus_provider_defs.h	-> linux/include/asm-ia64/sn/pcibus_provider_defs.h
-pcidev.h		-> linux/include/asm-ia64/sn/pcidev.h
 pda.h			-> linux/include/asm-ia64/sn/pda.h
 pic.h			-> linux/include/asm-ia64/sn/pic.h
 shub_mmr.h		-> linux/include/asm-ia64/sn/shub_mmr.h
