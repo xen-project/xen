@@ -403,21 +403,21 @@ static int handle_rtc_io(
     if ( bytes != 1 )
     {
         gdprintk(XENLOG_WARNING, "HVM_RTC bas access\n");
-        return 1;
+        return X86EMUL_OKAY;
     }
     
     if ( dir == IOREQ_WRITE )
     {
         if ( rtc_ioport_write(vrtc, port, (uint8_t)*val) )
-            return 1;
+            return X86EMUL_OKAY;
     }
     else if ( vrtc->hw.cmos_index < RTC_CMOS_SIZE )
     {
         *val = rtc_ioport_read(vrtc, port);
-        return 1;
+        return X86EMUL_OKAY;
     }
 
-    return 0;
+    return X86EMUL_UNHANDLEABLE;
 }
 
 void rtc_migrate_timers(struct vcpu *v)

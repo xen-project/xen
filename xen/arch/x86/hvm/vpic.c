@@ -319,7 +319,7 @@ static int vpic_intercept_pic_io(
     if ( bytes != 1 )
     {
         gdprintk(XENLOG_WARNING, "PIC_IO bad access size %d\n", bytes);
-        return 1;
+        return X86EMUL_OKAY;
     }
 
     vpic = &current->domain->arch.hvm_domain.vpic[port >> 7];
@@ -329,7 +329,7 @@ static int vpic_intercept_pic_io(
     else
         *val = (uint8_t)vpic_ioport_read(vpic, port);
 
-    return 1;
+    return X86EMUL_OKAY;
 }
 
 static int vpic_intercept_elcr_io(
@@ -338,11 +338,7 @@ static int vpic_intercept_elcr_io(
     struct hvm_hw_vpic *vpic;
     uint32_t data;
 
-    if ( bytes != 1 )
-    {
-        gdprintk(XENLOG_WARNING, "PIC_IO bad access size %d\n", bytes);
-        return 1;
-    }
+    BUG_ON(bytes != 1);
 
     vpic = &current->domain->arch.hvm_domain.vpic[port & 1];
 
@@ -360,7 +356,7 @@ static int vpic_intercept_elcr_io(
         *val = vpic->elcr & vpic_elcr_mask(vpic);
     }
 
-    return 1;
+    return X86EMUL_OKAY;
 }
 
 static int vpic_save(struct domain *d, hvm_domain_context_t *h)

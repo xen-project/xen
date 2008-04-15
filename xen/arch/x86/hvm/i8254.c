@@ -487,7 +487,7 @@ static int handle_pit_io(
     if ( bytes != 1 )
     {
         gdprintk(XENLOG_WARNING, "PIT bad access\n");
-        return 1;
+        return X86EMUL_OKAY;
     }
 
     if ( dir == IOREQ_WRITE )
@@ -502,7 +502,7 @@ static int handle_pit_io(
             gdprintk(XENLOG_WARNING, "PIT: read A1:A0=3!\n");
     }
 
-    return 1;
+    return X86EMUL_OKAY;
 }
 
 static void speaker_ioport_write(
@@ -526,11 +526,7 @@ static int handle_speaker_io(
 {
     struct PITState *vpit = vcpu_vpit(current);
 
-    if ( bytes != 1 )
-    {
-        gdprintk(XENLOG_WARNING, "PIT_SPEAKER bad access\n");
-        return 1;
-    }
+    BUG_ON(bytes != 1);
 
     spin_lock(&vpit->lock);
 
@@ -541,7 +537,7 @@ static int handle_speaker_io(
 
     spin_unlock(&vpit->lock);
 
-    return 1;
+    return X86EMUL_OKAY;
 }
 
 int pv_pit_handler(int port, int data, int write)

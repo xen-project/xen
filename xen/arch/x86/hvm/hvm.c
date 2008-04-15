@@ -277,7 +277,7 @@ static int hvm_print_line(
     }
     spin_unlock(&hd->pbuf_lock);
 
-    return 1;
+    return X86EMUL_OKAY;
 }
 
 int hvm_domain_initialise(struct domain *d)

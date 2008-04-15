@@ -167,19 +167,19 @@ static void stdvga_out(uint32_t port, uint32_t bytes, uint32_t val)
     }
 }
 
-int stdvga_intercept_pio(
+static int stdvga_intercept_pio(
     int dir, uint32_t port, uint32_t bytes, uint32_t *val)
 {
     struct hvm_hw_stdvga *s = &current->domain->arch.hvm_domain.stdvga;
 
-    if ( dir == IOREQ_READ )
-        return 0;
+    if ( dir == IOREQ_WRITE )
+    {
+        spin_lock(&s->lock);
+        stdvga_out(port, bytes, *val);
+        spin_unlock(&s->lock);
+    }
 
-    spin_lock(&s->lock);
-    stdvga_out(port, bytes, *val);
-    spin_unlock(&s->lock);
-
-    return 0; /* propagate to external ioemu */
+    return X86EMUL_UNHANDLEABLE; /* propagate to external ioemu */
 }
 
 #define GET_PLANE(data, p) (((data) >> ((p) * 8)) & 0xff)
@@ -459,7 +459,7 @@ static int mmio_move(struct hvm_hw_stdvga *s, ioreq_t *p)
     return 1;
 }
 
-int stdvga_intercept_mmio(ioreq_t *p)
+static int stdvga_intercept_mmio(ioreq_t *p)
 {
     struct domain *d = current->domain;
     struct hvm_hw_stdvga *s = &d->arch.hvm_domain.stdvga;
@@ -468,7 +468,7 @@ int stdvga_intercept_mmio(ioreq_t *p)
     if ( p->size > 8 )
     {
         gdprintk(XENLOG_WARNING, "invalid mmio size %d\n", (int)p->size);
-        return 0;
+        return X86EMUL_UNHANDLEABLE;
     }
 
     spin_lock(&s->lock);
@@ -499,7 +499,7 @@ int stdvga_intercept_mmio(ioreq_t *p)
 
     spin_unlock(&s->lock);
 
-    return rc;
+    return rc ? X86EMUL_OKAY : X86EMUL_UNHANDLEABLE;
 }
 
 void stdvga_init(struct domain *d)

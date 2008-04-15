@@ -20,12 +20,13 @@
 #include <asm/hvm/support.h>
 
 static int hvmemul_do_io(
-    int is_mmio, paddr_t addr, unsigned long count, int size,
+    int is_mmio, paddr_t addr, unsigned long *reps, int size,
     paddr_t value, int dir, int df, int value_is_ptr, unsigned long *val)
 {
     struct vcpu *curr = current;
     vcpu_iodata_t *vio = get_ioreq(curr);
     ioreq_t *p = &vio->vp_ioreq;
+    int rc;
 
     switch ( curr->arch.hvm_vcpu.io_state )
     {
@@ -56,40 +57,58 @@ static int hvmemul_do_io(
     p->type = is_mmio ? IOREQ_TYPE_COPY : IOREQ_TYPE_PIO;
     p->size = size;
     p->addr = addr;
-    p->count = count;
+    p->count = *reps;
     p->df = df;
     p->data = value;
     p->io_count++;
 
-    if ( is_mmio
-         ? (hvm_mmio_intercept(p) || hvm_buffered_io_intercept(p))
-         : hvm_portio_intercept(p) )
+    if ( is_mmio )
     {
+        rc = hvm_mmio_intercept(p);
+        if ( rc == X86EMUL_UNHANDLEABLE )
+            rc = hvm_buffered_io_intercept(p);
+    }
+    else
+    {
+        rc = hvm_portio_intercept(p);
+    }
+
+    switch ( rc )
+    {
+    case X86EMUL_OKAY:
+        *reps = p->count;
         p->state = STATE_IORESP_READY;
         hvm_io_assist();
         if ( val != NULL )
             *val = curr->arch.hvm_vcpu.io_data;
         curr->arch.hvm_vcpu.io_state = HVMIO_none;
-        return X86EMUL_OKAY;
+        break;
+    case X86EMUL_UNHANDLEABLE:
+        hvm_send_assist_req(curr);
+        rc = (val != NULL) ? X86EMUL_RETRY : X86EMUL_OKAY;
+        break;
+    case X86EMUL_RETRY:
+        break;
+    default:
+        BUG();
     }
 
-    hvm_send_assist_req(curr);
-    return (val != NULL) ? X86EMUL_RETRY : X86EMUL_OKAY;
+    return rc;
 }
 
 static int hvmemul_do_pio(
-    unsigned long port, unsigned long count, int size,
+    unsigned long port, unsigned long *reps, int size,
     paddr_t value, int dir, int df, int value_is_ptr, unsigned long *val)
 {
-    return hvmemul_do_io(0, port, count, size, value,
+    return hvmemul_do_io(0, port, reps, size, value,
                          dir, df, value_is_ptr, val);
 }
 
 static int hvmemul_do_mmio(
-    paddr_t gpa, unsigned long count, int size,
+    paddr_t gpa, unsigned long *reps, int size,
     paddr_t value, int dir, int df, int value_is_ptr, unsigned long *val)
 {
-    return hvmemul_do_io(1, gpa, count, size, value,
+    return hvmemul_do_io(1, gpa, reps, size, value,
                          dir, df, value_is_ptr, val);
 }
 
@@ -209,7 +228,7 @@ static int __hvmemul_read(
     struct hvm_emulate_ctxt *hvmemul_ctxt)
 {
     struct vcpu *curr = current;
-    unsigned long addr;
+    unsigned long addr, reps = 1;
     uint32_t pfec = PFEC_page_present;
     paddr_t gpa;
     int rc;
@@ -229,7 +248,8 @@ static int __hvmemul_read(
             return X86EMUL_UNHANDLEABLE;
         gpa = (((paddr_t)curr->arch.hvm_vcpu.mmio_gpfn << PAGE_SHIFT) | off);
         if ( (off + bytes) <= PAGE_SIZE )
-            return hvmemul_do_mmio(gpa, 1, bytes, 0, IOREQ_READ, 0, 0, val);
+            return hvmemul_do_mmio(gpa, &reps, bytes, 0,
+                                   IOREQ_READ, 0, 0, val);
     }
 
     if ( (seg != x86_seg_none) &&
@@ -254,7 +274,7 @@ static int __hvmemul_read(
         if ( rc != X86EMUL_OKAY )
             return rc;
 
-        return hvmemul_do_mmio(gpa, 1, bytes, 0, IOREQ_READ, 0, 0, val);
+        return hvmemul_do_mmio(gpa, &reps, bytes, 0, IOREQ_READ, 0, 0, val);
     }
 
     return X86EMUL_OKAY;
@@ -305,7 +325,7 @@ static int hvmemul_write(
     struct hvm_emulate_ctxt *hvmemul_ctxt =
         container_of(ctxt, struct hvm_emulate_ctxt, ctxt);
     struct vcpu *curr = current;
-    unsigned long addr;
+    unsigned long addr, reps = 1;
     uint32_t pfec = PFEC_page_present | PFEC_write_access;
     paddr_t gpa;
     int rc;
@@ -321,8 +341,8 @@ static int hvmemul_write(
         unsigned int off = addr & (PAGE_SIZE - 1);
         gpa = (((paddr_t)curr->arch.hvm_vcpu.mmio_gpfn << PAGE_SHIFT) | off);
         if ( (off + bytes) <= PAGE_SIZE )
-            return hvmemul_do_mmio(gpa, 1, bytes, val, IOREQ_WRITE,
-                                   0, 0, NULL);
+            return hvmemul_do_mmio(gpa, &reps, bytes, val,
+                                   IOREQ_WRITE, 0, 0, NULL);
     }
 
     if ( (seg != x86_seg_none) &&
@@ -342,7 +362,8 @@ static int hvmemul_write(
         if ( rc != X86EMUL_OKAY )
             return rc;
 
-        return hvmemul_do_mmio(gpa, 1, bytes, val, IOREQ_WRITE, 0, 0, NULL);
+        return hvmemul_do_mmio(gpa, &reps, bytes, val,
+                               IOREQ_WRITE, 0, 0, NULL);
     }
 
     return X86EMUL_OKAY;
@@ -389,7 +410,7 @@ static int hvmemul_rep_ins(
     if ( rc != X86EMUL_OKAY )
         return rc;
 
-    return hvmemul_do_pio(src_port, *reps, bytes_per_rep, gpa, IOREQ_READ,
+    return hvmemul_do_pio(src_port, reps, bytes_per_rep, gpa, IOREQ_READ,
                           !!(ctxt->regs->eflags & X86_EFLAGS_DF), 1, NULL);
 }
 
@@ -422,7 +443,7 @@ static int hvmemul_rep_outs(
     if ( rc != X86EMUL_OKAY )
         return rc;
 
-    return hvmemul_do_pio(dst_port, *reps, bytes_per_rep, gpa, IOREQ_WRITE,
+    return hvmemul_do_pio(dst_port, reps, bytes_per_rep, gpa, IOREQ_WRITE,
                           !!(ctxt->regs->eflags & X86_EFLAGS_DF), 1, NULL);
 }
 
@@ -472,14 +493,14 @@ static int hvmemul_rep_movs(
     (void)gfn_to_mfn_current(sgpa >> PAGE_SHIFT, &p2mt);
     if ( !p2m_is_ram(p2mt) )
         return hvmemul_do_mmio(
-            sgpa, *reps, bytes_per_rep, dgpa, IOREQ_READ,
+            sgpa, reps, bytes_per_rep, dgpa, IOREQ_READ,
             !!(ctxt->regs->eflags & X86_EFLAGS_DF), 1, NULL);
 
     (void)gfn_to_mfn_current(dgpa >> PAGE_SHIFT, &p2mt);
     if ( p2m_is_ram(p2mt) )
         return X86EMUL_UNHANDLEABLE;
     return hvmemul_do_mmio(
-        dgpa, *reps, bytes_per_rep, sgpa, IOREQ_WRITE,
+        dgpa, reps, bytes_per_rep, sgpa, IOREQ_WRITE,
         !!(ctxt->regs->eflags & X86_EFLAGS_DF), 1, NULL);
 }
 
@@ -516,7 +537,8 @@ static int hvmemul_read_io(
     unsigned long *val,
     struct x86_emulate_ctxt *ctxt)
 {
-    return hvmemul_do_pio(port, 1, bytes, 0, IOREQ_READ, 0, 0, val);
+    unsigned long reps = 1;
+    return hvmemul_do_pio(port, &reps, bytes, 0, IOREQ_READ, 0, 0, val);
 }
 
 static int hvmemul_write_io(
@@ -525,7 +547,8 @@ static int hvmemul_write_io(
     unsigned long val,
     struct x86_emulate_ctxt *ctxt)
 {
-    return hvmemul_do_pio(port, 1, bytes, val, IOREQ_WRITE, 0, 0, NULL);
+    unsigned long reps = 1;
+    return hvmemul_do_pio(port, &reps, bytes, val, IOREQ_WRITE, 0, 0, NULL);
 }
 
 static int hvmemul_read_cr(
