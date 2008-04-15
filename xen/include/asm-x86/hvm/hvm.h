@@ -138,7 +138,6 @@ void hvm_domain_destroy(struct domain *d);
 
 int hvm_vcpu_initialise(struct vcpu *v);
 void hvm_vcpu_destroy(struct vcpu *v);
-void hvm_vcpu_reset(struct vcpu *vcpu);
 
 void hvm_send_assist_req(struct vcpu *v);
 
@@ -223,8 +222,6 @@ hvm_inject_exception(unsigned int trapnr, int errcode, unsigned long cr2)
 {
     hvm_funcs.inject_exception(trapnr, errcode, cr2);
 }
-
-int hvm_bringup_ap(int vcpuid, int trampoline_vector);
 
 static inline int hvm_event_pending(struct vcpu *v)
 {
