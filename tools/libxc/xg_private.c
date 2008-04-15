@@ -8,7 +8,6 @@
 #include <unistd.h>
 #include <zlib.h>
 #include <strings.h>
-#include <stdlib.h>
 #include <malloc.h>
 
 #include "xg_private.h"
@@ -209,7 +208,7 @@ void *xg_memalign(size_t alignment, size_t size)
     if (ret != 0)
         return NULL;
     return ptr;
-#elif defined(_BSD)
+#elif defined(__NetBSD__) || defined(__OpenBSD__)
     return valloc(size);
 #else
     return memalign(alignment, size);
