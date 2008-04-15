@@ -78,6 +78,7 @@ static inline void cpu_relax(void)
 #define barrier() asm volatile ( "" : : : "memory" )
 #define rmb()     barrier()
 #define wmb()     barrier()
+#define mb()      asm volatile ( "lock; addl $0,0(%%esp)" : : : "memory" )
 
 /*
  * Divide a 64-bit dividend by a 32-bit divisor.

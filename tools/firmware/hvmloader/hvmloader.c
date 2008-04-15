@@ -32,7 +32,7 @@
 #include <xen/version.h>
 #include <xen/hvm/params.h>
 
-asm(
+asm (
     "    .text                       \n"
     "    .globl _start               \n"
     "_start:                         \n"
@@ -98,6 +98,7 @@ asm(
     "stack_top:                      \n"
     );
 
+void smp_initialise(void);
 void create_mp_tables(void);
 int hvm_write_smbios_tables(void);
 
@@ -443,6 +444,8 @@ int main(void)
     init_hypercalls();
 
     printf("CPU speed is %u MHz\n", get_cpu_mhz());
+
+    smp_initialise();
 
     printf("Writing SMBIOS tables ...\n");
     smbios_sz = hvm_write_smbios_tables();

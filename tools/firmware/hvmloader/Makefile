@@ -28,7 +28,7 @@ LOADADDR = 0x100000
 
 CFLAGS += $(CFLAGS_include) -I.
 
-SRCS = hvmloader.c mp_tables.c util.c smbios.c 32bitbios_support.c
+SRCS = hvmloader.c mp_tables.c util.c smbios.c 32bitbios_support.c smp.c
 OBJS = $(patsubst %.c,%.o,$(SRCS))
 
 .PHONY: all
