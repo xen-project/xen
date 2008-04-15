@@ -76,6 +76,7 @@ static int hvmemul_do_io(
     switch ( rc )
     {
     case X86EMUL_OKAY:
+    case X86EMUL_RETRY:
         *reps = p->count;
         p->state = STATE_IORESP_READY;
         hvm_io_assist();
@@ -86,8 +87,6 @@ static int hvmemul_do_io(
     case X86EMUL_UNHANDLEABLE:
         hvm_send_assist_req(curr);
         rc = (val != NULL) ? X86EMUL_RETRY : X86EMUL_OKAY;
-        break;
-    case X86EMUL_RETRY:
         break;
     default:
         BUG();
