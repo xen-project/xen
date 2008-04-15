@@ -2903,6 +2903,20 @@ int is_iomem_page(unsigned long mfn)
     return (!mfn_valid(mfn) || (page_get_owner(mfn_to_page(mfn)) == dom_io));
 }
 
+void xencomm_mark_dirty(unsigned long addr, unsigned int len)
+{
+    struct domain *d = current->domain;
+    unsigned long gpfn;
+    unsigned long end_addr = addr + len;
+
+    if (shadow_mode_enabled(d)) {
+        for (addr &= PAGE_MASK; addr < end_addr; addr += PAGE_SIZE) {
+            gpfn = get_gpfn_from_mfn(virt_to_mfn(addr));
+            shadow_mark_page_dirty(d, gpfn);
+        }
+    }
+}
+
 /*
  * Local variables:
  * mode: C

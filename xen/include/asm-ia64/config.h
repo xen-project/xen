@@ -291,4 +291,6 @@ struct screen_info { };
 /* Define CONFIG_PRIVIFY to support privified OS (deprecated).  */
 #undef CONFIG_PRIVIFY
 
+#define CONFIG_XENCOMM_MARK_DIRTY 1
+
 #endif	/* _IA64_CONFIG_H_ */
