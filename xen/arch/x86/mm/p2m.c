@@ -414,6 +414,7 @@ int p2m_init(struct domain *d)
 
     d->arch.p2m = p2m;
 
+    memset(p2m, 0, sizeof(*p2m));
     p2m_lock_init(p2m);
     INIT_LIST_HEAD(&p2m->pages);
 
