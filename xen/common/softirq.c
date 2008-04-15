@@ -52,65 +52,76 @@ void open_softirq(int nr, softirq_handler handler)
     softirq_handlers[nr] = handler;
 }
 
-static DEFINE_PER_CPU(struct tasklet *, tasklet_list);
+static LIST_HEAD(tasklet_list);
+static DEFINE_SPINLOCK(tasklet_lock);
 
 void tasklet_schedule(struct tasklet *t)
 {
     unsigned long flags;
 
-    if ( test_and_set_bool(t->is_scheduled) )
-        return;
+    spin_lock_irqsave(&tasklet_lock, flags);
 
-    local_irq_save(flags);
-    t->next = this_cpu(tasklet_list);
-    this_cpu(tasklet_list) = t;
-    local_irq_restore(flags);
+    if ( !t->is_scheduled )
+    {
+        list_add(&t->list, &tasklet_list);
+        t->is_scheduled = 1;
+    }
+
+    spin_unlock_irqrestore(&tasklet_lock, flags);
 
     raise_softirq(TASKLET_SOFTIRQ);
 }
 
 static void tasklet_action(void)
 {
-    struct tasklet *list, *t;
+    struct tasklet *t;
 
-    local_irq_disable();
-    list = this_cpu(tasklet_list);
-    this_cpu(tasklet_list) = NULL;
-    local_irq_enable();
+    spin_lock_irq(&tasklet_lock);
 
-    while ( (t = list) != NULL )
+    while ( !list_empty(&tasklet_list) )
     {
-        list = list->next;
-
-        BUG_ON(t->is_running);
-        t->is_running = 1;
-        smp_wmb();
+        t = list_entry(tasklet_list.next, struct tasklet, list);
+        list_del(&t->list);
 
         BUG_ON(!t->is_scheduled);
         t->is_scheduled = 0;
 
-        smp_mb();
+        BUG_ON(t->is_running);
+        t->is_running = 1;
+
+        spin_unlock_irq(&tasklet_lock);
         t->func(t->data);
-        smp_mb();
+        spin_lock_irq(&tasklet_lock);
 
         t->is_running = 0;
     }
+
+    spin_unlock_irq(&tasklet_lock);
 }
 
 void tasklet_kill(struct tasklet *t)
 {
-    /* Prevent tasklet from re-scheduling itself. */
-    while ( t->is_scheduled || test_and_set_bool(t->is_scheduled) )
-        cpu_relax();
-    smp_mb();
+    unsigned long flags;
+
+    spin_lock_irqsave(&tasklet_lock, flags);
+
+    /* De-schedule the tasklet and prevent it from re-scheduling itself. */
+    if ( !list_empty(&t->list) )
+        list_del(&t->list);
+    t->is_scheduled = 1;
 
     /* Wait for tasklet to complete. */
     while ( t->is_running )
+    {
+        spin_unlock_irqrestore(&tasklet_lock, flags);
         cpu_relax();
-    smp_mb();
+        spin_lock_irqsave(&tasklet_lock, flags);
+    }
 
     /* Clean up and we're done. */
     t->is_scheduled = 0;
+
+    spin_unlock_irqrestore(&tasklet_lock, flags);
 }
 
 void tasklet_init(

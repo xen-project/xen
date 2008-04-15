@@ -59,7 +59,7 @@ static inline void raise_softirq(unsigned int nr)
  */
 struct tasklet
 {
-    struct tasklet *next;
+    struct list_head list;
     bool_t is_scheduled;
     bool_t is_running;
     void (*func)(unsigned long);
@@ -67,7 +67,7 @@ struct tasklet
 };
 
 #define DECLARE_TASKLET(name, func, data) \
-    struct tasklet name = { NULL, 0, 0, func, data }
+    struct tasklet name = { LIST_HEAD_INIT(name.list), 0, 0, func, data }
 
 void tasklet_schedule(struct tasklet *t);
 void tasklet_kill(struct tasklet *t);
