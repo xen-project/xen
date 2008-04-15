@@ -688,13 +688,10 @@ void hvm_vcpu_destroy(struct vcpu *v)
     /*free_xen_event_channel(v, v->arch.hvm_vcpu.xen_port);*/
 }
 
-static void hvm_vcpu_down(void)
+void hvm_vcpu_down(struct vcpu *v)
 {
-    struct vcpu *v = current;
     struct domain *d = v->domain;
     int online_count = 0;
-
-    gdprintk(XENLOG_INFO, "VCPU%d: going offline.\n", v->vcpu_id);
 
     /* Doesn't halt us immediately, but we'll never return to guest context. */
     set_bit(_VPF_down, &v->pause_flags);
@@ -710,7 +707,7 @@ static void hvm_vcpu_down(void)
     /* ... Shut down the domain if not. */
     if ( online_count == 0 )
     {
-        gdprintk(XENLOG_INFO, "all CPUs offline -- powering off.\n");
+        gdprintk(XENLOG_INFO, "All CPUs offline -- powering off.\n");
         domain_shutdown(d, SHUTDOWN_poweroff);
     }
 }
@@ -749,7 +746,7 @@ void hvm_hlt(unsigned long rflags)
      * out of this.
      */
     if ( unlikely(!(rflags & X86_EFLAGS_IF)) )
-        return hvm_vcpu_down();
+        return hvm_vcpu_down(current);
 
     do_sched_op_compat(SCHEDOP_block, 0);
 }

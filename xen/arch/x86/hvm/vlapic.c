@@ -291,8 +291,7 @@ static int vlapic_accept_init(struct vcpu *v)
         return X86EMUL_OKAY;
 
     /* Asynchronously take the VCPU down and schedule reset work. */
-    set_bit(_VPF_down, &v->pause_flags);
-    vcpu_sleep_nosync(v);
+    hvm_vcpu_down(v);
     tasklet_schedule(&vcpu_vlapic(v)->init_tasklet);
     return X86EMUL_RETRY;
 }
