@@ -144,6 +144,7 @@ extern void FASTCALL(raise_softirq(unsigned int nr));
 #endif
 
 
+#ifndef XEN
 /* Tasklets --- multithreaded analogue of BHs.
 
    Main feature differing them of generic softirqs: tasklet
@@ -254,6 +255,7 @@ extern void tasklet_kill(struct tasklet_struct *t);
 extern void tasklet_kill_immediate(struct tasklet_struct *t, unsigned int cpu);
 extern void tasklet_init(struct tasklet_struct *t,
 			 void (*func)(unsigned long), unsigned long data);
+#endif
 
 /*
  * Autoprobing for irqs:
