@@ -558,7 +558,7 @@ static void fpu_handle_exception(void *_fic, struct cpu_user_regs *regs)
     regs->eip += fic->insn_bytes;
 }
 
-#define __emulate_fpu_insn(_op)                         \
+#define emulate_fpu_insn(_op)                           \
 do{ struct fpu_insn_ctxt fic = { 0 };                   \
     fail_if(ops->get_fpu == NULL);                      \
     ops->get_fpu(fpu_handle_exception, &fic, ctxt);     \
@@ -571,7 +571,7 @@ do{ struct fpu_insn_ctxt fic = { 0 };                   \
     generate_exception_if(fic.exn_raised, EXC_MF, -1);  \
 } while (0)
 
-#define __emulate_fpu_insn_memdst(_op, _arg)            \
+#define emulate_fpu_insn_memdst(_op, _arg)              \
 do{ struct fpu_insn_ctxt fic = { 0 };                   \
     fail_if(ops->get_fpu == NULL);                      \
     ops->get_fpu(fpu_handle_exception, &fic, ctxt);     \
@@ -583,6 +583,16 @@ do{ struct fpu_insn_ctxt fic = { 0 };                   \
         : : "memory" );                                 \
     ops->put_fpu(ctxt);                                 \
     generate_exception_if(fic.exn_raised, EXC_MF, -1);  \
+} while (0)
+
+#define emulate_fpu_insn_stub(_bytes...)                                \
+do{ uint8_t stub[] = { _bytes, 0xc3 };                                  \
+    struct fpu_insn_ctxt fic = { .insn_bytes = sizeof(stub)-1 };        \
+    fail_if(ops->get_fpu == NULL);                                      \
+    ops->get_fpu(fpu_handle_exception, &fic, ctxt);                     \
+    (*(void(*)(void))stub)();                                           \
+    ops->put_fpu(ctxt);                                                 \
+    generate_exception_if(fic.exn_raised, EXC_MF, -1);                  \
 } while (0)
 
 static unsigned long __get_rep_prefix(
@@ -2438,7 +2448,7 @@ x86_emulate(
     }
 
     case 0x9b:  /* wait/fwait */
-        __emulate_fpu_insn("fwait");
+        emulate_fpu_insn("fwait");
         break;
 
     case 0x9c: /* pushf */
@@ -2760,32 +2770,52 @@ x86_emulate(
     case 0xd9: /* FPU 0xd9 */
         switch ( modrm )
         {
-        case 0xc0: __emulate_fpu_insn(".byte 0xd9,0xc0"); break; /* fld %st0 */
-        case 0xc1: __emulate_fpu_insn(".byte 0xd9,0xc1"); break; /* fld %st1 */
-        case 0xc2: __emulate_fpu_insn(".byte 0xd9,0xc2"); break; /* fld %st2 */
-        case 0xc3: __emulate_fpu_insn(".byte 0xd9,0xc3"); break; /* fld %st3 */
-        case 0xc4: __emulate_fpu_insn(".byte 0xd9,0xc4"); break; /* fld %st4 */
-        case 0xc5: __emulate_fpu_insn(".byte 0xd9,0xc5"); break; /* fld %st5 */
-        case 0xc6: __emulate_fpu_insn(".byte 0xd9,0xc6"); break; /* fld %st6 */
-        case 0xc7: __emulate_fpu_insn(".byte 0xd9,0xc7"); break; /* fld %st7 */
-        case 0xe0: __emulate_fpu_insn(".byte 0xd9,0xe0"); break; /* fchs */
-        case 0xe1: __emulate_fpu_insn(".byte 0xd9,0xe1"); break; /* fabs */
-        case 0xe8: __emulate_fpu_insn(".byte 0xd9,0xe8"); break; /* fld1 */
-        case 0xee: __emulate_fpu_insn(".byte 0xd9,0xee"); break; /* fldz */
+        case 0xc0 ... 0xc7: /* fld %stN */
+        case 0xc8 ... 0xcf: /* fxch %stN */
+        case 0xd0: /* fnop */
+        case 0xe0: /* fchs */
+        case 0xe1: /* fabs */
+        case 0xe4: /* ftst */
+        case 0xe5: /* fxam */
+        case 0xe8: /* fld1 */
+        case 0xe9: /* fldl2t */
+        case 0xea: /* fldl2e */
+        case 0xeb: /* fldpi */
+        case 0xec: /* fldlg2 */
+        case 0xed: /* fldln2 */
+        case 0xee: /* fldz */
+        case 0xf0: /* f2xm1 */
+        case 0xf1: /* fyl2x */
+        case 0xf2: /* fptan */
+        case 0xf3: /* fpatan */
+        case 0xf4: /* fxtract */
+        case 0xf5: /* fprem1 */
+        case 0xf6: /* fdecstp */
+        case 0xf7: /* fincstp */
+        case 0xf8: /* fprem */
+        case 0xf9: /* fyl2xp1 */
+        case 0xfa: /* fsqrt */
+        case 0xfb: /* fsincos */
+        case 0xfc: /* frndint */
+        case 0xfd: /* fscale */
+        case 0xfe: /* fsin */
+        case 0xff: /* fcos */
+            emulate_fpu_insn_stub(0xd9, modrm);
+            break;
         default:
             fail_if((modrm_reg & 7) != 7);
             fail_if(modrm >= 0xc0);
             /* fnstcw m2byte */
             ea.bytes = 2;
             dst = ea;
-            __emulate_fpu_insn_memdst("fnstcw", dst.val);
+            emulate_fpu_insn_memdst("fnstcw", dst.val);
         }
         break;
 
     case 0xdb: /* FPU 0xdb */
         fail_if(modrm != 0xe3);
         /* fninit */
-        __emulate_fpu_insn("fninit");
+        emulate_fpu_insn("fninit");
         break;
 
     case 0xdd: /* FPU 0xdd */
@@ -2794,22 +2824,23 @@ x86_emulate(
         /* fnstsw m2byte */
         ea.bytes = 2;
         dst = ea;
-        __emulate_fpu_insn_memdst("fnstsw", dst.val);
+        emulate_fpu_insn_memdst("fnstsw", dst.val);
         break;
 
     case 0xde: /* FPU 0xde */
         switch ( modrm )
         {
-        case 0xd9: __emulate_fpu_insn(".byte 0xde,0xd9"); break;
-        case 0xf8: __emulate_fpu_insn(".byte 0xde,0xf8"); break;
-        case 0xf9: __emulate_fpu_insn(".byte 0xde,0xf9"); break;
-        case 0xfa: __emulate_fpu_insn(".byte 0xde,0xfa"); break;
-        case 0xfb: __emulate_fpu_insn(".byte 0xde,0xfb"); break;
-        case 0xfc: __emulate_fpu_insn(".byte 0xde,0xfc"); break;
-        case 0xfd: __emulate_fpu_insn(".byte 0xde,0xfd"); break;
-        case 0xfe: __emulate_fpu_insn(".byte 0xde,0xfe"); break;
-        case 0xff: __emulate_fpu_insn(".byte 0xde,0xff"); break;
-        default: goto cannot_emulate;
+        case 0xc0 ... 0xc7: /* faddp %stN */
+        case 0xc8 ... 0xcf: /* fmulp %stN */
+        case 0xd9: /* fcompp */
+        case 0xe0 ... 0xe7: /* fsubrp %stN */
+        case 0xe8 ... 0xef: /* fsubp %stN */
+        case 0xf0 ... 0xf7: /* fdivrp %stN */
+        case 0xf8 ... 0xff: /* fdivp %stN */
+            emulate_fpu_insn_stub(0xde, modrm);
+            break;
+        default:
+            goto cannot_emulate;
         }
         break;
 
@@ -2819,7 +2850,7 @@ x86_emulate(
         dst.bytes = 2;
         dst.type = OP_REG;
         dst.reg = (unsigned long *)&_regs.eax;
-        __emulate_fpu_insn_memdst("fnstsw", dst.val);
+        emulate_fpu_insn_memdst("fnstsw", dst.val);
         break;
 
     case 0xe0 ... 0xe2: /* loop{,z,nz} */ {
