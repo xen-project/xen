@@ -49,6 +49,7 @@ int __init map_iommu_mmio_region(struct amd_iommu *iommu);
 void __init unmap_iommu_mmio_region(struct amd_iommu *iommu);
 void __init register_iommu_dev_table_in_mmio_space(struct amd_iommu *iommu);
 void __init register_iommu_cmd_buffer_in_mmio_space(struct amd_iommu *iommu);
+void __init register_iommu_event_log_in_mmio_space(struct amd_iommu *iommu);
 void __init enable_iommu(struct amd_iommu *iommu);
 
 /* mapping functions */

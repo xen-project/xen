@@ -29,6 +29,7 @@
 struct list_head amd_iommu_head;
 long amd_iommu_poll_comp_wait = COMPLETION_WAIT_DEFAULT_POLLING_COUNT;
 static long amd_iommu_cmd_buffer_entries = IOMMU_CMD_BUFFER_DEFAULT_ENTRIES;
+static long amd_iommu_event_log_entries = IOMMU_EVENT_LOG_DEFAULT_ENTRIES;
 int nr_amd_iommus = 0;
 
 unsigned short ivrs_bdf_entries = 0;
@@ -73,7 +74,8 @@ static void __init deallocate_iommu_table_struct(
 static void __init deallocate_iommu_resources(struct amd_iommu *iommu)
 {
     deallocate_iommu_table_struct(&iommu->dev_table);
-    deallocate_iommu_table_struct(&iommu->cmd_buffer);;
+    deallocate_iommu_table_struct(&iommu->cmd_buffer);
+    deallocate_iommu_table_struct(&iommu->event_log);
 }
 
 static void __init detect_cleanup(void)
@@ -137,6 +139,20 @@ static int __init allocate_iommu_resources(struct amd_iommu *iommu)
 
     if ( allocate_iommu_table_struct(&iommu->cmd_buffer,
                                      "Command Buffer") != 0 )
+        goto error_out;
+
+    /* allocate 'event log' in power of 2 increments of 4K */
+    iommu->event_log_head = 0;
+    iommu->event_log.alloc_size =
+        PAGE_SIZE << get_order_from_bytes(
+            PAGE_ALIGN(amd_iommu_event_log_entries *
+                        IOMMU_EVENT_LOG_ENTRY_SIZE));
+
+    iommu->event_log.entries =
+        iommu->event_log.alloc_size / IOMMU_EVENT_LOG_ENTRY_SIZE;
+
+    if ( allocate_iommu_table_struct(&iommu->event_log,
+                                     "Event Log") != 0 )
         goto error_out;
 
     return 0;
@@ -203,6 +219,7 @@ static int __init amd_iommu_init(void)
             goto error_out;
         register_iommu_dev_table_in_mmio_space(iommu);
         register_iommu_cmd_buffer_in_mmio_space(iommu);
+        register_iommu_event_log_in_mmio_space(iommu);
 
         spin_unlock_irqrestore(&iommu->lock, flags);
     }
@@ -224,11 +241,9 @@ static int __init amd_iommu_init(void)
 
     for_each_amd_iommu ( iommu )
     {
-        spin_lock_irqsave(&iommu->lock, flags);
         /* enable IOMMU translation services */
         enable_iommu(iommu);
         nr_amd_iommus++;
-        spin_unlock_irqrestore(&iommu->lock, flags);
     }
 
     amd_iommu_enabled = 1;
@@ -288,7 +303,7 @@ void amd_iommu_setup_domain_device(
         sys_mgt = ivrs_mappings[req_id].dte_sys_mgt_enable;
         dev_ex = ivrs_mappings[req_id].dte_allow_exclusion;
         amd_iommu_set_dev_table_entry((u32 *)dte, root_ptr,
-                                      req_id, sys_mgt, dev_ex,
+                                      hd->domain_id, sys_mgt, dev_ex,
                                       hd->paging_mode);
 
         invalidate_dev_table_entry(iommu, req_id);

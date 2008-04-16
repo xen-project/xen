@@ -79,6 +79,9 @@ struct amd_iommu {
     int exclusion_allow_all;
     uint64_t exclusion_base;
     uint64_t exclusion_limit;
+
+    int msi_cap;
+    int maskbit;
 };
 
 struct ivrs_mappings {
