@@ -66,6 +66,21 @@ void do_hypervisor_callback(struct pt_regs *regs)
     in_callback = 0;
 }
 
+void force_evtchn_callback(void)
+{
+    vcpu_info_t *vcpu;
+    vcpu = &HYPERVISOR_shared_info->vcpu_info[smp_processor_id()];
+    int save = vcpu->evtchn_upcall_mask;
+
+    while (vcpu->evtchn_upcall_pending) {
+        vcpu->evtchn_upcall_mask = 1;
+        barrier();
+        do_hypervisor_callback(NULL);
+        barrier();
+        vcpu->evtchn_upcall_mask = save;
+        barrier();
+    };
+}
 
 inline void mask_evtchn(u32 port)
 {

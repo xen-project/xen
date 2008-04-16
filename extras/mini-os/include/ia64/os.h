@@ -189,17 +189,6 @@ __synch_cmpxchg(volatile void *ptr, uint64_t old, uint64_t new, int size)
 	return ia64_cmpxchg_acq_64(ptr, old, new);
 }
 
-/*
- * Force a proper event-channel callback from Xen after clearing the
- * callback mask. We do this in a very simple manner, by making a call
- * down into Xen. The pending flag will be checked by Xen on return.
- */
-static inline void
-force_evtchn_callback(void)
-{
-	(void)HYPERVISOR_xen_version(0, NULL);
-}
-
 extern shared_info_t *HYPERVISOR_shared_info;
 
 static inline int
