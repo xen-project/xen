@@ -1600,7 +1600,7 @@ int intel_iommu_map_page(
         return 0;
 #endif
 
-    pg_maddr = addr_to_dma_page_maddr(d, gfn << PAGE_SHIFT_4K);
+    pg_maddr = addr_to_dma_page_maddr(d, (paddr_t)gfn << PAGE_SHIFT_4K);
     if ( pg_maddr == 0 )
         return -ENOMEM;
     page = (struct dma_pte *)map_vtd_domain_page(pg_maddr);
@@ -1643,11 +1643,11 @@ int intel_iommu_unmap_page(struct domain *d, unsigned long gfn)
 }
 
 int iommu_page_mapping(struct domain *domain, paddr_t iova,
-                       void *hpa, size_t size, int prot)
+                       paddr_t hpa, size_t size, int prot)
 {
     struct acpi_drhd_unit *drhd;
     struct iommu *iommu;
-    unsigned long start_pfn, end_pfn;
+    u64 start_pfn, end_pfn;
     struct dma_pte *page = NULL, *pte = NULL;
     int index;
     u64 pg_maddr;
@@ -1657,9 +1657,8 @@ int iommu_page_mapping(struct domain *domain, paddr_t iova,
     if ( (prot & (DMA_PTE_READ|DMA_PTE_WRITE)) == 0 )
         return -EINVAL;
     iova = (iova >> PAGE_SHIFT_4K) << PAGE_SHIFT_4K;
-    start_pfn = (unsigned long)(((unsigned long) hpa) >> PAGE_SHIFT_4K);
-    end_pfn = (unsigned long)
-        ((PAGE_ALIGN_4K(((unsigned long)hpa) + size)) >> PAGE_SHIFT_4K);
+    start_pfn = hpa >> PAGE_SHIFT_4K;
+    end_pfn = (PAGE_ALIGN_4K(hpa + size)) >> PAGE_SHIFT_4K;
     index = 0;
     while ( start_pfn < end_pfn )
     {
@@ -1668,7 +1667,7 @@ int iommu_page_mapping(struct domain *domain, paddr_t iova,
             return -ENOMEM;
         page = (struct dma_pte *)map_vtd_domain_page(pg_maddr);
         pte = page + (start_pfn & LEVEL_MASK);
-        dma_set_pte_addr(*pte, start_pfn << PAGE_SHIFT_4K);
+        dma_set_pte_addr(*pte, (paddr_t)start_pfn << PAGE_SHIFT_4K);
         dma_set_pte_prot(*pte, prot);
         iommu_flush_cache_entry(iommu, pte);
         unmap_vtd_domain_page(page);
@@ -1727,7 +1726,7 @@ static int iommu_prepare_rmrr_dev(
     /* page table init */
     size = rmrr->end_address - rmrr->base_address + 1;
     ret = iommu_page_mapping(d, rmrr->base_address,
-                             (void *)rmrr->base_address, size,
+                             rmrr->base_address, size,
                              DMA_PTE_READ|DMA_PTE_WRITE);
     if ( ret )
         return ret;

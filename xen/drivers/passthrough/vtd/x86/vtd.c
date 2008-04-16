@@ -153,12 +153,12 @@ void iommu_set_pgd(struct domain *d)
                 return;
             }
             pgd_mfn = _mfn(dma_pte_addr(*dpte) >> PAGE_SHIFT_4K);
-            hd->pgd_maddr = mfn_x(pgd_mfn) << PAGE_SHIFT_4K;
+            hd->pgd_maddr = (paddr_t)(mfn_x(pgd_mfn)) << PAGE_SHIFT_4K;
             unmap_domain_page(dpte);
             break;
         case VTD_PAGE_TABLE_LEVEL_4:
             pgd_mfn = _mfn(p2m_table);
-            hd->pgd_maddr = mfn_x(pgd_mfn) << PAGE_SHIFT_4K;
+            hd->pgd_maddr = (paddr_t)(mfn_x(pgd_mfn)) << PAGE_SHIFT_4K;
             break;
         default:
             gdprintk(XENLOG_ERR VTDPREFIX,
@@ -250,12 +250,12 @@ void iommu_set_pgd(struct domain *d)
             }
 
             pgd_mfn = _mfn(l3e_get_pfn(*l3e));
-            hd->pgd_maddr = mfn_x(pgd_mfn) << PAGE_SHIFT_4K;
+            hd->pgd_maddr = (paddr_t)(mfn_x(pgd_mfn)) << PAGE_SHIFT_4K;
             unmap_domain_page(l3e);
             break;
         case VTD_PAGE_TABLE_LEVEL_4:
             pgd_mfn = _mfn(p2m_table);
-            hd->pgd_maddr = mfn_x(pgd_mfn) << PAGE_SHIFT_4K;
+            hd->pgd_maddr = (paddr_t)(mfn_x(pgd_mfn)) << PAGE_SHIFT_4K;
             break;
         default:
             gdprintk(XENLOG_ERR VTDPREFIX,
