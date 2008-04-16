@@ -70,62 +70,15 @@ void inline print_runqueue(void)
     printk("\n");
 }
 
-/* Find the time when the next timeout expires. If this is more than
-   10 seconds from now, return 10 seconds from now. */
-static s_time_t blocking_time(void)
-{
-    struct thread *thread;
-    struct list_head *iterator;
-    s_time_t min_wakeup_time;
-    unsigned long flags;
-    local_irq_save(flags);
-    /* default-block the domain for 10 seconds: */
-    min_wakeup_time = NOW() + SECONDS(10);
-
-    /* Thread list needs to be protected */
-    list_for_each(iterator, &idle_thread->thread_list)
-    {
-        thread = list_entry(iterator, struct thread, thread_list);
-        if(!is_runnable(thread) && thread->wakeup_time != 0LL)
-        {
-            if(thread->wakeup_time < min_wakeup_time)
-            {
-                min_wakeup_time = thread->wakeup_time;
-            }
-        }
-    }
-    local_irq_restore(flags);
-    return(min_wakeup_time);
-}
-
-/* Wake up all threads with expired timeouts. */
-static void wake_expired(void)
-{
-    struct thread *thread;
-    struct list_head *iterator;
-    s_time_t now = NOW();
-    unsigned long flags;
-    local_irq_save(flags);
-    /* Thread list needs to be protected */
-    list_for_each(iterator, &idle_thread->thread_list)
-    {
-        thread = list_entry(iterator, struct thread, thread_list);
-        if(!is_runnable(thread) && thread->wakeup_time != 0LL)
-        {
-            if(thread->wakeup_time <= now)
-                wake(thread);
-        }
-    }
-    local_irq_restore(flags);
-}
-
 void schedule(void)
 {
     struct thread *prev, *next, *thread;
     struct list_head *iterator;
     unsigned long flags;
+
     prev = current;
     local_irq_save(flags); 
+
     if (in_callback) {
         printk("Must not call schedule() from a callback\n");
         BUG();
@@ -134,6 +87,45 @@ void schedule(void)
         printk("Must not call schedule() with IRQs disabled\n");
         BUG();
     }
+
+    do {
+        /* Examine all threads.
+           Find a runnable thread, but also wake up expired ones and find the
+           time when the next timeout expires, else use 10 seconds. */
+        s_time_t now = NOW();
+        s_time_t min_wakeup_time = now + SECONDS(10);
+        next = NULL;   
+        list_for_each(iterator, &idle_thread->thread_list)
+        {
+            thread = list_entry(iterator, struct thread, thread_list);
+            if (!is_runnable(thread) && thread->wakeup_time != 0LL)
+            {
+                if (thread->wakeup_time <= now)
+                    wake(thread);
+                else if (thread->wakeup_time < min_wakeup_time)
+                    min_wakeup_time = thread->wakeup_time;
+            }
+            if(is_runnable(thread)) 
+            {
+                next = thread;
+                /* Put this thread on the end of the list */
+                list_del(&thread->thread_list);
+                list_add_tail(&thread->thread_list, &idle_thread->thread_list);
+                break;
+            }
+        }
+        if (next)
+            break;
+        /* block until the next timeout expires, or for 10 secs, whichever comes first */
+        block_domain(min_wakeup_time);
+        /* handle pending events if any */
+        force_evtchn_callback();
+    } while(1);
+    local_irq_restore(flags);
+    /* Interrupting the switch is equivalent to having the next thread
+       inturrupted at the return instruction. And therefore at safe point. */
+    if(prev != next) switch_threads(prev, next);
+
     list_for_each(iterator, &exited_threads)
     {
         thread = list_entry(iterator, struct thread, thread_list);
@@ -144,24 +136,6 @@ void schedule(void)
             xfree(thread);
         }
     }
-    next = idle_thread;   
-    /* Thread list needs to be protected */
-    list_for_each(iterator, &idle_thread->thread_list)
-    {
-        thread = list_entry(iterator, struct thread, thread_list);
-        if(is_runnable(thread)) 
-        {
-            next = thread;
-            /* Put this thread on the end of the list */
-            list_del(&thread->thread_list);
-            list_add_tail(&thread->thread_list, &idle_thread->thread_list);
-            break;
-        }
-    }
-    local_irq_restore(flags);
-    /* Interrupting the switch is equivalent to having the next thread
-       inturrupted at the return instruction. And therefore at safe point. */
-    if(prev != next) switch_threads(prev, next);
 }
 
 struct thread* create_thread(char *name, void (*function)(void *), void *data)
@@ -267,32 +241,10 @@ void wake(struct thread *thread)
 
 void idle_thread_fn(void *unused)
 {
-    s_time_t until;
     threads_started = 1;
-    unsigned long flags;
-    struct list_head *iterator;
-    struct thread *next, *thread;
-    for(;;)
-    {
+    while (1) {
+        block(current);
         schedule();
-        next = NULL;
-        local_irq_save(flags);
-        list_for_each(iterator, &idle_thread->thread_list)
-        {
-            thread = list_entry(iterator, struct thread, thread_list);
-            if(is_runnable(thread)) 
-            {
-                next = thread;
-                break;
-            }
-        }
-        if (!next) {
-            /* block until the next timeout expires, or for 10 secs, whichever comes first */
-            until = blocking_time();
-            block_domain(until);
-        }
-        local_irq_restore(flags);
-        wake_expired();
     }
 }
 
