@@ -243,12 +243,12 @@ struct fbfront_dev {
     char *backend;
     int request_update;
 
-    char *data;
     int width;
     int height;
     int depth;
-    int line_length;
+    int stride;
     int mem_length;
+    int offset;
 };
 
 void fbfront_handler(evtchn_port_t port, struct pt_regs *regs, void *data)
@@ -256,7 +256,7 @@ void fbfront_handler(evtchn_port_t port, struct pt_regs *regs, void *data)
     wake_up(&fbfront_queue);
 }
 
-struct fbfront_dev *init_fbfront(char *nodename, void *data, int width, int height, int depth, int line_length, int mem_length)
+struct fbfront_dev *init_fbfront(char *nodename, unsigned long *mfns, int width, int height, int depth, int stride, int n)
 {
     xenbus_transaction_t xbt;
     char* err;
@@ -289,24 +289,17 @@ struct fbfront_dev *init_fbfront(char *nodename, void *data, int width, int heig
     dev->width = s->width = width;
     dev->height = s->height = height;
     dev->depth = s->depth = depth;
-    dev->line_length = s->line_length = line_length;
-    dev->mem_length = s->mem_length = mem_length;
-
-    ASSERT(!((unsigned long)data & ~PAGE_MASK));
-    dev->data = data;
+    dev->stride = s->line_length = stride;
+    dev->mem_length = s->mem_length = n * PAGE_SIZE;
+    dev->offset = 0;
 
     const int max_pd = sizeof(s->pd) / sizeof(s->pd[0]);
     unsigned long mapped = 0;
 
-    for (i = 0; mapped < mem_length && i < max_pd; i++) {
+    for (i = 0; mapped < n && i < max_pd; i++) {
         unsigned long *pd = (unsigned long *) alloc_page();
-        for (j = 0; mapped < mem_length && j < PAGE_SIZE / sizeof(unsigned long); j++) {
-            /* Trigger CoW */
-            * ((char *)data + mapped) = 0;
-            barrier();
-            pd[j] = virtual_to_mfn((unsigned long) data + mapped);
-            mapped += PAGE_SIZE;
-        }
+        for (j = 0; mapped < n && j < PAGE_SIZE / sizeof(unsigned long); j++)
+            pd[j] = mfns[mapped++];
         for ( ; j < PAGE_SIZE / sizeof(unsigned long); j++)
             pd[j] = 0;
         s->pd[i] = virt_to_mfn(pd);
@@ -395,11 +388,28 @@ done:
     return dev;
 }
 
-void fbfront_update(struct fbfront_dev *dev, int x, int y, int width, int height)
+static void fbfront_out_event(struct fbfront_dev *dev, union xenfb_out_event *event)
 {
     struct xenfb_page *page = dev->page;
     uint32_t prod;
     DEFINE_WAIT(w);
+
+    add_waiter(w, fbfront_queue);
+    while (page->out_prod - page->out_cons == XENFB_OUT_RING_LEN)
+        schedule();
+    remove_waiter(w);
+
+    prod = page->out_prod;
+    mb(); /* ensure ring space available */
+    XENFB_OUT_RING_REF(page, prod) = *event;
+    wmb(); /* ensure ring contents visible */
+    page->out_prod = prod + 1;
+    notify_remote_via_evtchn(dev->evtchn);
+}
+
+void fbfront_update(struct fbfront_dev *dev, int x, int y, int width, int height)
+{
+    struct xenfb_update update;
 
     if (dev->request_update <= 0)
         return;
@@ -421,21 +431,25 @@ void fbfront_update(struct fbfront_dev *dev, int x, int y, int width, int height
     if (width <= 0 || height <= 0)
         return;
 
-    add_waiter(w, fbfront_queue);
-    while (page->out_prod - page->out_cons == XENFB_OUT_RING_LEN)
-        schedule();
-    remove_waiter(w);
+    update.type = XENFB_TYPE_UPDATE;
+    update.x = x;
+    update.y = y;
+    update.width = width;
+    update.height = height;
+    fbfront_out_event(dev, (union xenfb_out_event *) &update);
+}
 
-    prod = page->out_prod;
-    mb(); /* ensure ring space available */
-    XENFB_OUT_RING_REF(page, prod).type = XENFB_TYPE_UPDATE;
-    XENFB_OUT_RING_REF(page, prod).update.x = x;
-    XENFB_OUT_RING_REF(page, prod).update.y = y;
-    XENFB_OUT_RING_REF(page, prod).update.width = width;
-    XENFB_OUT_RING_REF(page, prod).update.height = height;
-    wmb(); /* ensure ring contents visible */
-    page->out_prod = prod + 1;
-    notify_remote_via_evtchn(dev->evtchn);
+void fbfront_resize(struct fbfront_dev *dev, int width, int height, int stride, int depth, int offset)
+{
+    struct xenfb_resize resize;
+
+    resize.type = XENFB_TYPE_RESIZE;
+    dev->width  = resize.width = width;
+    dev->height = resize.height = height;
+    dev->stride = resize.stride = stride;
+    dev->depth  = resize.depth = depth;
+    dev->offset = resize.offset = offset;
+    fbfront_out_event(dev, (union xenfb_out_event *) &resize);
 }
 
 void shutdown_fbfront(struct fbfront_dev *dev)

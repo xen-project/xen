@@ -2595,6 +2595,10 @@ static void *set_vram_mapping(unsigned long begin, unsigned long end)
 
     memset(vram_pointer, 0, nr_extents * TARGET_PAGE_SIZE);
 
+#ifdef CONFIG_STUBDOM
+    xenfb_pv_display_start(vram_pointer);
+#endif
+
     free(extent_start);
 
     return vram_pointer;

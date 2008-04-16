@@ -2067,8 +2067,8 @@ void vga_common_init(VGAState *s, DisplayState *ds, uint8_t *vga_ram_base,
                                  & ~(TARGET_PAGE_SIZE - 1));
 
     /* Video RAM must be 128-bit aligned for SSE optimizations later */
-    s->vram_alloc = qemu_malloc(vga_ram_size + 15);
-    s->vram_ptr = (uint8_t *)((long)(s->vram_alloc + 15) & ~15L);
+    /* and page-aligned for PVFB memory sharing */
+    s->vram_ptr = s->vram_alloc = qemu_memalign(TARGET_PAGE_SIZE, vga_ram_size);
 
     s->vram_offset = vga_ram_offset;
     s->vram_size = vga_ram_size;
@@ -2210,7 +2210,7 @@ void *vga_update_vram(VGAState *s, void *vga_ram_base, int vga_ram_size)
     }
 
     if (!vga_ram_base) {
-        vga_ram_base = qemu_malloc(vga_ram_size + TARGET_PAGE_SIZE + 1);
+        vga_ram_base = qemu_memalign(TARGET_PAGE_SIZE, vga_ram_size + TARGET_PAGE_SIZE + 1);
         if (!vga_ram_base) {
             fprintf(stderr, "reallocate error\n");
             return NULL;

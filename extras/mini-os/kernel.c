@@ -297,9 +297,20 @@ static void fbfront_thread(void *p)
 {
     size_t line_length = WIDTH * (DEPTH / 8);
     size_t memsize = HEIGHT * line_length;
+    unsigned long *mfns;
+    int i, n = (memsize + PAGE_SIZE-1) / PAGE_SIZE;
 
+    memsize = n * PAGE_SIZE;
     fb = _xmalloc(memsize, PAGE_SIZE);
-    fb_dev = init_fbfront(NULL, fb, WIDTH, HEIGHT, DEPTH, line_length, memsize);
+    mfns = xmalloc_array(unsigned long, n);
+    for (i = 0; i < n; i++) {
+        /* trigger CoW */
+        ((char *) fb) [i * PAGE_SIZE] = 0;
+        barrier();
+        mfns[i] = virtual_to_mfn((char *) fb + i * PAGE_SIZE);
+    }
+    fb_dev = init_fbfront(NULL, mfns, WIDTH, HEIGHT, DEPTH, line_length, n);
+    xfree(mfns);
     if (!fb_dev) {
         xfree(fb);
         return;

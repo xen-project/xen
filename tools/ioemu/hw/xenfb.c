@@ -1235,14 +1235,10 @@ static int xenfb_register_console(struct xenfb *xenfb) {
 static struct semaphore kbd_sem = __SEMAPHORE_INITIALIZER(kbd_sem, 0);
 static struct kbdfront_dev *kbd_dev;
 static char *kbd_path, *fb_path;
+static void *vga_vram, *nonshared_vram;
+static DisplayState *xenfb_ds;
 
 static unsigned char linux2scancode[KEY_MAX + 1];
-
-#define WIDTH 1024
-#define HEIGHT 768
-#define DEPTH 32
-#define LINESIZE (1280 * (DEPTH / 8))
-#define MEMSIZE (LINESIZE * HEIGHT)
 
 int xenfb_connect_vkbd(const char *path)
 {
@@ -1256,33 +1252,73 @@ int xenfb_connect_vfb(const char *path)
     return 0;
 }
 
-static void xenfb_pv_update(DisplayState *s, int x, int y, int w, int h)
+static void xenfb_pv_update(DisplayState *ds, int x, int y, int w, int h)
 {
-    struct fbfront_dev *fb_dev = s->opaque;
+    struct fbfront_dev *fb_dev = ds->opaque;
+    if (!fb_dev)
+        return;
     fbfront_update(fb_dev, x, y, w, h);
 }
 
-static void xenfb_pv_resize(DisplayState *s, int w, int h, int linesize)
+static void xenfb_pv_resize(DisplayState *ds, int w, int h, int linesize)
 {
-    struct fbfront_dev *fb_dev = s->opaque;
-    fprintf(stderr,"resize to %dx%d required\n", w, h);
-    s->width = w;
-    s->height = h;
-    /* TODO: send resize event if supported */
-    memset(s->data, 0, MEMSIZE);
-    fbfront_update(fb_dev, 0, 0, WIDTH, HEIGHT);
+    struct fbfront_dev *fb_dev = ds->opaque;
+    fprintf(stderr,"resize to %dx%d, %d required\n", w, h, linesize);
+    ds->width = w;
+    ds->height = h;
+    if (!linesize)
+        ds->shared_buf = 0;
+    if (!ds->shared_buf)
+        linesize = w * 4;
+    ds->linesize = linesize;
+    if (!fb_dev)
+        return;
+    if (ds->shared_buf) {
+        ds->data = NULL;
+    } else {
+        ds->data = nonshared_vram;
+        fbfront_resize(fb_dev, w, h, linesize, ds->depth, VGA_RAM_SIZE);
+    }
 }
 
 static void xenfb_pv_colourdepth(DisplayState *ds, int depth)
 {
-    /* TODO: send redepth event if supported */
+    struct fbfront_dev *fb_dev = ds->opaque;
     static int lastdepth = -1;
+    if (!depth) {
+        ds->shared_buf = 0;
+        ds->depth = 32;
+    } else {
+        ds->shared_buf = 1;
+        ds->depth = depth;
+    }
     if (depth != lastdepth) {
         fprintf(stderr,"redepth to %d required\n", depth);
         lastdepth = depth;
+    } else return;
+    if (!fb_dev)
+        return;
+    if (ds->shared_buf) {
+        ds->data = NULL;
+    } else {
+        ds->data = nonshared_vram;
+        fbfront_resize(fb_dev, ds->width, ds->height, ds->linesize, ds->depth, VGA_RAM_SIZE);
     }
-    /* We can't redepth for now */
-    ds->depth = DEPTH;
+}
+
+static void xenfb_pv_setdata(DisplayState *ds, void *pixels)
+{
+    struct fbfront_dev *fb_dev = ds->opaque;
+    int offset = pixels - vga_vram;
+    ds->data = pixels;
+    if (!fb_dev)
+        return;
+    fbfront_resize(fb_dev, ds->width, ds->height, ds->linesize, ds->depth, offset);
+}
+
+static void xenfb_pv_refresh(DisplayState *ds)
+{
+    vga_hw_update();
 }
 
 static void xenfb_kbd_handler(void *opaque)
@@ -1373,13 +1409,6 @@ static void xenfb_kbd_handler(void *opaque)
     }
 }
 
-static void xenfb_pv_refresh(DisplayState *ds)
-{
-    /* always request negociation */
-    ds->depth = -1;
-    vga_hw_update();
-}
-
 static void kbdfront_thread(void *p)
 {
     int scancode, keycode;
@@ -1399,22 +1428,64 @@ static void kbdfront_thread(void *p)
 
 int xenfb_pv_display_init(DisplayState *ds)
 {
-    void *data;
-    struct fbfront_dev *fb_dev;
-    int kbd_fd;
-
     if (!fb_path || !kbd_path)
         return -1;
 
     create_thread("kbdfront", kbdfront_thread, (void*) kbd_path);
 
-    data = qemu_memalign(PAGE_SIZE, VGA_RAM_SIZE);
-    fb_dev = init_fbfront(fb_path, data, WIDTH, HEIGHT, DEPTH, LINESIZE, MEMSIZE);
+    xenfb_ds = ds;
+
+    ds->data = nonshared_vram = qemu_memalign(PAGE_SIZE, VGA_RAM_SIZE);
+    memset(ds->data, 0, VGA_RAM_SIZE);
+    ds->depth = 32;
+    ds->bgr = 0;
+    ds->width = 640;
+    ds->height = 400;
+    ds->linesize = 640 * 4;
+    ds->dpy_update = xenfb_pv_update;
+    ds->dpy_resize = xenfb_pv_resize;
+    ds->dpy_colourdepth = xenfb_pv_colourdepth;
+    ds->dpy_setdata = xenfb_pv_setdata;
+    ds->dpy_refresh = xenfb_pv_refresh;
+    return 0;
+}
+
+int xenfb_pv_display_start(void *data)
+{
+    DisplayState *ds = xenfb_ds;
+    struct fbfront_dev *fb_dev;
+    int kbd_fd;
+    int offset = 0;
+    unsigned long *mfns;
+    int n = VGA_RAM_SIZE / PAGE_SIZE;
+    int i;
+
+    if (!fb_path || !kbd_path)
+        return 0;
+
+    vga_vram = data;
+    mfns = malloc(2 * n * sizeof(*mfns));
+    for (i = 0; i < n; i++)
+        mfns[i] = virtual_to_mfn(vga_vram + i * PAGE_SIZE);
+    for (i = 0; i < n; i++)
+        mfns[n + i] = virtual_to_mfn(nonshared_vram + i * PAGE_SIZE);
+
+    fb_dev = init_fbfront(fb_path, mfns, ds->width, ds->height, ds->depth, ds->linesize, 2 * n);
+    free(mfns);
     if (!fb_dev) {
         fprintf(stderr,"can't open frame buffer\n");
         exit(1);
     }
     free(fb_path);
+
+    if (ds->shared_buf) {
+        offset = (void*) ds->data - vga_vram;
+    } else {
+        offset = VGA_RAM_SIZE;
+        ds->data = nonshared_vram;
+    }
+    if (offset)
+        fbfront_resize(fb_dev, ds->width, ds->height, ds->linesize, ds->depth, offset);
 
     down(&kbd_sem);
     free(kbd_path);
@@ -1422,17 +1493,7 @@ int xenfb_pv_display_init(DisplayState *ds)
     kbd_fd = kbdfront_open(kbd_dev);
     qemu_set_fd_handler(kbd_fd, xenfb_kbd_handler, NULL, ds);
 
-    ds->data = data;
-    ds->linesize = LINESIZE;
-    ds->depth = DEPTH;
-    ds->bgr = 0;
-    ds->width = WIDTH;
-    ds->height = HEIGHT;
-    ds->dpy_update = xenfb_pv_update;
-    ds->dpy_resize = xenfb_pv_resize;
-    ds->dpy_colourdepth = xenfb_pv_colourdepth;
-    ds->dpy_refresh = xenfb_pv_refresh;
-    ds->opaque = fb_dev;
+    xenfb_ds->opaque = fb_dev;
     return 0;
 }
 #endif
