@@ -342,8 +342,18 @@ struct x86_emulate_ops
         uint8_t insn_len,
         struct x86_emulate_ctxt *ctxt);
 
-    /* load_fpu_ctxt: Load emulated environment's FPU state onto processor. */
-    void (*load_fpu_ctxt)(
+    /*
+     * get_fpu: Load emulated environment's FPU state onto processor.
+     *  @exn_callback: On any FPU or SIMD exception, pass control to
+     *                 (*exception_callback)(exception_callback_arg, regs).
+     */
+    void (*get_fpu)(
+        void (*exception_callback)(void *, struct cpu_user_regs *),
+        void *exception_callback_arg,
+        struct x86_emulate_ctxt *ctxt);
+
+    /* put_fpu: Relinquish the FPU. Unhook from FPU/SIMD exception handlers. */
+    void (*put_fpu)(
         struct x86_emulate_ctxt *ctxt);
 
     /* invlpg: Invalidate paging structures which map addressed byte. */

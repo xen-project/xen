@@ -546,6 +546,45 @@ do {                                                                    \
                      ? (uint16_t)_regs.eip : (uint32_t)_regs.eip);      \
 } while (0)
 
+struct fpu_insn_ctxt {
+    uint8_t insn_bytes;
+    uint8_t exn_raised;
+};
+
+static void fpu_handle_exception(void *_fic, struct cpu_user_regs *regs)
+{
+    struct fpu_insn_ctxt *fic = _fic;
+    fic->exn_raised = 1;
+    regs->eip += fic->insn_bytes;
+}
+
+#define __emulate_fpu_insn(_op)                         \
+do{ struct fpu_insn_ctxt fic = { 0 };                   \
+    fail_if(ops->get_fpu == NULL);                      \
+    ops->get_fpu(fpu_handle_exception, &fic, ctxt);     \
+    asm volatile (                                      \
+        "movb $2f-1f,%0 \n"                             \
+        "1: " _op "     \n"                             \
+        "2:             \n"                             \
+        : "=m" (fic.insn_bytes) : : "memory" );         \
+    ops->put_fpu(ctxt);                                 \
+    generate_exception_if(fic.exn_raised, EXC_MF, -1);  \
+} while (0)
+
+#define __emulate_fpu_insn_memdst(_op, _arg)            \
+do{ struct fpu_insn_ctxt fic = { 0 };                   \
+    fail_if(ops->get_fpu == NULL);                      \
+    ops->get_fpu(fpu_handle_exception, &fic, ctxt);     \
+    asm volatile (                                      \
+        "movb $2f-1f,%0 \n"                             \
+        "1: " _op " %1  \n"                             \
+        "2:             \n"                             \
+        : "=m" (fic.insn_bytes), "=m" (_arg)            \
+        : : "memory" );                                 \
+    ops->put_fpu(ctxt);                                 \
+    generate_exception_if(fic.exn_raised, EXC_MF, -1);  \
+} while (0)
+
 static unsigned long __get_rep_prefix(
     struct cpu_user_regs *int_regs,
     struct cpu_user_regs *ext_regs,
@@ -2399,8 +2438,6 @@ x86_emulate(
     }
 
     case 0x9b:  /* wait/fwait */
-        fail_if(ops->load_fpu_ctxt == NULL);
-        ops->load_fpu_ctxt(ctxt);
         __emulate_fpu_insn("fwait");
         break;
 
@@ -2721,53 +2758,46 @@ x86_emulate(
     }
 
     case 0xd9: /* FPU 0xd9 */
-        fail_if(ops->load_fpu_ctxt == NULL);
-        ops->load_fpu_ctxt(ctxt);
         switch ( modrm )
         {
-        case 0xc0: __emulate_fpu_insn(".byte 0xd9,0xc0"); break;
-        case 0xc1: __emulate_fpu_insn(".byte 0xd9,0xc1"); break;
-        case 0xc2: __emulate_fpu_insn(".byte 0xd9,0xc2"); break;
-        case 0xc3: __emulate_fpu_insn(".byte 0xd9,0xc3"); break;
-        case 0xc4: __emulate_fpu_insn(".byte 0xd9,0xc4"); break;
-        case 0xc5: __emulate_fpu_insn(".byte 0xd9,0xc5"); break;
-        case 0xc6: __emulate_fpu_insn(".byte 0xd9,0xc6"); break;
-        case 0xc7: __emulate_fpu_insn(".byte 0xd9,0xc7"); break;
-        case 0xe0: __emulate_fpu_insn(".byte 0xd9,0xe0"); break;
-        case 0xe8: __emulate_fpu_insn(".byte 0xd9,0xe8"); break;
-        case 0xee: __emulate_fpu_insn(".byte 0xd9,0xee"); break;
+        case 0xc0: __emulate_fpu_insn(".byte 0xd9,0xc0"); break; /* fld %st0 */
+        case 0xc1: __emulate_fpu_insn(".byte 0xd9,0xc1"); break; /* fld %st1 */
+        case 0xc2: __emulate_fpu_insn(".byte 0xd9,0xc2"); break; /* fld %st2 */
+        case 0xc3: __emulate_fpu_insn(".byte 0xd9,0xc3"); break; /* fld %st3 */
+        case 0xc4: __emulate_fpu_insn(".byte 0xd9,0xc4"); break; /* fld %st4 */
+        case 0xc5: __emulate_fpu_insn(".byte 0xd9,0xc5"); break; /* fld %st5 */
+        case 0xc6: __emulate_fpu_insn(".byte 0xd9,0xc6"); break; /* fld %st6 */
+        case 0xc7: __emulate_fpu_insn(".byte 0xd9,0xc7"); break; /* fld %st7 */
+        case 0xe0: __emulate_fpu_insn(".byte 0xd9,0xe0"); break; /* fchs */
+        case 0xe1: __emulate_fpu_insn(".byte 0xd9,0xe1"); break; /* fabs */
+        case 0xe8: __emulate_fpu_insn(".byte 0xd9,0xe8"); break; /* fld1 */
+        case 0xee: __emulate_fpu_insn(".byte 0xd9,0xee"); break; /* fldz */
         default:
             fail_if((modrm_reg & 7) != 7);
             fail_if(modrm >= 0xc0);
             /* fnstcw m2byte */
             ea.bytes = 2;
             dst = ea;
-            asm volatile ( "fnstcw %0" : "=m" (dst.val) );
+            __emulate_fpu_insn_memdst("fnstcw", dst.val);
         }
         break;
 
     case 0xdb: /* FPU 0xdb */
-        fail_if(ops->load_fpu_ctxt == NULL);
-        ops->load_fpu_ctxt(ctxt);
         fail_if(modrm != 0xe3);
         /* fninit */
-        asm volatile ( "fninit" );
+        __emulate_fpu_insn("fninit");
         break;
 
     case 0xdd: /* FPU 0xdd */
-        fail_if(ops->load_fpu_ctxt == NULL);
-        ops->load_fpu_ctxt(ctxt);
         fail_if((modrm_reg & 7) != 7);
         fail_if(modrm >= 0xc0);
         /* fnstsw m2byte */
         ea.bytes = 2;
         dst = ea;
-        asm volatile ( "fnstsw %0" : "=m" (dst.val) );
+        __emulate_fpu_insn_memdst("fnstsw", dst.val);
         break;
 
     case 0xde: /* FPU 0xde */
-        fail_if(ops->load_fpu_ctxt == NULL);
-        ops->load_fpu_ctxt(ctxt);
         switch ( modrm )
         {
         case 0xd9: __emulate_fpu_insn(".byte 0xde,0xd9"); break;
@@ -2784,14 +2814,12 @@ x86_emulate(
         break;
 
     case 0xdf: /* FPU 0xdf */
-        fail_if(ops->load_fpu_ctxt == NULL);
-        ops->load_fpu_ctxt(ctxt);
         fail_if(modrm != 0xe0);
         /* fnstsw %ax */
         dst.bytes = 2;
         dst.type = OP_REG;
         dst.reg = (unsigned long *)&_regs.eax;
-        asm volatile ( "fnstsw %0" : "=m" (dst.val) );
+        __emulate_fpu_insn_memdst("fnstsw", dst.val);
         break;
 
     case 0xe0 ... 0xe2: /* loop{,z,nz} */ {

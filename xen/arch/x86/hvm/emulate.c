@@ -674,11 +674,23 @@ static int hvmemul_inject_sw_interrupt(
     return X86EMUL_OKAY;
 }
 
-static void hvmemul_load_fpu_ctxt(
+static void hvmemul_get_fpu(
+    void (*exception_callback)(void *, struct cpu_user_regs *),
+    void *exception_callback_arg,
     struct x86_emulate_ctxt *ctxt)
 {
-    if ( !current->fpu_dirtied )
+    struct vcpu *curr = current;
+    if ( !curr->fpu_dirtied )
         hvm_funcs.fpu_dirty_intercept();
+    curr->arch.hvm_vcpu.fpu_exception_callback = exception_callback;
+    curr->arch.hvm_vcpu.fpu_exception_callback_arg = exception_callback_arg;
+}
+
+static void hvmemul_put_fpu(
+    struct x86_emulate_ctxt *ctxt)
+{
+    struct vcpu *curr = current;
+    curr->arch.hvm_vcpu.fpu_exception_callback = NULL;
 }
 
 static int hvmemul_invlpg(
@@ -720,7 +732,8 @@ static struct x86_emulate_ops hvm_emulate_ops = {
     .cpuid         = hvmemul_cpuid,
     .inject_hw_exception = hvmemul_inject_hw_exception,
     .inject_sw_interrupt = hvmemul_inject_sw_interrupt,
-    .load_fpu_ctxt = hvmemul_load_fpu_ctxt,
+    .get_fpu       = hvmemul_get_fpu,
+    .put_fpu       = hvmemul_put_fpu,
     .invlpg        = hvmemul_invlpg
 };
 

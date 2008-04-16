@@ -479,6 +479,7 @@ asmlinkage int set_guest_nmi_trapbounce(void)
 static inline void do_trap(
     int trapnr, struct cpu_user_regs *regs, int use_error_code)
 {
+    struct vcpu *curr = current;
     unsigned long fixup;
 
     DEBUGGER_trap_entry(trapnr, regs);
@@ -494,6 +495,14 @@ static inline void do_trap(
         dprintk(XENLOG_ERR, "Trap %d: %p -> %p\n",
                 trapnr, _p(regs->eip), _p(fixup));
         regs->eip = fixup;
+        return;
+    }
+
+    if ( ((trapnr == TRAP_copro_error) || (trapnr == TRAP_simd_error)) &&
+         is_hvm_vcpu(curr) && curr->arch.hvm_vcpu.fpu_exception_callback )
+    {
+        curr->arch.hvm_vcpu.fpu_exception_callback(
+            curr->arch.hvm_vcpu.fpu_exception_callback_arg, regs);
         return;
     }
 

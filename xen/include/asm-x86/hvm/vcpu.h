@@ -83,6 +83,9 @@ struct hvm_vcpu {
      */
     unsigned long       mmio_gva;
     unsigned long       mmio_gpfn;
+
+    void (*fpu_exception_callback)(void *, struct cpu_user_regs *);
+    void *fpu_exception_callback_arg;
 };
 
 #endif /* __ASM_X86_HVM_VCPU_H__ */
