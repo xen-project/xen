@@ -911,6 +911,9 @@ static void svm_cpuid_intercept(
             __clear_bit(X86_FEATURE_PAE & 31, edx);
         __clear_bit(X86_FEATURE_PSE36 & 31, edx);
 
+        /* We always support MTRR MSRs. */
+        *edx |= bitmaskof(X86_FEATURE_MTRR);
+
         /* Filter all other features according to a whitelist. */
         *ecx &= (bitmaskof(X86_FEATURE_LAHF_LM) |
                  bitmaskof(X86_FEATURE_ALTMOVCR) |
@@ -981,14 +984,6 @@ static int svm_msr_read_intercept(struct cpu_user_regs *regs)
 
     switch ( ecx )
     {
-    case MSR_IA32_TSC:
-        msr_content = hvm_get_guest_time(v);
-        break;
-
-    case MSR_IA32_APICBASE:
-        msr_content = vcpu_vlapic(v)->hw.apic_base_msr;
-        break;
-
     case MSR_EFER:
         msr_content = v->arch.hvm_vcpu.guest_efer;
         break;
@@ -1013,18 +1008,6 @@ static int svm_msr_read_intercept(struct cpu_user_regs *regs)
 
     case MSR_K8_VM_HSAVE_PA:
         goto gpf;
-
-    case MSR_IA32_MCG_CAP:
-    case MSR_IA32_MCG_STATUS:
-    case MSR_IA32_MC0_STATUS:
-    case MSR_IA32_MC1_STATUS:
-    case MSR_IA32_MC2_STATUS:
-    case MSR_IA32_MC3_STATUS:
-    case MSR_IA32_MC4_STATUS:
-    case MSR_IA32_MC5_STATUS:
-        /* No point in letting the guest see real MCEs */
-        msr_content = 0;
-        break;
 
     case MSR_IA32_DEBUGCTLMSR:
         msr_content = vmcb->debugctlmsr;
@@ -1083,15 +1066,6 @@ static int svm_msr_write_intercept(struct cpu_user_regs *regs)
 
     switch ( ecx )
     {
-    case MSR_IA32_TSC:
-        hvm_set_guest_time(v, msr_content);
-        pt_reset(v);
-        break;
-
-    case MSR_IA32_APICBASE:
-        vlapic_msr_set(vcpu_vlapic(v), msr_content);
-        break;
-
     case MSR_K8_VM_HSAVE_PA:
         goto gpf;
 
@@ -1152,12 +1126,12 @@ static void svm_do_msr_access(struct cpu_user_regs *regs)
 
     if ( vmcb->exitinfo1 == 0 )
     {
-        rc = svm_msr_read_intercept(regs);
+        rc = hvm_msr_read_intercept(regs);
         inst_len = __get_instruction_length(v, INSTR_RDMSR, NULL);
     }
     else
     {
-        rc = svm_msr_write_intercept(regs);
+        rc = hvm_msr_write_intercept(regs);
         inst_len = __get_instruction_length(v, INSTR_WRMSR, NULL);
     }
 

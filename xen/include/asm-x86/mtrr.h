@@ -12,13 +12,6 @@
 #define MTRR_NUM_TYPES       7
 #define MEMORY_NUM_TYPES     MTRR_NUM_TYPES
 
-#define MTRR_PHYSMASK_VALID_BIT  11
-#define MTRR_PHYSMASK_SHIFT      12
-
-#define MTRR_PHYSBASE_TYPE_MASK  0xff   /* lowest 8 bits */
-#define MTRR_PHYSBASE_SHIFT      12
-#define MTRR_VCNT            8
-
 #define NORMAL_CACHE_MODE          0
 #define NO_FILL_CACHE_MODE         2
 
@@ -58,7 +51,6 @@ struct mtrr_state {
 	u64       mtrr_cap;
 	/* ranges in var MSRs are overlapped or not:0(no overlapped) */
 	bool_t    overlapped;
-	bool_t    is_initialized;
 };
 
 extern void mtrr_save_fixed_ranges(void *);

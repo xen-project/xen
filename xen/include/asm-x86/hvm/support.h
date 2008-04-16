@@ -130,5 +130,7 @@ int hvm_set_efer(uint64_t value);
 int hvm_set_cr0(unsigned long value);
 int hvm_set_cr3(unsigned long value);
 int hvm_set_cr4(unsigned long value);
+int hvm_msr_read_intercept(struct cpu_user_regs *regs);
+int hvm_msr_write_intercept(struct cpu_user_regs *regs);
 
 #endif /* __ASM_X86_HVM_SUPPORT_H__ */

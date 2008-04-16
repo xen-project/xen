@@ -159,7 +159,7 @@ static void pci_setup(void)
     struct resource {
         uint32_t base, max;
     } *resource;
-    struct resource mem_resource = { 0xf0000000, 0xfc000000 };
+    struct resource mem_resource = { PCI_MEMBASE, PCI_MEMBASE + PCI_MEMSIZE };
     struct resource io_resource  = { 0xc000, 0x10000 };
 
     /* Create a list of device BARs in descending order of size. */

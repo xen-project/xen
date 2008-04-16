@@ -603,7 +603,7 @@ static int hvmemul_read_msr(
 
     _regs.ecx = (uint32_t)reg;
 
-    if ( (rc = hvm_funcs.msr_read_intercept(&_regs)) != 0 )
+    if ( (rc = hvm_msr_read_intercept(&_regs)) != 0 )
         return rc;
 
     *val = ((uint64_t)(uint32_t)_regs.edx << 32) || (uint32_t)_regs.eax;
@@ -621,7 +621,7 @@ static int hvmemul_write_msr(
     _regs.eax = (uint32_t)val;
     _regs.ecx = (uint32_t)reg;
 
-    return hvm_funcs.msr_write_intercept(&_regs);
+    return hvm_msr_write_intercept(&_regs);
 }
 
 static int hvmemul_wbinvd(

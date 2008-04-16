@@ -620,8 +620,6 @@ static int hvm_load_cpu_ctxt(struct domain *d, hvm_domain_context_t *h)
 HVM_REGISTER_SAVE_RESTORE(CPU, hvm_save_cpu_ctxt, hvm_load_cpu_ctxt,
                           1, HVMSR_PER_VCPU);
 
-extern int reset_vmsr(struct mtrr_state *m, u64 *p);
-
 int hvm_vcpu_initialise(struct vcpu *v)
 {
     int rc;
@@ -647,7 +645,7 @@ int hvm_vcpu_initialise(struct vcpu *v)
     spin_lock_init(&v->arch.hvm_vcpu.tm_lock);
     INIT_LIST_HEAD(&v->arch.hvm_vcpu.tm_list);
 
-    rc = reset_vmsr(&v->arch.hvm_vcpu.mtrr, &v->arch.hvm_vcpu.pat_cr);
+    rc = hvm_vcpu_cacheattr_init(v);
     if ( rc != 0 )
         goto fail3;
 
@@ -681,8 +679,7 @@ int hvm_vcpu_initialise(struct vcpu *v)
 
 void hvm_vcpu_destroy(struct vcpu *v)
 {
-    xfree(v->arch.hvm_vcpu.mtrr.var_ranges);
-
+    hvm_vcpu_cacheattr_destroy(v);
     vlapic_destroy(v);
     hvm_funcs.vcpu_destroy(v);
 
@@ -1606,6 +1603,9 @@ void hvm_cpuid(unsigned int input, unsigned int *eax, unsigned int *ebx,
         *ebx &= 0x0000FFFFu;
         *ebx |= (current->vcpu_id * 2) << 24;
 
+        /* We always support MTRR MSRs. */
+        *edx |= bitmaskof(X86_FEATURE_MTRR);
+
         *ecx &= (bitmaskof(X86_FEATURE_XMM3) |
                  bitmaskof(X86_FEATURE_SSSE3) |
                  bitmaskof(X86_FEATURE_CX16) |
@@ -1655,6 +1655,146 @@ void hvm_cpuid(unsigned int input, unsigned int *eax, unsigned int *ebx,
 #endif
         break;
     }
+}
+
+int hvm_msr_read_intercept(struct cpu_user_regs *regs)
+{
+    uint32_t ecx = regs->ecx;
+    uint64_t msr_content = 0;
+    struct vcpu *v = current;
+    uint64_t *var_range_base, *fixed_range_base;
+    int index;
+
+    var_range_base = (uint64_t *)v->arch.hvm_vcpu.mtrr.var_ranges;
+    fixed_range_base = (uint64_t *)v->arch.hvm_vcpu.mtrr.fixed_ranges;
+
+    switch ( ecx )
+    {
+    case MSR_IA32_TSC:
+        msr_content = hvm_get_guest_time(v);
+        break;
+
+    case MSR_IA32_APICBASE:
+        msr_content = vcpu_vlapic(v)->hw.apic_base_msr;
+        break;
+
+    case MSR_IA32_MCG_CAP:
+    case MSR_IA32_MCG_STATUS:
+    case MSR_IA32_MC0_STATUS:
+    case MSR_IA32_MC1_STATUS:
+    case MSR_IA32_MC2_STATUS:
+    case MSR_IA32_MC3_STATUS:
+    case MSR_IA32_MC4_STATUS:
+    case MSR_IA32_MC5_STATUS:
+        /* No point in letting the guest see real MCEs */
+        msr_content = 0;
+        break;
+
+    case MSR_IA32_CR_PAT:
+        msr_content = v->arch.hvm_vcpu.pat_cr;
+        break;
+
+    case MSR_MTRRcap:
+        msr_content = v->arch.hvm_vcpu.mtrr.mtrr_cap;
+        break;
+    case MSR_MTRRdefType:
+        msr_content = v->arch.hvm_vcpu.mtrr.def_type
+                        | (v->arch.hvm_vcpu.mtrr.enabled << 10);
+        break;
+    case MSR_MTRRfix64K_00000:
+        msr_content = fixed_range_base[0];
+        break;
+    case MSR_MTRRfix16K_80000:
+    case MSR_MTRRfix16K_A0000:
+        index = regs->ecx - MSR_MTRRfix16K_80000;
+        msr_content = fixed_range_base[index + 1];
+        break;
+    case MSR_MTRRfix4K_C0000...MSR_MTRRfix4K_F8000:
+        index = regs->ecx - MSR_MTRRfix4K_C0000;
+        msr_content = fixed_range_base[index + 3];
+        break;
+    case MSR_IA32_MTRR_PHYSBASE0...MSR_IA32_MTRR_PHYSMASK7:
+        index = regs->ecx - MSR_IA32_MTRR_PHYSBASE0;
+        msr_content = var_range_base[index];
+        break;
+
+    default:
+        return hvm_funcs.msr_read_intercept(regs);
+    }
+
+    regs->eax = (uint32_t)msr_content;
+    regs->edx = (uint32_t)(msr_content >> 32);
+    return X86EMUL_OKAY;
+}
+
+int hvm_msr_write_intercept(struct cpu_user_regs *regs)
+{
+    extern bool_t mtrr_var_range_msr_set(
+        struct mtrr_state *v, u32 msr, u64 msr_content);
+    extern bool_t mtrr_fix_range_msr_set(
+        struct mtrr_state *v, int row, u64 msr_content);
+    extern bool_t mtrr_def_type_msr_set(struct mtrr_state *v, u64 msr_content);
+    extern bool_t pat_msr_set(u64 *pat, u64 msr);
+
+    uint32_t ecx = regs->ecx;
+    uint64_t msr_content = (uint32_t)regs->eax | ((uint64_t)regs->edx << 32);
+    struct vcpu *v = current;
+    int index;
+
+    switch ( ecx )
+    {
+     case MSR_IA32_TSC:
+        hvm_set_guest_time(v, msr_content);
+        pt_reset(v);
+        break;
+
+    case MSR_IA32_APICBASE:
+        vlapic_msr_set(vcpu_vlapic(v), msr_content);
+        break;
+
+    case MSR_IA32_CR_PAT:
+        if ( !pat_msr_set(&v->arch.hvm_vcpu.pat_cr, msr_content) )
+           goto gp_fault;
+        break;
+
+    case MSR_MTRRcap:
+        goto gp_fault;
+    case MSR_MTRRdefType:
+        if ( !mtrr_def_type_msr_set(&v->arch.hvm_vcpu.mtrr, msr_content) )
+           goto gp_fault;
+        break;
+    case MSR_MTRRfix64K_00000:
+        if ( !mtrr_fix_range_msr_set(&v->arch.hvm_vcpu.mtrr, 0, msr_content) )
+            goto gp_fault;
+        break;
+    case MSR_MTRRfix16K_80000:
+    case MSR_MTRRfix16K_A0000:
+        index = regs->ecx - MSR_MTRRfix16K_80000 + 1;
+        if ( !mtrr_fix_range_msr_set(&v->arch.hvm_vcpu.mtrr,
+                                     index, msr_content) )
+            goto gp_fault;
+        break;
+    case MSR_MTRRfix4K_C0000...MSR_MTRRfix4K_F8000:
+        index = regs->ecx - MSR_MTRRfix4K_C0000 + 3;
+        if ( !mtrr_fix_range_msr_set(&v->arch.hvm_vcpu.mtrr,
+                                     index, msr_content) )
+            goto gp_fault;
+        break;
+    case MSR_IA32_MTRR_PHYSBASE0...MSR_IA32_MTRR_PHYSMASK7:
+        if ( !mtrr_var_range_msr_set(&v->arch.hvm_vcpu.mtrr,
+                                     regs->ecx, msr_content) )
+            goto gp_fault;
+        break;
+
+    default:
+        return hvm_funcs.msr_write_intercept(regs);
+    }
+
+    return X86EMUL_OKAY;
+
+gp_fault:
+    hvm_inject_exception(TRAP_gp_fault, 0, 0);
+    return X86EMUL_EXCEPTION;
 }
 
 enum hvm_intblk hvm_interrupt_blocked(struct vcpu *v, struct hvm_intack intack)
