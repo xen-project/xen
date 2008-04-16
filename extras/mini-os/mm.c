@@ -36,6 +36,7 @@
 
 #include <os.h>
 #include <hypervisor.h>
+#include <xen/memory.h>
 #include <mm.h>
 #include <types.h>
 #include <lib.h>
@@ -358,6 +359,17 @@ void free_pages(void *pointer, int order)
     freed_ch->next->pprev = &freed_ch->next;
     free_head[order] = freed_ch;   
    
+}
+
+int free_physical_pages(xen_pfn_t *mfns, int n)
+{
+    struct xen_memory_reservation reservation;
+
+    set_xen_guest_handle(reservation.extent_start, mfns);
+    reservation.nr_extents = n;
+    reservation.extent_order = 0;
+    reservation.domid = DOMID_SELF;
+    return HYPERVISOR_memory_op(XENMEM_decrease_reservation, &reservation);
 }
 
 #ifdef HAVE_LIBC

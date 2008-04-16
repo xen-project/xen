@@ -187,6 +187,7 @@ extern struct file {
 int alloc_fd(enum fd_type type);
 void close_all_files(void);
 extern struct thread *main_thread;
+void sparse(unsigned long data, size_t size);
 #endif
 
 #endif /* _LIB_H_ */
