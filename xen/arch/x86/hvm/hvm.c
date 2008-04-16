@@ -681,6 +681,8 @@ int hvm_vcpu_initialise(struct vcpu *v)
 
 void hvm_vcpu_destroy(struct vcpu *v)
 {
+    xfree(v->arch.hvm_vcpu.mtrr.var_ranges);
+
     vlapic_destroy(v);
     hvm_funcs.vcpu_destroy(v);
 
