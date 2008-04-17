@@ -95,6 +95,12 @@ struct segment_register {
  /* (cmpxchg accessor): CMPXCHG failed. Maps to X86EMUL_RETRY in caller. */
 #define X86EMUL_CMPXCHG_FAILED 3
 
+/* FPU sub-types which may be requested via ->get_fpu(). */
+enum x86_emulate_fpu_type {
+    X86EMUL_FPU_fpu, /* Standard FPU coprocessor instruction set */
+    X86EMUL_FPU_mmx  /* MMX instruction set (%mm0-%mm7) */
+};
+
 /*
  * These operations represent the instruction emulator's interface to memory.
  * 
@@ -347,9 +353,10 @@ struct x86_emulate_ops
      *  @exn_callback: On any FPU or SIMD exception, pass control to
      *                 (*exception_callback)(exception_callback_arg, regs).
      */
-    void (*get_fpu)(
+    int (*get_fpu)(
         void (*exception_callback)(void *, struct cpu_user_regs *),
         void *exception_callback_arg,
+        enum x86_emulate_fpu_type type,
         struct x86_emulate_ctxt *ctxt);
 
     /* put_fpu: Relinquish the FPU. Unhook from FPU/SIMD exception handlers. */

@@ -674,16 +674,33 @@ static int hvmemul_inject_sw_interrupt(
     return X86EMUL_OKAY;
 }
 
-static void hvmemul_get_fpu(
+static int hvmemul_get_fpu(
     void (*exception_callback)(void *, struct cpu_user_regs *),
     void *exception_callback_arg,
+    enum x86_emulate_fpu_type type,
     struct x86_emulate_ctxt *ctxt)
 {
     struct vcpu *curr = current;
+
+    switch ( type )
+    {
+    case X86EMUL_FPU_fpu:
+        break;
+    case X86EMUL_FPU_mmx:
+        if ( !cpu_has_mmx )
+            return X86EMUL_UNHANDLEABLE;
+        break;
+    default:
+        return X86EMUL_UNHANDLEABLE;
+    }
+
     if ( !curr->fpu_dirtied )
         hvm_funcs.fpu_dirty_intercept();
+
     curr->arch.hvm_vcpu.fpu_exception_callback = exception_callback;
     curr->arch.hvm_vcpu.fpu_exception_callback_arg = exception_callback_arg;
+
+    return X86EMUL_OKAY;
 }
 
 static void hvmemul_put_fpu(

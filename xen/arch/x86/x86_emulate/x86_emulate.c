@@ -195,9 +195,9 @@ static uint8_t twobyte_table[256] = {
     /* 0x50 - 0x5F */
     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
     /* 0x60 - 0x6F */
-    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, ImplicitOps|ModRM,
     /* 0x70 - 0x7F */
-    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, ImplicitOps|ModRM,
     /* 0x80 - 0x87 */
     ImplicitOps, ImplicitOps, ImplicitOps, ImplicitOps,
     ImplicitOps, ImplicitOps, ImplicitOps, ImplicitOps,
@@ -558,41 +558,48 @@ static void fpu_handle_exception(void *_fic, struct cpu_user_regs *regs)
     regs->eip += fic->insn_bytes;
 }
 
+#define get_fpu(_type, _fic)                                    \
+do{ (_fic)->exn_raised = 0;                                     \
+    fail_if(ops->get_fpu == NULL);                              \
+    rc = ops->get_fpu(fpu_handle_exception, _fic, _type, ctxt); \
+    if ( rc ) goto done;                                        \
+} while (0)
+#define put_fpu(_fic)                                           \
+do{                                                             \
+    if ( ops->put_fpu != NULL )                                 \
+        ops->put_fpu(ctxt);                                     \
+    generate_exception_if((_fic)->exn_raised, EXC_MF, -1);      \
+} while (0)
+
 #define emulate_fpu_insn(_op)                           \
-do{ struct fpu_insn_ctxt fic = { 0 };                   \
-    fail_if(ops->get_fpu == NULL);                      \
-    ops->get_fpu(fpu_handle_exception, &fic, ctxt);     \
+do{ struct fpu_insn_ctxt fic;                           \
+    get_fpu(X86EMUL_FPU_fpu, &fic);                     \
     asm volatile (                                      \
         "movb $2f-1f,%0 \n"                             \
         "1: " _op "     \n"                             \
         "2:             \n"                             \
         : "=m" (fic.insn_bytes) : : "memory" );         \
-    ops->put_fpu(ctxt);                                 \
-    generate_exception_if(fic.exn_raised, EXC_MF, -1);  \
+    put_fpu(&fic);                                      \
 } while (0)
 
 #define emulate_fpu_insn_memdst(_op, _arg)              \
-do{ struct fpu_insn_ctxt fic = { 0 };                   \
-    fail_if(ops->get_fpu == NULL);                      \
-    ops->get_fpu(fpu_handle_exception, &fic, ctxt);     \
+do{ struct fpu_insn_ctxt fic;                           \
+    get_fpu(X86EMUL_FPU_fpu, &fic);                     \
     asm volatile (                                      \
         "movb $2f-1f,%0 \n"                             \
         "1: " _op " %1  \n"                             \
         "2:             \n"                             \
         : "=m" (fic.insn_bytes), "=m" (_arg)            \
         : : "memory" );                                 \
-    ops->put_fpu(ctxt);                                 \
-    generate_exception_if(fic.exn_raised, EXC_MF, -1);  \
+    put_fpu(&fic);                                      \
 } while (0)
 
 #define emulate_fpu_insn_stub(_bytes...)                                \
 do{ uint8_t stub[] = { _bytes, 0xc3 };                                  \
     struct fpu_insn_ctxt fic = { .insn_bytes = sizeof(stub)-1 };        \
-    fail_if(ops->get_fpu == NULL);                                      \
-    ops->get_fpu(fpu_handle_exception, &fic, ctxt);                     \
+    get_fpu(X86EMUL_FPU_fpu, &fic);                                     \
     (*(void(*)(void))stub)();                                           \
-    ops->put_fpu(ctxt);                                                 \
-    generate_exception_if(fic.exn_raised, EXC_MF, -1);                  \
+    put_fpu(&fic);                                                      \
 } while (0)
 
 static unsigned long __get_rep_prefix(
@@ -3366,6 +3373,44 @@ x86_emulate(
             goto done;
         _regs.edx = (uint32_t)(val >> 32);
         _regs.eax = (uint32_t)(val >>  0);
+        break;
+    }
+
+    case 0x6f: /* movq mm/m64,mm */ {
+        uint8_t stub[] = { 0x0f, 0x6f, modrm, 0xc3 };
+        struct fpu_insn_ctxt fic = { .insn_bytes = sizeof(stub)-1 };
+        uint64_t val;
+        if ( ea.type == OP_MEM )
+        {
+            unsigned long lval, hval;
+            if ( (rc = ops->read(ea.mem.seg, ea.mem.off+0, &lval, 4, ctxt)) ||
+                 (rc = ops->read(ea.mem.seg, ea.mem.off+4, &hval, 4, ctxt)) )
+                goto done;
+            val = ((uint64_t)hval << 32) | (uint32_t)lval;
+            stub[2] = modrm & 0x38; /* movq (%eax),%mmN */
+        }
+        get_fpu(X86EMUL_FPU_mmx, &fic);
+        asm volatile ( "call *%0" : : "r" (stub), "a" (&val) : "memory" );
+        put_fpu(&fic);
+        break;
+    }
+
+    case 0x7f: /* movq mm,mm/m64 */ {
+        uint8_t stub[] = { 0x0f, 0x7f, modrm, 0xc3 };
+        struct fpu_insn_ctxt fic = { .insn_bytes = sizeof(stub)-1 };
+        uint64_t val;
+        if ( ea.type == OP_MEM )
+            stub[2] = modrm & 0x38; /* movq %mmN,(%eax) */
+        get_fpu(X86EMUL_FPU_mmx, &fic);
+        asm volatile ( "call *%0" : : "r" (stub), "a" (&val) : "memory" );
+        put_fpu(&fic);
+        if ( ea.type == OP_MEM )
+        {
+            unsigned long lval = (uint32_t)val, hval = (uint32_t)(val >> 32);
+            if ( (rc = ops->write(ea.mem.seg, ea.mem.off+0, lval, 4, ctxt)) ||
+                 (rc = ops->write(ea.mem.seg, ea.mem.off+4, hval, 4, ctxt)) )
+                goto done;
+        }
         break;
     }
 
