@@ -130,8 +130,6 @@ void iommu_set_pgd(struct domain *d)
 {
     struct hvm_iommu *hd  = domain_hvm_iommu(d);
     unsigned long p2m_table;
-    int level = agaw_to_level(hd->agaw);
-    l3_pgentry_t *l3e;
 
     p2m_table = mfn_x(pagetable_get_mfn(d->arch.phys_table));
 
@@ -173,6 +171,8 @@ void iommu_set_pgd(struct domain *d)
         int i;
         u64 pmd_maddr;
         unsigned long flags;
+        l3_pgentry_t *l3e;
+        int level = agaw_to_level(hd->agaw);
 
         spin_lock_irqsave(&hd->mapping_lock, flags);
         hd->pgd_maddr = alloc_pgtable_maddr();
@@ -236,6 +236,8 @@ void iommu_set_pgd(struct domain *d)
 
 #elif CONFIG_PAGING_LEVELS == 4
         mfn_t pgd_mfn;
+        l3_pgentry_t *l3e;
+        int level = agaw_to_level(hd->agaw);
 
         switch ( level )
         {
