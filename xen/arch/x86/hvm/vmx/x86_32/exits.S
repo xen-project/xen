@@ -58,9 +58,12 @@
         popl %eax
 
         ALIGN
-ENTRY(vmx_asm_vmexit_handler)
+.globl vmx_asm_vmexit_handler
+vmx_asm_vmexit_handler:
         HVM_SAVE_ALL_NOSEGREGS
         GET_CURRENT(%ebx)
+
+        movb $1,VCPU_vmx_launched(%ebx)
 
         movl $GUEST_RIP,%eax
         VMREAD(UREGS_eip)
@@ -89,28 +92,21 @@ ENTRY(vmx_asm_vmexit_handler)
         push %eax
         call vmx_vmexit_handler
         addl $4,%esp
-        jmp vmx_asm_do_vmentry
 
-        ALIGN
-vmx_process_softirqs:
-        sti
-        call do_softirq
-        jmp vmx_asm_do_vmentry
-
-        ALIGN
-ENTRY(vmx_asm_do_vmentry)
+.globl vmx_asm_do_vmentry
+vmx_asm_do_vmentry:
         GET_CURRENT(%ebx)
         cli                             # tests must not race interrupts
 
         movl VCPU_processor(%ebx),%eax
         shl  $IRQSTAT_shift,%eax
         cmpl $0,irq_stat(%eax,1)
-        jnz  vmx_process_softirqs
+        jnz  .Lvmx_process_softirqs
 
         call vmx_intr_assist
 
         testb $0xff,VCPU_vmx_emul(%ebx)
-        jnz  vmx_goto_realmode
+        jnz  .Lvmx_goto_realmode
 
         movl VCPU_hvm_guest_cr2(%ebx),%eax
         movl %eax,%cr2
@@ -124,25 +120,28 @@ ENTRY(vmx_asm_do_vmentry)
         VMWRITE(UREGS_eflags)
 
         cmpb $0,VCPU_vmx_launched(%ebx)
-        je   vmx_launch
-
-/*vmx_resume:*/
         HVM_RESTORE_ALL_NOSEGREGS
+        je   .Lvmx_launch
+
+/*.Lvmx_resume:*/
         VMRESUME
         call vm_resume_fail
         ud2
 
-vmx_launch:
-        movb $1,VCPU_vmx_launched(%ebx)
-        HVM_RESTORE_ALL_NOSEGREGS
+.Lvmx_launch:
         VMLAUNCH
         call vm_launch_fail
         ud2
 
-vmx_goto_realmode:
+.Lvmx_goto_realmode:
         sti
         movl %esp,%eax
         push %eax
         call vmx_realmode
         addl $4,%esp
+        jmp vmx_asm_do_vmentry
+
+.Lvmx_process_softirqs:
+        sti
+        call do_softirq
         jmp vmx_asm_do_vmentry

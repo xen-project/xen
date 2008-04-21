@@ -42,7 +42,7 @@ ENTRY(svm_asm_do_resume)
         movl VCPU_processor(%ebx),%eax
         shl  $IRQSTAT_shift,%eax
         testl $~0,irq_stat(%eax,1)
-        jnz  svm_process_softirqs
+        jnz  .Lsvm_process_softirqs
 
         call svm_asid_handle_vmrun
         call svm_intr_assist
@@ -52,8 +52,8 @@ ENTRY(svm_asm_do_resume)
          * instead of having a mostly taken branch over the unlikely code.
          */
         cmpb $0,tb_init_done
-        jnz  svm_trace
-svm_trace_done:
+        jnz  .Lsvm_trace
+.Lsvm_trace_done:
 
         movl VCPU_svm_vmcb(%ebx),%ecx
         movl UREGS_eax(%esp),%eax
@@ -108,7 +108,7 @@ svm_trace_done:
 #endif
 
         STGI
-.globl svm_stgi_label;
+.globl svm_stgi_label
 svm_stgi_label:
         movl %esp,%eax
         push %eax
@@ -116,16 +116,11 @@ svm_stgi_label:
         addl $4,%esp
         jmp  svm_asm_do_resume
 
-        ALIGN
-svm_process_softirqs:
+.Lsvm_process_softirqs:
         STGI
         call do_softirq
         jmp  svm_asm_do_resume
 
-svm_trace:
-        /* Call out to C, as this is not speed critical path
-         * Note: svm_trace_vmentry will recheck the tb_init_done,
-         * but this is on the slow path, so who cares 
-         */
+.Lsvm_trace:
         call svm_trace_vmentry
-        jmp  svm_trace_done
+        jmp  .Lsvm_trace_done
