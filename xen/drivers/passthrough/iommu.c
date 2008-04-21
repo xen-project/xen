@@ -21,6 +21,9 @@ extern struct iommu_ops amd_iommu_ops;
 int intel_vtd_setup(void);
 int amd_iov_detect(void);
 
+int iommu_enabled = 1;
+boolean_param("iommu", iommu_enabled);
+
 int iommu_domain_init(struct domain *domain)
 {
     struct hvm_iommu *hd = domain_hvm_iommu(domain);
@@ -139,13 +142,24 @@ void deassign_device(struct domain *d, u8 bus, u8 devfn)
 
 int iommu_setup(void)
 {
+    int rc = -ENODEV;
+
+    if ( !iommu_enabled )
+        goto out;
+
     switch ( boot_cpu_data.x86_vendor )
     {
     case X86_VENDOR_INTEL:
-        return intel_vtd_setup();
+        rc = intel_vtd_setup();
+        break;
     case X86_VENDOR_AMD:
-        return amd_iov_detect();
+        rc = amd_iov_detect();
+        break;
     }
 
-    return 0;
+    iommu_enabled = (rc == 0);
+
+ out:
+    printk("I/O virtualisation %sabled\n", iommu_enabled ? "en" : "dis");
+    return rc;
 }

@@ -102,7 +102,7 @@ static void svm_dirq_assist(struct vcpu *v)
     struct hvm_irq_dpci *hvm_irq_dpci = d->arch.hvm_domain.irq.dpci;
     struct dev_intx_gsi_link *digl;
 
-    if ( !amd_iommu_enabled || (v->vcpu_id != 0) || (hvm_irq_dpci == NULL) )
+    if ( !iommu_enabled || (v->vcpu_id != 0) || (hvm_irq_dpci == NULL) )
         return;
 
     for ( irq = find_first_bit(hvm_irq_dpci->dirq_mask, NR_IRQS);

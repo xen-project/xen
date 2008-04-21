@@ -27,9 +27,8 @@
 #include <public/domctl.h>
 
 extern int vtd_enabled;
-extern int amd_iommu_enabled;
+extern int iommu_enabled;
 
-#define iommu_enabled ( amd_iommu_enabled || vtd_enabled )
 #define domain_hvm_iommu(d)     (&d->arch.hvm_domain.hvm_iommu)
 #define domain_vmx_iommu(d)     (&d->arch.hvm_domain.hvm_iommu.vmx_iommu)
 

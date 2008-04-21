@@ -30,8 +30,7 @@
 #include "dmar.h"
 #include "../pci_regs.h"
 
-int vtd_enabled;
-boolean_param("vtd", vtd_enabled);
+int vtd_enabled = 1;
 
 #undef PREFIX
 #define PREFIX VTDPREFIX "ACPI DMAR:"
@@ -604,22 +603,24 @@ int acpi_dmar_init(void)
 {
     int rc;
 
-    if ( !vtd_enabled )
-        return -ENODEV;
+    rc = -ENODEV;
+    if ( !iommu_enabled )
+        goto fail;
 
     if ( (rc = vtd_hw_check()) != 0 )
-        return rc;
+        goto fail;
 
     acpi_table_parse(ACPI_DMAR, acpi_parse_dmar);
 
+    rc = -ENODEV;
     if ( list_empty(&acpi_drhd_units) )
-    {
-        dprintk(XENLOG_ERR VTDPREFIX, "No DMAR devices found\n");
-        vtd_enabled = 0;
-        return -ENODEV;
-    }
+        goto fail;
 
     printk("Intel VT-d has been enabled\n");
 
     return 0;
+
+ fail:
+    vtd_enabled = 0;
+    return -ENODEV;
 }

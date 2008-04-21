@@ -84,11 +84,6 @@ void invalidate_dev_table_entry(struct amd_iommu *iommu,
 int send_iommu_command(struct amd_iommu *iommu, u32 cmd[]);
 void flush_command_buffer(struct amd_iommu *iommu);
 
-/* iommu domain funtions */
-int amd_iommu_domain_init(struct domain *domain);
-void amd_iommu_setup_domain_device(struct domain *domain,
-    struct amd_iommu *iommu, int bdf);
-
 /* find iommu for bdf */
 struct amd_iommu *find_iommu_for_device(int bus, int devfn);
 

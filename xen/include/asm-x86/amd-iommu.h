@@ -28,7 +28,6 @@
 
 #define iommu_found()           (!list_empty(&amd_iommu_head))
 
-extern int amd_iommu_enabled;
 extern struct list_head amd_iommu_head;
 
 extern int __init amd_iov_detect(void);

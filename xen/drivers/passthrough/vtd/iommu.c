@@ -1111,7 +1111,7 @@ static void free_iommu(struct iommu *iommu)
         agaw = 64;                              \
     agaw; })
 
-int intel_iommu_domain_init(struct domain *domain)
+static int intel_iommu_domain_init(struct domain *domain)
 {
     struct hvm_iommu *hd = domain_hvm_iommu(domain);
     struct iommu *iommu = NULL;
@@ -1119,9 +1119,6 @@ int intel_iommu_domain_init(struct domain *domain)
     int adjust_width, agaw;
     unsigned long sagaw;
     struct acpi_drhd_unit *drhd;
-
-    if ( !vtd_enabled || list_empty(&acpi_drhd_units) )
-        return 0;
 
     for_each_drhd_unit ( drhd )
         iommu = drhd->iommu ? : iommu_alloc(drhd);
@@ -1911,7 +1908,7 @@ int intel_vtd_setup(void)
     unsigned long i;
 
     if ( !vtd_enabled )
-        return 0;
+        return -ENODEV;
 
     spin_lock_init(&domid_bitmap_lock);
     INIT_LIST_HEAD(&hd->pdev_list);
@@ -1946,13 +1943,13 @@ int intel_vtd_setup(void)
     return 0;
 
  error:
-    printk("iommu_setup() failed\n");
     for_each_drhd_unit ( drhd )
     {
         iommu = drhd->iommu;
         free_iommu(iommu);
     }
-    return -EIO;
+    vtd_enabled = 0;
+    return -ENOMEM;
 }
 
 /*
