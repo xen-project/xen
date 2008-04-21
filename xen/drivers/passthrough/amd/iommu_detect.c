@@ -216,24 +216,24 @@ static int __init scan_functions_for_iommu(
     int bus, int dev, iommu_detect_callback_ptr_t iommu_detect_callback)
 {
     int func, hdr_type;
-    int count, error = 0;
+    int count = 1, error = 0;
 
-    func = 0;
-    count = 1;
-    while ( VALID_PCI_VENDOR_ID(pci_conf_read16(bus, dev, func,
-                                                PCI_VENDOR_ID)) &&
-            !error && (func < count) )
+    for ( func = 0;
+          (func < count) && !error &&
+              VALID_PCI_VENDOR_ID(pci_conf_read16(bus, dev, func,
+                                                  PCI_VENDOR_ID));
+          func++ )
+
     {
         hdr_type = pci_conf_read8(bus, dev, func, PCI_HEADER_TYPE);
 
-        if ( func == 0 && IS_PCI_MULTI_FUNCTION(hdr_type) )
+        if ( (func == 0) && IS_PCI_MULTI_FUNCTION(hdr_type) )
             count = PCI_MAX_FUNC_COUNT;
 
         if ( IS_PCI_TYPE0_HEADER(hdr_type) ||
              IS_PCI_TYPE1_HEADER(hdr_type) )
             error = scan_caps_for_iommu(bus, dev, func,
                                         iommu_detect_callback);
-        func++;
     }
 
     return error;
