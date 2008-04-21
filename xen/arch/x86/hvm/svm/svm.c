@@ -927,7 +927,9 @@ static void svm_cpuid_intercept(
                  bitmaskof(X86_FEATURE_SYSCALL) |
                  bitmaskof(X86_FEATURE_MP) |
                  bitmaskof(X86_FEATURE_MMXEXT) |
-                 bitmaskof(X86_FEATURE_FFXSR));
+                 bitmaskof(X86_FEATURE_FFXSR) |
+                 bitmaskof(X86_FEATURE_3DNOW) |
+                 bitmaskof(X86_FEATURE_3DNOWEXT));
         break;
 
     case 0x80000007:
