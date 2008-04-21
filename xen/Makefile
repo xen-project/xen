@@ -44,6 +44,7 @@ _clean: delete-unfresh-files
 	$(MAKE) -f $(BASEDIR)/Rules.mk -C arch/$(TARGET_ARCH) clean
 	rm -f include/asm *.o $(TARGET)* *~ core
 	rm -f include/asm-*/asm-offsets.h
+	[ -d tools/figlet ] && rm -f .banner*
 
 .PHONY: _distclean
 _distclean: clean
@@ -70,8 +71,14 @@ delete-unfresh-files:
 		rm -f include/xen/compile.h; \
 	fi
 
+.banner: Makefile
+	$(MAKE) -C tools
+	@tools/figlet/figlet -d tools/figlet Xen $(XEN_FULLVERSION) 2>$@2 >$@1
+	@cat $@1 $@2 >$@
+	@rm -f $@1 $@2
+
 # compile.h contains dynamic build info. Rebuilt on every 'make' invocation.
-include/xen/compile.h: include/xen/compile.h.in
+include/xen/compile.h: include/xen/compile.h.in .banner
 	@sed -e 's/@@date@@/$(shell LC_ALL=C date)/g' \
 	    -e 's/@@time@@/$(shell LC_ALL=C date +%T)/g' \
 	    -e 's/@@whoami@@/$(USER)/g' \
@@ -83,7 +90,8 @@ include/xen/compile.h: include/xen/compile.h.in
 	    -e 's/@@extraversion@@/$(XEN_EXTRAVERSION)/g' \
 	    -e 's!@@changeset@@!$(shell ((hg parents --template "{date|date} {rev}:{node|short}" >/dev/null && hg parents --template "{date|date} {rev}:{node|short}") || echo "unavailable") 2>/dev/null)!g' \
 	    < include/xen/compile.h.in > $@.new
-	tools/figlet/figlet -d tools/figlet Xen $(XEN_FULLVERSION) >> $@.new
+	@grep \" .banner >> $@.new
+	@grep -v \" .banner
 	@mv -f $@.new $@
 
 include/asm-$(TARGET_ARCH)/asm-offsets.h: arch/$(TARGET_ARCH)/asm-offsets.s

@@ -243,6 +243,7 @@
 ^tools/xm-test/lib/XmTestLib/config.py$
 ^tools/xm-test/lib/XmTestReport/xmtest.py$
 ^tools/xm-test/tests/.*\.test$
+^xen/\.banner.*$
 ^xen/BLOG$
 ^xen/System.map$
 ^xen/TAGS$

@@ -122,6 +122,13 @@ distclean:
 .PHONY: mrproper
 mrproper: distclean
 
+# Prepare for source tarball
+.PHONY: src-tarball
+src-tarball: distclean
+	$(MAKE) -C xen .banner
+	rm -rf xen/tools/figlet
+	$(MAKE) -C xen distclean
+
 .PHONY: help
 help:
 	@echo 'Installation targets:'
