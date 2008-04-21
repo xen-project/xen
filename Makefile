@@ -126,7 +126,7 @@ mrproper: distclean
 .PHONY: src-tarball
 src-tarball: distclean
 	$(MAKE) -C xen .banner
-	rm -rf xen/tools/figlet
+	rm -rf xen/tools/figlet .[a-z]*
 	$(MAKE) -C xen distclean
 
 .PHONY: help
