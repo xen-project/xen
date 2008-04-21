@@ -35,6 +35,19 @@
 #define DMA_32BIT_MASK  0x00000000ffffffffULL
 #define PAGE_ALIGN(addr)    (((addr) + PAGE_SIZE - 1) & PAGE_MASK)
 
+#ifdef AMD_IOV_DEBUG
+#define amd_iov_info(fmt, args...) \
+    printk(XENLOG_INFO "AMD_IOV: " fmt, ## args)
+#define amd_iov_warning(fmt, args...) \
+    printk(XENLOG_WARNING "AMD_IOV: " fmt, ## args)
+#define amd_iov_error(fmt, args...) \
+    printk(XENLOG_ERR "AMD_IOV: %s:%d: " fmt, __FILE__ , __LINE__ , ## args)
+#else
+#define amd_iov_info(fmt, args...)
+#define amd_iov_warning(fmt, args...)
+#define amd_iov_error(fmt, args...)
+#endif
+
 typedef int (*iommu_detect_callback_ptr_t)(
     u8 bus, u8 dev, u8 func, u8 cap_ptr);
 

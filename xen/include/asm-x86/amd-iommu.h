@@ -31,7 +31,7 @@
 extern int amd_iommu_enabled;
 extern struct list_head amd_iommu_head;
 
-extern int __init amd_iommu_detect(void);
+extern int __init amd_iov_detect(void);
 
 struct table_struct {
     void *buffer;

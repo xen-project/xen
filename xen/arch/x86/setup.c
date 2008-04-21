@@ -1021,8 +1021,6 @@ void __init __start_xen(unsigned long mbi_p)
 
     iommu_setup();
 
-    amd_iommu_detect();
-
     /*
      * We're going to setup domain0 using the module(s) that we stashed safely
      * above our heap. The second module, if present, is an initrd ramdisk.

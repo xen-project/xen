@@ -35,8 +35,7 @@ int __init map_iommu_mmio_region(struct amd_iommu *iommu)
 
     if ( nr_amd_iommus > MAX_AMD_IOMMUS )
     {
-        gdprintk(XENLOG_ERR,
-                 "IOMMU: nr_amd_iommus %d > MAX_IOMMUS\n", nr_amd_iommus);
+        amd_iov_error("nr_amd_iommus %d > MAX_IOMMUS\n", nr_amd_iommus);
         return -ENOMEM;
     }
 
@@ -395,7 +394,7 @@ static void parse_event_log_entry(u32 entry[])
     if ( (code > IOMMU_EVENT_INVALID_DEV_REQUEST)
         || (code < IOMMU_EVENT_ILLEGAL_DEV_TABLE_ENTRY) )
     {
-        dprintk(XENLOG_ERR, "Invalid event log entry!\n");
+        amd_iov_error("Invalid event log entry!\n");
         return;
     }
 
@@ -408,8 +407,8 @@ static void parse_event_log_entry(u32 entry[])
                                            IOMMU_EVENT_DOMAIN_ID_MASK,
                                            IOMMU_EVENT_DOMAIN_ID_SHIFT);
         addr= (u64*) (entry + 2);
-        dprintk(XENLOG_ERR,
-            "%s: domain = %d, device id = 0x%x, fault address = 0x%"PRIx64"\n",
+        printk(XENLOG_ERR "AMD_IOV: "
+            "%s: domain:%d, device id:0x%x, fault address:0x%"PRIx64"\n",
             event_str[code-1], domain_id, device_id, *addr);
     }
 }
@@ -445,7 +444,7 @@ static int set_iommu_interrupt_handler(struct amd_iommu *iommu)
 
     if ( !vector )
     {
-        gdprintk(XENLOG_ERR, "AMD IOMMU: no vectors\n");
+        amd_iov_error("no vectors\n");
         return 0;
     }
 
@@ -453,7 +452,7 @@ static int set_iommu_interrupt_handler(struct amd_iommu *iommu)
     ret = request_irq(vector, amd_iommu_page_fault, 0, "dmar", iommu);
     if ( ret )
     {
-        gdprintk(XENLOG_ERR, "AMD IOMMU: can't request irq\n");
+        amd_iov_error("can't request irq\n");
         return 0;
     }
 
@@ -483,5 +482,5 @@ void __init enable_iommu(struct amd_iommu *iommu)
 
     spin_unlock_irqrestore(&iommu->lock, flags);
 
-    printk("AMD IOMMU %d: Enabled\n", nr_amd_iommus);
+    printk("AMD_IOV: IOMMU %d Enabled.\n", nr_amd_iommus);
 }

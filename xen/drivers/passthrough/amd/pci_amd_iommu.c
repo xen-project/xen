@@ -39,7 +39,7 @@ struct ivrs_mappings *ivrs_mappings = NULL;
 int amd_iommu_enabled = 0;
 
 static int enable_amd_iommu = 0;
-boolean_param("enable_amd_iommu", enable_amd_iommu);
+boolean_param("enable_amd_iov", enable_amd_iommu);
 
 static void deallocate_domain_page_tables(struct hvm_iommu *hd)
 {
@@ -104,7 +104,7 @@ static int __init allocate_iommu_table_struct(struct table_struct *table,
 
     if ( !table->buffer )
     {
-        dprintk(XENLOG_ERR, "AMD IOMMU: Error allocating %s\n", name);
+        amd_iov_error("Error allocating %s\n", name);
         return -ENOMEM;
     }
 
@@ -169,7 +169,7 @@ int iommu_detect_callback(u8 bus, u8 dev, u8 func, u8 cap_ptr)
     iommu = (struct amd_iommu *) xmalloc(struct amd_iommu);
     if ( !iommu )
     {
-        dprintk(XENLOG_ERR, "AMD IOMMU: Error allocating amd_iommu\n");
+        amd_iov_error("Error allocating amd_iommu\n");
         return -ENOMEM;
     }
     memset(iommu, 0, sizeof(struct amd_iommu));
@@ -237,7 +237,7 @@ static int __init amd_iommu_init(void)
     }
 
     if ( acpi_table_parse(ACPI_IVRS, parse_ivrs_table) != 0 )
-        dprintk(XENLOG_INFO, "AMD IOMMU: Did not find IVRS table!\n");
+        amd_iov_error("Did not find IVRS table!\n");
 
     for_each_amd_iommu ( iommu )
     {
@@ -308,7 +308,7 @@ void amd_iommu_setup_domain_device(
 
         invalidate_dev_table_entry(iommu, req_id);
         flush_command_buffer(iommu);
-        dprintk(XENLOG_INFO, "AMD IOMMU: Set DTE req_id:%x, "
+        amd_iov_info("Enable DTE:0x%x, "
                 "root_ptr:%"PRIx64", domain_id:%d, paging_mode:%d\n",
                 req_id, root_ptr, hd->domain_id, hd->paging_mode);
 
@@ -354,7 +354,7 @@ void __init amd_iommu_setup_dom0_devices(void)
     }
 }
 
-int amd_iommu_detect(void)
+int amd_iov_detect(void)
 {
     unsigned long i;
     int last_bus;
@@ -362,7 +362,7 @@ int amd_iommu_detect(void)
 
     if ( !enable_amd_iommu )
     {
-        printk("AMD IOMMU: Disabled\n");
+        printk("AMD_IOV: Disabled.\n");
         return 0;
     }
 
@@ -370,13 +370,13 @@ int amd_iommu_detect(void)
 
     if ( scan_for_iommu(iommu_detect_callback) != 0 )
     {
-        dprintk(XENLOG_ERR, "AMD IOMMU: Error detection\n");
+        amd_iov_error("Error detection\n");
         goto error_out;
     }
 
     if ( !iommu_found() )
     {
-        printk("AMD IOMMU: Not found!\n");
+        printk("AMD_IOV: IOMMU not found!\n");
         return 0;
     }
     else
@@ -394,8 +394,7 @@ int amd_iommu_detect(void)
 
         if ( !ivrs_mappings )
         {
-            dprintk(XENLOG_ERR, "AMD IOMMU:"
-                    " Error allocating IVRS DevMappings table\n");
+            amd_iov_error("Error allocating IVRS DevMappings table\n");
             goto error_out;
         }
         memset(ivrs_mappings, 0,
@@ -404,7 +403,7 @@ int amd_iommu_detect(void)
 
     if ( amd_iommu_init() != 0 )
     {
-        dprintk(XENLOG_ERR, "AMD IOMMU: Error initialization\n");
+        amd_iov_error("Error initialization\n");
         goto error_out;
     }
 
@@ -462,8 +461,6 @@ static int get_paging_mode(unsigned long entries)
             return -ENOMEM;
     }
 
-    dprintk(XENLOG_INFO, "AMD IOMMU: paging mode = %d\n", level);
-
     return level;
 }
 
@@ -505,7 +502,7 @@ static void amd_iommu_disable_domain_device(
         memset (dte, 0, IOMMU_DEV_TABLE_ENTRY_SIZE);
         invalidate_dev_table_entry(iommu, req_id);
         flush_command_buffer(iommu);
-        dprintk(XENLOG_INFO , "AMD IOMMU: disable DTE 0x%x,"
+        amd_iov_info("Disable DTE:0x%x,"
                 " domain_id:%d, paging_mode:%d\n",
                 req_id,  domain_hvm_iommu(domain)->domain_id,
                 domain_hvm_iommu(domain)->paging_mode);
@@ -540,7 +537,7 @@ static int reassign_device( struct domain *source, struct domain *target,
 
         if ( !iommu )
         {
-            gdprintk(XENLOG_ERR , "AMD IOMMU: fail to find iommu."
+            amd_iov_error("Fail to find iommu."
                      " %x:%x.%x cannot be assigned to domain %d\n", 
                      bus, PCI_SLOT(devfn), PCI_FUNC(devfn), target->domain_id);
             return -ENODEV;
@@ -555,8 +552,7 @@ static int reassign_device( struct domain *source, struct domain *target,
         spin_unlock_irqrestore(&source_hd->iommu_list_lock, flags);
 
         amd_iommu_setup_domain_device(target, iommu, bdf);
-        gdprintk(XENLOG_INFO ,
-                 "AMD IOMMU: reassign %x:%x.%x domain %d -> domain %d\n",
+        amd_iov_info("reassign %x:%x.%x domain %d -> domain %d\n",
                  bus, PCI_SLOT(devfn), PCI_FUNC(devfn),
                  source->domain_id, target->domain_id);
 
@@ -595,8 +591,7 @@ static void release_domain_devices(struct domain *d)
     {
         pdev = list_entry(hd->pdev_list.next, typeof(*pdev), list);
         pdev_flr(pdev->bus, pdev->devfn);
-        gdprintk(XENLOG_INFO ,
-                 "AMD IOMMU: release devices %x:%x.%x\n",
+        amd_iov_info("release domain %d devices %x:%x.%x\n", d->domain_id,
                  pdev->bus, PCI_SLOT(pdev->devfn), PCI_FUNC(pdev->devfn));
         reassign_device(d, dom0, pdev->bus, pdev->devfn);
     }

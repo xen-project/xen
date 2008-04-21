@@ -18,6 +18,8 @@
 
 extern struct iommu_ops intel_iommu_ops;
 extern struct iommu_ops amd_iommu_ops;
+int intel_vtd_setup(void);
+int amd_iov_detect(void);
 
 int iommu_domain_init(struct domain *domain)
 {
@@ -133,4 +135,17 @@ void deassign_device(struct domain *d, u8 bus, u8 devfn)
         return;
 
     return hd->platform_ops->reassign_device(d, dom0, bus, devfn);
+}
+
+int iommu_setup(void)
+{
+    switch ( boot_cpu_data.x86_vendor )
+    {
+    case X86_VENDOR_INTEL:
+        return intel_vtd_setup();
+    case X86_VENDOR_AMD:
+        return amd_iov_detect();
+    }
+
+    return 0;
 }

@@ -154,8 +154,7 @@ void flush_command_buffer(struct amd_iommu *iommu)
         }
         else
         {
-            dprintk(XENLOG_WARNING, "AMD IOMMU: Warning:"
-                    " ComWaitInt bit did not assert!\n");
+            amd_iov_warning("Warning: ComWaitInt bit did not assert!\n");
         }
     }
 }
@@ -402,10 +401,9 @@ int amd_iommu_map_page(struct domain *d, unsigned long gfn, unsigned long mfn)
     pte = get_pte_from_page_tables(hd->root_table, hd->paging_mode, gfn);
     if ( pte == NULL )
     {
-        dprintk(XENLOG_ERR,
-                "AMD IOMMU: Invalid IO pagetable entry gfn = %lx\n", gfn);
+        amd_iov_error("Invalid IO pagetable entry gfn = %lx\n", gfn);
         spin_unlock_irqrestore(&hd->mapping_lock, flags);
-        return -EIO;
+        return -EFAULT;
     }
 
     set_page_table_entry_present((u32 *)pte, maddr, iw, ir);
@@ -439,10 +437,9 @@ int amd_iommu_unmap_page(struct domain *d, unsigned long gfn)
     pte = get_pte_from_page_tables(hd->root_table, hd->paging_mode, gfn);
     if ( pte == NULL )
     {
-        dprintk(XENLOG_ERR,
-                "AMD IOMMU: Invalid IO pagetable entry gfn = %lx\n", gfn);
+        amd_iov_error("Invalid IO pagetable entry gfn = %lx\n", gfn);
         spin_unlock_irqrestore(&hd->mapping_lock, flags);
-        return -EIO;
+        return -EFAULT;
     }
 
     /* mark PTE as 'page not present' */
@@ -479,9 +476,8 @@ int amd_iommu_reserve_domain_unity_map(
             hd->root_table, hd->paging_mode, phys_addr >> PAGE_SHIFT);
         if ( pte == NULL )
         {
-            dprintk(XENLOG_ERR,
-                    "AMD IOMMU: Invalid IO pagetable entry "
-                    "phys_addr = %lx\n", phys_addr);
+            amd_iov_error(
+            "Invalid IO pagetable entry phys_addr = %lx\n", phys_addr);
             spin_unlock_irqrestore(&hd->mapping_lock, flags);
             return -EFAULT;
         }
@@ -528,8 +524,7 @@ int amd_iommu_sync_p2m(struct domain *d)
         pte = get_pte_from_page_tables(hd->root_table, hd->paging_mode, gfn);
         if ( pte == NULL )
         {
-            dprintk(XENLOG_ERR,
-                    "AMD IOMMU: Invalid IO pagetable entry gfn = %lx\n", gfn);
+            amd_iov_error("Invalid IO pagetable entry gfn = %lx\n", gfn);
             spin_unlock_irqrestore(&hd->mapping_lock, flags);
             return -EFAULT;
         }

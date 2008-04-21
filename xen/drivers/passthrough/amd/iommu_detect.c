@@ -117,7 +117,7 @@ static int __init get_iommu_msi_capabilities(u8 bus, u8 dev, u8 func,
     if ( !iommu->msi_cap )
         return -ENODEV;
 
-    dprintk(XENLOG_INFO, "AMD IOMMU: Found MSI capability block \n");
+    amd_iov_info("Found MSI capability block \n");
     control = pci_conf_read16(bus, dev, func,
             iommu->msi_cap + PCI_MSI_FLAGS);
     iommu->maskbit = control & PCI_MSI_FLAGS_MASKBIT;
@@ -138,8 +138,7 @@ int __init get_iommu_capabilities(u8 bus, u8 dev, u8 func, u8 cap_ptr,
 
     if ( ((mmio_bar & 0x1) == 0) || (iommu->mmio_base_phys == 0) )
     {
-        dprintk(XENLOG_ERR ,
-                "AMD IOMMU: Invalid MMIO_BAR = 0x%"PRIx64"\n", mmio_bar);
+        amd_iov_error("Invalid MMIO_BAR = 0x%"PRIx64"\n", mmio_bar);
         return -ENODEV;
     }
 

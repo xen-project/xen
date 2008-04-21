@@ -1903,7 +1903,7 @@ static void setup_dom0_rmrr(void)
     end_for_each_rmrr_device ( rmrr, pdev )
 }
 
-int iommu_setup(void)
+int intel_vtd_setup(void)
 {
     struct hvm_iommu *hd  = domain_hvm_iommu(dom0);
     struct acpi_drhd_unit *drhd;
