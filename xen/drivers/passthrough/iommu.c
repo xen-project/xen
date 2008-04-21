@@ -140,7 +140,7 @@ void deassign_device(struct domain *d, u8 bus, u8 devfn)
     return hd->platform_ops->reassign_device(d, dom0, bus, devfn);
 }
 
-int iommu_setup(void)
+static int iommu_setup(void)
 {
     int rc = -ENODEV;
 
@@ -163,3 +163,4 @@ int iommu_setup(void)
     printk("I/O virtualisation %sabled\n", iommu_enabled ? "en" : "dis");
     return rc;
 }
+__initcall(iommu_setup);

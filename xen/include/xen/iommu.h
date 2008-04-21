@@ -71,7 +71,6 @@ struct iommu {
     struct intel_iommu *intel;
 };
 
-int iommu_setup(void);
 int iommu_domain_init(struct domain *d);
 void iommu_domain_destroy(struct domain *d);
 int device_assigned(u8 bus, u8 devfn);

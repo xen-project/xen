@@ -521,10 +521,10 @@ int arch_domain_create(struct domain *d, unsigned int domcr_flags)
         clear_page(d->shared_info);
         share_xen_page_with_guest(
             virt_to_page(d->shared_info), d, XENSHARE_writable);
-    }
 
-    if ( (rc = iommu_domain_init(d)) != 0 )
-        goto fail;
+        if ( (rc = iommu_domain_init(d)) != 0 )
+            goto fail;
+    }
 
     if ( is_hvm_domain(d) )
     {
@@ -562,7 +562,8 @@ void arch_domain_destroy(struct domain *d)
     if ( is_hvm_domain(d) )
         hvm_domain_destroy(d);
 
-    iommu_domain_destroy(d);
+    if ( !is_idle_domain(d) )
+        iommu_domain_destroy(d);
 
     paging_final_teardown(d);
 

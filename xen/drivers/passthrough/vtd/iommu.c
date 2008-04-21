@@ -78,7 +78,7 @@ static struct intel_iommu *alloc_intel_iommu(void)
     struct intel_iommu *intel;
 
     intel = xmalloc(struct intel_iommu);
-    if ( !intel )
+    if ( intel == NULL )
     {
         gdprintk(XENLOG_ERR VTDPREFIX,
                  "Allocate intel_iommu failed.\n");
@@ -88,7 +88,6 @@ static struct intel_iommu *alloc_intel_iommu(void)
 
     spin_lock_init(&intel->qi_ctrl.qinval_lock);
     spin_lock_init(&intel->qi_ctrl.qinval_poll_lock);
-
     spin_lock_init(&intel->ir_ctrl.iremap_lock);
 
     return intel;
@@ -96,68 +95,22 @@ static struct intel_iommu *alloc_intel_iommu(void)
 
 static void free_intel_iommu(struct intel_iommu *intel)
 {
-    if ( intel )
-    {
-        xfree(intel);
-        intel = NULL;
-    }
+    xfree(intel);
 }
 
 struct qi_ctrl *iommu_qi_ctrl(struct iommu *iommu)
 {
-    if ( !iommu )
-        return NULL;
-
-    if ( !iommu->intel )
-    {
-        iommu->intel = alloc_intel_iommu();
-        if ( !iommu->intel )
-        {
-            dprintk(XENLOG_ERR VTDPREFIX,
-                    "iommu_qi_ctrl: Allocate iommu->intel failed.\n");
-            return NULL;
-        }
-    }
-
-    return &(iommu->intel->qi_ctrl);
+    return iommu ? &iommu->intel->qi_ctrl : NULL;
 }
 
 struct ir_ctrl *iommu_ir_ctrl(struct iommu *iommu)
 {
-    if ( !iommu )
-        return NULL;
-
-    if ( !iommu->intel )
-    {
-        iommu->intel = alloc_intel_iommu();
-        if ( !iommu->intel )
-        {
-            dprintk(XENLOG_ERR VTDPREFIX,
-                    "iommu_ir_ctrl: Allocate iommu->intel failed.\n");
-            return NULL;
-        }
-    }
-
-    return &(iommu->intel->ir_ctrl);
+    return iommu ? &iommu->intel->ir_ctrl : NULL;
 }
 
 struct iommu_flush *iommu_get_flush(struct iommu *iommu)
 {
-    if ( !iommu )
-        return NULL;
-
-    if ( !iommu->intel )
-    {
-        iommu->intel = alloc_intel_iommu();
-        if ( !iommu->intel )
-        {
-            dprintk(XENLOG_ERR VTDPREFIX,
-                    "iommu_get_flush: Allocate iommu->intel failed.\n");
-            return NULL;
-        }
-    }
-
-    return &(iommu->intel->flush);
+    return iommu ? &iommu->intel->flush : NULL;
 }
 
 unsigned int clflush_size;
@@ -1039,69 +992,65 @@ int iommu_set_interrupt(struct iommu *iommu)
     return vector;
 }
 
-struct iommu *iommu_alloc(void *hw_data)
+static int iommu_alloc(struct acpi_drhd_unit *drhd)
 {
-    struct acpi_drhd_unit *drhd = (struct acpi_drhd_unit *) hw_data;
     struct iommu *iommu;
 
     if ( nr_iommus > MAX_IOMMUS )
     {
         gdprintk(XENLOG_ERR VTDPREFIX,
                  "IOMMU: nr_iommus %d > MAX_IOMMUS\n", nr_iommus);
-        return NULL;
+        return -ENOMEM;
     }
 
     iommu = xmalloc(struct iommu);
-    if ( !iommu )
-        return NULL;
+    if ( iommu == NULL )
+        return -ENOMEM;
     memset(iommu, 0, sizeof(struct iommu));
 
-    set_fixmap_nocache(FIX_IOMMU_REGS_BASE_0 + nr_iommus, drhd->address);
-    iommu->reg = (void *) fix_to_virt(FIX_IOMMU_REGS_BASE_0 + nr_iommus);
-
-    printk("iommu_alloc: iommu->reg = %p drhd->address = %lx\n",
-           iommu->reg, drhd->address);
-
-    nr_iommus++;
-
-    if ( !iommu->reg )
+    iommu->intel = alloc_intel_iommu();
+    if ( iommu->intel == NULL )
     {
-        printk(KERN_ERR VTDPREFIX "IOMMU: can't mapping the region\n");
-        goto error;
+        xfree(iommu);
+        return -ENOMEM;
     }
+
+    set_fixmap_nocache(FIX_IOMMU_REGS_BASE_0 + nr_iommus, drhd->address);
+    iommu->reg = (void *)fix_to_virt(FIX_IOMMU_REGS_BASE_0 + nr_iommus);
+    nr_iommus++;
 
     iommu->cap = dmar_readq(iommu->reg, DMAR_CAP_REG);
     iommu->ecap = dmar_readq(iommu->reg, DMAR_ECAP_REG);
 
-    printk("iommu_alloc: cap = %"PRIx64"\n",iommu->cap);
-    printk("iommu_alloc: ecap = %"PRIx64"\n", iommu->ecap);
-
     spin_lock_init(&iommu->lock);
     spin_lock_init(&iommu->register_lock);
 
-    iommu->intel = alloc_intel_iommu();
 
     drhd->iommu = iommu;
-    return iommu;
- error:
-    xfree(iommu);
-    return NULL;
+    return 0;
 }
 
-static void free_iommu(struct iommu *iommu)
+static void iommu_free(struct acpi_drhd_unit *drhd)
 {
-    if ( !iommu )
+    struct iommu *iommu = drhd->iommu;
+
+    if ( iommu == NULL )
         return;
+
     if ( iommu->root_maddr != 0 )
     {
         free_pgtable_maddr(iommu->root_maddr);
         iommu->root_maddr = 0;
     }
+
     if ( iommu->reg )
         iounmap(iommu->reg);
+
     free_intel_iommu(iommu->intel);
     free_irq(iommu->vector);
     xfree(iommu);
+
+    drhd->iommu = NULL;
 }
 
 #define guestwidth_to_adjustwidth(gaw) ({       \
@@ -1120,10 +1069,10 @@ static int intel_iommu_domain_init(struct domain *domain)
     unsigned long sagaw;
     struct acpi_drhd_unit *drhd;
 
-    for_each_drhd_unit ( drhd )
-        iommu = drhd->iommu ? : iommu_alloc(drhd);
+    drhd = list_entry(acpi_drhd_units.next, typeof(*drhd), list);
+    iommu = drhd->iommu;
 
-    /* calculate AGAW */
+    /* Calculate AGAW. */
     if ( guest_width > cap_mgaw(iommu->cap) )
         guest_width = cap_mgaw(iommu->cap);
     adjust_width = guestwidth_to_adjustwidth(guest_width);
@@ -1913,8 +1862,11 @@ int intel_vtd_setup(void)
     spin_lock_init(&domid_bitmap_lock);
     INIT_LIST_HEAD(&hd->pdev_list);
 
-    /* setup clflush size */
     clflush_size = get_clflush_size();
+
+    for_each_drhd_unit ( drhd )
+        if ( iommu_alloc(drhd) != 0 )
+            goto error;
 
     /* Allocate IO page directory page for the domain. */
     drhd = list_entry(acpi_drhd_units.next, typeof(*drhd), list);
@@ -1929,7 +1881,7 @@ int intel_vtd_setup(void)
     memset(domid_bitmap, 0, domid_bitmap_size / 8);
     set_bit(0, domid_bitmap);
 
-    /* setup 1:1 page table for dom0 */
+    /* Set up 1:1 page table for dom0. */
     for ( i = 0; i < max_page; i++ )
         iommu_map_page(dom0, i, i);
 
@@ -1944,10 +1896,7 @@ int intel_vtd_setup(void)
 
  error:
     for_each_drhd_unit ( drhd )
-    {
-        iommu = drhd->iommu;
-        free_iommu(iommu);
-    }
+        iommu_free(drhd);
     vtd_enabled = 0;
     return -ENOMEM;
 }
