@@ -3134,7 +3134,11 @@ x86_emulate(
               : "=r" (dst.val), "=q" (zf)
               : "r" (src.val), "1" (0) );
         _regs.eflags &= ~EFLG_ZF;
-        _regs.eflags |= zf ? EFLG_ZF : 0;
+        if ( zf )
+        {
+            _regs.eflags |= EFLG_ZF;
+            dst.type = OP_NONE;
+        }
         break;
     }
 
@@ -3144,7 +3148,11 @@ x86_emulate(
               : "=r" (dst.val), "=q" (zf)
               : "r" (src.val), "1" (0) );
         _regs.eflags &= ~EFLG_ZF;
-        _regs.eflags |= zf ? EFLG_ZF : 0;
+        if ( zf )
+        {
+            _regs.eflags |= EFLG_ZF;
+            dst.type = OP_NONE;
+        }
         break;
     }
 
