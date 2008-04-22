@@ -229,11 +229,7 @@ static u64 addr_to_dma_page_maddr(struct domain *domain, u64 addr)
             dma_set_pte_addr(*pte, maddr);
             vaddr = map_vtd_domain_page(maddr);
             if ( !vaddr )
-            {
-                unmap_vtd_domain_page(parent);
-                spin_unlock_irqrestore(&hd->mapping_lock, flags);
-                return 0;
-            }
+                break;
 
             /*
              * high level table always sets r/w, last level
@@ -247,14 +243,9 @@ static u64 addr_to_dma_page_maddr(struct domain *domain, u64 addr)
         {
             vaddr = map_vtd_domain_page(pte->val);
             if ( !vaddr )
-            {
-                unmap_vtd_domain_page(parent);
-                spin_unlock_irqrestore(&hd->mapping_lock, flags);
-                return 0;
-            }
+                break;
         }
 
-        unmap_vtd_domain_page(parent);
         if ( level == 2 )
         {
             pte_maddr = pte->val & PAGE_MASK_4K;
@@ -262,11 +253,13 @@ static u64 addr_to_dma_page_maddr(struct domain *domain, u64 addr)
             break;
         }
 
+        unmap_vtd_domain_page(parent);
         parent = (struct dma_pte *)vaddr;
         vaddr = NULL;
         level--;
     }
 
+    unmap_vtd_domain_page(parent);
     spin_unlock_irqrestore(&hd->mapping_lock, flags);
     return pte_maddr;
 }
@@ -641,7 +634,7 @@ void dma_pte_free_pagetable(struct domain *domain, u64 start, u64 end)
     struct dma_pte *page, *pte;
     int total = agaw_to_level(hd->agaw);
     int level;
-    u32 tmp;
+    u64 tmp;
     u64 pg_maddr;
 
     drhd = list_entry(acpi_drhd_units.next, typeof(*drhd), list);
@@ -662,7 +655,10 @@ void dma_pte_free_pagetable(struct domain *domain, u64 start, u64 end)
         {
             pg_maddr = dma_addr_level_page_maddr(domain, tmp, level);
             if ( pg_maddr == 0 )
-                return;
+            {
+                tmp += level_size(level);
+                continue;
+            }
             page = (struct dma_pte *)map_vtd_domain_page(pg_maddr);
             pte = page + address_level_offset(tmp, level);
             dma_clear_pte(*pte);
@@ -688,6 +684,7 @@ static int iommu_set_root_entry(struct iommu *iommu)
 {
     u32 cmd, sts;
     unsigned long flags;
+    s_time_t start_time;
 
     if ( iommu == NULL )
     {
@@ -713,11 +710,14 @@ static int iommu_set_root_entry(struct iommu *iommu)
     dmar_writel(iommu->reg, DMAR_GCMD_REG, cmd);
 
     /* Make sure hardware complete it */
+    start_time = NOW();
     for ( ; ; )
     {
         sts = dmar_readl(iommu->reg, DMAR_GSTS_REG);
         if ( sts & DMA_GSTS_RTPS )
             break;
+        if ( NOW() > start_time + DMAR_OPERATION_TIMEOUT )
+            panic("DMAR hardware is malfunctional, please disable IOMMU\n");
         cpu_relax();
     }
 
@@ -730,6 +730,7 @@ static int iommu_enable_translation(struct iommu *iommu)
 {
     u32 sts;
     unsigned long flags;
+    s_time_t start_time;
 
     dprintk(XENLOG_INFO VTDPREFIX,
             "iommu_enable_translation: iommu->reg = %p\n", iommu->reg);
@@ -737,11 +738,14 @@ static int iommu_enable_translation(struct iommu *iommu)
     iommu->gcmd |= DMA_GCMD_TE;
     dmar_writel(iommu->reg, DMAR_GCMD_REG, iommu->gcmd);
     /* Make sure hardware complete it */
+    start_time = NOW();
     for ( ; ; )
     {
         sts = dmar_readl(iommu->reg, DMAR_GSTS_REG);
         if ( sts & DMA_GSTS_TES )
             break;
+        if ( NOW() > start_time + DMAR_OPERATION_TIMEOUT )
+            panic("DMAR hardware is malfunctional, please disable IOMMU\n");
         cpu_relax();
     }
 
@@ -755,17 +759,21 @@ int iommu_disable_translation(struct iommu *iommu)
 {
     u32 sts;
     unsigned long flags;
+    s_time_t start_time;
 
     spin_lock_irqsave(&iommu->register_lock, flags);
     iommu->gcmd &= ~ DMA_GCMD_TE;
     dmar_writel(iommu->reg, DMAR_GCMD_REG, iommu->gcmd);
 
     /* Make sure hardware complete it */
+    start_time = NOW();
     for ( ; ; )
     {
         sts = dmar_readl(iommu->reg, DMAR_GSTS_REG);
         if ( !(sts & DMA_GSTS_TES) )
             break;
+        if ( NOW() > start_time + DMAR_OPERATION_TIMEOUT )
+            panic("DMAR hardware is malfunctional, please disable IOMMU\n");
         cpu_relax();
     }
     spin_unlock_irqrestore(&iommu->register_lock, flags);
