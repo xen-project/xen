@@ -107,6 +107,7 @@ SUBCOMMAND_HELP = {
                      'Migrate a domain to another machine.'),
     'pause'       : ('<Domain>', 'Pause execution of a domain.'),
     'reboot'      : ('<Domain> [-wa]', 'Reboot a domain.'),
+    'reset'       : ('<Domain>', 'Reset a domain.'),
     'restore'     : ('<CheckpointFile> [-p]',
                      'Restore a domain from a saved state.'),
     'save'        : ('[-c] <Domain> <CheckpointFile>',
@@ -274,6 +275,7 @@ common_commands = [
     "migrate",
     "pause",
     "reboot",
+    "reset",
     "restore",
     "resume",
     "save",
@@ -303,6 +305,7 @@ domain_commands = [
     "pause",
     "reboot",
     "rename",
+    "reset",
     "restore",
     "resume",
     "save",
@@ -1247,6 +1250,13 @@ def xm_shutdown(args):
     arg_check(args, "shutdown", 1, 4)
     from xen.xm import shutdown
     shutdown.main(["shutdown"] + args)
+
+def xm_reset(args):
+    arg_check(args, "reset", 1)
+    dom = args[0]
+
+    # TODO: XenAPI
+    server.xend.domain.reset(dom)
 
 def xm_pause(args):
     arg_check(args, "pause", 1)
@@ -2474,6 +2484,7 @@ commands = {
     "dump-core": xm_dump_core,
     "reboot": xm_reboot,
     "rename": xm_rename,
+    "reset": xm_reset,
     "restore": xm_restore,
     "resume": xm_resume,
     "save": xm_save,
