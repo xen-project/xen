@@ -38,6 +38,7 @@ int log_hv = 0;
 int log_time_hv = 0;
 int log_time_guest = 0;
 char *log_dir = NULL;
+int discard_overflowed_data = 1;
 
 static void handle_hup(int sig)
 {
@@ -46,7 +47,7 @@ static void handle_hup(int sig)
 
 static void usage(char *name)
 {
-	printf("Usage: %s [-h] [-V] [-v] [-i] [--log=none|guest|hv|all] [--log-dir=DIR] [--pid-file=PATH] [-t, --timestamp=none|guest|hv|all]\n", name);
+	printf("Usage: %s [-h] [-V] [-v] [-i] [--log=none|guest|hv|all] [--log-dir=DIR] [--pid-file=PATH] [-t, --timestamp=none|guest|hv|all] [-o, --overflow-data=discard|keep]\n", name);
 }
 
 static void version(char *name)
@@ -56,7 +57,7 @@ static void version(char *name)
 
 int main(int argc, char **argv)
 {
-	const char *sopts = "hVvit:";
+	const char *sopts = "hVvit:o:";
 	struct option lopts[] = {
 		{ "help", 0, 0, 'h' },
 		{ "version", 0, 0, 'V' },
@@ -66,6 +67,7 @@ int main(int argc, char **argv)
 		{ "log-dir", 1, 0, 'r' },
 		{ "pid-file", 1, 0, 'p' },
 		{ "timestamp", 1, 0, 't' },
+		{ "overflow-data", 1, 0, 'o'},
 		{ 0 },
 	};
 	bool is_interactive = false;
@@ -117,6 +119,13 @@ int main(int argc, char **argv)
 			} else if (!strcmp(optarg, "none")) {
 				log_time_guest = 0;
 				log_time_hv = 0;
+			}
+			break;
+		case 'o':
+			if (!strcmp(optarg, "keep")) {
+				discard_overflowed_data = 0;
+			} else if (!strcmp(optarg, "discard")) {
+				discard_overflowed_data = 1;
 			}
 			break;
 		case '?':

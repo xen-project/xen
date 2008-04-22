@@ -63,6 +63,7 @@ extern int log_hv;
 extern int log_time_hv;
 extern int log_time_guest;
 extern char *log_dir;
+extern int discard_overflowed_data;
 
 static int log_time_hv_needts = 1;
 static int log_time_guest_needts = 1;
@@ -201,7 +202,7 @@ static void buffer_append(struct domain *dom)
 			      dom->domid, errno, strerror(errno));
 	}
 
-	if (buffer->max_capacity &&
+	if (discard_overflowed_data && buffer->max_capacity &&
 	    buffer->size > buffer->max_capacity) {
 		/* Discard the middle of the data. */
 
@@ -228,6 +229,11 @@ static void buffer_advance(struct buffer *buffer, size_t len)
 	if (buffer->consumed == buffer->size) {
 		buffer->consumed = 0;
 		buffer->size = 0;
+		if (buffer->max_capacity &&
+		    buffer->capacity > buffer->max_capacity) {
+			buffer->data = realloc(buffer->data, buffer->max_capacity);
+			buffer->capacity = buffer->max_capacity;
+		}
 	}
 }
 
@@ -1005,9 +1011,13 @@ void handle_io(void)
 				    d->next_period < next_timeout)
 					next_timeout = d->next_period;
 			} else if (d->xce_handle != -1) {
-				int evtchn_fd = xc_evtchn_fd(d->xce_handle);
-				FD_SET(evtchn_fd, &readfds);
-				max_fd = MAX(evtchn_fd, max_fd);
+				if (discard_overflowed_data ||
+				    !d->buffer.max_capacity ||
+				    d->buffer.size < d->buffer.max_capacity) {
+					int evtchn_fd = xc_evtchn_fd(d->xce_handle);
+					FD_SET(evtchn_fd, &readfds);
+					max_fd = MAX(evtchn_fd, max_fd);
+				}
 			}
 
 			if (d->master_fd != -1) {
