@@ -41,6 +41,9 @@ static spinlock_t domid_bitmap_lock;    /* protect domain id bitmap */
 static int domid_bitmap_size;           /* domain id bitmap size in bits */
 static unsigned long *domid_bitmap;     /* iommu domain id bitmap */
 
+static void setup_dom0_devices(struct domain *d);
+static void setup_dom0_rmrr(struct domain *d);
+
 #define DID_FIELD_WIDTH 16
 #define DID_HIGH_OFFSET 8
 static void context_set_domain_id(struct context_entry *context,
@@ -1033,7 +1036,6 @@ static int iommu_alloc(struct acpi_drhd_unit *drhd)
     spin_lock_init(&iommu->lock);
     spin_lock_init(&iommu->register_lock);
 
-
     drhd->iommu = iommu;
     return 0;
 }
@@ -1068,14 +1070,16 @@ static void iommu_free(struct acpi_drhd_unit *drhd)
         agaw = 64;                              \
     agaw; })
 
-static int intel_iommu_domain_init(struct domain *domain)
+static int intel_iommu_domain_init(struct domain *d)
 {
-    struct hvm_iommu *hd = domain_hvm_iommu(domain);
+    struct hvm_iommu *hd = domain_hvm_iommu(d);
     struct iommu *iommu = NULL;
     int guest_width = DEFAULT_DOMAIN_ADDRESS_WIDTH;
-    int adjust_width, agaw;
+    int i, adjust_width, agaw;
     unsigned long sagaw;
     struct acpi_drhd_unit *drhd;
+
+    INIT_LIST_HEAD(&hd->pdev_list);
 
     drhd = list_entry(acpi_drhd_units.next, typeof(*drhd), list);
     iommu = drhd->iommu;
@@ -1096,6 +1100,26 @@ static int intel_iommu_domain_init(struct domain *domain)
             return -ENODEV;
     }
     hd->agaw = agaw;
+
+    if ( d->domain_id == 0 )
+    {
+        /* Set up 1:1 page table for dom0. */
+        for ( i = 0; i < max_page; i++ )
+            iommu_map_page(d, i, i);
+
+        setup_dom0_devices(d);
+        setup_dom0_rmrr(d);
+
+        iommu_flush_all();
+
+        for_each_drhd_unit ( drhd )
+        {
+            iommu = drhd->iommu;
+            if ( iommu_enable_translation(iommu) )
+                return -EIO;
+        }
+    }
+
     return 0;
 }
 
@@ -1696,37 +1720,15 @@ static int iommu_prepare_rmrr_dev(
     return ret;
 }
 
-void __init setup_dom0_devices(void)
+static void setup_dom0_devices(struct domain *d)
 {
-    struct hvm_iommu *hd  = domain_hvm_iommu(dom0);
+    struct hvm_iommu *hd;
     struct acpi_drhd_unit *drhd;
     struct pci_dev *pdev;
     int bus, dev, func, ret;
     u32 l;
 
-#ifdef DEBUG_VTD_CONTEXT_ENTRY
-    for ( bus = 0; bus < 256; bus++ )
-    {
-        for ( dev = 0; dev < 32; dev++ )
-        { 
-            for ( func = 0; func < 8; func++ )
-            {
-                struct context_entry *context;
-                struct pci_dev device;
-
-                device.bus = bus; 
-                device.devfn = PCI_DEVFN(dev, func); 
-                drhd = acpi_find_matched_drhd_unit(&device);
-                context = device_to_context_entry(drhd->iommu,
-                                                  bus, PCI_DEVFN(dev, func));
-                if ( (context->lo != 0) || (context->hi != 0) )
-                    dprintk(XENLOG_INFO VTDPREFIX,
-                            "setup_dom0_devices-%x:%x:%x- context not 0\n",
-                            bus, dev, func);
-            }
-        }    
-    }        
-#endif
+    hd = domain_hvm_iommu(d);
 
     for ( bus = 0; bus < 256; bus++ )
     {
@@ -1745,7 +1747,7 @@ void __init setup_dom0_devices(void)
                 list_add_tail(&pdev->list, &hd->pdev_list);
 
                 drhd = acpi_find_matched_drhd_unit(pdev);
-                ret = domain_context_mapping(dom0, drhd->iommu, pdev);
+                ret = domain_context_mapping(d, drhd->iommu, pdev);
                 if ( ret != 0 )
                     gdprintk(XENLOG_ERR VTDPREFIX,
                              "domain_context_mapping failed\n");
@@ -1753,7 +1755,7 @@ void __init setup_dom0_devices(void)
         }
     }
 
-    for_each_pdev ( dom0, pdev )
+    for_each_pdev ( d, pdev )
         dprintk(XENLOG_INFO VTDPREFIX,
                 "setup_dom0_devices: bdf = %x:%x:%x\n",
                 pdev->bus, PCI_SLOT(pdev->devfn), PCI_FUNC(pdev->devfn));
@@ -1803,13 +1805,6 @@ static int init_vtd_hw(void)
         flush->context = flush_context_reg;
         flush->iotlb = flush_iotlb_reg;
     }
-    return 0;
-}
-
-static int init_vtd2_hw(void)
-{
-    struct acpi_drhd_unit *drhd;
-    struct iommu *iommu;
 
     for_each_drhd_unit ( drhd )
     {
@@ -1826,31 +1821,18 @@ static int init_vtd2_hw(void)
             dprintk(XENLOG_ERR VTDPREFIX,
                     "Interrupt Remapping hardware not found\n");
     }
+
     return 0;
 }
 
-static int enable_vtd_translation(void)
-{
-    struct acpi_drhd_unit *drhd;
-    struct iommu *iommu;
-
-    for_each_drhd_unit ( drhd )
-    {
-        iommu = drhd->iommu;
-        if ( iommu_enable_translation(iommu) )
-            return -EIO;
-    }
-    return 0;
-}
-
-static void setup_dom0_rmrr(void)
+static void setup_dom0_rmrr(struct domain *d)
 {
     struct acpi_rmrr_unit *rmrr;
     struct pci_dev *pdev;
     int ret;
 
     for_each_rmrr_device ( rmrr, pdev )
-        ret = iommu_prepare_rmrr_dev(dom0, rmrr, pdev);
+        ret = iommu_prepare_rmrr_dev(d, rmrr, pdev);
         if ( ret )
             gdprintk(XENLOG_ERR VTDPREFIX,
                      "IOMMU: mapping reserved region failed\n");
@@ -1859,17 +1841,13 @@ static void setup_dom0_rmrr(void)
 
 int intel_vtd_setup(void)
 {
-    struct hvm_iommu *hd  = domain_hvm_iommu(dom0);
     struct acpi_drhd_unit *drhd;
     struct iommu *iommu;
-    unsigned long i;
 
     if ( !vtd_enabled )
         return -ENODEV;
 
     spin_lock_init(&domid_bitmap_lock);
-    INIT_LIST_HEAD(&hd->pdev_list);
-
     clflush_size = get_clflush_size();
 
     for_each_drhd_unit ( drhd )
@@ -1889,16 +1867,7 @@ int intel_vtd_setup(void)
     memset(domid_bitmap, 0, domid_bitmap_size / 8);
     set_bit(0, domid_bitmap);
 
-    /* Set up 1:1 page table for dom0. */
-    for ( i = 0; i < max_page; i++ )
-        iommu_map_page(dom0, i, i);
-
     init_vtd_hw();
-    setup_dom0_devices();
-    setup_dom0_rmrr();
-    iommu_flush_all();
-    enable_vtd_translation();
-    init_vtd2_hw();
 
     return 0;
 
