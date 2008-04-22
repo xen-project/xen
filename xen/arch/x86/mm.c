@@ -3616,29 +3616,18 @@ static int ptwr_emulated_write(
 static int ptwr_emulated_cmpxchg(
     enum x86_segment seg,
     unsigned long offset,
-    unsigned long old,
-    unsigned long new,
+    void *p_old,
+    void *p_new,
     unsigned int bytes,
     struct x86_emulate_ctxt *ctxt)
 {
+    paddr_t old = 0, new = 0;
+    if ( bytes > sizeof(paddr_t) )
+        return X86EMUL_UNHANDLEABLE;
+    memcpy(&old, p_old, bytes);
+    memcpy(&new, p_new, bytes);
     return ptwr_emulated_update(
         offset, old, new, bytes, 1,
-        container_of(ctxt, struct ptwr_emulate_ctxt, ctxt));
-}
-
-static int ptwr_emulated_cmpxchg8b(
-    enum x86_segment seg,
-    unsigned long offset,
-    unsigned long old,
-    unsigned long old_hi,
-    unsigned long new,
-    unsigned long new_hi,
-    struct x86_emulate_ctxt *ctxt)
-{
-    if ( CONFIG_PAGING_LEVELS == 2 )
-        return X86EMUL_UNHANDLEABLE;
-    return ptwr_emulated_update(
-        offset, ((u64)old_hi << 32) | old, ((u64)new_hi << 32) | new, 8, 1,
         container_of(ctxt, struct ptwr_emulate_ctxt, ctxt));
 }
 
@@ -3647,7 +3636,6 @@ static struct x86_emulate_ops ptwr_emulate_ops = {
     .insn_fetch = ptwr_emulated_read,
     .write      = ptwr_emulated_write,
     .cmpxchg    = ptwr_emulated_cmpxchg,
-    .cmpxchg8b  = ptwr_emulated_cmpxchg8b
 };
 
 /* Write page fault handler: check if guest is trying to modify a PTE. */

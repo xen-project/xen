@@ -907,6 +907,7 @@ protmode_load_seg(
     struct { uint32_t a, b; } desc;
     unsigned long val;
     uint8_t dpl, rpl, cpl;
+    uint32_t new_desc_b;
     int rc, fault_type = EXC_TS;
 
     /* NULL selector? */
@@ -989,10 +990,11 @@ protmode_load_seg(
         }
 
         /* Ensure Accessed flag is set. */
+        new_desc_b = desc.b | 0x100;
         rc = ((desc.b & 0x100) ? X86EMUL_OKAY : 
               ops->cmpxchg(
-                  x86_seg_none, desctab.base + (sel & 0xfff8) + 4, desc.b,
-                  desc.b | 0x100, 4, ctxt));
+                  x86_seg_none, desctab.base + (sel & 0xfff8) + 4,
+                  &desc.b, &new_desc_b, 4, ctxt));
     } while ( rc == X86EMUL_CMPXCHG_FAILED );
 
     if ( rc )
@@ -2092,8 +2094,8 @@ x86_emulate(
             /* nothing to do */;
         else if ( lock_prefix )
             rc = ops->cmpxchg(
-                dst.mem.seg, dst.mem.off, dst.orig_val,
-                dst.val, dst.bytes, ctxt);
+                dst.mem.seg, dst.mem.off, &dst.orig_val,
+                &dst.val, dst.bytes, ctxt);
         else
             rc = ops->write(
                 dst.mem.seg, dst.mem.off, dst.val, dst.bytes, ctxt);
@@ -3459,60 +3461,49 @@ x86_emulate(
         src.val = x86_seg_gs;
         goto pop_seg;
 
-    case 0xc7: /* Grp9 (cmpxchg8b) */
-#if defined(__i386__)
-    {
-        unsigned long old_lo, old_hi;
+    case 0xc7: /* Grp9 (cmpxchg8b/cmpxchg16b) */ {
+        unsigned long old[2], exp[2], new[2];
+        unsigned int i;
+
         generate_exception_if((modrm_reg & 7) != 1, EXC_UD, -1);
         generate_exception_if(ea.type != OP_MEM, EXC_UD, -1);
-        if ( (rc = ops->read(ea.mem.seg, ea.mem.off+0, &old_lo, 4, ctxt)) ||
-             (rc = ops->read(ea.mem.seg, ea.mem.off+4, &old_hi, 4, ctxt)) )
-            goto done;
-        if ( (old_lo != _regs.eax) || (old_hi != _regs.edx) )
-        {
-            _regs.eax = old_lo;
-            _regs.edx = old_hi;
-            _regs.eflags &= ~EFLG_ZF;
-        }
-        else if ( ops->cmpxchg8b == NULL )
-        {
-            rc = X86EMUL_UNHANDLEABLE;
-            goto done;
-        }
-        else
-        {
-            if ( (rc = ops->cmpxchg8b(ea.mem.seg, ea.mem.off, old_lo, old_hi,
-                                      _regs.ebx, _regs.ecx, ctxt)) != 0 )
+        op_bytes *= 2;
+
+        /* Get actual old value. */
+        for ( i = 0; i < (op_bytes/sizeof(long)); i++ )
+            if ( (rc = ops->read(ea.mem.seg, ea.mem.off + i*sizeof(long),
+                                 &old[i], sizeof(long), ctxt)) != 0 )
                 goto done;
-            _regs.eflags |= EFLG_ZF;
-        }
-        break;
-    }
-#elif defined(__x86_64__)
-    {
-        unsigned long old, new;
-        generate_exception_if((modrm_reg & 7) != 1, EXC_UD, -1);
-        generate_exception_if(ea.type != OP_MEM, EXC_UD, -1);
-        if ( (rc = ops->read(ea.mem.seg, ea.mem.off, &old, 8, ctxt)) != 0 )
-            goto done;
-        if ( ((uint32_t)(old>>0) != (uint32_t)_regs.eax) ||
-             ((uint32_t)(old>>32) != (uint32_t)_regs.edx) )
+
+        /* Get expected and proposed values. */
+        if ( op_bytes == 8 )
         {
-            _regs.eax = (uint32_t)(old>>0);
-            _regs.edx = (uint32_t)(old>>32);
+            ((uint32_t *)exp)[0] = _regs.eax; ((uint32_t *)exp)[1] = _regs.edx;
+            ((uint32_t *)new)[0] = _regs.ebx; ((uint32_t *)new)[1] = _regs.ecx;
+        }
+        else
+        {
+            exp[0] = _regs.eax; exp[1] = _regs.edx;
+            new[0] = _regs.ebx; new[1] = _regs.ecx;
+        }
+
+        if ( memcmp(old, exp, op_bytes) )
+        {
+            /* Expected != actual: store actual to rDX:rAX and clear ZF. */
+            _regs.eax = (op_bytes == 8) ? ((uint32_t *)old)[0] : old[0];
+            _regs.edx = (op_bytes == 8) ? ((uint32_t *)old)[1] : old[1];
             _regs.eflags &= ~EFLG_ZF;
         }
         else
         {
-            new = (_regs.ecx<<32)|(uint32_t)_regs.ebx;
+            /* Expected == actual: attempt atomic cmpxchg and set ZF. */
             if ( (rc = ops->cmpxchg(ea.mem.seg, ea.mem.off, old,
-                                    new, 8, ctxt)) != 0 )
+                                    new, op_bytes, ctxt)) != 0 )
                 goto done;
             _regs.eflags |= EFLG_ZF;
         }
         break;
     }
-#endif
 
     case 0xc8 ... 0xcf: /* bswap */
         dst.type = OP_REG;

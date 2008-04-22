@@ -110,8 +110,7 @@ enum x86_emulate_fpu_type {
  *     some out-of-band mechanism, unknown to the emulator. The memop signals
  *     failure by returning X86EMUL_EXCEPTION to the emulator, which will
  *     then immediately bail.
- *  2. Valid access sizes are 1, 2, 4 and 8 bytes. On x86/32 systems only
- *     cmpxchg8b_emulated need support 8-byte accesses.
+ *  2. Valid access sizes are 1, 2, 4 and 8 (x86/64 only) bytes.
  *  3. The emulator cannot handle 64-bit mode emulation on an x86/32 system.
  */
 struct x86_emulate_ops
@@ -159,34 +158,16 @@ struct x86_emulate_ops
 
     /*
      * cmpxchg: Emulate an atomic (LOCKed) CMPXCHG operation.
-     *  @old:   [IN ] Value expected to be current at @addr.
-     *  @new:   [IN ] Value to write to @addr.
+     *  @p_old: [IN ] Pointer to value expected to be current at @addr.
+     *  @p_new: [IN ] Pointer to value to write to @addr.
+     *  @bytes: [IN ] Operation size (up to 8 (x86/32) or 16 (x86/64) bytes).
      */
     int (*cmpxchg)(
         enum x86_segment seg,
         unsigned long offset,
-        unsigned long old,
-        unsigned long new,
+        void *p_old,
+        void *p_new,
         unsigned int bytes,
-        struct x86_emulate_ctxt *ctxt);
-
-    /*
-     * cmpxchg8b: Emulate an atomic (LOCKed) CMPXCHG8B operation.
-     *  @old:   [IN ] Value expected to be current at @addr.
-     *  @new:   [IN ] Value to write to @addr.
-     * NOTES:
-     *  1. This function is only ever called when emulating a real CMPXCHG8B.
-     *  2. This function is *never* called on x86/64 systems.
-     *  2. Not defining this function (i.e., specifying NULL) is equivalent
-     *     to defining a function that always returns X86EMUL_UNHANDLEABLE.
-     */
-    int (*cmpxchg8b)(
-        enum x86_segment seg,
-        unsigned long offset,
-        unsigned long old_lo,
-        unsigned long old_hi,
-        unsigned long new_lo,
-        unsigned long new_hi,
         struct x86_emulate_ctxt *ctxt);
 
     /*

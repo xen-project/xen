@@ -437,11 +437,15 @@ static int hvmemul_write(
 static int hvmemul_cmpxchg(
     enum x86_segment seg,
     unsigned long offset,
-    unsigned long old,
-    unsigned long new,
+    void *p_old,
+    void *p_new,
     unsigned int bytes,
     struct x86_emulate_ctxt *ctxt)
 {
+    unsigned long new = 0;
+    if ( bytes > sizeof(new) )
+        return X86EMUL_UNHANDLEABLE;
+    memcpy(&new, p_new, bytes);
     /* Fix this in case the guest is really relying on r-m-w atomicity. */
     return hvmemul_write(seg, offset, new, bytes, ctxt);
 }
