@@ -331,10 +331,9 @@ extern unsigned int __find_first_zero_bit(
 extern unsigned int __find_next_zero_bit(
     const unsigned long *addr, unsigned int size, unsigned int offset);
 
-/* return index of first bit set in val or BITS_PER_LONG when no bit is set */
-static inline unsigned int __scanbit(unsigned long val)
+static inline unsigned int __scanbit(unsigned long val, unsigned long max)
 {
-    asm ( "bsf %1,%0" : "=r" (val) : "r" (val), "0" (BITS_PER_LONG) );
+    asm ( "bsf %1,%0 ; cmovz %2,%0" : "=&r" (val) : "r" (val), "r" (max) );
     return (unsigned int)val;
 }
 
@@ -346,9 +345,9 @@ static inline unsigned int __scanbit(unsigned long val)
  * Returns the bit-number of the first set bit, not the number of the byte
  * containing a bit.
  */
-#define find_first_bit(addr,size) \
-((__builtin_constant_p(size) && (size) <= BITS_PER_LONG ? \
-  (__scanbit(*(const unsigned long *)addr)) : \
+#define find_first_bit(addr,size)                               \
+((__builtin_constant_p(size) && (size) <= BITS_PER_LONG ?       \
+  (__scanbit(*(const unsigned long *)addr, size)) :             \
   __find_first_bit(addr,size)))
 
 /**
@@ -357,9 +356,9 @@ static inline unsigned int __scanbit(unsigned long val)
  * @offset: The bitnumber to start searching at
  * @size: The maximum size to search
  */
-#define find_next_bit(addr,size,off) \
-((__builtin_constant_p(size) && (size) <= BITS_PER_LONG ? \
-  ((off) + (__scanbit((*(const unsigned long *)addr) >> (off)))) : \
+#define find_next_bit(addr,size,off)                                     \
+((__builtin_constant_p(size) && (size) <= BITS_PER_LONG ?                \
+  ((off) + (__scanbit((*(const unsigned long *)addr) >> (off), size))) : \
   __find_next_bit(addr,size,off)))
 
 /**
@@ -370,9 +369,9 @@ static inline unsigned int __scanbit(unsigned long val)
  * Returns the bit-number of the first zero bit, not the number of the byte
  * containing a bit.
  */
-#define find_first_zero_bit(addr,size) \
-((__builtin_constant_p(size) && (size) <= BITS_PER_LONG ? \
-  (__scanbit(~*(const unsigned long *)addr)) : \
+#define find_first_zero_bit(addr,size)                          \
+((__builtin_constant_p(size) && (size) <= BITS_PER_LONG ?       \
+  (__scanbit(~*(const unsigned long *)addr, size)) :            \
   __find_first_zero_bit(addr,size)))
 
 /**
@@ -381,9 +380,9 @@ static inline unsigned int __scanbit(unsigned long val)
  * @offset: The bitnumber to start searching at
  * @size: The maximum size to search
  */
-#define find_next_zero_bit(addr,size,off) \
-((__builtin_constant_p(size) && (size) <= BITS_PER_LONG ? \
-  ((off)+(__scanbit(~(((*(const unsigned long *)addr)) >> (off))))) : \
+#define find_next_zero_bit(addr,size,off)                                   \
+((__builtin_constant_p(size) && (size) <= BITS_PER_LONG ?                   \
+  ((off)+(__scanbit(~(((*(const unsigned long *)addr)) >> (off)), size))) : \
   __find_next_zero_bit(addr,size,off)))
 
 
@@ -391,8 +390,7 @@ static inline unsigned int __scanbit(unsigned long val)
  * find_first_set_bit - find the first set bit in @word
  * @word: the word to search
  * 
- * Returns the bit-number of the first set bit. If no bits are set then the
- * result is undefined.
+ * Returns the bit-number of the first set bit. The input must *not* be zero.
  */
 static inline unsigned int find_first_set_bit(unsigned long word)
 {
@@ -401,26 +399,10 @@ static inline unsigned int find_first_set_bit(unsigned long word)
 }
 
 /**
- * ffz - find first zero in word.
- * @word: The word to search
- *
- * Undefined if no zero exists, so code should check against ~0UL first.
- */
-static inline unsigned long ffz(unsigned long word)
-{
-    asm ( "bsf %1,%0"
-          :"=r" (word)
-          :"r" (~word));
-    return word;
-}
-
-/**
  * ffs - find first bit set
  * @x: the word to search
  *
- * This is defined the same way as
- * the libc and compiler builtin ffs routines, therefore
- * differs in spirit from the above ffz (man ffs).
+ * This is defined the same way as the libc and compiler builtin ffs routines.
  */
 static inline int ffs(unsigned long x)
 {
