@@ -185,6 +185,30 @@ class ImageHandler:
         """Build the domain. Define in subclass."""
         raise NotImplementedError()
 
+    def prepareEnvironment(self):
+        """Prepare the environment for the execution of the domain. This
+        method is called before any devices are set up."""
+        
+        domid = self.vm.getDomid()
+	
+        # Delete left-over pipes
+        try:
+            os.unlink('/var/run/tap/qemu-read-%d' % domid)
+            os.unlink('/var/run/tap/qemu-write-%d' % domid)
+        except:
+            pass
+
+        # No device model, don't create pipes
+        if self.device_model is None:
+            return
+
+        # If we use a device model, the pipes for communication between
+        # blktapctrl and ioemu must be present before the devices are 
+        # created (blktapctrl must access them for new block devices)
+        os.mkfifo('/var/run/tap/qemu-read-%d' % domid, 0600)
+        os.mkfifo('/var/run/tap/qemu-write-%d' % domid, 0600)
+        
+
     # Return a list of cmd line args to the device models based on the
     # xm config file
     def parseDeviceModelArgs(self, vmConfig):
@@ -411,6 +435,12 @@ class ImageHandler:
             self.pid = None
             state = xstransact.Remove("/local/domain/0/device-model/%i"
                                       % self.vm.getDomid())
+            
+            try:
+                os.unlink('/var/run/tap/qemu-read-%d' % self.vm.getDomid())
+                os.unlink('/var/run/tap/qemu-write-%d' % self.vm.getDomid())
+            except:
+                pass
 
 
 class LinuxImageHandler(ImageHandler):
