@@ -494,14 +494,14 @@ static int hvm_load_cpu_ctxt(struct domain *d, hvm_domain_context_t *h)
          ((ctxt.cr0 & (X86_CR0_PE|X86_CR0_PG)) == X86_CR0_PG) )
     {
         gdprintk(XENLOG_ERR, "HVM restore: bad CR0 0x%"PRIx64"\n",
-                 ctxt.msr_efer);
+                 ctxt.cr0);
         return -EINVAL;
     }
 
     if ( ctxt.cr4 & HVM_CR4_GUEST_RESERVED_BITS )
     {
         gdprintk(XENLOG_ERR, "HVM restore: bad CR4 0x%"PRIx64"\n",
-                 ctxt.msr_efer);
+                 ctxt.cr4);
         return -EINVAL;
     }
 
