@@ -109,8 +109,10 @@ static void svm_dirq_assist(struct vcpu *v)
           irq < NR_IRQS;
           irq = find_next_bit(hvm_irq_dpci->dirq_mask, NR_IRQS, irq + 1) )
     {
+        if ( !test_and_clear_bit(irq, &hvm_irq_dpci->dirq_mask) )
+            continue;
+
         stop_timer(&hvm_irq_dpci->hvm_timer[irq_to_vector(irq)]);
-        clear_bit(irq, &hvm_irq_dpci->dirq_mask);
 
         list_for_each_entry ( digl, &hvm_irq_dpci->mirq[irq].digl_list, list )
         {
