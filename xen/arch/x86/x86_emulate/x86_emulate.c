@@ -3041,6 +3041,7 @@ x86_emulate(
 
     case 0xa3: bt: /* bt */
         emulate_2op_SrcV_nobyte("bt", src, dst, _regs.eflags);
+        dst.type = OP_NONE;
         break;
 
     case 0xa4: /* shld imm8,r,r/m */
