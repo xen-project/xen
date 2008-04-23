@@ -15,6 +15,16 @@
 #include <xen/mm.h>
 #include <xen/serial.h>
 
+unsigned int serial_txbufsz = 16384;
+static void __init parse_serial_tx_buffer(const char *s)
+{
+    serial_txbufsz = max((unsigned int)parse_size_and_unit(s, NULL), 512u);
+}
+custom_param("serial_tx_buffer", parse_serial_tx_buffer);
+
+#define mask_serial_rxbuf_idx(_i) ((_i)&(serial_rxbufsz-1))
+#define mask_serial_txbuf_idx(_i) ((_i)&(serial_txbufsz-1))
+
 static struct serial_port com[2] = {
     { .rx_lock = SPIN_LOCK_UNLOCKED, .tx_lock = SPIN_LOCK_UNLOCKED }, 
     { .rx_lock = SPIN_LOCK_UNLOCKED, .tx_lock = SPIN_LOCK_UNLOCKED }
@@ -36,8 +46,8 @@ void serial_rx_interrupt(struct serial_port *port, struct cpu_user_regs *regs)
             fn = port->rx_hi;
         else if ( !(c & 0x80) && (port->rx_lo != NULL) )
             fn = port->rx_lo;
-        else if ( (port->rxbufp - port->rxbufc) != SERIAL_RXBUFSZ )
-            port->rxbuf[MASK_SERIAL_RXBUF_IDX(port->rxbufp++)] = c;            
+        else if ( (port->rxbufp - port->rxbufc) != serial_rxbufsz )
+            port->rxbuf[mask_serial_rxbuf_idx(port->rxbufp++)] = c;            
     }
 
     spin_unlock_irqrestore(&port->rx_lock, flags);
@@ -72,7 +82,7 @@ void serial_tx_interrupt(struct serial_port *port, struct cpu_user_regs *regs)
             if ( port->txbufc == port->txbufp )
                 break;
             port->driver->putc(
-                port, port->txbuf[MASK_SERIAL_TXBUF_IDX(port->txbufc++)]);
+                port, port->txbuf[mask_serial_txbuf_idx(port->txbufc++)]);
         }
     }
 
@@ -86,15 +96,15 @@ static void __serial_putc(struct serial_port *port, char c)
     if ( (port->txbuf != NULL) && !port->sync )
     {
         /* Interrupt-driven (asynchronous) transmitter. */
-        if ( (port->txbufp - port->txbufc) == SERIAL_TXBUFSZ )
+        if ( (port->txbufp - port->txbufc) == serial_txbufsz )
         {
             /* Buffer is full: we spin, but could alternatively drop chars. */
             while ( !port->driver->tx_empty(port) )
                 cpu_relax();
             for ( i = 0; i < port->tx_fifo_size; i++ )
                 port->driver->putc(
-                    port, port->txbuf[MASK_SERIAL_TXBUF_IDX(port->txbufc++)]);
-            port->txbuf[MASK_SERIAL_TXBUF_IDX(port->txbufp++)] = c;
+                    port, port->txbuf[mask_serial_txbuf_idx(port->txbufc++)]);
+            port->txbuf[mask_serial_txbuf_idx(port->txbufp++)] = c;
         }
         else if ( ((port->txbufp - port->txbufc) == 0) &&
                   port->driver->tx_empty(port) )
@@ -105,7 +115,7 @@ static void __serial_putc(struct serial_port *port, char c)
         else
         {
             /* Normal case: buffer the character. */
-            port->txbuf[MASK_SERIAL_TXBUF_IDX(port->txbufp++)] = c;
+            port->txbuf[mask_serial_txbuf_idx(port->txbufp++)] = c;
         }
     }
     else if ( port->driver->tx_empty )
@@ -200,7 +210,7 @@ char serial_getc(int handle)
             
             if ( port->rxbufp != port->rxbufc )
             {
-                c = port->rxbuf[MASK_SERIAL_RXBUF_IDX(port->rxbufc++)];
+                c = port->rxbuf[mask_serial_rxbuf_idx(port->rxbufc++)];
                 spin_unlock_irqrestore(&port->rx_lock, flags);
                 break;
             }
@@ -336,7 +346,7 @@ void serial_start_sync(int handle)
             while ( !port->driver->tx_empty(port) )
                 cpu_relax();
             port->driver->putc(
-                port, port->txbuf[MASK_SERIAL_TXBUF_IDX(port->txbufc++)]);
+                port, port->txbuf[mask_serial_txbuf_idx(port->txbufc++)]);
         }
     }
 
@@ -364,9 +374,9 @@ int serial_tx_space(int handle)
 {
     struct serial_port *port;
     if ( handle == -1 )
-        return SERIAL_TXBUFSZ;
+        return serial_txbufsz;
     port = &com[handle & SERHND_IDX];
-    return SERIAL_TXBUFSZ - (port->txbufp - port->txbufc);
+    return serial_txbufsz - (port->txbufp - port->txbufc);
 }
 
 void __devinit serial_init_preirq(void)
@@ -431,7 +441,7 @@ void serial_async_transmit(struct serial_port *port)
     BUG_ON(!port->driver->tx_empty);
     if ( port->txbuf == NULL )
         port->txbuf = alloc_xenheap_pages(
-            get_order_from_bytes(SERIAL_TXBUFSZ));
+            get_order_from_bytes(serial_txbufsz));
 }
 
 /*

@@ -16,12 +16,10 @@ typedef void (*serial_rx_fn)(char, struct cpu_user_regs *);
 void serial_set_rx_handler(int handle, serial_rx_fn fn);
 
 /* Number of characters we buffer for a polling receiver. */
-#define SERIAL_RXBUFSZ 32
-#define MASK_SERIAL_RXBUF_IDX(_i) ((_i)&(SERIAL_RXBUFSZ-1))
+#define serial_rxbufsz 32
 
 /* Number of characters we buffer for an interrupt-driven transmitter. */
-#define SERIAL_TXBUFSZ 16384
-#define MASK_SERIAL_TXBUF_IDX(_i) ((_i)&(SERIAL_TXBUFSZ-1))
+extern unsigned int serial_txbufsz;
 
 struct uart_driver;
 
@@ -39,7 +37,7 @@ struct serial_port {
     /* Receiver callback functions (asynchronous receivers). */
     serial_rx_fn        rx_lo, rx_hi, rx;
     /* Receive data buffer (polling receivers). */
-    char                rxbuf[SERIAL_RXBUFSZ];
+    char                rxbuf[serial_rxbufsz];
     unsigned int        rxbufp, rxbufc;
     /* Serial I/O is concurrency-safe. */
     spinlock_t          rx_lock, tx_lock;
