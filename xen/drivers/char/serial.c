@@ -15,6 +15,9 @@
 #include <xen/mm.h>
 #include <xen/serial.h>
 
+/* Never drop characters, even if the async transmit buffer fills. */
+/* #define SERIAL_NEVER_DROP_CHARS 1 */
+
 unsigned int serial_txbufsz = 16384;
 static void __init parse_serial_tx_buffer(const char *s)
 {
@@ -91,22 +94,24 @@ void serial_tx_interrupt(struct serial_port *port, struct cpu_user_regs *regs)
 
 static void __serial_putc(struct serial_port *port, char c)
 {
-    int i;
-
     if ( (port->txbuf != NULL) && !port->sync )
     {
         /* Interrupt-driven (asynchronous) transmitter. */
+#ifdef SERIAL_NEVER_DROP_CHARS
         if ( (port->txbufp - port->txbufc) == serial_txbufsz )
         {
-            /* Buffer is full: we spin, but could alternatively drop chars. */
+            /* Buffer is full: we spin waiting for space to appear. */
+            int i;
             while ( !port->driver->tx_empty(port) )
                 cpu_relax();
             for ( i = 0; i < port->tx_fifo_size; i++ )
                 port->driver->putc(
                     port, port->txbuf[mask_serial_txbuf_idx(port->txbufc++)]);
             port->txbuf[mask_serial_txbuf_idx(port->txbufp++)] = c;
+            return;
         }
-        else if ( ((port->txbufp - port->txbufc) == 0) &&
+#endif
+        if ( ((port->txbufp - port->txbufc) == 0) &&
                   port->driver->tx_empty(port) )
         {
             /* Buffer and UART FIFO are both empty. */
