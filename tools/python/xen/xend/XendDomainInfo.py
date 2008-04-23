@@ -1837,9 +1837,6 @@ class XendDomainInfo:
 
         @raise: VmError for invalid devices
         """
-        if self.image:
-            self.image.prepareEnvironment()
-
         ordered_refs = self.info.ordered_device_refs()
         for dev_uuid in ordered_refs:
             devclass, config = self.info['devices'][dev_uuid]

@@ -4,7 +4,6 @@
 #include <string.h>
 #include <stdint.h>
 #include <signal.h>
-#include <unistd.h>
 #include <sys/time.h>
 
 #include <assert.h>
@@ -16,8 +15,6 @@ extern void bdrv_init(void);
 
 extern void *qemu_mallocz(size_t size);
 extern void qemu_free(void *ptr);
-
-extern void *fd_start;
 
 int domid = 0;
 FILE* logfile;
@@ -98,17 +95,12 @@ int main(void)
     int max_fd;
     fd_set rfds;
     struct timeval tv;
-    void *old_fd_start = NULL;
 
     logfile = stderr;
     
     bdrv_init();
     qemu_aio_init();
     init_blktap();
-
-    /* Daemonize */
-    if (fork() != 0)
-    	exit(0);
    
     /* 
      * Main loop: Pass events to the corrsponding handlers and check for
@@ -145,12 +137,6 @@ int main(void)
             } else 
                 pioh = &ioh->next;
         }
-
-        /* Exit when the last image has been closed */
-        if (old_fd_start != NULL && fd_start == NULL)
-            exit(0);
-
-        old_fd_start = fd_start;
     }
     return 0;
 }

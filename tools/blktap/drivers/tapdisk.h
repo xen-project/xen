@@ -235,7 +235,7 @@ static disk_info_t ioemu_disk = {
 	DISK_TYPE_IOEMU,
 	"ioemu disk",
 	"ioemu",
-	1,
+	0,
 #ifdef TAPDISK
 	NULL
 #endif
