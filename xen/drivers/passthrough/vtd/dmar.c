@@ -78,14 +78,9 @@ static int acpi_ioapic_device_match(
 struct acpi_drhd_unit * ioapic_to_drhd(unsigned int apic_id)
 {
     struct acpi_drhd_unit *drhd;
-    list_for_each_entry( drhd, &acpi_drhd_units, list ) {
-        if ( acpi_ioapic_device_match(&drhd->ioapic_list, apic_id) ) {
-            dprintk(XENLOG_INFO VTDPREFIX,
-                    "ioapic_to_drhd: drhd->address = %lx\n",
-                    drhd->address);
+    list_for_each_entry( drhd, &acpi_drhd_units, list )
+        if ( acpi_ioapic_device_match(&drhd->ioapic_list, apic_id) )
             return drhd;
-        }
-    }
     return NULL;
 }
 
@@ -93,15 +88,9 @@ struct iommu * ioapic_to_iommu(unsigned int apic_id)
 {
     struct acpi_drhd_unit *drhd;
 
-    list_for_each_entry( drhd, &acpi_drhd_units, list ) {
-        if ( acpi_ioapic_device_match(&drhd->ioapic_list, apic_id) ) {
-            dprintk(XENLOG_INFO VTDPREFIX,
-                    "ioapic_to_iommu: drhd->address = %lx\n",
-                    drhd->address);
+    list_for_each_entry( drhd, &acpi_drhd_units, list )
+        if ( acpi_ioapic_device_match(&drhd->ioapic_list, apic_id) )
             return drhd->iommu;
-        }
-    }
-    dprintk(XENLOG_INFO VTDPREFIX, "returning NULL\n");
     return NULL;
 }
 
@@ -149,21 +138,11 @@ struct acpi_drhd_unit * acpi_find_matched_drhd_unit(struct pci_dev *dev)
 
         if ( acpi_pci_device_match(drhd->devices,
                                    drhd->devices_cnt, dev) )
-        {
-            dprintk(XENLOG_INFO VTDPREFIX, 
-                    "acpi_find_matched_drhd_unit: drhd->address = %lx\n",
-                    drhd->address);
             return drhd;
-        }
     }
 
     if ( include_all_drhd )
-    {
-        dprintk(XENLOG_INFO VTDPREFIX, 
-                "acpi_find_matched_drhd_unit:include_all_drhd->addr = %lx\n",
-                include_all_drhd->address);
         return include_all_drhd;
-    }
 
     return NULL;
 }
@@ -173,11 +152,9 @@ struct acpi_rmrr_unit * acpi_find_matched_rmrr_unit(struct pci_dev *dev)
     struct acpi_rmrr_unit *rmrr;
 
     list_for_each_entry ( rmrr, &acpi_rmrr_units, list )
-    {
         if ( acpi_pci_device_match(rmrr->devices,
                                    rmrr->devices_cnt, dev) )
             return rmrr;
-    }
 
     return NULL;
 }
@@ -198,11 +175,7 @@ struct acpi_atsr_unit * acpi_find_matched_atsr_unit(struct pci_dev *dev)
     }
 
     if ( all_ports_atsru )
-    {
-        dprintk(XENLOG_INFO VTDPREFIX,
-                "acpi_find_matched_atsr_unit: all_ports_atsru\n");
         return all_ports_atsru;;
-    }
 
     return NULL;
 }
