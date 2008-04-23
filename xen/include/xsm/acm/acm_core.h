@@ -34,6 +34,7 @@ struct acm_binary_policy {
     u16 primary_policy_code;
     u16 secondary_policy_code;
     struct acm_policy_version xml_pol_version;
+    u8 xml_policy_hash[ACM_SHA1_HASH_SIZE];
 };
 
 struct chwall_binary_policy {

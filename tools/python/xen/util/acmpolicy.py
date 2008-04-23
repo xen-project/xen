@@ -17,6 +17,7 @@
 #============================================================================
 
 import os
+import sha
 import stat
 import array
 import struct
@@ -35,7 +36,7 @@ ACM_POLICIES_DIR = security.policy_dir_prefix + "/"
 
 # Constants needed for generating a binary policy from its XML
 # representation
-ACM_POLICY_VERSION = 3  # Latest one
+ACM_POLICY_VERSION = 4  # Latest one
 ACM_CHWALL_VERSION = 1
 
 ACM_STE_VERSION = 1
@@ -965,6 +966,10 @@ class ACMPolicy(XSPolicy):
             return dom.toxml()
         return None
 
+    def hash(self):
+        """ Calculate a SAH1 hash of the XML policy """
+        return sha.sha(self.toxml())
+
     def save(self):
         ### Save the XML policy into a file ###
         rc = -xsconstants.XSERR_FILE_ERROR
@@ -1403,7 +1408,7 @@ class ACMPolicy(XSPolicy):
             ste_bin += "\x00"
 
         #Write binary header:
-        headerformat="!iiiiiiiiii"
+        headerformat="!iiiiiiiiii20s"
         totallen_bin = struct.calcsize(headerformat) + \
                        len(pr_bin) + len(chw_bin) + len(ste_bin)
         polref_offset = struct.calcsize(headerformat)
@@ -1425,7 +1430,8 @@ class ACMPolicy(XSPolicy):
                               primpoloffset,
                               secpolcode,
                               secpoloffset,
-                              major, minor)
+                              major, minor,
+                              self.hash().digest())
 
         all_bin = array.array('B')
         for s in [ hdr_bin, pr_bin, chw_bin, ste_bin ]:
@@ -1442,6 +1448,21 @@ class ACMPolicy(XSPolicy):
                      " %s" % list(unknown_chw))
             rc = -xsconstants.XSERR_BAD_LABEL
         return rc, mapfile, all_bin.tostring()
+
+    def validate_enforced_policy_hash(self):
+        """ verify that the policy hash embedded in the binary policy
+            that is currently enforce matches the one of the XML policy.
+        """
+        if self.hash().digest() != self.get_enforced_policy_hash():
+            raise Exception('Policy hashes do not match')
+
+    def get_enforced_policy_hash(self):
+        binpol = self.get_enforced_binary()
+        headerformat="!iiiiiiiiii20s"
+        res = struct.unpack(headerformat, binpol[:60])
+        if len(res) >= 11:
+            return res[10]
+        return None
 
     def get_enforced_binary(self):
         rc, binpol = security.hv_get_policy()

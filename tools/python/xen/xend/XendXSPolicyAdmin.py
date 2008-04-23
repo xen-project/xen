@@ -54,6 +54,7 @@ class XSPolicyAdmin:
         try:
             self.xsobjs[ref] = ACMPolicy(name=act_pol_name, ref=ref)
             self.policies[ref] = (act_pol_name, xsconstants.ACM_POLICY_ID)
+            self.xsobjs[ref].validate_enforced_policy_hash()
         except Exception, e:
             log.error("Could not find XML representation of policy '%s': "
                       "%s" % (act_pol_name,e))
