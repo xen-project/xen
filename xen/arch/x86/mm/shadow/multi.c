@@ -2089,7 +2089,7 @@ static shadow_l1e_t * shadow_get_and_create_l1e(struct vcpu *v,
         else 
         {
             /* Shadowing an actual guest l1 table */
-            if ( !mfn_valid(gw->l2mfn) ) return NULL; /* No guest page. */
+            if ( !mfn_valid(gw->l1mfn) ) return NULL; /* No guest page. */
             *sl1mfn = get_shadow_status(v, gw->l1mfn, SH_type_l1_shadow);
             if ( !mfn_valid(*sl1mfn) ) 
             {
