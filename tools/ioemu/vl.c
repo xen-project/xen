@@ -6275,12 +6275,6 @@ void qemu_system_powerdown_request(void)
         cpu_interrupt(cpu_single_env, CPU_INTERRUPT_EXIT);
 }
 
-static void qemu_sighup_handler(int signal)
-{
-    fprintf(stderr, "Received SIGHUP, terminating.\n");
-    exit(0);
-}
-
 void main_loop_wait(int timeout)
 {
     IOHandlerRecord *ioh;
@@ -7976,7 +7970,7 @@ int main(int argc, char **argv)
 
 #ifndef CONFIG_STUBDOM
     /* Unblock SIGTERM and SIGHUP, which may have been blocked by the caller */
-    signal(SIGHUP, qemu_sighup_handler);
+    signal(SIGHUP, SIG_DFL);
     sigemptyset(&set);
     sigaddset(&set, SIGTERM);
     sigaddset(&set, SIGHUP);
