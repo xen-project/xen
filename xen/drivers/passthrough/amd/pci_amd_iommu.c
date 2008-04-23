@@ -290,9 +290,9 @@ static void amd_iommu_setup_domain_device(
     }
 }
 
-static void __init amd_iommu_setup_dom0_devices(void)
+static void amd_iommu_setup_dom0_devices(struct domain *d)
 {
-    struct hvm_iommu *hd = domain_hvm_iommu(dom0);
+    struct hvm_iommu *hd = domain_hvm_iommu(d);
     struct amd_iommu *iommu;
     struct pci_dev *pdev;
     int bus, dev, func;
@@ -322,7 +322,7 @@ static void __init amd_iommu_setup_dom0_devices(void)
                     find_iommu_for_device(bus, pdev->devfn) : NULL;
 
                 if ( iommu )
-                    amd_iommu_setup_domain_device(dom0, iommu, bdf);
+                    amd_iommu_setup_domain_device(d, iommu, bdf);
             }
         }
     }
@@ -330,7 +330,6 @@ static void __init amd_iommu_setup_dom0_devices(void)
 
 int amd_iov_detect(void)
 {
-    unsigned long i;
     int last_bus;
     struct amd_iommu *iommu, *next;
 
@@ -372,14 +371,6 @@ int amd_iov_detect(void)
         goto error_out;
     }
 
-    if ( iommu_domain_init(dom0) != 0 )
-        goto error_out;
-
-    /* setup 1:1 page table for dom0 */
-    for ( i = 0; i < max_page; i++ )
-        amd_iommu_map_page(dom0, i, i);
-
-    amd_iommu_setup_dom0_devices();
     return 0;
 
  error_out:
@@ -451,10 +442,18 @@ static int amd_iommu_domain_init(struct domain *domain)
         return -ENOMEM;
     }
 
-    if ( is_hvm_domain(domain) )
-        hd->paging_mode = IOMMU_PAGE_TABLE_LEVEL_4;
-    else
-        hd->paging_mode = get_paging_mode(max_page);
+    hd->paging_mode = is_hvm_domain(domain)?
+        IOMMU_PAGE_TABLE_LEVEL_4 : get_paging_mode(max_page);
+
+    if ( domain->domain_id == 0 )
+    {
+        unsigned long i; 
+       /* setup 1:1 page table for dom0 */
+        for ( i = 0; i < max_page; i++ )
+            amd_iommu_map_page(domain, i, i);
+
+        amd_iommu_setup_dom0_devices(domain);
+    }
 
     hd->domain_id = domain->domain_id;
 
