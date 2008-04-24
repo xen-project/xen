@@ -509,14 +509,36 @@ int monitor_tbufs(void)
     {
         for ( i = 0; (i < num) && !interrupted; i++ )
         {
-            while ( meta[i]->cons != meta[i]->prod )
+            unsigned long start_offset, end_offset, cons, prod;
+
+            cons = meta[i]->cons;
+            prod = meta[i]->prod;
+            xen_rmb(); /* read prod, then read item. */
+
+            if ( cons == prod )
+                continue;
+
+            start_offset = cons % data_size;
+            end_offset = prod % data_size;
+
+            if ( start_offset >= end_offset )
             {
-                xen_rmb(); /* read prod, then read item. */
-                rec_size = process_record(
-                    i, (struct t_rec *)(data[i] + meta[i]->cons % data_size));
-                xen_mb(); /* read item, then update cons. */
-                meta[i]->cons += rec_size;
+                while ( start_offset != data_size )
+                {
+                    rec_size = process_record(
+                        i, (struct t_rec *)(data[i] + start_offset));
+                    start_offset += rec_size;
+                }
+                start_offset = 0;
             }
+            while ( start_offset != end_offset )
+            {
+                rec_size = process_record(
+                    i, (struct t_rec *)(data[i] + start_offset));
+                start_offset += rec_size;
+            }
+            xen_mb(); /* read item, then update cons. */
+            meta[i]->cons = prod;
         }
 
 	wait_for_event();
