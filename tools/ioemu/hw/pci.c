@@ -79,18 +79,30 @@ int pci_bus_num(PCIBus *s)
 
 void pci_device_save(PCIDevice *s, QEMUFile *f)
 {
-    qemu_put_be32(f, 1); /* PCI device version */
+    uint8_t irq_state = 0;
+    int i;
+    qemu_put_be32(f, 2); /* PCI device version */
     qemu_put_buffer(f, s->config, 256);
+    for (i = 0; i < 4; i++)
+        irq_state |= !!s->irq_state[i] << i;
+    qemu_put_buffer(f, &irq_state, 1);
 }
 
 int pci_device_load(PCIDevice *s, QEMUFile *f)
 {
     uint32_t version_id;
     version_id = qemu_get_be32(f);
-    if (version_id != 1)
+    if (version_id != 1 && version_id != 2)
         return -EINVAL;
     qemu_get_buffer(f, s->config, 256);
     pci_update_mappings(s);
+    if (version_id == 2) {
+        uint8_t irq_state;
+        int i;
+        qemu_get_buffer(f, &irq_state, 1);
+        for (i = 0; i < 4; i++)
+            pci_set_irq(s, i, !!(irq_state >> i));
+    }
     return 0;
 }
 
