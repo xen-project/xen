@@ -352,6 +352,15 @@ complete_dom0_memmap(struct domain *d, struct fw_tables *tables)
 	efi_map_end = efi_map_start + ia64_boot_param->efi_memmap_size;
 	efi_desc_size = ia64_boot_param->efi_memdesc_size;
 
+
+	/* EFI memory descriptor is using 4k page, while xen is using 16k page.
+	 * To avoid identity mapping for EFI_ACPI_RECLAIM_MEMORY etc. being
+	 * blocked by WB mapping, scan memory descriptor twice.
+	 * First: setup identity mapping for EFI_ACPI_RECLAIM_MEMORY etc.
+	 * Second: setup mapping for EFI_CONVENTIONAL_MEMORY etc.
+	 */
+  
+	/* first scan, setup identity mapping for EFI_ACPI_RECLAIM_MEMORY etc. */
 	for (p = efi_map_start; p < efi_map_end; p += efi_desc_size) {
 		const efi_memory_desc_t *md = p;
 		efi_memory_desc_t *dom_md = &tables->efi_memmap[tables->num_mds];
@@ -415,6 +424,48 @@ complete_dom0_memmap(struct domain *d, struct fw_tables *tables)
 		case EFI_LOADER_CODE:
 		case EFI_LOADER_DATA:
 		case EFI_BOOT_SERVICES_CODE:
+		case EFI_BOOT_SERVICES_DATA:
+			break;
+
+		case EFI_UNUSABLE_MEMORY:
+		case EFI_PAL_CODE:
+			/*
+			 * We don't really need these, but holes in the
+			 * memory map may cause Linux to assume there are
+			 * uncacheable ranges within a granule.
+			 */
+			dom_md->type = EFI_UNUSABLE_MEMORY;
+			dom_md->phys_addr = start;
+			dom_md->virt_addr = 0;
+			dom_md->num_pages = (end - start) >> EFI_PAGE_SHIFT;
+			dom_md->attribute = EFI_MEMORY_WB;
+			tables->num_mds++;
+			break;
+
+		default:
+			/* Print a warning but continue.  */
+			printk("complete_dom0_memmap: warning: "
+			       "unhandled MDT entry type %u\n", md->type);
+		}
+	}
+
+ 
+	/* secend scan, setup mapping for EFI_CONVENTIONAL_MEMORY etc. */
+	for (p = efi_map_start; p < efi_map_end; p += efi_desc_size) {
+		const efi_memory_desc_t *md = p;
+		efi_memory_desc_t *dom_md = &tables->efi_memmap[tables->num_mds];
+		u64 start = md->phys_addr;
+		u64 size = md->num_pages << EFI_PAGE_SHIFT;
+		u64 end = start + size;
+		u64 mpaddr;
+		unsigned long flags;
+
+		switch (md->type) {
+
+		case EFI_CONVENTIONAL_MEMORY:
+		case EFI_LOADER_CODE:
+		case EFI_LOADER_DATA:
+		case EFI_BOOT_SERVICES_CODE:
 		case EFI_BOOT_SERVICES_DATA: {
 			u64 dom_md_start;
 			u64 dom_md_end;
@@ -458,27 +509,12 @@ complete_dom0_memmap(struct domain *d, struct fw_tables *tables)
 			break;
 		}
 
-		case EFI_UNUSABLE_MEMORY:
-		case EFI_PAL_CODE:
-			/*
-			 * We don't really need these, but holes in the
-			 * memory map may cause Linux to assume there are
-			 * uncacheable ranges within a granule.
-			 */
-			dom_md->type = EFI_UNUSABLE_MEMORY;
-			dom_md->phys_addr = start;
-			dom_md->virt_addr = 0;
-			dom_md->num_pages = (end - start) >> EFI_PAGE_SHIFT;
-			dom_md->attribute = EFI_MEMORY_WB;
-			tables->num_mds++;
-			break;
 
 		default:
-			/* Print a warning but continue.  */
-			printk("complete_dom0_memmap: warning: "
-			       "unhandled MDT entry type %u\n", md->type);
+			break;
 		}
 	}
+
 	BUG_ON(tables->fw_tables_size <
 	       sizeof(*tables) +
 	       sizeof(tables->efi_memmap[0]) * tables->num_mds);
