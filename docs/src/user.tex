@@ -4088,6 +4088,8 @@ editing \path{grub.conf}.
   a list of pages not to be allocated for use because they contain bad
   bytes. For example, if your memory tester says that byte 0x12345678
   is bad, you would place `badpage=0x12345' on Xen's command line.
+\item [ serial\_tx\_buffer=$<$size$>$ ] Size of serial transmit
+  buffers. Default is 16kB.
 \item [ com1=$<$baud$>$,DPS,$<$io\_base$>$,$<$irq$>$
   com2=$<$baud$>$,DPS,$<$io\_base$>$,$<$irq$>$ ] \mbox{}\\
   Xen supports up to two 16550-compatible serial ports.  For example:
@@ -4239,10 +4241,11 @@ In addition to the standard Linux kernel boot options, we support:
     \begin{tabular}{l}
       `xencons=off': disable virtual console \\
       `xencons=tty': attach console to /dev/tty1 (tty0 at boot-time) \\
-      `xencons=ttyS': attach console to /dev/ttyS0
+      `xencons=ttyS': attach console to /dev/ttyS0 \\
+      `xencons=xvc': attach console to /dev/xvc0
     \end{tabular}
 \end{center}
-The default is ttyS for dom0 and tty for all other domains.
+The default is ttyS for dom0 and xvc for all other domains.
 \end{description}
 
 

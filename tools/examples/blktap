@@ -54,10 +54,6 @@ check_blktap_sharing()
     echo 'ok'
 }
 
-FRONTEND_ID=$(xenstore_read "$XENBUS_PATH/frontend-id")
-FRONTEND_UUID=$(xenstore_read "/local/domain/$FRONTEND_ID/vm")
-mode=$(xenstore_read "$XENBUS_PATH/mode")
-mode=$(canonicalise_mode "$mode")
 
 t=$(xenstore_read_default "$XENBUS_PATH/type" 'MISSING')
 if [ -n "$t" ]
@@ -77,15 +73,21 @@ else
     file="$p"
 fi
 
-if [ "$mode" != '!' ] 
-then
-    result=$(check_blktap_sharing "$file" "$mode")
-    [ "$result" = 'ok' ] || ebusy "$file already in use by other domain"
-fi
-
 if [ "$command" = 'add' ]
 then
     [ -e "$file" ] || { fatal $file does not exist; }
+
+    FRONTEND_ID=$(xenstore_read "$XENBUS_PATH/frontend-id")
+    FRONTEND_UUID=$(xenstore_read "/local/domain/$FRONTEND_ID/vm")
+    mode=$(xenstore_read "$XENBUS_PATH/mode")
+    mode=$(canonicalise_mode "$mode")
+
+    if [ "$mode" != '!' ] 
+    then
+        result=$(check_blktap_sharing "$file" "$mode")
+        [ "$result" = 'ok' ] || ebusy "$file already in use by other domain"
+    fi
+
     success
 fi
 

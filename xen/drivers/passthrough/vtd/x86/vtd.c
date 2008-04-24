@@ -114,8 +114,6 @@ void hvm_dpci_isairq_eoi(struct domain *d, unsigned int isairq)
                 if ( --dpci->mirq[i].pending == 0 )
                 {
                     spin_unlock(&dpci->dirq_lock);
-                    gdprintk(XENLOG_INFO VTDPREFIX,
-                             "hvm_dpci_isairq_eoi:: mirq = %x\n", i);
                     stop_timer(&dpci->hvm_timer[irq_to_vector(i)]);
                     pirq_guest_eoi(d, i);
                 }
@@ -130,8 +128,6 @@ void iommu_set_pgd(struct domain *d)
 {
     struct hvm_iommu *hd  = domain_hvm_iommu(d);
     unsigned long p2m_table;
-    int level = agaw_to_level(hd->agaw);
-    l3_pgentry_t *l3e;
 
     p2m_table = mfn_x(pagetable_get_mfn(d->arch.phys_table));
 
@@ -153,12 +149,12 @@ void iommu_set_pgd(struct domain *d)
                 return;
             }
             pgd_mfn = _mfn(dma_pte_addr(*dpte) >> PAGE_SHIFT_4K);
-            hd->pgd_maddr = mfn_x(pgd_mfn) << PAGE_SHIFT_4K;
+            hd->pgd_maddr = (paddr_t)(mfn_x(pgd_mfn)) << PAGE_SHIFT_4K;
             unmap_domain_page(dpte);
             break;
         case VTD_PAGE_TABLE_LEVEL_4:
             pgd_mfn = _mfn(p2m_table);
-            hd->pgd_maddr = mfn_x(pgd_mfn) << PAGE_SHIFT_4K;
+            hd->pgd_maddr = (paddr_t)(mfn_x(pgd_mfn)) << PAGE_SHIFT_4K;
             break;
         default:
             gdprintk(XENLOG_ERR VTDPREFIX,
@@ -173,6 +169,8 @@ void iommu_set_pgd(struct domain *d)
         int i;
         u64 pmd_maddr;
         unsigned long flags;
+        l3_pgentry_t *l3e;
+        int level = agaw_to_level(hd->agaw);
 
         spin_lock_irqsave(&hd->mapping_lock, flags);
         hd->pgd_maddr = alloc_pgtable_maddr();
@@ -236,6 +234,8 @@ void iommu_set_pgd(struct domain *d)
 
 #elif CONFIG_PAGING_LEVELS == 4
         mfn_t pgd_mfn;
+        l3_pgentry_t *l3e;
+        int level = agaw_to_level(hd->agaw);
 
         switch ( level )
         {
@@ -250,12 +250,12 @@ void iommu_set_pgd(struct domain *d)
             }
 
             pgd_mfn = _mfn(l3e_get_pfn(*l3e));
-            hd->pgd_maddr = mfn_x(pgd_mfn) << PAGE_SHIFT_4K;
+            hd->pgd_maddr = (paddr_t)(mfn_x(pgd_mfn)) << PAGE_SHIFT_4K;
             unmap_domain_page(l3e);
             break;
         case VTD_PAGE_TABLE_LEVEL_4:
             pgd_mfn = _mfn(p2m_table);
-            hd->pgd_maddr = mfn_x(pgd_mfn) << PAGE_SHIFT_4K;
+            hd->pgd_maddr = (paddr_t)(mfn_x(pgd_mfn)) << PAGE_SHIFT_4K;
             break;
         default:
             gdprintk(XENLOG_ERR VTDPREFIX,

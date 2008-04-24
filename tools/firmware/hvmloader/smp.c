@@ -66,12 +66,15 @@ asm (
     "stack:                          \n"
     "    .skip    0x4000             \n"
     "stack_top:                      \n"
+    "    .text                       \n"
     );
+
+extern void cacheattr_init(void);
 
 /*static*/ void ap_start(void)
 {
     printf(" - CPU%d ... ", ap_cpuid);
-
+    cacheattr_init();
     printf("done.\n");
     wmb();
     ap_callin = 1;
@@ -121,12 +124,10 @@ void smp_initialise(void)
 {
     unsigned int i, nr_cpus = get_vcpu_nr();
 
-    if ( nr_cpus <= 1 )
-        return;
-
     memcpy((void *)AP_BOOT_EIP, ap_boot_start, ap_boot_end - ap_boot_start);
 
     printf("Multiprocessor initialisation:\n");
+    ap_start();
     for ( i = 1; i < nr_cpus; i++ )
         boot_cpu(i);
 }

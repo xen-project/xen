@@ -26,14 +26,8 @@ static int read(
     unsigned int bytes,
     struct x86_emulate_ctxt *ctxt)
 {
-    unsigned long addr = offset;
-    switch ( bytes )
-    {
-    case 1: *val = *(uint8_t *)addr; break;
-    case 2: *val = *(uint16_t *)addr; break;
-    case 4: *val = *(uint32_t *)addr; break;
-    case 8: *val = *(unsigned long *)addr; break;
-    }
+    *val = 0;
+    memcpy(val, (void *)offset, bytes);
     return X86EMUL_OKAY;
 }
 
@@ -44,48 +38,19 @@ static int write(
     unsigned int bytes,
     struct x86_emulate_ctxt *ctxt)
 {
-    unsigned long addr = offset;
-    switch ( bytes )
-    {
-    case 1: *(uint8_t *)addr = (uint8_t)val; break;
-    case 2: *(uint16_t *)addr = (uint16_t)val; break;
-    case 4: *(uint32_t *)addr = (uint32_t)val; break;
-    case 8: *(unsigned long *)addr = val; break;
-    }
+    memcpy((void *)offset, &val, bytes);
     return X86EMUL_OKAY;
 }
 
 static int cmpxchg(
     unsigned int seg,
     unsigned long offset,
-    unsigned long old,
-    unsigned long new,
+    void *old,
+    void *new,
     unsigned int bytes,
     struct x86_emulate_ctxt *ctxt)
 {
-    unsigned long addr = offset;
-    switch ( bytes )
-    {
-    case 1: *(uint8_t *)addr = (uint8_t)new; break;
-    case 2: *(uint16_t *)addr = (uint16_t)new; break;
-    case 4: *(uint32_t *)addr = (uint32_t)new; break;
-    case 8: *(unsigned long *)addr = new; break;
-    }
-    return X86EMUL_OKAY;
-}
-
-static int cmpxchg8b(
-    unsigned int seg,
-    unsigned long offset,
-    unsigned long old_lo,
-    unsigned long old_hi,
-    unsigned long new_lo,
-    unsigned long new_hi,
-    struct x86_emulate_ctxt *ctxt)
-{
-    unsigned long addr = offset;
-    ((unsigned long *)addr)[0] = new_lo;
-    ((unsigned long *)addr)[1] = new_hi;
+    memcpy((void *)offset, new, bytes);
     return X86EMUL_OKAY;
 }
 
@@ -94,7 +59,6 @@ static struct x86_emulate_ops emulops = {
     .insn_fetch = read,
     .write      = write,
     .cmpxchg    = cmpxchg,
-    .cmpxchg8b  = cmpxchg8b
 };
 
 int main(int argc, char **argv)

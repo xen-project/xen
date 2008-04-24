@@ -1622,7 +1622,31 @@ class XendDomain:
                                           vcpu)
         except Exception, ex:
             raise XendError(str(ex))
- 
+
+    def domain_reset(self, domid):
+        """Terminate domain immediately, and then create domain.
+
+        @param domid: Domain ID or Name
+        @type domid: int or string.
+        @rtype: None
+        @raise XendError: Failed to destroy or create
+        @raise XendInvalidDomain: Domain is not valid
+        """
+
+        dominfo = self.domain_lookup_nr(domid)
+        if not dominfo:
+            raise XendInvalidDomain(str(domid))
+        if dominfo and dominfo.getDomid() == DOM0_ID:
+            raise XendError("Cannot reset privileged domain %s" % domid)
+        if dominfo._stateGet() not in (DOM_STATE_RUNNING, DOM_STATE_PAUSED):
+            raise VMBadState("Domain '%s' is not started" % domid,
+                             POWER_STATE_NAMES[DOM_STATE_RUNNING],
+                             POWER_STATE_NAMES[dominfo._stateGet()])
+        try:
+            dominfo.resetDomain()
+        except Exception, ex:
+            raise XendError(str(ex))
+
 
 def instance():
     """Singleton constructor. Use this instead of the class constructor.

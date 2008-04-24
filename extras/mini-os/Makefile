@@ -19,6 +19,7 @@ include minios.mk
 
 # Define some default flags for linking.
 LDLIBS := 
+APP_LDLIBS := 
 LDARCHLIB := -L$(TARGET_ARCH_DIR) -l$(ARCH_LIB_NAME)
 LDFLAGS_FINAL := -T $(TARGET_ARCH_DIR)/minios-$(XEN_TARGET_ARCH).lds
 
@@ -33,6 +34,7 @@ TARGET := mini-os
 SUBDIRS := lib xenbus console
 
 # The common mini-os objects to build.
+APP_OBJS :=
 OBJS := $(patsubst %.c,%.o,$(wildcard *.c))
 OBJS += $(patsubst %.c,%.o,$(wildcard lib/*.c))
 OBJS += $(patsubst %.c,%.o,$(wildcard xenbus/*.c))
@@ -75,28 +77,28 @@ OBJS := $(filter-out lwip%.o $(LWO), $(OBJS))
 
 ifeq ($(caml),y)
 CAMLLIB = $(shell ocamlc -where)
-OBJS += $(CAMLDIR)/caml.o
-OBJS += $(CAMLLIB)/libasmrun.a
+APP_OBJS += main-caml.o
+APP_OBJS += $(CAMLDIR)/caml.o
+APP_OBJS += $(CAMLLIB)/libasmrun.a
 CFLAGS += -I$(CAMLLIB)
-LDLIBS += -lm
-else
-OBJS := $(filter-out main-caml.o, $(OBJS))
+APP_LDLIBS += -lm
 endif
+OBJS := $(filter-out main-caml.o, $(OBJS))
 
 ifeq ($(qemu),y)
-OBJS += $(QEMUDIR)/i386-dm-stubdom/qemu.a $(QEMUDIR)/i386-dm-stubdom/libqemu.a
+APP_OBJS += $(QEMUDIR)/i386-dm-stubdom/qemu.a $(QEMUDIR)/i386-dm-stubdom/libqemu.a
 CFLAGS += -DCONFIG_QEMU
 endif
 
 ifneq ($(CDIR),)
-OBJS += $(CDIR)/main.a
-LDLIBS += 
+APP_OBJS += $(CDIR)/main.a
+APP_LDLIBS += 
 endif
 
 ifeq ($(libc),y)
 LDLIBS += -L$(XEN_ROOT)/stubdom/libxc -lxenctrl -lxenguest
-LDLIBS += -lpci
-LDLIBS += -lz
+APP_LDLIBS += -lpci
+APP_LDLIBS += -lz
 LDLIBS += -lc
 endif
 
@@ -104,8 +106,11 @@ ifneq ($(caml)-$(qemu)-$(CDIR)-$(lwip),---y)
 OBJS := $(filter-out daytime.o, $(OBJS))
 endif
 
-$(TARGET): links $(OBJS) arch_lib
-	$(LD) -r $(LDFLAGS) $(HEAD_OBJ) $(OBJS) $(LDARCHLIB) $(LDLIBS) -o $@.o
+app.o: $(APP_OBJS) app.lds
+	$(LD) -r -d $(LDFLAGS) $^ $(APP_LDLIBS) --undefined main -o $@
+
+$(TARGET): links $(OBJS) app.o arch_lib
+	$(LD) -r $(LDFLAGS) $(HEAD_OBJ) app.o $(OBJS) $(LDARCHLIB) $(LDLIBS) -o $@.o
 	$(OBJCOPY) -w -G $(GLOBAL_PREFIX)* -G _start $@.o $@.o
 	$(LD) $(LDFLAGS) $(LDFLAGS_FINAL) $@.o $(EXTRA_OBJS) -o $@
 	gzip -f -9 -c $@ >$@.gz

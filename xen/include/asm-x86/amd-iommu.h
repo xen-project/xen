@@ -28,10 +28,9 @@
 
 #define iommu_found()           (!list_empty(&amd_iommu_head))
 
-extern int amd_iommu_enabled;
 extern struct list_head amd_iommu_head;
 
-extern int __init amd_iommu_detect(void);
+extern int __init amd_iov_detect(void);
 
 struct table_struct {
     void *buffer;
@@ -79,6 +78,9 @@ struct amd_iommu {
     int exclusion_allow_all;
     uint64_t exclusion_base;
     uint64_t exclusion_limit;
+
+    int msi_cap;
+    int maskbit;
 };
 
 struct ivrs_mappings {

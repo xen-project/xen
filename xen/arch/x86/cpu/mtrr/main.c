@@ -586,8 +586,6 @@ struct mtrr_value {
 	unsigned long	lsize;
 };
 
-extern void global_init_mtrr_pat(void);
-
 /**
  * mtrr_bp_init - initialize mtrrs on the boot CPU
  *
@@ -654,11 +652,8 @@ void __init mtrr_bp_init(void)
 	if (mtrr_if) {
 		set_num_var_ranges();
 		init_table();
-		if (use_intel()) {
+		if (use_intel())
 			get_mtrr_state();
-			/* initialize some global data for MTRR/PAT virutalization */
-			global_init_mtrr_pat();
-		}
 	}
 }
 

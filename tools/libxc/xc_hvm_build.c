@@ -298,7 +298,7 @@ static int setup_guest(int xc_handle,
                        _PAGE_ACCESSED | _PAGE_DIRTY | _PAGE_PSE);
     munmap(ident_pt, PAGE_SIZE);
     xc_set_hvm_param(xc_handle, dom, HVM_PARAM_IDENT_PT,
-                     special_page_nr + SPECIALPAGE_IDENT_PT);
+                     (special_page_nr + SPECIALPAGE_IDENT_PT) << PAGE_SHIFT);
 
     /* Insert JMP <rel32> instruction at address 0x0 to reach entry point. */
     entry_eip = elf_uval(&elf, elf.ehdr, e_entry);

@@ -374,6 +374,15 @@ static inline int insert_lost_records(struct t_buf *buf)
                            (unsigned char *)&ed);
 }
 
+/*
+ * Notification is performed in qtasklet to avoid deadlocks with contexts
+ * which __trace_var() may be called from (e.g., scheduler critical regions).
+ */
+static void trace_notify_dom0(unsigned long unused)
+{
+    send_guest_global_virq(dom0, VIRQ_TBUF);
+}
+static DECLARE_TASKLET(trace_notify_dom0_tasklet, trace_notify_dom0, 0);
 
 /**
  * trace - Enters a trace tuple into the trace buffer for the current CPU.
@@ -506,7 +515,7 @@ void __trace_var(u32 event, int cycles, int extra, unsigned char *extra_data)
     /* Notify trace buffer consumer that we've crossed the high water mark. */
     if ( started_below_highwater &&
          (calc_unconsumed_bytes(buf) >= t_buf_highwater) )
-        send_guest_global_virq(dom0, VIRQ_TBUF);
+        tasklet_schedule(&trace_notify_dom0_tasklet);
 }
 
 /*

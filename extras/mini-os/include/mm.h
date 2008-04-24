@@ -70,4 +70,6 @@ void *map_frames_ex(unsigned long *f, unsigned long n, unsigned long stride,
 extern unsigned long heap, brk, heap_mapped, heap_end;
 #endif
 
+int free_physical_pages(xen_pfn_t *mfns, int n);
+
 #endif /* _MM_H_ */

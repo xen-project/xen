@@ -139,6 +139,8 @@ void hvm_domain_destroy(struct domain *d);
 int hvm_vcpu_initialise(struct vcpu *v);
 void hvm_vcpu_destroy(struct vcpu *v);
 void hvm_vcpu_down(struct vcpu *v);
+int hvm_vcpu_cacheattr_init(struct vcpu *v);
+void hvm_vcpu_cacheattr_destroy(struct vcpu *v);
 
 void hvm_send_assist_req(struct vcpu *v);
 

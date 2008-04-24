@@ -156,6 +156,10 @@ _acm_update_policy(void *buf, u32 buf_size, int is_bootpolicy,
            &pol->xml_pol_version,
            sizeof(acm_bin_pol.xml_pol_version));
 
+    memcpy(&acm_bin_pol.xml_policy_hash,
+           pol->xml_policy_hash,
+           sizeof(acm_bin_pol.xml_policy_hash));
+
     if ( acm_primary_ops->is_default_policy() &&
          acm_secondary_ops->is_default_policy() )
         require_update = 0;
@@ -257,6 +261,10 @@ acm_get_policy(XEN_GUEST_HANDLE_64(void) buf, u32 buf_size)
     memcpy(&bin_pol->xml_pol_version,
            &acm_bin_pol.xml_pol_version,
            sizeof(struct acm_policy_version));
+
+    memcpy(&bin_pol->xml_policy_hash,
+           &acm_bin_pol.xml_policy_hash,
+           sizeof(acm_bin_pol.xml_policy_hash));
 
     ret = acm_dump_policy_reference(
                policy_buffer + be32_to_cpu(bin_pol->policy_reference_offset),

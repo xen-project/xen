@@ -140,9 +140,9 @@
 #define MAX_IOPORTS 65536
 
 const char *bios_dir = CONFIG_QEMU_SHAREDIR;
-void **ioport_opaque;
-IOPortReadFunc *(*ioport_read_table)[MAX_IOPORTS];
-IOPortWriteFunc *(*ioport_write_table)[MAX_IOPORTS];
+void *ioport_opaque[MAX_IOPORTS];
+IOPortReadFunc *ioport_read_table[3][MAX_IOPORTS];
+IOPortWriteFunc *ioport_write_table[3][MAX_IOPORTS];
 /* Note: bs_table[MAX_DISKS] is a dummy block driver if none available
    to store the VM snapshots */
 BlockDriverState *bs_table[MAX_DISKS + MAX_SCSI_DISKS + 1], *fd_table[MAX_FD];
@@ -281,9 +281,6 @@ void default_ioport_writel(void *opaque, uint32_t address, uint32_t data)
 
 void init_ioports(void)
 {
-    ioport_opaque = calloc(MAX_IOPORTS, sizeof(*ioport_opaque));
-    ioport_read_table = calloc(3 * MAX_IOPORTS, sizeof(**ioport_read_table));
-    ioport_write_table = calloc(3 * MAX_IOPORTS, sizeof(**ioport_write_table));
 }
 
 /* size is the word size in byte */
@@ -6278,12 +6275,6 @@ void qemu_system_powerdown_request(void)
         cpu_interrupt(cpu_single_env, CPU_INTERRUPT_EXIT);
 }
 
-static void qemu_sighup_handler(int signal)
-{
-    fprintf(stderr, "Received SIGHUP, terminating.\n");
-    exit(0);
-}
-
 void main_loop_wait(int timeout)
 {
     IOHandlerRecord *ioh;
@@ -7979,7 +7970,7 @@ int main(int argc, char **argv)
 
 #ifndef CONFIG_STUBDOM
     /* Unblock SIGTERM and SIGHUP, which may have been blocked by the caller */
-    signal(SIGHUP, qemu_sighup_handler);
+    signal(SIGHUP, SIG_DFL);
     sigemptyset(&set);
     sigaddset(&set, SIGTERM);
     sigaddset(&set, SIGHUP);

@@ -239,15 +239,15 @@ hvm_emulate_write(enum x86_segment seg,
 static int 
 hvm_emulate_cmpxchg(enum x86_segment seg,
                     unsigned long offset,
-                    unsigned long old,
-                    unsigned long new,
+                    void *p_old,
+                    void *p_new,
                     unsigned int bytes,
                     struct x86_emulate_ctxt *ctxt)
 {
     struct sh_emulate_ctxt *sh_ctxt =
         container_of(ctxt, struct sh_emulate_ctxt, ctxt);
     struct vcpu *v = current;
-    unsigned long addr;
+    unsigned long addr, old[2], new[2];
     int rc;
 
     if ( !is_x86_user_segment(seg) )
@@ -258,35 +258,21 @@ hvm_emulate_cmpxchg(enum x86_segment seg,
     if ( rc )
         return rc;
 
-    return v->arch.paging.mode->shadow.x86_emulate_cmpxchg(
-        v, addr, old, new, bytes, sh_ctxt);
-}
+    old[0] = new[0] = 0;
+    memcpy(old, p_old, bytes);
+    memcpy(new, p_new, bytes);
 
-static int 
-hvm_emulate_cmpxchg8b(enum x86_segment seg,
-                      unsigned long offset,
-                      unsigned long old_lo,
-                      unsigned long old_hi,
-                      unsigned long new_lo,
-                      unsigned long new_hi,
-                      struct x86_emulate_ctxt *ctxt)
-{
-    struct sh_emulate_ctxt *sh_ctxt =
-        container_of(ctxt, struct sh_emulate_ctxt, ctxt);
-    struct vcpu *v = current;
-    unsigned long addr;
-    int rc;
+    if ( bytes <= sizeof(long) )
+        return v->arch.paging.mode->shadow.x86_emulate_cmpxchg(
+            v, addr, old[0], new[0], bytes, sh_ctxt);
 
-    if ( !is_x86_user_segment(seg) )
-        return X86EMUL_UNHANDLEABLE;
+#ifdef __i386__
+    if ( bytes == 8 )
+        return v->arch.paging.mode->shadow.x86_emulate_cmpxchg8b(
+            v, addr, old[0], old[1], new[0], new[1], sh_ctxt);
+#endif
 
-    rc = hvm_translate_linear_addr(
-        seg, offset, 8, hvm_access_write, sh_ctxt, &addr);
-    if ( rc )
-        return rc;
-
-    return v->arch.paging.mode->shadow.x86_emulate_cmpxchg8b(
-        v, addr, old_lo, old_hi, new_lo, new_hi, sh_ctxt);
+    return X86EMUL_UNHANDLEABLE;
 }
 
 static struct x86_emulate_ops hvm_shadow_emulator_ops = {
@@ -294,7 +280,6 @@ static struct x86_emulate_ops hvm_shadow_emulator_ops = {
     .insn_fetch = hvm_emulate_insn_fetch,
     .write      = hvm_emulate_write,
     .cmpxchg    = hvm_emulate_cmpxchg,
-    .cmpxchg8b  = hvm_emulate_cmpxchg8b,
 };
 
 static int
@@ -338,36 +323,34 @@ pv_emulate_write(enum x86_segment seg,
 static int 
 pv_emulate_cmpxchg(enum x86_segment seg,
                    unsigned long offset,
-                   unsigned long old,
-                   unsigned long new,
+                   void *p_old,
+                   void *p_new,
                    unsigned int bytes,
                    struct x86_emulate_ctxt *ctxt)
 {
     struct sh_emulate_ctxt *sh_ctxt =
         container_of(ctxt, struct sh_emulate_ctxt, ctxt);
+    unsigned long old[2], new[2];
     struct vcpu *v = current;
-    if ( !is_x86_user_segment(seg) )
-        return X86EMUL_UNHANDLEABLE;
-    return v->arch.paging.mode->shadow.x86_emulate_cmpxchg(
-        v, offset, old, new, bytes, sh_ctxt);
-}
 
-static int 
-pv_emulate_cmpxchg8b(enum x86_segment seg,
-                     unsigned long offset,
-                     unsigned long old_lo,
-                     unsigned long old_hi,
-                     unsigned long new_lo,
-                     unsigned long new_hi,
-                     struct x86_emulate_ctxt *ctxt)
-{
-    struct sh_emulate_ctxt *sh_ctxt =
-        container_of(ctxt, struct sh_emulate_ctxt, ctxt);
-    struct vcpu *v = current;
     if ( !is_x86_user_segment(seg) )
         return X86EMUL_UNHANDLEABLE;
-    return v->arch.paging.mode->shadow.x86_emulate_cmpxchg8b(
-        v, offset, old_lo, old_hi, new_lo, new_hi, sh_ctxt);
+
+    old[0] = new[0] = 0;
+    memcpy(old, p_old, bytes);
+    memcpy(new, p_new, bytes);
+
+    if ( bytes <= sizeof(long) )
+        return v->arch.paging.mode->shadow.x86_emulate_cmpxchg(
+            v, offset, old[0], new[0], bytes, sh_ctxt);
+
+#ifdef __i386__
+    if ( bytes == 8 )
+        return v->arch.paging.mode->shadow.x86_emulate_cmpxchg8b(
+            v, offset, old[0], old[1], new[0], new[1], sh_ctxt);
+#endif
+
+    return X86EMUL_UNHANDLEABLE;
 }
 
 static struct x86_emulate_ops pv_shadow_emulator_ops = {
@@ -375,7 +358,6 @@ static struct x86_emulate_ops pv_shadow_emulator_ops = {
     .insn_fetch = pv_emulate_read,
     .write      = pv_emulate_write,
     .cmpxchg    = pv_emulate_cmpxchg,
-    .cmpxchg8b  = pv_emulate_cmpxchg8b,
 };
 
 struct x86_emulate_ops *shadow_init_emulation(

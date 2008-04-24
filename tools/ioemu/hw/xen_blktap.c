@@ -581,17 +581,13 @@ static void handle_blktap_ctrlmsg(void* private)
  */
 static int open_ctrl_socket(char *devname)
 {
-	int ret;
 	int ipc_fd;
 
 	if (mkdir(BLKTAP_CTRL_DIR, 0755) == 0)
 		DPRINTF("Created %s directory\n", BLKTAP_CTRL_DIR);
 
-	ret = mkfifo(devname,S_IRWXU|S_IRWXG|S_IRWXO);
-	if ( (ret != 0) && (errno != EEXIST) ) {
-		DPRINTF("ERROR: pipe failed (%d)\n", errno);
+	if (access(devname, R_OK | W_OK))
 		return -1;
-	}
 
 	ipc_fd = open(devname,O_RDWR|O_NONBLOCK);
 
@@ -601,42 +597,6 @@ static int open_ctrl_socket(char *devname)
 	}
 
 	return ipc_fd;
-}
-
-/**
- * Unmaps all disks and closes their pipes
- */
-void shutdown_blktap(void)
-{
-	fd_list_entry_t *ptr;
-	struct td_state *s;
-	char *devname;
-
-	DPRINTF("Shutdown blktap\n");
-
-	/* Unmap all disks */
-	ptr = fd_start;
-	while (ptr != NULL) {
-		s = ptr->s;
-		unmap_disk(s);
-		close(ptr->tap_fd);
-		ptr = ptr->next;
-	}
-
-	/* Delete control pipes */
-	if (asprintf(&devname, BLKTAP_CTRL_DIR "/qemu-read-%d", domid) >= 0) {
-		DPRINTF("Delete %s\n", devname);
-		if (unlink(devname))
-			DPRINTF("Could not delete: %s\n", strerror(errno));
-		free(devname);
-	}
-	
-	if (asprintf(&devname, BLKTAP_CTRL_DIR "/qemu-write-%d", domid) >= 0) {	
-		DPRINTF("Delete %s\n", devname);
-		if (unlink(devname))
-			DPRINTF("Could not delete: %s\n", strerror(errno));
-		free(devname);
-	}
 }
 
 /**
@@ -678,9 +638,6 @@ int init_blktap(void)
 
 	/* Attach a handler to the read pipe (called from qemu main loop) */
 	qemu_set_fd_handler2(read_fd, NULL, &handle_blktap_ctrlmsg, NULL, NULL);
-
-	/* Register handler to clean up when the domain is destroyed */
-	atexit(&shutdown_blktap);
 
 	return 0;
 }

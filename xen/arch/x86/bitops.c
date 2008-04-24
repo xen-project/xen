@@ -8,17 +8,18 @@ unsigned int __find_first_bit(
     unsigned long d0, d1, res;
 
     asm volatile (
-        "   xor %%eax,%%eax\n\t" /* also ensures ZF==1 if size==0 */
+        "1: xor %%eax,%%eax\n\t" /* also ensures ZF==1 if size==0 */
         "   repe; scas"__OS"\n\t"
-        "   je 1f\n\t"
+        "   je 2f\n\t"
+        "   bsf -"STR(BITS_PER_LONG/8)"(%2),%0\n\t"
+        "   jz 1b\n\t"
         "   lea -"STR(BITS_PER_LONG/8)"(%2),%2\n\t"
-        "   bsf (%2),%0\n"
-        "1: sub %%ebx,%%edi\n\t"
+        "2: sub %%ebx,%%edi\n\t"
         "   shl $3,%%edi\n\t"
         "   add %%edi,%%eax"
         : "=&a" (res), "=&c" (d0), "=&D" (d1)
-        : "1" ((size + BITS_PER_LONG - 1) / BITS_PER_LONG),
-          "2" (addr), "b" ((int)(long)addr) : "memory" );
+        : "1" (BITS_TO_LONGS(size)), "2" (addr), "b" ((int)(long)addr)
+        : "memory" );
 
     return res;
 }
@@ -34,8 +35,7 @@ unsigned int __find_next_bit(
     if ( bit != 0 )
     {
         /* Look for a bit in the first word. */
-        asm ( "bsf %1,%%"__OP"ax"
-              : "=a" (set) : "r" (*p >> bit), "0" (BITS_PER_LONG) );
+        set = __scanbit(*p >> bit, BITS_PER_LONG - bit);
         if ( set < (BITS_PER_LONG - bit) )
             return (offset + set);
         offset += BITS_PER_LONG - bit;
@@ -56,18 +56,20 @@ unsigned int __find_first_zero_bit(
     unsigned long d0, d1, d2, res;
 
     asm volatile (
+        "1: xor %%eax,%%eax ; not %3\n\t" /* rAX == ~0ul */
         "   xor %%edx,%%edx\n\t" /* also ensures ZF==1 if size==0 */
         "   repe; scas"__OS"\n\t"
-        "   je 1f\n\t"
+        "   je 2f\n\t"
+        "   xor -"STR(BITS_PER_LONG/8)"(%2),%3\n\t"
+        "   jz 1b\n\t"
+        "   bsf %3,%0\n\t"
         "   lea -"STR(BITS_PER_LONG/8)"(%2),%2\n\t"
-        "   xor (%2),%3\n\t"
-        "   bsf %3,%0\n"
-        "1: sub %%ebx,%%edi\n\t"
+        "2: sub %%ebx,%%edi\n\t"
         "   shl $3,%%edi\n\t"
         "   add %%edi,%%edx"
         : "=&d" (res), "=&c" (d0), "=&D" (d1), "=&a" (d2)
-        : "1" ((size + BITS_PER_LONG - 1) / BITS_PER_LONG),
-          "2" (addr), "b" ((int)(long)addr), "3" (-1L) : "memory" );
+        : "1" (BITS_TO_LONGS(size)), "2" (addr), "b" ((int)(long)addr)
+        : "memory" );
 
     return res;
 }
@@ -83,7 +85,7 @@ unsigned int __find_next_zero_bit(
     if ( bit != 0 )
     {
         /* Look for zero in the first word. */
-        asm ( "bsf %1,%%"__OP"ax" : "=a" (set) : "r" (~(*p >> bit)) );
+        set = __scanbit(~(*p >> bit), BITS_PER_LONG - bit);
         if ( set < (BITS_PER_LONG - bit) )
             return (offset + set);
         offset += BITS_PER_LONG - bit;

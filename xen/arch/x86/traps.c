@@ -479,6 +479,7 @@ asmlinkage int set_guest_nmi_trapbounce(void)
 static inline void do_trap(
     int trapnr, struct cpu_user_regs *regs, int use_error_code)
 {
+    struct vcpu *curr = current;
     unsigned long fixup;
 
     DEBUGGER_trap_entry(trapnr, regs);
@@ -494,6 +495,14 @@ static inline void do_trap(
         dprintk(XENLOG_ERR, "Trap %d: %p -> %p\n",
                 trapnr, _p(regs->eip), _p(fixup));
         regs->eip = fixup;
+        return;
+    }
+
+    if ( ((trapnr == TRAP_copro_error) || (trapnr == TRAP_simd_error)) &&
+         is_hvm_vcpu(curr) && curr->arch.hvm_vcpu.fpu_exception_callback )
+    {
+        curr->arch.hvm_vcpu.fpu_exception_callback(
+            curr->arch.hvm_vcpu.fpu_exception_callback_arg, regs);
         return;
     }
 
@@ -1399,6 +1408,13 @@ static int admin_io_okay(
     unsigned int port, unsigned int bytes,
     struct vcpu *v, struct cpu_user_regs *regs)
 {
+    /*
+     * Port 0xcf8 (CONFIG_ADDRESS) is only visible for DWORD accesses.
+     * We never permit direct access to that register.
+     */
+    if ( (port == 0xcf8) && (bytes == 4) )
+        return 0;
+
     return ioports_access_permitted(v->domain, port, port + bytes - 1);
 }
 
@@ -1431,10 +1447,10 @@ static uint32_t guest_io_read(
         {
             sub_data = pv_pit_handler(port, 0, 0);
         }
-        else if ( (port & 0xfffc) == 0xcf8 )
+        else if ( (port == 0xcf8) && (bytes == 4) )
         {
-            size = min(bytes, 4 - (port & 3));
-            sub_data = v->domain->arch.pci_cf8 >> ((port & 3) * 8);
+            size = 4;
+            sub_data = v->domain->arch.pci_cf8;
         }
         else if ( ((port & 0xfffc) == 0xcfc) && IS_PRIV(v->domain) )
         {
@@ -1489,19 +1505,10 @@ static void guest_io_write(
         {
             pv_pit_handler(port, (uint8_t)data, 1);
         }
-        else if ( (port & 0xfffc) == 0xcf8 )
+        else if ( (port == 0xcf8) && (bytes == 4) )
         {
-            size = min(bytes, 4 - (port & 3));
-            if ( size == 4 )
-            {
-                v->domain->arch.pci_cf8 = data;
-            }
-            else
-            {
-                uint32_t mask = ((1u << (size * 8)) - 1) << ((port & 3) * 8);
-                v->domain->arch.pci_cf8 &= ~mask;
-                v->domain->arch.pci_cf8 |= (data << ((port & 3) * 8)) & mask;
-            }
+            size = 4;
+            v->domain->arch.pci_cf8 = data;
         }
         else if ( ((port & 0xfffc) == 0xcfc) && IS_PRIV(v->domain) )
         {

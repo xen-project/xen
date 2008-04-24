@@ -35,6 +35,19 @@
 #define DMA_32BIT_MASK  0x00000000ffffffffULL
 #define PAGE_ALIGN(addr)    (((addr) + PAGE_SIZE - 1) & PAGE_MASK)
 
+#ifdef AMD_IOV_DEBUG
+#define amd_iov_info(fmt, args...) \
+    printk(XENLOG_INFO "AMD_IOV: " fmt, ## args)
+#define amd_iov_warning(fmt, args...) \
+    printk(XENLOG_WARNING "AMD_IOV: " fmt, ## args)
+#define amd_iov_error(fmt, args...) \
+    printk(XENLOG_ERR "AMD_IOV: %s:%d: " fmt, __FILE__ , __LINE__ , ## args)
+#else
+#define amd_iov_info(fmt, args...)
+#define amd_iov_warning(fmt, args...)
+#define amd_iov_error(fmt, args...)
+#endif
+
 typedef int (*iommu_detect_callback_ptr_t)(
     u8 bus, u8 dev, u8 func, u8 cap_ptr);
 
@@ -49,6 +62,7 @@ int __init map_iommu_mmio_region(struct amd_iommu *iommu);
 void __init unmap_iommu_mmio_region(struct amd_iommu *iommu);
 void __init register_iommu_dev_table_in_mmio_space(struct amd_iommu *iommu);
 void __init register_iommu_cmd_buffer_in_mmio_space(struct amd_iommu *iommu);
+void __init register_iommu_event_log_in_mmio_space(struct amd_iommu *iommu);
 void __init enable_iommu(struct amd_iommu *iommu);
 
 /* mapping functions */
@@ -69,11 +83,6 @@ void invalidate_dev_table_entry(struct amd_iommu *iommu,
 /* send cmd to iommu */
 int send_iommu_command(struct amd_iommu *iommu, u32 cmd[]);
 void flush_command_buffer(struct amd_iommu *iommu);
-
-/* iommu domain funtions */
-int amd_iommu_domain_init(struct domain *domain);
-void amd_iommu_setup_domain_device(struct domain *domain,
-    struct amd_iommu *iommu, int bdf);
 
 /* find iommu for bdf */
 struct amd_iommu *find_iommu_for_device(int bus, int devfn);

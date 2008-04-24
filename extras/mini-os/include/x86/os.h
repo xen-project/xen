@@ -28,7 +28,6 @@ extern void do_exit(void) __attribute__((noreturn));
 #include <xen/xen.h>
 
 
-#define force_evtchn_callback() ((void)HYPERVISOR_xen_version(0, 0))
 
 #define __KERNEL_CS  FLAT_KERNEL_CS
 #define __KERNEL_DS  FLAT_KERNEL_DS

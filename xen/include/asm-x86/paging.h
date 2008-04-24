@@ -83,12 +83,14 @@ struct shadow_paging_mode {
                                             unsigned long new,
                                             unsigned int bytes,
                                             struct sh_emulate_ctxt *sh_ctxt);
+#ifdef __i386__
     int           (*x86_emulate_cmpxchg8b )(struct vcpu *v, unsigned long va,
                                             unsigned long old_lo, 
                                             unsigned long old_hi, 
                                             unsigned long new_lo,
                                             unsigned long new_hi,
                                             struct sh_emulate_ctxt *sh_ctxt);
+#endif
     mfn_t         (*make_monitor_table    )(struct vcpu *v);
     void          (*destroy_monitor_table )(struct vcpu *v, mfn_t mmfn);
     int           (*guess_wrmap           )(struct vcpu *v, 

@@ -2089,7 +2089,7 @@ static shadow_l1e_t * shadow_get_and_create_l1e(struct vcpu *v,
         else 
         {
             /* Shadowing an actual guest l1 table */
-            if ( !mfn_valid(gw->l2mfn) ) return NULL; /* No guest page. */
+            if ( !mfn_valid(gw->l1mfn) ) return NULL; /* No guest page. */
             *sl1mfn = get_shadow_status(v, gw->l1mfn, SH_type_l1_shadow);
             if ( !mfn_valid(*sl1mfn) ) 
             {
@@ -4365,7 +4365,7 @@ static void emulate_unmap_dest(struct vcpu *v,
     atomic_inc(&v->domain->arch.paging.shadow.gtable_dirty_version);
 }
 
-int
+static int
 sh_x86_emulate_write(struct vcpu *v, unsigned long vaddr, void *src,
                       u32 bytes, struct sh_emulate_ctxt *sh_ctxt)
 {
@@ -4389,7 +4389,7 @@ sh_x86_emulate_write(struct vcpu *v, unsigned long vaddr, void *src,
     return X86EMUL_OKAY;
 }
 
-int
+static int
 sh_x86_emulate_cmpxchg(struct vcpu *v, unsigned long vaddr, 
                         unsigned long old, unsigned long new,
                         unsigned int bytes, struct sh_emulate_ctxt *sh_ctxt)
@@ -4432,7 +4432,8 @@ sh_x86_emulate_cmpxchg(struct vcpu *v, unsigned long vaddr,
     return rv;
 }
 
-int
+#ifdef __i386__
+static int
 sh_x86_emulate_cmpxchg8b(struct vcpu *v, unsigned long vaddr, 
                           unsigned long old_lo, unsigned long old_hi,
                           unsigned long new_lo, unsigned long new_hi,
@@ -4465,7 +4466,7 @@ sh_x86_emulate_cmpxchg8b(struct vcpu *v, unsigned long vaddr,
     shadow_unlock(v->domain);
     return rv;
 }
-
+#endif
 
 /**************************************************************************/
 /* Audit tools */
@@ -4738,7 +4739,9 @@ struct paging_mode sh_paging_mode = {
     .shadow.detach_old_tables      = sh_detach_old_tables,
     .shadow.x86_emulate_write      = sh_x86_emulate_write,
     .shadow.x86_emulate_cmpxchg    = sh_x86_emulate_cmpxchg,
+#ifdef __i386__
     .shadow.x86_emulate_cmpxchg8b  = sh_x86_emulate_cmpxchg8b,
+#endif
     .shadow.make_monitor_table     = sh_make_monitor_table,
     .shadow.destroy_monitor_table  = sh_destroy_monitor_table,
 #if SHADOW_OPTIMIZATIONS & SHOPT_WRITABLE_HEURISTIC

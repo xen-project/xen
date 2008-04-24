@@ -31,11 +31,12 @@ extern struct wait_queue_head kbdfront_queue;
 void shutdown_kbdfront(struct kbdfront_dev *dev);
 
 
-struct fbfront_dev *init_fbfront(char *nodename, void *data, int width, int height, int depth, int line_length, int mem_length);
+struct fbfront_dev *init_fbfront(char *nodename, unsigned long *mfns, int width, int height, int depth, int stride, int n);
 #ifdef HAVE_LIBC
 int fbfront_open(struct fbfront_dev *dev);
 #endif
 
 void fbfront_update(struct fbfront_dev *dev, int x, int y, int width, int height);
+void fbfront_resize(struct fbfront_dev *dev, int width, int height, int stride, int depth, int offset);
 
 void shutdown_fbfront(struct fbfront_dev *dev);

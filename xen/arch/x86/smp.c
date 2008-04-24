@@ -75,20 +75,10 @@ static inline int __prepare_ICR2 (unsigned int mask)
     return SET_APIC_DEST_FIELD(mask);
 }
 
-static inline void check_IPI_mask(cpumask_t cpumask)
-{
-    /*
-     * Sanity, and necessary. An IPI with no target generates a send accept
-     * error with Pentium and P6 APICs.
-     */
-    ASSERT(cpus_subset(cpumask, cpu_online_map));
-    ASSERT(!cpus_empty(cpumask));
-}
-
 void apic_wait_icr_idle(void)
 {
-	while ( apic_read( APIC_ICR ) & APIC_ICR_BUSY )
-		cpu_relax();
+    while ( apic_read( APIC_ICR ) & APIC_ICR_BUSY )
+        cpu_relax();
 }
 
 void send_IPI_mask_flat(cpumask_t cpumask, int vector)
@@ -97,7 +87,8 @@ void send_IPI_mask_flat(cpumask_t cpumask, int vector)
     unsigned long cfg;
     unsigned long flags;
 
-    check_IPI_mask(cpumask);
+    /* An IPI with no target generates a send accept error from P5/P6 APICs. */
+    WARN_ON(mask == 0);
 
     local_irq_save(flags);
 
@@ -130,17 +121,9 @@ void send_IPI_mask_phys(cpumask_t mask, int vector)
     unsigned long cfg, flags;
     unsigned int query_cpu;
 
-    check_IPI_mask(mask);
-
-    /*
-     * Hack. The clustered APIC addressing mode doesn't allow us to send 
-     * to an arbitrary mask, so I do a unicasts to each CPU instead. This 
-     * should be modified to do 1 message per cluster ID - mbligh
-     */ 
-
     local_irq_save(flags);
 
-    for_each_cpu_mask( query_cpu, mask )
+    for_each_cpu_mask ( query_cpu, mask )
     {
         /*
          * Wait for idle.

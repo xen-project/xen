@@ -1108,6 +1108,41 @@ int munmap(void *start, size_t length)
     return 0;
 }
 
+void sparse(unsigned long data, size_t size)
+{
+    unsigned long newdata;
+    xen_pfn_t *mfns;
+    int i, n;
+
+    newdata = (data + PAGE_SIZE - 1) & PAGE_MASK;
+    if (newdata - data > size)
+        return;
+    size -= newdata - data;
+    data = newdata;
+    n = size / PAGE_SIZE;
+    size = n * PAGE_SIZE;
+
+    mfns = malloc(n * sizeof(*mfns));
+    for (i = 0; i < n; i++) {
+#ifdef LIBC_DEBUG
+        int j;
+        for (j=0; j<PAGE_SIZE; j++)
+            if (((char*)data + i * PAGE_SIZE)[j]) {
+                printk("%lx is not zero!\n", data + i * PAGE_SIZE + j);
+                exit(1);
+            }
+#endif
+        mfns[i] = virtual_to_mfn(data + i * PAGE_SIZE);
+    }
+
+    printk("sparsing %ldMB at %lx\n", size >> 20, data);
+
+    munmap((void *) data, size);
+    free_physical_pages(mfns, n);
+    do_map_zero(data, n);
+}
+
+
 /* Not supported by FS yet.  */
 unsupported_function_crash(link);
 unsupported_function(int, readlink, -1);

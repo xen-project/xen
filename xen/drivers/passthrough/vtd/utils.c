@@ -60,10 +60,10 @@ int vtd_hw_check(void)
             dprintk(XENLOG_WARNING VTDPREFIX,
                     "***  vendor = %x device = %x revision = %x\n",
                     vendor, device, revision);
-            vtd_enabled = 0;
             return -ENODEV;
         }
     }
+
     return 0;
 }
 

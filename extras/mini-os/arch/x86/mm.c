@@ -556,7 +556,6 @@ void *map_frames_ex(unsigned long *f, unsigned long n, unsigned long stride,
 
 static void clear_bootstrap(void)
 {
-    struct xen_memory_reservation reservation;
     xen_pfn_t mfns[] = { virt_to_mfn(&shared_info) };
     int n = sizeof(mfns)/sizeof(*mfns);
     pte_t nullpte = { };
@@ -567,11 +566,7 @@ static void clear_bootstrap(void)
     if (HYPERVISOR_update_va_mapping((unsigned long) &_text, nullpte, UVMF_INVLPG))
 	printk("Unable to unmap first page\n");
 
-    set_xen_guest_handle(reservation.extent_start, mfns);
-    reservation.nr_extents = n;
-    reservation.extent_order = 0;
-    reservation.domid = DOMID_SELF;
-    if (HYPERVISOR_memory_op(XENMEM_decrease_reservation, &reservation) != n)
+    if (free_physical_pages(mfns, n) != n)
 	printk("Unable to free bootstrap pages\n");
 }
 

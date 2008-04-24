@@ -4467,7 +4467,7 @@ security_label, string old_label)\end{verbatim}
 {\bf type} & {\bf name} & {\bf description} \\ \hline
 {\tt VM ref } & self & reference to the object \\ \hline
 {\tt string } & security\_label & security label for the VM \\ \hline
-{\tt string } & old\_label & Optional label value that the security label \\
+{\tt string } & old\_label & Label value that the security label \\
 & & must currently have for the change to succeed.\\ \hline
 
 \end{tabular}
@@ -7619,6 +7619,8 @@ $\mathit{RW}$ &  {\tt name/label} & string & a human-readable name \\
 $\mathit{RW}$ &  {\tt name/description} & string & a notes field containg human-readable description \\
 $\mathit{RO}_\mathit{run}$ &  {\tt VIFs} & (VIF ref) Set & list of connected vifs \\
 $\mathit{RO}_\mathit{run}$ &  {\tt PIFs} & (PIF ref) Set & list of connected pifs \\
+$\mathit{RW}$ &  {\tt default\_gateway} & string & default gateway \\
+$\mathit{RW}$ &  {\tt default\_netmask} & string & default netmask \\
 $\mathit{RW}$ &  {\tt other\_config} & (string $\rightarrow$ string) Map & additional configuration \\
 \hline
 \end{longtable}
@@ -7869,6 +7871,138 @@ Get the PIFs field of the given network.
 
 
 value of the field
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~get\_default\_gateway}
+
+{\bf Overview:} 
+Get the default\_gateway field of the given network.
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} string get_default_gateway (session_id s, network ref self)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+ 
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt network ref } & self & reference to the object \\ \hline 
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+string
+}
+
+
+value of the field
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~set\_default\_gateway}
+
+{\bf Overview:} 
+Set the default\_gateway field of the given network.
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} void set_default_gateway (session_id s, network ref self, string value)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+ 
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt network ref } & self & reference to the object \\ \hline 
+
+{\tt string } & value & New value to set \\ \hline 
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+void
+}
+
+
+
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~get\_default\_netmask}
+
+{\bf Overview:} 
+Get the default\_netmask field of the given network.
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} string get_default_netmask (session_id s, network ref self)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+ 
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt network ref } & self & reference to the object \\ \hline 
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+string
+}
+
+
+value of the field
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~set\_default\_netmask}
+
+{\bf Overview:} 
+Set the default\_netmask field of the given network.
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} void set_default_netmask (session_id s, network ref self, string value)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+ 
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt network ref } & self & reference to the object \\ \hline 
+
+{\tt string } & value & New value to set \\ \hline 
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+void
+}
+
+
+
 \vspace{0.3cm}
 \vspace{0.3cm}
 \vspace{0.3cm}
@@ -8999,7 +9133,7 @@ security_label, string old_label)\end{verbatim}
 {\tt VIF ref } & self & reference to the object \\ \hline
 
 {\tt string } & security\_label & New value of the security label \\ \hline
-{\tt string } & old\_label & Optional label value that the security label \\
+{\tt string } & old\_label & Label value that the security label \\
 & & must currently have for the change to succeed.\\ \hline
 \end{tabular}
 
@@ -11504,7 +11638,7 @@ security_label, string old_label)\end{verbatim}
 {\tt VDI ref } & self & reference to the object \\ \hline
 
 {\tt string } & security\_label & New value of the security label \\ \hline
-{\tt string } & old\_label & Optional label value that the security label \\
+{\tt string } & old\_label & Label value that the security label \\
 & & must currently have for the change to succeed.\\ \hline
 \end{tabular}
 
@@ -14895,46 +15029,6 @@ string
 
 
 The label of the given resource.
-\vspace{0.3cm}
-\vspace{0.3cm}
-\vspace{0.3cm}
-\subsubsection{RPC name:~activate\_xspolicy}
-
-{\bf Overview:}
-Load the referenced policy into the hypervisor.
-
- \noindent {\bf Signature:}
-\begin{verbatim} xs_instantiationflags activate_xspolicy (session_id s, xs_ref xspolicy,
-xs_instantiationflags flags)\end{verbatim}
-
-
-\noindent{\bf Arguments:}
-
-
-\vspace{0.3cm}
-\begin{tabular}{|c|c|p{7cm}|}
- \hline
-{\bf type} & {\bf name} & {\bf description} \\ \hline
-{\tt xs ref } & self & reference to the object \\ \hline
-{\tt xs\_instantiationflags } & flags & flags to activate on a policy; flags
-  can only be set \\ \hline
-
-\end{tabular}
-
-\vspace{0.3cm}
-
-
- \noindent {\bf Return Type:}
-{\tt
-xs\_instantiationflags
-}
-
-
-Currently active instantiation flags.
-\vspace{0.3cm}
-
-\noindent{\bf Possible Error Codes:} {\tt SECURITY\_ERROR}
-
 \vspace{0.3cm}
 \vspace{0.3cm}
 \vspace{0.3cm}

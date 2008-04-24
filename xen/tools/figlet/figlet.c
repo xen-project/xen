@@ -1488,7 +1488,16 @@ static void myputchar(unsigned char c)
 
     putc(c, stderr);
 
-    if ( nr_chars == 0 )
+    if ( nr_chars == 18 ) 
+    {
+        nr_chars = 0;
+        putchar('"');
+        putchar(' ');
+        putchar('\\');
+        putchar('\n');
+    }
+
+    if ( nr_chars++ == 0 )
         putchar('"');
 
     putchar('\\');
@@ -1498,15 +1507,6 @@ static void myputchar(unsigned char c)
 
     if ( c == '\n' )
         startline = 1;
-
-    if ( ++nr_chars == 18 ) 
-    {
-        nr_chars = 0;
-        putchar('"');
-        putchar(' ');
-        putchar('\\');
-        putchar('\n');
-    }
 }
 
 void putstring(string)

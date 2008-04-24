@@ -27,9 +27,8 @@
 #include <public/domctl.h>
 
 extern int vtd_enabled;
-extern int amd_iommu_enabled;
+extern int iommu_enabled;
 
-#define iommu_enabled ( amd_iommu_enabled || vtd_enabled )
 #define domain_hvm_iommu(d)     (&d->arch.hvm_domain.hvm_iommu)
 #define domain_vmx_iommu(d)     (&d->arch.hvm_domain.hvm_iommu.vmx_iommu)
 
@@ -72,7 +71,6 @@ struct iommu {
     struct intel_iommu *intel;
 };
 
-int iommu_setup(void);
 int iommu_domain_init(struct domain *d);
 void iommu_domain_destroy(struct domain *d);
 int device_assigned(u8 bus, u8 devfn);

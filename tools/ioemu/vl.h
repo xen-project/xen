@@ -1545,6 +1545,7 @@ char *xenstore_vm_read(int domid, char *key, unsigned int *len);
 
 /* xenfb.c */
 int xenfb_pv_display_init(DisplayState *ds);
+int xenfb_pv_display_start(void *vram_start);
 int xenfb_connect_vkbd(const char *path);
 int xenfb_connect_vfb(const char *path);
 

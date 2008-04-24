@@ -39,6 +39,7 @@ void _fini(void)
 {
 }
 
+extern char __app_bss_start, __app_bss_end;
 static void call_main(void *p)
 {
     char *args, /**path,*/ *msg, *c;
@@ -56,6 +57,7 @@ static void call_main(void *p)
      * crashing. */
     //sleep(1);
 
+    sparse((unsigned long) &__app_bss_start, &__app_bss_end - &__app_bss_start);
     start_networking();
     init_fs_frontend();
 

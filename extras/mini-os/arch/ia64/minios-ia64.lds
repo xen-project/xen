@@ -59,7 +59,10 @@ SECTIONS
   { *(.IA_64.unwind) }
 
   .bss : AT(ADDR(.bss) - (((5<<(61))+0x100000000) - (1 << 20)))
-  { *(.bss) }
+  {
+    *(.bss)
+    *(.app.bss)
+  }
 
   _end = .;
 

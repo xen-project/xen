@@ -24,6 +24,7 @@
 #else
 #error "Unsupported architecture"
 #endif
+#include <traps.h>
 
 /*
  * a placeholder for the start of day information passed up from the hypervisor
@@ -37,7 +38,8 @@ extern union start_info_union start_info_union;
 #define start_info (start_info_union.start_info)
 
 /* hypervisor.c */
-//void do_hypervisor_callback(struct pt_regs *regs);
+void force_evtchn_callback(void);
+void do_hypervisor_callback(struct pt_regs *regs);
 void mask_evtchn(u32 port);
 void unmask_evtchn(u32 port);
 void clear_evtchn(u32 port);

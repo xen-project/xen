@@ -482,7 +482,7 @@ void cpu_handle_ioreq(void *opaque)
     CPUState *env = opaque;
     ioreq_t *req = cpu_get_ioreq();
 
-    handle_buffered_io(env);
+    __handle_buffered_iopage(env);
     if (req) {
         __handle_ioreq(env, req);
 

@@ -21,7 +21,7 @@ How to turn on VT-d in Xen
 
 title Xen-Fedora Core (2.6.18-xen)
         root (hd0,0)
-        kernel /boot/xen.gz com1=115200,8n1 console=com1 vtd=1
+        kernel /boot/xen.gz com1=115200,8n1 console=com1
         module /boot/vmlinuz-2.6.18.8-xen root=LABEL=/ ro console=tty0 console=ttyS0,115200,8n1 pciback.hide=(01:00.0)(03:00.0) pciback.verbose_request=1 apic=debug
         module /boot/initrd-2.6.18-xen.img
 

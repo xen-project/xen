@@ -85,6 +85,45 @@ int __init get_iommu_last_downstream_bus(struct amd_iommu *iommu)
     return 0;
 }
 
+static int __init get_iommu_msi_capabilities(u8 bus, u8 dev, u8 func,
+            struct amd_iommu *iommu)
+{
+    int cap_ptr, cap_id;
+    u32 cap_header;
+    u16 control;
+    int count = 0;
+
+    cap_ptr = pci_conf_read8(bus, dev, func,
+            PCI_CAPABILITY_LIST);
+
+    while ( cap_ptr >= PCI_MIN_CAP_OFFSET &&
+        count < PCI_MAX_CAP_BLOCKS )
+    {
+        cap_ptr &= PCI_CAP_PTR_MASK;
+        cap_header = pci_conf_read32(bus, dev, func, cap_ptr);
+        cap_id = get_field_from_reg_u32(cap_header,
+                PCI_CAP_ID_MASK, PCI_CAP_ID_SHIFT);
+
+        if ( cap_id == PCI_CAP_ID_MSI )
+        {
+            iommu->msi_cap = cap_ptr;
+            break;
+        }
+        cap_ptr = get_field_from_reg_u32(cap_header,
+                PCI_CAP_NEXT_PTR_MASK, PCI_CAP_NEXT_PTR_SHIFT);
+        count++;
+    }
+
+    if ( !iommu->msi_cap )
+        return -ENODEV;
+
+    amd_iov_info("Found MSI capability block \n");
+    control = pci_conf_read16(bus, dev, func,
+            iommu->msi_cap + PCI_MSI_FLAGS);
+    iommu->maskbit = control & PCI_MSI_FLAGS_MASKBIT;
+    return 0;
+}
+
 int __init get_iommu_capabilities(u8 bus, u8 dev, u8 func, u8 cap_ptr,
                                   struct amd_iommu *iommu)
 {
@@ -99,8 +138,7 @@ int __init get_iommu_capabilities(u8 bus, u8 dev, u8 func, u8 cap_ptr,
 
     if ( ((mmio_bar & 0x1) == 0) || (iommu->mmio_base_phys == 0) )
     {
-        dprintk(XENLOG_ERR ,
-                "AMD IOMMU: Invalid MMIO_BAR = 0x%"PRIx64"\n", mmio_bar);
+        amd_iov_error("Invalid MMIO_BAR = 0x%"PRIx64"\n", mmio_bar);
         return -ENODEV;
     }
 
@@ -132,6 +170,8 @@ int __init get_iommu_capabilities(u8 bus, u8 dev, u8 func, u8 cap_ptr,
                                 cap_ptr + PCI_MISC_INFO_OFFSET);
     iommu->msi_number = get_field_from_reg_u32(
         misc_info, PCI_CAP_MSI_NUMBER_MASK, PCI_CAP_MSI_NUMBER_SHIFT);
+
+    get_iommu_msi_capabilities(bus, dev, func, iommu);
 
     return 0;
 }
@@ -176,24 +216,24 @@ static int __init scan_functions_for_iommu(
     int bus, int dev, iommu_detect_callback_ptr_t iommu_detect_callback)
 {
     int func, hdr_type;
-    int count, error = 0;
+    int count = 1, error = 0;
 
-    func = 0;
-    count = 1;
-    while ( VALID_PCI_VENDOR_ID(pci_conf_read16(bus, dev, func,
-                                                PCI_VENDOR_ID)) &&
-            !error && (func < count) )
+    for ( func = 0;
+          (func < count) && !error &&
+              VALID_PCI_VENDOR_ID(pci_conf_read16(bus, dev, func,
+                                                  PCI_VENDOR_ID));
+          func++ )
+
     {
         hdr_type = pci_conf_read8(bus, dev, func, PCI_HEADER_TYPE);
 
-        if ( func == 0 && IS_PCI_MULTI_FUNCTION(hdr_type) )
+        if ( (func == 0) && IS_PCI_MULTI_FUNCTION(hdr_type) )
             count = PCI_MAX_FUNC_COUNT;
 
         if ( IS_PCI_TYPE0_HEADER(hdr_type) ||
              IS_PCI_TYPE1_HEADER(hdr_type) )
             error = scan_caps_for_iommu(bus, dev, func,
                                         iommu_detect_callback);
-        func++;
     }
 
     return error;

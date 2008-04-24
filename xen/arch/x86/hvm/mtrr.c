@@ -27,7 +27,6 @@
 #include <asm/hvm/support.h>
 #include <asm/hvm/cacheattr.h>
 
-/* Xen holds the native MTRR MSRs */
 extern struct mtrr_state mtrr_state;
 
 static uint64_t phys_base_msr_mask;
@@ -35,19 +34,17 @@ static uint64_t phys_mask_msr_mask;
 static uint32_t size_or_mask;
 static uint32_t size_and_mask;
 
-static void init_pat_entry_tbl(uint64_t pat);
-static void init_mtrr_epat_tbl(void);
-static uint8_t get_mtrr_type(struct mtrr_state *m, paddr_t pa);
-/* get page attribute fields (PAn) from PAT MSR */
+/* Get page attribute fields (PAn) from PAT MSR. */
 #define pat_cr_2_paf(pat_cr,n)  ((((uint64_t)pat_cr) >> ((n)<<3)) & 0xff)
-/* pat entry to PTE flags (PAT, PCD, PWT bits) */
+
+/* PAT entry to PTE flags (PAT, PCD, PWT bits). */
 static uint8_t pat_entry_2_pte_flags[8] = {
     0,           _PAGE_PWT,
     _PAGE_PCD,   _PAGE_PCD | _PAGE_PWT,
     _PAGE_PAT,   _PAGE_PAT | _PAGE_PWT,
     _PAGE_PAT | _PAGE_PCD, _PAGE_PAT | _PAGE_PCD | _PAGE_PWT };
 
-/* effective mm type lookup table, according to MTRR and PAT */
+/* Effective mm type lookup table, according to MTRR and PAT. */
 static uint8_t mm_type_tbl[MTRR_NUM_TYPES][PAT_TYPE_NUMS] = {
 /********PAT(UC,WC,RS,RS,WT,WP,WB,UC-)*/
 /* RS means reserved type(2,3), and type is hardcoded here */
@@ -67,12 +64,13 @@ static uint8_t mm_type_tbl[MTRR_NUM_TYPES][PAT_TYPE_NUMS] = {
             {0, 1, 2, 2, 4, 5, 6, 0}
 };
 
-/* reverse lookup table, to find a pat type according to MTRR and effective
- * memory type. This table is dynamically generated
+/*
+ * Reverse lookup table, to find a pat type according to MTRR and effective
+ * memory type. This table is dynamically generated.
  */
 static uint8_t mtrr_epat_tbl[MTRR_NUM_TYPES][MEMORY_NUM_TYPES];
 
-/* lookup table for PAT entry of a given PAT value in host pat */
+/* Lookup table for PAT entry of a given PAT value in host PAT. */
 static uint8_t pat_entry_tbl[PAT_TYPE_NUMS];
 
 static void get_mtrr_range(uint64_t base_msr, uint64_t mask_msr,
@@ -139,220 +137,63 @@ bool_t is_var_mtrr_overlapped(struct mtrr_state *m)
     return 0;
 }
 
-/* reserved mtrr for guest OS */
-#define RESERVED_MTRR 2
+#define MTRR_PHYSMASK_VALID_BIT  11
+#define MTRR_PHYSMASK_SHIFT      12
+
+#define MTRR_PHYSBASE_TYPE_MASK  0xff   /* lowest 8 bits */
+#define MTRR_PHYSBASE_SHIFT      12
+#define MTRR_VCNT                8
+
 #define MTRRphysBase_MSR(reg) (0x200 + 2 * (reg))
 #define MTRRphysMask_MSR(reg) (0x200 + 2 * (reg) + 1)
 bool_t mtrr_var_range_msr_set(struct mtrr_state *m, uint32_t msr,
                               uint64_t msr_content);
-bool_t mtrr_def_type_msr_set(struct mtrr_state *m, uint64_t msr_content);
 bool_t mtrr_fix_range_msr_set(struct mtrr_state *m, uint32_t row,
                               uint64_t msr_content);
-static void set_var_mtrr(uint32_t reg, struct mtrr_state *m,
-                         uint32_t base, uint32_t size,
-                         uint32_t type)
-{
-    struct mtrr_var_range *vr;
 
-    vr = &m->var_ranges[reg];
-
-    if ( size == 0 )
-    {
-        /* The invalid bit is kept in the mask, so we simply clear the
-         * relevant mask register to disable a range.
-         */
-        mtrr_var_range_msr_set(m, MTRRphysMask_MSR(reg), 0);
-    }
-    else
-    {
-        vr->base_lo = base << PAGE_SHIFT | type;
-        vr->base_hi = (base & size_and_mask) >> (32 - PAGE_SHIFT);
-        vr->mask_lo = -size << PAGE_SHIFT | 0x800;
-        vr->mask_hi = (-size & size_and_mask) >> (32 - PAGE_SHIFT);
-
-        mtrr_var_range_msr_set(m, MTRRphysBase_MSR(reg), *(uint64_t *)vr);
-        mtrr_var_range_msr_set(m, MTRRphysMask_MSR(reg),
-                               *((uint64_t *)vr + 1));
-    }
-}
-/* From Intel Vol. III Section 10.11.4, the Range Size and Base Alignment has
- * some kind of requirement:
- * 1. The range size must be 2^N byte for N >= 12 (i.e 4KB minimum).
- * 2. The base address must be 2^N aligned, where the N here is equal to
- * the N in previous requirement. So a 8K range must be 8K aligned not 4K aligned.
- */
-static uint32_t range_to_mtrr(uint32_t reg, struct mtrr_state *m,
-                              uint32_t range_startk, uint32_t range_sizek,
-                              uint8_t type)
-{
-    if ( !range_sizek || (reg >= ((m->mtrr_cap & 0xff) - RESERVED_MTRR)) )
-    {
-        gdprintk(XENLOG_WARNING,
-                "Failed to init var mtrr msr[%d]"
-                "range_size:%x, total available MSR:%d\n",
-                reg, range_sizek,
-                (uint32_t)((m->mtrr_cap & 0xff) - RESERVED_MTRR));
-        return reg;
-    }
-
-    while ( range_sizek )
-    {
-        uint32_t max_align, align, sizek;
-
-        max_align = (range_startk == 0) ? 32 : ffs(range_startk);
-        align = min_t(uint32_t, fls(range_sizek), max_align);
-        sizek = 1 << (align - 1);
-
-        set_var_mtrr(reg++, m, range_startk, sizek, type);
-
-        range_startk += sizek;
-        range_sizek  -= sizek;
-
-        if ( reg >= ((m->mtrr_cap & 0xff) - RESERVED_MTRR) )
-        {
-            gdprintk(XENLOG_WARNING,
-                    "Failed to init var mtrr msr[%d],"
-                    "total available MSR:%d\n",
-                    reg, (uint32_t)((m->mtrr_cap & 0xff) - RESERVED_MTRR));
-            break;
-        }
-    }
-
-    return reg;
-}
-
-static void setup_fixed_mtrrs(struct vcpu *v)
-{
-    uint64_t content;
-    int32_t i;
-    struct mtrr_state *m = &v->arch.hvm_vcpu.mtrr;
-
-    /* 1. Map (0~A0000) as WB */
-    content = 0x0606060606060606ull;
-    mtrr_fix_range_msr_set(m, 0, content);
-    mtrr_fix_range_msr_set(m, 1, content);
-    /* 2. Map VRAM(A0000~C0000) as WC */
-    content = 0x0101010101010101;
-    mtrr_fix_range_msr_set(m, 2, content);
-    /* 3. Map (C0000~100000) as UC */
-    for ( i = 3; i < 11; i++)
-        mtrr_fix_range_msr_set(m, i, 0);
-}
-
-static void setup_var_mtrrs(struct vcpu *v)
-{
-    p2m_type_t p2m;
-    uint64_t e820_mfn;
-    int8_t *p = NULL;
-    uint8_t nr = 0;
-    int32_t i;
-    uint32_t reg = 0;
-    uint64_t size = 0;
-    uint64_t addr = 0;
-    struct e820entry *e820_table;
-
-    e820_mfn = mfn_x(gfn_to_mfn(v->domain,
-                    HVM_E820_PAGE >> PAGE_SHIFT, &p2m));
-
-    p = (int8_t *)map_domain_page(e820_mfn);
-
-    nr = *(uint8_t*)(p + HVM_E820_NR_OFFSET);
-    e820_table = (struct e820entry*)(p + HVM_E820_OFFSET);
-    /* search E820 table, set MTRR for RAM */
-    for ( i = 0; i < nr; i++)
-    {
-        if ( (e820_table[i].addr >= 0x100000) &&
-             (e820_table[i].type == E820_RAM) )
-        {
-            if ( e820_table[i].addr == 0x100000 )
-            {
-                size = e820_table[i].size + 0x100000 + PAGE_SIZE * 5;
-                addr = 0;
-            }
-            else
-            {
-                /* Larger than 4G */
-                size = e820_table[i].size;
-                addr = e820_table[i].addr;
-            }
-
-            reg = range_to_mtrr(reg, &v->arch.hvm_vcpu.mtrr,
-                                addr >> PAGE_SHIFT, size >> PAGE_SHIFT,
-                                MTRR_TYPE_WRBACK);
-        }
-    }
-}
-
-void init_mtrr_in_hyper(struct vcpu *v)
-{
-    /* TODO:MTRR should be initialized in BIOS or other places.
-     * workaround to do it in here
-     */
-    if ( v->arch.hvm_vcpu.mtrr.is_initialized )
-        return;
-
-    setup_fixed_mtrrs(v);
-    setup_var_mtrrs(v);
-    /* enable mtrr */
-    mtrr_def_type_msr_set(&v->arch.hvm_vcpu.mtrr, 0xc00);
-
-    v->arch.hvm_vcpu.mtrr.is_initialized = 1;
-}
-
-static int32_t reset_mtrr(struct mtrr_state *m)
-{
-    m->var_ranges = xmalloc_array(struct mtrr_var_range, MTRR_VCNT);
-    if ( m->var_ranges == NULL )
-        return -ENOMEM;
-    memset(m->var_ranges, 0, MTRR_VCNT * sizeof(struct mtrr_var_range));
-    memset(m->fixed_ranges, 0, sizeof(m->fixed_ranges));
-    m->enabled = 0;
-    m->def_type = 0;/*mtrr is disabled*/
-    m->mtrr_cap = (0x5<<8)|MTRR_VCNT;/*wc,fix enabled, and vcnt=8*/
-    m->overlapped = 0;
-    return 0;
-}
-
-/* init global variables for MTRR and PAT */
-void global_init_mtrr_pat(void)
+static int hvm_mtrr_pat_init(void)
 {
     extern uint64_t host_pat;
-    uint32_t phys_addr;
+    unsigned int i, j, phys_addr;
 
-    init_mtrr_epat_tbl();
-    init_pat_entry_tbl(host_pat);
-    /* Get max physical address, set some global variable */
-    if ( cpuid_eax(0x80000000) < 0x80000008 )
-        phys_addr = 36;
-    else
-        phys_addr = cpuid_eax(0x80000008);
-
-    phys_base_msr_mask = ~((((uint64_t)1) << phys_addr) - 1) | 0xf00UL;
-    phys_mask_msr_mask = ~((((uint64_t)1) << phys_addr) - 1) | 0x7ffUL;
-
-    size_or_mask = ~((1 << (phys_addr - PAGE_SHIFT)) - 1);
-    size_and_mask = ~size_or_mask & 0xfff00000;
-}
-
-static void init_pat_entry_tbl(uint64_t pat)
-{
-    int32_t i, j;
+    memset(&mtrr_epat_tbl, INVALID_MEM_TYPE, sizeof(mtrr_epat_tbl));
+    for ( i = 0; i < MTRR_NUM_TYPES; i++ )
+    {
+        for ( j = 0; j < PAT_TYPE_NUMS; j++ )
+        {
+            int32_t tmp = mm_type_tbl[i][j];
+            if ( (tmp >= 0) && (tmp < MEMORY_NUM_TYPES) )
+                mtrr_epat_tbl[i][tmp] = j;
+        }
+    }
 
     memset(&pat_entry_tbl, INVALID_MEM_TYPE,
            PAT_TYPE_NUMS * sizeof(pat_entry_tbl[0]));
-
     for ( i = 0; i < PAT_TYPE_NUMS; i++ )
     {
         for ( j = 0; j < PAT_TYPE_NUMS; j++ )
         {
-            if ( pat_cr_2_paf(pat, j) == i )
+            if ( pat_cr_2_paf(host_pat, j) == i )
             {
                 pat_entry_tbl[i] = j;
                 break;
             }
         }
     }
+
+    phys_addr = 36;
+    if ( cpuid_eax(0x80000000) >= 0x80000008 )
+        phys_addr = (uint8_t)cpuid_eax(0x80000008);
+
+    phys_base_msr_mask = ~((((uint64_t)1) << phys_addr) - 1) | 0xf00UL;
+    phys_mask_msr_mask = ~((((uint64_t)1) << phys_addr) - 1) | 0x7ffUL;
+
+    size_or_mask = ~((1 << (phys_addr - PAGE_SHIFT)) - 1);
+    size_and_mask = ~size_or_mask & 0xfff00000;
+
+    return 0;
 }
+__initcall(hvm_mtrr_pat_init);
 
 uint8_t pat_type_2_pte_flags(uint8_t pat_type)
 {
@@ -368,24 +209,35 @@ uint8_t pat_type_2_pte_flags(uint8_t pat_type)
     return pat_entry_2_pte_flags[pat_entry_tbl[PAT_TYPE_UNCACHABLE]];
 }
 
-int32_t reset_vmsr(struct mtrr_state *m, uint64_t *pat_ptr)
+int hvm_vcpu_cacheattr_init(struct vcpu *v)
 {
-    int32_t rc;
+    struct mtrr_state *m = &v->arch.hvm_vcpu.mtrr;
 
-    rc = reset_mtrr(m);
-    if ( rc != 0 )
-        return rc;
+    memset(m, 0, sizeof(*m));
 
-    *pat_ptr = ((uint64_t)PAT_TYPE_WRBACK) |               /* PAT0: WB */
-               ((uint64_t)PAT_TYPE_WRTHROUGH << 8) |       /* PAT1: WT */
-               ((uint64_t)PAT_TYPE_UC_MINUS << 16) |       /* PAT2: UC- */
-               ((uint64_t)PAT_TYPE_UNCACHABLE << 24) |     /* PAT3: UC */
-               ((uint64_t)PAT_TYPE_WRBACK << 32) |         /* PAT4: WB */
-               ((uint64_t)PAT_TYPE_WRTHROUGH << 40) |      /* PAT5: WT */
-               ((uint64_t)PAT_TYPE_UC_MINUS << 48) |       /* PAT6: UC- */
-               ((uint64_t)PAT_TYPE_UNCACHABLE << 56);      /* PAT7: UC */
+    m->var_ranges = xmalloc_array(struct mtrr_var_range, MTRR_VCNT);
+    if ( m->var_ranges == NULL )
+        return -ENOMEM;
+    memset(m->var_ranges, 0, MTRR_VCNT * sizeof(struct mtrr_var_range));
+
+    m->mtrr_cap = (1u << 10) | (1u << 8) | MTRR_VCNT;
+
+    v->arch.hvm_vcpu.pat_cr =
+        ((uint64_t)PAT_TYPE_WRBACK) |               /* PAT0: WB */
+        ((uint64_t)PAT_TYPE_WRTHROUGH << 8) |       /* PAT1: WT */
+        ((uint64_t)PAT_TYPE_UC_MINUS << 16) |       /* PAT2: UC- */
+        ((uint64_t)PAT_TYPE_UNCACHABLE << 24) |     /* PAT3: UC */
+        ((uint64_t)PAT_TYPE_WRBACK << 32) |         /* PAT4: WB */
+        ((uint64_t)PAT_TYPE_WRTHROUGH << 40) |      /* PAT5: WT */
+        ((uint64_t)PAT_TYPE_UC_MINUS << 48) |       /* PAT6: UC- */
+        ((uint64_t)PAT_TYPE_UNCACHABLE << 56);      /* PAT7: UC */
 
     return 0;
+}
+
+void hvm_vcpu_cacheattr_destroy(struct vcpu *v)
+{
+    xfree(v->arch.hvm_vcpu.mtrr.var_ranges);
 }
 
 /*
@@ -510,23 +362,6 @@ static uint8_t effective_mm_type(struct mtrr_state *m,
     effective = mm_type_tbl[mtrr_mtype][pat_value];
 
     return effective;
-}
-
-static void init_mtrr_epat_tbl(void)
-{
-    int32_t i, j;
-    /* set default value to an invalid type, just for checking conflict */
-    memset(&mtrr_epat_tbl, INVALID_MEM_TYPE, sizeof(mtrr_epat_tbl));
-
-    for ( i = 0; i < MTRR_NUM_TYPES; i++ )
-    {
-        for ( j = 0; j < PAT_TYPE_NUMS; j++ )
-        {
-            int32_t tmp = mm_type_tbl[i][j];
-            if ( (tmp >= 0) && (tmp < MEMORY_NUM_TYPES) )
-                mtrr_epat_tbl[i][tmp] = j;
-        }
-    }
 }
 
 uint32_t get_pat_flags(struct vcpu *v,
@@ -856,7 +691,6 @@ static int hvm_load_mtrr_msr(struct domain *d, hvm_domain_context_t *h)
 
     mtrr_def_type_msr_set(mtrr_state, hw_mtrr.msr_mtrr_def_type);
 
-    v->arch.hvm_vcpu.mtrr.is_initialized = 1;
     return 0;
 }
 

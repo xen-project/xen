@@ -83,7 +83,16 @@ struct hvm_vcpu {
      */
     unsigned long       mmio_gva;
     unsigned long       mmio_gpfn;
+    /* Callback into x86_emulate when emulating FPU/MMX/XMM instructions. */
+    void (*fpu_exception_callback)(void *, struct cpu_user_regs *);
+    void *fpu_exception_callback_arg;
+    /* We may read up to m128 as a number of device-model transactions. */
+    paddr_t mmio_large_read_pa;
+    uint8_t mmio_large_read[16];
+    unsigned int mmio_large_read_bytes;
+    /* We may write up to m128 as a number of device-model transactions. */
+    paddr_t mmio_large_write_pa;
+    unsigned int mmio_large_write_bytes;
 };
 
 #endif /* __ASM_X86_HVM_VCPU_H__ */
-

@@ -52,6 +52,8 @@ obj-y += tboot.o
 
 obj-$(crash_debug) += gdbstub.o
 
+x86_emulate.o: x86_emulate/x86_emulate.c x86_emulate/x86_emulate.h
+
 $(TARGET): $(TARGET)-syms boot/mkelf32
 	./boot/mkelf32 $(TARGET)-syms $(TARGET) 0x100000 \
 	`$(NM) -nr $(TARGET)-syms | head -n 1 | sed -e 's/^\([^ ]*\).*/0x\1/'`

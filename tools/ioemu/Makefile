@@ -87,7 +87,7 @@ endif
 
 install: all $(if $(BUILD_DOCS),install-doc)
 	mkdir -p "$(DESTDIR)$(bindir)"
-	$(INSTALL) -m 755 -s $(TOOLS) "$(DESTDIR)$(prefix)/sbin"
+	$(INSTALL) -m 755 $(TOOLS) "$(DESTDIR)$(SBINDIR)"
 #	mkdir -p "$(DESTDIR)$(datadir)"
 #	for x in bios.bin vgabios.bin vgabios-cirrus.bin ppc_rom.bin \
 #		video.x openbios-sparc32 linux_boot.bin pxe-ne2k_pci.bin \

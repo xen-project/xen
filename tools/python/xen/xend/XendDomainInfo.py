@@ -1837,6 +1837,9 @@ class XendDomainInfo:
 
         @raise: VmError for invalid devices
         """
+        if self.image:
+            self.image.prepareEnvironment()
+
         ordered_refs = self.info.ordered_device_refs()
         for dev_uuid in ordered_refs:
             devclass, config = self.info['devices'][dev_uuid]
@@ -2321,6 +2324,34 @@ class XendDomainInfo:
 
         self.cleanupDomain()
         self._cleanup_phantom_devs(paths)
+
+
+    def resetDomain(self):
+        log.debug("XendDomainInfo.resetDomain(%s)", str(self.domid))
+
+        old_domid = self.domid
+        prev_vm_xend = self._listRecursiveVm('xend')
+        new_dom_info = self.info
+        try:
+            self._unwatchVm()
+            self.destroy()
+
+            new_dom = None
+            try:
+                from xen.xend import XendDomain
+                new_dom_info['domid'] = None
+                new_dom = XendDomain.instance().domain_create_from_dict(
+                    new_dom_info)
+                for x in prev_vm_xend[0][1]:
+                    new_dom._writeVm('xend/%s' % x[0], x[1])
+                new_dom.waitForDevices()
+                new_dom.unpause()
+            except:
+                if new_dom:
+                    new_dom.destroy()
+                raise
+        except:
+            log.exception('Failed to reset domain %s.', str(old_domid))
 
 
     def resumeDomain(self):

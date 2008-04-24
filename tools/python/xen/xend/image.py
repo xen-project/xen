@@ -185,6 +185,42 @@ class ImageHandler:
         """Build the domain. Define in subclass."""
         raise NotImplementedError()
 
+    def prepareEnvironment(self):
+        """Prepare the environment for the execution of the domain. This
+        method is called before any devices are set up."""
+        
+        domid = self.vm.getDomid()
+	
+        # Delete left-over pipes
+        try:
+            os.unlink('/var/run/tap/qemu-read-%d' % domid)
+            os.unlink('/var/run/tap/qemu-write-%d' % domid)
+        except:
+            pass
+
+        # No device model, don't create pipes
+        if self.device_model is None:
+            return
+
+        # If we use a device model, the pipes for communication between
+        # blktapctrl and ioemu must be present before the devices are 
+        # created (blktapctrl must access them for new block devices)
+
+        # mkdir throws an exception if the path already exists
+        try:
+            os.mkdir('/var/run/tap', 0755)
+        except:
+            pass
+
+        try:
+            os.mkfifo('/var/run/tap/qemu-read-%d' % domid, 0600)
+            os.mkfifo('/var/run/tap/qemu-write-%d' % domid, 0600)
+        except OSError, e:
+            log.warn('Could not create blktap pipes for domain %d' % domid)
+            log.exception(e)
+            pass
+
+
     # Return a list of cmd line args to the device models based on the
     # xm config file
     def parseDeviceModelArgs(self, vmConfig):
@@ -411,6 +447,12 @@ class ImageHandler:
             self.pid = None
             state = xstransact.Remove("/local/domain/0/device-model/%i"
                                       % self.vm.getDomid())
+            
+            try:
+                os.unlink('/var/run/tap/qemu-read-%d' % self.vm.getDomid())
+                os.unlink('/var/run/tap/qemu-write-%d' % self.vm.getDomid())
+            except:
+                pass
 
 
 class LinuxImageHandler(ImageHandler):
@@ -643,7 +685,9 @@ class IA64_HVM_ImageHandler(HVMImageHandler):
         # ROM size for guest firmware, io page, xenstore page
         # buffer io page, buffer pio page and memmap info page
         extra_pages = 1024 + 5
-        return mem_kb + extra_pages * page_kb
+        mem_kb += extra_pages * page_kb
+        # Add 8 MiB overhead for QEMU's video RAM.
+        return mem_kb + 8192
 
     def getRequiredInitialReservation(self):
         return self.vm.getMemoryTarget()

@@ -474,9 +474,8 @@ static int read_msg(int fd, int msgtype, void *ptr)
 
 }
 
-int launch_tapdisk(char *wrctldev, char *rdctldev)
+static int launch_tapdisk_provider(char **argv)
 {
-	char *argv[] = { "tapdisk", wrctldev, rdctldev, NULL };
 	pid_t child;
 	
 	if ((child = fork()) < 0)
@@ -490,7 +489,9 @@ int launch_tapdisk(char *wrctldev, char *rdctldev)
 			    i != STDERR_FILENO)
 				close(i);
 
-		execvp("tapdisk", argv);
+		execvp(argv[0], argv);
+		DPRINTF("execvp failed: %d (%s)\n", errno, strerror(errno));
+		DPRINTF("PATH = %s\n", getenv("PATH"));
 		_exit(1);
 	} else {
 		pid_t got;
@@ -498,28 +499,78 @@ int launch_tapdisk(char *wrctldev, char *rdctldev)
 			got = waitpid(child, NULL, 0);
 		} while (got != child);
 	}
+	return child;
+}
+
+static int launch_tapdisk(char *wrctldev, char *rdctldev)
+{
+	char *argv[] = { "tapdisk", wrctldev, rdctldev, NULL };
+
+	if (launch_tapdisk_provider(argv) < 0)
+		return -1;
+
 	return 0;
 }
 
-/* Connect to qemu-dm */
-static int connect_qemu(blkif_t *blkif)
+static int launch_tapdisk_ioemu(void)
+{
+	char *argv[] = { "tapdisk-ioemu", NULL };
+	return launch_tapdisk_provider(argv);
+}
+
+/* 
+ * Connect to an ioemu based disk provider (qemu-dm or tapdisk-ioemu)
+ *
+ * If the domain has a device model, connect to qemu-dm through the
+ * domain specific pipe. Otherwise use a single tapdisk-ioemu instance
+ * which is represented by domid 0 and provides access for Dom0 and
+ * all DomUs without device model.
+ */
+static int connect_qemu(blkif_t *blkif, int domid)
 {
 	char *rdctldev, *wrctldev;
+
+	static int tapdisk_ioemu_pid = 0;
+	static int dom0_readfd = 0;
+	static int dom0_writefd = 0;
 	
-	if (asprintf(&rdctldev, BLKTAP_CTRL_DIR "/qemu-read-%d", 
-			blkif->domid) < 0)
+	if (asprintf(&rdctldev, BLKTAP_CTRL_DIR "/qemu-read-%d", domid) < 0)
 		return -1;
 
-	if (asprintf(&wrctldev, BLKTAP_CTRL_DIR "/qemu-write-%d", 
-			blkif->domid) < 0) {
+	if (asprintf(&wrctldev, BLKTAP_CTRL_DIR "/qemu-write-%d", domid) < 0) {
 		free(rdctldev);
 		return -1;
 	}
 
 	DPRINTF("Using qemu blktap pipe: %s\n", rdctldev);
 	
-	blkif->fds[READ] = open_ctrl_socket(wrctldev);
-	blkif->fds[WRITE] = open_ctrl_socket(rdctldev);
+	if (domid == 0) {
+		/*
+		 * tapdisk-ioemu exits as soon as the last image is 
+		 * disconnected. Check if it is still running.
+		 */
+		if (tapdisk_ioemu_pid == 0 || kill(tapdisk_ioemu_pid, 0)) {
+			/* No device model and tapdisk-ioemu doesn't run yet */
+			DPRINTF("Launching tapdisk-ioemu\n");
+			tapdisk_ioemu_pid = launch_tapdisk_ioemu();
+			
+			dom0_readfd = open_ctrl_socket(wrctldev);
+			dom0_writefd = open_ctrl_socket(rdctldev);
+		}
+
+		DPRINTF("Using tapdisk-ioemu connection\n");
+		blkif->fds[READ] = dom0_readfd;
+		blkif->fds[WRITE] = dom0_writefd;
+	} else if (access(rdctldev, R_OK | W_OK) == 0) {
+		/* Use existing pipe to the device model */
+		DPRINTF("Using qemu-dm connection\n");
+		blkif->fds[READ] = open_ctrl_socket(wrctldev);
+		blkif->fds[WRITE] = open_ctrl_socket(rdctldev);
+	} else {
+		/* No device model => try with tapdisk-ioemu */
+		DPRINTF("No device model\n");
+		connect_qemu(blkif, 0);
+	}
 	
 	free(rdctldev);
 	free(wrctldev);
@@ -599,7 +650,7 @@ int blktapctrl_new_blkif(blkif_t *blkif)
 
 		if (!exist) {
 			if (type == DISK_TYPE_IOEMU) {
-				if (connect_qemu(blkif))
+				if (connect_qemu(blkif, blkif->domid))
 					goto fail;
 			} else {
 				if (connect_tapdisk(blkif, minor))
