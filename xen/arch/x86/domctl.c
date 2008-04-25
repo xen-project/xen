@@ -842,6 +842,45 @@ long arch_do_domctl(
     }
     break;
 
+    case XEN_DOMCTL_set_cpuid:
+    {
+        struct domain *d;
+        xen_domctl_cpuid_t *ctl = &domctl->u.cpuid;
+        cpuid_input_t *cpuid = NULL; 
+        int i;
+
+        ret = -ESRCH;
+        d = rcu_lock_domain_by_id(domctl->domain);
+        if ( d == NULL )
+            break;
+
+        for ( i = 0; i < MAX_CPUID_INPUT; i++ )
+        {
+            cpuid = &d->arch.cpuids[i];
+
+            if ( cpuid->input[0] == XEN_CPUID_INPUT_UNUSED )
+                break;
+
+            if ( (cpuid->input[0] == ctl->input[0]) &&
+                 ((cpuid->input[1] == XEN_CPUID_INPUT_UNUSED) ||
+                  (cpuid->input[1] == ctl->input[1])) )
+                break;
+        }
+        
+        if ( i == MAX_CPUID_INPUT )
+        {
+            ret = -ENOENT;
+        }
+        else
+        {
+            memcpy(cpuid, ctl, sizeof(cpuid_input_t));
+            ret = 0;
+        }
+
+        rcu_unlock_domain(d);
+    }
+    break;
+
     default:
         ret = -ENOSYS;
         break;

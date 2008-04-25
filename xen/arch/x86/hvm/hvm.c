@@ -1594,66 +1594,15 @@ void hvm_cpuid(unsigned int input, unsigned int *eax, unsigned int *ebx,
     if ( cpuid_hypervisor_leaves(input, eax, ebx, ecx, edx) )
         return;
 
-    cpuid(input, eax, ebx, ecx, edx);
+    domain_cpuid(v->domain, input, *ecx, eax, ebx, ecx, edx);
 
-    switch ( input )
+    if ( input == 0x00000001 )
     {
-    case 0x00000001:
-        /* Clear #threads count and poke initial VLAPIC ID. */
-        *ebx &= 0x0000FFFFu;
-        *ebx |= (current->vcpu_id * 2) << 24;
-
-        /* We always support MTRR MSRs. */
-        *edx |= bitmaskof(X86_FEATURE_MTRR);
-
-        *ecx &= (bitmaskof(X86_FEATURE_XMM3) |
-                 bitmaskof(X86_FEATURE_SSSE3) |
-                 bitmaskof(X86_FEATURE_CX16) |
-                 bitmaskof(X86_FEATURE_SSE4_1) |
-                 bitmaskof(X86_FEATURE_SSE4_2) |
-                 bitmaskof(X86_FEATURE_POPCNT));
-
-        *edx &= (bitmaskof(X86_FEATURE_FPU) |
-                 bitmaskof(X86_FEATURE_VME) |
-                 bitmaskof(X86_FEATURE_DE) |
-                 bitmaskof(X86_FEATURE_PSE) |
-                 bitmaskof(X86_FEATURE_TSC) |
-                 bitmaskof(X86_FEATURE_MSR) |
-                 bitmaskof(X86_FEATURE_PAE) |
-                 bitmaskof(X86_FEATURE_MCE) |
-                 bitmaskof(X86_FEATURE_CX8) |
-                 bitmaskof(X86_FEATURE_APIC) |
-                 bitmaskof(X86_FEATURE_SEP) |
-                 bitmaskof(X86_FEATURE_MTRR) |
-                 bitmaskof(X86_FEATURE_PGE) |
-                 bitmaskof(X86_FEATURE_MCA) |
-                 bitmaskof(X86_FEATURE_CMOV) |
-                 bitmaskof(X86_FEATURE_PAT) |
-                 bitmaskof(X86_FEATURE_CLFLSH) |
-                 bitmaskof(X86_FEATURE_MMX) |
-                 bitmaskof(X86_FEATURE_FXSR) |
-                 bitmaskof(X86_FEATURE_XMM) |
-                 bitmaskof(X86_FEATURE_XMM2));
+        /* Fix up VLAPIC details. */
+        *ebx &= 0x00FFFFFFu;
+        *ebx |= (v->vcpu_id * 2) << 24;
         if ( vlapic_hw_disabled(vcpu_vlapic(v)) )
-            __clear_bit(X86_FEATURE_APIC & 31, edx);
-#if CONFIG_PAGING_LEVELS >= 3
-        if ( !v->domain->arch.hvm_domain.params[HVM_PARAM_PAE_ENABLED] )
-#endif
-            __clear_bit(X86_FEATURE_PAE & 31, edx);
-        break;
-
-    case 0x80000001:
-#if CONFIG_PAGING_LEVELS >= 3
-        if ( !v->domain->arch.hvm_domain.params[HVM_PARAM_PAE_ENABLED] )
-#endif
-            __clear_bit(X86_FEATURE_NX & 31, edx);
-#ifdef __i386__
-        /* Mask feature for Intel ia32e or AMD long mode. */
-        __clear_bit(X86_FEATURE_LAHF_LM & 31, ecx);
-        __clear_bit(X86_FEATURE_LM & 31, edx);
-        __clear_bit(X86_FEATURE_SYSCALL & 31, edx);
-#endif
-        break;
+            __clear_bit(X86_FEATURE_APIC & 31, ebx);
     }
 }
 
@@ -1663,10 +1612,14 @@ int hvm_msr_read_intercept(struct cpu_user_regs *regs)
     uint64_t msr_content = 0;
     struct vcpu *v = current;
     uint64_t *var_range_base, *fixed_range_base;
-    int index;
+    int index, mtrr;
+    uint32_t cpuid[4];
 
     var_range_base = (uint64_t *)v->arch.hvm_vcpu.mtrr.var_ranges;
     fixed_range_base = (uint64_t *)v->arch.hvm_vcpu.mtrr.fixed_ranges;
+
+    hvm_cpuid(1, &cpuid[0], &cpuid[1], &cpuid[2], &cpuid[3]);
+    mtrr = !!(cpuid[3] & bitmaskof(X86_FEATURE_MTRR));
 
     switch ( ecx )
     {
@@ -1695,25 +1648,37 @@ int hvm_msr_read_intercept(struct cpu_user_regs *regs)
         break;
 
     case MSR_MTRRcap:
+        if ( !mtrr )
+            goto gp_fault;
         msr_content = v->arch.hvm_vcpu.mtrr.mtrr_cap;
         break;
     case MSR_MTRRdefType:
+        if ( !mtrr )
+            goto gp_fault;
         msr_content = v->arch.hvm_vcpu.mtrr.def_type
                         | (v->arch.hvm_vcpu.mtrr.enabled << 10);
         break;
     case MSR_MTRRfix64K_00000:
+        if ( !mtrr )
+            goto gp_fault;
         msr_content = fixed_range_base[0];
         break;
     case MSR_MTRRfix16K_80000:
     case MSR_MTRRfix16K_A0000:
+        if ( !mtrr )
+            goto gp_fault;
         index = regs->ecx - MSR_MTRRfix16K_80000;
         msr_content = fixed_range_base[index + 1];
         break;
     case MSR_MTRRfix4K_C0000...MSR_MTRRfix4K_F8000:
+        if ( !mtrr )
+            goto gp_fault;
         index = regs->ecx - MSR_MTRRfix4K_C0000;
         msr_content = fixed_range_base[index + 3];
         break;
     case MSR_IA32_MTRR_PHYSBASE0...MSR_IA32_MTRR_PHYSMASK7:
+        if ( !mtrr )
+            goto gp_fault;
         index = regs->ecx - MSR_IA32_MTRR_PHYSBASE0;
         msr_content = var_range_base[index];
         break;
@@ -1725,6 +1690,10 @@ int hvm_msr_read_intercept(struct cpu_user_regs *regs)
     regs->eax = (uint32_t)msr_content;
     regs->edx = (uint32_t)(msr_content >> 32);
     return X86EMUL_OKAY;
+
+gp_fault:
+    hvm_inject_exception(TRAP_gp_fault, 0, 0);
+    return X86EMUL_EXCEPTION;
 }
 
 int hvm_msr_write_intercept(struct cpu_user_regs *regs)
@@ -1739,7 +1708,11 @@ int hvm_msr_write_intercept(struct cpu_user_regs *regs)
     uint32_t ecx = regs->ecx;
     uint64_t msr_content = (uint32_t)regs->eax | ((uint64_t)regs->edx << 32);
     struct vcpu *v = current;
-    int index;
+    int index, mtrr;
+    uint32_t cpuid[4];
+
+    hvm_cpuid(1, &cpuid[0], &cpuid[1], &cpuid[2], &cpuid[3]);
+    mtrr = !!(cpuid[3] & bitmaskof(X86_FEATURE_MTRR));
 
     switch ( ecx )
     {
@@ -1758,29 +1731,41 @@ int hvm_msr_write_intercept(struct cpu_user_regs *regs)
         break;
 
     case MSR_MTRRcap:
+        if ( !mtrr )
+            goto gp_fault;
         goto gp_fault;
     case MSR_MTRRdefType:
+        if ( !mtrr )
+            goto gp_fault;
         if ( !mtrr_def_type_msr_set(&v->arch.hvm_vcpu.mtrr, msr_content) )
            goto gp_fault;
         break;
     case MSR_MTRRfix64K_00000:
+        if ( !mtrr )
+            goto gp_fault;
         if ( !mtrr_fix_range_msr_set(&v->arch.hvm_vcpu.mtrr, 0, msr_content) )
             goto gp_fault;
         break;
     case MSR_MTRRfix16K_80000:
     case MSR_MTRRfix16K_A0000:
+        if ( !mtrr )
+            goto gp_fault;
         index = regs->ecx - MSR_MTRRfix16K_80000 + 1;
         if ( !mtrr_fix_range_msr_set(&v->arch.hvm_vcpu.mtrr,
                                      index, msr_content) )
             goto gp_fault;
         break;
     case MSR_MTRRfix4K_C0000...MSR_MTRRfix4K_F8000:
+        if ( !mtrr )
+            goto gp_fault;
         index = regs->ecx - MSR_MTRRfix4K_C0000 + 3;
         if ( !mtrr_fix_range_msr_set(&v->arch.hvm_vcpu.mtrr,
                                      index, msr_content) )
             goto gp_fault;
         break;
     case MSR_IA32_MTRR_PHYSBASE0...MSR_IA32_MTRR_PHYSMASK7:
+        if ( !mtrr )
+            goto gp_fault;
         if ( !mtrr_var_range_msr_set(&v->arch.hvm_vcpu.mtrr,
                                      regs->ecx, msr_content) )
             goto gp_fault;

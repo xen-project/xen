@@ -203,6 +203,8 @@ XENAPI_CFG_TYPES = {
     'target': int,
     'security_label': str,
     'pci': str,
+    'cpuid' : dict,
+    'cpuid_check' : dict,
 }
 
 # List of legacy configuration keys that have no equivalent in the
@@ -497,6 +499,32 @@ class XendConfig(dict):
         if 'handle' in dominfo:
             self['uuid'] = uuid.toString(dominfo['handle'])
             
+    def parse_cpuid(self, cfg, field):
+       def int2bin(n, count=32):
+           return "".join([str((n >> y) & 1) for y in range(count-1, -1, -1)])
+
+       for input, regs in cfg[field].iteritems():
+           if not regs is dict:
+               cfg[field][input] = dict(regs)
+
+       cpuid = {}
+       for input in cfg[field]:
+           inputs = input.split(',')
+           if inputs[0][0:2] == '0x':
+               inputs[0] = str(int(inputs[0], 16))
+           if len(inputs) == 2:
+               if inputs[1][0:2] == '0x':
+                   inputs[1] = str(int(inputs[1], 16))
+           new_input = ','.join(inputs)
+           cpuid[new_input] = {} # new input
+           for reg in cfg[field][input]:
+               val = cfg[field][input][reg]
+               if val[0:2] == '0x':
+                   cpuid[new_input][reg] = int2bin(int(val, 16))
+               else:
+                   cpuid[new_input][reg] = val
+       cfg[field] = cpuid
+
     def _parse_sxp(self, sxp_cfg):
         """ Populate this XendConfig using the parsed SXP.
 
@@ -652,6 +680,12 @@ class XendConfig(dict):
                     cfg['cpus'] = cpus
                 except ValueError, e:
                     raise XendConfigError('cpus = %s: %s' % (cfg['cpus'], e))
+
+        # Parse cpuid
+        if 'cpuid' in cfg:
+            self.parse_cpuid(cfg, 'cpuid')
+        if 'cpuid_check' in cfg:
+            self.parse_cpuid(cfg, 'cpuid_check')
 
         import xen.util.xsm.xsm as security
         if security.on():
@@ -901,6 +935,16 @@ class XendConfig(dict):
             int(self['vcpus_params'].get('weight', 256))
         self['vcpus_params']['cap'] = int(self['vcpus_params'].get('cap', 0))
 
+    def cpuid_to_sxp(self, sxpr, field):
+        regs_list = []
+        for input, regs in self[field].iteritems():
+            reg_list = []
+            for reg, val in regs.iteritems():
+                reg_list.append([reg, val])
+            regs_list.append([input, reg_list])
+        sxpr.append([field, regs_list])
+
+
     def to_sxp(self, domain = None, ignore_devices = False, ignore = [],
                legacy_only = True):
         """ Get SXP representation of this config object.
@@ -1011,6 +1055,13 @@ class XendConfig(dict):
             except:
                 txn.abort()
                 raise
+
+        if 'cpuid' in self:
+            self.cpuid_to_sxp(sxpr, 'cpuid')
+        if 'cpuid_check' in self:
+            self.cpuid_to_sxp(sxpr, 'cpuid_check')
+
+        log.debug(sxpr)
 
         return sxpr    
     

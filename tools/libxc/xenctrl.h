@@ -983,4 +983,20 @@ int xc_domain_set_target(int xc_handle,
                          uint32_t domid,
                          uint32_t target);
 
+#if defined(__i386__) || defined(__x86_64__)
+int xc_cpuid_check(int xc,
+                   const unsigned int *input,
+                   const char **config,
+                   char **config_transformed);
+int xc_cpuid_set(int xc,
+                 domid_t domid,
+                 const unsigned int *input,
+                 const char **config,
+                 char **config_transformed);
+int xc_cpuid_apply_policy(int xc,
+                          domid_t domid);
+void xc_cpuid_to_str(const unsigned int *regs,
+                     char **strs);
+#endif
+
 #endif /* XENCTRL_H */

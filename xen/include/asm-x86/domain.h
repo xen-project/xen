@@ -187,6 +187,9 @@ struct paging_vcpu {
     struct shadow_vcpu shadow;
 };
 
+#define MAX_CPUID_INPUT 40
+typedef xen_domctl_cpuid_t cpuid_input_t;
+
 struct p2m_domain;
 
 struct arch_domain
@@ -243,6 +246,8 @@ struct arch_domain
         RELMEM_done,
     } relmem;
     struct list_head relmem_list;
+
+    cpuid_input_t cpuids[MAX_CPUID_INPUT];
 } __cacheline_aligned;
 
 #ifdef CONFIG_X86_PAE
@@ -352,6 +357,14 @@ unsigned long pv_guest_cr4_fixup(unsigned long guest_cr4);
     (((c) | (mmu_cr4_features & (X86_CR4_PGE | X86_CR4_PSE))) & ~X86_CR4_DE)
 #define real_cr4_to_pv_guest_cr4(c) \
     ((c) & ~(X86_CR4_PGE | X86_CR4_PSE))
+
+void domain_cpuid(struct domain *d,
+                  unsigned int  input,
+                  unsigned int  sub_input,
+                  unsigned int  *eax,
+                  unsigned int  *ebx,
+                  unsigned int  *ecx,
+                  unsigned int  *edx);
 
 #endif /* __ASM_DOMAIN_H__ */
 

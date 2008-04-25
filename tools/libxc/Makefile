@@ -53,6 +53,7 @@ GUEST_SRCS-y                 += xc_dom_binloader.c
 GUEST_SRCS-y                 += xc_dom_compat_linux.c
 
 GUEST_SRCS-$(CONFIG_X86)     += xc_dom_x86.c
+GUEST_SRCS-$(CONFIG_X86)     += xc_cpuid_x86.c
 GUEST_SRCS-$(CONFIG_IA64)    += xc_dom_ia64.c
 GUEST_SRCS-$(CONFIG_POWERPC) += xc_dom_powerpc.c
 endif

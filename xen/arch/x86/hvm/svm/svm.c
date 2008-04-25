@@ -892,56 +892,11 @@ static void svm_cpuid_intercept(
 
     hvm_cpuid(input, eax, ebx, ecx, edx);
 
-    switch ( input )
+    if ( input == 0x80000001 )
     {
-    case 0x00000001:
-        /* Mask Intel-only features. */
-        *ecx &= ~(bitmaskof(X86_FEATURE_SSSE3) |
-                  bitmaskof(X86_FEATURE_SSE4_1) |
-                  bitmaskof(X86_FEATURE_SSE4_2));
-        break;
-
-    case 0x80000001:
-        /* Filter features which are shared with 0x00000001:EDX. */
+        /* Fix up VLAPIC details. */
         if ( vlapic_hw_disabled(vcpu_vlapic(v)) )
             __clear_bit(X86_FEATURE_APIC & 31, edx);
-#if CONFIG_PAGING_LEVELS >= 3
-        if ( !v->domain->arch.hvm_domain.params[HVM_PARAM_PAE_ENABLED] )
-#endif
-            __clear_bit(X86_FEATURE_PAE & 31, edx);
-        __clear_bit(X86_FEATURE_PSE36 & 31, edx);
-
-        /* We always support MTRR MSRs. */
-        *edx |= bitmaskof(X86_FEATURE_MTRR);
-
-        /* Filter all other features according to a whitelist. */
-        *ecx &= (bitmaskof(X86_FEATURE_LAHF_LM) |
-                 bitmaskof(X86_FEATURE_ALTMOVCR) |
-                 bitmaskof(X86_FEATURE_ABM) |
-                 bitmaskof(X86_FEATURE_SSE4A) |
-                 bitmaskof(X86_FEATURE_MISALIGNSSE) |
-                 bitmaskof(X86_FEATURE_3DNOWPF));
-        *edx &= (0x0183f3ff | /* features shared with 0x00000001:EDX */
-                 bitmaskof(X86_FEATURE_NX) |
-                 bitmaskof(X86_FEATURE_LM) |
-                 bitmaskof(X86_FEATURE_SYSCALL) |
-                 bitmaskof(X86_FEATURE_MP) |
-                 bitmaskof(X86_FEATURE_MMXEXT) |
-                 bitmaskof(X86_FEATURE_FFXSR) |
-                 bitmaskof(X86_FEATURE_3DNOW) |
-                 bitmaskof(X86_FEATURE_3DNOWEXT));
-        break;
-
-    case 0x80000007:
-    case 0x8000000A:
-        /* Mask out features of power management and SVM extension. */
-        *eax = *ebx = *ecx = *edx = 0;
-        break;
-
-    case 0x80000008:
-        /* Make sure Number of CPU core is 1 when HTT=0 */
-        *ecx &= 0xFFFFFF00;
-        break;
     }
 
     HVMTRACE_3D(CPUID, v, input,

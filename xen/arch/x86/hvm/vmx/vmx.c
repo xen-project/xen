@@ -1311,34 +1311,21 @@ static void vmx_cpuid_intercept(
     unsigned int *ecx, unsigned int *edx)
 {
     unsigned int input = *eax;
-    unsigned int count = *ecx;
+    struct segment_register cs;
+    struct vcpu *v = current;
 
     hvm_cpuid(input, eax, ebx, ecx, edx);
 
     switch ( input )
     {
-    case 0x00000001:
-        /* Mask AMD-only features. */
-        *ecx &= ~(bitmaskof(X86_FEATURE_POPCNT));
-        break;
-
-    case 0x00000004:
-        cpuid_count(input, count, eax, ebx, ecx, edx);
-        *eax &= 0x3FFF; /* one core */
-        break;
-
-    case 0x00000006:
-    case 0x00000009:
-        *eax = *ebx = *ecx = *edx = 0;
-        break;
-
-    case 0x80000001:
-        /* Only a few features are advertised in Intel's 0x80000001. */
-        *ecx &= (bitmaskof(X86_FEATURE_LAHF_LM));
-        *edx &= (bitmaskof(X86_FEATURE_NX) |
-                 bitmaskof(X86_FEATURE_LM) |
-                 bitmaskof(X86_FEATURE_SYSCALL));
-        break;
+        case 0x80000001:
+            /* SYSCALL is visible iff running in long mode. */
+            hvm_get_segment_register(v, x86_seg_cs, &cs);
+            if ( cs.attr.fields.l )
+                *edx |= bitmaskof(X86_FEATURE_SYSCALL);
+            else
+                *edx &= ~(bitmaskof(X86_FEATURE_SYSCALL));
+            break;
     }
 
     HVMTRACE_3D(CPUID, current, input,
