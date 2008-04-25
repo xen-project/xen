@@ -781,7 +781,6 @@ static void _shadow_prealloc(
     struct vcpu *v, *v2;
     struct list_head *l, *t;
     struct shadow_page_info *sp;
-    cpumask_t flushmask = CPU_MASK_NONE;
     mfn_t smfn;
     int i;
 
@@ -819,12 +818,11 @@ static void _shadow_prealloc(
             {
                 shadow_unhook_mappings(v, 
                                pagetable_get_mfn(v2->arch.shadow_table[i]));
-                cpus_or(flushmask, v2->vcpu_dirty_cpumask, flushmask);
 
                 /* See if that freed up enough space */
                 if ( space_is_available(d, order, count) )
                 {
-                    flush_tlb_mask(flushmask);
+                    flush_tlb_mask(d->domain_dirty_cpumask);
                     return;
                 }
             }
