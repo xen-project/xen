@@ -2187,6 +2187,7 @@ replace_grant_host_mapping(unsigned long gpaddr,
     struct page_info* page = mfn_to_page(mfn);
     struct page_info* new_page = NULL;
     volatile pte_t* new_page_pte = NULL;
+    unsigned long new_page_mfn;
 
     if (new_gpaddr) {
         new_page_pte = lookup_noalloc_domain_pte_none(d, new_gpaddr);
@@ -2194,7 +2195,6 @@ replace_grant_host_mapping(unsigned long gpaddr,
             new_pte = ptep_get_and_clear(&d->arch.mm,
                                          new_gpaddr, new_page_pte);
             if (likely(pte_present(new_pte))) {
-                unsigned long new_page_mfn;
                 struct domain* page_owner;
 
                 new_page_mfn = pte_pfn(new_pte);
@@ -2255,22 +2255,24 @@ replace_grant_host_mapping(unsigned long gpaddr,
         goto out;
     }
 
-    old_pte = ptep_cmpxchg_rel(&d->arch.mm, gpaddr, pte, cur_pte, new_pte);
-    if (unlikely(!pte_present(old_pte))) {
-        gdprintk(XENLOG_INFO, "%s: gpaddr 0x%lx mfn 0x%lx"
-                         " cur_pte 0x%lx old_pte 0x%lx\n",
-                __func__, gpaddr, mfn, pte_val(cur_pte), pte_val(old_pte));
-        goto out;
+    if (new_page) {
+        set_gpfn_from_mfn(new_page_mfn, gpfn);
+        /* smp_mb() isn't needed because assign_domain_pge_cmpxchg_rel()
+           has release semantics. */
     }
+    old_pte = ptep_cmpxchg_rel(&d->arch.mm, gpaddr, pte, cur_pte, new_pte);
     if (unlikely(pte_val(cur_pte) != pte_val(old_pte))) {
         if (pte_pfn(old_pte) == mfn) {
             goto again;
         }
-        gdprintk(XENLOG_INFO, "%s gpaddr 0x%lx mfn 0x%lx cur_pte "
-                "0x%lx old_pte 0x%lx\n",
-                __func__, gpaddr, mfn, pte_val(cur_pte), pte_val(old_pte));
+        if (new_page) {
+            set_gpfn_from_mfn(new_page_mfn, INVALID_M2P_ENTRY);
+            domain_put_page(d, new_gpaddr, new_page_pte, new_pte, 1);
+        }
         goto out;
     }
+    if (unlikely(!pte_present(old_pte)))
+        goto out;
     BUG_ON(pte_pfn(old_pte) != mfn);
 
     /* try_to_clear_PGC_allocate(d, page) is not needed. */
@@ -2283,8 +2285,9 @@ replace_grant_host_mapping(unsigned long gpaddr,
     return GNTST_okay;
 
  out:
-    if (new_page)
-        domain_put_page(d, new_gpaddr, new_page_pte, new_pte, 1);
+    gdprintk(XENLOG_INFO, "%s gpaddr 0x%lx mfn 0x%lx cur_pte "
+             "0x%lx old_pte 0x%lx\n",
+             __func__, gpaddr, mfn, pte_val(cur_pte), pte_val(old_pte));
     return GNTST_general_error;
 }
 
