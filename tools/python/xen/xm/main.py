@@ -133,7 +133,7 @@ SUBCOMMAND_HELP = {
                      'Read and/or clear Xend\'s message buffer.'),
     'domid'       : ('<DomainName>', 'Convert a domain name to domain id.'),
     'domname'     : ('<DomId>', 'Convert a domain id to domain name.'),
-    'dump-core'   : ('[-L|--live] [-C|--crash] <Domain> [Filename]',
+    'dump-core'   : ('[-L|--live] [-C|--crash] [-R|--reset] <Domain> [Filename]',
                      'Dump core for a specific domain.'),
     'info'        : ('[-c|--config]', 'Get information about Xen host.'),
     'log'         : ('', 'Print Xend log'),
@@ -243,6 +243,7 @@ SUBCOMMAND_OPTIONS = {
     'dump-core': (
        ('-L', '--live', 'Dump core without pausing the domain'),
        ('-C', '--crash', 'Crash domain after dumping core'),
+       ('-R', '--reset', 'Reset domain after dumping core'),
     ),
     'start': (
        ('-p', '--paused', 'Do not unpause domain after starting it'),
@@ -1280,14 +1281,19 @@ def xm_unpause(args):
 def xm_dump_core(args):
     live = False
     crash = False
+    reset = False
     try:
-        (options, params) = getopt.gnu_getopt(args, 'LC', ['live','crash'])
+        (options, params) = getopt.gnu_getopt(args, 'LCR', ['live', 'crash', 'reset'])
         for (k, v) in options:
             if k in ('-L', '--live'):
                 live = True
-            if k in ('-C', '--crash'):
+            elif k in ('-C', '--crash'):
                 crash = True
+            elif k in ('-R', '--reset'):
+                reset = True
 
+        if crash and reset:
+            raise OptionError("You may not specify more than one '-CR' option")
         if len(params) not in (1, 2):
             raise OptionError("Expects 1 or 2 argument(s)")
     except getopt.GetoptError, e:
@@ -1309,8 +1315,11 @@ def xm_dump_core(args):
         if crash:
             print "Destroying domain: %s ..." % str(dom)
             server.xend.domain.destroy(dom)
+        elif reset:
+            print "Resetting domain: %s ..." % str(dom)
+            server.xend.domain.reset(dom)
     finally:
-        if not live and not crash and ds == DOM_STATE_RUNNING:
+        if not live and not crash and not reset and ds == DOM_STATE_RUNNING:
             server.xend.domain.unpause(dom)
 
 def xm_rename(args):
