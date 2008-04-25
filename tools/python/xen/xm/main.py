@@ -417,10 +417,11 @@ server = None
 def cmdHelp(cmd):
     """Print help for a specific subcommand."""
     
-    for fc in SUBCOMMAND_HELP.keys():
-        if fc[:len(cmd)] == cmd:
-            cmd = fc
-            break
+    if not SUBCOMMAND_HELP.has_key(cmd):
+        for fc in SUBCOMMAND_HELP.keys():
+            if fc[:len(cmd)] == cmd:
+                cmd = fc
+                break
     
     try:
         args, desc = SUBCOMMAND_HELP[cmd]
