@@ -263,7 +263,7 @@ static inline void __invept(int ext, u64 eptp, u64 gpa)
 
     asm volatile ( INVEPT_OPCODE
                    MODRM_EAX_08
-                   /* CF==1 or ZF==1 --> rc = -1 */
+                   /* CF==1 or ZF==1 --> crash (ud2) */
                    "ja 1f ; ud2 ; 1:\n"
                    :
                    : "a" (&operand), "c" (ext)
@@ -278,10 +278,14 @@ static inline void __invvpid(int ext, u16 vpid, u64 gva)
         u64 gva;
     } __attribute__ ((packed)) operand = {vpid, 0, gva};
 
-    asm volatile ( INVVPID_OPCODE
-                   MODRM_EAX_08
-                   /* CF==1 or ZF==1 --> rc = -1 */
-                   "ja 1f ; ud2 ; 1:\n"
+    /* Fix up #UD exceptions which occur when TLBs are flushed before VMXON. */
+    asm volatile ( "1: " INVVPID_OPCODE MODRM_EAX_08
+                   /* CF==1 or ZF==1 --> crash (ud2) */
+                   "ja 2f ; ud2 ; 2:\n"
+                   ".section __ex_table,\"a\"\n"
+                   "    "__FIXUP_ALIGN"\n"
+                   "    "__FIXUP_WORD" 1b,2b\n"
+                   ".previous"
                    :
                    : "a" (&operand), "c" (ext)
                    : "memory" );
