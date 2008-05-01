@@ -26,8 +26,10 @@
 
 struct pci_dev {
     struct list_head list;
+    struct list_head msi_dev_list;
     u8 bus;
     u8 devfn;
+    struct list_head msi_list;
 };
 
 uint8_t pci_conf_read8(

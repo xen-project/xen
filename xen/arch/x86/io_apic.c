@@ -27,13 +27,17 @@
 #include <xen/delay.h>
 #include <xen/sched.h>
 #include <xen/acpi.h>
+#include <xen/pci.h>
+#include <xen/pci_regs.h>
 #include <xen/keyhandler.h>
 #include <asm/io.h>
 #include <asm/mc146818rtc.h>
 #include <asm/smp.h>
 #include <asm/desc.h>
+#include <asm/msi.h>
 #include <mach_apic.h>
 #include <io_ports.h>
+#include <public/physdev.h>
 
 /* Different to Linux: our implementation can be simpler. */
 #define make_8259A_irq(irq) (io_apic_irqs &= ~(1<<(irq)))
@@ -726,6 +730,7 @@ next:
 
 static struct hw_interrupt_type ioapic_level_type;
 static struct hw_interrupt_type ioapic_edge_type;
+struct hw_interrupt_type pci_msi_type;
 
 #define IOAPIC_AUTO	-1
 #define IOAPIC_EDGE	0
@@ -1552,6 +1557,59 @@ static struct hw_interrupt_type ioapic_level_type = {
     .ack 		= mask_and_ack_level_ioapic_vector,
     .end 		= end_level_ioapic_vector,
     .set_affinity 	= set_ioapic_affinity_vector,
+};
+
+static void mask_msi_vector(unsigned int vector)
+{
+    mask_msi_irq(vector);
+}
+
+static void unmask_msi_vector(unsigned int vector)
+{
+    unmask_msi_irq(vector);
+}
+
+static unsigned int startup_msi_vector(unsigned int vector)
+{
+    dprintk(XENLOG_INFO, "startup msi vector %x\n", vector);
+    unmask_msi_irq(vector);
+    return 0;
+}
+
+static void ack_msi_vector(unsigned int vector)
+{
+    ack_APIC_irq();
+}
+
+static void end_msi_vector(unsigned int vector)
+{
+}
+
+static void shutdown_msi_vector(unsigned int vector)
+{
+    dprintk(XENLOG_INFO, "shutdown msi vector %x\n", vector);
+    mask_msi_irq(vector);
+}
+
+static void set_msi_affinity_vector(unsigned int vector, cpumask_t cpu_mask)
+{
+    set_native_irq_info(vector, cpu_mask);
+    set_msi_irq_affinity(vector, cpu_mask);
+}
+
+/*
+ * IRQ Chip for MSI PCI/PCI-X/PCI-Express Devices,
+ * which implement the MSI or MSI-X Capability Structure.
+ */
+struct hw_interrupt_type pci_msi_type = {
+    .typename   = "PCI-MSI",
+    .startup    = startup_msi_vector,
+    .shutdown   = shutdown_msi_vector,
+    .enable	    = unmask_msi_vector,
+    .disable    = mask_msi_vector,
+    .ack        = ack_msi_vector,
+    .end        = end_msi_vector,
+    .set_affinity   = set_msi_affinity_vector,
 };
 
 static inline void init_IO_APIC_traps(void)

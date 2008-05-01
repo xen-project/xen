@@ -23,6 +23,7 @@
 #include <xen/pci.h>
 #include <xen/pci_regs.h>
 #include <asm/amd-iommu.h>
+#include <asm/msi.h>
 #include <asm/hvm/svm/amd-iommu-proto.h>
 #include <asm-x86/fixmap.h>
 
@@ -292,7 +293,7 @@ static void amd_iommu_msi_addr_init(struct amd_iommu *iommu, int phy_cpu)
     u32 address_lo = MSI_ADDR_HEADER |
             MSI_ADDR_DESTMODE_PHYS |
             MSI_ADDR_REDIRECTION_CPU |
-            MSI_ADDR_DESTID_CPU(phy_cpu);
+            MSI_ADDR_DEST_ID(phy_cpu);
 
     pci_conf_write32(bus, dev, func,
         iommu->msi_cap + PCI_MSI_ADDRESS_LO, address_lo);

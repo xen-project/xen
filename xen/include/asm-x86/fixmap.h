@@ -19,6 +19,7 @@
 #include <xen/kexec.h>
 #include <xen/iommu.h>
 #include <asm/amd-iommu.h>
+#include <asm/msi.h>
 
 /*
  * Here we define all the compile-time 'special' virtual
@@ -47,6 +48,8 @@ enum fixed_addresses {
     FIX_IOMMU_MMIO_BASE_0,
     FIX_IOMMU_MMIO_END = FIX_IOMMU_MMIO_BASE_0 + IOMMU_PAGES -1,
     FIX_TBOOT_SHARED_BASE,
+    FIX_MSIX_IO_RESERV_BASE,
+    FIX_MSIX_IO_RESERV_END = FIX_MSIX_IO_RESERV_BASE + MAX_MSIX_PAGES -1,
     __end_of_fixed_addresses
 };
 

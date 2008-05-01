@@ -395,9 +395,11 @@ int pirq_acktype(struct domain *d, int irq)
     /*
      * Edge-triggered IO-APIC and LAPIC interrupts need no final
      * acknowledgement: we ACK early during interrupt processing.
+     * MSIs are treated as edge-triggered interrupts.
      */
     if ( !strcmp(desc->handler->typename, "IO-APIC-edge") ||
-         !strcmp(desc->handler->typename, "local-APIC-edge") )
+         !strcmp(desc->handler->typename, "local-APIC-edge") ||
+         !strcmp(desc->handler->typename, "PCI-MSI") )
         return ACKTYPE_NONE;
 
     /*

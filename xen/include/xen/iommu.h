@@ -23,6 +23,7 @@
 #include <xen/init.h>
 #include <xen/pci.h>
 #include <xen/spinlock.h>
+#include <xen/pci.h>
 #include <public/hvm/ioreq.h>
 #include <public/domctl.h>
 

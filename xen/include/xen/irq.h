@@ -44,6 +44,7 @@ typedef struct hw_interrupt_type hw_irq_controller;
 
 #include <asm/irq.h>
 
+struct msi_desc;
 /*
  * This is the "IRQ descriptor", which contains various information
  * about the irq, including what kind of hardware handling it has,
@@ -54,6 +55,7 @@ typedef struct hw_interrupt_type hw_irq_controller;
 typedef struct {
     unsigned int status;		/* IRQ status */
     hw_irq_controller *handler;
+    struct msi_desc   *msi_desc;
     struct irqaction *action;	/* IRQ action list */
     unsigned int depth;		/* nested irq disables */
     spinlock_t lock;

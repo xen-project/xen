@@ -9,6 +9,7 @@
 #include <xen/guest_access.h>
 #include <xen/iocap.h>
 #include <asm/current.h>
+#include <asm/msi.h>
 #include <asm/hypercall.h>
 #include <public/xen.h>
 #include <public/physdev.h>
@@ -24,6 +25,9 @@ ioapic_guest_read(
 int
 ioapic_guest_write(
     unsigned long physbase, unsigned int reg, u32 pval);
+
+
+extern struct hw_interrupt_type pci_msi_type;
 
 static int get_free_pirq(struct domain *d, int type, int index)
 {
@@ -57,7 +61,8 @@ static int get_free_pirq(struct domain *d, int type, int index)
 /*
  * Caller hold the irq_lock
  */
-static int map_domain_pirq(struct domain *d, int pirq, int vector, int type)
+static int map_domain_pirq(struct domain *d, int pirq, int vector,
+                           struct physdev_map_pirq *map)
 {
     int ret = 0;
     int old_vector, old_pirq;
@@ -97,6 +102,28 @@ static int map_domain_pirq(struct domain *d, int pirq, int vector, int type)
         goto done;
     }
 
+    if ( map && MAP_PIRQ_TYPE_MSI == map->type )
+    {
+        irq_desc_t         *desc;
+        unsigned long flags;
+
+        desc = &irq_desc[vector];
+
+        spin_lock_irqsave(&desc->lock, flags);
+        if ( desc->handler != &no_irq_type )
+            gdprintk(XENLOG_G_ERR, "Map vector %x to msi while it is in use\n",
+                     vector);
+        desc->handler = &pci_msi_type;
+        spin_unlock_irqrestore(&desc->lock, flags);
+
+        ret = pci_enable_msi(map->msi_info.bus,
+		                     map->msi_info.devfn, vector,
+							 map->msi_info.entry_nr,
+							 map->msi_info.msi);
+        if ( ret )
+            goto done;
+    }
+
     d->arch.pirq_vector[pirq] = vector;
     d->arch.vector_pirq[vector] = pirq;
 
@@ -129,7 +156,26 @@ static int unmap_domain_pirq(struct domain *d, int pirq)
         ret = -EINVAL;
     }
     else
+    {
+        unsigned long flags;
+        irq_desc_t *desc;
+
+        desc = &irq_desc[vector];
+        if ( desc->msi_desc )
+            pci_disable_msi(vector);
+
+        spin_lock_irqsave(&desc->lock, flags);
+        if ( desc->handler == &pci_msi_type )
+        {
+            /* MSI is not shared, so should be released already */
+            BUG_ON(desc->status & IRQ_GUEST);
+            irq_desc[vector].handler = &no_irq_type;
+        }
+        spin_unlock_irqrestore(&desc->lock, flags);
+
         d->arch.pirq_vector[pirq] = d->arch.vector_pirq[vector] = 0;
+    }
+
     ret = irq_deny_access(d, pirq);
 
     if ( ret )
@@ -187,6 +233,9 @@ static int physdev_map_pirq(struct physdev_map_pirq *map)
             break;
         case MAP_PIRQ_TYPE_MSI:
             vector = map->index;
+			if ( vector == -1 )
+				vector = assign_irq_vector(AUTO_ASSIGN);
+
             if ( vector < 0 || vector >= NR_VECTORS )
             {
                 ret = -EINVAL;
@@ -237,7 +286,8 @@ static int physdev_map_pirq(struct physdev_map_pirq *map)
             pirq = map->pirq;
     }
 
-    ret = map_domain_pirq(d, pirq, vector, map->type);
+
+    ret = map_domain_pirq(d, pirq, vector, map);
 
     if ( !ret )
         map->pirq = pirq;
@@ -331,6 +381,7 @@ ret_t do_physdev_op(int cmd, XEN_GUEST_HANDLE(void) arg)
             break;
 
         ret = physdev_map_pirq(&map);
+
         if ( copy_to_guest(arg, &map, 1) != 0 )
             ret = -EFAULT;
         break;
@@ -397,7 +448,7 @@ ret_t do_physdev_op(int cmd, XEN_GUEST_HANDLE(void) arg)
 
         irq = irq_op.irq;
         ret = -EINVAL;
-        if ( (irq < 0) || (irq >= NR_IRQS) )
+        if ( ((irq < 0) && (irq != AUTO_ASSIGN)) || (irq >= NR_IRQS) )
             break;
 
         irq_op.vector = assign_irq_vector(irq);
@@ -408,8 +459,7 @@ ret_t do_physdev_op(int cmd, XEN_GUEST_HANDLE(void) arg)
         {
             spin_lock_irqsave(&dom0->arch.irq_lock, flags);
             if ( irq != AUTO_ASSIGN )
-                ret = map_domain_pirq(dom0, irq_op.irq, irq_op.vector,
-                                     MAP_PIRQ_TYPE_GSI);
+                ret = map_domain_pirq(dom0, irq_op.irq, irq_op.vector, NULL);
             spin_unlock_irqrestore(&dom0->arch.irq_lock, flags);
         }
 

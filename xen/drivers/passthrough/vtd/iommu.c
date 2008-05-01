@@ -29,9 +29,9 @@
 #include <xen/pci.h>
 #include <xen/pci_regs.h>
 #include <asm/paging.h>
+#include <asm/msi.h>
 #include "iommu.h"
 #include "dmar.h"
-#include "msi.h"
 #include "extern.h"
 #include "vtd.h"
 

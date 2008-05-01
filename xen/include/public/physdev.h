@@ -135,6 +135,11 @@ struct physdev_map_pirq {
     int index;
     /* IN or OUT */
     int pirq;
+    /* IN */
+    struct {
+        int bus, devfn, entry_nr;
+		int msi;  /* 0 - MSIX    1 - MSI */
+    } msi_info;
 };
 typedef struct physdev_map_pirq physdev_map_pirq_t;
 DEFINE_XEN_GUEST_HANDLE(physdev_map_pirq_t);
