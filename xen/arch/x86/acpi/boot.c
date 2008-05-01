@@ -465,8 +465,9 @@ bad:
 static void __init
 acpi_fadt_parse_reg(struct acpi_table_fadt *fadt)
 {
-	unsigned int len = min(fadt->header.length, sizeof(*fadt));
+	unsigned int len;
 
+	len = min_t(unsigned int, fadt->header.length, sizeof(*fadt));
 	memcpy(&acpi_gbl_FADT, fadt, len);
 
 	if (len > offsetof(struct acpi_table_fadt, xpm1b_event_block)) {
