@@ -301,6 +301,12 @@ static inline void ept_sync_all(void)
 
 void ept_sync_domain(struct domain *d);
 
+static inline void vpid_sync_vcpu_gva(struct vcpu *v, unsigned long gva)
+{
+    if ( cpu_has_vmx_vpid )
+        __invvpid(0, v->arch.hvm_vmx.vpid, (u64)gva);
+}
+
 static inline void vpid_sync_vcpu_all(struct vcpu *v)
 {
     if ( cpu_has_vmx_vpid )

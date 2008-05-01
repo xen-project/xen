@@ -1368,7 +1368,8 @@ static void vmx_invlpg_intercept(unsigned long vaddr)
 {
     struct vcpu *curr = current;
     HVMTRACE_2D(INVLPG, curr, /*invlpga=*/ 0, vaddr);
-    paging_invlpg(curr, vaddr);
+    if ( paging_invlpg(curr, vaddr) )
+        vpid_sync_vcpu_gva(curr, vaddr);
 }
 
 #define CASE_SET_REG(REG, reg)      \
