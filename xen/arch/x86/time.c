@@ -759,12 +759,13 @@ int cpu_frequency_change(u64 freq)
     }
 
     local_irq_disable();
-    rdtscll(curr_tsc);
-    t->local_tsc_stamp = curr_tsc;
+    /* Platform time /first/, as we may be delayed by platform_timer_lock. */
     t->stime_master_stamp = read_platform_stime();
     /* TSC-extrapolated time may be bogus after frequency change. */
     /*t->stime_local_stamp = get_s_time();*/
     t->stime_local_stamp = t->stime_master_stamp;
+    rdtscll(curr_tsc);
+    t->local_tsc_stamp = curr_tsc;
     set_time_scale(&t->tsc_scale, freq);
     local_irq_enable();
 
@@ -834,11 +835,14 @@ static void local_time_calibration(void *unused)
     prev_local_stime  = t->stime_local_stamp;
     prev_master_stime = t->stime_master_stamp;
 
-    /* Disable IRQs to get 'instantaneous' current timestamps. */
+    /*
+     * Disable IRQs to get 'instantaneous' current timestamps. We read platform
+     * time first, as we may be delayed when acquiring platform_timer_lock.
+     */
     local_irq_disable();
-    rdtscll(curr_tsc);
-    curr_local_stime  = get_s_time();
     curr_master_stime = read_platform_stime();
+    curr_local_stime  = get_s_time();
+    rdtscll(curr_tsc);
     local_irq_enable();
 
 #if 0
