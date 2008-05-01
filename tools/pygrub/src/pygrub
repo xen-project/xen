@@ -646,7 +646,13 @@ if __name__ == "__main__":
         print "  args: %s" % chosencfg["args"]
         sys.exit(0)
 
-    fs = fsimage.open(file, get_fs_offset(file))
+    # if boot filesystem is set then pass to fsimage.open
+    bootfsargs = '"%s"' % incfg["args"]
+    bootfsgroup = re.findall('zfs-bootfs=(.*?)[\s\,\"]', bootfsargs)
+    if bootfsgroup:
+        fs = fsimage.open(file, get_fs_offset(file), bootfsgroup[0])
+    else:
+        fs = fsimage.open(file, get_fs_offset(file))
 
     chosencfg = sniff_solaris(fs, incfg)
 
@@ -672,7 +678,15 @@ if __name__ == "__main__":
     if bootcfg["ramdisk"]:
         sxp += "(ramdisk %s)" % bootcfg["ramdisk"]
     if chosencfg["args"]:
-        sxp += "(args \"%s\")" % chosencfg["args"]
+        zfsinfo = fsimage.getbootstring(fs)
+        if zfsinfo is None:
+            sxp += "(args \"%s\")" % chosencfg["args"]
+        else:
+            e = re.compile("zfs-bootfs=[\w\-\.\:@/]+" )
+            (chosencfg["args"],count) = e.subn(zfsinfo, chosencfg["args"])
+            if count == 0:
+               chosencfg["args"] += " -B %s" % zfsinfo
+            sxp += "(args \"%s\")" % (chosencfg["args"])
 
     sys.stdout.flush()
     os.write(fd, sxp)

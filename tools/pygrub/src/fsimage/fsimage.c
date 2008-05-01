@@ -17,7 +17,7 @@
  * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
  * DEALINGS IN THE SOFTWARE.
  *
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -281,6 +281,22 @@ fsimage_open(PyObject *o, PyObject *args, PyObject *kwargs)
 	return (PyObject *)fs;
 }
 
+static PyObject *
+fsimage_getbootstring(PyObject *o, PyObject *args)
+{
+	PyObject *fs;
+	char	*bootstring;
+	fsi_t	*fsi;
+
+	if (!PyArg_ParseTuple(args, "O", &fs))
+		return (NULL);
+
+	fsi = ((fsimage_fs_t *)fs)->fs;
+	bootstring = fsi_fs_bootstring(fsi);
+
+	return Py_BuildValue("s", bootstring);
+}
+
 PyDoc_STRVAR(fsimage_open__doc__,
     "open(name, [offset=off]) - Open the given file as a filesystem image.\n"
     "\n"
@@ -288,9 +304,15 @@ PyDoc_STRVAR(fsimage_open__doc__,
     "offset - offset of file system within file image.\n"
     "options - mount options string.\n");
 
+PyDoc_STRVAR(fsimage_getbootstring__doc__,
+    "getbootstring(fs) - Return the boot string needed for this file system "
+    "or NULL if none is needed.\n");
+
 static struct PyMethodDef fsimage_module_methods[] = {
 	{ "open", (PyCFunction)fsimage_open,
 	    METH_VARARGS|METH_KEYWORDS, fsimage_open__doc__ },
+	{ "getbootstring", (PyCFunction)fsimage_getbootstring,
+	    METH_VARARGS, fsimage_getbootstring__doc__ },
 	{ NULL, NULL, 0, NULL }
 };
 

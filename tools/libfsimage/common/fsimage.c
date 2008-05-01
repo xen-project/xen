@@ -17,7 +17,7 @@
  * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
  * DEALINGS IN THE SOFTWARE.
  *
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -51,6 +51,7 @@ fsi_t *fsi_open_fsimage(const char *path, uint64_t off, const char *options)
 	fsi->f_fd = fd;
 	fsi->f_off = off;
 	fsi->f_data = NULL;
+	fsi->f_bootstring = NULL;
 
 	pthread_mutex_lock(&fsi_lock);
 	err = find_plugin(fsi, path, options);
@@ -139,4 +140,30 @@ ssize_t fsi_pread_file(fsi_file_t *ffi, void *buf, size_t nbytes, uint64_t off)
 	pthread_mutex_unlock(&fsi_lock);
 
 	return (ret);
+}
+
+char *
+fsi_bootstring_alloc(fsi_t *fsi, size_t len)
+{
+	fsi->f_bootstring = malloc(len);
+	if (fsi->f_bootstring == NULL)
+		return (NULL);
+
+	bzero(fsi->f_bootstring, len);
+	return (fsi->f_bootstring);
+}
+
+void
+fsi_bootstring_free(fsi_t *fsi)
+{
+	if (fsi->f_bootstring != NULL) {
+		free(fsi->f_bootstring);
+		fsi->f_bootstring = NULL;
+	}
+}
+
+char *
+fsi_fs_bootstring(fsi_t *fsi)
+{
+	return (fsi->f_bootstring);
 }
