@@ -671,11 +671,24 @@ void dma_pte_free_pagetable(struct domain *domain, u64 start, u64 end)
     }
 
     /* free pgd */
-    if ( start == 0 && end == ((((u64)1) << addr_width) - 1) )
+    if ( start == 0 && end >= ((((u64)1) << addr_width) - 1) )
     {
         free_pgtable_maddr(hd->pgd_maddr);
         hd->pgd_maddr = 0;
     }
+}
+
+ /* free all VT-d page tables when shut down or destroy domain. */
+static void iommu_free_pagetable(struct domain *domain)
+{
+    struct hvm_iommu *hd = domain_hvm_iommu(domain);
+    int addr_width = agaw_to_width(hd->agaw);
+    u64 start, end;
+
+    start = 0;
+    end = (((u64)1) << addr_width) - 1;
+
+    dma_pte_free_pagetable(domain, start, end);
 }
 
 static int iommu_set_root_entry(struct iommu *iommu)
@@ -1472,9 +1485,9 @@ void iommu_domain_teardown(struct domain *d)
     if ( list_empty(&acpi_drhd_units) )
         return;
 
-    iommu_domid_release(d);
-    iommu_free_pgd(d);
+    iommu_free_pagetable(d);
     return_devices_to_dom0(d);
+    iommu_domid_release(d);
 }
 
 static int domain_context_mapped(struct pci_dev *pdev)

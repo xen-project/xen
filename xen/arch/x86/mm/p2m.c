@@ -259,18 +259,10 @@ p2m_set_entry(struct domain *d, unsigned long gfn, mfn_t mfn, p2m_type_t p2mt)
 
     if ( iommu_enabled && is_hvm_domain(d) )
     {
-        if ( boot_cpu_data.x86_vendor == X86_VENDOR_INTEL )
-        {
-            if ( (p2mt == p2m_mmio_direct) )
-                iommu_flush(d, gfn, (u64*)p2m_entry);
-        }
-        else if ( boot_cpu_data.x86_vendor == X86_VENDOR_AMD )
-        {
-            if ( p2mt == p2m_ram_rw )
-                iommu_map_page(d, gfn, mfn_x(mfn));
-            else
-                iommu_unmap_page(d, gfn);
-        }
+        if ( p2mt == p2m_ram_rw )
+            iommu_map_page(d, gfn, mfn_x(mfn));
+        else
+            iommu_unmap_page(d, gfn);
     }
 
     /* Success */
@@ -528,11 +520,6 @@ int p2m_alloc_table(struct domain *d,
             && !set_p2m_entry(d, gfn, mfn, p2m_ram_rw) )
             goto error;
     }
-
-#if CONFIG_PAGING_LEVELS >= 3
-    if (vtd_enabled && is_hvm_domain(d))
-        iommu_set_pgd(d);
-#endif
 
     P2M_PRINTK("p2m table initialised (%u pages)\n", page_count);
     p2m_unlock(p2m);

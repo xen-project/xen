@@ -2135,8 +2135,13 @@ class XendDomainInfo:
             # set memory limit
             xc.domain_setmaxmem(self.domid, maxmem)
 
+            # Reserve 1 page per MiB of RAM for separate VT-d page table.
+            vtd_mem = 4 * (self.info['memory_static_max'] / 1024 / 1024)
+            # Round vtd_mem up to a multiple of a MiB.
+            vtd_mem = ((vtd_mem + 1023) / 1024) * 1024
+
             # Make sure there's enough RAM available for the domain
-            balloon.free(memory + shadow)
+            balloon.free(memory + shadow + vtd_mem)
 
             # Set up the shadow memory
             shadow_cur = xc.shadow_mem_control(self.domid, shadow / 1024)
