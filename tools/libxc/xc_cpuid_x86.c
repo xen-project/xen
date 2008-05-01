@@ -385,7 +385,10 @@ int xc_cpuid_set(
     for ( i = 0; i < 4; i++ )
     {
         if ( config[i] == NULL )
+        {
+            regs[i] = polregs[i];
             continue;
+        }
         
         config_transformed[i] = alloc_str();
 

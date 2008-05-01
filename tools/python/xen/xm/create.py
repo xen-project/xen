@@ -856,7 +856,9 @@ def preprocess_cpuid(vals, attr_name):
     if not vals.cpuid: return
     cpuid = {} 
     for cpuid_input in getattr(vals, attr_name):
-        cpuid_match = re.match(r"(?P<input>(0x)?[0-9A-Fa-f]+):(?P<regs>.*)", cpuid_input)
+        input_re = "(0x)?[0-9A-Fa-f]+(,(0x)?[0-9A-Fa-f]+)?"
+        cpuid_match = re.match(r'(?P<input>%s):(?P<regs>.*)' % \
+                               input_re, cpuid_input)
         if cpuid_match != None:
             res_cpuid = cpuid_match.groupdict()
             input = res_cpuid['input']

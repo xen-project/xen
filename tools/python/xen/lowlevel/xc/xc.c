@@ -696,7 +696,7 @@ static PyObject *pyxc_dom_set_cpuid(XcObject *self,
     unsigned int input[2];
     char *regs[4], *regs_transform[4];
 
-    if ( !PyArg_ParseTuple(args, "iiOO", &domid,
+    if ( !PyArg_ParseTuple(args, "IIOO", &domid,
                            &input[0], &sub_input, &config) )
         return NULL;
 
