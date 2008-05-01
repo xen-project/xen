@@ -442,8 +442,8 @@ static void acpi_processor_idle(void)
          * stopped by H/W. Without carefully handling of TSC/APIC stop issues,
          * deep C state can't work correctly.
          */
-        /* placeholder for preparing TSC stop */
-
+        /* preparing TSC stop */
+        cstate_save_tsc();
         /* placeholder for preparing APIC stop */
 
         /* Invoke C3 */
@@ -451,7 +451,8 @@ static void acpi_processor_idle(void)
 
         /* placeholder for recovering APIC */
 
-        /* placeholder for recovering TSC */
+        /* recovering TSC */
+        cstate_restore_tsc();
 
         /* Get end time (ticks) */
         t2 = inl(pmtmr_ioport);

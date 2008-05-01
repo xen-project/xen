@@ -13,6 +13,8 @@
 #include <asm/time.h>
 
 extern int init_xen_time(void);
+extern void cstate_save_tsc(void);
+extern void cstate_restore_tsc(void);
 
 extern unsigned long cpu_khz;
 
