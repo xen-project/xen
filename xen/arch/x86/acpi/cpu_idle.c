@@ -60,6 +60,16 @@ extern void (*pm_idle) (void);
 static void (*pm_idle_save) (void) __read_mostly;
 unsigned int max_cstate __read_mostly = 2;
 integer_param("max_cstate", max_cstate);
+/*
+ * bm_history -- bit-mask with a bit per jiffy of bus-master activity
+ * 1000 HZ: 0xFFFFFFFF: 32 jiffies = 32ms
+ * 800 HZ: 0xFFFFFFFF: 32 jiffies = 40ms
+ * 100 HZ: 0x0000000F: 4 jiffies = 40ms
+ * reduce history for more aggressive entry into C3
+ */
+unsigned int bm_history __read_mostly =
+    (HZ >= 800 ? 0xFFFFFFFF : ((1U << (HZ / 25)) - 1));
+integer_param("bm_history", bm_history);
 
 struct acpi_processor_cx;
 
@@ -91,10 +101,20 @@ struct acpi_processor_cx
     struct acpi_processor_cx_policy demotion;
 };
 
+struct acpi_processor_flags
+{
+    u8 bm_control:1;
+    u8 bm_check:1;
+    u8 has_cst:1;
+    u8 power_setup_done:1;
+    u8 bm_rld_set:1;
+};
+
 struct acpi_processor_power
 {
+    struct acpi_processor_flags flags;
     struct acpi_processor_cx *state;
-    u64 bm_check_timestamp;
+    s_time_t bm_check_timestamp;
     u32 default_state;
     u32 bm_activity;
     u32 count;
@@ -185,6 +205,29 @@ static void acpi_processor_power_activate(struct acpi_processor_power *power,
         old->promotion.count = 0;
     new->demotion.count = 0;
 
+    /* Cleanup from old state. */
+    if ( old )
+    {
+        switch ( old->type )
+        {
+        case ACPI_STATE_C3:
+            /* Disable bus master reload */
+            if ( new->type != ACPI_STATE_C3 && power->flags.bm_check )
+                acpi_set_register(ACPI_BITREG_BUS_MASTER_RLD, 0);
+            break;
+        }
+    }
+
+    /* Prepare to use new state. */
+    switch ( new->type )
+    {
+    case ACPI_STATE_C3:
+        /* Enable bus master reload */
+        if ( old->type != ACPI_STATE_C3 && power->flags.bm_check )
+            acpi_set_register(ACPI_BITREG_BUS_MASTER_RLD, 1);
+        break;
+    }
+
     power->state = new;
 
     return;
@@ -196,7 +239,7 @@ static void acpi_safe_halt(void)
     safe_halt();
 }
 
-#define MWAIT_ECX_INTERRUPT_BREAK	(0x1)
+#define MWAIT_ECX_INTERRUPT_BREAK   (0x1)
 
 static void mwait_idle_with_hints(unsigned long eax, unsigned long ecx)
 {
@@ -229,6 +272,8 @@ static void acpi_idle_do_entry(struct acpi_processor_cx *cx)
     }
 }
 
+static atomic_t c3_cpu_count;
+
 static void acpi_processor_idle(void)
 {
     struct acpi_processor_power *power = NULL;
@@ -258,6 +303,62 @@ static void acpi_processor_idle(void)
             acpi_safe_halt();
         }
         return;
+    }
+
+    /*
+     * Check BM Activity
+     * -----------------
+     * Check for bus mastering activity (if required), record, and check
+     * for demotion.
+     */
+    if ( power->flags.bm_check )
+    {
+        u32 bm_status = 0;
+        unsigned long diff = (NOW() - power->bm_check_timestamp) >> 23;
+
+        if ( diff > 31 )
+            diff = 31;
+
+        power->bm_activity <<= diff;
+
+        acpi_get_register(ACPI_BITREG_BUS_MASTER_STATUS, &bm_status);
+        if ( bm_status )
+        {
+            power->bm_activity |= 0x1;
+            acpi_set_register(ACPI_BITREG_BUS_MASTER_STATUS, 1);
+        }
+        /*
+         * PIIX4 Erratum #18: Note that BM_STS doesn't always reflect
+         * the true state of bus mastering activity; forcing us to
+         * manually check the BMIDEA bit of each IDE channel.
+         */
+        /*else if ( errata.piix4.bmisx )
+        {
+            if ( (inb_p(errata.piix4.bmisx + 0x02) & 0x01)
+                || (inb_p(errata.piix4.bmisx + 0x0A) & 0x01) )
+                pr->power.bm_activity |= 0x1;
+        }*/
+
+        power->bm_check_timestamp = NOW();
+
+        /*
+         * If bus mastering is or was active this jiffy, demote
+         * to avoid a faulty transition.  Note that the processor
+         * won't enter a low-power state during this call (to this
+         * function) but should upon the next.
+         *
+         * TBD: A better policy might be to fallback to the demotion
+         *      state (use it for this quantum only) istead of
+         *      demoting -- and rely on duration as our sole demotion
+         *      qualification.  This may, however, introduce DMA
+         *      issues (e.g. floppy DMA transfer overrun/underrun).
+         */
+        if ( (power->bm_activity & 0x1) && cx->demotion.threshold.bm )
+        {
+            local_irq_enable();
+            next_state = cx->demotion.state;
+            goto end;
+        }
     }
 
     /*
@@ -303,6 +404,73 @@ static void acpi_processor_idle(void)
         sleep_ticks =
             ticks_elapsed(t1, t2) - cx->latency_ticks - C2_OVERHEAD;
         break;
+
+    case ACPI_STATE_C3:
+        /*
+         * disable bus master
+         * bm_check implies we need ARB_DIS
+         * !bm_check implies we need cache flush
+         * bm_control implies whether we can do ARB_DIS
+         *
+         * That leaves a case where bm_check is set and bm_control is
+         * not set. In that case we cannot do much, we enter C3
+         * without doing anything.
+         */
+        if ( power->flags.bm_check && power->flags.bm_control )
+        {
+            atomic_inc(&c3_cpu_count);
+            if ( atomic_read(&c3_cpu_count) == num_online_cpus() )
+            {
+                /*
+                 * All CPUs are trying to go to C3
+                 * Disable bus master arbitration
+                 */
+                acpi_set_register(ACPI_BITREG_ARB_DISABLE, 1);
+            }
+        }
+        else if ( !power->flags.bm_check )
+        {
+            /* SMP with no shared cache... Invalidate cache  */
+            ACPI_FLUSH_CPU_CACHE();
+        }
+
+        /* Get start time (ticks) */
+        t1 = inl(pmtmr_ioport);
+
+        /*
+         * FIXME: Before invoking C3, be aware that TSC/APIC timer may be 
+         * stopped by H/W. Without carefully handling of TSC/APIC stop issues,
+         * deep C state can't work correctly.
+         */
+        /* placeholder for preparing TSC stop */
+
+        /* placeholder for preparing APIC stop */
+
+        /* Invoke C3 */
+        acpi_idle_do_entry(cx);
+
+        /* placeholder for recovering APIC */
+
+        /* placeholder for recovering TSC */
+
+        /* Get end time (ticks) */
+        t2 = inl(pmtmr_ioport);
+        if ( power->flags.bm_check && power->flags.bm_control )
+        {
+            /* Enable bus master arbitration */
+            atomic_dec(&c3_cpu_count);
+            acpi_set_register(ACPI_BITREG_ARB_DISABLE, 0);
+        }
+
+        /* Compute time (ticks) that we were actually asleep */
+        sleep_ticks = ticks_elapsed(t1, t2);
+        /* Re-enable interrupts */
+        local_irq_enable();
+        /* Do not account our idle-switching overhead: */
+        sleep_ticks -= cx->latency_ticks + C3_OVERHEAD;
+
+        break;
+
     default:
         local_irq_enable();
         return;
@@ -331,8 +499,19 @@ static void acpi_processor_idle(void)
             cx->demotion.count = 0;
             if ( cx->promotion.count >= cx->promotion.threshold.count )
             {
-                next_state = cx->promotion.state;
-                goto end;
+                if ( power->flags.bm_check )
+                {
+                    if ( !(power->bm_activity & cx->promotion.threshold.bm) )
+                    {
+                        next_state = cx->promotion.state;
+                        goto end;
+                    }
+                }
+                else
+                {
+                    next_state = cx->promotion.state;
+                    goto end;
+                }
             }
         }
     }
@@ -425,6 +604,8 @@ static int acpi_processor_set_power_policy(struct acpi_processor_power *power)
             cx->demotion.state = lower;
             cx->demotion.threshold.ticks = cx->latency_ticks;
             cx->demotion.threshold.count = 1;
+            if ( cx->type == ACPI_STATE_C3 )
+                cx->demotion.threshold.bm = bm_history;
         }
 
         lower = cx;
@@ -445,6 +626,8 @@ static int acpi_processor_set_power_policy(struct acpi_processor_power *power)
                 cx->promotion.threshold.count = 4;
             else
                 cx->promotion.threshold.count = 10;
+            if ( higher->type == ACPI_STATE_C3 )
+                cx->promotion.threshold.bm = bm_history;
         }
 
         higher = cx;
@@ -511,11 +694,40 @@ static int acpi_processor_ffh_cstate_probe(xen_processor_cx_t *cx)
     return 0;
 }
 
+/*
+ * Initialize bm_flags based on the CPU cache properties
+ * On SMP it depends on cache configuration
+ * - When cache is not shared among all CPUs, we flush cache
+ *   before entering C3.
+ * - When cache is shared among all CPUs, we use bm_check
+ *   mechanism as in UP case
+ *
+ * This routine is called only after all the CPUs are online
+ */
+static void acpi_processor_power_init_bm_check(struct acpi_processor_flags *flags)
+{
+    struct cpuinfo_x86 *c = &current_cpu_data;
+
+    flags->bm_check = 0;
+    if ( num_online_cpus() == 1 )
+        flags->bm_check = 1;
+    else if ( c->x86_vendor == X86_VENDOR_INTEL )
+    {
+        /*
+         * Today all CPUs that support C3 share cache.
+         * TBD: This needs to look at cache shared map, once
+         * multi-core detection patch makes to the base.
+         */
+        flags->bm_check = 1;
+    }
+}
+
 #define VENDOR_INTEL                   (1)
 #define NATIVE_CSTATE_BEYOND_HALT      (2)
 
-static int check_cx(xen_processor_cx_t *cx)
+static int check_cx(struct acpi_processor_power *power, xen_processor_cx_t *cx)
 {
+    static int bm_check_flag;
     if ( cx == NULL )
         return -EINVAL;
 
@@ -543,6 +755,56 @@ static int check_cx(xen_processor_cx_t *cx)
         return -ENODEV;
     }
 
+    if ( cx->type == ACPI_STATE_C3 )
+    {
+        /* All the logic here assumes flags.bm_check is same across all CPUs */
+        if ( !bm_check_flag )
+        {
+            /* Determine whether bm_check is needed based on CPU  */
+            acpi_processor_power_init_bm_check(&(power->flags));
+            bm_check_flag = power->flags.bm_check;
+        }
+        else
+        {
+            power->flags.bm_check = bm_check_flag;
+        }
+
+        if ( power->flags.bm_check )
+        {
+            if ( !power->flags.bm_control )
+            {
+                if ( power->flags.has_cst != 1 )
+                {
+                    /* bus mastering control is necessary */
+                    ACPI_DEBUG_PRINT((ACPI_DB_INFO,
+                        "C3 support requires BM control\n"));
+                    return -1;
+                }
+                else
+                {
+                    /* Here we enter C3 without bus mastering */
+                    ACPI_DEBUG_PRINT((ACPI_DB_INFO,
+                        "C3 support without BM control\n"));
+                }
+            }
+        }
+        else
+        {
+            /*
+             * WBINVD should be set in fadt, for C3 state to be
+             * supported on when bm_check is not required.
+             */
+            if ( !(acpi_gbl_FADT.flags & ACPI_FADT_WBINVD) )
+            {
+                ACPI_DEBUG_PRINT((ACPI_DB_INFO,
+                          "Cache invalidation should work properly"
+                          " for C3 to be enabled on SMP systems\n"));
+                return -1;
+            }
+            acpi_set_register(ACPI_BITREG_BUS_MASTER_RLD, 0);
+        }
+    }
+
     return 0;
 }
 
@@ -552,7 +814,7 @@ static int set_cx(struct acpi_processor_power *acpi_power,
     struct acpi_processor_cx *cx;
 
     /* skip unsupported acpi cstate */
-    if ( check_cx(xen_cx) )
+    if ( check_cx(acpi_power, xen_cx) )
         return -EFAULT;
 
     cx = &acpi_power->states[xen_cx->type];
@@ -662,6 +924,10 @@ long set_cx_pminfo(uint32_t cpu, struct xen_processor_power *power)
     acpi_power = &processor_powers[cpu_id];
 
     init_cx_pminfo(acpi_power);
+
+    acpi_power->flags.bm_check = power->flags.bm_check;
+    acpi_power->flags.bm_control = power->flags.bm_control;
+    acpi_power->flags.has_cst = power->flags.has_cst;
 
     states = power->states;
 
