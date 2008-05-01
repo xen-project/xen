@@ -66,9 +66,9 @@
 
 
 # Address and port xend should use for the legacy TCP XMLRPC interface, 
-# if xen-tcp-xmlrpc-server is set.
-#(xen-tcp-xmlrpc-server-address 'localhost')
-#(xen-tcp-xmlrpc-server-port 8006)
+# if xend-tcp-xmlrpc-server is set.
+#(xend-tcp-xmlrpc-server-address 'localhost')
+#(xend-tcp-xmlrpc-server-port 8006)
 
 # SSL key and certificate to use for the legacy TCP XMLRPC interface.
 # Setting these will mean that this port serves only SSL connections as
