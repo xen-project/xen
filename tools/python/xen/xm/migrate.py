@@ -47,10 +47,6 @@ gopts.opt('node', short='n', val='nodenum',
           fn=set_int, default=-1,
           use="Use specified NUMA node on target.")
 
-gopts.opt('resource', short='r', val='MBIT',
-          fn=set_int, default=0,
-          use="Set level of resource usage for migration.")
-
 def help():
     return str(gopts)
     
@@ -69,13 +65,11 @@ def main(argv):
         vm_ref = get_single_vm(dom)
         other_config = {
             "port":     opts.vals.port,
-            "resource": opts.vals.resource,
             "node":     opts.vals.node
             }
         server.xenapi.VM.migrate(vm_ref, dst, bool(opts.vals.live),
                                  other_config)
     else:
         server.xend.domain.migrate(dom, dst, opts.vals.live,
-                                   opts.vals.resource,
                                    opts.vals.port,
                                    opts.vals.node)

@@ -1258,7 +1258,7 @@ class XendDomain:
 
         return val       
 
-    def domain_migrate(self, domid, dst, live=False, resource=0, port=0, node=-1):
+    def domain_migrate(self, domid, dst, live=False, port=0, node=-1):
         """Start domain migration.
         
         @param domid: Domain ID or Name
@@ -1269,7 +1269,6 @@ class XendDomain:
         @type port: int        
         @keyword live: Live migration
         @type live: bool
-        @keyword resource: not used??
         @rtype: None
         @keyword node: use node number for target
         @rtype: int 
