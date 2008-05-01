@@ -46,6 +46,7 @@ class XSPolicyAdmin:
         self.maxpolicies = maxpolicies
         self.policies = {}
         self.xsobjs = {}
+        bootloader.init()
 
         act_pol_name = self.get_hv_loaded_policy_name()
         initialize()
