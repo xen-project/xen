@@ -11,6 +11,10 @@ DEFINE_XEN_GUEST_HANDLE(compat_platform_op_t);
 #define xen_platform_op_t   compat_platform_op_t
 #define do_platform_op(x)   compat_platform_op(_##x)
 
+#define xen_processor_power     compat_processor_power
+#define xen_processor_power_t   compat_processor_power_t
+#define set_cx_pminfo           compat_set_cx_pminfo
+
 #define xenpf_enter_acpi_sleep compat_pf_enter_acpi_sleep
 
 #define COMPAT

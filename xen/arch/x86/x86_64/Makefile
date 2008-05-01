@@ -12,6 +12,7 @@ obj-$(CONFIG_COMPAT) += compat_kexec.o
 obj-$(CONFIG_COMPAT) += domain.o
 obj-$(CONFIG_COMPAT) += physdev.o
 obj-$(CONFIG_COMPAT) += platform_hypercall.o
+obj-$(CONFIG_COMPAT) += cpu_idle.o
 
 ifeq ($(CONFIG_COMPAT),y)
 # extra dependencies
@@ -22,4 +23,5 @@ physdev.o:	../physdev.c
 platform_hypercall.o: ../platform_hypercall.c
 sysctl.o:	../sysctl.c
 traps.o:	compat/traps.c
+cpu_idle.o:	../acpi/cpu_idle.c
 endif

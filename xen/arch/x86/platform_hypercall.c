@@ -44,6 +44,8 @@ extern spinlock_t xenpf_lock;
 
 static DEFINE_PER_CPU(uint64_t, freq);
 
+extern long set_cx_pminfo(uint32_t cpu, struct xen_processor_power *power);
+
 static long cpu_frequency_change_helper(void *data)
 {
     return cpu_frequency_change(this_cpu(freq));
@@ -340,6 +342,27 @@ ret_t do_platform_op(XEN_GUEST_HANDLE(xen_platform_op_t) u_xenpf_op)
     }
     break;
 
+    case XENPF_set_processor_pminfo:
+        switch ( op->u.set_pminfo.type )
+        {
+        case XEN_PM_PX:
+            ret = -EINVAL;
+            break;
+            
+        case XEN_PM_CX:
+            ret = set_cx_pminfo(op->u.set_pminfo.id, &op->u.set_pminfo.power);
+            break;
+
+        case XEN_PM_TX:
+            ret = -EINVAL;
+            break;
+
+        default:
+            ret = -EINVAL;
+            break;
+        }
+        break;
+ 
     default:
         ret = -ENOSYS;
         break;

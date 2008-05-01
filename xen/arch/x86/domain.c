@@ -56,6 +56,9 @@ DEFINE_PER_CPU(struct vcpu *, curr_vcpu);
 DEFINE_PER_CPU(u64, efer);
 DEFINE_PER_CPU(unsigned long, cr4);
 
+static void default_idle(void);
+void (*pm_idle) (void) = default_idle;
+
 static void unmap_vcpu_info(struct vcpu *v);
 
 static void paravirt_ctxt_switch_from(struct vcpu *v);
@@ -105,7 +108,7 @@ void idle_loop(void)
         if ( cpu_is_offline(smp_processor_id()) )
             play_dead();
         page_scrub_schedule_work();
-        default_idle();
+        (*pm_idle)();
         do_softirq();
     }
 }
