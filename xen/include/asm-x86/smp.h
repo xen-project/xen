@@ -22,7 +22,7 @@
 #endif
 #endif
 
-#define BAD_APICID 0xFFu
+#define BAD_APICID -1U
 #ifdef CONFIG_SMP
 #ifndef __ASSEMBLY__
 
@@ -45,7 +45,7 @@ extern void zap_low_mappings(l2_pgentry_t *base);
 #endif
 
 #define MAX_APICID 256
-extern u8 x86_cpu_to_apicid[];
+extern u32 x86_cpu_to_apicid[];
 
 #define cpu_physical_id(cpu)	x86_cpu_to_apicid[cpu]
 

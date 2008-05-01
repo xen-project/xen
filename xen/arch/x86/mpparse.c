@@ -73,7 +73,7 @@ static unsigned int __devinitdata num_processors;
 /* Bitmask of physically existing CPUs */
 physid_mask_t phys_cpu_present_map;
 
-u8 bios_cpu_apicid[NR_CPUS] = { [0 ... NR_CPUS-1] = BAD_APICID };
+u32 bios_cpu_apicid[NR_CPUS] = { [0 ... NR_CPUS-1] = BAD_APICID };
 
 /*
  * Intel MP BIOS table parsing routines:

@@ -103,8 +103,8 @@ static int __devinitdata tsc_sync_disabled;
 struct cpuinfo_x86 cpu_data[NR_CPUS] __cacheline_aligned;
 EXPORT_SYMBOL(cpu_data);
 
-u8 x86_cpu_to_apicid[NR_CPUS] __read_mostly =
-			{ [0 ... NR_CPUS-1] = 0xff };
+u32 x86_cpu_to_apicid[NR_CPUS] __read_mostly =
+			{ [0 ... NR_CPUS-1] = -1U };
 EXPORT_SYMBOL(x86_cpu_to_apicid);
 
 static void map_cpu_to_logical_apicid(void);
@@ -543,7 +543,7 @@ extern struct {
 	unsigned short ss;
 } stack_start;
 
-u8 cpu_2_logical_apicid[NR_CPUS] __read_mostly = { [0 ... NR_CPUS-1] = BAD_APICID };
+u32 cpu_2_logical_apicid[NR_CPUS] __read_mostly = { [0 ... NR_CPUS-1] = BAD_APICID };
 
 static void map_cpu_to_logical_apicid(void)
 {

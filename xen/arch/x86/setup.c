@@ -245,7 +245,7 @@ static void __init init_idle_domain(void)
 static void __init srat_detect_node(int cpu)
 {
     unsigned node;
-    u8 apicid = x86_cpu_to_apicid[cpu];
+    u32 apicid = x86_cpu_to_apicid[cpu];
 
     node = apicid_to_node[apicid];
     if ( node == NUMA_NO_NODE )
