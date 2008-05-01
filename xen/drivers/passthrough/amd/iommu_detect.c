@@ -22,9 +22,9 @@
 #include <xen/errno.h>
 #include <xen/iommu.h>
 #include <xen/pci.h>
+#include <xen/pci_regs.h>
 #include <asm/amd-iommu.h>
 #include <asm/hvm/svm/amd-iommu-proto.h>
-#include "../pci_regs.h"
 
 static int __init valid_bridge_bus_config(
     int bus, int dev, int func, int *sec_bus, int *sub_bus)

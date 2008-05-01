@@ -23,10 +23,10 @@
 #include <xen/iommu.h>
 #include <xen/time.h>
 #include <xen/pci.h>
+#include <xen/pci_regs.h>
 #include "iommu.h"
 #include "dmar.h"
 #include "vtd.h"
-#include "../pci_regs.h"
 #include "msi.h"
 #include "extern.h"
 

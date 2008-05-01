@@ -22,9 +22,9 @@
 #include <xen/iommu.h>
 #include <xen/time.h>
 #include <xen/pci.h>
+#include <xen/pci_regs.h>
 #include "iommu.h"
 #include "dmar.h"
-#include "../pci_regs.h"
 #include "msi.h"
 #include "vtd.h"
 
@@ -96,37 +96,6 @@ void disable_pmr(struct iommu *iommu)
             "Disabled protected memory registers\n");
 }
 
-static u8 find_cap_offset(u8 bus, u8 dev, u8 func, u8 cap)
-{
-    u8 id;
-    int max_cap = 48;
-    u8 pos = PCI_CAPABILITY_LIST;
-    u16 status;
-
-    status = pci_conf_read16(bus, dev, func, PCI_STATUS);
-    if ( (status & PCI_STATUS_CAP_LIST) == 0 )
-        return 0;
-
-    while ( max_cap-- )
-    {
-        pos = pci_conf_read8(bus, dev, func, pos);
-        if ( pos < 0x40 )
-            break;
-
-        pos &= ~3;
-        id = pci_conf_read8(bus, dev, func, pos + PCI_CAP_LIST_ID);
-
-        if ( id == 0xff )
-            break;
-        else if ( id == cap )
-            return pos;
-
-        pos += PCI_CAP_LIST_NEXT;
-    }
-
-    return 0;
-}
-
 #define PCI_D3hot   (3)
 #define PCI_CONFIG_DWORD_SIZE   (64)
 #define PCI_EXP_DEVCAP_FLR      (1 << 28)
@@ -140,7 +109,7 @@ void pdev_flr(u8 bus, u8 devfn)
     u8 dev = PCI_SLOT(devfn);
     u8 func = PCI_FUNC(devfn);
 
-    pos = find_cap_offset(bus, dev, func, PCI_CAP_ID_EXP);
+    pos = pci_find_cap_offset(bus, dev, func, PCI_CAP_ID_EXP);
     if ( pos != 0 )
     {
         dev_cap = pci_conf_read32(bus, dev, func, pos + PCI_EXP_DEVCAP);
@@ -163,7 +132,7 @@ void pdev_flr(u8 bus, u8 devfn)
      */
     if ( flr == 0 )
     {
-        pos = find_cap_offset(bus, dev, func, PCI_CAP_ID_PM);
+        pos = pci_find_cap_offset(bus, dev, func, PCI_CAP_ID_PM);
         if ( pos != 0 )
         {
             int i;

@@ -27,10 +27,10 @@
 #include <xen/numa.h>
 #include <xen/time.h>
 #include <xen/pci.h>
+#include <xen/pci_regs.h>
 #include <asm/paging.h>
 #include "iommu.h"
 #include "dmar.h"
-#include "../pci_regs.h"
 #include "msi.h"
 #include "extern.h"
 #include "vtd.h"
@@ -1182,31 +1182,6 @@ static int domain_context_mapping_one(
     return 0;
 }
 
-static int __pci_find_next_cap(u8 bus, unsigned int devfn, u8 pos, int cap)
-{
-    u8 id;
-    int ttl = 48;
-
-    while ( ttl-- )
-    {
-        pos = pci_conf_read8(bus, PCI_SLOT(devfn), PCI_FUNC(devfn), pos);
-        if ( pos < 0x40 )
-            break;
-
-        pos &= ~3;
-        id = pci_conf_read8(bus, PCI_SLOT(devfn), PCI_FUNC(devfn),
-                            pos + PCI_CAP_LIST_ID);
-
-        if ( id == 0xff )
-            break;
-        if ( id == cap )
-            return pos;
-
-        pos += PCI_CAP_LIST_NEXT;
-    }
-    return 0;
-}
-
 #define PCI_BASE_CLASS_BRIDGE    0x06
 #define PCI_CLASS_BRIDGE_PCI     0x0604
 
@@ -1230,7 +1205,7 @@ int pdev_type(struct pci_dev *dev)
     if ( !(status & PCI_STATUS_CAP_LIST) )
         return DEV_TYPE_PCI;
 
-    if ( __pci_find_next_cap(dev->bus, dev->devfn,
+    if ( pci_find_next_cap(dev->bus, dev->devfn,
                             PCI_CAPABILITY_LIST, PCI_CAP_ID_EXP) )
         return DEV_TYPE_PCIe_ENDPOINT;
 

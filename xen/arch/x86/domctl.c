@@ -10,6 +10,7 @@
 #include <xen/mm.h>
 #include <xen/guest_access.h>
 #include <xen/compat.h>
+#include <xen/pci.h>
 #include <public/domctl.h>
 #include <xen/sched.h>
 #include <xen/domain.h>

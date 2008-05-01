@@ -21,7 +21,7 @@
 #define _IOMMU_H_
 
 #include <xen/init.h>
-#include <xen/list.h>
+#include <xen/pci.h>
 #include <xen/spinlock.h>
 #include <public/hvm/ioreq.h>
 #include <public/domctl.h>
@@ -38,25 +38,6 @@ extern int iommu_enabled;
 #define PAGE_SIZE_4K        (1UL << PAGE_SHIFT_4K)
 #define PAGE_MASK_4K        (((u64)-1) << PAGE_SHIFT_4K)
 #define PAGE_ALIGN_4K(addr) (((addr) + PAGE_SIZE_4K - 1) & PAGE_MASK_4K)
-
-/*
- * The PCI interface treats multi-function devices as independent
- * devices.  The slot/function address of each device is encoded
- * in a single byte as follows:
- *
- * 15:8 = bus
- *  7:3 = slot
- *  2:0 = function
- */
-#define PCI_DEVFN(slot,func)  (((slot & 0x1f) << 3) | (func & 0x07))
-#define PCI_SLOT(devfn)       (((devfn) >> 3) & 0x1f)
-#define PCI_FUNC(devfn)       ((devfn) & 0x07)
-
-struct pci_dev {
-    struct list_head list;
-    u8 bus;
-    u8 devfn;
-};
 
 struct iommu {
     struct list_head list;

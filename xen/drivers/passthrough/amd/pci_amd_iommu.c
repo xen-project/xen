@@ -20,11 +20,11 @@
 
 #include <xen/sched.h>
 #include <xen/pci.h>
+#include <xen/pci_regs.h>
 #include <asm/amd-iommu.h>
 #include <asm/hvm/svm/amd-iommu-proto.h>
 #include <asm/hvm/svm/amd-iommu-acpi.h>
 #include <asm/mm.h>
-#include "../pci_regs.h"
 
 struct list_head amd_iommu_head;
 long amd_iommu_poll_comp_wait = COMPLETION_WAIT_DEFAULT_POLLING_COUNT;
