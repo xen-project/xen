@@ -203,7 +203,6 @@ static DEFINE_PER_CPU(struct pending_eoi, pending_eoi[NR_VECTORS]);
 
 static void __do_IRQ_guest(int vector)
 {
-    unsigned int        irq = vector_to_irq(vector);
     irq_desc_t         *desc = &irq_desc[vector];
     irq_guest_action_t *action = (irq_guest_action_t *)desc->action;
     struct domain      *d;
@@ -232,7 +231,9 @@ static void __do_IRQ_guest(int vector)
 
     for ( i = 0; i < action->nr_guests; i++ )
     {
+        unsigned int irq;
         d = action->guest[i];
+        irq = domain_vector_to_irq(d, vector);
         if ( (action->ack_type != ACKTYPE_NONE) &&
              !test_and_set_bit(irq, d->pirq_mask) )
             action->in_flight++;
@@ -305,8 +306,10 @@ static void __pirq_guest_eoi(struct domain *d, int irq)
     irq_desc_t         *desc;
     irq_guest_action_t *action;
     cpumask_t           cpu_eoi_map;
+    int                 vector;
 
-    desc   = &irq_desc[irq_to_vector(irq)];
+    vector = domain_irq_to_vector(d, irq);
+    desc   = &irq_desc[vector];
     action = (irq_guest_action_t *)desc->action;
 
     spin_lock_irq(&desc->lock);
@@ -324,7 +327,7 @@ static void __pirq_guest_eoi(struct domain *d, int irq)
     if ( action->ack_type == ACKTYPE_UNMASK )
     {
         ASSERT(cpus_empty(action->cpu_eoi_map));
-        desc->handler->end(irq_to_vector(irq));
+        desc->handler->end(vector);
         spin_unlock_irq(&desc->lock);
         return;
     }
@@ -375,12 +378,12 @@ int pirq_guest_unmask(struct domain *d)
 }
 
 extern int ioapic_ack_new;
-int pirq_acktype(int irq)
+int pirq_acktype(struct domain *d, int irq)
 {
     irq_desc_t  *desc;
     unsigned int vector;
 
-    vector = irq_to_vector(irq);
+    vector = domain_irq_to_vector(d, irq);
     if ( vector == 0 )
         return ACKTYPE_NONE;
 
@@ -421,7 +424,7 @@ int pirq_acktype(int irq)
     return 0;
 }
 
-int pirq_shared(int irq)
+int pirq_shared(struct domain *d, int irq)
 {
     unsigned int        vector;
     irq_desc_t         *desc;
@@ -429,7 +432,7 @@ int pirq_shared(int irq)
     unsigned long       flags;
     int                 shared;
 
-    vector = irq_to_vector(irq);
+    vector = domain_irq_to_vector(d, irq);
     if ( vector == 0 )
         return 0;
 
@@ -453,7 +456,7 @@ int pirq_guest_bind(struct vcpu *v, int irq, int will_share)
     cpumask_t           cpumask = CPU_MASK_NONE;
 
  retry:
-    vector = irq_to_vector(irq);
+    vector = domain_irq_to_vector(v->domain, irq);
     if ( vector == 0 )
         return -EINVAL;
 
@@ -487,7 +490,7 @@ int pirq_guest_bind(struct vcpu *v, int irq, int will_share)
         action->nr_guests   = 0;
         action->in_flight   = 0;
         action->shareable   = will_share;
-        action->ack_type    = pirq_acktype(irq);
+        action->ack_type    = pirq_acktype(v->domain, irq);
         cpus_clear(action->cpu_eoi_map);
 
         desc->depth = 0;
@@ -538,13 +541,15 @@ int pirq_guest_bind(struct vcpu *v, int irq, int will_share)
 
 int pirq_guest_unbind(struct domain *d, int irq)
 {
-    unsigned int        vector = irq_to_vector(irq);
-    irq_desc_t         *desc = &irq_desc[vector];
+    unsigned int        vector;
+    irq_desc_t         *desc;
     irq_guest_action_t *action;
     cpumask_t           cpu_eoi_map;
     unsigned long       flags;
     int                 i;
 
+    vector = domain_irq_to_vector(d, irq);
+    desc = &irq_desc[vector];
     BUG_ON(vector == 0);
 
     spin_lock_irqsave(&desc->lock, flags);

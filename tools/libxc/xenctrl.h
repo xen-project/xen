@@ -21,6 +21,7 @@
 #include <stdint.h>
 #include <xen/xen.h>
 #include <xen/domctl.h>
+#include <xen/physdev.h>
 #include <xen/sysctl.h>
 #include <xen/version.h>
 #include <xen/event_channel.h>
@@ -848,6 +849,16 @@ int xc_gnttab_munmap(int xcg_handle,
  */
 int xc_gnttab_set_max_grants(int xcg_handle,
 			     uint32_t count);
+
+int xc_physdev_map_pirq(int xc_handle,
+                        int domid,
+                        int type,
+                        int index,
+                        int *pirq);
+
+int xc_physdev_unmap_pirq(int xc_handle,
+                          int domid,
+                          int pirq);
 
 int xc_hvm_set_pci_intx_level(
     int xc_handle, domid_t dom,

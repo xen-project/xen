@@ -121,7 +121,7 @@ static void vmx_dirq_assist(struct vcpu *v)
         if ( !test_and_clear_bit(irq, &hvm_irq_dpci->dirq_mask) )
             continue;
 
-        stop_timer(&hvm_irq_dpci->hvm_timer[irq_to_vector(irq)]);
+        stop_timer(&hvm_irq_dpci->hvm_timer[domain_irq_to_vector(d, irq)]);
 
         list_for_each_entry ( digl, &hvm_irq_dpci->mirq[irq].digl_list, list )
         {
@@ -140,7 +140,7 @@ static void vmx_dirq_assist(struct vcpu *v)
          * guest will never deal with the irq, then the physical interrupt line
          * will never be deasserted.
          */
-        set_timer(&hvm_irq_dpci->hvm_timer[irq_to_vector(irq)],
+        set_timer(&hvm_irq_dpci->hvm_timer[domain_irq_to_vector(d, irq)],
                   NOW() + PT_IRQ_TIME_OUT);
     }
 }

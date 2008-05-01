@@ -799,6 +799,26 @@ static PyObject *pyxc_evtchn_reset(XcObject *self,
     return zero;
 }
 
+static PyObject *pyxc_physdev_map_pirq(PyObject *self,
+                                       PyObject *args,
+                                       PyObject *kwds)
+{
+    XcObject *xc = (XcObject *)self;
+    uint32_t dom;
+    int index, pirq, ret;
+
+    static char *kwd_list[] = {"domid", "index", "pirq", NULL};
+
+    if ( !PyArg_ParseTupleAndKeywords(args, kwds, "iii", kwd_list,
+                                      &dom, &index, &pirq) )
+        return NULL;
+    ret = xc_physdev_map_pirq(xc->xc_handle, dom, MAP_PIRQ_TYPE_GSI,
+                             index, &pirq);
+    if ( ret != 0 )
+          return pyxc_error_to_exception();
+    return PyLong_FromUnsignedLong(pirq);
+}
+
 static PyObject *pyxc_physdev_pci_access_modify(XcObject *self,
                                                 PyObject *args,
                                                 PyObject *kwds)
@@ -1588,6 +1608,15 @@ static PyMethodDef pyxc_methods[] = {
       METH_VARARGS | METH_KEYWORDS, "\n"
       "Reset all connections.\n"
       " dom [int]: Domain to reset.\n" },
+
+    { "physdev_map_pirq",
+      (PyCFunction)pyxc_physdev_map_pirq,
+      METH_VARARGS | METH_KEYWORDS, "\n"
+      "map physical irq to guest pirq.\n"
+      " dom     [int]:      Identifier of domain to map for.\n"
+      " index   [int]:      physical irq.\n"
+      " pirq    [int]:      guest pirq.\n"
+      "Returns: [long] value of the param.\n" },
 
     { "physdev_pci_access_modify",
       (PyCFunction)pyxc_physdev_pci_access_modify,

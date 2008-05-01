@@ -69,5 +69,10 @@ class IRQController(DevController):
             #todo non-fatal
             raise VmError(
                 'irq: Failed to configure irq: %d' % (pirq))
-
+        rc = xc.physdev_map_pirq(domid = self.getDomid(),
+                                index = pirq,
+                                pirq  = pirq)
+        if rc < 0:
+            raise VmError(
+                'irq: Failed to map irq %x' % (pirq))
         return (None, {}, {})

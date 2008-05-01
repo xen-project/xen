@@ -114,7 +114,7 @@ void hvm_dpci_isairq_eoi(struct domain *d, unsigned int isairq)
                 if ( --dpci->mirq[i].pending == 0 )
                 {
                     spin_unlock(&dpci->dirq_lock);
-                    stop_timer(&dpci->hvm_timer[irq_to_vector(i)]);
+                    stop_timer(&dpci->hvm_timer[domain_irq_to_vector(d, i)]);
                     pirq_guest_eoi(d, i);
                 }
                 else

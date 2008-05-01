@@ -24,10 +24,12 @@
 #define DECLARE_HYPERCALL privcmd_hypercall_t hypercall = { 0 }
 #define DECLARE_DOMCTL struct xen_domctl domctl = { 0 }
 #define DECLARE_SYSCTL struct xen_sysctl sysctl = { 0 }
+#define DECLARE_PHYSDEV_OP struct physdev_op physdev_op = { 0 }
 #else
 #define DECLARE_HYPERCALL privcmd_hypercall_t hypercall
 #define DECLARE_DOMCTL struct xen_domctl domctl
 #define DECLARE_SYSCTL struct xen_sysctl sysctl
+#define DECLARE_PHYSDEV_OP struct physdev_op physdev_op
 #endif
 
 #undef PAGE_SHIFT
@@ -94,6 +96,34 @@ static inline int do_xen_version(int xc_handle, int cmd, void *dest)
     hypercall.arg[1] = (unsigned long) dest;
 
     return do_xen_hypercall(xc_handle, &hypercall);
+}
+
+static inline int do_physdev_op(int xc_handle, int cmd, void *op)
+{
+    int ret = -1;
+
+    DECLARE_HYPERCALL;
+    hypercall.op = __HYPERVISOR_physdev_op;
+    hypercall.arg[0] = (unsigned long) cmd;
+    hypercall.arg[1] = (unsigned long) op;
+
+    if ( lock_pages(op, sizeof(*op)) != 0 )
+    {
+        PERROR("Could not lock memory for Xen hypercall");
+        goto out1;
+    }
+
+    if ( (ret = do_xen_hypercall(xc_handle, &hypercall)) < 0 )
+    {
+        if ( errno == EACCES )
+            DPRINTF("physdev operation failed -- need to"
+                    " rebuild the user-space tool set?\n");
+    }
+
+    unlock_pages(op, sizeof(*op));
+
+out1:
+    return ret;
 }
 
 static inline int do_domctl(int xc_handle, struct xen_domctl *domctl)

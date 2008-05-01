@@ -25,6 +25,7 @@ static void pt_irq_time_out(void *data)
 {
     struct hvm_mirq_dpci_mapping *irq_map = data;
     unsigned int guest_gsi, machine_gsi = 0;
+    int vector;
     struct hvm_irq_dpci *dpci = domain_get_irq_dpci(irq_map->dom);
     struct dev_intx_gsi_link *digl;
     uint32_t device, intx;
@@ -39,7 +40,8 @@ static void pt_irq_time_out(void *data)
     }
 
     clear_bit(machine_gsi, dpci->dirq_mask);
-    stop_timer(&dpci->hvm_timer[irq_to_vector(machine_gsi)]);
+    vector = domain_irq_to_vector(irq_map->dom, machine_gsi);
+    stop_timer(&dpci->hvm_timer[vector]);
     spin_lock(&dpci->dirq_lock);
     dpci->mirq[machine_gsi].pending = 0;
     spin_unlock(&dpci->dirq_lock);
@@ -98,7 +100,7 @@ int pt_irq_create_bind_vtd(
         hvm_irq_dpci->mirq[machine_gsi].valid = 1;
         hvm_irq_dpci->mirq[machine_gsi].dom = d;
 
-        init_timer(&hvm_irq_dpci->hvm_timer[irq_to_vector(machine_gsi)],
+        init_timer(&hvm_irq_dpci->hvm_timer[domain_irq_to_vector(d, machine_gsi)],
                    pt_irq_time_out, &hvm_irq_dpci->mirq[machine_gsi], 0);
         /* Deal with gsi for legacy devices */
         pirq_guest_bind(d->vcpu[0], machine_gsi, BIND_PIRQ__WILL_SHARE);
@@ -157,7 +159,7 @@ int pt_irq_destroy_bind_vtd(
         if ( list_empty(&hvm_irq_dpci->mirq[machine_gsi].digl_list) )
         {
             pirq_guest_unbind(d, machine_gsi);
-            kill_timer(&hvm_irq_dpci->hvm_timer[irq_to_vector(machine_gsi)]);
+            kill_timer(&hvm_irq_dpci->hvm_timer[domain_irq_to_vector(d, machine_gsi)]);
             hvm_irq_dpci->mirq[machine_gsi].dom   = NULL;
             hvm_irq_dpci->mirq[machine_gsi].valid = 0;
         }
@@ -185,7 +187,7 @@ int hvm_do_IRQ_dpci(struct domain *d, unsigned int mirq)
      * PIC) and we need to detect that.
      */
     set_bit(mirq, dpci->dirq_mask);
-    set_timer(&dpci->hvm_timer[irq_to_vector(mirq)],
+    set_timer(&dpci->hvm_timer[domain_irq_to_vector(d, mirq)],
               NOW() + PT_IRQ_TIME_OUT);
     vcpu_kick(d->vcpu[0]);
 
@@ -221,7 +223,7 @@ void hvm_dpci_eoi(struct domain *d, unsigned int guest_gsi,
 
         gdprintk(XENLOG_INFO VTDPREFIX,
                  "hvm_dpci_eoi:: mirq = %x\n", machine_gsi);
-        stop_timer(&hvm_irq_dpci->hvm_timer[irq_to_vector(machine_gsi)]);
+        stop_timer(&hvm_irq_dpci->hvm_timer[domain_irq_to_vector(d, machine_gsi)]);
         if ( (ent == NULL) || !ent->fields.mask )
             pirq_guest_eoi(d, machine_gsi);
     }

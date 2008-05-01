@@ -271,6 +271,12 @@ class PciController(DevController):
             if rc<0:
                 raise VmError(('pci: failed to configure I/O memory on device '+
                             '%s - errno=%d')%(dev.name,rc))
+            rc = xc.physdev_map_pirq(domid = fe_domid,
+                                   index = dev.irq,
+                                   pirq  = dev.irq)
+            if rc < 0:
+                raise VmError(('pci: failed to map irq on device '+
+                            '%s - errno=%d')%(dev.name,rc))
 
         if dev.irq>0:
             log.debug('pci: enabling irq %d'%dev.irq)

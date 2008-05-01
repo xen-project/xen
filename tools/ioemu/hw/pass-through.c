@@ -519,7 +519,21 @@ struct pt_dev * register_real_device(PCIBus *e_bus,
     e_intx = assigned_device->dev.config[0x3d]-1;
 
     if ( PT_MACHINE_IRQ_AUTO == machine_irq )
+    {
+        int pirq = pci_dev->irq;
+
         machine_irq = pci_dev->irq;
+        rc = xc_physdev_map_pirq(xc_handle, domid, MAP_PIRQ_TYPE_GSI,
+                                machine_irq, &pirq);
+
+        if ( rc )
+        {
+            /* TBD: unregister device in case of an error */
+            PT_LOG("Error: Mapping irq failed, rc = %d\n", rc);
+        }
+        else
+            machine_irq = pirq;
+    }
 
     /* bind machine_irq to device */
     if ( 0 != machine_irq )

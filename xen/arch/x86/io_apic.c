@@ -41,6 +41,25 @@
 int (*ioapic_renumber_irq)(int ioapic, int irq);
 atomic_t irq_mis_count;
 
+int msi_irq_enable = 0;
+boolean_param("msi_irq_enable", msi_irq_enable);
+
+int domain_irq_to_vector(struct domain *d, int irq)
+{
+    if ( !msi_irq_enable )
+        return irq_to_vector(irq);
+    else
+        return d->arch.pirq_vector[irq];
+}
+
+int domain_vector_to_irq(struct domain *d, int vector)
+{
+    if ( !msi_irq_enable )
+        return vector_to_irq(vector);
+    else
+        return d->arch.vector_pirq[vector];
+}
+
 /* Where if anywhere is the i8259 connect in external int mode */
 static struct { int pin, apic; } ioapic_i8259 = { -1, -1 };
 
