@@ -53,6 +53,241 @@
 #define _COMPONENT          ACPI_HARDWARE
 ACPI_MODULE_NAME("hwregs")
 
+/*******************************************************************************
+ *
+ * FUNCTION:    acpi_hw_get_register_bit_mask
+ *
+ * PARAMETERS:  register_id         - Index of ACPI Register to access
+ *
+ * RETURN:      The bitmask to be used when accessing the register
+ *
+ * DESCRIPTION: Map register_id into a register bitmask.
+ *
+ ******************************************************************************/
+struct acpi_bit_register_info *acpi_hw_get_bit_register_info(u32 register_id)
+{
+	ACPI_FUNCTION_ENTRY();
+
+	if (register_id > ACPI_BITREG_MAX) {
+		ACPI_DEBUG_PRINT((AE_INFO, "Invalid BitRegister ID: %X",
+			    register_id));
+		return (NULL);
+	}
+
+	return (&acpi_gbl_bit_register_info[register_id]);
+}
+
+/*******************************************************************************
+ *
+ * FUNCTION:    acpi_get_register
+ *
+ * PARAMETERS:  register_id     - ID of ACPI bit_register to access
+ *              return_value    - Value that was read from the register
+ *
+ * RETURN:      Status and the value read from specified Register. Value
+ *              returned is normalized to bit0 (is shifted all the way right)
+ *
+ * DESCRIPTION: ACPI bit_register read function.
+ *
+ ******************************************************************************/
+
+acpi_status acpi_get_register_unlocked(u32 register_id, u32 * return_value)
+{
+	u32 register_value = 0;
+	struct acpi_bit_register_info *bit_reg_info;
+	acpi_status status;
+
+	ACPI_FUNCTION_TRACE(acpi_get_register);
+
+	/* Get the info structure corresponding to the requested ACPI Register */
+
+	bit_reg_info = acpi_hw_get_bit_register_info(register_id);
+	if (!bit_reg_info) {
+		return_ACPI_STATUS(AE_BAD_PARAMETER);
+	}
+
+	/* Read from the register */
+
+	status = acpi_hw_register_read(bit_reg_info->parent_register,
+				       &register_value);
+
+	if (ACPI_SUCCESS(status)) {
+
+		/* Normalize the value that was read */
+
+		register_value =
+		    ((register_value & bit_reg_info->access_bit_mask)
+		     >> bit_reg_info->bit_position);
+
+		*return_value = register_value;
+
+		ACPI_DEBUG_PRINT((ACPI_DB_IO, "Read value %8.8X register %X\n",
+				  register_value,
+				  bit_reg_info->parent_register));
+	}
+
+	return_ACPI_STATUS(status);
+}
+
+acpi_status acpi_get_register(u32 register_id, u32 * return_value)
+{
+	acpi_status status;
+	//acpi_cpu_flags flags;
+	//flags = acpi_os_acquire_lock(acpi_gbl_hardware_lock);
+	status = acpi_get_register_unlocked(register_id, return_value);
+	//acpi_os_release_lock(acpi_gbl_hardware_lock, flags);
+	return status;
+}
+
+/*******************************************************************************
+ *
+ * FUNCTION:    acpi_set_register
+ *
+ * PARAMETERS:  register_id     - ID of ACPI bit_register to access
+ *              Value           - (only used on write) value to write to the
+ *                                Register, NOT pre-normalized to the bit pos
+ *
+ * RETURN:      Status
+ *
+ * DESCRIPTION: ACPI Bit Register write function.
+ *
+ ******************************************************************************/
+acpi_status acpi_set_register(u32 register_id, u32 value)
+{
+	u32 register_value = 0;
+	struct acpi_bit_register_info *bit_reg_info;
+	acpi_status status;
+	//acpi_cpu_flags lock_flags;
+
+	ACPI_FUNCTION_TRACE_U32(acpi_set_register, register_id);
+
+	/* Get the info structure corresponding to the requested ACPI Register */
+
+	bit_reg_info = acpi_hw_get_bit_register_info(register_id);
+	if (!bit_reg_info) {
+		ACPI_DEBUG_PRINT((AE_INFO, "Bad ACPI HW RegisterId: %X",
+			    register_id));
+		return_ACPI_STATUS(AE_BAD_PARAMETER);
+	}
+
+	//lock_flags = acpi_os_acquire_lock(acpi_gbl_hardware_lock);
+
+	/* Always do a register read first so we can insert the new bits  */
+
+	status = acpi_hw_register_read(bit_reg_info->parent_register,
+				       &register_value);
+	if (ACPI_FAILURE(status)) {
+		goto unlock_and_exit;
+	}
+
+	/*
+	 * Decode the Register ID
+	 * Register ID = [Register block ID] | [bit ID]
+	 *
+	 * Check bit ID to fine locate Register offset.
+	 * Check Mask to determine Register offset, and then read-write.
+	 */
+	switch (bit_reg_info->parent_register) {
+	case ACPI_REGISTER_PM1_STATUS:
+
+		/*
+		 * Status Registers are different from the rest. Clear by
+		 * writing 1, and writing 0 has no effect. So, the only relevant
+		 * information is the single bit we're interested in, all others should
+		 * be written as 0 so they will be left unchanged.
+		 */
+		value = ACPI_REGISTER_PREPARE_BITS(value,
+						   bit_reg_info->bit_position,
+						   bit_reg_info->
+						   access_bit_mask);
+		if (value) {
+			status = acpi_hw_register_write(ACPI_REGISTER_PM1_STATUS,
+							(u16) value);
+			register_value = 0;
+		}
+		break;
+
+	case ACPI_REGISTER_PM1_ENABLE:
+
+		ACPI_REGISTER_INSERT_VALUE(register_value,
+					   bit_reg_info->bit_position,
+					   bit_reg_info->access_bit_mask,
+					   value);
+
+		status = acpi_hw_register_write(ACPI_REGISTER_PM1_ENABLE,
+						(u16) register_value);
+		break;
+
+	case ACPI_REGISTER_PM1_CONTROL:
+
+		/*
+		 * Write the PM1 Control register.
+		 * Note that at this level, the fact that there are actually TWO
+		 * registers (A and B - and B may not exist) is abstracted.
+		 */
+		ACPI_DEBUG_PRINT((ACPI_DB_IO, "PM1 control: Read %X\n",
+				  register_value));
+
+		ACPI_REGISTER_INSERT_VALUE(register_value,
+					   bit_reg_info->bit_position,
+					   bit_reg_info->access_bit_mask,
+					   value);
+
+		status = acpi_hw_register_write(ACPI_REGISTER_PM1_CONTROL,
+						(u16) register_value);
+		break;
+
+	case ACPI_REGISTER_PM2_CONTROL:
+
+		status = acpi_hw_register_read(ACPI_REGISTER_PM2_CONTROL,
+					       &register_value);
+		if (ACPI_FAILURE(status)) {
+			goto unlock_and_exit;
+		}
+
+		ACPI_DEBUG_PRINT((ACPI_DB_IO,
+				  "PM2 control: Read %X from %8.8X%8.8X\n",
+				  register_value,
+				  ACPI_FORMAT_UINT64(acpi_gbl_FADT.
+						     xpm2_control_block.
+						     address)));
+
+		ACPI_REGISTER_INSERT_VALUE(register_value,
+					   bit_reg_info->bit_position,
+					   bit_reg_info->access_bit_mask,
+					   value);
+
+		ACPI_DEBUG_PRINT((ACPI_DB_IO,
+				  "About to write %4.4X to %8.8X%8.8X\n",
+				  register_value,
+				  ACPI_FORMAT_UINT64(acpi_gbl_FADT.
+						     xpm2_control_block.
+						     address)));
+
+		status = acpi_hw_register_write(ACPI_REGISTER_PM2_CONTROL,
+						(u8) (register_value));
+		break;
+
+	default:
+		break;
+	}
+
+      unlock_and_exit:
+
+	//acpi_os_release_lock(acpi_gbl_hardware_lock, lock_flags);
+
+	/* Normalize the value that was read */
+
+	ACPI_DEBUG_EXEC(register_value =
+			((register_value & bit_reg_info->access_bit_mask) >>
+			 bit_reg_info->bit_position));
+
+	ACPI_DEBUG_PRINT((ACPI_DB_IO,
+			  "Set bits: %8.8X actual %8.8X register %X\n", value,
+			  register_value, bit_reg_info->parent_register));
+	return_ACPI_STATUS(status);
+}
+
 /******************************************************************************
  *
  * FUNCTION:    acpi_hw_register_read
@@ -79,7 +314,7 @@ acpi_hw_register_read(u32 register_id, u32 * return_value)
 
 		status =
 		    acpi_hw_low_level_read(16, &value1,
-					   &acpi_sinfo.pm1a_evt_blk);
+					   &acpi_gbl_FADT.xpm1a_event_block);
 		if (ACPI_FAILURE(status)) {
 			goto exit;
 		}
@@ -88,28 +323,62 @@ acpi_hw_register_read(u32 register_id, u32 * return_value)
 
 		status =
 		    acpi_hw_low_level_read(16, &value2,
-					   &acpi_sinfo.pm1b_evt_blk);
+					   &acpi_gbl_FADT.xpm1b_event_block);
 		value1 |= value2;
 		break;
 
+	case ACPI_REGISTER_PM1_ENABLE:	/* 16-bit access */
+
+		status =
+		    acpi_hw_low_level_read(16, &value1, &acpi_gbl_xpm1a_enable);
+		if (ACPI_FAILURE(status)) {
+			goto exit;
+		}
+
+		/* PM1B is optional */
+
+		status =
+		    acpi_hw_low_level_read(16, &value2, &acpi_gbl_xpm1b_enable);
+		value1 |= value2;
+		break;
 
 	case ACPI_REGISTER_PM1_CONTROL:	/* 16-bit access */
 
 		status =
 		    acpi_hw_low_level_read(16, &value1,
-					   &acpi_sinfo.pm1a_cnt_blk);
+					   &acpi_gbl_FADT.xpm1a_control_block);
 		if (ACPI_FAILURE(status)) {
 			goto exit;
 		}
 
 		status =
 		    acpi_hw_low_level_read(16, &value2,
-					   &acpi_sinfo.pm1b_cnt_blk);
+					   &acpi_gbl_FADT.xpm1b_control_block);
 		value1 |= value2;
 		break;
 
+	case ACPI_REGISTER_PM2_CONTROL:	/* 8-bit access */
+
+		status =
+		    acpi_hw_low_level_read(8, &value1,
+					   &acpi_gbl_FADT.xpm2_control_block);
+		break;
+
+	case ACPI_REGISTER_PM_TIMER:	/* 32-bit access */
+
+		status =
+		    acpi_hw_low_level_read(32, &value1,
+					   &acpi_gbl_FADT.xpm_timer_block);
+		break;
+
+	case ACPI_REGISTER_SMI_COMMAND_BLOCK:	/* 8-bit access */
+
+		status =
+		    acpi_os_read_port(acpi_gbl_FADT.smi_command, &value1, 8);
+		break;
 
 	default:
+		ACPI_DEBUG_PRINT((AE_INFO, "Unknown Register ID: %X", register_id));
 		status = AE_BAD_PARAMETER;
 		break;
 	}
@@ -127,7 +396,7 @@ acpi_hw_register_read(u32 register_id, u32 * return_value)
  *
  * FUNCTION:    acpi_hw_register_write
  *
- * PARAMETERS:  register_id         - ACPI Register ID 
+ * PARAMETERS:  register_id         - ACPI Register ID
  *              Value               - The value to write
  *
  * RETURN:      Status
@@ -156,7 +425,7 @@ acpi_status acpi_hw_register_write(u32 register_id, u32 value)
 
 	ACPI_FUNCTION_TRACE(hw_register_write);
 
-	switch (register_id) {   //By now we just need handle PM1 status/PM1 control
+	switch (register_id) {
 	case ACPI_REGISTER_PM1_STATUS:	/* 16-bit access */
 
 		/* Perform a read first to preserve certain bits (per ACPI spec) */
@@ -176,7 +445,7 @@ acpi_status acpi_hw_register_write(u32 register_id, u32 value)
 
 		status =
 		    acpi_hw_low_level_write(16, value,
-					    &acpi_sinfo.pm1a_evt_blk);
+					    &acpi_gbl_FADT.xpm1a_event_block);
 		if (ACPI_FAILURE(status)) {
 			goto exit;
 		}
@@ -185,16 +454,27 @@ acpi_status acpi_hw_register_write(u32 register_id, u32 value)
 
 		status =
 		    acpi_hw_low_level_write(16, value,
-					    &acpi_sinfo.pm1b_evt_blk);
+					    &acpi_gbl_FADT.xpm1b_event_block);
 		break;
 
+	case ACPI_REGISTER_PM1_ENABLE:	/* 16-bit access */
+
+		status =
+		    acpi_hw_low_level_write(16, value, &acpi_gbl_xpm1a_enable);
+		if (ACPI_FAILURE(status)) {
+			goto exit;
+		}
+
+		/* PM1B is optional */
+
+		status =
+		    acpi_hw_low_level_write(16, value, &acpi_gbl_xpm1b_enable);
+		break;
 
 	case ACPI_REGISTER_PM1_CONTROL:	/* 16-bit access */
 
 		/*
 		 * Perform a read first to preserve certain bits (per ACPI spec)
-		 *
-		 * Note: This includes SCI_EN, we never want to change this bit
 		 */
 		status = acpi_hw_register_read(ACPI_REGISTER_PM1_CONTROL,
 					       &read_value);
@@ -211,30 +491,51 @@ acpi_status acpi_hw_register_write(u32 register_id, u32 value)
 
 		status =
 		    acpi_hw_low_level_write(16, value,
-					    &acpi_sinfo.pm1a_cnt_blk);
+					    &acpi_gbl_FADT.xpm1a_control_block);
 		if (ACPI_FAILURE(status)) {
 			goto exit;
 		}
 
 		status =
 		    acpi_hw_low_level_write(16, value,
-					    &acpi_sinfo.pm1b_cnt_blk);
+					    &acpi_gbl_FADT.xpm1b_control_block);
 		break;
 
 	case ACPI_REGISTER_PM1A_CONTROL:	/* 16-bit access */
 
 		status =
 		    acpi_hw_low_level_write(16, value,
-					    &acpi_sinfo.pm1a_cnt_blk);
+					    &acpi_gbl_FADT.xpm1a_control_block);
 		break;
 
 	case ACPI_REGISTER_PM1B_CONTROL:	/* 16-bit access */
 
 		status =
 		    acpi_hw_low_level_write(16, value,
-					    &acpi_sinfo.pm1b_cnt_blk);
+					    &acpi_gbl_FADT.xpm1b_control_block);
 		break;
 
+	case ACPI_REGISTER_PM2_CONTROL:	/* 8-bit access */
+
+		status =
+		    acpi_hw_low_level_write(8, value,
+					    &acpi_gbl_FADT.xpm2_control_block);
+		break;
+
+	case ACPI_REGISTER_PM_TIMER:	/* 32-bit access */
+
+		status =
+		    acpi_hw_low_level_write(32, value,
+					    &acpi_gbl_FADT.xpm_timer_block);
+		break;
+
+	case ACPI_REGISTER_SMI_COMMAND_BLOCK:	/* 8-bit access */
+
+		/* SMI_CMD is currently always in IO space */
+
+		status =
+		    acpi_os_write_port(acpi_gbl_FADT.smi_command, value, 8);
+		break;
 
 	default:
 		status = AE_BAD_PARAMETER;
@@ -242,7 +543,6 @@ acpi_status acpi_hw_register_write(u32 register_id, u32 value)
 	}
 
       exit:
-
 	return_ACPI_STATUS(status);
 }
 
@@ -383,3 +683,4 @@ acpi_hw_low_level_write(u32 width, u32 value, struct acpi_generic_address * reg)
 
 	return (status);
 }
+
