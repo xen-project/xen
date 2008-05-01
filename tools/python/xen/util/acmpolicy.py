@@ -49,8 +49,6 @@ ACM_SIMPLE_TYPE_ENFORCEMENT_POLICY = 2
 ACM_POLICY_UNDEFINED = 15
 
 
-ACM_SCHEMA_FILE = ACM_POLICIES_DIR + "security_policy.xsd"
-
 ACM_LABEL_UNLABELED = "__UNLABELED__"
 ACM_LABEL_UNLABELED_DISPLAY = "unlabeled"
 
@@ -118,6 +116,153 @@ DEFAULT_policy = \
 "  </SecurityLabelTemplate>\n" +\
 "</SecurityPolicyDefinition>\n"
 
+ACM_SCHEMA="""<?xml version="1.0" encoding="UTF-8"?>
+<!-- Author: Ray Valdez, Reiner Sailer {rvaldez,sailer}@us.ibm.com -->
+<!--         This file defines the schema, which is used to define -->
+<!--         the security policy and the security labels in Xen.    -->
+
+<xsd:schema xmlns:xsd="http://www.w3.org/2001/XMLSchema" targetNamespace="http://www.ibm.com" xmlns="http://www.ibm.com" elementFormDefault="qualified">
+	<xsd:element name="SecurityPolicyDefinition">
+		<xsd:complexType>
+			<xsd:sequence>
+				<xsd:element ref="PolicyHeader" minOccurs="1" maxOccurs="1"></xsd:element>
+				<xsd:element ref="SimpleTypeEnforcement" minOccurs="0" maxOccurs="1"></xsd:element>
+				<xsd:element ref="ChineseWall" minOccurs="0" maxOccurs="1"></xsd:element>
+				<xsd:element ref="SecurityLabelTemplate" minOccurs="1" maxOccurs="1"></xsd:element>
+			</xsd:sequence>
+		</xsd:complexType>
+	</xsd:element>
+	<xsd:element name="PolicyHeader">
+		<xsd:complexType>
+			<xsd:sequence>
+				<xsd:element name="PolicyName" minOccurs="1" maxOccurs="1" type="xsd:string"></xsd:element>
+				<xsd:element name="PolicyUrl" minOccurs="0" maxOccurs="1" type="xsd:string"></xsd:element>
+				<xsd:element name="Reference" type="xsd:string" minOccurs="0" maxOccurs="1" />
+				<xsd:element name="Date" minOccurs="0" maxOccurs="1" type="xsd:string"></xsd:element>
+				<xsd:element name="NameSpaceUrl" minOccurs="0" maxOccurs="1" type="xsd:string"></xsd:element>
+				<xsd:element name="Version" minOccurs="1" maxOccurs="1" type="VersionFormat"/>
+				<xsd:element ref="FromPolicy" minOccurs="0" maxOccurs="1"/>
+			</xsd:sequence>
+		</xsd:complexType>
+	</xsd:element>
+	<xsd:element name="ChineseWall">
+		<xsd:complexType>
+			<xsd:sequence>
+				<xsd:element ref="ChineseWallTypes" minOccurs="1" maxOccurs="1" />
+				<xsd:element ref="ConflictSets" minOccurs="0" maxOccurs="1" />
+			</xsd:sequence>
+			<xsd:attribute name="priority" type="PolicyOrder" use="optional"></xsd:attribute>
+		</xsd:complexType>
+	</xsd:element>
+	<xsd:element name="SimpleTypeEnforcement">
+		<xsd:complexType>
+			<xsd:sequence>
+				<xsd:element ref="SimpleTypeEnforcementTypes" />
+			</xsd:sequence>
+			<xsd:attribute name="priority" type="PolicyOrder" use="optional"></xsd:attribute>
+		</xsd:complexType>
+	</xsd:element>
+	<xsd:element name="SecurityLabelTemplate">
+		<xsd:complexType>
+			<xsd:sequence>
+				<xsd:element name="SubjectLabels" minOccurs="0" maxOccurs="1">
+					<xsd:complexType>
+						<xsd:sequence>
+							<xsd:element ref="VirtualMachineLabel" minOccurs="1" maxOccurs="unbounded"></xsd:element>
+						</xsd:sequence>
+						<xsd:attribute name="bootstrap" type="xsd:string" use="required"></xsd:attribute>
+					</xsd:complexType>
+				</xsd:element>
+				<xsd:element name="ObjectLabels" minOccurs="0" maxOccurs="1">
+					<xsd:complexType>
+						<xsd:sequence>
+							<xsd:element ref="ResourceLabel" minOccurs="1" maxOccurs="unbounded"></xsd:element>
+						</xsd:sequence>
+					</xsd:complexType>
+				</xsd:element>
+			</xsd:sequence>
+		</xsd:complexType>
+	</xsd:element>
+	<xsd:element name="ChineseWallTypes">
+		<xsd:complexType>
+			<xsd:sequence>
+				<xsd:element maxOccurs="unbounded" minOccurs="1" ref="Type" />
+			</xsd:sequence>
+		</xsd:complexType>
+	</xsd:element>
+	<xsd:element name="ConflictSets">
+		<xsd:complexType>
+			<xsd:sequence>
+				<xsd:element maxOccurs="unbounded" minOccurs="1" ref="Conflict" />
+			</xsd:sequence>
+		</xsd:complexType>
+	</xsd:element>
+	<xsd:element name="SimpleTypeEnforcementTypes">
+		<xsd:complexType>
+			<xsd:sequence>
+				<xsd:element maxOccurs="unbounded" minOccurs="1" ref="Type" />
+			</xsd:sequence>
+		</xsd:complexType>
+	</xsd:element>
+	<xsd:element name="Conflict">
+		<xsd:complexType>
+			<xsd:sequence>
+				<xsd:element maxOccurs="unbounded" minOccurs="1" ref="Type" />
+			</xsd:sequence>
+			<xsd:attribute name="name" type="xsd:string" use="required"></xsd:attribute>
+		</xsd:complexType>
+	</xsd:element>
+	<xsd:element name="VirtualMachineLabel">
+		<xsd:complexType>
+			<xsd:sequence>
+				<xsd:element name="Name" type="NameWithFrom"></xsd:element>
+				<xsd:element ref="SimpleTypeEnforcementTypes" minOccurs="0" maxOccurs="unbounded" />
+				<xsd:element ref="ChineseWallTypes" minOccurs="0" maxOccurs="unbounded" />
+			</xsd:sequence>
+		</xsd:complexType>
+	</xsd:element>
+	<xsd:element name="ResourceLabel">
+		<xsd:complexType>
+			<xsd:sequence>
+				<xsd:element name="Name" type="NameWithFrom"></xsd:element>
+				<xsd:element name="SimpleTypeEnforcementTypes" type="SingleSimpleTypeEnforcementType" />
+			</xsd:sequence>
+		</xsd:complexType>
+	</xsd:element>
+	<xsd:element name="Name" type="xsd:string" />
+	<xsd:element name="Type" type="xsd:string" />
+	<xsd:simpleType name="PolicyOrder">
+		<xsd:restriction base="xsd:string">
+			<xsd:enumeration value="PrimaryPolicyComponent"></xsd:enumeration>
+		</xsd:restriction>
+	</xsd:simpleType>
+	<xsd:element name="FromPolicy">
+		<xsd:complexType>
+			<xsd:sequence>
+				<xsd:element name="PolicyName" minOccurs="1" maxOccurs="1" type="xsd:string"/>
+				<xsd:element name="Version" minOccurs="1" maxOccurs="1" type="VersionFormat"/>
+			</xsd:sequence>
+		</xsd:complexType>
+	</xsd:element>
+	<xsd:simpleType name="VersionFormat">
+		<xsd:restriction base="xsd:string">
+			<xsd:pattern value="[0-9]{1,8}.[0-9]{1,8}"></xsd:pattern>
+		</xsd:restriction>
+	</xsd:simpleType>
+	<xsd:complexType name="NameWithFrom">
+		<xsd:simpleContent>
+			<xsd:extension base="xsd:string">
+				<xsd:attribute name="from" type="xsd:string" use="optional"></xsd:attribute>
+			</xsd:extension>
+		</xsd:simpleContent>
+	</xsd:complexType>
+	<xsd:complexType name="SingleSimpleTypeEnforcementType">
+		<xsd:sequence>
+			<xsd:element maxOccurs="1" minOccurs="1" ref="Type" />
+		</xsd:sequence>
+	</xsd:complexType>
+</xsd:schema>"""
+
 
 def get_DEFAULT_policy(dom0label=""):
     fromnode = ""
@@ -133,18 +278,7 @@ def initialize():
 
     instdir = security.install_policy_dir_prefix
     DEF_policy_file = "DEFAULT-security_policy.xml"
-    xsd_file = "security_policy.xsd"
 
-    files = [ xsd_file ]
-
-    for file in files:
-        if not os.path.isfile(policiesdir + "/" + file ):
-            try:
-                shutil.copyfile(instdir + "/" + file,
-                                policiesdir + "/" + file)
-            except Exception, e:
-                log.info("could not copy '%s': %s" %
-                         (file, str(e)))
     #Install default policy.
     f = open(policiesdir + "/" + DEF_policy_file, 'w')
     if f:
@@ -219,7 +353,8 @@ class ACMPolicy(XSPolicy):
             log.warn("Libxml2 python-wrapper is not installed on the system.")
             return xsconstants.XSERR_SUCCESS
         try:
-            parserctxt = libxml2.schemaNewParserCtxt(ACM_SCHEMA_FILE)
+            parserctxt = libxml2.schemaNewMemParserCtxt(ACM_SCHEMA,
+                                                        len(ACM_SCHEMA))
             schemaparser = parserctxt.schemaParse()
             valid = schemaparser.schemaNewValidCtxt()
             doc = libxml2.parseDoc(self.toxml())
