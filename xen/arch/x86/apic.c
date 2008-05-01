@@ -47,6 +47,8 @@ int enable_local_apic __initdata = 0; /* -1=force-disable, +1=force-enable */
  */
 int apic_verbosity;
 
+int x2apic_enabled __read_mostly = 0;
+
 
 static void apic_pm_activate(void);
 
@@ -306,7 +308,10 @@ int __init verify_local_APIC(void)
      */
     reg0 = apic_read(APIC_LVR);
     apic_printk(APIC_DEBUG, "Getting VERSION: %x\n", reg0);
-    apic_write(APIC_LVR, reg0 ^ APIC_LVR_MASK);
+
+    /* We don't try writing LVR in x2APIC mode since that incurs #GP. */
+    if ( !x2apic_enabled )
+        apic_write(APIC_LVR, reg0 ^ APIC_LVR_MASK);
     reg1 = apic_read(APIC_LVR);
     apic_printk(APIC_DEBUG, "Getting VERSION: %x\n", reg1);
 
@@ -610,7 +615,8 @@ int lapic_suspend(void)
     apic_pm_state.apic_id = apic_read(APIC_ID);
     apic_pm_state.apic_taskpri = apic_read(APIC_TASKPRI);
     apic_pm_state.apic_ldr = apic_read(APIC_LDR);
-    apic_pm_state.apic_dfr = apic_read(APIC_DFR);
+    if ( !x2apic_enabled )
+        apic_pm_state.apic_dfr = apic_read(APIC_DFR);
     apic_pm_state.apic_spiv = apic_read(APIC_SPIV);
     apic_pm_state.apic_lvtt = apic_read(APIC_LVTT);
     apic_pm_state.apic_lvtpc = apic_read(APIC_LVTPC);
@@ -643,14 +649,20 @@ int lapic_resume(void)
      * FIXME! This will be wrong if we ever support suspend on
      * SMP! We'll need to do this as part of the CPU restore!
      */
-    rdmsr(MSR_IA32_APICBASE, l, h);
-    l &= ~MSR_IA32_APICBASE_BASE;
-    l |= MSR_IA32_APICBASE_ENABLE | mp_lapic_addr;
-    wrmsr(MSR_IA32_APICBASE, l, h);
+    if ( !x2apic_enabled )
+    {
+        rdmsr(MSR_IA32_APICBASE, l, h);
+        l &= ~MSR_IA32_APICBASE_BASE;
+        l |= MSR_IA32_APICBASE_ENABLE | mp_lapic_addr;
+        wrmsr(MSR_IA32_APICBASE, l, h);
+    }
+    else
+        enable_x2apic();
 
     apic_write(APIC_LVTERR, ERROR_APIC_VECTOR | APIC_LVT_MASKED);
     apic_write(APIC_ID, apic_pm_state.apic_id);
-    apic_write(APIC_DFR, apic_pm_state.apic_dfr);
+    if ( !x2apic_enabled )
+        apic_write(APIC_DFR, apic_pm_state.apic_dfr);
     apic_write(APIC_LDR, apic_pm_state.apic_ldr);
     apic_write(APIC_TASKPRI, apic_pm_state.apic_taskpri);
     apic_write(APIC_SPIV, apic_pm_state.apic_spiv);
@@ -809,10 +821,29 @@ no_apic:
     return -1;
 }
 
+void enable_x2apic(void)
+{
+    u32 lo, hi;
+
+    rdmsr(MSR_IA32_APICBASE, lo, hi);
+    if ( !(lo & MSR_IA32_APICBASE_EXTD) )
+    {
+        lo |= MSR_IA32_APICBASE_ENABLE | MSR_IA32_APICBASE_EXTD;
+        wrmsr(MSR_IA32_APICBASE, lo, 0);
+        printk("x2APIC mode enabled.\n");
+    }
+    else
+        printk("x2APIC mode enabled by BIOS.\n");
+
+    x2apic_enabled = 1;
+}
+
 void __init init_apic_mappings(void)
 {
     unsigned long apic_phys;
 
+    if ( x2apic_enabled )
+        goto __next;
     /*
      * If no local APIC can be found then set up a fake all
      * zeroes page to simulate the local APIC and another
@@ -828,12 +859,13 @@ void __init init_apic_mappings(void)
     apic_printk(APIC_VERBOSE, "mapped APIC to %08lx (%08lx)\n", APIC_BASE,
                 apic_phys);
 
+__next:
     /*
      * Fetch the APIC ID of the BSP in case we have a
      * default configuration (or the MP table is broken).
      */
     if (boot_cpu_physical_apicid == -1U)
-        boot_cpu_physical_apicid = GET_APIC_ID(apic_read(APIC_ID));
+        boot_cpu_physical_apicid = get_apic_id();
 
 #ifdef CONFIG_X86_IO_APIC
     {
@@ -1271,7 +1303,7 @@ int __init APIC_init_uniprocessor (void)
      * might be zero if read from MP tables. Get it from LAPIC.
      */
 #ifdef CONFIG_CRASH_DUMP
-    boot_cpu_physical_apicid = GET_APIC_ID(apic_read(APIC_ID));
+    boot_cpu_physical_apicid = get_apic_id();
 #endif
     phys_cpu_present_map = physid_mask_of_physid(boot_cpu_physical_apicid);
 

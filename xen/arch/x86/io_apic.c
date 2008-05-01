@@ -1125,7 +1125,7 @@ void disable_IO_APIC(void)
         entry.delivery_mode   = dest_ExtINT; /* ExtInt */
         entry.vector          = 0;
         entry.dest.physical.physical_dest =
-            GET_APIC_ID(apic_read(APIC_ID));
+            get_apic_id();
 
         /*
          * Add it to the IO-APIC irq-routing table:

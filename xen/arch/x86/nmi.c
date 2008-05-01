@@ -434,14 +434,13 @@ void nmi_watchdog_tick(struct cpu_user_regs * regs)
  */
 static void do_nmi_trigger(unsigned char key)
 {
-    u32 id = GET_APIC_ID(apic_read(APIC_ID));
+    u32 id = get_apic_id();
 
     printk("Triggering NMI on APIC ID %x\n", id);
 
     local_irq_disable();
     apic_wait_icr_idle();
-    apic_write_around(APIC_ICR2, SET_APIC_DEST_FIELD(id));
-    apic_write_around(APIC_ICR, APIC_DM_NMI | APIC_DEST_PHYSICAL);
+    apic_icr_write(APIC_DM_NMI | APIC_DEST_PHYSICAL, id);
     local_irq_enable();
 }
 

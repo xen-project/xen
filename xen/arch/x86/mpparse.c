@@ -814,12 +814,15 @@ void __init find_smp_config (void)
 void __init mp_register_lapic_address (
 	u64			address)
 {
-	mp_lapic_addr = (unsigned long) address;
+    if ( !x2apic_enabled )
+    {
+    	mp_lapic_addr = (unsigned long) address;
 
-	set_fixmap_nocache(FIX_APIC_BASE, mp_lapic_addr);
+	    set_fixmap_nocache(FIX_APIC_BASE, mp_lapic_addr);
+    }
 
 	if (boot_cpu_physical_apicid == -1U)
-		boot_cpu_physical_apicid = GET_APIC_ID(apic_read(APIC_ID));
+		boot_cpu_physical_apicid = get_apic_id();
 
 	Dprintk("Boot CPU = %d\n", boot_cpu_physical_apicid);
 }

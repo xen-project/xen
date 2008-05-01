@@ -34,7 +34,7 @@
 #define vlapic_domain(vpic) (vlapic_vcpu(vlapic)->domain)
 
 #define VLAPIC_ID(vlapic)   \
-    (GET_APIC_ID(vlapic_get_reg((vlapic), APIC_ID)))
+    (GET_xAPIC_ID(vlapic_get_reg((vlapic), APIC_ID)))
 
 /*
  * APIC can be disabled in two ways:

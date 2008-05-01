@@ -90,13 +90,13 @@ static inline int num_booting_cpus(void)
 static inline int hard_smp_processor_id(void)
 {
 	/* we don't want to mark this access volatile - bad code generation */
-	return GET_APIC_ID(*(unsigned int *)(APIC_BASE+APIC_ID));
+	return get_apic_id();
 }
 
 static __inline int logical_smp_processor_id(void)
 {
 	/* we don't want to mark this access volatile - bad code generation */
-	return GET_APIC_LOGICAL_ID(*(unsigned int *)(APIC_BASE+APIC_LDR));
+	return get_logical_apic_id();
 }
 
 #endif

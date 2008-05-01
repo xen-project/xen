@@ -12,8 +12,8 @@
  
 #define		APIC_ID		0x20
 #define			APIC_ID_MASK		(0xFFu<<24)
-#define			GET_APIC_ID(x)		(((x)>>24)&0xFFu)
-#define			SET_APIC_ID(x)		(((x)<<24))
+#define			GET_xAPIC_ID(x)		(((x)>>24)&0xFFu)
+#define			SET_xAPIC_ID(x)		(((x)<<24))
 #define		APIC_LVR	0x30
 #define			APIC_LVR_MASK		0xFF00FF
 #define			GET_APIC_VERSION(x)	((x)&0xFF)
@@ -30,8 +30,8 @@
 #define		APIC_RRR	0xC0
 #define		APIC_LDR	0xD0
 #define			APIC_LDR_MASK		(0xFF<<24)
-#define			GET_APIC_LOGICAL_ID(x)	(((x)>>24)&0xFF)
-#define			SET_APIC_LOGICAL_ID(x)	(((x)<<24))
+#define			GET_xAPIC_LOGICAL_ID(x)	(((x)>>24)&0xFF)
+#define			SET_xAPIC_LOGICAL_ID(x)	(((x)<<24))
 #define			APIC_ALL_CPUS		0xFF
 #define		APIC_DFR	0xE0
 #define			APIC_DFR_CLUSTER		0x0FFFFFFFul
@@ -74,8 +74,8 @@
 #define			APIC_DM_EXTINT		0x00700
 #define			APIC_VECTOR_MASK	0x000FF
 #define		APIC_ICR2	0x310
-#define			GET_APIC_DEST_FIELD(x)	(((x)>>24)&0xFF)
-#define			SET_APIC_DEST_FIELD(x)	((x)<<24)
+#define			GET_xAPIC_DEST_FIELD(x)	(((x)>>24)&0xFF)
+#define			SET_xAPIC_DEST_FIELD(x)	((x)<<24)
 #define		APIC_LVTT	0x320
 #define		APIC_LVTTHMR	0x330
 #define		APIC_LVTPC	0x340
@@ -103,6 +103,10 @@
 #define		APIC_TMICT	0x380
 #define		APIC_TMCCT	0x390
 #define		APIC_TDCR	0x3E0
+
+/* Only available in x2APIC mode */
+#define		APIC_SELF_IPI	0x400
+
 #define			APIC_TDR_DIV_TMBASE	(1<<2)
 #define			APIC_TDR_DIV_1		0xB
 #define			APIC_TDR_DIV_2		0x0
@@ -114,6 +118,9 @@
 #define			APIC_TDR_DIV_128	0xA
 
 #define APIC_BASE (fix_to_virt(FIX_APIC_BASE))
+
+/* It's only used in x2APIC mode of an x2APIC unit. */
+#define APIC_MSR_BASE 0x800
 
 #ifdef __i386__
  #define MAX_IO_APICS 64

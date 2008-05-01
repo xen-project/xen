@@ -890,6 +890,9 @@ void __init __start_xen(unsigned long mbi_p)
 
     generic_apic_probe();
 
+    if ( x2apic_is_available() )
+        enable_x2apic();
+
     acpi_boot_init();
 
     init_cpu_to_node();

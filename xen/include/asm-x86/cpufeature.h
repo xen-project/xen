@@ -92,6 +92,7 @@
 #define X86_FEATURE_DCA		(4*32+18) /* Direct Cache Access */
 #define X86_FEATURE_SSE4_1	(4*32+19) /* Streaming SIMD Extensions 4.1 */
 #define X86_FEATURE_SSE4_2	(4*32+20) /* Streaming SIMD Extensions 4.2 */
+#define X86_FEATURE_X2APIC	(4*32+21) /* Extended xAPIC */
 #define X86_FEATURE_POPCNT	(4*32+23) /* POPCNT instruction */
 
 /* VIA/Cyrix/Centaur-defined CPU features, CPUID level 0xC0000001, word 5 */
@@ -182,6 +183,7 @@
 #define cpu_has_ffxsr           ((boot_cpu_data.x86_vendor == X86_VENDOR_AMD) \
                                  && boot_cpu_has(X86_FEATURE_FFXSR))
 
+#define cpu_has_x2apic          boot_cpu_has(X86_FEATURE_X2APIC)
 #endif /* __ASM_I386_CPUFEATURE_H */
 
 /* 

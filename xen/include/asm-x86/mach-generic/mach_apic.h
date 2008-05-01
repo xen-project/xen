@@ -62,7 +62,7 @@ extern void generic_bigsmp_probe(void);
  */
 static inline int apic_id_registered(void)
 {
-	return physid_isset(GET_APIC_ID(apic_read(APIC_ID)),
+	return physid_isset(get_apic_id(),
 			    phys_cpu_present_map);
 }
 
