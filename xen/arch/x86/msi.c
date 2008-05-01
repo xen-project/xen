@@ -520,7 +520,7 @@ static int msi_capability_init(struct pci_dev *dev, int vector)
 
 static u64 pci_resource_start(struct pci_dev *dev, u8 bar_index)
 {
-    unsigned long bar_base;
+    u64 bar_base;
     u8 bus = dev->bus;
     u8 slot = PCI_SLOT(dev->devfn);
     u8 func = PCI_FUNC(dev->devfn);
