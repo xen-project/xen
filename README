@@ -1,10 +1,10 @@
 #################################
- __  __            _____  ____  
- \ \/ /___ _ __   |___ / |___ \ 
-  \  // _ \ '_ \    |_ \   __) |
-  /  \  __/ | | |  ___) | / __/ 
- /_/\_\___|_| |_| |____(_)_____|
-                                
+ __  __            _____  _____  
+ \ \/ /___ _ __   |___ / |___ /  
+  \  // _ \ '_ \    |_ \   |_ \  
+  /  \  __/ | | |  ___) | ___) | 
+ /_/\_\___|_| |_| |____(_)____/  
+                                 
 #################################
 
 http://www.xen.org/
@@ -21,11 +21,10 @@ development community, spearheaded by XenSource Inc, a company created
 by the original Xen development team to build enterprise products
 around Xen.
 
-The 3.2 release offers excellent performance, hardware support and
+The 3.3 release offers excellent performance, hardware support and
 enterprise-grade features such as x86_32-PAE, x86_64, SMP guests and
-live relocation of VMs. This install tree contains source for a Linux
-2.6 guest; ports to Linux 2.4, NetBSD, FreeBSD and Solaris are
-available from the community.
+live relocation of VMs. Ports to Linux 2.6, Linux 2.4, NetBSD, FreeBSD
+and Solaris are available from the community.
 
 This file contains some quick-start instructions to install Xen on
 your system. For full documentation, see the Xen User Manual. If this
@@ -55,8 +54,8 @@ performed with root privileges.]
    /boot/grub/menu.lst: edit this file to include an entry like the
    following:
 
-    title Xen 3.2 / XenLinux 2.6
-       kernel /boot/xen-3.2.gz console=vga
+    title Xen 3.3 / XenLinux 2.6
+       kernel /boot/xen-3.3.gz console=vga
        module /boot/vmlinuz-2.6-xen root=<root-dev> ro console=tty0
        module /boot/initrd-2.6-xen.img
 
@@ -75,7 +74,7 @@ performed with root privileges.]
    32MB memory for internal use, which is not available for allocation
    to virtual machines.
 
-3. Reboot your system and select the "Xen 3.2 / XenLinux 2.6" menu
+3. Reboot your system and select the "Xen 3.3 / XenLinux 2.6" menu
    option. After booting Xen, Linux will start and your initialisation
    scripts should execute in the usual way.
 
