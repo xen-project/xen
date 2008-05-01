@@ -132,5 +132,14 @@ def listenRelocation():
         else:
             hosts_allow = map(re.compile, hosts_allow.split(" "))
 
-        tcp.TCPListener(RelocationProtocol, port, interface = interface,
-                        hosts_allow = hosts_allow)
+        ssl_key_file = xoptions.get_xend_relocation_server_ssl_key_file()
+        ssl_cert_file = xoptions.get_xend_relocation_server_ssl_cert_file()
+
+        if ssl_key_file and ssl_cert_file:
+            tcp.SSLTCPListener(RelocationProtocol, port, interface = interface,
+                               hosts_allow = hosts_allow,
+                               ssl_key_file = ssl_key_file,
+                               ssl_cert_file = ssl_cert_file)
+        else:
+            tcp.TCPListener(RelocationProtocol, port, interface = interface,
+                            hosts_allow = hosts_allow)

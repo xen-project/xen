@@ -82,6 +82,15 @@
 # is set.
 #(xend-relocation-port 8002)
 
+# Whether to use tls when relocating.
+#(xend-relocation-tls no)
+
+# SSL key and certificate to use for the relocation interface.
+# Setting these will mean that this port serves only SSL connections as
+# opposed to plaintext ones.
+#(xend-relocation-server-ssl-key-file  /etc/xen/xmlrpc.key)
+#(xend-relocation-server-ssl-cert-file  /etc/xen/xmlrpc.crt)
+
 # Address xend should listen on for HTTP connections, if xend-http-server is
 # set.
 # Specifying 'localhost' prevents remote connections.

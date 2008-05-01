@@ -1293,8 +1293,16 @@ class XendDomain:
 
         if port == 0:
             port = xoptions.get_xend_relocation_port()
+
         try:
-            sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            tls = xoptions.get_xend_relocation_tls()
+            if tls:
+                from OpenSSL import SSL
+                ctx = SSL.Context(SSL.SSLv23_METHOD)
+                sock = SSL.Connection(ctx, socket.socket(socket.AF_INET, socket.SOCK_STREAM))
+                sock.set_connect_state()
+            else:
+                sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             sock.connect((dst, port))
         except socket.error, err:
             raise XendError("can't connect: %s" % err[1])
