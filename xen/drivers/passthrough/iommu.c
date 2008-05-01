@@ -77,7 +77,7 @@ void iommu_domain_destroy(struct domain *d)
     {
         for ( i = 0; i < NR_IRQS; i++ )
         {
-            if ( !hvm_irq_dpci->mirq[i].valid )
+            if ( !(hvm_irq_dpci->mirq[i].flags & HVM_IRQ_DPCI_VALID) )
                 continue;
 
             pirq_guest_unbind(d, i);

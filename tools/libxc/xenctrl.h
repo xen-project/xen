@@ -856,6 +856,15 @@ int xc_physdev_map_pirq(int xc_handle,
                         int index,
                         int *pirq);
 
+int xc_physdev_map_pirq_msi(int xc_handle,
+                            int domid,
+                            int type,
+                            int index,
+                            int *pirq,
+                            int devfn,
+                            int bus,
+                            int msi_type);
+
 int xc_physdev_unmap_pirq(int xc_handle,
                           int domid,
                           int pirq);
@@ -959,6 +968,13 @@ int xc_domain_ioport_mapping(int xc_handle,
                              uint32_t first_mport,
                              uint32_t nr_ports,
                              uint32_t add_mapping);
+
+int xc_domain_update_msi_irq(
+    int xc_handle,
+    uint32_t domid,
+    uint32_t gvec,
+    uint32_t pirq,
+    uint32_t gflags);
 
 int xc_domain_bind_pt_irq(int xc_handle,
                           uint32_t domid,

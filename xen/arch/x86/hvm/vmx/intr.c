@@ -103,6 +103,12 @@ static void enable_intr_window(struct vcpu *v, struct hvm_intack intack)
     }
 }
 
+extern int vmsi_deliver(struct domain *d, int pirq);
+static int hvm_pci_msi_assert(struct domain *d, int pirq)
+{
+    return vmsi_deliver(d, pirq);
+}
+
 static void vmx_dirq_assist(struct vcpu *v)
 {
     unsigned int irq;
@@ -120,6 +126,12 @@ static void vmx_dirq_assist(struct vcpu *v)
     {
         if ( !test_and_clear_bit(irq, &hvm_irq_dpci->dirq_mask) )
             continue;
+
+		if ( test_bit(_HVM_IRQ_DPCI_MSI, &hvm_irq_dpci->mirq[irq].flags) )
+		{
+			hvm_pci_msi_assert(d, irq);
+			continue;
+		}
 
         stop_timer(&hvm_irq_dpci->hvm_timer[domain_irq_to_vector(d, irq)]);
 

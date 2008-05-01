@@ -16,4 +16,5 @@ obj-y += vioapic.o
 obj-y += vlapic.o
 obj-y += vpic.o
 obj-y += save.o
+obj-y += vmsi.o
 obj-y += stdvga.o

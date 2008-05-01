@@ -795,6 +795,32 @@ int xc_deassign_device(
     return do_domctl(xc_handle, &domctl);
 }
 
+int xc_domain_update_msi_irq(
+    int xc_handle,
+    uint32_t domid,
+    uint32_t gvec,
+    uint32_t pirq,
+    uint32_t gflags)
+{
+    int rc;
+    xen_domctl_bind_pt_irq_t *bind;
+
+    DECLARE_DOMCTL;
+
+    domctl.cmd = XEN_DOMCTL_bind_pt_irq;
+    domctl.domain = (domid_t)domid;
+
+    bind = &(domctl.u.bind_pt_irq);
+    bind->hvm_domid = domid;
+    bind->irq_type = PT_IRQ_TYPE_MSI;
+    bind->machine_irq = pirq;
+    bind->u.msi.gvec = gvec;
+    bind->u.msi.gflags = gflags;
+
+    rc = do_domctl(xc_handle, &domctl);
+    return rc;
+}
+
 /* Pass-through: binds machine irq to guests irq */
 int xc_domain_bind_pt_irq(
     int xc_handle,

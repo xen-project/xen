@@ -45,6 +45,37 @@ int xc_physdev_map_pirq(int xc_handle,
     return rc;
 }
 
+int xc_physdev_map_pirq_msi(int xc_handle,
+                            int domid,
+                            int type,
+                            int index,
+                            int *pirq,
+                            int devfn,
+                            int bus,
+                            int msi_type)
+{
+    int rc;
+    struct physdev_map_pirq map;
+
+    if ( !pirq )
+        return -EINVAL;
+
+    map.domid = domid;
+    map.type = type;
+    map.index = index;
+    map.pirq = *pirq;
+    map.msi_info.devfn = devfn;
+    map.msi_info.bus = bus;
+    map.msi_info.msi = msi_type;
+
+    rc = do_physdev_op(xc_handle, PHYSDEVOP_map_pirq, &map);
+
+    if ( !rc )
+        *pirq = map.pirq;
+
+    return rc;
+}
+
 int xc_physdev_unmap_pirq(int xc_handle,
                           int domid,
                           int pirq)
@@ -59,3 +90,4 @@ int xc_physdev_unmap_pirq(int xc_handle,
 
     return rc;
 }
+

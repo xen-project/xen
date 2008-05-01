@@ -26,6 +26,7 @@
 #include "pass-through.h"
 #include "pci/header.h"
 #include "pci/pci.h"
+#include "pt-msi.h"
 
 extern FILE *logfile;
 
@@ -287,6 +288,9 @@ static void pt_pci_write_config(PCIDevice *d, uint32_t address, uint32_t val,
         return;
     }
 
+    if ( pt_msi_write(assigned_device, address, val, len) )
+        return;
+
     /* PCI config pass-through */
     if (address == 0x4) {
         switch (len){
@@ -333,6 +337,7 @@ static uint32_t pt_pci_read_config(PCIDevice *d, uint32_t address, int len)
         break;
     }
 
+    pt_msi_read(assigned_device, address, len, &val);
 exit:
 
 #ifdef PT_DEBUG_PCI_CONFIG_ACCESS
@@ -445,11 +450,41 @@ static int pt_unregister_regions(struct pt_dev *assigned_device)
 
 }
 
+uint8_t find_cap_offset(struct pci_dev *pci_dev, uint8_t cap)
+{
+    int id;
+    int max_cap = 48;
+    int pos = PCI_CAPABILITY_LIST;
+    int status;
+
+    status = pci_read_byte(pci_dev, PCI_STATUS);
+    if ( (status & PCI_STATUS_CAP_LIST) == 0 )
+        return 0;
+
+    while ( max_cap-- )
+    {
+        pos = pci_read_byte(pci_dev, pos);
+        if ( pos < 0x40 )
+            break;
+
+        pos &= ~3;
+        id = pci_read_byte(pci_dev, pos + PCI_CAP_LIST_ID);
+
+        if ( id == 0xff )
+            break;
+        if ( id == cap )
+            return pos;
+
+        pos += PCI_CAP_LIST_NEXT;
+    }
+    return 0;
+}
+
 struct pt_dev * register_real_device(PCIBus *e_bus,
         const char *e_dev_name, int e_devfn, uint8_t r_bus, uint8_t r_dev,
         uint8_t r_func, uint32_t machine_irq, struct pci_access *pci_access)
 {
-    int rc = -1, i;
+    int rc = -1, i, pos;
     struct pt_dev *assigned_device = NULL;
     struct pci_dev *pci_dev;
     uint8_t e_device, e_intx;
@@ -510,6 +545,9 @@ struct pt_dev * register_real_device(PCIBus *e_bus,
     /* Initialize virtualized PCI configuration (Extended 256 Bytes) */
     for ( i = 0; i < PCI_CONFIG_SIZE; i++ )
         assigned_device->dev.config[i] = pci_read_byte(pci_dev, i);
+
+    if ( (pos = find_cap_offset(pci_dev, PCI_CAP_ID_MSI)) )
+        pt_msi_init(assigned_device, pos);
 
     /* Handle real device's MMIO/PIO BARs */
     pt_register_regions(assigned_device);

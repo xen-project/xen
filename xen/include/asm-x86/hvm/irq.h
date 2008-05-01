@@ -38,11 +38,21 @@ struct dev_intx_gsi_link {
     uint8_t link;
 };
 
+#define HVM_IRQ_DPCI_VALID 0x1
+#define HVM_IRQ_DPCI_MSI   0x2
+#define _HVM_IRQ_DPCI_MSI  0x1
+
+struct hvm_gmsi_info {
+    uint32_t gvec;
+    uint32_t gflags;
+};
+
 struct hvm_mirq_dpci_mapping {
-    uint8_t valid;
+    uint32_t flags;
     int pending;
     struct list_head digl_list;
     struct domain *dom;
+    struct hvm_gmsi_info gmsi;
 };
 
 struct hvm_girq_dpci_mapping {
@@ -60,6 +70,7 @@ struct hvm_irq_dpci {
     struct hvm_mirq_dpci_mapping mirq[NR_IRQS];
     /* Guest IRQ to guest device/intx mapping. */
     struct hvm_girq_dpci_mapping girq[NR_IRQS];
+    uint8_t msi_gvec_pirq[NR_VECTORS];
     DECLARE_BITMAP(dirq_mask, NR_IRQS);
     /* Record of mapped ISA IRQs */
     DECLARE_BITMAP(isairq_map, NR_ISAIRQS);
