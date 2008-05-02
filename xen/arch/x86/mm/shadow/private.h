@@ -528,6 +528,15 @@ sh_mfn_is_dirty(struct domain *d, mfn_t gmfn)
     return rv;
 }
 
+/**************************************************************************/
+/* VRAM dirty tracking support */
+
+struct sh_dirty_vram {
+    unsigned long begin_pfn;
+    unsigned long end_pfn;
+    paddr_t *sl1ma;
+    uint8_t *dirty_bitmap;
+};
 
 /**************************************************************************/
 /* Shadow-page refcounting. */

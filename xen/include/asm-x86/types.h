@@ -38,15 +38,18 @@ typedef signed long long s64;
 typedef unsigned long long u64;
 #if defined(CONFIG_X86_PAE)
 typedef u64 paddr_t;
+#define INVALID_PADDR (~0ULL)
 #define PRIpaddr "016llx"
 #else
 typedef unsigned long paddr_t;
+#define INVALID_PADDR (~0UL)
 #define PRIpaddr "08lx"
 #endif
 #elif defined(__x86_64__)
 typedef signed long s64;
 typedef unsigned long u64;
 typedef unsigned long paddr_t;
+#define INVALID_PADDR (~0UL)
 #define PRIpaddr "016lx"
 #endif
 

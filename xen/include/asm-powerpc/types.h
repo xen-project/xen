@@ -61,6 +61,7 @@ typedef unsigned long size_t;
 #endif
 
 typedef unsigned long paddr_t;
+#define INVALID_PADDR (~0UL)
 #define PRIpaddr "08lx"
 
 /* DMA addresses come in generic and 64-bit flavours.  */

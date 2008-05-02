@@ -882,6 +882,22 @@ int xc_hvm_set_pci_link_route(
     int xc_handle, domid_t dom, uint8_t link, uint8_t isa_irq);
 
 
+/*
+ * Track dirty bit changes in the VRAM area
+ *
+ * All of this is done atomically:
+ * - get the dirty bitmap since the last call
+ * - set up dirty tracking area for period up to the next call
+ * - clear the dirty tracking area.
+ *
+ * Returns -ENODATA and does not fill bitmap if the area has changed since the
+ * last call.
+ */
+int xc_hvm_track_dirty_vram(
+    int xc_handle, domid_t dom,
+    uint64_t first_pfn, uint64_t nr,
+    unsigned long *bitmap);
+
 typedef enum {
   XC_ERROR_NONE = 0,
   XC_INTERNAL_ERROR = 1,

@@ -2589,6 +2589,13 @@ void shadow_teardown(struct domain *d)
      * calls now that we've torn down the bitmap */
     d->arch.paging.mode &= ~PG_log_dirty;
 
+    if (d->dirty_vram) {
+        xfree(d->dirty_vram->sl1ma);
+        xfree(d->dirty_vram->dirty_bitmap);
+        xfree(d->dirty_vram);
+        d->dirty_vram = NULL;
+    }
+
     shadow_unlock(d);
 }
 
@@ -2849,6 +2856,164 @@ void shadow_clean_dirty_bitmap(struct domain *d)
     shadow_blow_tables(d);
     shadow_unlock(d);
 }
+
+
+/**************************************************************************/
+/* VRAM dirty tracking support */
+int shadow_track_dirty_vram(struct domain *d,
+                            unsigned long begin_pfn,
+                            unsigned long nr,
+                            XEN_GUEST_HANDLE_64(uint8) dirty_bitmap)
+{
+    int rc;
+    unsigned long end_pfn = begin_pfn + nr;
+    unsigned long dirty_size = (nr + 7) / 8;
+    int flush_tlb = 0;
+
+    if (end_pfn < begin_pfn
+            || begin_pfn > d->arch.p2m->max_mapped_pfn
+            || end_pfn >= d->arch.p2m->max_mapped_pfn)
+        return -EINVAL;
+
+    shadow_lock(d);
+
+    if ( d->dirty_vram && (!nr ||
+             ( begin_pfn != d->dirty_vram->begin_pfn
+            || end_pfn   != d->dirty_vram->end_pfn )) ) {
+        /* Different tracking, tear the previous down. */
+        gdprintk(XENLOG_INFO, "stopping tracking VRAM %lx - %lx\n", d->dirty_vram->begin_pfn, d->dirty_vram->end_pfn);
+        xfree(d->dirty_vram->sl1ma);
+        xfree(d->dirty_vram->dirty_bitmap);
+        xfree(d->dirty_vram);
+        d->dirty_vram = NULL;
+    }
+
+    if ( !nr ) {
+        rc = 0;
+        goto out;
+    }
+
+    /* This should happen seldomly (Video mode change),
+     * no need to be careful. */
+    if ( !d->dirty_vram ) {
+        unsigned long i;
+        p2m_type_t t;
+
+        /* Just recount from start. */
+        for ( i = begin_pfn; i < end_pfn; i++ )
+            flush_tlb |= sh_remove_all_mappings(d->vcpu[0], gfn_to_mfn(d, i, &t));
+
+        gdprintk(XENLOG_INFO, "tracking VRAM %lx - %lx\n", begin_pfn, end_pfn);
+
+        rc = -ENOMEM;
+        if ( (d->dirty_vram = xmalloc(struct sh_dirty_vram)) == NULL )
+            goto out;
+        d->dirty_vram->begin_pfn = begin_pfn;
+        d->dirty_vram->end_pfn = end_pfn;
+
+        if ( (d->dirty_vram->sl1ma = xmalloc_array(paddr_t, nr)) == NULL )
+            goto out_dirty_vram;
+        memset(d->dirty_vram->sl1ma, ~0, sizeof(paddr_t) * nr);
+
+        if ( (d->dirty_vram->dirty_bitmap = xmalloc_array(uint8_t, dirty_size)) == NULL )
+            goto out_sl1ma;
+        memset(d->dirty_vram->dirty_bitmap, 0, dirty_size);
+
+        /* Tell the caller that this time we could not track dirty bits. */
+        rc = -ENODATA;
+    } else {
+        int i;
+#ifdef __i386__
+        unsigned long map_mfn = INVALID_MFN;
+        void *map_sl1p = NULL;
+#endif
+
+        /* Iterate over VRAM to track dirty bits. */
+        for ( i = 0; i < nr; i++ ) {
+            p2m_type_t t;
+            mfn_t mfn = gfn_to_mfn(d, begin_pfn + i, &t);
+            struct page_info *page = mfn_to_page(mfn);
+            u32 count_info = page->u.inuse.type_info & PGT_count_mask;
+            int dirty = 0;
+            paddr_t sl1ma = d->dirty_vram->sl1ma[i];
+
+            switch (count_info) {
+            case 0:
+                /* No guest reference, nothing to track. */
+                break;
+            case 1:
+                /* One guest reference. */
+                if ( sl1ma == INVALID_PADDR ) {
+                    /* We don't know which sl1e points to this, too bad. */
+                    dirty = 1;
+                    /* TODO: Heuristics for finding the single mapping of
+                     * this gmfn */
+                    flush_tlb |= sh_remove_all_mappings(d->vcpu[0], gfn_to_mfn(d, begin_pfn + i, &t));
+                } else {
+                    /* Hopefully the most common case: only one mapping,
+                     * whose dirty bit we can use. */
+                    l1_pgentry_t *sl1e;
+#ifdef __i386__
+                    void *sl1p = map_sl1p;
+                    unsigned long sl1mfn = paddr_to_pfn(sl1ma);
+
+                    if ( sl1mfn != map_mfn ) {
+                        if ( map_sl1p )
+                            sh_unmap_domain_page(map_sl1p);
+                        map_sl1p = sl1p = sh_map_domain_page(_mfn(sl1mfn));
+                        map_mfn = sl1mfn;
+                    }
+                    sl1e = sl1p + (sl1ma & ~PAGE_MASK);
+#else
+                    sl1e = maddr_to_virt(sl1ma);
+#endif
+
+                    if ( l1e_get_flags(*sl1e) & _PAGE_DIRTY ) {
+                        dirty = 1;
+                        /* Note: this is atomic, so we may clear a
+                         * _PAGE_ACCESSED set by another processor. */
+                        l1e_remove_flags(*sl1e, _PAGE_DIRTY);
+                        flush_tlb = 1;
+                    }
+                }
+                break;
+            default:
+                /* More than one guest reference,
+                 * we don't afford tracking that. */
+                dirty = 1;
+                break;
+            }
+
+            if ( dirty )
+                d->dirty_vram->dirty_bitmap[i / 8] |= 1 << (i % 8);
+        }
+
+#ifdef __i386__
+        if ( map_sl1p )
+            sh_unmap_domain_page(map_sl1p);
+#endif
+
+        rc = -EFAULT;
+        if ( copy_to_guest(dirty_bitmap, d->dirty_vram->dirty_bitmap, dirty_size) == 0 ) {
+            memset(d->dirty_vram->dirty_bitmap, 0, dirty_size);
+            rc = 0;
+        }
+    }
+    if ( flush_tlb )
+        flush_tlb_mask(d->domain_dirty_cpumask);    
+    goto out;
+
+out_sl1ma:
+    xfree(d->dirty_vram->sl1ma);
+out_dirty_vram:
+    xfree(d->dirty_vram);
+    d->dirty_vram = NULL;
+
+out:
+    shadow_unlock(d);
+    return rc;
+}
+
 /**************************************************************************/
 /* Shadow-control XEN_DOMCTL dispatcher */
 

@@ -2345,6 +2345,54 @@ long do_hvm_op(unsigned long op, XEN_GUEST_HANDLE(void) arg)
         rc = guest_handle_is_null(arg) ? hvmop_flush_tlb_all() : -ENOSYS;
         break;
 
+    case HVMOP_track_dirty_vram:
+    {
+        struct xen_hvm_track_dirty_vram a;
+        struct domain *d;
+
+        if ( copy_from_guest(&a, arg, 1) )
+            return -EFAULT;
+
+        if ( a.domid == DOMID_SELF )
+        {
+            d = rcu_lock_current_domain();
+        }
+        else
+        {
+            if ( (d = rcu_lock_domain_by_id(a.domid)) == NULL )
+                return -ESRCH;
+            if ( !IS_PRIV_FOR(current->domain, d) )
+            {
+                rc = -EPERM;
+                goto param_fail2;
+            }
+        }
+
+        rc = -EINVAL;
+        if ( !is_hvm_domain(d) )
+            goto param_fail2;
+
+        rc = xsm_hvm_param(d, op);
+        if ( rc )
+            goto param_fail2;
+
+        rc = -ESRCH;
+        if ( d->is_dying )
+            goto param_fail2;
+
+        rc = -EINVAL;
+        if ( !shadow_mode_enabled(d))
+            goto param_fail2;
+        if ( d->vcpu[0] == NULL )
+            goto param_fail2;
+
+        rc = shadow_track_dirty_vram(d, a.first_pfn, a.nr, a.dirty_bitmap);
+
+    param_fail2:
+        rcu_unlock_domain(d);
+        break;
+    }
+
     default:
     {
         gdprintk(XENLOG_WARNING, "Bad HVM op %ld.\n", op);

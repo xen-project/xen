@@ -1086,6 +1086,9 @@ static void vga_draw_text(VGAState *s, int full_update)
     vga_draw_glyph8_func *vga_draw_glyph8;
     vga_draw_glyph9_func *vga_draw_glyph9;
 
+    /* Disable dirty bit tracking */
+    xc_hvm_track_dirty_vram(xc_handle, domid, 0, 0, NULL);
+
     if (s->ds->dpy_colourdepth != NULL && s->ds->depth != 0)
         s->ds->dpy_colourdepth(s->ds, 0);
     s->rgb_to_pixel = 
@@ -1485,7 +1488,7 @@ void check_sse2(void)
 static void vga_draw_graphic(VGAState *s, int full_update)
 {
     int y1, y, update, linesize, y_start, double_scan, mask, depth;
-    int width, height, shift_control, line_offset, bwidth, ds_depth;
+    int width, height, shift_control, line_offset, bwidth, ds_depth, bits;
     ram_addr_t page0, page1;
     int disp_width, multi_scan, multi_run;
     uint8_t *d;
@@ -1533,6 +1536,7 @@ static void vga_draw_graphic(VGAState *s, int full_update)
         } else {
             v = VGA_DRAW_LINE4;
         }
+        bits = 4;
     } else if (shift_control == 1) {
         full_update |= update_palette16(s);
         if (s->sr[0x01] & 8) {
@@ -1541,28 +1545,35 @@ static void vga_draw_graphic(VGAState *s, int full_update)
         } else {
             v = VGA_DRAW_LINE2;
         }
+        bits = 4;
     } else {
         switch(s->get_bpp(s)) {
         default:
         case 0:
             full_update |= update_palette256(s);
             v = VGA_DRAW_LINE8D2;
+            bits = 4;
             break;
         case 8:
             full_update |= update_palette256(s);
             v = VGA_DRAW_LINE8;
+            bits = 8;
             break;
         case 15:
             v = VGA_DRAW_LINE15;
+            bits = 16;
             break;
         case 16:
             v = VGA_DRAW_LINE16;
+            bits = 16;
             break;
         case 24:
             v = VGA_DRAW_LINE24;
+            bits = 24;
             break;
         case 32:
             v = VGA_DRAW_LINE32;
+            bits = 32;
             break;
         }
     }
@@ -1590,12 +1601,72 @@ static void vga_draw_graphic(VGAState *s, int full_update)
            width, height, v, line_offset, s->cr[9], s->cr[0x17], s->line_compare, s->sr[0x01]);
 #endif
 
-    for (y = 0; y < s->vram_size; y += TARGET_PAGE_SIZE)
-        if (vram_dirty(s, y, TARGET_PAGE_SIZE))
+    y = 0;
+
+    if (height - 1 > s->line_compare || multi_run || (s->cr[0x17] & 3) != 3
+            || !s->lfb_addr) {
+        /* Tricky things happen, disable dirty bit tracking */
+        xc_hvm_track_dirty_vram(xc_handle, domid, 0, 0, NULL);
+
+        for ( ; y < s->vram_size; y += TARGET_PAGE_SIZE)
+            if (vram_dirty(s, y, TARGET_PAGE_SIZE))
+                cpu_physical_memory_set_dirty(s->vram_offset + y);
+    } else {
+        /* Tricky things won't have any effect, i.e. we are in the very simple
+         * (and very usual) case of a linear buffer. */
+        unsigned long end;
+
+        for ( ; y < ((s->start_addr * 4) & TARGET_PAGE_MASK); y += TARGET_PAGE_SIZE)
+            /* We will not read that anyway. */
             cpu_physical_memory_set_dirty(s->vram_offset + y);
 
+        if (y < (s->start_addr * 4)) {
+            /* start address not aligned on a page, track dirtyness by hand. */
+            if (vram_dirty(s, y, TARGET_PAGE_SIZE))
+                cpu_physical_memory_set_dirty(s->vram_offset + y);
+            y += TARGET_PAGE_SIZE;
+        }
+
+        /* use page table dirty bit tracking for the inner of the LFB */
+        end = s->start_addr * 4 + height * line_offset;
+        {
+            unsigned long npages = ((end & TARGET_PAGE_MASK) - y) / TARGET_PAGE_SIZE;
+            const int width = sizeof(unsigned long) * 8;
+            unsigned long bitmap[(npages + width - 1) / width];
+            int err;
+
+            if (!(err = xc_hvm_track_dirty_vram(xc_handle, domid,
+                        (s->lfb_addr + y) / TARGET_PAGE_SIZE, npages, bitmap))) {
+                int i, j;
+                for (i = 0; i < sizeof(bitmap) / sizeof(*bitmap); i++) {
+                    unsigned long map = bitmap[i];
+                    for (j = i * width; map && j < npages; map >>= 1, j++)
+                        if (map & 1)
+                            cpu_physical_memory_set_dirty(s->vram_offset + y
+                                + j * TARGET_PAGE_SIZE);
+                }
+                y += npages * TARGET_PAGE_SIZE;
+            } else {
+                /* ENODATA just means we have changed mode and will succeed
+                 * next time */
+                if (err != -ENODATA)
+                    fprintf(stderr, "track_dirty_vram(%lx, %lx) failed (%d)\n", s->lfb_addr + y, npages, err);
+            }
+        }
+
+        for ( ; y < s->vram_size && y < end; y += TARGET_PAGE_SIZE)
+            /* failed or end address not aligned on a page, track dirtyness by
+             * hand. */
+            if (vram_dirty(s, y, TARGET_PAGE_SIZE))
+                cpu_physical_memory_set_dirty(s->vram_offset + y);
+
+        for ( ; y < s->vram_size; y += TARGET_PAGE_SIZE)
+            /* We will not read that anyway. */
+            cpu_physical_memory_set_dirty(s->vram_offset + y);
+    }
+
     addr1 = (s->start_addr * 4);
-    bwidth = width * 4;
+    bwidth = (width * bits + 7) / 8;
     y_start = -1;
     page_min = 0;
     page_max = 0;
@@ -1681,6 +1752,10 @@ static void vga_draw_blank(VGAState *s, int full_update)
         return;
     if (s->last_scr_width <= 0 || s->last_scr_height <= 0)
         return;
+
+    /* Disable dirty bit tracking */
+    xc_hvm_track_dirty_vram(xc_handle, domid, 0, 0, NULL);
+
     s->rgb_to_pixel = 
         rgb_to_pixel_dup_table[get_depth_index(s->ds)];
     if (s->ds->depth == 8) 

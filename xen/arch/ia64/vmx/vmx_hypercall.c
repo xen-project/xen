@@ -200,6 +200,10 @@ do_hvm_op(unsigned long op, XEN_GUEST_HANDLE(void) arg)
         rc = 0;
         break;
 
+    case HVMOP_track_dirty_vram:
+        rc = -ENOSYS;
+        break;
+
     default:
         gdprintk(XENLOG_INFO, "Bad HVM op %ld.\n", op);
         rc = -ENOSYS;
