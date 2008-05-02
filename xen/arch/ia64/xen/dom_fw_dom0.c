@@ -457,8 +457,6 @@ complete_dom0_memmap(struct domain *d, struct fw_tables *tables)
 		u64 start = md->phys_addr;
 		u64 size = md->num_pages << EFI_PAGE_SHIFT;
 		u64 end = start + size;
-		u64 mpaddr;
-		unsigned long flags;
 
 		switch (md->type) {
 
