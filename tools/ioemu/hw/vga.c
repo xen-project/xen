@@ -1075,7 +1075,7 @@ static rgb_to_pixel_dup_func *rgb_to_pixel_dup_table[NB_DEPTHS];
  */
 static void vga_draw_text(VGAState *s, int full_update)
 {
-    int cx, cy, cheight, cw, ch, cattr, height, width, ch_attr, depth;
+    int cx, cy, cheight, cw, ch, cattr, height, width, ch_attr;
     int cx_min, cx_max, linesize, x_incr;
     uint32_t offset, fgcol, bgcol, v, cursor_offset;
     uint8_t *d1, *d, *src, *s1, *dest, *cursor_ptr;
@@ -1086,9 +1086,8 @@ static void vga_draw_text(VGAState *s, int full_update)
     vga_draw_glyph8_func *vga_draw_glyph8;
     vga_draw_glyph9_func *vga_draw_glyph9;
 
-    depth = s->get_bpp(s);
-    if (s->ds->dpy_colourdepth != NULL && s->ds->depth != depth)
-        s->ds->dpy_colourdepth(s->ds, depth);
+    if (s->ds->dpy_colourdepth != NULL && s->ds->depth != 0)
+        s->ds->dpy_colourdepth(s->ds, 0);
     s->rgb_to_pixel = 
         rgb_to_pixel_dup_table[get_depth_index(s->ds)];
 
