@@ -235,6 +235,9 @@ static void sdl_resize(DisplayState *ds, int w, int h, int linesize)
  again:
     screen = SDL_SetVideoMode(w, h, 0, flags);
 
+    /* Process any WM-generated resize event */
+    SDL_PumpEvents();
+
     if (!screen) {
         fprintf(stderr, "Could not open SDL display: %s\n", SDL_GetError());
         if (opengl_enabled) {
