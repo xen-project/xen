@@ -1028,6 +1028,7 @@ done:
     /* The token will not be unique if multiple imports are inited */
     xenbus_watch_path(XBT_NIL, r_nodename/*, token*/);
     xenbus_wait_for_value(/*token,*/ r_nodename, STATE_READY);
+    xenbus_unwatch_path(XBT_NIL, r_nodename);
     printk("Backend ready.\n");
    
     //create_thread("fs-tester", test_fs_import, import); 
