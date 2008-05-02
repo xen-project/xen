@@ -940,7 +940,6 @@ struct DisplayState {
     uint32_t *palette;
     uint64_t gui_timer_interval;
 
-    int switchbpp;
     int shared_buf;
     
     void (*dpy_update)(struct DisplayState *s, int x, int y, int w, int h);
