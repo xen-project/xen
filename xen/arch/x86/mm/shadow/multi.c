@@ -1272,7 +1272,7 @@ static inline void shadow_vram_get_l1e(shadow_l1e_t new_sl1e,
         if ( count_info == 1 )
             /* Initial guest reference, record it */
             d->dirty_vram->sl1ma[i] = pfn_to_paddr(mfn_x(sl1mfn))
-                | ((paddr_t) sl1e & ~PAGE_MASK);
+                | ((unsigned long)sl1e & ~PAGE_MASK);
     }
 }
 
@@ -1294,8 +1294,8 @@ static inline void shadow_vram_put_l1e(shadow_l1e_t old_sl1e,
         struct page_info *page = mfn_to_page(mfn);
         u32 count_info = page->u.inuse.type_info & PGT_count_mask;
         int dirty = 0;
-        paddr_t sl1ma =  pfn_to_paddr(mfn_x(sl1mfn))
-            | ((paddr_t) sl1e & ~PAGE_MASK);
+        paddr_t sl1ma = pfn_to_paddr(mfn_x(sl1mfn))
+            | ((unsigned long)sl1e & ~PAGE_MASK);
 
         if ( count_info == 1 ) {
             /* Last reference */
