@@ -475,8 +475,12 @@ acpi_fadt_parse_reg(struct acpi_table_fadt *fadt)
 		       sizeof(acpi_gbl_xpm1a_enable));
 		memcpy(&acpi_gbl_xpm1b_enable, &fadt->xpm1b_event_block,
 		       sizeof(acpi_gbl_xpm1b_enable));
-		acpi_gbl_xpm1a_enable.address += 2;
-		acpi_gbl_xpm1b_enable.address += 2;
+
+		acpi_gbl_xpm1a_enable.address +=
+			acpi_gbl_FADT.pm1_event_length / 2;
+		if ( acpi_gbl_xpm1b_enable.address )
+			acpi_gbl_xpm1b_enable.address +=
+				acpi_gbl_FADT.pm1_event_length / 2;
 	}
 }
 
