@@ -1321,7 +1321,7 @@ static inline void shadow_vram_put_l1e(shadow_l1e_t old_sl1e,
             }
         }
         if ( dirty )
-            d->dirty_vram->dirty_bitmap[i / 8] |= d->dirty_vram->dirty_bitmap[i % 8];
+            d->dirty_vram->dirty_bitmap[i / 8] |= 1 << (i % 8);
     }
 }
 
