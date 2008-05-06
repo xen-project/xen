@@ -22,8 +22,6 @@ import re
 import socket
 import time
 
-from OpenSSL import SSL
-
 import connection
 
 from xen.xend.XendLogging import log
@@ -82,6 +80,7 @@ class SSLTCPListener(TCPListener):
 
 
     def createSocket(self):
+        from OpenSSL import SSL
         # make a SSL socket
         ctx = SSL.Context(SSL.SSLv23_METHOD)
         ctx.set_options(SSL.OP_NO_SSLv2)
