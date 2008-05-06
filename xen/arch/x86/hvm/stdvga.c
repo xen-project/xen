@@ -131,14 +131,15 @@ static int stdvga_outb(uint64_t addr, uint8_t val)
 
     /* When in standard vga mode, emulate here all writes to the vram buffer
      * so we can immediately satisfy reads without waiting for qemu. */
-    s->stdvga =
-        (s->sr[7] == 0x00) &&  /* standard vga mode */
-        (s->gr[6] == 0x05);    /* misc graphics register w/ MemoryMapSelect=1
-                                * 0xa0000-0xaffff (64k region), AlphaDis=1 */
+    s->stdvga = (s->sr[7] == 0x00);
 
     if ( !prev_stdvga && s->stdvga )
     {
-        s->cache = 1;       /* (re)start caching video buffer */
+        /*
+         * (Re)start caching of video buffer.
+         * XXX TODO: In case of a restart the cache could be unsynced.
+         */
+        s->cache = 1;
         gdprintk(XENLOG_INFO, "entering stdvga and caching modes\n");
     }
     else if ( prev_stdvga && !s->stdvga )
@@ -182,6 +183,40 @@ static int stdvga_intercept_pio(
     return X86EMUL_UNHANDLEABLE; /* propagate to external ioemu */
 }
 
+static unsigned int stdvga_mem_offset(
+    struct hvm_hw_stdvga *s, unsigned int mmio_addr)
+{
+    unsigned int memory_map_mode = (s->gr[6] >> 2) & 3;
+    unsigned int offset = mmio_addr & 0x1ffff;
+
+    switch ( memory_map_mode )
+    {
+    case 0:
+        break;
+    case 1:
+        if ( offset >= 0x10000 )
+            goto fail;
+        offset += 0; /* assume bank_offset == 0; */
+        break;
+    case 2:
+        offset -= 0x10000;
+        if ( offset >= 0x8000 )
+            goto fail;
+        break;
+    default:
+    case 3:
+        offset -= 0x18000;
+        if ( offset >= 0x8000 )
+            goto fail;
+        break;
+    }
+
+    return offset;
+
+ fail:
+    return ~0u;
+}
+
 #define GET_PLANE(data, p) (((data) >> ((p) * 8)) & 0xff)
 
 static uint8_t stdvga_mem_readb(uint64_t addr)
@@ -191,8 +226,8 @@ static uint8_t stdvga_mem_readb(uint64_t addr)
     uint32_t ret, *vram_l;
     uint8_t *vram_b;
 
-    addr &= 0x1ffff;
-    if ( addr >= 0x10000 )
+    addr = stdvga_mem_offset(s, addr);
+    if ( addr == ~0u )
         return 0xff;
 
     if ( s->sr[4] & 0x08 )
@@ -273,8 +308,8 @@ static void stdvga_mem_writeb(uint64_t addr, uint32_t val)
     uint32_t write_mask, bit_mask, set_mask, *vram_l;
     uint8_t *vram_b;
 
-    addr &= 0x1ffff;
-    if ( addr >= 0x10000 )
+    addr = stdvga_mem_offset(s, addr);
+    if ( addr == ~0u )
         return;
 
     if ( s->sr[4] & 0x08 )
@@ -531,7 +566,7 @@ void stdvga_init(struct domain *d)
         register_portio_handler(d, 0x3ce, 2, stdvga_intercept_pio);
         /* MMIO. */
         register_buffered_io_handler(
-            d, 0xa0000, 0x10000, stdvga_intercept_mmio);
+            d, 0xa0000, 0x20000, stdvga_intercept_mmio);
     }
 }
 
