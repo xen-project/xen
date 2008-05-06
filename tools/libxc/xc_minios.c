@@ -178,7 +178,7 @@ static void evtchn_handler(evtchn_port_t port, struct pt_regs *regs, void *data)
 	printk("Unknown port for handle %d\n", xce_handle);
 	return;
     }
-    files[xce_handle].evtchn.ports[i].pending++;
+    files[xce_handle].evtchn.ports[i].pending = 1;
     files[xce_handle].read = 1;
     wake_up(&event_queue);
 }
@@ -278,7 +278,7 @@ evtchn_port_or_error_t xc_evtchn_pending(int xce_handle)
     for (i = 0; i < MAX_EVTCHN_PORTS; i++) {
 	evtchn_port_t port = files[xce_handle].evtchn.ports[i].port;
 	if (port != -1 && files[xce_handle].evtchn.ports[i].pending) {
-	    files[xce_handle].evtchn.ports[i].pending--;
+	    files[xce_handle].evtchn.ports[i].pending = 0;
 	    local_irq_restore(flags);
 	    return port;
 	}
