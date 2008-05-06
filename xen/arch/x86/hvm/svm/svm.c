@@ -84,7 +84,10 @@ static void inline __update_guest_eip(
 {
     struct vcpu *curr = current;
 
-    if ( unlikely((inst_len == 0) || (inst_len > 15)) )
+    if ( unlikely(inst_len == 0) )
+        return;
+
+    if ( unlikely(inst_len > 15) )
     {
         gdprintk(XENLOG_ERR, "Bad instruction length %u\n", inst_len);
         domain_crash(curr->domain);
@@ -907,8 +910,7 @@ static void svm_vmexit_do_cpuid(struct cpu_user_regs *regs)
 {
     unsigned int eax, ebx, ecx, edx, inst_len;
 
-    inst_len = __get_instruction_length(current, INSTR_CPUID, NULL);
-    if ( inst_len == 0 ) 
+    if ( (inst_len = __get_instruction_length(current, INSTR_CPUID)) == 0 )
         return;
 
     eax = regs->eax;
@@ -1083,13 +1085,15 @@ static void svm_do_msr_access(struct cpu_user_regs *regs)
 
     if ( vmcb->exitinfo1 == 0 )
     {
+        if ( (inst_len = __get_instruction_length(v, INSTR_RDMSR)) == 0 )
+            return;
         rc = hvm_msr_read_intercept(regs);
-        inst_len = __get_instruction_length(v, INSTR_RDMSR, NULL);
     }
     else
     {
+        if ( (inst_len = __get_instruction_length(v, INSTR_WRMSR)) == 0 )
+            return;
         rc = hvm_msr_write_intercept(regs);
-        inst_len = __get_instruction_length(v, INSTR_WRMSR, NULL);
     }
 
     if ( rc == X86EMUL_OKAY )
@@ -1101,8 +1105,7 @@ static void svm_vmexit_do_hlt(struct vmcb_struct *vmcb,
 {
     unsigned int inst_len;
 
-    inst_len = __get_instruction_length(current, INSTR_HLT, NULL);
-    if ( inst_len == 0 )
+    if ( (inst_len = __get_instruction_length(current, INSTR_HLT)) == 0 )
         return;
     __update_guest_eip(regs, inst_len);
 
@@ -1125,10 +1128,13 @@ static void svm_vmexit_do_invalidate_cache(struct cpu_user_regs *regs)
     enum instruction_index list[] = { INSTR_INVD, INSTR_WBINVD };
     int inst_len;
 
+    inst_len = __get_instruction_length_from_list(
+        current, list, ARRAY_SIZE(list));
+    if ( inst_len == 0 )
+        return;
+
     svm_wbinvd_intercept();
 
-    inst_len = __get_instruction_length_from_list(
-        current, list, ARRAY_SIZE(list), NULL, NULL);
     __update_guest_eip(regs, inst_len);
 }
 
@@ -1204,7 +1210,8 @@ asmlinkage void svm_vmexit_handler(struct cpu_user_regs *regs)
         if ( !v->domain->debugger_attached )
             goto exit_and_crash;
         /* AMD Vol2, 15.11: INT3, INTO, BOUND intercepts do not update RIP. */
-        inst_len = __get_instruction_length(v, INSTR_INT3, NULL);
+        if ( (inst_len = __get_instruction_length(v, INSTR_INT3)) == 0 )
+            break;
         __update_guest_eip(regs, inst_len);
         domain_pause_for_debugger();
         break;
@@ -1281,8 +1288,7 @@ asmlinkage void svm_vmexit_handler(struct cpu_user_regs *regs)
         break;
 
     case VMEXIT_VMMCALL:
-        inst_len = __get_instruction_length(v, INSTR_VMCALL, NULL);
-        if ( inst_len == 0 )
+        if ( (inst_len = __get_instruction_length(v, INSTR_VMCALL)) == 0 )
             break;
         HVMTRACE_1D(VMMCALL, v, regs->eax);
         rc = hvm_do_hypercall(regs);

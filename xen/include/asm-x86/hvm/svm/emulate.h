@@ -34,15 +34,12 @@ enum instruction_index {
 };
 
 int __get_instruction_length_from_list(
-    struct vcpu *v,
-    enum instruction_index *list, unsigned int list_count, 
-    u8 *guest_eip_buf, enum instruction_index *match);
+    struct vcpu *v, enum instruction_index *list, unsigned int list_count);
 
-static inline int __get_instruction_length(struct vcpu *v, 
-        enum instruction_index instr, u8 *guest_eip_buf)
+static inline int __get_instruction_length(
+    struct vcpu *v, enum instruction_index instr)
 {
-    return __get_instruction_length_from_list(
-        v, &instr, 1, guest_eip_buf, NULL);
+    return __get_instruction_length_from_list(v, &instr, 1);
 }
 
 #endif /* __ASM_X86_HVM_SVM_EMULATE_H__ */

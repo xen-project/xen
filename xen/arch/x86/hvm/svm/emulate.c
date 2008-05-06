@@ -29,18 +29,6 @@
 
 #define MAX_INST_LEN 15
 
-static int inst_copy_from_guest(
-    unsigned char *buf, unsigned long guest_eip, int inst_len)
-{
-    struct vmcb_struct *vmcb = current->arch.hvm_svm.vmcb;
-    uint32_t pfec = (vmcb->cpl == 3) ? PFEC_user_mode : 0;
-    if ( (inst_len > MAX_INST_LEN) || (inst_len <= 0) )
-        return 0;
-    if ( hvm_fetch_from_guest_virt_nofault(buf, guest_eip, inst_len, pfec) )
-        return 0;
-    return inst_len;
-}
-
 static unsigned int is_prefix(u8 opc)
 {
     switch ( opc )
@@ -73,12 +61,7 @@ static unsigned long svm_rip2pointer(struct vcpu *v)
     return p;
 }
 
-/* 
- * Here's how it works:
- * First byte: Length. 
- * Following bytes: Opcode bytes. 
- * Special case: Last byte, if zero, doesn't need to match. 
- */
+/* First byte: Length. Following bytes: Opcode bytes. */
 #define MAKE_INSTR(nm, ...) static const u8 OPCODE_##nm[] = { __VA_ARGS__ }
 MAKE_INSTR(INVD,   2, 0x0f, 0x08);
 MAKE_INSTR(WBINVD, 2, 0x0f, 0x09);
@@ -101,70 +84,90 @@ static const u8 *opc_bytes[INSTR_MAX_COUNT] =
     [INSTR_INT3]   = OPCODE_INT3
 };
 
+static int fetch(struct vcpu *v, u8 *buf, unsigned long addr, int len)
+{
+    uint32_t pfec = (v->arch.hvm_svm.vmcb->cpl == 3) ? PFEC_user_mode : 0;
+
+    switch ( hvm_fetch_from_guest_virt(buf, addr, len, pfec) )
+    {
+    case HVMCOPY_okay:
+        return 1;
+    case HVMCOPY_bad_gva_to_gfn:
+        /* OK just to give up; we'll have injected #PF already */
+        return 0;
+    case HVMCOPY_bad_gfn_to_mfn:
+    default:
+        /* Not OK: fetches from non-RAM pages are not supportable. */
+        gdprintk(XENLOG_WARNING, "Bad instruction fetch at %#lx (%#lx)\n",
+                 (unsigned long) guest_cpu_user_regs()->eip, addr);
+        hvm_inject_exception(TRAP_gp_fault, 0, 0);
+        return 0;
+    }
+}
+
 int __get_instruction_length_from_list(struct vcpu *v,
-        enum instruction_index *list, unsigned int list_count, 
-        u8 *guest_eip_buf, enum instruction_index *match)
+        enum instruction_index *list, unsigned int list_count)
 {
     struct vmcb_struct *vmcb = v->arch.hvm_svm.vmcb;
     unsigned int i, j, inst_len = 0;
-    int found = 0;
     enum instruction_index instr = 0;
-    u8 buffer[MAX_INST_LEN];
-    u8 *buf;
+    u8 buf[MAX_INST_LEN];
     const u8 *opcode = NULL;
+    unsigned long fetch_addr;
+    unsigned int fetch_len;
 
-    if ( guest_eip_buf )
+    /* Fetch up to the next page break; we'll fetch from the next page
+     * later if we have to. */
+    fetch_addr = svm_rip2pointer(v);
+    fetch_len = min_t(unsigned int, MAX_INST_LEN,
+                      PAGE_SIZE - (fetch_addr & ~PAGE_MASK));
+    if ( !fetch(v, buf, fetch_addr, fetch_len) )
+        return 0;
+
+    while ( (inst_len < MAX_INST_LEN) && is_prefix(buf[inst_len]) )
     {
-        buf = guest_eip_buf;
-    }
-    else
-    {
-        if ( inst_copy_from_guest(buffer, svm_rip2pointer(v), MAX_INST_LEN)
-             != MAX_INST_LEN )
-            return 0;
-        buf = buffer;
+        inst_len++;
+        if ( inst_len >= fetch_len )
+        {
+            if ( !fetch(v, buf + fetch_len, fetch_addr + fetch_len,
+                        MAX_INST_LEN - fetch_len) )
+                return 0;
+            fetch_len = MAX_INST_LEN;
+        }
     }
 
     for ( j = 0; j < list_count; j++ )
     {
         instr = list[j];
         opcode = opc_bytes[instr];
-        ASSERT(opcode);
 
-        while ( (inst_len < MAX_INST_LEN) && 
-                is_prefix(buf[inst_len]) && 
-                !is_prefix(opcode[1]) )
-            inst_len++;
-
-        ASSERT(opcode[0] <= 15);    /* Make sure the table is correct. */
-        found = 1;
-
-        for ( i = 0; i < opcode[0]; i++ )
+        for ( i = 0; (i < opcode[0]) && ((inst_len + i) < MAX_INST_LEN); i++ )
         {
-            /* If the last byte is zero, we just accept it without checking */
-            if ( (i == (opcode[0]-1)) && (opcode[i+1] == 0) )
-                break;
+            if ( (inst_len + i) >= fetch_len ) 
+            { 
+                if ( !fetch(v, buf + fetch_len, 
+                            fetch_addr + fetch_len, 
+                            MAX_INST_LEN - fetch_len) ) 
+                    return 0;
+                fetch_len = MAX_INST_LEN;
+            }
 
             if ( buf[inst_len+i] != opcode[i+1] )
-            {
-                found = 0;
-                break;
-            }
+                goto mismatch;
         }
-
-        if ( found )
-            goto done;
+        goto done;
+    mismatch: ;
     }
 
-    printk("%s: Mismatch between expected and actual instruction bytes: "
-            "eip = %lx\n",  __func__, (unsigned long)vmcb->rip);
+    gdprintk(XENLOG_WARNING,
+             "%s: Mismatch between expected and actual instruction bytes: "
+             "eip = %lx\n",  __func__, (unsigned long)vmcb->rip);
+    hvm_inject_exception(TRAP_gp_fault, 0, 0);
     return 0;
 
  done:
     inst_len += opcode[0];
     ASSERT(inst_len <= MAX_INST_LEN);
-    if ( match )
-        *match = instr;
     return inst_len;
 }
 
