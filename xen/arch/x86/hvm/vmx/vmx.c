@@ -1857,22 +1857,6 @@ gp_fault:
     return X86EMUL_EXCEPTION;
 }
 
-static void vmx_do_hlt(struct cpu_user_regs *regs)
-{
-    unsigned long intr_info = __vmread(VM_ENTRY_INTR_INFO);
-    struct vcpu *curr = current;
-
-    /* Check for pending exception. */
-    if ( intr_info & INTR_INFO_VALID_MASK )
-    {
-        HVMTRACE_1D(HLT, curr, /*int pending=*/ 1);
-        return;
-    }
-
-    HVMTRACE_1D(HLT, curr, /*int pending=*/ 0);
-    hvm_hlt(regs->eflags);
-}
-
 static void vmx_do_extint(struct cpu_user_regs *regs)
 {
     unsigned int vector;
@@ -2187,7 +2171,7 @@ asmlinkage void vmx_vmexit_handler(struct cpu_user_regs *regs)
     case EXIT_REASON_HLT:
         inst_len = __get_instruction_length(); /* Safe: HLT */
         __update_guest_eip(inst_len);
-        vmx_do_hlt(regs);
+        hvm_hlt(regs->eflags);
         break;
     case EXIT_REASON_INVLPG:
     {

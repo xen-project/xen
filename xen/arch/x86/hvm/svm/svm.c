@@ -1099,25 +1099,13 @@ static void svm_do_msr_access(struct cpu_user_regs *regs)
 static void svm_vmexit_do_hlt(struct vmcb_struct *vmcb,
                               struct cpu_user_regs *regs)
 {
-    struct vcpu *curr = current;
-    struct hvm_intack intack = hvm_vcpu_has_pending_irq(curr);
     unsigned int inst_len;
 
-    inst_len = __get_instruction_length(curr, INSTR_HLT, NULL);
+    inst_len = __get_instruction_length(current, INSTR_HLT, NULL);
     if ( inst_len == 0 )
         return;
     __update_guest_eip(regs, inst_len);
 
-    /* Check for pending exception or new interrupt. */
-    if ( vmcb->eventinj.fields.v ||
-         ((intack.source != hvm_intsrc_none) &&
-          !hvm_interrupt_blocked(current, intack)) )
-    {
-        HVMTRACE_1D(HLT, curr, /*int pending=*/ 1);
-        return;
-    }
-
-    HVMTRACE_1D(HLT, curr, /*int pending=*/ 0);
     hvm_hlt(regs->eflags);
 }
 

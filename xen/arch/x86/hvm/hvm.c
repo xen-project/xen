@@ -46,6 +46,7 @@
 #include <asm/hvm/vpt.h>
 #include <asm/hvm/support.h>
 #include <asm/hvm/cacheattr.h>
+#include <asm/hvm/trace.h>
 #include <public/sched.h>
 #include <public/hvm/ioreq.h>
 #include <public/version.h>
@@ -739,15 +740,22 @@ void hvm_send_assist_req(struct vcpu *v)
 
 void hvm_hlt(unsigned long rflags)
 {
+    struct vcpu *curr = current;
+
+    if ( hvm_event_pending(curr) )
+        return;
+
     /*
      * If we halt with interrupts disabled, that's a pretty sure sign that we
      * want to shut down. In a real processor, NMIs are the only way to break
      * out of this.
      */
     if ( unlikely(!(rflags & X86_EFLAGS_IF)) )
-        return hvm_vcpu_down(current);
+        return hvm_vcpu_down(curr);
 
     do_sched_op_compat(SCHEDOP_block, 0);
+
+    HVMTRACE_1D(HLT, curr, /* pending = */ vcpu_runnable(curr));
 }
 
 void hvm_triple_fault(void)
