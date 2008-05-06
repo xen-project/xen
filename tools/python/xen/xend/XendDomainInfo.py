@@ -37,6 +37,7 @@ import xen.lowlevel.xc
 from xen.util import asserts
 from xen.util.blkif import blkdev_uname_to_file, blkdev_uname_to_taptype
 import xen.util.xsm.xsm as security
+from xen.util import xsconstants
 
 from xen.xend import balloon, sxp, uuid, image, arch, osdep
 from xen.xend import XendOptions, XendNode, XendConfig
@@ -1973,7 +1974,7 @@ class XendDomainInfo:
         balloon.free(2*1024) # 2MB should be plenty
 
         ssidref = 0
-        if security.on():
+        if security.on() == xsconstants.XS_POLICY_ACM:
             ssidref = security.calc_dom_ssidref_from_info(self.info)
             if security.has_authorization(ssidref) == False:
                 raise VmError("VM is not authorized to run.")
@@ -1987,7 +1988,7 @@ class XendDomainInfo:
                 target = self.info.target())
         except Exception, e:
             # may get here if due to ACM the operation is not permitted
-            if security.on():
+            if security.on() == xsconstants.XS_POLICY_ACM:
                 raise VmError('Domain in conflict set with running domain?')
 
         if self.domid < 0:
@@ -2853,7 +2854,6 @@ class XendDomainInfo:
         is_policy_update = (xspol_old != None)
 
         from xen.xend.XendXSPolicyAdmin import XSPolicyAdminInstance
-        from xen.util import xsconstants
 
         state = self._stateGet()
         # Relabel only HALTED or RUNNING or PAUSED domains

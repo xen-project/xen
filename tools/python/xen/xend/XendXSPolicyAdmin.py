@@ -48,6 +48,10 @@ class XSPolicyAdmin:
         self.xsobjs = {}
         bootloader.init()
 
+        if security.on() == xsconstants.XS_POLICY_ACM:
+            self.__acm_init()
+
+    def __acm_init(self):
         act_pol_name = self.get_hv_loaded_policy_name()
         initialize()
 
@@ -74,7 +78,7 @@ class XSPolicyAdmin:
             This currently only checks for ACM-enablement.
         """
         rc = 0
-        if security.on():
+        if security.on() == xsconstants.XS_POLICY_ACM:
             rc |= xsconstants.XS_POLICY_ACM
         return rc
 
@@ -104,6 +108,8 @@ class XSPolicyAdmin:
 
     def __add_acmpolicy_to_system(self, xmltext, flags, overwrite):
         errors = ""
+        if security.on() != xsconstants.XS_POLICY_ACM:
+            raise SecurityError(-xsconstants.XSERR_POLICY_TYPE_UNSUPPORTED)
         loadedpol = self.get_loaded_policy()
         if loadedpol:
             # This is meant as an update to a currently loaded policy

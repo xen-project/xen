@@ -22,6 +22,7 @@ import sys
 import xen.util.xsm.xsm as security
 from xen.xm import create
 from xen.xend import sxp
+from xen.util import xsconstants
 from xen.xm.opts import OptionError
 
 def help():
@@ -40,7 +41,7 @@ def check_domain_label(config, verbose):
     answer = 0
     default_label = None
     secon = 0
-    if security.on():
+    if security.on() == xsconstants.XS_POLICY_ACM:
         default_label = security.ssidref2label(security.NULL_SSIDREF)
         secon = 1
 
@@ -90,7 +91,7 @@ def config_security_check(config, verbose):
             domain_policy = sxp.child_value(sxp.name(sxp.child0(x)), 'policy')
 
     # if no domain label, use default
-    if not domain_label and security.on():
+    if not domain_label and security.on() == xsconstants.XS_POLICY_ACM:
         try:
             domain_label = security.ssidref2label(security.NULL_SSIDREF)
         except:
