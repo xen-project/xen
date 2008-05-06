@@ -162,7 +162,7 @@ extern struct file {
              * wakes select for this FD. */
             struct {
                 evtchn_port_t port;
-                volatile unsigned long pending;
+                unsigned long pending;
                 int bound;
             } ports[MAX_EVTCHN_PORTS];
 	} evtchn;
@@ -181,7 +181,7 @@ extern struct file {
             xenbus_event_queue events;
         } xenbus;
     };
-    volatile int read;	/* maybe available for read */
+    int read;	/* maybe available for read */
 } files[];
 
 int alloc_fd(enum fd_type type);
