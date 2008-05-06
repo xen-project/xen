@@ -713,8 +713,7 @@ static int emulate_forced_invalid_op(struct cpu_user_regs *regs)
         __clear_bit(X86_FEATURE_PBE, &d);
 
         __clear_bit(X86_FEATURE_DTES64 % 32, &c);
-        if ( !IS_PRIV(current->domain) )
-            __clear_bit(X86_FEATURE_MWAIT % 32, &c);
+        __clear_bit(X86_FEATURE_MWAIT % 32, &c);
         __clear_bit(X86_FEATURE_DSCPL % 32, &c);
         __clear_bit(X86_FEATURE_VMXE % 32, &c);
         __clear_bit(X86_FEATURE_SMXE % 32, &c);
@@ -2148,9 +2147,8 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
         case MSR_IA32_MISC_ENABLE:
             if ( rdmsr_safe(regs->ecx, regs->eax, regs->edx) )
                 goto fail;
-            regs->eax &= ~MSR_IA32_MISC_ENABLE_PERF_AVAIL;
-            if ( !IS_PRIV(current->domain) )
-                regs->eax &= ~MSR_IA32_MISC_ENABLE_MONITOR_ENABLE;
+            regs->eax &= ~(MSR_IA32_MISC_ENABLE_PERF_AVAIL |
+                           MSR_IA32_MISC_ENABLE_MONITOR_ENABLE);
             regs->eax |= MSR_IA32_MISC_ENABLE_BTS_UNAVAIL |
                          MSR_IA32_MISC_ENABLE_PEBS_UNAVAIL |
                          MSR_IA32_MISC_ENABLE_XTPR_DISABLE;
