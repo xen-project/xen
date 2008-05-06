@@ -53,6 +53,8 @@ struct netfront_dev {
     char *nodename;
     char *backend;
 
+    xenbus_event_queue events;
+
 #ifdef HAVE_LIBC
     int fd;
     unsigned char *data;
@@ -328,6 +330,8 @@ struct netfront_dev *init_netfront(char *nodename, void (*thenetif_rx)(unsigned 
 
     dev->netif_rx = thenetif_rx;
 
+    dev->events = NULL;
+
     // FIXME: proper frees on failures
 again:
     err = xenbus_transaction_start(&xbt);
@@ -399,11 +403,9 @@ done:
         char path[strlen(dev->backend) + 1 + 5 + 1];
         snprintf(path, sizeof(path), "%s/state", dev->backend);
 
-        xenbus_watch_path(XBT_NIL, path);
+        xenbus_watch_path_token(XBT_NIL, path, path, &dev->events);
 
-        xenbus_wait_for_value(path,"4");
-
-        xenbus_unwatch_path(XBT_NIL, path);
+        xenbus_wait_for_value(path, "4", &dev->events);
 
         if (ip) {
             snprintf(path, sizeof(path), "%s/ip", dev->backend);
@@ -458,10 +460,12 @@ void shutdown_netfront(struct netfront_dev *dev)
 
     snprintf(path, sizeof(path), "%s/state", dev->backend);
     err = xenbus_printf(XBT_NIL, nodename, "state", "%u", 5); /* closing */
-    xenbus_wait_for_value(path,"5");
+    xenbus_wait_for_value(path, "5", &dev->events);
 
     err = xenbus_printf(XBT_NIL, nodename, "state", "%u", 6);
-    xenbus_wait_for_value(path,"6");
+    xenbus_wait_for_value(path, "6", &dev->events);
+
+    xenbus_unwatch_path(XBT_NIL, path);
 
     unbind_evtchn(dev->evtchn);
 

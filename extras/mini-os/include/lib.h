@@ -178,7 +178,7 @@ extern struct file {
         struct {
             /* To each xenbus FD is associated a queue of watch events for this
              * FD.  */
-            struct xenbus_event *volatile events;
+            xenbus_event_queue events;
         } xenbus;
     };
     volatile int read;	/* maybe available for read */

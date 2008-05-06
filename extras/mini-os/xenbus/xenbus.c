@@ -45,10 +45,10 @@ static struct xenstore_domain_interface *xenstore_buf;
 static DECLARE_WAIT_QUEUE_HEAD(xb_waitq);
 DECLARE_WAIT_QUEUE_HEAD(xenbus_watch_queue);
 
-struct xenbus_event *volatile xenbus_events;
+xenbus_event_queue xenbus_events;
 static struct watch {
     char *token;
-    struct xenbus_event *volatile *events;
+    xenbus_event_queue *events;
     struct watch *next;
 } *watches;
 struct xenbus_req_info 
@@ -75,28 +75,34 @@ static void memcpy_from_ring(const void *Ring,
     memcpy(dest + c1, ring, c2);
 }
 
-char **xenbus_wait_for_watch_return()
+char **xenbus_wait_for_watch_return(xenbus_event_queue *queue)
 {
     struct xenbus_event *event;
+    if (!queue)
+        queue = &xenbus_events;
     DEFINE_WAIT(w);
-    while (!(event = xenbus_events)) {
+    while (!(event = *queue)) {
         add_waiter(w, xenbus_watch_queue);
         schedule();
     }
     remove_waiter(w);
-    xenbus_events = event->next;
+    *queue = event->next;
     return &event->path;
 }
 
-void xenbus_wait_for_watch(void)
+void xenbus_wait_for_watch(xenbus_event_queue *queue)
 {
     char **ret;
-    ret = xenbus_wait_for_watch_return();
+    if (!queue)
+        queue = &xenbus_events;
+    ret = xenbus_wait_for_watch_return(queue);
     free(ret);
 }
 
-char* xenbus_wait_for_value(const char* path, const char* value)
+char* xenbus_wait_for_value(const char* path, const char* value, xenbus_event_queue *queue)
 {
+    if (!queue)
+        queue = &xenbus_events;
     for(;;)
     {
         char *res, *msg;
@@ -109,7 +115,7 @@ char* xenbus_wait_for_value(const char* path, const char* value)
         free(res);
 
         if(r==0) break;
-        else xenbus_wait_for_watch();
+        else xenbus_wait_for_watch(queue);
     }
     return NULL;
 }
@@ -147,8 +153,8 @@ static void xenbus_thread_func(void *ign)
 
             if(msg.type == XS_WATCH_EVENT)
             {
-		struct xenbus_event *event = malloc(sizeof(*event) + msg.len),
-                                    *volatile *events = NULL;
+		struct xenbus_event *event = malloc(sizeof(*event) + msg.len);
+                xenbus_event_queue *events = NULL;
 		char *data = (char*)event + sizeof(*event);
                 struct watch *watch;
 
@@ -167,8 +173,6 @@ static void xenbus_thread_func(void *ign)
                         events = watch->events;
                         break;
                     }
-                if (!events)
-                    events = &xenbus_events;
 
 		event->next = *events;
 		*events = event;
@@ -463,7 +467,7 @@ char *xenbus_write(xenbus_transaction_t xbt, const char *path, const char *value
     return NULL;
 }
 
-char* xenbus_watch_path_token( xenbus_transaction_t xbt, const char *path, const char *token, struct xenbus_event *volatile *events)
+char* xenbus_watch_path_token( xenbus_transaction_t xbt, const char *path, const char *token, xenbus_event_queue *events)
 {
     struct xsd_sockmsg *rep;
 
@@ -473,6 +477,9 @@ char* xenbus_watch_path_token( xenbus_transaction_t xbt, const char *path, const
     };
 
     struct watch *watch = malloc(sizeof(*watch));
+
+    if (!events)
+        events = &xenbus_events;
 
     watch->token = strdup(token);
     watch->events = events;

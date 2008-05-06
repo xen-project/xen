@@ -50,6 +50,8 @@ struct blkfront_dev {
     char *backend;
     struct blkfront_info info;
 
+    xenbus_event_queue events;
+
 #ifdef HAVE_LIBC
     int fd;
 #endif
@@ -100,6 +102,8 @@ struct blkfront_dev *init_blkfront(char *nodename, struct blkfront_info *info)
     FRONT_RING_INIT(&dev->ring, s, PAGE_SIZE);
 
     dev->ring_ref = gnttab_grant_access(dev->dom,virt_to_mfn(s),0);
+
+    dev->events = NULL;
 
     // FIXME: proper frees on failures
 again:
@@ -166,11 +170,9 @@ done:
 
         snprintf(path, sizeof(path), "%s/state", dev->backend);
 
-        xenbus_watch_path(XBT_NIL, path);
+        xenbus_watch_path_token(XBT_NIL, path, path, &dev->events);
 
-        xenbus_wait_for_value(path,"4");
-
-        xenbus_unwatch_path(XBT_NIL, path);
+        xenbus_wait_for_value(path, "4", &dev->events);
 
         snprintf(path, sizeof(path), "%s/info", dev->backend);
         dev->info.info = xenbus_read_integer(path);
@@ -211,10 +213,12 @@ void shutdown_blkfront(struct blkfront_dev *dev)
 
     snprintf(path, sizeof(path), "%s/state", dev->backend);
     err = xenbus_printf(XBT_NIL, nodename, "state", "%u", 5); /* closing */
-    xenbus_wait_for_value(path,"5");
+    xenbus_wait_for_value(path, "5", &dev->events);
 
     err = xenbus_printf(XBT_NIL, nodename, "state", "%u", 6);
-    xenbus_wait_for_value(path,"6");
+    xenbus_wait_for_value(path, "6", &dev->events);
+
+    xenbus_unwatch_path(XBT_NIL, path);
 
     unbind_evtchn(dev->evtchn);
 

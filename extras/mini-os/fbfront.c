@@ -31,6 +31,8 @@ struct kbdfront_dev {
     char *nodename;
     char *backend;
 
+    xenbus_event_queue events;
+
 #ifdef HAVE_LIBC
     int fd;
 #endif
@@ -74,6 +76,8 @@ struct kbdfront_dev *init_kbdfront(char *nodename, int abs_pointer)
 
     dev->page = s = (struct xenkbd_page*) alloc_page();
     memset(s,0,PAGE_SIZE);
+
+    dev->events = NULL;
 
     s->in_cons = s->in_prod = 0;
     s->out_cons = s->out_prod = 0;
@@ -136,11 +140,9 @@ done:
 
         snprintf(path, sizeof(path), "%s/state", dev->backend);
 
-        xenbus_watch_path(XBT_NIL, path);
+        xenbus_watch_path_token(XBT_NIL, path, path, &dev->events);
 
-        xenbus_wait_for_value(path,"4");
-
-        xenbus_unwatch_path(XBT_NIL, path);
+        xenbus_wait_for_value(path, "4", &dev->events);
 
         printk("%s connected\n", dev->backend);
 
@@ -199,10 +201,12 @@ void shutdown_kbdfront(struct kbdfront_dev *dev)
 
     snprintf(path, sizeof(path), "%s/state", dev->backend);
     err = xenbus_printf(XBT_NIL, nodename, "state", "%u", 5); /* closing */
-    xenbus_wait_for_value(path,"5");
+    xenbus_wait_for_value(path, "5", &dev->events);
 
     err = xenbus_printf(XBT_NIL, nodename, "state", "%u", 6);
-    xenbus_wait_for_value(path,"6");
+    xenbus_wait_for_value(path, "6", &dev->events);
+
+    xenbus_unwatch_path(XBT_NIL, path);
 
     unbind_evtchn(dev->evtchn);
 
@@ -249,6 +253,8 @@ struct fbfront_dev {
     int stride;
     int mem_length;
     int offset;
+
+    xenbus_event_queue events;
 };
 
 void fbfront_handler(evtchn_port_t port, struct pt_regs *regs, void *data)
@@ -292,6 +298,7 @@ struct fbfront_dev *init_fbfront(char *nodename, unsigned long *mfns, int width,
     dev->stride = s->line_length = stride;
     dev->mem_length = s->mem_length = n * PAGE_SIZE;
     dev->offset = 0;
+    dev->events = NULL;
 
     const int max_pd = sizeof(s->pd) / sizeof(s->pd[0]);
     unsigned long mapped = 0;
@@ -368,13 +375,11 @@ done:
 
         snprintf(path, sizeof(path), "%s/state", dev->backend);
 
-        xenbus_watch_path(XBT_NIL, path);
+        xenbus_watch_path_token(XBT_NIL, path, path, &dev->events);
 
-        xenbus_wait_for_value(path,"4");
+        xenbus_wait_for_value(path, "4", &dev->events);
 
         printk("%s connected\n", dev->backend);
-
-        xenbus_unwatch_path(XBT_NIL, path);
 
         snprintf(path, sizeof(path), "%s/request-update", dev->backend);
         dev->request_update = xenbus_read_integer(path);
@@ -463,10 +468,12 @@ void shutdown_fbfront(struct fbfront_dev *dev)
 
     snprintf(path, sizeof(path), "%s/state", dev->backend);
     err = xenbus_printf(XBT_NIL, nodename, "state", "%u", 5); /* closing */
-    xenbus_wait_for_value(path,"5");
+    xenbus_wait_for_value(path, "5", &dev->events);
 
     err = xenbus_printf(XBT_NIL, nodename, "state", "%u", 6);
-    xenbus_wait_for_value(path,"6");
+    xenbus_wait_for_value(path, "6", &dev->events);
+
+    xenbus_unwatch_path(XBT_NIL, path);
 
     unbind_evtchn(dev->evtchn);
 

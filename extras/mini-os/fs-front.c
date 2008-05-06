@@ -917,6 +917,7 @@ static int init_fs_import(struct fs_import *import)
     struct fsif_sring *sring;
     int retry = 0;
     domid_t self_id;
+    xenbus_event_queue events = NULL;
 
     printk("Initialising FS fortend to backend dom %d\n", import->dom_id);
     /* Allocate page for the shared ring */
@@ -1026,8 +1027,8 @@ done:
     sprintf(r_nodename, "%s/state", import->backend);
     sprintf(token, "fs-front-%d", import->import_id);
     /* The token will not be unique if multiple imports are inited */
-    xenbus_watch_path(XBT_NIL, r_nodename/*, token*/);
-    xenbus_wait_for_value(/*token,*/ r_nodename, STATE_READY);
+    xenbus_watch_path_token(XBT_NIL, r_nodename, r_nodename, &events);
+    xenbus_wait_for_value(r_nodename, STATE_READY, &events);
     xenbus_unwatch_path(XBT_NIL, r_nodename);
     printk("Backend ready.\n");
    
