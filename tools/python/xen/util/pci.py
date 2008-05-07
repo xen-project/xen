@@ -30,7 +30,7 @@ PCI_STATUS_CAP_MASK = 0x10
 PCI_STATUS_OFFSET = 0x6
 PCI_CAP_OFFSET = 0x34
 MSIX_BIR_MASK = 0x7
-MSIX_SIZE_MASK = 0x3ff
+MSIX_SIZE_MASK = 0x7ff
 
 #Calculate PAGE_SHIFT: number of bits to shift an address to get the page number
 PAGE_SIZE = resource.getpagesize()
@@ -122,7 +122,7 @@ class PciDevice:
                         message_cont_hi = ord(conf_file.read(1))
                         self.msix=1
                         self.msix_entries = (message_cont_lo + \
-                                             message_cont_hi << 8) \
+                                             (message_cont_hi << 8)) \
                                              & MSIX_SIZE_MASK
                         t_off=conf_file.read(4)
                         p_off=conf_file.read(4)
