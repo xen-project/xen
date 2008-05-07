@@ -678,17 +678,63 @@ void dma_pte_free_pagetable(struct domain *domain, u64 start, u64 end)
     }
 }
 
- /* free all VT-d page tables when shut down or destroy domain. */
+static void iommu_free_next_pagetable(u64 pt_maddr, unsigned long index,
+                                      int level)
+{
+    struct acpi_drhd_unit *drhd;
+    unsigned long next_index;
+    struct dma_pte *pt_vaddr, *pde;
+    int next_level;
+
+    if ( pt_maddr == 0 )
+        return;
+
+    pt_vaddr = (struct dma_pte *)map_vtd_domain_page(pt_maddr);
+    pde = &pt_vaddr[index];
+    if ( dma_pte_addr(*pde) != 0 )
+    {
+        next_level = level - 1;
+        if ( next_level > 1 )
+        {
+            next_index = 0;
+            do
+            {
+                iommu_free_next_pagetable(pde->val,
+                                          next_index, next_level);
+                next_index++;
+            } while ( next_index < PTE_NUM );
+        }
+
+        dma_clear_pte(*pde);
+        drhd = list_entry(acpi_drhd_units.next, typeof(*drhd), list);
+        iommu_flush_cache_entry(drhd->iommu, pde);
+        free_pgtable_maddr(pde->val);
+        unmap_vtd_domain_page(pt_vaddr);
+    }
+    else
+        unmap_vtd_domain_page(pt_vaddr);
+}
+
+/* free all VT-d page tables when shut down or destroy domain. */
 static void iommu_free_pagetable(struct domain *domain)
 {
+    unsigned long index;
     struct hvm_iommu *hd = domain_hvm_iommu(domain);
-    int addr_width = agaw_to_width(hd->agaw);
-    u64 start, end;
+    int total_level = agaw_to_level(hd->agaw);
 
-    start = 0;
-    end = (((u64)1) << addr_width) - 1;
+    if ( hd->pgd_maddr != 0 )
+    {
+        index = 0;
+        do
+        {
+            iommu_free_next_pagetable(hd->pgd_maddr,
+                                      index, total_level + 1);
+            index++;
+        } while ( index < PTE_NUM );
 
-    dma_pte_free_pagetable(domain, start, end);
+        free_pgtable_maddr(hd->pgd_maddr);
+        hd->pgd_maddr = 0;
+    }
 }
 
 static int iommu_set_root_entry(struct iommu *iommu)
