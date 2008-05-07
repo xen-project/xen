@@ -2327,7 +2327,7 @@ static void sh_update_paging_modes(struct vcpu *v)
                                  current->domain->domain_id, current->vcpu_id,
                                  v->domain->domain_id, v->vcpu_id);
                     /* It's not safe to do that because we can't change
-                     * the host CR£ for a running domain */
+                     * the host CR3 for a running domain */
                     domain_crash(v->domain);
                     return;
                 }
