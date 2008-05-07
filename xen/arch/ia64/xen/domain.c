@@ -499,10 +499,9 @@ static void vcpu_share_privregs_with_guest(struct vcpu *v)
 
 int vcpu_late_initialise(struct vcpu *v)
 {
-	struct domain *d = v->domain;
 	int rc, order;
 
-	if (HAS_PERVCPU_VHPT(d)) {
+	if (HAS_PERVCPU_VHPT(v->domain)) {
 		rc = pervcpu_vhpt_alloc(v);
 		if (rc != 0)
 			return rc;

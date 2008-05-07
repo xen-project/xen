@@ -254,10 +254,12 @@ void foo(void)
 	DEFINE(IA64_MCA_CPU_RBSTORE_OFFSET,
 	       offsetof(struct ia64_mca_cpu, rbstore));
 
+#if VHPT_ENABLED
 	DEFINE(IA64_VCPU_VHPT_PAGE_OFFSET,
 	       offsetof(struct vcpu, arch.vhpt_page));
 	DEFINE(IA64_VCPU_VHPT_MADDR_OFFSET,
 	       offsetof(struct vcpu, arch.vhpt_maddr));
+#endif
 
 	BLANK();
 	DEFINE(IA64_MCA_TLB_INFO_SIZE, sizeof(struct ia64_mca_tlb_info));

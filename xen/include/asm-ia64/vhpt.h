@@ -1,8 +1,6 @@
 #ifndef ASM_VHPT_H
 #define ASM_VHPT_H
 
-#define VHPT_ENABLED 1
-
 /* Size of the VHPT.  */
 // XXX work around to avoid trigerring xenLinux software lock up detection.
 # define	VHPT_SIZE_LOG2			16	// 64KB

@@ -8,6 +8,7 @@ xenoprof := y
 no_warns ?= n
 vti_debug ?= n
 vmx_panic ?= n
+vhpt_disable ?= n
 xen_ia64_expose_p2m	?= y
 xen_ia64_pervcpu_vhpt	?= y
 xen_ia64_tlb_track	?= y
@@ -45,6 +46,9 @@ CFLAGS	+= -DCONFIG_XEN_IA64_EXPOSE_P2M
 endif
 ifeq ($(xen_ia64_pervcpu_vhpt),y)
 CFLAGS	+= -DCONFIG_XEN_IA64_PERVCPU_VHPT
+ifeq ($(vhpt_disable),y)
+$(error "both xen_ia64_pervcpu_vhpt=y and vhpt_disable=y are enabled. they can't be enabled simultaneously. disable one of them.")
+endif
 endif
 ifeq ($(xen_ia64_tlb_track),y)
 CFLAGS	+= -DCONFIG_XEN_IA64_TLB_TRACK
@@ -57,6 +61,11 @@ CFLAGS += -DCONFIG_XEN_IA64_TLBFLUSH_CLOCK
 endif
 ifeq ($(no_warns),y)
 CFLAGS	+= -Wa,--fatal-warnings -Werror -Wno-uninitialized
+endif
+ifneq ($(vhpt_disable),y)
+CFLAGS += -DVHPT_ENABLED=1
+else
+CFLAGS += -DVHPT_ENABLED=0
 endif
 
 LDFLAGS := -g
