@@ -2,7 +2,7 @@ Title   : How to do PCI Passthrough with VT-d
 Authors : Allen Kay    <allen.m.kay@intel.com>
           Weidong Han  <weidong.han@intel.com>
 Created : October-24-2007
-Updated : December-13-2007
+Updated : May-07-2007
 
 How to turn on VT-d in Xen
 --------------------------
@@ -22,7 +22,7 @@ How to turn on VT-d in Xen
 title Xen-Fedora Core (2.6.18-xen)
         root (hd0,0)
         kernel /boot/xen.gz com1=115200,8n1 console=com1
-        module /boot/vmlinuz-2.6.18.8-xen root=LABEL=/ ro console=tty0 console=ttyS0,115200,8n1 pciback.hide=(01:00.0)(03:00.0) pciback.verbose_request=1 apic=debug
+        module /boot/vmlinuz-2.6.18.8-xen root=LABEL=/ ro xencons=ttyS console=tty0 console=ttyS0, pciback.hide=(01:00.0)(03:00.0)
         module /boot/initrd-2.6.18-xen.img
 
 12) reboot system
@@ -47,14 +47,39 @@ VT-d Works on OS:
 1) Host OS: PAE, 64-bit
 2) Guest OS: 32-bit, PAE, 64-bit
 
-Because current Xen doesn't support MSI, for guest OS which uses MSI by default, need to add "pci=nomsi" option on its grub, e.g. RHEL5, FC6.
-
 
 Combinations Tested:
 --------------------
 
 1) 64-bit host: 32/PAE/64 Linux/XP/Win2003/Vista guests
 2) PAE host: 32/PAE Linux/XP/Win2003/Vista guests
+
+
+VTd device hotplug:
+-------------------
+ 
+2 virtual PCI slots (6~7) are reserved in HVM guest to support VTd hotplug. If you have more VTd devices, only 2 of them can support hotplug. Usage is simple:
+
+ 1. List the VTd device by dom. You can see a VTd device 0:2:0.0 is inserted in the HVM domain's PCI slot 6. '''lspci''' inside the guest should see the same.
+
+	[root@vt-vtd ~]# xm pci-list HVMDomainVtd
+	VSlt domain   bus   slot   func
+	0x6    0x0  0x02   0x00    0x0
+
+ 2. Detach the device from the guest by the physical BDF. Then HVM guest will receive a virtual PCI hot removal event to detach the physical device
+
+	[root@vt-vtd ~]# xm pci-detach HVMDomainVtd 0:2:0.0
+
+ 3. Attach a PCI device to the guest by the physical BDF and desired virtual slot(optional). Following command would insert the physical device into guest's virtual slot 7
+
+	[root@vt-vtd ~]# xm pci-attach HVMDomainVtd 0:2:0.0 7
+
+VTd hotplug usage model:
+------------------------
+
+ * For live migration: As you know, VTd device would break the live migration as physical device can't be save/restored like virtual device. With hotplug, live migration is back again. Just hot remove all the VTd devices before live migration and hot add new VTd devices on target machine after live migration.
+
+ * VTd hotplug for device switch: VTd hotplug can be used to dynamically switch physical device between different HVM guest without shutdown.
 
 
 VT-d Enabled Systems
@@ -73,4 +98,6 @@ http://www.dell.com/content/products/category.aspx/optix?c=us&cs=555&l=en&s=biz
 
 - HP Compaq:  DC7800
 http://h10010.www1.hp.com/wwpc/us/en/en/WF04a/12454-12454-64287-321860-3328898.html
+
+For more information, pls refer to http://wiki.xensource.com/xenwiki/VTdHowTo.
 
