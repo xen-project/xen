@@ -623,61 +623,6 @@ static void dma_pte_clear_range(struct domain *domain, u64 start, u64 end)
     }
 }
 
-/* free page table pages. last level pte should already be cleared */
-void dma_pte_free_pagetable(struct domain *domain, u64 start, u64 end)
-{
-    struct acpi_drhd_unit *drhd;
-    struct hvm_iommu *hd = domain_hvm_iommu(domain);
-    struct iommu *iommu;
-    int addr_width = agaw_to_width(hd->agaw);
-    struct dma_pte *page, *pte;
-    int total = agaw_to_level(hd->agaw);
-    int level;
-    u64 tmp;
-    u64 pg_maddr;
-
-    drhd = list_entry(acpi_drhd_units.next, typeof(*drhd), list);
-    iommu = drhd->iommu;
-
-    start &= (((u64)1) << addr_width) - 1;
-    end &= (((u64)1) << addr_width) - 1;
-
-    /* we don't need lock here, nobody else touches the iova range */
-    level = 2;
-    while ( level <= total )
-    {
-        tmp = align_to_level(start, level);
-        if ( (tmp >= end) || ((tmp + level_size(level)) > end) )
-            return;
-
-        while ( tmp < end )
-        {
-            pg_maddr = dma_addr_level_page_maddr(domain, tmp, level);
-            if ( pg_maddr == 0 )
-            {
-                tmp += level_size(level);
-                continue;
-            }
-            page = (struct dma_pte *)map_vtd_domain_page(pg_maddr);
-            pte = page + address_level_offset(tmp, level);
-            dma_clear_pte(*pte);
-            iommu_flush_cache_entry(iommu, pte);
-            unmap_vtd_domain_page(page);
-            free_pgtable_maddr(pg_maddr);
-
-            tmp += level_size(level);
-        }
-        level++;
-    }
-
-    /* free pgd */
-    if ( start == 0 && end >= ((((u64)1) << addr_width) - 1) )
-    {
-        free_pgtable_maddr(hd->pgd_maddr);
-        hd->pgd_maddr = 0;
-    }
-}
-
 static void iommu_free_next_pagetable(u64 pt_maddr, unsigned long index,
                                       int level)
 {
