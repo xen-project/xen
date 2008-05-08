@@ -77,7 +77,7 @@ runnable_tests() {
     # using the right version
     realrd=$(readlink ramdisk/initrd.img)
     eval $(./lib/XmTestReport/xmtest.py)
-    ARCH=$(uname -m | sed -e s/i.86/i386/ -e 's/ppc\(64\)*/powerpc/')
+    ARCH=$(uname -m | sed -e s/i.86/i386/)
     rrdver="initrd-${XM_TEST_MAJ}.${XM_TEST_MIN}-${ARCH}.img"
     exp_flag=0
     realarch=`echo $realrd | awk -F- '{print $3}' | awk -F. '{print $1}'`

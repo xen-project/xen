@@ -23,10 +23,8 @@
 #ifndef __XC_LIBELF__
 #define __XC_LIBELF__ 1
 
-#if defined(__i386__) || defined(__x86_64) || defined(__ia64__)
+#if defined(__i386__) || defined(__x86_64__) || defined(__ia64__)
 #define XEN_ELF_LITTLE_ENDIAN
-#elif defined(__powerpc__)
-#define XEN_ELF_BIG_ENDIAN
 #else
 #error define architectural endianness
 #endif

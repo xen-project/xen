@@ -9,7 +9,6 @@ ifneq ($(stubdom),y)
 CTRL_SRCS-y       += xc_core.c
 CTRL_SRCS-$(CONFIG_X86) += xc_core_x86.c
 CTRL_SRCS-$(CONFIG_IA64) += xc_core_ia64.c
-CTRL_SRCS-$(CONFIG_POWERPC) += xc_core_powerpc.c
 endif
 CTRL_SRCS-y       += xc_domain.c
 CTRL_SRCS-y       += xc_evtchn.c
@@ -55,7 +54,6 @@ GUEST_SRCS-y                 += xc_dom_compat_linux.c
 GUEST_SRCS-$(CONFIG_X86)     += xc_dom_x86.c
 GUEST_SRCS-$(CONFIG_X86)     += xc_cpuid_x86.c
 GUEST_SRCS-$(CONFIG_IA64)    += xc_dom_ia64.c
-GUEST_SRCS-$(CONFIG_POWERPC) += xc_dom_powerpc.c
 endif
 
 -include $(XEN_TARGET_ARCH)/Makefile

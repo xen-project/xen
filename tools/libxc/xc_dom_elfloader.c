@@ -43,8 +43,6 @@ static char *xc_dom_guest_type(struct xc_dom_image *dom,
         return "xen-3.0-x86_64";
     case EM_IA_64:
         return elf_msb(elf) ? "xen-3.0-ia64be" : "xen-3.0-ia64";
-    case EM_PPC64:
-        return "xen-3.0-powerpc64";
     default:
         return "xen-3.0-unknown";
     }
