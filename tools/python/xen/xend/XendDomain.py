@@ -1308,8 +1308,10 @@ class XendDomain:
 
         sock.send("receive\n")
         sock.recv(80)
-        XendCheckpoint.save(sock.fileno(), dominfo, True, live, dst, node=node)
-        sock.close()
+        try:
+            XendCheckpoint.save(sock.fileno(), dominfo, True, live, dst, node=node)
+        finally:
+            sock.close()
 
     def domain_save(self, domid, dst, checkpoint=False):
         """Start saving a domain to file.
