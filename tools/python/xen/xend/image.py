@@ -294,11 +294,11 @@ class ImageHandler:
 
             vnclisten = vnc_config.get('vnclisten',
                                        XendOptions.instance().get_vnclisten_address())
-            vncdisplay = vnc_config.get('vncdisplay', 0)
+            vncdisplay = int(vnc_config.get('vncdisplay', 0))
             ret.append('-vnc')
             ret.append("%s:%s%s" % (vnclisten, vncdisplay, vncopts))
 
-            if vnc_config.get('vncunused', 0):
+            if int(vnc_config.get('vncunused', 1)) != 0:
                 ret.append('-vncunused')
 
         elif has_sdl:
