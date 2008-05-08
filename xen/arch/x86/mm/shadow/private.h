@@ -157,49 +157,23 @@ extern void shadow_audit_tables(struct vcpu *v);
  * Macro for dealing with the naming of the internal names of the
  * shadow code's external entry points.
  */
-#define SHADOW_INTERNAL_NAME_HIDDEN(name, shadow_levels, guest_levels) \
-    name ## __shadow_ ## shadow_levels ## _guest_ ## guest_levels
-#define SHADOW_INTERNAL_NAME(name, shadow_levels, guest_levels) \
-    SHADOW_INTERNAL_NAME_HIDDEN(name, shadow_levels, guest_levels)
+#define SHADOW_INTERNAL_NAME_HIDDEN(name, guest_levels) \
+    name ## __guest_ ## guest_levels
+#define SHADOW_INTERNAL_NAME(name, guest_levels)        \
+    SHADOW_INTERNAL_NAME_HIDDEN(name, guest_levels)
 
-#if CONFIG_PAGING_LEVELS == 3
 #define GUEST_LEVELS  2
-#define SHADOW_LEVELS 3
 #include "multi.h"
 #undef GUEST_LEVELS
-#undef SHADOW_LEVELS
 
 #define GUEST_LEVELS  3
-#define SHADOW_LEVELS 3
 #include "multi.h"
 #undef GUEST_LEVELS
-#undef SHADOW_LEVELS
-#endif /* CONFIG_PAGING_LEVELS == 3 */
 
 #if CONFIG_PAGING_LEVELS == 4
-#define GUEST_LEVELS  2
-#define SHADOW_LEVELS 3
-#include "multi.h"
-#undef GUEST_LEVELS
-#undef SHADOW_LEVELS
-
-#define GUEST_LEVELS  3
-#define SHADOW_LEVELS 3
-#include "multi.h"
-#undef GUEST_LEVELS
-#undef SHADOW_LEVELS
-
-#define GUEST_LEVELS  3
-#define SHADOW_LEVELS 4
-#include "multi.h"
-#undef GUEST_LEVELS
-#undef SHADOW_LEVELS
-
 #define GUEST_LEVELS  4
-#define SHADOW_LEVELS 4
 #include "multi.h"
 #undef GUEST_LEVELS
-#undef SHADOW_LEVELS
 #endif /* CONFIG_PAGING_LEVELS == 4 */
 
 /******************************************************************************

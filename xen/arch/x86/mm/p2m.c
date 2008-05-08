@@ -220,7 +220,6 @@ p2m_set_entry(struct domain *d, unsigned long gfn, mfn_t mfn, p2m_type_t p2mt)
                          L4_PAGETABLE_ENTRIES, PGT_l3_page_table) )
         goto out;
 #endif
-#if CONFIG_PAGING_LEVELS >= 3
     /*
      * When using PAE Xen, we only allow 33 bits of pseudo-physical
      * address in translated guests (i.e. 8 GBytes).  This restriction
@@ -235,7 +234,7 @@ p2m_set_entry(struct domain *d, unsigned long gfn, mfn_t mfn, p2m_type_t p2mt)
                           : L3_PAGETABLE_ENTRIES),
                          PGT_l2_page_table) )
         goto out;
-#endif
+
     if ( !p2m_next_level(d, &table_mfn, &table, &gfn_remainder, gfn,
                          L2_PAGETABLE_SHIFT - PAGE_SHIFT,
                          L2_PAGETABLE_ENTRIES, PGT_l1_page_table) )
@@ -308,7 +307,6 @@ p2m_gfn_to_mfn(struct domain *d, unsigned long gfn, p2m_type_t *t)
         unmap_domain_page(l4e);
     }
 #endif
-#if CONFIG_PAGING_LEVELS >= 3
     {
         l3_pgentry_t *l3e = map_domain_page(mfn_x(mfn));
 #if CONFIG_PAGING_LEVELS == 3
@@ -329,7 +327,6 @@ p2m_gfn_to_mfn(struct domain *d, unsigned long gfn, p2m_type_t *t)
         mfn = _mfn(l3e_get_pfn(*l3e));
         unmap_domain_page(l3e);
     }
-#endif
 
     l2e = map_domain_page(mfn_x(mfn));
     l2e += l2_table_offset(addr);
@@ -486,7 +483,7 @@ int p2m_alloc_table(struct domain *d,
     p2m_top->u.inuse.type_info =
 #if CONFIG_PAGING_LEVELS == 4
         PGT_l4_page_table
-#elif CONFIG_PAGING_LEVELS == 3
+#else
         PGT_l3_page_table
 #endif
         | 1 | PGT_validated;
@@ -657,16 +654,13 @@ static void audit_p2m(struct domain *d)
         l3_pgentry_t *l3e;
         int i3, i4;
         l4e = map_domain_page(mfn_x(pagetable_get_mfn(d->arch.phys_table)));
-#elif CONFIG_PAGING_LEVELS == 3
+#else /* CONFIG_PAGING_LEVELS == 3 */
         l3_pgentry_t *l3e;
         int i3;
         l3e = map_domain_page(mfn_x(pagetable_get_mfn(d->arch.phys_table)));
-#else /* CONFIG_PAGING_LEVELS == 2 */
-        l2e = map_domain_page(mfn_x(pagetable_get_mfn(d->arch.phys_table)));
 #endif
 
         gfn = 0;
-#if CONFIG_PAGING_LEVELS >= 3
 #if CONFIG_PAGING_LEVELS >= 4
         for ( i4 = 0; i4 < L4_PAGETABLE_ENTRIES; i4++ )
         {
@@ -676,7 +670,7 @@ static void audit_p2m(struct domain *d)
                 continue;
             }
             l3e = map_domain_page(mfn_x(_mfn(l4e_get_pfn(l4e[i4]))));
-#endif /* now at levels 3 or 4... */
+#endif
             for ( i3 = 0;
                   i3 < ((CONFIG_PAGING_LEVELS==4) ? L3_PAGETABLE_ENTRIES : 8);
                   i3++ )
@@ -687,7 +681,6 @@ static void audit_p2m(struct domain *d)
                     continue;
                 }
                 l2e = map_domain_page(mfn_x(_mfn(l3e_get_pfn(l3e[i3]))));
-#endif /* all levels... */
                 for ( i2 = 0; i2 < L2_PAGETABLE_ENTRIES; i2++ )
                 {
                     if ( !(l2e_get_flags(l2e[i2]) & _PAGE_PRESENT) )
@@ -714,21 +707,17 @@ static void audit_p2m(struct domain *d)
                     }
                     unmap_domain_page(l1e);
                 }
-#if CONFIG_PAGING_LEVELS >= 3
                 unmap_domain_page(l2e);
             }
 #if CONFIG_PAGING_LEVELS >= 4
             unmap_domain_page(l3e);
         }
 #endif
-#endif
 
 #if CONFIG_PAGING_LEVELS == 4
         unmap_domain_page(l4e);
-#elif CONFIG_PAGING_LEVELS == 3
+#else /* CONFIG_PAGING_LEVELS == 3 */
         unmap_domain_page(l3e);
-#else /* CONFIG_PAGING_LEVELS == 2 */
-        unmap_domain_page(l2e);
 #endif
 
     }
@@ -864,14 +853,12 @@ void p2m_change_type_global(struct domain *d, p2m_type_t ot, p2m_type_t nt)
     l2_pgentry_t *l2e;
     mfn_t l1mfn;
     int i1, i2;
-#if CONFIG_PAGING_LEVELS >= 3
     l3_pgentry_t *l3e;
     int i3;
 #if CONFIG_PAGING_LEVELS == 4
     l4_pgentry_t *l4e;
     int i4;
 #endif /* CONFIG_PAGING_LEVELS == 4 */
-#endif /* CONFIG_PAGING_LEVELS >= 3 */
 
     if ( !paging_mode_translate(d) )
         return;
@@ -883,13 +870,10 @@ void p2m_change_type_global(struct domain *d, p2m_type_t ot, p2m_type_t nt)
 
 #if CONFIG_PAGING_LEVELS == 4
     l4e = map_domain_page(mfn_x(pagetable_get_mfn(d->arch.phys_table)));
-#elif CONFIG_PAGING_LEVELS == 3
+#else /* CONFIG_PAGING_LEVELS == 3 */
     l3e = map_domain_page(mfn_x(pagetable_get_mfn(d->arch.phys_table)));
-#else /* CONFIG_PAGING_LEVELS == 2 */
-    l2e = map_domain_page(mfn_x(pagetable_get_mfn(d->arch.phys_table)));
 #endif
 
-#if CONFIG_PAGING_LEVELS >= 3
 #if CONFIG_PAGING_LEVELS >= 4
     for ( i4 = 0; i4 < L4_PAGETABLE_ENTRIES; i4++ )
     {
@@ -898,7 +882,7 @@ void p2m_change_type_global(struct domain *d, p2m_type_t ot, p2m_type_t nt)
             continue;
         }
         l3e = map_domain_page(l4e_get_pfn(l4e[i4]));
-#endif /* now at levels 3 or 4... */
+#endif
         for ( i3 = 0;
               i3 < ((CONFIG_PAGING_LEVELS==4) ? L3_PAGETABLE_ENTRIES : 8);
               i3++ )
@@ -908,7 +892,6 @@ void p2m_change_type_global(struct domain *d, p2m_type_t ot, p2m_type_t nt)
                 continue;
             }
             l2e = map_domain_page(l3e_get_pfn(l3e[i3]));
-#endif /* all levels... */
             for ( i2 = 0; i2 < L2_PAGETABLE_ENTRIES; i2++ )
             {
                 if ( !(l2e_get_flags(l2e[i2]) & _PAGE_PRESENT) )
@@ -934,21 +917,17 @@ void p2m_change_type_global(struct domain *d, p2m_type_t ot, p2m_type_t nt)
                 }
                 unmap_domain_page(l1e);
             }
-#if CONFIG_PAGING_LEVELS >= 3
             unmap_domain_page(l2e);
         }
 #if CONFIG_PAGING_LEVELS >= 4
         unmap_domain_page(l3e);
     }
 #endif
-#endif
 
 #if CONFIG_PAGING_LEVELS == 4
     unmap_domain_page(l4e);
-#elif CONFIG_PAGING_LEVELS == 3
+#else /* CONFIG_PAGING_LEVELS == 3 */
     unmap_domain_page(l3e);
-#else /* CONFIG_PAGING_LEVELS == 2 */
-    unmap_domain_page(l2e);
 #endif
 
 }
