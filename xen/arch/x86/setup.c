@@ -121,11 +121,7 @@ char __attribute__ ((__section__(".bss.stack_aligned"))) cpu0_stack[STACK_SIZE];
 
 struct cpuinfo_x86 boot_cpu_data = { 0, 0, 0, 0, -1 };
 
-#if CONFIG_PAGING_LEVELS > 2
 unsigned long mmu_cr4_features = X86_CR4_PSE | X86_CR4_PGE | X86_CR4_PAE;
-#else
-unsigned long mmu_cr4_features = X86_CR4_PSE;
-#endif
 EXPORT_SYMBOL(mmu_cr4_features);
 
 int acpi_disabled;
@@ -1064,17 +1060,7 @@ void arch_get_xen_caps(xen_capabilities_info_t *info)
 
     (*info)[0] = '\0';
 
-#if defined(CONFIG_X86_32) && !defined(CONFIG_X86_PAE)
-
-    snprintf(s, sizeof(s), "xen-%d.%d-x86_32 ", major, minor);
-    safe_strcat(*info, s);
-    if ( hvm_enabled )
-    {
-        snprintf(s, sizeof(s), "hvm-%d.%d-x86_32 ", major, minor);
-        safe_strcat(*info, s);
-    }
-
-#elif defined(CONFIG_X86_32) && defined(CONFIG_X86_PAE)
+#if defined(CONFIG_X86_32)
 
     snprintf(s, sizeof(s), "xen-%d.%d-x86_32p ", major, minor);
     safe_strcat(*info, s);

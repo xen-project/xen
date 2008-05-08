@@ -255,7 +255,7 @@ struct arch_domain
     cpuid_input_t cpuids[MAX_CPUID_INPUT];
 } __cacheline_aligned;
 
-#ifdef CONFIG_X86_PAE
+#ifdef __i386__
 struct pae_l3_cache {
     /*
      * Two low-memory (<4GB) PAE L3 tables, used as fallback when the guest
@@ -269,7 +269,7 @@ struct pae_l3_cache {
     spinlock_t    lock;
 };
 #define pae_l3_cache_init(c) spin_lock_init(&(c)->lock)
-#else /* !CONFIG_X86_PAE */
+#else /* !defined(__i386__) */
 struct pae_l3_cache { };
 #define pae_l3_cache_init(c) ((void)0)
 #endif

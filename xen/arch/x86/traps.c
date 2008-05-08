@@ -1021,13 +1021,13 @@ static int __spurious_page_fault(
 
 #if CONFIG_PAGING_LEVELS >= 3
     l3t  = map_domain_page(mfn);
-#ifdef CONFIG_X86_PAE
+#if CONFIG_PAGING_LEVELS == 3
     l3t += (cr3 & 0xFE0UL) >> 3;
 #endif
     l3e = l3e_read_atomic(&l3t[l3_table_offset(addr)]);
     mfn = l3e_get_pfn(l3e);
     unmap_domain_page(l3t);
-#ifdef CONFIG_X86_PAE
+#if CONFIG_PAGING_LEVELS == 3
     if ( !(l3e_get_flags(l3e) & _PAGE_PRESENT) )
         return 0;
 #else

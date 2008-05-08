@@ -934,7 +934,7 @@ static void vmx_load_pdptrs(struct vcpu *v)
     __vmwrite(GUEST_PDPTR1, guest_pdptrs[1]);
     __vmwrite(GUEST_PDPTR2, guest_pdptrs[2]);
     __vmwrite(GUEST_PDPTR3, guest_pdptrs[3]);
-#ifdef CONFIG_X86_PAE
+#ifdef __i386__
     __vmwrite(GUEST_PDPTR0_HIGH, guest_pdptrs[0] >> 32);
     __vmwrite(GUEST_PDPTR1_HIGH, guest_pdptrs[1] >> 32);
     __vmwrite(GUEST_PDPTR2_HIGH, guest_pdptrs[2] >> 32);
@@ -2253,7 +2253,7 @@ asmlinkage void vmx_vmexit_handler(struct cpu_user_regs *regs)
     case EXIT_REASON_EPT_VIOLATION:
     {
         paddr_t gpa = __vmread(GUEST_PHYSICAL_ADDRESS);
-#ifdef CONFIG_X86_PAE
+#ifdef __i386__
         gpa |= (paddr_t)__vmread(GUEST_PHYSICAL_ADDRESS_HIGH) << 32;
 #endif
         exit_qualification = __vmread(EXIT_QUALIFICATION);

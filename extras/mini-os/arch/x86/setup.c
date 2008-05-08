@@ -53,7 +53,7 @@ extern char shared_info[PAGE_SIZE];
 void hypervisor_callback(void);
 void failsafe_callback(void);
 
-#if !defined(CONFIG_X86_PAE)
+#if defined(__x86_64__)
 #define __pte(x) ((pte_t) { (x) } )
 #else
 #define __pte(x) ({ unsigned long long _x = (x);        \

@@ -7,7 +7,7 @@
 #ifdef __ASSEMBLY__
 #define __PAGE_SIZE       (1 << __PAGE_SHIFT)
 #else
-#ifndef CONFIG_X86_PAE
+#ifdef __x86_64__
 #define __PAGE_SIZE       (1UL << __PAGE_SHIFT)
 #else
 #define __PAGE_SIZE       (1ULL << __PAGE_SHIFT)

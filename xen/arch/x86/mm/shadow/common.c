@@ -68,8 +68,6 @@ void shadow_vcpu_init(struct vcpu *v)
     v->arch.paging.mode = &SHADOW_INTERNAL_NAME(sh_paging_mode,3,3);
 #elif CONFIG_PAGING_LEVELS == 3
     v->arch.paging.mode = &SHADOW_INTERNAL_NAME(sh_paging_mode,3,3);
-#elif CONFIG_PAGING_LEVELS == 2
-    v->arch.paging.mode = &SHADOW_INTERNAL_NAME(sh_paging_mode,2,2);
 #endif
 }
 
@@ -504,27 +502,14 @@ sh_validate_guest_entry(struct vcpu *v, mfn_t gmfn, void *entry, u32 size)
     if ( !(page->count_info & PGC_page_table) )
         return 0;  /* Not shadowed at all */
 
-#if CONFIG_PAGING_LEVELS == 2
-    if ( page->shadow_flags & SHF_L1_32 ) 
-        result |= SHADOW_INTERNAL_NAME(sh_map_and_validate_gl1e, 2, 2)
-            (v, gmfn, entry, size);
-#else 
     if ( page->shadow_flags & SHF_L1_32 ) 
         result |= SHADOW_INTERNAL_NAME(sh_map_and_validate_gl1e, 3, 2)
             (v, gmfn, entry, size);
-#endif
 
-#if CONFIG_PAGING_LEVELS == 2
-    if ( page->shadow_flags & SHF_L2_32 ) 
-        result |= SHADOW_INTERNAL_NAME(sh_map_and_validate_gl2e, 2, 2)
-            (v, gmfn, entry, size);
-#else 
     if ( page->shadow_flags & SHF_L2_32 ) 
         result |= SHADOW_INTERNAL_NAME(sh_map_and_validate_gl2e, 3, 2)
             (v, gmfn, entry, size);
-#endif
 
-#if CONFIG_PAGING_LEVELS >= 3 
     if ( page->shadow_flags & SHF_L1_PAE ) 
         result |= SHADOW_INTERNAL_NAME(sh_map_and_validate_gl1e, 3, 3)
             (v, gmfn, entry, size);
@@ -534,9 +519,6 @@ sh_validate_guest_entry(struct vcpu *v, mfn_t gmfn, void *entry, u32 size)
     if ( page->shadow_flags & SHF_L2H_PAE ) 
         result |= SHADOW_INTERNAL_NAME(sh_map_and_validate_gl2he, 3, 3)
             (v, gmfn, entry, size);
-#else /* 32-bit non-PAE hypervisor does not support PAE guests */
-    ASSERT((page->shadow_flags & (SHF_L2H_PAE|SHF_L2_PAE|SHF_L1_PAE)) == 0);
-#endif
 
 #if CONFIG_PAGING_LEVELS >= 4 
     if ( page->shadow_flags & SHF_L1_64 ) 
@@ -554,7 +536,7 @@ sh_validate_guest_entry(struct vcpu *v, mfn_t gmfn, void *entry, u32 size)
     if ( page->shadow_flags & SHF_L4_64 ) 
         result |= SHADOW_INTERNAL_NAME(sh_map_and_validate_gl4e, 4, 4)
             (v, gmfn, entry, size);
-#else /* 32-bit/PAE hypervisor does not support 64-bit guests */
+#else /* 32-bit hypervisor does not support 64-bit guests */
     ASSERT((page->shadow_flags 
             & (SHF_L4_64|SHF_L3_64|SHF_L2H_64|SHF_L2_64|SHF_L1_64)) == 0);
 #endif
@@ -685,7 +667,6 @@ static unsigned int shadow_min_acceptable_pages(struct domain *d)
 static inline u32
 shadow_order(unsigned int shadow_type) 
 {
-#if CONFIG_PAGING_LEVELS > 2
     static const u32 type_to_order[SH_type_unused] = {
         0, /* SH_type_none           */
         1, /* SH_type_l1_32_shadow   */
@@ -706,9 +687,6 @@ shadow_order(unsigned int shadow_type)
         };
     ASSERT(shadow_type < SH_type_unused);
     return type_to_order[shadow_type];
-#else  /* 32-bit Xen only ever shadows 32-bit guests on 32-bit shadows. */
-    return 0;
-#endif
 }
 
 static inline unsigned int
@@ -745,18 +723,12 @@ static void shadow_unhook_mappings(struct vcpu *v, mfn_t smfn)
     switch ( sp->type )
     {
     case SH_type_l2_32_shadow:
-#if CONFIG_PAGING_LEVELS == 2
-        SHADOW_INTERNAL_NAME(sh_unhook_32b_mappings,2,2)(v,smfn);
-#else
         SHADOW_INTERNAL_NAME(sh_unhook_32b_mappings,3,2)(v,smfn);
-#endif
         break;
-#if CONFIG_PAGING_LEVELS >= 3
     case SH_type_l2_pae_shadow:
     case SH_type_l2h_pae_shadow:
         SHADOW_INTERNAL_NAME(sh_unhook_pae_mappings,3,3)(v,smfn);
         break;
-#endif
 #if CONFIG_PAGING_LEVELS >= 4
     case SH_type_l4_64_shadow:
         SHADOW_INTERNAL_NAME(sh_unhook_64b_mappings,4,4)(v,smfn);
@@ -1599,15 +1571,6 @@ void sh_destroy_shadow(struct vcpu *v, mfn_t smfn)
      * small numbers that the compiler will enjoy */
     switch ( t )
     {
-#if CONFIG_PAGING_LEVELS == 2
-    case SH_type_l1_32_shadow:
-    case SH_type_fl1_32_shadow:
-        SHADOW_INTERNAL_NAME(sh_destroy_l1_shadow, 2, 2)(v, smfn); 
-        break;
-    case SH_type_l2_32_shadow:
-        SHADOW_INTERNAL_NAME(sh_destroy_l2_shadow, 2, 2)(v, smfn);
-        break;
-#else /* PAE or 64bit */
     case SH_type_l1_32_shadow:
     case SH_type_fl1_32_shadow:
         SHADOW_INTERNAL_NAME(sh_destroy_l1_shadow, 3, 2)(v, smfn);
@@ -1615,9 +1578,7 @@ void sh_destroy_shadow(struct vcpu *v, mfn_t smfn)
     case SH_type_l2_32_shadow:
         SHADOW_INTERNAL_NAME(sh_destroy_l2_shadow, 3, 2)(v, smfn);
         break;
-#endif
 
-#if CONFIG_PAGING_LEVELS >= 3
     case SH_type_l1_pae_shadow:
     case SH_type_fl1_pae_shadow:
         SHADOW_INTERNAL_NAME(sh_destroy_l1_shadow, 3, 3)(v, smfn);
@@ -1626,7 +1587,6 @@ void sh_destroy_shadow(struct vcpu *v, mfn_t smfn)
     case SH_type_l2h_pae_shadow:
         SHADOW_INTERNAL_NAME(sh_destroy_l2_shadow, 3, 3)(v, smfn);
         break;
-#endif
 
 #if CONFIG_PAGING_LEVELS >= 4
     case SH_type_l1_64_shadow:
@@ -1666,21 +1626,11 @@ int sh_remove_write_access(struct vcpu *v, mfn_t gmfn,
     /* Dispatch table for getting per-type functions */
     static hash_callback_t callbacks[SH_type_unused] = {
         NULL, /* none    */
-#if CONFIG_PAGING_LEVELS == 2
-        SHADOW_INTERNAL_NAME(sh_rm_write_access_from_l1,2,2), /* l1_32   */
-        SHADOW_INTERNAL_NAME(sh_rm_write_access_from_l1,2,2), /* fl1_32  */
-#else 
         SHADOW_INTERNAL_NAME(sh_rm_write_access_from_l1,3,2), /* l1_32   */
         SHADOW_INTERNAL_NAME(sh_rm_write_access_from_l1,3,2), /* fl1_32  */
-#endif
         NULL, /* l2_32   */
-#if CONFIG_PAGING_LEVELS >= 3
         SHADOW_INTERNAL_NAME(sh_rm_write_access_from_l1,3,3), /* l1_pae  */
         SHADOW_INTERNAL_NAME(sh_rm_write_access_from_l1,3,3), /* fl1_pae */
-#else 
-        NULL, /* l1_pae  */
-        NULL, /* fl1_pae */
-#endif
         NULL, /* l2_pae  */
         NULL, /* l2h_pae */
 #if CONFIG_PAGING_LEVELS >= 4
@@ -1860,21 +1810,11 @@ int sh_remove_all_mappings(struct vcpu *v, mfn_t gmfn)
     /* Dispatch table for getting per-type functions */
     static hash_callback_t callbacks[SH_type_unused] = {
         NULL, /* none    */
-#if CONFIG_PAGING_LEVELS == 2
-        SHADOW_INTERNAL_NAME(sh_rm_mappings_from_l1,2,2), /* l1_32   */
-        SHADOW_INTERNAL_NAME(sh_rm_mappings_from_l1,2,2), /* fl1_32  */
-#else 
         SHADOW_INTERNAL_NAME(sh_rm_mappings_from_l1,3,2), /* l1_32   */
         SHADOW_INTERNAL_NAME(sh_rm_mappings_from_l1,3,2), /* fl1_32  */
-#endif
         NULL, /* l2_32   */
-#if CONFIG_PAGING_LEVELS >= 3
         SHADOW_INTERNAL_NAME(sh_rm_mappings_from_l1,3,3), /* l1_pae  */
         SHADOW_INTERNAL_NAME(sh_rm_mappings_from_l1,3,3), /* fl1_pae */
-#else 
-        NULL, /* l1_pae  */
-        NULL, /* fl1_pae */
-#endif
         NULL, /* l2_pae  */
         NULL, /* l2h_pae */
 #if CONFIG_PAGING_LEVELS >= 4
@@ -1978,13 +1918,8 @@ static int sh_remove_shadow_via_pointer(struct vcpu *v, mfn_t smfn)
     {
     case SH_type_l1_32_shadow:
     case SH_type_l2_32_shadow:
-#if CONFIG_PAGING_LEVELS == 2
-        SHADOW_INTERNAL_NAME(sh_clear_shadow_entry,2,2)(v, vaddr, pmfn);
-#else
         SHADOW_INTERNAL_NAME(sh_clear_shadow_entry,3,2)(v, vaddr, pmfn);
-#endif
         break;
-#if CONFIG_PAGING_LEVELS >=3
     case SH_type_l1_pae_shadow:
     case SH_type_l2_pae_shadow:
     case SH_type_l2h_pae_shadow:
@@ -1998,7 +1933,6 @@ static int sh_remove_shadow_via_pointer(struct vcpu *v, mfn_t smfn)
     case SH_type_l4_64_shadow:
         SHADOW_INTERNAL_NAME(sh_clear_shadow_entry,4,4)(v, vaddr, pmfn);
         break;
-#endif
 #endif
     default: BUG(); /* Some wierd unknown shadow type */
     }
@@ -2032,20 +1966,11 @@ void sh_remove_shadows(struct vcpu *v, mfn_t gmfn, int fast, int all)
         NULL, /* none    */
         NULL, /* l1_32   */
         NULL, /* fl1_32  */
-#if CONFIG_PAGING_LEVELS == 2
-        SHADOW_INTERNAL_NAME(sh_remove_l1_shadow,2,2), /* l2_32   */
-#else 
         SHADOW_INTERNAL_NAME(sh_remove_l1_shadow,3,2), /* l2_32   */
-#endif
         NULL, /* l1_pae  */
         NULL, /* fl1_pae */
-#if CONFIG_PAGING_LEVELS >= 3
         SHADOW_INTERNAL_NAME(sh_remove_l1_shadow,3,3), /* l2_pae  */
         SHADOW_INTERNAL_NAME(sh_remove_l1_shadow,3,3), /* l2h_pae */
-#else 
-        NULL, /* l2_pae  */
-        NULL, /* l2h_pae */
-#endif
         NULL, /* l1_64   */
         NULL, /* fl1_64  */
 #if CONFIG_PAGING_LEVELS >= 4
@@ -2232,8 +2157,6 @@ static void sh_update_paging_modes(struct vcpu *v)
         v->arch.paging.mode = &SHADOW_INTERNAL_NAME(sh_paging_mode,4,4);
 #elif CONFIG_PAGING_LEVELS == 3
         v->arch.paging.mode = &SHADOW_INTERNAL_NAME(sh_paging_mode,3,3);
-#elif CONFIG_PAGING_LEVELS == 2
-        v->arch.paging.mode = &SHADOW_INTERNAL_NAME(sh_paging_mode,2,2);
 #else
 #error unexpected paging mode
 #endif
@@ -3110,11 +3033,6 @@ void shadow_audit_tables(struct vcpu *v)
     /* Dispatch table for getting per-type functions */
     static hash_callback_t callbacks[SH_type_unused] = {
         NULL, /* none    */
-#if CONFIG_PAGING_LEVELS == 2
-        SHADOW_INTERNAL_NAME(sh_audit_l1_table,2,2),  /* l1_32   */
-        SHADOW_INTERNAL_NAME(sh_audit_fl1_table,2,2), /* fl1_32  */
-        SHADOW_INTERNAL_NAME(sh_audit_l2_table,2,2),  /* l2_32   */
-#else 
         SHADOW_INTERNAL_NAME(sh_audit_l1_table,3,2),  /* l1_32   */
         SHADOW_INTERNAL_NAME(sh_audit_fl1_table,3,2), /* fl1_32  */
         SHADOW_INTERNAL_NAME(sh_audit_l2_table,3,2),  /* l2_32   */
@@ -3130,7 +3048,6 @@ void shadow_audit_tables(struct vcpu *v)
         SHADOW_INTERNAL_NAME(sh_audit_l3_table,4,4),  /* l3_64   */
         SHADOW_INTERNAL_NAME(sh_audit_l4_table,4,4),  /* l4_64   */
 #endif /* CONFIG_PAGING_LEVELS >= 4 */
-#endif /* CONFIG_PAGING_LEVELS > 2 */
         NULL  /* All the rest */
     };
     unsigned int mask; 

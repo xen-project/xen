@@ -311,41 +311,6 @@ static void hap_install_xen_entries_in_l2h(struct vcpu *v, mfn_t l2hmfn)
 }
 #endif
 
-#if CONFIG_PAGING_LEVELS == 2
-static void hap_install_xen_entries_in_l2(struct vcpu *v, mfn_t l2mfn)
-{
-    struct domain *d = v->domain;
-    l2_pgentry_t *l2e;
-    int i;
-
-    l2e = hap_map_domain_page(l2mfn);
-    ASSERT(l2e != NULL);
-
-    /* Copy the common Xen mappings from the idle domain */
-    memcpy(&l2e[L2_PAGETABLE_FIRST_XEN_SLOT],
-           &idle_pg_table[L2_PAGETABLE_FIRST_XEN_SLOT],
-           L2_PAGETABLE_XEN_SLOTS * sizeof(l2_pgentry_t));
-
-    /* Install the per-domain mappings for this domain */
-    for ( i = 0; i < PDPT_L2_ENTRIES; i++ )
-        l2e[l2_table_offset(PERDOMAIN_VIRT_START) + i] =
-            l2e_from_pfn(
-                mfn_x(page_to_mfn(virt_to_page(d->arch.mm_perdomain_pt) + i)),
-                __PAGE_HYPERVISOR);
-
-    /* Install the linear mapping */
-    l2e[l2_table_offset(LINEAR_PT_VIRT_START)] =
-        l2e_from_pfn(mfn_x(l2mfn), __PAGE_HYPERVISOR);
-
-    /* Install the domain-specific P2M table */
-    l2e[l2_table_offset(RO_MPT_VIRT_START)] =
-        l2e_from_pfn(mfn_x(pagetable_get_mfn(d->arch.phys_table)),
-                            __PAGE_HYPERVISOR);
-
-    hap_unmap_domain_page(l2e);
-}
-#endif
-
 static mfn_t hap_make_monitor_table(struct vcpu *v)
 {
     struct domain *d = v->domain;
@@ -394,15 +359,6 @@ static mfn_t hap_make_monitor_table(struct vcpu *v)
 
         HAP_PRINTK("new monitor table: %#lx\n", mfn_x(m3mfn));
         return m3mfn;
-    }
-#else
-    {
-        mfn_t m2mfn;
-        if ( (pg = hap_alloc(d)) == NULL )
-            goto oom;
-        m2mfn = page_to_mfn(pg);;
-        hap_install_xen_entries_in_l2(v, m2mfn);
-        return m2mfn;
     }
 #endif
 

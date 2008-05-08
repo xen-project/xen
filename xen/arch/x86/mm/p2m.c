@@ -488,8 +488,6 @@ int p2m_alloc_table(struct domain *d,
         PGT_l4_page_table
 #elif CONFIG_PAGING_LEVELS == 3
         PGT_l3_page_table
-#elif CONFIG_PAGING_LEVELS == 2
-        PGT_l2_page_table
 #endif
         | 1 | PGT_validated;
 

@@ -1745,56 +1745,6 @@ static void sh_install_xen_entries_in_l2h(struct vcpu *v, mfn_t sl2hmfn)
 #endif
 
 
-#if CONFIG_PAGING_LEVELS == 2 && GUEST_PAGING_LEVELS == 2
-void sh_install_xen_entries_in_l2(struct vcpu *v, mfn_t gl2mfn, mfn_t sl2mfn)
-{
-    struct domain *d = v->domain;
-    shadow_l2e_t *sl2e;
-    int i;
-
-    sl2e = sh_map_domain_page(sl2mfn);
-    ASSERT(sl2e != NULL);
-    ASSERT(sizeof (l2_pgentry_t) == sizeof (shadow_l2e_t));
-    
-    /* Copy the common Xen mappings from the idle domain */
-    memcpy(&sl2e[L2_PAGETABLE_FIRST_XEN_SLOT],
-           &idle_pg_table[L2_PAGETABLE_FIRST_XEN_SLOT],
-           L2_PAGETABLE_XEN_SLOTS * sizeof(l2_pgentry_t));
-
-    /* Install the per-domain mappings for this domain */
-    for ( i = 0; i < PDPT_L2_ENTRIES; i++ )
-        sl2e[shadow_l2_table_offset(PERDOMAIN_VIRT_START) + i] =
-            shadow_l2e_from_mfn(
-                page_to_mfn(virt_to_page(d->arch.mm_perdomain_pt) + i),
-                __PAGE_HYPERVISOR);
-
-    /* Linear mapping */
-    sl2e[shadow_l2_table_offset(SH_LINEAR_PT_VIRT_START)] =
-        shadow_l2e_from_mfn(sl2mfn, __PAGE_HYPERVISOR);
-
-    if ( shadow_mode_translate(v->domain) && !shadow_mode_external(v->domain) )
-    {
-        // linear tables may not be used with translated PV guests
-        sl2e[shadow_l2_table_offset(LINEAR_PT_VIRT_START)] =
-            shadow_l2e_empty();
-    }
-    else
-    {
-        sl2e[shadow_l2_table_offset(LINEAR_PT_VIRT_START)] =
-            shadow_l2e_from_mfn(gl2mfn, __PAGE_HYPERVISOR);
-    }
-
-    if ( shadow_mode_translate(d) )
-    {
-        /* install domain-specific P2M table */
-        sl2e[shadow_l2_table_offset(RO_MPT_VIRT_START)] =
-            shadow_l2e_from_mfn(pagetable_get_mfn(d->arch.phys_table),
-                                __PAGE_HYPERVISOR);
-    }
-
-    sh_unmap_domain_page(sl2e);
-}
-#endif
 
 
 
@@ -1865,10 +1815,6 @@ sh_make_shadow(struct vcpu *v, mfn_t gmfn, u32 shadow_type)
 #if CONFIG_PAGING_LEVELS >= 3 && GUEST_PAGING_LEVELS >= 3
         case SH_type_l2h_shadow:
             sh_install_xen_entries_in_l2h(v, smfn); break;
-#endif
-#if CONFIG_PAGING_LEVELS == 2 && GUEST_PAGING_LEVELS == 2
-        case SH_type_l2_shadow:
-            sh_install_xen_entries_in_l2(v, gmfn, smfn); break;
 #endif
         default: /* Do nothing */ break;
         }
@@ -1987,17 +1933,6 @@ sh_make_monitor_table(struct vcpu *v)
 
         SHADOW_PRINTK("new monitor table: %#lx\n", mfn_x(m3mfn));
         return m3mfn;
-    }
-
-#elif CONFIG_PAGING_LEVELS == 2
-
-    {
-        mfn_t m2mfn;
-        m2mfn = shadow_alloc(d, SH_type_monitor_table, 0);
-        sh_install_xen_entries_in_l2(v, m2mfn, m2mfn);
-        /* Remember the level of this table */
-        mfn_to_page(m2mfn)->shadow_flags = 2;
-        return m2mfn;
     }
 
 #else
@@ -3639,32 +3574,6 @@ sh_update_linear_entries(struct vcpu *v)
         
         if ( unmap_l2e )
             sh_unmap_domain_page(l2e);
-    }
-
-#elif CONFIG_PAGING_LEVELS == 2
-
-    /* For PV, one l2e points at the guest l2, one points at the shadow
-     * l2. No maintenance required. 
-     * For HVM, just need to update the l2e that points to the shadow l2. */
-
-    if ( shadow_mode_external(d) )
-    {
-        /* Use the linear map if we can; otherwise make a new mapping */
-        if ( v == current ) 
-        {
-            __linear_l2_table[l2_linear_offset(SH_LINEAR_PT_VIRT_START)] = 
-                l2e_from_pfn(pagetable_get_pfn(v->arch.shadow_table[0]),
-                             __PAGE_HYPERVISOR);
-        } 
-        else
-        { 
-            l2_pgentry_t *ml2e;
-            ml2e = sh_map_domain_page(pagetable_get_mfn(v->arch.monitor_table));
-            ml2e[l2_table_offset(SH_LINEAR_PT_VIRT_START)] = 
-                l2e_from_pfn(pagetable_get_pfn(v->arch.shadow_table[0]),
-                             __PAGE_HYPERVISOR);
-            sh_unmap_domain_page(ml2e);
-        }
     }
 
 #else

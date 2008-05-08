@@ -630,7 +630,7 @@ static int construct_vmcs(struct vcpu *v)
     if ( paging_mode_hap(d) )
     {
         __vmwrite(EPT_POINTER, d->arch.hvm_domain.vmx.ept_control.eptp);
-#ifdef CONFIG_X86_PAE
+#ifdef __i386__
         __vmwrite(EPT_POINTER_HIGH,
                   d->arch.hvm_domain.vmx.ept_control.eptp >> 32);
 #endif

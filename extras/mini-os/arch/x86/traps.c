@@ -104,11 +104,9 @@ void page_walk(unsigned long virt_address)
         tab = pte_to_virt(page);
         printk(" L4 = %"PRIpte" (%p)  [offset = %lx]\n", page, tab, l4_table_offset(addr));
 #endif
-#if defined(__x86_64__) || defined(CONFIG_X86_PAE)
         page = tab[l3_table_offset(addr)];
         tab = pte_to_virt(page);
         printk("  L3 = %"PRIpte" (%p)  [offset = %lx]\n", page, tab, l3_table_offset(addr));
-#endif
         page = tab[l2_table_offset(addr)];
         tab = pte_to_virt(page);
         printk("   L2 = %"PRIpte" (%p)  [offset = %lx]\n", page, tab, l2_table_offset(addr));
@@ -129,12 +127,11 @@ static int handle_cow(unsigned long addr) {
 	    return 0;
         tab = pte_to_virt(page);
 #endif
-#if defined(__x86_64__) || defined(CONFIG_X86_PAE)
         page = tab[l3_table_offset(addr)];
 	if (!(page & _PAGE_PRESENT))
 	    return 0;
         tab = pte_to_virt(page);
-#endif
+
         page = tab[l2_table_offset(addr)];
 	if (!(page & _PAGE_PRESENT))
 	    return 0;

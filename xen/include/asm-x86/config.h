@@ -9,10 +9,8 @@
 
 #if defined(__x86_64__)
 # define CONFIG_PAGING_LEVELS 4
-#elif defined(CONFIG_X86_PAE)
-# define CONFIG_PAGING_LEVELS 3
 #else
-# define CONFIG_PAGING_LEVELS 2
+# define CONFIG_PAGING_LEVELS 3
 #endif
 
 #define CONFIG_X86 1
@@ -274,17 +272,17 @@ extern unsigned int video_mode, video_flags;
 #define asmlinkage __attribute__((regparm(0)))
 
 /*
- * Memory layout (high to low):                          SIZE   PAE-SIZE
- *                                                       ------ ------
+ * Memory layout (high to low):                          PAE-SIZE
+ *                                                       ------
  *  I/O remapping area                                   ( 4MB)
  *  Direct-map (1:1) area [Xen code/data/heap]           (12MB)
  *  Per-domain mappings (inc. 4MB map_domain_page cache) ( 8MB)
- *  Shadow linear pagetable                              ( 4MB) ( 8MB)
- *  Guest linear pagetable                               ( 4MB) ( 8MB)
- *  Machine-to-physical translation table [writable]     ( 4MB) (16MB)
- *  Frame-info table                                     (24MB) (96MB)
+ *  Shadow linear pagetable                              ( 8MB)
+ *  Guest linear pagetable                               ( 8MB)
+ *  Machine-to-physical translation table [writable]     (16MB)
+ *  Frame-info table                                     (96MB)
  *   * Start of guest inaccessible area
- *  Machine-to-physical translation table [read-only]    ( 4MB) (16MB)
+ *  Machine-to-physical translation table [read-only]    (16MB)
  *   * Start of guest unmodifiable area
  */
 
@@ -293,15 +291,9 @@ extern unsigned int video_mode, video_flags;
 #define MAPCACHE_MBYTES          4
 #define PERDOMAIN_MBYTES         8
 
-#ifdef CONFIG_X86_PAE
-# define LINEARPT_MBYTES         8
-# define MACHPHYS_MBYTES        16 /* 1 MB needed per 1 GB memory */
-# define FRAMETABLE_MBYTES (MACHPHYS_MBYTES * 6)
-#else
-# define LINEARPT_MBYTES         4
-# define MACHPHYS_MBYTES         4
-# define FRAMETABLE_MBYTES      24
-#endif
+#define LINEARPT_MBYTES          8
+#define MACHPHYS_MBYTES         16 /* 1 MB needed per 1 GB memory */
+#define FRAMETABLE_MBYTES       (MACHPHYS_MBYTES * 6)
 
 #define IOREMAP_VIRT_END	0UL
 #define IOREMAP_VIRT_START	(IOREMAP_VIRT_END - (IOREMAP_MBYTES<<20))
@@ -328,13 +320,8 @@ extern unsigned int video_mode, video_flags;
 /* Maximum linear address accessible via guest memory segments. */
 #define GUEST_SEGMENT_MAX_ADDR  RO_MPT_VIRT_END
 
-#ifdef CONFIG_X86_PAE
 /* Hypervisor owns top 168MB of virtual address space. */
 #define HYPERVISOR_VIRT_START   mk_unsigned_long(0xF5800000)
-#else
-/* Hypervisor owns top 64MB of virtual address space. */
-#define HYPERVISOR_VIRT_START   mk_unsigned_long(0xFC000000)
-#endif
 
 #define L2_PAGETABLE_FIRST_XEN_SLOT \
     (HYPERVISOR_VIRT_START >> L2_PAGETABLE_SHIFT)
@@ -343,11 +330,7 @@ extern unsigned int video_mode, video_flags;
 #define L2_PAGETABLE_XEN_SLOTS \
     (L2_PAGETABLE_LAST_XEN_SLOT - L2_PAGETABLE_FIRST_XEN_SLOT + 1)
 
-#ifdef CONFIG_X86_PAE
-# define PGT_base_page_table     PGT_l3_page_table
-#else
-# define PGT_base_page_table     PGT_l2_page_table
-#endif
+#define PGT_base_page_table     PGT_l3_page_table
 
 #define __HYPERVISOR_CS 0xe008
 #define __HYPERVISOR_DS 0xe010

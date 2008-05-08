@@ -129,7 +129,7 @@ l1_pgentry_t __attribute__ ((__section__ (".bss.page_aligned")))
  *  1. Debug builds get extra checking by using CMPXCHG[8B].
  *  2. PAE builds perform an atomic 8-byte store with CMPXCHG8B.
  */
-#if !defined(NDEBUG) || defined(CONFIG_X86_PAE)
+#if !defined(NDEBUG) || defined(__i386__)
 #define PTE_UPDATE_WITH_CMPXCHG
 #endif
 
@@ -340,7 +340,7 @@ void share_xen_page_with_privileged_guests(
     share_xen_page_with_guest(page, dom_xen, readonly);
 }
 
-#if defined(CONFIG_X86_PAE)
+#if defined(__i386__)
 
 #ifdef NDEBUG
 /* Only PDPTs above 4GB boundary need to be shadowed in low memory. */
@@ -416,14 +416,14 @@ void make_cr3(struct vcpu *v, unsigned long mfn)
     spin_unlock(&cache->lock);
 }
 
-#else /* !CONFIG_X86_PAE */
+#else /* !defined(__i386__) */
 
 void make_cr3(struct vcpu *v, unsigned long mfn)
 {
     v->arch.cr3 = mfn << PAGE_SHIFT;
 }
 
-#endif /* !CONFIG_X86_PAE */
+#endif /* !defined(__i386__) */
 
 void write_ptbase(struct vcpu *v)
 {
@@ -997,7 +997,6 @@ static int alloc_l1_table(struct page_info *page)
     return 0;
 }
 
-#if defined(CONFIG_X86_PAE) || defined(CONFIG_COMPAT)
 static int create_pae_xen_mappings(struct domain *d, l3_pgentry_t *pl3e)
 {
     struct page_info *page;
@@ -1070,11 +1069,8 @@ static int create_pae_xen_mappings(struct domain *d, l3_pgentry_t *pl3e)
 
     return 1;
 }
-#else
-# define create_pae_xen_mappings(d, pl3e) (1)
-#endif
 
-#ifdef CONFIG_X86_PAE
+#ifdef __i386__
 /* Flush a pgdir update into low-memory caches. */
 static void pae_flush_pgd(
     unsigned long mfn, unsigned int idx, l3_pgentry_t nl3e)
@@ -1144,20 +1140,6 @@ static int alloc_l2_table(struct page_info *page, unsigned long type)
         adjust_guest_l2e(pl2e[i], d);
     }
 
-#if CONFIG_PAGING_LEVELS == 2
-    /* Xen private mappings. */
-    memcpy(&pl2e[L2_PAGETABLE_FIRST_XEN_SLOT],
-           &idle_pg_table[L2_PAGETABLE_FIRST_XEN_SLOT],
-           L2_PAGETABLE_XEN_SLOTS * sizeof(l2_pgentry_t));
-    pl2e[l2_table_offset(LINEAR_PT_VIRT_START)] =
-        l2e_from_pfn(pfn, __PAGE_HYPERVISOR);
-    for ( i = 0; i < PDPT_L2_ENTRIES; i++ )
-        pl2e[l2_table_offset(PERDOMAIN_VIRT_START) + i] =
-            l2e_from_page(
-                virt_to_page(page_get_owner(page)->arch.mm_perdomain_pt) + i,
-                __PAGE_HYPERVISOR);
-#endif
-
     unmap_domain_page(pl2e);
     return 1;
 
@@ -1180,7 +1162,7 @@ static int alloc_l3_table(struct page_info *page)
     l3_pgentry_t  *pl3e;
     int            i;
 
-#ifdef CONFIG_X86_PAE
+#if CONFIG_PAGING_LEVELS == 3
     /*
      * PAE pgdirs above 4GB are unacceptable if the guest does not understand
      * the weird 'extended cr3' format for dealing with high-order address
@@ -1209,7 +1191,6 @@ static int alloc_l3_table(struct page_info *page)
 
     for ( i = 0; i < L3_PAGETABLE_ENTRIES; i++ )
     {
-#if defined(CONFIG_X86_PAE) || defined(CONFIG_COMPAT)
         if ( is_pv_32bit_domain(d) && (i == 3) )
         {
             if ( !(l3e_get_flags(pl3e[i]) & _PAGE_PRESENT) ||
@@ -1220,12 +1201,10 @@ static int alloc_l3_table(struct page_info *page)
                                                 d) )
                 goto fail;
         }
-        else
-#endif
-        if ( is_guest_l3_slot(i) &&
-             unlikely(!get_page_from_l3e(pl3e[i], pfn, d)) )
+        else if ( is_guest_l3_slot(i) &&
+                  unlikely(!get_page_from_l3e(pl3e[i], pfn, d)) )
             goto fail;
-        
+
         adjust_guest_l3e(pl3e[i], d);
     }
 
@@ -1562,14 +1541,12 @@ static int mod_l3_entry(l3_pgentry_t *pl3e,
         return 0;
     }
 
-#if defined(CONFIG_X86_PAE) || defined(CONFIG_COMPAT)
     /*
      * Disallow updates to final L3 slot. It contains Xen mappings, and it
      * would be a pain to ensure they remain continuously valid throughout.
      */
     if ( is_pv_32bit_domain(d) && (pgentry_ptr_to_slot(pl3e) >= 3) )
         return 0;
-#endif 
 
     if ( unlikely(__copy_from_user(&ol3e, pl3e, sizeof(ol3e)) != 0) )
         return 0;

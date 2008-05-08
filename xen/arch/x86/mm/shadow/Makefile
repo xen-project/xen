@@ -1,9 +1,4 @@
-ifneq ($(pae),n)
 obj-$(x86_32) += common.o g2_on_s3.o g3_on_s3.o
-else
-obj-$(x86_32) += common.o g2_on_s2.o
-endif
-
 obj-$(x86_64) += common.o g4_on_s4.o g3_on_s3.o g2_on_s3.o
 
 guest_levels  = $(subst g,,$(filter g%,$(subst ., ,$(subst _, ,$(1)))))

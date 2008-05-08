@@ -122,11 +122,7 @@ static inline u32 pickle_domptr(struct domain *domain)
 #endif
 
 /* The order of the largest allocation unit we use for shadow pages */
-#if CONFIG_PAGING_LEVELS == 2
-#define SHADOW_MAX_ORDER 0 /* Only ever need 4k allocations */
-#else  
 #define SHADOW_MAX_ORDER 2 /* Need up to 16k allocs for 32-bit on PAE/64 */
-#endif
 
 #define page_get_owner(_p)    (unpickle_domptr((_p)->u.inuse._domain))
 #define page_set_owner(_p,_d) ((_p)->u.inuse._domain = pickle_domptr(_d))

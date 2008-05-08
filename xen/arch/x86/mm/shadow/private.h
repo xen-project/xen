@@ -162,14 +162,6 @@ extern void shadow_audit_tables(struct vcpu *v);
 #define SHADOW_INTERNAL_NAME(name, shadow_levels, guest_levels) \
     SHADOW_INTERNAL_NAME_HIDDEN(name, shadow_levels, guest_levels)
 
-#if CONFIG_PAGING_LEVELS == 2
-#define GUEST_LEVELS  2
-#define SHADOW_LEVELS 2
-#include "multi.h"
-#undef GUEST_LEVELS
-#undef SHADOW_LEVELS
-#endif /* CONFIG_PAGING_LEVELS == 2 */
-
 #if CONFIG_PAGING_LEVELS == 3
 #define GUEST_LEVELS  2
 #define SHADOW_LEVELS 3
@@ -360,7 +352,6 @@ void  shadow_free(struct domain *d, mfn_t smfn);
 
 /* Install the xen mappings in various flavours of shadow */
 void sh_install_xen_entries_in_l4(struct vcpu *v, mfn_t gl4mfn, mfn_t sl4mfn);
-void sh_install_xen_entries_in_l2(struct vcpu *v, mfn_t gl2mfn, mfn_t sl2mfn);
 
 /* Update the shadows in response to a pagetable write from Xen */
 int sh_validate_guest_entry(struct vcpu *v, mfn_t gmfn, void *entry, u32 size);
