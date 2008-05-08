@@ -90,7 +90,7 @@ disk = [ 'phy:hda1,hda1,w' ]
 #
 # Or you can bind the first unused port above 5900:
 #
-# vfb = [ 'type=vnc,vnclisten=0.0.0.0,vnunused=1' ]
+# vfb = [ 'type=vnc,vnclisten=0.0.0.0,vncunused=1' ]
 #
 # You can override the password:
 #
