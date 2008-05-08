@@ -1610,7 +1610,7 @@ void hvm_cpuid(unsigned int input, unsigned int *eax, unsigned int *ebx,
         *ebx &= 0x00FFFFFFu;
         *ebx |= (v->vcpu_id * 2) << 24;
         if ( vlapic_hw_disabled(vcpu_vlapic(v)) )
-            __clear_bit(X86_FEATURE_APIC & 31, ebx);
+            __clear_bit(X86_FEATURE_APIC & 31, edx);
     }
 }
 
