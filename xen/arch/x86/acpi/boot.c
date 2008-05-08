@@ -462,6 +462,28 @@ bad:
 }
 #endif
 
+static void __init
+acpi_fadt_parse_reg(struct acpi_table_fadt *fadt)
+{
+	unsigned int len;
+
+	len = min_t(unsigned int, fadt->header.length, sizeof(*fadt));
+	memcpy(&acpi_gbl_FADT, fadt, len);
+
+	if (len > offsetof(struct acpi_table_fadt, xpm1b_event_block)) {
+		memcpy(&acpi_gbl_xpm1a_enable, &fadt->xpm1a_event_block,
+		       sizeof(acpi_gbl_xpm1a_enable));
+		memcpy(&acpi_gbl_xpm1b_enable, &fadt->xpm1b_event_block,
+		       sizeof(acpi_gbl_xpm1b_enable));
+
+		acpi_gbl_xpm1a_enable.address +=
+			acpi_gbl_FADT.pm1_event_length / 2;
+		if ( acpi_gbl_xpm1b_enable.address )
+			acpi_gbl_xpm1b_enable.address +=
+				acpi_gbl_FADT.pm1_event_length / 2;
+	}
+}
+
 static int __init acpi_parse_fadt(unsigned long phys, unsigned long size)
 {
 	struct acpi_table_fadt *fadt = NULL;
@@ -508,6 +530,8 @@ static int __init acpi_parse_fadt(unsigned long phys, unsigned long size)
 	acpi_smi_cmd       = fadt->smi_command;
 	acpi_enable_value  = fadt->acpi_enable;
 	acpi_disable_value = fadt->acpi_disable;
+
+	acpi_fadt_parse_reg(fadt);
 
 #ifdef CONFIG_ACPI_SLEEP
 	acpi_fadt_parse_sleep_info(fadt);

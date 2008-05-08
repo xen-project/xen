@@ -199,6 +199,70 @@ struct xenpf_getidletime {
 typedef struct xenpf_getidletime xenpf_getidletime_t;
 DEFINE_XEN_GUEST_HANDLE(xenpf_getidletime_t);
 
+#define XENPF_set_processor_pminfo      54
+
+/* ability bits */
+#define XEN_PROCESSOR_PM_CX	1
+#define XEN_PROCESSOR_PM_PX	2
+#define XEN_PROCESSOR_PM_TX	4
+
+/* cmd type */
+#define XEN_PM_CX   0
+#define XEN_PM_PX   1
+#define XEN_PM_TX   2
+
+struct xen_power_register {
+    uint32_t     space_id;
+    uint32_t     bit_width;
+    uint32_t     bit_offset;
+    uint32_t     access_size;
+    uint64_t     address;
+};
+
+struct xen_processor_csd {
+    uint32_t    domain;      /* domain number of one dependent group */
+    uint32_t    coord_type;  /* coordination type */
+    uint32_t    num;         /* number of processors in same domain */
+};
+typedef struct xen_processor_csd xen_processor_csd_t;
+DEFINE_XEN_GUEST_HANDLE(xen_processor_csd_t);
+
+struct xen_processor_cx {
+    struct xen_power_register  reg; /* GAS for Cx trigger register */
+    uint8_t     type;     /* cstate value, c0: 0, c1: 1, ... */
+    uint32_t    latency;  /* worst latency (ms) to enter/exit this cstate */
+    uint32_t    power;    /* average power consumption(mW) */
+    uint32_t    dpcnt;    /* number of dependency entries */
+    XEN_GUEST_HANDLE(xen_processor_csd_t) dp; /* NULL if no dependency */
+};
+typedef struct xen_processor_cx xen_processor_cx_t;
+DEFINE_XEN_GUEST_HANDLE(xen_processor_cx_t);
+
+struct xen_processor_flags {
+    uint32_t bm_control:1;
+    uint32_t bm_check:1;
+    uint32_t has_cst:1;
+    uint32_t power_setup_done:1;
+    uint32_t bm_rld_set:1;
+};
+
+struct xen_processor_power {
+    uint32_t count;  /* number of C state entries in array below */
+    struct xen_processor_flags flags;  /* global flags of this processor */
+    XEN_GUEST_HANDLE(xen_processor_cx_t) states; /* supported c states */
+};
+
+struct xenpf_set_processor_pminfo {
+    /* IN variables */
+    uint32_t id;    /* ACPI CPU ID */
+    uint32_t type;  /* {XEN_PM_CX, ...} */
+    union {
+        struct xen_processor_power          power;/* Cx: _CST/_CSD */
+    };
+};
+typedef struct xenpf_set_processor_pminfo xenpf_set_processor_pminfo_t;
+DEFINE_XEN_GUEST_HANDLE(xenpf_set_processor_pminfo_t);
+
 struct xen_platform_op {
     uint32_t cmd;
     uint32_t interface_version; /* XENPF_INTERFACE_VERSION */
@@ -213,6 +277,7 @@ struct xen_platform_op {
         struct xenpf_enter_acpi_sleep  enter_acpi_sleep;
         struct xenpf_change_freq       change_freq;
         struct xenpf_getidletime       getidletime;
+        struct xenpf_set_processor_pminfo set_pminfo;
         uint8_t                        pad[128];
     } u;
 };

@@ -454,7 +454,8 @@ DEFINE_XEN_GUEST_HANDLE(xen_domctl_assign_device_t);
 #define XEN_DOMCTL_unbind_pt_irq     48
 typedef enum pt_irq_type_e {
     PT_IRQ_TYPE_PCI,
-    PT_IRQ_TYPE_ISA
+    PT_IRQ_TYPE_ISA,
+    PT_IRQ_TYPE_MSI,
 } pt_irq_type_t;
 struct xen_domctl_bind_pt_irq {
     uint32_t machine_irq;
@@ -470,6 +471,10 @@ struct xen_domctl_bind_pt_irq {
             uint8_t device;
             uint8_t intx;
         } pci;
+        struct {
+            uint8_t gvec;
+            uint32_t gflags;
+        } msi;
     } u;
 };
 typedef struct xen_domctl_bind_pt_irq xen_domctl_bind_pt_irq_t;
@@ -571,6 +576,19 @@ struct xen_domctl_set_target {
 typedef struct xen_domctl_set_target xen_domctl_set_target_t;
 DEFINE_XEN_GUEST_HANDLE(xen_domctl_set_target_t);
 
+#if defined(__i386__) || defined(__x86_64__)
+# define XEN_CPUID_INPUT_UNUSED  0xFFFFFFFF
+# define XEN_DOMCTL_set_cpuid 49
+struct xen_domctl_cpuid {
+  unsigned int  input[2];
+  unsigned int  eax;
+  unsigned int  ebx;
+  unsigned int  ecx;
+  unsigned int  edx;
+};
+typedef struct xen_domctl_cpuid xen_domctl_cpuid_t;
+DEFINE_XEN_GUEST_HANDLE(xen_domctl_cpuid_t);
+#endif
 
 struct xen_domctl {
     uint32_t cmd;
@@ -609,6 +627,9 @@ struct xen_domctl {
         struct xen_domctl_ext_vcpucontext   ext_vcpucontext;
         struct xen_domctl_set_opt_feature   set_opt_feature;
         struct xen_domctl_set_target        set_target;
+#if defined(__i386__) || defined(__x86_64__)
+        struct xen_domctl_cpuid             cpuid;
+#endif
         uint8_t                             pad[128];
     } u;
 };

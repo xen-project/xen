@@ -72,11 +72,14 @@ static inline int __prepare_ICR (unsigned int shortcut, int vector)
 
 static inline int __prepare_ICR2 (unsigned int mask)
 {
-    return SET_APIC_DEST_FIELD(mask);
+    return SET_xAPIC_DEST_FIELD(mask);
 }
 
 void apic_wait_icr_idle(void)
 {
+    if ( x2apic_enabled )
+        return;
+
     while ( apic_read( APIC_ICR ) & APIC_ICR_BUSY )
         cpu_relax();
 }

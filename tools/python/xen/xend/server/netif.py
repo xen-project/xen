@@ -29,6 +29,7 @@ from xen.xend.server.DevController import DevController
 from xen.xend.XendError import VmError
 from xen.xend.XendXSPolicyAdmin import XSPolicyAdminInstance
 import xen.util.xsm.xsm as security
+from xen.util import xsconstants
 
 from xen.xend.XendLogging import log
 
@@ -155,7 +156,7 @@ class NetifController(DevController):
             front = { 'handle' : "%i" % devid,
                       'mac'    : mac }
 
-        if security.on():
+        if security.on() == xsconstants.XS_POLICY_ACM:
             self.do_access_control(config)
 
         return (devid, back, front)

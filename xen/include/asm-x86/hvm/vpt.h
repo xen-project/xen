@@ -78,6 +78,7 @@ struct periodic_time {
     bool_t one_shot;
     bool_t do_not_freeze;
     bool_t irq_issued;
+    bool_t warned_timeout_too_short;
 #define PTSRC_isa    1 /* ISA time source */
 #define PTSRC_lapic  2 /* LAPIC time source */
     u8 source;                  /* PTSRC_ */

@@ -338,9 +338,9 @@ void create_periodic_time(
     /* Periodic timer must be at least 0.9ms. */
     if ( (period < 900000) && !one_shot )
     {
-        gdprintk(XENLOG_WARNING,
-                 "HVM_PlatformTime: program too small period %"PRIu64"\n",
-                 period);
+        if ( !test_and_set_bool(pt->warned_timeout_too_short) )
+            gdprintk(XENLOG_WARNING, "HVM_PlatformTime: program too "
+                     "small period %"PRIu64"\n", period);
         period = 900000;
     }
 

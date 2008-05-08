@@ -198,6 +198,7 @@ struct VncState
     char *x509key;
 #endif
     char challenge[VNC_AUTH_CHALLENGE_SIZE];
+    int switchbpp;
 
 #if CONFIG_VNC_TLS
     int wiremode;
@@ -1686,7 +1687,7 @@ static void vnc_dpy_colourdepth(DisplayState *ds, int depth)
         default:
             return;
     }
-    if (ds->switchbpp) {
+    if (vs->switchbpp) {
         vnc_client_error(vs);
     } else if (vs->csock != -1 && vs->has_WMVi) {
         /* Sending a WMVi message to notify the client*/
@@ -2647,7 +2648,7 @@ int vnc_display_open(DisplayState *ds, const char *display, int find_unused)
 	if (strncmp(options, "password", 8) == 0) {
 	    password = 1; /* Require password auth */
         } else if (strncmp(options, "switchbpp", 9) == 0) {
-            ds->switchbpp = 1;
+            vs->switchbpp = 1;
 #if CONFIG_VNC_TLS
 	} else if (strncmp(options, "tls", 3) == 0) {
 	    tls = 1; /* Require TLS */

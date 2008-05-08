@@ -16,6 +16,15 @@ http://lists.xensource.com/archives/html/xen-devel/2008-01/msg00010.html
 Xen 3.3 release
 ---------------
 
+17538: Add XENPF_set_processor_pminfo
+http://xenbits.xensource.com/xen-unstable.hg?rev/5bb9093eb0e9
+
+17537: Add MSI support
+http://xenbits.xensource.com/xen-unstable.hg?rev/ad55c06c9bbc
+
+17524: Add DOMCTL_set_cpuid to configure guest CPUID on x86 systems.
+http://xenbits.xensource.com/xen-unstable.hg?rev/18727843db60
+
 17336: Add platform capabilities field to XEN_SYSCTL_physinfo
 http://xenbits.xensource.com/xen-unstable.hg?rev/250606290439
 

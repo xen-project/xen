@@ -8,6 +8,9 @@ VERSION {
 			fsi_close_file;
 			fsi_read_file;
 			fsi_pread_file;
+			fsi_bootstring_alloc;
+			fsi_bootstring_free;
+			fsi_fs_bootstring;
 	
 			fsip_fs_set_data;
 			fsip_file_alloc;

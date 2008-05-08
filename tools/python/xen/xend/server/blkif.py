@@ -23,6 +23,7 @@ from xen.util import blkif
 import xen.util.xsm.xsm as security
 from xen.xend.XendError import VmError
 from xen.xend.server.DevController import DevController
+from xen.util import xsconstants
 
 class BlkifController(DevController):
     """Block device interface controller. Handles all block devices
@@ -72,7 +73,7 @@ class BlkifController(DevController):
         if uuid:
             back['uuid'] = uuid
 
-        if security.on():
+        if security.on() == xsconstants.XS_POLICY_ACM:
             self.do_access_control(config, uname)
 
         devid = blkif.blkdev_name_to_number(dev)

@@ -141,7 +141,7 @@ unsigned long xc_translate_foreign_address(int xc_handle, uint32_t dom,
 
     /* Page Table */
 
-    if (pde & 0x00000008) { /* 4M page (or 2M in PAE mode) */
+    if (pde & 0x00000080) { /* 4M page (or 2M in PAE mode) */
         DPRINTF("Cannot currently cope with 2/4M pages\n");
         exit(-1);
     } else { /* 4k page */

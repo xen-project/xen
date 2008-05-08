@@ -551,6 +551,38 @@ class HVMImageHandler(ImageHandler):
         self.acpi = int(vmConfig['platform'].get('acpi', 0))
         self.guest_os_type = vmConfig['platform'].get('guest_os_type')
 
+        self.vmConfig = vmConfig
+           
+    def setCpuid(self):
+        xc.domain_set_policy_cpuid(self.vm.getDomid())
+
+        if 'cpuid' in self.vmConfig:
+            cpuid = self.vmConfig['cpuid']
+            transformed = {}
+            for sinput, regs in cpuid.iteritems():
+                inputs = sinput.split(',')
+                input = long(inputs[0])
+                sub_input = None
+                if len(inputs) == 2:
+                    sub_input = long(inputs[1])
+                t = xc.domain_set_cpuid(self.vm.getDomid(),
+                                        input, sub_input, regs)
+                transformed[sinput] = t
+            self.vmConfig['cpuid'] = transformed
+
+        if 'cpuid_check' in self.vmConfig:
+            cpuid_check = self.vmConfig['cpuid_check']
+            transformed = {}
+            for sinput, regs_check in cpuid_check.iteritems():
+                inputs = sinput.split(',')
+                input = long(inputs[0])
+                sub_input = None
+                if len(inputs) == 2:
+                    sub_input = long(inputs[1])
+                t = xc.domain_check_cpuid(input, sub_input, regs_check)
+                transformed[sinput] = t
+            self.vmConfig['cpuid_check'] = transformed
+
     # Return a list of cmd line args to the device models based on the
     # xm config file
     def parseDeviceModelArgs(self, vmConfig):
@@ -718,6 +750,7 @@ class X86_HVM_ImageHandler(HVMImageHandler):
 
     def buildDomain(self):
         xc.hvm_set_param(self.vm.getDomid(), HVM_PARAM_PAE_ENABLED, self.pae)
+        self.setCpuid()
         return HVMImageHandler.buildDomain(self)
 
     def getRequiredAvailableMemory(self, mem_kb):

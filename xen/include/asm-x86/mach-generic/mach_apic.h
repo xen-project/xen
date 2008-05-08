@@ -21,9 +21,9 @@ static inline void enable_apic_mode(void)
 	/*es7000_sw_apic();*/
 }
 
-#define apicid_to_node(apicid) ((int)apicid_to_node[(u8)apicid])
+#define apicid_to_node(apicid) ((int)apicid_to_node[(u32)apicid])
 
-extern u8 bios_cpu_apicid[];
+extern u32 bios_cpu_apicid[];
 static inline int cpu_present_to_apicid(int mps_cpu)
 {
 	if (mps_cpu < NR_CPUS)
@@ -62,7 +62,7 @@ extern void generic_bigsmp_probe(void);
  */
 static inline int apic_id_registered(void)
 {
-	return physid_isset(GET_APIC_ID(apic_read(APIC_ID)),
+	return physid_isset(get_apic_id(),
 			    phys_cpu_present_map);
 }
 

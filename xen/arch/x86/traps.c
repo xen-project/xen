@@ -717,7 +717,8 @@ static int emulate_forced_invalid_op(struct cpu_user_regs *regs)
         __clear_bit(X86_FEATURE_DSCPL % 32, &c);
         __clear_bit(X86_FEATURE_VMXE % 32, &c);
         __clear_bit(X86_FEATURE_SMXE % 32, &c);
-        __clear_bit(X86_FEATURE_EST % 32, &c);
+        if ( !IS_PRIV(current->domain) )
+            __clear_bit(X86_FEATURE_EST % 32, &c);
         __clear_bit(X86_FEATURE_TM2 % 32, &c);
         if ( is_pv_32bit_vcpu(current) )
             __clear_bit(X86_FEATURE_CX16 % 32, &c);

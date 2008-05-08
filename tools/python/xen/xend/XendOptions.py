@@ -192,6 +192,12 @@ class XendOptions:
         return self.get_config_bool("xend-relocation-server",
                                     self.xend_relocation_server_default)
 
+    def get_xend_relocation_server_ssl_key_file(self):
+        return self.get_config_string("xend-relocation-server-ssl-key-file")
+
+    def get_xend_relocation_server_ssl_cert_file(self):
+        return self.get_config_string("xend-relocation-server-ssl-cert-file")
+
     def get_xend_port(self):
         """Get the port xend listens at for its HTTP interface.
         """
@@ -202,6 +208,11 @@ class XendOptions:
         """
         return self.get_config_int('xend-relocation-port',
                                    self.xend_relocation_port_default)
+
+    def get_xend_relocation_tls(self):
+        """Whether to use tls when relocating.
+        """
+        return self.get_config_bool('xend-relocation-tls', 'no')
 
     def get_xend_relocation_hosts_allow(self):
         return self.get_config_string("xend-relocation-hosts-allow",

@@ -1929,7 +1929,7 @@ int main(int argc, char *argv[])
 
 	/* Main loop. */
 	for (;;) {
-		struct connection *conn, *old_conn;
+		struct connection *conn, *next;
 
 		if (select(max+1, &inset, &outset, NULL, timeout) < 0) {
 			if (errno == EINTR)
@@ -1953,27 +1953,39 @@ int main(int argc, char *argv[])
 		if (evtchn_fd != -1 && FD_ISSET(evtchn_fd, &inset))
 			handle_event();
 
-		conn = list_entry(connections.next, typeof(*conn), list);
-		while (&conn->list != &connections) {
-			talloc_increase_ref_count(conn);
+		next = list_entry(connections.next, typeof(*conn), list);
+		while (&next->list != &connections) {
+			conn = next;
+
+			next = list_entry(conn->list.next,
+					  typeof(*conn), list);
 
 			if (conn->domain) {
+				talloc_increase_ref_count(conn);
 				if (domain_can_read(conn))
 					handle_input(conn);
+				if (talloc_free(conn) == 0)
+					continue;
+
+				talloc_increase_ref_count(conn);
 				if (domain_can_write(conn) &&
 				    !list_empty(&conn->out_list))
 					handle_output(conn);
+				if (talloc_free(conn) == 0)
+					continue;
 			} else {
+				talloc_increase_ref_count(conn);
 				if (FD_ISSET(conn->fd, &inset))
 					handle_input(conn);
+				if (talloc_free(conn) == 0)
+					continue;
+
+				talloc_increase_ref_count(conn);
 				if (FD_ISSET(conn->fd, &outset))
 					handle_output(conn);
+				if (talloc_free(conn) == 0)
+					continue;
 			}
-
-			old_conn = conn;
-			conn = list_entry(old_conn->list.next,
-					  typeof(*conn), list);
-			talloc_free(old_conn);
 		}
 
 		max = initialize_set(&inset, &outset, *sock, *ro_sock,

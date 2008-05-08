@@ -801,7 +801,7 @@ _sh_propagate(struct vcpu *v,
     // Since we know the guest's PRESENT bit is set, we also set the shadow's
     // SHADOW_PRESENT bit.
     //
-    pass_thru_flags = (_PAGE_DIRTY | _PAGE_ACCESSED | _PAGE_USER |
+    pass_thru_flags = (_PAGE_ACCESSED | _PAGE_USER |
                        _PAGE_RW | _PAGE_PRESENT);
     if ( guest_supports_nx(v) )
         pass_thru_flags |= _PAGE_NX_BIT;
@@ -1251,6 +1251,80 @@ static int shadow_set_l2e(struct vcpu *v,
     return flags;
 }
 
+static inline void shadow_vram_get_l1e(shadow_l1e_t new_sl1e,
+                                       shadow_l1e_t *sl1e,
+                                       mfn_t sl1mfn,
+                                       struct domain *d)
+{ 
+    mfn_t mfn;
+    unsigned long gfn;
+
+    if ( !d->dirty_vram ) return;
+
+    mfn = shadow_l1e_get_mfn(new_sl1e);
+    gfn = mfn_to_gfn(d, mfn);
+
+    if ( (gfn >= d->dirty_vram->begin_pfn) && (gfn < d->dirty_vram->end_pfn) ) {
+        unsigned long i = gfn - d->dirty_vram->begin_pfn;
+        struct page_info *page = mfn_to_page(mfn);
+        u32 count_info = page->u.inuse.type_info & PGT_count_mask;
+        
+        if ( count_info == 1 )
+            /* Initial guest reference, record it */
+            d->dirty_vram->sl1ma[i] = pfn_to_paddr(mfn_x(sl1mfn))
+                | ((unsigned long)sl1e & ~PAGE_MASK);
+    }
+}
+
+static inline void shadow_vram_put_l1e(shadow_l1e_t old_sl1e,
+                                       shadow_l1e_t *sl1e,
+                                       mfn_t sl1mfn,
+                                       struct domain *d)
+{
+    mfn_t mfn;
+    unsigned long gfn;
+
+    if ( !d->dirty_vram ) return;
+
+    mfn = shadow_l1e_get_mfn(old_sl1e);
+    gfn = mfn_to_gfn(d, mfn);
+
+    if ( (gfn >= d->dirty_vram->begin_pfn) && (gfn < d->dirty_vram->end_pfn) ) {
+        unsigned long i = gfn - d->dirty_vram->begin_pfn;
+        struct page_info *page = mfn_to_page(mfn);
+        u32 count_info = page->u.inuse.type_info & PGT_count_mask;
+        int dirty = 0;
+        paddr_t sl1ma = pfn_to_paddr(mfn_x(sl1mfn))
+            | ((unsigned long)sl1e & ~PAGE_MASK);
+
+        if ( count_info == 1 ) {
+            /* Last reference */
+            if ( d->dirty_vram->sl1ma[i] == INVALID_PADDR ) {
+                /* We didn't know it was that one, let's say it is dirty */
+                dirty = 1;
+            } else {
+                ASSERT(d->dirty_vram->sl1ma[i] == sl1ma);
+                d->dirty_vram->sl1ma[i] = INVALID_PADDR;
+                if ( shadow_l1e_get_flags(old_sl1e) & _PAGE_DIRTY )
+                    dirty = 1;
+            }
+        } else {
+            /* We had more than one reference, just consider the page dirty. */
+            dirty = 1;
+            /* Check that it's not the one we recorded. */
+            if ( d->dirty_vram->sl1ma[i] == sl1ma ) {
+                /* Too bad, we remembered the wrong one... */
+                d->dirty_vram->sl1ma[i] = INVALID_PADDR;
+            } else {
+                /* Ok, our recorded sl1e is still pointing to this page, let's
+                 * just hope it will remain. */
+            }
+        }
+        if ( dirty )
+            d->dirty_vram->dirty_bitmap[i / 8] |= 1 << (i % 8);
+    }
+}
+
 static int shadow_set_l1e(struct vcpu *v, 
                           shadow_l1e_t *sl1e, 
                           shadow_l1e_t new_sl1e,
@@ -1275,6 +1349,8 @@ static int shadow_set_l1e(struct vcpu *v,
                 /* Doesn't look like a pagetable. */
                 flags |= SHADOW_SET_ERROR;
                 new_sl1e = shadow_l1e_empty();
+            } else {
+                shadow_vram_get_l1e(new_sl1e, sl1e, sl1mfn, d);
             }
         }
     } 
@@ -1293,6 +1369,7 @@ static int shadow_set_l1e(struct vcpu *v,
          * trigger a flush later. */
         if ( shadow_mode_refcounts(d) ) 
         {
+            shadow_vram_put_l1e(old_sl1e, sl1e, sl1mfn, d);
             shadow_put_page_from_l1e(old_sl1e, d);
         } 
     }
@@ -2248,8 +2325,10 @@ void sh_destroy_l1_shadow(struct vcpu *v, mfn_t smfn)
         mfn_t sl1mfn = smfn; 
         SHADOW_FOREACH_L1E(sl1mfn, sl1e, 0, 0, {
             if ( (shadow_l1e_get_flags(*sl1e) & _PAGE_PRESENT)
-                 && !sh_l1e_is_magic(*sl1e) )
+                 && !sh_l1e_is_magic(*sl1e) ) {
+                shadow_vram_put_l1e(*sl1e, sl1e, sl1mfn, d);
                 shadow_put_page_from_l1e(*sl1e, d);
+            }
         });
     }
     

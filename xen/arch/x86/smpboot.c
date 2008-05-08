@@ -103,8 +103,8 @@ static int __devinitdata tsc_sync_disabled;
 struct cpuinfo_x86 cpu_data[NR_CPUS] __cacheline_aligned;
 EXPORT_SYMBOL(cpu_data);
 
-u8 x86_cpu_to_apicid[NR_CPUS] __read_mostly =
-			{ [0 ... NR_CPUS-1] = 0xff };
+u32 x86_cpu_to_apicid[NR_CPUS] __read_mostly =
+			{ [0 ... NR_CPUS-1] = -1U };
 EXPORT_SYMBOL(x86_cpu_to_apicid);
 
 static void map_cpu_to_logical_apicid(void);
@@ -325,10 +325,13 @@ void __devinit smp_callin(void)
 	 */
 	wait_for_init_deassert(&init_deasserted);
 
+	if ( x2apic_is_available() )
+		enable_x2apic();
+
 	/*
 	 * (This works even if the APIC is not enabled.)
 	 */
-	phys_id = GET_APIC_ID(apic_read(APIC_ID));
+	phys_id = get_apic_id();
 	cpuid = smp_processor_id();
 	if (cpu_isset(cpuid, cpu_callin_map)) {
 		printk("huh, phys CPU#%d, CPU#%d already present??\n",
@@ -543,12 +546,12 @@ extern struct {
 	unsigned short ss;
 } stack_start;
 
-u8 cpu_2_logical_apicid[NR_CPUS] __read_mostly = { [0 ... NR_CPUS-1] = BAD_APICID };
+u32 cpu_2_logical_apicid[NR_CPUS] __read_mostly = { [0 ... NR_CPUS-1] = BAD_APICID };
 
 static void map_cpu_to_logical_apicid(void)
 {
 	int cpu = smp_processor_id();
-	int apicid = hard_smp_processor_id();
+	int apicid = logical_smp_processor_id();
 
 	cpu_2_logical_apicid[cpu] = apicid;
 }
@@ -575,8 +578,7 @@ static inline void __inquire_remote_apic(int apicid)
 		 */
 		apic_wait_icr_idle();
 
-		apic_write_around(APIC_ICR2, SET_APIC_DEST_FIELD(apicid));
-		apic_write_around(APIC_ICR, APIC_DM_REMRD | regs[i]);
+		apic_icr_write(APIC_DM_REMRD | regs[i], apicid);
 
 		timeout = 0;
 		do {
@@ -597,6 +599,21 @@ static inline void __inquire_remote_apic(int apicid)
 #endif
 
 #ifdef WAKE_SECONDARY_VIA_NMI
+
+static int logical_apicid_to_cpu(int logical_apicid)
+{
+	int i;
+
+	for ( i = 0; i < sizeof(cpu_2_logical_apicid); i++ )
+		if ( cpu_2_logical_apicid[i] == logical_apicid )
+			break;
+
+	if ( i == sizeof(cpu_2_logical_apicid) );
+		i = -1; /* not found */
+
+	return i;
+}
+
 /* 
  * Poke the other CPU in the eye via NMI to wake it up. Remember that the normal
  * INIT, INIT, STARTUP sequence will reset the chip hard for us, and this
@@ -607,20 +624,26 @@ wakeup_secondary_cpu(int logical_apicid, unsigned long start_eip)
 {
 	unsigned long send_status = 0, accept_status = 0;
 	int timeout, maxlvt;
+	int dest_cpu;
+	u32 dest;
 
-	/* Target chip */
-	apic_write_around(APIC_ICR2, SET_APIC_DEST_FIELD(logical_apicid));
+	dest_cpu = logical_apicid_to_cpu(logical_apicid);
+	BUG_ON(dest_cpu == -1);
+
+	dest = cpu_physical_id(dest_cpu);
 
 	/* Boot on the stack */
-	/* Kick the second */
-	apic_write_around(APIC_ICR, APIC_DM_NMI | APIC_DEST_LOGICAL);
+	apic_icr_write(APIC_DM_NMI | APIC_DEST_PHYSICAL, dest_cpu);
 
 	Dprintk("Waiting for send to finish...\n");
 	timeout = 0;
 	do {
 		Dprintk("+");
 		udelay(100);
-		send_status = apic_read(APIC_ICR) & APIC_ICR_BUSY;
+		if ( !x2apic_enabled )
+			send_status = apic_read(APIC_ICR) & APIC_ICR_BUSY;
+		else
+			send_status = 0; /* We go out of the loop directly. */
 	} while (send_status && (timeout++ < 1000));
 
 	/*
@@ -666,40 +689,37 @@ wakeup_secondary_cpu(int phys_apicid, unsigned long start_eip)
 	Dprintk("Asserting INIT.\n");
 
 	/*
-	 * Turn INIT on target chip
+	 * Turn INIT on target chip via IPI
 	 */
-	apic_write_around(APIC_ICR2, SET_APIC_DEST_FIELD(phys_apicid));
-
-	/*
-	 * Send IPI
-	 */
-	apic_write_around(APIC_ICR, APIC_INT_LEVELTRIG | APIC_INT_ASSERT
-				| APIC_DM_INIT);
+	apic_icr_write(APIC_INT_LEVELTRIG | APIC_INT_ASSERT | APIC_DM_INIT,
+			        phys_apicid);
 
 	Dprintk("Waiting for send to finish...\n");
 	timeout = 0;
 	do {
 		Dprintk("+");
 		udelay(100);
-		send_status = apic_read(APIC_ICR) & APIC_ICR_BUSY;
+		if ( !x2apic_enabled )
+			send_status = apic_read(APIC_ICR) & APIC_ICR_BUSY;
+		else
+			send_status = 0; /* We go out of the loop dirctly. */
 	} while (send_status && (timeout++ < 1000));
 
 	mdelay(10);
 
 	Dprintk("Deasserting INIT.\n");
 
-	/* Target chip */
-	apic_write_around(APIC_ICR2, SET_APIC_DEST_FIELD(phys_apicid));
-
-	/* Send IPI */
-	apic_write_around(APIC_ICR, APIC_INT_LEVELTRIG | APIC_DM_INIT);
+	apic_icr_write(APIC_INT_LEVELTRIG | APIC_DM_INIT, phys_apicid);
 
 	Dprintk("Waiting for send to finish...\n");
 	timeout = 0;
 	do {
 		Dprintk("+");
 		udelay(100);
-		send_status = apic_read(APIC_ICR) & APIC_ICR_BUSY;
+		if ( !x2apic_enabled )
+			send_status = apic_read(APIC_ICR) & APIC_ICR_BUSY;
+		else
+			send_status = 0; /* We go out of the loop dirctly. */
 	} while (send_status && (timeout++ < 1000));
 
 	atomic_set(&init_deasserted, 1);
@@ -731,15 +751,9 @@ wakeup_secondary_cpu(int phys_apicid, unsigned long start_eip)
 
 		/*
 		 * STARTUP IPI
+		 * Boot on the stack
 		 */
-
-		/* Target chip */
-		apic_write_around(APIC_ICR2, SET_APIC_DEST_FIELD(phys_apicid));
-
-		/* Boot on the stack */
-		/* Kick the second */
-		apic_write_around(APIC_ICR, APIC_DM_STARTUP
-					| (start_eip >> 12));
+		apic_icr_write(APIC_DM_STARTUP | (start_eip >> 12), phys_apicid);
 
 		/*
 		 * Give the other CPU some time to accept the IPI.
@@ -753,7 +767,10 @@ wakeup_secondary_cpu(int phys_apicid, unsigned long start_eip)
 		do {
 			Dprintk("+");
 			udelay(100);
-			send_status = apic_read(APIC_ICR) & APIC_ICR_BUSY;
+			if ( !x2apic_enabled )
+				send_status = apic_read(APIC_ICR) & APIC_ICR_BUSY;
+			else
+			    send_status = 0; /* We go out of the loop dirctly. */
 		} while (send_status && (timeout++ < 1000));
 
 		/*
@@ -988,7 +1005,7 @@ static void __init smp_boot_cpus(unsigned int max_cpus)
 	printk("CPU%d: ", 0);
 	print_cpu_info(&cpu_data[0]);
 
-	boot_cpu_physical_apicid = GET_APIC_ID(apic_read(APIC_ID));
+	boot_cpu_physical_apicid = get_apic_id();
 	x86_cpu_to_apicid[0] = boot_cpu_physical_apicid;
 
 	stack_base[0] = stack_start.esp;

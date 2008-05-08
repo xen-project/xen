@@ -611,6 +611,110 @@ static PyObject *pyxc_set_os_type(XcObject *self,
 }
 #endif /* __ia64__ */
 
+
+#if defined(__i386__) || defined(__x86_64__)
+static void pyxc_dom_extract_cpuid(PyObject *config,
+                                  char **regs)
+{
+    const char *regs_extract[4] = { "eax", "ebx", "ecx", "edx" };
+    PyObject *obj;
+    int i;
+
+    memset(regs, 0, 4*sizeof(*regs));
+
+    if ( !PyDict_Check(config) )
+        return;
+
+    for ( i = 0; i < 4; i++ )
+        if ( (obj = PyDict_GetItemString(config, regs_extract[i])) != NULL )
+            regs[i] = PyString_AS_STRING(obj);
+}
+
+static PyObject *pyxc_create_cpuid_dict(char **regs)
+{
+   const char *regs_extract[4] = { "eax", "ebx", "ecx", "edx" };
+   PyObject *dict;
+   int i;
+
+   dict = PyDict_New();
+   for ( i = 0; i < 4; i++ )
+   {
+       if ( regs[i] == NULL )
+           continue;
+       PyDict_SetItemString(dict, regs_extract[i],
+                            PyString_FromString(regs[i]));
+       free(regs[i]);
+       regs[i] = NULL;
+   }
+   return dict;
+}
+
+static PyObject *pyxc_dom_check_cpuid(XcObject *self,
+                                      PyObject *args)
+{
+    PyObject *sub_input, *config;
+    unsigned int input[2];
+    char *regs[4], *regs_transform[4];
+
+    if ( !PyArg_ParseTuple(args, "iOO", &input[0], &sub_input, &config) )
+        return NULL;
+
+    pyxc_dom_extract_cpuid(config, regs);
+
+    input[1] = XEN_CPUID_INPUT_UNUSED;
+    if ( PyLong_Check(sub_input) )
+        input[1] = PyLong_AsUnsignedLong(sub_input);
+
+    if ( xc_cpuid_check(self->xc_handle, input,
+                        (const char **)regs, regs_transform) )
+        return pyxc_error_to_exception();
+
+    return pyxc_create_cpuid_dict(regs_transform);
+}
+
+static PyObject *pyxc_dom_set_policy_cpuid(XcObject *self,
+                                           PyObject *args)
+{
+    domid_t domid;
+
+    if ( !PyArg_ParseTuple(args, "i", &domid) )
+        return NULL;
+
+    if ( xc_cpuid_apply_policy(self->xc_handle, domid) )
+        return pyxc_error_to_exception();
+
+    Py_INCREF(zero);
+    return zero;
+}
+
+
+static PyObject *pyxc_dom_set_cpuid(XcObject *self,
+                                    PyObject *args)
+{
+    domid_t domid;
+    PyObject *sub_input, *config;
+    unsigned int input[2];
+    char *regs[4], *regs_transform[4];
+
+    if ( !PyArg_ParseTuple(args, "IIOO", &domid,
+                           &input[0], &sub_input, &config) )
+        return NULL;
+
+    pyxc_dom_extract_cpuid(config, regs);
+
+    input[1] = XEN_CPUID_INPUT_UNUSED;
+    if ( PyLong_Check(sub_input) )
+        input[1] = PyLong_AsUnsignedLong(sub_input);
+
+    if ( xc_cpuid_set(self->xc_handle, domid, input, (const char **)regs,
+                      regs_transform) )
+        return pyxc_error_to_exception();
+
+    return pyxc_create_cpuid_dict(regs_transform);
+}
+
+#endif /* __i386__ || __x86_64__ */
+
 static PyObject *pyxc_hvm_build(XcObject *self,
                                 PyObject *args,
                                 PyObject *kwds)
@@ -693,6 +797,26 @@ static PyObject *pyxc_evtchn_reset(XcObject *self,
 
     Py_INCREF(zero);
     return zero;
+}
+
+static PyObject *pyxc_physdev_map_pirq(PyObject *self,
+                                       PyObject *args,
+                                       PyObject *kwds)
+{
+    XcObject *xc = (XcObject *)self;
+    uint32_t dom;
+    int index, pirq, ret;
+
+    static char *kwd_list[] = {"domid", "index", "pirq", NULL};
+
+    if ( !PyArg_ParseTupleAndKeywords(args, kwds, "iii", kwd_list,
+                                      &dom, &index, &pirq) )
+        return NULL;
+    ret = xc_physdev_map_pirq(xc->xc_handle, dom, MAP_PIRQ_TYPE_GSI,
+                             index, &pirq);
+    if ( ret != 0 )
+          return pyxc_error_to_exception();
+    return PyLong_FromUnsignedLong(pirq);
 }
 
 static PyObject *pyxc_physdev_pci_access_modify(XcObject *self,
@@ -1485,6 +1609,15 @@ static PyMethodDef pyxc_methods[] = {
       "Reset all connections.\n"
       " dom [int]: Domain to reset.\n" },
 
+    { "physdev_map_pirq",
+      (PyCFunction)pyxc_physdev_map_pirq,
+      METH_VARARGS | METH_KEYWORDS, "\n"
+      "map physical irq to guest pirq.\n"
+      " dom     [int]:      Identifier of domain to map for.\n"
+      " index   [int]:      physical irq.\n"
+      " pirq    [int]:      guest pirq.\n"
+      "Returns: [long] value of the param.\n" },
+
     { "physdev_pci_access_modify",
       (PyCFunction)pyxc_physdev_pci_access_modify,
       METH_VARARGS | METH_KEYWORDS, "\n"
@@ -1635,6 +1768,37 @@ static PyMethodDef pyxc_methods[] = {
       " log [int]: Specifies the area's size.\n"
       "Returns: [int] 0 on success; -1 on error.\n" },
 #endif /* __powerpc */
+  
+#if defined(__i386__) || defined(__x86_64__)
+    { "domain_check_cpuid", 
+      (PyCFunction)pyxc_dom_check_cpuid, 
+      METH_VARARGS, "\n"
+      "Apply checks to host CPUID.\n"
+      " input [long]: Input for cpuid instruction (eax)\n"
+      " sub_input [long]: Second input (optional, may be None) for cpuid "
+      "                     instruction (ecx)\n"
+      " config [dict]: Dictionary of register\n"
+      " config [dict]: Dictionary of register, use for checking\n\n"
+      "Returns: [int] 0 on success; exception on error.\n" },
+    
+    { "domain_set_cpuid", 
+      (PyCFunction)pyxc_dom_set_cpuid, 
+      METH_VARARGS, "\n"
+      "Set cpuid response for an input and a domain.\n"
+      " dom [int]: Identifier of domain.\n"
+      " input [long]: Input for cpuid instruction (eax)\n"
+      " sub_input [long]: Second input (optional, may be None) for cpuid "
+      "                     instruction (ecx)\n"
+      " config [dict]: Dictionary of register\n\n"
+      "Returns: [int] 0 on success; exception on error.\n" },
+
+    { "domain_set_policy_cpuid", 
+      (PyCFunction)pyxc_dom_set_policy_cpuid, 
+      METH_VARARGS, "\n"
+      "Set the default cpuid policy for a domain.\n"
+      " dom [int]: Identifier of domain.\n\n"
+      "Returns: [int] 0 on success; exception on error.\n" },
+#endif
 
     { NULL, NULL, 0, NULL }
 };

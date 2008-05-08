@@ -1258,7 +1258,7 @@ class XendDomain:
 
         return val       
 
-    def domain_migrate(self, domid, dst, live=False, resource=0, port=0, node=-1):
+    def domain_migrate(self, domid, dst, live=False, port=0, node=-1):
         """Start domain migration.
         
         @param domid: Domain ID or Name
@@ -1269,7 +1269,6 @@ class XendDomain:
         @type port: int        
         @keyword live: Live migration
         @type live: bool
-        @keyword resource: not used??
         @rtype: None
         @keyword node: use node number for target
         @rtype: int 
@@ -1293,8 +1292,16 @@ class XendDomain:
 
         if port == 0:
             port = xoptions.get_xend_relocation_port()
+
         try:
-            sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            tls = xoptions.get_xend_relocation_tls()
+            if tls:
+                from OpenSSL import SSL
+                ctx = SSL.Context(SSL.SSLv23_METHOD)
+                sock = SSL.Connection(ctx, socket.socket(socket.AF_INET, socket.SOCK_STREAM))
+                sock.set_connect_state()
+            else:
+                sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             sock.connect((dst, port))
         except socket.error, err:
             raise XendError("can't connect: %s" % err[1])

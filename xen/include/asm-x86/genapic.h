@@ -62,6 +62,20 @@ void send_IPI_mask_flat(cpumask_t mask, int vector);
 	.cpu_mask_to_apicid = cpu_mask_to_apicid_flat, \
 	.send_IPI_mask = send_IPI_mask_flat
 
+void init_apic_ldr_x2apic(void);
+void clustered_apic_check_x2apic(void);
+cpumask_t target_cpus_x2apic(void);
+unsigned int cpu_mask_to_apicid_x2apic(cpumask_t cpumask);
+void send_IPI_mask_x2apic(cpumask_t mask, int vector);
+#define GENAPIC_X2APIC \
+	.int_delivery_mode = dest_Fixed, \
+	.int_dest_mode = 0 /* physical delivery */, \
+	.init_apic_ldr = init_apic_ldr_x2apic, \
+	.clustered_apic_check = clustered_apic_check_x2apic, \
+	.target_cpus = target_cpus_x2apic, \
+	.cpu_mask_to_apicid = cpu_mask_to_apicid_x2apic, \
+	.send_IPI_mask = send_IPI_mask_x2apic
+
 void init_apic_ldr_phys(void);
 void clustered_apic_check_phys(void);
 cpumask_t target_cpus_phys(void);

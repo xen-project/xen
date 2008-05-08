@@ -450,8 +450,9 @@ static enum mode lookup_mode(const char *m)
 	return MODE_write;
     else if (strcmp(m, "read") == 0)
 	return MODE_read;
-    else
-	errx(1, "unknown mode %s\n", m);
+
+    errx(1, "unknown mode %s\n", m);
+    return 0;
 }
 
 int

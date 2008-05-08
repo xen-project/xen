@@ -236,6 +236,9 @@ struct domain
      * cause a deadlock. Acquirers don't spin waiting; they preempt.
      */
     spinlock_t hypercall_deadlock_mutex;
+
+    /* VRAM dirty support. */
+    struct sh_dirty_vram *dirty_vram;
 };
 
 struct domain_setup_info

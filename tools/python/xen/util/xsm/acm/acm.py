@@ -156,7 +156,9 @@ def on():
     returns none if security policy is off (not compiled),
     any string otherwise, use it: if not security.on() ...
     """
-    return (get_active_policy_name() not in ['INACTIVE', 'NULL'])
+    if get_active_policy_name() not in ['INACTIVE', 'NULL', '']:
+        return xsconstants.XS_POLICY_ACM
+    return 0
 
 
 def calc_dom_ssidref_from_info(info):

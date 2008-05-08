@@ -16,6 +16,21 @@
 #define APIC_DEBUG   2
 
 extern int apic_verbosity;
+extern int x2apic_enabled;
+
+extern void enable_x2apic(void);
+
+static __inline int x2apic_is_available(void)
+{
+    unsigned int op = 1, eax, ecx;
+
+    asm ( "cpuid"
+          : "=a" (eax), "=c" (ecx)
+          : "0" (op)
+          : "bx", "dx" );
+
+    return (ecx & (1U << 21));
+}
 
 /*
  * Define the default level of output to be very little
@@ -35,19 +50,103 @@ extern int apic_verbosity;
  * Basic functions accessing APICs.
  */
 
-static __inline void apic_write(unsigned long reg, u32 v)
+static __inline void apic_mem_write(unsigned long reg, u32 v)
 {
 	*((volatile u32 *)(APIC_BASE+reg)) = v;
 }
 
-static __inline void apic_write_atomic(unsigned long reg, u32 v)
+static __inline void apic_mem_write_atomic(unsigned long reg, u32 v)
 {
 	(void)xchg((volatile u32 *)(APIC_BASE+reg), v);
 }
 
-static __inline u32 apic_read(unsigned long reg)
+static __inline u32 apic_mem_read(unsigned long reg)
 {
 	return *((volatile u32 *)(APIC_BASE+reg));
+}
+
+/* NOTE: in x2APIC mode, we should use apic_icr_write()/apic_icr_read() to
+ * access the 64-bit ICR register.
+ */
+
+static __inline void apic_wrmsr(unsigned long reg, u32 low, u32 high)
+{
+    __asm__ __volatile__("wrmsr"
+            : /* no outputs */
+            : "c" (APIC_MSR_BASE + (reg >> 4)), "a" (low), "d" (high));
+}
+
+static __inline void apic_rdmsr(unsigned long reg, u32 *low, u32 *high)
+{
+    __asm__ __volatile__("rdmsr"
+            : "=a" (*low), "=d" (*high)
+            : "c" (APIC_MSR_BASE + (reg >> 4)));
+}
+
+static __inline void apic_write(unsigned long reg, u32 v)
+{
+
+    if ( x2apic_enabled )
+        apic_wrmsr(reg, v, 0);
+    else
+        apic_mem_write(reg, v);
+}
+
+static __inline void apic_write_atomic(unsigned long reg, u32 v)
+{
+    if ( x2apic_enabled )
+        apic_wrmsr(reg, v, 0);
+    else
+        apic_mem_write_atomic(reg, v);
+}
+
+static __inline u32 apic_read(unsigned long reg)
+{
+    u32 lo, hi;
+
+    if ( x2apic_enabled )
+        apic_rdmsr(reg, &lo, &hi);
+    else
+        lo = apic_mem_read(reg);
+    return lo;
+}
+
+static __inline u64 apic_icr_read(void)
+{
+    u32 lo, hi;
+
+    if ( x2apic_enabled )
+        apic_rdmsr(APIC_ICR, &lo, &hi);
+    else
+    {
+        lo = apic_mem_read(APIC_ICR);
+        hi = apic_mem_read(APIC_ICR2);
+    }
+    
+    return ((u64)lo) | (((u64)hi) << 32);
+}
+
+static __inline void apic_icr_write(u32 low, u32 dest)
+{
+    if ( x2apic_enabled )
+        apic_wrmsr(APIC_ICR, low, dest);
+    else
+    {
+        apic_mem_write(APIC_ICR2, dest << 24);
+        apic_mem_write(APIC_ICR, low);
+    }
+}
+
+static __inline u32 get_apic_id(void) /* Get the physical APIC id */
+{
+    u32 id = apic_read(APIC_ID);
+    return x2apic_enabled ? id : GET_xAPIC_ID(id);
+}
+
+static __inline u32 get_logical_apic_id(void)
+{
+    u32 logical_id = apic_read(APIC_LDR);
+    return x2apic_enabled ? logical_id : GET_xAPIC_LOGICAL_ID(logical_id);
 }
 
 void apic_wait_icr_idle(void);

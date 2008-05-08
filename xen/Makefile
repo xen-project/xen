@@ -6,6 +6,9 @@ export XEN_EXTRAVERSION ?= -unstable$(XEN_VENDORVERSION)
 export XEN_FULLVERSION   = $(XEN_VERSION).$(XEN_SUBVERSION)$(XEN_EXTRAVERSION)
 -include xen-version
 
+export XEN_WHOAMI	?= $(USER)
+export XEN_DOMAIN	?= $(shell ([ -x /bin/dnsdomainname ] && /bin/dnsdomainname) || ([ -x /bin/domainname ] && /bin/domainname || echo [unknown]))
+
 export BASEDIR := $(CURDIR)
 
 .PHONY: default
@@ -81,8 +84,8 @@ delete-unfresh-files:
 include/xen/compile.h: include/xen/compile.h.in .banner
 	@sed -e 's/@@date@@/$(shell LC_ALL=C date)/g' \
 	    -e 's/@@time@@/$(shell LC_ALL=C date +%T)/g' \
-	    -e 's/@@whoami@@/$(USER)/g' \
-	    -e 's/@@domain@@/$(shell ([ -x /bin/dnsdomainname ] && /bin/dnsdomainname) || ([ -x /bin/domainname ] && /bin/domainname || echo [unknown]))/g' \
+	    -e 's/@@whoami@@/$(XEN_WHOAMI)/g' \
+	    -e 's/@@domain@@/$(XEN_DOMAIN)/g' \
 	    -e 's/@@hostname@@/$(shell hostname)/g' \
 	    -e 's!@@compiler@@!$(shell $(CC) $(CFLAGS) -v 2>&1 | grep -i "gcc.*version")!g' \
 	    -e 's/@@version@@/$(XEN_VERSION)/g' \

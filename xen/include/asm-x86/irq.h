@@ -49,7 +49,9 @@ extern unsigned long io_apic_irqs;
 extern atomic_t irq_err_count;
 extern atomic_t irq_mis_count;
 
-int pirq_acktype(int irq);
-int pirq_shared(int irq);
+int pirq_acktype(struct domain *d, int irq);
+int pirq_shared(struct domain *d , int irq);
 
+extern int domain_irq_to_vector(struct domain *d, int irq);
+extern int domain_vector_to_irq(struct domain *d, int vector);
 #endif /* _ASM_HW_IRQ_H */

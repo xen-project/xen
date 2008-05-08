@@ -51,9 +51,11 @@ struct time_scale {
 
 struct cpu_time {
     u64 local_tsc_stamp;
+    u64 cstate_tsc_stamp;
     s_time_t stime_local_stamp;
     s_time_t stime_master_stamp;
     struct time_scale tsc_scale;
+    u32 cstate_plt_count_stamp;
     struct timer calibration_timer;
 };
 
@@ -65,6 +67,8 @@ struct platform_timesource {
 };
 
 static DEFINE_PER_CPU(struct cpu_time, cpu_time);
+
+static u8 tsc_invariant=0;  /* TSC is invariant upon C state entry */
 
 /*
  * We simulate a 32-bit platform timer from the 16-bit PIT ch2 counter.
@@ -594,6 +598,36 @@ static void init_platform_timer(void)
            freq_string(pts->frequency), pts->name);
 }
 
+void cstate_save_tsc(void)
+{
+    struct cpu_time *t = &this_cpu(cpu_time);
+
+    if (!tsc_invariant){
+        t->cstate_plt_count_stamp = plt_src.read_counter();
+        rdtscll(t->cstate_tsc_stamp);
+    }
+}
+
+void cstate_restore_tsc(void)
+{
+    struct cpu_time *t;
+    u32    plt_count_delta;
+    u64    tsc_delta;
+
+    if (!tsc_invariant){
+        t = &this_cpu(cpu_time);
+
+        /* if platform counter overflow happens, interrupt will bring CPU from
+           C state to working state, so the platform counter won't wrap the
+           cstate_plt_count_stamp, and the 32 bit unsigned platform counter
+           is enough for delta calculation
+         */
+        plt_count_delta = 
+            (plt_src.read_counter() - t->cstate_plt_count_stamp) & plt_mask;
+        tsc_delta = scale_delta(plt_count_delta, &plt_scale)*cpu_khz/1000000UL;
+        wrmsrl(MSR_IA32_TSC,  t->cstate_tsc_stamp + tsc_delta);
+    }
+}
 
 /***************************************************************************
  * CMOS Timer functions
@@ -759,12 +793,13 @@ int cpu_frequency_change(u64 freq)
     }
 
     local_irq_disable();
-    rdtscll(curr_tsc);
-    t->local_tsc_stamp = curr_tsc;
+    /* Platform time /first/, as we may be delayed by platform_timer_lock. */
     t->stime_master_stamp = read_platform_stime();
     /* TSC-extrapolated time may be bogus after frequency change. */
     /*t->stime_local_stamp = get_s_time();*/
     t->stime_local_stamp = t->stime_master_stamp;
+    rdtscll(curr_tsc);
+    t->local_tsc_stamp = curr_tsc;
     set_time_scale(&t->tsc_scale, freq);
     local_irq_enable();
 
@@ -834,11 +869,14 @@ static void local_time_calibration(void *unused)
     prev_local_stime  = t->stime_local_stamp;
     prev_master_stime = t->stime_master_stamp;
 
-    /* Disable IRQs to get 'instantaneous' current timestamps. */
+    /*
+     * Disable IRQs to get 'instantaneous' current timestamps. We read platform
+     * time first, as we may be delayed when acquiring platform_timer_lock.
+     */
     local_irq_disable();
-    rdtscll(curr_tsc);
-    curr_local_stime  = get_s_time();
     curr_master_stime = read_platform_stime();
+    curr_local_stime  = get_s_time();
+    rdtscll(curr_tsc);
     local_irq_enable();
 
 #if 0
@@ -968,6 +1006,11 @@ int __init init_xen_time(void)
 
     stime_platform_stamp = 0;
     init_platform_timer();
+
+    /* check if TSC is invariant during deep C state
+       this is a new feature introduced by Nehalem*/
+    if ( cpuid_edx(0x80000007) & (1U<<8) )
+        tsc_invariant = 1;
 
     local_irq_enable();
 

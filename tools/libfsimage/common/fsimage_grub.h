@@ -17,7 +17,7 @@
  * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
  * DEALINGS IN THE SOFTWARE.
  *
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -72,6 +72,12 @@ unsigned long fsig_log2(unsigned long);
 #define	ERR_FILELENGTH 1
 #define	ERR_BAD_FILETYPE 1
 #define	ERR_FILE_NOT_FOUND 1
+#define	ERR_BAD_ARGUMENT 1
+#define	ERR_FILESYSTEM_NOT_FOUND 1
+#define	ERR_NO_BOOTPATH 1
+#define	ERR_DEV_VALUES 1
+#define	ERR_WONT_FIT 1
+#define	ERR_READ 1
 
 fsi_plugin_ops_t *fsig_init(fsi_plugin_t *, fsig_plugin_ops_t *);
 

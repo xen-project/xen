@@ -26,8 +26,6 @@ from xen.xend.XendLogging import log
 from xen.util import mkdir
 import xen.util.xsm.xsm as security
 
-__bootloader = None
-
 #
 # Functions for modifying entries in the bootloader, i.e. adding
 # a module to boot the system with a policy.
@@ -513,8 +511,11 @@ class LatePolicyLoader(Bootloader):
         Bootloader.__init__(self)
 
     def probe(self):
-        _dir=os.path.dirname(self.FILENAME)
-        mkdir.parents(_dir, stat.S_IRWXU)
+        try:
+            _dir=os.path.dirname(self.FILENAME)
+            mkdir.parents(_dir, stat.S_IRWXU)
+        except:
+            return False
         return True
 
     def get_default_title(self):
@@ -614,10 +615,12 @@ class LatePolicyLoader(Bootloader):
 
 __bootloader = Bootloader()
 
-grub = Grub()
-if grub.probe() == True:
-    __bootloader = grub
-else:
-    late = LatePolicyLoader()
-    if late.probe() == True:
-        __bootloader = late
+def init():
+    global __bootloader
+    grub = Grub()
+    if grub.probe() == True:
+        __bootloader = grub
+    else:
+        late = LatePolicyLoader()
+        if late.probe() == True:
+            __bootloader = late

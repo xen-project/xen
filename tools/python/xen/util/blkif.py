@@ -42,10 +42,12 @@ def blkdev_name_to_number(name):
     if re.match( '/dev/xvd[a-p]([1-9]|1[0-5])?', n):
         return 202 * 256 + 16 * (ord(n[8:9]) - ord('a')) + int(n[9:] or 0)
 
-    # see if this is a hex device number
-    if re.match( '^(0x)?[0-9a-fA-F]+$', name ):
+    if re.match( '^(0x)[0-9a-fA-F]+$', name ):
         return string.atoi(name,16)
-        
+
+    if re.match('^[0-9]+$', name):
+        return string.atoi(name, 10)
+
     return None
 
 def blkdev_segment(name):

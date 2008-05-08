@@ -236,6 +236,37 @@ int xc_hvm_set_pci_link_route(
     return rc;
 }
 
+int xc_hvm_track_dirty_vram(
+    int xc_handle, domid_t dom,
+    uint64_t first_pfn, uint64_t nr,
+    unsigned long *dirty_bitmap)
+{
+    DECLARE_HYPERCALL;
+    struct xen_hvm_track_dirty_vram arg;
+    int rc;
+
+    hypercall.op     = __HYPERVISOR_hvm_op;
+    hypercall.arg[0] = HVMOP_track_dirty_vram;
+    hypercall.arg[1] = (unsigned long)&arg;
+
+    arg.domid     = dom;
+    arg.first_pfn = first_pfn;
+    arg.nr        = nr;
+    set_xen_guest_handle(arg.dirty_bitmap, (uint8_t *)dirty_bitmap);
+
+    if ( (rc = lock_pages(&arg, sizeof(arg))) != 0 )
+    {
+        PERROR("Could not lock memory");
+        return rc;
+    }
+
+    rc = do_xen_hypercall(xc_handle, &hypercall);
+
+    unlock_pages(&arg, sizeof(arg));
+
+    return rc;
+}
+
 void *xc_map_foreign_pages(int xc_handle, uint32_t dom, int prot,
                            const xen_pfn_t *arr, int num)
 {

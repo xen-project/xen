@@ -17,7 +17,7 @@
  * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
  * DEALINGS IN THE SOFTWARE.
  *
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -44,6 +44,10 @@ int fsi_close_file(fsi_file_t *);
 
 ssize_t fsi_read_file(fsi_file_t *, void *, size_t);
 ssize_t fsi_pread_file(fsi_file_t *, void *, size_t, uint64_t);
+
+char *fsi_bootstring_alloc(fsi_t *, size_t);
+void fsi_bootstring_free(fsi_t *);
+char *fsi_fs_bootstring(fsi_t *);
 
 #ifdef __cplusplus
 };

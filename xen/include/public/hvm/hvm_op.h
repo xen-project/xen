@@ -73,4 +73,20 @@ DEFINE_XEN_GUEST_HANDLE(xen_hvm_set_pci_link_route_t);
 /* Flushes all VCPU TLBs: @arg must be NULL. */
 #define HVMOP_flush_tlbs          5
 
+/* Track dirty VRAM. */
+#define HVMOP_track_dirty_vram    6
+struct xen_hvm_track_dirty_vram {
+    /* Domain to be tracked. */
+    domid_t  domid;
+    /* First pfn to track. */
+    uint64_aligned_t first_pfn;
+    /* Number of pages to track. */
+    uint64_aligned_t nr;
+    /* OUT variable. */
+    /* Dirty bitmap buffer. */
+    XEN_GUEST_HANDLE_64(uint8) dirty_bitmap;
+};
+typedef struct xen_hvm_track_dirty_vram xen_hvm_track_dirty_vram_t;
+DEFINE_XEN_GUEST_HANDLE(xen_hvm_track_dirty_vram_t);
+
 #endif /* __XEN_PUBLIC_HVM_HVM_OP_H__ */

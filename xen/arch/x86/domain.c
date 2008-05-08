@@ -56,6 +56,9 @@ DEFINE_PER_CPU(struct vcpu *, curr_vcpu);
 DEFINE_PER_CPU(u64, efer);
 DEFINE_PER_CPU(unsigned long, cr4);
 
+static void default_idle(void);
+void (*pm_idle) (void) = default_idle;
+
 static void unmap_vcpu_info(struct vcpu *v);
 
 static void paravirt_ctxt_switch_from(struct vcpu *v);
@@ -105,7 +108,7 @@ void idle_loop(void)
         if ( cpu_is_offline(smp_processor_id()) )
             play_dead();
         page_scrub_schedule_work();
-        default_idle();
+        (*pm_idle)();
         do_softirq();
     }
 }
@@ -440,10 +443,9 @@ int arch_domain_create(struct domain *d, unsigned int domcr_flags)
 {
 #ifdef __x86_64__
     struct page_info *pg;
-    int i;
 #endif
     l1_pgentry_t gdt_l1e;
-    int vcpuid, pdpt_order, paging_initialised = 0;
+    int i, vcpuid, pdpt_order, paging_initialised = 0;
     int rc = -ENOMEM;
 
     d->arch.hvm_domain.hap_enabled =
@@ -526,6 +528,8 @@ int arch_domain_create(struct domain *d, unsigned int domcr_flags)
             goto fail;
     }
 
+    spin_lock_init(&d->arch.irq_lock);
+
     if ( is_hvm_domain(d) )
     {
         if ( (rc = hvm_domain_initialise(d)) != 0 )
@@ -539,6 +543,13 @@ int arch_domain_create(struct domain *d, unsigned int domcr_flags)
         /* 32-bit PV guest by default only if Xen is not 64-bit. */
         d->arch.is_32bit_pv = d->arch.has_32bit_shinfo =
             (CONFIG_PAGING_LEVELS != 4);
+    }
+
+    memset(d->arch.cpuids, 0, sizeof(d->arch.cpuids));
+    for ( i = 0; i < MAX_CPUID_INPUT; i++ )
+    {
+        d->arch.cpuids[i].input[0] = XEN_CPUID_INPUT_UNUSED;
+        d->arch.cpuids[i].input[1] = XEN_CPUID_INPUT_UNUSED;
     }
 
     return 0;
@@ -1908,6 +1919,37 @@ void arch_dump_domain_info(struct domain *d)
 void arch_dump_vcpu_info(struct vcpu *v)
 {
     paging_dump_vcpu_info(v);
+}
+
+void domain_cpuid(
+    struct domain *d,
+    unsigned int  input,
+    unsigned int  sub_input,
+    unsigned int  *eax,
+    unsigned int  *ebx,
+    unsigned int  *ecx,
+    unsigned int  *edx)
+{
+    cpuid_input_t *cpuid;
+    int i;
+
+    for ( i = 0; i < MAX_CPUID_INPUT; i++ )
+    {
+        cpuid = &d->arch.cpuids[i];
+
+        if ( (cpuid->input[0] == input) &&
+             ((cpuid->input[1] == XEN_CPUID_INPUT_UNUSED) ||
+              (cpuid->input[1] == sub_input)) )
+        {
+            *eax = cpuid->eax;
+            *ebx = cpuid->ebx;
+            *ecx = cpuid->ecx;
+            *edx = cpuid->edx;
+            return;
+        }
+    }
+
+    *eax = *ebx = *ecx = *edx = 0;
 }
 
 /*

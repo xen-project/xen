@@ -485,9 +485,9 @@ class xenapi_create:
                 vm_ref,
             "protocol":
                 console.attributes["protocol"].value,
-            "other_params":
+            "other_config":
                 get_child_nodes_as_dict(console,
-                  "other_param", "key", "value")
+                  "other_config", "key", "value")
             }
 
         return server.xenapi.console.create(console_record)

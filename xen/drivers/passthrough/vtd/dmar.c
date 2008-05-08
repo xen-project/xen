@@ -26,9 +26,9 @@
 #include <xen/mm.h>
 #include <xen/xmalloc.h>
 #include <xen/pci.h>
+#include <xen/pci_regs.h>
 #include <asm/string.h>
 #include "dmar.h"
-#include "../pci_regs.h"
 
 int vtd_enabled = 1;
 

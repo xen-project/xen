@@ -209,7 +209,7 @@ void machine_restart(void)
     local_irq_enable();
 
     /* Ensure we are the boot CPU. */
-    if ( GET_APIC_ID(apic_read(APIC_ID)) != boot_cpu_physical_apicid )
+    if ( get_apic_id() != boot_cpu_physical_apicid )
     {
         /* Send IPI to the boot CPU (logical cpu 0). */
         on_selected_cpus(cpumask_of_cpu(0), (void *)machine_restart,

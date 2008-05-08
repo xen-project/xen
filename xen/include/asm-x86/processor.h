@@ -167,9 +167,9 @@ struct cpuinfo_x86 {
     int  x86_cache_size; /* in KB - valid for CPUS which support this call  */
     int  x86_cache_alignment;    /* In bytes */
     int  x86_power;
-    unsigned char x86_max_cores; /* cpuid returned max cores value */
-    unsigned char booted_cores;  /* number of cores as seen by OS */
-    unsigned char apicid;
+    __u32 x86_max_cores; /* cpuid returned max cores value */
+    __u32 booted_cores;  /* number of cores as seen by OS */
+    __u32 apicid;
     unsigned short x86_clflush_size;
 } __cacheline_aligned;
 

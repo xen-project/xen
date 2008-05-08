@@ -370,7 +370,7 @@ endif
 
 ifdef CONFIG_PASSTHROUGH
 LIBS+=-lpci
-VL_OBJS+= pass-through.o
+VL_OBJS+= pass-through.o pt-msi.o
 CFLAGS += -DCONFIG_PASSTHROUGH
 $(info *** PCI passthrough capability has been enabled ***)
 endif

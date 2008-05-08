@@ -21,6 +21,7 @@
 #include <stdint.h>
 #include <xen/xen.h>
 #include <xen/domctl.h>
+#include <xen/physdev.h>
 #include <xen/sysctl.h>
 #include <xen/version.h>
 #include <xen/event_channel.h>
@@ -849,6 +850,25 @@ int xc_gnttab_munmap(int xcg_handle,
 int xc_gnttab_set_max_grants(int xcg_handle,
 			     uint32_t count);
 
+int xc_physdev_map_pirq(int xc_handle,
+                        int domid,
+                        int type,
+                        int index,
+                        int *pirq);
+
+int xc_physdev_map_pirq_msi(int xc_handle,
+                            int domid,
+                            int type,
+                            int index,
+                            int *pirq,
+                            int devfn,
+                            int bus,
+                            int msi_type);
+
+int xc_physdev_unmap_pirq(int xc_handle,
+                          int domid,
+                          int pirq);
+
 int xc_hvm_set_pci_intx_level(
     int xc_handle, domid_t dom,
     uint8_t domain, uint8_t bus, uint8_t device, uint8_t intx,
@@ -861,6 +881,22 @@ int xc_hvm_set_isa_irq_level(
 int xc_hvm_set_pci_link_route(
     int xc_handle, domid_t dom, uint8_t link, uint8_t isa_irq);
 
+
+/*
+ * Track dirty bit changes in the VRAM area
+ *
+ * All of this is done atomically:
+ * - get the dirty bitmap since the last call
+ * - set up dirty tracking area for period up to the next call
+ * - clear the dirty tracking area.
+ *
+ * Returns -ENODATA and does not fill bitmap if the area has changed since the
+ * last call.
+ */
+int xc_hvm_track_dirty_vram(
+    int xc_handle, domid_t dom,
+    uint64_t first_pfn, uint64_t nr,
+    unsigned long *bitmap);
 
 typedef enum {
   XC_ERROR_NONE = 0,
@@ -949,6 +985,13 @@ int xc_domain_ioport_mapping(int xc_handle,
                              uint32_t nr_ports,
                              uint32_t add_mapping);
 
+int xc_domain_update_msi_irq(
+    int xc_handle,
+    uint32_t domid,
+    uint32_t gvec,
+    uint32_t pirq,
+    uint32_t gflags);
+
 int xc_domain_bind_pt_irq(int xc_handle,
                           uint32_t domid,
                           uint8_t machine_irq,
@@ -982,5 +1025,21 @@ int xc_domain_bind_pt_isa_irq(int xc_handle,
 int xc_domain_set_target(int xc_handle,
                          uint32_t domid,
                          uint32_t target);
+
+#if defined(__i386__) || defined(__x86_64__)
+int xc_cpuid_check(int xc,
+                   const unsigned int *input,
+                   const char **config,
+                   char **config_transformed);
+int xc_cpuid_set(int xc,
+                 domid_t domid,
+                 const unsigned int *input,
+                 const char **config,
+                 char **config_transformed);
+int xc_cpuid_apply_policy(int xc,
+                          domid_t domid);
+void xc_cpuid_to_str(const unsigned int *regs,
+                     char **strs);
+#endif
 
 #endif /* XENCTRL_H */

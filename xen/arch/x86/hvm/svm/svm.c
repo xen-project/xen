@@ -84,7 +84,10 @@ static void inline __update_guest_eip(
 {
     struct vcpu *curr = current;
 
-    if ( unlikely((inst_len == 0) || (inst_len > 15)) )
+    if ( unlikely(inst_len == 0) )
+        return;
+
+    if ( unlikely(inst_len > 15) )
     {
         gdprintk(XENLOG_ERR, "Bad instruction length %u\n", inst_len);
         domain_crash(curr->domain);
@@ -892,56 +895,11 @@ static void svm_cpuid_intercept(
 
     hvm_cpuid(input, eax, ebx, ecx, edx);
 
-    switch ( input )
+    if ( input == 0x80000001 )
     {
-    case 0x00000001:
-        /* Mask Intel-only features. */
-        *ecx &= ~(bitmaskof(X86_FEATURE_SSSE3) |
-                  bitmaskof(X86_FEATURE_SSE4_1) |
-                  bitmaskof(X86_FEATURE_SSE4_2));
-        break;
-
-    case 0x80000001:
-        /* Filter features which are shared with 0x00000001:EDX. */
+        /* Fix up VLAPIC details. */
         if ( vlapic_hw_disabled(vcpu_vlapic(v)) )
             __clear_bit(X86_FEATURE_APIC & 31, edx);
-#if CONFIG_PAGING_LEVELS >= 3
-        if ( !v->domain->arch.hvm_domain.params[HVM_PARAM_PAE_ENABLED] )
-#endif
-            __clear_bit(X86_FEATURE_PAE & 31, edx);
-        __clear_bit(X86_FEATURE_PSE36 & 31, edx);
-
-        /* We always support MTRR MSRs. */
-        *edx |= bitmaskof(X86_FEATURE_MTRR);
-
-        /* Filter all other features according to a whitelist. */
-        *ecx &= (bitmaskof(X86_FEATURE_LAHF_LM) |
-                 bitmaskof(X86_FEATURE_ALTMOVCR) |
-                 bitmaskof(X86_FEATURE_ABM) |
-                 bitmaskof(X86_FEATURE_SSE4A) |
-                 bitmaskof(X86_FEATURE_MISALIGNSSE) |
-                 bitmaskof(X86_FEATURE_3DNOWPF));
-        *edx &= (0x0183f3ff | /* features shared with 0x00000001:EDX */
-                 bitmaskof(X86_FEATURE_NX) |
-                 bitmaskof(X86_FEATURE_LM) |
-                 bitmaskof(X86_FEATURE_SYSCALL) |
-                 bitmaskof(X86_FEATURE_MP) |
-                 bitmaskof(X86_FEATURE_MMXEXT) |
-                 bitmaskof(X86_FEATURE_FFXSR) |
-                 bitmaskof(X86_FEATURE_3DNOW) |
-                 bitmaskof(X86_FEATURE_3DNOWEXT));
-        break;
-
-    case 0x80000007:
-    case 0x8000000A:
-        /* Mask out features of power management and SVM extension. */
-        *eax = *ebx = *ecx = *edx = 0;
-        break;
-
-    case 0x80000008:
-        /* Make sure Number of CPU core is 1 when HTT=0 */
-        *ecx &= 0xFFFFFF00;
-        break;
     }
 
     HVMTRACE_3D(CPUID, v, input,
@@ -952,8 +910,7 @@ static void svm_vmexit_do_cpuid(struct cpu_user_regs *regs)
 {
     unsigned int eax, ebx, ecx, edx, inst_len;
 
-    inst_len = __get_instruction_length(current, INSTR_CPUID, NULL);
-    if ( inst_len == 0 ) 
+    if ( (inst_len = __get_instruction_length(current, INSTR_CPUID)) == 0 )
         return;
 
     eax = regs->eax;
@@ -1128,13 +1085,15 @@ static void svm_do_msr_access(struct cpu_user_regs *regs)
 
     if ( vmcb->exitinfo1 == 0 )
     {
+        if ( (inst_len = __get_instruction_length(v, INSTR_RDMSR)) == 0 )
+            return;
         rc = hvm_msr_read_intercept(regs);
-        inst_len = __get_instruction_length(v, INSTR_RDMSR, NULL);
     }
     else
     {
+        if ( (inst_len = __get_instruction_length(v, INSTR_WRMSR)) == 0 )
+            return;
         rc = hvm_msr_write_intercept(regs);
-        inst_len = __get_instruction_length(v, INSTR_WRMSR, NULL);
     }
 
     if ( rc == X86EMUL_OKAY )
@@ -1144,25 +1103,12 @@ static void svm_do_msr_access(struct cpu_user_regs *regs)
 static void svm_vmexit_do_hlt(struct vmcb_struct *vmcb,
                               struct cpu_user_regs *regs)
 {
-    struct vcpu *curr = current;
-    struct hvm_intack intack = hvm_vcpu_has_pending_irq(curr);
     unsigned int inst_len;
 
-    inst_len = __get_instruction_length(curr, INSTR_HLT, NULL);
-    if ( inst_len == 0 )
+    if ( (inst_len = __get_instruction_length(current, INSTR_HLT)) == 0 )
         return;
     __update_guest_eip(regs, inst_len);
 
-    /* Check for pending exception or new interrupt. */
-    if ( vmcb->eventinj.fields.v ||
-         ((intack.source != hvm_intsrc_none) &&
-          !hvm_interrupt_blocked(current, intack)) )
-    {
-        HVMTRACE_1D(HLT, curr, /*int pending=*/ 1);
-        return;
-    }
-
-    HVMTRACE_1D(HLT, curr, /*int pending=*/ 0);
     hvm_hlt(regs->eflags);
 }
 
@@ -1182,10 +1128,13 @@ static void svm_vmexit_do_invalidate_cache(struct cpu_user_regs *regs)
     enum instruction_index list[] = { INSTR_INVD, INSTR_WBINVD };
     int inst_len;
 
+    inst_len = __get_instruction_length_from_list(
+        current, list, ARRAY_SIZE(list));
+    if ( inst_len == 0 )
+        return;
+
     svm_wbinvd_intercept();
 
-    inst_len = __get_instruction_length_from_list(
-        current, list, ARRAY_SIZE(list), NULL, NULL);
     __update_guest_eip(regs, inst_len);
 }
 
@@ -1261,7 +1210,8 @@ asmlinkage void svm_vmexit_handler(struct cpu_user_regs *regs)
         if ( !v->domain->debugger_attached )
             goto exit_and_crash;
         /* AMD Vol2, 15.11: INT3, INTO, BOUND intercepts do not update RIP. */
-        inst_len = __get_instruction_length(v, INSTR_INT3, NULL);
+        if ( (inst_len = __get_instruction_length(v, INSTR_INT3)) == 0 )
+            break;
         __update_guest_eip(regs, inst_len);
         domain_pause_for_debugger();
         break;
@@ -1338,8 +1288,7 @@ asmlinkage void svm_vmexit_handler(struct cpu_user_regs *regs)
         break;
 
     case VMEXIT_VMMCALL:
-        inst_len = __get_instruction_length(v, INSTR_VMCALL, NULL);
-        if ( inst_len == 0 )
+        if ( (inst_len = __get_instruction_length(v, INSTR_VMCALL)) == 0 )
             break;
         HVMTRACE_1D(VMMCALL, v, regs->eax);
         rc = hvm_do_hypercall(regs);

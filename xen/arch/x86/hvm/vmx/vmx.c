@@ -1311,34 +1311,21 @@ static void vmx_cpuid_intercept(
     unsigned int *ecx, unsigned int *edx)
 {
     unsigned int input = *eax;
-    unsigned int count = *ecx;
+    struct segment_register cs;
+    struct vcpu *v = current;
 
     hvm_cpuid(input, eax, ebx, ecx, edx);
 
     switch ( input )
     {
-    case 0x00000001:
-        /* Mask AMD-only features. */
-        *ecx &= ~(bitmaskof(X86_FEATURE_POPCNT));
-        break;
-
-    case 0x00000004:
-        cpuid_count(input, count, eax, ebx, ecx, edx);
-        *eax &= 0x3FFF; /* one core */
-        break;
-
-    case 0x00000006:
-    case 0x00000009:
-        *eax = *ebx = *ecx = *edx = 0;
-        break;
-
-    case 0x80000001:
-        /* Only a few features are advertised in Intel's 0x80000001. */
-        *ecx &= (bitmaskof(X86_FEATURE_LAHF_LM));
-        *edx &= (bitmaskof(X86_FEATURE_NX) |
-                 bitmaskof(X86_FEATURE_LM) |
-                 bitmaskof(X86_FEATURE_SYSCALL));
-        break;
+        case 0x80000001:
+            /* SYSCALL is visible iff running in long mode. */
+            hvm_get_segment_register(v, x86_seg_cs, &cs);
+            if ( cs.attr.fields.l )
+                *edx |= bitmaskof(X86_FEATURE_SYSCALL);
+            else
+                *edx &= ~(bitmaskof(X86_FEATURE_SYSCALL));
+            break;
     }
 
     HVMTRACE_3D(CPUID, current, input,
@@ -1381,7 +1368,8 @@ static void vmx_invlpg_intercept(unsigned long vaddr)
 {
     struct vcpu *curr = current;
     HVMTRACE_2D(INVLPG, curr, /*invlpga=*/ 0, vaddr);
-    paging_invlpg(curr, vaddr);
+    if ( paging_invlpg(curr, vaddr) )
+        vpid_sync_vcpu_gva(curr, vaddr);
 }
 
 #define CASE_SET_REG(REG, reg)      \
@@ -1869,22 +1857,6 @@ gp_fault:
     return X86EMUL_EXCEPTION;
 }
 
-static void vmx_do_hlt(struct cpu_user_regs *regs)
-{
-    unsigned long intr_info = __vmread(VM_ENTRY_INTR_INFO);
-    struct vcpu *curr = current;
-
-    /* Check for pending exception. */
-    if ( intr_info & INTR_INFO_VALID_MASK )
-    {
-        HVMTRACE_1D(HLT, curr, /*int pending=*/ 1);
-        return;
-    }
-
-    HVMTRACE_1D(HLT, curr, /*int pending=*/ 0);
-    hvm_hlt(regs->eflags);
-}
-
 static void vmx_do_extint(struct cpu_user_regs *regs)
 {
     unsigned int vector;
@@ -2199,7 +2171,7 @@ asmlinkage void vmx_vmexit_handler(struct cpu_user_regs *regs)
     case EXIT_REASON_HLT:
         inst_len = __get_instruction_length(); /* Safe: HLT */
         __update_guest_eip(inst_len);
-        vmx_do_hlt(regs);
+        hvm_hlt(regs->eflags);
         break;
     case EXIT_REASON_INVLPG:
     {

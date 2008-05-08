@@ -19,17 +19,18 @@ struct xenbus_event {
     char *token;
     struct xenbus_event *next;
 };
+typedef struct xenbus_event *xenbus_event_queue;
 
-char *xenbus_watch_path_token(xenbus_transaction_t xbt, const char *path, const char *token, struct xenbus_event *volatile *events);
+char *xenbus_watch_path_token(xenbus_transaction_t xbt, const char *path, const char *token, xenbus_event_queue *events);
 char *xenbus_unwatch_path_token(xenbus_transaction_t xbt, const char *path, const char *token);
 extern struct wait_queue_head xenbus_watch_queue;
-void xenbus_wait_for_watch(void);
-char **xenbus_wait_for_watch_return(void);
-char* xenbus_wait_for_value(const char *path, const char *value);
+void xenbus_wait_for_watch(xenbus_event_queue *queue);
+char **xenbus_wait_for_watch_return(xenbus_event_queue *queue);
+char* xenbus_wait_for_value(const char *path, const char *value, xenbus_event_queue *queue);
 
 /* When no token is provided, use a global queue. */
 #define XENBUS_WATCH_PATH_TOKEN "xenbus_watch_path"
-extern struct xenbus_event * volatile xenbus_events;
+extern xenbus_event_queue xenbus_events;
 #define xenbus_watch_path(xbt, path) xenbus_watch_path_token(xbt, path, XENBUS_WATCH_PATH_TOKEN, NULL)
 #define xenbus_unwatch_path(xbt, path) xenbus_unwatch_path_token(xbt, path, XENBUS_WATCH_PATH_TOKEN)
 

@@ -549,6 +549,14 @@ gopts.var('hap', val='HAP',
           use="""Hap status (0=hap is disabled;
           1=hap is enabled.""")
 
+gopts.var('cpuid', val="IN[,SIN]:eax=EAX,ebx=EBX,exc=ECX,edx=EDX",
+          fn=append_value, default=[],
+          use="""Cpuid description.""")
+
+gopts.var('cpuid_check', val="IN[,SIN]:eax=EAX,ebx=EBX,exc=ECX,edx=EDX",
+          fn=append_value, default=[],
+          use="""Cpuid check description.""")
+
 def err(msg):
     """Print an error to stderr and exit.
     """
@@ -755,7 +763,7 @@ def configure_hvm(config_image, vals):
              'vnc', 'vncdisplay', 'vncunused', 'vncconsole', 'vnclisten',
              'sdl', 'display', 'xauthority', 'rtc_timeoffset', 'monitor',
              'acpi', 'apic', 'usb', 'usbdevice', 'keymap', 'pci', 'hpet',
-             'guest_os_type', 'hap', 'opengl']
+             'guest_os_type', 'hap', 'opengl', 'cpuid', 'cpuid_check']
 
     for a in args:
         if a in vals.__dict__ and vals.__dict__[a] is not None:
@@ -779,7 +787,8 @@ def make_config(vals):
     map(add_conf, ['name', 'memory', 'maxmem', 'shadow_memory',
                    'restart', 'on_poweroff',
                    'on_reboot', 'on_crash', 'vcpus', 'vcpu_avail', 'features',
-                   'on_xend_start', 'on_xend_stop', 'target'])
+                   'on_xend_start', 'on_xend_stop', 'target', 'cpuid',
+                   'cpuid_check'])
 
     if vals.uuid is not None:
         config.append(['uuid', vals.uuid])
@@ -842,6 +851,26 @@ def preprocess_disk(vals):
             err('Invalid disk specifier: ' + v)
         disk.append(d)
     vals.disk = disk
+
+def preprocess_cpuid(vals, attr_name):
+    if not vals.cpuid: return
+    cpuid = {} 
+    for cpuid_input in getattr(vals, attr_name):
+        input_re = "(0x)?[0-9A-Fa-f]+(,(0x)?[0-9A-Fa-f]+)?"
+        cpuid_match = re.match(r'(?P<input>%s):(?P<regs>.*)' % \
+                               input_re, cpuid_input)
+        if cpuid_match != None:
+            res_cpuid = cpuid_match.groupdict()
+            input = res_cpuid['input']
+            regs = res_cpuid['regs'].split(',')
+            cpuid[input]= {} # New input
+            for reg in regs:
+                reg_match = re.match(r"(?P<reg>eax|ebx|ecx|edx)=(?P<val>.*)", reg)
+                if reg_match == None:
+                    err("cpuid's syntax is (eax|ebx|ecx|edx)=value")
+                res = reg_match.groupdict()
+                cpuid[input][res['reg']] = res['val'] # new register
+    setattr(vals, attr_name, cpuid)
 
 def preprocess_pci(vals):
     if not vals.pci: return
@@ -1047,6 +1076,8 @@ def preprocess(vals):
     preprocess_vnc(vals)
     preprocess_vtpm(vals)
     preprocess_access_control(vals)
+    preprocess_cpuid(vals, 'cpuid')
+    preprocess_cpuid(vals, 'cpuid_check')
 
 
 def comma_sep_kv_to_dict(c):

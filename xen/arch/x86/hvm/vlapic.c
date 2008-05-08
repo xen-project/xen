@@ -171,7 +171,7 @@ int vlapic_match_logical_addr(struct vlapic *vlapic, uint8_t mda)
     int result = 0;
     uint8_t logical_id;
 
-    logical_id = GET_APIC_LOGICAL_ID(vlapic_get_reg(vlapic, APIC_LDR));
+    logical_id = GET_xAPIC_LOGICAL_ID(vlapic_get_reg(vlapic, APIC_LDR));
 
     switch ( vlapic_get_reg(vlapic, APIC_DFR) )
     {
@@ -476,12 +476,15 @@ void vlapic_EOI_set(struct vlapic *vlapic)
 
     if ( vlapic_test_and_clear_vector(vector, &vlapic->regs->data[APIC_TMR]) )
         vioapic_update_EOI(vlapic_domain(vlapic), vector);
+	
+    if ( vtd_enabled )
+        hvm_dpci_msi_eoi(current->domain, vector);
 }
 
 static int vlapic_ipi(
     struct vlapic *vlapic, uint32_t icr_low, uint32_t icr_high)
 {
-    unsigned int dest =         GET_APIC_DEST_FIELD(icr_high);
+    unsigned int dest =         GET_xAPIC_DEST_FIELD(icr_high);
     unsigned int short_hand =   icr_low & APIC_SHORT_MASK;
     unsigned int trig_mode =    icr_low & APIC_INT_LEVELTRIG;
     unsigned int level =        icr_low & APIC_INT_ASSERT;

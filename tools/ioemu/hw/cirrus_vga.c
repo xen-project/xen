@@ -234,8 +234,6 @@ typedef struct CirrusVGAState {
     int cirrus_linear_io_addr;
     int cirrus_linear_bitblt_io_addr;
     int cirrus_mmio_io_addr;
-    unsigned long cirrus_lfb_addr;
-    unsigned long cirrus_lfb_end;
     uint32_t cirrus_addr_mask;
     uint32_t linear_mmio_mask;
     uint8_t cirrus_shadow_gr0;
@@ -2657,11 +2655,11 @@ static void cirrus_update_memory_access(CirrusVGAState *s)
         
 	mode = s->gr[0x05] & 0x7;
 	if (mode < 4 || mode > 5 || ((s->gr[0x0B] & 0x4) == 0)) {
-            if (s->cirrus_lfb_addr && s->cirrus_lfb_end && !s->map_addr) {
+            if (s->lfb_addr && s->lfb_end && !s->map_addr) {
                 void *vram_pointer, *old_vram;
 
-                vram_pointer = set_vram_mapping(s->cirrus_lfb_addr,
-                                                s->cirrus_lfb_end);
+                vram_pointer = set_vram_mapping(s->lfb_addr,
+                                                s->lfb_end);
                 if (!vram_pointer)
                     fprintf(stderr, "NULL vram_pointer\n");
                 else {
@@ -2669,21 +2667,21 @@ static void cirrus_update_memory_access(CirrusVGAState *s)
                                                VGA_RAM_SIZE);
                     qemu_free(old_vram);
                 }
-                s->map_addr = s->cirrus_lfb_addr;
-                s->map_end = s->cirrus_lfb_end;
+                s->map_addr = s->lfb_addr;
+                s->map_end = s->lfb_end;
             }
             s->cirrus_linear_write[0] = cirrus_linear_mem_writeb;
             s->cirrus_linear_write[1] = cirrus_linear_mem_writew;
             s->cirrus_linear_write[2] = cirrus_linear_mem_writel;
         } else {
         generic_io:
-            if (s->cirrus_lfb_addr && s->cirrus_lfb_end && s->map_addr) {
+            if (s->lfb_addr && s->lfb_end && s->map_addr) {
                 void *old_vram;
 
                 old_vram = vga_update_vram((VGAState *)s, NULL, VGA_RAM_SIZE);
 
-                unset_vram_mapping(s->cirrus_lfb_addr,
-                                   s->cirrus_lfb_end, 
+                unset_vram_mapping(s->lfb_addr,
+                                   s->lfb_end, 
                                    old_vram);
 
                 s->map_addr = s->map_end = 0;
@@ -3049,27 +3047,27 @@ void cirrus_stop_acc(CirrusVGAState *s)
     if (s->map_addr){
         int error;
         s->map_addr = 0;
-        error = unset_vram_mapping(s->cirrus_lfb_addr,
-                s->cirrus_lfb_end, s->vram_ptr);
+        error = unset_vram_mapping(s->lfb_addr,
+                s->lfb_end, s->vram_ptr);
         fprintf(stderr, "cirrus_stop_acc:unset_vram_mapping.\n");
     }
 }
 
 void cirrus_restart_acc(CirrusVGAState *s)
 {
-    if (s->cirrus_lfb_addr && s->cirrus_lfb_end) {
+    if (s->lfb_addr && s->lfb_end) {
         void *vram_pointer, *old_vram;
         fprintf(stderr, "cirrus_vga_load:re-enable vga acc.lfb_addr=0x%lx, lfb_end=0x%lx.\n",
-                s->cirrus_lfb_addr, s->cirrus_lfb_end);
-        vram_pointer = set_vram_mapping(s->cirrus_lfb_addr ,s->cirrus_lfb_end);
+                s->lfb_addr, s->lfb_end);
+        vram_pointer = set_vram_mapping(s->lfb_addr ,s->lfb_end);
         if (!vram_pointer){
             fprintf(stderr, "cirrus_vga_load:NULL vram_pointer\n");
         } else {
             old_vram = vga_update_vram((VGAState *)s, vram_pointer,
                     VGA_RAM_SIZE);
             qemu_free(old_vram);
-            s->map_addr = s->cirrus_lfb_addr;
-            s->map_end = s->cirrus_lfb_end;
+            s->map_addr = s->lfb_addr;
+            s->map_end = s->lfb_end;
         }
     }
 }
@@ -3120,8 +3118,8 @@ static void cirrus_vga_save(QEMUFile *f, void *opaque)
 
     vga_acc = (!!s->map_addr);
     qemu_put_8s(f, &vga_acc);
-    qemu_put_be64s(f, (uint64_t*)&s->cirrus_lfb_addr);
-    qemu_put_be64s(f, (uint64_t*)&s->cirrus_lfb_end);
+    qemu_put_be64s(f, (uint64_t*)&s->lfb_addr);
+    qemu_put_be64s(f, (uint64_t*)&s->lfb_end);
     qemu_put_buffer(f, s->vram_ptr, VGA_RAM_SIZE); 
 }
 
@@ -3175,8 +3173,8 @@ static int cirrus_vga_load(QEMUFile *f, void *opaque, int version_id)
     qemu_get_be32s(f, &s->hw_cursor_y);
 
     qemu_get_8s(f, &vga_acc);
-    qemu_get_be64s(f, (uint64_t*)&s->cirrus_lfb_addr);
-    qemu_get_be64s(f, (uint64_t*)&s->cirrus_lfb_end);
+    qemu_get_be64s(f, (uint64_t*)&s->lfb_addr);
+    qemu_get_be64s(f, (uint64_t*)&s->lfb_end);
     qemu_get_buffer(f, s->vram_ptr, VGA_RAM_SIZE); 
     if (vga_acc){
         cirrus_restart_acc(s);
@@ -3337,11 +3335,11 @@ static void cirrus_pci_lfb_map(PCIDevice *d, int region_num,
     /* XXX: add byte swapping apertures */
     cpu_register_physical_memory(addr, s->vram_size,
 				 s->cirrus_linear_io_addr);
-    s->cirrus_lfb_addr = addr;
-    s->cirrus_lfb_end = addr + VGA_RAM_SIZE;
+    s->lfb_addr = addr;
+    s->lfb_end = addr + VGA_RAM_SIZE;
 
-    if (s->map_addr && (s->cirrus_lfb_addr != s->map_addr) &&
-        (s->cirrus_lfb_end != s->map_end))
+    if (s->map_addr && (s->lfb_addr != s->map_addr) &&
+        (s->lfb_end != s->map_end))
         fprintf(logfile, "cirrus vga map change while on lfb mode\n");
 
     cpu_register_physical_memory(addr + 0x1000000, 0x400000,

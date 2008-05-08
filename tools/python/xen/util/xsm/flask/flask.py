@@ -12,7 +12,7 @@ def err(msg):
     raise XSMError(msg)
 
 def on():
-    return 1
+    return 0 #xsconstants.XS_POLICY_FLASK
 
 def ssidref2label(ssidref):
     try:

@@ -17,7 +17,7 @@
  * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
  * DEALINGS IN THE SOFTWARE.
  *
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -286,6 +286,7 @@ fsig_mount(fsi_t *fsi, const char *path, const char *options)
 
 	if (!ops->fpo_mount(ffi, options)) {
 		fsip_file_free(ffi);
+		fsi_bootstring_free(fsi);
 		free(fsi->f_data);
 		fsi->f_data = NULL;
 		return (-1);
@@ -299,6 +300,7 @@ fsig_mount(fsi_t *fsi, const char *path, const char *options)
 static int
 fsig_umount(fsi_t *fsi)
 {
+	fsi_bootstring_free(fsi);
 	free(fsi->f_data);
 	return (0);
 }

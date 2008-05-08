@@ -101,7 +101,7 @@ void hvm_dpci_isairq_eoi(struct domain *d, unsigned int isairq)
     /* Multiple mirq may be mapped to one isa irq */
     for ( i = 0; i < NR_IRQS; i++ )
     {
-        if ( !dpci->mirq[i].valid )
+        if ( !dpci->mirq[i].flags & HVM_IRQ_DPCI_VALID )
             continue;
 
         list_for_each_entry_safe ( digl, tmp,
@@ -114,7 +114,7 @@ void hvm_dpci_isairq_eoi(struct domain *d, unsigned int isairq)
                 if ( --dpci->mirq[i].pending == 0 )
                 {
                     spin_unlock(&dpci->dirq_lock);
-                    stop_timer(&dpci->hvm_timer[irq_to_vector(i)]);
+                    stop_timer(&dpci->hvm_timer[domain_irq_to_vector(d, i)]);
                     pirq_guest_eoi(d, i);
                 }
                 else

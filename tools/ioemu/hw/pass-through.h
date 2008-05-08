@@ -57,6 +57,14 @@ struct pt_region {
     } access;
 };
 
+struct pt_msi_info {
+    uint32_t flags;
+    int offset;
+    int size;
+    int pvec;   /* physical vector used */
+    int pirq;  /* guest pirq corresponding */
+};
+
 /*
     This structure holds the context of the mapping functions
     and data that is relevant for qemu device management.
@@ -65,6 +73,7 @@ struct pt_dev {
     PCIDevice dev;
     struct pci_dev *pci_dev;                     /* libpci struct */
     struct pt_region bases[PCI_NUM_REGIONS];    /* Access regions */
+    struct pt_msi_info *msi;                    /* MSI virtualization */
 };
 
 /* Used for formatting PCI BDF into cf8 format */

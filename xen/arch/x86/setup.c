@@ -94,6 +94,11 @@ boolean_param("acpi_skip_timer_override", acpi_skip_timer_override);
 extern int skip_ioapic_setup;
 boolean_param("noapic", skip_ioapic_setup);
 
+/* **** Linux config option: propagated to domain0. */
+/* xen_processor_pm: xen control cstate. */
+static int xen_processor_pm;
+boolean_param("xen_processor_pm", xen_processor_pm);
+
 int early_boot = 1;
 
 cpumask_t cpu_present_map;
@@ -240,7 +245,7 @@ static void __init init_idle_domain(void)
 static void __init srat_detect_node(int cpu)
 {
     unsigned node;
-    u8 apicid = x86_cpu_to_apicid[cpu];
+    u32 apicid = x86_cpu_to_apicid[cpu];
 
     node = apicid_to_node[apicid];
     if ( node == NUMA_NO_NODE )
@@ -885,6 +890,9 @@ void __init __start_xen(unsigned long mbi_p)
 
     generic_apic_probe();
 
+    if ( x2apic_is_available() )
+        enable_x2apic();
+
     acpi_boot_init();
 
     init_cpu_to_node();
@@ -1008,6 +1016,8 @@ void __init __start_xen(unsigned long mbi_p)
             safe_strcat(dom0_cmdline, " acpi=");
             safe_strcat(dom0_cmdline, acpi_param);
         }
+        if ( xen_processor_pm && !strstr(dom0_cmdline, "xen_processor_pmbits=") )
+            safe_strcat(dom0_cmdline, " xen_processor_pmbits=1");
 
         cmdline = dom0_cmdline;
     }

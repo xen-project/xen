@@ -27,11 +27,11 @@
 #include <xen/numa.h>
 #include <xen/time.h>
 #include <xen/pci.h>
+#include <xen/pci_regs.h>
 #include <asm/paging.h>
+#include <asm/msi.h>
 #include "iommu.h"
 #include "dmar.h"
-#include "../pci_regs.h"
-#include "msi.h"
 #include "extern.h"
 #include "vtd.h"
 
@@ -623,56 +623,60 @@ static void dma_pte_clear_range(struct domain *domain, u64 start, u64 end)
     }
 }
 
-/* free page table pages. last level pte should already be cleared */
-void dma_pte_free_pagetable(struct domain *domain, u64 start, u64 end)
+static void iommu_free_next_pagetable(u64 pt_maddr, unsigned long index,
+                                      int level)
 {
     struct acpi_drhd_unit *drhd;
-    struct hvm_iommu *hd = domain_hvm_iommu(domain);
-    struct iommu *iommu;
-    int addr_width = agaw_to_width(hd->agaw);
-    struct dma_pte *page, *pte;
-    int total = agaw_to_level(hd->agaw);
-    int level;
-    u64 tmp;
-    u64 pg_maddr;
+    unsigned long next_index;
+    struct dma_pte *pt_vaddr, *pde;
+    int next_level;
 
-    drhd = list_entry(acpi_drhd_units.next, typeof(*drhd), list);
-    iommu = drhd->iommu;
+    if ( pt_maddr == 0 )
+        return;
 
-    start &= (((u64)1) << addr_width) - 1;
-    end &= (((u64)1) << addr_width) - 1;
-
-    /* we don't need lock here, nobody else touches the iova range */
-    level = 2;
-    while ( level <= total )
+    pt_vaddr = (struct dma_pte *)map_vtd_domain_page(pt_maddr);
+    pde = &pt_vaddr[index];
+    if ( dma_pte_addr(*pde) != 0 )
     {
-        tmp = align_to_level(start, level);
-        if ( (tmp >= end) || ((tmp + level_size(level)) > end) )
-            return;
-
-        while ( tmp < end )
+        next_level = level - 1;
+        if ( next_level > 1 )
         {
-            pg_maddr = dma_addr_level_page_maddr(domain, tmp, level);
-            if ( pg_maddr == 0 )
+            next_index = 0;
+            do
             {
-                tmp += level_size(level);
-                continue;
-            }
-            page = (struct dma_pte *)map_vtd_domain_page(pg_maddr);
-            pte = page + address_level_offset(tmp, level);
-            dma_clear_pte(*pte);
-            iommu_flush_cache_entry(iommu, pte);
-            unmap_vtd_domain_page(page);
-            free_pgtable_maddr(pg_maddr);
-
-            tmp += level_size(level);
+                iommu_free_next_pagetable(pde->val,
+                                          next_index, next_level);
+                next_index++;
+            } while ( next_index < PTE_NUM );
         }
-        level++;
-    }
 
-    /* free pgd */
-    if ( start == 0 && end == ((((u64)1) << addr_width) - 1) )
+        dma_clear_pte(*pde);
+        drhd = list_entry(acpi_drhd_units.next, typeof(*drhd), list);
+        iommu_flush_cache_entry(drhd->iommu, pde);
+        free_pgtable_maddr(pde->val);
+        unmap_vtd_domain_page(pt_vaddr);
+    }
+    else
+        unmap_vtd_domain_page(pt_vaddr);
+}
+
+/* free all VT-d page tables when shut down or destroy domain. */
+static void iommu_free_pagetable(struct domain *domain)
+{
+    unsigned long index;
+    struct hvm_iommu *hd = domain_hvm_iommu(domain);
+    int total_level = agaw_to_level(hd->agaw);
+
+    if ( hd->pgd_maddr != 0 )
     {
+        index = 0;
+        do
+        {
+            iommu_free_next_pagetable(hd->pgd_maddr,
+                                      index, total_level + 1);
+            index++;
+        } while ( index < PTE_NUM );
+
         free_pgtable_maddr(hd->pgd_maddr);
         hd->pgd_maddr = 0;
     }
@@ -1169,31 +1173,6 @@ static int domain_context_mapping_one(
     return 0;
 }
 
-static int __pci_find_next_cap(u8 bus, unsigned int devfn, u8 pos, int cap)
-{
-    u8 id;
-    int ttl = 48;
-
-    while ( ttl-- )
-    {
-        pos = pci_conf_read8(bus, PCI_SLOT(devfn), PCI_FUNC(devfn), pos);
-        if ( pos < 0x40 )
-            break;
-
-        pos &= ~3;
-        id = pci_conf_read8(bus, PCI_SLOT(devfn), PCI_FUNC(devfn),
-                            pos + PCI_CAP_LIST_ID);
-
-        if ( id == 0xff )
-            break;
-        if ( id == cap )
-            return pos;
-
-        pos += PCI_CAP_LIST_NEXT;
-    }
-    return 0;
-}
-
 #define PCI_BASE_CLASS_BRIDGE    0x06
 #define PCI_CLASS_BRIDGE_PCI     0x0604
 
@@ -1217,7 +1196,7 @@ int pdev_type(struct pci_dev *dev)
     if ( !(status & PCI_STATUS_CAP_LIST) )
         return DEV_TYPE_PCI;
 
-    if ( __pci_find_next_cap(dev->bus, dev->devfn,
+    if ( pci_find_next_cap(dev->bus, dev->devfn,
                             PCI_CAPABILITY_LIST, PCI_CAP_ID_EXP) )
         return DEV_TYPE_PCIe_ENDPOINT;
 
@@ -1472,9 +1451,9 @@ void iommu_domain_teardown(struct domain *d)
     if ( list_empty(&acpi_drhd_units) )
         return;
 
-    iommu_domid_release(d);
-    iommu_free_pgd(d);
+    iommu_free_pagetable(d);
     return_devices_to_dom0(d);
+    iommu_domid_release(d);
 }
 
 static int domain_context_mapped(struct pci_dev *pdev)

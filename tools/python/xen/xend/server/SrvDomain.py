@@ -115,7 +115,6 @@ class SrvDomain(SrvDir):
                     [['dom',         'int'],
                      ['destination', 'str'],
                      ['live',        'int'],
-                     ['resource',    'int'],
                      ['port',        'int']])
         return fn(req.args, {'dom': self.dom.domid})
 

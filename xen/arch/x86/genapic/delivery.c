@@ -17,7 +17,7 @@ void init_apic_ldr_flat(void)
 
 	apic_write_around(APIC_DFR, APIC_DFR_FLAT);
 	val = apic_read(APIC_LDR) & ~APIC_LDR_MASK;
-	val |= SET_APIC_LOGICAL_ID(1UL << smp_processor_id());
+	val |= SET_xAPIC_LOGICAL_ID(1UL << smp_processor_id());
 	apic_write_around(APIC_LDR, val);
 }
 

@@ -14,6 +14,7 @@
 #include <asm/apicdef.h>
 #include <asm/genapic.h>
 
+extern struct genapic apic_x2apic;
 extern struct genapic apic_summit;
 extern struct genapic apic_bigsmp;
 extern struct genapic apic_default;
@@ -21,6 +22,7 @@ extern struct genapic apic_default;
 struct genapic *genapic;
 
 struct genapic *apic_probe[] __initdata = { 
+	&apic_x2apic, 
 	&apic_summit,
 	&apic_bigsmp, 
 	&apic_default,	/* must be last */

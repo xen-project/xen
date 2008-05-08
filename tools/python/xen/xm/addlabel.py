@@ -205,17 +205,17 @@ def main(argv):
     policy_type = ""
     if len(argv) not in (4, 5):
         raise OptionError('Needs either 2 or 3 arguments')
-    
+
     label = argv[1]
-    
+
     if len(argv) == 5:
         policyref = argv[4]
-    elif security.on():
+    elif security.on() == xsconstants.XS_POLICY_ACM:
         policyref = security.active_policy
         policy_type = xsconstants.ACM_POLICY_ID
     else:
-        raise OptionError("No active policy. Must specify policy on the "
-                          "command line.")
+        raise OptionError("ACM security is not enabled. You must specify "\
+                          "the policy on the command line.")
 
     if argv[2].lower() == "dom":
         configfile = argv[3]

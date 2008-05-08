@@ -121,6 +121,38 @@ struct physdev_irq {
 };
 typedef struct physdev_irq physdev_irq_t;
 DEFINE_XEN_GUEST_HANDLE(physdev_irq_t);
+ 
+#define MAP_PIRQ_TYPE_MSI               0x0
+#define MAP_PIRQ_TYPE_GSI               0x1
+#define MAP_PIRQ_TYPE_UNKNOWN           0x2
+
+#define PHYSDEVOP_map_pirq               13
+struct physdev_map_pirq {
+    domid_t domid;
+    /* IN */
+    int type;
+    /* IN */
+    int index;
+    /* IN or OUT */
+    int pirq;
+    /* IN */
+    struct {
+        int bus, devfn, entry_nr;
+		int msi;  /* 0 - MSIX    1 - MSI */
+    } msi_info;
+};
+typedef struct physdev_map_pirq physdev_map_pirq_t;
+DEFINE_XEN_GUEST_HANDLE(physdev_map_pirq_t);
+
+#define PHYSDEVOP_unmap_pirq             14
+struct physdev_unmap_pirq {
+    domid_t domid;
+    /* IN */
+    int pirq;
+};
+
+typedef struct physdev_unmap_pirq physdev_unmap_pirq_t;
+DEFINE_XEN_GUEST_HANDLE(physdev_unmap_pirq_t);
 
 /*
  * Argument to physdev_op_compat() hypercall. Superceded by new physdev_op()

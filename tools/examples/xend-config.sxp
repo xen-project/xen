@@ -64,9 +64,9 @@
 
 
 # Address and port xend should use for the legacy TCP XMLRPC interface, 
-# if xen-tcp-xmlrpc-server is set.
-#(xen-tcp-xmlrpc-server-address 'localhost')
-#(xen-tcp-xmlrpc-server-port 8006)
+# if xend-tcp-xmlrpc-server is set.
+#(xend-tcp-xmlrpc-server-address 'localhost')
+#(xend-tcp-xmlrpc-server-port 8006)
 
 # SSL key and certificate to use for the legacy TCP XMLRPC interface.
 # Setting these will mean that this port serves only SSL connections as
@@ -81,6 +81,15 @@
 # Port xend should use for the relocation interface, if xend-relocation-server
 # is set.
 #(xend-relocation-port 8002)
+
+# Whether to use tls when relocating.
+#(xend-relocation-tls no)
+
+# SSL key and certificate to use for the relocation interface.
+# Setting these will mean that this port serves only SSL connections as
+# opposed to plaintext ones.
+#(xend-relocation-server-ssl-key-file  /etc/xen/xmlrpc.key)
+#(xend-relocation-server-ssl-cert-file  /etc/xen/xmlrpc.crt)
 
 # Address xend should listen on for HTTP connections, if xend-http-server is
 # set.

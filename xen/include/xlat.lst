@@ -44,3 +44,8 @@
 !	vcpu_runstate_info		vcpu.h
 ?	xenoprof_init			xenoprof.h
 ?	xenoprof_passive		xenoprof.h
+!	power_register			platform.h
+?	processor_csd			platform.h
+!	processor_cx			platform.h
+!	processor_flags			platform.h
+!	processor_power			platform.h

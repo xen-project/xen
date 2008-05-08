@@ -24,6 +24,7 @@ obj-y += platform_hypercall.o
 obj-y += i387.o
 obj-y += i8259.o
 obj-y += io_apic.o
+obj-y += msi.o
 obj-y += ioport_emulate.o
 obj-y += irq.o
 obj-y += microcode.o

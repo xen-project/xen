@@ -64,3 +64,43 @@ class TCPListener(connection.SocketListener):
                 sock.close()
             except:
                 pass
+
+class SSLTCPListener(TCPListener):
+
+    def __init__(self, protocol_class, port, interface, hosts_allow,
+                 ssl_key_file = None, ssl_cert_file = None):
+        if not ssl_key_file or not ssl_cert_file:
+            raise ValueError("SSLXMLRPCServer requires ssl_key_file "
+                             "and ssl_cert_file to be set.")
+
+        self.ssl_key_file = ssl_key_file
+        self.ssl_cert_file = ssl_cert_file
+
+        TCPListener.__init__(self, protocol_class, port, interface, hosts_allow)
+
+
+    def createSocket(self):
+        from OpenSSL import SSL
+        # make a SSL socket
+        ctx = SSL.Context(SSL.SSLv23_METHOD)
+        ctx.set_options(SSL.OP_NO_SSLv2)
+        ctx.use_privatekey_file (self.ssl_key_file)
+        ctx.use_certificate_file(self.ssl_cert_file)
+        sock = SSL.Connection(ctx,
+                              socket.socket(socket.AF_INET, socket.SOCK_STREAM))
+        sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+
+        # SO_REUSEADDR does not always ensure that we do not get an address
+        # in use error when restarted quickly
+        # we implement a timeout to try and avoid failing unnecessarily
+        timeout = time.time() + 30
+        while True:
+            try:
+                sock.bind((self.interface, self.port))
+                return sock
+            except socket.error, (_errno, strerrno):
+                if _errno == errno.EADDRINUSE and time.time() < timeout:
+                    time.sleep(0.5)
+                else:
+                    raise
+
