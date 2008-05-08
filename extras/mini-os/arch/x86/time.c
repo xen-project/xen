@@ -201,10 +201,12 @@ void block_domain(s_time_t until)
 {
     struct timeval tv;
     gettimeofday(&tv, NULL);
+    ASSERT(irqs_disabled());
     if(monotonic_clock() < until)
     {
         HYPERVISOR_set_timer_op(until);
         HYPERVISOR_sched_op(SCHEDOP_block, 0);
+        local_irq_disable();
     }
 }
 
