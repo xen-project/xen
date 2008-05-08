@@ -1365,28 +1365,25 @@ class XendDomain:
             raise XendInvalidDomain(str(domid))
 
         # if vcpu is keyword 'all', apply the cpumap to all vcpus
-        vcpus = [ vcpu ]
         if str(vcpu).lower() == "all":
             vcpus = range(0, int(dominfo.getVCpuCount()))
+        else:
+            vcpus = [ int(vcpu) ]
        
         # set the same cpumask for all vcpus
         rc = 0
-        if dominfo._stateGet() in (DOM_STATE_RUNNING, DOM_STATE_PAUSED):
-            for v in vcpus:
-                try:
-                    rc = xc.vcpu_setaffinity(dominfo.getDomid(), int(v), cpumap)
-                except Exception, ex:
-                    log.exception(ex)
-                    raise XendError("Cannot pin vcpu: %s to cpu: %s - %s" % \
-                                    (v, cpumap, str(ex)))
-        else:
-            # FIXME: if we could define cpu affinity definitions to
-            #        each vcpu, reprogram the following processing.
-            if str(vcpu).lower() != "all":
-                raise XendError("Must specify 'all' to VCPU "
-                                "for inactive managed domains")
-            dominfo.setCpus(cpumap)
-            self.managed_config_save(dominfo)
+        cpus = dominfo.getCpus()
+        for v in vcpus:
+            try:
+                if dominfo._stateGet() in (DOM_STATE_RUNNING, DOM_STATE_PAUSED):
+                    rc = xc.vcpu_setaffinity(dominfo.getDomid(), v, cpumap)
+                cpus[v] = cpumap
+            except Exception, ex:
+                log.exception(ex)
+                raise XendError("Cannot pin vcpu: %d to cpu: %s - %s" % \
+                                (v, cpumap, str(ex)))
+        dominfo.setCpus(cpus)
+        self.managed_config_save(dominfo)
 
         return rc
 
