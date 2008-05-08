@@ -2869,6 +2869,8 @@ int shadow_track_dirty_vram(struct domain *d,
     unsigned long end_pfn = begin_pfn + nr;
     unsigned long dirty_size = (nr + 7) / 8;
     int flush_tlb = 0;
+    unsigned long i;
+    p2m_type_t t;
 
     if (end_pfn < begin_pfn
             || begin_pfn > d->arch.p2m->max_mapped_pfn
@@ -2879,7 +2881,8 @@ int shadow_track_dirty_vram(struct domain *d,
 
     if ( d->dirty_vram && (!nr ||
              ( begin_pfn != d->dirty_vram->begin_pfn
-            || end_pfn   != d->dirty_vram->end_pfn )) ) {
+            || end_pfn   != d->dirty_vram->end_pfn )) )
+    {
         /* Different tracking, tear the previous down. */
         gdprintk(XENLOG_INFO, "stopping tracking VRAM %lx - %lx\n", d->dirty_vram->begin_pfn, d->dirty_vram->end_pfn);
         xfree(d->dirty_vram->sl1ma);
@@ -2888,17 +2891,16 @@ int shadow_track_dirty_vram(struct domain *d,
         d->dirty_vram = NULL;
     }
 
-    if ( !nr ) {
+    if ( !nr )
+    {
         rc = 0;
         goto out;
     }
 
     /* This should happen seldomly (Video mode change),
      * no need to be careful. */
-    if ( !d->dirty_vram ) {
-        unsigned long i;
-        p2m_type_t t;
-
+    if ( !d->dirty_vram )
+    {
         /* Just recount from start. */
         for ( i = begin_pfn; i < end_pfn; i++ )
             flush_tlb |= sh_remove_all_mappings(d->vcpu[0], gfn_to_mfn(d, i, &t));
@@ -2919,10 +2921,20 @@ int shadow_track_dirty_vram(struct domain *d,
             goto out_sl1ma;
         memset(d->dirty_vram->dirty_bitmap, 0, dirty_size);
 
+        d->dirty_vram->last_dirty = NOW();
+
         /* Tell the caller that this time we could not track dirty bits. */
         rc = -ENODATA;
-    } else {
-        int i;
+    }
+    else if (d->dirty_vram->last_dirty == -1)
+    {
+        /* still completely clean, just copy our empty bitmap */
+        rc = -EFAULT;
+        if ( copy_to_guest(dirty_bitmap, d->dirty_vram->dirty_bitmap, dirty_size) == 0 )
+            rc = 0;
+    }
+    else
+    {
 #ifdef __i386__
         unsigned long map_mfn = INVALID_MFN;
         void *map_sl1p = NULL;
@@ -2930,26 +2942,29 @@ int shadow_track_dirty_vram(struct domain *d,
 
         /* Iterate over VRAM to track dirty bits. */
         for ( i = 0; i < nr; i++ ) {
-            p2m_type_t t;
             mfn_t mfn = gfn_to_mfn(d, begin_pfn + i, &t);
             struct page_info *page = mfn_to_page(mfn);
             u32 count_info = page->u.inuse.type_info & PGT_count_mask;
             int dirty = 0;
             paddr_t sl1ma = d->dirty_vram->sl1ma[i];
 
-            switch (count_info) {
+            switch (count_info)
+            {
             case 0:
                 /* No guest reference, nothing to track. */
                 break;
             case 1:
                 /* One guest reference. */
-                if ( sl1ma == INVALID_PADDR ) {
+                if ( sl1ma == INVALID_PADDR )
+                {
                     /* We don't know which sl1e points to this, too bad. */
                     dirty = 1;
                     /* TODO: Heuristics for finding the single mapping of
                      * this gmfn */
                     flush_tlb |= sh_remove_all_mappings(d->vcpu[0], gfn_to_mfn(d, begin_pfn + i, &t));
-                } else {
+                }
+                else
+                {
                     /* Hopefully the most common case: only one mapping,
                      * whose dirty bit we can use. */
                     l1_pgentry_t *sl1e;
@@ -2968,7 +2983,8 @@ int shadow_track_dirty_vram(struct domain *d,
                     sl1e = maddr_to_virt(sl1ma);
 #endif
 
-                    if ( l1e_get_flags(*sl1e) & _PAGE_DIRTY ) {
+                    if ( l1e_get_flags(*sl1e) & _PAGE_DIRTY )
+                    {
                         dirty = 1;
                         /* Note: this is atomic, so we may clear a
                          * _PAGE_ACCESSED set by another processor. */
@@ -2985,7 +3001,10 @@ int shadow_track_dirty_vram(struct domain *d,
             }
 
             if ( dirty )
+            {
                 d->dirty_vram->dirty_bitmap[i / 8] |= 1 << (i % 8);
+                d->dirty_vram->last_dirty = NOW();
+            }
         }
 
 #ifdef __i386__
@@ -2996,6 +3015,14 @@ int shadow_track_dirty_vram(struct domain *d,
         rc = -EFAULT;
         if ( copy_to_guest(dirty_bitmap, d->dirty_vram->dirty_bitmap, dirty_size) == 0 ) {
             memset(d->dirty_vram->dirty_bitmap, 0, dirty_size);
+            if (d->dirty_vram->last_dirty + SECONDS(2) < NOW())
+            {
+                /* was clean for more than two seconds, try to disable guest
+                 * write access */
+                for ( i = begin_pfn; i < end_pfn; i++ )
+                    flush_tlb |= sh_remove_write_access(d->vcpu[0], gfn_to_mfn(d, i, &t), 1, 0);
+                d->dirty_vram->last_dirty = -1;
+            }
             rc = 0;
         }
     }

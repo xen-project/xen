@@ -536,6 +536,7 @@ struct sh_dirty_vram {
     unsigned long end_pfn;
     paddr_t *sl1ma;
     uint8_t *dirty_bitmap;
+    s_time_t last_dirty;
 };
 
 /**************************************************************************/

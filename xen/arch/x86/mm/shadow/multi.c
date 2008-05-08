@@ -870,6 +870,17 @@ _sh_propagate(struct vcpu *v,
         }
     }
 
+    if ( unlikely((level == 1) && d->dirty_vram
+            && d->dirty_vram->last_dirty == -1
+            && gfn_x(target_gfn) >= d->dirty_vram->begin_pfn
+            && gfn_x(target_gfn) < d->dirty_vram->end_pfn) )
+    {
+        if ( ft & FETCH_TYPE_WRITE )
+            d->dirty_vram->last_dirty = NOW();
+        else
+            sflags &= ~_PAGE_RW;
+    }
+
     /* Read-only memory */
     if ( p2mt == p2m_ram_ro ) 
         sflags &= ~_PAGE_RW;
@@ -1320,8 +1331,10 @@ static inline void shadow_vram_put_l1e(shadow_l1e_t old_sl1e,
                  * just hope it will remain. */
             }
         }
-        if ( dirty )
+        if ( dirty ) {
             d->dirty_vram->dirty_bitmap[i / 8] |= 1 << (i % 8);
+            d->dirty_vram->last_dirty = NOW();
+        }
     }
 }
 
