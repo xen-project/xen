@@ -651,13 +651,37 @@ GLOBAL_ENTRY(ia64_ret_from_clone)
 #ifdef XEN
 	// new domains are cloned but not exec'ed so switch to user mode here
 	cmp.ne pKStk,pUStk=r0,r0
-    adds r16 = IA64_VCPU_FLAGS_OFFSET, r13
-    ;;
-    ld8 r16 = [r16]
-    ;;
-    cmp.ne p6,p7 = r16, r0
- (p6) br.cond.spnt ia64_leave_hypervisor	/* VTi */
- (p7) br.cond.spnt ia64_leave_kernel		/* !VTi */
+	adds r16 = IA64_VCPU_FLAGS_OFFSET, r13
+	;;
+	ld8 r16 = [r16]				// arch.arch_vmx.flags
+	;;
+	cmp.eq p6,p0 = r16, r0
+(p6)	br.cond.spnt ia64_leave_kernel		// !VMX_DOMAIN
+	;;
+	adds r16 = PT(CR_IFS)+16, r12
+	;;
+	ld8 r16 = [r16]
+	cmp.eq pNonSys,pSys=r0,r0		// pSys=0,pNonSys=1
+	;;
+	cmp.eq p6,p7 = 0x6, r16
+(p7)	br.cond.sptk ia64_leave_hypervisor	// VMX_DOMAIN
+	;;
+	/*
+	 * cr.ifs.v==0 && cr.ifm(ar.pfm)==6 means that HYPERVISOR_suspend
+	 * has been called. (i.e. HVM with PV driver is restored here)
+	 * We need to allocate a dummy RSE stack frame to resume.
+	 */
+	alloc r32=ar.pfs, 0, 0, 6, 0
+	cmp.eq pSys,pNonSys=r0,r0		// pSys=1,pNonSys=0
+	;;
+	bsw.0
+	;;
+	mov r21=r13				// set current
+	;;
+	bsw.1
+	;;
+	mov r8=r0
+	br.cond.sptk.many ia64_leave_hypercall
 #else
 .ret8:
 	adds r2=TI_FLAGS+IA64_TASK_SIZE,r13

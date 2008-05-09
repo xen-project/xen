@@ -55,7 +55,6 @@
 #include <asm/vhpt.h>
 #include <asm/vmx_pal_vsa.h>
 #include <asm/patch.h>
-#include "entry.h"
 
 /* Global flag to identify whether Intel vmx feature is on */
 u32 vmx_enabled = 0;
@@ -531,10 +530,6 @@ vmx_final_setup_guest(struct vcpu *v)
 
 	/* Set up guest 's indicator for VTi domain*/
 	set_bit(ARCH_VMX_DOMAIN, &v->arch.arch_vmx.flags);
-
-	/* Initialize pNonSys=1 for the first context switching */
-	sw = (struct switch_stack *)vcpu_regs(v) - 1;
-	sw->pr = (1UL << PRED_NON_SYSCALL);
 
 	return 0;
 }
