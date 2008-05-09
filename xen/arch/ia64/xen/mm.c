@@ -494,6 +494,10 @@ gmfn_to_mfn_foreign(struct domain *d, unsigned long gpfn)
 	if (!pte) {
 		panic("gmfn_to_mfn_foreign: bad gpfn. spinning...\n");
 	}
+
+	if ((pte & _PAGE_IO) && is_hvm_domain(d))
+		return INVALID_MFN;
+
 	return ((pte & _PFN_MASK) >> PAGE_SHIFT);
 }
 
