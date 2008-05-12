@@ -4,12 +4,14 @@
 #
 # (i.e. we need the native config for things like -mregparm, but
 # a Xen kernel to find the right headers)
-EXTRA_CFLAGS += -D__XEN_INTERFACE_VERSION__=0x00030205
-EXTRA_CFLAGS += -DCONFIG_XEN_COMPAT=0xffffff
-EXTRA_CFLAGS += -I$(M)/include -I$(M)/compat-include -DHAVE_XEN_PLATFORM_COMPAT_H
+_XEN_CPPFLAGS += -D__XEN_INTERFACE_VERSION__=0x00030205
+_XEN_CPPFLAGS += -DCONFIG_XEN_COMPAT=0xffffff
+_XEN_CPPFLAGS += -I$(M)/include -I$(M)/compat-include -DHAVE_XEN_PLATFORM_COMPAT_H
 ifeq ($(ARCH),ia64)
-  EXTRA_CFLAGS += -DCONFIG_VMX_GUEST
+  _XEN_CPPFLAGS += -DCONFIG_VMX_GUEST
 endif
 
-EXTRA_CFLAGS += -include $(objtree)/include/linux/autoconf.h
-EXTRA_AFLAGS += -I$(M)/include -I$(M)/compat-include -DHAVE_XEN_PLATFORM_COMPAT_H
+_XEN_CPPFLAGS += -include $(objtree)/include/linux/autoconf.h
+
+EXTRA_CFLAGS += $(_XEN_CPPFLAGS)
+EXTRA_AFLAGS += $(_XEN_CPPFLAGS)
