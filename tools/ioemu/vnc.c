@@ -778,6 +778,7 @@ static void _vnc_update_client(void *opaque)
     vs->has_update = 0;
     vnc_flush(vs);
     vs->last_update_time = now;
+    vs->ds->idle = 0;
 
     vs->timer_interval /= 2;
     if (vs->timer_interval < VNC_REFRESH_INTERVAL_BASE)
@@ -790,26 +791,29 @@ static void _vnc_update_client(void *opaque)
     vs->timer_interval += VNC_REFRESH_INTERVAL_INC;
     if (vs->timer_interval > VNC_REFRESH_INTERVAL_MAX) {
 	vs->timer_interval = VNC_REFRESH_INTERVAL_MAX;
-	if (now - vs->last_update_time >= VNC_MAX_UPDATE_INTERVAL &&
-            vs->update_requested) {
-	    /* Send a null update.  If the client is no longer
-	       interested (e.g. minimised) it'll ignore this, and we
-	       can stop scanning the buffer until it sends another
-	       update request. */
-	    /* It turns out that there's a bug in realvncviewer 4.1.2
-	       which means that if you send a proper null update (with
-	       no update rectangles), it gets a bit out of sync and
-	       never sends any further requests, regardless of whether
-	       it needs one or not.  Fix this by sending a single 1x1
-	       update rectangle instead. */
-	    vnc_write_u8(vs, 0);
-	    vnc_write_u8(vs, 0);
-	    vnc_write_u16(vs, 1);
-	    send_framebuffer_update(vs, 0, 0, 1, 1);
-	    vnc_flush(vs);
-	    vs->last_update_time = now;
-            vs->update_requested--;
-	    return;
+	if (now - vs->last_update_time >= VNC_MAX_UPDATE_INTERVAL) {
+            if (!vs->update_requested) {
+                vs->ds->idle = 1;
+            } else {
+                /* Send a null update.  If the client is no longer
+                   interested (e.g. minimised) it'll ignore this, and we
+                   can stop scanning the buffer until it sends another
+                   update request. */
+                /* It turns out that there's a bug in realvncviewer 4.1.2
+                   which means that if you send a proper null update (with
+                   no update rectangles), it gets a bit out of sync and
+                   never sends any further requests, regardless of whether
+                   it needs one or not.  Fix this by sending a single 1x1
+                   update rectangle instead. */
+                vnc_write_u8(vs, 0);
+                vnc_write_u8(vs, 0);
+                vnc_write_u16(vs, 1);
+                send_framebuffer_update(vs, 0, 0, 1, 1);
+                vnc_flush(vs);
+                vs->last_update_time = now;
+                vs->update_requested--;
+                return;
+            }
 	}
     }
     qemu_mod_timer(vs->timer, now + vs->timer_interval);
@@ -970,6 +974,7 @@ static int vnc_client_io_error(VncState *vs, int ret, int last_errno)
 	qemu_set_fd_handler2(vs->csock, NULL, NULL, NULL, NULL);
 	closesocket(vs->csock);
 	vs->csock = -1;
+	vs->ds->idle = 1;
 	buffer_reset(&vs->input);
 	buffer_reset(&vs->output);
         free_queue(vs);
@@ -2443,6 +2448,7 @@ static void vnc_listen_read(void *opaque)
     vs->csock = accept(vs->lsock, (struct sockaddr *)&addr, &addrlen);
     if (vs->csock != -1) {
 	VNC_DEBUG("New client on socket %d\n", vs->csock);
+	vs->ds->idle = 0;
         socket_set_nonblock(vs->csock);
 	qemu_set_fd_handler2(vs->csock, NULL, vnc_client_read, NULL, opaque);
 	vnc_write(vs, "RFB 003.008\n", 12);
@@ -2468,6 +2474,7 @@ void vnc_display_init(DisplayState *ds)
 	exit(1);
 
     ds->opaque = vs;
+    ds->idle = 1;
     vnc_state = vs;
     vs->display = NULL;
     vs->password = NULL;

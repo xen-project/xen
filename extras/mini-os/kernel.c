@@ -260,6 +260,7 @@ static void blkfront_thread(void *p)
 #define DEPTH 32
 
 static uint32_t *fb;
+static int refresh_period = 50;
 static struct fbfront_dev *fb_dev;
 static struct semaphore fbfront_sem = __SEMAPHORE_INITIALIZER(fbfront_sem, 0);
 
@@ -333,6 +334,10 @@ static void clip_cursor(int *x, int *y)
 static void refresh_cursor(int new_x, int new_y)
 {
     static int old_x = -1, old_y = -1;
+
+    if (!refresh_period)
+        return;
+
     if (old_x != -1 && old_y != -1) {
         fbfront_drawvert(old_x, old_y + 1, old_y + 8, 0xffffffff);
         fbfront_drawhoriz(old_x + 1, old_x + 8, old_y, 0xffffffff);
@@ -358,43 +363,46 @@ static void kbdfront_thread(void *p)
     down(&fbfront_sem);
     refresh_cursor(x, y);
     while (1) {
-        union xenkbd_in_event event;
+        union xenkbd_in_event kbdevent;
+        union xenfb_in_event fbevent;
+        int sleep = 1;
 
         add_waiter(w, kbdfront_queue);
+        add_waiter(w, fbfront_queue);
 
-        if (kbdfront_receive(kbd_dev, &event, 1) == 0)
-            schedule();
-        else switch(event.type) {
+        while (kbdfront_receive(kbd_dev, &kbdevent, 1) != 0) {
+            sleep = 0;
+            switch(kbdevent.type) {
             case XENKBD_TYPE_MOTION:
                 printk("motion x:%d y:%d z:%d\n",
-                        event.motion.rel_x,
-                        event.motion.rel_y,
-                        event.motion.rel_z);
-                x += event.motion.rel_x;
-                y += event.motion.rel_y;
-                z += event.motion.rel_z;
+                        kbdevent.motion.rel_x,
+                        kbdevent.motion.rel_y,
+                        kbdevent.motion.rel_z);
+                x += kbdevent.motion.rel_x;
+                y += kbdevent.motion.rel_y;
+                z += kbdevent.motion.rel_z;
                 clip_cursor(&x, &y);
                 refresh_cursor(x, y);
                 break;
             case XENKBD_TYPE_POS:
                 printk("pos x:%d y:%d dz:%d\n",
-                        event.pos.abs_x,
-                        event.pos.abs_y,
-                        event.pos.rel_z);
-                x = event.pos.abs_x;
-                y = event.pos.abs_y;
-                z = event.pos.rel_z;
+                        kbdevent.pos.abs_x,
+                        kbdevent.pos.abs_y,
+                        kbdevent.pos.rel_z);
+                x = kbdevent.pos.abs_x;
+                y = kbdevent.pos.abs_y;
+                z = kbdevent.pos.rel_z;
                 clip_cursor(&x, &y);
                 refresh_cursor(x, y);
                 break;
             case XENKBD_TYPE_KEY:
                 printk("key %d %s\n",
-                        event.key.keycode,
-                        event.key.pressed ? "pressed" : "released");
-                if (event.key.keycode == BTN_LEFT) {
+                        kbdevent.key.keycode,
+                        kbdevent.key.pressed ? "pressed" : "released");
+                if (kbdevent.key.keycode == BTN_LEFT) {
                     printk("mouse %s at (%d,%d,%d)\n",
-                            event.key.pressed ? "clic" : "release", x, y, z);
-                    if (event.key.pressed) {
+                            kbdevent.key.pressed ? "clic" : "release", x, y, z);
+                    if (kbdevent.key.pressed) {
                         uint32_t color = rand();
                         fbfront_drawvert(x - 16, y - 16, y + 15, color);
                         fbfront_drawhoriz(x - 16, x + 15, y + 16, color);
@@ -402,13 +410,26 @@ static void kbdfront_thread(void *p)
                         fbfront_drawhoriz(x - 15, x + 16, y - 16, color);
                         fbfront_update(fb_dev, x - 16, y - 16, 33, 33);
                     }
-                } else if (event.key.keycode == KEY_Q) {
+                } else if (kbdevent.key.keycode == KEY_Q) {
                     struct sched_shutdown sched_shutdown = { .reason = SHUTDOWN_poweroff };
                     HYPERVISOR_sched_op(SCHEDOP_shutdown, &sched_shutdown);
                     do_exit();
                 }
                 break;
+            }
         }
+        while (fbfront_receive(fb_dev, &fbevent, 1) != 0) {
+            sleep = 0;
+            switch(fbevent.type) {
+            case XENFB_TYPE_REFRESH_PERIOD:
+                refresh_period = fbevent.refresh_period.period;
+                printk("refresh period %d\n", refresh_period);
+                refresh_cursor(x, y);
+                break;
+            }
+        }
+        if (sleep)
+            schedule();
     }
 }
 

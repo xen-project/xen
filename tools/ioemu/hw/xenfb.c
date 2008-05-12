@@ -59,6 +59,7 @@ struct xenfb {
 	int offset;             /* offset of the framebuffer */
 	int abs_pointer_wanted; /* Whether guest supports absolute pointer */
 	int button_state;       /* Last seen pointer button state */
+	int refresh_period;     /* The refresh period we have advised */
 	char protocol[64];	/* frontend protocol */
 };
 
@@ -536,6 +537,41 @@ static void xenfb_on_fb_event(struct xenfb *xenfb)
 	xc_evtchn_notify(xenfb->evt_xch, xenfb->fb.port);
 }
 
+static int xenfb_queue_full(struct xenfb *xenfb)
+{
+	struct xenfb_page *page = xenfb->fb.page;
+	uint32_t cons, prod;
+
+	prod = page->in_prod;
+	cons = page->in_cons;
+	return prod - cons == XENFB_IN_RING_LEN;
+}
+
+static void xenfb_send_event(struct xenfb *xenfb, union xenfb_in_event *event)
+{
+	uint32_t prod;
+	struct xenfb_page *page = xenfb->fb.page;
+
+	prod = page->in_prod;
+	/* caller ensures !xenfb_queue_full() */
+	xen_mb();                   /* ensure ring space available */
+	XENFB_IN_RING_REF(page, prod) = *event;
+	xen_wmb();                  /* ensure ring contents visible */
+	page->in_prod = prod + 1;
+
+	xc_evtchn_notify(xenfb->evt_xch, xenfb->fb.port);
+}
+
+static void xenfb_send_refresh_period(struct xenfb *xenfb, int period)
+{
+	union xenfb_in_event event;
+
+	memset(&event, 0, sizeof(event));
+	event.type = XENFB_TYPE_REFRESH_PERIOD;
+	event.refresh_period.period = period;
+	xenfb_send_event(xenfb, &event);
+}
+
 static void xenfb_on_kbd_event(struct xenfb *xenfb)
 {
 	struct xenkbd_page *page = xenfb->kbd.page;
@@ -707,6 +743,7 @@ static int xenfb_read_frontend_fb_config(struct xenfb *xenfb) {
                             xenfb->protocol) < 0)
                 xenfb->protocol[0] = '\0';
         xenfb_xs_printf(xenfb->xsh, xenfb->fb.nodename, "request-update", "1");
+        xenfb->refresh_period = -1;
 
         /* TODO check for permitted ranges */
         fb_page = xenfb->fb.page;
@@ -1185,10 +1222,28 @@ static void xenfb_guest_copy(struct xenfb *xenfb, int x, int y, int w, int h)
     dpy_update(xenfb->ds, x, y, w, h);
 }
 
-/* Periodic update of display, no need for any in our case */
+/* Periodic update of display, transmit the refresh interval to the frontend */
 static void xenfb_update(void *opaque)
 {
     struct xenfb *xenfb = opaque;
+    int period;
+
+    if (xenfb_queue_full(xenfb))
+        return;
+
+    if (xenfb->ds->idle)
+        period = XENFB_NO_REFRESH;
+    else {
+        period = xenfb->ds->gui_timer_interval;
+        if (!period)
+            period = GUI_REFRESH_INTERVAL;
+    }
+
+    /* Will have to be disabled for frontends without feature-update */
+    if (xenfb->refresh_period != period) {
+        xenfb_send_refresh_period(xenfb, period);
+        xenfb->refresh_period = period;
+    }
 }
 
 /* QEMU display state changed, so refresh the framebuffer copy */
@@ -1232,11 +1287,17 @@ static int xenfb_register_console(struct xenfb *xenfb) {
 }
 
 #ifdef CONFIG_STUBDOM
-static struct semaphore kbd_sem = __SEMAPHORE_INITIALIZER(kbd_sem, 0);
-static struct kbdfront_dev *kbd_dev;
+typedef struct XenFBState {
+    struct semaphore kbd_sem;
+    struct kbdfront_dev *kbd_dev;
+    struct fbfront_dev *fb_dev;
+    void *vga_vram, *nonshared_vram;
+    DisplayState *ds;
+} XenFBState;
+
+XenFBState *xs;
+
 static char *kbd_path, *fb_path;
-static void *vga_vram, *nonshared_vram;
-static DisplayState *xenfb_ds;
 
 static unsigned char linux2scancode[KEY_MAX + 1];
 
@@ -1254,7 +1315,8 @@ int xenfb_connect_vfb(const char *path)
 
 static void xenfb_pv_update(DisplayState *ds, int x, int y, int w, int h)
 {
-    struct fbfront_dev *fb_dev = ds->opaque;
+    XenFBState *xs = ds->opaque;
+    struct fbfront_dev *fb_dev = xs->fb_dev;
     if (!fb_dev)
         return;
     fbfront_update(fb_dev, x, y, w, h);
@@ -1262,7 +1324,8 @@ static void xenfb_pv_update(DisplayState *ds, int x, int y, int w, int h)
 
 static void xenfb_pv_resize(DisplayState *ds, int w, int h, int linesize)
 {
-    struct fbfront_dev *fb_dev = ds->opaque;
+    XenFBState *xs = ds->opaque;
+    struct fbfront_dev *fb_dev = xs->fb_dev;
     fprintf(stderr,"resize to %dx%d, %d required\n", w, h, linesize);
     ds->width = w;
     ds->height = h;
@@ -1276,14 +1339,15 @@ static void xenfb_pv_resize(DisplayState *ds, int w, int h, int linesize)
     if (ds->shared_buf) {
         ds->data = NULL;
     } else {
-        ds->data = nonshared_vram;
+        ds->data = xs->nonshared_vram;
         fbfront_resize(fb_dev, w, h, linesize, ds->depth, VGA_RAM_SIZE);
     }
 }
 
 static void xenfb_pv_colourdepth(DisplayState *ds, int depth)
 {
-    struct fbfront_dev *fb_dev = ds->opaque;
+    XenFBState *xs = ds->opaque;
+    struct fbfront_dev *fb_dev = xs->fb_dev;
     static int lastdepth = -1;
     if (!depth) {
         ds->shared_buf = 0;
@@ -1301,15 +1365,16 @@ static void xenfb_pv_colourdepth(DisplayState *ds, int depth)
     if (ds->shared_buf) {
         ds->data = NULL;
     } else {
-        ds->data = nonshared_vram;
+        ds->data = xs->nonshared_vram;
         fbfront_resize(fb_dev, ds->width, ds->height, ds->linesize, ds->depth, VGA_RAM_SIZE);
     }
 }
 
 static void xenfb_pv_setdata(DisplayState *ds, void *pixels)
 {
-    struct fbfront_dev *fb_dev = ds->opaque;
-    int offset = pixels - vga_vram;
+    XenFBState *xs = ds->opaque;
+    struct fbfront_dev *fb_dev = xs->fb_dev;
+    int offset = pixels - xs->vga_vram;
     ds->data = pixels;
     if (!fb_dev)
         return;
@@ -1321,16 +1386,45 @@ static void xenfb_pv_refresh(DisplayState *ds)
     vga_hw_update();
 }
 
+static void xenfb_fb_handler(void *opaque)
+{
+#define FB_NUM_BATCH 4
+    union xenfb_in_event buf[FB_NUM_BATCH];
+    int n, i;
+    XenFBState *xs = opaque;
+    DisplayState *ds = xs->ds;
+
+    n = fbfront_receive(xs->fb_dev, buf, FB_NUM_BATCH);
+    for (i = 0; i < n; i++) {
+        switch (buf[i].type) {
+        case XENFB_TYPE_REFRESH_PERIOD:
+            if (buf[i].refresh_period.period == XENFB_NO_REFRESH) {
+                /* Sleeping interval */
+                ds->idle = 1;
+                ds->gui_timer_interval = 500;
+            } else {
+                /* Set interval */
+                ds->idle = 0;
+                ds->gui_timer_interval = buf[i].refresh_period.period;
+            }
+        default:
+            /* ignore unknown events */
+            break;
+        }
+    }
+}
+
 static void xenfb_kbd_handler(void *opaque)
 {
 #define KBD_NUM_BATCH 64
     union xenkbd_in_event buf[KBD_NUM_BATCH];
     int n, i;
-    DisplayState *s = opaque;
+    XenFBState *xs = opaque;
+    DisplayState *s = xs->ds;
     static int buttons;
     static int x, y;
 
-    n = kbdfront_receive(kbd_dev, buf, KBD_NUM_BATCH);
+    n = kbdfront_receive(xs->kbd_dev, buf, KBD_NUM_BATCH);
     for (i = 0; i < n; i++) {
         switch (buf[i].type) {
 
@@ -1412,12 +1506,13 @@ static void xenfb_kbd_handler(void *opaque)
 static void kbdfront_thread(void *p)
 {
     int scancode, keycode;
-    kbd_dev = init_kbdfront(p, 1);
-    if (!kbd_dev) {
+    XenFBState *xs = p;
+    xs->kbd_dev = init_kbdfront(kbd_path, 1);
+    if (!xs->kbd_dev) {
         fprintf(stderr,"can't open keyboard\n");
         exit(1);
     }
-    up(&kbd_sem);
+    up(&xs->kbd_sem);
     for (scancode = 0; scancode < 128; scancode++) {
         keycode = atkbd_set2_keycode[atkbd_unxlate_table[scancode]];
         linux2scancode[keycode] = scancode;
@@ -1431,12 +1526,18 @@ int xenfb_pv_display_init(DisplayState *ds)
     if (!fb_path || !kbd_path)
         return -1;
 
-    create_thread("kbdfront", kbdfront_thread, (void*) kbd_path);
+    xs = qemu_mallocz(sizeof(XenFBState));
+    if (!xs)
+        return -1;
 
-    xenfb_ds = ds;
+    init_SEMAPHORE(&xs->kbd_sem, 0);
+    xs->ds = ds;
 
-    ds->data = nonshared_vram = qemu_memalign(PAGE_SIZE, VGA_RAM_SIZE);
+    create_thread("kbdfront", kbdfront_thread, (void*) xs);
+
+    ds->data = xs->nonshared_vram = qemu_memalign(PAGE_SIZE, VGA_RAM_SIZE);
     memset(ds->data, 0, VGA_RAM_SIZE);
+    ds->opaque = xs;
     ds->depth = 32;
     ds->bgr = 0;
     ds->width = 640;
@@ -1452,9 +1553,9 @@ int xenfb_pv_display_init(DisplayState *ds)
 
 int xenfb_pv_display_start(void *data)
 {
-    DisplayState *ds = xenfb_ds;
+    DisplayState *ds;
     struct fbfront_dev *fb_dev;
-    int kbd_fd;
+    int kbd_fd, fb_fd;
     int offset = 0;
     unsigned long *mfns;
     int n = VGA_RAM_SIZE / PAGE_SIZE;
@@ -1463,12 +1564,13 @@ int xenfb_pv_display_start(void *data)
     if (!fb_path || !kbd_path)
         return 0;
 
-    vga_vram = data;
+    ds = xs->ds;
+    xs->vga_vram = data;
     mfns = malloc(2 * n * sizeof(*mfns));
     for (i = 0; i < n; i++)
-        mfns[i] = virtual_to_mfn(vga_vram + i * PAGE_SIZE);
+        mfns[i] = virtual_to_mfn(xs->vga_vram + i * PAGE_SIZE);
     for (i = 0; i < n; i++)
-        mfns[n + i] = virtual_to_mfn(nonshared_vram + i * PAGE_SIZE);
+        mfns[n + i] = virtual_to_mfn(xs->nonshared_vram + i * PAGE_SIZE);
 
     fb_dev = init_fbfront(fb_path, mfns, ds->width, ds->height, ds->depth, ds->linesize, 2 * n);
     free(mfns);
@@ -1479,21 +1581,24 @@ int xenfb_pv_display_start(void *data)
     free(fb_path);
 
     if (ds->shared_buf) {
-        offset = (void*) ds->data - vga_vram;
+        offset = (void*) ds->data - xs->vga_vram;
     } else {
         offset = VGA_RAM_SIZE;
-        ds->data = nonshared_vram;
+        ds->data = xs->nonshared_vram;
     }
     if (offset)
         fbfront_resize(fb_dev, ds->width, ds->height, ds->linesize, ds->depth, offset);
 
-    down(&kbd_sem);
+    down(&xs->kbd_sem);
     free(kbd_path);
 
-    kbd_fd = kbdfront_open(kbd_dev);
-    qemu_set_fd_handler(kbd_fd, xenfb_kbd_handler, NULL, ds);
+    kbd_fd = kbdfront_open(xs->kbd_dev);
+    qemu_set_fd_handler(kbd_fd, xenfb_kbd_handler, NULL, xs);
 
-    xenfb_ds->opaque = fb_dev;
+    fb_fd = fbfront_open(fb_dev);
+    qemu_set_fd_handler(fb_fd, xenfb_fb_handler, NULL, xs);
+
+    xs->fb_dev = fb_dev;
     return 0;
 }
 #endif

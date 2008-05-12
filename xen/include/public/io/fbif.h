@@ -80,14 +80,33 @@ union xenfb_out_event
 
 /*
  * Frontends should ignore unknown in events.
- * No in events currently defined.
  */
+
+/*
+ * Framebuffer refresh period advice
+ * Backend sends it to advise the frontend their preferred period of
+ * refresh.  Frontends that keep the framebuffer constantly up-to-date
+ * just ignore it.  Frontends that use the advice should immediately
+ * refresh the framebuffer (and send an update notification event if
+ * those have been requested), then use the update frequency to guide
+ * their periodical refreshs.
+ */
+#define XENFB_TYPE_REFRESH_PERIOD 1
+#define XENFB_NO_REFRESH 0
+
+struct xenfb_refresh_period
+{
+    uint8_t type;    /* XENFB_TYPE_UPDATE_PERIOD */
+    uint32_t period; /* period of refresh, in ms,
+                      * XENFB_NO_REFRESH if no refresh is needed */
+};
 
 #define XENFB_IN_EVENT_SIZE 40
 
 union xenfb_in_event
 {
     uint8_t type;
+    struct xenfb_refresh_period refresh_period;
     char pad[XENFB_IN_EVENT_SIZE];
 };
 

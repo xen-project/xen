@@ -130,8 +130,6 @@
 #else
 #define DEFAULT_RAM_SIZE 128
 #endif
-/* in ms */
-#define GUI_REFRESH_INTERVAL 30
 
 /* Max number of USB devices that can be specified on the commandline.  */
 #define MAX_USB_CMDLINE 8
@@ -4467,6 +4465,8 @@ void dumb_display_init(DisplayState *ds)
     ds->dpy_resize = dumb_resize;
     ds->dpy_colourdepth = NULL;
     ds->dpy_refresh = dumb_refresh;
+    ds->gui_timer_interval = 500;
+    ds->idle = 1;
 }
 
 /***********************************************************/
