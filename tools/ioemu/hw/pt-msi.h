@@ -62,4 +62,19 @@ pt_msi_write(struct pt_dev *d, uint32_t addr, uint32_t val, uint32_t len);
 int
 pt_msi_read(struct pt_dev *d, int addr, int len, uint32_t *val);
 
+int
+remove_msix_mapping(struct pt_dev *dev, int bar_index);
+
+int
+add_msix_mapping(struct pt_dev *dev, int bar_index);
+
+int
+pt_msix_init(struct pt_dev *dev, int pos);
+
+int
+pt_msix_write(struct pt_dev *d, uint32_t addr, uint32_t val, uint32_t len);
+
+int
+pt_msix_read(struct pt_dev *d, int addr, int len, uint32_t *val);
+
 #endif

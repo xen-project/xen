@@ -61,8 +61,26 @@ struct pt_msi_info {
     uint32_t flags;
     int offset;
     int size;
-    int pvec;   /* physical vector used */
     int pirq;  /* guest pirq corresponding */
+};
+
+struct msix_entry_info {
+    int pirq;   /* -1 means unmapped */
+    int flags;  /* flags indicting whether MSI ADDR or DATA is updated */
+    uint32_t io_mem[4];
+};
+
+struct pt_msix_info {
+    int enabled;
+    int offset;
+    int total_entries;
+    int bar_index;
+    uint32_t table_off;
+    u64 mmio_base_addr;
+    int mmio_index;
+    int fd;
+    void *phys_iomem_base;
+    struct msix_entry_info msix_entry[0];
 };
 
 /*
@@ -74,6 +92,7 @@ struct pt_dev {
     struct pci_dev *pci_dev;                     /* libpci struct */
     struct pt_region bases[PCI_NUM_REGIONS];    /* Access regions */
     struct pt_msi_info *msi;                    /* MSI virtualization */
+    struct pt_msix_info *msix;                  /* MSI-X virtualization */
 };
 
 /* Used for formatting PCI BDF into cf8 format */
