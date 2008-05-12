@@ -52,6 +52,7 @@ struct netfront_dev {
 
     char *nodename;
     char *backend;
+    char *mac;
 
     xenbus_event_queue events;
 
@@ -263,6 +264,39 @@ void netfront_select_handler(evtchn_port_t port, struct pt_regs *regs, void *dat
 }
 #endif
 
+static void free_netfront(struct netfront_dev *dev)
+{
+    int i;
+
+    for(i=0;i<NET_TX_RING_SIZE;i++)
+	down(&dev->tx_sem);
+
+    mask_evtchn(dev->evtchn);
+
+    free(dev->mac);
+    free(dev->backend);
+
+    gnttab_end_access(dev->rx_ring_ref);
+    gnttab_end_access(dev->tx_ring_ref);
+
+    free_page(dev->rx.sring);
+    free_page(dev->tx.sring);
+
+    unbind_evtchn(dev->evtchn);
+
+    for(i=0;i<NET_RX_RING_SIZE;i++) {
+	gnttab_end_access(dev->rx_buffers[i].gref);
+	free_page(dev->rx_buffers[i].page);
+    }
+
+    for(i=0;i<NET_TX_RING_SIZE;i++)
+	if (dev->tx_buffers[i].page)
+	    free_page(dev->tx_buffers[i].page);
+
+    free(dev->nodename);
+    free(dev);
+}
+
 struct netfront_dev *init_netfront(char *nodename, void (*thenetif_rx)(unsigned char* data, int len), unsigned char rawmac[6], char **ip)
 {
     xenbus_transaction_t xbt;
@@ -272,7 +306,6 @@ struct netfront_dev *init_netfront(char *nodename, void (*thenetif_rx)(unsigned 
     struct netif_rx_sring *rxs;
     int retry=0;
     int i;
-    char* mac;
     char* msg;
 
     struct netfront_dev *dev;
@@ -288,6 +321,7 @@ struct netfront_dev *init_netfront(char *nodename, void (*thenetif_rx)(unsigned 
     printk("************************ NETFRONT for %s **********\n\n\n", nodename);
 
     dev = malloc(sizeof(*dev));
+    memset(dev, 0, sizeof(*dev));
     dev->nodename = strdup(nodename);
 
     printk("net TX ring size %d\n", NET_TX_RING_SIZE);
@@ -314,7 +348,7 @@ struct netfront_dev *init_netfront(char *nodename, void (*thenetif_rx)(unsigned 
 #endif
         evtchn_alloc_unbound(dev->dom, netfront_handler, dev, &dev->evtchn);
 
-    txs = (struct netif_tx_sring*) alloc_page();
+    txs = (struct netif_tx_sring *) alloc_page();
     rxs = (struct netif_rx_sring *) alloc_page();
     memset(txs,0,PAGE_SIZE);
     memset(rxs,0,PAGE_SIZE);
@@ -328,11 +362,12 @@ struct netfront_dev *init_netfront(char *nodename, void (*thenetif_rx)(unsigned 
     dev->tx_ring_ref = gnttab_grant_access(dev->dom,virt_to_mfn(txs),0);
     dev->rx_ring_ref = gnttab_grant_access(dev->dom,virt_to_mfn(rxs),0);
 
+    init_rx_buffers(dev);
+
     dev->netif_rx = thenetif_rx;
 
     dev->events = NULL;
 
-    // FIXME: proper frees on failures
 again:
     err = xenbus_transaction_start(&xbt);
     if (err) {
@@ -379,25 +414,22 @@ again:
 
 abort_transaction:
     xenbus_transaction_end(xbt, 1, &retry);
-    return NULL;
+    goto error;
 
 done:
 
     snprintf(path, sizeof(path), "%s/backend", nodename);
     msg = xenbus_read(XBT_NIL, path, &dev->backend);
     snprintf(path, sizeof(path), "%s/mac", nodename);
-    msg = xenbus_read(XBT_NIL, path, &mac);
+    msg = xenbus_read(XBT_NIL, path, &dev->mac);
 
-    if ((dev->backend == NULL) || (mac == NULL)) {
-        struct evtchn_close op = { dev->evtchn };
+    if ((dev->backend == NULL) || (dev->mac == NULL)) {
         printk("%s: backend/mac failed\n", __func__);
-        unbind_evtchn(dev->evtchn);
-        HYPERVISOR_event_channel_op(EVTCHNOP_close, &op);
-        return NULL;
+        goto error;
     }
 
     printk("backend at %s\n",dev->backend);
-    printk("mac is %s\n",mac);
+    printk("mac is %s\n",dev->mac);
 
     {
         char path[strlen(dev->backend) + 1 + 5 + 1];
@@ -415,13 +447,12 @@ done:
 
     printk("**************************\n");
 
-    init_rx_buffers(dev);
     unmask_evtchn(dev->evtchn);
 
         /* Special conversion specifier 'hh' needed for __ia64__. Without
            this mini-os panics with 'Unaligned reference'. */
     if (rawmac)
-	sscanf(mac,"%hhx:%hhx:%hhx:%hhx:%hhx:%hhx",
+	sscanf(dev->mac,"%hhx:%hhx:%hhx:%hhx:%hhx:%hhx",
             &rawmac[0],
             &rawmac[1],
             &rawmac[2],
@@ -430,6 +461,9 @@ done:
             &rawmac[5]);
 
     return dev;
+error:
+    free_netfront(dev);
+    return NULL;
 }
 
 #ifdef HAVE_LIBC
@@ -467,11 +501,7 @@ void shutdown_netfront(struct netfront_dev *dev)
 
     xenbus_unwatch_path(XBT_NIL, path);
 
-    unbind_evtchn(dev->evtchn);
-
-    free(nodename);
-    free(dev->backend);
-    free(dev);
+    free_netfront(dev);
 }
 
 

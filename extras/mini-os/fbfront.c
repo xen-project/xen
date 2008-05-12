@@ -210,7 +210,7 @@ void shutdown_kbdfront(struct kbdfront_dev *dev)
 
     unbind_evtchn(dev->evtchn);
 
-    free_pages(dev->page,0);
+    free_page(dev->page);
     free(nodename);
     free(dev->backend);
     free(dev);
@@ -521,7 +521,7 @@ void shutdown_fbfront(struct fbfront_dev *dev)
 
     unbind_evtchn(dev->evtchn);
 
-    free_pages(dev->page,0);
+    free_page(dev->page);
     free(nodename);
     free(dev->backend);
     free(dev);
