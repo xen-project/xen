@@ -666,7 +666,7 @@ int pt_msix_init(struct pt_dev *dev, int pos)
     uint8_t id;
     uint16_t flags, control;
     int i, total_entries, table_off, bar_index;
-    u64 bar_base;
+    uint64_t bar_base;
     struct pci_dev *pd = dev->pci_dev;
 
     id = pci_read_byte(pd, pos + PCI_CAP_LIST_ID);
@@ -714,7 +714,7 @@ int pt_msix_init(struct pt_dev *dev, int pos)
     if ( (bar_base & 0x6) == 0x4 )
     {
         bar_base &= ~0xf;
-        bar_base += (u64)pci_read_long(pd, 0x10 + 4 * (bar_index + 1)) << 32;
+        bar_base += (uint64_t)pci_read_long(pd, 0x10 + 4 * (bar_index + 1)) << 32;
     }
     PT_LOG("get MSI-X table bar base %lx\n", bar_base);
 

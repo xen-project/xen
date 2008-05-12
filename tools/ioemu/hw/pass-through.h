@@ -76,7 +76,7 @@ struct pt_msix_info {
     int total_entries;
     int bar_index;
     uint32_t table_off;
-    u64 mmio_base_addr;
+    uint64_t mmio_base_addr;
     int mmio_index;
     int fd;
     void *phys_iomem_base;
