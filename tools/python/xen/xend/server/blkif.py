@@ -56,8 +56,12 @@ class BlkifController(DevController):
         else:
             try:
                 (typ, params) = string.split(uname, ':', 1)
+                if typ not in ('phy', 'file'):
+                    raise VmError(
+                        'Block device must have "phy" or "file" specified to type')
             except ValueError:
-                (typ, params) = ("", "")
+                raise VmError(
+                    'Block device must have physical details specified')
 
         mode = config.get('mode', 'r')
         if mode not in ('r', 'w', 'w!'):
