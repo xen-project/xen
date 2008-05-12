@@ -780,8 +780,16 @@ void pci_disable_msi(int vector)
         __pci_disable_msix(vector);
 }
 
-void pci_cleanup_msi(struct pci_dev *dev)
+void pci_cleanup_msi(u8 bus, u8 devfn)
 {
+    struct pci_dev *dev = get_msi_pdev(bus, devfn);
+
+    if ( !dev )
+        return;
     msi_free_vectors(dev);
+
+    /* Disable MSI and/or MSI-X */
+    msi_set_enable(dev, 0);
+    msix_set_enable(dev, 0);
 }
 
