@@ -303,13 +303,10 @@ static void fbfront_thread(void *p)
 
     memsize = n * PAGE_SIZE;
     fb = _xmalloc(memsize, PAGE_SIZE);
+    memset(fb, 0, memsize);
     mfns = xmalloc_array(unsigned long, n);
-    for (i = 0; i < n; i++) {
-        /* trigger CoW */
-        ((char *) fb) [i * PAGE_SIZE] = 0;
-        barrier();
+    for (i = 0; i < n; i++)
         mfns[i] = virtual_to_mfn((char *) fb + i * PAGE_SIZE);
-    }
     fb_dev = init_fbfront(NULL, mfns, WIDTH, HEIGHT, DEPTH, line_length, n);
     xfree(mfns);
     if (!fb_dev) {
