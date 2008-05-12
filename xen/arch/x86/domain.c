@@ -138,16 +138,16 @@ void dump_pageframe_info(struct domain *d)
     {
         list_for_each_entry ( page, &d->page_list, list )
         {
-            printk("    DomPage %p: mfn=%p, caf=%08x, taf=%" PRtype_info "\n",
-                   _p(page_to_maddr(page)), _p(page_to_mfn(page)),
+            printk("    DomPage %p: caf=%08x, taf=%" PRtype_info "\n",
+                   _p(page_to_mfn(page)),
                    page->count_info, page->u.inuse.type_info);
         }
     }
 
     list_for_each_entry ( page, &d->xenpage_list, list )
     {
-        printk("    XenPage %p: mfn=%p, caf=%08x, taf=%" PRtype_info "\n",
-               _p(page_to_maddr(page)), _p(page_to_mfn(page)),
+        printk("    XenPage %p: caf=%08x, taf=%" PRtype_info "\n",
+               _p(page_to_mfn(page)),
                page->count_info, page->u.inuse.type_info);
     }
 }
