@@ -46,8 +46,6 @@ enum {
 #endif /* __ASSEMBLY__ */
 
 #define VTLB_PTE_P_BIT      0
-#define VTLB_PTE_IO_BIT     60
-#define VTLB_PTE_IO         (1UL<<VTLB_PTE_IO_BIT)
 #define VTLB_PTE_P         (1UL<<VTLB_PTE_P_BIT)
 
 #define ITIR_RV_MASK            (((1UL<<32)-1)<<32 | 0x3)
