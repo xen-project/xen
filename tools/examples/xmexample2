@@ -62,7 +62,8 @@ name = "VM%d" % vmid
 # List of which CPUS this domain is allowed to use, default Xen picks
 #cpus = ""         # leave to Xen to pick
 #cpus = "0"        # all vcpus run on CPU0
-#cpus = "0-3,5,^1" # run on cpus 0,2,3,5
+#cpus = "0-3,5,^1" # all vcpus run on cpus 0,2,3,5
+#cpus = ["2", "3"] # VCPU0 runs on CPU2, VCPU1 runs on CPU3
 #cpus = "%s" % vmid # set based on vmid (mod number of CPUs)
 
 # Number of Virtual CPUS to use, default is 1
