@@ -5,6 +5,7 @@
 ?	mmu_update			xen.h
 !	mmuext_op			xen.h
 !	start_info			xen.h
+?	vcpu_info			xen.h
 ?	vcpu_time_info			xen.h
 !	cpu_user_regs			arch-x86/xen-@arch@.h
 !	trap_info			arch-x86/xen.h
@@ -41,7 +42,11 @@
 ?	sched_remote_shutdown		sched.h
 ?	sched_shutdown			sched.h
 ?	t_buf				trace.h
+?	vcpu_get_physid			vcpu.h
+?	vcpu_register_vcpu_info		vcpu.h
 !	vcpu_runstate_info		vcpu.h
+?	vcpu_set_periodic_timer		vcpu.h
+!	vcpu_set_singleshot_timer	vcpu.h
 ?	xenoprof_init			xenoprof.h
 ?	xenoprof_passive		xenoprof.h
 !	power_register			platform.h
