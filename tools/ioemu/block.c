@@ -254,7 +254,7 @@ static BlockDriver *find_protocol(const char *filename)
 #endif
     p = strchr(filename, ':');
     if (!p)
-        return &bdrv_raw;
+        return NULL; /* do not ever guess raw, it is a security problem! */
     len = p - filename;
     if (len > sizeof(protocol) - 1)
         len = sizeof(protocol) - 1;
