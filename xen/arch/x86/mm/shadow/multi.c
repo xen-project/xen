@@ -1268,6 +1268,9 @@ static inline void shadow_vram_get_l1e(shadow_l1e_t new_sl1e,
     if ( !d->dirty_vram ) return;
 
     mfn = shadow_l1e_get_mfn(new_sl1e);
+
+    if ( !mfn_valid(mfn) ) return; /* m2p for mmio_direct may not exist */
+
     gfn = mfn_to_gfn(d, mfn);
 
     if ( (gfn >= d->dirty_vram->begin_pfn) && (gfn < d->dirty_vram->end_pfn) ) {
@@ -1293,6 +1296,9 @@ static inline void shadow_vram_put_l1e(shadow_l1e_t old_sl1e,
     if ( !d->dirty_vram ) return;
 
     mfn = shadow_l1e_get_mfn(old_sl1e);
+
+    if ( !mfn_valid(mfn) ) return;
+
     gfn = mfn_to_gfn(d, mfn);
 
     if ( (gfn >= d->dirty_vram->begin_pfn) && (gfn < d->dirty_vram->end_pfn) ) {
