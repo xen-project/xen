@@ -49,6 +49,20 @@ void kbdfront_handler(evtchn_port_t port, struct pt_regs *regs, void *data)
     wake_up(&kbdfront_queue);
 }
 
+static void free_kbdfront(struct kbdfront_dev *dev)
+{
+    mask_evtchn(dev->evtchn);
+
+    free(dev->backend);
+
+    free_page(dev->page);
+
+    unbind_evtchn(dev->evtchn);
+
+    free(dev->nodename);
+    free(dev);
+}
+
 struct kbdfront_dev *init_kbdfront(char *nodename, int abs_pointer)
 {
     xenbus_transaction_t xbt;
@@ -122,7 +136,7 @@ again:
 
 abort_transaction:
     xenbus_transaction_end(xbt, 1, &retry);
-    return NULL;
+    goto error;
 
 done:
 
@@ -130,7 +144,7 @@ done:
     msg = xenbus_read(XBT_NIL, path, &dev->backend);
     if (msg) {
         printk("Error %s when reading the backend path %s\n", msg, path);
-        return NULL;
+        goto error;
     }
 
     printk("backend at %s\n", dev->backend);
@@ -153,6 +167,9 @@ done:
     printk("************************** KBDFRONT\n");
 
     return dev;
+error:
+    free_kbdfront(dev);
+    return NULL;
 }
 
 int kbdfront_receive(struct kbdfront_dev *dev, union xenkbd_in_event *buf, int n)
@@ -208,12 +225,7 @@ void shutdown_kbdfront(struct kbdfront_dev *dev)
 
     xenbus_unwatch_path(XBT_NIL, path);
 
-    unbind_evtchn(dev->evtchn);
-
-    free_page(dev->page);
-    free(nodename);
-    free(dev->backend);
-    free(dev);
+    free_kbdfront(dev);
 }
 
 #ifdef HAVE_LIBC
@@ -270,6 +282,20 @@ void fbfront_handler(evtchn_port_t port, struct pt_regs *regs, void *data)
     files[fd].read = 1;
 #endif
     wake_up(&fbfront_queue);
+}
+
+static void free_fbfront(struct fbfront_dev *dev)
+{
+    mask_evtchn(dev->evtchn);
+
+    free(dev->backend);
+
+    free_page(dev->page);
+
+    unbind_evtchn(dev->evtchn);
+
+    free(dev->nodename);
+    free(dev);
 }
 
 int fbfront_receive(struct fbfront_dev *dev, union xenfb_in_event *buf, int n)
@@ -401,7 +427,7 @@ again:
 
 abort_transaction:
     xenbus_transaction_end(xbt, 1, &retry);
-    return NULL;
+    goto error;
 
 done:
 
@@ -409,7 +435,7 @@ done:
     msg = xenbus_read(XBT_NIL, path, &dev->backend);
     if (msg) {
         printk("Error %s when reading the backend path %s\n", msg, path);
-        return NULL;
+        goto error;
     }
 
     printk("backend at %s\n", dev->backend);
@@ -435,6 +461,10 @@ done:
     printk("************************** FBFRONT\n");
 
     return dev;
+
+error:
+    free_fbfront(dev);
+    return NULL;
 }
 
 static void fbfront_out_event(struct fbfront_dev *dev, union xenfb_out_event *event)
@@ -521,10 +551,7 @@ void shutdown_fbfront(struct fbfront_dev *dev)
 
     unbind_evtchn(dev->evtchn);
 
-    free_page(dev->page);
-    free(nodename);
-    free(dev->backend);
-    free(dev);
+    free_fbfront(dev);
 }
 
 #ifdef HAVE_LIBC
