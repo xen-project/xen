@@ -135,13 +135,15 @@ class SSLSocketServerConnection(SocketServerConnection):
     received data to one end of the pipe, then read from the other end:
     
     p2cread, p2cwrite = os.pipe()
-    threading.Thread(target=connection.recv2fd, args=(sock, p2cwrite)).start()
+    threading.Thread(target=connection.SSLSocketServerConnection.recv2fd,
+                     args=(sock, p2cwrite)).start()
     os.read(p2cread, 1024)
     
     To use fd2send():
     
     p2cread, p2cwrite = os.pipe()
-    threading.Thread(target=connection.fd2send, args=(sock, p2cread)).start()
+    threading.Thread(target=connection.SSLSocketServerConnection.fd2send,
+                     args=(sock, p2cread)).start()
     os.write(p2cwrite, "data")
     """
 
@@ -233,6 +235,7 @@ class SSLSocketServerConnection(SocketServerConnection):
 
     recv2fd = staticmethod(recv2fd)
 
+
     def fd2send(sock, fd):
         try:
             while True:
@@ -277,6 +280,7 @@ class SSLSocketServerConnection(SocketServerConnection):
                 pass
 
     fd2send = staticmethod(fd2send)
+
 
 def hostAllowed(addrport, hosts_allowed):
     if hosts_allowed is None:
