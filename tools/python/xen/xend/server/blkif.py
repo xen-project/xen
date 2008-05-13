@@ -47,7 +47,7 @@ class BlkifController(DevController):
         except ValueError:
             dev_type = "disk"
 
-        if uname is None:
+        if uname == '':
             if dev_type == 'cdrom':
                 (typ, params) = ("", "")
             else:
