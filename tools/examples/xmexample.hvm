@@ -223,17 +223,54 @@ serial='pty'
 
 #-----------------------------------------------------------------------------
 #   Configure guest CPUID responses:
-#cpuid=[ '1:ecx=xxxxxxxxxxxxxxxxxxxxxxxxxx1xxxxx,
+#
+#cpuid=[ '1:ecx=xxxxxxxxxxx00xxxxxxxxxxxxxxxxxxx,
 #           eax=xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx' ]
-# - Set the VMX feature flag in the guest (CPUID_1:ECX:5)
+# - Unset the SSE4 features (CPUID.1[ECX][20-19])
 # - Default behaviour for all other bits in ECX And EAX registers.
 # 
 # Each successive character represent a lesser-significant bit:
 #  '1' -> force the corresponding bit to 1
 #  '0' -> force to 0
-#  'x' -> we don't care (default behaviour)
+#  'x' -> Get a safe value (pass through and mask with the default policy)
 #  'k' -> pass through the host bit value
 #  's' -> as 'k' but preserve across save/restore and migration
+# 
+#   Expose to the guest multi-core cpu instead of multiple processors
+# Example for intel, expose a 8-core processor :
+#cpuid=['1:edx=xxx1xxxxxxxxxxxxxxxxxxxxxxxxxxxx,
+#          ebx=xxxxxxxx00010000xxxxxxxxxxxxxxxx',
+#     '4,0:eax=001111xxxxxxxxxxxxxxxxxxxxxxxxxx']
+#  - CPUID.1[EDX][HT] : Enable HT
+#  - CPUID.1[EBX] : Number of vcpus * 2
+#  - CPUID.4,0[EAX] : Number of vcpus * 2 - 1
+#vcpus=8
+#
+# Example for amd, expose a 5-core processor :
+# cpuid = ['1:ebx=xxxxxxxx00000001xxxxxxxxxxxxxxxx,
+#             edx=xxx1xxxxxxxxxxxxxxxxxxxxxxxxxxxx',
+# '0x80000008:ecx=xxxxxxxxxxxxxxxx0000xxxx00001010']
+#  - CPUID.1[EBX] : (Thread * Cores ) per processors
+#  - CPUID.1[EDX][HT] : Enable HT
+#  - CPUID.0x80000008[ECX] : Number of vcpus * 2
+#vcpus=5
+#
+#  Downgrade the cpuid to make a better compatibility for migration :
+# Look like a PIII :
+# cpuid = [ '0:eax=0x3',
+#           '1:eax=0x06b1,
+#              ecx=xxxxxxxxxx0000xx00xxx0000000xx0,
+#              edx=xx00000xxxxxxx0xxxxxxxxx0xxxxxx',
+#           '4:eax=0x3,ebx=0x756e6547,ecx=0x6c65746e,edx=0x49656e69',
+#  '0x80000000:eax=0x3,ebx=0x756e6547,ecx=0x6c65746e,edx=0x49656e69']
+#  with the highest leaf
+#  - CPUID.0[EAX] : Set the highest leaf
+#  - CPUID.1[EAX] : Pentium III
+#  - CPUID.1[ECX] : Mask some features
+#  - CPUID.1[EDX] : Mask some features
+#  - CPUID.4 : Reply like the highest leaf, in our case CPUID.3
+#  - CPUID.0x80000000 : No extension we are on a Pentium III, reply like the
+#  highest leaf (CPUID.3).
 #
 #   Configure host CPUID consistency checks, which must be satisfied for this
 #   VM to be allowed to run on this host's processor type:
