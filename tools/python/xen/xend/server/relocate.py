@@ -17,10 +17,12 @@
 #============================================================================
 
 import re
+import os
 import sys
 import StringIO
+import threading
 
-from xen.web import protocol, tcp, unix
+from xen.web import protocol, tcp, unix, connection
 
 from xen.xend import sxp
 from xen.xend import XendDomain
@@ -110,6 +112,24 @@ class RelocationProtocol(protocol.Protocol):
                 XendDomain.instance().domain_restore_fd(
                     self.transport.sock.fileno(), relocating=True)
             except:
+                self.send_error()
+                self.close()
+        else:
+            log.error(name + ": no transport")
+            raise XendError(name + ": no transport")
+
+    def op_sslreceive(self, name, _):
+        if self.transport:
+            self.send_reply(["ready", name])
+            p2cread, p2cwrite = os.pipe()
+            threading.Thread(target=connection.SSLSocketServerConnection.recv2fd,
+                             args=(self.transport.sock, p2cwrite)).start()
+            try:
+                XendDomain.instance().domain_restore_fd(p2cread,
+                                                        relocating=True)
+            except:
+                os.close(p2cread)
+                os.close(p2cwrite)
                 self.send_error()
                 self.close()
         else:

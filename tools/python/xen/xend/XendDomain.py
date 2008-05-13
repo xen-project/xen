@@ -1293,25 +1293,56 @@ class XendDomain:
         if port == 0:
             port = xoptions.get_xend_relocation_port()
 
-        try:
-            tls = xoptions.get_xend_relocation_tls()
-            if tls:
-                from OpenSSL import SSL
+        tls = xoptions.get_xend_relocation_tls()
+        if tls:
+            from OpenSSL import SSL
+            from xen.web import connection
+            try:
                 ctx = SSL.Context(SSL.SSLv23_METHOD)
-                sock = SSL.Connection(ctx, socket.socket(socket.AF_INET, socket.SOCK_STREAM))
+                sock = SSL.Connection(ctx,
+                           socket.socket(socket.AF_INET, socket.SOCK_STREAM))
                 sock.set_connect_state()
-            else:
-                sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            sock.connect((dst, port))
-        except socket.error, err:
-            raise XendError("can't connect: %s" % err[1])
+                sock.connect((dst, port))
+                sock.send("sslreceive\n")
+                sock.recv(80)
+            except SSL.Error, err:
+                raise XendError("SSL error: %s" % err)
+            except socket.error, err:
+                raise XendError("can't connect: %s" % err)
 
-        sock.send("receive\n")
-        sock.recv(80)
-        try:
-            XendCheckpoint.save(sock.fileno(), dominfo, True, live, dst, node=node)
-        finally:
-            sock.close()
+            p2cread, p2cwrite = os.pipe()
+            threading.Thread(target=connection.SSLSocketServerConnection.fd2send,
+                             args=(sock, p2cread)).start()
+
+            try:
+                XendCheckpoint.save(p2cwrite, dominfo, True, live, dst,
+                                    node=node)
+            finally:
+                sock.shutdown()
+                sock.close()
+
+            os.close(p2cread)
+            os.close(p2cwrite)
+        else:
+            try:
+                sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                # When connecting to our ssl enabled relocation server using a
+                # plain socket, send will success but recv will block. Add a
+                # 30 seconds timeout to raise a socket.timeout exception to
+                # inform the client.
+                sock.settimeout(30.0)
+                sock.connect((dst, port))
+                sock.send("receive\n")
+                sock.recv(80)
+                sock.settimeout(None)
+            except socket.error, err:
+                raise XendError("can't connect: %s" % err)
+
+            try:
+                XendCheckpoint.save(sock.fileno(), dominfo, True, live,
+                                    dst, node=node)
+            finally:
+                sock.close()
 
     def domain_save(self, domid, dst, checkpoint=False):
         """Start saving a domain to file.

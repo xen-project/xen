@@ -88,6 +88,7 @@ class SSLTCPListener(TCPListener):
         ctx.use_certificate_file(self.ssl_cert_file)
         sock = SSL.Connection(ctx,
                               socket.socket(socket.AF_INET, socket.SOCK_STREAM))
+        sock.set_accept_state()
         sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
 
         # SO_REUSEADDR does not always ensure that we do not get an address
@@ -103,4 +104,15 @@ class SSLTCPListener(TCPListener):
                     time.sleep(0.5)
                 else:
                     raise
+
+
+    def acceptConnection(self, sock, addrport):
+        addr = addrport[0]
+        if connection.hostAllowed(addrport, self.hosts_allow):
+            connection.SSLSocketServerConnection(sock, self.protocol_class)
+        else:
+            try:
+                sock.close()
+            except:
+                pass
 
