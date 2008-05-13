@@ -1320,6 +1320,11 @@ static void free_l3_table(struct page_info *page)
     l3_pgentry_t *pl3e;
     int           i;
 
+#ifdef DOMAIN_DESTRUCT_AVOID_RECURSION
+    if ( d->arch.relmem == RELMEM_dom_l3 )
+        return;
+#endif
+
     pl3e = map_domain_page(pfn);
 
     for ( i = 0; i < L3_PAGETABLE_ENTRIES; i++ )
@@ -1342,6 +1347,11 @@ static void free_l4_table(struct page_info *page)
     unsigned long pfn = page_to_mfn(page);
     l4_pgentry_t *pl4e = page_to_virt(page);
     int           i;
+
+#ifdef DOMAIN_DESTRUCT_AVOID_RECURSION
+    if ( d->arch.relmem == RELMEM_dom_l4 )
+        return;
+#endif
 
     for ( i = 0; i < L4_PAGETABLE_ENTRIES; i++ )
         if ( is_guest_l4_slot(d, i) )

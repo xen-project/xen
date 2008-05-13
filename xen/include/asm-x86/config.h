@@ -41,6 +41,14 @@
 #define CONFIG_HOTPLUG 1
 #define CONFIG_HOTPLUG_CPU 1
 
+/*
+ * Avoid deep recursion when tearing down pagetables during domain destruction,
+ * causing dom0 to become unresponsive and Xen to miss time-critical softirq
+ * deadlines. This will ultimately be replaced by built-in preemptibility of
+ * get_page_type().
+ */
+#define DOMAIN_DESTRUCT_AVOID_RECURSION 1
+
 #define HZ 100
 
 #define OPT_CONSOLE_STR "vga"
