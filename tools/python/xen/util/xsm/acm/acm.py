@@ -1363,6 +1363,45 @@ def relabel_domains(relabel_list):
     return rc, errors
 
 
+def __update_label_policy_change(sec_lab,
+                                 cur_poltype,
+                                 cur_polname,
+                                 new_poltype,
+                                 new_polname,
+                                 polnew_labels,
+                                 label_map):
+    """
+    Determine a new resource label given the new policy's type
+    and name and the new policy's (resource/VM) labels and the
+    (resource/VM) label map that indicates renaming rules for
+    labels.
+    """
+    is_deleted = False
+    policytype, policy, label = sec_lab
+
+    if cur_poltype != policytype or \
+       cur_polname != policy:
+        return sec_lab, is_deleted
+
+    if policytype != xsconstants.ACM_POLICY_ID:
+        return sec_lab, is_deleted
+    elif label_map.has_key(label) and policy == cur_polname:
+        # renaming of an active label; policy may have been renamed
+        label = label_map[label]
+        polname = new_polname
+    elif label not in polnew_labels:
+        # label been removed
+        policytype = xsconstants.INVALID_POLICY_PREFIX + policytype
+        polname = policy
+        is_deleted = True
+    else:
+        # no change to label
+        policytype = xsconstants.ACM_POLICY_ID
+        polname = new_polname
+
+    return tuple( [ policytype, polname, label ] ), is_deleted
+
+
 def change_acm_policy(bin_pol, del_array, chg_array,
                       vmlabel_map, reslabel_map, cur_acmpol, new_acmpol,
                       is_reset):
@@ -1430,30 +1469,21 @@ def change_acm_policy(bin_pol, del_array, chg_array,
             else:
                 return -xsconstants.XSERR_BAD_LABEL_FORMAT, ""
 
-            if policytype != cur_policytype or \
-               policy     != cur_policyname:
-                continue
+            new_sec_lab, is_deleted = \
+                __update_label_policy_change( tuple([policytype,
+                                                     policy,
+                                                     label]),
+                                             cur_policytype,
+                                             cur_policyname,
+                                             new_policytype,
+                                             new_policyname,
+                                             polnew_reslabels,
+                                             reslabel_map)
 
-            # label been renamed or deleted?
-            if policytype != xsconstants.ACM_POLICY_ID:
-                continue
-            elif reslabel_map.has_key(label) and cur_policyname == policy:
-                # renaming of an active label; policy may have been renamed
-                label = reslabel_map[label]
-                polname = new_policyname
-            elif label not in polnew_reslabels:
-                # label been removed
-                policytype = xsconstants.INVALID_POLICY_PREFIX + policytype
+            if is_deleted:
                 label_changes.append(key)
-                polname = policy
-            else:
-                # no change to label
-                policytype = xsconstants.ACM_POLICY_ID
-                polname = new_policyname
-
             # Update entry
-            access_control[key] = \
-                   tuple([ policytype, polname, label ])
+            access_control[key] = new_sec_lab
 
         # All resources have new labels in the access_control map
         # There may still be labels in there that are invalid now.
@@ -1509,6 +1539,29 @@ def change_acm_policy(bin_pol, del_array, chg_array,
                          new_acmpol.policy_get_virtualmachinelabel_names())
                 if not compatible:
                     return (-xsconstants.XSERR_RESOURCE_ACCESS, "")
+
+        for dominfo in dominfos:
+            # relabel the VIF interfaces
+            changed = False
+            for vif_uuid in dominfo.get_vifs():
+                sec_lab = dominfo.info['devices'][vif_uuid][1]\
+                                 .get('security_label')
+                if sec_lab:
+                    result, _ = \
+                        __update_label_policy_change(tuple(sec_lab.split(':')),
+                                                     cur_policytype,
+                                                     cur_policyname,
+                                                     new_policytype,
+                                                     new_policyname,
+                                                     polnew_reslabels,
+                                                     reslabel_map)
+                    new_sec_lab = ':'.join(list(result))
+                    if new_sec_lab != sec_lab:
+                        changed = True
+                        dominfo.info['devices'][vif_uuid][1]\
+                                    ['security_label'] = new_sec_lab
+            if changed:
+                XendDomain.instance().managed_config_save(dominfo)
 
         rc, errors = hv_chg_policy(bin_pol, del_array, chg_array)
         if rc == 0:
