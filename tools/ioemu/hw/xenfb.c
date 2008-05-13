@@ -29,8 +29,6 @@
 #define BTN_LEFT 0x110 /* from <linux/input.h> */
 #endif
 
-// FIXME defend against malicious frontend?
-
 struct xenfb;
 
 struct xenfb_device {
@@ -484,6 +482,68 @@ void xenfb_shutdown(struct xenfb *xenfb)
 	free(xenfb);
 }
 
+static int xenfb_configure_fb(struct xenfb *xenfb, size_t fb_len_lim,
+			      int width, int height, int depth,
+			      size_t fb_len, int offset, int row_stride)
+{
+	size_t mfn_sz = sizeof(*((struct xenfb_page *)0)->pd);
+	size_t pd_len = sizeof(((struct xenfb_page *)0)->pd) / mfn_sz;
+	size_t fb_pages = pd_len * XC_PAGE_SIZE / mfn_sz;
+	size_t fb_len_max = fb_pages * XC_PAGE_SIZE;
+	int max_width, max_height;
+
+	if (fb_len_lim > fb_len_max) {
+		fprintf(stderr,
+			"FB: fb size limit %zu exceeds %zu, corrected\n",
+			fb_len_lim, fb_len_max);
+		fb_len_lim = fb_len_max;
+	}
+	if (fb_len > fb_len_lim) {
+		fprintf(stderr,
+			"FB: frontend fb size %zu limited to %zu\n",
+			fb_len, fb_len_lim);
+	}
+	if (depth != 8 && depth != 16 && depth != 24 && depth != 32) {
+		fprintf(stderr,
+			"FB: can't handle frontend fb depth %d\n",
+			depth);
+		return -1;
+	}
+	if (row_stride < 0 || row_stride > fb_len) {
+		fprintf(stderr,
+			"FB: invalid frontend stride %d\n", row_stride);
+		return -1;
+	}
+	max_width = row_stride / (depth / 8);
+	if (width < 0 || width > max_width) {
+		fprintf(stderr,
+			"FB: invalid frontend width %d limited to %d\n",
+			width, max_width);
+		width = max_width;
+	}
+	if (offset < 0 || offset >= fb_len) {
+		fprintf(stderr,
+			"FB: invalid frontend offset %d (max %zu)\n",
+			offset, fb_len - 1);
+		return -1;
+	}
+	max_height = (fb_len - offset) / row_stride;
+	if (height < 0 || height > max_height) {
+		fprintf(stderr,
+			"FB: invalid frontend height %d limited to %d\n",
+			height, max_height);
+		height = max_height;
+	}
+	xenfb->fb_len = fb_len;
+	xenfb->row_stride = row_stride;
+	xenfb->depth = depth;
+	xenfb->width = width;
+	xenfb->height = height;
+	xenfb->offset = offset;
+	fprintf(stderr, "Framebuffer %dx%dx%d offset %d stride %d\n",
+		width, height, depth, offset, row_stride);
+	return 0;
+}
 
 static void xenfb_on_fb_event(struct xenfb *xenfb)
 {
@@ -514,16 +574,18 @@ static void xenfb_on_fb_event(struct xenfb *xenfb)
 			    || h != event->update.height) {
 				fprintf(stderr, "%s bogus update clipped\n",
 					xenfb->fb.nodename);
-				break;
 			}
 			xenfb_guest_copy(xenfb, x, y, w, h);
 			break;
 		case XENFB_TYPE_RESIZE:
-			xenfb->width  = event->resize.width;
-			xenfb->height = event->resize.height;
-			xenfb->depth = event->resize.depth;
-			xenfb->row_stride = event->resize.stride;
-			xenfb->offset = event->resize.offset;
+			if (xenfb_configure_fb(xenfb, xenfb->fb_len,
+					       event->resize.width,
+					       event->resize.height,
+					       event->resize.depth,
+					       xenfb->fb_len,
+					       event->resize.offset,
+					       event->resize.stride) < 0)
+				break;
 			dpy_colourdepth(xenfb->ds, xenfb->depth);
 			dpy_resize(xenfb->ds, xenfb->width, xenfb->height, xenfb->row_stride);
 			if (xenfb->ds->shared_buf)
@@ -745,29 +807,18 @@ static int xenfb_read_frontend_fb_config(struct xenfb *xenfb) {
         xenfb_xs_printf(xenfb->xsh, xenfb->fb.nodename, "request-update", "1");
         xenfb->refresh_period = -1;
 
-        /* TODO check for permitted ranges */
-        fb_page = xenfb->fb.page;
-        xenfb->depth = fb_page->depth;
-        xenfb->width = fb_page->width;
-        xenfb->height = fb_page->height;
-        /* TODO check for consistency with the above */
-        xenfb->fb_len = fb_page->mem_length;
-        xenfb->row_stride = fb_page->line_length;
-
-        /* Protect against hostile frontend, limit fb_len to max allowed */
         if (xenfb_xs_scanf1(xenfb->xsh, xenfb->fb.nodename, "videoram", "%d",
                             &videoram) < 0)
                 videoram = 0;
-        videoram = videoram * 1024 * 1024;
-        if (videoram && xenfb->fb_len > videoram) {
-                fprintf(stderr, "Framebuffer requested length of %zd exceeded allowed %d\n",
-                        xenfb->fb_len, videoram);
-                xenfb->fb_len = videoram;
-                if (xenfb->row_stride * xenfb->height > xenfb->fb_len)
-                        xenfb->height = xenfb->fb_len / xenfb->row_stride;
-        }
-        fprintf(stderr, "Framebuffer depth %d width %d height %d line %d\n",
-                fb_page->depth, fb_page->width, fb_page->height, fb_page->line_length);
+	fb_page = xenfb->fb.page;
+	if (xenfb_configure_fb(xenfb, videoram * 1024 * 1024U,
+			       fb_page->width, fb_page->height, fb_page->depth,
+			       fb_page->mem_length, 0, fb_page->line_length)
+	    < 0) {
+		errno = EINVAL;
+		return -1;
+	}
+
         if (xenfb_map_fb(xenfb, xenfb->fb.otherend_id) < 0)
 		return -1;
 
