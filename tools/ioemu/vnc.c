@@ -1307,6 +1307,7 @@ static void do_key_event(VncState *vs, int down, uint32_t sym)
     int keycode;
     int shift_keys = 0;
     int shift = 0;
+    int keypad = 0;
 
     if (is_graphic_console()) {
         if (sym >= 'A' && sym <= 'Z') {
@@ -1363,7 +1364,8 @@ static void do_key_event(VncState *vs, int down, uint32_t sym)
 	return;
     }
 
-    if (keycodeIsKeypad(vs->kbd_layout, keycode)) {
+    keypad = keycodeIsKeypad(vs->kbd_layout, keycode);
+    if (keypad) {
         /* If the numlock state needs to change then simulate an additional
            keypress before sending this one.  This will happen if the user
            toggles numlock away from the VNC window.
@@ -1383,13 +1385,14 @@ static void do_key_event(VncState *vs, int down, uint32_t sym)
 
     if (is_graphic_console()) {
         /*  If the shift state needs to change then simulate an additional
-            keypress before sending this one.
+            keypress before sending this one. Ignore for non shiftable keys.
         */
         if (shift && !shift_keys) {
             press_key_shift_down(vs, down, keycode);
             return;
         }
-        else if (!shift && shift_keys) {
+        else if (!shift && shift_keys && !keypad &&
+                 keycodeIsShiftable(vs->kbd_layout, keycode)) {
             press_key_shift_up(vs, down, keycode);
             return;
         }
