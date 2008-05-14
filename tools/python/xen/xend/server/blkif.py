@@ -89,6 +89,10 @@ class BlkifController(DevController):
                   'device-type' : dev_type
                 }
 
+        protocol = config.get('protocol')
+        if protocol:
+            front['protocol'] = protocol
+
         return (devid, back, front)
 
     def do_access_control(self, config, uname):
@@ -161,6 +165,10 @@ class BlkifController(DevController):
             config['mode'] = mode
         if uuid:
             config['uuid'] = uuid
+
+        proto = self.readFrontend(devid, 'protocol')
+        if proto:
+            config['protocol'] = proto
 
         return config
 
