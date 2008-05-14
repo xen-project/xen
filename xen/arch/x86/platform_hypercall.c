@@ -21,6 +21,7 @@
 #include <xen/acpi.h>
 #include <asm/current.h>
 #include <public/platform.h>
+#include <acpi/cpufreq/processor_perf.h>
 #include <asm/edd.h>
 #include <asm/mtrr.h>
 #include "cpu/mtrr/mtrr.h"
@@ -346,9 +347,68 @@ ret_t do_platform_op(XEN_GUEST_HANDLE(xen_platform_op_t) u_xenpf_op)
         switch ( op->u.set_pminfo.type )
         {
         case XEN_PM_PX:
-            ret = -EINVAL;
+        {
+            static int cpu_count = 0;
+            struct xenpf_set_processor_pminfo *xenpmpt = &op->u.set_pminfo;
+            struct xen_processor_performance *xenpxpt = &op->u.set_pminfo.perf;
+            int cpuid = get_cpu_id(xenpmpt->id);
+            struct processor_pminfo *pmpt;
+            struct processor_performance *pxpt;
+
+            if ( cpuid < 0 )
+            {
+                ret = -EINVAL;
+                break;
+            }
+            pmpt = &processor_pminfo[cpuid];
+            pxpt = &processor_pminfo[cpuid].perf;
+            pmpt->acpi_id = xenpmpt->id;
+            pmpt->id = cpuid;
+
+            if ( xenpxpt->flags & XEN_PX_PCT )
+            {
+                memcpy ((void *)&pxpt->control_register,
+                    (void *)&xenpxpt->control_register,
+                    sizeof(struct xen_pct_register));
+                memcpy ((void *)&pxpt->status_register,
+                    (void *)&xenpxpt->status_register,
+                    sizeof(struct xen_pct_register));
+            }
+            if ( xenpxpt->flags & XEN_PX_PSS ) 
+            {
+                if ( !(pxpt->states = xmalloc_array(struct xen_processor_px,
+                    xenpxpt->state_count)) )
+                {
+                    ret = -ENOMEM;
+                    break;
+                }
+                if ( copy_from_compat(pxpt->states, xenpxpt->states, 
+                    xenpxpt->state_count) )
+                {
+                    xfree(pxpt->states);
+                    ret = -EFAULT;
+                    break;
+                }
+                pxpt->state_count = xenpxpt->state_count;
+            }
+            if ( xenpxpt->flags & XEN_PX_PSD )
+            {
+                pxpt->shared_type = xenpxpt->shared_type;
+                memcpy ((void *)&pxpt->domain_info,
+                    (void *)&xenpxpt->domain_info,
+                    sizeof(struct xen_psd_package));
+            }
+            if ( xenpxpt->flags & XEN_PX_PPC )
+                pxpt->ppc = xenpxpt->ppc;
+
+            if ( xenpxpt->flags == ( XEN_PX_PCT | XEN_PX_PSS | 
+                XEN_PX_PSD | XEN_PX_PPC ) )
+                cpu_count++;
+            if ( cpu_count == num_online_cpus() )
+                ret = acpi_cpufreq_init();
             break;
-            
+        }
+ 
         case XEN_PM_CX:
             ret = set_cx_pminfo(op->u.set_pminfo.id, &op->u.set_pminfo.power);
             break;

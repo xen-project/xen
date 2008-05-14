@@ -95,9 +95,9 @@ extern int skip_ioapic_setup;
 boolean_param("noapic", skip_ioapic_setup);
 
 /* **** Linux config option: propagated to domain0. */
-/* xen_processor_pm: xen control cstate. */
-static int xen_processor_pm;
-boolean_param("xen_processor_pm", xen_processor_pm);
+/* xen_cpuidle: xen control cstate. */
+static int xen_cpuidle;
+boolean_param("cpuidle", xen_cpuidle);
 
 int early_boot = 1;
 
@@ -988,6 +988,7 @@ void __init __start_xen(unsigned long mbi_p)
     if ( (cmdline != NULL) || (kextra != NULL) )
     {
         static char dom0_cmdline[MAX_GUEST_CMDLINE];
+        char xen_pm_param[32];
 
         cmdline = cmdline_cook(cmdline);
         safe_strcpy(dom0_cmdline, cmdline);
@@ -1012,8 +1013,14 @@ void __init __start_xen(unsigned long mbi_p)
             safe_strcat(dom0_cmdline, " acpi=");
             safe_strcat(dom0_cmdline, acpi_param);
         }
-        if ( xen_processor_pm && !strstr(dom0_cmdline, "xen_processor_pmbits=") )
-            safe_strcat(dom0_cmdline, " xen_processor_pmbits=1");
+        if ( xen_cpuidle )
+            xen_processor_pmbits |= XEN_PROCESSOR_PM_CX;
+
+        snprintf(xen_pm_param, sizeof(xen_pm_param), 
+            " xen_processor_pmbits=%d", xen_processor_pmbits);
+
+        if ( !strstr(dom0_cmdline, "xen_processor_pmbits=") )
+            safe_strcat(dom0_cmdline, xen_pm_param);
 
         cmdline = dom0_cmdline;
     }

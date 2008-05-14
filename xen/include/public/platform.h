@@ -211,6 +211,12 @@ DEFINE_XEN_GUEST_HANDLE(xenpf_getidletime_t);
 #define XEN_PM_PX   1
 #define XEN_PM_TX   2
 
+/* Px sub info type */
+#define XEN_PX_PCT   1
+#define XEN_PX_PSS   2
+#define XEN_PX_PPC   4
+#define XEN_PX_PSD   8
+
 struct xen_power_register {
     uint32_t     space_id;
     uint32_t     bit_width;
@@ -252,12 +258,55 @@ struct xen_processor_power {
     XEN_GUEST_HANDLE(xen_processor_cx_t) states; /* supported c states */
 };
 
+struct xen_pct_register {
+    uint8_t  descriptor;
+    uint16_t length;
+    uint8_t  space_id;
+    uint8_t  bit_width;
+    uint8_t  bit_offset;
+    uint8_t  reserved;
+    uint64_t address;
+};
+
+struct xen_processor_px {
+    uint64_t core_frequency; /* megahertz */
+    uint64_t power;      /* milliWatts */
+    uint64_t transition_latency; /* microseconds */
+    uint64_t bus_master_latency; /* microseconds */
+    uint64_t control;        /* control value */
+    uint64_t status;     /* success indicator */
+};
+typedef struct xen_processor_px xen_processor_px_t;
+DEFINE_XEN_GUEST_HANDLE(xen_processor_px_t);
+
+struct xen_psd_package {
+    uint64_t num_entries;
+    uint64_t revision;
+    uint64_t domain;
+    uint64_t coord_type;
+    uint64_t num_processors;
+};
+
+struct xen_processor_performance {
+    uint32_t flags;     /* flag for Px sub info type */
+    uint32_t ppc;       /* Platform limitation on freq usage */
+    struct xen_pct_register control_register;
+    struct xen_pct_register status_register;
+    uint32_t state_count;     /* total available performance states */
+    XEN_GUEST_HANDLE(xen_processor_px_t) states;
+    struct xen_psd_package domain_info;
+    uint32_t shared_type;     /* coordination type of this processor */
+};
+typedef struct xen_processor_performance xen_processor_performance_t;
+DEFINE_XEN_GUEST_HANDLE(xen_processor_performance_t);
+
 struct xenpf_set_processor_pminfo {
     /* IN variables */
     uint32_t id;    /* ACPI CPU ID */
-    uint32_t type;  /* {XEN_PM_CX, ...} */
+    uint32_t type;  /* {XEN_PM_CX, XEN_PM_PX} */
     union {
         struct xen_processor_power          power;/* Cx: _CST/_CSD */
+        struct xen_processor_performance    perf; /* Px: _PPC/_PCT/_PSS/_PSD */
     };
 };
 typedef struct xenpf_set_processor_pminfo xenpf_set_processor_pminfo_t;

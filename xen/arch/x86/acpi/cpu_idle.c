@@ -834,7 +834,7 @@ static int set_cx(struct acpi_processor_power *acpi_power,
     return 0;   
 }
 
-static int get_cpu_id(u8 acpi_id)
+int get_cpu_id(u8 acpi_id)
 {
     int i;
     u8 apic_id;
