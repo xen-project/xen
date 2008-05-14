@@ -407,10 +407,15 @@ long arch_do_sysctl(xen_sysctl_t *op, XEN_GUEST_HANDLE(xen_sysctl_t) u_sysctl)
     {
         int i;
         uint32_t max_array_ent;
+        XEN_GUEST_HANDLE_64(uint32) cpu_to_node_arr;
 
         xen_sysctl_physinfo_t *pi = &op->u.physinfo;
 
+        max_array_ent = pi->max_cpu_id;
+        cpu_to_node_arr = pi->cpu_to_node;
+
         memset(pi, 0, sizeof(*pi));
+        pi->cpu_to_node = cpu_to_node_arr;
         pi->threads_per_core = cpus_weight(cpu_sibling_map[0]);
         pi->cores_per_socket =
             cpus_weight(cpu_core_map[0]) / pi->threads_per_core;
@@ -421,16 +426,15 @@ long arch_do_sysctl(xen_sysctl_t *op, XEN_GUEST_HANDLE(xen_sysctl_t) u_sysctl)
         pi->scrub_pages      = avail_scrub_pages();
         pi->cpu_khz          = local_cpu_data->proc_freq / 1000;
 
-        max_array_ent = pi->max_cpu_id;
         pi->max_cpu_id = last_cpu(cpu_online_map);
         max_array_ent = min_t(uint32_t, max_array_ent, pi->max_cpu_id);
 
         ret = 0;
 
-        if (!guest_handle_is_null(pi->cpu_to_node)) {
+        if (!guest_handle_is_null(cpu_to_node_arr)) {
             for (i = 0; i <= max_array_ent; i++) {
                 uint32_t node = cpu_online(i) ? cpu_to_node(i) : ~0u;
-                if (copy_to_guest_offset(pi->cpu_to_node, i, &node, 1)) {
+                if (copy_to_guest_offset(cpu_to_node_arr, i, &node, 1)) {
                     ret = -EFAULT;
                     break;
                 }
