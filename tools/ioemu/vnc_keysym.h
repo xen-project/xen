@@ -345,6 +345,7 @@ static name2keysym_t name2keysym[]={
 {"Num_Lock", 0xff7f},    /* XK_Num_Lock */
 {"Pause", 0xff13},       /* XK_Pause */
 {"Escape", 0xff1b},      /* XK_Escape */
+{"ISO_Left_Tab", 0xfe20},/* XK_ISO_Left_Tab */
 
     /* localized keys */
 {"BackApostrophe", 0xff21},

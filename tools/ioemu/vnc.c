@@ -1333,6 +1333,8 @@ static void do_key_event(VncState *vs, int down, uint32_t sym)
     case 0x9d:                          /* Right CTRL */
     case 0x38:                          /* Left ALT */
     case 0xb8:                          /* Right ALT */
+        if (keycode & 0x80)
+            kbd_put_keycode(0xe0);
         if (down) {
             vs->modifiers_state[keycode] = 1;
             kbd_put_keycode(keycode & 0x7f);
