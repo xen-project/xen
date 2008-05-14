@@ -258,7 +258,7 @@ void xenstore_parse_domain_config(int hvm_domid)
 		}
 		if (!strcmp(drv,"qcow")) {
 		    /* autoguess qcow vs qcow2 */
-		} else if (!strcmp(drv,"file")) {
+		} else if (!strcmp(drv,"file") || !strcmp(drv,"phy")) {
 		    format = &bdrv_raw;
 		} else {
 		    format = bdrv_find_format(drv);
