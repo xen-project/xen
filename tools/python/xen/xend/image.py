@@ -720,6 +720,9 @@ class IA64_HVM_ImageHandler(HVMImageHandler):
                          (self.getRequiredInitialReservation() / 1024) ])
         return args
 
+    def setCpuid(self):
+        # Guest CPUID configuration is not implemented yet.
+        return
 
 class IA64_Linux_ImageHandler(LinuxImageHandler):
 
