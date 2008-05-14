@@ -289,6 +289,7 @@
 #define ASC_ILLEGAL_OPCODE                   0x20
 #define ASC_LOGICAL_BLOCK_OOR                0x21
 #define ASC_INV_FIELD_IN_CMD_PACKET          0x24
+#define ASC_MEDIUM_MAY_HAVE_CHANGED          0x28
 #define ASC_MEDIUM_NOT_PRESENT               0x3a
 #define ASC_SAVING_PARAMETERS_NOT_SUPPORTED  0x39
 
@@ -1456,6 +1457,11 @@ static void ide_atapi_cmd(IDEState *s)
     switch(s->io_buffer[0]) {
     case GPCMD_TEST_UNIT_READY:
         if (bdrv_is_inserted(s->bs)) {
+            if (s->is_cdrom && s->sense_key == SENSE_NOT_READY) {
+                ide_atapi_cmd_error(s, SENSE_UNIT_ATTENTION, 
+                                    ASC_MEDIUM_MAY_HAVE_CHANGED);
+                break;
+            }
             ide_atapi_cmd_ok(s);
         } else {
             ide_atapi_cmd_error(s, SENSE_NOT_READY, 
