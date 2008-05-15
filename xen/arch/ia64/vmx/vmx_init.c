@@ -494,7 +494,6 @@ vmx_final_setup_guest(struct vcpu *v)
 {
 	vpd_t *vpd;
 	int rc;
-	struct switch_stack *sw;
 
 	vpd = alloc_vpd();
 	ASSERT(vpd);
