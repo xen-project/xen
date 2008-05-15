@@ -441,17 +441,9 @@ acpi_fadt_parse_sleep_info(struct acpi_table_fadt *fadt)
 			"FACS is shorter than ACPI spec allow: 0x%x",
 			facs->length);
 
-	if ((rsdp->revision < 2) || (facs->length < 32)) {
-		acpi_sinfo.wakeup_vector = facs_pa + 
-			offsetof(struct acpi_table_facs,
-				 firmware_waking_vector);
-		acpi_sinfo.vector_width = 32;
-	} else {
-		acpi_sinfo.wakeup_vector = facs_pa +
-			offsetof(struct acpi_table_facs,
-				 xfirmware_waking_vector);
-		acpi_sinfo.vector_width = 64;
-	}
+	acpi_sinfo.wakeup_vector = facs_pa + 
+		offsetof(struct acpi_table_facs, firmware_waking_vector);
+	acpi_sinfo.vector_width = 32;
 
 	printk(KERN_INFO PREFIX
 	       "                 wakeup_vec[%"PRIx64"], vec_size[%x]\n",
