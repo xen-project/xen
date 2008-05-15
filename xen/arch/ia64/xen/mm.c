@@ -2191,7 +2191,7 @@ replace_grant_host_mapping(unsigned long gpaddr,
     struct page_info* page = mfn_to_page(mfn);
     struct page_info* new_page = NULL;
     volatile pte_t* new_page_pte = NULL;
-    unsigned long new_page_mfn;
+    unsigned long new_page_mfn = INVALID_MFN;
 
     if (new_gpaddr) {
         new_page_pte = lookup_noalloc_domain_pte_none(d, new_gpaddr);
@@ -2211,7 +2211,7 @@ replace_grant_host_mapping(unsigned long gpaddr,
                              "new_gpaddr 0x%lx mfn 0x%lx\n",
                              __func__, gpaddr, mfn, new_gpaddr, new_page_mfn);
                     new_page = NULL; /* prevent domain_put_page() */
-                    goto out;
+                    return GNTST_general_error;
                 }
 
                 /*
@@ -2228,7 +2228,7 @@ replace_grant_host_mapping(unsigned long gpaddr,
                                  "new_gpaddr 0x%lx mfn 0x%lx\n",
                                  __func__, gpaddr, mfn,
                                  new_gpaddr, new_page_mfn);
-                        goto out;
+                        return GNTST_general_error;
                     }
                 }
                 domain_put_page(d, new_gpaddr, new_page_pte, new_pte, 0);
@@ -2246,7 +2246,7 @@ replace_grant_host_mapping(unsigned long gpaddr,
     if (pte == NULL) {
         gdprintk(XENLOG_INFO, "%s: gpaddr 0x%lx mfn 0x%lx\n",
                 __func__, gpaddr, mfn);
-        goto out;
+        return GNTST_general_error;
     }
 
  again:
@@ -2256,10 +2256,11 @@ replace_grant_host_mapping(unsigned long gpaddr,
         (page_get_owner(page) == d && get_gpfn_from_mfn(mfn) == gpfn)) {
         gdprintk(XENLOG_INFO, "%s: gpaddr 0x%lx mfn 0x%lx cur_pte 0x%lx\n",
                 __func__, gpaddr, mfn, pte_val(cur_pte));
-        goto out;
+        return GNTST_general_error;
     }
 
     if (new_page) {
+        BUG_ON(new_page_mfn == INVALID_MFN);
         set_gpfn_from_mfn(new_page_mfn, gpfn);
         /* smp_mb() isn't needed because assign_domain_pge_cmpxchg_rel()
            has release semantics. */
@@ -2270,6 +2271,7 @@ replace_grant_host_mapping(unsigned long gpaddr,
             goto again;
         }
         if (new_page) {
+            BUG_ON(new_page_mfn == INVALID_MFN);
             set_gpfn_from_mfn(new_page_mfn, INVALID_M2P_ENTRY);
             domain_put_page(d, new_gpaddr, new_page_pte, new_pte, 1);
         }
