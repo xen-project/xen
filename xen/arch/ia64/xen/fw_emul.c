@@ -200,10 +200,15 @@ sal_emulator (long index, unsigned long in1, unsigned long in2,
 				d->arch.sal_data->boot_rdv_r1 = in3;
 			}
  		}
- 		else
-		{
-			if (in1 > sizeof(sal_vectors)/sizeof(sal_vectors[0])-1)
-				BUG();
+ 		else if (current->domain == dom0) {
+			if (in1 >
+			    sizeof(sal_vectors)/sizeof(sal_vectors[0])-1) {
+				gdprintk(XENLOG_DEBUG,
+					 "SAL_SET_VECTORS invalid in1 %ld\n",
+					 in1);
+				status = -2;
+				break;
+			}
 			sal_vectors[in1].vector_type	= in1;
 			sal_vectors[in1].handler_addr1	= in2;
 			sal_vectors[in1].gp1		= in3;
@@ -211,6 +216,10 @@ sal_emulator (long index, unsigned long in1, unsigned long in2,
 			sal_vectors[in1].handler_addr2	= in5;
 			sal_vectors[in1].gp2		= in6;
 			sal_vectors[in1].handler_len2	= in7;
+		} else {
+			gdprintk(XENLOG_DEBUG, "NON-PRIV DOMAIN CALLED "
+				 "SAL_SET_VECTORS %ld\n", in1);
+			status = -2;
 		}
 		break;
 	    case SAL_GET_STATE_INFO:
@@ -352,13 +361,25 @@ sal_emulator (long index, unsigned long in1, unsigned long in2,
 		printk("*** CALLED SAL_MC_RENDEZ.  IGNORED...\n");
 		break;
 	    case SAL_MC_SET_PARAMS:
-		if (in1 > sizeof(sal_mc_params)/sizeof(sal_mc_params[0]))
-			BUG();
-		sal_mc_params[in1].param_type	= in1;
-		sal_mc_params[in1].i_or_m	= in2;
-		sal_mc_params[in1].i_or_m_val	= in3;
-		sal_mc_params[in1].timeout	= in4;
-		sal_mc_params[in1].rz_always	= in5;
+		if (current->domain == dom0) {
+			if (in1 > 
+			    sizeof(sal_mc_params) / sizeof(sal_mc_params[0])) {
+				gdprintk(XENLOG_DEBUG,
+					 "SAL_MC_SET_PARAMS invalid in1 %ld\n",
+					 in1);
+				status = -2;
+				break;
+			}
+			sal_mc_params[in1].param_type	= in1;
+			sal_mc_params[in1].i_or_m	= in2;
+			sal_mc_params[in1].i_or_m_val	= in3;
+			sal_mc_params[in1].timeout	= in4;
+			sal_mc_params[in1].rz_always	= in5;
+		} else {
+			gdprintk(XENLOG_DEBUG,
+				 "*** CALLED SAL_MC_SET_PARAMS. IGNORED...\n");
+			status = -1; /* not implemented */
+		}
 		break;
 	    case SAL_CACHE_FLUSH:
 		if (1) {
