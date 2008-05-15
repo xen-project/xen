@@ -240,8 +240,28 @@ static int is_windows_drive(const char *filename)
 }
 #endif
 
+static int bdrv_invalid_protocol_open(BlockDriverState *bs,
+				      const char *filename, int flags) {
+    return -ENOENT;
+}
+
+static BlockDriver bdrv_invalid_protocol = {
+    "invalid_protocol",
+    .bdrv_open = bdrv_invalid_protocol_open,
+};
+
 static BlockDriver *find_protocol(const char *filename)
 {
+    /* Return values:
+     *   &bdrv_xxx
+     *      filename specifies protocol xxx
+     *      caller should use that
+     *   NULL                    filename does not specify any protocol
+     *       caller may apply their own default
+     *   &bdrv_invalid_protocol  filename speciies an unknown protocol
+     *       caller should return -ENOENT; or may just try to open with
+     *       that bdrv, which always fails that way.
+     */
     BlockDriver *drv1;
     char protocol[128];
     int len;
@@ -254,7 +274,7 @@ static BlockDriver *find_protocol(const char *filename)
 #endif
     p = strchr(filename, ':');
     if (!p)
-        return NULL; /* do not ever guess raw, it is a security problem! */
+        return NULL;
     len = p - filename;
     if (len > sizeof(protocol) - 1)
         len = sizeof(protocol) - 1;
@@ -265,7 +285,7 @@ static BlockDriver *find_protocol(const char *filename)
             !strcmp(drv1->protocol_name, protocol))
             return drv1;
     }
-    return NULL;
+    return &bdrv_invalid_protocol;
 }
 
 /* XXX: force raw format if block or character device ? It would
@@ -295,8 +315,8 @@ static BlockDriver *find_image_format(const char *filename)
 #endif
     
     drv = find_protocol(filename);
-    /* no need to test disk image formats for vvfat */
-    if (drv == &bdrv_vvfat)
+    /* no need to test disk image format if the filename told us */
+    if (drv != NULL)
         return drv;
 
     ret = bdrv_file_open(&bs, filename, BDRV_O_RDONLY);
@@ -390,7 +410,7 @@ int bdrv_open2(BlockDriverState *bs, const char *filename, int flags,
     if (flags & BDRV_O_FILE) {
         drv = find_protocol(filename);
         if (!drv)
-            return -ENOENT;
+	    drv = &bdrv_raw;
     } else {
         if (!drv) {
             drv = find_image_format(filename);
@@ -438,7 +458,7 @@ int bdrv_open2(BlockDriverState *bs, const char *filename, int flags,
         }
         path_combine(backing_filename, sizeof(backing_filename),
                      filename, bs->backing_file);
-        if (bdrv_open(bs->backing_hd, backing_filename, 0) < 0)
+        if (bdrv_open2(bs->backing_hd, backing_filename, 0, &bdrv_raw) < 0)
             goto fail;
     }
 

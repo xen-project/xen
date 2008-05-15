@@ -260,6 +260,8 @@ void xenstore_parse_domain_config(int hvm_domid)
 		    /* autoguess qcow vs qcow2 */
 		} else if (!strcmp(drv,"file") || !strcmp(drv,"phy")) {
 		    format = &bdrv_raw;
+		} else if (!strcmp(drv,"phy")) {
+		    format = &bdrv_raw;
 		} else {
 		    format = bdrv_find_format(drv);
 		    if (!format) {
@@ -269,7 +271,7 @@ void xenstore_parse_domain_config(int hvm_domid)
 		}
 	    }
             if (bdrv_open2(bs, params, 0 /* snapshot */, format) < 0)
-                fprintf(stderr, "qemu: could not open vbd '%s' or hard disk image '%s' (drv '%s')\n", buf, params, drv ? drv : "?");
+                fprintf(stderr, "qemu: could not open vbd '%s' or hard disk image '%s' (drv '%s' format '%s')\n", buf, params, drv ? drv : "?", format ? format->format_name : "0");
         }
     }
 
