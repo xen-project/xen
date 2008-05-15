@@ -521,17 +521,20 @@ static int msi_capability_init(struct pci_dev *dev, int vector)
 static u64 pci_resource_start(struct pci_dev *dev, u8 bar_index)
 {
     u64 bar_base;
+    u32 reg_val;
     u8 bus = dev->bus;
     u8 slot = PCI_SLOT(dev->devfn);
     u8 func = PCI_FUNC(dev->devfn);
 
-    bar_base = pci_conf_read32(bus, slot, func,
-                               PCI_BASE_ADDRESS_0 + 4 * bar_index);
-    if ( bar_base & PCI_BASE_ADDRESS_MEM_TYPE_64 )
+    reg_val = pci_conf_read32(bus, slot, func,
+                              PCI_BASE_ADDRESS_0 + 4 * bar_index);
+    bar_base = reg_val & PCI_BASE_ADDRESS_MEM_MASK;
+    if ( ( reg_val & PCI_BASE_ADDRESS_MEM_TYPE_MASK ) ==
+         PCI_BASE_ADDRESS_MEM_TYPE_64 )
     {
-        bar_base <<= 32;
-        bar_base += pci_conf_read32(bus, slot, func,
-                               PCI_BASE_ADDRESS_0 + 4 * (bar_index + 1));
+        reg_val = pci_conf_read32(bus, slot, func,
+                                  PCI_BASE_ADDRESS_0 + 4 * (bar_index + 1));
+        bar_base |= ((u64)reg_val) << 32;
     }
 
     return bar_base;
@@ -780,8 +783,16 @@ void pci_disable_msi(int vector)
         __pci_disable_msix(vector);
 }
 
-void pci_cleanup_msi(struct pci_dev *dev)
+void pci_cleanup_msi(u8 bus, u8 devfn)
 {
+    struct pci_dev *dev = get_msi_pdev(bus, devfn);
+
+    if ( !dev )
+        return;
     msi_free_vectors(dev);
+
+    /* Disable MSI and/or MSI-X */
+    msi_set_enable(dev, 0);
+    msix_set_enable(dev, 0);
 }
 

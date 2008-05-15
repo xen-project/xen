@@ -398,11 +398,7 @@ int __init construct_dom0(
         v_end            = (vstack_end + (1UL<<22)-1) & ~((1UL<<22)-1);
         if ( (v_end - vstack_end) < (512UL << 10) )
             v_end += 1UL << 22; /* Add extra 4MB to get >= 512kB padding. */
-#if defined(__i386__) && !defined(CONFIG_X86_PAE)
-        if ( (((v_end - v_start + ((1UL<<L2_PAGETABLE_SHIFT)-1)) >>
-               L2_PAGETABLE_SHIFT) + 1) <= nr_pt_pages )
-            break;
-#elif defined(__i386__) && defined(CONFIG_X86_PAE)
+#if defined(__i386__)
         /* 5 pages: 1x 3rd + 4x 2nd level */
         if ( (((v_end - v_start + ((1UL<<L2_PAGETABLE_SHIFT)-1)) >>
                L2_PAGETABLE_SHIFT) + 5) <= nr_pt_pages )

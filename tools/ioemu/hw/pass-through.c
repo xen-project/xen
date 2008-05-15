@@ -205,6 +205,7 @@ void pt_iomem_map(PCIDevice *d, int i, uint32_t e_phys, uint32_t e_size,
 
     if ( !first_map )
     {
+        add_msix_mapping(assigned_device, i);
         /* Remove old mapping */
         ret = xc_domain_memory_mapping(xc_handle, domid,
                 old_ebase >> XC_PAGE_SHIFT,
@@ -227,6 +228,9 @@ void pt_iomem_map(PCIDevice *d, int i, uint32_t e_phys, uint32_t e_size,
     if ( ret != 0 )
         PT_LOG("Error: create new mapping failed!\n");
 
+    ret = remove_msix_mapping(assigned_device, i);
+    if ( ret != 0 )
+        PT_LOG("Error: remove MSX-X mmio mapping failed!\n");
 }
 
 /* Being called each time a pio region has been updated */
@@ -291,6 +295,9 @@ static void pt_pci_write_config(PCIDevice *d, uint32_t address, uint32_t val,
     if ( pt_msi_write(assigned_device, address, val, len) )
         return;
 
+    if ( pt_msix_write(assigned_device, address, val, len) )
+        return;
+
     /* PCI config pass-through */
     if (address == 0x4) {
         switch (len){
@@ -338,6 +345,7 @@ static uint32_t pt_pci_read_config(PCIDevice *d, uint32_t address, int len)
     }
 
     pt_msi_read(assigned_device, address, len, &val);
+    pt_msix_read(assigned_device, address, len, &val);
 exit:
 
 #ifdef PT_DEBUG_PCI_CONFIG_ACCESS
@@ -548,6 +556,9 @@ struct pt_dev * register_real_device(PCIBus *e_bus,
 
     if ( (pos = find_cap_offset(pci_dev, PCI_CAP_ID_MSI)) )
         pt_msi_init(assigned_device, pos);
+
+    if ( (pos = find_cap_offset(pci_dev, PCI_CAP_ID_MSIX)) )
+        pt_msix_init(assigned_device, pos);
 
     /* Handle real device's MMIO/PIO BARs */
     pt_register_regions(assigned_device);

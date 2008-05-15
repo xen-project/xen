@@ -50,6 +50,7 @@ typedef struct {
     struct key_range *keypad_range;
     struct key_range *numlock_range;
     struct key_range *shift_range;
+    struct key_range *localstate_range;
 } kbd_layout_t;
 
 static void add_to_key_range(struct key_range **krp, int code) {
@@ -131,6 +132,10 @@ static kbd_layout_t *parse_keyboard_layout(const char *language,
 		    if (rest && strstr(rest, "shift")) {
 			add_to_key_range(&k->shift_range, keysym);
 			//fprintf(stderr, "shift keysym %04x keycode %d\n", keysym, keycode);
+		    }
+		    if (rest && strstr(rest, "localstate")) {
+			add_to_key_range(&k->localstate_range, keycode);
+			//fprintf(stderr, "localstate keysym %04x keycode %d\n", keysym, keycode);
 		    }
 
 		    /* if(keycode&0x80)
@@ -220,4 +225,15 @@ static int keysymIsShift(void *kbd_layout, int keysym)
 	if (keysym >= kr->start && keysym <= kr->end)
 	    return 1;
     return 0;
+}
+
+static int keycodeIsShiftable(void *kbd_layout, int keycode)
+{
+    kbd_layout_t *k = kbd_layout;
+    struct key_range *kr;
+
+    for (kr = k->localstate_range; kr; kr = kr->next)
+	if (keycode >= kr->start && keycode <= kr->end)
+	    return 0;
+    return 1;
 }

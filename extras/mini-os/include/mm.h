@@ -48,6 +48,7 @@ void init_mm(void);
 unsigned long alloc_pages(int order);
 #define alloc_page()    alloc_pages(0)
 void free_pages(void *pointer, int order);
+#define free_page(p)    free_pages(p, 0)
 
 static __inline__ int get_order(unsigned long size)
 {

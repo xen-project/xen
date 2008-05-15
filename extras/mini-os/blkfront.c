@@ -68,6 +68,21 @@ void blkfront_handler(evtchn_port_t port, struct pt_regs *regs, void *data)
     wake_up(&blkfront_queue);
 }
 
+static void free_blkfront(struct blkfront_dev *dev)
+{
+    mask_evtchn(dev->evtchn);
+
+    free(dev->backend);
+
+    gnttab_end_access(dev->ring_ref);
+    free_page(dev->ring.sring);
+
+    unbind_evtchn(dev->evtchn);
+
+    free(dev->nodename);
+    free(dev);
+}
+
 struct blkfront_dev *init_blkfront(char *nodename, struct blkfront_info *info)
 {
     xenbus_transaction_t xbt;
@@ -88,6 +103,7 @@ struct blkfront_dev *init_blkfront(char *nodename, struct blkfront_info *info)
     printk("******************* BLKFRONT for %s **********\n\n\n", nodename);
 
     dev = malloc(sizeof(*dev));
+    memset(dev, 0, sizeof(*dev));
     dev->nodename = strdup(nodename);
 
     snprintf(path, sizeof(path), "%s/backend-id", nodename);
@@ -139,7 +155,7 @@ again:
 
 abort_transaction:
     xenbus_transaction_end(xbt, 1, &retry);
-    return NULL;
+    goto error;
 
 done:
 
@@ -147,7 +163,7 @@ done:
     msg = xenbus_read(XBT_NIL, path, &dev->backend);
     if (msg) {
         printk("Error %s when reading the backend path %s\n", msg, path);
-        return NULL;
+        goto error;
     }
 
     printk("backend at %s\n", dev->backend);
@@ -160,7 +176,7 @@ done:
         msg = xenbus_read(XBT_NIL, path, &c);
         if (msg) {
             printk("Error %s when reading the mode\n", msg);
-            return NULL;
+            goto error;
         }
         if (*c == 'w')
             dev->info.mode = O_RDWR;
@@ -198,6 +214,10 @@ done:
     printk("**************************\n");
 
     return dev;
+
+error:
+    free_blkfront(dev);
+    return NULL;
 }
 
 void shutdown_blkfront(struct blkfront_dev *dev)
@@ -220,11 +240,7 @@ void shutdown_blkfront(struct blkfront_dev *dev)
 
     xenbus_unwatch_path(XBT_NIL, path);
 
-    unbind_evtchn(dev->evtchn);
-
-    free(nodename);
-    free(dev->backend);
-    free(dev);
+    free_blkfront(dev);
 }
 
 static void blkfront_wait_slot(struct blkfront_dev *dev)

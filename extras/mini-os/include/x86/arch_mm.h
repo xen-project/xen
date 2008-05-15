@@ -44,24 +44,6 @@
 
 #if defined(__i386__)
 
-#if !defined(CONFIG_X86_PAE)
-
-#define L2_PAGETABLE_SHIFT      22
-
-#define L1_PAGETABLE_ENTRIES    1024
-#define L2_PAGETABLE_ENTRIES    1024
-
-#define PADDR_BITS              32
-#define PADDR_MASK              (~0UL)
-
-#define NOT_L1_FRAMES           1
-#define PRIpte "08lx"
-#ifndef __ASSEMBLY__
-typedef unsigned long pgentry_t;
-#endif
-
-#else /* defined(CONFIG_X86_PAE) */
-
 #define L2_PAGETABLE_SHIFT      21
 #define L3_PAGETABLE_SHIFT      30
 
@@ -84,8 +66,6 @@ typedef unsigned long pgentry_t;
 #ifndef __ASSEMBLY__
 typedef uint64_t pgentry_t;
 #endif
-
-#endif /* !defined(CONFIG_X86_PAE) */
 
 #elif defined(__x86_64__)
 
@@ -122,10 +102,8 @@ typedef unsigned long pgentry_t;
   (((_a) >> L1_PAGETABLE_SHIFT) & (L1_PAGETABLE_ENTRIES - 1))
 #define l2_table_offset(_a) \
   (((_a) >> L2_PAGETABLE_SHIFT) & (L2_PAGETABLE_ENTRIES - 1))
-#if defined(__x86_64__) || defined(CONFIG_X86_PAE)
 #define l3_table_offset(_a) \
   (((_a) >> L3_PAGETABLE_SHIFT) & (L3_PAGETABLE_ENTRIES - 1))
-#endif
 #if defined(__x86_64__)
 #define l4_table_offset(_a) \
   (((_a) >> L4_PAGETABLE_SHIFT) & (L4_PAGETABLE_ENTRIES - 1))
@@ -146,9 +124,7 @@ typedef unsigned long pgentry_t;
 #define L1_PROT (_PAGE_PRESENT|_PAGE_RW|_PAGE_ACCESSED)
 #define L1_PROT_RO (_PAGE_PRESENT|_PAGE_ACCESSED)
 #define L2_PROT (_PAGE_PRESENT|_PAGE_RW|_PAGE_ACCESSED|_PAGE_DIRTY |_PAGE_USER)
-#if defined(CONFIG_X86_PAE)
 #define L3_PROT (_PAGE_PRESENT)
-#endif /* CONFIG_X86_PAE */
 #elif defined(__x86_64__)
 #define L1_PROT (_PAGE_PRESENT|_PAGE_RW|_PAGE_ACCESSED|_PAGE_USER)
 #define L1_PROT_RO (_PAGE_PRESENT|_PAGE_ACCESSED|_PAGE_USER)
@@ -172,7 +148,7 @@ typedef unsigned long pgentry_t;
 
 #ifndef __ASSEMBLY__
 /* Definitions for machine and pseudophysical addresses. */
-#ifdef CONFIG_X86_PAE
+#ifdef __i386__
 typedef unsigned long long paddr_t;
 typedef unsigned long long maddr_t;
 #else
@@ -225,14 +201,10 @@ static __inline__ paddr_t machine_to_phys(maddr_t machine)
 #define virtual_to_l3(_virt)	   PT_BASE
 #endif
 
-#if defined(__x86_64__) || defined(CONFIG_X86_PAE)
 #define virtual_to_l2(_virt)	   ({ \
 	unsigned long __virt2 = (_virt); \
 	(pgentry_t *) pte_to_virt(virtual_to_l3(__virt2)[l3_table_offset(__virt2)]); \
 })
-#else
-#define virtual_to_l2(_virt)	   PT_BASE
-#endif
 
 #define virtual_to_l1(_virt)	   ({ \
 	unsigned long __virt1 = (_virt); \

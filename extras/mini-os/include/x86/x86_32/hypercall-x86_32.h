@@ -220,12 +220,8 @@ static inline int
 HYPERVISOR_update_va_mapping(
 	unsigned long va, pte_t new_val, unsigned long flags)
 {
-	unsigned long pte_hi = 0;
-#ifdef CONFIG_X86_PAE
-	pte_hi = new_val.pte_high;
-#endif
 	return _hypercall4(int, update_va_mapping, va,
-			   new_val.pte_low, pte_hi, flags);
+			   new_val.pte_low, new_val.pte_high, flags);
 }
 
 static inline int
@@ -267,12 +263,8 @@ static inline int
 HYPERVISOR_update_va_mapping_otherdomain(
 	unsigned long va, pte_t new_val, unsigned long flags, domid_t domid)
 {
-	unsigned long pte_hi = 0;
-#ifdef CONFIG_X86_PAE
-	pte_hi = new_val.pte_high;
-#endif
 	return _hypercall5(int, update_va_mapping_otherdomain, va,
-			   new_val.pte_low, pte_hi, flags, domid);
+			   new_val.pte_low, new_val.pte_high, flags, domid);
 }
 
 static inline int

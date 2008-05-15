@@ -310,7 +310,6 @@ build_body ()
 	done
 	echo " \\"
 	echo "} while (0)"
-	echo ""
 }
 
 check_field ()

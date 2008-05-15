@@ -9,7 +9,6 @@ xenoprof := y
 # If you change any of these configuration options then you must
 # 'make clean' before rebuilding.
 #
-pae ?= n
 supervisor_mode_kernel ?= n
 
 # Solaris grabs stdarg.h and friends from the system include directory.
@@ -30,10 +29,6 @@ CFLAGS += -msoft-float
 CFLAGS += $(call cc-option,$(CC),-nopie,)
 CFLAGS += $(call cc-option,$(CC),-fno-stack-protector,)
 CFLAGS += $(call cc-option,$(CC),-fno-stack-protector-all,)
-
-ifeq ($(TARGET_SUBARCH)$(pae),x86_32y)
-CFLAGS += -DCONFIG_X86_PAE=1
-endif
 
 ifeq ($(supervisor_mode_kernel),y)
 CFLAGS += -DCONFIG_X86_SUPERVISOR_MODE_KERNEL=1

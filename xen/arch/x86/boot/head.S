@@ -132,7 +132,7 @@ __start:
         mov     %eax,sym_phys(idle_pg_table) + (262*8) /* PML4[262]: 1:1 map */
         mov     $(sym_phys(l3_xenmap)+7),%eax
         mov     %eax,sym_phys(idle_pg_table) + (261*8) /* PML4[261]: xen map */
-#elif defined(CONFIG_X86_PAE)
+#else
         /* Initialize low and high mappings of memory with 2MB pages */
         mov     $sym_phys(idle_pg_table_l2),%edi
         mov     $0xe3,%eax                   /* PRESENT+RW+A+D+2MB */
@@ -147,19 +147,6 @@ __start:
         add     $(1<<L2_PAGETABLE_SHIFT),%eax
         cmp     $(16<<20)+0xe3,%eax
         jne     1b
-#else
-        /* Initialize low and high mappings of memory with 4MB pages */
-        mov     $sym_phys(idle_pg_table),%edi
-        mov     $0xe3,%eax                   /* PRESENT+RW+A+D+4MB */
-1:      mov     %eax,__PAGE_OFFSET>>20(%edi) /* high mapping */
-        stosl                                /* low mapping */
-        add     $(1<<L2_PAGETABLE_SHIFT),%eax
-        cmp     $DIRECTMAP_PHYS_END+0xe3,%eax
-        jne     1b
-1:      stosl   /* low mappings cover up to 16MB */
-        add     $(1<<L2_PAGETABLE_SHIFT),%eax
-        cmp     $(16<<20)+0xe3,%eax
-        jne     1b
 #endif
 
         /* Initialize 4kB mappings of first 2MB or 4MB of memory. */
@@ -170,9 +157,7 @@ __start:
 #endif
         xor     %ecx,%ecx
 1:      stosl
-#if CONFIG_PAGING_LEVELS >= 3
         add     $4,%edi
-#endif
         add     $PAGE_SIZE,%eax
         inc     %ecx
         /* VGA hole (0xa0000-0xc0000) should be mapped UC. */
@@ -188,12 +173,9 @@ __start:
 #if defined(__x86_64__)
         mov     %edi,sym_phys(l2_identmap)
         mov     %edi,sym_phys(l2_xenmap)
-#elif defined(CONFIG_X86_PAE)
+#else
         mov     %edi,sym_phys(idle_pg_table_l2)
         mov     %edi,sym_phys(idle_pg_table_l2) + (__PAGE_OFFSET>>18)
-#else
-        mov     %edi,sym_phys(idle_pg_table)
-        mov     %edi,sym_phys(idle_pg_table) + (__PAGE_OFFSET>>20)
 #endif
 
         /* Copy bootstrap trampoline to low memory, below 1MB. */

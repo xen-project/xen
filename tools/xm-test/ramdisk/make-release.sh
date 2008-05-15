@@ -3,9 +3,6 @@
 if [ "$1" == "" ]
 then
   arch=""
-elif [ "$1" == "powerpc" ]
-then
-  arch="BR_ARCH=powerpc"
 else
   echo "Invalid architecture specified." >&2
   exit 1

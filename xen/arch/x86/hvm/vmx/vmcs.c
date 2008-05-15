@@ -72,12 +72,14 @@ static u32 adjust_vmx_controls(u32 ctl_min, u32 ctl_opt, u32 msr)
 
 static void vmx_init_vmcs_config(void)
 {
-    u32 vmx_msr_low, vmx_msr_high, min, opt;
+    u32 vmx_basic_msr_low, vmx_basic_msr_high, min, opt;
     u32 _vmx_pin_based_exec_control;
     u32 _vmx_cpu_based_exec_control;
     u32 _vmx_secondary_exec_control = 0;
     u32 _vmx_vmexit_control;
     u32 _vmx_vmentry_control;
+
+    rdmsr(MSR_IA32_VMX_BASIC, vmx_basic_msr_low, vmx_basic_msr_high);
 
     min = (PIN_BASED_EXT_INTR_MASK |
            PIN_BASED_NMI_EXITING);
@@ -122,9 +124,14 @@ static void vmx_init_vmcs_config(void)
 
     if ( _vmx_secondary_exec_control & SECONDARY_EXEC_ENABLE_EPT )
     {
-        /* To use EPT we expect to be able to clear certain intercepts. */
-        uint32_t must_be_one, must_be_zero;
-        rdmsr(MSR_IA32_VMX_PROCBASED_CTLS, must_be_one, must_be_zero);
+        /*
+         * To use EPT we expect to be able to clear certain intercepts.
+         * We check VMX_BASIC_MSR[55] to correctly handle default1 controls.
+         */
+        uint32_t must_be_one, must_be_zero, msr = MSR_IA32_VMX_PROCBASED_CTLS;
+        if ( vmx_basic_msr_high & (1u << 23) )
+            msr = MSR_IA32_VMX_TRUE_PROCBASED_CTLS;
+        rdmsr(msr, must_be_one, must_be_zero);
         if ( must_be_one & (CPU_BASED_INVLPG_EXITING |
                             CPU_BASED_CR3_LOAD_EXITING |
                             CPU_BASED_CR3_STORE_EXITING) )
@@ -150,41 +157,40 @@ static void vmx_init_vmcs_config(void)
     _vmx_vmentry_control = adjust_vmx_controls(
         min, opt, MSR_IA32_VMX_ENTRY_CTLS);
 
-    rdmsr(MSR_IA32_VMX_BASIC, vmx_msr_low, vmx_msr_high);
-
     if ( !vmx_pin_based_exec_control )
     {
         /* First time through. */
-        vmcs_revision_id = vmx_msr_low;
+        vmcs_revision_id = vmx_basic_msr_low;
         vmx_pin_based_exec_control = _vmx_pin_based_exec_control;
         vmx_cpu_based_exec_control = _vmx_cpu_based_exec_control;
         vmx_secondary_exec_control = _vmx_secondary_exec_control;
         vmx_vmexit_control         = _vmx_vmexit_control;
         vmx_vmentry_control        = _vmx_vmentry_control;
-        cpu_has_vmx_ins_outs_instr_info = !!(vmx_msr_high & (1U<<22));
+        cpu_has_vmx_ins_outs_instr_info = !!(vmx_basic_msr_high & (1U<<22));
     }
     else
     {
         /* Globals are already initialised: re-check them. */
-        BUG_ON(vmcs_revision_id != vmx_msr_low);
+        BUG_ON(vmcs_revision_id != vmx_basic_msr_low);
         BUG_ON(vmx_pin_based_exec_control != _vmx_pin_based_exec_control);
         BUG_ON(vmx_cpu_based_exec_control != _vmx_cpu_based_exec_control);
         BUG_ON(vmx_secondary_exec_control != _vmx_secondary_exec_control);
         BUG_ON(vmx_vmexit_control != _vmx_vmexit_control);
         BUG_ON(vmx_vmentry_control != _vmx_vmentry_control);
-        BUG_ON(cpu_has_vmx_ins_outs_instr_info != !!(vmx_msr_high & (1U<<22)));
+        BUG_ON(cpu_has_vmx_ins_outs_instr_info !=
+               !!(vmx_basic_msr_high & (1U<<22)));
     }
 
     /* IA-32 SDM Vol 3B: VMCS size is never greater than 4kB. */
-    BUG_ON((vmx_msr_high & 0x1fff) > PAGE_SIZE);
+    BUG_ON((vmx_basic_msr_high & 0x1fff) > PAGE_SIZE);
 
 #ifdef __x86_64__
     /* IA-32 SDM Vol 3B: 64-bit CPUs always have VMX_BASIC_MSR[48]==0. */
-    BUG_ON(vmx_msr_high & (1u<<16));
+    BUG_ON(vmx_basic_msr_high & (1u<<16));
 #endif
 
     /* Require Write-Back (WB) memory type for VMCS accesses. */
-    BUG_ON(((vmx_msr_high >> 18) & 15) != 6);
+    BUG_ON(((vmx_basic_msr_high >> 18) & 15) != 6);
 }
 
 static struct vmcs_struct *vmx_alloc_vmcs(void)
@@ -630,7 +636,7 @@ static int construct_vmcs(struct vcpu *v)
     if ( paging_mode_hap(d) )
     {
         __vmwrite(EPT_POINTER, d->arch.hvm_domain.vmx.ept_control.eptp);
-#ifdef CONFIG_X86_PAE
+#ifdef __i386__
         __vmwrite(EPT_POINTER_HIGH,
                   d->arch.hvm_domain.vmx.ept_control.eptp >> 32);
 #endif

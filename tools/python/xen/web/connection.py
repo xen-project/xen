@@ -18,11 +18,17 @@
 #============================================================================
 
 import sys
+import os
 import threading
 import socket
 import fcntl
 
 from errno import EAGAIN, EINTR, EWOULDBLOCK
+
+try:
+    from OpenSSL import SSL
+except ImportError:
+    pass
 
 from xen.xend.XendLogging import log
 
@@ -113,6 +119,167 @@ class SocketListener:
                         break
         finally:
             self.close()
+
+
+class SSLSocketServerConnection(SocketServerConnection):
+    """An SSL aware accepted connection to a server.
+
+    As pyOpenSSL SSL.Connection fileno() method just retrieve the file
+    descriptor number for the underlying socket, direct read/write to the file
+    descriptor will result no data encrypted.
+    
+    recv2fd() and fd2send() are simple wrappers for functions who need direct
+    read/write to a file descriptor rather than a socket like object.
+    
+    To use recv2fd(), you can create a pipe and start a thread to transfer all
+    received data to one end of the pipe, then read from the other end:
+    
+    p2cread, p2cwrite = os.pipe()
+    threading.Thread(target=connection.SSLSocketServerConnection.recv2fd,
+                     args=(sock, p2cwrite)).start()
+    os.read(p2cread, 1024)
+    
+    To use fd2send():
+    
+    p2cread, p2cwrite = os.pipe()
+    threading.Thread(target=connection.SSLSocketServerConnection.fd2send,
+                     args=(sock, p2cread)).start()
+    os.write(p2cwrite, "data")
+    """
+
+    def __init__(self, sock, protocol_class):
+        SocketServerConnection.__init__(self, sock, protocol_class)
+
+
+    def main(self):
+        try:
+            while True:
+                try:
+                    data = self.sock.recv(BUFFER_SIZE)
+                    if data == "":
+                        break
+                    if self.protocol.dataReceived(data):
+                        break
+                except socket.error, ex:
+                    if ex.args[0] not in (EWOULDBLOCK, EAGAIN, EINTR):
+                        break
+                except (SSL.WantReadError, SSL.WantWriteError, \
+                        SSL.WantX509LookupError):
+                    # The operation did not complete; the same I/O method
+                    # should be called again.
+                    continue
+                except SSL.ZeroReturnError:
+                    # The SSL Connection has been closed.
+                    break
+                except SSL.SysCallError, (retval, desc):
+                    if ((retval == -1 and desc == "Unexpected EOF")
+                        or retval > 0):
+                        # The SSL Connection is lost.
+                        break
+                    log.debug("SSL SysCallError:%d:%s" % (retval, desc))
+                    break
+                except SSL.Error, e:
+                    # other SSL errors
+                    log.debug("SSL Error:%s" % e)
+                    break
+        finally:
+            try:
+                self.sock.close()
+            except:
+                pass
+
+
+    def recv2fd(sock, fd):
+        try:
+            while True:
+                try:
+                    data = sock.recv(BUFFER_SIZE)
+                    if data == "":
+                        break
+                    count = 0
+                    while count < len(data):
+                        try:
+                            nbytes = os.write(fd, data[count:])
+                            count += nbytes
+                        except os.error, ex:
+                            if ex.args[0] not in (EWOULDBLOCK, EAGAIN, EINTR):
+                                raise
+                except socket.error, ex:
+                    if ex.args[0] not in (EWOULDBLOCK, EAGAIN, EINTR):
+                        break
+                except (SSL.WantReadError, SSL.WantWriteError, \
+                        SSL.WantX509LookupError):
+                    # The operation did not complete; the same I/O method
+                    # should be called again.
+                    continue
+                except SSL.ZeroReturnError:
+                    # The SSL Connection has been closed.
+                    break
+                except SSL.SysCallError, (retval, desc):
+                    if ((retval == -1 and desc == "Unexpected EOF")
+                        or retval > 0):
+                        # The SSL Connection is lost.
+                        break
+                    log.debug("SSL SysCallError:%d:%s" % (retval, desc))
+                    break
+                except SSL.Error, e:
+                    # other SSL errors
+                    log.debug("SSL Error:%s" % e)
+                    break
+        finally:
+            try:
+                sock.close()
+                os.close(fd)
+            except:
+                pass
+
+    recv2fd = staticmethod(recv2fd)
+
+
+    def fd2send(sock, fd):
+        try:
+            while True:
+                try:
+                    data = os.read(fd, BUFFER_SIZE)
+                    if data == "":
+                        break
+                    count = 0
+                    while count < len(data):
+                        try:
+                            nbytes = sock.send(data[count:])
+                            count += nbytes
+                        except socket.error, ex:
+                            if ex.args[0] not in (EWOULDBLOCK, EAGAIN, EINTR):
+                                raise
+                        except (SSL.WantReadError, SSL.WantWriteError, \
+                                SSL.WantX509LookupError):
+                            # The operation did not complete; the same I/O method
+                            # should be called again.
+                            continue
+                        except SSL.ZeroReturnError:
+                            # The SSL Connection has been closed.
+                            raise
+                        except SSL.SysCallError, (retval, desc):
+                            if not (retval == -1 and data == ""):
+                                # errors when writing empty strings are expected
+                                # and can be ignored
+                                log.debug("SSL SysCallError:%d:%s" % (retval, desc))
+                                raise
+                        except SSL.Error, e:
+                            # other SSL errors
+                            log.debug("SSL Error:%s" % e)
+                            raise
+                except os.error, ex:
+                    if ex.args[0] not in (EWOULDBLOCK, EAGAIN, EINTR):
+                        break
+        finally:
+            try:
+                sock.close()
+                os.close(fd)
+            except:
+                pass
+
+    fd2send = staticmethod(fd2send)
 
 
 def hostAllowed(addrport, hosts_allowed):

@@ -43,11 +43,7 @@ typedef unsigned long       u_long;
 typedef long long           quad_t;
 typedef unsigned long long  u_quad_t;
 
-#if !defined(CONFIG_X86_PAE)
-typedef struct { unsigned long pte_low; } pte_t;
-#else
 typedef struct { unsigned long pte_low, pte_high; } pte_t;
-#endif /* CONFIG_X86_PAE */
 
 #elif defined(__x86_64__) || defined(__ia64__)
 typedef long                quad_t;
@@ -56,7 +52,7 @@ typedef unsigned long       u_quad_t;
 typedef struct { unsigned long pte; } pte_t;
 #endif /* __i386__ || __x86_64__ */
 
-#if !defined(CONFIG_X86_PAE)
+#ifdef __x86_64__
 #define __pte(x) ((pte_t) { (x) } )
 #else
 #define __pte(x) ({ unsigned long long _x = (x);        \

@@ -11,11 +11,15 @@
 #include <xen/hypercall.h>
 #include <compat/vcpu.h>
 
+#define xen_vcpu_set_periodic_timer vcpu_set_periodic_timer
+CHECK_vcpu_set_periodic_timer;
+#undef xen_vcpu_set_periodic_timer
+
 int compat_vcpu_op(int cmd, int vcpuid, XEN_GUEST_HANDLE(void) arg)
 {
     struct domain *d = current->domain;
     struct vcpu *v;
-    long rc = 0;
+    int rc = 0;
 
     if ( (vcpuid < 0) || (vcpuid >= MAX_VIRT_CPUS) )
         return -EINVAL;
@@ -57,7 +61,6 @@ int compat_vcpu_op(int cmd, int vcpuid, XEN_GUEST_HANDLE(void) arg)
     case VCPUOP_is_up:
     case VCPUOP_set_periodic_timer:
     case VCPUOP_stop_periodic_timer:
-    case VCPUOP_set_singleshot_timer:
     case VCPUOP_stop_singleshot_timer:
     case VCPUOP_send_nmi:
         rc = do_vcpu_op(cmd, vcpuid, arg);
@@ -74,6 +77,19 @@ int compat_vcpu_op(int cmd, int vcpuid, XEN_GUEST_HANDLE(void) arg)
         xlat_vcpu_runstate_info(&runstate.nat);
         if ( copy_to_guest(arg, &runstate.cmp, 1) )
             rc = -EFAULT;
+        break;
+    }
+
+    case VCPUOP_set_singleshot_timer:
+    {
+        struct compat_vcpu_set_singleshot_timer cmp;
+        struct vcpu_set_singleshot_timer *nat;
+
+        if ( copy_from_guest(&cmp, arg, 1) )
+            return -EFAULT;
+        nat = (void *)COMPAT_ARG_XLAT_VIRT_START(current->vcpu_id);
+        XLAT_vcpu_set_singleshot_timer(nat, &cmp);
+        rc = do_vcpu_op(cmd, vcpuid, guest_handle_from_ptr(nat, void));
         break;
     }
 

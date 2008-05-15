@@ -138,16 +138,16 @@ void dump_pageframe_info(struct domain *d)
     {
         list_for_each_entry ( page, &d->page_list, list )
         {
-            printk("    DomPage %p: mfn=%p, caf=%08x, taf=%" PRtype_info "\n",
-                   _p(page_to_maddr(page)), _p(page_to_mfn(page)),
+            printk("    DomPage %p: caf=%08x, taf=%" PRtype_info "\n",
+                   _p(page_to_mfn(page)),
                    page->count_info, page->u.inuse.type_info);
         }
     }
 
     list_for_each_entry ( page, &d->xenpage_list, list )
     {
-        printk("    XenPage %p: mfn=%p, caf=%08x, taf=%" PRtype_info "\n",
-               _p(page_to_maddr(page)), _p(page_to_mfn(page)),
+        printk("    XenPage %p: caf=%08x, taf=%" PRtype_info "\n",
+               _p(page_to_mfn(page)),
                page->count_info, page->u.inuse.type_info);
     }
 }
@@ -1725,6 +1725,27 @@ static int relinquish_memory(
         if ( test_and_clear_bit(_PGC_allocated, &page->count_info) )
             put_page(page);
 
+#ifdef DOMAIN_DESTRUCT_AVOID_RECURSION
+        /*
+         * Forcibly drop reference counts of page tables above top most (which
+         * were skipped to prevent long latencies due to deep recursion - see
+         * the special treatment in free_lX_table()).
+         */
+        y = page->u.inuse.type_info;
+        if ( (type < PGT_root_page_table) &&
+             unlikely(((y + PGT_type_mask) &
+                       (PGT_type_mask|PGT_validated)) == type) )
+        {
+            BUG_ON((y & PGT_count_mask) >=
+                   (page->count_info & PGC_count_mask));
+            while ( y & PGT_count_mask )
+            {
+                put_page_and_type(page);
+                y = page->u.inuse.type_info;
+            }
+        }
+#endif
+
         /*
          * Forcibly invalidate top-most, still valid page tables at this point
          * to break circular 'linear page table' references. This is okay
@@ -1896,6 +1917,11 @@ int domain_relinquish_resources(struct domain *d)
         /* fallthrough */
 
     case RELMEM_done:
+#ifdef DOMAIN_DESTRUCT_AVOID_RECURSION
+        ret = relinquish_memory(d, &d->page_list, PGT_l1_page_table);
+        if ( ret )
+            return ret;
+#endif
         break;
 
     default:

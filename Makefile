@@ -13,10 +13,6 @@ SUBARCH := $(subst x86_32,i386,$(XEN_TARGET_ARCH))
 export XEN_TARGET_ARCH SUBARCH XEN_SYSTYPE
 include buildconfigs/Rules.mk
 
-ifeq ($(XEN_TARGET_X86_PAE),y)
-export pae=y
-endif
-
 # build and install everything into the standard system directories
 .PHONY: install
 install: install-xen install-kernels install-tools install-docs

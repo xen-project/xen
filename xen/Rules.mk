@@ -30,8 +30,7 @@ endif
 # Set ARCH/SUBARCH appropriately.
 override TARGET_SUBARCH  := $(XEN_TARGET_ARCH)
 override TARGET_ARCH     := $(shell echo $(XEN_TARGET_ARCH) | \
-                              sed -e 's/x86.*/x86/' \
-                                  -e 's/powerpc.*/powerpc/')
+                              sed -e 's/x86.*/x86/')
 
 TARGET := $(BASEDIR)/xen
 

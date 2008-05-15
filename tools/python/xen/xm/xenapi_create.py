@@ -31,6 +31,7 @@ import xen.util.xsm.xsm as security
 import sys
 import os
 import traceback
+import re
 
 def log(_, msg):
     #print "> " + msg
@@ -509,7 +510,7 @@ class sxp2xml:
                    if len(child) > 0 and child[0] == "device"]
                    
         vbds_sxp = map(lambda x: x[1], [device for device in devices
-                                        if device[1][0] == "vbd"])
+                                        if device[1][0] in ("vbd", "tap")])
 
         vifs_sxp = map(lambda x: x[1], [device for device in devices
                                         if device[1][0] == "vif"])
@@ -707,9 +708,11 @@ class sxp2xml:
             = get_child_by_name(vbd_sxp, "mode") != "w" \
               and "RO" or "RW"
         vbd.attributes["device"] \
-            = get_child_by_name(vbd_sxp, "dev")
+            = re.sub(":cdrom$", "", get_child_by_name(vbd_sxp, "dev"))
         vbd.attributes["bootable"] = "1"
-        vbd.attributes["type"] = "disk"
+        vbd.attributes["type"] \
+            = re.search(":cdrom$", get_child_by_name(vbd_sxp, "dev")) \
+              and "CD" or "disk"
         vbd.attributes["qos_algorithm_type"] = ""
 
         return vbd

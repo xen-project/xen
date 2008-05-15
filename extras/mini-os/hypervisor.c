@@ -46,7 +46,11 @@ void do_hypervisor_callback(struct pt_regs *regs)
     in_callback = 1;
    
     vcpu_info->evtchn_upcall_pending = 0;
-    /* NB. No need for a barrier here -- XCHG is a barrier on x86. */
+    /* NB x86. No need for a barrier here -- XCHG is a barrier on x86. */
+#if !defined(__i386__) && !defined(__x86_64__)
+    /* Clear master flag /before/ clearing selector flag. */
+    wmb();
+#endif
     l1 = xchg(&vcpu_info->evtchn_pending_sel, 0);
     while ( l1 != 0 )
     {
@@ -58,7 +62,7 @@ void do_hypervisor_callback(struct pt_regs *regs)
             l2i = __ffs(l2);
             l2 &= ~(1 << l2i);
 
-            port = (l1i << 5) + l2i;
+            port = (l1i * (sizeof(unsigned long) * 8)) + l2i;
 			do_event(port, regs);
         }
     }
@@ -100,7 +104,8 @@ inline void unmask_evtchn(u32 port)
      * a real IO-APIC we 'lose the interrupt edge' if the channel is masked.
      */
     if (  synch_test_bit        (port,    &s->evtchn_pending[0]) && 
-         !synch_test_and_set_bit(port>>5, &vcpu_info->evtchn_pending_sel) )
+         !synch_test_and_set_bit(port / (sizeof(unsigned long) * 8),
+              &vcpu_info->evtchn_pending_sel) )
     {
         vcpu_info->evtchn_upcall_pending = 1;
         if ( !vcpu_info->evtchn_upcall_mask )

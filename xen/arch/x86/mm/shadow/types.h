@@ -23,47 +23,19 @@
 #ifndef _XEN_SHADOW_TYPES_H
 #define _XEN_SHADOW_TYPES_H
 
-// Map a shadow page
-static inline void *
-map_shadow_page(mfn_t smfn)
-{
-    // XXX -- Possible optimization/measurement question for 32-bit and PAE
-    //        hypervisors:
-    //        How often is this smfn already available in the shadow linear
-    //        table?  Might it be worth checking that table first,
-    //        presumably using the reverse map hint in the page_info of this
-    //        smfn, rather than calling map_domain_page()?
-    //
-    return sh_map_domain_page(smfn);
-}
-
-// matching unmap for map_shadow_page()
-static inline void
-unmap_shadow_page(void *p)
-{
-    sh_unmap_domain_page(p);
-}
+/* The number of levels in the shadow pagetable is entirely determined
+ * by the number of levels in the guest pagetable */
+#if GUEST_PAGING_LEVELS == 4
+#define SHADOW_PAGING_LEVELS 4
+#else
+#define SHADOW_PAGING_LEVELS 3
+#endif
 
 /* 
  * Define various types for handling pagetabels, based on these options:
  * SHADOW_PAGING_LEVELS : Number of levels of shadow pagetables
  * GUEST_PAGING_LEVELS  : Number of levels of guest pagetables
  */
-
-#if (CONFIG_PAGING_LEVELS < SHADOW_PAGING_LEVELS) 
-#error Cannot have more levels of shadow pagetables than host pagetables
-#endif
-
-#if (SHADOW_PAGING_LEVELS < GUEST_PAGING_LEVELS) 
-#error Cannot have more levels of guest pagetables than shadow pagetables
-#endif
-
-#if SHADOW_PAGING_LEVELS == 2
-#define SHADOW_L1_PAGETABLE_ENTRIES    1024
-#define SHADOW_L2_PAGETABLE_ENTRIES    1024
-#define SHADOW_L1_PAGETABLE_SHIFT        12
-#define SHADOW_L2_PAGETABLE_SHIFT        22
-#endif
 
 #if SHADOW_PAGING_LEVELS == 3
 #define SHADOW_L1_PAGETABLE_ENTRIES     512
@@ -72,9 +44,7 @@ unmap_shadow_page(void *p)
 #define SHADOW_L1_PAGETABLE_SHIFT        12
 #define SHADOW_L2_PAGETABLE_SHIFT        21
 #define SHADOW_L3_PAGETABLE_SHIFT        30
-#endif
-
-#if SHADOW_PAGING_LEVELS == 4
+#else /* SHADOW_PAGING_LEVELS == 4 */
 #define SHADOW_L1_PAGETABLE_ENTRIES     512
 #define SHADOW_L2_PAGETABLE_ENTRIES     512
 #define SHADOW_L3_PAGETABLE_ENTRIES     512
@@ -88,11 +58,9 @@ unmap_shadow_page(void *p)
 /* Types of the shadow page tables */
 typedef l1_pgentry_t shadow_l1e_t;
 typedef l2_pgentry_t shadow_l2e_t;
-#if SHADOW_PAGING_LEVELS >= 3
 typedef l3_pgentry_t shadow_l3e_t;
 #if SHADOW_PAGING_LEVELS >= 4
 typedef l4_pgentry_t shadow_l4e_t;
-#endif
 #endif
 
 /* Access functions for them */
@@ -100,39 +68,33 @@ static inline paddr_t shadow_l1e_get_paddr(shadow_l1e_t sl1e)
 { return l1e_get_paddr(sl1e); }
 static inline paddr_t shadow_l2e_get_paddr(shadow_l2e_t sl2e)
 { return l2e_get_paddr(sl2e); }
-#if SHADOW_PAGING_LEVELS >= 3
 static inline paddr_t shadow_l3e_get_paddr(shadow_l3e_t sl3e)
 { return l3e_get_paddr(sl3e); }
 #if SHADOW_PAGING_LEVELS >= 4
 static inline paddr_t shadow_l4e_get_paddr(shadow_l4e_t sl4e)
 { return l4e_get_paddr(sl4e); }
 #endif
-#endif
 
 static inline mfn_t shadow_l1e_get_mfn(shadow_l1e_t sl1e)
 { return _mfn(l1e_get_pfn(sl1e)); }
 static inline mfn_t shadow_l2e_get_mfn(shadow_l2e_t sl2e)
 { return _mfn(l2e_get_pfn(sl2e)); }
-#if SHADOW_PAGING_LEVELS >= 3
 static inline mfn_t shadow_l3e_get_mfn(shadow_l3e_t sl3e)
 { return _mfn(l3e_get_pfn(sl3e)); }
 #if SHADOW_PAGING_LEVELS >= 4
 static inline mfn_t shadow_l4e_get_mfn(shadow_l4e_t sl4e)
 { return _mfn(l4e_get_pfn(sl4e)); }
 #endif
-#endif
 
 static inline u32 shadow_l1e_get_flags(shadow_l1e_t sl1e)
 { return l1e_get_flags(sl1e); }
 static inline u32 shadow_l2e_get_flags(shadow_l2e_t sl2e)
 { return l2e_get_flags(sl2e); }
-#if SHADOW_PAGING_LEVELS >= 3
 static inline u32 shadow_l3e_get_flags(shadow_l3e_t sl3e)
 { return l3e_get_flags(sl3e); }
 #if SHADOW_PAGING_LEVELS >= 4
 static inline u32 shadow_l4e_get_flags(shadow_l4e_t sl4e)
 { return l4e_get_flags(sl4e); }
-#endif
 #endif
 
 static inline shadow_l1e_t
@@ -143,26 +105,22 @@ static inline shadow_l1e_t shadow_l1e_empty(void)
 { return l1e_empty(); }
 static inline shadow_l2e_t shadow_l2e_empty(void) 
 { return l2e_empty(); }
-#if SHADOW_PAGING_LEVELS >= 3
 static inline shadow_l3e_t shadow_l3e_empty(void) 
 { return l3e_empty(); }
 #if SHADOW_PAGING_LEVELS >= 4
 static inline shadow_l4e_t shadow_l4e_empty(void) 
 { return l4e_empty(); }
 #endif
-#endif
 
 static inline shadow_l1e_t shadow_l1e_from_mfn(mfn_t mfn, u32 flags)
 { return l1e_from_pfn(mfn_x(mfn), flags); }
 static inline shadow_l2e_t shadow_l2e_from_mfn(mfn_t mfn, u32 flags)
 { return l2e_from_pfn(mfn_x(mfn), flags); }
-#if SHADOW_PAGING_LEVELS >= 3
 static inline shadow_l3e_t shadow_l3e_from_mfn(mfn_t mfn, u32 flags)
 { return l3e_from_pfn(mfn_x(mfn), flags); }
 #if SHADOW_PAGING_LEVELS >= 4
 static inline shadow_l4e_t shadow_l4e_from_mfn(mfn_t mfn, u32 flags)
 { return l4e_from_pfn(mfn_x(mfn), flags); }
-#endif
 #endif
 
 #define shadow_l1_table_offset(a) l1_table_offset(a)
@@ -441,8 +399,7 @@ struct shadow_walk_t
 /* macros for dealing with the naming of the internal function names of the
  * shadow code's external entry points.
  */
-#define INTERNAL_NAME(name) \
-    SHADOW_INTERNAL_NAME(name, SHADOW_PAGING_LEVELS, GUEST_PAGING_LEVELS)
+#define INTERNAL_NAME(name) SHADOW_INTERNAL_NAME(name, GUEST_PAGING_LEVELS)
 
 /* macros for renaming the primary entry points, so that they are more
  * easily distinguished from a debugger
@@ -481,42 +438,24 @@ struct shadow_walk_t
 #define sh_guess_wrmap             INTERNAL_NAME(sh_guess_wrmap)
 #define sh_clear_shadow_entry      INTERNAL_NAME(sh_clear_shadow_entry)
 
-/* The sh_guest_(map|get)_* functions only depends on the number of config
- * levels
- */
-#define sh_guest_map_l1e                                       \
-        SHADOW_INTERNAL_NAME(sh_guest_map_l1e,                \
-                              CONFIG_PAGING_LEVELS,             \
-                              CONFIG_PAGING_LEVELS)
-#define sh_guest_get_eff_l1e                                   \
-        SHADOW_INTERNAL_NAME(sh_guest_get_eff_l1e,            \
-                              CONFIG_PAGING_LEVELS,             \
-                              CONFIG_PAGING_LEVELS)
 
-/* sh_make_monitor_table only depends on the number of shadow levels */
-#define sh_make_monitor_table                                  \
-        SHADOW_INTERNAL_NAME(sh_make_monitor_table,           \
-                              SHADOW_PAGING_LEVELS,             \
-                              SHADOW_PAGING_LEVELS)
-#define sh_destroy_monitor_table                               \
-        SHADOW_INTERNAL_NAME(sh_destroy_monitor_table,        \
-                              SHADOW_PAGING_LEVELS,             \
-                              SHADOW_PAGING_LEVELS)
+/* The sh_guest_(map|get)_* functions depends on Xen's paging levels */
+#define sh_guest_map_l1e \
+        SHADOW_INTERNAL_NAME(sh_guest_map_l1e, CONFIG_PAGING_LEVELS)
+#define sh_guest_get_eff_l1e \
+        SHADOW_INTERNAL_NAME(sh_guest_get_eff_l1e, CONFIG_PAGING_LEVELS)
 
+/* sh_make_monitor_table depends only on the number of shadow levels */
+#define sh_make_monitor_table \
+        SHADOW_INTERNAL_NAME(sh_make_monitor_table, SHADOW_PAGING_LEVELS)
+#define sh_destroy_monitor_table \
+        SHADOW_INTERNAL_NAME(sh_destroy_monitor_table, SHADOW_PAGING_LEVELS)
 
 #if SHADOW_PAGING_LEVELS == 3
 #define MFN_FITS_IN_HVM_CR3(_MFN) !(mfn_x(_MFN) >> 20)
 #endif
 
-#if SHADOW_PAGING_LEVELS == 2
-#define SH_PRI_pte "08x"
-#else /* SHADOW_PAGING_LEVELS >= 3 */
-#ifndef __x86_64__
-#define SH_PRI_pte "016llx"
-#else
-#define SH_PRI_pte "016lx"
-#endif
-#endif /* SHADOW_PAGING_LEVELS >= 3 */
+#define SH_PRI_pte PRIpte
 
 #if GUEST_PAGING_LEVELS == 2
 #define SH_PRI_gpte "08x"
@@ -529,7 +468,7 @@ struct shadow_walk_t
 #endif /* GUEST_PAGING_LEVELS >= 3 */
 
 
-#if (SHADOW_OPTIMIZATIONS & SHOPT_FAST_FAULT_PATH) && SHADOW_PAGING_LEVELS > 2
+#if (SHADOW_OPTIMIZATIONS & SHOPT_FAST_FAULT_PATH)
 /******************************************************************************
  * We implement a "fast path" for two special cases: faults that require
  * MMIO emulation, and faults where the guest PTE is not present.  We

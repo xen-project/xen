@@ -21,14 +21,10 @@
 static void print_xen_info(void)
 {
     char taint_str[TAINT_STRING_MAX_LEN];
-    char debug = 'n', *arch = "x86_32";
+    char debug = 'n', *arch = "x86_32p";
 
 #ifndef NDEBUG
     debug = 'y';
-#endif
-
-#ifdef CONFIG_X86_PAE
-    arch = "x86_32p";
 #endif
 
     printk("----[ Xen-%d.%d%s  %s  debug=%c  %s ]----\n",
@@ -117,9 +113,7 @@ void show_registers(struct cpu_user_regs *regs)
 void show_page_walk(unsigned long addr)
 {
     unsigned long pfn, mfn, cr3 = read_cr3();
-#ifdef CONFIG_X86_PAE
     l3_pgentry_t l3e, *l3t;
-#endif
     l2_pgentry_t l2e, *l2t;
     l1_pgentry_t l1e, *l1t;
 
@@ -127,7 +121,6 @@ void show_page_walk(unsigned long addr)
 
     mfn = cr3 >> PAGE_SHIFT;
 
-#ifdef CONFIG_X86_PAE
     l3t  = map_domain_page(mfn);
     l3t += (cr3 & 0xFE0UL) >> 3;
     l3e = l3t[l3_table_offset(addr)];
@@ -138,7 +131,6 @@ void show_page_walk(unsigned long addr)
     unmap_domain_page(l3t);
     if ( !(l3e_get_flags(l3e) & _PAGE_PRESENT) )
         return;
-#endif
 
     l2t = map_domain_page(mfn);
     l2e = l2t[l2_table_offset(addr)];

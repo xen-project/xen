@@ -126,11 +126,7 @@ wakeup_32:
         /* fpu init? */
 
         /* Initialise CR4. */
-#if CONFIG_PAGING_LEVELS == 2
-        mov     $X86_CR4_PSE, %ecx
-#else
         mov     $X86_CR4_PAE, %ecx
-#endif
         mov     %ecx, %cr4
 
         /* Load pagetable base register */
@@ -139,7 +135,6 @@ wakeup_32:
         mov     %eax,%cr3
 
         /* Will cpuid feature change after resume? */
-#if CONFIG_PAGING_LEVELS != 2
         /* Set up EFER (Extended Feature Enable Register). */
         mov     bootsym_phys(cpuid_ext_features),%edi
         test    $0x20100800,%edi /* SYSCALL/SYSRET, No Execute, Long Mode? */
@@ -155,7 +150,6 @@ wakeup_32:
         btsl    $_EFER_NX,%eax  /* No Execute     */
 1:      wrmsr
 .Lskip_eferw:
-#endif
 
         wbinvd
 

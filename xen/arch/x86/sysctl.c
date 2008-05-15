@@ -40,6 +40,7 @@ long arch_do_sysctl(
     case XEN_SYSCTL_physinfo:
     {
         uint32_t i, max_array_ent;
+        XEN_GUEST_HANDLE_64(uint32) cpu_to_node_arr;
 
         xen_sysctl_physinfo_t *pi = &sysctl->u.physinfo;
 
@@ -47,7 +48,11 @@ long arch_do_sysctl(
         if ( ret )
             break;
 
+        max_array_ent = pi->max_cpu_id;
+        cpu_to_node_arr = pi->cpu_to_node;
+
         memset(pi, 0, sizeof(*pi));
+        pi->cpu_to_node = cpu_to_node_arr;
         pi->threads_per_core =
             cpus_weight(cpu_sibling_map[0]);
         pi->cores_per_socket =
@@ -64,22 +69,26 @@ long arch_do_sysctl(
         if ( iommu_enabled )
             pi->capabilities |= XEN_SYSCTL_PHYSCAP_hvm_directio;
 
-        max_array_ent = pi->max_cpu_id;
         pi->max_cpu_id = last_cpu(cpu_online_map);
         max_array_ent = min_t(uint32_t, max_array_ent, pi->max_cpu_id);
 
-        ret = -EFAULT;
-        if ( !guest_handle_is_null(pi->cpu_to_node) )
+        ret = 0;
+
+        if ( !guest_handle_is_null(cpu_to_node_arr) )
         {
             for ( i = 0; i <= max_array_ent; i++ )
             {
                 uint32_t node = cpu_online(i) ? cpu_to_node(i) : ~0u;
-                if ( copy_to_guest_offset(pi->cpu_to_node, i, &node, 1) )
+                if ( copy_to_guest_offset(cpu_to_node_arr, i, &node, 1) )
+                {
+                    ret = -EFAULT;
                     break;
+                }
             }
         }
 
-        ret = copy_to_guest(u_sysctl, sysctl, 1) ? -EFAULT : 0;
+        if ( copy_to_guest(u_sysctl, sysctl, 1) )
+            ret = -EFAULT;
     }
     break;
     

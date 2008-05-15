@@ -55,10 +55,6 @@
 #define xen_mb()   asm volatile ("mf" ::: "memory")
 #define xen_rmb()  asm volatile ("mf" ::: "memory")
 #define xen_wmb()  asm volatile ("mf" ::: "memory")
-#elif defined(__powerpc__)
-#define xen_mb()   asm volatile ("sync" : : : "memory")
-#define xen_rmb()  asm volatile ("sync" : : : "memory") /* lwsync? */
-#define xen_wmb()  asm volatile ("sync" : : : "memory") /* eieio? */
 #else
 #error "Define barriers"
 #endif
@@ -863,6 +859,7 @@ int xc_physdev_map_pirq_msi(int xc_handle,
                             int *pirq,
                             int devfn,
                             int bus,
+                            int entry_nr,
                             int msi_type);
 
 int xc_physdev_unmap_pirq(int xc_handle,
@@ -943,11 +940,6 @@ xc_error_handler xc_set_error_handler(xc_error_handler handler);
 
 int xc_set_hvm_param(int handle, domid_t dom, int param, unsigned long value);
 int xc_get_hvm_param(int handle, domid_t dom, int param, unsigned long *value);
-
-/* PowerPC specific. */
-int xc_alloc_real_mode_area(int xc_handle,
-                            uint32_t domid,
-                            unsigned int log);
 
 /* IA64 specific, nvram save */
 int xc_ia64_save_to_nvram(int xc_handle, uint32_t dom);

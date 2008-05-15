@@ -264,7 +264,7 @@ void xfree(const void *p)
             printk("Bug\n");
             *(int*)0=0;
         }
-        free_pages(hdr, 0);
+        free_page(hdr);
     }
     else
     {

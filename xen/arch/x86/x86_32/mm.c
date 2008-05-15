@@ -30,13 +30,8 @@
 #include <asm/fixmap.h>
 #include <public/memory.h>
 
-#ifdef CONFIG_X86_PAE
 l2_pgentry_t __attribute__ ((__section__ (".bss.page_aligned")))
     idle_pg_table_l2[4 * L2_PAGETABLE_ENTRIES];
-#else
-l2_pgentry_t __attribute__ ((__section__ (".bss.page_aligned")))
-    idle_pg_table_l2[L2_PAGETABLE_ENTRIES];
-#endif
 
 extern l1_pgentry_t l1_identmap[L1_PAGETABLE_ENTRIES];
 
@@ -73,12 +68,6 @@ void __init paging_init(void)
     unsigned long v;
     struct page_info *pg;
     int i;
-
-#ifdef CONFIG_X86_PAE
-    printk("PAE enabled, limit: %d GB\n", MACHPHYS_MBYTES);
-#else
-    printk("PAE disabled.\n");
-#endif
 
     if ( cpu_has_pge )
     {

@@ -640,46 +640,84 @@ class XendConfig(dict):
             else:
                 cfg['cpus'] = str(cfg['cpu'])
 
-        # Convert 'cpus' to list of ints
+        # Convert 'cpus' to list of list of ints
+        cpus_list = []
         if 'cpus' in cfg:
-            cpus = []
-            if type(cfg['cpus']) == list:
-                # If sxp_cfg was created from config.sxp,
-                # the form of 'cpus' is list of string.
-                # Convert 'cpus' to list of ints.
-                #    ['1']         -> [1]
-                #    ['0','2','3'] -> [0,2,3]
-                try:
-                    for c in cfg['cpus']:
-                        cpus.append(int(c))
-                    
-                    cfg['cpus'] = cpus
-                except ValueError, e:
-                    raise XendConfigError('cpus = %s: %s' % (cfg['cpus'], e))
-            else:
-                # Convert 'cpus' string to list of ints
-                # 'cpus' supports a list of ranges (0-3),
-                # seperated by commas, and negation, (^1).  
-                # Precedence is settled by order of the 
-                # string:
-                #    "0-3,^1"      -> [0,2,3]
-                #    "0-3,^1,1"    -> [0,1,2,3]
-                try:
-                    for c in cfg['cpus'].split(','):
-                        if c.find('-') != -1:             
-                            (x, y) = c.split('-')
-                            for i in range(int(x), int(y)+1):
-                                cpus.append(int(i))
+            # Convert the following string to list of ints.
+            # The string supports a list of ranges (0-3),
+            # seperated by commas, and negation (^1).  
+            # Precedence is settled by order of the string:
+            #    "0-3,^1"      -> [0,2,3]
+            #    "0-3,^1,1"    -> [0,1,2,3]
+            def cnv(s):
+                l = []
+                for c in s.split(','):
+                    if c.find('-') != -1:
+                        (x, y) = c.split('-')
+                        for i in range(int(x), int(y)+1):
+                            l.append(int(i))
+                    else:
+                        # remove this element from the list 
+                        if c[0] == '^':
+                            l = [x for x in l if x != int(c[1:])]
                         else:
-                            # remove this element from the list 
-                            if c[0] == '^':
-                                cpus = [x for x in cpus if x != int(c[1:])]
-                            else:
-                                cpus.append(int(c))
-                    
-                    cfg['cpus'] = cpus
+                            l.append(int(c))
+                return l
+            
+            if type(cfg['cpus']) == list:
+                if len(cfg['cpus']) > 0 and type(cfg['cpus'][0]) == list:
+                    # If sxp_cfg was created from config.sxp,
+                    # the form of 'cpus' is list of list of string.
+                    # Convert 'cpus' to list of list of ints.
+                    # Conversion examples:
+                    #    [['1']]               -> [[1]]
+                    #    [['0','2'],['1','3']] -> [[0,2],[1,3]]
+                    try:
+                        for c1 in cfg['cpus']:
+                            cpus = []
+                            for c2 in c1:
+                                cpus.append(int(c2))
+                            cpus_list.append(cpus)
+                    except ValueError, e:
+                        raise XendConfigError('cpus = %s: %s' % (cfg['cpus'], e))
+                else:
+                    # Conversion examples:
+                    #    ["1"]               -> [[1]]
+                    #    ["0,2","1,3"]       -> [[0,2],[1,3]]
+                    #    ["0-3,^1","1-4,^2"] -> [[0,2,3],[1,3,4]]
+                    try:
+                        for c in cfg['cpus']:
+                            cpus = cnv(c)
+                            cpus_list.append(cpus)
+                    except ValueError, e:
+                        raise XendConfigError('cpus = %s: %s' % (cfg['cpus'], e))
+                
+                if len(cpus_list) != cfg['vcpus']:
+                    raise XendConfigError('vcpus and the item number of cpus are not same')
+            else:
+                # Conversion examples:
+                #  vcpus=1:
+                #    "1"      -> [[1]]
+                #    "0-3,^1" -> [[0,2,3]]
+                #  vcpus=2:
+                #    "1"      -> [[1],[1]]
+                #    "0-3,^1" -> [[0,2,3],[0,2,3]]
+                try:
+                    cpus = cnv(cfg['cpus'])
+                    for v in range(0, cfg['vcpus']):
+                        cpus_list.append(cpus)
                 except ValueError, e:
                     raise XendConfigError('cpus = %s: %s' % (cfg['cpus'], e))
+        else:
+            # Generation examples:
+            #  vcpus=1:
+            #    -> [[]]
+            #  vcpus=2:
+            #    -> [[],[]]
+            for v in range(0, cfg['vcpus']):
+                cpus_list.append(list())
+        
+        cfg['cpus'] = cpus_list
 
         # Parse cpuid
         if 'cpuid' in cfg:

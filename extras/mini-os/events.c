@@ -58,9 +58,12 @@ void unbind_all_ports(void)
 int do_event(evtchn_port_t port, struct pt_regs *regs)
 {
     ev_action_t  *action;
+
+    clear_evtchn(port);
+
     if (port >= NR_EVS) {
         printk("Port number too large: %d\n", port);
-		goto out;
+        return 1;
     }
 
     action = &ev_actions[port];
@@ -68,9 +71,6 @@ int do_event(evtchn_port_t port, struct pt_regs *regs)
 
     /* call the handler */
 	action->handler(port, regs, action->data);
-
- out:
-	clear_evtchn(port);
 
     return 1;
 

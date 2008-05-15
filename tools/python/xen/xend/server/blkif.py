@@ -47,7 +47,7 @@ class BlkifController(DevController):
         except ValueError:
             dev_type = "disk"
 
-        if uname is None:
+        if uname == '':
             if dev_type == 'cdrom':
                 (typ, params) = ("", "")
             else:
@@ -56,8 +56,13 @@ class BlkifController(DevController):
         else:
             try:
                 (typ, params) = string.split(uname, ':', 1)
+                if typ not in ('phy', 'file', 'tap'):
+                    raise VmError(
+                        'Block device must have "phy", "file" or "tap" '
+                        'specified to type')
             except ValueError:
-                (typ, params) = ("", "")
+                raise VmError(
+                    'Block device must have physical details specified')
 
         mode = config.get('mode', 'r')
         if mode not in ('r', 'w', 'w!'):
@@ -83,6 +88,10 @@ class BlkifController(DevController):
         front = { 'virtual-device' : "%i" % devid,
                   'device-type' : dev_type
                 }
+
+        protocol = config.get('protocol')
+        if protocol:
+            front['protocol'] = protocol
 
         return (devid, back, front)
 
@@ -156,6 +165,10 @@ class BlkifController(DevController):
             config['mode'] = mode
         if uuid:
             config['uuid'] = uuid
+
+        proto = self.readFrontend(devid, 'protocol')
+        if proto:
+            config['protocol'] = proto
 
         return config
 

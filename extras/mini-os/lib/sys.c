@@ -249,6 +249,16 @@ int read(int fd, void *buf, size_t nbytes)
 	    }
 	    return ret * sizeof(union xenkbd_in_event);
         }
+        case FTYPE_FB: {
+            int ret, n;
+            n = nbytes / sizeof(union xenfb_in_event);
+            ret = fbfront_receive(files[fd].fb.dev, buf, n);
+	    if (ret <= 0) {
+		errno = EAGAIN;
+		return -1;
+	    }
+	    return ret * sizeof(union xenfb_in_event);
+        }
 	case FTYPE_NONE:
 	case FTYPE_XENBUS:
 	case FTYPE_EVTCHN:
@@ -290,6 +300,7 @@ int write(int fd, const void *buf, size_t nbytes)
 	case FTYPE_EVTCHN:
 	case FTYPE_BLK:
 	case FTYPE_KBD:
+	case FTYPE_FB:
 	    break;
     }
     printk("write(%d): Bad descriptor\n", fd);
@@ -348,6 +359,7 @@ int fsync(int fd) {
 	case FTYPE_TAP:
 	case FTYPE_BLK:
 	case FTYPE_KBD:
+	case FTYPE_FB:
 	    break;
     }
     printk("fsync(%d): Bad descriptor\n", fd);
@@ -392,6 +404,10 @@ int close(int fd)
 	    return 0;
 	case FTYPE_KBD:
             shutdown_kbdfront(files[fd].kbd.dev);
+            files[fd].type = FTYPE_NONE;
+            return 0;
+	case FTYPE_FB:
+            shutdown_fbfront(files[fd].fb.dev);
             files[fd].type = FTYPE_NONE;
             return 0;
 	case FTYPE_NONE:
@@ -485,6 +501,7 @@ int fstat(int fd, struct stat *buf)
 	case FTYPE_TAP:
 	case FTYPE_BLK:
 	case FTYPE_KBD:
+	case FTYPE_FB:
 	    break;
     }
 
@@ -513,6 +530,7 @@ int ftruncate(int fd, off_t length)
 	case FTYPE_TAP:
 	case FTYPE_BLK:
 	case FTYPE_KBD:
+	case FTYPE_FB:
 	    break;
     }
 
@@ -624,6 +642,7 @@ static const char file_types[] = {
     [FTYPE_TAP]		= 'T',
     [FTYPE_BLK]		= 'B',
     [FTYPE_KBD]		= 'K',
+    [FTYPE_FB]		= 'G',
 };
 #ifdef LIBC_DEBUG
 static void dump_set(int nfds, fd_set *readfds, fd_set *writefds, fd_set *exceptfds, struct timeval *timeout)
@@ -732,6 +751,7 @@ static int select_poll(int nfds, fd_set *readfds, fd_set *writefds, fd_set *exce
 	case FTYPE_TAP:
 	case FTYPE_BLK:
 	case FTYPE_KBD:
+	case FTYPE_FB:
 	    if (FD_ISSET(i, readfds)) {
 		if (files[i].read)
 		    n++;

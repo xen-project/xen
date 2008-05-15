@@ -49,6 +49,20 @@ void kbdfront_handler(evtchn_port_t port, struct pt_regs *regs, void *data)
     wake_up(&kbdfront_queue);
 }
 
+static void free_kbdfront(struct kbdfront_dev *dev)
+{
+    mask_evtchn(dev->evtchn);
+
+    free(dev->backend);
+
+    free_page(dev->page);
+
+    unbind_evtchn(dev->evtchn);
+
+    free(dev->nodename);
+    free(dev);
+}
+
 struct kbdfront_dev *init_kbdfront(char *nodename, int abs_pointer)
 {
     xenbus_transaction_t xbt;
@@ -122,7 +136,7 @@ again:
 
 abort_transaction:
     xenbus_transaction_end(xbt, 1, &retry);
-    return NULL;
+    goto error;
 
 done:
 
@@ -130,7 +144,7 @@ done:
     msg = xenbus_read(XBT_NIL, path, &dev->backend);
     if (msg) {
         printk("Error %s when reading the backend path %s\n", msg, path);
-        return NULL;
+        goto error;
     }
 
     printk("backend at %s\n", dev->backend);
@@ -153,6 +167,9 @@ done:
     printk("************************** KBDFRONT\n");
 
     return dev;
+error:
+    free_kbdfront(dev);
+    return NULL;
 }
 
 int kbdfront_receive(struct kbdfront_dev *dev, union xenkbd_in_event *buf, int n)
@@ -208,12 +225,7 @@ void shutdown_kbdfront(struct kbdfront_dev *dev)
 
     xenbus_unwatch_path(XBT_NIL, path);
 
-    unbind_evtchn(dev->evtchn);
-
-    free_pages(dev->page,0);
-    free(nodename);
-    free(dev->backend);
-    free(dev);
+    free_kbdfront(dev);
 }
 
 #ifdef HAVE_LIBC
@@ -255,11 +267,69 @@ struct fbfront_dev {
     int offset;
 
     xenbus_event_queue events;
+
+#ifdef HAVE_LIBC
+    int fd;
+#endif
 };
 
 void fbfront_handler(evtchn_port_t port, struct pt_regs *regs, void *data)
 {
+#ifdef HAVE_LIBC
+    struct fbfront_dev *dev = data;
+    int fd = dev->fd;
+
+    files[fd].read = 1;
+#endif
     wake_up(&fbfront_queue);
+}
+
+static void free_fbfront(struct fbfront_dev *dev)
+{
+    mask_evtchn(dev->evtchn);
+
+    free(dev->backend);
+
+    free_page(dev->page);
+
+    unbind_evtchn(dev->evtchn);
+
+    free(dev->nodename);
+    free(dev);
+}
+
+int fbfront_receive(struct fbfront_dev *dev, union xenfb_in_event *buf, int n)
+{
+    struct xenfb_page *page = dev->page;
+    uint32_t prod, cons;
+    int i;
+
+#ifdef HAVE_LIBC
+    files[dev->fd].read = 0;
+    mb(); /* Make sure to let the handler set read to 1 before we start looking at the ring */
+#endif
+
+    prod = page->in_prod;
+
+    if (prod == page->in_cons)
+        return 0;
+
+    rmb();      /* ensure we see ring contents up to prod */
+
+    for (i = 0, cons = page->in_cons; i < n && cons != prod; i++, cons++)
+        memcpy(buf + i, &XENFB_IN_RING_REF(page, cons), sizeof(*buf));
+
+    mb();       /* ensure we got ring contents */
+    page->in_cons = cons;
+    notify_remote_via_evtchn(dev->evtchn);
+
+#ifdef HAVE_LIBC
+    if (cons != prod)
+        /* still some events to read */
+        files[dev->fd].read = 1;
+#endif
+
+    return i;
 }
 
 struct fbfront_dev *init_fbfront(char *nodename, unsigned long *mfns, int width, int height, int depth, int stride, int n)
@@ -357,7 +427,7 @@ again:
 
 abort_transaction:
     xenbus_transaction_end(xbt, 1, &retry);
-    return NULL;
+    goto error;
 
 done:
 
@@ -365,7 +435,7 @@ done:
     msg = xenbus_read(XBT_NIL, path, &dev->backend);
     if (msg) {
         printk("Error %s when reading the backend path %s\n", msg, path);
-        return NULL;
+        goto error;
     }
 
     printk("backend at %s\n", dev->backend);
@@ -391,6 +461,10 @@ done:
     printk("************************** FBFRONT\n");
 
     return dev;
+
+error:
+    free_fbfront(dev);
+    return NULL;
 }
 
 static void fbfront_out_event(struct fbfront_dev *dev, union xenfb_out_event *event)
@@ -477,8 +551,16 @@ void shutdown_fbfront(struct fbfront_dev *dev)
 
     unbind_evtchn(dev->evtchn);
 
-    free_pages(dev->page,0);
-    free(nodename);
-    free(dev->backend);
-    free(dev);
+    free_fbfront(dev);
 }
+
+#ifdef HAVE_LIBC
+int fbfront_open(struct fbfront_dev *dev)
+{
+    dev->fd = alloc_fd(FTYPE_FB);
+    printk("fb_open(%s) -> %d\n", dev->nodename, dev->fd);
+    files[dev->fd].fb.dev = dev;
+    return dev->fd;
+}
+#endif
+

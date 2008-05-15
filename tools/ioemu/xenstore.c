@@ -90,6 +90,7 @@ void xenstore_parse_domain_config(int hvm_domid)
     int i, is_scsi, is_hdN = 0;
     unsigned int len, num, hd_index, pci_devid = 0;
     BlockDriverState *bs;
+    BlockDriver *format;
 
     for(i = 0; i < MAX_DISKS + MAX_SCSI_DISKS; i++)
         media_filename[i] = NULL;
@@ -135,6 +136,8 @@ void xenstore_parse_domain_config(int hvm_domid)
     }
         
     for (i = 0; i < num; i++) {
+	format = NULL; /* don't know what the format is yet */
+
         /* read the backend path */
         if (pasprintf(&buf, "%s/device/vbd/%s/backend", path, e[i]) == -1)
             continue;
@@ -181,13 +184,20 @@ void xenstore_parse_domain_config(int hvm_domid)
         drv = xs_read(xsh, XBT_NULL, buf, &len);
         if (drv == NULL)
             continue;
-        /* Strip off blktap sub-type prefix aio: - QEMU can autodetect this */
+        /* Obtain blktap sub-type prefix */
         if (!strcmp(drv, "tap") && params[0]) {
             char *offset = strchr(params, ':'); 
             if (!offset)
                 continue ;
+	    free(drv);
+	    drv = malloc(offset - params + 1);
+	    memcpy(drv, params, offset - params);
+	    drv[offset - params] = '\0';
+	    if (!strcmp(drv, "aio"))
+		/* qemu does aio anyway if it can */
+		format = &bdrv_raw;
             memmove(params, offset+1, strlen(offset+1)+1 );
-            fprintf(logfile, "Strip off blktap sub-type prefix to %s\n", params); 
+            fprintf(logfile, "Strip off blktap sub-type prefix to %s (drv '%s')\n", params, drv); 
         }
         /* Prefix with /dev/ if needed */
         if (!strcmp(drv, "phy") && params[0] != '/') {
@@ -195,6 +205,7 @@ void xenstore_parse_domain_config(int hvm_domid)
             sprintf(newparams, "/dev/%s", params);
             free(params);
             params = newparams;
+	    format = &bdrv_raw;
         }
 
         /* 
@@ -240,8 +251,25 @@ void xenstore_parse_domain_config(int hvm_domid)
 #endif
 
         if (params[0]) {
-            if (bdrv_open(bs, params, 0 /* snapshot */) < 0)
-                fprintf(stderr, "qemu: could not open vbd '%s' or hard disk image '%s'\n", buf, params);
+	    if (!format) {
+		if (!drv) {
+		    fprintf(stderr, "qemu: type (image format) not specified for vbd '%s' or image '%s'\n", buf, params);
+		    continue;
+		}
+		if (!strcmp(drv,"qcow")) {
+		    /* autoguess qcow vs qcow2 */
+		} else if (!strcmp(drv,"file") || !strcmp(drv,"phy")) {
+		    format = &bdrv_raw;
+		} else {
+		    format = bdrv_find_format(drv);
+		    if (!format) {
+			fprintf(stderr, "qemu: type (image format) '%s' unknown for vbd '%s' or image '%s'\n", drv, buf, params);
+			continue;
+		    }
+		}
+	    }
+            if (bdrv_open2(bs, params, 0 /* snapshot */, format) < 0)
+                fprintf(stderr, "qemu: could not open vbd '%s' or hard disk image '%s' (drv '%s')\n", buf, params, drv ? drv : "?");
         }
     }
 

@@ -79,13 +79,11 @@ void new_pt_frame(unsigned long *pt_pfn, unsigned long prev_l_mfn,
          prot_t = L2_PROT;
          pincmd = MMUEXT_PIN_L1_TABLE;
          break;
-#if defined(__x86_64__) || defined(CONFIG_X86_PAE)
     case L2_FRAME:
          prot_e = L2_PROT;
          prot_t = L3_PROT;
          pincmd = MMUEXT_PIN_L2_TABLE;
          break;
-#endif
 #if defined(__x86_64__)
     case L3_FRAME:
          prot_e = L3_PROT;
@@ -102,11 +100,8 @@ void new_pt_frame(unsigned long *pt_pfn, unsigned long prev_l_mfn,
     /* Update the entry */
 #if defined(__x86_64__)
     tab = pte_to_virt(tab[l4_table_offset(pt_page)]);
-    tab = pte_to_virt(tab[l3_table_offset(pt_page)]);
 #endif
-#if defined(CONFIG_X86_PAE)
     tab = pte_to_virt(tab[l3_table_offset(pt_page)]);
-#endif
 
     mmu_updates[0].ptr = ((pgentry_t)tab[l2_table_offset(pt_page)] & PAGE_MASK) + 
                          sizeof(pgentry_t) * l1_table_offset(pt_page);
@@ -164,7 +159,6 @@ static int need_pt_frame(unsigned long virt_address, int level)
     } else
 #endif
 
-#if defined(__x86_64__) || defined(CONFIG_X86_PAE)
     if(level == L2_FRAME)
     {
 #if defined(__x86_64__)
@@ -181,7 +175,6 @@ static int need_pt_frame(unsigned long virt_address, int level)
 
         return 1;
     } else 
-#endif /* defined(__x86_64__) || defined(CONFIG_X86_PAE) */
 
     /* Always need l1 frames */
     if(level == L1_FRAME)
@@ -236,7 +229,6 @@ void build_pagetable(unsigned long *start_pfn, unsigned long *max_pfn)
         mfn = pte_to_mfn(page);
         tab = to_virt(mfn_to_pfn(mfn) << PAGE_SHIFT);
 #endif
-#if defined(__x86_64__) || defined(CONFIG_X86_PAE)
         offset = l3_table_offset(start_address);
         /* Need new L2 pt frame */
         if(!(start_address & L2_MASK))
@@ -246,7 +238,6 @@ void build_pagetable(unsigned long *start_pfn, unsigned long *max_pfn)
         page = tab[offset];
         mfn = pte_to_mfn(page);
         tab = to_virt(mfn_to_pfn(mfn) << PAGE_SHIFT);
-#endif
         offset = l2_table_offset(start_address);        
         /* Need new L1 pt frame */
         if(!(start_address & L1_MASK))
@@ -298,12 +289,10 @@ static void set_readonly(void *text, void *etext)
         mfn = pte_to_mfn(page);
         tab = to_virt(mfn_to_pfn(mfn) << PAGE_SHIFT);
 #endif
-#if defined(__x86_64__) || defined(CONFIG_X86_PAE)
         offset = l3_table_offset(start_address);
         page = tab[offset];
         mfn = pte_to_mfn(page);
         tab = to_virt(mfn_to_pfn(mfn) << PAGE_SHIFT);
-#endif
         offset = l2_table_offset(start_address);        
         page = tab[offset];
         mfn = pte_to_mfn(page);
@@ -382,13 +371,11 @@ static pgentry_t *get_pgt(unsigned long addr)
     mfn = pte_to_mfn(tab[offset]);
     tab = mfn_to_virt(mfn);
 #endif
-#if defined(__x86_64__) || defined(CONFIG_X86_PAE)
     offset = l3_table_offset(addr);
     if (!(tab[offset] & _PAGE_PRESENT))
         return NULL;
     mfn = pte_to_mfn(tab[offset]);
     tab = mfn_to_virt(mfn);
-#endif
     offset = l2_table_offset(addr);
     if (!(tab[offset] & _PAGE_PRESENT))
         return NULL;
@@ -418,7 +405,6 @@ static pgentry_t *need_pgt(unsigned long addr)
     mfn = pte_to_mfn(tab[offset]);
     tab = mfn_to_virt(mfn);
 #endif
-#if defined(__x86_64__) || defined(CONFIG_X86_PAE)
     offset = l3_table_offset(addr);
     if (!(tab[offset] & _PAGE_PRESENT)) {
         pt_pfn = virt_to_pfn(alloc_page());
@@ -427,7 +413,6 @@ static pgentry_t *need_pgt(unsigned long addr)
     ASSERT(tab[offset] & _PAGE_PRESENT);
     mfn = pte_to_mfn(tab[offset]);
     tab = mfn_to_virt(mfn);
-#endif
     offset = l2_table_offset(addr);
     if (!(tab[offset] & _PAGE_PRESENT)) {
         pt_pfn = virt_to_pfn(alloc_page());

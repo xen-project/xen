@@ -30,8 +30,6 @@ _uname_to_arch_map = {
     "i686"  : "x86",
     "x86_64": "x86_64",
     "ia64"  : "ia64",
-    "ppc"   : "powerpc",
-    "ppc64" : "powerpc",
 }
 
 _arch = _uname_to_arch_map.get(os.uname()[4], "Unknown")
@@ -44,9 +42,5 @@ elif _arch == "x86_64":
 elif _arch == "ia64":
     cpuValues = {"arch"     : "Unknown",
                  "features" : "Unknown"}
-elif _arch == "powerpc":
-    cpuValues = {"cpu"      : "Unknown",
-                 "platform" : "Unknown",
-                 "revision" : "Unknown"}
 else:
     raise ValueError, "Unknown architecture!"

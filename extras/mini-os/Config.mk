@@ -2,9 +2,6 @@
 MINI-OS_ROOT=$(XEN_ROOT)/extras/mini-os
 export MINI-OS_ROOT
 
-ifeq ($(XEN_TARGET_ARCH),x86_32)
-export pae ?= y
-endif
 libc = $(stubdom)
 
 XEN_INTERFACE_VERSION := 0x00030205
@@ -25,7 +22,6 @@ TARGET_ARCH_DIR := arch/$(TARGET_ARCH_FAM)
 # Export these variables for possible use in architecture dependent makefiles.
 export TARGET_ARCH_DIR
 export TARGET_ARCH_FAM
-export XEN_TARGET_X86_PAE 
 
 # This is used for architecture specific links.
 # This can be overwritten from arch specific rules.
@@ -69,8 +65,4 @@ endif
 
 ifneq ($(CAMLDIR),)
 caml=y
-endif
-
-ifeq ($(pae),y)
-DEF_CPPFLAGS += -DCONFIG_X86_PAE
 endif

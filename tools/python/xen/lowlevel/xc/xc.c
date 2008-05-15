@@ -1350,28 +1350,6 @@ static PyObject *dom_op(XcObject *self, PyObject *args,
     return zero;
 }
 
-#ifdef __powerpc__
-static PyObject *pyxc_alloc_real_mode_area(XcObject *self,
-                                           PyObject *args,
-                                           PyObject *kwds)
-{
-    uint32_t dom;
-    unsigned int log;
-
-    static char *kwd_list[] = { "dom", "log", NULL };
-
-    if ( !PyArg_ParseTupleAndKeywords(args, kwds, "ii", kwd_list, 
-                                      &dom, &log) )
-        return NULL;
-
-    if ( xc_alloc_real_mode_area(self->xc_handle, dom, log) )
-        return pyxc_error_to_exception();
-
-    Py_INCREF(zero);
-    return zero;
-}
-#endif /* powerpc */
-
 static PyMethodDef pyxc_methods[] = {
     { "handle",
       (PyCFunction)pyxc_handle,
@@ -1759,16 +1737,6 @@ static PyMethodDef pyxc_methods[] = {
       "Inject debug keys into Xen.\n"
       " keys    [str]: String of keys to inject.\n" },
 
-#ifdef __powerpc__
-    { "arch_alloc_real_mode_area", 
-      (PyCFunction)pyxc_alloc_real_mode_area, 
-      METH_VARARGS | METH_KEYWORDS, "\n"
-      "Allocate a domain's real mode area.\n"
-      " dom [int]: Identifier of domain.\n"
-      " log [int]: Specifies the area's size.\n"
-      "Returns: [int] 0 on success; -1 on error.\n" },
-#endif /* __powerpc */
-  
 #if defined(__i386__) || defined(__x86_64__)
     { "domain_check_cpuid", 
       (PyCFunction)pyxc_dom_check_cpuid, 

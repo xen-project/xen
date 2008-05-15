@@ -929,6 +929,9 @@ extern struct soundhw soundhw[];
 
 #define VGA_RAM_SIZE (8192 * 1024)
 
+/* in ms */
+#define GUI_REFRESH_INTERVAL 30
+
 struct DisplayState {
     uint8_t *data;
     int linesize;
@@ -939,6 +942,7 @@ struct DisplayState {
     void *opaque;
     uint32_t *palette;
     uint64_t gui_timer_interval;
+    int idle;
 
     int shared_buf;
     

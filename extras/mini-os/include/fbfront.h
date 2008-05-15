@@ -1,4 +1,5 @@
 #include <xen/io/kbdif.h>
+#include <xen/io/fbif.h>
 #include <wait.h>
 
 /* from <linux/input.h> */
@@ -36,6 +37,8 @@ struct fbfront_dev *init_fbfront(char *nodename, unsigned long *mfns, int width,
 int fbfront_open(struct fbfront_dev *dev);
 #endif
 
+int fbfront_receive(struct fbfront_dev *dev, union xenfb_in_event *buf, int n);
+extern struct wait_queue_head fbfront_queue;
 void fbfront_update(struct fbfront_dev *dev, int x, int y, int width, int height);
 void fbfront_resize(struct fbfront_dev *dev, int width, int height, int stride, int depth, int offset);
 

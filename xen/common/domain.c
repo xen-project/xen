@@ -30,6 +30,10 @@
 #include <public/vcpu.h>
 #include <xsm/xsm.h>
 
+/* Linux config option: propageted to domain0 */
+/* xen_processor_pmbits: xen control Cx, Px, ... */
+unsigned int xen_processor_pmbits = 0;
+
 /* opt_dom0_vcpus_pin: If true, dom0 VCPUs are pinned. */
 static unsigned int opt_dom0_vcpus_pin;
 boolean_param("dom0_vcpus_pin", opt_dom0_vcpus_pin);
@@ -39,8 +43,14 @@ static void __init setup_cpufreq_option(char *str)
 {
     if ( !strcmp(str, "dom0-kernel") )
     {
+        xen_processor_pmbits &= ~XEN_PROCESSOR_PM_PX;
         cpufreq_controller = FREQCTL_dom0_kernel;
         opt_dom0_vcpus_pin = 1;
+    }
+    else if ( !strcmp(str, "xen") )
+    {
+        xen_processor_pmbits |= XEN_PROCESSOR_PM_PX;
+        cpufreq_controller = FREQCTL_none;
     }
 }
 custom_param("cpufreq", setup_cpufreq_option);

@@ -610,7 +610,7 @@ def configure_image(vals):
 def configure_disks(config_devs, vals):
     """Create the config for disks (virtual block devices).
     """
-    for (uname, dev, mode, backend) in vals.disk:
+    for (uname, dev, mode, backend, protocol) in vals.disk:
         if uname.startswith('tap:'):
             cls = 'tap'
         else:
@@ -622,6 +622,8 @@ def configure_disks(config_devs, vals):
                       ['mode', mode ] ]
         if backend:
             config_vbd.append(['backend', backend])
+        if protocol:
+            config_vbd.append(['protocol', protocol])
         config_devs.append(['device', config_vbd])
 
 def configure_pci(config_devs, vals):
@@ -845,7 +847,10 @@ def preprocess_disk(vals):
         n = len(d)
         if n == 3:
             d.append(None)
+            d.append(None)
         elif n == 4:
+            d.append(None)
+        elif n == 5:
             pass
         else:
             err('Invalid disk specifier: ' + v)

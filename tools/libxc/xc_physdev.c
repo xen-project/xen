@@ -52,6 +52,7 @@ int xc_physdev_map_pirq_msi(int xc_handle,
                             int *pirq,
                             int devfn,
                             int bus,
+                            int entry_nr,
                             int msi_type)
 {
     int rc;
@@ -66,6 +67,7 @@ int xc_physdev_map_pirq_msi(int xc_handle,
     map.pirq = *pirq;
     map.msi_info.devfn = devfn;
     map.msi_info.bus = bus;
+    map.msi_info.entry_nr = entry_nr;
     map.msi_info.msi = msi_type;
 
     rc = do_physdev_op(xc_handle, PHYSDEVOP_map_pirq, &map);

@@ -60,11 +60,7 @@ trampoline_protmode_entry:
         fninit
 
         /* Initialise CR4. */
-#if CONFIG_PAGING_LEVELS == 2
-        mov     $X86_CR4_PSE,%ecx
-#else
         mov     $X86_CR4_PAE,%ecx
-#endif
         mov     %ecx,%cr4
 
         /* Load pagetable base register. */
@@ -72,7 +68,6 @@ trampoline_protmode_entry:
         add     bootsym_phys(trampoline_xen_phys_start),%eax
         mov     %eax,%cr3
 
-#if CONFIG_PAGING_LEVELS != 2
         /* Set up EFER (Extended Feature Enable Register). */
         mov     bootsym_phys(cpuid_ext_features),%edi
         test    $0x20100800,%edi /* SYSCALL/SYSRET, No Execute, Long Mode? */
@@ -88,7 +83,6 @@ trampoline_protmode_entry:
         btsl    $_EFER_NX,%eax  /* No Execute     */
 1:      wrmsr
 .Lskip_efer:
-#endif
 
         mov     $0x80050033,%eax /* hi-to-lo: PG,AM,WP,NE,ET,MP,PE */
         mov     %eax,%cr0

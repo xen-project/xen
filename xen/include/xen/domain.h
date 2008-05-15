@@ -57,4 +57,6 @@ void arch_dump_domain_info(struct domain *d);
 
 int arch_vcpu_reset(struct vcpu *v);
 
+extern unsigned int xen_processor_pmbits;
+
 #endif /* __XEN_DOMAIN_H__ */

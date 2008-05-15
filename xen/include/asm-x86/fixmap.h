@@ -29,7 +29,7 @@
  * from the end of virtual memory backwards.
  */
 enum fixed_addresses {
-#ifdef CONFIG_X86_PAE
+#ifdef __i386__
     FIX_PAE_HIGHMEM_0,
     FIX_PAE_HIGHMEM_END = FIX_PAE_HIGHMEM_0 + NR_CPUS-1,
 #endif

@@ -1051,8 +1051,8 @@ class XendDomainInfo:
                                  ['running',  0],
                                  ['cpu_time', 0.0],
                                  ['cpu',      -1],
-                                 ['cpumap',   self.info['cpus'] and \
-                                              self.info['cpus'] or range(64)]])
+                                 ['cpumap',   self.info['cpus'][i] and \
+                                              self.info['cpus'][i] or range(64)]])
 
             return sxpr
 
@@ -1477,6 +1477,13 @@ class XendDomainInfo:
                 self.info['VCPUs_live'] = vcpus
                 self._writeDom(self._vcpuDomDetails())
         else:
+            if self.info['VCPUs_max'] > vcpus:
+                # decreasing
+                del self.info['cpus'][vcpus:]
+            elif self.info['VCPUs_max'] < vcpus:
+                # increasing
+                for c in range(self.info['VCPUs_max'], vcpus):
+                    self.info['cpus'].append(list())
             self.info['VCPUs_max'] = vcpus
             xen.xend.XendDomain.instance().managed_config_save(self)
         log.info("Set VCPU count on domain %s to %d", self.info['name_label'],
@@ -2071,9 +2078,17 @@ class XendDomainInfo:
             # repin domain vcpus if a restricted cpus list is provided
             # this is done prior to memory allocation to aide in memory
             # distribution for NUMA systems.
-            if self.info['cpus'] is not None and len(self.info['cpus']) > 0:
+            def has_cpus():
+                if self.info['cpus'] is not None:
+                    for c in self.info['cpus']:
+                        if c:
+                            return True
+                return False
+
+            if has_cpus():
                 for v in range(0, self.info['VCPUs_max']):
-                    xc.vcpu_setaffinity(self.domid, v, self.info['cpus'])
+                    if self.info['cpus'][v]:
+                        xc.vcpu_setaffinity(self.domid, v, self.info['cpus'][v])
             else:
                 def find_relaxed_node(node_list):
                     import sys 
@@ -2363,8 +2378,19 @@ class XendDomainInfo:
     def resumeDomain(self):
         log.debug("XendDomainInfo.resumeDomain(%s)", str(self.domid))
 
-        if self.domid is None:
+        # resume a suspended domain (e.g. after live checkpoint, or after
+        # a later error during save or migate); checks that the domain
+        # is currently suspended first so safe to call from anywhere
+
+        xeninfo = dom_get(self.domid)
+        if xeninfo is None: 
             return
+        if not xeninfo['shutdown']:
+            return
+        reason = shutdown_reason(xeninfo['shutdown_reason'])
+        if reason != 'suspend':
+            return
+
         try:
             # could also fetch a parsed note from xenstore
             fast = self.info.get_notes().get('SUSPEND_CANCEL') and 1 or 0

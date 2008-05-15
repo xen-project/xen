@@ -121,7 +121,7 @@
 #define _SEGMENT_S       ( 1<<12) /* System descriptor (yes iff S==0) */
 #define _SEGMENT_DPL     ( 3<<13) /* Descriptor Privilege Level */
 #define _SEGMENT_P       ( 1<<15) /* Segment Present */
-#ifdef __x86_64
+#ifdef __x86_64__
 #define _SEGMENT_L       ( 1<<21) /* 64-bit segment */
 #else
 #define _SEGMENT_L       0

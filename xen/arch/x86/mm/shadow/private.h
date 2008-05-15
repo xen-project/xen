@@ -157,57 +157,23 @@ extern void shadow_audit_tables(struct vcpu *v);
  * Macro for dealing with the naming of the internal names of the
  * shadow code's external entry points.
  */
-#define SHADOW_INTERNAL_NAME_HIDDEN(name, shadow_levels, guest_levels) \
-    name ## __shadow_ ## shadow_levels ## _guest_ ## guest_levels
-#define SHADOW_INTERNAL_NAME(name, shadow_levels, guest_levels) \
-    SHADOW_INTERNAL_NAME_HIDDEN(name, shadow_levels, guest_levels)
+#define SHADOW_INTERNAL_NAME_HIDDEN(name, guest_levels) \
+    name ## __guest_ ## guest_levels
+#define SHADOW_INTERNAL_NAME(name, guest_levels)        \
+    SHADOW_INTERNAL_NAME_HIDDEN(name, guest_levels)
 
-#if CONFIG_PAGING_LEVELS == 2
 #define GUEST_LEVELS  2
-#define SHADOW_LEVELS 2
 #include "multi.h"
 #undef GUEST_LEVELS
-#undef SHADOW_LEVELS
-#endif /* CONFIG_PAGING_LEVELS == 2 */
-
-#if CONFIG_PAGING_LEVELS == 3
-#define GUEST_LEVELS  2
-#define SHADOW_LEVELS 3
-#include "multi.h"
-#undef GUEST_LEVELS
-#undef SHADOW_LEVELS
 
 #define GUEST_LEVELS  3
-#define SHADOW_LEVELS 3
 #include "multi.h"
 #undef GUEST_LEVELS
-#undef SHADOW_LEVELS
-#endif /* CONFIG_PAGING_LEVELS == 3 */
 
 #if CONFIG_PAGING_LEVELS == 4
-#define GUEST_LEVELS  2
-#define SHADOW_LEVELS 3
-#include "multi.h"
-#undef GUEST_LEVELS
-#undef SHADOW_LEVELS
-
-#define GUEST_LEVELS  3
-#define SHADOW_LEVELS 3
-#include "multi.h"
-#undef GUEST_LEVELS
-#undef SHADOW_LEVELS
-
-#define GUEST_LEVELS  3
-#define SHADOW_LEVELS 4
-#include "multi.h"
-#undef GUEST_LEVELS
-#undef SHADOW_LEVELS
-
 #define GUEST_LEVELS  4
-#define SHADOW_LEVELS 4
 #include "multi.h"
 #undef GUEST_LEVELS
-#undef SHADOW_LEVELS
 #endif /* CONFIG_PAGING_LEVELS == 4 */
 
 /******************************************************************************
@@ -360,7 +326,6 @@ void  shadow_free(struct domain *d, mfn_t smfn);
 
 /* Install the xen mappings in various flavours of shadow */
 void sh_install_xen_entries_in_l4(struct vcpu *v, mfn_t gl4mfn, mfn_t sl4mfn);
-void sh_install_xen_entries_in_l2(struct vcpu *v, mfn_t gl2mfn, mfn_t sl2mfn);
 
 /* Update the shadows in response to a pagetable write from Xen */
 int sh_validate_guest_entry(struct vcpu *v, mfn_t gmfn, void *entry, u32 size);
@@ -536,6 +501,7 @@ struct sh_dirty_vram {
     unsigned long end_pfn;
     paddr_t *sl1ma;
     uint8_t *dirty_bitmap;
+    s_time_t last_dirty;
 };
 
 /**************************************************************************/

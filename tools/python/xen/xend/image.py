@@ -294,11 +294,11 @@ class ImageHandler:
 
             vnclisten = vnc_config.get('vnclisten',
                                        XendOptions.instance().get_vnclisten_address())
-            vncdisplay = vnc_config.get('vncdisplay', 0)
+            vncdisplay = int(vnc_config.get('vncdisplay', 0))
             ret.append('-vnc')
             ret.append("%s:%s%s" % (vnclisten, vncdisplay, vncopts))
 
-            if vnc_config.get('vncunused', 0):
+            if int(vnc_config.get('vncunused', 1)) != 0:
                 ret.append('-vncunused')
 
         elif has_sdl:
@@ -504,20 +504,6 @@ class LinuxImageHandler(ImageHandler):
         args = ImageHandler.getDeviceModelArgs(self, restore)
         args = args + ([ "-M", "xenpv"])
         return args
-
-
-class PPC_LinuxImageHandler(LinuxImageHandler):
-
-    ostype = "linux"
-    
-    def getRequiredShadowMemory(self, shadow_mem_kb, maxmem_kb):
-        """@param shadow_mem_kb The configured shadow memory, in KiB.
-        @param maxmem_kb The configured maxmem, in KiB.
-        @return The corresponding required amount of shadow memory, also in
-        KiB.
-        PowerPC currently uses "shadow memory" to refer to the hash table."""
-        return max(maxmem_kb / 64, shadow_mem_kb)
-
 
 
 class HVMImageHandler(ImageHandler):
@@ -734,6 +720,9 @@ class IA64_HVM_ImageHandler(HVMImageHandler):
                          (self.getRequiredInitialReservation() / 1024) ])
         return args
 
+    def setCpuid(self):
+        # Guest CPUID configuration is not implemented yet.
+        return
 
 class IA64_Linux_ImageHandler(LinuxImageHandler):
 
@@ -783,9 +772,6 @@ class X86_Linux_ImageHandler(LinuxImageHandler):
         return LinuxImageHandler.buildDomain(self)
 
 _handlers = {
-    "powerpc": {
-        "linux": PPC_LinuxImageHandler,
-    },
     "ia64": {
         "linux": IA64_Linux_ImageHandler,
         "hvm": IA64_HVM_ImageHandler,

@@ -1434,6 +1434,7 @@ void return_devices_to_dom0(struct domain *d)
     while ( !list_empty(&hd->pdev_list) )
     {
         pdev = list_entry(hd->pdev_list.next, typeof(*pdev), list);
+        pci_cleanup_msi(pdev->bus, pdev->devfn);
         reassign_device_ownership(d, dom0, pdev->bus, pdev->devfn);
     }
 

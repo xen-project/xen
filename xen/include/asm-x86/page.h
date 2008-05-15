@@ -123,13 +123,11 @@ static inline l2_pgentry_t l2e_from_paddr(paddr_t pa, unsigned int flags)
     ASSERT((pa & ~(PADDR_MASK & PAGE_MASK)) == 0);
     return (l2_pgentry_t) { pa | put_pte_flags(flags) };
 }
-#if CONFIG_PAGING_LEVELS >= 3
 static inline l3_pgentry_t l3e_from_paddr(paddr_t pa, unsigned int flags)
 {
     ASSERT((pa & ~(PADDR_MASK & PAGE_MASK)) == 0);
     return (l3_pgentry_t) { pa | put_pte_flags(flags) };
 }
-#endif
 #if CONFIG_PAGING_LEVELS >= 4
 static inline l4_pgentry_t l4e_from_paddr(paddr_t pa, unsigned int flags)
 {
@@ -195,10 +193,7 @@ static inline l4_pgentry_t l4e_from_paddr(paddr_t pa, unsigned int flags)
 #ifndef __ASSEMBLY__
 
 /* Page-table type. */
-#if CONFIG_PAGING_LEVELS == 2
-/* x86_32 default */
-typedef struct { u32 pfn; } pagetable_t;
-#elif CONFIG_PAGING_LEVELS == 3
+#if CONFIG_PAGING_LEVELS == 3
 /* x86_32 PAE */
 typedef struct { u32 pfn; } pagetable_t;
 #elif CONFIG_PAGING_LEVELS == 4
@@ -251,12 +246,6 @@ void clear_page_sse2(void *);
 #endif /* !defined(__ASSEMBLY__) */
 
 /* High table entries are reserved by the hypervisor. */
-#if defined(CONFIG_X86_32) && !defined(CONFIG_X86_PAE)
-#define DOMAIN_ENTRIES_PER_L2_PAGETABLE     \
-  (HYPERVISOR_VIRT_START >> L2_PAGETABLE_SHIFT)
-#define HYPERVISOR_ENTRIES_PER_L2_PAGETABLE \
-  (L2_PAGETABLE_ENTRIES - DOMAIN_ENTRIES_PER_L2_PAGETABLE)
-#else
 #define DOMAIN_ENTRIES_PER_L2_PAGETABLE     0
 #define HYPERVISOR_ENTRIES_PER_L2_PAGETABLE 0
 
@@ -267,7 +256,6 @@ void clear_page_sse2(void *);
 #define HYPERVISOR_ENTRIES_PER_L4_PAGETABLE \
     (L4_PAGETABLE_ENTRIES - GUEST_ENTRIES_PER_L4_PAGETABLE  \
      + DOMAIN_ENTRIES_PER_L4_PAGETABLE)
-#endif
 
 /* Where to find each level of the linear mapping */
 #define __linear_l1_table ((l1_pgentry_t *)(LINEAR_PT_VIRT_START))
@@ -284,8 +272,6 @@ extern root_pgentry_t idle_pg_table[ROOT_PAGETABLE_ENTRIES];
 #if CONFIG_PAGING_LEVELS == 3
 extern l2_pgentry_t   idle_pg_table_l2[
     ROOT_PAGETABLE_ENTRIES * L2_PAGETABLE_ENTRIES];
-#elif CONFIG_PAGING_LEVELS == 2
-#define idle_pg_table_l2 idle_pg_table
 #elif CONFIG_PAGING_LEVELS == 4
 extern l2_pgentry_t  *compat_idle_pg_table_l2;
 extern unsigned int   m2p_compat_vstart;

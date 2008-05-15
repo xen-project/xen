@@ -84,7 +84,4 @@ extern void lwip_die(char *fmt, ...);
 #define DBG_TYPES_ON	DBG_ON
 #endif
 
-/* TODO: checksum doesn't work fine?! */
-#define CHECKSUM_CHECK_TCP	0
-
 #endif /* __LWIP_ARCH_CC_H__ */
