@@ -19,6 +19,9 @@
 
 #include <xen/libelf.h>
 
+#define SUPERPAGE_PFN_SHIFT  9
+#define SUPERPAGE_NR_PFNS    (1UL << SUPERPAGE_PFN_SHIFT)
+
 #define SCRATCH_PFN 0xFFFFF
 
 #define SPECIALPAGE_GUARD    0
@@ -211,7 +214,7 @@ static int setup_guest(int xc_handle,
 
     /*
      * Allocate memory for HVM guest, skipping VGA hole 0xA0000-0xC0000.
-     * We allocate pages in batches of no more than 2048 to ensure that
+     * We allocate pages in batches of no more than 8MB to ensure that
      * we can be preempted and hence dom0 remains responsive.
      */
     rc = xc_domain_memory_populate_physmap(
@@ -219,13 +222,50 @@ static int setup_guest(int xc_handle,
     cur_pages = 0xc0;
     while ( (rc == 0) && (nr_pages > cur_pages) )
     {
+        /* Clip count to maximum 8MB extent. */
         unsigned long count = nr_pages - cur_pages;
         if ( count > 2048 )
             count = 2048;
-        rc = xc_domain_memory_populate_physmap(
-            xc_handle, dom, count, 0, 0, &page_array[cur_pages]);
-        cur_pages += count;
+
+        /* Clip partial superpage extents to superpage boundaries. */
+        if ( ((cur_pages & (SUPERPAGE_NR_PFNS-1)) != 0) &&
+             (count > (-cur_pages & (SUPERPAGE_NR_PFNS-1))) )
+            count = -cur_pages & (SUPERPAGE_NR_PFNS-1); /* clip s.p. tail */
+        else if ( ((count & (SUPERPAGE_NR_PFNS-1)) != 0) &&
+                  (count > SUPERPAGE_NR_PFNS) )
+            count &= ~(SUPERPAGE_NR_PFNS - 1); /* clip non-s.p. tail */
+
+        /* Attempt to allocate superpage extents. */
+        if ( ((count | cur_pages) & (SUPERPAGE_NR_PFNS - 1)) == 0 )
+        {
+            long done;
+            xen_pfn_t sp_extents[2048 >> SUPERPAGE_PFN_SHIFT];
+            struct xen_memory_reservation sp_req = {
+                .nr_extents   = count >> SUPERPAGE_PFN_SHIFT,
+                .extent_order = SUPERPAGE_PFN_SHIFT,
+                .domid        = dom
+            };
+            set_xen_guest_handle(sp_req.extent_start, sp_extents);
+            for ( i = 0; i < sp_req.nr_extents; i++ )
+                sp_extents[i] = page_array[cur_pages+(i<<SUPERPAGE_PFN_SHIFT)];
+            done = xc_memory_op(xc_handle, XENMEM_populate_physmap, &sp_req);
+            if ( done > 0 )
+            {
+                done <<= SUPERPAGE_PFN_SHIFT;
+                cur_pages += done;
+                count -= done;
+            }
+        }
+
+        /* Fall back to 4kB extents. */
+        if ( count != 0 )
+        {
+            rc = xc_domain_memory_populate_physmap(
+                xc_handle, dom, count, 0, 0, &page_array[cur_pages]);
+            cur_pages += count;
+        }
     }
+
     if ( rc != 0 )
     {
         PERROR("Could not allocate memory for HVM guest.\n");

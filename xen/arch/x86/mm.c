@@ -3297,7 +3297,7 @@ long arch_memory_op(int op, XEN_GUEST_HANDLE(void) arg)
         {
             if ( is_xen_heap_mfn(prev_mfn) )
                 /* Xen heap frames are simply unhooked from this phys slot. */
-                guest_physmap_remove_page(d, xatp.gpfn, prev_mfn);
+                guest_physmap_remove_page(d, xatp.gpfn, prev_mfn, 0);
             else
                 /* Normal domain memory is freed, to avoid leaking memory. */
                 guest_remove_page(d, xatp.gpfn);
@@ -3306,10 +3306,10 @@ long arch_memory_op(int op, XEN_GUEST_HANDLE(void) arg)
         /* Unmap from old location, if any. */
         gpfn = get_gpfn_from_mfn(mfn);
         if ( gpfn != INVALID_M2P_ENTRY )
-            guest_physmap_remove_page(d, gpfn, mfn);
+            guest_physmap_remove_page(d, gpfn, mfn, 0);
 
         /* Map at new location. */
-        guest_physmap_add_page(d, xatp.gpfn, mfn);
+        guest_physmap_add_page(d, xatp.gpfn, mfn, 0);
 
         domain_unlock(d);
 

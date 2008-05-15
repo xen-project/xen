@@ -1159,7 +1159,7 @@ gnttab_transfer(
         spin_lock(&e->grant_table->lock);
 
         sha = &shared_entry(e->grant_table, gop.ref);
-        guest_physmap_add_page(e, sha->frame, mfn);
+        guest_physmap_add_page(e, sha->frame, mfn, 0);
         sha->frame = mfn;
         wmb();
         sha->flags |= GTF_transfer_completed;
