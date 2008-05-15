@@ -3,10 +3,10 @@
  * optimize virtualization fault handler
  *
  * Copyright (C) 2006 Intel Co
- *	Xuefei Xu (Anthony Xu) <anthony.xu@intel.com>
+ * Xuefei Xu (Anthony Xu) <anthony.xu@intel.com>
  */
 
-#include <linux/config.h>	
+#include <linux/config.h>
 #include <asm/config.h>
 #include <asm/pgtable.h>
 #include <asm/asmmacro.h>
@@ -20,26 +20,230 @@
 #include <asm/virt_event.h>
 #include <asm-ia64/vmx_mm_def.h>
 #include <asm-ia64/vmx_phy_mode.h>
+#include "entry.h"
 
-#define ACCE_MOV_FROM_AR
-#define ACCE_MOV_FROM_RR
-#define ACCE_MOV_TO_RR
-#define ACCE_RSM
-#define ACCE_SSM
-#define ACCE_MOV_TO_PSR
-#define ACCE_THASH
+// r21 : current
+// r23 : b0
+// r31 : pr
+
+#define VMX_VIRT_SAVE                                                       \
+    mov r27=ar.rsc;     /* M */                                             \
+    ;;                                                                      \
+    cover;              /* B;; (or nothing) */                              \
+    ;;                                                                      \
+    /* switch from user to kernel RBS: */                                   \
+    invala;             /* M */                                             \
+    ;;                                                                      \
+    mov ar.rsc=0;       /* set enforced lazy mode  */                       \
+    ;;                                                                      \
+    mov.m r26=ar.rnat;                                                      \
+    movl r28=IA64_RBS_OFFSET;        /* compute base of RBS */              \
+    ;;                                                                      \
+    mov r22=ar.bspstore;             /* save ar.bspstore */                 \
+    add r28=r28,r21;                                                        \
+    ;;                                                                      \
+    mov ar.bspstore=r28;    /* switch to kernel RBS */                      \
+    ;;                                                                      \
+    mov r18=ar.bsp;                                                         \
+    mov ar.rsc=0x3;         /* set eager mode */                            \
+    ;;                                                                      \
+    alloc r32=ar.pfs,24,0,3,0    /* save pfs */                             \
+    ;;                                                                      \
+    sub r18=r18,r28;    /* r18=RSE.ndirty*8 */                              \
+    ;;                                                                      \
+    shl r33=r18,16;     /* save loadrs */                                   \
+    mov r35=b6;         /* save b6 */                                       \
+    mov r36=b7;         /* save b7 */                                       \
+    mov r37=ar.csd;     /* save ar.csd */                                   \
+    mov r38=ar.ssd;     /* save ar.ssd */                                   \
+    mov r39=r8;         /* save r8 */                               \
+    mov r40=r9;         /* save r9 */                               \
+    mov r41=r10;        /* save r10 */                              \
+    mov r42=r11;        /* save r11 */                              \
+    mov r43=r27;        /* save ar.rsc */                           \
+    mov r44=r26;        /* save ar.rnat */                          \
+    mov r45=r22;        /* save ar.bspstore */                      \
+    mov r46=r31;        /* save pr */                               \
+    mov r47=r23;        /* save b0 */                               \
+    mov r48=r1;         /* save r1 */                               \
+    mov r49=r12;        /* save r12 */                              \
+    mov r50=r13;        /* save r13 */                              \
+    mov r51=r15;        /* save r15 */                              \
+    mov r52=r14;        /* save r14 */                              \
+    mov r53=r2;         /* save r2 */                               \
+    mov r54=r3;         /* save r3 */                               \
+    mov r34=ar.ccv;     /* save ar.ccv */                           \
+    ;;                                                              \
+    movl r1=__gp;                                                   \
+    movl r29=IA64_STK_OFFSET-IA64_PT_REGS_SIZE-16;                  \
+    ;;                                                              \
+    add r12=r29,r21;   /* compute base of memory stack */           \
+    mov r13=r21;                                                    \
+    ;;                                                              \
+{ .mii;       /* call vps sync read */                              \
+    add r25=IA64_VPD_BASE_OFFSET, r21;                              \
+    nop 0x0;                                                        \
+    mov r24=ip;                                                     \
+    ;;                                                              \
+};                                                                  \
+{ .mmb;                                                             \
+    add r24 = 0x20, r24;                                            \
+    ld8 r25=[r25];          /* read vpd base */                     \
+    br.cond.sptk vmx_vps_sync_read;   /*  call the service */       \
+    ;;                                                              \
+};
+
+
+ENTRY(ia64_leave_hypervisor_virt)
+    invala              /* M */
+    ;;
+    mov r21=r13         /* get current */
+    mov b6=r35          /* restore b6 */
+    mov b7=r36          /* restore b7 */
+    mov ar.csd=r37      /* restore ar.csd */
+    mov ar.ssd=r38      /* restore ar.ssd */
+    mov r8=r39          /* restore r8 */
+    mov r9=r40          /* restore r9 */
+    mov r10=r41         /* restore r10 */
+    mov r11=r42         /* restore r11 */
+    mov ar.pfs=r32      /* restore ar.pfs */
+    mov r27=r43         /* restore ar.rsc */
+    mov r26=r44         /* restore ar.rnat */
+    mov r25=r45         /* restore ar.bspstore */
+    mov r23=r46         /* restore predicates */
+    mov r22=r47         /* restore b0 */
+    mov r1=r48          /* restore r1 */
+    mov r12=r49         /* restore r12 */
+    mov r13=r50         /* restore r13 */
+    mov r15=r51         /* restore r15 */
+    mov r14=r52         /* restore r14 */
+    mov r2=r53          /* restore r2 */
+    mov r3=r54          /* restore r3 */
+    mov ar.ccv=r34      /* restore ar.ccv */
+    mov ar.rsc=r33      /* load ar.rsc to be used for "loadrs" */
+    ;;
+    alloc r16=ar.pfs,0,0,0,0    /* drop current register frame */
+    ;;
+    loadrs
+    ;;
+    mov ar.bspstore=r25
+    ;;
+    mov ar.rnat=r26
+    ;;
+    mov ar.rsc=r27
+    adds r18=IA64_VPD_BASE_OFFSET,r21
+    ;;
+    ld8 r25=[r18]       // load vpd
+    mov r17=r0
+    ;;
+//vsa_sync_write_start
+    ;;
+    movl r24=ia64_leave_hypervisor_virt_1   // calculate return address
+    br.cond.sptk vmx_vps_sync_write         // call the service
+    ;;
+ia64_leave_hypervisor_virt_1:
+    mov r24=r22
+    mov r31=r23
+    br.cond.sptk vmx_resume_to_guest
+END(ia64_leave_hypervisor_virt)
+
+
 
 // Inputs are: r21 (= current), r24 (= cause), r25 (= insn), r31 (=saved pr)
+
+#define BACK_TO_SLOW_PATH                   \
+{;                                          \
+    nop.m 0x0;                              \
+    mov b0=r23;                             \
+    br.many vmx_virtualization_fault_back;  \
+};                                          \
+
+GLOBAL_ENTRY(virtualization_fault_table)
+    BACK_TO_SLOW_PATH
+    BACK_TO_SLOW_PATH
+    BACK_TO_SLOW_PATH
+{   /* Entry 3 */
+    cmp.eq p2,p0=r0,r0
+    mov b0=r23
+    br.many vmx_asm_mov_from_ar
+}
+    BACK_TO_SLOW_PATH
+    BACK_TO_SLOW_PATH
+{   /* Entry 6 */
+    cmp.eq p2,p0=r0,r0
+    mov b0=r23
+    br.many vmx_asm_mov_to_psr
+}
+    BACK_TO_SLOW_PATH
+    BACK_TO_SLOW_PATH
+    BACK_TO_SLOW_PATH
+{   /* Entry 10 */
+    cmp.eq p2,p0=r0,r0
+    mov b0=r23
+    br.many vmx_asm_mov_to_rr
+}
+    BACK_TO_SLOW_PATH
+    BACK_TO_SLOW_PATH
+    BACK_TO_SLOW_PATH
+    BACK_TO_SLOW_PATH
+    BACK_TO_SLOW_PATH
+    BACK_TO_SLOW_PATH
+    BACK_TO_SLOW_PATH
+{   /* Entry 18 */
+    cmp.eq p2,p0=r0,r0
+    mov b0=r23
+    br.many vmx_asm_mov_from_rr
+}
+    BACK_TO_SLOW_PATH
+    BACK_TO_SLOW_PATH
+    BACK_TO_SLOW_PATH
+    BACK_TO_SLOW_PATH
+    BACK_TO_SLOW_PATH
+{   /* Entry 24 */
+    cmp.eq p2,p0=r0,r0
+    mov b0=r23
+    br.many vmx_asm_ssm
+}
+{   /* Entry 25 */
+    cmp.eq p2,p0=r0,r0
+    mov b0=r23
+    br.many vmx_asm_rsm
+}
+    BACK_TO_SLOW_PATH
+    BACK_TO_SLOW_PATH
+    BACK_TO_SLOW_PATH
+    BACK_TO_SLOW_PATH
+    BACK_TO_SLOW_PATH
+{   /* Entry 31 */
+    cmp.eq p2,p0=r0,r0
+    mov b0=r23
+    br.many vmx_asm_thash
+}
+    BACK_TO_SLOW_PATH
+    BACK_TO_SLOW_PATH
+    BACK_TO_SLOW_PATH
+    BACK_TO_SLOW_PATH
+    BACK_TO_SLOW_PATH
+{   /* Entry 37 */
+    cmp.ne p2,p0=r0,r0
+    mov b0=r23
+    br.many vmx_asm_rfi
+}
+    BACK_TO_SLOW_PATH
+    BACK_TO_SLOW_PATH
+    BACK_TO_SLOW_PATH
+END(virtualization_fault_table)
+
 
 ENTRY(vmx_dummy_function)
     br.sptk.many vmx_dummy_function
 END(vmx_dummy_function)
 
 /*
- *	Inputs:
- *		r24 : return address
- *  	r25 : vpd
- *		r29 : scratch
+ *  Inputs:
+ *  r24 : return address
+ *  r25 : vpd
+ *  r29 : scratch
  *
  */
 GLOBAL_ENTRY(vmx_vps_sync_read)
@@ -50,11 +254,10 @@ GLOBAL_ENTRY(vmx_vps_sync_read)
 END(vmx_vps_sync_read)
 
 /*
- *	Inputs:
- *		r24 : return address
- *  	r25 : vpd
- *		r29 : scratch
- *
+ *  Inputs:
+ *  r24 : return address
+ *  r25 : vpd
+ *  r29 : scratch
  */
 GLOBAL_ENTRY(vmx_vps_sync_write)
     movl r29 = vmx_dummy_function
@@ -64,11 +267,10 @@ GLOBAL_ENTRY(vmx_vps_sync_write)
 END(vmx_vps_sync_write)
 
 /*
- *	Inputs:
- *		r23 : pr
- *		r24 : guest b0
- *  	r25 : vpd
- *
+ *  Inputs:
+ *  r23 : pr
+ *  r24 : guest b0
+ *  r25 : vpd
  */
 GLOBAL_ENTRY(vmx_vps_resume_normal)
     movl r29 = vmx_dummy_function
@@ -79,11 +281,11 @@ GLOBAL_ENTRY(vmx_vps_resume_normal)
 END(vmx_vps_resume_normal)
 
 /*
- *	Inputs:
- *		r23 : pr
- *		r24 : guest b0
- *  	r25 : vpd
- *		r17 : isr
+ *  Inputs:
+ *  r23 : pr
+ *  r24 : guest b0
+ *  r25 : vpd
+ *  r17 : isr
  */
 GLOBAL_ENTRY(vmx_vps_resume_handler)
     movl r29 = vmx_dummy_function
@@ -97,12 +299,203 @@ GLOBAL_ENTRY(vmx_vps_resume_handler)
     br.sptk.many b0
 END(vmx_vps_resume_handler)
 
+//r13 ->vcpu
+//call with psr.bn = 0
+GLOBAL_ENTRY(vmx_asm_bsw0)
+    mov r15=ar.unat
+    ;;
+    adds r14=IA64_VPD_BASE_OFFSET,r13
+    ;;
+    ld8 r14=[r14]
+    bsw.1
+    ;;
+    adds r2=IA64_VPD_VB1REG_OFFSET, r14
+    adds r3=IA64_VPD_VB1REG_OFFSET+8, r14
+    ;;
+    .mem.offset 0,0; st8.spill [r2]=r16,16
+    .mem.offset 8,0; st8.spill [r3]=r17,16
+    ;;
+    .mem.offset 0,0; st8.spill [r2]=r18,16
+    .mem.offset 8,0; st8.spill [r3]=r19,16
+    ;;
+    .mem.offset 0,0; st8.spill [r2]=r20,16
+    .mem.offset 8,0; st8.spill [r3]=r21,16
+    ;;
+    .mem.offset 0,0; st8.spill [r2]=r22,16
+    .mem.offset 8,0; st8.spill [r3]=r23,16
+    ;;
+    .mem.offset 0,0; st8.spill [r2]=r24,16
+    .mem.offset 8,0; st8.spill [r3]=r25,16
+    ;;
+    .mem.offset 0,0; st8.spill [r2]=r26,16
+    .mem.offset 8,0; st8.spill [r3]=r27,16
+    ;;
+    .mem.offset 0,0; st8.spill [r2]=r28,16
+    .mem.offset 8,0; st8.spill [r3]=r29,16
+    ;;
+    .mem.offset 0,0; st8.spill [r2]=r30,16
+    .mem.offset 8,0; st8.spill [r3]=r31,16
+    ;;
+    mov r9=ar.unat
+    adds r8=IA64_VPD_VB1NAT_OFFSET, r14
+    ;;
+    st8 [r8]=r9
+    adds r8=IA64_VPD_VB0NAT_OFFSET, r14
+    ;;
+    ld8 r9=[r8]
+    adds r2= IA64_VPD_VB0REG_OFFSET, r14
+    adds r3= IA64_VPD_VB0REG_OFFSET+8, r14
+    ;;
+    mov ar.unat=r9
+    ;;
+    ld8.fill r16=[r2],16
+    ld8.fill r17=[r3],16
+    ;;
+    ld8.fill r18=[r2],16
+    ld8.fill r19=[r3],16
+    ;;
+    ld8.fill r20=[r2],16
+    ld8.fill r21=[r3],16
+    ;;
+    ld8.fill r22=[r2],16
+    ld8.fill r23=[r3],16
+    ;;
+    ld8.fill r24=[r2],16
+    ld8.fill r25=[r3],16
+    ;;
+    ld8.fill r26=[r2],16
+    ld8.fill r27=[r3],16
+    ;;
+    ld8.fill r28=[r2],16
+    ld8.fill r29=[r3],16
+    ;;
+    ld8.fill r30=[r2],16
+    ld8.fill r31=[r3],16
+    ;;
+    mov ar.unat=r15
+    ;;
+    bsw.0
+    ;;
+    br.ret.sptk.many b0
+END(vmx_asm_bsw0)
+
+//r13 ->vcpu
+//call with psr.bn = 0
+GLOBAL_ENTRY(vmx_asm_bsw1)
+    mov r15=ar.unat
+    ;;
+    adds r14=IA64_VPD_BASE_OFFSET,r13
+    ;;
+    ld8 r14=[r14]
+    bsw.1
+    ;;
+    adds r2=IA64_VPD_VB0REG_OFFSET, r14
+    adds r3=IA64_VPD_VB0REG_OFFSET+8, r14
+    ;;
+    .mem.offset 0,0; st8.spill [r2]=r16,16
+    .mem.offset 8,0; st8.spill [r3]=r17,16
+    ;;
+    .mem.offset 0,0; st8.spill [r2]=r18,16
+    .mem.offset 8,0; st8.spill [r3]=r19,16
+    ;;
+    .mem.offset 0,0; st8.spill [r2]=r20,16
+    .mem.offset 8,0; st8.spill [r3]=r21,16
+    ;;
+    .mem.offset 0,0; st8.spill [r2]=r22,16
+    .mem.offset 8,0; st8.spill [r3]=r23,16
+    ;;
+    .mem.offset 0,0; st8.spill [r2]=r24,16
+    .mem.offset 8,0; st8.spill [r3]=r25,16
+    ;;
+    .mem.offset 0,0; st8.spill [r2]=r26,16
+    .mem.offset 8,0; st8.spill [r3]=r27,16
+    ;;
+    .mem.offset 0,0; st8.spill [r2]=r28,16
+    .mem.offset 8,0; st8.spill [r3]=r29,16
+    ;;
+    .mem.offset 0,0; st8.spill [r2]=r30,16
+    .mem.offset 8,0; st8.spill [r3]=r31,16
+    ;;
+    mov r9=ar.unat
+    adds r8=IA64_VPD_VB0NAT_OFFSET, r14
+    ;;
+    st8 [r8]=r9
+    adds r8=IA64_VPD_VB1NAT_OFFSET, r14
+    ;;
+    ld8 r9=[r8]
+    adds r2=IA64_VPD_VB1REG_OFFSET, r14
+    adds r3=IA64_VPD_VB1REG_OFFSET+8, r14
+    ;;
+    mov ar.unat=r9
+    ;;
+    ld8.fill r16=[r2],16
+    ld8.fill r17=[r3],16
+    ;;
+    ld8.fill r18=[r2],16
+    ld8.fill r19=[r3],16
+    ;;
+    ld8.fill r20=[r2],16
+    ld8.fill r21=[r3],16
+    ;;
+    ld8.fill r22=[r2],16
+    ld8.fill r23=[r3],16
+    ;;
+    ld8.fill r24=[r2],16
+    ld8.fill r25=[r3],16
+    ;;
+    ld8.fill r26=[r2],16
+    ld8.fill r27=[r3],16
+    ;;
+    ld8.fill r28=[r2],16
+    ld8.fill r29=[r3],16
+    ;;
+    ld8.fill r30=[r2],16
+    ld8.fill r31=[r3],16
+    ;;
+    mov ar.unat=r15
+    ;;
+    bsw.0
+    ;;
+    br.ret.sptk.many b0
+END(vmx_asm_bsw1)
+
+
+// rfi
+ENTRY(vmx_asm_rfi)
+    adds r18=IA64_VPD_BASE_OFFSET,r21
+    ;;
+    ld8 r18=[r18]
+    ;;
+    adds r26=IA64_VPD_VIFS_OFFSET,r18
+    ;;
+    ld8 r26=[r26]
+    ;;
+    tbit.z p6,p0=r26,63
+    (p6) br.cond.dptk.few vmx_asm_rfi_1
+    ;;
+    //if vifs.v=1 desert current register frame
+    alloc r27=ar.pfs,0,0,0,0
+    ;;
+vmx_asm_rfi_1:
+    adds r26=IA64_VPD_VHPI_OFFSET,r18
+    ;;
+    ld8 r26=[r26]
+    ;;
+    cmp.ne p6,p0=r26,r0
+    (p6) br.cond.dpnt.many vmx_virtualization_fault_back
+    ;;
+    VMX_VIRT_SAVE
+    ;;
+    mov out0=r21
+    movl r14=ia64_leave_hypervisor_virt
+    ;;
+    mov rp=r14
+    br.call.sptk.many b6=vmx_vcpu_rfi_fast
+END(vmx_asm_rfi)
+
 
 //mov r1=ar3 (only itc is virtualized)
-GLOBAL_ENTRY(vmx_asm_mov_from_ar)
-#ifndef ACCE_MOV_FROM_AR
-    br.many vmx_virtualization_fault_back
-#endif
+ENTRY(vmx_asm_mov_from_ar)
     add r18=VCPU_VTM_OFFSET_OFS,r21
     add r16=VCPU_VTM_LAST_ITC_OFS,r21
     extr.u r17=r25,6,7
@@ -127,10 +520,7 @@ END(vmx_asm_mov_from_ar)
 
 
 // mov r1=rr[r3]
-GLOBAL_ENTRY(vmx_asm_mov_from_rr)
-#ifndef ACCE_MOV_FROM_RR
-    br.many vmx_virtualization_fault_back
-#endif
+ENTRY(vmx_asm_mov_from_rr)
     extr.u r16=r25,20,7
     extr.u r17=r25,6,7
     movl r20=asm_mov_from_reg
@@ -142,8 +532,8 @@ GLOBAL_ENTRY(vmx_asm_mov_from_rr)
     add r27=VCPU_VRR0_OFS,r21
     mov b0=r16
     br.many b0
-    ;;   
-vmx_asm_mov_from_rr_back_1:  
+    ;;
+vmx_asm_mov_from_rr_back_1:
     adds r30=vmx_resume_to_guest-asm_mov_from_reg,r20
     adds r22=asm_mov_to_reg-asm_mov_from_reg,r20
     shr.u r26=r19,61
@@ -158,475 +548,204 @@ END(vmx_asm_mov_from_rr)
 
 
 // mov rr[r3]=r2
-GLOBAL_ENTRY(vmx_asm_mov_to_rr)
-#ifndef ACCE_MOV_TO_RR
-    br.many vmx_virtualization_fault_back
-#endif
-    add r22=IA64_VCPU_RID_BITS_OFFSET,r21
-    extr.u r16=r25,20,7		// r3
-    extr.u r17=r25,13,7		// r2
-    ;;
+ENTRY(vmx_asm_mov_to_rr)
+    extr.u r16=r25,20,7         // r3
+    extr.u r17=r25,13,7         // r2
     movl r20=asm_mov_from_reg
     ;;
     adds r30=vmx_asm_mov_to_rr_back_1-asm_mov_from_reg,r20
-    shladd r16=r16,4,r20	// get r3
-    mov r18=b0			// save b0
+    shladd r16=r16,4,r20        // get r3
     ;;
-    add r27=VCPU_VRR0_OFS,r21
     mov b0=r16
     br.many b0
-    ;;   
+    ;;
 vmx_asm_mov_to_rr_back_1:
     adds r30=vmx_asm_mov_to_rr_back_2-asm_mov_from_reg,r20
-    shr.u r23=r19,61		// get RR #
-    shladd r17=r17,4,r20	// get r2
+    shr.u r16=r19,61            // get RR #
     ;;
     //if rr7, go back
-    cmp.eq p6,p0=7,r23
-    mov b0=r18			// restore b0
+    cmp.eq p6,p0=7,r16
+    mov b0=r23// restore b0
     (p6) br.cond.dpnt.many vmx_virtualization_fault_back
     ;;
-    mov r28=r19			// save r3
+    mov r16=r19
+    shladd r17=r17,4,r20        // get r2
+    ;;
     mov b0=r17
     br.many b0
-vmx_asm_mov_to_rr_back_2: 
-    adds r30=vmx_resume_to_guest-asm_mov_from_reg,r20
-    shladd r27=r23,3,r27	// address of VRR
+vmx_asm_mov_to_rr_back_2:
+    mov r17=r19                 // get value
     ;;
-    ld1 r22=[r22]		// Load rid_bits from domain
-    mov b0=r18			// restore b0
-    adds r16=IA64_VCPU_STARTING_RID_OFFSET,r21
+    // if invalid value , go back
+    adds r26=IA64_VCPU_RID_BITS_OFFSET,r21
+    mov r27=r0
     ;;
-    ld4 r16=[r16]		// load starting_rid
-    extr.u r17=r19,8,24		// Extract RID
+    ld1 r27=[r26]
     ;;
-    shr r17=r17,r22		// Shift out used bits
-    shl r16=r16,8
+    shr r19=r19,r27
     ;;
-    add r20=r19,r16
-    cmp.ne p6,p0=0,r17	// If reserved RID bits are set, use C fall back.
+    cmp.ne p6,p0=r19,r0
+    mov b0=r23// restore b0
     (p6) br.cond.dpnt.many vmx_virtualization_fault_back
-    ;; //mangling rid 1 and 3
-    extr.u r16=r20,8,8
-    extr.u r17=r20,24,8
-    mov r24=r18		// saved b0 for resume
     ;;
-    extr.u r18=r20,2,6 // page size
-    dep r20=r16,r20,24,8
-    mov b0=r30
+    VMX_VIRT_SAVE
     ;;
-    dep r20=r17,r20,8,8
-    ;; //set ve 1
-    dep r20=-1,r20,0,1
-    // If ps > PAGE_SHIFT, use PAGE_SHIFT
-    cmp.lt p6,p0=PAGE_SHIFT,r18
+    mov out0=r21
+    mov out1=r16
+    mov out2=r17
+    movl r14=ia64_leave_hypervisor_virt
     ;;
-    (p6) mov r18=PAGE_SHIFT
-    ;;
-    (p6) dep r20=r18,r20,2,6
-    ;;	
-    st8 [r27]=r19	// Write to vrr.
-    // Write to save_rr if rr=0 or rr=4.
-    cmp.eq p6,p0=0,r23
-    ;;
-    cmp.eq.or p6,p0=4,r23
-    ;;
-    adds r16=IA64_VCPU_MMU_MODE_OFFSET,r21
-    (p6) adds r17=IA64_VCPU_META_SAVED_RR0_OFFSET,r21
-    ;;
-    ld1 r16=[r16]
-    cmp.eq p7,p0=r0,r0
-    (p6) shladd r17=r23,1,r17
-    ;;
-    (p6) st8 [r17]=r20
-    (p6) cmp.eq p7,p0=VMX_MMU_VIRTUAL,r16 // Set physical rr if in virt mode
-    ;;
-    (p7) mov rr[r28]=r20
-    br.many b0
+    mov rp=r14
+    br.call.sptk.many b6=vmx_vcpu_set_rr_fast
 END(vmx_asm_mov_to_rr)
 
 
-//rsm 
-GLOBAL_ENTRY(vmx_asm_rsm)
-#ifndef ACCE_RSM
-    br.many vmx_virtualization_fault_back
-#endif
-    mov r23=r31
-    add r16=IA64_VPD_BASE_OFFSET,r21
+//rsm 25
+ENTRY(vmx_asm_rsm)
     extr.u r26=r25,6,21 // Imm21
     extr.u r27=r25,31,2 // I2d
     ;;
-    ld8 r16=[r16]
     extr.u r28=r25,36,1 // I
     dep r26=r27,r26,21,2
     ;;
-    add r17=VPD_VPSR_START_OFFSET,r16
     //r18 is imm24
-    dep r18=r28,r26,23,1
+    dep r16=r28,r26,23,1
     ;;
-    //sync read
-    mov r25=r16
-    movl r24=vmx_asm_rsm_sync_read_return
-    mov r20=b0
-    br.sptk.many vmx_vps_sync_read
+    VMX_VIRT_SAVE
     ;;
-vmx_asm_rsm_sync_read_return:
-    ld8 r26=[r17]
-    // xenoprof
-    // Don't change mPSR.pp.
-    // It is manipulated by xenoprof.
-    movl r28=IA64_PSR_IC+IA64_PSR_I+IA64_PSR_DT+IA64_PSR_SI+IA64_PSR_PP
-
-    sub r27=-1,r18 // ~imm24
+    mov out0=r21
+    mov out1=r16
+    movl r14=ia64_leave_hypervisor_virt
     ;;
-    or r28=r27,r28 // Keep IC,I,DT,SI
-    and r19=r26,r27 // Update vpsr
-    ;;
-    st8 [r17]=r19
-    mov r24=cr.ipsr
-    ;;
-    and r24=r24,r28 // Update ipsr
-    adds r27=IA64_VCPU_FP_PSR_OFFSET,r21
-    ;;
-    ld8 r27=[r27]
-    ;;
-    tbit.nz p8,p0=r27,IA64_PSR_DFH_BIT
-    ;;
-    (p8) dep r24=-1,r24,IA64_PSR_DFH_BIT,1  // Keep dfh
-    ;;
-    mov cr.ipsr=r24
-    //sync write
-    mov r25=r16
-    movl r24=vmx_asm_rsm_sync_write_return
-    br.sptk.many vmx_vps_sync_write
-    ;;
-vmx_asm_rsm_sync_write_return:
-    add r29=IA64_VCPU_MMU_MODE_OFFSET,r21
-    ;;
-    ld1 r27=[r29]
-    ;;
-    cmp.ne p6,p0=VMX_MMU_VIRTUAL,r27
-    ;;
-    tbit.z.or p6,p0=r18,IA64_PSR_DT_BIT
-    (p6) br.dptk vmx_asm_rsm_out
-    // DT not cleared or already in phy mode
-    ;;
-    // Switch to meta physical mode D.
-    add r26=IA64_VCPU_META_RID_D_OFFSET,r21
-    mov r27=VMX_MMU_PHY_D
-    ;;
-    ld8 r26=[r26]
-    st1 [r29]=r27 
-    dep.z r28=4,61,3
-    ;;
-    mov rr[r0]=r26
-    ;;
-    mov rr[r28]=r26
-    ;;
-    srlz.d
-vmx_asm_rsm_out:	
-    mov r31=r23
-    mov r24=r20
-    br.many vmx_resume_to_guest
+    mov rp=r14
+    br.call.sptk.many b6=vmx_vcpu_rsm_fast
 END(vmx_asm_rsm)
 
 
-//ssm 
-GLOBAL_ENTRY(vmx_asm_ssm)
-#ifndef ACCE_SSM
-    br.many vmx_virtualization_fault_back
-#endif
-    mov r23=r31
-    add r16=IA64_VPD_BASE_OFFSET,r21
+//ssm 24
+ENTRY(vmx_asm_ssm)
+    adds r18=IA64_VPD_BASE_OFFSET,r21
+    ;;
+    ld8 r18=[r18]
+    ;;
+    adds r26=IA64_VPD_VHPI_OFFSET,r18
+    ;;
+    ld8 r26=[r26]
+    ;;
+    cmp.ne p6,p0=r26,r0
+    (p6) br.cond.dpnt.many vmx_virtualization_fault_back
+    ;;
     extr.u r26=r25,6,21
     extr.u r27=r25,31,2
     ;;
-    ld8 r16=[r16]
     extr.u r28=r25,36,1
     dep r26=r27,r26,21,2
     ;;  //r18 is imm24
-    dep r18=r28,r26,23,1
-    ;;  
-    //sync read
-    mov r25=r16
-    movl r24=vmx_asm_ssm_sync_read_return
-    mov r20=b0
-    br.sptk.many vmx_vps_sync_read
+    dep r16=r28,r26,23,1
     ;;
-vmx_asm_ssm_sync_read_return:
-    add r27=VPD_VPSR_START_OFFSET,r16
+    VMX_VIRT_SAVE
     ;;
-    ld8 r17=[r27]		//r17 old vpsr
-    dep r28=0,r18,IA64_PSR_PP_BIT,1 // For xenoprof
-                                    // Don't change mPSR.pp
-                                    // It is maintained by xenoprof.
+    mov out0=r21
+    mov out1=r16
+    movl r14=ia64_leave_hypervisor_virt
     ;;
-    or r19=r17,r18		//r19 new vpsr
-    ;;
-    st8 [r27]=r19 // update vpsr
-    mov r24=cr.ipsr
-    ;;
-    or r24=r24,r28
-    ;;
-    mov cr.ipsr=r24
-    //sync_write
-    mov r25=r16
-    movl r24=vmx_asm_ssm_sync_write_return
-    br.sptk.many vmx_vps_sync_write
-    ;;
-vmx_asm_ssm_sync_write_return:	
-    add r29=IA64_VCPU_MMU_MODE_OFFSET,r21
-    movl r28=IA64_PSR_DT+IA64_PSR_RT+IA64_PSR_IT
-    ;;
-    ld1 r30=[r29] // mmu_mode
-    ;;
-    and r27=r28,r19
-    cmp.eq p6,p0=VMX_MMU_VIRTUAL,r30
-    ;;
-    cmp.ne.or p6,p0=r28,r27 // (vpsr & (it+dt+rt)) /= (it+dt+rt) ie stay in phy
-    (p6) br.dptk vmx_asm_ssm_1
-    ;;
-    add r26=IA64_VCPU_META_SAVED_RR0_OFFSET,r21
-    add r27=IA64_VCPU_META_SAVED_RR0_OFFSET+8,r21
-    mov r30=VMX_MMU_VIRTUAL
-    ;;
-    ld8 r26=[r26]
-    ld8 r27=[r27]
-    st1 [r29]=r30
-    dep.z r28=4,61,3
-    ;;
-    mov rr[r0]=r26
-    ;;
-    mov rr[r28]=r27
-    ;;
-    srlz.d
-    ;;
-vmx_asm_ssm_1:
-    tbit.nz p6,p0=r17,IA64_PSR_I_BIT
-    ;;
-    tbit.z.or p6,p0=r19,IA64_PSR_I_BIT
-    (p6) br.dptk vmx_asm_ssm_out
-    ;;
-    add r29=VPD_VTPR_START_OFFSET,r16
-    add r30=VPD_VHPI_START_OFFSET,r16
-    ;;
-    ld8 r29=[r29]
-    ld8 r30=[r30]
-    ;;
-    extr.u r17=r29,4,4
-    extr.u r18=r29,16,1
-    ;;
-    dep r17=r18,r17,4,1
-    mov r31=r23
-    mov b0=r20
-    ;;
-    cmp.gt p6,p0=r30,r17
-    (p6) br.dpnt.few vmx_asm_dispatch_vexirq
-vmx_asm_ssm_out:	
-    mov r31=r23
-    mov r24=r20
-    br.many vmx_resume_to_guest
+    mov rp=r14
+    br.call.sptk.many b6=vmx_vcpu_ssm_fast
 END(vmx_asm_ssm)
 
 
-//mov psr.l=r2 
-GLOBAL_ENTRY(vmx_asm_mov_to_psr)
-#ifndef ACCE_MOV_TO_PSR
-    br.many vmx_virtualization_fault_back
-#endif
-    mov r23=r31
-    add r16=IA64_VPD_BASE_OFFSET,r21
+//mov psr.l=r2
+ENTRY(vmx_asm_mov_to_psr)
     extr.u r26=r25,13,7 //r2
+    movl r27=asm_mov_from_reg
     ;;
-    ld8 r16=[r16]
-    movl r24=asm_mov_from_reg
-    ;;
-    adds r30=vmx_asm_mov_to_psr_back-asm_mov_from_reg,r24
-    shladd r26=r26,4,r24
-    mov r20=b0
+    adds r30=vmx_asm_mov_to_psr_back-asm_mov_from_reg,r27
+    shladd r26=r26,4,r27
     ;;
     mov b0=r26
     br.many b0
-    ;;   
+    ;;
 vmx_asm_mov_to_psr_back:
-    //sync read
-    mov r25=r16
-    movl r24=vmx_asm_mov_to_psr_sync_read_return
-    br.sptk.many vmx_vps_sync_read
+    adds r18=IA64_VPD_BASE_OFFSET,r21
+    tbit.nz p6,p0 = r19, IA64_PSR_I_BIT
     ;;
-vmx_asm_mov_to_psr_sync_read_return:
-    add r27=VPD_VPSR_START_OFFSET,r16
+    ld8 r18=[r18]
     ;;
-    ld8 r17=[r27] // r17 old vpsr
-    dep r19=0,r19,32,32 // Clear bits 32-63
-    ;;   
-    dep r18=0,r17,0,32
-    ;; 
-    or r18=r18,r19 //r18 new vpsr
-    ;;
-    st8 [r27]=r18 // set vpsr
-    //sync write
-    mov r25=r16
-    movl r24=vmx_asm_mov_to_psr_sync_write_return
-    br.sptk.many vmx_vps_sync_write
-    ;;
-vmx_asm_mov_to_psr_sync_write_return:
-    add r22=IA64_VCPU_MMU_MODE_OFFSET,r21
-    movl r28=IA64_PSR_DT+IA64_PSR_RT+IA64_PSR_IT
-    ;;
-    and r27=r28,r18
-    and r29=r28,r17
-    ;;
-    cmp.eq p5,p0=r29,r27 // (old_vpsr & (dt+rt+it)) == (new_vpsr & (dt+rt+it))
-    cmp.eq p6,p7=r28,r27 // (new_vpsr & (dt+rt+it)) == (dt+rt+it)
-    (p5) br.many vmx_asm_mov_to_psr_1 // no change
-    ;;
-    //virtual to physical D
-    (p7) add r26=IA64_VCPU_META_RID_D_OFFSET,r21
-    (p7) add r27=IA64_VCPU_META_RID_D_OFFSET,r21
-    (p7) mov r30=VMX_MMU_PHY_D
-    ;;
-    //physical to virtual
-    (p6) add r26=IA64_VCPU_META_SAVED_RR0_OFFSET,r21
-    (p6) add r27=IA64_VCPU_META_SAVED_RR0_OFFSET+8,r21
-    (p6) mov r30=VMX_MMU_VIRTUAL
+    adds r26=IA64_VPD_VHPI_OFFSET,r18
     ;;
     ld8 r26=[r26]
-    ld8 r27=[r27]
-    st1 [r22]=r30
-    dep.z r28=4,61,3
     ;;
-    mov rr[r0]=r26
+    // if enable interrupt and vhpi has value, return
+    cmp.ne.and p6,p0=r26,r0
+    (p6) br.cond.dpnt.many vmx_virtualization_fault_back
     ;;
-    mov rr[r28]=r27
+    mov r16=r19
     ;;
-    srlz.d
+    VMX_VIRT_SAVE
     ;;
-vmx_asm_mov_to_psr_1:
-    mov r24=cr.ipsr
-    movl r28=IA64_PSR_IC+IA64_PSR_I+IA64_PSR_DT+IA64_PSR_SI+IA64_PSR_RT
+    mov out0=r21
+    mov out1=r16
+    movl r14=ia64_leave_hypervisor_virt
     ;;
-    tbit.nz p7,p0=r24,IA64_PSR_PP_BIT           // For xenoprof
-    or r27=r19,r28
-    dep r24=0,r24,0,32
-    ;;
-    add r24=r27,r24
-    ;;
-    adds r27=IA64_VCPU_FP_PSR_OFFSET,r21
-    (p7) dep r24=-1,r24,IA64_PSR_PP_BIT,1       // For xenoprof
-                                                // Dom't change mPSR.pp
-                                                // It is maintaned by xenoprof
-    ;;
-    ld8 r27=[r27]
-    ;;
-    tbit.nz p8,p0=r27,IA64_PSR_DFH_BIT
-    ;;
-    (p8) dep r24=-1,r24,IA64_PSR_DFH_BIT,1
-    ;;
-    mov cr.ipsr=r24
-    tbit.nz p6,p0=r17,IA64_PSR_I_BIT
-    ;;
-    tbit.z.or p6,p0=r18,IA64_PSR_I_BIT
-    (p6) br.dpnt.few vmx_asm_mov_to_psr_out
-    ;;
-    add r29=VPD_VTPR_START_OFFSET,r16
-    add r30=VPD_VHPI_START_OFFSET,r16
-    ;;
-    ld8 r29=[r29]
-    ld8 r30=[r30]
-    ;;
-    extr.u r17=r29,4,4
-    extr.u r18=r29,16,1
-    ;;
-    dep r17=r18,r17,4,1
-    mov r31=r23
-    mov b0=r20
-    ;;
-    cmp.gt p6,p0=r30,r17
-    (p6) br.dpnt.few vmx_asm_dispatch_vexirq
-vmx_asm_mov_to_psr_out:
-    mov r31=r23
-    mov r24=r20
-    br.many vmx_resume_to_guest
+    mov rp=r14
+    br.call.sptk.many b6=vmx_vcpu_mov_to_psr_fast
 END(vmx_asm_mov_to_psr)
 
 
-ENTRY(vmx_asm_dispatch_vexirq)
-//increment iip
-    mov r16=cr.ipsr
-    ;;
-    extr.u r17=r16,IA64_PSR_RI_BIT,2
-    tbit.nz p6,p7=r16,IA64_PSR_RI_BIT+1
-    ;;	
-    (p6) mov r18=cr.iip
-    (p6) mov r17=r0
-    (p7) add r17=1,r17
-    ;;    
-    (p6) add r18=0x10,r18
-    dep r16=r17,r16,IA64_PSR_RI_BIT,2
-    ;;		
-    (p6) mov cr.iip=r18
-    mov cr.ipsr=r16
-    br.many vmx_dispatch_vexirq
-END(vmx_asm_dispatch_vexirq)
-
 // thash r1=r3
 // TODO: add support when pta.vf = 1
-GLOBAL_ENTRY(vmx_asm_thash)
-#ifndef ACCE_THASH
-    br.many vmx_virtualization_fault_back
-#endif
-    extr.u r17=r25,20,7		// get r3 from opcode in r25 
-    extr.u r18=r25,6,7		// get r1 from opcode in r25
+ENTRY(vmx_asm_thash)
+    extr.u r17=r25,20,7                 // get r3 from opcode in r25
+    extr.u r18=r25,6,7                  // get r1 from opcode in r25
     movl r20=asm_mov_from_reg
     ;;
     adds r30=vmx_asm_thash_back1-asm_mov_from_reg,r20
-    shladd r17=r17,4,r20	// get addr of MOVE_FROM_REG(r17)
-    adds r16=IA64_VPD_BASE_OFFSET,r21	// get vcpu.arch.priveregs
-    mov r24=b0			// save b0
+    shladd r17=r17,4,r20                // get addr of MOVE_FROM_REG(r17)
+    adds r16=IA64_VPD_BASE_OFFSET,r21   // get vcpu.arch.priveregs
+    mov r24=b0                          // save b0
     ;;
-    ld8 r16=[r16]		// get VPD addr
+    ld8 r16=[r16]                       // get VPD addr
     mov b0=r17
-    br.many b0			// r19 return value
-    ;;                                                     
-vmx_asm_thash_back1:
-    shr.u r23=r19,61		// get RR number
-    adds r28=VCPU_VRR0_OFS,r21	// get vcpu->arch.arch_vmx.vrr[0]'s addr
-    adds r16=IA64_VPD_VPTA_OFFSET,r16	// get virtual pta 
+    br.many b0                          // r19 return value
     ;;
-    shladd r27=r23,3,r28	// get vcpu->arch.arch_vmx.vrr[r23]'s addr
-    ld8 r17=[r16]		// get virtual PTA
+vmx_asm_thash_back1:
+    shr.u r23=r19,61                    // get RR number
+    adds r28=VCPU_VRR0_OFS,r21  // get vcpu->arch.arch_vmx.vrr[0]'s addr
+    adds r16=IA64_VPD_VPTA_OFFSET,r16   // get virtual pta
+    ;;
+    shladd r27=r23,3,r28        // get vcpu->arch.arch_vmx.vrr[r23]'s addr
+    ld8 r17=[r16]               // get virtual PTA
     mov r26=1
     ;;
-    extr.u r29=r17,2,6		// get pta.size
-    ld8 r28=[r27]		// get vcpu->arch.arch_vmx.vrr[r23]'s value
+    extr.u r29=r17,2,6// get pta.size
+    ld8 r28=[r27]               // get vcpu->arch.arch_vmx.vrr[r23]'s value
     ;;
     // Fall-back to C if VF (long format) is set
     tbit.nz p6,p0=r17,8
     mov b0=r24
     ;;
-(p6) mov r24=EVENT_THASH
-(p6) br.cond.dpnt.many vmx_virtualization_fault_back
-    extr.u r28=r28,2,6		// get rr.ps
-    shl r22=r26,r29		// 1UL << pta.size
+    (p6) mov r24=EVENT_THASH
+    (p6) br.cond.dpnt.many vmx_virtualization_fault_back
+    extr.u r28=r28,2,6      // get rr.ps
+    shl r22=r26,r29         // 1UL << pta.size
     ;;
-    shr.u r23=r19,r28		// vaddr >> rr.ps
-    adds r26=3,r29		// pta.size + 3 
-    shl r27=r17,3		// pta << 3 
+    shr.u r23=r19,r28       // vaddr >> rr.ps
+    adds r26=3,r29          // pta.size + 3
+    shl r27=r17,3           // pta << 3
     ;;
-    shl r23=r23,3		// (vaddr >> rr.ps) << 3
-    shr.u r27=r27,r26		// (pta << 3) >> (pta.size+3)
+    shl r23=r23,3           // (vaddr >> rr.ps) << 3
+    shr.u r27=r27,r26       // (pta << 3) >> (pta.size+3)
     movl r16=VRN_MASK
     ;;
-    adds r22=-1,r22		// (1UL << pta.size) - 1
-    shl r27=r27,r29		// ((pta<<3)>>(pta.size+3))<<pta.size
-    and r19=r19,r16		// vaddr & VRN_MASK
+    adds r22=-1,r22         // (1UL << pta.size) - 1
+    shl r27=r27,r29         // ((pta<<3)>>(pta.size+3))<<pta.size
+    and r19=r19,r16         // vaddr & VRN_MASK
     ;;
-    and r22=r22,r23		// vhpt_offset 
-    or r19=r19,r27		// (vadr&VRN_MASK) |(((pta<<3)>>(pta.size + 3))<<pta.size) 
+    and r22=r22,r23         // vhpt_offset
+    or r19=r19,r27          // (vadr&VRN_MASK) |(((pta<<3)>>(pta.size + 3))<<pta.size)
     adds r26=asm_mov_to_reg-asm_mov_from_reg,r20
     ;;
-    or r19=r19,r22		// calc pval
+    or r19=r19,r22          // calc pval
     shladd r17=r18,4,r26
     adds r30=vmx_resume_to_guest-asm_mov_from_reg,r20
     ;;
@@ -634,99 +753,101 @@ vmx_asm_thash_back1:
     br.many b0
 END(vmx_asm_thash)
 
-#define MOV_TO_REG0	\
-{;			\
-    nop.b 0x0;		\
-    nop.b 0x0;		\
-    nop.b 0x0;		\
-    ;;			\
+
+
+#define MOV_TO_REG0     \
+{;                      \
+    nop.b 0x0;          \
+    nop.b 0x0;          \
+    nop.b 0x0;          \
+    ;;                  \
 };
 
 
-#define MOV_TO_REG(n)	\
-{;			\
-    mov r##n##=r19;	\
-    mov b0=r30;		\
-    br.sptk.many b0;	\
-    ;;			\
+#define MOV_TO_REG(n)   \
+{;                      \
+    mov r##n##=r19;     \
+    mov b0=r30;         \
+    br.sptk.many b0;    \
+    ;;                  \
 };
 
 
-#define MOV_FROM_REG(n)	\
-{;			\
-    mov r19=r##n##;	\
-    mov b0=r30;		\
-    br.sptk.many b0;	\
-    ;;			\
+#define MOV_FROM_REG(n) \
+{;                      \
+    mov r19=r##n##;     \
+    mov b0=r30;         \
+    br.sptk.many b0;    \
+    ;;                  \
 };
 
 
-#define MOV_TO_BANK0_REG(n)			\
-ENTRY_MIN_ALIGN(asm_mov_to_bank0_reg##n##);	\
-{;						\
-    mov r26=r2;					\
-    mov r2=r19;					\
-    bsw.1;					\
-    ;;						\
-};						\
-{;						\
-    mov r##n##=r2;				\
-    nop.b 0x0;					\
-    bsw.0;					\
-    ;;						\
-};						\
-{;						\
-    mov r2=r26;					\
-    mov b0=r30;					\
-    br.sptk.many b0;				\
-    ;;						\
-};						\
+#define MOV_TO_BANK0_REG(n)                 \
+ENTRY_MIN_ALIGN(asm_mov_to_bank0_reg##n##); \
+{;                                          \
+    mov r26=r2;                             \
+    mov r2=r19;                             \
+    bsw.1;                                  \
+    ;;                                      \
+};                                          \
+{;                                          \
+    mov r##n##=r2;                          \
+    nop.b 0x0;                              \
+    bsw.0;                                  \
+    ;;                                      \
+};                                          \
+{;                                          \
+    mov r2=r26;                             \
+    mov b0=r30;                             \
+    br.sptk.many b0;                        \
+    ;;                                      \
+};                                          \
 END(asm_mov_to_bank0_reg##n##)
 
 
-#define MOV_FROM_BANK0_REG(n)			\
-ENTRY_MIN_ALIGN(asm_mov_from_bank0_reg##n##);	\
-{;						\
-    mov r26=r2;					\
-    nop.b 0x0;					\
-    bsw.1;					\
-    ;;						\
-};						\
-{;						\
-    mov r2=r##n##;				\
-    nop.b 0x0;					\
-    bsw.0;					\
-    ;;						\
-};						\
-{;						\
-    mov r19=r2;					\
-    mov r2=r26;					\
-    mov b0=r30;					\
-};						\
-{;						\
-    nop.b 0x0;					\
-    nop.b 0x0;					\
-    br.sptk.many b0;				\
-    ;;						\
-};						\
+#define MOV_FROM_BANK0_REG(n)                   \
+ENTRY_MIN_ALIGN(asm_mov_from_bank0_reg##n##);   \
+{;                                              \
+    mov r26=r2;                                 \
+    nop.b 0x0;                                  \
+    bsw.1;                                      \
+    ;;                                          \
+};                                              \
+{;                                              \
+    mov r2=r##n##;                              \
+    nop.b 0x0;                                  \
+    bsw.0;                                      \
+    ;;                                          \
+};                                              \
+{;                                              \
+    mov r19=r2;                                 \
+    mov r2=r26;                                 \
+    mov b0=r30;                                 \
+};                                              \
+{;                                              \
+    nop.b 0x0;                                  \
+    nop.b 0x0;                                  \
+    br.sptk.many b0;                            \
+    ;;                                          \
+};                                              \
 END(asm_mov_from_bank0_reg##n##)
 
 
-#define JMP_TO_MOV_TO_BANK0_REG(n)		\
-{;						\
-    nop.b 0x0;					\
-    nop.b 0x0;					\
-    br.sptk.many asm_mov_to_bank0_reg##n##;	\
-    ;;						\
-}    
+#define JMP_TO_MOV_TO_BANK0_REG(n)              \
+{;                                              \
+    nop.b 0x0;                                  \
+    nop.b 0x0;                                  \
+    br.sptk.many asm_mov_to_bank0_reg##n##;     \
+    ;;                                          \
+}
 
 
-#define JMP_TO_MOV_FROM_BANK0_REG(n)		\
-{;						\
-    nop.b 0x0;					\
-    nop.b 0x0;					\
-    br.sptk.many asm_mov_from_bank0_reg##n##;	\
-    ;;						\
+#define JMP_TO_MOV_FROM_BANK0_REG(n)            \
+{;                                              \
+    nop.b 0x0;                                  \
+    nop.b 0x0;                                  \
+    br.sptk.many asm_mov_from_bank0_reg##n##;   \
+    ;;                                          \
 }
 
 
@@ -749,7 +870,7 @@ MOV_FROM_BANK0_REG(31)
 
 
 // mov from reg table
-// r19:	value, r30: return address
+// r19:value, r30: return address
 // r26 may be destroyed
 ENTRY(asm_mov_from_reg)
     MOV_FROM_REG(0)
@@ -884,29 +1005,30 @@ END(asm_mov_from_reg)
 
 
 /* must be in bank 0
- * parameter:
- * r31: pr
- * r24: b0
+ *  parameter:
+ *  r31: pr
+ *  r24: b0
+ *  p2: whether increase IP
+ *  p3: whether check vpsr.ic
  */
 ENTRY(vmx_resume_to_guest)
-    mov r16=cr.ipsr
-    ;;
+    // ip ++
+    (p2) mov r16=cr.ipsr
+    (p2)dep.z r30=1,IA64_PSR_RI_BIT,1
     adds r19=IA64_VPD_BASE_OFFSET,r21
-    extr.u r17=r16,IA64_PSR_RI_BIT,2
     ;;
     ld8 r25=[r19]
-    add r17=1,r17
+    (p2) add r16=r30,r16
     ;;
+    (p2) mov cr.ipsr=r16
     adds r19= VPD_VPSR_START_OFFSET,r25
-    dep r16=r17,r16,IA64_PSR_RI_BIT,2
     ;;
-    mov cr.ipsr=r16
     ld8 r19=[r19]
     ;;
     mov r23=r31
     mov r17=r0
     //vps_resume_normal/handler
-    tbit.z p6,p7 = r19,IA64_PSR_IC_BIT		// p1=vpsr.ic
+    tbit.z p6,p7 = r19,IA64_PSR_IC_BIT  // p7=vpsr.ic
     (p6) br.cond.sptk.many vmx_vps_resume_handler
     (p7) br.cond.sptk.few vmx_vps_resume_normal
 END(vmx_resume_to_guest)
@@ -931,7 +1053,7 @@ MOV_TO_BANK0_REG(31)
 
 
 // mov to reg table
-// r19:	value, r30: return address
+// r19:value, r30: return address
 ENTRY(asm_mov_to_reg)
     MOV_TO_REG0
     MOV_TO_REG(1)

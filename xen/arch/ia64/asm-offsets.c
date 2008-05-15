@@ -204,6 +204,11 @@ void foo(void)
 
 	DEFINE(IA64_VPD_BASE_OFFSET, offsetof (struct vcpu, arch.privregs));
 	DEFINE(IA64_VPD_VIFS_OFFSET, offsetof (mapped_regs_t, ifs));
+	DEFINE(IA64_VPD_VHPI_OFFSET, offsetof (mapped_regs_t, vhpi));
+	DEFINE(IA64_VPD_VB1REG_OFFSET, offsetof (mapped_regs_t, bank1_regs[0]));
+	DEFINE(IA64_VPD_VB0REG_OFFSET, offsetof (mapped_regs_t, bank0_regs[0]));
+	DEFINE(IA64_VPD_VB1NAT_OFFSET, offsetof (mapped_regs_t, vnat));
+	DEFINE(IA64_VPD_VB0NAT_OFFSET, offsetof (mapped_regs_t, vbnat));
  	DEFINE(IA64_VLSAPIC_INSVC_BASE_OFFSET, offsetof (struct vcpu, arch.insvc[0]));
 	DEFINE(IA64_VPD_VPTA_OFFSET, offsetof (struct mapped_regs, pta));
 	DEFINE(XXX_THASH_SIZE, sizeof (thash_data_t));

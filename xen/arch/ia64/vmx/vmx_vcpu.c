@@ -168,6 +168,34 @@ IA64FAULT vmx_vcpu_cover(VCPU *vcpu)
     return (IA64_NO_FAULT);
 }
 
+/* In fast path, psr.ic = 0, psr.i = 0, psr.bn = 0
+ * so that no tlb miss is allowed.
+ */
+void vmx_vcpu_set_rr_fast(VCPU *vcpu, u64 reg, u64 val)
+{
+    u64 rrval;
+
+    VMX(vcpu, vrr[reg >> VRN_SHIFT]) = val;
+    switch((u64)(reg >> VRN_SHIFT)) {
+    case VRN4:
+        rrval = vrrtomrr(vcpu, val);
+        vcpu->arch.metaphysical_saved_rr4 = rrval;
+        if (is_virtual_mode(vcpu) && likely(vcpu == current))
+            ia64_set_rr(reg, rrval);
+        break;
+    case VRN0:
+        rrval = vrrtomrr(vcpu, val);
+        vcpu->arch.metaphysical_saved_rr0 = rrval;
+        if (is_virtual_mode(vcpu) && likely(vcpu == current))
+            ia64_set_rr(reg, rrval);
+        break;
+    default:
+        if (likely(vcpu == current))
+            ia64_set_rr(reg, vrrtomrr(vcpu, val));
+        break;
+    }
+}
+
 IA64FAULT vmx_vcpu_set_rr(VCPU *vcpu, u64 reg, u64 val)
 {
     u64 rrval;
@@ -246,8 +274,138 @@ u64 vmx_vcpu_get_itir_on_fault(VCPU *vcpu, u64 ifa)
     return (rr1.rrval);
 }
 
+/* In fast path, psr.ic = 0, psr.i = 0, psr.bn = 0
+ * so that no tlb miss is allowed.
+ */
+void vmx_vcpu_mov_to_psr_fast(VCPU *vcpu, u64 value)
+{
+    /* TODO: Only allowed for current vcpu */
+    u64 old_vpsr, new_vpsr, mipsr, mask;
+    old_vpsr = VCPU(vcpu, vpsr);
 
+    new_vpsr = (old_vpsr & 0xffffffff00000000) | (value & 0xffffffff);
+    VCPU(vcpu, vpsr) = new_vpsr;
 
+    mipsr = ia64_getreg(_IA64_REG_CR_IPSR);
+
+    /* xenoprof:
+     * don't change psr.pp.
+     * It is manipulated by xenoprof.
+     */
+    mask = 0xffffffff00000000 | IA64_PSR_IC | IA64_PSR_I 
+        | IA64_PSR_DT  | IA64_PSR_PP | IA64_PSR_SI | IA64_PSR_RT;
+
+    mipsr = (mipsr & mask) | (value & (~mask));
+
+    if (FP_PSR(vcpu) & IA64_PSR_DFH)
+         mipsr |= IA64_PSR_DFH;
+
+    ia64_setreg(_IA64_REG_CR_IPSR, mipsr);
+
+    switch_mm_mode_fast(vcpu, (IA64_PSR)old_vpsr, (IA64_PSR)new_vpsr);
+}
+
+#define IA64_PSR_MMU_VIRT (IA64_PSR_DT | IA64_PSR_RT | IA64_PSR_IT)
+/* In fast path, psr.ic = 0, psr.i = 0, psr.bn = 0
+ * so that no tlb miss is allowed.
+ */
+void vmx_vcpu_rfi_fast(VCPU *vcpu)
+{
+    /* TODO: Only allowed for current vcpu */
+    u64 vifs, vipsr, vpsr, mipsr, mask;
+    vipsr = VCPU(vcpu, ipsr);
+    vpsr = VCPU(vcpu, vpsr);
+    vifs = VCPU(vcpu, ifs);
+    if (vipsr & IA64_PSR_BN) {
+        if(!(vpsr & IA64_PSR_BN))
+             vmx_asm_bsw1();
+    } else if (vpsr & IA64_PSR_BN)
+             vmx_asm_bsw0();
+
+    /*
+     *  For those IA64_PSR bits: id/da/dd/ss/ed/ia
+     *  Since these bits will become 0, after success execution of each
+     *  instruction, we will change set them to mIA64_PSR
+     */
+    VCPU(vcpu, vpsr) = vipsr & (~ (IA64_PSR_ID |IA64_PSR_DA 
+                | IA64_PSR_DD | IA64_PSR_ED | IA64_PSR_IA));    
+
+    /*
+     * All vIA64_PSR bits shall go to mPSR (v->tf->tf_special.psr)
+     * , except for the following bits:
+     * ic/i/dt/si/rt/mc/it/bn/vm
+     */
+    /* xenoprof */
+    mask = (IA64_PSR_IC | IA64_PSR_I | IA64_PSR_DT | IA64_PSR_SI |
+            IA64_PSR_RT | IA64_PSR_MC | IA64_PSR_IT | IA64_PSR_BN |
+            IA64_PSR_VM | IA64_PSR_PP);
+    mipsr = ia64_getreg(_IA64_REG_CR_IPSR);
+    mipsr = (mipsr & mask) | (vipsr & (~mask));
+
+    if (FP_PSR(vcpu) & IA64_PSR_DFH)
+         mipsr |= IA64_PSR_DFH;
+
+    ia64_setreg(_IA64_REG_CR_IPSR, mipsr);
+    vmx_ia64_set_dcr(vcpu);
+
+    if(vifs >> 63)
+        ia64_setreg(_IA64_REG_CR_IFS, vifs);
+
+    ia64_setreg(_IA64_REG_CR_IIP, VCPU(vcpu, iip));
+
+    switch_mm_mode_fast(vcpu, (IA64_PSR)vpsr, (IA64_PSR)vipsr);
+}
+
+/* In fast path, psr.ic = 0, psr.i = 0, psr.bn = 0
+ * so that no tlb miss is allowed.
+ */
+void vmx_vcpu_ssm_fast(VCPU *vcpu, u64 imm24)
+{
+    u64  old_vpsr, new_vpsr, mipsr;
+
+    old_vpsr = VCPU(vcpu, vpsr);
+    new_vpsr = old_vpsr | imm24;
+
+    VCPU(vcpu, vpsr) = new_vpsr;
+
+    mipsr = ia64_getreg(_IA64_REG_CR_IPSR);
+    /* xenoprof:
+     * don't change psr.pp.
+     * It is manipulated by xenoprof.
+     */
+    mipsr |= imm24 & (~IA64_PSR_PP);
+    ia64_setreg(_IA64_REG_CR_IPSR, mipsr);
+
+    switch_mm_mode_fast(vcpu, (IA64_PSR)old_vpsr, (IA64_PSR)new_vpsr);
+}
+
+/* In fast path, psr.ic = 0, psr.i = 0, psr.bn = 0
+ * so that no tlb miss is allowed.
+ */
+void vmx_vcpu_rsm_fast(VCPU *vcpu, u64 imm24)
+{
+    u64  old_vpsr, new_vpsr, mipsr;
+
+    old_vpsr = VCPU(vcpu, vpsr);
+    new_vpsr = old_vpsr & ~imm24;
+
+    VCPU(vcpu, vpsr) = new_vpsr;
+
+    mipsr = ia64_getreg(_IA64_REG_CR_IPSR);
+    /* xenoprof:
+     * don't change psr.pp.
+     * It is manipulated by xenoprof.
+     */
+    mipsr &= (~imm24) | IA64_PSR_PP;
+    mipsr |= IA64_PSR_IC | IA64_PSR_I | IA64_PSR_DT | IA64_PSR_SI;
+
+    if (FP_PSR(vcpu) & IA64_PSR_DFH)
+         mipsr |= IA64_PSR_DFH;
+
+    ia64_setreg(_IA64_REG_CR_IPSR, mipsr);
+
+    switch_mm_mode_fast(vcpu, (IA64_PSR)old_vpsr, (IA64_PSR)new_vpsr);
+}
 
 IA64FAULT vmx_vcpu_rfi(VCPU *vcpu)
 {

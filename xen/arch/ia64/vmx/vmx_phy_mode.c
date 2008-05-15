@@ -228,6 +228,33 @@ static int mm_switch_action(IA64_PSR opsr, IA64_PSR npsr)
     return mm_switch_table[MODE_IND(opsr)][MODE_IND(npsr)];
 }
 
+/* In fast path, psr.ic = 0, psr.i = 0, psr.bn = 0
+ * so that no tlb miss is allowed.
+ */
+void
+switch_mm_mode_fast(VCPU *vcpu, IA64_PSR old_psr, IA64_PSR new_psr)
+{
+    int act;
+    act = mm_switch_action(old_psr, new_psr);
+    switch (act) {
+    case SW_2P_DT:
+        vcpu->arch.arch_vmx.mmu_mode = VMX_MMU_PHY_DT;
+        switch_to_physical_rid(vcpu);
+        break;
+    case SW_2P_D:
+        vcpu->arch.arch_vmx.mmu_mode = VMX_MMU_PHY_D;
+        switch_to_physical_rid(vcpu);
+        break;
+    case SW_2V:
+        vcpu->arch.arch_vmx.mmu_mode = VMX_MMU_VIRTUAL;
+        switch_to_virtual_rid(vcpu);
+        break;
+    default:
+        break;
+    }
+    return;
+}
+
 void
 switch_mm_mode(VCPU *vcpu, IA64_PSR old_psr, IA64_PSR new_psr)
 {
