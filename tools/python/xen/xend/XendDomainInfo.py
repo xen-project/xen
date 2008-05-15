@@ -3013,7 +3013,8 @@ class XendDomainInfo:
         # shortcut if the domain isn't started because
         # the devcontrollers will have no better information
         # than XendConfig.
-        if self._stateGet() in (XEN_API_VM_POWER_STATE_HALTED,):
+        if self._stateGet() in (XEN_API_VM_POWER_STATE_HALTED,
+                                XEN_API_VM_POWER_STATE_SUSPENDED):
             if dev_config:
                 return copy.deepcopy(dev_config)
             return None
