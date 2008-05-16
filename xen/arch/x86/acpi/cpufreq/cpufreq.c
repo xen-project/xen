@@ -369,6 +369,8 @@ static int acpi_cpufreq_target(struct cpufreq_policy *policy,
     if (!check_freqs(cmd.mask, freqs.new, data))
         return -EAGAIN;
 
+    px_statistic_update(cmd.mask, perf->state, next_perf_state);
+
     perf->state = next_perf_state;
     policy->cur = freqs.new;
 
@@ -581,9 +583,13 @@ int acpi_cpufreq_init(void)
     for_each_online_cpu(i) {
         xen_px_policy[i].cpu = i;
 
+        ret = px_statistic_init(i);
+        if (ret)
+            goto out;
+
         ret = acpi_cpufreq_cpu_init(&xen_px_policy[i]);
         if (ret)
-            goto cpufreq_init_out;
+            goto out;
     }
 
     /* setup ondemand cpufreq */
@@ -593,10 +599,10 @@ int acpi_cpufreq_init(void)
         i = first_cpu(pt[dom]);
         ret = cpufreq_governor_dbs(&xen_px_policy[i], CPUFREQ_GOV_START);
         if (ret)
-            goto cpufreq_init_out;
+            goto out;
     }
 
-cpufreq_init_out:
+out:
     xfree(pt);
    
     return ret;

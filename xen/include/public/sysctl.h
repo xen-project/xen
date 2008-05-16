@@ -212,7 +212,41 @@ struct xen_sysctl_availheap {
 };
 typedef struct xen_sysctl_availheap xen_sysctl_availheap_t;
 DEFINE_XEN_GUEST_HANDLE(xen_sysctl_availheap_t);
- 
+
+#define XEN_SYSCTL_get_pmstat        10
+struct pm_px_val {
+    uint64_aligned_t freq;        /* Px core frequency */
+    uint64_aligned_t residency;   /* Px residency time */
+    uint64_aligned_t count;       /* Px transition count */
+};
+typedef struct pm_px_val pm_px_val_t;
+DEFINE_XEN_GUEST_HANDLE(pm_px_val_t);
+
+struct pm_px_stat {
+    uint8_t total;        /* total Px states */
+    uint8_t usable;       /* usable Px states */
+    uint8_t last;         /* last Px state */
+    uint8_t cur;          /* current Px state */
+    XEN_GUEST_HANDLE_64(uint64) trans_pt;   /* Px transition table */
+    XEN_GUEST_HANDLE_64(pm_px_val_t) pt;
+};
+typedef struct pm_px_stat pm_px_stat_t;
+DEFINE_XEN_GUEST_HANDLE(pm_px_stat_t);
+
+struct xen_sysctl_get_pmstat {
+#define PMSTAT_get_max_px   0x11
+#define PMSTAT_get_pxstat   0x12
+#define PMSTAT_reset_pxstat 0x13
+    uint32_t type;
+    uint32_t cpuid;
+    union {
+        struct pm_px_stat getpx;
+        /* other struct for cx, tx, etc */
+    } u;
+};
+typedef struct xen_sysctl_get_pmstat xen_sysctl_get_pmstat_t;
+DEFINE_XEN_GUEST_HANDLE(xen_sysctl_get_pmstat_t);
+
 struct xen_sysctl {
     uint32_t cmd;
     uint32_t interface_version; /* XEN_SYSCTL_INTERFACE_VERSION */
@@ -226,6 +260,7 @@ struct xen_sysctl {
         struct xen_sysctl_debug_keys        debug_keys;
         struct xen_sysctl_getcpuinfo        getcpuinfo;
         struct xen_sysctl_availheap         availheap;
+        struct xen_sysctl_get_pmstat        get_pmstat;
         uint8_t                             pad[128];
     } u;
 };

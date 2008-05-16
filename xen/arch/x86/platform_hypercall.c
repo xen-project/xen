@@ -403,7 +403,10 @@ ret_t do_platform_op(XEN_GUEST_HANDLE(xen_platform_op_t) u_xenpf_op)
 
             if ( xenpxpt->flags == ( XEN_PX_PCT | XEN_PX_PSS | 
                 XEN_PX_PSD | XEN_PX_PPC ) )
+            {
+                pxpt->init =1;
                 cpu_count++;
+            }
             if ( cpu_count == num_online_cpus() )
                 ret = acpi_cpufreq_init();
             break;
