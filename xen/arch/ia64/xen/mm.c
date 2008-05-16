@@ -2442,7 +2442,7 @@ guest_physmap_remove_page(struct domain *d, unsigned long gpfn,
 
     BUG_ON(mfn == 0);//XXX
 
-    for (i = 0; i < (1UL << page_order); i++) {
+    for (i = 0; i < (1UL << page_order); i++)
         zap_domain_page_one(d, (gpfn+i) << PAGE_SHIFT, 0, mfn+i);
 
     perfc_incr(guest_physmap_remove_page);
