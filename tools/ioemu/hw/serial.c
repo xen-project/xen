@@ -705,12 +705,13 @@ static void serial_save(QEMUFile *f, void *opaque)
     qemu_put_8s(f,&s->lsr);
     qemu_put_8s(f,&s->msr);
     qemu_put_8s(f,&s->scr);
-    qemu_get_8s(f,&s->fcr);
+    qemu_put_8s(f,&s->fcr);
 }
 
 static int serial_load(QEMUFile *f, void *opaque, int version_id)
 {
     SerialState *s = opaque;
+    uint8_t fcr = 0;
 
     if(version_id > 2)
         return -EINVAL;
@@ -729,6 +730,11 @@ static int serial_load(QEMUFile *f, void *opaque, int version_id)
     qemu_get_8s(f,&s->scr);
     qemu_get_8s(f,&s->fcr);
 
+    if (version_id >= 2)
+        qemu_get_8s(f,&fcr);
+
+    /* Initialize fcr via setter to perform essential side-effects */
+    serial_ioport_write(s, 0x02, fcr);
     return 0;
 }
 
