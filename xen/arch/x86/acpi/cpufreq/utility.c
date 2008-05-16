@@ -34,6 +34,83 @@
 struct cpufreq_driver *cpufreq_driver;
 
 /*********************************************************************
+ *                    Px STATISTIC INFO                              *
+ *********************************************************************/
+
+void px_statistic_update(cpumask_t cpumask, uint8_t from, uint8_t to)
+{
+    uint32_t i;
+    uint64_t now;
+
+    now = NOW();
+
+    for_each_cpu_mask(i, cpumask) {
+        struct pm_px *pxpt = &px_statistic_data[i];
+        uint32_t statnum = processor_pminfo[i].perf.state_count;
+
+        pxpt->u.last = from;
+        pxpt->u.cur = to;
+        pxpt->u.pt[to].count++;
+        pxpt->u.pt[from].residency += now - pxpt->prev_state_wall;
+
+        (*(pxpt->u.trans_pt + from*statnum + to))++;
+
+        pxpt->prev_state_wall = now;
+    }
+}
+
+int px_statistic_init(int cpuid)
+{
+    uint32_t i, count;
+    struct pm_px *pxpt = &px_statistic_data[cpuid];
+    struct processor_pminfo *pmpt = &processor_pminfo[cpuid];
+
+    count = pmpt->perf.state_count;
+
+    pxpt->u.trans_pt = xmalloc_array(uint64_t, count * count);
+    if (!pxpt->u.trans_pt)
+        return -ENOMEM;
+
+    pxpt->u.pt = xmalloc_array(struct pm_px_val, count);
+    if (!pxpt->u.pt) {
+        xfree(pxpt->u.trans_pt);
+        return -ENOMEM;
+    }
+
+    memset(pxpt->u.trans_pt, 0, count * count * (sizeof(uint64_t)));
+    memset(pxpt->u.pt, 0, count * (sizeof(struct pm_px_val)));
+
+    pxpt->u.total = pmpt->perf.state_count;
+    pxpt->u.usable = pmpt->perf.state_count - pmpt->perf.ppc;
+
+    for (i=0; i < pmpt->perf.state_count; i++)
+        pxpt->u.pt[i].freq = pmpt->perf.states[i].core_frequency;
+
+    pxpt->prev_state_wall = NOW();
+
+    return 0;
+}
+
+void px_statistic_reset(int cpuid)
+{
+    uint32_t i, j, count;
+    struct pm_px *pxpt = &px_statistic_data[cpuid];
+
+    count = processor_pminfo[cpuid].perf.state_count;
+
+    for (i=0; i < count; i++) {
+        pxpt->u.pt[i].residency = 0;
+        pxpt->u.pt[i].count = 0;
+
+        for (j=0; j < count; j++)
+            *(pxpt->u.trans_pt + i*count + j) = 0;
+    }
+
+    pxpt->prev_state_wall = NOW();
+}
+
+
+/*********************************************************************
  *                   FREQUENCY TABLE HELPERS                         *
  *********************************************************************/
 

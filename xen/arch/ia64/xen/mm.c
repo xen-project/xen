@@ -2424,16 +2424,20 @@ steal_page(struct domain *d, struct page_info *page, unsigned int memflags)
 
 int
 guest_physmap_add_page(struct domain *d, unsigned long gpfn,
-                       unsigned long mfn)
+                       unsigned long mfn, unsigned int page_order)
 {
-    BUG_ON(!mfn_valid(mfn));
-    BUG_ON(mfn_to_page(mfn)->count_info != (PGC_allocated | 1));
-    set_gpfn_from_mfn(mfn, gpfn);
-    smp_mb();
-    assign_domain_page_replace(d, gpfn << PAGE_SHIFT, mfn,
-                               ASSIGN_writable | ASSIGN_pgc_allocated);
+    unsigned long i;
 
-    //BUG_ON(mfn != ((lookup_domain_mpa(d, gpfn << PAGE_SHIFT) & _PFN_MASK) >> PAGE_SHIFT));
+    for (i = 0; i < (1UL << page_order); i++) {
+        BUG_ON(!mfn_valid(mfn));
+        BUG_ON(mfn_to_page(mfn)->count_info != (PGC_allocated | 1));
+        set_gpfn_from_mfn(mfn, gpfn);
+        smp_mb();
+        assign_domain_page_replace(d, gpfn << PAGE_SHIFT, mfn,
+                                   ASSIGN_writable | ASSIGN_pgc_allocated);
+        mfn++;
+        gpfn++;
+    }
 
     perfc_incr(guest_physmap_add_page);
     return 0;
@@ -2441,10 +2445,15 @@ guest_physmap_add_page(struct domain *d, unsigned long gpfn,
 
 void
 guest_physmap_remove_page(struct domain *d, unsigned long gpfn,
-                          unsigned long mfn)
+                          unsigned long mfn, unsigned int page_order)
 {
+    unsigned long i;
+
     BUG_ON(mfn == 0);//XXX
-    zap_domain_page_one(d, gpfn << PAGE_SHIFT, 0, mfn);
+
+    for (i = 0; i < (1UL << page_order); i++)
+        zap_domain_page_one(d, (gpfn+i) << PAGE_SHIFT, 0, mfn+i);
+
     perfc_incr(guest_physmap_remove_page);
 }
 
@@ -2847,7 +2856,7 @@ arch_memory_op(int op, XEN_GUEST_HANDLE(void) arg)
         if (prev_mfn && mfn_valid(prev_mfn)) {
             if (is_xen_heap_mfn(prev_mfn))
                 /* Xen heap frames are simply unhooked from this phys slot. */
-                guest_physmap_remove_page(d, xatp.gpfn, prev_mfn);
+                guest_physmap_remove_page(d, xatp.gpfn, prev_mfn, 0);
             else
                 /* Normal domain memory is freed, to avoid leaking memory. */
                 guest_remove_page(d, xatp.gpfn);
@@ -2856,10 +2865,10 @@ arch_memory_op(int op, XEN_GUEST_HANDLE(void) arg)
         /* Unmap from old location, if any. */
         gpfn = get_gpfn_from_mfn(mfn);
         if (gpfn != INVALID_M2P_ENTRY)
-            guest_physmap_remove_page(d, gpfn, mfn);
+            guest_physmap_remove_page(d, gpfn, mfn, 0);
 
         /* Map at new location. */
-        guest_physmap_add_page(d, xatp.gpfn, mfn);
+        guest_physmap_add_page(d, xatp.gpfn, mfn, 0);
 
     out:
         domain_unlock(d);

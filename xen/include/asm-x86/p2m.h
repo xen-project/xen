@@ -102,7 +102,8 @@ struct p2m_domain {
     void               (*free_page   )(struct domain *d,
                                        struct page_info *pg);
     int                (*set_entry   )(struct domain *d, unsigned long gfn,
-                                       mfn_t mfn, p2m_type_t p2mt);
+                                       mfn_t mfn, unsigned int page_order,
+                                       p2m_type_t p2mt);
     mfn_t              (*get_entry   )(struct domain *d, unsigned long gfn,
                                        p2m_type_t *p2mt);
     mfn_t              (*get_entry_current)(unsigned long gfn,
@@ -203,21 +204,23 @@ void p2m_final_teardown(struct domain *d);
 
 /* Add a page to a domain's p2m table */
 int guest_physmap_add_entry(struct domain *d, unsigned long gfn,
-                             unsigned long mfn, p2m_type_t t);
+                            unsigned long mfn, unsigned int page_order, 
+                            p2m_type_t t);
 
 /* Untyped version for RAM only, for compatibility 
  *
  * Return 0 for success
  */
 static inline int guest_physmap_add_page(struct domain *d, unsigned long gfn,
-                                         unsigned long mfn)
+                                         unsigned long mfn,
+                                         unsigned int page_order)
 {
-    return guest_physmap_add_entry(d, gfn, mfn, p2m_ram_rw);
+    return guest_physmap_add_entry(d, gfn, mfn, page_order, p2m_ram_rw);
 }
 
 /* Remove a page from a domain's p2m table */
 void guest_physmap_remove_page(struct domain *d, unsigned long gfn,
-                               unsigned long mfn);
+                               unsigned long mfn, unsigned int page_order);
 
 /* Change types across all p2m entries in a domain */
 void p2m_change_type_global(struct domain *d, p2m_type_t ot, p2m_type_t nt);

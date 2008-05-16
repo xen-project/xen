@@ -40,8 +40,10 @@
  * Utilities to change relationship of gpfn->mfn for designated domain,
  * which is required by gnttab transfer, balloon, device model and etc.
  */
-int guest_physmap_add_page(struct domain *d, unsigned long gpfn, unsigned long mfn);
-void guest_physmap_remove_page(struct domain *d, unsigned long gpfn, unsigned long mfn);
+int guest_physmap_add_page(struct domain *d, unsigned long gpfn, 
+                           unsigned long mfn, unsigned int page_order);
+void guest_physmap_remove_page(struct domain *d, unsigned long gpfn, 
+                               unsigned long mfn, unsigned int page_order);
 
 static inline int
 shadow_mode_enabled(struct domain *d)

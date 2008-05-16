@@ -1034,4 +1034,23 @@ void xc_cpuid_to_str(const unsigned int *regs,
                      char **strs);
 #endif
 
+struct xc_px_val {
+    uint64_t freq;        /* Px core frequency */
+    uint64_t residency;   /* Px residency time */
+    uint64_t count;       /* Px transition count */
+};
+
+struct xc_px_stat {
+    uint8_t total;        /* total Px states */
+    uint8_t usable;       /* usable Px states */
+    uint8_t last;         /* last Px state */
+    uint8_t cur;          /* current Px state */
+    uint64_t *trans_pt;   /* Px transition table */
+    struct xc_px_val *pt;
+};
+
+int xc_pm_get_max_px(int xc_handle, int cpuid, int *max_px);
+int xc_pm_get_pxstat(int xc_handle, int cpuid, struct xc_px_stat *pxpt);
+int xc_pm_reset_pxstat(int xc_handle, int cpuid);
+
 #endif /* XENCTRL_H */

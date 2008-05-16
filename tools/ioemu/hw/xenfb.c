@@ -502,6 +502,7 @@ static int xenfb_configure_fb(struct xenfb *xenfb, size_t fb_len_lim,
 		fprintf(stderr,
 			"FB: frontend fb size %zu limited to %zu\n",
 			fb_len, fb_len_lim);
+		fb_len = fb_len_lim;
 	}
 	if (depth != 8 && depth != 16 && depth != 24 && depth != 32) {
 		fprintf(stderr,

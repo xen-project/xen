@@ -127,9 +127,7 @@ static void populate_physmap(struct memop_args *a)
 
         if ( unlikely(paging_mode_translate(d)) )
         {
-            for ( j = 0; j < (1 << a->extent_order); j++ )
-                if ( guest_physmap_add_page(d, gpfn + j, mfn + j) )
-                    goto out;
+            guest_physmap_add_page(d, gpfn, mfn, a->extent_order);
         }
         else
         {
@@ -172,7 +170,7 @@ int guest_remove_page(struct domain *d, unsigned long gmfn)
     if ( test_and_clear_bit(_PGC_allocated, &page->count_info) )
         put_page(page);
 
-    guest_physmap_remove_page(d, gmfn, mfn);
+    guest_physmap_remove_page(d, gmfn, mfn, 0);
 
     put_page(page);
 
@@ -419,7 +417,7 @@ static long memory_exchange(XEN_GUEST_HANDLE(xen_memory_exchange_t) arg)
             if ( !test_and_clear_bit(_PGC_allocated, &page->count_info) )
                 BUG();
             mfn = page_to_mfn(page);
-            guest_physmap_remove_page(d, mfn_to_gmfn(d, mfn), mfn);
+            guest_physmap_remove_page(d, mfn_to_gmfn(d, mfn), mfn, 0);
             put_page(page);
         }
 
@@ -440,9 +438,7 @@ static long memory_exchange(XEN_GUEST_HANDLE(xen_memory_exchange_t) arg)
             mfn = page_to_mfn(page);
             if ( unlikely(paging_mode_translate(d)) )
             {
-                /* Ignore failure here. There's nothing we can do. */
-                for ( k = 0; k < (1UL << exch.out.extent_order); k++ )
-                    (void)guest_physmap_add_page(d, gpfn + k, mfn + k);
+                guest_physmap_add_page(d, gpfn, mfn, exch.out.extent_order);
             }
             else
             {
