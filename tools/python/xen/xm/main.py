@@ -1096,7 +1096,7 @@ def xm_vcpu_list(args):
 
             # normalize cpumap by modulus nr_cpus, and drop duplicates
             cpumap = dict.fromkeys(
-                       map(lambda x: x % nr_cpus, cpumap)).keys()
+                       filter(lambda x: x < nr_cpus, cpumap)).keys()
             if len(cpumap) == nr_cpus:
                 return "any cpu"
 
