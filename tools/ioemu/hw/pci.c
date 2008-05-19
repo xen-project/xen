@@ -101,7 +101,7 @@ int pci_device_load(PCIDevice *s, QEMUFile *f)
         int i;
         qemu_get_buffer(f, &irq_state, 1);
         for (i = 0; i < 4; i++)
-            pci_set_irq(s, i, !!(irq_state >> i));
+            pci_set_irq(s, i, (irq_state >> i) & 1);
     }
     return 0;
 }
