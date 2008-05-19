@@ -271,9 +271,9 @@ static uint8_t stdvga_mem_readb(uint64_t addr)
     return ret;
 }
 
-static uint32_t stdvga_mem_read(uint32_t addr, uint32_t size)
+static uint64_t stdvga_mem_read(uint64_t addr, uint64_t size)
 {
-    uint32_t data = 0;
+    uint64_t data = 0;
 
     switch ( size )
     {
@@ -293,8 +293,19 @@ static uint32_t stdvga_mem_read(uint32_t addr, uint32_t size)
         data |= stdvga_mem_readb(addr + 3) << 24;
         break;
 
+    case 8:
+        data =  (uint64_t)(stdvga_mem_readb(addr));
+        data |= (uint64_t)(stdvga_mem_readb(addr + 1)) << 8;
+        data |= (uint64_t)(stdvga_mem_readb(addr + 2)) << 16;
+        data |= (uint64_t)(stdvga_mem_readb(addr + 3)) << 24;
+        data |= (uint64_t)(stdvga_mem_readb(addr + 4)) << 32;
+        data |= (uint64_t)(stdvga_mem_readb(addr + 5)) << 40;
+        data |= (uint64_t)(stdvga_mem_readb(addr + 6)) << 48;
+        data |= (uint64_t)(stdvga_mem_readb(addr + 7)) << 56;
+        break;
+
     default:
-        gdprintk(XENLOG_WARNING, "invalid io size:%d\n", size);
+        gdprintk(XENLOG_WARNING, "invalid io size: %"PRId64"\n", size);
         break;
     }
 
@@ -409,7 +420,7 @@ static void stdvga_mem_writeb(uint64_t addr, uint32_t val)
     }
 }
 
-static void stdvga_mem_write(uint32_t addr, uint32_t data, uint32_t size)
+static void stdvga_mem_write(uint64_t addr, uint64_t data, uint64_t size)
 {
     /* Intercept mmio write */
     switch ( size )
@@ -430,8 +441,19 @@ static void stdvga_mem_write(uint32_t addr, uint32_t data, uint32_t size)
         stdvga_mem_writeb(addr+3, (data >> 24) & 0xff);
         break;
 
+    case 8:
+        stdvga_mem_writeb(addr+0, (data >>  0) & 0xff);
+        stdvga_mem_writeb(addr+1, (data >>  8) & 0xff);
+        stdvga_mem_writeb(addr+2, (data >> 16) & 0xff);
+        stdvga_mem_writeb(addr+3, (data >> 24) & 0xff);
+        stdvga_mem_writeb(addr+4, (data >> 32) & 0xff);
+        stdvga_mem_writeb(addr+5, (data >> 40) & 0xff);
+        stdvga_mem_writeb(addr+6, (data >> 48) & 0xff);
+        stdvga_mem_writeb(addr+7, (data >> 56) & 0xff);
+        break;
+
     default:
-        gdprintk(XENLOG_WARNING, "invalid io size:%d\n", size);
+        gdprintk(XENLOG_WARNING, "invalid io size: %"PRId64"\n", size);
         break;
     }
 }
@@ -447,7 +469,7 @@ static int mmio_move(struct hvm_hw_stdvga *s, ioreq_t *p)
     {
         if ( p->dir == IOREQ_READ )
         {
-            uint32_t addr = p->addr, data = p->data, tmp;
+            uint64_t addr = p->addr, data = p->data, tmp;
             for ( i = 0; i < p->count; i++ ) 
             {
                 tmp = stdvga_mem_read(addr, p->size);
