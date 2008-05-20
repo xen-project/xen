@@ -367,15 +367,27 @@ static void svm_fpu_leave(struct vcpu *v)
 static unsigned int svm_get_interrupt_shadow(struct vcpu *v)
 {
     struct vmcb_struct *vmcb = v->arch.hvm_svm.vmcb;
-    return (vmcb->interrupt_shadow ?
-            (HVM_INTR_SHADOW_MOV_SS|HVM_INTR_SHADOW_STI) : 0);
+    unsigned int intr_shadow = 0;
+
+    if ( vmcb->interrupt_shadow )
+        intr_shadow |= HVM_INTR_SHADOW_MOV_SS | HVM_INTR_SHADOW_STI;
+
+    if ( vmcb->general1_intercepts & GENERAL1_INTERCEPT_IRET )
+        intr_shadow |= HVM_INTR_SHADOW_NMI;
+
+    return intr_shadow;
 }
 
 static void svm_set_interrupt_shadow(struct vcpu *v, unsigned int intr_shadow)
 {
     struct vmcb_struct *vmcb = v->arch.hvm_svm.vmcb;
+
     vmcb->interrupt_shadow =
         !!(intr_shadow & (HVM_INTR_SHADOW_MOV_SS|HVM_INTR_SHADOW_STI));
+
+    vmcb->general1_intercepts &= ~GENERAL1_INTERCEPT_IRET;
+    if ( intr_shadow & HVM_INTR_SHADOW_NMI )
+        vmcb->general1_intercepts |= GENERAL1_INTERCEPT_IRET;
 }
 
 static int svm_guest_x86_mode(struct vcpu *v)
@@ -1266,6 +1278,15 @@ asmlinkage void svm_vmexit_handler(struct cpu_user_regs *regs)
             reason = TSW_call_or_int;
         if ( (vmcb->exitinfo2 >> 44) & 1 )
             errcode = (uint32_t)vmcb->exitinfo2;
+
+        /*
+         * Some processors set the EXITINTINFO field when the task switch
+         * is caused by a task gate in the IDT. In this case we will be
+         * emulating the event injection, so we do not want the processor
+         * to re-inject the original event!
+         */
+        vmcb->eventinj.bytes = 0;
+
         hvm_task_switch((uint16_t)vmcb->exitinfo1, reason, errcode);
         break;
     }
@@ -1329,6 +1350,19 @@ asmlinkage void svm_vmexit_handler(struct cpu_user_regs *regs)
         perfc_incra(svmexits, VMEXIT_NPF_PERFC);
         regs->error_code = vmcb->exitinfo1;
         svm_do_nested_pgfault(vmcb->exitinfo2, regs);
+        break;
+
+    case VMEXIT_IRET:
+        /*
+         * IRET clears the NMI mask. However because we clear the mask
+         * /before/ executing IRET, we set the interrupt shadow to prevent
+         * a pending NMI from being injected immediately. This will work
+         * perfectly unless the IRET instruction faults: in that case we
+         * may inject an NMI before the NMI handler's IRET instruction is
+         * retired.
+         */
+        vmcb->general1_intercepts &= ~GENERAL1_INTERCEPT_IRET;
+        vmcb->interrupt_shadow = 1;
         break;
 
     default:

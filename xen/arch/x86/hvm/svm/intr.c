@@ -51,6 +51,12 @@ static void svm_inject_nmi(struct vcpu *v)
 
     ASSERT(vmcb->eventinj.fields.v == 0);
     vmcb->eventinj = event;
+
+    /*
+     * SVM does not virtualise the NMI mask, so we emulate it by intercepting
+     * the next IRET and blocking NMI injection until the intercept triggers.
+     */
+    vmcb->general1_intercepts |= GENERAL1_INTERCEPT_IRET;
 }
     
 static void svm_inject_extint(struct vcpu *v, int vector)
