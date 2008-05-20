@@ -1657,6 +1657,9 @@ class XendDomain:
             trigger = TRIGGER_TYPE[trigger_name.lower()]
         else:
             raise XendError("Invalid trigger: %s" % trigger_name)
+        if trigger == TRIGGER_S3RESUME:
+            xc.hvm_set_param(dominfo.getDomid(), HVM_PARAM_ACPI_S_STATE, 0)
+            return None
         try:
             return xc.domain_send_trigger(dominfo.getDomid(),
                                           trigger,

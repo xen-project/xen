@@ -143,7 +143,7 @@ SUBCOMMAND_HELP = {
                      'Get/set credit scheduler parameters.'),
     'sysrq'       : ('<Domain> <letter>', 'Send a sysrq to a domain.'),
     'debug-keys'  : ('<Keys>', 'Send debug keys to Xen.'),
-    'trigger'     : ('<Domain> <nmi|reset|init> [<VCPU>]',
+    'trigger'     : ('<Domain> <nmi|reset|init|s3resume> [<VCPU>]',
                      'Send a trigger to a domain.'),
     'vcpu-list'   : ('[Domain, ...]',
                      'List the VCPUs for all/some domains.'),

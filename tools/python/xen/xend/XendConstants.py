@@ -48,6 +48,7 @@ HVM_PARAM_VHPT_SIZE    = 8
 HVM_PARAM_BUFPIOREQ_PFN = 9
 HVM_PARAM_TIMER_MODE   = 10
 HVM_PARAM_HPET_ENABLED = 11
+HVM_PARAM_ACPI_S_STATE = 14
 
 restart_modes = [
     "restart",
@@ -102,11 +103,13 @@ LAST_SHUTDOWN_REASON = 'xend/last_shutdown_reason'
 TRIGGER_NMI   = 0
 TRIGGER_RESET = 1
 TRIGGER_INIT  = 2
+TRIGGER_S3RESUME = 3
 
 TRIGGER_TYPE = {
     "nmi"   : TRIGGER_NMI,
     "reset" : TRIGGER_RESET,
-    "init"  : TRIGGER_INIT
+    "init"  : TRIGGER_INIT,
+    "s3resume": TRIGGER_S3RESUME
 }
 
 #
