@@ -1282,6 +1282,10 @@ class XendDomain:
 
         if dominfo.getDomid() == DOM0_ID:
             raise XendError("Cannot migrate privileged domain %s" % domid)
+        if dominfo._stateGet() != DOM_STATE_RUNNING:
+            raise VMBadState("Domain is not running",
+                             POWER_STATE_NAMES[DOM_STATE_RUNNING],
+                             POWER_STATE_NAMES[dominfo._stateGet()])
 
         """ The following call may raise a XendError exception """
         dominfo.testMigrateDevices(True, dst)
