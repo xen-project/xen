@@ -591,3 +591,8 @@ void hpet_deinit(struct domain *d)
         kill_timer(&h->timers[i]);
 }
 
+void hpet_reset(struct domain *d)
+{
+    hpet_deinit(d);
+    hpet_init(d->vcpu[0]);
+}

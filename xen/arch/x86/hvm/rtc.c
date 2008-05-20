@@ -511,3 +511,9 @@ void rtc_deinit(struct domain *d)
     kill_timer(&s->second_timer);
     kill_timer(&s->second_timer2);
 }
+
+void rtc_reset(struct domain *d)
+{
+    RTCState *s = domain_vrtc(d);
+    destroy_periodic_time(&s->pt);
+}

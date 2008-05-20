@@ -141,6 +141,7 @@ void hvm_vcpu_destroy(struct vcpu *v);
 void hvm_vcpu_down(struct vcpu *v);
 int hvm_vcpu_cacheattr_init(struct vcpu *v);
 void hvm_vcpu_cacheattr_destroy(struct vcpu *v);
+void hvm_vcpu_reset_state(struct vcpu *v, uint16_t cs, uint16_t ip);
 
 void hvm_send_assist_req(struct vcpu *v);
 

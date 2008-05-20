@@ -276,3 +276,9 @@ void pmtimer_deinit(struct domain *d)
     PMTState *s = &d->arch.hvm_domain.pl_time.vpmt;
     kill_timer(&s->timer);
 }
+
+void pmtimer_reset(struct domain *d)
+{
+    /* Reset the counter. */
+    d->arch.hvm_domain.pl_time.vpmt.pm.tmr_val = 0;
+}

@@ -298,10 +298,6 @@ static int vlapic_accept_init(struct vcpu *v)
 
 static int vlapic_accept_sipi(struct vcpu *v, int trampoline_vector)
 {
-    struct domain *d = current->domain;
-    struct vcpu_guest_context *ctxt;
-    struct segment_register reg;
-
     /* If the VCPU is not on its way down we have nothing to do. */
     if ( !test_bit(_VPF_down, &v->pause_flags) )
         return X86EMUL_OKAY;
@@ -309,68 +305,10 @@ static int vlapic_accept_sipi(struct vcpu *v, int trampoline_vector)
     if ( !vlapic_vcpu_pause_async(v) )
         return X86EMUL_RETRY;
 
-    domain_lock(d);
+    hvm_vcpu_reset_state(v, trampoline_vector << 8, 0);
 
-    if ( v->is_initialised )
-        goto out;
-
-    ctxt = &v->arch.guest_context;
-    memset(ctxt, 0, sizeof(*ctxt));
-    ctxt->flags = VGCF_online;
-    ctxt->user_regs.eflags = 2;
-
-    v->arch.hvm_vcpu.guest_cr[0] = X86_CR0_ET;
-    hvm_update_guest_cr(v, 0);
-
-    v->arch.hvm_vcpu.guest_cr[2] = 0;
-    hvm_update_guest_cr(v, 2);
-
-    v->arch.hvm_vcpu.guest_cr[3] = 0;
-    hvm_update_guest_cr(v, 3);
-
-    v->arch.hvm_vcpu.guest_cr[4] = 0;
-    hvm_update_guest_cr(v, 4);
-
-    v->arch.hvm_vcpu.guest_efer = 0;
-    hvm_update_guest_efer(v);
-
-    reg.sel = trampoline_vector << 8;
-    reg.base = (uint32_t)reg.sel << 4;
-    reg.limit = 0xffff;
-    reg.attr.bytes = 0x89b;
-    hvm_set_segment_register(v, x86_seg_cs, &reg);
-
-    reg.sel = reg.base = 0;
-    reg.limit = 0xffff;
-    reg.attr.bytes = 0x893;
-    hvm_set_segment_register(v, x86_seg_ds, &reg);
-    hvm_set_segment_register(v, x86_seg_es, &reg);
-    hvm_set_segment_register(v, x86_seg_fs, &reg);
-    hvm_set_segment_register(v, x86_seg_gs, &reg);
-    hvm_set_segment_register(v, x86_seg_ss, &reg);
-
-    reg.attr.bytes = 0x82; /* LDT */
-    hvm_set_segment_register(v, x86_seg_ldtr, &reg);
-
-    reg.attr.bytes = 0x8b; /* 32-bit TSS (busy) */
-    hvm_set_segment_register(v, x86_seg_tr, &reg);
-
-    reg.attr.bytes = 0;
-    hvm_set_segment_register(v, x86_seg_gdtr, &reg);
-    hvm_set_segment_register(v, x86_seg_idtr, &reg);
-
-    /* Sync AP's TSC with BSP's. */
-    v->arch.hvm_vcpu.cache_tsc_offset =
-        v->domain->vcpu[0]->arch.hvm_vcpu.cache_tsc_offset;
-    hvm_funcs.set_tsc_offset(v, v->arch.hvm_vcpu.cache_tsc_offset);
-
-    v->arch.flags |= TF_kernel_mode;
-    v->is_initialised = 1;
-    clear_bit(_VPF_down, &v->pause_flags);
-
- out:
-    domain_unlock(d);
     vcpu_unpause(v);
+
     return X86EMUL_OKAY;
 }
 
@@ -1028,23 +966,26 @@ int vlapic_init(struct vcpu *v)
     if ( boot_cpu_data.x86_vendor == X86_VENDOR_INTEL )
         memflags |= MEMF_bits(32);
 #endif
-
-    vlapic->regs_page = alloc_domheap_page(NULL, memflags);
-    if ( vlapic->regs_page == NULL )
+    if (vlapic->regs_page == NULL)
     {
-        dprintk(XENLOG_ERR, "alloc vlapic regs error: %d/%d\n",
-                v->domain->domain_id, v->vcpu_id);
-        return -ENOMEM;
+        vlapic->regs_page = alloc_domheap_page(NULL, memflags);
+        if ( vlapic->regs_page == NULL )
+        {
+            dprintk(XENLOG_ERR, "alloc vlapic regs error: %d/%d\n",
+                    v->domain->domain_id, v->vcpu_id);
+            return -ENOMEM;
+        }
     }
-
-    vlapic->regs = map_domain_page_global(page_to_mfn(vlapic->regs_page));
-    if ( vlapic->regs == NULL )
+    if (vlapic->regs == NULL) 
     {
-        dprintk(XENLOG_ERR, "map vlapic regs error: %d/%d\n",
-                v->domain->domain_id, v->vcpu_id);
-        return -ENOMEM;
+        vlapic->regs = map_domain_page_global(page_to_mfn(vlapic->regs_page));
+        if ( vlapic->regs == NULL )
+        {
+            dprintk(XENLOG_ERR, "map vlapic regs error: %d/%d\n",
+                    v->domain->domain_id, v->vcpu_id);
+            return -ENOMEM;
+        }
     }
-
     clear_page(vlapic->regs);
 
     vlapic_reset(vlapic);

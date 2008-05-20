@@ -395,7 +395,7 @@ static int vpic_load(struct domain *d, hvm_domain_context_t *h)
 
 HVM_REGISTER_SAVE_RESTORE(PIC, vpic_save, vpic_load, 2, HVMSR_PER_DOM);
 
-void vpic_init(struct domain *d)
+void vpic_reset(struct domain *d)
 {
     struct hvm_hw_vpic *vpic;
 
@@ -404,13 +404,20 @@ void vpic_init(struct domain *d)
     memset(vpic, 0, sizeof(*vpic));
     vpic->is_master = 1;
     vpic->elcr      = 1 << 2;
-    register_portio_handler(d, 0x20, 2, vpic_intercept_pic_io);
-    register_portio_handler(d, 0x4d0, 1, vpic_intercept_elcr_io);
 
     /* Slave PIC. */
     vpic++;
     memset(vpic, 0, sizeof(*vpic));
+}
+
+void vpic_init(struct domain *d)
+{
+    vpic_reset(d);
+
+    register_portio_handler(d, 0x20, 2, vpic_intercept_pic_io);
     register_portio_handler(d, 0xa0, 2, vpic_intercept_pic_io);
+
+    register_portio_handler(d, 0x4d0, 1, vpic_intercept_elcr_io);
     register_portio_handler(d, 0x4d1, 1, vpic_intercept_elcr_io);
 }
 
