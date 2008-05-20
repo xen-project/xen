@@ -219,7 +219,12 @@ sal_emulator (long index, unsigned long in1, unsigned long in2,
 		} else {
 			gdprintk(XENLOG_DEBUG, "NON-PRIV DOMAIN CALLED "
 				 "SAL_SET_VECTORS %ld\n", in1);
-			status = -2;
+			/*
+			 * status = -2;
+			 * Temporal work around untill gfw support:
+			 * windows 2003 sp2/sp1 dislike -2 to crash.
+			 */
+			status = 0; 
 		}
 		break;
 	    case SAL_GET_STATE_INFO:
@@ -378,7 +383,13 @@ sal_emulator (long index, unsigned long in1, unsigned long in2,
 		} else {
 			gdprintk(XENLOG_DEBUG,
 				 "*** CALLED SAL_MC_SET_PARAMS. IGNORED...\n");
-			status = -1; /* not implemented */
+			/*
+			 * status = -1;
+			 * Temporal work around untill gfw support:
+			 * windows 2003 sp2/sp1 dislike -1(not implemented)
+			 * to crash.
+			 */
+			status = 0;
 		}
 		break;
 	    case SAL_CACHE_FLUSH:
