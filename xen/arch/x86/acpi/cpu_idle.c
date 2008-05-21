@@ -44,6 +44,7 @@
 #include <asm/hpet.h>
 #include <asm/processor.h>
 #include <public/platform.h>
+#include <public/sysctl.h>
 
 #define DEBUG_PM_CX
 
@@ -940,3 +941,41 @@ long set_cx_pminfo(uint32_t cpu, struct xen_processor_power *power)
         
     return 0;
 }
+
+uint32_t pmstat_get_cx_nr(uint32_t cpuid)
+{
+    return processor_powers[cpuid].count;
+}
+
+int pmstat_get_cx_stat(uint32_t cpuid, struct pm_cx_stat *stat)
+{
+    struct acpi_processor_power *power = &processor_powers[cpuid];
+    struct vcpu *v = idle_vcpu[cpuid];
+    uint64_t usage;
+    int i;
+
+    stat->last = (power->state) ? power->state->type : 0;
+    stat->nr = processor_powers[cpuid].count;
+    stat->idle_time = v->runstate.time[RUNSTATE_running];
+    if ( v->is_running )
+        stat->idle_time += NOW() - v->runstate.state_entry_time;
+
+    for ( i = 0; i < power->count; i++ )
+    {
+        usage = power->states[i].usage;
+        if ( copy_to_guest_offset(stat->triggers, i, &usage, 1) )
+            return -EFAULT;
+    }
+    for ( i = 0; i < power->count; i++ )
+        if ( copy_to_guest_offset(stat->residencies, i, 
+                                  &power->states[i].time, 1) )
+            return -EFAULT;
+
+    return 0;
+}
+
+int pmstat_reset_cx_stat(uint32_t cpuid)
+{
+    return 0;
+}
+

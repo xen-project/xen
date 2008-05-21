@@ -99,3 +99,71 @@ int xc_pm_reset_pxstat(int xc_handle, int cpuid)
 
     return xc_sysctl(xc_handle, &sysctl);
 }
+
+int xc_pm_get_max_cx(int xc_handle, int cpuid, int *max_cx)
+{
+    DECLARE_SYSCTL;
+    int ret = 0;
+
+    sysctl.cmd = XEN_SYSCTL_get_pmstat;
+    sysctl.u.get_pmstat.type = PMSTAT_get_max_cx;
+    sysctl.u.get_pmstat.cpuid = cpuid;
+    if ( (ret = xc_sysctl(xc_handle, &sysctl)) != 0 )
+        return ret;
+
+    *max_cx = sysctl.u.get_pmstat.u.getcx.nr;
+    return ret;
+}
+
+int xc_pm_get_cxstat(int xc_handle, int cpuid, struct xc_cx_stat *cxpt)
+{
+    DECLARE_SYSCTL;
+    int max_cx, ret;
+
+    if( !cxpt || !(cxpt->triggers) || !(cxpt->residencies) )
+        return -EINVAL;
+
+    if ( (ret = xc_pm_get_max_cx(xc_handle, cpuid, &max_cx)) )
+        goto unlock_0;
+
+    if ( (ret = lock_pages(cxpt, sizeof(struct xc_cx_stat))) )
+        goto unlock_0;
+    if ( (ret = lock_pages(cxpt->triggers, max_cx * sizeof(uint64_t))) )
+        goto unlock_1;
+    if ( (ret = lock_pages(cxpt->residencies, max_cx * sizeof(uint64_t))) )
+        goto unlock_2;
+
+    sysctl.cmd = XEN_SYSCTL_get_pmstat;
+    sysctl.u.get_pmstat.type = PMSTAT_get_cxstat;
+    sysctl.u.get_pmstat.cpuid = cpuid;
+    set_xen_guest_handle(sysctl.u.get_pmstat.u.getcx.triggers, cxpt->triggers);
+    set_xen_guest_handle(sysctl.u.get_pmstat.u.getcx.residencies, 
+                         cxpt->residencies);
+
+    if ( (ret = xc_sysctl(xc_handle, &sysctl)) )
+        goto unlock_3;
+
+    cxpt->nr = sysctl.u.get_pmstat.u.getcx.nr;
+    cxpt->last = sysctl.u.get_pmstat.u.getcx.last;
+    cxpt->idle_time = sysctl.u.get_pmstat.u.getcx.idle_time;
+
+unlock_3:
+    unlock_pages(cxpt->residencies, max_cx * sizeof(uint64_t));
+unlock_2:
+    unlock_pages(cxpt->triggers, max_cx * sizeof(uint64_t));
+unlock_1:
+    unlock_pages(cxpt, sizeof(struct xc_cx_stat));
+unlock_0:
+    return ret;
+}
+
+int xc_pm_reset_cxstat(int xc_handle, int cpuid)
+{
+    DECLARE_SYSCTL;
+
+    sysctl.cmd = XEN_SYSCTL_get_pmstat;
+    sysctl.u.get_pmstat.type = PMSTAT_reset_cxstat;
+    sysctl.u.get_pmstat.cpuid = cpuid;
+
+    return xc_sysctl(xc_handle, &sysctl);
+}

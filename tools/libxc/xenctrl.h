@@ -1053,4 +1053,17 @@ int xc_pm_get_max_px(int xc_handle, int cpuid, int *max_px);
 int xc_pm_get_pxstat(int xc_handle, int cpuid, struct xc_px_stat *pxpt);
 int xc_pm_reset_pxstat(int xc_handle, int cpuid);
 
+struct xc_cx_stat {
+    uint32_t nr;    /* entry nr in triggers & residencies, including C0 */
+    uint32_t last;         /* last Cx state */
+    uint64_t idle_time;    /* idle time from boot */
+    uint64_t *triggers;    /* Cx trigger counts */
+    uint64_t *residencies; /* Cx residencies */
+};
+typedef struct xc_cx_stat xc_cx_stat_t;
+
+int xc_pm_get_max_cx(int xc_handle, int cpuid, int *max_cx);
+int xc_pm_get_cxstat(int xc_handle, int cpuid, struct xc_cx_stat *cxpt);
+int xc_pm_reset_cxstat(int xc_handle, int cpuid);
+
 #endif /* XENCTRL_H */
