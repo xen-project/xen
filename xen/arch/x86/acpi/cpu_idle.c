@@ -37,13 +37,13 @@
 #include <xen/types.h>
 #include <xen/acpi.h>
 #include <xen/smp.h>
+#include <xen/guest_access.h>
+#include <xen/keyhandler.h>
 #include <asm/cache.h>
 #include <asm/io.h>
 #include <asm/hpet.h>
-#include <xen/guest_access.h>
-#include <public/platform.h>
 #include <asm/processor.h>
-#include <xen/keyhandler.h>
+#include <public/platform.h>
 
 #define DEBUG_PM_CX
 
@@ -128,45 +128,29 @@ static void print_acpi_power(uint32_t cpu, struct acpi_processor_power *power)
 {
     uint32_t i;
 
-    printk("saved cpu%d cx acpi info:\n", cpu);
-    printk("\tcurrent state is C%d\n", (power->state)?power->state->type:-1);
-    printk("\tbm_check_timestamp = %"PRId64"\n", power->bm_check_timestamp);
-    printk("\tdefault_state = %d\n", power->default_state);
-    printk("\tbm_activity = 0x%08x\n", power->bm_activity);
-    printk("\tcount = %d\n", power->count);
+    printk("==cpu%d==\n", cpu);
+    printk("active state:\t\tC%d\n", (power->state)?power->state->type:-1);
+    printk("max_cstate:\t\tC%d\n", max_cstate);
+    printk("bus master activity:\t%08x\n", power->bm_activity);
+    printk("states:\n");
     
-    for ( i = 0; i < power->count; i++ )
+    for ( i = 1; i < power->count; i++ )
     {
-        printk("\tstates[%d]:\n", i);
-        printk("\t\tvalid   = %d\n", power->states[i].valid);
-        printk("\t\ttype    = %d\n", power->states[i].type);
-        printk("\t\taddress = 0x%x\n", power->states[i].address);
-        printk("\t\tspace_id = 0x%x\n", power->states[i].space_id);
-        printk("\t\tlatency = %d\n", power->states[i].latency);
-        printk("\t\tpower   = %d\n", power->states[i].power);
-        printk("\t\tlatency_ticks = %d\n", power->states[i].latency_ticks);
-        printk("\t\tusage   = %d\n", power->states[i].usage);
-        printk("\t\ttime    = %"PRId64"\n", power->states[i].time);
-
-        printk("\t\tpromotion policy:\n");
-        printk("\t\t\tcount    = %d\n", power->states[i].promotion.count);
-        printk("\t\t\tstate    = C%d\n",
-               (power->states[i].promotion.state) ? 
-               power->states[i].promotion.state->type : -1);
-        printk("\t\t\tthreshold.time = %d\n", power->states[i].promotion.threshold.time);
-        printk("\t\t\tthreshold.ticks = %d\n", power->states[i].promotion.threshold.ticks);
-        printk("\t\t\tthreshold.count = %d\n", power->states[i].promotion.threshold.count);
-        printk("\t\t\tthreshold.bm = %d\n", power->states[i].promotion.threshold.bm);
-
-        printk("\t\tdemotion policy:\n");
-        printk("\t\t\tcount    = %d\n", power->states[i].demotion.count);
-        printk("\t\t\tstate    = C%d\n",
-               (power->states[i].demotion.state) ? 
-               power->states[i].demotion.state->type : -1);
-        printk("\t\t\tthreshold.time = %d\n", power->states[i].demotion.threshold.time);
-        printk("\t\t\tthreshold.ticks = %d\n", power->states[i].demotion.threshold.ticks);
-        printk("\t\t\tthreshold.count = %d\n", power->states[i].demotion.threshold.count);
-        printk("\t\t\tthreshold.bm = %d\n", power->states[i].demotion.threshold.bm);
+        printk((power->states[i].type == power->state->type) ? "   *" : "    ");
+        printk("C%d:\t\t", i);
+        printk("type[C%d] ", power->states[i].type);
+        if ( power->states[i].promotion.state )
+            printk("promotion[C%d] ", power->states[i].promotion.state->type);
+        else
+            printk("promotion[--] ");
+        if ( power->states[i].demotion.state )
+            printk("demotion[C%d] ", power->states[i].demotion.state->type);
+        else
+            printk("demotion[--] ");
+        printk("latency[%03d]\n ", power->states[i].latency);
+        printk("\t\t\t");
+        printk("usage[%08d] ", power->states[i].usage);
+        printk("duration[%"PRId64"]\n", power->states[i].time);
     }
 }
 
