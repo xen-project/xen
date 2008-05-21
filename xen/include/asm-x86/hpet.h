@@ -49,4 +49,24 @@
 #define hpet_write32(y,x) \
     (*(volatile u32 *)(fix_to_virt(FIX_HPET_BASE) + (x)) = (y))
 
+/*
+ * Detect and initialise HPET hardware: return counter update frequency.
+ * Return value is zero if HPET is unavailable.
+ */
+u64 hpet_setup(void);
+
+/*
+ * Callback from legacy timer (PIT channel 0) IRQ handler.
+ * Returns 1 if tick originated from HPET; else 0.
+ */
+int hpet_legacy_irq_tick(void);
+
+/*
+ * Temporarily use an HPET event counter for timer interrupt handling,
+ * rather than using the LAPIC timer. Used for Cx state entry.
+ */
+void hpet_broadcast_init(void);
+void hpet_broadcast_enter(void);
+void hpet_broadcast_exit(void);
+
 #endif /* __X86_HPET_H__ */

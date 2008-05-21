@@ -50,6 +50,7 @@ obj-y += x86_emulate.o
 obj-y += machine_kexec.o
 obj-y += crash.o
 obj-y += tboot.o
+obj-y += hpet.o
 
 obj-$(crash_debug) += gdbstub.o
 

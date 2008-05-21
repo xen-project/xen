@@ -35,7 +35,7 @@ struct timers {
 
 static DEFINE_PER_CPU(struct timers, timers);
 
-extern int reprogram_timer(s_time_t timeout);
+DEFINE_PER_CPU(s_time_t, timer_deadline);
 
 /****************************************************************************
  * HEAP OPERATIONS.
@@ -323,8 +323,10 @@ static void timer_softirq_action(void)
         }
 
         ts->running = NULL;
+
+        this_cpu(timer_deadline) = GET_HEAP_SIZE(heap) ? heap[1]->expires : 0;
     }
-    while ( !reprogram_timer(GET_HEAP_SIZE(heap) ? heap[1]->expires : 0) );
+    while ( !reprogram_timer(this_cpu(timer_deadline)) );
 
     spin_unlock_irq(&ts->lock);
 }

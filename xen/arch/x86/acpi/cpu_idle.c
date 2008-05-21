@@ -39,6 +39,7 @@
 #include <xen/smp.h>
 #include <asm/cache.h>
 #include <asm/io.h>
+#include <asm/hpet.h>
 #include <xen/guest_access.h>
 #include <public/platform.h>
 #include <asm/processor.h>
@@ -438,19 +439,19 @@ static void acpi_processor_idle(void)
         t1 = inl(pmtmr_ioport);
 
         /*
-         * FIXME: Before invoking C3, be aware that TSC/APIC timer may be 
+         * Before invoking C3, be aware that TSC/APIC timer may be 
          * stopped by H/W. Without carefully handling of TSC/APIC stop issues,
          * deep C state can't work correctly.
          */
         /* preparing TSC stop */
         cstate_save_tsc();
-        /* placeholder for preparing APIC stop */
-
+        /* preparing APIC stop */
+        hpet_broadcast_enter();
         /* Invoke C3 */
         acpi_idle_do_entry(cx);
 
-        /* placeholder for recovering APIC */
-
+        /* recovering APIC */
+        hpet_broadcast_exit();
         /* recovering TSC */
         cstate_restore_tsc();
 
