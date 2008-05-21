@@ -49,10 +49,35 @@ static void ept_p2m_type_to_flags(ept_entry_t *entry, p2m_type_t type)
 
 #define GUEST_TABLE_NORMAL_PAGE 1
 #define GUEST_TABLE_SUPER_PAGE  2
+#define GUEST_TABLE_SPLIT_PAGE  3
+
+static int ept_set_middle_entry(struct domain *d, ept_entry_t *ept_entry)
+{
+    struct page_info *pg;
+
+    pg = d->arch.p2m->alloc_page(d);
+    if ( pg == NULL )
+        return 0;
+
+    pg->count_info = 1;
+    pg->u.inuse.type_info = 1 | PGT_validated;
+    list_add_tail(&pg->list, &d->arch.p2m->pages);
+
+    ept_entry->emt = 0;
+    ept_entry->sp_avail = 0;
+    ept_entry->avail1 = 0;
+    ept_entry->mfn = page_to_mfn(pg);
+    ept_entry->rsvd = 0;
+    ept_entry->avail2 = 0;
+    /* last step */
+    ept_entry->r = ept_entry->w = ept_entry->x = 1;
+
+    return 1;
+}
 
 static int ept_next_level(struct domain *d, bool_t read_only,
                           ept_entry_t **table, unsigned long *gfn_remainder,
-                          u32 shift)
+                          u32 shift, int order)
 {
     ept_entry_t *ept_entry, *next;
     u32 index;
@@ -63,27 +88,11 @@ static int ept_next_level(struct domain *d, bool_t read_only,
 
     if ( !(ept_entry->epte & 0x7) )
     {
-        struct page_info *pg;
-
         if ( read_only )
             return 0;
 
-        pg = d->arch.p2m->alloc_page(d);
-        if ( pg == NULL )
+        if ( !ept_set_middle_entry(d, ept_entry) )
             return 0;
-
-        pg->count_info = 1;
-        pg->u.inuse.type_info = 1 | PGT_validated;
-        list_add_tail(&pg->list, &d->arch.p2m->pages);
-
-        ept_entry->emt = 0;
-        ept_entry->sp_avail = 0;
-        ept_entry->avail1 = 0;
-        ept_entry->mfn = page_to_mfn(pg);
-        ept_entry->rsvd = 0;
-        ept_entry->avail2 = 0;
-        /* last step */
-        ept_entry->r = ept_entry->w = ept_entry->x = 1;
     }
 
     if ( !ept_entry->sp_avail )
@@ -95,7 +104,12 @@ static int ept_next_level(struct domain *d, bool_t read_only,
         return GUEST_TABLE_NORMAL_PAGE;
     }
     else
-        return GUEST_TABLE_SUPER_PAGE;
+    {
+        if ( order == shift || read_only )
+            return GUEST_TABLE_SUPER_PAGE;
+        else
+            return GUEST_TABLE_SPLIT_PAGE;
+    }
 }
 
 static int
@@ -109,7 +123,9 @@ ept_set_entry(struct domain *d, unsigned long gfn, mfn_t mfn,
     int i, rv = 0, ret = 0;
     int walk_level = order / EPT_TABLE_ORDER;
 
-    /* Should check if gfn obeys GAW here */
+    /* we only support 4k and 2m pages now */
+
+    BUG_ON(order && order != EPT_TABLE_ORDER);
 
     if (  order != 0 )
         if ( (gfn & ((1UL << order) - 1)) )
@@ -122,10 +138,10 @@ ept_set_entry(struct domain *d, unsigned long gfn, mfn_t mfn,
     for ( i = EPT_DEFAULT_GAW; i > walk_level; i-- )
     {
         ret = ept_next_level(d, 0, &table, &gfn_remainder,
-          i * EPT_TABLE_ORDER);
+          i * EPT_TABLE_ORDER, order);
         if ( !ret )
             goto out;
-        else if ( ret == GUEST_TABLE_SUPER_PAGE )
+        else if ( ret != GUEST_TABLE_NORMAL_PAGE )
             break;
     }
 
@@ -135,35 +151,87 @@ ept_set_entry(struct domain *d, unsigned long gfn, mfn_t mfn,
 
     ept_entry = table + index;
 
-    if ( mfn_valid(mfn_x(mfn)) || (p2mt == p2m_mmio_direct) )
+    if ( ret != GUEST_TABLE_SPLIT_PAGE )
     {
-        /* Track the highest gfn for which we have ever had a valid mapping */
-        if ( gfn > d->arch.p2m->max_mapped_pfn )
-            d->arch.p2m->max_mapped_pfn = gfn;
-
-        ept_entry->emt = EPT_DEFAULT_MT;
-        ept_entry->sp_avail = walk_level ? 1 : 0;
-
-        if ( ret == GUEST_TABLE_SUPER_PAGE )
+        if ( mfn_valid(mfn_x(mfn)) || (p2mt == p2m_mmio_direct) )
         {
-            ept_entry->mfn = mfn_x(mfn) - offset;
-            if ( ept_entry->avail1 == p2m_ram_logdirty &&
-              p2mt == p2m_ram_rw )
-                for ( i = 0; i < 512; i++ )
-                    paging_mark_dirty(d, mfn_x(mfn)-offset+i);
+            /* Track the highest gfn for which we have ever had a valid mapping */
+            if ( gfn > d->arch.p2m->max_mapped_pfn )
+                d->arch.p2m->max_mapped_pfn = gfn;
+
+            ept_entry->emt = EPT_DEFAULT_MT;
+            ept_entry->sp_avail = walk_level ? 1 : 0;
+
+            if ( ret == GUEST_TABLE_SUPER_PAGE )
+            {
+                ept_entry->mfn = mfn_x(mfn) - offset;
+                if ( ept_entry->avail1 == p2m_ram_logdirty &&
+                  p2mt == p2m_ram_rw )
+                    for ( i = 0; i < 512; i++ )
+                        paging_mark_dirty(d, mfn_x(mfn)-offset+i);
+            }
+            else
+                ept_entry->mfn = mfn_x(mfn);
+
+            ept_entry->avail1 = p2mt;
+            ept_entry->rsvd = 0;
+            ept_entry->avail2 = 0;
+            /* last step */
+            ept_entry->r = ept_entry->w = ept_entry->x = 1;
+            ept_p2m_type_to_flags(ept_entry, p2mt);
         }
         else
-            ept_entry->mfn = mfn_x(mfn);
-
-        ept_entry->avail1 = p2mt;
-        ept_entry->rsvd = 0;
-        ept_entry->avail2 = 0;
-        /* last step */
-        ept_entry->r = ept_entry->w = ept_entry->x = 1;
-        ept_p2m_type_to_flags(ept_entry, p2mt);
+            ept_entry->epte = 0;
     }
     else
-        ept_entry->epte = 0;
+    {
+        /* It's super page before, now set one of the 4k pages, so
+         * we should split the 2m page to 4k pages now.
+         */
+
+        ept_entry_t *split_table = NULL;
+        ept_entry_t *split_ept_entry = NULL;
+        unsigned long split_mfn = ept_entry->mfn;
+        p2m_type_t split_p2mt = ept_entry->avail1;
+
+        /* alloc new page for new ept middle level entry which is
+         * before a leaf super entry
+         */
+
+        if ( !ept_set_middle_entry(d, ept_entry) )
+            goto out;
+
+        /* split the super page before to 4k pages */
+
+        split_table = map_domain_page(ept_entry->mfn);
+
+        for ( i = 0; i < 512; i++ )
+        {
+            split_ept_entry = split_table + i;
+            split_ept_entry->emt = EPT_DEFAULT_MT;
+            split_ept_entry->sp_avail =  0;
+
+            split_ept_entry->mfn = split_mfn+i;
+
+            split_ept_entry->avail1 = split_p2mt;
+            split_ept_entry->rsvd = 0;
+            split_ept_entry->avail2 = 0;
+            /* last step */
+            split_ept_entry->r = split_ept_entry->w = split_ept_entry->x = 1;
+            ept_p2m_type_to_flags(split_ept_entry, split_p2mt);
+        }
+
+        /* Set the destinated 4k page as normal */
+
+        offset = gfn & ((1 << EPT_TABLE_ORDER) - 1);
+        split_ept_entry = split_table + offset;
+        split_ept_entry->mfn = mfn_x(mfn);
+        split_ept_entry->avail1 = p2mt;
+        ept_p2m_type_to_flags(split_ept_entry, p2mt);
+
+        unmap_domain_page(split_table);
+
+    }
 
     /* Success */
     rv = 1;
@@ -179,22 +247,22 @@ out:
     {
         if ( p2mt == p2m_ram_rw )
         {
-            if ( ret == GUEST_TABLE_SUPER_PAGE )
+            if ( order == EPT_TABLE_ORDER )
             {
                 for ( i = 0; i < 512; i++ )
                     iommu_map_page(d, gfn-offset+i, mfn_x(mfn)-offset+i);
             }
-            else if ( ret )
+            else if ( !order )
                 iommu_map_page(d, gfn, mfn_x(mfn));
         }
         else
         {
-            if ( ret == GUEST_TABLE_SUPER_PAGE )
+            if ( order == EPT_TABLE_ORDER )
             {
                 for ( i = 0; i < 512; i++ )
                     iommu_unmap_page(d, gfn-offset+i);
             }
-            else if ( ret )
+            else if ( !order )
                 iommu_unmap_page(d, gfn);
         }
     }
@@ -230,7 +298,7 @@ static mfn_t ept_get_entry(struct domain *d, unsigned long gfn, p2m_type_t *t)
     for ( i = EPT_DEFAULT_GAW; i > 0; i-- )
     {
         ret = ept_next_level(d, 1, &table, &gfn_remainder,
-                             i * EPT_TABLE_ORDER);
+                             i * EPT_TABLE_ORDER, 0);
         if ( !ret )
             goto out;
         else if ( ret == GUEST_TABLE_SUPER_PAGE )
