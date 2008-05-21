@@ -103,12 +103,7 @@ void smp_initialise(void);
 void create_mp_tables(void);
 int hvm_write_smbios_tables(void);
 
-static int
-cirrus_check(void)
-{
-    outw(0x3C4, 0x9206);
-    return inb(0x3C5) == 0x12;
-}
+static enum { VGA_none, VGA_std, VGA_cirrus } virtual_vga = VGA_none;
 
 static void
 init_hypercalls(void)
@@ -165,7 +160,7 @@ static void pci_setup(void)
     /* Create a list of device BARs in descending order of size. */
     struct bars {
         uint32_t devfn, bar_reg, bar_sz;
-    } *bars = (struct bars *)0xc0000;
+    } *bars = (struct bars *)SCRATCH_PHYSICAL_ADDRESS;
     unsigned int i, nr_bars = 0;
 
     /* Program PCI-ISA bridge with appropriate link routes. */
@@ -196,6 +191,12 @@ static void pci_setup(void)
 
         switch ( class )
         {
+        case 0x0300:
+            if ( (vendor_id == 0x1234) && (device_id == 0x1111) )
+                virtual_vga = VGA_std;
+            if ( (vendor_id == 0x1013) && (device_id == 0xb8) )
+                virtual_vga = VGA_cirrus;
+            break;
         case 0x0680:
             ASSERT((vendor_id == 0x8086) && (device_id == 0x7113));
             /*
@@ -464,19 +465,23 @@ int main(void)
     if ( (get_vcpu_nr() > 1) || get_apic_mode() )
         create_mp_tables();
 
-    if ( cirrus_check() )
+    switch ( virtual_vga )
     {
+    case VGA_cirrus:
         printf("Loading Cirrus VGABIOS ...\n");
         memcpy((void *)VGABIOS_PHYSICAL_ADDRESS,
                vgabios_cirrusvga, sizeof(vgabios_cirrusvga));
         vgabios_sz = sizeof(vgabios_cirrusvga);
-    }
-    else
-    {
+        break;
+    case VGA_std:
         printf("Loading Standard VGABIOS ...\n");
         memcpy((void *)VGABIOS_PHYSICAL_ADDRESS,
                vgabios_stdvga, sizeof(vgabios_stdvga));
         vgabios_sz = sizeof(vgabios_stdvga);
+        break;
+    default:
+        printf("No emulated VGA adaptor ...\n");
+        break;
     }
 
     etherboot_sz = scan_etherboot_nic((void*)ETHERBOOT_PHYSICAL_ADDRESS);
