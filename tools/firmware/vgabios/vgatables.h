@@ -25,6 +25,7 @@
 #define BIOSMEM_VS_POINTER    0xA8
 #define BIOSMEM_VBE_FLAG      0xB9
 #define BIOSMEM_VBE_MODE      0xBA
+#define BIOSMEM_VBE_POWER     0xBC
 
 
 /*

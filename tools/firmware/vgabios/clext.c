@@ -26,6 +26,7 @@
 #define PM_BIOSMEM_CURRENT_MODE 0x449
 #define PM_BIOSMEM_CRTC_ADDRESS 0x463
 #define PM_BIOSMEM_VBE_MODE 0x4BA
+#define PM_BIOSMEM_VBE_POWER 0x4BC 
 
 typedef struct
 {
@@ -491,7 +492,7 @@ cirrus_vesa:
 #ifdef CIRRUS_DEBUG
   call cirrus_debug_dump
 #endif
-  cmp al, #0x0F
+  cmp al, #0x10
   ja cirrus_vesa_not_handled
   push bx
   xor bx, bx
@@ -682,7 +683,7 @@ c80h_2:
   ret
 
 cirrus_extbios_81h:
-  mov ax, #0x100 ;; XXX
+  mov ax, #0x103 ;; XXX
   ret
 cirrus_extbios_82h:
   push dx
@@ -1177,6 +1178,52 @@ cirrus_vesa_07h_2:
   mov  ax, #0x004f
   ret
 
+cirrus_vesa_10h: ;; Power management functions
+  ;; Set up DS to read stored power info from RAM
+  push ds
+#ifdef CIRRUS_VESA3_PMINFO
+ db 0x2e ;; cs:
+  mov ax, [cirrus_vesa_sel0000_data]
+#else
+  xor ax, ax
+#endif
+  mov  ds, ax
+  ;; Now choose the right function
+  cmp  bl, #0x00
+  ja   cirrus_vesa_10h_01
+  ;;
+  ;; Function 00h: Get capabilities
+  ;;
+  mov  bx, #0x0720 ;; 07: standby/suspend/off, 20: VBE/PM 2.0
+  mov  ax, #0x004f
+  jmp cirrus_vesa_10h_done
+cirrus_vesa_10h_01:
+  cmp  bl, #0x01
+  ja   cirrus_vesa_10h_02
+  ;;
+  ;; Function 01h: Set power state
+  ;; 
+  mov  ax, bx
+  mov  bx, # PM_BIOSMEM_VBE_POWER
+  mov  [bx], ah
+  mov  ax, #0x004f 
+  jmp cirrus_vesa_10h_done
+cirrus_vesa_10h_02:
+  cmp  bl, #0x02
+  ja   cirrus_vesa_10h_unimplemented
+  ;;
+  ;; Function 02h: Get power state
+  ;; 
+  mov  bx, # PM_BIOSMEM_VBE_POWER
+  mov  bh, [bx]
+  mov  ax, #0x004f 
+  jmp cirrus_vesa_10h_done
+cirrus_vesa_10h_unimplemented:
+  mov  ax, #0x014F ;; not implemented
+cirrus_vesa_10h_done:
+  pop ds
+  ret
+
 cirrus_vesa_unimplemented:
   mov ax, #0x014F ;; not implemented
   ret
@@ -1601,7 +1648,8 @@ cirrus_vesa_handlers:
   dw cirrus_vesa_unimplemented
   dw cirrus_vesa_unimplemented
   dw cirrus_vesa_unimplemented
-
+  ;; 10h
+  dw cirrus_vesa_10h
 
 
 ASM_END
