@@ -105,11 +105,14 @@ static void intel_xc_cpuid_policy(
 static void cpuid(const unsigned int *input, unsigned int *regs)
 {
     unsigned int count = (input[1] == XEN_CPUID_INPUT_UNUSED) ? 0 : input[1];
-    unsigned int bx_temp;
-    asm ( "mov %%ebx,%4; cpuid; mov %%ebx,%1; mov %4,%%ebx"
-          : "=a" (regs[0]), "=r" (regs[1]),
-          "=c" (regs[2]), "=d" (regs[3]), "=m" (bx_temp)
-          : "0" (input[0]), "2" (count) );
+    asm (
+#ifdef __i386__
+        "push %%ebx; cpuid; mov %%ebx,%1; pop %%ebx"
+#else
+        "push %%rbx; cpuid; mov %%ebx,%1; pop %%rbx"
+#endif
+        : "=a" (regs[0]), "=r" (regs[1]), "=c" (regs[2]), "=d" (regs[3])
+        : "0" (input[0]), "2" (count) );
 }
 
 /* Get the manufacturer brand name of the host processor. */
