@@ -42,6 +42,10 @@
 
 struct pm_px px_statistic_data[NR_CPUS];
 
+extern uint32_t pmstat_get_cx_nr(uint32_t cpuid);
+extern int pmstat_get_cx_stat(uint32_t cpuid, struct pm_cx_stat *stat);
+extern int pmstat_reset_cx_stat(uint32_t cpuid);
+
 int do_get_pm_info(struct xen_sysctl_get_pmstat *op)
 {
     int ret = 0;
@@ -50,7 +54,7 @@ int do_get_pm_info(struct xen_sysctl_get_pmstat *op)
 
     /* to protect the case when Px was controlled by dom0-kernel */
     /* or when CPU_FREQ not set in which case ACPI Px objects not parsed */
-    if ( !pmpt->perf.init )
+    if ( !pmpt->perf.init && (op->type & PMSTAT_CATEGORY_MASK) == PMSTAT_PX )
         return -EINVAL;
 
     if ( !cpu_online(op->cpuid) )
@@ -97,6 +101,25 @@ int do_get_pm_info(struct xen_sysctl_get_pmstat *op)
     case PMSTAT_reset_pxstat:
     {
         px_statistic_reset(op->cpuid);
+        break;
+    }
+
+    case PMSTAT_get_max_cx:
+    {
+        op->u.getcx.nr = pmstat_get_cx_nr(op->cpuid);
+        ret = 0;
+        break;
+    }
+
+    case PMSTAT_get_cxstat:
+    {
+        ret = pmstat_get_cx_stat(op->cpuid, &op->u.getcx);
+        break;
+    }
+
+    case PMSTAT_reset_cxstat:
+    {
+        ret = pmstat_reset_cx_stat(op->cpuid);
         break;
     }
 

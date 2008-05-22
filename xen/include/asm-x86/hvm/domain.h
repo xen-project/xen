@@ -76,6 +76,7 @@ struct hvm_domain {
 
     bool_t                 hap_enabled;
     bool_t                 qemu_mapcache_invalidate;
+    bool_t                 is_s3_suspended;
 
     union {
         struct vmx_domain vmx;

@@ -63,6 +63,7 @@ struct hvm_vioapic {
 
 int vioapic_init(struct domain *d);
 void vioapic_deinit(struct domain *d);
+void vioapic_reset(struct domain *d);
 void vioapic_irq_positive_edge(struct domain *d, unsigned int irq);
 void vioapic_update_EOI(struct domain *d, int vector);
 

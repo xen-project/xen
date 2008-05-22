@@ -1121,6 +1121,14 @@ static void pc_init_isa(uint64_t ram_size, int vga_ram_size, char *boot_device,
              initrd_filename, 0, NULL);
 }
 
+/* set CMOS shutdown status register (index 0xF) as S3_resume(0xFE)
+   BIOS will read it and start S3 resume at POST Entry*/
+void cmos_set_s3_resume(void)
+{
+    if (rtc_state)
+        rtc_set_memory(rtc_state, 0xF, 0xFE);
+}
+
 QEMUMachine pc_machine = {
     "pc",
     "Standard PC",

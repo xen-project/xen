@@ -103,12 +103,7 @@ void smp_initialise(void);
 void create_mp_tables(void);
 int hvm_write_smbios_tables(void);
 
-static int
-cirrus_check(void)
-{
-    outw(0x3C4, 0x9206);
-    return inb(0x3C5) == 0x12;
-}
+static enum { VGA_none, VGA_std, VGA_cirrus } virtual_vga = VGA_none;
 
 static void
 init_hypercalls(void)
@@ -165,7 +160,7 @@ static void pci_setup(void)
     /* Create a list of device BARs in descending order of size. */
     struct bars {
         uint32_t devfn, bar_reg, bar_sz;
-    } *bars = (struct bars *)0xc0000;
+    } *bars = (struct bars *)SCRATCH_PHYSICAL_ADDRESS;
     unsigned int i, nr_bars = 0;
 
     /* Program PCI-ISA bridge with appropriate link routes. */
@@ -196,12 +191,15 @@ static void pci_setup(void)
 
         switch ( class )
         {
+        case 0x0300:
+            if ( (vendor_id == 0x1234) && (device_id == 0x1111) )
+                virtual_vga = VGA_std;
+            if ( (vendor_id == 0x1013) && (device_id == 0xb8) )
+                virtual_vga = VGA_cirrus;
+            break;
         case 0x0680:
+            /* PIIX4 ACPI PM. Special device with special PCI config space. */
             ASSERT((vendor_id == 0x8086) && (device_id == 0x7113));
-            /*
-             * PIIX4 ACPI PM. Special device with special PCI config space.
-             * No ordinary BARs.
-             */
             pci_writew(devfn, 0x20, 0x0000); /* No smb bus IO enable */
             pci_writew(devfn, 0x22, 0x0000);
             pci_writew(devfn, 0x3c, 0x0009); /* Hardcoded IRQ9 */
@@ -212,42 +210,41 @@ static void pci_setup(void)
             ASSERT((vendor_id == 0x8086) && (device_id == 0x7010));
             pci_writew(devfn, 0x40, 0x8000); /* enable IDE0 */
             pci_writew(devfn, 0x42, 0x8000); /* enable IDE1 */
-            /* fall through */
-        default:
-            /* Default memory mappings. */
-            for ( bar = 0; bar < 7; bar++ )
-            {
-                bar_reg = PCI_BASE_ADDRESS_0 + 4*bar;
-                if ( bar == 6 )
-                    bar_reg = PCI_ROM_ADDRESS;
-
-                bar_data = pci_readl(devfn, bar_reg);
-                pci_writel(devfn, bar_reg, ~0);
-                bar_sz = pci_readl(devfn, bar_reg);
-                pci_writel(devfn, bar_reg, bar_data);
-                if ( bar_sz == 0 )
-                    continue;
-
-                bar_sz &= (((bar_data & PCI_BASE_ADDRESS_SPACE) ==
-                           PCI_BASE_ADDRESS_SPACE_MEMORY) ?
-                           PCI_BASE_ADDRESS_MEM_MASK :
-                           (PCI_BASE_ADDRESS_IO_MASK & 0xffff));
-                bar_sz &= ~(bar_sz - 1);
-
-                for ( i = 0; i < nr_bars; i++ )
-                    if ( bars[i].bar_sz < bar_sz )
-                        break;
-
-                if ( i != nr_bars )
-                    memmove(&bars[i+1], &bars[i], (nr_bars-i) * sizeof(*bars));
-
-                bars[i].devfn   = devfn;
-                bars[i].bar_reg = bar_reg;
-                bars[i].bar_sz  = bar_sz;
-
-                nr_bars++;
-            }
             break;
+        }
+
+        /* Map the I/O memory and port resources. */
+        for ( bar = 0; bar < 7; bar++ )
+        {
+            bar_reg = PCI_BASE_ADDRESS_0 + 4*bar;
+            if ( bar == 6 )
+                bar_reg = PCI_ROM_ADDRESS;
+
+            bar_data = pci_readl(devfn, bar_reg);
+            pci_writel(devfn, bar_reg, ~0);
+            bar_sz = pci_readl(devfn, bar_reg);
+            pci_writel(devfn, bar_reg, bar_data);
+            if ( bar_sz == 0 )
+                continue;
+
+            bar_sz &= (((bar_data & PCI_BASE_ADDRESS_SPACE) ==
+                        PCI_BASE_ADDRESS_SPACE_MEMORY) ?
+                       PCI_BASE_ADDRESS_MEM_MASK :
+                       (PCI_BASE_ADDRESS_IO_MASK & 0xffff));
+            bar_sz &= ~(bar_sz - 1);
+
+            for ( i = 0; i < nr_bars; i++ )
+                if ( bars[i].bar_sz < bar_sz )
+                    break;
+
+            if ( i != nr_bars )
+                memmove(&bars[i+1], &bars[i], (nr_bars-i) * sizeof(*bars));
+
+            bars[i].devfn   = devfn;
+            bars[i].bar_reg = bar_reg;
+            bars[i].bar_sz  = bar_sz;
+
+            nr_bars++;
         }
 
         /* Map the interrupt. */
@@ -464,19 +461,23 @@ int main(void)
     if ( (get_vcpu_nr() > 1) || get_apic_mode() )
         create_mp_tables();
 
-    if ( cirrus_check() )
+    switch ( virtual_vga )
     {
+    case VGA_cirrus:
         printf("Loading Cirrus VGABIOS ...\n");
         memcpy((void *)VGABIOS_PHYSICAL_ADDRESS,
                vgabios_cirrusvga, sizeof(vgabios_cirrusvga));
         vgabios_sz = sizeof(vgabios_cirrusvga);
-    }
-    else
-    {
+        break;
+    case VGA_std:
         printf("Loading Standard VGABIOS ...\n");
         memcpy((void *)VGABIOS_PHYSICAL_ADDRESS,
                vgabios_stdvga, sizeof(vgabios_stdvga));
         vgabios_sz = sizeof(vgabios_stdvga);
+        break;
+    default:
+        printf("No emulated VGA adaptor ...\n");
+        break;
     }
 
     etherboot_sz = scan_etherboot_nic((void*)ETHERBOOT_PHYSICAL_ADDRESS);

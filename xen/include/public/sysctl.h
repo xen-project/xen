@@ -233,15 +233,30 @@ struct pm_px_stat {
 typedef struct pm_px_stat pm_px_stat_t;
 DEFINE_XEN_GUEST_HANDLE(pm_px_stat_t);
 
+struct pm_cx_stat {
+    uint32_t nr;    /* entry nr in triggers & residencies, including C0 */
+    uint32_t last;  /* last Cx state */
+    uint64_aligned_t idle_time;                 /* idle time from boot */
+    XEN_GUEST_HANDLE_64(uint64) triggers;    /* Cx trigger counts */
+    XEN_GUEST_HANDLE_64(uint64) residencies; /* Cx residencies */
+};
+
 struct xen_sysctl_get_pmstat {
-#define PMSTAT_get_max_px   0x11
-#define PMSTAT_get_pxstat   0x12
-#define PMSTAT_reset_pxstat 0x13
+#define PMSTAT_CATEGORY_MASK 0xf0
+#define PMSTAT_PX            0x10
+#define PMSTAT_CX            0x20
+#define PMSTAT_get_max_px    (PMSTAT_PX | 0x1)
+#define PMSTAT_get_pxstat    (PMSTAT_PX | 0x2)
+#define PMSTAT_reset_pxstat  (PMSTAT_PX | 0x3)
+#define PMSTAT_get_max_cx    (PMSTAT_CX | 0x1)
+#define PMSTAT_get_cxstat    (PMSTAT_CX | 0x2)
+#define PMSTAT_reset_cxstat  (PMSTAT_CX | 0x3)
     uint32_t type;
     uint32_t cpuid;
     union {
         struct pm_px_stat getpx;
-        /* other struct for cx, tx, etc */
+        struct pm_cx_stat getcx;
+        /* other struct for tx, etc */
     } u;
 };
 typedef struct xen_sysctl_get_pmstat xen_sysctl_get_pmstat_t;

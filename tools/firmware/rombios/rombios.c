@@ -1843,12 +1843,24 @@ keyboard_panic(status)
   BX_PANIC("Keyboard error:%u\n",status);
 }
 
+
+#define CMOS_SHUTDOWN_S3 0xFE
 //--------------------------------------------------------------------------
 // machine_reset
 //--------------------------------------------------------------------------
   void
 machine_reset()
 {
+ASM_START
+;we must check whether CMOS_SHUTDOWN_S3 is set or not
+;if it is s3 resume, just jmp back to normal Post Entry
+;below port io will prevent s3 resume
+  mov al, #0x0f
+  out 0x70, al
+  in al, 0x71
+  cmp al, #0xFE
+  jz post
+ASM_END
   /* Frob the keyboard reset line to reset the processor */
   outb(0x64, 0x60); /* Map the flags register at data port (0x60) */
   outb(0x60, 0x14); /* Set the flags to system|disable */
@@ -2305,6 +2317,72 @@ debugger_on()
 debugger_off()
 {
   outb(0xfedc, 0x00);
+}
+
+/* according to memory layout defined in acpi_build_tables(),
+   acpi FACS table is located in ACPI_PHYSICAL_ADDRESS(0xEA000) */
+#define ACPI_FACS_ADDRESS 0xEA000
+#define ACPI_FACS_OFFSET 0x10
+/* S3 resume status in CMOS 0Fh shutdown status byte*/
+
+void 
+s3_resume()
+{
+    Bit16u s3_wakeup_vector;
+    extern Bit16u s3_wakeup_ip;
+    extern Bit16u s3_wakeup_cs;
+    extern Bit8u s3_resume_flag;
+
+ASM_START
+    push ds
+    mov ax, #0xF000
+    mov ds, ax
+ASM_END
+
+    if (s3_resume_flag!=CMOS_SHUTDOWN_S3){
+        goto s3_out;
+    }
+    s3_resume_flag = 0;
+
+ASM_START
+    mov ax, #0x0
+    mov ds, ax
+ASM_END
+
+    /* get x_firmware_waking_vector */
+    s3_wakeup_vector = *((Bit16u*)(ACPI_FACS_ADDRESS+ACPI_FACS_OFFSET+24));
+    if (s3_wakeup_vector == 0){
+        /* get firmware_waking_vector */
+        s3_wakeup_vector = *((Bit16u*)(ACPI_FACS_ADDRESS+ACPI_FACS_OFFSET+12));
+        if (s3_wakeup_vector == 0){
+            goto s3_out;
+        }
+    }
+
+    /* setup wakeup vector */
+    s3_wakeup_ip = s3_wakeup_vector & 0xF;
+    s3_wakeup_cs = s3_wakeup_vector >> 4;
+
+ASM_START
+    mov bx, [_s3_wakeup_cs]
+    mov dx, [_s3_wakeup_ip]
+
+    mov ax, #0xF000
+    mov ds, ax
+    mov [_s3_wakeup_cs], bx
+    mov [_s3_wakeup_ip], dx
+    jmpf [_s3_wakeup_ip]
+
+; S3 data
+_s3_wakeup_ip:    dw 0x0a      
+_s3_wakeup_cs:    dw 0x0      
+_s3_resume_flag:  db 0   ; set at POST time by CMOS[0xF] shutdown status
+ASM_END
+
+s3_out:
+ASM_START
+   pop ds 
+ASM_END
 }
 
 #if BX_USE_ATADRV
@@ -9752,6 +9830,18 @@ post:
   ;; Examine CMOS shutdown status.
   mov al, bl
 
+  ;; 0xFE S3 resume
+  cmp AL, #0xFE
+  jnz not_s3_resume
+
+  ;; set S3 resume flag
+  mov dx, #0xF000
+  mov ds, dx
+  mov [_s3_resume_flag], AL
+  jmp normal_post
+
+not_s3_resume:
+
   ;; 0x00, 0x09, 0x0D+ = normal startup
   cmp AL, #0x00
   jz normal_post
@@ -10049,6 +10139,7 @@ post_default_ints:
   ;;
 #endif // BX_ELTORITO_BOOT
 
+  call _s3_resume
   call _interactive_bootkey
 
 #if BX_TCGBIOS

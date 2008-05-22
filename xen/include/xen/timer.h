@@ -99,6 +99,15 @@ extern void process_pending_timers(void);
  */
 extern void timer_init(void);
 
+/*
+ * Next timer deadline for each CPU.
+ * Modified only by the local CPU and never in interrupt context.
+ */
+DECLARE_PER_CPU(s_time_t, timer_deadline);
+
+/* Arch-defined function to reprogram timer hardware for new deadline. */
+extern int reprogram_timer(s_time_t timeout);
+
 #endif /* _TIMER_H_ */
 
 /*

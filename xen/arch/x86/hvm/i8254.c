@@ -446,22 +446,16 @@ static int pit_load(struct domain *d, hvm_domain_context_t *h)
 
 HVM_REGISTER_SAVE_RESTORE(PIT, pit_save, pit_load, 1, HVMSR_PER_DOM);
 
-void pit_init(struct vcpu *v, unsigned long cpu_khz)
+void pit_reset(struct domain *d)
 {
-    PITState *pit = vcpu_vpit(v);
+    PITState *pit = domain_vpit(d);
     struct hvm_hw_pit_channel *s;
     int i;
 
-    spin_lock_init(&pit->lock);
-
-    /* Some sub-functions assert that they are called with the lock held. */
-    spin_lock(&pit->lock);
-
+    destroy_periodic_time(&pit->pt0);
     pit->pt0.source = PTSRC_isa;
 
-    register_portio_handler(v->domain, PIT_BASE, 4, handle_pit_io);
-    register_portio_handler(v->domain, 0x61, 1, handle_speaker_io);
-    ticks_per_sec(v) = cpu_khz * (int64_t)1000;
+    spin_lock(&pit->lock);
 
     for ( i = 0; i < 3; i++ )
     {
@@ -472,6 +466,20 @@ void pit_init(struct vcpu *v, unsigned long cpu_khz)
     }
 
     spin_unlock(&pit->lock);
+}
+
+void pit_init(struct vcpu *v, unsigned long cpu_khz)
+{
+    PITState *pit = vcpu_vpit(v);
+
+    spin_lock_init(&pit->lock);
+
+    register_portio_handler(v->domain, PIT_BASE, 4, handle_pit_io);
+    register_portio_handler(v->domain, 0x61, 1, handle_speaker_io);
+
+    ticks_per_sec(v) = cpu_khz * (int64_t)1000;
+
+    pit_reset(v->domain);
 }
 
 void pit_deinit(struct domain *d)

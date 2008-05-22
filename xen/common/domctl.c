@@ -218,7 +218,8 @@ long do_domctl(XEN_GUEST_HANDLE(xen_domctl_t) u_domctl)
 
         if ( guest_handle_is_null(op->u.vcpucontext.ctxt) )
         {
-            ret = vcpu_reset(v);
+            vcpu_reset(v);
+            ret = 0;
             goto svc_out;
         }
 

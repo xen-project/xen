@@ -2058,6 +2058,118 @@ static int hvmop_set_pci_intx_level(
     return rc;
 }
 
+void hvm_vcpu_reset_state(struct vcpu *v, uint16_t cs, uint16_t ip)
+{
+    struct domain *d = current->domain;
+    struct vcpu_guest_context *ctxt;
+    struct segment_register reg;
+
+    BUG_ON(vcpu_runnable(v));
+
+    domain_lock(d);
+
+    if ( v->is_initialised )
+        goto out;
+
+    ctxt = &v->arch.guest_context;
+    memset(ctxt, 0, sizeof(*ctxt));
+    ctxt->flags = VGCF_online;
+    ctxt->user_regs.eflags = 2;
+    ctxt->user_regs.edx = 0x00000f00;
+    ctxt->user_regs.eip = ip;
+
+    v->arch.hvm_vcpu.guest_cr[0] = X86_CR0_ET;
+    hvm_update_guest_cr(v, 0);
+
+    v->arch.hvm_vcpu.guest_cr[2] = 0;
+    hvm_update_guest_cr(v, 2);
+
+    v->arch.hvm_vcpu.guest_cr[3] = 0;
+    hvm_update_guest_cr(v, 3);
+
+    v->arch.hvm_vcpu.guest_cr[4] = 0;
+    hvm_update_guest_cr(v, 4);
+
+    v->arch.hvm_vcpu.guest_efer = 0;
+    hvm_update_guest_efer(v);
+
+    reg.sel = cs;
+    reg.base = (uint32_t)reg.sel << 4;
+    reg.limit = 0xffff;
+    reg.attr.bytes = 0x09b;
+    hvm_set_segment_register(v, x86_seg_cs, &reg);
+
+    reg.sel = reg.base = 0;
+    reg.limit = 0xffff;
+    reg.attr.bytes = 0x093;
+    hvm_set_segment_register(v, x86_seg_ds, &reg);
+    hvm_set_segment_register(v, x86_seg_es, &reg);
+    hvm_set_segment_register(v, x86_seg_fs, &reg);
+    hvm_set_segment_register(v, x86_seg_gs, &reg);
+    hvm_set_segment_register(v, x86_seg_ss, &reg);
+
+    reg.attr.bytes = 0x82; /* LDT */
+    hvm_set_segment_register(v, x86_seg_ldtr, &reg);
+
+    reg.attr.bytes = 0x8b; /* 32-bit TSS (busy) */
+    hvm_set_segment_register(v, x86_seg_tr, &reg);
+
+    reg.attr.bytes = 0;
+    hvm_set_segment_register(v, x86_seg_gdtr, &reg);
+    hvm_set_segment_register(v, x86_seg_idtr, &reg);
+
+    /* Sync AP's TSC with BSP's. */
+    v->arch.hvm_vcpu.cache_tsc_offset =
+        v->domain->vcpu[0]->arch.hvm_vcpu.cache_tsc_offset;
+    hvm_funcs.set_tsc_offset(v, v->arch.hvm_vcpu.cache_tsc_offset);
+
+    v->arch.flags |= TF_kernel_mode;
+    v->is_initialised = 1;
+    clear_bit(_VPF_down, &v->pause_flags);
+
+ out:
+    domain_unlock(d);
+}
+
+static void hvm_s3_suspend(struct domain *d)
+{
+    struct vcpu *v;
+
+    domain_pause(d);
+    domain_lock(d);
+
+    if ( (d->vcpu[0] == NULL) ||
+         test_and_set_bool(d->arch.hvm_domain.is_s3_suspended) )
+    {
+        domain_unlock(d);
+        domain_unpause(d);
+        return;
+    }
+
+    for_each_vcpu ( d, v )
+    {
+        vlapic_reset(vcpu_vlapic(v));
+        vcpu_reset(v);
+    }
+
+    vpic_reset(d);
+    vioapic_reset(d);
+    pit_reset(d);
+    rtc_reset(d);	
+    pmtimer_reset(d);
+    hpet_reset(d);
+
+    hvm_vcpu_reset_state(d->vcpu[0], 0xf000, 0xfff0);
+
+    domain_unlock(d);
+}
+
+static void hvm_s3_resume(struct domain *d)
+{
+    if ( test_and_clear_bool(d->arch.hvm_domain.is_s3_suspended) )
+        domain_unpause(d);
+}
+
 static int hvmop_set_isa_irq_level(
     XEN_GUEST_HANDLE(xen_hvm_set_isa_irq_level_t) uop)
 {
@@ -2314,6 +2426,21 @@ long do_hvm_op(unsigned long op, XEN_GUEST_HANDLE(void) arg)
                 }
                 domain_unpause(d);
                 break;
+            case HVM_PARAM_ACPI_S_STATE:
+                /* Privileged domains only, as we must domain_pause(d). */
+                rc = -EPERM;
+                if ( !IS_PRIV_FOR(current->domain, d) )
+                    break;
+
+                rc = 0;
+                if ( a.value == 3 )
+                    hvm_s3_suspend(d);
+                else if ( a.value == 0 )
+                    hvm_s3_resume(d);
+                else
+                    rc = -EINVAL;
+
+                break;
             }
 
             if ( rc == 0 )
@@ -2321,7 +2448,15 @@ long do_hvm_op(unsigned long op, XEN_GUEST_HANDLE(void) arg)
         }
         else
         {
-            a.value = d->arch.hvm_domain.params[a.index];
+            switch ( a.index )
+            {
+            case HVM_PARAM_ACPI_S_STATE:
+                a.value = d->arch.hvm_domain.is_s3_suspended ? 3 : 0;
+                break;
+            default:
+                a.value = d->arch.hvm_domain.params[a.index];
+                break;
+            }
             rc = copy_to_guest(arg, &a, 1) ? -EFAULT : 0;
         }
 

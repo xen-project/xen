@@ -494,21 +494,25 @@ static int ioapic_load(struct domain *d, hvm_domain_context_t *h)
 
 HVM_REGISTER_SAVE_RESTORE(IOAPIC, ioapic_save, ioapic_load, 1, HVMSR_PER_DOM);
 
-int vioapic_init(struct domain *d)
+void vioapic_reset(struct domain *d)
 {
-    struct hvm_vioapic *vioapic;
+    struct hvm_vioapic *vioapic = d->arch.hvm_domain.vioapic;
     int i;
-
-    vioapic = d->arch.hvm_domain.vioapic = xmalloc(struct hvm_vioapic);
-    if ( vioapic == NULL )
-        return -ENOMEM;
-
-    vioapic->domain = d;
 
     memset(&vioapic->hvm_hw_vioapic, 0, sizeof(vioapic->hvm_hw_vioapic));
     for ( i = 0; i < VIOAPIC_NUM_PINS; i++ )
         vioapic->hvm_hw_vioapic.redirtbl[i].fields.mask = 1;
     vioapic->hvm_hw_vioapic.base_address = VIOAPIC_DEFAULT_BASE_ADDRESS;
+}
+
+int vioapic_init(struct domain *d)
+{
+    if ( (d->arch.hvm_domain.vioapic == NULL) &&
+         ((d->arch.hvm_domain.vioapic = xmalloc(struct hvm_vioapic)) == NULL) )
+        return -ENOMEM;
+
+    d->arch.hvm_domain.vioapic->domain = d;
+    vioapic_reset(d);
 
     return 0;
 }

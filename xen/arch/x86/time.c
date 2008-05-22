@@ -38,7 +38,6 @@ string_param("clocksource", opt_clocksource);
 #define EPOCH MILLISECS(1000)
 
 unsigned long cpu_khz;  /* CPU clock frequency in kHz. */
-unsigned long hpet_address;
 DEFINE_SPINLOCK(rtc_lock);
 unsigned long pit0_ticks;
 static u32 wc_sec, wc_nsec; /* UTC time at last 'time update'. */
@@ -68,7 +67,8 @@ struct platform_timesource {
 
 static DEFINE_PER_CPU(struct cpu_time, cpu_time);
 
-static u8 tsc_invariant=0;  /* TSC is invariant upon C state entry */
+/* TSC is invariant on C state entry? */
+static bool_t tsc_invariant;
 
 /*
  * We simulate a 32-bit platform timer from the 16-bit PIT ch2 counter.
@@ -150,6 +150,9 @@ static inline u64 scale_delta(u64 delta, struct time_scale *scale)
 static void timer_interrupt(int irq, void *dev_id, struct cpu_user_regs *regs)
 {
     ASSERT(local_irq_is_enabled());
+
+    if ( hpet_legacy_irq_tick() )
+        return;
 
     /* Only for start-of-day interruopt tests in io_apic.c. */
     (*(volatile unsigned long *)&pit0_ticks)++;
@@ -347,47 +350,10 @@ static u32 read_hpet_count(void)
 
 static int init_hpet(struct platform_timesource *pts)
 {
-    u64 hpet_rate;
-    u32 hpet_id, hpet_period, cfg;
-    int i;
+    u64 hpet_rate = hpet_setup();
 
-    if ( hpet_address == 0 )
+    if ( hpet_rate == 0 )
         return 0;
-
-    set_fixmap_nocache(FIX_HPET_BASE, hpet_address);
-
-    hpet_id = hpet_read32(HPET_ID);
-    if ( hpet_id == 0 )
-    {
-        printk("BAD HPET vendor id.\n");
-        return 0;
-    }
-
-    /* Check for sane period (100ps <= period <= 100ns). */
-    hpet_period = hpet_read32(HPET_PERIOD);
-    if ( (hpet_period > 100000000) || (hpet_period < 100000) )
-    {
-        printk("BAD HPET period %u.\n", hpet_period);
-        return 0;
-    }
-
-    cfg = hpet_read32(HPET_CFG);
-    cfg &= ~(HPET_CFG_ENABLE | HPET_CFG_LEGACY);
-    hpet_write32(cfg, HPET_CFG);
-
-    for ( i = 0; i <= ((hpet_id >> 8) & 31); i++ )
-    {
-        cfg = hpet_read32(HPET_T0_CFG + i*0x20);
-        cfg &= ~HPET_TN_ENABLE;
-        hpet_write32(cfg & ~HPET_TN_ENABLE, HPET_T0_CFG);
-    }
-
-    cfg = hpet_read32(HPET_CFG);
-    cfg |= HPET_CFG_ENABLE;
-    hpet_write32(cfg, HPET_CFG);
-
-    hpet_rate = 1000000000000000ULL; /* 10^15 */
-    (void)do_div(hpet_rate, hpet_period);
 
     pts->name = "HPET";
     pts->frequency = hpet_rate;
@@ -1041,7 +1007,14 @@ static int __init disable_pit_irq(void)
         outb_p(0x30, PIT_MODE);
         outb_p(0, PIT_CH0);
         outb_p(0, PIT_CH0);
+
+        /*
+         * If we do not rely on PIT CH0 then we can use HPET for one-shot
+         * timer emulation when entering deep C states.
+         */
+        hpet_broadcast_init();
     }
+
     return 0;
 }
 __initcall(disable_pit_irq);

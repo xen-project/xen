@@ -217,15 +217,16 @@ hvm_write_smbios_tables(void)
 
     xen_version_str[sizeof(xen_version_str)-1] = '\0';
 
-    /* NB. 0xC0000 is a safe large memory area for scratch. */
-    len = write_smbios_tables((void *)0xC0000,
+    /* SCRATCH_PHYSICAL_ADDRESS is a safe large memory area for scratch. */
+    len = write_smbios_tables((void *)SCRATCH_PHYSICAL_ADDRESS,
                               get_vcpu_nr(), get_memsize(),
                               uuid, xen_version_str,
                               xen_major_version, xen_minor_version);
     if ( len > SMBIOS_MAXIMUM_SIZE )
         goto error_out;
     /* Okay, not too large: copy out of scratch to final location. */
-    memcpy((void *)SMBIOS_PHYSICAL_ADDRESS, (void *)0xC0000, len);
+    memcpy((void *)SMBIOS_PHYSICAL_ADDRESS,
+           (void *)SCRATCH_PHYSICAL_ADDRESS, len);
 
     return len;
 

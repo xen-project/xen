@@ -90,6 +90,9 @@
 /* Device Model domain, defaults to 0. */
 #define HVM_PARAM_DM_DOMAIN    13
 
-#define HVM_NR_PARAMS          14
+/* ACPI S state: currently support S0 and S3 on x86. */
+#define HVM_PARAM_ACPI_S_STATE 14
+
+#define HVM_NR_PARAMS          15
 
 #endif /* __XEN_PUBLIC_HVM_PARAMS_H__ */

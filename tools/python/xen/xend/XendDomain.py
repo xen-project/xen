@@ -1282,6 +1282,10 @@ class XendDomain:
 
         if dominfo.getDomid() == DOM0_ID:
             raise XendError("Cannot migrate privileged domain %s" % domid)
+        if dominfo._stateGet() != DOM_STATE_RUNNING:
+            raise VMBadState("Domain is not running",
+                             POWER_STATE_NAMES[DOM_STATE_RUNNING],
+                             POWER_STATE_NAMES[dominfo._stateGet()])
 
         """ The following call may raise a XendError exception """
         dominfo.testMigrateDevices(True, dst)
@@ -1653,6 +1657,9 @@ class XendDomain:
             trigger = TRIGGER_TYPE[trigger_name.lower()]
         else:
             raise XendError("Invalid trigger: %s" % trigger_name)
+        if trigger == TRIGGER_S3RESUME:
+            xc.hvm_set_param(dominfo.getDomid(), HVM_PARAM_ACPI_S_STATE, 0)
+            return None
         try:
             return xc.domain_send_trigger(dominfo.getDomid(),
                                           trigger,

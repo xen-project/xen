@@ -823,11 +823,10 @@ int arch_set_info_guest(
 #undef c
 }
 
-int arch_vcpu_reset(struct vcpu *v)
+void arch_vcpu_reset(struct vcpu *v)
 {
     destroy_gdt(v);
     vcpu_destroy_pagetables(v);
-    return 0;
 }
 
 /* 

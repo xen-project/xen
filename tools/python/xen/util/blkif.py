@@ -2,8 +2,6 @@ import os
 import re
 import string
 
-from xen.xend.XendLogging import log
-
 def expand_dev_name(name):
     if not name:
         return name

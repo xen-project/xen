@@ -633,17 +633,14 @@ int boot_vcpu(struct domain *d, int vcpuid, vcpu_guest_context_u ctxt)
     return arch_set_info_guest(v, ctxt);
 }
 
-int vcpu_reset(struct vcpu *v)
+void vcpu_reset(struct vcpu *v)
 {
     struct domain *d = v->domain;
-    int rc;
 
     domain_pause(d);
     domain_lock(d);
 
-    rc = arch_vcpu_reset(v);
-    if ( rc != 0 )
-        goto out;
+    arch_vcpu_reset(v);
 
     set_bit(_VPF_down, &v->pause_flags);
 
@@ -655,11 +652,8 @@ int vcpu_reset(struct vcpu *v)
     v->nmi_masked      = 0;
     clear_bit(_VPF_blocked, &v->pause_flags);
 
- out:
     domain_unlock(v->domain);
     domain_unpause(d);
-
-    return rc;
 }
 
 

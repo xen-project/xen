@@ -9,8 +9,6 @@ import errno
 import threading
 from xen.xend.xenstore.xsutil import xshandle
 
-from xen.xend.XendLogging import log
-
 
 class xswatch:
 
@@ -76,7 +74,7 @@ def watchMain():
                     else:
                         raise
         except:
-            log.exception("read_watch failed")
+            pass
             # Ignore this exception -- there's no point throwing it
             # further on because that will just kill the watcher thread,
             # which achieves nothing.

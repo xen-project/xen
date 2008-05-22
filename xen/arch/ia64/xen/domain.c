@@ -644,10 +644,9 @@ void arch_domain_destroy(struct domain *d)
 	deallocate_rid_range(d);
 }
 
-int arch_vcpu_reset(struct vcpu *v)
+void arch_vcpu_reset(struct vcpu *v)
 {
 	/* FIXME: Stub for now */
-	return 0;
 }
 
 /* Here it is assumed that all of the CPUs has same RSE.N_STACKED_PHYS */

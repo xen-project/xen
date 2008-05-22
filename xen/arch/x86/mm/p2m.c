@@ -250,7 +250,7 @@ p2m_set_entry(struct domain *d, unsigned long gfn, mfn_t mfn,
     // XXX -- this might be able to be faster iff current->domain == d
     mfn_t table_mfn = pagetable_get_mfn(d->arch.phys_table);
     void *table =map_domain_page(mfn_x(table_mfn));
-    unsigned long gfn_remainder = gfn;
+    unsigned long i, gfn_remainder = gfn;
     l1_pgentry_t *p2m_entry;
     l1_pgentry_t entry_content;
     l2_pgentry_t l2e_content;
@@ -328,9 +328,11 @@ p2m_set_entry(struct domain *d, unsigned long gfn, mfn_t mfn,
     if ( iommu_enabled && is_hvm_domain(d) )
     {
         if ( p2mt == p2m_ram_rw )
-            iommu_map_page(d, gfn, mfn_x(mfn));
+            for ( i = 0; i < (1UL << page_order); i++ )
+                iommu_map_page(d, gfn+i, mfn_x(mfn)+i );
         else
-            iommu_unmap_page(d, gfn);
+            for ( int i = 0; i < (1UL << page_order); i++ )
+                iommu_unmap_page(d, gfn+i);
     }
 
     /* Success */

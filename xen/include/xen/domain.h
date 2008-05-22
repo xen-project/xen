@@ -14,7 +14,7 @@ struct vcpu *alloc_vcpu(
 int boot_vcpu(
     struct domain *d, int vcpuid, vcpu_guest_context_u ctxt);
 struct vcpu *alloc_idle_vcpu(unsigned int cpu_id);
-int vcpu_reset(struct vcpu *v);
+void vcpu_reset(struct vcpu *v);
 
 struct domain *alloc_domain(domid_t domid);
 void free_domain(struct domain *d);
@@ -55,7 +55,7 @@ void arch_dump_vcpu_info(struct vcpu *v);
 
 void arch_dump_domain_info(struct domain *d);
 
-int arch_vcpu_reset(struct vcpu *v);
+void arch_vcpu_reset(struct vcpu *v);
 
 extern unsigned int xen_processor_pmbits;
 

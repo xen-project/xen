@@ -52,7 +52,17 @@ DefinitionBlock ("DSDT.aml", "DSDT", 2, "Xen", "HVM", 0)
          * at HVM guest boot time. */
     }
 
-    /* S4 (STD) and S5 (power-off) type codes: must match piix4 emulation. */
+    /*
+     * S3 (suspend-to-ram), S4 (suspend-to-disc) and S5 (power-off) type codes:
+     * must match piix4 emulation.
+     */
+    Name (\_S3, Package (0x04)
+    {
+        0x05,  /* PM1a_CNT.SLP_TYP */
+        0x05,  /* PM1b_CNT.SLP_TYP */
+        0x0,   /* reserved */
+        0x0    /* reserved */
+    })
     Name (\_S4, Package (0x04)
     {
         0x06,  /* PM1a_CNT.SLP_TYP */
