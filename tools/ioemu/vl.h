@@ -154,8 +154,6 @@ int unset_mm_mapping(int xc_handle, uint32_t domid, unsigned long nr_pages,
 int set_mm_mapping(int xc_handle, uint32_t domid, unsigned long nr_pages,
                    unsigned int address_bits, unsigned long *extent_start);
 
-extern void *shared_vram;
-
 extern FILE *logfile;
 
 

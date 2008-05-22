@@ -281,8 +281,6 @@ typedef struct PCICirrusVGAState {
 
 static uint8_t rop_to_index[256];
     
-void *shared_vram;
-
 /***************************************
  *
  *  prototypes.
