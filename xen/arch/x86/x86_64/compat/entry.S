@@ -59,7 +59,7 @@ ENTRY(compat_hypercall)
 #define SHADOW_BYTES 0  /* No on-stack shadow state */
 #endif
         cmpb  $0,tb_init_done(%rip)
-        je    compat_tracing_off
+        je    1f
         call  trace_hypercall
         /* Now restore all the registers that trace_hypercall clobbered */
         movl  UREGS_rax+SHADOW_BYTES(%rsp),%eax   /* Hypercall #  */
@@ -70,8 +70,7 @@ ENTRY(compat_hypercall)
         movl  UREGS_rdi+SHADOW_BYTES(%rsp),%r8d   /* Arg 5        */
         movl  UREGS_rbp+SHADOW_BYTES(%rsp),%r9d   /* Arg 6        */
 #undef SHADOW_BYTES
-compat_tracing_off:
-        leaq  compat_hypercall_table(%rip),%r10
+1:      leaq  compat_hypercall_table(%rip),%r10
         PERFC_INCR(PERFC_hypercalls, %rax, %rbx)
         callq *(%r10,%rax,8)
 #ifndef NDEBUG

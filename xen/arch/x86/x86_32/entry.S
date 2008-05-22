@@ -197,13 +197,12 @@ ENTRY(hypercall)
 #define SHADOW_BYTES 24 /* 6 shadow parameters */
 #endif
         cmpb  $0,tb_init_done
-        je    tracing_off
+        je    1f
         call  trace_hypercall
         /* Now restore all the registers that trace_hypercall clobbered */
         movl  UREGS_eax+SHADOW_BYTES(%esp),%eax /* Hypercall # */
 #undef SHADOW_BYTES
-tracing_off:
-        call *hypercall_table(,%eax,4)
+1:      call *hypercall_table(,%eax,4)
         addl  $24,%esp     # Discard the shadow parameters
 #ifndef NDEBUG
         /* Deliberately corrupt real parameter regs used by this hypercall. */
