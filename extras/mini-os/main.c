@@ -19,6 +19,8 @@
 extern int main(int argc, char *argv[], char *envp[]);
 extern void __libc_init_array(void);
 extern void __libc_fini_array(void);
+extern unsigned long __CTOR_LIST__[];
+extern unsigned long __DTOR_LIST__[];
 
 struct thread *main_thread;
 
@@ -147,6 +149,8 @@ static void call_main(void *p)
 
     __libc_init_array();
     environ = envp;
+    for (i = 1; i <= __CTOR_LIST__[0]; i++)
+        ((void((*)(void)))__CTOR_LIST__[i]) ();
     tzset();
 
     exit(main(argc, argv, envp));
@@ -154,6 +158,10 @@ static void call_main(void *p)
 
 void _exit(int ret)
 {
+    int i;
+
+    for (i = 1; i <= __DTOR_LIST__[0]; i++)
+        ((void((*)(void)))__DTOR_LIST__[i]) ();
     close_all_files();
     __libc_fini_array();
     printk("main returned %d\n", ret);

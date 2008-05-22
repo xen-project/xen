@@ -52,6 +52,23 @@ SECTIONS
   .fini_array     : { *(.fini_array) }
   PROVIDE (__fini_array_end = .);
 
+  .ctors : {
+        __CTOR_LIST__ = .;
+        LONG((__CTOR_END__ - __CTOR_LIST__) / 8 - 2)
+        *(SORT_BY_NAME(.ctors))
+	SORT_BY_NAME(CONSTRUCTORS)
+        LONG(0)
+        __CTOR_END__ = .;
+        }
+
+  .dtors : {
+        __DTOR_LIST__ = .;
+        LONG((__DTOR_END__ - __DTOR_LIST__) / 8 - 2)
+        *(SORT_BY_NAME(.dtors))
+        LONG(0)
+        __DTOR_END__ = .;
+        }
+
   .IA_64.unwind_info : AT(ADDR(.IA_64.unwind_info) - (((5<<(61))+0x100000000) - (1 << 20)))
   { *(.IA_64.unwind_info) }
 
