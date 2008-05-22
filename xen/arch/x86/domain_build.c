@@ -221,9 +221,7 @@ int __init construct_dom0(
 #if CONFIG_PAGING_LEVELS >= 4
     l4_pgentry_t *l4tab = NULL, *l4start = NULL;
 #endif
-#if CONFIG_PAGING_LEVELS >= 3
     l3_pgentry_t *l3tab = NULL, *l3start = NULL;
-#endif
     l2_pgentry_t *l2tab = NULL, *l2start = NULL;
     l1_pgentry_t *l1tab = NULL, *l1start = NULL;
 
@@ -277,13 +275,6 @@ int __init construct_dom0(
     compat32   = 0;
     machine = elf_uval(&elf, elf.ehdr, e_machine);
     switch (CONFIG_PAGING_LEVELS) {
-    case 2: /* x86_32 */
-        if (parms.pae == PAEKERN_bimodal)
-            parms.pae = PAEKERN_no;
-        printk(" Xen  kernel: 32-bit, lsb\n");
-        if (elf_32bit(&elf) && !parms.pae && machine == EM_386)
-            compatible = 1;
-        break;
     case 3: /* x86_32p */
         if (parms.pae == PAEKERN_bimodal)
             parms.pae = PAEKERN_extended_cr3;
@@ -479,7 +470,6 @@ int __init construct_dom0(
     }
 
     /* WARNING: The new domain must have its 'processor' field filled in! */
-#if CONFIG_PAGING_LEVELS == 3
     l3start = l3tab = (l3_pgentry_t *)mpt_alloc; mpt_alloc += PAGE_SIZE;
     l2start = l2tab = (l2_pgentry_t *)mpt_alloc; mpt_alloc += 4*PAGE_SIZE;
     memcpy(l2tab, idle_pg_table_l2, 4*PAGE_SIZE);
@@ -489,13 +479,6 @@ int __init construct_dom0(
             l2e_from_paddr((u32)l2tab + i*PAGE_SIZE, __PAGE_HYPERVISOR);
     }
     v->arch.guest_table = pagetable_from_paddr((unsigned long)l3start);
-#else
-    l2start = l2tab = (l2_pgentry_t *)mpt_alloc; mpt_alloc += PAGE_SIZE;
-    copy_page(l2tab, idle_pg_table);
-    l2tab[LINEAR_PT_VIRT_START >> L2_PAGETABLE_SHIFT] =
-        l2e_from_paddr((unsigned long)l2start, __PAGE_HYPERVISOR);
-    v->arch.guest_table = pagetable_from_paddr((unsigned long)l2start);
-#endif
 
     for ( i = 0; i < PDPT_L2_ENTRIES; i++ )
         l2tab[l2_linear_offset(PERDOMAIN_VIRT_START) + i] =
@@ -539,16 +522,16 @@ int __init construct_dom0(
             if ( !get_page_type(page, PGT_writable_page) )
                 BUG();
 
-#if CONFIG_PAGING_LEVELS == 3
-        switch (count) {
+        switch ( count )
+        {
         case 0:
             page->u.inuse.type_info &= ~PGT_type_mask;
             page->u.inuse.type_info |= PGT_l3_page_table;
             get_page(page, d); /* an extra ref because of readable mapping */
 
             /* Get another ref to L3 page so that it can be pinned. */
-            if ( !get_page_and_type(page, d, PGT_l3_page_table) )
-                BUG();
+            page->u.inuse.type_info++;
+            page->count_info++;
             set_bit(_PGT_pinned, &page->u.inuse.type_info);
             break;
         case 1 ... 4:
@@ -564,38 +547,6 @@ int __init construct_dom0(
             get_page(page, d); /* an extra ref because of readable mapping */
             break;
         }
-#else
-        if ( count == 0 )
-        {
-            page->u.inuse.type_info &= ~PGT_type_mask;
-            page->u.inuse.type_info |= PGT_l2_page_table;
-
-            /*
-             * No longer writable: decrement the type_count.
-             * Installed as CR3: increment both the ref_count and type_count.
-             * Net: just increment the ref_count.
-             */
-            get_page(page, d); /* an extra ref because of readable mapping */
-
-            /* Get another ref to L2 page so that it can be pinned. */
-            if ( !get_page_and_type(page, d, PGT_l2_page_table) )
-                BUG();
-            set_bit(_PGT_pinned, &page->u.inuse.type_info);
-        }
-        else
-        {
-            page->u.inuse.type_info &= ~PGT_type_mask;
-            page->u.inuse.type_info |= PGT_l1_page_table;
-
-            /*
-             * No longer writable: decrement the type_count.
-             * This is an L1 page, installed in a validated L2 page:
-             * increment both the ref_count and type_count.
-             * Net: just increment the ref_count.
-             */
-            get_page(page, d); /* an extra ref because of readable mapping */
-        }
-#endif
         if ( !((unsigned long)++l1tab & (PAGE_SIZE - 1)) )
             l1start = l1tab = (l1_pgentry_t *)(u32)l2e_get_paddr(*++l2tab);
     }
