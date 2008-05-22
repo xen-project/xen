@@ -198,11 +198,8 @@ static void pci_setup(void)
                 virtual_vga = VGA_cirrus;
             break;
         case 0x0680:
+            /* PIIX4 ACPI PM. Special device with special PCI config space. */
             ASSERT((vendor_id == 0x8086) && (device_id == 0x7113));
-            /*
-             * PIIX4 ACPI PM. Special device with special PCI config space.
-             * No ordinary BARs.
-             */
             pci_writew(devfn, 0x20, 0x0000); /* No smb bus IO enable */
             pci_writew(devfn, 0x22, 0x0000);
             pci_writew(devfn, 0x3c, 0x0009); /* Hardcoded IRQ9 */
@@ -213,42 +210,41 @@ static void pci_setup(void)
             ASSERT((vendor_id == 0x8086) && (device_id == 0x7010));
             pci_writew(devfn, 0x40, 0x8000); /* enable IDE0 */
             pci_writew(devfn, 0x42, 0x8000); /* enable IDE1 */
-            /* fall through */
-        default:
-            /* Default memory mappings. */
-            for ( bar = 0; bar < 7; bar++ )
-            {
-                bar_reg = PCI_BASE_ADDRESS_0 + 4*bar;
-                if ( bar == 6 )
-                    bar_reg = PCI_ROM_ADDRESS;
-
-                bar_data = pci_readl(devfn, bar_reg);
-                pci_writel(devfn, bar_reg, ~0);
-                bar_sz = pci_readl(devfn, bar_reg);
-                pci_writel(devfn, bar_reg, bar_data);
-                if ( bar_sz == 0 )
-                    continue;
-
-                bar_sz &= (((bar_data & PCI_BASE_ADDRESS_SPACE) ==
-                           PCI_BASE_ADDRESS_SPACE_MEMORY) ?
-                           PCI_BASE_ADDRESS_MEM_MASK :
-                           (PCI_BASE_ADDRESS_IO_MASK & 0xffff));
-                bar_sz &= ~(bar_sz - 1);
-
-                for ( i = 0; i < nr_bars; i++ )
-                    if ( bars[i].bar_sz < bar_sz )
-                        break;
-
-                if ( i != nr_bars )
-                    memmove(&bars[i+1], &bars[i], (nr_bars-i) * sizeof(*bars));
-
-                bars[i].devfn   = devfn;
-                bars[i].bar_reg = bar_reg;
-                bars[i].bar_sz  = bar_sz;
-
-                nr_bars++;
-            }
             break;
+        }
+
+        /* Map the I/O memory and port resources. */
+        for ( bar = 0; bar < 7; bar++ )
+        {
+            bar_reg = PCI_BASE_ADDRESS_0 + 4*bar;
+            if ( bar == 6 )
+                bar_reg = PCI_ROM_ADDRESS;
+
+            bar_data = pci_readl(devfn, bar_reg);
+            pci_writel(devfn, bar_reg, ~0);
+            bar_sz = pci_readl(devfn, bar_reg);
+            pci_writel(devfn, bar_reg, bar_data);
+            if ( bar_sz == 0 )
+                continue;
+
+            bar_sz &= (((bar_data & PCI_BASE_ADDRESS_SPACE) ==
+                        PCI_BASE_ADDRESS_SPACE_MEMORY) ?
+                       PCI_BASE_ADDRESS_MEM_MASK :
+                       (PCI_BASE_ADDRESS_IO_MASK & 0xffff));
+            bar_sz &= ~(bar_sz - 1);
+
+            for ( i = 0; i < nr_bars; i++ )
+                if ( bars[i].bar_sz < bar_sz )
+                    break;
+
+            if ( i != nr_bars )
+                memmove(&bars[i+1], &bars[i], (nr_bars-i) * sizeof(*bars));
+
+            bars[i].devfn   = devfn;
+            bars[i].bar_reg = bar_reg;
+            bars[i].bar_sz  = bar_sz;
+
+            nr_bars++;
         }
 
         /* Map the interrupt. */
