@@ -54,18 +54,18 @@ SECTIONS
 
   .ctors : {
         __CTOR_LIST__ = .;
-        LONG((__CTOR_END__ - __CTOR_LIST__) / 8 - 2)
+        QUAD((__CTOR_END__ - __CTOR_LIST__) / 8 - 2)
         *(SORT_BY_NAME(.ctors))
 	SORT_BY_NAME(CONSTRUCTORS)
-        LONG(0)
+        QUAD(0)
         __CTOR_END__ = .;
         }
 
   .dtors : {
         __DTOR_LIST__ = .;
-        LONG((__DTOR_END__ - __DTOR_LIST__) / 8 - 2)
+        QUAD((__DTOR_END__ - __DTOR_LIST__) / 8 - 2)
         *(SORT_BY_NAME(.dtors))
-        LONG(0)
+        QUAD(0)
         __DTOR_END__ = .;
         }
 
