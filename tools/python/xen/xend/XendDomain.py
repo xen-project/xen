@@ -1258,7 +1258,7 @@ class XendDomain:
 
         return val       
 
-    def domain_migrate(self, domid, dst, live=False, port=0, node=-1):
+    def domain_migrate(self, domid, dst, live=False, port=0, node=-1, ssl=None):
         """Start domain migration.
         
         @param domid: Domain ID or Name
@@ -1269,6 +1269,8 @@ class XendDomain:
         @type port: int        
         @keyword live: Live migration
         @type live: bool
+        @keyword ssl: use ssl connection
+        @type ssl: bool
         @rtype: None
         @keyword node: use node number for target
         @rtype: int 
@@ -1294,7 +1296,9 @@ class XendDomain:
             """ Make sure there's memory free for enabling shadow mode """
             dominfo.checkLiveMigrateMemory()
 
-        ssl = xoptions.get_xend_relocation_ssl()
+        if ssl is None:
+            ssl = xoptions.get_xend_relocation_ssl()
+
         if ssl:
             from OpenSSL import SSL
             from xen.web import connection

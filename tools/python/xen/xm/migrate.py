@@ -47,6 +47,10 @@ gopts.opt('node', short='n', val='nodenum',
           fn=set_int, default=-1,
           use="Use specified NUMA node on target.")
 
+gopts.opt('ssl', short='s',
+          fn=set_true, default=None,
+          use="Use ssl connection for migration.")
+
 def help():
     return str(gopts)
     
@@ -65,11 +69,13 @@ def main(argv):
         vm_ref = get_single_vm(dom)
         other_config = {
             "port":     opts.vals.port,
-            "node":     opts.vals.node
+            "node":     opts.vals.node,
+            "ssl":      opts.vals.ssl
             }
         server.xenapi.VM.migrate(vm_ref, dst, bool(opts.vals.live),
                                  other_config)
     else:
         server.xend.domain.migrate(dom, dst, opts.vals.live,
                                    opts.vals.port,
-                                   opts.vals.node)
+                                   opts.vals.node,
+                                   opts.vals.ssl)
