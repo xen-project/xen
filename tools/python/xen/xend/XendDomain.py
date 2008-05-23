@@ -1294,13 +1294,12 @@ class XendDomain:
             """ Make sure there's memory free for enabling shadow mode """
             dominfo.checkLiveMigrateMemory()
 
-        if port == 0:
-            port = xoptions.get_xend_relocation_port()
-
-        tls = xoptions.get_xend_relocation_tls()
-        if tls:
+        ssl = xoptions.get_xend_relocation_ssl()
+        if ssl:
             from OpenSSL import SSL
             from xen.web import connection
+            if port == 0:
+                port = xoptions.get_xend_relocation_ssl_port()
             try:
                 ctx = SSL.Context(SSL.SSLv23_METHOD)
                 sock = SSL.Connection(ctx,
@@ -1328,6 +1327,8 @@ class XendDomain:
             os.close(p2cread)
             os.close(p2cwrite)
         else:
+            if port == 0:
+                port = xoptions.get_xend_relocation_port()
             try:
                 sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
                 # When connecting to our ssl enabled relocation server using a
