@@ -43,8 +43,8 @@ from xen.xend.XendConstants import XS_VMROOT
 from xen.xend.XendConstants import DOM_STATE_HALTED, DOM_STATE_PAUSED
 from xen.xend.XendConstants import DOM_STATE_RUNNING, DOM_STATE_SUSPENDED
 from xen.xend.XendConstants import DOM_STATE_SHUTDOWN, DOM_STATE_UNKNOWN
-from xen.xend.XendConstants import DOM_STATE_CRASHED
-from xen.xend.XendConstants import TRIGGER_TYPE
+from xen.xend.XendConstants import DOM_STATE_CRASHED, HVM_PARAM_ACPI_S_STATE
+from xen.xend.XendConstants import TRIGGER_TYPE, TRIGGER_S3RESUME
 from xen.xend.XendDevices import XendDevices
 from xen.xend.XendAPIConstants import *
 
