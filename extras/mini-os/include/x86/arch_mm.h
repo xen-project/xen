@@ -219,11 +219,6 @@ static __inline__ paddr_t machine_to_phys(maddr_t machine)
 
 #define map_frames(f, n) map_frames_ex(f, n, 1, 0, 1, DOMID_SELF, 0, L1_PROT)
 #define map_zero(n, a) map_frames_ex(&mfn_zero, n, 0, 0, a, DOMID_SELF, 0, L1_PROT_RO)
-#ifndef __ASSEMBLY__
-void do_map_frames(unsigned long addr,
-        unsigned long *f, unsigned long n, unsigned long stride,
-	unsigned long increment, domid_t id, int may_fail, unsigned long prot);
-#endif
 #define do_map_zero(start, n) do_map_frames(start, &mfn_zero, n, 0, 0, DOMID_SELF, 0, L1_PROT_RO)
 
 #endif /* _ARCH_MM_H_ */

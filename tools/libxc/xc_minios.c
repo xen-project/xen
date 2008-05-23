@@ -35,11 +35,12 @@ extern struct wait_queue_head event_queue;
 
 int xc_interface_open(void)
 {
-    return 0;
+    return alloc_fd(FTYPE_XC);
 }
 
 int xc_interface_close(int xc_handle)
 {
+    files[xc_handle].type = FTYPE_NONE;
     return 0;
 }
 
@@ -79,8 +80,12 @@ void *xc_map_foreign_range(int xc_handle, uint32_t dom,
 int xc_map_foreign_ranges(int xc_handle, uint32_t dom,
                           privcmd_mmap_entry_t *entries, int nr)
 {
-    printf("xc_map_foreign_ranges, TODO\n");
-    do_exit();
+    int i;
+    for (i = 0; i < nr; i++) {
+	unsigned long mfn = entries[i].mfn;
+        do_map_frames(entries[i].va, &mfn, entries[i].npages, 0, 1, dom, 0, L1_PROT);
+    }
+    return 0;
 }
 
 int do_xen_hypercall(int xc_handle, privcmd_hypercall_t *hypercall)
@@ -294,6 +299,12 @@ int xc_evtchn_unmask(int xce_handle, evtchn_port_t port)
     return 0;
 }
 
+/* Optionally flush file to disk and discard page cache */
+void discard_file_cache(int fd, int flush)
+{
+    if (flush)
+        fsync(fd);
+}
 /*
  * Local variables:
  * mode: C

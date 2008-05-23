@@ -96,7 +96,7 @@ APP_LDLIBS +=
 endif
 
 ifeq ($(libc),y)
-LDLIBS += -L$(XEN_ROOT)/stubdom/libxc -lxenctrl -lxenguest
+APP_LDLIBS += -L$(XEN_ROOT)/stubdom/libxc -whole-archive -lxenguest -lxenctrl -no-whole-archive
 APP_LDLIBS += -lpci
 APP_LDLIBS += -lz
 LDLIBS += -lc

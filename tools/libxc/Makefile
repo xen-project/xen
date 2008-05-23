@@ -5,11 +5,9 @@ MAJOR    = 3.2
 MINOR    = 0
 
 CTRL_SRCS-y       :=
-ifneq ($(stubdom),y)
 CTRL_SRCS-y       += xc_core.c
 CTRL_SRCS-$(CONFIG_X86) += xc_core_x86.c
 CTRL_SRCS-$(CONFIG_IA64) += xc_core_ia64.c
-endif
 CTRL_SRCS-y       += xc_domain.c
 CTRL_SRCS-y       += xc_evtchn.c
 CTRL_SRCS-y       += xc_misc.c
@@ -21,9 +19,7 @@ CTRL_SRCS-y       += xc_sedf.c
 CTRL_SRCS-y       += xc_csched.c
 CTRL_SRCS-y       += xc_tbuf.c
 CTRL_SRCS-y       += xc_pm.c
-ifneq ($(stubdom),y)
 CTRL_SRCS-y       += xc_resume.c
-endif
 CTRL_SRCS-$(CONFIG_X86) += xc_pagetab.c
 CTRL_SRCS-$(CONFIG_Linux) += xc_linux.c
 CTRL_SRCS-$(CONFIG_SunOS) += xc_solaris.c
@@ -33,15 +29,12 @@ CTRL_SRCS-$(CONFIG_MiniOS) += xc_minios.c
 
 GUEST_SRCS-y :=
 GUEST_SRCS-y += xg_private.c
-ifneq ($(stubdom),y)
 GUEST_SRCS-$(CONFIG_MIGRATE) += xc_domain_restore.c xc_domain_save.c
 GUEST_SRCS-$(CONFIG_HVM) += xc_hvm_build.c
-endif
 
 VPATH = ../../xen/common/libelf
 CFLAGS += -I../../xen/common/libelf
 
-ifneq ($(stubdom),y)
 GUEST_SRCS-y += libelf-tools.c libelf-loader.c
 GUEST_SRCS-y += libelf-dominfo.c libelf-relocate.c
 
@@ -55,7 +48,6 @@ GUEST_SRCS-y                 += xc_dom_compat_linux.c
 GUEST_SRCS-$(CONFIG_X86)     += xc_dom_x86.c
 GUEST_SRCS-$(CONFIG_X86)     += xc_cpuid_x86.c
 GUEST_SRCS-$(CONFIG_IA64)    += xc_dom_ia64.c
-endif
 
 -include $(XEN_TARGET_ARCH)/Makefile
 

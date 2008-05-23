@@ -67,6 +67,9 @@ void arch_init_p2m(unsigned long max_pfn_p);
 void *map_frames_ex(unsigned long *f, unsigned long n, unsigned long stride,
 	unsigned long increment, unsigned long alignment, domid_t id,
 	int may_fail, unsigned long prot);
+void do_map_frames(unsigned long addr,
+        unsigned long *f, unsigned long n, unsigned long stride,
+	unsigned long increment, domid_t id, int may_fail, unsigned long prot);
 #ifdef HAVE_LIBC
 extern unsigned long heap, brk, heap_mapped, heap_end;
 #endif
