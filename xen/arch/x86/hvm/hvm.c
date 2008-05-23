@@ -2123,6 +2123,8 @@ void hvm_vcpu_reset_state(struct vcpu *v, uint16_t cs, uint16_t ip)
         v->domain->vcpu[0]->arch.hvm_vcpu.cache_tsc_offset;
     hvm_funcs.set_tsc_offset(v, v->arch.hvm_vcpu.cache_tsc_offset);
 
+    paging_update_paging_modes(v);
+
     v->arch.flags |= TF_kernel_mode;
     v->is_initialised = 1;
     clear_bit(_VPF_down, &v->pause_flags);

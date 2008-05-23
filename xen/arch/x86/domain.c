@@ -825,8 +825,15 @@ int arch_set_info_guest(
 
 void arch_vcpu_reset(struct vcpu *v)
 {
-    destroy_gdt(v);
-    vcpu_destroy_pagetables(v);
+    if ( !is_hvm_vcpu(v) )
+    {
+        destroy_gdt(v);
+        vcpu_destroy_pagetables(v);
+    }
+    else
+    {
+        vcpu_end_shutdown_deferral(v);
+    }
 }
 
 /* 

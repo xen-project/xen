@@ -637,7 +637,7 @@ void vcpu_reset(struct vcpu *v)
 {
     struct domain *d = v->domain;
 
-    domain_pause(d);
+    vcpu_pause(v);
     domain_lock(d);
 
     arch_vcpu_reset(v);
@@ -653,7 +653,7 @@ void vcpu_reset(struct vcpu *v)
     clear_bit(_VPF_blocked, &v->pause_flags);
 
     domain_unlock(v->domain);
-    domain_unpause(d);
+    vcpu_unpause(v);
 }
 
 
