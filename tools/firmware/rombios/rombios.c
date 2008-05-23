@@ -2225,26 +2225,12 @@ void interactive_bootkey()
     Bit16u i;
     Bit8u scan = 0;
 
-    bios_printf(BIOS_PRINTF_SCREEN | BIOS_PRINTF_INFO, "\n\nPress F10 to select boot device.\n");
-    for (i = 3; i > 0; i--)
-    {
-        scan = wait(WAIT_HZ, 0);
-        switch (scan) {
-        case 0x3D:
-        case 0x3E:
-        case 0x3F:
-        case 0x58:
-            break;
-        case 0x44:
-            scan = bootmenu(inb_cmos(0x3d) & 0x0f);
-            break;
-        default:
-            scan = 0;
-            break;
-        }
-        if (scan != 0)
-            break;
-    }
+    bios_printf(BIOS_PRINTF_SCREEN | BIOS_PRINTF_INFO,
+                "\n\nPress F10 to select boot device.\n");
+
+    scan = wait(1, 0);
+    if (scan == 0x44)
+        scan = bootmenu(inb_cmos(0x3d) & 0x0f);
 
     /* set the default based on the keypress or menu */
     switch(scan) {
