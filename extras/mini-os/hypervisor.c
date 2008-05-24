@@ -55,12 +55,12 @@ void do_hypervisor_callback(struct pt_regs *regs)
     while ( l1 != 0 )
     {
         l1i = __ffs(l1);
-        l1 &= ~(1 << l1i);
+        l1 &= ~(1UL << l1i);
         
         while ( (l2 = active_evtchns(cpu, s, l1i)) != 0 )
         {
             l2i = __ffs(l2);
-            l2 &= ~(1 << l2i);
+            l2 &= ~(1UL << l2i);
 
             port = (l1i * (sizeof(unsigned long) * 8)) + l2i;
 			do_event(port, regs);
