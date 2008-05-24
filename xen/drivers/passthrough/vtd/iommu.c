@@ -1518,6 +1518,8 @@ int intel_iommu_unmap_page(struct domain *d, unsigned long gfn)
 {
     struct acpi_drhd_unit *drhd;
     struct iommu *iommu;
+    struct dma_pte *page = NULL, *pte = NULL;
+    u64 pg_maddr;
 
     drhd = list_entry(acpi_drhd_units.next, typeof(*drhd), list);
     iommu = drhd->iommu;
@@ -1528,7 +1530,24 @@ int intel_iommu_unmap_page(struct domain *d, unsigned long gfn)
         return 0;
 #endif
 
-    dma_pte_clear_one(d, (paddr_t)gfn << PAGE_SHIFT_4K);
+    pg_maddr = addr_to_dma_page_maddr(d, (paddr_t)gfn << PAGE_SHIFT_4K);
+    if ( pg_maddr == 0 )
+        return -ENOMEM;
+    page = (struct dma_pte *)map_vtd_domain_page(pg_maddr);
+    pte = page + (gfn & LEVEL_MASK);
+    dma_clear_pte(*pte);
+    iommu_flush_cache_entry(drhd->iommu, pte);
+    unmap_vtd_domain_page(page);
+
+    for_each_drhd_unit ( drhd )
+    {
+        iommu = drhd->iommu;
+        if ( cap_caching_mode(iommu->cap) )
+            iommu_flush_iotlb_psi(iommu, domain_iommu_domid(d),
+                                  (paddr_t)gfn << PAGE_SHIFT_4K, 1, 0);
+        else if ( cap_rwbf(iommu->cap) )
+            iommu_flush_write_buffer(iommu);
+    }
 
     return 0;
 }
