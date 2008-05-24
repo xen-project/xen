@@ -2105,12 +2105,14 @@ x86_emulate(
         break;
     }
 
+    /* Inject #DB if single-step tracing was enabled at instruction start. */
+    if ( (ctxt->regs->eflags & EFLG_TF) && (rc == X86EMUL_OKAY) &&
+         (ops->inject_hw_exception != NULL) )
+        rc = ops->inject_hw_exception(EXC_DB, -1, ctxt) ? : X86EMUL_EXCEPTION;
+
     /* Commit shadow register state. */
     _regs.eflags &= ~EFLG_RF;
     *ctxt->regs = _regs;
-    if ( (_regs.eflags & EFLG_TF) && (rc == X86EMUL_OKAY) &&
-         (ops->inject_hw_exception != NULL) )
-        rc = ops->inject_hw_exception(EXC_DB, -1, ctxt) ? : X86EMUL_EXCEPTION;
 
  done:
     return rc;
