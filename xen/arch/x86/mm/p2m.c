@@ -325,7 +325,7 @@ p2m_set_entry(struct domain *d, unsigned long gfn, mfn_t mfn,
     if ( mfn_valid(mfn) && (gfn > d->arch.p2m->max_mapped_pfn) )
         d->arch.p2m->max_mapped_pfn = gfn;
 
-    if ( iommu_enabled && is_hvm_domain(d) )
+    if ( iommu_enabled && (is_hvm_domain(d) || need_iommu(d)) )
     {
         if ( p2mt == p2m_ram_rw )
             for ( i = 0; i < (1UL << page_order); i++ )
@@ -868,7 +868,12 @@ p2m_remove_page(struct domain *d, unsigned long gfn, unsigned long mfn,
     unsigned long i;
 
     if ( !paging_mode_translate(d) )
+    {
+        if ( need_iommu(d) )
+            for ( i = 0; i < (1 << page_order); i++ )
+                iommu_unmap_page(d, mfn + i);
         return;
+    }
 
     P2M_DEBUG("removing gfn=%#lx mfn=%#lx\n", gfn, mfn);
 
@@ -899,7 +904,19 @@ guest_physmap_add_entry(struct domain *d, unsigned long gfn,
     int rc = 0;
 
     if ( !paging_mode_translate(d) )
-        return -EINVAL;
+    {
+        if ( need_iommu(d) && t == p2m_ram_rw )
+        {
+            for ( i = 0; i < (1 << page_order); i++ )
+                if ( (rc = iommu_map_page(d, mfn + i, mfn + i)) != 0 )
+                {
+                    while ( i-- > 0 )
+                        iommu_unmap_page(d, mfn + i);
+                    return rc;
+                }
+        }
+        return 0;
+    }
 
 #if CONFIG_PAGING_LEVELS == 3
     /*

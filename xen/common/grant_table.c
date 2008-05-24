@@ -196,8 +196,9 @@ __gnttab_map_grant_ref(
     struct domain *ld, *rd;
     struct vcpu   *led;
     int            handle;
-    unsigned long  frame = 0;
+    unsigned long  frame = 0, nr_gets = 0;
     int            rc = GNTST_okay;
+    u32            old_pin;
     unsigned int   cache_flags;
     struct active_grant_entry *act;
     struct grant_mapping *mt;
@@ -318,6 +319,7 @@ __gnttab_map_grant_ref(
         }
     }
 
+    old_pin = act->pin;
     if ( op->flags & GNTMAP_device_map )
         act->pin += (op->flags & GNTMAP_readonly) ?
             GNTPIN_devr_inc : GNTPIN_devw_inc;
@@ -361,24 +363,32 @@ __gnttab_map_grant_ref(
             rc = GNTST_general_error;
             goto undo_out;
         }
-        
+
+        nr_gets++;
         if ( op->flags & GNTMAP_host_map )
         {
             rc = create_grant_host_mapping(op->host_addr, frame, op->flags, 0);
             if ( rc != GNTST_okay )
-            {
-                if ( gnttab_host_mapping_get_page_type(op, ld, rd) )
-                    put_page_type(mfn_to_page(frame));
-                put_page(mfn_to_page(frame));
                 goto undo_out;
-            }
 
             if ( op->flags & GNTMAP_device_map )
             {
+                nr_gets++;
                 (void)get_page(mfn_to_page(frame), rd);
                 if ( !(op->flags & GNTMAP_readonly) )
                     get_page_type(mfn_to_page(frame), PGT_writable_page);
             }
+        }
+    }
+
+    if ( need_iommu(ld) &&
+         !(old_pin & (GNTPIN_hstw_mask|GNTPIN_devw_mask)) &&
+         (act->pin & (GNTPIN_hstw_mask|GNTPIN_devw_mask)) )
+    {
+        if ( iommu_map_page(ld, mfn_to_gmfn(ld, frame), frame) )
+        {
+            rc = GNTST_general_error;
+            goto undo_out;
         }
     }
 
@@ -397,6 +407,19 @@ __gnttab_map_grant_ref(
     return;
 
  undo_out:
+    if ( nr_gets > 1 )
+    {
+        if ( !(op->flags & GNTMAP_readonly) )
+            put_page_type(mfn_to_page(frame));
+        put_page(mfn_to_page(frame));
+    }
+    if ( nr_gets > 0 )
+    {
+        if ( gnttab_host_mapping_get_page_type(op, ld, rd) )
+            put_page_type(mfn_to_page(frame));
+        put_page(mfn_to_page(frame));
+    }
+
     spin_lock(&rd->grant_table->lock);
 
     act = &active_entry(rd->grant_table, op->ref);
@@ -451,6 +474,7 @@ __gnttab_unmap_common(
     struct active_grant_entry *act;
     grant_entry_t   *sha;
     s16              rc = 0;
+    u32              old_pin;
 
     ld = current->domain;
 
@@ -497,6 +521,7 @@ __gnttab_unmap_common(
 
     act = &active_entry(rd->grant_table, op->map->ref);
     sha = &shared_entry(rd->grant_table, op->map->ref);
+    old_pin = act->pin;
 
     if ( op->frame == 0 )
     {
@@ -532,6 +557,17 @@ __gnttab_unmap_common(
             act->pin -= GNTPIN_hstr_inc;
         else
             act->pin -= GNTPIN_hstw_inc;
+    }
+
+    if ( need_iommu(ld) &&
+         (old_pin & (GNTPIN_hstw_mask|GNTPIN_devw_mask)) &&
+         !(act->pin & (GNTPIN_hstw_mask|GNTPIN_devw_mask)) )
+    {
+        if ( iommu_unmap_page(ld, mfn_to_gmfn(ld, op->frame)) )
+        {
+            rc = GNTST_general_error;
+            goto unmap_out;
+        }
     }
 
     /* If just unmapped a writable mapping, mark as dirtied */

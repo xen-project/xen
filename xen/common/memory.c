@@ -124,12 +124,9 @@ static void populate_physmap(struct memop_args *a)
         }
 
         mfn = page_to_mfn(page);
+        guest_physmap_add_page(d, gpfn, mfn, a->extent_order);
 
-        if ( unlikely(paging_mode_translate(d)) )
-        {
-            guest_physmap_add_page(d, gpfn, mfn, a->extent_order);
-        }
-        else
+        if ( !paging_mode_translate(d) )
         {
             for ( j = 0; j < (1 << a->extent_order); j++ )
                 set_gpfn_from_mfn(mfn + j, gpfn + j);
@@ -436,11 +433,9 @@ static long memory_exchange(XEN_GUEST_HANDLE(xen_memory_exchange_t) arg)
                 &gpfn, exch.out.extent_start, (i<<out_chunk_order)+j, 1);
 
             mfn = page_to_mfn(page);
-            if ( unlikely(paging_mode_translate(d)) )
-            {
-                guest_physmap_add_page(d, gpfn, mfn, exch.out.extent_order);
-            }
-            else
+            guest_physmap_add_page(d, gpfn, mfn, exch.out.extent_order);
+
+            if ( !paging_mode_translate(d) )
             {
                 for ( k = 0; k < (1UL << exch.out.extent_order); k++ )
                     set_gpfn_from_mfn(mfn + k, gpfn + k);
