@@ -777,16 +777,17 @@ int iommu_disable_translation(struct iommu *iommu)
 
 static struct iommu *vector_to_iommu[NR_VECTORS];
 static int iommu_page_fault_do_one(struct iommu *iommu, int type,
-                                   u8 fault_reason, u16 source_id, u32 addr)
+                                   u8 fault_reason, u16 source_id, u64 addr)
 {
     dprintk(XENLOG_WARNING VTDPREFIX,
-            "iommu_fault:%s: %x:%x.%x addr %x REASON %x iommu->reg = %p\n",
+            "iommu_fault:%s: %x:%x.%x addr %"PRIx64" REASON %x "
+            "iommu->reg = %p\n",
             (type ? "DMA Read" : "DMA Write"), (source_id >> 8),
             PCI_SLOT(source_id & 0xFF), PCI_FUNC(source_id & 0xFF), addr,
             fault_reason, iommu->reg);
 
     if ( fault_reason < 0x20 )
-        print_vtd_entries(current->domain, iommu, (source_id >> 8),
+        print_vtd_entries(iommu, (source_id >> 8),
                           (source_id & 0xff), (addr >> PAGE_SHIFT));
 
     return 0;
@@ -844,7 +845,8 @@ static void iommu_page_fault(int vector, void *dev_id,
     {
         u8 fault_reason;
         u16 source_id;
-        u32 guest_addr, data;
+        u32 data;
+        u64 guest_addr;
         int type;
 
         /* highest 32 bits */
