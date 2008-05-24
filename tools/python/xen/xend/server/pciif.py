@@ -248,6 +248,15 @@ class PciController(DevController):
         PCIQuirk(dev.vendor, dev.device, dev.subvendor, dev.subdevice, domain, 
                 bus, slot, func)
 
+        if not self.vm.info.is_hvm():
+            # Setup IOMMU device assignment
+            pci_str = "0x%x, 0x%x, 0x%x, 0x%x" % (domain, bus, slot, func)
+            bdf = xc.assign_device(fe_domid, pci_str)
+            if bdf > 0:
+                raise VmError("Failed to assign device to IOMMU (%x:%x.%x)"
+                              % (bus, slot, func))
+            log.debug("pci: assign device %x:%x.%x" % (bus, slot, func))
+
         for (start, size) in dev.ioports:
             log.debug('pci: enabling ioport 0x%x/0x%x'%(start,size))
             rc = xc.domain_ioport_permission(domid = fe_domid, first_port = start,
@@ -329,6 +338,14 @@ class PciController(DevController):
                     "command-line parameter or\n"+ \
                     "bind your slot/device to the PCI backend using sysfs" \
                     )%(dev.name))
+
+        if not self.vm.info.is_hvm():
+            pci_str = "0x%x, 0x%x, 0x%x, 0x%x" % (domain, bus, slot, func)
+            bdf = xc.deassign_device(fe_domid, pci_str)
+            if bdf > 0:
+                raise VmError("Failed to deassign device from IOMMU (%x:%x.%x)"
+                              % (bus, slot, func))
+            log.debug("pci: deassign device %x:%x.%x" % (bus, slot, func))
 
         for (start, size) in dev.ioports:
             log.debug('pci: disabling ioport 0x%x/0x%x'%(start,size))

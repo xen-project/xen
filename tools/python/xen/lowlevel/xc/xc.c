@@ -106,7 +106,7 @@ static PyObject *pyxc_domain_create(XcObject *self,
     static char *kwd_list[] = { "domid", "ssidref", "handle", "flags", "target", NULL };
 
     if ( !PyArg_ParseTupleAndKeywords(args, kwds, "|iiOii", kwd_list,
-				      &dom, &ssidref, &pyhandle, &flags, &target))
+                                      &dom, &ssidref, &pyhandle, &flags, &target))
         return NULL;
     if ( pyhandle != NULL )
     {
@@ -434,44 +434,44 @@ static PyObject *pyxc_linux_build(XcObject *self,
     dom->vhpt_size_log2 = vhpt;
 
     if ( xc_dom_linux_build(self->xc_handle, dom, domid, mem_mb, image,
-			    ramdisk, flags, store_evtchn, &store_mfn,
-			    console_evtchn, &console_mfn) != 0 ) {
-	goto out;
+                            ramdisk, flags, store_evtchn, &store_mfn,
+                            console_evtchn, &console_mfn) != 0 ) {
+        goto out;
     }
 
     if ( !(elfnote_dict = PyDict_New()) )
-	goto out;
+        goto out;
     
     for ( i = 0; i < ARRAY_SIZE(dom->parms.elf_notes); i++ )
     {
-	switch ( dom->parms.elf_notes[i].type )
+        switch ( dom->parms.elf_notes[i].type )
         {
-	case XEN_ENT_NONE:
-	    continue;
-	case XEN_ENT_LONG:
-	    elfnote = Py_BuildValue("k", dom->parms.elf_notes[i].data.num);
-	    break;
-	case XEN_ENT_STR:
-	    elfnote = Py_BuildValue("s", dom->parms.elf_notes[i].data.str);
-	    break;
-	}
-	PyDict_SetItemString(elfnote_dict,
-			     dom->parms.elf_notes[i].name,
-			     elfnote);
-	Py_DECREF(elfnote);
+        case XEN_ENT_NONE:
+            continue;
+        case XEN_ENT_LONG:
+            elfnote = Py_BuildValue("k", dom->parms.elf_notes[i].data.num);
+            break;
+        case XEN_ENT_STR:
+            elfnote = Py_BuildValue("s", dom->parms.elf_notes[i].data.str);
+            break;
+        }
+        PyDict_SetItemString(elfnote_dict,
+                             dom->parms.elf_notes[i].name,
+                             elfnote);
+        Py_DECREF(elfnote);
     }
 
     ret = Py_BuildValue("{s:i,s:i,s:N}",
-			"store_mfn", store_mfn,
-			"console_mfn", console_mfn,
-			"notes", elfnote_dict);
+                        "store_mfn", store_mfn,
+                        "console_mfn", console_mfn,
+                        "notes", elfnote_dict);
 
     if ( dom->arch_hooks->native_protocol )
     {
-	PyObject *native_protocol =
-	    Py_BuildValue("s", dom->arch_hooks->native_protocol);
-	PyDict_SetItemString(ret, "native_protocol", native_protocol);
-	Py_DECREF(native_protocol);
+        PyObject *native_protocol =
+            Py_BuildValue("s", dom->arch_hooks->native_protocol);
+        PyDict_SetItemString(ret, "native_protocol", native_protocol);
+        Py_DECREF(native_protocol);
     }
 
     xc_dom_release(dom);
@@ -556,7 +556,7 @@ static PyObject *pyxc_test_assign_device(XcObject *self,
 {
     uint32_t dom;
     char *pci_str;
-    uint32_t bdf = 0;
+    int32_t bdf = 0;
     int seg, bus, dev, func;
 
     static char *kwd_list[] = { "domid", "pci", NULL };
@@ -571,8 +571,75 @@ static PyObject *pyxc_test_assign_device(XcObject *self,
         bdf |= (func & 0x7) << 8;
 
         if ( xc_test_assign_device(self->xc_handle, dom, bdf) != 0 )
+        {
+            if (errno == ENOSYS)
+                bdf = -1;
             break;
+        }
+        bdf = 0;
+    }
 
+    return Py_BuildValue("i", bdf);
+}
+
+static PyObject *pyxc_assign_device(XcObject *self,
+                                    PyObject *args,
+                                    PyObject *kwds)
+{
+    uint32_t dom;
+    char *pci_str;
+    int32_t bdf = 0;
+    int seg, bus, dev, func;
+
+    static char *kwd_list[] = { "domid", "pci", NULL };
+    if ( !PyArg_ParseTupleAndKeywords(args, kwds, "is", kwd_list,
+                                      &dom, &pci_str) )
+        return NULL;
+
+    while ( next_bdf(&pci_str, &seg, &bus, &dev, &func) )
+    {
+        bdf |= (bus & 0xff) << 16;
+        bdf |= (dev & 0x1f) << 11;
+        bdf |= (func & 0x7) << 8;
+
+        if ( xc_assign_device(self->xc_handle, dom, bdf) != 0 )
+        {
+            if (errno == ENOSYS)
+                bdf = -1;
+            break;
+        }
+        bdf = 0;
+    }
+
+    return Py_BuildValue("i", bdf);
+}
+
+static PyObject *pyxc_deassign_device(XcObject *self,
+                                      PyObject *args,
+                                      PyObject *kwds)
+{
+    uint32_t dom;
+    char *pci_str;
+    int32_t bdf = 0;
+    int seg, bus, dev, func;
+
+    static char *kwd_list[] = { "domid", "pci", NULL };
+    if ( !PyArg_ParseTupleAndKeywords(args, kwds, "is", kwd_list,
+                                      &dom, &pci_str) )
+        return NULL;
+
+    while ( next_bdf(&pci_str, &seg, &bus, &dev, &func) )
+    {
+        bdf |= (bus & 0xff) << 16;
+        bdf |= (dev & 0x1f) << 11;
+        bdf |= (func & 0x7) << 8;
+
+        if ( xc_deassign_device(self->xc_handle, dom, bdf) != 0 )
+        {
+            if (errno == ENOSYS)
+                bdf = -1;
+            break;
+        }
         bdf = 0;
     }
 
@@ -729,8 +796,8 @@ static PyObject *pyxc_hvm_build(XcObject *self,
     int memsize, vcpus = 1, acpi = 0, apic = 1;
 
     static char *kwd_list[] = { "domid",
-				"memsize", "image", "vcpus", "acpi",
-				"apic", NULL };
+                                "memsize", "image", "vcpus", "acpi",
+                                "apic", NULL };
     if ( !PyArg_ParseTupleAndKeywords(args, kwds, "iis|iii", kwd_list,
                                       &dom, &memsize,
                                       &image, &vcpus, &acpi, &apic) )
@@ -782,8 +849,8 @@ static PyObject *pyxc_evtchn_alloc_unbound(XcObject *self,
 }
 
 static PyObject *pyxc_evtchn_reset(XcObject *self,
-				   PyObject *args,
-				   PyObject *kwds)
+                                   PyObject *args,
+                                   PyObject *kwds)
 {
     uint32_t dom;
 
@@ -947,11 +1014,11 @@ static PyObject *pyxc_physinfo(XcObject *self)
 
     for ( i = 0; i < info.nr_nodes; i++ )
     {
-	xc_availheap(self->xc_handle, 0, 0, i, &free_heap);
-	PyList_Append(node_to_memory_obj,
-	    PyInt_FromLong(free_heap / 1024));
+        xc_availheap(self->xc_handle, 0, 0, i, &free_heap);
+        PyList_Append(node_to_memory_obj,
+                      PyInt_FromLong(free_heap / 1024));
     }
-	
+
     PyDict_SetItemString(ret_obj, "node_to_cpu", node_to_cpu_obj);
     PyDict_SetItemString(ret_obj, "node_to_memory", node_to_memory_obj);
  
@@ -1524,6 +1591,22 @@ static PyMethodDef pyxc_methods[] = {
        " dom     [int]:      Identifier of domain to build into.\n"
        " pci_str [str]:      PCI devices.\n"
        "Returns: [int] 0 on success, or device bdf that can't be assigned.\n" },
+
+     { "assign_device",
+       (PyCFunction)pyxc_assign_device,
+       METH_VARARGS | METH_KEYWORDS, "\n"
+       "Assign device to IOMMU domain.\n"
+       " dom     [int]:      Domain to assign device to.\n"
+       " pci_str [str]:      PCI devices.\n"
+       "Returns: [int] 0 on success, or device bdf that can't be assigned.\n" },
+
+     { "deassign_device",
+       (PyCFunction)pyxc_deassign_device,
+       METH_VARARGS | METH_KEYWORDS, "\n"
+       "Deassign device from IOMMU domain.\n"
+       " dom     [int]:      Domain to deassign device from.\n"
+       " pci_str [str]:      PCI devices.\n"
+       "Returns: [int] 0 on success, or device bdf that can't be deassigned.\n" },
   
     { "sched_id_get",
       (PyCFunction)pyxc_sched_id_get,
