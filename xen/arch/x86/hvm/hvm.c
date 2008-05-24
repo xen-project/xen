@@ -296,6 +296,8 @@ int hvm_domain_initialise(struct domain *d)
     spin_lock_init(&d->arch.hvm_domain.irq_lock);
     spin_lock_init(&d->arch.hvm_domain.uc_lock);
 
+    hvm_init_guest_time(d);
+
     d->arch.hvm_domain.params[HVM_PARAM_HPET_ENABLED] = 1;
 
     hvm_init_cacheattr_region_list(d);
@@ -661,7 +663,7 @@ int hvm_vcpu_initialise(struct vcpu *v)
         hpet_init(v);
  
         /* Init guest TSC to start from zero. */
-        hvm_set_guest_time(v, 0);
+        hvm_set_guest_tsc(v, 0);
 
         /* Can start up without SIPI-SIPI or setvcpucontext domctl. */
         v->is_initialised = 1;
@@ -1632,7 +1634,7 @@ int hvm_msr_read_intercept(struct cpu_user_regs *regs)
     switch ( ecx )
     {
     case MSR_IA32_TSC:
-        msr_content = hvm_get_guest_time(v);
+        msr_content = hvm_get_guest_tsc(v);
         break;
 
     case MSR_IA32_APICBASE:
@@ -1725,7 +1727,7 @@ int hvm_msr_write_intercept(struct cpu_user_regs *regs)
     switch ( ecx )
     {
      case MSR_IA32_TSC:
-        hvm_set_guest_time(v, msr_content);
+        hvm_set_guest_tsc(v, msr_content);
         pt_reset(v);
         break;
 

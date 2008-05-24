@@ -257,7 +257,7 @@ void pmtimer_init(struct vcpu *v)
 
     spin_lock_init(&s->lock);
 
-    s->scale = ((uint64_t)FREQUENCE_PMTIMER << 32) / ticks_per_sec(v);
+    s->scale = ((uint64_t)FREQUENCE_PMTIMER << 32) / SYSTEM_TIME_HZ;
     s->vcpu = v;
 
     /* Intercept port I/O (need two handlers because PM1a_CNT is between

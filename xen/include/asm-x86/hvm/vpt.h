@@ -57,7 +57,7 @@ struct hpet_registers {
 typedef struct HPETState {
     struct hpet_registers hpet;
     struct vcpu *vcpu;
-    uint64_t tsc_freq;
+    uint64_t stime_freq;
     uint64_t hpet_to_ns_scale; /* hpet ticks to ns (multiplied by 2^10) */
     uint64_t hpet_to_ns_limit; /* max hpet ticks convertable to ns      */
     uint64_t mc_offset;
@@ -137,6 +137,11 @@ struct pl_time {    /* platform time */
     struct RTCState  vrtc;
     struct HPETState vhpet;
     struct PMTState  vpmt;
+    /* guest_time = Xen sys time + stime_offset */
+    int64_t stime_offset;
+    /* Ensures monotonicity in appropriate timer modes. */
+    uint64_t last_guest_time;
+    spinlock_t pl_time_lock;
 };
 
 #define ticks_per_sec(v) (v->domain->arch.hvm_domain.tsc_frequency)

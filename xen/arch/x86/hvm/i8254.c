@@ -31,6 +31,7 @@
 #include <xen/lib.h>
 #include <xen/errno.h>
 #include <xen/sched.h>
+#include <asm/time.h>
 #include <asm/hvm/hvm.h>
 #include <asm/hvm/io.h>
 #include <asm/hvm/support.h>
@@ -87,7 +88,7 @@ static int pit_get_count(PITState *pit, int channel)
     ASSERT(spin_is_locked(&pit->lock));
 
     d = muldiv64(hvm_get_guest_time(v) - pit->count_load_time[channel],
-                 PIT_FREQ, ticks_per_sec(v));
+                 PIT_FREQ, SYSTEM_TIME_HZ);
 
     switch ( c->mode )
     {
@@ -118,7 +119,7 @@ static int pit_get_out(PITState *pit, int channel)
     ASSERT(spin_is_locked(&pit->lock));
 
     d = muldiv64(hvm_get_guest_time(v) - pit->count_load_time[channel], 
-                 PIT_FREQ, ticks_per_sec(v));
+                 PIT_FREQ, SYSTEM_TIME_HZ);
 
     switch ( s->mode )
     {
@@ -195,11 +196,11 @@ static void pit_load_count(PITState *pit, int channel, int val)
         val = 0x10000;
 
     if ( v == NULL )
-        rdtscll(pit->count_load_time[channel]);
+        pit->count_load_time[channel] = 0;
     else
         pit->count_load_time[channel] = hvm_get_guest_time(v);
     s->count = val;
-    period = DIV_ROUND((val * 1000000000ULL), PIT_FREQ);
+    period = DIV_ROUND(val * SYSTEM_TIME_HZ, PIT_FREQ);
 
     if ( (v == NULL) || !is_hvm_vcpu(v) || (channel != 0) )
         return;

@@ -47,6 +47,7 @@ struct tm {
 };
 struct tm gmtime(unsigned long t);
 
+#define SYSTEM_TIME_HZ  1000000000ULL
 #define NOW()           ((s_time_t)get_s_time())
 #define SECONDS(_s)     ((s_time_t)((_s)  * 1000000000ULL))
 #define MILLISECS(_ms)  ((s_time_t)((_ms) * 1000000ULL))

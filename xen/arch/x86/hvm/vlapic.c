@@ -473,7 +473,6 @@ static uint32_t vlapic_get_tmcct(struct vlapic *vlapic)
     uint64_t counter_passed;
 
     counter_passed = ((hvm_get_guest_time(v) - vlapic->timer_last_update)
-                      * 1000000000ULL / ticks_per_sec(v)
                       / APIC_BUS_CYCLE_NS / vlapic->hw.timer_divisor);
     tmcct = tmict - counter_passed;
 

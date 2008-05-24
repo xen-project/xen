@@ -25,6 +25,36 @@
 #define mode_is(d, name) \
     ((d)->arch.hvm_domain.params[HVM_PARAM_TIMER_MODE] == HVMPTM_##name)
 
+void hvm_init_guest_time(struct domain *d)
+{
+    struct pl_time *pl = &d->arch.hvm_domain.pl_time;
+
+    spin_lock_init(&pl->pl_time_lock);
+    pl->stime_offset = -(u64)get_s_time();
+    pl->last_guest_time = 0;
+}
+
+u64 hvm_get_guest_time(struct vcpu *v)
+{
+    struct pl_time *pl = &v->domain->arch.hvm_domain.pl_time;
+    u64 now;
+
+    spin_lock(&pl->pl_time_lock);
+    now = get_s_time() + pl->stime_offset;
+    if ( (int64_t)(now - pl->last_guest_time) >= 0 )
+        pl->last_guest_time = now;
+    else
+        now = pl->last_guest_time;
+    spin_unlock(&pl->pl_time_lock);
+
+    return now + v->arch.hvm_vcpu.stime_offset;
+}
+
+void hvm_set_guest_time(struct vcpu *v, u64 guest_time)
+{
+    v->arch.hvm_vcpu.stime_offset += guest_time - hvm_get_guest_time(v);
+}
+
 static int pt_irq_vector(struct periodic_time *pt, enum hvm_intsrc src)
 {
     struct vcpu *v = pt->vcpu;
@@ -348,7 +378,7 @@ void create_periodic_time(
     pt->vcpu = v;
     pt->last_plt_gtime = hvm_get_guest_time(pt->vcpu);
     pt->irq = irq;
-    pt->period_cycles = (u64)period * cpu_khz / 1000000L;
+    pt->period_cycles = (u64)period;
     pt->one_shot = one_shot;
     pt->scheduled = NOW() + period;
     /*
