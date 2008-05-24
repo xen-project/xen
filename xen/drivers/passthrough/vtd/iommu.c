@@ -1138,26 +1138,35 @@ static int domain_context_mapping_one(
     }
 
     spin_lock_irqsave(&iommu->lock, flags);
-    /*
-     * domain_id 0 is not valid on Intel's IOMMU, force domain_id to
-     * be 1 based as required by intel's iommu hw.
-     */
-    context_set_domain_id(context, domain);
-    context_set_address_width(*context, hd->agaw);
 
-    if ( ecap_pass_thru(iommu->ecap) )
-        context_set_translation_type(*context, CONTEXT_TT_PASS_THRU);
 #ifdef CONTEXT_PASSTHRU
+    if ( ecap_pass_thru(iommu->ecap) && (domain->domain_id == 0) )
+        context_set_translation_type(*context, CONTEXT_TT_PASS_THRU);
     else
     {
 #endif
-        ASSERT(hd->pgd_maddr != 0);
+        if ( hd->pgd_maddr == 0 )
+        {
+            hd->pgd_maddr = alloc_pgtable_maddr();
+            if ( hd->pgd_maddr == 0 )
+            {
+                unmap_vtd_domain_page(context_entries);
+                spin_unlock_irqrestore(&iommu->lock, flags);
+                return -ENOMEM;
+            }
+        }
         context_set_address_root(*context, hd->pgd_maddr);
         context_set_translation_type(*context, CONTEXT_TT_MULTI_LEVEL);
 #ifdef CONTEXT_PASSTHRU
     }
 #endif
 
+    /*
+     * domain_id 0 is not valid on Intel's IOMMU, force domain_id to
+     * be 1 based as required by intel's iommu hw.
+     */
+    context_set_domain_id(context, domain);
+    context_set_address_width(*context, hd->agaw);
     context_set_fault_enable(*context);
     context_set_present(*context);
     iommu_flush_cache_entry(iommu, context);

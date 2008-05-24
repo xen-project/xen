@@ -54,4 +54,7 @@ struct hvm_iommu {
     struct iommu_ops *platform_ops;
 };
 
+#define has_iommu_pdevs(domain) \
+    (!list_empty(&(domain->arch.hvm_domain.hvm_iommu.pdev_list)))
+
 #endif /* __ASM_X86_HVM_IOMMU_H__ */
