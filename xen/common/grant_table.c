@@ -32,6 +32,8 @@
 #include <xen/trace.h>
 #include <xen/guest_access.h>
 #include <xen/domain_page.h>
+#include <xen/iommu.h>
+#include <xen/paging.h>
 #include <xsm/xsm.h>
 
 #ifndef max_nr_grant_frames
