@@ -1097,9 +1097,21 @@ static int intel_iommu_domain_init(struct domain *d)
 
     if ( d->domain_id == 0 )
     {
-        /* Set up 1:1 page table for dom0. */
+        extern int xen_in_range(unsigned long start, unsigned long end);
+        extern int tboot_in_range(unsigned long start, unsigned long end);
+
+        /* 
+         * Set up 1:1 page table for dom0 except the critical segments
+         * like Xen and tboot.
+         */
         for ( i = 0; i < max_page; i++ )
+        {
+            if ( xen_in_range(i << PAGE_SHIFT_4K, (i + 1) << PAGE_SHIFT_4K) ||
+                 tboot_in_range(i << PAGE_SHIFT_4K, (i + 1) << PAGE_SHIFT_4K) )
+                continue;
+
             iommu_map_page(d, i, i);
+        }
 
         setup_dom0_devices(d);
         setup_dom0_rmrr(d);
