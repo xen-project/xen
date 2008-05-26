@@ -572,6 +572,7 @@ void iommu_flush_all(void)
 /* clear one page's page table */
 static void dma_pte_clear_one(struct domain *domain, u64 addr)
 {
+    struct hvm_iommu *hd = domain_hvm_iommu(domain);
     struct acpi_drhd_unit *drhd;
     struct iommu *iommu;
     struct dma_pte *page = NULL, *pte = NULL;
@@ -593,6 +594,10 @@ static void dma_pte_clear_one(struct domain *domain, u64 addr)
         for_each_drhd_unit ( drhd )
         {
             iommu = drhd->iommu;
+
+            if ( !test_bit(iommu->index, &hd->iommu_bitmap) )
+                continue;
+
             if ( cap_caching_mode(iommu->cap) )
                 iommu_flush_iotlb_psi(iommu, domain_iommu_domid(domain),
                                       addr, 1, 0);
@@ -1022,7 +1027,7 @@ static int iommu_alloc(struct acpi_drhd_unit *drhd)
 
     set_fixmap_nocache(FIX_IOMMU_REGS_BASE_0 + nr_iommus, drhd->address);
     iommu->reg = (void *)fix_to_virt(FIX_IOMMU_REGS_BASE_0 + nr_iommus);
-    nr_iommus++;
+    iommu->index = nr_iommus++;
 
     iommu->cap = dmar_readq(iommu->reg, DMAR_CAP_REG);
     iommu->ecap = dmar_readq(iommu->reg, DMAR_ECAP_REG);
@@ -1191,6 +1196,8 @@ static int domain_context_mapping_one(
         iommu_flush_write_buffer(iommu);
     else
         iommu_flush_iotlb_dsi(iommu, domain_iommu_domid(domain), 0);
+
+    set_bit(iommu->index, &hd->iommu_bitmap);
     spin_unlock_irqrestore(&iommu->lock, flags);
 
     return 0;
@@ -1418,11 +1425,12 @@ void reassign_device_ownership(
 {
     struct hvm_iommu *source_hd = domain_hvm_iommu(source);
     struct hvm_iommu *target_hd = domain_hvm_iommu(target);
-    struct pci_dev *pdev;
+    struct pci_dev *pdev, *pdev2;
     struct acpi_drhd_unit *drhd;
     struct iommu *iommu;
     int status;
     unsigned long flags;
+    int found = 0;
 
     pdev_flr(bus, devfn);
 
@@ -1443,6 +1451,18 @@ void reassign_device_ownership(
     list_move(&pdev->list, &target_hd->pdev_list);
     spin_unlock_irqrestore(&target_hd->iommu_list_lock, flags);
     spin_unlock_irqrestore(&source_hd->iommu_list_lock, flags);
+
+    for_each_pdev ( source, pdev2 )
+    {
+        drhd = acpi_find_matched_drhd_unit(pdev2);
+        if ( drhd->iommu == iommu )
+        {
+            found = 1;
+            break;
+        }
+    }
+    if ( !found )
+        clear_bit(iommu->index, &source_hd->iommu_bitmap);
 
     status = domain_context_mapping(target, iommu, pdev);
     if ( status != 0 )
@@ -1500,6 +1520,7 @@ static int domain_context_mapped(struct pci_dev *pdev)
 int intel_iommu_map_page(
     struct domain *d, unsigned long gfn, unsigned long mfn)
 {
+    struct hvm_iommu *hd = domain_hvm_iommu(d);
     struct acpi_drhd_unit *drhd;
     struct iommu *iommu;
     struct dma_pte *page = NULL, *pte = NULL;
@@ -1527,6 +1548,10 @@ int intel_iommu_map_page(
     for_each_drhd_unit ( drhd )
     {
         iommu = drhd->iommu;
+
+        if ( !test_bit(iommu->index, &hd->iommu_bitmap) )
+            continue;
+
         if ( cap_caching_mode(iommu->cap) )
             iommu_flush_iotlb_psi(iommu, domain_iommu_domid(d),
                                   (paddr_t)gfn << PAGE_SHIFT_4K, 1, 0);
@@ -1578,6 +1603,7 @@ int intel_iommu_unmap_page(struct domain *d, unsigned long gfn)
 int iommu_page_mapping(struct domain *domain, paddr_t iova,
                        paddr_t hpa, size_t size, int prot)
 {
+    struct hvm_iommu *hd = domain_hvm_iommu(domain);
     struct acpi_drhd_unit *drhd;
     struct iommu *iommu;
     u64 start_pfn, end_pfn;
@@ -1611,6 +1637,10 @@ int iommu_page_mapping(struct domain *domain, paddr_t iova,
     for_each_drhd_unit ( drhd )
     {
         iommu = drhd->iommu;
+
+        if ( !test_bit(iommu->index, &hd->iommu_bitmap) )
+            continue;
+
         if ( cap_caching_mode(iommu->cap) )
             iommu_flush_iotlb_psi(iommu, domain_iommu_domid(domain),
                                   iova, index, 0);
@@ -1630,6 +1660,7 @@ int iommu_page_unmapping(struct domain *domain, paddr_t addr, size_t size)
 
 void iommu_flush(struct domain *d, unsigned long gfn, u64 *p2m_entry)
 {
+    struct hvm_iommu *hd = domain_hvm_iommu(d);
     struct acpi_drhd_unit *drhd;
     struct iommu *iommu = NULL;
     struct dma_pte *pte = (struct dma_pte *) p2m_entry;
@@ -1637,6 +1668,10 @@ void iommu_flush(struct domain *d, unsigned long gfn, u64 *p2m_entry)
     for_each_drhd_unit ( drhd )
     {
         iommu = drhd->iommu;
+
+        if ( !test_bit(iommu->index, &hd->iommu_bitmap) )
+            continue;
+
         if ( cap_caching_mode(iommu->cap) )
             iommu_flush_iotlb_psi(iommu, domain_iommu_domid(d),
                                   (paddr_t)gfn << PAGE_SHIFT_4K, 1, 0);

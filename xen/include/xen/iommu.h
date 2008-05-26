@@ -44,6 +44,7 @@ extern int iommu_pv_enabled;
 struct iommu {
     struct list_head list;
     void __iomem *reg; /* Pointer to hardware regs, virtual addr */
+    u32	index;         /* Sequence number of iommu */
     u32	gcmd;          /* Holds TE, EAFL. Don't need SRTP, SFL, WBF */
     u64	cap;
     u64	ecap;
