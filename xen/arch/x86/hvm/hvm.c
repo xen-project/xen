@@ -2073,6 +2073,13 @@ void hvm_vcpu_reset_state(struct vcpu *v, uint16_t cs, uint16_t ip)
     if ( v->is_initialised )
         goto out;
 
+    if ( !paging_mode_hap(d) )
+    {
+        if ( v->arch.hvm_vcpu.guest_cr[0] & X86_CR0_PG )
+            put_page(pagetable_get_page(v->arch.guest_table));
+        v->arch.guest_table = pagetable_null();
+    }
+
     ctxt = &v->arch.guest_context;
     memset(ctxt, 0, sizeof(*ctxt));
     ctxt->flags = VGCF_online;
