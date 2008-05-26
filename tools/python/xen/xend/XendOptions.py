@@ -222,7 +222,7 @@ class XendOptions:
                                    self.xend_relocation_port_default)
 
     def get_xend_relocation_ssl_port(self):
-	"""Get the port xend listens at for ssl connection to its relocation
+        """Get the port xend listens at for ssl connection to its relocation
         server.
         """
         return self.get_config_int('xend-relocation-ssl-port',
