@@ -44,7 +44,6 @@ import fcntl
 import re
 import time
 import signal
-import os
 from threading import Thread
 
 from xen.web.httpserver import HttpServer, UnixHttpServer
@@ -149,27 +148,14 @@ class XendServers:
 
             # Reaching this point means we can auto start domains
             try:
-                dom = xenddomain()
-                dom.autostart_domains()
+                xenddomain().autostart_domains()
             except Exception, e:
                 log.exception("Failed while autostarting domains")
 
             # loop to keep main thread alive until it receives a SIGTERM
             self.running = True
             while self.running:
-                # loop to destroy those hvm domain that whoes DM has dead unexpectedly.
-                for item in dom.domains.values():
-                    if item.info.is_hvm():
-                        device_model_pid = item.gatherDom(('image/device-model-pid', str))
-                        dm_stat_cmd = "ps -o stat --no-headers -p"+device_model_pid
-                        dm_stat = os.popen(dm_stat_cmd).readline().rstrip()
-                        if dm_stat == 'Z':
-                            log.warn("Devices Model for domain " + str(item.domid) + "was killed unexpectedly")
-                            item.info['crashed'] = 1
-                            item.refreshShutdown(item.info)
-                        else:
-                            continue
-                time.sleep(30)
+                time.sleep(100000000)
                 
             if self.reloadingConfig:
                 log.info("Restarting all XML-RPC and Xen-API servers...")
