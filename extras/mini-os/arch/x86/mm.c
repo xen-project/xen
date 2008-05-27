@@ -59,11 +59,10 @@ void new_pt_frame(unsigned long *pt_pfn, unsigned long prev_l_mfn,
 {   
     pgentry_t *tab = (pgentry_t *)start_info.pt_base;
     unsigned long pt_page = (unsigned long)pfn_to_virt(*pt_pfn); 
-    unsigned long prot_e, prot_t, pincmd;
+    unsigned long prot_e, prot_t;
     mmu_update_t mmu_updates[1];
-    struct mmuext_op pin_request;
     
-    prot_e = prot_t = pincmd = 0;
+    prot_e = prot_t = 0;
     DEBUG("Allocating new L%d pt frame for pt_pfn=%lx, "
            "prev_l_mfn=%lx, offset=%lx", 
            level, *pt_pfn, prev_l_mfn, offset);
@@ -77,18 +76,15 @@ void new_pt_frame(unsigned long *pt_pfn, unsigned long prev_l_mfn,
     case L1_FRAME:
          prot_e = L1_PROT;
          prot_t = L2_PROT;
-         pincmd = MMUEXT_PIN_L1_TABLE;
          break;
     case L2_FRAME:
          prot_e = L2_PROT;
          prot_t = L3_PROT;
-         pincmd = MMUEXT_PIN_L2_TABLE;
          break;
 #if defined(__x86_64__)
     case L3_FRAME:
          prot_e = L3_PROT;
          prot_t = L4_PROT;
-         pincmd = MMUEXT_PIN_L3_TABLE;
          break;
 #endif
     default:
@@ -113,15 +109,6 @@ void new_pt_frame(unsigned long *pt_pfn, unsigned long prev_l_mfn,
          do_exit();
     }
                         
-    /* Pin the page to provide correct protection */
-    pin_request.cmd = pincmd;
-    pin_request.arg1.mfn = pfn_to_mfn(*pt_pfn);
-    if(HYPERVISOR_mmuext_op(&pin_request, 1, NULL, DOMID_SELF) < 0)
-    {
-        printk("ERROR: pinning failed\n");
-        do_exit();
-    }
-
     /* Now fill the new page table page with entries.
        Update the page directory as well. */
     mmu_updates[0].ptr = ((pgentry_t)prev_l_mfn << PAGE_SHIFT) + sizeof(pgentry_t) * offset;
