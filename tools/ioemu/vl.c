@@ -7807,8 +7807,9 @@ int main(int argc, char **argv)
                 bdrv_set_type_hint(fd_table[i], BDRV_TYPE_FLOPPY);
             }
             if (fd_filename[i] != '\0') {
-                if (bdrv_open(fd_table[i], fd_filename[i],
-                              snapshot ? BDRV_O_SNAPSHOT : 0) < 0) {
+                if (bdrv_open2(fd_table[i], fd_filename[i],
+                               snapshot ? BDRV_O_SNAPSHOT : 0,
+                               &bdrv_raw) < 0) {
                     fprintf(stderr, "qemu: could not open floppy disk image '%s'\n",
                             fd_filename[i]);
                     exit(1);
