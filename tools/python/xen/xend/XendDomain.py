@@ -1265,17 +1265,17 @@ class XendDomain:
         @type domid: int or string.
         @param dst: Destination IP address
         @type dst: string
-        @keyword port: relocation port on destination
-        @type port: int        
         @keyword live: Live migration
         @type live: bool
+        @keyword port: relocation port on destination
+        @type port: int
+        @keyword node: use node number for target
+        @type node: int
         @keyword ssl: use ssl connection
         @type ssl: bool
         @rtype: None
-        @keyword node: use node number for target
-        @rtype: int 
         @raise XendError: Failed to migrate
-        @raise XendInvalidDomain: Domain is not valid        
+        @raise XendInvalidDomain: Domain is not valid
         """
 
         dominfo = self.domain_lookup_nr(domid)
