@@ -1074,7 +1074,8 @@ static int intel_iommu_domain_init(struct domain *d)
     struct hvm_iommu *hd = domain_hvm_iommu(d);
     struct iommu *iommu = NULL;
     int guest_width = DEFAULT_DOMAIN_ADDRESS_WIDTH;
-    int i, adjust_width, agaw;
+    int adjust_width, agaw;
+    u64 i;
     unsigned long sagaw;
     struct acpi_drhd_unit *drhd;
 
@@ -1102,8 +1103,8 @@ static int intel_iommu_domain_init(struct domain *d)
 
     if ( d->domain_id == 0 )
     {
-        extern int xen_in_range(unsigned long start, unsigned long end);
-        extern int tboot_in_range(unsigned long start, unsigned long end);
+        extern int xen_in_range(paddr_t start, paddr_t end);
+        extern int tboot_in_range(paddr_t start, paddr_t end);
 
         /* 
          * Set up 1:1 page table for dom0 except the critical segments
