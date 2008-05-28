@@ -1526,6 +1526,7 @@ int intel_iommu_map_page(
     struct iommu *iommu;
     struct dma_pte *page = NULL, *pte = NULL;
     u64 pg_maddr;
+    int pte_present;
 
     drhd = list_entry(acpi_drhd_units.next, typeof(*drhd), list);
     iommu = drhd->iommu;
@@ -1541,6 +1542,7 @@ int intel_iommu_map_page(
         return -ENOMEM;
     page = (struct dma_pte *)map_vtd_domain_page(pg_maddr);
     pte = page + (gfn & LEVEL_MASK);
+    pte_present = dma_pte_present(*pte);
     dma_set_pte_addr(*pte, (paddr_t)mfn << PAGE_SHIFT_4K);
     dma_set_pte_prot(*pte, DMA_PTE_READ | DMA_PTE_WRITE);
     iommu_flush_cache_entry(iommu, pte);
@@ -1553,7 +1555,7 @@ int intel_iommu_map_page(
         if ( !test_bit(iommu->index, &hd->iommu_bitmap) )
             continue;
 
-        if ( cap_caching_mode(iommu->cap) )
+        if ( pte_present || cap_caching_mode(iommu->cap) )
             iommu_flush_iotlb_psi(iommu, domain_iommu_domid(d),
                                   (paddr_t)gfn << PAGE_SHIFT_4K, 1, 0);
         else if ( cap_rwbf(iommu->cap) )
@@ -1565,6 +1567,7 @@ int intel_iommu_map_page(
 
 int intel_iommu_unmap_page(struct domain *d, unsigned long gfn)
 {
+    struct hvm_iommu *hd = domain_hvm_iommu(d);
     struct acpi_drhd_unit *drhd;
     struct iommu *iommu;
     struct dma_pte *page = NULL, *pte = NULL;
@@ -1591,11 +1594,13 @@ int intel_iommu_unmap_page(struct domain *d, unsigned long gfn)
     for_each_drhd_unit ( drhd )
     {
         iommu = drhd->iommu;
-        if ( cap_caching_mode(iommu->cap) )
-            iommu_flush_iotlb_psi(iommu, domain_iommu_domid(d),
-                                  (paddr_t)gfn << PAGE_SHIFT_4K, 1, 0);
-        else if ( cap_rwbf(iommu->cap) )
-            iommu_flush_write_buffer(iommu);
+ 
+        if ( !test_bit(iommu->index, &hd->iommu_bitmap) )
+            continue;
+
+       if ( iommu_flush_iotlb_psi(iommu, domain_iommu_domid(d),
+                                  (paddr_t)gfn << PAGE_SHIFT_4K, 1, 0) )
+           iommu_flush_write_buffer(iommu);
     }
 
     return 0;
