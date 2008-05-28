@@ -55,11 +55,3 @@ DEF_CPPFLAGS += -DHAVE_LWIP
 DEF_CPPFLAGS += -I$(LWIPDIR)/src/include
 DEF_CPPFLAGS += -I$(LWIPDIR)/src/include/ipv4
 endif
-
-ifneq ($(QEMUDIR),)
-qemu=y
-endif
-
-ifneq ($(CAMLDIR),)
-caml=y
-endif

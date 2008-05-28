@@ -4,7 +4,6 @@
  * Samuel Thibault <Samuel.Thibault@eu.citrix.net>, October 2007
  */
 
-#ifdef HAVE_LIBC
 #include <os.h>
 #include <sched.h>
 #include <console.h>
@@ -180,4 +179,3 @@ int app_main(start_info_t *si)
     main_thread = create_thread("main", call_main, si);
     return 0;
 }
-#endif

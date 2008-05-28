@@ -358,6 +358,13 @@ VL_OBJS+=tap-win32.o
 endif
 
 ifdef CONFIG_STUBDOM
+VL_OBJS+=main-qemu.o
+CFLAGS += -DCONFIG_QEMU
+main-qemu.c:
+	ln -s $(XEN_ROOT)/extras/mini-os/main.c $@
+endif
+
+ifdef CONFIG_STUBDOM
 #CONFIG_PASSTHROUGH=1
 else
   ifeq (,$(wildcard /usr/include/pci))
