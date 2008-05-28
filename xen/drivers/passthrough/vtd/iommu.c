@@ -485,9 +485,12 @@ static int flush_iotlb_reg(void *_iommu, u16 did,
     /* check IOTLB invalidation granularity */
     if ( DMA_TLB_IAIG(val) == 0 )
         printk(KERN_ERR VTDPREFIX "IOMMU: flush IOTLB failed\n");
+
+#ifdef VTD_DEBUG
     if ( DMA_TLB_IAIG(val) != DMA_TLB_IIRG(type) )
         printk(KERN_ERR VTDPREFIX "IOMMU: tlb flush request %x, actual %x\n",
                (u32)DMA_TLB_IIRG(type), (u32)DMA_TLB_IAIG(val));
+#endif
     /* flush context entry will implictly flush write buffer */
     return 0;
 }
@@ -581,30 +584,29 @@ static void dma_pte_clear_one(struct domain *domain, u64 addr)
     drhd = list_entry(acpi_drhd_units.next, typeof(*drhd), list);
 
     /* get last level pte */
-    pg_maddr = dma_addr_level_page_maddr(domain, addr, 1);
+    pg_maddr = dma_addr_level_page_maddr(domain, addr, 2);
     if ( pg_maddr == 0 )
         return;
     page = (struct dma_pte *)map_vtd_domain_page(pg_maddr);
     pte = page + address_level_offset(addr, 1);
-    if ( pte )
+
+    if ( !dma_pte_present(*pte) )
     {
-        dma_clear_pte(*pte);
-        iommu_flush_cache_entry(drhd->iommu, pte);
-
-        for_each_drhd_unit ( drhd )
-        {
-            iommu = drhd->iommu;
-
-            if ( !test_bit(iommu->index, &hd->iommu_bitmap) )
-                continue;
-
-            if ( cap_caching_mode(iommu->cap) )
-                iommu_flush_iotlb_psi(iommu, domain_iommu_domid(domain),
-                                      addr, 1, 0);
-            else if (cap_rwbf(iommu->cap))
-                iommu_flush_write_buffer(iommu);
-        }
+        unmap_vtd_domain_page(page);
+        return;
     }
+
+    dma_clear_pte(*pte); 
+    iommu_flush_cache_entry(drhd->iommu, pte);
+
+    for_each_drhd_unit ( drhd )
+    {
+        iommu = drhd->iommu;
+
+        if ( test_bit(iommu->index, &hd->iommu_bitmap) )
+            iommu_flush_iotlb_psi(iommu, domain_iommu_domid(domain), addr, 1, 0);
+    }
+
     unmap_vtd_domain_page(page);
 }
 
@@ -1191,12 +1193,13 @@ static int domain_context_mapping_one(
 
     unmap_vtd_domain_page(context_entries);
 
+    /* it's a non-present to present mapping */
     if ( iommu_flush_context_device(iommu, domain_iommu_domid(domain),
                                     (((u16)bus) << 8) | devfn,
                                     DMA_CCMD_MASK_NOBIT, 1) )
         iommu_flush_write_buffer(iommu);
     else
-        iommu_flush_iotlb_dsi(iommu, domain_iommu_domid(domain), 0);
+        iommu_flush_iotlb_dsi(iommu, 0, 0);
 
     set_bit(iommu->index, &hd->iommu_bitmap);
     spin_unlock_irqrestore(&iommu->lock, flags);
@@ -1555,10 +1558,11 @@ int intel_iommu_map_page(
         if ( !test_bit(iommu->index, &hd->iommu_bitmap) )
             continue;
 
-        if ( pte_present || cap_caching_mode(iommu->cap) )
+        if ( pte_present )
             iommu_flush_iotlb_psi(iommu, domain_iommu_domid(d),
                                   (paddr_t)gfn << PAGE_SHIFT_4K, 1, 0);
-        else if ( cap_rwbf(iommu->cap) )
+        else if ( iommu_flush_iotlb_psi(iommu, domain_iommu_domid(d),
+                                   (paddr_t)gfn << PAGE_SHIFT_4K, 1, 1) )
             iommu_flush_write_buffer(iommu);
     }
 
@@ -1567,11 +1571,8 @@ int intel_iommu_map_page(
 
 int intel_iommu_unmap_page(struct domain *d, unsigned long gfn)
 {
-    struct hvm_iommu *hd = domain_hvm_iommu(d);
     struct acpi_drhd_unit *drhd;
     struct iommu *iommu;
-    struct dma_pte *page = NULL, *pte = NULL;
-    u64 pg_maddr;
 
     drhd = list_entry(acpi_drhd_units.next, typeof(*drhd), list);
     iommu = drhd->iommu;
@@ -1582,26 +1583,7 @@ int intel_iommu_unmap_page(struct domain *d, unsigned long gfn)
         return 0;
 #endif
 
-    pg_maddr = addr_to_dma_page_maddr(d, (paddr_t)gfn << PAGE_SHIFT_4K);
-    if ( pg_maddr == 0 )
-        return -ENOMEM;
-    page = (struct dma_pte *)map_vtd_domain_page(pg_maddr);
-    pte = page + (gfn & LEVEL_MASK);
-    dma_clear_pte(*pte);
-    iommu_flush_cache_entry(drhd->iommu, pte);
-    unmap_vtd_domain_page(page);
-
-    for_each_drhd_unit ( drhd )
-    {
-        iommu = drhd->iommu;
- 
-        if ( !test_bit(iommu->index, &hd->iommu_bitmap) )
-            continue;
-
-       if ( iommu_flush_iotlb_psi(iommu, domain_iommu_domid(d),
-                                  (paddr_t)gfn << PAGE_SHIFT_4K, 1, 0) )
-           iommu_flush_write_buffer(iommu);
-    }
+    dma_pte_clear_one(d, (paddr_t)gfn << PAGE_SHIFT_4K);
 
     return 0;
 }
@@ -1647,10 +1629,8 @@ int iommu_page_mapping(struct domain *domain, paddr_t iova,
         if ( !test_bit(iommu->index, &hd->iommu_bitmap) )
             continue;
 
-        if ( cap_caching_mode(iommu->cap) )
-            iommu_flush_iotlb_psi(iommu, domain_iommu_domid(domain),
-                                  iova, index, 0);
-        else if ( cap_rwbf(iommu->cap) )
+        if ( iommu_flush_iotlb_psi(iommu, domain_iommu_domid(domain),
+                                   iova, index, 1) )
             iommu_flush_write_buffer(iommu);
     }
 
@@ -1662,30 +1642,6 @@ int iommu_page_unmapping(struct domain *domain, paddr_t addr, size_t size)
     dma_pte_clear_range(domain, addr, addr + size);
 
     return 0;
-}
-
-void iommu_flush(struct domain *d, unsigned long gfn, u64 *p2m_entry)
-{
-    struct hvm_iommu *hd = domain_hvm_iommu(d);
-    struct acpi_drhd_unit *drhd;
-    struct iommu *iommu = NULL;
-    struct dma_pte *pte = (struct dma_pte *) p2m_entry;
-
-    for_each_drhd_unit ( drhd )
-    {
-        iommu = drhd->iommu;
-
-        if ( !test_bit(iommu->index, &hd->iommu_bitmap) )
-            continue;
-
-        if ( cap_caching_mode(iommu->cap) )
-            iommu_flush_iotlb_psi(iommu, domain_iommu_domid(d),
-                                  (paddr_t)gfn << PAGE_SHIFT_4K, 1, 0);
-        else if ( cap_rwbf(iommu->cap) )
-            iommu_flush_write_buffer(iommu);
-    }
-
-    iommu_flush_cache_entry(iommu, pte);
 }
 
 static int iommu_prepare_rmrr_dev(

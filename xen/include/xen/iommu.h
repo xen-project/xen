@@ -66,7 +66,6 @@ void reassign_device_ownership(struct domain *source,
                                u8 bus, u8 devfn);
 int iommu_map_page(struct domain *d, unsigned long gfn, unsigned long mfn);
 int iommu_unmap_page(struct domain *d, unsigned long gfn);
-void iommu_flush(struct domain *d, unsigned long gfn, u64 *p2m_entry);
 void iommu_set_pgd(struct domain *d);
 void iommu_free_pgd(struct domain *d);
 void iommu_domain_teardown(struct domain *d);
