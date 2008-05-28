@@ -21,8 +21,6 @@ extern void __libc_fini_array(void);
 extern unsigned long __CTOR_LIST__[];
 extern unsigned long __DTOR_LIST__[];
 
-struct thread *main_thread;
-
 #if 0
 #include <stdio.h>
 int main(int argc, char *argv[], char *envp[])
