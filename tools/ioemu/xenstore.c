@@ -112,7 +112,7 @@ void xenstore_parse_domain_config(int hvm_domid)
 
     e = xs_directory(xsh, XBT_NULL, buf, &num);
     if (e == NULL)
-        goto out;
+        num = 0;
 
     for (i = 0; i < num; i++) {
         /* read the backend path */
