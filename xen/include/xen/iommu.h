@@ -26,6 +26,7 @@
 #include <xen/pci.h>
 #include <public/hvm/ioreq.h>
 #include <public/domctl.h>
+#include <asm/msi.h>
 
 extern int vtd_enabled;
 extern int iommu_enabled;
@@ -78,6 +79,8 @@ int pt_irq_destroy_bind_vtd(struct domain *d,
 unsigned int io_apic_read_remap_rte(unsigned int apic, unsigned int reg);
 void io_apic_write_remap_rte(unsigned int apic,
                              unsigned int reg, unsigned int value);
+void msi_msg_read_remap_rte(struct msi_desc *msi_desc, struct msi_msg *msg);
+void msi_msg_write_remap_rte(struct msi_desc *msi_desc, struct msi_msg *msg);
 struct qi_ctrl *iommu_qi_ctrl(struct iommu *iommu);
 struct ir_ctrl *iommu_ir_ctrl(struct iommu *iommu);
 struct iommu_flush *iommu_get_flush(struct iommu *iommu);

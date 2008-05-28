@@ -42,6 +42,24 @@ struct IO_APIC_route_remap_entry {
     };
 };
 
+struct msi_msg_remap_entry {
+    union {
+        u32 val;
+        struct {
+            u32 dontcare:2,
+                index_15:1,
+                SHV:1,
+                format:1,
+                index_0_14:15,
+                addr_id_val:12; /* Interrupt address identifier value,
+                                   must be 0FEEh */
+        };
+    } address_lo;   /* low 32 bits of msi message address */
+
+    u32	address_hi;	/* high 32 bits of msi message address */
+    u32	data;		/* msi message data */
+};
+
 unsigned int get_clflush_size(void);
 u64 alloc_pgtable_maddr(void);
 void free_pgtable_maddr(u64 maddr);

@@ -251,6 +251,176 @@ void io_apic_write_remap_rte(
     *(IO_APIC_BASE(apic)+4) = *(((u32 *)&old_rte)+1);
 }
 
+static void remap_entry_to_msi_msg(
+    struct iommu *iommu, struct msi_msg *msg)
+{
+    struct iremap_entry *iremap_entry = NULL, *iremap_entries;
+    struct msi_msg_remap_entry *remap_rte;
+    int index;
+    unsigned long flags;
+    struct ir_ctrl *ir_ctrl = iommu_ir_ctrl(iommu);
+
+    if ( ir_ctrl == NULL )
+    {
+        dprintk(XENLOG_ERR VTDPREFIX,
+                "remap_entry_to_msi_msg: ir_ctl == NULL");
+        return;
+    }
+
+    remap_rte = (struct msi_msg_remap_entry *) msg;
+    index = (remap_rte->address_lo.index_15 << 15) |
+            remap_rte->address_lo.index_0_14;
+
+    if ( index > ir_ctrl->iremap_index )
+        panic("%s: index (%d) is larger than remap table entry size (%d)\n",
+              __func__, index, ir_ctrl->iremap_index);
+
+    spin_lock_irqsave(&ir_ctrl->iremap_lock, flags);
+
+    iremap_entries =
+        (struct iremap_entry *)map_vtd_domain_page(ir_ctrl->iremap_maddr);
+    iremap_entry = &iremap_entries[index];
+
+    msg->address_hi = MSI_ADDR_BASE_HI;
+    msg->address_lo =
+        MSI_ADDR_BASE_LO |
+        ((iremap_entry->lo.dm == 0) ?
+            MSI_ADDR_DESTMODE_PHYS:
+            MSI_ADDR_DESTMODE_LOGIC) |
+        ((iremap_entry->lo.dlm != dest_LowestPrio) ?
+            MSI_ADDR_REDIRECTION_CPU:
+            MSI_ADDR_REDIRECTION_LOWPRI) |
+        iremap_entry->lo.dst >> 8;
+
+    msg->data =
+        MSI_DATA_TRIGGER_EDGE |
+        MSI_DATA_LEVEL_ASSERT |
+        ((iremap_entry->lo.dlm != dest_LowestPrio) ?
+            MSI_DATA_DELIVERY_FIXED:
+            MSI_DATA_DELIVERY_LOWPRI) |
+        iremap_entry->lo.vector;
+
+    unmap_vtd_domain_page(iremap_entries);
+    spin_unlock_irqrestore(&ir_ctrl->iremap_lock, flags);
+}
+
+static void msi_msg_to_remap_entry(
+    struct iommu *iommu, struct pci_dev *pdev, struct msi_msg *msg)
+{
+    struct iremap_entry *iremap_entry = NULL, *iremap_entries;
+    struct iremap_entry new_ire;
+    struct msi_msg_remap_entry *remap_rte;
+    unsigned int index;
+    unsigned long flags;
+    struct ir_ctrl *ir_ctrl = iommu_ir_ctrl(iommu);
+    int i = 0;
+
+    remap_rte = (struct msi_msg_remap_entry *) msg;
+    spin_lock_irqsave(&ir_ctrl->iremap_lock, flags);
+
+    iremap_entries =
+        (struct iremap_entry *)map_vtd_domain_page(ir_ctrl->iremap_maddr);
+
+    /* If the entry for a PCI device has been there, use the old entry,
+     * Or, assign a new entry for it.
+     */
+    for ( i = 0; i <= ir_ctrl->iremap_index; i++ )
+    {
+        iremap_entry = &iremap_entries[i];
+        if ( iremap_entry->hi.sid ==
+             ((pdev->bus << 8) | pdev->devfn) )
+           break;
+    }
+
+    if ( i > ir_ctrl->iremap_index )
+    {
+    	ir_ctrl->iremap_index++;
+        index = ir_ctrl->iremap_index;
+    }
+    else
+        index = i;
+
+    if ( index > IREMAP_ENTRY_NR - 1 )
+        panic("msi_msg_to_remap_entry: intremap index is more than 256!\n");
+
+    iremap_entry = &iremap_entries[index];
+    memcpy(&new_ire, iremap_entry, sizeof(struct iremap_entry));
+
+    /* Set interrupt remapping table entry */
+    new_ire.lo.fpd = 0;
+    new_ire.lo.dm = (msg->address_lo >> MSI_ADDR_DESTMODE_SHIFT) & 0x1;
+    new_ire.lo.rh = 0;
+    new_ire.lo.tm = (msg->data >> MSI_DATA_TRIGGER_SHIFT) & 0x1;
+    new_ire.lo.dlm = (msg->data >> MSI_DATA_DELIVERY_MODE_SHIFT) & 0x1;
+    new_ire.lo.avail = 0;
+    new_ire.lo.res_1 = 0;
+    new_ire.lo.vector = (msg->data >> MSI_DATA_VECTOR_SHIFT) &
+                        MSI_DATA_VECTOR_MASK;
+    new_ire.lo.res_2 = 0;
+    new_ire.lo.dst = ((msg->address_lo >> MSI_ADDR_DEST_ID_SHIFT)
+                      & 0xff) << 8;
+
+    new_ire.hi.sid = (pdev->bus << 8) | pdev->devfn;
+    new_ire.hi.sq = 0;
+    new_ire.hi.svt = 1;
+    new_ire.hi.res_1 = 0;
+    new_ire.lo.p = 1;    /* finally, set present bit */
+
+    /* now construct new MSI/MSI-X rte entry */
+    remap_rte->address_lo.dontcare = 0;
+    remap_rte->address_lo.index_15 = index & 0x8000;
+    remap_rte->address_lo.index_0_14 = index & 0x7fff;
+    remap_rte->address_lo.SHV = 1;
+    remap_rte->address_lo.format = 1;
+
+    remap_rte->address_hi = 0;
+    remap_rte->data = 0;
+
+    memcpy(iremap_entry, &new_ire, sizeof(struct iremap_entry));
+    iommu_flush_iec_index(iommu, 0, index);
+    invalidate_sync(iommu);
+
+    unmap_vtd_domain_page(iremap_entries);
+    spin_unlock_irqrestore(&ir_ctrl->iremap_lock, flags);
+    return;
+}
+
+void msi_msg_read_remap_rte(
+    struct msi_desc *msi_desc, struct msi_msg *msg)
+{
+    struct pci_dev *pdev = msi_desc->dev;
+    struct acpi_drhd_unit *drhd = NULL;
+    struct iommu *iommu = NULL;
+    struct ir_ctrl *ir_ctrl;
+
+    drhd = acpi_find_matched_drhd_unit(pdev);
+    iommu = drhd->iommu;
+
+    ir_ctrl = iommu_ir_ctrl(iommu);
+    if ( !iommu || !ir_ctrl || ir_ctrl->iremap_maddr == 0 )
+        return;
+
+    remap_entry_to_msi_msg(iommu, msg);
+}
+
+void msi_msg_write_remap_rte(
+    struct msi_desc *msi_desc, struct msi_msg *msg)
+{
+    struct pci_dev *pdev = msi_desc->dev;
+    struct acpi_drhd_unit *drhd = NULL;
+    struct iommu *iommu = NULL;
+    struct ir_ctrl *ir_ctrl;
+
+    drhd = acpi_find_matched_drhd_unit(msi_desc->dev);
+    iommu = drhd->iommu;
+
+    ir_ctrl = iommu_ir_ctrl(iommu);
+    if ( !iommu || !ir_ctrl || ir_ctrl->iremap_maddr == 0 )
+        return;
+
+    msi_msg_to_remap_entry(iommu, pdev, msg);
+}
+
 int intremap_setup(struct iommu *iommu)
 {
     struct ir_ctrl *ir_ctrl;
