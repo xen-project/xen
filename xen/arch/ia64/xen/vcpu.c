@@ -301,13 +301,12 @@ IA64FAULT vcpu_reset_psr_dt(VCPU * vcpu)
 
 IA64FAULT vcpu_reset_psr_sm(VCPU * vcpu, u64 imm24)
 {
-	struct ia64_psr psr, imm, *ipsr;
+	struct ia64_psr imm, *ipsr;
 	REGS *regs = vcpu_regs(vcpu);
 
 	//PRIVOP_COUNT_ADDR(regs,_RSM);
 	// TODO: All of these bits need to be virtualized
 	// TODO: Only allowed for current vcpu
-	__asm__ __volatile("mov %0=psr;;":"=r"(psr)::"memory");
 	ipsr = (struct ia64_psr *)&regs->cr_ipsr;
 	imm = *(struct ia64_psr *)&imm24;
 	// interrupt flag
@@ -336,14 +335,10 @@ IA64FAULT vcpu_reset_psr_sm(VCPU * vcpu, u64 imm24)
 		// ipsr->pp = 1;
 		PSCB(vcpu, vpsr_pp) = 0; // but fool the domain if it gets psr
 	}
-	if (imm.up) {
+	if (imm.up)
 		ipsr->up = 0;
-		psr.up = 0;
-	}
-	if (imm.sp) {
+	if (imm.sp)
 		ipsr->sp = 0;
-		psr.sp = 0;
-	}
 	if (imm.be)
 		ipsr->be = 0;
 	if (imm.dt)
@@ -352,7 +347,6 @@ IA64FAULT vcpu_reset_psr_sm(VCPU * vcpu, u64 imm24)
 		ipsr->pk = 0;
 		vcpu_pkr_use_unset(vcpu);
 	}
-	__asm__ __volatile(";; mov psr.l=%0;; srlz.d"::"r"(psr):"memory");
 	return IA64_NO_FAULT;
 }
 
@@ -371,13 +365,12 @@ IA64FAULT vcpu_set_psr_i(VCPU * vcpu)
 
 IA64FAULT vcpu_set_psr_sm(VCPU * vcpu, u64 imm24)
 {
-	struct ia64_psr psr, imm, *ipsr;
+	struct ia64_psr imm, *ipsr;
 	REGS *regs = vcpu_regs(vcpu);
 	u64 mask, enabling_interrupts = 0;
 
 	//PRIVOP_COUNT_ADDR(regs,_SSM);
 	// TODO: All of these bits need to be virtualized
-	__asm__ __volatile("mov %0=psr;;":"=r"(psr)::"memory");
 	imm = *(struct ia64_psr *)&imm24;
 	ipsr = (struct ia64_psr *)&regs->cr_ipsr;
 	// just handle psr.sp,pp and psr.i,ic (and user mask) for now
@@ -401,10 +394,8 @@ IA64FAULT vcpu_set_psr_sm(VCPU * vcpu, u64 imm24)
 		// ipsr->pp = 1;
 		PSCB(vcpu, vpsr_pp) = 1;
 	}
-	if (imm.sp) {
+	if (imm.sp)
 		ipsr->sp = 1;
-		psr.sp = 1;
-	}
 	if (imm.i) {
 		if (vcpu->vcpu_info->evtchn_upcall_mask) {
 //printk("vcpu_set_psr_sm: psr.ic 0->1\n");
@@ -415,22 +406,14 @@ IA64FAULT vcpu_set_psr_sm(VCPU * vcpu, u64 imm24)
 	if (imm.ic)
 		PSCB(vcpu, interrupt_collection_enabled) = 1;
 	// TODO: do this faster
-	if (imm.mfl) {
+	if (imm.mfl)
 		ipsr->mfl = 1;
-		psr.mfl = 1;
-	}
-	if (imm.mfh) {
+	if (imm.mfh)
 		ipsr->mfh = 1;
-		psr.mfh = 1;
-	}
-	if (imm.ac) {
+	if (imm.ac)
 		ipsr->ac = 1;
-		psr.ac = 1;
-	}
-	if (imm.up) {
+	if (imm.up)
 		ipsr->up = 1;
-		psr.up = 1;
-	}
 	if (imm.be)
 		ipsr->be = 1;
 	if (imm.dt)
@@ -439,7 +422,6 @@ IA64FAULT vcpu_set_psr_sm(VCPU * vcpu, u64 imm24)
 		vcpu_pkr_set_psr_handling(vcpu);
 		ipsr->pk = 1;
 	}
-	__asm__ __volatile(";; mov psr.l=%0;; srlz.d"::"r"(psr):"memory");
 	if (enabling_interrupts &&
 	    vcpu_check_pending_interrupts(vcpu) != SPURIOUS_VECTOR)
 		PSCB(vcpu, pending_interruption) = 1;
