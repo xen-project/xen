@@ -635,6 +635,16 @@ static void amd_iommu_return_device(
     reassign_device(s, t, bus, devfn);
 }
 
+static int amd_iommu_group_id(u8 bus, u8 devfn)
+{
+    int rt;
+    int bdf = (bus << 8) | devfn;
+    rt = ( bdf < ivrs_bdf_entries ) ?
+        ivrs_mappings[bdf].dte_requestor_id :
+        bdf;
+    return rt;
+}
+
 struct iommu_ops amd_iommu_ops = {
     .init = amd_iommu_domain_init,
     .assign_device  = amd_iommu_assign_device,
@@ -642,4 +652,5 @@ struct iommu_ops amd_iommu_ops = {
     .map_page = amd_iommu_map_page,
     .unmap_page = amd_iommu_unmap_page,
     .reassign_device = amd_iommu_return_device,
+    .get_device_group_id = amd_iommu_group_id,
 };

@@ -767,6 +767,37 @@ int xc_assign_device(
     return do_domctl(xc_handle, &domctl);
 }
 
+int xc_get_device_group(
+    int xc_handle,
+    uint32_t domid,
+    uint32_t machine_bdf,
+    uint32_t max_sdevs,
+    uint32_t *num_sdevs,
+    uint32_t *sdev_array)
+{
+    int rc;
+    DECLARE_DOMCTL;
+
+    domctl.cmd = XEN_DOMCTL_get_device_group;
+    domctl.domain = (domid_t)domid;
+
+    domctl.u.get_device_group.machine_bdf = machine_bdf;
+    domctl.u.get_device_group.max_sdevs = max_sdevs;
+
+    set_xen_guest_handle(domctl.u.get_device_group.sdev_array, sdev_array);
+
+    if ( lock_pages(sdev_array, max_sdevs * sizeof(*sdev_array)) != 0 )
+    {
+        PERROR("Could not lock memory for xc_get_device_group\n");
+        return -ENOMEM;
+    }
+    rc = do_domctl(xc_handle, &domctl);
+    unlock_pages(sdev_array, max_sdevs * sizeof(*sdev_array));
+
+    *num_sdevs = domctl.u.get_device_group.num_sdevs;
+    return rc;
+}
+
 int xc_test_assign_device(
     int xc_handle,
     uint32_t domid,

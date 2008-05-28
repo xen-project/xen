@@ -16,6 +16,7 @@
 #include <xen/sched.h>
 #include <xen/iommu.h>
 #include <xen/paging.h>
+#include <xen/guest_access.h>
 
 extern struct iommu_ops intel_iommu_ops;
 extern struct iommu_ops amd_iommu_ops;
@@ -216,7 +217,41 @@ static int iommu_setup(void)
 }
 __initcall(iommu_setup);
 
+int iommu_get_device_group(struct domain *d, u8 bus, u8 devfn, 
+    XEN_GUEST_HANDLE_64(uint32) buf, int max_sdevs)
+{
+    struct hvm_iommu *hd = domain_hvm_iommu(d);
+    struct pci_dev *pdev;
+    int group_id, sdev_id;
+    u32 bdf;
+    int i = 0;
+    struct iommu_ops *ops = hd->platform_ops;
 
+    if ( !iommu_enabled || !ops || !ops->get_device_group_id )
+        return 0;
+
+    group_id = ops->get_device_group_id(bus, devfn);
+
+    list_for_each_entry(pdev,
+        &(dom0->arch.hvm_domain.hvm_iommu.pdev_list), list)
+    {
+        if ( (pdev->bus == bus) && (pdev->devfn == devfn) )
+            continue;
+
+        sdev_id = ops->get_device_group_id(pdev->bus, pdev->devfn);
+        if ( (sdev_id == group_id) && (i < max_sdevs) )
+        {
+            bdf = 0;
+            bdf |= (pdev->bus & 0xff) << 16;
+            bdf |= (pdev->devfn & 0xff) << 8;
+            if ( unlikely(copy_to_guest_offset(buf, i, &bdf, 1)) )
+                return -1;
+            i++;
+        }
+    }
+
+    return i;
+}
 /*
  * Local variables:
  * mode: C

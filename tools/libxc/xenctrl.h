@@ -955,6 +955,13 @@ int xc_assign_device(int xc_handle,
                      uint32_t domid,
                      uint32_t machine_bdf);
 
+int xc_get_device_group(int xc_handle,
+                     uint32_t domid,
+                     uint32_t machine_bdf,
+                     uint32_t max_sdevs,
+                     uint32_t *num_sdevs,
+                     uint32_t *sdev_array);
+
 int xc_test_assign_device(int xc_handle,
                           uint32_t domid,
                           uint32_t machine_bdf);

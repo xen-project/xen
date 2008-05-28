@@ -448,6 +448,16 @@ struct xen_domctl_assign_device {
 typedef struct xen_domctl_assign_device xen_domctl_assign_device_t;
 DEFINE_XEN_GUEST_HANDLE(xen_domctl_assign_device_t);
 
+/* Retrieve sibling devices infomation of machine_bdf */
+#define XEN_DOMCTL_get_device_group 50
+struct xen_domctl_get_device_group {
+    uint32_t  machine_bdf;      /* IN */
+    uint32_t  max_sdevs;        /* IN */
+    uint32_t  num_sdevs;        /* OUT */
+    XEN_GUEST_HANDLE_64(uint32)  sdev_array;   /* OUT */
+};
+typedef struct xen_domctl_get_device_group xen_domctl_get_device_group_t;
+DEFINE_XEN_GUEST_HANDLE(xen_domctl_get_device_group_t);
 
 /* Pass-through interrupts: bind real irq -> hvm devfn. */
 #define XEN_DOMCTL_bind_pt_irq       38
@@ -619,6 +629,7 @@ struct xen_domctl {
         struct xen_domctl_hvmcontext        hvmcontext;
         struct xen_domctl_address_size      address_size;
         struct xen_domctl_sendtrigger       sendtrigger;
+        struct xen_domctl_get_device_group  get_device_group;
         struct xen_domctl_assign_device     assign_device;
         struct xen_domctl_bind_pt_irq       bind_pt_irq;
         struct xen_domctl_memory_mapping    memory_mapping;

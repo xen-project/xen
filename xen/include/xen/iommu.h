@@ -61,6 +61,8 @@ void iommu_domain_destroy(struct domain *d);
 int device_assigned(u8 bus, u8 devfn);
 int assign_device(struct domain *d, u8 bus, u8 devfn);
 void deassign_device(struct domain *d, u8 bus, u8 devfn);
+int iommu_get_device_group(struct domain *d, u8 bus, u8 devfn, 
+    XEN_GUEST_HANDLE_64(uint32) buf, int max_sdevs);
 void reassign_device_ownership(struct domain *source,
                                struct domain *target,
                                u8 bus, u8 devfn);
@@ -98,6 +100,7 @@ struct iommu_ops {
     int (*unmap_page)(struct domain *d, unsigned long gfn);
     void (*reassign_device)(struct domain *s, struct domain *t,
                             u8 bus, u8 devfn);
+    int (*get_device_group_id)(u8 bus, u8 devfn);
 };
 
 #endif /* _IOMMU_H_ */

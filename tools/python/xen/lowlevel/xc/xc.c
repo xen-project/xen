@@ -646,6 +646,68 @@ static PyObject *pyxc_deassign_device(XcObject *self,
     return Py_BuildValue("i", bdf);
 }
 
+static PyObject *pyxc_get_device_group(XcObject *self,
+                                         PyObject *args)
+{
+    domid_t domid;
+    uint32_t bdf = 0;
+    uint32_t max_sdevs, num_sdevs;
+    int seg, bus, dev, func, rc, i;
+    PyObject *Pystr;
+    char *group_str;
+    char dev_str[9];
+    uint32_t *sdev_array;
+
+    if ( !PyArg_ParseTuple(args, "iiiii", &domid, &seg, &bus, &dev, &func) )
+        return NULL;
+
+    /* Maximum allowed siblings device number per group */
+    max_sdevs = 1024;
+
+    if ( (sdev_array = malloc(max_sdevs * sizeof(*sdev_array))) == NULL )
+        return PyErr_NoMemory();
+    memset(sdev_array, 0, max_sdevs * sizeof(*sdev_array));
+
+    bdf |= (bus & 0xff) << 16;
+    bdf |= (dev & 0x1f) << 11;
+    bdf |= (func & 0x7) << 8;
+
+    rc = xc_get_device_group(self->xc_handle,
+        domid, bdf, max_sdevs, &num_sdevs, sdev_array);
+
+    if ( rc < 0 )
+    {
+      free(sdev_array); 
+      return pyxc_error_to_exception();
+    }
+
+    if ( !num_sdevs )
+    {
+       free(sdev_array);
+       return Py_BuildValue("s", "");
+    }
+
+    if ( (group_str = malloc(num_sdevs * sizeof(dev_str))) == NULL )
+        return PyErr_NoMemory();
+    memset(group_str, '\0', num_sdevs * sizeof(dev_str));
+
+    for ( i = 0; i < num_sdevs; i++ )
+    {
+        bus = (sdev_array[i] >> 16) & 0xff;
+        dev = (sdev_array[i] >> 11) & 0x1f;
+        func = (sdev_array[i] >> 8) & 0x7;
+        sprintf(dev_str, "%02x:%02x.%x,", bus, dev, func);
+        strcat(group_str, dev_str);
+    }
+
+    Pystr = Py_BuildValue("s", group_str);
+
+    free(sdev_array);
+    free(group_str);
+
+    return Pystr;
+}
+
 #ifdef __ia64__
 static PyObject *pyxc_nvram_init(XcObject *self,
                                  PyObject *args)
@@ -1583,6 +1645,17 @@ static PyMethodDef pyxc_methods[] = {
       " param   [int]:      No. of HVM param.\n"
       " value   [long]:     Value of param.\n"
       "Returns: [int] 0 on success.\n" },
+
+    { "get_device_group",
+      (PyCFunction)pyxc_get_device_group,
+      METH_VARARGS, "\n"
+      "get sibling devices infomation.\n"
+      " dom     [int]:      Domain to assign device to.\n"
+      " seg     [int]:      PCI segment.\n"
+      " bus     [int]:      PCI bus.\n"
+      " dev     [int]:      PCI dev.\n"
+      " func    [int]:      PCI func.\n"
+      "Returns: [string]:   Sibling devices \n" },
 
      { "test_assign_device",
        (PyCFunction)pyxc_test_assign_device,
