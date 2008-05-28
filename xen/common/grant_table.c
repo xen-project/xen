@@ -1113,6 +1113,7 @@ gnttab_transfer(
         }
 
         guest_physmap_remove_page(d, gop.mfn, mfn, 0);
+        flush_tlb_mask(d->domain_dirty_cpumask);
 
         /* Find the target domain. */
         if ( unlikely((e = rcu_lock_domain_by_id(gop.domid)) == NULL) )
