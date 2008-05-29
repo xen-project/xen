@@ -147,39 +147,6 @@ struct acpi_drhd_unit * acpi_find_matched_drhd_unit(struct pci_dev *dev)
     return NULL;
 }
 
-struct acpi_rmrr_unit * acpi_find_matched_rmrr_unit(struct pci_dev *dev)
-{
-    struct acpi_rmrr_unit *rmrr;
-
-    list_for_each_entry ( rmrr, &acpi_rmrr_units, list )
-        if ( acpi_pci_device_match(rmrr->devices,
-                                   rmrr->devices_cnt, dev) )
-            return rmrr;
-
-    return NULL;
-}
-
-struct acpi_atsr_unit * acpi_find_matched_atsr_unit(struct pci_dev *dev)
-{
-    struct acpi_atsr_unit *atsru;
-    struct acpi_atsr_unit *all_ports_atsru;
-
-    all_ports_atsru = NULL;
-    list_for_each_entry ( atsru, &acpi_atsr_units, list )
-    {
-        if ( atsru->all_ports )
-            all_ports_atsru = atsru;
-        if ( acpi_pci_device_match(atsru->devices,
-                                   atsru->devices_cnt, dev) )
-            return atsru;
-    }
-
-    if ( all_ports_atsru )
-        return all_ports_atsru;;
-
-    return NULL;
-}
-
 static int scope_device_count(void *start, void *end)
 {
     struct acpi_dev_scope *scope;
