@@ -212,10 +212,10 @@ static u64 addr_to_dma_page_maddr(struct domain *domain, u64 addr, int alloc)
     if ( hd->pgd_maddr == 0 )
     {
         if ( !alloc )
-            return 0;
+            goto out;
         hd->pgd_maddr = alloc_pgtable_maddr();
         if ( hd->pgd_maddr == 0 )
-            return 0;
+            goto out;
     }
 
     parent = (struct dma_pte *)map_vtd_domain_page(hd->pgd_maddr);
@@ -263,6 +263,7 @@ static u64 addr_to_dma_page_maddr(struct domain *domain, u64 addr, int alloc)
     }
 
     unmap_vtd_domain_page(parent);
+ out:
     spin_unlock_irqrestore(&hd->mapping_lock, flags);
     return pte_maddr;
 }
