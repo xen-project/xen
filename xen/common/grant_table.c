@@ -1112,7 +1112,9 @@ gnttab_transfer(
             goto copyback;
         }
 
+#ifndef __ia64__ /* IA64 implicitly replaces the old page in steal_page(). */
         guest_physmap_remove_page(d, gop.mfn, mfn, 0);
+#endif
         flush_tlb_mask(d->domain_dirty_cpumask);
 
         /* Find the target domain. */
