@@ -116,6 +116,7 @@ class SrvDomain(SrvDir):
                      ['destination', 'str'],
                      ['live',        'int'],
                      ['port',        'int'],
+                     ['node',        'int'],
                      ['ssl',         'int']])
         return fn(req.args, {'dom': self.dom.domid})
 
