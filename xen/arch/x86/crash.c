@@ -102,6 +102,7 @@ void machine_crash_shutdown(void)
     hvm_cpu_down();
 
     info = kexec_crash_save_info();
+    info->xen_phys_start = xen_phys_start;
     info->dom0_pfn_to_mfn_frame_list_list =
         arch_get_pfn_to_mfn_frame_list_list(dom0);
 }
