@@ -1402,13 +1402,13 @@ void hvm_task_switch(
          hvm_load_segment_selector(v, x86_seg_ldtr, tss.ldt) )
         exn_raised = 1;
 
-    if ( (tss.trace & 1) && !exn_raised )
-        hvm_inject_exception(TRAP_debug, tss_sel & 0xfff8, 0);
-
     rc = hvm_copy_to_guest_virt(
         tr.base, &tss, sizeof(tss), PFEC_page_present);
     if ( rc == HVMCOPY_bad_gva_to_gfn )
         exn_raised = 1;
+
+    if ( (tss.trace & 1) && !exn_raised )
+        hvm_inject_exception(TRAP_debug, tss_sel & 0xfff8, 0);
 
     tr.attr.fields.type = 0xb; /* busy 32-bit tss */
     hvm_set_segment_register(v, x86_seg_tr, &tr);
