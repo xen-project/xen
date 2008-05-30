@@ -39,6 +39,9 @@ u64 hvm_get_guest_time(struct vcpu *v)
     struct pl_time *pl = &v->domain->arch.hvm_domain.pl_time;
     u64 now;
 
+    /* Called from device models shared with PV guests. Be careful. */
+    ASSERT(is_hvm_vcpu(v));
+
     spin_lock(&pl->pl_time_lock);
     now = get_s_time() + pl->stime_offset;
     if ( (int64_t)(now - pl->last_guest_time) >= 0 )
