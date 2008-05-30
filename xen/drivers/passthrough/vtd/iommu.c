@@ -112,28 +112,27 @@ struct iommu_flush *iommu_get_flush(struct iommu *iommu)
     return iommu ? &iommu->intel->flush : NULL;
 }
 
-unsigned int clflush_size;
-void clflush_cache_range(void *adr, int size)
+static unsigned int clflush_size;
+static int iommus_incoherent;
+static void __iommu_flush_cache(void *addr, int size)
 {
     int i;
+
+    if ( !iommus_incoherent )
+        return;
+
     for ( i = 0; i < size; i += clflush_size )
-        clflush(adr + i);
+        clflush((char *)addr + i);
 }
 
-static void __iommu_flush_cache(struct iommu *iommu, void *addr, int size)
+void iommu_flush_cache_entry(void *addr)
 {
-    if ( !ecap_coherent(iommu->ecap) )
-        clflush_cache_range(addr, size);
+    __iommu_flush_cache(addr, 8);
 }
 
-void iommu_flush_cache_entry(struct iommu *iommu, void *addr)
+void iommu_flush_cache_page(void *addr)
 {
-    __iommu_flush_cache(iommu, addr, 8);
-}
-
-void iommu_flush_cache_page(struct iommu *iommu, void *addr)
-{
-    __iommu_flush_cache(iommu, addr, PAGE_SIZE_4K);
+    __iommu_flush_cache(addr, PAGE_SIZE_4K);
 }
 
 int nr_iommus;
@@ -157,7 +156,7 @@ static u64 bus_to_context_maddr(struct iommu *iommu, u8 bus)
         }
         set_root_value(*root, maddr);
         set_root_present(*root);
-        iommu_flush_cache_entry(iommu, root);
+        iommu_flush_cache_entry(root);
     }
     maddr = (u64) get_context_addr(*root);
     unmap_vtd_domain_page(root_entries);
@@ -194,8 +193,6 @@ static int device_context_mapped(struct iommu *iommu, u8 bus, u8 devfn)
 static u64 addr_to_dma_page_maddr(struct domain *domain, u64 addr, int alloc)
 {
     struct hvm_iommu *hd = domain_hvm_iommu(domain);
-    struct acpi_drhd_unit *drhd;
-    struct iommu *iommu;
     int addr_width = agaw_to_width(hd->agaw);
     struct dma_pte *parent, *pte = NULL;
     int level = agaw_to_level(hd->agaw);
@@ -204,19 +201,11 @@ static u64 addr_to_dma_page_maddr(struct domain *domain, u64 addr, int alloc)
     u64 pte_maddr = 0, maddr;
     u64 *vaddr = NULL;
 
-    drhd = list_entry(acpi_drhd_units.next, typeof(*drhd), list);
-    iommu = drhd->iommu;
-
     addr &= (((u64)1) << addr_width) - 1;
     spin_lock_irqsave(&hd->mapping_lock, flags);
     if ( hd->pgd_maddr == 0 )
-    {
-        if ( !alloc )
+        if ( !alloc || ((hd->pgd_maddr = alloc_pgtable_maddr()) == 0) )
             goto out;
-        hd->pgd_maddr = alloc_pgtable_maddr();
-        if ( hd->pgd_maddr == 0 )
-            goto out;
-    }
 
     parent = (struct dma_pte *)map_vtd_domain_page(hd->pgd_maddr);
     while ( level > 1 )
@@ -240,7 +229,7 @@ static u64 addr_to_dma_page_maddr(struct domain *domain, u64 addr, int alloc)
              */
             dma_set_pte_readable(*pte);
             dma_set_pte_writable(*pte);
-            iommu_flush_cache_entry(iommu, pte);
+            iommu_flush_cache_entry(pte);
         }
         else
         {
@@ -551,8 +540,6 @@ static void dma_pte_clear_one(struct domain *domain, u64 addr)
     struct dma_pte *page = NULL, *pte = NULL;
     u64 pg_maddr;
 
-    drhd = list_entry(acpi_drhd_units.next, typeof(*drhd), list);
-
     /* get last level pte */
     pg_maddr = addr_to_dma_page_maddr(domain, addr, 0);
     if ( pg_maddr == 0 )
@@ -567,14 +554,14 @@ static void dma_pte_clear_one(struct domain *domain, u64 addr)
     }
 
     dma_clear_pte(*pte); 
-    iommu_flush_cache_entry(drhd->iommu, pte);
+    iommu_flush_cache_entry(pte);
 
     for_each_drhd_unit ( drhd )
     {
         iommu = drhd->iommu;
-
         if ( test_bit(iommu->index, &hd->iommu_bitmap) )
-            iommu_flush_iotlb_psi(iommu, domain_iommu_domid(domain), addr, 1, 0);
+            iommu_flush_iotlb_psi(iommu, domain_iommu_domid(domain),
+                                  addr, 1, 0);
     }
 
     unmap_vtd_domain_page(page);
@@ -603,7 +590,6 @@ static void dma_pte_clear_range(struct domain *domain, u64 start, u64 end)
 static void iommu_free_next_pagetable(u64 pt_maddr, unsigned long index,
                                       int level)
 {
-    struct acpi_drhd_unit *drhd;
     unsigned long next_index;
     struct dma_pte *pt_vaddr, *pde;
     int next_level;
@@ -613,50 +599,38 @@ static void iommu_free_next_pagetable(u64 pt_maddr, unsigned long index,
 
     pt_vaddr = (struct dma_pte *)map_vtd_domain_page(pt_maddr);
     pde = &pt_vaddr[index];
-    if ( dma_pte_addr(*pde) != 0 )
-    {
-        next_level = level - 1;
-        if ( next_level > 1 )
-        {
-            next_index = 0;
-            do
-            {
-                iommu_free_next_pagetable(pde->val,
-                                          next_index, next_level);
-                next_index++;
-            } while ( next_index < PTE_NUM );
-        }
+    if ( dma_pte_addr(*pde) == 0 )
+        goto out;
 
-        dma_clear_pte(*pde);
-        drhd = list_entry(acpi_drhd_units.next, typeof(*drhd), list);
-        iommu_flush_cache_entry(drhd->iommu, pde);
-        free_pgtable_maddr(pde->val);
-        unmap_vtd_domain_page(pt_vaddr);
+    next_level = level - 1;
+    if ( next_level > 1 )
+    {
+        for ( next_index = 0; next_index < PTE_NUM; next_index++ )
+            iommu_free_next_pagetable(pde->val, next_index, next_level);
     }
-    else
-        unmap_vtd_domain_page(pt_vaddr);
+
+    dma_clear_pte(*pde);
+    iommu_flush_cache_entry(pde);
+    free_pgtable_maddr(pde->val);
+
+ out:
+    unmap_vtd_domain_page(pt_vaddr);
 }
 
 /* free all VT-d page tables when shut down or destroy domain. */
 static void iommu_free_pagetable(struct domain *domain)
 {
-    unsigned long index;
     struct hvm_iommu *hd = domain_hvm_iommu(domain);
-    int total_level = agaw_to_level(hd->agaw);
+    int i, total_level = agaw_to_level(hd->agaw);
 
-    if ( hd->pgd_maddr != 0 )
-    {
-        index = 0;
-        do
-        {
-            iommu_free_next_pagetable(hd->pgd_maddr,
-                                      index, total_level + 1);
-            index++;
-        } while ( index < PTE_NUM );
+    if ( hd->pgd_maddr == 0 )
+        return;
 
-        free_pgtable_maddr(hd->pgd_maddr);
-        hd->pgd_maddr = 0;
-    }
+    for ( i = 0; i < PTE_NUM; i++ )
+        iommu_free_next_pagetable(hd->pgd_maddr, i, total_level + 1);
+
+    free_pgtable_maddr(hd->pgd_maddr);
+    hd->pgd_maddr = 0;
 }
 
 static int iommu_set_root_entry(struct iommu *iommu)
@@ -977,6 +951,8 @@ int iommu_set_interrupt(struct iommu *iommu)
 static int iommu_alloc(struct acpi_drhd_unit *drhd)
 {
     struct iommu *iommu;
+    unsigned long sagaw;
+    int agaw;
 
     if ( nr_iommus > MAX_IOMMUS )
     {
@@ -1003,6 +979,23 @@ static int iommu_alloc(struct acpi_drhd_unit *drhd)
 
     iommu->cap = dmar_readq(iommu->reg, DMAR_CAP_REG);
     iommu->ecap = dmar_readq(iommu->reg, DMAR_ECAP_REG);
+
+    /* Calculate number of pagetable levels: between 2 and 4. */
+    sagaw = cap_sagaw(iommu->cap);
+    for ( agaw = level_to_agaw(4); agaw >= 0; agaw-- )
+        if ( test_bit(agaw, &sagaw) )
+            break;
+    if ( agaw < 0 )
+    {
+        gdprintk(XENLOG_ERR VTDPREFIX,
+                 "IOMMU: unsupported sagaw %lx\n", sagaw);
+        xfree(iommu);
+        return -ENODEV;
+    }
+    iommu->nr_pt_levels = agaw_to_level(agaw);
+
+    if ( !ecap_coherent(iommu->ecap) )
+        iommus_incoherent = 1;
 
     spin_lock_init(&iommu->lock);
     spin_lock_init(&iommu->register_lock);
@@ -1045,10 +1038,7 @@ static int intel_iommu_domain_init(struct domain *d)
 {
     struct hvm_iommu *hd = domain_hvm_iommu(d);
     struct iommu *iommu = NULL;
-    int guest_width = DEFAULT_DOMAIN_ADDRESS_WIDTH;
-    int adjust_width, agaw;
     u64 i;
-    unsigned long sagaw;
     struct acpi_drhd_unit *drhd;
 
     INIT_LIST_HEAD(&hd->pdev_list);
@@ -1056,22 +1046,7 @@ static int intel_iommu_domain_init(struct domain *d)
     drhd = list_entry(acpi_drhd_units.next, typeof(*drhd), list);
     iommu = drhd->iommu;
 
-    /* Calculate AGAW. */
-    if ( guest_width > cap_mgaw(iommu->cap) )
-        guest_width = cap_mgaw(iommu->cap);
-    adjust_width = guestwidth_to_adjustwidth(guest_width);
-    agaw = width_to_agaw(adjust_width);
-    /* FIXME: hardware doesn't support it, choose a bigger one? */
-    sagaw = cap_sagaw(iommu->cap);
-    if ( !test_bit(agaw, &sagaw) )
-    {
-        gdprintk(XENLOG_ERR VTDPREFIX,
-                 "IOMMU: hardware doesn't support the agaw\n");
-        agaw = find_next_bit(&sagaw, 5, agaw);
-        if ( agaw >= 5 )
-            return -ENODEV;
-    }
-    hd->agaw = agaw;
+    hd->agaw = width_to_agaw(DEFAULT_DOMAIN_ADDRESS_WIDTH);
 
     if ( d->domain_id == 0 )
     {
@@ -1115,7 +1090,8 @@ static int domain_context_mapping_one(
     struct hvm_iommu *hd = domain_hvm_iommu(domain);
     struct context_entry *context, *context_entries;
     unsigned long flags;
-    u64 maddr;
+    u64 maddr, pgd_maddr;
+    int agaw;
 
     maddr = bus_to_context_maddr(iommu, bus);
     context_entries = (struct context_entry *)map_vtd_domain_page(maddr);
@@ -1135,17 +1111,33 @@ static int domain_context_mapping_one(
     else
     {
 #endif
+        /* Ensure we have pagetables allocated down to leaf PTE. */
         if ( hd->pgd_maddr == 0 )
         {
-            hd->pgd_maddr = alloc_pgtable_maddr();
+            addr_to_dma_page_maddr(domain, 0, 1);
             if ( hd->pgd_maddr == 0 )
             {
+            nomem:
                 unmap_vtd_domain_page(context_entries);
                 spin_unlock_irqrestore(&iommu->lock, flags);
                 return -ENOMEM;
             }
         }
-        context_set_address_root(*context, hd->pgd_maddr);
+
+        /* Skip top levels of page tables for 2- and 3-level DRHDs. */
+        pgd_maddr = hd->pgd_maddr;
+        for ( agaw = level_to_agaw(4);
+              agaw != level_to_agaw(iommu->nr_pt_levels);
+              agaw-- )
+        {
+            struct dma_pte *p = map_vtd_domain_page(pgd_maddr);
+            pgd_maddr = dma_pte_addr(*p);
+            unmap_vtd_domain_page(p);
+            if ( pgd_maddr == 0 )
+                goto nomem;
+        }
+
+        context_set_address_root(*context, pgd_maddr);
         context_set_translation_type(*context, CONTEXT_TT_MULTI_LEVEL);
 #ifdef CONTEXT_PASSTHRU
     }
@@ -1156,10 +1148,10 @@ static int domain_context_mapping_one(
      * be 1 based as required by intel's iommu hw.
      */
     context_set_domain_id(context, domain);
-    context_set_address_width(*context, hd->agaw);
+    context_set_address_width(*context, agaw);
     context_set_fault_enable(*context);
     context_set_present(*context);
-    iommu_flush_cache_entry(iommu, context);
+    iommu_flush_cache_entry(context);
 
     unmap_vtd_domain_page(context_entries);
 
@@ -1316,7 +1308,7 @@ static int domain_context_unmap_one(
     spin_lock_irqsave(&iommu->lock, flags);
     context_clear_present(*context);
     context_clear_entry(*context);
-    iommu_flush_cache_entry(iommu, context);
+    iommu_flush_cache_entry(context);
     iommu_flush_context_global(iommu, 0);
     iommu_flush_iotlb_global(iommu, 0);
     unmap_vtd_domain_page(context_entries);
@@ -1499,9 +1491,6 @@ int intel_iommu_map_page(
     u64 pg_maddr;
     int pte_present;
 
-    drhd = list_entry(acpi_drhd_units.next, typeof(*drhd), list);
-    iommu = drhd->iommu;
-
 #ifdef CONTEXT_PASSTHRU
     /* do nothing if dom0 and iommu supports pass thru */
     if ( ecap_pass_thru(iommu->ecap) && (d->domain_id == 0) )
@@ -1516,7 +1505,7 @@ int intel_iommu_map_page(
     pte_present = dma_pte_present(*pte);
     dma_set_pte_addr(*pte, (paddr_t)mfn << PAGE_SHIFT_4K);
     dma_set_pte_prot(*pte, DMA_PTE_READ | DMA_PTE_WRITE);
-    iommu_flush_cache_entry(iommu, pte);
+    iommu_flush_cache_entry(pte);
     unmap_vtd_domain_page(page);
 
     for_each_drhd_unit ( drhd )
@@ -1565,10 +1554,9 @@ int iommu_page_mapping(struct domain *domain, paddr_t iova,
     int index;
     u64 pg_maddr;
 
-    drhd = list_entry(acpi_drhd_units.next, typeof(*drhd), list);
-    iommu = drhd->iommu;
     if ( (prot & (DMA_PTE_READ|DMA_PTE_WRITE)) == 0 )
         return -EINVAL;
+
     iova = (iova >> PAGE_SHIFT_4K) << PAGE_SHIFT_4K;
     start_pfn = hpa >> PAGE_SHIFT_4K;
     end_pfn = (PAGE_ALIGN_4K(hpa + size)) >> PAGE_SHIFT_4K;
@@ -1582,7 +1570,7 @@ int iommu_page_mapping(struct domain *domain, paddr_t iova,
         pte = page + (start_pfn & LEVEL_MASK);
         dma_set_pte_addr(*pte, (paddr_t)start_pfn << PAGE_SHIFT_4K);
         dma_set_pte_prot(*pte, prot);
-        iommu_flush_cache_entry(iommu, pte);
+        iommu_flush_cache_entry(pte);
         unmap_vtd_domain_page(page);
         start_pfn++;
         index++;

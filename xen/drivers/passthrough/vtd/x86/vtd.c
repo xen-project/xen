@@ -41,8 +41,6 @@ u64 alloc_pgtable_maddr(void)
 {
     struct page_info *pg;
     u64 *vaddr;
-    struct acpi_drhd_unit *drhd;
-    struct iommu *iommu;
 
     pg = alloc_domheap_page(NULL, 0);
     vaddr = map_domain_page(page_to_mfn(pg));
@@ -50,9 +48,7 @@ u64 alloc_pgtable_maddr(void)
         return 0;
     memset(vaddr, 0, PAGE_SIZE);
 
-    drhd = list_entry(acpi_drhd_units.next, typeof(*drhd), list);
-    iommu = drhd->iommu;
-    iommu_flush_cache_page(iommu, vaddr);
+    iommu_flush_cache_page(vaddr);
     unmap_domain_page(vaddr);
 
     return page_to_maddr(pg);
