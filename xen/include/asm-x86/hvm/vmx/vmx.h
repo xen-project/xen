@@ -334,7 +334,7 @@ static inline int __vmxon(u64 addr)
         "   setna %b0 ; neg %0\n" /* CF==1 or ZF==1 --> rc = -1 */
         "2:\n"
         ".section .fixup,\"ax\"\n"
-        "3: not %0 ; jmp 2b\n"    /* #UD --> rc = -1 */
+        "3: sub $2,%0 ; jmp 2b\n"    /* #UD or #GP --> rc = -2 */
         ".previous\n"
         ".section __ex_table,\"a\"\n"
         "   "__FIXUP_ALIGN"\n"
