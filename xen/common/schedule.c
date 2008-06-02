@@ -503,10 +503,7 @@ ret_t do_sched_op(int cmd, XEN_GUEST_HANDLE(void) arg)
             return ret;
         }
 
-        /* domain_pause() prevens any further execution in guest context. */
-        domain_pause(d);
         domain_shutdown(d, (u8)sched_remote_shutdown.reason);
-        domain_unpause(d);
 
         rcu_unlock_domain(d);
         ret = 0;
