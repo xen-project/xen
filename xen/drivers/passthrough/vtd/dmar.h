@@ -86,7 +86,6 @@ struct acpi_atsr_unit {
     }
 
 struct acpi_drhd_unit * acpi_find_matched_drhd_unit(struct pci_dev *dev);
-struct acpi_rmrr_unit * acpi_find_matched_rmrr_unit(struct pci_dev *dev);
 
 #define DMAR_TYPE 1
 #define RMRR_TYPE 2

@@ -284,7 +284,7 @@ static irqreturn_t evtchn_interrupt(int irq, void *dev_id
 
 #ifndef CONFIG_X86 /* No need for a barrier -- XCHG is a barrier on x86. */
 	/* Clear master flag /before/ clearing selector flag. */
-	rmb();
+	wmb();
 #endif
 	l1 = xchg(&v->evtchn_pending_sel, 0);
 

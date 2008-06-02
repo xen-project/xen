@@ -59,8 +59,6 @@ DEFINE_PER_CPU(unsigned long, cr4);
 static void default_idle(void);
 void (*pm_idle) (void) = default_idle;
 
-static void unmap_vcpu_info(struct vcpu *v);
-
 static void paravirt_ctxt_switch_from(struct vcpu *v);
 static void paravirt_ctxt_switch_to(struct vcpu *v);
 
@@ -432,8 +430,6 @@ void vcpu_destroy(struct vcpu *v)
 {
     if ( is_pv_32on64_vcpu(v) )
         release_compat_l4(v);
-
-    unmap_vcpu_info(v);
 
     if ( is_hvm_vcpu(v) )
         hvm_vcpu_destroy(v);
@@ -825,8 +821,15 @@ int arch_set_info_guest(
 
 void arch_vcpu_reset(struct vcpu *v)
 {
-    destroy_gdt(v);
-    vcpu_destroy_pagetables(v);
+    if ( !is_hvm_vcpu(v) )
+    {
+        destroy_gdt(v);
+        vcpu_destroy_pagetables(v);
+    }
+    else
+    {
+        vcpu_end_shutdown_deferral(v);
+    }
 }
 
 /* 
@@ -1857,16 +1860,19 @@ int domain_relinquish_resources(struct domain *d)
         /* Tear down paging-assistance stuff. */
         paging_teardown(d);
 
-        /* Drop the in-use references to page-table bases. */
         for_each_vcpu ( d, v )
+        {
+            /* Drop the in-use references to page-table bases. */
             vcpu_destroy_pagetables(v);
 
-        /*
-         * Relinquish GDT mappings. No need for explicit unmapping of the LDT
-         * as it automatically gets squashed when the guest's mappings go away.
-         */
-        for_each_vcpu(d, v)
+            /*
+             * Relinquish GDT mappings. No need for explicit unmapping of the
+             * LDT as it automatically gets squashed with the guest mappings.
+             */
             destroy_gdt(v);
+
+            unmap_vcpu_info(v);
+        }
 
         d->arch.relmem = RELMEM_xen_l4;
         /* fallthrough */

@@ -29,9 +29,9 @@
 #define S_TO_NS  1000000000ULL           /* 1s  = 10^9  ns */
 #define S_TO_FS  1000000000000000ULL     /* 1s  = 10^15 fs */
 
-/* Frequency_of_TSC / frequency_of_HPET = 32 */
-#define TSC_PER_HPET_TICK 32
-#define guest_time_hpet(v) (hvm_get_guest_time(v) / TSC_PER_HPET_TICK)
+/* Frequency_of_Xen_systeme_time / frequency_of_HPET = 16 */
+#define STIME_PER_HPET_TICK 16
+#define guest_time_hpet(v) (hvm_get_guest_time(v) / STIME_PER_HPET_TICK)
 
 #define HPET_ID         0x000
 #define HPET_PERIOD     0x004
@@ -192,7 +192,7 @@ static void hpet_stop_timer(HPETState *h, unsigned int tn)
 
 /* the number of HPET tick that stands for
  * 1/(2^10) second, namely, 0.9765625 milliseconds */
-#define  HPET_TINY_TIME_SPAN  ((h->tsc_freq >> 10) / TSC_PER_HPET_TICK)
+#define  HPET_TINY_TIME_SPAN  ((h->stime_freq >> 10) / STIME_PER_HPET_TICK)
 
 static void hpet_set_timer(HPETState *h, unsigned int tn)
 {
@@ -558,17 +558,17 @@ void hpet_init(struct vcpu *v)
     spin_lock_init(&h->lock);
 
     h->vcpu = v;
-    h->tsc_freq = ticks_per_sec(v);
+    h->stime_freq = S_TO_NS;
 
-    h->hpet_to_ns_scale = ((S_TO_NS * TSC_PER_HPET_TICK) << 10) / h->tsc_freq;
+    h->hpet_to_ns_scale = ((S_TO_NS * STIME_PER_HPET_TICK) << 10) / h->stime_freq;
     h->hpet_to_ns_limit = ~0ULL / h->hpet_to_ns_scale;
 
     /* 64-bit main counter; 3 timers supported; LegacyReplacementRoute. */
     h->hpet.capability = 0x8086A201ULL;
 
     /* This is the number of femptoseconds per HPET tick. */
-    /* Here we define HPET's frequency to be 1/32 of the TSC's */
-    h->hpet.capability |= ((S_TO_FS*TSC_PER_HPET_TICK/h->tsc_freq) << 32);
+    /* Here we define HPET's frequency to be 1/16 of Xen system time */
+    h->hpet.capability |= ((S_TO_FS*STIME_PER_HPET_TICK/h->stime_freq) << 32);
 
     for ( i = 0; i < HPET_TIMER_NUM; i++ )
     {

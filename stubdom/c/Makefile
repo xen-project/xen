@@ -2,7 +2,12 @@ XEN_ROOT = ../..
 
 include $(XEN_ROOT)/Config.mk
 
-main.a: main.o
+all: main.a
+
+main-c.c:
+	ln -sf $(XEN_ROOT)/extras/mini-os/main.c $@
+
+main.a: main-c.o main.o 
 	$(AR) cr $@ $^
 
 clean:

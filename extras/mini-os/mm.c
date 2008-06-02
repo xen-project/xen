@@ -58,7 +58,7 @@ static unsigned long *alloc_bitmap;
 #define PAGES_PER_MAPWORD (sizeof(unsigned long) * 8)
 
 #define allocated_in_map(_pn) \
-(alloc_bitmap[(_pn)/PAGES_PER_MAPWORD] & (1<<((_pn)&(PAGES_PER_MAPWORD-1))))
+(alloc_bitmap[(_pn)/PAGES_PER_MAPWORD] & (1UL<<((_pn)&(PAGES_PER_MAPWORD-1))))
 
 /*
  * Hint regarding bitwise arithmetic in map_{alloc,free}:
@@ -80,13 +80,13 @@ static void map_alloc(unsigned long first_page, unsigned long nr_pages)
 
     if ( curr_idx == end_idx )
     {
-        alloc_bitmap[curr_idx] |= ((1<<end_off)-1) & -(1<<start_off);
+        alloc_bitmap[curr_idx] |= ((1UL<<end_off)-1) & -(1UL<<start_off);
     }
     else 
     {
-        alloc_bitmap[curr_idx] |= -(1<<start_off);
-        while ( ++curr_idx < end_idx ) alloc_bitmap[curr_idx] = ~0L;
-        alloc_bitmap[curr_idx] |= (1<<end_off)-1;
+        alloc_bitmap[curr_idx] |= -(1UL<<start_off);
+        while ( ++curr_idx < end_idx ) alloc_bitmap[curr_idx] = ~0UL;
+        alloc_bitmap[curr_idx] |= (1UL<<end_off)-1;
     }
 }
 
@@ -102,13 +102,13 @@ static void map_free(unsigned long first_page, unsigned long nr_pages)
 
     if ( curr_idx == end_idx )
     {
-        alloc_bitmap[curr_idx] &= -(1<<end_off) | ((1<<start_off)-1);
+        alloc_bitmap[curr_idx] &= -(1UL<<end_off) | ((1UL<<start_off)-1);
     }
     else 
     {
-        alloc_bitmap[curr_idx] &= (1<<start_off)-1;
+        alloc_bitmap[curr_idx] &= (1UL<<start_off)-1;
         while ( ++curr_idx != end_idx ) alloc_bitmap[curr_idx] = 0;
-        alloc_bitmap[curr_idx] &= -(1<<end_off);
+        alloc_bitmap[curr_idx] &= -(1UL<<end_off);
     }
 }
 
@@ -178,7 +178,7 @@ USED static void print_chunks(void *start, int nr_pages)
         head = free_head[order];
         while(!FREELIST_EMPTY(head))
         {
-            for(count = 0; count < 1<< head->level; count++)
+            for(count = 0; count < 1UL<< head->level; count++)
             {
                 if(count + virt_to_pfn(head) - pfn_start < 1000)
                     chunks[count + virt_to_pfn(head) - pfn_start] = current;
@@ -235,13 +235,13 @@ static void init_page_allocator(unsigned long min, unsigned long max)
          * Next chunk is limited by alignment of min, but also
          * must not be bigger than remaining range.
          */
-        for ( i = PAGE_SHIFT; (1<<(i+1)) <= range; i++ )
-            if ( min & (1<<i) ) break;
+        for ( i = PAGE_SHIFT; (1UL<<(i+1)) <= range; i++ )
+            if ( min & (1UL<<i) ) break;
 
 
         ch = (chunk_head_t *)min;
-        min   += (1<<i);
-        range -= (1<<i);
+        min   += (1UL<<i);
+        range -= (1UL<<i);
         ct = (chunk_tail_t *)min-1;
         i -= PAGE_SHIFT;
         ch->level       = i;
@@ -280,8 +280,8 @@ unsigned long alloc_pages(int order)
     {
         /* Split into two equal parts. */
         i--;
-        spare_ch = (chunk_head_t *)((char *)alloc_ch + (1<<(i+PAGE_SHIFT)));
-        spare_ct = (chunk_tail_t *)((char *)spare_ch + (1<<(i+PAGE_SHIFT)))-1;
+        spare_ch = (chunk_head_t *)((char *)alloc_ch + (1UL<<(i+PAGE_SHIFT)));
+        spare_ct = (chunk_tail_t *)((char *)spare_ch + (1UL<<(i+PAGE_SHIFT)))-1;
 
         /* Create new header for spare chunk. */
         spare_ch->level = i;
@@ -294,7 +294,7 @@ unsigned long alloc_pages(int order)
         free_head[i] = spare_ch;
     }
     
-    map_alloc(PHYS_PFN(to_phys(alloc_ch)), 1<<order);
+    map_alloc(PHYS_PFN(to_phys(alloc_ch)), 1UL<<order);
 
     return((unsigned long)alloc_ch);
 
@@ -312,16 +312,16 @@ void free_pages(void *pointer, int order)
     unsigned long mask;
     
     /* First free the chunk */
-    map_free(virt_to_pfn(pointer), 1 << order);
+    map_free(virt_to_pfn(pointer), 1UL << order);
     
     /* Create free chunk */
     freed_ch = (chunk_head_t *)pointer;
-    freed_ct = (chunk_tail_t *)((char *)pointer + (1<<(order + PAGE_SHIFT)))-1;
+    freed_ct = (chunk_tail_t *)((char *)pointer + (1UL<<(order + PAGE_SHIFT)))-1;
     
     /* Now, possibly we can conseal chunks together */
     while(order < FREELIST_SIZE)
     {
-        mask = 1 << (order + PAGE_SHIFT);
+        mask = 1UL << (order + PAGE_SHIFT);
         if((unsigned long)freed_ch & mask) 
         {
             to_merge_ch = (chunk_head_t *)((char *)freed_ch - mask);

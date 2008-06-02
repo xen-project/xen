@@ -1100,6 +1100,14 @@ void arch_get_xen_caps(xen_capabilities_info_t *info)
 #endif
 }
 
+int xen_in_range(paddr_t start, paddr_t end)
+{
+    start = max_t(paddr_t, start, xenheap_phys_start);
+    end = min_t(paddr_t, end, xenheap_phys_end);
+ 
+    return start < end; 
+}
+
 /*
  * Local variables:
  * mode: C

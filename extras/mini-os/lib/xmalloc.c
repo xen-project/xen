@@ -127,7 +127,7 @@ static void *xmalloc_whole_pages(size_t size, size_t align)
     if ( hdr == NULL )
         return NULL;
 
-    hdr->size = (1 << (pageorder + PAGE_SHIFT));
+    hdr->size = (1UL << (pageorder + PAGE_SHIFT));
     /* Debugging aid. */
     hdr->freelist.next = hdr->freelist.prev = NULL;
 

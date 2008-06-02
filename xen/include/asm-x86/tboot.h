@@ -46,7 +46,15 @@ typedef struct __attribute__ ((__packed__)) {
 } uuid_t;
 
 /* used to communicate between tboot and the launched kernel (i.e. Xen) */
-#define MAX_TB_ACPI_SINFO_SIZE   64
+
+typedef struct __attribute__ ((__packed__)) {
+    uint16_t pm1a_cnt;
+    uint16_t pm1b_cnt;
+    uint16_t pm1a_evt;
+    uint16_t pm1b_evt;
+    uint16_t pm1a_cnt_val;
+    uint16_t pm1b_cnt_val;
+} tboot_acpi_sleep_info;
 
 typedef struct __attribute__ ((__packed__)) {
     /* version 0x01+ fields: */
@@ -58,8 +66,9 @@ typedef struct __attribute__ ((__packed__)) {
     uint32_t  shutdown_type;     /* type of shutdown (TB_SHUTDOWN_*) */
     uint32_t  s3_tb_wakeup_entry;/* entry point for tboot s3 wake up */
     uint32_t  s3_k_wakeup_entry; /* entry point for xen s3 wake up */
-    uint8_t   acpi_sinfo[MAX_TB_ACPI_SINFO_SIZE];
-                                 /* where kernel put acpi sleep info in Sx */
+    tboot_acpi_sleep_info
+              acpi_sinfo;        /* where kernel put acpi sleep info in Sx */
+    uint8_t   reserved[52];      /* this pad is for compat with old field */
     /* version 0x02+ fields: */
     uint32_t  tboot_base;        /* starting addr for tboot */
     uint32_t  tboot_size;        /* size of tboot */

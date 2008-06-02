@@ -1939,6 +1939,20 @@ int get_page_type(struct page_info *page, unsigned long type)
     }
     while ( unlikely((y = cmpxchg(&page->u.inuse.type_info, x, nx)) != x) );
 
+    if ( unlikely((x & PGT_type_mask) != type) )
+    {
+        /* Special pages should not be accessible from devices. */
+        struct domain *d = page_get_owner(page);
+        if ( d && unlikely(need_iommu(d)) )
+        {
+            if ( (x & PGT_type_mask) == PGT_writable_page )
+                iommu_unmap_page(d, mfn_to_gmfn(d, page_to_mfn(page)));
+            else if ( type == PGT_writable_page )
+                iommu_map_page(d, mfn_to_gmfn(d, page_to_mfn(page)),
+                               page_to_mfn(page));
+        }
+    }
+
     if ( unlikely(!(nx & PGT_validated)) )
     {
         /* Try to validate page type; drop the new reference on failure. */

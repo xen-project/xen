@@ -22,18 +22,19 @@
 #include <xen/types.h>
 #include <xen/mm.h>
 #include <xen/xmalloc.h>
+#include <xen/domain.h>
 #include <xen/domain_page.h>
-#include <asm/page.h>
 #include <xen/event.h>
 #include <xen/trace.h>
+#include <xen/lib.h>
+#include <xen/sched.h>
+#include <xen/numa.h>
+#include <asm/current.h>
+#include <asm/page.h>
 #include <asm/hvm/hvm.h>
 #include <asm/hvm/io.h>
 #include <asm/hvm/support.h>
-#include <xen/lib.h>
-#include <xen/sched.h>
-#include <asm/current.h>
 #include <asm/hvm/vmx/vmx.h>
-#include <xen/numa.h>
 #include <public/hvm/ioreq.h>
 #include <public/hvm/params.h>
 
@@ -259,6 +260,7 @@ static void vlapic_init_action(unsigned long _vcpu)
 {
     struct vcpu *v = (struct vcpu *)_vcpu;
     struct domain *d = v->domain;
+    bool_t fpu_initialised;
 
     /* If the VCPU is not on its way down we have nothing to do. */
     if ( !test_bit(_VPF_down, &v->pause_flags) )
@@ -270,15 +272,12 @@ static void vlapic_init_action(unsigned long _vcpu)
         return;
     }
 
+    /* Reset necessary VCPU state. This does not include FPU state. */
     domain_lock(d);
-
-    /* Paranoia makes us re-assert VPF_down under the domain lock. */
-    set_bit(_VPF_down, &v->pause_flags);
-    v->is_initialised = 0;
-    clear_bit(_VPF_blocked, &v->pause_flags);
-
+    fpu_initialised = v->fpu_initialised;
+    vcpu_reset(v);
+    v->fpu_initialised = fpu_initialised;
     vlapic_reset(vcpu_vlapic(v));
-
     domain_unlock(d);
 
     vcpu_unpause(v);
@@ -474,7 +473,6 @@ static uint32_t vlapic_get_tmcct(struct vlapic *vlapic)
     uint64_t counter_passed;
 
     counter_passed = ((hvm_get_guest_time(v) - vlapic->timer_last_update)
-                      * 1000000000ULL / ticks_per_sec(v)
                       / APIC_BUS_CYCLE_NS / vlapic->hw.timer_divisor);
     tmcct = tmict - counter_passed;
 

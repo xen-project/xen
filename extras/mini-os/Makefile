@@ -73,44 +73,25 @@ lwip.a: $(LWO)
 OBJS += lwip.a
 endif
 
-OBJS := $(filter-out lwip%.o $(LWO), $(OBJS))
-
-ifeq ($(caml),y)
-CAMLLIB = $(shell ocamlc -where)
-APP_OBJS += main-caml.o
-APP_OBJS += $(CAMLDIR)/caml.o
-APP_OBJS += $(CAMLLIB)/libasmrun.a
-CFLAGS += -I$(CAMLLIB)
-APP_LDLIBS += -lm
-endif
-OBJS := $(filter-out main-caml.o, $(OBJS))
-
-ifeq ($(qemu),y)
-APP_OBJS += $(QEMUDIR)/i386-dm-stubdom/qemu.a $(QEMUDIR)/i386-dm-stubdom/libqemu.a
-CFLAGS += -DCONFIG_QEMU
-endif
-
-ifneq ($(CDIR),)
-APP_OBJS += $(CDIR)/main.a
-APP_LDLIBS += 
-endif
+OBJS := $(filter-out main.o lwip%.o $(LWO), $(OBJS))
 
 ifeq ($(libc),y)
-LDLIBS += -L$(XEN_ROOT)/stubdom/libxc -lxenctrl -lxenguest
+APP_LDLIBS += -L$(XEN_ROOT)/stubdom/libxc -whole-archive -lxenguest -lxenctrl -no-whole-archive
 APP_LDLIBS += -lpci
 APP_LDLIBS += -lz
+APP_LDLIBS += -lm
 LDLIBS += -lc
 endif
 
-ifneq ($(caml)-$(qemu)-$(CDIR)-$(lwip),---y)
+ifneq ($(APP_OBJS)-$(lwip),-y)
 OBJS := $(filter-out daytime.o, $(OBJS))
 endif
 
-app.o: $(APP_OBJS) app.lds
-	$(LD) -r -d $(LDFLAGS) $^ $(APP_LDLIBS) --undefined main -o $@
+$(TARGET)_app.o: $(APP_OBJS) app.lds
+	$(LD) -r -d $(LDFLAGS) $^ $(APP_LDLIBS) --undefined app_main -o $@
 
-$(TARGET): links $(OBJS) app.o arch_lib
-	$(LD) -r $(LDFLAGS) $(HEAD_OBJ) app.o $(OBJS) $(LDARCHLIB) $(LDLIBS) -o $@.o
+$(TARGET): links $(OBJS) $(TARGET)_app.o arch_lib
+	$(LD) -r $(LDFLAGS) $(HEAD_OBJ) $(TARGET)_app.o $(OBJS) $(LDARCHLIB) $(LDLIBS) -o $@.o
 	$(OBJCOPY) -w -G $(GLOBAL_PREFIX)* -G _start $@.o $@.o
 	$(LD) $(LDFLAGS) $(LDFLAGS_FINAL) $@.o $(EXTRA_OBJS) -o $@
 	gzip -f -9 -c $@ >$@.gz

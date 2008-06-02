@@ -526,14 +526,54 @@ long arch_do_domctl(
     }
     break;
 
+    case XEN_DOMCTL_get_device_group:
+    {
+        struct domain *d;
+        u32 max_sdevs;
+        u8 bus, devfn;
+        XEN_GUEST_HANDLE_64(uint32) sdevs;
+        int num_sdevs;
+
+        ret = -ENOSYS;
+        if ( !iommu_enabled )
+            break;
+
+        ret = -EINVAL;
+        if ( (d = rcu_lock_domain_by_id(domctl->domain)) == NULL )
+            break;
+
+        bus = (domctl->u.get_device_group.machine_bdf >> 16) & 0xff;
+        devfn = (domctl->u.get_device_group.machine_bdf >> 8) & 0xff;
+        max_sdevs = domctl->u.get_device_group.max_sdevs;
+        sdevs = domctl->u.get_device_group.sdev_array;
+
+        num_sdevs = iommu_get_device_group(d, bus, devfn, sdevs, max_sdevs);
+        if ( num_sdevs < 0 )
+        {
+            dprintk(XENLOG_ERR, "iommu_get_device_group() failed!\n");
+            ret = -EFAULT;
+            domctl->u.get_device_group.num_sdevs = 0;
+        }
+        else
+        {
+            ret = 0;
+            domctl->u.get_device_group.num_sdevs = num_sdevs;
+        }
+        if ( copy_to_guest(u_domctl, domctl, 1) )
+            ret = -EFAULT;
+        rcu_unlock_domain(d);
+    }
+    break;
+
     case XEN_DOMCTL_test_assign_device:
     {
         u8 bus, devfn;
 
-        ret = -EINVAL;
+        ret = -ENOSYS;
         if ( !iommu_enabled )
             break;
 
+        ret = -EINVAL;
         bus = (domctl->u.assign_device.machine_bdf >> 16) & 0xff;
         devfn = (domctl->u.assign_device.machine_bdf >> 8) & 0xff;
 
@@ -553,10 +593,11 @@ long arch_do_domctl(
         struct domain *d;
         u8 bus, devfn;
 
-        ret = -EINVAL;
+        ret = -ENOSYS;
         if ( !iommu_enabled )
             break;
 
+        ret = -EINVAL;
         if ( unlikely((d = get_domain_by_id(domctl->domain)) == NULL) )
         {
             gdprintk(XENLOG_ERR,
@@ -565,6 +606,12 @@ long arch_do_domctl(
         }
         bus = (domctl->u.assign_device.machine_bdf >> 16) & 0xff;
         devfn = (domctl->u.assign_device.machine_bdf >> 8) & 0xff;
+
+        if ( !iommu_pv_enabled && !is_hvm_domain(d) )
+        {
+            ret = -ENOSYS;
+            break;
+        }
 
         if ( device_assigned(bus, devfn) )
         {
@@ -576,7 +623,7 @@ long arch_do_domctl(
 
         ret = assign_device(d, bus, devfn);
         gdprintk(XENLOG_INFO, "XEN_DOMCTL_assign_device: bdf = %x:%x:%x\n",
-            bus, PCI_SLOT(devfn), PCI_FUNC(devfn));
+                 bus, PCI_SLOT(devfn), PCI_FUNC(devfn));
         put_domain(d);
     }
     break;
@@ -586,10 +633,11 @@ long arch_do_domctl(
         struct domain *d;
         u8 bus, devfn;
 
-        ret = -EINVAL;
+        ret = -ENOSYS;
         if ( !iommu_enabled )
             break;
 
+        ret = -EINVAL;
         if ( unlikely((d = get_domain_by_id(domctl->domain)) == NULL) )
         {
             gdprintk(XENLOG_ERR,
@@ -599,9 +647,16 @@ long arch_do_domctl(
         bus = (domctl->u.assign_device.machine_bdf >> 16) & 0xff;
         devfn = (domctl->u.assign_device.machine_bdf >> 8) & 0xff;
 
+        if ( !iommu_pv_enabled && !is_hvm_domain(d) )
+        {
+            ret = -ENOSYS;
+            break;
+        }
+
         if ( !device_assigned(bus, devfn) )
             break;
 
+        ret = 0;
         deassign_device(d, bus, devfn);
         gdprintk(XENLOG_INFO, "XEN_DOMCTL_deassign_device: bdf = %x:%x:%x\n",
             bus, PCI_SLOT(devfn), PCI_FUNC(devfn));

@@ -29,6 +29,7 @@
 
 extern int vtd_enabled;
 extern int iommu_enabled;
+extern int iommu_pv_enabled;
 
 #define domain_hvm_iommu(d)     (&d->arch.hvm_domain.hvm_iommu)
 #define domain_vmx_iommu(d)     (&d->arch.hvm_domain.hvm_iommu.vmx_iommu)
@@ -43,7 +44,9 @@ extern int iommu_enabled;
 struct iommu {
     struct list_head list;
     void __iomem *reg; /* Pointer to hardware regs, virtual addr */
+    u32	index;         /* Sequence number of iommu */
     u32	gcmd;          /* Holds TE, EAFL. Don't need SRTP, SFL, WBF */
+    u32 nr_pt_levels;
     u64	cap;
     u64	ecap;
     spinlock_t lock; /* protect context, domain ids */
@@ -58,14 +61,13 @@ void iommu_domain_destroy(struct domain *d);
 int device_assigned(u8 bus, u8 devfn);
 int assign_device(struct domain *d, u8 bus, u8 devfn);
 void deassign_device(struct domain *d, u8 bus, u8 devfn);
+int iommu_get_device_group(struct domain *d, u8 bus, u8 devfn, 
+    XEN_GUEST_HANDLE_64(uint32) buf, int max_sdevs);
 void reassign_device_ownership(struct domain *source,
                                struct domain *target,
                                u8 bus, u8 devfn);
 int iommu_map_page(struct domain *d, unsigned long gfn, unsigned long mfn);
 int iommu_unmap_page(struct domain *d, unsigned long gfn);
-void iommu_flush(struct domain *d, unsigned long gfn, u64 *p2m_entry);
-void iommu_set_pgd(struct domain *d);
-void iommu_free_pgd(struct domain *d);
 void iommu_domain_teardown(struct domain *d);
 int hvm_do_IRQ_dpci(struct domain *d, unsigned int irq);
 int dpci_ioport_intercept(ioreq_t *p);
@@ -76,6 +78,11 @@ int pt_irq_destroy_bind_vtd(struct domain *d,
 unsigned int io_apic_read_remap_rte(unsigned int apic, unsigned int reg);
 void io_apic_write_remap_rte(unsigned int apic,
                              unsigned int reg, unsigned int value);
+
+struct msi_desc;
+struct msi_msg;
+void msi_msg_read_remap_rte(struct msi_desc *msi_desc, struct msi_msg *msg);
+void msi_msg_write_remap_rte(struct msi_desc *msi_desc, struct msi_msg *msg);
 struct qi_ctrl *iommu_qi_ctrl(struct iommu *iommu);
 struct ir_ctrl *iommu_ir_ctrl(struct iommu *iommu);
 struct iommu_flush *iommu_get_flush(struct iommu *iommu);
@@ -94,6 +101,7 @@ struct iommu_ops {
     int (*unmap_page)(struct domain *d, unsigned long gfn);
     void (*reassign_device)(struct domain *s, struct domain *t,
                             u8 bus, u8 devfn);
+    int (*get_device_group_id)(u8 bus, u8 devfn);
 };
 
 #endif /* _IOMMU_H_ */

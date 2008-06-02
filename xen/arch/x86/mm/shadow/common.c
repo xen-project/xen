@@ -2799,8 +2799,11 @@ int shadow_track_dirty_vram(struct domain *d,
     if ( !d->dirty_vram )
     {
         /* Just recount from start. */
-        for ( i = begin_pfn; i < end_pfn; i++ )
-            flush_tlb |= sh_remove_all_mappings(d->vcpu[0], gfn_to_mfn(d, i, &t));
+        for ( i = begin_pfn; i < end_pfn; i++ ) {
+            mfn_t mfn = gfn_to_mfn(d, i, &t);
+            if (mfn_x(mfn) != INVALID_MFN)
+                flush_tlb |= sh_remove_all_mappings(d->vcpu[0], mfn);
+        }
 
         gdprintk(XENLOG_INFO, "tracking VRAM %lx - %lx\n", begin_pfn, end_pfn);
 
@@ -2840,61 +2843,70 @@ int shadow_track_dirty_vram(struct domain *d,
         /* Iterate over VRAM to track dirty bits. */
         for ( i = 0; i < nr; i++ ) {
             mfn_t mfn = gfn_to_mfn(d, begin_pfn + i, &t);
-            struct page_info *page = mfn_to_page(mfn);
-            u32 count_info = page->u.inuse.type_info & PGT_count_mask;
+            struct page_info *page;
+            u32 count_info;
             int dirty = 0;
             paddr_t sl1ma = d->dirty_vram->sl1ma[i];
 
-            switch (count_info)
+            if (mfn_x(mfn) == INVALID_MFN)
             {
-            case 0:
-                /* No guest reference, nothing to track. */
-                break;
-            case 1:
-                /* One guest reference. */
-                if ( sl1ma == INVALID_PADDR )
+                dirty = 1;
+            }
+            else
+            {
+                page = mfn_to_page(mfn);
+                count_info = page->u.inuse.type_info & PGT_count_mask;
+                switch (count_info)
                 {
-                    /* We don't know which sl1e points to this, too bad. */
-                    dirty = 1;
-                    /* TODO: Heuristics for finding the single mapping of
-                     * this gmfn */
-                    flush_tlb |= sh_remove_all_mappings(d->vcpu[0], gfn_to_mfn(d, begin_pfn + i, &t));
-                }
-                else
-                {
-                    /* Hopefully the most common case: only one mapping,
-                     * whose dirty bit we can use. */
-                    l1_pgentry_t *sl1e;
-#ifdef __i386__
-                    void *sl1p = map_sl1p;
-                    unsigned long sl1mfn = paddr_to_pfn(sl1ma);
-
-                    if ( sl1mfn != map_mfn ) {
-                        if ( map_sl1p )
-                            sh_unmap_domain_page(map_sl1p);
-                        map_sl1p = sl1p = sh_map_domain_page(_mfn(sl1mfn));
-                        map_mfn = sl1mfn;
+                case 0:
+                    /* No guest reference, nothing to track. */
+                    break;
+                case 1:
+                    /* One guest reference. */
+                    if ( sl1ma == INVALID_PADDR )
+                    {
+                        /* We don't know which sl1e points to this, too bad. */
+                        dirty = 1;
+                        /* TODO: Heuristics for finding the single mapping of
+                         * this gmfn */
+                        flush_tlb |= sh_remove_all_mappings(d->vcpu[0], mfn);
                     }
-                    sl1e = sl1p + (sl1ma & ~PAGE_MASK);
+                    else
+                    {
+                        /* Hopefully the most common case: only one mapping,
+                         * whose dirty bit we can use. */
+                        l1_pgentry_t *sl1e;
+#ifdef __i386__
+                        void *sl1p = map_sl1p;
+                        unsigned long sl1mfn = paddr_to_pfn(sl1ma);
+
+                        if ( sl1mfn != map_mfn ) {
+                            if ( map_sl1p )
+                                sh_unmap_domain_page(map_sl1p);
+                            map_sl1p = sl1p = sh_map_domain_page(_mfn(sl1mfn));
+                            map_mfn = sl1mfn;
+                        }
+                        sl1e = sl1p + (sl1ma & ~PAGE_MASK);
 #else
-                    sl1e = maddr_to_virt(sl1ma);
+                        sl1e = maddr_to_virt(sl1ma);
 #endif
 
-                    if ( l1e_get_flags(*sl1e) & _PAGE_DIRTY )
-                    {
-                        dirty = 1;
-                        /* Note: this is atomic, so we may clear a
-                         * _PAGE_ACCESSED set by another processor. */
-                        l1e_remove_flags(*sl1e, _PAGE_DIRTY);
-                        flush_tlb = 1;
+                        if ( l1e_get_flags(*sl1e) & _PAGE_DIRTY )
+                        {
+                            dirty = 1;
+                            /* Note: this is atomic, so we may clear a
+                             * _PAGE_ACCESSED set by another processor. */
+                            l1e_remove_flags(*sl1e, _PAGE_DIRTY);
+                            flush_tlb = 1;
+                        }
                     }
+                    break;
+                default:
+                    /* More than one guest reference,
+                     * we don't afford tracking that. */
+                    dirty = 1;
+                    break;
                 }
-                break;
-            default:
-                /* More than one guest reference,
-                 * we don't afford tracking that. */
-                dirty = 1;
-                break;
             }
 
             if ( dirty )
@@ -2916,8 +2928,11 @@ int shadow_track_dirty_vram(struct domain *d,
             {
                 /* was clean for more than two seconds, try to disable guest
                  * write access */
-                for ( i = begin_pfn; i < end_pfn; i++ )
-                    flush_tlb |= sh_remove_write_access(d->vcpu[0], gfn_to_mfn(d, i, &t), 1, 0);
+                for ( i = begin_pfn; i < end_pfn; i++ ) {
+                    mfn_t mfn = gfn_to_mfn(d, i, &t);
+                    if (mfn_x(mfn) != INVALID_MFN)
+                        flush_tlb |= sh_remove_write_access(d->vcpu[0], mfn, 1, 0);
+                }
                 d->dirty_vram->last_dirty = -1;
             }
             rc = 0;

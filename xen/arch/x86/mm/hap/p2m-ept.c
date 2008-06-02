@@ -267,12 +267,6 @@ out:
         }
     }
 
-#ifdef P2M_SHARE_WITH_VTD_PAGE_TABLE
-    /* If p2m table is shared with vtd page-table. */
-    if ( iommu_enabled && is_hvm_domain(d) && (p2mt == p2m_mmio_direct) )
-        iommu_flush(d, gfn, (u64*)ept_entry);
-#endif
-
     return rv;
 }
 

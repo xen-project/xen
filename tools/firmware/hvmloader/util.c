@@ -609,7 +609,7 @@ int get_apic_mode(void)
 uint16_t get_cpu_mhz(void)
 {
     struct xen_add_to_physmap xatp;
-    struct shared_info *shared_info = (struct shared_info *)0xa0000;
+    struct shared_info *shared_info = (struct shared_info *)0xfffff000;
     struct vcpu_time_info *info = &shared_info->vcpu_info[0].time;
     uint64_t cpu_khz;
     uint32_t tsc_to_nsec_mul, version;
@@ -619,7 +619,7 @@ uint16_t get_cpu_mhz(void)
     if ( cpu_mhz != 0 )
         return cpu_mhz;
 
-    /* Map shared-info page to 0xa0000 (i.e., overlap VGA hole). */
+    /* Map shared-info page. */
     xatp.domid = DOMID_SELF;
     xatp.space = XENMAPSPACE_shared_info;
     xatp.idx   = 0;
@@ -643,14 +643,6 @@ uint16_t get_cpu_mhz(void)
         cpu_khz = cpu_khz << -tsc_shift;
     else
         cpu_khz = cpu_khz >> tsc_shift;
-
-    /* Get the VGA MMIO hole back by remapping shared info to scratch. */
-    xatp.domid = DOMID_SELF;
-    xatp.space = XENMAPSPACE_shared_info;
-    xatp.idx   = 0;
-    xatp.gpfn  = 0xfffff; /* scratch pfn */
-    if ( hypercall_memory_op(XENMEM_add_to_physmap, &xatp) != 0 )
-        BUG();
 
     cpu_mhz = (uint16_t)(((uint32_t)cpu_khz + 500) / 1000);
     return cpu_mhz;

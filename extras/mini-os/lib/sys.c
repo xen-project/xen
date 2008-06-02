@@ -81,6 +81,7 @@
 
 #define NOFILE 32
 extern int xc_evtchn_close(int fd);
+extern int xc_interface_close(int fd);
 
 pthread_mutex_t fd_lock = PTHREAD_MUTEX_INITIALIZER;
 struct file files[NOFILE] = {
@@ -259,10 +260,7 @@ int read(int fd, void *buf, size_t nbytes)
 	    }
 	    return ret * sizeof(union xenfb_in_event);
         }
-	case FTYPE_NONE:
-	case FTYPE_XENBUS:
-	case FTYPE_EVTCHN:
-	case FTYPE_BLK:
+	default:
 	    break;
     }
     printk("read(%d): Bad descriptor\n", fd);
@@ -295,12 +293,7 @@ int write(int fd, const void *buf, size_t nbytes)
 	case FTYPE_TAP:
 	    netfront_xmit(files[fd].tap.dev, (void*) buf, nbytes);
 	    return nbytes;
-	case FTYPE_NONE:
-	case FTYPE_XENBUS:
-	case FTYPE_EVTCHN:
-	case FTYPE_BLK:
-	case FTYPE_KBD:
-	case FTYPE_FB:
+	default:
 	    break;
     }
     printk("write(%d): Bad descriptor\n", fd);
@@ -351,15 +344,7 @@ int fsync(int fd) {
 	    }
 	    return 0;
 	}
-	case FTYPE_NONE:
-	case FTYPE_CONSOLE:
-	case FTYPE_SOCKET:
-	case FTYPE_XENBUS:
-	case FTYPE_EVTCHN:
-	case FTYPE_TAP:
-	case FTYPE_BLK:
-	case FTYPE_KBD:
-	case FTYPE_FB:
+	default:
 	    break;
     }
     printk("fsync(%d): Bad descriptor\n", fd);
@@ -391,6 +376,9 @@ int close(int fd)
 	    files[fd].type = FTYPE_NONE;
 	    return res;
 	}
+	case FTYPE_XC:
+	    xc_interface_close(fd);
+	    return 0;
 	case FTYPE_EVTCHN:
             xc_evtchn_close(fd);
             return 0;
@@ -495,13 +483,7 @@ int fstat(int fd, struct stat *buf)
 	    stat_from_fs(buf, &stat);
 	    return 0;
 	}
-	case FTYPE_NONE:
-	case FTYPE_XENBUS:
-	case FTYPE_EVTCHN:
-	case FTYPE_TAP:
-	case FTYPE_BLK:
-	case FTYPE_KBD:
-	case FTYPE_FB:
+	default:
 	    break;
     }
 
@@ -522,15 +504,7 @@ int ftruncate(int fd, off_t length)
 	    }
 	    return 0;
 	}
-	case FTYPE_NONE:
-	case FTYPE_CONSOLE:
-	case FTYPE_SOCKET:
-	case FTYPE_XENBUS:
-	case FTYPE_EVTCHN:
-	case FTYPE_TAP:
-	case FTYPE_BLK:
-	case FTYPE_KBD:
-	case FTYPE_FB:
+	default:
 	    break;
     }
 
@@ -636,9 +610,10 @@ static const char file_types[] = {
     [FTYPE_NONE]	= 'N',
     [FTYPE_CONSOLE]	= 'C',
     [FTYPE_FILE]	= 'F',
-    [FTYPE_XENBUS]	= 'X',
+    [FTYPE_XENBUS]	= 'S',
+    [FTYPE_XC]		= 'X',
     [FTYPE_EVTCHN]	= 'E',
-    [FTYPE_SOCKET]	= 'S',
+    [FTYPE_SOCKET]	= 's',
     [FTYPE_TAP]		= 'T',
     [FTYPE_BLK]		= 'B',
     [FTYPE_KBD]		= 'K',
@@ -722,7 +697,7 @@ static int select_poll(int nfds, fd_set *readfds, fd_set *writefds, fd_set *exce
     /* Then see others as well. */
     for (i = 0; i < nfds; i++) {
 	switch(files[i].type) {
-	case FTYPE_NONE:
+	default:
 	    if (FD_ISSET(i, readfds) || FD_ISSET(i, writefds) || FD_ISSET(i, exceptfds))
 		printk("bogus fd %d in select\n", i);
 	    /* Fallthrough.  */
@@ -1083,14 +1058,20 @@ int clock_gettime(clockid_t clk_id, struct timespec *tp)
 
 void *mmap(void *start, size_t length, int prot, int flags, int fd, off_t offset)
 {
+    unsigned long n = (length + PAGE_SIZE - 1) / PAGE_SIZE;
+
     ASSERT(!start);
-    length = (length + PAGE_SIZE - 1) & PAGE_MASK;
     ASSERT(prot == (PROT_READ|PROT_WRITE));
-    ASSERT(flags == (MAP_SHARED|MAP_ANON) || flags == (MAP_PRIVATE|MAP_ANON));
-    ASSERT(fd == -1);
+    ASSERT((fd == -1 && (flags == (MAP_SHARED|MAP_ANON) || flags == (MAP_PRIVATE|MAP_ANON)))
+        || (fd != -1 && flags == MAP_SHARED));
     ASSERT(offset == 0);
 
-    return map_zero(length / PAGE_SIZE, 1);
+    if (fd == -1)
+        return map_zero(n, 1);
+    else if (files[fd].type == FTYPE_XC) {
+        unsigned long zero = 0;
+        return map_frames_ex(&zero, n, 0, 0, 1, DOMID_SELF, 0, 0);
+    } else ASSERT(0);
 }
 #if defined(__x86_64__) || defined(__ia64__)
 __typeof__(mmap) mmap64 __attribute__((__alias__("mmap")));
@@ -1110,7 +1091,7 @@ int munmap(void *start, size_t length)
 	call[i].args[0] = (unsigned long) &data[i];
 	call[i].args[1] = 0;
 	call[i].args[2] = 0;
-	call[i].args[3] = UVMF_INVLPG | UVMF_ALL;
+	call[i].args[3] = UVMF_INVLPG;
     }
 
     ret = HYPERVISOR_multicall(call, n);

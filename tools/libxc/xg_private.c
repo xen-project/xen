@@ -12,22 +12,6 @@
 
 #include "xg_private.h"
 
-int lock_pages(void *addr, size_t len)
-{
-    int e = 0;
-#ifndef __sun__
-    e = mlock(addr, len);
-#endif
-    return (e);
-}
-
-void unlock_pages(void *addr, size_t len)
-{
-#ifndef __sun__
-    safe_munlock(addr, len);
-#endif
-}
-
 char *xc_read_image(const char *filename, unsigned long *size)
 {
     int kernel_fd = -1;

@@ -28,9 +28,25 @@ SECTIONS
   .fini_array     : { *(.fini_array) }
   PROVIDE (__fini_array_end = .);
 
+  .ctors : {
+        __CTOR_LIST__ = .;
+        QUAD((__CTOR_END__ - __CTOR_LIST__) / 8 - 2)
+        *(SORT_BY_NAME(.ctors))
+	SORT_BY_NAME(CONSTRUCTORS)
+        QUAD(0)
+        __CTOR_END__ = .;
+        }
+
+  .dtors : {
+        __DTOR_LIST__ = .;
+        QUAD((__DTOR_END__ - __DTOR_LIST__) / 8 - 2)
+        *(SORT_BY_NAME(.dtors))
+        QUAD(0)
+        __DTOR_END__ = .;
+        }
+
   .data : {			/* Data */
 	*(.data)
-	CONSTRUCTORS
 	}
 
   _edata = .;			/* End of data section */

@@ -43,6 +43,7 @@ struct hvm_iommu {
     int agaw;     /* adjusted guest address width, 0 is level 2 30-bit */
     struct list_head g2m_ioport_list;  /* guest to machine ioport mapping */
     domid_t iommu_domid;           /* domain id stored in iommu */
+    u64 iommu_bitmap;              /* bitmap of iommu(s) that the domain uses */
 
     /* amd iommu support */
     int domain_id;
@@ -53,5 +54,8 @@ struct hvm_iommu {
     /* iommu_ops */
     struct iommu_ops *platform_ops;
 };
+
+#define has_iommu_pdevs(domain) \
+    (!list_empty(&(domain->arch.hvm_domain.hvm_iommu.pdev_list)))
 
 #endif /* __ASM_X86_HVM_IOMMU_H__ */

@@ -226,6 +226,39 @@ class PciController(DevController):
 
         return sxpr    
 
+    def CheckSiblingDevices(self, domid, dev):
+        """ Check if all sibling devices of dev are owned by pciback
+        """
+        if not self.vm.info.is_hvm():
+            return
+
+        group_str = xc.get_device_group(domid, dev.domain, dev.bus, dev.slot, dev.func)
+        if group_str == "":
+            return
+
+        #group string format xx:xx.x,xx:xx.x,
+        devstr_len = group_str.find(',')
+        for i in range(0, len(group_str), devstr_len + 1):
+            (bus, slotfunc) = group_str[i:i + devstr_len].split(':')
+            (slot, func) = slotfunc.split('.')
+            b = parse_hex(bus)
+            d = parse_hex(slot)
+            f = parse_hex(func)
+            try:
+                sdev = PciDevice(dev.domain, b, d, f)
+            except Exception, e:
+                #no dom0 drivers bound to sdev
+                continue
+
+            if sdev.driver!='pciback':
+                raise VmError(("pci: PCI Backend does not own\n "+ \
+                    "sibling device %s of device %s\n"+ \
+                    "See the pciback.hide kernel "+ \
+                    "command-line parameter or\n"+ \
+                    "bind your slot/device to the PCI backend using sysfs" \
+                    )%(sdev.name, dev.name))
+        return
+
     def setupOneDevice(self, domain, bus, slot, func):
         """ Attach I/O resources for device to frontend domain
         """
@@ -245,8 +278,19 @@ class PciController(DevController):
                     "bind your slot/device to the PCI backend using sysfs" \
                     )%(dev.name))
 
+        self.CheckSiblingDevices(fe_domid, dev)
+
         PCIQuirk(dev.vendor, dev.device, dev.subvendor, dev.subdevice, domain, 
                 bus, slot, func)
+
+        if not self.vm.info.is_hvm():
+            # Setup IOMMU device assignment
+            pci_str = "0x%x, 0x%x, 0x%x, 0x%x" % (domain, bus, slot, func)
+            bdf = xc.assign_device(fe_domid, pci_str)
+            if bdf > 0:
+                raise VmError("Failed to assign device to IOMMU (%x:%x.%x)"
+                              % (bus, slot, func))
+            log.debug("pci: assign device %x:%x.%x" % (bus, slot, func))
 
         for (start, size) in dev.ioports:
             log.debug('pci: enabling ioport 0x%x/0x%x'%(start,size))
@@ -329,6 +373,14 @@ class PciController(DevController):
                     "command-line parameter or\n"+ \
                     "bind your slot/device to the PCI backend using sysfs" \
                     )%(dev.name))
+
+        if not self.vm.info.is_hvm():
+            pci_str = "0x%x, 0x%x, 0x%x, 0x%x" % (domain, bus, slot, func)
+            bdf = xc.deassign_device(fe_domid, pci_str)
+            if bdf > 0:
+                raise VmError("Failed to deassign device from IOMMU (%x:%x.%x)"
+                              % (bus, slot, func))
+            log.debug("pci: deassign device %x:%x.%x" % (bus, slot, func))
 
         for (start, size) in dev.ioports:
             log.debug('pci: disabling ioport 0x%x/0x%x'%(start,size))

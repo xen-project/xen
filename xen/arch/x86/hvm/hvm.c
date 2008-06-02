@@ -296,6 +296,8 @@ int hvm_domain_initialise(struct domain *d)
     spin_lock_init(&d->arch.hvm_domain.irq_lock);
     spin_lock_init(&d->arch.hvm_domain.uc_lock);
 
+    hvm_init_guest_time(d);
+
     d->arch.hvm_domain.params[HVM_PARAM_HPET_ENABLED] = 1;
 
     hvm_init_cacheattr_region_list(d);
@@ -661,7 +663,7 @@ int hvm_vcpu_initialise(struct vcpu *v)
         hpet_init(v);
  
         /* Init guest TSC to start from zero. */
-        hvm_set_guest_time(v, 0);
+        hvm_set_guest_tsc(v, 0);
 
         /* Can start up without SIPI-SIPI or setvcpucontext domctl. */
         v->is_initialised = 1;
@@ -1098,16 +1100,17 @@ int hvm_virtual_to_linear_addr(
     return 0;
 }
 
-static void *hvm_map(unsigned long va, int size)
+static void *hvm_map_entry(unsigned long va)
 {
     unsigned long gfn, mfn;
     p2m_type_t p2mt;
     uint32_t pfec;
 
-    if ( ((va & ~PAGE_MASK) + size) > PAGE_SIZE )
+    if ( ((va & ~PAGE_MASK) + 8) > PAGE_SIZE )
     {
-        hvm_inject_exception(TRAP_page_fault, PFEC_write_access,
-                             (va + PAGE_SIZE - 1) & PAGE_MASK);
+        gdprintk(XENLOG_ERR, "Descriptor table entry "
+                 "straddles page boundary\n");
+        domain_crash(current->domain);
         return NULL;
     }
 
@@ -1119,7 +1122,8 @@ static void *hvm_map(unsigned long va, int size)
     mfn = mfn_x(gfn_to_mfn_current(gfn, &p2mt));
     if ( !p2m_is_ram(p2mt) )
     {
-        hvm_inject_exception(TRAP_page_fault, pfec, va);
+        gdprintk(XENLOG_ERR, "Failed to look up descriptor table entry\n");
+        domain_crash(current->domain);
         return NULL;
     }
 
@@ -1130,7 +1134,7 @@ static void *hvm_map(unsigned long va, int size)
     return (char *)map_domain_page(mfn) + (va & ~PAGE_MASK);
 }
 
-static void hvm_unmap(void *p)
+static void hvm_unmap_entry(void *p)
 {
     if ( p )
         unmap_domain_page(p);
@@ -1166,7 +1170,7 @@ static int hvm_load_segment_selector(
     if ( ((sel & 0xfff8) + 7) > desctab.limit )
         goto fail;
 
-    pdesc = hvm_map(desctab.base + (sel & 0xfff8), 8);
+    pdesc = hvm_map_entry(desctab.base + (sel & 0xfff8));
     if ( pdesc == NULL )
         goto hvm_map_fail;
 
@@ -1226,7 +1230,7 @@ static int hvm_load_segment_selector(
     desc.b |= 0x100;
 
  skip_accessed_flag:
-    hvm_unmap(pdesc);
+    hvm_unmap_entry(pdesc);
 
     segr.base = (((desc.b <<  0) & 0xff000000u) |
                  ((desc.b << 16) & 0x00ff0000u) |
@@ -1242,7 +1246,7 @@ static int hvm_load_segment_selector(
     return 0;
 
  unmap_and_fail:
-    hvm_unmap(pdesc);
+    hvm_unmap_entry(pdesc);
  fail:
     hvm_inject_exception(fault_type, sel & 0xfffc, 0);
  hvm_map_fail:
@@ -1258,7 +1262,7 @@ void hvm_task_switch(
     struct segment_register gdt, tr, prev_tr, segr;
     struct desc_struct *optss_desc = NULL, *nptss_desc = NULL, tss_desc;
     unsigned long eflags;
-    int exn_raised;
+    int exn_raised, rc;
     struct {
         u16 back_link,__blh;
         u32 esp0;
@@ -1270,7 +1274,7 @@ void hvm_task_switch(
         u32 cr3, eip, eflags, eax, ecx, edx, ebx, esp, ebp, esi, edi;
         u16 es, _3, cs, _4, ss, _5, ds, _6, fs, _7, gs, _8, ldt, _9;
         u16 trace, iomap;
-    } *ptss, tss;
+    } tss = { 0 };
 
     hvm_get_segment_register(v, x86_seg_gdtr, &gdt);
     hvm_get_segment_register(v, x86_seg_tr, &prev_tr);
@@ -1283,11 +1287,11 @@ void hvm_task_switch(
         goto out;
     }
 
-    optss_desc = hvm_map(gdt.base + (prev_tr.sel & 0xfff8), 8);
+    optss_desc = hvm_map_entry(gdt.base + (prev_tr.sel & 0xfff8));
     if ( optss_desc == NULL )
         goto out;
 
-    nptss_desc = hvm_map(gdt.base + (tss_sel & 0xfff8), 8);
+    nptss_desc = hvm_map_entry(gdt.base + (tss_sel & 0xfff8));
     if ( nptss_desc == NULL )
         goto out;
 
@@ -1322,84 +1326,89 @@ void hvm_task_switch(
         goto out;
     }
 
-    ptss = hvm_map(prev_tr.base, sizeof(tss));
-    if ( ptss == NULL )
+    rc = hvm_copy_from_guest_virt(
+        &tss, prev_tr.base, sizeof(tss), PFEC_page_present);
+    if ( rc == HVMCOPY_bad_gva_to_gfn )
         goto out;
 
     eflags = regs->eflags;
     if ( taskswitch_reason == TSW_iret )
         eflags &= ~X86_EFLAGS_NT;
 
-    ptss->cr3    = v->arch.hvm_vcpu.guest_cr[3];
-    ptss->eip    = regs->eip;
-    ptss->eflags = eflags;
-    ptss->eax    = regs->eax;
-    ptss->ecx    = regs->ecx;
-    ptss->edx    = regs->edx;
-    ptss->ebx    = regs->ebx;
-    ptss->esp    = regs->esp;
-    ptss->ebp    = regs->ebp;
-    ptss->esi    = regs->esi;
-    ptss->edi    = regs->edi;
+    tss.cr3    = v->arch.hvm_vcpu.guest_cr[3];
+    tss.eip    = regs->eip;
+    tss.eflags = eflags;
+    tss.eax    = regs->eax;
+    tss.ecx    = regs->ecx;
+    tss.edx    = regs->edx;
+    tss.ebx    = regs->ebx;
+    tss.esp    = regs->esp;
+    tss.ebp    = regs->ebp;
+    tss.esi    = regs->esi;
+    tss.edi    = regs->edi;
 
     hvm_get_segment_register(v, x86_seg_es, &segr);
-    ptss->es = segr.sel;
+    tss.es = segr.sel;
     hvm_get_segment_register(v, x86_seg_cs, &segr);
-    ptss->cs = segr.sel;
+    tss.cs = segr.sel;
     hvm_get_segment_register(v, x86_seg_ss, &segr);
-    ptss->ss = segr.sel;
+    tss.ss = segr.sel;
     hvm_get_segment_register(v, x86_seg_ds, &segr);
-    ptss->ds = segr.sel;
+    tss.ds = segr.sel;
     hvm_get_segment_register(v, x86_seg_fs, &segr);
-    ptss->fs = segr.sel;
+    tss.fs = segr.sel;
     hvm_get_segment_register(v, x86_seg_gs, &segr);
-    ptss->gs = segr.sel;
+    tss.gs = segr.sel;
     hvm_get_segment_register(v, x86_seg_ldtr, &segr);
-    ptss->ldt = segr.sel;
+    tss.ldt = segr.sel;
 
-    hvm_unmap(ptss);
-
-    ptss = hvm_map(tr.base, sizeof(tss));
-    if ( ptss == NULL )
+    rc = hvm_copy_to_guest_virt(
+        prev_tr.base, &tss, sizeof(tss), PFEC_page_present);
+    if ( rc == HVMCOPY_bad_gva_to_gfn )
         goto out;
 
-    if ( hvm_set_cr3(ptss->cr3) )
-    {
-        hvm_unmap(ptss);
+    rc = hvm_copy_from_guest_virt(
+        &tss, tr.base, sizeof(tss), PFEC_page_present);
+    if ( rc == HVMCOPY_bad_gva_to_gfn )
         goto out;
-    }
 
-    regs->eip    = ptss->eip;
-    regs->eflags = ptss->eflags | 2;
-    regs->eax    = ptss->eax;
-    regs->ecx    = ptss->ecx;
-    regs->edx    = ptss->edx;
-    regs->ebx    = ptss->ebx;
-    regs->esp    = ptss->esp;
-    regs->ebp    = ptss->ebp;
-    regs->esi    = ptss->esi;
-    regs->edi    = ptss->edi;
+    if ( hvm_set_cr3(tss.cr3) )
+        goto out;
+
+    regs->eip    = tss.eip;
+    regs->eflags = tss.eflags | 2;
+    regs->eax    = tss.eax;
+    regs->ecx    = tss.ecx;
+    regs->edx    = tss.edx;
+    regs->ebx    = tss.ebx;
+    regs->esp    = tss.esp;
+    regs->ebp    = tss.ebp;
+    regs->esi    = tss.esi;
+    regs->edi    = tss.edi;
 
     if ( (taskswitch_reason == TSW_call_or_int) )
     {
         regs->eflags |= X86_EFLAGS_NT;
-        ptss->back_link = prev_tr.sel;
+        tss.back_link = prev_tr.sel;
     }
 
     exn_raised = 0;
-    if ( hvm_load_segment_selector(v, x86_seg_es, ptss->es) ||
-         hvm_load_segment_selector(v, x86_seg_cs, ptss->cs) ||
-         hvm_load_segment_selector(v, x86_seg_ss, ptss->ss) ||
-         hvm_load_segment_selector(v, x86_seg_ds, ptss->ds) ||
-         hvm_load_segment_selector(v, x86_seg_fs, ptss->fs) ||
-         hvm_load_segment_selector(v, x86_seg_gs, ptss->gs) ||
-         hvm_load_segment_selector(v, x86_seg_ldtr, ptss->ldt) )
+    if ( hvm_load_segment_selector(v, x86_seg_es, tss.es) ||
+         hvm_load_segment_selector(v, x86_seg_cs, tss.cs) ||
+         hvm_load_segment_selector(v, x86_seg_ss, tss.ss) ||
+         hvm_load_segment_selector(v, x86_seg_ds, tss.ds) ||
+         hvm_load_segment_selector(v, x86_seg_fs, tss.fs) ||
+         hvm_load_segment_selector(v, x86_seg_gs, tss.gs) ||
+         hvm_load_segment_selector(v, x86_seg_ldtr, tss.ldt) )
         exn_raised = 1;
 
-    if ( (ptss->trace & 1) && !exn_raised )
-        hvm_inject_exception(TRAP_debug, tss_sel & 0xfff8, 0);
+    rc = hvm_copy_to_guest_virt(
+        tr.base, &tss, sizeof(tss), PFEC_page_present);
+    if ( rc == HVMCOPY_bad_gva_to_gfn )
+        exn_raised = 1;
 
-    hvm_unmap(ptss);
+    if ( (tss.trace & 1) && !exn_raised )
+        hvm_inject_exception(TRAP_debug, tss_sel & 0xfff8, 0);
 
     tr.attr.fields.type = 0xb; /* busy 32-bit tss */
     hvm_set_segment_register(v, x86_seg_tr, &tr);
@@ -1428,8 +1437,8 @@ void hvm_task_switch(
     }
 
  out:
-    hvm_unmap(optss_desc);
-    hvm_unmap(nptss_desc);
+    hvm_unmap_entry(optss_desc);
+    hvm_unmap_entry(nptss_desc);
 }
 
 #define HVMCOPY_from_guest (0u<<0)
@@ -1632,7 +1641,7 @@ int hvm_msr_read_intercept(struct cpu_user_regs *regs)
     switch ( ecx )
     {
     case MSR_IA32_TSC:
-        msr_content = hvm_get_guest_time(v);
+        msr_content = hvm_get_guest_tsc(v);
         break;
 
     case MSR_IA32_APICBASE:
@@ -1725,7 +1734,7 @@ int hvm_msr_write_intercept(struct cpu_user_regs *regs)
     switch ( ecx )
     {
      case MSR_IA32_TSC:
-        hvm_set_guest_time(v, msr_content);
+        hvm_set_guest_tsc(v, msr_content);
         pt_reset(v);
         break;
 
@@ -2071,6 +2080,13 @@ void hvm_vcpu_reset_state(struct vcpu *v, uint16_t cs, uint16_t ip)
     if ( v->is_initialised )
         goto out;
 
+    if ( !paging_mode_hap(d) )
+    {
+        if ( v->arch.hvm_vcpu.guest_cr[0] & X86_CR0_PG )
+            put_page(pagetable_get_page(v->arch.guest_table));
+        v->arch.guest_table = pagetable_null();
+    }
+
     ctxt = &v->arch.guest_context;
     memset(ctxt, 0, sizeof(*ctxt));
     ctxt->flags = VGCF_online;
@@ -2122,6 +2138,8 @@ void hvm_vcpu_reset_state(struct vcpu *v, uint16_t cs, uint16_t ip)
     v->arch.hvm_vcpu.cache_tsc_offset =
         v->domain->vcpu[0]->arch.hvm_vcpu.cache_tsc_offset;
     hvm_funcs.set_tsc_offset(v, v->arch.hvm_vcpu.cache_tsc_offset);
+
+    paging_update_paging_modes(v);
 
     v->arch.flags |= TF_kernel_mode;
     v->is_initialised = 1;

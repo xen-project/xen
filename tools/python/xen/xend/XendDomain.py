@@ -43,8 +43,8 @@ from xen.xend.XendConstants import XS_VMROOT
 from xen.xend.XendConstants import DOM_STATE_HALTED, DOM_STATE_PAUSED
 from xen.xend.XendConstants import DOM_STATE_RUNNING, DOM_STATE_SUSPENDED
 from xen.xend.XendConstants import DOM_STATE_SHUTDOWN, DOM_STATE_UNKNOWN
-from xen.xend.XendConstants import DOM_STATE_CRASHED
-from xen.xend.XendConstants import TRIGGER_TYPE
+from xen.xend.XendConstants import DOM_STATE_CRASHED, HVM_PARAM_ACPI_S_STATE
+from xen.xend.XendConstants import TRIGGER_TYPE, TRIGGER_S3RESUME
 from xen.xend.XendDevices import XendDevices
 from xen.xend.XendAPIConstants import *
 
@@ -1258,22 +1258,24 @@ class XendDomain:
 
         return val       
 
-    def domain_migrate(self, domid, dst, live=False, port=0, node=-1):
+    def domain_migrate(self, domid, dst, live=False, port=0, node=-1, ssl=None):
         """Start domain migration.
         
         @param domid: Domain ID or Name
         @type domid: int or string.
         @param dst: Destination IP address
         @type dst: string
-        @keyword port: relocation port on destination
-        @type port: int        
         @keyword live: Live migration
         @type live: bool
-        @rtype: None
+        @keyword port: relocation port on destination
+        @type port: int
         @keyword node: use node number for target
-        @rtype: int 
+        @type node: int
+        @keyword ssl: use ssl connection
+        @type ssl: bool
+        @rtype: None
         @raise XendError: Failed to migrate
-        @raise XendInvalidDomain: Domain is not valid        
+        @raise XendInvalidDomain: Domain is not valid
         """
 
         dominfo = self.domain_lookup_nr(domid)
@@ -1294,13 +1296,14 @@ class XendDomain:
             """ Make sure there's memory free for enabling shadow mode """
             dominfo.checkLiveMigrateMemory()
 
-        if port == 0:
-            port = xoptions.get_xend_relocation_port()
+        if ssl is None:
+            ssl = xoptions.get_xend_relocation_ssl()
 
-        tls = xoptions.get_xend_relocation_tls()
-        if tls:
+        if ssl:
             from OpenSSL import SSL
             from xen.web import connection
+            if port == 0:
+                port = xoptions.get_xend_relocation_ssl_port()
             try:
                 ctx = SSL.Context(SSL.SSLv23_METHOD)
                 sock = SSL.Connection(ctx,
@@ -1328,6 +1331,8 @@ class XendDomain:
             os.close(p2cread)
             os.close(p2cwrite)
         else:
+            if port == 0:
+                port = xoptions.get_xend_relocation_port()
             try:
                 sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
                 # When connecting to our ssl enabled relocation server using a

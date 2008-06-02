@@ -131,6 +131,14 @@ arch_init_demand_mapping_area(unsigned long max_pfn)
 }
 
 /* Helper function used in gnttab.c. */
+void do_map_frames(unsigned long addr,
+        unsigned long *f, unsigned long n, unsigned long stride,
+	unsigned long increment, domid_t id, int may_fail, unsigned long prot)
+{
+	/* TODO */
+	ASSERT(0);
+}
+
 void*
 map_frames_ex(unsigned long* frames, unsigned long n, unsigned long stride,
 	unsigned long increment, unsigned long alignment, domid_t id,

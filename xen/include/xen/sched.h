@@ -186,6 +186,8 @@ struct domain
 
     /* Is this an HVM guest? */
     bool_t           is_hvm;
+    /* Does this guest need iommu mappings? */
+    bool_t           need_iommu;
     /* Is this guest fully privileged (aka dom0)? */
     bool_t           is_privileged;
     /* Which guest this guest has privileges on */
@@ -515,6 +517,7 @@ static inline void vcpu_unblock(struct vcpu *v)
 
 #define is_hvm_domain(d) ((d)->is_hvm)
 #define is_hvm_vcpu(v)   (is_hvm_domain(v->domain))
+#define need_iommu(d)    ((d)->need_iommu && !(d)->is_hvm)
 
 extern enum cpufreq_controller {
     FREQCTL_none, FREQCTL_dom0_kernel

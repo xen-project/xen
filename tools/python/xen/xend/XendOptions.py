@@ -72,6 +72,9 @@ class XendOptions:
     """Default for the flag indicating whether xend should run a relocation server."""
     xend_relocation_server_default = 'no'
 
+    """Default for the flag indicating whether xend should run a ssl relocation server."""
+    xend_relocation_ssl_server_default = 'no'
+
     """Default interface address the xend relocation server listens at. """
     xend_relocation_address_default = ''
 
@@ -80,6 +83,9 @@ class XendOptions:
 
     """Default port xend serves relocation at. """
     xend_relocation_port_default = 8002
+
+    """Default port xend serves ssl relocation at. """
+    xend_relocation_ssl_port_default = 8003
 
     xend_relocation_hosts_allow_default = ''
 
@@ -192,6 +198,12 @@ class XendOptions:
         return self.get_config_bool("xend-relocation-server",
                                     self.xend_relocation_server_default)
 
+    def get_xend_relocation_ssl_server(self):
+        """Get the flag indicating whether xend should run a ssl relocation server.
+        """
+        return self.get_config_bool("xend-relocation-ssl-server",
+                                    self.xend_relocation_ssl_server_default)
+
     def get_xend_relocation_server_ssl_key_file(self):
         return self.get_config_string("xend-relocation-server-ssl-key-file")
 
@@ -209,10 +221,17 @@ class XendOptions:
         return self.get_config_int('xend-relocation-port',
                                    self.xend_relocation_port_default)
 
-    def get_xend_relocation_tls(self):
-        """Whether to use tls when relocating.
+    def get_xend_relocation_ssl_port(self):
+        """Get the port xend listens at for ssl connection to its relocation
+        server.
         """
-        return self.get_config_bool('xend-relocation-tls', 'no')
+        return self.get_config_int('xend-relocation-ssl-port',
+                                   self.xend_relocation_ssl_port_default)
+
+    def get_xend_relocation_ssl(self):
+        """Whether to use ssl when relocating.
+        """
+        return self.get_config_bool('xend-relocation-ssl', 'no')
 
     def get_xend_relocation_hosts_allow(self):
         return self.get_config_string("xend-relocation-hosts-allow",

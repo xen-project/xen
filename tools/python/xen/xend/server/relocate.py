@@ -142,16 +142,22 @@ def listenRelocation():
     if xoptions.get_xend_unix_server():
         path = '/var/lib/xend/relocation-socket'
         unix.UnixListener(path, RelocationProtocol)
+
+    interface = xoptions.get_xend_relocation_address()
+
+    hosts_allow = xoptions.get_xend_relocation_hosts_allow()
+    if hosts_allow == '':
+        hosts_allow = None
+    else:
+        hosts_allow = map(re.compile, hosts_allow.split(" "))
+
     if xoptions.get_xend_relocation_server():
         port = xoptions.get_xend_relocation_port()
-        interface = xoptions.get_xend_relocation_address()
+        tcp.TCPListener(RelocationProtocol, port, interface = interface,
+                        hosts_allow = hosts_allow)
 
-        hosts_allow = xoptions.get_xend_relocation_hosts_allow()
-        if hosts_allow == '':
-            hosts_allow = None
-        else:
-            hosts_allow = map(re.compile, hosts_allow.split(" "))
-
+    if xoptions.get_xend_relocation_ssl_server():
+        port = xoptions.get_xend_relocation_ssl_port()
         ssl_key_file = xoptions.get_xend_relocation_server_ssl_key_file()
         ssl_cert_file = xoptions.get_xend_relocation_server_ssl_cert_file()
 
@@ -161,5 +167,5 @@ def listenRelocation():
                                ssl_key_file = ssl_key_file,
                                ssl_cert_file = ssl_cert_file)
         else:
-            tcp.TCPListener(RelocationProtocol, port, interface = interface,
-                            hosts_allow = hosts_allow)
+            raise XendError("ssl_key_file or ssl_cert_file for ssl relocation server is missing.")
+

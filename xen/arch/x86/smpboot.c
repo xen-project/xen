@@ -1391,6 +1391,11 @@ void enable_nonboot_cpus(void)
 		panic("Not enough cpus");
 	}
 	cpus_clear(frozen_cpus);
+
+	/*
+	 * Cleanup possible dangling ends after sleep...
+	 */
+	smpboot_restore_warm_reset_vector();
 }
 #else /* ... !CONFIG_HOTPLUG_CPU */
 int __cpu_disable(void)

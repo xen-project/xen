@@ -68,6 +68,9 @@ struct hvm_vcpu {
     struct mtrr_state   mtrr;
     u64                 pat_cr;
 
+    /* In mode delay_for_missed_ticks, VCPUs have differing guest times. */
+    int64_t             stime_offset;
+
     /* Which cache mode is this VCPU in (CR0:CD/NW)? */
     u8                  cache_mode;
 

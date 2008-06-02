@@ -31,6 +31,7 @@
 #include <xen/lib.h>
 #include <xen/errno.h>
 #include <xen/sched.h>
+#include <asm/time.h>
 #include <asm/hvm/hvm.h>
 #include <asm/hvm/io.h>
 #include <asm/hvm/support.h>
@@ -52,6 +53,9 @@ static int handle_pit_io(
     int dir, uint32_t port, uint32_t bytes, uint32_t *val);
 static int handle_speaker_io(
     int dir, uint32_t port, uint32_t bytes, uint32_t *val);
+
+#define get_guest_time(v) \
+   (is_hvm_vcpu(v) ? hvm_get_guest_time(v) : (u64)get_s_time())
 
 /* Compute with 96 bit intermediate result: (a*b)/c */
 static uint64_t muldiv64(uint64_t a, uint32_t b, uint32_t c)
@@ -86,8 +90,8 @@ static int pit_get_count(PITState *pit, int channel)
 
     ASSERT(spin_is_locked(&pit->lock));
 
-    d = muldiv64(hvm_get_guest_time(v) - pit->count_load_time[channel],
-                 PIT_FREQ, ticks_per_sec(v));
+    d = muldiv64(get_guest_time(v) - pit->count_load_time[channel],
+                 PIT_FREQ, SYSTEM_TIME_HZ);
 
     switch ( c->mode )
     {
@@ -117,8 +121,8 @@ static int pit_get_out(PITState *pit, int channel)
 
     ASSERT(spin_is_locked(&pit->lock));
 
-    d = muldiv64(hvm_get_guest_time(v) - pit->count_load_time[channel], 
-                 PIT_FREQ, ticks_per_sec(v));
+    d = muldiv64(get_guest_time(v) - pit->count_load_time[channel], 
+                 PIT_FREQ, SYSTEM_TIME_HZ);
 
     switch ( s->mode )
     {
@@ -164,7 +168,7 @@ static void pit_set_gate(PITState *pit, int channel, int val)
     case 3:
         /* Restart counting on rising edge. */
         if ( s->gate < val )
-            pit->count_load_time[channel] = hvm_get_guest_time(v);
+            pit->count_load_time[channel] = get_guest_time(v);
         break;
     }
 
@@ -180,7 +184,7 @@ int pit_get_gate(PITState *pit, int channel)
 static void pit_time_fired(struct vcpu *v, void *priv)
 {
     uint64_t *count_load_time = priv;
-    *count_load_time = hvm_get_guest_time(v);
+    *count_load_time = get_guest_time(v);
 }
 
 static void pit_load_count(PITState *pit, int channel, int val)
@@ -195,11 +199,11 @@ static void pit_load_count(PITState *pit, int channel, int val)
         val = 0x10000;
 
     if ( v == NULL )
-        rdtscll(pit->count_load_time[channel]);
+        pit->count_load_time[channel] = 0;
     else
-        pit->count_load_time[channel] = hvm_get_guest_time(v);
+        pit->count_load_time[channel] = get_guest_time(v);
     s->count = val;
-    period = DIV_ROUND((val * 1000000000ULL), PIT_FREQ);
+    period = DIV_ROUND(val * SYSTEM_TIME_HZ, PIT_FREQ);
 
     if ( (v == NULL) || !is_hvm_vcpu(v) || (channel != 0) )
         return;
@@ -435,7 +439,7 @@ static int pit_load(struct domain *d, hvm_domain_context_t *h)
      * time jitter here, but the wall-clock will have jumped massively, so 
      * we hope the guest can handle it.
      */
-    pit->pt0.last_plt_gtime = hvm_get_guest_time(d->vcpu[0]);
+    pit->pt0.last_plt_gtime = get_guest_time(d->vcpu[0]);
     for ( i = 0; i < 3; i++ )
         pit_load_count(pit, i, pit->hw.channels[i].count);
 

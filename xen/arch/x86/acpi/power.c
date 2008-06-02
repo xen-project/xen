@@ -238,9 +238,17 @@ static int acpi_get_wake_status(void)
 static void tboot_sleep(u8 sleep_state)
 {
    uint32_t shutdown_type;
-   
-   *((struct acpi_sleep_info *)(unsigned long)g_tboot_shared->acpi_sinfo) =
-       acpi_sinfo;
+
+   g_tboot_shared->acpi_sinfo.pm1a_cnt =
+                           (uint16_t)acpi_sinfo.pm1a_cnt_blk.address;
+   g_tboot_shared->acpi_sinfo.pm1b_cnt =
+                           (uint16_t)acpi_sinfo.pm1b_cnt_blk.address;
+   g_tboot_shared->acpi_sinfo.pm1a_evt =
+                           (uint16_t)acpi_sinfo.pm1a_evt_blk.address;
+   g_tboot_shared->acpi_sinfo.pm1b_evt =
+                           (uint16_t)acpi_sinfo.pm1b_evt_blk.address;
+   g_tboot_shared->acpi_sinfo.pm1a_cnt_val = acpi_sinfo.pm1a_cnt_val;
+   g_tboot_shared->acpi_sinfo.pm1b_cnt_val = acpi_sinfo.pm1b_cnt_val;
 
    switch ( sleep_state )
    {

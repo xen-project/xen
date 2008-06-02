@@ -2091,28 +2091,28 @@ class XendDomainInfo:
                         xc.vcpu_setaffinity(self.domid, v, self.info['cpus'][v])
             else:
                 def find_relaxed_node(node_list):
-                    import sys 
+                    import sys
+                    nr_nodes = info['nr_nodes']
                     if node_list is None:
-                        node_list = range(0, info['nr_nodes'])
+                        node_list = range(0, nr_nodes)
                     nodeload = [0]
-                    nodeload = nodeload * info['nr_nodes']
+                    nodeload = nodeload * nr_nodes
                     from xen.xend import XendDomain
                     doms = XendDomain.instance().list('all')
-                    for dom in doms:
+                    for dom in filter (lambda d: d.domid != self.domid, doms):
                         cpuinfo = dom.getVCPUInfo()
                         for vcpu in sxp.children(cpuinfo, 'vcpu'):
-                            def vinfo(n, t):
-                                return t(sxp.child_value(vcpu, n))
-                            cpumap = vinfo('cpumap', list)
-                            for i in node_list:
+                            if sxp.child_value(vcpu, 'online') == 0: continue
+                            cpumap = list(sxp.child_value(vcpu,'cpumap'))
+                            for i in range(0, nr_nodes):
                                 node_cpumask = info['node_to_cpu'][i]
                                 for j in node_cpumask:
                                     if j in cpumap:
                                         nodeload[i] += 1
                                         break
-                    for i in node_list:
-                        if len(info['node_to_cpu'][i]) > 0:
-                            nodeload[i] = int(nodeload[i] / len(info['node_to_cpu'][i]))
+                    for i in range(0, nr_nodes):
+                        if len(info['node_to_cpu'][i]) > 0 and i in node_list:
+                            nodeload[i] = int(nodeload[i] * 16 / len(info['node_to_cpu'][i]))
                         else:
                             nodeload[i] = sys.maxint
                     index = nodeload.index( min(nodeload) )    

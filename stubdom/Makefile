@@ -37,7 +37,7 @@ export CROSS_COMPILE=$(GNU_TARGET_ARCH)-xen-elf-
 export PATH:=$(CROSS_PREFIX)/bin:$(PATH)
 
 .PHONY: all
-all: qemu-stubdom
+all: ioemu-stubdom c-stubdom
 
 ################
 # Cross-binutils
@@ -174,6 +174,7 @@ mk-symlinks:
 	  ([ ! -h config-host.h ] || rm -f config-host.h) && \
 	  ([ ! -h config-host.mak ] || rm -f config-host.mak) )
 	[ -h mini-os ] || ln -sf ../extras/mini-os .
+	[ -h mini-os/include/xen ] || ln -sf ../../../xen/include/public mini-os/include/xen
 
 #######
 # libxc
@@ -198,40 +199,41 @@ ioemu: cross-zlib cross-libpci mk-symlinks libxc
 ######
 
 .PHONY: caml
-caml:
-	$(MAKE) -C $@
+caml: mk-symlinks
+	$(MAKE) -C $@ LWIPDIR=$(CURDIR)/lwip-cvs 
 
 ###
 # C
 ###
 
 .PHONY: c
-c:
-	$(MAKE) -C $@
+c: mk-symlinks
+	$(MAKE) -C $@ LWIPDIR=$(CURDIR)/lwip-cvs 
 
 ########
 # minios
 ########
 
-.PHONY: qemu-stubdom
-qemu-stubdom: mk-symlinks lwip-cvs libxc ioemu
-	$(MAKE) -C mini-os LWIPDIR=$(CURDIR)/lwip-cvs QEMUDIR=$(CURDIR)/ioemu
+.PHONY: ioemu-stubdom
+ioemu-stubdom: lwip-cvs libxc ioemu
+	$(MAKE) -C mini-os TARGET=$@ LWIPDIR=$(CURDIR)/lwip-cvs APP_OBJS="$(CURDIR)/ioemu/i386-dm-stubdom/qemu.a $(CURDIR)/ioemu/i386-dm-stubdom/libqemu.a"
 
+CAMLLIB = $(shell ocamlc -where)
 .PHONY: caml-stubdom
-caml-stubdom: mk-symlinks lwip-cvs libxc cross-libpci caml
-	$(MAKE) -C mini-os LWIPDIR=$(CURDIR)/lwip-cvs CAMLDIR=$(CURDIR)/caml
+caml-stubdom: lwip-cvs libxc caml
+	$(MAKE) -C mini-os TARGET=$@ LWIPDIR=$(CURDIR)/lwip-cvs APP_OBJS="$(CURDIR)/caml/main-c.o $(CURDIR)/caml/main-caml.o $(CURDIR)/caml/caml.o $(CAMLLIB)/libasmrun.a"
 
 .PHONY: c-stubdom
-c-stubdom: mk-symlinks lwip-cvs libxc cross-libpci c
-	$(MAKE) -C mini-os LWIPDIR=$(CURDIR)/lwip-cvs CDIR=$(CURDIR)/c
+c-stubdom: lwip-cvs libxc c
+	$(MAKE) -C mini-os TARGET=$@ LWIPDIR=$(CURDIR)/lwip-cvs APP_OBJS=$(CURDIR)/c/main.a
 
 #########
 # install
 #########
 
-install: mini-os/mini-os.gz
+install: mini-os/ioemu-stubdom.gz
 	$(INSTALL_PROG) stubdom-dm "$(DESTDIR)/usr/lib/xen/bin"
-	$(INSTALL_PROG) mini-os/mini-os.gz "$(DESTDIR)/usr/lib/xen/boot/stubdom.gz"
+	$(INSTALL_PROG) $< "$(DESTDIR)/usr/lib/xen/boot/stubdom.gz"
 
 #######
 # clean
@@ -242,6 +244,7 @@ install: mini-os/mini-os.gz
 clean:
 	-$(MAKE) -C mini-os LWIPDIR=$(CURDIR)/lwip-cvs clean
 	$(MAKE) -C caml clean
+	$(MAKE) -C c clean
 	rm -fr libxc ioemu mini-os include
 
 # clean the cross-compilation result

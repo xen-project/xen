@@ -58,6 +58,8 @@ struct thread *idle_thread = NULL;
 LIST_HEAD(exited_threads);
 static int threads_started;
 
+struct thread *main_thread;
+
 void inline print_runqueue(void)
 {
     struct list_head *it;

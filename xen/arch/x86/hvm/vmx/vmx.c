@@ -607,7 +607,7 @@ static void vmx_save_cpu_state(struct vcpu *v, struct hvm_hw_cpu *data)
     data->msr_syscall_mask = guest_state->msrs[VMX_INDEX_MSR_SYSCALL_MASK];
 #endif
 
-    data->tsc = hvm_get_guest_time(v);
+    data->tsc = hvm_get_guest_tsc(v);
 }
 
 static void vmx_load_cpu_state(struct vcpu *v, struct hvm_hw_cpu *data)
@@ -625,7 +625,7 @@ static void vmx_load_cpu_state(struct vcpu *v, struct hvm_hw_cpu *data)
     v->arch.hvm_vmx.shadow_gs = data->shadow_gs;
 #endif
 
-    hvm_set_guest_time(v, data->tsc);
+    hvm_set_guest_tsc(v, data->tsc);
 }
 
 

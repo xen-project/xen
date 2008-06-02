@@ -655,12 +655,20 @@ unsigned long long xenstat_vbd_wr_reqs(xenstat_vbd * vbd)
 
 static char *xenstat_get_domain_name(xenstat_handle *handle, unsigned int domain_id)
 {
-	char path[80];
+	char path[80], *vmpath;
 
-	snprintf(path, sizeof(path),"/local/domain/%i/name", domain_id);
-	
+	snprintf(path, sizeof(path),"/local/domain/%i/vm", domain_id);
+
+	vmpath = xs_read(handle->xshandle, XBT_NULL, path, NULL);
+
+	if (vmpath == NULL)
+		return NULL;
+
+	snprintf(path, sizeof(path),"%s/name", vmpath);
+	free(vmpath);
+
 	return xs_read(handle->xshandle, XBT_NULL, path, NULL);
-}	
+}
 
 /* Remove specified entry from list of domains */
 static void xenstat_prune_domain(xenstat_node *node, unsigned int entry)

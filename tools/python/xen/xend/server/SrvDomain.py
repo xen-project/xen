@@ -115,7 +115,9 @@ class SrvDomain(SrvDir):
                     [['dom',         'int'],
                      ['destination', 'str'],
                      ['live',        'int'],
-                     ['port',        'int']])
+                     ['port',        'int'],
+                     ['node',        'int'],
+                     ['ssl',         'int']])
         return fn(req.args, {'dom': self.dom.domid})
 
     def op_pincpu(self, _, req):
@@ -217,6 +219,11 @@ class SrvDomain(SrvDir):
         return self.call(self.dom.getVCPUInfo, [], req)
 
 
+    def op_reset(self, _, req):
+        self.acceptCommand(req)
+        return self.xd.domain_reset(self.dom.getName())
+
+
     def render_POST(self, req):
         return self.perform(req)
         
@@ -254,6 +261,10 @@ class SrvDomain(SrvDir):
 
         req.write('<form method="post" action="%s">' % url)
         req.write('<input type="submit" name="op" value="destroy">')
+        req.write('</form>')
+
+        req.write('<form method="post" action="%s">' % url)
+        req.write('<input type="submit" name="op" value="reset">')
         req.write('</form>')
 
         req.write('<form method="post" action="%s">' % url)

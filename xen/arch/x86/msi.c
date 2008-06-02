@@ -25,6 +25,7 @@
 #include <mach_apic.h>
 #include <io_ports.h>
 #include <public/physdev.h>
+#include <xen/iommu.h>
 
 extern int msi_irq_enable;
 
@@ -156,6 +157,9 @@ void read_msi_msg(unsigned int irq, struct msi_msg *msg)
     default:
         BUG();
     }
+
+    if ( vtd_enabled )
+        msi_msg_read_remap_rte(entry, msg);
 }
 
 static int set_vector_msi(struct msi_desc *entry)
@@ -201,6 +205,9 @@ static int unset_vector_msi(int vector)
 void write_msi_msg(unsigned int irq, struct msi_msg *msg)
 {
     struct msi_desc *entry = irq_desc[irq].msi_desc;
+
+    if ( vtd_enabled )
+        msi_msg_write_remap_rte(entry, msg);
 
     switch ( entry->msi_attrib.type )
     {

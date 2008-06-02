@@ -64,7 +64,7 @@
 /* string table */
 struct xc_core_strtab {
     char       *strings;
-    uint16_t    current;
+    uint16_t    length;
     uint16_t    max;
 };
 
@@ -89,7 +89,7 @@ xc_core_strtab_init(void)
 
     /* index 0 represents none */
     strtab->strings[0] = '\0';
-    strtab->current = 1;
+    strtab->length = 1;
 
     return strtab;
 }
@@ -107,14 +107,14 @@ xc_core_strtab_get(struct xc_core_strtab *strtab, const char *name)
     uint16_t ret = 0;
     uint16_t len = strlen(name) + 1;
 
-    if ( strtab->current > UINT16_MAX - len )
+    if ( strtab->length > UINT16_MAX - len )
     {
         PERROR("too long string table");
         errno = E2BIG;
         return ret;
     }
     
-    if ( strtab->current + len > strtab->max )
+    if ( strtab->length + len > strtab->max )
     {
         char *tmp;
         if ( strtab->max > UINT16_MAX / 2 )
@@ -135,9 +135,9 @@ xc_core_strtab_get(struct xc_core_strtab *strtab, const char *name)
         strtab->max *= 2;
     }
 
-    ret = strtab->current;
-    strcpy(strtab->strings + strtab->current, name);
-    strtab->current += len;
+    ret = strtab->length;
+    strcpy(strtab->strings + strtab->length, name);
+    strtab->length += len;
     return ret;
 }
 
@@ -669,7 +669,7 @@ xc_domain_dumpcore_via_callback(int xc_handle,
     offset += filesz;
 
     /* fixing up section header string table section header */
-    filesz = strtab->current;
+    filesz = strtab->length;
     sheaders->shdrs[strtab_idx].sh_offset = offset;
     sheaders->shdrs[strtab_idx].sh_size = filesz;
 
@@ -829,7 +829,7 @@ copy_done:
         goto out;
 
     /* elf section header string table: .shstrtab */
-    sts = dump_rtn(args, strtab->strings, strtab->current);
+    sts = dump_rtn(args, strtab->strings, strtab->length);
     if ( sts != 0 )
         goto out;
 
