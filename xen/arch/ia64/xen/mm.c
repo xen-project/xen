@@ -2935,6 +2935,18 @@ void xencomm_mark_dirty(unsigned long addr, unsigned int len)
     }
 }
 
+int iommu_map_page(struct domain *d, unsigned long gfn, unsigned long mfn)
+{
+    /* STUB to compile */
+    return -ENOSYS;
+}
+
+int iommu_unmap_page(struct domain *d, unsigned long gfn)
+{
+    /* STUB to compile */
+    return -ENOSYS;
+}
+
 /*
  * Local variables:
  * mode: C
