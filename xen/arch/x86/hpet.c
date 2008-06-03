@@ -17,7 +17,7 @@
 #define STIME_MAX ((s_time_t)((uint64_t)~0ull>>1))
 
 #define MAX_DELTA_NS MILLISECS(10*1000)
-#define MIN_DELTA_NS MICROSECS(1)
+#define MIN_DELTA_NS MICROSECS(20)
 
 struct hpet_event_channel
 {
@@ -67,13 +67,18 @@ static inline unsigned long ns2ticks(unsigned long nsec, int shift,
 
 static int hpet_legacy_next_event(unsigned long delta)
 {
-    unsigned long cnt;
+    uint32_t cnt, cmp;
+    unsigned long flags;
 
+    local_irq_save(flags);
     cnt = hpet_read32(HPET_COUNTER);
-    cnt += delta;
-    hpet_write32(cnt, HPET_T0_CMP);
+    cmp = cnt + delta;
+    hpet_write32(cmp, HPET_T0_CMP);
+    cmp = hpet_read32(HPET_COUNTER);
+    local_irq_restore(flags);
 
-    return ((long)(hpet_read32(HPET_COUNTER) - cnt) > 0) ? -ETIME : 0;
+    /* Are we within two ticks of the deadline passing? Then we may miss. */
+    return ((cmp + 2 - cnt) > delta) ? -ETIME : 0;
 }
 
 static int reprogram_hpet_evt_channel(
