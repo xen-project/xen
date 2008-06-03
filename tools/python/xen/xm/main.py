@@ -1257,8 +1257,10 @@ def xm_reset(args):
     arg_check(args, "reset", 1)
     dom = args[0]
 
-    # TODO: XenAPI
-    server.xend.domain.reset(dom)
+    if serverType == SERVER_XEN_API:
+        server.xenapi.VM.hard_reboot(get_single_vm(dom))
+    else:
+        server.xend.domain.reset(dom)
 
 def xm_pause(args):
     arg_check(args, "pause", 1)
