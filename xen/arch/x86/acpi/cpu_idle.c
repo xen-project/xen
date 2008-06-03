@@ -277,6 +277,13 @@ static void acpi_processor_idle(void)
      * for C2/C3 transitions.
      */
     local_irq_disable();
+
+    if ( softirq_pending(smp_processor_id()) )
+    {
+        local_irq_enable();
+        return;
+    }
+
     cx = power->state;
     if ( !cx )
     {
@@ -422,9 +429,6 @@ static void acpi_processor_idle(void)
             ACPI_FLUSH_CPU_CACHE();
         }
 
-        /* Get start time (ticks) */
-        t1 = inl(pmtmr_ioport);
-
         /*
          * Before invoking C3, be aware that TSC/APIC timer may be 
          * stopped by H/W. Without carefully handling of TSC/APIC stop issues,
@@ -434,16 +438,19 @@ static void acpi_processor_idle(void)
         cstate_save_tsc();
         /* preparing APIC stop */
         hpet_broadcast_enter();
+
+        /* Get start time (ticks) */
+        t1 = inl(pmtmr_ioport);
         /* Invoke C3 */
         acpi_idle_do_entry(cx);
+        /* Get end time (ticks) */
+        t2 = inl(pmtmr_ioport);
 
         /* recovering APIC */
         hpet_broadcast_exit();
         /* recovering TSC */
         cstate_restore_tsc();
 
-        /* Get end time (ticks) */
-        t2 = inl(pmtmr_ioport);
         if ( power->flags.bm_check && power->flags.bm_control )
         {
             /* Enable bus master arbitration */
@@ -451,10 +458,10 @@ static void acpi_processor_idle(void)
             acpi_set_register(ACPI_BITREG_ARB_DISABLE, 0);
         }
 
-        /* Compute time (ticks) that we were actually asleep */
-        sleep_ticks = ticks_elapsed(t1, t2);
         /* Re-enable interrupts */
         local_irq_enable();
+        /* Compute time (ticks) that we were actually asleep */
+        sleep_ticks = ticks_elapsed(t1, t2);
         /* Do not account our idle-switching overhead: */
         sleep_ticks -= cx->latency_ticks + C3_OVERHEAD;
 
