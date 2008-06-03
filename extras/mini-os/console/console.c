@@ -49,17 +49,13 @@
    of standard dom0 handled console */
 #define USE_XEN_CONSOLE
 
-/* Low level functions defined in xencons_ring.c */
-extern int xencons_ring_init(void);
-extern int xencons_ring_send(const char *data, unsigned len);
-extern int xencons_ring_send_no_notify(const char *data, unsigned len);
-
 
 /* If console not initialised the printk will be sent to xen serial line 
    NOTE: you need to enable verbose in xen/Rules.mk for it to work. */
 static int console_initialised = 0;
 
 
+#ifndef HAVE_LIBC
 void xencons_rx(char *buf, unsigned len, struct pt_regs *regs)
 {
     if(len > 0)
@@ -77,6 +73,7 @@ void xencons_tx(void)
 {
     /* Do nothing, handled by _rx */
 }
+#endif
 
 
 void console_print(char *data, int length)

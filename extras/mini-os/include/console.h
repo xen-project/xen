@@ -52,4 +52,13 @@ void xencons_tx(void);
 void init_console(void);
 void console_print(char *data, int length);
 
+/* Low level functions defined in xencons_ring.c */
+extern struct wait_queue_head console_queue;
+int xencons_ring_init(void);
+int xencons_ring_send(const char *data, unsigned len);
+int xencons_ring_send_no_notify(const char *data, unsigned len);
+int xencons_ring_avail(void);
+int xencons_ring_recv(char *data, unsigned len);
+
+
 #endif /* _LIB_CONSOLE_H_ */

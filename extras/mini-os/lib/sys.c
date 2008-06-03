@@ -213,8 +213,19 @@ int isatty(int fd)
 int read(int fd, void *buf, size_t nbytes)
 {
     switch (files[fd].type) {
-	case FTYPE_CONSOLE:
-	    return 0;
+	case FTYPE_CONSOLE: {
+	    int ret;
+            DEFINE_WAIT(w);
+            while(1) {
+                add_waiter(w, console_queue);
+                ret = xencons_ring_recv(buf, nbytes);
+                if (ret)
+                    break;
+                schedule();
+            }
+            remove_waiter(w);
+            return ret;
+        }
 	case FTYPE_FILE: {
 	    ssize_t ret;
 	    if (nbytes > PAGE_SIZE)
@@ -707,7 +718,12 @@ static int select_poll(int nfds, fd_set *readfds, fd_set *writefds, fd_set *exce
 	    FD_CLR(i, exceptfds);
 	    break;
 	case FTYPE_CONSOLE:
-	    FD_CLR(i, readfds);
+	    if (FD_ISSET(i, writefds)) {
+                if (xencons_ring_avail())
+		    n++;
+		else
+		    FD_CLR(i, readfds);
+            }
 	    if (FD_ISSET(i, writefds))
                 n++;
 	    FD_CLR(i, exceptfds);
@@ -809,6 +825,7 @@ int select(int nfds, fd_set *readfds, fd_set *writefds, fd_set *exceptfds,
     DEFINE_WAIT(w3);
     DEFINE_WAIT(w4);
     DEFINE_WAIT(w5);
+    DEFINE_WAIT(w6);
 
     assert(thread == main_thread);
 
@@ -830,6 +847,7 @@ int select(int nfds, fd_set *readfds, fd_set *writefds, fd_set *exceptfds,
     add_waiter(w3, blkfront_queue);
     add_waiter(w4, xenbus_watch_queue);
     add_waiter(w5, kbdfront_queue);
+    add_waiter(w6, console_queue);
 
     if (readfds)
         myread = *readfds;
@@ -916,6 +934,7 @@ out:
     remove_waiter(w3);
     remove_waiter(w4);
     remove_waiter(w5);
+    remove_waiter(w6);
     return ret;
 }
 
