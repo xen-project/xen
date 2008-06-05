@@ -1,6 +1,7 @@
 .*\.a$
 .*\.cmi$
 .*\.cmo$
+.*\.cmx$
 .*\.d$
 .*\.o$
 .*\.opic$
@@ -62,6 +63,7 @@
 ^extras/mini-os/h/hypervisor-ifs$
 ^extras/mini-os/h/xen-public$
 ^extras/mini-os/mini-os.*$
+^extras/mini-os/*-stubdom.*$
 ^install/.*$
 ^linux-[^/]*-paravirt/.*$
 ^linux-2.6[^/]*/.*$
@@ -92,6 +94,8 @@
 ^stubdom/newlib-.*$
 ^stubdom/pciutils-.*$
 ^stubdom/zlib-.*$
+^stubdom/c/main-c.c$
+^stubdom/caml/main-c.c$
 ^tools/.*/TAGS$
 ^tools/.*/build/lib.*/.*\.py$
 ^tools/blktap/Makefile\.smh$
