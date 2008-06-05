@@ -4007,7 +4007,9 @@ int sh_rm_write_access_from_l1(struct vcpu *v, mfn_t sl1mfn,
     shadow_l1e_t *sl1e;
     int done = 0;
     int flags;
+#if SHADOW_OPTIMIZATIONS & SHOPT_WRITABLE_HEURISTIC 
     mfn_t base_sl1mfn = sl1mfn; /* Because sl1mfn changes in the foreach */
+#endif
     
     SHADOW_FOREACH_L1E(sl1mfn, sl1e, 0, done, 
     {
