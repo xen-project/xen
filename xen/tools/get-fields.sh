@@ -2,7 +2,9 @@ test -n "$1" -a -n "$2" -a -n "$3"
 set -ef
 
 SED=sed
-test -x /usr/xpg4/bin/sed && SED=/usr/xpg4/bin/sed
+if test -x /usr/xpg4/bin/sed; then
+	SED=/usr/xpg4/bin/sed
+fi
 
 get_fields ()
 {
