@@ -2039,7 +2039,7 @@ def xm_block_list(args):
                 hdr = 1
             ni = parse_dev_info(x[1])
             ni['idx'] = int(x[0])
-            print ("%(idx)-3d    "
+            print ("%(idx)-5d  "
                    "%(backend-id)-3d  "
                    "%(handle)-3d   "
                    "%(state)-3d    "
