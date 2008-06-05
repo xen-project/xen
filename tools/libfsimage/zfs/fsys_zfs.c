@@ -776,11 +776,11 @@ dnode_get_path(fsi_file_t *ffi, dnode_phys_t *mdn, char *path,
 	while (*path == '/')
 		path++;
 
-	while (*path && !isspace(*path)) {
+	while (*path && !isspace((uint8_t)*path)) {
 
 		/* get the next component name */
 		cname = path;
-		while (*path && !isspace(*path) && *path != '/')
+		while (*path && !isspace((uint8_t)*path) && *path != '/')
 			path++;
 		ch = *path;
 		*path = 0;   /* ensure null termination */
@@ -890,17 +890,17 @@ get_objset_mdn(fsi_file_t *ffi, dnode_phys_t *mosmdn, char *fsname,
 	}
 
 	/* take out the pool name */
-	while (*fsname && !isspace(*fsname) && *fsname != '/')
+	while (*fsname && !isspace((uint8_t)*fsname) && *fsname != '/')
 		fsname++;
 
-	while (*fsname && !isspace(*fsname)) {
+	while (*fsname && !isspace((uint8_t)*fsname)) {
 		uint64_t childobj;
 
 		while (*fsname == '/')
 			fsname++;
 
 		cname = fsname;
-		while (*fsname && !isspace(*fsname) && *fsname != '/')
+		while (*fsname && !isspace((uint8_t)*fsname) && *fsname != '/')
 			fsname++;
 		ch = *fsname;
 		*fsname = 0;
