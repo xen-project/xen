@@ -356,8 +356,10 @@ int __init construct_dom0(
 #if defined(__x86_64__)
     if ( is_pv_32on64_domain(d) )
         d->arch.physaddr_bitsize =
-            fls((1UL << 32) - HYPERVISOR_COMPAT_VIRT_START(d)) - 1
-            + (PAGE_SIZE - 2);
+            /* 2^n entries can be contained in guest's p2m mapping space */
+            fls((1UL << 32) - HYPERVISOR_COMPAT_VIRT_START(d)) - 3
+            /* 2^n pages -> 2^(n+PAGE_SHIFT) bits */
+            + PAGE_SHIFT;
 #endif
 
     /*
