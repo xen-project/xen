@@ -19,6 +19,8 @@ device_model = '/usr/lib/xen/bin/stubdom-dm'
 
 #disk = [  'file:/tmp/install.iso,hdc:cdrom,r', 'phy:/dev/sda6,hda,w', 'file:/tmp/test,hdb,r' ]
 
+- disable anything related to dom0, like pty serial assignments
+
 
 Create /etc/xen/stubdom-hvmconfig (where "hvmconfig" is the name of your HVM
 guest) with
