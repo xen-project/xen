@@ -45,5 +45,6 @@ static inline int notify_remote_via_evtchn(evtchn_port_t port)
     return HYPERVISOR_event_channel_op(EVTCHNOP_send, &op);
 }
 
+void fini_events(void);
 
 #endif /* _EVENTS_H_ */

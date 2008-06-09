@@ -124,7 +124,7 @@ char* xenbus_wait_for_value(const char* path, const char* value, xenbus_event_qu
 static void xenbus_thread_func(void *ign)
 {
     struct xsd_sockmsg msg;
-    unsigned prod = 0;
+    unsigned prod = xenstore_buf->rsp_prod;
 
     for (;;) 
     {
@@ -174,9 +174,14 @@ static void xenbus_thread_func(void *ign)
                         break;
                     }
 
-		event->next = *events;
-		*events = event;
-                wake_up(&xenbus_watch_queue);
+                if (events) {
+                    event->next = *events;
+                    *events = event;
+                    wake_up(&xenbus_watch_queue);
+                } else {
+                    printk("unexpected watch token %s\n", event->token);
+                    free(event);
+                }
             }
 
             else
@@ -263,6 +268,10 @@ void init_xenbus(void)
               NULL);
     unmask_evtchn(start_info.store_evtchn);
     DEBUG("xenbus on irq %d\n", err);
+}
+
+void fini_xenbus(void)
+{
 }
 
 /* Send data to xenbus.  This can block.  All of the requests are seen

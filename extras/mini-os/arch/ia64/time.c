@@ -280,3 +280,9 @@ init_time(void)
 	ia64_set_itm(new);
 	ia64_srlz_d();
 }
+
+void
+fini_time(void)
+{
+	/* TODO */
+}

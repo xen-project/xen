@@ -193,3 +193,14 @@ init_gnttab(void)
     gnttab_table = map_frames(frames, NR_GRANT_FRAMES);
     printk("gnttab_table mapped at %p.\n", gnttab_table);
 }
+
+void
+fini_gnttab(void)
+{
+    struct gnttab_setup_table setup;
+
+    setup.dom = DOMID_SELF;
+    setup.nr_frames = 0;
+
+    HYPERVISOR_grant_table_op(GNTTABOP_setup_table, &setup, 1);
+}

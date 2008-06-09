@@ -46,6 +46,7 @@
 #include <xen/features.h>
 #include <xen/version.h>
 
+static struct netfront_dev *net_dev;
 
 u8 xen_features[XENFEAT_NR_SUBMAPS * 32];
 
@@ -87,7 +88,7 @@ static void periodic_thread(void *p)
 
 static void netfront_thread(void *p)
 {
-    init_netfront(NULL, NULL, NULL, NULL);
+    net_dev = init_netfront(NULL, NULL, NULL, NULL);
 }
 
 static struct blkfront_dev *blk_dev;
@@ -347,9 +348,9 @@ static void refresh_cursor(int new_x, int new_y)
     fbfront_update(fb_dev, new_x, new_y, 9, 9);
 }
 
+static struct kbdfront_dev *kbd_dev;
 static void kbdfront_thread(void *p)
 {
-    struct kbdfront_dev *kbd_dev;
     DEFINE_WAIT(w);
     int x = WIDTH / 2, y = HEIGHT / 2, z = 0;
 
@@ -509,6 +510,49 @@ void start_kernel(start_info_t *si)
     run_idle_thread();
 }
 
+void stop_kernel(void)
+{
+    if (net_dev)
+        shutdown_netfront(net_dev);
+
+    if (blk_dev)
+        shutdown_blkfront(blk_dev);
+
+    if (fb_dev)
+        shutdown_fbfront(fb_dev);
+
+    if (kbd_dev)
+        shutdown_kbdfront(kbd_dev);
+
+    /* TODO: fs import */
+
+    local_irq_disable();
+
+    /* Reset grant tables */
+    fini_gnttab();
+
+    /* Reset the console driver. */
+    fini_console();
+    /* TODO: record new ring mfn & event in start_info */
+
+    /* Reset XenBus */
+    fini_xenbus();
+
+    /* Reset timers */
+    fini_time();
+
+    /* Reset memory management. */
+    fini_mm();
+
+    /* Reset events. */
+    fini_events();
+
+    /* Reset traps */
+    trap_fini();
+
+    /* Reset arch details */
+    arch_fini();
+}
 
 /*
  * do_exit: This is called whenever an IRET fails in entry.S.

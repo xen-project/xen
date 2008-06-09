@@ -39,19 +39,29 @@ static unsigned long bound_ports[NR_EVS/(8*sizeof(unsigned long))];
 void unbind_all_ports(void)
 {
     int i;
+    int cpu = 0;
+    shared_info_t *s = HYPERVISOR_shared_info;
+    vcpu_info_t   *vcpu_info = &s->vcpu_info[cpu];
 
     for (i = 0; i < NR_EVS; i++)
     {
+        if (i == start_info.console.domU.evtchn ||
+            i == start_info.store_evtchn)
+            continue;
         if (test_and_clear_bit(i, bound_ports))
         {
             struct evtchn_close close;
+            printk("port %d still bound!\n", i);
             mask_evtchn(i);
             close.port = i;
             HYPERVISOR_event_channel_op(EVTCHNOP_close, &close);
+            clear_evtchn(i);
         }
     }
+    vcpu_info->evtchn_upcall_pending = 0;
+    vcpu_info->evtchn_pending_sel = 0;
 }
-  
+
 /*
  * Demux events to different handlers.
  */
@@ -86,17 +96,27 @@ evtchn_port_t bind_evtchn(evtchn_port_t port, evtchn_handler_t handler,
 	ev_actions[port].data = data;
 	wmb();
 	ev_actions[port].handler = handler;
+	set_bit(port, bound_ports);
 
 	return port;
 }
 
 void unbind_evtchn(evtchn_port_t port )
 {
+	struct evtchn_close close;
+
 	if (ev_actions[port].handler == default_handler)
 		printk("WARN: No handler for port %d when unbinding\n", port);
+	mask_evtchn(port);
+	clear_evtchn(port);
+
 	ev_actions[port].handler = default_handler;
 	wmb();
 	ev_actions[port].data = NULL;
+	clear_bit(port, bound_ports);
+
+	close.port = port;
+	HYPERVISOR_event_channel_op(EVTCHNOP_close, &close);
 }
 
 evtchn_port_t bind_virq(uint32_t virq, evtchn_handler_t handler, void *data)
@@ -112,7 +132,6 @@ evtchn_port_t bind_virq(uint32_t virq, evtchn_handler_t handler, void *data)
 		printk("Failed to bind virtual IRQ %d\n", virq);
 		return -1;
     }
-    set_bit(op.port,bound_ports);
     bind_evtchn(op.port, handler, data);
 	return op.port;
 }
@@ -145,6 +164,15 @@ void init_events(void)
         ev_actions[i].handler = default_handler;
         mask_evtchn(i);
     }
+}
+
+void fini_events(void)
+{
+    /* Dealloc all events */
+    unbind_all_ports();
+#if defined(__x86_64__)
+    wrmsrl(0xc0000101, NULL); /* 0xc0000101 is MSR_GS_BASE */
+#endif
 }
 
 void default_handler(evtchn_port_t port, struct pt_regs *regs, void *ignore)
@@ -185,7 +213,6 @@ int evtchn_bind_interdomain(domid_t pal, evtchn_port_t remote_port,
     int err = HYPERVISOR_event_channel_op(EVTCHNOP_bind_interdomain, &op);
     if (err)
 		return err;
-    set_bit(op.local_port,bound_ports);
     evtchn_port_t port = op.local_port;
     *local_port = bind_evtchn(port, handler, data);
     return err;

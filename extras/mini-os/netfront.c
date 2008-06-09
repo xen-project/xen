@@ -501,6 +501,8 @@ void shutdown_netfront(struct netfront_dev *dev)
 
     xenbus_unwatch_path(XBT_NIL, path);
 
+    err = xenbus_printf(XBT_NIL, nodename, "state", "%u", 1);
+
     free_netfront(dev);
 }
 

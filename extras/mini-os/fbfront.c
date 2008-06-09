@@ -225,6 +225,8 @@ void shutdown_kbdfront(struct kbdfront_dev *dev)
 
     xenbus_unwatch_path(XBT_NIL, path);
 
+    err = xenbus_printf(XBT_NIL, nodename, "state", "%u", 1);
+
     free_kbdfront(dev);
 }
 
@@ -548,6 +550,8 @@ void shutdown_fbfront(struct fbfront_dev *dev)
     xenbus_wait_for_value(path, "6", &dev->events);
 
     xenbus_unwatch_path(XBT_NIL, path);
+
+    err = xenbus_printf(XBT_NIL, nodename, "state", "%u", 1);
 
     unbind_evtchn(dev->evtchn);
 

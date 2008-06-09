@@ -38,6 +38,10 @@ inline static void trap_init(void)
 {
 	//printk("trap_init() until now not needed!\n");
 }
+inline static void trap_fini(void)
+{
+	//printk("trap_fini() until now not needed!\n");
+}
 
 
 #endif /* !defined(__ASSEMBLY__) */

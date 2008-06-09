@@ -54,6 +54,7 @@ typedef long suseconds_t;
 
 /* prototypes */
 void     init_time(void);
+void     fini_time(void);
 s_time_t get_s_time(void);
 s_time_t get_v_time(void);
 u64      monotonic_clock(void);

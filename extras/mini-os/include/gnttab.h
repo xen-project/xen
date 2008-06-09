@@ -11,5 +11,6 @@ grant_ref_t gnttab_grant_transfer(domid_t domid, unsigned long pfn);
 unsigned long gnttab_end_transfer(grant_ref_t gref);
 int gnttab_end_access(grant_ref_t ref);
 const char *gnttabop_error(int16_t status);
+void fini_gnttab(void);
 
 #endif /* !__GNTTAB_H__ */

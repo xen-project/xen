@@ -150,3 +150,8 @@ void init_console(void)
     /* This is also required to notify the daemon */
     printk("done.\n");
 }
+
+void fini_console(void)
+{
+    /* Destruct the console and get the parameters of the restarted one */
+}

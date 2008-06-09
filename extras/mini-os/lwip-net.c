@@ -376,3 +376,9 @@ void start_networking(void)
 
   tprintk("Network is ready.\n");
 }
+
+/* Shut down the network */
+void stop_networking(void)
+{
+  shutdown_netfront(dev);
+}

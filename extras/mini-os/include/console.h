@@ -51,6 +51,7 @@ void xencons_tx(void);
 
 void init_console(void);
 void console_print(char *data, int length);
+void fini_console(void);
 
 /* Low level functions defined in xencons_ring.c */
 extern struct wait_queue_head console_queue;

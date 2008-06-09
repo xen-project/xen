@@ -419,6 +419,10 @@ void init_mm(void)
     arch_init_demand_mapping_area(max_pfn);
 }
 
+void fini_mm(void)
+{
+}
+
 void sanity_check(void)
 {
     int x;
