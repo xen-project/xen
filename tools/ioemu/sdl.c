@@ -50,6 +50,8 @@ static SDL_Cursor *sdl_cursor_hidden;
 static int absolute_enabled = 0;
 static int opengl_enabled;
 
+static void sdl_colourdepth(DisplayState *ds, int depth);
+
 #ifdef CONFIG_OPENGL
 static GLint tex_format;
 static GLint tex_type;
@@ -211,11 +213,13 @@ static void sdl_setdata(DisplayState *ds, void *pixels)
     ds->data = pixels;
 }
 
-static void sdl_resize(DisplayState *ds, int w, int h, int linesize)
+static void sdl_resize_shared(DisplayState *ds, int w, int h, int depth, int linesize, void *pixels)
 {
     int flags;
 
     //    printf("resizing to %d %d\n", w, h);
+
+    sdl_colourdepth(ds, depth);
 
 #ifdef CONFIG_OPENGL
     if (ds->shared_buf && opengl_enabled)
@@ -245,7 +249,8 @@ static void sdl_resize(DisplayState *ds, int w, int h, int linesize)
             opengl_enabled = 0;
             ds->dpy_update = sdl_update;
             ds->dpy_setdata = sdl_setdata;
-            sdl_resize(ds, w, h, linesize);
+            ds->dpy_resize_shared = sdl_resize_shared;
+            sdl_resize_shared(ds, w, h, depth, linesize, pixels);
             return;
         }
         exit(1);
@@ -272,6 +277,7 @@ static void sdl_resize(DisplayState *ds, int w, int h, int linesize)
         } else {
             ds->bgr = 0;
         }
+        shared = NULL;
         ds->data = screen->pixels;
         ds->linesize = screen->pitch;
     } else {
@@ -296,21 +302,26 @@ static void sdl_resize(DisplayState *ds, int w, int h, int linesize)
         };
 #endif
     }
+    if (ds->shared_buf) ds->dpy_setdata(ds, pixels);
+}
+
+static void sdl_resize(DisplayState *ds, int w, int h)
+{
+    sdl_resize_shared(ds, w, h, 0, w * (ds->depth / 8), NULL);
 }
 
 static void sdl_colourdepth(DisplayState *ds, int depth)
 {
     if (!depth || !ds->depth) {
         ds->shared_buf = 0;
+        ds->dpy_update = sdl_update;
         return;
     }
     ds->shared_buf = 1;
     ds->depth = depth;
-    ds->linesize = width * depth / 8;
 #ifdef CONFIG_OPENGL
     if (opengl_enabled) {
         ds->dpy_update = opengl_update;
-        ds->dpy_setdata = opengl_setdata;
     }
 #endif
 }
@@ -517,8 +528,7 @@ static void sdl_send_mouse_event(int dx, int dy, int dz, int state)
 static void toggle_full_screen(DisplayState *ds)
 {
     gui_fullscreen = !gui_fullscreen;
-    sdl_resize(ds, ds->width, ds->height, ds->linesize);
-    ds->dpy_setdata(ds, ds->data);
+    sdl_resize_shared(ds, ds->width, ds->height, ds->depth, ds->linesize, ds->data);
     if (gui_fullscreen) {
         gui_saved_grab = gui_grab;
         sdl_grab_start();
@@ -760,11 +770,16 @@ void sdl_display_init(DisplayState *ds, int full_screen, int opengl)
 
     ds->dpy_update = sdl_update;
     ds->dpy_resize = sdl_resize;
+    ds->dpy_resize_shared = sdl_resize_shared;
     ds->dpy_refresh = sdl_refresh;
-    ds->dpy_colourdepth = sdl_colourdepth;
-    ds->dpy_setdata = sdl_setdata;
+#ifdef CONFIG_OPENGL
+    if (opengl_enabled)
+        ds->dpy_setdata = opengl_setdata;
+    else
+        ds->dpy_setdata = sdl_setdata;
+#endif
 
-    sdl_resize(ds, 640, 400, 640 * 4);
+    sdl_resize(ds, 640, 400);
     sdl_update_caption();
     SDL_EnableKeyRepeat(250, 50);
     SDL_EnableUNICODE(1);

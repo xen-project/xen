@@ -277,6 +277,7 @@ static void enqueue_framebuffer_update(VncState *vs, int x, int y, int w, int h,
 static void dequeue_framebuffer_update(VncState *vs);
 static int is_empty_queue(VncState *vs);
 static void free_queue(VncState *vs);
+static void vnc_colourdepth(DisplayState *ds, int depth);
 
 #if 0
 static inline void vnc_set_bit(uint32_t *d, int k)
@@ -363,13 +364,14 @@ static void vnc_framebuffer_update(VncState *vs, int x, int y, int w, int h,
     vnc_write_s32(vs, encoding);
 }
 
-static void vnc_dpy_resize(DisplayState *ds, int w, int h, int linesize)
+static void vnc_dpy_resize_shared(DisplayState *ds, int w, int h, int depth, int linesize, void *pixels)
 {
     static int allocated;
     int size_changed;
     VncState *vs = ds->opaque;
     int o;
 
+    vnc_colourdepth(ds, depth);
     if (!ds->shared_buf) {
         ds->linesize = w * vs->depth;
         if (allocated)
@@ -419,6 +421,12 @@ static void vnc_dpy_resize(DisplayState *ds, int w, int h, int linesize)
     for (o = DIRTY_PIXEL_BITS; o < ds->width; o *= 2)
 	vs->dirty_pixel_shift++;
     framebuffer_set_updated(vs, 0, 0, ds->width, ds->height);
+    if (ds->shared_buf) ds->data = pixels;
+}
+
+static void vnc_dpy_resize(DisplayState *ds, int w, int h)
+{
+    vnc_dpy_resize_shared(ds, w, h, 0, w * (ds->depth / 8), NULL);
 }
 
 /* fastest code */
@@ -1640,7 +1648,7 @@ static void vnc_dpy_setdata(DisplayState *ds, void *pixels)
     ds->data = pixels;
 }
 
-static void vnc_dpy_colourdepth(DisplayState *ds, int depth)
+static void vnc_colourdepth(DisplayState *ds, int depth)
 {
     int host_big_endian_flag;
     struct VncState *vs = ds->opaque;
@@ -1742,8 +1750,6 @@ static void vnc_dpy_colourdepth(DisplayState *ds, int depth)
             vs->write_pixels = vnc_write_pixels_generic;
         }
     }
-
-    vnc_dpy_resize(ds, ds->width, ds->height, ds->linesize);
 }
 
 static int protocol_client_msg(VncState *vs, uint8_t *data, size_t len)
@@ -2502,14 +2508,14 @@ void vnc_display_init(DisplayState *ds)
     vs->ds->data = NULL;
     vs->ds->dpy_update = vnc_dpy_update;
     vs->ds->dpy_resize = vnc_dpy_resize;
-    vs->ds->dpy_colourdepth = vnc_dpy_colourdepth;
     vs->ds->dpy_setdata = vnc_dpy_setdata;
+    vs->ds->dpy_resize_shared = vnc_dpy_resize_shared;
     vs->ds->dpy_refresh = vnc_dpy_refresh;
 
     vs->ds->width = 640;
     vs->ds->height = 400;
     vs->ds->linesize = 640 * 4;
-    vnc_dpy_colourdepth(vs->ds, 24);
+    vnc_dpy_resize_shared(ds, ds->width, ds->height, 24, ds->linesize, NULL);
 }
 
 #if CONFIG_VNC_TLS

@@ -96,7 +96,7 @@ static void cocoa_update(DisplayState *ds, int x, int y, int w, int h)
     cocoa_resize
  ------------------------------------------------------
 */
-static void cocoa_resize(DisplayState *ds, int w, int h, int linesize)
+static void cocoa_resize(DisplayState *ds, int w, int h)
 {
     const int device_bpp = 32;
     static void *screen_pixels;

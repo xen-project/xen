@@ -1065,6 +1065,8 @@ typedef unsigned int rgb_to_pixel_dup_func(unsigned int r, unsigned int g, unsig
 
 static rgb_to_pixel_dup_func *rgb_to_pixel_dup_table[NB_DEPTHS];
 
+static int old_depth = 0;
+
 /* 
  * Text mode update 
  * Missing:
@@ -1089,14 +1091,51 @@ static void vga_draw_text(VGAState *s, int full_update)
     /* Disable dirty bit tracking */
     xc_hvm_track_dirty_vram(xc_handle, domid, 0, 0, NULL);
 
-    if (s->ds->dpy_colourdepth != NULL && s->ds->depth != 0)
-        s->ds->dpy_colourdepth(s->ds, 0);
+    /* total width & height */
+    cheight = (s->cr[9] & 0x1f) + 1;
+    cw = 8;
+    if (!(s->sr[1] & 0x01))
+        cw = 9;
+    if (s->sr[1] & 0x08)
+        cw = 16; /* NOTE: no 18 pixel wide */
+    width = (s->cr[0x01] + 1);
+    if (s->cr[0x06] == 100) {
+        /* ugly hack for CGA 160x100x16 - explain me the logic */
+        height = 100;
+    } else {
+        height = s->cr[0x12] | 
+            ((s->cr[0x07] & 0x02) << 7) | 
+            ((s->cr[0x07] & 0x40) << 3);
+        height = (height + 1) / cheight;
+    }
+    if ((height * width) > CH_ATTR_SIZE) {
+        /* better than nothing: exit if transient size is too big */
+        return;
+    }
+
+    s->last_scr_width = width * cw;
+    s->last_scr_height = height * cheight;
+    if (s->ds->dpy_resize_shared && old_depth) {
+        dpy_resize_shared(s->ds, s->last_scr_width, s->last_scr_height, 0, s->last_scr_width * (s->ds->depth / 8), NULL);
+        old_depth = 0;
+        full_update = 1;
+    } else if (width != s->last_width || height != s->last_height ||
+        cw != s->last_cw || cheight != s->last_ch) {
+        dpy_resize(s->ds, s->last_scr_width, s->last_scr_height);
+        full_update = 1;
+    }
+    s->last_width = width;
+    s->last_height = height;
+    s->last_ch = cheight;
+    s->last_cw = cw;
+
     s->rgb_to_pixel = 
         rgb_to_pixel_dup_table[get_depth_index(s->ds)];
 
     full_update |= update_palette16(s);
     palette = s->last_palette;
     
+    x_incr = cw * ((s->ds->depth + 7) >> 3);
     /* compute font data address (in plane 2) */
     v = s->sr[3];
     offset = (((v >> 4) & 1) | ((v << 1) & 6)) * 8192 * 4 + 2;
@@ -1123,40 +1162,6 @@ static void vga_draw_text(VGAState *s, int full_update)
     line_offset = s->line_offset;
     s1 = s->vram_ptr + (s->start_addr * 4);
 
-    /* total width & height */
-    cheight = (s->cr[9] & 0x1f) + 1;
-    cw = 8;
-    if (!(s->sr[1] & 0x01))
-        cw = 9;
-    if (s->sr[1] & 0x08)
-        cw = 16; /* NOTE: no 18 pixel wide */
-    x_incr = cw * ((s->ds->depth + 7) >> 3);
-    width = (s->cr[0x01] + 1);
-    if (s->cr[0x06] == 100) {
-        /* ugly hack for CGA 160x100x16 - explain me the logic */
-        height = 100;
-    } else {
-        height = s->cr[0x12] | 
-            ((s->cr[0x07] & 0x02) << 7) | 
-            ((s->cr[0x07] & 0x40) << 3);
-        height = (height + 1) / cheight;
-    }
-    if ((height * width) > CH_ATTR_SIZE) {
-        /* better than nothing: exit if transient size is too big */
-        return;
-    }
-
-    if (width != s->last_width || height != s->last_height ||
-        cw != s->last_cw || cheight != s->last_ch) {
-        s->last_scr_width = width * cw;
-        s->last_scr_height = height * cheight;
-        dpy_resize(s->ds, s->last_scr_width, s->last_scr_height, s->last_scr_width * (s->ds->depth / 8));
-        s->last_width = width;
-        s->last_height = height;
-        s->last_ch = cheight;
-        s->last_cw = cw;
-        full_update = 1;
-    }
     cursor_offset = ((s->cr[0x0e] << 8) | s->cr[0x0f]) - s->start_addr;
     if (cursor_offset != s->cursor_offset ||
         s->cr[0xa] != s->cursor_start ||
@@ -1501,16 +1506,6 @@ static void vga_draw_graphic(VGAState *s, int full_update)
     s->get_resolution(s, &width, &height);
     disp_width = width;
 
-    ds_depth = s->ds->depth;
-    depth = s->get_bpp(s);
-    if (s->ds->dpy_colourdepth != NULL && 
-            (ds_depth != depth || !s->ds->shared_buf))
-        s->ds->dpy_colourdepth(s->ds, depth);
-    if (ds_depth != s->ds->depth) full_update = 1;
-
-    s->rgb_to_pixel = 
-        rgb_to_pixel_dup_table[get_depth_index(s->ds)];
-
     shift_control = (s->gr[0x05] >> 5) & 3;
     double_scan = (s->cr[0x09] >> 7);
     if (shift_control != 1) {
@@ -1527,12 +1522,44 @@ static void vga_draw_graphic(VGAState *s, int full_update)
         s->shift_control = shift_control;
         s->double_scan = double_scan;
     }
-    
+    if (shift_control == 1 && (s->sr[0x01] & 8)) {
+        disp_width <<= 1;
+    }
+
+    ds_depth = s->ds->depth;
+    depth = s->get_bpp(s);
+    if (s->ds->dpy_resize_shared) {
+        if (s->line_offset != s->last_line_offset || 
+            disp_width != s->last_width ||
+            height != s->last_height ||
+            old_depth != depth) {
+            dpy_resize_shared(s->ds, disp_width, height, depth, s->line_offset, s->vram_ptr + (s->start_addr * 4));
+            s->last_scr_width = disp_width;
+            s->last_scr_height = height;
+            s->last_width = disp_width;
+            s->last_height = height;
+            s->last_line_offset = s->line_offset;
+            old_depth = depth;
+            full_update = 1;
+        } else if (s->ds->shared_buf && (full_update || s->ds->data != s->vram_ptr + (s->start_addr * 4)))
+            s->ds->dpy_setdata(s->ds, s->vram_ptr + (s->start_addr * 4));
+    } else if (disp_width != s->last_width ||
+               height != s->last_height) {
+        dpy_resize(s->ds, disp_width, height);
+        s->last_scr_width = disp_width;
+        s->last_scr_height = height;
+        s->last_width = disp_width;
+        s->last_height = height;
+        full_update = 1;
+    }
+
+    s->rgb_to_pixel = 
+        rgb_to_pixel_dup_table[get_depth_index(s->ds)];
+
     if (shift_control == 0) {
         full_update |= update_palette16(s);
         if (s->sr[0x01] & 8) {
             v = VGA_DRAW_LINE4D2;
-            disp_width <<= 1;
         } else {
             v = VGA_DRAW_LINE4;
         }
@@ -1541,7 +1568,6 @@ static void vga_draw_graphic(VGAState *s, int full_update)
         full_update |= update_palette16(s);
         if (s->sr[0x01] & 8) {
             v = VGA_DRAW_LINE2D2;
-            disp_width <<= 1;
         } else {
             v = VGA_DRAW_LINE2;
         }
@@ -1579,19 +1605,6 @@ static void vga_draw_graphic(VGAState *s, int full_update)
     }
 
     vga_draw_line = vga_draw_line_table[v * NB_DEPTHS + get_depth_index(s->ds)];
-    if (s->line_offset != s->last_line_offset || 
-        disp_width != s->last_width ||
-        height != s->last_height) {
-        dpy_resize(s->ds, disp_width, height, s->line_offset);
-        s->last_scr_width = disp_width;
-        s->last_scr_height = height;
-        s->last_width = disp_width;
-        s->last_height = height;
-        s->last_line_offset = s->line_offset; 
-        full_update = 1;
-    }
-    if (s->ds->shared_buf && (full_update || s->ds->data != s->vram_ptr + (s->start_addr * 4)))
-        s->ds->dpy_setdata(s->ds, s->vram_ptr + (s->start_addr * 4));
     if (!s->ds->shared_buf && s->cursor_invalidate)
         s->cursor_invalidate(s);
     
@@ -2311,7 +2324,7 @@ static void vga_save_dpy_update(DisplayState *s,
 {
 }
 
-static void vga_save_dpy_resize(DisplayState *s, int w, int h, int linesize)
+static void vga_save_dpy_resize(DisplayState *s, int w, int h)
 {
     s->linesize = w * 4;
     s->data = qemu_malloc(h * s->linesize);

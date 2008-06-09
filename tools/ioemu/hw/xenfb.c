@@ -587,10 +587,10 @@ static void xenfb_on_fb_event(struct xenfb *xenfb)
 					       event->resize.offset,
 					       event->resize.stride) < 0)
 				break;
-			dpy_colourdepth(xenfb->ds, xenfb->depth);
-			dpy_resize(xenfb->ds, xenfb->width, xenfb->height, xenfb->row_stride);
-			if (xenfb->ds->shared_buf)
-				dpy_setdata(xenfb->ds, xenfb->pixels + xenfb->offset);
+			if (xenfb->ds->dpy_resize_shared)
+			    dpy_resize_shared(xenfb->ds, xenfb->width, xenfb->height, xenfb->depth, xenfb->row_stride, xenfb->pixels + xenfb->offset);
+			else
+			    dpy_resize(xenfb->ds, xenfb->width, xenfb->height);
 			xenfb_invalidate(xenfb);
 			break;
 		}
@@ -1324,10 +1324,10 @@ static int xenfb_register_console(struct xenfb *xenfb) {
 			     xenfb_invalidate,
 			     xenfb_screen_dump,
 			     xenfb);
-	dpy_colourdepth(xenfb->ds, xenfb->depth);
-        dpy_resize(xenfb->ds, xenfb->width, xenfb->height, xenfb->row_stride);
-	if (xenfb->ds->shared_buf)
-	    dpy_setdata(xenfb->ds, xenfb->pixels);
+        if (xenfb->ds->dpy_resize_shared)
+            dpy_resize_shared(xenfb->ds, xenfb->width, xenfb->height, xenfb->depth, xenfb->row_stride, xenfb->pixels + xenfb->offset);
+        else
+            dpy_resize(xenfb->ds, xenfb->width, xenfb->height);
 
 	if (qemu_set_fd_handler2(xc_evtchn_fd(xenfb->evt_xch), NULL, xenfb_dispatch_channel, NULL, xenfb) < 0)
 	        return -1;
@@ -1353,6 +1353,8 @@ static char *kbd_path, *fb_path;
 
 static unsigned char linux2scancode[KEY_MAX + 1];
 
+static void xenfb_pv_colourdepth(DisplayState *ds, int depth);
+
 int xenfb_connect_vkbd(const char *path)
 {
     kbd_path = strdup(path);
@@ -1374,11 +1376,13 @@ static void xenfb_pv_update(DisplayState *ds, int x, int y, int w, int h)
     fbfront_update(fb_dev, x, y, w, h);
 }
 
-static void xenfb_pv_resize(DisplayState *ds, int w, int h, int linesize)
+static void xenfb_pv_resize_shared(DisplayState *ds, int w, int h, int depth, int linesize, void *pixels)
 {
     XenFBState *xs = ds->opaque;
     struct fbfront_dev *fb_dev = xs->fb_dev;
+    int offset;
     fprintf(stderr,"resize to %dx%d, %d required\n", w, h, linesize);
+    xenfb_pv_colourdepth(ds, depth);
     ds->width = w;
     ds->height = h;
     if (!linesize)
@@ -1389,11 +1393,18 @@ static void xenfb_pv_resize(DisplayState *ds, int w, int h, int linesize)
     if (!fb_dev)
         return;
     if (ds->shared_buf) {
-        ds->data = NULL;
+        offset = pixels - xs->vga_vram;
+        ds->data = pixels;
+        fbfront_resize(fb_dev, ds->width, ds->height, ds->linesize, ds->depth, offset);
     } else {
         ds->data = xs->nonshared_vram;
         fbfront_resize(fb_dev, w, h, linesize, ds->depth, VGA_RAM_SIZE);
     }
+}
+
+static void xenfb_pv_resize(DisplayState *ds, int w, int h)
+{
+    xenfb_pv_resize_shared(ds, w, h, 0, 0, NULL);
 }
 
 static void xenfb_pv_colourdepth(DisplayState *ds, int depth)
@@ -1418,7 +1429,6 @@ static void xenfb_pv_colourdepth(DisplayState *ds, int depth)
         ds->data = NULL;
     } else {
         ds->data = xs->nonshared_vram;
-        fbfront_resize(fb_dev, ds->width, ds->height, ds->linesize, ds->depth, VGA_RAM_SIZE);
     }
 }
 
@@ -1597,7 +1607,7 @@ int xenfb_pv_display_init(DisplayState *ds)
     ds->linesize = 640 * 4;
     ds->dpy_update = xenfb_pv_update;
     ds->dpy_resize = xenfb_pv_resize;
-    ds->dpy_colourdepth = xenfb_pv_colourdepth;
+    ds->dpy_resize_shared = xenfb_pv_resize_shared;
     ds->dpy_setdata = xenfb_pv_setdata;
     ds->dpy_refresh = xenfb_pv_refresh;
     return 0;
