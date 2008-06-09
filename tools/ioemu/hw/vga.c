@@ -2157,6 +2157,11 @@ void vga_common_init(VGAState *s, DisplayState *ds, uint8_t *vga_ram_base,
     /* and page-aligned for PVFB memory sharing */
     s->vram_ptr = s->vram_alloc = qemu_memalign(TARGET_PAGE_SIZE, vga_ram_size);
 
+#ifdef CONFIG_STUBDOM
+    if (!cirrus_vga_enabled)
+        xenfb_pv_display_start(s->vram_ptr);
+#endif
+
     s->vram_offset = vga_ram_offset;
     s->vram_size = vga_ram_size;
     s->ds = ds;
