@@ -41,16 +41,18 @@ void _fini(void)
 extern char __app_bss_start, __app_bss_end;
 static void call_main(void *p)
 {
-    char *args, /**path,*/ *msg, *c;
+    char *c;
 #ifdef CONFIG_QEMU
-    char *domargs;
+    char *domargs, *msg;
 #endif
     int argc;
     char **argv;
     char *envp[] = { NULL };
+#ifdef CONFIG_QEMU
     char *vm;
-    int i;
     char path[128];
+#endif
+    int i;
 
     /* Let other parts initialize (including console output) before maybe
      * crashing. */
@@ -94,22 +96,6 @@ static void call_main(void *p)
     }
 #endif
 
-    msg = xenbus_read(XBT_NIL, "vm", &vm);
-    if (msg) {
-        printk("Couldn't read vm path\n");
-        do_exit();
-    }
-
-    printk("my vm is at %s\n", vm);
-    snprintf(path, sizeof(path), "%s/image/cmdline", vm);
-    free(vm);
-    msg = xenbus_read(XBT_NIL, path, &args);
-
-    if (msg) {
-        printk("Couldn't get my args: %s\n", msg);
-        args = strdup("");
-    }
-
     argc = 1;
 
 #define PARSE_ARGS(ARGS,START,END) \
@@ -126,7 +112,7 @@ static void call_main(void *p)
 	} \
     }
 
-    PARSE_ARGS(args, argc++, );
+    PARSE_ARGS(start_info.cmd_line, argc++, );
 #ifdef CONFIG_QEMU
     PARSE_ARGS(domargs, argc++, );
 #endif
@@ -135,7 +121,7 @@ static void call_main(void *p)
     argv[0] = "main";
     argc = 1;
 
-    PARSE_ARGS(args, argv[argc++] = c, *c++ = 0)
+    PARSE_ARGS(start_info.cmd_line, argv[argc++] = c, *c++ = 0)
 #ifdef CONFIG_QEMU
     PARSE_ARGS(domargs, argv[argc++] = c, *c++ = 0)
 #endif
