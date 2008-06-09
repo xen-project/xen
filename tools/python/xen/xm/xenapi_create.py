@@ -821,17 +821,43 @@ class sxp2xml:
 
 
     def extract_platform(self, image, document):
-        platform_keys = ['acpi', 'apic', 'pae', 'vhpt', 'timer_mode',
-                         'hap', 'hpet']
 
-        def extract_platform_key(key):
-            platform = document.createElement("platform")
-            platform.attributes["key"] = key
-            platform.attributes["value"] \
-                = str(get_child_by_name(image, key, "1"))
-            return platform
-        
-        return map(extract_platform_key, platform_keys)
+        platform_keys = [
+            'acpi',
+            'apic',
+            'boot',
+            'device_model',
+            'loader',
+            'fda',
+            'fdb',
+            'keymap',
+            'isa',
+            'localtime',
+            'monitor',
+            'pae',
+            'rtc_timeoffset',
+            'serial',
+            'soundhw',
+            'stdvga',
+            'usb',
+            'usbdevice',
+            'hpet',
+            'timer_mode',
+            'vhpt',
+            'guest_os_type',
+            'hap',
+        ]
+
+        platform_configs = []
+        for key in platform_keys:
+            value = get_child_by_name(image, key, None)
+            if value is not None:
+                platform = document.createElement("platform")
+                platform.attributes["key"] = key
+                platform.attributes["value"] = str(value)
+                platform_configs.append(platform)
+ 
+        return platform_configs
     
     def getFreshEthDevice(self):
         self._eths += 1
