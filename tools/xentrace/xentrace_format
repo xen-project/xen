@@ -17,12 +17,12 @@ def usage():
           {event_id}{whitespace}{text format string}
 
           The textual format string may include format specifiers, such as:
-            %(cpu)d, %(tsc)d, %(event)d, %(1)d, %(2)d, %(3)d, %(4)d, %(5)d
+            %(cpu)d, %(tsc)d, %(event)d, %(1)d, %(2)d, %(3)d, %(4)d, ... 
           [ the 'd' format specifier outputs in decimal, alternatively 'x'
             will output in hexadecimal and 'o' will output in octal ]
 
           Which correspond to the CPU number, event ID, timestamp counter and
-          the 5 data fields from the trace record.  There should be one such
+          the 7 data fields from the trace record.  There should be one such
           rule for each type of event.
           
           Depending on your system and the volume of trace buffer data,
@@ -84,7 +84,7 @@ interrupted = 0
 defs = read_defs(arg[0])
 
 # structure of trace record (as output by xentrace):
-# HDR(I) {TSC(Q)} D1(I) D2(I) D3(I) D4(I) D5(I)
+# HDR(I) {TSC(Q)} D1(I) D2(I) D3(I) D4(I) D5(I) D6(I) D7(I)
 #
 # HDR consists of EVENT:28:, n_data:3:, tsc_in:1:
 # EVENT means Event ID
@@ -101,6 +101,8 @@ D2REC  = "II"
 D3REC  = "III"
 D4REC  = "IIII"
 D5REC  = "IIIII"
+D6REC  = "IIIIII"
+D7REC  = "IIIIIII"
 
 last_tsc = [0]
 
@@ -121,6 +123,8 @@ while not interrupted:
         d3 = 0
         d4 = 0
         d5 = 0
+        d6 = 0
+        d7 = 0
 
         tsc = 0
 
@@ -155,6 +159,16 @@ while not interrupted:
             if not line:
                 break
             (d1, d2, d3, d4, d5) = struct.unpack(D5REC, line)
+        if n_data == 6:
+            line = sys.stdin.read(struct.calcsize(D6REC))
+            if not line:
+                break
+            (d1, d2, d3, d4, d5, d6) = struct.unpack(D6REC, line)
+        if n_data == 7:
+            line = sys.stdin.read(struct.calcsize(D7REC))
+            if not line:
+                break
+            (d1, d2, d3, d4, d5, d6, d7) = struct.unpack(D7REC, line)
 
         # Event field is 28bit of 'uint32_t' in header, not 'long'.
         event &= 0x0fffffff
@@ -191,7 +205,9 @@ while not interrupted:
                 '2'     : d2,
                 '3'     : d3,
                 '4'     : d4,
-                '5'     : d5    }
+                '5'     : d5,
+                '6'     : d6,
+                '7'     : d7    }
 
         try:
 

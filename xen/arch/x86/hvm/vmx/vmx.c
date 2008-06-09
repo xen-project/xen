@@ -1107,7 +1107,8 @@ static void __vmx_inject_exception(
     __vmwrite(VM_ENTRY_INTR_INFO, intr_fields);
 
     if ( trap == TRAP_page_fault )
-        HVMTRACE_2D(PF_INJECT, v, v->arch.hvm_vcpu.guest_cr[2], error_code);
+        HVMTRACE_LONG_2D(PF_INJECT, v, error_code,
+            TRC_PAR_LONG(v->arch.hvm_vcpu.guest_cr[2]));
     else
         HVMTRACE_2D(INJ_EXC, v, trap, error_code);
 }
@@ -1328,8 +1329,7 @@ static void vmx_cpuid_intercept(
             break;
     }
 
-    HVMTRACE_3D(CPUID, current, input,
-                ((uint64_t)*eax << 32) | *ebx, ((uint64_t)*ecx << 32) | *edx);
+    HVMTRACE_5D (CPUID, current, input, *eax, *ebx, *ecx, *edx);
 }
 
 static void vmx_do_cpuid(struct cpu_user_regs *regs)
@@ -1367,7 +1367,7 @@ static void vmx_dr_access(unsigned long exit_qualification,
 static void vmx_invlpg_intercept(unsigned long vaddr)
 {
     struct vcpu *curr = current;
-    HVMTRACE_2D(INVLPG, curr, /*invlpga=*/ 0, vaddr);
+    HVMTRACE_LONG_2D(INVLPG, curr, /*invlpga=*/ 0, TRC_PAR_LONG(vaddr));
     if ( paging_invlpg(curr, vaddr) )
         vpid_sync_vcpu_gva(curr, vaddr);
 }
@@ -1418,7 +1418,7 @@ static int mov_to_cr(int gp, int cr, struct cpu_user_regs *regs)
         goto exit_and_crash;
     }
 
-    HVMTRACE_2D(CR_WRITE, v, cr, value);
+    HVMTRACE_LONG_2D(CR_WRITE, v, cr, TRC_PAR_LONG(value));
 
     HVM_DBG_LOG(DBG_LEVEL_1, "CR%d, value = %lx", cr, value);
 
@@ -1489,7 +1489,7 @@ static void mov_from_cr(int cr, int gp, struct cpu_user_regs *regs)
         break;
     }
 
-    HVMTRACE_2D(CR_READ, v, cr, value);
+    HVMTRACE_LONG_2D(CR_READ, v, cr, TRC_PAR_LONG(value));
 
     HVM_DBG_LOG(DBG_LEVEL_VMMU, "CR%d, value = %lx", cr, value);
 }
@@ -1520,7 +1520,7 @@ static int vmx_cr_access(unsigned long exit_qualification,
     case VMX_CONTROL_REG_ACCESS_TYPE_LMSW:
         value = v->arch.hvm_vcpu.guest_cr[0];
         value = (value & ~0xFFFF) | ((exit_qualification >> 16) & 0xFFFF);
-        HVMTRACE_1D(LMSW, current, value);
+        HVMTRACE_LONG_1D(LMSW, current, value);
         return !hvm_set_cr0(value);
     default:
         BUG();
@@ -1675,7 +1675,7 @@ static int vmx_msr_read_intercept(struct cpu_user_regs *regs)
     regs->edx = (uint32_t)(msr_content >> 32);
 
 done:
-    hvmtrace_msr_read(v, ecx, msr_content);
+    HVMTRACE_3D (MSR_READ, v, ecx, regs->eax, regs->edx);
     HVM_DBG_LOG(DBG_LEVEL_1, "returns: ecx=%x, eax=%lx, edx=%lx",
                 ecx, (unsigned long)regs->eax,
                 (unsigned long)regs->edx);
@@ -1786,7 +1786,7 @@ static int vmx_msr_write_intercept(struct cpu_user_regs *regs)
 
     msr_content = (u32)regs->eax | ((u64)regs->edx << 32);
 
-    hvmtrace_msr_write(v, ecx, msr_content);
+    HVMTRACE_3D (MSR_WRITE, v, ecx, regs->eax, regs->edx);
 
     switch ( ecx )
     {
@@ -2020,7 +2020,12 @@ asmlinkage void vmx_vmexit_handler(struct cpu_user_regs *regs)
 
     exit_reason = __vmread(VM_EXIT_REASON);
 
-    hvmtrace_vmexit(v, regs->eip, exit_reason);
+    if ( hvm_long_mode_enabled(v) )
+        HVMTRACE_ND (VMEXIT64, 1/*cycles*/, v, 3, exit_reason,
+            regs->eip & 0xFFFFFFFF, regs->eip >> 32, 0, 0, 0);
+    else
+        HVMTRACE_ND (VMEXIT, 1/*cycles*/, v, 2, exit_reason,
+            regs->eip, 0, 0, 0, 0);
 
     perfc_incra(vmexits, exit_reason);
 
@@ -2109,7 +2114,12 @@ asmlinkage void vmx_vmexit_handler(struct cpu_user_regs *regs)
 
             if ( paging_fault(exit_qualification, regs) )
             {
-                hvmtrace_pf_xen(v, exit_qualification, regs->error_code);
+                if ( hvm_long_mode_enabled(v) )
+                    HVMTRACE_LONG_2D (PF_XEN, v, regs->error_code,
+                        TRC_PAR_LONG(exit_qualification) );
+                else
+                    HVMTRACE_2D (PF_XEN, v,
+                        regs->error_code, exit_qualification );
                 break;
             }
 
@@ -2271,7 +2281,7 @@ asmlinkage void vmx_vmexit_handler(struct cpu_user_regs *regs)
 
 asmlinkage void vmx_trace_vmentry(void)
 {
-    hvmtrace_vmentry(current);
+    HVMTRACE_ND (VMENTRY, 1/*cycles*/, current, 0, 0, 0, 0, 0, 0, 0);
 }
 
 /*

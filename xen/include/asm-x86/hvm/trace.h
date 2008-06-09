@@ -3,173 +3,66 @@
 
 #include <xen/trace.h>
 
-#define DO_TRC_HVM_VMENTRY     1
-#define DO_TRC_HVM_VMEXIT      1
-#define DO_TRC_HVM_PF_XEN      1
-#define DO_TRC_HVM_PF_INJECT   1
-#define DO_TRC_HVM_INJ_EXC     1
-#define DO_TRC_HVM_INJ_VIRQ    1
-#define DO_TRC_HVM_REINJ_VIRQ  1
-#define DO_TRC_HVM_IO_READ     1
-#define DO_TRC_HVM_IO_WRITE    1
-#define DO_TRC_HVM_CR_READ     1
-#define DO_TRC_HVM_CR_WRITE    1
-#define DO_TRC_HVM_DR_READ     1
-#define DO_TRC_HVM_DR_WRITE    1
-#define DO_TRC_HVM_MSR_READ    1
-#define DO_TRC_HVM_MSR_WRITE   1
-#define DO_TRC_HVM_CPUID       1
-#define DO_TRC_HVM_INTR        1
-#define DO_TRC_HVM_NMI         1
-#define DO_TRC_HVM_MCE         1
-#define DO_TRC_HVM_SMI         1
-#define DO_TRC_HVM_VMMCALL     1
-#define DO_TRC_HVM_HLT         1
-#define DO_TRC_HVM_INVLPG      1
-#define DO_TRC_HVM_IO_ASSIST   1
-#define DO_TRC_HVM_MMIO_ASSIST 1
-#define DO_TRC_HVM_CLTS        1
-#define DO_TRC_HVM_LMSW        1
+#define DEFAULT_HVM_TRACE_ON  1
+#define DEFAULT_HVM_TRACE_OFF 0
 
-static inline void hvmtrace_vmexit(struct vcpu *v,
-                                   unsigned long rip,
-                                   unsigned long exit_reason)
-{
-    if ( likely(!tb_init_done) )
-        return;
+#define DEFAULT_HVM_VMSWITCH   DEFAULT_HVM_TRACE_ON
+#define DEFAULT_HVM_PF         DEFAULT_HVM_TRACE_ON
+#define DEFAULT_HVM_INJECT     DEFAULT_HVM_TRACE_ON
+#define DEFAULT_HVM_IO         DEFAULT_HVM_TRACE_ON
+#define DEFAULT_HVM_REGACCESS  DEFAULT_HVM_TRACE_ON
+#define DEFAULT_HVM_MISC       DEFAULT_HVM_TRACE_ON
+#define DEFAULT_HVM_INTR       DEFAULT_HVM_TRACE_ON
+
+#define DO_TRC_HVM_VMENTRY     DEFAULT_HVM_VMSWITCH
+#define DO_TRC_HVM_VMEXIT      DEFAULT_HVM_VMSWITCH
+#define DO_TRC_HVM_VMEXIT64    DEFAULT_HVM_VMSWITCH
+#define DO_TRC_HVM_PF_XEN      DEFAULT_HVM_PF
+#define DO_TRC_HVM_PF_XEN64    DEFAULT_HVM_PF
+#define DO_TRC_HVM_PF_INJECT   DEFAULT_HVM_PF
+#define DO_TRC_HVM_PF_INJECT64 DEFAULT_HVM_PF
+#define DO_TRC_HVM_INJ_EXC     DEFAULT_HVM_INJECT
+#define DO_TRC_HVM_INJ_VIRQ    DEFAULT_HVM_INJECT
+#define DO_TRC_HVM_REINJ_VIRQ  DEFAULT_HVM_INJECT
+#define DO_TRC_HVM_IO_READ     DEFAULT_HVM_IO
+#define DO_TRC_HVM_IO_WRITE    DEFAULT_HVM_IO
+#define DO_TRC_HVM_CR_READ     DEFAULT_HVM_REGACCESS
+#define DO_TRC_HVM_CR_READ64   DEFAULT_HVM_REGACCESS
+#define DO_TRC_HVM_CR_WRITE    DEFAULT_HVM_REGACCESS
+#define DO_TRC_HVM_CR_WRITE64  DEFAULT_HVM_REGACCESS
+#define DO_TRC_HVM_DR_READ     DEFAULT_HVM_REGACCESS
+#define DO_TRC_HVM_DR_WRITE    DEFAULT_HVM_REGACCESS
+#define DO_TRC_HVM_MSR_READ    DEFAULT_HVM_REGACCESS
+#define DO_TRC_HVM_MSR_WRITE   DEFAULT_HVM_REGACCESS
+#define DO_TRC_HVM_CPUID       DEFAULT_HVM_MISC
+#define DO_TRC_HVM_INTR        DEFAULT_HVM_INTR
+#define DO_TRC_HVM_NMI         DEFAULT_HVM_INTR
+#define DO_TRC_HVM_MCE         DEFAULT_HVM_INTR
+#define DO_TRC_HVM_SMI         DEFAULT_HVM_INTR
+#define DO_TRC_HVM_VMMCALL     DEFAULT_HVM_MISC
+#define DO_TRC_HVM_HLT         DEFAULT_HVM_MISC
+#define DO_TRC_HVM_INVLPG      DEFAULT_HVM_MISC
+#define DO_TRC_HVM_INVLPG64    DEFAULT_HVM_MISC
+#define DO_TRC_HVM_IO_ASSIST   DEFAULT_HVM_MISC
+#define DO_TRC_HVM_MMIO_ASSIST DEFAULT_HVM_MISC
+#define DO_TRC_HVM_CLTS        DEFAULT_HVM_MISC
+#define DO_TRC_HVM_LMSW        DEFAULT_HVM_MISC
+#define DO_TRC_HVM_LMSW64      DEFAULT_HVM_MISC
+
 
 #ifdef __x86_64__
-    if ( hvm_long_mode_enabled(v) )
-    {
-        struct {
-            unsigned did:16, vid:16;
-            unsigned exit_reason:32;
-            u64 rip;
-        } d;
-
-        d.did = v->domain->domain_id;
-        d.vid = v->vcpu_id;
-        d.exit_reason = exit_reason;
-        d.rip = rip;
-        __trace_var(TRC_HVM_VMEXIT64, 1/*cycles*/, sizeof(d),
-                    (unsigned char *)&d);
-    }
-    else
+#define TRC_PAR_LONG(par) ((par)&0xFFFFFFFF),((par)>>32)
+#else
+#define TRC_PAR_LONG(par) (par)
 #endif
-    {
-        struct {
-            unsigned did:16, vid:16;
-            unsigned exit_reason:32;
-            u32 eip;
-        } d;
 
-        d.did = v->domain->domain_id;
-        d.vid = v->vcpu_id;
-        d.exit_reason = exit_reason;
-        d.eip = rip;
-        __trace_var(TRC_HVM_VMEXIT, 1/*cycles*/, sizeof(d),
-                    (unsigned char *)&d);
-    }
-}
-
-
-static inline void hvmtrace_vmentry(struct vcpu *v)
-{
-    struct {
-        unsigned did:16, vid:16;
-    } d;
-
-    if ( likely(!tb_init_done) )
-        return;
-
-    d.did = v->domain->domain_id;
-    d.vid = v->vcpu_id;
-    __trace_var(TRC_HVM_VMENTRY, 1/*cycles*/, sizeof(d), (unsigned char *)&d);
-}
-
-static inline void hvmtrace_msr_read(struct vcpu *v, u32 ecx, u64 msr_content)
-{
-    struct {
-        unsigned did:16, vid:16;
-        u32 ecx;
-        u64 msr_content;
-    } d;
-
-    if ( likely(!tb_init_done) )
-        return;
-
-    d.did = v->domain->domain_id;
-    d.vid = v->vcpu_id;
-    d.ecx = ecx;
-    d.msr_content = msr_content;
-    __trace_var(TRC_HVM_MSR_READ, 0/*!cycles*/, sizeof(d),
-                (unsigned char *)&d);
-}
-
-static inline void hvmtrace_msr_write(struct vcpu *v, u32 ecx, u64 msr_content)
-{
-    struct {
-        unsigned did:16, vid:16;
-        u32 ecx;
-        u64 msr_content;
-    } d;
-
-    if ( likely(!tb_init_done) )
-        return;
-
-    d.did = v->domain->domain_id;
-    d.vid = v->vcpu_id;
-    d.ecx = ecx;
-    d.msr_content = msr_content;
-    __trace_var(TRC_HVM_MSR_WRITE, 0/*!cycles*/,sizeof(d),
-                (unsigned char *)&d);
-}
-
-static inline void hvmtrace_pf_xen(struct vcpu *v, unsigned long va,
-                                   u32 error_code)
-{
-    if ( likely(!tb_init_done) )
-        return;
-
-#ifdef __x86_64__
-    if( hvm_long_mode_enabled(v) )
-    {
-        struct {
-            unsigned did:16, vid:16;
-            u32 error_code;
-            u64 va;
-        } d;
-        d.did = v->domain->domain_id;
-        d.vid = v->vcpu_id;
-        d.error_code = error_code;
-        d.va = va;
-        __trace_var(TRC_HVM_PF_XEN64, 0/*!cycles*/,sizeof(d),
-                    (unsigned char *)&d);
-    }
-    else
-#endif
-    {
-        struct {
-            unsigned did:16, vid:16;
-            u32 error_code;
-            u32 va;
-        } d;
-        d.did = v->domain->domain_id;
-        d.vid = v->vcpu_id;
-        d.error_code = error_code;
-        d.va = va;
-        __trace_var(TRC_HVM_PF_XEN, 0/*!cycles*/,sizeof(d),
-                    (unsigned char *)&d);
-    }
-}
-
-#define HVMTRACE_ND(evt, vcpu, count, d1, d2, d3, d4)                   \
+#define HVMTRACE_ND(evt, cycles, vcpu, count, d1, d2, d3, d4, d5, d6)   \
     do {                                                                \
         if ( unlikely(tb_init_done) && DO_TRC_HVM_ ## evt )             \
         {                                                               \
             struct {                                                    \
-                unsigned did:16, vid:16;                                \
-                u32 d[4];                                               \
+                u32 did:16, vid:16;                                     \
+                u32 d[6];                                               \
             } _d;                                                       \
             _d.did=(vcpu)->domain->domain_id;                           \
             _d.vid=(vcpu)->vcpu_id;                                     \
@@ -177,16 +70,45 @@ static inline void hvmtrace_pf_xen(struct vcpu *v, unsigned long va,
             _d.d[1]=(d2);                                               \
             _d.d[2]=(d3);                                               \
             _d.d[3]=(d4);                                               \
-            __trace_var(TRC_HVM_ ## evt, 0/*!cycles*/,                  \
+            _d.d[4]=(d5);                                               \
+            _d.d[5]=(d6);                                               \
+            __trace_var(TRC_HVM_ ## evt, cycles,                        \
                         sizeof(u32)*count+1, (unsigned char *)&_d);     \
         }                                                               \
     } while(0)
 
-#define HVMTRACE_4D(evt, vcpu, d1, d2, d3, d4)   HVMTRACE_ND(evt, vcpu, 4, d1, d2, d3,  d4)
-#define HVMTRACE_3D(evt, vcpu, d1, d2, d3)       HVMTRACE_ND(evt, vcpu, 3, d1, d2, d3,  0)
-#define HVMTRACE_2D(evt, vcpu, d1, d2)           HVMTRACE_ND(evt, vcpu, 2, d1, d2,  0,  0)
-#define HVMTRACE_1D(evt, vcpu, d1)               HVMTRACE_ND(evt, vcpu, 1, d1,  0,  0,  0)
-#define HVMTRACE_0D(evt, vcpu)                   HVMTRACE_ND(evt, vcpu, 0, 0,  0,  0,  0)
+#define HVMTRACE_6D(evt, vcpu, d1, d2, d3, d4, d5, d6)    \
+                      HVMTRACE_ND(evt, 0, vcpu, 6, d1, d2, d3,  d4, d5, d6)
+#define HVMTRACE_5D(evt, vcpu, d1, d2, d3, d4, d5)        \
+                      HVMTRACE_ND(evt, 0, vcpu, 5, d1, d2, d3,  d4, d5, 0)
+#define HVMTRACE_4D(evt, vcpu, d1, d2, d3, d4)               \
+                      HVMTRACE_ND(evt, 0, vcpu, 4, d1, d2, d3,  d4, 0, 0)
+#define HVMTRACE_3D(evt, vcpu, d1, d2, d3)                   \
+                      HVMTRACE_ND(evt, 0, vcpu, 3, d1, d2, d3,  0, 0, 0)
+#define HVMTRACE_2D(evt, vcpu, d1, d2)                       \
+                      HVMTRACE_ND(evt, 0, vcpu, 2, d1, d2,  0,  0, 0, 0)
+#define HVMTRACE_1D(evt, vcpu, d1)                           \
+                      HVMTRACE_ND(evt, 0, vcpu, 1, d1,  0,  0,  0, 0, 0)
+#define HVMTRACE_0D(evt, vcpu)                               \
+                      HVMTRACE_ND(evt, 0, vcpu, 0, 0,  0,  0,  0, 0, 0)
+
+
+
+#ifdef __x86_64__
+#define HVMTRACE_LONG_1D(evt, vcpu, d1)                  \
+                   HVMTRACE_2D(evt ## 64, vcpu, (d1) & 0xFFFFFFFF, (d1) >> 32)
+#define HVMTRACE_LONG_2D(evt,vcpu,d1,d2, ...)              \
+                   HVMTRACE_3D(evt ## 64, vcpu, d1, d2)
+#define HVMTRACE_LONG_3D(evt, vcpu, d1, d2, d3, ...)      \
+                   HVMTRACE_4D(evt ## 64, vcpu, d1, d2, d3)
+#define HVMTRACE_LONG_4D(evt, vcpu, d1, d2, d3, d4, ...)  \
+                   HVMTRACE_5D(evt ## 64, vcpu, d1, d2, d3, d4)
+#else
+#define HVMTRACE_LONG_1D HVMTRACE_1D
+#define HVMTRACE_LONG_2D HVMTRACE_2D
+#define HVMTRACE_LONG_3D HVMTRACE_3D
+#define HVMTRACE_LONG_4D HVMTRACE_4D
+#endif
 
 #endif /* __ASM_X86_HVM_TRACE_H__ */
 

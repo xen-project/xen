@@ -7,8 +7,8 @@
 #include <xen/trace.h>
 
 #ifndef __x86_64__
-#undef TRC_PV_64_FLAG
-#define TRC_PV_64_FLAG 0
+#undef TRC_64_FLAG
+#define TRC_64_FLAG 0
 #endif
 
 asmlinkage void trace_hypercall(void)
@@ -38,7 +38,7 @@ asmlinkage void trace_hypercall(void)
         u32 event;
 
         event = TRC_PV_HYPERCALL;
-        event |= TRC_PV_64_FLAG;
+        event |= TRC_64_FLAG;
         d.eip = regs->eip;
         d.eax = regs->eax;
 
@@ -84,7 +84,7 @@ void __trace_pv_trap(int trapnr, unsigned long eip,
         d.use_error_code=!!use_error_code;
                 
         event = TRC_PV_TRAP;
-        event |= TRC_PV_64_FLAG;
+        event |= TRC_64_FLAG;
         __trace_var(event, 1, sizeof(d), (unsigned char *)&d);
     }
 }
@@ -119,7 +119,7 @@ void __trace_pv_page_fault(unsigned long addr, unsigned error_code)
         d.addr = addr;
         d.error_code = error_code;
         event = TRC_PV_PAGE_FAULT;
-        event |= TRC_PV_64_FLAG;
+        event |= TRC_64_FLAG;
         __trace_var(event, 1, sizeof(d), (unsigned char *)&d);
     }
 }
@@ -135,7 +135,7 @@ void __trace_trap_one_addr(unsigned event, unsigned long va)
     else
 #endif        
     {
-        event |= TRC_PV_64_FLAG;
+        event |= TRC_64_FLAG;
         __trace_var(event, 1, sizeof(va), (unsigned char *)&va);
     }
 }
@@ -161,7 +161,7 @@ void __trace_trap_two_addr(unsigned event, unsigned long va1,
         } __attribute__((packed)) d;
         d.va1=va1;
         d.va2=va2;
-        event |= TRC_PV_64_FLAG;
+        event |= TRC_64_FLAG;
         __trace_var(event, 1, sizeof(d), (unsigned char *)&d);
     }
 }
@@ -207,7 +207,7 @@ void __trace_ptwr_emulation(unsigned long addr, l1_pgentry_t npte)
 
         event = ((CONFIG_PAGING_LEVELS == 3) ?
                  TRC_PV_PTWR_EMULATION_PAE : TRC_PV_PTWR_EMULATION);
-        event |= TRC_PV_64_FLAG;
+        event |= TRC_64_FLAG;
         __trace_var(event, 1/*tsc*/, sizeof(d), (unsigned char *)&d);
     }
 }
