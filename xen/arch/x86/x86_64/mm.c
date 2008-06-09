@@ -402,8 +402,33 @@ int check_descriptor(const struct domain *dom, struct desc_struct *d)
     /* All code and data segments are okay. No base/limit checking. */
     if ( (b & _SEGMENT_S) )
     {
-        if ( is_pv_32bit_domain(dom) && (b & _SEGMENT_L) )
-            goto bad;
+        if ( is_pv_32bit_domain(dom) )
+        {
+            unsigned long base, limit;
+
+            if ( b & _SEGMENT_L )
+                goto bad;
+
+            /*
+             * Older PAE Linux guests use segments which are limited to
+             * 0xf6800000. Extend these to allow access to the larger read-only
+             * M2P table available in 32on64 mode.
+             */
+            base = (b & (0xff << 24)) | ((b & 0xff) << 16) | (a >> 16);
+
+            limit = (b & 0xf0000) | (a & 0xffff);
+            limit++; /* We add one because limit is inclusive. */
+
+            if ( (b & _SEGMENT_G) )
+                limit <<= 12;
+
+            if ( (base == 0) && (limit > HYPERVISOR_COMPAT_VIRT_START(dom)) )
+            {
+                a |= 0x0000ffff;
+                b |= 0x000f0000;
+            }
+        }
+
         goto good;
     }
 
