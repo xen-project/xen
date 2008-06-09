@@ -792,11 +792,17 @@ class sxp2xml:
             console = document.createElement("console")
             console.attributes["protocol"] = "rfb"
             console.appendChild(self.mk_other_config(
-                "vncunused", str(get_child_by_name(image, "vncunused", "0")),
+                "type", "vnc",
+                document))
+            console.appendChild(self.mk_other_config(
+                "vncunused", str(get_child_by_name(image, "vncunused", "1")),
                 document))
             console.appendChild(self.mk_other_config(
                 "vnclisten",
                 get_child_by_name(image, "vnclisten", "127.0.0.1"),
+                document))
+            console.appendChild(self.mk_other_config(
+                "vncdisplay", str(get_child_by_name(image, "vncdisplay", "0")),
                 document))
             console.appendChild(self.mk_other_config(
                 "vncpasswd", get_child_by_name(image, "vncpasswd", ""),
@@ -804,16 +810,18 @@ class sxp2xml:
             consoles.append(console)          
         if int(get_child_by_name(image, "sdl", "0")) == 1:
             console = document.createElement("console")
-            console.attributes["protocol"] = "sdl"
+            console.attributes["protocol"] = "rfb"
+            console.appendChild(self.mk_other_config(
+                "type", "sdl",
+                document))
             console.appendChild(self.mk_other_config(
                 "display", get_child_by_name(image, "display", ""),
                 document))
             console.appendChild(self.mk_other_config(
-                "xauthority",
-                get_child_by_name(image, "vxauthority", "127.0.0.1"),
+                "xauthority", get_child_by_name(image, "xauthority", ""),
                 document))
             console.appendChild(self.mk_other_config(
-                "opengl", get_child_by_name(image, "opengl", "1"),
+                "opengl", str(get_child_by_name(image, "opengl", "1")),
                 document))
             consoles.append(console)
             
