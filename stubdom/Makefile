@@ -23,9 +23,11 @@ endif
 
 ifeq ($(GNU_TARGET_ARCH), i686)
 TARGET_CFLAGS=
+NEWLIB_CFLAGS+=-D_I386MACH_ALLOW_HW_INTERRUPTS
 endif
 ifeq ($(GNU_TARGET_ARCH), x86_64)
 TARGET_CFLAGS=-mno-red-zone
+NEWLIB_CFLAGS+=-D_I386MACH_ALLOW_HW_INTERRUPTS
 endif
 ifeq ($(GNU_TARGET_ARCH), ia64)
 TARGET_CFLAGS=-mconstant-gp
@@ -71,7 +73,7 @@ gcc-$(GCC_VERSION): gcc-$(GCC_VERSION).tar.bz2
 	tar xjf gcc-$(GCC_VERSION).tar.bz2
 	( cd gcc-$(GCC_VERSION) && patch -p1 < ../gcc.patch )
 	touch $@
-	
+
 GCC_STAMPFILE=$(CROSS_ROOT)/bin/$(GNU_TARGET_ARCH)-xen-elf-gcc-$(GCC_VERSION)
 .PHONY: cross-gcc
 cross-gcc: $(GCC_STAMPFILE)
@@ -97,7 +99,7 @@ cross-newlib: $(NEWLIB_STAMPFILE)
 $(NEWLIB_STAMPFILE): newlib-cvs $(GCC_STAMPFILE)
 	mkdir -p newlib-build
 	( cd newlib-build && \
-	  CC_FOR_TARGET="$(GNU_TARGET_ARCH)-xen-elf-gcc $(TARGET_CFLAGS)" ../newlib-cvs/configure --prefix=$(CROSS_PREFIX) --verbose --target=$(GNU_TARGET_ARCH)-xen-elf --enable-newlib-io-long-long && \
+	  CC_FOR_TARGET="$(GNU_TARGET_ARCH)-xen-elf-gcc $(TARGET_CFLAGS) $(NEWLIB_CFLAGS)" ../newlib-cvs/configure --prefix=$(CROSS_PREFIX) --verbose --target=$(GNU_TARGET_ARCH)-xen-elf --enable-newlib-io-long-long && \
 	  $(MAKE) && \
 	  $(MAKE) install )
 
@@ -199,7 +201,7 @@ ioemu: cross-zlib cross-libpci mk-symlinks libxc
 ######
 
 .PHONY: caml
-caml: mk-symlinks
+caml: cross-newlib mk-symlinks
 	$(MAKE) -C $@ LWIPDIR=$(CURDIR)/lwip-cvs 
 
 ###
@@ -207,7 +209,7 @@ caml: mk-symlinks
 ###
 
 .PHONY: c
-c: mk-symlinks
+c: cross-newlib mk-symlinks
 	$(MAKE) -C $@ LWIPDIR=$(CURDIR)/lwip-cvs 
 
 ########
@@ -243,6 +245,9 @@ install: mini-os/ioemu-stubdom.gz
 .PHONY: clean
 clean:
 	-$(MAKE) -C mini-os LWIPDIR=$(CURDIR)/lwip-cvs clean
+	-$(MAKE) -C mini-os TARGET=ioemu-stubdom LWIPDIR=$(CURDIR)/lwip-cvs clean
+	-$(MAKE) -C mini-os TARGET=c-stubdom LWIPDIR=$(CURDIR)/lwip-cvs clean
+	-$(MAKE) -C mini-os TARGET=caml-stubdom LWIPDIR=$(CURDIR)/lwip-cvs clean
 	$(MAKE) -C caml clean
 	$(MAKE) -C c clean
 	rm -fr libxc ioemu mini-os include
