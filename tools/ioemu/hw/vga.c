@@ -1065,8 +1065,6 @@ typedef unsigned int rgb_to_pixel_dup_func(unsigned int r, unsigned int g, unsig
 
 static rgb_to_pixel_dup_func *rgb_to_pixel_dup_table[NB_DEPTHS];
 
-static int old_depth = 0;
-
 /* 
  * Text mode update 
  * Missing:
@@ -1115,13 +1113,10 @@ static void vga_draw_text(VGAState *s, int full_update)
 
     s->last_scr_width = width * cw;
     s->last_scr_height = height * cheight;
-    if (s->ds->dpy_resize_shared && old_depth) {
-        dpy_resize_shared(s->ds, s->last_scr_width, s->last_scr_height, 0, s->last_scr_width * (s->ds->depth / 8), NULL);
-        old_depth = 0;
-        full_update = 1;
-    } else if (width != s->last_width || height != s->last_height ||
-        cw != s->last_cw || cheight != s->last_ch) {
+    if (width != s->last_width || height != s->last_height ||
+        cw != s->last_cw || cheight != s->last_ch || s->last_depth) {
         dpy_resize(s->ds, s->last_scr_width, s->last_scr_height);
+        s->last_depth = 0;
         full_update = 1;
     }
     s->last_width = width;
@@ -1532,14 +1527,14 @@ static void vga_draw_graphic(VGAState *s, int full_update)
         if (s->line_offset != s->last_line_offset || 
             disp_width != s->last_width ||
             height != s->last_height ||
-            old_depth != depth) {
+            s->last_depth != depth) {
             dpy_resize_shared(s->ds, disp_width, height, depth, s->line_offset, s->vram_ptr + (s->start_addr * 4));
             s->last_scr_width = disp_width;
             s->last_scr_height = height;
             s->last_width = disp_width;
             s->last_height = height;
             s->last_line_offset = s->line_offset;
-            old_depth = depth;
+            s->last_depth = depth;
             full_update = 1;
         } else if (s->ds->shared_buf && (full_update || s->ds->data != s->vram_ptr + (s->start_addr * 4)))
             s->ds->dpy_setdata(s->ds, s->vram_ptr + (s->start_addr * 4));
