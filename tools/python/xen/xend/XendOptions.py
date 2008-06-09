@@ -330,10 +330,10 @@ class XendOptions:
                                      self.vncpasswd_default)
 
     def get_keymap(self):
-        return self.get_config_value('keymap', None)
+        return self.get_config_string('keymap', None)
 
     def get_resource_label_change_script(self):
-        s = self.get_config_value('resource-label-change-script')
+        s = self.get_config_string('resource-label-change-script')
         if s:
             result = s.split(" ")
             result[0] = os.path.join(osdep.scripts_dir, result[0])
