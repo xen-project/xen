@@ -68,7 +68,7 @@ int assign_device(struct domain *d, u8 bus, u8 devfn)
     if ( (rc = hd->platform_ops->assign_device(d, bus, devfn)) )
         return rc;
 
-    if ( has_iommu_pdevs(d) && !need_iommu(d) )
+    if ( has_iommu_pdevs(d) && !is_hvm_domain(d) && !need_iommu(d) )
     {
         d->need_iommu = 1;
         return iommu_populate_page_table(d);
@@ -113,6 +113,16 @@ void iommu_domain_destroy(struct domain *d)
 
     if ( !iommu_enabled || !hd->platform_ops )
         return;
+
+    if ( !is_hvm_domain(d) && !need_iommu(d)  )
+        return;
+
+    if ( need_iommu(d) )
+    {
+        d->need_iommu = 0;
+        hd->platform_ops->teardown(d);
+        return;
+    }
 
     if ( hvm_irq_dpci != NULL )
     {
@@ -207,10 +217,10 @@ static int iommu_setup(void)
     iommu_enabled = (rc == 0);
 
  out:
-    if ( !iommu_enabled || !vtd_enabled )
+    if ( !iommu_enabled )
         iommu_pv_enabled = 0;
     printk("I/O virtualisation %sabled\n", iommu_enabled ? "en" : "dis");
-    if (iommu_enabled)
+    if ( iommu_enabled )
         printk("I/O virtualisation for PV guests %sabled\n",
                iommu_pv_enabled ? "en" : "dis");
     return rc;
