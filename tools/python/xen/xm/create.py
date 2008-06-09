@@ -424,7 +424,7 @@ gopts.var('nfs_root', val="PATH",
           use="Set the path of the root NFS directory.")
 
 gopts.var('device_model', val='FILE',
-          fn=set_value, default='',
+          fn=set_value, default=None,
           use="Path to device model program.")
 
 gopts.var('fda', val='FILE',
