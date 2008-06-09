@@ -999,7 +999,7 @@ void __init early_time_init(void)
     setup_irq(0, &irq0);
 }
 
-static int __init disable_pit_irq(void)
+static int disable_pit_irq(void)
 {
     if ( !using_pit && cpu_has_apic )
     {
