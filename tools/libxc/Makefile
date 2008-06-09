@@ -32,7 +32,7 @@ GUEST_SRCS-y += xg_private.c
 GUEST_SRCS-$(CONFIG_MIGRATE) += xc_domain_restore.c xc_domain_save.c
 GUEST_SRCS-$(CONFIG_HVM) += xc_hvm_build.c
 
-VPATH = ../../xen/common/libelf
+vpath %.c ../../xen/common/libelf
 CFLAGS += -I../../xen/common/libelf
 
 GUEST_SRCS-y += libelf-tools.c libelf-loader.c
