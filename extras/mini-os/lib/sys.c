@@ -43,7 +43,9 @@
 #include <stdlib.h>
 #include <math.h>
 
+#ifdef HAVE_LWIP
 #include <lwip/sockets.h>
+#endif
 #include <fs.h>
 
 #define debug(fmt, ...) \
@@ -240,8 +242,10 @@ int read(int fd, void *buf, size_t nbytes)
 	    }
 	    return 0;
 	}
+#ifdef HAVE_LWIP
 	case FTYPE_SOCKET:
 	    return lwip_read(files[fd].socket.fd, buf, nbytes);
+#endif
 	case FTYPE_TAP: {
 	    ssize_t ret;
 	    ret = netfront_receive(files[fd].tap.dev, buf, nbytes);
@@ -299,8 +303,10 @@ int write(int fd, const void *buf, size_t nbytes)
 	    }
 	    return 0;
 	}
+#ifdef HAVE_LWIP
 	case FTYPE_SOCKET:
 	    return lwip_write(files[fd].socket.fd, (void*) buf, nbytes);
+#endif
 	case FTYPE_TAP:
 	    netfront_xmit(files[fd].tap.dev, (void*) buf, nbytes);
 	    return nbytes;
@@ -367,7 +373,7 @@ int close(int fd)
 {
     printk("close(%d)\n", fd);
     switch (files[fd].type) {
-	case FTYPE_CONSOLE:
+        default:
 	    files[fd].type = FTYPE_NONE;
 	    return 0;
 	case FTYPE_FILE: {
@@ -382,11 +388,13 @@ int close(int fd)
 	case FTYPE_XENBUS:
             xs_daemon_close((void*)(intptr_t) fd);
             return 0;
+#ifdef HAVE_LWIP
 	case FTYPE_SOCKET: {
 	    int res = lwip_close(files[fd].socket.fd);
 	    files[fd].type = FTYPE_NONE;
 	    return res;
 	}
+#endif
 	case FTYPE_XC:
 	    xc_interface_close(fd);
 	    return 0;
@@ -555,6 +563,7 @@ int fcntl(int fd, int cmd, ...)
     va_end(ap);
 
     switch (cmd) {
+#ifdef HAVE_LWIP
 	case F_SETFL:
 	    if (files[fd].type == FTYPE_SOCKET && !(arg & ~O_NONBLOCK)) {
 		/* Only flag supported: non-blocking mode */
@@ -562,6 +571,7 @@ int fcntl(int fd, int cmd, ...)
 		return lwip_ioctl(files[fd].socket.fd, FIONBIO, &nblock);
 	    }
 	    /* Fallthrough */
+#endif
 	default:
 	    printk("fcntl(%d, %d, %lx/%lo)\n", fd, cmd, arg, arg);
 	    errno = ENOSYS;
@@ -666,9 +676,12 @@ static void dump_set(int nfds, fd_set *readfds, fd_set *writefds, fd_set *except
 /* Just poll without blocking */
 static int select_poll(int nfds, fd_set *readfds, fd_set *writefds, fd_set *exceptfds)
 {
-    int i, n = 0, sock_n, sock_nfds = 0;
+    int i, n = 0;
+#ifdef HAVE_LWIP
+    int sock_n, sock_nfds = 0;
     fd_set sock_readfds, sock_writefds, sock_exceptfds;
     struct timeval timeout = { .tv_sec = 0, .tv_usec = 0};
+#endif
 
 #ifdef LIBC_VERBOSE
     static int nb;
@@ -678,6 +691,7 @@ static int select_poll(int nfds, fd_set *readfds, fd_set *writefds, fd_set *exce
     nb++;
 #endif
 
+#ifdef HAVE_LWIP
     /* first poll network */
     FD_ZERO(&sock_readfds);
     FD_ZERO(&sock_writefds);
@@ -704,6 +718,7 @@ static int select_poll(int nfds, fd_set *readfds, fd_set *writefds, fd_set *exce
     sock_n = lwip_select(sock_nfds, &sock_readfds, &sock_writefds, &sock_exceptfds, &timeout);
     dump_set(nfds, &sock_readfds, &sock_writefds, &sock_exceptfds, &timeout);
     DEBUG("\n");
+#endif
 
     /* Then see others as well. */
     for (i = 0; i < nfds; i++) {
@@ -752,6 +767,7 @@ static int select_poll(int nfds, fd_set *readfds, fd_set *writefds, fd_set *exce
 	    FD_CLR(i, writefds);
 	    FD_CLR(i, exceptfds);
 	    break;
+#ifdef HAVE_LWIP
 	case FTYPE_SOCKET:
 	    if (FD_ISSET(i, readfds)) {
 	        /* Optimize no-network-packet case.  */
@@ -773,6 +789,7 @@ static int select_poll(int nfds, fd_set *readfds, fd_set *writefds, fd_set *exce
 		    FD_CLR(i, exceptfds);
             }
 	    break;
+#endif
 	}
 #ifdef LIBC_VERBOSE
 	if (FD_ISSET(i, readfds))
@@ -938,6 +955,7 @@ out:
     return ret;
 }
 
+#ifdef HAVE_LWIP
 int socket(int domain, int type, int protocol)
 {
     int fd, res;
@@ -989,6 +1007,7 @@ LWIP_STUB(ssize_t, recvfrom, (int s, void *buf, size_t len, int flags, struct so
 LWIP_STUB(ssize_t, send, (int s, void *buf, size_t len, int flags), (s, buf, len, flags))
 LWIP_STUB(ssize_t, sendto, (int s, void *buf, size_t len, int flags, struct sockaddr *to, socklen_t tolen), (s, buf, len, flags, to, tolen))
 LWIP_STUB(int, getsockname, (int s, struct sockaddr *name, socklen_t *namelen), (s, name, namelen))
+#endif
 
 int nanosleep(const struct timespec *req, struct timespec *rem)
 {

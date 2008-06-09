@@ -57,7 +57,9 @@ static void call_main(void *p)
     //sleep(1);
 
     sparse((unsigned long) &__app_bss_start, &__app_bss_end - &__app_bss_start);
+#ifdef HAVE_LWIP
     start_networking();
+#endif
     init_fs_frontend();
 
 #ifdef CONFIG_QEMU
@@ -162,6 +164,9 @@ void _exit(int ret)
     close_all_files();
     __libc_fini_array();
     printk("main returned %d\n", ret);
+#ifdef HAVE_LWIP
+    stop_networking();
+#endif
     unbind_all_ports();
     if (!ret) {
 	/* No problem, just shutdown.  */
