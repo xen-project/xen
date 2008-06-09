@@ -1353,8 +1353,6 @@ static char *kbd_path, *fb_path;
 
 static unsigned char linux2scancode[KEY_MAX + 1];
 
-static void xenfb_pv_colourdepth(DisplayState *ds, int depth);
-
 int xenfb_connect_vkbd(const char *path)
 {
     kbd_path = strdup(path);
@@ -1381,10 +1379,17 @@ static void xenfb_pv_resize_shared(DisplayState *ds, int w, int h, int depth, in
     XenFBState *xs = ds->opaque;
     struct fbfront_dev *fb_dev = xs->fb_dev;
     int offset;
-    fprintf(stderr,"resize to %dx%d, %d required\n", w, h, linesize);
-    xenfb_pv_colourdepth(ds, depth);
+
+    fprintf(stderr,"resize to %dx%d@%d, %d required\n", w, h, depth, linesize);
     ds->width = w;
     ds->height = h;
+    if (!depth) {
+        ds->shared_buf = 0;
+        ds->depth = 32;
+    } else {
+        ds->shared_buf = 1;
+        ds->depth = depth;
+    }
     if (!linesize)
         ds->shared_buf = 0;
     if (!ds->shared_buf)
@@ -1405,31 +1410,6 @@ static void xenfb_pv_resize_shared(DisplayState *ds, int w, int h, int depth, in
 static void xenfb_pv_resize(DisplayState *ds, int w, int h)
 {
     xenfb_pv_resize_shared(ds, w, h, 0, 0, NULL);
-}
-
-static void xenfb_pv_colourdepth(DisplayState *ds, int depth)
-{
-    XenFBState *xs = ds->opaque;
-    struct fbfront_dev *fb_dev = xs->fb_dev;
-    static int lastdepth = -1;
-    if (!depth) {
-        ds->shared_buf = 0;
-        ds->depth = 32;
-    } else {
-        ds->shared_buf = 1;
-        ds->depth = depth;
-    }
-    if (depth != lastdepth) {
-        fprintf(stderr,"redepth to %d required\n", depth);
-        lastdepth = depth;
-    } else return;
-    if (!fb_dev)
-        return;
-    if (ds->shared_buf) {
-        ds->data = NULL;
-    } else {
-        ds->data = xs->nonshared_vram;
-    }
 }
 
 static void xenfb_pv_setdata(DisplayState *ds, void *pixels)
