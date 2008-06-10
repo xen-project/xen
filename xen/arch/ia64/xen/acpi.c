@@ -58,7 +58,7 @@
 
 #define BAD_MADT_ENTRY(entry, end) (                                        \
 		(!entry) || (unsigned long)entry + sizeof(*entry) > end ||  \
-		((acpi_table_entry_header *)entry)->length != sizeof(*entry))
+		((struct acpi_subtable_header *)entry)->length != sizeof(*entry))
 
 #define PREFIX			"ACPI: "
 
@@ -167,7 +167,7 @@ static u8			has_8259;
 
 static int __init
 acpi_parse_lapic_addr_ovr (
-	acpi_table_entry_header *header, const unsigned long end)
+	struct acpi_subtable_header *header, const unsigned long end)
 {
 	struct acpi_table_lapic_addr_ovr *lapic;
 
@@ -187,7 +187,7 @@ acpi_parse_lapic_addr_ovr (
 
 
 static int __init
-acpi_parse_lsapic (acpi_table_entry_header *header, const unsigned long end)
+acpi_parse_lsapic (struct acpi_subtable_header *header, const unsigned long end)
 {
 	struct acpi_table_lsapic *lsapic;
 
@@ -227,7 +227,7 @@ acpi_parse_lsapic (acpi_table_entry_header *header, const unsigned long end)
 
 
 static int __init
-acpi_parse_lapic_nmi (acpi_table_entry_header *header, const unsigned long end)
+acpi_parse_lapic_nmi (struct acpi_subtable_header *header, const unsigned long end)
 {
 	struct acpi_table_lapic_nmi *lacpi_nmi;
 
@@ -244,7 +244,7 @@ acpi_parse_lapic_nmi (acpi_table_entry_header *header, const unsigned long end)
 
 
 static int __init
-acpi_parse_iosapic (acpi_table_entry_header *header, const unsigned long end)
+acpi_parse_iosapic (struct acpi_subtable_header *header, const unsigned long end)
 {
 	struct acpi_table_iosapic *iosapic;
 
@@ -262,7 +262,7 @@ acpi_parse_iosapic (acpi_table_entry_header *header, const unsigned long end)
 
 static int __init
 acpi_parse_plat_int_src (
-	acpi_table_entry_header *header, const unsigned long end)
+	struct acpi_subtable_header *header, const unsigned long end)
 {
 	struct acpi_table_plat_int_src *plintsrc;
 	int vector;
@@ -293,7 +293,7 @@ acpi_parse_plat_int_src (
 
 static int __init
 acpi_parse_int_src_ovr (
-	acpi_table_entry_header *header, const unsigned long end)
+	struct acpi_subtable_header *header, const unsigned long end)
 {
 	struct acpi_table_int_src_ovr *p;
 
@@ -311,7 +311,7 @@ acpi_parse_int_src_ovr (
 }
 
 static int __init
-acpi_parse_nmi_src (acpi_table_entry_header *header, const unsigned long end)
+acpi_parse_nmi_src (struct acpi_subtable_header *header, const unsigned long end)
 {
 	struct acpi_table_nmi_src *nmi_src;
 
@@ -345,12 +345,9 @@ void __init acpi_madt_oem_check(char *oem_id, char *oem_table_id)
 }
 
 static int __init
-acpi_parse_madt (unsigned long phys_addr, unsigned long size)
+acpi_parse_madt (struct acpi_table_header *table)
 {
-	if (!phys_addr || !size)
-		return -EINVAL;
-
-	acpi_madt = (struct acpi_table_madt *) __va(phys_addr);
+	acpi_madt = (struct acpi_table_madt *)table;
 
 	/* remember the value for reference after free_initmem() */
 #ifdef CONFIG_ITANIUM
@@ -560,15 +557,12 @@ acpi_register_gsi (u32 gsi, int polarity, int trigger)
 EXPORT_SYMBOL(acpi_register_gsi);
 #endif
 static int __init
-acpi_parse_fadt (unsigned long phys_addr, unsigned long size)
+acpi_parse_fadt (struct acpi_table_header *table)
 {
 	struct acpi_table_header *fadt_header;
 	struct acpi_table_fadt *fadt;
 
-	if (!phys_addr || !size)
-		return -EINVAL;
-
-	fadt_header = (struct acpi_table_header *) __va(phys_addr);
+	fadt_header = (struct acpi_table_header *)table;
 	if (fadt_header->revision != 3)
 		return -ENODEV;		/* Only deal with ACPI 2.0 FADT */
 
@@ -610,7 +604,7 @@ acpi_boot_init (void)
 	 * information -- the successor to MPS tables.
 	 */
 
-	if (acpi_table_parse(ACPI_APIC, acpi_parse_madt) < 1) {
+	if (acpi_table_parse(ACPI_SIG_MADT, acpi_parse_madt)) {
 		printk(KERN_ERR PREFIX "Can't find MADT\n");
 		goto skip_madt;
 	}
@@ -649,7 +643,7 @@ acpi_boot_init (void)
 	 * gets interrupts such as power and sleep buttons.  If it's not
 	 * on a Legacy interrupt, it needs to be setup.
 	 */
-	if (acpi_table_parse(ACPI_FADT, acpi_parse_fadt) < 1)
+	if (acpi_table_parse(ACPI_SIG_FADT, acpi_parse_fadt))
 		printk(KERN_ERR PREFIX "Can't find FADT\n");
 
 #ifdef CONFIG_SMP

@@ -794,14 +794,13 @@ static void __init dump_acpi_table_header(struct acpi_table_header *table)
 
 }
 
-int __init parse_ivrs_table(unsigned long phys_addr, unsigned long size)
+int __init parse_ivrs_table(struct acpi_table_header *_table)
 {
     struct acpi_ivrs_block_header *ivrs_block;
     unsigned long length, i;
     u8 checksum, *raw_table;
     int error = 0;
-    struct acpi_table_header  *table =
-        (struct acpi_table_header *) __acpi_map_table(phys_addr, size);
+    struct acpi_table_header *table = (struct acpi_table_header *)_table;
 
     BUG_ON(!table);
 

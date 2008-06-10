@@ -88,7 +88,7 @@ void flush_command_buffer(struct amd_iommu *iommu);
 struct amd_iommu *find_iommu_for_device(int bus, int devfn);
 
 /* amd-iommu-acpi functions */
-int __init parse_ivrs_table(unsigned long phys_addr, unsigned long size);
+int __init parse_ivrs_table(struct acpi_table_header *table);
 
 static inline u32 get_field_from_reg_u32(u32 reg_value, u32 mask, u32 shift)
 {

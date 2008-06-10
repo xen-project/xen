@@ -45,7 +45,7 @@ int sbf_port;
 
 #define BAD_MADT_ENTRY(entry, end) (					    \
 		(!entry) || (unsigned long)entry + sizeof(*entry) > end ||  \
-		((acpi_table_entry_header *)entry)->length != sizeof(*entry))
+		((struct acpi_subtable_header *)entry)->length != sizeof(*entry))
 
 #define PREFIX			"ACPI: "
 
@@ -111,7 +111,7 @@ char *__acpi_map_table(unsigned long phys, unsigned long size)
 	int idx;
 
 	/* XEN: RAM holes above 1MB are not permanently mapped. */
-	if (phys + size < 1 * 1024 * 1024)
+	if ((phys + size) <= (1 * 1024 * 1024))
 		return __va(phys);
 
 	offset = phys & (PAGE_SIZE - 1);
@@ -135,18 +135,11 @@ char *__acpi_map_table(unsigned long phys, unsigned long size)
 }
 
 #ifdef CONFIG_X86_LOCAL_APIC
-static int __init acpi_parse_madt(unsigned long phys_addr, unsigned long size)
+static int __init acpi_parse_madt(struct acpi_table_header *table)
 {
-	struct acpi_table_madt *madt = NULL;
+	struct acpi_table_madt *madt;
 
-	if (!phys_addr || !size)
-		return -EINVAL;
-
-	madt = (struct acpi_table_madt *)__acpi_map_table(phys_addr, size);
-	if (!madt) {
-		printk(KERN_WARNING PREFIX "Unable to map MADT\n");
-		return -ENODEV;
-	}
+	madt = (struct acpi_table_madt *)table;
 
 	if (madt->address) {
 		acpi_lapic_addr = (u64) madt->address;
@@ -161,7 +154,7 @@ static int __init acpi_parse_madt(unsigned long phys_addr, unsigned long size)
 }
 
 static int __init
-acpi_parse_lapic(acpi_table_entry_header * header, const unsigned long end)
+acpi_parse_lapic(struct acpi_subtable_header * header, const unsigned long end)
 {
 	struct acpi_table_lapic *processor = NULL;
 
@@ -190,7 +183,7 @@ acpi_parse_lapic(acpi_table_entry_header * header, const unsigned long end)
 }
 
 static int __init
-acpi_parse_lapic_addr_ovr(acpi_table_entry_header * header,
+acpi_parse_lapic_addr_ovr(struct acpi_subtable_header * header,
 			  const unsigned long end)
 {
 	struct acpi_table_lapic_addr_ovr *lapic_addr_ovr = NULL;
@@ -206,7 +199,7 @@ acpi_parse_lapic_addr_ovr(acpi_table_entry_header * header,
 }
 
 static int __init
-acpi_parse_lapic_nmi(acpi_table_entry_header * header, const unsigned long end)
+acpi_parse_lapic_nmi(struct acpi_subtable_header * header, const unsigned long end)
 {
 	struct acpi_table_lapic_nmi *lapic_nmi = NULL;
 
@@ -228,7 +221,7 @@ acpi_parse_lapic_nmi(acpi_table_entry_header * header, const unsigned long end)
 #if defined(CONFIG_X86_IO_APIC) /*&& defined(CONFIG_ACPI_INTERPRETER)*/
 
 static int __init
-acpi_parse_ioapic(acpi_table_entry_header * header, const unsigned long end)
+acpi_parse_ioapic(struct acpi_subtable_header * header, const unsigned long end)
 {
 	struct acpi_table_ioapic *ioapic = NULL;
 
@@ -246,7 +239,7 @@ acpi_parse_ioapic(acpi_table_entry_header * header, const unsigned long end)
 }
 
 static int __init
-acpi_parse_int_src_ovr(acpi_table_entry_header * header,
+acpi_parse_int_src_ovr(struct acpi_subtable_header * header,
 		       const unsigned long end)
 {
 	struct acpi_table_int_src_ovr *intsrc = NULL;
@@ -272,7 +265,7 @@ acpi_parse_int_src_ovr(acpi_table_entry_header * header,
 }
 
 static int __init
-acpi_parse_nmi_src(acpi_table_entry_header * header, const unsigned long end)
+acpi_parse_nmi_src(struct acpi_subtable_header * header, const unsigned long end)
 {
 	struct acpi_table_nmi_src *nmi_src = NULL;
 
@@ -309,38 +302,26 @@ acpi_scan_rsdp(unsigned long start, unsigned long length)
 	return 0;
 }
 
-static int __init acpi_parse_sbf(unsigned long phys_addr, unsigned long size)
+static int __init acpi_parse_sbf(struct acpi_table_header *table)
 {
-	struct acpi_table_sbf *sb;
+	struct acpi_table_boot *sb;
 
-	if (!phys_addr || !size)
-		return -EINVAL;
-
-	sb = (struct acpi_table_sbf *)__acpi_map_table(phys_addr, size);
+	sb = (struct acpi_table_boot *)table;
 	if (!sb) {
 		printk(KERN_WARNING PREFIX "Unable to map SBF\n");
 		return -ENODEV;
 	}
 
-	sbf_port = sb->sbf_cmos;	/* Save CMOS port */
+	sbf_port = sb->cmos_index;	/* Save CMOS port */
 
 	return 0;
 }
 
 #ifdef CONFIG_HPET_TIMER
 
-static int __init acpi_parse_hpet(unsigned long phys, unsigned long size)
+static int __init acpi_parse_hpet(struct acpi_table_header *table)
 {
-	struct acpi_table_hpet *hpet_tbl;
-
-	if (!phys || !size)
-		return -EINVAL;
-
-	hpet_tbl = (struct acpi_table_hpet *)__acpi_map_table(phys, size);
-	if (!hpet_tbl) {
-		printk(KERN_WARNING PREFIX "Unable to map HPET\n");
-		return -ENODEV;
-	}
+	struct acpi_table_hpet *hpet_tbl = (struct acpi_table_hpet *)table;
 
 	if (hpet_tbl->address.space_id != ACPI_SPACE_MEM) {
 		printk(KERN_WARNING PREFIX "HPET timers must be located in "
@@ -454,37 +435,9 @@ bad:
 }
 #endif
 
-static void __init
-acpi_fadt_parse_reg(struct acpi_table_fadt *fadt)
+static int __init acpi_parse_fadt(struct acpi_table_header *table)
 {
-	unsigned int len;
-
-	len = min_t(unsigned int, fadt->header.length, sizeof(*fadt));
-	memcpy(&acpi_gbl_FADT, fadt, len);
-
-	if (len > offsetof(struct acpi_table_fadt, xpm1b_event_block)) {
-		memcpy(&acpi_gbl_xpm1a_enable, &fadt->xpm1a_event_block,
-		       sizeof(acpi_gbl_xpm1a_enable));
-		memcpy(&acpi_gbl_xpm1b_enable, &fadt->xpm1b_event_block,
-		       sizeof(acpi_gbl_xpm1b_enable));
-
-		acpi_gbl_xpm1a_enable.address +=
-			acpi_gbl_FADT.pm1_event_length / 2;
-		if ( acpi_gbl_xpm1b_enable.address )
-			acpi_gbl_xpm1b_enable.address +=
-				acpi_gbl_FADT.pm1_event_length / 2;
-	}
-}
-
-static int __init acpi_parse_fadt(unsigned long phys, unsigned long size)
-{
-	struct acpi_table_fadt *fadt = NULL;
-
-	fadt = (struct acpi_table_fadt *)__acpi_map_table(phys, size);
-	if (!fadt) {
-		printk(KERN_WARNING PREFIX "Unable to map FADT\n");
-		return 0;
-	}
+	struct acpi_table_fadt *fadt = (struct acpi_table_fadt *)table;
 
 #ifdef	CONFIG_ACPI_INTERPRETER
 	/* initialize sci_int early for INT_SRC_OVR MADT parsing */
@@ -522,8 +475,6 @@ static int __init acpi_parse_fadt(unsigned long phys, unsigned long size)
 	acpi_smi_cmd       = fadt->smi_command;
 	acpi_enable_value  = fadt->acpi_enable;
 	acpi_disable_value = fadt->acpi_disable;
-
-	acpi_fadt_parse_reg(fadt);
 
 #ifdef CONFIG_ACPI_SLEEP
 	acpi_fadt_parse_sleep_info(fadt);
@@ -692,10 +643,9 @@ static inline int acpi_parse_madt_ioapic_entries(void)
 static void __init acpi_process_madt(void)
 {
 #ifdef CONFIG_X86_LOCAL_APIC
-	int count, error;
+	int error;
 
-	count = acpi_table_parse(ACPI_APIC, acpi_parse_madt);
-	if (count >= 1) {
+	if (!acpi_table_parse(ACPI_SIG_MADT, acpi_parse_madt)) {
 
 		/*
 		 * Parse MADT LAPIC entries
@@ -990,7 +940,7 @@ int __init acpi_boot_table_init(void)
 		return error;
 	}
 
-	acpi_table_parse(ACPI_BOOT, acpi_parse_sbf);
+	acpi_table_parse(ACPI_SIG_BOOT, acpi_parse_sbf);
 
 	/*
 	 * blacklist may disable ACPI entirely
@@ -1020,19 +970,19 @@ int __init acpi_boot_init(void)
 	if (acpi_disabled && !acpi_ht)
 		return 1;
 
-	acpi_table_parse(ACPI_BOOT, acpi_parse_sbf);
+	acpi_table_parse(ACPI_SIG_BOOT, acpi_parse_sbf);
 
 	/*
 	 * set sci_int and PM timer address
 	 */
-	acpi_table_parse(ACPI_FADT, acpi_parse_fadt);
+	acpi_table_parse(ACPI_SIG_FADT, acpi_parse_fadt);
 
 	/*
 	 * Process the Multiple APIC Description Table (MADT), if present
 	 */
 	acpi_process_madt();
 
-	acpi_table_parse(ACPI_HPET, acpi_parse_hpet);
+	acpi_table_parse(ACPI_SIG_HPET, acpi_parse_hpet);
 
 	acpi_dmar_init();
 

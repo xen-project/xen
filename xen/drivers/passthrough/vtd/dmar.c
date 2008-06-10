@@ -477,22 +477,13 @@ acpi_parse_one_atsr(struct acpi_dmar_entry_header *header)
     return ret;
 }
 
-static int __init acpi_parse_dmar(unsigned long phys_addr,
-                                  unsigned long size)
+static int __init acpi_parse_dmar(struct acpi_table_header *table)
 {
-    struct acpi_table_dmar *dmar = NULL;
+    struct acpi_table_dmar *dmar;
     struct acpi_dmar_entry_header *entry_header;
     int ret = 0;
 
-    if ( !phys_addr || !size )
-        return -EINVAL;
-
-    dmar = (struct acpi_table_dmar *)__acpi_map_table(phys_addr, size);
-    if ( !dmar )
-    {
-        dprintk(XENLOG_WARNING VTDPREFIX, "Unable to map DMAR\n");
-        return -ENODEV;
-    }
+    dmar = (struct acpi_table_dmar *)table;
 
     if ( !dmar->width )
     {
@@ -506,7 +497,7 @@ static int __init acpi_parse_dmar(unsigned long phys_addr,
 
     entry_header = (struct acpi_dmar_entry_header *)(dmar + 1);
     while ( ((unsigned long)entry_header) <
-            (((unsigned long)dmar) + size) )
+            (((unsigned long)dmar) + table->length) )
     {
         switch ( entry_header->type )
         {
@@ -550,7 +541,7 @@ int acpi_dmar_init(void)
     if ( (rc = vtd_hw_check()) != 0 )
         goto fail;
 
-    acpi_table_parse(ACPI_DMAR, acpi_parse_dmar);
+    acpi_table_parse(ACPI_SIG_DMAR, acpi_parse_dmar);
 
     rc = -ENODEV;
     if ( list_empty(&acpi_drhd_units) )

@@ -50,7 +50,7 @@ static u32 lsapic_nbr;
 
 /* Modify lsapic table.  Provides LPs.  */
 static int __init
-acpi_update_lsapic(acpi_table_entry_header * header, const unsigned long end)
+acpi_update_lsapic(struct acpi_subtable_header * header, const unsigned long end)
 {
 	struct acpi_table_lsapic *lsapic;
 	int enable;
@@ -79,7 +79,7 @@ acpi_update_lsapic(acpi_table_entry_header * header, const unsigned long end)
 }
 
 static int __init
-acpi_patch_plat_int_src(acpi_table_entry_header * header,
+acpi_patch_plat_int_src(struct acpi_subtable_header * header,
 			const unsigned long end)
 {
 	struct acpi_table_plat_int_src *plintsrc;
@@ -96,14 +96,11 @@ acpi_patch_plat_int_src(acpi_table_entry_header * header,
 }
 
 static int __init
-acpi_update_madt_checksum(unsigned long phys_addr, unsigned long size)
+acpi_update_madt_checksum(struct acpi_table_header *table)
 {
 	struct acpi_table_madt *acpi_madt;
 
-	if (!phys_addr || !size)
-		return -EINVAL;
-
-	acpi_madt = (struct acpi_table_madt *)__va(phys_addr);
+	acpi_madt = (struct acpi_table_madt *)table;
 	acpi_madt->header.checksum = 0;
 	acpi_madt->header.checksum = generate_acpi_checksum(acpi_madt, size);
 
@@ -111,32 +108,26 @@ acpi_update_madt_checksum(unsigned long phys_addr, unsigned long size)
 }
 
 static int __init
-acpi_backup_table(unsigned long phys_addr, unsigned long size)
+acpi_backup_table(struct acpi_table_header *table)
 {
 	struct acpi_backup_table_entry *entry;
-	void *vaddr = __va(phys_addr);
 
-	if (!phys_addr || !size)
-		return -EINVAL;
-
-	entry = xmalloc_bytes(sizeof(*entry) + size);
+	entry = xmalloc_bytes(sizeof(*entry) + table->length);
 	if (!entry) {
 		dprintk(XENLOG_WARNING, "Failed to allocate memory for "
-		        "%.4s table backup\n",
-			((struct acpi_table_header *)vaddr)->signature);
+		        "%.4s table backup\n", table->signature);
 		return -ENOMEM;
 	}
 
-	entry->pa = phys_addr;
-	entry->size = size;
+	entry->pa = __pa(table);
+	entry->size = table->length;
 
-	memcpy(entry->data, vaddr, size);
+	memcpy(entry->data, table, table->length);
 
 	list_add(&entry->list, &acpi_backup_table_list);
 
 	printk(XENLOG_INFO "Backup %.4s table stored @0x%p\n",
-	       ((struct acpi_table_header *)entry->data)->signature,
-	       entry->data);
+	       table->signature, entry->data);
 
 	return 0;
 }
@@ -156,6 +147,22 @@ acpi_restore_tables()
 	}
 }
 
+static int __init __acpi_table_disable(struct acpi_table_header *header)
+{
+	memcpy(header->oem_id, "xxxxxx", 6);
+	memcpy(header->oem_id+1, header->signature, 4);
+	memcpy(header->oem_table_id, "Xen     ", 8);
+	memcpy(header->signature, "OEMx", 4);
+	header->checksum = 0;
+	header->checksum = generate_acpi_checksum(header, header->length);
+	return 0;
+}
+
+static void __init acpi_table_disable(char *id)
+{
+	acpi_table_parse(id, __acpi_table_disable);
+}
+
 /* base is physical address of acpi table */
 static void __init touch_acpi_table(void)
 {
@@ -170,7 +177,7 @@ static void __init touch_acpi_table(void)
 	 *
 	 * ACPI tables must be backed-up before modification!
 	 */
-	acpi_table_parse(ACPI_APIC, acpi_backup_table);
+	acpi_table_parse(ACPI_SIG_MADT, acpi_backup_table);
 
 	if (acpi_table_parse_madt(ACPI_MADT_LSAPIC, acpi_update_lsapic, 0) < 0)
 		printk("Error parsing MADT - no LAPIC entries\n");
@@ -178,7 +185,7 @@ static void __init touch_acpi_table(void)
 				  acpi_patch_plat_int_src, 0) < 0)
 		printk("Error parsing MADT - no PLAT_INT_SRC entries\n");
 
-	acpi_table_parse(ACPI_APIC, acpi_update_madt_checksum);
+	acpi_table_parse(ACPI_SIG_MADT, acpi_update_madt_checksum);
 
 	/*
 	 * SRAT & SLIT tables aren't useful for Dom0 until
@@ -186,16 +193,16 @@ static void __init touch_acpi_table(void)
 	 *
 	 * NB - backup ACPI tables first.
 	 */
-	acpi_table_parse(ACPI_SRAT, acpi_backup_table);
-	acpi_table_parse(ACPI_SLIT, acpi_backup_table);
+	acpi_table_parse(ACPI_SIG_SRAT, acpi_backup_table);
+	acpi_table_parse(ACPI_SIG_SLIT, acpi_backup_table);
 
-	result = acpi_table_disable(ACPI_SRAT);
+	result = acpi_table_disable(ACPI_SIG_SRAT);
 	if ( result == 0 )
 		printk("Success Disabling SRAT\n");
 	else if ( result != -ENOENT )
 		printk("ERROR: Failed Disabling SRAT\n");
 
-	result = acpi_table_disable(ACPI_SLIT);
+	result = acpi_table_disable(ACPI_SIG_SLIT);
 	if ( result == 0 )
 		printk("Success Disabling SLIT\n");
 	else if ( result != -ENOENT )
