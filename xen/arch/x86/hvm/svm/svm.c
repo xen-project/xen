@@ -1175,12 +1175,9 @@ asmlinkage void svm_vmexit_handler(struct cpu_user_regs *regs)
 
     exit_reason = vmcb->exitcode;
 
-    if ( hvm_long_mode_enabled(v) )
-        HVMTRACE_ND (VMEXIT64, 1/*cycles*/, v, 3, exit_reason,
-            regs->eip & 0xFFFFFFFF, regs->eip >> 32, 0, 0, 0);
-    else
-        HVMTRACE_ND (VMEXIT, 1/*cycles*/, v, 2, exit_reason,
-            regs->eip, 0, 0, 0, 0);
+    HVMTRACE_ND(VMEXIT64, 1/*cycles*/, v, 3, exit_reason,
+                (uint32_t)regs->eip, (uint32_t)((uint64_t)regs->eip >> 32),
+                0, 0, 0);
 
     if ( unlikely(exit_reason == VMEXIT_INVALID) )
     {
