@@ -933,7 +933,7 @@ GLOBAL_ENTRY(ia64_leave_kernel)
 	;;
 (pUStk)	ssm psr.i
 (pUStk)	br.call.sptk.many b0=do_softirq
-(pUStk)	ssm psr.i
+(pUStk)	rsm psr.i
 	;;
 (pUStk)	br.call.sptk.many b0=reflect_event
 	;;
