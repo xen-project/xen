@@ -415,7 +415,7 @@ static PyObject *xspy_watch(XsHandle *self, PyObject *args)
     if (i == PyList_Size(self->watches))
         PyList_Append(self->watches, token);
 
-    sprintf(token_str, "%li", (unsigned long)token);
+    snprintf(token_str, sizeof(token_str), "%li", (unsigned long)token);
     Py_BEGIN_ALLOW_THREADS
     result = xs_watch(xh, path, token_str);
     Py_END_ALLOW_THREADS
@@ -500,7 +500,7 @@ static PyObject *xspy_unwatch(XsHandle *self, PyObject *args)
     if (!PyArg_ParseTuple(args, "sO", &path, &token))
         return NULL;
 
-    sprintf(token_str, "%li", (unsigned long)token);
+    snprintf(token_str, sizeof(token_str), "%li", (unsigned long)token);
     Py_BEGIN_ALLOW_THREADS
     result = xs_unwatch(xh, path, token_str);
     Py_END_ALLOW_THREADS
@@ -535,7 +535,7 @@ static PyObject *xspy_transaction_start(XsHandle *self)
         return NULL;
     }
 
-    sprintf(thstr, "%lX", (unsigned long)th);
+    snprintf(thstr, sizeof(thstr), "%lX", (unsigned long)th);
     return PyString_FromString(thstr);
 }
 

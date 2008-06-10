@@ -298,7 +298,8 @@ static PyObject *pyxc_domain_getinfo(XcObject *self,
                                       &first_dom, &max_doms) )
         return NULL;
 
-    if ( (info = malloc(max_doms * sizeof(xc_dominfo_t))) == NULL )
+    info = calloc(max_doms, sizeof(xc_dominfo_t));
+    if (info == NULL)
         return PyErr_NoMemory();
 
     nr_doms = xc_domain_getinfo(self->xc_handle, first_dom, max_doms, info);
@@ -664,9 +665,9 @@ static PyObject *pyxc_get_device_group(XcObject *self,
     /* Maximum allowed siblings device number per group */
     max_sdevs = 1024;
 
-    if ( (sdev_array = malloc(max_sdevs * sizeof(*sdev_array))) == NULL )
+    sdev_array = calloc(max_sdevs, sizeof(*sdev_array));
+    if (sdev_array == NULL)
         return PyErr_NoMemory();
-    memset(sdev_array, 0, max_sdevs * sizeof(*sdev_array));
 
     bdf |= (bus & 0xff) << 16;
     bdf |= (dev & 0x1f) << 11;
@@ -687,16 +688,16 @@ static PyObject *pyxc_get_device_group(XcObject *self,
        return Py_BuildValue("s", "");
     }
 
-    if ( (group_str = malloc(num_sdevs * sizeof(dev_str))) == NULL )
+    group_str = calloc(num_sdevs, sizeof(dev_str));
+    if (group_str == NULL)
         return PyErr_NoMemory();
-    memset(group_str, '\0', num_sdevs * sizeof(dev_str));
 
     for ( i = 0; i < num_sdevs; i++ )
     {
         bus = (sdev_array[i] >> 16) & 0xff;
         dev = (sdev_array[i] >> 11) & 0x1f;
         func = (sdev_array[i] >> 8) & 0x7;
-        sprintf(dev_str, "%02x:%02x.%x,", bus, dev, func);
+        snprintf(dev_str, sizeof(dev_str), "%02x:%02x.%x,", bus, dev, func);
         strcat(group_str, dev_str);
     }
 
@@ -1116,7 +1117,7 @@ static PyObject *pyxc_xeninfo(XcObject *self)
     if ( xc_version(self->xc_handle, XENVER_platform_parameters, &p_parms) != 0 )
         return pyxc_error_to_exception();
 
-    sprintf(str, "virt_start=0x%lx", p_parms.virt_start);
+    snprintf(str, sizeof(str), "virt_start=0x%lx", p_parms.virt_start);
 
     xen_pagesize = xc_version(self->xc_handle, XENVER_pagesize, NULL);
     if (xen_pagesize < 0 )

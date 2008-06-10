@@ -29,10 +29,9 @@
 #include <arpa/inet.h>
 #include <sys/ioctl.h>
 #include <netinet/in.h>
+#include <xenctrl.h>
 #include <xen/xsm/acm.h>
 #include <xen/xsm/acm_ops.h>
-
-#include <xenctrl.h>
 
 #define PERROR(_m, _a...) \
 fprintf(stderr, "ERROR: " _m " (%d = %s)\n" , ## _a ,    \
