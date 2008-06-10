@@ -518,6 +518,9 @@ class sxp2xml:
         vtpms_sxp = map(lambda x: x[1], [device for device in devices
                                          if device[1][0] == "vtpm"])
 
+        vfbs_sxp = map(lambda x: x[1], [device for device in devices
+                                        if device[1][0] == "vfb"])
+
         # Create XML Document
         
         impl = getDOMImplementation()
@@ -657,6 +660,10 @@ class sxp2xml:
 
         map(vm.appendChild, consoles)
 
+        vfbs = map(lambda vfb: self.extract_vfb(vfb, document), vfbs_sxp)
+
+        map(vm.appendChild, vfbs)
+
         # Platform variables...
 
         platform = self.extract_platform(image, document)
@@ -773,6 +780,46 @@ class sxp2xml:
              = get_child_by_name(vtpm_sxp, "backend", "0")
 
         return vtpm
+
+    def extract_vfb(self, vfb_sxp, document):
+
+        vfb = document.createElement("console")
+        vfb.attributes["protocol"] = "rfb"
+
+        if get_child_by_name(vfb_sxp, "type", "") == "vnc":
+            vfb.appendChild(self.mk_other_config(
+                "type", "vnc",
+                document))
+            vfb.appendChild(self.mk_other_config(
+                "vncunused", get_child_by_name(vfb_sxp, "vncunused", "1"),
+                document))
+            vfb.appendChild(self.mk_other_config(
+                "vnclisten",
+                get_child_by_name(vfb_sxp, "vnclisten", "127.0.0.1"),
+                document))
+            vfb.appendChild(self.mk_other_config(
+                "vncdisplay", get_child_by_name(vfb_sxp, "vncdisplay", "0"),
+                document))
+            vfb.appendChild(self.mk_other_config(
+                "vncpasswd", get_child_by_name(vfb_sxp, "vncpasswd", ""),
+                document))
+
+        if get_child_by_name(vfb_sxp, "type", "") == "sdl":
+            vfb.appendChild(self.mk_other_config(
+                "type", "sdl",
+                document))
+            vfb.appendChild(self.mk_other_config(
+                "display", get_child_by_name(vfb_sxp, "display", ""),
+                document))
+            vfb.appendChild(self.mk_other_config(
+                "xauthority",
+                get_child_by_name(vfb_sxp, "xauthority", ""),
+                document))
+            vfb.appendChild(self.mk_other_config(
+                "opengl", get_child_by_name(vfb_sxp, "opengl", "1"),
+                document))
+
+        return vfb
 
     _eths = -1
 
