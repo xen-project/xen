@@ -127,7 +127,7 @@ xc_ia64_recv_vcpu_context(int xc_handle, int io_fd, uint32_t dom,
     fprintf(stderr, "ip=%016lx, b0=%016lx\n", ctxt->regs.ip, ctxt->regs.b[0]);
 
     /* Initialize and set registers.  */
-    ctxt->flags = VGCF_EXTRA_REGS | VGCF_SET_CR_IRR;
+    ctxt->flags = VGCF_EXTRA_REGS | VGCF_SET_CR_IRR | VGCF_online;
     if (xc_vcpu_setcontext(xc_handle, dom, vcpu, ctxt) != 0) {
         ERROR("Couldn't set vcpu context");
         return -1;
@@ -184,29 +184,57 @@ xc_ia64_recv_shared_info(int xc_handle, int io_fd, uint32_t dom,
 }
 
 static int
-xc_ia64_pv_recv_context(int xc_handle, int io_fd, uint32_t dom,
-                        unsigned long shared_info_frame,
-                        struct xen_ia64_p2m_table *p2m_table,
-                        unsigned int store_evtchn, unsigned long *store_mfn,
-                        unsigned int console_evtchn,
-                        unsigned long *console_mfn)
+xc_ia64_recv_vcpumap(const xc_dominfo_t *info, int io_fd, uint64_t **vcpumapp)
+{
+    uint64_t max_virt_cpus;
+    unsigned long vcpumap_size;
+    uint64_t *vcpumap = NULL;
+
+    *vcpumapp = NULL;
+    
+    if (read_exact(io_fd, &max_virt_cpus, sizeof(max_virt_cpus))) {
+        ERROR("error reading max_virt_cpus");
+        return -1;
+    }
+    if (max_virt_cpus < info->max_vcpu_id) {
+        ERROR("too large max_virt_cpus %i < %i\n",
+              max_virt_cpus, info->max_vcpu_id);
+        return -1;
+    }
+    vcpumap_size = (max_virt_cpus + 1 + sizeof(vcpumap[0]) - 1) /
+        sizeof(vcpumap[0]);
+    vcpumap = malloc(vcpumap_size);
+    if (vcpumap == NULL) {
+        ERROR("memory alloc for vcpumap");
+        return -1;
+    }
+    memset(vcpumap, 0, vcpumap_size);
+    if (read_exact(io_fd, vcpumap, vcpumap_size)) {
+        ERROR("read vcpumap");
+        free(vcpumap);
+        return -1;
+    }
+
+    *vcpumapp = vcpumap;
+    return 0;
+}
+
+static int
+xc_ia64_pv_recv_vcpu_context(int xc_handle, int io_fd, int32_t dom,
+                             uint32_t vcpu)
 {
     int rc = -1;
-    unsigned long gmfn;
 
     /* A copy of the CPU context of the guest. */
     vcpu_guest_context_t ctxt;
-
-    /* A temporary mapping of the guest's start_info page. */
-    start_info_t *start_info;
-
+    
     if (lock_pages(&ctxt, sizeof(ctxt))) {
         /* needed for build domctl, but might as well do early */
         ERROR("Unable to lock_pages ctxt");
         return -1;
     }
 
-    if (xc_ia64_recv_vcpu_context(xc_handle, io_fd, dom, 0, &ctxt))
+    if (xc_ia64_recv_vcpu_context(xc_handle, io_fd, dom, vcpu, &ctxt))
         goto out;
 
     /* Then get privreg page.  */
@@ -215,21 +243,42 @@ xc_ia64_pv_recv_context(int xc_handle, int io_fd, uint32_t dom,
         goto out;
     }
 
+    rc = 0;
+
+ out:
+    unlock_pages(&ctxt, sizeof(ctxt));
+    return rc;
+}
+
+static int
+xc_ia64_pv_recv_shared_info(int xc_handle, int io_fd, int32_t dom, 
+                            unsigned long shared_info_frame,
+                            struct xen_ia64_p2m_table *p2m_table,
+                            unsigned int store_evtchn,
+                            unsigned long *store_mfn,
+                            unsigned int console_evtchn,
+                            unsigned long *console_mfn)
+{
+    unsigned long gmfn;
+
+    /* A temporary mapping of the guest's start_info page. */
+    start_info_t *start_info;
+    
     /* Read shared info.  */
     if (xc_ia64_recv_shared_info(xc_handle, io_fd, dom,
                                  shared_info_frame, &gmfn))
-        goto out;
+        return -1;
 
     /* Uncanonicalise the suspend-record frame number and poke resume rec. */
     if (populate_page_if_necessary(xc_handle, dom, gmfn, p2m_table)) {
         ERROR("cannot populate page 0x%lx", gmfn);
-        goto out;
+        return -1;
     }
     start_info = xc_map_foreign_range(xc_handle, dom, PAGE_SIZE,
                                       PROT_READ | PROT_WRITE, gmfn);
     if (start_info == NULL) {
         ERROR("cannot map start_info page");
-        goto out;
+        return -1;
     }
     start_info->nr_pages = p2m_size;
     start_info->shared_info = shared_info_frame << PAGE_SHIFT;
@@ -240,10 +289,109 @@ xc_ia64_pv_recv_context(int xc_handle, int io_fd, uint32_t dom,
     start_info->console.domU.evtchn = console_evtchn;
     munmap(start_info, PAGE_SIZE);
 
-    rc = 0;
+    return 0;
+}
 
+static int
+xc_ia64_pv_recv_context_ver_one_or_two(int xc_handle, int io_fd, uint32_t dom,
+                                       unsigned long shared_info_frame,
+                                       struct xen_ia64_p2m_table *p2m_table,
+                                       unsigned int store_evtchn,
+                                       unsigned long *store_mfn,
+                                       unsigned int console_evtchn,
+                                       unsigned long *console_mfn)
+{
+    int rc;
+
+    /* vcpu 0 context */
+    rc = xc_ia64_pv_recv_vcpu_context(xc_handle, io_fd, dom, 0);
+    if (rc)
+        return rc;
+
+
+    /* shared_info */
+    rc = xc_ia64_pv_recv_shared_info(xc_handle, io_fd, dom, shared_info_frame,
+                                     p2m_table, store_evtchn, store_mfn,
+                                     console_evtchn, console_mfn);
+    return rc;
+}
+
+static int
+xc_ia64_pv_recv_context_ver_three(int xc_handle, int io_fd, uint32_t dom,
+                                  unsigned long shared_info_frame,
+                                  struct xen_ia64_p2m_table *p2m_table,
+                                  unsigned int store_evtchn,
+                                  unsigned long *store_mfn,
+                                  unsigned int console_evtchn,
+                                  unsigned long *console_mfn)
+{
+    int rc = -1;
+    xc_dominfo_t info;
+    unsigned int i;
+    
+    /* vcpu map */
+    uint64_t *vcpumap = NULL;
+    
+    if (xc_domain_getinfo(xc_handle, dom, 1, &info) != 1) {
+        ERROR("Could not get domain info");
+        return -1;
+    }
+    rc = xc_ia64_recv_vcpumap(&info, io_fd, &vcpumap);
+    if (rc != 0)
+        goto out;
+
+    /* vcpu context */
+    for (i = 0; i <= info.max_vcpu_id; i++) {
+        if (!__test_bit(i, vcpumap))
+            continue;
+
+        rc = xc_ia64_pv_recv_vcpu_context(xc_handle, io_fd, dom, i);
+        if (rc != 0)
+            goto out;
+    }    
+
+    /* shared_info */
+    rc = xc_ia64_pv_recv_shared_info(xc_handle, io_fd, dom, shared_info_frame,
+                                     p2m_table, store_evtchn, store_mfn,
+                                     console_evtchn, console_mfn);
  out:
-    unlock_pages(&ctxt, sizeof(ctxt));
+    if (vcpumap != NULL)
+        free(vcpumap);
+    return rc;
+}
+
+static int
+xc_ia64_pv_recv_context(unsigned long format_version,
+                        int xc_handle, int io_fd, uint32_t dom,
+                        unsigned long shared_info_frame,
+                        struct xen_ia64_p2m_table *p2m_table,
+                        unsigned int store_evtchn,
+                        unsigned long *store_mfn,
+                        unsigned int console_evtchn,
+                        unsigned long *console_mfn)
+{
+    int rc;
+    switch (format_version) {
+    case XC_IA64_SR_FORMAT_VER_ONE:
+    case XC_IA64_SR_FORMAT_VER_TWO:
+        rc = xc_ia64_pv_recv_context_ver_one_or_two(xc_handle, io_fd, dom,
+                                                    shared_info_frame,
+                                                    p2m_table, store_evtchn,
+                                                    store_mfn, console_evtchn,
+                                                    console_mfn);
+        break;
+    case XC_IA64_SR_FORMAT_VER_THREE:
+        rc = xc_ia64_pv_recv_context_ver_three(xc_handle, io_fd, dom,
+                                               shared_info_frame,
+                                               p2m_table, store_evtchn,
+                                               store_mfn, console_evtchn,
+                                               console_mfn);
+        break;
+    default:
+        ERROR("Unsupported format version");
+        rc = -1;
+        break;
+    }
     return rc;
 }
 
@@ -259,9 +407,7 @@ xc_ia64_hvm_recv_context(int xc_handle, int io_fd, uint32_t dom,
     xc_dominfo_t info;
     unsigned int i;
     
-    /* cpu */
-    uint64_t max_virt_cpus;
-    unsigned long vcpumap_size;
+    /* cpumap */
     uint64_t *vcpumap = NULL;
 
     /* HVM: magic frames for ioreqs and xenstore comms */
@@ -289,27 +435,8 @@ xc_ia64_hvm_recv_context(int xc_handle, int io_fd, uint32_t dom,
         ERROR("Could not get domain info");
         goto out;
     }
-    if (read_exact(io_fd, &max_virt_cpus, sizeof(max_virt_cpus))) {
-        ERROR("error reading max_virt_cpus");
+    if (xc_ia64_recv_vcpumap(&info, io_fd, &vcpumap))
         goto out;
-    }
-    if (max_virt_cpus < info.max_vcpu_id) {
-        ERROR("too large max_virt_cpus %i < %i\n",
-              max_virt_cpus, info.max_vcpu_id);
-        goto out;
-    }
-    vcpumap_size = (max_virt_cpus + 1 + sizeof(vcpumap[0]) - 1) /
-        sizeof(vcpumap[0]);
-    vcpumap = malloc(vcpumap_size);
-    if (vcpumap == NULL) {
-        ERROR("memory alloc for vcpumap");
-        goto out;
-    }
-    memset(vcpumap, 0, vcpumap_size);
-    if (read_exact(io_fd, vcpumap, vcpumap_size)) {
-        ERROR("read vcpumap");
-        goto out;
-    }
     
     /* vcpu context */
     for (i = 0; i <= info.max_vcpu_id; i++) {
@@ -322,7 +449,7 @@ xc_ia64_hvm_recv_context(int xc_handle, int io_fd, uint32_t dom,
         if (xc_ia64_recv_vcpu_context(xc_handle, io_fd, dom, i, &ctxt))
             goto out;
 
-        // system context of vcpu is recieved as hvm context.
+        /* system context of vcpu is recieved as hvm context. */
     }    
 
     /* Set HVM-specific parameters */
@@ -350,6 +477,7 @@ xc_ia64_hvm_recv_context(int xc_handle, int io_fd, uint32_t dom,
         ERROR("error setting HVM params: %i", rc);
         goto out;
     }
+    rc = -1;
     *store_mfn = magic_pfns[0];
 
     /* Read HVM context */
@@ -437,7 +565,9 @@ xc_domain_restore(int xc_handle, int io_fd, uint32_t dom,
         ERROR("Error when reading version");
         goto out;
     }
-    if (ver != XC_IA64_SR_FORMAT_VER_ONE && ver != XC_IA64_SR_FORMAT_VER_TWO) {
+    if (ver != XC_IA64_SR_FORMAT_VER_ONE &&
+        ver != XC_IA64_SR_FORMAT_VER_TWO &&
+        ver != XC_IA64_SR_FORMAT_VER_THREE) {
         ERROR("version of save doesn't match");
         goto out;
     }
@@ -468,7 +598,8 @@ xc_domain_restore(int xc_handle, int io_fd, uint32_t dom,
     }
     shared_info_frame = domctl.u.getdomaininfo.shared_info_frame;
 
-    if (ver == XC_IA64_SR_FORMAT_VER_TWO) {
+    if (ver == XC_IA64_SR_FORMAT_VER_THREE ||
+        ver == XC_IA64_SR_FORMAT_VER_TWO) {
         unsigned int memmap_info_num_pages;
         unsigned long memmap_size;
         xen_ia64_memmap_info_t *memmap_info;
@@ -548,7 +679,8 @@ xc_domain_restore(int xc_handle, int io_fd, uint32_t dom,
         goto out;
 
     if (!hvm)
-        rc = xc_ia64_pv_recv_context(xc_handle, io_fd, dom, shared_info_frame,
+        rc = xc_ia64_pv_recv_context(ver, 
+                                     xc_handle, io_fd, dom, shared_info_frame,
                                      &p2m_table, store_evtchn, store_mfn,
                                      console_evtchn, console_mfn);
     else

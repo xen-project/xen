@@ -27,7 +27,9 @@
 #define XC_IA64_SR_FORMAT_VER_ONE       1UL
         /* using foreign p2m exposure version */
 #define XC_IA64_SR_FORMAT_VER_TWO       2UL
-#define XC_IA64_SR_FORMAT_VER_MAX       2UL
+        /* only pv change: send vcpumap and all vcpu context */
+#define XC_IA64_SR_FORMAT_VER_THREE     3UL
+#define XC_IA64_SR_FORMAT_VER_MAX       3UL
 
 #define XC_IA64_SR_FORMAT_VER_CURRENT   XC_IA64_SR_FORMAT_VER_TWO
 
