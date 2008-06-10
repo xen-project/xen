@@ -142,9 +142,13 @@ static int do_privcmd(int xc_handle, unsigned int cmd, unsigned long data)
 
 int do_xen_hypercall(int xc_handle, privcmd_hypercall_t *hypercall)
 {
-    return do_privcmd(xc_handle,
+    int error = do_privcmd(xc_handle,
                       IOCTL_PRIVCMD_HYPERCALL,
                       (unsigned long)hypercall);
+    if (error)
+       return error;
+    else
+       return (hypercall->retval);
 }
 
 #define EVTCHN_DEV_NAME  "/dev/xenevt"
