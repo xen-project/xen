@@ -31,7 +31,7 @@
 #define XC_IA64_SR_FORMAT_VER_THREE     3UL
 #define XC_IA64_SR_FORMAT_VER_MAX       3UL
 
-#define XC_IA64_SR_FORMAT_VER_CURRENT   XC_IA64_SR_FORMAT_VER_TWO
+#define XC_IA64_SR_FORMAT_VER_CURRENT   XC_IA64_SR_FORMAT_VER_THREE
 
 /*
 ** During (live) save/migrate, we maintain a number of bitmaps to track
