@@ -1200,7 +1200,8 @@ int arch_set_info_guest(struct vcpu *v, vcpu_guest_context_u c)
 
 		v->is_initialised = 1;
 		/* Auto-online VCPU0 when it is initialised. */
-		if (v->vcpu_id == 0)
+		if (v->vcpu_id == 0 || (c.nat != NULL && 
+					c.nat->flags & VGCF_online))
 			clear_bit(_VPF_down, &v->pause_flags);
 	}
 
