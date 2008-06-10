@@ -14,6 +14,7 @@
 #include <xen/irq.h>
 #include <xen/console.h>
 #include <xen/shutdown.h>
+#include <xen/acpi.h>
 #include <asm/msr.h>
 #include <asm/regs.h>
 #include <asm/mc146818rtc.h>
@@ -23,12 +24,53 @@
 #include <asm/mpspec.h>
 #include <asm/tboot.h>
 
-/* reboot_str: comma-separated list of reboot options. */
-static char __initdata reboot_str[10] = "";
-string_param("reboot", reboot_str);
+enum reboot_type {
+        BOOT_TRIPLE = 't',
+        BOOT_KBD = 'k',
+        BOOT_ACPI = 'a',
+#ifdef CONFIG_X86_32
+        BOOT_BIOS = 'b',
+#endif
+};
 
 static long no_idt[2];
 static int reboot_mode;
+
+/*
+ * reboot=b[ios] | t[riple] | k[bd] | [, [w]arm | [c]old]
+ * warm   Don't set the cold reboot flag
+ * cold   Set the cold reboot flag
+ * bios   Reboot by jumping through the BIOS (only for X86_32)
+ * triple Force a triple fault (init)
+ * kbd    Use the keyboard controller. cold reset (default)
+ * acpi   Use the RESET_REG in the FADT
+ */
+static enum reboot_type reboot_type = BOOT_ACPI;
+static void __init set_reboot_type(char *str)
+{
+    for ( ; ; )
+    {
+        switch ( *str )
+        {
+        case 'w': /* "warm" reboot (no memory testing etc) */
+            reboot_mode = 0x1234;
+            break;
+        case 'c': /* "cold" reboot (with memory testing etc) */
+            reboot_mode = 0x0;
+            break;
+        case 'b':
+        case 'a':
+        case 'k':
+        case 't':
+            reboot_type = *str;
+            break;
+        }
+        if ( (str = strchr(str, ',')) == NULL )
+            break;
+        str++;
+    }
+}
+custom_param("reboot", set_reboot_type);
 
 static inline void kb_wait(void)
 {
@@ -55,8 +97,6 @@ void machine_halt(void)
 }
 
 #ifdef __i386__
-
-static int reboot_thru_bios;
 
 /* The following code and data reboots the machine by switching to real
    mode and jumping to the BIOS reset entry point, as if the CPU has
@@ -192,67 +232,11 @@ static void machine_real_restart(const unsigned char *code, unsigned length)
                                           MAX_LENGTH)));
 }
 
-#else /* __x86_64__ */
-
-#define machine_real_restart(x, y)
-#define reboot_thru_bios 0
-
-#endif
-
-void machine_restart(void)
-{
-    int i;
-
-    watchdog_disable();
-    console_start_sync();
-
-    local_irq_enable();
-
-    /* Ensure we are the boot CPU. */
-    if ( get_apic_id() != boot_cpu_physical_apicid )
-    {
-        /* Send IPI to the boot CPU (logical cpu 0). */
-        on_selected_cpus(cpumask_of_cpu(0), (void *)machine_restart,
-                         NULL, 1, 0);
-        for ( ; ; )
-            halt();
-    }
-
-    smp_send_stop();
-
-    if ( tboot_in_measured_env() )
-        tboot_shutdown(TB_SHUTDOWN_REBOOT);
-
-    /* Rebooting needs to touch the page at absolute address 0. */
-    *((unsigned short *)__va(0x472)) = reboot_mode;
-
-    if ( reboot_thru_bios <= 0 )
-    {
-        for ( ; ; )
-        {
-            /* Pulse the keyboard reset line. */
-            for ( i = 0; i < 100; i++ )
-            {
-                kb_wait();
-                udelay(50);
-                outb(0xfe,0x64); /* pulse reset low */
-                udelay(50);
-            }
-
-            /* That didn't work - force a triple fault.. */
-            __asm__ __volatile__("lidt %0": "=m" (no_idt));
-            __asm__ __volatile__("int3");
-        }
-    }
-    machine_real_restart(jump_to_bios, sizeof(jump_to_bios));
-}
-
-#ifndef reboot_thru_bios
 static int __init set_bios_reboot(struct dmi_system_id *d)
 {
-    if ( !reboot_thru_bios )
+    if ( reboot_type != BOOT_BIOS )
     {
-        reboot_thru_bios = 1;
+        reboot_type = BOOT_BIOS;
         printk("%s series board detected. "
                "Selecting BIOS-method for reboots.\n", d->ident);
     }
@@ -294,44 +278,75 @@ static struct dmi_system_id __initdata reboot_dmi_table[] = {
     },
     { }
 };
-#endif
 
 static int __init reboot_init(void)
 {
-    const char *str;
-
-    for ( str = reboot_str; *str != '\0'; str++ )
-    {
-        switch ( *str )
-        {
-        case 'n': /* no reboot */
-            opt_noreboot = 1;
-            break;
-        case 'w': /* "warm" reboot (no memory testing etc) */
-            reboot_mode = 0x1234;
-            break;
-        case 'c': /* "cold" reboot (with memory testing etc) */
-            reboot_mode = 0x0;
-            break;
-#ifndef reboot_thru_bios
-        case 'b': /* "bios" reboot by jumping through the BIOS */
-            reboot_thru_bios = 1;
-            break;
-        case 'h': /* "hard" reboot by toggling RESET and/or crashing the CPU */
-            reboot_thru_bios = -1;
-            break;
-#endif
-        }
-        if ( (str = strchr(str, ',')) == NULL )
-            break;
-    }
-
-#ifndef reboot_thru_bios
     dmi_check_system(reboot_dmi_table);
-#endif
     return 0;
 }
 __initcall(reboot_init);
+
+#else /* __x86_64__ */
+
+#define machine_real_restart(x, y)
+
+#endif
+
+void machine_restart(void)
+{
+    int i;
+
+    watchdog_disable();
+    console_start_sync();
+
+    local_irq_enable();
+
+    /* Ensure we are the boot CPU. */
+    if ( get_apic_id() != boot_cpu_physical_apicid )
+    {
+        /* Send IPI to the boot CPU (logical cpu 0). */
+        on_selected_cpus(cpumask_of_cpu(0), (void *)machine_restart,
+                         NULL, 1, 0);
+        for ( ; ; )
+            halt();
+    }
+
+    smp_send_stop();
+
+    if ( tboot_in_measured_env() )
+        tboot_shutdown(TB_SHUTDOWN_REBOOT);
+
+    /* Rebooting needs to touch the page at absolute address 0. */
+    *((unsigned short *)__va(0x472)) = reboot_mode;
+
+    for ( ; ; )
+    {
+        switch ( reboot_type )
+        {
+        case BOOT_KBD:
+            /* Pulse the keyboard reset line. */
+            for ( i = 0; i < 100; i++ )
+            {
+                kb_wait();
+                udelay(50);
+                outb(0xfe,0x64); /* pulse reset low */
+                udelay(50);
+            }
+            /* fall through */
+        case BOOT_TRIPLE:
+            asm volatile ( "lidt %0 ; int3" : "=m" (no_idt) );
+            break;
+        case BOOT_BIOS:
+            machine_real_restart(jump_to_bios, sizeof(jump_to_bios));
+            break;
+        case BOOT_ACPI:
+            acpi_reboot();
+            break;
+        }
+
+        reboot_type = BOOT_KBD;
+    }
+}
 
 /*
  * Local variables:

@@ -441,4 +441,6 @@ static inline int acpi_get_pxm(acpi_handle handle)
 
 extern int pnpacpi_disabled;
 
+void acpi_reboot(void);
+
 #endif /*_LINUX_ACPI_H*/
