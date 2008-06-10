@@ -57,9 +57,9 @@ create_hashtable(unsigned int minsize,
     h->loadlimit    = (unsigned int)(((uint64_t)size * max_load_factor) / 100);
     return h;
 
-err0:
-   free(h);
 err1:
+   free(h);
+err0:
    return NULL;
 }
 
