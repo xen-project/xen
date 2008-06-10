@@ -323,7 +323,7 @@ typedef efi_status_t (*efi_get_next_high_mono_count_t) (uint32_t* HighCount);
  * EFI Runtime Serivces Table
  */
 
-#define EFI_RUNTIME_SERVICES_SIGNATURE  0x56524553544e5552
+#define EFI_RUNTIME_SERVICES_SIGNATURE  0x5652453544e5552ULL
 #define EFI_RUNTIME_SERVICES_REVISION ((EFI_SPECIFICATION_MAJOR_REVISION<<16) \
 					| (EFI_SPECIFICATION_MINOR_REVISION))
 
