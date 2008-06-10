@@ -28,9 +28,7 @@ enum reboot_type {
         BOOT_TRIPLE = 't',
         BOOT_KBD = 'k',
         BOOT_ACPI = 'a',
-#ifdef CONFIG_X86_32
         BOOT_BIOS = 'b',
-#endif
 };
 
 static long no_idt[2];
