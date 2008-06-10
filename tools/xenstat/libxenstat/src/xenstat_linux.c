@@ -165,7 +165,8 @@ static int read_attributes_vbd(const char *vbd_directory, const char *what, char
 	static char file_name[80];
 	int fd, num_read;
 
-	sprintf(file_name, "%s/%s/%s", SYSFS_VBD_PATH, vbd_directory, what);
+	snprintf(file_name, sizeof(file_name), "%s/%s/%s",
+		SYSFS_VBD_PATH, vbd_directory, what);
 	fd = open(file_name, O_RDONLY, 0);
 	if (fd==-1) return -1;
 	num_read = read(fd, ret, cap - 1);
