@@ -59,7 +59,7 @@ void new_pt_frame(unsigned long *pt_pfn, unsigned long prev_l_mfn,
 {   
     pgentry_t *tab = (pgentry_t *)start_info.pt_base;
     unsigned long pt_page = (unsigned long)pfn_to_virt(*pt_pfn); 
-    unsigned long prot_e, prot_t;
+    pgentry_t prot_e, prot_t;
     mmu_update_t mmu_updates[1];
     
     prot_e = prot_t = 0;
@@ -69,7 +69,7 @@ void new_pt_frame(unsigned long *pt_pfn, unsigned long prev_l_mfn,
 
     /* We need to clear the page, otherwise we might fail to map it
        as a page table page */
-    memset((unsigned long*)pfn_to_virt(*pt_pfn), 0, PAGE_SIZE);  
+    memset((void*) pt_page, 0, PAGE_SIZE);  
  
     switch ( level )
     {
@@ -99,7 +99,7 @@ void new_pt_frame(unsigned long *pt_pfn, unsigned long prev_l_mfn,
 #endif
     tab = pte_to_virt(tab[l3_table_offset(pt_page)]);
 
-    mmu_updates[0].ptr = ((pgentry_t)tab[l2_table_offset(pt_page)] & PAGE_MASK) + 
+    mmu_updates[0].ptr = (tab[l2_table_offset(pt_page)] & PAGE_MASK) + 
                          sizeof(pgentry_t) * l1_table_offset(pt_page);
     mmu_updates[0].val = (pgentry_t)pfn_to_mfn(*pt_pfn) << PAGE_SHIFT | 
                          (prot_e & ~_PAGE_RW);
@@ -474,7 +474,7 @@ void do_map_frames(unsigned long addr,
                 if (!pgt || !(addr & L1_MASK))
                     pgt = need_pgt(addr);
 		mmu_updates[i].ptr = virt_to_mach(pgt);
-		mmu_updates[i].val = ((f[(done + i) * stride] + (done + i) * increment) << PAGE_SHIFT) | prot;
+		mmu_updates[i].val = ((pgentry_t)(f[(done + i) * stride] + (done + i) * increment) << PAGE_SHIFT) | prot;
 	    }
 
 	    rc = HYPERVISOR_mmu_update(mmu_updates, todo, NULL, id);

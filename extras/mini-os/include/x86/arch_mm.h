@@ -109,16 +109,16 @@ typedef unsigned long pgentry_t;
   (((_a) >> L4_PAGETABLE_SHIFT) & (L4_PAGETABLE_ENTRIES - 1))
 #endif
 
-#define _PAGE_PRESENT  0x001UL
-#define _PAGE_RW       0x002UL
-#define _PAGE_USER     0x004UL
-#define _PAGE_PWT      0x008UL
-#define _PAGE_PCD      0x010UL
-#define _PAGE_ACCESSED 0x020UL
-#define _PAGE_DIRTY    0x040UL
-#define _PAGE_PAT      0x080UL
-#define _PAGE_PSE      0x080UL
-#define _PAGE_GLOBAL   0x100UL
+#define _PAGE_PRESENT  0x001ULL
+#define _PAGE_RW       0x002ULL
+#define _PAGE_USER     0x004ULL
+#define _PAGE_PWT      0x008ULL
+#define _PAGE_PCD      0x010ULL
+#define _PAGE_ACCESSED 0x020ULL
+#define _PAGE_DIRTY    0x040ULL
+#define _PAGE_PAT      0x080ULL
+#define _PAGE_PSE      0x080ULL
+#define _PAGE_GLOBAL   0x100ULL
 
 #if defined(__i386__)
 #define L1_PROT (_PAGE_PRESENT|_PAGE_RW|_PAGE_ACCESSED)
@@ -140,7 +140,7 @@ typedef unsigned long pgentry_t;
 
 #define PFN_UP(x)	(((x) + PAGE_SIZE-1) >> L1_PAGETABLE_SHIFT)
 #define PFN_DOWN(x)	((x) >> L1_PAGETABLE_SHIFT)
-#define PFN_PHYS(x)	((x) << L1_PAGETABLE_SHIFT)
+#define PFN_PHYS(x)	((uint64_t)(x) << L1_PAGETABLE_SHIFT)
 #define PHYS_PFN(x)	((x) >> L1_PAGETABLE_SHIFT)
 
 /* to align the pointer to the (next) page boundary */
