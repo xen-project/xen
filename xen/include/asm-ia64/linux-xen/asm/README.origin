@@ -5,7 +5,6 @@
 # (e.g. with #ifdef XEN or XEN in a comment) so that they can be
 # easily updated to future versions of the corresponding Linux files.
 
-acpi.h			-> linux/include/asm-ia64/acpi.h
 atomic.h		-> linux/include/asm-ia64/atomic.h
 cache.h			-> linux/include/asm-ia64/cache.h
 gcc_intrin.h		-> linux/include/asm-ia64/gcc_intrin.h
@@ -43,3 +42,6 @@ machvec_pci.h		-> linux/include/asm-ia64/pci.h
 
 # The files below are from Linux-2.6.21
 pal.h			-> linux/include/asm-ia64/pal.h
+
+# The files below are from Linux-2.6.26-rc5
+acpi.h			-> linux/include/asm-ia64/acpi.h
