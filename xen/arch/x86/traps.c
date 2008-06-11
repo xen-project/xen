@@ -649,37 +649,21 @@ int cpuid_hypervisor_leaves(
     return 1;
 }
 
-static int emulate_forced_invalid_op(struct cpu_user_regs *regs)
+static void pv_cpuid(struct cpu_user_regs *regs)
 {
-    char sig[5], instr[2];
     uint32_t a, b, c, d;
-    unsigned long eip, rc;
 
     a = regs->eax;
     b = regs->ebx;
     c = regs->ecx;
     d = regs->edx;
-    eip = regs->eip;
 
-    /* Check for forced emulation signature: ud2 ; .ascii "xen". */
-    if ( (rc = copy_from_user(sig, (char *)eip, sizeof(sig))) != 0 )
+    if ( current->domain->domain_id != 0 )
     {
-        propagate_page_fault(eip + sizeof(sig) - rc, 0);
-        return EXCRET_fault_fixed;
+        if ( !cpuid_hypervisor_leaves(a, &a, &b, &c, &d) )
+            domain_cpuid(current->domain, a, b, &a, &b, &c, &d);
+        goto out;
     }
-    if ( memcmp(sig, "\xf\xbxen", sizeof(sig)) )
-        return 0;
-    eip += sizeof(sig);
-
-    /* We only emulate CPUID. */
-    if ( ( rc = copy_from_user(instr, (char *)eip, sizeof(instr))) != 0 )
-    {
-        propagate_page_fault(eip + sizeof(instr) - rc, 0);
-        return EXCRET_fault_fixed;
-    }
-    if ( memcmp(instr, "\xf\xa2", sizeof(instr)) )
-        return 0;
-    eip += sizeof(instr);
 
     asm ( 
         "cpuid"
@@ -694,8 +678,6 @@ static int emulate_forced_invalid_op(struct cpu_user_regs *regs)
         __clear_bit(X86_FEATURE_PGE, &d);
         __clear_bit(X86_FEATURE_MCE, &d);
         __clear_bit(X86_FEATURE_MCA, &d);
-        if ( !IS_PRIV(current->domain) )
-            __clear_bit(X86_FEATURE_MTRR, &d);
         __clear_bit(X86_FEATURE_PSE36, &d);
     }
     switch ( (uint32_t)regs->eax )
@@ -717,8 +699,6 @@ static int emulate_forced_invalid_op(struct cpu_user_regs *regs)
         __clear_bit(X86_FEATURE_DSCPL % 32, &c);
         __clear_bit(X86_FEATURE_VMXE % 32, &c);
         __clear_bit(X86_FEATURE_SMXE % 32, &c);
-        if ( !IS_PRIV(current->domain) )
-            __clear_bit(X86_FEATURE_EST % 32, &c);
         __clear_bit(X86_FEATURE_TM2 % 32, &c);
         if ( is_pv_32bit_vcpu(current) )
             __clear_bit(X86_FEATURE_CX16 % 32, &c);
@@ -758,10 +738,41 @@ static int emulate_forced_invalid_op(struct cpu_user_regs *regs)
         break;
     }
 
+ out:
     regs->eax = a;
     regs->ebx = b;
     regs->ecx = c;
     regs->edx = d;
+}
+
+static int emulate_forced_invalid_op(struct cpu_user_regs *regs)
+{
+    char sig[5], instr[2];
+    unsigned long eip, rc;
+
+    eip = regs->eip;
+
+    /* Check for forced emulation signature: ud2 ; .ascii "xen". */
+    if ( (rc = copy_from_user(sig, (char *)eip, sizeof(sig))) != 0 )
+    {
+        propagate_page_fault(eip + sizeof(sig) - rc, 0);
+        return EXCRET_fault_fixed;
+    }
+    if ( memcmp(sig, "\xf\xbxen", sizeof(sig)) )
+        return 0;
+    eip += sizeof(sig);
+
+    /* We only emulate CPUID. */
+    if ( ( rc = copy_from_user(instr, (char *)eip, sizeof(instr))) != 0 )
+    {
+        propagate_page_fault(eip + sizeof(instr) - rc, 0);
+        return EXCRET_fault_fixed;
+    }
+    if ( memcmp(instr, "\xf\xa2", sizeof(instr)) )
+        return 0;
+    eip += sizeof(instr);
+
+    pv_cpuid(regs);
 
     instruction_done(regs, eip, 0);
 

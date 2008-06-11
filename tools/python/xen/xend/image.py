@@ -103,6 +103,12 @@ class ImageHandler:
         if rtc_timeoffset is not None:
             xc.domain_set_time_offset(self.vm.getDomid(), int(rtc_timeoffset))
 
+        self.cpuid = None
+        self.cpuid_check = None
+        if 'cpuid' in vmConfig:
+            self.cpuid = vmConfig['cpuid'];
+        if 'cpuid_check' in vmConfig:
+            self.cpuid_check = vmConfig['cpuid_check']
 
     def cleanupBootloading(self):
         if self.bootloader:
@@ -454,6 +460,37 @@ class ImageHandler:
             except:
                 pass
 
+    def setCpuid(self):
+        xc.domain_set_policy_cpuid(self.vm.getDomid())
+
+        if self.cpuid is not None:
+            cpuid = self.cpuid
+            transformed = {}
+            for sinput, regs in cpuid.iteritems():
+                inputs = sinput.split(',')
+                input = long(inputs[0])
+                sub_input = None
+                if len(inputs) == 2:
+                    sub_input = long(inputs[1])
+                t = xc.domain_set_cpuid(self.vm.getDomid(),
+                                        input, sub_input, regs)
+                transformed[sinput] = t
+            self.cpuid = transformed
+
+        if self.cpuid_check is not None:
+            cpuid_check = self.cpuid_check
+            transformed = {}
+            for sinput, regs_check in cpuid_check.iteritems():
+                inputs = sinput.split(',')
+                input = long(inputs[0])
+                sub_input = None
+                if len(inputs) == 2:
+                    sub_input = long(inputs[1])
+                t = xc.domain_check_cpuid(input, sub_input, regs_check)
+                transformed[sinput] = t
+            self.cpuid_check = transformed
+
+
 
 class LinuxImageHandler(ImageHandler):
 
@@ -536,38 +573,7 @@ class HVMImageHandler(ImageHandler):
         self.apic = int(vmConfig['platform'].get('apic', 0))
         self.acpi = int(vmConfig['platform'].get('acpi', 0))
         self.guest_os_type = vmConfig['platform'].get('guest_os_type')
-
-        self.vmConfig = vmConfig
            
-    def setCpuid(self):
-        xc.domain_set_policy_cpuid(self.vm.getDomid())
-
-        if 'cpuid' in self.vmConfig:
-            cpuid = self.vmConfig['cpuid']
-            transformed = {}
-            for sinput, regs in cpuid.iteritems():
-                inputs = sinput.split(',')
-                input = long(inputs[0])
-                sub_input = None
-                if len(inputs) == 2:
-                    sub_input = long(inputs[1])
-                t = xc.domain_set_cpuid(self.vm.getDomid(),
-                                        input, sub_input, regs)
-                transformed[sinput] = t
-            self.vmConfig['cpuid'] = transformed
-
-        if 'cpuid_check' in self.vmConfig:
-            cpuid_check = self.vmConfig['cpuid_check']
-            transformed = {}
-            for sinput, regs_check in cpuid_check.iteritems():
-                inputs = sinput.split(',')
-                input = long(inputs[0])
-                sub_input = None
-                if len(inputs) == 2:
-                    sub_input = long(inputs[1])
-                t = xc.domain_check_cpuid(input, sub_input, regs_check)
-                transformed[sinput] = t
-            self.vmConfig['cpuid_check'] = transformed
 
     # Return a list of cmd line args to the device models based on the
     # xm config file
@@ -730,6 +736,9 @@ class IA64_Linux_ImageHandler(LinuxImageHandler):
         LinuxImageHandler.configure(self, vmConfig)
         self.vhpt = int(vmConfig['platform'].get('vhpt',  0))
 
+    def setCpuid(self):
+        # Guest CPUID configuration is not implemented yet.
+        return
 
 class X86_HVM_ImageHandler(HVMImageHandler):
 
@@ -739,8 +748,9 @@ class X86_HVM_ImageHandler(HVMImageHandler):
 
     def buildDomain(self):
         xc.hvm_set_param(self.vm.getDomid(), HVM_PARAM_PAE_ENABLED, self.pae)
+        rc = HVMImageHandler.buildDomain(self)
         self.setCpuid()
-        return HVMImageHandler.buildDomain(self)
+        return rc
 
     def getRequiredAvailableMemory(self, mem_kb):
         # Add 8 MiB overhead for QEMU's video RAM.
@@ -769,7 +779,9 @@ class X86_Linux_ImageHandler(LinuxImageHandler):
         # add an 8MB slack to balance backend allocations.
         mem_kb = self.getRequiredMaximumReservation() + (8 * 1024)
         xc.domain_set_memmap_limit(self.vm.getDomid(), mem_kb)
-        return LinuxImageHandler.buildDomain(self)
+        rc = LinuxImageHandler.buildDomain(self)
+        self.setCpuid()
+        return rc
 
 _handlers = {
     "ia64": {
