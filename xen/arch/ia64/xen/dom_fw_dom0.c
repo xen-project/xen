@@ -212,33 +212,33 @@ void __init efi_systable_init_dom0(struct fw_tables *tables)
 
 	/* Write messages to the console.  */
 	printk("Domain0 EFI passthrough:");
-	if (efi.mps) {
+	if (efi.mps != EFI_INVALID_TABLE_ADDR) {
 		tables->efi_tables[i].guid = MPS_TABLE_GUID;
-		tables->efi_tables[i].table = __pa(efi.mps);
+		tables->efi_tables[i].table = efi.mps;
 		printk(" MPS=0x%lx", tables->efi_tables[i].table);
 		i++;
 	}
-	if (efi.acpi20) {
+	if (efi.acpi20 != EFI_INVALID_TABLE_ADDR) {
 		tables->efi_tables[i].guid = ACPI_20_TABLE_GUID;
-		tables->efi_tables[i].table = __pa(efi.acpi20);
+		tables->efi_tables[i].table = efi.acpi20;
 		printk(" ACPI 2.0=0x%lx", tables->efi_tables[i].table);
 		i++;
 	}
-	if (efi.acpi) {
+	if (efi.acpi != EFI_INVALID_TABLE_ADDR) {
 		tables->efi_tables[i].guid = ACPI_TABLE_GUID;
-		tables->efi_tables[i].table = __pa(efi.acpi);
+		tables->efi_tables[i].table = efi.acpi;
 		printk(" ACPI=0x%lx", tables->efi_tables[i].table);
 		i++;
 	}
-	if (efi.smbios) {
+	if (efi.smbios != EFI_INVALID_TABLE_ADDR) {
 		tables->efi_tables[i].guid = SMBIOS_TABLE_GUID;
-		tables->efi_tables[i].table = __pa(efi.smbios);
+		tables->efi_tables[i].table = efi.smbios;
 		printk(" SMBIOS=0x%lx", tables->efi_tables[i].table);
 		i++;
 	}
-	if (efi.hcdp) {
+	if (efi.hcdp != EFI_INVALID_TABLE_ADDR) {
 		tables->efi_tables[i].guid = HCDP_TABLE_GUID;
-		tables->efi_tables[i].table = __pa(efi.hcdp);
+		tables->efi_tables[i].table = efi.hcdp;
 		printk(" HCDP=0x%lx", tables->efi_tables[i].table);
 		i++;
 	}

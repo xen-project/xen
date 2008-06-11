@@ -256,7 +256,6 @@ struct efi_memory_map {
  */
 extern struct efi {
 	efi_system_table_t *systab;	/* EFI system table */
-#ifndef XEN
 	unsigned long mps;		/* MPS table */
 	unsigned long acpi;		/* ACPI table  (IA64 ext 0.71) */
 	unsigned long acpi20;		/* ACPI table  (ACPI 2.0) */
@@ -265,16 +264,6 @@ extern struct efi {
 	unsigned long boot_info;	/* boot info table */
 	unsigned long hcdp;		/* HCDP table */
 	unsigned long uga;		/* UGA table */
-#else
-	void *mps;			/* MPS table */
-	void *acpi;			/* ACPI table  (IA64 ext 0.71) */
-	void *acpi20;			/* ACPI table  (ACPI 2.0) */
-	void *smbios;			/* SM BIOS table */
-	void *sal_systab;		/* SAL system table */
-	void *boot_info;		/* boot info table */
-	void *hcdp;			/* HCDP table */
-	void *uga;			/* UGA table */
-#endif
 	efi_get_time_t *get_time;
 	efi_set_time_t *set_time;
 	efi_get_wakeup_time_t *get_wakeup_time;

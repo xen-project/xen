@@ -557,7 +557,8 @@ skip_move:
 
     /* process SAL system table */
     /* must be before any pal/sal call */
-    ia64_sal_init(efi.sal_systab);
+    BUG_ON(efi.sal_systab == EFI_INVALID_TABLE_ADDR);
+    ia64_sal_init(__va(efi.sal_systab));
 
     /* early_setup_arch() maps PAL code. */
     identify_vmx_feature();

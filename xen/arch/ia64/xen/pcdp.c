@@ -146,10 +146,17 @@ setup_serial_console(struct pcdp_uart *uart)
 	if (uart->bits)
 		ns16550_com1.data_bits = uart->bits;
 
+#ifndef XEN
 	setup_pcdp_irq(efi.hcdp, uart);
 
 	/* Hide the HCDP table from dom0, xencons will be the console */
 	efi.hcdp = NULL;
+#else
+	setup_pcdp_irq(__va(efi.hcdp), uart);
+
+	/* Hide the HCDP table from dom0, xencons will be the console */
+	efi.hcdp = EFI_INVALID_TABLE_ADDR;
+#endif
 
 	return 0;
 }
@@ -227,9 +234,15 @@ efi_setup_pcdp_console(char *cmdline)
 	struct pcdp_device *dev, *end;
 	int i, serial = 0;
 
+#ifndef XEN
 	pcdp = efi.hcdp;
 	if (!pcdp)
 		return -ENODEV;
+#else
+	if (efi.hcdp == EFI_INVALID_TABLE_ADDR)
+		return -ENODEV;
+	pcdp = __va(efi.hcdp);
+#endif
 
 	printk(KERN_INFO "PCDP: v%d at 0x%lx\n", pcdp->rev, __pa(pcdp));
 
