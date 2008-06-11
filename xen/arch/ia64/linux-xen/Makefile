@@ -23,3 +23,5 @@ obj-y += numa.o
 obj-y += mm_numa.o
 obj-y += perfmon.o
 obj-y += perfmon_default_smpl.o
+obj-y += acpi.o
+obj-y += acpi_numa.o

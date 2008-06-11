@@ -31,11 +31,23 @@
 #include <acpi/acpi_bus.h>
 #include <acpi/acmacros.h>
 
+#ifndef XEN
 #define ACPI_NUMA	0x80000000
 #define _COMPONENT	ACPI_NUMA
 ACPI_MODULE_NAME("numa");
+#else
+#define NID_INVAL	-1
+#define PXM_INVAL	-1
+#endif
 
+#ifndef XEN
 static nodemask_t nodes_found_map = NODE_MASK_NONE;
+#else
+/* the above causes error: initializer element is not constant
+ * anyway NODE_MASK_NONE is 0 filled array.
+ */
+static nodemask_t nodes_found_map;
+#endif
 
 /* maps to convert between proximity domain and logical node ID */
 static int pxm_to_node_map[MAX_PXM_DOMAINS]
@@ -78,6 +90,7 @@ int acpi_map_pxm_to_node(int pxm)
 	return node;
 }
 
+#ifndef XEN
 #if 0
 void __cpuinit acpi_unmap_pxm_to_node(int node)
 {
@@ -261,3 +274,4 @@ int acpi_get_node(acpi_handle *handle)
 	return node;
 }
 EXPORT_SYMBOL(acpi_get_node);
+#endif /* XEN */

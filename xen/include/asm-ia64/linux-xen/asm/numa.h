@@ -89,6 +89,8 @@ extern int paddr_to_nid(unsigned long paddr);
 #define phys_to_nid(paddr) paddr_to_nid(paddr)
 extern int pxm_to_node(int pxm);
 extern int node_to_pxm(int node);
+extern void __acpi_map_pxm_to_node(int, int);
+extern int acpi_map_pxm_to_node(int);
 #endif
 
 #endif /* _ASM_IA64_NUMA_H */

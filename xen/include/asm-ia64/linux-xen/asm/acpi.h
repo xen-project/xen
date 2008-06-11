@@ -36,6 +36,9 @@
 #include <linux/numa.h>
 #include <asm/system.h>
 #include <asm/numa.h>
+#ifdef XEN
+#include <xen/nodemask.h>
+#endif
 
 #define COMPILER_DEPENDENT_INT64	long
 #define COMPILER_DEPENDENT_UINT64	unsigned long

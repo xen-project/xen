@@ -51,8 +51,14 @@
 #include <asm/system.h>
 #include <asm/numa.h>
 #include <asm/sal.h>
+#ifndef XEN
 #include <asm/cyclone.h>
 #include <asm/xen/hypervisor.h>
+#else
+#include <asm/hw_irq.h>
+extern u8 numa_slit[MAX_NUMNODES * MAX_NUMNODES];
+#endif
+
 
 #define BAD_MADT_ENTRY(entry, end) (                                        \
 		(!entry) || (unsigned long)entry + sizeof(*entry) > end ||  \
@@ -71,7 +77,11 @@ unsigned int acpi_cpei_phys_cpuid;
 unsigned long acpi_wakeup_address = 0;
 
 #ifdef CONFIG_IA64_GENERIC
+#ifndef XEN
 static unsigned long __init acpi_find_rsdp(void)
+#else
+unsigned long __init acpi_find_rsdp(void)
+#endif
 {
 	unsigned long rsdp_phys = 0;
 
@@ -122,8 +132,10 @@ acpi_get_sysname(void)
 			return "uv";
 		else
 			return "sn2";
+#ifndef XEN
 	} else if (is_running_on_xen() && !strcmp(hdr->oem_id, "XEN")) {
 		return "xen";
+#endif
 	}
 
 	return "dig";
@@ -300,6 +312,11 @@ acpi_parse_plat_int_src(struct acpi_subtable_header * header,
 }
 
 #ifdef CONFIG_HOTPLUG_CPU
+
+#ifdef XEN
+unsigned int force_cpei_retarget = 0;
+#endif
+
 unsigned int can_cpei_retarget(void)
 {
 	extern int cpe_vector;
@@ -388,7 +405,9 @@ static void __init acpi_madt_oem_check(char *oem_id, char *oem_table_id)
 		 */
 		sal_platform_features |= IA64_SAL_PLATFORM_FEATURE_ITC_DRIFT;
 
+#ifndef XEN
 		cyclone_setup();
+#endif
 	}
 }
 
@@ -476,9 +495,17 @@ void __init acpi_numa_slit_init(struct acpi_table_slit *slit)
 	slit_table = slit;
 }
 
+#ifndef XEN
 void __init
 acpi_numa_processor_affinity_init(struct acpi_srat_cpu_affinity *pa)
+#else
+void __init
+acpi_numa_processor_affinity_init (struct acpi_table_processor_affinity *pa__)
+#endif
 {
+#ifdef XEN
+	struct acpi_srat_cpu_affinity *pa = (struct acpi_srat_cpu_affinity *)pa__;
+#endif
 	int pxm;
 
 	if (!(pa->flags & ACPI_SRAT_CPU_ENABLED))
@@ -497,9 +524,18 @@ acpi_numa_processor_affinity_init(struct acpi_srat_cpu_affinity *pa)
 	srat_num_cpus++;
 }
 
+#ifndef XEN
 void __init
 acpi_numa_memory_affinity_init(struct acpi_srat_mem_affinity *ma)
+#else
+void __init
+acpi_numa_memory_affinity_init (struct acpi_table_memory_affinity *ma__)
+#endif
 {
+#ifdef XEN
+	struct acpi_srat_mem_affinity *ma =
+		(struct acpi_srat_mem_affinity *)ma__;
+#endif
 	unsigned long paddr, size;
 	int pxm;
 	struct node_memblk_s *p, *q, *pend;
@@ -606,6 +642,7 @@ void __init acpi_numa_arch_fixup(void)
 }
 #endif				/* CONFIG_ACPI_NUMA */
 
+#ifndef XEN
 /*
  * success: return IRQ number (>=0)
  * failure: return < 0
@@ -637,6 +674,7 @@ void acpi_unregister_gsi(u32 gsi)
 
 	iosapic_unregister_intr(gsi);
 }
+#endif
 
 static int __init acpi_parse_fadt(struct acpi_table_header *table)
 {
@@ -652,7 +690,9 @@ static int __init acpi_parse_fadt(struct acpi_table_header *table)
 
 	fadt = (struct acpi_table_fadt *)fadt_header;
 
+#ifndef XEN
 	acpi_register_gsi(fadt->sci_interrupt, ACPI_LEVEL_SENSITIVE, ACPI_ACTIVE_LOW);
+#endif
 	return 0;
 }
 
@@ -848,6 +888,7 @@ __init void prefill_possible_map(void)
 		cpu_set(i, cpu_possible_map);
 }
 
+#ifndef XEN
 int acpi_map_lsapic(acpi_handle handle, int *pcpu)
 {
 	struct acpi_buffer buffer = { ACPI_ALLOCATE_BUFFER, NULL };
@@ -913,8 +954,10 @@ int acpi_unmap_lsapic(int cpu)
 }
 
 EXPORT_SYMBOL(acpi_unmap_lsapic);
+#endif /* XEN */
 #endif				/* CONFIG_ACPI_HOTPLUG_CPU */
 
+#ifndef XEN
 #ifdef CONFIG_ACPI_NUMA
 static acpi_status __devinit
 acpi_map_iosapic(acpi_handle handle, u32 depth, void *context, void **ret)
@@ -1001,6 +1044,7 @@ int acpi_unregister_ioapic(acpi_handle handle, u32 gsi_base)
 }
 
 EXPORT_SYMBOL(acpi_unregister_ioapic);
+#endif /* XEN */
 
 /*
  * acpi_save_state_mem() - save kernel state
