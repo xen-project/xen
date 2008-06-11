@@ -100,6 +100,12 @@ static void enable_intr_window(struct vcpu *v, struct hvm_intack intack)
     vmcb->general1_intercepts |= GENERAL1_INTERCEPT_VINTR;
 }
 
+extern int vmsi_deliver(struct domain *d, int pirq);
+static int hvm_pci_msi_assert(struct domain *d, int pirq)
+{
+    return vmsi_deliver(d, pirq);
+}
+
 static void svm_dirq_assist(struct vcpu *v)
 {
     unsigned int irq;
@@ -118,7 +124,13 @@ static void svm_dirq_assist(struct vcpu *v)
         if ( !test_and_clear_bit(irq, &hvm_irq_dpci->dirq_mask) )
             continue;
 
-        stop_timer(&hvm_irq_dpci->hvm_timer[irq_to_vector(irq)]);
+        if ( test_bit(_HVM_IRQ_DPCI_MSI, &hvm_irq_dpci->mirq[irq].flags) )
+        {
+            hvm_pci_msi_assert(d, irq);
+            continue;
+        }
+
+        stop_timer(&hvm_irq_dpci->hvm_timer[domain_irq_to_vector(d, irq)]);
 
         list_for_each_entry ( digl, &hvm_irq_dpci->mirq[irq].digl_list, list )
         {
@@ -137,7 +149,7 @@ static void svm_dirq_assist(struct vcpu *v)
          * guest will never deal with the irq, then the physical interrupt line
          * will never be deasserted.
          */
-        set_timer(&hvm_irq_dpci->hvm_timer[irq_to_vector(irq)],
+        set_timer(&hvm_irq_dpci->hvm_timer[domain_irq_to_vector(d, irq)],
                   NOW() + PT_IRQ_TIME_OUT);
     }
 }
