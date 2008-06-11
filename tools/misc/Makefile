@@ -21,6 +21,11 @@ SUBDIRS := $(SUBDIRS-y)
 INSTALL_BIN  = $(TARGETS) xencons
 INSTALL_SBIN = netfix xm xen-bugtool xen-python-path xend xenperf xsview
 
+DEFAULT_PYTHON_PATH := $(shell $(XEN_ROOT)/tools/python/get-path)
+PYTHON_PATH ?= $(DEFAULT_PYTHON_PATH)
+INSTALL_PYTHON_PROG = $(XEN_ROOT)/tools/python/install-wrap \
+"$(PYTHON_PATH)" $(INSTALL_PROG)
+
 .PHONY: all
 all: build
 
