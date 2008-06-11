@@ -26,7 +26,11 @@
 #include <asm/mmzone.h>
 
 extern u8 cpu_to_node_map[NR_CPUS] __cacheline_aligned;
+#ifndef XEN
 extern cpumask_t node_to_cpu_mask[MAX_NUMNODES] __cacheline_aligned;
+#else
+extern cpumask_t node_to_cpu_mask[] __cacheline_aligned;
+#endif
 
 /* Stuff below this line could be architecture independent */
 
@@ -49,7 +53,11 @@ struct node_cpuid_s {
 	int	nid;		/* logical node containing this CPU */
 };
 
+#ifndef XEN
 extern struct node_memblk_s node_memblk[NR_NODE_MEMBLKS];
+#else
+extern struct node_memblk_s node_memblk[];
+#endif
 extern struct node_cpuid_s node_cpuid[NR_CPUS];
 
 /*
@@ -60,7 +68,11 @@ extern struct node_cpuid_s node_cpuid[NR_CPUS];
  * proportional to the memory access latency ratios.
  */
 
+#ifndef XEN
 extern u8 numa_slit[MAX_NUMNODES * MAX_NUMNODES];
+#else
+extern u8 numa_slit[];
+#endif
 #define node_distance(from,to) (numa_slit[(from) * num_online_nodes() + (to)])
 
 extern int paddr_to_nid(unsigned long paddr);

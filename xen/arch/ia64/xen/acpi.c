@@ -54,6 +54,7 @@
 #ifdef XEN
 #include <xen/errno.h>
 #include <xen/nodemask.h>
+extern u8 numa_slit[MAX_NUMNODES * MAX_NUMNODES];
 #endif
 
 #define BAD_MADT_ENTRY(entry, end) (                                        \

@@ -13,7 +13,6 @@ jiffies.h		-> linux/include/linux/jiffies.h
 kmalloc_sizes.h		-> linux/include/linux/kmalloc_sizes.h
 linkage.h		-> linux/include/linux/linkage.h
 notifier.h		-> linux/include/linux/notifier.h
-numa.h			-> linux/include/linux/numa.h
 percpu.h		-> linux/include/linux/percpu.h
 preempt.h		-> linux/include/linux/preempt.h
 seqlock.h		-> linux/include/linux/seqlock.h

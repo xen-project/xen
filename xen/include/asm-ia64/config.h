@@ -33,10 +33,8 @@
 #endif
 #define CONFIG_NUMA
 #define CONFIG_ACPI_NUMA
-#define NODES_SHIFT 8
-#define MAX_NUMNODES (1 << NODES_SHIFT)
-#define NR_NODE_MEMBLKS (MAX_NUMNODES*2)
-#define MAX_PXM_DOMAINS 256
+#define NODES_SHIFT 8				/* linux/asm/numnodes.h */
+#define NR_NODE_MEMBLKS (MAX_NUMNODES*2)	/* linux-xen/asm/acpi.h */
 #else
 #undef CONFIG_SMP
 #define NR_CPUS 1
