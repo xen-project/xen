@@ -105,6 +105,9 @@ static void dump_registers(unsigned char key, struct cpu_user_regs *regs)
 {
     unsigned int cpu;
 
+    /* We want to get everything out that we possibly can. */
+    console_start_sync();
+
     printk("'%c' pressed -> dumping registers\n", key);
 
     /* Get local execution state out immediately, in case we get stuck. */
@@ -120,6 +123,8 @@ static void dump_registers(unsigned char key, struct cpu_user_regs *regs)
     }
 
     printk("\n");
+
+    console_end_sync();
 }
 
 static void halt_machine(unsigned char key, struct cpu_user_regs *regs)
