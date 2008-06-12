@@ -463,11 +463,7 @@ void shadow_demote(struct vcpu *v, mfn_t gmfn, u32 type)
     clear_bit(type, &page->shadow_flags);
 
     if ( (page->shadow_flags & SHF_page_type_mask) == 0 )
-    {
-        /* tlbflush timestamp field is valid again */
-        page->tlbflush_timestamp = tlbflush_current_time();
         clear_bit(_PGC_page_table, &page->count_info);
-    }
 }
 
 /**************************************************************************/
@@ -2076,7 +2072,7 @@ void sh_remove_shadows(struct vcpu *v, mfn_t gmfn, int fast, int all)
     if ( !fast && all && (pg->count_info & PGC_page_table) )
     {
         SHADOW_ERROR("can't find all shadows of mfn %05lx "
-                     "(shadow_flags=%08lx)\n",
+                     "(shadow_flags=%08x)\n",
                       mfn_x(gmfn), pg->shadow_flags);
         domain_crash(v->domain);
     }

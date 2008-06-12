@@ -59,8 +59,12 @@ struct page_info
          * tlbflush_timestamp since page table pages are explicitly not
          * tracked for TLB-flush avoidance when a guest runs in shadow mode.
          */
-        unsigned long shadow_flags;
+        u32 shadow_flags;
     };
+
+#if defined(__x86_64__)
+    spinlock_t lock;
+#endif
 };
 
  /* The following page types are MUTUALLY EXCLUSIVE. */
@@ -89,9 +93,11 @@ struct page_info
  /* Cleared when the owning guest 'frees' this page. */
 #define _PGC_allocated      31
 #define PGC_allocated       (1U<<_PGC_allocated)
- /* Set on a *guest* page to mark it out-of-sync with its shadow */
-#define _PGC_out_of_sync    30
-#define PGC_out_of_sync     (1U<<_PGC_out_of_sync)
+#if defined(__i386__)
+ /* Page is locked? */
+# define _PGC_locked        30
+# define PGC_locked         (1U<<_PGC_out_of_sync)
+#endif
  /* Set when is using a page as a page table */
 #define _PGC_page_table     29
 #define PGC_page_table      (1U<<_PGC_page_table)
