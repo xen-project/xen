@@ -27,7 +27,7 @@ int compat_memory_op(unsigned int cmd, XEN_GUEST_HANDLE(void) compat)
             struct compat_translate_gpfn_list xlat;
         } cmp;
 
-        set_xen_guest_handle(nat.hnd, (void *)COMPAT_ARG_XLAT_VIRT_START(current->vcpu_id));
+        set_xen_guest_handle(nat.hnd, (void *)COMPAT_ARG_XLAT_VIRT_BASE);
         split = 0;
         switch ( op )
         {

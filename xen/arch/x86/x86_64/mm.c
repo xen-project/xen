@@ -36,6 +36,8 @@
 unsigned int m2p_compat_vstart = __HYPERVISOR_COMPAT_VIRT_START;
 #endif
 
+DEFINE_PER_CPU(char, compat_arg_xlat[COMPAT_ARG_XLAT_SIZE]);
+
 /* Top-level master (and idle-domain) page directory. */
 l4_pgentry_t __attribute__ ((__section__ (".bss.page_aligned")))
     idle_pg_table[L4_PAGETABLE_ENTRIES];

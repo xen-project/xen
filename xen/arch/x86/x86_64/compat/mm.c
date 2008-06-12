@@ -58,7 +58,7 @@ int compat_arch_memory_op(int op, XEN_GUEST_HANDLE(void) arg)
     case XENMEM_add_to_physmap:
     {
         struct compat_add_to_physmap cmp;
-        struct xen_add_to_physmap *nat = (void *)COMPAT_ARG_XLAT_VIRT_START(current->vcpu_id);
+        struct xen_add_to_physmap *nat = (void *)COMPAT_ARG_XLAT_VIRT_BASE;
 
         if ( copy_from_guest(&cmp, arg, 1) )
             return -EFAULT;
@@ -72,7 +72,7 @@ int compat_arch_memory_op(int op, XEN_GUEST_HANDLE(void) arg)
     case XENMEM_set_memory_map:
     {
         struct compat_foreign_memory_map cmp;
-        struct xen_foreign_memory_map *nat = (void *)COMPAT_ARG_XLAT_VIRT_START(current->vcpu_id);
+        struct xen_foreign_memory_map *nat = (void *)COMPAT_ARG_XLAT_VIRT_BASE;
 
         if ( copy_from_guest(&cmp, arg, 1) )
             return -EFAULT;
@@ -91,7 +91,7 @@ int compat_arch_memory_op(int op, XEN_GUEST_HANDLE(void) arg)
     case XENMEM_machine_memory_map:
     {
         struct compat_memory_map cmp;
-        struct xen_memory_map *nat = (void *)COMPAT_ARG_XLAT_VIRT_START(current->vcpu_id);
+        struct xen_memory_map *nat = (void *)COMPAT_ARG_XLAT_VIRT_BASE;
 
         if ( copy_from_guest(&cmp, arg, 1) )
             return -EFAULT;
@@ -189,7 +189,7 @@ int compat_mmuext_op(XEN_GUEST_HANDLE(mmuext_op_compat_t) cmp_uops,
     if ( unlikely(!guest_handle_okay(cmp_uops, count)) )
         return -EFAULT;
 
-    set_xen_guest_handle(nat_ops, (void *)COMPAT_ARG_XLAT_VIRT_START(current->vcpu_id));
+    set_xen_guest_handle(nat_ops, (void *)COMPAT_ARG_XLAT_VIRT_BASE);
 
     for ( ; count; count -= i )
     {

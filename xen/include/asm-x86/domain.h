@@ -208,7 +208,6 @@ struct arch_domain
 
 #ifdef CONFIG_COMPAT
     unsigned int hv_compat_vstart;
-    l3_pgentry_t *mm_arg_xlat_l3;
 #endif
 
     /* I/O-port admin-specified access capabilities. */

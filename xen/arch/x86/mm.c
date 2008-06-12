@@ -1253,10 +1253,6 @@ static int alloc_l4_table(struct page_info *page)
     pl4e[l4_table_offset(PERDOMAIN_VIRT_START)] =
         l4e_from_page(virt_to_page(d->arch.mm_perdomain_l3),
                       __PAGE_HYPERVISOR);
-    if ( is_pv_32on64_domain(d) )
-        pl4e[l4_table_offset(COMPAT_ARG_XLAT_VIRT_BASE)] =
-            l4e_from_page(virt_to_page(d->arch.mm_arg_xlat_l3),
-                          __PAGE_HYPERVISOR);
 
     return 1;
 
@@ -3008,7 +3004,7 @@ int do_update_va_mapping(unsigned long va, u64 val64,
 
     perfc_incr(calls_to_update_va);
 
-    if ( unlikely(!__addr_ok(va) && !paging_mode_external(d)) )
+    if ( unlikely(!access_ok(va, 1) && !paging_mode_external(d)) )
         return -EINVAL;
 
     rc = xsm_update_va_mapping(current->domain, val);

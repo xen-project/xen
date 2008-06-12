@@ -1571,17 +1571,21 @@ enum hvm_copy_result hvm_fetch_from_guest_virt_nofault(
                       PFEC_page_present | pfec);
 }
 
-DEFINE_PER_CPU(int, guest_handles_in_xen_space);
+#ifdef __x86_64__
+DEFINE_PER_CPU(bool_t, hvm_64bit_hcall);
+#endif
 
-unsigned long copy_to_user_hvm(void *to, const void *from, unsigned len)
+unsigned long copy_to_user_hvm(void *to, const void *from, unsigned int len)
 {
     int rc;
 
-    if ( this_cpu(guest_handles_in_xen_space) )
+#ifdef __x86_64__
+    if ( !this_cpu(hvm_64bit_hcall) && is_compat_arg_xlat_range(to, len) )
     {
         memcpy(to, from, len);
         return 0;
     }
+#endif
 
     rc = hvm_copy_to_guest_virt_nofault((unsigned long)to, (void *)from,
                                         len, 0);
@@ -1592,11 +1596,13 @@ unsigned long copy_from_user_hvm(void *to, const void *from, unsigned len)
 {
     int rc;
 
-    if ( this_cpu(guest_handles_in_xen_space) )
+#ifdef __x86_64__
+    if ( !this_cpu(hvm_64bit_hcall) && is_compat_arg_xlat_range(from, len) )
     {
         memcpy(to, from, len);
         return 0;
     }
+#endif
 
     rc = hvm_copy_from_guest_virt_nofault(to, (unsigned long)from, len, 0);
     return rc ? len : 0; /* fake a copy_from_user() return code */
@@ -1878,20 +1884,17 @@ static long hvm_memory_op_compat32(int cmd, XEN_GUEST_HANDLE(void) arg)
             uint32_t idx;
             uint32_t gpfn;
         } u;
-        struct xen_add_to_physmap h;
+        struct xen_add_to_physmap *h = (void *)COMPAT_ARG_XLAT_VIRT_BASE;
 
         if ( copy_from_guest(&u, arg, 1) )
             return -EFAULT;
 
-        h.domid = u.domid;
-        h.space = u.space;
-        h.idx = u.idx;
-        h.gpfn = u.gpfn;
+        h->domid = u.domid;
+        h->space = u.space;
+        h->idx = u.idx;
+        h->gpfn = u.gpfn;
 
-        this_cpu(guest_handles_in_xen_space) = 1;
-        rc = hvm_memory_op(cmd, guest_handle_from_ptr(&h, void));
-        this_cpu(guest_handles_in_xen_space) = 0;
-
+        rc = hvm_memory_op(cmd, guest_handle_from_ptr(h, void));
         break;
     }
 
@@ -1934,7 +1937,7 @@ int hvm_do_hypercall(struct cpu_user_regs *regs)
     switch ( mode )
     {
 #ifdef __x86_64__
-    case 8:
+    case 8:        
 #endif
     case 4:
     case 2:
@@ -1963,11 +1966,13 @@ int hvm_do_hypercall(struct cpu_user_regs *regs)
         HVM_DBG_LOG(DBG_LEVEL_HCALL, "hcall%u(%lx, %lx, %lx, %lx, %lx)", eax,
                     regs->rdi, regs->rsi, regs->rdx, regs->r10, regs->r8);
 
+        this_cpu(hvm_64bit_hcall) = 1;
         regs->rax = hvm_hypercall64_table[eax](regs->rdi,
                                                regs->rsi,
                                                regs->rdx,
                                                regs->r10,
-                                               regs->r8);
+                                               regs->r8); 
+        this_cpu(hvm_64bit_hcall) = 0;
     }
     else
 #endif

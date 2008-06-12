@@ -2,7 +2,7 @@
 #define __ASM_X86_HVM_GUEST_ACCESS_H__
 
 #include <xen/percpu.h>
-DECLARE_PER_CPU(int, guest_handles_in_xen_space);
+DECLARE_PER_CPU(bool_t, hvm_64bit_hcall);
 
 unsigned long copy_to_user_hvm(void *to, const void *from, unsigned len);
 unsigned long copy_from_user_hvm(void *to, const void *from, unsigned len);

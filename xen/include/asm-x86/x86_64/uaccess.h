@@ -1,6 +1,15 @@
 #ifndef __X86_64_UACCESS_H
 #define __X86_64_UACCESS_H
 
+#define COMPAT_ARG_XLAT_VIRT_BASE this_cpu(compat_arg_xlat)
+#define COMPAT_ARG_XLAT_SIZE      PAGE_SIZE
+DECLARE_PER_CPU(char, compat_arg_xlat[COMPAT_ARG_XLAT_SIZE]);
+#define is_compat_arg_xlat_range(addr, size) ({                               \
+    unsigned long __off;                                                      \
+    __off = (unsigned long)(addr) - (unsigned long)COMPAT_ARG_XLAT_VIRT_BASE; \
+    (__off | (__off + (unsigned long)(size))) <= PAGE_SIZE;                   \
+})
+
 /*
  * Valid if in +ve half of 48-bit address space, or above Xen-reserved area.
  * This is also valid for range checks (addr, addr+size). As long as the
@@ -11,11 +20,11 @@
     (((unsigned long)(addr) < (1UL<<48)) || \
      ((unsigned long)(addr) >= HYPERVISOR_VIRT_END))
 
-#define access_ok(addr, size) (__addr_ok(addr))
+#define access_ok(addr, size) \
+    (__addr_ok(addr) || is_compat_arg_xlat_range(addr, size))
 
-#define array_access_ok(addr, count, size) (__addr_ok(addr))
-
-#ifdef CONFIG_COMPAT
+#define array_access_ok(addr, count, size) \
+    (access_ok(addr, (count)*(size)))
 
 #define __compat_addr_ok(addr) \
     ((unsigned long)(addr) < HYPERVISOR_COMPAT_VIRT_START(current->domain))
@@ -26,8 +35,6 @@
 #define compat_array_access_ok(addr,count,size) \
     (likely((count) < (~0U / (size))) && \
      compat_access_ok(addr, (count) * (size)))
-
-#endif
 
 #define __put_user_size(x,ptr,size,retval,errret)			\
 do {									\

@@ -1631,15 +1631,6 @@ void sh_install_xen_entries_in_l4(struct vcpu *v, mfn_t gl4mfn, mfn_t sl4mfn)
                                 __PAGE_HYPERVISOR);
     }
 
-    if ( is_pv_32on64_domain(v->domain) )
-    {
-        /* install compat arg xlat entry */
-        sl4e[shadow_l4_table_offset(COMPAT_ARG_XLAT_VIRT_BASE)] =
-            shadow_l4e_from_mfn(
-                    page_to_mfn(virt_to_page(d->arch.mm_arg_xlat_l3)),
-                    __PAGE_HYPERVISOR);
-    }
-
     sh_unmap_domain_page(sl4e);    
 }
 #endif
