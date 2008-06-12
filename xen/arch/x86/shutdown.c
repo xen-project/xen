@@ -90,6 +90,7 @@ void machine_halt(void)
 {
     watchdog_disable();
     console_start_sync();
+    local_irq_enable();
     smp_call_function(__machine_halt, NULL, 1, 0);
     __machine_halt(NULL);
 }
