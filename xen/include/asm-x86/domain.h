@@ -241,12 +241,10 @@ struct arch_domain
     /* Continuable domain_relinquish_resources(). */
     enum {
         RELMEM_not_started,
-        RELMEM_xen_l4,
-        RELMEM_dom_l4,
-        RELMEM_xen_l3,
-        RELMEM_dom_l3,
-        RELMEM_xen_l2,
-        RELMEM_dom_l2,
+        RELMEM_xen,
+        RELMEM_l4,
+        RELMEM_l3,
+        RELMEM_l2,
         RELMEM_done,
     } relmem;
     struct list_head relmem_list;

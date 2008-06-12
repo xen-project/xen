@@ -1317,7 +1317,7 @@ static void free_l3_table(struct page_info *page)
     int           i;
 
 #ifdef DOMAIN_DESTRUCT_AVOID_RECURSION
-    if ( d->arch.relmem == RELMEM_dom_l3 )
+    if ( d->arch.relmem == RELMEM_l3 )
         return;
 #endif
 
@@ -1345,7 +1345,7 @@ static void free_l4_table(struct page_info *page)
     int           i;
 
 #ifdef DOMAIN_DESTRUCT_AVOID_RECURSION
-    if ( d->arch.relmem == RELMEM_dom_l4 )
+    if ( d->arch.relmem == RELMEM_l4 )
         return;
 #endif
 

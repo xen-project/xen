@@ -1776,47 +1776,36 @@ int domain_relinquish_resources(struct domain *d)
             unmap_vcpu_info(v);
         }
 
-        d->arch.relmem = RELMEM_xen_l4;
+        d->arch.relmem = RELMEM_xen;
         /* fallthrough */
 
         /* Relinquish every page of memory. */
-    case RELMEM_xen_l4:
-#if CONFIG_PAGING_LEVELS >= 4
-        ret = relinquish_memory(d, &d->xenpage_list, PGT_l4_page_table);
+    case RELMEM_xen:
+        ret = relinquish_memory(d, &d->xenpage_list, ~0UL);
         if ( ret )
             return ret;
-        d->arch.relmem = RELMEM_dom_l4;
+#if CONFIG_PAGING_LEVELS >= 4
+        d->arch.relmem = RELMEM_l4;
         /* fallthrough */
-    case RELMEM_dom_l4:
+
+    case RELMEM_l4:
         ret = relinquish_memory(d, &d->page_list, PGT_l4_page_table);
         if ( ret )
             return ret;
-        d->arch.relmem = RELMEM_xen_l3;
-        /* fallthrough */
 #endif
-
-    case RELMEM_xen_l3:
 #if CONFIG_PAGING_LEVELS >= 3
-        ret = relinquish_memory(d, &d->xenpage_list, PGT_l3_page_table);
-        if ( ret )
-            return ret;
-        d->arch.relmem = RELMEM_dom_l3;
+        d->arch.relmem = RELMEM_l3;
         /* fallthrough */
-    case RELMEM_dom_l3:
+
+    case RELMEM_l3:
         ret = relinquish_memory(d, &d->page_list, PGT_l3_page_table);
         if ( ret )
             return ret;
-        d->arch.relmem = RELMEM_xen_l2;
-        /* fallthrough */
 #endif
-
-    case RELMEM_xen_l2:
-        ret = relinquish_memory(d, &d->xenpage_list, PGT_l2_page_table);
-        if ( ret )
-            return ret;
-        d->arch.relmem = RELMEM_dom_l2;
+        d->arch.relmem = RELMEM_l2;
         /* fallthrough */
-    case RELMEM_dom_l2:
+
+    case RELMEM_l2:
         ret = relinquish_memory(d, &d->page_list, PGT_l2_page_table);
         if ( ret )
             return ret;
@@ -1829,6 +1818,7 @@ int domain_relinquish_resources(struct domain *d)
         if ( ret )
             return ret;
 #endif
+        WARN_ON(d->xenheap_pages);
         break;
 
     default:
