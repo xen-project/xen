@@ -17,6 +17,7 @@
 // this needs to be on to run on system with large memory hole
 #define	CONFIG_VIRTUAL_FRAME_TABLE
 
+#define CONFIG_EFI
 #define CONFIG_EFI_PCDP
 #define CONFIG_SERIAL_SGI_L1_CONSOLE
 
