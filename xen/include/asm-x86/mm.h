@@ -342,8 +342,10 @@ int steal_page(
 int map_ldt_shadow_page(unsigned int);
 
 #ifdef CONFIG_COMPAT
+void domain_set_alloc_bitsize(struct domain *d);
 unsigned int domain_clamp_alloc_bitsize(struct domain *d, unsigned int bits);
 #else
+# define domain_set_alloc_bitsize(d) ((void)0)
 # define domain_clamp_alloc_bitsize(d, b) (b)
 #endif
 

@@ -254,11 +254,7 @@ int switch_compat(struct domain *d)
                                  FIRST_RESERVED_GDT_PAGE)] = gdt_l1e;
     }
 
-    d->arch.physaddr_bitsize =
-        /* 2^n entries can be contained in guest's p2m mapping space */
-        fls((1UL << 32) - HYPERVISOR_COMPAT_VIRT_START(d)) - 3
-        /* 2^n pages -> 2^(n+PAGE_SHIFT) bits */
-        + PAGE_SHIFT;
+    domain_set_alloc_bitsize(d);
 
     return 0;
 

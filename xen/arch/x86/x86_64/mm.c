@@ -168,7 +168,7 @@ void __init paging_init(void)
     if ( mpt_size > RDWR_COMPAT_MPT_VIRT_END - RDWR_COMPAT_MPT_VIRT_START )
         mpt_size = RDWR_COMPAT_MPT_VIRT_END - RDWR_COMPAT_MPT_VIRT_START;
     mpt_size &= ~((1UL << L2_PAGETABLE_SHIFT) - 1UL);
-    if ( m2p_compat_vstart + mpt_size < MACH2PHYS_COMPAT_VIRT_END )
+    if ( (m2p_compat_vstart + mpt_size) < MACH2PHYS_COMPAT_VIRT_END )
         m2p_compat_vstart = MACH2PHYS_COMPAT_VIRT_END - mpt_size;
     for ( i = 0; i < (mpt_size >> L2_PAGETABLE_SHIFT); i++ )
     {
@@ -472,9 +472,21 @@ int check_descriptor(const struct domain *dom, struct desc_struct *d)
     return 0;
 }
 
+void domain_set_alloc_bitsize(struct domain *d)
+{
+    if ( !is_pv_32on64_domain(d) ||
+         (MACH2PHYS_COMPAT_NR_ENTRIES(d) >= max_page) )
+        return;
+    d->arch.physaddr_bitsize =
+        /* 2^n entries can be contained in guest's p2m mapping space */
+        fls(MACH2PHYS_COMPAT_NR_ENTRIES(d)) - 1
+        /* 2^n pages -> 2^(n+PAGE_SHIFT) bits */
+        + PAGE_SHIFT;
+}
+
 unsigned int domain_clamp_alloc_bitsize(struct domain *d, unsigned int bits)
 {
-    if ( (d == NULL) || !is_pv_32on64_domain(d) )
+    if ( (d == NULL) || (d->arch.physaddr_bitsize == 0) )
         return bits;
     return min(d->arch.physaddr_bitsize, bits);
 }
