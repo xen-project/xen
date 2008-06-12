@@ -331,6 +331,28 @@ void show_execution_state(struct cpu_user_regs *regs)
     show_stack(regs);
 }
 
+void vcpu_show_execution_state(struct vcpu *v)
+{
+    printk("*** Dumping Dom%d vcpu#%d state: ***\n",
+           v->domain->domain_id, v->vcpu_id);
+
+    if ( v == current )
+    {
+        show_execution_state(guest_cpu_user_regs());
+        return;
+    }
+
+    vcpu_pause(v); /* acceptably dangerous */
+
+    vcpu_show_registers(v);
+    /* Todo: map arbitrary vcpu's top guest stack page here. */
+    if ( (v->domain == current->domain) &&
+         guest_kernel_mode(v, &v->arch.guest_context.user_regs) )
+        show_guest_stack(&v->arch.guest_context.user_regs);
+
+    vcpu_unpause(v);
+}
+
 char *trapstr(int trapnr)
 {
     static char *strings[] = { 

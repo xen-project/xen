@@ -127,6 +127,19 @@ static void dump_registers(unsigned char key, struct cpu_user_regs *regs)
     console_end_sync();
 }
 
+static void dump_dom0_registers(unsigned char key)
+{
+    struct vcpu *v;
+
+    if ( dom0 == NULL )
+        return;
+
+    printk("'%c' pressed -> dumping Dom0's registers\n", key);
+
+    for_each_vcpu ( dom0, v )
+        vcpu_show_execution_state(v);
+}
+
 static void halt_machine(unsigned char key, struct cpu_user_regs *regs)
 {
     printk("'%c' pressed -> rebooting machine\n", key);
@@ -311,6 +324,9 @@ void __init initialize_keytable(void)
     register_keyhandler(
         'P', perfc_reset,    "reset performance counters");
 #endif
+
+    register_keyhandler(
+        '0', dump_dom0_registers, "dump Dom0 registers");
 
     register_irq_keyhandler('%', do_debug_key,   "Trap to xendbg");
 }

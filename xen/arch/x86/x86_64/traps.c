@@ -40,6 +40,33 @@ static void print_xen_info(void)
            debug, print_tainted(taint_str));
 }
 
+static void _show_registers(const struct cpu_user_regs *regs,
+                            unsigned long crs[8], int guest_mode,
+                            const char *context)
+{
+    printk("RIP:    %04x:[<%016lx>]", regs->cs, regs->rip);
+    if ( !guest_mode )
+        print_symbol(" %s", regs->rip);
+    printk("\nRFLAGS: %016lx   CONTEXT: %s\n", regs->rflags, context);
+    printk("rax: %016lx   rbx: %016lx   rcx: %016lx\n",
+           regs->rax, regs->rbx, regs->rcx);
+    printk("rdx: %016lx   rsi: %016lx   rdi: %016lx\n",
+           regs->rdx, regs->rsi, regs->rdi);
+    printk("rbp: %016lx   rsp: %016lx   r8:  %016lx\n",
+           regs->rbp, regs->rsp, regs->r8);
+    printk("r9:  %016lx   r10: %016lx   r11: %016lx\n",
+           regs->r9,  regs->r10, regs->r11);
+    printk("r12: %016lx   r13: %016lx   r14: %016lx\n",
+           regs->r12, regs->r13, regs->r14);
+    printk("r15: %016lx   cr0: %016lx   cr4: %016lx\n",
+           regs->r15, crs[0], crs[4]);
+    printk("cr3: %016lx   cr2: %016lx\n", crs[3], crs[2]);
+    printk("ds: %04x   es: %04x   fs: %04x   gs: %04x   "
+           "ss: %04x   cs: %04x\n",
+           regs->ds, regs->es, regs->fs,
+           regs->gs, regs->ss, regs->cs);
+}
+
 void show_registers(struct cpu_user_regs *regs)
 {
     struct cpu_user_regs fault_regs = *regs;
@@ -91,28 +118,8 @@ void show_registers(struct cpu_user_regs *regs)
     }
 
     print_xen_info();
-    printk("CPU:    %d\nRIP:    %04x:[<%016lx>]",
-           smp_processor_id(), fault_regs.cs, fault_regs.rip);
-    if ( !guest_mode(regs) )
-        print_symbol(" %s", fault_regs.rip);
-    printk("\nRFLAGS: %016lx   CONTEXT: %s\n", fault_regs.rflags, context);
-    printk("rax: %016lx   rbx: %016lx   rcx: %016lx\n",
-           fault_regs.rax, fault_regs.rbx, fault_regs.rcx);
-    printk("rdx: %016lx   rsi: %016lx   rdi: %016lx\n",
-           fault_regs.rdx, fault_regs.rsi, fault_regs.rdi);
-    printk("rbp: %016lx   rsp: %016lx   r8:  %016lx\n",
-           fault_regs.rbp, fault_regs.rsp, fault_regs.r8);
-    printk("r9:  %016lx   r10: %016lx   r11: %016lx\n",
-           fault_regs.r9,  fault_regs.r10, fault_regs.r11);
-    printk("r12: %016lx   r13: %016lx   r14: %016lx\n",
-           fault_regs.r12, fault_regs.r13, fault_regs.r14);
-    printk("r15: %016lx   cr0: %016lx   cr4: %016lx\n",
-           fault_regs.r15, fault_crs[0], fault_crs[4]);
-    printk("cr3: %016lx   cr2: %016lx\n", fault_crs[3], fault_crs[2]);
-    printk("ds: %04x   es: %04x   fs: %04x   gs: %04x   "
-           "ss: %04x   cs: %04x\n",
-           fault_regs.ds, fault_regs.es, fault_regs.fs,
-           fault_regs.gs, fault_regs.ss, fault_regs.cs);
+    printk("CPU:    %d\n", smp_processor_id());
+    _show_registers(&fault_regs, fault_crs, guest_mode(regs), context);
 
     if ( this_cpu(ler_msr) && !guest_mode(regs) )
     {
@@ -121,6 +128,25 @@ void show_registers(struct cpu_user_regs *regs)
         rdmsrl(this_cpu(ler_msr) + 1, to);
         printk("ler: %016lx -> %016lx\n", from, to);
     }
+}
+
+void vcpu_show_registers(const struct vcpu *v)
+{
+    const struct cpu_user_regs *regs = &v->arch.guest_context.user_regs;
+    unsigned long crs[8];
+
+    /* No need to handle HVM for now. */
+    if ( is_hvm_vcpu(v) )
+        return;
+
+    crs[0] = v->arch.guest_context.ctrlreg[0];
+    crs[2] = arch_get_cr2(v);
+    crs[3] = pagetable_get_paddr(guest_kernel_mode(v, regs) ?
+                                 v->arch.guest_table :
+                                 v->arch.guest_table_user);
+    crs[4] = v->arch.guest_context.ctrlreg[4];
+
+    _show_registers(regs, crs, 1, "guest");
 }
 
 void show_page_walk(unsigned long addr)
