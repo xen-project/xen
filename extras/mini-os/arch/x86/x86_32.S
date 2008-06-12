@@ -8,7 +8,7 @@
 	.ascii	",VIRT_BASE=0x0" /* &_text from minios_x86_32.lds */
 	.ascii	",ELF_PADDR_OFFSET=0x0"
 	.ascii	",HYPERCALL_PAGE=0x2"
-	.ascii	",PAE=yes"
+	.ascii	",PAE=yes[extended-cr3]"
 	.ascii	",LOADER=generic"
 	.byte	0
 .text
