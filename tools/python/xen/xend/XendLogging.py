@@ -25,10 +25,10 @@ import tempfile
 import types
 import logging
 import logging.handlers
-import fcntl
 
 from xen.util import mkdir
 from xen.xend.server import params
+from xen.util import oshelp
 
 
 __all__ = [ 'log', 'init', 'getLogFilename' ]
@@ -103,9 +103,7 @@ class XendRotatingFileHandler(logging.handlers.RotatingFileHandler):
     # entire FileHandler, StreamHandler & RotatingFileHandler classes which
     # is even worse
     def setCloseOnExec(self):
-        flags = fcntl.fcntl(self.stream.fileno(), fcntl.F_GETFD)
-        flags |= fcntl.FD_CLOEXEC
-        fcntl.fcntl(self.stream.fileno(), fcntl.F_SETFD, flags)
+        oshelp.fcntl_setfd_cloexec(self.stream, True)
         
 
 def init(filename, level):
