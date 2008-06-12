@@ -801,8 +801,6 @@ int __init construct_dom0(
     {
         si->mod_start = vinitrd_start;
         si->mod_len   = initrd_len;
-        printk("Initrd len 0x%lx, start at 0x%lx\n",
-               si->mod_len, si->mod_start);
     }
 
     memset(si->cmd_line, 0, sizeof(si->cmd_line));
