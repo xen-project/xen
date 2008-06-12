@@ -575,6 +575,7 @@ int __init construct_dom0(
         page = alloc_domheap_page(NULL, 0);
         if ( !page )
             panic("Not enough RAM for domain 0 PML4.\n");
+        page->u.inuse.type_info = PGT_l4_page_table|PGT_validated|1;
         l4start = l4tab = page_to_virt(page);
     }
     copy_page(l4tab, idle_pg_table);

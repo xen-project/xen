@@ -201,6 +201,11 @@ void __init init_frametable(void)
     }
 
     memset(frame_table, 0, nr_pages << PAGE_SHIFT);
+
+#if defined(__x86_64__)
+    for ( i = 0; i < max_page; i ++ )
+        spin_lock_init(&frame_table[i].lock);
+#endif
 }
 
 void __init arch_init_memory(void)
@@ -1356,6 +1361,25 @@ static void free_l4_table(struct page_info *page)
 
 #endif
 
+static void page_lock(struct page_info *page)
+{
+#if defined(__i386__)
+    while ( unlikely(test_and_set_bit(_PGC_locked, &page->count_info)) )
+        while ( test_bit(_PGC_locked, &page->count_info) )
+            cpu_relax();
+#else
+    spin_lock(&page->lock);
+#endif
+}
+
+static void page_unlock(struct page_info *page)
+{
+#if defined(__i386__)
+    clear_bit(_PGC_locked, &page->count_info);
+#else
+    spin_unlock(&page->lock);
+#endif
+}
 
 /* How to write an entry to the guest pagetables.
  * Returns 0 for failure (pointer not valid), 1 for success. */
@@ -1417,24 +1441,33 @@ static int mod_l1_entry(l1_pgentry_t *pl1e, l1_pgentry_t nl1e,
     struct vcpu *curr = current;
     struct domain *d = curr->domain;
     unsigned long mfn;
+    struct page_info *l1pg = mfn_to_page(gl1mfn);
+    int rc = 1;
+
+    page_lock(l1pg);
 
     if ( unlikely(__copy_from_user(&ol1e, pl1e, sizeof(ol1e)) != 0) )
-        return 0;
+        return page_unlock(l1pg), 0;
 
     if ( unlikely(paging_mode_refcounts(d)) )
-        return UPDATE_ENTRY(l1, pl1e, ol1e, nl1e, gl1mfn, curr, preserve_ad);
+    {
+        rc = UPDATE_ENTRY(l1, pl1e, ol1e, nl1e, gl1mfn, curr, preserve_ad);
+        page_unlock(l1pg);
+        return rc;
+    }
 
     if ( l1e_get_flags(nl1e) & _PAGE_PRESENT )
     {
         /* Translate foreign guest addresses. */
         mfn = gmfn_to_mfn(FOREIGNDOM, l1e_get_pfn(nl1e));
         if ( unlikely(mfn == INVALID_MFN) )
-            return 0;
+            return page_unlock(l1pg), 0;
         ASSERT((mfn & ~(PADDR_MASK >> PAGE_SHIFT)) == 0);
         nl1e = l1e_from_pfn(mfn, l1e_get_flags(nl1e));
 
         if ( unlikely(l1e_get_flags(nl1e) & l1_disallow_mask(d)) )
         {
+            page_unlock(l1pg);
             MEM_LOG("Bad L1 flags %x",
                     l1e_get_flags(nl1e) & l1_disallow_mask(d));
             return 0;
@@ -1444,30 +1477,33 @@ static int mod_l1_entry(l1_pgentry_t *pl1e, l1_pgentry_t nl1e,
         if ( !l1e_has_changed(ol1e, nl1e, _PAGE_RW | _PAGE_PRESENT) )
         {
             adjust_guest_l1e(nl1e, d);
-            return UPDATE_ENTRY(l1, pl1e, ol1e, nl1e, gl1mfn, curr,
-                                preserve_ad);
+            rc = UPDATE_ENTRY(l1, pl1e, ol1e, nl1e, gl1mfn, curr,
+                              preserve_ad);
+            page_unlock(l1pg);
+            return rc;
         }
 
         if ( unlikely(!get_page_from_l1e(nl1e, FOREIGNDOM)) )
-            return 0;
+            return page_unlock(l1pg), 0;
         
         adjust_guest_l1e(nl1e, d);
         if ( unlikely(!UPDATE_ENTRY(l1, pl1e, ol1e, nl1e, gl1mfn, curr,
                                     preserve_ad)) )
         {
-            put_page_from_l1e(nl1e, d);
-            return 0;
+            ol1e = nl1e;
+            rc = 0;
         }
     }
-    else
+    else if ( unlikely(!UPDATE_ENTRY(l1, pl1e, ol1e, nl1e, gl1mfn, curr,
+                                     preserve_ad)) )
     {
-        if ( unlikely(!UPDATE_ENTRY(l1, pl1e, ol1e, nl1e, gl1mfn, curr,
-                                    preserve_ad)) )
-            return 0;
+        page_unlock(l1pg);
+        return 0;
     }
 
+    page_unlock(l1pg);
     put_page_from_l1e(ol1e, d);
-    return 1;
+    return rc;
 }
 
 
@@ -1481,6 +1517,8 @@ static int mod_l2_entry(l2_pgentry_t *pl2e,
     l2_pgentry_t ol2e;
     struct vcpu *curr = current;
     struct domain *d = curr->domain;
+    struct page_info *l2pg = mfn_to_page(pfn);
+    int rc = 1;
 
     if ( unlikely(!is_guest_l2_slot(d, type, pgentry_ptr_to_slot(pl2e))) )
     {
@@ -1488,13 +1526,16 @@ static int mod_l2_entry(l2_pgentry_t *pl2e,
         return 0;
     }
 
+    page_lock(l2pg);
+
     if ( unlikely(__copy_from_user(&ol2e, pl2e, sizeof(ol2e)) != 0) )
-        return 0;
+        return page_unlock(l2pg), 0;
 
     if ( l2e_get_flags(nl2e) & _PAGE_PRESENT )
     {
         if ( unlikely(l2e_get_flags(nl2e) & L2_DISALLOW_MASK) )
         {
+            page_unlock(l2pg);
             MEM_LOG("Bad L2 flags %x",
                     l2e_get_flags(nl2e) & L2_DISALLOW_MASK);
             return 0;
@@ -1504,28 +1545,32 @@ static int mod_l2_entry(l2_pgentry_t *pl2e,
         if ( !l2e_has_changed(ol2e, nl2e, _PAGE_PRESENT) )
         {
             adjust_guest_l2e(nl2e, d);
-            return UPDATE_ENTRY(l2, pl2e, ol2e, nl2e, pfn, curr, preserve_ad);
+            rc = UPDATE_ENTRY(l2, pl2e, ol2e, nl2e, pfn, curr, preserve_ad);
+            page_unlock(l2pg);
+            return rc;
         }
 
         if ( unlikely(!get_page_from_l2e(nl2e, pfn, d)) )
-            return 0;
+            return page_unlock(l2pg), 0;
 
         adjust_guest_l2e(nl2e, d);
         if ( unlikely(!UPDATE_ENTRY(l2, pl2e, ol2e, nl2e, pfn, curr,
                                     preserve_ad)) )
         {
-            put_page_from_l2e(nl2e, pfn);
-            return 0;
+            ol2e = nl2e;
+            rc = 0;
         }
     }
     else if ( unlikely(!UPDATE_ENTRY(l2, pl2e, ol2e, nl2e, pfn, curr,
                                      preserve_ad)) )
     {
+        page_unlock(l2pg);
         return 0;
     }
 
+    page_unlock(l2pg);
     put_page_from_l2e(ol2e, pfn);
-    return 1;
+    return rc;
 }
 
 #if CONFIG_PAGING_LEVELS >= 3
@@ -1539,7 +1584,8 @@ static int mod_l3_entry(l3_pgentry_t *pl3e,
     l3_pgentry_t ol3e;
     struct vcpu *curr = current;
     struct domain *d = curr->domain;
-    int okay;
+    struct page_info *l3pg = mfn_to_page(pfn);
+    int okay, rc = 1;
 
     if ( unlikely(!is_guest_l3_slot(pgentry_ptr_to_slot(pl3e))) )
     {
@@ -1554,13 +1600,16 @@ static int mod_l3_entry(l3_pgentry_t *pl3e,
     if ( is_pv_32bit_domain(d) && (pgentry_ptr_to_slot(pl3e) >= 3) )
         return 0;
 
+    page_lock(l3pg);
+
     if ( unlikely(__copy_from_user(&ol3e, pl3e, sizeof(ol3e)) != 0) )
-        return 0;
+        return page_unlock(l3pg), 0;
 
     if ( l3e_get_flags(nl3e) & _PAGE_PRESENT )
     {
         if ( unlikely(l3e_get_flags(nl3e) & l3_disallow_mask(d)) )
         {
+            page_unlock(l3pg);
             MEM_LOG("Bad L3 flags %x",
                     l3e_get_flags(nl3e) & l3_disallow_mask(d));
             return 0;
@@ -1570,23 +1619,26 @@ static int mod_l3_entry(l3_pgentry_t *pl3e,
         if ( !l3e_has_changed(ol3e, nl3e, _PAGE_PRESENT) )
         {
             adjust_guest_l3e(nl3e, d);
-            return UPDATE_ENTRY(l3, pl3e, ol3e, nl3e, pfn, curr, preserve_ad);
+            rc = UPDATE_ENTRY(l3, pl3e, ol3e, nl3e, pfn, curr, preserve_ad);
+            page_unlock(l3pg);
+            return rc;
         }
 
         if ( unlikely(!get_page_from_l3e(nl3e, pfn, d)) )
-            return 0;
+            return page_unlock(l3pg), 0;
 
         adjust_guest_l3e(nl3e, d);
         if ( unlikely(!UPDATE_ENTRY(l3, pl3e, ol3e, nl3e, pfn, curr,
                                     preserve_ad)) )
         {
-            put_page_from_l3e(nl3e, pfn);
-            return 0;
+            ol3e = nl3e;
+            rc = 0;
         }
     }
     else if ( unlikely(!UPDATE_ENTRY(l3, pl3e, ol3e, nl3e, pfn, curr,
                                      preserve_ad)) )
     {
+        page_unlock(l3pg);
         return 0;
     }
 
@@ -1595,8 +1647,9 @@ static int mod_l3_entry(l3_pgentry_t *pl3e,
 
     pae_flush_pgd(pfn, pgentry_ptr_to_slot(pl3e), nl3e);
 
+    page_unlock(l3pg);
     put_page_from_l3e(ol3e, pfn);
-    return 1;
+    return rc;
 }
 
 #endif
@@ -1612,6 +1665,8 @@ static int mod_l4_entry(l4_pgentry_t *pl4e,
     struct vcpu *curr = current;
     struct domain *d = curr->domain;
     l4_pgentry_t ol4e;
+    struct page_info *l4pg = mfn_to_page(pfn);
+    int rc = 1;
 
     if ( unlikely(!is_guest_l4_slot(d, pgentry_ptr_to_slot(pl4e))) )
     {
@@ -1619,13 +1674,16 @@ static int mod_l4_entry(l4_pgentry_t *pl4e,
         return 0;
     }
 
+    page_lock(l4pg);
+
     if ( unlikely(__copy_from_user(&ol4e, pl4e, sizeof(ol4e)) != 0) )
-        return 0;
+        return page_unlock(l4pg), 0;
 
     if ( l4e_get_flags(nl4e) & _PAGE_PRESENT )
     {
         if ( unlikely(l4e_get_flags(nl4e) & L4_DISALLOW_MASK) )
         {
+            page_unlock(l4pg);
             MEM_LOG("Bad L4 flags %x",
                     l4e_get_flags(nl4e) & L4_DISALLOW_MASK);
             return 0;
@@ -1635,28 +1693,32 @@ static int mod_l4_entry(l4_pgentry_t *pl4e,
         if ( !l4e_has_changed(ol4e, nl4e, _PAGE_PRESENT) )
         {
             adjust_guest_l4e(nl4e, d);
-            return UPDATE_ENTRY(l4, pl4e, ol4e, nl4e, pfn, curr, preserve_ad);
+            rc = UPDATE_ENTRY(l4, pl4e, ol4e, nl4e, pfn, curr, preserve_ad);
+            page_unlock(l4pg);
+            return rc;
         }
 
         if ( unlikely(!get_page_from_l4e(nl4e, pfn, d)) )
-            return 0;
+            return page_unlock(l4pg), 0;
 
         adjust_guest_l4e(nl4e, d);
         if ( unlikely(!UPDATE_ENTRY(l4, pl4e, ol4e, nl4e, pfn, curr,
                                     preserve_ad)) )
         {
-            put_page_from_l4e(nl4e, pfn);
-            return 0;
+            ol4e = nl4e;
+            rc = 0;
         }
     }
     else if ( unlikely(!UPDATE_ENTRY(l4, pl4e, ol4e, nl4e, pfn, curr,
                                      preserve_ad)) )
     {
+        page_unlock(l4pg);
         return 0;
     }
 
+    page_unlock(l4pg);
     put_page_from_l4e(ol4e, pfn);
-    return 1;
+    return rc;
 }
 
 #endif
@@ -2185,8 +2247,6 @@ int do_mmuext_op(
         goto out;
     }
 
-    domain_lock(d);
-
     for ( i = 0; i < count; i++ )
     {
         if ( hypercall_preempt_check() )
@@ -2434,8 +2494,6 @@ int do_mmuext_op(
 
     process_deferred_ops();
 
-    domain_unlock(d);
-
     perfc_add(num_mmuext_ops, i);
 
  out:
@@ -2488,8 +2546,6 @@ int do_mmu_update(
     }
 
     domain_mmap_cache_init(&mapcache);
-
-    domain_lock(d);
 
     for ( i = 0; i < count; i++ )
     {
@@ -2663,8 +2719,6 @@ int do_mmu_update(
 
     process_deferred_ops();
 
-    domain_unlock(d);
-
     domain_mmap_cache_destroy(&mapcache);
 
     perfc_add(num_page_updates, i);
@@ -2717,13 +2771,18 @@ static int create_grant_pte_mapping(
         goto failed;
     }
 
+    page_lock(page);
+
     ol1e = *(l1_pgentry_t *)va;
     if ( !UPDATE_ENTRY(l1, (l1_pgentry_t *)va, ol1e, nl1e, mfn, v, 0) )
     {
+        page_unlock(page);
         put_page_type(page);
         rc = GNTST_general_error;
         goto failed;
     } 
+
+    page_unlock(page);
 
     if ( !paging_mode_refcounts(d) )
         put_page_from_l1e(ol1e, d);
@@ -2768,16 +2827,14 @@ static int destroy_grant_pte_mapping(
         goto failed;
     }
 
-    if ( __copy_from_user(&ol1e, (l1_pgentry_t *)va, sizeof(ol1e)) )
-    {
-        put_page_type(page);
-        rc = GNTST_general_error;
-        goto failed;
-    }
+    page_lock(page);
+
+    ol1e = *(l1_pgentry_t *)va;
     
     /* Check that the virtual address supplied is actually mapped to frame. */
     if ( unlikely((l1e_get_intpte(ol1e) >> PAGE_SHIFT) != frame) )
     {
+        page_unlock(page);
         MEM_LOG("PTE entry %lx for address %"PRIx64" doesn't match frame %lx",
                 (unsigned long)l1e_get_intpte(ol1e), addr, frame);
         put_page_type(page);
@@ -2792,12 +2849,14 @@ static int destroy_grant_pte_mapping(
                    d->vcpu[0] /* Change if we go to per-vcpu shadows. */,
                    0)) )
     {
+        page_unlock(page);
         MEM_LOG("Cannot delete PTE entry at %p", va);
         put_page_type(page);
         rc = GNTST_general_error;
         goto failed;
     }
 
+    page_unlock(page);
     put_page_type(page);
 
  failed:
@@ -2813,6 +2872,7 @@ static int create_grant_va_mapping(
     l1_pgentry_t *pl1e, ol1e;
     struct domain *d = v->domain;
     unsigned long gl1mfn;
+    struct page_info *l1pg;
     int okay;
     
     ASSERT(domain_is_locked(d));
@@ -2825,8 +2885,11 @@ static int create_grant_va_mapping(
         MEM_LOG("Could not find L1 PTE for address %lx", va);
         return GNTST_general_error;
     }
+    l1pg = mfn_to_page(gl1mfn);
+    page_lock(l1pg);
     ol1e = *pl1e;
     okay = UPDATE_ENTRY(l1, pl1e, ol1e, nl1e, gl1mfn, v, 0);
+    page_unlock(l1pg);
     guest_unmap_l1e(v, pl1e);
     pl1e = NULL;
 
@@ -2844,6 +2907,7 @@ static int replace_grant_va_mapping(
 {
     l1_pgentry_t *pl1e, ol1e;
     unsigned long gl1mfn;
+    struct page_info *l1pg;
     int rc = 0;
     
     pl1e = guest_map_l1e(v, addr, &gl1mfn);
@@ -2852,11 +2916,15 @@ static int replace_grant_va_mapping(
         MEM_LOG("Could not find L1 PTE for address %lx", addr);
         return GNTST_general_error;
     }
+
+    l1pg = mfn_to_page(gl1mfn);
+    page_lock(l1pg);
     ol1e = *pl1e;
 
     /* Check that the virtual address supplied is actually mapped to frame. */
     if ( unlikely(l1e_get_pfn(ol1e) != frame) )
     {
+        page_unlock(l1pg);
         MEM_LOG("PTE entry %lx for address %lx doesn't match frame %lx",
                 l1e_get_pfn(ol1e), addr, frame);
         rc = GNTST_general_error;
@@ -2866,10 +2934,13 @@ static int replace_grant_va_mapping(
     /* Delete pagetable entry. */
     if ( unlikely(!UPDATE_ENTRY(l1, pl1e, ol1e, nl1e, gl1mfn, v, 0)) )
     {
+        page_unlock(l1pg);
         MEM_LOG("Cannot delete PTE entry at %p", (unsigned long *)pl1e);
         rc = GNTST_general_error;
         goto out;
     }
+
+    page_unlock(l1pg);
 
  out:
     guest_unmap_l1e(v, pl1e);
@@ -2905,6 +2976,7 @@ int replace_grant_host_mapping(
     struct vcpu *curr = current;
     l1_pgentry_t *pl1e, ol1e;
     unsigned long gl1mfn;
+    struct page_info *l1pg;
     int rc;
     
     if ( flags & GNTMAP_contains_pte )
@@ -2926,16 +2998,21 @@ int replace_grant_host_mapping(
                 (unsigned long)new_addr);
         return GNTST_general_error;
     }
+
+    l1pg = mfn_to_page(gl1mfn);
+    page_lock(l1pg);
     ol1e = *pl1e;
 
     if ( unlikely(!UPDATE_ENTRY(l1, pl1e, ol1e, l1e_empty(),
                                 gl1mfn, curr, 0)) )
     {
+        page_unlock(l1pg);
         MEM_LOG("Cannot delete PTE entry at %p", (unsigned long *)pl1e);
         guest_unmap_l1e(curr, pl1e);
         return GNTST_general_error;
     }
 
+    page_unlock(l1pg);
     guest_unmap_l1e(curr, pl1e);
 
     rc = replace_grant_va_mapping(addr, frame, ol1e, curr);
@@ -3013,8 +3090,6 @@ int do_update_va_mapping(unsigned long va, u64 val64,
     if ( rc )
         return rc;
 
-    domain_lock(d);
-
     pl1e = guest_map_l1e(v, va, &gl1mfn);
 
     if ( unlikely(!pl1e || !mod_l1_entry(pl1e, val, gl1mfn, 0)) )
@@ -3025,8 +3100,6 @@ int do_update_va_mapping(unsigned long va, u64 val64,
     pl1e = NULL;
 
     process_deferred_ops();
-
-    domain_unlock(d);
 
     switch ( flags & UVMF_FLUSHTYPE_MASK )
     {
@@ -3647,8 +3720,6 @@ int ptwr_do_page_fault(struct vcpu *v, unsigned long addr,
     struct ptwr_emulate_ctxt ptwr_ctxt;
     int rc;
 
-    domain_lock(d);
-
     /* Attempt to read the PTE that maps the VA being accessed. */
     guest_get_eff_l1e(v, addr, &pte);
     page = l1e_get_page(pte);
@@ -3668,16 +3739,16 @@ int ptwr_do_page_fault(struct vcpu *v, unsigned long addr,
     ptwr_ctxt.cr2 = addr;
     ptwr_ctxt.pte = pte;
 
+    page_lock(page);
     rc = x86_emulate(&ptwr_ctxt.ctxt, &ptwr_emulate_ops);
+    page_unlock(page);
     if ( rc == X86EMUL_UNHANDLEABLE )
         goto bail;
 
-    domain_unlock(d);
     perfc_incr(ptwr_emulations);
     return EXCRET_fault_fixed;
 
  bail:
-    domain_unlock(d);
     return 0;
 }
 

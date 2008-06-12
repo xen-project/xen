@@ -46,6 +46,10 @@ struct page_info
 
     } u;
 
+#if defined(__x86_64__)
+    spinlock_t lock;
+#endif
+
     union {
         /*
          * Timestamp from 'TLB clock', used to avoid extra safety flushes.
@@ -61,10 +65,6 @@ struct page_info
          */
         u32 shadow_flags;
     };
-
-#if defined(__x86_64__)
-    spinlock_t lock;
-#endif
 };
 
  /* The following page types are MUTUALLY EXCLUSIVE. */
