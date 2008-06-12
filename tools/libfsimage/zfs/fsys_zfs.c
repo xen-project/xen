@@ -1336,7 +1336,7 @@ zfs_open(fsi_file_t *ffi, char *filename)
 			char zfs_bootstr[] = "zfs-bootfs=";
 			char zfs_bootpath[] = ",bootpath='";
 
-			sprintf(temp, "%llu", (unsigned long long)
+			snprintf(temp, sizeof(temp), "%llu", (unsigned long long)
 			    current_bootfs_obj);
 			alloc_size = strlen(zfs_bootstr) +
 			    strlen(current_rootpool) +

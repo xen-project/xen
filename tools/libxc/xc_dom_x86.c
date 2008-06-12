@@ -418,7 +418,7 @@ static int start_info_x86_32(struct xc_dom_image *dom)
     xc_dom_printf("%s: called\n", __FUNCTION__);
 
     memset(start_info, 0, sizeof(*start_info));
-    sprintf(start_info->magic, dom->guest_type);
+    snprintf(start_info->magic, sizeof(start_info->magic), dom->guest_type);
     start_info->nr_pages = dom->total_pages;
     start_info->shared_info = shinfo << PAGE_SHIFT_X86;
     start_info->pt_base = dom->pgtables_seg.vstart;
@@ -457,7 +457,7 @@ static int start_info_x86_64(struct xc_dom_image *dom)
     xc_dom_printf("%s: called\n", __FUNCTION__);
 
     memset(start_info, 0, sizeof(*start_info));
-    sprintf(start_info->magic, dom->guest_type);
+    snprintf(start_info->magic, sizeof(start_info->magic), dom->guest_type);
     start_info->nr_pages = dom->total_pages;
     start_info->shared_info = shinfo << PAGE_SHIFT_X86;
     start_info->pt_base = dom->pgtables_seg.vstart;

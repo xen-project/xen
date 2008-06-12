@@ -525,7 +525,8 @@ static int domain_create_ring(struct domain *dom)
 	} else
 		dom->use_consolepath = 0;
 
-	sprintf(path, "%s/type", dom->use_consolepath ? dom->conspath: dom->serialpath);
+	snprintf(path, sizeof(path), "%s/type",
+		dom->use_consolepath ? dom->conspath: dom->serialpath);
 	type = xs_read(xs, XBT_NULL, path, NULL);
 	if (type && strcmp(type, "xenconsoled") != 0) {
 		free(type);

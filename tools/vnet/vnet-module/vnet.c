@@ -354,7 +354,7 @@ static int vnet_setup(void){
         if(err) break;
         vnetid = VNET_VIF + i;
         vnet->vnet = toVnetId(vnetid);
-        sprintf(vnet->device, "vnif%04x", vnetid);
+        snprintf(vnet->device, sizeof(vnet->device), "vnif%04x", vnetid);
         vnet->security = (vnetid > 10 ? security : 0);
         err = Vnet_create(vnet);
         Vnet_decref(vnet);
