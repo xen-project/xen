@@ -1012,7 +1012,7 @@ static int disable_pit_irq(void)
          * If we do not rely on PIT CH0 then we can use HPET for one-shot
          * timer emulation when entering deep C states.
          */
-        hpet_broadcast_init();
+        /*hpet_broadcast_init(); XXX dom0 may rely on RTC interrupt delivery */
     }
 
     return 0;

@@ -724,8 +724,6 @@ static void acpi_processor_power_init_bm_check(struct acpi_processor_flags *flag
 static int check_cx(struct acpi_processor_power *power, xen_processor_cx_t *cx)
 {
     static int bm_check_flag;
-    if ( cx == NULL )
-        return -EINVAL;
 
     switch ( cx->reg.space_id )
     {
@@ -743,7 +741,7 @@ static int check_cx(struct acpi_processor_power *power, xen_processor_cx_t *cx)
 
             /* assume all logical cpu has the same support for mwait */
             if ( acpi_processor_ffh_cstate_probe(cx) )
-                return -EFAULT;
+                return -EINVAL;
         }
         break;
 
@@ -753,6 +751,10 @@ static int check_cx(struct acpi_processor_power *power, xen_processor_cx_t *cx)
 
     if ( cx->type == ACPI_STATE_C3 )
     {
+        /* We must be able to use HPET in place of LAPIC timers. */
+        if ( !hpet_broadcast_is_available() )
+            return -EINVAL;
+
         /* All the logic here assumes flags.bm_check is same across all CPUs */
         if ( !bm_check_flag )
         {
@@ -774,7 +776,7 @@ static int check_cx(struct acpi_processor_power *power, xen_processor_cx_t *cx)
                     /* bus mastering control is necessary */
                     ACPI_DEBUG_PRINT((ACPI_DB_INFO,
                         "C3 support requires BM control\n"));
-                    return -1;
+                    return -EINVAL;
                 }
                 else
                 {
@@ -795,7 +797,7 @@ static int check_cx(struct acpi_processor_power *power, xen_processor_cx_t *cx)
                 ACPI_DEBUG_PRINT((ACPI_DB_INFO,
                           "Cache invalidation should work properly"
                           " for C3 to be enabled on SMP systems\n"));
-                return -1;
+                return -EINVAL;
             }
             acpi_set_register(ACPI_BITREG_BUS_MASTER_RLD, 0);
         }
@@ -804,14 +806,14 @@ static int check_cx(struct acpi_processor_power *power, xen_processor_cx_t *cx)
     return 0;
 }
 
-static int set_cx(struct acpi_processor_power *acpi_power,
-                  xen_processor_cx_t *xen_cx)
+static void set_cx(
+    struct acpi_processor_power *acpi_power,
+    xen_processor_cx_t *xen_cx)
 {
     struct acpi_processor_cx *cx;
 
-    /* skip unsupported acpi cstate */
-    if ( check_cx(acpi_power, xen_cx) )
-        return -EFAULT;
+    if ( check_cx(acpi_power, xen_cx) != 0 )
+        return;
 
     cx = &acpi_power->states[xen_cx->type];
     if ( !cx->valid )
@@ -825,8 +827,6 @@ static int set_cx(struct acpi_processor_power *acpi_power,
     cx->power    = xen_cx->power;
     
     cx->latency_ticks = US_TO_PM_TIMER_TICKS(cx->latency);
-
-    return 0;   
 }
 
 int get_cpu_id(u8 acpi_id)

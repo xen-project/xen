@@ -235,6 +235,11 @@ void hpet_broadcast_exit(void)
         reprogram_timer(per_cpu(timer_deadline, cpu));
 }
 
+int hpet_broadcast_is_available(void)
+{
+    return (hpet_event.event_handler == handle_hpet_broadcast);
+}
+
 int hpet_legacy_irq_tick(void)
 {
     if ( !hpet_event.event_handler )
