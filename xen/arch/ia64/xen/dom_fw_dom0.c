@@ -25,10 +25,11 @@
  */
 
 #include <xen/config.h>
-#include <xen/acpi.h>
 #include <xen/errno.h>
 #include <xen/sched.h>
 #include <xen/list.h>
+#include <xen/acpi.h>
+#include <acpi/actables.h>
 
 #include <asm/dom_fw.h>
 #include <asm/dom_fw_common.h>
@@ -102,7 +103,8 @@ acpi_update_madt_checksum(struct acpi_table_header *table)
 
 	acpi_madt = (struct acpi_table_madt *)table;
 	acpi_madt->header.checksum = 0;
-	acpi_madt->header.checksum = generate_acpi_checksum(acpi_madt, size);
+	acpi_madt->header.checksum = -acpi_tb_checksum((u8*)acpi_madt,
+						       table->length);
 
 	return 0;
 }
@@ -154,7 +156,9 @@ static int __init __acpi_table_disable(struct acpi_table_header *header)
 	memcpy(header->oem_table_id, "Xen     ", 8);
 	memcpy(header->signature, "OEMx", 4);
 	header->checksum = 0;
-	header->checksum = generate_acpi_checksum(header, header->length);
+	header->checksum = -acpi_tb_checksum((u8*)header, header->length);
+
+	printk("Successfully Disabling %s\n", header->signature);
 	return 0;
 }
 
@@ -166,7 +170,6 @@ static void __init acpi_table_disable(char *id)
 /* base is physical address of acpi table */
 static void __init touch_acpi_table(void)
 {
-	int result;
 	lsapic_nbr = 0;
 
 	/*
@@ -196,18 +199,8 @@ static void __init touch_acpi_table(void)
 	acpi_table_parse(ACPI_SIG_SRAT, acpi_backup_table);
 	acpi_table_parse(ACPI_SIG_SLIT, acpi_backup_table);
 
-	result = acpi_table_disable(ACPI_SIG_SRAT);
-	if ( result == 0 )
-		printk("Success Disabling SRAT\n");
-	else if ( result != -ENOENT )
-		printk("ERROR: Failed Disabling SRAT\n");
-
-	result = acpi_table_disable(ACPI_SIG_SLIT);
-	if ( result == 0 )
-		printk("Success Disabling SLIT\n");
-	else if ( result != -ENOENT )
-		printk("ERROR: Failed Disabling SLIT\n");
-
+	acpi_table_disable(ACPI_SIG_SRAT);
+	acpi_table_disable(ACPI_SIG_SLIT);
 	return;
 }
 

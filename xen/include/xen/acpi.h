@@ -295,7 +295,6 @@ int acpi_table_parse_madt(enum acpi_madt_type id, acpi_table_entry_handler handl
 void acpi_table_print (struct acpi_table_header *header, unsigned long phys_addr);
 void acpi_table_print_madt_entry (struct acpi_subtable_header *madt);
 void acpi_table_print_srat_entry (struct acpi_subtable_header *srat);
-uint8_t generate_acpi_checksum(void *tbl, unsigned long len);
 
 /* the following four functions are architecture-dependent */
 void acpi_numa_slit_init (struct acpi_table_slit *slit);
