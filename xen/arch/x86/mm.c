@@ -1702,8 +1702,8 @@ int get_page(struct page_info *page, struct domain *domain)
             return 0;
         }
         asm volatile (
-            LOCK_PREFIX "cmpxchg8b %3"
-            : "=d" (nd), "=a" (y), "=c" (d),
+            LOCK_PREFIX "cmpxchg8b %2"
+            : "=d" (nd), "=a" (y),
             "=m" (*(volatile u64 *)(&page->count_info))
             : "0" (d), "1" (x), "c" (d), "b" (nx) );
     }
