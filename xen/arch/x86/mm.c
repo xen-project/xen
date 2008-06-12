@@ -2602,6 +2602,8 @@ int do_mmu_update(
                 if ( unlikely(!get_page_type(page, PGT_writable_page)) )
                     break;
 
+                perfc_incr(writable_mmu_updates);
+
                 okay = paging_write_guest_entry(v, va, req.val, _mfn(mfn));
 
                 put_page_type(page);
