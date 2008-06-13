@@ -507,7 +507,7 @@ class ACMPolicy(XSPolicy):
             rc = self.compile()
         return rc, errors
 
-    def force_default_policy(klass):
+    def force_default_policy(klass, policy_ref):
         """
            Force the installation of the DEFAULT policy if for
            example no XML of the current policy is available and
@@ -518,7 +518,7 @@ class ACMPolicy(XSPolicy):
         """
         errors = ""
 
-        acmpol_new = ACMPolicy(xml = get_DEFAULT_policy())
+        acmpol_new = ACMPolicy(xml = get_DEFAULT_policy(), ref=policy_ref)
 
         from xen.lowlevel import acm
         dom0_ssidref = acm.getssid(0)
