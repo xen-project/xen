@@ -7,7 +7,8 @@ DECLARE_PER_CPU(char, compat_arg_xlat[COMPAT_ARG_XLAT_SIZE]);
 #define is_compat_arg_xlat_range(addr, size) ({                               \
     unsigned long __off;                                                      \
     __off = (unsigned long)(addr) - (unsigned long)COMPAT_ARG_XLAT_VIRT_BASE; \
-    (__off | (__off + (unsigned long)(size))) <= PAGE_SIZE;                   \
+    (__off <= COMPAT_ARG_XLAT_SIZE) &&                                        \
+    ((__off + (unsigned long)(size)) <= COMPAT_ARG_XLAT_SIZE);                \
 })
 
 /*
