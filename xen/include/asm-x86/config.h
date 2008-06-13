@@ -371,4 +371,6 @@ extern unsigned long xen_phys_start, xenheap_phys_start, xenheap_phys_end;
 #define ELFSIZE 32
 #endif
 
+#define ARCH_CRASH_SAVE_VMCOREINFO
+
 #endif /* __X86_CONFIG_H__ */

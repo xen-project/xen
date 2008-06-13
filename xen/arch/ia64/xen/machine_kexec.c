@@ -193,6 +193,15 @@ int machine_kexec_get(xen_kexec_range_t *range)
 	return -EINVAL;
 }
 
+void arch_crash_save_vmcoreinfo(void)
+{
+	VMCOREINFO_SYMBOL(dom_xen);
+	VMCOREINFO_SYMBOL(dom_io);
+	VMCOREINFO_SYMBOL(xen_pstart);
+	VMCOREINFO_SYMBOL(frametable_pg_dir);
+	VMCOREINFO_SYMBOL_ALIAS(xen_heap_start, xen_pickle_offset);
+}
+
 /*
  * Local variables:
  * mode: C

@@ -295,4 +295,6 @@ struct screen_info { };
 
 #define CONFIG_XENCOMM_MARK_DIRTY 1
 
+#define ARCH_CRASH_SAVE_VMCOREINFO
+
 #endif	/* _IA64_CONFIG_H_ */

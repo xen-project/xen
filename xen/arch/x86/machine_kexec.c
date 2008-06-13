@@ -145,6 +145,19 @@ int machine_kexec_get(xen_kexec_range_t *range)
 	return machine_kexec_get_xen(range);
 }
 
+void arch_crash_save_vmcoreinfo(void)
+{
+	VMCOREINFO_SYMBOL(dom_xen);
+	VMCOREINFO_SYMBOL(dom_io);
+
+#ifdef CONFIG_X86_PAE
+	VMCOREINFO_SYMBOL_ALIAS(pgd_l3, idle_pg_table);
+#endif
+#ifdef CONFIG_X86_64
+	VMCOREINFO_SYMBOL_ALIAS(pgd_l4, idle_pg_table);
+#endif
+}
+
 /*
  * Local variables:
  * mode: C

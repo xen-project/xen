@@ -151,7 +151,7 @@ static DEFINE_PER_CPU(struct percpu_mm_info, percpu_mm_info);
 #define FOREIGNDOM (this_cpu(percpu_mm_info).foreign ?: current->domain)
 
 /* Private domain structs for DOMID_XEN and DOMID_IO. */
-static struct domain *dom_xen, *dom_io;
+struct domain *dom_xen, *dom_io;
 
 /* Frame table and its size in pages. */
 struct page_info *frame_table;

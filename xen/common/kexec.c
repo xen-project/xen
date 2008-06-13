@@ -43,6 +43,9 @@ static unsigned long kexec_flags = 0; /* the lowest bits are for KEXEC_IMAGE... 
 
 static spinlock_t kexec_lock = SPIN_LOCK_UNLOCKED;
 
+static unsigned char vmcoreinfo_data[VMCOREINFO_BYTES];
+static size_t vmcoreinfo_size = 0;
+
 xen_kexec_reserve_t kexec_crash_area;
 
 static void __init parse_crashkernel(const char *str)
@@ -208,6 +211,13 @@ static int kexec_get_cpu(xen_kexec_range_t *range)
     return 0;
 }
 
+static int kexec_get_vmcoreinfo(xen_kexec_range_t *range)
+{
+    range->start = __pa((unsigned long)vmcoreinfo_data);
+    range->size = VMCOREINFO_BYTES;
+    return 0;
+}
+
 static int kexec_get_range_internal(xen_kexec_range_t *range)
 {
     int ret = -EINVAL;
@@ -219,6 +229,9 @@ static int kexec_get_range_internal(xen_kexec_range_t *range)
         break;
     case KEXEC_RANGE_MA_CPU:
         ret = kexec_get_cpu(range);
+        break;
+    case KEXEC_RANGE_MA_VMCOREINFO:
+        ret = kexec_get_vmcoreinfo(range);
         break;
     default:
         ret = machine_kexec_get(range);
@@ -288,6 +301,56 @@ static int kexec_load_get_bits(int type, int *base, int *bit)
     return 0;
 }
 
+void vmcoreinfo_append_str(const char *fmt, ...)
+{
+    va_list args;
+    char buf[0x50];
+    int r;
+    size_t note_size = sizeof(Elf_Note) + ELFNOTE_ALIGN(strlen(VMCOREINFO_NOTE_NAME) + 1);
+
+    if (vmcoreinfo_size + note_size + sizeof(buf) > VMCOREINFO_BYTES)
+        return;
+
+    va_start(args, fmt);
+    r = vsnprintf(buf, sizeof(buf), fmt, args);
+    va_end(args);
+
+    memcpy(&vmcoreinfo_data[note_size + vmcoreinfo_size], buf, r);
+
+    vmcoreinfo_size += r;
+}
+
+static void crash_save_vmcoreinfo(void)
+{
+    size_t data_size;
+
+    if (vmcoreinfo_size > 0)    /* already saved */
+        return;
+
+    data_size = VMCOREINFO_BYTES - (sizeof(Elf_Note) + ELFNOTE_ALIGN(strlen(VMCOREINFO_NOTE_NAME) + 1));
+    setup_note((Elf_Note *)vmcoreinfo_data, VMCOREINFO_NOTE_NAME, 0, data_size);
+
+    VMCOREINFO_PAGESIZE(PAGE_SIZE);
+
+    VMCOREINFO_SYMBOL(domain_list);
+    VMCOREINFO_SYMBOL(frame_table);
+    VMCOREINFO_SYMBOL(alloc_bitmap);
+    VMCOREINFO_SYMBOL(max_page);
+    VMCOREINFO_SYMBOL(xenheap_phys_end);
+
+    VMCOREINFO_STRUCT_SIZE(page_info);
+    VMCOREINFO_STRUCT_SIZE(domain);
+
+    VMCOREINFO_OFFSET(page_info, count_info);
+    VMCOREINFO_OFFSET_ALIAS(page_info, u, _domain);
+    VMCOREINFO_OFFSET(domain, domain_id);
+    VMCOREINFO_OFFSET(domain, next_in_list);
+
+#ifdef ARCH_CRASH_SAVE_VMCOREINFO
+    arch_crash_save_vmcoreinfo();
+#endif
+}
+
 static int kexec_load_unload_internal(unsigned long op, xen_kexec_load_t *load)
 {
     xen_kexec_image_t *image;
@@ -316,6 +379,8 @@ static int kexec_load_unload_internal(unsigned long op, xen_kexec_load_t *load)
             /* Make new image the active one */
             change_bit(bit, &kexec_flags);
         }
+
+        crash_save_vmcoreinfo();
     }
 
     /* Unload the old image if present and load successful */
