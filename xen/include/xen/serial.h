@@ -3,7 +3,7 @@
  * 
  * Framework for serial device drivers.
  * 
- * Copyright (c) 2003-2005, K A Fraser
+ * Copyright (c) 2003-2008, K A Fraser
  */
 
 #ifndef __XEN_SERIAL_H__
@@ -32,6 +32,7 @@ struct serial_port {
     /* Transmit data buffer (interrupt-driven uart). */
     char               *txbuf;
     unsigned int        txbufp, txbufc;
+    bool_t              tx_quench;
     /* Force synchronous transmit. */
     int                 sync;
     /* Receiver callback functions (asynchronous receivers). */

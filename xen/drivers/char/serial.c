@@ -3,7 +3,7 @@
  * 
  * Framework for serial device drivers.
  * 
- * Copyright (c) 2003-2005, K A Fraser
+ * Copyright (c) 2003-2008, K A Fraser
  */
 
 #include <xen/config.h>
@@ -97,9 +97,18 @@ static void __serial_putc(struct serial_port *port, char c)
     if ( (port->txbuf != NULL) && !port->sync )
     {
         /* Interrupt-driven (asynchronous) transmitter. */
-#ifdef SERIAL_NEVER_DROP_CHARS
+
+        if ( port->tx_quench )
+        {
+            /* Buffer filled and we are dropping characters. */
+            if ( (port->txbufp - port->txbufc) > (serial_txbufsz / 2) )
+                return;
+            port->tx_quench = 0;
+        }
+
         if ( (port->txbufp - port->txbufc) == serial_txbufsz )
         {
+#ifdef SERIAL_NEVER_DROP_CHARS
             /* Buffer is full: we spin waiting for space to appear. */
             int i;
             while ( !port->driver->tx_empty(port) )
@@ -108,9 +117,13 @@ static void __serial_putc(struct serial_port *port, char c)
                 port->driver->putc(
                     port, port->txbuf[mask_serial_txbuf_idx(port->txbufc++)]);
             port->txbuf[mask_serial_txbuf_idx(port->txbufp++)] = c;
+#else
+            /* Buffer is full: drop characters until buffer is half empty. */
+            port->tx_quench = 1;
+#endif
             return;
         }
-#endif
+
         if ( ((port->txbufp - port->txbufc) == 0) &&
                   port->driver->tx_empty(port) )
         {

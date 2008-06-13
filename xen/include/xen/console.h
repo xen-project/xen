@@ -26,9 +26,6 @@ void console_force_lock(void);
 void console_start_sync(void);
 void console_end_sync(void);
 
-void console_start_log_everything(void);
-void console_end_log_everything(void);
-
 /*
  * Steal output from the console. Returns +ve identifier, else -ve error.
  * Takes the handle of the serial line to steal, and steal callback function.

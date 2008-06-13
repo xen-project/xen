@@ -635,16 +635,6 @@ int console_has(const char *device)
     return 0;
 }
 
-void console_start_log_everything(void)
-{
-    atomic_inc(&print_everything);
-}
-
-void console_end_log_everything(void)
-{
-    atomic_dec(&print_everything);
-}
-
 void console_force_unlock(void)
 {
     spin_lock_init(&console_lock);
@@ -659,14 +649,14 @@ void console_force_lock(void)
 
 void console_start_sync(void)
 {
-    console_start_log_everything();
+    atomic_inc(&print_everything);
     serial_start_sync(sercon_handle);
 }
 
 void console_end_sync(void)
 {
     serial_end_sync(sercon_handle);
-    console_end_log_everything();
+    atomic_dec(&print_everything);
 }
 
 void console_putc(char c)
