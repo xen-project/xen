@@ -323,7 +323,7 @@ p2m_set_entry(struct domain *d, unsigned long gfn, mfn_t mfn,
 
     /* Track the highest gfn for which we have ever had a valid mapping */
     if ( mfn_valid(mfn) && (gfn > d->arch.p2m->max_mapped_pfn) )
-        d->arch.p2m->max_mapped_pfn = gfn;
+        d->arch.p2m->max_mapped_pfn = gfn + (1UL << page_order) - 1;
 
     if ( iommu_enabled && (is_hvm_domain(d) || need_iommu(d)) )
     {
