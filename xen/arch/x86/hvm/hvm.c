@@ -1871,39 +1871,9 @@ static hvm_hypercall_t *hvm_hypercall32_table[NR_hypercalls] = {
 
 static long hvm_memory_op_compat32(int cmd, XEN_GUEST_HANDLE(void) arg)
 {
-    extern long do_add_to_physmap(struct xen_add_to_physmap *xatp);
-    long rc;
-
-    switch ( cmd )
-    {
-    case XENMEM_add_to_physmap:
-    {
-        struct {
-            domid_t domid;
-            uint32_t space;
-            uint32_t idx;
-            uint32_t gpfn;
-        } u;
-        struct xen_add_to_physmap *h = (void *)COMPAT_ARG_XLAT_VIRT_BASE;
-
-        if ( copy_from_guest(&u, arg, 1) )
-            return -EFAULT;
-
-        h->domid = u.domid;
-        h->space = u.space;
-        h->idx = u.idx;
-        h->gpfn = u.gpfn;
-
-        rc = hvm_memory_op(cmd, guest_handle_from_ptr(h, void));
-        break;
-    }
-
-    default:
-        gdprintk(XENLOG_WARNING, "memory_op %d.\n", cmd);
-        rc = -ENOSYS;
-        break;
-    }
-
+    long rc = compat_memory_op(cmd, arg);
+    if ( (cmd & MEMOP_CMD_MASK) == XENMEM_decrease_reservation )
+        current->domain->arch.hvm_domain.qemu_mapcache_invalidate = 1;
     return rc;
 }
 
