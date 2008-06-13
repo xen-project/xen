@@ -635,6 +635,18 @@ int console_has(const char *device)
     return 0;
 }
 
+void console_start_log_everything(void)
+{
+    serial_start_log_everything(sercon_handle);
+    atomic_inc(&print_everything);
+}
+
+void console_end_log_everything(void)
+{
+    serial_end_log_everything(sercon_handle);
+    atomic_dec(&print_everything);
+}
+
 void console_force_unlock(void)
 {
     spin_lock_init(&console_lock);

@@ -36,10 +36,10 @@ static void keypress_action(unsigned long unused)
 {
     keyhandler_t *h;
     unsigned char key = keypress_key;
-    console_start_sync();
+    console_start_log_everything();
     if ( (h = key_table[key].u.handler) != NULL )
         (*h)(key);
-    console_end_sync();
+    console_end_log_everything();
 }
 
 static DECLARE_TASKLET(keypress_tasklet, keypress_action, 0);
@@ -50,10 +50,10 @@ void handle_keypress(unsigned char key, struct cpu_user_regs *regs)
 
     if ( !in_irq() || (key_table[key].flags & KEYHANDLER_IRQ_CALLBACK) )
     {
-        console_start_sync();
+        console_start_log_everything();
         if ( (h = key_table[key].u.irq_handler) != NULL )
             (*h)(key, regs);
-        console_end_sync();
+        console_end_log_everything();
     }
     else
     {
@@ -105,6 +105,9 @@ static void dump_registers(unsigned char key, struct cpu_user_regs *regs)
 {
     unsigned int cpu;
 
+    /* We want to get everything out that we possibly can. */
+    console_start_sync();
+
     printk("'%c' pressed -> dumping registers\n", key);
 
     /* Get local execution state out immediately, in case we get stuck. */
@@ -120,6 +123,8 @@ static void dump_registers(unsigned char key, struct cpu_user_regs *regs)
     }
 
     printk("\n");
+
+    console_end_sync();
 }
 
 static void dump_dom0_registers(unsigned char key)
