@@ -170,11 +170,11 @@ void vmcoreinfo_append_str(const char *fmt, ...)
 #define VMCOREINFO_STRUCT_SIZE(name) \
        vmcoreinfo_append_str("SIZE(%s)=%zu\n", #name, sizeof(struct name))
 #define VMCOREINFO_OFFSET(name, field) \
-       vmcoreinfo_append_str("OFFSET(%s.%s)=%zu\n", #name, #field, \
-                             offsetof(struct name, field))
+       vmcoreinfo_append_str("OFFSET(%s.%s)=%lu\n", #name, #field, \
+                             (unsigned long)offsetof(struct name, field))
 #define VMCOREINFO_OFFSET_ALIAS(name, field, alias) \
-       vmcoreinfo_append_str("OFFSET(%s.%s)=%zu\n", #name, #alias, \
-                             offsetof(struct name, field))
+       vmcoreinfo_append_str("OFFSET(%s.%s)=%lu\n", #name, #alias, \
+                             (unsigned long)offsetof(struct name, field))
 
 #endif /* _XEN_PUBLIC_KEXEC_H */
 
