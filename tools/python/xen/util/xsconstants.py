@@ -103,8 +103,10 @@ def xserr2string(err):
     return "Unknown XSERR code '%s'." % (hex(err))
 
 # Policy identifiers used in labels
-ACM_POLICY_ID = "ACM"
+ACM_POLICY_ID = 'ACM'
 
-INVALID_POLICY_PREFIX = "INV_"
+INVALID_POLICY_PREFIX = 'INV_'
 
 INVALID_SSIDREF = 0xFFFFFFFF
+
+XS_INACCESSIBLE_LABEL = '__INACCESSIBLE__'
