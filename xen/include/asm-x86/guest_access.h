@@ -79,6 +79,11 @@
 #define guest_handle_okay(hnd, nr)                      \
     (shadow_mode_external(current->domain) ||           \
      array_access_ok((hnd).p, (nr), sizeof(*(hnd).p)))
+#define guest_handle_subrange_okay(hnd, first, last)    \
+    (shadow_mode_external(current->domain) ||           \
+     array_access_ok((hnd).p + (first),                 \
+                     (last)-(first)+1,                  \
+                     sizeof(*(hnd).p)))
 
 #define __copy_to_guest_offset(hnd, off, ptr, nr) ({    \
     const typeof(*(ptr)) *_s = (ptr);                   \

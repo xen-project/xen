@@ -62,6 +62,7 @@ static inline unsigned long xencomm_inline_addr(const void *handle)
 /* Since we run in real mode, we can safely access all addresses. That also
  * means our __routines are identical to our "normal" routines. */
 #define guest_handle_okay(hnd, nr) 1
+#define guest_handle_subrange_okay(hnd, first, last) 1
 
 /*
  * Copy an array of objects to guest context via a guest handle.
