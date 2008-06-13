@@ -474,6 +474,22 @@ int xc_domain_restore(int xc_handle, int io_fd, uint32_t dom,
             continue;
         }
 
+        if ( j == -3 )
+        {
+            uint64_t ident_pt;
+
+            /* Skip padding 4 bytes then read the EPT identity PT location. */
+            if ( read_exact(io_fd, &ident_pt, sizeof(uint32_t)) ||
+                 read_exact(io_fd, &ident_pt, sizeof(uint64_t)) )
+            {
+                ERROR("error read the address of the EPT identity map");
+                goto out;
+            }
+
+            xc_set_hvm_param(xc_handle, dom, HVM_PARAM_IDENT_PT, ident_pt);
+            continue;
+        }
+
         if ( j == 0 )
             break;  /* our work here is done */
 
