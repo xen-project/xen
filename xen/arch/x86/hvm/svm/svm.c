@@ -574,10 +574,12 @@ static void svm_set_segment_register(struct vcpu *v, enum x86_segment seg,
         memcpy(&vmcb->tr, reg, sizeof(*reg));
         break;
     case x86_seg_gdtr:
-        memcpy(&vmcb->gdtr, reg, sizeof(*reg));
+        vmcb->gdtr.base = reg->base;
+        vmcb->gdtr.limit = (uint16_t)reg->limit;
         break;
     case x86_seg_idtr:
-        memcpy(&vmcb->idtr, reg, sizeof(*reg));
+        vmcb->idtr.base = reg->base;
+        vmcb->idtr.limit = (uint16_t)reg->limit;
         break;
     case x86_seg_ldtr:
         memcpy(&vmcb->ldtr, reg, sizeof(*reg));
