@@ -17,8 +17,6 @@
 #include <linux/efi.h>
 #include <asm/pgalloc.h>
 
-extern unsigned long frametable_pg_dir[];
-
 #define FRAMETABLE_PGD_OFFSET(ADDR) \
 	(frametable_pg_dir + (((ADDR) >> PGDIR_SHIFT) & \
 	((1UL << (PAGE_SHIFT - 3)) - 1)))

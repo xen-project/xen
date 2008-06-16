@@ -138,6 +138,7 @@ void share_xen_page_with_guest(struct page_info *page,
 void share_xen_page_with_privileged_guests(struct page_info *page,
                                            int readonly);
 
+extern unsigned long frametable_pg_dir[];
 extern struct page_info *frame_table;
 extern unsigned long frame_table_size;
 extern struct list_head free_list;
