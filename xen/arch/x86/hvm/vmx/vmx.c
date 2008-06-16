@@ -616,7 +616,7 @@ static void vmx_load_cpu_state(struct vcpu *v, struct hvm_hw_cpu *data)
     struct vmx_msr_state *guest_state = &v->arch.hvm_vmx.msr_state;
 
     /* restore msrs */
-    guest_state->flags = data->msr_flags;
+    guest_state->flags = data->msr_flags & 7;
     guest_state->msrs[VMX_INDEX_MSR_LSTAR]        = data->msr_lstar;
     guest_state->msrs[VMX_INDEX_MSR_STAR]         = data->msr_star;
     guest_state->msrs[VMX_INDEX_MSR_SYSCALL_MASK] = data->msr_syscall_mask;
@@ -790,6 +790,9 @@ static void vmx_set_segment_register(struct vcpu *v, enum x86_segment seg,
     /* Not-present must mean unusable. */
     if ( !reg->attr.fields.p )
         attr |= (1u << 16);
+
+    /* VMX has strict consistency requirement for flag G. */
+    attr |= !!(reg->limit >> 20) << 15;
 
     vmx_vmcs_enter(v);
 
