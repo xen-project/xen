@@ -90,12 +90,10 @@
 ^stubdom/ioemu$
 ^stubdom/libxc$
 ^stubdom/lwip-.*$
-^stubdom/mini-os$
+^stubdom/mini-os-.*$
 ^stubdom/newlib-.*$
 ^stubdom/pciutils-.*$
 ^stubdom/zlib-.*$
-^stubdom/c/main-c.c$
-^stubdom/caml/main-c.c$
 ^tools/.*/TAGS$
 ^tools/.*/build/lib.*/.*\.py$
 ^tools/blktap/Makefile\.smh$

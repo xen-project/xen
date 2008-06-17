@@ -11,10 +11,7 @@ OCAMLOPT=ocamlopt
 OBJS := hello.cmx
 LIBS := 
 
-all: main-c.o main-caml.o caml.o
-
-main-c.c:
-	ln -sf $(XEN_ROOT)/extras/mini-os/main.c $@
+all: main-caml.o caml.o
 
 %.cmx: %.ml
 	$(OCAMLFIND) $(OCAMLOPT) -c $< -o $@

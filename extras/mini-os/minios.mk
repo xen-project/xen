@@ -57,13 +57,13 @@ ARCH_LIB := lib$(ARCH_LIB_NAME).a
 # This object contains the entrypoint for startup from Xen.
 # $(HEAD_ARCH_OBJ) has to be built in the architecture specific directory.
 HEAD_ARCH_OBJ := $(XEN_TARGET_ARCH).o
-HEAD_OBJ := $(TARGET_ARCH_DIR)/$(HEAD_ARCH_OBJ)
+HEAD_OBJ := $(OBJ_DIR)/$(TARGET_ARCH_DIR)/$(HEAD_ARCH_OBJ)
 
 
-%.o: %.c $(HDRS) Makefile $(EXTRA_DEPS)
+$(OBJ_DIR)/%.o: %.c $(HDRS) Makefile $(EXTRA_DEPS)
 	$(CC) $(CFLAGS) $(CPPFLAGS) -c $< -o $@
 
-%.o: %.S $(HDRS) Makefile $(EXTRA_DEPS)
+$(OBJ_DIR)/%.o: %.S $(HDRS) Makefile $(EXTRA_DEPS)
 	$(CC) $(ASFLAGS) $(CPPFLAGS) -c $< -o $@
 
 
