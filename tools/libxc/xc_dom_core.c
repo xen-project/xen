@@ -409,6 +409,8 @@ int xc_dom_alloc_segment(struct xc_dom_image *dom,
     seg->vend = start + pages * page_size;
     seg->pfn = (seg->vstart - dom->parms.virt_base) / page_size;
     dom->virt_alloc_end = seg->vend;
+    if (dom->allocate)
+        dom->allocate(dom, dom->virt_alloc_end);
 
     xc_dom_printf("%-20s:   %-12s : 0x%" PRIx64 " -> 0x%" PRIx64
                   "  (pfn 0x%" PRIpfn " + 0x%" PRIpfn " pages)\n",
@@ -431,6 +433,8 @@ int xc_dom_alloc_page(struct xc_dom_image *dom, char *name)
 
     start = dom->virt_alloc_end;
     dom->virt_alloc_end += page_size;
+    if (dom->allocate)
+        dom->allocate(dom, dom->virt_alloc_end);
     pfn = (start - dom->parms.virt_base) / page_size;
 
     xc_dom_printf("%-20s:   %-12s : 0x%" PRIx64 " (pfn 0x%" PRIpfn ")\n",
@@ -506,7 +510,7 @@ void xc_dom_register_arch_hooks(struct xc_dom_arch *hooks)
     first_hook = hooks;
 }
 
-static struct xc_dom_arch *xc_dom_find_arch_hooks(char *guest_type)
+struct xc_dom_arch *xc_dom_find_arch_hooks(char *guest_type)
 {
     struct xc_dom_arch *hooks = first_hook;
 

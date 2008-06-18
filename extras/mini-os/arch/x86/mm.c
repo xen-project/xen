@@ -372,7 +372,7 @@ static pgentry_t *get_pgt(unsigned long addr)
     return &tab[offset];
 }
 
-static pgentry_t *need_pgt(unsigned long addr)
+pgentry_t *need_pgt(unsigned long addr)
 {
     unsigned long mfn;
     pgentry_t *tab;

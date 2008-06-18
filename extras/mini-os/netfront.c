@@ -497,15 +497,26 @@ void shutdown_netfront(struct netfront_dev *dev)
     printk("close network: backend at %s\n",dev->backend);
 
     snprintf(path, sizeof(path), "%s/state", dev->backend);
+
     err = xenbus_printf(XBT_NIL, nodename, "state", "%u", 5); /* closing */
     xenbus_wait_for_value(path, "5", &dev->events);
 
     err = xenbus_printf(XBT_NIL, nodename, "state", "%u", 6);
     xenbus_wait_for_value(path, "6", &dev->events);
 
+    err = xenbus_printf(XBT_NIL, nodename, "state", "%u", 1);
+    xenbus_wait_for_value(path, "2", &dev->events);
+
     xenbus_unwatch_path(XBT_NIL, path);
 
-    err = xenbus_printf(XBT_NIL, nodename, "state", "%u", 1);
+    snprintf(path, sizeof(path), "%s/tx-ring-ref", nodename);
+    xenbus_rm(XBT_NIL, path);
+    snprintf(path, sizeof(path), "%s/rx-ring-ref", nodename);
+    xenbus_rm(XBT_NIL, path);
+    snprintf(path, sizeof(path), "%s/event-channel", nodename);
+    xenbus_rm(XBT_NIL, path);
+    snprintf(path, sizeof(path), "%s/request-rx-copy", nodename);
+    xenbus_rm(XBT_NIL, path);
 
     free_netfront(dev);
 }

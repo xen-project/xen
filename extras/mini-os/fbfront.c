@@ -229,9 +229,18 @@ void shutdown_kbdfront(struct kbdfront_dev *dev)
     err = xenbus_printf(XBT_NIL, nodename, "state", "%u", 6);
     xenbus_wait_for_value(path, "6", &dev->events);
 
+    err = xenbus_printf(XBT_NIL, nodename, "state", "%u", 1);
+    // does not work yet.
+    //xenbus_wait_for_value(path, "2", &dev->events);
+
     xenbus_unwatch_path(XBT_NIL, path);
 
-    err = xenbus_printf(XBT_NIL, nodename, "state", "%u", 1);
+    snprintf(path, sizeof(path), "%s/page-ref", nodename);
+    xenbus_rm(XBT_NIL, path);
+    snprintf(path, sizeof(path), "%s/event-channel", nodename);
+    xenbus_rm(XBT_NIL, path);
+    snprintf(path, sizeof(path), "%s/request-abs-pointer", nodename);
+    xenbus_rm(XBT_NIL, path);
 
     free_kbdfront(dev);
 }
@@ -561,9 +570,20 @@ void shutdown_fbfront(struct fbfront_dev *dev)
     err = xenbus_printf(XBT_NIL, nodename, "state", "%u", 6);
     xenbus_wait_for_value(path, "6", &dev->events);
 
+    err = xenbus_printf(XBT_NIL, nodename, "state", "%u", 1);
+    // does not work yet
+    //xenbus_wait_for_value(path, "2", &dev->events);
+
     xenbus_unwatch_path(XBT_NIL, path);
 
-    err = xenbus_printf(XBT_NIL, nodename, "state", "%u", 1);
+    snprintf(path, sizeof(path), "%s/page-ref", nodename);
+    xenbus_rm(XBT_NIL, path);
+    snprintf(path, sizeof(path), "%s/event-channel", nodename);
+    xenbus_rm(XBT_NIL, path);
+    snprintf(path, sizeof(path), "%s/protocol", nodename);
+    xenbus_rm(XBT_NIL, path);
+    snprintf(path, sizeof(path), "%s/feature-update", nodename);
+    xenbus_rm(XBT_NIL, path);
 
     unbind_evtchn(dev->evtchn);
 

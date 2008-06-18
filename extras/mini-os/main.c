@@ -59,11 +59,13 @@ static void call_main(void *p)
      * crashing. */
     //sleep(1);
 
+#ifndef CONFIG_GRUB
     sparse((unsigned long) &__app_bss_start, &__app_bss_end - &__app_bss_start);
 #ifdef HAVE_LWIP
     start_networking();
 #endif
     init_fs_frontend();
+#endif
 
 #ifdef CONFIG_QEMU
     if (!fs_import) {
@@ -154,7 +156,7 @@ void _exit(int ret)
 #ifdef HAVE_LWIP
     stop_networking();
 #endif
-    unbind_all_ports();
+    stop_kernel();
     if (!ret) {
 	/* No problem, just shutdown.  */
         struct sched_shutdown sched_shutdown = { .reason = SHUTDOWN_poweroff };

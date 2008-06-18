@@ -107,6 +107,8 @@ struct xc_dom_image {
 
     /* kernel loader */
     struct xc_dom_arch *arch_hooks;
+    /* allocate up to virt_alloc_end */
+    int (*allocate) (struct xc_dom_image * dom, xen_vaddr_t up_to);
 };
 
 /* --- pluggable kernel loader ------------------------------------- */
@@ -167,6 +169,7 @@ int xc_dom_ramdisk_mem(struct xc_dom_image *dom, const void *mem,
                        size_t memsize);
 
 int xc_dom_parse_image(struct xc_dom_image *dom);
+struct xc_dom_arch *xc_dom_find_arch_hooks(char *guest_type);
 int xc_dom_build_image(struct xc_dom_image *dom);
 int xc_dom_update_guest_p2m(struct xc_dom_image *dom);
 

@@ -242,9 +242,15 @@ void shutdown_blkfront(struct blkfront_dev *dev)
     err = xenbus_printf(XBT_NIL, nodename, "state", "%u", 6);
     xenbus_wait_for_value(path, "6", &dev->events);
 
+    err = xenbus_printf(XBT_NIL, nodename, "state", "%u", 1);
+    xenbus_wait_for_value(path, "2", &dev->events);
+
     xenbus_unwatch_path(XBT_NIL, path);
 
-    err = xenbus_printf(XBT_NIL, nodename, "state", "%u", 1);
+    snprintf(path, sizeof(path), "%s/ring-ref", nodename);
+    xenbus_rm(XBT_NIL, path);
+    snprintf(path, sizeof(path), "%s/event-channel", nodename);
+    xenbus_rm(XBT_NIL, path);
 
     free_blkfront(dev);
 }

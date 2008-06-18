@@ -14,6 +14,7 @@ ZLIB_VERSION=1.2.3
 LIBPCI_VERSION=2.2.9
 NEWLIB_DATE=2008-01-01
 LWIP_DATE=2008-06-01
+GRUB_DATE=2008-06-01
 
 WGET=wget -c
 
@@ -39,10 +40,10 @@ CROSS_PREFIX=$(CURDIR)/$(CROSS_ROOT)
 export CROSS_COMPILE=$(GNU_TARGET_ARCH)-xen-elf-
 export PATH:=$(CROSS_PREFIX)/bin:$(PATH)
 
-TARGETS=ioemu c caml
+TARGETS=ioemu c caml grub
 
 .PHONY: all
-all: ioemu-stubdom c-stubdom
+all: ioemu-stubdom c-stubdom pv-grub
 
 ################
 # Cross-binutils
@@ -221,30 +222,53 @@ caml: cross-newlib mk-symlinks
 c: cross-newlib mk-symlinks
 	$(MAKE) -C $@ LWIPDIR=$(CURDIR)/lwip-cvs 
 
+######
+# Grub
+######
+
+grub-cvs:
+	cvs -z 9 -d :pserver:anonymous@cvs.sv.gnu.org:/sources/grub co -D $(GRUB_DATE) -d $@ grub
+	for i in grub.patches/* ; do \
+		patch -d $@ -p1 < $$i ; \
+	done
+
+.PHONY: grub
+grub: grub-cvs cross-newlib mk-symlinks
+	$(MAKE) -C $@
+
 ########
 # minios
 ########
 
 .PHONY: ioemu-stubdom
 ioemu-stubdom: mini-os-ioemu lwip-cvs libxc ioemu
-	$(MAKE) -C $(MINI_OS) OBJ_DIR=$(CURDIR)/$< LWIPDIR=$(CURDIR)/lwip-cvs APP_OBJS="$(CURDIR)/ioemu/i386-dm-stubdom/qemu.a $(CURDIR)/ioemu/i386-dm-stubdom/libqemu.a" CFLAGS=-DCONFIG_QEMU
+	DEF_CFLAGS=-DCONFIG_QEMU $(MAKE) -C $(MINI_OS) OBJ_DIR=$(CURDIR)/$< LWIPDIR=$(CURDIR)/lwip-cvs APP_OBJS="$(CURDIR)/ioemu/i386-dm-stubdom/qemu.a $(CURDIR)/ioemu/i386-dm-stubdom/libqemu.a"
 
 CAMLLIB = $(shell ocamlc -where)
 .PHONY: caml-stubdom
 caml-stubdom: mini-os-caml lwip-cvs libxc caml
-	$(MAKE) -C $(MINI_OS) OBJ_DIR=$(CURDIR)/$< LWIPDIR=$(CURDIR)/lwip-cvs APP_OBJS="$(CURDIR)/caml/main-caml.o $(CURDIR)/caml/caml.o $(CAMLLIB)/libasmrun.a" CFLAGS=-DCONFIG_CAML
+	DEF_CFLAGS=-DCONFIG_CAML $(MAKE) -C $(MINI_OS) OBJ_DIR=$(CURDIR)/$< LWIPDIR=$(CURDIR)/lwip-cvs APP_OBJS="$(CURDIR)/caml/main-caml.o $(CURDIR)/caml/caml.o $(CAMLLIB)/libasmrun.a"
 
 .PHONY: c-stubdom
 c-stubdom: mini-os-c lwip-cvs libxc c
-	$(MAKE) -C $(MINI_OS) OBJ_DIR=$(CURDIR)/$< LWIPDIR=$(CURDIR)/lwip-cvs APP_OBJS=$(CURDIR)/c/main.a CFLAGS=-DCONFIG_C
+	DEF_CFLAGS=-DCONFIG_C $(MAKE) -C $(MINI_OS) OBJ_DIR=$(CURDIR)/$< LWIPDIR=$(CURDIR)/lwip-cvs APP_OBJS=$(CURDIR)/c/main.a
+
+.PHONY: pv-grub
+pv-grub: mini-os-grub libxc grub
+	DEF_CFLAGS=-DCONFIG_GRUB $(MAKE) -C $(MINI_OS) OBJ_DIR=$(CURDIR)/$< APP_OBJS=$(CURDIR)/grub/main.a
 
 #########
 # install
 #########
 
-install: mini-os-ioemu/mini-os.gz
+install: install-ioemu install-grub
+
+install-ioemu: mini-os-ioemu/mini-os.gz
 	$(INSTALL_PROG) stubdom-dm "$(DESTDIR)/usr/lib/xen/bin"
-	$(INSTALL_PROG) $< "$(DESTDIR)/usr/lib/xen/boot/stubdom.gz"
+	$(INSTALL_PROG) $< "$(DESTDIR)/usr/lib/xen/boot/ioemu-stubdom.gz"
+
+install-grub: mini-os-grub/mini-os.gz
+	$(INSTALL_PROG) $< "$(DESTDIR)/usr/lib/xen/boot/pv-grub.gz"
 
 #######
 # clean
@@ -256,8 +280,10 @@ clean:
 	rm -fr mini-os-ioemu
 	rm -fr mini-os-c
 	rm -fr mini-os-caml
+	rm -fr mini-os-grub
 	$(MAKE) -C caml clean
 	$(MAKE) -C c clean
+	$(MAKE) -C grub clean
 	rm -fr libxc ioemu mini-os include
 
 # clean the cross-compilation result
@@ -274,6 +300,7 @@ patchclean: crossclean
 	rm -fr gcc-$(GCC_VERSION)
 	rm -fr newlib-cvs
 	rm -fr lwip-cvs
+	rm -fr grub-cvs
 
 # clean downloads
 .PHONY: downloadclean

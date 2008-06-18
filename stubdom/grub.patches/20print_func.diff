@@ -1,0 +1,80 @@
+2006-01-05  Otavio Salvador  <otavio@debian.org>
+
+       * Rediff.
+
+2005-16-10  Samuel Thibault  <samuel.thibault@ens-lyon.org>
+
+       * docs/grub.texi: Added print command description.
+       * stage2/builtins.c(print_func): New function.
+       (builtin_print): New variable.
+       (builtin_table): Added builtin_print in table.
+
+Debian Status Following:
+   Added by: Otavio Salvador
+       Date: 2006-01-05
+
+diff -Nur grub-0.97-bkp/docs/grub.texi grub-0.97/docs/grub.texi
+--- grub-0.97-bkp/docs/grub.texi	2006-01-05 10:59:05.564347912 -0200
++++ grub-0.97/docs/grub.texi	2006-01-05 11:18:59.033912960 -0200
+@@ -2685,6 +2685,7 @@
+ * module::                      Load a module
+ * modulenounzip::               Load a module without decompression
+ * pause::                       Wait for a key press
++* print::                       Print a message
+ * quit::                        Exit from the grub shell
+ * reboot::                      Reboot your computer
+ * read::                        Read data from memory
+@@ -3091,6 +3092,16 @@
+ @end deffn
+ 
+ 
++@node print
++@subsection print
++
++@deffn Command print message @dots{}
++Print the @var{message}. Note that placing @key{^G} (ASCII code 7) in the
++message will cause the speaker to emit the standard beep sound, which is
++useful for visually impaired people.
++@end deffn
++
++
+ @node quit
+ @subsection quit
+ 
+diff -Nur grub-0.97-bkp/stage2/builtins.c grub-0.97/stage2/builtins.c
+--- grub-0.97-bkp/stage2/builtins.c	2006-01-05 10:59:05.550350040 -0200
++++ grub-0.97/stage2/builtins.c	2006-01-05 11:19:28.422445224 -0200
+@@ -2323,6 +2323,25 @@
+   "Probe I/O ports used for the drive DRIVE."
+ };
+ 
++/* print */
++static int
++print_func (char *arg, int flags)
++{
++  printf("%s\n", arg);
++
++  return 0;
++}
++
++static struct builtin builtin_print =
++{
++  "print",
++  print_func,
++  BUILTIN_CMDLINE | BUILTIN_MENU | BUILTIN_NO_ECHO,
++  "print [MESSAGE ...]",
++  "Print MESSAGE."
++};
++
++
+ 
+ /* kernel */
+ static int
+@@ -4848,6 +4867,7 @@
+   &builtin_parttype,
+   &builtin_password,
+   &builtin_pause,
++  &builtin_print,
+ #ifdef GRUB_UTIL
+   &builtin_quit,
+ #endif /* GRUB_UTIL */

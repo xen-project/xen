@@ -94,6 +94,9 @@
 ^stubdom/newlib-.*$
 ^stubdom/pciutils-.*$
 ^stubdom/zlib-.*$
+^stubdom/grub-cvs$
+^stubdom/grub/stage2$
+^stubdom/grub/netboot$
 ^tools/.*/TAGS$
 ^tools/.*/build/lib.*/.*\.py$
 ^tools/blktap/Makefile\.smh$
