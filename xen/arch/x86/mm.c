@@ -3086,7 +3086,7 @@ int do_update_va_mapping(unsigned long va, u64 val64,
     if ( unlikely(!access_ok(va, 1) && !paging_mode_external(d)) )
         return -EINVAL;
 
-    rc = xsm_update_va_mapping(current->domain, val);
+    rc = xsm_update_va_mapping(d, val);
     if ( rc )
         return rc;
 
