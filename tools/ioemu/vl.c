@@ -4265,7 +4265,9 @@ static int usb_device_add(const char *devname)
     } else if (!strcmp(devname, "tablet")) {
 	dev = usb_tablet_init();
     } else if (strstart(devname, "disk:", &p)) {
-        dev = usb_msd_init(p);
+        dev = usb_msd_init(p, &bdrv_raw);
+    } else if (strstart(devname, "disk-qcow:", &p)) {
+        dev = usb_msd_init(p, 0);
     } else {
         return -1;
     }
