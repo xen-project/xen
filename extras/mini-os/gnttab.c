@@ -35,7 +35,7 @@ static grant_ref_t gnttab_list[NR_GRANT_ENTRIES];
 #ifdef GNT_DEBUG
 static char inuse[NR_GRANT_ENTRIES];
 #endif
-static __DECLARE_SEMAPHORE_GENERIC(gnttab_sem, NR_GRANT_ENTRIES);
+static __DECLARE_SEMAPHORE_GENERIC(gnttab_sem, 0);
 
 static void
 put_free_entry(grant_ref_t ref)
@@ -60,6 +60,7 @@ get_free_entry(void)
     down(&gnttab_sem);
     local_irq_save(flags);
     ref = gnttab_list[0];
+    BUG_ON(ref < NR_RESERVED_ENTRIES || ref >= NR_GRANT_ENTRIES);
     gnttab_list[0] = gnttab_list[ref];
 #ifdef GNT_DEBUG
     BUG_ON(inuse[ref]);
