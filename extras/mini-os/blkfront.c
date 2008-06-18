@@ -63,7 +63,8 @@ void blkfront_handler(evtchn_port_t port, struct pt_regs *regs, void *data)
     struct blkfront_dev *dev = data;
     int fd = dev->fd;
 
-    files[fd].read = 1;
+    if (fd != -1)
+        files[fd].read = 1;
 #endif
     wake_up(&blkfront_queue);
 }
@@ -105,6 +106,9 @@ struct blkfront_dev *init_blkfront(char *nodename, struct blkfront_info *info)
     dev = malloc(sizeof(*dev));
     memset(dev, 0, sizeof(*dev));
     dev->nodename = strdup(nodename);
+#ifdef HAVE_LIBC
+    dev->fd = -1;
+#endif
 
     snprintf(path, sizeof(path), "%s/backend-id", nodename);
     dev->dom = xenbus_read_integer(path); 
@@ -418,8 +422,10 @@ int blkfront_aio_poll(struct blkfront_dev *dev)
 
 moretodo:
 #ifdef HAVE_LIBC
-    files[dev->fd].read = 0;
-    mb(); /* Make sure to let the handler set read to 1 before we start looking at the ring */
+    if (dev->fd != -1) {
+        files[dev->fd].read = 0;
+        mb(); /* Make sure to let the handler set read to 1 before we start looking at the ring */
+    }
 #endif
 
     rp = dev->ring.sring->rsp_prod;

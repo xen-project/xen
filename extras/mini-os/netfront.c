@@ -259,7 +259,8 @@ void netfront_select_handler(evtchn_port_t port, struct pt_regs *regs, void *dat
     network_tx_buf_gc(dev);
     local_irq_restore(flags);
 
-    files[fd].read = 1;
+    if (fd != -1)
+        files[fd].read = 1;
     wake_up(&netfront_queue);
 }
 #endif
@@ -323,6 +324,9 @@ struct netfront_dev *init_netfront(char *nodename, void (*thenetif_rx)(unsigned 
     dev = malloc(sizeof(*dev));
     memset(dev, 0, sizeof(*dev));
     dev->nodename = strdup(nodename);
+#ifdef HAVE_LIBC
+    dev->fd = -1;
+#endif
 
     printk("net TX ring size %d\n", NET_TX_RING_SIZE);
     printk("net RX ring size %d\n", NET_RX_RING_SIZE);
@@ -599,7 +603,7 @@ ssize_t netfront_receive(struct netfront_dev *dev, unsigned char *data, size_t l
 
     local_irq_save(flags);
     network_rx(dev);
-    if (!dev->rlen)
+    if (!dev->rlen && fd != -1)
 	/* No data for us, make select stop returning */
 	files[fd].read = 0;
     /* Before re-enabling the interrupts, in case a packet just arrived in the

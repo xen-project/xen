@@ -44,7 +44,8 @@ void kbdfront_handler(evtchn_port_t port, struct pt_regs *regs, void *data)
     struct kbdfront_dev *dev = data;
     int fd = dev->fd;
 
-    files[fd].read = 1;
+    if (fd != -1)
+        files[fd].read = 1;
 #endif
     wake_up(&kbdfront_queue);
 }
@@ -83,6 +84,9 @@ struct kbdfront_dev *init_kbdfront(char *nodename, int abs_pointer)
 
     dev = malloc(sizeof(*dev));
     dev->nodename = strdup(nodename);
+#ifdef HAVE_LIBC
+    dev->fd = -1;
+#endif
 
     snprintf(path, sizeof(path), "%s/backend-id", nodename);
     dev->dom = xenbus_read_integer(path); 
@@ -179,8 +183,10 @@ int kbdfront_receive(struct kbdfront_dev *dev, union xenkbd_in_event *buf, int n
     int i;
 
 #ifdef HAVE_LIBC
-    files[dev->fd].read = 0;
-    mb(); /* Make sure to let the handler set read to 1 before we start looking at the ring */
+    if (dev->fd != -1) {
+        files[dev->fd].read = 0;
+        mb(); /* Make sure to let the handler set read to 1 before we start looking at the ring */
+    }
 #endif
 
     prod = page->in_prod;
@@ -198,7 +204,7 @@ int kbdfront_receive(struct kbdfront_dev *dev, union xenkbd_in_event *buf, int n
     notify_remote_via_evtchn(dev->evtchn);
 
 #ifdef HAVE_LIBC
-    if (cons != prod)
+    if (cons != prod && dev->fd != -1)
         /* still some events to read */
         files[dev->fd].read = 1;
 #endif
@@ -281,7 +287,8 @@ void fbfront_handler(evtchn_port_t port, struct pt_regs *regs, void *data)
     struct fbfront_dev *dev = data;
     int fd = dev->fd;
 
-    files[fd].read = 1;
+    if (fd != -1)
+        files[fd].read = 1;
 #endif
     wake_up(&fbfront_queue);
 }
@@ -307,8 +314,10 @@ int fbfront_receive(struct fbfront_dev *dev, union xenfb_in_event *buf, int n)
     int i;
 
 #ifdef HAVE_LIBC
-    files[dev->fd].read = 0;
-    mb(); /* Make sure to let the handler set read to 1 before we start looking at the ring */
+    if (dev->fd != -1) {
+        files[dev->fd].read = 0;
+        mb(); /* Make sure to let the handler set read to 1 before we start looking at the ring */
+    }
 #endif
 
     prod = page->in_prod;
@@ -326,7 +335,7 @@ int fbfront_receive(struct fbfront_dev *dev, union xenfb_in_event *buf, int n)
     notify_remote_via_evtchn(dev->evtchn);
 
 #ifdef HAVE_LIBC
-    if (cons != prod)
+    if (cons != prod && dev->fd != -1)
         /* still some events to read */
         files[dev->fd].read = 1;
 #endif
@@ -354,6 +363,9 @@ struct fbfront_dev *init_fbfront(char *nodename, unsigned long *mfns, int width,
 
     dev = malloc(sizeof(*dev));
     dev->nodename = strdup(nodename);
+#ifdef HAVE_LIBC
+    dev->fd = -1;
+#endif
 
     snprintf(path, sizeof(path), "%s/backend-id", nodename);
     dev->dom = xenbus_read_integer(path); 
