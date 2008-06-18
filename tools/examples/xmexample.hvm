@@ -256,16 +256,16 @@ serial='pty'
 #vcpus=5
 #
 #  Downgrade the cpuid to make a better compatibility for migration :
-# Look like a PIII :
-# cpuid = [ '0:eax=0x3',
+# Look like a generic 686 :
+# cpuid = [ '0:eax=0x3,ebx=0x0,ecx=0x0,edx=0x0',
 #           '1:eax=0x06b1,
 #              ecx=xxxxxxxxxx0000xx00xxx0000000xx0,
 #              edx=xx00000xxxxxxx0xxxxxxxxx0xxxxxx',
-#           '4:eax=0x3,ebx=0x756e6547,ecx=0x6c65746e,edx=0x49656e69',
-#  '0x80000000:eax=0x3,ebx=0x756e6547,ecx=0x6c65746e,edx=0x49656e69']
+#           '4:eax=0x3,ebx=0x0,ecx=0x0,edx=0x0',
+#  '0x80000000:eax=0x3,ebx=0x0,ecx=0x0,edx=0x0']
 #  with the highest leaf
 #  - CPUID.0[EAX] : Set the highest leaf
-#  - CPUID.1[EAX] : Pentium III
+#  - CPUID.1[EAX] : 686 
 #  - CPUID.1[ECX] : Mask some features
 #  - CPUID.1[EDX] : Mask some features
 #  - CPUID.4 : Reply like the highest leaf, in our case CPUID.3
