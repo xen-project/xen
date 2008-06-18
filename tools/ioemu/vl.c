@@ -137,6 +137,9 @@
 /* XXX: use a two level table to limit memory usage */
 #define MAX_IOPORTS 65536
 
+/* Max number of PCI emulation */
+#define MAX_PCI_EMULATION 32
+
 const char *bios_dir = CONFIG_QEMU_SHAREDIR;
 void *ioport_opaque[MAX_IOPORTS];
 IOPortReadFunc *ioport_read_table[3][MAX_IOPORTS];
@@ -211,6 +214,8 @@ int xc_handle;
 
 char domain_name[64] = "Xen-no-name";
 extern int domid;
+
+PCI_EMULATION_INFO *PciEmulationInfoHead = NULL;
 
 /***********************************************************/
 /* x86 ISA bus support */
@@ -4399,6 +4404,17 @@ void do_pci_add(char *devname)
 #endif
 }
 
+static int pci_emulation_add(char *config_text)
+{
+    PCI_EMULATION_INFO *new;
+    if ((new = qemu_mallocz(sizeof(PCI_EMULATION_INFO))) == NULL) {
+        return -1;
+    }
+    parse_pci_emulation_info(config_text, new);
+    new->next = PciEmulationInfoHead;
+    PciEmulationInfoHead = new;
+    return 0;
+}
 
 /***********************************************************/
 /* pid file */
@@ -6590,6 +6606,7 @@ void help(void)
 #endif
 	   "-option-rom rom load a file, rom, into the option ROM space\n"
            "-acpi           disable or enable ACPI of HVM domain \n"
+           "-pciemulation       name:vendorid:deviceid:command:status:revision:classcode:headertype:subvendorid:subsystemid:interruputline:interruputpin\n"
            "\n"
            "During emulation, the following keys are useful:\n"
            "ctrl-alt-f      toggle full screen\n"
@@ -6688,6 +6705,7 @@ enum {
     QEMU_OPTION_vncviewer,
     QEMU_OPTION_vncunused,
     QEMU_OPTION_pci,
+    QEMU_OPTION_pci_emulation,
 };
 
 typedef struct QEMUOption {
@@ -6789,6 +6807,7 @@ const QEMUOption qemu_options[] = {
     { "vcpus", 1, QEMU_OPTION_vcpus },
     { "acpi", 0, QEMU_OPTION_acpi },
     { "pci", HAS_ARG, QEMU_OPTION_pci},
+    { "pciemulation", HAS_ARG, QEMU_OPTION_pci_emulation },
     { NULL },
 };
 
@@ -7073,6 +7092,8 @@ int main(int argc, char **argv)
     sigset_t set;
     char qemu_dm_logfilename[128];
     const char *direct_pci = direct_pci_str;
+    int nb_pci_emulation = 0;
+    char pci_emulation_config_text[MAX_PCI_EMULATION][256];
 
 #if !defined(__sun__) && !defined(CONFIG_STUBDOM)
     /* Maximise rlimits. Needed where default constraints are tight (*BSD). */
@@ -7598,6 +7619,16 @@ int main(int argc, char **argv)
             case QEMU_OPTION_vncunused:
                 vncunused++;
                 break;
+            case QEMU_OPTION_pci_emulation:
+                if (nb_pci_emulation >= MAX_PCI_EMULATION) {
+                    fprintf(stderr, "Too many PCI emulations\n");
+                    exit(1);
+                }
+                pstrcpy(pci_emulation_config_text[nb_pci_emulation],
+                        sizeof(pci_emulation_config_text[0]),
+                        optarg);
+                nb_pci_emulation++;
+                break;
             }
         }
     }
@@ -7894,6 +7925,13 @@ int main(int argc, char **argv)
             store_dev_info(parallel_devices[i], domid, parallel_hds[i], buf);
             if (!strcmp(devname, "vc"))
                 qemu_chr_printf(parallel_hds[i], "parallel%d console\r\n", i);
+        }
+    }
+
+    for (i = 0; i < nb_pci_emulation; i++) {
+        if(pci_emulation_add(pci_emulation_config_text[i]) < 0) {
+            fprintf(stderr, "Warning: could not add PCI device %s\n",
+                    pci_emulation_config_text[i]);
         }
     }
 

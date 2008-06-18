@@ -1560,6 +1560,10 @@ void timeoffset_get(void);
 void pci_xen_platform_init(PCIBus *bus);
 #endif
 
+/* pci_emulation.c */
+#ifndef QEMU_TOOL
+#include "hw/pci_emulation.h"
+#endif
 
 void kqemu_record_dump(void);
 

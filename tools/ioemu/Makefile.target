@@ -441,6 +441,7 @@ ifdef CONFIG_STUBDOM
 VL_OBJS+= xenfbfront.o
 endif
 VL_OBJS+= xen_console.o
+VL_OBJS+= pci_emulation.o
 ifndef CONFIG_STUBDOM
 VL_OBJS+= tpm_tis.o
 VL_OBJS+= $(SOUND_HW) $(AUDIODRV) mixeng.o 
