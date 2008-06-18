@@ -838,7 +838,8 @@ static void vmx_set_segment_register(struct vcpu *v, enum x86_segment seg,
         __vmwrite(GUEST_TR_SELECTOR, reg->sel);
         __vmwrite(GUEST_TR_LIMIT, reg->limit);
         __vmwrite(GUEST_TR_BASE, reg->base);
-        __vmwrite(GUEST_TR_AR_BYTES, attr);
+        /* VMX checks that the the busy flag (bit 1) is set. */
+        __vmwrite(GUEST_TR_AR_BYTES, attr | 2);
         break;
     case x86_seg_gdtr:
         __vmwrite(GUEST_GDTR_LIMIT, reg->limit);
