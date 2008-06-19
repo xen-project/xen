@@ -11,9 +11,7 @@
 #endif
 
 #include <asm/io.h>
-#ifndef XEN
 #include <asm/scatterlist.h>
-#endif
 
 /*
  * Can be used to override the logic in pci_scan_bus for skipping already-configured bus
@@ -60,9 +58,7 @@ pcibios_penalize_isa_irq (int irq, int active)
 #define HAVE_ARCH_PCI_MWI 1
 extern int pcibios_prep_mwi (struct pci_dev *);
 
-#ifndef XEN
 #include <asm-generic/pci-dma-compat.h>
-#endif
 
 /* pci_unmap_{single,page} is not a nop, thus... */
 #define DECLARE_PCI_UNMAP_ADDR(ADDR_NAME)	\

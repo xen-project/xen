@@ -51,10 +51,9 @@
 #include <asm/system.h>
 #include <asm/numa.h>
 #include <asm/sal.h>
-#ifndef XEN
 #include <asm/cyclone.h>
 #include <asm/xen/hypervisor.h>
-#else
+#ifdef XEN
 #include <asm/hw_irq.h>
 extern u8 numa_slit[MAX_NUMNODES * MAX_NUMNODES];
 #endif

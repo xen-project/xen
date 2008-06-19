@@ -41,10 +41,8 @@
 #include <linux/serial_core.h>
 #include <linux/efi.h>
 #include <linux/initrd.h>
-#ifndef XEN
 #include <linux/platform.h>
 #include <linux/pm.h>
-#endif
 
 #include <asm/ia32.h>
 #include <asm/machvec.h>

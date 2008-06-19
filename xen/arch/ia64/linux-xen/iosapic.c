@@ -75,9 +75,8 @@
 #include <linux/irq.h>
 #include <linux/kernel.h>
 #include <linux/list.h>
-#ifndef XEN
 #include <linux/pci.h>
-#else
+#ifdef XEN
 #include <xen/errno.h>
 #endif
 #include <linux/smp.h>

@@ -10,6 +10,7 @@ hpsim.S			-> linux/arch/ia64/hp/sim/hpsim.S
 irq_lsapic.c		-> linux/arch/ia64/kernel/irq_lsapic.c
 linuxextable.c		-> linux/kernel/extable.c
 machvec.c		-> linux/arch/ia64/kernel/machvec.c
+numa.c			-> linux/arch/ia64/mm/numa.c
 patch.c			-> linux/arch/ia64/kernel/patch.c
 pcdp.h			-> linux/drivers/firmware/pcdp.h
 
