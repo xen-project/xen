@@ -333,10 +333,10 @@ enum vmcs_field {
 #define VMCS_VPID_WIDTH 16
 
 void vmx_disable_intercept_for_msr(struct vcpu *v, u32 msr);
-int vmx_read_guest_msr(struct vcpu *v, u32 msr, u64 *val);
-int vmx_write_guest_msr(struct vcpu *v, u32 msr, u64 val);
-int vmx_add_guest_msr(struct vcpu *v, u32 msr);
-int vmx_add_host_load_msr(struct vcpu *v, u32 msr);
+int vmx_read_guest_msr(u32 msr, u64 *val);
+int vmx_write_guest_msr(u32 msr, u64 val);
+int vmx_add_guest_msr(u32 msr);
+int vmx_add_host_load_msr(u32 msr);
 
 #endif /* ASM_X86_HVM_VMX_VMCS_H__ */
 

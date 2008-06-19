@@ -219,12 +219,12 @@ static int core2_vpmu_alloc_resource(struct vcpu *v)
         return 0;
 
     wrmsrl(MSR_CORE_PERF_GLOBAL_CTRL, 0);
-    if ( vmx_add_host_load_msr(v, MSR_CORE_PERF_GLOBAL_CTRL) )
+    if ( vmx_add_host_load_msr(MSR_CORE_PERF_GLOBAL_CTRL) )
         return 0;
 
-    if ( vmx_add_guest_msr(v, MSR_CORE_PERF_GLOBAL_CTRL) )
+    if ( vmx_add_guest_msr(MSR_CORE_PERF_GLOBAL_CTRL) )
         return 0;
-    vmx_write_guest_msr(v, MSR_CORE_PERF_GLOBAL_CTRL, -1ULL);
+    vmx_write_guest_msr(MSR_CORE_PERF_GLOBAL_CTRL, -1ULL);
 
     pmu_enable = xmalloc_bytes(sizeof(struct core2_pmu_enable) +
                  (core2_get_pmc_count()-1)*sizeof(char));
@@ -347,7 +347,7 @@ static int core2_vpmu_do_wrmsr(struct cpu_user_regs *regs)
         break;
     case MSR_CORE_PERF_FIXED_CTR_CTRL:
         non_global_ctrl = msr_content;
-        vmx_read_guest_msr(v, MSR_CORE_PERF_GLOBAL_CTRL, &global_ctrl);
+        vmx_read_guest_msr(MSR_CORE_PERF_GLOBAL_CTRL, &global_ctrl);
         global_ctrl >>= 32;
         for ( i = 0; i < 3; i++ )
         {
@@ -359,7 +359,7 @@ static int core2_vpmu_do_wrmsr(struct cpu_user_regs *regs)
         break;
     default:
         tmp = ecx - MSR_P6_EVNTSEL0;
-        vmx_read_guest_msr(v, MSR_CORE_PERF_GLOBAL_CTRL, &global_ctrl);
+        vmx_read_guest_msr(MSR_CORE_PERF_GLOBAL_CTRL, &global_ctrl);
         if ( tmp >= 0 && tmp < core2_get_pmc_count() )
             core2_vpmu_cxt->pmu_enable->arch_pmc_enable[tmp] =
                 (global_ctrl >> tmp) & (msr_content >> 22) & 1;
@@ -385,7 +385,7 @@ static int core2_vpmu_do_wrmsr(struct cpu_user_regs *regs)
     if ( type != MSR_TYPE_GLOBAL )
         wrmsrl(ecx, msr_content);
     else
-        vmx_write_guest_msr(v, MSR_CORE_PERF_GLOBAL_CTRL, msr_content);
+        vmx_write_guest_msr(MSR_CORE_PERF_GLOBAL_CTRL, msr_content);
 
     return 1;
 }
@@ -410,7 +410,7 @@ static int core2_vpmu_do_rdmsr(struct cpu_user_regs *regs)
         msr_content = core2_vpmu_cxt->global_ovf_status;
         break;
     case MSR_CORE_PERF_GLOBAL_CTRL:
-        vmx_read_guest_msr(v, MSR_CORE_PERF_GLOBAL_CTRL, &msr_content);
+        vmx_read_guest_msr(MSR_CORE_PERF_GLOBAL_CTRL, &msr_content);
         break;
     default:
         rdmsrl(regs->ecx, msr_content);

@@ -677,10 +677,11 @@ static int construct_vmcs(struct vcpu *v)
     return 0;
 }
 
-int vmx_read_guest_msr(struct vcpu *v, u32 msr, u64 *val)
+int vmx_read_guest_msr(u32 msr, u64 *val)
 {
-    unsigned int i, msr_count = v->arch.hvm_vmx.msr_count;
-    const struct vmx_msr_entry *msr_area = v->arch.hvm_vmx.msr_area;
+    struct vcpu *curr = current;
+    unsigned int i, msr_count = curr->arch.hvm_vmx.msr_count;
+    const struct vmx_msr_entry *msr_area = curr->arch.hvm_vmx.msr_area;
 
     for ( i = 0; i < msr_count; i++ )
     {
@@ -694,10 +695,11 @@ int vmx_read_guest_msr(struct vcpu *v, u32 msr, u64 *val)
     return -ESRCH;
 }
 
-int vmx_write_guest_msr(struct vcpu *v, u32 msr, u64 val)
+int vmx_write_guest_msr(u32 msr, u64 val)
 {
-    unsigned int i, msr_count = v->arch.hvm_vmx.msr_count;
-    struct vmx_msr_entry *msr_area = v->arch.hvm_vmx.msr_area;
+    struct vcpu *curr = current;
+    unsigned int i, msr_count = curr->arch.hvm_vmx.msr_count;
+    struct vmx_msr_entry *msr_area = curr->arch.hvm_vmx.msr_area;
 
     for ( i = 0; i < msr_count; i++ )
     {
@@ -711,10 +713,20 @@ int vmx_write_guest_msr(struct vcpu *v, u32 msr, u64 val)
     return -ESRCH;
 }
 
-int vmx_add_guest_msr(struct vcpu *v, u32 msr)
+int vmx_add_guest_msr(u32 msr)
 {
-    unsigned int i, msr_count = v->arch.hvm_vmx.msr_count;
-    struct vmx_msr_entry *msr_area = v->arch.hvm_vmx.msr_area;
+    struct vcpu *curr = current;
+    unsigned int i, msr_count = curr->arch.hvm_vmx.msr_count;
+    struct vmx_msr_entry *msr_area = curr->arch.hvm_vmx.msr_area;
+
+    if ( msr_area == NULL )
+    {
+        if ( (msr_area = alloc_xenheap_page()) == NULL )
+            return -ENOMEM;
+        curr->arch.hvm_vmx.msr_area = msr_area;
+        __vmwrite(VM_EXIT_MSR_STORE_ADDR, virt_to_maddr(msr_area));
+        __vmwrite(VM_ENTRY_MSR_LOAD_ADDR, virt_to_maddr(msr_area));
+    }
 
     for ( i = 0; i < msr_count; i++ )
         if ( msr_area[i].index == msr )
@@ -723,29 +735,29 @@ int vmx_add_guest_msr(struct vcpu *v, u32 msr)
     if ( msr_count == (PAGE_SIZE / sizeof(struct vmx_msr_entry)) )
         return -ENOSPC;
 
-    if ( msr_area == NULL )
-    {
-        if ( (msr_area = alloc_xenheap_page()) == NULL )
-            return -ENOMEM;
-        v->arch.hvm_vmx.msr_area = msr_area;
-        __vmwrite(VM_EXIT_MSR_STORE_ADDR, virt_to_maddr(msr_area));
-        __vmwrite(VM_ENTRY_MSR_LOAD_ADDR, virt_to_maddr(msr_area));
-    }
-
     msr_area[msr_count].index = msr;
     msr_area[msr_count].mbz   = 0;
     msr_area[msr_count].data  = 0;
-    v->arch.hvm_vmx.msr_count = ++msr_count;
+    curr->arch.hvm_vmx.msr_count = ++msr_count;
     __vmwrite(VM_EXIT_MSR_STORE_COUNT, msr_count);
     __vmwrite(VM_ENTRY_MSR_LOAD_COUNT, msr_count);
 
     return 0;
 }
 
-int vmx_add_host_load_msr(struct vcpu *v, u32 msr)
+int vmx_add_host_load_msr(u32 msr)
 {
-    unsigned int i, msr_count = v->arch.hvm_vmx.host_msr_count;
-    struct vmx_msr_entry *msr_area = v->arch.hvm_vmx.host_msr_area;
+    struct vcpu *curr = current;
+    unsigned int i, msr_count = curr->arch.hvm_vmx.host_msr_count;
+    struct vmx_msr_entry *msr_area = curr->arch.hvm_vmx.host_msr_area;
+
+    if ( msr_area == NULL )
+    {
+        if ( (msr_area = alloc_xenheap_page()) == NULL )
+            return -ENOMEM;
+        curr->arch.hvm_vmx.host_msr_area = msr_area;
+        __vmwrite(VM_EXIT_MSR_LOAD_ADDR, virt_to_maddr(msr_area));
+    }
 
     for ( i = 0; i < msr_count; i++ )
         if ( msr_area[i].index == msr )
@@ -754,18 +766,10 @@ int vmx_add_host_load_msr(struct vcpu *v, u32 msr)
     if ( msr_count == (PAGE_SIZE / sizeof(struct vmx_msr_entry)) )
         return -ENOSPC;
 
-    if ( msr_area == NULL )
-    {
-        if ( (msr_area = alloc_xenheap_page()) == NULL )
-            return -ENOMEM;
-        v->arch.hvm_vmx.host_msr_area = msr_area;
-        __vmwrite(VM_EXIT_MSR_LOAD_ADDR, virt_to_maddr(msr_area));
-    }
-
     msr_area[msr_count].index = msr;
     msr_area[msr_count].mbz   = 0;
     rdmsrl(msr, msr_area[msr_count].data);
-    v->arch.hvm_vmx.host_msr_count = ++msr_count;
+    curr->arch.hvm_vmx.host_msr_count = ++msr_count;
     __vmwrite(VM_EXIT_MSR_LOAD_COUNT, msr_count);
 
     return 0;
@@ -776,21 +780,17 @@ int vmx_create_vmcs(struct vcpu *v)
     struct arch_vmx_struct *arch_vmx = &v->arch.hvm_vmx;
     int rc;
 
-    if ( arch_vmx->vmcs == NULL )
-    {
-        if ( (arch_vmx->vmcs = vmx_alloc_vmcs()) == NULL )
-            return -ENOMEM;
+    if ( (arch_vmx->vmcs = vmx_alloc_vmcs()) == NULL )
+        return -ENOMEM;
 
-        INIT_LIST_HEAD(&arch_vmx->active_list);
-        __vmpclear(virt_to_maddr(arch_vmx->vmcs));
-        arch_vmx->active_cpu = -1;
-        arch_vmx->launched   = 0;
-    }
+    INIT_LIST_HEAD(&arch_vmx->active_list);
+    __vmpclear(virt_to_maddr(arch_vmx->vmcs));
+    arch_vmx->active_cpu = -1;
+    arch_vmx->launched   = 0;
 
     if ( (rc = construct_vmcs(v)) != 0 )
     {
         vmx_free_vmcs(arch_vmx->vmcs);
-        arch_vmx->vmcs = NULL;
         return rc;
     }
 
@@ -801,13 +801,13 @@ void vmx_destroy_vmcs(struct vcpu *v)
 {
     struct arch_vmx_struct *arch_vmx = &v->arch.hvm_vmx;
 
-    if ( arch_vmx->vmcs == NULL )
-        return;
-
     vmx_clear_vmcs(v);
 
     vmx_free_vmcs(arch_vmx->vmcs);
-    arch_vmx->vmcs = NULL;
+
+    free_xenheap_page(v->arch.hvm_vmx.host_msr_area);
+    free_xenheap_page(v->arch.hvm_vmx.msr_area);
+    free_xenheap_page(v->arch.hvm_vmx.msr_bitmap);
 }
 
 void vm_launch_fail(void)
