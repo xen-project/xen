@@ -87,7 +87,7 @@ int compat_vcpu_op(int cmd, int vcpuid, XEN_GUEST_HANDLE(void) arg)
 
         if ( copy_from_guest(&cmp, arg, 1) )
             return -EFAULT;
-        nat = (void *)COMPAT_ARG_XLAT_VIRT_START(current->vcpu_id);
+        nat = (void *)COMPAT_ARG_XLAT_VIRT_BASE;
         XLAT_vcpu_set_singleshot_timer(nat, &cmp);
         rc = do_vcpu_op(cmd, vcpuid, guest_handle_from_ptr(nat, void));
         break;

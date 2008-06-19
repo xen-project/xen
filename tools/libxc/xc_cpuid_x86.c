@@ -25,81 +25,17 @@
 #include <xen/hvm/params.h>
 
 #define bitmaskof(idx)      (1u << ((idx) & 31))
-#define clear_bit(idx, dst) ((dst) &= ~(1u << (idx)))
-#define set_bit(idx, dst)   ((dst) |= (1u << (idx)))
+#define clear_bit(idx, dst) ((dst) &= ~(1u << ((idx) & 31)))
+#define set_bit(idx, dst)   ((dst) |= (1u << ((idx) & 31)))
 
 #define DEF_MAX_BASE 0x00000004u
 #define DEF_MAX_EXT  0x80000008u
 
-static void amd_xc_cpuid_policy(
-    int xc, domid_t domid, const unsigned int *input, unsigned int *regs)
+static int hypervisor_is_64bit(int xc)
 {
-    unsigned long pae = 0;
-
-    xc_get_hvm_param(xc, domid, HVM_PARAM_PAE_ENABLED, &pae);
-
-    switch ( input[0] )
-    {
-    case 0x00000001:
-        /* Mask Intel-only features. */
-        regs[2] &= ~(bitmaskof(X86_FEATURE_SSSE3) |
-                     bitmaskof(X86_FEATURE_SSE4_1) |
-                     bitmaskof(X86_FEATURE_SSE4_2));
-        break;
-
-    case 0x00000002:
-    case 0x00000004:
-        regs[0] = regs[1] = regs[2] = 0;
-        break;
-
-    case 0x80000001:
-        if ( !pae )
-            clear_bit(X86_FEATURE_PAE & 31, regs[3]);
-        clear_bit(X86_FEATURE_PSE36 & 31, regs[3]);
-
-        /* Filter all other features according to a whitelist. */
-        regs[2] &= (bitmaskof(X86_FEATURE_LAHF_LM) |
-                    bitmaskof(X86_FEATURE_ALTMOVCR) |
-                    bitmaskof(X86_FEATURE_ABM) |
-                    bitmaskof(X86_FEATURE_SSE4A) |
-                    bitmaskof(X86_FEATURE_MISALIGNSSE) |
-                    bitmaskof(X86_FEATURE_3DNOWPF));
-        regs[3] &= (0x0183f3ff | /* features shared with 0x00000001:EDX */
-                    bitmaskof(X86_FEATURE_NX) |
-                    bitmaskof(X86_FEATURE_LM) |
-                    bitmaskof(X86_FEATURE_SYSCALL) |
-                    bitmaskof(X86_FEATURE_MP) |
-                    bitmaskof(X86_FEATURE_MMXEXT) |
-                    bitmaskof(X86_FEATURE_FFXSR) |
-                    bitmaskof(X86_FEATURE_3DNOW) |
-                    bitmaskof(X86_FEATURE_3DNOWEXT));
-        break;
-    }
-}
-
-static void intel_xc_cpuid_policy(
-    int xc, domid_t domid, const unsigned int *input, unsigned int *regs)
-{
-    switch ( input[0] )
-    {
-    case 0x00000001:
-        /* Mask AMD-only features. */
-        regs[2] &= ~(bitmaskof(X86_FEATURE_POPCNT));
-        break;
-
-    case 0x00000004:
-        regs[0] &= 0x3FF;
-        regs[3] &= 0x3FF;
-        break;
-
-    case 0x80000001:
-        /* Only a few features are advertised in Intel's 0x80000001. */
-        regs[2] &= (bitmaskof(X86_FEATURE_LAHF_LM));
-        regs[3] &= (bitmaskof(X86_FEATURE_NX) |
-                    bitmaskof(X86_FEATURE_LM) |
-                    bitmaskof(X86_FEATURE_SYSCALL));
-        break;
-    }
+    xen_capabilities_info_t xen_caps = "";
+    return ((xc_version(xc, XENVER_capabilities, &xen_caps) == 0) &&
+            (strstr(xen_caps, "x86_64") != NULL));
 }
 
 static void cpuid(const unsigned int *input, unsigned int *regs)
@@ -129,15 +65,92 @@ static void xc_cpuid_brand_get(char *str)
     str[12] = '\0';
 }
 
-static void xc_cpuid_policy(
+static void amd_xc_cpuid_policy(
+    int xc, domid_t domid, const unsigned int *input, unsigned int *regs,
+    int is_pae)
+{
+    switch ( input[0] )
+    {
+    case 0x00000001:
+        /* Mask Intel-only features. */
+        regs[2] &= ~(bitmaskof(X86_FEATURE_SSSE3) |
+                     bitmaskof(X86_FEATURE_SSE4_1) |
+                     bitmaskof(X86_FEATURE_SSE4_2));
+        break;
+
+    case 0x00000002:
+    case 0x00000004:
+        regs[0] = regs[1] = regs[2] = 0;
+        break;
+
+    case 0x80000001: {
+        int is_64bit = hypervisor_is_64bit(xc) && is_pae;
+
+        if ( !is_pae )
+            clear_bit(X86_FEATURE_PAE, regs[3]);
+        clear_bit(X86_FEATURE_PSE36, regs[3]);
+
+        /* Filter all other features according to a whitelist. */
+        regs[2] &= ((is_64bit ? bitmaskof(X86_FEATURE_LAHF_LM) : 0) |
+                    bitmaskof(X86_FEATURE_ALTMOVCR) |
+                    bitmaskof(X86_FEATURE_ABM) |
+                    bitmaskof(X86_FEATURE_SSE4A) |
+                    bitmaskof(X86_FEATURE_MISALIGNSSE) |
+                    bitmaskof(X86_FEATURE_3DNOWPF));
+        regs[3] &= (0x0183f3ff | /* features shared with 0x00000001:EDX */
+                    (is_pae ? bitmaskof(X86_FEATURE_NX) : 0) |
+                    (is_64bit ? bitmaskof(X86_FEATURE_LM) : 0) |
+                    bitmaskof(X86_FEATURE_SYSCALL) |
+                    bitmaskof(X86_FEATURE_MP) |
+                    bitmaskof(X86_FEATURE_MMXEXT) |
+                    bitmaskof(X86_FEATURE_FFXSR) |
+                    bitmaskof(X86_FEATURE_3DNOW) |
+                    bitmaskof(X86_FEATURE_3DNOWEXT));
+        break;
+    }
+    }
+}
+
+static void intel_xc_cpuid_policy(
+    int xc, domid_t domid, const unsigned int *input, unsigned int *regs,
+    int is_pae)
+{
+    switch ( input[0] )
+    {
+    case 0x00000001:
+        /* Mask AMD-only features. */
+        regs[2] &= ~(bitmaskof(X86_FEATURE_POPCNT));
+        break;
+
+    case 0x00000004:
+        regs[0] &= 0x3FF;
+        regs[3] &= 0x3FF;
+        break;
+
+    case 0x80000001: {
+        int is_64bit = hypervisor_is_64bit(xc) && is_pae;
+
+        /* Only a few features are advertised in Intel's 0x80000001. */
+        regs[2] &= (is_64bit ? bitmaskof(X86_FEATURE_LAHF_LM) : 0);
+        regs[3] &= ((is_pae ? bitmaskof(X86_FEATURE_NX) : 0) |
+                    (is_64bit ? bitmaskof(X86_FEATURE_LM) : 0) |
+                    (is_64bit ? bitmaskof(X86_FEATURE_SYSCALL) : 0));
+        break;
+    }
+    }
+}
+
+static void xc_cpuid_hvm_policy(
     int xc, domid_t domid, const unsigned int *input, unsigned int *regs)
 {
     char brand[13];
     unsigned long pae;
+    int is_pae;
 
     xc_get_hvm_param(xc, domid, HVM_PARAM_PAE_ENABLED, &pae);
+    is_pae = !!pae;
 
-    switch( input[0] )
+    switch ( input[0] )
     {
     case 0x00000000:
         if ( regs[0] > DEF_MAX_BASE )
@@ -177,8 +190,8 @@ static void xc_cpuid_policy(
         /* We always support MTRR MSRs. */
         regs[3] |= bitmaskof(X86_FEATURE_MTRR);
 
-        if ( !pae )
-            clear_bit(X86_FEATURE_PAE & 31, regs[3]);
+        if ( !is_pae )
+            clear_bit(X86_FEATURE_PAE, regs[3]);
         break;
 
     case 0x80000000:
@@ -187,8 +200,8 @@ static void xc_cpuid_policy(
         break;
 
     case 0x80000001:
-        if ( !pae )
-            clear_bit(X86_FEATURE_NX & 31, regs[3]);
+        if ( !is_pae )
+            clear_bit(X86_FEATURE_NX, regs[3]);
         break;
 
 
@@ -212,9 +225,104 @@ static void xc_cpuid_policy(
 
     xc_cpuid_brand_get(brand);
     if ( strstr(brand, "AMD") )
-        amd_xc_cpuid_policy(xc, domid, input, regs);
+        amd_xc_cpuid_policy(xc, domid, input, regs, is_pae);
     else
-        intel_xc_cpuid_policy(xc, domid, input, regs);
+        intel_xc_cpuid_policy(xc, domid, input, regs, is_pae);
+
+}
+
+static void xc_cpuid_pv_policy(
+    int xc, domid_t domid, const unsigned int *input, unsigned int *regs)
+{
+    DECLARE_DOMCTL;
+    int guest_64bit, xen_64bit = hypervisor_is_64bit(xc);
+    char brand[13];
+
+    xc_cpuid_brand_get(brand);
+
+    memset(&domctl, 0, sizeof(domctl));
+    domctl.domain = domid;
+    domctl.cmd = XEN_DOMCTL_get_address_size;
+    do_domctl(xc, &domctl);
+    guest_64bit = (domctl.u.address_size.size == 64);
+
+    if ( (input[0] & 0x7fffffff) == 1 )
+    {
+        clear_bit(X86_FEATURE_VME, regs[3]);
+        clear_bit(X86_FEATURE_PSE, regs[3]);
+        clear_bit(X86_FEATURE_PGE, regs[3]);
+        clear_bit(X86_FEATURE_MCE, regs[3]);
+        clear_bit(X86_FEATURE_MCA, regs[3]);
+        clear_bit(X86_FEATURE_MTRR, regs[3]);
+        clear_bit(X86_FEATURE_PSE36, regs[3]);
+    }
+
+    switch ( input[0] )
+    {
+    case 1:
+        if ( !xen_64bit || strstr(brand, "AMD") )
+            clear_bit(X86_FEATURE_SEP, regs[3]);
+        clear_bit(X86_FEATURE_DS, regs[3]);
+        clear_bit(X86_FEATURE_ACC, regs[3]);
+        clear_bit(X86_FEATURE_PBE, regs[3]);
+
+        clear_bit(X86_FEATURE_DTES64, regs[2]);
+        clear_bit(X86_FEATURE_MWAIT, regs[2]);
+        clear_bit(X86_FEATURE_DSCPL, regs[2]);
+        clear_bit(X86_FEATURE_VMXE, regs[2]);
+        clear_bit(X86_FEATURE_SMXE, regs[2]);
+        clear_bit(X86_FEATURE_EST, regs[2]);
+        clear_bit(X86_FEATURE_TM2, regs[2]);
+        if ( !guest_64bit )
+            clear_bit(X86_FEATURE_CX16, regs[2]);
+        clear_bit(X86_FEATURE_XTPR, regs[2]);
+        clear_bit(X86_FEATURE_PDCM, regs[2]);
+        clear_bit(X86_FEATURE_DCA, regs[2]);
+        break;
+    case 0x80000001:
+        if ( !guest_64bit )
+        {
+            clear_bit(X86_FEATURE_LM, regs[3]);
+            clear_bit(X86_FEATURE_LAHF_LM, regs[2]);
+            if ( !strstr(brand, "AMD") )
+                clear_bit(X86_FEATURE_SYSCALL, regs[3]);
+        }
+        else
+        {
+            set_bit(X86_FEATURE_SYSCALL, regs[3]);
+        }
+        clear_bit(X86_FEATURE_PAGE1GB, regs[3]);
+        clear_bit(X86_FEATURE_RDTSCP, regs[3]);
+
+        clear_bit(X86_FEATURE_SVME, regs[2]);
+        clear_bit(X86_FEATURE_OSVW, regs[2]);
+        clear_bit(X86_FEATURE_IBS, regs[2]);
+        clear_bit(X86_FEATURE_SKINIT, regs[2]);
+        clear_bit(X86_FEATURE_WDT, regs[2]);
+        break;
+    case 5: /* MONITOR/MWAIT */
+    case 0xa: /* Architectural Performance Monitor Features */
+    case 0x8000000a: /* SVM revision and features */
+    case 0x8000001b: /* Instruction Based Sampling */
+        regs[0] = regs[1] = regs[2] = regs[3] = 0;
+        break;
+    }
+}
+
+static int xc_cpuid_policy(
+    int xc, domid_t domid, const unsigned int *input, unsigned int *regs)
+{
+    xc_dominfo_t        info;
+
+    if ( xc_domain_getinfo(xc, domid, 1, &info) == 0 )
+        return -EINVAL;
+
+    if ( info.hvm )
+        xc_cpuid_hvm_policy(xc, domid, input, regs);
+    else
+        xc_cpuid_pv_policy(xc, domid, input, regs);
+
+    return 0;
 }
 
 static int xc_cpuid_do_domctl(

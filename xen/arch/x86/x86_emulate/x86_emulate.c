@@ -878,6 +878,14 @@ in_realmode(
 }
 
 static int
+in_protmode(
+    struct x86_emulate_ctxt *ctxt,
+    struct x86_emulate_ops  *ops)
+{
+    return !(in_realmode(ctxt, ops) || (ctxt->regs->eflags & EFLG_VM));
+}
+
+static int
 realmode_load_seg(
     enum x86_segment seg,
     uint16_t sel,
@@ -903,7 +911,7 @@ protmode_load_seg(
     struct x86_emulate_ctxt *ctxt,
     struct x86_emulate_ops *ops)
 {
-    struct segment_register desctab, cs, segr;
+    struct segment_register desctab, ss, segr;
     struct { uint32_t a, b; } desc;
     unsigned long val;
     uint8_t dpl, rpl, cpl;
@@ -923,7 +931,7 @@ protmode_load_seg(
     if ( (seg == x86_seg_ldtr) && (sel & 4) )
         goto raise_exn;
 
-    if ( (rc = ops->read_segment(x86_seg_cs, &cs, ctxt)) ||
+    if ( (rc = ops->read_segment(x86_seg_ss, &ss, ctxt)) ||
          (rc = ops->read_segment((sel & 4) ? x86_seg_ldtr : x86_seg_gdtr,
                                  &desctab, ctxt)) )
         return rc;
@@ -955,7 +963,7 @@ protmode_load_seg(
 
         dpl = (desc.b >> 13) & 3;
         rpl = sel & 3;
-        cpl = cs.sel & 3;
+        cpl = ss.attr.fields.dpl;
 
         switch ( seg )
         {
@@ -964,7 +972,7 @@ protmode_load_seg(
             if ( !(desc.b & (1u<<11)) )
                 goto raise_exn;
             /* Non-conforming segment: check DPL against RPL. */
-            if ( ((desc.b & (6u<<9)) != 6) && (dpl != rpl) )
+            if ( ((desc.b & (6u<<9)) != (6u<<9)) && (dpl != rpl) )
                 goto raise_exn;
             break;
         case x86_seg_ss:
@@ -984,7 +992,7 @@ protmode_load_seg(
             if ( (desc.b & (5u<<9)) == (4u<<9) )
                 goto raise_exn;
             /* Non-conforming segment: check DPL against RPL and CPL. */
-            if ( ((desc.b & (6u<<9)) != 6) && ((dpl < cpl) || (dpl < rpl)) )
+            if ( ((desc.b & (6u<<9)) != (6u<<9)) && ((dpl < cpl) || (dpl < rpl)) )
                 goto raise_exn;
             break;
         }
@@ -1034,10 +1042,10 @@ load_seg(
          (ops->write_segment == NULL) )
         return X86EMUL_UNHANDLEABLE;
 
-    if ( in_realmode(ctxt, ops) )
-        return realmode_load_seg(seg, sel, ctxt, ops);
+    if ( in_protmode(ctxt, ops) )
+        return protmode_load_seg(seg, sel, ctxt, ops);
 
-    return protmode_load_seg(seg, sel, ctxt, ops);
+    return realmode_load_seg(seg, sel, ctxt, ops);
 }
 
 void *
@@ -1596,7 +1604,7 @@ x86_emulate(
                 dst.val  = (dst.val & ~3) | (src_val & 3);
             else
                 dst.type = OP_NONE;
-            generate_exception_if(in_realmode(ctxt, ops), EXC_UD, -1);
+            generate_exception_if(!in_protmode(ctxt, ops), EXC_UD, -1);
         }
         break;
 
@@ -3212,7 +3220,7 @@ x86_emulate(
 
         if ( modrm == 0xdf ) /* invlpga */
         {
-            generate_exception_if(in_realmode(ctxt, ops), EXC_UD, -1);
+            generate_exception_if(!in_protmode(ctxt, ops), EXC_UD, -1);
             generate_exception_if(!mode_ring0(), EXC_GP, 0);
             fail_if(ops->invlpg == NULL);
             if ( (rc = ops->invlpg(x86_seg_none, truncate_ea(_regs.eax),

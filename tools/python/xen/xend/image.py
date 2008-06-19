@@ -22,6 +22,12 @@ import re
 import math
 import time
 import signal
+import thread
+import fcntl
+import sys
+import errno
+import glob
+import traceback
 
 import xen.lowlevel.xc
 from xen.xend.XendConstants import *
@@ -32,11 +38,23 @@ from xen.xend.xenstore.xstransact import xstransact
 from xen.xend.xenstore.xswatch import xswatch
 from xen.xend import arch
 from xen.xend import XendOptions
+from xen.util import oshelp
+from xen.util import utils
 
 xc = xen.lowlevel.xc.xc()
 
 MAX_GUEST_CMDLINE = 1024
 
+sentinel_path_prefix = '/var/run/xend/dm-'
+sentinel_fifos_inuse = { }
+
+def cleanup_stale_sentinel_fifos():
+    for path in glob.glob(sentinel_path_prefix + '*.fifo'):
+        if path in sentinel_fifos_inuse: continue
+        try: os.unlink(path)
+        except OSError, e:
+            log.warning('could not delete stale fifo %s: %s',
+                path, utils.exception_string(e))
 
 def create(vm, vmConfig):
     """Create an image handler for a vm.
@@ -103,6 +121,12 @@ class ImageHandler:
         if rtc_timeoffset is not None:
             xc.domain_set_time_offset(self.vm.getDomid(), int(rtc_timeoffset))
 
+        self.cpuid = None
+        self.cpuid_check = None
+        if 'cpuid' in vmConfig:
+            self.cpuid = vmConfig['cpuid'];
+        if 'cpuid_check' in vmConfig:
+            self.cpuid_check = vmConfig['cpuid_check']
 
     def cleanupBootloading(self):
         if self.bootloader:
@@ -318,6 +342,13 @@ class ImageHandler:
         args = args + self.dmargs
         return args
 
+    def _openSentinel(self, sentinel_path_fifo):
+        self.sentinel_fifo = file(sentinel_path_fifo, 'r')
+        self.sentinel_lock = thread.allocate_lock()
+        oshelp.fcntl_setfd_cloexec(self.sentinel_fifo, True)
+        sentinel_fifos_inuse[sentinel_path_fifo] = 1
+        self.sentinel_path_fifo = sentinel_path_fifo
+
     def createDeviceModel(self, restore = False):
         if self.device_model is None:
             return
@@ -333,21 +364,29 @@ class ImageHandler:
             env['XAUTHORITY'] = self.xauthority
         if self.vncconsole:
             args = args + ([ "-vncviewer" ])
+        unique_id = "%i-%i" % (self.vm.getDomid(), time.time())
+        sentinel_path = sentinel_path_prefix + unique_id
+        sentinel_path_fifo = sentinel_path + '.fifo'
+        os.mkfifo(sentinel_path_fifo, 0600)
+        sentinel_write = file(sentinel_path_fifo, 'r+')
+        self._openSentinel(sentinel_path_fifo)
+        self.vm.storeDom("image/device-model-fifo", sentinel_path_fifo)
         xstransact.Mkdir("/local/domain/0/device-model/%i" % self.vm.getDomid())
         xstransact.SetPermissions("/local/domain/0/device-model/%i" % self.vm.getDomid(),
                         { 'dom': self.vm.getDomid(), 'read': True, 'write': True })
         log.info("spawning device models: %s %s", self.device_model, args)
         # keep track of pid and spawned options to kill it later
 
-        logfile = "/var/log/xen/qemu-dm-%s.log" %  str(self.vm.info['name_label'])
-        if os.path.exists(logfile):
-            if os.path.exists(logfile + ".1"):
-                os.unlink(logfile + ".1")
-            os.rename(logfile, logfile + ".1")
+        self.logfile = "/var/log/xen/qemu-dm-%s.log" %  str(self.vm.info['name_label'])
+        if os.path.exists(self.logfile):
+            if os.path.exists(self.logfile + ".1"):
+                os.unlink(self.logfile + ".1")
+            os.rename(self.logfile, self.logfile + ".1")
 
         null = os.open("/dev/null", os.O_RDONLY)
-        logfd = os.open(logfile, os.O_WRONLY|os.O_CREAT|os.O_TRUNC)
+        logfd = os.open(self.logfile, os.O_WRONLY|os.O_CREAT|os.O_TRUNC|os.O_APPEND)
         
+        sys.stderr.flush()
         pid = os.fork()
         if pid == 0: #child
             try:
@@ -356,18 +395,26 @@ class ImageHandler:
                 os.dup2(logfd, 2)
                 os.close(null)
                 os.close(logfd)
+                self.sentinel_fifo.close()
                 try:
                     os.execve(self.device_model, args, env)
-                except:
-                    os._exit(127)
+                except Exception, e:
+                    print >>sys.stderr, (
+                        'failed to set up fds or execute dm %s: %s' %
+                        (self.device_model, utils.exception_string(e)))
+                    os._exit(126)
             except:
                 os._exit(127)
         else:
             self.pid = pid
             os.close(null)
             os.close(logfd)
+        sentinel_write.close()
         self.vm.storeDom("image/device-model-pid", self.pid)
         log.info("device model pid: %d", self.pid)
+        # we would very much prefer not to have a thread here and instead
+        #  have a callback but sadly we don't have Twisted in xend
+        self.sentinel_thread = thread.start_new_thread(self._sentinel_watch,())
 
     def signalDeviceModel(self, cmd, ret, par = None):
         if self.device_model is None:
@@ -413,46 +460,149 @@ class ImageHandler:
         xstransact.Store("/local/domain/0/device-model/%i"
                          % self.vm.getDomid(), ('command', 'continue'))
 
+    def _dmfailed(self, message):
+        log.warning("domain %s: %s", self.vm.getName(), message)
+        # ideally we would like to forcibly crash the domain with
+        # something like
+        #    xc.domain_shutdown(self.vm.getDomid(), DOMAIN_CRASH)
+        # but this can easily lead to very rapid restart loops against
+        # which we currently have no protection
+
     def recreate(self):
         if self.device_model is None:
             return
-        self.pid = self.vm.gatherDom(('image/device-model-pid', int))
+        name = self.vm.getName()
+        sentinel_path_fifo = self.vm.readDom('image/device-model-fifo')
+        fifo_fd = -1
+        log.debug("rediscovering %s", sentinel_path_fifo)
+        if sentinel_path_fifo is None:
+            log.debug("%s device model no sentinel, cannot rediscover", name)
+        else:
+            try:
+                # We open it O_WRONLY because that fails ENXIO if no-one
+                # has it open for reading (see SuSv3).  The dm process got
+                # a read/write descriptor from our earlier invocation.
+                fifo_fd = os.open(sentinel_path_fifo, os.O_WRONLY|os.O_NONBLOCK)
+            except OSError, e:
+                if e.errno == errno.ENXIO:
+                    self._dmfailed("%s device model no longer running"%name)
+                elif e.errno == errno.ENOENT:
+                    log.debug("%s device model sentinel %s absent!",
+                            name, sentinel_path_fifo)
+                else:
+                    raise
+        if fifo_fd >= 0:
+            self._openSentinel(sentinel_path_fifo)
+            os.close(fifo_fd)
+            self.pid = self.vm.gatherDom(('image/device-model-pid', int))
+            log.debug("%s device model rediscovered, pid %s sentinel fifo %s",
+                    name, self.pid, sentinel_path_fifo)
+            self.sentinel_thread = thread.start_new_thread(self._sentinel_watch,())
+
+    def _sentinel_watch(self):
+        log.info("waiting for sentinel_fifo")
+        try: self.sentinel_fifo.read(1)
+        except OSError, e: pass
+        self.sentinel_lock.acquire()
+        try:
+            if self.pid:
+                (p,st) = os.waitpid(self.pid, os.WNOHANG)
+                if p == self.pid:
+                    message = oshelp.waitstatus_description(st)
+                else:
+                    # obviously it is malfunctioning, kill it now
+                    try:
+                        os.kill(self.pid, signal.SIGKILL)
+                        message = "malfunctioning (closed sentinel), killed"
+                    except:
+                        message = "malfunctioning or died ?"
+                message = "pid %d: %s" % (self.pid, message)
+            else:
+                message = "no longer running"
+        except Exception, e:
+            message = "waitpid failed: %s" % utils.exception_string(e)
+        message = "device model failure: %s" % message
+        try: message += "; see %s " % self.logfile
+        except: pass
+        self._dmfailed(message)
+        self.pid = None
+        self.sentinel_lock.release()
 
     def destroyDeviceModel(self):
         if self.device_model is None:
             return
         if self.pid:
+            self.sentinel_lock.acquire()
             try:
-                os.kill(self.pid, signal.SIGHUP)
-            except OSError, exn:
-                log.exception(exn)
-            try:
-                # Try to reap the child every 100ms for 10s. Then SIGKILL it.
-                for i in xrange(100):
-                    (p, rv) = os.waitpid(self.pid, os.WNOHANG)
-                    if p == self.pid:
-                        break
-                    time.sleep(0.1)
-                else:
-                    log.warning("DeviceModel %d took more than 10s "
-                                "to terminate: sending SIGKILL" % self.pid)
+                try:
+                    os.kill(self.pid, signal.SIGHUP)
+                except OSError, exn:
+                    log.exception(exn)
+                try:
+                    # Try to reap the child every 100ms for 10s. Then SIGKILL it.
+                    for i in xrange(100):
+                        (p, rv) = os.waitpid(self.pid, os.WNOHANG)
+                        if p == self.pid:
+                            break
+                        time.sleep(0.1)
+                    else:
+                        log.warning("DeviceModel %d took more than 10s "
+                                    "to terminate: sending SIGKILL" % self.pid)
+                        os.kill(self.pid, signal.SIGKILL)
+                        os.waitpid(self.pid, 0)
+                except OSError, exn:
+                    # This is expected if Xend has been restarted within the
+                    # life of this domain.  In this case, we can kill the process,
+                    # but we can't wait for it because it's not our child.
+                    # We just make really sure it's going away (SIGKILL) first.
                     os.kill(self.pid, signal.SIGKILL)
-                    os.waitpid(self.pid, 0)
-            except OSError, exn:
-                # This is expected if Xend has been restarted within the
-                # life of this domain.  In this case, we can kill the process,
-                # but we can't wait for it because it's not our child.
-                # We just make really sure it's going away (SIGKILL) first.
-                os.kill(self.pid, signal.SIGKILL)
-            self.pid = None
-            state = xstransact.Remove("/local/domain/0/device-model/%i"
-                                      % self.vm.getDomid())
+                state = xstransact.Remove("/local/domain/0/device-model/%i"
+                                          % self.vm.getDomid())
+            finally:
+                self.pid = None
+                self.sentinel_lock.release()
             
             try:
                 os.unlink('/var/run/tap/qemu-read-%d' % self.vm.getDomid())
                 os.unlink('/var/run/tap/qemu-write-%d' % self.vm.getDomid())
             except:
                 pass
+            try:
+                del sentinel_fifos_inuse[self.sentinel_path_fifo]
+                os.unlink(self.sentinel_path_fifo)
+            except:
+                pass
+
+    def setCpuid(self):
+        xc.domain_set_policy_cpuid(self.vm.getDomid())
+
+        if self.cpuid is not None:
+            cpuid = self.cpuid
+            transformed = {}
+            for sinput, regs in cpuid.iteritems():
+                inputs = sinput.split(',')
+                input = long(inputs[0])
+                sub_input = None
+                if len(inputs) == 2:
+                    sub_input = long(inputs[1])
+                t = xc.domain_set_cpuid(self.vm.getDomid(),
+                                        input, sub_input, regs)
+                transformed[sinput] = t
+            self.cpuid = transformed
+
+        if self.cpuid_check is not None:
+            cpuid_check = self.cpuid_check
+            transformed = {}
+            for sinput, regs_check in cpuid_check.iteritems():
+                inputs = sinput.split(',')
+                input = long(inputs[0])
+                sub_input = None
+                if len(inputs) == 2:
+                    sub_input = long(inputs[1])
+                t = xc.domain_check_cpuid(input, sub_input, regs_check)
+                transformed[sinput] = t
+            self.cpuid_check = transformed
+
 
 
 class LinuxImageHandler(ImageHandler):
@@ -536,38 +686,7 @@ class HVMImageHandler(ImageHandler):
         self.apic = int(vmConfig['platform'].get('apic', 0))
         self.acpi = int(vmConfig['platform'].get('acpi', 0))
         self.guest_os_type = vmConfig['platform'].get('guest_os_type')
-
-        self.vmConfig = vmConfig
            
-    def setCpuid(self):
-        xc.domain_set_policy_cpuid(self.vm.getDomid())
-
-        if 'cpuid' in self.vmConfig:
-            cpuid = self.vmConfig['cpuid']
-            transformed = {}
-            for sinput, regs in cpuid.iteritems():
-                inputs = sinput.split(',')
-                input = long(inputs[0])
-                sub_input = None
-                if len(inputs) == 2:
-                    sub_input = long(inputs[1])
-                t = xc.domain_set_cpuid(self.vm.getDomid(),
-                                        input, sub_input, regs)
-                transformed[sinput] = t
-            self.vmConfig['cpuid'] = transformed
-
-        if 'cpuid_check' in self.vmConfig:
-            cpuid_check = self.vmConfig['cpuid_check']
-            transformed = {}
-            for sinput, regs_check in cpuid_check.iteritems():
-                inputs = sinput.split(',')
-                input = long(inputs[0])
-                sub_input = None
-                if len(inputs) == 2:
-                    sub_input = long(inputs[1])
-                t = xc.domain_check_cpuid(input, sub_input, regs_check)
-                transformed[sinput] = t
-            self.vmConfig['cpuid_check'] = transformed
 
     # Return a list of cmd line args to the device models based on the
     # xm config file
@@ -730,6 +849,9 @@ class IA64_Linux_ImageHandler(LinuxImageHandler):
         LinuxImageHandler.configure(self, vmConfig)
         self.vhpt = int(vmConfig['platform'].get('vhpt',  0))
 
+    def setCpuid(self):
+        # Guest CPUID configuration is not implemented yet.
+        return
 
 class X86_HVM_ImageHandler(HVMImageHandler):
 
@@ -739,8 +861,9 @@ class X86_HVM_ImageHandler(HVMImageHandler):
 
     def buildDomain(self):
         xc.hvm_set_param(self.vm.getDomid(), HVM_PARAM_PAE_ENABLED, self.pae)
+        rc = HVMImageHandler.buildDomain(self)
         self.setCpuid()
-        return HVMImageHandler.buildDomain(self)
+        return rc
 
     def getRequiredAvailableMemory(self, mem_kb):
         # Add 8 MiB overhead for QEMU's video RAM.
@@ -769,7 +892,9 @@ class X86_Linux_ImageHandler(LinuxImageHandler):
         # add an 8MB slack to balance backend allocations.
         mem_kb = self.getRequiredMaximumReservation() + (8 * 1024)
         xc.domain_set_memmap_limit(self.vm.getDomid(), mem_kb)
-        return LinuxImageHandler.buildDomain(self)
+        rc = LinuxImageHandler.buildDomain(self)
+        self.setCpuid()
+        return rc
 
 _handlers = {
     "ia64": {

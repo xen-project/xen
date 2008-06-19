@@ -47,9 +47,8 @@
 #define ACPI_USE_SYSTEM_CLIBRARY
 #define ACPI_USE_DO_WHILE_0
 
-#ifdef __XEN__
-
 #include <xen/config.h>
+#include <xen/cache.h>
 #include <xen/string.h>
 #include <xen/kernel.h>
 #include <xen/ctype.h>
@@ -71,34 +70,6 @@
 /* Full namespace pathname length limit - arbitrary */
 #define ACPI_PATHNAME_MAX              256
 
-#else				/* !__XEN__ */
-
-#include <stdarg.h>
-#include <string.h>
-#include <stdlib.h>
-#include <ctype.h>
-#include <unistd.h>
-
-#if defined(__ia64__) || defined(__x86_64__)
-#define ACPI_MACHINE_WIDTH          64
-#define COMPILER_DEPENDENT_INT64    long
-#define COMPILER_DEPENDENT_UINT64   unsigned long
-#else
-#define ACPI_MACHINE_WIDTH          32
-#define COMPILER_DEPENDENT_INT64    long long
-#define COMPILER_DEPENDENT_UINT64   unsigned long long
-#define ACPI_USE_NATIVE_DIVIDE
-#endif
-
-#ifndef __cdecl
-#define __cdecl
-#endif
-
-#define ACPI_FLUSH_CPU_CACHE()
-#endif				/* __XEN__ */
-
-/* Linux uses GCC */
-
 #include "acgcc.h"
 
 #define acpi_cpu_flags unsigned long
@@ -110,32 +81,11 @@ static inline acpi_thread_id acpi_os_get_thread_id(void)
 	return current;
 }
 
-#if 0
-/*
- * The irqs_disabled() check is for resume from RAM.
- * Interrupts are off during resume, just like they are for boot.
- * However, boot has  (system_state != SYSTEM_RUNNING)
- * to quiet __might_sleep() in kmalloc() and resume does not.
- */
-#include <acpi/actypes.h>
-static inline void *acpi_os_allocate(acpi_size size)
-{
-	return kmalloc(size, irqs_disabled()? GFP_ATOMIC : GFP_KERNEL);
-}
-static inline void *acpi_os_allocate_zeroed(acpi_size size)
-{
-	return kzalloc(size, irqs_disabled()? GFP_ATOMIC : GFP_KERNEL);
-}
-
-static inline void *acpi_os_acquire_object(acpi_cache_t * cache)
-{
-	return kmem_cache_zalloc(cache,
-				 irqs_disabled()? GFP_ATOMIC : GFP_KERNEL);
-}
-
-#define ACPI_ALLOCATE(a)	acpi_os_allocate(a)
-#define ACPI_ALLOCATE_ZEROED(a)	acpi_os_allocate_zeroed(a)
-#define ACPI_FREE(a)		kfree(a)
-#endif /* 0 */
+#define ACPI_ALLOCATE(a)	xmalloc_bytes(a)
+#define ACPI_ALLOCATE_ZEROED(a)	({              \
+    void *p = xmalloc_bytes(a);                 \
+    if ( p ) memset(p, 0, a);                   \
+    p; })
+#define ACPI_FREE(a)		xfree(a)
 
 #endif				/* __ACLINUX_H__ */

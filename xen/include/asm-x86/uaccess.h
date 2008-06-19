@@ -118,7 +118,7 @@ extern void __put_user_bad(void);
 ({									\
 	long __pu_err = -EFAULT;					\
 	__typeof__(*(ptr)) __user *__pu_addr = (ptr);			\
-	if (__addr_ok(__pu_addr))					\
+	if (access_ok(__pu_addr,size))					\
 		__put_user_size((x),__pu_addr,(size),__pu_err,-EFAULT);	\
 	__pu_err;							\
 })							
@@ -135,7 +135,7 @@ extern void __put_user_bad(void);
 	long __gu_err;                                          \
 	__typeof__(*(ptr)) __user *__gu_addr = (ptr);           \
 	__get_user_size((x),__gu_addr,(size),__gu_err,-EFAULT); \
-	if (!__addr_ok(__gu_addr)) __gu_err = -EFAULT;          \
+	if (!access_ok(__gu_addr,size)) __gu_err = -EFAULT;     \
 	__gu_err;                                               \
 })							
 

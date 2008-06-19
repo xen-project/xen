@@ -34,7 +34,7 @@ import xen.lowlevel.xc
 
 from xen.xend import XendOptions, XendCheckpoint, XendDomainInfo
 from xen.xend.PrettyPrint import prettyprint
-from xen.xend import XendConfig
+from xen.xend import XendConfig, image
 from xen.xend.XendError import XendError, XendInvalidDomain, VmError
 from xen.xend.XendError import VMBadState
 from xen.xend.XendLogging import log
@@ -178,6 +178,8 @@ class XendDomain:
                     except Exception:
                         log.exception("Failed to create reference to running "
                                       "domain id: %d" % dom['domid'])
+
+            image.cleanup_stale_sentinel_fifos()
 
             # add all managed domains as dormant domains.
             for dom in managed:

@@ -165,104 +165,16 @@ void free_vcpu_struct(struct vcpu *v)
 
 #ifdef CONFIG_COMPAT
 
-int setup_arg_xlat_area(struct vcpu *v, l4_pgentry_t *l4tab)
-{
-    struct domain *d = v->domain;
-    unsigned i;
-    struct page_info *pg;
-
-    if ( !d->arch.mm_arg_xlat_l3 )
-    {
-        pg = alloc_domheap_page(NULL, 0);
-        if ( !pg )
-            return -ENOMEM;
-        d->arch.mm_arg_xlat_l3 = page_to_virt(pg);
-        clear_page(d->arch.mm_arg_xlat_l3);
-    }
-
-    l4tab[l4_table_offset(COMPAT_ARG_XLAT_VIRT_BASE)] =
-        l4e_from_paddr(__pa(d->arch.mm_arg_xlat_l3), __PAGE_HYPERVISOR);
-
-    for ( i = 0; i < COMPAT_ARG_XLAT_PAGES; ++i )
-    {
-        unsigned long va = COMPAT_ARG_XLAT_VIRT_START(v->vcpu_id) + i * PAGE_SIZE;
-        l2_pgentry_t *l2tab;
-        l1_pgentry_t *l1tab;
-
-        if ( !l3e_get_intpte(d->arch.mm_arg_xlat_l3[l3_table_offset(va)]) )
-        {
-            pg = alloc_domheap_page(NULL, 0);
-            if ( !pg )
-                return -ENOMEM;
-            clear_page(page_to_virt(pg));
-            d->arch.mm_arg_xlat_l3[l3_table_offset(va)] = l3e_from_page(pg, __PAGE_HYPERVISOR);
-        }
-        l2tab = l3e_to_l2e(d->arch.mm_arg_xlat_l3[l3_table_offset(va)]);
-        if ( !l2e_get_intpte(l2tab[l2_table_offset(va)]) )
-        {
-            pg = alloc_domheap_page(NULL, 0);
-            if ( !pg )
-                return -ENOMEM;
-            clear_page(page_to_virt(pg));
-            l2tab[l2_table_offset(va)] = l2e_from_page(pg, __PAGE_HYPERVISOR);
-        }
-        l1tab = l2e_to_l1e(l2tab[l2_table_offset(va)]);
-        BUG_ON(l1e_get_intpte(l1tab[l1_table_offset(va)]));
-        pg = alloc_domheap_page(NULL, 0);
-        if ( !pg )
-            return -ENOMEM;
-        l1tab[l1_table_offset(va)] = l1e_from_page(pg, PAGE_HYPERVISOR);
-    }
-
-    return 0;
-}
-
-static void release_arg_xlat_area(struct domain *d)
-{
-    if ( d->arch.mm_arg_xlat_l3 )
-    {
-        unsigned l3;
-
-        for ( l3 = 0; l3 < L3_PAGETABLE_ENTRIES; ++l3 )
-        {
-            if ( l3e_get_intpte(d->arch.mm_arg_xlat_l3[l3]) )
-            {
-                l2_pgentry_t *l2tab = l3e_to_l2e(d->arch.mm_arg_xlat_l3[l3]);
-                unsigned l2;
-
-                for ( l2 = 0; l2 < L2_PAGETABLE_ENTRIES; ++l2 )
-                {
-                    if ( l2e_get_intpte(l2tab[l2]) )
-                    {
-                        l1_pgentry_t *l1tab = l2e_to_l1e(l2tab[l2]);
-                        unsigned l1;
-
-                        for ( l1 = 0; l1 < L1_PAGETABLE_ENTRIES; ++l1 )
-                        {
-                            if ( l1e_get_intpte(l1tab[l1]) )
-                                free_domheap_page(l1e_get_page(l1tab[l1]));
-                        }
-                        free_domheap_page(l2e_get_page(l2tab[l2]));
-                    }
-                }
-                free_domheap_page(l3e_get_page(d->arch.mm_arg_xlat_l3[l3]));
-            }
-        }
-        free_domheap_page(virt_to_page(d->arch.mm_arg_xlat_l3));
-    }
-}
-
 static int setup_compat_l4(struct vcpu *v)
 {
     struct page_info *pg = alloc_domheap_page(NULL, 0);
     l4_pgentry_t *l4tab;
-    int rc;
 
     if ( pg == NULL )
         return -ENOMEM;
 
     /* This page needs to look like a pagetable so that it can be shadowed */
-    pg->u.inuse.type_info = PGT_l4_page_table|PGT_validated;
+    pg->u.inuse.type_info = PGT_l4_page_table|PGT_validated|1;
 
     l4tab = copy_page(page_to_virt(pg), idle_pg_table);
     l4tab[0] = l4e_empty();
@@ -271,12 +183,6 @@ static int setup_compat_l4(struct vcpu *v)
     l4tab[l4_table_offset(PERDOMAIN_VIRT_START)] =
         l4e_from_paddr(__pa(v->domain->arch.mm_perdomain_l3),
                        __PAGE_HYPERVISOR);
-
-    if ( (rc = setup_arg_xlat_area(v, l4tab)) < 0 )
-    {
-        free_domheap_page(pg);
-        return rc;
-    }
 
     v->arch.guest_table = pagetable_from_page(pg);
     v->arch.guest_table_user = v->arch.guest_table;
@@ -309,7 +215,6 @@ int switch_native(struct domain *d)
         return 0;
 
     d->arch.is_32bit_pv = d->arch.has_32bit_shinfo = 0;
-    release_arg_xlat_area(d);
 
     /* switch gdt */
     gdt_l1e = l1e_from_page(virt_to_page(gdt_table), PAGE_HYPERVISOR);
@@ -349,15 +254,12 @@ int switch_compat(struct domain *d)
                                  FIRST_RESERVED_GDT_PAGE)] = gdt_l1e;
     }
 
-    d->arch.physaddr_bitsize =
-        fls((1UL << 32) - HYPERVISOR_COMPAT_VIRT_START(d)) - 1
-        + (PAGE_SIZE - 2);
+    domain_set_alloc_bitsize(d);
 
     return 0;
 
  undo_and_fail:
     d->arch.is_32bit_pv = d->arch.has_32bit_shinfo = 0;
-    release_arg_xlat_area(d);
     gdt_l1e = l1e_from_page(virt_to_page(gdt_table), PAGE_HYPERVISOR);
     while ( vcpuid-- != 0 )
     {
@@ -370,7 +272,6 @@ int switch_compat(struct domain *d)
 }
 
 #else
-#define release_arg_xlat_area(d) ((void)0)
 #define setup_compat_l4(v) 0
 #define release_compat_l4(v) ((void)0)
 #endif
@@ -582,9 +483,6 @@ void arch_domain_destroy(struct domain *d)
     free_domheap_page(virt_to_page(d->arch.mm_perdomain_l2));
     free_domheap_page(virt_to_page(d->arch.mm_perdomain_l3));
 #endif
-
-    if ( is_pv_32on64_domain(d) )
-        release_arg_xlat_area(d);
 
     free_xenheap_page(d->shared_info);
 }
@@ -1874,47 +1772,36 @@ int domain_relinquish_resources(struct domain *d)
             unmap_vcpu_info(v);
         }
 
-        d->arch.relmem = RELMEM_xen_l4;
+        d->arch.relmem = RELMEM_xen;
         /* fallthrough */
 
         /* Relinquish every page of memory. */
-    case RELMEM_xen_l4:
-#if CONFIG_PAGING_LEVELS >= 4
-        ret = relinquish_memory(d, &d->xenpage_list, PGT_l4_page_table);
+    case RELMEM_xen:
+        ret = relinquish_memory(d, &d->xenpage_list, ~0UL);
         if ( ret )
             return ret;
-        d->arch.relmem = RELMEM_dom_l4;
+#if CONFIG_PAGING_LEVELS >= 4
+        d->arch.relmem = RELMEM_l4;
         /* fallthrough */
-    case RELMEM_dom_l4:
+
+    case RELMEM_l4:
         ret = relinquish_memory(d, &d->page_list, PGT_l4_page_table);
         if ( ret )
             return ret;
-        d->arch.relmem = RELMEM_xen_l3;
-        /* fallthrough */
 #endif
-
-    case RELMEM_xen_l3:
 #if CONFIG_PAGING_LEVELS >= 3
-        ret = relinquish_memory(d, &d->xenpage_list, PGT_l3_page_table);
-        if ( ret )
-            return ret;
-        d->arch.relmem = RELMEM_dom_l3;
+        d->arch.relmem = RELMEM_l3;
         /* fallthrough */
-    case RELMEM_dom_l3:
+
+    case RELMEM_l3:
         ret = relinquish_memory(d, &d->page_list, PGT_l3_page_table);
         if ( ret )
             return ret;
-        d->arch.relmem = RELMEM_xen_l2;
-        /* fallthrough */
 #endif
-
-    case RELMEM_xen_l2:
-        ret = relinquish_memory(d, &d->xenpage_list, PGT_l2_page_table);
-        if ( ret )
-            return ret;
-        d->arch.relmem = RELMEM_dom_l2;
+        d->arch.relmem = RELMEM_l2;
         /* fallthrough */
-    case RELMEM_dom_l2:
+
+    case RELMEM_l2:
         ret = relinquish_memory(d, &d->page_list, PGT_l2_page_table);
         if ( ret )
             return ret;
@@ -1927,6 +1814,7 @@ int domain_relinquish_resources(struct domain *d)
         if ( ret )
             return ret;
 #endif
+        WARN_ON(d->xenheap_pages);
         break;
 
     default:

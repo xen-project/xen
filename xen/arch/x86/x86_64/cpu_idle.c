@@ -35,7 +35,7 @@ CHECK_processor_csd;
 DEFINE_XEN_GUEST_HANDLE(compat_processor_csd_t);
 DEFINE_XEN_GUEST_HANDLE(compat_processor_cx_t);
 
-#define xlat_page_start COMPAT_ARG_XLAT_VIRT_START(current->vcpu_id)
+#define xlat_page_start ((unsigned long)COMPAT_ARG_XLAT_VIRT_BASE)
 #define xlat_page_size  COMPAT_ARG_XLAT_SIZE
 #define xlat_page_left_size(xlat_page_current) \
     (xlat_page_start + xlat_page_size - xlat_page_current)

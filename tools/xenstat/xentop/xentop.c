@@ -755,10 +755,11 @@ void do_summary(void)
 	unsigned i, num_domains = 0;
 	unsigned long long used = 0;
 	xenstat_domain *domain;
+	time_t curt;
 
 	/* Print program name, current time, and number of domains */
-	strftime(time_str, TIME_STR_LEN, TIME_STR_FORMAT,
-	         localtime((const time_t *)&curtime.tv_sec));
+	curt = curtime.tv_sec;
+	strftime(time_str, TIME_STR_LEN, TIME_STR_FORMAT, localtime(&curt));
 	num_domains = xenstat_node_num_domains(cur_node);
 	ver_str = xenstat_node_xen_version(cur_node);
 	print("xentop - %s   Xen %s\n", time_str, ver_str);
@@ -978,7 +979,7 @@ static void top(void)
 	/* Count the number of domains for which to report data */
 	num_domains = xenstat_node_num_domains(cur_node);
 
-	domains = malloc(num_domains*sizeof(xenstat_domain *));
+	domains = calloc(num_domains, sizeof(xenstat_domain *));
 	if(domains == NULL)
 		fail("Failed to allocate memory\n");
 

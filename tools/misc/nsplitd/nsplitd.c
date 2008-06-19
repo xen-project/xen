@@ -106,7 +106,7 @@ static void fault(char *format, ...)
     
     /* XXX This is a bit dubious, but there is no vsyslog */
     va_start(ap, format);
-    vsprintf(logbuf, format, ap);
+    vsnprintf(logbuf, sizeof(logbuf), format, ap);
     syslog(LOG_ERR, logbuf);
     va_end(ap);
     exit(1);

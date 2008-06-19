@@ -12,6 +12,24 @@
 #include <asm/hvm/support.h>
 #include <asm/hvm/guest_access.h>
 
+/* Raw access functions: no type checking. */
+#define raw_copy_to_guest(dst, src, len)        \
+    (is_hvm_vcpu(current) ?                     \
+     copy_to_user_hvm((dst), (src), (len)) :    \
+     copy_to_user((dst), (src), (len)))
+#define raw_copy_from_guest(dst, src, len)      \
+    (is_hvm_vcpu(current) ?                     \
+     copy_from_user_hvm((dst), (src), (len)) :  \
+     copy_from_user((dst), (src), (len)))
+#define __raw_copy_to_guest(dst, src, len)      \
+    (is_hvm_vcpu(current) ?                     \
+     copy_to_user_hvm((dst), (src), (len)) :    \
+     __copy_to_user((dst), (src), (len)))
+#define __raw_copy_from_guest(dst, src, len)    \
+    (is_hvm_vcpu(current) ?                     \
+     copy_from_user_hvm((dst), (src), (len)) :  \
+     __copy_from_user((dst), (src), (len)))
+
 /* Is the guest handle a NULL reference? */
 #define guest_handle_is_null(hnd)        ((hnd).p == NULL)
 
@@ -36,9 +54,7 @@
     const typeof(*(ptr)) *_s = (ptr);                   \
     char (*_d)[sizeof(*_s)] = (void *)(hnd).p;          \
     ((void)((hnd).p == (ptr)));                         \
-    is_hvm_vcpu(current) ?                              \
-    copy_to_user_hvm(_d+(off), _s, sizeof(*_s)*(nr)) :  \
-    copy_to_user(_d+(off), _s, sizeof(*_s)*(nr));       \
+    raw_copy_to_guest(_d+(off), _s, sizeof(*_s)*(nr));  \
 })
 
 /*
@@ -48,9 +64,7 @@
 #define copy_from_guest_offset(ptr, hnd, off, nr) ({    \
     const typeof(*(ptr)) *_s = (hnd).p;                 \
     typeof(*(ptr)) *_d = (ptr);                         \
-    is_hvm_vcpu(current) ?                              \
-    copy_from_user_hvm(_d, _s+(off), sizeof(*_d)*(nr)) :\
-    copy_from_user(_d, _s+(off), sizeof(*_d)*(nr));     \
+    raw_copy_from_guest(_d, _s+(off), sizeof(*_d)*(nr));\
 })
 
 /* Copy sub-field of a structure to guest context via a guest handle. */
@@ -58,18 +72,14 @@
     const typeof(&(ptr)->field) _s = &(ptr)->field;     \
     void *_d = &(hnd).p->field;                         \
     ((void)(&(hnd).p->field == &(ptr)->field));         \
-    is_hvm_vcpu(current) ?                              \
-    copy_to_user_hvm(_d, _s, sizeof(*_s)) :             \
-    copy_to_user(_d, _s, sizeof(*_s));                  \
+    raw_copy_to_guest(_d, _s, sizeof(*_s));             \
 })
 
 /* Copy sub-field of a structure from guest context via a guest handle. */
 #define copy_field_from_guest(ptr, hnd, field) ({       \
     const typeof(&(ptr)->field) _s = &(hnd).p->field;   \
     typeof(&(ptr)->field) _d = &(ptr)->field;           \
-    is_hvm_vcpu(current) ?                              \
-    copy_from_user_hvm(_d, _s, sizeof(*_d)) :           \
-    copy_from_user(_d, _s, sizeof(*_d));                \
+    raw_copy_from_guest(_d, _s, sizeof(*_d));           \
 })
 
 /*
@@ -79,39 +89,36 @@
 #define guest_handle_okay(hnd, nr)                      \
     (shadow_mode_external(current->domain) ||           \
      array_access_ok((hnd).p, (nr), sizeof(*(hnd).p)))
+#define guest_handle_subrange_okay(hnd, first, last)    \
+    (shadow_mode_external(current->domain) ||           \
+     array_access_ok((hnd).p + (first),                 \
+                     (last)-(first)+1,                  \
+                     sizeof(*(hnd).p)))
 
 #define __copy_to_guest_offset(hnd, off, ptr, nr) ({    \
     const typeof(*(ptr)) *_s = (ptr);                   \
     char (*_d)[sizeof(*_s)] = (void *)(hnd).p;          \
     ((void)((hnd).p == (ptr)));                         \
-    is_hvm_vcpu(current) ?                              \
-    copy_to_user_hvm(_d+(off), _s, sizeof(*_s)*(nr)) :  \
-    __copy_to_user(_d+(off), _s, sizeof(*_s)*(nr));     \
+    __raw_copy_to_guest(_d+(off), _s, sizeof(*_s)*(nr));\
 })
 
 #define __copy_from_guest_offset(ptr, hnd, off, nr) ({  \
     const typeof(*(ptr)) *_s = (hnd).p;                 \
     typeof(*(ptr)) *_d = (ptr);                         \
-    is_hvm_vcpu(current) ?                              \
-    copy_from_user_hvm(_d, _s+(off), sizeof(*_d)*(nr)) :\
-    __copy_from_user(_d, _s+(off), sizeof(*_d)*(nr));   \
+    __raw_copy_from_guest(_d, _s+(off), sizeof(*_d)*(nr));\
 })
 
 #define __copy_field_to_guest(hnd, ptr, field) ({       \
     const typeof(&(ptr)->field) _s = &(ptr)->field;     \
     void *_d = &(hnd).p->field;                         \
     ((void)(&(hnd).p->field == &(ptr)->field));         \
-    is_hvm_vcpu(current) ?                              \
-    copy_to_user_hvm(_d, _s, sizeof(*_s)) :             \
-    __copy_to_user(_d, _s, sizeof(*_s));                \
+    __raw_copy_to_guest(_d, _s, sizeof(*_s));           \
 })
 
 #define __copy_field_from_guest(ptr, hnd, field) ({     \
     const typeof(&(ptr)->field) _s = &(hnd).p->field;   \
     typeof(&(ptr)->field) _d = &(ptr)->field;           \
-    is_hvm_vcpu(current) ?                              \
-    copy_from_user_hvm(_d, _s, sizeof(*_d)) :           \
-    __copy_from_user(_d, _s, sizeof(*_d));              \
+    __raw_copy_from_guest(_d, _s, sizeof(*_d));         \
 })
 
 #endif /* __ASM_X86_GUEST_ACCESS_H__ */

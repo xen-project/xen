@@ -208,7 +208,6 @@ struct arch_domain
 
 #ifdef CONFIG_COMPAT
     unsigned int hv_compat_vstart;
-    l3_pgentry_t *mm_arg_xlat_l3;
 #endif
 
     /* I/O-port admin-specified access capabilities. */
@@ -242,12 +241,10 @@ struct arch_domain
     /* Continuable domain_relinquish_resources(). */
     enum {
         RELMEM_not_started,
-        RELMEM_xen_l4,
-        RELMEM_dom_l4,
-        RELMEM_xen_l3,
-        RELMEM_dom_l3,
-        RELMEM_xen_l2,
-        RELMEM_dom_l2,
+        RELMEM_xen,
+        RELMEM_l4,
+        RELMEM_l3,
+        RELMEM_l2,
         RELMEM_done,
     } relmem;
     struct list_head relmem_list;
@@ -353,6 +350,9 @@ struct arch_vcpu
 
 /* Continue the current hypercall via func(data) on specified cpu. */
 int continue_hypercall_on_cpu(int cpu, long (*func)(void *data), void *data);
+
+void vcpu_show_execution_state(struct vcpu *);
+void vcpu_show_registers(const struct vcpu *);
 
 /* Clean up CR4 bits that are not under guest control. */
 unsigned long pv_guest_cr4_fixup(unsigned long guest_cr4);

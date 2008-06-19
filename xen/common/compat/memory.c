@@ -27,7 +27,7 @@ int compat_memory_op(unsigned int cmd, XEN_GUEST_HANDLE(void) compat)
             struct compat_translate_gpfn_list xlat;
         } cmp;
 
-        set_xen_guest_handle(nat.hnd, (void *)COMPAT_ARG_XLAT_VIRT_START(current->vcpu_id));
+        set_xen_guest_handle(nat.hnd, (void *)COMPAT_ARG_XLAT_VIRT_BASE);
         split = 0;
         switch ( op )
         {
@@ -250,7 +250,7 @@ int compat_memory_op(unsigned int cmd, XEN_GUEST_HANDLE(void) compat)
         case XENMEM_decrease_reservation:
         case XENMEM_populate_physmap:
             end_extent = split >= 0 ? rc : cmd >> MEMOP_EXTENT_SHIFT;
-            if ( op != XENMEM_decrease_reservation &&
+            if ( (op != XENMEM_decrease_reservation) &&
                  !guest_handle_is_null(nat.rsrv->extent_start) )
             {
                 for ( ; start_extent < end_extent; ++start_extent )
@@ -276,13 +276,14 @@ int compat_memory_op(unsigned int cmd, XEN_GUEST_HANDLE(void) compat)
                         break;
                     }
                 }
-
-                /* Bail if there was an error. */
-                if ( (split >= 0) && (end_extent != nat.rsrv->nr_extents) )
-                    split = 0;
             }
             else
+            {
                 start_extent = end_extent;
+            }
+            /* Bail if there was an error. */
+            if ( (split >= 0) && (end_extent != nat.rsrv->nr_extents) )
+                split = 0;
             break;
 
         case XENMEM_exchange:

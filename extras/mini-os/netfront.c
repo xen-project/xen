@@ -259,7 +259,8 @@ void netfront_select_handler(evtchn_port_t port, struct pt_regs *regs, void *dat
     network_tx_buf_gc(dev);
     local_irq_restore(flags);
 
-    files[fd].read = 1;
+    if (fd != -1)
+        files[fd].read = 1;
     wake_up(&netfront_queue);
 }
 #endif
@@ -323,6 +324,9 @@ struct netfront_dev *init_netfront(char *nodename, void (*thenetif_rx)(unsigned 
     dev = malloc(sizeof(*dev));
     memset(dev, 0, sizeof(*dev));
     dev->nodename = strdup(nodename);
+#ifdef HAVE_LIBC
+    dev->fd = -1;
+#endif
 
     printk("net TX ring size %d\n", NET_TX_RING_SIZE);
     printk("net RX ring size %d\n", NET_RX_RING_SIZE);
@@ -493,13 +497,26 @@ void shutdown_netfront(struct netfront_dev *dev)
     printk("close network: backend at %s\n",dev->backend);
 
     snprintf(path, sizeof(path), "%s/state", dev->backend);
+
     err = xenbus_printf(XBT_NIL, nodename, "state", "%u", 5); /* closing */
     xenbus_wait_for_value(path, "5", &dev->events);
 
     err = xenbus_printf(XBT_NIL, nodename, "state", "%u", 6);
     xenbus_wait_for_value(path, "6", &dev->events);
 
+    err = xenbus_printf(XBT_NIL, nodename, "state", "%u", 1);
+    xenbus_wait_for_value(path, "2", &dev->events);
+
     xenbus_unwatch_path(XBT_NIL, path);
+
+    snprintf(path, sizeof(path), "%s/tx-ring-ref", nodename);
+    xenbus_rm(XBT_NIL, path);
+    snprintf(path, sizeof(path), "%s/rx-ring-ref", nodename);
+    xenbus_rm(XBT_NIL, path);
+    snprintf(path, sizeof(path), "%s/event-channel", nodename);
+    xenbus_rm(XBT_NIL, path);
+    snprintf(path, sizeof(path), "%s/request-rx-copy", nodename);
+    xenbus_rm(XBT_NIL, path);
 
     free_netfront(dev);
 }
@@ -597,7 +614,7 @@ ssize_t netfront_receive(struct netfront_dev *dev, unsigned char *data, size_t l
 
     local_irq_save(flags);
     network_rx(dev);
-    if (!dev->rlen)
+    if (!dev->rlen && fd != -1)
 	/* No data for us, make select stop returning */
 	files[fd].read = 0;
     /* Before re-enabling the interrupts, in case a packet just arrived in the

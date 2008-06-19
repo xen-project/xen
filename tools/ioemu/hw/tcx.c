@@ -342,7 +342,7 @@ void tcx_init(DisplayState *ds, uint32_t addr, uint8_t *vram_base,
     register_savevm("tcx", addr, 1, tcx_save, tcx_load, s);
     qemu_register_reset(tcx_reset, s);
     tcx_reset(s);
-    dpy_resize(s->ds, width, height, width * 1);
+    dpy_resize(s->ds, width, height);
 }
 
 static void tcx_screen_dump(void *opaque, const char *filename)

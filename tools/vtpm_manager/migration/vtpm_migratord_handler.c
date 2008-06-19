@@ -49,8 +49,8 @@
 // This must be updated to the longest command name. Currently GETINST
 #define VTPM_SH_CMD_SIZE (strlen(VTPM_SH_CMD_HDR) + strlen(VTPM_SH_CMD_FTR) + 1 + strlen(VTPM_SH_GETINST) + 2)
 
-void handle_vtpm_mig_step2(buffer_t *in_param_buf, buffer_t *result_buf){
-
+void handle_vtpm_mig_step2(buffer_t *in_param_buf, buffer_t *result_buf)
+{
   TPM_TAG tag = VTPM_TAG_RSP;
   buffer_t out_param_buf= NULL_BUF, mig_key_buf=NULL_BUF; 
   TPM_RESULT status=TPM_SUCCESS, cmd_status;
@@ -97,13 +97,14 @@ void handle_vtpm_mig_step2(buffer_t *in_param_buf, buffer_t *result_buf){
   return;
 }
 
-void handle_vtpm_mig_step3(buffer_t *in_param_buf, buffer_t *result_buf){
-  
+void handle_vtpm_mig_step3(buffer_t *in_param_buf, buffer_t *result_buf)
+{
   TPM_TAG tag = VTPM_TAG_RSP;
   buffer_t out_param_buf= NULL_BUF, mig_key_buf=NULL_BUF, empty_buf=NULL_BUF;
   TPM_RESULT status=TPM_SUCCESS, cmd_status;
   UINT32 out_param_size, instance;
   char *shell_cmd_str=NULL;
+  size_t shell_cmd_strlen;
   FILE *shell_f=NULL;
 
   if ( (!in_param_buf) || (!result_buf) ) {
@@ -124,16 +125,20 @@ void handle_vtpm_mig_step3(buffer_t *in_param_buf, buffer_t *result_buf){
   }
 
   // ====== Call hotplug-script and get an instance ======
-  shell_cmd_str = (char *) malloc(VTPM_SH_CMD_SIZE + name_data32.size + 10); // 10 is just padding for the UINT32
+  shell_cmd_strlen = VTPM_SH_CMD_SIZE + name_data32.size + 10;
+  shell_cmd_str = (char *) malloc(shell_cmd_strlen); // 10 is just padding for the UINT32
 
-  sprintf(shell_cmd_str, VTPM_SH_CMD_HDR VTPM_SH_GETINST VTPM_SH_CMD_FTR);
+  snprintf(shell_cmd_str, shell_cmd_strlen,
+	VTPM_SH_CMD_HDR VTPM_SH_GETINST VTPM_SH_CMD_FTR);
 
   shell_f = popen(shell_cmd_str, "r");
   fscanf(shell_f, "%d", &instance);
   pclose(shell_f);
   
   // ====== Call hotplug-script and add instance ======
-  sprintf(shell_cmd_str, VTPM_SH_CMD_HDR VTPM_SH_ADD " %s %d" VTPM_SH_CMD_FTR, name_data32.data, instance);
+  snprintf(shell_cmd_str, shell_cmd_strlen,
+	VTPM_SH_CMD_HDR VTPM_SH_ADD " %s %d" VTPM_SH_CMD_FTR,
+	name_data32.data, instance);
   system(shell_cmd_str);
 
   // ========= Call vtpm_manager and load VTPM =======
@@ -156,7 +161,8 @@ void handle_vtpm_mig_step3(buffer_t *in_param_buf, buffer_t *result_buf){
   TPMTRYRETURN(cmd_status);
 
   // ====== Call hotplug-script and resume instance ======
-  sprintf(shell_cmd_str, VTPM_SH_CMD_HDR VTPM_SH_RESUME " %d" VTPM_SH_CMD_FTR, instance);
+  snprintf(shell_cmd_str, shell_cmd_strlen,
+	VTPM_SH_CMD_HDR VTPM_SH_RESUME " %d" VTPM_SH_CMD_FTR, instance);
   system(shell_cmd_str);
 
   goto egress;

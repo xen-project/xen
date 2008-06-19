@@ -59,7 +59,8 @@ XSERR_HV_OP_FAILED             = 24 + XSERR_BASE
 XSERR_BOOTPOLICY_INSTALL_ERROR = 25 + XSERR_BASE
 XSERR_VM_NOT_AUTHORIZED        = 26 + XSERR_BASE
 XSERR_VM_IN_CONFLICT           = 27 + XSERR_BASE
-XSERR_LAST                     = 27 + XSERR_BASE ## KEEP LAST
+XSERR_POLICY_HAS_DUPLICATES    = 28 + XSERR_BASE
+XSERR_LAST                     = 28 + XSERR_BASE ## KEEP LAST
 
 XSERR_MESSAGES = [
     '',
@@ -89,7 +90,8 @@ XSERR_MESSAGES = [
     'Operation failed in hypervisor',
     'Boot policy installation error',
     'VM is not authorized to run',
-    'VM label conflicts with another VM'
+    'VM label conflicts with another VM',
+    'Duplicate labels or types in policy'
 ]
 
 def xserr2string(err):
@@ -101,8 +103,10 @@ def xserr2string(err):
     return "Unknown XSERR code '%s'." % (hex(err))
 
 # Policy identifiers used in labels
-ACM_POLICY_ID = "ACM"
+ACM_POLICY_ID = 'ACM'
 
-INVALID_POLICY_PREFIX = "INV_"
+INVALID_POLICY_PREFIX = 'INV_'
 
 INVALID_SSIDREF = 0xFFFFFFFF
+
+XS_INACCESSIBLE_LABEL = '__INACCESSIBLE__'

@@ -189,7 +189,7 @@ static void domain_page_flush_and_put(struct domain* d, unsigned long mpaddr,
 
 extern unsigned long ia64_iobase;
 
-static struct domain *dom_xen, *dom_io;
+struct domain *dom_xen, *dom_io;
 
 /*
  * This number is bigger than DOMID_SELF, DOMID_XEN and DOMID_IO.

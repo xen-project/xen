@@ -33,17 +33,22 @@ create_hashtable(unsigned int minsize,
 {
     struct hashtable *h;
     unsigned int pindex, size = primes[0];
+
     /* Check requested hashtable isn't too large */
     if (minsize > (1u << 30)) return NULL;
+
     /* Enforce size as prime */
     for (pindex=0; pindex < prime_table_length; pindex++) {
         if (primes[pindex] > minsize) { size = primes[pindex]; break; }
     }
-    h = (struct hashtable *)malloc(sizeof(struct hashtable));
-    if (NULL == h) return NULL; /*oom*/
-    h->table = (struct entry **)malloc(sizeof(struct entry*) * size);
-    if (NULL == h->table) { free(h); return NULL; } /*oom*/
-    memset(h->table, 0, size * sizeof(struct entry *));
+
+    h = (struct hashtable *)calloc(1, sizeof(struct hashtable));
+    if (NULL == h)
+        goto err0;
+    h->table = (struct entry **)calloc(size, sizeof(struct entry *));
+    if (NULL == h->table)
+        goto err1;
+
     h->tablelength  = size;
     h->primeindex   = pindex;
     h->entrycount   = 0;
@@ -51,6 +56,11 @@ create_hashtable(unsigned int minsize,
     h->eqfn         = eqf;
     h->loadlimit    = (unsigned int)(((uint64_t)size * max_load_factor) / 100);
     return h;
+
+err1:
+   free(h);
+err0:
+   return NULL;
 }
 
 /*****************************************************************************/
@@ -80,10 +90,9 @@ hashtable_expand(struct hashtable *h)
     if (h->primeindex == (prime_table_length - 1)) return 0;
     newsize = primes[++(h->primeindex)];
 
-    newtable = (struct entry **)malloc(sizeof(struct entry*) * newsize);
+    newtable = (struct entry **)calloc(newsize, sizeof(struct entry*));
     if (NULL != newtable)
     {
-        memset(newtable, 0, newsize * sizeof(struct entry *));
         /* This algorithm is not 'stable'. ie. it reverses the list
          * when it transfers entries between the tables */
         for (i = 0; i < h->tablelength; i++) {
@@ -149,7 +158,7 @@ hashtable_insert(struct hashtable *h, void *k, void *v)
          * element may be ok. Next time we insert, we'll try expanding again.*/
         hashtable_expand(h);
     }
-    e = (struct entry *)malloc(sizeof(struct entry));
+    e = (struct entry *)calloc(1, sizeof(struct entry));
     if (NULL == e) { --(h->entrycount); return 0; } /*oom*/
     e->h = hash(h,k);
     index = indexFor(h->tablelength,e->h);

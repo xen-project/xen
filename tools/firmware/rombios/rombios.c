@@ -2311,10 +2311,31 @@ debugger_off()
 #define ACPI_FACS_OFFSET 0x10
 /* S3 resume status in CMOS 0Fh shutdown status byte*/
 
+Bit32u facs_get32(offs)
+Bit16u offs;
+{
+ASM_START
+  push bp
+  mov  bp, sp
+
+    push ds
+    mov ax, #(ACPI_FACS_ADDRESS >> 4)
+    mov ds, ax
+
+    mov bx, 4[bp]
+    mov ax, [bx]
+    mov dx, 2[bx]
+    pop ds
+
+  pop  bp
+ASM_END
+}
+
+
 void 
 s3_resume()
 {
-    Bit16u s3_wakeup_vector;
+    Bit32u s3_wakeup_vector;
     extern Bit16u s3_wakeup_ip;
     extern Bit16u s3_wakeup_cs;
     extern Bit8u s3_resume_flag;
@@ -2330,19 +2351,14 @@ ASM_END
     }
     s3_resume_flag = 0;
 
-ASM_START
-    mov ax, #0x0
-    mov ds, ax
-ASM_END
-
     /* get x_firmware_waking_vector */
-    s3_wakeup_vector = *((Bit16u*)(ACPI_FACS_ADDRESS+ACPI_FACS_OFFSET+24));
-    if (s3_wakeup_vector == 0){
+    s3_wakeup_vector = facs_get32(ACPI_FACS_OFFSET+24);
+    if (!s3_wakeup_vector) {
         /* get firmware_waking_vector */
-        s3_wakeup_vector = *((Bit16u*)(ACPI_FACS_ADDRESS+ACPI_FACS_OFFSET+12));
-        if (s3_wakeup_vector == 0){
+	s3_wakeup_vector = facs_get32(ACPI_FACS_OFFSET+12);
+    	if (!s3_wakeup_vector) {
             goto s3_out;
-        }
+	}
     }
 
     /* setup wakeup vector */
@@ -2350,13 +2366,6 @@ ASM_END
     s3_wakeup_cs = s3_wakeup_vector >> 4;
 
 ASM_START
-    mov bx, [_s3_wakeup_cs]
-    mov dx, [_s3_wakeup_ip]
-
-    mov ax, #0xF000
-    mov ds, ax
-    mov [_s3_wakeup_cs], bx
-    mov [_s3_wakeup_ip], dx
     jmpf [_s3_wakeup_ip]
 
 ; S3 data

@@ -60,7 +60,7 @@ static void remap_entry_to_ioapic_rte(
     }
 
     remap_rte = (struct IO_APIC_route_remap_entry *) old_rte;
-    index = (remap_rte->index_15 << 15) + remap_rte->index_0_14;
+    index = (remap_rte->index_15 << 15) | remap_rte->index_0_14;
 
     if ( index > ir_ctrl->iremap_index )
         panic("%s: index (%d) is larger than remap table entry size (%d)!\n",
@@ -140,7 +140,7 @@ static void ioapic_rte_to_remap_entry(struct iommu *iommu,
         /* now construct new ioapic rte entry */
         remap_rte->vector = new_rte.vector;
         remap_rte->delivery_mode = 0;    /* has to be 0 for remap format */
-        remap_rte->index_15 = index & 0x8000;
+        remap_rte->index_15 = (index >> 15) & 0x1;
         remap_rte->index_0_14 = index & 0x7fff;
 
         remap_rte->delivery_status = new_rte.delivery_status;
@@ -269,7 +269,7 @@ static void remap_entry_to_msi_msg(
 
     remap_rte = (struct msi_msg_remap_entry *) msg;
     index = (remap_rte->address_lo.index_15 << 15) |
-            remap_rte->address_lo.index_0_14;
+             remap_rte->address_lo.index_0_14;
 
     if ( index > ir_ctrl->iremap_index )
         panic("%s: index (%d) is larger than remap table entry size (%d)\n",
@@ -368,7 +368,7 @@ static void msi_msg_to_remap_entry(
 
     /* now construct new MSI/MSI-X rte entry */
     remap_rte->address_lo.dontcare = 0;
-    remap_rte->address_lo.index_15 = index & 0x8000;
+    remap_rte->address_lo.index_15 = (index >> 15) & 0x1;
     remap_rte->address_lo.index_0_14 = index & 0x7fff;
     remap_rte->address_lo.SHV = 1;
     remap_rte->address_lo.format = 1;

@@ -236,6 +236,12 @@ arch_init(start_info_t *si)
 }
 
 void
+arch_fini(void)
+{
+	/* TODO */
+}
+
+void
 arch_print_info(void)
 {
 	int major, minor;

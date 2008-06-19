@@ -4,6 +4,7 @@
  * Samuel Thibault <Samuel.Thibault@eu.citrix.net>, October 2007
  */
 
+#ifdef HAVE_LIBC
 #include <os.h>
 #include <sched.h>
 #include <console.h>
@@ -41,24 +42,30 @@ void _fini(void)
 extern char __app_bss_start, __app_bss_end;
 static void call_main(void *p)
 {
-    char *args, /**path,*/ *msg, *c;
+    char *c;
 #ifdef CONFIG_QEMU
-    char *domargs;
+    char *domargs, *msg;
 #endif
     int argc;
     char **argv;
     char *envp[] = { NULL };
+#ifdef CONFIG_QEMU
     char *vm;
-    int i;
     char path[128];
+#endif
+    int i;
 
     /* Let other parts initialize (including console output) before maybe
      * crashing. */
     //sleep(1);
 
+#ifndef CONFIG_GRUB
     sparse((unsigned long) &__app_bss_start, &__app_bss_end - &__app_bss_start);
+#ifdef HAVE_LWIP
     start_networking();
+#endif
     init_fs_frontend();
+#endif
 
 #ifdef CONFIG_QEMU
     if (!fs_import) {
@@ -92,22 +99,6 @@ static void call_main(void *p)
     }
 #endif
 
-    msg = xenbus_read(XBT_NIL, "vm", &vm);
-    if (msg) {
-        printk("Couldn't read vm path\n");
-        do_exit();
-    }
-
-    printk("my vm is at %s\n", vm);
-    snprintf(path, sizeof(path), "%s/image/cmdline", vm);
-    free(vm);
-    msg = xenbus_read(XBT_NIL, path, &args);
-
-    if (msg) {
-        printk("Couldn't get my args: %s\n", msg);
-        args = strdup("");
-    }
-
     argc = 1;
 
 #define PARSE_ARGS(ARGS,START,END) \
@@ -124,7 +115,7 @@ static void call_main(void *p)
 	} \
     }
 
-    PARSE_ARGS(args, argc++, );
+    PARSE_ARGS((char*)start_info.cmd_line, argc++, );
 #ifdef CONFIG_QEMU
     PARSE_ARGS(domargs, argc++, );
 #endif
@@ -133,7 +124,7 @@ static void call_main(void *p)
     argv[0] = "main";
     argc = 1;
 
-    PARSE_ARGS(args, argv[argc++] = c, *c++ = 0)
+    PARSE_ARGS((char*)start_info.cmd_line, argv[argc++] = c, *c++ = 0)
 #ifdef CONFIG_QEMU
     PARSE_ARGS(domargs, argv[argc++] = c, *c++ = 0)
 #endif
@@ -162,7 +153,10 @@ void _exit(int ret)
     close_all_files();
     __libc_fini_array();
     printk("main returned %d\n", ret);
-    unbind_all_ports();
+#ifdef HAVE_LWIP
+    stop_networking();
+#endif
+    stop_kernel();
     if (!ret) {
 	/* No problem, just shutdown.  */
         struct sched_shutdown sched_shutdown = { .reason = SHUTDOWN_poweroff };
@@ -177,3 +171,4 @@ int app_main(start_info_t *si)
     main_thread = create_thread("main", call_main, si);
     return 0;
 }
+#endif

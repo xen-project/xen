@@ -749,9 +749,13 @@ void qos_init_domain(int domid, int idx)
     new_qos->domain_info[idx].blocked_start_time = 0;
     new_qos->domain_info[idx].id = domid;
     if (domid == IDLE_DOMAIN_ID)
-        sprintf(new_qos->domain_info[idx].name, "Idle Task%d", global_cpu);
+        snprintf(new_qos->domain_info[idx].name,
+		sizeof(new_qos->domain_info[idx].name),
+		"Idle Task%d", global_cpu);
     else
-        sprintf(new_qos->domain_info[idx].name, "Domain#%d", domid);
+        snprintf(new_qos->domain_info[idx].name,
+		sizeof(new_qos->domain_info[idx].name),
+		"Domain#%d", domid);
   
     for (i=0; i<NSAMPLES; i++) {
         new_qos->qdata[i].ns_gotten[idx] = 0;

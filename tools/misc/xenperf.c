@@ -202,7 +202,7 @@ int main(int argc, char *argv[])
                         strncpy(hypercall_name, hypercall_name_table[j],
                                 sizeof(hypercall_name));
                     else
-                        sprintf(hypercall_name, "[%d]", j);
+                        snprintf(hypercall_name, sizeof(hypercall_name), "[%d]", j);
                     hypercall_name[sizeof(hypercall_name)-1]='\0';
                     printf("%-35s ", hypercall_name);
                     printf("%12u\n", (unsigned int)val[j]);

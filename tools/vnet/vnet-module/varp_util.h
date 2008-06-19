@@ -53,11 +53,11 @@ static inline const char *VarpAddr_ntoa(VarpAddr *addr, char buf[VARP_ADDR_BUF])
     switch(addr->family){
     default:
     case AF_INET:
-        sprintf(buf, "%u.%u.%u.%u",
+        snprintf(buf, sizeof(buf), "%u.%u.%u.%u",
                 NIPQUAD(addr->u.ip4));
         break;
     case AF_INET6:
-        sprintf(buf, "%04x:%04x:%04x:%04x:%04x:%04x:%04x:%04x",
+        snprintf(buf, sizeof(buf), "%04x:%04x:%04x:%04x:%04x:%04x:%04x:%04x",
                 NIP6(addr->u.ip6));
         break;
     }
@@ -66,7 +66,7 @@ static inline const char *VarpAddr_ntoa(VarpAddr *addr, char buf[VARP_ADDR_BUF])
 
 static inline const char *VnetId_ntoa(VnetId *vnet, char buf[VNET_ID_BUF])
 {
-    sprintf(buf, "%04x:%04x:%04x:%04x:%04x:%04x:%04x:%04x",
+    snprintf(buf, sizeof(buf), "%04x:%04x:%04x:%04x:%04x:%04x:%04x:%04x",
             ntohs(vnet->u.vnet16[0]), \
             ntohs(vnet->u.vnet16[1]), \
             ntohs(vnet->u.vnet16[2]), \

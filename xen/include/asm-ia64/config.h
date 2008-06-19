@@ -17,6 +17,7 @@
 // this needs to be on to run on system with large memory hole
 #define	CONFIG_VIRTUAL_FRAME_TABLE
 
+#define CONFIG_EFI
 #define CONFIG_EFI_PCDP
 #define CONFIG_SERIAL_SGI_L1_CONSOLE
 
@@ -293,5 +294,7 @@ struct screen_info { };
 #undef CONFIG_PRIVIFY
 
 #define CONFIG_XENCOMM_MARK_DIRTY 1
+
+#define ARCH_CRASH_SAVE_VMCOREINFO
 
 #endif	/* _IA64_CONFIG_H_ */

@@ -3,6 +3,10 @@
 /* Taken from Linux kernel code, but de-kernelized for userspace. */
 #include <stddef.h>
 
+#undef LIST_HEAD_INIT
+#undef LIST_HEAD
+#undef INIT_LIST_HEAD
+
 /*
  * These are non-NULL pointers that will result in page faults
  * under normal circumstances, used to verify that nobody uses

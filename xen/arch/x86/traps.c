@@ -331,6 +331,28 @@ void show_execution_state(struct cpu_user_regs *regs)
     show_stack(regs);
 }
 
+void vcpu_show_execution_state(struct vcpu *v)
+{
+    printk("*** Dumping Dom%d vcpu#%d state: ***\n",
+           v->domain->domain_id, v->vcpu_id);
+
+    if ( v == current )
+    {
+        show_execution_state(guest_cpu_user_regs());
+        return;
+    }
+
+    vcpu_pause(v); /* acceptably dangerous */
+
+    vcpu_show_registers(v);
+    /* Todo: map arbitrary vcpu's top guest stack page here. */
+    if ( (v->domain == current->domain) &&
+         guest_kernel_mode(v, &v->arch.guest_context.user_regs) )
+        show_guest_stack(&v->arch.guest_context.user_regs);
+
+    vcpu_unpause(v);
+}
+
 char *trapstr(int trapnr)
 {
     static char *strings[] = { 
@@ -649,37 +671,21 @@ int cpuid_hypervisor_leaves(
     return 1;
 }
 
-static int emulate_forced_invalid_op(struct cpu_user_regs *regs)
+static void pv_cpuid(struct cpu_user_regs *regs)
 {
-    char sig[5], instr[2];
     uint32_t a, b, c, d;
-    unsigned long eip, rc;
 
     a = regs->eax;
     b = regs->ebx;
     c = regs->ecx;
     d = regs->edx;
-    eip = regs->eip;
 
-    /* Check for forced emulation signature: ud2 ; .ascii "xen". */
-    if ( (rc = copy_from_user(sig, (char *)eip, sizeof(sig))) != 0 )
+    if ( current->domain->domain_id != 0 )
     {
-        propagate_page_fault(eip + sizeof(sig) - rc, 0);
-        return EXCRET_fault_fixed;
+        if ( !cpuid_hypervisor_leaves(a, &a, &b, &c, &d) )
+            domain_cpuid(current->domain, a, b, &a, &b, &c, &d);
+        goto out;
     }
-    if ( memcmp(sig, "\xf\xbxen", sizeof(sig)) )
-        return 0;
-    eip += sizeof(sig);
-
-    /* We only emulate CPUID. */
-    if ( ( rc = copy_from_user(instr, (char *)eip, sizeof(instr))) != 0 )
-    {
-        propagate_page_fault(eip + sizeof(instr) - rc, 0);
-        return EXCRET_fault_fixed;
-    }
-    if ( memcmp(instr, "\xf\xa2", sizeof(instr)) )
-        return 0;
-    eip += sizeof(instr);
 
     asm ( 
         "cpuid"
@@ -694,8 +700,6 @@ static int emulate_forced_invalid_op(struct cpu_user_regs *regs)
         __clear_bit(X86_FEATURE_PGE, &d);
         __clear_bit(X86_FEATURE_MCE, &d);
         __clear_bit(X86_FEATURE_MCA, &d);
-        if ( !IS_PRIV(current->domain) )
-            __clear_bit(X86_FEATURE_MTRR, &d);
         __clear_bit(X86_FEATURE_PSE36, &d);
     }
     switch ( (uint32_t)regs->eax )
@@ -717,8 +721,6 @@ static int emulate_forced_invalid_op(struct cpu_user_regs *regs)
         __clear_bit(X86_FEATURE_DSCPL % 32, &c);
         __clear_bit(X86_FEATURE_VMXE % 32, &c);
         __clear_bit(X86_FEATURE_SMXE % 32, &c);
-        if ( !IS_PRIV(current->domain) )
-            __clear_bit(X86_FEATURE_EST % 32, &c);
         __clear_bit(X86_FEATURE_TM2 % 32, &c);
         if ( is_pv_32bit_vcpu(current) )
             __clear_bit(X86_FEATURE_CX16 % 32, &c);
@@ -758,10 +760,41 @@ static int emulate_forced_invalid_op(struct cpu_user_regs *regs)
         break;
     }
 
+ out:
     regs->eax = a;
     regs->ebx = b;
     regs->ecx = c;
     regs->edx = d;
+}
+
+static int emulate_forced_invalid_op(struct cpu_user_regs *regs)
+{
+    char sig[5], instr[2];
+    unsigned long eip, rc;
+
+    eip = regs->eip;
+
+    /* Check for forced emulation signature: ud2 ; .ascii "xen". */
+    if ( (rc = copy_from_user(sig, (char *)eip, sizeof(sig))) != 0 )
+    {
+        propagate_page_fault(eip + sizeof(sig) - rc, 0);
+        return EXCRET_fault_fixed;
+    }
+    if ( memcmp(sig, "\xf\xbxen", sizeof(sig)) )
+        return 0;
+    eip += sizeof(sig);
+
+    /* We only emulate CPUID. */
+    if ( ( rc = copy_from_user(instr, (char *)eip, sizeof(instr))) != 0 )
+    {
+        propagate_page_fault(eip + sizeof(instr) - rc, 0);
+        return EXCRET_fault_fixed;
+    }
+    if ( memcmp(instr, "\xf\xa2", sizeof(instr)) )
+        return 0;
+    eip += sizeof(instr);
+
+    pv_cpuid(regs);
 
     instruction_done(regs, eip, 0);
 
@@ -2645,13 +2678,11 @@ asmlinkage void do_general_protection(struct cpu_user_regs *regs)
     panic("GENERAL PROTECTION FAULT\n[error_code=%04x]\n", regs->error_code);
 }
 
-static void nmi_action(unsigned long unused)
+static void nmi_mce_softirq(void)
 {
     /* Only used to defer wakeup of dom0,vcpu0 to a safe (non-NMI) context. */
     vcpu_kick(dom0->vcpu[0]);
 }
-
-static DECLARE_TASKLET(nmi_tasklet, nmi_action, 0);
 
 static void nmi_dom0_report(unsigned int reason_idx)
 {
@@ -2663,8 +2694,9 @@ static void nmi_dom0_report(unsigned int reason_idx)
 
     set_bit(reason_idx, nmi_reason(d));
 
+    /* Not safe to wake a vcpu here, or even to schedule a tasklet! */
     if ( !test_and_set_bool(v->nmi_pending) )
-        tasklet_schedule(&nmi_tasklet); /* not safe to wake a vcpu here */
+        raise_softirq(NMI_MCE_SOFTIRQ);
 }
 
 asmlinkage void mem_parity_error(struct cpu_user_regs *regs)
@@ -2942,6 +2974,8 @@ void __init trap_init(void)
     percpu_traps_init();
 
     cpu_init();
+
+    open_softirq(NMI_MCE_SOFTIRQ, nmi_mce_softirq);
 }
 
 long register_guest_nmi_callback(unsigned long address)

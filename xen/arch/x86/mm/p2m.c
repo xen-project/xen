@@ -323,7 +323,7 @@ p2m_set_entry(struct domain *d, unsigned long gfn, mfn_t mfn,
 
     /* Track the highest gfn for which we have ever had a valid mapping */
     if ( mfn_valid(mfn) && (gfn > d->arch.p2m->max_mapped_pfn) )
-        d->arch.p2m->max_mapped_pfn = gfn;
+        d->arch.p2m->max_mapped_pfn = gfn + (1UL << page_order) - 1;
 
     if ( iommu_enabled && (is_hvm_domain(d) || need_iommu(d)) )
     {
@@ -1058,7 +1058,7 @@ void p2m_change_type_global(struct domain *d, p2m_type_t ot, p2m_type_t nt)
                         continue;
                     mfn = l2e_get_pfn(l2e[i2]);
                     gfn = get_gpfn_from_mfn(mfn);
-                    flags = p2m_flags_to_type(nt);
+                    flags = p2m_type_to_flags(nt);
                     l1e_content = l1e_from_pfn(mfn, flags | _PAGE_PSE);
                     paging_write_p2m_entry(d, gfn, (l1_pgentry_t *)&l2e[i2],
                                            l2mfn, l1e_content, 2);

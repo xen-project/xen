@@ -1429,6 +1429,25 @@ int xc_domain_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
         }
     }
 
+    if ( hvm )
+    {
+        struct {
+            int minusthree;
+            uint32_t pad;
+            uint64_t ident_pt;
+        } chunk = { -3, 0 };
+
+        xc_get_hvm_param(xc_handle, dom, HVM_PARAM_IDENT_PT,
+                         (unsigned long *)&chunk.ident_pt);
+
+        if ( (chunk.ident_pt != 0) &&
+             write_exact(io_fd, &chunk, sizeof(chunk)) )
+        {
+            PERROR("Error when writing the ident_pt for EPT guest");
+            goto out;
+        }
+    }
+
     /* Zero terminate */
     i = 0;
     if ( write_exact(io_fd, &i, sizeof(int)) )

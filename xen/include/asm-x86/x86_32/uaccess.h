@@ -1,8 +1,6 @@
 #ifndef __i386_UACCESS_H
 #define __i386_UACCESS_H
 
-#define __addr_ok(addr) ((unsigned long)(addr) < HYPERVISOR_VIRT_START)
-
 /*
  * Test whether a block of memory is a valid user space address.
  * Returns 0 if the range is valid, nonzero otherwise.

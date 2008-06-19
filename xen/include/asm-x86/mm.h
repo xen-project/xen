@@ -46,6 +46,10 @@ struct page_info
 
     } u;
 
+#if defined(__x86_64__)
+    spinlock_t lock;
+#endif
+
     union {
         /*
          * Timestamp from 'TLB clock', used to avoid extra safety flushes.
@@ -59,7 +63,7 @@ struct page_info
          * tlbflush_timestamp since page table pages are explicitly not
          * tracked for TLB-flush avoidance when a guest runs in shadow mode.
          */
-        unsigned long shadow_flags;
+        u32 shadow_flags;
     };
 };
 
@@ -89,9 +93,11 @@ struct page_info
  /* Cleared when the owning guest 'frees' this page. */
 #define _PGC_allocated      31
 #define PGC_allocated       (1U<<_PGC_allocated)
- /* Set on a *guest* page to mark it out-of-sync with its shadow */
-#define _PGC_out_of_sync    30
-#define PGC_out_of_sync     (1U<<_PGC_out_of_sync)
+#if defined(__i386__)
+ /* Page is locked? */
+# define _PGC_locked        30
+# define PGC_locked         (1U<<_PGC_out_of_sync)
+#endif
  /* Set when is using a page as a page table */
 #define _PGC_page_table     29
 #define PGC_page_table      (1U<<_PGC_page_table)
@@ -342,13 +348,15 @@ int steal_page(
 int map_ldt_shadow_page(unsigned int);
 
 #ifdef CONFIG_COMPAT
-int setup_arg_xlat_area(struct vcpu *, l4_pgentry_t *);
+void domain_set_alloc_bitsize(struct domain *d);
 unsigned int domain_clamp_alloc_bitsize(struct domain *d, unsigned int bits);
 #else
-# define setup_arg_xlat_area(vcpu, l4tab) 0
+# define domain_set_alloc_bitsize(d) ((void)0)
 # define domain_clamp_alloc_bitsize(d, b) (b)
 #endif
 
 unsigned long domain_get_maximum_gpfn(struct domain *d);
+
+extern struct domain *dom_xen, *dom_io;	/* for vmcoreinfo */
 
 #endif /* __ASM_X86_MM_H__ */

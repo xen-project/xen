@@ -3,6 +3,10 @@
 #include <linux/notifier.h>
 #include <asm/hypervisor.h>
 
+#ifdef HAVE_XEN_PLATFORM_COMPAT_H
+#include <xen/platform-compat.h>
+#endif
+
 MODULE_LICENSE("GPL");
 
 #ifdef __ia64__
@@ -26,29 +30,13 @@ xen_panic_event(struct notifier_block *this, unsigned long event, void *ptr)
 	/* we're never actually going to get here... */
 	return NOTIFY_DONE;
 }
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,18)
-static struct notifier_block xen_panic_block = {
-	xen_panic_event, NULL, 0 /* try to go last */
-};
-#else
-static struct notifier_block xen_panic_block = {
-	.notifier_call= xen_panic_event,
-	.next= NULL,
-	.priority= 0/* try to go last */
-};
-#endif /*LINUX_VERSION_CODE < KERNEL_VERSION(2,6,18)*/
 
-static int __init setup_panic_event(void)
-{
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,18)
-	notifier_chain_register(&panic_notifier_list, &xen_panic_block);
-#else
-	atomic_notifier_chain_register(&panic_notifier_list, &xen_panic_block);
-#endif /*LINUX_VERSION_CODE < KERNEL_VERSION(2,6,18)*/
-	return 0;
-}
+static struct notifier_block xen_panic_block = {
+	.notifier_call = xen_panic_event
+};
 
 int xen_panic_handler_init(void)
 {
-	return setup_panic_event();
+	atomic_notifier_chain_register(&panic_notifier_list, &xen_panic_block);
+	return 0;
 }

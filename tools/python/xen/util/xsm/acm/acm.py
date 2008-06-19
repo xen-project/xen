@@ -720,19 +720,24 @@ def list_labels(policy_name, ltype):
     else:
         err("Unknown label type \'" + ltype + "\'")
 
-    (primary, secondary, f, pol_exists) = getmapfile(policy_name)
-    if not f:
-        if pol_exists:
-            err("Cannot find mapfile for policy \'" + policy_name + "\'.\n")
-        else:
-            err("Unknown policy \'" + policy_name + "\'")
+    try:
+        mapfile_lock()
 
-    labels = []
-    for line in f:
-        if condition.match(line):
-            label = line.split()[3]
-            if label not in labels:
-                labels.append(label)
+        (primary, secondary, f, pol_exists) = getmapfile(policy_name)
+        if not f:
+            if pol_exists:
+                err("Cannot find mapfile for policy \'" + policy_name + "\'.\n")
+            else:
+                err("Unknown policy \'" + policy_name + "\'")
+
+        labels = []
+        for line in f:
+            if condition.match(line):
+                label = line.split()[3]
+                if label not in labels:
+                    labels.append(label)
+    finally:
+        mapfile_unlock()
 
     if '__NULL_LABEL__' in labels:
         labels.remove('__NULL_LABEL__')
@@ -778,8 +783,6 @@ def get_res_security_details(resource):
         policy = active_policy
         return (label, ssidref, policy)
 
-    (label, ssidref, policy) = default_security_details()
-
     # find the entry associated with this resource
     (policytype, label, policy) = get_res_label(resource)
     if policy == 'NULL':
@@ -793,6 +796,8 @@ def get_res_security_details(resource):
     # is this resource label for the running policy?
     if policy == active_policy:
         ssidref = label2ssidref(label, policy, 'res')
+    elif label == xsconstants.XS_INACCESSIBLE_LABEL:
+        ssidref = NULL_SSIDREF
     else:
         log.info("Resource label not for active policy, using DEFAULT.")
         return default_security_details()
@@ -916,6 +921,8 @@ def res_security_check_xapi(rlabel, rssidref, rpolicy, xapi_dom_label):
     rtnval = 1
     # if security is on, ask the hypervisor for a decision
     if on():
+        if rlabel == xsconstants.XS_INACCESSIBLE_LABEL:
+            return 0
         typ, dpolicy, domain_label = xapi_dom_label.split(":")
         if not dpolicy or not domain_label:
             raise VmError("VM security label in wrong format.")
@@ -973,6 +980,8 @@ def validate_label(policytype, policyref, label, dom_or_res):
     if not policytype or not label:
         return -xsconstants.XSERR_BAD_LABEL_FORMAT
     rc = xsconstants.XSERR_SUCCESS
+    if label == xsconstants.XS_INACCESSIBLE_LABEL:
+        return rc
     from xen.xend.XendXSPolicyAdmin import XSPolicyAdminInstance
     curpol = XSPolicyAdminInstance().get_loaded_policy()
     if not curpol or curpol.get_name() != policyref:
@@ -1197,20 +1206,23 @@ def set_resource_label(resource, policytype, policyref, reslabel, \
     @return Success (0) or failure value (< 0)
     """
 
-    if reslabel != "":
-        ssidref = label2ssidref(reslabel, policyref, 'res')
 
     try:
         resource = unify_resname(resource, mustexist=False)
     except Exception:
         return -xsconstants.XSERR_BAD_RESOURCE_FORMAT
 
-    domains = is_resource_in_use(resource)
-    if len(domains) > 0:
-        return -xsconstants.XSERR_RESOURCE_IN_USE
-
     try:
         resfile_lock()
+        mapfile_lock()
+
+        if reslabel not in [ '', xsconstants.XS_INACCESSIBLE_LABEL ]:
+            ssidref = label2ssidref(reslabel, policyref, 'res')
+
+        domains = is_resource_in_use(resource)
+        if len(domains) > 0:
+            return -xsconstants.XSERR_RESOURCE_IN_USE
+
         access_control = {}
         try:
              access_control = dictio.dict_read("resources", res_label_filename)
@@ -1229,6 +1241,11 @@ def set_resource_label(resource, policytype, policyref, reslabel, \
                 if value == tuple([policytype, policyref, reslabel]) and \
                    key.startswith('vlan:'):
                     return -xsconstants.XSERR_BAD_LABEL
+
+        if reslabel == xsconstants.XS_INACCESSIBLE_LABEL:
+            policytype = xsconstants.ACM_POLICY_ID
+            policyref  = '*'
+
         if reslabel != "":
             new_entry = { resource : tuple([policytype, policyref, reslabel])}
             access_control.update(new_entry)
@@ -1243,6 +1260,7 @@ def set_resource_label(resource, policytype, policyref, reslabel, \
         dictio.dict_write(access_control, "resources", res_label_filename)
     finally:
         resfile_unlock()
+        mapfile_unlock()
     return xsconstants.XSERR_SUCCESS
 
 def rm_resource_label(resource, oldlabel_xapi):

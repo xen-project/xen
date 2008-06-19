@@ -507,7 +507,7 @@ class ACMPolicy(XSPolicy):
             rc = self.compile()
         return rc, errors
 
-    def force_default_policy(klass):
+    def force_default_policy(klass, policy_ref):
         """
            Force the installation of the DEFAULT policy if for
            example no XML of the current policy is available and
@@ -518,7 +518,7 @@ class ACMPolicy(XSPolicy):
         """
         errors = ""
 
-        acmpol_new = ACMPolicy(xml = get_DEFAULT_policy())
+        acmpol_new = ACMPolicy(xml = get_DEFAULT_policy(), ref=policy_ref)
 
         from xen.lowlevel import acm
         dom0_ssidref = acm.getssid(0)
@@ -1322,6 +1322,13 @@ class ACMPolicy(XSPolicy):
 
         if ACM_LABEL_UNLABELED in resnames:
             resnames.remove(ACM_LABEL_UNLABELED)
+
+        # check for duplicate labels
+        if len(vmlabels) != len(set(vmlabels)) or \
+           len(resnames) != len(set(resnames)) or \
+           len(stes)     != len(set(stes))     or \
+           len(chws)     != len(set(chws)):
+            return -xsconstants.XSERR_POLICY_HAS_DUPLICATES, "", ""
 
         max_chw_ssids = 1 + len(vms_with_chws)
         max_chw_types = 1 + len(vms_with_chws)

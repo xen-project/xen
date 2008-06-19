@@ -8,6 +8,7 @@
 #include <xenbus.h>
 #include <xen/io/console.h>
 
+DECLARE_WAIT_QUEUE_HEAD(console_queue);
 
 static inline struct xencons_interface *xencons_interface(void)
 {
@@ -52,6 +53,9 @@ int xencons_ring_send(const char *data, unsigned len)
 
 static void handle_input(evtchn_port_t port, struct pt_regs *regs, void *ign)
 {
+#ifdef HAVE_LIBC
+        wake_up(&console_queue);
+#else
 	struct xencons_interface *intf = xencons_interface();
 	XENCONS_RING_IDX cons, prod;
 
@@ -71,7 +75,47 @@ static void handle_input(evtchn_port_t port, struct pt_regs *regs, void *ign)
 	notify_daemon();
 
 	xencons_tx();
+#endif
 }
+
+#ifdef HAVE_LIBC
+int xencons_ring_avail(void)
+{
+	struct xencons_interface *intf = xencons_interface();
+	XENCONS_RING_IDX cons, prod;
+
+	cons = intf->in_cons;
+	prod = intf->in_prod;
+	mb();
+	BUG_ON((prod - cons) > sizeof(intf->in));
+
+        return prod - cons;
+}
+
+int xencons_ring_recv(char *data, unsigned len)
+{
+	struct xencons_interface *intf = xencons_interface();
+	XENCONS_RING_IDX cons, prod;
+        unsigned filled = 0;
+
+	cons = intf->in_cons;
+	prod = intf->in_prod;
+	mb();
+	BUG_ON((prod - cons) > sizeof(intf->in));
+
+        while (filled < len && cons + filled != prod) {
+                data[filled] = *(intf->in + MASK_XENCONS_IDX(cons + filled, intf->in));
+                filled++;
+	}
+
+	mb();
+        intf->in_cons = cons + filled;
+
+	notify_daemon();
+
+        return filled;
+}
+#endif
 
 int xencons_ring_init(void)
 {

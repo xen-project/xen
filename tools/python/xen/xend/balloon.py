@@ -96,7 +96,6 @@ def free(need_mem):
     xoptions = XendOptions.instance()
     dom0 = XendDomain.instance().privilegedDomain()
     xc = xen.lowlevel.xc.xc()
-    dom0_start_alloc_mb = get_dom0_current_alloc() / 1024
 
     try:
         dom0_min_mem = xoptions.get_dom0_min_mem() * 1024
@@ -176,6 +175,7 @@ def free(need_mem):
                 (need_mem, dom0_min_mem, dom0_min_mem,
                  free_mem + scrub_mem + dom0_alloc - dom0_min_mem))
         else:
+            dom0_start_alloc_mb = get_dom0_current_alloc() / 1024
             dom0.setMemoryTarget(dom0_start_alloc_mb)
             raise VmError(
                 ('Not enough memory is available, and dom0 cannot'

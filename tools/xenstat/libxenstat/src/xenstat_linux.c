@@ -165,7 +165,8 @@ static int read_attributes_vbd(const char *vbd_directory, const char *what, char
 	static char file_name[80];
 	int fd, num_read;
 
-	sprintf(file_name, "%s/%s/%s", SYSFS_VBD_PATH, vbd_directory, what);
+	snprintf(file_name, sizeof(file_name), "%s/%s/%s",
+		SYSFS_VBD_PATH, vbd_directory, what);
 	fd = open(file_name, O_RDONLY, 0);
 	if (fd==-1) return -1;
 	num_read = read(fd, ret, cap - 1);
@@ -180,6 +181,12 @@ int xenstat_collect_vbds(xenstat_node * node)
 {
 	struct dirent *dp;
 	struct priv_data *priv = get_priv_data(node->handle);
+
+	char *sys_prefix = "statistics/";
+
+	/* 23 = "statistics/" + "xxxx_xx_req" */
+	char ooreq[23], rdreq[23], wrreq[23]; 
+	char *stat_prefix = NULL;
 
 	if (priv == NULL) {
 		perror("Allocation error");
@@ -208,12 +215,16 @@ int xenstat_collect_vbds(xenstat_node * node)
 		if (ret != 3)
 			continue;
 
-		if (strcmp(buf,"vbd") == 0)
+
+		if (strcmp(buf,"vbd") == 0){
+			stat_prefix = "";
 			vbd.back_type = 1;
-		else if (strcmp(buf,"tap") == 0)
+		} else if (strcmp(buf,"tap") == 0){
+			stat_prefix = "tap_";
 			vbd.back_type = 2;
-		else
+		} else {
 			continue;
+		}
 
 		domain = xenstat_node_domain(node, domid);
 		if (domain == NULL) {
@@ -224,24 +235,26 @@ int xenstat_collect_vbds(xenstat_node * node)
 			continue;
 		}
 
-		if((read_attributes_vbd(dp->d_name, "statistics/oo_req", buf, 256)<=0)
+		snprintf(ooreq, sizeof(ooreq), "%s%soo_req", sys_prefix, stat_prefix);
+		if((read_attributes_vbd(dp->d_name, ooreq, buf, 256)<=0)
 		   || ((ret = sscanf(buf, "%llu", &vbd.oo_reqs)) != 1))
 		{
 			continue;
 		}
 
-		if((read_attributes_vbd(dp->d_name, "statistics/rd_req", buf, 256)<=0)
+		snprintf(rdreq,  sizeof(rdreq),"%s%srd_req", sys_prefix, stat_prefix);
+		if((read_attributes_vbd(dp->d_name, rdreq, buf, 256)<=0)
 		   || ((ret = sscanf(buf, "%llu", &vbd.rd_reqs)) != 1))
 		{
 			continue;
 		}
 
-		if((read_attributes_vbd(dp->d_name, "statistics/wr_req", buf, 256)<=0)
+		snprintf(wrreq,  sizeof(wrreq),"%s%swr_req", sys_prefix, stat_prefix);
+		if((read_attributes_vbd(dp->d_name, wrreq, buf, 256)<=0)
 		   || ((ret = sscanf(buf, "%llu", &vbd.wr_reqs)) != 1))
 		{
 			continue;
 		}
-
 
 		if (domain->vbds == NULL) {
 			domain->num_vbds = 1;

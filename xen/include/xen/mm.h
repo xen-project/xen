@@ -104,4 +104,6 @@ int guest_remove_page(struct domain *d, unsigned long gmfn);
 /* Returns TRUE if the memory at address @p is ordinary RAM. */
 int memory_is_conventional_ram(paddr_t p);
 
+extern unsigned long *alloc_bitmap;	/* for vmcoreinfo */
+
 #endif /* __XEN_MM_H__ */

@@ -353,12 +353,7 @@ int __init construct_dom0(
 #endif
     }
 
-#if defined(__x86_64__)
-    if ( is_pv_32on64_domain(d) )
-        d->arch.physaddr_bitsize =
-            fls((1UL << 32) - HYPERVISOR_COMPAT_VIRT_START(d)) - 1
-            + (PAGE_SIZE - 2);
-#endif
+    domain_set_alloc_bitsize(d);
 
     /*
      * Why do we need this? The number of page-table frames depends on the 
@@ -580,6 +575,7 @@ int __init construct_dom0(
         page = alloc_domheap_page(NULL, 0);
         if ( !page )
             panic("Not enough RAM for domain 0 PML4.\n");
+        page->u.inuse.type_info = PGT_l4_page_table|PGT_validated|1;
         l4start = l4tab = page_to_virt(page);
     }
     copy_page(l4tab, idle_pg_table);
@@ -590,11 +586,7 @@ int __init construct_dom0(
         l4e_from_paddr(__pa(d->arch.mm_perdomain_l3), __PAGE_HYPERVISOR);
     v->arch.guest_table = pagetable_from_paddr(__pa(l4start));
     if ( is_pv_32on64_domain(d) )
-    {
         v->arch.guest_table_user = v->arch.guest_table;
-        if ( setup_arg_xlat_area(v, l4start) < 0 )
-            panic("Not enough RAM for domain 0 hypercall argument translation.\n");
-    }
 
     l4tab += l4_table_offset(v_start);
     mfn = alloc_spfn;
@@ -810,8 +802,6 @@ int __init construct_dom0(
     {
         si->mod_start = vinitrd_start;
         si->mod_len   = initrd_len;
-        printk("Initrd len 0x%lx, start at 0x%lx\n",
-               si->mod_len, si->mod_start);
     }
 
     memset(si->cmd_line, 0, sizeof(si->cmd_line));

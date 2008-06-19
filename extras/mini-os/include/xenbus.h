@@ -90,4 +90,7 @@ char* xenbus_printf(xenbus_transaction_t xbt,
                                   char* node, char* path,
                                   char* fmt, ...);
 
+/* Reset the XenBus system. */
+void fini_xenbus(void);
+
 #endif /* XENBUS_H__ */

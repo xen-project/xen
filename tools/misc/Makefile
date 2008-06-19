@@ -21,6 +21,11 @@ SUBDIRS := $(SUBDIRS-y)
 INSTALL_BIN  = $(TARGETS) xencons
 INSTALL_SBIN = netfix xm xen-bugtool xen-python-path xend xenperf xsview
 
+DEFAULT_PYTHON_PATH := $(shell $(XEN_ROOT)/tools/python/get-path)
+PYTHON_PATH ?= $(DEFAULT_PYTHON_PATH)
+INSTALL_PYTHON_PROG = $(XEN_ROOT)/tools/python/install-wrap \
+"$(PYTHON_PATH)" $(INSTALL_PROG)
+
 .PHONY: all
 all: build
 
@@ -32,8 +37,8 @@ build: $(TARGETS)
 install: build
 	$(INSTALL_DIR) $(DESTDIR)$(BINDIR)
 	$(INSTALL_DIR) $(DESTDIR)$(SBINDIR)
-	$(INSTALL_PROG) $(INSTALL_BIN) $(DESTDIR)$(BINDIR)
-	$(INSTALL_PROG) $(INSTALL_SBIN) $(DESTDIR)$(SBINDIR)
+	$(INSTALL_PYTHON_PROG) $(INSTALL_BIN) $(DESTDIR)$(BINDIR)
+	$(INSTALL_PYTHON_PROG) $(INSTALL_SBIN) $(DESTDIR)$(SBINDIR)
 	set -e; for d in $(SUBDIRS); do $(MAKE) -C $$d install-recurse; done
 
 .PHONY: clean

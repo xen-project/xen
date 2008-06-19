@@ -18,10 +18,10 @@
 #ifndef __ASSEMBLY__
 #include <types.h>
 #include <hypervisor.h>
+#include <kernel.h>
 
 #define USED    __attribute__ ((used))
 
-extern void do_exit(void) __attribute__((noreturn));
 #define BUG do_exit
 
 #endif
@@ -61,9 +61,11 @@ extern void do_exit(void) __attribute__((noreturn));
 extern shared_info_t *HYPERVISOR_shared_info;
 
 void trap_init(void);
+void trap_fini(void);
 
 void arch_init(start_info_t *si);
 void arch_print_info(void);
+void arch_fini(void);
 
 
 

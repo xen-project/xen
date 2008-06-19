@@ -3,7 +3,7 @@
  * 
  * Framework for serial device drivers.
  * 
- * Copyright (c) 2003-2005, K A Fraser
+ * Copyright (c) 2003-2008, K A Fraser
  */
 
 #ifndef __XEN_SERIAL_H__
@@ -32,6 +32,8 @@ struct serial_port {
     /* Transmit data buffer (interrupt-driven uart). */
     char               *txbuf;
     unsigned int        txbufp, txbufc;
+    bool_t              tx_quench;
+    int                 tx_log_everything;
     /* Force synchronous transmit. */
     int                 sync;
     /* Receiver callback functions (asynchronous receivers). */
@@ -95,6 +97,10 @@ void serial_force_unlock(int handle);
 /* Start/end a synchronous region (temporarily disable interrupt-driven tx). */
 void serial_start_sync(int handle);
 void serial_end_sync(int handle);
+
+/* Start/end a region where we will wait rather than drop characters. */
+void serial_start_log_everything(int handle);
+void serial_end_log_everything(int handle);
 
 /* Return number of bytes headroom in transmit buffer. */
 int serial_tx_space(int handle);

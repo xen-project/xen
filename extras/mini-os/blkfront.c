@@ -63,7 +63,8 @@ void blkfront_handler(evtchn_port_t port, struct pt_regs *regs, void *data)
     struct blkfront_dev *dev = data;
     int fd = dev->fd;
 
-    files[fd].read = 1;
+    if (fd != -1)
+        files[fd].read = 1;
 #endif
     wake_up(&blkfront_queue);
 }
@@ -105,6 +106,9 @@ struct blkfront_dev *init_blkfront(char *nodename, struct blkfront_info *info)
     dev = malloc(sizeof(*dev));
     memset(dev, 0, sizeof(*dev));
     dev->nodename = strdup(nodename);
+#ifdef HAVE_LIBC
+    dev->fd = -1;
+#endif
 
     snprintf(path, sizeof(path), "%s/backend-id", nodename);
     dev->dom = xenbus_read_integer(path); 
@@ -238,7 +242,15 @@ void shutdown_blkfront(struct blkfront_dev *dev)
     err = xenbus_printf(XBT_NIL, nodename, "state", "%u", 6);
     xenbus_wait_for_value(path, "6", &dev->events);
 
+    err = xenbus_printf(XBT_NIL, nodename, "state", "%u", 1);
+    xenbus_wait_for_value(path, "2", &dev->events);
+
     xenbus_unwatch_path(XBT_NIL, path);
+
+    snprintf(path, sizeof(path), "%s/ring-ref", nodename);
+    xenbus_rm(XBT_NIL, path);
+    snprintf(path, sizeof(path), "%s/event-channel", nodename);
+    xenbus_rm(XBT_NIL, path);
 
     free_blkfront(dev);
 }
@@ -323,14 +335,33 @@ void blkfront_aio(struct blkfront_aiocb *aiocbp, int write)
     if(notify) notify_remote_via_evtchn(dev->evtchn);
 }
 
-void blkfront_aio_write(struct blkfront_aiocb *aiocbp)
+static void blkfront_aio_cb(struct blkfront_aiocb *aiocbp, int ret)
 {
-    blkfront_aio(aiocbp, 1);
+    aiocbp->data = (void*) 1;
 }
 
-void blkfront_aio_read(struct blkfront_aiocb *aiocbp)
+void blkfront_io(struct blkfront_aiocb *aiocbp, int write)
 {
-    blkfront_aio(aiocbp, 0);
+    unsigned long flags;
+    ASSERT(!aiocbp->aio_cb);
+    aiocbp->aio_cb = blkfront_aio_cb;
+    blkfront_aio(aiocbp, write);
+    aiocbp->data = NULL;
+
+    local_irq_save(flags);
+    DEFINE_WAIT(w);
+    while (1) {
+	blkfront_aio_poll(aiocbp->aio_dev);
+	if (aiocbp->data)
+	    break;
+
+	add_waiter(w, blkfront_queue);
+	local_irq_restore(flags);
+	schedule();
+	local_irq_save(flags);
+    }
+    remove_waiter(w);
+    local_irq_restore(flags);
 }
 
 static void blkfront_push_operation(struct blkfront_dev *dev, uint8_t op, uint64_t id)
@@ -397,8 +428,10 @@ int blkfront_aio_poll(struct blkfront_dev *dev)
 
 moretodo:
 #ifdef HAVE_LIBC
-    files[dev->fd].read = 0;
-    mb(); /* Make sure to let the handler set read to 1 before we start looking at the ring */
+    if (dev->fd != -1) {
+        files[dev->fd].read = 0;
+        mb(); /* Make sure to let the handler set read to 1 before we start looking at the ring */
+    }
 #endif
 
     rp = dev->ring.sring->rsp_prod;

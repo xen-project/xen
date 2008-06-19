@@ -267,7 +267,7 @@ static void vmx_load_vmcs(struct vcpu *v)
 int vmx_cpu_up(void)
 {
     u32 eax, edx;
-    int cpu = smp_processor_id();
+    int bios_locked, cpu = smp_processor_id();
     u64 cr0, vmx_cr0_fixed0, vmx_cr0_fixed1;
 
     BUG_ON(!(read_cr4() & X86_CR4_VMXE));
@@ -288,7 +288,8 @@ int vmx_cpu_up(void)
 
     rdmsr(IA32_FEATURE_CONTROL_MSR, eax, edx);
 
-    if ( eax & IA32_FEATURE_CONTROL_MSR_LOCK )
+    bios_locked = !!(eax & IA32_FEATURE_CONTROL_MSR_LOCK);
+    if ( bios_locked )
     {
         if ( !(eax & (IA32_FEATURE_CONTROL_MSR_ENABLE_VMXON_OUTSIDE_SMX |
                       IA32_FEATURE_CONTROL_MSR_ENABLE_VMXON_INSIDE_SMX)) )
@@ -320,10 +321,28 @@ int vmx_cpu_up(void)
         }
     }
 
-    if ( __vmxon(virt_to_maddr(this_cpu(host_vmcs))) )
+    switch ( __vmxon(virt_to_maddr(this_cpu(host_vmcs))) )
     {
-        printk("CPU%d: VMXON failed\n", cpu);
+    case -2: /* #UD or #GP */
+        if ( bios_locked &&
+             test_bit(X86_FEATURE_SMXE, &boot_cpu_data.x86_capability) &&
+             (!(eax & IA32_FEATURE_CONTROL_MSR_ENABLE_VMXON_OUTSIDE_SMX) ||
+              !(eax & IA32_FEATURE_CONTROL_MSR_ENABLE_VMXON_INSIDE_SMX)) )
+        {
+            printk("CPU%d: VMXON failed: perhaps because of TXT settings "
+                   "in your BIOS configuration?\n", cpu);
+            printk(" --> Disable TXT in your BIOS unless using a secure "
+                   "bootloader.\n");
+            return 0;
+        }
+        /* fall through */
+    case -1: /* CF==1 or ZF==1 */
+        printk("CPU%d: unexpected VMXON failure\n", cpu);
         return 0;
+    case 0: /* success */
+        break;
+    default:
+        BUG();
     }
 
     ept_sync_all();

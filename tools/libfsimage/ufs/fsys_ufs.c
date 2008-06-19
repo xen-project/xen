@@ -32,8 +32,9 @@
 #define SUPERBLOCK ((struct fs *)(FSYS_BUF + 0x2000))
 #define	INODE ((struct icommon *)(FSYS_BUF + 0x1000))
 #define DIRENT (FSYS_BUF + 0x4000)
+#define MAXBSIZE ((FSYS_BUFLEN - 0x4000) / 2)
 #define INDIRBLK1 ((grub_daddr32_t *)(FSYS_BUF + 0x4000)) /* 2+ indir blk */
-#define	INDIRBLK0 ((grub_daddr32_t *)(FSYS_BUF+ 0x6000))  /* 1st indirect blk */
+#define	INDIRBLK0 ((grub_daddr32_t *)(FSYS_BUF+ 0x4000 + MAXBSIZE))  /* 1st indirect blk */
 
 #define	indirblk0 (*fsig_int1(ffi))
 #define	indirblk1 (*fsig_int2(ffi))
@@ -48,7 +49,8 @@ ufs_mount(fsi_file_t *ffi, const char *options)
 {
 	if (/*! IS_PC_SLICE_TYPE_SOLARIS(current_slice) || */
 	    !devread(ffi, UFS_SBLOCK, 0, UFS_SBSIZE, (char *)SUPERBLOCK) ||
-	    SUPERBLOCK->fs_magic != UFS_MAGIC)
+	    SUPERBLOCK->fs_magic != UFS_MAGIC ||
+	    MAXBSIZE < SUPERBLOCK->fs_bsize)
 		return 0;
 
 	return 1;

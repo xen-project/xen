@@ -2891,9 +2891,9 @@ class XendDomainInfo:
                      DOM_STATES[state])
             return (-xsconstants.XSERR_VM_WRONG_STATE, "", "", 0)
 
-        # Remove security label. Works only for halted domains
+        # Remove security label. Works only for halted or suspended domains
         if not seclab or seclab == "":
-            if state not in [ DOM_STATE_HALTED ]:
+            if state not in [ DOM_STATE_HALTED, DOM_STATE_SUSPENDED ]:
                 return (-xsconstants.XSERR_VM_WRONG_STATE, "", "", 0)
 
             if self.info.has_key('security_label'):

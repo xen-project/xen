@@ -587,50 +587,32 @@ static void dma_pte_clear_range(struct domain *domain, u64 start, u64 end)
     }
 }
 
-static void iommu_free_next_pagetable(u64 pt_maddr, unsigned long index,
-                                      int level)
+static void iommu_free_pagetable(u64 pt_maddr, int level)
 {
-    unsigned long next_index;
-    struct dma_pte *pt_vaddr, *pde;
-    int next_level;
+    int i;
+    struct dma_pte *pt_vaddr, *pte;
+    int next_level = level - 1;
 
     if ( pt_maddr == 0 )
         return;
 
     pt_vaddr = (struct dma_pte *)map_vtd_domain_page(pt_maddr);
-    pde = &pt_vaddr[index];
-    if ( dma_pte_addr(*pde) == 0 )
-        goto out;
-
-    next_level = level - 1;
-    if ( next_level > 1 )
-    {
-        for ( next_index = 0; next_index < PTE_NUM; next_index++ )
-            iommu_free_next_pagetable(pde->val, next_index, next_level);
-    }
-
-    dma_clear_pte(*pde);
-    iommu_flush_cache_entry(pde);
-    free_pgtable_maddr(pde->val);
-
- out:
-    unmap_vtd_domain_page(pt_vaddr);
-}
-
-/* free all VT-d page tables when shut down or destroy domain. */
-static void iommu_free_pagetable(struct domain *domain)
-{
-    struct hvm_iommu *hd = domain_hvm_iommu(domain);
-    int i, total_level = agaw_to_level(hd->agaw);
-
-    if ( hd->pgd_maddr == 0 )
-        return;
 
     for ( i = 0; i < PTE_NUM; i++ )
-        iommu_free_next_pagetable(hd->pgd_maddr, i, total_level + 1);
+    {
+        pte = &pt_vaddr[i];
+        if ( !dma_pte_present(*pte) )
+            continue;
 
-    free_pgtable_maddr(hd->pgd_maddr);
-    hd->pgd_maddr = 0;
+        if ( next_level >= 1 )
+            iommu_free_pagetable(dma_pte_addr(*pte), next_level);
+
+        dma_clear_pte(*pte);
+        iommu_flush_cache_entry(pte);
+    }
+
+    unmap_vtd_domain_page(pt_vaddr);
+    free_pgtable_maddr(pt_maddr);
 }
 
 static int iommu_set_root_entry(struct iommu *iommu)
@@ -1456,11 +1438,14 @@ void return_devices_to_dom0(struct domain *d)
 
 void iommu_domain_teardown(struct domain *d)
 {
+    struct hvm_iommu *hd = domain_hvm_iommu(d);
+
     if ( list_empty(&acpi_drhd_units) )
         return;
 
-    iommu_free_pagetable(d);
     return_devices_to_dom0(d);
+    iommu_free_pagetable(hd->pgd_maddr, agaw_to_level(hd->agaw));
+    hd->pgd_maddr = 0;
     iommu_domid_release(d);
 }
 
@@ -1711,7 +1696,7 @@ static int init_vtd_hw(void)
     {
         iommu = drhd->iommu;
         if ( qinval_setup(iommu) != 0 )
-            dprintk(XENLOG_ERR VTDPREFIX,
+            dprintk(XENLOG_INFO VTDPREFIX,
                     "Queued Invalidation hardware not found\n");
     }
 
@@ -1719,7 +1704,7 @@ static int init_vtd_hw(void)
     {
         iommu = drhd->iommu;
         if ( intremap_setup(iommu) != 0 )
-            dprintk(XENLOG_ERR VTDPREFIX,
+            dprintk(XENLOG_INFO VTDPREFIX,
                     "Interrupt Remapping hardware not found\n");
     }
 

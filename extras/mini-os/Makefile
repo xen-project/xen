@@ -6,6 +6,7 @@
 
 export XEN_ROOT = ../..
 include $(XEN_ROOT)/Config.mk
+OBJ_DIR ?= $(CURDIR)
 
 ifneq ($(stubdom),y)
 include Config.mk
@@ -20,7 +21,7 @@ include minios.mk
 # Define some default flags for linking.
 LDLIBS := 
 APP_LDLIBS := 
-LDARCHLIB := -L$(TARGET_ARCH_DIR) -l$(ARCH_LIB_NAME)
+LDARCHLIB := -L$(OBJ_DIR)/$(TARGET_ARCH_DIR) -l$(ARCH_LIB_NAME)
 LDFLAGS_FINAL := -T $(TARGET_ARCH_DIR)/minios-$(XEN_TARGET_ARCH).lds
 
 # Prefix for global API names. All other symbols are localised before
@@ -35,14 +36,14 @@ SUBDIRS := lib xenbus console
 
 # The common mini-os objects to build.
 APP_OBJS :=
-OBJS := $(patsubst %.c,%.o,$(wildcard *.c))
-OBJS += $(patsubst %.c,%.o,$(wildcard lib/*.c))
-OBJS += $(patsubst %.c,%.o,$(wildcard xenbus/*.c))
-OBJS += $(patsubst %.c,%.o,$(wildcard console/*.c))
+OBJS := $(patsubst %.c,$(OBJ_DIR)/%.o,$(wildcard *.c))
+OBJS += $(patsubst %.c,$(OBJ_DIR)/%.o,$(wildcard lib/*.c))
+OBJS += $(patsubst %.c,$(OBJ_DIR)/%.o,$(wildcard xenbus/*.c))
+OBJS += $(patsubst %.c,$(OBJ_DIR)/%.o,$(wildcard console/*.c))
 
 
 .PHONY: default
-default: $(TARGET)
+default: $(OBJ_DIR)/$(TARGET)
 
 # Create special architecture specific links. The function arch_links
 # has to be defined in arch.mk (see include above).
@@ -57,7 +58,7 @@ links:	$(ARCH_LINKS)
 
 .PHONY: arch_lib
 arch_lib:
-	$(MAKE) --directory=$(TARGET_ARCH_DIR) || exit 1;
+	$(MAKE) --directory=$(TARGET_ARCH_DIR) OBJ_DIR=$(OBJ_DIR)/$(TARGET_ARCH_DIR) || exit 1;
 
 ifeq ($(lwip),y)
 # lwIP library
@@ -66,14 +67,14 @@ LWC	:= $(filter-out %6.c %ip6_addr.c %ethernetif.c, $(LWC))
 LWC	+= lwip-arch.c lwip-net.c
 LWO	:= $(patsubst %.c,%.o,$(LWC))
 
-lwip.a: $(LWO)
+$(OBJ_DIR)/lwip.a: $(LWO)
 	$(RM) $@
 	$(AR) cqs $@ $^
 
-OBJS += lwip.a
+OBJS += $(OBJ_DIR)/lwip.a
 endif
 
-OBJS := $(filter-out main.o lwip%.o $(LWO), $(OBJS))
+OBJS := $(filter-out $(OBJ_DIR)/lwip%.o $(LWO), $(OBJS))
 
 ifeq ($(libc),y)
 APP_LDLIBS += -L$(XEN_ROOT)/stubdom/libxc -whole-archive -lxenguest -lxenctrl -no-whole-archive
@@ -84,14 +85,14 @@ LDLIBS += -lc
 endif
 
 ifneq ($(APP_OBJS)-$(lwip),-y)
-OBJS := $(filter-out daytime.o, $(OBJS))
+OBJS := $(filter-out $(OBJ_DIR)/daytime.o, $(OBJS))
 endif
 
-$(TARGET)_app.o: $(APP_OBJS) app.lds
-	$(LD) -r -d $(LDFLAGS) $^ $(APP_LDLIBS) --undefined app_main -o $@
+$(OBJ_DIR)/$(TARGET)_app.o: $(APP_OBJS) app.lds
+	$(LD) -r -d $(LDFLAGS) $^ $(APP_LDLIBS) --undefined main -o $@
 
-$(TARGET): links $(OBJS) $(TARGET)_app.o arch_lib
-	$(LD) -r $(LDFLAGS) $(HEAD_OBJ) $(TARGET)_app.o $(OBJS) $(LDARCHLIB) $(LDLIBS) -o $@.o
+$(OBJ_DIR)/$(TARGET): links $(OBJS) $(OBJ_DIR)/$(TARGET)_app.o arch_lib
+	$(LD) -r $(LDFLAGS) $(HEAD_OBJ) $(OBJ_DIR)/$(TARGET)_app.o $(OBJS) $(LDARCHLIB) $(LDLIBS) -o $@.o
 	$(OBJCOPY) -w -G $(GLOBAL_PREFIX)* -G _start $@.o $@.o
 	$(LD) $(LDFLAGS) $(LDFLAGS_FINAL) $@.o $(EXTRA_OBJS) -o $@
 	gzip -f -9 -c $@ >$@.gz
@@ -99,15 +100,15 @@ $(TARGET): links $(OBJS) $(TARGET)_app.o arch_lib
 .PHONY: clean arch_clean
 
 arch_clean:
-	$(MAKE) --directory=$(TARGET_ARCH_DIR) clean || exit 1;
+	$(MAKE) --directory=$(TARGET_ARCH_DIR) OBJ_DIR=$(OBJ_DIR)/$(TARGET_ARCH_DIR) clean || exit 1;
 
 clean:	arch_clean
-	for dir in $(SUBDIRS); do \
+	for dir in $(addprefix $(OBJ_DIR)/,$(SUBDIRS)); do \
 		rm -f $$dir/*.o; \
 	done
-	rm -f *.o *~ core $(TARGET).elf $(TARGET).raw $(TARGET) $(TARGET).gz
-	find . -type l | xargs rm -f
-	$(RM) lwip.a $(LWO)
+	rm -f $(OBJ_DIR)/*.o *~ $(OBJ_DIR)/core $(OBJ_DIR)/$(TARGET).elf $(OBJ_DIR)/$(TARGET).raw $(OBJ_DIR)/$(TARGET) $(OBJ_DIR)/$(TARGET).gz
+	find . $(OBJ_DIR) -type l | xargs rm -f
+	$(RM) $(OBJ_DIR)/lwip.a $(LWO)
 	rm -f tags TAGS
 
 

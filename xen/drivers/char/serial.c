@@ -3,7 +3,7 @@
  * 
  * Framework for serial device drivers.
  * 
- * Copyright (c) 2003-2005, K A Fraser
+ * Copyright (c) 2003-2008, K A Fraser
  */
 
 #include <xen/config.h>
@@ -97,20 +97,37 @@ static void __serial_putc(struct serial_port *port, char c)
     if ( (port->txbuf != NULL) && !port->sync )
     {
         /* Interrupt-driven (asynchronous) transmitter. */
-#ifdef SERIAL_NEVER_DROP_CHARS
+
+        if ( port->tx_quench )
+        {
+            /* Buffer filled and we are dropping characters. */
+            if ( (port->txbufp - port->txbufc) > (serial_txbufsz / 2) )
+                return;
+            port->tx_quench = 0;
+        }
+
         if ( (port->txbufp - port->txbufc) == serial_txbufsz )
         {
-            /* Buffer is full: we spin waiting for space to appear. */
-            int i;
-            while ( !port->driver->tx_empty(port) )
-                cpu_relax();
-            for ( i = 0; i < port->tx_fifo_size; i++ )
-                port->driver->putc(
-                    port, port->txbuf[mask_serial_txbuf_idx(port->txbufc++)]);
-            port->txbuf[mask_serial_txbuf_idx(port->txbufp++)] = c;
+            if ( port->tx_log_everything )
+            {
+                /* Buffer is full: we spin waiting for space to appear. */
+                int i;
+                while ( !port->driver->tx_empty(port) )
+                    cpu_relax();
+                for ( i = 0; i < port->tx_fifo_size; i++ )
+                    port->driver->putc(
+                        port,
+                        port->txbuf[mask_serial_txbuf_idx(port->txbufc++)]);
+                port->txbuf[mask_serial_txbuf_idx(port->txbufp++)] = c;
+            }
+            else
+            {
+                /* Buffer is full: drop chars until buffer is half empty. */
+                port->tx_quench = 1;
+            }
             return;
         }
-#endif
+
         if ( ((port->txbufp - port->txbufc) == 0) &&
                   port->driver->tx_empty(port) )
         {
@@ -372,6 +389,37 @@ void serial_end_sync(int handle)
 
     port->sync--;
 
+    spin_unlock_irqrestore(&port->tx_lock, flags);
+}
+
+void serial_start_log_everything(int handle)
+{
+    struct serial_port *port;
+    unsigned long flags;
+
+    if ( handle == -1 )
+        return;
+    
+    port = &com[handle & SERHND_IDX];
+
+    spin_lock_irqsave(&port->tx_lock, flags);
+    port->tx_log_everything++;
+    port->tx_quench = 0;
+    spin_unlock_irqrestore(&port->tx_lock, flags);
+}
+
+void serial_end_log_everything(int handle)
+{
+    struct serial_port *port;
+    unsigned long flags;
+
+    if ( handle == -1 )
+        return;
+    
+    port = &com[handle & SERHND_IDX];
+
+    spin_lock_irqsave(&port->tx_lock, flags);
+    port->tx_log_everything--;
     spin_unlock_irqrestore(&port->tx_lock, flags);
 }
 

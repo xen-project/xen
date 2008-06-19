@@ -1,4 +1,5 @@
 XEN_ROOT = ..
+MINI_OS = $(XEN_ROOT)/extras/mini-os
 
 export XEN_OS=MiniOS
 
@@ -12,7 +13,8 @@ GCC_VERSION=4.2.2
 ZLIB_VERSION=1.2.3
 LIBPCI_VERSION=2.2.9
 NEWLIB_DATE=2008-01-01
-LWIP_DATE=2008-02-08
+LWIP_DATE=2008-06-01
+GRUB_DATE=2008-06-01
 
 WGET=wget -c
 
@@ -23,9 +25,11 @@ endif
 
 ifeq ($(GNU_TARGET_ARCH), i686)
 TARGET_CFLAGS=
+NEWLIB_CFLAGS+=-D_I386MACH_ALLOW_HW_INTERRUPTS
 endif
 ifeq ($(GNU_TARGET_ARCH), x86_64)
 TARGET_CFLAGS=-mno-red-zone
+NEWLIB_CFLAGS+=-D_I386MACH_ALLOW_HW_INTERRUPTS
 endif
 ifeq ($(GNU_TARGET_ARCH), ia64)
 TARGET_CFLAGS=-mconstant-gp
@@ -36,8 +40,10 @@ CROSS_PREFIX=$(CURDIR)/$(CROSS_ROOT)
 export CROSS_COMPILE=$(GNU_TARGET_ARCH)-xen-elf-
 export PATH:=$(CROSS_PREFIX)/bin:$(PATH)
 
+TARGETS=ioemu c caml grub
+
 .PHONY: all
-all: ioemu-stubdom c-stubdom
+all: ioemu-stubdom c-stubdom pv-grub
 
 ################
 # Cross-binutils
@@ -46,8 +52,8 @@ all: ioemu-stubdom c-stubdom
 binutils-$(BINUTILS_VERSION).tar.bz2:
 	$(WGET) http://ftp.gnu.org/gnu/binutils/$@
 binutils-$(BINUTILS_VERSION): binutils-$(BINUTILS_VERSION).tar.bz2
-	tar xjf $@.tar.bz2
-	( cd binutils-$(BINUTILS_VERSION) && patch -p1 < ../binutils.patch )
+	tar xjf $<
+	patch -d $@ -p1 < binutils.patch
 	touch $@
 
 BINUTILS_STAMPFILE=$(CROSS_ROOT)/bin/$(GNU_TARGET_ARCH)-xen-elf-ar
@@ -68,10 +74,10 @@ $(BINUTILS_STAMPFILE): binutils-$(BINUTILS_VERSION)
 gcc-$(GCC_VERSION).tar.bz2:
 	$(WGET) http://ftp.gnu.org/gnu/gcc/gcc-$(GCC_VERSION)/gcc-$(GCC_VERSION).tar.bz2
 gcc-$(GCC_VERSION): gcc-$(GCC_VERSION).tar.bz2
-	tar xjf gcc-$(GCC_VERSION).tar.bz2
-	( cd gcc-$(GCC_VERSION) && patch -p1 < ../gcc.patch )
+	tar xjf $<
+	patch -d $@ -p1 < gcc.patch
 	touch $@
-	
+
 GCC_STAMPFILE=$(CROSS_ROOT)/bin/$(GNU_TARGET_ARCH)-xen-elf-gcc-$(GCC_VERSION)
 .PHONY: cross-gcc
 cross-gcc: $(GCC_STAMPFILE)
@@ -89,7 +95,7 @@ $(GCC_STAMPFILE): gcc-$(GCC_VERSION) $(BINUTILS_STAMPFILE)
 newlib-cvs:
 	cvs -z 9 -d :pserver:anoncvs@sources.redhat.com:/cvs/src co -D $(NEWLIB_DATE) newlib
 	mv src newlib-cvs
-	( cd newlib-cvs && patch -p0 < ../newlib.patch)
+	patch -d $@ -p0 < newlib.patch
 
 NEWLIB_STAMPFILE=$(CROSS_ROOT)/$(GNU_TARGET_ARCH)-xen-elf/lib/libc.a
 .PHONY: cross-newlib
@@ -97,7 +103,7 @@ cross-newlib: $(NEWLIB_STAMPFILE)
 $(NEWLIB_STAMPFILE): newlib-cvs $(GCC_STAMPFILE)
 	mkdir -p newlib-build
 	( cd newlib-build && \
-	  CC_FOR_TARGET="$(GNU_TARGET_ARCH)-xen-elf-gcc $(TARGET_CFLAGS)" ../newlib-cvs/configure --prefix=$(CROSS_PREFIX) --verbose --target=$(GNU_TARGET_ARCH)-xen-elf --enable-newlib-io-long-long && \
+	  CC_FOR_TARGET="$(GNU_TARGET_ARCH)-xen-elf-gcc $(TARGET_CFLAGS) $(NEWLIB_CFLAGS)" ../newlib-cvs/configure --prefix=$(CROSS_PREFIX) --verbose --target=$(GNU_TARGET_ARCH)-xen-elf --enable-newlib-io-long-long && \
 	  $(MAKE) && \
 	  $(MAKE) install )
 
@@ -145,8 +151,7 @@ $(LIBPCI_STAMPFILE): pciutils-$(LIBPCI_VERSION).tar.bz2 $(NEWLIB_STAMPFILE) $(ZL
 ######
 
 lwip-cvs:
-	cvs -z 9 -d :pserver:anonymous@cvs.savannah.nongnu.org:/sources/lwip co -D $(LWIP_DATE) lwip
-	mv lwip lwip-cvs
+	cvs -z 9 -d :pserver:anonymous@cvs.savannah.nongnu.org:/sources/lwip co -D $(LWIP_DATE) -d $@ lwip
 
 #######
 # Links
@@ -160,29 +165,36 @@ mk-symlinks:
 	[ -h include ] || ln -sf ../tools/include .
 	mkdir -p libxc
 	[ -h libxc/Makefile ] || ( cd libxc && \
-	  ln -sf ../../tools/libxc/*.h . && \
-	  ln -sf ../../tools/libxc/*.c . && \
-	  ln -sf ../../tools/libxc/Makefile . )
+	  ln -sf ../$(XEN_ROOT)/tools/libxc/*.h . && \
+	  ln -sf ../$(XEN_ROOT)/tools/libxc/*.c . && \
+	  ln -sf ../$(XEN_ROOT)/tools/libxc/Makefile . )
 	mkdir -p libxc/$(XEN_TARGET_ARCH)
 	[ -h libxc/$(XEN_TARGET_ARCH) ] || ( cd libxc/$(XEN_TARGET_ARCH) && \
-	  ln -sf ../../tools/libxc/$(XEN_TARGET_ARCH)/*.c . && \
-	  ln -sf ../../tools/libxc/$(XEN_TARGET_ARCH)/*.h . && \
-	  ln -sf ../../tools/libxc/$(XEN_TARGET_ARCH)/Makefile . )
+	  ln -sf ../$(XEN_ROOT)/tools/libxc/$(XEN_TARGET_ARCH)/*.c . && \
+	  ln -sf ../$(XEN_ROOT)/tools/libxc/$(XEN_TARGET_ARCH)/*.h . && \
+	  ln -sf ../$(XEN_ROOT)/tools/libxc/$(XEN_TARGET_ARCH)/Makefile . )
 	mkdir -p ioemu
 	[ -h ioemu/Makefile ] || ( cd ioemu && \
-	  ln -sf ../../tools/ioemu/* . && \
+	  ln -sf ../$(XEN_ROOT)/tools/ioemu/* . && \
 	  ([ ! -h config-host.h ] || rm -f config-host.h) && \
 	  ([ ! -h config-host.mak ] || rm -f config-host.mak) )
-	[ -h mini-os ] || ln -sf ../extras/mini-os .
-	[ -h mini-os/include/xen ] || ln -sf ../../../xen/include/public mini-os/include/xen
+	$(MAKE) -C $(MINI_OS) links
+
+TARGETS_MINIOS=$(addprefix mini-os-,$(TARGETS))
+$(TARGETS_MINIOS): mini-os-%:
+	[ -d $@ ] || \
+	for i in $$(cd $(MINI_OS) ; find . -type d) ; do \
+                mkdir -p $@/$$i ; \
+	done
 
 #######
 # libxc
 #######
 
 .PHONY: libxc
-libxc: cross-zlib mk-symlinks
-	$(MAKE) -C $@
+libxc: libxc/libxenctrl.a libxc/libxenguest.a
+libxc/libxenctrl.a libxc/libxenguest.a: cross-zlib mk-symlinks
+	$(MAKE) -C libxc
 
 #######
 # ioemu
@@ -199,7 +211,7 @@ ioemu: cross-zlib cross-libpci mk-symlinks libxc
 ######
 
 .PHONY: caml
-caml: mk-symlinks
+caml: cross-newlib mk-symlinks
 	$(MAKE) -C $@ LWIPDIR=$(CURDIR)/lwip-cvs 
 
 ###
@@ -207,33 +219,56 @@ caml: mk-symlinks
 ###
 
 .PHONY: c
-c: mk-symlinks
+c: cross-newlib mk-symlinks
 	$(MAKE) -C $@ LWIPDIR=$(CURDIR)/lwip-cvs 
+
+######
+# Grub
+######
+
+grub-cvs:
+	cvs -z 9 -d :pserver:anonymous@cvs.sv.gnu.org:/sources/grub co -D $(GRUB_DATE) -d $@ grub
+	for i in grub.patches/* ; do \
+		patch -d $@ -p1 < $$i ; \
+	done
+
+.PHONY: grub
+grub: grub-cvs cross-newlib mk-symlinks
+	$(MAKE) -C $@
 
 ########
 # minios
 ########
 
 .PHONY: ioemu-stubdom
-ioemu-stubdom: lwip-cvs libxc ioemu
-	$(MAKE) -C mini-os TARGET=$@ LWIPDIR=$(CURDIR)/lwip-cvs APP_OBJS="$(CURDIR)/ioemu/i386-dm-stubdom/qemu.a $(CURDIR)/ioemu/i386-dm-stubdom/libqemu.a"
+ioemu-stubdom: mini-os-ioemu lwip-cvs libxc ioemu
+	DEF_CFLAGS=-DCONFIG_QEMU $(MAKE) -C $(MINI_OS) OBJ_DIR=$(CURDIR)/$< LWIPDIR=$(CURDIR)/lwip-cvs APP_OBJS="$(CURDIR)/ioemu/i386-dm-stubdom/qemu.a $(CURDIR)/ioemu/i386-dm-stubdom/libqemu.a"
 
 CAMLLIB = $(shell ocamlc -where)
 .PHONY: caml-stubdom
-caml-stubdom: lwip-cvs libxc caml
-	$(MAKE) -C mini-os TARGET=$@ LWIPDIR=$(CURDIR)/lwip-cvs APP_OBJS="$(CURDIR)/caml/main-c.o $(CURDIR)/caml/main-caml.o $(CURDIR)/caml/caml.o $(CAMLLIB)/libasmrun.a"
+caml-stubdom: mini-os-caml lwip-cvs libxc caml
+	DEF_CFLAGS=-DCONFIG_CAML $(MAKE) -C $(MINI_OS) OBJ_DIR=$(CURDIR)/$< LWIPDIR=$(CURDIR)/lwip-cvs APP_OBJS="$(CURDIR)/caml/main-caml.o $(CURDIR)/caml/caml.o $(CAMLLIB)/libasmrun.a"
 
 .PHONY: c-stubdom
-c-stubdom: lwip-cvs libxc c
-	$(MAKE) -C mini-os TARGET=$@ LWIPDIR=$(CURDIR)/lwip-cvs APP_OBJS=$(CURDIR)/c/main.a
+c-stubdom: mini-os-c lwip-cvs libxc c
+	DEF_CFLAGS=-DCONFIG_C $(MAKE) -C $(MINI_OS) OBJ_DIR=$(CURDIR)/$< LWIPDIR=$(CURDIR)/lwip-cvs APP_OBJS=$(CURDIR)/c/main.a
+
+.PHONY: pv-grub
+pv-grub: mini-os-grub libxc grub
+	DEF_CFLAGS=-DCONFIG_GRUB $(MAKE) -C $(MINI_OS) OBJ_DIR=$(CURDIR)/$< APP_OBJS=$(CURDIR)/grub/main.a
 
 #########
 # install
 #########
 
-install: mini-os/ioemu-stubdom.gz
+install: install-ioemu install-grub
+
+install-ioemu: mini-os-ioemu/mini-os.gz
 	$(INSTALL_PROG) stubdom-dm "$(DESTDIR)/usr/lib/xen/bin"
-	$(INSTALL_PROG) $< "$(DESTDIR)/usr/lib/xen/boot/stubdom.gz"
+	$(INSTALL_PROG) $< "$(DESTDIR)/usr/lib/xen/boot/ioemu-stubdom.gz"
+
+install-grub: mini-os-grub/mini-os.gz
+	$(INSTALL_PROG) $< "$(DESTDIR)/usr/lib/xen/boot/pv-grub.gz"
 
 #######
 # clean
@@ -242,9 +277,13 @@ install: mini-os/ioemu-stubdom.gz
 # Only clean the libxc/ioemu/mini-os part
 .PHONY: clean
 clean:
-	-$(MAKE) -C mini-os LWIPDIR=$(CURDIR)/lwip-cvs clean
+	rm -fr mini-os-ioemu
+	rm -fr mini-os-c
+	rm -fr mini-os-caml
+	rm -fr mini-os-grub
 	$(MAKE) -C caml clean
 	$(MAKE) -C c clean
+	$(MAKE) -C grub clean
 	rm -fr libxc ioemu mini-os include
 
 # clean the cross-compilation result
@@ -261,6 +300,7 @@ patchclean: crossclean
 	rm -fr gcc-$(GCC_VERSION)
 	rm -fr newlib-cvs
 	rm -fr lwip-cvs
+	rm -fr grub-cvs
 
 # clean downloads
 .PHONY: downloadclean

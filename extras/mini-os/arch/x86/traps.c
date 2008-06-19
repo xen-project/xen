@@ -268,3 +268,7 @@ void trap_init(void)
     HYPERVISOR_set_trap_table(trap_table);    
 }
 
+void trap_fini(void)
+{
+    HYPERVISOR_set_trap_table(NULL);
+}

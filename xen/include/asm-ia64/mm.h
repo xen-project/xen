@@ -138,6 +138,7 @@ void share_xen_page_with_guest(struct page_info *page,
 void share_xen_page_with_privileged_guests(struct page_info *page,
                                            int readonly);
 
+extern unsigned long frametable_pg_dir[];
 extern struct page_info *frame_table;
 extern unsigned long frame_table_size;
 extern struct list_head free_list;
@@ -502,5 +503,7 @@ int steal_page(
 #define domain_clamp_alloc_bitsize(d, b) (b)
 
 unsigned long domain_get_maximum_gpfn(struct domain *d);
+
+extern struct domain *dom_xen, *dom_io;	/* for vmcoreinfo */
 
 #endif /* __ASM_IA64_MM_H__ */

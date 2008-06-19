@@ -249,14 +249,6 @@ extern unsigned int video_mode, video_flags;
 
 #endif
 
-#define COMPAT_ARG_XLAT_VIRT_BASE      (1UL << ROOT_PAGETABLE_SHIFT)
-#define COMPAT_ARG_XLAT_SHIFT          0
-#define COMPAT_ARG_XLAT_PAGES          (1U << COMPAT_ARG_XLAT_SHIFT)
-#define COMPAT_ARG_XLAT_SIZE           (COMPAT_ARG_XLAT_PAGES << PAGE_SHIFT)
-#define COMPAT_ARG_XLAT_VIRT_START(vcpu_id) \
-    (COMPAT_ARG_XLAT_VIRT_BASE + ((unsigned long)(vcpu_id) << \
-                                  (PAGE_SHIFT + COMPAT_ARG_XLAT_SHIFT + 1)))
-
 #define PGT_base_page_table     PGT_l4_page_table
 
 #define __HYPERVISOR_CS64 0xe008
@@ -378,5 +370,7 @@ extern unsigned long xen_phys_start, xenheap_phys_start, xenheap_phys_end;
 #else
 #define ELFSIZE 32
 #endif
+
+#define ARCH_CRASH_SAVE_VMCOREINFO
 
 #endif /* __X86_CONFIG_H__ */

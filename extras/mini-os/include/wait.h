@@ -87,9 +87,9 @@ static inline void wake_up(struct wait_queue_head *head)
 
 #define wait_event_deadline(wq, condition, deadline) do {       \
     unsigned long flags;                                        \
+    DEFINE_WAIT(__wait);                                        \
     if(condition)                                               \
         break;                                                  \
-    DEFINE_WAIT(__wait);                                        \
     for(;;)                                                     \
     {                                                           \
         /* protect the list */                                  \

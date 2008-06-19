@@ -55,7 +55,8 @@ void dispatch_file_open(struct mount *mount, struct fsif_request *req)
     printf("File open issued for %s\n", file_name); 
     assert(BUFFER_SIZE > 
            strlen(file_name) + strlen(mount->export->export_path) + 1); 
-    sprintf(full_path, "%s/%s", mount->export->export_path, file_name);
+    snprintf(full_path, sizeof(full_path), "%s/%s",
+           mount->export->export_path, file_name);
     assert(xc_gnttab_munmap(mount->gnth, file_name, 1) == 0);
     printf("Issuing open for %s\n", full_path);
     fd = open(full_path, O_RDWR);
@@ -311,7 +312,8 @@ void dispatch_remove(struct mount *mount, struct fsif_request *req)
     printf("File remove issued for %s\n", file_name); 
     assert(BUFFER_SIZE > 
            strlen(file_name) + strlen(mount->export->export_path) + 1); 
-    sprintf(full_path, "%s/%s", mount->export->export_path, file_name);
+    snprintf(full_path, sizeof(full_path), "%s/%s",
+           mount->export->export_path, file_name);
     assert(xc_gnttab_munmap(mount->gnth, file_name, 1) == 0);
     printf("Issuing remove for %s\n", full_path);
     ret = remove(full_path);
@@ -355,8 +357,10 @@ void dispatch_rename(struct mount *mount, struct fsif_request *req)
            strlen(old_file_name) + strlen(mount->export->export_path) + 1); 
     assert(BUFFER_SIZE > 
            strlen(new_file_name) + strlen(mount->export->export_path) + 1); 
-    sprintf(old_full_path, "%s/%s", mount->export->export_path, old_file_name);
-    sprintf(new_full_path, "%s/%s", mount->export->export_path, new_file_name);
+    snprintf(old_full_path, sizeof(old_full_path), "%s/%s",
+           mount->export->export_path, old_file_name);
+    snprintf(new_full_path, sizeof(new_full_path), "%s/%s",
+           mount->export->export_path, new_file_name);
     assert(xc_gnttab_munmap(mount->gnth, buf, 1) == 0);
     printf("Issuing rename for %s -> %s\n", old_full_path, new_full_path);
     ret = rename(old_full_path, new_full_path);
@@ -398,7 +402,8 @@ void dispatch_create(struct mount *mount, struct fsif_request *req)
     printf("File create issued for %s\n", file_name); 
     assert(BUFFER_SIZE > 
            strlen(file_name) + strlen(mount->export->export_path) + 1); 
-    sprintf(full_path, "%s/%s", mount->export->export_path, file_name);
+    snprintf(full_path, sizeof(full_path), "%s/%s",
+           mount->export->export_path, file_name);
     assert(xc_gnttab_munmap(mount->gnth, file_name, 1) == 0);
     /* We can advance the request consumer index, from here on, the request
      * should not be used (it may be overrinden by a response) */
@@ -447,7 +452,8 @@ void dispatch_list(struct mount *mount, struct fsif_request *req)
     printf("Dir list issued for %s\n", file_name); 
     assert(BUFFER_SIZE > 
            strlen(file_name) + strlen(mount->export->export_path) + 1); 
-    sprintf(full_path, "%s/%s", mount->export->export_path, file_name);
+    snprintf(full_path, sizeof(full_path), "%s/%s",
+           mount->export->export_path, file_name);
     /* We can advance the request consumer index, from here on, the request
      * should not be used (it may be overrinden by a response) */
     mount->ring.req_cons++;
@@ -540,7 +546,8 @@ void dispatch_fs_space(struct mount *mount, struct fsif_request *req)
     printf("Fs space issued for %s\n", file_name); 
     assert(BUFFER_SIZE > 
            strlen(file_name) + strlen(mount->export->export_path) + 1); 
-    sprintf(full_path, "%s/%s", mount->export->export_path, file_name);
+    snprintf(full_path, sizeof(full_path), "%s/%s",
+           mount->export->export_path, file_name);
     assert(xc_gnttab_munmap(mount->gnth, file_name, 1) == 0);
     printf("Issuing fs space for %s\n", full_path);
     ret = statfs(full_path, &stat);

@@ -47,7 +47,8 @@ static void increase_reservation(struct memop_args *a)
     unsigned int node = domain_to_node(d);
 
     if ( !guest_handle_is_null(a->extent_list) &&
-         !guest_handle_okay(a->extent_list, a->nr_extents) )
+         !guest_handle_subrange_okay(a->extent_list, a->nr_done,
+                                     a->nr_extents-1) )
         return;
 
     if ( (a->extent_order != 0) &&
@@ -94,7 +95,8 @@ static void populate_physmap(struct memop_args *a)
     struct domain *d = a->domain;
     unsigned int node = domain_to_node(d);
 
-    if ( !guest_handle_okay(a->extent_list, a->nr_extents) )
+    if ( !guest_handle_subrange_okay(a->extent_list, a->nr_done,
+                                     a->nr_extents-1) )
         return;
 
     if ( (a->extent_order != 0) &&
@@ -179,7 +181,8 @@ static void decrease_reservation(struct memop_args *a)
     unsigned long i, j;
     xen_pfn_t gmfn;
 
-    if ( !guest_handle_okay(a->extent_list, a->nr_extents) )
+    if ( !guest_handle_subrange_okay(a->extent_list, a->nr_done,
+                                     a->nr_extents-1) )
         return;
 
     for ( i = a->nr_done; i < a->nr_extents; i++ )
@@ -219,8 +222,8 @@ static long translate_gpfn_list(
     if ( op.nr_gpfns > (ULONG_MAX >> MEMOP_EXTENT_SHIFT) )
         return -EINVAL;
 
-    if ( !guest_handle_okay(op.gpfn_list, op.nr_gpfns) ||
-         !guest_handle_okay(op.mfn_list,  op.nr_gpfns) )
+    if ( !guest_handle_subrange_okay(op.gpfn_list, *progress, op.nr_gpfns-1) ||
+         !guest_handle_subrange_okay(op.mfn_list, *progress, op.nr_gpfns-1) )
         return -EFAULT;
 
     if ( op.domid == DOMID_SELF )

@@ -68,5 +68,6 @@ int hpet_legacy_irq_tick(void);
 void hpet_broadcast_init(void);
 void hpet_broadcast_enter(void);
 void hpet_broadcast_exit(void);
+int hpet_broadcast_is_available(void);
 
 #endif /* __X86_HPET_H__ */

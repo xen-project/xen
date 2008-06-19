@@ -22,8 +22,8 @@ static bool xenbus_printf(struct xs_handle *xsh,
     va_list args;
     
     va_start(args, fmt);
-    sprintf(fullpath,"%s/%s", node, path);
-    vsprintf(val, fmt, args);
+    snprintf(fullpath, sizeof(fullpath), "%s/%s", node, path);
+    vsnprintf(val, sizeof(val), fmt, args);
     va_end(args);
     printf("xenbus_printf (%s) <= %s.\n", fullpath, val);    
 
@@ -72,7 +72,7 @@ int xenbus_register_export(struct fs_export *export)
     printf("XS transaction is %d\n", xst); 
  
     /* Create node string */
-    sprintf(node, "%s/%d", EXPORTS_NODE, export->export_id); 
+    snprintf(node, sizeof(node), "%s/%d", EXPORTS_NODE, export->export_id); 
     /* Remove old export (if exists) */ 
     xs_rm(xsh, xst, node);
 
@@ -116,20 +116,20 @@ void xenbus_read_mount_request(struct mount *mount, char *frontend)
 
     assert(xsh != NULL);
 #if 0
-    sprintf(node, WATCH_NODE"/%d/%d/frontend", 
+    snprintf(node, sizeof(node), WATCH_NODE"/%d/%d/frontend", 
                            mount->dom_id, mount->export->export_id);
     frontend = xs_read(xsh, XBT_NULL, node, NULL);
 #endif
     mount->frontend = frontend;
-    sprintf(node, "%s/state", frontend);
+    snprintf(node, sizeof(node), "%s/state", frontend);
     s = xs_read(xsh, XBT_NULL, node, NULL);
     assert(strcmp(s, STATE_READY) == 0);
     free(s);
-    sprintf(node, "%s/ring-ref", frontend);
+    snprintf(node, sizeof(node), "%s/ring-ref", frontend);
     s = xs_read(xsh, XBT_NULL, node, NULL);
     mount->gref = atoi(s);
     free(s);
-    sprintf(node, "%s/event-channel", frontend);
+    snprintf(node, sizeof(node), "%s/event-channel", frontend);
     s = xs_read(xsh, XBT_NULL, node, NULL);
     mount->remote_evtchn = atoi(s);
     free(s);
@@ -158,12 +158,12 @@ void xenbus_write_backend_node(struct mount *mount)
     assert(xsh != NULL);
     self_id = get_self_id();
     printf("Our own dom_id=%d\n", self_id);
-    sprintf(node, "%s/backend", mount->frontend);
-    sprintf(backend_node, "/local/domain/%d/"ROOT_NODE"/%d",
+    snprintf(node, sizeof(node), "%s/backend", mount->frontend);
+    snprintf(backend_node, sizeof(backend_node), "/local/domain/%d/"ROOT_NODE"/%d",
                                 self_id, mount->mount_id);
     xs_write(xsh, XBT_NULL, node, backend_node, strlen(backend_node));
 
-    sprintf(node, ROOT_NODE"/%d/state", mount->mount_id);
+    snprintf(node, sizeof(node), ROOT_NODE"/%d/state", mount->mount_id);
     xs_write(xsh, XBT_NULL, node, STATE_INITIALISED, strlen(STATE_INITIALISED));
 }
 
@@ -174,7 +174,7 @@ void xenbus_write_backend_ready(struct mount *mount)
 
     assert(xsh != NULL);
     self_id = get_self_id();
-    sprintf(node, ROOT_NODE"/%d/state", mount->mount_id);
+    snprintf(node, sizeof(node), ROOT_NODE"/%d/state", mount->mount_id);
     xs_write(xsh, XBT_NULL, node, STATE_READY, strlen(STATE_READY));
 }
 

@@ -1407,12 +1407,13 @@ class XendConfig(dict):
                     dev_uuid = uuid.createString()
                 dev_info['uuid'] = dev_uuid
                 dev_info['protocol'] = cfg_xenapi.get('protocol', 'rfb')
-                dev_info['other_config'] = cfg_xenapi.get('other_config', {})
+                console_other_config = cfg_xenapi.get('other_config', {})
+                dev_info['other_config'] = console_other_config
                 if dev_info['protocol'] == 'rfb':
                     # collapse other config into devinfo for things
                     # such as vncpasswd, vncunused, etc.                    
-                    dev_info.update(cfg_xenapi.get('other_config', {}))
-                    dev_info['type'] = 'vnc'                        
+                    dev_info.update(console_other_config)
+                    dev_info['type'] = console_other_config.get('type', 'vnc') 
                     target['devices'][dev_uuid] = ('vfb', dev_info)
                     target['console_refs'].append(dev_uuid)
 

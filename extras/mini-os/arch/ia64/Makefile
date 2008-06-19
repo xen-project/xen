@@ -40,12 +40,13 @@ ARCH_OBJS += __umoddi3.o
 ARCH_OBJS += __udivdi3.o
 ARCH_OBJS += __udivsi3.o
 ARCH_OBJS += __divdi3.o
+ARCH_OBJS := $(addprefix $(OBJ_DIR)/,$(ARCH_OBJS))
 
 GEN_OFF_SRC := gen_off.c
 GEN_OFF_ASM := gen_off.s
 GEN_OFF_H   := $(MINI-OS_ROOT)/include/$(ARCH_INC)/offsets.h
 
-all: $(ARCH_LIB)
+all: $(OBJ_DIR)/$(ARCH_LIB)
 
 $(GEN_OFF_ASM): $(GEN_OFF_SRC)
 	$(CC) -S -o $@ $(CPPFLAGS) $<
@@ -53,10 +54,10 @@ $(GEN_OFF_ASM): $(GEN_OFF_SRC)
 $(GEN_OFF_H): $(GEN_OFF_ASM)
 	sed -ne "/^->/ {s/->/#define /; p}" < $< > $@
 
-$(ARCH_LIB): $(GEN_OFF_H) $(ARCH_OBJS) $(HEAD_ARCH_OBJ)
+$(OBJ_DIR)/$(ARCH_LIB): $(GEN_OFF_H) $(ARCH_OBJS) $(OBJ_DIR)/$(HEAD_ARCH_OBJ)
 	$(AR) rv $(ARCH_LIB) $(ARCH_OBJS)
 
 clean:
-	rm -f $(ARCH_LIB) $(ARCH_OBJS) $(HEAD_ARCH_OBJ)
+	rm -f $(OBJ_DIR)/$(ARCH_LIB) $(ARCH_OBJS) $(OBJ_DIR)/$(HEAD_ARCH_OBJ)
 	rm -f $(GEN_OFF_ASM)
 	rm -f $(GEN_OFF_H)

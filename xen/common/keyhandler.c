@@ -105,6 +105,9 @@ static void dump_registers(unsigned char key, struct cpu_user_regs *regs)
 {
     unsigned int cpu;
 
+    /* We want to get everything out that we possibly can. */
+    console_start_sync();
+
     printk("'%c' pressed -> dumping registers\n", key);
 
     /* Get local execution state out immediately, in case we get stuck. */
@@ -120,6 +123,21 @@ static void dump_registers(unsigned char key, struct cpu_user_regs *regs)
     }
 
     printk("\n");
+
+    console_end_sync();
+}
+
+static void dump_dom0_registers(unsigned char key)
+{
+    struct vcpu *v;
+
+    if ( dom0 == NULL )
+        return;
+
+    printk("'%c' pressed -> dumping Dom0's registers\n", key);
+
+    for_each_vcpu ( dom0, v )
+        vcpu_show_execution_state(v);
 }
 
 static void halt_machine(unsigned char key, struct cpu_user_regs *regs)
@@ -306,6 +324,9 @@ void __init initialize_keytable(void)
     register_keyhandler(
         'P', perfc_reset,    "reset performance counters");
 #endif
+
+    register_keyhandler(
+        '0', dump_dom0_registers, "dump Dom0 registers");
 
     register_irq_keyhandler('%', do_debug_key,   "Trap to xendbg");
 }

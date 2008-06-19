@@ -31,6 +31,7 @@
 #endif /* __XEN__ */
 
 #include <xen/acpi.h>
+#include <acpi/actables.h>
 #include <asm/dom_fw.h>
 #include <asm/dom_fw_domu.h>
 
@@ -258,8 +259,8 @@ dom_fw_fake_acpi(domain_t *d, struct fake_acpi_tables *tables)
 	xsdt->table_offset_entry[0] = ACPI_TABLE_MPA(fadt);
 	tables->madt_ptr = ACPI_TABLE_MPA(madt);
 
-	xsdt->header.checksum = generate_acpi_checksum(xsdt,
-	                                               xsdt->header.length);
+	xsdt->header.checksum = -acpi_tb_checksum((u8*)xsdt,
+						  xsdt->header.length);
 
 	/* setup FADT */
 	memcpy(fadt->header.signature, ACPI_SIG_FADT,
@@ -296,8 +297,8 @@ dom_fw_fake_acpi(domain_t *d, struct fake_acpi_tables *tables)
 	fadt->xpm_timer_block.bit_width = 8;
 	fadt->xpm_timer_block.address = ACPI_TABLE_MPA(pm_timer_block);
 
-	fadt->header.checksum = generate_acpi_checksum(fadt,
-	                                               fadt->header.length);
+	fadt->header.checksum = -acpi_tb_checksum((u8*)fadt,
+						  fadt->header.length);
 
 	/* setup RSDP */
 	memcpy(rsdp->signature, ACPI_SIG_RSDP, strlen(ACPI_SIG_RSDP));
@@ -306,9 +307,9 @@ dom_fw_fake_acpi(domain_t *d, struct fake_acpi_tables *tables)
 	rsdp->length = sizeof(struct acpi_table_rsdp);
 	rsdp->xsdt_physical_address = ACPI_TABLE_MPA(xsdt);
 
-	rsdp->checksum = generate_acpi_checksum(rsdp,
-	                                        ACPI_RSDP_CHECKSUM_LENGTH);
-	rsdp->extended_checksum = generate_acpi_checksum(rsdp, rsdp->length);
+	rsdp->checksum = -acpi_tb_checksum((u8*)rsdp,
+					   ACPI_RSDP_CHECKSUM_LENGTH);
+	rsdp->extended_checksum = -acpi_tb_checksum((u8*)rsdp, rsdp->length);
 
 	/* setup DSDT with trivial namespace. */ 
 	memcpy(dsdt->signature, ACPI_SIG_DSDT, strlen(ACPI_SIG_DSDT));
@@ -347,7 +348,7 @@ dom_fw_fake_acpi(domain_t *d, struct fake_acpi_tables *tables)
 	tables->aml[1] = 0x40 + ((aml_len - 1) & 0x0f);
 	tables->aml[2] = (aml_len - 1) >> 4;
 	dsdt->length = sizeof(struct acpi_table_header) + aml_len;
-	dsdt->checksum = generate_acpi_checksum(dsdt, dsdt->length);
+	dsdt->checksum = -acpi_tb_checksum((u8*)dsdt, dsdt->length);
 
 	/* setup MADT */
 	memcpy(madt->header.signature, ACPI_SIG_MADT,
@@ -373,8 +374,8 @@ dom_fw_fake_acpi(domain_t *d, struct fake_acpi_tables *tables)
 	}
 	madt->header.length = sizeof(struct acpi_table_madt) +
 	                      nbr_cpus * sizeof(struct acpi_table_lsapic);
-	madt->header.checksum = generate_acpi_checksum(madt,
-	                                               madt->header.length);
+	madt->header.checksum = -acpi_tb_checksum((u8*)madt,
+						  madt->header.length);
 	return;
 }
 

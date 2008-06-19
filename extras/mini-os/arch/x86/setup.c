@@ -100,6 +100,16 @@ arch_init(start_info_t *si)
 }
 
 void
+arch_fini(void)
+{
+#ifdef __i386__
+	HYPERVISOR_set_callbacks(0, 0, 0, 0);
+#else
+	HYPERVISOR_set_callbacks(0, 0, 0);
+#endif
+}
+
+void
 arch_print_info(void)
 {
 	printk("  stack:      %p-%p\n", stack, stack + sizeof(stack));

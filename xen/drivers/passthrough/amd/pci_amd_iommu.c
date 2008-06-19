@@ -212,7 +212,7 @@ static int __init amd_iommu_init(void)
             IOMMU_CONTROL_DISABLED;
     }
 
-    if ( acpi_table_parse(ACPI_IVRS, parse_ivrs_table) != 0 )
+    if ( acpi_table_parse(AMD_IOMMU_ACPI_IVRS_SIG, parse_ivrs_table) != 0 )
         amd_iov_error("Did not find IVRS table!\n");
 
     for_each_amd_iommu ( iommu )

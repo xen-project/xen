@@ -17,15 +17,15 @@ include ../../minios.mk
 ARCH_SRCS := $(wildcard *.c)
 
 # The objects built from the sources.
-ARCH_OBJS := $(patsubst %.c,%.o,$(ARCH_SRCS))
+ARCH_OBJS := $(patsubst %.c,$(OBJ_DIR)/%.o,$(ARCH_SRCS))
 
-all: $(ARCH_LIB)
+all: $(OBJ_DIR)/$(ARCH_LIB)
 
 # $(HEAD_ARCH_OBJ) is only build here, needed on linking
 # in ../../Makefile.
-$(ARCH_LIB): $(ARCH_OBJS) $(HEAD_ARCH_OBJ)
-	$(AR) rv $(ARCH_LIB) $(ARCH_OBJS)
+$(OBJ_DIR)/$(ARCH_LIB): $(ARCH_OBJS) $(OBJ_DIR)/$(HEAD_ARCH_OBJ)
+	$(AR) rv $(OBJ_DIR)/$(ARCH_LIB) $(ARCH_OBJS)
 
 clean:
-	rm -f $(ARCH_LIB) $(ARCH_OBJS) $(HEAD_ARCH_OBJ)
+	rm -f $(OBJ_DIR)/$(ARCH_LIB) $(ARCH_OBJS) $(OBJ_DIR)/$(HEAD_ARCH_OBJ)
 

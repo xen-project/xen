@@ -518,6 +518,9 @@ class sxp2xml:
         vtpms_sxp = map(lambda x: x[1], [device for device in devices
                                          if device[1][0] == "vtpm"])
 
+        vfbs_sxp = map(lambda x: x[1], [device for device in devices
+                                        if device[1][0] == "vfb"])
+
         # Create XML Document
         
         impl = getDOMImplementation()
@@ -657,6 +660,10 @@ class sxp2xml:
 
         map(vm.appendChild, consoles)
 
+        vfbs = map(lambda vfb: self.extract_vfb(vfb, document), vfbs_sxp)
+
+        map(vm.appendChild, vfbs)
+
         # Platform variables...
 
         platform = self.extract_platform(image, document)
@@ -774,6 +781,46 @@ class sxp2xml:
 
         return vtpm
 
+    def extract_vfb(self, vfb_sxp, document):
+
+        vfb = document.createElement("console")
+        vfb.attributes["protocol"] = "rfb"
+
+        if get_child_by_name(vfb_sxp, "type", "") == "vnc":
+            vfb.appendChild(self.mk_other_config(
+                "type", "vnc",
+                document))
+            vfb.appendChild(self.mk_other_config(
+                "vncunused", get_child_by_name(vfb_sxp, "vncunused", "1"),
+                document))
+            vfb.appendChild(self.mk_other_config(
+                "vnclisten",
+                get_child_by_name(vfb_sxp, "vnclisten", "127.0.0.1"),
+                document))
+            vfb.appendChild(self.mk_other_config(
+                "vncdisplay", get_child_by_name(vfb_sxp, "vncdisplay", "0"),
+                document))
+            vfb.appendChild(self.mk_other_config(
+                "vncpasswd", get_child_by_name(vfb_sxp, "vncpasswd", ""),
+                document))
+
+        if get_child_by_name(vfb_sxp, "type", "") == "sdl":
+            vfb.appendChild(self.mk_other_config(
+                "type", "sdl",
+                document))
+            vfb.appendChild(self.mk_other_config(
+                "display", get_child_by_name(vfb_sxp, "display", ""),
+                document))
+            vfb.appendChild(self.mk_other_config(
+                "xauthority",
+                get_child_by_name(vfb_sxp, "xauthority", ""),
+                document))
+            vfb.appendChild(self.mk_other_config(
+                "opengl", get_child_by_name(vfb_sxp, "opengl", "1"),
+                document))
+
+        return vfb
+
     _eths = -1
 
     def mk_other_config(self, key, value, document):
@@ -792,11 +839,17 @@ class sxp2xml:
             console = document.createElement("console")
             console.attributes["protocol"] = "rfb"
             console.appendChild(self.mk_other_config(
-                "vncunused", str(get_child_by_name(image, "vncunused", "0")),
+                "type", "vnc",
+                document))
+            console.appendChild(self.mk_other_config(
+                "vncunused", str(get_child_by_name(image, "vncunused", "1")),
                 document))
             console.appendChild(self.mk_other_config(
                 "vnclisten",
                 get_child_by_name(image, "vnclisten", "127.0.0.1"),
+                document))
+            console.appendChild(self.mk_other_config(
+                "vncdisplay", str(get_child_by_name(image, "vncdisplay", "0")),
                 document))
             console.appendChild(self.mk_other_config(
                 "vncpasswd", get_child_by_name(image, "vncpasswd", ""),
@@ -804,16 +857,18 @@ class sxp2xml:
             consoles.append(console)          
         if int(get_child_by_name(image, "sdl", "0")) == 1:
             console = document.createElement("console")
-            console.attributes["protocol"] = "sdl"
+            console.attributes["protocol"] = "rfb"
+            console.appendChild(self.mk_other_config(
+                "type", "sdl",
+                document))
             console.appendChild(self.mk_other_config(
                 "display", get_child_by_name(image, "display", ""),
                 document))
             console.appendChild(self.mk_other_config(
-                "xauthority",
-                get_child_by_name(image, "vxauthority", "127.0.0.1"),
+                "xauthority", get_child_by_name(image, "xauthority", ""),
                 document))
             console.appendChild(self.mk_other_config(
-                "opengl", get_child_by_name(image, "opengl", "1"),
+                "opengl", str(get_child_by_name(image, "opengl", "1")),
                 document))
             consoles.append(console)
             
@@ -821,17 +876,43 @@ class sxp2xml:
 
 
     def extract_platform(self, image, document):
-        platform_keys = ['acpi', 'apic', 'pae', 'vhpt', 'timer_mode',
-                         'hap', 'hpet']
 
-        def extract_platform_key(key):
-            platform = document.createElement("platform")
-            platform.attributes["key"] = key
-            platform.attributes["value"] \
-                = str(get_child_by_name(image, key, "1"))
-            return platform
-        
-        return map(extract_platform_key, platform_keys)
+        platform_keys = [
+            'acpi',
+            'apic',
+            'boot',
+            'device_model',
+            'loader',
+            'fda',
+            'fdb',
+            'keymap',
+            'isa',
+            'localtime',
+            'monitor',
+            'pae',
+            'rtc_timeoffset',
+            'serial',
+            'soundhw',
+            'stdvga',
+            'usb',
+            'usbdevice',
+            'hpet',
+            'timer_mode',
+            'vhpt',
+            'guest_os_type',
+            'hap',
+        ]
+
+        platform_configs = []
+        for key in platform_keys:
+            value = get_child_by_name(image, key, None)
+            if value is not None:
+                platform = document.createElement("platform")
+                platform.attributes["key"] = key
+                platform.attributes["value"] = str(value)
+                platform_configs.append(platform)
+ 
+        return platform_configs
     
     def getFreshEthDevice(self):
         self._eths += 1

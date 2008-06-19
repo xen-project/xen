@@ -36,6 +36,7 @@ typedef struct privcmd_hypercall
 {
     unsigned long op;
     unsigned long arg[5];
+    long retval;
 } privcmd_hypercall_t;
 
 typedef struct privcmd_mmap_entry {

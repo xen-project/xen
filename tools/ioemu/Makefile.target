@@ -358,13 +358,6 @@ VL_OBJS+=tap-win32.o
 endif
 
 ifdef CONFIG_STUBDOM
-VL_OBJS+=main-qemu.o
-CFLAGS += -DCONFIG_QEMU
-main-qemu.c:
-	ln -s $(XEN_ROOT)/extras/mini-os/main.c $@
-endif
-
-ifdef CONFIG_STUBDOM
 #CONFIG_PASSTHROUGH=1
 else
   ifeq (,$(wildcard /usr/include/pci))
@@ -444,7 +437,11 @@ VL_OBJS+= xen_platform.o
 VL_OBJS+= xen_machine_fv.o
 VL_OBJS+= xen_machine_pv.o
 VL_OBJS+= xenfb.o
+ifdef CONFIG_STUBDOM
+VL_OBJS+= xenfbfront.o
+endif
 VL_OBJS+= xen_console.o
+VL_OBJS+= pci_emulation.o
 ifndef CONFIG_STUBDOM
 VL_OBJS+= tpm_tis.o
 VL_OBJS+= $(SOUND_HW) $(AUDIODRV) mixeng.o 

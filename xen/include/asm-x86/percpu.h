@@ -1,7 +1,7 @@
 #ifndef __X86_PERCPU_H__
 #define __X86_PERCPU_H__
 
-#define PERCPU_SHIFT 12
+#define PERCPU_SHIFT 13
 #define PERCPU_SIZE  (1UL << PERCPU_SHIFT)
 
 /* Separate out the type, so (int[3], foo) works. */

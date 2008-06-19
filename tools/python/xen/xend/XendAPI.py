@@ -1707,11 +1707,13 @@ class XendAPI(object):
                                      "domain_delete", vm_ref)
     
     def VM_hard_reboot(self, session, vm_ref):
-        return xen_api_error(XEND_ERROR_UNSUPPORTED)
+        return XendTask.log_progress(0, 100, do_vm_func,
+                                     "domain_reset", vm_ref)
     
     def VM_hard_shutdown(self, session, vm_ref):
         return XendTask.log_progress(0, 100, do_vm_func,
-                                     "domain_destroy", vm_ref)    
+                                     "domain_destroy", vm_ref)
+    
     def VM_pause(self, session, vm_ref):
         return XendTask.log_progress(0, 100, do_vm_func,
                                      "domain_pause", vm_ref)

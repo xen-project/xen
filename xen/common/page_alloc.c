@@ -102,7 +102,7 @@ static unsigned long scrub_pages;
  *  One bit per page of memory. Bit set => page is allocated.
  */
 
-static unsigned long *alloc_bitmap;
+unsigned long *alloc_bitmap;
 #define PAGES_PER_MAPWORD (sizeof(unsigned long) * 8)
 
 #define allocated_in_map(_pn)                       \

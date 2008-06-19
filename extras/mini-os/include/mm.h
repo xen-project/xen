@@ -75,5 +75,6 @@ extern unsigned long heap, brk, heap_mapped, heap_end;
 #endif
 
 int free_physical_pages(xen_pfn_t *mfns, int n);
+void fini_mm(void);
 
 #endif /* _MM_H_ */

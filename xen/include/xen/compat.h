@@ -47,7 +47,7 @@
     const typeof(*(ptr)) *_s = (ptr);                                \
     char (*_d)[sizeof(*_s)] = (void *)(full_ptr_t)(hnd).c;           \
     ((void)((typeof(**(hnd)._) *)(full_ptr_t)(hnd).c == (ptr)));     \
-    copy_to_user(_d + (off), _s, sizeof(*_s) * (nr));                \
+    raw_copy_to_guest(_d + (off), _s, sizeof(*_s) * (nr));           \
 })
 
 /*
@@ -57,7 +57,7 @@
 #define copy_from_compat_offset(ptr, hnd, off, nr) ({                \
     const typeof(*(ptr)) *_s = (typeof(**(hnd)._) *)(full_ptr_t)(hnd).c; \
     typeof(*(ptr)) *_d = (ptr);                                      \
-    copy_from_user(_d, _s + (off), sizeof(*_d) * (nr));              \
+    raw_copy_from_guest(_d, _s + (off), sizeof(*_d) * (nr));         \
 })
 
 #define copy_to_compat(hnd, ptr, nr)                                 \
@@ -72,7 +72,7 @@
     void *_d = &((typeof(**(hnd)._) *)(full_ptr_t)(hnd).c)->field;   \
     ((void)(&((typeof(**(hnd)._) *)(full_ptr_t)(hnd).c)->field ==    \
             &(ptr)->field));                                         \
-    copy_to_user(_d, _s, sizeof(*_s));                               \
+    raw_copy_to_guest(_d, _s, sizeof(*_s));                          \
 })
 
 /* Copy sub-field of a structure from guest context via a compat handle. */
@@ -80,7 +80,7 @@
     const typeof(&(ptr)->field) _s =                                 \
         &((typeof(**(hnd)._) *)(full_ptr_t)(hnd).c)->field;          \
     typeof(&(ptr)->field) _d = &(ptr)->field;                        \
-    copy_from_user(_d, _s, sizeof(*_d));                             \
+    raw_copy_from_guest(_d, _s, sizeof(*_d));                        \
 })
 
 /*
@@ -95,13 +95,13 @@
     const typeof(*(ptr)) *_s = (ptr);                                \
     char (*_d)[sizeof(*_s)] = (void *)(full_ptr_t)(hnd).c;           \
     ((void)((typeof(**(hnd)._) *)(full_ptr_t)(hnd).c == (ptr)));     \
-    __copy_to_user(_d + (off), _s, sizeof(*_s) * (nr));              \
+    __raw_copy_to_guest(_d + (off), _s, sizeof(*_s) * (nr));         \
 })
 
 #define __copy_from_compat_offset(ptr, hnd, off, nr) ({              \
     const typeof(*(ptr)) *_s = (typeof(**(hnd)._) *)(full_ptr_t)(hnd).c; \
     typeof(*(ptr)) *_d = (ptr);                                      \
-    __copy_from_user(_d, _s + (off), sizeof(*_d) * (nr));            \
+    __raw_copy_from_guest(_d, _s + (off), sizeof(*_d) * (nr));       \
 })
 
 #define __copy_to_compat(hnd, ptr, nr)                               \
@@ -115,14 +115,14 @@
     void *_d = &((typeof(**(hnd)._) *)(full_ptr_t)(hnd).c)->field;   \
     ((void)(&((typeof(**(hnd)._) *)(full_ptr_t)(hnd).c)->field ==    \
             &(ptr)->field));                                         \
-    __copy_to_user(_d, _s, sizeof(*_s));                             \
+    __raw_copy_to_guest(_d, _s, sizeof(*_s));                        \
 })
 
 #define __copy_field_from_compat(ptr, hnd, field) ({                 \
     const typeof(&(ptr)->field) _s =                                 \
         &((typeof(**(hnd)._) *)(full_ptr_t)(hnd).c)->field;          \
     typeof(&(ptr)->field) _d = &(ptr)->field;                        \
-    __copy_from_user(_d, _s, sizeof(*_d));                           \
+    __raw_copy_from_guest(_d, _s, sizeof(*_d));                      \
 })
 
 

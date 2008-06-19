@@ -216,7 +216,7 @@ void hvm_dpci_msi_eoi(struct domain *d, int vector)
     struct hvm_irq_dpci *hvm_irq_dpci = d->arch.hvm_domain.irq.dpci;
     int pirq;
 
-    if ( !vtd_enabled || (hvm_irq_dpci == NULL) )
+    if ( !iommu_enabled || (hvm_irq_dpci == NULL) )
        return;
 
     pirq = hvm_irq_dpci->msi_gvec_pirq[vector];
@@ -253,9 +253,8 @@ void hvm_dpci_eoi(struct domain *d, unsigned int guest_gsi,
     {
         spin_unlock(&hvm_irq_dpci->dirq_lock);
 
-        gdprintk(XENLOG_INFO VTDPREFIX,
-                 "hvm_dpci_eoi:: mirq = %x\n", machine_gsi);
-        stop_timer(&hvm_irq_dpci->hvm_timer[domain_irq_to_vector(d, machine_gsi)]);
+        stop_timer(&hvm_irq_dpci->hvm_timer[
+            domain_irq_to_vector(d, machine_gsi)]);
         if ( (ent == NULL) || !ent->fields.mask )
             pirq_guest_eoi(d, machine_gsi);
     }

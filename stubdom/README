@@ -6,12 +6,19 @@ Then make install to install the result.
 
 Also, run make and make install in $XEN_ROOT/tools/fs-back
 
+
+
+                                IOEMU stubdom
+                                =============
+
+  This boosts HVM performance by putting ioemu in its own lightweight domain.
+
 General Configuration
 =====================
 
 In your HVM config "hvmconfig",
 
-- use /usr/lib/xen/bin/stubdom-dm as dm script
+- use /usr/lib/xen/bin/stubdom-dm as dm script:
 
 device_model = '/usr/lib/xen/bin/stubdom-dm'
 
@@ -19,11 +26,13 @@ device_model = '/usr/lib/xen/bin/stubdom-dm'
 
 #disk = [  'file:/tmp/install.iso,hdc:cdrom,r', 'phy:/dev/sda6,hda,w', 'file:/tmp/test,hdb,r' ]
 
+- disable anything related to dom0, like pty serial assignments
+
 
 Create /etc/xen/stubdom-hvmconfig (where "hvmconfig" is the name of your HVM
 guest) with
 
-kernel = "/usr/lib/xen/boot/stubdom.gz"
+kernel = "/usr/lib/xen/boot/ioemu-stubdom.gz"
 vif = [ '', 'ip=10.0.1.1,mac=aa:00:00:12:23:34']
 disk = [  'file:/tmp/install.iso,hdc:cdrom,r', 'phy:/dev/sda6,hda,w', 'file:/tmp/test,hdb,r' ]
 
@@ -40,34 +49,36 @@ There are three posibilities
 
 * Using SDL
 
-In hvmconfig, disable vnc:
+  - In hvmconfig, disable vnc and sdl:
 
 vnc = 0
+sdl = 0
 
-In stubdom-hvmconfig, set a vfb:
+  - In stubdom-hvmconfig, set an sdl vfb:
 
 vfb = [ 'type=sdl' ]
 
 * Using a VNC server in the stub domain
 
-In hvmconfig, set vnclisten to "172.30.206.1" for instance.  Do not use a host
-name as Mini-OS does not have a name resolver.  Do not use 127.0.0.1 since then
-you will not be able to connect to it.
+  - In hvmconfig, set vnclisten to "172.30.206.1" for instance.  Do not use a
+host name as Mini-OS does not have a name resolver.  Do not use 127.0.0.1 since
+then you will not be able to connect to it.
 
 vnc = 1
 vnclisten = "172.30.206.1"
 
-In stubdom-hvmconfig, fill the reserved vif with the same IP, for instance:
+  - In stubdom-hvmconfig, fill the reserved vif with the same IP, for instance:
 
 vif = [ 'ip=172.30.206.1', 'ip=10.0.1.1,mac=aa:00:00:12:23:34']
 
 * Using a VNC server in dom0
 
-In hvmconfig, disable vnc:
+  - In hvmconfig, disable vnc and sdl:
 
 vnc = 0
+sdl = 0
 
-In stubdom-hvmconfig, set a vfb:
+  - In stubdom-hvmconfig, set a vnc vfb:
 
 vfb = [ 'type=vnc' ]
 
@@ -83,3 +94,43 @@ ln -s /var/lib/xen /exports/var/lib
 /usr/sbin/fs-backend &
 
 xm create hvmconfig
+
+
+
+                                   PV-GRUB
+                                   =======
+
+  This replaces pygrub to boot domU images safely: it runs the regular grub
+inside the created domain itself and uses regular domU facilities to read the
+disk / fetch files from network etc. ; it eventually loads the PV kernel and
+chain-boots it.
+  
+Configuration
+=============
+
+In your PV config,
+
+- use /usr/lib/xen/boot/pv-grub.gz as kernel:
+
+kernel = "/usr/lib/xen/boot/pv-grub.gz"
+
+- set the path to menu.lst, as seen from the domU, in extra:
+
+extra = "(hd0,0)/boot/grub/menu.lst"
+
+you can also use a tftp path (dhcp will be automatically performed):
+
+extra = "(nd)/somepath/menu.lst"
+
+or you can set it in option 150 of your dhcp server and leave extra empty
+
+Limitations
+===========
+
+- You can not boot a 64bit kernel with a 32bit-compiled PV-GRUB and vice-versa.
+To cross-compile a 32bit PV-GRUB,
+
+export XEN_TARGET_ARCH=x86_32
+
+- bootsplash is supported, but the ioemu backend does not yet support restart
+for use by the booted kernel.
