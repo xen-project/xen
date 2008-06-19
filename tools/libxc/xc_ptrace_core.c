@@ -641,24 +641,24 @@ static const struct xc_core_format_type* current_format_type = NULL;
 
 void *
 map_domain_va_core(unsigned long domfd, int cpu, void *guest_va,
-                   vcpu_guest_context_t *ctxt)
+                   vcpu_guest_context_any_t *ctxt)
 {
     if (current_format_type == NULL)
         return NULL;
     return (current_format_type->map_domain_va_core)(domfd, cpu, guest_va,
-                                                     ctxt);
+                                                     &ctxt->c);
 }
 
 int
 xc_waitdomain_core(int xc_handle, int domfd, int *status, int options,
-                   vcpu_guest_context_t *ctxt)
+                   vcpu_guest_context_any_t *ctxt)
 {
     int ret;
     int i;
 
     for (i = 0; i < NR_FORMAT_TYPE; i++) {
         ret = (format_type[i].waitdomain_core)(xc_handle, domfd, status,
-                                               options, ctxt);
+                                               options, &ctxt->c);
         if (ret == 0) {
             current_format_type = &format_type[i];
             break;

@@ -48,7 +48,7 @@
 unsigned long xc_translate_foreign_address(int xc_handle, uint32_t dom,
                                            int vcpu, unsigned long long virt )
 {
-    vcpu_guest_context_t ctx;
+    vcpu_guest_context_any_t ctx;
     unsigned long long cr3;
     void *pd, *pt, *pdppage = NULL, *pdp, *pml = NULL;
     unsigned long long pde, pte, pdpe, pmle;
@@ -78,7 +78,7 @@ unsigned long xc_translate_foreign_address(int xc_handle, uint32_t dom,
         DPRINTF("failed to retreive vcpu context\n");
         goto out;
     }
-    cr3 = ((unsigned long long)xen_cr3_to_pfn(ctx.ctrlreg[3])) << PAGE_SHIFT;
+    cr3 = ((unsigned long long)xen_cr3_to_pfn(ctx.c.ctrlreg[3])) << PAGE_SHIFT;
 
     /* Page Map Level 4 */
 

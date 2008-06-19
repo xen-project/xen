@@ -13,7 +13,7 @@
 
 static int modify_returncode(int xc_handle, uint32_t domid)
 {
-    vcpu_guest_context_either_t ctxt;
+    vcpu_guest_context_any_t ctxt;
     xc_dominfo_t info;
     xen_capabilities_info_t caps;
     int rc;
@@ -39,7 +39,7 @@ static int modify_returncode(int xc_handle, uint32_t domid)
         return -1;
     }
 
-    if ( (rc = xc_vcpu_getcontext(xc_handle, domid, 0, &ctxt.c)) != 0 )
+    if ( (rc = xc_vcpu_getcontext(xc_handle, domid, 0, &ctxt)) != 0 )
         return rc;
 
     if ( !info.hvm )
@@ -49,7 +49,7 @@ static int modify_returncode(int xc_handle, uint32_t domid)
     else
         ctxt.x32.user_regs.eax = 1;
 
-    if ( (rc = xc_vcpu_setcontext(xc_handle, domid, 0, &ctxt.c)) != 0 )
+    if ( (rc = xc_vcpu_setcontext(xc_handle, domid, 0, &ctxt)) != 0 )
         return rc;
 
     return 0;
@@ -89,7 +89,7 @@ static int xc_domain_resume_any(int xc_handle, uint32_t domid)
     int i, rc = -1;
 #if defined(__i386__) || defined(__x86_64__)
     unsigned long mfn, p2m_size = 0;
-    vcpu_guest_context_t ctxt;
+    vcpu_guest_context_any_t ctxt;
     start_info_t *start_info;
     shared_info_t *shinfo = NULL;
     xen_pfn_t *p2m_frame_list_list = NULL;
@@ -167,7 +167,7 @@ static int xc_domain_resume_any(int xc_handle, uint32_t domid)
         goto out;
     }
 
-    mfn = ctxt.user_regs.edx;
+    mfn = ctxt.c.user_regs.edx;
 
     start_info = xc_map_foreign_range(xc_handle, domid, PAGE_SIZE,
                                       PROT_READ | PROT_WRITE, mfn);

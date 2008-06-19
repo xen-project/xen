@@ -298,30 +298,21 @@ int xc_domain_hvm_setcontext(int xc_handle,
 int xc_vcpu_getcontext(int xc_handle,
                        uint32_t domid,
                        uint32_t vcpu,
-                       vcpu_guest_context_t *ctxt)
+                       vcpu_guest_context_any_t *ctxt)
 {
     int rc;
     DECLARE_DOMCTL;
-    size_t sz = sizeof(vcpu_guest_context_either_t);
+    size_t sz = sizeof(vcpu_guest_context_any_t);
 
     domctl.cmd = XEN_DOMCTL_getvcpucontext;
     domctl.domain = (domid_t)domid;
     domctl.u.vcpucontext.vcpu   = (uint16_t)vcpu;
-    set_xen_guest_handle(domctl.u.vcpucontext.ctxt, ctxt);
+    set_xen_guest_handle(domctl.u.vcpucontext.ctxt, &ctxt->c);
 
-    /*
-     * We may be asked to lock either a 32-bit or a 64-bit context. Lock the
-     * larger of the two if possible, otherwise fall back to native size.
-     */
+    
     if ( (rc = lock_pages(ctxt, sz)) != 0 )
-    {
-        sz = sizeof(*ctxt);
-        if ( (rc = lock_pages(ctxt, sz)) != 0 )
-            return rc;
-    }
-
+        return rc;
     rc = do_domctl(xc_handle, &domctl);
-
     unlock_pages(ctxt, sz);
 
     return rc;
@@ -626,32 +617,28 @@ int xc_availheap(int xc_handle,
 int xc_vcpu_setcontext(int xc_handle,
                        uint32_t domid,
                        uint32_t vcpu,
-                       vcpu_guest_context_t *ctxt)
+                       vcpu_guest_context_any_t *ctxt)
 {
     DECLARE_DOMCTL;
     int rc;
-    size_t sz = sizeof(vcpu_guest_context_either_t);
+    size_t sz = sizeof(vcpu_guest_context_any_t);
+
+    if (ctxt == NULL)
+    {
+        errno = EINVAL;
+        return -1;
+    }
 
     domctl.cmd = XEN_DOMCTL_setvcpucontext;
     domctl.domain = domid;
     domctl.u.vcpucontext.vcpu = vcpu;
-    set_xen_guest_handle(domctl.u.vcpucontext.ctxt, ctxt);
+    set_xen_guest_handle(domctl.u.vcpucontext.ctxt, &ctxt->c);
 
-    /*
-     * We may be asked to lock either a 32-bit or a 64-bit context. Lock the
-     * larger of the two if possible, otherwise fall back to native size.
-     */
-    if ( (ctxt != NULL) && (rc = lock_pages(ctxt, sz)) != 0 )
-    {
-        sz = sizeof(*ctxt);
-        if ( (rc = lock_pages(ctxt, sz)) != 0 )
-            return rc;
-    }
-
+    if ( (rc = lock_pages(ctxt, sz)) != 0 )
+        return rc;
     rc = do_domctl(xc_handle, &domctl);
-
-    if ( ctxt != NULL )
-        unlock_pages(ctxt, sz);
+    
+    unlock_pages(ctxt, sz);
 
     return rc;
 }

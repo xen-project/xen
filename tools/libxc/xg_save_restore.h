@@ -112,28 +112,6 @@ static inline int get_platform_info(int xc_handle, uint32_t dom,
 #define is_mapped(pfn_type) (!((pfn_type) & 0x80000000UL))
 
 
-/* 32-on-64 support: saving 32bit guests from 64bit tools and vice versa */
-typedef union 
-{
-    vcpu_guest_context_x86_64_t x64;
-    vcpu_guest_context_x86_32_t x32;   
-    vcpu_guest_context_t c;
-} vcpu_guest_context_either_t;
-
-typedef union 
-{
-    shared_info_x86_64_t x64;
-    shared_info_x86_32_t x32;   
-    shared_info_t s;
-} shared_info_either_t;
-
-typedef union 
-{
-    start_info_x86_64_t x64;
-    start_info_x86_32_t x32;   
-    start_info_t s;
-} start_info_either_t;
-
 #define GET_FIELD(_p, _f) ((guest_width==8) ? ((_p)->x64._f) : ((_p)->x32._f))
 
 #define SET_FIELD(_p, _f, _v) do {              \

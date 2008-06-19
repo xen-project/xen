@@ -153,7 +153,7 @@ static xen_pfn_t *load_p2m_frame_list(
     int io_fd, int *pae_extended_cr3, int *ext_vcpucontext)
 {
     xen_pfn_t *p2m_frame_list;
-    vcpu_guest_context_either_t ctxt;
+    vcpu_guest_context_any_t ctxt;
     xen_pfn_t p2m_fl_zero;
 
     /* Read first entry of P2M list, or extended-info signature (~0UL). */
@@ -284,12 +284,12 @@ int xc_domain_restore(int xc_handle, int io_fd, uint32_t dom,
     /* The new domain's shared-info frame number. */
     unsigned long shared_info_frame;
     unsigned char shared_info_page[PAGE_SIZE]; /* saved contents from file */
-    shared_info_either_t *old_shared_info = 
-        (shared_info_either_t *)shared_info_page;
-    shared_info_either_t *new_shared_info;
+    shared_info_any_t *old_shared_info = 
+        (shared_info_any_t *)shared_info_page;
+    shared_info_any_t *new_shared_info;
 
     /* A copy of the CPU context of the guest. */
-    vcpu_guest_context_either_t ctxt;
+    vcpu_guest_context_any_t ctxt;
 
     /* A table containing the type of each PFN (/not/ MFN!). */
     unsigned long *pfn_type = NULL;
@@ -304,7 +304,7 @@ int xc_domain_restore(int xc_handle, int io_fd, uint32_t dom,
     xen_pfn_t *p2m_frame_list = NULL;
     
     /* A temporary mapping of the guest's start_info page. */
-    start_info_either_t *start_info;
+    start_info_any_t *start_info;
 
     /* Our mapping of the current region (batch) */
     char *region_base;
