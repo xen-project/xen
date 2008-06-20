@@ -3288,6 +3288,13 @@ static int sh_page_fault(struct vcpu *v,
         return 0;
     }
 
+#if (SHADOW_OPTIMIZATIONS & SHOPT_OUT_OF_SYNC)
+    /* Always unsync when writing to L1 page tables. */
+    if ( sh_mfn_is_a_page_table(gmfn)
+         && ft == ft_demand_write )
+        sh_unsync(v, gmfn, va);
+#endif /* OOS */
+
     /* Calculate the shadow entry and write it */
     l1e_propagate_from_guest(v, gw.l1e, gmfn, &sl1e, ft, p2mt);
     r = shadow_set_l1e(v, ptr_sl1e, sl1e, sl1mfn);
