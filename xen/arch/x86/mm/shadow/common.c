@@ -54,6 +54,10 @@ void shadow_domain_init(struct domain *d)
     /* Use shadow pagetables for log-dirty support */
     paging_log_dirty_init(d, shadow_enable_log_dirty, 
                           shadow_disable_log_dirty, shadow_clean_dirty_bitmap);
+
+#if (SHADOW_OPTIMIZATIONS & SHOPT_OUT_OF_SYNC)
+    d->arch.paging.shadow.oos_active = 0;
+#endif
 }
 
 /* Setup the shadow-specfic parts of a vcpu struct. Note: The most important
@@ -64,6 +68,13 @@ void shadow_domain_init(struct domain *d)
  */
 void shadow_vcpu_init(struct vcpu *v)
 {
+#if (SHADOW_OPTIMIZATIONS & SHOPT_OUT_OF_SYNC)
+    int i;
+
+    for ( i = 0; i < SHADOW_OOS_PAGES; i++ )
+        v->arch.paging.shadow.oos[i] = _mfn(INVALID_MFN);
+#endif
+
     v->arch.paging.mode = &SHADOW_INTERNAL_NAME(sh_paging_mode, 3);
 }
 
@@ -427,6 +438,404 @@ void shadow_continue_emulation(struct sh_emulate_ctxt *sh_ctxt,
         }
     }
 }
+ 
+
+#if (SHADOW_OPTIMIZATIONS & SHOPT_OUT_OF_SYNC)
+/**************************************************************************/
+/* Out-of-sync shadows. */ 
+
+/* From time to time, we let a shadowed pagetable page go out of sync 
+ * with its shadow: the guest is allowed to write directly to the page, 
+ * and those writes are not synchronously reflected in the shadow.
+ * This lets us avoid many emulations if the guest is writing a lot to a 
+ * pagetable, but it relaxes a pretty important invariant in the shadow 
+ * pagetable design.  Therefore, some rules:
+ *
+ * 1. Only L1 pagetables may go out of sync: any page that is shadowed
+ *    at at higher level must be synchronously updated.  This makes
+ *    using linear shadow pagetables much less dangerous.
+ *    That means that: (a) unsyncing code needs to check for higher-level
+ *    shadows, and (b) promotion code needs to resync.
+ * 
+ * 2. All shadow operations on a guest page require the page to be brought
+ *    back into sync before proceeding.  This must be done under the
+ *    shadow lock so that the page is guaranteed to remain synced until
+ *    the operation completes.
+ *
+ *    Exceptions to this rule: the pagefault and invlpg handlers may 
+ *    update only one entry on an out-of-sync page without resyncing it. 
+ *
+ * 3. Operations on shadows that do not start from a guest page need to
+ *    be aware that they may be handling an out-of-sync shadow.
+ *
+ * 4. Operations that do not normally take the shadow lock (fast-path 
+ *    #PF handler, INVLPG) must fall back to a locking, syncing version 
+ *    if they see an out-of-sync table. 
+ *
+ * 5. Operations corresponding to guest TLB flushes (MOV CR3, INVLPG)
+ *    must explicitly resync all relevant pages or update their
+ *    shadows.
+ *
+ * Currently out-of-sync pages are listed in a simple open-addressed
+ * hash table with a second chance (must resist temptation to radically
+ * over-engineer hash tables...)  The virtual address of the access
+ * which caused us to unsync the page is also kept in the hash table, as
+ * a hint for finding the writable mappings later.
+ *
+ * We keep a hash per vcpu, because we want as much as possible to do
+ * the re-sync on the save vcpu we did the unsync on, so the VA hint
+ * will be valid.
+ */
+
+
+#if SHADOW_AUDIT & SHADOW_AUDIT_ENTRIES_FULL
+static void sh_oos_audit(struct domain *d) 
+{
+    int idx, expected_idx, expected_idx_alt;
+    struct page_info *pg;
+    struct vcpu *v;
+    
+    for_each_vcpu(d, v) 
+    {
+        for ( idx = 0; idx < SHADOW_OOS_PAGES; idx++ )
+        {
+            mfn_t *oos = v->arch.paging.shadow.oos;
+            if ( !mfn_valid(oos[idx]) )
+                continue;
+            
+            expected_idx = mfn_x(oos[idx]) % SHADOW_OOS_PAGES;
+            expected_idx_alt = ((expected_idx + 1) % SHADOW_OOS_PAGES);
+            if ( idx != expected_idx && idx != expected_idx_alt )
+            {
+                printk("%s: idx %d contains gmfn %lx, expected at %d or %d.\n",
+                       __func__, idx, mfn_x(oos[idx]), 
+                       expected_idx, expected_idx_alt);
+                BUG();
+            }
+            pg = mfn_to_page(oos[idx]);
+            if ( !(pg->count_info & PGC_page_table) )
+            {
+                printk("%s: idx %x gmfn %lx not a pt (count %"PRIx32")\n",
+                       __func__, idx, mfn_x(oos[idx]), pg->count_info);
+                BUG();
+            }
+            if ( !(pg->shadow_flags & SHF_out_of_sync) )
+            {
+                printk("%s: idx %x gmfn %lx not marked oos (flags %lx)\n",
+                       __func__, idx, mfn_x(oos[idx]), pg->shadow_flags);
+                BUG();
+            }
+            if ( (pg->shadow_flags & SHF_page_type_mask & ~SHF_L1_ANY) )
+            {
+                printk("%s: idx %x gmfn %lx shadowed as non-l1 (flags %lx)\n",
+                       __func__, idx, mfn_x(oos[idx]), pg->shadow_flags);
+                BUG();
+            }
+        }
+    }
+}
+#endif
+
+#if SHADOW_AUDIT & SHADOW_AUDIT_ENTRIES
+void oos_audit_hash_is_present(struct domain *d, mfn_t gmfn) 
+{
+    int idx;
+    struct vcpu *v;
+    mfn_t *oos;
+
+    ASSERT(mfn_is_out_of_sync(gmfn));
+    
+    for_each_vcpu(d, v) 
+    {
+        oos = v->arch.paging.shadow.oos;
+        idx = mfn_x(gmfn) % SHADOW_OOS_PAGES;
+        if ( mfn_x(oos[idx]) != mfn_x(gmfn) )
+            idx = (idx + 1) % SHADOW_OOS_PAGES;
+        
+        if ( mfn_x(oos[idx]) == mfn_x(gmfn) )
+            return;
+    }
+
+    SHADOW_ERROR("gmfn %lx marked OOS but not in hash table\n", mfn_x(gmfn));
+    BUG();
+}
+#endif
+
+/* Update the shadow, but keep the page out of sync. */
+static inline void _sh_resync_l1(struct vcpu *v, mfn_t gmfn)
+{
+    struct page_info *pg = mfn_to_page(gmfn);
+
+    ASSERT(mfn_valid(gmfn));
+    ASSERT(page_is_out_of_sync(pg));
+
+    /* Call out to the appropriate per-mode resyncing function */
+    if ( pg->shadow_flags & SHF_L1_32 )
+        SHADOW_INTERNAL_NAME(sh_resync_l1, 2)(v, gmfn);
+    else if ( pg->shadow_flags & SHF_L1_PAE )
+        SHADOW_INTERNAL_NAME(sh_resync_l1, 3)(v, gmfn);
+#if CONFIG_PAGING_LEVELS >= 4
+    else if ( pg->shadow_flags & SHF_L1_64 )
+        SHADOW_INTERNAL_NAME(sh_resync_l1, 4)(v, gmfn);
+#endif
+}
+
+/* Pull all the entries on an out-of-sync page back into sync. */
+static void _sh_resync(struct vcpu *v, mfn_t gmfn, unsigned long va)
+{
+    struct page_info *pg = mfn_to_page(gmfn);
+
+    ASSERT(shadow_locked_by_me(v->domain));
+    ASSERT(mfn_is_out_of_sync(gmfn));
+    /* Guest page must be shadowed *only* as L1 when out of sync. */
+    ASSERT(!(mfn_to_page(gmfn)->shadow_flags & SHF_page_type_mask 
+             & ~SHF_L1_ANY));
+    ASSERT(!sh_page_has_multiple_shadows(mfn_to_page(gmfn)));
+
+    SHADOW_PRINTK("d=%d, v=%d, gmfn=%05lx, va=%lx\n",
+                  v->domain->domain_id, v->vcpu_id, mfn_x(gmfn), va);
+
+    /* Need to pull write access so the page *stays* in sync. 
+     * This might be rather slow but we hope that in the common case 
+     * we're handling this pagetable after a guest walk has pulled 
+     * write access the fast way. */
+    switch ( sh_remove_write_access(v, gmfn, 0, va) )
+    {
+    default:
+    case 0:
+        break;
+
+    case 1:
+        flush_tlb_mask(v->domain->domain_dirty_cpumask);
+        break;
+
+    case -1:
+        /* An unfindable writeable typecount has appeared, probably via a
+         * grant table entry: can't shoot the mapping, so try to unshadow 
+         * the page.  If that doesn't work either, the guest is granting
+         * his pagetables and must be killed after all. */
+        sh_remove_shadows(v, gmfn, 0 /* Be thorough */, 1 /* Must succeed */);
+        return;
+    }
+
+    /* No more writable mappings of this page, please */
+    pg->shadow_flags &= ~SHF_oos_may_write;
+
+    /* Update the shadows with current guest entries. */
+    _sh_resync_l1(v, gmfn);
+
+    /* Now we know all the entries are synced, and will stay that way */
+    pg->shadow_flags &= ~SHF_out_of_sync;
+    perfc_incr(shadow_resync);
+}
+
+
+/* Add an MFN to the list of out-of-sync guest pagetables */
+static void oos_hash_add(struct vcpu *v, mfn_t gmfn, unsigned long va)
+{
+    int idx;
+    mfn_t *oos = v->arch.paging.shadow.oos;
+    unsigned long *oos_va = v->arch.paging.shadow.oos_va;
+
+    idx = mfn_x(gmfn) % SHADOW_OOS_PAGES;
+    if ( mfn_valid(oos[idx]) 
+         && (mfn_x(oos[idx]) % SHADOW_OOS_PAGES) == idx )
+    {
+        /* Punt the current occupant into the next slot */
+        SWAP(oos[idx], gmfn);
+        SWAP(oos_va[idx], va);
+        idx = (idx + 1) % SHADOW_OOS_PAGES;
+    }
+    if ( mfn_valid(oos[idx]) )
+   {
+        /* Crush the current occupant. */
+        _sh_resync(v, oos[idx], oos_va[idx]);
+        perfc_incr(shadow_unsync_evict);
+    }
+    oos[idx] = gmfn;
+    oos_va[idx] = va;
+}
+
+/* Remove an MFN from the list of out-of-sync guest pagetables */
+static void oos_hash_remove(struct vcpu *v, mfn_t gmfn)
+{
+    int idx;
+    mfn_t *oos;
+    struct domain *d = v->domain;
+
+    SHADOW_PRINTK("D%dV%d gmfn %lx\n",
+                  v->domain->domain_id, v->vcpu_id, mfn_x(gmfn)); 
+
+    for_each_vcpu(d, v) 
+    {
+        oos = v->arch.paging.shadow.oos;
+        idx = mfn_x(gmfn) % SHADOW_OOS_PAGES;
+        if ( mfn_x(oos[idx]) != mfn_x(gmfn) )
+            idx = (idx + 1) % SHADOW_OOS_PAGES;
+        if ( mfn_x(oos[idx]) == mfn_x(gmfn) )
+        {
+            oos[idx] = _mfn(INVALID_MFN);
+            return;
+        }
+    }
+
+    SHADOW_ERROR("gmfn %lx was OOS but not in hash table\n", mfn_x(gmfn));
+    BUG();
+}
+
+/* Pull a single guest page back into sync */
+void sh_resync(struct vcpu *v, mfn_t gmfn)
+{
+    int idx;
+    mfn_t *oos;
+    unsigned long *oos_va;
+    struct domain *d = v->domain;
+
+    for_each_vcpu(d, v) 
+    {
+        oos = v->arch.paging.shadow.oos;
+        oos_va = v->arch.paging.shadow.oos_va;
+        idx = mfn_x(gmfn) % SHADOW_OOS_PAGES;
+        if ( mfn_x(oos[idx]) != mfn_x(gmfn) )
+            idx = (idx + 1) % SHADOW_OOS_PAGES;
+        
+        if ( mfn_x(oos[idx]) == mfn_x(gmfn) )
+        {
+            _sh_resync(v, gmfn, oos_va[idx]);
+            oos[idx] = _mfn(INVALID_MFN);
+            return;
+        }
+    }
+
+    SHADOW_ERROR("gmfn %lx was OOS but not in hash table\n", mfn_x(gmfn));
+    BUG();
+}
+
+/* Figure out whether it's definitely safe not to sync this l1 table,
+ * by making a call out to the mode in which that shadow was made. */
+static int sh_skip_sync(struct vcpu *v, mfn_t gl1mfn)
+{
+    struct page_info *pg = mfn_to_page(gl1mfn);
+    if ( pg->shadow_flags & SHF_L1_32 )
+        return SHADOW_INTERNAL_NAME(sh_safe_not_to_sync, 2)(v, gl1mfn);
+    else if ( pg->shadow_flags & SHF_L1_PAE )
+        return SHADOW_INTERNAL_NAME(sh_safe_not_to_sync, 3)(v, gl1mfn);
+#if CONFIG_PAGING_LEVELS >= 4
+    else if ( pg->shadow_flags & SHF_L1_64 )
+        return SHADOW_INTERNAL_NAME(sh_safe_not_to_sync, 4)(v, gl1mfn);
+#endif
+    SHADOW_ERROR("gmfn 0x%lx was OOS but not shadowed as an l1.\n", 
+                 mfn_x(gl1mfn));
+    BUG();
+    return 0; /* BUG() is no longer __attribute__((noreturn)). */
+}
+
+
+/* Pull all out-of-sync pages back into sync.  Pages brought out of sync
+ * on other vcpus are allowed to remain out of sync, but their contents
+ * will be made safe (TLB flush semantics); pages unsynced by this vcpu
+ * are brought back into sync and write-protected.  If skip != 0, we try
+ * to avoid resyncing at all if we think we can get away with it. */
+void sh_resync_all(struct vcpu *v, int skip, int this, int others, int do_locking)
+{
+    int idx;
+    struct vcpu *other;
+    mfn_t *oos = v->arch.paging.shadow.oos;
+    unsigned long *oos_va = v->arch.paging.shadow.oos_va;
+
+    SHADOW_PRINTK("d=%d, v=%d\n", v->domain->domain_id, v->vcpu_id);
+
+    ASSERT(do_locking || shadow_locked_by_me(v->domain));
+
+    if ( !this )
+        goto resync_others;
+
+    if ( do_locking )
+        shadow_lock(v->domain);
+
+    /* First: resync all of this vcpu's oos pages */
+    for ( idx = 0; idx < SHADOW_OOS_PAGES; idx++ ) 
+        if ( mfn_valid(oos[idx]) )
+        {
+            /* Write-protect and sync contents */
+            _sh_resync(v, oos[idx], oos_va[idx]);
+            oos[idx] = _mfn(INVALID_MFN);
+        }
+
+    if ( do_locking )
+        shadow_unlock(v->domain);
+
+ resync_others:
+    if ( !others )
+        return;
+
+    /* Second: make all *other* vcpus' oos pages safe. */
+    for_each_vcpu(v->domain, other)
+    {
+        if ( v == other ) 
+            continue;
+
+        if ( do_locking )
+            shadow_lock(v->domain);
+
+        oos = other->arch.paging.shadow.oos;
+        oos_va = other->arch.paging.shadow.oos_va;
+
+        for ( idx = 0; idx < SHADOW_OOS_PAGES; idx++ ) 
+        {
+            if ( !mfn_valid(oos[idx]) )
+                continue;
+
+            if ( skip )
+            {
+                /* Update the shadows and leave the page OOS. */
+                if ( sh_skip_sync(v, oos[idx]) )
+                    continue;
+                _sh_resync_l1(other, oos[idx]);
+            }
+            else
+            {
+                /* Write-protect and sync contents */
+                _sh_resync(other, oos[idx], oos_va[idx]);
+                oos[idx] = _mfn(INVALID_MFN);
+            }
+        }
+        
+        if ( do_locking )
+            shadow_unlock(v->domain);
+    }
+}
+
+/* Allow a shadowed page to go out of sync */
+int sh_unsync(struct vcpu *v, mfn_t gmfn, unsigned long va)
+{
+    struct page_info *pg;
+    
+    ASSERT(shadow_locked_by_me(v->domain));
+
+    SHADOW_PRINTK("d=%d, v=%d, gmfn=%05lx va %lx\n",
+                  v->domain->domain_id, v->vcpu_id, mfn_x(gmfn), va);
+
+    pg = mfn_to_page(gmfn);
+ 
+    /* Guest page must be shadowed *only* as L1 and *only* once when out
+     * of sync.  Also, get out now if it's already out of sync. 
+     * Also, can't safely unsync if some vcpus have paging disabled.*/
+    if ( pg->shadow_flags & 
+         ((SHF_page_type_mask & ~SHF_L1_ANY) | SHF_out_of_sync) 
+         || sh_page_has_multiple_shadows(pg)
+         || !is_hvm_domain(v->domain)
+         || !v->domain->arch.paging.shadow.oos_active )
+        return 0;
+
+    pg->shadow_flags |= SHF_out_of_sync|SHF_oos_may_write;
+    oos_hash_add(v, gmfn, va);
+    perfc_incr(shadow_unsync);
+    return 1;
+}
+
+#endif /* (SHADOW_OPTIMIZATIONS & SHOPT_OUT_OF_SYNC) */
+
 
 /**************************************************************************/
 /* Code for "promoting" a guest page to the point where the shadow code is
@@ -439,6 +848,12 @@ void shadow_promote(struct vcpu *v, mfn_t gmfn, unsigned int type)
     struct page_info *page = mfn_to_page(gmfn);
 
     ASSERT(mfn_valid(gmfn));
+
+#if (SHADOW_OPTIMIZATIONS & SHOPT_OUT_OF_SYNC) 
+    /* Is the page already shadowed and out of sync? */
+    if ( page_is_out_of_sync(page) ) 
+        sh_resync(v, gmfn);
+#endif
 
     /* We should never try to promote a gmfn that has writeable mappings */
     ASSERT((page->u.inuse.type_info & PGT_type_mask) != PGT_writable_page
@@ -463,7 +878,14 @@ void shadow_demote(struct vcpu *v, mfn_t gmfn, u32 type)
     clear_bit(type, &page->shadow_flags);
 
     if ( (page->shadow_flags & SHF_page_type_mask) == 0 )
+    {
+#if (SHADOW_OPTIMIZATIONS & SHOPT_OUT_OF_SYNC) 
+        /* Was the page out of sync? */
+        if ( page_is_out_of_sync(page) ) 
+            oos_hash_remove(v, gmfn);
+#endif 
         clear_bit(_PGC_page_table, &page->count_info);
+    }
 }
 
 /**************************************************************************/
@@ -1297,6 +1719,27 @@ static void sh_hash_audit_bucket(struct domain *d, int bucket)
             /* Bad shadow flags on guest page? */
             BUG_ON( !(gpg->shadow_flags & (1<<sp->type)) );
             /* Bad type count on guest page? */
+#if (SHADOW_OPTIMIZATIONS & SHOPT_OUT_OF_SYNC)
+            if ( sp->type == SH_type_l1_32_shadow
+                 || sp->type == SH_type_l1_pae_shadow
+                 || sp->type == SH_type_l1_64_shadow )
+            {
+                if ( (gpg->u.inuse.type_info & PGT_type_mask) == PGT_writable_page
+                     && (gpg->u.inuse.type_info & PGT_count_mask) != 0 )
+                {
+                    if ( !page_is_out_of_sync(gpg) )
+                    {
+                        SHADOW_ERROR("MFN %#lx shadowed (by %#"PRI_mfn")"
+                                     " and not OOS but has typecount %#lx\n",
+                                     sp->backpointer, 
+                                     mfn_x(shadow_page_to_mfn(sp)), 
+                                     gpg->u.inuse.type_info);
+                        BUG();
+                    }
+                }
+            }
+            else /* Not an l1 */
+#endif
             if ( (gpg->u.inuse.type_info & PGT_type_mask) == PGT_writable_page 
                  && (gpg->u.inuse.type_info & PGT_count_mask) != 0 )
             {
@@ -1608,7 +2051,8 @@ void sh_destroy_shadow(struct vcpu *v, mfn_t smfn)
 /* Remove all writeable mappings of a guest frame from the shadow tables 
  * Returns non-zero if we need to flush TLBs. 
  * level and fault_addr desribe how we found this to be a pagetable;
- * level==0 means we have some other reason for revoking write access.*/
+ * level==0 means we have some other reason for revoking write access.
+ * If level==0 we are allowed to fail, returning -1. */
 
 int sh_remove_write_access(struct vcpu *v, mfn_t gmfn, 
                            unsigned int level,
@@ -1659,7 +2103,12 @@ int sh_remove_write_access(struct vcpu *v, mfn_t gmfn,
         return 0;
 
     /* Early exit if it's already a pagetable, or otherwise not writeable */
-    if ( sh_mfn_is_a_page_table(gmfn) 
+    if ( (sh_mfn_is_a_page_table(gmfn)
+#if (SHADOW_OPTIMIZATIONS & SHOPT_OUT_OF_SYNC) 
+         /* Unless they've been allowed to go out of sync with their shadows */
+           && !mfn_oos_may_write(gmfn)
+#endif
+         )
          || (pg->u.inuse.type_info & PGT_count_mask) == 0 )
         return 0;
 
@@ -1676,7 +2125,7 @@ int sh_remove_write_access(struct vcpu *v, mfn_t gmfn,
     }
 
 #if SHADOW_OPTIMIZATIONS & SHOPT_WRITABLE_HEURISTIC
-    if ( v == current && level != 0 )
+    if ( v == current )
     {
         unsigned long gfn;
         /* Heuristic: there is likely to be only one writeable mapping,
@@ -1690,6 +2139,8 @@ int sh_remove_write_access(struct vcpu *v, mfn_t gmfn,
                 return 1;                                                 \
         } while (0)
 
+        if ( level == 0 && fault_addr )
+            GUESS(fault_addr, 6);
         
         if ( v->arch.paging.mode->guest_levels == 2 )
         {
@@ -1780,6 +2231,9 @@ int sh_remove_write_access(struct vcpu *v, mfn_t gmfn,
      * mapping -- ioreq page, grant mapping, &c. */
     if ( (mfn_to_page(gmfn)->u.inuse.type_info & PGT_count_mask) != 0 )
     {
+        if ( level == 0 )
+            return -1;
+
         SHADOW_ERROR("can't remove write access to mfn %lx: guest has "
                       "%lu special-use mappings of it\n", mfn_x(gmfn),
                       (mfn_to_page(gmfn)->u.inuse.type_info&PGT_count_mask));
@@ -2159,6 +2613,13 @@ static void sh_update_paging_modes(struct vcpu *v)
         ASSERT(shadow_mode_translate(d));
         ASSERT(shadow_mode_external(d));
 
+#if (SHADOW_OPTIMIZATIONS & SHOPT_OUT_OF_SYNC) 
+        /* Need to resync all our pages now, because if a page goes out
+         * of sync with paging enabled and is resynced with paging
+         * disabled, the resync will go wrong. */
+        shadow_resync_all(v, 0);
+#endif /* OOS */
+
         if ( !hvm_paging_enabled(v) )
         {
             /* When the guest has CR0.PG clear, we provide a 32-bit, non-PAE
@@ -2253,6 +2714,27 @@ static void sh_update_paging_modes(struct vcpu *v)
         //        different values for CR4.PSE and CR4.PGE at the same time.
         //        This *does* happen, at least for CR4.PGE...
     }
+
+#if (SHADOW_OPTIMIZATIONS & SHOPT_OUT_OF_SYNC)
+    /* We need to check that all the vcpus have paging enabled to
+     * unsync PTs. */
+    if ( is_hvm_domain(d) )
+    {
+        int pe = 1;
+        struct vcpu *vptr;
+
+        for_each_vcpu(d, vptr)
+        {
+            if ( !hvm_paging_enabled(vptr) )
+            {
+                pe = 0;
+                break;
+            }
+        }
+
+        d->arch.paging.shadow.oos_active = pe;
+    }
+#endif /* OOS */
 
     v->arch.paging.mode->update_cr3(v, 0);
 }
@@ -3044,7 +3526,11 @@ void shadow_audit_tables(struct vcpu *v)
 
     if ( !(SHADOW_AUDIT_ENABLE) )
         return;
-    
+
+#if (SHADOW_OPTIMIZATIONS & SHOPT_OUT_OF_SYNC)
+    sh_oos_audit(v->domain);
+#endif
+
     if ( SHADOW_AUDIT & SHADOW_AUDIT_ENTRIES_FULL )
         mask = ~1; /* Audit every table in the system */
     else 

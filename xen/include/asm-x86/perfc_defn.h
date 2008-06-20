@@ -80,6 +80,7 @@ PERFCOUNTER(shadow_writeable_h_2,  "shadow writeable: 32pae w2k3")
 PERFCOUNTER(shadow_writeable_h_3,  "shadow writeable: 64b w2k3")
 PERFCOUNTER(shadow_writeable_h_4,  "shadow writeable: linux low/solaris")
 PERFCOUNTER(shadow_writeable_h_5,  "shadow writeable: linux high")
+PERFCOUNTER(shadow_writeable_h_6,  "shadow writeable: unsync va")
 PERFCOUNTER(shadow_writeable_bf,   "shadow writeable brute-force")
 PERFCOUNTER(shadow_mappings,       "shadow removes all mappings")
 PERFCOUNTER(shadow_mappings_bf,    "shadow rm-mappings brute-force")
@@ -100,5 +101,9 @@ PERFCOUNTER(shadow_invlpg_fault,   "shadow invlpg faults")
 PERFCOUNTER(shadow_em_ex_pt,       "shadow extra pt write")
 PERFCOUNTER(shadow_em_ex_non_pt,   "shadow extra non-pt-write op")
 PERFCOUNTER(shadow_em_ex_fail,     "shadow extra emulation failed")
+
+PERFCOUNTER(shadow_unsync,         "shadow OOS unsyncs")
+PERFCOUNTER(shadow_unsync_evict,   "shadow OOS evictions")
+PERFCOUNTER(shadow_resync,         "shadow OOS resyncs")
 
 /*#endif*/ /* __XEN_PERFC_DEFN_H__ */

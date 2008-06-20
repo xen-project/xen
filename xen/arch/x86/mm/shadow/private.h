@@ -63,8 +63,9 @@ extern int shadow_audit_enable;
 #define SHOPT_SKIP_VERIFY         0x20  /* Skip PTE v'fy when safe to do so */
 #define SHOPT_VIRTUAL_TLB         0x40  /* Cache guest v->p translations */
 #define SHOPT_FAST_EMULATION      0x80  /* Fast write emulation */
+#define SHOPT_OUT_OF_SYNC        0x100  /* Allow guest writes to L1 PTs */
 
-#define SHADOW_OPTIMIZATIONS      0xff
+#define SHADOW_OPTIMIZATIONS     0x1ff
 
 
 /******************************************************************************
@@ -301,6 +302,62 @@ static inline int sh_type_is_pinnable(struct vcpu *v, unsigned int t)
 #define SHF_PAE (SHF_L1_PAE|SHF_FL1_PAE|SHF_L2_PAE|SHF_L2H_PAE)
 #define SHF_64  (SHF_L1_64|SHF_FL1_64|SHF_L2_64|SHF_L2H_64|SHF_L3_64|SHF_L4_64)
 
+#define SHF_L1_ANY  (SHF_L1_32|SHF_L1_PAE|SHF_L1_64)
+
+#if (SHADOW_OPTIMIZATIONS & SHOPT_OUT_OF_SYNC) 
+/* Marks a guest L1 page table which is shadowed but not write-protected.
+ * If set, then *only* L1 shadows (SHF_L1_*) are allowed. 
+ *
+ * out_of_sync indicates that the shadow tables may not reflect the
+ * guest tables.  If it is clear, then the shadow tables *must* reflect
+ * the guest tables.
+ *
+ * oos_may_write indicates that a page may have writable mappings.
+ *
+ * Most of the time the flags are synonymous.  There is a short period of time 
+ * during resync that oos_may_write is clear but out_of_sync is not.  If a 
+ * codepath is called during that time and is sensitive to oos issues, it may 
+ * need to use the second flag.
+ */
+#define SHF_out_of_sync (1u<<30)
+#define SHF_oos_may_write (1u<<29)
+#endif /* (SHADOW_OPTIMIZATIONS & SHOPT_OUT_OF_SYNC) */
+
+static inline int sh_page_has_multiple_shadows(struct page_info *pg)
+{
+    u32 shadows;
+    if ( !(pg->count_info & PGC_page_table) )
+        return 0;
+    shadows = pg->shadow_flags & SHF_page_type_mask;
+    /* More than one type bit set in shadow-flags? */
+    return ( (shadows & ~(1UL << find_first_set_bit(shadows))) != 0 );
+}
+
+#if (SHADOW_OPTIMIZATIONS & SHOPT_OUT_OF_SYNC) 
+/* The caller must verify this is reasonable to call; i.e., valid mfn,
+ * domain is translated, &c */
+static inline int page_is_out_of_sync(struct page_info *p) 
+{
+    return (p->count_info & PGC_page_table)
+        && (p->shadow_flags & SHF_out_of_sync);
+}
+
+static inline int mfn_is_out_of_sync(mfn_t gmfn) 
+{
+    return page_is_out_of_sync(mfn_to_page(mfn_x(gmfn)));
+}
+
+static inline int page_oos_may_write(struct page_info *p) 
+{
+    return (p->count_info & PGC_page_table)
+        && (p->shadow_flags & SHF_oos_may_write);
+}
+
+static inline int mfn_oos_may_write(mfn_t gmfn) 
+{
+    return page_oos_may_write(mfn_to_page(mfn_x(gmfn)));
+}
+#endif /* (SHADOW_OPTIMIZATIONS & SHOPT_OUT_OF_SYNC) */
 
 /******************************************************************************
  * Various function declarations 
@@ -351,7 +408,50 @@ int shadow_write_guest_entry(struct vcpu *v, intpte_t *p,
 int shadow_cmpxchg_guest_entry(struct vcpu *v, intpte_t *p,
                                intpte_t *old, intpte_t new, mfn_t gmfn);
 
+#if (SHADOW_OPTIMIZATIONS & SHOPT_OUT_OF_SYNC)
+/* Allow a shadowed page to go out of sync */
+int sh_unsync(struct vcpu *v, mfn_t gmfn, unsigned long va);
 
+/* Pull an out-of-sync page back into sync. */
+void sh_resync(struct vcpu *v, mfn_t gmfn);
+
+/* Pull all out-of-sync shadows back into sync.  If skip != 0, we try
+ * to avoid resyncing where we think we can get away with it. */
+
+void sh_resync_all(struct vcpu *v, int skip, int this, int others, int do_locking);
+
+static inline void
+shadow_resync_all(struct vcpu *v, int do_locking)
+{
+    sh_resync_all(v,
+                  0 /* skip */,
+                  1 /* this */,
+                  1 /* others */,
+                  do_locking);
+}
+
+static inline void
+shadow_resync_current_vcpu(struct vcpu *v, int do_locking)
+{
+    sh_resync_all(v,
+                  0 /* skip */,
+                  1 /* this */, 
+                  0 /* others */,
+                  do_locking);
+}
+
+static inline void
+shadow_sync_other_vcpus(struct vcpu *v, int do_locking)
+{
+    sh_resync_all(v,
+                  1 /* skip */, 
+                  0 /* this */,
+                  1 /* others */,
+                  do_locking);
+}
+
+void oos_audit_hash_is_present(struct domain *d, mfn_t gmfn);
+#endif /* (SHADOW_OPTIMIZATIONS & SHOPT_OUT_OF_SYNC) */
 
 /******************************************************************************
  * Flags used in the return value of the shadow_set_lXe() functions...

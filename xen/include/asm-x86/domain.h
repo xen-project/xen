@@ -103,6 +103,9 @@ struct shadow_domain {
      * emulation and remove write permission
      */
     atomic_t          gtable_dirty_version;
+
+    /* OOS */
+    int oos_active;
 };
 
 struct shadow_vcpu {
@@ -122,6 +125,10 @@ struct shadow_vcpu {
     unsigned long last_emulated_frame;
     /* Last MFN that we emulated a write successfully */
     unsigned long last_emulated_mfn;
+
+    /* Shadow out-of-sync: pages that this vcpu has let go out of sync */
+    mfn_t oos[SHADOW_OOS_PAGES];
+    unsigned long oos_va[SHADOW_OOS_PAGES];
 };
 
 /************************************************/

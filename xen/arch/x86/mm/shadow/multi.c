@@ -305,22 +305,54 @@ shadow_check_gwalk(struct vcpu *v, unsigned long va, walk_t *gw)
 }
 
 /* Remove write access permissions from a gwalk_t in a batch, and
- * return OR-ed result for TLB flush hint
+ * return OR-ed result for TLB flush hint and need to rewalk the guest
+ * pages.
+ *
+ * Syncing pages will remove write access to that page; but it may
+ * also give write access to other pages in the path. If we resync any
+ * pages, re-walk from the beginning.
  */
+#define GW_RMWR_FLUSHTLB 1
+#define GW_RMWR_REWALK   2
+
 static inline uint32_t
 gw_remove_write_accesses(struct vcpu *v, unsigned long va, walk_t *gw)
 {
-    int rc = 0;
+    uint32_t rc = 0;
 
 #if GUEST_PAGING_LEVELS >= 3 /* PAE or 64... */
 #if GUEST_PAGING_LEVELS >= 4 /* 64-bit only... */
-    rc = sh_remove_write_access(v, gw->l3mfn, 3, va);
-#endif
-    rc |= sh_remove_write_access(v, gw->l2mfn, 2, va);
-#endif
+#if (SHADOW_OPTIMIZATIONS & SHOPT_OUT_OF_SYNC)
+    if ( mfn_is_out_of_sync(gw->l3mfn) )
+    {
+        sh_resync(v, gw->l3mfn);
+        rc = GW_RMWR_REWALK;
+    }
+    else
+#endif /* OOS */
+     if ( sh_remove_write_access(v, gw->l3mfn, 3, va) )
+         rc = GW_RMWR_FLUSHTLB;
+#endif /* GUEST_PAGING_LEVELS >= 4 */
+
+#if (SHADOW_OPTIMIZATIONS & SHOPT_OUT_OF_SYNC)
+    if ( mfn_is_out_of_sync(gw->l2mfn) )
+    {
+        sh_resync(v, gw->l2mfn);
+        rc |= GW_RMWR_REWALK;
+    }
+    else
+#endif /* OOS */
+    if ( sh_remove_write_access(v, gw->l2mfn, 2, va) )
+        rc |= GW_RMWR_FLUSHTLB;
+#endif /* GUEST_PAGING_LEVELS >= 3 */
+
     if ( !(guest_supports_superpages(v) &&
-           (guest_l2e_get_flags(gw->l2e) & _PAGE_PSE)) )
-        rc |= sh_remove_write_access(v, gw->l1mfn, 1, va);
+           (guest_l2e_get_flags(gw->l2e) & _PAGE_PSE))
+#if (SHADOW_OPTIMIZATIONS & SHOPT_OUT_OF_SYNC)
+         && !mfn_is_out_of_sync(gw->l1mfn)
+#endif /* OOS */
+         && sh_remove_write_access(v, gw->l1mfn, 1, va) )
+        rc |= GW_RMWR_FLUSHTLB;
 
     return rc;
 }
@@ -882,7 +914,12 @@ _sh_propagate(struct vcpu *v,
     
     // protect guest page tables
     //
-    if ( unlikely((level == 1) && sh_mfn_is_a_page_table(target_mfn)) )
+    if ( unlikely((level == 1) 
+                  && sh_mfn_is_a_page_table(target_mfn)
+#if (SHADOW_OPTIMIZATIONS & SHOPT_OUT_OF_SYNC )
+                  && !mfn_oos_may_write(target_mfn)
+#endif /* OOS */
+                  ) )
     {
         if ( shadow_mode_trap_reads(d) )
         {
@@ -1125,6 +1162,9 @@ static int shadow_set_l4e(struct vcpu *v,
             domain_crash(v->domain);
             return SHADOW_SET_ERROR;
         }
+#if (SHADOW_OPTIMIZATIONS & SHOPT_OUT_OF_SYNC )
+        shadow_resync_all(v, 0);
+#endif
     }
 
     /* Write the new entry */
@@ -1163,12 +1203,17 @@ static int shadow_set_l3e(struct vcpu *v,
              | (((unsigned long)sl3e) & ~PAGE_MASK));
     
     if ( shadow_l3e_get_flags(new_sl3e) & _PAGE_PRESENT )
+    {
         /* About to install a new reference */        
         if ( !sh_get_ref(v, shadow_l3e_get_mfn(new_sl3e), paddr) )
         {
             domain_crash(v->domain);
             return SHADOW_SET_ERROR;
-        } 
+        }
+#if (SHADOW_OPTIMIZATIONS & SHOPT_OUT_OF_SYNC )
+        shadow_resync_all(v, 0);
+#endif
+    }
 
     /* Write the new entry */
     shadow_write_entries(sl3e, &new_sl3e, 1, sl3mfn);
@@ -1219,12 +1264,29 @@ static int shadow_set_l2e(struct vcpu *v,
              | (((unsigned long)sl2e) & ~PAGE_MASK));
 
     if ( shadow_l2e_get_flags(new_sl2e) & _PAGE_PRESENT ) 
+    {
+        mfn_t sl1mfn = shadow_l2e_get_mfn(new_sl2e);
+
         /* About to install a new reference */
-        if ( !sh_get_ref(v, shadow_l2e_get_mfn(new_sl2e), paddr) )
+        if ( !sh_get_ref(v, sl1mfn, paddr) )
         {
             domain_crash(v->domain);
             return SHADOW_SET_ERROR;
-        } 
+        }
+#if (SHADOW_OPTIMIZATIONS & SHOPT_OUT_OF_SYNC)
+        {
+            struct shadow_page_info *sp = mfn_to_shadow_page(sl1mfn);
+            mfn_t gl1mfn = _mfn(sp->backpointer);
+
+            /* If the shadow is a fl1 then the backpointer contains
+               the GFN instead of the GMFN, and it's definitely not
+               OOS. */
+            if ( (sp->type != SH_type_fl1_shadow) && mfn_valid(gl1mfn)
+                 && mfn_is_out_of_sync(gl1mfn) )
+                sh_resync(v, gl1mfn);
+        }
+#endif
+    }
 
     /* Write the new entry */
 #if GUEST_PAGING_LEVELS == 2
@@ -2544,6 +2606,97 @@ static int validate_gl1e(struct vcpu *v, void *new_ge, mfn_t sl1mfn, void *se)
     return result;
 }
 
+#if (SHADOW_OPTIMIZATIONS & SHOPT_OUT_OF_SYNC)
+/**************************************************************************/
+/* Special validation function for re-syncing out-of-sync shadows. 
+ * Walks the *shadow* page, and for every entry that it finds,
+ * revalidates the guest entry that corresponds to it.
+ * N.B. This function is called with the vcpu that unsynced the page,
+ *      *not* the one that is causing it to be resynced. */
+void sh_resync_l1(struct vcpu *v, mfn_t gmfn)
+{
+    mfn_t sl1mfn;
+    shadow_l1e_t *sl1p;
+    guest_l1e_t *gl1p, *gp;
+    int rc = 0;
+
+    sl1mfn = get_shadow_status(v, gmfn, SH_type_l1_shadow);
+    ASSERT(mfn_valid(sl1mfn)); /* Otherwise we would not have been called */
+
+    gp = sh_map_domain_page(gmfn);
+    gl1p = gp;
+
+    SHADOW_FOREACH_L1E(sl1mfn, sl1p, &gl1p, 0, {
+        rc |= validate_gl1e(v, gl1p, sl1mfn, sl1p);
+    });
+
+    sh_unmap_domain_page(gp);
+
+    /* Setting shadow L1 entries should never need us to flush the TLB */
+    ASSERT(!(rc & SHADOW_SET_FLUSH));
+}
+
+/* Figure out whether it's definitely safe not to sync this l1 table. 
+ * That is: if we can tell that it's only used once, and that the 
+ * toplevel shadow responsible is not one of ours. 
+ * N.B. This function is called with the vcpu that required the resync, 
+ *      *not* the one that originally unsynced the page, but it is
+ *      called in the *mode* of the vcpu that unsynced it.  Clear?  Good. */
+int sh_safe_not_to_sync(struct vcpu *v, mfn_t gl1mfn)
+{
+    struct shadow_page_info *sp;
+    mfn_t smfn;
+
+    smfn = get_shadow_status(v, gl1mfn, SH_type_l1_shadow);
+    ASSERT(mfn_valid(smfn)); /* Otherwise we would not have been called */
+    
+    /* Up to l2 */
+    sp = mfn_to_shadow_page(smfn);
+    if ( sp->count != 1 || !sp->up )
+        return 0;
+    smfn = _mfn(sp->up >> PAGE_SHIFT);
+    ASSERT(mfn_valid(smfn));
+
+#if (SHADOW_PAGING_LEVELS == 4) 
+    /* up to l3 */
+    sp = mfn_to_shadow_page(smfn);
+    if ( sp->count != 1 || !sp->up )
+        return 0;
+    smfn = _mfn(sp->up >> PAGE_SHIFT);
+    ASSERT(mfn_valid(smfn));
+
+    /* up to l4 */
+    sp = mfn_to_shadow_page(smfn);
+    if ( sp->count != 1 
+         || sh_type_is_pinnable(v, SH_type_l3_64_shadow) || !sp->up )
+        return 0;
+    smfn = _mfn(sp->up >> PAGE_SHIFT);
+    ASSERT(mfn_valid(smfn));
+
+#if (GUEST_PAGING_LEVELS == 2)
+    /* In 2-on-3 shadow mode the up pointer contains the link to the
+     * shadow page, but the shadow_table contains only the first of the
+     * four pages that makes the PAE top shadow tables. */
+    smfn = _mfn(mfn_x(smfn) & ~0x3UL);
+#endif
+
+#endif
+
+    if ( pagetable_get_pfn(v->arch.shadow_table[0]) == mfn_x(smfn)
+#if (SHADOW_PAGING_LEVELS == 3) 
+         || pagetable_get_pfn(v->arch.shadow_table[1]) == mfn_x(smfn)
+         || pagetable_get_pfn(v->arch.shadow_table[2]) == mfn_x(smfn)
+         || pagetable_get_pfn(v->arch.shadow_table[3]) == mfn_x(smfn) 
+#endif
+        )
+        return 0;
+    
+    /* Only in use in one toplevel shadow, and it's not the one we're 
+     * running on */
+    return 1;
+}
+#endif /* (SHADOW_OPTIMIZATIONS & SHOPT_OUT_OF_SYNC) */
+
 
 /**************************************************************************/
 /* Functions which translate and install the shadows of arbitrary guest 
@@ -2805,6 +2958,7 @@ static int sh_page_fault(struct vcpu *v,
     int r;
     fetch_type_t ft = 0;
     p2m_type_t p2mt;
+    uint32_t rc;
 #if SHADOW_OPTIMIZATIONS & SHOPT_FAST_EMULATION
     int fast_emul = 0;
 #endif
@@ -2830,6 +2984,17 @@ static int sh_page_fault(struct vcpu *v,
         {
             fast_emul = 1;
             gmfn = _mfn(v->arch.paging.shadow.last_emulated_mfn);
+
+#if (SHADOW_OPTIMIZATIONS & SHOPT_OUT_OF_SYNC) 
+            /* Fall back to the slow path if we're trying to emulate
+               writes to an out of sync page. */
+            if ( mfn_valid(gmfn) && mfn_is_out_of_sync(gmfn) )
+            {
+                v->arch.paging.last_write_emul_ok = 0;
+                goto page_fault_slow_path;
+            }
+#endif /* OOS */
+
             perfc_incr(shadow_fault_fast_emulate);
             goto early_emulation;
         }
@@ -2855,6 +3020,31 @@ static int sh_page_fault(struct vcpu *v,
                                       sizeof(sl1e)) == 0)
                     && sh_l1e_is_magic(sl1e)) )
         {
+#if (SHADOW_OPTIMIZATIONS & SHOPT_OUT_OF_SYNC) 
+             /* First, need to check that this isn't an out-of-sync
+              * shadow l1e.  If it is, we fall back to the slow path, which
+              * will sync it up again. */
+            {
+                shadow_l2e_t sl2e;
+                mfn_t gl1mfn;
+               if ( (__copy_from_user(&sl2e,
+                                       (sh_linear_l2_table(v)
+                                        + shadow_l2_linear_offset(va)),
+                                       sizeof(sl2e)) != 0)
+                     || !(shadow_l2e_get_flags(sl2e) & _PAGE_PRESENT)
+                     || !mfn_valid(gl1mfn = _mfn(mfn_to_shadow_page(
+                                      shadow_l2e_get_mfn(sl2e))->backpointer))
+                     || unlikely(mfn_is_out_of_sync(gl1mfn)) )
+               {
+                   /* Hit the slow path as if there had been no 
+                    * shadow entry at all, and let it tidy up */
+                   ASSERT(regs->error_code & PFEC_page_present);
+                   regs->error_code ^= (PFEC_reserved_bit|PFEC_page_present);
+                   goto page_fault_slow_path;
+               }
+            }
+#endif /* SHOPT_OUT_OF_SYNC */
+
             if ( sh_l1e_is_gnp(sl1e) )
             {
                 /* Not-present in a guest PT: pass to the guest as
@@ -2890,6 +3080,10 @@ static int sh_page_fault(struct vcpu *v,
             return EXCRET_fault_fixed;
         }
     }
+
+#if (SHADOW_OPTIMIZATIONS & SHOPT_OUT_OF_SYNC) 
+ page_fault_slow_path:
+#endif
 #endif /* SHOPT_FAST_FAULT_PATH */
 
     /* Detect if this page fault happened while we were already in Xen
@@ -2904,7 +3098,21 @@ static int sh_page_fault(struct vcpu *v,
         return 0;
     }
 
-    if ( guest_walk_tables(v, va, &gw, regs->error_code) != 0 )
+ rewalk:
+    rc = guest_walk_tables(v, va, &gw, regs->error_code);
+
+#if (SHADOW_OPTIMIZATIONS & SHOPT_OUT_OF_SYNC)
+    if ( !(rc & _PAGE_PRESENT) )
+        regs->error_code |= PFEC_page_present;
+    else if ( regs->error_code & PFEC_page_present )
+    {
+            SHADOW_ERROR("OOS paranoia: Something is wrong in guest TLB"
+                         " flushing. Have fun debugging it.\n");
+            regs->error_code &= ~PFEC_page_present;
+    }
+#endif
+
+    if ( rc != 0 )
     {
         perfc_incr(shadow_fault_bail_real_fault);
         SHADOW_PRINTK("not a shadow fault\n");
@@ -2948,7 +3156,10 @@ static int sh_page_fault(struct vcpu *v,
 
     shadow_lock(d);
 
-    if ( gw_remove_write_accesses(v, va, &gw) )
+    rc = gw_remove_write_accesses(v, va, &gw);
+
+    /* First bit set: Removed write access to a page. */
+    if ( rc & GW_RMWR_FLUSHTLB )
     {
         /* Write permission removal is also a hint that other gwalks
          * overlapping with this one may be inconsistent
@@ -2958,11 +3169,20 @@ static int sh_page_fault(struct vcpu *v,
         flush_tlb_mask(d->domain_dirty_cpumask);
     }
 
+#if (SHADOW_OPTIMIZATIONS & SHOPT_OUT_OF_SYNC)
+    /* Second bit set: Resynced a page. Re-walk needed. */
+    if ( rc & GW_RMWR_REWALK )
+    {
+        shadow_unlock(d);
+        goto rewalk;
+    }
+#endif /* OOS */
+
     if ( !shadow_check_gwalk(v, va, &gw) )
     {
         perfc_incr(shadow_inconsistent_gwalk);
         shadow_unlock(d);
-        return EXCRET_fault_fixed;
+        goto rewalk;
     }
 
     shadow_audit_tables(v);
@@ -3001,7 +3221,12 @@ static int sh_page_fault(struct vcpu *v,
 #endif
 
     /* Need to emulate accesses to page tables */
-    if ( sh_mfn_is_a_page_table(gmfn) )
+    if ( sh_mfn_is_a_page_table(gmfn)
+#if (SHADOW_OPTIMIZATIONS & SHOPT_OUT_OF_SYNC) 
+         /* Unless they've been allowed to go out of sync with their shadows */
+         && !mfn_is_out_of_sync(gmfn)
+#endif
+         )
     {
         if ( ft == ft_demand_write )
         {
@@ -3215,6 +3440,7 @@ sh_invlpg(struct vcpu *v, unsigned long va)
  * instruction should be issued on the hardware, or 0 if it's safe not
  * to do so. */
 {
+    mfn_t sl1mfn;
     shadow_l2e_t sl2e;
     
     perfc_incr(shadow_invlpg);
@@ -3278,12 +3504,64 @@ sh_invlpg(struct vcpu *v, unsigned long va)
     // If so, then we'll need to flush the entire TLB (because that's
     // easier than invalidating all of the individual 4K pages).
     //
-    if ( mfn_to_shadow_page(shadow_l2e_get_mfn(sl2e))->type
+    sl1mfn = shadow_l2e_get_mfn(sl2e);
+    if ( mfn_to_shadow_page(sl1mfn)->type
          == SH_type_fl1_shadow )
     {
         flush_tlb_local();
         return 0;
     }
+
+#if (SHADOW_OPTIMIZATIONS & SHOPT_OUT_OF_SYNC) 
+    /* Check to see if the SL1 is out of sync. */
+    {
+        mfn_t gl1mfn = _mfn(mfn_to_shadow_page(sl1mfn)->backpointer);
+        struct page_info *pg = mfn_to_page(gl1mfn);
+        if ( mfn_valid(gl1mfn) 
+             && page_is_out_of_sync(pg) )
+        {
+            /* The test above may give false positives, since we don't
+             * hold the shadow lock yet.  Check again with the lock held. */
+            shadow_lock(v->domain);
+
+            /* This must still be a copy-from-user because we didn't
+             * have the shadow lock last time we checked, and the
+             * higher-level shadows might have disappeared under our
+             * feet. */
+            if ( __copy_from_user(&sl2e, 
+                                  sh_linear_l2_table(v)
+                                  + shadow_l2_linear_offset(va),
+                                  sizeof (sl2e)) != 0 )
+            {
+                perfc_incr(shadow_invlpg_fault);
+                shadow_unlock(v->domain);
+                return 0;
+            }
+
+            if ( !(shadow_l2e_get_flags(sl2e) & _PAGE_PRESENT) )
+            {
+                shadow_unlock(v->domain);
+                return 0;
+            }
+
+            sl1mfn = shadow_l2e_get_mfn(sl2e);
+            gl1mfn = _mfn(mfn_to_shadow_page(sl1mfn)->backpointer);
+            pg = mfn_to_page(gl1mfn);
+            
+            if ( likely(sh_mfn_is_a_page_table(gl1mfn)
+                        && page_is_out_of_sync(pg) ) )
+            {
+                shadow_l1e_t *sl1;
+                sl1 = sh_linear_l1_table(v) + shadow_l1_linear_offset(va);
+                /* Remove the shadow entry that maps this VA */
+                (void) shadow_set_l1e(v, sl1, shadow_l1e_empty(), sl1mfn);
+            }
+            shadow_unlock(v->domain);
+            /* Need the invlpg, to pick up the disappeareance of the sl1e */
+            return 1;
+        }
+    }
+#endif
 
     return 1;
 }
@@ -3710,6 +3988,13 @@ sh_update_cr3(struct vcpu *v, int do_locking)
         return;
     }
 
+#if (SHADOW_OPTIMIZATIONS & SHOPT_OUT_OF_SYNC)
+    /* Need to resync all the shadow entries on a TLB flush.  Resync
+     * current vcpus OOS pages before switching to the new shadow
+     * tables so that the VA hint is still valid.  */
+    shadow_resync_current_vcpu(v, do_locking);
+#endif
+
     if ( do_locking ) shadow_lock(v->domain);
 
     ASSERT(shadow_locked_by_me(v->domain));
@@ -3938,6 +4223,15 @@ sh_update_cr3(struct vcpu *v, int do_locking)
 
     /* Release the lock, if we took it (otherwise it's the caller's problem) */
     if ( do_locking ) shadow_unlock(v->domain);
+
+#if (SHADOW_OPTIMIZATIONS & SHOPT_OUT_OF_SYNC)
+    /* Need to resync all the shadow entries on a TLB flush. We only
+     * update the shadows, leaving the pages out of sync. Also, we try
+     * to skip synchronization of shadows not mapped in the new
+     * tables. */
+    shadow_sync_other_vcpus(v, do_locking);
+#endif
+
 }
 
 
@@ -4437,23 +4731,35 @@ sh_x86_emulate_cmpxchg8b(struct vcpu *v, unsigned long vaddr,
 
 #if SHADOW_AUDIT & SHADOW_AUDIT_ENTRIES
 
-#define AUDIT_FAIL(_level, _fmt, _a...) do {                               \
-    printk("Shadow %u-on-%u audit failed at level %i, index %i\n"         \
-           "gl" #_level "mfn = %" PRI_mfn                              \
-           " sl" #_level "mfn = %" PRI_mfn                             \
-           " &gl" #_level "e = %p &sl" #_level "e = %p"                    \
-           " gl" #_level "e = %" SH_PRI_gpte                              \
-           " sl" #_level "e = %" SH_PRI_pte "\nError: " _fmt "\n",        \
-           GUEST_PAGING_LEVELS, SHADOW_PAGING_LEVELS,                      \
-           _level, guest_index(gl ## _level ## e),                         \
-           mfn_x(gl ## _level ## mfn), mfn_x(sl ## _level ## mfn),         \
-           gl ## _level ## e, sl ## _level ## e,                           \
-           gl ## _level ## e->l ## _level, sl ## _level ## e->l ## _level, \
-           ##_a);                                                          \
-    BUG();                                                                 \
-    done = 1;                                                              \
+#define AUDIT_FAIL(_level, _fmt, _a...) do {                            \
+    printk("Shadow %u-on-%u audit failed at level %i, index %i\n"       \
+           "gl" #_level "mfn = %" PRI_mfn                               \
+           " sl" #_level "mfn = %" PRI_mfn                              \
+           " &gl" #_level "e = %p &sl" #_level "e = %p"                 \
+           " gl" #_level "e = %" SH_PRI_gpte                            \
+           " sl" #_level "e = %" SH_PRI_pte "\nError: " _fmt "\n",      \
+           GUEST_PAGING_LEVELS, SHADOW_PAGING_LEVELS,                   \
+               _level, guest_index(gl ## _level ## e),                  \
+               mfn_x(gl ## _level ## mfn), mfn_x(sl ## _level ## mfn),  \
+               gl ## _level ## e, sl ## _level ## e,                    \
+               gl ## _level ## e->l ## _level, sl ## _level ## e->l ## _level, \
+               ##_a);                                                   \
+        BUG();                                                          \
+        done = 1;                                                       \
 } while (0)
 
+#define AUDIT_FAIL_MIN(_level, _fmt, _a...) do {                        \
+    printk("Shadow %u-on-%u audit failed at level %i\n"                 \
+           "gl" #_level "mfn = %" PRI_mfn                               \
+           " sl" #_level "mfn = %" PRI_mfn                              \
+           " Error: " _fmt "\n",                                        \
+           GUEST_PAGING_LEVELS, SHADOW_PAGING_LEVELS,                   \
+           _level,                                                      \
+           mfn_x(gl ## _level ## mfn), mfn_x(sl ## _level ## mfn),      \
+           ##_a);                                                       \
+    BUG();                                                              \
+    done = 1;                                                           \
+} while (0)
 
 static char * sh_audit_flags(struct vcpu *v, int level,
                               int gflags, int sflags) 
@@ -4494,6 +4800,16 @@ int sh_audit_l1_table(struct vcpu *v, mfn_t sl1mfn, mfn_t x)
     
     /* Follow the backpointer */
     gl1mfn = _mfn(mfn_to_shadow_page(sl1mfn)->backpointer);
+
+#if (SHADOW_OPTIMIZATIONS & SHOPT_OUT_OF_SYNC)
+    /* Out-of-sync l1 shadows can contain anything: just check the OOS hash */
+    if ( page_is_out_of_sync(mfn_to_page(gl1mfn)) )
+    {
+        oos_audit_hash_is_present(v->domain, gl1mfn);
+        return 0;
+    }
+#endif
+
     gl1e = gp = sh_map_domain_page(gl1mfn);
     SHADOW_FOREACH_L1E(sl1mfn, sl1e, &gl1e, done, {
 
@@ -4574,6 +4890,13 @@ int sh_audit_l2_table(struct vcpu *v, mfn_t sl2mfn, mfn_t x)
 
     /* Follow the backpointer */
     gl2mfn = _mfn(mfn_to_shadow_page(sl2mfn)->backpointer);
+
+#if (SHADOW_OPTIMIZATIONS & SHOPT_OUT_OF_SYNC)
+    /* Only L1's may be out of sync. */
+    if ( page_is_out_of_sync(mfn_to_page(gl2mfn)) )
+        AUDIT_FAIL_MIN(2, "gmfn %lx is out of sync", mfn_x(gl2mfn));
+#endif
+
     gl2e = gp = sh_map_domain_page(gl2mfn);
     SHADOW_FOREACH_L2E(sl2mfn, sl2e, &gl2e, done, v->domain, {
 
@@ -4616,6 +4939,13 @@ int sh_audit_l3_table(struct vcpu *v, mfn_t sl3mfn, mfn_t x)
 
     /* Follow the backpointer */
     gl3mfn = _mfn(mfn_to_shadow_page(sl3mfn)->backpointer);
+
+#if (SHADOW_OPTIMIZATIONS & SHOPT_OUT_OF_SYNC) 
+    /* Only L1's may be out of sync. */
+    if ( page_is_out_of_sync(mfn_to_page(gl3mfn)) )
+        AUDIT_FAIL_MIN(3, "gmfn %lx is out of sync", mfn_x(gl3mfn));
+#endif
+
     gl3e = gp = sh_map_domain_page(gl3mfn);
     SHADOW_FOREACH_L3E(sl3mfn, sl3e, &gl3e, done, {
 
@@ -4656,6 +4986,13 @@ int sh_audit_l4_table(struct vcpu *v, mfn_t sl4mfn, mfn_t x)
 
     /* Follow the backpointer */
     gl4mfn = _mfn(mfn_to_shadow_page(sl4mfn)->backpointer);
+
+#if (SHADOW_OPTIMIZATIONS & SHOPT_OUT_OF_SYNC) 
+    /* Only L1's may be out of sync. */
+    if ( page_is_out_of_sync(mfn_to_page(gl4mfn)) )
+        AUDIT_FAIL_MIN(4, "gmfn %lx is out of sync", mfn_x(gl4mfn));
+#endif
+
     gl4e = gp = sh_map_domain_page(gl4mfn);
     SHADOW_FOREACH_L4E(sl4mfn, sl4e, &gl4e, done, v->domain,
     {

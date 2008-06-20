@@ -438,6 +438,10 @@ struct shadow_walk_t
 #define sh_guess_wrmap             INTERNAL_NAME(sh_guess_wrmap)
 #define sh_clear_shadow_entry      INTERNAL_NAME(sh_clear_shadow_entry)
 
+#if SHADOW_OPTIMIZATIONS & SHOPT_OUT_OF_SYNC
+#define sh_resync_l1               INTERNAL_NAME(sh_resync_l1)
+#define sh_safe_not_to_sync        INTERNAL_NAME(sh_safe_not_to_sync)
+#endif
 
 /* The sh_guest_(map|get)_* functions depends on Xen's paging levels */
 #define sh_guest_map_l1e \
