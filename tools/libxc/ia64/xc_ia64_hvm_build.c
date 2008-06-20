@@ -1052,7 +1052,8 @@ error_out:
 int
 xc_hvm_build(int xc_handle, uint32_t domid, int memsize, const char *image_name)
 {
-    vcpu_guest_context_t st_ctxt, *ctxt = &st_ctxt;
+    vcpu_guest_context_any_t st_ctxt_any;
+    vcpu_guest_context_t *ctxt = &st_ctxt_any.c;
     char *image = NULL;
     unsigned long image_size;
     unsigned long nr_pages;
@@ -1079,14 +1080,14 @@ xc_hvm_build(int xc_handle, uint32_t domid, int memsize, const char *image_name)
 
     free(image);
 
-    memset(ctxt, 0, sizeof(*ctxt));
+    memset(&st_ctxt_any, 0, sizeof(st_ctxt_any));
     ctxt->regs.ip = 0x80000000ffffffb0UL;
     ctxt->regs.ar.fpsr = xc_ia64_fpsr_default();
     ctxt->regs.cr.itir = 14 << 2;
     ctxt->regs.psr = IA64_PSR_AC | IA64_PSR_BN;
     ctxt->regs.cr.dcr = 0;
     ctxt->regs.cr.pta = 15 << 2;
-    return xc_vcpu_setcontext(xc_handle, domid, 0, ctxt);
+    return xc_vcpu_setcontext(xc_handle, domid, 0, &st_ctxt_any);
 
 error_out:
     free(image);
