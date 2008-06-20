@@ -124,4 +124,8 @@ SHADOW_INTERNAL_NAME(sh_resync_l1, GUEST_LEVELS)
 extern int
 SHADOW_INTERNAL_NAME(sh_safe_not_to_sync, GUEST_LEVELS)
      (struct vcpu*v, mfn_t gmfn);
+
+extern int
+SHADOW_INTERNAL_NAME(sh_rm_write_access_from_sl1p, GUEST_LEVELS)
+     (struct vcpu *v, mfn_t gmfn, mfn_t smfn, unsigned long off);
 #endif

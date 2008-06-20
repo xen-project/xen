@@ -1409,6 +1409,9 @@ static int shadow_set_l1e(struct vcpu *v,
     int flags = 0;
     struct domain *d = v->domain;
     shadow_l1e_t old_sl1e;
+#if SHADOW_OPTIMIZATIONS & SHOPT_OUT_OF_SYNC
+    mfn_t new_gmfn = shadow_l1e_get_mfn(new_sl1e);
+#endif
     ASSERT(sl1e != NULL);
     
     old_sl1e = *sl1e;
@@ -1425,8 +1428,18 @@ static int shadow_set_l1e(struct vcpu *v,
                 /* Doesn't look like a pagetable. */
                 flags |= SHADOW_SET_ERROR;
                 new_sl1e = shadow_l1e_empty();
-            } else {
+            }
+            else
+            {
                 shadow_vram_get_l1e(new_sl1e, sl1e, sl1mfn, d);
+#if SHADOW_OPTIMIZATIONS & SHOPT_OUT_OF_SYNC
+                if ( mfn_valid(new_gmfn) && mfn_oos_may_write(new_gmfn)
+                     && (shadow_l1e_get_flags(new_sl1e) & _PAGE_RW) )
+                {
+                    oos_fixup_add(v, new_gmfn, sl1mfn, pgentry_ptr_to_slot(sl1e));
+                }
+#endif
+
             }
         }
     } 
@@ -4237,6 +4250,56 @@ sh_update_cr3(struct vcpu *v, int do_locking)
 
 /**************************************************************************/
 /* Functions to revoke guest rights */
+
+#if SHADOW_OPTIMIZATIONS & SHOPT_OUT_OF_SYNC
+int sh_rm_write_access_from_sl1p(struct vcpu *v, mfn_t gmfn, 
+                                 mfn_t smfn, unsigned long off)
+{
+    int r;
+    shadow_l1e_t *sl1p, sl1e;
+    struct shadow_page_info *sp;
+
+    ASSERT(mfn_valid(gmfn));
+    ASSERT(mfn_valid(smfn));
+
+    sp = mfn_to_shadow_page(smfn);
+
+    if ( sp->mbz != 0 ||
+#if GUEST_PAGING_LEVELS == 4
+         (sp->type != SH_type_l1_64_shadow)
+#elif GUEST_PAGING_LEVELS == 3
+         (sp->type != SH_type_l1_pae_shadow)
+#elif GUEST_PAGING_LEVELS == 2
+         (sp->type != SH_type_l1_32_shadow)
+#endif
+       )
+        goto fail;
+
+    sl1p = sh_map_domain_page(smfn);
+    sl1p += off;
+    sl1e = *sl1p;
+    if ( ((shadow_l1e_get_flags(sl1e) & (_PAGE_PRESENT|_PAGE_RW))
+          != (_PAGE_PRESENT|_PAGE_RW))
+         || (mfn_x(shadow_l1e_get_mfn(sl1e)) != mfn_x(gmfn)) )
+    {
+        sh_unmap_domain_page(sl1p);
+        goto fail;
+    }
+
+    /* Found it!  Need to remove its write permissions. */
+    sl1e = shadow_l1e_remove_flags(sl1e, _PAGE_RW);
+    r = shadow_set_l1e(v, sl1p, sl1e, smfn);
+    ASSERT( !(r & SHADOW_SET_ERROR) );
+
+    sh_unmap_domain_page(sl1p);
+    perfc_incr(shadow_writeable_h_7);
+    return 1;
+
+ fail:
+    perfc_incr(shadow_writeable_h_8);
+    return 0;
+}
+#endif /* OOS */
 
 #if SHADOW_OPTIMIZATIONS & SHOPT_WRITABLE_HEURISTIC
 static int sh_guess_wrmap(struct vcpu *v, unsigned long vaddr, mfn_t gmfn)

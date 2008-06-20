@@ -441,6 +441,7 @@ struct shadow_walk_t
 #if SHADOW_OPTIMIZATIONS & SHOPT_OUT_OF_SYNC
 #define sh_resync_l1               INTERNAL_NAME(sh_resync_l1)
 #define sh_safe_not_to_sync        INTERNAL_NAME(sh_safe_not_to_sync)
+#define sh_rm_write_access_from_sl1p INTERNAL_NAME(sh_rm_write_access_from_sl1p)
 #endif
 
 /* The sh_guest_(map|get)_* functions depends on Xen's paging levels */
