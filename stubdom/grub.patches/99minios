@@ -832,7 +832,18 @@ Index: grub/stage2/fsys_iso9660.c
 Index: grub/stage2/fsys_reiserfs.c
 ===================================================================
 --- grub.orig/stage2/fsys_reiserfs.c	2008-06-16 15:18:03.410933000 +0100
-+++ grub/stage2/fsys_reiserfs.c	2008-06-16 15:18:14.786009000 +0100
++++ grub/stage2/fsys_reiserfs.c	2008-06-20 18:33:52.002100000 +0100
+@@ -224,8 +224,8 @@
+ 
+ struct disk_child
+ {
+-  unsigned long       dc_block_number;              /* Disk child's block number. */
+-  unsigned short      dc_size;		            /* Disk child's used space.   */
++  __u32       dc_block_number;              /* Disk child's block number. */
++  __u16      dc_size;		            /* Disk child's used space.   */
+ };
+ 
+ #define DC_SIZE (sizeof (struct disk_child))
 @@ -369,7 +369,14 @@
  static __inline__ unsigned long
  log2 (unsigned long word)
