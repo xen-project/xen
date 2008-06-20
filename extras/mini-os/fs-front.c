@@ -136,8 +136,8 @@ static inline void add_id_to_freelist(unsigned int id,unsigned short* freelist)
 again:    
     old_id = freelist[0];
     /* Note: temporal inconsistency, since freelist[0] can be changed by someone
-     * else, but we are a sole owner of freelist[id], it's OK. */
-    freelist[id] = old_id;
+     * else, but we are a sole owner of freelist[id + 1], it's OK. */
+    freelist[id + 1] = old_id;
     new_id = id;
     if(cmpxchg(&freelist[0], old_id, new_id) != old_id)
     {
@@ -154,7 +154,7 @@ static inline unsigned short get_id_from_freelist(unsigned short* freelist)
 
 again:    
     old_id = freelist[0];
-    new_id = freelist[old_id];
+    new_id = freelist[old_id + 1];
     if(cmpxchg(&freelist[0], old_id, new_id) != old_id)
     {
         printk("Cmpxchg on freelist remove failed.\n");
@@ -785,8 +785,8 @@ static void alloc_request_table(struct fs_import *import)
     printk("Allocating request array for import %d, nr_entries = %d.\n",
             import->import_id, import->nr_entries);
     requests = xmalloc_array(struct fs_request, import->nr_entries);
-    import->freelist = xmalloc_array(unsigned short, import->nr_entries);
-    memset(import->freelist, 0, sizeof(unsigned short) * import->nr_entries);
+    import->freelist = xmalloc_array(unsigned short, import->nr_entries + 1);
+    memset(import->freelist, 0, sizeof(unsigned short) * (import->nr_entries + 1));
     for(i=0; i<import->nr_entries; i++)
     {
 	/* TODO: that's a lot of memory */
