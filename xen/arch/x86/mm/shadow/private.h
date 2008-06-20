@@ -196,9 +196,9 @@ struct shadow_page_info
         u32 tlbflush_timestamp;
     };
     struct {
-        unsigned int type:4;      /* What kind of shadow is this? */
+        unsigned int type:5;      /* What kind of shadow is this? */
         unsigned int pinned:1;    /* Is the shadow pinned? */
-        unsigned int count:27;    /* Reference count */
+        unsigned int count:26;    /* Reference count */
         u32 mbz;                  /* Must be zero: this is where the owner 
                                    * field lives in a non-shadow page */
     } __attribute__((packed));
@@ -243,7 +243,8 @@ static inline void shadow_check_page_struct_offsets(void) {
 #define SH_type_max_shadow    (13U)
 #define SH_type_p2m_table     (14U) /* in use as the p2m table */
 #define SH_type_monitor_table (15U) /* in use as a monitor table */
-#define SH_type_unused        (16U)
+#define SH_type_oos_snapshot  (16U) /* in use as OOS snapshot */
+#define SH_type_unused        (17U)
 
 /* 
  * What counts as a pinnable shadow?
@@ -466,6 +467,8 @@ shadow_sync_other_vcpus(struct vcpu *v, int do_locking)
 }
 
 void oos_audit_hash_is_present(struct domain *d, mfn_t gmfn);
+mfn_t oos_snapshot_lookup(struct vcpu *v, mfn_t gmfn);
+
 #endif /* (SHADOW_OPTIMIZATIONS & SHOPT_OUT_OF_SYNC) */
 
 /******************************************************************************

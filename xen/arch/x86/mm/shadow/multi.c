@@ -2607,6 +2607,9 @@ static int validate_gl1e(struct vcpu *v, void *new_ge, mfn_t sl1mfn, void *se)
     mfn_t gmfn;
     p2m_type_t p2mt;
     int result = 0;
+#if (SHADOW_OPTIMIZATIONS & SHOPT_OUT_OF_SYNC)
+    mfn_t gl1mfn;
+#endif /* OOS */
 
     perfc_incr(shadow_validate_gl1e_calls);
 
@@ -2614,8 +2617,25 @@ static int validate_gl1e(struct vcpu *v, void *new_ge, mfn_t sl1mfn, void *se)
     gmfn = gfn_to_mfn(v->domain, gfn, &p2mt);
 
     l1e_propagate_from_guest(v, new_gl1e, gmfn, &new_sl1e, ft_prefetch, p2mt);
-    
     result |= shadow_set_l1e(v, sl1p, new_sl1e, sl1mfn);
+
+#if (SHADOW_OPTIMIZATIONS & SHOPT_OUT_OF_SYNC)
+    gl1mfn = _mfn(mfn_to_shadow_page(sl1mfn)->backpointer);
+    if ( mfn_valid(gl1mfn) 
+         && mfn_is_out_of_sync(gl1mfn) )
+    {
+        /* Update the OOS snapshot. */
+        mfn_t snpmfn = oos_snapshot_lookup(v, gl1mfn);
+        guest_l1e_t *snp;
+
+        ASSERT(mfn_valid(snpmfn));
+
+        snp = sh_map_domain_page(snpmfn);
+        snp[guest_index(new_ge)] = new_gl1e;
+        sh_unmap_domain_page(snp);
+    }
+#endif /* OOS */
+
     return result;
 }
 
@@ -2626,24 +2646,44 @@ static int validate_gl1e(struct vcpu *v, void *new_ge, mfn_t sl1mfn, void *se)
  * revalidates the guest entry that corresponds to it.
  * N.B. This function is called with the vcpu that unsynced the page,
  *      *not* the one that is causing it to be resynced. */
-void sh_resync_l1(struct vcpu *v, mfn_t gmfn)
+void sh_resync_l1(struct vcpu *v, mfn_t gl1mfn, mfn_t snpmfn)
 {
     mfn_t sl1mfn;
     shadow_l1e_t *sl1p;
-    guest_l1e_t *gl1p, *gp;
+    guest_l1e_t *gl1p, *gp, *snp;
     int rc = 0;
 
-    sl1mfn = get_shadow_status(v, gmfn, SH_type_l1_shadow);
+    ASSERT(mfn_valid(snpmfn));
+
+    sl1mfn = get_shadow_status(v, gl1mfn, SH_type_l1_shadow);
     ASSERT(mfn_valid(sl1mfn)); /* Otherwise we would not have been called */
 
-    gp = sh_map_domain_page(gmfn);
+    snp = sh_map_domain_page(snpmfn);
+    gp = sh_map_domain_page(gl1mfn);
     gl1p = gp;
 
-    SHADOW_FOREACH_L1E(sl1mfn, sl1p, &gl1p, 0, {
-        rc |= validate_gl1e(v, gl1p, sl1mfn, sl1p);
+   SHADOW_FOREACH_L1E(sl1mfn, sl1p, &gl1p, 0, {
+        guest_l1e_t gl1e = *gl1p;
+        guest_l1e_t *snpl1p = (guest_l1e_t *)snp + guest_index(gl1p);
+
+        if ( memcmp(snpl1p, &gl1e, sizeof(gl1e)) )
+        {
+            gfn_t gfn;
+            mfn_t gmfn;
+            p2m_type_t p2mt;
+            shadow_l1e_t nsl1e;
+
+            gfn = guest_l1e_get_gfn(gl1e);
+            gmfn = gfn_to_mfn(v->domain, gfn, &p2mt);
+            l1e_propagate_from_guest(v, gl1e, gmfn, &nsl1e, ft_prefetch, p2mt);
+            rc |= shadow_set_l1e(v, sl1p, nsl1e, sl1mfn);
+            
+            *snpl1p = gl1e;
+        }
     });
 
     sh_unmap_domain_page(gp);
+    sh_unmap_domain_page(snp);
 
     /* Setting shadow L1 entries should never need us to flush the TLB */
     ASSERT(!(rc & SHADOW_SET_FLUSH));
@@ -2891,6 +2931,10 @@ static void sh_prefetch(struct vcpu *v, walk_t *gw,
     shadow_l1e_t sl1e;
     u32 gflags;
     p2m_type_t p2mt;
+#if (SHADOW_OPTIMIZATIONS & SHOPT_OUT_OF_SYNC)
+    guest_l1e_t *snpl1p = NULL;
+#endif /* OOS */
+
 
     /* Prefetch no further than the end of the _shadow_ l1 MFN */
     dist = (PAGE_SIZE - ((unsigned long)ptr_sl1e & ~PAGE_MASK)) / sizeof sl1e;
@@ -2903,6 +2947,17 @@ static void sh_prefetch(struct vcpu *v, walk_t *gw,
         /* Normal guest page; grab the next guest entry */
         gl1p = sh_map_domain_page(gw->l1mfn);
         gl1p += guest_l1_table_offset(gw->va);
+
+#if (SHADOW_OPTIMIZATIONS & SHOPT_OUT_OF_SYNC)
+        if ( mfn_is_out_of_sync(gw->l1mfn) )
+        {
+            mfn_t snpmfn = oos_snapshot_lookup(v, gw->l1mfn);
+
+            ASSERT(mfn_valid(snpmfn));
+            snpl1p = sh_map_domain_page(snpmfn);
+            snpl1p += guest_l1_table_offset(gw->va);
+        }
+#endif /* OOS */
     }
 
     for ( i = 1; i < dist ; i++ ) 
@@ -2940,9 +2995,18 @@ static void sh_prefetch(struct vcpu *v, walk_t *gw,
         /* Propagate the entry.  */
         l1e_propagate_from_guest(v, gl1e, gmfn, &sl1e, ft_prefetch, p2mt);
         (void) shadow_set_l1e(v, ptr_sl1e + i, sl1e, sl1mfn);
+
+#if (SHADOW_OPTIMIZATIONS & SHOPT_OUT_OF_SYNC)
+        if ( snpl1p != NULL )
+            snpl1p[i] = gl1e;
+#endif /* OOS */
     }
     if ( gl1p != NULL )
         sh_unmap_domain_page(gl1p);
+#if (SHADOW_OPTIMIZATIONS & SHOPT_OUT_OF_SYNC)
+    if ( snpl1p != NULL )
+        sh_unmap_domain_page(snpl1p);
+#endif /* OOS */
 }
 
 #endif /* SHADOW_OPTIMIZATIONS & SHOPT_PREFETCH */
@@ -3227,6 +3291,22 @@ static int sh_page_fault(struct vcpu *v,
     /* Calculate the shadow entry and write it */
     l1e_propagate_from_guest(v, gw.l1e, gmfn, &sl1e, ft, p2mt);
     r = shadow_set_l1e(v, ptr_sl1e, sl1e, sl1mfn);
+
+#if (SHADOW_OPTIMIZATIONS & SHOPT_OUT_OF_SYNC)
+    if ( mfn_valid(gw.l1mfn) 
+         && mfn_is_out_of_sync(gw.l1mfn) )
+    {
+        /* Update the OOS snapshot. */
+        mfn_t snpmfn = oos_snapshot_lookup(v, gw.l1mfn);
+        guest_l1e_t *snp;
+        
+        ASSERT(mfn_valid(snpmfn));
+        
+        snp = sh_map_domain_page(snpmfn);
+        snp[guest_l1_table_offset(va)] = gw.l1e;
+        sh_unmap_domain_page(snp);
+    }
+#endif /* OOS */
 
 #if SHADOW_OPTIMIZATIONS & SHOPT_PREFETCH
     /* Prefetch some more shadow entries */
