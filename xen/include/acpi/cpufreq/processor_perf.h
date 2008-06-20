@@ -6,6 +6,7 @@
 
 int get_cpu_id(u8);
 int acpi_cpufreq_init(void);
+int powernow_cpufreq_init(void);
 void px_statistic_update(cpumask_t, uint8_t, uint8_t);
 int  px_statistic_init(int);
 void px_statistic_reset(int);

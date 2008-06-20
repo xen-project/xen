@@ -408,7 +408,12 @@ ret_t do_platform_op(XEN_GUEST_HANDLE(xen_platform_op_t) u_xenpf_op)
                 cpu_count++;
             }
             if ( cpu_count == num_online_cpus() )
-                ret = acpi_cpufreq_init();
+            {
+                if ( boot_cpu_data.x86_vendor == X86_VENDOR_AMD )
+                    ret = powernow_cpufreq_init();
+                else
+                    ret = acpi_cpufreq_init();
+            }
             break;
         }
  
