@@ -22,8 +22,6 @@
 #include <string.h>
 #include <inttypes.h>
 #include <getopt.h>
-#include <xen/foreign/x86_64.h>
-#include <xen/foreign/x86_32.h>
 
 #include "xenctrl.h"
 
