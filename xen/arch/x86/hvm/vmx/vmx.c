@@ -1523,7 +1523,8 @@ static int vmx_cr_access(unsigned long exit_qualification,
         break;
     case VMX_CONTROL_REG_ACCESS_TYPE_LMSW:
         value = v->arch.hvm_vcpu.guest_cr[0];
-        value = (value & ~0xFFFF) | ((exit_qualification >> 16) & 0xFFFF);
+        /* NB. LMSW can set, but never clear, PE. */
+        value = (value & 0xFFFF0001) | ((exit_qualification >> 16) & 0xFFFF);
         HVMTRACE_LONG_1D(LMSW, current, value);
         return !hvm_set_cr0(value);
     default:

@@ -3284,7 +3284,7 @@ x86_emulate(
             else if ( (rc = ops->read(ea.mem.seg, ea.mem.off,
                                       &cr0w, 2, ctxt)) )
                 goto done;
-            cr0 &= 0xffff0000;
+            cr0 &= 0xffff0001; /* lmsw can set, but never clear, PE */
             cr0 |= (uint16_t)cr0w;
             if ( (rc = ops->write_cr(0, cr0, ctxt)) )
                 goto done;
