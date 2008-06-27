@@ -631,6 +631,11 @@ void oos_fixup_remove(struct vcpu *v, mfn_t gmfn)
 
     perfc_incr(shadow_oos_fixup_remove);
 
+    /* If the domain is dying we might get called when deallocating
+     * the shadows. Fixup tables are already freed so exit now. */
+    if ( d->is_dying )
+        return;
+
     idx = mfn_x(gmfn) % SHADOW_OOS_FT_HASH;
     for_each_vcpu(d, v)
     {
@@ -3168,6 +3173,7 @@ void shadow_teardown(struct domain *d)
         {
             free_xenheap_pages(v->arch.paging.shadow.oos_fixups,
                                SHADOW_OOS_FT_ORDER);
+            v->arch.paging.shadow.oos_fixups = NULL;
         }
 
         {
