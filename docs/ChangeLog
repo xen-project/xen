@@ -16,6 +16,15 @@ http://lists.xensource.com/archives/html/xen-devel/2008-01/msg00010.html
 Xen 3.3 release
 ---------------
 
+17903: Add greater than 16 xvd device availability
+http://xenbits.xensource.com/xen-unstable.hg?rev/0728459b3c8d
+
+The tools can now attach a disk of the form:
+(1<<28) | (device<<8) | partition
+to support many more xvd disks and up to 256 partitions.
+The linux guest frontend has been expanded to support
+this new construct, while legacy guests should just ignore it.
+	
 17538: Add XENPF_set_processor_pminfo
 http://xenbits.xensource.com/xen-unstable.hg?rev/5bb9093eb0e9
 
