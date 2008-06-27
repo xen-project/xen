@@ -254,10 +254,7 @@ static int bdrv_pread(int fd, int64_t offset, void *buf, int count)
  */
 static int bdrv_pwrite(int fd, int64_t offset, const void *buf, int count)
 {
-	int ret;
-	
-	ret = lseek(fd, offset, SEEK_SET);
-	if (ret != offset) {
+	if (lseek(fd, offset, SEEK_SET) == -1) {
 		DPRINTF("bdrv_pwrite failed seek (%#"PRIx64").\n", offset);
 		return -1;
 	}
