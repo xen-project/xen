@@ -16,6 +16,9 @@ def blkdev_name_to_number(name):
 
     n = expand_dev_name(name)
 
+    devname = 'virtual-device'
+    devnum = None
+
     try:
         return os.stat(n).st_rdev
     except Exception, ex:
@@ -25,28 +28,30 @@ def blkdev_name_to_number(name):
     if re.match( '/dev/sd[a-z]([1-9]|1[0-5])?$', n):
         major = scsi_major[(ord(n[7:8]) - ord('a')) / 16]
         minor = ((ord(n[7:8]) - ord('a')) % 16) * 16 + int(n[8:] or 0)
-        return major * 256 + minor
-    if re.match( '/dev/sd[a-i][a-z]([1-9]|1[0-5])?$', n):
+        devnum = major * 256 + minor
+    elif re.match( '/dev/sd[a-i][a-z]([1-9]|1[0-5])?$', n):
         major = scsi_major[((ord(n[7:8]) - ord('a') + 1) * 26 + (ord(n[8:9]) - ord('a'))) / 16 ]
         minor = (((ord(n[7:8]) - ord('a') + 1 ) * 26 + (ord(n[8:9]) - ord('a'))) % 16) * 16 + int(n[9:] or 0)
-        return major * 256 + minor
-
-    if re.match( '/dev/hd[a-t]([1-9]|[1-5][0-9]|6[0-3])?', n):
+        devnum = major * 256 + minor
+    elif re.match( '/dev/hd[a-t]([1-9]|[1-5][0-9]|6[0-3])?', n):
         ide_majors = [ 3, 22, 33, 34, 56, 57, 88, 89, 90, 91 ]
         major = ide_majors[(ord(n[7:8]) - ord('a')) / 2]
         minor = ((ord(n[7:8]) - ord('a')) % 2) * 64 + int(n[8:] or 0)
-        return major * 256 + minor
+        devnum = major * 256 + minor
+    elif re.match( '/dev/xvd[a-p]([1-9]|1[0-5])?$', n):
+        devnum = (202 << 8) + ((ord(n[8:9]) - ord('a')) << 4) + int(n[9:] or 0)
+    elif re.match('/dev/xvd[q-z]([1-9]|1[0-5])?$', n):
+        devname = 'virtual-device-ext'
+        devnum = (1 << 28) + ((ord(n[8:9]) - ord('a')) << 8) + int(n[9:] or 0)
+    elif re.match('/dev/xvd[a-i][a-z]([1-9]|1[0-5])?$', n):
+        devname = 'virtual-device-ext'
+        devnum = (1 << 28) + (((ord(n[8:9]) - ord('a') + 1) * 26 + (ord(n[9:10]) - ord('a'))) << 8) + int(n[10:] or 0)
+    elif re.match( '^(0x)[0-9a-fA-F]+$', name ):
+        devnum = string.atoi(name, 16)
+    elif re.match('^[0-9]+$', name):
+        devnum = string.atoi(name, 10)
 
-    if re.match( '/dev/xvd[a-p]([1-9]|1[0-5])?', n):
-        return 202 * 256 + 16 * (ord(n[8:9]) - ord('a')) + int(n[9:] or 0)
-
-    if re.match( '^(0x)[0-9a-fA-F]+$', name ):
-        return string.atoi(name,16)
-
-    if re.match('^[0-9]+$', name):
-        return string.atoi(name, 10)
-
-    return None
+    return (devname, devnum)
 
 def blkdev_segment(name):
     """Take the given block-device name (e.g. '/dev/sda1', 'hda')

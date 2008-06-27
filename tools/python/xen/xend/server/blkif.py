@@ -81,11 +81,11 @@ class BlkifController(DevController):
         if security.on() == xsconstants.XS_POLICY_ACM:
             self.do_access_control(config, uname)
 
-        devid = blkif.blkdev_name_to_number(dev)
+        (device_path, devid) = blkif.blkdev_name_to_number(dev)
         if devid is None:
             raise VmError('Unable to find number for device (%s)' % (dev))
 
-        front = { 'virtual-device' : "%i" % devid,
+        front = { device_path : "%i" % devid,
                   'device-type' : dev_type
                 }
 
@@ -204,5 +204,5 @@ class BlkifController(DevController):
                 dev = devid.split('/')[-1]
                 dev = int(dev)
             except ValueError:
-                dev = blkif.blkdev_name_to_number(dev)
+                (device_path, dev) = blkif.blkdev_name_to_number(dev)
         return dev

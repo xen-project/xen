@@ -2022,8 +2022,7 @@ def xm_block_list(args):
             map(server.xenapi.VBD.get_runtime_properties, vbd_refs)
         vbd_devs = \
             map(server.xenapi.VBD.get_device, vbd_refs)
-        vbd_devids = \
-            map(blkdev_name_to_number, vbd_devs)
+        vbd_devids = [blkdev_name_to_number(x)[1] for x in vbd_devs]
         devs = map(lambda (devid, prop): [devid, map2sxp(prop)],
                    zip(vbd_devids, vbd_properties))
     else:
