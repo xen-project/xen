@@ -260,8 +260,6 @@ void xenstore_parse_domain_config(int hvm_domid)
 		    /* autoguess qcow vs qcow2 */
 		} else if (!strcmp(drv,"file") || !strcmp(drv,"phy")) {
 		    format = &bdrv_raw;
-		} else if (!strcmp(drv,"phy")) {
-		    format = &bdrv_raw;
 		} else {
 		    format = bdrv_find_format(drv);
 		    if (!format) {
