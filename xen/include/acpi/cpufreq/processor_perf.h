@@ -10,6 +10,13 @@ int powernow_cpufreq_init(void);
 void px_statistic_update(cpumask_t, uint8_t, uint8_t);
 int  px_statistic_init(int);
 void px_statistic_reset(int);
+void px_statistic_suspend(void);
+void px_statistic_resume(void);
+void cpufreq_dom_exit(void);
+int  cpufreq_dom_init(void);
+int  cpufreq_dom_dbs(unsigned int);
+void cpufreq_suspend(void);
+int  cpufreq_resume(void);
 
 struct processor_performance {
     uint32_t state;

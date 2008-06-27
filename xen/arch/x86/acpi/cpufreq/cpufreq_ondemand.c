@@ -79,6 +79,12 @@ static void dbs_check_cpu(struct cpu_dbs_info_s *this_dbs_info)
         return;
 
     policy = this_dbs_info->cur_policy;
+
+    if (unlikely(policy->resume)) {
+        __cpufreq_driver_target(policy, policy->max,CPUFREQ_RELATION_H);
+        return;
+    }
+
     cur_ns = NOW();
     total_ns = cur_ns - this_dbs_info->prev_cpu_wall;
     this_dbs_info->prev_cpu_wall = NOW();
@@ -217,8 +223,7 @@ int cpufreq_governor_dbs(struct cpufreq_policy *policy, unsigned int event)
         break;
 
     case CPUFREQ_GOV_STOP:
-        if (this_dbs_info->enable)
-            dbs_timer_exit(this_dbs_info);
+        dbs_timer_exit(this_dbs_info);
         dbs_enable--;
 
         break;
@@ -233,5 +238,4 @@ int cpufreq_governor_dbs(struct cpufreq_policy *policy, unsigned int event)
         break;
     }
     return 0;
-}
-             
+} 

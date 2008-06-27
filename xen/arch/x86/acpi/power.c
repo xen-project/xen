@@ -27,6 +27,8 @@
 #include <public/platform.h>
 #include <asm/tboot.h>
 
+#include <acpi/cpufreq/cpufreq.h>
+
 static char opt_acpi_sleep[20];
 string_param("acpi_sleep", opt_acpi_sleep);
 
@@ -126,6 +128,8 @@ static int enter_state(u32 state)
 
     freeze_domains();
 
+    cpufreq_suspend();
+
     disable_nonboot_cpus();
     if ( num_online_cpus() != 1 )
     {
@@ -181,6 +185,7 @@ static int enter_state(u32 state)
 
  enable_cpu:
     enable_nonboot_cpus();
+    cpufreq_resume();
     thaw_domains();
     spin_unlock(&pm_lock);
     return error;
