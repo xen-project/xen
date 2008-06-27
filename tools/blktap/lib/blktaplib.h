@@ -161,7 +161,7 @@ typedef struct tapdev_info {
 
 typedef struct domid_translate {
 	unsigned short domid;
-	unsigned short busid;
+	uint32_t busid;
 } domid_translate_t ;
 
 typedef struct image {
