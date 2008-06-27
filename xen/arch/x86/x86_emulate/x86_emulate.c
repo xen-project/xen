@@ -3267,7 +3267,8 @@ x86_emulate(
                 goto done;
             break;
         case 4: /* smsw */
-            ea.bytes = 2;
+            if ( ea.type == OP_MEM )
+                ea.bytes = 2;
             dst = ea;
             fail_if(ops->read_cr == NULL);
             if ( (rc = ops->read_cr(0, &dst.val, ctxt)) )
@@ -3284,8 +3285,8 @@ x86_emulate(
             else if ( (rc = ops->read(ea.mem.seg, ea.mem.off,
                                       &cr0w, 2, ctxt)) )
                 goto done;
-            cr0 &= 0xffff0001; /* lmsw can set, but never clear, PE */
-            cr0 |= (uint16_t)cr0w;
+            /* LMSW can: (1) set bits 0-3; (2) clear bits 1-3. */
+            cr0 = (cr0 & ~0xe) | (cr0w & 0xf);
             if ( (rc = ops->write_cr(0, cr0, ctxt)) )
                 goto done;
             break;
