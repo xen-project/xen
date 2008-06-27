@@ -1269,7 +1269,6 @@ static int domain_context_mapping(
 }
 
 static int domain_context_unmap_one(
-    struct domain *domain,
     struct iommu *iommu,
     u8 bus, u8 devfn)
 {
@@ -1300,7 +1299,6 @@ static int domain_context_unmap_one(
 }
 
 static int domain_context_unmap(
-    struct domain *domain,
     struct iommu *iommu,
     struct pci_dev *pdev)
 {
@@ -1320,14 +1318,13 @@ static int domain_context_unmap(
             PCI_FUNC(pdev->devfn), PCI_SUBORDINATE_BUS);
         break;
     case DEV_TYPE_PCIe_ENDPOINT:
-        ret = domain_context_unmap_one(domain, iommu,
+        ret = domain_context_unmap_one(iommu,
                                        (u8)(pdev->bus), (u8)(pdev->devfn));
         break;
     case DEV_TYPE_PCI:
         if ( pdev->bus == 0 )
             ret = domain_context_unmap_one(
-                domain, iommu,
-                (u8)(pdev->bus), (u8)(pdev->devfn));
+                iommu, (u8)(pdev->bus), (u8)(pdev->devfn));
         else
         {
             if ( bus2bridge[pdev->bus].bus != 0 )
@@ -1335,7 +1332,7 @@ static int domain_context_unmap(
                          "domain_context_unmap:"
                          "bus2bridge[%d].bus != 0\n", pdev->bus);
 
-            ret = domain_context_unmap_one(domain, iommu,
+            ret = domain_context_unmap_one(iommu,
                                            (u8)(bus2bridge[pdev->bus].bus),
                                            (u8)(bus2bridge[pdev->bus].devfn));
 
@@ -1345,8 +1342,7 @@ static int domain_context_unmap(
                 for ( func = 0; func < 8; func++ )
                 {
                     ret = domain_context_unmap_one(
-                        domain, iommu,
-                        pdev->bus, (u8)PCI_DEVFN(dev, func));
+                        iommu, pdev->bus, (u8)PCI_DEVFN(dev, func));
                     if ( ret )
                         return ret;
                 }
@@ -1389,7 +1385,7 @@ void reassign_device_ownership(
  found:
     drhd = acpi_find_matched_drhd_unit(pdev);
     iommu = drhd->iommu;
-    domain_context_unmap(source, iommu, pdev);
+    domain_context_unmap(iommu, pdev);
 
     /* Move pci device from the source domain to target domain. */
     spin_lock_irqsave(&source_hd->iommu_list_lock, flags);
@@ -1589,7 +1585,7 @@ static int iommu_prepare_rmrr_dev(
     struct pci_dev *pdev)
 {
     struct acpi_drhd_unit *drhd;
-    unsigned long size;
+    u64 size;
     int ret;
 
     /* page table init */
