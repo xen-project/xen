@@ -52,7 +52,7 @@ static void remap_entry_to_ioapic_rte(
     unsigned long flags;
     struct ir_ctrl *ir_ctrl = iommu_ir_ctrl(iommu);
 
-    if ( ir_ctrl == NULL || ir_ctrl->iremap_index < 0 )
+    if ( ir_ctrl == NULL )
     {
         dprintk(XENLOG_ERR VTDPREFIX,
                 "remap_entry_to_ioapic_rte: ir_ctl is not ready\n");
@@ -170,7 +170,8 @@ unsigned int io_apic_read_remap_rte(
     struct iommu *iommu = ioapic_to_iommu(mp_ioapics[apic].mpc_apicid);
     struct ir_ctrl *ir_ctrl = iommu_ir_ctrl(iommu);
 
-    if ( !iommu || !ir_ctrl || ir_ctrl->iremap_maddr == 0 )
+    if ( !iommu || !ir_ctrl || ir_ctrl->iremap_maddr == 0 ||
+         ir_ctrl->iremap_index == -1 )
     {
         *IO_APIC_BASE(apic) = reg;
         return *(IO_APIC_BASE(apic)+4);
