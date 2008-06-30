@@ -145,7 +145,7 @@ static int hvm_translate_linear_addr(
 static int
 hvm_read(enum x86_segment seg,
          unsigned long offset,
-         unsigned long *val,
+         void *p_data,
          unsigned int bytes,
          enum hvm_access_type access_type,
          struct sh_emulate_ctxt *sh_ctxt)
@@ -158,12 +158,10 @@ hvm_read(enum x86_segment seg,
     if ( rc )
         return rc;
 
-    *val = 0;
-
     if ( access_type == hvm_access_insn_fetch )
-        rc = hvm_fetch_from_guest_virt(val, addr, bytes, 0);
+        rc = hvm_fetch_from_guest_virt(p_data, addr, bytes, 0);
     else
-        rc = hvm_copy_from_guest_virt(val, addr, bytes, 0);
+        rc = hvm_copy_from_guest_virt(p_data, addr, bytes, 0);
 
     switch ( rc )
     {
@@ -181,20 +179,20 @@ hvm_read(enum x86_segment seg,
 static int
 hvm_emulate_read(enum x86_segment seg,
                  unsigned long offset,
-                 unsigned long *val,
+                 void *p_data,
                  unsigned int bytes,
                  struct x86_emulate_ctxt *ctxt)
 {
     if ( !is_x86_user_segment(seg) )
         return X86EMUL_UNHANDLEABLE;
-    return hvm_read(seg, offset, val, bytes, hvm_access_read,
+    return hvm_read(seg, offset, p_data, bytes, hvm_access_read,
                     container_of(ctxt, struct sh_emulate_ctxt, ctxt));
 }
 
 static int
 hvm_emulate_insn_fetch(enum x86_segment seg,
                        unsigned long offset,
-                       unsigned long *val,
+                       void *p_data,
                        unsigned int bytes,
                        struct x86_emulate_ctxt *ctxt)
 {
@@ -206,19 +204,18 @@ hvm_emulate_insn_fetch(enum x86_segment seg,
 
     /* Fall back if requested bytes are not in the prefetch cache. */
     if ( unlikely((insn_off + bytes) > sh_ctxt->insn_buf_bytes) )
-        return hvm_read(seg, offset, val, bytes,
+        return hvm_read(seg, offset, p_data, bytes,
                         hvm_access_insn_fetch, sh_ctxt);
 
     /* Hit the cache. Simple memcpy. */
-    *val = 0;
-    memcpy(val, &sh_ctxt->insn_buf[insn_off], bytes);
+    memcpy(p_data, &sh_ctxt->insn_buf[insn_off], bytes);
     return X86EMUL_OKAY;
 }
 
 static int
 hvm_emulate_write(enum x86_segment seg,
                   unsigned long offset,
-                  unsigned long val,
+                  void *p_data,
                   unsigned int bytes,
                   struct x86_emulate_ctxt *ctxt)
 {
@@ -241,7 +238,7 @@ hvm_emulate_write(enum x86_segment seg,
         return rc;
 
     return v->arch.paging.mode->shadow.x86_emulate_write(
-        v, addr, &val, bytes, sh_ctxt);
+        v, addr, p_data, bytes, sh_ctxt);
 }
 
 static int 
@@ -293,7 +290,7 @@ static struct x86_emulate_ops hvm_shadow_emulator_ops = {
 static int
 pv_emulate_read(enum x86_segment seg,
                 unsigned long offset,
-                unsigned long *val,
+                void *p_data,
                 unsigned int bytes,
                 struct x86_emulate_ctxt *ctxt)
 {
@@ -302,8 +299,7 @@ pv_emulate_read(enum x86_segment seg,
     if ( !is_x86_user_segment(seg) )
         return X86EMUL_UNHANDLEABLE;
 
-    *val = 0;
-    if ( (rc = copy_from_user((void *)val, (void *)offset, bytes)) != 0 )
+    if ( (rc = copy_from_user(p_data, (void *)offset, bytes)) != 0 )
     {
         propagate_page_fault(offset + bytes - rc, 0); /* read fault */
         return X86EMUL_EXCEPTION;
@@ -315,7 +311,7 @@ pv_emulate_read(enum x86_segment seg,
 static int
 pv_emulate_write(enum x86_segment seg,
                  unsigned long offset,
-                 unsigned long val,
+                 void *p_data,
                  unsigned int bytes,
                  struct x86_emulate_ctxt *ctxt)
 {
@@ -325,7 +321,7 @@ pv_emulate_write(enum x86_segment seg,
     if ( !is_x86_user_segment(seg) )
         return X86EMUL_UNHANDLEABLE;
     return v->arch.paging.mode->shadow.x86_emulate_write(
-        v, offset, &val, bytes, sh_ctxt);
+        v, offset, p_data, bytes, sh_ctxt);
 }
 
 static int 

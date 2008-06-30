@@ -3539,15 +3539,14 @@ struct ptwr_emulate_ctxt {
 static int ptwr_emulated_read(
     enum x86_segment seg,
     unsigned long offset,
-    unsigned long *val,
+    void *p_data,
     unsigned int bytes,
     struct x86_emulate_ctxt *ctxt)
 {
     unsigned int rc;
     unsigned long addr = offset;
 
-    *val = 0;
-    if ( (rc = copy_from_user((void *)val, (void *)addr, bytes)) != 0 )
+    if ( (rc = copy_from_user(p_data, (void *)addr, bytes)) != 0 )
     {
         propagate_page_fault(addr + bytes - rc, 0); /* read fault */
         return X86EMUL_EXCEPTION;
@@ -3574,7 +3573,7 @@ static int ptwr_emulated_update(
     /* Only allow naturally-aligned stores within the original %cr2 page. */
     if ( unlikely(((addr^ptwr_ctxt->cr2) & PAGE_MASK) || (addr & (bytes-1))) )
     {
-        MEM_LOG("Bad ptwr access (cr2=%lx, addr=%lx, bytes=%u)",
+        MEM_LOG("ptwr_emulate: bad access (cr2=%lx, addr=%lx, bytes=%u)",
                 ptwr_ctxt->cr2, addr, bytes);
         return X86EMUL_UNHANDLEABLE;
     }
@@ -3682,10 +3681,21 @@ static int ptwr_emulated_update(
 static int ptwr_emulated_write(
     enum x86_segment seg,
     unsigned long offset,
-    unsigned long val,
+    void *p_data,
     unsigned int bytes,
     struct x86_emulate_ctxt *ctxt)
 {
+    paddr_t val = 0;
+
+    if ( (bytes > sizeof(paddr_t)) || (bytes & (bytes -1)) )
+    {
+        MEM_LOG("ptwr_emulate: bad write size (addr=%lx, bytes=%u)",
+                offset, bytes);
+        return X86EMUL_UNHANDLEABLE;
+    }
+
+    memcpy(&val, p_data, bytes);
+
     return ptwr_emulated_update(
         offset, 0, val, bytes, 0,
         container_of(ctxt, struct ptwr_emulate_ctxt, ctxt));
@@ -3700,10 +3710,17 @@ static int ptwr_emulated_cmpxchg(
     struct x86_emulate_ctxt *ctxt)
 {
     paddr_t old = 0, new = 0;
-    if ( bytes > sizeof(paddr_t) )
+
+    if ( (bytes > sizeof(paddr_t)) || (bytes & (bytes -1)) )
+    {
+        MEM_LOG("ptwr_emulate: bad cmpxchg size (addr=%lx, bytes=%u)",
+                offset, bytes);
         return X86EMUL_UNHANDLEABLE;
+    }
+
     memcpy(&old, p_old, bytes);
     memcpy(&new, p_new, bytes);
+
     return ptwr_emulated_update(
         offset, old, new, bytes, 1,
         container_of(ctxt, struct ptwr_emulate_ctxt, ctxt));

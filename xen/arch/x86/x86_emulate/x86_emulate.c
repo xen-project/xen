@@ -466,7 +466,7 @@ do{ asm volatile (                                                      \
 
 /* Fetch next part of the instruction being emulated. */
 #define insn_fetch_bytes(_size)                                         \
-({ unsigned long _x, _eip = _regs.eip;                                  \
+({ unsigned long _x = 0, _eip = _regs.eip;                              \
    if ( !mode_64bit() ) _eip = (uint32_t)_eip; /* ignore upper dword */ \
    _regs.eip += (_size); /* real hardware doesn't truncate */           \
    generate_exception_if((uint8_t)(_regs.eip - ctxt->regs->eip) > 15,   \
@@ -655,6 +655,19 @@ static void __put_rep_prefix(
         __put_rep_prefix(&_regs, ctxt->regs, ad_bytes, reps_completed); \
 })
 
+/* Compatibility function: read guest memory, zero-extend result to a ulong. */
+static int read_ulong(
+        enum x86_segment seg,
+        unsigned long offset,
+        unsigned long *val,
+        unsigned int bytes,
+        struct x86_emulate_ctxt *ctxt,
+        struct x86_emulate_ops *ops)
+{
+    *val = 0;
+    return ops->read(seg, offset, val, bytes, ctxt);
+}
+
 /*
  * Unsigned multiplication with double-word result.
  * IN:  Multiplicand=m[0], Multiplier=m[1]
@@ -841,7 +854,8 @@ static int ioport_access_check(
          (tr.limit < 0x67) )
         goto raise_exception;
 
-    if ( (rc = ops->read(x86_seg_none, tr.base + 0x66, &iobmp, 2, ctxt)) )
+    if ( (rc = read_ulong(x86_seg_none, tr.base + 0x66,
+                          &iobmp, 2, ctxt, ops)) )
         return rc;
 
     /* Ensure TSS includes two bytes including byte containing first port. */
@@ -849,7 +863,8 @@ static int ioport_access_check(
     if ( tr.limit <= iobmp )
         goto raise_exception;
 
-    if ( (rc = ops->read(x86_seg_none, tr.base + iobmp, &iobmp, 2, ctxt)) )
+    if ( (rc = read_ulong(x86_seg_none, tr.base + iobmp,
+                          &iobmp, 2, ctxt, ops)) )
         return rc;
     if ( (iobmp & (((1<<bytes)-1) << (first_port&7))) != 0 )
         goto raise_exception;
@@ -941,12 +956,12 @@ protmode_load_seg(
         goto raise_exn;
 
     do {
-        if ( (rc = ops->read(x86_seg_none, desctab.base + (sel & 0xfff8),
-                             &val, 4, ctxt)) )
+        if ( (rc = read_ulong(x86_seg_none, desctab.base + (sel & 0xfff8),
+                              &val, 4, ctxt, ops)) )
             return rc;
         desc.a = val;
-        if ( (rc = ops->read(x86_seg_none, desctab.base + (sel & 0xfff8) + 4,
-                             &val, 4, ctxt)) )
+        if ( (rc = read_ulong(x86_seg_none, desctab.base + (sel & 0xfff8) + 4,
+                              &val, 4, ctxt, ops)) )
             return rc;
         desc.b = val;
 
@@ -1402,8 +1417,8 @@ x86_emulate(
             case 8: src.val = *(uint64_t *)src.reg; break;
             }
         }
-        else if ( (rc = ops->read(src.mem.seg, src.mem.off,
-                                  &src.val, src.bytes, ctxt)) )
+        else if ( (rc = read_ulong(src.mem.seg, src.mem.off,
+                                   &src.val, src.bytes, ctxt, ops)) )
             goto done;
         break;
     case SrcImm:
@@ -1494,8 +1509,8 @@ x86_emulate(
         }
         else if ( !(d & Mov) ) /* optimisation - avoid slow emulated read */
         {
-            if ( (rc = ops->read(dst.mem.seg, dst.mem.off,
-                                 &dst.val, dst.bytes, ctxt)) )
+            if ( (rc = read_ulong(dst.mem.seg, dst.mem.off,
+                                  &dst.val, dst.bytes, ctxt, ops)) )
                 goto done;
             dst.orig_val = dst.val;
         }
@@ -1571,8 +1586,8 @@ x86_emulate(
         int lb, ub, idx;
         generate_exception_if(mode_64bit() || (src.type != OP_MEM),
                               EXC_UD, -1);
-        if ( (rc = ops->read(src.mem.seg, src.mem.off + op_bytes,
-                             &src_val2, op_bytes, ctxt)) )
+        if ( (rc = read_ulong(src.mem.seg, src.mem.off + op_bytes,
+                              &src_val2, op_bytes, ctxt, ops)) )
             goto done;
         ub  = (op_bytes == 2) ? (int16_t)src_val2 : (int32_t)src_val2;
         lb  = (op_bytes == 2) ? (int16_t)src.val  : (int32_t)src.val;
@@ -1588,8 +1603,8 @@ x86_emulate(
             /* movsxd */
             if ( src.type == OP_REG )
                 src.val = *(int32_t *)src.reg;
-            else if ( (rc = ops->read(src.mem.seg, src.mem.off,
-                                      &src.val, 4, ctxt)) )
+            else if ( (rc = read_ulong(src.mem.seg, src.mem.off,
+                                       &src.val, 4, ctxt, ops)) )
                 goto done;
             dst.val = (int32_t)src.val;
         }
@@ -1613,8 +1628,8 @@ x86_emulate(
         unsigned long src1; /* ModR/M source operand */
         if ( ea.type == OP_REG )
             src1 = *ea.reg;
-        else if ( (rc = ops->read(ea.mem.seg, ea.mem.off,
-                                  &src1, op_bytes, ctxt)) )
+        else if ( (rc = read_ulong(ea.mem.seg, ea.mem.off,
+                                   &src1, op_bytes, ctxt, ops)) )
             goto done;
         _regs.eflags &= ~(EFLG_OF|EFLG_CF);
         switch ( dst.bytes )
@@ -1720,8 +1735,8 @@ x86_emulate(
         /* 64-bit mode: POP defaults to a 64-bit operand. */
         if ( mode_64bit() && (dst.bytes == 4) )
             dst.bytes = 8;
-        if ( (rc = ops->read(x86_seg_ss, sp_post_inc(dst.bytes),
-                             &dst.val, dst.bytes, ctxt)) != 0 )
+        if ( (rc = read_ulong(x86_seg_ss, sp_post_inc(dst.bytes),
+                              &dst.val, dst.bytes, ctxt, ops)) != 0 )
             goto done;
         break;
 
@@ -1773,8 +1788,8 @@ x86_emulate(
         dst.val = x86_seg_es;
     les: /* dst.val identifies the segment */
         generate_exception_if(src.type != OP_MEM, EXC_UD, -1);
-        if ( (rc = ops->read(src.mem.seg, src.mem.off + src.bytes,
-                             &sel, 2, ctxt)) != 0 )
+        if ( (rc = read_ulong(src.mem.seg, src.mem.off + src.bytes,
+                              &sel, 2, ctxt, ops)) != 0 )
             goto done;
         if ( (rc = load_seg(dst.val, (uint16_t)sel, ctxt, ops)) != 0 )
             goto done;
@@ -2020,8 +2035,8 @@ x86_emulate(
                 dst.bytes = op_bytes = 8;
                 if ( dst.type == OP_REG )
                     dst.val = *dst.reg;
-                else if ( (rc = ops->read(dst.mem.seg, dst.mem.off,
-                                          &dst.val, 8, ctxt)) != 0 )
+                else if ( (rc = read_ulong(dst.mem.seg, dst.mem.off,
+                                           &dst.val, 8, ctxt, ops)) != 0 )
                     goto done;
             }
             src.val = _regs.eip;
@@ -2036,8 +2051,8 @@ x86_emulate(
 
             generate_exception_if(dst.type != OP_MEM, EXC_UD, -1);
 
-            if ( (rc = ops->read(dst.mem.seg, dst.mem.off+dst.bytes,
-                                 &sel, 2, ctxt)) )
+            if ( (rc = read_ulong(dst.mem.seg, dst.mem.off+dst.bytes,
+                                  &sel, 2, ctxt, ops)) )
                 goto done;
 
             if ( (modrm_reg & 7) == 3 ) /* call */
@@ -2046,9 +2061,9 @@ x86_emulate(
                 fail_if(ops->read_segment == NULL);
                 if ( (rc = ops->read_segment(x86_seg_cs, &reg, ctxt)) ||
                      (rc = ops->write(x86_seg_ss, sp_pre_dec(op_bytes),
-                                      reg.sel, op_bytes, ctxt)) ||
+                                      &reg.sel, op_bytes, ctxt)) ||
                      (rc = ops->write(x86_seg_ss, sp_pre_dec(op_bytes),
-                                      _regs.eip, op_bytes, ctxt)) )
+                                      &_regs.eip, op_bytes, ctxt)) )
                     goto done;
             }
 
@@ -2066,12 +2081,12 @@ x86_emulate(
                 dst.bytes = 8;
                 if ( dst.type == OP_REG )
                     dst.val = *dst.reg;
-                else if ( (rc = ops->read(dst.mem.seg, dst.mem.off,
-                                          &dst.val, 8, ctxt)) != 0 )
+                else if ( (rc = read_ulong(dst.mem.seg, dst.mem.off,
+                                           &dst.val, 8, ctxt, ops)) != 0 )
                     goto done;
             }
             if ( (rc = ops->write(x86_seg_ss, sp_pre_dec(dst.bytes),
-                                  dst.val, dst.bytes, ctxt)) != 0 )
+                                  &dst.val, dst.bytes, ctxt)) != 0 )
                 goto done;
             dst.type = OP_NONE;
             break;
@@ -2106,7 +2121,7 @@ x86_emulate(
                 &dst.val, dst.bytes, ctxt);
         else
             rc = ops->write(
-                dst.mem.seg, dst.mem.off, dst.val, dst.bytes, ctxt);
+                dst.mem.seg, dst.mem.off, &dst.val, dst.bytes, ctxt);
         if ( rc != 0 )
             goto done;
     default:
@@ -2153,7 +2168,7 @@ x86_emulate(
         if ( mode_64bit() && (op_bytes == 4) )
             op_bytes = 8;
         if ( (rc = ops->write(x86_seg_ss, sp_pre_dec(op_bytes),
-                              reg.sel, op_bytes, ctxt)) != 0 )
+                              &reg.sel, op_bytes, ctxt)) != 0 )
             goto done;
         break;
     }
@@ -2165,8 +2180,8 @@ x86_emulate(
         /* 64-bit mode: POP defaults to a 64-bit operand. */
         if ( mode_64bit() && (op_bytes == 4) )
             op_bytes = 8;
-        if ( (rc = ops->read(x86_seg_ss, sp_post_inc(op_bytes),
-                             &dst.val, op_bytes, ctxt)) != 0 )
+        if ( (rc = read_ulong(x86_seg_ss, sp_post_inc(op_bytes),
+                              &dst.val, op_bytes, ctxt, ops)) != 0 )
             goto done;
         if ( (rc = load_seg(src.val, (uint16_t)dst.val, ctxt, ops)) != 0 )
             return rc;
@@ -2275,8 +2290,8 @@ x86_emulate(
         dst.bytes = op_bytes;
         if ( mode_64bit() && (dst.bytes == 4) )
             dst.bytes = 8;
-        if ( (rc = ops->read(x86_seg_ss, sp_post_inc(dst.bytes),
-                             &dst.val, dst.bytes, ctxt)) != 0 )
+        if ( (rc = read_ulong(x86_seg_ss, sp_post_inc(dst.bytes),
+                              &dst.val, dst.bytes, ctxt, ops)) != 0 )
             goto done;
         break;
 
@@ -2288,7 +2303,7 @@ x86_emulate(
         generate_exception_if(mode_64bit(), EXC_UD, -1);
         for ( i = 0; i < 8; i++ )
             if ( (rc = ops->write(x86_seg_ss, sp_pre_dec(op_bytes),
-                                  regs[i], op_bytes, ctxt)) != 0 )
+                                  &regs[i], op_bytes, ctxt)) != 0 )
             goto done;
         break;
     }
@@ -2303,8 +2318,8 @@ x86_emulate(
         generate_exception_if(mode_64bit(), EXC_UD, -1);
         for ( i = 0; i < 8; i++ )
         {
-            if ( (rc = ops->read(x86_seg_ss, sp_post_inc(op_bytes),
-                                 &dst.val, op_bytes, ctxt)) != 0 )
+            if ( (rc = read_ulong(x86_seg_ss, sp_post_inc(op_bytes),
+                                  &dst.val, op_bytes, ctxt, ops)) != 0 )
                 goto done;
             switch ( op_bytes )
             {
@@ -2382,8 +2397,8 @@ x86_emulate(
         }
         else
         {
-            if ( (rc = ops->read(ea.mem.seg, truncate_ea(_regs.esi),
-                                 &dst.val, dst.bytes, ctxt)) != 0 )
+            if ( (rc = read_ulong(ea.mem.seg, truncate_ea(_regs.esi),
+                                  &dst.val, dst.bytes, ctxt, ops)) != 0 )
                 goto done;
             fail_if(ops->write_io == NULL);
             if ( (rc = ops->write_io(port, dst.bytes, dst.val, ctxt)) != 0 )
@@ -2455,9 +2470,9 @@ x86_emulate(
 
         if ( (rc = ops->read_segment(x86_seg_cs, &reg, ctxt)) ||
              (rc = ops->write(x86_seg_ss, sp_pre_dec(op_bytes),
-                              reg.sel, op_bytes, ctxt)) ||
+                              &reg.sel, op_bytes, ctxt)) ||
              (rc = ops->write(x86_seg_ss, sp_pre_dec(op_bytes),
-                              _regs.eip, op_bytes, ctxt)) )
+                              &_regs.eip, op_bytes, ctxt)) )
             goto done;
 
         if ( (rc = load_seg(x86_seg_cs, sel, ctxt, ops)) != 0 )
@@ -2483,8 +2498,8 @@ x86_emulate(
         /* 64-bit mode: POP defaults to a 64-bit operand. */
         if ( mode_64bit() && (op_bytes == 4) )
             op_bytes = 8;
-        if ( (rc = ops->read(x86_seg_ss, sp_post_inc(op_bytes),
-                             &dst.val, op_bytes, ctxt)) != 0 )
+        if ( (rc = read_ulong(x86_seg_ss, sp_post_inc(op_bytes),
+                              &dst.val, op_bytes, ctxt, ops)) != 0 )
             goto done;
         if ( op_bytes == 2 )
             dst.val = (uint16_t)dst.val | (_regs.eflags & 0xffff0000u);
@@ -2507,8 +2522,8 @@ x86_emulate(
         dst.type  = OP_REG;
         dst.reg   = (unsigned long *)&_regs.eax;
         dst.bytes = (d & ByteOp) ? 1 : op_bytes;
-        if ( (rc = ops->read(ea.mem.seg, insn_fetch_bytes(ad_bytes),
-                             &dst.val, dst.bytes, ctxt)) != 0 )
+        if ( (rc = read_ulong(ea.mem.seg, insn_fetch_bytes(ad_bytes),
+                              &dst.val, dst.bytes, ctxt, ops)) != 0 )
             goto done;
         break;
 
@@ -2536,8 +2551,8 @@ x86_emulate(
         }
         else
         {
-            if ( (rc = ops->read(ea.mem.seg, truncate_ea(_regs.esi),
-                                 &dst.val, dst.bytes, ctxt)) != 0 )
+            if ( (rc = read_ulong(ea.mem.seg, truncate_ea(_regs.esi),
+                                  &dst.val, dst.bytes, ctxt, ops)) != 0 )
                 goto done;
             dst.type = OP_MEM;
             nr_reps = 1;
@@ -2556,10 +2571,10 @@ x86_emulate(
         unsigned long next_eip = _regs.eip;
         get_rep_prefix();
         src.bytes = dst.bytes = (d & ByteOp) ? 1 : op_bytes;
-        if ( (rc = ops->read(ea.mem.seg, truncate_ea(_regs.esi),
-                             &dst.val, dst.bytes, ctxt)) ||
-             (rc = ops->read(x86_seg_es, truncate_ea(_regs.edi),
-                             &src.val, src.bytes, ctxt)) )
+        if ( (rc = read_ulong(ea.mem.seg, truncate_ea(_regs.esi),
+                              &dst.val, dst.bytes, ctxt, ops)) ||
+             (rc = read_ulong(x86_seg_es, truncate_ea(_regs.edi),
+                              &src.val, src.bytes, ctxt, ops)) )
             goto done;
         register_address_increment(
             _regs.esi, (_regs.eflags & EFLG_DF) ? -dst.bytes : dst.bytes);
@@ -2592,8 +2607,8 @@ x86_emulate(
         dst.type  = OP_REG;
         dst.bytes = (d & ByteOp) ? 1 : op_bytes;
         dst.reg   = (unsigned long *)&_regs.eax;
-        if ( (rc = ops->read(ea.mem.seg, truncate_ea(_regs.esi),
-                             &dst.val, dst.bytes, ctxt)) != 0 )
+        if ( (rc = read_ulong(ea.mem.seg, truncate_ea(_regs.esi),
+                              &dst.val, dst.bytes, ctxt, ops)) != 0 )
             goto done;
         register_address_increment(
             _regs.esi, (_regs.eflags & EFLG_DF) ? -dst.bytes : dst.bytes);
@@ -2606,8 +2621,8 @@ x86_emulate(
         get_rep_prefix();
         src.bytes = dst.bytes = (d & ByteOp) ? 1 : op_bytes;
         dst.val = _regs.eax;
-        if ( (rc = ops->read(x86_seg_es, truncate_ea(_regs.edi),
-                             &src.val, src.bytes, ctxt)) != 0 )
+        if ( (rc = read_ulong(x86_seg_es, truncate_ea(_regs.edi),
+                              &src.val, src.bytes, ctxt, ops)) != 0 )
             goto done;
         register_address_increment(
             _regs.edi, (_regs.eflags & EFLG_DF) ? -src.bytes : src.bytes);
@@ -2624,8 +2639,8 @@ x86_emulate(
     case 0xc3: /* ret (near) */ {
         int offset = (b == 0xc2) ? insn_fetch_type(uint16_t) : 0;
         op_bytes = mode_64bit() ? 8 : op_bytes;
-        if ( (rc = ops->read(x86_seg_ss, sp_post_inc(op_bytes + offset),
-                             &dst.val, op_bytes, ctxt)) != 0 )
+        if ( (rc = read_ulong(x86_seg_ss, sp_post_inc(op_bytes + offset),
+                              &dst.val, op_bytes, ctxt, ops)) != 0 )
             goto done;
         _regs.eip = dst.val;
         break;
@@ -2640,7 +2655,7 @@ x86_emulate(
         dst.bytes = (mode_64bit() && (op_bytes == 4)) ? 8 : op_bytes;
         dst.reg = (unsigned long *)&_regs.ebp;
         if ( (rc = ops->write(x86_seg_ss, sp_pre_dec(dst.bytes),
-                              _regs.ebp, dst.bytes, ctxt)) )
+                              &_regs.ebp, dst.bytes, ctxt)) )
             goto done;
         dst.val = _regs.esp;
 
@@ -2650,14 +2665,14 @@ x86_emulate(
             {
                 unsigned long ebp, temp_data;
                 ebp = truncate_word(_regs.ebp - i*dst.bytes, ctxt->sp_size/8);
-                if ( (rc = ops->read(x86_seg_ss, ebp,
-                                     &temp_data, dst.bytes, ctxt)) ||
+                if ( (rc = read_ulong(x86_seg_ss, ebp,
+                                      &temp_data, dst.bytes, ctxt, ops)) ||
                      (rc = ops->write(x86_seg_ss, sp_pre_dec(dst.bytes),
-                                      temp_data, dst.bytes, ctxt)) )
+                                      &temp_data, dst.bytes, ctxt)) )
                     goto done;
             }
             if ( (rc = ops->write(x86_seg_ss, sp_pre_dec(dst.bytes),
-                                  dst.val, dst.bytes, ctxt)) )
+                                  &dst.val, dst.bytes, ctxt)) )
                 goto done;
         }
 
@@ -2683,8 +2698,8 @@ x86_emulate(
 
         /* Second writeback, to %%ebp. */
         dst.reg = (unsigned long *)&_regs.ebp;
-        if ( (rc = ops->read(x86_seg_ss, sp_post_inc(dst.bytes),
-                             &dst.val, dst.bytes, ctxt)) )
+        if ( (rc = read_ulong(x86_seg_ss, sp_post_inc(dst.bytes),
+                              &dst.val, dst.bytes, ctxt, ops)) )
             goto done;
         break;
 
@@ -2692,10 +2707,10 @@ x86_emulate(
     case 0xcb: /* ret (far) */ {
         int offset = (b == 0xca) ? insn_fetch_type(uint16_t) : 0;
         op_bytes = mode_64bit() ? 8 : op_bytes;
-        if ( (rc = ops->read(x86_seg_ss, sp_post_inc(op_bytes),
-                             &dst.val, op_bytes, ctxt)) || 
-             (rc = ops->read(x86_seg_ss, sp_post_inc(op_bytes + offset),
-                             &src.val, op_bytes, ctxt)) ||
+        if ( (rc = read_ulong(x86_seg_ss, sp_post_inc(op_bytes),
+                              &dst.val, op_bytes, ctxt, ops)) || 
+             (rc = read_ulong(x86_seg_ss, sp_post_inc(op_bytes + offset),
+                              &src.val, op_bytes, ctxt, ops)) ||
              (rc = load_seg(x86_seg_cs, (uint16_t)src.val, ctxt, ops)) )
             goto done;
         _regs.eip = dst.val;
@@ -2729,12 +2744,12 @@ x86_emulate(
         if ( !mode_iopl() )
             mask |= EFLG_IF;
         fail_if(!in_realmode(ctxt, ops));
-        if ( (rc = ops->read(x86_seg_ss, sp_post_inc(op_bytes),
-                             &eip, op_bytes, ctxt)) ||
-             (rc = ops->read(x86_seg_ss, sp_post_inc(op_bytes),
-                             &cs, op_bytes, ctxt)) ||
-             (rc = ops->read(x86_seg_ss, sp_post_inc(op_bytes),
-                             &eflags, op_bytes, ctxt)) )
+        if ( (rc = read_ulong(x86_seg_ss, sp_post_inc(op_bytes),
+                              &eip, op_bytes, ctxt, ops)) ||
+             (rc = read_ulong(x86_seg_ss, sp_post_inc(op_bytes),
+                              &cs, op_bytes, ctxt, ops)) ||
+             (rc = read_ulong(x86_seg_ss, sp_post_inc(op_bytes),
+                              &eflags, op_bytes, ctxt, ops)) )
             goto done;
         if ( op_bytes == 2 )
             eflags = (uint16_t)eflags | (_regs.eflags & 0xffff0000u);
@@ -2779,8 +2794,8 @@ x86_emulate(
 
     case 0xd7: /* xlat */ {
         unsigned long al = (uint8_t)_regs.eax;
-        if ( (rc = ops->read(ea.mem.seg, truncate_ea(_regs.ebx + al),
-                             &al, 1, ctxt)) != 0 )
+        if ( (rc = read_ulong(ea.mem.seg, truncate_ea(_regs.ebx + al),
+                              &al, 1, ctxt, ops)) != 0 )
             goto done;
         *(uint8_t *)&_regs.eax = al;
         break;
@@ -3242,9 +3257,9 @@ x86_emulate(
             if ( op_bytes == 2 )
                 reg.base &= 0xffffff;
             if ( (rc = ops->write(ea.mem.seg, ea.mem.off+0,
-                                  reg.limit, 2, ctxt)) ||
+                                  &reg.limit, 2, ctxt)) ||
                  (rc = ops->write(ea.mem.seg, ea.mem.off+2,
-                                  reg.base, mode_64bit() ? 8 : 4, ctxt)) )
+                                  &reg.base, mode_64bit() ? 8 : 4, ctxt)) )
                 goto done;
             break;
         case 2: /* lgdt */
@@ -3252,10 +3267,10 @@ x86_emulate(
             generate_exception_if(ea.type != OP_MEM, EXC_UD, -1);
             fail_if(ops->write_segment == NULL);
             memset(&reg, 0, sizeof(reg));
-            if ( (rc = ops->read(ea.mem.seg, ea.mem.off+0,
-                                 &limit, 2, ctxt)) ||
-                 (rc = ops->read(ea.mem.seg, ea.mem.off+2,
-                                 &base, mode_64bit() ? 8 : 4, ctxt)) )
+            if ( (rc = read_ulong(ea.mem.seg, ea.mem.off+0,
+                                  &limit, 2, ctxt, ops)) ||
+                 (rc = read_ulong(ea.mem.seg, ea.mem.off+2,
+                                  &base, mode_64bit() ? 8 : 4, ctxt, ops)) )
                 goto done;
             reg.base = base;
             reg.limit = limit;
@@ -3282,8 +3297,8 @@ x86_emulate(
                 goto done;
             if ( ea.type == OP_REG )
                 cr0w = *ea.reg;
-            else if ( (rc = ops->read(ea.mem.seg, ea.mem.off,
-                                      &cr0w, 2, ctxt)) )
+            else if ( (rc = read_ulong(ea.mem.seg, ea.mem.off,
+                                       &cr0w, 2, ctxt, ops)) )
                 goto done;
             /* LMSW can: (1) set bits 0-3; (2) clear bits 1-3. */
             cr0 = (cr0 & ~0xe) | (cr0w & 0xf);
@@ -3405,8 +3420,10 @@ x86_emulate(
         if ( ea.type == OP_MEM )
         {
             unsigned long lval, hval;
-            if ( (rc = ops->read(ea.mem.seg, ea.mem.off+0, &lval, 4, ctxt)) ||
-                 (rc = ops->read(ea.mem.seg, ea.mem.off+4, &hval, 4, ctxt)) )
+            if ( (rc = read_ulong(ea.mem.seg, ea.mem.off+0,
+                                  &lval, 4, ctxt, ops)) ||
+                 (rc = read_ulong(ea.mem.seg, ea.mem.off+4,
+                                  &hval, 4, ctxt, ops)) )
                 goto done;
             val = ((uint64_t)hval << 32) | (uint32_t)lval;
             stub[2] = modrm & 0x38; /* movq (%eax),%mmN */
@@ -3429,8 +3446,8 @@ x86_emulate(
         if ( ea.type == OP_MEM )
         {
             unsigned long lval = (uint32_t)val, hval = (uint32_t)(val >> 32);
-            if ( (rc = ops->write(ea.mem.seg, ea.mem.off+0, lval, 4, ctxt)) ||
-                 (rc = ops->write(ea.mem.seg, ea.mem.off+4, hval, 4, ctxt)) )
+            if ( (rc = ops->write(ea.mem.seg, ea.mem.off+0, &lval, 4, ctxt)) ||
+                 (rc = ops->write(ea.mem.seg, ea.mem.off+4, &hval, 4, ctxt)) )
                 goto done;
         }
         break;
@@ -3482,8 +3499,8 @@ x86_emulate(
 
         /* Get actual old value. */
         for ( i = 0; i < (op_bytes/sizeof(long)); i++ )
-            if ( (rc = ops->read(ea.mem.seg, ea.mem.off + i*sizeof(long),
-                                 &old[i], sizeof(long), ctxt)) != 0 )
+            if ( (rc = read_ulong(ea.mem.seg, ea.mem.off + i*sizeof(long),
+                                  &old[i], sizeof(long), ctxt, ops)) != 0 )
                 goto done;
 
         /* Get expected and proposed values. */

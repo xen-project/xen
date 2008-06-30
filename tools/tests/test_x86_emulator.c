@@ -22,23 +22,22 @@
 static int read(
     unsigned int seg,
     unsigned long offset,
-    unsigned long *val,
+    void *p_data,
     unsigned int bytes,
     struct x86_emulate_ctxt *ctxt)
 {
-    *val = 0;
-    memcpy(val, (void *)offset, bytes);
+    memcpy(p_data, (void *)offset, bytes);
     return X86EMUL_OKAY;
 }
 
 static int write(
     unsigned int seg,
     unsigned long offset,
-    unsigned long val,
+    void *p_data,
     unsigned int bytes,
     struct x86_emulate_ctxt *ctxt)
 {
-    memcpy((void *)offset, &val, bytes);
+    memcpy((void *)offset, p_data, bytes);
     return X86EMUL_OKAY;
 }
 
