@@ -686,7 +686,7 @@ static int select_poll(int nfds, fd_set *readfds, fd_set *writefds, fd_set *exce
 #ifdef LIBC_VERBOSE
     static int nb;
     static int nbread[NOFILE], nbwrite[NOFILE], nbexcept[NOFILE];
-    static s64_t lastshown;
+    static s_time_t lastshown;
 
     nb++;
 #endif
