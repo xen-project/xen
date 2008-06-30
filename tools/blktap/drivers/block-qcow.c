@@ -33,7 +33,6 @@
 #include <zlib.h>
 #include <inttypes.h>
 #include <libaio.h>
-#include <gcrypt.h>
 #include "bswap.h"
 #include "aes.h"
 #include "tapdisk.h"
@@ -146,6 +145,10 @@ struct tdqcow_state {
 
 static int decompress_cluster(struct tdqcow_state *s, uint64_t cluster_offset);
 
+#ifdef USE_GCRYPT
+
+#include <gcrypt.h>
+
 static uint32_t gen_cksum(char *ptr, int len)
 {
 	int i;
@@ -166,6 +169,41 @@ static uint32_t gen_cksum(char *ptr, int len)
 
 	return md[0];
 }
+
+#else /* use libcrypto */
+
+#include <openssl/md5.h>
+
+static uint32_t gen_cksum(char *ptr, int len)
+{
+	int i;
+	unsigned char *md;
+	uint32_t ret;
+
+	md = malloc(MD5_DIGEST_LENGTH);
+	if(!md) return 0;
+
+	/* Convert L1 table to big endian */
+	for(i = 0; i < len / sizeof(uint64_t); i++) {
+		cpu_to_be64s(&((uint64_t*) ptr)[i]);
+	}
+
+	/* Generate checksum */
+	if (MD5((unsigned char *)ptr, len, md) != md)
+		ret = 0;
+	else
+		memcpy(&ret, md, sizeof(uint32_t));
+
+	/* Convert L1 table back to native endianess */
+	for(i = 0; i < len / sizeof(uint64_t); i++) {
+		be64_to_cpus(&((uint64_t*) ptr)[i]);
+	}
+
+	free(md);
+	return ret;
+}
+
+#endif
 
 static int get_filesize(char *filename, uint64_t *size, struct stat *st)
 {

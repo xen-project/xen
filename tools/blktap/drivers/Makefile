@@ -17,8 +17,16 @@ CFLAGS   += -D_GNU_SOURCE
 CFLAGS   += -Wp,-MD,.$(@F).d
 DEPS      = .*.d
 
+ifeq ($(shell . ./check_gcrypt),"yes")
+CFLAGS += -DUSE_GCRYPT
+CRYPT_LIB := -lgcrypt
+else
+CRYPT_LIB := -lcrypto
+$(warning *** libgcrypt not installed: falling back to libcrypto ***)
+endif
+
 LDFLAGS_blktapctrl := $(LDFLAGS_libxenctrl) $(LDFLAGS_libxenstore) -L../lib -lblktap
-LDFLAGS_img := $(LIBAIO_DIR)/libaio.a -lgcrypt -lpthread -lz
+LDFLAGS_img := $(LIBAIO_DIR)/libaio.a $(CRYPT_LIB) -lpthread -lz
 
 BLK-OBJS-y  := block-aio.o
 BLK-OBJS-y  += block-sync.o
