@@ -20,7 +20,7 @@ def blkdev_name_to_number(name):
     devnum = None
 
     try:
-        return os.stat(n).st_rdev
+        return (devname, os.stat(n).st_rdev)
     except Exception, ex:
         pass
 
