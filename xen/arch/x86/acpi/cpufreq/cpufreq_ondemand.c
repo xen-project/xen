@@ -52,7 +52,7 @@ static struct dbs_tuners {
 
 static struct timer dbs_timer[NR_CPUS];
 
-static inline uint64_t get_cpu_idle_time(unsigned int cpu)
+inline uint64_t get_cpu_idle_time(unsigned int cpu)
 {
     uint64_t idle_ns;
     struct vcpu *v;

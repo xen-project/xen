@@ -71,11 +71,18 @@ int do_get_pm_info(struct xen_sysctl_get_pmstat *op)
     case PMSTAT_get_pxstat:
     {
         uint64_t now, ct;
+        uint64_t total_idle_ns;
+        uint64_t tmp_idle_ns;
+
+        total_idle_ns = get_cpu_idle_time(op->cpuid);
+        tmp_idle_ns = total_idle_ns - pxpt->prev_idle_wall;
 
         now = NOW();
         pxpt->u.usable = pmpt->perf.state_count - pmpt->perf.ppc;
         pxpt->u.pt[pxpt->u.cur].residency += now - pxpt->prev_state_wall;
+        pxpt->u.pt[pxpt->u.cur].residency -= tmp_idle_ns;
         pxpt->prev_state_wall = now;
+        pxpt->prev_idle_wall = total_idle_ns;
 
         ct = pmpt->perf.state_count;
         if ( copy_to_guest(op->u.getpx.trans_pt, pxpt->u.trans_pt, ct*ct) )
