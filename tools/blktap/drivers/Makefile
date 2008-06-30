@@ -18,7 +18,7 @@ CFLAGS   += -Wp,-MD,.$(@F).d
 DEPS      = .*.d
 
 LDFLAGS_blktapctrl := $(LDFLAGS_libxenctrl) $(LDFLAGS_libxenstore) -L../lib -lblktap
-LDFLAGS_img := $(LIBAIO_DIR)/libaio.a -lcrypto -lpthread -lz
+LDFLAGS_img := $(LIBAIO_DIR)/libaio.a -lgcrypt -lpthread -lz
 
 BLK-OBJS-y  := block-aio.o
 BLK-OBJS-y  += block-sync.o

@@ -33,7 +33,7 @@
 #include <zlib.h>
 #include <inttypes.h>
 #include <libaio.h>
-#include <openssl/md5.h>
+#include <gcrypt.h>
 #include "bswap.h"
 #include "aes.h"
 #include "tapdisk.h"
@@ -149,31 +149,22 @@ static int decompress_cluster(struct tdqcow_state *s, uint64_t cluster_offset);
 static uint32_t gen_cksum(char *ptr, int len)
 {
 	int i;
-	unsigned char *md;
-	uint32_t ret;
+	uint32_t md[4];
 
-	md = malloc(MD5_DIGEST_LENGTH);
-
-	if(!md) return 0;
-	
 	/* Convert L1 table to big endian */
 	for(i = 0; i < len / sizeof(uint64_t); i++) {
 		cpu_to_be64s(&((uint64_t*) ptr)[i]);
 	}
 
 	/* Generate checksum */
-	if (MD5((unsigned char *)ptr, len, md) != md)
-		ret = 0;
-	else
-		memcpy(&ret, md, sizeof(uint32_t));
+	gcry_md_hash_buffer(GCRY_MD_MD5, md, ptr, len);
 
 	/* Convert L1 table back to native endianess */
 	for(i = 0; i < len / sizeof(uint64_t); i++) {
 		be64_to_cpus(&((uint64_t*) ptr)[i]);
 	}
 
-	free(md);
-	return ret;
+	return md[0];
 }
 
 static int get_filesize(char *filename, uint64_t *size, struct stat *st)
