@@ -63,7 +63,7 @@ def blkdev_segment(name):
         type:         'Disk' or identifying name for partition type
     """
     val = None
-    n = blkdev_name_to_number(name)
+    (name, n) = blkdev_name_to_number(name)
     if not n is None:
         val = { 'device'       : n,
                 'start_sector' : long(0),

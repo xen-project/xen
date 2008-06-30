@@ -1123,7 +1123,7 @@ class XendConfig(dict):
             try:
                 devid = int(dev2)
             except ValueError:
-                devid = blkdev_name_to_number(dev2)
+                (xenbus, devid) = blkdev_name_to_number(dev2)
                 if devid == None:
                     log.debug("The device %s is not device name", dev2)
                     return None
