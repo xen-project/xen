@@ -929,6 +929,12 @@ int xc_hvm_track_dirty_vram(
     uint64_t first_pfn, uint64_t nr,
     unsigned long *bitmap);
 
+/*
+ * Notify that some pages got modified by the Device Model
+ */
+int xc_hvm_modified_memory(
+    int xc_handle, domid_t dom, uint64_t first_pfn, uint64_t nr);
+
 typedef enum {
   XC_ERROR_NONE = 0,
   XC_INTERNAL_ERROR = 1,

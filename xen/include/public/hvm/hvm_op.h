@@ -92,6 +92,19 @@ struct xen_hvm_track_dirty_vram {
 typedef struct xen_hvm_track_dirty_vram xen_hvm_track_dirty_vram_t;
 DEFINE_XEN_GUEST_HANDLE(xen_hvm_track_dirty_vram_t);
 
+/* Notify that some pages got modified by the Device Model. */
+#define HVMOP_modified_memory    7
+struct xen_hvm_modified_memory {
+    /* Domain to be updated. */
+    domid_t  domid;
+    /* First pfn. */
+    uint64_aligned_t first_pfn;
+    /* Number of pages. */
+    uint64_aligned_t nr;
+};
+typedef struct xen_hvm_modified_memory xen_hvm_modified_memory_t;
+DEFINE_XEN_GUEST_HANDLE(xen_hvm_modified_memory_t);
+
 #endif /* defined(__XEN__) || defined(__XEN_TOOLS__) */
 
 #endif /* __XEN_PUBLIC_HVM_HVM_OP_H__ */

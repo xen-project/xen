@@ -483,9 +483,11 @@ static void memcpy_words(void *dst, void *src, size_t n)
 }
 #endif
 
-void cpu_physical_memory_rw(target_phys_addr_t addr, uint8_t *buf, 
-                            int len, int is_write)
+void cpu_physical_memory_rw(target_phys_addr_t _addr, uint8_t *buf, 
+                            int _len, int is_write)
 {
+    target_phys_addr_t addr = _addr;
+    int len = _len;
     int l, io_index;
     uint8_t *ptr;
     uint32_t val;
@@ -520,6 +522,7 @@ void cpu_physical_memory_rw(target_phys_addr_t addr, uint8_t *buf,
             } else if ((ptr = phys_ram_addr(addr)) != NULL) {
                 /* Writing to RAM */
                 memcpy_words(ptr, buf, l);
+#ifndef CONFIG_STUBDOM
                 if (logdirty_bitmap != NULL) {
                     /* Record that we have dirtied this frame */
                     unsigned long pfn = addr >> TARGET_PAGE_BITS;
@@ -531,6 +534,7 @@ void cpu_physical_memory_rw(target_phys_addr_t addr, uint8_t *buf,
                             |= 1UL << pfn % HOST_LONG_BITS;
                     }
                 }
+#endif
 #ifdef __ia64__
                 sync_icache(ptr, l);
 #endif 
@@ -565,6 +569,13 @@ void cpu_physical_memory_rw(target_phys_addr_t addr, uint8_t *buf,
         buf += l;
         addr += l;
     }
+
+#ifdef CONFIG_STUBDOM
+    if (logdirty_bitmap != NULL)
+        xc_hvm_modified_memory(xc_handle, domid, _addr >> TARGET_PAGE_BITS,
+                (_addr + _len + TARGET_PAGE_SIZE - 1) >> TARGET_PAGE_BITS
+                    - _addr >> TARGET_PAGE_BITS);
+#endif
 
     mapcache_unlock();
 }

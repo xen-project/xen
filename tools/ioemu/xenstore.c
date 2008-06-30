@@ -402,6 +402,10 @@ void xenstore_process_logdirty_event(void)
             /* No key yet: wait for the next watch */
             return;
 
+#ifdef CONFIG_STUBDOM
+        /* We pass the writes to hypervisor */
+        seg = (void*)1;
+#else
         strncpy(key_terminated, key_ascii, 16);
         free(key_ascii);
         key = (key_t) strtoull(key_terminated, NULL, 16);
@@ -417,11 +421,6 @@ void xenstore_process_logdirty_event(void)
         fprintf(logfile, "%s: key=%16.16llx size=%lu\n", __FUNCTION__,
                 (unsigned long long)key, logdirty_bitmap_size);
 
-#ifdef CONFIG_STUBDOM
-        /* XXX we just can't use shm. */
-        fprintf(logfile, "Log dirty is not implemented in stub domains!\n");
-        return;
-#else
         shmid = shmget(key, 2 * logdirty_bitmap_size, S_IRUSR|S_IWUSR);
         if (shmid == -1) {
             fprintf(logfile, "Log-dirty: shmget failed: segment %16.16llx "

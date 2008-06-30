@@ -2529,6 +2529,66 @@ long do_hvm_op(unsigned long op, XEN_GUEST_HANDLE(void) arg)
         break;
     }
 
+    case HVMOP_modified_memory:
+    {
+        struct xen_hvm_modified_memory a;
+        struct domain *d;
+        unsigned long pfn;
+
+        if ( copy_from_guest(&a, arg, 1) )
+            return -EFAULT;
+
+        if ( a.domid == DOMID_SELF )
+        {
+            d = rcu_lock_current_domain();
+        }
+        else
+        {
+            if ( (d = rcu_lock_domain_by_id(a.domid)) == NULL )
+                return -ESRCH;
+            if ( !IS_PRIV_FOR(current->domain, d) )
+            {
+                rc = -EPERM;
+                goto param_fail3;
+            }
+        }
+
+        rc = -EINVAL;
+        if ( !is_hvm_domain(d) )
+            goto param_fail3;
+
+        rc = xsm_hvm_param(d, op);
+        if ( rc )
+            goto param_fail3;
+
+        rc = -EINVAL;
+        if ( (a.first_pfn > domain_get_maximum_gpfn(d)) ||
+             ((a.first_pfn + a.nr - 1) < a.first_pfn) ||
+             ((a.first_pfn + a.nr - 1) > domain_get_maximum_gpfn(d)) )
+            goto param_fail3;
+
+        rc = 0;
+        if ( !paging_mode_log_dirty(d) )
+            goto param_fail3;
+
+        for ( pfn = a.first_pfn; pfn < a.first_pfn + a.nr; pfn++ )
+        {
+            p2m_type_t t;
+            mfn_t mfn = gfn_to_mfn(d, pfn, &t);
+            if ( mfn_x(mfn) != INVALID_MFN )
+            {
+                paging_mark_dirty(d, mfn_x(mfn));
+                /* These are most probably not page tables any more */
+                /* don't take a long time and don't die either */
+                sh_remove_shadows(d->vcpu[0], mfn, 1, 0);
+            }
+        }
+
+    param_fail3:
+        rcu_unlock_domain(d);
+        break;
+    }
+
     default:
     {
         gdprintk(XENLOG_WARNING, "Bad HVM op %ld.\n", op);
