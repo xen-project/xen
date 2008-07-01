@@ -153,6 +153,7 @@ static void ioapic_rte_to_remap_entry(struct iommu *iommu,
     }
 
     memcpy(iremap_entry, &new_ire, sizeof(struct iremap_entry));
+    iommu_flush_cache_entry(iremap_entry);
     iommu_flush_iec_index(iommu, 0, index);
     invalidate_sync(iommu);
 
@@ -378,6 +379,7 @@ static void msi_msg_to_remap_entry(
     remap_rte->data = 0;
 
     memcpy(iremap_entry, &new_ire, sizeof(struct iremap_entry));
+    iommu_flush_cache_entry(iremap_entry);
     iommu_flush_iec_index(iommu, 0, index);
     invalidate_sync(iommu);
 
