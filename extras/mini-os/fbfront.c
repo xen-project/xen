@@ -100,7 +100,6 @@ struct kbdfront_dev *init_kbdfront(char *nodename, int abs_pointer)
     s->in_cons = s->in_prod = 0;
     s->out_cons = s->out_prod = 0;
 
-    // FIXME: proper frees on failures
 again:
     err = xenbus_transaction_start(&xbt);
     if (err) {
@@ -408,7 +407,6 @@ struct fbfront_dev *init_fbfront(char *nodename, unsigned long *mfns, int width,
         s->pd[i] = 0;
 
 
-    // FIXME: proper frees on failures
 again:
     err = xenbus_transaction_start(&xbt);
     if (err) {
