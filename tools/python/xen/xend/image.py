@@ -380,8 +380,10 @@ class ImageHandler:
         self.logfile = "/var/log/xen/qemu-dm-%s.log" %  str(self.vm.info['name_label'])
 
         # rotate log
+        logfile_mode = os.O_WRONLY|os.O_CREAT|os.O_APPEND
         logrotate_count = XendOptions.instance().get_qemu_dm_logrotate_count()
         if logrotate_count > 0:
+            logfile_mode |= os.O_TRUNC
             if os.path.exists("%s.%d" % (self.logfile, logrotate_count)):
                 os.unlink("%s.%d" % (self.logfile, logrotate_count))
             for n in range(logrotate_count - 1, 0, -1):
@@ -392,7 +394,7 @@ class ImageHandler:
                 os.rename(self.logfile, self.logfile + ".1")
 
         null = os.open("/dev/null", os.O_RDONLY)
-        logfd = os.open(self.logfile, os.O_WRONLY|os.O_CREAT|os.O_TRUNC|os.O_APPEND)
+        logfd = os.open(self.logfile, logfile_mode)
         
         sys.stderr.flush()
         pid = os.fork()
