@@ -242,3 +242,6 @@
 
 # Script to run when the label of a resource has changed.
 #(resource-label-change-script '')
+
+# Rotation count of qemu-dm log file.
+#(qemu-dm-logrotate-count 10)
