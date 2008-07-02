@@ -341,6 +341,7 @@ int domain_kill(struct domain *d)
     case DOMDYING_alive:
         domain_pause(d);
         d->is_dying = DOMDYING_dying;
+        spin_barrier(&d->domain_lock);
         evtchn_destroy(d);
         gnttab_release_mappings(d);
         /* fallthrough */
