@@ -1762,7 +1762,7 @@ class XendConfig(dict):
         return self['HVM_boot_policy'] != ''
 
     def target(self):
-	return self['target']
+        return self['target']
 
     def image_type(self):
         stored_type = self['platform'].get('image_type')
