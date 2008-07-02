@@ -58,6 +58,16 @@ static int cur_vcpu;
 
 int virt_to_phys (int is_inst, unsigned long vaddr, unsigned long *paddr);
 
+/* wrapper for vcpu_gest_context_any_t */
+static int xc_ia64_vcpu_getcontext(int xc_handle,
+                                   uint32_t domid,
+                                   uint32_t vcpu,
+                                   vcpu_guest_context_t *ctxt)
+{
+    return xc_vcpu_getcontext(xc_handle, domid, vcpu,
+                              (vcpu_guest_context_any_t *)ctxt);
+}
+
 static inline unsigned int ctx_slot (vcpu_guest_context_t *ctx)
 {
     return (ctx->regs.psr >> PSR_RI_SHIFT) & 3;
@@ -729,7 +739,7 @@ int wait_domain (int vcpu, vcpu_guest_context_t *ctx)
         fflush (stdout);
         nanosleep (&ts, NULL);
     }
-    return xc_vcpu_getcontext (xc_handle, domid, vcpu, ctx);
+    return xc_ia64_vcpu_getcontext (xc_handle, domid, vcpu, ctx);
 }
 
 int virt_to_phys (int is_inst, unsigned long vaddr, unsigned long *paddr)
@@ -945,13 +955,13 @@ char *parse_arg (char **buf)
     return res;
 }
 
-vcpu_guest_context_t vcpu_ctx[MAX_VIRT_CPUS];
+vcpu_guest_context_any_t vcpu_ctx_any[MAX_VIRT_CPUS];
 
 int vcpu_setcontext (int vcpu)
 {
     int ret;
 
-    ret = xc_vcpu_setcontext (xc_handle, domid, vcpu, &vcpu_ctx[vcpu]);
+    ret = xc_vcpu_setcontext (xc_handle, domid, vcpu, &vcpu_ctx_any[vcpu]);
     if (ret < 0)
         perror ("xc_vcpu_setcontext");
 
@@ -1518,7 +1528,7 @@ enum cmd_status do_command (int vcpu, char *line)
     int flag_ambiguous;
 
     cur_vcpu = vcpu;
-    cur_ctx = &vcpu_ctx[vcpu];
+    cur_ctx = &vcpu_ctx_any[vcpu].c;
 
     /* Handle repeat last-command.  */
     if (*line == 0) {
@@ -1575,7 +1585,7 @@ void xenitp (int vcpu)
     int ret;
     struct sigaction sa;
 
-    cur_ctx = &vcpu_ctx[vcpu];
+    cur_ctx = &vcpu_ctx_any[vcpu].c;
 
     xc_handle = xc_interface_open (); /* for accessing control interface */
 
@@ -1588,9 +1598,9 @@ void xenitp (int vcpu)
         exit (-1);
     }
 
-    ret = xc_vcpu_getcontext (xc_handle, domid, vcpu, cur_ctx);
+    ret = xc_ia64_vcpu_getcontext (xc_handle, domid, vcpu, cur_ctx);
     if (ret < 0) {
-        perror ("xc_vcpu_getcontext");
+        perror ("xc_ia64_vcpu_getcontext");
         exit (-1);
     }
 

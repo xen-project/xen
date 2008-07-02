@@ -5,7 +5,7 @@ vpath %.c ../grub-cvs
 
 BOOT=boot-$(XEN_TARGET_ARCH).o
 
-DEF_CPPFLAGS += -I$(XEN_ROOT)/tools/libxc -I.
+DEF_CPPFLAGS += -I$(XEN_ROOT)/tools/libxc -I$(XEN_ROOT)/tools/include -I.
 DEF_CPPFLAGS += -I../grub-cvs/stage1
 DEF_CPPFLAGS += -I../grub-cvs/stage2
 DEF_CPPFLAGS += -I../grub-cvs/netboot

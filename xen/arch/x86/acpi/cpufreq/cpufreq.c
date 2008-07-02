@@ -47,6 +47,10 @@
 struct processor_pminfo processor_pminfo[NR_CPUS];
 struct cpufreq_policy xen_px_policy[NR_CPUS];
 
+static cpumask_t *cpufreq_dom_pt;
+static cpumask_t cpufreq_dom_mask;
+static unsigned int cpufreq_dom_max;
+
 enum {
     UNDEFINED_CAPABLE = 0,
     SYSTEM_INTEL_MSR_CAPABLE,
@@ -60,7 +64,6 @@ struct acpi_cpufreq_data {
     struct processor_performance *acpi_data;
     struct cpufreq_frequency_table *freq_table;
     unsigned int max_freq;
-    unsigned int resume;
     unsigned int cpu_feature;
 };
 
@@ -328,14 +331,16 @@ static int acpi_cpufreq_target(struct cpufreq_policy *policy,
 
     next_perf_state = data->freq_table[next_state].index;
     if (perf->state == next_perf_state) {
-        if (unlikely(data->resume)) {
-            printk("xen_pminfo: @acpi_cpufreq_target, "
-                "Called after resume, resetting to P%d\n", 
+        if (unlikely(policy->resume)) {
+            printk(KERN_INFO "Called after resume, resetting to P%d\n", 
                 next_perf_state);
-            data->resume = 0;
+            policy->resume = 0;
         }
-        else
+        else {
+            printk(KERN_INFO "Already at target state (P%d)\n", 
+                next_perf_state);
             return 0;
+        }
     }
 
     switch (data->cpu_feature) {
@@ -531,7 +536,7 @@ acpi_cpufreq_cpu_init(struct cpufreq_policy *policy)
      * the first call to ->target() should result in us actually
      * writing something to the appropriate registers.
      */
-    data->resume = 1;
+    policy->resume = 1;
 
     return result;
 
@@ -549,61 +554,101 @@ static struct cpufreq_driver acpi_cpufreq_driver = {
     .init   = acpi_cpufreq_cpu_init,
 };
 
-int acpi_cpufreq_init(void)
+void cpufreq_dom_exit(void)
 {
-    unsigned int i, ret = 0;
-    unsigned int dom, max_dom = 0;
-    cpumask_t *pt, dom_mask;
+    cpufreq_dom_max = 0;
+    cpus_clear(cpufreq_dom_mask);
+    if (cpufreq_dom_pt)
+        xfree(cpufreq_dom_pt);
+}
 
-    cpus_clear(dom_mask);
+int cpufreq_dom_init(void)
+{
+    unsigned int i;
+
+    cpufreq_dom_max = 0;
+    cpus_clear(cpufreq_dom_mask);
 
     for_each_online_cpu(i) {
-        cpu_set(processor_pminfo[i].perf.domain_info.domain, dom_mask);
-        if (max_dom < processor_pminfo[i].perf.domain_info.domain)
-            max_dom = processor_pminfo[i].perf.domain_info.domain;
+        cpu_set(processor_pminfo[i].perf.domain_info.domain, cpufreq_dom_mask);
+        if (cpufreq_dom_max < processor_pminfo[i].perf.domain_info.domain)
+            cpufreq_dom_max = processor_pminfo[i].perf.domain_info.domain;
     }
-    max_dom++;
+    cpufreq_dom_max++;
 
-    pt = xmalloc_array(cpumask_t, max_dom);
-    if (!pt)
+    cpufreq_dom_pt = xmalloc_array(cpumask_t, cpufreq_dom_max);
+    if (!cpufreq_dom_pt)
         return -ENOMEM;
-    memset(pt, 0, max_dom * sizeof(cpumask_t));
-
-    /* get cpumask of each psd domain */
-    for_each_online_cpu(i)
-        cpu_set(i, pt[processor_pminfo[i].perf.domain_info.domain]);
+    memset(cpufreq_dom_pt, 0, cpufreq_dom_max * sizeof(cpumask_t));
 
     for_each_online_cpu(i)
-        processor_pminfo[i].perf.shared_cpu_map = 
-            pt[processor_pminfo[i].perf.domain_info.domain];
+        cpu_set(i, cpufreq_dom_pt[processor_pminfo[i].perf.domain_info.domain]);
 
-    cpufreq_driver = &acpi_cpufreq_driver;
+    for_each_online_cpu(i)
+        processor_pminfo[i].perf.shared_cpu_map =
+            cpufreq_dom_pt[processor_pminfo[i].perf.domain_info.domain];
 
-    /* setup cpufreq infrastructure */
+    return 0;
+}
+
+static int cpufreq_cpu_init(void)
+{
+    int i, ret = 0;
+
     for_each_online_cpu(i) {
         xen_px_policy[i].cpu = i;
 
         ret = px_statistic_init(i);
         if (ret)
-            goto out;
+            return ret;
 
         ret = acpi_cpufreq_cpu_init(&xen_px_policy[i]);
         if (ret)
-            goto out;
+            return ret;
     }
+    return ret;
+}
 
-    /* setup ondemand cpufreq */
-    for (dom=0; dom<max_dom; dom++) {
-        if (!cpu_isset(dom, dom_mask))
+int cpufreq_dom_dbs(unsigned int event)
+{
+    int cpu, dom, ret = 0;
+
+    for (dom=0; dom<cpufreq_dom_max; dom++) {
+        if (!cpu_isset(dom, cpufreq_dom_mask))
             continue;
-        i = first_cpu(pt[dom]);
-        ret = cpufreq_governor_dbs(&xen_px_policy[i], CPUFREQ_GOV_START);
+        cpu = first_cpu(cpufreq_dom_pt[dom]);
+        ret = cpufreq_governor_dbs(&xen_px_policy[cpu], event);
         if (ret)
-            goto out;
+            return ret;
     }
+    return ret;
+}
 
-out:
-    xfree(pt);
-   
+int acpi_cpufreq_init(void)
+{
+    int ret = 0;
+    
+    /* setup cpumask of psd dom and shared cpu map of cpu */
+    ret = cpufreq_dom_init();
+    if (ret)
+        goto err;
+
+    /* setup cpufreq driver */
+    cpufreq_driver = &acpi_cpufreq_driver;
+
+    /* setup cpufreq infrastructure */
+    ret = cpufreq_cpu_init();
+    if (ret)
+        goto err;
+
+    /* setup cpufreq dbs according to dom coordiation */
+    ret = cpufreq_dom_dbs(CPUFREQ_GOV_START);
+    if (ret)
+        goto err;
+
+    return ret;
+
+err:
+    cpufreq_dom_exit();
     return ret;
 }

@@ -132,6 +132,9 @@ class XendOptions:
     """Default script to configure a backend network interface"""
     vif_script = osdep.vif_script
 
+    """Default rotation count of qemu-dm log file."""
+    qemu_dm_logrotate_count = 10
+
     def __init__(self):
         self.configure()
 
@@ -350,6 +353,10 @@ class XendOptions:
 
     def get_vnc_x509_verify(self):
         return self.get_config_string('vnc-x509-verify', self.xend_vnc_x509_verify)
+
+    def get_qemu_dm_logrotate_count(self):
+        return self.get_config_int("qemu-dm-logrotate-count",
+                                   self.qemu_dm_logrotate_count)
 
 
 class XendOptionsFile(XendOptions):

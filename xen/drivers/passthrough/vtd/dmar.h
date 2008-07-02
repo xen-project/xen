@@ -42,28 +42,28 @@ struct acpi_ioapic_unit {
 
 struct acpi_drhd_unit {
     struct list_head list;
-    unsigned long    address; /* register base address of the unit */
-    struct    pci_dev *devices; /* target devices */
+    u64    address; /* register base address of the unit */
+    struct pci_dev *devices; /* target devices */
     int    devices_cnt;
-    u8    include_all:1;
+    u8     include_all:1;
     struct iommu *iommu;
     struct list_head ioapic_list;
 };
 
 struct acpi_rmrr_unit {
     struct list_head list;
-    unsigned long base_address;
-    unsigned long end_address;
+    u64    base_address;
+    u64    end_address;
     struct pci_dev *devices; /* target devices */
     int    devices_cnt;
-    u8    allow_all:1;
+    u8     allow_all:1;
 };
 
 struct acpi_atsr_unit {
     struct list_head list;
-    struct    pci_dev *devices; /* target devices */
+    struct pci_dev *devices; /* target devices */
     int    devices_cnt;
-    u8    all_ports:1;
+    u8     all_ports:1;
 };
 
 #define for_each_iommu(domain, iommu) \

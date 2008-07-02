@@ -180,9 +180,10 @@ xc_ia64_send_unallocated_list(int xc_handle, int io_fd,
 
 static int
 xc_ia64_send_vcpu_context(int xc_handle, int io_fd, uint32_t dom,
-                          uint32_t vcpu, vcpu_guest_context_t *ctxt)
+                          uint32_t vcpu, vcpu_guest_context_any_t *ctxt_any)
 {
-    if (xc_vcpu_getcontext(xc_handle, dom, vcpu, ctxt)) {
+    vcpu_guest_context_t *ctxt = &ctxt_any->c;
+    if (xc_vcpu_getcontext(xc_handle, dom, vcpu, ctxt_any)) {
         ERROR("Could not get vcpu context");
         return -1;
     }
@@ -269,17 +270,19 @@ xc_ia64_pv_send_context(int xc_handle, int io_fd, uint32_t dom,
     /* vcpu context */
     for (i = 0; i <= info->max_vcpu_id; i++) {
         /* A copy of the CPU context of the guest. */
-        vcpu_guest_context_t ctxt;
+        vcpu_guest_context_any_t ctxt_any;
+        vcpu_guest_context_t *ctxt = &ctxt_any.c;
+
         char *mem;
 
         if (!__test_bit(i, vcpumap))
             continue;
 
-        if (xc_ia64_send_vcpu_context(xc_handle, io_fd, dom, i, &ctxt))
+        if (xc_ia64_send_vcpu_context(xc_handle, io_fd, dom, i, &ctxt_any))
             goto out;
 
         mem = xc_map_foreign_range(xc_handle, dom, PAGE_SIZE,
-                                   PROT_READ|PROT_WRITE, ctxt.privregs_pfn);
+                                   PROT_READ|PROT_WRITE, ctxt->privregs_pfn);
         if (mem == NULL) {
             ERROR("cannot map privreg page");
             goto out;
@@ -337,12 +340,12 @@ xc_ia64_hvm_send_context(int xc_handle, int io_fd, uint32_t dom,
     /* vcpu context */
     for (i = 0; i <= info->max_vcpu_id; i++) {
         /* A copy of the CPU context of the guest. */
-        vcpu_guest_context_t ctxt;
+        vcpu_guest_context_any_t ctxt_any;
 
         if (!__test_bit(i, vcpumap))
             continue;
 
-        if (xc_ia64_send_vcpu_context(xc_handle, io_fd, dom, i, &ctxt))
+        if (xc_ia64_send_vcpu_context(xc_handle, io_fd, dom, i, &ctxt_any))
             goto out;
 
         /* system context of vcpu is sent as hvm context. */

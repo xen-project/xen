@@ -21,15 +21,33 @@
 
 static int hvmemul_do_io(
     int is_mmio, paddr_t addr, unsigned long *reps, int size,
-    paddr_t value, int dir, int df, int value_is_ptr, unsigned long *val)
+    paddr_t ram_gpa, int dir, int df, void *p_data)
 {
+    paddr_t value = ram_gpa;
+    int value_is_ptr = (p_data == NULL);
     struct vcpu *curr = current;
     vcpu_iodata_t *vio = get_ioreq(curr);
     ioreq_t *p = &vio->vp_ioreq;
     int rc;
 
-    /* Only retrieve the value from singleton (non-REP) reads. */
-    ASSERT((val == NULL) || ((dir == IOREQ_READ) && !value_is_ptr));
+    /*
+     * Weird-sized accesses have undefined behaviour: we discard writes
+     * and read all-ones.
+     */
+    if ( unlikely((size > sizeof(long)) || (size & (size - 1))) )
+    {
+        gdprintk(XENLOG_WARNING, "bad mmio size %d\n", size);
+        ASSERT(p_data != NULL); /* cannot happen with a REP prefix */
+        if ( dir == IOREQ_READ )
+            memset(p_data, ~0, size);
+        return X86EMUL_UNHANDLEABLE;
+    }
+
+    if ( (p_data != NULL) && (dir == IOREQ_WRITE) )
+    {
+        memcpy(&value, p_data, size);
+        p_data = NULL;
+    }
 
     if ( is_mmio && !value_is_ptr )
     {
@@ -47,8 +65,7 @@ static int hvmemul_do_io(
             unsigned int bytes = curr->arch.hvm_vcpu.mmio_large_read_bytes;
             if ( (addr >= pa) && ((addr + size) <= (pa + bytes)) )
             {
-                *val = 0;
-                memcpy(val, &curr->arch.hvm_vcpu.mmio_large_read[addr - pa],
+                memcpy(p_data, &curr->arch.hvm_vcpu.mmio_large_read[addr - pa],
                        size);
                 return X86EMUL_OKAY;
             }
@@ -61,7 +78,7 @@ static int hvmemul_do_io(
         break;
     case HVMIO_completed:
         curr->arch.hvm_vcpu.io_state = HVMIO_none;
-        if ( val == NULL )
+        if ( p_data == NULL )
             return X86EMUL_UNHANDLEABLE;
         goto finish_access;
     case HVMIO_dispatched:
@@ -82,7 +99,7 @@ static int hvmemul_do_io(
     }
 
     curr->arch.hvm_vcpu.io_state =
-        (val == NULL) ? HVMIO_dispatched : HVMIO_awaiting_completion;
+        (p_data == NULL) ? HVMIO_dispatched : HVMIO_awaiting_completion;
 
     p->dir = dir;
     p->data_is_ptr = value_is_ptr;
@@ -116,7 +133,7 @@ static int hvmemul_do_io(
         break;
     case X86EMUL_UNHANDLEABLE:
         hvm_send_assist_req(curr);
-        rc = (val != NULL) ? X86EMUL_RETRY : X86EMUL_OKAY;
+        rc = (p_data != NULL) ? X86EMUL_RETRY : X86EMUL_OKAY;
         break;
     default:
         BUG();
@@ -126,8 +143,8 @@ static int hvmemul_do_io(
         return rc;
 
  finish_access:
-    if ( val != NULL )
-        *val = curr->arch.hvm_vcpu.io_data;
+    if ( p_data != NULL )
+        memcpy(p_data, &curr->arch.hvm_vcpu.io_data, size);
 
     if ( is_mmio && !value_is_ptr )
     {
@@ -152,7 +169,7 @@ static int hvmemul_do_io(
                   sizeof(curr->arch.hvm_vcpu.mmio_large_read)) )
             {
                 memcpy(&curr->arch.hvm_vcpu.mmio_large_read[addr - pa],
-                       val, size);
+                       p_data, size);
                 curr->arch.hvm_vcpu.mmio_large_read_bytes += size;
             }
         }
@@ -163,18 +180,16 @@ static int hvmemul_do_io(
 
 static int hvmemul_do_pio(
     unsigned long port, unsigned long *reps, int size,
-    paddr_t value, int dir, int df, int value_is_ptr, unsigned long *val)
+    paddr_t ram_gpa, int dir, int df, void *p_data)
 {
-    return hvmemul_do_io(0, port, reps, size, value,
-                         dir, df, value_is_ptr, val);
+    return hvmemul_do_io(0, port, reps, size, ram_gpa, dir, df, p_data);
 }
 
 static int hvmemul_do_mmio(
     paddr_t gpa, unsigned long *reps, int size,
-    paddr_t value, int dir, int df, int value_is_ptr, unsigned long *val)
+    paddr_t ram_gpa, int dir, int df, void *p_data)
 {
-    return hvmemul_do_io(1, gpa, reps, size, value,
-                         dir, df, value_is_ptr, val);
+    return hvmemul_do_io(1, gpa, reps, size, ram_gpa, dir, df, p_data);
 }
 
 /*
@@ -287,7 +302,7 @@ static int hvmemul_virtual_to_linear(
 static int __hvmemul_read(
     enum x86_segment seg,
     unsigned long offset,
-    unsigned long *val,
+    void *p_data,
     unsigned int bytes,
     enum hvm_access_type access_type,
     struct hvm_emulate_ctxt *hvmemul_ctxt)
@@ -303,8 +318,6 @@ static int __hvmemul_read(
     if ( rc != X86EMUL_OKAY )
         return rc;
 
-    *val = 0;
-
     if ( unlikely(curr->arch.hvm_vcpu.mmio_gva == (addr & PAGE_MASK)) &&
          curr->arch.hvm_vcpu.mmio_gva )
     {
@@ -314,7 +327,7 @@ static int __hvmemul_read(
         gpa = (((paddr_t)curr->arch.hvm_vcpu.mmio_gpfn << PAGE_SHIFT) | off);
         if ( (off + bytes) <= PAGE_SIZE )
             return hvmemul_do_mmio(gpa, &reps, bytes, 0,
-                                   IOREQ_READ, 0, 0, val);
+                                   IOREQ_READ, 0, p_data);
     }
 
     if ( (seg != x86_seg_none) &&
@@ -322,15 +335,13 @@ static int __hvmemul_read(
         pfec |= PFEC_user_mode;
 
     rc = ((access_type == hvm_access_insn_fetch) ?
-          hvm_fetch_from_guest_virt(val, addr, bytes, pfec) :
-          hvm_copy_from_guest_virt(val, addr, bytes, pfec));
+          hvm_fetch_from_guest_virt(p_data, addr, bytes, pfec) :
+          hvm_copy_from_guest_virt(p_data, addr, bytes, pfec));
     if ( rc == HVMCOPY_bad_gva_to_gfn )
         return X86EMUL_EXCEPTION;
 
     if ( rc == HVMCOPY_bad_gfn_to_mfn )
     {
-        unsigned long reps = 1;
-
         if ( access_type == hvm_access_insn_fetch )
             return X86EMUL_UNHANDLEABLE;
 
@@ -339,7 +350,7 @@ static int __hvmemul_read(
         if ( rc != X86EMUL_OKAY )
             return rc;
 
-        return hvmemul_do_mmio(gpa, &reps, bytes, 0, IOREQ_READ, 0, 0, val);
+        return hvmemul_do_mmio(gpa, &reps, bytes, 0, IOREQ_READ, 0, p_data);
     }
 
     return X86EMUL_OKAY;
@@ -348,19 +359,19 @@ static int __hvmemul_read(
 static int hvmemul_read(
     enum x86_segment seg,
     unsigned long offset,
-    unsigned long *val,
+    void *p_data,
     unsigned int bytes,
     struct x86_emulate_ctxt *ctxt)
 {
     return __hvmemul_read(
-        seg, offset, val, bytes, hvm_access_read,
+        seg, offset, p_data, bytes, hvm_access_read,
         container_of(ctxt, struct hvm_emulate_ctxt, ctxt));
 }
 
 static int hvmemul_insn_fetch(
     enum x86_segment seg,
     unsigned long offset,
-    unsigned long *val,
+    void *p_data,
     unsigned int bytes,
     struct x86_emulate_ctxt *ctxt)
 {
@@ -371,19 +382,18 @@ static int hvmemul_insn_fetch(
     /* Fall back if requested bytes are not in the prefetch cache. */
     if ( unlikely((insn_off + bytes) > hvmemul_ctxt->insn_buf_bytes) )
         return __hvmemul_read(
-            seg, offset, val, bytes,
+            seg, offset, p_data, bytes,
             hvm_access_insn_fetch, hvmemul_ctxt);
 
     /* Hit the cache. Simple memcpy. */
-    *val = 0;
-    memcpy(val, &hvmemul_ctxt->insn_buf[insn_off], bytes);
+    memcpy(p_data, &hvmemul_ctxt->insn_buf[insn_off], bytes);
     return X86EMUL_OKAY;
 }
 
 static int hvmemul_write(
     enum x86_segment seg,
     unsigned long offset,
-    unsigned long val,
+    void *p_data,
     unsigned int bytes,
     struct x86_emulate_ctxt *ctxt)
 {
@@ -406,29 +416,27 @@ static int hvmemul_write(
         unsigned int off = addr & (PAGE_SIZE - 1);
         gpa = (((paddr_t)curr->arch.hvm_vcpu.mmio_gpfn << PAGE_SHIFT) | off);
         if ( (off + bytes) <= PAGE_SIZE )
-            return hvmemul_do_mmio(gpa, &reps, bytes, val,
-                                   IOREQ_WRITE, 0, 0, NULL);
+            return hvmemul_do_mmio(gpa, &reps, bytes, 0,
+                                   IOREQ_WRITE, 0, p_data);
     }
 
     if ( (seg != x86_seg_none) &&
          (hvmemul_ctxt->seg_reg[x86_seg_ss].attr.fields.dpl == 3) )
         pfec |= PFEC_user_mode;
 
-    rc = hvm_copy_to_guest_virt(addr, &val, bytes, pfec);
+    rc = hvm_copy_to_guest_virt(addr, p_data, bytes, pfec);
     if ( rc == HVMCOPY_bad_gva_to_gfn )
         return X86EMUL_EXCEPTION;
 
     if ( rc == HVMCOPY_bad_gfn_to_mfn )
     {
-        unsigned long reps = 1;
-
         rc = hvmemul_linear_to_phys(
             addr, &gpa, bytes, &reps, pfec, hvmemul_ctxt);
         if ( rc != X86EMUL_OKAY )
             return rc;
 
-        return hvmemul_do_mmio(gpa, &reps, bytes, val,
-                               IOREQ_WRITE, 0, 0, NULL);
+        return hvmemul_do_mmio(gpa, &reps, bytes, 0,
+                               IOREQ_WRITE, 0, p_data);
     }
 
     return X86EMUL_OKAY;
@@ -442,12 +450,8 @@ static int hvmemul_cmpxchg(
     unsigned int bytes,
     struct x86_emulate_ctxt *ctxt)
 {
-    unsigned long new = 0;
-    if ( bytes > sizeof(new) )
-        return X86EMUL_UNHANDLEABLE;
-    memcpy(&new, p_new, bytes);
     /* Fix this in case the guest is really relying on r-m-w atomicity. */
-    return hvmemul_write(seg, offset, new, bytes, ctxt);
+    return hvmemul_write(seg, offset, p_new, bytes, ctxt);
 }
 
 static int hvmemul_rep_ins(
@@ -480,7 +484,7 @@ static int hvmemul_rep_ins(
         return rc;
 
     return hvmemul_do_pio(src_port, reps, bytes_per_rep, gpa, IOREQ_READ,
-                          !!(ctxt->regs->eflags & X86_EFLAGS_DF), 1, NULL);
+                          !!(ctxt->regs->eflags & X86_EFLAGS_DF), NULL);
 }
 
 static int hvmemul_rep_outs(
@@ -513,7 +517,7 @@ static int hvmemul_rep_outs(
         return rc;
 
     return hvmemul_do_pio(dst_port, reps, bytes_per_rep, gpa, IOREQ_WRITE,
-                          !!(ctxt->regs->eflags & X86_EFLAGS_DF), 1, NULL);
+                          !!(ctxt->regs->eflags & X86_EFLAGS_DF), NULL);
 }
 
 static int hvmemul_rep_movs(
@@ -563,14 +567,14 @@ static int hvmemul_rep_movs(
     if ( !p2m_is_ram(p2mt) )
         return hvmemul_do_mmio(
             sgpa, reps, bytes_per_rep, dgpa, IOREQ_READ,
-            !!(ctxt->regs->eflags & X86_EFLAGS_DF), 1, NULL);
+            !!(ctxt->regs->eflags & X86_EFLAGS_DF), NULL);
 
     (void)gfn_to_mfn_current(dgpa >> PAGE_SHIFT, &p2mt);
     if ( p2m_is_ram(p2mt) )
         return X86EMUL_UNHANDLEABLE;
     return hvmemul_do_mmio(
         dgpa, reps, bytes_per_rep, sgpa, IOREQ_WRITE,
-        !!(ctxt->regs->eflags & X86_EFLAGS_DF), 1, NULL);
+        !!(ctxt->regs->eflags & X86_EFLAGS_DF), NULL);
 }
 
 static int hvmemul_read_segment(
@@ -607,7 +611,8 @@ static int hvmemul_read_io(
     struct x86_emulate_ctxt *ctxt)
 {
     unsigned long reps = 1;
-    return hvmemul_do_pio(port, &reps, bytes, 0, IOREQ_READ, 0, 0, val);
+    *val = 0;
+    return hvmemul_do_pio(port, &reps, bytes, 0, IOREQ_READ, 0, val);
 }
 
 static int hvmemul_write_io(
@@ -617,7 +622,7 @@ static int hvmemul_write_io(
     struct x86_emulate_ctxt *ctxt)
 {
     unsigned long reps = 1;
-    return hvmemul_do_pio(port, &reps, bytes, val, IOREQ_WRITE, 0, 0, NULL);
+    return hvmemul_do_pio(port, &reps, bytes, 0, IOREQ_WRITE, 0, &val);
 }
 
 static int hvmemul_read_cr(

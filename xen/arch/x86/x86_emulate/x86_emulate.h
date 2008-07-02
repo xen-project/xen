@@ -102,7 +102,8 @@ enum x86_emulate_fpu_type {
 };
 
 /*
- * These operations represent the instruction emulator's interface to memory.
+ * These operations represent the instruction emulator's interface to memory,
+ * I/O ports, privileged state... pretty much everything other than GPRs.
  * 
  * NOTES:
  *  1. If the access fails (cannot emulate, or a standard access faults) then
@@ -110,8 +111,7 @@ enum x86_emulate_fpu_type {
  *     some out-of-band mechanism, unknown to the emulator. The memop signals
  *     failure by returning X86EMUL_EXCEPTION to the emulator, which will
  *     then immediately bail.
- *  2. Valid access sizes are 1, 2, 4 and 8 (x86/64 only) bytes.
- *  3. The emulator cannot handle 64-bit mode emulation on an x86/32 system.
+ *  2. The emulator cannot handle 64-bit mode emulation on an x86/32 system.
  */
 struct x86_emulate_ops
 {
@@ -121,19 +121,25 @@ struct x86_emulate_ops
      * All memory-access functions:
      *  @seg:   [IN ] Segment being dereferenced (specified as x86_seg_??).
      *  @offset:[IN ] Offset within segment.
+     *  @p_data:[IN ] Pointer to i/o data buffer (length is @bytes)
      * Read functions:
      *  @val:   [OUT] Value read, zero-extended to 'ulong'.
      * Write functions:
      *  @val:   [IN ] Value to write (low-order bytes used as req'd).
      * Variable-length access functions:
-     *  @bytes: [IN ] Number of bytes to read or write.
+     *  @bytes: [IN ] Number of bytes to read or write. Valid access sizes are
+     *                1, 2, 4 and 8 (x86/64 only) bytes, unless otherwise
+     *                stated.
      */
 
-    /* read: Emulate a memory read. */
+    /*
+     * read: Emulate a memory read.
+     *  @bytes: Access length (0 < @bytes < 4096).
+     */
     int (*read)(
         enum x86_segment seg,
         unsigned long offset,
-        unsigned long *val,
+        void *p_data,
         unsigned int bytes,
         struct x86_emulate_ctxt *ctxt);
 
@@ -144,15 +150,18 @@ struct x86_emulate_ops
     int (*insn_fetch)(
         enum x86_segment seg,
         unsigned long offset,
-        unsigned long *val,
+        void *p_data,
         unsigned int bytes,
         struct x86_emulate_ctxt *ctxt);
 
-    /* write: Emulate a memory write. */
+    /*
+     * write: Emulate a memory write.
+     *  @bytes: Access length (0 < @bytes < 4096).
+     */
     int (*write)(
         enum x86_segment seg,
         unsigned long offset,
-        unsigned long val,
+        void *p_data,
         unsigned int bytes,
         struct x86_emulate_ctxt *ctxt);
 

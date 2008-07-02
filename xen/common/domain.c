@@ -73,36 +73,13 @@ int current_domain_id(void)
     return current->domain->domain_id;
 }
 
-struct domain *alloc_domain(domid_t domid)
+static struct domain *alloc_domain_struct(void)
 {
-    struct domain *d;
-
-    if ( (d = xmalloc(struct domain)) == NULL )
-        return NULL;
-
-    memset(d, 0, sizeof(*d));
-    d->domain_id = domid;
-
-    if ( xsm_alloc_security_domain(d) != 0 )
-    {
-        free_domain(d);
-        return NULL;
-    }
-
-    atomic_set(&d->refcnt, 1);
-    spin_lock_init(&d->domain_lock);
-    spin_lock_init(&d->page_alloc_lock);
-    spin_lock_init(&d->shutdown_lock);
-    spin_lock_init(&d->hypercall_deadlock_mutex);
-    INIT_LIST_HEAD(&d->page_list);
-    INIT_LIST_HEAD(&d->xenpage_list);
-
-    return d;
+    return xmalloc(struct domain);
 }
 
-void free_domain(struct domain *d)
+static void free_domain_struct(struct domain *d)
 {
-    xsm_free_security_domain(d);
     xfree(d);
 }
 
@@ -210,11 +187,27 @@ struct domain *domain_create(
     domid_t domid, unsigned int domcr_flags, ssidref_t ssidref)
 {
     struct domain *d, **pd;
-    enum { INIT_evtchn = 1, INIT_gnttab = 2, INIT_arch = 8 }; 
+    enum { INIT_xsm = 1u<<0, INIT_rangeset = 1u<<1, INIT_evtchn = 1u<<2,
+           INIT_gnttab = 1u<<3, INIT_arch = 1u<<4 };
     int init_status = 0;
 
-    if ( (d = alloc_domain(domid)) == NULL )
+    if ( (d = alloc_domain_struct()) == NULL )
         return NULL;
+
+    memset(d, 0, sizeof(*d));
+    d->domain_id = domid;
+
+    if ( xsm_alloc_security_domain(d) != 0 )
+        goto fail;
+    init_status |= INIT_xsm;
+
+    atomic_set(&d->refcnt, 1);
+    spin_lock_init(&d->domain_lock);
+    spin_lock_init(&d->page_alloc_lock);
+    spin_lock_init(&d->shutdown_lock);
+    spin_lock_init(&d->hypercall_deadlock_mutex);
+    INIT_LIST_HEAD(&d->page_list);
+    INIT_LIST_HEAD(&d->xenpage_list);
 
     if ( domcr_flags & DOMCRF_hvm )
         d->is_hvm = 1;
@@ -222,7 +215,11 @@ struct domain *domain_create(
     if ( (domid == 0) && opt_dom0_vcpus_pin )
         d->is_pinned = 1;
 
+    if ( domcr_flags & DOMCRF_dummy )
+        return d;
+
     rangeset_domain_initialise(d);
+    init_status |= INIT_rangeset;
 
     if ( !is_idle_domain(d) )
     {
@@ -278,8 +275,11 @@ struct domain *domain_create(
         grant_table_destroy(d);
     if ( init_status & INIT_evtchn )
         evtchn_destroy(d);
-    rangeset_domain_destroy(d);
-    free_domain(d);
+    if ( init_status & INIT_rangeset )
+        rangeset_domain_destroy(d);
+    if ( init_status & INIT_xsm )
+        xsm_free_security_domain(d);
+    free_domain_struct(d);
     return NULL;
 }
 
@@ -535,7 +535,8 @@ static void complete_domain_destroy(struct rcu_head *head)
     if ( d->target != NULL )
         put_domain(d->target);
 
-    free_domain(d);
+    xsm_free_security_domain(d);
+    free_domain_struct(d);
 
     send_guest_global_virq(dom0, VIRQ_DOM_EXC);
 }

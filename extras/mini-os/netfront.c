@@ -38,7 +38,7 @@ struct net_buffer {
 struct netfront_dev {
     domid_t dom;
 
-    unsigned short tx_freelist[NET_TX_RING_SIZE];
+    unsigned short tx_freelist[NET_TX_RING_SIZE + 1];
     struct semaphore tx_sem;
 
     struct net_buffer rx_buffers[NET_RX_RING_SIZE];
@@ -70,14 +70,14 @@ void init_rx_buffers(struct netfront_dev *dev);
 
 static inline void add_id_to_freelist(unsigned int id,unsigned short* freelist)
 {
-    freelist[id] = freelist[0];
+    freelist[id + 1] = freelist[0];
     freelist[0]  = id;
 }
 
 static inline unsigned short get_id_from_freelist(unsigned short* freelist)
 {
     unsigned int id = freelist[0];
-    freelist[0] = freelist[id];
+    freelist[0] = freelist[id + 1];
     return id;
 }
 

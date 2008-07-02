@@ -125,7 +125,6 @@ struct blkfront_dev *init_blkfront(char *nodename, struct blkfront_info *info)
 
     dev->events = NULL;
 
-    // FIXME: proper frees on failures
 again:
     err = xenbus_transaction_start(&xbt);
     if (err) {

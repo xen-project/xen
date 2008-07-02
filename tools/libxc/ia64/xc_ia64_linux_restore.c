@@ -117,8 +117,9 @@ xc_ia64_recv_unallocated_list(int xc_handle, int io_fd, uint32_t dom,
 
 static int
 xc_ia64_recv_vcpu_context(int xc_handle, int io_fd, uint32_t dom,
-                          uint32_t vcpu, vcpu_guest_context_t *ctxt)
+                          uint32_t vcpu, vcpu_guest_context_any_t *ctxt_any)
 {
+    vcpu_guest_context_t *ctxt = &ctxt_any->c;
     if (read_exact(io_fd, ctxt, sizeof(*ctxt))) {
         ERROR("Error when reading ctxt");
         return -1;
@@ -128,14 +129,14 @@ xc_ia64_recv_vcpu_context(int xc_handle, int io_fd, uint32_t dom,
 
     /* Initialize and set registers.  */
     ctxt->flags = VGCF_EXTRA_REGS | VGCF_SET_CR_IRR | VGCF_online;
-    if (xc_vcpu_setcontext(xc_handle, dom, vcpu, ctxt) != 0) {
+    if (xc_vcpu_setcontext(xc_handle, dom, vcpu, ctxt_any) != 0) {
         ERROR("Couldn't set vcpu context");
         return -1;
     }
 
     /* Just a check.  */
     ctxt->flags = 0;
-    if (xc_vcpu_getcontext(xc_handle, dom, vcpu, ctxt)) {
+    if (xc_vcpu_getcontext(xc_handle, dom, vcpu, ctxt_any)) {
         ERROR("Could not get vcpu context");
         return -1;
     }
@@ -226,19 +227,20 @@ xc_ia64_pv_recv_vcpu_context(int xc_handle, int io_fd, int32_t dom,
     int rc = -1;
 
     /* A copy of the CPU context of the guest. */
-    vcpu_guest_context_t ctxt;
-    
-    if (lock_pages(&ctxt, sizeof(ctxt))) {
+    vcpu_guest_context_any_t ctxt_any;
+    vcpu_guest_context_t *ctxt = &ctxt_any.c;
+
+    if (lock_pages(&ctxt_any, sizeof(ctxt_any))) {
         /* needed for build domctl, but might as well do early */
         ERROR("Unable to lock_pages ctxt");
         return -1;
     }
 
-    if (xc_ia64_recv_vcpu_context(xc_handle, io_fd, dom, vcpu, &ctxt))
+    if (xc_ia64_recv_vcpu_context(xc_handle, io_fd, dom, vcpu, &ctxt_any))
         goto out;
 
     /* Then get privreg page.  */
-    if (read_page(xc_handle, io_fd, dom, ctxt.privregs_pfn) < 0) {
+    if (read_page(xc_handle, io_fd, dom, ctxt->privregs_pfn) < 0) {
         ERROR("Could not read vcpu privregs");
         goto out;
     }
@@ -441,12 +443,12 @@ xc_ia64_hvm_recv_context(int xc_handle, int io_fd, uint32_t dom,
     /* vcpu context */
     for (i = 0; i <= info.max_vcpu_id; i++) {
         /* A copy of the CPU context of the guest. */
-        vcpu_guest_context_t ctxt;
+        vcpu_guest_context_any_t ctxt_any;
 
         if (!__test_bit(i, vcpumap))
             continue;
 
-        if (xc_ia64_recv_vcpu_context(xc_handle, io_fd, dom, i, &ctxt))
+        if (xc_ia64_recv_vcpu_context(xc_handle, io_fd, dom, i, &ctxt_any))
             goto out;
 
         /* system context of vcpu is recieved as hvm context. */

@@ -412,7 +412,7 @@ static int suspend_and_state(int (*suspend)(int), int xc_handle, int io_fd,
 ** it to update the MFN to a reasonable value.
 */
 static void *map_frame_list_list(int xc_handle, uint32_t dom,
-                                 shared_info_either_t *shinfo)
+                                 shared_info_any_t *shinfo)
 {
     int count = 100;
     void *p;
@@ -628,9 +628,9 @@ static xen_pfn_t *map_and_save_p2m_table(int xc_handle,
                                          int io_fd, 
                                          uint32_t dom,
                                          unsigned long p2m_size,
-                                         shared_info_either_t *live_shinfo)
+                                         shared_info_any_t *live_shinfo)
 {
-    vcpu_guest_context_either_t ctxt;
+    vcpu_guest_context_any_t ctxt;
 
     /* Double and single indirect references to the live P2M table */
     void *live_p2m_frame_list_list = NULL;
@@ -735,7 +735,7 @@ static xen_pfn_t *map_and_save_p2m_table(int xc_handle,
         p2m_frame_list[i/FPP] = mfn_to_pfn(p2m_frame_list[i/FPP]);
     }
 
-    if ( xc_vcpu_getcontext(xc_handle, dom, 0, &ctxt.c) )
+    if ( xc_vcpu_getcontext(xc_handle, dom, 0, &ctxt) )
     {
         ERROR("Could not get vcpu context");
         goto out;
@@ -814,7 +814,7 @@ int xc_domain_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
     unsigned long shared_info_frame;
 
     /* A copy of the CPU context of the guest. */
-    vcpu_guest_context_either_t ctxt;
+    vcpu_guest_context_any_t ctxt;
 
     /* A table containing the type of each PFN (/not/ MFN!). */
     unsigned long *pfn_type = NULL;
@@ -824,7 +824,7 @@ int xc_domain_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
     char page[PAGE_SIZE];
 
     /* Live mapping of shared info structure */
-    shared_info_either_t *live_shinfo = NULL;
+    shared_info_any_t *live_shinfo = NULL;
 
     /* base of the region in which domain memory is mapped */
     unsigned char *region_base = NULL;
@@ -1536,7 +1536,7 @@ int xc_domain_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
         }
     }
 
-    if ( xc_vcpu_getcontext(xc_handle, dom, 0, &ctxt.c) )
+    if ( xc_vcpu_getcontext(xc_handle, dom, 0, &ctxt) )
     {
         ERROR("Could not get vcpu context");
         goto out;
@@ -1556,7 +1556,7 @@ int xc_domain_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
         if ( !(vcpumap & (1ULL << i)) )
             continue;
 
-        if ( (i != 0) && xc_vcpu_getcontext(xc_handle, dom, i, &ctxt.c) )
+        if ( (i != 0) && xc_vcpu_getcontext(xc_handle, dom, i, &ctxt) )
         {
             ERROR("No context for VCPU%d", i);
             goto out;
@@ -1624,7 +1624,7 @@ int xc_domain_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
      * Reset the MFN to be a known-invalid value. See map_frame_list_list().
      */
     memcpy(page, live_shinfo, PAGE_SIZE);
-    SET_FIELD(((shared_info_either_t *)page), 
+    SET_FIELD(((shared_info_any_t *)page), 
               arch.pfn_to_mfn_frame_list_list, 0);
     if ( write_exact(io_fd, page, PAGE_SIZE) )
     {

@@ -15,7 +15,7 @@ __all__ = [ "block_attach", "block_detach" ]
 
 
 def get_state(domain, devname):
-    number = xen.util.blkif.blkdev_name_to_number(devname)
+    (path, number) = xen.util.blkif.blkdev_name_to_number(devname)
     s, o = traceCommand("xm block-list %s | awk '/^%d/ {print $4}'" %
                         (domain.getName(), number))
     if s != 0:

@@ -702,7 +702,7 @@ void print_stack(vcpu_guest_context_t *ctx, int vcpu)
 void dump_ctx(int vcpu)
 {
     int ret;
-    vcpu_guest_context_t ctx;
+    vcpu_guest_context_any_t ctx;
     xc_dominfo_t dominfo;
 
     xc_handle = xc_interface_open(); /* for accessing control interface */
@@ -727,10 +727,10 @@ void dump_ctx(int vcpu)
         exit(-1);
     }
 
-    print_ctx(&ctx);
+    print_ctx(&ctx.c);
 #ifndef NO_TRANSLATION
-    if (is_kernel_text(INSTR_POINTER((&ctx.user_regs))))
-        print_stack(&ctx, vcpu);
+    if (is_kernel_text(INSTR_POINTER((&ctx.c.user_regs))))
+        print_stack(&ctx.c, vcpu);
 #endif
 
     if (!dominfo.paused) {

@@ -383,7 +383,8 @@ acpi_parse_one_drhd(struct acpi_dmar_entry_header *header)
     dmaru->address = drhd->address;
     dmaru->include_all = drhd->flags & 1; /* BIT0: INCLUDE_ALL */
     INIT_LIST_HEAD(&dmaru->ioapic_list);
-    dprintk(XENLOG_INFO VTDPREFIX, "dmaru->address = %lx\n", dmaru->address);
+    dprintk(XENLOG_INFO VTDPREFIX, "dmaru->address = %"PRIx64"\n",
+            dmaru->address);
 
     dev_scope_start = (void *)(drhd + 1);
     dev_scope_end   = ((void *)drhd) + header->length;

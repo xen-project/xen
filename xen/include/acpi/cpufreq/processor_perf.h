@@ -6,9 +6,21 @@
 
 int get_cpu_id(u8);
 int acpi_cpufreq_init(void);
+int powernow_cpufreq_init(void);
+
 void px_statistic_update(cpumask_t, uint8_t, uint8_t);
 int  px_statistic_init(int);
 void px_statistic_reset(int);
+void px_statistic_suspend(void);
+void px_statistic_resume(void);
+
+void cpufreq_dom_exit(void);
+int  cpufreq_dom_init(void);
+int  cpufreq_dom_dbs(unsigned int);
+void cpufreq_suspend(void);
+int  cpufreq_resume(void);
+
+inline uint64_t get_cpu_idle_time(unsigned int);
 
 struct processor_performance {
     uint32_t state;
@@ -44,6 +56,7 @@ struct px_stat {
 struct pm_px {
     struct px_stat u;
     uint64_t prev_state_wall;
+    uint64_t prev_idle_wall;
 };
 
 extern struct pm_px px_statistic_data[NR_CPUS];

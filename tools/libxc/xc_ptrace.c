@@ -40,9 +40,9 @@ static int current_domid = -1;
 static int current_isfile;
 static int current_is_hvm;
 
-static uint64_t                 online_cpumap;
-static uint64_t                 regs_valid;
-static vcpu_guest_context_t     ctxt[MAX_VIRT_CPUS];
+static uint64_t                         online_cpumap;
+static uint64_t                         regs_valid;
+static vcpu_guest_context_any_t      ctxt[MAX_VIRT_CPUS];
 
 extern int ffsll(long long int);
 #define FOREACH_CPU(cpumap, i)  for ( cpumap = online_cpumap; (i = ffsll(cpumap)); cpumap &= ~(1 << (index - 1)) )
@@ -96,9 +96,9 @@ xc_register_event_handler(thr_ev_handler_t h,
 }
 
 static inline int
-paging_enabled(vcpu_guest_context_t *v)
+paging_enabled(vcpu_guest_context_any_t *v)
 {
-    unsigned long cr0 = v->ctrlreg[0];
+    unsigned long cr0 = v->c.ctrlreg[0];
     return (cr0 & X86_CR0_PE) && (cr0 & X86_CR0_PG);
 }
 
@@ -174,7 +174,7 @@ map_domain_va_32(
 
     l2 = xc_map_foreign_range(
          xc_handle, current_domid, PAGE_SIZE, PROT_READ,
-         xen_cr3_to_pfn(ctxt[cpu].ctrlreg[3]));
+         xen_cr3_to_pfn(ctxt[cpu].c.ctrlreg[3]));
     if ( l2 == NULL )
         return NULL;
 
@@ -216,7 +216,7 @@ map_domain_va_pae(
 
     l3 = xc_map_foreign_range(
         xc_handle, current_domid, PAGE_SIZE, PROT_READ,
-        xen_cr3_to_pfn(ctxt[cpu].ctrlreg[3]));
+        xen_cr3_to_pfn(ctxt[cpu].c.ctrlreg[3]));
     if ( l3 == NULL )
         return NULL;
 
@@ -264,12 +264,12 @@ map_domain_va_64(
     uint64_t *l4, *l3, *l2, *l1;
     static void *v[MAX_VIRT_CPUS];
 
-    if ((ctxt[cpu].ctrlreg[4] & 0x20) == 0 ) /* legacy ia32 mode */
+    if ((ctxt[cpu].c.ctrlreg[4] & 0x20) == 0 ) /* legacy ia32 mode */
         return map_domain_va_32(xc_handle, cpu, guest_va, perm);
 
     l4 = xc_map_foreign_range(
         xc_handle, current_domid, PAGE_SIZE, PROT_READ,
-        xen_cr3_to_pfn(ctxt[cpu].ctrlreg[3]));
+        xen_cr3_to_pfn(ctxt[cpu].c.ctrlreg[3]));
     if ( l4 == NULL )
         return NULL;
 
@@ -494,26 +494,26 @@ xc_ptrace(
     case PTRACE_GETREGS:
         if (!current_isfile && fetch_regs(xc_handle, cpu, NULL))
             goto out_error;
-        SET_PT_REGS(pt, ctxt[cpu].user_regs);
+        SET_PT_REGS(pt, ctxt[cpu].c.user_regs);
         memcpy(data, &pt, sizeof(struct gdb_regs));
         break;
 
     case PTRACE_GETFPREGS:
         if (!current_isfile && fetch_regs(xc_handle, cpu, NULL)) 
                 goto out_error;
-        memcpy(data, &ctxt[cpu].fpu_ctxt, sizeof (elf_fpregset_t));
+        memcpy(data, &ctxt[cpu].c.fpu_ctxt, sizeof (elf_fpregset_t));
         break;
 
     case PTRACE_GETFPXREGS:
         if (!current_isfile && fetch_regs(xc_handle, cpu, NULL))
                 goto out_error;
-        memcpy(data, &ctxt[cpu].fpu_ctxt, sizeof(ctxt[cpu].fpu_ctxt));
+        memcpy(data, &ctxt[cpu].c.fpu_ctxt, sizeof(ctxt[cpu].c.fpu_ctxt));
         break;
 
     case PTRACE_SETREGS:
         if (current_isfile)
                 goto out_unsupported; /* XXX not yet supported */
-        SET_XC_REGS(((struct gdb_regs *)data), ctxt[cpu].user_regs);
+        SET_XC_REGS(((struct gdb_regs *)data), ctxt[cpu].c.user_regs);
         if ((retval = xc_vcpu_setcontext(xc_handle, current_domid, cpu,
                                 &ctxt[cpu])))
             goto out_error_domctl;
@@ -525,7 +525,7 @@ xc_ptrace(
         /*  XXX we can still have problems if the user switches threads
          *  during single-stepping - but that just seems retarded
          */
-        ctxt[cpu].user_regs.eflags |= PSL_T;
+        ctxt[cpu].c.user_regs.eflags |= PSL_T;
         if ((retval = xc_vcpu_setcontext(xc_handle, current_domid, cpu,
                                 &ctxt[cpu])))
             goto out_error_domctl;
@@ -542,9 +542,9 @@ xc_ptrace(
                 if (fetch_regs(xc_handle, cpu, NULL))
                     goto out_error;
                 /* Clear trace flag */
-                if ( ctxt[cpu].user_regs.eflags & PSL_T )
+                if ( ctxt[cpu].c.user_regs.eflags & PSL_T )
                 {
-                    ctxt[cpu].user_regs.eflags &= ~PSL_T;
+                    ctxt[cpu].c.user_regs.eflags &= ~PSL_T;
                     if ((retval = xc_vcpu_setcontext(xc_handle, current_domid,
                                                 cpu, &ctxt[cpu])))
                         goto out_error_domctl;

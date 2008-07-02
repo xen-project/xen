@@ -222,7 +222,7 @@ int invalidate_sync(struct iommu *iommu)
     int ret = -1;
     struct qi_ctrl *qi_ctrl = iommu_qi_ctrl(iommu);
 
-    if ( qi_ctrl->qinval_maddr == 0 )
+    if ( qi_ctrl->qinval_maddr != 0 )
     {
         ret = queue_invalidate_wait(iommu,
             0, 1, 1, 1, &qi_ctrl->qinval_poll_status);
@@ -416,7 +416,6 @@ static int flush_iotlb_qi(
 int qinval_setup(struct iommu *iommu)
 {
     s_time_t start_time;
-    u32 status = 0;
     struct qi_ctrl *qi_ctrl;
     struct iommu_flush *flush;
 
@@ -450,15 +449,12 @@ int qinval_setup(struct iommu *iommu)
 
     /* Make sure hardware complete it */
     start_time = NOW();
-    for ( ; ; )
+    while ( !(dmar_readl(iommu->reg, DMAR_GSTS_REG) & DMA_GSTS_QIES) )
     {
-        status = dmar_readl(iommu->reg, DMAR_GSTS_REG);
-        if ( status & DMA_GSTS_QIES )
-            break;
         if ( NOW() > (start_time + DMAR_OPERATION_TIMEOUT) )
             panic("Cannot set QIE field for queue invalidation\n");
         cpu_relax();
     }
-    status = 0;
-    return status;
+
+    return 0;
 }

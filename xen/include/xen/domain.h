@@ -16,9 +16,6 @@ int boot_vcpu(
 struct vcpu *alloc_idle_vcpu(unsigned int cpu_id);
 void vcpu_reset(struct vcpu *v);
 
-struct domain *alloc_domain(domid_t domid);
-void free_domain(struct domain *d);
-
 struct xen_domctl_getdomaininfo;
 void getdomaininfo(struct domain *d, struct xen_domctl_getdomaininfo *info);
 

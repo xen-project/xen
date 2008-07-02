@@ -37,6 +37,41 @@ struct cpufreq_driver *cpufreq_driver;
  *                    Px STATISTIC INFO                              *
  *********************************************************************/
 
+void px_statistic_suspend(void)
+{
+    int cpu;
+    uint64_t now;
+
+    now = NOW();
+
+    for_each_online_cpu(cpu) {
+        struct pm_px *pxpt = &px_statistic_data[cpu];
+        uint64_t total_idle_ns;
+        uint64_t tmp_idle_ns;
+
+        total_idle_ns = get_cpu_idle_time(cpu);
+        tmp_idle_ns = total_idle_ns - pxpt->prev_idle_wall;
+
+        pxpt->u.pt[pxpt->u.cur].residency +=
+                    now - pxpt->prev_state_wall;
+        pxpt->u.pt[pxpt->u.cur].residency -= tmp_idle_ns;
+    }
+}
+
+void px_statistic_resume(void)
+{
+    int cpu;
+    uint64_t now;
+
+    now = NOW();
+
+    for_each_online_cpu(cpu) {
+        struct pm_px *pxpt = &px_statistic_data[cpu];
+        pxpt->prev_state_wall = now;
+        pxpt->prev_idle_wall = get_cpu_idle_time(cpu);
+    }
+}
+
 void px_statistic_update(cpumask_t cpumask, uint8_t from, uint8_t to)
 {
     uint32_t i;
@@ -47,15 +82,22 @@ void px_statistic_update(cpumask_t cpumask, uint8_t from, uint8_t to)
     for_each_cpu_mask(i, cpumask) {
         struct pm_px *pxpt = &px_statistic_data[i];
         uint32_t statnum = processor_pminfo[i].perf.state_count;
+        uint64_t total_idle_ns;
+        uint64_t tmp_idle_ns;
+
+        total_idle_ns = get_cpu_idle_time(i);
+        tmp_idle_ns = total_idle_ns - pxpt->prev_idle_wall;
 
         pxpt->u.last = from;
         pxpt->u.cur = to;
         pxpt->u.pt[to].count++;
         pxpt->u.pt[from].residency += now - pxpt->prev_state_wall;
+        pxpt->u.pt[from].residency -= tmp_idle_ns;
 
         (*(pxpt->u.trans_pt + from*statnum + to))++;
 
         pxpt->prev_state_wall = now;
+        pxpt->prev_idle_wall = total_idle_ns;
     }
 }
 
@@ -87,6 +129,7 @@ int px_statistic_init(int cpuid)
         pxpt->u.pt[i].freq = pmpt->perf.states[i].core_frequency;
 
     pxpt->prev_state_wall = NOW();
+    pxpt->prev_idle_wall = get_cpu_idle_time(cpuid);
 
     return 0;
 }
@@ -107,6 +150,7 @@ void px_statistic_reset(int cpuid)
     }
 
     pxpt->prev_state_wall = NOW();
+    pxpt->prev_idle_wall = get_cpu_idle_time(cpuid);
 }
 
 
@@ -240,5 +284,64 @@ int __cpufreq_driver_getavg(struct cpufreq_policy *policy)
     if (cpu_online(policy->cpu) && cpufreq_driver->getavg)
         ret = cpufreq_driver->getavg(policy->cpu);
 
+    return ret;
+}
+
+
+/*********************************************************************
+ *               CPUFREQ SUSPEND/RESUME                              *
+ *********************************************************************/
+
+void cpufreq_suspend(void)
+{
+    int cpu;
+
+    /* to protect the case when Px was controlled by dom0-kernel */
+    /* or when CPU_FREQ not set in which case ACPI Px objects not parsed */
+    for_each_online_cpu(cpu) {
+        struct processor_performance *perf = &processor_pminfo[cpu].perf;
+
+        if (!perf->init)
+            return;
+    }
+
+    cpufreq_dom_dbs(CPUFREQ_GOV_STOP);
+
+    cpufreq_dom_exit();
+
+    px_statistic_suspend();
+}
+
+int cpufreq_resume(void)
+{
+    int cpu, ret = 0;
+
+    /* 1. to protect the case when Px was controlled by dom0-kernel */
+    /* or when CPU_FREQ not set in which case ACPI Px objects not parsed */
+    /* 2. set state and resume flag to sync cpu to right state and freq */
+    for_each_online_cpu(cpu) {
+        struct processor_performance *perf = &processor_pminfo[cpu].perf;
+        struct cpufreq_policy *policy = &xen_px_policy[cpu];
+
+        if (!perf->init)
+            goto err;
+        perf->state = 0;
+        policy->resume = 1;
+    }
+
+    px_statistic_resume();
+
+    ret = cpufreq_dom_init();
+    if (ret)
+        goto err;
+
+    ret = cpufreq_dom_dbs(CPUFREQ_GOV_START);
+    if (ret)
+        goto err;
+
+    return ret;
+
+err:
+    cpufreq_dom_exit();
     return ret;
 }

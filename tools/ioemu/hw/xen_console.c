@@ -160,16 +160,18 @@ int xs_gather(struct xs_handle *xs, const char *dir, ...)
 
 static int domain_create_ring(struct domain *dom)
 {
-	int err, remote_port, ring_ref, rc;
+	int err, remote_port, ring_ref, limit, rc;
 
 	err = xs_gather(dom->xsh, dom->serialpath,
 			"ring-ref", "%u", &ring_ref,
 			"port", "%i", &remote_port,
+			"limit", "%i", &limit,
 			NULL);
 	if (err) {
 		err = xs_gather(dom->xsh, dom->conspath,
 				"ring-ref", "%u", &ring_ref,
 				"port", "%i", &remote_port,
+				"limit", "%i", &limit,
 				NULL);
 		if (err) {
 			fprintf(stderr, "Console: failed to find ring-ref/port yet\n");
@@ -178,7 +180,9 @@ static int domain_create_ring(struct domain *dom)
 		dom->use_consolepath = 1;
 	} else
 		dom->use_consolepath = 0;
-	fprintf(stderr, "Console: got ring-ref %d port %d\n", ring_ref, remote_port);
+	dom->buffer.max_capacity = limit;
+	fprintf(stderr, "Console: got ring-ref %d port %d limit %d\n", 
+		ring_ref, remote_port, limit);
 
 	if ((ring_ref == dom->ring_ref) && (remote_port == dom->remote_port))
 		goto out;

@@ -1,0 +1,43 @@
+#!/bin/bash
+#
+# xenballoon-monitor - monitor certain stats from xenballoond
+#   (run in dom0 with "watch -d xenballoon-monitor" for xentop-like output)
+#
+# Copyright (C) 2009 Oracle Corporation and/or its affiliates.
+# All rights reserved
+# Written by: Dan Magenheimer <dan.magenheimer@oracle.com>
+#
+# Hint: Use "xm sched-credit -d 0 -w 2000" to watch on heavily loaded machines
+#
+echo "id   mem-kb  tgt-kb  commit   swapin  swapout      pgin     pgout active(sec)"
+for i in `xenstore-list /local/domain`; do
+ if [ "$i" -ne 0 ]; then
+ tot=0; tgt=0; sin=0; sout=0; pgin=0; pgout=0; cmt=0; up=0; idle=0; act=0;
+ if xenstore-exists /local/domain/$i/memory/meminfo; then
+  tot=`xenstore-read /local/domain/$i/memory/meminfo | grep MemTotal \
+   | sed 's/[^1-9]*\([1-9][0-9]*\).*/\1/'`
+  cmt=`xenstore-read /local/domain/$i/memory/meminfo | grep Committed_AS \
+   | sed 's/[^1-9]*\([1-9][0-9]*\).*/\1/'`
+ fi
+ if xenstore-exists /local/domain/$i/memory/selftarget; then
+  tgt=`xenstore-read /local/domain/$i/memory/selftarget`
+ fi
+ if xenstore-exists /local/domain/$i/memory/vmstat; then
+  sin=`xenstore-read /local/domain/$i/memory/vmstat | grep pswpin \
+ 	| cut -d" " -f2`
+  sout=`xenstore-read /local/domain/$i/memory/vmstat | grep pswpout \
+ 	| cut -d" " -f2`
+  pgin=`xenstore-read /local/domain/$i/memory/vmstat | grep pgpgin \
+ 	| cut -d" " -f2`
+  pgout=`xenstore-read /local/domain/$i/memory/vmstat | grep pgout \
+  	| cut -d" " -f2`
+ fi
+ if xenstore-exists /local/domain/$i/memory/uptime; then
+  up=`xenstore-read /local/domain/$i/memory/uptime | cut -d" " -f1`
+  idle=`xenstore-read /local/domain/$i/memory/uptime | cut -d" " -f2`
+  act=`echo $up - $idle | bc -iq`
+ fi
+ printf "%2d %8d%8d%8d%9d%9d%10d%10d%10.2f\n" $i $tot $tgt $cmt $sin $sout $pgin $pgout $act
+ fi
+done
+echo Free memory: `xm info | grep free | sed 's/[^1-9]*\([1-9][0-9]*\).*/\1/'` MB

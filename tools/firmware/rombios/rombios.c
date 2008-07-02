@@ -9783,6 +9783,27 @@ smbios_init:
 
 #endif
 
+#if BX_TCGBIOS
+; The section between the POST entry and the NMI entry is filling up
+; and causes crashes if this code was directly there
+tcpa_post_part1:
+  call _tcpa_acpi_init
+
+  push dword #0
+  call _tcpa_initialize_tpm
+  add sp, #4
+
+  call _tcpa_do_measure_POSTs
+  call _tcpa_wake_event     /* specs: 3.2.3.7 */
+  ret
+
+tcpa_post_part2:
+  call _tcpa_calling_int19h          /* specs: 8.2.3 step 1 */
+  call _tcpa_add_event_separators    /* specs: 8.2.3 step 2 */
+  /* we do not call int 19h handler but keep following eventlog */
+  call _tcpa_returned_int19h         /* specs: 8.2.3 step 3/7 */
+  ret
+#endif
 
 
 ;; for 'C' strings and other data, insert them here with
@@ -10003,14 +10024,7 @@ post_default_ints:
   mov  0x0410, ax
 
 #if BX_TCGBIOS
-  call _tcpa_acpi_init
-
-  push dword #0
-  call _tcpa_initialize_tpm
-  add sp, #4
-
-  call _tcpa_do_measure_POSTs
-  call _tcpa_wake_event     /* specs: 3.2.3.7 */
+  call tcpa_post_part1
 #endif
 
   ;; Parallel setup
@@ -10138,10 +10152,7 @@ post_default_ints:
   call _interactive_bootkey
 
 #if BX_TCGBIOS
-  call _tcpa_calling_int19h          /* specs: 8.2.3 step 1 */
-  call _tcpa_add_event_separators    /* specs: 8.2.3 step 2 */
-  /* we do not call int 19h handler but keep following eventlog */
-  call _tcpa_returned_int19h         /* specs: 8.2.3 step 3/7 */
+  call tcpa_post_part2
 #endif
 
   ;; Start the boot sequence.   See the comments in int19_relocated 

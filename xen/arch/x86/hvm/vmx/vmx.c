@@ -1523,7 +1523,8 @@ static int vmx_cr_access(unsigned long exit_qualification,
         break;
     case VMX_CONTROL_REG_ACCESS_TYPE_LMSW:
         value = v->arch.hvm_vcpu.guest_cr[0];
-        value = (value & ~0xFFFF) | ((exit_qualification >> 16) & 0xFFFF);
+        /* LMSW can: (1) set bits 0-3; (2) clear bits 1-3. */
+        value = (value & ~0xe) | ((exit_qualification >> 16) & 0xf);
         HVMTRACE_LONG_1D(LMSW, current, value);
         return !hvm_set_cr0(value);
     default:
@@ -1655,7 +1656,7 @@ static int vmx_msr_read_intercept(struct cpu_user_regs *regs)
                 goto done;
         }
 
-        if ( vmx_read_guest_msr(v, ecx, &msr_content) == 0 )
+        if ( vmx_read_guest_msr(ecx, &msr_content) == 0 )
             break;
 
         if ( is_last_branch_msr(ecx) )
@@ -1817,12 +1818,12 @@ static int vmx_msr_write_intercept(struct cpu_user_regs *regs)
 
             for ( ; (rc == 0) && lbr->count; lbr++ )
                 for ( i = 0; (rc == 0) && (i < lbr->count); i++ )
-                    if ( (rc = vmx_add_guest_msr(v, lbr->base + i)) == 0 )
+                    if ( (rc = vmx_add_guest_msr(lbr->base + i)) == 0 )
                         vmx_disable_intercept_for_msr(v, lbr->base + i);
         }
 
         if ( (rc < 0) ||
-             (vmx_add_host_load_msr(v, ecx) < 0) )
+             (vmx_add_host_load_msr(ecx) < 0) )
             vmx_inject_hw_exception(v, TRAP_machine_check, 0);
         else
         {
@@ -1842,7 +1843,7 @@ static int vmx_msr_write_intercept(struct cpu_user_regs *regs)
         switch ( long_mode_do_msr_write(regs) )
         {
             case HNDL_unhandled:
-                if ( (vmx_write_guest_msr(v, ecx, msr_content) != 0) &&
+                if ( (vmx_write_guest_msr(ecx, msr_content) != 0) &&
                      !is_last_branch_msr(ecx) )
                     wrmsr_hypervisor_regs(ecx, regs->eax, regs->edx);
                 break;

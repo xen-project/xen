@@ -36,7 +36,10 @@ struct cpufreq_policy {
     unsigned int        max;    /* in kHz */
     unsigned int        cur;    /* in kHz, only needed if cpufreq
                                  * governors are used */
+    unsigned int        resume; /* flag for cpufreq 1st run
+                                 * S3 wakeup, hotplug cpu, etc */
 };
+extern struct cpufreq_policy xen_px_policy[NR_CPUS];
 
 #define CPUFREQ_SHARED_TYPE_NONE (0) /* None */
 #define CPUFREQ_SHARED_TYPE_HW   (1) /* HW does needed coordination */

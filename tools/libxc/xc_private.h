@@ -188,9 +188,9 @@ int xc_map_foreign_ranges(int xc_handle, uint32_t dom,
                           privcmd_mmap_entry_t *entries, int nr);
 
 void *map_domain_va_core(unsigned long domfd, int cpu, void *guest_va,
-                         vcpu_guest_context_t *ctxt);
+                         vcpu_guest_context_any_t *ctxt);
 int xc_waitdomain_core(int xc_handle, int domain, int *status,
-    int options, vcpu_guest_context_t *ctxt);
+    int options, vcpu_guest_context_any_t *ctxt);
 
 void bitmap_64_to_byte(uint8_t *bp, const uint64_t *lp, int nbits);
 void bitmap_byte_to_64(uint64_t *lp, const uint8_t *bp, int nbits);

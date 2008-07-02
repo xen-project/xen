@@ -31,6 +31,11 @@
 #include <xen/xsm/acm_ops.h>
 #include <xen/xsm/flask_op.h>
 
+#if defined(__i386__) || defined(__x86_64__)
+#include <xen/foreign/x86_32.h>
+#include <xen/foreign/x86_64.h>
+#endif
+
 #ifdef __ia64__
 #define XC_PAGE_SHIFT           14
 #else
@@ -162,6 +167,35 @@ typedef struct xc_dominfo {
 } xc_dominfo_t;
 
 typedef xen_domctl_getdomaininfo_t xc_domaininfo_t;
+
+typedef union 
+{
+#if defined(__i386__) || defined(__x86_64__)
+    vcpu_guest_context_x86_64_t x64;
+    vcpu_guest_context_x86_32_t x32;   
+#endif
+    vcpu_guest_context_t c;
+} vcpu_guest_context_any_t;
+
+typedef union
+{
+#if defined(__i386__) || defined(__x86_64__)
+    shared_info_x86_64_t x64;
+    shared_info_x86_32_t x32;
+#endif
+    shared_info_t s;
+} shared_info_any_t;
+
+typedef union
+{
+#if defined(__i386__) || defined(__x86_64__)
+    start_info_x86_64_t x64;
+    start_info_x86_32_t x32;
+#endif
+    start_info_t s;
+} start_info_any_t;
+
+
 int xc_domain_create(int xc_handle,
                      uint32_t ssidref,
                      xen_domain_handle_t handle,
@@ -307,7 +341,7 @@ int xc_domain_getinfo(int xc_handle,
 int xc_vcpu_setcontext(int xc_handle,
                        uint32_t domid,
                        uint32_t vcpu,
-                       vcpu_guest_context_t *ctxt);
+                       vcpu_guest_context_any_t *ctxt);
 /**
  * This function will return information about one or more domains, using a
  * single hypercall.  The domain information will be stored into the supplied
@@ -368,7 +402,7 @@ int xc_domain_hvm_setcontext(int xc_handle,
 int xc_vcpu_getcontext(int xc_handle,
                        uint32_t domid,
                        uint32_t vcpu,
-                       vcpu_guest_context_t *ctxt);
+                       vcpu_guest_context_any_t *ctxt);
 
 typedef xen_domctl_getvcpuinfo_t xc_vcpuinfo_t;
 int xc_vcpu_getinfo(int xc_handle,
@@ -894,6 +928,12 @@ int xc_hvm_track_dirty_vram(
     int xc_handle, domid_t dom,
     uint64_t first_pfn, uint64_t nr,
     unsigned long *bitmap);
+
+/*
+ * Notify that some pages got modified by the Device Model
+ */
+int xc_hvm_modified_memory(
+    int xc_handle, domid_t dom, uint64_t first_pfn, uint64_t nr);
 
 typedef enum {
   XC_ERROR_NONE = 0,

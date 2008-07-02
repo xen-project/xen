@@ -308,9 +308,10 @@ xc_core_arch_context_free(struct xc_core_arch_context* arch_ctxt)
 
 int
 xc_core_arch_context_get(struct xc_core_arch_context* arch_ctxt,
-                         vcpu_guest_context_t* ctxt,
+                         vcpu_guest_context_any_t* ctxt_any,
                          int xc_handle, uint32_t domid)
 {
+    vcpu_guest_context_t *ctxt = &ctxt_any->c;
     mapped_regs_t* mapped_regs;
 
     if ( ctxt->privregs_pfn == VGC_PRIVREGS_HVM )

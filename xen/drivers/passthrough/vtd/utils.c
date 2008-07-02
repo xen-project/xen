@@ -166,7 +166,7 @@ void print_iommu_regs(struct acpi_drhd_unit *drhd)
     struct iommu *iommu = drhd->iommu;
 
     printk("---- print_iommu_regs ----\n");
-    printk("print_iommu_regs: drhd->address = %lx\n", drhd->address);
+    printk("print_iommu_regs: drhd->address = %"PRIx64"\n", drhd->address);
     printk("print_iommu_regs: DMAR_VER_REG = %x\n",
            dmar_readl(iommu->reg,DMAR_VER_REG));
     printk("print_iommu_regs: DMAR_CAP_REG = %"PRIx64"\n",

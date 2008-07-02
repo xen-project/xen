@@ -27,7 +27,7 @@
 #include <public/platform.h>
 #include <asm/tboot.h>
 
-#define pmprintk(_l, _f, _a...) printk(_l "<PM> " _f "\n", ## _a )
+#include <acpi/cpufreq/cpufreq.h>
 
 static char opt_acpi_sleep[20];
 string_param("acpi_sleep", opt_acpi_sleep);
@@ -124,9 +124,11 @@ static int enter_state(u32 state)
     if ( !spin_trylock(&pm_lock) )
         return -EBUSY;
 
-    pmprintk(XENLOG_INFO, "Preparing system for ACPI S%d state.", state);
+    printk(XENLOG_INFO "Preparing system for ACPI S%d state.", state);
 
     freeze_domains();
+
+    cpufreq_suspend();
 
     disable_nonboot_cpus();
     if ( num_online_cpus() != 1 )
@@ -139,11 +141,14 @@ static int enter_state(u32 state)
 
     acpi_sleep_prepare(state);
 
+    console_start_sync();
+    printk("Entering ACPI S%d state.\n", state);
+
     local_irq_save(flags);
 
     if ( (error = device_power_down()) )
     {
-        pmprintk(XENLOG_ERR, "Some devices failed to power down.");
+        printk(XENLOG_ERR "Some devices failed to power down.");
         goto done;
     }
 
@@ -162,8 +167,6 @@ static int enter_state(u32 state)
         break;
     }
 
-    pmprintk(XENLOG_DEBUG, "Back to C.");
-
     /* Restore CR4 and EFER from cached values. */
     write_cr4(read_cr4());
     if ( cpu_has_efer )
@@ -171,16 +174,18 @@ static int enter_state(u32 state)
 
     device_power_up();
 
-    pmprintk(XENLOG_INFO, "Finishing wakeup from ACPI S%d state.", state);
+    printk(XENLOG_INFO "Finishing wakeup from ACPI S%d state.", state);
 
  done:
     local_irq_restore(flags);
+    console_end_sync();
     acpi_sleep_post(state);
     if ( !hvm_cpu_up() )
         BUG();
 
  enable_cpu:
     enable_nonboot_cpus();
+    cpufreq_resume();
     thaw_domains();
     spin_unlock(&pm_lock);
     return error;
@@ -206,7 +211,7 @@ int acpi_enter_sleep(struct xenpf_enter_acpi_sleep *sleep)
          ((sleep->pm1a_cnt_val ^ sleep->pm1b_cnt_val) &
           ACPI_BITMASK_SLEEP_ENABLE) )
     {
-        pmprintk(XENLOG_ERR, "Mismatched pm1a/pm1b setting.");
+        gdprintk(XENLOG_ERR, "Mismatched pm1a/pm1b setting.");
         return -EINVAL;
     }
 
@@ -278,7 +283,7 @@ acpi_status asmlinkage acpi_enter_sleep_state(u8 sleep_state)
     if ( tboot_in_measured_env() )
     {
         tboot_sleep(sleep_state);
-        pmprintk(XENLOG_ERR, "TBOOT failed entering s3 state\n");
+        printk(XENLOG_ERR "TBOOT failed entering s3 state\n");
         return_ACPI_STATUS(AE_ERROR);
     }
 
@@ -320,7 +325,7 @@ static int __init acpi_sleep_init(void)
             p += strspn(p, ", \t");
     }
 
-    printk(XENLOG_INFO "<PM> ACPI (supports");
+    printk(XENLOG_INFO "ACPI sleep modes:");
     for ( i = 0; i < ACPI_S_STATE_COUNT; i++ )
     {
         if ( i == ACPI_STATE_S3 )
@@ -331,7 +336,7 @@ static int __init acpi_sleep_init(void)
         else
             sleep_states[i] = 0;
     }
-    printk(")\n");
+    printk("\n");
 
     return 0;
 }

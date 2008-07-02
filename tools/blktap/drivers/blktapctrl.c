@@ -127,7 +127,7 @@ static int get_new_dev(int *major, int *minor, blkif_t *blkif)
 	char *devname;
 	
 	tr.domid = blkif->domid;
-        tr.busid = (unsigned short)blkif->be_id;
+        tr.busid = blkif->be_id;
 	ret = ioctl(ctlfd, BLKTAP_IOCTL_NEWINTF, tr );
 	
 	if ( (ret <= 0)||(ret > MAX_TAP_DEV) ) {

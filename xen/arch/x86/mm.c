@@ -219,7 +219,7 @@ void __init arch_init_memory(void)
      * Any Xen-heap pages that we will allow to be mapped will have
      * their domain field set to dom_xen.
      */
-    dom_xen = alloc_domain(DOMID_XEN);
+    dom_xen = domain_create(DOMID_XEN, DOMCRF_dummy, 0);
     BUG_ON(dom_xen == NULL);
 
     /*
@@ -227,7 +227,7 @@ void __init arch_init_memory(void)
      * This domain owns I/O pages that are within the range of the page_info
      * array. Mappings occur at the priv of the caller.
      */
-    dom_io = alloc_domain(DOMID_IO);
+    dom_io = domain_create(DOMID_IO, DOMCRF_dummy, 0);
     BUG_ON(dom_io == NULL);
 
     /* First 1MB of RAM is historically marked as I/O. */
@@ -1933,9 +1933,15 @@ int get_page_type(struct page_info *page, unsigned long type)
         {
             struct domain *d = page_get_owner(page);
 
-            /* Never allow a shadowed frame to go from type count 0 to 1 */
-            if ( d && shadow_mode_enabled(d) )
-                shadow_remove_all_shadows(d->vcpu[0], _mfn(page_to_mfn(page)));
+            /* Normally we should never let a page go from type count 0
+             * to type count 1 when it is shadowed. One exception:
+             * out-of-sync shadowed pages are allowed to become
+             * writeable. */
+            if ( d && shadow_mode_enabled(d)
+                 && (page->count_info & PGC_page_table)
+                 && !((page->shadow_flags & (1u<<29))
+                      && type == PGT_writable_page) )
+               shadow_remove_all_shadows(d->vcpu[0], _mfn(page_to_mfn(page)));
 
             ASSERT(!(x & PGT_pae_xen_l2));
             if ( (x & PGT_type_mask) != type )
@@ -3533,15 +3539,14 @@ struct ptwr_emulate_ctxt {
 static int ptwr_emulated_read(
     enum x86_segment seg,
     unsigned long offset,
-    unsigned long *val,
+    void *p_data,
     unsigned int bytes,
     struct x86_emulate_ctxt *ctxt)
 {
     unsigned int rc;
     unsigned long addr = offset;
 
-    *val = 0;
-    if ( (rc = copy_from_user((void *)val, (void *)addr, bytes)) != 0 )
+    if ( (rc = copy_from_user(p_data, (void *)addr, bytes)) != 0 )
     {
         propagate_page_fault(addr + bytes - rc, 0); /* read fault */
         return X86EMUL_EXCEPTION;
@@ -3568,7 +3573,7 @@ static int ptwr_emulated_update(
     /* Only allow naturally-aligned stores within the original %cr2 page. */
     if ( unlikely(((addr^ptwr_ctxt->cr2) & PAGE_MASK) || (addr & (bytes-1))) )
     {
-        MEM_LOG("Bad ptwr access (cr2=%lx, addr=%lx, bytes=%u)",
+        MEM_LOG("ptwr_emulate: bad access (cr2=%lx, addr=%lx, bytes=%u)",
                 ptwr_ctxt->cr2, addr, bytes);
         return X86EMUL_UNHANDLEABLE;
     }
@@ -3676,10 +3681,21 @@ static int ptwr_emulated_update(
 static int ptwr_emulated_write(
     enum x86_segment seg,
     unsigned long offset,
-    unsigned long val,
+    void *p_data,
     unsigned int bytes,
     struct x86_emulate_ctxt *ctxt)
 {
+    paddr_t val = 0;
+
+    if ( (bytes > sizeof(paddr_t)) || (bytes & (bytes -1)) )
+    {
+        MEM_LOG("ptwr_emulate: bad write size (addr=%lx, bytes=%u)",
+                offset, bytes);
+        return X86EMUL_UNHANDLEABLE;
+    }
+
+    memcpy(&val, p_data, bytes);
+
     return ptwr_emulated_update(
         offset, 0, val, bytes, 0,
         container_of(ctxt, struct ptwr_emulate_ctxt, ctxt));
@@ -3694,10 +3710,17 @@ static int ptwr_emulated_cmpxchg(
     struct x86_emulate_ctxt *ctxt)
 {
     paddr_t old = 0, new = 0;
-    if ( bytes > sizeof(paddr_t) )
+
+    if ( (bytes > sizeof(paddr_t)) || (bytes & (bytes -1)) )
+    {
+        MEM_LOG("ptwr_emulate: bad cmpxchg size (addr=%lx, bytes=%u)",
+                offset, bytes);
         return X86EMUL_UNHANDLEABLE;
+    }
+
     memcpy(&old, p_old, bytes);
     memcpy(&new, p_new, bytes);
+
     return ptwr_emulated_update(
         offset, old, new, bytes, 1,
         container_of(ctxt, struct ptwr_emulate_ctxt, ctxt));

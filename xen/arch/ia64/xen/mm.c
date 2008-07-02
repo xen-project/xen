@@ -207,7 +207,7 @@ alloc_dom_xen_and_dom_io(void)
      * Any Xen-heap pages that we will allow to be mapped will have
      * their domain field set to dom_xen.
      */
-    dom_xen = alloc_domain(DOMID_XEN);
+    dom_xen = domain_create(DOMID_XEN, DOMCRF_dummy, 0);
     BUG_ON(dom_xen == NULL);
 
     /*
@@ -215,7 +215,7 @@ alloc_dom_xen_and_dom_io(void)
      * This domain owns I/O pages that are within the range of the page_info
      * array. Mappings occur at the priv of the caller.
      */
-    dom_io = alloc_domain(DOMID_IO);
+    dom_io = domain_create(DOMID_IO, DOMCRF_dummy, 0);
     BUG_ON(dom_io == NULL);
 }
 
@@ -1553,7 +1553,7 @@ expose_p2m_init(void)
      * Initialise our DOMID_P2M domain.
      * This domain owns m2p table pages.
      */
-    dom_p2m = alloc_domain(DOMID_P2M);
+    dom_p2m = domain_create(DOMID_P2M, DOMCRF_dummy, 0);
     BUG_ON(dom_p2m == NULL);
     dom_p2m->max_pages = ~0U;
 

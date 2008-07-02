@@ -206,10 +206,12 @@ static void pci_setup(void)
             pci_writew(devfn, 0x3d, 0x0001);
             break;
         case 0x0101:
-            /* PIIX3 IDE */
-            ASSERT((vendor_id == 0x8086) && (device_id == 0x7010));
-            pci_writew(devfn, 0x40, 0x8000); /* enable IDE0 */
-            pci_writew(devfn, 0x42, 0x8000); /* enable IDE1 */
+            if ( vendor_id == 0x8086 )
+            {
+                /* Intel ICHs since PIIX3: enable IDE legacy mode. */
+                pci_writew(devfn, 0x40, 0x8000); /* enable IDE0 */
+                pci_writew(devfn, 0x42, 0x8000); /* enable IDE1 */
+            }
             break;
         }
 

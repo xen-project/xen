@@ -315,10 +315,14 @@ static inline struct domain *get_current_domain(void)
 struct domain *domain_create(
     domid_t domid, unsigned int domcr_flags, ssidref_t ssidref);
  /* DOMCRF_hvm: Create an HVM domain, as opposed to a PV domain. */
-#define _DOMCRF_hvm 0
-#define DOMCRF_hvm  (1U<<_DOMCRF_hvm)
-#define _DOMCRF_hap 1
-#define DOMCRF_hap  (1U<<_DOMCRF_hap)
+#define _DOMCRF_hvm   0
+#define DOMCRF_hvm    (1U<<_DOMCRF_hvm)
+ /* DOMCRF_hap: Create a domain with hardware-assisted paging. */
+#define _DOMCRF_hap   1
+#define DOMCRF_hap    (1U<<_DOMCRF_hap)
+ /* DOMCRF_dummy: Create a dummy domain (not scheduled; not on domain list) */
+#define _DOMCRF_dummy 2
+#define DOMCRF_dummy  (1U<<_DOMCRF_dummy)
 
 int construct_dom0(
     struct domain *d,
