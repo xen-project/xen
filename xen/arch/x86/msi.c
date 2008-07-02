@@ -435,14 +435,6 @@ static void msi_free_vector(int vector)
     xfree(entry);
 }
 
-void msi_free_vectors(struct pci_dev* dev)
-{
-    struct msi_desc *entry, *tmp;
-
-    list_for_each_entry_safe( entry, tmp, &dev->msi_list, list )
-        msi_free_vector(entry->vector);
-}
-
 static struct msi_desc *find_msi_entry(struct pci_dev *dev,
                                        int vector, int cap_id)
 {
@@ -790,16 +782,40 @@ void pci_disable_msi(int vector)
         __pci_disable_msix(vector);
 }
 
+extern struct hw_interrupt_type pci_msi_type;
+static void msi_free_vectors(struct pci_dev* dev)
+{
+    struct msi_desc *entry, *tmp;
+    irq_desc_t *desc;
+    unsigned long flags;
+
+    list_for_each_entry_safe( entry, tmp, &dev->msi_list, list )
+    {
+        desc = &irq_desc[entry->vector];
+
+        spin_lock_irqsave(&desc->lock, flags);
+        if ( desc->handler == &pci_msi_type )
+        {
+            /* MSI is not shared, so should be released already */
+            BUG_ON(desc->status & IRQ_GUEST);
+            desc->handler = &no_irq_type;
+        }
+        spin_unlock_irqrestore(&desc->lock, flags);
+
+        msi_free_vector(entry->vector);
+    }
+}
+
 void pci_cleanup_msi(u8 bus, u8 devfn)
 {
     struct pci_dev *dev = get_msi_pdev(bus, devfn);
 
     if ( !dev )
         return;
-    msi_free_vectors(dev);
 
     /* Disable MSI and/or MSI-X */
     msi_set_enable(dev, 0);
     msix_set_enable(dev, 0);
+    msi_free_vectors(dev);
 }
 

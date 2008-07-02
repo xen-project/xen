@@ -75,13 +75,18 @@ int pt_irq_create_bind_vtd(
     {
         int pirq = pt_irq_bind->machine_irq;
 
+        if ( !(hvm_irq_dpci->mirq[pirq].flags & HVM_IRQ_DPCI_VALID ) )
+        {
+            hvm_irq_dpci->mirq[pirq].flags |= HVM_IRQ_DPCI_VALID |
+                                              HVM_IRQ_DPCI_MSI ;
+            pirq_guest_bind(d->vcpu[0], pirq, 0);
+        }
+
         hvm_irq_dpci->mirq[pirq].flags |= HVM_IRQ_DPCI_VALID |HVM_IRQ_DPCI_MSI ;
         hvm_irq_dpci->mirq[pirq].gmsi.gvec = pt_irq_bind->u.msi.gvec;
         hvm_irq_dpci->mirq[pirq].gmsi.gflags = pt_irq_bind->u.msi.gflags;
-
         hvm_irq_dpci->msi_gvec_pirq[pt_irq_bind->u.msi.gvec] = pirq;
 
-        pirq_guest_bind(d->vcpu[0], pirq, BIND_PIRQ__WILL_SHARE);
     }
     else
     {
