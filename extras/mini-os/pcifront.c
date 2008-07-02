@@ -276,3 +276,91 @@ int pcifront_conf_write(struct pcifront_dev *dev,
 
     return op.err;
 }
+
+int pcifront_enable_msi(struct pcifront_dev *dev,
+                        unsigned int dom,
+                        unsigned int bus, unsigned int slot, unsigned long fun)
+{
+    struct xen_pci_op op;
+
+    memset(&op, 0, sizeof(op));
+
+    op.cmd = XEN_PCI_OP_enable_msi;
+    op.domain = dom;
+    op.bus = bus;
+    op.devfn = PCI_DEVFN(slot, fun);
+
+    pcifront_op(dev, &op);
+    
+    if (op.err)
+        return op.err;
+    else
+        return op.value;
+}
+
+int pcifront_disable_msi(struct pcifront_dev *dev,
+                         unsigned int dom,
+                         unsigned int bus, unsigned int slot, unsigned long fun)
+{
+    struct xen_pci_op op;
+
+    memset(&op, 0, sizeof(op));
+
+    op.cmd = XEN_PCI_OP_disable_msi;
+    op.domain = dom;
+    op.bus = bus;
+    op.devfn = PCI_DEVFN(slot, fun);
+
+    pcifront_op(dev, &op);
+    
+    return op.err;
+}
+
+int pcifront_enable_msix(struct pcifront_dev *dev,
+                         unsigned int dom,
+                         unsigned int bus, unsigned int slot, unsigned long fun,
+                         struct xen_msix_entry *entries, int n)
+{
+    struct xen_pci_op op;
+
+    if (n > SH_INFO_MAX_VEC)
+        return XEN_PCI_ERR_op_failed;
+
+    memset(&op, 0, sizeof(op));
+
+    op.cmd = XEN_PCI_OP_enable_msix;
+    op.domain = dom;
+    op.bus = bus;
+    op.devfn = PCI_DEVFN(slot, fun);
+    op.value = n;
+
+    memcpy(op.msix_entries, entries, n * sizeof(*entries));
+
+    pcifront_op(dev, &op);
+    
+    if (op.err)
+        return op.err;
+
+    memcpy(entries, op.msix_entries, n * sizeof(*entries));
+
+    return 0;
+}
+
+
+int pcifront_disable_msix(struct pcifront_dev *dev,
+                          unsigned int dom,
+                          unsigned int bus, unsigned int slot, unsigned long fun)
+{
+    struct xen_pci_op op;
+
+    memset(&op, 0, sizeof(op));
+
+    op.cmd = XEN_PCI_OP_disable_msix;
+    op.domain = dom;
+    op.bus = bus;
+    op.devfn = PCI_DEVFN(slot, fun);
+
+    pcifront_op(dev, &op);
+    
+    return op.err;
+}
