@@ -523,9 +523,3 @@ void irq_exit(void)
 {
 	sub_preempt_count(IRQ_EXIT_OFFSET);
 }
-
-// this is a temporary hack until real console input is implemented
-void guest_forward_keyboard_input(int irq, void *nada, struct pt_regs *regs)
-{
-	vcpu_pend_interrupt(dom0->vcpu[0],irq);
-}
