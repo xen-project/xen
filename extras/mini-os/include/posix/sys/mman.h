@@ -9,6 +9,9 @@
 #define MAP_PRIVATE	0x02
 #define MAP_ANON	0x20
 
+/* Pages are always resident anyway */
+#define MAP_LOCKED	0x0
+
 #define MAP_FAILED	((void*)0)
 
 void *mmap(void *start, size_t length, int prot, int flags, int fd, off_t offset);

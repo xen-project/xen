@@ -131,16 +131,20 @@ $(ZLIB_STAMPFILE): zlib-$(ZLIB_VERSION).tar.gz $(NEWLIB_STAMPFILE)
 pciutils-$(LIBPCI_VERSION).tar.bz2:
 	$(WGET) http://www.kernel.org/pub/software/utils/pciutils/pciutils-$(LIBPCI_VERSION).tar.bz2
 
+pciutils-$(LIBPCI_VERSION): pciutils-$(LIBPCI_VERSION).tar.bz2
+	tar xjf $<
+	patch -d $@ -p1 < pciutils.patch
+	touch $@
+
 LIBPCI_STAMPFILE=$(CROSS_ROOT)/$(GNU_TARGET_ARCH)-xen-elf/lib/libpci.a
 .PHONY: cross-libpci
 cross-libpci: $(LIBPCI_STAMPFILE)
-$(LIBPCI_STAMPFILE): pciutils-$(LIBPCI_VERSION).tar.bz2 $(NEWLIB_STAMPFILE) $(ZLIB_STAMPFILE)
-	tar xjf $<
+$(LIBPCI_STAMPFILE): pciutils-$(LIBPCI_VERSION) $(NEWLIB_STAMPFILE) $(ZLIB_STAMPFILE)
 	( cd pciutils-$(LIBPCI_VERSION) && \
 	  cp ../libpci.config.h lib/config.h && \
 	  echo '#define PCILIB_VERSION "$(LIBPCI_VERSION)"' >> lib/config.h && \
 	  cp ../libpci.config.mak lib/config.mk && \
-	  $(MAKE) CC="$(GNU_TARGET_ARCH)-xen-elf-gcc $(TARGET_CFLAGS)" lib/libpci.a && \
+	  $(MAKE) CC="$(GNU_TARGET_ARCH)-xen-elf-gcc $(TARGET_CFLAGS) -I$(realpath $(MINI_OS)/include)" lib/libpci.a && \
 	  $(INSTALL_DATA) lib/libpci.a $(CROSS_PREFIX)/$(GNU_TARGET_ARCH)-xen-elf/lib/ && \
 	  $(INSTALL_DIR) $(CROSS_PREFIX)/$(GNU_TARGET_ARCH)-xen-elf/include/pci && \
 	  $(INSTALL_DATA) lib/{config,header,pci,types}.h $(CROSS_PREFIX)/$(GNU_TARGET_ARCH)-xen-elf/include/pci/ \

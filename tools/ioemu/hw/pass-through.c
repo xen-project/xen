@@ -515,6 +515,7 @@ struct pt_dev * register_real_device(PCIBus *e_bus,
         PT_LOG("Error: couldn't locate device in libpci structures\n");
         return NULL;
     }
+    pci_fill_info(pci_dev, PCI_FILL_IRQ | PCI_FILL_BASES | PCI_FILL_ROM_BASE | PCI_FILL_SIZES);
 
     if ( e_devfn == PT_VIRT_DEVFN_AUTO ) {
         /*indicate a static assignment(not hotplug), so find a free PCI hot plug slot */

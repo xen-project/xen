@@ -40,6 +40,7 @@
 #include <netfront.h>
 #include <blkfront.h>
 #include <fbfront.h>
+#include <pcifront.h>
 #include <fs.h>
 #include <xmalloc.h>
 #include <fcntl.h>
@@ -431,6 +432,27 @@ static void kbdfront_thread(void *p)
     }
 }
 
+static struct pcifront_dev *pci_dev;
+
+static void pcifront_thread(void *p)
+{
+    void print(unsigned int domain, unsigned int bus, unsigned int slot, unsigned int fun)
+    {
+        unsigned int vendor, device, rev, class;
+
+        pcifront_conf_read(pci_dev, domain, bus, slot, fun, 0x00, 2, &vendor);
+        pcifront_conf_read(pci_dev, domain, bus, slot, fun, 0x02, 2, &device);
+        pcifront_conf_read(pci_dev, domain, bus, slot, fun, 0x08, 1, &rev);
+        pcifront_conf_read(pci_dev, domain, bus, slot, fun, 0x0a, 2, &class);
+
+        printk("%04x:%02x:%02x.%02x %04x: %04x:%04x (rev %02x)\n", domain, bus, slot, fun, class, vendor, device, rev);
+    }
+
+    pci_dev = init_pcifront(NULL);
+    printk("PCI devices:\n");
+    pcifront_scan(pci_dev, print);
+}
+
 static void fs_thread(void *p)
 {
     init_fs_frontend();
@@ -446,6 +468,7 @@ __attribute__((weak)) int app_main(start_info_t *si)
     create_thread("blkfront", blkfront_thread, si);
     create_thread("fbfront", fbfront_thread, si);
     create_thread("kbdfront", kbdfront_thread, si);
+    create_thread("pcifront", pcifront_thread, si);
     create_thread("fs-frontend", fs_thread, si);
     return 0;
 }
@@ -523,6 +546,9 @@ void stop_kernel(void)
 
     if (kbd_dev)
         shutdown_kbdfront(kbd_dev);
+
+    if (pci_dev)
+        shutdown_pcifront(pci_dev);
 
     /* TODO: fs import */
 
