@@ -94,6 +94,13 @@ static int pt_msi_setup(struct pt_dev *dev)
         PT_LOG("error map msi\n");
         return -1;
     }
+
+    if ( pirq < 0 )
+    {
+        PT_LOG("invalid pirq number\n");
+        return -1;
+    }
+
     dev->msi->pirq = pirq;
     PT_LOG("msi mapped with pirq %x\n", pirq);
 
