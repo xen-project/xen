@@ -54,6 +54,10 @@
  */
 #define SH_INFO_MAX_VEC     128
 
+struct xen_msix_entry {
+    uint16_t vector;
+    uint16_t entry;
+};
 struct xen_pci_op {
     /* IN: what action to perform: XEN_PCI_OP_* */
     uint32_t cmd;
@@ -75,7 +79,7 @@ struct xen_pci_op {
     /* IN: Contains extra infor for this operation */
     uint32_t info;
     /*IN:  param for msi-x */
-    struct msix_entry msix_entries[SH_INFO_MAX_VEC];
+    struct xen_msix_entry msix_entries[SH_INFO_MAX_VEC];
 };
 
 struct xen_pci_sharedinfo {
