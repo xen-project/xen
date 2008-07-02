@@ -20,7 +20,7 @@ int  cpufreq_dom_dbs(unsigned int);
 void cpufreq_suspend(void);
 int  cpufreq_resume(void);
 
-inline uint64_t get_cpu_idle_time(unsigned int);
+uint64_t get_cpu_idle_time(unsigned int);
 
 struct processor_performance {
     uint32_t state;
