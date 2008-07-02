@@ -118,7 +118,6 @@ typedef struct RTCState {
     struct timer second_timer;
     struct timer second_timer2;
     struct periodic_time pt;
-    int32_t time_offset_seconds;
     spinlock_t lock;
 } RTCState;
 
@@ -176,10 +175,11 @@ void pit_reset(struct domain *d);
 void pit_init(struct vcpu *v, unsigned long cpu_khz);
 void pit_stop_channel0_irq(PITState * pit);
 void pit_deinit(struct domain *d);
-void rtc_init(struct vcpu *v, int base);
+void rtc_init(struct domain *d);
 void rtc_migrate_timers(struct vcpu *v);
 void rtc_deinit(struct domain *d);
 void rtc_reset(struct domain *d);
+void rtc_update_clock(struct domain *d);
 
 void pmtimer_init(struct vcpu *v);
 void pmtimer_deinit(struct domain *d);

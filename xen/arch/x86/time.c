@@ -745,6 +745,13 @@ void update_domain_wallclock_time(struct domain *d)
     spin_unlock(&wc_lock);
 }
 
+void domain_set_time_offset(struct domain *d, int32_t time_offset_seconds)
+{
+    d->time_offset_seconds = time_offset_seconds;
+    if ( is_hvm_domain(d) )
+        rtc_update_clock(d);
+}
+
 int cpu_frequency_change(u64 freq)
 {
     struct cpu_time *t = &this_cpu(cpu_time);

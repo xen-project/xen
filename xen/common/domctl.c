@@ -787,7 +787,7 @@ long do_domctl(XEN_GUEST_HANDLE(xen_domctl_t) u_domctl)
             break;
         }
 
-        d->time_offset_seconds = op->u.settimeoffset.time_offset_seconds;
+        domain_set_time_offset(d, op->u.settimeoffset.time_offset_seconds);
         rcu_unlock_domain(d);
         ret = 0;
     }

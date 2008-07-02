@@ -452,6 +452,7 @@ int arch_domain_create(struct domain *d, unsigned int domcr_flags)
     return 0;
 
  fail:
+    d->is_dying = DOMDYING_dead;
     free_xenheap_page(d->shared_info);
     if ( paging_initialised )
         paging_final_teardown(d);

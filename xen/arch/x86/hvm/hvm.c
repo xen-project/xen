@@ -314,6 +314,8 @@ int hvm_domain_initialise(struct domain *d)
 
     stdvga_init(d);
 
+    rtc_init(d);
+
     hvm_init_ioreq_page(d, &d->arch.hvm_domain.ioreq);
     hvm_init_ioreq_page(d, &d->arch.hvm_domain.buf_ioreq);
 
@@ -326,6 +328,8 @@ int hvm_domain_initialise(struct domain *d)
     return 0;
 
  fail2:
+    rtc_deinit(d);
+    stdvga_deinit(d);
     vioapic_deinit(d);
  fail1:
     hvm_destroy_cacheattr_region_list(d);
@@ -337,16 +341,21 @@ void hvm_domain_relinquish_resources(struct domain *d)
     hvm_destroy_ioreq_page(d, &d->arch.hvm_domain.ioreq);
     hvm_destroy_ioreq_page(d, &d->arch.hvm_domain.buf_ioreq);
 
-    pit_deinit(d);
+    /* Stop all asynchronous timer actions. */
     rtc_deinit(d);
-    pmtimer_deinit(d);
-    hpet_deinit(d);
-    stdvga_deinit(d);
+    if ( d->vcpu[0] != NULL )
+    {
+        pit_deinit(d);
+        pmtimer_deinit(d);
+        hpet_deinit(d);
+    }
 }
 
 void hvm_domain_destroy(struct domain *d)
 {
     hvm_funcs.domain_destroy(d);
+    rtc_deinit(d);
+    stdvga_deinit(d);
     vioapic_deinit(d);
     hvm_destroy_cacheattr_region_list(d);
 }
@@ -658,7 +667,6 @@ int hvm_vcpu_initialise(struct vcpu *v)
     {
         /* NB. All these really belong in hvm_domain_initialise(). */
         pit_init(v, cpu_khz);
-        rtc_init(v, RTC_PORT(0));
         pmtimer_init(v);
         hpet_init(v);
  
@@ -2131,7 +2139,7 @@ static void hvm_s3_suspend(struct domain *d)
     domain_pause(d);
     domain_lock(d);
 
-    if ( (d->vcpu[0] == NULL) ||
+    if ( d->is_dying || (d->vcpu[0] == NULL) ||
          test_and_set_bool(d->arch.hvm_domain.is_s3_suspended) )
     {
         domain_unlock(d);
