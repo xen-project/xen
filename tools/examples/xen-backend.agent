@@ -19,6 +19,9 @@ case "$XENBUS_TYPE" in
   vif)
     [ -n "$script" ] && $script "$ACTION"
     ;;
+  vscsi)
+    /etc/xen/scripts/vscsi "$ACTION"
+    ;;
 esac
 
 case "$ACTION" in

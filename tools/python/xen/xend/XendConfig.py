@@ -1216,7 +1216,7 @@ class XendConfig(dict):
             dev_type = sxp.name(config)
             dev_info = {}
 
-            if dev_type == 'pci':
+            if dev_type == 'pci' or dev_type == 'vscsi':
                 pci_devs_uuid = sxp.child_value(config, 'uuid',
                                                 uuid.createString())
 
@@ -1625,7 +1625,7 @@ class XendConfig(dict):
 
             dev_type, dev_info = self['devices'][dev_uuid]
 
-            if dev_type == 'pci': # Special case for pci
+            if dev_type == 'pci' or dev_type == 'vscsi': # Special case for pci
                 pci_dict = self.pci_convert_sxp_to_dict(config)
                 pci_devs = pci_dict['devs']
 
@@ -1739,8 +1739,11 @@ class XendConfig(dict):
         ordered_refs = self.ordered_device_refs(target = target)
         for dev_uuid in ordered_refs:
             dev_type, dev_info = target['devices'][dev_uuid]
-            if dev_type == 'pci': # special case for pci devices
-                sxpr = ['pci', ['uuid', dev_info['uuid']]]
+            if dev_type == 'pci' or dev_type == 'vscsi': # special case for pci devices
+                if dev_type == 'pci':
+                    sxpr = ['pci', ['uuid', dev_info['uuid']]]
+                elif dev_type == 'vscsi':
+                    sxpr = ['vscsi', ['uuid', dev_info['uuid']]]
                 for pci_dev_info in dev_info['devs']:
                     pci_dev_sxpr = ['dev']
                     for opt, val in pci_dev_info.items():

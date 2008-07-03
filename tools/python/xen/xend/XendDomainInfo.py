@@ -750,6 +750,52 @@ class XendDomainInfo:
 
         return True
 
+    def vscsi_device_configure(self, dev_sxp):
+        """Configure an existing vscsi device.
+            quoted pci funciton
+        """
+        dev_class = sxp.name(dev_sxp)
+        if dev_class != 'vscsi':
+            return False
+
+        dev_config = self.pci_convert_sxp_to_dict(dev_sxp)
+        dev = dev_config['devs'][0]
+        req_devid = sxp.child_value(dev_sxp, 'devid')
+        req_devid = int(req_devid)
+        existing_dev_info = self._getDeviceInfo_vscsi(req_devid, dev['v-dev'])
+        state = sxp.child_value(dev_sxp, 'state')
+
+        if state == 'Initialising':
+            # new create
+            # If request devid does not exist, create and exit.
+            if existing_dev_info is None:
+                self.device_create(dev_sxp)
+                return True
+            elif existing_dev_info == "exists":
+                raise XendError("The virtual device %s is already defined" % dev['v-dev'])
+
+        elif state == 'Closing':
+            if existing_dev_info is None:
+                raise XendError("Cannot detach vscsi device does not exist")
+
+        # use DevController.reconfigureDevice to change device config
+        dev_control = self.getDeviceController(dev_class)
+        dev_uuid = dev_control.reconfigureDevice(req_devid, dev_config)
+        dev_control.waitForDevice_reconfigure(req_devid)
+        num_devs = dev_control.cleanupDevice(req_devid)
+
+        # update XendConfig with new device info
+        if dev_uuid:
+            new_dev_sxp = dev_control.configuration(req_devid)
+            self.info.device_update(dev_uuid, new_dev_sxp)
+
+        # If there is no device left, destroy vscsi and remove config.
+        if num_devs == 0:
+            self.destroyDevice('vscsi', req_devid)
+            del self.info['devices'][dev_uuid]
+
+        return True
+
     def device_configure(self, dev_sxp, devid = None):
         """Configure an existing device.
         
@@ -767,6 +813,9 @@ class XendDomainInfo:
 
         if dev_class == 'pci':
             return self.pci_device_configure(dev_sxp)
+
+        if dev_class == 'vscsi':
+            return self.vscsi_device_configure(dev_sxp)
 
         for opt_val in dev_sxp[1:]:
             try:
@@ -940,6 +989,25 @@ class XendDomainInfo:
             if dev_type != 'pci':
                 continue
             return dev_info
+        return None
+
+    def _getDeviceInfo_vscsi(self, devid, vdev):
+        devid = int(devid)
+        for dev_type, dev_info in self.info.all_devices_sxpr():
+            if dev_type != 'vscsi':
+                continue
+            existing_dev_uuid = sxp.child_value(dev_info, 'uuid')
+            existing_conf = self.info['devices'][existing_dev_uuid][1]
+            existing_dev = existing_conf['devs'][0]
+            existing_devid = int(existing_dev['devid'])
+            existing_vdev = existing_dev['v-dev']
+
+            if vdev == existing_vdev:
+                return "exists"
+
+            if devid == existing_devid:
+                return dev_info
+
         return None
 
     def setMemoryTarget(self, target):
@@ -1811,10 +1879,12 @@ class XendDomainInfo:
         if self.image:
             self.image.prepareEnvironment()
 
+        vscsi_uuidlist = {}
+        vscsi_devidlist = []
         ordered_refs = self.info.ordered_device_refs()
         for dev_uuid in ordered_refs:
             devclass, config = self.info['devices'][dev_uuid]
-            if devclass in XendDevices.valid_devices():
+            if devclass in XendDevices.valid_devices() and devclass != 'vscsi':
                 log.info("createDevice: %s : %s" % (devclass, scrub_password(config)))
                 dev_uuid = config.get('uuid')
                 devid = self._createDevice(devclass, config)
@@ -1822,6 +1892,27 @@ class XendDomainInfo:
                 # store devid in XendConfig for caching reasons
                 if dev_uuid in self.info['devices']:
                     self.info['devices'][dev_uuid][1]['devid'] = devid
+
+            elif devclass == 'vscsi':
+                vscsi_config = config.get('devs', [])[0]
+                devid = vscsi_config.get('devid', '')
+                dev_uuid = config.get('uuid')
+                vscsi_uuidlist[devid] = dev_uuid
+                vscsi_devidlist.append(devid)
+
+        #It is necessary to sorted it for /dev/sdxx in guest. 
+        if len(vscsi_uuidlist) > 0:
+            vscsi_devidlist.sort()
+            for vscsiid in vscsi_devidlist:
+                dev_uuid = vscsi_uuidlist[vscsiid]
+                devclass, config = self.info['devices'][dev_uuid]
+                log.info("createDevice: %s : %s" % (devclass, scrub_password(config)))
+                dev_uuid = config.get('uuid')
+                devid = self._createDevice(devclass, config)
+                # store devid in XendConfig for caching reasons
+                if dev_uuid in self.info['devices']:
+                    self.info['devices'][dev_uuid][1]['devid'] = devid
+
 
         if self.image:
             self.image.createDeviceModel()

@@ -3,6 +3,7 @@ SUBSYSTEM=="xen-backend", KERNEL=="vbd*", RUN+="/etc/xen/scripts/block $env{ACTI
 SUBSYSTEM=="xen-backend", KERNEL=="vtpm*", RUN+="/etc/xen/scripts/vtpm $env{ACTION}"
 SUBSYSTEM=="xen-backend", KERNEL=="vif*", ACTION=="online", RUN+="$env{script} online"
 SUBSYSTEM=="xen-backend", KERNEL=="vif*", ACTION=="offline", RUN+="$env{script} offline"
+SUBSYSTEM=="xen-backend", KERNEL=="vscsi*", RUN+="/etc/xen/scripts/vscsi $env{ACTION}"
 SUBSYSTEM=="xen-backend", ACTION=="remove", RUN+="/etc/xen/scripts/xen-hotplug-cleanup"
 KERNEL=="evtchn", NAME="xen/%k"
 KERNEL=="blktap[0-9]*", NAME="xen/%k"
