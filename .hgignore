@@ -248,6 +248,8 @@
 ^tools/xm-test/lib/XmTestLib/config.py$
 ^tools/xm-test/lib/XmTestReport/xmtest.py$
 ^tools/xm-test/tests/.*\.test$
+^tools/ioemu-remote
+^tools/ioemu-dir$
 ^xen/\.banner.*$
 ^xen/BLOG$
 ^xen/System.map$
