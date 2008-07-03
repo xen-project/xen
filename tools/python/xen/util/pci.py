@@ -8,6 +8,8 @@
 import sys
 import os, os.path
 import resource
+import re
+import types
 
 PROC_MNT_PATH = '/proc/mounts'
 PROC_PCI_PATH = '/proc/bus/pci/devices'
@@ -22,6 +24,9 @@ SYSFS_PCI_DEV_VENDOR_PATH = '/vendor'
 SYSFS_PCI_DEV_DEVICE_PATH = '/device'
 SYSFS_PCI_DEV_SUBVENDOR_PATH = '/subsystem_vendor'
 SYSFS_PCI_DEV_SUBDEVICE_PATH = '/subsystem_device'
+SYSFS_PCI_DEV_CLASS_PATH = '/class'
+
+LSPCI_CMD = 'lspci'
 
 PCI_BAR_IO = 0x01
 PCI_BAR_IO_MASK = ~0x03
@@ -31,6 +36,9 @@ PCI_STATUS_OFFSET = 0x6
 PCI_CAP_OFFSET = 0x34
 MSIX_BIR_MASK = 0x7
 MSIX_SIZE_MASK = 0x7ff
+
+# Global variable to store information from lspci
+lspci_info = None
 
 #Calculate PAGE_SHIFT: number of bits to shift an address to get the page number
 PAGE_SIZE = resource.getpagesize()
@@ -45,6 +53,15 @@ PAGE_MASK=~(PAGE_SIZE - 1)
 def PCI_DEVFN(slot, func):
     return ((((slot) & 0x1f) << 3) | ((func) & 0x07))
 
+def parse_hex(val):
+    try:
+        if isinstance(val, types.StringTypes):
+            return int(val, 16)
+        else:
+            return val
+    except ValueError:
+        return None
+
 def find_sysfs_mnt():
     mounts_file = open(PROC_MNT_PATH,'r')
 
@@ -57,6 +74,61 @@ def find_sysfs_mnt():
             return sline[1]
 
     return None
+
+def get_all_pci_names():
+    try:
+        sysfs_mnt = find_sysfs_mnt()
+    except IOError, (errno, strerr):
+        raise PciDeviceParseError(('Failed to locate sysfs mount: %s (%d)' %
+            (PROC_PCI_PATH, strerr, errno)))
+
+    pci_names = os.popen('ls ' + sysfs_mnt + SYSFS_PCI_DEVS_PATH).read().split()
+
+    return pci_names
+
+def get_all_pci_devices():
+    pci_devs = []
+    for pci_name in get_all_pci_names():
+        pci_match = re.match(r"((?P<domain>[0-9a-fA-F]{1,4})[:,])?" + \
+                r"(?P<bus>[0-9a-fA-F]{1,2})[:,]" + \
+                r"(?P<slot>[0-9a-fA-F]{1,2})[.,]" + \
+                r"(?P<func>[0-7])$", pci_name)
+        if pci_match is None:
+            raise PciDeviceParseError(('Failed to parse pci device name: %s' %
+                pci_name))
+        pci_dev_info = pci_match.groupdict('0')
+        domain = parse_hex(pci_dev_info['domain'])
+        bus = parse_hex(pci_dev_info['bus'])
+        slot = parse_hex(pci_dev_info['slot'])
+        func = parse_hex(pci_dev_info['func'])
+        try:
+            pci_dev = PciDevice(domain, bus, slot, func)
+        except:
+            continue
+        pci_devs.append(pci_dev)
+
+    return pci_devs
+
+def create_lspci_info():
+    global lspci_info
+    lspci_info = {}
+
+    # Execute 'lspci' command and parse the result.
+    # If the command does not exist, lspci_info will be kept blank ({}).
+    for paragraph in os.popen(LSPCI_CMD + ' -vmmD').read().split('\n\n'):
+        device_name = None
+        device_info = {}
+        for line in paragraph.split('\n'):
+            try:
+                (opt, value) = line.split(':\t')
+                if opt == 'Slot':
+                    device_name = value
+                else:
+                    device_info[opt] = value
+            except:
+                pass
+        if device_name is not None:
+            lspci_info[device_name] = device_info
 
 class PciDeviceNotFoundError(Exception):
     def __init__(self,domain,bus,slot,func):
@@ -92,7 +164,15 @@ class PciDevice:
         self.subdevice = None
         self.msix = 0
         self.msix_iomem = []
+        self.revision = 0
+        self.classcode = None
+        self.vendorname = ""
+        self.devicename = ""
+        self.classname = ""
+        self.subvendorname = ""
+        self.subdevicename = ""
         self.get_info_from_sysfs()
+        self.get_info_from_lspci()
 
     def find_capability(self, type):
         try:
@@ -208,9 +288,8 @@ class PciDevice:
                 self.name+SYSFS_PCI_DEV_DRIVER_DIR_PATH
         try:
             self.driver = os.path.basename(os.readlink(path))
-        except IOError, (errno, strerr):
-            raise PciDeviceParseError(('Failed to read %s: %s (%d)' %
-                (path, strerr, errno)))
+        except OSError, (errno, strerr):
+            self.driver = ""
 
         path = sysfs_mnt+SYSFS_PCI_DEVS_PATH+'/'+ \
                 self.name+SYSFS_PCI_DEV_VENDOR_PATH
@@ -243,6 +322,36 @@ class PciDevice:
         except IOError, (errno, strerr):
             raise PciDeviceParseError(('Failed to open & read %s: %s (%d)' %
                 (path, strerr, errno)))
+
+        path = sysfs_mnt+SYSFS_PCI_DEVS_PATH+'/'+ \
+                self.name+SYSFS_PCI_DEV_CLASS_PATH
+        try:
+            self.classcode = int(open(path,'r').readline(), 16)
+        except IOError, (errno, strerr):
+            raise PciDeviceParseError(('Failed to open & read %s: %s (%d)' %
+                (path, strerr, errno)))
+
+        return True
+
+    def get_info_from_lspci(self):
+        """ Get information such as vendor name, device name, class name, etc.
+        Since we cannot obtain these data from sysfs, use 'lspci' command.
+        """
+        global lspci_info
+
+        if lspci_info is None:
+            create_lspci_info()
+
+        try:
+            device_info = lspci_info[self.name]
+            self.revision = int(device_info['Rev'], 16)
+            self.vendorname = device_info['Vendor']
+            self.devicename = device_info['Device']
+            self.classname = device_info['Class']
+            self.subvendorname = device_info['SVendor']
+            self.subdevicename = device_info['SDevice']
+        except KeyError:
+            pass
 
         return True
 
