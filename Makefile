@@ -214,7 +214,7 @@ linux26:
 # tboot targets
 #
 
-TBOOT_TARFILE = tboot-20071128.tar.gz
+TBOOT_TARFILE = tboot-20080613.tar.gz
 TBOOT_BASE_URL = http://downloads.sourceforge.net/tboot
 
 .PHONY: build-tboot
