@@ -2,9 +2,31 @@
 #define _PT_MSI_H
 
 #include "vl.h"
-#include "pci/header.h"
 #include "pci/pci.h"
 #include "pass-through.h"
+
+#define  PCI_CAP_ID_MSI     0x05    /* Message Signalled Interrupts */
+#define  PCI_CAP_ID_MSIX    0x11    /* MSI-X */
+
+/* Message Signalled Interrupts registers */
+#define PCI_MSI_FLAGS       2   /* Various flags */
+#define  PCI_MSI_FLAGS_64BIT    0x80    /* 64-bit addresses allowed */
+#define  PCI_MSI_FLAGS_QSIZE    0x70    /* Message queue size configured */
+#define  PCI_MSI_FLAGS_QMASK    0x0e    /* Maximum queue size available */
+#define  PCI_MSI_FLAGS_ENABLE   0x01    /* MSI feature enabled */
+#define PCI_MSI_RFU         3   /* Rest of capability flags */
+#define PCI_MSI_ADDRESS_LO  4   /* Lower 32 bits */
+#define PCI_MSI_ADDRESS_HI  8   /* Upper 32 bits (if PCI_MSI_FLAGS_64BIT set) */
+#define PCI_MSI_DATA_32     8   /* 16 bits of data for 32-bit devices */
+#define PCI_MSI_DATA_64     12  /* 16 bits of data for 64-bit devices */
+
+/* MSI-X */
+#define  PCI_MSIX_ENABLE    0x8000
+#define  PCI_MSIX_MASK      0x4000
+#define  PCI_MSIX_TABSIZE   0x03ff
+#define PCI_MSIX_TABLE      4
+#define PCI_MSIX_PBA        8
+#define  PCI_MSIX_BIR       0x7
 
 #define MSI_FLAG_UNINIT 0x1000
 #define PT_MSI_MAPPED   0x2000
@@ -29,7 +51,7 @@
    + */
 
 #define MSI_ADDR_HEADER                0xfee00000
-#define MSI_TARGET_CPU_SHIFT   	       12
+#define MSI_TARGET_CPU_SHIFT           12
 
 #define MSI_ADDR_DESTID_MASK           0xfff0000f
 #define     MSI_ADDR_DESTID_CPU(cpu)   ((cpu) << MSI_TARGET_CPU_SHIFT)
