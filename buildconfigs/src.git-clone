@@ -1,0 +1,60 @@
+# Mercurial
+GIT ?= git
+
+LINUX_SRCDIR ?= linux-$(LINUX_VER).git
+
+# The URL of the remote GIT repository
+ifeq ($(XEN_LINUX_GIT_URL),)
+.ERROR: XEN_LINUX_GIT_URL not specified
+endif
+
+# The name to use for the remote repository
+XEN_LINUX_GIT_REMOTENAME ?= origin
+
+# The branch in the remote repository
+ifeq ($(XEN_LINUX_GIT_REMOTEBRANCH),)
+.ERROR: XEN_LINUX_GIT_REMOTEBRANCH not specified
+endif
+
+XEN_LINUX_GIT_LOCALBRANCH ?= master
+
+# Set XEN_LINUX_GITREV to update to a particlar revision.
+XEN_LINUX_GITREV  ?= 
+
+$(LINUX_SRCDIR)/.valid-src: $(__XEN_LINUX_UPDATE)
+	@set -e ; if [ -d $(LINUX_SRCDIR) ] && [ ! -d $(GIT_DIR) ] ; then \
+	    echo "$(LINUX_SRCDIR) exists but is not a git repository." 1>&2 ; \
+	    false ; \
+	fi
+
+	@set -e ; if [ ! -e $(LINUX_SRCDIR)/.git ] ; then \
+	    mkdir $(LINUX_SRCDIR) ; \
+	    cd $(LINUX_SRCDIR) ; \
+	    $(GIT) init-db ; \
+	fi
+
+	@set -e ; cd $(LINUX_SRCDIR) ; \
+	if ! $(GIT) remote | grep -q $(XEN_LINUX_GIT_REMOTENAME) ; then \
+	    echo "Adding remote git repository \`$(XEN_LINUX_GIT_URL)' as \`$(XEN_LINUX_GIT_REMOTENAME)'" ; \
+	    $(GIT) remote add $(XEN_LINUX_GIT_REMOTENAME) $(XEN_LINUX_GIT_URL) ; \
+	fi
+
+	@echo "Updating remote \`$(XEN_LINUX_GIT_REMOTENAME)'"
+	@cd $(LINUX_SRCDIR) && $(GIT) fetch $(XEN_LINUX_GIT_REMOTENAME)
+
+	@set -e ; cd $(LINUX_SRCDIR) ; \
+	if ! $(GIT) branch -l | grep -q $(XEN_LINUX_GIT_LOCALBRANCH) ; then \
+	    $(GIT) branch --track $(XEN_LINUX_GIT_LOCALBRANCH) \
+	        $(XEN_LINUX_GIT_REMOTENAME)/$(XEN_LINUX_GIT_REMOTEBRANCH) ; \
+	    $(GIT) checkout ; \
+	fi
+
+	@ set -e ; cd $(LINUX_SRCDIR) ; \
+	if [ -n "$(XEN_LINUX_GITREV)" ] ; then \
+	    echo "Updating $(LINUX_SRCDIR) to revision \'$(XEN_LINUX_GITREV)'." ; \
+	    $(GIT) reset --hard $(XEN_LINUX_GITREV) ; \
+	else \
+	    $(GIT) reset --hard $(XEN_LINUX_GIT_REMOTENAME)/$(XEN_LINUX_GIT_REMOTEBRANCH) ; \
+	fi
+
+	touch $@
