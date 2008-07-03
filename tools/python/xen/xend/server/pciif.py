@@ -76,6 +76,7 @@ class PciController(DevController):
 
             back['dev-%i' % pcidevid] = "%04x:%02x:%02x.%02x" % \
                                         (domain, bus, slot, func)
+            back['uuid-%i' % pcidevid] = pci_config.get('uuid', '')
             pcidevid += 1
 
         if vslots != "":
@@ -101,6 +102,7 @@ class PciController(DevController):
             try:
                 dev = back['dev-%i' % i]
                 state = states[i]
+                uuid = back['uuid-%i' %i]
             except:
                 raise XendError('Error reading config')
 
@@ -121,6 +123,7 @@ class PciController(DevController):
                 self.writeBackend(devid, 'dev-%i' % (num_olddevs + i), dev)
                 self.writeBackend(devid, 'state-%i' % (num_olddevs + i),
                                   str(xenbusState['Initialising']))
+                self.writeBackend(devid, 'uuid-%i' % (num_olddevs + i), uuid)
                 self.writeBackend(devid, 'num_devs', str(num_olddevs + i + 1))
 
                 # Update vslots
@@ -141,7 +144,7 @@ class PciController(DevController):
                     raise XendError('Device %s is not connected' % dev)
 
                 # Update vslots
-                if back['vslots'] is not None:
+                if back.get('vslots') is not None:
                     vslots = old_vslots
                     for vslt in back['vslots'].split(';'):
                         if vslt != '':
@@ -185,6 +188,9 @@ class PciController(DevController):
                                  'bus': '0x%(bus)s' % pci_dev_info,
                                  'slot': '0x%(slot)s' % pci_dev_info,
                                  'func': '0x%(func)s' % pci_dev_info}
+
+                # Per device uuid info
+                dev_dict['uuid'] = self.readBackend(devid, 'uuid-%d' % i)
 
                 #append vslot info
                 if vslots is not None:
@@ -442,6 +448,7 @@ class PciController(DevController):
                 self.removeBackend(devid, 'dev-%i' % i)
                 self.removeBackend(devid, 'vdev-%i' % i)
                 self.removeBackend(devid, 'state-%i' % i)
+                self.removeBackend(devid, 'uuid-%i' % i)
             else:
                 if new_num_devs != i:
                     tmpdev = self.readBackend(devid, 'dev-%i' % i)
@@ -455,6 +462,9 @@ class PciController(DevController):
                     tmpstate = self.readBackend(devid, 'state-%i' % i)
                     self.writeBackend(devid, 'state-%i' % new_num_devs, tmpstate)
                     self.removeBackend(devid, 'state-%i' % i)
+                    tmpuuid = self.readBackend(devid, 'uuid-%i' % i)
+                    self.writeBackend(devid, 'uuid-%i' % new_num_devs, tmpuuid)
+                    self.removeBackend(devid, 'uuid-%i' % i)
                 new_num_devs = new_num_devs + 1
 
         self.writeBackend(devid, 'num_devs', str(new_num_devs))

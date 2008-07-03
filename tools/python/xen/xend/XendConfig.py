@@ -24,6 +24,8 @@ from xen.xend import sxp
 from xen.xend import uuid
 from xen.xend import XendOptions
 from xen.xend import XendAPIStore
+from xen.xend.XendPPCI import XendPPCI
+from xen.xend.XendDPCI import XendDPCI
 from xen.xend.XendError import VmError
 from xen.xend.XendDevices import XendDevices
 from xen.xend.PrettyPrint import prettyprintstring
@@ -773,6 +775,11 @@ class XendConfig(dict):
         """
         log.debug('_sxp_to_xapi(%s)' % scrub_password(sxp_cfg))
 
+        # _parse_sxp() below will call device_add() and construct devices.
+        # Some devices (currently only pci) may require VM's uuid, so
+        # setup self['uuid'] beforehand.
+        self['uuid'] = sxp.child_value(sxp_cfg, 'uuid', uuid.createString())
+
         cfg = self._parse_sxp(sxp_cfg)
 
         for key, typ in XENAPI_CFG_TYPES.items():
@@ -1209,42 +1216,35 @@ class XendConfig(dict):
             dev_type = sxp.name(config)
             dev_info = {}
 
-            # Parsing the device SXP's. In most cases, the SXP looks
-            # like this:
-            #
-            # [device, [vif, [mac, xx:xx:xx:xx:xx:xx], [ip 1.3.4.5]]]
-            #
-            # However, for PCI devices it looks like this:
-            #
-            # [device, [pci, [dev, [domain, 0], [bus, 0], [slot, 1]]]]
-            #
-            # It seems the reasoning for this difference is because
-            # pciif.py needs all the PCI device configurations at
-            # the same time when creating the devices.
-            #
-            # To further complicate matters, Xen 2.0 configuration format
-            # uses the following for pci device configuration:
-            #
-            # [device, [pci, [domain, 0], [bus, 0], [dev, 1], [func, 2]]]
-
             if dev_type == 'pci':
                 pci_devs_uuid = sxp.child_value(config, 'uuid',
                                                 uuid.createString())
-                pci_devs = []
-                for pci_dev in sxp.children(config, 'dev'):
-                    pci_dev_info = {}
-                    for opt_val in pci_dev[1:]:
-                        try:
-                            opt, val = opt_val
-                            pci_dev_info[opt] = val
-                        except TypeError:
-                            pass
-                    pci_devs.append(pci_dev_info)
+
+                pci_dict = self.pci_convert_sxp_to_dict(config)
+                pci_devs = pci_dict['devs']
+
+                # create XenAPI DPCI objects.
+                for pci_dev in pci_devs:
+                    dpci_uuid = pci_dev.get('uuid')
+                    ppci_uuid = XendPPCI.get_by_sbdf(pci_dev['domain'],
+                                                    pci_dev['bus'],
+                                                    pci_dev['slot'],
+                                                    pci_dev['func'])
+                    if ppci_uuid is None:
+                        continue
+                    dpci_record = {
+                        'VM': self['uuid'],
+                        'PPCI': ppci_uuid,
+                        'hotplug_slot': pci_dev.get('vslot', 0)
+                    }
+                    XendDPCI(dpci_uuid, dpci_record)
+                    
                 target['devices'][pci_devs_uuid] = (dev_type,
                                                     {'devs': pci_devs,
                                                      'uuid': pci_devs_uuid})
 
                 log.debug("XendConfig: reading device: %s" % pci_devs)
+
                 return pci_devs_uuid
 
             for opt_val in config[1:]:
@@ -1482,6 +1482,76 @@ class XendConfig(dict):
 
         return ''
 
+    def pci_convert_sxp_to_dict(self, dev_sxp):
+        """Convert pci device sxp to dict
+        @param dev_sxp: device configuration
+        @type  dev_sxp: SXP object (parsed config)
+        @return: dev_config
+        @rtype: dictionary
+        """
+        # Parsing the device SXP's. In most cases, the SXP looks
+        # like this:
+        #
+        # [device, [vif, [mac, xx:xx:xx:xx:xx:xx], [ip 1.3.4.5]]]
+        #
+        # However, for PCI devices it looks like this:
+        #
+        # [device, [pci, [dev, [domain, 0], [bus, 0], [slot, 1], [func, 2]]]
+        #
+        # It seems the reasoning for this difference is because
+        # pciif.py needs all the PCI device configurations at
+        # the same time when creating the devices.
+        #
+        # To further complicate matters, Xen 2.0 configuration format
+        # uses the following for pci device configuration:
+        #
+        # [device, [pci, [domain, 0], [bus, 0], [dev, 1], [func, 2]]]
+
+        # For PCI device hotplug support, the SXP of PCI devices is
+        # extendend like this:
+        #
+        # [device, [pci, [dev, [domain, 0], [bus, 0], [slot, 1], [func, 2],
+        #                      [vslt, 0]],
+        #                [state, 'Initialising']]]
+        #
+        # 'vslt' shows the virtual hotplug slot number which the PCI device
+        # is inserted in. This is only effective for HVM domains.
+        #
+        # state 'Initialising' indicates that the device is being attached,
+        # while state 'Closing' indicates that the device is being detached.
+        #
+        # The Dict looks like this:
+        #
+        # { devs: [{domain: 0, bus: 0, slot: 1, func: 2, vslt: 0}],
+        #   states: ['Initialising'] }
+
+        dev_config = {}
+
+        pci_devs = []
+        for pci_dev in sxp.children(dev_sxp, 'dev'):
+            pci_dev_info = {}
+            for opt_val in pci_dev[1:]:
+                try:
+                    opt, val = opt_val
+                    pci_dev_info[opt] = val
+                except TypeError:
+                    pass
+                # append uuid for each pci device.
+                dpci_uuid = pci_dev_info.get('uuid', uuid.createString())
+                pci_dev_info['uuid'] = dpci_uuid
+            pci_devs.append(pci_dev_info)
+        dev_config['devs'] = pci_devs 
+
+        pci_states = []
+        for pci_state in sxp.children(dev_sxp, 'state'):
+            try:
+                pci_states.append(pci_state[1])
+            except IndexError:
+                raise XendError("Error reading state while parsing pci sxp")
+        dev_config['states'] = pci_states
+
+        return dev_config
+
     def console_add(self, protocol, location, other_config = {}):
         dev_uuid = uuid.createString()
         if protocol == 'vt100':
@@ -1556,16 +1626,29 @@ class XendConfig(dict):
             dev_type, dev_info = self['devices'][dev_uuid]
 
             if dev_type == 'pci': # Special case for pci
-                pci_devs = []
-                for pci_dev in sxp.children(config, 'dev'):
-                    pci_dev_info = {}
-                    for opt_val in pci_dev[1:]:
-                        try:
-                            opt, val = opt_val
-                            pci_dev_info[opt] = val
-                        except TypeError:
-                            pass
-                    pci_devs.append(pci_dev_info)
+                pci_dict = self.pci_convert_sxp_to_dict(config)
+                pci_devs = pci_dict['devs']
+
+                # destroy existing XenAPI DPCI objects
+                for dpci_uuid in XendDPCI.get_by_VM(self['uuid']):
+                    XendAPIStore.deregister(dpci_uuid, "DPCI")
+
+                # create XenAPI DPCI objects.
+                for pci_dev in pci_devs:
+                    dpci_uuid = pci_dev.get('uuid')
+                    ppci_uuid = XendPPCI.get_by_sbdf(pci_dev['domain'],
+                                                     pci_dev['bus'],
+                                                     pci_dev['slot'],
+                                                     pci_dev['func'])
+                    if ppci_uuid is None:
+                        continue
+                    dpci_record = {
+                        'VM': self['uuid'],
+                        'PPCI': ppci_uuid,
+                        'hotplug_slot': pci_dev.get('vslot', 0)
+                    }
+                    XendDPCI(dpci_uuid, dpci_record)
+
                 self['devices'][dev_uuid] = (dev_type,
                                              {'devs': pci_devs,
                                               'uuid': dev_uuid})

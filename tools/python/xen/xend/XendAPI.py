@@ -41,6 +41,7 @@ from XendVMMetrics import XendVMMetrics
 from XendPIF import XendPIF
 from XendPBD import XendPBD
 from XendPPCI import XendPPCI
+from XendDPCI import XendDPCI
 from XendXSPolicy import XendXSPolicy, XendACMPolicy
 
 from XendAPIConstants import *
@@ -479,6 +480,7 @@ classes = {
     'PBD'          : valid_object("PBD"),
     'PIF_metrics'  : valid_object("PIF_metrics"),
     'PPCI'         : valid_object("PPCI"),
+    'DPCI'         : valid_object("DPCI")
 }
 
 autoplug_classes = {
@@ -488,6 +490,7 @@ autoplug_classes = {
     'PBD'         : XendPBD,
     'PIF_metrics' : XendPIFMetrics,
     'PPCI'        : XendPPCI,
+    'DPCI'        : XendDPCI,
     'XSPolicy'    : XendXSPolicy,
     'ACMPolicy'   : XendACMPolicy,
 }
@@ -1154,6 +1157,7 @@ class XendAPI(object):
                   'VIFs',
                   'VBDs',
                   'VTPMs',
+                  'DPCIs',
                   'tools_version',
                   'domid',
                   'is_control_domain',
@@ -1296,6 +1300,10 @@ class XendAPI(object):
         dom = XendDomain.instance().get_vm_by_uuid(vm_ref)
         return xen_api_success(dom.get_consoles())
 
+    def VM_get_DPCIs(self, session, vm_ref):
+        dom = XendDomain.instance().get_vm_by_uuid(vm_ref)
+        return xen_api_success(dom.get_dpcis())
+    
     def VM_get_tools_version(self, session, vm_ref):
         dom = XendDomain.instance().get_vm_by_uuid(vm_ref)
         return dom.get_tools_version()
@@ -1675,6 +1683,7 @@ class XendAPI(object):
             'VIFs': xeninfo.get_vifs(),
             'VBDs': xeninfo.get_vbds(),
             'VTPMs': xeninfo.get_vtpms(),
+            'DPCIs': xeninfo.get_dpcis(),
             'PV_bootloader': xeninfo.info.get('PV_bootloader'),
             'PV_kernel': xeninfo.info.get('PV_kernel'),
             'PV_ramdisk': xeninfo.info.get('PV_ramdisk'),

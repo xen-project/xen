@@ -55,6 +55,10 @@ from xen.xend.XendAPIConstants import *
 
 from xen.xend.XendVMMetrics import XendVMMetrics
 
+from xen.xend.XendPPCI import XendPPCI
+from xen.xend.XendDPCI import XendDPCI
+from xen.xend import XendAPIStore
+
 MIGRATE_TIMEOUT = 30.0
 BOOTLOADER_LOOPBACK_DEVICE = '/dev/xvdp'
 
@@ -642,50 +646,7 @@ class XendDomainInfo:
         xen.xend.XendDomain.instance().managed_config_save(self)
         return self.getDeviceController(dev_type).sxpr(devid)
 
-    def pci_convert_sxp_to_dict(self, dev_sxp):
-        """Convert pci device sxp to dict
-        @param dev_sxp: device configuration
-        @type  dev_sxp: SXP object (parsed config)
-        @return: dev_config
-        @rtype: dictionary
-        """
-        # In reconfigure phase, config of PCI device looks like below:
-        #
-        # sxp:
-        # [device, [pci, [dev, [domain, '0x0'], [bus, '0x0'], [slot, '0x0'],
-        #                      [func, '0x0'], [vslt, '0x0']],
-        #                [state, 'Initialising']]]
-        #
-        # dict:
-        # {devs: [{domain: '0x0', bus: '0x0', slot: '0x0', func: '0x0',
-        #          vslt: '0x0'}],
-        #  states: ['Initialising']}
-        #
-        # state 'Initialising' means the device is being attached.
-        # state 'Closing' means the device is being detached.
 
-        dev_config = {}
-        pci_devs = []
-        for pci_dev in sxp.children(dev_sxp, 'dev'):
-            pci_dev_info = {}
-            for opt_val in pci_dev[1:]:
-                try:
-                    opt, val = opt_val
-                    pci_dev_info[opt] = val
-                except TypeError:
-                    pass
-            pci_devs.append(pci_dev_info)
-        dev_config['devs'] = pci_devs 
-        pci_states = []
-        for pci_state in sxp.children(dev_sxp, 'state'):
-            try:
-                pci_states.append(pci_state[1])
-            except IndexError:
-                raise XendError("Error reading state while parsing pci sxp")
-        dev_config['states'] = pci_states
-        
-        return dev_config
- 
     def pci_device_configure(self, dev_sxp, devid = 0):
         """Configure an existing pci device.
         
@@ -711,7 +672,7 @@ class XendDomainInfo:
             raise XendError("Cannot detach when pci platform does not exist")
 
         pci_dev = sxp.children(dev_sxp, 'dev')[0]
-        dev_config = self.pci_convert_sxp_to_dict(dev_sxp)
+        dev_config = self.info.pci_convert_sxp_to_dict(dev_sxp)
         dev = dev_config['devs'][0]
                 
         # Do HVM specific processing
@@ -784,6 +745,8 @@ class XendDomainInfo:
             else:
                 self.destroyDevice('pci', devid)
                 del self.info['devices'][dev_uuid]
+
+        xen.xend.XendDomain.instance().managed_config_save(self)
 
         return True
 
@@ -3169,6 +3132,9 @@ class XendDomainInfo:
     def get_vtpms(self):
         return self.info.get('vtpm_refs', [])
 
+    def get_dpcis(self):
+        return XendDPCI.get_by_VM(self.info.get('uuid'))
+
     def create_vbd(self, xenapi_vbd, vdi_image_path):
         """Create a VBD using a VDI from XendStorageRepository.
 
@@ -3292,6 +3258,64 @@ class XendDomainInfo:
     def set_console_other_config(self, console_uuid, other_config):
         self.info.console_update(console_uuid, 'other_config', other_config)
 
+    def create_dpci(self, xenapi_pci):
+        """Create pci device from the passed struct in Xen API format.
+
+        @param xenapi_pci: DPCI struct from Xen API
+        @rtype: bool
+        #@rtype: string
+        @return: True if successfully created device
+        #@return: UUID
+        """
+
+        dpci_uuid = uuid.createString()
+
+        # Convert xenapi to sxp
+        ppci = XendAPIStore.get(xenapi_pci.get('PPCI'), 'PPCI')
+
+        target_pci_sxp = \
+            ['pci', 
+                ['dev',
+                    ['domain', '0x%02x' % ppci.get_domain()],
+                    ['bus', '0x%02x' % ppci.get_bus()],
+                    ['slot', '0x%02x' % ppci.get_slot()],
+                    ['func', '0x%1x' % ppci.get_func()],
+                    ['vslt', '0x%02x' % xenapi_pci.get('hotplug_slot')],
+                    ['uuid', dpci_uuid]
+                ],
+                ['state', 'Initialising']
+            ]
+
+        if self._stateGet() != XEN_API_VM_POWER_STATE_RUNNING:
+
+            old_pci_sxp = self._getDeviceInfo_pci(0)
+
+            if old_pci_sxp is None:
+                dev_uuid = self.info.device_add('pci', cfg_sxp = target_pci_sxp)
+                if not dev_uuid:
+                    raise XendError('Failed to create device')
+
+            else:
+                new_pci_sxp = ['pci']
+                for existing_dev in sxp.children(old_pci_sxp, 'dev'):
+                    new_pci_sxp.append(existing_dev)
+                new_pci_sxp.append(sxp.child0(target_pci_sxp, 'dev'))
+
+                dev_uuid = sxp.child_value(old_pci_sxp, 'uuid')
+                self.info.device_update(dev_uuid, new_pci_sxp)
+
+            xen.xend.XendDomain.instance().managed_config_save(self)
+
+        else:
+            try:
+                self.device_configure(target_pci_sxp)
+
+            except Exception, exn:
+                raise XendError('Failed to create device')
+
+        return dpci_uuid
+
+
     def destroy_device_by_uuid(self, dev_type, dev_uuid):
         if dev_uuid not in self.info['devices']:
             raise XendError('Device does not exist')
@@ -3318,6 +3342,63 @@ class XendDomainInfo:
 
     def destroy_vtpm(self, dev_uuid):
         self.destroy_device_by_uuid('vtpm', dev_uuid)
+
+    def destroy_dpci(self, dev_uuid):
+
+        dpci = XendAPIStore.get(dev_uuid, 'DPCI')
+        ppci = XendAPIStore.get(dpci.get_PPCI(), 'PPCI')
+
+        old_pci_sxp = self._getDeviceInfo_pci(0)
+        dev_uuid = sxp.child_value(old_pci_sxp, 'uuid')
+        target_dev = None
+        new_pci_sxp = ['pci']
+        for dev in sxp.children(old_pci_sxp, 'dev'):
+            domain = int(sxp.child_value(dev, 'domain'), 16)
+            bus = int(sxp.child_value(dev, 'bus'), 16)
+            slot = int(sxp.child_value(dev, 'slot'), 16)
+            func = int(sxp.child_value(dev, 'func'), 16)
+            name = "%04x:%02x:%02x.%01x" % (domain, bus, slot, func)
+            if ppci.get_name() == name:
+                target_dev = dev
+            else:
+                new_pci_sxp.append(dev)
+
+        if target_dev is None:
+            raise XendError('Failed to destroy device')
+
+        target_pci_sxp = ['pci', target_dev, ['state', 'Closing']]
+
+        if self._stateGet() != XEN_API_VM_POWER_STATE_RUNNING:
+
+            self.info.device_update(dev_uuid, new_pci_sxp)
+            if len(sxp.children(new_pci_sxp, 'dev')) == 0:
+                del self.info['devices'][dev_uuid]
+            xen.xend.XendDomain.instance().managed_config_save(self)
+
+        else:
+            try:
+                self.device_configure(target_pci_sxp)
+
+            except Exception, exn:
+                raise XendError('Failed to destroy device')
+
+    def destroy_xapi_device_instances(self):
+        """Destroy Xen-API device instances stored in XendAPIStore.
+        """
+        # Xen-API classes based on XendBase have their instances stored
+        # in XendAPIStore. Cleanup these virtual device instances here
+        # if they are supposed to be destroyed when the parent domain is dead.
+        #
+        # Most of the virtual devices (vif, vbd, vfb, etc) are not based on
+        # XendBase and there's no need to remove them from XendAPIStore.
+
+        from xen.xend import XendDomain
+        if XendDomain.instance().is_valid_vm(self.info.get('uuid')):
+            # domain still exists.
+            return
+
+        for dpci_uuid in XendDPCI.get_by_VM(self.info.get('uuid')):
+            XendAPIStore.deregister(dpci_uuid, "DPCI")
             
     def has_device(self, dev_class, dev_uuid):
         return (dev_uuid in self.info['%s_refs' % dev_class.lower()])
