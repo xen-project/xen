@@ -234,7 +234,7 @@ void set_msi_irq_affinity(unsigned int irq, cpumask_t mask)
     if ( !desc )
 	return;
 
-    ASSERT(spin_is_locked(&irq_desc[vector].lock));
+    ASSERT(spin_is_locked(&irq_desc[irq].lock));
     spin_lock(&desc->dev->lock);
     read_msi_msg(desc, &msg);
 
@@ -309,7 +309,7 @@ static void msi_set_mask_bit(unsigned int irq, int flag)
 {
     struct msi_desc *entry = irq_desc[irq].msi_desc;
 
-    ASSERT(spin_is_locked(&irq_desc[vector].lock));
+    ASSERT(spin_is_locked(&irq_desc[irq].lock));
     BUG_ON(!entry || !entry->dev);
     switch (entry->msi_attrib.type) {
     case PCI_CAP_ID_MSI:
