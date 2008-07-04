@@ -130,6 +130,8 @@ struct vcpu
 
     /* Bitmask of CPUs on which this VCPU may run. */
     cpumask_t        cpu_affinity;
+    /* Used to change affinity temporarily. */
+    cpumask_t        cpu_affinity_tmp;
 
     /* Bitmask of CPUs which are holding onto this VCPU's state. */
     cpumask_t        vcpu_dirty_cpumask;
@@ -208,6 +210,10 @@ struct domain
     bool_t           is_shutting_down; /* in process of shutting down? */
     bool_t           is_shut_down;     /* fully shut down? */
     int              shutdown_code;
+
+    /* If this is not 0, send suspend notification here instead of
+     * raising DOM_EXC */
+    int              suspend_evtchn;
 
     atomic_t         pause_count;
 

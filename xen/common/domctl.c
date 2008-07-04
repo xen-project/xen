@@ -824,6 +824,21 @@ long do_domctl(XEN_GUEST_HANDLE(xen_domctl_t) u_domctl)
     }
     break;
 
+    case XEN_DOMCTL_subscribe:
+    {
+        struct domain *d;
+
+        ret = -ESRCH;
+        d = rcu_lock_domain_by_id(op->domain);
+        if ( d != NULL )
+        {
+            d->suspend_evtchn = op->u.subscribe.port;
+            rcu_unlock_domain(d);
+            ret = 0;
+        }
+    }
+    break;
+
     default:
         ret = arch_do_domctl(op, u_domctl);
         break;

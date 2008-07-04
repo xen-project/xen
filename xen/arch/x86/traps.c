@@ -61,6 +61,7 @@
 #include <asm/msr.h>
 #include <asm/shared.h>
 #include <asm/x86_emulate.h>
+#include <asm/traps.h>
 #include <asm/hvm/vpt.h>
 #include <public/arch-x86/cpuid.h>
 
@@ -2678,25 +2679,51 @@ asmlinkage void do_general_protection(struct cpu_user_regs *regs)
     panic("GENERAL PROTECTION FAULT\n[error_code=%04x]\n", regs->error_code);
 }
 
+static DEFINE_PER_CPU(struct softirq_trap, softirq_trap);
+
 static void nmi_mce_softirq(void)
 {
-    /* Only used to defer wakeup of dom0,vcpu0 to a safe (non-NMI) context. */
-    vcpu_kick(dom0->vcpu[0]);
+    int cpu = smp_processor_id();
+    struct softirq_trap *st = &per_cpu(softirq_trap, cpu);
+    cpumask_t affinity;
+
+    BUG_ON(st == NULL);
+    BUG_ON(st->vcpu == NULL);
+
+    /* Set the tmp value unconditionally, so that
+     * the check in the iret hypercall works. */
+    st->vcpu->cpu_affinity_tmp = st->vcpu->cpu_affinity;
+
+    if ((cpu != st->processor)
+       || (st->processor != st->vcpu->processor))
+    {
+        /* We are on a different physical cpu.
+         * Make sure to wakeup the vcpu on the
+         * specified processor.
+         */
+        cpus_clear(affinity);
+        cpu_set(st->processor, affinity);
+        vcpu_set_affinity(st->vcpu, &affinity);
+
+        /* Affinity is restored in the iret hypercall. */
+    }
+
+    /* Only used to defer wakeup of domain/vcpu to
+     * a safe (non-NMI/MCE) context.
+     */
+    vcpu_kick(st->vcpu);
 }
 
 static void nmi_dom0_report(unsigned int reason_idx)
 {
-    struct domain *d;
-    struct vcpu   *v;
+    struct domain *d = dom0;
 
-    if ( ((d = dom0) == NULL) || ((v = d->vcpu[0]) == NULL) )
+    if ( (d == NULL) || (d->vcpu[0] == NULL) )
         return;
 
     set_bit(reason_idx, nmi_reason(d));
 
-    /* Not safe to wake a vcpu here, or even to schedule a tasklet! */
-    if ( !test_and_set_bool(v->nmi_pending) )
-        raise_softirq(NMI_MCE_SOFTIRQ);
+    send_guest_trap(d, 0, TRAP_nmi);
 }
 
 asmlinkage void mem_parity_error(struct cpu_user_regs *regs)
@@ -3009,6 +3036,35 @@ long unregister_guest_nmi_callback(void)
 
     return 0;
 }
+
+int send_guest_trap(struct domain *d, uint16_t vcpuid, unsigned int trap_nr)
+{
+    struct vcpu *v;
+    struct softirq_trap *st;
+
+    BUG_ON(d == NULL);
+    BUG_ON(vcpuid >= MAX_VIRT_CPUS);
+    v = d->vcpu[vcpuid];
+
+    switch (trap_nr) {
+    case TRAP_nmi:
+        if ( !test_and_set_bool(v->nmi_pending) ) {
+               st = &per_cpu(softirq_trap, smp_processor_id());
+               st->domain = dom0;
+               st->vcpu = dom0->vcpu[0];
+               st->processor = st->vcpu->processor;
+
+               /* not safe to wake up a vcpu here */
+               raise_softirq(NMI_MCE_SOFTIRQ);
+               return 0;
+        }
+        break;
+    }
+
+    /* delivery failed */
+    return -EIO;
+}
+
 
 long do_set_trap_table(XEN_GUEST_HANDLE(const_trap_info_t) traps)
 {

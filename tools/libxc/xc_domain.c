@@ -981,6 +981,17 @@ int xc_domain_set_target(
     return do_domctl(xc_handle, &domctl);
 }
 
+int xc_dom_subscribe(int xc_handle, domid_t dom, evtchn_port_t port)
+{
+    DECLARE_DOMCTL;
+
+    domctl.cmd = XEN_DOMCTL_subscribe;
+    domctl.domain = dom;
+    domctl.u.subscribe.port = port;
+
+    return do_domctl(xc_handle, &domctl);
+}
+
 /*
  * Local variables:
  * mode: C
