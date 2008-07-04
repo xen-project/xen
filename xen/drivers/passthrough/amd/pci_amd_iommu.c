@@ -292,7 +292,6 @@ static void amd_iommu_setup_domain_device(
 
 static void amd_iommu_setup_dom0_devices(struct domain *d)
 {
-    struct hvm_iommu *hd = domain_hvm_iommu(d);
     struct amd_iommu *iommu;
     struct pci_dev *pdev;
     int bus, dev, func;
@@ -314,7 +313,7 @@ static void amd_iommu_setup_dom0_devices(struct domain *d)
                 pdev = xmalloc(struct pci_dev);
                 pdev->bus = bus;
                 pdev->devfn = PCI_DEVFN(dev, func);
-                list_add_tail(&pdev->list, &hd->pdev_list);
+                list_add_tail(&pdev->domain_list, &d->arch.pdev_list);
 
                 bdf = (bus << 8) | pdev->devfn;
                 /* supported device? */
@@ -490,12 +489,9 @@ extern void pdev_flr(u8 bus, u8 devfn);
 static int reassign_device( struct domain *source, struct domain *target,
                             u8 bus, u8 devfn)
 {
-    struct hvm_iommu *source_hd = domain_hvm_iommu(source);
-    struct hvm_iommu *target_hd = domain_hvm_iommu(target);
     struct pci_dev *pdev;
     struct amd_iommu *iommu;
     int bdf;
-    unsigned long flags;
 
     for_each_pdev ( source, pdev )
     {
@@ -520,11 +516,7 @@ static int reassign_device( struct domain *source, struct domain *target,
 
         amd_iommu_disable_domain_device(source, iommu, bdf);
         /* Move pci device from the source domain to target domain. */
-        spin_lock_irqsave(&source_hd->iommu_list_lock, flags);
-        spin_lock_irqsave(&target_hd->iommu_list_lock, flags);
-        list_move(&pdev->list, &target_hd->pdev_list);
-        spin_unlock_irqrestore(&target_hd->iommu_list_lock, flags);
-        spin_unlock_irqrestore(&source_hd->iommu_list_lock, flags);
+        list_move(&pdev->domain_list, &target->arch.pdev_list);
 
         amd_iommu_setup_domain_device(target, iommu, bdf);
         amd_iov_info("reassign %x:%x.%x domain %d -> domain %d\n",
@@ -559,12 +551,11 @@ static int amd_iommu_assign_device(struct domain *d, u8 bus, u8 devfn)
 
 static void release_domain_devices(struct domain *d)
 {
-    struct hvm_iommu *hd  = domain_hvm_iommu(d);
     struct pci_dev *pdev;
 
-    while ( !list_empty(&hd->pdev_list) )
+    while ( has_arch_pdevs(d) )
     {
-        pdev = list_entry(hd->pdev_list.next, typeof(*pdev), list);
+        pdev = list_entry(d->arch.pdev_list.next, typeof(*pdev), domain_list);
         pdev_flr(pdev->bus, pdev->devfn);
         amd_iov_info("release domain %d devices %x:%x.%x\n", d->domain_id,
                  pdev->bus, PCI_SLOT(pdev->devfn), PCI_FUNC(pdev->devfn));

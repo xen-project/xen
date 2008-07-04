@@ -70,10 +70,6 @@ struct acpi_atsr_unit {
     list_for_each_entry(iommu, \
         &(domain->arch.hvm_domain.hvm_iommu.iommu_list), list)
 
-#define for_each_pdev(domain, pdev) \
-    list_for_each_entry(pdev, \
-         &(domain->arch.hvm_domain.hvm_iommu.pdev_list), list)
-
 #define for_each_drhd_unit(drhd) \
     list_for_each_entry(drhd, &acpi_drhd_units, list)
 #define for_each_rmrr_device(rmrr, pdev) \

@@ -28,10 +28,6 @@
     list_for_each_entry(amd_iommu, \
         &amd_iommu_head, list)
 
-#define for_each_pdev(domain, pdev) \
-    list_for_each_entry(pdev, \
-         &(domain->arch.hvm_domain.hvm_iommu.pdev_list), list)
-
 #define DMA_32BIT_MASK  0x00000000ffffffffULL
 #define PAGE_ALIGN(addr)    (((addr) + PAGE_SIZE - 1) & PAGE_MASK)
 

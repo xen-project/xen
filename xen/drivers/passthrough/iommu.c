@@ -35,8 +35,6 @@ int iommu_domain_init(struct domain *domain)
     struct hvm_iommu *hd = domain_hvm_iommu(domain);
 
     spin_lock_init(&hd->mapping_lock);
-    spin_lock_init(&hd->iommu_list_lock);
-    INIT_LIST_HEAD(&hd->pdev_list);
     INIT_LIST_HEAD(&hd->g2m_ioport_list);
 
     if ( !iommu_enabled )
@@ -68,7 +66,7 @@ int assign_device(struct domain *d, u8 bus, u8 devfn)
     if ( (rc = hd->platform_ops->assign_device(d, bus, devfn)) )
         return rc;
 
-    if ( has_iommu_pdevs(d) && !is_hvm_domain(d) && !need_iommu(d) )
+    if ( has_arch_pdevs(d) && !is_hvm_domain(d) && !need_iommu(d) )
     {
         d->need_iommu = 1;
         return iommu_populate_page_table(d);
@@ -190,7 +188,7 @@ void deassign_device(struct domain *d, u8 bus, u8 devfn)
 
     hd->platform_ops->reassign_device(d, dom0, bus, devfn);
 
-    if ( !has_iommu_pdevs(d) && need_iommu(d) )
+    if ( !has_arch_pdevs(d) && need_iommu(d) )
     {
         d->need_iommu = 0;
         hd->platform_ops->teardown(d);
@@ -242,8 +240,7 @@ int iommu_get_device_group(struct domain *d, u8 bus, u8 devfn,
 
     group_id = ops->get_device_group_id(bus, devfn);
 
-    list_for_each_entry(pdev,
-        &(dom0->arch.hvm_domain.hvm_iommu.pdev_list), list)
+    for_each_pdev( d, pdev )
     {
         if ( (pdev->bus == bus) && (pdev->devfn == devfn) )
             continue;

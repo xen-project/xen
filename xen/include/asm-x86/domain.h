@@ -228,6 +228,7 @@ struct arch_domain
     struct rangeset *ioport_caps;
     uint32_t pci_cf8;
 
+    struct list_head pdev_list;
     struct hvm_domain hvm_domain;
 
     struct paging_domain paging;
@@ -265,6 +266,9 @@ struct arch_domain
 
     cpuid_input_t cpuids[MAX_CPUID_INPUT];
 } __cacheline_aligned;
+
+#define has_arch_pdevs(d)    (!list_empty(&(d)->arch.pdev_list))
+
 
 #ifdef __i386__
 struct pae_l3_cache {

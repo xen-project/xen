@@ -911,7 +911,7 @@ int hvm_set_cr0(unsigned long value)
         }
     }
 
-    if ( !list_empty(&domain_hvm_iommu(v->domain)->pdev_list) )
+    if ( has_arch_pdevs(v->domain) )
     {
         if ( (value & X86_CR0_CD) && !(value & X86_CR0_NW) )
         {

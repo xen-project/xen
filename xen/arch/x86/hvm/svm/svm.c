@@ -1132,7 +1132,7 @@ static void wbinvd_ipi(void *info)
 
 static void svm_wbinvd_intercept(void)
 {
-    if ( !list_empty(&(domain_hvm_iommu(current->domain)->pdev_list)) )
+    if ( has_arch_pdevs(current->domain) )
         on_each_cpu(wbinvd_ipi, NULL, 1, 1);
 }
 

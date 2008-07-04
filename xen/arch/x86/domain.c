@@ -350,6 +350,8 @@ int arch_domain_create(struct domain *d, unsigned int domcr_flags)
         hvm_funcs.hap_supported &&
         (domcr_flags & DOMCRF_hap);
 
+    INIT_LIST_HEAD(&d->arch.pdev_list);
+
     d->arch.relmem = RELMEM_not_started;
     INIT_LIST_HEAD(&d->arch.relmem_list);
 

@@ -1926,7 +1926,7 @@ static void wbinvd_ipi(void *info)
 
 static void vmx_wbinvd_intercept(void)
 {
-    if ( list_empty(&(domain_hvm_iommu(current->domain)->pdev_list)) )
+    if ( !has_arch_pdevs(current->domain) )
         return;
 
     if ( cpu_has_wbinvd_exiting )

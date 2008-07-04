@@ -1023,8 +1023,6 @@ static int intel_iommu_domain_init(struct domain *d)
     u64 i;
     struct acpi_drhd_unit *drhd;
 
-    INIT_LIST_HEAD(&hd->pdev_list);
-
     drhd = list_entry(acpi_drhd_units.next, typeof(*drhd), list);
     iommu = drhd->iommu;
 
@@ -1366,12 +1364,10 @@ void reassign_device_ownership(
     u8 bus, u8 devfn)
 {
     struct hvm_iommu *source_hd = domain_hvm_iommu(source);
-    struct hvm_iommu *target_hd = domain_hvm_iommu(target);
     struct pci_dev *pdev, *pdev2;
     struct acpi_drhd_unit *drhd;
     struct iommu *iommu;
     int status;
-    unsigned long flags;
     int found = 0;
 
     pdev_flr(bus, devfn);
@@ -1388,11 +1384,7 @@ void reassign_device_ownership(
     domain_context_unmap(iommu, pdev);
 
     /* Move pci device from the source domain to target domain. */
-    spin_lock_irqsave(&source_hd->iommu_list_lock, flags);
-    spin_lock_irqsave(&target_hd->iommu_list_lock, flags);
-    list_move(&pdev->list, &target_hd->pdev_list);
-    spin_unlock_irqrestore(&target_hd->iommu_list_lock, flags);
-    spin_unlock_irqrestore(&source_hd->iommu_list_lock, flags);
+    list_move(&pdev->domain_list, &target->arch.pdev_list);
 
     for_each_pdev ( source, pdev2 )
     {
@@ -1413,12 +1405,11 @@ void reassign_device_ownership(
 
 void return_devices_to_dom0(struct domain *d)
 {
-    struct hvm_iommu *hd  = domain_hvm_iommu(d);
     struct pci_dev *pdev;
 
-    while ( !list_empty(&hd->pdev_list) )
+    while ( has_arch_pdevs(d) )
     {
-        pdev = list_entry(hd->pdev_list.next, typeof(*pdev), list);
+        pdev = list_entry(d->arch.pdev_list.next, typeof(*pdev), domain_list);
         pci_cleanup_msi(pdev->bus, pdev->devfn);
         reassign_device_ownership(d, dom0, pdev->bus, pdev->devfn);
     }
@@ -1631,7 +1622,7 @@ static void setup_dom0_devices(struct domain *d)
                 pdev = xmalloc(struct pci_dev);
                 pdev->bus = bus;
                 pdev->devfn = PCI_DEVFN(dev, func);
-                list_add_tail(&pdev->list, &hd->pdev_list);
+                list_add_tail(&pdev->domain_list, &d->arch.pdev_list);
 
                 drhd = acpi_find_matched_drhd_unit(pdev);
                 ret = domain_context_mapping(d, drhd->iommu, pdev);

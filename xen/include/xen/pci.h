@@ -25,7 +25,7 @@
 #define PCI_FUNC(devfn)       ((devfn) & 0x07)
 
 struct pci_dev {
-    struct list_head list;
+    struct list_head domain_list;
     struct list_head msi_dev_list;
     u8 bus;
     u8 devfn;
@@ -49,5 +49,10 @@ void pci_conf_write32(
     uint32_t data);
 int pci_find_cap_offset(u8 bus, u8 dev, u8 func, u8 cap);
 int pci_find_next_cap(u8 bus, unsigned int devfn, u8 pos, int cap);
+
+
+#define for_each_pdev(domain, pdev) \
+    list_for_each_entry(pdev, &(domain->arch.pdev_list), domain_list)
+
 
 #endif /* __XEN_PCI_H__ */
