@@ -41,9 +41,6 @@ static spinlock_t domid_bitmap_lock;    /* protect domain id bitmap */
 static int domid_bitmap_size;           /* domain id bitmap size in bits */
 static unsigned long *domid_bitmap;     /* iommu domain id bitmap */
 
-static void setup_dom0_devices(struct domain *d);
-static void setup_dom0_rmrr(struct domain *d);
-
 #define DID_FIELD_WIDTH 16
 #define DID_HIGH_OFFSET 8
 static void context_set_domain_id(struct context_entry *context,
@@ -1045,10 +1042,6 @@ static int intel_iommu_domain_init(struct domain *d)
 
             iommu_map_page(d, i, i);
         }
-
-        setup_dom0_devices(d);
-        setup_dom0_rmrr(d);
-
         iommu_flush_all();
 
         for_each_drhd_unit ( drhd )
@@ -1333,12 +1326,18 @@ static int domain_context_unmap(u8 bus, u8 devfn)
         break;
 
     case DEV_TYPE_PCIe_ENDPOINT:
+        gdprintk(XENLOG_INFO VTDPREFIX, "domain_context_unmap:PCIe: "
+                 "bdf = %x:%x.%x\n", bus, PCI_SLOT(devfn), PCI_FUNC(devfn));
         ret = domain_context_unmap_one(drhd->iommu, bus, devfn);
         break;
 
     case DEV_TYPE_PCI:
         if ( find_pcie_endpoint(&bus, &devfn) )
+        {
+            gdprintk(XENLOG_INFO VTDPREFIX, "domain_context_unmap:PCI:  "
+                     "bdf = %x:%x.%x\n", bus, PCI_SLOT(devfn), PCI_FUNC(devfn));
             ret = domain_context_unmap_one(drhd->iommu, bus, devfn);
+        }
         break;
 
     default:
@@ -1593,38 +1592,6 @@ static int intel_iommu_remove_device(struct pci_dev *pdev)
     return domain_context_unmap(pdev->bus, pdev->devfn);
 }
 
-static void setup_dom0_devices(struct domain *d)
-{
-    struct hvm_iommu *hd;
-    struct pci_dev *pdev;
-    int bus, dev, func;
-    u32 l;
-
-    hd = domain_hvm_iommu(d);
-
-    write_lock(&pcidevs_lock);
-    for ( bus = 0; bus < 256; bus++ )
-    {
-        for ( dev = 0; dev < 32; dev++ )
-        {
-            for ( func = 0; func < 8; func++ )
-            {
-                l = pci_conf_read32(bus, dev, func, PCI_VENDOR_ID);
-                /* some broken boards return 0 or ~0 if a slot is empty: */
-                if ( (l == 0xffffffff) || (l == 0x00000000) ||
-                     (l == 0x0000ffff) || (l == 0xffff0000) )
-                    continue;
-
-                pdev = alloc_pdev(bus, PCI_DEVFN(dev, func));
-                pdev->domain = d;
-                list_add(&pdev->domain_list, &d->arch.pdev_list);
-                domain_context_mapping(d, pdev->bus, pdev->devfn);
-            }
-        }
-    }
-    write_unlock(&pcidevs_lock);
-}
-
 void clear_fault_bits(struct iommu *iommu)
 {
     u64 val;
@@ -1687,21 +1654,6 @@ static int init_vtd_hw(void)
     }
 
     return 0;
-}
-
-static void setup_dom0_rmrr(struct domain *d)
-{
-    struct acpi_rmrr_unit *rmrr;
-    u16 bdf;
-    int ret, i;
-
-    for_each_rmrr_device ( rmrr, bdf, i )
-    {
-        ret = iommu_prepare_rmrr_dev(d, rmrr, PCI_BUS(bdf), PCI_DEVFN2(bdf));
-        if ( ret )
-            gdprintk(XENLOG_ERR VTDPREFIX,
-                     "IOMMU: mapping reserved region failed\n");
-    }
 }
 
 int intel_vtd_setup(void)
