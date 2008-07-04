@@ -288,10 +288,6 @@ unsigned long do_iret(void)
         regs->rcx = iret_saved.rcx;
     }
 
-    /* Restore affinity.  */
-    if (!cpus_equal(v->cpu_affinity_tmp, v->cpu_affinity))
-        vcpu_set_affinity(v, &v->cpu_affinity_tmp);
-
     /* No longer in NMI context. */
     v->nmi_masked = 0;
 

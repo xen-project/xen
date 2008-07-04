@@ -121,10 +121,6 @@ unsigned int compat_iret(void)
     else
         regs->_esp += 16;
 
-    /* Restore affinity.  */
-    if (!cpus_equal(v->cpu_affinity_tmp, v->cpu_affinity))
-        vcpu_set_affinity(v, &v->cpu_affinity_tmp);
-
     /* No longer in NMI context. */
     v->nmi_masked = 0;
 
