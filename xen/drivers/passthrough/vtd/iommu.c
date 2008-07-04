@@ -1089,8 +1089,8 @@ static int domain_context_mapping_one(
     if ( ecap_pass_thru(iommu->ecap) && (domain->domain_id == 0) )
         context_set_translation_type(*context, CONTEXT_TT_PASS_THRU);
     else
-    {
 #endif
+    {
         /* Ensure we have pagetables allocated down to leaf PTE. */
         if ( hd->pgd_maddr == 0 )
         {
@@ -1119,9 +1119,7 @@ static int domain_context_mapping_one(
 
         context_set_address_root(*context, pgd_maddr);
         context_set_translation_type(*context, CONTEXT_TT_MULTI_LEVEL);
-#ifdef CONTEXT_PASSTHRU
     }
-#endif
 
     /*
      * domain_id 0 is not valid on Intel's IOMMU, force domain_id to
@@ -1150,115 +1148,128 @@ static int domain_context_mapping_one(
 #define PCI_BASE_CLASS_BRIDGE    0x06
 #define PCI_CLASS_BRIDGE_PCI     0x0604
 
-#define DEV_TYPE_PCIe_ENDPOINT   1
-#define DEV_TYPE_PCI_BRIDGE      2
-#define DEV_TYPE_PCI             3
+enum {
+    DEV_TYPE_PCIe_ENDPOINT,
+    DEV_TYPE_PCIe_BRIDGE,
+    DEV_TYPE_PCI_BRIDGE,
+    DEV_TYPE_PCI,
+};
 
-int pdev_type(struct pci_dev *dev)
+int pdev_type(u8 bus, u8 devfn)
 {
     u16 class_device;
-    u16 status;
+    u16 status, creg;
+    int pos;
+    u8 d = PCI_SLOT(devfn), f = PCI_FUNC(devfn);
 
-    class_device = pci_conf_read16(dev->bus, PCI_SLOT(dev->devfn),
-                                   PCI_FUNC(dev->devfn), PCI_CLASS_DEVICE);
+    class_device = pci_conf_read16(bus, d, f, PCI_CLASS_DEVICE);
     if ( class_device == PCI_CLASS_BRIDGE_PCI )
-        return DEV_TYPE_PCI_BRIDGE;
+    {
+        pos = pci_find_next_cap(bus, devfn, PCI_CAPABILITY_LIST, PCI_CAP_ID_EXP);
+        if ( !pos )
+            return DEV_TYPE_PCI_BRIDGE;
+        creg = pci_conf_read16(bus, d, f, pos + PCI_EXP_FLAGS);
+        return ((creg & PCI_EXP_FLAGS_TYPE) >> 4) == PCI_EXP_TYPE_PCI_BRIDGE ?
+            DEV_TYPE_PCI_BRIDGE : DEV_TYPE_PCIe_BRIDGE;
+    }
 
-    status = pci_conf_read16(dev->bus, PCI_SLOT(dev->devfn),
-                             PCI_FUNC(dev->devfn), PCI_STATUS);
-
+    status = pci_conf_read16(bus, d, f, PCI_STATUS);
     if ( !(status & PCI_STATUS_CAP_LIST) )
         return DEV_TYPE_PCI;
 
-    if ( pci_find_next_cap(dev->bus, dev->devfn,
-                            PCI_CAPABILITY_LIST, PCI_CAP_ID_EXP) )
+    if ( pci_find_next_cap(bus, devfn, PCI_CAPABILITY_LIST, PCI_CAP_ID_EXP) )
         return DEV_TYPE_PCIe_ENDPOINT;
 
     return DEV_TYPE_PCI;
 }
 
 #define MAX_BUSES 256
-struct pci_dev bus2bridge[MAX_BUSES];
+static struct { u8 map, bus, devfn; } bus2bridge[MAX_BUSES];
 
-static int domain_context_mapping(
-    struct domain *domain,
-    struct iommu *iommu,
-    struct pci_dev *pdev)
+static int find_pcie_endpoint(u8 *bus, u8 *devfn)
 {
+    int cnt = 0;
+
+    if ( *bus == 0 )
+        /* assume integrated PCI devices in RC have valid requester-id */
+        return 1;
+
+    if ( !bus2bridge[*bus].map )
+        return 0;
+
+    while ( bus2bridge[*bus].map )
+    {
+        *devfn = bus2bridge[*bus].devfn;
+        *bus = bus2bridge[*bus].bus;
+        if ( cnt++ >= MAX_BUSES )
+            return 0;
+    }
+
+    return 1;
+}
+
+static int domain_context_mapping(struct domain *domain, u8 bus, u8 devfn)
+{
+    struct acpi_drhd_unit *drhd;
     int ret = 0;
-    int dev, func, sec_bus, sub_bus;
+    u16 sec_bus, sub_bus, ob, odf;
     u32 type;
 
-    type = pdev_type(pdev);
+    drhd = acpi_find_matched_drhd_unit(bus, devfn);
+    if ( !drhd )
+        return -ENODEV;
+
+    type = pdev_type(bus, devfn);
     switch ( type )
     {
-    case DEV_TYPE_PCI_BRIDGE:
-        sec_bus = pci_conf_read8(
-            pdev->bus, PCI_SLOT(pdev->devfn),
-            PCI_FUNC(pdev->devfn), PCI_SECONDARY_BUS);
-
-        if ( bus2bridge[sec_bus].bus == 0 )
-        {
-            bus2bridge[sec_bus].bus   =  pdev->bus;
-            bus2bridge[sec_bus].devfn =  pdev->devfn;
-        }
-
-        sub_bus = pci_conf_read8(
-            pdev->bus, PCI_SLOT(pdev->devfn),
-            PCI_FUNC(pdev->devfn), PCI_SUBORDINATE_BUS);
-
-        if ( sec_bus != sub_bus )
-            gdprintk(XENLOG_WARNING VTDPREFIX,
-                     "context_context_mapping: nested PCI bridge not "
-                     "supported: bdf = %x:%x:%x sec_bus = %x sub_bus = %x\n",
-                     pdev->bus, PCI_SLOT(pdev->devfn), PCI_FUNC(pdev->devfn),
-                     sec_bus, sub_bus);
+    case DEV_TYPE_PCIe_BRIDGE:
         break;
+
+    case DEV_TYPE_PCI_BRIDGE:
+        sec_bus = pci_conf_read8(bus, PCI_SLOT(devfn), PCI_FUNC(devfn),
+                                 PCI_SECONDARY_BUS);
+        sub_bus = pci_conf_read8(bus, PCI_SLOT(devfn), PCI_FUNC(devfn),
+                                 PCI_SUBORDINATE_BUS);
+
+        for ( sub_bus &= 0xff; sec_bus <= sub_bus; sec_bus++ )
+        {
+            bus2bridge[sec_bus].map = 1;
+            bus2bridge[sec_bus].bus =  bus;
+            bus2bridge[sec_bus].devfn =  devfn;
+        }
+        break;
+
     case DEV_TYPE_PCIe_ENDPOINT:
         gdprintk(XENLOG_INFO VTDPREFIX,
-                 "domain_context_mapping:PCIe : bdf = %x:%x:%x\n",
-                 pdev->bus, PCI_SLOT(pdev->devfn), PCI_FUNC(pdev->devfn));
-        ret = domain_context_mapping_one(domain, iommu,
-                                         (u8)(pdev->bus), (u8)(pdev->devfn));
+                 "domain_context_mapping:PCIe: bdf = %x:%x.%x\n",
+                 bus, PCI_SLOT(devfn), PCI_FUNC(devfn));
+        ret = domain_context_mapping_one(domain, drhd->iommu, bus, devfn);
         break;
+
     case DEV_TYPE_PCI:
         gdprintk(XENLOG_INFO VTDPREFIX,
-                 "domain_context_mapping:PCI: bdf = %x:%x:%x\n",
-                 pdev->bus, PCI_SLOT(pdev->devfn), PCI_FUNC(pdev->devfn));
+                 "domain_context_mapping:PCI:  bdf = %x:%x.%x\n",
+                 bus, PCI_SLOT(devfn), PCI_FUNC(devfn));
 
-        if ( pdev->bus == 0 )
-            ret = domain_context_mapping_one(
-                domain, iommu, (u8)(pdev->bus), (u8)(pdev->devfn));
-        else
+        ob = bus; odf = devfn;
+        if ( !find_pcie_endpoint(&bus, &devfn) )
         {
-            if ( bus2bridge[pdev->bus].bus != 0 )
-                gdprintk(XENLOG_WARNING VTDPREFIX,
-                         "domain_context_mapping:bus2bridge"
-                         "[%d].bus != 0\n", pdev->bus);
-
-            ret = domain_context_mapping_one(
-                domain, iommu,
-                (u8)(bus2bridge[pdev->bus].bus),
-                (u8)(bus2bridge[pdev->bus].devfn));
-
-            /* now map everything behind the PCI bridge */
-            for ( dev = 0; dev < 32; dev++ )
-            {
-                for ( func = 0; func < 8; func++ )
-                {
-                    ret = domain_context_mapping_one(
-                        domain, iommu,
-                        pdev->bus, (u8)PCI_DEVFN(dev, func));
-                    if ( ret )
-                        return ret;
-                }
-            }
+            gdprintk(XENLOG_WARNING VTDPREFIX, "domain_context_mapping:invalid");
+            break;
         }
+
+        if ( ob != bus || odf != devfn )
+            gdprintk(XENLOG_INFO VTDPREFIX,
+                     "domain_context_mapping:map:  bdf = %x:%x.%x -> %x:%x.%x\n",
+                     ob, PCI_SLOT(odf), PCI_FUNC(odf),
+                     bus, PCI_SLOT(devfn), PCI_FUNC(devfn));
+        ret = domain_context_mapping_one(domain, drhd->iommu, bus, devfn);
         break;
+
     default:
         gdprintk(XENLOG_ERR VTDPREFIX,
-                 "domain_context_mapping:unknown type : bdf = %x:%x:%x\n",
-                 pdev->bus, PCI_SLOT(pdev->devfn), PCI_FUNC(pdev->devfn));
+                 "domain_context_mapping:unknown type : bdf = %x:%x.%x\n",
+                 bus, PCI_SLOT(devfn), PCI_FUNC(devfn));
         ret = -EINVAL;
         break;
     }
@@ -1266,9 +1277,7 @@ static int domain_context_mapping(
     return ret;
 }
 
-static int domain_context_unmap_one(
-    struct iommu *iommu,
-    u8 bus, u8 devfn)
+static int domain_context_unmap_one(struct iommu *iommu, u8 bus, u8 devfn)
 {
     struct context_entry *context, *context_entries;
     unsigned long flags;
@@ -1296,61 +1305,39 @@ static int domain_context_unmap_one(
     return 0;
 }
 
-static int domain_context_unmap(
-    struct iommu *iommu,
-    struct pci_dev *pdev)
+static int domain_context_unmap(u8 bus, u8 devfn)
 {
+    struct acpi_drhd_unit *drhd;
     int ret = 0;
-    int dev, func, sec_bus, sub_bus;
     u32 type;
 
-    type = pdev_type(pdev);
+    drhd = acpi_find_matched_drhd_unit(bus, devfn);
+    if ( !drhd )
+        return -ENODEV;
+
+    type = pdev_type(bus, devfn);
     switch ( type )
     {
+    case DEV_TYPE_PCIe_BRIDGE:
+        break;
+
     case DEV_TYPE_PCI_BRIDGE:
-        sec_bus = pci_conf_read8(
-            pdev->bus, PCI_SLOT(pdev->devfn),
-            PCI_FUNC(pdev->devfn), PCI_SECONDARY_BUS);
-        sub_bus = pci_conf_read8(
-            pdev->bus, PCI_SLOT(pdev->devfn),
-            PCI_FUNC(pdev->devfn), PCI_SUBORDINATE_BUS);
+        ret = domain_context_unmap_one(drhd->iommu, bus, devfn);
         break;
+
     case DEV_TYPE_PCIe_ENDPOINT:
-        ret = domain_context_unmap_one(iommu,
-                                       (u8)(pdev->bus), (u8)(pdev->devfn));
+        ret = domain_context_unmap_one(drhd->iommu, bus, devfn);
         break;
+
     case DEV_TYPE_PCI:
-        if ( pdev->bus == 0 )
-            ret = domain_context_unmap_one(
-                iommu, (u8)(pdev->bus), (u8)(pdev->devfn));
-        else
-        {
-            if ( bus2bridge[pdev->bus].bus != 0 )
-                gdprintk(XENLOG_WARNING VTDPREFIX,
-                         "domain_context_unmap:"
-                         "bus2bridge[%d].bus != 0\n", pdev->bus);
-
-            ret = domain_context_unmap_one(iommu,
-                                           (u8)(bus2bridge[pdev->bus].bus),
-                                           (u8)(bus2bridge[pdev->bus].devfn));
-
-            /* Unmap everything behind the PCI bridge */
-            for ( dev = 0; dev < 32; dev++ )
-            {
-                for ( func = 0; func < 8; func++ )
-                {
-                    ret = domain_context_unmap_one(
-                        iommu, pdev->bus, (u8)PCI_DEVFN(dev, func));
-                    if ( ret )
-                        return ret;
-                }
-            }
-        }
+        if ( find_pcie_endpoint(&bus, &devfn) )
+            ret = domain_context_unmap_one(drhd->iommu, bus, devfn);
         break;
+
     default:
         gdprintk(XENLOG_ERR VTDPREFIX,
                  "domain_context_unmap:unknown type: bdf = %x:%x:%x\n",
-                 pdev->bus, PCI_SLOT(pdev->devfn), PCI_FUNC(pdev->devfn));
+                 bus, PCI_SLOT(devfn), PCI_FUNC(devfn));
         ret = -EINVAL;
         break;
     }
@@ -1364,7 +1351,7 @@ void reassign_device_ownership(
     u8 bus, u8 devfn)
 {
     struct hvm_iommu *source_hd = domain_hvm_iommu(source);
-    struct pci_dev *pdev, *pdev2;
+    struct pci_dev *pdev;
     struct acpi_drhd_unit *drhd;
     struct iommu *iommu;
     int status;
@@ -1378,27 +1365,28 @@ void reassign_device_ownership(
 
     return;
 
- found:
-    drhd = acpi_find_matched_drhd_unit(pdev);
+found:
+    drhd = acpi_find_matched_drhd_unit(bus, devfn);
     iommu = drhd->iommu;
-    domain_context_unmap(iommu, pdev);
+    domain_context_unmap(bus, devfn);
 
     /* Move pci device from the source domain to target domain. */
     list_move(&pdev->domain_list, &target->arch.pdev_list);
 
-    for_each_pdev ( source, pdev2 )
+    for_each_pdev ( source, pdev )
     {
-        drhd = acpi_find_matched_drhd_unit(pdev2);
+        drhd = acpi_find_matched_drhd_unit(pdev->bus, pdev->devfn);
         if ( drhd->iommu == iommu )
         {
             found = 1;
             break;
         }
     }
+
     if ( !found )
         clear_bit(iommu->index, &source_hd->iommu_bitmap);
 
-    status = domain_context_mapping(target, iommu, pdev);
+    status = domain_context_mapping(target, bus, devfn);
     if ( status != 0 )
         gdprintk(XENLOG_ERR VTDPREFIX, "domain_context_mapping failed\n");
 }
@@ -1436,19 +1424,13 @@ void iommu_domain_teardown(struct domain *d)
     iommu_domid_release(d);
 }
 
-static int domain_context_mapped(struct pci_dev *pdev)
+static int domain_context_mapped(u8 bus, u8 devfn)
 {
     struct acpi_drhd_unit *drhd;
-    struct iommu *iommu;
-    int ret;
 
     for_each_drhd_unit ( drhd )
-    {
-        iommu = drhd->iommu;
-        ret = device_context_mapped(iommu, pdev->bus, pdev->devfn);
-        if ( ret )
-            return ret;
-    }
+        if ( device_context_mapped(drhd->iommu, bus, devfn) )
+            return 1;
 
     return 0;
 }
@@ -1570,12 +1552,10 @@ int iommu_page_unmapping(struct domain *domain, paddr_t addr, size_t size)
     return 0;
 }
 
-static int iommu_prepare_rmrr_dev(
-    struct domain *d,
-    struct acpi_rmrr_unit *rmrr,
-    struct pci_dev *pdev)
+static int iommu_prepare_rmrr_dev(struct domain *d,
+                                  struct acpi_rmrr_unit *rmrr,
+                                  u8 bus, u8 devfn)
 {
-    struct acpi_drhd_unit *drhd;
     u64 size;
     int ret;
 
@@ -1587,10 +1567,9 @@ static int iommu_prepare_rmrr_dev(
     if ( ret )
         return ret;
 
-    if ( domain_context_mapped(pdev) == 0 )
+    if ( domain_context_mapped(bus, devfn) == 0 )
     {
-        drhd = acpi_find_matched_drhd_unit(pdev);
-        ret = domain_context_mapping(d, drhd->iommu, pdev);
+        ret = domain_context_mapping(d, bus, devfn);
         if ( !ret )
             return 0;
     }
@@ -1601,7 +1580,6 @@ static int iommu_prepare_rmrr_dev(
 static void setup_dom0_devices(struct domain *d)
 {
     struct hvm_iommu *hd;
-    struct acpi_drhd_unit *drhd;
     struct pci_dev *pdev;
     int bus, dev, func, ret;
     u32 l;
@@ -1624,8 +1602,7 @@ static void setup_dom0_devices(struct domain *d)
                 pdev->devfn = PCI_DEVFN(dev, func);
                 list_add_tail(&pdev->domain_list, &d->arch.pdev_list);
 
-                drhd = acpi_find_matched_drhd_unit(pdev);
-                ret = domain_context_mapping(d, drhd->iommu, pdev);
+                ret = domain_context_mapping(d, pdev->bus, pdev->devfn);
                 if ( ret != 0 )
                     gdprintk(XENLOG_ERR VTDPREFIX,
                              "domain_context_mapping failed\n");
@@ -1701,15 +1678,16 @@ static int init_vtd_hw(void)
 static void setup_dom0_rmrr(struct domain *d)
 {
     struct acpi_rmrr_unit *rmrr;
-    struct pci_dev *pdev;
-    int ret;
+    u16 bdf;
+    int ret, i;
 
-    for_each_rmrr_device ( rmrr, pdev )
-        ret = iommu_prepare_rmrr_dev(d, rmrr, pdev);
+    for_each_rmrr_device ( rmrr, bdf, i )
+    {
+        ret = iommu_prepare_rmrr_dev(d, rmrr, PCI_BUS(bdf), PCI_DEVFN2(bdf));
         if ( ret )
             gdprintk(XENLOG_ERR VTDPREFIX,
                      "IOMMU: mapping reserved region failed\n");
-    end_for_each_rmrr_device ( rmrr, pdev )
+    }
 }
 
 int intel_vtd_setup(void)
@@ -1769,25 +1747,26 @@ int device_assigned(u8 bus, u8 devfn)
 int intel_iommu_assign_device(struct domain *d, u8 bus, u8 devfn)
 {
     struct acpi_rmrr_unit *rmrr;
-    struct pci_dev *pdev;
-    int ret = 0;
+    int ret = 0, i;
+    u16 bdf;
 
     if ( list_empty(&acpi_drhd_units) )
         return ret;
 
     reassign_device_ownership(dom0, d, bus, devfn);
 
-    /* Setup rmrr identify mapping */
-    for_each_rmrr_device( rmrr, pdev )
-        if ( pdev->bus == bus && pdev->devfn == devfn )
+    /* Setup rmrr identity mapping */
+    for_each_rmrr_device( rmrr, bdf, i )
+    {
+        if ( PCI_BUS(bdf) == bus && PCI_DEVFN2(bdf) == devfn )
         {
             /* FIXME: Because USB RMRR conflicts with guest bios region,
              * ignore USB RMRR temporarily.
              */
-            if ( is_usb_device(pdev) )
+            if ( is_usb_device(bus, devfn) )
                 return 0;
 
-            ret = iommu_prepare_rmrr_dev(d, rmrr, pdev);
+            ret = iommu_prepare_rmrr_dev(d, rmrr, bus, devfn);
             if ( ret )
             {
                 gdprintk(XENLOG_ERR VTDPREFIX,
@@ -1795,9 +1774,17 @@ int intel_iommu_assign_device(struct domain *d, u8 bus, u8 devfn)
                 return ret;
             }
         }
-    end_for_each_rmrr_device(rmrr, pdev)
+    }
 
     return ret;
+}
+
+static int intel_iommu_group_id(u8 bus, u8 devfn)
+{
+    if ( !bus2bridge[bus].map || find_pcie_endpoint(&bus, &devfn) )
+        return PCI_BDF2(bus, devfn);
+    else
+        return -1;
 }
 
 u8 iommu_state[MAX_IOMMU_REGS * MAX_IOMMUS];
@@ -1881,7 +1868,7 @@ struct iommu_ops intel_iommu_ops = {
     .map_page = intel_iommu_map_page,
     .unmap_page = intel_iommu_unmap_page,
     .reassign_device = reassign_device_ownership,
-    .get_device_group_id = NULL,
+    .get_device_group_id = intel_iommu_group_id,
 };
 
 /*

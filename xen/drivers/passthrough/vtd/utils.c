@@ -32,12 +32,10 @@
 #define SEABURG 0x4000
 #define C_STEP  2
 
-int is_usb_device(struct pci_dev *pdev)
+int is_usb_device(u8 bus, u8 devfn)
 {
-    u8 bus = pdev->bus;
-    u8 dev = PCI_SLOT(pdev->devfn);
-    u8 func = PCI_FUNC(pdev->devfn);
-    u16 class = pci_conf_read16(bus, dev, func, PCI_CLASS_DEVICE);
+    u16 class = pci_conf_read16(bus, PCI_SLOT(devfn), PCI_FUNC(devfn),
+                                PCI_CLASS_DEVICE);
     return (class == 0xc03);
 }
 
