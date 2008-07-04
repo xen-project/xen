@@ -56,6 +56,8 @@
         goto out;                                                   \
     } while ( 0 )
 
+static int evtchn_set_pending(struct vcpu *v, int port);
+
 static int virq_is_global(int virq)
 {
     int rc;
@@ -470,11 +472,10 @@ static long evtchn_close(evtchn_close_t *close)
     return __evtchn_close(current->domain, close->port);
 }
 
-
-long evtchn_send(unsigned int lport)
+int evtchn_send(struct domain *d, unsigned int lport)
 {
     struct evtchn *lchn, *rchn;
-    struct domain *ld = current->domain, *rd;
+    struct domain *ld = d, *rd;
     struct vcpu   *rvcpu;
     int            rport, ret = 0;
 
@@ -534,8 +535,7 @@ out:
     return ret;
 }
 
-
-int evtchn_set_pending(struct vcpu *v, int port)
+static int evtchn_set_pending(struct vcpu *v, int port)
 {
     struct domain *d = v->domain;
 
@@ -891,7 +891,7 @@ long do_event_channel_op(int cmd, XEN_GUEST_HANDLE(void) arg)
         struct evtchn_send send;
         if ( copy_from_guest(&send, arg, 1) != 0 )
             return -EFAULT;
-        rc = evtchn_send(send.port);
+        rc = evtchn_send(current->domain, send.port);
         break;
     }
 

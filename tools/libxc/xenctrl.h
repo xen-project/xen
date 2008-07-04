@@ -814,7 +814,8 @@ int xc_flask_op(int xc_handle, flask_op_t *op);
  * Subscribe to state changes in a domain via evtchn.
  * Returns -1 on failure, in which case errno will be set appropriately.
  */
-int xc_dom_subscribe(int xc_handle, domid_t domid, evtchn_port_t port);
+int xc_domain_subscribe_for_suspend(
+    int xc_handle, domid_t domid, evtchn_port_t port);
 
 /**************************
  * GRANT TABLE OPERATIONS *

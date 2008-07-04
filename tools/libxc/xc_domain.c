@@ -981,7 +981,8 @@ int xc_domain_set_target(
     return do_domctl(xc_handle, &domctl);
 }
 
-int xc_dom_subscribe(int xc_handle, domid_t dom, evtchn_port_t port)
+int xc_domain_subscribe_for_suspend(
+    int xc_handle, domid_t dom, evtchn_port_t port)
 {
     DECLARE_DOMCTL;
 

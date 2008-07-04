@@ -25,9 +25,7 @@
 
 static struct suspendinfo {
     int xce; /* event channel handle */
-
     int suspend_evtchn;
-    int suspended_evtchn;
 } si;
 
 /**
@@ -47,11 +45,6 @@ static int compat_suspend(int domid)
 
 static int suspend_evtchn_release(int xc, int domid)
 {
-    if (si.suspended_evtchn >= 0) {
-	xc_dom_subscribe(xc, domid, 0);
-	xc_evtchn_unbind(si.xce, si.suspended_evtchn);
-	si.suspended_evtchn = -1;
-    }
     if (si.suspend_evtchn >= 0) {
 	xc_evtchn_unbind(si.xce, si.suspend_evtchn);
 	si.suspend_evtchn = -1;
@@ -75,7 +68,6 @@ static int suspend_evtchn_init(int xc, int domid)
 
     si.xce = -1;
     si.suspend_evtchn = -1;
-    si.suspended_evtchn = -1;
 
     xs = xs_daemon_open();
     if (!xs) {
@@ -107,14 +99,7 @@ static int suspend_evtchn_init(int xc, int domid)
 	goto cleanup;
     }
 
-    si.suspended_evtchn = xc_evtchn_bind_unbound_port(si.xce, domid);
-    if (si.suspended_evtchn < 0) {
-	errx(1, "failed to allocate suspend notification port: %d",
-	     si.suspended_evtchn);
-	goto cleanup;
-    }
-
-    rc = xc_dom_subscribe(xc, domid, si.suspended_evtchn);
+    rc = xc_domain_subscribe_for_suspend(xc, domid, port);
     if (rc < 0) {
 	errx(1, "failed to subscribe to domain: %d", rc);
 	goto cleanup;
@@ -149,10 +134,10 @@ static int evtchn_suspend(int domid)
 	errx(1, "error polling suspend notification channel: %d", rc);
 	return 0;
       }
-    } while (rc != si.suspended_evtchn);
+    } while (rc != si.suspend_evtchn);
 
     /* harmless for one-off suspend */
-    if (xc_evtchn_unmask(si.xce, si.suspended_evtchn) < 0)
+    if (xc_evtchn_unmask(si.xce, si.suspend_evtchn) < 0)
 	errx(1, "failed to unmask suspend notification channel: %d", rc);
 
     /* notify xend that it can do device migration */
