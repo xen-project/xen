@@ -56,8 +56,6 @@
         goto out;                                                   \
     } while ( 0 )
 
-static int evtchn_set_pending(struct vcpu *v, int port);
-
 static int virq_is_global(int virq)
 {
     int rc;
@@ -537,7 +535,7 @@ out:
 }
 
 
-static int evtchn_set_pending(struct vcpu *v, int port)
+int evtchn_set_pending(struct vcpu *v, int port)
 {
     struct domain *d = v->domain;
 

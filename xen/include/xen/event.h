@@ -16,6 +16,9 @@
 #include <asm/bitops.h>
 #include <asm/event.h>
 
+/* Returns TRUE if the delivery port was already pending. */
+int evtchn_set_pending(struct vcpu *v, int port);
+
 /*
  * send_guest_vcpu_virq: Notify guest via a per-VCPU VIRQ.
  *  @v:        VCPU to which virtual IRQ should be sent

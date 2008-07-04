@@ -97,11 +97,8 @@ static void __domain_finalise_shutdown(struct domain *d)
             return;
 
     d->is_shut_down = 1;
-    if ( d->shutdown_code == SHUTDOWN_suspend
-         && d->suspend_evtchn > 0 )
-    {
+    if ( (d->shutdown_code == SHUTDOWN_suspend) && d->suspend_evtchn )
         evtchn_set_pending(dom0->vcpu[0], d->suspend_evtchn);
-    }
     else
         send_guest_global_virq(dom0, VIRQ_DOM_EXC);
 }
