@@ -3,13 +3,11 @@ MINI_OS = $(XEN_ROOT)/extras/mini-os
 
 export XEN_OS=MiniOS
 
-include $(XEN_ROOT)/Config.mk
 export stubdom=y
 export debug=y
+include $(XEN_ROOT)/Config.mk
 
 IOEMU_OPTIONS=--disable-vnc-tls 
-BINUTILS_VERSION=2.18
-GCC_VERSION=4.2.2
 ZLIB_VERSION=1.2.3
 LIBPCI_VERSION=2.2.9
 NEWLIB_DATE=2008-01-01
@@ -37,56 +35,28 @@ endif
 
 CROSS_ROOT=cross-root-$(GNU_TARGET_ARCH)
 CROSS_PREFIX=$(CURDIR)/$(CROSS_ROOT)
-export CROSS_COMPILE=$(GNU_TARGET_ARCH)-xen-elf-
-export PATH:=$(CROSS_PREFIX)/bin:$(PATH)
+
+# Disable PIE/SSP if GCC supports them. They can break us.
+TARGET_CFLAGS += $(CFLAGS)
+TARGET_CPPFLAGS += $(CPPFLAGS)
+TARGET_CFLAGS += $(call cc-option,$(CC),-nopie,)
+TARGET_CFLAGS += $(call cc-option,$(CC),-fno-stack-protector,)
+TARGET_CFLAGS += $(call cc-option,$(CC),-fno-stack-protector-all,)
+
+# Do not use host headers and libs
+GCC_INSTALL = $(shell gcc -print-search-dirs | sed -n -e 's/install: \(.*\)/\1/p')
+TARGET_CPPFLAGS += -U __linux__ -U __FreeBSD__ -U __sun__
+TARGET_CFLAGS += -nostdinc
+TARGET_CPPFLAGS += -isystem $(realpath $(MINI_OS)/include/posix)
+TARGET_CPPFLAGS += -isystem $(CROSS_PREFIX)/$(GNU_TARGET_ARCH)-xen-elf/include
+TARGET_CPPFLAGS += -isystem $(GCC_INSTALL)include
+
+TARGET_LDFLAGS += -nostdlib -L$(CROSS_PREFIX)/$(GNU_TARGET_ARCH)-xen-elf/lib
 
 TARGETS=ioemu c caml grub
 
 .PHONY: all
 all: ioemu-stubdom c-stubdom pv-grub
-
-################
-# Cross-binutils
-################
-
-binutils-$(BINUTILS_VERSION).tar.bz2:
-	$(WGET) http://ftp.gnu.org/gnu/binutils/$@
-binutils-$(BINUTILS_VERSION): binutils-$(BINUTILS_VERSION).tar.bz2
-	tar xjf $<
-	patch -d $@ -p1 < binutils.patch
-	touch $@
-
-BINUTILS_STAMPFILE=$(CROSS_ROOT)/bin/$(GNU_TARGET_ARCH)-xen-elf-ar
-.PHONY: cross-binutils
-cross-binutils: $(BINUTILS_STAMPFILE)
-$(BINUTILS_STAMPFILE): binutils-$(BINUTILS_VERSION)
-	mkdir -p binutils-build
-	( cd binutils-build && \
-	  ../binutils-$(BINUTILS_VERSION)/configure --prefix=$(CROSS_PREFIX) --verbose --target=$(GNU_TARGET_ARCH)-xen-elf && \
-	  $(MAKE) && \
-	  $(MAKE) check && \
-	  $(MAKE) install )
-
-###########
-# Cross-gcc
-###########
-
-gcc-$(GCC_VERSION).tar.bz2:
-	$(WGET) http://ftp.gnu.org/gnu/gcc/gcc-$(GCC_VERSION)/gcc-$(GCC_VERSION).tar.bz2
-gcc-$(GCC_VERSION): gcc-$(GCC_VERSION).tar.bz2
-	tar xjf $<
-	patch -d $@ -p1 < gcc.patch
-	touch $@
-
-GCC_STAMPFILE=$(CROSS_ROOT)/bin/$(GNU_TARGET_ARCH)-xen-elf-gcc-$(GCC_VERSION)
-.PHONY: cross-gcc
-cross-gcc: $(GCC_STAMPFILE)
-$(GCC_STAMPFILE): gcc-$(GCC_VERSION) $(BINUTILS_STAMPFILE)
-	mkdir -p gcc-build
-	( cd gcc-build && \
-	  ../gcc-$(GCC_VERSION)/configure --prefix=$(CROSS_PREFIX) --verbose --target=$(GNU_TARGET_ARCH)-xen-elf --enable-languages=c --disable-libssp --with-gnu-as --with-gnu-ld && \
-	  $(MAKE) GCC_FOR_TARGET='$$$$r/gcc/xgcc -B$$$$r/gcc/ '"$(TARGET_CFLAGS)"' $$(FLAGS_FOR_TARGET)' && \
-	  $(MAKE) install )
 
 ##############
 # Cross-newlib
@@ -100,10 +70,10 @@ newlib-cvs:
 NEWLIB_STAMPFILE=$(CROSS_ROOT)/$(GNU_TARGET_ARCH)-xen-elf/lib/libc.a
 .PHONY: cross-newlib
 cross-newlib: $(NEWLIB_STAMPFILE)
-$(NEWLIB_STAMPFILE): newlib-cvs $(GCC_STAMPFILE)
+$(NEWLIB_STAMPFILE): newlib-cvs
 	mkdir -p newlib-build
 	( cd newlib-build && \
-	  CC_FOR_TARGET="$(GNU_TARGET_ARCH)-xen-elf-gcc $(TARGET_CFLAGS) $(NEWLIB_CFLAGS)" ../newlib-cvs/configure --prefix=$(CROSS_PREFIX) --verbose --target=$(GNU_TARGET_ARCH)-xen-elf --enable-newlib-io-long-long && \
+	  CC_FOR_TARGET="$(CC) $(TARGET_CPPFLAGS) $(TARGET_CFLAGS) $(NEWLIB_CFLAGS)" AR_FOR_TARGET=$(AR) LD_FOR_TARGET=$(LD) RANLIB_FOR_TARGET=$(RANLIB) ../newlib-cvs/configure --prefix=$(CROSS_PREFIX) --verbose --target=$(GNU_TARGET_ARCH)-xen-elf --enable-newlib-io-long-long --disable-multilib && \
 	  $(MAKE) && \
 	  $(MAKE) install )
 
@@ -120,7 +90,7 @@ cross-zlib: $(ZLIB_STAMPFILE)
 $(ZLIB_STAMPFILE): zlib-$(ZLIB_VERSION).tar.gz $(NEWLIB_STAMPFILE)
 	tar xzf $<
 	( cd zlib-$(ZLIB_VERSION) && \
-	  CFLAGS="$(TARGET_CFLAGS)" CC=$(GNU_TARGET_ARCH)-xen-elf-gcc ./configure --prefix=$(CROSS_PREFIX)/$(GNU_TARGET_ARCH)-xen-elf && \
+	  CFLAGS="$(TARGET_CPPFLAGS) $(TARGET_CFLAGS)" CC=$(CC) ./configure --prefix=$(CROSS_PREFIX)/$(GNU_TARGET_ARCH)-xen-elf && \
 	  $(MAKE) libz.a && \
 	  $(MAKE) install )
 
@@ -144,7 +114,7 @@ $(LIBPCI_STAMPFILE): pciutils-$(LIBPCI_VERSION) $(NEWLIB_STAMPFILE) $(ZLIB_STAMP
 	  cp ../libpci.config.h lib/config.h && \
 	  echo '#define PCILIB_VERSION "$(LIBPCI_VERSION)"' >> lib/config.h && \
 	  cp ../libpci.config.mak lib/config.mk && \
-	  $(MAKE) CC="$(GNU_TARGET_ARCH)-xen-elf-gcc $(TARGET_CFLAGS) -I$(realpath $(MINI_OS)/include)" lib/libpci.a && \
+	  $(MAKE) CC="$(CC) $(TARGET_CPPFLAGS) $(TARGET_CFLAGS) -I$(realpath $(MINI_OS)/include)" lib/libpci.a && \
 	  $(INSTALL_DATA) lib/libpci.a $(CROSS_PREFIX)/$(GNU_TARGET_ARCH)-xen-elf/lib/ && \
 	  $(INSTALL_DIR) $(CROSS_PREFIX)/$(GNU_TARGET_ARCH)-xen-elf/include/pci && \
 	  $(INSTALL_DATA) lib/{config,header,pci,types}.h $(CROSS_PREFIX)/$(GNU_TARGET_ARCH)-xen-elf/include/pci/ \
@@ -198,7 +168,7 @@ $(TARGETS_MINIOS): mini-os-%:
 .PHONY: libxc
 libxc: libxc/libxenctrl.a libxc/libxenguest.a
 libxc/libxenctrl.a libxc/libxenguest.a: cross-zlib mk-symlinks
-	$(MAKE) -C libxc
+	CPPFLAGS="$(TARGET_CPPFLAGS)" CFLAGS="$(TARGET_CFLAGS)" $(MAKE) -C libxc
 
 #######
 # ioemu
@@ -207,8 +177,9 @@ libxc/libxenctrl.a libxc/libxenguest.a: cross-zlib mk-symlinks
 .PHONY: ioemu
 ioemu: cross-zlib cross-libpci mk-symlinks libxc
 	[ -f ioemu/config-host.mak ] || \
-	  ( cd ioemu ; XEN_TARGET_ARCH=$(XEN_TARGET_ARCH) sh configure --prefix=/usr --enable-stubdom $(IOEMU_OPTIONS))
-	$(MAKE) -C ioemu LWIPDIR=$(CURDIR)/lwip-cvs
+	  ( cd ioemu ; \
+          XEN_TARGET_ARCH=$(XEN_TARGET_ARCH) CFLAGS="$(TARGET_CFLAGS)" sh configure --prefix=/usr --enable-stubdom $(IOEMU_OPTIONS))
+	CPPFLAGS="$(TARGET_CPPFLAGS)" $(MAKE) -C ioemu LWIPDIR=$(CURDIR)/lwip-cvs
 
 ######
 # caml
@@ -216,7 +187,7 @@ ioemu: cross-zlib cross-libpci mk-symlinks libxc
 
 .PHONY: caml
 caml: cross-newlib mk-symlinks
-	$(MAKE) -C $@ LWIPDIR=$(CURDIR)/lwip-cvs 
+	CPPFLAGS="$(TARGET_CPPFLAGS)" CFLAGS="$(TARGET_CFLAGS)" $(MAKE) -C $@ LWIPDIR=$(CURDIR)/lwip-cvs 
 
 ###
 # C
@@ -224,7 +195,7 @@ caml: cross-newlib mk-symlinks
 
 .PHONY: c
 c: cross-newlib mk-symlinks
-	$(MAKE) -C $@ LWIPDIR=$(CURDIR)/lwip-cvs 
+	CPPFLAGS="$(TARGET_CPPFLAGS)" CFLAGS="$(TARGET_CFLAGS)" $(MAKE) -C $@ LWIPDIR=$(CURDIR)/lwip-cvs 
 
 ######
 # Grub
@@ -238,7 +209,7 @@ grub-cvs:
 
 .PHONY: grub
 grub: grub-cvs cross-newlib mk-symlinks
-	$(MAKE) -C $@
+	CPPFLAGS="$(TARGET_CPPFLAGS)" CFLAGS="$(TARGET_CFLAGS)" $(MAKE) -C $@
 
 ########
 # minios
@@ -246,20 +217,20 @@ grub: grub-cvs cross-newlib mk-symlinks
 
 .PHONY: ioemu-stubdom
 ioemu-stubdom: mini-os-ioemu lwip-cvs libxc ioemu
-	DEF_CFLAGS=-DCONFIG_QEMU $(MAKE) -C $(MINI_OS) OBJ_DIR=$(CURDIR)/$< LWIPDIR=$(CURDIR)/lwip-cvs APP_OBJS="$(CURDIR)/ioemu/i386-dm-stubdom/qemu.a $(CURDIR)/ioemu/i386-dm-stubdom/libqemu.a"
+	DEF_CPPFLAGS="$(TARGET_CPPFLAGS)" DEF_CFLAGS="-DCONFIG_QEMU $(TARGET_CFLAGS)" DEF_LDFLAGS="$(TARGET_LDFLAGS)" $(MAKE) -C $(MINI_OS) OBJ_DIR=$(CURDIR)/$< LWIPDIR=$(CURDIR)/lwip-cvs APP_OBJS="$(CURDIR)/ioemu/i386-dm-stubdom/qemu.a $(CURDIR)/ioemu/i386-dm-stubdom/libqemu.a"
 
 CAMLLIB = $(shell ocamlc -where)
 .PHONY: caml-stubdom
 caml-stubdom: mini-os-caml lwip-cvs libxc caml
-	DEF_CFLAGS=-DCONFIG_CAML $(MAKE) -C $(MINI_OS) OBJ_DIR=$(CURDIR)/$< LWIPDIR=$(CURDIR)/lwip-cvs APP_OBJS="$(CURDIR)/caml/main-caml.o $(CURDIR)/caml/caml.o $(CAMLLIB)/libasmrun.a"
+	DEF_CPPFLAGS="$(TARGET_CPPFLAGS)" DEF_CFLAGS="-DCONFIG_CAML $(TARGET_CFLAGS)" DEF_LDFLAGS="$(TARGET_LDFLAGS)" $(MAKE) -C $(MINI_OS) OBJ_DIR=$(CURDIR)/$< LWIPDIR=$(CURDIR)/lwip-cvs APP_OBJS="$(CURDIR)/caml/main-caml.o $(CURDIR)/caml/caml.o $(CAMLLIB)/libasmrun.a"
 
 .PHONY: c-stubdom
 c-stubdom: mini-os-c lwip-cvs libxc c
-	DEF_CFLAGS=-DCONFIG_C $(MAKE) -C $(MINI_OS) OBJ_DIR=$(CURDIR)/$< LWIPDIR=$(CURDIR)/lwip-cvs APP_OBJS=$(CURDIR)/c/main.a
+	DEF_CPPFLAGS="$(TARGET_CPPFLAGS)" DEF_CFLAGS="-DCONFIG_C $(TARGET_CFLAGS)" DEF_LDFLAGS="$(TARGET_LDFLAGS)" $(MAKE) -C $(MINI_OS) OBJ_DIR=$(CURDIR)/$< LWIPDIR=$(CURDIR)/lwip-cvs APP_OBJS=$(CURDIR)/c/main.a
 
 .PHONY: pv-grub
 pv-grub: mini-os-grub libxc grub
-	DEF_CFLAGS=-DCONFIG_GRUB $(MAKE) -C $(MINI_OS) OBJ_DIR=$(CURDIR)/$< APP_OBJS=$(CURDIR)/grub/main.a
+	DEF_CPPFLAGS="$(TARGET_CPPFLAGS)" DEF_CFLAGS="-DCONFIG_GRUB $(TARGET_CFLAGS)" DEF_LDFLAGS="$(TARGET_LDFLAGS)" $(MAKE) -C $(MINI_OS) OBJ_DIR=$(CURDIR)/$< APP_OBJS=$(CURDIR)/grub/main.a
 
 #########
 # install
@@ -294,14 +265,12 @@ clean:
 .PHONY: crossclean
 crossclean: clean
 	rm -fr $(CROSS_ROOT)
-	rm -fr binutils-build gcc-build newlib-build
+	rm -fr newlib-build
 	rm -fr zlib-$(ZLIB_VERSION) pciutils-$(LIBPCI_VERSION)
 
 # clean patched sources
 .PHONY: patchclean
 patchclean: crossclean
-	rm -fr binutils-$(BINUTILS_VERSION)
-	rm -fr gcc-$(GCC_VERSION)
 	rm -fr newlib-cvs
 	rm -fr lwip-cvs
 	rm -fr grub-cvs
@@ -309,8 +278,6 @@ patchclean: crossclean
 # clean downloads
 .PHONY: downloadclean
 downloadclean: patchclean
-	rm -f binutils-$(BINUTILS_VERSION).tar.bz2
-	rm -f gcc-$(GCC_VERSION).tar.bz2
 	rm -f zlib-$(ZLIB_VERSION).tar.gz
 	rm -f pciutils-$(LIBPCI_VERSION).tar.bz2
 

@@ -139,7 +139,7 @@ static void *xmalloc_whole_pages(size_t size, size_t align)
 
 void *_xmalloc(size_t size, size_t align)
 {
-    struct xmalloc_hdr *i, *hdr = NULL;
+    struct xmalloc_hdr *i, *tmp, *hdr = NULL;
     uintptr_t data_begin;
     size_t hdr_size;
     /* unsigned long flags; */
@@ -155,7 +155,7 @@ void *_xmalloc(size_t size, size_t align)
 
     /* Search free list. */
     /* spin_lock_irqsave(&freelist_lock, flags); */
-    list_for_each_entry( i, &freelist, freelist )
+    list_for_each_entry_safe( i, tmp, &freelist, freelist )
     {
         data_begin = align_up((uintptr_t)i + hdr_size, align);
 

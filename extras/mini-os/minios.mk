@@ -6,13 +6,14 @@ debug = y
 
 # Define some default flags.
 # NB. '-Wcast-qual' is nasty, so I omitted it.
-DEF_CFLAGS += -fno-builtin -Wall -Werror -Wredundant-decls -Wno-format
+DEF_CFLAGS += -fno-builtin -Wall -Werror -Wredundant-decls -Wno-format -Wno-redundant-decls
 DEF_CFLAGS += $(call cc-option,$(CC),-fno-stack-protector,)
+DEF_CFLAGS += $(call cc-option,$(CC),-fgnu89-inline)
 DEF_CFLAGS += -Wstrict-prototypes -Wnested-externs -Wpointer-arith -Winline
 DEF_CPPFLAGS += -D__XEN_INTERFACE_VERSION__=$(XEN_INTERFACE_VERSION)
 
-DEF_ASFLAGS = -D__ASSEMBLY__
-DEF_LDFLAGS =
+DEF_ASFLAGS += -D__ASSEMBLY__
+DEF_LDFLAGS +=
 
 ifeq ($(debug),y)
 DEF_CFLAGS += -g

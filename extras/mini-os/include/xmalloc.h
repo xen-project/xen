@@ -11,6 +11,8 @@
 
 #else
 
+#include <limits.h>
+
 #define DEFAULT_ALIGN (sizeof(unsigned long))
 #define malloc(size) _xmalloc(size, DEFAULT_ALIGN)
 #define free(ptr) xfree(ptr)

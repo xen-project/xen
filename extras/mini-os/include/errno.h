@@ -3,6 +3,8 @@
 
 #include <errno-base.h>
 
+typedef int error_t;
+
 #define	EDEADLK		35	/* Resource deadlock would occur */
 #define	ENAMETOOLONG	36	/* File name too long */
 #define	ENOLCK		37	/* No record locks available */
@@ -106,6 +108,9 @@
 /* for robust mutexes */
 #define	EOWNERDEAD	130	/* Owner died */
 #define	ENOTRECOVERABLE	131	/* State not recoverable */
+
+
+#define EFTYPE          132     /* Inappropriate file type or format */
 
 #ifdef HAVE_LIBC
 #include <sched.h>

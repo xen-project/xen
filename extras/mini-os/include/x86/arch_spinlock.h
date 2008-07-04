@@ -7,7 +7,7 @@
 #include "os.h"
 
 
-#define ARCH_SPIN_LOCK_UNLOCKED (spinlock_t) { 1 }
+#define ARCH_SPIN_LOCK_UNLOCKED { 1 }
 
 /*
  * Simple spin lock operations.  There are two variants, one clears IRQ's

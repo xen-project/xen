@@ -49,18 +49,16 @@ static void free_pcifront(struct pcifront_dev *dev)
     free(dev);
 }
 
-struct pcifront_dev *init_pcifront(char *nodename)
+struct pcifront_dev *init_pcifront(char *_nodename)
 {
     xenbus_transaction_t xbt;
     char* err;
     char* message=NULL;
     int retry=0;
     char* msg;
+    char* nodename = _nodename ? _nodename : "device/pci/0";
 
     struct pcifront_dev *dev;
-
-    if (!nodename)
-        nodename = "device/pci/0";
 
     char path[strlen(nodename) + 1 + 10 + 1];
 

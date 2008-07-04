@@ -361,6 +361,7 @@ void free_pages(void *pointer, int order)
    
 }
 
+#ifndef __ia64__
 int free_physical_pages(xen_pfn_t *mfns, int n)
 {
     struct xen_memory_reservation reservation;
@@ -371,6 +372,7 @@ int free_physical_pages(xen_pfn_t *mfns, int n)
     reservation.domid = DOMID_SELF;
     return HYPERVISOR_memory_op(XENMEM_decrease_reservation, &reservation);
 }
+#endif
 
 #ifdef HAVE_LIBC
 void *sbrk(ptrdiff_t increment)

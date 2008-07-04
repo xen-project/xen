@@ -84,7 +84,7 @@ static void free_blkfront(struct blkfront_dev *dev)
     free(dev);
 }
 
-struct blkfront_dev *init_blkfront(char *nodename, struct blkfront_info *info)
+struct blkfront_dev *init_blkfront(char *_nodename, struct blkfront_info *info)
 {
     xenbus_transaction_t xbt;
     char* err;
@@ -93,11 +93,9 @@ struct blkfront_dev *init_blkfront(char *nodename, struct blkfront_info *info)
     int retry=0;
     char* msg;
     char* c;
+    char* nodename = _nodename ? _nodename : "device/vbd/768";
 
     struct blkfront_dev *dev;
-
-    if (!nodename)
-        nodename = "device/vbd/768";
 
     char path[strlen(nodename) + 1 + 10 + 1];
 
@@ -342,13 +340,14 @@ static void blkfront_aio_cb(struct blkfront_aiocb *aiocbp, int ret)
 void blkfront_io(struct blkfront_aiocb *aiocbp, int write)
 {
     unsigned long flags;
+    DEFINE_WAIT(w);
+
     ASSERT(!aiocbp->aio_cb);
     aiocbp->aio_cb = blkfront_aio_cb;
     blkfront_aio(aiocbp, write);
     aiocbp->data = NULL;
 
     local_irq_save(flags);
-    DEFINE_WAIT(w);
     while (1) {
 	blkfront_aio_poll(aiocbp->aio_dev);
 	if (aiocbp->data)
@@ -393,6 +392,7 @@ void blkfront_aio_push_operation(struct blkfront_aiocb *aiocbp, uint8_t op)
 void blkfront_sync(struct blkfront_dev *dev)
 {
     unsigned long flags;
+    DEFINE_WAIT(w);
 
     if (dev->info.mode == O_RDWR) {
         if (dev->info.barrier == 1)
@@ -404,7 +404,6 @@ void blkfront_sync(struct blkfront_dev *dev)
 
     /* Note: This won't finish if another thread enqueues requests.  */
     local_irq_save(flags);
-    DEFINE_WAIT(w);
     while (1) {
 	blkfront_aio_poll(dev);
 	if (RING_FREE_REQUESTS(&dev->ring) == RING_SIZE(&dev->ring))
@@ -424,6 +423,7 @@ int blkfront_aio_poll(struct blkfront_dev *dev)
     RING_IDX rp, cons;
     struct blkif_response *rsp;
     int more;
+    int nr_consumed;
 
 moretodo:
 #ifdef HAVE_LIBC
@@ -437,14 +437,17 @@ moretodo:
     rmb(); /* Ensure we see queued responses up to 'rp'. */
     cons = dev->ring.rsp_cons;
 
-    int nr_consumed = 0;
+    nr_consumed = 0;
     while ((cons != rp))
     {
+        struct blkfront_aiocb *aiocbp;
+        int status;
+
 	rsp = RING_GET_RESPONSE(&dev->ring, cons);
 	nr_consumed++;
 
-        struct blkfront_aiocb *aiocbp = (void*) (uintptr_t) rsp->id;
-        int status = rsp->status;
+        aiocbp = (void*) (uintptr_t) rsp->id;
+        status = rsp->status;
 
         if (status != BLKIF_RSP_OKAY)
             printk("block error %d for op %d\n", status, rsp->operation);

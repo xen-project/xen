@@ -93,6 +93,9 @@ static err_t netfront_output(struct netif *netif, struct pbuf *p,
 static err_t
 low_level_output(struct netif *netif, struct pbuf *p)
 {
+  if (!dev)
+    return ERR_OK;
+
 #ifdef ETH_PAD_SIZE
   pbuf_header(p, -ETH_PAD_SIZE); /* drop the padding word */
 #endif
@@ -342,7 +345,7 @@ void start_networking(void)
   struct ip_addr ipaddr = { htonl(IF_IPADDR) };
   struct ip_addr netmask = { htonl(IF_NETMASK) };
   struct ip_addr gw = { 0 };
-  char *ip;
+  char *ip = NULL;
 
   tprintk("Waiting for network.\n");
 
@@ -380,5 +383,6 @@ void start_networking(void)
 /* Shut down the network */
 void stop_networking(void)
 {
-  shutdown_netfront(dev);
+  if (dev)
+    shutdown_netfront(dev);
 }

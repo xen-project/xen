@@ -449,6 +449,8 @@ static void pcifront_thread(void *p)
     }
 
     pci_dev = init_pcifront(NULL);
+    if (!pci_dev)
+        return;
     printk("PCI devices:\n");
     pcifront_scan(pci_dev, print);
 }

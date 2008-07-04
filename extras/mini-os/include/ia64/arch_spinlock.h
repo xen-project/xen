@@ -27,7 +27,7 @@
 
 #include "atomic.h"
 
-#define ARCH_SPIN_LOCK_UNLOCKED (spinlock_t) { 0 }
+#define ARCH_SPIN_LOCK_UNLOCKED { 0 }
 
 #define SPIN_LOCK_UNUSED	0
 #define SPIN_LOCK_USED		1

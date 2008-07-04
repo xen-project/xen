@@ -78,9 +78,9 @@ static void memcpy_from_ring(const void *Ring,
 char **xenbus_wait_for_watch_return(xenbus_event_queue *queue)
 {
     struct xenbus_event *event;
+    DEFINE_WAIT(w);
     if (!queue)
         queue = &xenbus_events;
-    DEFINE_WAIT(w);
     while (!(event = *queue)) {
         add_waiter(w, xenbus_watch_queue);
         schedule();
@@ -382,6 +382,7 @@ xenbus_msg_reply(int type,
 
 static char *errmsg(struct xsd_sockmsg *rep)
 {
+    char *res;
     if (!rep) {
 	char msg[] = "No reply";
 	size_t len = strlen(msg) + 1;
@@ -389,7 +390,7 @@ static char *errmsg(struct xsd_sockmsg *rep)
     }
     if (rep->type != XS_ERROR)
 	return NULL;
-    char *res = malloc(rep->len + 1);
+    res = malloc(rep->len + 1);
     memcpy(res, rep + 1, rep->len);
     res[rep->len] = 0;
     free(rep);
@@ -419,10 +420,10 @@ char *xenbus_ls(xenbus_transaction_t xbt, const char *pre, char ***contents)
     struct xsd_sockmsg *reply, *repmsg;
     struct write_req req[] = { { pre, strlen(pre)+1 } };
     int nr_elems, x, i;
-    char **res;
+    char **res, *msg;
 
     repmsg = xenbus_msg_reply(XS_DIRECTORY, xbt, req, ARRAY_SIZE(req));
-    char *msg = errmsg(repmsg);
+    msg = errmsg(repmsg);
     if (msg) {
 	*contents = NULL;
 	return msg;
@@ -447,9 +448,9 @@ char *xenbus_read(xenbus_transaction_t xbt, const char *path, char **value)
 {
     struct write_req req[] = { {path, strlen(path) + 1} };
     struct xsd_sockmsg *rep;
-    char *res;
+    char *res, *msg;
     rep = xenbus_msg_reply(XS_READ, xbt, req, ARRAY_SIZE(req));
-    char *msg = errmsg(rep);
+    msg = errmsg(rep);
     if (msg) {
 	*value = NULL;
 	return msg;
@@ -469,8 +470,9 @@ char *xenbus_write(xenbus_transaction_t xbt, const char *path, const char *value
 	{value, strlen(value)},
     };
     struct xsd_sockmsg *rep;
+    char *msg;
     rep = xenbus_msg_reply(XS_WRITE, xbt, req, ARRAY_SIZE(req));
-    char *msg = errmsg(rep);
+    msg = errmsg(rep);
     if (msg) return msg;
     free(rep);
     return NULL;
@@ -487,6 +489,8 @@ char* xenbus_watch_path_token( xenbus_transaction_t xbt, const char *path, const
 
     struct watch *watch = malloc(sizeof(*watch));
 
+    char *msg;
+
     if (!events)
         events = &xenbus_events;
 
@@ -497,7 +501,7 @@ char* xenbus_watch_path_token( xenbus_transaction_t xbt, const char *path, const
 
     rep = xenbus_msg_reply(XS_WATCH, xbt, req, ARRAY_SIZE(req));
 
-    char *msg = errmsg(rep);
+    msg = errmsg(rep);
     if (msg) return msg;
     free(rep);
 
@@ -515,9 +519,11 @@ char* xenbus_unwatch_path_token( xenbus_transaction_t xbt, const char *path, con
 
     struct watch *watch, **prev;
 
+    char *msg;
+
     rep = xenbus_msg_reply(XS_UNWATCH, xbt, req, ARRAY_SIZE(req));
 
-    char *msg = errmsg(rep);
+    msg = errmsg(rep);
     if (msg) return msg;
     free(rep);
 
@@ -536,8 +542,9 @@ char *xenbus_rm(xenbus_transaction_t xbt, const char *path)
 {
     struct write_req req[] = { {path, strlen(path) + 1} };
     struct xsd_sockmsg *rep;
+    char *msg;
     rep = xenbus_msg_reply(XS_RM, xbt, req, ARRAY_SIZE(req));
-    char *msg = errmsg(rep);
+    msg = errmsg(rep);
     if (msg)
 	return msg;
     free(rep);
@@ -548,9 +555,9 @@ char *xenbus_get_perms(xenbus_transaction_t xbt, const char *path, char **value)
 {
     struct write_req req[] = { {path, strlen(path) + 1} };
     struct xsd_sockmsg *rep;
-    char *res;
+    char *res, *msg;
     rep = xenbus_msg_reply(XS_GET_PERMS, xbt, req, ARRAY_SIZE(req));
-    char *msg = errmsg(rep);
+    msg = errmsg(rep);
     if (msg) {
 	*value = NULL;
 	return msg;
@@ -567,14 +574,16 @@ char *xenbus_get_perms(xenbus_transaction_t xbt, const char *path, char **value)
 char *xenbus_set_perms(xenbus_transaction_t xbt, const char *path, domid_t dom, char perm)
 {
     char value[PERM_MAX_SIZE];
-    snprintf(value, PERM_MAX_SIZE, "%c%hu", perm, dom);
     struct write_req req[] = { 
 	{path, strlen(path) + 1},
-	{value, strlen(value) + 1},
+	{value, 0},
     };
     struct xsd_sockmsg *rep;
+    char *msg;
+    snprintf(value, PERM_MAX_SIZE, "%c%hu", perm, dom);
+    req[1].len = strlen(value) + 1;
     rep = xenbus_msg_reply(XS_SET_PERMS, xbt, req, ARRAY_SIZE(req));
-    char *msg = errmsg(rep);
+    msg = errmsg(rep);
     if (msg)
 	return msg;
     free(rep);
@@ -659,11 +668,11 @@ char* xenbus_printf(xenbus_transaction_t xbt,
 
 static void do_ls_test(const char *pre)
 {
-    char **dirs;
+    char **dirs, *msg;
     int x;
 
     DEBUG("ls %s...\n", pre);
-    char *msg = xenbus_ls(XBT_NIL, pre, &dirs);
+    msg = xenbus_ls(XBT_NIL, pre, &dirs);
     if (msg) {
 	DEBUG("Error in xenbus ls: %s\n", msg);
 	free(msg);
@@ -679,9 +688,9 @@ static void do_ls_test(const char *pre)
 
 static void do_read_test(const char *path)
 {
-    char *res;
+    char *res, *msg;
     DEBUG("Read %s...\n", path);
-    char *msg = xenbus_read(XBT_NIL, path, &res);
+    msg = xenbus_read(XBT_NIL, path, &res);
     if (msg) {
 	DEBUG("Error in xenbus read: %s\n", msg);
 	free(msg);
@@ -693,8 +702,9 @@ static void do_read_test(const char *path)
 
 static void do_write_test(const char *path, const char *val)
 {
+    char *msg;
     DEBUG("Write %s to %s...\n", val, path);
-    char *msg = xenbus_write(XBT_NIL, path, val);
+    msg = xenbus_write(XBT_NIL, path, val);
     if (msg) {
 	DEBUG("Result %s\n", msg);
 	free(msg);
@@ -705,8 +715,9 @@ static void do_write_test(const char *path, const char *val)
 
 static void do_rm_test(const char *path)
 {
+    char *msg;
     DEBUG("rm %s...\n", path);
-    char *msg = xenbus_rm(XBT_NIL, path);
+    msg = xenbus_rm(XBT_NIL, path);
     if (msg) {
 	DEBUG("Result %s\n", msg);
 	free(msg);

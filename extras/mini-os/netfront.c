@@ -95,8 +95,9 @@ static inline int xennet_rxidx(RING_IDX idx)
 
 void network_rx(struct netfront_dev *dev)
 {
-    RING_IDX rp,cons;
+    RING_IDX rp,cons,req_prod;
     struct netif_rx_response *rx;
+    int nr_consumed, some, more, i, notify;
 
 
 moretodo:
@@ -104,12 +105,13 @@ moretodo:
     rmb(); /* Ensure we see queued responses up to 'rp'. */
     cons = dev->rx.rsp_cons;
 
-    int nr_consumed=0;
-    int some = 0;
+    nr_consumed = 0;
+    some = 0;
     while ((cons != rp) && !some)
     {
         struct net_buffer* buf;
         unsigned char* page;
+        int id;
 
         rx = RING_GET_RESPONSE(&dev->rx, cons);
 
@@ -122,7 +124,7 @@ moretodo:
 
         if (rx->status == NETIF_RSP_NULL) continue;
 
-        int id = rx->id;
+        id = rx->id;
         BUG_ON(id >= NET_TX_RING_SIZE);
 
         buf = &dev->rx_buffers[id];
@@ -151,19 +153,15 @@ moretodo:
     }
     dev->rx.rsp_cons=cons;
 
-    int more;
     RING_FINAL_CHECK_FOR_RESPONSES(&dev->rx,more);
     if(more && !some) goto moretodo;
 
-    RING_IDX req_prod = dev->rx.req_prod_pvt;
-
-    int i;
-    netif_rx_request_t *req;
+    req_prod = dev->rx.req_prod_pvt;
 
     for(i=0; i<nr_consumed; i++)
     {
         int id = xennet_rxidx(req_prod + i);
-        req = RING_GET_REQUEST(&dev->rx, req_prod + i);
+        netif_rx_request_t *req = RING_GET_REQUEST(&dev->rx, req_prod + i);
         struct net_buffer* buf = &dev->rx_buffers[id];
         void* page = buf->page;
 
@@ -178,7 +176,6 @@ moretodo:
 
     dev->rx.req_prod_pvt = req_prod + i;
     
-    int notify;
     RING_PUSH_REQUESTS_AND_CHECK_NOTIFY(&dev->rx, notify);
     if (notify)
         notify_remote_via_evtchn(dev->evtchn);
@@ -199,6 +196,7 @@ void network_tx_buf_gc(struct netfront_dev *dev)
         for (cons = dev->tx.rsp_cons; cons != prod; cons++) 
         {
             struct netif_tx_response *txrsp;
+            struct net_buffer *buf;
 
             txrsp = RING_GET_RESPONSE(&dev->tx, cons);
             if (txrsp->status == NETIF_RSP_NULL)
@@ -209,7 +207,7 @@ void network_tx_buf_gc(struct netfront_dev *dev)
 
             id  = txrsp->id;
             BUG_ON(id >= NET_TX_RING_SIZE);
-            struct net_buffer* buf = &dev->tx_buffers[id];
+            buf = &dev->tx_buffers[id];
             gnttab_end_access(buf->gref);
             buf->gref=GRANT_INVALID_REF;
 
@@ -298,7 +296,7 @@ static void free_netfront(struct netfront_dev *dev)
     free(dev);
 }
 
-struct netfront_dev *init_netfront(char *nodename, void (*thenetif_rx)(unsigned char* data, int len), unsigned char rawmac[6], char **ip)
+struct netfront_dev *init_netfront(char *_nodename, void (*thenetif_rx)(unsigned char* data, int len), unsigned char rawmac[6], char **ip)
 {
     xenbus_transaction_t xbt;
     char* err;
@@ -308,11 +306,9 @@ struct netfront_dev *init_netfront(char *nodename, void (*thenetif_rx)(unsigned 
     int retry=0;
     int i;
     char* msg;
+    char* nodename = _nodename ? _nodename : "device/vif/0";
 
     struct netfront_dev *dev;
-
-    if (!nodename)
-	nodename = "device/vif/0";
 
     char path[strlen(nodename) + 1 + 10 + 1];
 

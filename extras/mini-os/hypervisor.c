@@ -72,9 +72,10 @@ void do_hypervisor_callback(struct pt_regs *regs)
 
 void force_evtchn_callback(void)
 {
+    int save;
     vcpu_info_t *vcpu;
     vcpu = &HYPERVISOR_shared_info->vcpu_info[smp_processor_id()];
-    int save = vcpu->evtchn_upcall_mask;
+    save = vcpu->evtchn_upcall_mask;
 
     while (vcpu->evtchn_upcall_pending) {
         vcpu->evtchn_upcall_mask = 1;
