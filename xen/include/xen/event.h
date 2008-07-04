@@ -16,8 +16,6 @@
 #include <asm/bitops.h>
 #include <asm/event.h>
 
-void evtchn_set_pending(struct vcpu *v, int port);
-
 /*
  * send_guest_vcpu_virq: Notify guest via a per-VCPU VIRQ.
  *  @v:        VCPU to which virtual IRQ should be sent
@@ -36,8 +34,9 @@ void send_guest_global_virq(struct domain *d, int virq);
  * send_guest_pirq:
  *  @d:        Domain to which physical IRQ should be sent
  *  @pirq:     Physical IRQ number
+ * Returns TRUE if the delivery port was already pending.
  */
-void send_guest_pirq(struct domain *d, int pirq);
+int send_guest_pirq(struct domain *d, int pirq);
 
 /* Send a notification from a local event-channel port. */
 long evtchn_send(unsigned int lport);

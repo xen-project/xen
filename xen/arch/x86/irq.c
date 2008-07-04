@@ -201,12 +201,25 @@ struct pending_eoi {
 static DEFINE_PER_CPU(struct pending_eoi, pending_eoi[NR_VECTORS]);
 #define pending_eoi_sp(p) ((p)[NR_VECTORS-1].vector)
 
+static struct timer irq_guest_eoi_timer[NR_IRQS];
+static void irq_guest_eoi_timer_fn(void *data)
+{
+    irq_desc_t *desc = data;
+    unsigned vector = desc - irq_desc;
+    unsigned long flags;
+
+    spin_lock_irqsave(&desc->lock, flags);
+    desc->status &= ~IRQ_INPROGRESS;
+    desc->handler->enable(vector);
+    spin_unlock_irqrestore(&desc->lock, flags);
+}
+
 static void __do_IRQ_guest(int vector)
 {
     irq_desc_t         *desc = &irq_desc[vector];
     irq_guest_action_t *action = (irq_guest_action_t *)desc->action;
     struct domain      *d;
-    int                 i, sp;
+    int                 i, sp, already_pending = 0;
     struct pending_eoi *peoi = this_cpu(pending_eoi);
 
     if ( unlikely(action->nr_guests == 0) )
@@ -237,9 +250,28 @@ static void __do_IRQ_guest(int vector)
         if ( (action->ack_type != ACKTYPE_NONE) &&
              !test_and_set_bit(irq, d->pirq_mask) )
             action->in_flight++;
-        if (!hvm_do_IRQ_dpci(d, irq))
-            send_guest_pirq(d, irq);
+        if ( hvm_do_IRQ_dpci(d, irq) )
+        {
+            if ( action->ack_type == ACKTYPE_NONE )
+            {
+                already_pending += !!(desc->status & IRQ_INPROGRESS);
+                desc->status |= IRQ_INPROGRESS; /* cleared during hvm eoi */
+            }
+        }
+        else if ( send_guest_pirq(d, irq) &&
+                  (action->ack_type == ACKTYPE_NONE) )
+        {
+            already_pending++;
+        }
+    }
 
+    if ( already_pending == action->nr_guests )
+    {
+        desc->handler->disable(vector);
+        stop_timer(&irq_guest_eoi_timer[vector]);
+        init_timer(&irq_guest_eoi_timer[vector],
+                   irq_guest_eoi_timer_fn, desc, smp_processor_id());
+        set_timer(&irq_guest_eoi_timer[vector], NOW() + MILLISECS(1));
     }
 }
 
@@ -622,6 +654,8 @@ int pirq_guest_unbind(struct domain *d, int irq)
     desc->action = NULL;
     xfree(action);
     desc->status &= ~IRQ_GUEST;
+    desc->status &= ~IRQ_INPROGRESS;
+    kill_timer(&irq_guest_eoi_timer[vector]);
     desc->handler->shutdown(vector);
 
  out:
