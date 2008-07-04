@@ -64,8 +64,6 @@
 #define     MSI_ADDR_REDIRECTION_CPU   (0 << MSI_ADDR_REDIRECTION_SHIFT)
 #define     MSI_ADDR_REDIRECTION_LOWPRI (1 << MSI_ADDR_REDIRECTION_SHIFT)
 
-#define PCI_MSI_FLAGS_PVMASK           0x100
-
 #define AUTO_ASSIGN -1
 
 /* shift count for gflags */
@@ -76,13 +74,16 @@
 #define GLFAGS_SHIFT_TRG_MODE       15
 
 int
-pt_msi_init(struct pt_dev *dev, int pos);
+pt_msi_setup(struct pt_dev *dev);
+
+uint32_t
+__get_msi_gflags(uint32_t data, uint64_t addr);
 
 int
-pt_msi_write(struct pt_dev *d, uint32_t addr, uint32_t val, uint32_t len);
+pt_msi_update(struct pt_dev *d);
 
 int
-pt_msi_read(struct pt_dev *d, int addr, int len, uint32_t *val);
+pt_msix_update(struct pt_dev *dev);
 
 int
 remove_msix_mapping(struct pt_dev *dev, int bar_index);
@@ -92,11 +93,5 @@ add_msix_mapping(struct pt_dev *dev, int bar_index);
 
 int
 pt_msix_init(struct pt_dev *dev, int pos);
-
-int
-pt_msix_write(struct pt_dev *d, uint32_t addr, uint32_t val, uint32_t len);
-
-int
-pt_msix_read(struct pt_dev *d, int addr, int len, uint32_t *val);
 
 #endif
