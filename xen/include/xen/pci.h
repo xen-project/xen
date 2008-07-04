@@ -10,6 +10,7 @@
 #include <xen/config.h>
 #include <xen/types.h>
 #include <xen/list.h>
+#include <xen/spinlock.h>
 
 /*
  * The PCI interface treats multi-function devices as independent
@@ -29,15 +30,31 @@
 #define PCI_BDF2(b,df)  (((b & 0xff) << 8) | (df & 0xff))
 
 struct pci_dev {
+    struct list_head alldevs_list;
     struct list_head domain_list;
-    struct list_head msi_dev_list;
-    u8 bus;
-    u8 devfn;
     struct list_head msi_list;
+    struct domain *domain;
+    const u8 bus;
+    const u8 devfn;
+    spinlock_t lock;
 };
 
 #define for_each_pdev(domain, pdev) \
     list_for_each_entry(pdev, &(domain->arch.pdev_list), domain_list)
+
+/*
+ * The pcidevs_lock write-lock must be held when doing alloc_pdev() or
+ * free_pdev().  Never de-reference pdev without holding pdev->lock or
+ * pcidevs_lock.  Always aquire pcidevs_lock before pdev->lock when
+ * doing free_pdev().
+ */
+
+extern rwlock_t pcidevs_lock;
+
+struct pci_dev *alloc_pdev(u8 bus, u8 devfn);
+void free_pdev(struct pci_dev *pdev);
+struct pci_dev *pci_lock_pdev(int bus, int devfn);
+struct pci_dev *pci_lock_domain_pdev(struct domain *d, int bus, int devfn);
 
 
 uint8_t pci_conf_read8(

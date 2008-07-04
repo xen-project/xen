@@ -63,12 +63,10 @@ struct msi_msg {
 /* Helper functions */
 extern void mask_msi_irq(unsigned int irq);
 extern void unmask_msi_irq(unsigned int irq);
-extern void read_msi_msg(unsigned int irq, struct msi_msg *msg);
-extern void write_msi_msg(unsigned int irq, struct msi_msg *msg);
 extern void set_msi_irq_affinity(unsigned int irq, cpumask_t mask);
 extern int pci_enable_msi(u8 bus, u8 devfn, int vector, int entry_nr, int msi);
 extern void pci_disable_msi(int vector);
-extern void pci_cleanup_msi(u8 bus, u8 devfn);
+extern void pci_cleanup_msi(struct pci_dev *pdev);
 
 struct msi_desc {
 	struct {

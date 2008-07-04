@@ -298,6 +298,7 @@ static void amd_iommu_setup_dom0_devices(struct domain *d)
     u32 l;
     int bdf;
 
+    write_lock(&pcidevs_lock);
     for ( bus = 0; bus < 256; bus++ )
     {
         for ( dev = 0; dev < 32; dev++ )
@@ -310,10 +311,9 @@ static void amd_iommu_setup_dom0_devices(struct domain *d)
                      (l == 0x0000ffff) || (l == 0xffff0000) )
                     continue;
 
-                pdev = xmalloc(struct pci_dev);
-                pdev->bus = bus;
-                pdev->devfn = PCI_DEVFN(dev, func);
-                list_add_tail(&pdev->domain_list, &d->arch.pdev_list);
+                pdev = alloc_pdev(bus, PCI_DEVFN(dev, func));
+                pdev->domain = d;
+                list_add(&pdev->domain_list, &d->arch.pdev_list);
 
                 bdf = (bus << 8) | pdev->devfn;
                 /* supported device? */
@@ -325,6 +325,7 @@ static void amd_iommu_setup_dom0_devices(struct domain *d)
             }
         }
     }
+    write_unlock(&pcidevs_lock);
 }
 
 int amd_iov_detect(void)
@@ -493,38 +494,37 @@ static int reassign_device( struct domain *source, struct domain *target,
     struct amd_iommu *iommu;
     int bdf;
 
-    for_each_pdev ( source, pdev )
+    pdev = pci_lock_domain_pdev(source, bus, devfn);
+    if ( !pdev )
+	return -ENODEV;
+
+    bdf = (bus << 8) | devfn;
+    /* supported device? */
+    iommu = (bdf < ivrs_bdf_entries) ?
+	find_iommu_for_device(bus, pdev->devfn) : NULL;
+
+    if ( !iommu )
     {
-        if ( (pdev->bus != bus) || (pdev->devfn != devfn) )
-            continue;
+	spin_unlock(&pdev->lock);
+	amd_iov_error("Fail to find iommu."
+		      " %x:%x.%x cannot be assigned to domain %d\n", 
+		      bus, PCI_SLOT(devfn), PCI_FUNC(devfn), target->domain_id);
+	return -ENODEV;
+    }
 
-        pdev->bus = bus;
-        pdev->devfn = devfn;
+    amd_iommu_disable_domain_device(source, iommu, bdf);
 
-        bdf = (bus << 8) | devfn;
-        /* supported device? */
-        iommu = (bdf < ivrs_bdf_entries) ?
-            find_iommu_for_device(bus, pdev->devfn) : NULL;
+    write_lock(&pcidevs_lock);
+    list_move(&pdev->domain_list, &target->arch.pdev_list);
+    write_unlock(&pcidevs_lock);
+    pdev->domain = target;
 
-        if ( !iommu )
-        {
-            amd_iov_error("Fail to find iommu."
-                     " %x:%x.%x cannot be assigned to domain %d\n", 
-                     bus, PCI_SLOT(devfn), PCI_FUNC(devfn), target->domain_id);
-            return -ENODEV;
-        }
-
-        amd_iommu_disable_domain_device(source, iommu, bdf);
-        /* Move pci device from the source domain to target domain. */
-        list_move(&pdev->domain_list, &target->arch.pdev_list);
-
-        amd_iommu_setup_domain_device(target, iommu, bdf);
-        amd_iov_info("reassign %x:%x.%x domain %d -> domain %d\n",
+    amd_iommu_setup_domain_device(target, iommu, bdf);
+    amd_iov_info("reassign %x:%x.%x domain %d -> domain %d\n",
                  bus, PCI_SLOT(devfn), PCI_FUNC(devfn),
                  source->domain_id, target->domain_id);
 
-        break;
-    }
+    spin_unlock(&pdev->lock);
     return 0;
 }
 
@@ -552,14 +552,16 @@ static int amd_iommu_assign_device(struct domain *d, u8 bus, u8 devfn)
 static void release_domain_devices(struct domain *d)
 {
     struct pci_dev *pdev;
+    u8 bus, devfn;
 
-    while ( has_arch_pdevs(d) )
+    while ( (pdev = pci_lock_domain_pdev(d, -1, -1)) )
     {
-        pdev = list_entry(d->arch.pdev_list.next, typeof(*pdev), domain_list);
         pdev_flr(pdev->bus, pdev->devfn);
+	bus = pdev->bus; devfn = pdev->devfn;
+	spin_unlock(&pdev->lock);
         amd_iov_info("release domain %d devices %x:%x.%x\n", d->domain_id,
-                 pdev->bus, PCI_SLOT(pdev->devfn), PCI_FUNC(pdev->devfn));
-        reassign_device(d, dom0, pdev->bus, pdev->devfn);
+		     bus, PCI_SLOT(devfn), PCI_FUNC(devfn));
+        reassign_device(d, dom0, bus, devfn);
     }
 }
 
@@ -619,11 +621,11 @@ static void amd_iommu_domain_destroy(struct domain *d)
     release_domain_devices(d);
 }
 
-static void amd_iommu_return_device(
+static int amd_iommu_return_device(
     struct domain *s, struct domain *t, u8 bus, u8 devfn)
 {
     pdev_flr(bus, devfn);
-    reassign_device(s, t, bus, devfn);
+    return reassign_device(s, t, bus, devfn);
 }
 
 static int amd_iommu_group_id(u8 bus, u8 devfn)

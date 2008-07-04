@@ -1345,7 +1345,7 @@ static int domain_context_unmap(u8 bus, u8 devfn)
     return ret;
 }
 
-void reassign_device_ownership(
+static int reassign_device_ownership(
     struct domain *source,
     struct domain *target,
     u8 bus, u8 devfn)
@@ -1353,61 +1353,62 @@ void reassign_device_ownership(
     struct hvm_iommu *source_hd = domain_hvm_iommu(source);
     struct pci_dev *pdev;
     struct acpi_drhd_unit *drhd;
-    struct iommu *iommu;
-    int status;
-    int found = 0;
+    struct iommu *pdev_iommu;
+    int ret, found = 0;
+
+    if ( !(pdev = pci_lock_domain_pdev(source, bus, devfn)) )
+        return -ENODEV;
 
     pdev_flr(bus, devfn);
-
-    for_each_pdev( source, pdev )
-        if ( (pdev->bus == bus) && (pdev->devfn == devfn) )
-            goto found;
-
-    return;
-
-found:
     drhd = acpi_find_matched_drhd_unit(bus, devfn);
-    iommu = drhd->iommu;
+    pdev_iommu = drhd->iommu;
     domain_context_unmap(bus, devfn);
 
-    /* Move pci device from the source domain to target domain. */
+    write_lock(&pcidevs_lock);
     list_move(&pdev->domain_list, &target->arch.pdev_list);
+    write_unlock(&pcidevs_lock);
+    pdev->domain = target;
 
+    ret = domain_context_mapping(target, bus, devfn);
+    spin_unlock(&pdev->lock);
+
+    read_lock(&pcidevs_lock);
     for_each_pdev ( source, pdev )
     {
         drhd = acpi_find_matched_drhd_unit(pdev->bus, pdev->devfn);
-        if ( drhd->iommu == iommu )
+        if ( drhd->iommu == pdev_iommu )
         {
             found = 1;
             break;
         }
     }
+    read_unlock(&pcidevs_lock);
 
     if ( !found )
-        clear_bit(iommu->index, &source_hd->iommu_bitmap);
+        clear_bit(pdev_iommu->index, &source_hd->iommu_bitmap);
 
-    status = domain_context_mapping(target, bus, devfn);
-    if ( status != 0 )
-        gdprintk(XENLOG_ERR VTDPREFIX, "domain_context_mapping failed\n");
+    return ret;
 }
 
 void return_devices_to_dom0(struct domain *d)
 {
     struct pci_dev *pdev;
 
-    while ( has_arch_pdevs(d) )
+    while ( (pdev = pci_lock_domain_pdev(d, -1, -1)) )
     {
-        pdev = list_entry(d->arch.pdev_list.next, typeof(*pdev), domain_list);
-        pci_cleanup_msi(pdev->bus, pdev->devfn);
+        pci_cleanup_msi(pdev);
+        spin_unlock(&pdev->lock);
         reassign_device_ownership(d, dom0, pdev->bus, pdev->devfn);
     }
 
 #ifdef VTD_DEBUG
+    read_lock(&pcidevs_lock);
     for_each_pdev ( dom0, pdev )
         dprintk(XENLOG_INFO VTDPREFIX,
                 "return_devices_to_dom0:%x: bdf = %x:%x:%x\n",
                 dom0->domain_id, pdev->bus,
                 PCI_SLOT(pdev->devfn), PCI_FUNC(pdev->devfn));
+    read_unlock(&pcidevs_lock);
 #endif
 }
 
@@ -1568,11 +1569,7 @@ static int iommu_prepare_rmrr_dev(struct domain *d,
         return ret;
 
     if ( domain_context_mapped(bus, devfn) == 0 )
-    {
         ret = domain_context_mapping(d, bus, devfn);
-        if ( !ret )
-            return 0;
-    }
 
     return ret;
 }
@@ -1586,6 +1583,7 @@ static void setup_dom0_devices(struct domain *d)
 
     hd = domain_hvm_iommu(d);
 
+    write_lock(&pcidevs_lock);
     for ( bus = 0; bus < 256; bus++ )
     {
         for ( dev = 0; dev < 32; dev++ )
@@ -1597,10 +1595,10 @@ static void setup_dom0_devices(struct domain *d)
                 if ( (l == 0xffffffff) || (l == 0x00000000) ||
                      (l == 0x0000ffff) || (l == 0xffff0000) )
                     continue;
-                pdev = xmalloc(struct pci_dev);
-                pdev->bus = bus;
-                pdev->devfn = PCI_DEVFN(dev, func);
-                list_add_tail(&pdev->domain_list, &d->arch.pdev_list);
+
+                pdev = alloc_pdev(bus, PCI_DEVFN(dev, func));
+                pdev->domain = d;
+                list_add(&pdev->domain_list, &d->arch.pdev_list);
 
                 ret = domain_context_mapping(d, pdev->bus, pdev->devfn);
                 if ( ret != 0 )
@@ -1609,6 +1607,7 @@ static void setup_dom0_devices(struct domain *d)
             }
         }
     }
+    write_unlock(&pcidevs_lock);
 }
 
 void clear_fault_bits(struct iommu *iommu)
@@ -1737,9 +1736,11 @@ int device_assigned(u8 bus, u8 devfn)
 {
     struct pci_dev *pdev;
 
-    for_each_pdev( dom0, pdev )
-        if ( (pdev->bus == bus ) && (pdev->devfn == devfn) )
-            return 0;
+    if ( (pdev = pci_lock_domain_pdev(dom0, bus, devfn)) )
+    {
+        spin_unlock(&pdev->lock);
+        return 0;
+    }
 
     return 1;
 }
@@ -1751,9 +1752,11 @@ int intel_iommu_assign_device(struct domain *d, u8 bus, u8 devfn)
     u16 bdf;
 
     if ( list_empty(&acpi_drhd_units) )
-        return ret;
+        return -ENODEV;
 
-    reassign_device_ownership(dom0, d, bus, devfn);
+    ret = reassign_device_ownership(dom0, d, bus, devfn);
+    if ( ret )
+        return ret;
 
     /* Setup rmrr identity mapping */
     for_each_rmrr_device( rmrr, bdf, i )

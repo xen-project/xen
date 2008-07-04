@@ -240,6 +240,7 @@ int iommu_get_device_group(struct domain *d, u8 bus, u8 devfn,
 
     group_id = ops->get_device_group_id(bus, devfn);
 
+    read_lock(&pcidevs_lock);
     for_each_pdev( d, pdev )
     {
         if ( (pdev->bus == bus) && (pdev->devfn == devfn) )
@@ -252,10 +253,14 @@ int iommu_get_device_group(struct domain *d, u8 bus, u8 devfn,
             bdf |= (pdev->bus & 0xff) << 16;
             bdf |= (pdev->devfn & 0xff) << 8;
             if ( unlikely(copy_to_guest_offset(buf, i, &bdf, 1)) )
+            {
+                read_unlock(&pcidevs_lock);
                 return -1;
+            }
             i++;
         }
     }
+    read_unlock(&pcidevs_lock);
 
     return i;
 }
