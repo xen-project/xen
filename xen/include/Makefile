@@ -20,6 +20,7 @@ headers-y := \
     compat/xen.h \
     compat/xencomm.h \
     compat/xenoprof.h
+headers-$(CONFIG_X86)     += compat/arch-x86/xen-mca.h
 headers-$(CONFIG_X86)     += compat/arch-x86/xen.h
 headers-$(CONFIG_X86)     += compat/arch-x86/xen-$(compat-arch-y).h
 headers-y                 += compat/arch-$(compat-arch-y).h compat/xlat.h

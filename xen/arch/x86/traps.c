@@ -61,6 +61,7 @@
 #include <asm/msr.h>
 #include <asm/shared.h>
 #include <asm/x86_emulate.h>
+#include <asm/traps.h>
 #include <asm/hvm/vpt.h>
 #include <public/arch-x86/cpuid.h>
 
@@ -486,6 +487,20 @@ static unsigned int check_guest_io_breakpoint(struct vcpu *v,
 }
 
 /*
+ * Called from asm to set up the MCE trapbounce info.
+ * Returns 0 if no callback is set up, else 1.
+ */
+asmlinkage int set_guest_machinecheck_trapbounce(void)
+{
+    struct vcpu *v = current;
+    struct trap_bounce *tb = &v->arch.trap_bounce;
+ 
+    do_guest_trap(TRAP_machine_check, guest_cpu_user_regs(), 0);
+    tb->flags &= ~TBF_EXCEPTION; /* not needed for MCE delivery path */
+    return !null_trap_bounce(v, tb);
+}
+
+/*
  * Called from asm to set up the NMI trapbounce info.
  * Returns 0 if no callback is set up, else 1.
  */
@@ -904,8 +919,6 @@ asmlinkage void do_int3(struct cpu_user_regs *regs)
 
 asmlinkage void do_machine_check(struct cpu_user_regs *regs)
 {
-    extern fastcall void (*machine_check_vector)(
-        struct cpu_user_regs *, long error_code);
     machine_check_vector(regs, regs->error_code);
 }
 
@@ -2678,25 +2691,51 @@ asmlinkage void do_general_protection(struct cpu_user_regs *regs)
     panic("GENERAL PROTECTION FAULT\n[error_code=%04x]\n", regs->error_code);
 }
 
+static DEFINE_PER_CPU(struct softirq_trap, softirq_trap);
+
 static void nmi_mce_softirq(void)
 {
-    /* Only used to defer wakeup of dom0,vcpu0 to a safe (non-NMI) context. */
-    vcpu_kick(dom0->vcpu[0]);
+    int cpu = smp_processor_id();
+    struct softirq_trap *st = &per_cpu(softirq_trap, cpu);
+    cpumask_t affinity;
+
+    BUG_ON(st == NULL);
+    BUG_ON(st->vcpu == NULL);
+
+    /* Set the tmp value unconditionally, so that
+     * the check in the iret hypercall works. */
+    st->vcpu->cpu_affinity_tmp = st->vcpu->cpu_affinity;
+
+    if ((cpu != st->processor)
+       || (st->processor != st->vcpu->processor))
+    {
+        /* We are on a different physical cpu.
+         * Make sure to wakeup the vcpu on the
+         * specified processor.
+         */
+        cpus_clear(affinity);
+        cpu_set(st->processor, affinity);
+        vcpu_set_affinity(st->vcpu, &affinity);
+
+        /* Affinity is restored in the iret hypercall. */
+    }
+
+    /* Only used to defer wakeup of domain/vcpu to
+     * a safe (non-NMI/MCE) context.
+     */
+    vcpu_kick(st->vcpu);
 }
 
 static void nmi_dom0_report(unsigned int reason_idx)
 {
-    struct domain *d;
-    struct vcpu   *v;
+    struct domain *d = dom0;
 
-    if ( ((d = dom0) == NULL) || ((v = d->vcpu[0]) == NULL) )
+    if ( (d == NULL) || (d->vcpu[0] == NULL) )
         return;
 
     set_bit(reason_idx, nmi_reason(d));
 
-    /* Not safe to wake a vcpu here, or even to schedule a tasklet! */
-    if ( !test_and_set_bool(v->nmi_pending) )
-        raise_softirq(NMI_MCE_SOFTIRQ);
+    send_guest_trap(d, 0, TRAP_nmi);
 }
 
 asmlinkage void mem_parity_error(struct cpu_user_regs *regs)
@@ -3009,6 +3048,70 @@ long unregister_guest_nmi_callback(void)
 
     return 0;
 }
+
+int guest_has_trap_callback(struct domain *d, uint16_t vcpuid, unsigned int trap_nr)
+{
+    struct vcpu *v;
+    struct trap_info *t;
+
+    BUG_ON(d == NULL);
+    BUG_ON(vcpuid >= MAX_VIRT_CPUS);
+
+    /* Sanity check - XXX should be more fine grained. */
+    BUG_ON(trap_nr > TRAP_syscall);
+
+    v = d->vcpu[vcpuid];
+    t = &v->arch.guest_context.trap_ctxt[trap_nr];
+
+    return (t->address != 0);
+}
+
+
+int send_guest_trap(struct domain *d, uint16_t vcpuid, unsigned int trap_nr)
+{
+    struct vcpu *v;
+    struct softirq_trap *st;
+
+    BUG_ON(d == NULL);
+    BUG_ON(vcpuid >= MAX_VIRT_CPUS);
+    v = d->vcpu[vcpuid];
+
+    switch (trap_nr) {
+    case TRAP_nmi:
+        if ( !test_and_set_bool(v->nmi_pending) ) {
+               st = &per_cpu(softirq_trap, smp_processor_id());
+               st->domain = dom0;
+               st->vcpu = dom0->vcpu[0];
+               st->processor = st->vcpu->processor;
+
+               /* not safe to wake up a vcpu here */
+               raise_softirq(NMI_MCE_SOFTIRQ);
+               return 0;
+        }
+        break;
+
+    case TRAP_machine_check:
+
+        /* We are called by the machine check (exception or polling) handlers
+         * on the physical CPU that reported a machine check error. */
+
+        if ( !test_and_set_bool(v->mce_pending) ) {
+                st = &per_cpu(softirq_trap, smp_processor_id());
+                st->domain = d;
+                st->vcpu = v;
+                st->processor = v->processor;
+
+                /* not safe to wake up a vcpu here */
+                raise_softirq(NMI_MCE_SOFTIRQ);
+                return 0;
+        }
+        break;
+    }
+
+    /* delivery failed */
+    return -EIO;
+}
+
 
 long do_set_trap_table(XEN_GUEST_HANDLE(const_trap_info_t) traps)
 {

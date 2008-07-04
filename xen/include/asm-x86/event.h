@@ -69,7 +69,12 @@ static inline void local_event_delivery_enable(void)
 /* No arch specific virq definition now. Default to global. */
 static inline int arch_virq_is_global(int virq)
 {
-    return 1;
+    switch (virq) {
+    case VIRQ_MCA:
+        return 1;
+    default:
+        return 1;
+    }
 }
 
 #endif

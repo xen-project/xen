@@ -141,6 +141,9 @@ static inline u32 pickle_domptr(struct domain *domain)
 #define page_get_owner(_p)    (unpickle_domptr((_p)->u.inuse._domain))
 #define page_set_owner(_p,_d) ((_p)->u.inuse._domain = pickle_domptr(_d))
 
+#define maddr_get_owner(ma)   (page_get_owner(maddr_to_page((ma))))
+#define vaddr_get_owner(va)   (page_get_owner(virt_to_page((va))))
+
 #define XENSHARE_writable 0
 #define XENSHARE_readonly 1
 extern void share_xen_page_with_guest(

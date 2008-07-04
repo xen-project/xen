@@ -587,6 +587,21 @@ void send_guest_vcpu_virq(struct vcpu *v, int virq)
     evtchn_set_pending(v, port);
 }
 
+int guest_enabled_event(struct vcpu *v, int virq)
+{
+    int port;
+
+    if ( unlikely(v == NULL) )
+        return 0;
+
+    port = v->virq_to_evtchn[virq];
+    if ( port == 0 )
+        return 0;
+
+    /* virq is in use */
+    return 1;
+}
+
 void send_guest_global_virq(struct domain *d, int virq)
 {
     int port;

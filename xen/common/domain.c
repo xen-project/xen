@@ -654,7 +654,9 @@ void vcpu_reset(struct vcpu *v)
     v->is_polling      = 0;
     v->is_initialised  = 0;
     v->nmi_pending     = 0;
-    v->nmi_masked      = 0;
+    v->mce_pending     = 0;
+    v->old_trap_priority = VCPU_TRAP_NONE;
+    v->trap_priority   = VCPU_TRAP_NONE;
     clear_bit(_VPF_blocked, &v->pause_flags);
 
     domain_unlock(v->domain);

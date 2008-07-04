@@ -101,6 +101,8 @@ ENTRY(compat_test_all_events)
         leaq  irq_stat(%rip),%rcx
         testl $~0,(%rcx,%rax,1)
         jnz   compat_process_softirqs
+        testb $1,VCPU_mce_pending(%rbx)
+        jnz   compat_process_mce
         testb $1,VCPU_nmi_pending(%rbx)
         jnz   compat_process_nmi
 compat_test_guest_events:
@@ -129,15 +131,34 @@ compat_process_softirqs:
 
 	ALIGN
 /* %rbx: struct vcpu */
+compat_process_mce:
+        cmpw $VCPU_TRAP_MCE,VCPU_trap_priority(%rbx)
+        jae  compat_test_guest_events
+        sti
+        movb $0,VCPU_mce_pending(%rbx)
+        call set_guest_machinecheck_trapbounce
+        testl %eax,%eax
+        jz    compat_test_all_events
+        movw VCPU_trap_priority(%rbx),%dx           # safe priority for the
+        movw %dx,VCPU_old_trap_priority(%rbx)       # iret hypercall
+        movw  $VCPU_TRAP_MCE,VCPU_trap_priority(%rbx)
+        jmp   compat_process_trap
+
+	ALIGN
+/* %rbx: struct vcpu */
 compat_process_nmi:
-        testb $1,VCPU_nmi_masked(%rbx)
-        jnz   compat_test_guest_events
+        cmpw $VCPU_TRAP_NMI,VCPU_trap_priority(%rbx)
+        jae   compat_test_guest_events
         sti
         movb  $0,VCPU_nmi_pending(%rbx)
         call  set_guest_nmi_trapbounce
         testl %eax,%eax
         jz    compat_test_all_events
-        movb  $1,VCPU_nmi_masked(%rbx)
+        movw VCPU_trap_priority(%rbx),%dx           # safe priority for the
+        movw %dx,VCPU_old_trap_priority(%rbx)       # iret hypercall
+        movw  $VCPU_TRAP_NMI,VCPU_trap_priority(%rbx)
+        /* FALLTHROUGH */
+compat_process_trap:
         leaq  VCPU_trap_bounce(%rbx),%rdx
         call  compat_create_bounce_frame
         jmp   compat_test_all_events
@@ -386,6 +407,10 @@ ENTRY(compat_hypercall_table)
         .quad do_sysctl                 /* 35 */
         .quad do_domctl
         .quad compat_kexec_op
+        .rept __HYPERVISOR_arch_0-((.-compat_hypercall_table)/8)
+        .quad compat_ni_hypercall
+        .endr
+        .quad do_mca                    /* 48 */
         .rept NR_hypercalls-((.-compat_hypercall_table)/8)
         .quad compat_ni_hypercall
         .endr
@@ -429,6 +454,10 @@ ENTRY(compat_hypercall_args_table)
         .byte 1 /* do_sysctl                */  /* 35 */
         .byte 1 /* do_domctl                */
         .byte 2 /* compat_kexec_op          */
+        .rept __HYPERVISOR_arch_0-(.-compat_hypercall_args_table)
+        .byte 0 /* compat_ni_hypercall      */
+        .endr
+        .byte 1 /* do_mca                   */
         .rept NR_hypercalls-(.-compat_hypercall_args_table)
         .byte 0 /* compat_ni_hypercall      */
         .endr

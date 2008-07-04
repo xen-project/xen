@@ -68,19 +68,29 @@ static int __init init_nonfatal_mce_checker(void)
 	if (!cpu_has(c, X86_FEATURE_MCA))
 		return -ENODEV;
 
-	/* Some Athlons misbehave when we frob bank 0 */
-	if (boot_cpu_data.x86_vendor == X86_VENDOR_AMD &&
-		boot_cpu_data.x86 == 6)
-			firstbank = 1;
-	else
-			firstbank = 0;
-
 	/*
 	 * Check for non-fatal errors every MCE_RATE s
 	 */
-	init_timer(&mce_timer, mce_work_fn, NULL, 0);
-	set_timer(&mce_timer, NOW() + MCE_PERIOD);
-	printk(KERN_INFO "Machine check exception polling timer started.\n");
+	switch (c->x86_vendor) {
+	case X86_VENDOR_AMD:
+		if (c->x86 == 6) { /* K7 */
+			firstbank = 1;
+			init_timer(&mce_timer, mce_work_fn, NULL, 0);
+			set_timer(&mce_timer, NOW() + MCE_PERIOD);
+			break;
+		}
+
+		/* Assume we are on K8 or newer AMD CPU here */
+		amd_nonfatal_mcheck_init(c);
+		break;
+
+	case X86_VENDOR_INTEL:
+		init_timer(&mce_timer, mce_work_fn, NULL, 0);
+		set_timer(&mce_timer, NOW() + MCE_PERIOD);
+		break;
+	}
+
+	printk(KERN_INFO "MCA: Machine check polling timer started.\n");
 	return 0;
 }
 __initcall(init_nonfatal_mce_checker);

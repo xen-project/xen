@@ -229,6 +229,8 @@ test_all_events:
         shl  $IRQSTAT_shift,%eax
         test %ecx,irq_stat(%eax,1)
         jnz  process_softirqs
+        testb $1,VCPU_mce_pending(%ebx)
+        jnz  process_mce
         testb $1,VCPU_nmi_pending(%ebx)
         jnz  process_nmi
 test_guest_events:
@@ -255,15 +257,35 @@ process_softirqs:
         jmp  test_all_events
 
         ALIGN
+/* %ebx: struct vcpu */
+process_mce:
+        cmpw $VCPU_TRAP_MCE,VCPU_trap_priority(%ebx)
+        jae  test_guest_events
+        sti
+        movb $0,VCPU_mce_pending(%ebx)
+        call set_guest_machinecheck_trapbounce
+        test %eax,%eax
+        jz   test_all_events
+        movw VCPU_trap_priority(%ebx),%dx           # safe priority for the
+        movw %dx,VCPU_old_trap_priority(%ebx)       # iret hypercall
+        movw $VCPU_TRAP_MCE,VCPU_trap_priority(%ebx)
+        jmp process_trap
+
+        ALIGN
+/* %ebx: struct vcpu */
 process_nmi:
-        testb $1,VCPU_nmi_masked(%ebx)
-        jnz  test_guest_events
+        cmpw $VCPU_TRAP_NMI,VCPU_trap_priority(%ebx)
+        jae  test_guest_events
         sti
         movb $0,VCPU_nmi_pending(%ebx)
         call set_guest_nmi_trapbounce
         test %eax,%eax
         jz   test_all_events
-        movb $1,VCPU_nmi_masked(%ebx)
+        movw VCPU_trap_priority(%ebx),%dx           # safe priority for the
+        movw %dx,VCPU_old_trap_priority(%ebx)       # iret hypercall
+        movw $VCPU_TRAP_NMI,VCPU_trap_priority(%ebx)
+        /* FALLTHROUGH */
+process_trap:
         leal VCPU_trap_bounce(%ebx),%edx
         call create_bounce_frame
         jmp  test_all_events
@@ -681,6 +703,10 @@ ENTRY(hypercall_table)
         .long do_sysctl             /* 35 */
         .long do_domctl
         .long do_kexec_op
+        .rept __HYPERVISOR_arch_0-((.-hypercall_table)/4)
+        .long do_ni_hypercall
+        .endr
+        .long do_mca                /* 48 */
         .rept NR_hypercalls-((.-hypercall_table)/4)
         .long do_ni_hypercall
         .endr
@@ -724,6 +750,10 @@ ENTRY(hypercall_args_table)
         .byte 1 /* do_sysctl            */  /* 35 */
         .byte 1 /* do_domctl            */
         .byte 2 /* do_kexec_op          */
+        .rept __HYPERVISOR_arch_0-(.-hypercall_args_table)
+        .byte 0 /* do_ni_hypercall      */
+        .endr
+        .byte 1 /* do_mca               */  /* 48 */
         .rept NR_hypercalls-(.-hypercall_args_table)
         .byte 0 /* do_ni_hypercall      */
         .endr
