@@ -90,6 +90,34 @@ For any information on qemu, visit the website http://fabrice.bellard.free.fr/qe
 
 History
 -------
+vgabios-0.6b : May 30 2008
+  - Volker
+    . added PCI data structure for the Cirrus VGABIOS images
+    . minor bugfixes in biossums utility, VBE support and makefile
+
+vgabios-0.6a : Aug 19 2006
+  - Volker
+    . added minimal support for the video parameter table (VPT)
+    . Cirrus SVGA now supports the "no clear" bit in Cirrus and VESA mode
+    . Bochs VBE protected mode interface improved
+    . save/restore video state support for Bochs VBE and standard VGA added
+    . generate vbetables.h dynamicly
+    . VBE video memory increased to 8 MB (VBE dispi ID changed to B0C4)
+    . lots of 4bpp VBE fixes (all 4bpp VBE modes now enabled)
+    . VGA compatible setup for VBE modes added
+
+vgabios-0.5d : Dec 29 2005
+  - Volker
+    . Bochs VBE protected mode interface added (based on a patch by malc@pulsesoft.com)
+    . biossums utility now supports VGABIOS sizes up to 64 kBytes
+    . VGA mode 0x11: all color planes must be enabled in this 2-color VGA mode
+
+vgabios-0.5c : Jul 07 2005
+  - Volker
+    . BIOS configuration word usually reports initial mode 80x25 color text
+    . vgabios function 0x0e (write teletype): linefeed (0x0a) only increments the
+      cursor row value
+
 vgabios-0.5b : May 24 2005
   - Volker
     . fixed return value for the default case in the VBE section (non-debug mode)
