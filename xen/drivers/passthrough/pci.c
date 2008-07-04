@@ -19,6 +19,7 @@
 #include <xen/pci.h>
 #include <xen/list.h>
 #include <xen/prefetch.h>
+#include <xen/iommu.h>
 #include <xen/keyhandler.h>
 
 
@@ -91,6 +92,57 @@ struct pci_dev *pci_lock_domain_pdev(struct domain *d, int bus, int devfn)
     read_unlock(&pcidevs_lock);
 
     return NULL;
+}
+
+int pci_add_device(u8 bus, u8 devfn)
+{
+    struct pci_dev *pdev;
+    int ret = -ENOMEM;
+
+    write_lock(&pcidevs_lock);
+    pdev = alloc_pdev(bus, devfn);
+    if ( !pdev )
+	goto out;
+
+    ret = 0;
+    spin_lock(&pdev->lock);
+    if ( !pdev->domain )
+    {
+	pdev->domain = dom0;
+	list_add(&pdev->domain_list, &dom0->arch.pdev_list);
+	ret = iommu_add_device(pdev);
+    }
+    spin_unlock(&pdev->lock);
+    printk(XENLOG_DEBUG "PCI add device %02x:%02x.%x\n", bus,
+	   PCI_SLOT(devfn), PCI_FUNC(devfn));
+
+out:
+    write_unlock(&pcidevs_lock);
+    return ret;
+}
+
+int pci_remove_device(u8 bus, u8 devfn)
+{
+    struct pci_dev *pdev;
+    int ret = -ENODEV;;
+
+    write_lock(&pcidevs_lock);
+    list_for_each_entry ( pdev, &alldevs_list, alldevs_list )
+        if ( pdev->bus == bus && pdev->devfn == devfn )
+	{
+	    spin_lock(&pdev->lock);
+	    ret = iommu_remove_device(pdev);
+	    if ( pdev->domain )
+		list_del(&pdev->domain_list);
+	    pci_cleanup_msi(pdev);
+	    free_pdev(pdev);
+	    printk(XENLOG_DEBUG "PCI remove device %02x:%02x.%x\n", bus,
+		   PCI_SLOT(devfn), PCI_FUNC(devfn));
+	    break;
+	}
+
+    write_unlock(&pcidevs_lock);
+    return ret;
 }
 
 static void dump_pci_devices(unsigned char ch)

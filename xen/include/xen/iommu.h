@@ -56,8 +56,8 @@ struct iommu {
     struct intel_iommu *intel;
 };
 
-int iommu_add_device(u8 bus, u8 devfn);
-void iommu_remove_device(u8 bus, u8 devfn);
+int iommu_add_device(struct pci_dev *pdev);
+int iommu_remove_device(struct pci_dev *pdev);
 int iommu_domain_init(struct domain *d);
 void iommu_domain_destroy(struct domain *d);
 int device_assigned(u8 bus, u8 devfn);
@@ -94,6 +94,8 @@ int domain_set_irq_dpci(struct domain *domain, struct hvm_irq_dpci *dpci);
 
 struct iommu_ops {
     int (*init)(struct domain *d);
+    int (*add_device)(struct pci_dev *pdev);
+    int (*remove_device)(struct pci_dev *pdev);
     int (*assign_device)(struct domain *d, u8 bus, u8 devfn);
     void (*teardown)(struct domain *d);
     int (*map_page)(struct domain *d, unsigned long gfn, unsigned long mfn);

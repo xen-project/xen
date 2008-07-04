@@ -628,6 +628,16 @@ static int amd_iommu_return_device(
     return reassign_device(s, t, bus, devfn);
 }
 
+static int amd_iommu_add_device(struct pci_dev *pdev)
+{
+    return 0;
+}
+
+static int amd_iommu_remove_device(struct pci_dev *pdev)
+{
+    return 0;
+}
+
 static int amd_iommu_group_id(u8 bus, u8 devfn)
 {
     int rt;
@@ -640,6 +650,8 @@ static int amd_iommu_group_id(u8 bus, u8 devfn)
 
 struct iommu_ops amd_iommu_ops = {
     .init = amd_iommu_domain_init,
+    .add_device = amd_iommu_add_device,
+    .remove_device = amd_iommu_remove_device,
     .assign_device  = amd_iommu_assign_device,
     .teardown = amd_iommu_domain_destroy,
     .map_page = amd_iommu_map_page,

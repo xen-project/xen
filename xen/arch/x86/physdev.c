@@ -500,6 +500,32 @@ ret_t do_physdev_op(int cmd, XEN_GUEST_HANDLE(void) arg)
         break;
     }
 
+    case PHYSDEVOP_manage_pci_add: {
+        struct physdev_manage_pci manage_pci;
+        ret = -EPERM;
+        if ( !IS_PRIV(v->domain) )
+            break;
+        ret = -EFAULT;
+        if ( copy_from_guest(&manage_pci, arg, 1) != 0 )
+            break;
+
+        ret = pci_add_device(manage_pci.bus, manage_pci.devfn);
+        break;
+    }
+
+    case PHYSDEVOP_manage_pci_remove: {
+        struct physdev_manage_pci manage_pci;
+        ret = -EPERM;
+        if ( !IS_PRIV(v->domain) )
+            break;
+        ret = -EFAULT;
+        if ( copy_from_guest(&manage_pci, arg, 1) != 0 )
+            break;
+
+        ret = pci_remove_device(manage_pci.bus, manage_pci.devfn);
+        break;
+    }
+
     default:
         ret = -ENOSYS;
         break;

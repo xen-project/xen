@@ -1223,13 +1223,15 @@ static int domain_context_mapping(struct domain *domain, u8 bus, u8 devfn)
     switch ( type )
     {
     case DEV_TYPE_PCIe_BRIDGE:
-        break;
-
     case DEV_TYPE_PCI_BRIDGE:
         sec_bus = pci_conf_read8(bus, PCI_SLOT(devfn), PCI_FUNC(devfn),
                                  PCI_SECONDARY_BUS);
         sub_bus = pci_conf_read8(bus, PCI_SLOT(devfn), PCI_FUNC(devfn),
                                  PCI_SUBORDINATE_BUS);
+        /*dmar_scope_add_buses(&drhd->scope, sec_bus, sub_bus);*/
+
+        if ( type == DEV_TYPE_PCIe_BRIDGE )
+            break;
 
         for ( sub_bus &= 0xff; sec_bus <= sub_bus; sec_bus++ )
         {
@@ -1308,6 +1310,7 @@ static int domain_context_unmap_one(struct iommu *iommu, u8 bus, u8 devfn)
 static int domain_context_unmap(u8 bus, u8 devfn)
 {
     struct acpi_drhd_unit *drhd;
+    u16 sec_bus, sub_bus;
     int ret = 0;
     u32 type;
 
@@ -1319,10 +1322,14 @@ static int domain_context_unmap(u8 bus, u8 devfn)
     switch ( type )
     {
     case DEV_TYPE_PCIe_BRIDGE:
-        break;
-
     case DEV_TYPE_PCI_BRIDGE:
-        ret = domain_context_unmap_one(drhd->iommu, bus, devfn);
+        sec_bus = pci_conf_read8(bus, PCI_SLOT(devfn), PCI_FUNC(devfn),
+                                 PCI_SECONDARY_BUS);
+        sub_bus = pci_conf_read8(bus, PCI_SLOT(devfn), PCI_FUNC(devfn),
+                                 PCI_SUBORDINATE_BUS);
+        /*dmar_scope_remove_buses(&drhd->scope, sec_bus, sub_bus);*/
+        if ( DEV_TYPE_PCI_BRIDGE )
+            ret = domain_context_unmap_one(drhd->iommu, bus, devfn);
         break;
 
     case DEV_TYPE_PCIe_ENDPOINT:
@@ -1574,11 +1581,23 @@ static int iommu_prepare_rmrr_dev(struct domain *d,
     return ret;
 }
 
+static int intel_iommu_add_device(struct pci_dev *pdev)
+{
+    if ( !pdev->domain )
+        return -EINVAL;
+    return domain_context_mapping(pdev->domain, pdev->bus, pdev->devfn);
+}
+
+static int intel_iommu_remove_device(struct pci_dev *pdev)
+{
+    return domain_context_unmap(pdev->bus, pdev->devfn);
+}
+
 static void setup_dom0_devices(struct domain *d)
 {
     struct hvm_iommu *hd;
     struct pci_dev *pdev;
-    int bus, dev, func, ret;
+    int bus, dev, func;
     u32 l;
 
     hd = domain_hvm_iommu(d);
@@ -1599,11 +1618,7 @@ static void setup_dom0_devices(struct domain *d)
                 pdev = alloc_pdev(bus, PCI_DEVFN(dev, func));
                 pdev->domain = d;
                 list_add(&pdev->domain_list, &d->arch.pdev_list);
-
-                ret = domain_context_mapping(d, pdev->bus, pdev->devfn);
-                if ( ret != 0 )
-                    gdprintk(XENLOG_ERR VTDPREFIX,
-                             "domain_context_mapping failed\n");
+                domain_context_mapping(d, pdev->bus, pdev->devfn);
             }
         }
     }
@@ -1866,6 +1881,8 @@ int iommu_resume(void)
 
 struct iommu_ops intel_iommu_ops = {
     .init = intel_iommu_domain_init,
+    .add_device = intel_iommu_add_device,
+    .remove_device = intel_iommu_remove_device,
     .assign_device  = intel_iommu_assign_device,
     .teardown = iommu_domain_teardown,
     .map_page = intel_iommu_map_page,

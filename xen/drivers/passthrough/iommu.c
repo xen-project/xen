@@ -55,6 +55,32 @@ int iommu_domain_init(struct domain *domain)
     return hd->platform_ops->init(domain);
 }
 
+int iommu_add_device(struct pci_dev *pdev)
+{
+    struct hvm_iommu *hd;
+    if ( !pdev->domain )
+        return -EINVAL;
+
+    hd = domain_hvm_iommu(pdev->domain);
+    if ( !iommu_enabled || !hd->platform_ops )
+        return 0;
+
+    return hd->platform_ops->add_device(pdev);
+}
+
+int iommu_remove_device(struct pci_dev *pdev)
+{
+    struct hvm_iommu *hd;
+    if ( !pdev->domain )
+        return -EINVAL;
+
+    hd = domain_hvm_iommu(pdev->domain);
+    if ( !iommu_enabled || !hd->platform_ops )
+        return 0;
+
+    return hd->platform_ops->remove_device(pdev);
+}
+
 int assign_device(struct domain *d, u8 bus, u8 devfn)
 {
     struct hvm_iommu *hd = domain_hvm_iommu(d);
