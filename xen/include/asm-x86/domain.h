@@ -128,14 +128,12 @@ struct shadow_vcpu {
 
     /* Shadow out-of-sync: pages that this vcpu has let go out of sync */
     mfn_t oos[SHADOW_OOS_PAGES];
-    unsigned long oos_va[SHADOW_OOS_PAGES];
     mfn_t oos_snapshot[SHADOW_OOS_PAGES];
     struct oos_fixup {
-        mfn_t gmfn;
-        mfn_t smfn;
-        unsigned long off;
-    } *oos_fixups;
-    int oos_fixup_used;
+        int next;
+        mfn_t smfn[SHADOW_OOS_FIXUPS];
+        unsigned long off[SHADOW_OOS_FIXUPS];
+    } oos_fixup[SHADOW_OOS_PAGES];
 };
 
 /************************************************/

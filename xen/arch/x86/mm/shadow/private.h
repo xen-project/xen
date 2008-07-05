@@ -323,15 +323,6 @@ static inline int sh_type_is_pinnable(struct vcpu *v, unsigned int t)
 #define SHF_out_of_sync (1u<<30)
 #define SHF_oos_may_write (1u<<29)
 
-/* Fixup tables are a non-complete writable-mappings reverse map for
-   OOS pages. This let us quickly resync pages (avoiding brute-force
-   search of the shadows) when the va hint is not sufficient (i.e.,
-   the pagetable is mapped in multiple places and in multiple
-   shadows.) */
-#define SHADOW_OOS_FT_ENTRIES                           \
-    ((PAGE_SIZE << SHADOW_OOS_FT_ORDER)                 \
-     / (SHADOW_OOS_FT_HASH * sizeof(struct oos_fixup)))
-
 #endif /* (SHADOW_OPTIMIZATIONS & SHOPT_OUT_OF_SYNC) */
 
 static inline int sh_page_has_multiple_shadows(struct page_info *pg)
@@ -421,7 +412,7 @@ int shadow_cmpxchg_guest_entry(struct vcpu *v, intpte_t *p,
 
 #if (SHADOW_OPTIMIZATIONS & SHOPT_OUT_OF_SYNC)
 /* Allow a shadowed page to go out of sync */
-int sh_unsync(struct vcpu *v, mfn_t gmfn, unsigned long va);
+int sh_unsync(struct vcpu *v, mfn_t gmfn);
 
 /* Pull an out-of-sync page back into sync. */
 void sh_resync(struct vcpu *v, mfn_t gmfn);

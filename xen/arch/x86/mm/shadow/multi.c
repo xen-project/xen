@@ -916,7 +916,10 @@ _sh_propagate(struct vcpu *v,
     if ( unlikely((level == 1) 
                   && sh_mfn_is_a_page_table(target_mfn)
 #if (SHADOW_OPTIMIZATIONS & SHOPT_OUT_OF_SYNC )
-                  && !mfn_oos_may_write(target_mfn)
+                  /* Unless the page is out of sync and the guest is
+                     writing to it. */
+                  && !(mfn_oos_may_write(target_mfn)
+                       && (ft == ft_demand_write))
 #endif /* OOS */
                   ) )
     {
@@ -3291,7 +3294,7 @@ static int sh_page_fault(struct vcpu *v,
     /* Always unsync when writing to L1 page tables. */
     if ( sh_mfn_is_a_page_table(gmfn)
          && ft == ft_demand_write )
-        sh_unsync(v, gmfn, va);
+        sh_unsync(v, gmfn);
 #endif /* OOS */
 
     /* Calculate the shadow entry and write it */
@@ -3322,8 +3325,10 @@ static int sh_page_fault(struct vcpu *v,
     /* Need to emulate accesses to page tables */
     if ( sh_mfn_is_a_page_table(gmfn)
 #if (SHADOW_OPTIMIZATIONS & SHOPT_OUT_OF_SYNC) 
-         /* Unless they've been allowed to go out of sync with their shadows */
-         && !mfn_is_out_of_sync(gmfn)
+         /* Unless they've been allowed to go out of sync with their
+            shadows and we don't need to unshadow it. */
+         && !(mfn_is_out_of_sync(gmfn)
+              && !(regs->error_code & PFEC_user_mode))
 #endif
          )
     {
@@ -4350,15 +4355,8 @@ int sh_rm_write_access_from_sl1p(struct vcpu *v, mfn_t gmfn,
 
     sp = mfn_to_shadow_page(smfn);
 
-    if ( sp->mbz != 0 ||
-#if GUEST_PAGING_LEVELS == 4
-         (sp->type != SH_type_l1_64_shadow)
-#elif GUEST_PAGING_LEVELS == 3
-         (sp->type != SH_type_l1_pae_shadow)
-#elif GUEST_PAGING_LEVELS == 2
-         (sp->type != SH_type_l1_32_shadow)
-#endif
-       )
+    if ( sp->mbz != 0
+         || (sp->type != SH_type_l1_shadow) )
         goto fail;
 
     sl1p = sh_map_domain_page(smfn);
