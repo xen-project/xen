@@ -135,9 +135,7 @@
 ^tools/firmware/rombios/_rombios[^/]*_\.c$
 ^tools/firmware/rombios/rombios[^/]*\.s$
 ^tools/firmware/rombios/32bit/32bitbios_flat\.h$
-^tools/firmware/vmxassist/gen$
-^tools/firmware/vmxassist/offsets\.h$
-^tools/firmware/vmxassist/vmxassist$
+^tools/firmware/vgabios/vbetables-gen$
 ^tools/flask/loadpolicy/flask-loadpolicy$
 ^tools/include/xen/.*$
 ^tools/include/xen-foreign/.*\.(c|h|size)$
