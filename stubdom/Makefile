@@ -167,7 +167,7 @@ $(TARGETS_MINIOS): mini-os-%:
 
 .PHONY: libxc
 libxc: libxc/libxenctrl.a libxc/libxenguest.a
-libxc/libxenctrl.a libxc/libxenguest.a: cross-zlib mk-symlinks
+libxc/libxenctrl.a libxc/libxenguest.a:: cross-zlib mk-symlinks
 	CPPFLAGS="$(TARGET_CPPFLAGS)" CFLAGS="$(TARGET_CFLAGS)" $(MAKE) -C libxc
 
 #######
