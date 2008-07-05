@@ -41,5 +41,6 @@
 #define ULONG_LONG_MAX  ULLONG_MAX
 
 #define PATH_MAX __PAGE_SIZE
+#define PAGE_SIZE __PAGE_SIZE
 
 #endif /* _POSIX_LIMITS_H */
