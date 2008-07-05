@@ -611,7 +611,7 @@ int xc_domain_memory_increase_reservation(int xc_handle,
                                           uint32_t domid,
                                           unsigned long nr_extents,
                                           unsigned int extent_order,
-                                          unsigned int address_bits,
+                                          unsigned int mem_flags,
                                           xen_pfn_t *extent_start);
 
 int xc_domain_memory_decrease_reservation(int xc_handle,
@@ -624,7 +624,7 @@ int xc_domain_memory_populate_physmap(int xc_handle,
                                       uint32_t domid,
                                       unsigned long nr_extents,
                                       unsigned int extent_order,
-                                      unsigned int address_bits,
+                                      unsigned int mem_flags,
                                       xen_pfn_t *extent_start);
 
 int xc_domain_ioport_permission(int xc_handle,

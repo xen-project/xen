@@ -1317,33 +1317,6 @@ static PyObject *pyxc_domain_set_memmap_limit(XcObject *self, PyObject *args)
     return zero;
 }
 
-static PyObject *pyxc_domain_memory_increase_reservation(XcObject *self,
-                                                         PyObject *args,
-                                                         PyObject *kwds)
-{
-    uint32_t dom;
-    unsigned long mem_kb;
-    unsigned int extent_order = 0 , address_bits = 0;
-    unsigned long nr_extents;
-
-    static char *kwd_list[] = { "domid", "mem_kb", "extent_order", "address_bits", NULL };
-
-    if ( !PyArg_ParseTupleAndKeywords(args, kwds, "il|ii", kwd_list, 
-                                      &dom, &mem_kb, &extent_order, &address_bits) )
-        return NULL;
-
-    /* round down to nearest power of 2. Assume callers using extent_order>0
-       know what they are doing */
-    nr_extents = (mem_kb / (XC_PAGE_SIZE/1024)) >> extent_order;
-    if ( xc_domain_memory_increase_reservation(self->xc_handle, dom, 
-                                               nr_extents, extent_order, 
-                                               address_bits, NULL) )
-        return pyxc_error_to_exception();
-    
-    Py_INCREF(zero);
-    return zero;
-}
-
 static PyObject *pyxc_domain_ioport_permission(XcObject *self,
                                                PyObject *args,
                                                PyObject *kwds)
@@ -1817,13 +1790,6 @@ static PyMethodDef pyxc_methods[] = {
       " map_limitkb [int]: .\n"
       "Returns: [int] 0 on success; -1 on error.\n" },
 
-    { "domain_memory_increase_reservation", 
-      (PyCFunction)pyxc_domain_memory_increase_reservation, 
-      METH_VARARGS | METH_KEYWORDS, "\n"
-      "Increase a domain's memory reservation\n"
-      " dom [int]: Identifier of domain.\n"
-      " mem_kb [long]: .\n"
-      "Returns: [int] 0 on success; -1 on error.\n" },
 #ifdef __ia64__
     { "nvram_init",
       (PyCFunction)pyxc_nvram_init,

@@ -438,14 +438,14 @@ int xc_domain_memory_increase_reservation(int xc_handle,
                                           uint32_t domid,
                                           unsigned long nr_extents,
                                           unsigned int extent_order,
-                                          unsigned int address_bits,
+                                          unsigned int mem_flags,
                                           xen_pfn_t *extent_start)
 {
     int err;
     struct xen_memory_reservation reservation = {
         .nr_extents   = nr_extents,
         .extent_order = extent_order,
-        .address_bits = address_bits,
+        .mem_flags    = mem_flags,
         .domid        = domid
     };
 
@@ -459,8 +459,8 @@ int xc_domain_memory_increase_reservation(int xc_handle,
     if ( err >= 0 )
     {
         DPRINTF("Failed allocation for dom %d: "
-                "%ld extents of order %d, addr_bits %d\n",
-                domid, nr_extents, extent_order, address_bits);
+                "%ld extents of order %d, mem_flags %x\n",
+                domid, nr_extents, extent_order, mem_flags);
         errno = ENOMEM;
         err = -1;
     }
@@ -478,7 +478,7 @@ int xc_domain_memory_decrease_reservation(int xc_handle,
     struct xen_memory_reservation reservation = {
         .nr_extents   = nr_extents,
         .extent_order = extent_order,
-        .address_bits = 0,
+        .mem_flags    = 0,
         .domid        = domid
     };
 
@@ -507,17 +507,17 @@ int xc_domain_memory_decrease_reservation(int xc_handle,
 }
 
 int xc_domain_memory_populate_physmap(int xc_handle,
-                                          uint32_t domid,
-                                          unsigned long nr_extents,
-                                          unsigned int extent_order,
-                                          unsigned int address_bits,
-                                          xen_pfn_t *extent_start)
+                                      uint32_t domid,
+                                      unsigned long nr_extents,
+                                      unsigned int extent_order,
+                                      unsigned int mem_flags,
+                                      xen_pfn_t *extent_start)
 {
     int err;
     struct xen_memory_reservation reservation = {
         .nr_extents   = nr_extents,
         .extent_order = extent_order,
-        .address_bits = address_bits,
+        .mem_flags    = mem_flags,
         .domid        = domid
     };
     set_xen_guest_handle(reservation.extent_start, extent_start);
