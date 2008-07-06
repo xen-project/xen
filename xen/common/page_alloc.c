@@ -792,7 +792,7 @@ struct page_info *alloc_domheap_pages(
 
     ASSERT(!in_irq());
 
-    if ( node == NUMA_NO_NODE )
+    if ( (node == NUMA_NO_NODE) && (d != NULL) )
         node = domain_to_node(d);
 
     bits = domain_clamp_alloc_bitsize(d, bits ? : (BITS_PER_LONG+PAGE_SHIFT));
