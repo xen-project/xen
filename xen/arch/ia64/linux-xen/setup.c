@@ -362,7 +362,7 @@ acpi_oem_console_setup(void)
 	int i;
 
 	/* Don't duplicate setup if an HCDP table is present */
-	if (efi.hcdp)
+	if (efi.hcdp != EFI_INVALID_TABLE_ADDR)
 		return -ENODEV;
 
 	/* Manually walk firmware provided tables to get to the XSDT.  */
