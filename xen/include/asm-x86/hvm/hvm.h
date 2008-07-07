@@ -127,6 +127,7 @@ struct hvm_function_table {
     int (*msr_read_intercept)(struct cpu_user_regs *regs);
     int (*msr_write_intercept)(struct cpu_user_regs *regs);
     void (*invlpg_intercept)(unsigned long vaddr);
+    void (*set_uc_mode)(struct vcpu *v);
 };
 
 extern struct hvm_function_table hvm_funcs;

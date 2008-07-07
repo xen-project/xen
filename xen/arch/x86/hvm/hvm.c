@@ -836,6 +836,14 @@ static void local_flush_cache(void *info)
     wbinvd();
 }
 
+static void hvm_set_uc_mode(struct vcpu *v, bool_t is_in_uc_mode)
+{
+    v->domain->arch.hvm_domain.is_in_uc_mode = is_in_uc_mode;
+    shadow_blow_tables_per_domain(v->domain);
+    if ( hvm_funcs.set_uc_mode )
+        return hvm_funcs.set_uc_mode(v);
+}
+
 int hvm_set_cr0(unsigned long value)
 {
     struct vcpu *v = current;
@@ -923,9 +931,7 @@ int hvm_set_cr0(unsigned long value)
             {
                 /* Flush physical caches. */
                 on_each_cpu(local_flush_cache, NULL, 1, 1);
-                /* Shadow pagetables must recognise UC mode. */
-                v->domain->arch.hvm_domain.is_in_uc_mode = 1;
-                shadow_blow_tables_per_domain(v->domain);
+                hvm_set_uc_mode(v, 1);
             }
             spin_unlock(&v->domain->arch.hvm_domain.uc_lock);
         }
@@ -937,11 +943,8 @@ int hvm_set_cr0(unsigned long value)
             v->arch.hvm_vcpu.cache_mode = NORMAL_CACHE_MODE;
 
             if ( domain_exit_uc_mode(v) )
-            {
-                /* Shadow pagetables must recognise normal caching mode. */
-                v->domain->arch.hvm_domain.is_in_uc_mode = 0;
-                shadow_blow_tables_per_domain(v->domain);
-            }
+                hvm_set_uc_mode(v, 0);
+
             spin_unlock(&v->domain->arch.hvm_domain.uc_lock);
         }
     }

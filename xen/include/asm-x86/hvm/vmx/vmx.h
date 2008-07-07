@@ -44,6 +44,10 @@ typedef union {
 } ept_entry_t;
 
 #define EPT_TABLE_ORDER     9
+#define EPTE_SUPER_PAGE_MASK    0x80
+#define EPTE_MFN_MASK           0x1fffffffffff000
+#define EPTE_AVAIL1_MASK        0xF00
+#define EPTE_EMT_MASK           0x78
 
 void vmx_asm_vmexit_handler(struct cpu_user_regs);
 void vmx_asm_do_vmentry(void);

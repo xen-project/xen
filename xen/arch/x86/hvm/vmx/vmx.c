@@ -1173,6 +1173,14 @@ static int vmx_do_pmu_interrupt(struct cpu_user_regs *regs)
     return vpmu_do_interrupt(regs);
 }
 
+static void vmx_set_uc_mode(struct vcpu *v)
+{
+    if ( paging_mode_hap(v->domain) )
+        ept_change_entry_emt_with_range(
+            v->domain, 0, v->domain->arch.p2m->max_mapped_pfn);
+    vpid_sync_all();
+}
+
 static struct hvm_function_table vmx_function_table = {
     .name                 = "VMX",
     .domain_initialise    = vmx_domain_initialise,
@@ -1202,7 +1210,8 @@ static struct hvm_function_table vmx_function_table = {
     .fpu_dirty_intercept  = vmx_fpu_dirty_intercept,
     .msr_read_intercept   = vmx_msr_read_intercept,
     .msr_write_intercept  = vmx_msr_write_intercept,
-    .invlpg_intercept     = vmx_invlpg_intercept
+    .invlpg_intercept     = vmx_invlpg_intercept,
+    .set_uc_mode          = vmx_set_uc_mode
 };
 
 static unsigned long *vpid_bitmap;

@@ -696,3 +696,30 @@ static int hvm_load_mtrr_msr(struct domain *d, hvm_domain_context_t *h)
 
 HVM_REGISTER_SAVE_RESTORE(MTRR, hvm_save_mtrr_msr, hvm_load_mtrr_msr,
                           1, HVMSR_PER_VCPU);
+
+uint8_t epte_get_entry_emt(
+    struct domain *d, unsigned long gfn, unsigned long mfn)
+{
+    uint8_t gmtrr_mtype, hmtrr_mtype;
+    uint32_t type;
+    struct vcpu *v = current;
+
+    if ( (current->domain != d) && ((v = d->vcpu[0]) == NULL) )
+        return MTRR_TYPE_WRBACK;
+
+    if ( !v->domain->arch.hvm_domain.params[HVM_PARAM_IDENT_PT] )
+        return MTRR_TYPE_WRBACK;
+
+    if ( (v == current) && v->domain->arch.hvm_domain.is_in_uc_mode )
+        return MTRR_TYPE_UNCACHABLE;
+
+    if ( !mfn_valid(mfn) )
+        return MTRR_TYPE_UNCACHABLE;
+
+    if ( hvm_get_mem_pinned_cacheattr(d, gfn, &type) )
+        return type;
+
+    gmtrr_mtype = get_mtrr_type(&v->arch.hvm_vcpu.mtrr, (gfn << PAGE_SHIFT));
+    hmtrr_mtype = get_mtrr_type(&mtrr_state, (mfn << PAGE_SHIFT));
+    return ((gmtrr_mtype <= hmtrr_mtype) ? gmtrr_mtype : hmtrr_mtype);
+}
