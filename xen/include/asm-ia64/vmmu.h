@@ -175,6 +175,7 @@ extern int thash_purge_and_insert(struct vcpu *v, u64 pte, u64 itir, u64 ifa, in
  *
  */
 extern void thash_purge_all(struct vcpu *v);
+extern void vmx_vcpu_flush_vtlb_all(struct vcpu *v);
 
 /*
  * Lookup the hash table and its collision chain to find an entry

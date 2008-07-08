@@ -249,31 +249,20 @@ domain_purge_swtc_entries_vcpu_dirty_mask(struct domain* d,
 // (e.g. vcpu == current), smp_mb() is unnecessary.
 void vcpu_flush_vtlb_all(struct vcpu *v)
 {
-	if (VMX_DOMAIN(v)) {
-		/* This code may be call for remapping shared_info and
-		   grant_table share page from guest_physmap_remove_page()
-		   in arch_memory_op() XENMEM_add_to_physmap to realize
-		   PV-on-HVM feature. */
-		/* FIXME: This is not SMP-safe yet about p2m table */
-		/* Purge vTLB for VT-i domain */
-		thash_purge_all(v);
-	}
-	else {
-		/* First VCPU tlb.  */
-		vcpu_purge_tr_entry(&PSCBX(v,dtlb));
-		vcpu_purge_tr_entry(&PSCBX(v,itlb));
-		smp_mb();
+	/* First VCPU tlb.  */
+	vcpu_purge_tr_entry(&PSCBX(v,dtlb));
+	vcpu_purge_tr_entry(&PSCBX(v,itlb));
+	smp_mb();
 
-		/* Then VHPT.  */
-		if (HAS_PERVCPU_VHPT(v->domain))
-			vcpu_vhpt_flush(v);
-		else
-			local_vhpt_flush();
-		smp_mb();
+	/* Then VHPT.  */
+	if (HAS_PERVCPU_VHPT(v->domain))
+		vcpu_vhpt_flush(v);
+	else
+		local_vhpt_flush();
+	smp_mb();
 
-		/* Then mTLB.  */
-		local_flush_tlb_all();
-	}
+	/* Then mTLB.  */
+	local_flush_tlb_all();
 
 	/* We could clear bit in d->domain_dirty_cpumask only if domain d in
 	   not running on this processor.  There is currently no easy way to
@@ -296,6 +285,15 @@ void domain_flush_vtlb_all(struct domain* d)
 	for_each_vcpu(d, v) {
 		if (!v->is_initialised)
 			continue;
+
+		if (VMX_DOMAIN(v)) {
+			// This code may be called for remapping shared_info
+			// and grant_table from guest_physmap_remove_page()
+			// in arch_memory_op() XENMEM_add_to_physmap to realize
+			// PV-on-HVM feature.
+			vmx_vcpu_flush_vtlb_all(v);
+			continue;
+		}
 
 		if (v->processor == cpu)
 			vcpu_flush_vtlb_all(v);

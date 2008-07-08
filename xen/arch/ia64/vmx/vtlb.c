@@ -623,6 +623,30 @@ void thash_purge_all(VCPU *v)
     local_flush_tlb_all();
 }
 
+static void __thash_purge_all(void *arg)
+{
+    struct vcpu *v = arg;
+
+    BUG_ON(vcpu_runnable(v) || v->is_running);
+    thash_purge_all(v);
+}
+
+void vmx_vcpu_flush_vtlb_all(VCPU *v)
+{
+    if (v == current) {
+        thash_purge_all(v);
+        return;
+    }
+
+    /* SMP safe */
+    vcpu_pause(v);
+    if (v->processor == smp_processor_id())
+        __thash_purge_all(v);
+    else
+        smp_call_function_single(v->processor, __thash_purge_all, v, 1, 1);
+    vcpu_unpause(v);
+}
+
 
 /*
  * Lookup the hash table and its collision chain to find an entry
