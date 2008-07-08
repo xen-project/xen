@@ -179,7 +179,7 @@ ioemu: cross-zlib cross-libpci mk-symlinks libxc
 	[ -f ioemu/config-host.mak ] || \
 	  ( cd ioemu ; \
           XEN_TARGET_ARCH=$(XEN_TARGET_ARCH) CFLAGS="$(TARGET_CFLAGS)" sh configure --prefix=/usr --enable-stubdom $(IOEMU_OPTIONS))
-	CPPFLAGS="$(TARGET_CPPFLAGS)" $(MAKE) -C ioemu LWIPDIR=$(CURDIR)/lwip-cvs
+	CPPFLAGS="$(TARGET_CPPFLAGS)" $(MAKE) -C ioemu LWIPDIR=$(CURDIR)/lwip-cvs TOOLS=
 
 ######
 # caml
