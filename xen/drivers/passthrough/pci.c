@@ -170,7 +170,7 @@ static void dump_pci_devices(unsigned char ch)
 
 static int __init setup_dump_pcidevs(void)
 {
-    register_keyhandler('P', dump_pci_devices, "dump PCI devices");
+    register_keyhandler('Q', dump_pci_devices, "dump PCI devices");
     return 0;
 }
 __initcall(setup_dump_pcidevs);
