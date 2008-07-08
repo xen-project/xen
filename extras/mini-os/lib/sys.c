@@ -733,7 +733,7 @@ static int select_poll(int nfds, fd_set *readfds, fd_set *writefds, fd_set *exce
 	    FD_CLR(i, exceptfds);
 	    break;
 	case FTYPE_CONSOLE:
-	    if (FD_ISSET(i, writefds)) {
+	    if (FD_ISSET(i, readfds)) {
                 if (xencons_ring_avail())
 		    n++;
 		else
