@@ -1223,22 +1223,23 @@ class XendConfig(dict):
                 pci_dict = self.pci_convert_sxp_to_dict(config)
                 pci_devs = pci_dict['devs']
 
-                # create XenAPI DPCI objects.
-                for pci_dev in pci_devs:
-                    dpci_uuid = pci_dev.get('uuid')
-                    ppci_uuid = XendPPCI.get_by_sbdf(pci_dev['domain'],
-                                                    pci_dev['bus'],
-                                                    pci_dev['slot'],
-                                                    pci_dev['func'])
-                    if ppci_uuid is None:
-                        continue
-                    dpci_record = {
-                        'VM': self['uuid'],
-                        'PPCI': ppci_uuid,
-                        'hotplug_slot': pci_dev.get('vslot', 0)
-                    }
-                    XendDPCI(dpci_uuid, dpci_record)
-                    
+                if dev_type != 'vscsi':
+                    # create XenAPI DPCI objects.
+                    for pci_dev in pci_devs:
+                        dpci_uuid = pci_dev.get('uuid')
+                        ppci_uuid = XendPPCI.get_by_sbdf(pci_dev['domain'],
+                                                        pci_dev['bus'],
+                                                        pci_dev['slot'],
+                                                        pci_dev['func'])
+                        if ppci_uuid is None:
+                            continue
+                        dpci_record = {
+                            'VM': self['uuid'],
+                            'PPCI': ppci_uuid,
+                            'hotplug_slot': pci_dev.get('vslot', 0)
+                        }
+                        XendDPCI(dpci_uuid, dpci_record)
+
                 target['devices'][pci_devs_uuid] = (dev_type,
                                                     {'devs': pci_devs,
                                                      'uuid': pci_devs_uuid})
@@ -1633,21 +1634,22 @@ class XendConfig(dict):
                 for dpci_uuid in XendDPCI.get_by_VM(self['uuid']):
                     XendAPIStore.deregister(dpci_uuid, "DPCI")
 
-                # create XenAPI DPCI objects.
-                for pci_dev in pci_devs:
-                    dpci_uuid = pci_dev.get('uuid')
-                    ppci_uuid = XendPPCI.get_by_sbdf(pci_dev['domain'],
-                                                     pci_dev['bus'],
-                                                     pci_dev['slot'],
-                                                     pci_dev['func'])
-                    if ppci_uuid is None:
-                        continue
-                    dpci_record = {
-                        'VM': self['uuid'],
-                        'PPCI': ppci_uuid,
-                        'hotplug_slot': pci_dev.get('vslot', 0)
-                    }
-                    XendDPCI(dpci_uuid, dpci_record)
+                if dev_type != 'vscsi':
+                    # create XenAPI DPCI objects.
+                    for pci_dev in pci_devs:
+                        dpci_uuid = pci_dev.get('uuid')
+                        ppci_uuid = XendPPCI.get_by_sbdf(pci_dev['domain'],
+                                                         pci_dev['bus'],
+                                                         pci_dev['slot'],
+                                                         pci_dev['func'])
+                        if ppci_uuid is None:
+                            continue
+                        dpci_record = {
+                            'VM': self['uuid'],
+                            'PPCI': ppci_uuid,
+                            'hotplug_slot': pci_dev.get('vslot', 0)
+                        }
+                        XendDPCI(dpci_uuid, dpci_record)
 
                 self['devices'][dev_uuid] = (dev_type,
                                              {'devs': pci_devs,

@@ -169,6 +169,10 @@ class VSCSIController(DevController):
         devid = int(devid)
         vscsi_config = config['devs'][0]
         states = config.get('states', [])
+        driver_state = self.readBackend(devid, 'state')
+        if str(xenbusState['Connected']) != driver_state:
+            raise VmError("Driver status is not connected")
+
         uuid = self.readBackend(devid, 'uuid')
         if states[0] == 'Initialising':
             back['uuid'] = uuid

@@ -758,7 +758,7 @@ class XendDomainInfo:
         if dev_class != 'vscsi':
             return False
 
-        dev_config = self.pci_convert_sxp_to_dict(dev_sxp)
+        dev_config = self.info.pci_convert_sxp_to_dict(dev_sxp)
         dev = dev_config['devs'][0]
         req_devid = sxp.child_value(dev_sxp, 'devid')
         req_devid = int(req_devid)
