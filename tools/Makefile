@@ -79,15 +79,14 @@ ioemu-dir-find:
 			$(GIT) clone $(CONFIG_QEMU) ioemu-remote.tmp; \
 			mv ioemu-remote.tmp ioemu-remote; \
 		fi; \
+		rm -f ioemu-dir; \
 		ln -sf ioemu-remote ioemu-dir; \
 	fi
-	set -e; \
-		case "$XEN_ROOT" in \
-		/*)	XEN_ROOT=$(XEN_ROOT) ;; \
-		*)	XEN_ROOT=`pwd`/$(XEN_ROOT) ;; \
-		esac; \
-		export XEN_ROOT; \
-		cd ioemu-dir; \
-		./xen-setup
+	cd ioemu-dir && XEN_ROOT="$(abspath $(XEN_ROOT))" ./xen-setup
 
 subdir-all-ioemu-dir subdir-install-ioemu-dir: ioemu-dir-find
+
+subdir-clean-ioemu-dir:
+	if test -d ioemu-dir/.; then \
+		$(MAKE) -C ioemu-dir clean; \
+	fi
