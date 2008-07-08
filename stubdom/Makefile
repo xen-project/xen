@@ -10,7 +10,7 @@ include $(XEN_ROOT)/Config.mk
 IOEMU_OPTIONS=--disable-vnc-tls 
 ZLIB_VERSION=1.2.3
 LIBPCI_VERSION=2.2.9
-NEWLIB_DATE=2008-01-01
+NEWLIB_VERSION=1.16.0
 LWIP_DATE=2008-06-01
 GRUB_DATE=2008-06-01
 
@@ -24,10 +24,12 @@ endif
 ifeq ($(GNU_TARGET_ARCH), i686)
 TARGET_CFLAGS=
 NEWLIB_CFLAGS+=-D_I386MACH_ALLOW_HW_INTERRUPTS
+STUBDOM_SUPPORTED=1
 endif
 ifeq ($(GNU_TARGET_ARCH), x86_64)
 TARGET_CFLAGS=-mno-red-zone
 NEWLIB_CFLAGS+=-D_I386MACH_ALLOW_HW_INTERRUPTS
+STUBDOM_SUPPORTED=1
 endif
 ifeq ($(GNU_TARGET_ARCH), ia64)
 TARGET_CFLAGS=-mconstant-gp
@@ -56,26 +58,34 @@ TARGET_LDFLAGS += -nostdlib -L$(CROSS_PREFIX)/$(GNU_TARGET_ARCH)-xen-elf/lib
 TARGETS=ioemu c caml grub
 
 .PHONY: all
-all: ioemu-stubdom c-stubdom pv-grub
+all: build
+ifeq ($(STUBDOM_SUPPORTED),1)
+build: ioemu-stubdom c-stubdom pv-grub
+else
+build:
+endif
 
 ##############
 # Cross-newlib
 ##############
 
-newlib-cvs:
-	cvs -z 9 -d :pserver:anoncvs@sources.redhat.com:/cvs/src co -D $(NEWLIB_DATE) newlib
-	mv src newlib-cvs
+newlib-$(NEWLIB_VERSION).tar.gz:
+	$(WGET) ftp://sources.redhat.com/pub/newlib/newlib-$(NEWLIB_VERSION).tar.gz
+
+newlib-$(NEWLIB_VERSION): newlib-$(NEWLIB_VERSION).tar.gz
+	tar xzf $<
 	patch -d $@ -p0 < newlib.patch
+	touch $@
 
 NEWLIB_STAMPFILE=$(CROSS_ROOT)/$(GNU_TARGET_ARCH)-xen-elf/lib/libc.a
 .PHONY: cross-newlib
 cross-newlib: $(NEWLIB_STAMPFILE)
-$(NEWLIB_STAMPFILE): newlib-cvs
+$(NEWLIB_STAMPFILE): newlib-$(NEWLIB_VERSION)
 	mkdir -p newlib-build
 	( cd newlib-build && \
-	  CC_FOR_TARGET="$(CC) $(TARGET_CPPFLAGS) $(TARGET_CFLAGS) $(NEWLIB_CFLAGS)" AR_FOR_TARGET=$(AR) LD_FOR_TARGET=$(LD) RANLIB_FOR_TARGET=$(RANLIB) ../newlib-cvs/configure --prefix=$(CROSS_PREFIX) --verbose --target=$(GNU_TARGET_ARCH)-xen-elf --enable-newlib-io-long-long --disable-multilib && \
+	  CC_FOR_TARGET="$(CC) $(TARGET_CPPFLAGS) $(TARGET_CFLAGS) $(NEWLIB_CFLAGS)" AR_FOR_TARGET=$(AR) LD_FOR_TARGET=$(LD) RANLIB_FOR_TARGET=$(RANLIB) ../newlib-$(NEWLIB_VERSION)/configure --prefix=$(CROSS_PREFIX) --verbose --target=$(GNU_TARGET_ARCH)-xen-elf --enable-newlib-io-long-long --disable-multilib && \
 	  $(MAKE) && \
-	  $(MAKE) install )
+	  DESTDIR= $(MAKE) install )
 
 ############
 # Cross-zlib
@@ -236,14 +246,21 @@ pv-grub: mini-os-grub libxc grub
 # install
 #########
 
+ifeq ($(STUBDOM_SUPPORTED),1)
 install: install-ioemu install-grub
+else
+install:
+endif
 
-install-ioemu: mini-os-ioemu/mini-os.gz
+install-ioemu: ioemu-stubdom
+	$(INSTALL_DIR) "$(DESTDIR)/usr/lib/xen/bin"
 	$(INSTALL_PROG) stubdom-dm "$(DESTDIR)/usr/lib/xen/bin"
-	$(INSTALL_PROG) $< "$(DESTDIR)/usr/lib/xen/boot/ioemu-stubdom.gz"
+	$(INSTALL_DIR) "$(DESTDIR)/usr/lib/xen/boot"
+	$(INSTALL_PROG) mini-os-ioemu/mini-os.gz "$(DESTDIR)/usr/lib/xen/boot/ioemu-stubdom.gz"
 
-install-grub: mini-os-grub/mini-os.gz
-	$(INSTALL_PROG) $< "$(DESTDIR)/usr/lib/xen/boot/pv-grub.gz"
+install-grub: pv-grub
+	$(INSTALL_DIR) "$(DESTDIR)/usr/lib/xen/boot"
+	$(INSTALL_PROG) mini-os-grub/mini-os.gz "$(DESTDIR)/usr/lib/xen/boot/pv-grub.gz"
 
 #######
 # clean
@@ -271,13 +288,14 @@ crossclean: clean
 # clean patched sources
 .PHONY: patchclean
 patchclean: crossclean
-	rm -fr newlib-cvs
+	rm -fr newlib-$(NEWLIB_VERSION)
 	rm -fr lwip-cvs
 	rm -fr grub-cvs
 
 # clean downloads
 .PHONY: downloadclean
 downloadclean: patchclean
+	rm -f newlib-$(ZLIB_VERSION).tar.gz
 	rm -f zlib-$(ZLIB_VERSION).tar.gz
 	rm -f pciutils-$(LIBPCI_VERSION).tar.bz2
 
