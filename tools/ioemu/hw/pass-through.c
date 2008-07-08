@@ -827,7 +827,7 @@ void pt_iomem_map(PCIDevice *d, int i, uint32_t e_phys, uint32_t e_size,
     if ( e_size == 0 )
         return;
 
-    if ( !first_map )
+    if ( !first_map && old_ebase != -1 )
     {
         add_msix_mapping(assigned_device, i);
         /* Remove old mapping */
@@ -883,7 +883,7 @@ void pt_ioport_map(PCIDevice *d, int i,
     if ( e_size == 0 )
         return;
 
-    if ( !first_map )
+    if ( !first_map && old_ebase != -1 )
     {
         /* Remove old mapping */
         ret = xc_domain_ioport_mapping(xc_handle, domid, old_ebase,
