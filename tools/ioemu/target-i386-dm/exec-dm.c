@@ -573,8 +573,8 @@ void cpu_physical_memory_rw(target_phys_addr_t _addr, uint8_t *buf,
 #ifdef CONFIG_STUBDOM
     if (logdirty_bitmap != NULL)
         xc_hvm_modified_memory(xc_handle, domid, _addr >> TARGET_PAGE_BITS,
-                (_addr + _len + TARGET_PAGE_SIZE - 1) >> TARGET_PAGE_BITS
-                    - _addr >> TARGET_PAGE_BITS);
+                ((_addr + _len + TARGET_PAGE_SIZE - 1) >> TARGET_PAGE_BITS)
+                    - (_addr >> TARGET_PAGE_BITS));
 #endif
 
     mapcache_unlock();
