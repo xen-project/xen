@@ -123,6 +123,9 @@
 #define MSR_P6_EVNTSEL0			0x00000186
 #define MSR_P6_EVNTSEL1			0x00000187
 
+/* MSR for cpuid feature mask */
+#define MSR_IA32_CPUID_FEATURE_MASK1	0x00000478
+
 /* MSRs & bits used for VMX enabling */
 #define MSR_IA32_VMX_BASIC                      0x480
 #define MSR_IA32_VMX_PINBASED_CTLS              0x481

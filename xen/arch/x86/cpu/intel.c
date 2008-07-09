@@ -18,12 +18,41 @@
 
 extern int trap_init_f00f_bug(void);
 
+/*
+ * opt_cpuid_mask_ecx/edx: cpuid.1[ecx, edx] feature mask.
+ * For example, E8400[Intel Core 2 Duo Processor series] ecx = 0x0008E3FD, 
+ * edx = 0xBFEBFBFF when executing CPUID.EAX = 1 normally. If you want to
+ * 'rev down' to E8400, you can set these values in these Xen boot parameters.
+ */
+static unsigned int opt_cpuid_mask_ecx, opt_cpuid_mask_edx;
+integer_param("cpuid_mask_ecx", opt_cpuid_mask_ecx);
+integer_param("cpuid_mask_edx", opt_cpuid_mask_edx);
+
 #ifdef CONFIG_X86_INTEL_USERCOPY
 /*
  * Alignment at which movsl is preferred for bulk memory copies.
  */
 struct movsl_mask movsl_mask __read_mostly;
 #endif
+
+static void __devinit set_cpuidmask(void)
+{
+	unsigned int eax, ebx, ecx, edx;
+
+	if (!(opt_cpuid_mask_ecx | opt_cpuid_mask_edx))
+		return;
+
+	cpuid(0x00000001, &eax, &ebx, &ecx, &edx);
+	if (eax < 0x00010674) {
+		printk(XENLOG_ERR "Cannot set CPU feature mask on CPU#%d\n",
+		       smp_processor_id());
+		return;
+	}
+
+	wrmsr(MSR_IA32_CPUID_FEATURE_MASK1,
+	      opt_cpuid_mask_ecx ? : ~0u,
+	      opt_cpuid_mask_edx ? : ~0u);
+}
 
 void __devinit early_intel_workaround(struct cpuinfo_x86 *c)
 {
@@ -157,6 +186,8 @@ static void __devinit init_intel(struct cpuinfo_x86 *c)
 	c->x86_max_cores = num_cpu_cores(c);
 
 	detect_ht(c);
+
+	set_cpuidmask();
 
 	/* Work around errata */
 	Intel_errata_workarounds(c);
