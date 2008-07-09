@@ -21,7 +21,6 @@
 #include <errno.h>
 
 #include <xen/memory.h>
-#include <xen/sys/evtchn.h>
 #include <unistd.h>
 #include <fcntl.h>
 #include <stdio.h>
