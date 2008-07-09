@@ -1129,6 +1129,12 @@ class XendDomainInfo:
                 else:
                     self.info[arg] = val
 
+        # read CPU Affinity
+        self.info['cpus'] = []
+        vcpus_info = self.getVCPUInfo()
+        for vcpu_info in sxp.children(vcpus_info, 'vcpu'):
+            self.info['cpus'].append(sxp.child_value(vcpu_info, 'cpumap'))
+
         # For dom0, we ignore any stored value for the vcpus fields, and
         # read the current value from Xen instead.  This allows boot-time
         # settings to take precedence over any entries in the store.
