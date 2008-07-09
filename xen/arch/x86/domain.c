@@ -30,6 +30,7 @@
 #include <xen/percpu.h>
 #include <xen/compat.h>
 #include <xen/acpi.h>
+#include <xen/pci.h>
 #include <asm/regs.h>
 #include <asm/mc146818rtc.h>
 #include <asm/system.h>
@@ -473,6 +474,7 @@ void arch_domain_destroy(struct domain *d)
     if ( is_hvm_domain(d) )
         hvm_domain_destroy(d);
 
+    pci_release_devices(d);
     if ( !is_idle_domain(d) )
         iommu_domain_destroy(d);
 

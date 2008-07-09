@@ -485,8 +485,6 @@ static void amd_iommu_disable_domain_device(
     }
 }
 
-extern void pdev_flr(u8 bus, u8 devfn);
-
 static int reassign_device( struct domain *source, struct domain *target,
                             u8 bus, u8 devfn)
 {
@@ -498,6 +496,7 @@ static int reassign_device( struct domain *source, struct domain *target,
     if ( !pdev )
 	return -ENODEV;
 
+    pdev_flr(pdev);
     bdf = (bus << 8) | devfn;
     /* supported device? */
     iommu = (bdf < ivrs_bdf_entries) ?
@@ -545,24 +544,7 @@ static int amd_iommu_assign_device(struct domain *d, u8 bus, u8 devfn)
             ivrs_mappings[req_id].read_permission);
     }
 
-    pdev_flr(bus, devfn);
     return reassign_device(dom0, d, bus, devfn);
-}
-
-static void release_domain_devices(struct domain *d)
-{
-    struct pci_dev *pdev;
-    u8 bus, devfn;
-
-    while ( (pdev = pci_lock_domain_pdev(d, -1, -1)) )
-    {
-        pdev_flr(pdev->bus, pdev->devfn);
-	bus = pdev->bus; devfn = pdev->devfn;
-	spin_unlock(&pdev->lock);
-        amd_iov_info("release domain %d devices %x:%x.%x\n", d->domain_id,
-		     bus, PCI_SLOT(devfn), PCI_FUNC(devfn));
-        reassign_device(d, dom0, bus, devfn);
-    }
 }
 
 static void deallocate_next_page_table(void *table, unsigned long index,
@@ -618,13 +600,11 @@ static void deallocate_iommu_page_tables(struct domain *d)
 static void amd_iommu_domain_destroy(struct domain *d)
 {
     deallocate_iommu_page_tables(d);
-    release_domain_devices(d);
 }
 
 static int amd_iommu_return_device(
     struct domain *s, struct domain *t, u8 bus, u8 devfn)
 {
-    pdev_flr(bus, devfn);
     return reassign_device(s, t, bus, devfn);
 }
 

@@ -1366,7 +1366,7 @@ static int reassign_device_ownership(
     if ( !(pdev = pci_lock_domain_pdev(source, bus, devfn)) )
         return -ENODEV;
 
-    pdev_flr(bus, devfn);
+    pdev_flr(pdev);
     drhd = acpi_find_matched_drhd_unit(bus, devfn);
     pdev_iommu = drhd->iommu;
     domain_context_unmap(bus, devfn);
@@ -1397,28 +1397,6 @@ static int reassign_device_ownership(
     return ret;
 }
 
-void return_devices_to_dom0(struct domain *d)
-{
-    struct pci_dev *pdev;
-
-    while ( (pdev = pci_lock_domain_pdev(d, -1, -1)) )
-    {
-        pci_cleanup_msi(pdev);
-        spin_unlock(&pdev->lock);
-        reassign_device_ownership(d, dom0, pdev->bus, pdev->devfn);
-    }
-
-#ifdef VTD_DEBUG
-    read_lock(&pcidevs_lock);
-    for_each_pdev ( dom0, pdev )
-        dprintk(XENLOG_INFO VTDPREFIX,
-                "return_devices_to_dom0:%x: bdf = %x:%x:%x\n",
-                dom0->domain_id, pdev->bus,
-                PCI_SLOT(pdev->devfn), PCI_FUNC(pdev->devfn));
-    read_unlock(&pcidevs_lock);
-#endif
-}
-
 void iommu_domain_teardown(struct domain *d)
 {
     struct hvm_iommu *hd = domain_hvm_iommu(d);
@@ -1426,7 +1404,6 @@ void iommu_domain_teardown(struct domain *d)
     if ( list_empty(&acpi_drhd_units) )
         return;
 
-    return_devices_to_dom0(d);
     iommu_free_pagetable(hd->pgd_maddr, agaw_to_level(hd->agaw));
     hd->pgd_maddr = 0;
     iommu_domid_release(d);
