@@ -123,12 +123,25 @@ static void make_blktap_dev(char *devname, int major, int minor)
 static int get_new_dev(int *major, int *minor, blkif_t *blkif)
 {
 	domid_translate_t tr;
+	domid_translate_ext_t tr_ext;
 	int ret;
 	char *devname;
 	
-	tr.domid = blkif->domid;
-        tr.busid = blkif->be_id;
-	ret = ioctl(ctlfd, BLKTAP_IOCTL_NEWINTF, tr );
+	if (blkif->be_id >= (1<<28)) {
+		/* new-style backend-id, so use the extended structure */
+		tr_ext.domid = blkif->domid;
+		tr_ext.busid = blkif->be_id;
+		ret = ioctl(ctlfd, BLKTAP_IOCTL_NEWINTF_EXT, &tr_ext);
+		DPRINTF("Sent domid %d and be_id %d\n", tr_ext.domid,
+			tr_ext.busid);
+	}
+	else {
+		/* old-style backend-id; use the old structure */
+		tr.domid = blkif->domid;
+		tr.busid = (unsigned short)blkif->be_id;
+		ret = ioctl(ctlfd, BLKTAP_IOCTL_NEWINTF, tr);
+		DPRINTF("Sent domid %d and be_id %d\n", tr.domid, tr.busid);
+	}
 	
 	if ( (ret <= 0)||(ret > MAX_TAP_DEV) ) {
 		DPRINTF("Incorrect Dev ID [%d]\n",ret);
@@ -145,9 +158,8 @@ static int get_new_dev(int *major, int *minor, blkif_t *blkif)
 	if (asprintf(&devname,"%s/%s%d",BLKTAP_DEV_DIR, BLKTAP_DEV_NAME, *minor) == -1)
 		return -1;
 	make_blktap_dev(devname,*major,*minor);	
-	DPRINTF("Received device id %d and major %d, "
-		"sent domid %d and be_id %d\n",
-		*minor, *major, tr.domid, tr.busid);
+	DPRINTF("Received device id %d and major %d\n",
+		*minor, *major);
 	return 0;
 }
 

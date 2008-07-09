@@ -57,6 +57,7 @@
 #define BLKTAP_IOCTL_MAJOR	     7
 #define BLKTAP_QUERY_ALLOC_REQS      8
 #define BLKTAP_IOCTL_FREEINTF	     9
+#define BLKTAP_IOCTL_NEWINTF_EXT     50
 #define BLKTAP_IOCTL_PRINT_IDXS      100   
 
 /* blktap switching modes: (Set with BLKTAP_IOCTL_SETMODE)             */
@@ -161,8 +162,13 @@ typedef struct tapdev_info {
 
 typedef struct domid_translate {
 	unsigned short domid;
-	uint32_t busid;
+	unsigned short busid;
 } domid_translate_t ;
+
+typedef struct domid_translate_ext {
+	unsigned short domid;
+	uint32_t busid;
+} domid_translate_ext_t ;
 
 typedef struct image {
 	unsigned long long size;
