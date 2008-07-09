@@ -73,7 +73,7 @@ enum {
 
 #define PT_GET_EMUL_SIZE(flag, r_size) do { \
     if (flag == PT_BAR_FLAG_MEM) {\
-        r_size = (((r_size) + PAGE_SIZE - 1) & ~(PAGE_SIZE - 1)); \
+        r_size = (((r_size) + XC_PAGE_SIZE - 1) & ~(XC_PAGE_SIZE - 1)); \
     }\
 } while(0)
 
