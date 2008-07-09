@@ -1519,7 +1519,7 @@ static void pt_bar_mapping(struct pt_dev *ptdev, int io_enable, int mem_enable)
     PCIDevice *dev = (PCIDevice *)&ptdev->dev;
     PCIIORegion *r;
     struct pt_region *base = NULL;
-    uint32_t r_size = 0;
+    uint32_t r_size = 0, r_addr = -1;
     int ret = 0;
     int i;
 
@@ -1537,30 +1537,33 @@ static void pt_bar_mapping(struct pt_dev *ptdev, int io_enable, int mem_enable)
            (base->bar_flag == PT_BAR_FLAG_UPPER))
                continue;
 
+        /* copy region address to temporary */
+        r_addr = r->addr;
+
         /* clear region address in case I/O Space or Memory Space disable */
         if (((base->bar_flag == PT_BAR_FLAG_IO) && !io_enable ) ||
             ((base->bar_flag == PT_BAR_FLAG_MEM) && !mem_enable ))
-            r->addr = -1;
+            r_addr = -1;
 
         /* prevent guest software mapping memory resource to 00000000h */
-        if ((base->bar_flag == PT_BAR_FLAG_MEM) && (r->addr == 0))
-            r->addr = -1;
+        if ((base->bar_flag == PT_BAR_FLAG_MEM) && (r_addr == 0))
+            r_addr = -1;
 
         /* align resource size (memory type only) */
         r_size = r->size;
         PT_GET_EMUL_SIZE(base->bar_flag, r_size);
 
         /* check overlapped address */
-        ret = pt_chk_bar_overlap(dev->bus, dev->devfn, r->addr, r_size);
+        ret = pt_chk_bar_overlap(dev->bus, dev->devfn, r_addr, r_size);
         if (ret > 0)
             PT_LOG("Base Address[%d] is overlapped. "
-                "[Address:%08xh][Size:%04xh]\n", i, r->addr, r_size);
+                "[Address:%08xh][Size:%04xh]\n", i, r_addr, r_size);
 
         /* check whether we need to update the mapping or not */
-        if (r->addr != ptdev->bases[i].e_physbase)
+        if (r_addr != ptdev->bases[i].e_physbase)
         {
             /* mapping BAR */
-            r->map_func((PCIDevice *)ptdev, i, r->addr, 
+            r->map_func((PCIDevice *)ptdev, i, r_addr, 
                          r_size, r->type);
         }
     }
