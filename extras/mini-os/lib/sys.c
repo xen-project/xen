@@ -1185,6 +1185,7 @@ void sparse(unsigned long data, size_t size)
 /* Not supported by FS yet.  */
 unsupported_function_crash(link);
 unsupported_function(int, readlink, -1);
+unsupported_function_crash(umask);
 
 /* We could support that.  */
 unsupported_function_log(int, chdir, -1);
@@ -1206,6 +1207,16 @@ unsupported_function(int, sigaction, -1);
 unsupported_function(int, __sigsetjmp, 0);
 unsupported_function(int, sigaltstack, -1);
 unsupported_function_crash(kill);
+
+/* Unsupported */
+unsupported_function_crash(pipe);
+unsupported_function_crash(fork);
+unsupported_function_crash(execv);
+unsupported_function_crash(waitpid);
+unsupported_function_crash(lockf);
+unsupported_function_crash(sysconf);
+unsupported_function(int, tcsetattr, -1);
+unsupported_function(int, tcgetattr, 0);
 
 /* Linuxish abi for the Caml runtime, don't support */
 unsupported_function_log(struct dirent *, readdir64, NULL);
