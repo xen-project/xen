@@ -3354,6 +3354,26 @@ shadow_write_p2m_entry(struct vcpu *v, unsigned long gfn,
         }
     }
 
+    /* If we're removing a superpage mapping from the p2m, remove all the
+     * MFNs covered by it from the shadows too. */
+    if ( level == 2 && (l1e_get_flags(*p) & _PAGE_PRESENT) &&
+         (l1e_get_flags(*p) & _PAGE_PSE) )
+    {
+        unsigned int i;
+        mfn_t mfn = _mfn(l1e_get_pfn(*p));
+        p2m_type_t p2mt = p2m_flags_to_type(l1e_get_flags(*p));
+        if ( p2m_is_valid(p2mt) && mfn_valid(mfn) )
+        {
+            for ( i = 0; i < L1_PAGETABLE_ENTRIES; i++ )
+            {
+                sh_remove_all_shadows_and_parents(v, mfn);
+                if ( sh_remove_all_mappings(v, mfn) )
+                    flush_tlb_mask(d->domain_dirty_cpumask);
+                mfn = _mfn(mfn_x(mfn) + 1);
+            }
+        }
+    }
+
     /* Update the entry with new content */
     safe_write_pte(p, new);
 
