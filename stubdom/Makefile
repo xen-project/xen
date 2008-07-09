@@ -52,6 +52,7 @@ TARGET_CFLAGS += -nostdinc
 TARGET_CPPFLAGS += -isystem $(realpath $(MINI_OS)/include/posix)
 TARGET_CPPFLAGS += -isystem $(CROSS_PREFIX)/$(GNU_TARGET_ARCH)-xen-elf/include
 TARGET_CPPFLAGS += -isystem $(GCC_INSTALL)include
+TARGET_CPPFLAGS += -I$(CURDIR)/include
 
 TARGET_LDFLAGS += -nostdlib -L$(CROSS_PREFIX)/$(GNU_TARGET_ARCH)-xen-elf/lib
 
@@ -144,9 +145,15 @@ lwip-cvs:
 .PHONY: $(CROSS_ROOT)
 $(CROSS_ROOT): cross-newlib cross-zlib cross-libpci
 
-.PHONY: mk-symlinks
-mk-symlinks:
-	[ -h include ] || ln -sf ../tools/include .
+.PHONY: mk-headers
+mk-headers:
+	mkdir -p include/xen && \
+          ln -sf $(addprefix ../../,$(wildcard $(XEN_ROOT)/xen/include/public/*.h)) include/xen && \
+          ( [ -h include/xen/sys ] || ln -sf ../../$(XEN_ROOT)/tools/include/xen-sys/MiniOS include/xen/sys ) && \
+	  mkdir -p include/xen-foreign && \
+	  ln -sf $(addprefix ../../,$(wildcard $(XEN_ROOT)/tools/include/xen-foreign/*)) include/xen-foreign/ && \
+	  $(MAKE) -C include/xen-foreign/ && \
+	  ( [ -h include/xen/foreign ] || ln -sf ../xen-foreign include/xen/foreign )
 	mkdir -p libxc
 	[ -h libxc/Makefile ] || ( cd libxc && \
 	  ln -sf ../$(XEN_ROOT)/tools/libxc/*.h . && \
@@ -177,7 +184,7 @@ $(TARGETS_MINIOS): mini-os-%:
 
 .PHONY: libxc
 libxc: libxc/libxenctrl.a libxc/libxenguest.a
-libxc/libxenctrl.a libxc/libxenguest.a:: cross-zlib mk-symlinks
+libxc/libxenctrl.a libxc/libxenguest.a:: cross-zlib mk-headers
 	CPPFLAGS="$(TARGET_CPPFLAGS)" CFLAGS="$(TARGET_CFLAGS)" $(MAKE) -C libxc
 
 #######
@@ -185,7 +192,7 @@ libxc/libxenctrl.a libxc/libxenguest.a:: cross-zlib mk-symlinks
 #######
 
 .PHONY: ioemu
-ioemu: cross-zlib cross-libpci mk-symlinks libxc
+ioemu: cross-zlib cross-libpci mk-headers libxc
 	[ -f ioemu/config-host.mak ] || \
 	  ( cd ioemu ; \
           XEN_TARGET_ARCH=$(XEN_TARGET_ARCH) CFLAGS="$(TARGET_CFLAGS)" sh configure --prefix=/usr --enable-stubdom $(IOEMU_OPTIONS))
@@ -196,7 +203,7 @@ ioemu: cross-zlib cross-libpci mk-symlinks libxc
 ######
 
 .PHONY: caml
-caml: cross-newlib mk-symlinks
+caml: cross-newlib mk-headers
 	CPPFLAGS="$(TARGET_CPPFLAGS)" CFLAGS="$(TARGET_CFLAGS)" $(MAKE) -C $@ LWIPDIR=$(CURDIR)/lwip-cvs 
 
 ###
@@ -204,7 +211,7 @@ caml: cross-newlib mk-symlinks
 ###
 
 .PHONY: c
-c: cross-newlib mk-symlinks
+c: cross-newlib mk-headers
 	CPPFLAGS="$(TARGET_CPPFLAGS)" CFLAGS="$(TARGET_CFLAGS)" $(MAKE) -C $@ LWIPDIR=$(CURDIR)/lwip-cvs 
 
 ######
@@ -218,7 +225,7 @@ grub-cvs:
 	done
 
 .PHONY: grub
-grub: grub-cvs cross-newlib mk-symlinks
+grub: grub-cvs cross-newlib mk-headers
 	CPPFLAGS="$(TARGET_CPPFLAGS)" CFLAGS="$(TARGET_CFLAGS)" $(MAKE) -C $@
 
 ########
