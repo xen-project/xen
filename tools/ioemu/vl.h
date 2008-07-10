@@ -927,7 +927,7 @@ extern struct soundhw soundhw[];
 
 /* vga.c */
 
-#define VGA_RAM_SIZE (8192 * 1024)
+#define VGA_RAM_SIZE (4096 * 1024)
 
 /* in ms */
 #define GUI_REFRESH_INTERVAL 30
