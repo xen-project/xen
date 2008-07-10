@@ -51,10 +51,8 @@ CPPFLAGS += -DFSYS_UFS2=1
 STAGE2_SOURCES+=fsys_vstafs.c
 CPPFLAGS += -DFSYS_VSTAFS=1
 
-ifeq (0,1)
 STAGE2_SOURCES+=fsys_xfs.c
 CPPFLAGS += -DFSYS_XFS=1
-endif
 
 STAGE2_SOURCES:=$(addprefix stage2/,$(STAGE2_SOURCES))
 NETBOOT_SOURCES:=$(addprefix netboot/,$(NETBOOT_SOURCES))
