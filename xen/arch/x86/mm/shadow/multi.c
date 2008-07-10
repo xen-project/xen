@@ -3344,13 +3344,22 @@ static int sh_page_fault(struct vcpu *v,
         }
     }
 
-    /* Need to hand off device-model MMIO and writes to read-only
-     * memory to the device model */
-    if ( p2mt == p2m_mmio_dm 
-         || (p2mt == p2m_ram_ro && ft == ft_demand_write) ) 
+    /* Need to hand off device-model MMIO to the device model */
+    if ( p2mt == p2m_mmio_dm ) 
     {
         gpa = guest_walk_to_gpa(&gw);
         goto mmio;
+    }
+
+    /* Log attempts to write to read-only memory */
+    if ( (p2mt == p2m_ram_ro) && (ft == ft_demand_write) )
+    {
+        static unsigned long lastpage = 0;
+        if ( xchg(&lastpage, va & PAGE_MASK) != (va & PAGE_MASK) )
+            gdprintk(XENLOG_DEBUG, "guest attempted write to read-only memory"
+                     " page. va page=%#lx, mfn=%#lx\n",
+                     va & PAGE_MASK, mfn_x(gmfn));
+        goto emulate; /* skip over the instruction */
     }
 
     /* In HVM guests, we force CR0.WP always to be set, so that the
@@ -4587,6 +4596,7 @@ int sh_remove_l3_shadow(struct vcpu *v, mfn_t sl4mfn, mfn_t sl3mfn)
 /* Translate a VA to an MFN, injecting a page-fault if we fail */
 #define BAD_GVA_TO_GFN (~0UL)
 #define BAD_GFN_TO_MFN (~1UL)
+#define READONLY_GFN   (~2UL)
 static mfn_t emulate_gva_to_mfn(struct vcpu *v,
                                 unsigned long vaddr,
                                 struct sh_emulate_ctxt *sh_ctxt)
@@ -4609,21 +4619,22 @@ static mfn_t emulate_gva_to_mfn(struct vcpu *v,
 
     /* Translate the GFN to an MFN */
     mfn = gfn_to_mfn(v->domain, _gfn(gfn), &p2mt);
-    if ( p2m_is_ram(p2mt) )
-    {
-        ASSERT(mfn_valid(mfn));
-        v->arch.paging.last_write_was_pt = !!sh_mfn_is_a_page_table(mfn);
-        return mfn;
-    }
- 
-    return _mfn(BAD_GFN_TO_MFN);
+    if ( p2mt == p2m_ram_ro )
+        return _mfn(READONLY_GFN);
+    if ( !p2m_is_ram(p2mt) )
+        return _mfn(BAD_GFN_TO_MFN);
+
+    ASSERT(mfn_valid(mfn));
+    v->arch.paging.last_write_was_pt = !!sh_mfn_is_a_page_table(mfn);
+    return mfn;
 }
 
 /* Check that the user is allowed to perform this write. 
  * Returns a mapped pointer to write to, or NULL for error. */
-#define MAPPING_UNHANDLEABLE ((void *)0)
-#define MAPPING_EXCEPTION    ((void *)1)
-#define emulate_map_dest_failed(rc) ((unsigned long)(rc) <= 1)
+#define MAPPING_UNHANDLEABLE ((void *)(unsigned long)X86EMUL_UNHANDLEABLE)
+#define MAPPING_EXCEPTION    ((void *)(unsigned long)X86EMUL_EXCEPTION)
+#define MAPPING_SILENT_FAIL  ((void *)(unsigned long)X86EMUL_OKAY)
+#define emulate_map_dest_failed(rc) ((unsigned long)(rc) <= 3)
 static void *emulate_map_dest(struct vcpu *v,
                               unsigned long vaddr,
                               u32 bytes,
@@ -4641,7 +4652,9 @@ static void *emulate_map_dest(struct vcpu *v,
     sh_ctxt->mfn1 = emulate_gva_to_mfn(v, vaddr, sh_ctxt);
     if ( !mfn_valid(sh_ctxt->mfn1) ) 
         return ((mfn_x(sh_ctxt->mfn1) == BAD_GVA_TO_GFN) ?
-                MAPPING_EXCEPTION : MAPPING_UNHANDLEABLE);
+                MAPPING_EXCEPTION :
+                (mfn_x(sh_ctxt->mfn1) == READONLY_GFN) ?
+                MAPPING_SILENT_FAIL : MAPPING_UNHANDLEABLE);
 
     /* Unaligned writes mean probably this isn't a pagetable */
     if ( vaddr & (bytes - 1) )
@@ -4665,7 +4678,9 @@ static void *emulate_map_dest(struct vcpu *v,
                                            sh_ctxt);
         if ( !mfn_valid(sh_ctxt->mfn2) ) 
             return ((mfn_x(sh_ctxt->mfn2) == BAD_GVA_TO_GFN) ?
-                    MAPPING_EXCEPTION : MAPPING_UNHANDLEABLE);
+                    MAPPING_EXCEPTION :
+                    (mfn_x(sh_ctxt->mfn2) == READONLY_GFN) ?
+                    MAPPING_SILENT_FAIL : MAPPING_UNHANDLEABLE);
 
         /* Cross-page writes mean probably not a pagetable */
         sh_remove_shadows(v, sh_ctxt->mfn2, 0, 0 /* Slow, can fail */ );
@@ -4782,8 +4797,7 @@ sh_x86_emulate_write(struct vcpu *v, unsigned long vaddr, void *src,
 
     addr = emulate_map_dest(v, vaddr, bytes, sh_ctxt);
     if ( emulate_map_dest_failed(addr) )
-        return ((addr == MAPPING_EXCEPTION) ?
-                X86EMUL_EXCEPTION : X86EMUL_UNHANDLEABLE);
+        return (long)addr;
 
     shadow_lock(v->domain);
     memcpy(addr, src, bytes);
@@ -4809,8 +4823,7 @@ sh_x86_emulate_cmpxchg(struct vcpu *v, unsigned long vaddr,
 
     addr = emulate_map_dest(v, vaddr, bytes, sh_ctxt);
     if ( emulate_map_dest_failed(addr) )
-        return ((addr == MAPPING_EXCEPTION) ?
-                X86EMUL_EXCEPTION : X86EMUL_UNHANDLEABLE);
+        return (long)addr;
 
     shadow_lock(v->domain);
     switch ( bytes )
@@ -4854,8 +4867,7 @@ sh_x86_emulate_cmpxchg8b(struct vcpu *v, unsigned long vaddr,
 
     addr = emulate_map_dest(v, vaddr, 8, sh_ctxt);
     if ( emulate_map_dest_failed(addr) )
-        return ((addr == MAPPING_EXCEPTION) ?
-                X86EMUL_EXCEPTION : X86EMUL_UNHANDLEABLE);
+        return (long)addr;
 
     old = (((u64) old_hi) << 32) | (u64) old_lo;
     new = (((u64) new_hi) << 32) | (u64) new_lo;

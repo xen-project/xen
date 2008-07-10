@@ -1496,8 +1496,19 @@ static enum hvm_copy_result __hvm_copy(
 
         if ( flags & HVMCOPY_to_guest )
         {
-            memcpy(p, buf, count);
-            paging_mark_dirty(curr->domain, mfn);
+            if ( p2mt == p2m_ram_ro )
+            {
+                static unsigned long lastpage;
+                if ( xchg(&lastpage, gfn) != gfn )
+                    gdprintk(XENLOG_DEBUG, "guest attempted write to read-only"
+                             " memory page. gfn=%#lx, mfn=%#lx\n",
+                             gfn, mfn);
+            }
+            else
+            {
+                memcpy(p, buf, count);
+                paging_mark_dirty(curr->domain, mfn);
+            }
         }
         else
         {
