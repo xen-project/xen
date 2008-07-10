@@ -216,10 +216,10 @@ void pcifront_op(struct pcifront_dev *dev, struct xen_pci_op *op)
     dev->info->op = *op;
     /* Make sure info is written before the flag */
     wmb();
-    set_bit(_XEN_PCIF_active, &dev->info->flags);
+    set_bit(_XEN_PCIF_active, (void*) &dev->info->flags);
     notify_remote_via_evtchn(dev->evtchn);
 
-    wait_event(pcifront_queue, !test_bit(_XEN_PCIF_active, &dev->info->flags));
+    wait_event(pcifront_queue, !test_bit(_XEN_PCIF_active, (void*) &dev->info->flags));
 
     /* Make sure flag is read before info */
     rmb();

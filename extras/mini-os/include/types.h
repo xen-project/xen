@@ -89,6 +89,5 @@ typedef intptr_t            ptrdiff_t;
 #ifndef HAVE_LIBC
 typedef long ssize_t;
 #endif
-typedef unsigned long size_t;
 
 #endif /* _TYPES_H_ */
