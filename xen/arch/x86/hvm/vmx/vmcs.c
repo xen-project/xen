@@ -95,7 +95,8 @@ static void vmx_init_vmcs_config(void)
            CPU_BASED_MWAIT_EXITING |
            CPU_BASED_MOV_DR_EXITING |
            CPU_BASED_ACTIVATE_IO_BITMAP |
-           CPU_BASED_USE_TSC_OFFSETING);
+           CPU_BASED_USE_TSC_OFFSETING |
+           (opt_softtsc ? CPU_BASED_RDTSC_EXITING : 0));
     opt = (CPU_BASED_ACTIVATE_MSR_BITMAP |
            CPU_BASED_TPR_SHADOW |
            CPU_BASED_ACTIVATE_SECONDARY_CONTROLS);

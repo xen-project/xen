@@ -57,6 +57,9 @@ int hvm_enabled __read_mostly;
 unsigned int opt_hvm_debug_level __read_mostly;
 integer_param("hvm_debug", opt_hvm_debug_level);
 
+int opt_softtsc;
+boolean_param("softtsc", opt_softtsc);
+
 struct hvm_function_table hvm_funcs __read_mostly;
 
 /* I/O permission bitmap is globally shared by all HVM guests. */
@@ -148,7 +151,11 @@ u64 hvm_get_guest_tsc(struct vcpu *v)
 {
     u64 host_tsc;
 
-    rdtscll(host_tsc);
+    if ( opt_softtsc )
+        host_tsc = hvm_get_guest_time(v);
+    else
+        rdtscll(host_tsc);
+
     return host_tsc + v->arch.hvm_vcpu.cache_tsc_offset;
 }
 
@@ -1649,6 +1656,16 @@ void hvm_cpuid(unsigned int input, unsigned int *eax, unsigned int *ebx,
         if ( vlapic_hw_disabled(vcpu_vlapic(v)) )
             __clear_bit(X86_FEATURE_APIC & 31, edx);
     }
+}
+
+void hvm_rdtsc_intercept(struct cpu_user_regs *regs)
+{
+    uint64_t tsc;
+    struct vcpu *v = current;
+
+    tsc = hvm_get_guest_tsc(v);
+    regs->eax = (uint32_t)tsc;
+    regs->edx = (uint32_t)(tsc >> 32);
 }
 
 int hvm_msr_read_intercept(struct cpu_user_regs *regs)

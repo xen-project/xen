@@ -1340,6 +1340,10 @@ asmlinkage void svm_vmexit_handler(struct cpu_user_regs *regs)
         hvm_triple_fault();
         break;
 
+    case VMEXIT_RDTSC:
+        hvm_rdtsc_intercept(regs);
+        break;
+
     case VMEXIT_RDTSCP:
     case VMEXIT_MONITOR:
     case VMEXIT_MWAIT:

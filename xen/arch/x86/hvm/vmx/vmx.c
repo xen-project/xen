@@ -2205,6 +2205,11 @@ asmlinkage void vmx_vmexit_handler(struct cpu_user_regs *regs)
         vmx_invlpg_intercept(exit_qualification);
         break;
     }
+    case EXIT_REASON_RDTSC:
+        inst_len = __get_instruction_length();
+        __update_guest_eip(inst_len);
+        hvm_rdtsc_intercept(regs);
+        break;
     case EXIT_REASON_VMCALL:
     {
         int rc;
