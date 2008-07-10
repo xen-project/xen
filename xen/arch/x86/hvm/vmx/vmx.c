@@ -1086,7 +1086,10 @@ void ept_sync_domain(struct domain *d)
 {
     /* Only if using EPT and this domain has some VCPUs to dirty. */
     if ( d->arch.hvm_domain.hap_enabled && d->vcpu[0] )
+    {
+        ASSERT(local_irq_is_enabled());
         on_each_cpu(__ept_sync_domain, d, 1, 1);
+    }
 }
 
 static void __vmx_inject_exception(
