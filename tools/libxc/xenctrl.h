@@ -27,6 +27,7 @@
 #include <xen/event_channel.h>
 #include <xen/sched.h>
 #include <xen/memory.h>
+#include <xen/hvm/params.h>
 #include <xen/xsm/acm.h>
 #include <xen/xsm/acm_ops.h>
 #include <xen/xsm/flask_op.h>
@@ -941,6 +942,14 @@ int xc_hvm_track_dirty_vram(
  */
 int xc_hvm_modified_memory(
     int xc_handle, domid_t dom, uint64_t first_pfn, uint64_t nr);
+
+/*
+ * Set a range of memory to a specific type.
+ * Allowed types are HVMMEM_ram_rw, HVMMEM_ram_ro, HVMMEM_mmio_dm
+ */
+int xc_hvm_set_mem_type(
+    int xc_handle, domid_t dom, hvmmem_type_t memtype, uint64_t first_pfn, uint64_t nr);
+
 
 typedef enum {
   XC_ERROR_NONE = 0,

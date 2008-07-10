@@ -2611,6 +2611,65 @@ long do_hvm_op(unsigned long op, XEN_GUEST_HANDLE(void) arg)
         break;
     }
 
+    case HVMOP_set_mem_type:
+    {
+        struct xen_hvm_set_mem_type a;
+        struct domain *d;
+        unsigned long pfn;
+        
+        /* Interface types to internal p2m types */
+        p2m_type_t memtype[] = {
+            p2m_ram_rw,        /* HVMMEM_ram_rw  */
+            p2m_ram_ro,        /* HVMMEM_ram_ro  */
+            p2m_mmio_dm        /* HVMMEM_mmio_dm */
+        };
+
+        if ( copy_from_guest(&a, arg, 1) )
+            return -EFAULT;
+
+        if ( a.domid == DOMID_SELF )
+        {
+            d = rcu_lock_current_domain();
+        }
+        else
+        {
+            if ( (d = rcu_lock_domain_by_id(a.domid)) == NULL )
+                return -ESRCH;
+            if ( !IS_PRIV_FOR(current->domain, d) )
+            {
+                rc = -EPERM;
+                goto param_fail4;
+            }
+        }
+
+        rc = -EINVAL;
+        if ( !is_hvm_domain(d) )
+            goto param_fail4;
+
+        rc = -EINVAL;
+        if ( (a.first_pfn > domain_get_maximum_gpfn(d)) ||
+             ((a.first_pfn + a.nr - 1) < a.first_pfn) ||
+             ((a.first_pfn + a.nr - 1) > domain_get_maximum_gpfn(d)) )
+            goto param_fail4;
+            
+        if ( a.hvmmem_type >= ARRAY_SIZE(memtype) )
+            goto param_fail4;
+            
+        rc = 0;
+        
+        for ( pfn = a.first_pfn; pfn < a.first_pfn + a.nr; pfn++ )
+        {
+            p2m_type_t t;
+            mfn_t mfn;
+            mfn = gfn_to_mfn(d, pfn, &t);
+            p2m_change_type(d, pfn, t, memtype[a.hvmmem_type]);
+        }
+         
+    param_fail4:
+        rcu_unlock_domain(d);
+        break;
+    }
+
     default:
     {
         gdprintk(XENLOG_WARNING, "Bad HVM op %ld.\n", op);
