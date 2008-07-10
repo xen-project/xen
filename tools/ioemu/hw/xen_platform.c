@@ -28,10 +28,52 @@
 
 extern FILE *logfile;
 
-static void platform_ioport_map(PCIDevice *pci_dev, int region_num,
-                                uint32_t addr, uint32_t size, int type)
+#define PFFLAG_ROM_LOCK 1 /* Sets whether ROM memory area is RW or RO */
+
+typedef struct PCIXenPlatformState
 {
-    /* nothing yet */
+  PCIDevice  pci_dev;
+  uint8_t    platform_flags;
+} PCIXenPlatformState;
+
+static uint32_t xen_platform_ioport_readb(void *opaque, uint32_t addr)
+{
+    PCIXenPlatformState *s = opaque;
+
+    addr &= 0xff;
+
+    return (addr == 0) ? s->platform_flags : ~0u;
+}
+                              
+static void xen_platform_ioport_writeb(void *opaque, uint32_t addr, uint32_t val)
+{
+    PCIXenPlatformState *d = opaque;
+
+    addr &= 0xff;
+    val  &= 0xff;
+
+    switch (addr) {
+    case 0: /* Platform flags */ {
+        hvmmem_type_t mem_type = (val & PFFLAG_ROM_LOCK) ?
+            HVMMEM_ram_ro : HVMMEM_ram_rw;
+        if (xc_hvm_set_mem_type(xc_handle, domid, mem_type, 0xc0, 0x40))
+            fprintf(logfile,"xen_platform: unable to change ro/rw "
+                    "state of ROM memory area!\n");
+        else
+            d->platform_flags = val & PFFLAG_ROM_LOCK;
+        break;
+    }
+    default:
+        break;
+    }
+}
+
+
+static void platform_ioport_map(PCIDevice *pci_dev, int region_num, uint32_t addr, uint32_t size, int type)
+{
+    PCIXenPlatformState *d = (PCIXenPlatformState *)pci_dev;
+    register_ioport_write(addr, size, 1, xen_platform_ioport_writeb, d);
+    register_ioport_read(addr, size, 1, xen_platform_ioport_readb, d);
 }
 
 static uint32_t platform_mmio_read(void *opaque, target_phys_addr_t addr)
@@ -109,30 +151,42 @@ struct pci_config_header {
 
 void xen_pci_save(QEMUFile *f, void *opaque)
 {
-    PCIDevice *d = opaque;
+    PCIXenPlatformState *d = opaque;
 
-    pci_device_save(d, f);
+    pci_device_save(&d->pci_dev, f);
+    qemu_put_8s(f, &d->platform_flags);
 }
 
 int xen_pci_load(QEMUFile *f, void *opaque, int version_id)
 {
-    PCIDevice *d = opaque;
+    PCIXenPlatformState *d = opaque;
+    int ret;
 
-    if (version_id != 1)
+    if (version_id > 2)
         return -EINVAL;
 
-    return pci_device_load(d, f);
+    ret = pci_device_load(&d->pci_dev, f);
+    if (ret < 0)
+        return ret;
+
+    if (version_id >= 2) {
+        uint8_t flags;
+        qemu_get_8s(f, &flags);
+        xen_platform_ioport_writeb(d, 0, flags);
+    }
+
+    return 0;
 }
 
 void pci_xen_platform_init(PCIBus *bus)
 {
-    PCIDevice *d;
+    PCIXenPlatformState *d;
     struct pci_config_header *pch;
 
     printf("Register xen platform.\n");
-    d = pci_register_device(bus, "xen-platform", sizeof(PCIDevice), -1, NULL,
-			    NULL);
-    pch = (struct pci_config_header *)d->config;
+    d = (PCIXenPlatformState *)pci_register_device(
+        bus, "xen-platform", sizeof(PCIXenPlatformState), -1, NULL, NULL);
+    pch = (struct pci_config_header *)d->pci_dev.config;
     pch->vendor_id = 0x5853;
     pch->device_id = 0x0001;
     pch->command = 3; /* IO and memory access */
@@ -148,13 +202,15 @@ void pci_xen_platform_init(PCIBus *bus)
     pch->subsystem_vendor_id = pch->vendor_id; /* Duplicate vendor id.  */
     pch->subsystem_id        = 0x0001;         /* Hardcode sub-id as 1. */
 
-    pci_register_io_region(d, 0, 0x100, PCI_ADDRESS_SPACE_IO,
-                           platform_ioport_map);
+    pci_register_io_region(&d->pci_dev, 0, 0x100,
+                           PCI_ADDRESS_SPACE_IO, platform_ioport_map);
 
     /* reserve 16MB mmio address for share memory*/
-    pci_register_io_region(d, 1, 0x1000000, PCI_ADDRESS_SPACE_MEM_PREFETCH,
-			   platform_mmio_map);
+    pci_register_io_region(&d->pci_dev, 1, 0x1000000,
+                           PCI_ADDRESS_SPACE_MEM_PREFETCH, platform_mmio_map);
 
-    register_savevm("platform", 0, 1, xen_pci_save, xen_pci_load, d);
+    xen_platform_ioport_writeb(d, 0, 0);
+
+    register_savevm("platform", 0, 2, xen_pci_save, xen_pci_load, d);
     printf("Done register platform.\n");
 }
