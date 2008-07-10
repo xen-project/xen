@@ -1186,9 +1186,10 @@ int pdev_type(u8 bus, u8 devfn)
 #define MAX_BUSES 256
 static struct { u8 map, bus, devfn; } bus2bridge[MAX_BUSES];
 
-static int find_pcie_endpoint(u8 *bus, u8 *devfn)
+static int find_pcie_endpoint(u8 *bus, u8 *devfn, u8 *secbus)
 {
     int cnt = 0;
+    *secbus = *bus;
 
     if ( *bus == 0 )
         /* assume integrated PCI devices in RC have valid requester-id */
@@ -1199,6 +1200,7 @@ static int find_pcie_endpoint(u8 *bus, u8 *devfn)
 
     while ( bus2bridge[*bus].map )
     {
+        *secbus = *bus;
         *devfn = bus2bridge[*bus].devfn;
         *bus = bus2bridge[*bus].bus;
         if ( cnt++ >= MAX_BUSES )
@@ -1214,6 +1216,7 @@ static int domain_context_mapping(struct domain *domain, u8 bus, u8 devfn)
     int ret = 0;
     u16 sec_bus, sub_bus, ob, odf;
     u32 type;
+    u8 secbus;
 
     drhd = acpi_find_matched_drhd_unit(bus, devfn);
     if ( !drhd )
@@ -1254,7 +1257,7 @@ static int domain_context_mapping(struct domain *domain, u8 bus, u8 devfn)
                  bus, PCI_SLOT(devfn), PCI_FUNC(devfn));
 
         ob = bus; odf = devfn;
-        if ( !find_pcie_endpoint(&bus, &devfn) )
+        if ( !find_pcie_endpoint(&bus, &devfn, &secbus) )
         {
             gdprintk(XENLOG_WARNING VTDPREFIX, "domain_context_mapping:invalid");
             break;
@@ -1265,7 +1268,17 @@ static int domain_context_mapping(struct domain *domain, u8 bus, u8 devfn)
                      "domain_context_mapping:map:  bdf = %x:%x.%x -> %x:%x.%x\n",
                      ob, PCI_SLOT(odf), PCI_FUNC(odf),
                      bus, PCI_SLOT(devfn), PCI_FUNC(devfn));
+
         ret = domain_context_mapping_one(domain, drhd->iommu, bus, devfn);
+        if ( secbus != bus )
+            /*
+             * The source-id for transactions on non-PCIe buses seem
+             * to originate from devfn=0 on the secondary bus behind
+             * the bridge.  Map that id as well.  The id to use in
+             * these scanarios is not particularly well documented
+             * anywhere.
+             */
+            domain_context_mapping_one(domain, drhd->iommu, secbus, 0);
         break;
 
     default:
@@ -1313,6 +1326,7 @@ static int domain_context_unmap(u8 bus, u8 devfn)
     u16 sec_bus, sub_bus;
     int ret = 0;
     u32 type;
+    u8 secbus;
 
     drhd = acpi_find_matched_drhd_unit(bus, devfn);
     if ( !drhd )
@@ -1337,8 +1351,10 @@ static int domain_context_unmap(u8 bus, u8 devfn)
         break;
 
     case DEV_TYPE_PCI:
-        if ( find_pcie_endpoint(&bus, &devfn) )
+        if ( find_pcie_endpoint(&bus, &devfn, &secbus) )
             ret = domain_context_unmap_one(drhd->iommu, bus, devfn);
+        if ( bus != secbus )
+            domain_context_unmap_one(drhd->iommu, secbus, 0);
         break;
 
     default:
@@ -1776,7 +1792,8 @@ int intel_iommu_assign_device(struct domain *d, u8 bus, u8 devfn)
 
 static int intel_iommu_group_id(u8 bus, u8 devfn)
 {
-    if ( !bus2bridge[bus].map || find_pcie_endpoint(&bus, &devfn) )
+    u8 secbus;
+    if ( !bus2bridge[bus].map || find_pcie_endpoint(&bus, &devfn, &secbus) )
         return PCI_BDF2(bus, devfn);
     else
         return -1;
