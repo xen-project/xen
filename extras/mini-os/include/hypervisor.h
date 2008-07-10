@@ -13,7 +13,7 @@
 #ifndef _HYPERVISOR_H_
 #define _HYPERVISOR_H_
 
-#include <types.h>
+#include <mini-os/types.h>
 #include <xen/xen.h>
 #if defined(__i386__)
 #include <hypercall-x86_32.h>
@@ -24,7 +24,7 @@
 #else
 #error "Unsupported architecture"
 #endif
-#include <traps.h>
+#include <mini-os/traps.h>
 
 /*
  * a placeholder for the start of day information passed up from the hypervisor

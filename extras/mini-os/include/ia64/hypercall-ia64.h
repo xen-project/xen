@@ -34,8 +34,8 @@
 #ifndef __HYPERCALL_H__
 #define __HYPERCALL_H__
 
-#include "lib.h"	/* memcpy() */
-#include "errno.h"	/* ENOSYS() */
+#include <mini-os/lib.h>	/* memcpy() */
+#include <mini-os/errno.h>	/* ENOSYS() */
 #include <xen/event_channel.h>
 #include <xen/sched.h>
 #include <xen/version.h>

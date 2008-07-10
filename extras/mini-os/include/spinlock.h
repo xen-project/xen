@@ -1,7 +1,7 @@
 #ifndef __ASM_SPINLOCK_H
 #define __ASM_SPINLOCK_H
 
-#include <lib.h>
+#include <mini-os/lib.h>
 
 /*
  * Your basic SMP spinlocks, allowing only a single CPU anywhere
@@ -12,7 +12,7 @@ typedef struct {
 } spinlock_t;
 
 
-#include "arch_spinlock.h"
+#include <mini-os/arch_spinlock.h>
 
 
 #define SPINLOCK_MAGIC	0xdead4ead

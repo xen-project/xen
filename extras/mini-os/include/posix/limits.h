@@ -1,7 +1,7 @@
 #ifndef _POSIX_LIMITS_H
 #define _POSIX_LIMITS_H
 
-#include <arch_limits.h>
+#include <mini-os/arch_limits.h>
 
 #define CHAR_BIT        8
 

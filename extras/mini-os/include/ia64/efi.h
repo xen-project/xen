@@ -32,7 +32,7 @@
 #ifndef _EFI_H_
 #define _EFI_H_
 
-#include "types.h"
+#include <mini-os/types.h>
 
 
 #define EFIWARN(a)                      (a)

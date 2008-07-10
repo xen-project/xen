@@ -3,11 +3,13 @@ MINI_OS = $(XEN_ROOT)/extras/mini-os
 
 export XEN_OS=MiniOS
 
+CONFIG_QEMU=ioemu
+
 export stubdom=y
 export debug=y
 include $(XEN_ROOT)/Config.mk
 
-IOEMU_OPTIONS=--disable-vnc-tls 
+IOEMU_OPTIONS=--disable-sdl --disable-opengl --disable-gfx-check --disable-vnc-tls --disable-brlapi --disable-kqemu
 ZLIB_VERSION=1.2.3
 LIBPCI_VERSION=2.2.9
 NEWLIB_VERSION=1.16.0
@@ -48,10 +50,12 @@ TARGET_CFLAGS += $(call cc-option,$(CC),-fno-stack-protector-all,)
 # Do not use host headers and libs
 GCC_INSTALL = $(shell gcc -print-search-dirs | sed -n -e 's/install: \(.*\)/\1/p')
 TARGET_CPPFLAGS += -U __linux__ -U __FreeBSD__ -U __sun__
-TARGET_CFLAGS += -nostdinc
-TARGET_CPPFLAGS += -isystem $(realpath $(MINI_OS)/include/posix)
+TARGET_CPPFLAGS += -nostdinc
+TARGET_CPPFLAGS += -isystem $(abspath $(MINI_OS)/include/posix)
 TARGET_CPPFLAGS += -isystem $(CROSS_PREFIX)/$(GNU_TARGET_ARCH)-xen-elf/include
 TARGET_CPPFLAGS += -isystem $(GCC_INSTALL)include
+TARGET_CPPFLAGS += -isystem $(CURDIR)/lwip-cvs/src/include
+TARGET_CPPFLAGS += -isystem $(CURDIR)/lwip-cvs/src/include/ipv4
 TARGET_CPPFLAGS += -I$(CURDIR)/include
 
 TARGET_LDFLAGS += -nostdlib -L$(CROSS_PREFIX)/$(GNU_TARGET_ARCH)-xen-elf/lib
@@ -149,6 +153,7 @@ $(CROSS_ROOT): cross-newlib cross-zlib cross-libpci
 mk-headers:
 	mkdir -p include/xen && \
           ln -sf $(addprefix ../../,$(wildcard $(XEN_ROOT)/xen/include/public/*.h)) include/xen && \
+          ln -sf $(addprefix ../../$(XEN_ROOT)/xen/include/public/,arch-ia64 arch-x86 hvm io xsm) include/xen && \
           ( [ -h include/xen/sys ] || ln -sf ../../$(XEN_ROOT)/tools/include/xen-sys/MiniOS include/xen/sys ) && \
 	  mkdir -p include/xen-foreign && \
 	  ln -sf $(addprefix ../../,$(wildcard $(XEN_ROOT)/tools/include/xen-foreign/*)) include/xen-foreign/ && \
@@ -165,10 +170,21 @@ mk-headers:
 	  ln -sf ../$(XEN_ROOT)/tools/libxc/$(XEN_TARGET_ARCH)/*.h . && \
 	  ln -sf ../$(XEN_ROOT)/tools/libxc/$(XEN_TARGET_ARCH)/Makefile . )
 	mkdir -p ioemu
+ifeq ($(CONFIG_QEMU),ioemu)
 	[ -h ioemu/Makefile ] || ( cd ioemu && \
-	  ln -sf ../$(XEN_ROOT)/tools/ioemu/* . && \
-	  ([ ! -h config-host.h ] || rm -f config-host.h) && \
-	  ([ ! -h config-host.mak ] || rm -f config-host.mak) )
+	  ln -sf ../$(XEN_ROOT)/tools/ioemu/* .)
+else
+	[ -h ioemu/Makefile ] || ( cd ioemu && \
+	  ln -sf $(CONFIG_QEMU)/* . && \
+          rm -fr i386-dm && \
+          rm -fr i386-stubdom && \
+          mkdir i386-dm && \
+          mkdir i386-stubdom && \
+	  ln -sf $(CONFIG_QEMU)/i386-dm/* i386-dm/ && \
+	  ln -sf $(CONFIG_QEMU)/i386-stubdom/* i386-stubdom/ )
+endif
+	[ ! -h ioemu/config-host.h ] || rm -f ioemu/config-host.h
+	[ ! -h ioemu/config-host.mak ] || rm -f ioemu/config-host.mak
 	$(MAKE) -C $(MINI_OS) links
 
 TARGETS_MINIOS=$(addprefix mini-os-,$(TARGETS))
@@ -193,10 +209,17 @@ libxc/libxenctrl.a libxc/libxenguest.a:: cross-zlib mk-headers
 
 .PHONY: ioemu
 ioemu: cross-zlib cross-libpci mk-headers libxc
+ifeq ($(CONFIG_QEMU),ioemu)
 	[ -f ioemu/config-host.mak ] || \
 	  ( cd ioemu ; \
           XEN_TARGET_ARCH=$(XEN_TARGET_ARCH) CFLAGS="$(TARGET_CFLAGS)" sh configure --prefix=/usr --enable-stubdom $(IOEMU_OPTIONS))
 	CPPFLAGS="$(TARGET_CPPFLAGS)" $(MAKE) -C ioemu LWIPDIR=$(CURDIR)/lwip-cvs TOOLS=
+else
+	[ -f ioemu/config-host.mak ] || \
+	  ( cd ioemu ; \
+          CONFIG_STUBDOM=yes XEN_ROOT=$(abspath $(XEN_ROOT)) XEN_TARGET_ARCH=$(XEN_TARGET_ARCH) CFLAGS="$(TARGET_CFLAGS)" sh ./xen-setup --cc=$(CC) --disable-gcc-check $(IOEMU_OPTIONS))
+	CPPFLAGS= TARGET_CPPFLAGS="$(TARGET_CPPFLAGS)" $(MAKE) -C ioemu LWIPDIR=$(CURDIR)/lwip-cvs TOOLS= CONFIG_STUBDOM=yes
+endif
 
 ######
 # caml
@@ -233,8 +256,13 @@ grub: grub-cvs cross-newlib mk-headers
 ########
 
 .PHONY: ioemu-stubdom
+ifeq ($(CONFIG_QEMU),ioemu)
+ioemu-stubdom: APP_OBJS=$(CURDIR)/ioemu/i386-dm-stubdom/qemu.a $(CURDIR)/ioemu/i386-dm-stubdom/libqemu.a
+else
+ioemu-stubdom: APP_OBJS=$(CURDIR)/ioemu/i386-stubdom/qemu.a $(CURDIR)/ioemu/i386-stubdom/libqemu.a $(CURDIR)/ioemu/libqemu_common.a
+endif
 ioemu-stubdom: mini-os-ioemu lwip-cvs libxc ioemu
-	DEF_CPPFLAGS="$(TARGET_CPPFLAGS)" DEF_CFLAGS="-DCONFIG_QEMU $(TARGET_CFLAGS)" DEF_LDFLAGS="$(TARGET_LDFLAGS)" $(MAKE) -C $(MINI_OS) OBJ_DIR=$(CURDIR)/$< LWIPDIR=$(CURDIR)/lwip-cvs APP_OBJS="$(CURDIR)/ioemu/i386-dm-stubdom/qemu.a $(CURDIR)/ioemu/i386-dm-stubdom/libqemu.a"
+	DEF_CPPFLAGS="$(TARGET_CPPFLAGS)" DEF_CFLAGS="-DCONFIG_QEMU $(TARGET_CFLAGS)" DEF_LDFLAGS="$(TARGET_LDFLAGS)" $(MAKE) -C $(MINI_OS) OBJ_DIR=$(CURDIR)/$< LWIPDIR=$(CURDIR)/lwip-cvs APP_OBJS="$(APP_OBJS)"
 
 CAMLLIB = $(shell ocamlc -where)
 .PHONY: caml-stubdom
@@ -302,7 +330,7 @@ patchclean: crossclean
 # clean downloads
 .PHONY: downloadclean
 downloadclean: patchclean
-	rm -f newlib-$(ZLIB_VERSION).tar.gz
+	rm -f newlib-$(NEWLIB_VERSION).tar.gz
 	rm -f zlib-$(ZLIB_VERSION).tar.gz
 	rm -f pciutils-$(LIBPCI_VERSION).tar.bz2
 

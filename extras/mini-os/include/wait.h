@@ -1,9 +1,9 @@
 #ifndef __WAIT_H__
 #define __WAIT_H__
 
-#include <sched.h>
-#include <os.h>
-#include <waittypes.h>
+#include <mini-os/sched.h>
+#include <mini-os/os.h>
+#include <mini-os/waittypes.h>
 
 #define DEFINE_WAIT(name)                               \
 struct wait_queue name = {                              \

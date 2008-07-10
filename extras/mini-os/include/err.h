@@ -1,7 +1,7 @@
 #ifndef _ERR_H
 #define _ERR_H
 
-#include <errno.h>
+#include <mini-os/errno.h>
 
 /*
  * Kernel pointers have redundant information, so we can use a

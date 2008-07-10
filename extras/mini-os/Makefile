@@ -55,6 +55,8 @@ endif
 .PHONY: links
 links:	$(ARCH_LINKS)
 	[ -e include/xen ] || ln -sf ../../../xen/include/public include/xen
+	[ -e include/mini-os ] || ln -sf . include/mini-os
+	[ -e include/$(TARGET_ARCH_FAM)/mini-os ] || ln -sf . include/$(TARGET_ARCH_FAM)/mini-os
 
 .PHONY: arch_lib
 arch_lib:
@@ -89,7 +91,7 @@ OBJS := $(filter-out $(OBJ_DIR)/daytime.o, $(OBJS))
 endif
 
 $(OBJ_DIR)/$(TARGET)_app.o: $(APP_OBJS) app.lds
-	$(LD) -r -d $(LDFLAGS) $^ $(APP_LDLIBS) --undefined main -o $@
+	$(LD) -r -d $(LDFLAGS) -\( $^ -\) $(APP_LDLIBS) --undefined main -o $@
 
 $(OBJ_DIR)/$(TARGET): links $(OBJS) $(OBJ_DIR)/$(TARGET)_app.o arch_lib
 	$(LD) -r $(LDFLAGS) $(HEAD_OBJ) $(OBJ_DIR)/$(TARGET)_app.o $(OBJS) $(LDARCHLIB) $(LDLIBS) -o $@.o

@@ -1,7 +1,7 @@
 #ifndef __WAITTYPE_H__
 #define __WAITTYPE_H__
 
-#include <list.h>
+#include <mini-os/list.h>
 
 struct thread;
 struct wait_queue

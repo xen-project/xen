@@ -2,8 +2,7 @@
 #define _POSIX_UNISTD_H
 
 #include_next <unistd.h>
-#include <sys/select.h>
-#include <arch_limits.h>
+#include <mini-os/arch_limits.h>
 
 #define getpagesize() __PAGE_SIZE
 

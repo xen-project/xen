@@ -1,7 +1,7 @@
 #ifndef _ERRNO_H
 #define _ERRNO_H
 
-#include <errno-base.h>
+#include <mini-os/errno-base.h>
 
 typedef int error_t;
 
@@ -113,7 +113,7 @@ typedef int error_t;
 #define EFTYPE          132     /* Inappropriate file type or format */
 
 #ifdef HAVE_LIBC
-#include <sched.h>
+#include <mini-os/sched.h>
 extern int errno;
 #define ERRNO
 #define errno (get_current()->reent._errno)

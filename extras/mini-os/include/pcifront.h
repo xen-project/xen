@@ -1,4 +1,4 @@
-#include <types.h>
+#include <mini-os/types.h>
 #include <xen/io/pciif.h>
 struct pcifront_dev;
 struct pcifront_dev *init_pcifront(char *nodename);

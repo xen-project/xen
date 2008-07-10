@@ -1,6 +1,6 @@
 #include <xen/io/kbdif.h>
 #include <xen/io/fbif.h>
-#include <wait.h>
+#include <mini-os/wait.h>
 
 /* from <linux/input.h> */
 #ifndef BTN_LEFT

@@ -16,9 +16,9 @@
 
 
 #ifndef __ASSEMBLY__
-#include <types.h>
-#include <hypervisor.h>
-#include <kernel.h>
+#include <mini-os/types.h>
+#include <mini-os/hypervisor.h>
+#include <mini-os/kernel.h>
 
 #define USED    __attribute__ ((used))
 

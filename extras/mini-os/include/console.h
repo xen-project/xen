@@ -36,8 +36,8 @@
 #ifndef _LIB_CONSOLE_H_
 #define _LIB_CONSOLE_H_
 
-#include<os.h>
-#include<traps.h>
+#include<mini-os/os.h>
+#include<mini-os/traps.h>
 #include<stdarg.h>
 
 void print(int direct, const char *fmt, va_list args);

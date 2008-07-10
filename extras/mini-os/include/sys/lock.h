@@ -5,7 +5,7 @@
 
 /* Due to inclusion loop, we can not include sched.h, so have to hide things */
 
-#include <waittypes.h>
+#include <mini-os/waittypes.h>
 
 
 typedef struct {

@@ -3,7 +3,7 @@
 #ifndef __ARCH_ASM_SPINLOCK_H
 #define __ARCH_ASM_SPINLOCK_H
 
-#include <lib.h>
+#include <mini-os/lib.h>
 #include "os.h"
 
 

@@ -38,7 +38,7 @@
 
 #if !defined(__ASSEMBLY__)
 
-#include <types.h>
+#include <mini-os/types.h>
 
 
 /*

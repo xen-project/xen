@@ -35,10 +35,10 @@
 #error "Unsupported architecture"
 #endif
 
-#include <lib.h>
+#include <mini-os/lib.h>
 
-#include <arch_limits.h>
-#include <arch_mm.h>
+#include <mini-os/arch_limits.h>
+#include <mini-os/arch_mm.h>
 
 #define STACK_SIZE_PAGE_ORDER __STACK_SIZE_PAGE_ORDER
 #define STACK_SIZE __STACK_SIZE
