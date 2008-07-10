@@ -1465,3 +1465,31 @@ Index: grub/stage2/stage2.c
  # endif /* SUPPORT_DISKLESS */
  
  static int preset_menu_offset;
+Index: grub/stage2/fsys_xfs.c
+===================================================================
+RCS file: /sources/grub/grub/stage2/fsys_xfs.c,v
+retrieving revision 1.5
+diff -u -p -r1.5 fsys_xfs.c
+--- grub/stage2/fsys_xfs.c	8 May 2005 02:18:14 -0000	1.5
++++ grub/stage2/fsys_xfs.c	10 Jul 2008 13:09:50 -0000
+@@ -101,7 +101,7 @@ static inline __const__ xfs_uint16_t
+ le16 (xfs_uint16_t x)
+ {
+ 	__asm__("xchgb %b0,%h0"	\
+-		: "=q" (x) \
++		: "=Q" (x) \
+ 		:  "0" (x)); \
+ 		return x;
+ }
+@@ -109,9 +109,9 @@ le16 (xfs_uint16_t x)
+ static inline __const__ xfs_uint32_t
+ le32 (xfs_uint32_t x)
+ {
+-#if 0
++#if 1
+         /* 386 doesn't have bswap.  */
+-	__asm__("bswap %0" : "=r" (x) : "0" (x));
++	__asm__("bswapl %k0" : "=r" (x) : "0" (x));
+ #else
+ 	/* This is slower but this works on all x86 architectures.  */
+ 	__asm__("xchgb %b0, %h0" \
