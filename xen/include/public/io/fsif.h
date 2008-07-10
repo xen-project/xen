@@ -21,7 +21,7 @@
  * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
  * DEALINGS IN THE SOFTWARE.
  *
- * Copyright (c) 2007, Grzegorz Milos, Sun Microsystems, Inc.  
+ * Copyright (c) 2007, Grzegorz Milos, <gm281@cam.ac.uk>.
  */
 
 #ifndef __XEN_PUBLIC_IO_FSIF_H__
