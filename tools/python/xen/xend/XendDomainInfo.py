@@ -2613,6 +2613,7 @@ class XendDomainInfo:
     def _cleanupVm(self):
         """Cleanup VM resources.  Idempotent.  Nothrow guarantee."""
 
+        self.metrics.destroy()
         self._unwatchVm()
 
         try:
