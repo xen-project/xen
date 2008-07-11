@@ -64,7 +64,14 @@ def domains(detail = True, full = False):
 def domains_with_state(detail, state, full):
     if detail:
         domains = XendDomain.instance().list_sorted(state)
-        return map(lambda dom: fixup_sxpr(dom.sxpr(not full)), domains)
+        ret = []
+        for dom in domains:
+            try:
+                ret.append(fixup_sxpr(dom.sxpr(not full)))
+            except:
+                log.warn("Failed to query SXPR for domain %s" % str(dom))
+                pass
+        return ret
     else:
         return XendDomain.instance().list_names(state)
 
