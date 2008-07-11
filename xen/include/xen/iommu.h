@@ -103,6 +103,10 @@ struct iommu_ops {
     int (*reassign_device)(struct domain *s, struct domain *t,
 			   u8 bus, u8 devfn);
     int (*get_device_group_id)(u8 bus, u8 devfn);
+    void (*update_ire_from_apic)(unsigned int apic, unsigned int reg, unsigned int value);
+    void (*update_ire_from_msi)(struct msi_desc *msi_desc, struct msi_msg *msg);
 };
 
+void iommu_update_ire_from_apic(unsigned int apic, unsigned int reg, unsigned int value);
+void iommu_update_ire_from_msi(struct msi_desc *msi_desc, struct msi_msg *msg);
 #endif /* _IOMMU_H_ */

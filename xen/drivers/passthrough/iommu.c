@@ -290,6 +290,43 @@ int iommu_get_device_group(struct domain *d, u8 bus, u8 devfn,
 
     return i;
 }
+
+void iommu_update_ire_from_apic(
+    unsigned int apic, unsigned int reg, unsigned int value)
+{
+    struct iommu_ops *ops = NULL;
+
+    switch ( boot_cpu_data.x86_vendor )
+    {
+    case X86_VENDOR_INTEL:
+        ops = &intel_iommu_ops;
+        break;
+    case X86_VENDOR_AMD:
+        ops = &amd_iommu_ops;
+        break;
+    default:
+        BUG();
+    }
+    ops->update_ire_from_apic(apic, reg, value);
+}
+void iommu_update_ire_from_msi(
+    struct msi_desc *msi_desc, struct msi_msg *msg)
+{
+    struct iommu_ops *ops = NULL;
+
+    switch ( boot_cpu_data.x86_vendor )
+    {
+    case X86_VENDOR_INTEL:
+        ops = &intel_iommu_ops;
+        break;
+    case X86_VENDOR_AMD:
+        ops = &amd_iommu_ops;
+        break;
+    default:
+        BUG();
+    }
+    ops->update_ire_from_msi(msi_desc, msg);
+}
 /*
  * Local variables:
  * mode: C

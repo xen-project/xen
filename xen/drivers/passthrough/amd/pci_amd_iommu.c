@@ -649,4 +649,6 @@ struct iommu_ops amd_iommu_ops = {
     .unmap_page = amd_iommu_unmap_page,
     .reassign_device = amd_iommu_return_device,
     .get_device_group_id = amd_iommu_group_id,
+    .update_ire_from_apic = amd_iommu_ioapic_update_ire,
+    .update_ire_from_msi = amd_iommu_msi_msg_update_ire,
 };

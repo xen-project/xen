@@ -1883,6 +1883,8 @@ struct iommu_ops intel_iommu_ops = {
     .unmap_page = intel_iommu_unmap_page,
     .reassign_device = reassign_device_ownership,
     .get_device_group_id = intel_iommu_group_id,
+    .update_ire_from_apic = io_apic_write_remap_rte,
+    .update_ire_from_msi = msi_msg_write_remap_rte,
 };
 
 /*

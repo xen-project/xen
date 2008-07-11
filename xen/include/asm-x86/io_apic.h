@@ -133,8 +133,8 @@ static inline unsigned int io_apic_read(unsigned int apic, unsigned int reg)
 
 static inline void io_apic_write(unsigned int apic, unsigned int reg, unsigned int value)
 {
-	if (vtd_enabled)
-		return io_apic_write_remap_rte(apic, reg, value);
+	if (iommu_enabled)
+		return iommu_update_ire_from_apic(apic, reg, value);
 	*IO_APIC_BASE(apic) = reg;
 	*(IO_APIC_BASE(apic)+4) = value;
 }

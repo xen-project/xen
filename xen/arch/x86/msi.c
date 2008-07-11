@@ -173,8 +173,8 @@ static int unset_vector_msi(int vector)
 
 static void write_msi_msg(struct msi_desc *entry, struct msi_msg *msg)
 {
-    if ( vtd_enabled )
-        msi_msg_write_remap_rte(entry, msg);
+    if ( iommu_enabled )
+        iommu_update_ire_from_msi(entry, msg);
 
     switch ( entry->msi_attrib.type )
     {
