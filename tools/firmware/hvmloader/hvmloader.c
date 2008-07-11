@@ -434,6 +434,23 @@ static void cmos_write_memory_size(void)
     cmos_outb(0x35, (uint8_t)( alt_mem >> 8));
 }
 
+static void init_xen_platform_io_base(void)
+{
+    struct bios_info *bios_info = (struct bios_info *)ACPI_PHYSICAL_ADDRESS;
+    uint32_t devfn, bar_data;
+    uint16_t vendor_id, device_id;
+
+    for ( devfn = 0; devfn < 128; devfn++ )
+    {
+        vendor_id = pci_readw(devfn, PCI_VENDOR_ID);
+        device_id = pci_readw(devfn, PCI_DEVICE_ID);
+        if ( (vendor_id != 0x5853) || (device_id != 0x0001) )
+            continue;
+        bar_data = pci_readl(devfn, PCI_BASE_ADDRESS_0);
+        bios_info->xen_pfiob = bar_data & PCI_BASE_ADDRESS_IO_MASK;
+    }
+}
+
 int main(void)
 {
     int acpi_sz = 0, vgabios_sz = 0, etherboot_sz = 0, rombios_sz, smbios_sz;
@@ -526,6 +543,8 @@ int main(void)
         printf(" %05x-%05x: Main BIOS\n",
                ROMBIOS_PHYSICAL_ADDRESS,
                ROMBIOS_PHYSICAL_ADDRESS + rombios_sz - 1);
+
+    init_xen_platform_io_base();
 
     printf("Invoking ROMBIOS ...\n");
     return 0;

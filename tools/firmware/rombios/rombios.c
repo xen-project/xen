@@ -26,6 +26,9 @@
 
 // ROM BIOS for use with Bochs/Plex x86 emulation environment
 
+#define uint8_t unsigned char
+#define uint16_t unsigned short
+#define uint32_t unsigned long
 #include "../hvmloader/config.h"
 
 #define HVMASSIST
@@ -1459,6 +1462,23 @@ copy_e820_table()
   base_mem = read_dword(0x9000, 0x2d0 + 8);
   write_word(0x40, 0x13, base_mem >> 10);
 }
+
+void
+disable_rom_write_access()
+{
+    Bit16u off = (Bit16u)&((struct bios_info *)0)->xen_pfiob;
+ASM_START
+    mov si,.disable_rom_write_access.off[bp]
+    push ds
+    mov ax,#(ACPI_PHYSICAL_ADDRESS >> 4)
+    mov ds,ax
+    mov dx,[si]
+    pop ds
+    mov ax,#PFFLAG_ROM_LOCK
+    out dx,al
+ASM_END
+}
+    
 #endif /* HVMASSIST */
 
 #if BX_DEBUG_SERIAL
@@ -10154,6 +10174,10 @@ post_default_ints:
 #if BX_TCGBIOS
   call tcpa_post_part2
 #endif
+
+#ifdef HVMASSIST
+  call _disable_rom_write_access
+#endif 
 
   ;; Start the boot sequence.   See the comments in int19_relocated 
   ;; for why we use INT 18h instead of INT 19h here.
