@@ -1383,105 +1383,6 @@ void vga_invalidate_scanlines(VGAState *s, int y1, int y2)
     }
 }
 
-static inline int cmp_vram(VGAState *s, int offset, int n)
-{
-    long *vp, *sp;
-
-    if (s->vram_shadow == NULL)
-        return 1;
-    vp = (long *)(s->vram_ptr + offset);
-    sp = (long *)(s->vram_shadow + offset);
-    while ((n -= sizeof(*vp)) >= 0) {
-        if (*vp++ != *sp++) {
-            memcpy(sp - 1, vp - 1, n + sizeof(*vp));
-            return 1;
-        }
-    }
-    return 0;
-}
-
-#ifdef USE_SSE2
-
-#include <signal.h>
-#include <setjmp.h>
-#include <emmintrin.h>
-
-int sse2_ok = 1;
-
-static inline unsigned int cpuid_edx(unsigned int op)
-{
-    unsigned int eax, edx;
-
-#ifdef __x86_64__
-#define __bx "rbx"
-#else
-#define __bx "ebx"
-#endif
-    __asm__("push %%"__bx"; cpuid; pop %%"__bx
-            : "=a" (eax), "=d" (edx)
-            : "0" (op)
-            : "cx");
-#undef __bx
-
-    return edx;
-}
-
-jmp_buf sse_jbuf;
-
-void intr(int sig)
-{
-    sse2_ok = 0;
-    longjmp(sse_jbuf, 1);
-}
-
-void check_sse2(void)
-{
-    /* Check 1: What does CPUID say? */
-    if ((cpuid_edx(1) & 0x4000000) == 0) {
-        sse2_ok = 0;
-        return;
-    }
-
-    /* Check 2: Can we use SSE2 in anger? */
-    signal(SIGILL, intr);
-    if (setjmp(sse_jbuf) == 0)
-        __asm__("xorps %xmm0,%xmm0\n");
-}
-
-int vram_dirty(VGAState *s, int offset, int n)
-{
-    __m128i *sp, *vp;
-
-    if (s->vram_shadow == NULL)
-        return 1;
-    if (sse2_ok == 0)
-        return cmp_vram(s, offset, n);
-    vp = (__m128i *)(s->vram_ptr + offset);
-    sp = (__m128i *)(s->vram_shadow + offset);
-    while ((n -= sizeof(*vp)) >= 0) {
-        if (_mm_movemask_epi8(_mm_cmpeq_epi8(*sp, *vp)) != 0xffff) {
-            while (n >= 0) {
-                _mm_store_si128(sp++, _mm_load_si128(vp++));
-                n -= sizeof(*vp);
-            }
-            return 1;
-        }
-        sp++;
-        vp++;
-    }
-    return 0;
-}
-#else /* !USE_SSE2 */
-int vram_dirty(VGAState *s, int offset, int n)
-{
-    return cmp_vram(s, offset, n);
-}
-
-void check_sse2(void)
-{
-}
-#endif /* !USE_SSE2 */
-
 /* 
  * graphic modes
  */
@@ -1495,6 +1396,7 @@ static void vga_draw_graphic(VGAState *s, int full_update)
     uint32_t v, addr1, addr;
     vga_draw_line_func *vga_draw_line;
     ram_addr_t page_min, page_max;
+    unsigned long start, end;
 
     full_update |= update_basic_params(s);
 
@@ -1609,69 +1511,51 @@ static void vga_draw_graphic(VGAState *s, int full_update)
            width, height, v, line_offset, s->cr[9], s->cr[0x17], s->line_compare, s->sr[0x01]);
 #endif
 
-    y = 0;
-
     if (height - 1 > s->line_compare || multi_run || (s->cr[0x17] & 3) != 3
             || !s->lfb_addr) {
-        /* Tricky things happen, disable dirty bit tracking */
-        xc_hvm_track_dirty_vram(xc_handle, domid, 0, 0, NULL);
-
-        for ( ; y < s->vram_size; y += TARGET_PAGE_SIZE)
-            if (vram_dirty(s, y, TARGET_PAGE_SIZE))
-                cpu_physical_memory_set_dirty(s->vram_offset + y);
+        /* Tricky things happen, just track all video memory */
+        start = 0;
+        end = s->vram_size;
     } else {
         /* Tricky things won't have any effect, i.e. we are in the very simple
          * (and very usual) case of a linear buffer. */
-        unsigned long end;
-
-        for ( ; y < ((s->start_addr * 4) & TARGET_PAGE_MASK); y += TARGET_PAGE_SIZE)
-            /* We will not read that anyway. */
-            cpu_physical_memory_set_dirty(s->vram_offset + y);
-
-        if (y < (s->start_addr * 4)) {
-            /* start address not aligned on a page, track dirtyness by hand. */
-            if (vram_dirty(s, y, TARGET_PAGE_SIZE))
-                cpu_physical_memory_set_dirty(s->vram_offset + y);
-            y += TARGET_PAGE_SIZE;
-        }
-
-        /* use page table dirty bit tracking for the inner of the LFB */
-        end = s->start_addr * 4 + height * line_offset;
-        {
-            unsigned long npages = ((end & TARGET_PAGE_MASK) - y) / TARGET_PAGE_SIZE;
-            const int width = sizeof(unsigned long) * 8;
-            unsigned long bitmap[(npages + width - 1) / width];
-            int err;
-
-            if (!(err = xc_hvm_track_dirty_vram(xc_handle, domid,
-                        (s->lfb_addr + y) / TARGET_PAGE_SIZE, npages, bitmap))) {
-                int i, j;
-                for (i = 0; i < sizeof(bitmap) / sizeof(*bitmap); i++) {
-                    unsigned long map = bitmap[i];
-                    for (j = i * width; map && j < npages; map >>= 1, j++)
-                        if (map & 1)
-                            cpu_physical_memory_set_dirty(s->vram_offset + y
-                                + j * TARGET_PAGE_SIZE);
-                }
-                y += npages * TARGET_PAGE_SIZE;
-            } else {
-                /* ENODATA just means we have changed mode and will succeed
-                 * next time */
-                if (err != -ENODATA)
-                    fprintf(stderr, "track_dirty_vram(%lx, %lx) failed (%d)\n", s->lfb_addr + y, npages, err);
-            }
-        }
-
-        for ( ; y < s->vram_size && y < end; y += TARGET_PAGE_SIZE)
-            /* failed or end address not aligned on a page, track dirtyness by
-             * hand. */
-            if (vram_dirty(s, y, TARGET_PAGE_SIZE))
-                cpu_physical_memory_set_dirty(s->vram_offset + y);
-
-        for ( ; y < s->vram_size; y += TARGET_PAGE_SIZE)
-            /* We will not read that anyway. */
-            cpu_physical_memory_set_dirty(s->vram_offset + y);
+        /* use page table dirty bit tracking for the LFB plus border */
+        start = (s->start_addr * 4) & TARGET_PAGE_MASK;
+        end = ((s->start_addr * 4 + height * line_offset) + TARGET_PAGE_SIZE - 1) & TARGET_PAGE_MASK;
     }
+
+    for (y = 0 ; y < start; y += TARGET_PAGE_SIZE)
+        /* We will not read that anyway. */
+        cpu_physical_memory_set_dirty(s->vram_offset + y);
+
+    {
+        unsigned long npages = (end - y) / TARGET_PAGE_SIZE;
+        const int width = sizeof(unsigned long) * 8;
+        unsigned long bitmap[(npages + width - 1) / width];
+        int err;
+
+        if (!(err = xc_hvm_track_dirty_vram(xc_handle, domid,
+                    (s->lfb_addr + y) / TARGET_PAGE_SIZE, npages, bitmap))) {
+            int i, j;
+            for (i = 0; i < sizeof(bitmap) / sizeof(*bitmap); i++) {
+                unsigned long map = bitmap[i];
+                for (j = i * width; map && j < npages; map >>= 1, j++)
+                    if (map & 1)
+                        cpu_physical_memory_set_dirty(s->vram_offset + y
+                            + j * TARGET_PAGE_SIZE);
+            }
+            y += npages * TARGET_PAGE_SIZE;
+        } else {
+            /* ENODATA just means we have changed mode and will succeed
+             * next time */
+            if (err != -ENODATA)
+                fprintf(stderr, "track_dirty_vram(%lx, %lx) failed (%d)\n", s->lfb_addr + y, npages, err);
+        }
+    }
+
+    for ( ; y < s->vram_size; y += TARGET_PAGE_SIZE)
+        /* We will not read that anyway. */
+        cpu_physical_memory_set_dirty(s->vram_offset + y);
 
     addr1 = (s->start_addr * 4);
     bwidth = (width * bits + 7) / 8;
@@ -2140,16 +2024,7 @@ void vga_common_init(VGAState *s, DisplayState *ds, uint8_t *vga_ram_base,
 
     vga_reset(s);
 
-    check_sse2();
-    s->vram_shadow = qemu_malloc(vga_ram_size+TARGET_PAGE_SIZE+1);
-    if (s->vram_shadow == NULL)
-        fprintf(stderr, "Cannot allocate %d bytes for VRAM shadow, "
-                "mouse will be slow\n", vga_ram_size);
-    s->vram_shadow = (uint8_t *)((long)(s->vram_shadow + TARGET_PAGE_SIZE - 1)
-                                 & ~(TARGET_PAGE_SIZE - 1));
-
-    /* Video RAM must be 128-bit aligned for SSE optimizations later */
-    /* and page-aligned for PVFB memory sharing */
+    /* Video RAM must be page-aligned for PVFB memory sharing */
     s->vram_ptr = s->vram_alloc = qemu_memalign(TARGET_PAGE_SIZE, vga_ram_size);
 
 #ifdef CONFIG_STUBDOM
