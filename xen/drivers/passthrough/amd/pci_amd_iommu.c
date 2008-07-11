@@ -34,6 +34,7 @@ int nr_amd_iommus;
 
 unsigned short ivrs_bdf_entries;
 struct ivrs_mappings *ivrs_mappings;
+extern void *int_remap_table;
 
 static void deallocate_domain_page_tables(struct hvm_iommu *hd)
 {
@@ -256,18 +257,21 @@ static void amd_iommu_setup_domain_device(
 {
     void *dte;
     u64 root_ptr;
+    u64 intremap_ptr;
     unsigned long flags;
     int req_id;
     u8 sys_mgt, dev_ex;
     struct hvm_iommu *hd = domain_hvm_iommu(domain);
 
-    BUG_ON( !hd->root_table || !hd->paging_mode );
+    BUG_ON( !hd->root_table || !hd->paging_mode || !int_remap_table );
 
     root_ptr = (u64)virt_to_maddr(hd->root_table);
     /* get device-table entry */
     req_id = ivrs_mappings[bdf].dte_requestor_id;
     dte = iommu->dev_table.buffer +
         (req_id * IOMMU_DEV_TABLE_ENTRY_SIZE);
+
+    intremap_ptr = (u64)virt_to_maddr(int_remap_table);
 
     if ( !amd_iommu_is_dte_page_translation_valid((u32 *)dte) )
     {
@@ -276,11 +280,12 @@ static void amd_iommu_setup_domain_device(
         /* bind DTE to domain page-tables */
         sys_mgt = ivrs_mappings[req_id].dte_sys_mgt_enable;
         dev_ex = ivrs_mappings[req_id].dte_allow_exclusion;
-        amd_iommu_set_dev_table_entry((u32 *)dte, root_ptr,
+        amd_iommu_set_dev_table_entry((u32 *)dte, root_ptr, intremap_ptr,
                                       hd->domain_id, sys_mgt, dev_ex,
                                       hd->paging_mode);
 
         invalidate_dev_table_entry(iommu, req_id);
+        invalidate_interrupt_table(iommu, req_id);
         flush_command_buffer(iommu);
         amd_iov_info("Enable DTE:0x%x, "
                 "root_ptr:%"PRIx64", domain_id:%d, paging_mode:%d\n",
@@ -364,6 +369,12 @@ int amd_iov_detect(void)
     }
     memset(ivrs_mappings, 0,
            ivrs_bdf_entries * sizeof(struct ivrs_mappings));
+
+    if ( amd_iommu_setup_intremap_table() != 0 )
+    {
+        amd_iov_error("Error allocating interrupt remapping table\n");
+        goto error_out;
+    }
 
     if ( amd_iommu_init() != 0 )
     {

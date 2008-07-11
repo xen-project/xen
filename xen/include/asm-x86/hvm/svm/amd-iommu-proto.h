@@ -70,7 +70,7 @@ int amd_iommu_reserve_domain_unity_map(struct domain *domain,
 int amd_iommu_sync_p2m(struct domain *d);
 
 /* device table functions */
-void amd_iommu_set_dev_table_entry(u32 *dte, u64 root_ptr,
+void amd_iommu_set_dev_table_entry(u32 *dte, u64 root_ptr, u64 intremap_ptr,
         u16 domain_id, u8 sys_mgt, u8 dev_ex, u8 paging_mode);
 int amd_iommu_is_dte_page_translation_valid(u32 *entry);
 void invalidate_dev_table_entry(struct amd_iommu *iommu,
@@ -85,6 +85,14 @@ struct amd_iommu *find_iommu_for_device(int bus, int devfn);
 
 /* amd-iommu-acpi functions */
 int __init parse_ivrs_table(struct acpi_table_header *table);
+
+/*interrupt remapping */
+int amd_iommu_setup_intremap_table(void);
+void invalidate_interrupt_table(struct amd_iommu *iommu, u16 device_id);
+void amd_iommu_ioapic_update_ire(
+    unsigned int apic, unsigned int reg, unsigned int value);
+void amd_iommu_msi_msg_update_ire(
+    struct msi_desc *msi_desc, struct msi_msg *msg);
 
 static inline u32 get_field_from_reg_u32(u32 reg_value, u32 mask, u32 shift)
 {
