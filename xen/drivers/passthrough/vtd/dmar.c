@@ -400,7 +400,7 @@ static int __init acpi_parse_dmar(struct acpi_table_header *table)
         return -EINVAL;
     }
 
-    dmar_host_address_width = dmar->width;
+    dmar_host_address_width = dmar->width + 1;
     dprintk(XENLOG_INFO VTDPREFIX, "Host address width %d\n",
             dmar_host_address_width);
 
