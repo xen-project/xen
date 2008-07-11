@@ -2223,6 +2223,11 @@ class XendDomainInfo:
             shadow_cur = xc.shadow_mem_control(self.domid, shadow / 1024)
             self.info['shadow_memory'] = shadow_cur
 
+            # machine address size
+            if self.info.has_key('machine_address_size'):
+                log.debug("_initDomain: setting maximum machine address size %d" % self.info['machine_address_size'])
+                xc.domain_set_machine_address_size(self.domid, self.info['machine_address_size'])
+                
             self._createChannels()
 
             channel_details = self.image.createImage()

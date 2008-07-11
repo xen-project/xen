@@ -207,6 +207,7 @@ XENAPI_CFG_TYPES = {
     'pci': str,
     'cpuid' : dict,
     'cpuid_check' : dict,
+    'machine_address_size': int,
 }
 
 # List of legacy configuration keys that have no equivalent in the

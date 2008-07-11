@@ -1076,6 +1076,12 @@ int xc_domain_bind_pt_isa_irq(int xc_handle,
                               uint32_t domid,
                               uint8_t machine_irq);
 
+int xc_domain_set_machine_address_size(int handle,
+				       uint32_t domid,
+				       unsigned int width);
+int xc_domain_get_machine_address_size(int handle,
+				       uint32_t domid);
+
 /* Set the target domain */
 int xc_domain_set_target(int xc_handle,
                          uint32_t domid,

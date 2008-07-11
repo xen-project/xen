@@ -475,7 +475,8 @@ int check_descriptor(const struct domain *dom, struct desc_struct *d)
 void domain_set_alloc_bitsize(struct domain *d)
 {
     if ( !is_pv_32on64_domain(d) ||
-         (MACH2PHYS_COMPAT_NR_ENTRIES(d) >= max_page) )
+         (MACH2PHYS_COMPAT_NR_ENTRIES(d) >= max_page) ||
+         d->arch.physaddr_bitsize > 0 )
         return;
     d->arch.physaddr_bitsize =
         /* 2^n entries can be contained in guest's p2m mapping space */

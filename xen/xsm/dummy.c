@@ -467,6 +467,7 @@ void xsm_fixup_ops (struct xsm_operations *ops)
     set_to_dummy_if_null(ops, hypercall_init);
     set_to_dummy_if_null(ops, hvmcontext);
     set_to_dummy_if_null(ops, address_size);
+    set_to_dummy_if_null(ops, machine_address_size);
     set_to_dummy_if_null(ops, hvm_param);
     set_to_dummy_if_null(ops, hvm_set_pci_intx_level);
     set_to_dummy_if_null(ops, hvm_set_isa_irq_level);

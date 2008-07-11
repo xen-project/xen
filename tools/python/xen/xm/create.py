@@ -563,6 +563,10 @@ gopts.var('cpuid_check', val="IN[,SIN]:eax=EAX,ebx=EBX,exc=ECX,edx=EDX",
           fn=append_value, default=[],
           use="""Cpuid check description.""")
 
+gopts.var('machine_address_size', val='BITS',
+          fn=set_int, default=None,
+          use="""Maximum machine address size""")
+
 def err(msg):
     """Print an error to stderr and exit.
     """
@@ -610,6 +614,9 @@ def configure_image(vals):
 
     if vals.vhpt != 0:
         config_image.append(['vhpt', vals.vhpt])
+
+    if vals.machine_address_size:
+        config_image.append(['machine_address_size', vals.machine_address_size])
 
     return config_image
     
@@ -863,7 +870,7 @@ def make_config(vals):
                    'restart', 'on_poweroff',
                    'on_reboot', 'on_crash', 'vcpus', 'vcpu_avail', 'features',
                    'on_xend_start', 'on_xend_stop', 'target', 'cpuid',
-                   'cpuid_check'])
+                   'cpuid_check', 'machine_address_size'])
 
     if vals.uuid is not None:
         config.append(['uuid', vals.uuid])

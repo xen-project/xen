@@ -607,6 +607,14 @@ struct xen_domctl_subscribe {
 typedef struct xen_domctl_subscribe xen_domctl_subscribe_t;
 DEFINE_XEN_GUEST_HANDLE(xen_domctl_subscribe_t);
 
+/*
+ * Define the maximum machine address size which should be allocated
+ * to a guest.
+ */
+#define XEN_DOMCTL_set_machine_address_size  51
+#define XEN_DOMCTL_get_machine_address_size  52
+
+
 struct xen_domctl {
     uint32_t cmd;
     uint32_t interface_version; /* XEN_DOMCTL_INTERFACE_VERSION */

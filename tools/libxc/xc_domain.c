@@ -993,6 +993,35 @@ int xc_domain_subscribe_for_suspend(
     return do_domctl(xc_handle, &domctl);
 }
 
+int xc_domain_set_machine_address_size(int xc,
+                                       uint32_t domid,
+                                       unsigned int width)
+{
+    DECLARE_DOMCTL;
+
+    memset(&domctl, 0, sizeof(domctl));
+    domctl.domain = domid;
+    domctl.cmd    = XEN_DOMCTL_set_machine_address_size;
+    domctl.u.address_size.size = width;
+
+    return do_domctl(xc, &domctl);
+}
+
+
+int xc_domain_get_machine_address_size(int xc, uint32_t domid)
+{
+    DECLARE_DOMCTL;
+    int rc;
+
+    memset(&domctl, 0, sizeof(domctl));
+    domctl.domain = domid;
+    domctl.cmd    = XEN_DOMCTL_get_machine_address_size;
+
+    rc = do_domctl(xc, &domctl);
+
+    return rc == 0 ? domctl.u.address_size.size : rc;
+}
+
 /*
  * Local variables:
  * mode: C
