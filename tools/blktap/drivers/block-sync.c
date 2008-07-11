@@ -129,7 +129,7 @@ int tdsync_open (struct disk_driver *dd, const char *name, td_flag_t flags)
 
                 /* Maybe O_DIRECT isn't supported. */
 		o_flags &= ~O_DIRECT;
-                fd = open(name, O_RDWR | O_LARGEFILE);
+                fd = open(name, o_flags);
                 if (fd != -1) DPRINTF("WARNING: Accessing image without"
                                      "O_DIRECT! (%s)\n", name);
 
