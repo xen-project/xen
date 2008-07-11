@@ -109,7 +109,7 @@ static inline void init_fds(struct disk_driver *dd)
 }
 
 /* Open the disk file and initialize aio state. */
-int tdsync_open (struct disk_driver *dd, const char *name, td_flag_t flags)
+static int tdsync_open (struct disk_driver *dd, const char *name, td_flag_t flags)
 {
 	int i, fd, ret = 0, o_flags;
 	struct td_state     *s   = dd->td_state;
@@ -149,7 +149,7 @@ done:
 	return ret;	
 }
 
- int tdsync_queue_read(struct disk_driver *dd, uint64_t sector,
+static int tdsync_queue_read(struct disk_driver *dd, uint64_t sector,
 			       int nb_sectors, char *buf, td_callback_t cb,
 			       int id, void *private)
 {
@@ -172,7 +172,7 @@ done:
 	return cb(dd, (ret < 0) ? ret: 0, sector, nb_sectors, id, private);
 }
 
- int tdsync_queue_write(struct disk_driver *dd, uint64_t sector,
+static int tdsync_queue_write(struct disk_driver *dd, uint64_t sector,
 			       int nb_sectors, char *buf, td_callback_t cb,
 			       int id, void *private)
 {
@@ -195,12 +195,12 @@ done:
 	return cb(dd, (ret < 0) ? ret : 0, sector, nb_sectors, id, private);
 }
  		
-int tdsync_submit(struct disk_driver *dd)
+static int tdsync_submit(struct disk_driver *dd)
 {
 	return 0;	
 }
 
-int tdsync_close(struct disk_driver *dd)
+static int tdsync_close(struct disk_driver *dd)
 {
 	struct tdsync_state *prv = (struct tdsync_state *)dd->private;
 	
@@ -211,18 +211,18 @@ int tdsync_close(struct disk_driver *dd)
 	return 0;
 }
 
-int tdsync_do_callbacks(struct disk_driver *dd, int sid)
+static int tdsync_do_callbacks(struct disk_driver *dd, int sid)
 {
 	/* always ask for a kick */
 	return 1;
 }
 
-int tdsync_get_parent_id(struct disk_driver *dd, struct disk_id *id)
+static int tdsync_get_parent_id(struct disk_driver *dd, struct disk_id *id)
 {
 	return TD_NO_PARENT;
 }
 
-int tdsync_validate_parent(struct disk_driver *dd, 
+static int tdsync_validate_parent(struct disk_driver *dd, 
 			   struct disk_driver *parent, td_flag_t flags)
 {
 	return -EINVAL;

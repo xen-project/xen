@@ -65,8 +65,8 @@ struct disk_driver ddqcow, ddaio;
 static uint64_t prev = 0, written = 0;
 static char output[25];
 
-void print_bytes(void *ptr, int length) {
-
+static void print_bytes(void *ptr, int length)
+{
   int i,k;
   unsigned char *p = ptr;
 
@@ -81,7 +81,7 @@ void print_bytes(void *ptr, int length) {
     return;
 }
 
-void debug_output(uint64_t progress, uint64_t size)
+static void debug_output(uint64_t progress, uint64_t size)
 {
 	/*Output progress every 5% */	
 	uint64_t blocks = size/20;

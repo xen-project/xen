@@ -720,7 +720,7 @@ static inline void init_fds(struct disk_driver *dd)
 }
 
 /* Open the disk file and initialize qcow state. */
-int tdqcow_open (struct disk_driver *dd, const char *name, td_flag_t flags)
+static int tdqcow_open (struct disk_driver *dd, const char *name, td_flag_t flags)
 {
 	int fd, len, i, shift, ret, size, l1_table_size, o_flags;
 	int max_aio_reqs;
@@ -937,7 +937,7 @@ fail:
 	return -1;
 }
 
-int tdqcow_queue_read(struct disk_driver *dd, uint64_t sector,
+static int tdqcow_queue_read(struct disk_driver *dd, uint64_t sector,
 		      int nb_sectors, char *buf, td_callback_t cb,
 		      int id, void *private)
 {
@@ -999,7 +999,7 @@ done:
 	return rsp;
 }
 
-int tdqcow_queue_write(struct disk_driver *dd, uint64_t sector,
+static int tdqcow_queue_write(struct disk_driver *dd, uint64_t sector,
 		       int nb_sectors, char *buf, td_callback_t cb,
 		       int id, void *private)
 {
@@ -1057,14 +1057,14 @@ int tdqcow_queue_write(struct disk_driver *dd, uint64_t sector,
 	return 0;
 }
  		
-int tdqcow_submit(struct disk_driver *dd)
+static int tdqcow_submit(struct disk_driver *dd)
 {
         struct tdqcow_state *prv = (struct tdqcow_state *)dd->private;
 
 	return tap_aio_submit(&prv->aio);
 }
 
-int tdqcow_close(struct disk_driver *dd)
+static int tdqcow_close(struct disk_driver *dd)
 {
 	struct tdqcow_state *s = (struct tdqcow_state *)dd->private;
 	uint32_t cksum, out;
@@ -1092,7 +1092,7 @@ int tdqcow_close(struct disk_driver *dd)
 	return 0;
 }
 
-int tdqcow_do_callbacks(struct disk_driver *dd, int sid)
+static int tdqcow_do_callbacks(struct disk_driver *dd, int sid)
 {
         int ret, i, nr_events, rsp = 0,*ptr;
         struct io_event *ep;
@@ -1276,7 +1276,7 @@ int qcow_create(const char *filename, uint64_t total_size,
 	return 0;
 }
 
-int qcow_make_empty(struct tdqcow_state *s)
+static int qcow_make_empty(struct tdqcow_state *s)
 {
 	uint32_t l1_length = s->l1_size * sizeof(uint64_t);
 
@@ -1296,14 +1296,14 @@ int qcow_make_empty(struct tdqcow_state *s)
 	return 0;
 }
 
-int qcow_get_cluster_size(struct tdqcow_state *s)
+static int qcow_get_cluster_size(struct tdqcow_state *s)
 {
 	return s->cluster_size;
 }
 
 /* XXX: put compressed sectors first, then all the cluster aligned
    tables to avoid losing bytes in alignment */
-int qcow_compress_cluster(struct tdqcow_state *s, int64_t sector_num, 
+static int qcow_compress_cluster(struct tdqcow_state *s, int64_t sector_num, 
                           const uint8_t *buf)
 {
 	z_stream strm;
@@ -1358,7 +1358,7 @@ int qcow_compress_cluster(struct tdqcow_state *s, int64_t sector_num,
 	return 0;
 }
 
-int tdqcow_get_parent_id(struct disk_driver *dd, struct disk_id *id)
+static int tdqcow_get_parent_id(struct disk_driver *dd, struct disk_id *id)
 {
 	off_t off;
 	char *buf, *filename;
@@ -1392,7 +1392,7 @@ int tdqcow_get_parent_id(struct disk_driver *dd, struct disk_id *id)
 	return err;
 }
 
-int tdqcow_validate_parent(struct disk_driver *child,
+static int tdqcow_validate_parent(struct disk_driver *child,
 			   struct disk_driver *parent, td_flag_t flags)
 {
 	struct stat stats;

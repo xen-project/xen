@@ -55,6 +55,8 @@
 #include "blktaplib.h"
 #include "blktapctrl.h"
 #include "tapdisk.h"
+#include "list.h"
+#include "xs_api.h" /* for xs_fire_next_watch() */
 
 #define PIDFILE "/var/run/blktapctrl.pid"
 
@@ -638,7 +640,7 @@ fail:
 	return ret;
 }
 
-int blktapctrl_new_blkif(blkif_t *blkif)
+static int blktapctrl_new_blkif(blkif_t *blkif)
 {
 	blkif_info_t *blk;
 	int major, minor, fd_read, fd_write, type, new;
@@ -710,7 +712,7 @@ fail:
 	return -EINVAL;
 }
 
-int map_new_blktapctrl(blkif_t *blkif)
+static int map_new_blktapctrl(blkif_t *blkif)
 {
 	DPRINTF("Received a poll for a new devmap\n");
 	if (write_msg(blkif->fds[WRITE], CTLMSG_NEWDEV, blkif, NULL) <= 0) {
@@ -727,7 +729,7 @@ int map_new_blktapctrl(blkif_t *blkif)
 	return blkif->minor - 1;
 }
 
-int unmap_blktapctrl(blkif_t *blkif)
+static int unmap_blktapctrl(blkif_t *blkif)
 {
 	DPRINTF("Unmapping vbd\n");
 

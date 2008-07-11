@@ -354,7 +354,7 @@ static void ueblktap_probe(struct xs_handle *h, struct xenbus_watch *w,
  *are created, we initalise the state and attach a disk.
  */
 
-int add_blockdevice_probe_watch(struct xs_handle *h, const char *domid)
+static int add_blockdevice_probe_watch(struct xs_handle *h, const char *domid)
 {
 	char *path;
 	struct xenbus_watch *vbd_watch;
@@ -377,7 +377,7 @@ int add_blockdevice_probe_watch(struct xs_handle *h, const char *domid)
 }
 
 /* Asynch callback to check for /local/domain/<DOMID>/name */
-void check_dom(struct xs_handle *h, struct xenbus_watch *w, 
+static void check_dom(struct xs_handle *h, struct xenbus_watch *w, 
 	       const char *bepath_im)
 {
 	char *domid;
@@ -392,7 +392,7 @@ void check_dom(struct xs_handle *h, struct xenbus_watch *w,
 }
 
 /* We must wait for xend to register /local/domain/<DOMID> */
-int watch_for_domid(struct xs_handle *h)
+static int watch_for_domid(struct xs_handle *h)
 {
 	struct xenbus_watch *domid_watch;
 	char *path = NULL;

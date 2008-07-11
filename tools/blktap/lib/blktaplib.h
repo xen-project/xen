@@ -213,7 +213,6 @@ typedef struct msg_pid {
 /* xenstore/xenbus: */
 #define DOMNAME "Domain-0"
 int setup_probe_watch(struct xs_handle *h);
-int xs_fire_next_watch(struct xs_handle *h);
 
 
 /* Abitrary values, must match the underlying driver... */

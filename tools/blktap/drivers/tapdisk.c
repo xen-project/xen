@@ -53,14 +53,14 @@ int do_cow_read(struct disk_driver *dd, blkif_request_t *req,
 #define td_for_each_disk(tds, drv) \
         for (drv = tds->disks; drv != NULL; drv = drv->next)
 
-void usage(void) 
+static void usage(void) 
 {
 	fprintf(stderr, "blktap-utils: v1.0.0\n");
 	fprintf(stderr, "usage: tapdisk <READ fifo> <WRITE fifo>\n");
         exit(-1);
 }
 
-void daemonize(void)
+static void daemonize(void)
 {
 	int i;
 
@@ -121,7 +121,7 @@ static void unmap_disk(struct td_state *s)
 	return;
 }
 
-void sig_handler(int sig)
+static void sig_handler(int sig)
 {
 	/*Received signal to close. If no disks are active, we close app.*/
 
@@ -512,7 +512,7 @@ static inline void kick_responses(struct td_state *s)
 	}
 }
 
-void io_done(struct disk_driver *dd, int sid)
+static void io_done(struct disk_driver *dd, int sid)
 {
 	struct tap_disk *drv = dd->drv;
 
@@ -537,7 +537,7 @@ segment_start(blkif_request_t *req, int sidx)
 }
 
 uint64_t sends, responds;
-int send_responses(struct disk_driver *dd, int res, 
+static int send_responses(struct disk_driver *dd, int res, 
 		   uint64_t sector, int nr_secs, int idx, void *private)
 {
 	pending_req_t   *preq;
