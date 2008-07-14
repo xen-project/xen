@@ -30,26 +30,7 @@
  */
 
 
-static inline unsigned long long tapdisk_get_size(blkif_t *blkif)
-{
-	image_t *img = (image_t *)blkif->prv;
-	return img->size;
-}
+int blktap_interface_open(void);
 
-static inline unsigned long tapdisk_get_secsize(blkif_t *blkif)
-{
-	image_t *img = (image_t *)blkif->prv;
-	return img->secsize;
-}
+int blktap_interface_create(int ctlfd, int *major, int *minor, blkif_t *blkif);
 
-static inline unsigned int tapdisk_get_info(blkif_t *blkif)
-{
-	image_t *img = (image_t *)blkif->prv;
-	return img->info;
-}
-
-struct blkif_ops tapdisk_ops = {
-	.get_size = tapdisk_get_size,
-	.get_secsize = tapdisk_get_secsize,
-	.get_info = tapdisk_get_info,
-};
