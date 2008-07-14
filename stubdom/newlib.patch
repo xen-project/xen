@@ -538,3 +538,92 @@ diff -u -p -r1.1 memcpy.S
  
    leaq    128 (rdi), rdi
  
+--- newlib/libm/machine/i386/i386mach.h.orig	2008-07-11 15:30:37.367227000 +0100
++++ newlib/libm/machine/i386/i386mach.h	2008-07-11 15:30:55.232337000 +0100
+@@ -27,46 +27,46 @@
+  
+ #define REG(x) CONCAT1(__REG_PREFIX__, x)
+  
+-#define eax REG(eax)
+-#define ebx REG(ebx)
+-#define ecx REG(ecx)
+-#define edx REG(edx)
+-#define esi REG(esi)
+-#define edi REG(edi)
+-#define ebp REG(ebp)
+-#define esp REG(esp)
+-
+-#define st0 REG(st)
+-#define st1 REG(st(1))
+-#define st2 REG(st(2))
+-#define st3 REG(st(3))
+-#define st4 REG(st(4))
+-#define st5 REG(st(5))
+-#define st6 REG(st(6))
+-#define st7 REG(st(7))
+-
+-#define ax REG(ax)
+-#define bx REG(bx)
+-#define cx REG(cx)
+-#define dx REG(dx)
+-
+-#define ah REG(ah)
+-#define bh REG(bh)
+-#define ch REG(ch)
+-#define dh REG(dh)
+-
+-#define al REG(al)
+-#define bl REG(bl)
+-#define cl REG(cl)
+-#define dl REG(dl)
+-
+-#define mm1 REG(mm1)
+-#define mm2 REG(mm2)
+-#define mm3 REG(mm3)
+-#define mm4 REG(mm4)
+-#define mm5 REG(mm5)
+-#define mm6 REG(mm6)
+-#define mm7 REG(mm7)
++#define eax %eax
++#define ebx %ebx
++#define ecx %ecx
++#define edx %edx
++#define esi %esi
++#define edi %edi
++#define ebp %ebp
++#define esp %esp
++
++#define st0 %st
++#define st1 %st(1)
++#define st2 %st(2)
++#define st3 %st(3)
++#define st4 %st(4)
++#define st5 %st(5)
++#define st6 %st(6)
++#define st7 %st(7)
++
++#define ax %ax
++#define bx %bx
++#define cx %cx
++#define dx %dx
++
++#define ah %ah
++#define bh %bh
++#define ch %ch
++#define dh %dh
++
++#define al %al
++#define bl %bl
++#define cl %cl
++#define dl %dl
++
++#define mm1 %mm1
++#define mm2 %mm2
++#define mm3 %mm3
++#define mm4 %mm4
++#define mm5 %mm5
++#define mm6 %mm6
++#define mm7 %mm7
+ 
+ #ifdef _I386MACH_NEED_SOTYPE_FUNCTION
+ #define SOTYPE_FUNCTION(sym) .type SYM(sym),@function
