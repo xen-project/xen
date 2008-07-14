@@ -833,8 +833,8 @@ class IA64_HVM_ImageHandler(HVMImageHandler):
         # buffer io page, buffer pio page and memmap info page
         extra_pages = 1024 + 5
         mem_kb += extra_pages * page_kb
-        # Add 4 MiB overhead for QEMU's video RAM.
-        return mem_kb + 4096
+        # Add 8 MiB overhead for QEMU's video RAM.
+        return mem_kb + 8192
 
     def getRequiredInitialReservation(self):
         return self.vm.getMemoryTarget()
@@ -876,8 +876,8 @@ class X86_HVM_ImageHandler(HVMImageHandler):
         return rc
 
     def getRequiredAvailableMemory(self, mem_kb):
-        # Add 4 MiB overhead for QEMU's video RAM.
-        return mem_kb + 4096
+        # Add 8 MiB overhead for QEMU's video RAM.
+        return mem_kb + 8192
 
     def getRequiredInitialReservation(self):
         return self.vm.getMemoryTarget()
