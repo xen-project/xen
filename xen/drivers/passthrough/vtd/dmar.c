@@ -84,6 +84,29 @@ static int __init acpi_register_rmrr_unit(struct acpi_rmrr_unit *rmrr)
     return 0;
 }
 
+static void __init disable_all_dmar_units(void)
+{
+    struct acpi_drhd_unit *drhd, *_drhd;
+    struct acpi_rmrr_unit *rmrr, *_rmrr;
+    struct acpi_atsr_unit *atsr, *_atsr;
+
+    list_for_each_entry_safe ( drhd, _drhd, &acpi_drhd_units, list )
+    {
+        list_del(&drhd->list);
+        xfree(drhd);
+    }
+    list_for_each_entry_safe ( rmrr, _rmrr, &acpi_rmrr_units, list )
+    {
+        list_del(&rmrr->list);
+        xfree(rmrr);
+    }
+    list_for_each_entry_safe ( atsr, _atsr, &acpi_atsr_units, list )
+    {
+        list_del(&atsr->list);
+        xfree(atsr);
+    }
+}
+
 static int acpi_ioapic_device_match(
     struct list_head *ioapic_list, unsigned int apic_id)
 {
@@ -435,6 +458,12 @@ static int __init acpi_parse_dmar(struct acpi_table_header *table)
 
     /* Zap APCI DMAR signature to prevent dom0 using vt-d HW. */
     dmar->header.signature[0] = '\0';
+
+    if ( ret )
+    {
+        printk(XENLOG_WARNING "Failed to parse ACPI DMAR.  Disabling VT-d.\n");
+        disable_all_dmar_units();
+    }
 
     return ret;
 }
