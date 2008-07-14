@@ -40,6 +40,9 @@ MSIX_SIZE_MASK = 0x7ff
 # Global variable to store information from lspci
 lspci_info = None
 
+# Global variable to store the sysfs mount point
+sysfs_mnt_point = None
+
 #Calculate PAGE_SHIFT: number of bits to shift an address to get the page number
 PAGE_SIZE = resource.getpagesize()
 PAGE_SHIFT = 0
@@ -63,27 +66,28 @@ def parse_hex(val):
         return None
 
 def find_sysfs_mnt():
-    mounts_file = open(PROC_MNT_PATH,'r')
+    global sysfs_mnt_point
+    if not sysfs_mnt_point is None:
+        return sysfs_mnt_point
 
-    for line in mounts_file:
-        sline = line.split()
-        if len(sline)<3:
-            continue
+    try:
+        mounts_file = open(PROC_MNT_PATH,'r')
 
-        if sline[2]=='sysfs':
-            return sline[1]
-
+        for line in mounts_file:
+            sline = line.split()
+            if len(sline)<3:
+                continue
+            if sline[2]=='sysfs':
+                sysfs_mnt_point= sline[1]
+                return sysfs_mnt_point
+    except IOError, (errno, strerr):
+        raise PciDeviceParseError(('Failed to locate sysfs mount: %s: %s (%d)'%
+            (PROC_PCI_PATH, strerr, errno)))
     return None
 
 def get_all_pci_names():
-    try:
-        sysfs_mnt = find_sysfs_mnt()
-    except IOError, (errno, strerr):
-        raise PciDeviceParseError(('Failed to locate sysfs mount: %s (%d)' %
-            (PROC_PCI_PATH, strerr, errno)))
-
+    sysfs_mnt = find_sysfs_mnt()
     pci_names = os.popen('ls ' + sysfs_mnt + SYSFS_PCI_DEVS_PATH).read().split()
-
     return pci_names
 
 def get_all_pci_devices():
@@ -175,12 +179,7 @@ class PciDevice:
         self.get_info_from_lspci()
 
     def find_capability(self, type):
-        try:
-            sysfs_mnt = find_sysfs_mnt()
-        except IOError, (errno, strerr):
-            raise PciDeviceParseError(('Failed to locate sysfs mount: %s (%d)' %
-                (PROC_PCI_PATH, strerr, errno)))
-
+        sysfs_mnt = find_sysfs_mnt()
         if sysfs_mnt == None:
             return False
         path = sysfs_mnt+SYSFS_PCI_DEVS_PATH+'/'+ \
@@ -218,7 +217,7 @@ class PciDevice:
                         self.pba_offset = self.pba_offset & ~MSIX_BIR_MASK
                         break
         except IOError, (errno, strerr):
-            raise PciDeviceParseError(('Failed to locate sysfs mount: %s (%d)' %
+            raise PciDeviceParseError(('Failed to locate sysfs mount: %s: %s (%d)' %
                 (PROC_PCI_PATH, strerr, errno)))
 
     def remove_msix_iomem(self, index, start, size):
@@ -237,12 +236,7 @@ class PciDevice:
 
     def get_info_from_sysfs(self):
         self.find_capability(0x11)
-        try:
-            sysfs_mnt = find_sysfs_mnt()
-        except IOError, (errno, strerr):
-            raise PciDeviceParseError(('Failed to locate sysfs mount: %s (%d)' %
-                (PROC_PCI_PATH, strerr, errno)))
-
+        sysfs_mnt = find_sysfs_mnt()
         if sysfs_mnt == None:
             return False
 
