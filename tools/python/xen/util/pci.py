@@ -27,6 +27,7 @@ SYSFS_PCI_DEV_DEVICE_PATH = '/device'
 SYSFS_PCI_DEV_SUBVENDOR_PATH = '/subsystem_vendor'
 SYSFS_PCI_DEV_SUBDEVICE_PATH = '/subsystem_device'
 SYSFS_PCI_DEV_CLASS_PATH = '/class'
+SYSFS_PCIBACK_PATH = '/bus/pci/drivers/pciback/'
 
 LSPCI_CMD = 'lspci'
 
@@ -209,6 +210,109 @@ def restore_pci_conf_space(pci_cfg_list):
         for dw in configs:
             os.write(fd, dw)
         os.close(fd) 
+
+def find_all_devices_owned_by_pciback():
+    sysfs_mnt = find_sysfs_mnt()
+    pciback_path = sysfs_mnt + SYSFS_PCIBACK_PATH
+    pci_names = os.popen('ls ' + pciback_path).read()
+    pci_list = re.findall(PCI_DEV_REG_EXPRESS_STR, pci_names)
+    dev_list = []
+    for pci in pci_list:
+        (dom, b, d, f) = parse_pci_name(pci)
+        dev = PciDevice(dom, b, d, f)
+        dev_list = dev_list + [dev]
+    return dev_list
+
+def transform_list(target, src):
+    ''' src: its element is pci string (Format: xxxx:xx:xx:x).
+        target: its element is pci string, or a list of pci string.
+
+        If all the elements in src are in target, we remove them from target
+        and add src into target; otherwise, we remove from target all the
+        elements that also appear in src.
+    '''
+    result = []
+    target_contains_src = True
+    for e in src:
+        if not e in target:
+            target_contains_src = False
+            break
+
+    if target_contains_src:
+        result = result + [src]
+    for e in target:
+        if not e in src:
+             result = result + [e]
+    return  result
+
+def check_FLR_capability(dev_list):
+    i = len(dev_list)
+    if i == 0:
+        return []
+    i = i - 1;
+    while i >= 0:
+        dev = dev_list[i]
+        if dev.bus == 0:
+            if dev.dev_type == DEV_TYPE_PCIe_ENDPOINT and not dev.pcie_flr:
+                del dev_list[i]
+            elif dev.dev_type == DEV_TYPE_PCI and not dev.pci_af_flr:
+                del dev_list[i]
+        i = i - 1
+
+    pci_list = []
+    pci_dev_dict = {}
+    for dev in dev_list:
+        pci_list = pci_list + [dev.name]
+        pci_dev_dict[dev.name] = dev
+
+    while True:
+        need_transform = False
+        for pci in pci_list:
+            if isinstance(pci, types.StringTypes):
+                dev = pci_dev_dict[pci]
+                if dev.dev_type == DEV_TYPE_PCIe_ENDPOINT and not dev.pcie_flr:
+                    coassigned_pci_list = dev.find_all_the_multi_functions()
+                    need_transform = True
+                elif dev.dev_type == DEV_TYPE_PCI and not dev.pci_af_flr:
+                    coassigned_pci_list = dev.find_coassigned_devices(True)
+                    del coassigned_pci_list[0]
+                    need_transform = True
+
+                if need_transform:
+                    pci_list = transform_list(pci_list, coassigned_pci_list)
+        if not need_transform:
+            break
+
+    if len(pci_list) == 0:
+        return []
+
+    for i in range(0, len(pci_list)):
+        if isinstance(pci_list[i], types.StringTypes):
+            pci_list[i] = [pci_list[i]]
+    
+    # Now every element in pci_list is a list of pci string.
+
+    result = []
+    for pci_names in pci_list:
+        devs = []
+        for pci in pci_names:
+            devs = devs + [pci_dev_dict[pci]]
+        result = result + [devs]
+    return result
+
+def check_mmio_bar(devs_list):
+    result = []
+
+    for dev_list in devs_list:
+        non_aligned_bar_found = False
+        for dev in dev_list:
+            if dev.has_non_page_aligned_bar:
+                non_aligned_bar_found = True
+                break
+        if not non_aligned_bar_found:
+            result = result + [dev_list]
+
+    return result
 
 class PciDeviceNotFoundError(Exception):
     def __init__(self,domain,bus,slot,func):
