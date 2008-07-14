@@ -1382,7 +1382,6 @@ static int reassign_device_ownership(
     if ( !(pdev = pci_lock_domain_pdev(source, bus, devfn)) )
         return -ENODEV;
 
-    pdev_flr(pdev);
     drhd = acpi_find_matched_drhd_unit(bus, devfn);
     pdev_iommu = drhd->iommu;
     domain_context_unmap(bus, devfn);

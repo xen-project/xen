@@ -507,7 +507,6 @@ static int reassign_device( struct domain *source, struct domain *target,
     if ( !pdev )
 	return -ENODEV;
 
-    pdev_flr(pdev);
     bdf = (bus << 8) | devfn;
     /* supported device? */
     iommu = (bdf < ivrs_bdf_entries) ?
