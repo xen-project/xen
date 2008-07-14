@@ -15,18 +15,13 @@ include buildconfigs/Rules.mk
 
 # build and install everything into the standard system directories
 .PHONY: install
-ifdef CONFIG_STUBDOM
-install: install-stubdom
-endif
-install: install-xen install-kernels install-tools install-docs
+install: install-xen install-kernels install-tools install-stubdom install-docs
 
 .PHONY: build
 build: kernels
 	$(MAKE) -C xen build
 	$(MAKE) -C tools build
-ifdef CONFIG_STUBDOM
 	$(MAKE) -C stubdom build
-endif
 	$(MAKE) -C docs build
 
 # The test target is for unit tests that can run without an installation.  Of
@@ -39,10 +34,7 @@ test:
 # build and install everything into local dist directory
 .PHONY: dist
 dist: DESTDIR=$(DISTDIR)/install
-ifdef CONFIG_STUBDOM
-dist: dist-stubdom
-endif
-dist: dist-xen dist-kernels dist-tools dist-docs
+dist: dist-xen dist-kernels dist-tools dist-stubdom dist-docs
 	$(INSTALL_DIR) $(DISTDIR)/check
 	$(INSTALL_DATA) ./COPYING $(DISTDIR)
 	$(INSTALL_DATA) ./README $(DISTDIR)
