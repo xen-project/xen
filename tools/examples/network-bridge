@@ -60,7 +60,18 @@ is_network_root () {
     local rootfs=$(awk '{ if ($1 !~ /^[ \t]*#/ && $2 == "/") { print $3; }}' /etc/mtab)
     local rootopts=$(awk '{ if ($1 !~ /^[ \t]*#/ && $2 == "/") { print $4; }}' /etc/mtab)
 
-    [[ "$rootfs" =~ "^nfs" ]] || [[ "$rootopts" =~ "_netdev" ]] && return 0 || return 1
+    [[ "$rootfs" =~ "^nfs" ]] || [[ "$rootopts" =~ "_netdev" ]] && has_nfsroot=1 || has_nfsroot=0
+    if [ $has_nfsroot -eq 1 ]; then
+        local bparms=$(cat /proc/cmdline)
+        for p in $bparms; do
+            local ipaddr=$(echo $p | awk /nfsroot=/'{ print substr($1,9,index($1,":")-9) }')
+            if [ "$ipaddr" != "" ]; then
+                local nfsdev=$(ip route get $ipaddr | awk /$ipaddr/'{ print $3 }')
+                [[ "$nfsdev" == "$netdev" ]] && return 0 || return 1
+            fi
+        done
+    fi
+    return 1
 }
 
 find_alt_device () {
