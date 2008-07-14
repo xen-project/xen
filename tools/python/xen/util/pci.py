@@ -10,6 +10,8 @@ import os, os.path
 import resource
 import re
 import types
+import struct
+import time
 
 PROC_MNT_PATH = '/proc/mounts'
 PROC_PCI_PATH = '/proc/bus/pci/devices'
@@ -28,8 +30,44 @@ SYSFS_PCI_DEV_CLASS_PATH = '/class'
 
 LSPCI_CMD = 'lspci'
 
+PCI_DEV_REG_EXPRESS_STR = r"[0-9a-fA-F]{4}:[0-9a-fA-F]{2}:[0-9a-fA-F]{2}."+ \
+            r"[0-9a-fA-F]{1}"
+PCI_DEV_FORMAT_STR = '%04x:%02x:%02x.%01x'
+
+DEV_TYPE_PCIe_ENDPOINT  = 0
+DEV_TYPE_PCIe_BRIDGE    = 1
+DEV_TYPE_PCI_BRIDGE     = 2
+DEV_TYPE_PCI            = 3    
+
+PCI_STATUS = 0x6
+PCI_CLASS_DEVICE = 0x0a
+PCI_CLASS_BRIDGE_PCI = 0x0604
+
+PCI_CAPABILITY_LIST = 0x34
+PCI_CB_BRIDGE_CONTROL = 0x3e
+PCI_BRIDGE_CTL_BUS_RESET= 0x40
+
+PCI_CAP_ID_EXP = 0x10
+PCI_EXP_FLAGS  = 0x2
+PCI_EXP_FLAGS_TYPE = 0x00f0
+PCI_EXP_TYPE_PCI_BRIDGE = 0x7
+PCI_EXP_DEVCAP = 0x4
+PCI_EXP_DEVCAP_FLR = (0x1 << 28)
+PCI_EXP_DEVCTL = 0x8
+PCI_EXP_DEVCTL_FLR = (0x1 << 15)
+
+PCI_CAP_ID_AF = 0x13
+PCI_AF_CAPs   = 0x3
+PCI_AF_CAPs_TP_FLR = 0x3
+PCI_AF_CTL = 0x4
+PCI_AF_CTL_FLR = 0x1
+
+PCI_BAR_0 = 0x10
+PCI_BAR_5 = 0x24
+PCI_BAR_SPACE = 0x01
 PCI_BAR_IO = 0x01
 PCI_BAR_IO_MASK = ~0x03
+PCI_BAR_MEM = 0x00
 PCI_BAR_MEM_MASK = ~0x0f
 PCI_STATUS_CAP_MASK = 0x10
 PCI_STATUS_OFFSET = 0x6
@@ -64,6 +102,17 @@ def parse_hex(val):
             return val
     except ValueError:
         return None
+
+def parse_pci_name(pci_name_string):
+    # Format: xxxx:xx:xx:x
+    s = pci_name_string
+    s = s.split(':')
+    dom = parse_hex(s[0])
+    bus = parse_hex(s[1])
+    s = s[2].split('.')
+    dev = parse_hex(s[0])
+    func =  parse_hex(s[1])
+    return (dom, bus, dev, func)
 
 def find_sysfs_mnt():
     global sysfs_mnt_point
@@ -134,13 +183,40 @@ def create_lspci_info():
         if device_name is not None:
             lspci_info[device_name] = device_info
 
+def save_pci_conf_space(devs_string):
+    pci_list = []
+    cfg_list = []
+    sysfs_mnt = find_sysfs_mnt()
+    for pci_str in devs_string:
+        pci_path = sysfs_mnt + SYSFS_PCI_DEVS_PATH + '/' + pci_str + \
+                SYSFS_PCI_DEV_CONFIG_PATH
+        fd = os.open(pci_path, os.O_RDONLY)
+        configs = []
+        for i in range(0, 256, 4):
+            configs = configs + [os.read(fd,4)]
+        os.close(fd)
+        pci_list = pci_list + [pci_path]
+        cfg_list = cfg_list + [configs]
+    return (pci_list, cfg_list)
+
+def restore_pci_conf_space(pci_cfg_list):
+    pci_list = pci_cfg_list[0]
+    cfg_list = pci_cfg_list[1]
+    for i in range(0, len(pci_list)):
+        pci_path = pci_list[i]
+        configs  = cfg_list[i]
+        fd = os.open(pci_path, os.O_WRONLY)
+        for dw in configs:
+            os.write(fd, dw)
+        os.close(fd) 
+
 class PciDeviceNotFoundError(Exception):
     def __init__(self,domain,bus,slot,func):
         self.domain = domain
         self.bus = bus
         self.slot = slot
         self.func = func
-        self.name = "%04x:%02x:%02x.%01x"%(domain, bus, slot, func)
+        self.name = PCI_DEV_FORMAT_STR %(domain, bus, slot, func)
     
     def __str__(self):
         return ('PCI Device %s Not Found' % (self.name))
@@ -151,13 +227,29 @@ class PciDeviceParseError(Exception):
     def __str__(self):
         return 'Error Parsing PCI Device Info: '+self.message
 
+class PciDeviceAssignmentError(Exception):
+    def __init__(self,msg):
+        self.message = msg
+    def __str__(self):
+        return 'pci: impproper device assignment spcified: ' + \
+            self.message
+
+class PciDeviceFlrError(PciDeviceAssignmentError):
+    def __init__(self,msg):
+        self.message = msg
+    def __str__(self):
+        return 'Can not find a suitable FLR method for the device(s): ' + \
+            self.message
+
 class PciDevice:
     def __init__(self, domain, bus, slot, func):
         self.domain = domain
         self.bus = bus
         self.slot = slot
         self.func = func
-        self.name = "%04x:%02x:%02x.%01x"%(domain, bus, slot, func)
+        self.name = PCI_DEV_FORMAT_STR % (domain, bus, slot, func)
+        self.cfg_space_path = find_sysfs_mnt()+SYSFS_PCI_DEVS_PATH+'/'+ \
+            self.name + SYSFS_PCI_DEV_CONFIG_PATH 
         self.irq = 0
         self.iomem = []
         self.ioports = []
@@ -175,8 +267,316 @@ class PciDevice:
         self.classname = ""
         self.subvendorname = ""
         self.subdevicename = ""
+        self.dev_type = None
+        self.has_non_page_aligned_bar = False
+        self.pcie_flr = False
+        self.pci_af_flr = False
+        self.detect_dev_info()
         self.get_info_from_sysfs()
         self.get_info_from_lspci()
+
+    def find_parent(self):
+        # i.e.,  /sys/bus/pci/devices/0000:00:19.0 or
+        #        /sys/bus/pci/devices/0000:03:04.0
+        path = find_sysfs_mnt()+SYSFS_PCI_DEVS_PATH+'/'+ self.name
+        # i.e., ../../../devices/pci0000:00/0000:00:19.0
+        #  ../../../devices/pci0000:00/0000:00:02.0/0000:01:00.2/0000:03:04.0
+        try:
+            target = os.readlink(path)
+            lst = target.split('/')
+            parent = lst[len(lst)-2]
+            if parent[0:3] == 'pci':
+                parent = parent[3:]
+                lst = parent.split(':')
+                dom = int(lst[0], 16)
+                bus = int(lst[1], 16)
+                dev = 0
+                func = 0
+            else:
+                lst = parent.split(':')
+                dom = int(lst[0], 16)
+                bus = int(lst[1], 16)
+                lst = lst[2]
+                lst = lst.split('.')
+                dev =  int(lst[0], 16)
+                func =  int(lst[1], 16)
+            return (dom, bus, dev, func)
+        except OSError, (errno, strerr):
+            raise PciDeviceParseError('Can not locate the parent of %s',
+                self.name)
+
+    def find_the_uppermost_pci_bridge(self):
+        # Find the uppermost PCI/PCI-X bridge
+        (dom, b, d, f) = self.find_parent()
+        dev = dev_parent = PciDevice(dom, b, d, f)
+        while dev_parent.dev_type != DEV_TYPE_PCIe_BRIDGE:
+            (dom, b, d, f) = dev_parent.find_parent()
+            dev = dev_parent
+            dev_parent = PciDevice(dom, b, d, f)
+        return dev
+
+    def find_all_devices_behind_the_bridge(self, ignore_bridge):
+        sysfs_mnt = find_sysfs_mnt()
+        self_path = sysfs_mnt + SYSFS_PCI_DEVS_PATH + '/' + self.name
+        pci_names = os.popen('ls ' + self_path).read()
+        dev_list = re.findall(PCI_DEV_REG_EXPRESS_STR, pci_names)
+
+        list = [self.name]
+        for pci_str in dev_list:
+            (dom, b, d, f) = parse_pci_name(pci_str)
+            dev = PciDevice(dom, b, d, f)
+            if dev.dev_type == DEV_TYPE_PCI_BRIDGE or \
+                dev.dev_type == DEV_TYPE_PCIe_BRIDGE:
+                sub_list_including_self = \
+                    dev.find_all_devices_behind_the_bridge(ignore_bridge)
+                if ignore_bridge:
+                    del sub_list_including_self[0]
+                list = list + [sub_list_including_self]
+            else:
+                list = list + [dev.name]
+        return list
+        
+    def find_coassigned_devices(self, ignore_bridge = True):
+        ''' Here'self' is a PCI device, we need find the uppermost PCI/PCI-X
+            bridge, and all devices behind it must be co-assigned to the same
+            guest.
+        
+            Parameter:
+                [ignore_bridge]: if set, the returned result doesn't include
+            any bridge behind the uppermost PCI/PCI-X bridge.
+        
+            Note: The first element of the return value is the uppermost
+                PCI/PCI-X bridge. If the caller doesn't need the first
+                element,  the caller itself can remove it explicitly.
+        '''
+        dev = self.find_the_uppermost_pci_bridge()
+        dev_list = dev.find_all_devices_behind_the_bridge(ignore_bridge)
+        dev_list = re.findall(PCI_DEV_REG_EXPRESS_STR, '%s' % dev_list)
+        return dev_list
+
+    def do_secondary_bus_reset(self, target_bus, devs):
+        # Save the config spaces of all the devices behind the bus.
+        (pci_list, cfg_list) = save_pci_conf_space(devs)
+        
+        #Do the Secondary Bus Reset
+        sysfs_mnt = find_sysfs_mnt()
+        parent_path = sysfs_mnt + SYSFS_PCI_DEVS_PATH + '/' + \
+            target_bus + SYSFS_PCI_DEV_CONFIG_PATH
+        fd = os.open(parent_path, os.O_WRONLY)
+        # Assert Secondary Bus Reset
+        os.lseek(fd, PCI_CB_BRIDGE_CONTROL, 0)
+        os.write(fd, struct.pack('I', PCI_BRIDGE_CTL_BUS_RESET))
+        time.sleep(0.200)
+        # De-assert Secondary Bus Reset
+        os.lseek(fd, 0x3e, 0)
+        os.write(fd, struct.pack('I', 0x00))
+        time.sleep(0.200)
+        os.close(fd)
+
+        # Restore the config spaces
+        restore_pci_conf_space((pci_list, cfg_list))
+        
+    def find_all_the_multi_functions(self):
+        sysfs_mnt = find_sysfs_mnt()
+        pci_names = os.popen('ls ' + sysfs_mnt + SYSFS_PCI_DEVS_PATH).read()
+        p = self.name
+        p = p[0 : p.rfind('.')] + '.[0-7]'
+        funcs = re.findall(p, pci_names)
+        return funcs
+
+    def find_cap_offset(self, cap):
+        path = find_sysfs_mnt()+SYSFS_PCI_DEVS_PATH+'/'+ \
+               self.name+SYSFS_PCI_DEV_CONFIG_PATH
+
+        pos = PCI_CAPABILITY_LIST
+
+        try:
+            fd = os.open(path, os.O_RDONLY)
+            os.lseek(fd, PCI_STATUS, 0)
+            status = struct.unpack('H', os.read(fd, 2))[0]
+            if (status & 0x10) == 0:
+                # The device doesn't support PCI_STATUS_CAP_LIST
+                return 0
+
+            max_cap = 48
+            while max_cap > 0:
+                os.lseek(fd, pos, 0)
+                pos = ord(os.read(fd, 1))
+                if pos < 0x40:
+                    pos = 0
+                    break;
+                os.lseek(fd, pos + 0, 0)
+                id = ord(os.read(fd, 1))
+                if id == 0xff:
+                    pos = 0
+                    break;
+
+                # Found the capability
+                if id == cap:
+                    break;
+
+                # Test the next one
+                pos = pos + 1
+                max_cap = max_cap - 1;
+
+            os.close(fd)
+        except OSError, (errno, strerr):
+            raise PciDeviceParseError(('Error when accessing sysfs: %s (%d)' %
+                (strerr, errno)))
+        return pos
+
+    def pci_conf_read8(self, pos):
+        fd = os.open(self.cfg_space_path, os.O_RDONLY)
+        os.lseek(fd, pos, 0)
+        str = os.read(fd, 1)
+        os.close(fd)
+        val = struct.unpack('B', str)[0]
+        return val
+
+    def pci_conf_read16(self, pos):
+        fd = os.open(self.cfg_space_path, os.O_RDONLY)
+        os.lseek(fd, pos, 0)
+        str = os.read(fd, 2)
+        os.close(fd)
+        val = struct.unpack('H', str)[0]
+        return val
+
+    def pci_conf_read32(self, pos):
+        fd = os.open(self.cfg_space_path, os.O_RDONLY)
+        os.lseek(fd, pos, 0)
+        str = os.read(fd, 4)
+        os.close(fd)
+        val = struct.unpack('I', str)[0]
+        return val
+
+    def pci_conf_write8(self, pos, val):
+        str = struct.pack('B', val)
+        fd = os.open(self.cfg_space_path, os.O_WRONLY)
+        os.lseek(fd, pos, 0)
+        os.write(fd, str)
+        os.close(fd)
+
+    def pci_conf_write16(self, pos, val):
+        str = struct.pack('H', val)
+        fd = os.open(self.cfg_space_path, os.O_WRONLY)
+        os.lseek(fd, pos, 0)
+        os.write(fd, str)
+        os.close(fd)
+
+    def pci_conf_write32(self, pos, val):
+        str = struct.pack('I', val)
+        fd = os.open(self.cfg_space_path, os.O_WRONLY)
+        os.lseek(fd, pos, 0)
+        os.write(fd, str)
+        os.close(fd)
+
+    def detect_dev_info(self):
+        class_dev = self.pci_conf_read16(PCI_CLASS_DEVICE)
+        pos = self.find_cap_offset(PCI_CAP_ID_EXP)
+        if class_dev == PCI_CLASS_BRIDGE_PCI:
+            if pos == 0:
+                self.dev_type = DEV_TYPE_PCI_BRIDGE
+            else:
+                creg = self.pci_conf_read16(pos + PCI_EXP_FLAGS)
+                if ((creg & PCI_EXP_TYPE_PCI_BRIDGE) >> 4) == \
+                    PCI_EXP_TYPE_PCI_BRIDGE:
+                    self.dev_type = DEV_TYPE_PCI_BRIDGE
+                else:
+                    self.dev_type = DEV_TYPE_PCIe_BRIDGE
+        else:
+            if  pos != 0:
+                self.dev_type = DEV_TYPE_PCIe_ENDPOINT
+            else:
+                self.dev_type = DEV_TYPE_PCI
+                
+        # Force 0000:00:00.0 to be DEV_TYPE_PCIe_BRIDGE
+        if self.name == '0000:00:00.0':
+            self.dev_type = DEV_TYPE_PCIe_BRIDGE
+
+        if (self.dev_type == DEV_TYPE_PCI_BRIDGE) or \
+            (self.dev_type == DEV_TYPE_PCIe_BRIDGE):
+            return
+
+        # Try to findthe PCIe FLR capability
+        if self.dev_type == DEV_TYPE_PCIe_ENDPOINT:
+            dev_cap = self.pci_conf_read32(pos + PCI_EXP_DEVCAP)
+            if dev_cap & PCI_EXP_DEVCAP_FLR:
+                self.pcie_flr = True
+        elif self.dev_type == DEV_TYPE_PCI:
+            # Try to find the "PCI Advanced Capabilities"
+            pos = self.find_cap_offset(PCI_CAP_ID_AF)
+            if pos != 0:
+                af_cap = self.pci_conf_read8(pos + PCI_AF_CAPs)
+                if (af_cap & PCI_AF_CAPs_TP_FLR) == PCI_AF_CAPs_TP_FLR:
+                    self.pci_af_flr = True
+
+        bar_addr = PCI_BAR_0
+        while bar_addr <= PCI_BAR_5:
+            bar = self.pci_conf_read32(bar_addr)
+            if (bar & PCI_BAR_SPACE) == PCI_BAR_MEM:
+                bar = bar & PCI_BAR_MEM_MASK
+                bar = bar & ~PAGE_MASK
+                if bar != 0:
+                    self.has_non_page_aligned_bar = True
+                    break 
+            bar_addr = bar_addr + 4
+
+    def devs_check_driver(self, devs):
+        if len(devs) == 0:
+            return
+        for pci_dev in devs:
+            (dom, b, d, f) = parse_pci_name(pci_dev)
+            dev = PciDevice(dom, b, d, f)
+            if dev.driver == 'pciback':
+                continue
+            err_msg = 'pci: %s must be co-assigned to the same guest with %s' + \
+                ', but it is not owned by pciback.'
+            raise PciDeviceAssignmentError(err_msg % (pci_dev, self.name))
+
+    def do_FLR(self):
+        """ Perform FLR (Functional Level Reset) for the device.
+        """
+        if self.dev_type == DEV_TYPE_PCIe_ENDPOINT:
+            # If PCIe device supports FLR, we use it.
+            if self.pcie_flr:
+                (pci_list, cfg_list) = save_pci_conf_space([self.name])
+                pos = self.find_cap_offset(PCI_CAP_ID_EXP)
+                self.pci_conf_write32(pos + PCI_EXP_DEVCTL, PCI_EXP_DEVCTL_FLR)
+                # We must sleep at least 100ms for the completion of FLR
+                time.sleep(0.200)
+                restore_pci_conf_space((pci_list, cfg_list))
+            else:
+                funcs = self.find_all_the_multi_functions()
+                self.devs_check_driver(funcs)
+
+                parent = '%04x:%02x:%02x.%01x' % self.find_parent()
+
+                # Do Secondary Bus Reset.
+                self.do_secondary_bus_reset(parent, funcs)
+        # PCI devices
+        else:
+            # For PCI device on host bus, we test "PCI Advanced Capabilities".
+            if self.bus == 0 and self.pci_af_flr:
+                (pci_list, cfg_list) = save_pci_conf_space([self.name])
+                # We use Advanced Capability to do FLR.
+                pos = self.find_cap_offset(PCI_CAP_ID_AF)
+                self.pci_conf_write8(pos + PCI_AF_CTL, PCI_AF_CTL_FLR)
+                time.sleep(0.200)
+                restore_pci_conf_space((pci_list, cfg_list))
+            else:
+                if self.bus == 0:
+                    err_msg = 'pci: %s is not assignable: it is on bus 0, '+ \
+                        'but it has no PCI Advanced Capabilities.'
+                    raise PciDeviceFlrError(err_msg % self.name)
+                else:
+                    devs = self.find_coassigned_devices(False)
+                    # Remove the element 0 which is a bridge
+                    target_bus = devs[0]
+                    del devs[0]
+                    self.devs_check_driver(devs)
+
+                    # Do Secondary Bus Reset.
+                    self.do_secondary_bus_reset(target_bus, devs)
 
     def find_capability(self, type):
         sysfs_mnt = find_sysfs_mnt()
@@ -364,7 +764,7 @@ class PciDevice:
 
 def main():
     if len(sys.argv)<5:
-        print "Usage: %s <domain> <bus> <slot> <func>\n"
+        print "Usage: %s <domain> <bus> <slot> <func>\n" % sys.argv[0]
         sys.exit(2)
 
     dev = PciDevice(int(sys.argv[1],16), int(sys.argv[2],16),

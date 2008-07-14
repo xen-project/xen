@@ -701,7 +701,7 @@ class XendDomainInfo:
                         vslt = x['vslt']
                         break
                 if vslt == '0x0':
-                    raise VmError("Device %04x:%02x:%02x.%02x is not connected"
+                    raise VmError("Device %04x:%02x:%02x.%01x is not connected"
                                   % (int(dev['domain'],16), int(dev['bus'],16),
                                      int(dev['slot'],16), int(dev['func'],16)))
                 self.hvm_destroyPCIDevice(int(vslt, 16))
