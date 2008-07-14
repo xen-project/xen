@@ -56,6 +56,9 @@
 #define ACPI_PROCESSOR_MAX_C2_LATENCY   100
 #define ACPI_PROCESSOR_MAX_C3_LATENCY   1000
 
+static void (*lapic_timer_off)(void);
+static void (*lapic_timer_on)(void);
+
 extern u32 pmtmr_ioport;
 extern void (*pm_idle) (void);
 
@@ -437,7 +440,7 @@ static void acpi_processor_idle(void)
         /* preparing TSC stop */
         cstate_save_tsc();
         /* preparing APIC stop */
-        hpet_broadcast_enter();
+        lapic_timer_off();
 
         /* Get start time (ticks) */
         t1 = inl(pmtmr_ioport);
@@ -446,8 +449,6 @@ static void acpi_processor_idle(void)
         /* Get end time (ticks) */
         t2 = inl(pmtmr_ioport);
 
-        /* recovering APIC */
-        hpet_broadcast_exit();
         /* recovering TSC */
         cstate_restore_tsc();
 
@@ -460,6 +461,8 @@ static void acpi_processor_idle(void)
 
         /* Re-enable interrupts */
         local_irq_enable();
+        /* recovering APIC */
+        lapic_timer_on();
         /* Compute time (ticks) that we were actually asleep */
         sleep_ticks = ticks_elapsed(t1, t2);
         /* Do not account our idle-switching overhead: */
@@ -752,8 +755,20 @@ static int check_cx(struct acpi_processor_power *power, xen_processor_cx_t *cx)
     if ( cx->type == ACPI_STATE_C3 )
     {
         /* We must be able to use HPET in place of LAPIC timers. */
-        if ( !hpet_broadcast_is_available() )
+        if ( hpet_broadcast_is_available() )
+        {
+            lapic_timer_off = hpet_broadcast_enter;
+            lapic_timer_on = hpet_broadcast_exit;
+        }
+        else if ( pit_broadcast_is_available() )
+        {
+            lapic_timer_off = pit_broadcast_enter;
+            lapic_timer_on = pit_broadcast_exit;
+        }
+        else
+        {
             return -EINVAL;
+        }
 
         /* All the logic here assumes flags.bm_check is same across all CPUs */
         if ( !bm_check_flag )

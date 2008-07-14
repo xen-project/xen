@@ -147,6 +147,32 @@ static inline u64 scale_delta(u64 delta, struct time_scale *scale)
     return product;
 }
 
+/*
+ * cpu_mask that denotes the CPUs that needs timer interrupt coming in as
+ * IPIs in place of local APIC timers
+ */
+extern int xen_cpuidle;
+static cpumask_t pit_broadcast_mask;
+
+static void smp_send_timer_broadcast_ipi(void)
+{
+    int cpu = smp_processor_id();
+    cpumask_t mask;
+
+    cpus_and(mask, cpu_online_map, pit_broadcast_mask);
+
+    if ( cpu_isset(cpu, mask) )
+    {
+        cpu_clear(cpu, mask);
+        raise_softirq(TIMER_SOFTIRQ);
+    }
+
+    if ( !cpus_empty(mask) )
+    {
+        cpumask_raise_softirq(mask, TIMER_SOFTIRQ);
+    }
+}
+
 static void timer_interrupt(int irq, void *dev_id, struct cpu_user_regs *regs)
 {
     ASSERT(local_irq_is_enabled());
@@ -160,6 +186,9 @@ static void timer_interrupt(int irq, void *dev_id, struct cpu_user_regs *regs)
     /* Rough hack to allow accurate timers to sort-of-work with no APIC. */
     if ( !cpu_has_apic )
         raise_softirq(TIMER_SOFTIRQ);
+
+    if ( xen_cpuidle )
+        smp_send_timer_broadcast_ipi();
 
     /* Emulate a 32-bit PIT counter. */
     if ( using_pit )
@@ -1006,9 +1035,10 @@ void __init early_time_init(void)
     setup_irq(0, &irq0);
 }
 
+/* keep pit enabled for pit_broadcast working while cpuidle enabled */
 static int disable_pit_irq(void)
 {
-    if ( !using_pit && cpu_has_apic )
+    if ( !using_pit && cpu_has_apic && !xen_cpuidle )
     {
         /* Disable PIT CH0 timer interrupt. */
         outb_p(0x30, PIT_MODE);
@@ -1025,6 +1055,21 @@ static int disable_pit_irq(void)
     return 0;
 }
 __initcall(disable_pit_irq);
+
+void pit_broadcast_enter(void)
+{
+    cpu_set(smp_processor_id(), pit_broadcast_mask);
+}
+
+void pit_broadcast_exit(void)
+{
+    cpu_clear(smp_processor_id(), pit_broadcast_mask);
+}
+
+int pit_broadcast_is_available(void)
+{
+    return xen_cpuidle;
+}
 
 void send_timer_event(struct vcpu *v)
 {
