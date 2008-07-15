@@ -240,7 +240,7 @@ void dispatch_stat(struct mount *mount, struct fsif_request *req)
     buf->stat_gid   = stat.st_gid;
 #ifdef BLKGETSIZE
     if (S_ISBLK(stat.st_mode)) {
-	int sectors;
+	unsigned long sectors;
 	if (ioctl(fd, BLKGETSIZE, &sectors)) {
 	    perror("getting device size\n");
 	    buf->stat_size = 0;
