@@ -54,14 +54,14 @@ struct cpu_time {
     s_time_t stime_local_stamp;
     s_time_t stime_master_stamp;
     struct time_scale tsc_scale;
-    u32 cstate_plt_count_stamp;
+    u64 cstate_plt_count_stamp;
     struct timer calibration_timer;
 };
 
 struct platform_timesource {
     char *name;
     u64 frequency;
-    u32 (*read_counter)(void);
+    u64 (*read_counter)(void);
     int counter_bits;
 };
 
@@ -340,7 +340,7 @@ static char *freq_string(u64 freq)
  * PLATFORM TIMER 1: PROGRAMMABLE INTERVAL TIMER (LEGACY PIT)
  */
 
-static u32 read_pit_count(void)
+static u64 read_pit_count(void)
 {
     u16 count16;
     u32 count32;
@@ -372,7 +372,7 @@ static void init_pit(struct platform_timesource *pts)
  * PLATFORM TIMER 2: HIGH PRECISION EVENT TIMER (HPET)
  */
 
-static u32 read_hpet_count(void)
+static u64 read_hpet_count(void)
 {
     return hpet_read32(HPET_COUNTER);
 }
@@ -412,7 +412,7 @@ int use_cyclone;
 /* Cyclone MPMC0 register. */
 static volatile u32 *cyclone_timer;
 
-static u32 read_cyclone_count(void)
+static u64 read_cyclone_count(void)
 {
     return *cyclone_timer;
 }
@@ -462,7 +462,7 @@ u32 pmtmr_ioport;
 /* ACPI PM timer ticks at 3.579545 MHz. */
 #define ACPI_PM_FREQUENCY 3579545
 
-static u32 read_pmtimer_count(void)
+static u64 read_pmtimer_count(void)
 {
     return inl(pmtmr_ioport);
 }
@@ -485,7 +485,7 @@ static int init_pmtimer(struct platform_timesource *pts)
  */
 
 static struct platform_timesource plt_src; /* details of chosen timesource  */
-static u32 plt_mask;             /* hardware-width mask                     */
+static u64 plt_mask;             /* hardware-width mask                     */
 static u64 plt_overflow_period;  /* ns between calls to plt_overflow()      */
 static struct time_scale plt_scale; /* scale: platform counter -> nanosecs  */
 
@@ -494,12 +494,12 @@ static DEFINE_SPINLOCK(platform_timer_lock);
 static s_time_t stime_platform_stamp; /* System time at below platform time */
 static u64 platform_timer_stamp;      /* Platform time at above system time */
 static u64 plt_stamp64;          /* 64-bit platform counter stamp           */
-static u32 plt_stamp;            /* hardware-width platform counter stamp   */
+static u64 plt_stamp;            /* hardware-width platform counter stamp   */
 static struct timer plt_overflow_timer;
 
 static void plt_overflow(void *unused)
 {
-    u32 count;
+    u64 count;
 
     spin_lock(&platform_timer_lock);
     count = plt_src.read_counter();
@@ -578,7 +578,7 @@ static void init_platform_timer(void)
          !init_pmtimer(pts) )
         init_pit(pts);
 
-    plt_mask = (u32)~0u >> (32 - pts->counter_bits);
+    plt_mask = (u64)~0ull >> (64 - pts->counter_bits);
 
     set_time_scale(&plt_scale, pts->frequency);
 
@@ -597,31 +597,25 @@ void cstate_save_tsc(void)
 {
     struct cpu_time *t = &this_cpu(cpu_time);
 
-    if (!tsc_invariant){
-        t->cstate_plt_count_stamp = plt_src.read_counter();
-        rdtscll(t->cstate_tsc_stamp);
-    }
+    if ( tsc_invariant )
+        return;
+
+    t->cstate_plt_count_stamp = plt_src.read_counter();
+    rdtscll(t->cstate_tsc_stamp);
 }
 
 void cstate_restore_tsc(void)
 {
-    struct cpu_time *t;
-    u32    plt_count_delta;
-    u64    tsc_delta;
+    struct cpu_time *t = &this_cpu(cpu_time);
+    u64 plt_count_delta, tsc_delta;
 
-    if (!tsc_invariant){
-        t = &this_cpu(cpu_time);
+    if ( tsc_invariant )
+        return;
 
-        /* if platform counter overflow happens, interrupt will bring CPU from
-           C state to working state, so the platform counter won't wrap the
-           cstate_plt_count_stamp, and the 32 bit unsigned platform counter
-           is enough for delta calculation
-         */
-        plt_count_delta = 
-            (plt_src.read_counter() - t->cstate_plt_count_stamp) & plt_mask;
-        tsc_delta = scale_delta(plt_count_delta, &plt_scale)*cpu_khz/1000000UL;
-        wrmsrl(MSR_IA32_TSC,  t->cstate_tsc_stamp + tsc_delta);
-    }
+    plt_count_delta = (plt_src.read_counter() -
+                       t->cstate_plt_count_stamp) & plt_mask;
+    tsc_delta = scale_delta(plt_count_delta, &plt_scale) * cpu_khz/1000000UL;
+    wrmsrl(MSR_IA32_TSC, t->cstate_tsc_stamp + tsc_delta);
 }
 
 /***************************************************************************
