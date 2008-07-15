@@ -286,6 +286,10 @@ int vcpu_initialise(struct vcpu *v)
 
     v->arch.flags = TF_kernel_mode;
 
+    /* Ensure that update_vcpu_system_time() fires at least once. */
+    if ( !is_idle_domain(d) )
+        vcpu_info(v, time).tsc_timestamp = ~0ull;
+
 #if defined(__i386__)
     mapcache_vcpu_init(v);
 #endif
@@ -811,14 +815,6 @@ map_vcpu_info(struct vcpu *v, unsigned long mfn, unsigned offset)
     vcpu_info(v, evtchn_upcall_pending) = 1;
     for ( i = 0; i < BITS_PER_GUEST_LONG(d); i++ )
         set_bit(i, &vcpu_info(v, evtchn_pending_sel));
-
-    /*
-     * Only bother to update time for the current vcpu.  If we're
-     * operating on another vcpu, then it had better not be running at
-     * the time.
-     */
-    if ( v == current )
-         update_vcpu_system_time(v);
 
     return 0;
 }
