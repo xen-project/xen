@@ -287,18 +287,18 @@ static inline void list_insert_sort(
     list_add(element, cur->prev);
 }
 
-#define DOMAIN_COMPARER(name, field, comp1, comp2)          \
-int name##_comp(struct list_head* el1, struct list_head* el2) \
-{                                                           \
-    struct sedf_vcpu_info *d1, *d2;                     \
-    d1 = list_entry(el1,struct sedf_vcpu_info, field);  \
-    d2 = list_entry(el2,struct sedf_vcpu_info, field);  \
-    if ( (comp1) == (comp2) )                             \
-        return 0;                                   \
-    if ( (comp1) < (comp2) )                              \
-        return -1;                                  \
-    else                                                \
-        return 1;                                   \
+#define DOMAIN_COMPARER(name, field, comp1, comp2)                      \
+static int name##_comp(struct list_head* el1, struct list_head* el2)    \
+{                                                                       \
+    struct sedf_vcpu_info *d1, *d2;                                     \
+    d1 = list_entry(el1,struct sedf_vcpu_info, field);                  \
+    d2 = list_entry(el2,struct sedf_vcpu_info, field);                  \
+    if ( (comp1) == (comp2) )                                           \
+        return 0;                                                       \
+    if ( (comp1) < (comp2) )                                            \
+        return -1;                                                      \
+    else                                                                \
+        return 1;                                                       \
 }
 
 /* adds a domain to the queue of processes which wait for the beginning of the
@@ -1067,7 +1067,7 @@ static inline int should_switch(struct vcpu *cur,
     return 1;
 }
 
-void sedf_wake(struct vcpu *d)
+static void sedf_wake(struct vcpu *d)
 {
     s_time_t              now = NOW();
     struct sedf_vcpu_info* inf = EDOM_INFO(d);

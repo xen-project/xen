@@ -25,7 +25,7 @@
 DEFINE_SPINLOCK(int_remap_table_lock);
 void *int_remap_table = NULL;
 
-u8* get_intremap_entry(u8 vector, u8 dm)
+static u8 *get_intremap_entry(u8 vector, u8 dm)
 {
     u8 *table;
     int offset = 0;

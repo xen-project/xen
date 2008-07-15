@@ -25,6 +25,7 @@
 #include <xen/sched.h>
 #include <xen/spinlock.h>
 #include <xen/softirq.h>
+#include <xen/stop_machine.h>
 #include <xen/errno.h>
 #include <xen/smp.h>
 #include <asm/current.h>
