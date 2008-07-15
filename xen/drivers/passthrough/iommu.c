@@ -24,7 +24,7 @@ static int iommu_populate_page_table(struct domain *d);
 int intel_vtd_setup(void);
 int amd_iov_detect(void);
 
-int iommu_enabled = 1;
+int iommu_enabled = 0;
 boolean_param("iommu", iommu_enabled);
 
 int iommu_pv_enabled = 0;
