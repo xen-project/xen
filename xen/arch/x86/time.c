@@ -481,6 +481,30 @@ static int init_pmtimer(struct platform_timesource *pts)
 }
 
 /************************************************************
+ * PLATFORM TIMER 5: TSC
+ */
+
+#define platform_timer_is_tsc() (!strcmp(plt_src.name, "TSC"))
+static u64 tsc_freq;
+
+static u64 read_tsc_count(void)
+{
+    u64 tsc;
+    rdtscll(tsc);
+    return tsc;
+}
+
+static int init_tsctimer(struct platform_timesource *pts)
+{
+    /* TODO: evaluate stability of TSC here, return 0 if not stable. */
+    pts->name = "TSC";
+    pts->frequency = tsc_freq;
+    pts->read_counter = read_tsc_count;
+    pts->counter_bits = 64;
+    return 1;
+}
+
+/************************************************************
  * GENERIC PLATFORM TIMER INFRASTRUCTURE
  */
 
@@ -565,6 +589,8 @@ static void init_platform_timer(void)
             rc = init_cyclone(pts);
         else if ( !strcmp(opt_clocksource, "acpi") )
             rc = init_pmtimer(pts);
+        else if ( !strcmp(opt_clocksource, "tsc") )
+            rc = init_tsctimer(pts);
 
         if ( rc <= 0 )
             printk("WARNING: %s clocksource '%s'.\n",
@@ -780,6 +806,10 @@ int cpu_frequency_change(u64 freq)
     struct cpu_time *t = &this_cpu(cpu_time);
     u64 curr_tsc;
 
+    /* Nothing to do if TSC is platform timer. Assume it is constant-rate. */
+    if ( platform_timer_is_tsc() )
+        return 0;
+
     /* Sanity check: CPU frequency allegedly dropping below 1MHz? */
     if ( freq < 1000000u )
     {
@@ -978,9 +1008,12 @@ void init_percpu_time(void)
     unsigned long flags;
     s_time_t now;
 
+    if ( platform_timer_is_tsc() )
+        return;
+
     local_irq_save(flags);
     rdtscll(t->local_tsc_stamp);
-    now = !plt_src.read_counter ? 0 : read_platform_stime();
+    now = read_platform_stime();
     local_irq_restore(flags);
 
     t->stime_master_stamp = now;
@@ -998,10 +1031,10 @@ int __init init_xen_time(void)
 
     local_irq_disable();
 
-    init_percpu_time();
-
     stime_platform_stamp = 0;
     init_platform_timer();
+
+    init_percpu_time();
 
     /* check if TSC is invariant during deep C state
        this is a new feature introduced by Nehalem*/
@@ -1019,6 +1052,7 @@ void __init early_time_init(void)
 {
     u64 tmp = init_pit_and_calibrate_tsc();
 
+    tsc_freq = tmp;
     set_time_scale(&this_cpu(cpu_time).tsc_scale, tmp);
 
     do_div(tmp, 1000);
