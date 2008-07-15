@@ -110,9 +110,9 @@ void allocate_request_array(struct mount *mount)
     unsigned short *freelist;
     
     requests = malloc(sizeof(struct fs_request) *nr_entries);
-    freelist = malloc(sizeof(unsigned short) * nr_entries); 
+    freelist = malloc(sizeof(unsigned short) * (nr_entries + 1)); 
     memset(requests, 0, sizeof(struct fs_request) * nr_entries);
-    memset(freelist, 0, sizeof(unsigned short) * nr_entries);
+    memset(freelist, 0, sizeof(unsigned short) * (nr_entries + 1));
     for(i=0; i< nr_entries; i++)
     {
         requests[i].active = 0; 
