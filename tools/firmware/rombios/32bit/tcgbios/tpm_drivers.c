@@ -75,7 +75,7 @@ static uint32_t tis_activate(uint32_t baseaddr)
 	return rc;
 }
 
-uint32_t tis_ready(uint32_t baseaddr)
+static uint32_t tis_ready(uint32_t baseaddr)
 {
 	uint32_t rc = 0;
 	uint8_t *tis_addr = (uint8_t*)baseaddr;
@@ -86,7 +86,7 @@ uint32_t tis_ready(uint32_t baseaddr)
 	return rc;
 }
 
-uint32_t tis_senddata(uint32_t baseaddr, unsigned char *data, uint32_t len)
+static uint32_t tis_senddata(uint32_t baseaddr, unsigned char *data, uint32_t len)
 {
 	uint32_t rc = 0;
 	uint8_t *tis_addr = (uint8_t*)baseaddr;
@@ -127,7 +127,7 @@ uint32_t tis_senddata(uint32_t baseaddr, unsigned char *data, uint32_t len)
 	return rc;
 }
 
-uint32_t tis_readresp(uint32_t baseaddr, unsigned char *buffer, uint32_t len)
+static uint32_t tis_readresp(uint32_t baseaddr, unsigned char *buffer, uint32_t len)
 {
 	uint32_t rc = 0;
 	uint32_t offset = 0;
@@ -147,7 +147,7 @@ uint32_t tis_readresp(uint32_t baseaddr, unsigned char *buffer, uint32_t len)
 }
 
 
-uint32_t tis_waitdatavalid(uint32_t baseaddr)
+static uint32_t tis_waitdatavalid(uint32_t baseaddr)
 {
 	uint8_t *tis_addr = (uint8_t*)baseaddr;
 	uint32_t rc = 0;
@@ -157,7 +157,7 @@ uint32_t tis_waitdatavalid(uint32_t baseaddr)
 	return rc;
 }
 
-uint32_t tis_waitrespready(uint32_t baseaddr, uint32_t timeout)
+static uint32_t tis_waitrespready(uint32_t baseaddr, uint32_t timeout)
 {
 	uint32_t rc = 0;
 	uint8_t *tis_addr = (uint8_t*)baseaddr;
@@ -170,7 +170,7 @@ uint32_t tis_waitrespready(uint32_t baseaddr, uint32_t timeout)
 }
 
 /* if device is not there, return '0', '1' otherwise */
-uint32_t tis_probe(uint32_t baseaddr)
+static uint32_t tis_probe(uint32_t baseaddr)
 {
 	uint32_t rc = 0;
 	uint8_t *tis_addr = (uint8_t*)baseaddr;

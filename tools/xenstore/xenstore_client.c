@@ -121,7 +121,7 @@ static int show_whole_path = 0;
 
 #define MIN(a, b) (((a) < (b))? (a) : (b))
 
-void do_ls(struct xs_handle *h, char *path, int cur_depth, int show_perms)
+static void do_ls(struct xs_handle *h, char *path, int cur_depth, int show_perms)
 {
     static struct expanding_buffer ebuf;
     char **e;

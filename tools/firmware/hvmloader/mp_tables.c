@@ -69,8 +69,6 @@
 
 #include "util.h"
 
-extern int get_vcpu_nr(void);  /* for the guest's VCPU count */
-
 /*
  * The following structures are defined in the MuliProcessor Specifiation v1.4
  */
@@ -152,7 +150,7 @@ struct mp_local_intr_entry {
 };
 
 
-void fill_mp_config_table(struct mp_config_table *mpct, int length)
+static void fill_mp_config_table(struct mp_config_table *mpct, int length)
 {
     int vcpu_nr, i;
     uint8_t checksum;
@@ -199,7 +197,7 @@ void fill_mp_config_table(struct mp_config_table *mpct, int length)
 }
 
 /* fills in an MP processor entry for VCPU 'vcpu_id' */
-void fill_mp_proc_entry(struct mp_proc_entry *mppe, int vcpu_id)
+static void fill_mp_proc_entry(struct mp_proc_entry *mppe, int vcpu_id)
 {
     mppe->type = ENTRY_TYPE_PROCESSOR;
     mppe->lapic_id = LAPIC_ID(vcpu_id);
@@ -213,7 +211,7 @@ void fill_mp_proc_entry(struct mp_proc_entry *mppe, int vcpu_id)
 
 
 /* fills in an MP bus entry of type 'type' and bus ID 'bus_id' */
-void fill_mp_bus_entry(struct mp_bus_entry *mpbe, int bus_id, const char *type)
+static void fill_mp_bus_entry(struct mp_bus_entry *mpbe, int bus_id, const char *type)
 {
     int i;
 
@@ -225,7 +223,7 @@ void fill_mp_bus_entry(struct mp_bus_entry *mpbe, int bus_id, const char *type)
 
 
 /* fills in an MP IOAPIC entry for IOAPIC 'ioapic_id' */
-void fill_mp_ioapic_entry(struct mp_ioapic_entry *mpie)
+static void fill_mp_ioapic_entry(struct mp_ioapic_entry *mpie)
 {
     mpie->type = ENTRY_TYPE_IOAPIC;
     mpie->ioapic_id = IOAPIC_ID;
@@ -236,7 +234,7 @@ void fill_mp_ioapic_entry(struct mp_ioapic_entry *mpie)
 
 
 /* fills in an IO interrupt entry for IOAPIC 'ioapic_id' */
-void fill_mp_io_intr_entry(
+static void fill_mp_io_intr_entry(
     struct mp_io_intr_entry *mpiie,
     int src_bus_id, int src_bus_irq, int ioapic_id, int dst_ioapic_intin)
 {
@@ -251,7 +249,7 @@ void fill_mp_io_intr_entry(
 
 
 /* fill in the mp floating processor structure */
-void fill_mpfps(struct mp_floating_pointer_struct *mpfps, uint32_t mpct)
+static void fill_mpfps(struct mp_floating_pointer_struct *mpfps, uint32_t mpct)
 {
     int i;
     uint8_t checksum;
@@ -283,7 +281,7 @@ void fill_mpfps(struct mp_floating_pointer_struct *mpfps, uint32_t mpct)
  * The '___HVMMP' signature is created by the ROMBIOS and designates a chunk
  * of space inside the ROMBIOS that is safe for us to write our MP table info
  */
-void* get_mp_table_start(void)
+static void *get_mp_table_start(void)
 {
     char *bios_mem;
 
@@ -300,7 +298,7 @@ void* get_mp_table_start(void)
 
 
 /* recalculate the new ROMBIOS checksum after adding MP tables */
-void reset_bios_checksum(void)
+static void reset_bios_checksum(void)
 {
     uint32_t i;
     uint8_t checksum;
@@ -311,7 +309,6 @@ void reset_bios_checksum(void)
 
     *((uint8_t *)(ROMBIOS_BEGIN + ROMBIOS_MAXOFFSET)) = -checksum;
 }
-
 
 /* create_mp_tables - creates MP tables for the guest based upon config data */
 void create_mp_tables(void)

@@ -99,10 +99,6 @@ asm (
     "    .text                       \n"
     );
 
-void smp_initialise(void);
-void create_mp_tables(void);
-int hvm_write_smbios_tables(void);
-
 static enum { VGA_none, VGA_std, VGA_cirrus } virtual_vga = VGA_none;
 
 static void

@@ -68,7 +68,7 @@ static int xc_handle = -1;
 static int event_fd = -1;
 static int virq_port = -1;
 
-void close_handler(int signal)
+static void close_handler(int signal)
 {
     interrupted = 1;
 }
@@ -84,7 +84,7 @@ void close_handler(int signal)
  * Outputs the trace buffer to a filestream, prepending the CPU and size
  * of the buffer write.
  */
-void write_buffer(unsigned int cpu, unsigned char *start, int size,
+static void write_buffer(unsigned int cpu, unsigned char *start, int size,
                int total_size, int outfd)
 {
     struct statvfs stat;
@@ -206,7 +206,7 @@ static void get_tbufs(unsigned long *mfn, unsigned long *size)
  *
  * Maps the Xen trace buffers them into process address space.
  */
-struct t_buf *map_tbufs(unsigned long tbufs_mfn, unsigned int num,
+static struct t_buf *map_tbufs(unsigned long tbufs_mfn, unsigned int num,
                         unsigned long size)
 {
     struct t_buf *tbufs_mapped;
@@ -230,7 +230,7 @@ struct t_buf *map_tbufs(unsigned long tbufs_mfn, unsigned int num,
  * @type:           the new mask type,0-event mask, 1-cpu mask
  *
  */
-void set_mask(uint32_t mask, int type)
+static void set_mask(uint32_t mask, int type)
 {
     int ret = 0;
 
@@ -258,7 +258,7 @@ void set_mask(uint32_t mask, int type)
  * Initialises an array of pointers to individual trace buffers within the
  * mapped region containing all trace buffers.
  */
-struct t_buf **init_bufs_ptrs(void *bufs_mapped, unsigned int num,
+static struct t_buf **init_bufs_ptrs(void *bufs_mapped, unsigned int num,
                               unsigned long size)
 {
     int i;
@@ -291,7 +291,7 @@ struct t_buf **init_bufs_ptrs(void *bufs_mapped, unsigned int num,
  * mapped in user space.  Note that the trace buffer metadata contains machine
  * pointers - the array returned allows more convenient access to them.
  */
-unsigned char **init_rec_ptrs(struct t_buf **meta, unsigned int num)
+static unsigned char **init_rec_ptrs(struct t_buf **meta, unsigned int num)
 {
     int i;
     unsigned char **data;
@@ -312,7 +312,7 @@ unsigned char **init_rec_ptrs(struct t_buf **meta, unsigned int num)
 /**
  * get_num_cpus - get the number of logical CPUs
  */
-unsigned int get_num_cpus(void)
+static unsigned int get_num_cpus(void)
 {
     xc_physinfo_t physinfo = { 0 };
     int ret;
@@ -331,7 +331,7 @@ unsigned int get_num_cpus(void)
 /**
  * event_init - setup to receive the VIRQ_TBUF event
  */
-void event_init(void)
+static void event_init(void)
 {
     int rc;
 
@@ -354,7 +354,7 @@ void event_init(void)
  * wait_for_event_or_timeout - sleep for the specified number of milliseconds,
  *                             or until an VIRQ_TBUF event occurs
  */
-void wait_for_event_or_timeout(unsigned long milliseconds)
+static void wait_for_event_or_timeout(unsigned long milliseconds)
 {
     int rc;
     struct pollfd fd = { .fd = event_fd,
@@ -394,7 +394,7 @@ void wait_for_event_or_timeout(unsigned long milliseconds)
  * monitor_tbufs - monitor the contents of tbufs and output to a file
  * @logfile:       the FILE * representing the file to log to
  */
-int monitor_tbufs(int outfd)
+static int monitor_tbufs(int outfd)
 {
     int i;
 
@@ -512,7 +512,7 @@ int monitor_tbufs(int outfd)
 const char *program_version     = "xentrace v1.2";
 const char *program_bug_address = "<mark.a.williamson@intel.com>";
 
-void usage(void)
+static void usage(void)
 {
 #define USAGE_STR \
 "Usage: xentrace [OPTION...] [output file]\n" \
@@ -554,7 +554,7 @@ void usage(void)
 }
 
 /* convert the argument string pointed to by arg to a long int representation */
-long argtol(const char *restrict arg, int base)
+static long argtol(const char *restrict arg, int base)
 {
     char *endp;
     long val;
@@ -574,7 +574,7 @@ long argtol(const char *restrict arg, int base)
     return val;
 }
 
-int parse_evtmask(char *arg)
+static int parse_evtmask(char *arg)
 {
     /* search filtering class */
     if (strcmp(arg, "gen") == 0){ 
@@ -595,7 +595,7 @@ int parse_evtmask(char *arg)
 }
 
 /* parse command line arguments */
-void parse_args(int argc, char **argv)
+static void parse_args(int argc, char **argv)
 {
     int option;
     static struct option long_options[] = {

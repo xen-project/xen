@@ -71,7 +71,7 @@ struct symbol {
 
 size_t kernel_stext, kernel_etext, kernel_sinittext, kernel_einittext, kernel_hypercallpage;
 
-int is_kernel_text(size_t addr)
+static int is_kernel_text(size_t addr)
 {
 #if defined (__i386__)
     if (symbol_table == NULL)
@@ -96,7 +96,8 @@ int is_kernel_text(size_t addr)
     return 0;
 }
 
-void free_symbol(struct symbol *symbol)
+#if 0
+static void free_symbol(struct symbol *symbol)
 {
     if (symbol == NULL)
         return;
@@ -104,8 +105,9 @@ void free_symbol(struct symbol *symbol)
         free(symbol->name);
     free(symbol);
 }
+#endif
 
-void insert_symbol(struct symbol *symbol)
+static void insert_symbol(struct symbol *symbol)
 {
     static struct symbol *prev = NULL;
     struct symbol *s = symbol_table;
@@ -132,7 +134,7 @@ void insert_symbol(struct symbol *symbol)
     prev = symbol;
 }
 
-struct symbol *lookup_symbol(size_t address)
+static struct symbol *lookup_symbol(size_t address)
 {
     struct symbol *s = symbol_table;
 
@@ -145,7 +147,7 @@ struct symbol *lookup_symbol(size_t address)
     return NULL;
 }
 
-void print_symbol(size_t addr)
+static void print_symbol(size_t addr)
 {
     struct symbol *s;
 
@@ -163,7 +165,7 @@ void print_symbol(size_t addr)
         printf("%s+%#x ", s->name, (unsigned int)(addr - s->address));
 }
 
-void read_symbol_table(const char *symtab)
+static void read_symbol_table(const char *symtab)
 {
     char line[256];
     char *p;
@@ -240,7 +242,7 @@ char *flag_values[22][2] =
     { NULL,     "cid"  }  // 21       Cpuid Identification Flag
 };
 
-void print_flags(uint64_t flags)
+static void print_flags(uint64_t flags)
 {
     int i;
 
@@ -253,7 +255,7 @@ void print_flags(uint64_t flags)
     printf("\n");
 }
 
-void print_special(unsigned long *regs, const char *name, unsigned int mask)
+static void print_special(unsigned long *regs, const char *name, unsigned int mask)
 {
     unsigned int i;
 
@@ -265,7 +267,7 @@ void print_special(unsigned long *regs, const char *name, unsigned int mask)
 #endif
 
 #ifdef __i386__
-void print_ctx(vcpu_guest_context_t *ctx1)
+static void print_ctx(vcpu_guest_context_t *ctx1)
 {
     struct cpu_user_regs *regs = &ctx1->user_regs;
 
@@ -294,7 +296,7 @@ void print_ctx(vcpu_guest_context_t *ctx1)
     }
 }
 #elif defined(__x86_64__)
-void print_ctx(vcpu_guest_context_t *ctx1)
+static void print_ctx(vcpu_guest_context_t *ctx1)
 {
     struct cpu_user_regs *regs = &ctx1->user_regs;
 
@@ -582,7 +584,7 @@ void print_ctx(vcpu_guest_context_t *ctx)
 #endif
 
 #ifndef NO_TRANSLATION
-void *map_page(vcpu_guest_context_t *ctx, int vcpu, size_t virt)
+static void *map_page(vcpu_guest_context_t *ctx, int vcpu, size_t virt)
 {
     static unsigned long previous_mfn = 0;
     static void *mapped = NULL;
@@ -609,7 +611,7 @@ void *map_page(vcpu_guest_context_t *ctx, int vcpu, size_t virt)
     return (void *)(mapped + offset);
 }
 
-void print_stack(vcpu_guest_context_t *ctx, int vcpu)
+static void print_stack(vcpu_guest_context_t *ctx, int vcpu)
 {
     struct cpu_user_regs *regs = &ctx->user_regs;
     size_t stack = STACK_POINTER(regs);
@@ -699,7 +701,7 @@ void print_stack(vcpu_guest_context_t *ctx, int vcpu)
 }
 #endif
 
-void dump_ctx(int vcpu)
+static void dump_ctx(int vcpu)
 {
     int ret;
     vcpu_guest_context_any_t ctx;
@@ -748,7 +750,7 @@ void dump_ctx(int vcpu)
     }
 }
 
-void usage(void)
+static void usage(void)
 {
     printf("usage:\n\n");
 

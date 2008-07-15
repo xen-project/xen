@@ -581,7 +581,7 @@ static char wake_event_1[]    = "Wake Event 1";
  * data       : additional parameter; used as parameter for 10.4.3
  *              'action index'
  */
-void tcpa_add_measurement(uint32_t pcrIndex,
+static void tcpa_add_measurement(uint32_t pcrIndex,
                           uint16_t event_type,
                           uint32_t data)
 {
@@ -863,7 +863,7 @@ uint32_t tcpa_initialize_tpm(uint32_t physpres)
 }
 
 
-uint16_t TCG_IsShutdownPreBootInterface(void)
+static uint16_t TCG_IsShutdownPreBootInterface(void)
 {
 	return tcpa_acpi.flags & STATUS_FLAG_SHUTDOWN;
 }

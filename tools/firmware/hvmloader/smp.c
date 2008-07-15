@@ -69,8 +69,7 @@ asm (
     "    .text                       \n"
     );
 
-extern void cacheattr_init(void);
-
+void ap_start(void); /* non-static avoids unused-function compiler warning */
 /*static*/ void ap_start(void)
 {
     printf(" - CPU%d ... ", ap_cpuid);

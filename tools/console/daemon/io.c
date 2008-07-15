@@ -471,7 +471,7 @@ out:
 }
  
 /* Takes tuples of names, scanf-style args, and void **, NULL terminated. */
-int xs_gather(struct xs_handle *xs, const char *dir, ...)
+static int xs_gather(struct xs_handle *xs, const char *dir, ...)
 {
 	va_list ap;
 	const char *name;
