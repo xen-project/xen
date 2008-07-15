@@ -496,11 +496,27 @@ static u64 read_tsc_count(void)
 
 static int init_tsctimer(struct platform_timesource *pts)
 {
-    /* TODO: evaluate stability of TSC here, return 0 if not stable. */
+    unsigned int cpu;
+
+    /*
+     * TODO: evaluate stability of TSC here, return 0 if not stable.
+     * For now we assume all TSCs are synchronised and hence can all share
+     * CPU 0's calibration values.
+     */
+    for_each_cpu ( cpu )
+    {
+        if ( cpu == 0 )
+            continue;
+        memcpy(&per_cpu(cpu_time, cpu),
+               &per_cpu(cpu_time, 0),
+               sizeof(struct cpu_time));
+    }
+
     pts->name = "TSC";
     pts->frequency = tsc_freq;
     pts->read_counter = read_tsc_count;
     pts->counter_bits = 64;
+
     return 1;
 }
 
@@ -1130,11 +1146,12 @@ int time_suspend(void)
 
 int time_resume(void)
 {
-    u64 tmp = init_pit_and_calibrate_tsc();
+    /*u64 tmp = */init_pit_and_calibrate_tsc();
 
     disable_pit_irq();
 
-    set_time_scale(&this_cpu(cpu_time).tsc_scale, tmp);
+    /* Disable this while calibrate_tsc_ap() also is skipped. */
+    /*set_time_scale(&this_cpu(cpu_time).tsc_scale, tmp);*/
 
     resume_platform_timer();
 
