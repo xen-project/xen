@@ -68,7 +68,7 @@ const char *hypercall_name_table[64] =
 };
 #undef X
 
-int lock_pages(void *addr, size_t len)
+static int lock_pages(void *addr, size_t len)
 {
     int e = 0;
 #ifndef __sun__
@@ -77,7 +77,7 @@ int lock_pages(void *addr, size_t len)
     return (e);
 }
 
-void unlock_pages(void *addr, size_t len)
+static void unlock_pages(void *addr, size_t len)
 {
 #ifndef __sun__
     munlock(addr, len);

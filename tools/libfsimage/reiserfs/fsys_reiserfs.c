@@ -555,7 +555,7 @@ journal_init (fsi_file_t *ffi)
 }
 
 /* check filesystem types and read superblock into memory buffer */
-int
+static int
 reiserfs_mount (fsi_file_t *ffi, const char *options)
 {
   struct reiserfs_super_block super;
@@ -872,7 +872,7 @@ search_stat (fsi_file_t *ffi, __u32 dir_id, __u32 objectid)
   return 0;
 }
 
-int
+static int
 reiserfs_read (fsi_file_t *ffi, char *buf, int len)
 {
   unsigned int blocksize;
@@ -980,7 +980,7 @@ reiserfs_read (fsi_file_t *ffi, char *buf, int len)
  *   of the file we were trying to look up, filepos is 0 and filemax is 
  *   the size of the file.
  */
-int
+static int
 reiserfs_dir (fsi_file_t *ffi, char *dirname)
 {
   struct reiserfs_de_head *de_head;

@@ -54,7 +54,7 @@ struct fat_superblock
 
 #define log2 grub_log2
 
-int
+static int
 fat_mount (fsi_file_t *ffi, const char *options)
 {
   struct fat_bpb bpb;
@@ -179,7 +179,7 @@ fat_mount (fsi_file_t *ffi, const char *options)
   return 1;
 }
 
-int
+static int
 fat_read (fsi_file_t *ffi, char *buf, int len)
 {
   int logical_clust;
@@ -273,7 +273,7 @@ fat_read (fsi_file_t *ffi, char *buf, int len)
   return errnum ? 0 : ret;
 }
 
-int
+static int
 fat_dir (fsi_file_t *ffi, char *dirname)
 {
   char *rest, ch, dir_buf[FAT_DIRENTRY_LENGTH];
