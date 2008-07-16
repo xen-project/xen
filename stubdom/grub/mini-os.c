@@ -681,7 +681,9 @@ int main(int argc, char *argv[])
         config_file[sizeof(config_file) - 1] = 0;
         if (!strncmp(config_file, "(nd)", 4))
             preset_menu = "dhcp";
-    } else
+    } else if (start_info.mod_len)
+        preset_menu = (void*) start_info.mod_start;
+    else
         preset_menu = "dhcp --with-configfile";
 
     mbi.drives_addr = BOOTSEC_LOCATION + (60 * 1024);
