@@ -719,9 +719,11 @@ static int iommu_page_fault_do_one(struct iommu *iommu, int type,
             PCI_SLOT(source_id & 0xFF), PCI_FUNC(source_id & 0xFF), addr,
             fault_reason, iommu->reg);
 
+#ifndef __i386__ /* map_domain_page() cannot be used in this context */
     if ( fault_reason < 0x20 )
         print_vtd_entries(iommu, (source_id >> 8),
                           (source_id & 0xff), (addr >> PAGE_SHIFT));
+#endif
 
     return 0;
 }
