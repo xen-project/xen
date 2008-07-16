@@ -2618,7 +2618,9 @@ class XendDomainInfo:
     def _cleanupVm(self):
         """Cleanup VM resources.  Idempotent.  Nothrow guarantee."""
 
-        self.metrics.destroy()
+        from xen.xend import XendDomain
+        if not XendDomain.instance().is_domain_managed(self):
+            self.metrics.destroy()
         self._unwatchVm()
 
         try:
