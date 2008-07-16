@@ -1686,6 +1686,33 @@ out:
     return err;
 }
 
+/* delete all emulate register */
+static void pt_config_delete(struct pt_dev *ptdev)
+{
+    struct pt_reg_grp_tbl *reg_grp_entry = NULL;
+    struct pt_reg_tbl *reg_entry = NULL;
+
+    /* free MSI/MSI-X info table */
+    if (ptdev->msix)
+        pt_msix_delete(ptdev);
+    if (ptdev->msi)
+        free(ptdev->msi);
+
+    /* free all register group entry */
+    while ((reg_grp_entry = ptdev->reg_grp_tbl_head.lh_first) != NULL)
+    {
+        /* free all register entry */
+        while ((reg_entry = reg_grp_entry->reg_tbl_head.lh_first) != NULL)
+        {
+            QEMU_LIST_REMOVE(reg_entry, entries);
+            qemu_free(reg_entry);
+        }
+
+        QEMU_LIST_REMOVE(reg_grp_entry, entries);
+        qemu_free(reg_grp_entry);
+    }
+}
+
 /* initialize common register value */
 static uint32_t pt_common_reg_init(struct pt_dev *ptdev,
         struct pt_reg_info_tbl *reg, uint32_t real_offset)
@@ -2821,7 +2848,8 @@ int unregister_real_device(int php_slot)
 
     /* Unbind interrupt */
     e_device = (assigned_device->dev.devfn >> 3) & 0x1f;
-    e_intx = assigned_device->dev.config[0x3d]-1;
+    /* fix virtual interrupt pin to INTA# */
+    e_intx = 0;
     machine_irq = pci_dev->irq;
 
     if ( machine_irq != 0 ) {
@@ -2833,6 +2861,9 @@ int unregister_real_device(int php_slot)
             PT_LOG("Error: Unbinding of interrupt failed! rc=%d\n", rc);
         }
     }
+
+    /* delete all emulated config registers */
+    pt_config_delete(assigned_device);
 
     /* unregister real device's MMIO/PIO BARs */
     pt_unregister_regions(assigned_device);

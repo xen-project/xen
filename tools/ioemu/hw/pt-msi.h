@@ -94,4 +94,7 @@ add_msix_mapping(struct pt_dev *dev, int bar_index);
 int
 pt_msix_init(struct pt_dev *dev, int pos);
 
+void
+pt_msix_delete(struct pt_dev *dev);
+
 #endif

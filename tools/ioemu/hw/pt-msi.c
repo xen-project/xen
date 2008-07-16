@@ -332,3 +332,16 @@ int pt_msix_init(struct pt_dev *dev, int pos)
            (unsigned long)dev->msix->phys_iomem_base);
     return 0;
 }
+
+void pt_msix_delete(struct pt_dev *dev)
+{
+    /* unmap the MSI-X memory mapped register area */
+    if (dev->msix->phys_iomem_base)
+    {
+        PT_LOG("unmapping physical MSI-X table from %lx\n",
+           (unsigned long)dev->msix->phys_iomem_base);
+        munmap(dev->msix->phys_iomem_base, dev->msix->total_entries * 16);
+    }
+
+    free(dev->msix);
+}
