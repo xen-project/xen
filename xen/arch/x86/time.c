@@ -1079,22 +1079,37 @@ void __init early_time_init(void)
     setup_irq(0, &irq0);
 }
 
+/* force_hpet_broadcast: if true, force using hpet_broadcast to fix lapic stop
+   issue for deep C state with pit disabled */
+static int force_hpet_broadcast;
+boolean_param("hpetbroadcast", force_hpet_broadcast);
+
 /* keep pit enabled for pit_broadcast working while cpuidle enabled */
 static int disable_pit_irq(void)
 {
-    if ( !using_pit && cpu_has_apic && !xen_cpuidle )
-    {
-        /* Disable PIT CH0 timer interrupt. */
-        outb_p(0x30, PIT_MODE);
-        outb_p(0, PIT_CH0);
-        outb_p(0, PIT_CH0);
+    if ( using_pit || !cpu_has_apic || (xen_cpuidle && !force_hpet_broadcast) )
+        return 0;
 
-        /*
-         * If we do not rely on PIT CH0 then we can use HPET for one-shot
-         * timer emulation when entering deep C states.
-         */
-        /*hpet_broadcast_init(); XXX dom0 may rely on RTC interrupt delivery */
+    /*
+     * If we do not rely on PIT CH0 then we can use HPET for one-shot timer 
+     * emulation when entering deep C states.
+     * XXX dom0 may rely on RTC interrupt delivery, so only enable
+     * hpet_broadcast if force_hpet_broadcast.
+     */
+    if ( xen_cpuidle && force_hpet_broadcast )
+    {
+        hpet_broadcast_init();
+        if ( !hpet_broadcast_is_available() )
+        {
+            printk("HPET broadcast init failed, turn to PIT broadcast.\n");
+            return 0;
+        }
     }
+
+    /* Disable PIT CH0 timer interrupt. */
+    outb_p(0x30, PIT_MODE);
+    outb_p(0, PIT_CH0);
+    outb_p(0, PIT_CH0);
 
     return 0;
 }
