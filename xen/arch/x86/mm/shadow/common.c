@@ -1676,6 +1676,9 @@ shadow_free_p2m_page(struct domain *d, struct page_info *pg)
     /* Free should not decrement domain's total allocation, since 
      * these pages were allocated without an owner. */
     page_set_owner(pg, NULL); 
+#if defined(__x86_64__)
+    spin_lock_init(&pg->lock);
+#endif
     free_domheap_pages(pg, 0);
     d->arch.paging.shadow.p2m_pages--;
     perfc_decr(shadow_alloc_count);
