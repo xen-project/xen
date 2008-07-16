@@ -12,6 +12,7 @@
 #define EXPORTS_SUBNODE     "exports"
 #define EXPORTS_NODE        ROOT_NODE"/"EXPORTS_SUBNODE
 #define WATCH_NODE          EXPORTS_NODE"/requests"
+#define MAX_FDS             16
 
 struct fs_export
 {
@@ -45,6 +46,7 @@ struct mount
     int nr_entries;
     struct fs_request *requests;
     unsigned short *freelist;
+    int fds[MAX_FDS];
 };
 
 

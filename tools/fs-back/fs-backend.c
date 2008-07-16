@@ -198,6 +198,7 @@ static void handle_connection(int frontend_dom_id, int export_id, char *frontend
     int evt_port;
     pthread_t handling_thread;
     struct fsif_sring *sring;
+    int i;
 
     printf("Handling connection from dom=%d, for export=%d\n", 
             frontend_dom_id, export_id);
@@ -240,6 +241,8 @@ static void handle_connection(int frontend_dom_id, int export_id, char *frontend
                                     PROT_READ | PROT_WRITE);
     BACK_RING_INIT(&mount->ring, sring, PAGE_SIZE);
     mount->nr_entries = mount->ring.nr_ents; 
+    for (i = 0; i < MAX_FDS; i++)
+        mount->fds[i] = -1;
     xenbus_write_backend_ready(mount);
 
     pthread_create(&handling_thread, NULL, &handle_mount, mount);
