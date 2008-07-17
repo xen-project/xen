@@ -1094,6 +1094,11 @@ int clock_gettime(clockid_t clk_id, struct timespec *tp)
     return 0;
 }
 
+size_t getpagesize(void)
+{
+    return PAGE_SIZE;
+}
+
 void *mmap(void *start, size_t length, int prot, int flags, int fd, off_t offset)
 {
     unsigned long n = (length + PAGE_SIZE - 1) / PAGE_SIZE;
@@ -1212,7 +1217,9 @@ unsupported_function_crash(kill);
 unsupported_function_crash(pipe);
 unsupported_function_crash(fork);
 unsupported_function_crash(execv);
+unsupported_function_crash(execve);
 unsupported_function_crash(waitpid);
+unsupported_function_crash(wait);
 unsupported_function_crash(lockf);
 unsupported_function_crash(sysconf);
 unsupported_function(int, tcsetattr, -1);

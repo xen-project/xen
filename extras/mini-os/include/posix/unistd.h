@@ -2,10 +2,8 @@
 #define _POSIX_UNISTD_H
 
 #include_next <unistd.h>
-#include <mini-os/arch_limits.h>
 
-#define getpagesize() __PAGE_SIZE
-
+size_t getpagesize(void);
 int ftruncate(int fd, off_t length);
 
 #endif /* _POSIX_UNISTD_H */
