@@ -13,7 +13,7 @@ IOEMU_OPTIONS=--disable-sdl --disable-opengl --disable-gfx-check --disable-vnc-t
 ZLIB_VERSION=1.2.3
 LIBPCI_VERSION=2.2.9
 NEWLIB_VERSION=1.16.0
-LWIP_DATE=2008-06-01
+LWIP_VERSION=1.3.0
 GRUB_VERSION=0.97
 
 WGET=wget -c
@@ -54,8 +54,8 @@ TARGET_CPPFLAGS += -nostdinc
 TARGET_CPPFLAGS += -isystem $(CURDIR)/$(MINI_OS)/include/posix
 TARGET_CPPFLAGS += -isystem $(CROSS_PREFIX)/$(GNU_TARGET_ARCH)-xen-elf/include
 TARGET_CPPFLAGS += -isystem $(GCC_INSTALL)include
-TARGET_CPPFLAGS += -isystem $(CURDIR)/lwip-cvs/src/include
-TARGET_CPPFLAGS += -isystem $(CURDIR)/lwip-cvs/src/include/ipv4
+TARGET_CPPFLAGS += -isystem $(CURDIR)/lwip/src/include
+TARGET_CPPFLAGS += -isystem $(CURDIR)/lwip/src/include/ipv4
 TARGET_CPPFLAGS += -I$(CURDIR)/include
 
 TARGET_LDFLAGS += -nostdlib -L$(CROSS_PREFIX)/$(GNU_TARGET_ARCH)-xen-elf/lib
@@ -139,8 +139,13 @@ $(LIBPCI_STAMPFILE): pciutils-$(LIBPCI_VERSION) $(NEWLIB_STAMPFILE) $(ZLIB_STAMP
 # lwIP
 ######
 
-lwip-cvs:
-	cvs -z 9 -d :pserver:anonymous@cvs.savannah.nongnu.org:/sources/lwip co -D $(LWIP_DATE) -d $@ lwip
+lwip-$(LWIP_VERSION).tar.gz:
+	$(WGET) http://download.savannah.gnu.org/releases/lwip/$@
+
+lwip: lwip-$(LWIP_VERSION).tar.gz
+	tar xzf $<
+	patch -d $@ -p0 < lwip.patch-cvs
+	touch $@
 
 #######
 # Links
@@ -213,12 +218,12 @@ ifeq ($(CONFIG_QEMU),ioemu)
 	[ -f ioemu/config-host.mak ] || \
 	  ( cd ioemu ; \
           XEN_TARGET_ARCH=$(XEN_TARGET_ARCH) CFLAGS="$(TARGET_CFLAGS)" sh configure --prefix=/usr --enable-stubdom $(IOEMU_OPTIONS))
-	CPPFLAGS="$(TARGET_CPPFLAGS)" $(MAKE) -C ioemu LWIPDIR=$(CURDIR)/lwip-cvs TOOLS=
+	CPPFLAGS="$(TARGET_CPPFLAGS)" $(MAKE) -C ioemu LWIPDIR=$(CURDIR)/lwip TOOLS=
 else
 	[ -f ioemu/config-host.mak ] || \
 	  ( cd ioemu ; \
           CONFIG_STUBDOM=yes XEN_ROOT=$(abspath $(XEN_ROOT)) XEN_TARGET_ARCH=$(XEN_TARGET_ARCH) CFLAGS="$(TARGET_CFLAGS)" sh ./xen-setup --cc=$(CC) --disable-gcc-check $(IOEMU_OPTIONS))
-	CPPFLAGS= TARGET_CPPFLAGS="$(TARGET_CPPFLAGS)" $(MAKE) -C ioemu LWIPDIR=$(CURDIR)/lwip-cvs TOOLS= CONFIG_STUBDOM=yes
+	CPPFLAGS= TARGET_CPPFLAGS="$(TARGET_CPPFLAGS)" $(MAKE) -C ioemu LWIPDIR=$(CURDIR)/lwip TOOLS= CONFIG_STUBDOM=yes
 endif
 
 ######
@@ -227,7 +232,7 @@ endif
 
 .PHONY: caml
 caml: cross-newlib mk-headers
-	CPPFLAGS="$(TARGET_CPPFLAGS)" CFLAGS="$(TARGET_CFLAGS)" $(MAKE) -C $@ LWIPDIR=$(CURDIR)/lwip-cvs 
+	CPPFLAGS="$(TARGET_CPPFLAGS)" CFLAGS="$(TARGET_CFLAGS)" $(MAKE) -C $@ LWIPDIR=$(CURDIR)/lwip 
 
 ###
 # C
@@ -235,7 +240,7 @@ caml: cross-newlib mk-headers
 
 .PHONY: c
 c: cross-newlib mk-headers
-	CPPFLAGS="$(TARGET_CPPFLAGS)" CFLAGS="$(TARGET_CFLAGS)" $(MAKE) -C $@ LWIPDIR=$(CURDIR)/lwip-cvs 
+	CPPFLAGS="$(TARGET_CPPFLAGS)" CFLAGS="$(TARGET_CFLAGS)" $(MAKE) -C $@ LWIPDIR=$(CURDIR)/lwip 
 
 ######
 # Grub
@@ -265,17 +270,17 @@ ioemu-stubdom: APP_OBJS=$(CURDIR)/ioemu/i386-dm-stubdom/qemu.a $(CURDIR)/ioemu/i
 else
 ioemu-stubdom: APP_OBJS=$(CURDIR)/ioemu/i386-stubdom/qemu.a $(CURDIR)/ioemu/i386-stubdom/libqemu.a $(CURDIR)/ioemu/libqemu_common.a
 endif
-ioemu-stubdom: mini-os-ioemu lwip-cvs libxc ioemu
-	DEF_CPPFLAGS="$(TARGET_CPPFLAGS)" DEF_CFLAGS="-DCONFIG_QEMU $(TARGET_CFLAGS)" DEF_LDFLAGS="$(TARGET_LDFLAGS)" $(MAKE) -C $(MINI_OS) OBJ_DIR=$(CURDIR)/$< LWIPDIR=$(CURDIR)/lwip-cvs APP_OBJS="$(APP_OBJS)"
+ioemu-stubdom: mini-os-ioemu lwip libxc ioemu
+	DEF_CPPFLAGS="$(TARGET_CPPFLAGS)" DEF_CFLAGS="-DCONFIG_QEMU $(TARGET_CFLAGS)" DEF_LDFLAGS="$(TARGET_LDFLAGS)" $(MAKE) -C $(MINI_OS) OBJ_DIR=$(CURDIR)/$< LWIPDIR=$(CURDIR)/lwip APP_OBJS="$(APP_OBJS)"
 
 CAMLLIB = $(shell ocamlc -where)
 .PHONY: caml-stubdom
-caml-stubdom: mini-os-caml lwip-cvs libxc caml
-	DEF_CPPFLAGS="$(TARGET_CPPFLAGS)" DEF_CFLAGS="-DCONFIG_CAML $(TARGET_CFLAGS)" DEF_LDFLAGS="$(TARGET_LDFLAGS)" $(MAKE) -C $(MINI_OS) OBJ_DIR=$(CURDIR)/$< LWIPDIR=$(CURDIR)/lwip-cvs APP_OBJS="$(CURDIR)/caml/main-caml.o $(CURDIR)/caml/caml.o $(CAMLLIB)/libasmrun.a"
+caml-stubdom: mini-os-caml lwip libxc caml
+	DEF_CPPFLAGS="$(TARGET_CPPFLAGS)" DEF_CFLAGS="-DCONFIG_CAML $(TARGET_CFLAGS)" DEF_LDFLAGS="$(TARGET_LDFLAGS)" $(MAKE) -C $(MINI_OS) OBJ_DIR=$(CURDIR)/$< LWIPDIR=$(CURDIR)/lwip APP_OBJS="$(CURDIR)/caml/main-caml.o $(CURDIR)/caml/caml.o $(CAMLLIB)/libasmrun.a"
 
 .PHONY: c-stubdom
-c-stubdom: mini-os-c lwip-cvs libxc c
-	DEF_CPPFLAGS="$(TARGET_CPPFLAGS)" DEF_CFLAGS="-DCONFIG_C $(TARGET_CFLAGS)" DEF_LDFLAGS="$(TARGET_LDFLAGS)" $(MAKE) -C $(MINI_OS) OBJ_DIR=$(CURDIR)/$< LWIPDIR=$(CURDIR)/lwip-cvs APP_OBJS=$(CURDIR)/c/main.a
+c-stubdom: mini-os-c lwip libxc c
+	DEF_CPPFLAGS="$(TARGET_CPPFLAGS)" DEF_CFLAGS="-DCONFIG_C $(TARGET_CFLAGS)" DEF_LDFLAGS="$(TARGET_LDFLAGS)" $(MAKE) -C $(MINI_OS) OBJ_DIR=$(CURDIR)/$< LWIPDIR=$(CURDIR)/lwip APP_OBJS=$(CURDIR)/c/main.a
 
 .PHONY: pv-grub
 pv-grub: mini-os-grub libxc grub
@@ -328,7 +333,7 @@ crossclean: clean
 .PHONY: patchclean
 patchclean: crossclean
 	rm -fr newlib-$(NEWLIB_VERSION)
-	rm -fr lwip-cvs
+	rm -fr lwip
 	rm -fr grub-upstream
 
 # clean downloads
@@ -337,6 +342,8 @@ downloadclean: patchclean
 	rm -f newlib-$(NEWLIB_VERSION).tar.gz
 	rm -f zlib-$(ZLIB_VERSION).tar.gz
 	rm -f pciutils-$(LIBPCI_VERSION).tar.bz2
+	rm -f grub-$(GRUB_VERSION).tar.gz
+	rm -f lwip-$(LWIP_VERSION).tar.gz
 
 .PHONY: distclean
 distclean: downloadclean
