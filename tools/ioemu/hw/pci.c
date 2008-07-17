@@ -644,17 +644,21 @@ PCIBus *pci_bridge_init(PCIBus *bus, int devfn, uint32_t id,
 
 int pt_chk_bar_overlap(PCIBus *bus, int devfn, uint32_t addr, uint32_t size)
 {
-    PCIDevice *devices = (PCIDevice *)bus->devices;
+    PCIDevice *devices = NULL;
     PCIIORegion *r;
     int ret = 0;
     int i, j;
 
     /* check Overlapped to Base Address */
-    for (i=0; i<256; i++, devices++)
+    for (i=0; i<256; i++)
     {
-        if ((devices == NULL) || (devices->devfn == devfn))
+        if ( !(devices = bus->devices[i]) )
             continue;
 
+        /* skip itself */
+        if (devices->devfn == devfn)
+            continue;
+        
         for (j=0; j<PCI_NUM_REGIONS; j++)
         {
             r = &devices->io_regions[j];
