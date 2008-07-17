@@ -14,7 +14,7 @@ ZLIB_VERSION=1.2.3
 LIBPCI_VERSION=2.2.9
 NEWLIB_VERSION=1.16.0
 LWIP_DATE=2008-06-01
-GRUB_DATE=2008-06-01
+GRUB_VERSION=0.97
 
 WGET=wget -c
 
@@ -75,7 +75,7 @@ endif
 ##############
 
 newlib-$(NEWLIB_VERSION).tar.gz:
-	$(WGET) ftp://sources.redhat.com/pub/newlib/newlib-$(NEWLIB_VERSION).tar.gz
+	$(WGET) ftp://sources.redhat.com/pub/newlib/$@
 
 newlib-$(NEWLIB_VERSION): newlib-$(NEWLIB_VERSION).tar.gz
 	tar xzf $<
@@ -97,7 +97,7 @@ $(NEWLIB_STAMPFILE): newlib-$(NEWLIB_VERSION)
 ############
 
 zlib-$(ZLIB_VERSION).tar.gz:
-	$(WGET) http://www.zlib.net/zlib-$(ZLIB_VERSION).tar.gz
+	$(WGET) http://www.zlib.net/$@
 
 ZLIB_STAMPFILE=$(CROSS_ROOT)/$(GNU_TARGET_ARCH)-xen-elf/lib/libz.a
 .PHONY: cross-zlib
@@ -114,7 +114,7 @@ $(ZLIB_STAMPFILE): zlib-$(ZLIB_VERSION).tar.gz $(NEWLIB_STAMPFILE)
 ##############
 
 pciutils-$(LIBPCI_VERSION).tar.bz2:
-	$(WGET) http://www.kernel.org/pub/software/utils/pciutils/pciutils-$(LIBPCI_VERSION).tar.bz2
+	$(WGET) http://www.kernel.org/pub/software/utils/pciutils/$@
 
 pciutils-$(LIBPCI_VERSION): pciutils-$(LIBPCI_VERSION).tar.bz2
 	tar xjf $<
@@ -241,14 +241,18 @@ c: cross-newlib mk-headers
 # Grub
 ######
 
-grub-cvs:
-	cvs -z 9 -d :pserver:anonymous@cvs.sv.gnu.org:/sources/grub co -D $(GRUB_DATE) -d $@ grub
+grub-$(GRUB_VERSION).tar.gz:
+	$(WGET) ftp://alpha.gnu.org/gnu/grub/$@
+
+grub-upstream: grub-$(GRUB_VERSION).tar.gz
+	tar xzf $<
+	mv grub-$(GRUB_VERSION) $@
 	for i in grub.patches/* ; do \
 		patch -d $@ -p1 < $$i ; \
 	done
 
 .PHONY: grub
-grub: grub-cvs cross-newlib mk-headers
+grub: grub-upstream cross-newlib mk-headers
 	CPPFLAGS="$(TARGET_CPPFLAGS)" CFLAGS="$(TARGET_CFLAGS)" $(MAKE) -C $@
 
 ########
@@ -325,7 +329,7 @@ crossclean: clean
 patchclean: crossclean
 	rm -fr newlib-$(NEWLIB_VERSION)
 	rm -fr lwip-cvs
-	rm -fr grub-cvs
+	rm -fr grub-upstream
 
 # clean downloads
 .PHONY: downloadclean
