@@ -301,6 +301,11 @@ static int dummy_address_size (struct domain *d, uint32_t cmd)
     return 0;
 }
 
+static int dummy_machine_address_size (struct domain *d, uint32_t cmd)
+{
+    return 0;
+}
+
 static int dummy_hvm_param (struct domain *d, unsigned long op)
 {
     return 0;
