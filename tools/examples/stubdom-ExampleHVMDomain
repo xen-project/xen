@@ -1,0 +1,21 @@
+# Not to be started directly,
+# See xmexample.hvm-stubdom and stubdom/README for more details
+
+import os, re
+arch = os.uname()[4]
+if re.search('64', arch):
+    arch_libdir = 'lib64'
+else:
+    arch_libdir = 'lib'
+
+kernel = "/usr/" + arch_libdir + "/xen/boot/ioemu-stubdom.gz"
+
+# Must be the same as in xmexample.hvm-stubdom, with a prepended vif for TCP/IP
+# networking in the stubdomain itself, here just ''
+vif = [ '', 'type=ioemu, bridge=xenbr0' ]
+
+# Set here instead of in xmexample.hvm-stubdom
+disk = [ 'file:/var/images/min-el3-i386.img,hda,w', ',hdc:cdrom,r' ]
+
+# Actual output via PVFB
+vfb = [ 'type=sdl' ]
