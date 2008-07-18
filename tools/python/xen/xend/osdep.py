@@ -87,6 +87,33 @@ _balloon_stat = {
     "SunOS": _solaris_balloon_stat
 }
 
+def _linux_get_cpuinfo():
+    cpuinfo = {}
+    f = file('/proc/cpuinfo', 'r')
+    try:    
+        p = -1  
+        d = {}  
+        for line in f:
+            keyvalue = line.split(':')
+            if len(keyvalue) != 2:
+                continue 
+            key = keyvalue[0].strip()
+            val = keyvalue[1].strip()
+            if key == 'processor':
+                if p != -1:
+                    cpuinfo[p] = d
+                p = int(val)
+                d = {}
+            else:
+                d[key] = val
+        cpuinfo[p] = d
+        return cpuinfo
+    finally:
+        f.close()
+
+_get_cpuinfo = {
+}
+
 def _get(var, default=None):
     return var.get(os.uname()[0], default)
 
@@ -95,3 +122,4 @@ xend_autorestart = _get(_xend_autorestart)
 pygrub_path = _get(_pygrub_path, "/usr/bin/pygrub")
 vif_script = _get(_vif_script, "vif-bridge")
 lookup_balloon_stat = _get(_balloon_stat, _linux_balloon_stat)
+get_cpuinfo = _get(_get_cpuinfo, _linux_get_cpuinfo)
