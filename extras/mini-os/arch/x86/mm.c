@@ -492,9 +492,7 @@ void do_map_frames(unsigned long addr,
     }
 }
 
-void *map_frames_ex(unsigned long *f, unsigned long n, unsigned long stride,
-	unsigned long increment, unsigned long alignment, domid_t id,
-	int may_fail, unsigned long prot)
+unsigned long allocate_ondemand(unsigned long n, unsigned long alignment)
 {
     unsigned long x;
     unsigned long y = 0;
@@ -517,13 +515,24 @@ void *map_frames_ex(unsigned long *f, unsigned long n, unsigned long stride,
     }
     if (y != n) {
         printk("Failed to find %ld frames!\n", n);
-        return NULL;
+        return 0;
     }
+    return demand_map_area_start + x * PAGE_SIZE;
+}
+
+void *map_frames_ex(unsigned long *f, unsigned long n, unsigned long stride,
+	unsigned long increment, unsigned long alignment, domid_t id,
+	int may_fail, unsigned long prot)
+{
+    unsigned long addr = allocate_ondemand(n, alignment);
+
+    if (!addr)
+        return NULL;
 
     /* Found it at x.  Map it in. */
-    do_map_frames(demand_map_area_start + x * PAGE_SIZE, f, n, stride, increment, id, may_fail, prot);
+    do_map_frames(addr, f, n, stride, increment, id, may_fail, prot);
 
-    return (void *)(unsigned long)(demand_map_area_start + x * PAGE_SIZE);
+    return (void *)addr;
 }
 
 static void clear_bootstrap(void)
