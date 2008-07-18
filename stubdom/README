@@ -87,8 +87,8 @@ and any other parameter as wished.
 To run
 ======
 
-mkdir -p /exports/usr/share/qemu
-ln -s /usr/share/qemu/keymaps /exports/usr/share/qemu
+mkdir -p /exports/usr/share/xen/qemu
+ln -s /usr/share/xen/qemu/keymaps /exports/usr/share/xen/qemu
 mkdir -p /exports/var/lib
 ln -s /var/lib/xen /exports/var/lib
 /usr/sbin/fs-backend &
