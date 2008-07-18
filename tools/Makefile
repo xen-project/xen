@@ -22,6 +22,7 @@ SUBDIRS-y += libaio
 SUBDIRS-y += blktap
 SUBDIRS-y += libfsimage
 SUBDIRS-$(LIBXENAPI_BINDINGS) += libxen
+SUBDIRS-y += fs-back
 
 ifeq (ioemu,$(CONFIG_QEMU))
 SUBDIRS-$(CONFIG_IOEMU) += ioemu
