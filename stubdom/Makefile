@@ -231,7 +231,7 @@ endif
 ######
 
 .PHONY: caml
-caml: cross-newlib
+caml: $(CROSS_ROOT)
 	CPPFLAGS="$(TARGET_CPPFLAGS)" CFLAGS="$(TARGET_CFLAGS)" $(MAKE) -C $@ LWIPDIR=$(CURDIR)/lwip 
 
 ###
@@ -239,7 +239,7 @@ caml: cross-newlib
 ###
 
 .PHONY: c
-c: cross-newlib
+c: $(CROSS_ROOT)
 	CPPFLAGS="$(TARGET_CPPFLAGS)" CFLAGS="$(TARGET_CFLAGS)" $(MAKE) -C $@ LWIPDIR=$(CURDIR)/lwip 
 
 ######
@@ -257,7 +257,7 @@ grub-upstream: grub-$(GRUB_VERSION).tar.gz
 	done
 
 .PHONY: grub
-grub: grub-upstream cross-newlib
+grub: grub-upstream $(CROSS_ROOT)
 	CPPFLAGS="$(TARGET_CPPFLAGS)" CFLAGS="$(TARGET_CFLAGS)" $(MAKE) -C $@
 
 ########
