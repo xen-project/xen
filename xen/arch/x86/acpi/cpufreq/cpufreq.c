@@ -237,9 +237,9 @@ static u32 get_cur_val(cpumask_t mask)
  * Only IA32_APERF/IA32_MPERF ratio is architecturally defined and
  * no meaning should be associated with absolute values of these MSRs.
  */
-/* FIXME: handle query on non-current cpu later */
-static unsigned int get_measured_perf(unsigned int cpu)
+static void  __get_measured_perf(void *perf_percent)
 {
+    unsigned int *ratio = perf_percent;
     union {
         struct {
             uint32_t lo;
@@ -247,9 +247,6 @@ static unsigned int get_measured_perf(unsigned int cpu)
         } split;
         uint64_t whole;
     } aperf_cur, mperf_cur;
-
-    unsigned int perf_percent;
-    unsigned int retval;
 
     rdmsr(MSR_IA32_APERF, aperf_cur.split.lo, aperf_cur.split.hi);
     rdmsr(MSR_IA32_MPERF, mperf_cur.split.lo, mperf_cur.split.hi);
@@ -264,10 +261,21 @@ static unsigned int get_measured_perf(unsigned int cpu)
     }
 
     if (aperf_cur.whole && mperf_cur.whole)
-        perf_percent = (aperf_cur.whole * 100) / mperf_cur.whole;
+        *ratio = (aperf_cur.whole * 100) / mperf_cur.whole;
     else
-        perf_percent = 0;
+        *ratio = 0;
+}
 
+static unsigned int get_measured_perf(unsigned int cpu)
+{
+    unsigned int retval, perf_percent;
+    cpumask_t cpumask;
+
+    if (!cpu_online(cpu))
+        return 0;
+
+    cpumask = cpumask_of_cpu(cpu);
+    on_selected_cpus(cpumask, __get_measured_perf, (void *)&perf_percent,0,1);
 
     retval = drv_data[cpu]->max_freq * perf_percent / 100;
     return retval;
