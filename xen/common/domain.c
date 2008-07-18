@@ -97,7 +97,10 @@ static void __domain_finalise_shutdown(struct domain *d)
             return;
 
     d->is_shut_down = 1;
-    send_guest_global_virq(dom0, VIRQ_DOM_EXC);
+    if ( (d->shutdown_code == SHUTDOWN_suspend) && d->suspend_evtchn )
+        evtchn_send(d, d->suspend_evtchn);
+    else
+        send_guest_global_virq(dom0, VIRQ_DOM_EXC);
 }
 
 static void vcpu_check_shutdown(struct vcpu *v)
@@ -341,6 +344,7 @@ int domain_kill(struct domain *d)
     case DOMDYING_alive:
         domain_pause(d);
         d->is_dying = DOMDYING_dying;
+        spin_barrier(&d->domain_lock);
         evtchn_destroy(d);
         gnttab_release_mappings(d);
         /* fallthrough */
@@ -650,7 +654,9 @@ void vcpu_reset(struct vcpu *v)
     v->is_polling      = 0;
     v->is_initialised  = 0;
     v->nmi_pending     = 0;
-    v->nmi_masked      = 0;
+    v->mce_pending     = 0;
+    v->old_trap_priority = VCPU_TRAP_NONE;
+    v->trap_priority   = VCPU_TRAP_NONE;
     clear_bit(_VPF_blocked, &v->pause_flags);
 
     domain_unlock(v->domain);

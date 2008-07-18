@@ -64,7 +64,7 @@ static void free_kbdfront(struct kbdfront_dev *dev)
     free(dev);
 }
 
-struct kbdfront_dev *init_kbdfront(char *nodename, int abs_pointer)
+struct kbdfront_dev *init_kbdfront(char *_nodename, int abs_pointer)
 {
     xenbus_transaction_t xbt;
     char* err;
@@ -72,11 +72,8 @@ struct kbdfront_dev *init_kbdfront(char *nodename, int abs_pointer)
     struct xenkbd_page *s;
     int retry=0;
     char* msg;
-
+    char* nodename = _nodename ? _nodename : "device/vkbd/0";
     struct kbdfront_dev *dev;
-
-    if (!nodename)
-        nodename = "device/vkbd/0";
 
     char path[strlen(nodename) + 1 + 10 + 1];
 
@@ -351,7 +348,7 @@ int fbfront_receive(struct fbfront_dev *dev, union xenfb_in_event *buf, int n)
     return i;
 }
 
-struct fbfront_dev *init_fbfront(char *nodename, unsigned long *mfns, int width, int height, int depth, int stride, int n)
+struct fbfront_dev *init_fbfront(char *_nodename, unsigned long *mfns, int width, int height, int depth, int stride, int n)
 {
     xenbus_transaction_t xbt;
     char* err;
@@ -361,9 +358,9 @@ struct fbfront_dev *init_fbfront(char *nodename, unsigned long *mfns, int width,
     char* msg;
     int i, j;
     struct fbfront_dev *dev;
-
-    if (!nodename)
-        nodename = "device/vfb/0";
+    int max_pd;
+    unsigned long mapped;
+    char* nodename = _nodename ? _nodename : "device/vfb/0";
 
     char path[strlen(nodename) + 1 + 10 + 1];
 
@@ -392,8 +389,8 @@ struct fbfront_dev *init_fbfront(char *nodename, unsigned long *mfns, int width,
     dev->offset = 0;
     dev->events = NULL;
 
-    const int max_pd = sizeof(s->pd) / sizeof(s->pd[0]);
-    unsigned long mapped = 0;
+    max_pd = sizeof(s->pd) / sizeof(s->pd[0]);
+    mapped = 0;
 
     for (i = 0; mapped < n && i < max_pd; i++) {
         unsigned long *pd = (unsigned long *) alloc_page();

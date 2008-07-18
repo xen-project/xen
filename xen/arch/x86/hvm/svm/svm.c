@@ -1132,7 +1132,7 @@ static void wbinvd_ipi(void *info)
 
 static void svm_wbinvd_intercept(void)
 {
-    if ( !list_empty(&(domain_hvm_iommu(current->domain)->pdev_list)) )
+    if ( has_arch_pdevs(current->domain) )
         on_each_cpu(wbinvd_ipi, NULL, 1, 1);
 }
 
@@ -1338,6 +1338,10 @@ asmlinkage void svm_vmexit_handler(struct cpu_user_regs *regs)
 
     case VMEXIT_SHUTDOWN:
         hvm_triple_fault();
+        break;
+
+    case VMEXIT_RDTSC:
+        hvm_rdtsc_intercept(regs);
         break;
 
     case VMEXIT_RDTSCP:

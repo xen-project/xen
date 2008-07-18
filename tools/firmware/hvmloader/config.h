@@ -31,4 +31,15 @@
 #define ROMBIOS_PHYSICAL_ADDRESS      0x000F0000
 #define SCRATCH_PHYSICAL_ADDRESS      0x00010000
 
+/* Xen Platform Device */
+#define PFFLAG_ROM_LOCK 1 /* Sets whether ROM memory area is RW or RO */
+
+struct bios_info {
+    uint8_t  com1_present:1;
+    uint8_t  com2_present:1;
+    uint8_t  hpet_present:1;
+    uint32_t pci_min, pci_len;
+    uint16_t xen_pfiob;
+};
+
 #endif /* __HVMLOADER_CONFIG_H__ */

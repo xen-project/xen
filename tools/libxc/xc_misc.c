@@ -295,6 +295,36 @@ int xc_hvm_modified_memory(
     return rc;
 }
 
+int xc_hvm_set_mem_type(
+    int xc_handle, domid_t dom, hvmmem_type_t mem_type, uint64_t first_pfn, uint64_t nr)
+{
+    DECLARE_HYPERCALL;
+    struct xen_hvm_set_mem_type arg;
+    int rc;
+
+    hypercall.op     = __HYPERVISOR_hvm_op;
+    hypercall.arg[0] = HVMOP_set_mem_type;
+    hypercall.arg[1] = (unsigned long)&arg;
+
+    arg.domid        = dom;
+    arg.hvmmem_type  = mem_type;
+    arg.first_pfn    = first_pfn;
+    arg.nr           = nr;
+
+    if ( (rc = lock_pages(&arg, sizeof(arg))) != 0 )
+    {
+        PERROR("Could not lock memory");
+        return rc;
+    }
+
+    rc = do_xen_hypercall(xc_handle, &hypercall);
+
+    unlock_pages(&arg, sizeof(arg));
+
+    return rc;
+}
+
+
 void *xc_map_foreign_pages(int xc_handle, uint32_t dom, int prot,
                            const xen_pfn_t *arr, int num)
 {

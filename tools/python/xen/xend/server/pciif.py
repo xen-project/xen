@@ -28,7 +28,7 @@ from xen.xend.server.DevController import DevController, xenbusState
 
 import xen.lowlevel.xc
 
-from xen.util.pci import PciDevice
+from xen.util.pci import *
 import resource
 import re
 
@@ -74,8 +74,9 @@ class PciController(DevController):
             if vslt is not None:
                 vslots = vslots + vslt + ";"
 
-            back['dev-%i' % pcidevid] = "%04x:%02x:%02x.%02x" % \
+            back['dev-%i' % pcidevid] = "%04x:%02x:%02x.%01x" % \
                                         (domain, bus, slot, func)
+            back['uuid-%i' % pcidevid] = pci_config.get('uuid', '')
             pcidevid += 1
 
         if vslots != "":
@@ -101,6 +102,7 @@ class PciController(DevController):
             try:
                 dev = back['dev-%i' % i]
                 state = states[i]
+                uuid = back['uuid-%i' %i]
             except:
                 raise XendError('Error reading config')
 
@@ -121,6 +123,7 @@ class PciController(DevController):
                 self.writeBackend(devid, 'dev-%i' % (num_olddevs + i), dev)
                 self.writeBackend(devid, 'state-%i' % (num_olddevs + i),
                                   str(xenbusState['Initialising']))
+                self.writeBackend(devid, 'uuid-%i' % (num_olddevs + i), uuid)
                 self.writeBackend(devid, 'num_devs', str(num_olddevs + i + 1))
 
                 # Update vslots
@@ -141,7 +144,7 @@ class PciController(DevController):
                     raise XendError('Device %s is not connected' % dev)
 
                 # Update vslots
-                if back['vslots'] is not None:
+                if back.get('vslots') is not None:
                     vslots = old_vslots
                     for vslt in back['vslots'].split(';'):
                         if vslt != '':
@@ -185,6 +188,9 @@ class PciController(DevController):
                                  'bus': '0x%(bus)s' % pci_dev_info,
                                  'slot': '0x%(slot)s' % pci_dev_info,
                                  'func': '0x%(func)s' % pci_dev_info}
+
+                # Per device uuid info
+                dev_dict['uuid'] = self.readBackend(devid, 'uuid-%d' % i)
 
                 #append vslot info
                 if vslots is not None:
@@ -278,7 +284,12 @@ class PciController(DevController):
                     "bind your slot/device to the PCI backend using sysfs" \
                     )%(dev.name))
 
+        if dev.has_non_page_aligned_bar:
+            raise VmError("pci: %: non-page-aligned MMIO BAR found." % dev.name)
+
         self.CheckSiblingDevices(fe_domid, dev)
+
+        dev.do_FLR()
 
         PCIQuirk(dev.vendor, dev.device, dev.subvendor, dev.subdevice, domain, 
                 bus, slot, func)
@@ -346,11 +357,48 @@ class PciController(DevController):
     def setupDevice(self, config):
         """Setup devices from config
         """
+        pci_str_list = []
+        pci_dev_list = []
         for pci_config in config.get('devs', []):
             domain = parse_hex(pci_config.get('domain', 0))
             bus = parse_hex(pci_config.get('bus', 0))
             slot = parse_hex(pci_config.get('slot', 0))
             func = parse_hex(pci_config.get('func', 0))            
+            pci_str = '%04x:%02x:%02x.%01x' % (domain, bus, slot, func)
+            pci_str_list = pci_str_list + [pci_str]
+            pci_dev_list = pci_dev_list + [(domain, bus, slot, func)]
+
+        for (domain, bus, slot, func) in pci_dev_list:
+            try:
+                dev = PciDevice(domain, bus, slot, func)
+            except Exception, e:
+                raise VmError("pci: failed to locate device and "+
+                        "parse it's resources - "+str(e))
+            if (dev.dev_type == DEV_TYPE_PCIe_ENDPOINT) and not dev.pcie_flr:
+                funcs = dev.find_all_the_multi_functions()
+                for f in funcs:
+                    if not f in pci_str_list:
+                        err_msg = 'pci: % must be co-assigned to guest with %s'
+                        raise VmError(err_msg % (f, dev.name))
+            elif dev.dev_type == DEV_TYPE_PCI:
+                if dev.bus == 0:
+                    if not dev.pci_af_flr:
+                        err_msg = 'pci: %s is not assignable: it is on ' + \
+                            'bus 0,  but lacks of FLR capability'
+                        raise VmError(err_msg % dev.name)
+                else:
+                    # All devices behind the uppermost PCI/PCI-X bridge must be\
+                    # co-assigned to the same guest.
+                    devs_str = dev.find_coassigned_devices(True)
+                    # Remove the element 0 which is a bridge
+                    del devs_str[0]
+
+                    for s in devs_str:
+                        if not s in pci_str_list:
+                            err_msg = 'pci: %s must be co-assigned to guest with %s'
+                            raise VmError(err_msg % (s, dev.name))
+
+        for (domain, bus, slot, func) in pci_dev_list:
             self.setupOneDevice(domain, bus, slot, func)
 
         return
@@ -413,6 +461,7 @@ class PciController(DevController):
             if rc<0:
                 raise VmError(('pci: failed to configure irq on device '+
                             '%s - errno=%d')%(dev.name,rc))
+        dev.do_FLR()
 
     def cleanupDevice(self, devid):
         """ Detach I/O resources for device and cleanup xenstore nodes
@@ -442,6 +491,7 @@ class PciController(DevController):
                 self.removeBackend(devid, 'dev-%i' % i)
                 self.removeBackend(devid, 'vdev-%i' % i)
                 self.removeBackend(devid, 'state-%i' % i)
+                self.removeBackend(devid, 'uuid-%i' % i)
             else:
                 if new_num_devs != i:
                     tmpdev = self.readBackend(devid, 'dev-%i' % i)
@@ -455,11 +505,30 @@ class PciController(DevController):
                     tmpstate = self.readBackend(devid, 'state-%i' % i)
                     self.writeBackend(devid, 'state-%i' % new_num_devs, tmpstate)
                     self.removeBackend(devid, 'state-%i' % i)
+                    tmpuuid = self.readBackend(devid, 'uuid-%i' % i)
+                    self.writeBackend(devid, 'uuid-%i' % new_num_devs, tmpuuid)
+                    self.removeBackend(devid, 'uuid-%i' % i)
                 new_num_devs = new_num_devs + 1
 
         self.writeBackend(devid, 'num_devs', str(new_num_devs))
 
         return new_num_devs
+
+    def cleanupDeviceOnDomainDestroy(self, devid):
+        num_devs = int(self.readBackend(devid, 'num_devs'))
+        dev_str_list = []
+        for i in range(num_devs):
+            dev_str = self.readBackend(devid, 'dev-%i' % i)
+            dev_str_list = dev_str_list + [dev_str]
+
+        for dev_str in dev_str_list:
+            (dom, b, d, f) = parse_pci_name(dev_str)
+            try:
+                dev = PciDevice(dom, b, d, f)
+            except Exception, e:
+                raise VmError("pci: failed to locate device and "+
+                        "parse it's resources - "+str(e))
+            dev.do_FLR()
 
     def waitForBackend(self,devid):
         return (0, "ok - no hotplug")

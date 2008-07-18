@@ -281,7 +281,7 @@ struct ext2_dir_entry
 #define S_ISDIR(m)      (((m) & S_IFMT) == S_IFDIR)
 
 /* check filesystem types and read superblock into memory buffer */
-int
+static int
 ext2fs_mount (fsi_file_t *ffi, const char *options)
 {
   int retval = 1;
@@ -419,7 +419,7 @@ ext2fs_block_map (fsi_file_t *ffi, int logical_block)
 }
 
 /* preconditions: all preconds of ext2fs_block_map */
-int
+static int
 ext2fs_read (fsi_file_t *ffi, char *buf, int len)
 {
   int logical_block;
@@ -526,7 +526,7 @@ int ext2_is_fast_symlink (fsi_file_t *ffi)
  *   inode of the file we were trying to look up
  * side effects: messes up GROUP_DESC buffer area
  */
-int
+static int
 ext2fs_dir (fsi_file_t *ffi, char *dirname)
 {
   int current_ino = EXT2_ROOT_INO;	/* start at the root */

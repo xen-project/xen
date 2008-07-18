@@ -56,6 +56,8 @@ struct iommu {
     struct intel_iommu *intel;
 };
 
+int iommu_add_device(struct pci_dev *pdev);
+int iommu_remove_device(struct pci_dev *pdev);
 int iommu_domain_init(struct domain *d);
 void iommu_domain_destroy(struct domain *d);
 int device_assigned(u8 bus, u8 devfn);
@@ -63,9 +65,6 @@ int assign_device(struct domain *d, u8 bus, u8 devfn);
 void deassign_device(struct domain *d, u8 bus, u8 devfn);
 int iommu_get_device_group(struct domain *d, u8 bus, u8 devfn, 
     XEN_GUEST_HANDLE_64(uint32) buf, int max_sdevs);
-void reassign_device_ownership(struct domain *source,
-                               struct domain *target,
-                               u8 bus, u8 devfn);
 int iommu_map_page(struct domain *d, unsigned long gfn, unsigned long mfn);
 int iommu_unmap_page(struct domain *d, unsigned long gfn);
 void iommu_domain_teardown(struct domain *d);
@@ -95,13 +94,19 @@ int domain_set_irq_dpci(struct domain *domain, struct hvm_irq_dpci *dpci);
 
 struct iommu_ops {
     int (*init)(struct domain *d);
+    int (*add_device)(struct pci_dev *pdev);
+    int (*remove_device)(struct pci_dev *pdev);
     int (*assign_device)(struct domain *d, u8 bus, u8 devfn);
     void (*teardown)(struct domain *d);
     int (*map_page)(struct domain *d, unsigned long gfn, unsigned long mfn);
     int (*unmap_page)(struct domain *d, unsigned long gfn);
-    void (*reassign_device)(struct domain *s, struct domain *t,
-                            u8 bus, u8 devfn);
+    int (*reassign_device)(struct domain *s, struct domain *t,
+			   u8 bus, u8 devfn);
     int (*get_device_group_id)(u8 bus, u8 devfn);
+    void (*update_ire_from_apic)(unsigned int apic, unsigned int reg, unsigned int value);
+    void (*update_ire_from_msi)(struct msi_desc *msi_desc, struct msi_msg *msg);
 };
 
+void iommu_update_ire_from_apic(unsigned int apic, unsigned int reg, unsigned int value);
+void iommu_update_ire_from_msi(struct msi_desc *msi_desc, struct msi_msg *msg);
 #endif /* _IOMMU_H_ */

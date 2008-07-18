@@ -37,7 +37,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <sys/mman.h>
-#include <sys/stat.h>
 #include <err.h>
 #include <errno.h>
 #include <sys/types.h>
@@ -55,6 +54,8 @@
 #include "blktaplib.h"
 #include "blktapctrl.h"
 #include "tapdisk.h"
+#include "list.h"
+#include "xs_api.h" /* for xs_fire_next_watch() */
 
 #define PIDFILE "/var/run/blktapctrl.pid"
 
@@ -75,6 +76,32 @@ static int write_msg(int fd, int msgtype, void *ptr, void *ptr2);
 static int read_msg(int fd, int msgtype, void *ptr);
 static driver_list_entry_t *active_disks[MAX_DISK_TYPES];
 
+
+static unsigned long long tapdisk_get_size(blkif_t *blkif)
+{
+	image_t *img = (image_t *)blkif->prv;
+	return img->size;
+}
+
+static unsigned long tapdisk_get_secsize(blkif_t *blkif)
+{
+	image_t *img = (image_t *)blkif->prv;
+	return img->secsize;
+}
+
+static unsigned int tapdisk_get_info(blkif_t *blkif)
+{
+	image_t *img = (image_t *)blkif->prv;
+	return img->info;
+}
+
+struct blkif_ops tapdisk_ops = {
+	.get_size = tapdisk_get_size,
+	.get_secsize = tapdisk_get_secsize,
+	.get_info = tapdisk_get_info,
+};
+
+
 static void init_driver_list(void)
 {
 	int i;
@@ -93,62 +120,6 @@ static void init_rng(void)
 	seed = tv.tv_usec;
 	srand48(seed);
 	return;
-}
-
-static void make_blktap_dev(char *devname, int major, int minor)
-{
-	struct stat st;
-	
-	if (lstat(devname, &st) != 0) {
-		/*Need to create device*/
-		if (mkdir(BLKTAP_DEV_DIR, 0755) == 0)
-			DPRINTF("Created %s directory\n",BLKTAP_DEV_DIR);
-		if (mknod(devname, S_IFCHR|0600,
-                	makedev(major, minor)) == 0)
-			DPRINTF("Created %s device\n",devname);
-	} else {
-		DPRINTF("%s device already exists\n",devname);
-		/* it already exists, but is it the same major number */
-		if (((st.st_rdev>>8) & 0xff) != major) {
-			DPRINTF("%s has old major %d\n",
-				devname,
-				(unsigned int)((st.st_rdev >> 8) & 0xff));
-			/* only try again if we succed in deleting it */
-			if (!unlink(devname))
-				make_blktap_dev(devname, major, minor);
-		}
-	}
-}
-
-static int get_new_dev(int *major, int *minor, blkif_t *blkif)
-{
-	domid_translate_t tr;
-	int ret;
-	char *devname;
-	
-	tr.domid = blkif->domid;
-        tr.busid = blkif->be_id;
-	ret = ioctl(ctlfd, BLKTAP_IOCTL_NEWINTF, tr );
-	
-	if ( (ret <= 0)||(ret > MAX_TAP_DEV) ) {
-		DPRINTF("Incorrect Dev ID [%d]\n",ret);
-		return -1;
-	}
-	
-	*minor = ret;
-	*major = ioctl(ctlfd, BLKTAP_IOCTL_MAJOR, ret );
-	if (*major < 0) {
-		DPRINTF("Incorrect Major ID [%d]\n",*major);
-		return -1;
-	}
-
-	if (asprintf(&devname,"%s/%s%d",BLKTAP_DEV_DIR, BLKTAP_DEV_NAME, *minor) == -1)
-		return -1;
-	make_blktap_dev(devname,*major,*minor);	
-	DPRINTF("Received device id %d and major %d, "
-		"sent domid %d and be_id %d\n",
-		*minor, *major, tr.domid, tr.busid);
-	return 0;
 }
 
 static int get_tapdisk_pid(blkif_t *blkif)
@@ -626,7 +597,7 @@ fail:
 	return ret;
 }
 
-int blktapctrl_new_blkif(blkif_t *blkif)
+static int blktapctrl_new_blkif(blkif_t *blkif)
 {
 	blkif_info_t *blk;
 	int major, minor, fd_read, fd_write, type, new;
@@ -637,7 +608,7 @@ int blktapctrl_new_blkif(blkif_t *blkif)
 
 	DPRINTF("Received a poll for a new vbd\n");
 	if ( ((blk=blkif->info) != NULL) && (blk->params != NULL) ) {
-		if (get_new_dev(&major, &minor, blkif)<0)
+		if (blktap_interface_create(ctlfd, &major, &minor, blkif) < 0)
 			return -1;
 
 		if (test_path(blk->params, &ptr, &type, &exist) != 0) {
@@ -698,7 +669,7 @@ fail:
 	return -EINVAL;
 }
 
-int map_new_blktapctrl(blkif_t *blkif)
+static int map_new_blktapctrl(blkif_t *blkif)
 {
 	DPRINTF("Received a poll for a new devmap\n");
 	if (write_msg(blkif->fds[WRITE], CTLMSG_NEWDEV, blkif, NULL) <= 0) {
@@ -715,7 +686,7 @@ int map_new_blktapctrl(blkif_t *blkif)
 	return blkif->minor - 1;
 }
 
-int unmap_blktapctrl(blkif_t *blkif)
+static int unmap_blktapctrl(blkif_t *blkif)
 {
 	DPRINTF("Unmapping vbd\n");
 
@@ -829,21 +800,11 @@ int main(int argc, char *argv[])
 	register_new_devmap_hook(map_new_blktapctrl);
 	register_new_unmap_hook(unmap_blktapctrl);
 
-	/* Attach to blktap0 */
-	if (asprintf(&devname,"%s/%s0", BLKTAP_DEV_DIR, BLKTAP_DEV_NAME) == -1)
-                goto open_failed;
-	if ((ret = xc_find_device_number("blktap0")) < 0) {
-		DPRINTF("couldn't find device number for 'blktap0'\n");
+	ctlfd = blktap_interface_open();
+	if (ctlfd < 0) {
+		DPRINTF("couldn't open blktap interface\n");
 		goto open_failed;
 	}
-	blktap_major = major(ret);
-	make_blktap_dev(devname,blktap_major,0);
-	ctlfd = open(devname, O_RDWR);
-	if (ctlfd == -1) {
-		DPRINTF("blktap0 open failed\n");
-		goto open_failed;
-	}
-
 
  retry:
 	/* Set up store connection and watch. */

@@ -101,7 +101,7 @@ iso9660_devread (fsi_file_t *ffi, int sector, int byte_offset, int byte_len, cha
   return devread(ffi, sector, byte_offset, byte_len, buf);
 }
 
-int
+static int
 iso9660_mount (fsi_file_t *ffi, const char *options)
 {
   unsigned int sector;
@@ -141,7 +141,7 @@ iso9660_mount (fsi_file_t *ffi, const char *options)
   return 0;
 }
 
-int
+static int
 iso9660_dir (fsi_file_t *ffi, char *dirname)
 {
   struct iso_directory_record *idr;
@@ -413,7 +413,7 @@ iso9660_dir (fsi_file_t *ffi, char *dirname)
   return 1;
 }
 
-int
+static int
 iso9660_read (fsi_file_t *ffi, char *buf, int len)
 {
   int sector, blkoffset, size, ret;

@@ -27,6 +27,7 @@
 #include <xen/event_channel.h>
 #include <xen/sched.h>
 #include <xen/memory.h>
+#include <xen/hvm/params.h>
 #include <xen/xsm/acm.h>
 #include <xen/xsm/acm_ops.h>
 #include <xen/xsm/flask_op.h>
@@ -611,7 +612,7 @@ int xc_domain_memory_increase_reservation(int xc_handle,
                                           uint32_t domid,
                                           unsigned long nr_extents,
                                           unsigned int extent_order,
-                                          unsigned int address_bits,
+                                          unsigned int mem_flags,
                                           xen_pfn_t *extent_start);
 
 int xc_domain_memory_decrease_reservation(int xc_handle,
@@ -624,7 +625,7 @@ int xc_domain_memory_populate_physmap(int xc_handle,
                                       uint32_t domid,
                                       unsigned long nr_extents,
                                       unsigned int extent_order,
-                                      unsigned int address_bits,
+                                      unsigned int mem_flags,
                                       xen_pfn_t *extent_start);
 
 int xc_domain_ioport_permission(int xc_handle,
@@ -810,6 +811,13 @@ int xc_acm_op(int xc_handle, int cmd, void *arg, unsigned long arg_size);
 
 int xc_flask_op(int xc_handle, flask_op_t *op);
 
+/*
+ * Subscribe to state changes in a domain via evtchn.
+ * Returns -1 on failure, in which case errno will be set appropriately.
+ */
+int xc_domain_subscribe_for_suspend(
+    int xc_handle, domid_t domid, evtchn_port_t port);
+
 /**************************
  * GRANT TABLE OPERATIONS *
  **************************/
@@ -935,6 +943,14 @@ int xc_hvm_track_dirty_vram(
 int xc_hvm_modified_memory(
     int xc_handle, domid_t dom, uint64_t first_pfn, uint64_t nr);
 
+/*
+ * Set a range of memory to a specific type.
+ * Allowed types are HVMMEM_ram_rw, HVMMEM_ram_ro, HVMMEM_mmio_dm
+ */
+int xc_hvm_set_mem_type(
+    int xc_handle, domid_t dom, hvmmem_type_t memtype, uint64_t first_pfn, uint64_t nr);
+
+
 typedef enum {
   XC_ERROR_NONE = 0,
   XC_INTERNAL_ERROR = 1,
@@ -1059,6 +1075,12 @@ int xc_domain_bind_pt_pci_irq(int xc_handle,
 int xc_domain_bind_pt_isa_irq(int xc_handle,
                               uint32_t domid,
                               uint8_t machine_irq);
+
+int xc_domain_set_machine_address_size(int handle,
+				       uint32_t domid,
+				       unsigned int width);
+int xc_domain_get_machine_address_size(int handle,
+				       uint32_t domid);
 
 /* Set the target domain */
 int xc_domain_set_target(int xc_handle,

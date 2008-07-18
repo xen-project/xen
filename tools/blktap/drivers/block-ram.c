@@ -127,7 +127,7 @@ static inline void init_fds(struct disk_driver *dd)
 }
 
 /* Open the disk file and initialize ram state. */
-int tdram_open (struct disk_driver *dd, const char *name, td_flag_t flags)
+static int tdram_open (struct disk_driver *dd, const char *name, td_flag_t flags)
 {
 	char *p;
 	uint64_t size;
@@ -220,7 +220,7 @@ done:
 	return ret;
 }
 
- int tdram_queue_read(struct disk_driver *dd, uint64_t sector,
+static int tdram_queue_read(struct disk_driver *dd, uint64_t sector,
 		      int nb_sectors, char *buf, td_callback_t cb,
 		      int id, void *private)
 {
@@ -234,7 +234,7 @@ done:
 	return cb(dd, 0, sector, nb_sectors, id, private);
 }
 
-int tdram_queue_write(struct disk_driver *dd, uint64_t sector,
+static int tdram_queue_write(struct disk_driver *dd, uint64_t sector,
 		      int nb_sectors, char *buf, td_callback_t cb,
 		      int id, void *private)
 {
@@ -250,12 +250,12 @@ int tdram_queue_write(struct disk_driver *dd, uint64_t sector,
 	return cb(dd, 0, sector, nb_sectors, id, private);
 }
  		
-int tdram_submit(struct disk_driver *dd)
+static int tdram_submit(struct disk_driver *dd)
 {
 	return 0;	
 }
 
-int tdram_close(struct disk_driver *dd)
+static int tdram_close(struct disk_driver *dd)
 {
 	struct tdram_state *prv = (struct tdram_state *)dd->private;
 	
@@ -264,18 +264,18 @@ int tdram_close(struct disk_driver *dd)
 	return 0;
 }
 
-int tdram_do_callbacks(struct disk_driver *dd, int sid)
+static int tdram_do_callbacks(struct disk_driver *dd, int sid)
 {
 	/* always ask for a kick */
 	return 1;
 }
 
-int tdram_get_parent_id(struct disk_driver *dd, struct disk_id *id)
+static int tdram_get_parent_id(struct disk_driver *dd, struct disk_id *id)
 {
 	return TD_NO_PARENT;
 }
 
-int tdram_validate_parent(struct disk_driver *dd, 
+static int tdram_validate_parent(struct disk_driver *dd, 
 			  struct disk_driver *parent, td_flag_t flags)
 {
 	return -EINVAL;

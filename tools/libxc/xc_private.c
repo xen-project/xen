@@ -501,7 +501,7 @@ unsigned long xc_make_page_below_4G(
     }
 
     if ( xc_domain_memory_increase_reservation(
-        xc_handle, domid, 1, 0, 32, &new_mfn) != 0 )
+        xc_handle, domid, 1, 0, XENMEMF_address_bits(32), &new_mfn) != 0 )
     {
         DPRINTF("xc_make_page_below_4G increase failed. mfn=%lx\n",mfn);
         return 0;

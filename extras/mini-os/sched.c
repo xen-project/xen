@@ -75,7 +75,7 @@ void inline print_runqueue(void)
 void schedule(void)
 {
     struct thread *prev, *next, *thread;
-    struct list_head *iterator;
+    struct list_head *iterator, *next_iterator;
     unsigned long flags;
 
     prev = current;
@@ -97,7 +97,7 @@ void schedule(void)
         s_time_t now = NOW();
         s_time_t min_wakeup_time = now + SECONDS(10);
         next = NULL;   
-        list_for_each(iterator, &idle_thread->thread_list)
+        list_for_each_safe(iterator, next_iterator, &idle_thread->thread_list)
         {
             thread = list_entry(iterator, struct thread, thread_list);
             if (!is_runnable(thread) && thread->wakeup_time != 0LL)
@@ -128,7 +128,7 @@ void schedule(void)
        inturrupted at the return instruction. And therefore at safe point. */
     if(prev != next) switch_threads(prev, next);
 
-    list_for_each(iterator, &exited_threads)
+    list_for_each_safe(iterator, next_iterator, &exited_threads)
     {
         thread = list_entry(iterator, struct thread, thread_list);
         if(thread != prev)

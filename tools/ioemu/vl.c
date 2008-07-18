@@ -7044,8 +7044,9 @@ int set_mm_mapping(int xc_handle, uint32_t domid,
 {
     int err = 0;
 
-    err = xc_domain_memory_populate_physmap(xc_handle, domid, nr_pages, 0,
-                                            address_bits, extent_start);
+    err = xc_domain_memory_populate_physmap(
+        xc_handle, domid, nr_pages, 0,
+        XENMEMF_address_bits(address_bits), extent_start);
     if (err) {
         fprintf(stderr, "Failed to populate physmap\n");
         return -1;

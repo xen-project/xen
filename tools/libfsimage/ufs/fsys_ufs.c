@@ -44,7 +44,7 @@ static grub_ino_t dlook(fsi_file_t *, grub_ino_t, char *);
 static grub_daddr32_t sbmap(fsi_file_t *, grub_daddr32_t);
 
 /* read superblock and check fs magic */
-int
+static int
 ufs_mount(fsi_file_t *ffi, const char *options)
 {
 	if (/*! IS_PC_SLICE_TYPE_SOLARIS(current_slice) || */
@@ -62,7 +62,7 @@ ufs_mount(fsi_file_t *ffi, const char *options)
  * The entry point should really be named ufs_open(char *pathname).
  * For now, keep it consistent with the rest of fsys modules.
  */
-int
+static int
 ufs_dir(fsi_file_t *ffi, char *dirname)
 {
 	grub_ino_t inode = ROOTINO;	/* start from root */
@@ -102,7 +102,7 @@ ufs_dir(fsi_file_t *ffi, char *dirname)
 /*
  * This is the high-level read function.
  */
-int
+static int
 ufs_read(fsi_file_t *ffi, char *buf, int len)
 {
   	int off, size, ret = 0, ok;

@@ -3,7 +3,7 @@
 
 /* Unfortunately not provided by newlib.  */
 
-#include <types.h>
+#include <mini-os/types.h>
 static inline uint16_t bswap_16(uint16_t x)
 {
     return

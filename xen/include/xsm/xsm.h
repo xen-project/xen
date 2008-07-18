@@ -119,6 +119,7 @@ struct xsm_operations {
     int (*hypercall_init) (struct domain *d);
     int (*hvmcontext) (struct domain *d, uint32_t op);
     int (*address_size) (struct domain *d, uint32_t op);
+    int (*machine_address_size) (struct domain *d, uint32_t op);
     int (*hvm_param) (struct domain *d, unsigned long op);
     int (*hvm_set_pci_intx_level) (struct domain *d);
     int (*hvm_set_isa_irq_level) (struct domain *d);
@@ -446,6 +447,11 @@ static inline int xsm_hvmcontext (struct domain *d, uint32_t cmd)
 static inline int xsm_address_size (struct domain *d, uint32_t cmd)
 {
     return xsm_call(address_size(d, cmd));
+}
+
+static inline int xsm_machine_address_size (struct domain *d, uint32_t cmd)
+{
+    return xsm_call(machine_address_size(d, cmd));
 }
 
 static inline int xsm_hvm_param (struct domain *d, unsigned long op)

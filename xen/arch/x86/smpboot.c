@@ -195,7 +195,7 @@ static void __init synchronize_tsc_bp (void)
 	unsigned int one_usec;
 	int buggy = 0;
 
-	printk(KERN_INFO "checking TSC synchronization across %u CPUs: ", num_booting_cpus());
+	printk("checking TSC synchronization across %u CPUs: ", num_booting_cpus());
 
 	/* convert from kcyc/sec to cyc/usec */
 	one_usec = cpu_khz / 1000;
@@ -274,7 +274,7 @@ static void __init synchronize_tsc_bp (void)
 			if (tsc_values[i] < avg)
 				realdelta = -realdelta;
 
-			printk(KERN_INFO "CPU#%d had %ld usecs TSC skew, fixed it up.\n", i, realdelta);
+			printk("CPU#%d had %ld usecs TSC skew, fixed it up.\n", i, realdelta);
 		}
 
 		sum += delta;

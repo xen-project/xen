@@ -61,8 +61,8 @@ static int returned_events = 0, submit_events = 0;
 static uint64_t prev = 0;
 static char output[25];
 
-void print_bytes(void *ptr, int length) {
-
+static void print_bytes(void *ptr, int length)
+{
   int i,k;
   unsigned char *p = ptr;
 
@@ -77,7 +77,7 @@ void print_bytes(void *ptr, int length) {
     return;
 }
 
-void debug_output(uint64_t progress, uint64_t size)
+static void debug_output(uint64_t progress, uint64_t size)
 {
 	uint64_t blocks = size/20;
 

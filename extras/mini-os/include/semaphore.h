@@ -1,8 +1,8 @@
 #ifndef _SEMAPHORE_H_
 #define _SEMAPHORE_H_
 
-#include <wait.h>
-#include <spinlock.h>
+#include <mini-os/wait.h>
+#include <mini-os/spinlock.h>
 
 /*
  * Implementation of semaphore in Mini-os is simple, because 

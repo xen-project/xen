@@ -490,6 +490,57 @@ long arch_do_domctl(
     }
     break;
 
+    case XEN_DOMCTL_set_machine_address_size:
+    {
+        struct domain *d;
+
+        ret = -ESRCH;
+        if ( (d = rcu_lock_domain_by_id(domctl->domain)) == NULL )
+            break;
+
+        ret = xsm_machine_address_size(d, domctl->cmd);
+        if ( ret )
+            rcu_unlock_domain(d);
+
+        ret = -EBUSY;
+        if ( d->tot_pages > 0 )
+            goto set_machine_address_size_out;
+
+        d->arch.physaddr_bitsize = domctl->u.address_size.size;
+
+        ret = 0;
+    set_machine_address_size_out:
+        rcu_unlock_domain(d);
+    }
+    break;
+
+    case XEN_DOMCTL_get_machine_address_size:
+    {
+        struct domain *d;
+
+        ret = -ESRCH;
+        if ( (d = rcu_lock_domain_by_id(domctl->domain)) == NULL )
+            break;
+
+        ret = xsm_machine_address_size(d, domctl->cmd);
+        if ( ret )
+        {
+            rcu_unlock_domain(d);
+            break;
+        }
+
+        domctl->u.address_size.size = d->arch.physaddr_bitsize;
+
+        ret = 0;
+        rcu_unlock_domain(d);
+
+        if ( copy_to_guest(u_domctl, domctl, 1) )
+            ret = -EFAULT;
+
+
+    }
+    break;
+
     case XEN_DOMCTL_sendtrigger:
     {
         struct domain *d;

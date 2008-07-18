@@ -24,7 +24,7 @@ static int iommu_populate_page_table(struct domain *d);
 int intel_vtd_setup(void);
 int amd_iov_detect(void);
 
-int iommu_enabled = 1;
+int iommu_enabled = 0;
 boolean_param("iommu", iommu_enabled);
 
 int iommu_pv_enabled = 0;
@@ -35,8 +35,6 @@ int iommu_domain_init(struct domain *domain)
     struct hvm_iommu *hd = domain_hvm_iommu(domain);
 
     spin_lock_init(&hd->mapping_lock);
-    spin_lock_init(&hd->iommu_list_lock);
-    INIT_LIST_HEAD(&hd->pdev_list);
     INIT_LIST_HEAD(&hd->g2m_ioport_list);
 
     if ( !iommu_enabled )
@@ -57,6 +55,32 @@ int iommu_domain_init(struct domain *domain)
     return hd->platform_ops->init(domain);
 }
 
+int iommu_add_device(struct pci_dev *pdev)
+{
+    struct hvm_iommu *hd;
+    if ( !pdev->domain )
+        return -EINVAL;
+
+    hd = domain_hvm_iommu(pdev->domain);
+    if ( !iommu_enabled || !hd->platform_ops )
+        return 0;
+
+    return hd->platform_ops->add_device(pdev);
+}
+
+int iommu_remove_device(struct pci_dev *pdev)
+{
+    struct hvm_iommu *hd;
+    if ( !pdev->domain )
+        return -EINVAL;
+
+    hd = domain_hvm_iommu(pdev->domain);
+    if ( !iommu_enabled || !hd->platform_ops )
+        return 0;
+
+    return hd->platform_ops->remove_device(pdev);
+}
+
 int assign_device(struct domain *d, u8 bus, u8 devfn)
 {
     struct hvm_iommu *hd = domain_hvm_iommu(d);
@@ -68,7 +92,7 @@ int assign_device(struct domain *d, u8 bus, u8 devfn)
     if ( (rc = hd->platform_ops->assign_device(d, bus, devfn)) )
         return rc;
 
-    if ( has_iommu_pdevs(d) && !is_hvm_domain(d) && !need_iommu(d) )
+    if ( has_arch_pdevs(d) && !is_hvm_domain(d) && !need_iommu(d) )
     {
         d->need_iommu = 1;
         return iommu_populate_page_table(d);
@@ -190,7 +214,7 @@ void deassign_device(struct domain *d, u8 bus, u8 devfn)
 
     hd->platform_ops->reassign_device(d, dom0, bus, devfn);
 
-    if ( !has_iommu_pdevs(d) && need_iommu(d) )
+    if ( !has_arch_pdevs(d) && need_iommu(d) )
     {
         d->need_iommu = 0;
         hd->platform_ops->teardown(d);
@@ -242,8 +266,8 @@ int iommu_get_device_group(struct domain *d, u8 bus, u8 devfn,
 
     group_id = ops->get_device_group_id(bus, devfn);
 
-    list_for_each_entry(pdev,
-        &(dom0->arch.hvm_domain.hvm_iommu.pdev_list), list)
+    read_lock(&pcidevs_lock);
+    for_each_pdev( d, pdev )
     {
         if ( (pdev->bus == bus) && (pdev->devfn == devfn) )
             continue;
@@ -255,12 +279,53 @@ int iommu_get_device_group(struct domain *d, u8 bus, u8 devfn,
             bdf |= (pdev->bus & 0xff) << 16;
             bdf |= (pdev->devfn & 0xff) << 8;
             if ( unlikely(copy_to_guest_offset(buf, i, &bdf, 1)) )
+            {
+                read_unlock(&pcidevs_lock);
                 return -1;
+            }
             i++;
         }
     }
+    read_unlock(&pcidevs_lock);
 
     return i;
+}
+
+void iommu_update_ire_from_apic(
+    unsigned int apic, unsigned int reg, unsigned int value)
+{
+    struct iommu_ops *ops = NULL;
+
+    switch ( boot_cpu_data.x86_vendor )
+    {
+    case X86_VENDOR_INTEL:
+        ops = &intel_iommu_ops;
+        break;
+    case X86_VENDOR_AMD:
+        ops = &amd_iommu_ops;
+        break;
+    default:
+        BUG();
+    }
+    ops->update_ire_from_apic(apic, reg, value);
+}
+void iommu_update_ire_from_msi(
+    struct msi_desc *msi_desc, struct msi_msg *msg)
+{
+    struct iommu_ops *ops = NULL;
+
+    switch ( boot_cpu_data.x86_vendor )
+    {
+    case X86_VENDOR_INTEL:
+        ops = &intel_iommu_ops;
+        break;
+    case X86_VENDOR_AMD:
+        ops = &amd_iommu_ops;
+        break;
+    default:
+        BUG();
+    }
+    ops->update_ire_from_msi(msi_desc, msg);
 }
 /*
  * Local variables:

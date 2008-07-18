@@ -95,13 +95,8 @@ static int reprogram_hpet_evt_channel(
     }
 
     delta = expire - now;
-    if ( delta <= 0 )
-    {
-        printk(KERN_DEBUG "reprogram: expire(%"PRIx64") < "
-               "now(%"PRIx64")\n", expire, now);
-        if ( !force )
-            return -ETIME;
-    }
+    if ( (delta <= 0) && !force )
+        return -ETIME;
 
     ch->next_event = expire;
 
@@ -142,12 +137,10 @@ static void handle_hpet_broadcast(struct hpet_event_channel *ch)
 {
     cpumask_t mask;
     s_time_t now, next_event;
-    int cpu, current_cpu = smp_processor_id();
+    int cpu;
 
     spin_lock(&ch->lock);
 
-    if ( cpu_isset(current_cpu, ch->cpumask) )
-        printk(KERN_DEBUG "WARNING: current cpu%d in bc_mask\n", current_cpu);
 again:
     ch->next_event = STIME_MAX;
     next_event = STIME_MAX;
@@ -162,8 +155,6 @@ again:
         else if ( per_cpu(timer_deadline, cpu) < next_event )
             next_event = per_cpu(timer_deadline, cpu);
     }
-    if ( per_cpu(timer_deadline, current_cpu) <= now )
-        cpu_set(current_cpu, mask);
 
     /* wakeup the cpus which have an expired event. */
     evt_do_broadcast(mask);

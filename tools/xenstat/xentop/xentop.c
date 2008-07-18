@@ -1015,7 +1015,7 @@ static void top(void)
 
 static int signal_exit;
 
-void signal_exit_handler(int sig)
+static void signal_exit_handler(int sig)
 {
 	signal_exit = 1;
 }

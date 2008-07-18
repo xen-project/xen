@@ -61,6 +61,8 @@ extern void do_settime(
 
 extern void send_timer_event(struct vcpu *v);
 
+void domain_set_time_offset(struct domain *d, int32_t time_offset_seconds);
+
 #endif /* __XEN_TIME_H__ */
 
 /*

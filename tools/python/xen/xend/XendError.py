@@ -175,6 +175,17 @@ class NetworkError(XendAPIError):
     def __str__(self):
         return 'NETWORK_ERROR: %s %s' % (self.error, self.network)
 
+class DirectPCIError(XendAPIError):
+    def __init__(self, error):
+        XendAPIError.__init__(self)
+        self.error = error
+
+    def get_api_error(self):
+        return ['DIRECT_PCI_ERROR', self.error]
+
+    def __str__(self):
+        return 'DIRECT_PCI_ERROR: %s' % self.error
+
 from xen.util.xsconstants import xserr2string
 
 class SecurityError(XendAPIError):

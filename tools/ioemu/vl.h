@@ -832,6 +832,8 @@ void pci_register_io_region(PCIDevice *pci_dev, int region_num,
                             uint32_t size, int type, 
                             PCIMapIORegionFunc *map_func);
 
+int pt_chk_bar_overlap(PCIBus *bus, int devfn, uint32_t addr, uint32_t size);
+
 void pci_set_irq(PCIDevice *pci_dev, int irq_num, int level);
 
 uint32_t pci_default_read_config(PCIDevice *d, 

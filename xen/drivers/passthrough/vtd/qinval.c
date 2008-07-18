@@ -190,13 +190,13 @@ static int queue_invalidate_wait(struct iommu *iommu,
     struct qi_ctrl *qi_ctrl = iommu_qi_ctrl(iommu);
 
     spin_lock_irqsave(&qi_ctrl->qinval_poll_lock, flags);
-    spin_lock_irqsave(&iommu->register_lock, flags);
+    spin_lock(&iommu->register_lock);
     index = qinval_next_index(iommu);
     if ( *saddr == 1 )
         *saddr = 0;
     ret = gen_wait_dsc(iommu, index, iflag, sw, fn, sdata, saddr);
     ret |= qinval_update_qtail(iommu, index);
-    spin_unlock_irqrestore(&iommu->register_lock, flags);
+    spin_unlock(&iommu->register_lock);
 
     /* Now we don't support interrupt method */
     if ( sw )

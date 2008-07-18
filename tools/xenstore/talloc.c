@@ -500,7 +500,7 @@ void *talloc_init(const char *fmt, ...)
   should probably not be used in new code. It's in here to keep the talloc
   code consistent across Samba 3 and 4.
 */
-void talloc_free_children(void *ptr)
+static void talloc_free_children(void *ptr)
 {
 	struct talloc_chunk *tc;
 

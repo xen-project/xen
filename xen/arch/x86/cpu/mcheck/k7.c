@@ -66,8 +66,8 @@ static fastcall void k7_machine_check(struct cpu_user_regs * regs, long error_co
 }
 
 
-/* AMD K7 machine check is Intel like */
-void amd_mcheck_init(struct cpuinfo_x86 *c)
+/* AMD K7 machine check */
+void amd_k7_mcheck_init(struct cpuinfo_x86 *c)
 {
 	u32 l, h;
 	int i;
@@ -75,7 +75,6 @@ void amd_mcheck_init(struct cpuinfo_x86 *c)
 	machine_check_vector = k7_machine_check;
 	wmb();
 
-	printk (KERN_INFO "Intel machine check architecture supported.\n");
 	rdmsr (MSR_IA32_MCG_CAP, l, h);
 	if (l & (1<<8))	/* Control register present ? */
 		wrmsr (MSR_IA32_MCG_CTL, 0xffffffff, 0xffffffff);
@@ -90,6 +89,6 @@ void amd_mcheck_init(struct cpuinfo_x86 *c)
 	}
 
 	set_in_cr4 (X86_CR4_MCE);
-	printk (KERN_INFO "Intel machine check reporting enabled on CPU#%d.\n",
+	printk (KERN_INFO "CPU%d: AMD K7 machine check reporting enabled.\n",
 		smp_processor_id());
 }

@@ -135,9 +135,8 @@
 ^tools/firmware/rombios/_rombios[^/]*_\.c$
 ^tools/firmware/rombios/rombios[^/]*\.s$
 ^tools/firmware/rombios/32bit/32bitbios_flat\.h$
-^tools/firmware/vmxassist/gen$
-^tools/firmware/vmxassist/offsets\.h$
-^tools/firmware/vmxassist/vmxassist$
+^tools/firmware/vgabios/vbetables-gen$
+^tools/firmware/vgabios/vbetables\.h$
 ^tools/flask/loadpolicy/flask-loadpolicy$
 ^tools/include/xen/.*$
 ^tools/include/xen-foreign/.*\.(c|h|size)$
@@ -248,6 +247,8 @@
 ^tools/xm-test/lib/XmTestLib/config.py$
 ^tools/xm-test/lib/XmTestReport/xmtest.py$
 ^tools/xm-test/tests/.*\.test$
+^tools/ioemu-remote
+^tools/ioemu-dir$
 ^xen/\.banner.*$
 ^xen/BLOG$
 ^xen/System.map$

@@ -22,7 +22,12 @@ SUBDIRS-y += libaio
 SUBDIRS-y += blktap
 SUBDIRS-y += libfsimage
 SUBDIRS-$(LIBXENAPI_BINDINGS) += libxen
+
+ifeq (ioemu,$(CONFIG_QEMU))
 SUBDIRS-$(CONFIG_IOEMU) += ioemu
+else
+SUBDIRS-$(CONFIG_IOEMU) += ioemu-dir
+endif
 
 # These don't cross-compile
 ifeq ($(XEN_COMPILE_ARCH),$(XEN_TARGET_ARCH))
@@ -62,3 +67,33 @@ subdir-all-ioemu subdir-install-ioemu: ioemu/config-host.mak
 subdir-clean-ioemu:
 	$(MAKE) -C ioemu distclean
 
+ioemu-dir-find:
+	set -ex; \
+	if test -d $(CONFIG_QEMU); then \
+		rm -f ioemu-dir; \
+		ln -sf $(CONFIG_QEMU) ioemu-dir; \
+	else \
+		if [ ! -d ioemu-remote ]; then \
+			rm -rf ioemu-remote ioemu-remote.tmp; \
+			mkdir ioemu-remote.tmp; rmdir ioemu-remote.tmp; \
+			$(GIT) clone $(CONFIG_QEMU) ioemu-remote.tmp; \
+			mv ioemu-remote.tmp ioemu-remote; \
+		fi; \
+		rm -f ioemu-dir; \
+		ln -sf ioemu-remote ioemu-dir; \
+	fi
+	set -e; \
+		case "$(XEN_ROOT)" in \
+		/*)	XEN_ROOT=$(XEN_ROOT) ;; \
+		*)	XEN_ROOT=`pwd`/$(XEN_ROOT) ;; \
+		esac; \
+		export XEN_ROOT; \
+		cd ioemu-dir; \
+		./xen-setup
+
+subdir-all-ioemu-dir subdir-install-ioemu-dir: ioemu-dir-find
+
+subdir-clean-ioemu-dir:
+	if test -d ioemu-dir/.; then \
+		$(MAKE) -C ioemu-dir clean; \
+	fi

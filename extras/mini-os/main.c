@@ -52,6 +52,7 @@ static void call_main(void *p)
 #ifdef CONFIG_QEMU
     char *vm;
     char path[128];
+    int domid;
 #endif
     int i;
 
@@ -74,7 +75,6 @@ static void call_main(void *p)
     }
 
     /* Fetch argc, argv from XenStore */
-    int domid;
     domid = xenbus_read_integer("target");
     if (domid == -1) {
         printk("Couldn't read target\n");

@@ -15,12 +15,13 @@ include buildconfigs/Rules.mk
 
 # build and install everything into the standard system directories
 .PHONY: install
-install: install-xen install-kernels install-tools install-docs
+install: install-xen install-kernels install-tools install-stubdom install-docs
 
 .PHONY: build
 build: kernels
 	$(MAKE) -C xen build
 	$(MAKE) -C tools build
+	$(MAKE) -C stubdom build
 	$(MAKE) -C docs build
 
 # The test target is for unit tests that can run without an installation.  Of
@@ -33,7 +34,7 @@ test:
 # build and install everything into local dist directory
 .PHONY: dist
 dist: DESTDIR=$(DISTDIR)/install
-dist: dist-xen dist-kernels dist-tools dist-docs
+dist: dist-xen dist-kernels dist-tools dist-stubdom dist-docs
 	$(INSTALL_DIR) $(DISTDIR)/check
 	$(INSTALL_DATA) ./COPYING $(DISTDIR)
 	$(INSTALL_DATA) ./README $(DISTDIR)
@@ -44,10 +45,11 @@ dist-%: install-%
 	@: # do nothing
 
 # Legacy dist targets
-.PHONY: xen tools kernels docs
+.PHONY: xen tools stubdom kernels docs
 xen: dist-xen
 tools: dist-tools
 kernels: dist-kernels
+stubdom: dist-stubdom
 docs: dist-docs
 
 .PHONY: prep-kernels
@@ -65,6 +67,10 @@ install-tools:
 .PHONY: install-kernels
 install-kernels:
 	for i in $(XKERNELS) ; do $(MAKE) $$i-install || exit 1; done
+
+.PHONY: install-stubdom
+install-stubdom:
+	$(MAKE) -C stubdom install
 
 .PHONY: install-docs
 install-docs:
@@ -102,6 +108,7 @@ world:
 clean::
 	$(MAKE) -C xen clean
 	$(MAKE) -C tools clean
+	$(MAKE) -C stubdom crossclean
 	$(MAKE) -C docs clean
 
 # clean, but blow away kernel build tree plus tarballs
@@ -109,6 +116,7 @@ clean::
 distclean:
 	$(MAKE) -C xen distclean
 	$(MAKE) -C tools distclean
+	$(MAKE) -C stubdom distclean
 	$(MAKE) -C docs distclean
 	rm -rf dist patches/tmp
 	for i in $(ALLKERNELS) ; do $(MAKE) $$i-delete ; done
@@ -132,6 +140,7 @@ help:
 	@echo '  install-xen      - build and install the Xen hypervisor'
 	@echo '  install-tools    - build and install the control tools'
 	@echo '  install-kernels  - build and install guest kernels'
+	@echo '  install-stubdom  - build and install the stubdomain images'
 	@echo '  install-docs     - build and install user documentation'
 	@echo ''
 	@echo 'Building targets:'
@@ -140,6 +149,7 @@ help:
 	@echo '                     trees then make dist'
 	@echo '  xen              - build and install Xen hypervisor'
 	@echo '  tools            - build and install tools'
+	@echo '  stubdomain       - build and install the stubdomain images'
 	@echo '  kernels          - build and install guest kernels'
 	@echo '  kbuild           - synonym for make kernels'
 	@echo '  docs             - build and install user documentation'
@@ -214,7 +224,7 @@ linux26:
 # tboot targets
 #
 
-TBOOT_TARFILE = tboot-20071128.tar.gz
+TBOOT_TARFILE = tboot-20080613.tar.gz
 TBOOT_BASE_URL = http://downloads.sourceforge.net/tboot
 
 .PHONY: build-tboot

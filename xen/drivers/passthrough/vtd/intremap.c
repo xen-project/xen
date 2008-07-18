@@ -396,7 +396,7 @@ void msi_msg_read_remap_rte(
     struct iommu *iommu = NULL;
     struct ir_ctrl *ir_ctrl;
 
-    drhd = acpi_find_matched_drhd_unit(pdev);
+    drhd = acpi_find_matched_drhd_unit(pdev->bus, pdev->devfn);
     iommu = drhd->iommu;
 
     ir_ctrl = iommu_ir_ctrl(iommu);
@@ -414,7 +414,7 @@ void msi_msg_write_remap_rte(
     struct iommu *iommu = NULL;
     struct ir_ctrl *ir_ctrl;
 
-    drhd = acpi_find_matched_drhd_unit(msi_desc->dev);
+    drhd = acpi_find_matched_drhd_unit(pdev->bus, pdev->devfn);
     iommu = drhd->iommu;
 
     ir_ctrl = iommu_ir_ctrl(iommu);

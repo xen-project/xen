@@ -48,7 +48,7 @@
 
 #define MAX_NAME_LEN 1000
 
-void help(void)
+static void help(void)
 {
 	fprintf(stderr, "Qcow-utils: v1.0.0\n");
 	fprintf(stderr, 

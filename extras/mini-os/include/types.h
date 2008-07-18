@@ -36,9 +36,11 @@ typedef unsigned long       u64;
 #endif
 
 /* FreeBSD compat types */
+#ifndef HAVE_LIBC
 typedef unsigned char       u_char;
 typedef unsigned int        u_int;
 typedef unsigned long       u_long;
+#endif
 #ifdef __i386__
 typedef long long           quad_t;
 typedef unsigned long long  u_quad_t;
@@ -79,11 +81,13 @@ typedef s32 int32_t;
 typedef u64 uint64_t, uintmax_t;
 typedef s64 int64_t, intmax_t;
 typedef u64 off_t;
+#endif
+
+typedef intptr_t            ptrdiff_t;
 
 
-#define INT_MAX         ((int)(~0U>>1))
-#define UINT_MAX            (~0U)
-
+#ifndef HAVE_LIBC
 typedef long ssize_t;
 #endif
+
 #endif /* _TYPES_H_ */

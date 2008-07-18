@@ -37,6 +37,8 @@ import datetime
 from select import select
 import xml.dom.minidom
 from xen.util.blkif import blkdev_name_to_number
+from xen.util import vscsi_util
+from xen.util.pci import *
 
 import warnings
 warnings.filterwarnings('ignore', category=FutureWarning)
@@ -54,6 +56,9 @@ from xen.util.xsm.xsm import XSMError
 from xen.util.acmpolicy import ACM_LABEL_UNLABELED_DISPLAY
 
 import XenAPI
+
+import xen.lowlevel.xc
+xc = xen.lowlevel.xc.xc()
 
 import inspect
 from xen.xend import XendOptions
@@ -182,6 +187,13 @@ SUBCOMMAND_HELP = {
                         'Remove a domain\'s pass-through pci device.'),
     'pci-list'      :  ('<Domain>',
                         'List pass-through pci devices for a domain.'),
+    'pci-list-assignable-devices' : ('', 'List all the assignable pci devices'),
+    'scsi-attach'  :  ('<Domain> <PhysDevice> <VirtDevice> [BackDomain]',
+                        'Attach a new SCSI device.'),
+    'scsi-detach'  :  ('<Domain> <VirtDevice>',
+                        'Detach a specified SCSI device.'),
+    'scsi-list'    :  ('<Domain> [--long]',
+                        'List all SCSI devices currently attached.'),
 
     # security
 
@@ -348,6 +360,10 @@ device_commands = [
     "pci-attach",
     "pci-detach",
     "pci-list",
+    "pci-list-assignable-devices",
+    "scsi-attach",
+    "scsi-detach",
+    "scsi-list",
     ]
 
 vnet_commands = [
@@ -2106,6 +2122,69 @@ def xm_pci_list(args):
             hdr = 1
         print ( fmt_str % x )
 
+def xm_pci_list_assignable_devices(args):
+    # Each element of dev_list is a PciDevice
+    dev_list = find_all_devices_owned_by_pciback()
+
+    # Each element of devs_list is a list of PciDevice
+    devs_list = check_FLR_capability(dev_list)
+
+    devs_list = check_mmio_bar(devs_list)
+
+    # Check if the devices have been assigned to guests.
+    final_devs_list = []
+    for dev_list in devs_list:
+        available = True
+        for d in dev_list:
+            pci_str = '0x%x,0x%x,0x%x,0x%x' %(d.domain, d.bus, d.slot, d.func)
+            # Xen doesn't care what the domid is, so we pass 0 here...
+            domid = 0
+            bdf = xc.test_assign_device(domid, pci_str)
+            if bdf != 0:
+                available = False
+                break
+        if available:
+            final_devs_list = final_devs_list + [dev_list]
+
+    for dev_list in final_devs_list:
+        for d in dev_list:
+            print d.name,
+        print
+
+def vscsi_convert_sxp_to_dict(dev_sxp):
+    dev_dict = {}
+    for opt_val in dev_sxp[1:]:
+        try:
+            opt, val = opt_val
+            dev_dict[opt] = val
+        except TypeError:
+            pass
+    return dev_dict
+
+def xm_scsi_list(args):
+    xenapi_unsupported()
+    (use_long, params) = arg_check_for_resource_list(args, "scsi-list")
+
+    dom = params[0]
+
+    devs = server.xend.domain.getDeviceSxprs(dom, 'vscsi')
+
+    if use_long:
+        map(PrettyPrint.prettyprint, devs)
+    else:
+        hdr = 0
+        for x in devs:
+            if hdr == 0:
+                print "%-3s %-3s %-5s  %-10s %-5s %-10s %-4s" \
+                        % ('Idx', 'BE', 'state', 'phy-hctl', 'phy', 'vir-hctl', 'devstate')
+                hdr = 1
+            ni = parse_dev_info(x[1])
+            ni['idx'] = int(x[0])
+            for dev in x[1][0][1]:
+                mi = vscsi_convert_sxp_to_dict(dev)
+                print "%(idx)-3d %(backend-id)-3d %(state)-5d " % ni,
+                print "%(p-dev)-10s %(p-devname)-5s %(v-dev)-10s %(frontstate)-4s" % mi
+
 def parse_block_configuration(args):
     dom = args[0]
 
@@ -2285,6 +2364,38 @@ def xm_pci_attach(args):
     (dom, pci) = parse_pci_configuration(args, 'Initialising')
     server.xend.domain.device_configure(dom, pci)
 
+def xm_scsi_attach(args):
+    xenapi_unsupported()
+
+    arg_check(args, 'scsi-attach', 3, 4)
+    p_devname = args[1]
+    v_dev = args[2]
+
+    v_hctl = v_dev.split(':')
+    if len(v_hctl) != 4:
+        raise OptionError("Invalid argument: %s" % v_dev)
+
+    (p_hctl, block) = vscsi_util.vscsi_search_hctl_and_block(p_devname)
+
+    if p_hctl == None:
+        raise OptionError("Cannot find device \"%s\"" % p_devname)
+
+    dom = args[0]
+    vscsi = ['vscsi']
+    vscsi.append(['dev', \
+                ['state', 'Initialising'], \
+                ['devid', v_hctl[0]], \
+                ['p-dev', p_hctl], \
+                ['p-devname', block], \
+                ['v-dev', v_dev] ])
+
+    if len(args) == 4:
+        vscsi.append(['backend', args[3]])
+
+    vscsi.append(['state', 'Initialising'])
+    vscsi.append(['devid', v_hctl[0]])
+    server.xend.domain.device_configure(dom, vscsi)
+
 def detach(args, deviceClass):
     rm_cfg = True
     dom = args[0]
@@ -2353,6 +2464,27 @@ def xm_pci_detach(args):
     (dom, pci) = parse_pci_configuration(args, 'Closing')
     server.xend.domain.device_configure(dom, pci)
 
+def xm_scsi_detach(args):
+    xenapi_unsupported()
+    arg_check(args, 'scsi-detach', 2)
+
+    v_dev = args[1]
+    v_hctl = v_dev.split(':')
+    if len(v_hctl) != 4:
+        raise OptionError("Invalid argument: %s" % v_dev)
+
+    dom = args[0]
+    vscsi = ['vscsi']
+    vscsi.append(['dev', \
+                ['state', 'Closing'], \
+                ['devid', v_hctl[0]], \
+                ['p-dev', ''], \
+                ['p-devname', ''], \
+                ['v-dev', v_dev] ])
+
+    vscsi.append(['state', 'Closing'])
+    vscsi.append(['devid', v_hctl[0]])
+    server.xend.domain.device_configure(dom, vscsi)
 
 def xm_vnet_list(args):
     xenapi_unsupported()
@@ -2548,6 +2680,11 @@ commands = {
     "pci-attach": xm_pci_attach,
     "pci-detach": xm_pci_detach,
     "pci-list": xm_pci_list,
+    "pci-list-assignable-devices": xm_pci_list_assignable_devices,
+    # vscsi
+    "scsi-attach": xm_scsi_attach,
+    "scsi-detach": xm_scsi_detach,
+    "scsi-list": xm_scsi_list,
     }
 
 ## The commands supported by a separate argument parser in xend.xm.

@@ -30,19 +30,15 @@
 
 
 // defines available
-// enable LFB support
-#define VBE_HAVE_LFB
 
 // disable VESA/VBE2 check in vbe info
 //#define VBE2_NO_VESA_CHECK
-
-// dynamicly generate a mode_info list
-#define DYN_LIST
 
 
 #include "vbe.h"
 #include "vbetables.h"
 
+#define VBE_TOTAL_VIDEO_MEMORY_DIV_64K (VBE_DISPI_TOTAL_VIDEO_MEMORY_MB*1024/64)
 
 // The current OEM Software Revision of this VBE Bios
 #define VBE_OEM_SOFTWARE_REV 0x0002;
@@ -51,10 +47,6 @@ extern char vbebios_copyright;
 extern char vbebios_vendor_name;
 extern char vbebios_product_name;
 extern char vbebios_product_revision;
-
-#ifndef DYN_LIST
-extern Bit16u vbebios_mode_list;
-#endif
 
 ASM_START
 // FIXME: 'merge' these (c) etc strings with the vgabios.c strings?
@@ -71,7 +63,7 @@ _vbebios_product_name:
 .byte        0x00
 
 _vbebios_product_revision:
-.ascii       "$Id: vbe.c,v 1.47 2005/05/24 16:50:50 vruppert Exp $"
+.ascii       "$Id: vbe.c,v 1.60 2008/03/02 07:47:21 vruppert Exp $"
 .byte        0x00
 
 _vbebios_info_string:
@@ -88,35 +80,143 @@ _no_vbebios_info_string:
 
 #if defined(USE_BX_INFO) || defined(DEBUG)
 msg_vbe_init:
-.ascii      "VBE Bios $Id: vbe.c,v 1.47 2005/05/24 16:50:50 vruppert Exp $"
+.ascii      "VBE Bios $Id: vbe.c,v 1.60 2008/03/02 07:47:21 vruppert Exp $"
 .byte	0x0a,0x0d, 0x00
 #endif
 
-#ifndef DYN_LIST
-// FIXME: for each new mode add a statement here
-//        at least until dynamic list creation is working
-_vbebios_mode_list:
+  .align 2
+vesa_pm_start:
+  dw vesa_pm_set_window - vesa_pm_start
+  dw vesa_pm_set_display_start - vesa_pm_start
+  dw vesa_pm_unimplemented - vesa_pm_start
+  dw vesa_pm_io_ports_table - vesa_pm_start
+vesa_pm_io_ports_table:
+  dw VBE_DISPI_IOPORT_INDEX
+  dw VBE_DISPI_IOPORT_INDEX + 1
+  dw VBE_DISPI_IOPORT_DATA
+  dw VBE_DISPI_IOPORT_DATA + 1
+  dw 0xffff
+  dw 0xffff
 
-.word VBE_VESA_MODE_640X400X8
-.word VBE_VESA_MODE_640X480X8
-.word VBE_VESA_MODE_800X600X4
-.word VBE_VESA_MODE_800X600X8
-.word VBE_VESA_MODE_1024X768X8
-.word VBE_VESA_MODE_640X480X1555
-.word VBE_VESA_MODE_640X480X565
-.word VBE_VESA_MODE_640X480X888
-.word VBE_VESA_MODE_800X600X1555
-.word VBE_VESA_MODE_800X600X565
-.word VBE_VESA_MODE_800X600X888
-.word VBE_VESA_MODE_1024X768X1555
-.word VBE_VESA_MODE_1024X768X565
-.word VBE_VESA_MODE_1024X768X888
-.word VBE_OWN_MODE_640X480X8888
-.word VBE_OWN_MODE_800X600X8888
-.word VBE_OWN_MODE_1024X768X8888
-.word VBE_OWN_MODE_320X200X8
-.word VBE_VESA_MODE_END_OF_LIST
-#endif
+  USE32
+vesa_pm_set_window:
+  cmp  bx, #0x00
+  je  vesa_pm_set_display_window1
+  mov  ax, #0x0100
+  ret
+vesa_pm_set_display_window1:
+  mov  ax, dx
+  push dx
+  push ax
+  mov  dx, # VBE_DISPI_IOPORT_INDEX
+  mov  ax, # VBE_DISPI_INDEX_BANK
+  out  dx, ax
+  pop  ax
+  mov  dx, # VBE_DISPI_IOPORT_DATA
+  out  dx, ax
+  in   ax, dx
+  pop  dx
+  cmp  dx, ax
+  jne  illegal_window
+  mov  ax, #0x004f
+  ret
+illegal_window:
+  mov  ax, #0x014f
+  ret
+
+vesa_pm_set_display_start:
+  cmp  bl, #0x80
+  je   vesa_pm_set_display_start1
+  cmp  bl, #0x00
+  je   vesa_pm_set_display_start1
+  mov  ax, #0x0100
+  ret
+vesa_pm_set_display_start1:
+; convert offset to (X, Y) coordinate 
+; (would be simpler to change Bochs VBE API...)
+  push eax
+  push ecx
+  push edx
+  push esi
+  push edi
+  shl edx, #16
+  and ecx, #0xffff
+  or ecx, edx
+  shl ecx, #2
+  mov eax, ecx
+
+  push eax
+  mov  dx, # VBE_DISPI_IOPORT_INDEX
+  mov  ax, # VBE_DISPI_INDEX_VIRT_WIDTH
+  out  dx, ax
+  mov  dx, # VBE_DISPI_IOPORT_DATA
+  in   ax, dx
+  movzx ecx, ax
+
+  mov  dx, # VBE_DISPI_IOPORT_INDEX
+  mov  ax, # VBE_DISPI_INDEX_BPP
+  out  dx, ax
+  mov  dx, # VBE_DISPI_IOPORT_DATA
+  in   ax, dx
+  movzx esi, ax
+  pop  eax
+
+  cmp esi, #4
+  jz bpp4_mode
+  add esi, #7
+  shr esi, #3
+  imul ecx, esi
+  xor edx, edx
+  div ecx
+  mov edi, eax
+  mov eax, edx
+  xor edx, edx
+  div esi
+  jmp set_xy_regs
+
+bpp4_mode:
+  shr ecx, #1
+  xor edx, edx
+  div ecx
+  mov edi, eax
+  mov eax, edx
+  shl eax, #1
+
+set_xy_regs:
+  push dx
+  push ax
+  mov  dx, # VBE_DISPI_IOPORT_INDEX
+  mov  ax, # VBE_DISPI_INDEX_X_OFFSET
+  out  dx, ax
+  pop  ax
+  mov  dx, # VBE_DISPI_IOPORT_DATA
+  out  dx, ax
+  pop  dx
+
+  mov  ax, di
+  push dx
+  push ax
+  mov  dx, # VBE_DISPI_IOPORT_INDEX
+  mov  ax, # VBE_DISPI_INDEX_Y_OFFSET
+  out  dx, ax
+  pop  ax
+  mov  dx, # VBE_DISPI_IOPORT_DATA
+  out  dx, ax
+  pop  dx
+
+  pop edi
+  pop esi
+  pop edx
+  pop ecx
+  pop eax
+  mov  ax, #0x004f
+  ret
+
+vesa_pm_unimplemented:
+  mov ax, #0x014f
+  ret
+  USE16
+vesa_pm_end:
 
 ; DISPI ioport functions
 
@@ -158,20 +258,6 @@ ASM_START
   mov  dx, # VBE_DISPI_IOPORT_DATA
   mov  ax, 4[bp] ; xres
   out  dx, ax
-  push ax
-  mov  dx, #0x03d4
-  mov  ax, #0x0011
-  out  dx, ax
-  mov  dx, #0x03d4
-  pop  ax
-  push ax
-  shr  ax, #3
-  dec  ax
-  mov  ah, al
-  mov  al, #0x01
-  out  dx, ax
-  pop  ax
-  call vga_set_virt_width
 
   pop  dx
   pop  ax
@@ -208,6 +294,28 @@ dispi_get_bpp:
   jz   get_bpp_noinc
   inc  ah
 get_bpp_noinc:
+  pop  dx
+  ret
+
+; get display capabilities
+
+_dispi_get_max_xres:
+  push dx
+  push bx
+  call dispi_get_enable
+  mov  bx, ax
+  or   ax, # VBE_DISPI_GETCAPS
+  call _dispi_set_enable
+  mov  dx, # VBE_DISPI_IOPORT_INDEX
+  mov  ax, # VBE_DISPI_INDEX_XRES
+  out  dx, ax
+  mov  dx, # VBE_DISPI_IOPORT_DATA
+  in   ax, dx
+  push ax
+  mov  ax, bx
+  call _dispi_set_enable
+  pop  ax
+  pop  bx
   pop  dx
   ret
 
@@ -283,13 +391,20 @@ ASM_START
   je dispi_set_bank_farcall_get
   or bx,bx
   jnz dispi_set_bank_farcall_error
+  mov ax,dx
   push dx
+  push ax
   mov ax,# VBE_DISPI_INDEX_BANK
   mov dx,# VBE_DISPI_IOPORT_INDEX
   out dx,ax
   pop ax
   mov dx,# VBE_DISPI_IOPORT_DATA
   out dx,ax
+  in  ax,dx
+  pop dx
+  cmp dx,ax
+  jne dispi_set_bank_farcall_error
+  mov ax, #0x004f
   retf
 dispi_set_bank_farcall_get:
   mov ax,# VBE_DISPI_INDEX_BANK
@@ -358,10 +473,10 @@ vga_set_virt_width:
   call dispi_get_bpp
   cmp  al, #0x04
   ja   set_width_svga
-  shr  bx, #2
+  shr  bx, #1
 set_width_svga:
-  shr  bx, #2
-  mov  dx, #0x03d4
+  shr  bx, #3
+  mov  dx, # VGAREG_VGA_CRTC_ADDRESS
   mov  ah, bl
   mov  al, #0x13
   out  dx, ax
@@ -402,6 +517,134 @@ dispi_get_virt_height:
   in   ax, dx
   pop  dx
   ret
+
+_vga_compat_setup:
+  push ax
+  push dx
+
+  ; set CRT X resolution
+  mov  dx, # VBE_DISPI_IOPORT_INDEX
+  mov  ax, # VBE_DISPI_INDEX_XRES
+  out  dx, ax
+  mov  dx, # VBE_DISPI_IOPORT_DATA
+  in   ax, dx
+  push ax
+  mov  dx, # VGAREG_VGA_CRTC_ADDRESS
+  mov  ax, #0x0011
+  out  dx, ax
+  pop  ax
+  push ax
+  shr  ax, #3
+  dec  ax
+  mov  ah, al
+  mov  al, #0x01
+  out  dx, ax
+  pop  ax
+  call vga_set_virt_width
+
+  ; set CRT Y resolution
+  mov  dx, # VBE_DISPI_IOPORT_INDEX
+  mov  ax, # VBE_DISPI_INDEX_YRES
+  out  dx, ax
+  mov  dx, # VBE_DISPI_IOPORT_DATA
+  in   ax, dx
+  dec  ax
+  push ax
+  mov  dx, # VGAREG_VGA_CRTC_ADDRESS
+  mov  ah, al
+  mov  al, #0x12
+  out  dx, ax
+  pop  ax
+  mov  al, #0x07
+  out  dx, al
+  inc  dx
+  in   al, dx
+  and  al, #0xbd
+  test ah, #0x01
+  jz   bit8_clear
+  or   al, #0x02
+bit8_clear:
+  test ah, #0x02
+  jz   bit9_clear
+  or   al, #0x40
+bit9_clear:
+  out  dx, al
+
+  ; other settings
+  mov  dx, # VGAREG_VGA_CRTC_ADDRESS
+  mov  ax, #0x0009
+  out  dx, ax
+  mov  al, #0x17
+  out  dx, al
+  mov  dx, # VGAREG_VGA_CRTC_DATA
+  in   al, dx
+  or   al, #0x03
+  out  dx, al
+  mov  dx, # VGAREG_ACTL_RESET
+  in   al, dx
+  mov  dx, # VGAREG_ACTL_ADDRESS
+  mov  al, #0x10
+  out  dx, al
+  mov  dx, # VGAREG_ACTL_READ_DATA
+  in   al, dx
+  or   al, #0x01
+  mov  dx, # VGAREG_ACTL_ADDRESS
+  out  dx, al
+  mov  al, #0x20
+  out  dx, al
+  mov  dx, # VGAREG_GRDC_ADDRESS
+  mov  ax, #0x0506
+  out  dx, ax
+  mov  dx, # VGAREG_SEQU_ADDRESS
+  mov  ax, #0x0f02
+  out  dx, ax
+
+  ; settings for >= 8bpp
+  mov  dx, # VBE_DISPI_IOPORT_INDEX
+  mov  ax, # VBE_DISPI_INDEX_BPP
+  out  dx, ax
+  mov  dx, # VBE_DISPI_IOPORT_DATA
+  in   ax, dx
+  cmp  al, #0x08
+  jb   vga_compat_end
+  mov  dx, # VGAREG_VGA_CRTC_ADDRESS
+  mov  al, #0x14
+  out  dx, al
+  mov  dx, # VGAREG_VGA_CRTC_DATA
+  in   al, dx
+  or   al, #0x40
+  out  dx, al
+  mov  dx, # VGAREG_ACTL_RESET
+  in   al, dx
+  mov  dx, # VGAREG_ACTL_ADDRESS
+  mov  al, #0x10
+  out  dx, al
+  mov  dx, # VGAREG_ACTL_READ_DATA
+  in   al, dx
+  or   al, #0x40
+  mov  dx, # VGAREG_ACTL_ADDRESS
+  out  dx, al
+  mov  al, #0x20
+  out  dx, al
+  mov  dx, # VGAREG_SEQU_ADDRESS
+  mov  al, #0x04
+  out  dx, al
+  mov  dx, # VGAREG_SEQU_DATA
+  in   al, dx
+  or   al, #0x08
+  out  dx, al
+  mov  dx, # VGAREG_GRDC_ADDRESS
+  mov  al, #0x05
+  out  dx, al
+  mov  dx, # VGAREG_GRDC_DATA
+  in   al, dx
+  and  al, #0x9f
+  or   al, #0x40
+  out  dx, al
+
+vga_compat_end:
+  pop  dx
+  pop  ax
 ASM_END
 
 
@@ -472,7 +715,7 @@ vbe_init:
   mov  [bx], al
   pop  bx
   pop  ds
-  mov  ax, # VBE_DISPI_ID3
+  mov  ax, # VBE_DISPI_ID4
   call dispi_set_id
 no_vbe_interface:
 #if defined(USE_BX_INFO) || defined(DEBUG)
@@ -573,15 +816,9 @@ Bit16u *AX;Bit16u ES;Bit16u DI;
         vbe_info_block.Capabilities[2] = 0;
         vbe_info_block.Capabilities[3] = 0;
 
-#ifdef DYN_LIST
         // VBE Video Mode Pointer (dynamicly generated from the mode_info_list)
         vbe_info_block.VideoModePtr_Seg= ES ;
         vbe_info_block.VideoModePtr_Off= DI + 34;
-#else
-        // VBE Video Mode Pointer (staticly in rom)
-        vbe_info_block.VideoModePtr_Seg = 0xc000;
-        vbe_info_block.VideoModePtr_Off = &vbebios_mode_list;
-#endif
 
         // VBE Total Memory (in 64b blocks)
         vbe_info_block.TotalMemory = VBE_TOTAL_VIDEO_MEMORY_DIV_64K;
@@ -606,23 +843,26 @@ Bit16u *AX;Bit16u ES;Bit16u DI;
                 memcpyb(ES, DI, ss, &vbe_info_block, 256);
 	}
                 
-#ifdef DYN_LIST
         do
         {
-                if (cur_info->info.BitsPerPixel <= dispi_get_max_bpp()) {
+                if ((cur_info->info.XResolution <= dispi_get_max_xres()) &&
+                    (cur_info->info.BitsPerPixel <= dispi_get_max_bpp())) {
 #ifdef DEBUG
                   printf("VBE found mode %x => %x\n", cur_info->mode,cur_mode);
 #endif
                   write_word(ES, DI + cur_ptr, cur_info->mode);
                   cur_mode++;
                   cur_ptr+=2;
+                } else {
+#ifdef DEBUG
+                  printf("VBE mode %x (xres=%x / bpp=%02x) not supported by display\n", cur_info->mode,cur_info->info.XResolution,cur_info->info.BitsPerPixel);
+#endif
                 }
                 cur_info++;
         } while (cur_info->mode != VBE_VESA_MODE_END_OF_LIST);
         
         // Add vesa mode list terminator
         write_word(ES, DI + cur_ptr, cur_info->mode);
-#endif
 
         result = 0x4f;
 
@@ -666,6 +906,9 @@ Bit16u *AX;Bit16u CX; Bit16u ES;Bit16u DI;
 #endif        
                 memsetb(ss, &info, 0, sizeof(ModeInfoBlock));
                 memcpyb(ss, &info, 0xc000, &(cur_info->info), sizeof(ModeInfoBlockCompact));
+                if (using_lfb) {
+                  info.NumberOfBanks = 1;
+                }
                 if (info.WinAAttributes & VBE_WINDOW_ATTRIBUTE_RELOCATABLE) {
                   info.WinFuncPtr = 0xC0000000UL;
                   *(Bit16u *)&(info.WinFuncPtr) = (Bit16u)(dispi_set_bank_farcall);
@@ -747,7 +990,7 @@ Bit16u *AX;Bit16u BX; Bit16u ES;Bit16u DI;
                 // first disable current mode (when switching between vesa modi)
                 dispi_set_enable(VBE_DISPI_DISABLED);
 
-                if (cur_info->mode == VBE_VESA_MODE_800X600X4)
+                if (cur_info->info.BitsPerPixel == 4)
                 {
                   biosfn_set_video_mode(0x6a);
                 }
@@ -757,6 +1000,7 @@ Bit16u *AX;Bit16u BX; Bit16u ES;Bit16u DI;
                 dispi_set_yres(cur_info->info.YResolution);
                 dispi_set_bank(0);
                 dispi_set_enable(VBE_DISPI_ENABLED | no_clear | lfb_flag);
+                vga_compat_setup();
 
                 write_word(BIOSMEM_SEG,BIOSMEM_VBE_MODE,BX);
                 write_byte(BIOSMEM_SEG,BIOSMEM_VIDEO_CTL,(0x60 | no_clear));
@@ -812,6 +1056,64 @@ vbe_03_ok:
 ASM_END
 
 
+Bit16u vbe_biosfn_read_video_state_size()
+{
+    return 9 * 2;
+}
+
+void vbe_biosfn_save_video_state(ES, BX)
+     Bit16u ES; Bit16u BX;
+{
+    Bit16u enable, i;
+
+    outw(VBE_DISPI_IOPORT_INDEX,VBE_DISPI_INDEX_ENABLE);
+    enable = inw(VBE_DISPI_IOPORT_DATA);
+    write_word(ES, BX, enable);
+    BX += 2;
+    if (!(enable & VBE_DISPI_ENABLED)) 
+        return;
+    for(i = VBE_DISPI_INDEX_XRES; i <= VBE_DISPI_INDEX_Y_OFFSET; i++) {
+        if (i != VBE_DISPI_INDEX_ENABLE) {
+            outw(VBE_DISPI_IOPORT_INDEX, i);
+            write_word(ES, BX, inw(VBE_DISPI_IOPORT_DATA));
+            BX += 2;
+        }
+    }
+}
+
+
+void vbe_biosfn_restore_video_state(ES, BX)
+     Bit16u ES; Bit16u BX;
+{
+    Bit16u enable, i;
+
+    enable = read_word(ES, BX);
+    BX += 2;
+    
+    if (!(enable & VBE_DISPI_ENABLED)) {
+        outw(VBE_DISPI_IOPORT_INDEX,VBE_DISPI_INDEX_ENABLE);
+        outw(VBE_DISPI_IOPORT_DATA, enable);
+    } else {
+        outw(VBE_DISPI_IOPORT_INDEX, VBE_DISPI_INDEX_XRES);
+        outw(VBE_DISPI_IOPORT_DATA, read_word(ES, BX));
+        BX += 2;
+        outw(VBE_DISPI_IOPORT_INDEX, VBE_DISPI_INDEX_YRES);
+        outw(VBE_DISPI_IOPORT_DATA, read_word(ES, BX));
+        BX += 2;
+        outw(VBE_DISPI_IOPORT_INDEX, VBE_DISPI_INDEX_BPP);
+        outw(VBE_DISPI_IOPORT_DATA, read_word(ES, BX));
+        BX += 2;
+        outw(VBE_DISPI_IOPORT_INDEX,VBE_DISPI_INDEX_ENABLE);
+        outw(VBE_DISPI_IOPORT_DATA, enable);
+
+        for(i = VBE_DISPI_INDEX_BANK; i <= VBE_DISPI_INDEX_Y_OFFSET; i++) {
+            outw(VBE_DISPI_IOPORT_INDEX, i);
+            outw(VBE_DISPI_IOPORT_DATA, read_word(ES, BX));
+            BX += 2;
+        }
+    }
+}
+
 /** Function 04h - Save/Restore State
  * 
  * Input:
@@ -826,10 +1128,48 @@ ASM_END
  *              BX      = Number of 64-byte blocks to hold the state buffer (if DL=00h)
  * 
  */
-void vbe_biosfn_save_restore_state(AX, DL, CX, ES, BX)
+void vbe_biosfn_save_restore_state(AX, CX, DX, ES, BX)
+Bit16u *AX; Bit16u CX; Bit16u DX; Bit16u ES; Bit16u *BX;
 {
-}
+    Bit16u ss=get_SS();
+    Bit16u result, val;
 
+    result = 0x4f;
+    switch(GET_DL()) {
+    case 0x00:
+        val = biosfn_read_video_state_size2(CX);
+#ifdef DEBUG
+        printf("VGA state size=%x\n", val);
+#endif
+        if (CX & 8)
+            val += vbe_biosfn_read_video_state_size();
+        write_word(ss, BX, val);
+        break;
+    case 0x01:
+        val = read_word(ss, BX);
+        val = biosfn_save_video_state(CX, ES, val);
+#ifdef DEBUG
+        printf("VGA save_state offset=%x\n", val);
+#endif
+        if (CX & 8)
+            vbe_biosfn_save_video_state(ES, val);
+        break;
+    case 0x02:
+        val = read_word(ss, BX);
+        val = biosfn_restore_video_state(CX, ES, val);
+#ifdef DEBUG
+        printf("VGA restore_state offset=%x\n", val);
+#endif
+        if (CX & 8)
+            vbe_biosfn_restore_video_state(ES, val);
+        break;
+    default:
+        // function failed
+        result = 0x100;
+        break;
+    }
+    write_word(ss, AX, result);
+}
 
 /** Function 05h - Display Window Control
  * 
@@ -913,6 +1253,11 @@ set_logical_scan_line_bytes:
   call dispi_get_bpp
   xor  bh, bh
   mov  bl, ah
+  or   bl, bl
+  jnz  no_4bpp_1
+  shl  ax, #3
+  mov  bl, #1
+no_4bpp_1:
   xor  dx, dx
   pop  ax
   div  bx
@@ -924,6 +1269,11 @@ get_logical_scan_line_length:
   mov  bl, ah
   call dispi_get_virt_width
   mov  cx, ax
+  or   bl, bl
+  jnz  no_4bpp_2
+  shr  ax, #3
+  mov  bl, #1
+no_4bpp_2:
   mul  bx
   mov  bx, ax
   call dispi_get_virt_height
@@ -1055,14 +1405,28 @@ void vbe_biosfn_set_get_palette_data(AX)
 }
 
 /** Function 0Ah - Return VBE Protected Mode Interface
- * 
- * Input:
- *              AX      = 4F0Ah
- * Output:
- *              AX      = VBE Return Status
+ * Input:    AX   = 4F0Ah   VBE 2.0 Protected Mode Interface
+ *           BL   = 00h          Return protected mode table
  *
- * FIXME: incomplete API description, Input & Output
+ *
+ * Output:   AX   =         Status
+ *           ES   =         Real Mode Segment of Table
+ *           DI   =         Offset of Table
+ *           CX   =         Length of Table including protected mode code
+ *                          (for copying purposes)
  */
-void vbe_biosfn_return_protected_mode_interface(AX)
-{
-}
+ASM_START
+vbe_biosfn_return_protected_mode_interface:
+  test bl, bl
+  jnz _fail
+  mov di, #0xc000
+  mov es, di
+  mov di, # vesa_pm_start
+  mov cx, # vesa_pm_end
+  sub cx, di
+  mov ax, #0x004f
+  ret
+_fail:
+  mov ax, #0x014f
+  ret
+ASM_END

@@ -118,7 +118,7 @@ static inline void init_fds(struct disk_driver *dd)
 }
 
 /* Open the disk file and initialize aio state. */
-int tdaio_open (struct disk_driver *dd, const char *name, td_flag_t flags)
+static int tdaio_open (struct disk_driver *dd, const char *name, td_flag_t flags)
 {
 	int i, fd, ret = 0, o_flags;
 	struct td_state    *s   = dd->td_state;
@@ -161,7 +161,7 @@ done:
 	return ret;	
 }
 
-int tdaio_queue_read(struct disk_driver *dd, uint64_t sector,
+static int tdaio_queue_read(struct disk_driver *dd, uint64_t sector,
 		     int nb_sectors, char *buf, td_callback_t cb,
 		     int id, void *private)
 {
@@ -174,7 +174,7 @@ int tdaio_queue_read(struct disk_driver *dd, uint64_t sector,
 		cb, id, sector, private);
 }
 			
-int tdaio_queue_write(struct disk_driver *dd, uint64_t sector,
+static int tdaio_queue_write(struct disk_driver *dd, uint64_t sector,
 		      int nb_sectors, char *buf, td_callback_t cb,
 		      int id, void *private)
 {
@@ -187,14 +187,14 @@ int tdaio_queue_write(struct disk_driver *dd, uint64_t sector,
 		cb, id, sector, private);
 }
 
-int tdaio_submit(struct disk_driver *dd)
+static int tdaio_submit(struct disk_driver *dd)
 {
 	struct tdaio_state *prv = (struct tdaio_state *)dd->private;
 
 	return tap_aio_submit(&prv->aio);
 }
 			
-int tdaio_close(struct disk_driver *dd)
+static int tdaio_close(struct disk_driver *dd)
 {
 	struct tdaio_state *prv = (struct tdaio_state *)dd->private;
 	
@@ -204,7 +204,7 @@ int tdaio_close(struct disk_driver *dd)
 	return 0;
 }
 
-int tdaio_do_callbacks(struct disk_driver *dd, int sid)
+static int tdaio_do_callbacks(struct disk_driver *dd, int sid)
 {
 	int i, nr_events, rsp = 0;
 	struct io_event *ep;
@@ -234,12 +234,12 @@ repeat:
 	return rsp;
 }
 
-int tdaio_get_parent_id(struct disk_driver *dd, struct disk_id *id)
+static int tdaio_get_parent_id(struct disk_driver *dd, struct disk_id *id)
 {
 	return TD_NO_PARENT;
 }
 
-int tdaio_validate_parent(struct disk_driver *dd, 
+static int tdaio_validate_parent(struct disk_driver *dd, 
 			  struct disk_driver *parent, td_flag_t flags)
 {
 	return -EINVAL;

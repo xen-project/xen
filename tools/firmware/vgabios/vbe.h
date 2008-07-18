@@ -14,7 +14,7 @@ Boolean vbe_has_vbe_display();
 void vbe_biosfn_return_controller_information(AX, ES, DI);
 void vbe_biosfn_return_mode_information(AX, CX, ES, DI);
 void vbe_biosfn_set_mode(AX, BX, ES, DI);
-void vbe_biosfn_save_restore_state(AX, DL, CX, ES, BX); 
+void vbe_biosfn_save_restore_state(AX, CX, DX, ES, BX);
 void vbe_biosfn_set_get_palette_data(AX);
 void vbe_biosfn_return_protected_mode_interface(AX);
 
@@ -151,6 +151,12 @@ typedef struct ModeInfoBlock
    Bit8u  Reserved[189];
 } ModeInfoBlock;
 
+typedef struct ModeInfoListItem
+{
+  Bit16u                mode;
+  ModeInfoBlockCompact  info;
+} ModeInfoListItem;
+
 // VBE Return Status Info
 // AL
 #define VBE_RETURN_STATUS_SUPPORTED                      0x4F
@@ -193,6 +199,10 @@ typedef struct ModeInfoBlock
 #define VBE_VESA_MODE_1280X1024X1555                     0x119
 #define VBE_VESA_MODE_1280X1024X565                      0x11A
 #define VBE_VESA_MODE_1280X1024X888                      0x11B
+#define VBE_VESA_MODE_1600X1200X8                        0x11C
+#define VBE_VESA_MODE_1600X1200X1555                     0x11D
+#define VBE_VESA_MODE_1600X1200X565                      0x11E
+#define VBE_VESA_MODE_1600X1200X888                      0x11F
 
 // BOCHS/PLEX86 'own' mode numbers
 #define VBE_OWN_MODE_320X200X8888                        0x140
@@ -202,6 +212,12 @@ typedef struct ModeInfoBlock
 #define VBE_OWN_MODE_1024X768X8888                       0x144
 #define VBE_OWN_MODE_1280X1024X8888                      0x145
 #define VBE_OWN_MODE_320X200X8                           0x146
+#define VBE_OWN_MODE_1600X1200X8888                      0x147
+#define VBE_OWN_MODE_1152X864X8                          0x148
+#define VBE_OWN_MODE_1152X864X1555                       0x149
+#define VBE_OWN_MODE_1152X864X565                        0x14a
+#define VBE_OWN_MODE_1152X864X888                        0x14b
+#define VBE_OWN_MODE_1152X864X8888                       0x14c
 
 #define VBE_VESA_MODE_END_OF_LIST                        0xFFFF
 
@@ -259,8 +275,6 @@ typedef struct ModeInfoBlock
 //        like 0xE0000000
 
 
-  #define VBE_DISPI_TOTAL_VIDEO_MEMORY_MB 4
-
   #define VBE_DISPI_BANK_ADDRESS          0xA0000
   #define VBE_DISPI_BANK_SIZE_KB          64
   
@@ -285,6 +299,7 @@ typedef struct ModeInfoBlock
   #define VBE_DISPI_ID1                   0xB0C1
   #define VBE_DISPI_ID2                   0xB0C2
   #define VBE_DISPI_ID3                   0xB0C3
+  #define VBE_DISPI_ID4                   0xB0C4
   
   #define VBE_DISPI_DISABLED              0x00
   #define VBE_DISPI_ENABLED               0x01
@@ -294,9 +309,5 @@ typedef struct ModeInfoBlock
   #define VBE_DISPI_NOCLEARMEM            0x80
   
   #define VBE_DISPI_LFB_PHYSICAL_ADDRESS  0xE0000000
-
-
-#define VBE_TOTAL_VIDEO_MEMORY_DIV_64K                  (VBE_DISPI_TOTAL_VIDEO_MEMORY_MB*1024/64)
-
 
 #endif

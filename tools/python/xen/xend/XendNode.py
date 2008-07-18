@@ -21,6 +21,7 @@ import socket
 import xen.lowlevel.xc
 
 from xen.util import Brctl
+from xen.util import pci as PciUtil
 from xen.xend import XendAPIStore
 
 import uuid, arch
@@ -35,6 +36,7 @@ from XendPIFMetrics import XendPIFMetrics
 from XendNetwork import *
 from XendStateStore import XendStateStore
 from XendMonitor import XendMonitor
+from XendPPCI import XendPPCI
      
 class XendNode:
     """XendNode - Represents a Domain 0 Host."""
@@ -49,6 +51,7 @@ class XendNode:
         * PIF_metrics
         * network
         * Storage Repository
+        * PPCI
         """
         
         self.xc = xen.lowlevel.xc.xc()
@@ -230,6 +233,41 @@ class XendNode:
                 except CreateUnspecifiedAttributeError:
                     log.warn("Error recreating PBD %s", pbd_uuid) 
 
+
+        # Initialise PPCIs
+        saved_ppcis = self.state_store.load_state('ppci')
+        saved_ppci_table = {}
+        if saved_ppcis:
+            for ppci_uuid, ppci_record in saved_ppcis.items():
+                try:
+                    saved_ppci_table[ppci_record['name']] = ppci_uuid
+                except KeyError:
+                    pass
+
+        for pci_dev in PciUtil.get_all_pci_devices():
+            ppci_record = {
+                'domain':                   pci_dev.domain,
+                'bus':                      pci_dev.bus,
+                'slot':                     pci_dev.slot,
+                'func':                     pci_dev.func,
+                'vendor_id':                pci_dev.vendor,
+                'vendor_name':              pci_dev.vendorname,
+                'device_id':                pci_dev.device,
+                'device_name':              pci_dev.devicename,
+                'revision_id':              pci_dev.revision,
+                'class_code':               pci_dev.classcode,
+                'class_name':               pci_dev.classname,
+                'subsystem_vendor_id':      pci_dev.subvendor,
+                'subsystem_vendor_name':    pci_dev.subvendorname,
+                'subsystem_id':             pci_dev.subdevice,
+                'subsystem_name':           pci_dev.subdevicename,
+                'driver':                   pci_dev.driver
+                }
+            # If saved uuid exists, use it. Otherwise create one.
+            ppci_uuid = saved_ppci_table.get(pci_dev.name, uuid.createString())
+            XendPPCI(ppci_uuid, ppci_record)
+
+
 ##    def network_destroy(self, net_uuid):
  ##       del self.networks[net_uuid]
   ##      self.save_networks()
@@ -272,6 +310,15 @@ class XendNode:
 ##         self.save_PIFs()
 
 
+    def get_PPCI_refs(self):
+        return XendPPCI.get_all()
+
+    def get_ppci_by_uuid(self, ppci_uuid):
+        if ppci_uuid in self.get_PPCI_refs():
+            return ppci_uuid
+        return None
+
+
     def save(self):
         # save state
         host_record = {self.uuid: {'name_label':self.name,
@@ -284,6 +331,7 @@ class XendNode:
         self.save_networks()
         self.save_PBDs()
         self.save_SRs()
+        self.save_PPCIs()
 
     def save_PIFs(self):
         pif_records = dict([(pif_uuid, XendAPIStore.get(
@@ -307,6 +355,12 @@ class XendNode:
         sr_records = dict([(k, v.get_record(transient = False))
                             for k, v in self.srs.items()])
         self.state_store.save_state('sr', sr_records)
+
+    def save_PPCIs(self):
+        ppci_records = dict([(ppci_uuid, XendAPIStore.get(
+                                 ppci_uuid, "PPCI").get_record())
+                            for ppci_uuid in XendPPCI.get_all()])
+        self.state_store.save_state('ppci', ppci_records)
 
     def shutdown(self):
         return 0

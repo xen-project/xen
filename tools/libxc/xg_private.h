@@ -170,9 +170,6 @@ typedef l4_pgentry_64_t l4_pgentry_t;
 #define PAEKERN_extended_cr3 2
 #define PAEKERN_bimodal      3
 
-int xc_copy_to_domain_page(int xc_handle, uint32_t domid,
-                            unsigned long dst_pfn, const char *src_page);
-
 int pin_table(int xc_handle, unsigned int type, unsigned long mfn,
               domid_t dom);
 

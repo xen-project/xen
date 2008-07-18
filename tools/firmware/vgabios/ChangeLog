@@ -1,3 +1,207 @@
+2008-05-11 08:40  vruppert
+
+	* biossums.c (1.6):
+
+	- fixed a warning
+
+2008-03-02 08:47  vruppert
+
+	* vbe.c (1.60):
+
+	- added debug message for unsupported VBE modes
+
+2008-02-24 09:18  vruppert
+
+	* vbe.c (1.59):
+
+	- in LFB modes the number of banks must be set to 1
+
+2008-01-27 10:44  vruppert
+
+	* Makefile (1.21), biossums.c (1.5), vgabios.c (1.67):
+
+	- added PCI data structure for the Cirrus VGABIOS images
+	- added support for the PCI data structure in biossums
+	- updated year in copyright
+
+2008-01-26 11:46  vruppert
+
+	* BUGS (1.4), Makefile (1.20), README (1.14), TODO (1.13), vbe_display_api.txt (1.14):
+
+	- whitespace cleanup
+
+2006-11-26 10:43  vruppert
+
+	* Makefile (1.19):
+
+	- disable the generation of linemarkers by the preprocessor, since the latest
+	  versions of bcc don't like them
+
+2006-09-02 13:15  vruppert
+
+	* biossums.c (1.4):
+
+	- the biossums utility no longer modifies VGABIOS images with proper checksum
+	  and size
+
+2006-08-19 14:28  vruppert
+
+	* Changelog (1.26), README (1.13), TODO (1.12):
+
+	- updates for 0.6a release
+
+2006-08-19 09:39  vruppert
+
+	* vbe.c (1.58):
+
+	- improved VGA compatible setup for VBE modes (disable CGA and Hercules
+	  compatible memory layout)
+
+2006-08-18 20:39  vruppert
+
+	* vbe.c (1.57):
+
+	- improved VGA compatible setup for >=8bpp VBE modes (CRTC doubleword mode and
+	  GRDC shift register setting added)
+	- now using symbolic name for CRTC address register
+
+2006-08-15 20:42  vruppert
+
+	* vbe.c (1.56), vbetables-gen.c (1.4):
+
+	- init 4bpp VBE modes by a temporary switch to VGA mode 0x6A
+	- all 4bpp VBE modes now enabled
+
+2006-08-14 20:24  vruppert
+
+	* vbe.c (1.55):
+
+	- VGA compatible setup for VBE modes improved (Bochs hack can be removed now)
+
+2006-08-12 07:51  vruppert
+
+	* .cvsignore (1.1):
+
+	- .cvsignore added for auto-generated file
+
+2006-08-12 07:47  vruppert
+
+	* vbe.c (1.54), vbe.h (1.27), vbe_display_api.txt (1.13), vbetables-gen.c (1.3):
+
+	- cleaned up VBE memory size definitions (removed duplicate defines, main
+	  definition now in vbetables-gen.c)
+
+2006-08-09 21:28  vruppert
+
+	* vbetables.h (1.30):
+
+	- removed auto-generated file
+
+2006-08-09 21:26  vruppert
+
+	* vbe.c (1.53), vbe.h (1.26), vbe_display_api.txt (1.12), vbetables-gen.c (1.2),
+	  vbetables.h (1.29):
+
+	- VBE video memory increased to 8 MB
+	- VBE dispi ID changed to B0C4
+	- documentation update
+
+2006-07-11 08:03  vruppert
+
+	* Makefile (1.18), vbetables-gen.c (1.1), vbetables.h (1.28):
+
+	- generate vbetables.h dynamicly
+	  * initial patch from the qemu project by Fabrice Bellard
+	  * only add modes that fit in video memory (still 4 MB)
+	  * several other fixes (e.g. 4 bpp specific stuff, number of pages)
+
+2006-07-10 07:47  vruppert
+
+	* vgabios.c (1.66):
+
+	- biosfn_scroll(): check variable 'i' for underflowing when scrolling downwards
+	  to avoid screen corruption
+
+2006-07-10 07:47  vruppert
+
+	* vbe.c (1.52):
+
+	- VBE set bank functions failure handling added
+	- VBE get/set logical scan line length fixes for the 4bpp mode
+
+2006-07-08 13:27  vruppert
+
+	* vbe.c (1.51), vbetables.h (1.27):
+
+	- added special case for the 4 bpp when setting VBE display start
+	- VBE mode table fixes
+
+2006-07-07 13:30  vruppert
+
+	* clext.c (1.12):
+
+	- bank pointer must be set to 0 after a mode set
+
+2006-06-21 16:58  vruppert
+
+	* vbe.c (1.50), vbetables.h (1.26):
+
+	- improved VBE display capabilities check (X resulution checked now)
+	- removed obsolete defines (LFB always available, always generate dynamic list)
+	- CR/LF to LF fixes
+
+2006-06-18 15:22  vruppert
+
+	* clext.c (1.11), vbe.c (1.49), vbe.h (1.25), vbetables.h (1.25), vgabios.c
+	  (1.65):
+
+	- applied patch from the qemu project (Fabrice Bellard)
+	  * Cirrus SVGA now supports the "no clear" bit when switching to Cirrus or
+	    VESA mode
+	  * Bochs VBE protected mode interface improved
+	  * save/restore video state support for Bochs VBE and standard VGA added
+	  * Bochs VBE prepared for more modi
+
+2006-03-25 10:19  vruppert
+
+	* clext.c (1.10), vgabios.c (1.64), vgatables.h (1.10):
+
+	- applied patch from Fabrice Bellard
+	 * added minimal support for the video parameter table (VPT)
+	 * added Cirrus SVGA mode 0x7b (1600x1200x8)
+
+2005-12-26 19:50  vruppert
+
+	* vbe.c (1.48), vgabios.c (1.63):
+
+	- Bochs VBE protected mode interface added (based on a patch by malc@pulsesoft.com)
+
+2005-12-26 19:50  vruppert
+
+	* biossums.c (1.3):
+
+	- biossums utility now supports VGABIOS sizes up to 64 kBytes
+
+2005-09-21 18:45  vruppert
+
+	* vgatables.h (1.9):
+
+	- mode 0x11: all color planes must be enabled in this 2-color VGA mode
+
+2005-08-30 18:41  vruppert
+
+	* biossums.c (1.2):
+
+	- missing license text added in biossums.c
+
+2005-07-02 18:39  vruppert
+
+	* vgabios.c (1.62):
+
+	- BIOS configuration word usually reports initial mode 80x25 color text
+	- vgabios function 0x0e (write teletype): linefeed (0x0a) only increments the
+	  cursor row value
+
 2005-05-24 16:50  vruppert
 
 	* vbe.c (1.47), vgabios.c (1.61):

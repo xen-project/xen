@@ -99,13 +99,13 @@ char  *strstr(const char *s1, const char *s2);
 char * strcat(char * dest, const char * src);
 char  *strdup(const char *s);
 #endif
-#include <console.h>
+#include <mini-os/console.h>
 
 #define RAND_MIX 2654435769U
 
 int rand(void);
 
-#include <xenbus.h>
+#include <mini-os/xenbus.h>
 
 #define ARRAY_SIZE(x) (sizeof(x) / sizeof((x)[0]))
 

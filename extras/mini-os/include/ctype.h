@@ -1,6 +1,9 @@
 #ifndef _CTYPE_H
 #define _CTYPE_H
 
+#ifdef HAVE_LIBC
+#include_next <ctype.h>
+#else
 /*
  * NOTE! This ctype does not handle EOF like the standard C
  * library is required to.
@@ -51,5 +54,7 @@ static inline unsigned char __toupper(unsigned char c)
 
 #define tolower(c) __tolower(c)
 #define toupper(c) __toupper(c)
+
+#endif
 
 #endif

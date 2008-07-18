@@ -310,11 +310,11 @@ function vtpm_remove_instance () {
 
 	instance="0"
 
-	if [ "$uuid != "" ]; then
+	if [ "$uuid" != "" ]; then
 		instance=$(vtpmdb_find_instance $uuid)
 	fi
 
-	if [ "$instance == "0" ]; then
+	if [ "$instance" == "0" ]; then
 		domname=$(xenstore_read "$XENBUS_PATH"/domain)
 		instance=$(vtpmdb_find_instance $domname)
 	fi

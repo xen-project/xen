@@ -12,6 +12,7 @@
 #define EXPORTS_SUBNODE     "exports"
 #define EXPORTS_NODE        ROOT_NODE"/"EXPORTS_SUBNODE
 #define WATCH_NODE          EXPORTS_NODE"/requests"
+#define MAX_FDS             16
 
 struct fs_export
 {
@@ -45,6 +46,7 @@ struct mount
     int nr_entries;
     struct fs_request *requests;
     unsigned short *freelist;
+    int fds[MAX_FDS];
 };
 
 
@@ -72,14 +74,14 @@ extern struct fs_op *fsops[];
 
 static inline void add_id_to_freelist(unsigned int id,unsigned short* freelist)
 {
-    freelist[id] = freelist[0];
+    freelist[id + 1] = freelist[0];
     freelist[0]  = id;
 }
 
 static inline unsigned short get_id_from_freelist(unsigned short* freelist)
 {
     unsigned int id = freelist[0];
-    freelist[0] = freelist[id];
+    freelist[0] = freelist[id + 1];
     return id;
 }
 

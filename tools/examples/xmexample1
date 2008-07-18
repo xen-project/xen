@@ -185,4 +185,27 @@ extra = "4"
 #on_reboot   = 'restart'
 #on_crash    = 'restart'
 
+#-----------------------------------------------------------------------------
+#   Configure PVSCSI devices:
+#
+#vscsi=[ 'PDEV, VDEV' ]
+#
+#   PDEV   gives physical SCSI device to be attached to specified guest
+#          domain by one of the following identifier format.
+#          - XX:XX:XX:XX (4-tuples with decimal notation which shows
+#                          "host:channel:target:lun")
+#          - /dev/sdxx or sdx
+#          - /dev/stxx or stx
+#          - /dev/sgxx or sgx
+#          - result of 'scsi_id -gu -s'.
+#            ex. # scsi_id -gu -s /block/sdb
+#                  36000b5d0006a0000006a0257004c0000
+#
+#   VDEV   gives virtual SCSI device by 4-tuples (XX:XX:XX:XX) as 
+#          which the specified guest domain recognize.
+#
+
+#vscsi = [ '/dev/sdx, 0:0:0:0' ]
+
 #============================================================================
+

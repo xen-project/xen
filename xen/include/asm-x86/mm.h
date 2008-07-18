@@ -133,13 +133,14 @@ static inline u32 pickle_domptr(struct domain *domain)
 /* The number of out-of-sync shadows we allow per vcpu (prime, please) */
 #define SHADOW_OOS_PAGES 3
 
-/* The order OOS fixup tables per vcpu */
-#define SHADOW_OOS_FT_ORDER 1
-/* OOS fixup tables hash entries */
-#define SHADOW_OOS_FT_HASH 13
+/* OOS fixup entries */
+#define SHADOW_OOS_FIXUPS 2
 
 #define page_get_owner(_p)    (unpickle_domptr((_p)->u.inuse._domain))
 #define page_set_owner(_p,_d) ((_p)->u.inuse._domain = pickle_domptr(_d))
+
+#define maddr_get_owner(ma)   (page_get_owner(maddr_to_page((ma))))
+#define vaddr_get_owner(va)   (page_get_owner(virt_to_page((va))))
 
 #define XENSHARE_writable 0
 #define XENSHARE_readonly 1

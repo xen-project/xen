@@ -96,7 +96,7 @@ boolean_param("noapic", skip_ioapic_setup);
 
 /* **** Linux config option: propagated to domain0. */
 /* xen_cpuidle: xen control cstate. */
-static int xen_cpuidle;
+/*static*/ int xen_cpuidle;
 boolean_param("cpuidle", xen_cpuidle);
 
 int early_boot = 1;

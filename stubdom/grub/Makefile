@@ -1,14 +1,14 @@
 XEN_ROOT = ../..
 
 include $(XEN_ROOT)/Config.mk
-vpath %.c ../grub-cvs
+vpath %.c ../grub-upstream
 
 BOOT=boot-$(XEN_TARGET_ARCH).o
 
 DEF_CPPFLAGS += -I$(XEN_ROOT)/tools/libxc -I$(XEN_ROOT)/tools/include -I.
-DEF_CPPFLAGS += -I../grub-cvs/stage1
-DEF_CPPFLAGS += -I../grub-cvs/stage2
-DEF_CPPFLAGS += -I../grub-cvs/netboot
+DEF_CPPFLAGS += -I../grub-upstream/stage1
+DEF_CPPFLAGS += -I../grub-upstream/stage2
+DEF_CPPFLAGS += -I../grub-upstream/netboot
 DEF_CPPFLAGS += -I$(XEN_ROOT)/tools/firmware/vgabios
 DEF_CPPFLAGS += -DWITHOUT_LIBC_STUBS
 DEF_CPPFLAGS += -DSUPPORT_NETBOOT
@@ -51,10 +51,8 @@ CPPFLAGS += -DFSYS_UFS2=1
 STAGE2_SOURCES+=fsys_vstafs.c
 CPPFLAGS += -DFSYS_VSTAFS=1
 
-ifeq (0,1)
 STAGE2_SOURCES+=fsys_xfs.c
 CPPFLAGS += -DFSYS_XFS=1
-endif
 
 STAGE2_SOURCES:=$(addprefix stage2/,$(STAGE2_SOURCES))
 NETBOOT_SOURCES:=$(addprefix netboot/,$(NETBOOT_SOURCES))

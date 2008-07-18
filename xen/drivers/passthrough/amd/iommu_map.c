@@ -235,13 +235,56 @@ static void amd_iommu_set_page_directory_entry(u32 *pde,
     pde[0] = entry;
 }
 
-void amd_iommu_set_dev_table_entry(u32 *dte, u64 root_ptr, u16 domain_id,
-                                   u8 sys_mgt, u8 dev_ex, u8 paging_mode)
+void amd_iommu_set_dev_table_entry(u32 *dte, u64 root_ptr, u64 intremap_ptr,
+                                   u16 domain_id, u8 sys_mgt, u8 dev_ex,
+                                   u8 paging_mode)
 {
     u64 addr_hi, addr_lo;
     u32 entry;
 
-    dte[7] = dte[6] = dte[5] = dte[4] = 0;
+    dte[7] = dte[6] = 0;
+
+    addr_lo = intremap_ptr & DMA_32BIT_MASK;
+    addr_hi = intremap_ptr >> 32;
+
+    set_field_in_reg_u32((u32)addr_hi, 0,
+                        IOMMU_DEV_TABLE_INT_TABLE_PTR_HIGH_MASK,
+                        IOMMU_DEV_TABLE_INT_TABLE_PTR_HIGH_SHIFT, &entry);
+    set_field_in_reg_u32(IOMMU_CONTROL_ENABLED, entry,
+                        IOMMU_DEV_TABLE_INIT_PASSTHRU_MASK,
+                        IOMMU_DEV_TABLE_INIT_PASSTHRU_SHIFT, &entry);
+    set_field_in_reg_u32(IOMMU_CONTROL_ENABLED, entry,
+                        IOMMU_DEV_TABLE_EINT_PASSTHRU_MASK,
+                        IOMMU_DEV_TABLE_EINT_PASSTHRU_SHIFT, &entry);
+    set_field_in_reg_u32(IOMMU_CONTROL_ENABLED, entry,
+                        IOMMU_DEV_TABLE_NMI_PASSTHRU_MASK,
+                        IOMMU_DEV_TABLE_NMI_PASSTHRU_SHIFT, &entry);
+    /* Fixed and arbitrated interrupts remapepd */
+    set_field_in_reg_u32(2, entry,
+                        IOMMU_DEV_TABLE_INT_CONTROL_MASK,
+                        IOMMU_DEV_TABLE_INT_CONTROL_SHIFT, &entry);
+    set_field_in_reg_u32(IOMMU_CONTROL_ENABLED, entry,
+                        IOMMU_DEV_TABLE_LINT0_ENABLE_MASK,
+                        IOMMU_DEV_TABLE_LINT0_ENABLE_SHIFT, &entry);
+    set_field_in_reg_u32(IOMMU_CONTROL_ENABLED, entry,
+                        IOMMU_DEV_TABLE_LINT1_ENABLE_MASK,
+                        IOMMU_DEV_TABLE_LINT1_ENABLE_SHIFT, &entry);
+    dte[5] = entry;
+
+    set_field_in_reg_u32((u32)addr_lo >> 6, 0,
+                        IOMMU_DEV_TABLE_INT_TABLE_PTR_LOW_MASK,
+                        IOMMU_DEV_TABLE_INT_TABLE_PTR_LOW_SHIFT, &entry);
+    /* 2048 entries */
+    set_field_in_reg_u32(0xB, entry,
+                         IOMMU_DEV_TABLE_INT_TABLE_LENGTH_MASK,
+                         IOMMU_DEV_TABLE_INT_TABLE_LENGTH_SHIFT, &entry);
+    set_field_in_reg_u32(IOMMU_CONTROL_ENABLED, entry,
+                         IOMMU_DEV_TABLE_INT_VALID_MASK,
+                         IOMMU_DEV_TABLE_INT_VALID_SHIFT, &entry);
+    set_field_in_reg_u32(IOMMU_CONTROL_ENABLED, entry,
+                         IOMMU_DEV_TABLE_INT_TABLE_IGN_UNMAPPED_MASK,
+                         IOMMU_DEV_TABLE_INT_TABLE_IGN_UNMAPPED_SHIFT, &entry);
+    dte[4] = entry;
 
     set_field_in_reg_u32(sys_mgt, 0,
                          IOMMU_DEV_TABLE_SYS_MGT_MSG_ENABLE_MASK,

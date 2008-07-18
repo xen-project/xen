@@ -26,7 +26,7 @@
 #if !defined(_ENDIAN_H_)
 #define _ENDIAN_H_
 
-#include "types.h"
+#include <mini-os/types.h>
 
 
 #if !defined(__ASSEMBLY__)

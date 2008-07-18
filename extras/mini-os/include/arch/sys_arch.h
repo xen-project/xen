@@ -9,9 +9,9 @@
 #ifndef __LWIP_ARCH_SYS_ARCH_H__
 #define __LWIP_ARCH_SYS_ARCH_H__
 
-#include <os.h>
-#include <xmalloc.h>
-#include <semaphore.h>
+#include <mini-os/os.h>
+#include <mini-os/xmalloc.h>
+#include <mini-os/semaphore.h>
 
 typedef struct semaphore *sys_sem_t;
 #define SYS_SEM_NULL ((sys_sem_t) NULL)

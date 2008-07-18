@@ -1061,6 +1061,11 @@ errout:
 	return status;
 }
 
+void domain_set_time_offset(struct domain *d, int32_t time_offset_seconds)
+{
+	d->time_offset_seconds = time_offset_seconds;
+}
+
 static efi_status_t
 efi_emulate_set_time(
 	unsigned long tv_addr, IA64FAULT *fault)

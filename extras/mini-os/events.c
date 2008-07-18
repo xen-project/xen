@@ -136,6 +136,23 @@ evtchn_port_t bind_virq(uint32_t virq, evtchn_handler_t handler, void *data)
 	return op.port;
 }
 
+evtchn_port_t bind_pirq(uint32_t pirq, int will_share, evtchn_handler_t handler, void *data)
+{
+	evtchn_bind_pirq_t op;
+
+	/* Try to bind the pirq to a port */
+	op.pirq = pirq;
+	op.flags = will_share ? BIND_PIRQ__WILL_SHARE : 0;
+
+	if ( HYPERVISOR_event_channel_op(EVTCHNOP_bind_pirq, &op) != 0 )
+	{
+		printk("Failed to bind physical IRQ %d\n", pirq);
+		return -1;
+	}
+	bind_evtchn(op.port, handler, data);
+	return op.port;
+}
+
 #if defined(__x86_64__)
 char irqstack[2 * STACK_SIZE];
 
@@ -190,10 +207,11 @@ void default_handler(evtchn_port_t port, struct pt_regs *regs, void *ignore)
 int evtchn_alloc_unbound(domid_t pal, evtchn_handler_t handler,
 						 void *data, evtchn_port_t *port)
 {
+    int err;
     evtchn_alloc_unbound_t op;
     op.dom = DOMID_SELF;
     op.remote_dom = pal;
-    int err = HYPERVISOR_event_channel_op(EVTCHNOP_alloc_unbound, &op);
+    err = HYPERVISOR_event_channel_op(EVTCHNOP_alloc_unbound, &op);
     if (err)
 		return err;
     *port = bind_evtchn(op.port, handler, data);
@@ -207,13 +225,15 @@ int evtchn_bind_interdomain(domid_t pal, evtchn_port_t remote_port,
 			    evtchn_handler_t handler, void *data,
 			    evtchn_port_t *local_port)
 {
+    int err;
+    evtchn_port_t port;
     evtchn_bind_interdomain_t op;
     op.remote_dom = pal;
     op.remote_port = remote_port;
-    int err = HYPERVISOR_event_channel_op(EVTCHNOP_bind_interdomain, &op);
+    err = HYPERVISOR_event_channel_op(EVTCHNOP_bind_interdomain, &op);
     if (err)
 		return err;
-    evtchn_port_t port = op.local_port;
+    port = op.local_port;
     *local_port = bind_evtchn(port, handler, data);
     return err;
 }

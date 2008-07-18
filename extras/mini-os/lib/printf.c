@@ -62,6 +62,7 @@
 #include <lib.h>
 #include <mm.h>
 #include <ctype.h>
+#include <limits.h>
 
 /**
  * simple_strtoul - convert a string to an unsigned long

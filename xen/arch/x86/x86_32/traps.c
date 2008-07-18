@@ -255,8 +255,13 @@ unsigned long do_iret(void)
             goto exit_and_crash;
     }
 
-    /* No longer in NMI context. */
-    v->nmi_masked = 0;
+    /* Restore affinity.  */
+    if ((v->trap_priority >= VCPU_TRAP_NMI)
+       && !cpus_equal(v->cpu_affinity_tmp, v->cpu_affinity))
+        vcpu_set_affinity(v, &v->cpu_affinity_tmp);
+
+    /* Restore previous trap priority */
+    v->trap_priority = v->old_trap_priority;
 
     /* Restore upcall mask from supplied EFLAGS.IF. */
     vcpu_info(v, evtchn_upcall_mask) = !(eflags & X86_EFLAGS_IF);

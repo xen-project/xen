@@ -1086,7 +1086,10 @@ void ept_sync_domain(struct domain *d)
 {
     /* Only if using EPT and this domain has some VCPUs to dirty. */
     if ( d->arch.hvm_domain.hap_enabled && d->vcpu[0] )
+    {
+        ASSERT(local_irq_is_enabled());
         on_each_cpu(__ept_sync_domain, d, 1, 1);
+    }
 }
 
 static void __vmx_inject_exception(
@@ -1173,6 +1176,14 @@ static int vmx_do_pmu_interrupt(struct cpu_user_regs *regs)
     return vpmu_do_interrupt(regs);
 }
 
+static void vmx_set_uc_mode(struct vcpu *v)
+{
+    if ( paging_mode_hap(v->domain) )
+        ept_change_entry_emt_with_range(
+            v->domain, 0, v->domain->arch.p2m->max_mapped_pfn);
+    vpid_sync_all();
+}
+
 static struct hvm_function_table vmx_function_table = {
     .name                 = "VMX",
     .domain_initialise    = vmx_domain_initialise,
@@ -1202,7 +1213,8 @@ static struct hvm_function_table vmx_function_table = {
     .fpu_dirty_intercept  = vmx_fpu_dirty_intercept,
     .msr_read_intercept   = vmx_msr_read_intercept,
     .msr_write_intercept  = vmx_msr_write_intercept,
-    .invlpg_intercept     = vmx_invlpg_intercept
+    .invlpg_intercept     = vmx_invlpg_intercept,
+    .set_uc_mode          = vmx_set_uc_mode
 };
 
 static unsigned long *vpid_bitmap;
@@ -1926,7 +1938,7 @@ static void wbinvd_ipi(void *info)
 
 static void vmx_wbinvd_intercept(void)
 {
-    if ( list_empty(&(domain_hvm_iommu(current->domain)->pdev_list)) )
+    if ( !has_arch_pdevs(current->domain) )
         return;
 
     if ( cpu_has_wbinvd_exiting )
@@ -2193,6 +2205,11 @@ asmlinkage void vmx_vmexit_handler(struct cpu_user_regs *regs)
         vmx_invlpg_intercept(exit_qualification);
         break;
     }
+    case EXIT_REASON_RDTSC:
+        inst_len = __get_instruction_length();
+        __update_guest_eip(inst_len);
+        hvm_rdtsc_intercept(regs);
+        break;
     case EXIT_REASON_VMCALL:
     {
         int rc;

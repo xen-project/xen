@@ -27,15 +27,15 @@
 
 #if !defined(__ASSEMBLY__)
 
-#include "types.h"
+#include <mini-os/types.h>
 #include "endian.h"
 #include "ia64_cpu.h"
 #include "atomic.h"
 #include "efi.h"
 #include "sal.h"
 #include "pal.h"
-#include "hypervisor.h"
-#include <kernel.h>
+#include <mini-os/hypervisor.h>
+#include <mini-os/kernel.h>
 
 
 typedef uint64_t paddr_t;		/* Physical address. */

@@ -297,11 +297,6 @@ except DomainError, e:
 # Stop red domain
 domain_red.destroy()
 
-# reset the policy - should not work
-s, o = traceCommand('xm resetpolicy')
-if not s:
-    FAIL("Could reset the policy.")
-
 # Stop unlabeled domain
 domain_ul.destroy()
 

@@ -64,6 +64,9 @@ extern int mtrr_del_page(int reg, unsigned long base, unsigned long size);
 extern void mtrr_centaur_report_mcr(int mcr, u32 lo, u32 hi);
 extern u32 get_pat_flags(struct vcpu *v, u32 gl1e_flags, paddr_t gpaddr,
                   paddr_t spaddr);
+extern uint8_t epte_get_entry_emt(struct domain *d, unsigned long gfn, unsigned long mfn);
+extern void ept_change_entry_emt_with_range(struct domain *d, unsigned long start_gfn,
+                 unsigned long end_gfn);
 extern unsigned char pat_type_2_pte_flags(unsigned char pat_type);
 
 #endif /* __ASM_X86_MTRR_H__ */

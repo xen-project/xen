@@ -40,7 +40,7 @@ fprintf(stderr, "ERROR: " _m " (%d = %s)\n" , ## _a ,    \
 static PyObject *acm_error_obj;
 
 /* generic shared function */
-void * __getssid(int domid, uint32_t *buflen)
+static void *__getssid(int domid, uint32_t *buflen)
 {
     struct acm_getssid getssid;
     int xc_handle;

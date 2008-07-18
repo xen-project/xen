@@ -1,6 +1,6 @@
-#include <wait.h>
+#include <mini-os/wait.h>
 #include <xen/io/blkif.h>
-#include <types.h>
+#include <mini-os/types.h>
 struct blkfront_dev;
 struct blkfront_aiocb
 {

@@ -349,23 +349,6 @@ static int destroy_fd(void *_fd)
 	return 0;
 }
 
-/* Return a pointer to an fd, self-closing and attached to this pathname. */
-int *talloc_open(const char *pathname, int flags, int mode)
-{
-	int *fd;
-
-	fd = talloc(pathname, int);
-	*fd = open(pathname, flags, mode);
-	if (*fd < 0) {
-		int saved_errno = errno;
-		talloc_free(fd);
-		errno = saved_errno;
-		return NULL;
-	}
-	talloc_set_destructor(fd, destroy_fd);
-	return fd;
-}
-
 /* Is child a subnode of parent, or equal? */
 bool is_child(const char *child, const char *parent)
 {

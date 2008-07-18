@@ -40,52 +40,48 @@ struct acpi_ioapic_unit {
     }ioapic;
 };
 
-struct acpi_drhd_unit {
-    struct list_head list;
-    u64    address; /* register base address of the unit */
-    struct pci_dev *devices; /* target devices */
+struct dmar_scope {
+    DECLARE_BITMAP(buses, 256);         /* buses owned by this unit */
+    u16    *devices;                    /* devices owned by this unit */
     int    devices_cnt;
+};
+
+struct acpi_drhd_unit {
+    struct dmar_scope scope;            /* must be first member of struct */
+    struct list_head list;
+    u64    address;                     /* register base address of the unit */
     u8     include_all:1;
     struct iommu *iommu;
     struct list_head ioapic_list;
 };
 
 struct acpi_rmrr_unit {
+    struct dmar_scope scope;            /* must be first member of struct */
     struct list_head list;
     u64    base_address;
     u64    end_address;
-    struct pci_dev *devices; /* target devices */
-    int    devices_cnt;
     u8     allow_all:1;
 };
 
 struct acpi_atsr_unit {
+    struct dmar_scope scope;            /* must be first member of struct */
     struct list_head list;
-    struct pci_dev *devices; /* target devices */
-    int    devices_cnt;
     u8     all_ports:1;
 };
 
-#define for_each_iommu(domain, iommu) \
-    list_for_each_entry(iommu, \
-        &(domain->arch.hvm_domain.hvm_iommu.iommu_list), list)
-
-#define for_each_pdev(domain, pdev) \
-    list_for_each_entry(pdev, \
-         &(domain->arch.hvm_domain.hvm_iommu.pdev_list), list)
 
 #define for_each_drhd_unit(drhd) \
     list_for_each_entry(drhd, &acpi_drhd_units, list)
-#define for_each_rmrr_device(rmrr, pdev) \
-    list_for_each_entry(rmrr, &acpi_rmrr_units, list) { \
-        int _i; \
-        for (_i = 0; _i < rmrr->devices_cnt; _i++) { \
-            pdev = &(rmrr->devices[_i]);
-#define end_for_each_rmrr_device(rmrr, pdev) \
-        } \
-    }
 
-struct acpi_drhd_unit * acpi_find_matched_drhd_unit(struct pci_dev *dev);
+#define for_each_rmrr_device(rmrr, bdf, idx)            \
+    list_for_each_entry(rmrr, &acpi_rmrr_units, list)   \
+        /* assume there never is a bdf == 0 */          \
+        for (idx = 0; (bdf = rmrr->scope.devices[i]) && \
+                 idx < rmrr->scope.devices_cnt; idx++)
+
+struct acpi_drhd_unit * acpi_find_matched_drhd_unit(u8 bus, u8 devfn);
+void dmar_scope_add_buses(struct dmar_scope *scope, u16 sec, u16 sub);
+void dmar_scope_remove_buses(struct dmar_scope *scope, u16 sec, u16 sub);
 
 #define DMAR_TYPE 1
 #define RMRR_TYPE 2
@@ -95,6 +91,6 @@ struct acpi_drhd_unit * acpi_find_matched_drhd_unit(struct pci_dev *dev);
 
 int vtd_hw_check(void);
 void disable_pmr(struct iommu *iommu);
-int is_usb_device(struct pci_dev *pdev);
+int is_usb_device(u8 bus, u8 devfn);
 
 #endif /* _DMAR_H_ */

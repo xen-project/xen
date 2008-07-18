@@ -114,12 +114,12 @@ static int map_domain_pirq(struct domain *d, int pirq, int vector,
             gdprintk(XENLOG_G_ERR, "Map vector %x to msi while it is in use\n",
                      vector);
         desc->handler = &pci_msi_type;
-        spin_unlock_irqrestore(&desc->lock, flags);
 
         ret = pci_enable_msi(map->msi_info.bus,
 		                     map->msi_info.devfn, vector,
 							 map->msi_info.entry_nr,
 							 map->msi_info.msi);
+        spin_unlock_irqrestore(&desc->lock, flags);
         if ( ret )
             goto done;
     }
@@ -161,10 +161,10 @@ static int unmap_domain_pirq(struct domain *d, int pirq)
         irq_desc_t *desc;
 
         desc = &irq_desc[vector];
+        spin_lock_irqsave(&desc->lock, flags);
         if ( desc->msi_desc )
             pci_disable_msi(vector);
 
-        spin_lock_irqsave(&desc->lock, flags);
         if ( desc->handler == &pci_msi_type )
         {
             /* MSI is not shared, so should be released already */
@@ -497,6 +497,32 @@ ret_t do_physdev_op(int cmd, XEN_GUEST_HANDLE(void) arg)
         guest_from_compat_handle(v->arch.iobmp, set_iobitmap.bitmap);
 #endif
         v->arch.iobmp_limit = set_iobitmap.nr_ports;
+        break;
+    }
+
+    case PHYSDEVOP_manage_pci_add: {
+        struct physdev_manage_pci manage_pci;
+        ret = -EPERM;
+        if ( !IS_PRIV(v->domain) )
+            break;
+        ret = -EFAULT;
+        if ( copy_from_guest(&manage_pci, arg, 1) != 0 )
+            break;
+
+        ret = pci_add_device(manage_pci.bus, manage_pci.devfn);
+        break;
+    }
+
+    case PHYSDEVOP_manage_pci_remove: {
+        struct physdev_manage_pci manage_pci;
+        ret = -EPERM;
+        if ( !IS_PRIV(v->domain) )
+            break;
+        ret = -EFAULT;
+        if ( copy_from_guest(&manage_pci, arg, 1) != 0 )
+            break;
+
+        ret = pci_remove_device(manage_pci.bus, manage_pci.devfn);
         break;
     }
 

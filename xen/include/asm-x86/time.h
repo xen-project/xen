@@ -34,4 +34,8 @@ int cpu_frequency_change(u64 freq);
 struct tm;
 struct tm wallclock_time(void);
 
+void pit_broadcast_enter(void);
+void pit_broadcast_exit(void);
+int pit_broadcast_is_available(void);
+
 #endif /* __X86_TIME_H__ */

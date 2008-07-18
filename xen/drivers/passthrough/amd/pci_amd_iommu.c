@@ -34,6 +34,7 @@ int nr_amd_iommus;
 
 unsigned short ivrs_bdf_entries;
 struct ivrs_mappings *ivrs_mappings;
+extern void *int_remap_table;
 
 static void deallocate_domain_page_tables(struct hvm_iommu *hd)
 {
@@ -256,18 +257,21 @@ static void amd_iommu_setup_domain_device(
 {
     void *dte;
     u64 root_ptr;
+    u64 intremap_ptr;
     unsigned long flags;
     int req_id;
     u8 sys_mgt, dev_ex;
     struct hvm_iommu *hd = domain_hvm_iommu(domain);
 
-    BUG_ON( !hd->root_table || !hd->paging_mode );
+    BUG_ON( !hd->root_table || !hd->paging_mode || !int_remap_table );
 
     root_ptr = (u64)virt_to_maddr(hd->root_table);
     /* get device-table entry */
     req_id = ivrs_mappings[bdf].dte_requestor_id;
     dte = iommu->dev_table.buffer +
         (req_id * IOMMU_DEV_TABLE_ENTRY_SIZE);
+
+    intremap_ptr = (u64)virt_to_maddr(int_remap_table);
 
     if ( !amd_iommu_is_dte_page_translation_valid((u32 *)dte) )
     {
@@ -276,11 +280,12 @@ static void amd_iommu_setup_domain_device(
         /* bind DTE to domain page-tables */
         sys_mgt = ivrs_mappings[req_id].dte_sys_mgt_enable;
         dev_ex = ivrs_mappings[req_id].dte_allow_exclusion;
-        amd_iommu_set_dev_table_entry((u32 *)dte, root_ptr,
+        amd_iommu_set_dev_table_entry((u32 *)dte, root_ptr, intremap_ptr,
                                       hd->domain_id, sys_mgt, dev_ex,
                                       hd->paging_mode);
 
         invalidate_dev_table_entry(iommu, req_id);
+        invalidate_interrupt_table(iommu, req_id);
         flush_command_buffer(iommu);
         amd_iov_info("Enable DTE:0x%x, "
                 "root_ptr:%"PRIx64", domain_id:%d, paging_mode:%d\n",
@@ -292,13 +297,13 @@ static void amd_iommu_setup_domain_device(
 
 static void amd_iommu_setup_dom0_devices(struct domain *d)
 {
-    struct hvm_iommu *hd = domain_hvm_iommu(d);
     struct amd_iommu *iommu;
     struct pci_dev *pdev;
     int bus, dev, func;
     u32 l;
     int bdf;
 
+    write_lock(&pcidevs_lock);
     for ( bus = 0; bus < 256; bus++ )
     {
         for ( dev = 0; dev < 32; dev++ )
@@ -311,10 +316,9 @@ static void amd_iommu_setup_dom0_devices(struct domain *d)
                      (l == 0x0000ffff) || (l == 0xffff0000) )
                     continue;
 
-                pdev = xmalloc(struct pci_dev);
-                pdev->bus = bus;
-                pdev->devfn = PCI_DEVFN(dev, func);
-                list_add_tail(&pdev->list, &hd->pdev_list);
+                pdev = alloc_pdev(bus, PCI_DEVFN(dev, func));
+                pdev->domain = d;
+                list_add(&pdev->domain_list, &d->arch.pdev_list);
 
                 bdf = (bus << 8) | pdev->devfn;
                 /* supported device? */
@@ -326,6 +330,7 @@ static void amd_iommu_setup_dom0_devices(struct domain *d)
             }
         }
     }
+    write_unlock(&pcidevs_lock);
 }
 
 int amd_iov_detect(void)
@@ -364,6 +369,12 @@ int amd_iov_detect(void)
     }
     memset(ivrs_mappings, 0,
            ivrs_bdf_entries * sizeof(struct ivrs_mappings));
+
+    if ( amd_iommu_setup_intremap_table() != 0 )
+    {
+        amd_iov_error("Error allocating interrupt remapping table\n");
+        goto error_out;
+    }
 
     if ( amd_iommu_init() != 0 )
     {
@@ -485,54 +496,44 @@ static void amd_iommu_disable_domain_device(
     }
 }
 
-extern void pdev_flr(u8 bus, u8 devfn);
-
 static int reassign_device( struct domain *source, struct domain *target,
                             u8 bus, u8 devfn)
 {
-    struct hvm_iommu *source_hd = domain_hvm_iommu(source);
-    struct hvm_iommu *target_hd = domain_hvm_iommu(target);
     struct pci_dev *pdev;
     struct amd_iommu *iommu;
     int bdf;
-    unsigned long flags;
 
-    for_each_pdev ( source, pdev )
+    pdev = pci_lock_domain_pdev(source, bus, devfn);
+    if ( !pdev )
+	return -ENODEV;
+
+    bdf = (bus << 8) | devfn;
+    /* supported device? */
+    iommu = (bdf < ivrs_bdf_entries) ?
+	find_iommu_for_device(bus, pdev->devfn) : NULL;
+
+    if ( !iommu )
     {
-        if ( (pdev->bus != bus) || (pdev->devfn != devfn) )
-            continue;
+	spin_unlock(&pdev->lock);
+	amd_iov_error("Fail to find iommu."
+		      " %x:%x.%x cannot be assigned to domain %d\n", 
+		      bus, PCI_SLOT(devfn), PCI_FUNC(devfn), target->domain_id);
+	return -ENODEV;
+    }
 
-        pdev->bus = bus;
-        pdev->devfn = devfn;
+    amd_iommu_disable_domain_device(source, iommu, bdf);
 
-        bdf = (bus << 8) | devfn;
-        /* supported device? */
-        iommu = (bdf < ivrs_bdf_entries) ?
-            find_iommu_for_device(bus, pdev->devfn) : NULL;
+    write_lock(&pcidevs_lock);
+    list_move(&pdev->domain_list, &target->arch.pdev_list);
+    write_unlock(&pcidevs_lock);
+    pdev->domain = target;
 
-        if ( !iommu )
-        {
-            amd_iov_error("Fail to find iommu."
-                     " %x:%x.%x cannot be assigned to domain %d\n", 
-                     bus, PCI_SLOT(devfn), PCI_FUNC(devfn), target->domain_id);
-            return -ENODEV;
-        }
-
-        amd_iommu_disable_domain_device(source, iommu, bdf);
-        /* Move pci device from the source domain to target domain. */
-        spin_lock_irqsave(&source_hd->iommu_list_lock, flags);
-        spin_lock_irqsave(&target_hd->iommu_list_lock, flags);
-        list_move(&pdev->list, &target_hd->pdev_list);
-        spin_unlock_irqrestore(&target_hd->iommu_list_lock, flags);
-        spin_unlock_irqrestore(&source_hd->iommu_list_lock, flags);
-
-        amd_iommu_setup_domain_device(target, iommu, bdf);
-        amd_iov_info("reassign %x:%x.%x domain %d -> domain %d\n",
+    amd_iommu_setup_domain_device(target, iommu, bdf);
+    amd_iov_info("reassign %x:%x.%x domain %d -> domain %d\n",
                  bus, PCI_SLOT(devfn), PCI_FUNC(devfn),
                  source->domain_id, target->domain_id);
 
-        break;
-    }
+    spin_unlock(&pdev->lock);
     return 0;
 }
 
@@ -553,23 +554,7 @@ static int amd_iommu_assign_device(struct domain *d, u8 bus, u8 devfn)
             ivrs_mappings[req_id].read_permission);
     }
 
-    pdev_flr(bus, devfn);
     return reassign_device(dom0, d, bus, devfn);
-}
-
-static void release_domain_devices(struct domain *d)
-{
-    struct hvm_iommu *hd  = domain_hvm_iommu(d);
-    struct pci_dev *pdev;
-
-    while ( !list_empty(&hd->pdev_list) )
-    {
-        pdev = list_entry(hd->pdev_list.next, typeof(*pdev), list);
-        pdev_flr(pdev->bus, pdev->devfn);
-        amd_iov_info("release domain %d devices %x:%x.%x\n", d->domain_id,
-                 pdev->bus, PCI_SLOT(pdev->devfn), PCI_FUNC(pdev->devfn));
-        reassign_device(d, dom0, pdev->bus, pdev->devfn);
-    }
 }
 
 static void deallocate_next_page_table(void *table, unsigned long index,
@@ -625,14 +610,22 @@ static void deallocate_iommu_page_tables(struct domain *d)
 static void amd_iommu_domain_destroy(struct domain *d)
 {
     deallocate_iommu_page_tables(d);
-    release_domain_devices(d);
 }
 
-static void amd_iommu_return_device(
+static int amd_iommu_return_device(
     struct domain *s, struct domain *t, u8 bus, u8 devfn)
 {
-    pdev_flr(bus, devfn);
-    reassign_device(s, t, bus, devfn);
+    return reassign_device(s, t, bus, devfn);
+}
+
+static int amd_iommu_add_device(struct pci_dev *pdev)
+{
+    return 0;
+}
+
+static int amd_iommu_remove_device(struct pci_dev *pdev)
+{
+    return 0;
 }
 
 static int amd_iommu_group_id(u8 bus, u8 devfn)
@@ -647,10 +640,14 @@ static int amd_iommu_group_id(u8 bus, u8 devfn)
 
 struct iommu_ops amd_iommu_ops = {
     .init = amd_iommu_domain_init,
+    .add_device = amd_iommu_add_device,
+    .remove_device = amd_iommu_remove_device,
     .assign_device  = amd_iommu_assign_device,
     .teardown = amd_iommu_domain_destroy,
     .map_page = amd_iommu_map_page,
     .unmap_page = amd_iommu_unmap_page,
     .reassign_device = amd_iommu_return_device,
     .get_device_group_id = amd_iommu_group_id,
+    .update_ire_from_apic = amd_iommu_ioapic_update_ire,
+    .update_ire_from_msi = amd_iommu_msi_msg_update_ire,
 };

@@ -30,6 +30,7 @@
 #include <xen/percpu.h>
 #include <xen/compat.h>
 #include <xen/acpi.h>
+#include <xen/pci.h>
 #include <asm/regs.h>
 #include <asm/mc146818rtc.h>
 #include <asm/system.h>
@@ -285,6 +286,10 @@ int vcpu_initialise(struct vcpu *v)
 
     v->arch.flags = TF_kernel_mode;
 
+    /* Ensure that update_vcpu_system_time() fires at least once. */
+    if ( !is_idle_domain(d) )
+        vcpu_info(v, time).tsc_timestamp = ~0ull;
+
 #if defined(__i386__)
     mapcache_vcpu_init(v);
 #endif
@@ -349,6 +354,8 @@ int arch_domain_create(struct domain *d, unsigned int domcr_flags)
         is_hvm_domain(d) &&
         hvm_funcs.hap_supported &&
         (domcr_flags & DOMCRF_hap);
+
+    INIT_LIST_HEAD(&d->arch.pdev_list);
 
     d->arch.relmem = RELMEM_not_started;
     INIT_LIST_HEAD(&d->arch.relmem_list);
@@ -452,6 +459,7 @@ int arch_domain_create(struct domain *d, unsigned int domcr_flags)
     return 0;
 
  fail:
+    d->is_dying = DOMDYING_dead;
     free_xenheap_page(d->shared_info);
     if ( paging_initialised )
         paging_final_teardown(d);
@@ -470,6 +478,7 @@ void arch_domain_destroy(struct domain *d)
     if ( is_hvm_domain(d) )
         hvm_domain_destroy(d);
 
+    pci_release_devices(d);
     if ( !is_idle_domain(d) )
         iommu_domain_destroy(d);
 
@@ -806,14 +815,6 @@ map_vcpu_info(struct vcpu *v, unsigned long mfn, unsigned offset)
     vcpu_info(v, evtchn_upcall_pending) = 1;
     for ( i = 0; i < BITS_PER_GUEST_LONG(d); i++ )
         set_bit(i, &vcpu_info(v, evtchn_pending_sel));
-
-    /*
-     * Only bother to update time for the current vcpu.  If we're
-     * operating on another vcpu, then it had better not be running at
-     * the time.
-     */
-    if ( v == current )
-         update_vcpu_system_time(v);
 
     return 0;
 }

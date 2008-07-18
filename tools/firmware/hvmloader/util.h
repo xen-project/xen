@@ -137,6 +137,12 @@ uint32_t e820_malloc(uint32_t size);
 /* Prepare the 32bit BIOS */
 void highbios_setup(void);
 
+/* Miscellaneous. */
+void cacheattr_init(void);
+void create_mp_tables(void);
+int hvm_write_smbios_tables(void);
+void smp_initialise(void);
+
 #define isdigit(c) ((c) >= '0' && (c) <= '9')
 
 #endif /* __HVMLOADER_UTIL_H__ */

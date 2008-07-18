@@ -358,7 +358,7 @@ VL_OBJS+=tap-win32.o
 endif
 
 ifdef CONFIG_STUBDOM
-#CONFIG_PASSTHROUGH=1
+CONFIG_PASSTHROUGH=1
 else
   ifeq (,$(wildcard /usr/include/pci))
 $(warning *** pciutils-devl package not found - missing /usr/include/pci)

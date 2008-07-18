@@ -54,14 +54,14 @@ struct cpu_time {
     s_time_t stime_local_stamp;
     s_time_t stime_master_stamp;
     struct time_scale tsc_scale;
-    u32 cstate_plt_count_stamp;
+    u64 cstate_plt_count_stamp;
     struct timer calibration_timer;
 };
 
 struct platform_timesource {
     char *name;
     u64 frequency;
-    u32 (*read_counter)(void);
+    u64 (*read_counter)(void);
     int counter_bits;
 };
 
@@ -147,6 +147,32 @@ static inline u64 scale_delta(u64 delta, struct time_scale *scale)
     return product;
 }
 
+/*
+ * cpu_mask that denotes the CPUs that needs timer interrupt coming in as
+ * IPIs in place of local APIC timers
+ */
+extern int xen_cpuidle;
+static cpumask_t pit_broadcast_mask;
+
+static void smp_send_timer_broadcast_ipi(void)
+{
+    int cpu = smp_processor_id();
+    cpumask_t mask;
+
+    cpus_and(mask, cpu_online_map, pit_broadcast_mask);
+
+    if ( cpu_isset(cpu, mask) )
+    {
+        cpu_clear(cpu, mask);
+        raise_softirq(TIMER_SOFTIRQ);
+    }
+
+    if ( !cpus_empty(mask) )
+    {
+        cpumask_raise_softirq(mask, TIMER_SOFTIRQ);
+    }
+}
+
 static void timer_interrupt(int irq, void *dev_id, struct cpu_user_regs *regs)
 {
     ASSERT(local_irq_is_enabled());
@@ -160,6 +186,9 @@ static void timer_interrupt(int irq, void *dev_id, struct cpu_user_regs *regs)
     /* Rough hack to allow accurate timers to sort-of-work with no APIC. */
     if ( !cpu_has_apic )
         raise_softirq(TIMER_SOFTIRQ);
+
+    if ( xen_cpuidle )
+        smp_send_timer_broadcast_ipi();
 
     /* Emulate a 32-bit PIT counter. */
     if ( using_pit )
@@ -311,7 +340,7 @@ static char *freq_string(u64 freq)
  * PLATFORM TIMER 1: PROGRAMMABLE INTERVAL TIMER (LEGACY PIT)
  */
 
-static u32 read_pit_count(void)
+static u64 read_pit_count(void)
 {
     u16 count16;
     u32 count32;
@@ -343,7 +372,7 @@ static void init_pit(struct platform_timesource *pts)
  * PLATFORM TIMER 2: HIGH PRECISION EVENT TIMER (HPET)
  */
 
-static u32 read_hpet_count(void)
+static u64 read_hpet_count(void)
 {
     return hpet_read32(HPET_COUNTER);
 }
@@ -383,7 +412,7 @@ int use_cyclone;
 /* Cyclone MPMC0 register. */
 static volatile u32 *cyclone_timer;
 
-static u32 read_cyclone_count(void)
+static u64 read_cyclone_count(void)
 {
     return *cyclone_timer;
 }
@@ -433,7 +462,7 @@ u32 pmtmr_ioport;
 /* ACPI PM timer ticks at 3.579545 MHz. */
 #define ACPI_PM_FREQUENCY 3579545
 
-static u32 read_pmtimer_count(void)
+static u64 read_pmtimer_count(void)
 {
     return inl(pmtmr_ioport);
 }
@@ -452,11 +481,51 @@ static int init_pmtimer(struct platform_timesource *pts)
 }
 
 /************************************************************
+ * PLATFORM TIMER 5: TSC
+ */
+
+#define platform_timer_is_tsc() (!strcmp(plt_src.name, "TSC"))
+static u64 tsc_freq;
+
+static u64 read_tsc_count(void)
+{
+    u64 tsc;
+    rdtscll(tsc);
+    return tsc;
+}
+
+static int init_tsctimer(struct platform_timesource *pts)
+{
+    unsigned int cpu;
+
+    /*
+     * TODO: evaluate stability of TSC here, return 0 if not stable.
+     * For now we assume all TSCs are synchronised and hence can all share
+     * CPU 0's calibration values.
+     */
+    for_each_cpu ( cpu )
+    {
+        if ( cpu == 0 )
+            continue;
+        memcpy(&per_cpu(cpu_time, cpu),
+               &per_cpu(cpu_time, 0),
+               sizeof(struct cpu_time));
+    }
+
+    pts->name = "TSC";
+    pts->frequency = tsc_freq;
+    pts->read_counter = read_tsc_count;
+    pts->counter_bits = 64;
+
+    return 1;
+}
+
+/************************************************************
  * GENERIC PLATFORM TIMER INFRASTRUCTURE
  */
 
 static struct platform_timesource plt_src; /* details of chosen timesource  */
-static u32 plt_mask;             /* hardware-width mask                     */
+static u64 plt_mask;             /* hardware-width mask                     */
 static u64 plt_overflow_period;  /* ns between calls to plt_overflow()      */
 static struct time_scale plt_scale; /* scale: platform counter -> nanosecs  */
 
@@ -465,12 +534,12 @@ static DEFINE_SPINLOCK(platform_timer_lock);
 static s_time_t stime_platform_stamp; /* System time at below platform time */
 static u64 platform_timer_stamp;      /* Platform time at above system time */
 static u64 plt_stamp64;          /* 64-bit platform counter stamp           */
-static u32 plt_stamp;            /* hardware-width platform counter stamp   */
+static u64 plt_stamp;            /* hardware-width platform counter stamp   */
 static struct timer plt_overflow_timer;
 
 static void plt_overflow(void *unused)
 {
-    u32 count;
+    u64 count;
 
     spin_lock(&platform_timer_lock);
     count = plt_src.read_counter();
@@ -536,6 +605,8 @@ static void init_platform_timer(void)
             rc = init_cyclone(pts);
         else if ( !strcmp(opt_clocksource, "acpi") )
             rc = init_pmtimer(pts);
+        else if ( !strcmp(opt_clocksource, "tsc") )
+            rc = init_tsctimer(pts);
 
         if ( rc <= 0 )
             printk("WARNING: %s clocksource '%s'.\n",
@@ -549,7 +620,7 @@ static void init_platform_timer(void)
          !init_pmtimer(pts) )
         init_pit(pts);
 
-    plt_mask = (u32)~0u >> (32 - pts->counter_bits);
+    plt_mask = (u64)~0ull >> (64 - pts->counter_bits);
 
     set_time_scale(&plt_scale, pts->frequency);
 
@@ -568,31 +639,25 @@ void cstate_save_tsc(void)
 {
     struct cpu_time *t = &this_cpu(cpu_time);
 
-    if (!tsc_invariant){
-        t->cstate_plt_count_stamp = plt_src.read_counter();
-        rdtscll(t->cstate_tsc_stamp);
-    }
+    if ( tsc_invariant )
+        return;
+
+    t->cstate_plt_count_stamp = plt_src.read_counter();
+    rdtscll(t->cstate_tsc_stamp);
 }
 
 void cstate_restore_tsc(void)
 {
-    struct cpu_time *t;
-    u32    plt_count_delta;
-    u64    tsc_delta;
+    struct cpu_time *t = &this_cpu(cpu_time);
+    u64 plt_count_delta, tsc_delta;
 
-    if (!tsc_invariant){
-        t = &this_cpu(cpu_time);
+    if ( tsc_invariant )
+        return;
 
-        /* if platform counter overflow happens, interrupt will bring CPU from
-           C state to working state, so the platform counter won't wrap the
-           cstate_plt_count_stamp, and the 32 bit unsigned platform counter
-           is enough for delta calculation
-         */
-        plt_count_delta = 
-            (plt_src.read_counter() - t->cstate_plt_count_stamp) & plt_mask;
-        tsc_delta = scale_delta(plt_count_delta, &plt_scale)*cpu_khz/1000000UL;
-        wrmsrl(MSR_IA32_TSC,  t->cstate_tsc_stamp + tsc_delta);
-    }
+    plt_count_delta = (plt_src.read_counter() -
+                       t->cstate_plt_count_stamp) & plt_mask;
+    tsc_delta = scale_delta(plt_count_delta, &plt_scale) * cpu_khz/1000000UL;
+    wrmsrl(MSR_IA32_TSC, t->cstate_tsc_stamp + tsc_delta);
 }
 
 /***************************************************************************
@@ -745,10 +810,21 @@ void update_domain_wallclock_time(struct domain *d)
     spin_unlock(&wc_lock);
 }
 
+void domain_set_time_offset(struct domain *d, int32_t time_offset_seconds)
+{
+    d->time_offset_seconds = time_offset_seconds;
+    if ( is_hvm_domain(d) )
+        rtc_update_clock(d);
+}
+
 int cpu_frequency_change(u64 freq)
 {
     struct cpu_time *t = &this_cpu(cpu_time);
     u64 curr_tsc;
+
+    /* Nothing to do if TSC is platform timer. Assume it is constant-rate. */
+    if ( platform_timer_is_tsc() )
+        return 0;
 
     /* Sanity check: CPU frequency allegedly dropping below 1MHz? */
     if ( freq < 1000000u )
@@ -948,9 +1024,12 @@ void init_percpu_time(void)
     unsigned long flags;
     s_time_t now;
 
+    if ( platform_timer_is_tsc() )
+        return;
+
     local_irq_save(flags);
     rdtscll(t->local_tsc_stamp);
-    now = !plt_src.read_counter ? 0 : read_platform_stime();
+    now = read_platform_stime();
     local_irq_restore(flags);
 
     t->stime_master_stamp = now;
@@ -968,10 +1047,10 @@ int __init init_xen_time(void)
 
     local_irq_disable();
 
-    init_percpu_time();
-
     stime_platform_stamp = 0;
     init_platform_timer();
+
+    init_percpu_time();
 
     /* check if TSC is invariant during deep C state
        this is a new feature introduced by Nehalem*/
@@ -989,6 +1068,7 @@ void __init early_time_init(void)
 {
     u64 tmp = init_pit_and_calibrate_tsc();
 
+    tsc_freq = tmp;
     set_time_scale(&this_cpu(cpu_time).tsc_scale, tmp);
 
     do_div(tmp, 1000);
@@ -999,25 +1079,56 @@ void __init early_time_init(void)
     setup_irq(0, &irq0);
 }
 
+/* force_hpet_broadcast: if true, force using hpet_broadcast to fix lapic stop
+   issue for deep C state with pit disabled */
+static int force_hpet_broadcast;
+boolean_param("hpetbroadcast", force_hpet_broadcast);
+
+/* keep pit enabled for pit_broadcast working while cpuidle enabled */
 static int disable_pit_irq(void)
 {
-    if ( !using_pit && cpu_has_apic )
-    {
-        /* Disable PIT CH0 timer interrupt. */
-        outb_p(0x30, PIT_MODE);
-        outb_p(0, PIT_CH0);
-        outb_p(0, PIT_CH0);
+    if ( using_pit || !cpu_has_apic || (xen_cpuidle && !force_hpet_broadcast) )
+        return 0;
 
-        /*
-         * If we do not rely on PIT CH0 then we can use HPET for one-shot
-         * timer emulation when entering deep C states.
-         */
-        /*hpet_broadcast_init(); XXX dom0 may rely on RTC interrupt delivery */
+    /*
+     * If we do not rely on PIT CH0 then we can use HPET for one-shot timer 
+     * emulation when entering deep C states.
+     * XXX dom0 may rely on RTC interrupt delivery, so only enable
+     * hpet_broadcast if force_hpet_broadcast.
+     */
+    if ( xen_cpuidle && force_hpet_broadcast )
+    {
+        hpet_broadcast_init();
+        if ( !hpet_broadcast_is_available() )
+        {
+            printk("HPET broadcast init failed, turn to PIT broadcast.\n");
+            return 0;
+        }
     }
+
+    /* Disable PIT CH0 timer interrupt. */
+    outb_p(0x30, PIT_MODE);
+    outb_p(0, PIT_CH0);
+    outb_p(0, PIT_CH0);
 
     return 0;
 }
 __initcall(disable_pit_irq);
+
+void pit_broadcast_enter(void)
+{
+    cpu_set(smp_processor_id(), pit_broadcast_mask);
+}
+
+void pit_broadcast_exit(void)
+{
+    cpu_clear(smp_processor_id(), pit_broadcast_mask);
+}
+
+int pit_broadcast_is_available(void)
+{
+    return xen_cpuidle;
+}
 
 void send_timer_event(struct vcpu *v)
 {
@@ -1050,11 +1161,12 @@ int time_suspend(void)
 
 int time_resume(void)
 {
-    u64 tmp = init_pit_and_calibrate_tsc();
+    /*u64 tmp = */init_pit_and_calibrate_tsc();
 
     disable_pit_irq();
 
-    set_time_scale(&this_cpu(cpu_time).tsc_scale, tmp);
+    /* Disable this while calibrate_tsc_ap() also is skipped. */
+    /*set_time_scale(&this_cpu(cpu_time).tsc_scale, tmp);*/
 
     resume_platform_timer();
 

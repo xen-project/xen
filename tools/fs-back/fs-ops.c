@@ -34,6 +34,16 @@ unsigned short get_request(struct mount *mount, struct fsif_request *req)
     return id;
 }
 
+int get_fd(struct mount *mount)
+{
+    int i;
+
+    for (i = 0; i < MAX_FDS; i++)
+        if (mount->fds[i] == -1)
+            return i;
+    return -1;
+}
+
 
 void dispatch_file_open(struct mount *mount, struct fsif_request *req)
 {
@@ -59,8 +69,17 @@ void dispatch_file_open(struct mount *mount, struct fsif_request *req)
            mount->export->export_path, file_name);
     assert(xc_gnttab_munmap(mount->gnth, file_name, 1) == 0);
     printf("Issuing open for %s\n", full_path);
-    fd = open(full_path, O_RDWR);
-    printf("Got FD: %d\n", fd);
+    fd = get_fd(mount);
+    if (fd >= 0) {
+        int real_fd = open(full_path, O_RDWR);
+        if (real_fd < 0)
+            fd = -1;
+        else
+        {
+            mount->fds[fd] = real_fd;
+            printf("Got FD: %d for real %d\n", fd, real_fd);
+        }
+    }
     /* We can advance the request consumer index, from here on, the request
      * should not be used (it may be overrinden by a response) */
     mount->ring.req_cons++;
@@ -84,7 +103,12 @@ void dispatch_file_close(struct mount *mount, struct fsif_request *req)
     printf("Dispatching file close operation (fd=%d).\n", req->u.fclose.fd);
    
     req_id = req->id;
-    ret = close(req->u.fclose.fd);
+    if (req->u.fclose.fd < MAX_FDS) {
+        int fd = mount->fds[req->u.fclose.fd];
+        ret = close(fd);
+        mount->fds[req->u.fclose.fd] = -1;
+    } else
+        ret = -1;
     printf("Got ret: %d\n", ret);
     /* We can advance the request consumer index, from here on, the request
      * should not be used (it may be overrinden by a response) */
@@ -115,7 +139,12 @@ void dispatch_file_read(struct mount *mount, struct fsif_request *req)
     req_id = req->id;
     printf("File read issued for FD=%d (len=%"PRIu64", offest=%"PRIu64")\n", 
             req->u.fread.fd, req->u.fread.len, req->u.fread.offset); 
-   
+
+    if (req->u.fread.fd < MAX_FDS)
+        fd = mount->fds[req->u.fread.fd];
+    else
+        fd = -1;
+
     priv_id = get_request(mount, req);
     printf("Private id is: %d\n", priv_id);
     priv_req = &mount->requests[priv_id];
@@ -123,13 +152,13 @@ void dispatch_file_read(struct mount *mount, struct fsif_request *req)
 
     /* Dispatch AIO read request */
     bzero(&priv_req->aiocb, sizeof(struct aiocb));
-    priv_req->aiocb.aio_fildes = req->u.fread.fd;
+    priv_req->aiocb.aio_fildes = fd;
     priv_req->aiocb.aio_nbytes = req->u.fread.len;
     priv_req->aiocb.aio_offset = req->u.fread.offset;
     priv_req->aiocb.aio_buf = buf;
     assert(aio_read(&priv_req->aiocb) >= 0);
 
-     
+out: 
     /* We can advance the request consumer index, from here on, the request
      * should not be used (it may be overrinden by a response) */
     mount->ring.req_cons++;
@@ -171,6 +200,11 @@ void dispatch_file_write(struct mount *mount, struct fsif_request *req)
     printf("File write issued for FD=%d (len=%"PRIu64", offest=%"PRIu64")\n", 
             req->u.fwrite.fd, req->u.fwrite.len, req->u.fwrite.offset); 
    
+    if (req->u.fwrite.fd < MAX_FDS)
+        fd = mount->fds[req->u.fwrite.fd];
+    else
+        fd = -1;
+
     priv_id = get_request(mount, req);
     printf("Private id is: %d\n", priv_id);
     priv_req = &mount->requests[priv_id];
@@ -178,7 +212,7 @@ void dispatch_file_write(struct mount *mount, struct fsif_request *req)
 
     /* Dispatch AIO write request */
     bzero(&priv_req->aiocb, sizeof(struct aiocb));
-    priv_req->aiocb.aio_fildes = req->u.fwrite.fd;
+    priv_req->aiocb.aio_fildes = fd;
     priv_req->aiocb.aio_nbytes = req->u.fwrite.len;
     priv_req->aiocb.aio_offset = req->u.fwrite.offset;
     priv_req->aiocb.aio_buf = buf;
@@ -224,8 +258,12 @@ void dispatch_stat(struct mount *mount, struct fsif_request *req)
                                   PROT_WRITE);
    
     req_id = req->id;
-    fd = req->u.fstat.fd;
-    printf("File stat issued for FD=%d\n", fd); 
+    if (req->u.fstat.fd < MAX_FDS)
+        fd = mount->fds[req->u.fstat.fd];
+    else
+        fd = -1;
+
+    printf("File stat issued for FD=%d\n", req->u.fstat.fd); 
    
     /* We can advance the request consumer index, from here on, the request
      * should not be used (it may be overrinden by a response) */
@@ -240,7 +278,7 @@ void dispatch_stat(struct mount *mount, struct fsif_request *req)
     buf->stat_gid   = stat.st_gid;
 #ifdef BLKGETSIZE
     if (S_ISBLK(stat.st_mode)) {
-	int sectors;
+	unsigned long sectors;
 	if (ioctl(fd, BLKGETSIZE, &sectors)) {
 	    perror("getting device size\n");
 	    buf->stat_size = 0;
@@ -274,10 +312,14 @@ void dispatch_truncate(struct mount *mount, struct fsif_request *req)
     int64_t length;
 
     req_id = req->id;
-    fd = req->u.ftruncate.fd;
     length = req->u.ftruncate.length;
-    printf("File truncate issued for FD=%d, length=%"PRId64"\n", fd, length); 
+    printf("File truncate issued for FD=%d, length=%"PRId64"\n", req->u.ftruncate.fd, length); 
    
+    if (req->u.ftruncate.fd < MAX_FDS)
+        fd = mount->fds[req->u.ftruncate.fd];
+    else
+        fd = -1;
+
     /* We can advance the request consumer index, from here on, the request
      * should not be used (it may be overrinden by a response) */
     mount->ring.req_cons++;
@@ -510,7 +552,11 @@ void dispatch_chmod(struct mount *mount, struct fsif_request *req)
     printf("Dispatching file chmod operation (fd=%d, mode=%o).\n", 
             req->u.fchmod.fd, req->u.fchmod.mode);
     req_id = req->id;
-    fd = req->u.fchmod.fd;
+    if (req->u.fchmod.fd < MAX_FDS)
+        fd = mount->fds[req->u.fchmod.fd];
+    else
+        fd = -1;
+
     mode = req->u.fchmod.mode;
     /* We can advance the request consumer index, from here on, the request
      * should not be used (it may be overrinden by a response) */
@@ -575,8 +621,12 @@ void dispatch_file_sync(struct mount *mount, struct fsif_request *req)
     struct fs_request *priv_req;
 
     req_id = req->id;
-    fd = req->u.fsync.fd;
-    printf("File sync issued for FD=%d\n", fd); 
+    if (req->u.fsync.fd < MAX_FDS)
+        fd = mount->fds[req->u.fsync.fd];
+    else
+        fd = -1;
+
+    printf("File sync issued for FD=%d\n", req->u.fsync.fd); 
    
     priv_id = get_request(mount, req);
     printf("Private id is: %d\n", priv_id);

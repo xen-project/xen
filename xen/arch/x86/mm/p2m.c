@@ -530,11 +530,25 @@ void p2m_change_entry_type_global(struct domain *d,
     p2m_unlock(p2m);
 }
 
-static inline
+static
 int set_p2m_entry(struct domain *d, unsigned long gfn, mfn_t mfn, 
-                  unsigned int page_order, p2m_type_t p2mt)
+                    unsigned int page_order, p2m_type_t p2mt)
 {
-    return d->arch.p2m->set_entry(d, gfn, mfn, page_order, p2mt);
+    unsigned long todo = 1ul << page_order;
+    unsigned int order;
+    int rc = 0;
+
+    while ( todo )
+    {
+        order = (((gfn | mfn_x(mfn) | todo) & ((1ul << 9) - 1)) == 0) ? 9 : 0;
+        rc = d->arch.p2m->set_entry(d, gfn, mfn, order, p2mt);
+        gfn += 1ul << order;
+        if ( mfn_x(mfn) != INVALID_MFN )
+            mfn = _mfn(mfn_x(mfn) + (1ul << order));
+        todo -= 1ul << order;
+    }
+
+    return rc;
 }
 
 // Allocate a new p2m table for a domain.

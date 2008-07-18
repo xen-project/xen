@@ -1,4 +1,5 @@
 #include <xen/compile.h>
+#include <xen/version.h>
 
 const char *xen_compile_date(void)
 {

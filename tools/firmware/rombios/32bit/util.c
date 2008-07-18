@@ -388,12 +388,6 @@ int printf(const char *fmt, ...)
     return 0;
 }
 
-int vprintf(const char *fmt, va_list ap)
-{
-    _doprint(putchar, fmt, ap);
-    return 0;
-}
-
 void mssleep(uint32_t waittime)
 {
     uint32_t i;

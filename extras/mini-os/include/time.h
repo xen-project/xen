@@ -19,7 +19,7 @@
 
 #ifndef _MINIOS_TIME_H_
 #define _MINIOS_TIME_H_
-#include <types.h>
+#include <mini-os/types.h>
 
 /*
  * System Time

@@ -214,7 +214,7 @@ class ImageHandler:
         method is called before any devices are set up."""
         
         domid = self.vm.getDomid()
-	
+        
         # Delete left-over pipes
         try:
             os.unlink('/var/run/tap/qemu-read-%d' % domid)

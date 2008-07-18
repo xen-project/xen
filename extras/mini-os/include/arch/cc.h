@@ -10,8 +10,8 @@
 #define __LWIP_ARCH_CC_H__
 
 /*   Typedefs for the types used by lwip - */
-#include <os.h>
-#include <types.h>
+#include <mini-os/os.h>
+#include <mini-os/types.h>
 #include <time.h>
 typedef  u8  u8_t;
 typedef  s8  s8_t;
@@ -46,7 +46,7 @@ extern void lwip_die(char *fmt, ...);
 
 /*   If the compiler does not provide memset() this file must include a */
 /*   definition of it, or include a file which defines it. */
-#include <lib.h>
+#include <mini-os/lib.h>
 
 /*   This file must either include a system-local <errno.h> which defines */
 /*   the standard *nix error codes, or it should #define LWIP_PROVIDE_ERRNO */

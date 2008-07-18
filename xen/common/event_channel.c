@@ -56,6 +56,7 @@
         goto out;                                                   \
     } while ( 0 )
 
+static int evtchn_set_pending(struct vcpu *v, int port);
 
 static int virq_is_global(int virq)
 {
@@ -471,11 +472,10 @@ static long evtchn_close(evtchn_close_t *close)
     return __evtchn_close(current->domain, close->port);
 }
 
-
-long evtchn_send(unsigned int lport)
+int evtchn_send(struct domain *d, unsigned int lport)
 {
     struct evtchn *lchn, *rchn;
-    struct domain *ld = current->domain, *rd;
+    struct domain *ld = d, *rd;
     struct vcpu   *rvcpu;
     int            rport, ret = 0;
 
@@ -535,8 +535,7 @@ out:
     return ret;
 }
 
-
-void evtchn_set_pending(struct vcpu *v, int port)
+static int evtchn_set_pending(struct vcpu *v, int port)
 {
     struct domain *d = v->domain;
 
@@ -548,7 +547,7 @@ void evtchn_set_pending(struct vcpu *v, int port)
      */
 
     if ( test_and_set_bit(port, &shared_info(d, evtchn_pending)) )
-        return;
+        return 1;
 
     if ( !test_bit        (port, &shared_info(d, evtchn_mask)) &&
          !test_and_set_bit(port / BITS_PER_GUEST_LONG(d),
@@ -570,6 +569,8 @@ void evtchn_set_pending(struct vcpu *v, int port)
             vcpu_unblock(v);
         }
     }
+
+    return 0;
 }
 
 
@@ -584,6 +585,21 @@ void send_guest_vcpu_virq(struct vcpu *v, int virq)
         return;
 
     evtchn_set_pending(v, port);
+}
+
+int guest_enabled_event(struct vcpu *v, int virq)
+{
+    int port;
+
+    if ( unlikely(v == NULL) )
+        return 0;
+
+    port = v->virq_to_evtchn[virq];
+    if ( port == 0 )
+        return 0;
+
+    /* virq is in use */
+    return 1;
 }
 
 void send_guest_global_virq(struct domain *d, int virq)
@@ -610,7 +626,7 @@ void send_guest_global_virq(struct domain *d, int virq)
 }
 
 
-void send_guest_pirq(struct domain *d, int pirq)
+int send_guest_pirq(struct domain *d, int pirq)
 {
     int port = d->pirq_to_evtchn[pirq];
     struct evtchn *chn;
@@ -618,7 +634,7 @@ void send_guest_pirq(struct domain *d, int pirq)
     ASSERT(port != 0);
 
     chn = evtchn_from_port(d, port);
-    evtchn_set_pending(d->vcpu[chn->notify_vcpu_id], port);
+    return evtchn_set_pending(d->vcpu[chn->notify_vcpu_id], port);
 }
 
 
@@ -890,7 +906,7 @@ long do_event_channel_op(int cmd, XEN_GUEST_HANDLE(void) arg)
         struct evtchn_send send;
         if ( copy_from_guest(&send, arg, 1) != 0 )
             return -EFAULT;
-        rc = evtchn_send(send.port);
+        rc = evtchn_send(current->domain, send.port);
         break;
     }
 

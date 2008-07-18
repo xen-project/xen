@@ -549,7 +549,7 @@ void arch_init_p2m(unsigned long max_pfn)
 #define L2_P2M_MASK     (L2_P2M_ENTRIES - 1)    
 #define L3_P2M_MASK     (L3_P2M_ENTRIES - 1)    
     
-    unsigned long *l1_list, *l2_list, *l3_list;
+    unsigned long *l1_list = NULL, *l2_list = NULL, *l3_list;
     unsigned long pfn;
     
     l3_list = (unsigned long *)alloc_page(); 

@@ -772,11 +772,10 @@ void sdl_display_init(DisplayState *ds, int full_screen, int opengl)
     ds->dpy_resize = sdl_resize;
     ds->dpy_resize_shared = sdl_resize_shared;
     ds->dpy_refresh = sdl_refresh;
+    ds->dpy_setdata = sdl_setdata;
 #ifdef CONFIG_OPENGL
     if (opengl_enabled)
         ds->dpy_setdata = opengl_setdata;
-    else
-        ds->dpy_setdata = sdl_setdata;
 #endif
 
     sdl_resize(ds, 640, 400);

@@ -1,4 +1,4 @@
-#include <wait.h>
+#include <mini-os/wait.h>
 #ifdef HAVE_LWIP
 #include <lwip/netif.h>
 #endif

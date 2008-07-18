@@ -382,7 +382,6 @@ void __devinit init_8259A(int auto_eoi)
 
 static struct irqaction cascade = { no_action, "cascade", NULL};
 
-extern struct list_head msi_pdev_list;
 void __init init_IRQ(void)
 {
     int i;
@@ -419,7 +418,5 @@ void __init init_IRQ(void)
     outb(LATCH >> 8, PIT_CH0);     /* MSB */
 
     setup_irq(2, &cascade);
-
-    INIT_LIST_HEAD(&msi_pdev_list);
 }
 

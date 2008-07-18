@@ -186,15 +186,8 @@ static void rtc_set_time(RTCState *s)
 static void rtc_copy_date(RTCState *s)
 {
     const struct tm *tm = &s->current_tm;
-    struct domain *d = vrtc_domain(s);
 
     ASSERT(spin_is_locked(&s->lock));
-
-    if ( s->time_offset_seconds != d->time_offset_seconds )
-    {
-        s->current_tm = gmtime(get_localtime(d));
-        s->time_offset_seconds = d->time_offset_seconds;
-    }
 
     s->hw.cmos_data[RTC_SECONDS] = to_bcd(s, tm->tm_sec);
     s->hw.cmos_data[RTC_MINUTES] = to_bcd(s, tm->tm_min);
@@ -237,15 +230,8 @@ static void rtc_next_second(RTCState *s)
 {
     struct tm *tm = &s->current_tm;
     int days_in_month;
-    struct domain *d = vrtc_domain(s);
 
     ASSERT(spin_is_locked(&s->lock));
-
-    if ( s->time_offset_seconds != d->time_offset_seconds )
-    {
-        s->current_tm = gmtime(get_localtime(d));
-        s->time_offset_seconds = d->time_offset_seconds;
-    }
 
     tm->tm_sec++;
     if ( (unsigned)tm->tm_sec >= 60 )
@@ -474,46 +460,61 @@ static int rtc_load(struct domain *d, hvm_domain_context_t *h)
 
 HVM_REGISTER_SAVE_RESTORE(RTC, rtc_save, rtc_load, 1, HVMSR_PER_DOM);
 
-
-void rtc_init(struct vcpu *v, int base)
+void rtc_reset(struct domain *d)
 {
-    RTCState *s = vcpu_vrtc(v);
+    RTCState *s = domain_vrtc(d);
+
+    destroy_periodic_time(&s->pt);
+    s->pt.source = PTSRC_isa;
+}
+
+void rtc_init(struct domain *d)
+{
+    RTCState *s = domain_vrtc(d);
 
     spin_lock_init(&s->lock);
 
-    s->pt.source = PTSRC_isa;
+    init_timer(&s->second_timer, rtc_update_second, s, smp_processor_id());
+    init_timer(&s->second_timer2, rtc_update_second2, s, smp_processor_id());
+
+    register_portio_handler(d, RTC_PORT(0), 2, handle_rtc_io);
+
+    rtc_reset(d);
+
+    spin_lock(&s->lock);
 
     s->hw.cmos_data[RTC_REG_A] = RTC_REF_CLCK_32KHZ | 6; /* ~1kHz */
     s->hw.cmos_data[RTC_REG_B] = RTC_24H;
     s->hw.cmos_data[RTC_REG_C] = 0;
     s->hw.cmos_data[RTC_REG_D] = RTC_VRT;
 
-    s->current_tm = gmtime(get_localtime(v->domain));
+    s->current_tm = gmtime(get_localtime(d));
 
-    spin_lock(&s->lock);
     rtc_copy_date(s);
-    spin_unlock(&s->lock);
-
-    init_timer(&s->second_timer, rtc_update_second, s, v->processor);
-    init_timer(&s->second_timer2, rtc_update_second2, s, v->processor);
 
     s->next_second_time = NOW() + 1000000000ULL;
+    stop_timer(&s->second_timer);
     set_timer(&s->second_timer2, s->next_second_time);
 
-    register_portio_handler(v->domain, base, 2, handle_rtc_io);
+    spin_unlock(&s->lock);
 }
 
 void rtc_deinit(struct domain *d)
 {
     RTCState *s = domain_vrtc(d);
 
+    spin_barrier(&s->lock);
+
     destroy_periodic_time(&s->pt);
     kill_timer(&s->second_timer);
     kill_timer(&s->second_timer2);
 }
 
-void rtc_reset(struct domain *d)
+void rtc_update_clock(struct domain *d)
 {
     RTCState *s = domain_vrtc(d);
-    destroy_periodic_time(&s->pt);
+
+    spin_lock(&s->lock);
+    s->current_tm = gmtime(get_localtime(d));
+    spin_unlock(&s->lock);
 }

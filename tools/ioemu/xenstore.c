@@ -320,7 +320,7 @@ void xenstore_parse_domain_config(int hvm_domid)
 
     /* get the pci pass-through parameter */
     if (pasprintf(&buf, "/local/domain/0/backend/pci/%u/%u/num_devs",
-                  domid, pci_devid) == -1)
+                  hvm_domid, pci_devid) == -1)
         goto out;
 
     free(params);
@@ -331,7 +331,7 @@ void xenstore_parse_domain_config(int hvm_domid)
 
     for ( i = 0; i < num; i++ ) {
         if (pasprintf(&buf, "/local/domain/0/backend/pci/%u/%u/dev-%d",
-                    domid, pci_devid, i) != -1) {
+                    hvm_domid, pci_devid, i) != -1) {
             free(dev);
             dev = xs_read(xsh, XBT_NULL, buf, &len);
 

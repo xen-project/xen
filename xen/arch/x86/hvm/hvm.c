@@ -57,6 +57,9 @@ int hvm_enabled __read_mostly;
 unsigned int opt_hvm_debug_level __read_mostly;
 integer_param("hvm_debug", opt_hvm_debug_level);
 
+int opt_softtsc;
+boolean_param("softtsc", opt_softtsc);
+
 struct hvm_function_table hvm_funcs __read_mostly;
 
 /* I/O permission bitmap is globally shared by all HVM guests. */
@@ -148,7 +151,11 @@ u64 hvm_get_guest_tsc(struct vcpu *v)
 {
     u64 host_tsc;
 
-    rdtscll(host_tsc);
+    if ( opt_softtsc )
+        host_tsc = hvm_get_guest_time(v);
+    else
+        rdtscll(host_tsc);
+
     return host_tsc + v->arch.hvm_vcpu.cache_tsc_offset;
 }
 
@@ -314,6 +321,8 @@ int hvm_domain_initialise(struct domain *d)
 
     stdvga_init(d);
 
+    rtc_init(d);
+
     hvm_init_ioreq_page(d, &d->arch.hvm_domain.ioreq);
     hvm_init_ioreq_page(d, &d->arch.hvm_domain.buf_ioreq);
 
@@ -326,6 +335,8 @@ int hvm_domain_initialise(struct domain *d)
     return 0;
 
  fail2:
+    rtc_deinit(d);
+    stdvga_deinit(d);
     vioapic_deinit(d);
  fail1:
     hvm_destroy_cacheattr_region_list(d);
@@ -337,16 +348,21 @@ void hvm_domain_relinquish_resources(struct domain *d)
     hvm_destroy_ioreq_page(d, &d->arch.hvm_domain.ioreq);
     hvm_destroy_ioreq_page(d, &d->arch.hvm_domain.buf_ioreq);
 
-    pit_deinit(d);
+    /* Stop all asynchronous timer actions. */
     rtc_deinit(d);
-    pmtimer_deinit(d);
-    hpet_deinit(d);
-    stdvga_deinit(d);
+    if ( d->vcpu[0] != NULL )
+    {
+        pit_deinit(d);
+        pmtimer_deinit(d);
+        hpet_deinit(d);
+    }
 }
 
 void hvm_domain_destroy(struct domain *d)
 {
     hvm_funcs.domain_destroy(d);
+    rtc_deinit(d);
+    stdvga_deinit(d);
     vioapic_deinit(d);
     hvm_destroy_cacheattr_region_list(d);
 }
@@ -658,7 +674,6 @@ int hvm_vcpu_initialise(struct vcpu *v)
     {
         /* NB. All these really belong in hvm_domain_initialise(). */
         pit_init(v, cpu_khz);
-        rtc_init(v, RTC_PORT(0));
         pmtimer_init(v);
         hpet_init(v);
  
@@ -828,6 +843,14 @@ static void local_flush_cache(void *info)
     wbinvd();
 }
 
+static void hvm_set_uc_mode(struct vcpu *v, bool_t is_in_uc_mode)
+{
+    v->domain->arch.hvm_domain.is_in_uc_mode = is_in_uc_mode;
+    shadow_blow_tables_per_domain(v->domain);
+    if ( hvm_funcs.set_uc_mode )
+        return hvm_funcs.set_uc_mode(v);
+}
+
 int hvm_set_cr0(unsigned long value)
 {
     struct vcpu *v = current;
@@ -903,7 +926,7 @@ int hvm_set_cr0(unsigned long value)
         }
     }
 
-    if ( !list_empty(&domain_hvm_iommu(v->domain)->pdev_list) )
+    if ( has_arch_pdevs(v->domain) )
     {
         if ( (value & X86_CR0_CD) && !(value & X86_CR0_NW) )
         {
@@ -915,9 +938,7 @@ int hvm_set_cr0(unsigned long value)
             {
                 /* Flush physical caches. */
                 on_each_cpu(local_flush_cache, NULL, 1, 1);
-                /* Shadow pagetables must recognise UC mode. */
-                v->domain->arch.hvm_domain.is_in_uc_mode = 1;
-                shadow_blow_tables_per_domain(v->domain);
+                hvm_set_uc_mode(v, 1);
             }
             spin_unlock(&v->domain->arch.hvm_domain.uc_lock);
         }
@@ -929,11 +950,8 @@ int hvm_set_cr0(unsigned long value)
             v->arch.hvm_vcpu.cache_mode = NORMAL_CACHE_MODE;
 
             if ( domain_exit_uc_mode(v) )
-            {
-                /* Shadow pagetables must recognise normal caching mode. */
-                v->domain->arch.hvm_domain.is_in_uc_mode = 0;
-                shadow_blow_tables_per_domain(v->domain);
-            }
+                hvm_set_uc_mode(v, 0);
+
             spin_unlock(&v->domain->arch.hvm_domain.uc_lock);
         }
     }
@@ -1485,8 +1503,19 @@ static enum hvm_copy_result __hvm_copy(
 
         if ( flags & HVMCOPY_to_guest )
         {
-            memcpy(p, buf, count);
-            paging_mark_dirty(curr->domain, mfn);
+            if ( p2mt == p2m_ram_ro )
+            {
+                static unsigned long lastpage;
+                if ( xchg(&lastpage, gfn) != gfn )
+                    gdprintk(XENLOG_DEBUG, "guest attempted write to read-only"
+                             " memory page. gfn=%#lx, mfn=%#lx\n",
+                             gfn, mfn);
+            }
+            else
+            {
+                memcpy(p, buf, count);
+                paging_mark_dirty(curr->domain, mfn);
+            }
         }
         else
         {
@@ -1627,6 +1656,16 @@ void hvm_cpuid(unsigned int input, unsigned int *eax, unsigned int *ebx,
         if ( vlapic_hw_disabled(vcpu_vlapic(v)) )
             __clear_bit(X86_FEATURE_APIC & 31, edx);
     }
+}
+
+void hvm_rdtsc_intercept(struct cpu_user_regs *regs)
+{
+    uint64_t tsc;
+    struct vcpu *v = current;
+
+    tsc = hvm_get_guest_tsc(v);
+    regs->eax = (uint32_t)tsc;
+    regs->edx = (uint32_t)(tsc >> 32);
 }
 
 int hvm_msr_read_intercept(struct cpu_user_regs *regs)
@@ -2131,7 +2170,7 @@ static void hvm_s3_suspend(struct domain *d)
     domain_pause(d);
     domain_lock(d);
 
-    if ( (d->vcpu[0] == NULL) ||
+    if ( d->is_dying || (d->vcpu[0] == NULL) ||
          test_and_set_bool(d->arch.hvm_domain.is_s3_suspended) )
     {
         domain_unlock(d);
@@ -2585,6 +2624,65 @@ long do_hvm_op(unsigned long op, XEN_GUEST_HANDLE(void) arg)
         }
 
     param_fail3:
+        rcu_unlock_domain(d);
+        break;
+    }
+
+    case HVMOP_set_mem_type:
+    {
+        struct xen_hvm_set_mem_type a;
+        struct domain *d;
+        unsigned long pfn;
+        
+        /* Interface types to internal p2m types */
+        p2m_type_t memtype[] = {
+            p2m_ram_rw,        /* HVMMEM_ram_rw  */
+            p2m_ram_ro,        /* HVMMEM_ram_ro  */
+            p2m_mmio_dm        /* HVMMEM_mmio_dm */
+        };
+
+        if ( copy_from_guest(&a, arg, 1) )
+            return -EFAULT;
+
+        if ( a.domid == DOMID_SELF )
+        {
+            d = rcu_lock_current_domain();
+        }
+        else
+        {
+            if ( (d = rcu_lock_domain_by_id(a.domid)) == NULL )
+                return -ESRCH;
+            if ( !IS_PRIV_FOR(current->domain, d) )
+            {
+                rc = -EPERM;
+                goto param_fail4;
+            }
+        }
+
+        rc = -EINVAL;
+        if ( !is_hvm_domain(d) )
+            goto param_fail4;
+
+        rc = -EINVAL;
+        if ( (a.first_pfn > domain_get_maximum_gpfn(d)) ||
+             ((a.first_pfn + a.nr - 1) < a.first_pfn) ||
+             ((a.first_pfn + a.nr - 1) > domain_get_maximum_gpfn(d)) )
+            goto param_fail4;
+            
+        if ( a.hvmmem_type >= ARRAY_SIZE(memtype) )
+            goto param_fail4;
+            
+        rc = 0;
+        
+        for ( pfn = a.first_pfn; pfn < a.first_pfn + a.nr; pfn++ )
+        {
+            p2m_type_t t;
+            mfn_t mfn;
+            mfn = gfn_to_mfn(d, pfn, &t);
+            p2m_change_type(d, pfn, t, memtype[a.hvmmem_type]);
+        }
+         
+    param_fail4:
         rcu_unlock_domain(d);
         break;
     }

@@ -1199,7 +1199,7 @@ check_pool_label(fsi_file_t *ffi, int label, char *stack)
  *	1 - success
  *	0 - failure
  */
-int
+static int
 zfs_mount(fsi_file_t *ffi, const char *options)
 {
 	char *stack;
@@ -1284,7 +1284,7 @@ zfs_mount(fsi_file_t *ffi, const char *options)
  *	1 - success
  *	0 - failure
  */
-int
+static int
 zfs_open(fsi_file_t *ffi, char *filename)
 {
 	char *stack;
@@ -1377,7 +1377,7 @@ zfs_open(fsi_file_t *ffi, char *filename)
  *	len - the length successfully read in to the buffer
  *	0   - failure
  */
-int
+static int
 zfs_read(fsi_file_t *ffi, char *buf, int len)
 {
 	char *stack;

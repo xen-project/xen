@@ -36,11 +36,14 @@ BLK-OBJS-y  += block-qcow.o
 BLK-OBJS-y  += block-qcow2.o
 BLK-OBJS-y  += aes.o
 BLK-OBJS-y  += tapaio.o
-BLK-OBJS-$(CONFIG_Linux) += blk_linux.c
+BLK-OBJS-$(CONFIG_Linux) += blk_linux.o
+
+BLKTAB-OBJS-y := blktapctrl.o
+BLKTAB-OBJS-$(CONFIG_Linux) += blktapctrl_linux.o
 
 all: $(IBIN) qcow-util
 
-blktapctrl: blktapctrl.o
+blktapctrl: $(BLKTAB-OBJS-y)
 	$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS) $(LDFLAGS_blktapctrl)
 
 tapdisk: tapdisk.o $(BLK-OBJS-y)

@@ -110,9 +110,9 @@ void allocate_request_array(struct mount *mount)
     unsigned short *freelist;
     
     requests = malloc(sizeof(struct fs_request) *nr_entries);
-    freelist = malloc(sizeof(unsigned short) * nr_entries); 
+    freelist = malloc(sizeof(unsigned short) * (nr_entries + 1)); 
     memset(requests, 0, sizeof(struct fs_request) * nr_entries);
-    memset(freelist, 0, sizeof(unsigned short) * nr_entries);
+    memset(freelist, 0, sizeof(unsigned short) * (nr_entries + 1));
     for(i=0; i< nr_entries; i++)
     {
         requests[i].active = 0; 
@@ -198,6 +198,7 @@ static void handle_connection(int frontend_dom_id, int export_id, char *frontend
     int evt_port;
     pthread_t handling_thread;
     struct fsif_sring *sring;
+    int i;
 
     printf("Handling connection from dom=%d, for export=%d\n", 
             frontend_dom_id, export_id);
@@ -240,6 +241,8 @@ static void handle_connection(int frontend_dom_id, int export_id, char *frontend
                                     PROT_READ | PROT_WRITE);
     BACK_RING_INIT(&mount->ring, sring, PAGE_SIZE);
     mount->nr_entries = mount->ring.nr_ents; 
+    for (i = 0; i < MAX_FDS; i++)
+        mount->fds[i] = -1;
     xenbus_write_backend_ready(mount);
 
     pthread_create(&handling_thread, NULL, &handle_mount, mount);

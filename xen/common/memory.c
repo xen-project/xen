@@ -44,7 +44,6 @@ static void increase_reservation(struct memop_args *a)
     unsigned long i;
     xen_pfn_t mfn;
     struct domain *d = a->domain;
-    unsigned int node = domain_to_node(d);
 
     if ( !guest_handle_is_null(a->extent_list) &&
          !guest_handle_subrange_okay(a->extent_list, a->nr_done,
@@ -63,8 +62,7 @@ static void increase_reservation(struct memop_args *a)
             goto out;
         }
 
-        page = alloc_domheap_pages(
-            d, a->extent_order, a->memflags | MEMF_node(node));
+        page = alloc_domheap_pages(d, a->extent_order, a->memflags);
         if ( unlikely(page == NULL) ) 
         {
             gdprintk(XENLOG_INFO, "Could not allocate order=%d extent: "
@@ -93,7 +91,6 @@ static void populate_physmap(struct memop_args *a)
     unsigned long i, j;
     xen_pfn_t gpfn, mfn;
     struct domain *d = a->domain;
-    unsigned int node = domain_to_node(d);
 
     if ( !guest_handle_subrange_okay(a->extent_list, a->nr_done,
                                      a->nr_extents-1) )
@@ -114,8 +111,7 @@ static void populate_physmap(struct memop_args *a)
         if ( unlikely(__copy_from_guest_offset(&gpfn, a->extent_list, i, 1)) )
             goto out;
 
-        page = alloc_domheap_pages(
-            d, a->extent_order, a->memflags | MEMF_node(node));
+        page = alloc_domheap_pages(d, a->extent_order, a->memflags);
         if ( unlikely(page == NULL) ) 
         {
             gdprintk(XENLOG_INFO, "Could not allocate order=%d extent: "
@@ -291,7 +287,7 @@ static long memory_exchange(XEN_GUEST_HANDLE(xen_memory_exchange_t) arg)
     unsigned long in_chunk_order, out_chunk_order;
     xen_pfn_t     gpfn, gmfn, mfn;
     unsigned long i, j, k;
-    unsigned int  memflags = 0;
+    unsigned int  node, memflags = 0;
     long          rc = 0;
     struct domain *d;
     struct page_info *page;
@@ -345,8 +341,13 @@ static long memory_exchange(XEN_GUEST_HANDLE(xen_memory_exchange_t) arg)
     d = current->domain;
 
     memflags |= MEMF_bits(domain_clamp_alloc_bitsize(
-        d, exch.out.address_bits ? : (BITS_PER_LONG+PAGE_SHIFT)));
-    memflags |= MEMF_node(domain_to_node(d));
+        d,
+        XENMEMF_get_address_bits(exch.out.mem_flags) ? :
+        (BITS_PER_LONG+PAGE_SHIFT)));
+    node = XENMEMF_get_node(exch.out.mem_flags);
+    if ( node == NUMA_NO_NODE )
+        node = domain_to_node(d);
+    memflags |= MEMF_node(node);
 
     for ( i = (exch.nr_exchanged >> in_chunk_order);
           i < (exch.in.nr_extents >> in_chunk_order);
@@ -490,6 +491,7 @@ long do_memory_op(unsigned long cmd, XEN_GUEST_HANDLE(void) arg)
 {
     struct domain *d;
     int rc, op;
+    unsigned int address_bits;
     unsigned long start_extent, progress;
     struct xen_memory_reservation reservation;
     struct memop_args args;
@@ -521,14 +523,16 @@ long do_memory_op(unsigned long cmd, XEN_GUEST_HANDLE(void) arg)
         args.preempted    = 0;
         args.memflags     = 0;
 
-        if ( (reservation.address_bits != 0) &&
-             (reservation.address_bits <
-              (get_order_from_pages(max_page) + PAGE_SHIFT)) )
+        address_bits = XENMEMF_get_address_bits(reservation.mem_flags);
+        if ( (address_bits != 0) &&
+             (address_bits < (get_order_from_pages(max_page) + PAGE_SHIFT)) )
         {
-            if ( reservation.address_bits <= PAGE_SHIFT )
+            if ( address_bits <= PAGE_SHIFT )
                 return start_extent;
-            args.memflags = MEMF_bits(reservation.address_bits);
+            args.memflags = MEMF_bits(address_bits);
         }
+
+        args.memflags |= MEMF_node(XENMEMF_get_node(reservation.mem_flags));
 
         if ( likely(reservation.domid == DOMID_SELF) )
         {

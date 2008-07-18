@@ -36,8 +36,6 @@ struct g2m_ioport {
 };
 
 struct hvm_iommu {
-    spinlock_t iommu_list_lock;    /* protect iommu specific lists */
-    struct list_head pdev_list;    /* direct accessed pci devices */
     u64 pgd_maddr;                 /* io page directory machine address */
     spinlock_t mapping_lock;       /* io page table lock */
     int agaw;     /* adjusted guest address width, 0 is level 2 30-bit */
@@ -54,8 +52,5 @@ struct hvm_iommu {
     /* iommu_ops */
     struct iommu_ops *platform_ops;
 };
-
-#define has_iommu_pdevs(domain) \
-    (!list_empty(&(domain->arch.hvm_domain.hvm_iommu.pdev_list)))
 
 #endif /* __ASM_X86_HVM_IOMMU_H__ */

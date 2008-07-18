@@ -95,7 +95,8 @@ static void vmx_init_vmcs_config(void)
            CPU_BASED_MWAIT_EXITING |
            CPU_BASED_MOV_DR_EXITING |
            CPU_BASED_ACTIVATE_IO_BITMAP |
-           CPU_BASED_USE_TSC_OFFSETING);
+           CPU_BASED_USE_TSC_OFFSETING |
+           (opt_softtsc ? CPU_BASED_RDTSC_EXITING : 0));
     opt = (CPU_BASED_ACTIVATE_MSR_BITMAP |
            CPU_BASED_TPR_SHADOW |
            CPU_BASED_ACTIVATE_SECONDARY_CONTROLS);
@@ -849,8 +850,7 @@ void vmx_do_resume(struct vcpu *v)
          *     there is no wbinvd exit, or
          *  2: execute wbinvd on all dirty pCPUs when guest wbinvd exits.
          */
-        if ( !list_empty(&(domain_hvm_iommu(v->domain)->pdev_list)) &&
-             !cpu_has_wbinvd_exiting )
+        if ( has_arch_pdevs(v->domain) && !cpu_has_wbinvd_exiting )
         {
             int cpu = v->arch.hvm_vmx.active_cpu;
             if ( cpu != -1 )

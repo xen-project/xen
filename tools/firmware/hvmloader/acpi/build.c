@@ -70,12 +70,7 @@ static int hpet_exists(unsigned long hpet_base)
 
 static int construct_bios_info_table(uint8_t *buf)
 {
-    struct bios_info {
-        uint8_t  com1_present:1;
-        uint8_t  com2_present:1;
-        uint8_t  hpet_present:1;
-        uint32_t pci_min, pci_len;
-    } *bios_info = (struct bios_info *)buf;
+    struct bios_info *bios_info = (struct bios_info *)buf;
 
     memset(bios_info, 0, sizeof(*bios_info));
 
@@ -86,6 +81,7 @@ static int construct_bios_info_table(uint8_t *buf)
 
     bios_info->pci_min = PCI_MEMBASE;
     bios_info->pci_len = PCI_MEMSIZE;
+    bios_info->xen_pfiob = 0xdead;
 
     return align16(sizeof(*bios_info));
 }

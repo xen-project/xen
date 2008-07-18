@@ -1,30 +1,9 @@
 #ifndef __WAIT_H__
 #define __WAIT_H__
 
-#include <sched.h>
-#include <list.h>
-#include <lib.h>
-#include <os.h>
-
-struct wait_queue
-{
-    struct thread *thread;
-    struct list_head thread_list;
-};
-
-struct wait_queue_head
-{
-    /* TODO - lock required? */
-    struct list_head thread_list;
-};
-
-#define DECLARE_WAIT_QUEUE_HEAD(name) \
-   struct wait_queue_head name =     \
-        { .thread_list = { &(name).thread_list, &(name).thread_list} }
-
-#define __WAIT_QUEUE_HEAD_INITIALIZER(name) {                           \
-    .thread_list      = { &(name).thread_list, &(name).thread_list } }
-
+#include <mini-os/sched.h>
+#include <mini-os/os.h>
+#include <mini-os/waittypes.h>
 
 #define DEFINE_WAIT(name)                               \
 struct wait_queue name = {                              \

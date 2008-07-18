@@ -33,6 +33,7 @@ from xen.xend import osdep
 import xen.xend.XendClient
 from xen.xend.XendBootloader import bootloader
 from xen.util import blkif
+from xen.util import vscsi_util
 import xen.util.xsm.xsm as security
 from xen.xm.main import serverType, SERVER_XEN_API, get_single_vm
 
@@ -307,6 +308,11 @@ gopts.var('pci', val='BUS:DEV.FUNC',
          For example 'pci=c0:02.1'.
          The option may be repeated to add more than one pci device.""")
 
+gopts.var('vscsi', val='PDEV,VDEV[,DOM]',
+          fn=append_value, default=[],
+          use="""Add a SCSI device to a domain. The physical device is PDEV,
+          which is exported to the domain as VDEV(X:X:X:X).""")
+
 gopts.var('ioports', val='FROM[-TO]',
           fn=append_value, default=[],
           use="""Add a legacy I/O range to a domain, using given params (in hex).
@@ -557,6 +563,10 @@ gopts.var('cpuid_check', val="IN[,SIN]:eax=EAX,ebx=EBX,exc=ECX,edx=EDX",
           fn=append_value, default=[],
           use="""Cpuid check description.""")
 
+gopts.var('machine_address_size', val='BITS',
+          fn=set_int, default=None,
+          use="""Maximum machine address size""")
+
 def err(msg):
     """Print an error to stderr and exit.
     """
@@ -605,6 +615,9 @@ def configure_image(vals):
     if vals.vhpt != 0:
         config_image.append(['vhpt', vals.vhpt])
 
+    if vals.machine_address_size:
+        config_image.append(['machine_address_size', vals.machine_address_size])
+
     return config_image
     
 def configure_disks(config_devs, vals):
@@ -637,6 +650,73 @@ def configure_pci(config_devs, vals):
     if len(config_pci)>0:
         config_pci.insert(0, 'pci')
         config_devs.append(['device', config_pci])
+
+def vscsi_convert_sxp_to_dict(dev_sxp):
+    dev_dict = {}
+    for opt_val in dev_sxp[1:]:
+        try:
+            opt, val = opt_val
+            dev_dict[opt] = val
+        except TypeError:
+            pass
+    return dev_dict
+
+def vscsi_lookup_devid(devlist, req_devid):
+    if len(devlist) == 0:
+        return 0
+    else:
+        for devid, backend in devlist:
+            if devid == req_devid:
+                return 1
+        return 0
+
+def configure_vscsis(config_devs, vals):
+    """Create the config for vscsis (virtual scsi devices).
+    """
+    devidlist = []
+    config_scsi = []
+    if len(vals.vscsi) == 0:
+        return 0
+
+    scsi_devices = vscsi_util.vscsi_get_scsidevices()
+    for (p_dev, v_dev, backend) in vals.vscsi:
+        tmp = p_dev.split(':')
+        if len(tmp) == 4:
+            (p_hctl, block) = vscsi_util._vscsi_hctl_block(p_dev, scsi_devices)
+        else:
+            (p_hctl, block) = vscsi_util._vscsi_block_scsiid_to_hctl(p_dev, scsi_devices)
+
+        if p_hctl == None:
+            raise ValueError("Cannot find device \"%s\"" % p_dev)
+
+        for config in config_scsi:
+            dev = vscsi_convert_sxp_to_dict(config)
+            if dev['v-dev'] == v_dev:
+                raise ValueError('The virtual device "%s" is already defined' % v_dev)
+
+        v_hctl = v_dev.split(':')
+        devid = int(v_hctl[0])
+        config_scsi.append(['dev', \
+                        ['state', 'Initialising'], \
+                        ['devid', devid], \
+                        ['p-dev', p_hctl], \
+                        ['p-devname', block], \
+                        ['v-dev', v_dev] ])
+
+        if vscsi_lookup_devid(devidlist, devid) == 0:
+            devidlist.append([devid, backend])
+
+    for devid, backend in devidlist:
+        tmp = []
+        for config in config_scsi:
+            dev = vscsi_convert_sxp_to_dict(config)
+            if dev['devid'] == devid:
+                tmp.append(config)
+
+        tmp.insert(0, 'vscsi')
+        if backend:
+            tmp.append(['backend', backend])
+        config_devs.append(['device', tmp])
 
 def configure_ioports(config_devs, vals):
     """Create the config for legacy i/o ranges.
@@ -790,7 +870,7 @@ def make_config(vals):
                    'restart', 'on_poweroff',
                    'on_reboot', 'on_crash', 'vcpus', 'vcpu_avail', 'features',
                    'on_xend_start', 'on_xend_stop', 'target', 'cpuid',
-                   'cpuid_check'])
+                   'cpuid_check', 'machine_address_size'])
 
     if vals.uuid is not None:
         config.append(['uuid', vals.uuid])
@@ -829,6 +909,7 @@ def make_config(vals):
     config_devs = []
     configure_disks(config_devs, vals)
     configure_pci(config_devs, vals)
+    configure_vscsis(config_devs, vals)
     configure_ioports(config_devs, vals)
     configure_irq(config_devs, vals)
     configure_vifs(config_devs, vals)
@@ -895,6 +976,25 @@ def preprocess_pci(vals):
             except IndexError:
                 err('Error in PCI slot syntax "%s"'%(pci_dev_str))
     vals.pci = pci
+
+def preprocess_vscsi(vals):
+    if not vals.vscsi: return
+    scsi = []
+    for scsi_str in vals.vscsi:
+        d = scsi_str.split(',')
+        n = len(d)
+        if n == 2:
+            tmp = d[1].split(':')
+            if len(tmp) != 4:
+                err('vscsi syntax error "%s"' % d[1])
+            else:
+                d.append(None)
+        elif n == 3:
+            pass
+        else:
+            err('vscsi syntax error "%s"' % scsi_str)
+        scsi.append(d)
+    vals.vscsi = scsi
 
 def preprocess_ioports(vals):
     if not vals.ioports: return
@@ -1075,6 +1175,7 @@ def preprocess_vnc(vals):
 def preprocess(vals):
     preprocess_disk(vals)
     preprocess_pci(vals)
+    preprocess_vscsi(vals)
     preprocess_ioports(vals)
     preprocess_ip(vals)
     preprocess_nfs(vals)

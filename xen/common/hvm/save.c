@@ -84,6 +84,9 @@ int hvm_save(struct domain *d, hvm_domain_context_t *h)
     hvm_save_handler handler;
     uint16_t i;
 
+    if ( d->is_dying )
+        return -EINVAL;
+
     hdr.magic = HVM_FILE_MAGIC;
     hdr.version = HVM_FILE_VERSION;
 
@@ -140,6 +143,9 @@ int hvm_load(struct domain *d, hvm_domain_context_t *h)
     hvm_load_handler handler;
     struct vcpu *v;
     
+    if ( d->is_dying )
+        return -EINVAL;
+
     /* Read the save header, which must be first */
     if ( hvm_load_entry(HEADER, h, &hdr) != 0 ) 
         return -1;

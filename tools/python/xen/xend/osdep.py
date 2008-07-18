@@ -67,11 +67,11 @@ def _solaris_balloon_stat(label):
     BLN_IOCTL_LOW = 0x42410003
     BLN_IOCTL_HIGH = 0x42410004
     BLN_IOCTL_LIMIT = 0x42410005
-    label_to_ioctl = {	'Current allocation'	: BLN_IOCTL_CURRENT,
-			'Requested target'	: BLN_IOCTL_TARGET,
-			'Low-mem balloon'	: BLN_IOCTL_LOW,
-			'High-mem balloon'	: BLN_IOCTL_HIGH,
-			'Xen hard limit'	: BLN_IOCTL_LIMIT }
+    label_to_ioctl = { 'Current allocation' : BLN_IOCTL_CURRENT,
+                       'Requested target'   : BLN_IOCTL_TARGET,
+                       'Low-mem balloon'    : BLN_IOCTL_LOW,
+                       'High-mem balloon'   : BLN_IOCTL_HIGH,
+                       'Xen hard limit'     : BLN_IOCTL_LIMIT }
 
     f = file(DEV_XEN_BALLOON, 'r')
     try:

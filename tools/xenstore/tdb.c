@@ -28,7 +28,7 @@
 
 
 #ifndef _SAMBA_BUILD_
-#if HAVE_CONFIG_H
+#ifdef HAVE_CONFIG_H
 #include <config.h>
 #endif
 
@@ -731,7 +731,7 @@ update:
 static int expand_file(TDB_CONTEXT *tdb, tdb_off size, tdb_off addition)
 {
 	char buf[1024];
-#if HAVE_FTRUNCATE_EXTEND
+#ifdef HAVE_FTRUNCATE_EXTEND
 	if (ftruncate(tdb->fd, size+addition) != 0) {
 		TDB_LOG((tdb, 0, "expand_file ftruncate to %d failed (%s)\n", 
 			   size+addition, strerror(errno)));

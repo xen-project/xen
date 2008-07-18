@@ -67,7 +67,11 @@ void __dummy__(void)
            arch.guest_context.kernel_sp);
     OFFSET(VCPU_guest_context_flags, struct vcpu, arch.guest_context.flags);
     OFFSET(VCPU_nmi_pending, struct vcpu, nmi_pending);
-    OFFSET(VCPU_nmi_masked, struct vcpu, nmi_masked);
+    OFFSET(VCPU_mce_pending, struct vcpu, mce_pending);
+    OFFSET(VCPU_old_trap_priority, struct vcpu, old_trap_priority);
+    OFFSET(VCPU_trap_priority, struct vcpu, trap_priority);
+    DEFINE(VCPU_TRAP_NMI, VCPU_TRAP_NMI);
+    DEFINE(VCPU_TRAP_MCE, VCPU_TRAP_MCE);
     DEFINE(_VGCF_failsafe_disables_events, _VGCF_failsafe_disables_events);
     BLANK();
 
