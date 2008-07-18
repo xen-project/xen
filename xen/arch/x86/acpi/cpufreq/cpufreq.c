@@ -433,16 +433,13 @@ acpi_cpufreq_cpu_init(struct cpufreq_policy *policy)
     perf = data->acpi_data;
     policy->shared_type = perf->shared_type;
 
-    /*
-     * Will let policy->cpus know about dependency only when software
-     * coordination is required.
+    /* 
+     * Currently the latest linux (kernel version 2.6.26) 
+     * still has issue when handle the situation _psd HW_ALL coordination.
+     * In Xen hypervisor, we handle _psd HW_ALL coordination in same way as
+     * _psd SW_ALL coordination for the seek of safety.
      */
-    if (policy->shared_type == CPUFREQ_SHARED_TYPE_ALL ||
-        policy->shared_type == CPUFREQ_SHARED_TYPE_ANY) {
-        policy->cpus = perf->shared_cpu_map;
-    } else {
-        policy->cpus = cpumask_of_cpu(cpu);    
-    }
+    policy->cpus = perf->shared_cpu_map;
 
     /* capability check */
     if (perf->state_count <= 1) {
