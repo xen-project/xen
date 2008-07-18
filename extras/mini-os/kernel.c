@@ -592,6 +592,7 @@ void stop_kernel(void)
 void do_exit(void)
 {
     printk("Do_exit called!\n");
+    stack_walk();
     for( ;; )
     {
         struct sched_shutdown sched_shutdown = { .reason = SHUTDOWN_crash };
