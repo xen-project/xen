@@ -69,7 +69,6 @@ fi
 if [ -L "$p" ]; then
     file=$(readlink -f "$p") || fatal "$p link does not exist."
 else
-    [ -f "$p" ] || { fatal "$p file does not exist."; }
     file="$p"
 fi
 
