@@ -209,6 +209,14 @@ case "$command" in
         FRONTEND_ID=$(xenstore_read "$XENBUS_PATH/frontend-id")
         FRONTEND_UUID=$(xenstore_read_default \
             "/local/domain/$FRONTEND_ID/vm" 'unknown')
+
+        if [ -L "$dev" ]
+        then
+          dev=$(readlink -f "$dev") || fatal "$dev link does not exist."
+        fi
+        test -e "$dev" || fatal "$dev does not exist."
+        test -b "$dev" || fatal "$dev is not a block device."
+
         claim_lock "block"
         check_device_sharing "$dev" "$mode"
 	write_dev "$dev"
