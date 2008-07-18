@@ -85,7 +85,7 @@ newlib-$(NEWLIB_VERSION): newlib-$(NEWLIB_VERSION).tar.gz
 NEWLIB_STAMPFILE=$(CROSS_ROOT)/$(GNU_TARGET_ARCH)-xen-elf/lib/libc.a
 .PHONY: cross-newlib
 cross-newlib: $(NEWLIB_STAMPFILE)
-$(NEWLIB_STAMPFILE): newlib-$(NEWLIB_VERSION)
+$(NEWLIB_STAMPFILE): mk-headers newlib-$(NEWLIB_VERSION)
 	mkdir -p newlib-build
 	( cd newlib-build && \
 	  CC_FOR_TARGET="$(CC) $(TARGET_CPPFLAGS) $(TARGET_CFLAGS) $(NEWLIB_CFLAGS)" AR_FOR_TARGET=$(AR) LD_FOR_TARGET=$(LD) RANLIB_FOR_TARGET=$(RANLIB) ../newlib-$(NEWLIB_VERSION)/configure --prefix=$(CROSS_PREFIX) --verbose --target=$(GNU_TARGET_ARCH)-xen-elf --enable-newlib-io-long-long --disable-multilib && \
@@ -205,7 +205,7 @@ $(TARGETS_MINIOS): mini-os-%:
 
 .PHONY: libxc
 libxc: libxc/libxenctrl.a libxc/libxenguest.a
-libxc/libxenctrl.a libxc/libxenguest.a:: cross-zlib mk-headers
+libxc/libxenctrl.a libxc/libxenguest.a:: cross-zlib
 	CPPFLAGS="$(TARGET_CPPFLAGS)" CFLAGS="$(TARGET_CFLAGS)" $(MAKE) -C libxc
 
 #######
@@ -213,7 +213,7 @@ libxc/libxenctrl.a libxc/libxenguest.a:: cross-zlib mk-headers
 #######
 
 .PHONY: ioemu
-ioemu: cross-zlib cross-libpci mk-headers libxc
+ioemu: cross-zlib cross-libpci libxc
 ifeq ($(CONFIG_QEMU),ioemu)
 	[ -f ioemu/config-host.mak ] || \
 	  ( cd ioemu ; \
@@ -231,7 +231,7 @@ endif
 ######
 
 .PHONY: caml
-caml: cross-newlib mk-headers
+caml: cross-newlib
 	CPPFLAGS="$(TARGET_CPPFLAGS)" CFLAGS="$(TARGET_CFLAGS)" $(MAKE) -C $@ LWIPDIR=$(CURDIR)/lwip 
 
 ###
@@ -239,7 +239,7 @@ caml: cross-newlib mk-headers
 ###
 
 .PHONY: c
-c: cross-newlib mk-headers
+c: cross-newlib
 	CPPFLAGS="$(TARGET_CPPFLAGS)" CFLAGS="$(TARGET_CFLAGS)" $(MAKE) -C $@ LWIPDIR=$(CURDIR)/lwip 
 
 ######
@@ -257,7 +257,7 @@ grub-upstream: grub-$(GRUB_VERSION).tar.gz
 	done
 
 .PHONY: grub
-grub: grub-upstream cross-newlib mk-headers
+grub: grub-upstream cross-newlib
 	CPPFLAGS="$(TARGET_CPPFLAGS)" CFLAGS="$(TARGET_CFLAGS)" $(MAKE) -C $@
 
 ########
