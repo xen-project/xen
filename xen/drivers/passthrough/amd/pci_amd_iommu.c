@@ -620,11 +620,49 @@ static int amd_iommu_return_device(
 
 static int amd_iommu_add_device(struct pci_dev *pdev)
 {
+    struct amd_iommu *iommu;
+    u16 bdf;
+    if ( !pdev->domain )
+        return -EINVAL;
+
+    bdf = (pdev->bus << 8) | pdev->devfn;
+    iommu = (bdf < ivrs_bdf_entries) ?
+    find_iommu_for_device(pdev->bus, pdev->devfn) : NULL;
+
+    if ( !iommu )
+    {
+        amd_iov_error("Fail to find iommu."
+            " %x:%x.%x cannot be assigned to domain %d\n", 
+            pdev->bus, PCI_SLOT(pdev->devfn),
+            PCI_FUNC(pdev->devfn), pdev->domain->domain_id);
+        return -ENODEV;
+    }
+
+    amd_iommu_setup_domain_device(pdev->domain, iommu, bdf);
     return 0;
 }
 
 static int amd_iommu_remove_device(struct pci_dev *pdev)
 {
+    struct amd_iommu *iommu;
+    u16 bdf;
+    if ( !pdev->domain )
+        return -EINVAL;
+
+    bdf = (pdev->bus << 8) | pdev->devfn;
+    iommu = (bdf < ivrs_bdf_entries) ?
+    find_iommu_for_device(pdev->bus, pdev->devfn) : NULL;
+
+    if ( !iommu )
+    {
+        amd_iov_error("Fail to find iommu."
+            " %x:%x.%x cannot be removed from domain %d\n", 
+            pdev->bus, PCI_SLOT(pdev->devfn),
+            PCI_FUNC(pdev->devfn), pdev->domain->domain_id);
+        return -ENODEV;
+    }
+
+    amd_iommu_disable_domain_device(pdev->domain, iommu, bdf);
     return 0;
 }
 
