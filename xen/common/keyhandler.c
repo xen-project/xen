@@ -240,10 +240,12 @@ static s_time_t read_clocks_time[NR_CPUS];
 static void read_clocks_slave(void *unused)
 {
     unsigned int cpu = smp_processor_id();
+    local_irq_disable();
     while ( !cpu_isset(cpu, read_clocks_cpumask) )
         cpu_relax();
     read_clocks_time[cpu] = NOW();
     cpu_clear(cpu, read_clocks_cpumask);
+    local_irq_enable();
 }
 
 static void read_clocks(unsigned char key)
