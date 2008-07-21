@@ -214,7 +214,7 @@ static struct irqaction irq0 = { timer_interrupt, "timer", NULL };
  * Return processor ticks per second / CALIBRATE_FRAC.
  */
 
-#define CLOCK_TICK_RATE 1193180 /* system crystal frequency (Hz) */
+#define CLOCK_TICK_RATE 1193182 /* system crystal frequency (Hz) */
 #define CALIBRATE_FRAC  20      /* calibrate over 50ms */
 #define CALIBRATE_LATCH ((CLOCK_TICK_RATE+(CALIBRATE_FRAC/2))/CALIBRATE_FRAC)
 
