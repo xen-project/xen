@@ -29,6 +29,43 @@ int flask_enabled = 1;
 integer_param("flask_enabled", flask_enabled);
 #endif
 
+#define MAX_POLICY_SIZE 0x4000000
+#define FLASK_COPY_IN \
+    ( \
+        1UL<<FLASK_LOAD | \
+        1UL<<FLASK_SETENFORCE | \
+        1UL<<FLASK_CONTEXT_TO_SID | \
+        1UL<<FLASK_SID_TO_CONTEXT | \
+        1UL<<FLASK_ACCESS | \
+        1UL<<FLASK_CREATE | \
+        1UL<<FLASK_RELABEL | \
+        1UL<<FLASK_USER | \
+        1UL<<FLASK_GETBOOL | \
+        1UL<<FLASK_SETBOOL | \
+        1UL<<FLASK_COMMITBOOLS | \
+        1UL<<FLASK_DISABLE | \
+        1UL<<FLASK_SETAVC_THRESHOLD | \
+        1UL<<FLASK_MEMBER \
+    )
+
+#define FLASK_COPY_OUT \
+    ( \
+        1UL<<FLASK_GETENFORCE | \
+        1UL<<FLASK_CONTEXT_TO_SID | \
+        1UL<<FLASK_SID_TO_CONTEXT | \
+        1UL<<FLASK_ACCESS | \
+        1UL<<FLASK_CREATE | \
+        1UL<<FLASK_RELABEL | \
+        1UL<<FLASK_USER | \
+        1UL<<FLASK_POLICYVERS | \
+        1UL<<FLASK_GETBOOL | \
+        1UL<<FLASK_MLS | \
+        1UL<<FLASK_GETAVC_THRESHOLD | \
+        1UL<<FLASK_AVC_HASHSTATS | \
+        1UL<<FLASK_AVC_CACHESTATS | \
+        1UL<<FLASK_MEMBER \
+    )
+
 static DEFINE_SPINLOCK(sel_sem);
 
 /* global data for booleans */
@@ -51,7 +88,7 @@ static int domain_has_security(struct domain *d, u32 perms)
                                                                 perms, NULL);
 }
 
-static int flask_security_user(char *buf, int size)
+static int flask_security_user(char *buf, uint32_t size)
 {
     char *page = NULL;
     char *con, *user, *ptr;
@@ -82,12 +119,8 @@ static int flask_security_user(char *buf, int size)
         goto out2;
     memset(page, 0, PAGE_SIZE);
 
-    length = -EFAULT;
-    if ( copy_from_user(page, buf, size) )
-        goto out2;
-        
     length = -EINVAL;
-    if ( sscanf(page, "%s %s", con, user) != 2 )
+    if ( sscanf(buf, "%s %s", con, user) != 2 )
         goto out2;
 
     length = security_context_to_sid(con, strlen(con)+1, &sid);
@@ -98,7 +131,6 @@ static int flask_security_user(char *buf, int size)
     if ( length < 0 )
         goto out2;
     
-    memset(page, 0, PAGE_SIZE);
     length = snprintf(page, PAGE_SIZE, "%u", nsids) + 1;
     ptr = page + length;
     for ( i = 0; i < nsids; i++ )
@@ -121,8 +153,16 @@ static int flask_security_user(char *buf, int size)
         length += len;
     }
     
-    if ( copy_to_user(buf, page, length) )
-        length = -EFAULT;
+    if ( length > size )
+    {
+        printk( "%s:  context size (%u) exceeds payload "
+                "max\n", __FUNCTION__, length);
+        length = -ERANGE;
+        goto out3;
+    }
+
+    memset(buf, 0, size);
+    memcpy(buf, page, length);
         
 out3:
     xfree(sids);
@@ -135,7 +175,7 @@ out:
     return length;
 }
 
-static int flask_security_relabel(char *buf, int size)
+static int flask_security_relabel(char *buf, uint32_t size)
 {
     char *scon, *tcon;
     u32 ssid, tsid, newsid;
@@ -178,17 +218,18 @@ static int flask_security_relabel(char *buf, int size)
     if ( length < 0 )
         goto out2;
             
-    if ( len > PAGE_SIZE )
+    if ( len > size )
     {
+        printk( "%s:  context size (%u) exceeds payload "
+                "max\n", __FUNCTION__, len);
         length = -ERANGE;
         goto out3;
     }
-        
-    if ( copy_to_user(buf, newcon, len) )
-        len = -EFAULT;
 
+    memset(buf, 0, size);
+    memcpy(buf, newcon, len);
     length = len;
-        
+
 out3:
     xfree(newcon);
 out2:
@@ -198,7 +239,7 @@ out:
     return length;
 }
 
-static int flask_security_create(char *buf, int size)
+static int flask_security_create(char *buf, uint32_t size)
 {
     char *scon, *tcon;
     u32 ssid, tsid, newsid;
@@ -242,7 +283,7 @@ static int flask_security_create(char *buf, int size)
     if ( length < 0 )    
         goto out2;
 
-    if ( len > PAGE_SIZE )
+    if ( len > size )
     {
         printk( "%s:  context size (%u) exceeds payload "
                 "max\n", __FUNCTION__, len);
@@ -250,9 +291,8 @@ static int flask_security_create(char *buf, int size)
         goto out3;
     }
 
-    if ( copy_to_user(buf, newcon, len) )
-        len = -EFAULT;
-
+    memset(buf, 0, size);
+    memcpy(buf, newcon, len);
     length = len;
         
 out3:
@@ -264,9 +304,8 @@ out:
     return length;
 }
 
-static int flask_security_access(char *buf, int size)
+static int flask_security_access(char *buf, uint32_t size)
 {
-    char *page = NULL;
     char *scon, *tcon;
     u32 ssid, tsid;
     u16 tclass;
@@ -305,23 +344,12 @@ static int flask_security_access(char *buf, int size)
     if ( length < 0 )
         goto out2;
 
-    page = (char *)xmalloc_bytes(PAGE_SIZE);
-    if ( !page )
-    {
-        length = -ENOMEM;
-        goto out2;
-    }
-
-    memset(page, 0, PAGE_SIZE);
-
-    length = snprintf(page, PAGE_SIZE, "%x %x %x %x %u", 
+    memset(buf, 0, size);
+    length = snprintf(buf, size, "%x %x %x %x %u", 
                                         avd.allowed, avd.decided,
                                         avd.auditallow, avd.auditdeny, 
                                         avd.seqno);
                 
-    if ( copy_to_user(buf, page, length) )
-        length = -EFAULT;
-        
 out2:
     xfree(tcon);
 out:
@@ -329,7 +357,7 @@ out:
     return length;
 }
 
-static int flask_security_member(char *buf, int size)
+static int flask_security_member(char *buf, uint32_t size)
 {
     char *scon, *tcon;
     u32 ssid, tsid, newsid;
@@ -373,7 +401,7 @@ static int flask_security_member(char *buf, int size)
     if ( length < 0 )
         goto out2;
 
-    if ( len > PAGE_SIZE )
+    if ( len > size )
     {
         printk("%s:  context size (%u) exceeds payload "
                 "max\n", __FUNCTION__, len);
@@ -381,9 +409,8 @@ static int flask_security_member(char *buf, int size)
         goto out3;
     }
 
-    if ( copy_to_user(buf, newcon, len) )
-        len = -EFAULT;
-
+    memset(buf, 0, size);
+    memcpy(buf, newcon, len);
     length = len;
 
 out3:
@@ -395,26 +422,13 @@ out:
     return length;
 }
 
-static int flask_security_setenforce(char *buf, int count)
+static int flask_security_setenforce(char *buf, uint32_t count)
 {
-    char *page = NULL;
     int length;
     int new_value;
 
-    if ( count < 0 || count >= PAGE_SIZE )
-        return -ENOMEM;
-
-    page = (char *)xmalloc_bytes(PAGE_SIZE);
-    if ( !page )
-        return -ENOMEM;
-    memset(page, 0, PAGE_SIZE);
-    length = -EFAULT;
-    if ( copy_from_user(page, buf, count) )
-        goto out;
-
-    length = -EINVAL;
-    if ( sscanf(page, "%d", &new_value) != 1 )
-        goto out;
+    if ( sscanf(buf, "%d", &new_value) != 1 )
+        return -EINVAL;
 
     if ( new_value != flask_enforcing )
     {
@@ -428,13 +442,11 @@ static int flask_security_setenforce(char *buf, int count)
     length = count;
 
 out:
-    xfree(page);
     return length;
 }
 
-static int flask_security_context(char *buf, int count)
+static int flask_security_context(char *buf, uint32_t count)
 {
-    char *page = NULL;
     u32 sid;
     int length;
 
@@ -442,35 +454,19 @@ static int flask_security_context(char *buf, int count)
     if ( length )
         goto out;
 
-    if ( count < 0 || count >= PAGE_SIZE )
-        return -ENOMEM;
-
-    page = (char *)xmalloc_bytes(PAGE_SIZE);
-    if ( !page )
-        return -ENOMEM;
-    memset(page, 0, PAGE_SIZE);
-    length = -EFAULT;
-    if ( copy_from_user(page, buf, count) )
-        goto out;
-
-    length = security_context_to_sid(page, count, &sid);
+    length = security_context_to_sid(buf, count, &sid);
     if ( length < 0 )
         goto out;
 
-    memset(page, 0, PAGE_SIZE);
-    length = snprintf(page, PAGE_SIZE, "%u", sid);
-
-    if ( copy_to_user(buf, page, count) )
-        length = -EFAULT;
+    memset(buf, 0, count);
+    length = snprintf(buf, count, "%u", sid);
 
 out:
-    xfree(page);
     return length;
 }
 
-static int flask_security_sid(char *buf, int count)
+static int flask_security_sid(char *buf, uint32_t count)
 {
-    char *page = NULL;
     char *context;
     u32 sid;
     u32 len;
@@ -480,31 +476,20 @@ static int flask_security_sid(char *buf, int count)
     if ( length )
         goto out;
 
-    if ( count < 0 || count >= PAGE_SIZE )
-        return -ENOMEM;
-
-    page = (char *)xmalloc_bytes(PAGE_SIZE);
-    if ( !page )
-        return -ENOMEM;
-    memset(page, 0, PAGE_SIZE);
-    length = -EFAULT;
-    if ( copy_from_user(page, buf, count) )
-        goto out;
-
-    if ( sscanf(page, "%u", &sid) != 1 )
+    if ( sscanf(buf, "%u", &sid) != 1 )
         goto out;
 
     length = security_sid_to_context(sid, &context, &len);
     if ( length < 0 )
         goto out;
 
-    if ( copy_to_user(buf, context, len) )
-        length = -EFAULT;
-    
+    memset(buf, 0, count);
+    memcpy(buf, context, len);
+    length = len;
+
     xfree(context);
 
 out:
-    xfree(page);
     return length;
 }
 
@@ -534,24 +519,13 @@ int flask_disable(void)
     return 0;
 }
 
-static int flask_security_disable(char *buf, int count)
+static int flask_security_disable(char *buf, uint32_t count)
 {
-    char *page = NULL;
     int length;
     int new_value;
 
-    if ( count < 0 || count >= PAGE_SIZE )
-        return -ENOMEM;
-    page = (char *)xmalloc_bytes(PAGE_SIZE);
-    if ( !page )
-        return -ENOMEM;
-    memset(page, 0, PAGE_SIZE);
-    length = -EFAULT;
-    if ( copy_from_user(page, buf, count) )
-        goto out;
-
     length = -EINVAL;
-    if ( sscanf(page, "%d", &new_value) != 1 )
+    if ( sscanf(buf, "%d", &new_value) != 1 )
         goto out;
 
     if ( new_value )
@@ -564,57 +538,35 @@ static int flask_security_disable(char *buf, int count)
     length = count;
 
 out:
-    xfree(page);
     return length;
 }
 
-static int flask_security_setavc_threshold(char *buf, int count)
+static int flask_security_setavc_threshold(char *buf, uint32_t count)
 {
-    char *page = NULL;
     int ret;
     int new_value;
 
-    if ( count < 0 || count >= PAGE_SIZE )
-    {
-        ret = -ENOMEM;
-        goto out;
-    }
-
-    page = (char*)xmalloc_bytes(PAGE_SIZE);
-    if (!page)
-        return -ENOMEM;
-    memset(page, 0, PAGE_SIZE);
-
-    if ( copy_from_user(page, buf, count) )
-    {
-        ret = -EFAULT;
-        goto out_free;
-    }
-
-    if ( sscanf(page, "%u", &new_value) != 1 )
+    if ( sscanf(buf, "%u", &new_value) != 1 )
     {
         ret = -EINVAL;
-        goto out_free;
+        goto out;
     }
 
     if ( new_value != avc_cache_threshold )
     {
         ret = domain_has_security(current->domain, SECURITY__SETSECPARAM);
         if ( ret )
-            goto out_free;
+            goto out;
         avc_cache_threshold = new_value;
     }
     ret = count;
 
-out_free:
-    xfree(page);
 out:
     return ret;
 }
 
-static int flask_security_set_bool(char *buf, int count)
+static int flask_security_set_bool(char *buf, uint32_t count)
 {
-    char *page = NULL;
     int length = -EFAULT;
     int i, new_value;
 
@@ -624,25 +576,8 @@ static int flask_security_set_bool(char *buf, int count)
     if ( length )
         goto out;
 
-    if ( count < 0 || count >= PAGE_SIZE )
-    {
-        length = -ENOMEM;
-        goto out;
-    }
-
-    page = (char *)xmalloc_bytes(PAGE_SIZE);
-    if ( !page )
-    {
-        length = -ENOMEM;
-        goto out;
-    }
-    memset(page, 0, PAGE_SIZE);
-
-    if ( copy_from_user(page, buf, count) )
-        goto out;
-
     length = -EINVAL;
-    if ( sscanf(page, "%d %d", &i, &new_value) != 2 )
+    if ( sscanf(buf, "%d %d", &i, &new_value) != 2 )
         goto out;
 
     if ( new_value )
@@ -655,14 +590,11 @@ static int flask_security_set_bool(char *buf, int count)
 
 out:
     spin_unlock(&sel_sem);
-    if ( page )
-        xfree(page);
     return length;
 }
 
-static int flask_security_commit_bools(char *buf, int count)
+static int flask_security_commit_bools(char *buf, uint32_t count)
 {
-    char *page = NULL;
     int length = -EFAULT;
     int new_value;
 
@@ -672,25 +604,8 @@ static int flask_security_commit_bools(char *buf, int count)
     if ( length )
         goto out;
 
-    if ( count < 0 || count >= PAGE_SIZE )
-    {
-        length = -ENOMEM;
-        goto out;
-    }
-
-    page = (char *)xmalloc_bytes(PAGE_SIZE);
-    if ( !page )
-    {
-        length = -ENOMEM;
-        goto out;
-    }
-    memset(page, 0, PAGE_SIZE);
-
-    if ( copy_from_user(page, buf, count) )
-        goto out;
-
     length = -EINVAL;
-    if ( sscanf(page, "%d", &new_value) != 1 )
+    if ( sscanf(buf, "%d", &new_value) != 1 )
         goto out;
 
     if ( new_value )
@@ -700,40 +615,18 @@ static int flask_security_commit_bools(char *buf, int count)
 
 out:
     spin_unlock(&sel_sem);
-    if ( page )
-        xfree(page);
     return length;
 }
 
-static int flask_security_get_bool(char *buf, int count)
+static int flask_security_get_bool(char *buf, uint32_t count)
 {
-    char *page = NULL;
     int length;
     int i, cur_enforcing;
     
     spin_lock(&sel_sem);
     
-    length = -EFAULT;
-
-    if ( count < 0 || count > PAGE_SIZE )
-    {
-        length = -EINVAL;
-        goto out;
-    }
-
-    page = (char *)xmalloc_bytes(PAGE_SIZE);
-    if ( !page )
-    {
-        length = -ENOMEM;
-        goto out;
-    }
-    memset(page, 0, PAGE_SIZE);
-
-    if ( copy_from_user(page, buf, count) )
-        goto out;
-
     length = -EINVAL;
-    if ( sscanf(page, "%d", &i) != 1 )
+    if ( sscanf(buf, "%d", &i) != 1 )
         goto out;
 
     cur_enforcing = security_get_bool_value(i);
@@ -743,18 +636,12 @@ static int flask_security_get_bool(char *buf, int count)
         goto out;
     }
 
-    length = snprintf(page, PAGE_SIZE, "%d %d", cur_enforcing,
+    memset(buf, 0, count);
+    length = snprintf(buf, count, "%d %d", cur_enforcing,
                 bool_pending_values[i]);
-    if ( length < 0 )
-        goto out;
-
-    if ( copy_to_user(buf, page, length) )
-        length = -EFAULT;
 
 out:
     spin_unlock(&sel_sem);
-    if ( page )
-        xfree(page);
     return length;
 }
 
@@ -786,7 +673,7 @@ out:
 
 #ifdef FLASK_AVC_STATS
 
-static int flask_security_avc_cachestats(char *buf, int count)
+static int flask_security_avc_cachestats(char *buf, uint32_t count)
 {
     char *page = NULL;
     int len = 0;
@@ -802,9 +689,15 @@ static int flask_security_avc_cachestats(char *buf, int count)
 
     len = snprintf(page, PAGE_SIZE, "lookups hits misses allocations reclaims "
                                                                    "frees\n");
+    if ( len > count ) {
+        length = -EINVAL;
+        goto out;
+    }
+    
     memcpy(buf, page, len);
     buf += len;
     length += len;
+    count -= len;
 
     for ( cpu = idx; cpu < NR_CPUS; ++cpu )
     {
@@ -816,22 +709,27 @@ static int flask_security_avc_cachestats(char *buf, int count)
         len = snprintf(page, PAGE_SIZE, "%u %u %u %u %u %u\n", st->lookups,
                                        st->hits, st->misses, st->allocations,
                                                        st->reclaims, st->frees);
+        if ( len > count ) {
+            length = -EINVAL;
+            goto out;
+        }
         memcpy(buf, page, len);
         buf += len;
         length += len;
+        count -= len;
     }
 
+out:
     xfree(page);    
     return length;
 }
 
 #endif
 
-static int flask_security_load(char *buf, int count)
+static int flask_security_load(char *buf, uint32_t count)
 {
     int ret;
     int length;
-    void *data = NULL;
 
     spin_lock(&sel_sem);
 
@@ -839,18 +737,7 @@ static int flask_security_load(char *buf, int count)
     if ( length )
         goto out;
 
-    if ( (count < 0) || (count > 64 * 1024 * 1024) 
-                               || (data = xmalloc_array(char, count)) == NULL )
-    {
-        length = -ENOMEM;
-        goto out;
-    }
-
-    length = -EFAULT;
-    if ( copy_from_user(data, buf, count) != 0 )
-        goto out;
-
-    length = security_load_policy(data, count);
+    length = security_load_policy(buf, count);
     if ( length )
         goto out;
 
@@ -862,7 +749,6 @@ static int flask_security_load(char *buf, int count)
 
 out:
     spin_unlock(&sel_sem);
-    xfree(data);
     return length;
 }
 
@@ -871,188 +757,156 @@ long do_flask_op(XEN_GUEST_HANDLE(xsm_op_t) u_flask_op)
     flask_op_t curop, *op = &curop;
     int rc = 0;
     int length = 0;
-    char *page = NULL;
+    char *arg = NULL;
 
     if ( copy_from_guest(op, u_flask_op, 1) )
         return -EFAULT;
+
+    if ( op->cmd > FLASK_LAST)
+        return -EINVAL;
+
+    if ( op->size > MAX_POLICY_SIZE )
+        return -EINVAL;
+
+    if ( (op->buf == NULL && op->size != 0) || 
+                                    (op->buf != NULL && op->size == 0) )
+        return -EINVAL;
+
+    arg = xmalloc_bytes(op->size + 1);
+    if ( !arg )
+        return -ENOMEM;
+
+    memset(arg, 0, op->size + 1);
+
+    if ( (FLASK_COPY_IN&(1UL<<op->cmd)) && op->buf != NULL && 
+           copy_from_guest(arg, guest_handle_from_ptr(op->buf, char), op->size) )
+    {
+        rc = -EFAULT;
+        goto out;
+    }
 
     switch ( op->cmd )
     {
 
     case FLASK_LOAD:
     {
-        length = flask_security_load(op->buf, op->size);
+        length = flask_security_load(arg, op->size);
     }
     break;
     
     case FLASK_GETENFORCE:
     {
-        page = (char *)xmalloc_bytes(PAGE_SIZE);
-        if ( !page )
-            return -ENOMEM;
-        memset(page, 0, PAGE_SIZE);
-        
-        length = snprintf(page, PAGE_SIZE, "%d", flask_enforcing);
-        
-        if ( copy_to_user(op->buf, page, length) )
-        {
-            rc = -EFAULT;
-            goto out;
-        }
+        length = snprintf(arg, op->size, "%d", flask_enforcing);
     }
     break;    
 
     case FLASK_SETENFORCE:
     {
-        length = flask_security_setenforce(op->buf, op->size);
+        length = flask_security_setenforce(arg, op->size);
     }
     break;    
 
     case FLASK_CONTEXT_TO_SID:
     {
-        length = flask_security_context(op->buf, op->size);
+        length = flask_security_context(arg, op->size);
     }
     break;    
 
     case FLASK_SID_TO_CONTEXT:
     {
-        length = flask_security_sid(op->buf, op->size);
+        length = flask_security_sid(arg, op->size);
     }
     break; 
 
     case FLASK_ACCESS:
     {
-        length = flask_security_access(op->buf, op->size);
+        length = flask_security_access(arg, op->size);
     }
     break;    
 
     case FLASK_CREATE:
     {
-        length = flask_security_create(op->buf, op->size);
+        length = flask_security_create(arg, op->size);
     }
     break;    
 
     case FLASK_RELABEL:
     {
-        length = flask_security_relabel(op->buf, op->size);
+        length = flask_security_relabel(arg, op->size);
     }
     break;
 
     case FLASK_USER:
     {
-        length = flask_security_user(op->buf, op->size);
+        length = flask_security_user(arg, op->size);
     }
     break;    
 
     case FLASK_POLICYVERS:
     {
-        page = (char *)xmalloc_bytes(PAGE_SIZE);
-        if ( !page )
-            return -ENOMEM;
-        memset(page, 0, PAGE_SIZE);
-
-        length = snprintf(page, PAGE_SIZE, "%d", POLICYDB_VERSION_MAX);
-
-        if ( copy_to_user(op->buf, page, length) )
-        {
-            rc = -EFAULT;
-            goto out;
-        }
+        length = snprintf(arg, op->size, "%d", POLICYDB_VERSION_MAX);
     }
     break;    
 
     case FLASK_GETBOOL:
     {
-        length = flask_security_get_bool(op->buf, op->size);
+        length = flask_security_get_bool(arg, op->size);
     }
     break;
 
     case FLASK_SETBOOL:
     {
-        length = flask_security_set_bool(op->buf, op->size);
+        length = flask_security_set_bool(arg, op->size);
     }
     break;
 
     case FLASK_COMMITBOOLS:
     {
-        length = flask_security_commit_bools(op->buf, op->size);
+        length = flask_security_commit_bools(arg, op->size);
     }
     break;
 
     case FLASK_MLS:
     {
-        page = (char *)xmalloc_bytes(PAGE_SIZE);
-        if ( !page )
-            return -ENOMEM;
-        memset(page, 0, PAGE_SIZE);
-
-        length = snprintf(page, PAGE_SIZE, "%d", flask_mls_enabled);
-
-        if ( copy_to_user(op->buf, page, length) )
-        {
-            rc = -EFAULT;
-            goto out;
-        }
+        length = snprintf(arg, op->size, "%d", flask_mls_enabled);
     }
     break;    
 
     case FLASK_DISABLE:
     {
-        length = flask_security_disable(op->buf, op->size);
+        length = flask_security_disable(arg, op->size);
     }
     break;    
 
     case FLASK_GETAVC_THRESHOLD:
     {
-        page = (char *)xmalloc_bytes(PAGE_SIZE);
-        if ( !page )
-            return -ENOMEM;
-        memset(page, 0, PAGE_SIZE);
-
-        length = snprintf(page, PAGE_SIZE, "%d", avc_cache_threshold);
-
-        if ( copy_to_user(op->buf, page, length) )
-        {
-            rc = -EFAULT;
-            goto out;
-        }
+        length = snprintf(arg, op->size, "%d", avc_cache_threshold);
     }
     break;
 
     case FLASK_SETAVC_THRESHOLD:
     {
-        length = flask_security_setavc_threshold(op->buf, op->size);
+        length = flask_security_setavc_threshold(arg, op->size);
     }
     break;
 
     case FLASK_AVC_HASHSTATS:
     {
-        page = (char *)xmalloc_bytes(PAGE_SIZE);
-        if ( !page )
-            return -ENOMEM;
-        memset(page, 0, PAGE_SIZE);
-
-        length = avc_get_hash_stats(page);
-
-        if ( copy_to_user(op->buf, page, length) )
-        {
-            rc = -EFAULT;
-            goto out;
-        }
+        length = avc_get_hash_stats(arg, op->size);
     }
     break;
 
 #ifdef FLASK_AVC_STATS    
     case FLASK_AVC_CACHESTATS:
     {
-        length = flask_security_avc_cachestats(op->buf, op->size);
+        length = flask_security_avc_cachestats(arg, op->size);
     }
     break;
-#endif    
+#endif
 
     case FLASK_MEMBER:
     {
-        length = flask_security_member(op->buf, op->size);
+        length = flask_security_member(arg, op->size);
     }
     break;    
 
@@ -1067,13 +921,19 @@ long do_flask_op(XEN_GUEST_HANDLE(xsm_op_t) u_flask_op)
         rc = length;
         goto out;
     }
+    
+    if ( (FLASK_COPY_OUT&(1UL<<op->cmd)) && op->buf != NULL && 
+             copy_to_guest(guest_handle_from_ptr(op->buf, char), arg, op->size) )
+    {
+        rc = -EFAULT;
+        goto out;
+    }
+
     op->size = length;
     if ( copy_to_guest(u_flask_op, op, 1) )
         rc = -EFAULT;
 
 out:
-    if ( page )
-        xfree(page);
+    xfree(arg);
     return rc;
 }
-
