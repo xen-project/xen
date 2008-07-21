@@ -265,12 +265,14 @@ stdvga=0
 #vcpus=8
 #
 # Example for amd, expose a 5-core processor :
-# cpuid = ['1:ebx=xxxxxxxx00000001xxxxxxxxxxxxxxxx,
+# cpuid = ['1:ebx=xxxxxxxx00001010xxxxxxxxxxxxxxxx,
 #             edx=xxx1xxxxxxxxxxxxxxxxxxxxxxxxxxxx',
-# '0x80000008:ecx=xxxxxxxxxxxxxxxx0000xxxx00001010']
-#  - CPUID.1[EBX] : (Thread * Cores ) per processors
-#  - CPUID.1[EDX][HT] : Enable HT
-#  - CPUID.0x80000008[ECX] : Number of vcpus * 2
+# '0x80000001:ecx=xxxxxxxxxxxxxxxxxxxxxxxxxxxxxx1x',
+# '0x80000008:ecx=xxxxxxxxxxxxxxxxxxxxxxxxxx001001']
+#   - CPUID.1[EBX] : Threads per Core * Cores per Socket (2 * #vcpus)
+#   - CPUID.1[EDX][HT] : Enable HT
+#   - CPUID.0x80000001[CmpLegacy] : Use legacy method
+#   - CPUID.0x80000008[ECX] : #vcpus * 2 - 1
 #vcpus=5
 #
 #  Downgrade the cpuid to make a better compatibility for migration :
