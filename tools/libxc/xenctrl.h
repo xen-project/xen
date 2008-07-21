@@ -865,6 +865,23 @@ void *xc_gnttab_map_grant_refs(int xcg_handle,
                                uint32_t *refs,
                                int prot);
 
+/**
+ * Memory maps one or more grant references from one domain to a
+ * contiguous local address range. Mappings should be unmapped with
+ * xc_gnttab_munmap.  Returns NULL on failure.
+ *
+ * @parm xcg_handle a handle on an open grant table interface
+ * @parm count the number of grant references to be mapped
+ * @parm domid the domain to map memory from
+ * @parm refs an array of @count grant references to be mapped
+ * @parm prot same flag as in mmap()
+ */
+void *xc_gnttab_map_domain_grant_refs(int xcg_handle,
+                                      uint32_t count,
+                                      uint32_t domid,
+                                      uint32_t *refs,
+                                      int prot);
+
 /*
  * Unmaps the @count pages starting at @start_address, which were mapped by a
  * call to xc_gnttab_map_grant_ref or xc_gnttab_map_grant_refs. Returns zero

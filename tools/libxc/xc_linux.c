@@ -418,9 +418,10 @@ void *xc_gnttab_map_grant_ref(int xcg_handle,
     return addr;
 }
 
-void *xc_gnttab_map_grant_refs(int xcg_handle,
+static void *do_gnttab_map_grant_refs(int xcg_handle,
                                uint32_t count,
                                uint32_t *domids,
+                               int domids_stride,
                                uint32_t *refs,
                                int prot)
 {
@@ -435,7 +436,7 @@ void *xc_gnttab_map_grant_refs(int xcg_handle,
 
     for ( i = 0; i < count; i++ )
     {
-        map->refs[i].domid = domids[i];
+        map->refs[i].domid = domids[i * domids_stride];
         map->refs[i].ref   = refs[i];
     }
 
@@ -462,6 +463,24 @@ void *xc_gnttab_map_grant_refs(int xcg_handle,
  out:
     free(map);
     return addr;
+}
+
+void *xc_gnttab_map_grant_refs(int xcg_handle,
+                               uint32_t count,
+                               uint32_t *domids,
+                               uint32_t *refs,
+                               int prot)
+{
+    return do_gnttab_map_grant_refs(xcg_handle, count, domids, 1, refs, prot);
+}
+
+void *xc_gnttab_map_domain_grant_refs(int xcg_handle,
+                               uint32_t count,
+                               uint32_t domid,
+                               uint32_t *refs,
+                               int prot)
+{
+    return do_gnttab_map_grant_refs(xcg_handle, count, &domid, 0, refs, prot);
 }
 
 int xc_gnttab_munmap(int xcg_handle,
