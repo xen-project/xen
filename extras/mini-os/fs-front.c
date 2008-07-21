@@ -746,7 +746,7 @@ static void fsfront_handler(evtchn_port_t port, struct pt_regs *regs, void *data
 
     DEBUG("Event from import [%d:%d].\n", import->dom_id, import->export_id);
 moretodo:   
-    rp = import->ring.sring->req_prod;
+    rp = import->ring.sring->rsp_prod;
     rmb(); /* Ensure we see queued responses up to 'rp'. */
     cons = import->ring.rsp_cons;
     while (cons != rp)
@@ -756,7 +756,7 @@ moretodo:
 
         rsp = RING_GET_RESPONSE(&import->ring, cons); 
         DEBUG("Response at idx=%d to request id=%d, ret_val=%lx\n", 
-            import->ring.rsp_cons, rsp->id, rsp->ret_val);
+            cons, rsp->id, rsp->ret_val);
         req = &import->requests[rsp->id];
         memcpy(&req->shadow_rsp, rsp, sizeof(struct fsif_response));
         DEBUG("Waking up: %s\n", req->thread->name);
