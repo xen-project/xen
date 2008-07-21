@@ -714,18 +714,6 @@ static int flask_perfcontrol(void)
     return domain_has_xen(current->domain, XEN__PERFCONTROL);
 }
 
-void flask_complete_init(struct domain *d)
-{
-    struct domain_security_struct *dsec;
-
-    /* Set the security state for the Dom0 domain. */
-    dsec = d->ssid;
-    dsec->sid = SECINITSID_DOM0;
-    dsec->create_sid = SECINITSID_UNLABELED;
-
-    printk("Flask:  Completed initialization.\n");
-}
-
 #ifdef CONFIG_X86
 static int flask_shadow_control(struct domain *d, uint32_t op)
 {
@@ -1101,7 +1089,6 @@ static struct xsm_operations flask_ops = {
     .schedop_shutdown = flask_schedop_shutdown,
 
     .__do_xsm_op = do_flask_op,
-    .complete_init = flask_complete_init,    
 
 #ifdef CONFIG_X86
     .shadow_control = flask_shadow_control,

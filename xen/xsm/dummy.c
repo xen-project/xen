@@ -254,11 +254,6 @@ static void dummy_free_security_evtchn (struct evtchn *chn)
     return;
 }
 
-static void dummy_complete_init (struct domain *d)
-{
-    return;
-}
-
 static long dummy___do_xsm_op(XEN_GUEST_HANDLE(xsm_op_t) op)
 {
     return -ENOSYS;
@@ -462,7 +457,6 @@ void xsm_fixup_ops (struct xsm_operations *ops)
     set_to_dummy_if_null(ops, schedop_shutdown);
 
     set_to_dummy_if_null(ops, __do_xsm_op);
-    set_to_dummy_if_null(ops, complete_init);
 
 #ifdef CONFIG_X86
     set_to_dummy_if_null(ops, shadow_control);

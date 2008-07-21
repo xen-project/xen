@@ -108,7 +108,6 @@ struct xsm_operations {
     int (*schedop_shutdown) (struct domain *d1, struct domain *d2);
 
     long (*__do_xsm_op) (XEN_GUEST_HANDLE(xsm_op_t) op);
-    void (*complete_init) (struct domain *d);
 
 #ifdef CONFIG_X86
     int (*shadow_control) (struct domain *d, uint32_t op);
@@ -390,11 +389,6 @@ static inline int xsm_schedop_shutdown (struct domain *d1, struct domain *d2)
 static inline long __do_xsm_op (XEN_GUEST_HANDLE(xsm_op_t) op)
 {
     return xsm_call(__do_xsm_op(op));
-}
-
-static inline void xsm_complete_init (struct domain *d)
-{
-    xsm_call(complete_init(d));
 }
 
 #ifdef XSM_ENABLE
