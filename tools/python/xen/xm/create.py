@@ -956,6 +956,10 @@ def preprocess_cpuid(vals, attr_name):
                 if reg_match == None:
                     err("cpuid's syntax is (eax|ebx|ecx|edx)=value")
                 res = reg_match.groupdict()
+                if (res['val'][:2] != '0x' and len(res['val']) != 32):
+                    err("cpuid: We should specify all the bits " \
+                        "of the register %s for input %s\n"
+                        % (res['reg'], input) )
                 cpuid[input][res['reg']] = res['val'] # new register
     setattr(vals, attr_name, cpuid)
 
