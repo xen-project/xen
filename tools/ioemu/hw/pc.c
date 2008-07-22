@@ -591,9 +591,9 @@ static void load_linux(const char *kernel_filename,
             "qemu: real_addr     = %#zx\n"
             "qemu: cmdline_addr  = %#zx\n"
             "qemu: prot_addr     = %#zx\n",
-            real_addr,
-            cmdline_addr,
-            prot_addr);
+            (size_t)real_addr,
+            (size_t)cmdline_addr,
+            (size_t)prot_addr);
 
     /* highest address for loading the initrd */
     if (protocol >= 0x203)
