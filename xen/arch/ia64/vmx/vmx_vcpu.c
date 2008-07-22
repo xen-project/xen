@@ -200,6 +200,8 @@ void vmx_switch_rr7(unsigned long rid, void *guest_vhpt,
                     void *pal_vaddr, void *shared_arch_info)
 {
     __get_cpu_var(inserted_vhpt) = (unsigned long)guest_vhpt;
+    __get_cpu_var(inserted_vpd) = (unsigned long)shared_arch_info;
+    __get_cpu_var(inserted_mapped_regs) = (unsigned long)shared_arch_info;
     __vmx_switch_rr7(rid, guest_vhpt, pal_vaddr, shared_arch_info);
 }
 

@@ -49,6 +49,9 @@ static unsigned int domain_rid_bits_default = IA64_MIN_IMPL_RID_BITS;
 integer_param("dom_rid_bits", domain_rid_bits_default); 
 
 DEFINE_PER_CPU(unsigned long, inserted_vhpt);
+DEFINE_PER_CPU(unsigned long, inserted_shared_info);
+DEFINE_PER_CPU(unsigned long, inserted_mapped_regs);
+DEFINE_PER_CPU(unsigned long, inserted_vpd);
 
 #if 0
 // following already defined in include/asm-ia64/gcc_intrin.h
@@ -266,6 +269,11 @@ int set_one_rr(unsigned long rr, unsigned long val)
 #if VHPT_ENABLED
 		__get_cpu_var(inserted_vhpt) = __va_ul(vcpu_vhpt_maddr(v));
 #endif
+		__get_cpu_var(inserted_shared_info) =
+					v->domain->arch.shared_info_va;
+		__get_cpu_var(inserted_mapped_regs) =
+					v->domain->arch.shared_info_va +
+					XMAPPEDREGS_OFS;
 		ia64_new_rr7(vmMangleRID(newrrv.rrval),v->domain->shared_info,
 			     v->arch.privregs, v->domain->arch.shared_info_va,
 		             __va_ul(vcpu_vhpt_maddr(v)));
