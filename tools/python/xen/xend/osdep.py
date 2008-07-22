@@ -41,12 +41,18 @@ _vif_script = {
 def _linux_balloon_stat(label):
     """Returns the value for the named label, or None if an error occurs."""
 
+    xend2linux_labels = { 'current'      : 'Current allocation',
+                          'target'       : 'Requested target',
+                          'low-balloon'  : 'Low-mem balloon',
+                          'high-balloon' : 'High-mem balloon',
+                          'limit'        : 'Xen hard limit' }
+
     PROC_XEN_BALLOON = '/proc/xen/balloon'
     f = file(PROC_XEN_BALLOON, 'r')
     try:
         for line in f:
             keyvalue = line.split(':')
-            if keyvalue[0] == label:
+            if keyvalue[0] == xend2linux_labels[label]:
                 values = keyvalue[1].split()
                 if values[0].isdigit():
                     return int(values[0])
@@ -67,11 +73,11 @@ def _solaris_balloon_stat(label):
     BLN_IOCTL_LOW = 0x42410003
     BLN_IOCTL_HIGH = 0x42410004
     BLN_IOCTL_LIMIT = 0x42410005
-    label_to_ioctl = { 'Current allocation' : BLN_IOCTL_CURRENT,
-                       'Requested target'   : BLN_IOCTL_TARGET,
-                       'Low-mem balloon'    : BLN_IOCTL_LOW,
-                       'High-mem balloon'   : BLN_IOCTL_HIGH,
-                       'Xen hard limit'     : BLN_IOCTL_LIMIT }
+    label_to_ioctl = { 'current'      : BLN_IOCTL_CURRENT,
+                       'target'       : BLN_IOCTL_TARGET,
+                       'low-balloon'  : BLN_IOCTL_LOW,
+                       'high-balloon' : BLN_IOCTL_HIGH,
+                       'limit'        : BLN_IOCTL_LIMIT }
 
     f = file(DEV_XEN_BALLOON, 'r')
     try:
