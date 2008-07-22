@@ -365,16 +365,22 @@ vmx_alt_dtlb_miss_vmm:
     ;;
     and r22=IA64_ISR_CODE_MASK,r20		// get the isr.code field
     tbit.nz p6,p7=r20,IA64_ISR_SP_BIT		// is speculation bit on?
-    extr.u r18=r16,XEN_VIRT_UC_BIT, 1		// extract UC bit
+    tbit.nz p8,p0=r16,XEN_VIRT_UC_BIT		// is Xen UC region?
+    extr.u r23=r16,59,5				// iva fault address
+						// 0xc0000000_00000000 >> 59 = 0x18 EFI UC address
+						// 0xe0000000_00000000 >> 59 = 0x1c EFI address
+
     and r19=r19,r16				// clear ed, reserved bits, and PTE control bits
     tbit.nz p9,p0=r20,IA64_ISR_NA_BIT		// is non-access bit on?
     ;;
+    cmp.eq.or p8,p0=0x18,r23			// Region 6 is UC for EFI
 (p9)cmp.eq.or.andcm p6,p7=IA64_ISR_CODE_LFETCH,r22	// check isr.code field
     dep r24=-1,r24,IA64_PSR_ED_BIT,1
     or r19=r19,r17				// insert PTE control bits into r19
     mov r20=IA64_GRANULE_SHIFT<<2
     ;;
-    dep r19=r18,r19,4,1	// set bit 4 (uncached) if the access was to UC region
+(p8)dep r19=-1,r19,4,1				// set bit 4 (uncached) if access to UC area
+
 (p6)mov cr.ipsr=r24
     mov cr.itir=r20
     ;;
