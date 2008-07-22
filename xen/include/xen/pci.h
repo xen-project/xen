@@ -24,10 +24,10 @@
 #define PCI_BUS(bdf)    (((bdf) >> 8) & 0xff)
 #define PCI_SLOT(bdf)   (((bdf) >> 3) & 0x1f)
 #define PCI_FUNC(bdf)   ((bdf) & 0x07)
-#define PCI_DEVFN(d,f)  (((d & 0x1f) << 3) | (f & 0x07))
+#define PCI_DEVFN(d,f)  ((((d) & 0x1f) << 3) | ((f) & 0x07))
 #define PCI_DEVFN2(bdf) ((bdf) & 0xff)
-#define PCI_BDF(b,d,f)  (((b * 0xff) << 8) | PCI_DEVFN(d,f))
-#define PCI_BDF2(b,df)  (((b & 0xff) << 8) | (df & 0xff))
+#define PCI_BDF(b,d,f)  ((((b) & 0xff) << 8) | PCI_DEVFN(d,f))
+#define PCI_BDF2(b,df)  ((((b) & 0xff) << 8) | ((df) & 0xff))
 
 struct pci_dev {
     struct list_head alldevs_list;
