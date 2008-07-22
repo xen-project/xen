@@ -41,7 +41,10 @@ DECLARE_PER_CPU(unsigned long, inserted_shared_info);
 DECLARE_PER_CPU(unsigned long, inserted_mapped_regs);
 DECLARE_PER_CPU(unsigned long, inserted_vpd);
 
+extern cpumask_t percpu_set;
+
 int set_one_rr(unsigned long rr, unsigned long val);
+int set_one_rr_efi(unsigned long rr, unsigned long val);
 
 // This function is purely for performance... apparently scrambling
 //  bits in the region id makes for better hashing, which means better

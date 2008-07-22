@@ -18,12 +18,16 @@ struct ia64_mca_tlb_info ia64_mca_tlb_list[NR_CPUS];
 
 extern void ia64_tlb_init (void);
 
+#ifdef XEN
+cpumask_t percpu_set;
+#endif
+
 void __devinit
 ia64_mmu_init (void *my_cpu_data)
 {
 	unsigned long psr, impl_va_bits;
 	extern void __devinit tlb_init (void);
-	int cpu;
+	int cpu = smp_processor_id();
 
 	/* Pin mapping for percpu area into TLB */
 	psr = ia64_clear_ic();
@@ -33,6 +37,9 @@ ia64_mmu_init (void *my_cpu_data)
 
 	ia64_set_psr(psr);
 	ia64_srlz_i();
+#ifdef XEN
+	cpu_set(cpu, percpu_set);
+#endif
 
 	/*
 	 * Check if the virtually mapped linear page table (VMLPT) overlaps with a mapped
@@ -71,8 +78,6 @@ ia64_mmu_init (void *my_cpu_data)
 	ia64_set_rr(HPAGE_REGION_BASE, HPAGE_SHIFT << 2);
 	ia64_srlz_d();
 #endif
-
-	cpu = smp_processor_id();
 
 	/* mca handler uses cr.lid as key to pick the right entry */
 	ia64_mca_tlb_list[cpu].cr_lid = ia64_getreg(_IA64_REG_CR_LID);
