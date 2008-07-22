@@ -16,6 +16,7 @@
 #include <asm/vhpt.h>
 #include <asm/vcpu.h>
 #include <asm/percpu.h>
+#include <asm/pal.h>
 
 /* Defined in xemasm.S  */
 extern void ia64_new_rr7(unsigned long rid, void *shared_info, void *shared_arch_info, unsigned long shared_info_va, unsigned long va_vhpt);

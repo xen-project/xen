@@ -16,7 +16,9 @@
 
 #include <asm/kregs.h>
 #include <asm/page.h>
+#ifndef XEN
 #include <asm/pal.h>
+#endif
 #include <asm/percpu.h>
 
 #ifndef XEN
