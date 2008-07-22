@@ -33,6 +33,12 @@
 #define KERNEL_START		 0xf400000004000000
 #define GATE_ADDR		 KERNEL_START
 
+/* In order for Kexec between Xen and Linux to work EFI needs
+ * to be mapped into the same place by both. It seems most convenient
+ * to make Xen do the dirty work here */
+#define __IA64_EFI_UNCACHED_OFFSET	0xc000000000000000UL
+#define __IA64_EFI_CACHED_OFFSET	0xe000000000000000UL
+
 #define IS_VMM_ADDRESS(addr) ((((addr) >> 60) ^ ((addr) >> 59)) & 1)
 
 #endif // _ASM_IA64_XENSYSTEM_H
