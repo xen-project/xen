@@ -321,8 +321,13 @@ ia64_do_tlb_purge:
 	;;
 #ifdef XEN
 	// 5. VHPT
-#if VHPT_ENABLED
-	GET_VA_VCPU_VHPT_MADDR(r2,r3);;
+	// GET_VA_VCPU_VHPT_MADDR() may not give the
+	// value of the VHPT currently pinned into the TLB
+	GET_THIS_PADDR(r2, inserted_vhpt);;
+	;;
+	cmp.eq p7,p0=r2,r0
+	;;
+(p7)	br.cond.sptk .vhpt_not_mapped
 	dep r16=0,r2,0,IA64_GRANULE_SHIFT
 	mov r18=IA64_GRANULE_SHIFT<<2
 	;;
@@ -330,7 +335,7 @@ ia64_do_tlb_purge:
 	;;
 	srlz.d
 	;;
-#endif
+.vhpt_not_mapped:
 #endif
 	// Now branch away to caller.
 	br.sptk.many b1

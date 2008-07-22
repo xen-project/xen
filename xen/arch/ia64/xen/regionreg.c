@@ -15,6 +15,7 @@
 #include <asm/regionreg.h>
 #include <asm/vhpt.h>
 #include <asm/vcpu.h>
+#include <asm/percpu.h>
 
 /* Defined in xemasm.S  */
 extern void ia64_new_rr7(unsigned long rid, void *shared_info, void *shared_arch_info, unsigned long shared_info_va, unsigned long va_vhpt);
@@ -46,6 +47,8 @@ extern void ia64_new_rr7(unsigned long rid, void *shared_info, void *shared_arch
 /* Default number of rid bits for domains.  */
 static unsigned int domain_rid_bits_default = IA64_MIN_IMPL_RID_BITS;
 integer_param("dom_rid_bits", domain_rid_bits_default); 
+
+DEFINE_PER_CPU(unsigned long, inserted_vhpt);
 
 #if 0
 // following already defined in include/asm-ia64/gcc_intrin.h
@@ -260,6 +263,9 @@ int set_one_rr(unsigned long rr, unsigned long val)
 		if (!PSCB(v,metaphysical_mode))
 			set_rr(rr,newrrv.rrval);
 	} else if (rreg == 7) {
+#if VHPT_ENABLED
+		__get_cpu_var(inserted_vhpt) = __va_ul(vcpu_vhpt_maddr(v));
+#endif
 		ia64_new_rr7(vmMangleRID(newrrv.rrval),v->domain->shared_info,
 			     v->arch.privregs, v->domain->arch.shared_info_va,
 		             __va_ul(vcpu_vhpt_maddr(v)));

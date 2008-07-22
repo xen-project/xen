@@ -199,6 +199,7 @@ void vmx_vcpu_set_rr_fast(VCPU *vcpu, u64 reg, u64 val)
 void vmx_switch_rr7(unsigned long rid, void *guest_vhpt,
                     void *pal_vaddr, void *shared_arch_info)
 {
+    __get_cpu_var(inserted_vhpt) = (unsigned long)guest_vhpt;
     __vmx_switch_rr7(rid, guest_vhpt, pal_vaddr, shared_arch_info);
 }
 
