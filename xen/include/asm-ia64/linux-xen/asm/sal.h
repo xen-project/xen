@@ -52,9 +52,12 @@ extern spinlock_t sal_lock;
 # define SAL_CALL(result,args...) do {				\
 	unsigned long __ia64_sc_flags;				\
 	struct ia64_fpreg __ia64_sc_fr[6];			\
+	XEN_EFI_RR_DECLARE(rr6, rr7);				\
 	ia64_save_scratch_fpregs(__ia64_sc_fr);			\
 	spin_lock_irqsave(&sal_lock, __ia64_sc_flags);		\
+	XEN_EFI_RR_ENTER(rr6, rr7);				\
 	__SAL_CALL(result, args);				\
+	XEN_EFI_RR_LEAVE(rr6, rr7);				\
 	spin_unlock_irqrestore(&sal_lock, __ia64_sc_flags);	\
 	ia64_load_scratch_fpregs(__ia64_sc_fr);			\
 } while (0)
@@ -62,18 +65,24 @@ extern spinlock_t sal_lock;
 # define SAL_CALL_NOLOCK(result,args...) do {		\
 	unsigned long __ia64_scn_flags;			\
 	struct ia64_fpreg __ia64_scn_fr[6];		\
+	XEN_EFI_RR_DECLARE(rr6, rr7);			\
 	ia64_save_scratch_fpregs(__ia64_scn_fr);	\
 	local_irq_save(__ia64_scn_flags);		\
+	XEN_EFI_RR_ENTER(rr6, rr7);			\
 	__SAL_CALL(result, args);			\
+	XEN_EFI_RR_LEAVE(rr6, rr7);			\
 	local_irq_restore(__ia64_scn_flags);		\
 	ia64_load_scratch_fpregs(__ia64_scn_fr);	\
 } while (0)
 
 # define SAL_CALL_REENTRANT(result,args...) do {	\
 	struct ia64_fpreg __ia64_scs_fr[6];		\
+	XEN_EFI_RR_DECLARE(rr6, rr7);			\
 	ia64_save_scratch_fpregs(__ia64_scs_fr);	\
 	preempt_disable();				\
+	XEN_EFI_RR_ENTER(rr6, rr7);			\
 	__SAL_CALL(result, args);			\
+	XEN_EFI_RR_LEAVE(rr6, rr7);			\
 	preempt_enable();				\
 	ia64_load_scratch_fpregs(__ia64_scs_fr);	\
 } while (0)

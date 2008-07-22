@@ -65,11 +65,14 @@ prefix##_get_time (efi_time_t *tm, efi_time_cap_t *tc)						  \
 	struct ia64_fpreg fr[6];								  \
 	efi_time_cap_t *atc = NULL;								  \
 	efi_status_t ret;									  \
+	XEN_EFI_RR_DECLARE(rr6, rr7);								  \
 												  \
 	if (tc)											  \
 		atc = adjust_arg(tc);								  \
 	ia64_save_scratch_fpregs(fr);								  \
+	XEN_EFI_RR_ENTER(rr6, rr7);								  \
 	ret = efi_call_##prefix((efi_get_time_t *) __va(runtime->get_time), adjust_arg(tm), atc); \
+	XEN_EFI_RR_LEAVE(rr6, rr7);								  \
 	ia64_load_scratch_fpregs(fr);								  \
 	return ret;										  \
 }
@@ -80,9 +83,12 @@ prefix##_set_time (efi_time_t *tm)								\
 {												\
 	struct ia64_fpreg fr[6];								\
 	efi_status_t ret;									\
+	XEN_EFI_RR_DECLARE(rr6, rr7);								  \
 												\
 	ia64_save_scratch_fpregs(fr);								\
+	XEN_EFI_RR_ENTER(rr6, rr7);								  \
 	ret = efi_call_##prefix((efi_set_time_t *) __va(runtime->set_time), adjust_arg(tm));	\
+	XEN_EFI_RR_LEAVE(rr6, rr7);								  \
 	ia64_load_scratch_fpregs(fr);								\
 	return ret;										\
 }
@@ -93,10 +99,13 @@ prefix##_get_wakeup_time (efi_bool_t *enabled, efi_bool_t *pending, efi_time_t *
 {												\
 	struct ia64_fpreg fr[6];								\
 	efi_status_t ret;									\
+	XEN_EFI_RR_DECLARE(rr6, rr7);								  \
 												\
 	ia64_save_scratch_fpregs(fr);								\
+	XEN_EFI_RR_ENTER(rr6, rr7);								  \
 	ret = efi_call_##prefix((efi_get_wakeup_time_t *) __va(runtime->get_wakeup_time),	\
 				adjust_arg(enabled), adjust_arg(pending), adjust_arg(tm));	\
+	XEN_EFI_RR_LEAVE(rr6, rr7);								  \
 	ia64_load_scratch_fpregs(fr);								\
 	return ret;										\
 }
@@ -108,12 +117,15 @@ prefix##_set_wakeup_time (efi_bool_t enabled, efi_time_t *tm)					\
 	struct ia64_fpreg fr[6];								\
 	efi_time_t *atm = NULL;									\
 	efi_status_t ret;									\
+	XEN_EFI_RR_DECLARE(rr6, rr7);								  \
 												\
 	if (tm)											\
 		atm = adjust_arg(tm);								\
 	ia64_save_scratch_fpregs(fr);								\
+	XEN_EFI_RR_ENTER(rr6, rr7);								  \
 	ret = efi_call_##prefix((efi_set_wakeup_time_t *) __va(runtime->set_wakeup_time),	\
 				enabled, atm);							\
+	XEN_EFI_RR_LEAVE(rr6, rr7);								  \
 	ia64_load_scratch_fpregs(fr);								\
 	return ret;										\
 }
@@ -126,13 +138,16 @@ prefix##_get_variable (efi_char16_t *name, efi_guid_t *vendor, u32 *attr,		\
 	struct ia64_fpreg fr[6];							\
 	u32 *aattr = NULL;									\
 	efi_status_t ret;								\
+	XEN_EFI_RR_DECLARE(rr6, rr7);								  \
 											\
 	if (attr)									\
 		aattr = adjust_arg(attr);						\
 	ia64_save_scratch_fpregs(fr);							\
+	XEN_EFI_RR_ENTER(rr6, rr7);								  \
 	ret = efi_call_##prefix((efi_get_variable_t *) __va(runtime->get_variable),	\
 				adjust_arg(name), adjust_arg(vendor), aattr,		\
 				adjust_arg(data_size), adjust_arg(data));		\
+	XEN_EFI_RR_LEAVE(rr6, rr7);								  \
 	ia64_load_scratch_fpregs(fr);							\
 	return ret;									\
 }
@@ -143,10 +158,13 @@ prefix##_get_next_variable (unsigned long *name_size, efi_char16_t *name, efi_gu
 {												\
 	struct ia64_fpreg fr[6];								\
 	efi_status_t ret;									\
+	XEN_EFI_RR_DECLARE(rr6, rr7);								  \
 												\
 	ia64_save_scratch_fpregs(fr);								\
+	XEN_EFI_RR_ENTER(rr6, rr7);								  \
 	ret = efi_call_##prefix((efi_get_next_variable_t *) __va(runtime->get_next_variable),	\
 				adjust_arg(name_size), adjust_arg(name), adjust_arg(vendor));	\
+	XEN_EFI_RR_LEAVE(rr6, rr7);								  \
 	ia64_load_scratch_fpregs(fr);								\
 	return ret;										\
 }
@@ -158,11 +176,14 @@ prefix##_set_variable (efi_char16_t *name, efi_guid_t *vendor, unsigned long att
 {											\
 	struct ia64_fpreg fr[6];							\
 	efi_status_t ret;								\
+	XEN_EFI_RR_DECLARE(rr6, rr7);								  \
 											\
 	ia64_save_scratch_fpregs(fr);							\
+	XEN_EFI_RR_ENTER(rr6, rr7);								  \
 	ret = efi_call_##prefix((efi_set_variable_t *) __va(runtime->set_variable),	\
 				adjust_arg(name), adjust_arg(vendor), attr, data_size,	\
 				adjust_arg(data));					\
+	XEN_EFI_RR_LEAVE(rr6, rr7);								  \
 	ia64_load_scratch_fpregs(fr);							\
 	return ret;									\
 }
@@ -173,10 +194,13 @@ prefix##_get_next_high_mono_count (u32 *count)							\
 {												\
 	struct ia64_fpreg fr[6];								\
 	efi_status_t ret;									\
+	XEN_EFI_RR_DECLARE(rr6, rr7);								  \
 												\
 	ia64_save_scratch_fpregs(fr);								\
+	XEN_EFI_RR_ENTER(rr6, rr7);								  \
 	ret = efi_call_##prefix((efi_get_next_high_mono_count_t *)				\
 				__va(runtime->get_next_high_mono_count), adjust_arg(count));	\
+	XEN_EFI_RR_LEAVE(rr6, rr7);								  \
 	ia64_load_scratch_fpregs(fr);								\
 	return ret;										\
 }
@@ -188,14 +212,17 @@ prefix##_reset_system (int reset_type, efi_status_t status,			\
 {										\
 	struct ia64_fpreg fr[6];						\
 	efi_char16_t *adata = NULL;						\
+	XEN_EFI_RR_DECLARE(rr6, rr7);								  \
 										\
 	if (data)								\
 		adata = adjust_arg(data);					\
 										\
 	ia64_save_scratch_fpregs(fr);						\
+	XEN_EFI_RR_ENTER(rr6, rr7);						\
 	efi_call_##prefix((efi_reset_system_t *) __va(runtime->reset_system),	\
 			  reset_type, status, data_size, adata);		\
 	/* should not return, but just in case... */				\
+	XEN_EFI_RR_LEAVE(rr6, rr7);								  \
 	ia64_load_scratch_fpregs(fr);						\
 }
 
