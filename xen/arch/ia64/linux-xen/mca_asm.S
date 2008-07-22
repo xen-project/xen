@@ -473,6 +473,7 @@ ia64_reload_tr:
 	;;
 	srlz.d
 	;;
+#ifndef XEN
 	// 3. Reload ITR for PAL code.
 	GET_THIS_PADDR(r2, ia64_mca_pal_pte)
 	;;
@@ -491,6 +492,8 @@ ia64_reload_tr:
 	;;
 	srlz.i
 	;;
+#endif
+
 	// 4. Reload DTR for stack.
 #ifdef XEN
 	// Kernel registers are saved in a per_cpu cpu_kr_ia64_t

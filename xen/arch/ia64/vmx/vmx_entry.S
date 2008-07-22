@@ -598,7 +598,7 @@ END(ia64_leave_hypercall)
 /*
  * in0: new rr7
  * in1: virtual address of guest_vhpt
- * in2: virtual address of pal code segment
+ * in2: virtual addres of guest shared_info
  * r8: will contain old rid value
  */
 
@@ -611,7 +611,7 @@ END(ia64_leave_hypercall)
 GLOBAL_ENTRY(__vmx_switch_rr7)
        // not sure this unwind statement is correct...
        .prologue ASM_UNW_PRLG_RP|ASM_UNW_PRLG_PFS, ASM_UNW_PRLG_GRSAVE(1)
-	alloc loc1 = ar.pfs, 4, 8, 0, 0
+	alloc loc1 = ar.pfs, 4, 7, 0, 0
 1:{
 	mov r28  = in0                  // copy procedure index
 	mov r8   = ip                   // save ip to compute branch
@@ -623,12 +623,9 @@ GLOBAL_ENTRY(__vmx_switch_rr7)
 	tpa loc2 = loc2                 // get physical address of per cpu date
 	tpa r3 = r8                     // get physical address of ip
 	dep loc5 = 0,in1,60,4           // get physical address of guest_vhpt
-	dep loc6 = 0,in2,60,4           // get physical address of pal code
-	dep loc7 = 0,in3,60,4           // get physical address of privregs
+	dep loc6 = 0,in2,60,4           // get physical address of privregs
 	;;
 	dep loc6 = 0,loc6,0,IA64_GRANULE_SHIFT
-                                        // mask granule shift
-	dep loc7 = 0,loc7,0,IA64_GRANULE_SHIFT
                                         // mask granule shift
 	mov loc4 = psr                  // save psr
 	;;
@@ -725,46 +722,31 @@ GLOBAL_ENTRY(__vmx_switch_rr7)
 	;;
 .vhpt_overlaps:
 
-	// re-pin mappings for PAL code section
-	mov r24=IA64_TR_PALCODE
-	or loc6 = r25,loc6              // construct PA | page properties
-	mov r23 = IA64_GRANULE_SHIFT<<2
-	;;
-	ptr.i   in2,r23
-	;;
-	mov cr.itir=r23
-	mov cr.ifa=in2
-	;;
-	itr.i itr[r24]=loc6             // wire in new mapping...
-	;;
-
 	// r16, r19, r20 are used by
 	//  ia64_switch_mode_phys()/ia64_switch_mode_virt()
 	// re-pin mappings for privregs
 	// r21  = (current physical addr) & (IA64_GRANULE_SIZE - 1)
 	// r17  = (guest_vhpt physical addr) & (IA64_GRANULE_SIZE - 1)
-	// loc6 = (((pal phys addr) & (IA64_GRANULE_SIZE - 1) << 2)) | PAGE_KERNEL
-	// loc7 = (privregs physical addr) & (IA64_GRANULE_SIZE - 1)
-	cmp.ne.unc p7,p0=r21,loc7	// check overlap with current stack
+	// loc6 = (privregs physical addr) & (IA64_GRANULE_SIZE - 1)
+	cmp.ne.unc p7,p0=r21,loc6	// check overlap with current stack
 	;;
-(p7)	cmp.ne.unc p8,p0=r17,loc7	// check overlap with guest_vhpt
+(p7)	cmp.ne.unc p8,p0=r17,loc6	// check overlap with guest_vhpt
 	;;
-	// loc7 = (((privregs phys) & (IA64_GRANULE_SIZE - 1)) << 2) | PAGE_KERNEL
-	or loc7 = r25,loc7          // construct PA | page properties
+	// loc6 = (((privregs phys) & (IA64_GRANULE_SIZE - 1)) << 2) | PAGE_KERNEL
+	or loc6 = r25,loc6          // construct PA | page properties
 	;;
-	cmp.ne p9,p0=loc6,loc7
 	mov r22=IA64_TR_VPD
 	mov r24=IA64_TR_MAPPED_REGS
 	mov r23=IA64_GRANULE_SHIFT<<2
 	;;
-(p9)	ptr.i   in3,r23	
-(p8)	ptr.d   in3,r23
+	ptr.i   in2,r23
+(p8)	ptr.d   in2,r23
 	mov cr.itir=r23
-	mov cr.ifa=in3
+	mov cr.ifa=in2
 	;;
-(p9)	itr.i itr[r22]=loc7         // wire in new mapping...
+	itr.i itr[r22]=loc6         // wire in new mapping...
 	;;
-(p8)	itr.d dtr[r24]=loc7         // wire in new mapping...
+(p8)	itr.d dtr[r24]=loc6         // wire in new mapping...
 	;;
 
 	// done, switch back to virtual and return

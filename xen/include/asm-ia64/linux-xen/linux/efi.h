@@ -24,10 +24,6 @@
 #include <asm/page.h>
 #include <asm/system.h>
 
-#ifdef XEN
-extern void * pal_vaddr;
-#endif
-
 #define EFI_SUCCESS		0
 #define EFI_LOAD_ERROR          ( 1 | (1UL << (BITS_PER_LONG-1)))
 #define EFI_INVALID_PARAMETER	( 2 | (1UL << (BITS_PER_LONG-1)))
@@ -302,6 +298,9 @@ efi_guid_unparse(efi_guid_t *guid, char *out)
 extern void efi_init (void);
 extern void *efi_get_pal_addr (void);
 extern void efi_map_pal_code (void);
+#ifdef XEN
+extern void efi_unmap_pal_code (void);
+#endif
 extern void efi_map_memmap(void);
 extern void efi_memmap_walk (efi_freemem_callback_t callback, void *arg);
 extern void efi_gettimeofday (struct timespec *ts);
@@ -466,16 +465,32 @@ struct efi_generic_dev_path {
  * E: bits N-53: reserved (0)
  */
 
+/* rr7 (and rr6) may already be set to XEN_EFI_RR, which
+ * would indicate a nested EFI, SAL or PAL call, such
+ * as from an MCA. This may have occured during a call
+ * to set_one_rr_efi(). To be safe, repin everything anyway.
+ */
+
 #define XEN_EFI_RR_ENTER(rr6, rr7) do {			\
 	rr6 = ia64_get_rr(6UL << 61);			\
 	rr7 = ia64_get_rr(7UL << 61);			\
 	set_one_rr_efi(6UL << 61, XEN_EFI_RR);		\
 	set_one_rr_efi(7UL << 61, XEN_EFI_RR);		\
+	efi_map_pal_code();				\
 } while (0)
 
+/* There is no need to do anything if the saved rr7 (and rr6)
+ * is XEN_EFI_RR, as it would just switch them from XEN_EFI_RR to XEN_EFI_RR
+ * Furthermore, if this is a nested call it is important not
+ * to unpin efi_unmap_pal_code() until the outermost call is finished
+ */
+
 #define XEN_EFI_RR_LEAVE(rr6, rr7) do {			\
-	set_one_rr_efi(6UL << 61, rr6);			\
-	set_one_rr_efi(7UL << 61, rr7);			\
+	if (rr7 != XEN_EFI_RR) {			\
+		efi_unmap_pal_code();			\
+		set_one_rr_efi(6UL << 61, rr6);		\
+		set_one_rr_efi(7UL << 61, rr7);		\
+	}						\
 } while (0)
 
 #else

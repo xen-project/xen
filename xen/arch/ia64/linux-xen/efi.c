@@ -424,7 +424,7 @@ efi_get_pal_addr (void)
 			md->phys_addr + (md->num_pages << EFI_PAGE_SHIFT),
 			vaddr & mask, (vaddr & mask) + IA64_GRANULE_SIZE);
 #endif
-		return __va(md->phys_addr);
+		return __va_efi(md->phys_addr);
 	}
 	printk(KERN_WARNING "%s: no PAL-code memory-descriptor found\n",
 	       __FUNCTION__);
@@ -432,7 +432,7 @@ efi_get_pal_addr (void)
 }
 
 #ifdef XEN
-void *pal_vaddr = 0;
+static void *pal_vaddr = 0;
 
 void *
 efi_get_pal_addr(void)
@@ -443,24 +443,51 @@ efi_get_pal_addr(void)
 }
 #endif
 
-void
-efi_map_pal_code (void)
-{
 #ifdef XEN
-	u64 psr;
-	(void)efi_get_pal_addr();
-#else
+static void
+__efi_unmap_pal_code (void *pal_vaddr)
+{
+	ia64_ptr(0x1, GRANULEROUNDDOWN((unsigned long)pal_vaddr),
+		 IA64_GRANULE_SHIFT);
+}
+
+void
+efi_unmap_pal_code (void)
+{
 	void *pal_vaddr = efi_get_pal_addr ();
 	u64 psr;
 
 	if (!pal_vaddr)
 		return;
-#endif
 
 	/*
 	 * Cannot write to CRx with PSR.ic=1
 	 */
 	psr = ia64_clear_ic();
+	__efi_unmap_pal_code(pal_vaddr);
+	ia64_set_psr(psr);		/* restore psr */
+	ia64_srlz_i();
+}
+#endif
+
+void
+efi_map_pal_code (void)
+{
+	void *pal_vaddr = efi_get_pal_addr ();
+	u64 psr;
+
+	if (!pal_vaddr)
+		return;
+
+	/*
+	 * Cannot write to CRx with PSR.ic=1
+	 */
+	psr = ia64_clear_ic();
+#ifdef XEN
+	/* pal_vaddr must be unpinned before pinning
+	 * This is needed in the case of a nested EFI, PAL or SAL call */
+	__efi_unmap_pal_code(pal_vaddr);
+#endif
 	ia64_itr(0x1, IA64_TR_PALCODE, GRANULEROUNDDOWN((unsigned long) pal_vaddr),
 		 pte_val(pfn_pte(__pa(pal_vaddr) >> PAGE_SHIFT, PAGE_KERNEL)),
 		 IA64_GRANULE_SHIFT);
@@ -594,7 +621,9 @@ efi_init (void)
 	}
 #endif
 
+#ifndef XEN
 	efi_map_pal_code();
+#endif
 	efi_enter_virtual_mode();
 }
 

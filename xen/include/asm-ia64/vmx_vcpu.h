@@ -104,9 +104,9 @@ extern uint64_t guest_read_vivr(VCPU * vcpu);
 extern int vmx_vcpu_pend_interrupt(VCPU * vcpu, uint8_t vector);
 extern void vcpu_load_kernel_regs(VCPU * vcpu);
 extern void __vmx_switch_rr7(unsigned long rid, void *guest_vhpt,
-                             void *pal_vaddr, void *shared_arch_info);
+                             void *shared_arch_info);
 extern void vmx_switch_rr7(unsigned long rid, void *guest_vhpt,
-                           void *pal_vaddr, void *shared_arch_info);
+                           void *shared_arch_info);
 extern void vmx_ia64_set_dcr(VCPU * v);
 extern void inject_guest_interruption(struct vcpu *vcpu, u64 vec);
 extern void vmx_asm_bsw0(void);

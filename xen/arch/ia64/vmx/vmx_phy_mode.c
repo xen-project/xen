@@ -133,8 +133,6 @@ vmx_init_all_rr(VCPU *vcpu)
 	VMX(vcpu, vrr[VRN7]) = 0x738;
 }
 
-extern void * pal_vaddr;
-
 void
 vmx_load_all_rr(VCPU *vcpu)
 {
@@ -173,7 +171,7 @@ vmx_load_all_rr(VCPU *vcpu)
 	ia64_dv_serialize_data();
 	vmx_switch_rr7(vrrtomrr(vcpu,VMX(vcpu, vrr[VRN7])),
                       (void *)vcpu->arch.vhpt.hash,
-		       pal_vaddr, vcpu->arch.privregs);
+		       vcpu->arch.privregs);
 	ia64_set_pta(VMX(vcpu, mpta));
 	vmx_ia64_set_dcr(vcpu);
 
