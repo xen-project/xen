@@ -57,6 +57,7 @@
 #include <asm/thread_info.h>
 #include <asm/unistd.h>
 #include <xen/errno.h>
+#include <linux/efi.h>
 
 #if 1
 # define PSR_DEFAULT_BITS	psr.ac
