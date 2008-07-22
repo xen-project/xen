@@ -1511,51 +1511,52 @@ static void vga_draw_graphic(VGAState *s, int full_update)
            width, height, v, line_offset, s->cr[9], s->cr[0x17], s->line_compare, s->sr[0x01]);
 #endif
 
-    if (height - 1 > s->line_compare || multi_run || (s->cr[0x17] & 3) != 3
-            || !s->lfb_addr) {
-        /* Tricky things happen, just track all video memory */
-        start = 0;
-        end = s->vram_size;
-    } else {
-        /* Tricky things won't have any effect, i.e. we are in the very simple
-         * (and very usual) case of a linear buffer. */
-        /* use page table dirty bit tracking for the LFB plus border */
-        start = (s->start_addr * 4) & TARGET_PAGE_MASK;
-        end = ((s->start_addr * 4 + height * line_offset) + TARGET_PAGE_SIZE - 1) & TARGET_PAGE_MASK;
-    }
-
-    for (y = 0 ; y < start; y += TARGET_PAGE_SIZE)
-        /* We will not read that anyway. */
-        cpu_physical_memory_set_dirty(s->vram_offset + y);
-
-    {
-        unsigned long npages = (end - y) / TARGET_PAGE_SIZE;
-        const int width = sizeof(unsigned long) * 8;
-        unsigned long bitmap[(npages + width - 1) / width];
-        int err;
-
-        if (!(err = xc_hvm_track_dirty_vram(xc_handle, domid,
-                    (s->lfb_addr + y) / TARGET_PAGE_SIZE, npages, bitmap))) {
-            int i, j;
-            for (i = 0; i < sizeof(bitmap) / sizeof(*bitmap); i++) {
-                unsigned long map = bitmap[i];
-                for (j = i * width; map && j < npages; map >>= 1, j++)
-                    if (map & 1)
-                        cpu_physical_memory_set_dirty(s->vram_offset + y
-                            + j * TARGET_PAGE_SIZE);
-            }
-            y += npages * TARGET_PAGE_SIZE;
+    if (s->lfb_addr) {
+        if (height - 1 > s->line_compare || multi_run || (s->cr[0x17] & 3) != 3) {
+            /* Tricky things happen, just track all video memory */
+            start = 0;
+            end = s->vram_size;
         } else {
-            /* ENODATA just means we have changed mode and will succeed
-             * next time */
-            if (err != -ENODATA)
-                fprintf(stderr, "track_dirty_vram(%lx, %lx) failed (%d)\n", s->lfb_addr + y, npages, err);
+            /* Tricky things won't have any effect, i.e. we are in the very simple
+             * (and very usual) case of a linear buffer. */
+            /* use page table dirty bit tracking for the LFB plus border */
+            start = (s->start_addr * 4) & TARGET_PAGE_MASK;
+            end = ((s->start_addr * 4 + height * line_offset) + TARGET_PAGE_SIZE - 1) & TARGET_PAGE_MASK;
         }
-    }
 
-    for ( ; y < s->vram_size; y += TARGET_PAGE_SIZE)
-        /* We will not read that anyway. */
-        cpu_physical_memory_set_dirty(s->vram_offset + y);
+        for (y = 0 ; y < start; y += TARGET_PAGE_SIZE)
+            /* We will not read that anyway. */
+            cpu_physical_memory_set_dirty(s->vram_offset + y);
+
+        {
+            unsigned long npages = (end - y) / TARGET_PAGE_SIZE;
+            const int width = sizeof(unsigned long) * 8;
+            unsigned long bitmap[(npages + width - 1) / width];
+            int err;
+
+            if (!(err = xc_hvm_track_dirty_vram(xc_handle, domid,
+                        (s->lfb_addr + y) / TARGET_PAGE_SIZE, npages, bitmap))) {
+                int i, j;
+                for (i = 0; i < sizeof(bitmap) / sizeof(*bitmap); i++) {
+                    unsigned long map = bitmap[i];
+                    for (j = i * width; map && j < npages; map >>= 1, j++)
+                        if (map & 1)
+                            cpu_physical_memory_set_dirty(s->vram_offset + y
+                                + j * TARGET_PAGE_SIZE);
+                }
+                y += npages * TARGET_PAGE_SIZE;
+            } else {
+                /* ENODATA just means we have changed mode and will succeed
+                 * next time */
+                if (err != -ENODATA)
+                    fprintf(stderr, "track_dirty_vram(%lx, %lx) failed (%d)\n", s->lfb_addr + y, npages, err);
+            }
+        }
+
+        for ( ; y < s->vram_size; y += TARGET_PAGE_SIZE)
+            /* We will not read that anyway. */
+            cpu_physical_memory_set_dirty(s->vram_offset + y);
+    }
 
     addr1 = (s->start_addr * 4);
     bwidth = (width * bits + 7) / 8;
