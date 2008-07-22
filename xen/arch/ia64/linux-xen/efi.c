@@ -641,6 +641,17 @@ efi_enter_virtual_mode (void)
 
 	for (p = efi_map_start; p < efi_map_end; p += efi_desc_size) {
 		md = p;
+#ifdef XEN
+		if (md->attribute & EFI_MEMORY_RUNTIME) {
+			if (md->attribute & EFI_MEMORY_WB)
+				md->virt_addr = __IA64_EFI_CACHED_OFFSET|
+						md->phys_addr;
+			else if (md->attribute & (EFI_MEMORY_UC|EFI_MEMORY_WC|
+						  EFI_MEMORY_WT))
+				md->virt_addr = __IA64_EFI_UNCACHED_OFFSET|
+						md->phys_addr;
+		}
+#else
 		if (md->attribute & EFI_MEMORY_RUNTIME) {
 			/*
 			 * Some descriptors have multiple bits set, so the order of
@@ -673,6 +684,7 @@ efi_enter_virtual_mode (void)
 #endif
 			}
 		}
+#endif
 	}
 
 	status = efi_call_phys(__va(runtime->set_virtual_address_map),
