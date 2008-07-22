@@ -30,7 +30,6 @@ param.h			-> linux/include/asm-ia64/param.h
 patch.h			-> linux/include/asm-ia64/patch.h
 pci.h			-> linux/include/asm-ia64/pci.h
 rse.h			-> linux/include/asm-ia64/rse.h
-sal.h			-> linux/include/asm-ia64/sal.h
 sections.h		-> linux/include/asm-ia64/sections.h
 setup.h			-> linux/include/asm-ia64/setup.h
 string.h		-> linux/include/asm-ia64/string.h

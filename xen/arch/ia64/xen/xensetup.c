@@ -31,7 +31,7 @@
 #include <xen/rcupdate.h>
 #include <xsm/acm/acm_hooks.h>
 #include <asm/sn/simulator.h>
-#include <linux/asm/sal.h>
+#include <asm/sal.h>
 
 unsigned long xenheap_phys_end, total_pages;
 
