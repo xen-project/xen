@@ -121,8 +121,8 @@ static void __init
 sal_desc_entry_point (void *p)
 {
 	struct ia64_sal_desc_entry_point *ep = p;
-	ia64_pal_handler_init(__va(ep->pal_proc));
-	ia64_sal_handler_init(__va(ep->sal_proc), __va(ep->gp));
+	ia64_pal_handler_init(__va_efi(ep->pal_proc));
+	ia64_sal_handler_init(__va_efi(ep->sal_proc), __va_efi(ep->gp));
 }
 
 #ifdef CONFIG_SMP
