@@ -608,8 +608,7 @@ END(ia64_leave_hypercall)
 	 IA64_PSR_ED | IA64_PSR_DFL | IA64_PSR_DFH | IA64_PSR_IC)
 #define PSR_BITS_TO_SET    IA64_PSR_BN
 
-//extern void vmx_switch_rr7(unsigned long rid, void *guest_vhpt, void * pal_vaddr, void * shared_arch_info );
-GLOBAL_ENTRY(vmx_switch_rr7)
+GLOBAL_ENTRY(__vmx_switch_rr7)
        // not sure this unwind statement is correct...
        .prologue ASM_UNW_PRLG_RP|ASM_UNW_PRLG_PFS, ASM_UNW_PRLG_GRSAVE(1)
 	alloc loc1 = ar.pfs, 4, 8, 0, 0
@@ -777,4 +776,4 @@ GLOBAL_ENTRY(vmx_switch_rr7)
 	mov ar.rsc=loc3                 // restore RSE configuration
 	srlz.d                          // seralize restoration of psr.l
 	br.ret.sptk.many rp
-END(vmx_switch_rr7)
+END(__vmx_switch_rr7)

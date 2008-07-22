@@ -196,6 +196,12 @@ void vmx_vcpu_set_rr_fast(VCPU *vcpu, u64 reg, u64 val)
     }
 }
 
+void vmx_switch_rr7(unsigned long rid, void *guest_vhpt,
+                    void *pal_vaddr, void *shared_arch_info)
+{
+    __vmx_switch_rr7(rid, guest_vhpt, pal_vaddr, shared_arch_info);
+}
+
 IA64FAULT vmx_vcpu_set_rr(VCPU *vcpu, u64 reg, u64 val)
 {
     u64 rrval;
