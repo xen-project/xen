@@ -1,6 +1,8 @@
 #ifndef _LINUX_EFI_H
 #define _LINUX_EFI_H
 
+#ifndef __ASSEMBLY__
+
 /*
  * Extensible Firmware Interface
  * Based on 'Extensible Firmware Interface Specification' version 0.9, April 30, 1999
@@ -407,5 +409,94 @@ struct efi_generic_dev_path {
 	u8 sub_type;
 	u16 length;
 } __attribute ((packed));
+
+#ifdef XEN
+/*
+ * According to xen/arch/ia64/xen/regionreg.c the RID space is broken up
+ * into large-blocks. Each block belongs to a domain, except 0th block,
+ * which is broken up into small-blocks. The small-blocks are used for
+ * metaphysical mappings, again one per domain, except for the 0th
+ * small-block which is unused other than very early on in the
+ * hypervisor boot.
+ *
+ * By default each large-block is 18 bits wide, which is also the minimum
+ * allowed width for a block. Each small-block is by default 1/64 the width
+ * of a large-block, which is the maximum division allowed. In other words
+ * each small-block is at least 12 bits wide.
+ *
+ * The portion of the 0th small-block that is used early on during
+ * the hypervisor boot relates to IA64_REGION_ID_KERNEL, which is
+ * used to form an RID using the following scheme which seems to be
+ * have been inherited from Linux:
+ *
+ * a: bits 0-2: Region Number (0-7)
+ * b: 3-N:      IA64_REGION_ID_KERNEL (0)
+ * c: N-23:     reserved (0)
+ *
+ * N is defined by the platform.
+ *
+ * For EFI we use the following RID:
+ *
+ * a: bits 0-2:  Region Number (0-7)
+ * e: bits 3-N:  IA64_REGION_ID_KERNEL (1)
+ * f: bits N-53: reserved (0)
+ *
+ * + Only 0 is used as we only need one RID. Its not really important
+ *   what this number is, so long as its between 0 and 7.
+ *
+ * The nice thing about this is that we are only using 4 bits of RID
+ * space, so it shouldn't have any chance of running into an adjacent
+ * small-block since small-blocks are at least 12 bits wide.
+ *
+ * It would actually be possible to just use a IA64_REGION_ID_KERNEL
+ * based RID for EFI use. The important thing is that it is in the 0th
+ * small block, and thus not available to domains. But as we have
+ * lots of space, its seems to be nice and clean to just use a separate
+ * RID for EFI.
+ *
+ * This can be trivially changed by updating the definition of XEN_EFI_RR.
+ *
+ * For reference, the RID is used to produce the value inserted
+ * in to a region register in the following way:
+ *
+ * A: bit 0:     VHPT (0 = off, 1 = on)
+ * B: bit 1:     reserved (0)
+ * C: bits 2-7:  log 2 page_size
+ * D: bits 8-N:  RID
+ * E: bits N-53: reserved (0)
+ */
+
+#define XEN_EFI_RR_ENTER(rr6, rr7) do {			\
+	rr6 = ia64_get_rr(6UL << 61);			\
+	rr7 = ia64_get_rr(7UL << 61);			\
+	set_one_rr_efi(6UL << 61, XEN_EFI_RR);		\
+	set_one_rr_efi(7UL << 61, XEN_EFI_RR);		\
+} while (0)
+
+#define XEN_EFI_RR_LEAVE(rr6, rr7) do {			\
+	set_one_rr_efi(6UL << 61, rr6);			\
+	set_one_rr_efi(7UL << 61, rr7);			\
+} while (0)
+
+#else
+/* Just use rr6 and rr7 in a dummy fashion here to get
+ * rid of compiler warnings - a better solution should
+ * be found if this code is ever actually used */
+#define XEN_EFI_RR_ENTER(rr6, rr7)	do { rr6 = 0; rr7 = 0; } while (0)
+#define XEN_EFI_RR_LEAVE(rr6, rr7)	do {} while (0)
+#endif /* XEN */
+
+#define XEN_EFI_RR_DECLARE(rr6, rr7)	unsigned long rr6, rr7;
+
+#endif /* !__ASSEMBLY__ */
+
+#ifdef XEN
+#include <asm/mmu_context.h> /* For IA64_REGION_ID_EFI and ia64_rid() */
+#include <asm/pgtable.h>     /* IA64_GRANULE_SHIFT */
+#define XEN_EFI_REGION_NO __IA64_UL_CONST(0)
+#define XEN_EFI_RR ((ia64_rid(XEN_IA64_REGION_ID_EFI,			\
+			      XEN_EFI_REGION_NO) << 8) |		\
+		    (IA64_GRANULE_SHIFT << 2))
+#endif /* XEN */
 
 #endif /* _LINUX_EFI_H */

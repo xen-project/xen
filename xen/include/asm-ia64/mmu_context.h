@@ -3,6 +3,7 @@
 //dummy file to resolve non-arch-indep include
 #ifdef XEN
 #define IA64_REGION_ID_KERNEL 0
+#define XEN_IA64_REGION_ID_EFI 1
 #define ia64_rid(ctx,addr)	(((ctx) << 3) | (addr >> 61))
 
 #ifndef __ASSEMBLY__
