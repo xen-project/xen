@@ -1294,11 +1294,18 @@ static int domain_context_mapping(struct domain *domain, u8 bus, u8 devfn)
     return ret;
 }
 
-static int domain_context_unmap_one(struct iommu *iommu, u8 bus, u8 devfn)
+static int domain_context_unmap_one(
+    struct domain *domain,
+    struct iommu *iommu,
+    u8 bus, u8 devfn)
 {
     struct context_entry *context, *context_entries;
     unsigned long flags;
     u64 maddr;
+    struct acpi_rmrr_unit *rmrr;
+    u16 bdf;
+    int i;
+    unsigned int is_rmrr_device = 0;
 
     maddr = bus_to_context_maddr(iommu, bus);
     context_entries = (struct context_entry *)map_vtd_domain_page(maddr);
@@ -1311,18 +1318,32 @@ static int domain_context_unmap_one(struct iommu *iommu, u8 bus, u8 devfn)
     }
 
     spin_lock_irqsave(&iommu->lock, flags);
-    context_clear_present(*context);
-    context_clear_entry(*context);
-    iommu_flush_cache_entry(context);
-    iommu_flush_context_global(iommu, 0);
-    iommu_flush_iotlb_global(iommu, 0);
+    if ( domain->domain_id == 0 )
+    {
+        for_each_rmrr_device ( rmrr, bdf, i )
+        {
+            if ( PCI_BUS(bdf) == bus && PCI_DEVFN2(bdf) == devfn )
+            {
+                is_rmrr_device = 1;
+                break;
+            }
+        }
+    }
+    if ( !is_rmrr_device )
+    {
+        context_clear_present(*context);
+        context_clear_entry(*context);
+        iommu_flush_cache_entry(context);
+        iommu_flush_context_domain(iommu, domain_iommu_domid(domain), 0);
+        iommu_flush_iotlb_dsi(iommu, domain_iommu_domid(domain), 0);
+    }
     unmap_vtd_domain_page(context_entries);
     spin_unlock_irqrestore(&iommu->lock, flags);
 
     return 0;
 }
 
-static int domain_context_unmap(u8 bus, u8 devfn)
+static int domain_context_unmap(struct domain *domain, u8 bus, u8 devfn)
 {
     struct acpi_drhd_unit *drhd;
     u16 sec_bus, sub_bus;
@@ -1345,18 +1366,18 @@ static int domain_context_unmap(u8 bus, u8 devfn)
                                  PCI_SUBORDINATE_BUS);
         /*dmar_scope_remove_buses(&drhd->scope, sec_bus, sub_bus);*/
         if ( DEV_TYPE_PCI_BRIDGE )
-            ret = domain_context_unmap_one(drhd->iommu, bus, devfn);
+            ret = domain_context_unmap_one(domain, drhd->iommu, bus, devfn);
         break;
 
     case DEV_TYPE_PCIe_ENDPOINT:
-        ret = domain_context_unmap_one(drhd->iommu, bus, devfn);
+        ret = domain_context_unmap_one(domain, drhd->iommu, bus, devfn);
         break;
 
     case DEV_TYPE_PCI:
         if ( find_pcie_endpoint(&bus, &devfn, &secbus) )
-            ret = domain_context_unmap_one(drhd->iommu, bus, devfn);
+            ret = domain_context_unmap_one(domain, drhd->iommu, bus, devfn);
         if ( bus != secbus )
-            domain_context_unmap_one(drhd->iommu, secbus, 0);
+            domain_context_unmap_one(domain, drhd->iommu, secbus, 0);
         break;
 
     default:
@@ -1386,7 +1407,7 @@ static int reassign_device_ownership(
 
     drhd = acpi_find_matched_drhd_unit(bus, devfn);
     pdev_iommu = drhd->iommu;
-    domain_context_unmap(bus, devfn);
+    domain_context_unmap(source, bus, devfn);
 
     write_lock(&pcidevs_lock);
     list_move(&pdev->domain_list, &target->arch.pdev_list);
@@ -1584,7 +1605,9 @@ static int intel_iommu_add_device(struct pci_dev *pdev)
 
 static int intel_iommu_remove_device(struct pci_dev *pdev)
 {
-    return domain_context_unmap(pdev->bus, pdev->devfn);
+    if ( !pdev->domain )
+        return -EINVAL;
+    return domain_context_unmap(pdev->domain, pdev->bus, pdev->devfn);
 }
 
 static void setup_dom0_devices(struct domain *d)
