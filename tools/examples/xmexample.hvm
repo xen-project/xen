@@ -15,7 +15,7 @@ else:
 
 #----------------------------------------------------------------------------
 # Kernel image file.
-kernel = "/usr/" + arch_libdir + "/xen/boot/hvmloader"
+kernel = "/usr/lib/xen/boot/hvmloader"
 
 # The domain build function. HVM domain uses 'hvm'.
 builder='hvm'

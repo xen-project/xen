@@ -1,14 +1,7 @@
 # Not to be started directly,
 # See xmexample.hvm-stubdom and stubdom/README for more details
 
-import os, re
-arch = os.uname()[4]
-if re.search('64', arch):
-    arch_libdir = 'lib64'
-else:
-    arch_libdir = 'lib'
-
-kernel = "/usr/" + arch_libdir + "/xen/boot/ioemu-stubdom.gz"
+kernel = "/usr/lib/xen/boot/ioemu-stubdom.gz"
 
 # Must be the same as in xmexample.hvm-stubdom, with a prepended vif for TCP/IP
 # networking in the stubdomain itself, here just ''
