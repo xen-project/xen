@@ -207,17 +207,37 @@ late_alt_dtlb_miss:
 (p8)	br.cond.sptk frametable_miss ;;
 #endif
 	// If it is not a Xen address, handle it via page_fault.
+	//    !( ((r22 == 0x18 || r22 == 0x1c) && rr7 == XEN_EFI_RR) ||
+	//	 r22 == 0x1e )
+	// Note that rr7 == XEN_EFI_RR implies rr6 == XEN_EFI_RR
 	extr.u r22=r16,59,5
 	;;
 	dep r20=0,r20,IA64_ITIR_KEY,IA64_ITIR_KEY_LEN	// clear the key
-	cmp.ne p8,p0=0x1e,r22
-(p8)	br.cond.sptk page_fault
+	movl r23=7 << 61
 	;;
+	mov r23=rr[r23]
+	;;
+	mov r25=XEN_EFI_RR
+	cmp.eq p8,p0=0x18,r22		// 0xc...
+	;;
+	cmp.eq.or p8,p0=0x1c,r22	// 0xe...
+	;;
+	cmp.eq.and p8,p0=r25,r23	// rr7 == XEN_EFI_RR
+	;;
+	cmp.eq.or p8,p0=0x1e,r22	// 0xf...
+(p8)	br.cond.spnt alt_dtlb_miss_identity_map
+	br.cond.spnt page_fault
+	;;
+alt_dtlb_miss_identity_map:
 	dep r21=-1,r21,IA64_PSR_ED_BIT,1
 	or r19=r19,r17		// insert PTE control bits into r19
 	mov cr.itir=r20		// set itir with cleared key
 	;;
-	dep r19=r18,r19,4,1	// set bit 4 (uncached) if access to UC area
+	cmp.ne p8,p0=r0,r18		// Xen UC bit set
+	;;
+	cmp.eq.or p8,p0=0x18,r22	// Region 6 is UC for EFI
+	;;
+(p8)	dep r19=-1,r19,4,1	// set bit 4 (uncached) if access to UC area
 (p6)	mov cr.ipsr=r21
 	;;
 (p7)	itc.d r19		// insert the TLB entry
