@@ -214,7 +214,7 @@ static struct irqaction irq0 = { timer_interrupt, "timer", NULL };
  * Return processor ticks per second / CALIBRATE_FRAC.
  */
 
-#define CLOCK_TICK_RATE 1193180 /* system crystal frequency (Hz) */
+#define CLOCK_TICK_RATE 1193182 /* system crystal frequency (Hz) */
 #define CALIBRATE_FRAC  20      /* calibrate over 50ms */
 #define CALIBRATE_LATCH ((CLOCK_TICK_RATE+(CALIBRATE_FRAC/2))/CALIBRATE_FRAC)
 
@@ -484,40 +484,29 @@ static int init_pmtimer(struct platform_timesource *pts)
  * PLATFORM TIMER 5: TSC
  */
 
-#define platform_timer_is_tsc() (!strcmp(plt_src.name, "TSC"))
-static u64 tsc_freq;
-
-static u64 read_tsc_count(void)
-{
-    u64 tsc;
-    rdtscll(tsc);
-    return tsc;
-}
+static const char plt_tsc_name[] = "TSC";
+#define platform_timer_is_tsc() (plt_src.name == plt_tsc_name)
 
 static int init_tsctimer(struct platform_timesource *pts)
 {
-    unsigned int cpu;
+    if ( !tsc_invariant )
+        return 0;
 
-    /*
-     * TODO: evaluate stability of TSC here, return 0 if not stable.
-     * For now we assume all TSCs are synchronised and hence can all share
-     * CPU 0's calibration values.
-     */
-    for_each_cpu ( cpu )
-    {
-        if ( cpu == 0 )
-            continue;
-        memcpy(&per_cpu(cpu_time, cpu),
-               &per_cpu(cpu_time, 0),
-               sizeof(struct cpu_time));
-    }
-
-    pts->name = "TSC";
-    pts->frequency = tsc_freq;
-    pts->read_counter = read_tsc_count;
-    pts->counter_bits = 64;
-
+    pts->name = (char *)plt_tsc_name;
     return 1;
+}
+
+static void make_tsctimer_record(void)
+{
+    struct cpu_time *t = &this_cpu(cpu_time);
+    s_time_t now;
+    u64 tsc;
+
+    rdtscll(tsc);
+    now = scale_delta(tsc, &t->tsc_scale);
+
+    t->local_tsc_stamp = tsc;
+    t->stime_local_stamp = t->stime_master_stamp = now;
 }
 
 /************************************************************
@@ -585,6 +574,12 @@ static void platform_time_calibration(void)
 
 static void resume_platform_timer(void)
 {
+    if ( platform_timer_is_tsc() )
+    {
+        /* TODO: Save/restore TSC values. */
+        return;
+    }
+
     /* No change in platform_stime across suspend/resume. */
     platform_timer_stamp = plt_stamp64;
     plt_stamp = plt_src.read_counter();
@@ -619,6 +614,12 @@ static void init_platform_timer(void)
          !init_hpet(pts) &&
          !init_pmtimer(pts) )
         init_pit(pts);
+
+    if ( platform_timer_is_tsc() )
+    {
+        printk("Platform timer is TSC\n");
+        return;
+    }
 
     plt_mask = (u64)~0ull >> (64 - pts->counter_bits);
 
@@ -907,6 +908,14 @@ static void local_time_calibration(void *unused)
     /* The overall calibration scale multiplier. */
     u32 calibration_mul_frac;
 
+    if ( platform_timer_is_tsc() )
+    {
+        make_tsctimer_record(); 
+        update_vcpu_system_time(current);
+        set_timer(&t->calibration_timer, NOW() + MILLISECS(10*1000));
+        return;
+    }
+
     prev_tsc          = t->local_tsc_stamp;
     prev_local_stime  = t->stime_local_stamp;
     prev_master_stime = t->stime_master_stamp;
@@ -1025,16 +1034,20 @@ void init_percpu_time(void)
     s_time_t now;
 
     if ( platform_timer_is_tsc() )
-        return;
+    {
+        make_tsctimer_record();
+        goto out;
+    }
 
     local_irq_save(flags);
     rdtscll(t->local_tsc_stamp);
-    now = read_platform_stime();
+    now = !plt_src.read_counter ? 0 : read_platform_stime();
     local_irq_restore(flags);
 
     t->stime_master_stamp = now;
     t->stime_local_stamp  = now;
 
+ out:
     init_timer(&t->calibration_timer, local_time_calibration,
                NULL, smp_processor_id());
     set_timer(&t->calibration_timer, NOW() + EPOCH);
@@ -1043,19 +1056,19 @@ void init_percpu_time(void)
 /* Late init function (after all CPUs are booted). */
 int __init init_xen_time(void)
 {
-    wc_sec = get_cmos_time();
-
     local_irq_disable();
+
+    /* check if TSC is invariant during deep C state
+       this is a new feature introduced by Nehalem*/
+    if ( cpuid_edx(0x80000007) & (1u<<8) )
+        tsc_invariant = 1;
+
+    init_percpu_time();
 
     stime_platform_stamp = 0;
     init_platform_timer();
 
-    init_percpu_time();
-
-    /* check if TSC is invariant during deep C state
-       this is a new feature introduced by Nehalem*/
-    if ( cpuid_edx(0x80000007) & (1U<<8) )
-        tsc_invariant = 1;
+    do_settime(get_cmos_time(), 0, NOW());
 
     local_irq_enable();
 
@@ -1068,7 +1081,6 @@ void __init early_time_init(void)
 {
     u64 tmp = init_pit_and_calibrate_tsc();
 
-    tsc_freq = tmp;
     set_time_scale(&this_cpu(cpu_time).tsc_scale, tmp);
 
     do_div(tmp, 1000);
@@ -1170,9 +1182,9 @@ int time_resume(void)
 
     resume_platform_timer();
 
-    do_settime(get_cmos_time() + cmos_utc_offset, 0, read_platform_stime());
-
     init_percpu_time();
+
+    do_settime(get_cmos_time() + cmos_utc_offset, 0, NOW());
 
     if ( !is_idle_vcpu(current) )
         update_vcpu_system_time(current);

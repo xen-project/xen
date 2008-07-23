@@ -23,6 +23,7 @@ import xen.lowlevel.xc
 from xen.util import Brctl
 from xen.util import pci as PciUtil
 from xen.xend import XendAPIStore
+from xen.xend import osdep
 
 import uuid, arch
 from XendPBD import XendPBD
@@ -91,7 +92,7 @@ class XendNode:
         for cpu_uuid, cpu in saved_cpus.items():
             self.cpus[cpu_uuid] = cpu
 
-        cpuinfo = parse_proc_cpuinfo()
+        cpuinfo = osdep.get_cpuinfo()
         physinfo = self.physinfo_dict()
         cpu_count = physinfo['nr_cpus']
         cpu_features = physinfo['hw_caps']
@@ -742,31 +743,6 @@ class XendNode:
         return dict(self.physinfo())
     def info_dict(self):
         return dict(self.info())
-
-def parse_proc_cpuinfo():
-    cpuinfo = {}
-    f = file('/proc/cpuinfo', 'r')
-    try:
-        p = -1
-        d = {}
-        for line in f:
-            keyvalue = line.split(':')
-            if len(keyvalue) != 2:
-                continue
-            key = keyvalue[0].strip()
-            val = keyvalue[1].strip()
-            if key == 'processor':
-                if p != -1:
-                    cpuinfo[p] = d
-                p = int(val)
-                d = {}
-            else:
-                d[key] = val
-        cpuinfo[p] = d
-        return cpuinfo
-    finally:
-        f.close()
-
 
 def instance():
     global inst

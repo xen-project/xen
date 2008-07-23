@@ -24,6 +24,12 @@ struct list_head {
 	(ptr)->next = (ptr); (ptr)->prev = (ptr); \
 } while (0)
 
+#define list_top(head, type, member)					  \
+({ 									  \
+	struct list_head *_head = (head);				  \
+	list_empty(_head) ? NULL : list_entry(_head->next, type, member); \
+})
+
 /*
  * Insert a new entry between two known consecutive entries. 
  *

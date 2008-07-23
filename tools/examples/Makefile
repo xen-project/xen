@@ -28,6 +28,7 @@ XEN_SCRIPTS += blktap
 XEN_SCRIPTS += vtpm vtpm-delete
 XEN_SCRIPTS += xen-hotplug-cleanup
 XEN_SCRIPTS += external-device-migrate
+XEN_SCRIPTS += vscsi
 XEN_SCRIPT_DATA = xen-script-common.sh locking.sh logging.sh
 XEN_SCRIPT_DATA += xen-hotplug-common.sh xen-network-common.sh vif-common.sh
 XEN_SCRIPT_DATA += block-common.sh vtpm-common.sh vtpm-hotplug-common.sh

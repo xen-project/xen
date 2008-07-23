@@ -95,7 +95,7 @@ struct periodic_time {
 };
 
 
-#define PIT_FREQ 1193181
+#define PIT_FREQ 1193182
 #define PIT_BASE 0x40
 
 typedef struct PITState {

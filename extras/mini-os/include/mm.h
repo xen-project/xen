@@ -63,6 +63,7 @@ void arch_init_demand_mapping_area(unsigned long max_pfn);
 void arch_init_mm(unsigned long* start_pfn_p, unsigned long* max_pfn_p);
 void arch_init_p2m(unsigned long max_pfn_p);
 
+unsigned long allocate_ondemand(unsigned long n, unsigned long alignment);
 /* map f[i*stride]+i*increment for i in 0..n-1, aligned on alignment pages */
 void *map_frames_ex(unsigned long *f, unsigned long n, unsigned long stride,
 	unsigned long increment, unsigned long alignment, domid_t id,

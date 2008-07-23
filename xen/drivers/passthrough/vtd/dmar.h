@@ -76,7 +76,7 @@ struct acpi_atsr_unit {
 #define for_each_rmrr_device(rmrr, bdf, idx)            \
     list_for_each_entry(rmrr, &acpi_rmrr_units, list)   \
         /* assume there never is a bdf == 0 */          \
-        for (idx = 0; (bdf = rmrr->scope.devices[i]) && \
+        for (idx = 0; (bdf = rmrr->scope.devices[idx]) && \
                  idx < rmrr->scope.devices_cnt; idx++)
 
 struct acpi_drhd_unit * acpi_find_matched_drhd_unit(u8 bus, u8 devfn);

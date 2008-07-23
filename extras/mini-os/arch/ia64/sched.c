@@ -34,6 +34,11 @@
 /* The function is implemented in fw.S */
 extern void thread_starter(void);
 
+void stack_walk(void)
+{
+    /* TODO */
+}
+
 struct thread*
 arch_create_thread(char *name, void (*function)(void *), void *data)
 {

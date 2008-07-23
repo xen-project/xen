@@ -48,5 +48,7 @@ inline static void trap_fini(void)
 
 #include "ia64_cpu.h"
 
+void stack_walk(void);
+
 #endif /* !defined(_TRAPS_H_) */
 

@@ -521,14 +521,6 @@ void __init __start_xen(unsigned long mbi_p)
     if ( ((unsigned long)cpu0_stack & (STACK_SIZE-1)) != 0 )
         EARLY_FAIL("Misaligned CPU0 stack.\n");
 
-    /*
-     * Since there are some stubs getting built on the stacks which use
-     * direct calls/jumps, the heap must be confined to the lower 2G so
-     * that those branches can reach their targets.
-     */
-    if ( opt_xenheap_megabytes > 2048 )
-        opt_xenheap_megabytes = 2048;
-
     if ( e820_raw_nr != 0 )
     {
         memmap_type = "Xen-e820";
@@ -599,6 +591,23 @@ void __init __start_xen(unsigned long mbi_p)
 
     /* Sanitise the raw E820 map to produce a final clean version. */
     max_page = init_e820(memmap_type, e820_raw, &e820_raw_nr);
+
+#ifdef CONFIG_X86_64
+    /*
+     * On x86/64 we are able to account for the allocation bitmap
+     * (allocated in common/page_alloc.c:init_boot_allocator()) stealing
+     * from the Xen heap. Here we make the Xen heap appropriately larger.
+     */
+    opt_xenheap_megabytes += (max_page / 8) >> 20;
+#endif
+
+    /*
+     * Since there are some stubs getting built on the stacks which use
+     * direct calls/jumps, the heap must be confined to the lower 2G so
+     * that those branches can reach their targets.
+     */
+    if ( opt_xenheap_megabytes > 2048 )
+        opt_xenheap_megabytes = 2048;
 
     /* Create a temporary copy of the E820 map. */
     memcpy(&boot_e820, &e820, sizeof(e820));

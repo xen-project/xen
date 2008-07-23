@@ -39,11 +39,11 @@ SLEEP_TIME_GROWTH = 0.1
 
 # A mapping between easy-to-remember labels and the more verbose
 # label actually shown in the PROC_XEN_BALLOON file.
-labels = { 'current'      : 'Current allocation',
-           'target'       : 'Requested target',
-           'low-balloon'  : 'Low-mem balloon',
-           'high-balloon' : 'High-mem balloon',
-           'limit'        : 'Xen hard limit' }
+#labels = { 'current'      : 'Current allocation',
+#           'target'       : 'Requested target',
+#           'low-balloon'  : 'Low-mem balloon',
+#           'high-balloon' : 'High-mem balloon',
+#           'limit'        : 'Xen hard limit' }
 
 def _get_proc_balloon(label):
     """Returns the value for the named label.  Returns None if the label was
@@ -54,7 +54,7 @@ def _get_proc_balloon(label):
 def get_dom0_current_alloc():
     """Returns the current memory allocation (in KiB) of dom0."""
 
-    kb = _get_proc_balloon(labels['current'])
+    kb = _get_proc_balloon('current')
     if kb == None:
         raise VmError('Failed to query current memory allocation of dom0.')
     return kb
@@ -62,7 +62,7 @@ def get_dom0_current_alloc():
 def get_dom0_target_alloc():
     """Returns the target memory allocation (in KiB) of dom0."""
 
-    kb = _get_proc_balloon(labels['target'])
+    kb = _get_proc_balloon('target')
     if kb == None:
         raise VmError('Failed to query target memory allocation of dom0.')
     return kb

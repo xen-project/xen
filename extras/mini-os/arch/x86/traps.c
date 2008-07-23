@@ -112,7 +112,7 @@ void page_walk(unsigned long virt_address)
         printk("   L2 = %"PRIpte" (%p)  [offset = %lx]\n", page, tab, l2_table_offset(addr));
         
         page = tab[l1_table_offset(addr)];
-        printk("    L1 = %"PRIpte" (%p)  [offset = %lx]\n", page, tab, l1_table_offset(addr));
+        printk("    L1 = %"PRIpte" [offset = %lx]\n", page, l1_table_offset(addr));
 
 }
 
@@ -155,6 +155,40 @@ static int handle_cow(unsigned long addr) {
 	return 0;
 }
 
+static void do_stack_walk(unsigned long frame_base)
+{
+    unsigned long *frame = (void*) frame_base;
+    printk("base is %#lx ", frame_base);
+    printk("caller is %#lx\n", frame[1]);
+    if (frame[0])
+	do_stack_walk(frame[0]);
+}
+
+void stack_walk(void)
+{
+    unsigned long bp;
+#ifdef __x86_64__
+    asm("movq %%rbp, %0":"=r"(bp));
+#else
+    asm("movl %%ebp, %0":"=r"(bp));
+#endif
+    do_stack_walk(bp);
+}
+
+static void dump_mem(unsigned long addr)
+{
+    unsigned long i;
+    if (addr < PAGE_SIZE)
+	return;
+
+    for (i = ((addr)-16 ) & ~15; i < (((addr)+48 ) & ~15); i++)
+    {
+	if (!(i%16))
+	    printk("\n%lx:", i);
+	printk(" %02x", *(unsigned char *)i);
+    }
+    printk("\n");
+}
 #define read_cr2() \
         (HYPERVISOR_shared_info->vcpu_info[smp_processor_id()].arch.cr2)
 
@@ -163,6 +197,7 @@ static int handling_pg_fault = 0;
 void do_page_fault(struct pt_regs *regs, unsigned long error_code)
 {
     unsigned long addr = read_cr2();
+    struct sched_shutdown sched_shutdown = { .reason = SHUTDOWN_crash };
 
     if ((error_code & TRAP_PF_WRITE) && handle_cow(addr))
 	return;
@@ -170,37 +205,61 @@ void do_page_fault(struct pt_regs *regs, unsigned long error_code)
     /* If we are already handling a page fault, and got another one
        that means we faulted in pagetable walk. Continuing here would cause
        a recursive fault */       
-    if(handling_pg_fault) 
+    if(handling_pg_fault == 1) 
     {
         printk("Page fault in pagetable walk (access to invalid memory?).\n"); 
-        do_exit();
+        HYPERVISOR_sched_op(SCHEDOP_shutdown, &sched_shutdown);
     }
-    handling_pg_fault = 1;
+    handling_pg_fault++;
+    barrier();
 
 #if defined(__x86_64__)
-    printk("Page fault at linear address %p, rip %p, code %lx\n",
-           addr, regs->rip, error_code);
+    printk("Page fault at linear address %p, rip %p, regs %p, sp %p, our_sp %p, code %lx\n",
+           addr, regs->rip, regs, regs->rsp, &addr, error_code);
 #else
-    printk("Page fault at linear address %p, eip %p, code %lx\n",
-           addr, regs->eip, error_code);
+    printk("Page fault at linear address %p, eip %p, regs %p, sp %p, our_sp %p, code %lx\n",
+           addr, regs->eip, regs, regs->esp, &addr, error_code);
 #endif
 
     dump_regs(regs);
+#if defined(__x86_64__)
+    do_stack_walk(regs->rbp);
+    dump_mem(regs->rsp);
+    dump_mem(regs->rbp);
+    dump_mem(regs->rip);
+#else
+    do_stack_walk(regs->ebp);
+    dump_mem(regs->esp);
+    dump_mem(regs->ebp);
+    dump_mem(regs->eip);
+#endif
     page_walk(addr);
-    do_exit();
+    HYPERVISOR_sched_op(SCHEDOP_shutdown, &sched_shutdown);
     /* We should never get here ... but still */
-    handling_pg_fault = 0;
+    handling_pg_fault--;
 }
 
 void do_general_protection(struct pt_regs *regs, long error_code)
 {
+    struct sched_shutdown sched_shutdown = { .reason = SHUTDOWN_crash };
 #ifdef __i386__
     printk("GPF eip: %p, error_code=%lx\n", regs->eip, error_code);
 #else    
     printk("GPF rip: %p, error_code=%lx\n", regs->rip, error_code);
 #endif
     dump_regs(regs);
-    do_exit();
+#if defined(__x86_64__)
+    do_stack_walk(regs->rbp);
+    dump_mem(regs->rsp);
+    dump_mem(regs->rbp);
+    dump_mem(regs->rip);
+#else
+    do_stack_walk(regs->ebp);
+    dump_mem(regs->esp);
+    dump_mem(regs->ebp);
+    dump_mem(regs->eip);
+#endif
+    HYPERVISOR_sched_op(SCHEDOP_shutdown, &sched_shutdown);
 }
 
 

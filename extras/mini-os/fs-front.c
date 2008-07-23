@@ -183,12 +183,13 @@ int fs_open(struct fs_import *import, char *file)
 
     /* Prepare request for the backend */
     back_req_id = reserve_fsif_request(import);
-    DEBUG("Backend request id=%d, gref=%d\n", back_req_id, fsr->gref);
+    DEBUG("Backend request id=%d\n", back_req_id);
 
     /* Prepare our private request structure */
     priv_req_id = get_id_from_freelist(import->freelist);
     DEBUG("Request id for fs_open call is: %d\n", priv_req_id);
     fsr = &import->requests[priv_req_id];
+    DEBUG("gref id=%d\n", fsr->gref);
     fsr->thread = current;
     sprintf(fsr->page, "%s", file);
 
@@ -221,7 +222,7 @@ int fs_close(struct fs_import *import, int fd)
 
     /* Prepare request for the backend */
     back_req_id = reserve_fsif_request(import);
-    DEBUG("Backend request id=%d, gref=%d\n", back_req_id, fsr->gref);
+    DEBUG("Backend request id=%d\n", back_req_id);
 
     /* Prepare our private request structure */
     priv_req_id = get_id_from_freelist(import->freelist);
@@ -261,12 +262,13 @@ ssize_t fs_read(struct fs_import *import, int fd, void *buf,
 
     /* Prepare request for the backend */
     back_req_id = reserve_fsif_request(import);
-    DEBUG("Backend request id=%d, gref=%d\n", back_req_id, fsr->gref);
+    DEBUG("Backend request id=%d\n", back_req_id);
 
     /* Prepare our private request structure */
     priv_req_id = get_id_from_freelist(import->freelist);
     DEBUG("Request id for fs_read call is: %d\n", priv_req_id);
     fsr = &import->requests[priv_req_id];
+    DEBUG("gref=%d\n", fsr->gref);
     fsr->thread = current;
     memset(fsr->page, 0, PAGE_SIZE);
 
@@ -307,12 +309,13 @@ ssize_t fs_write(struct fs_import *import, int fd, void *buf,
 
     /* Prepare request for the backend */
     back_req_id = reserve_fsif_request(import);
-    DEBUG("Backend request id=%d, gref=%d\n", back_req_id, fsr->gref);
+    DEBUG("Backend request id=%d\n", back_req_id);
 
     /* Prepare our private request structure */
     priv_req_id = get_id_from_freelist(import->freelist);
     DEBUG("Request id for fs_read call is: %d\n", priv_req_id);
     fsr = &import->requests[priv_req_id];
+    DEBUG("gref=%d\n", fsr->gref);
     fsr->thread = current;
     memcpy(fsr->page, buf, len);
     BUG_ON(len > PAGE_SIZE);
@@ -352,12 +355,13 @@ int fs_stat(struct fs_import *import,
 
     /* Prepare request for the backend */
     back_req_id = reserve_fsif_request(import);
-    DEBUG("Backend request id=%d, gref=%d\n", back_req_id, fsr->gref);
+    DEBUG("Backend request id=%d\n", back_req_id);
 
     /* Prepare our private request structure */
     priv_req_id = get_id_from_freelist(import->freelist);
     DEBUG("Request id for fs_stat call is: %d\n", priv_req_id);
     fsr = &import->requests[priv_req_id];
+    DEBUG("gref=%d\n", fsr->gref);
     fsr->thread = current;
     memset(fsr->page, 0, PAGE_SIZE);
 
@@ -394,7 +398,7 @@ int fs_truncate(struct fs_import *import,
 
     /* Prepare request for the backend */
     back_req_id = reserve_fsif_request(import);
-    DEBUG("Backend request id=%d, gref=%d\n", back_req_id, fsr->gref);
+    DEBUG("Backend request id=%d\n", back_req_id);
 
     /* Prepare our private request structure */
     priv_req_id = get_id_from_freelist(import->freelist);
@@ -432,12 +436,13 @@ int fs_remove(struct fs_import *import, char *file)
 
     /* Prepare request for the backend */
     back_req_id = reserve_fsif_request(import);
-    DEBUG("Backend request id=%d, gref=%d\n", back_req_id, fsr->gref);
+    DEBUG("Backend request id=%d\n", back_req_id);
 
     /* Prepare our private request structure */
     priv_req_id = get_id_from_freelist(import->freelist);
     DEBUG("Request id for fs_open call is: %d\n", priv_req_id);
     fsr = &import->requests[priv_req_id];
+    DEBUG("gref=%d\n", fsr->gref);
     fsr->thread = current;
     sprintf(fsr->page, "%s", file);
 
@@ -475,12 +480,13 @@ int fs_rename(struct fs_import *import,
 
     /* Prepare request for the backend */
     back_req_id = reserve_fsif_request(import);
-    DEBUG("Backend request id=%d, gref=%d\n", back_req_id, fsr->gref);
+    DEBUG("Backend request id=%d\n", back_req_id);
 
     /* Prepare our private request structure */
     priv_req_id = get_id_from_freelist(import->freelist);
     DEBUG("Request id for fs_open call is: %d\n", priv_req_id);
     fsr = &import->requests[priv_req_id];
+    DEBUG("gref=%d\n", fsr->gref);
     fsr->thread = current;
     sprintf(fsr->page, "%s%s%c%s%s", 
             old_header, old_file_name, '\0', new_header, new_file_name);
@@ -521,12 +527,13 @@ int fs_create(struct fs_import *import, char *name,
 
     /* Prepare request for the backend */
     back_req_id = reserve_fsif_request(import);
-    DEBUG("Backend request id=%d, gref=%d\n", back_req_id, fsr->gref);
+    DEBUG("Backend request id=%d\n", back_req_id);
 
     /* Prepare our private request structure */
     priv_req_id = get_id_from_freelist(import->freelist);
     DEBUG("Request id for fs_create call is: %d\n", priv_req_id);
     fsr = &import->requests[priv_req_id];
+    DEBUG("gref=%d\n", fsr->gref);
     fsr->thread = current;
     sprintf(fsr->page, "%s", name);
 
@@ -566,12 +573,13 @@ char** fs_list(struct fs_import *import, char *name,
 
     /* Prepare request for the backend */
     back_req_id = reserve_fsif_request(import);
-    DEBUG("Backend request id=%d, gref=%d\n", back_req_id, fsr->gref);
+    DEBUG("Backend request id=%d\n", back_req_id);
 
     /* Prepare our private request structure */
     priv_req_id = get_id_from_freelist(import->freelist);
     DEBUG("Request id for fs_list call is: %d\n", priv_req_id);
     fsr = &import->requests[priv_req_id];
+    DEBUG("gref=%d\n", fsr->gref);
     fsr->thread = current;
     sprintf(fsr->page, "%s", name);
 
@@ -615,7 +623,7 @@ int fs_chmod(struct fs_import *import, int fd, int32_t mode)
 
     /* Prepare request for the backend */
     back_req_id = reserve_fsif_request(import);
-    DEBUG("Backend request id=%d, gref=%d\n", back_req_id, fsr->gref);
+    DEBUG("Backend request id=%d\n", back_req_id);
 
     /* Prepare our private request structure */
     priv_req_id = get_id_from_freelist(import->freelist);
@@ -653,12 +661,13 @@ int64_t fs_space(struct fs_import *import, char *location)
 
     /* Prepare request for the backend */
     back_req_id = reserve_fsif_request(import);
-    DEBUG("Backend request id=%d, gref=%d\n", back_req_id, fsr->gref);
+    DEBUG("Backend request id=%d\n", back_req_id);
 
     /* Prepare our private request structure */
     priv_req_id = get_id_from_freelist(import->freelist);
     DEBUG("Request id for fs_space is: %d\n", priv_req_id);
     fsr = &import->requests[priv_req_id];
+    DEBUG("gref=%d\n", fsr->gref);
     fsr->thread = current;
     sprintf(fsr->page, "%s", location);
 
@@ -691,7 +700,7 @@ int fs_sync(struct fs_import *import, int fd)
 
     /* Prepare request for the backend */
     back_req_id = reserve_fsif_request(import);
-    DEBUG("Backend request id=%d, gref=%d\n", back_req_id, fsr->gref);
+    DEBUG("Backend request id=%d\n", back_req_id);
 
     /* Prepare our private request structure */
     priv_req_id = get_id_from_freelist(import->freelist);
@@ -737,7 +746,7 @@ static void fsfront_handler(evtchn_port_t port, struct pt_regs *regs, void *data
 
     DEBUG("Event from import [%d:%d].\n", import->dom_id, import->export_id);
 moretodo:   
-    rp = import->ring.sring->req_prod;
+    rp = import->ring.sring->rsp_prod;
     rmb(); /* Ensure we see queued responses up to 'rp'. */
     cons = import->ring.rsp_cons;
     while (cons != rp)
@@ -747,7 +756,7 @@ moretodo:
 
         rsp = RING_GET_RESPONSE(&import->ring, cons); 
         DEBUG("Response at idx=%d to request id=%d, ret_val=%lx\n", 
-            import->ring.rsp_cons, rsp->id, rsp->ret_val);
+            cons, rsp->id, rsp->ret_val);
         req = &import->requests[rsp->id];
         memcpy(&req->shadow_rsp, rsp, sizeof(struct fsif_response));
         DEBUG("Waking up: %s\n", req->thread->name);

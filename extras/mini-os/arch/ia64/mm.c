@@ -130,6 +130,11 @@ arch_init_demand_mapping_area(unsigned long max_pfn)
 	max_pfn = max_pfn;
 }
 
+unsigned long allocate_ondemand(unsigned long n, unsigned long alignment)
+{
+        return 0;
+}
+
 /* Helper function used in gnttab.c. */
 void do_map_frames(unsigned long addr,
         unsigned long *f, unsigned long n, unsigned long stride,

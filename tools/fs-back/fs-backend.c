@@ -239,7 +239,7 @@ static void handle_connection(int frontend_dom_id, int export_id, char *frontend
                                     mount->dom_id,
                                     mount->gref,
                                     PROT_READ | PROT_WRITE);
-    BACK_RING_INIT(&mount->ring, sring, PAGE_SIZE);
+    BACK_RING_INIT(&mount->ring, sring, XC_PAGE_SIZE);
     mount->nr_entries = mount->ring.nr_ents; 
     for (i = 0; i < MAX_FDS; i++)
         mount->fds[i] = -1;

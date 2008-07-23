@@ -250,7 +250,7 @@ void __init avc_init(void)
     printk("AVC INITIALIZED\n");
 }
 
-int avc_get_hash_stats(char *page)
+int avc_get_hash_stats(char *buf, uint32_t size)
 {
     int i, chain_len, max_chain_len, slots_used;
     struct avc_node *node;
@@ -274,7 +274,7 @@ int avc_get_hash_stats(char *page)
 
     rcu_read_unlock();
     
-    return snprintf(page, PAGE_SIZE, "entries: %d\nbuckets used: %d/%d\n"
+    return snprintf(buf, size, "entries: %d\nbuckets used: %d/%d\n"
                                 "longest chain: %d\n",
                                 atomic_read(&avc_cache.active_nodes),
                                 slots_used, AVC_CACHE_SLOTS, max_chain_len);

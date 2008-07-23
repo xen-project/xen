@@ -265,9 +265,12 @@ class ImageHandler:
         has_vnc = int(vmConfig['platform'].get('vnc', 0)) != 0
         has_sdl = int(vmConfig['platform'].get('sdl', 0)) != 0
         opengl = 1
+        keymap = vmConfig['platform'].get("keymap")
         for dev_uuid in vmConfig['console_refs']:
             dev_type, dev_info = vmConfig['devices'][dev_uuid]
             if dev_type == 'vfb':
+                if 'keymap' in dev_info:
+                    keymap = dev_info.get('keymap',{})
                 vfb_type = dev_info.get('type', {})
                 if vfb_type == 'sdl':
                     self.display = dev_info.get('display', {})
@@ -279,7 +282,6 @@ class ImageHandler:
                     has_vnc = True
                 break
 
-        keymap = vmConfig['platform'].get("keymap")
         if keymap:
             ret.append("-k")
             ret.append(keymap)

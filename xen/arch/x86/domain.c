@@ -286,10 +286,6 @@ int vcpu_initialise(struct vcpu *v)
 
     v->arch.flags = TF_kernel_mode;
 
-    /* Ensure that update_vcpu_system_time() fires at least once. */
-    if ( !is_idle_domain(d) )
-        vcpu_info(v, time).tsc_timestamp = ~0ull;
-
 #if defined(__i386__)
     mapcache_vcpu_init(v);
 #endif

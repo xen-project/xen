@@ -325,7 +325,7 @@ gopts.var('irq', val='IRQ',
          For example 'irq=7'.
          This option may be repeated to add more than one IRQ.""")
 
-gopts.var('vfb', val="type={vnc,sdl},vncunused=1,vncdisplay=N,vnclisten=ADDR,display=DISPLAY,xauthority=XAUTHORITY,vncpasswd=PASSWORD,opengl=1",
+gopts.var('vfb', val="type={vnc,sdl},vncunused=1,vncdisplay=N,vnclisten=ADDR,display=DISPLAY,xauthority=XAUTHORITY,vncpasswd=PASSWORD,opengl=1,keymap=FILE",
           fn=append_value, default=[],
           use="""Make the domain a framebuffer backend.
           The backend type should be either sdl or vnc.
@@ -336,7 +336,8 @@ gopts.var('vfb', val="type={vnc,sdl},vncunused=1,vncdisplay=N,vnclisten=ADDR,dis
           default password.
           For type=sdl, a viewer will be started automatically using the
           given DISPLAY and XAUTHORITY, which default to the current user's
-          ones.  OpenGL will be used by default unless opengl is set to 0.""")
+          ones.  OpenGL will be used by default unless opengl is set to 0.
+          keymap overrides the XendD configured default layout file.""")
 
 gopts.var('vif', val="type=TYPE,mac=MAC,bridge=BRIDGE,ip=IPADDR,script=SCRIPT," + \
           "backend=DOM,vifname=NAME,rate=RATE,model=MODEL,accel=ACCEL",
@@ -741,7 +742,7 @@ def configure_vfbs(config_devs, vals):
         for (k,v) in d.iteritems():
             if not k in [ 'vnclisten', 'vncunused', 'vncdisplay', 'display',
                           'videoram', 'xauthority', 'type', 'vncpasswd',
-                          'opengl' ]:
+                          'opengl', 'keymap' ]:
                 err("configuration option %s unknown to vfbs" % k)
             config.append([k,v])
         if not d.has_key("keymap"):
@@ -955,6 +956,10 @@ def preprocess_cpuid(vals, attr_name):
                 if reg_match == None:
                     err("cpuid's syntax is (eax|ebx|ecx|edx)=value")
                 res = reg_match.groupdict()
+                if (res['val'][:2] != '0x' and len(res['val']) != 32):
+                    err("cpuid: We should specify all the bits " \
+                        "of the register %s for input %s\n"
+                        % (res['reg'], input) )
                 cpuid[input][res['reg']] = res['val'] # new register
     setattr(vals, attr_name, cpuid)
 
