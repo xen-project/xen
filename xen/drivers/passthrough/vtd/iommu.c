@@ -1523,9 +1523,6 @@ int intel_iommu_unmap_page(struct domain *d, unsigned long gfn)
 int iommu_page_mapping(struct domain *domain, paddr_t iova,
                        paddr_t hpa, size_t size, int prot)
 {
-    struct hvm_iommu *hd = domain_hvm_iommu(domain);
-    struct acpi_drhd_unit *drhd;
-    struct iommu *iommu;
     u64 start_pfn, end_pfn;
     struct dma_pte *page = NULL, *pte = NULL;
     int index;
@@ -1551,18 +1548,6 @@ int iommu_page_mapping(struct domain *domain, paddr_t iova,
         unmap_vtd_domain_page(page);
         start_pfn++;
         index++;
-    }
-
-    for_each_drhd_unit ( drhd )
-    {
-        iommu = drhd->iommu;
-
-        if ( !test_bit(iommu->index, &hd->iommu_bitmap) )
-            continue;
-
-        if ( iommu_flush_iotlb_psi(iommu, domain_iommu_domid(domain),
-                                   iova, index, 1) )
-            iommu_flush_write_buffer(iommu);
     }
 
     return 0;
@@ -1803,11 +1788,9 @@ int intel_iommu_assign_device(struct domain *d, u8 bus, u8 devfn)
 
             ret = iommu_prepare_rmrr_dev(d, rmrr, bus, devfn);
             if ( ret )
-            {
                 gdprintk(XENLOG_ERR VTDPREFIX,
                          "IOMMU: mapping reserved region failed\n");
-                return ret;
-            }
+            return ret;
         }
     }
 
