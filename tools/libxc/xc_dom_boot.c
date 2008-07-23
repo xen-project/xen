@@ -153,7 +153,7 @@ void *xc_dom_boot_domU_map(struct xc_dom_image *dom, xen_pfn_t pfn,
     int page_shift = XC_DOM_PAGE_SHIFT(dom);
     privcmd_mmap_entry_t *entries;
     void *ptr;
-    int i, rc;
+    int i;
     int err;
 
     entries = xc_dom_malloc(dom, count * sizeof(privcmd_mmap_entry_t));
@@ -165,9 +165,13 @@ void *xc_dom_boot_domU_map(struct xc_dom_image *dom, xen_pfn_t pfn,
         return NULL;
     }
 
-    ptr = mmap(NULL, count << page_shift, PROT_READ | PROT_WRITE,
-               MAP_SHARED, dom->guest_xc, 0);
-    if ( ptr == MAP_FAILED )
+    for ( i = 0; i < count; i++ )
+        entries[i].mfn = xc_dom_p2m_host(dom, pfn + i);
+
+    ptr = xc_map_foreign_ranges(dom->guest_xc, dom->guest_domid,
+                count << page_shift, PROT_READ | PROT_WRITE, 1 << page_shift,
+                entries, count);
+    if ( ptr == NULL )
     {
         err = errno;
         xc_dom_panic(XC_INTERNAL_ERROR,
@@ -177,22 +181,6 @@ void *xc_dom_boot_domU_map(struct xc_dom_image *dom, xen_pfn_t pfn,
         return NULL;
     }
 
-    for ( i = 0; i < count; i++ )
-    {
-        entries[i].va = (uintptr_t) ptr + (i << page_shift);
-        entries[i].mfn = xc_dom_p2m_host(dom, pfn + i);
-        entries[i].npages = 1;
-    }
-
-    rc = xc_map_foreign_ranges(dom->guest_xc, dom->guest_domid,
-                               entries, count);
-    if ( rc < 0 )
-    {
-        xc_dom_panic(XC_INTERNAL_ERROR,
-                     "%s: failed to mmap domU pages 0x%" PRIpfn "+0x%" PRIpfn
-                     " [xenctl, rc=%d]\n", __FUNCTION__, pfn, count, rc);
-        return NULL;
-    }
     return ptr;
 }
 

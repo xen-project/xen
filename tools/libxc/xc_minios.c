@@ -76,6 +76,16 @@ void *xc_map_foreign_range(int xc_handle, uint32_t dom,
     return map_frames_ex(&mfn, size / getpagesize(), 0, 1, 1, dom, 0, pt_prot);
 }
 
+void *xc_map_foreign_ranges(int xc_handle, uint32_t dom,
+                            size_t size, int prot, size_t chunksize,
+                            privcmd_mmap_entry_t entries[], int nentries)
+{
+    ERROR("%s: implement me\n");
+    return NULL;
+}
+
+
+#if 0
 int xc_map_foreign_ranges(int xc_handle, uint32_t dom,
                           privcmd_mmap_entry_t *entries, int nr)
 {
@@ -86,6 +96,7 @@ int xc_map_foreign_ranges(int xc_handle, uint32_t dom,
     }
     return 0;
 }
+#endif
 
 int do_xen_hypercall(int xc_handle, privcmd_hypercall_t *hypercall)
 {

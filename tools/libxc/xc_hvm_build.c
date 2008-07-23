@@ -115,27 +115,21 @@ static int loadelfimage(
     struct elf_binary *elf, int xch, uint32_t dom, unsigned long *parray)
 {
     privcmd_mmap_entry_t *entries = NULL;
-    int pages = (elf->pend - elf->pstart + PAGE_SIZE - 1) >> PAGE_SHIFT;
+    size_t pages = (elf->pend - elf->pstart + PAGE_SIZE - 1) >> PAGE_SHIFT;
     int i, rc = -1;
 
     /* Map address space for initial elf image. */
-    entries = malloc(pages * sizeof(privcmd_mmap_entry_t));
+    entries = calloc(pages, sizeof(privcmd_mmap_entry_t));
     if ( entries == NULL )
-        goto err;
-    elf->dest = mmap(NULL, pages << PAGE_SHIFT, PROT_READ | PROT_WRITE,
-                     MAP_SHARED, xch, 0);
-    if ( elf->dest == MAP_FAILED )
         goto err;
 
     for ( i = 0; i < pages; i++ )
-    {
-        entries[i].va = (uintptr_t)elf->dest + (i << PAGE_SHIFT);
         entries[i].mfn = parray[(elf->pstart >> PAGE_SHIFT) + i];
-        entries[i].npages = 1;
-    }
 
-    rc = xc_map_foreign_ranges(xch, dom, entries, pages);
-    if ( rc < 0 )
+    elf->dest = xc_map_foreign_ranges(xch, dom, pages << PAGE_SHIFT,
+			PROT_READ | PROT_WRITE, 1 << PAGE_SHIFT,
+			entries, pages);
+    if (elf->dest == NULL)
         goto err;
 
     /* Load the initial elf image. */
@@ -143,12 +137,6 @@ static int loadelfimage(
     rc = 0;
 
  err:
-    if ( elf->dest )
-    {
-        munmap(elf->dest, pages << PAGE_SHIFT);
-        elf->dest = NULL;
-    }
-
     if ( entries )
         free(entries);
 

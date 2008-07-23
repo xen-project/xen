@@ -184,8 +184,9 @@ static inline int do_sysctl(int xc_handle, struct xen_sysctl *sysctl)
     return ret;
 }
 
-int xc_map_foreign_ranges(int xc_handle, uint32_t dom,
-                          privcmd_mmap_entry_t *entries, int nr);
+void *xc_map_foreign_ranges(int xc_handle, uint32_t dom,
+                            size_t size, int prot, size_t chunksize,
+                            privcmd_mmap_entry_t entries[], int nentries);
 
 void *map_domain_va_core(unsigned long domfd, int cpu, void *guest_va,
                          vcpu_guest_context_any_t *ctxt);
