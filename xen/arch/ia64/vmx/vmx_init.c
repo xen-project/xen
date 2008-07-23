@@ -335,7 +335,7 @@ vmx_save_state(struct vcpu *v)
 {
 	BUG_ON(v != current);
 	
-	ia64_call_vsa(PAL_VPS_SAVE, (u64)v->arch.privregs, 0, 0, 0, 0, 0, 0);
+	ia64_call_vsa(PAL_VPS_SAVE, (u64)v->arch.privregs, 1, 0, 0, 0, 0, 0);
 
 	/* Need to save KR when domain switch, though HV itself doesn;t
 	 * use them.
@@ -359,7 +359,7 @@ vmx_load_state(struct vcpu *v)
 	vmx_load_all_rr(v);
 
 	/* vmx_load_all_rr() pins down v->arch.privregs with both dtr/itr*/
-	ia64_call_vsa(PAL_VPS_RESTORE, (u64)v->arch.privregs, 0, 0, 0, 0, 0, 0);
+	ia64_call_vsa(PAL_VPS_RESTORE, (u64)v->arch.privregs, 1, 0, 0, 0, 0, 0);
 
 	ia64_set_kr(0, v->arch.arch_vmx.vkr[0]);
 	ia64_set_kr(1, v->arch.arch_vmx.vkr[1]);
