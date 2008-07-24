@@ -84,6 +84,7 @@
 #define NOFILE 32
 extern int xc_evtchn_close(int fd);
 extern int xc_interface_close(int fd);
+extern int xc_gnttab_close(int fd);
 
 pthread_mutex_t fd_lock = PTHREAD_MUTEX_INITIALIZER;
 struct file files[NOFILE] = {
