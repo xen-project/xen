@@ -292,18 +292,24 @@ evtchn_port_or_error_t xc_evtchn_pending(int xce_handle)
 {
     int i;
     unsigned long flags;
+    evtchn_port_t ret = -1;
+
     local_irq_save(flags);
-    for (i = 0; i < MAX_EVTCHN_PORTS; i++) {
-	evtchn_port_t port = files[xce_handle].evtchn.ports[i].port;
-	if (port != -1 && files[xce_handle].evtchn.ports[i].pending) {
-	    files[xce_handle].evtchn.ports[i].pending = 0;
-	    local_irq_restore(flags);
-	    return port;
-	}
-    }
     files[xce_handle].read = 0;
+    for (i = 0; i < MAX_EVTCHN_PORTS; i++) {
+        evtchn_port_t port = files[xce_handle].evtchn.ports[i].port;
+        if (port != -1 && files[xce_handle].evtchn.ports[i].pending) {
+            if (ret == -1) {
+                ret = port;
+                files[xce_handle].evtchn.ports[i].pending = 0;
+            } else {
+                files[xce_handle].read = 1;
+                break;
+            }
+        }
+    }
     local_irq_restore(flags);
-    return -1;
+    return ret;
 }
 
 int xc_evtchn_unmask(int xce_handle, evtchn_port_t port)
