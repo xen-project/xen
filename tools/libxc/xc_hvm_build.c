@@ -126,19 +126,21 @@ static int loadelfimage(
     for ( i = 0; i < pages; i++ )
         entries[i].mfn = parray[(elf->pstart >> PAGE_SHIFT) + i];
 
-    elf->dest = xc_map_foreign_ranges(xch, dom, pages << PAGE_SHIFT,
-			PROT_READ | PROT_WRITE, 1 << PAGE_SHIFT,
-			entries, pages);
-    if (elf->dest == NULL)
+    elf->dest = xc_map_foreign_ranges(
+        xch, dom, pages << PAGE_SHIFT, PROT_READ | PROT_WRITE, 1 << PAGE_SHIFT,
+        entries, pages);
+    if ( elf->dest == NULL )
         goto err;
 
     /* Load the initial elf image. */
     elf_load_binary(elf);
     rc = 0;
 
+    munmap(elf->dest, pages << PAGE_SHIFT);
+    elf->dest = NULL;
+
  err:
-    if ( entries )
-        free(entries);
+    free(entries);
 
     return rc;
 }

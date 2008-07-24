@@ -123,16 +123,16 @@ void *xc_map_foreign_ranges(int xc_handle, uint32_t dom,
                             privcmd_mmap_entry_t entries[], int nentries)
 {
     privcmd_mmap_t ioctlx;
-
     int i, rc;
     void *addr;
 
     addr = mmap(NULL, size, prot, MAP_SHARED, xc_handle, 0);
-    if (addr == MAP_FAILED)
+    if ( addr == MAP_FAILED )
         goto mmap_failed;
 
-    for (i = 0; i < nentries; i++) {
-        entries[i].va = (uintptr_t)addr + (i * chunksize);
+    for ( i = 0; i < nentries; i++ )
+    {
+        entries[i].va = (unsigned long)addr + (i * chunksize);
         entries[i].npages = chunksize >> PAGE_SHIFT;
     }
 
@@ -141,14 +141,14 @@ void *xc_map_foreign_ranges(int xc_handle, uint32_t dom,
     ioctlx.entry = entries;
 
     rc = ioctl(xc_handle, IOCTL_PRIVCMD_MMAP, &ioctlx);
-    if (rc)
+    if ( rc )
         goto ioctl_failed;
 
     return addr;
 
 ioctl_failed:
     rc = munmap(addr, size);
-    if (rc == -1)
+    if ( rc == -1 )
         ERROR("%s: error in error path\n", __FUNCTION__);
 
 mmap_failed:
