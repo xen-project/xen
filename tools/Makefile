@@ -60,8 +60,8 @@ IOEMU_CONFIGURE_CROSS ?= --cross-prefix=$(CROSS_COMPILE) \
 endif
 
 ioemu/config-host.mak:
-	cd ioemu && XEN_TARGET_ARCH=$(XEN_TARGET_ARCH) sh configure --prefix=/usr \
-		$(IOEMU_CONFIGURE_CROSS)
+	cd ioemu && XEN_TARGET_ARCH=$(XEN_TARGET_ARCH) sh configure \
+		--prefix=$(PREFIX) $(IOEMU_CONFIGURE_CROSS)
 
 subdir-all-ioemu subdir-install-ioemu: ioemu/config-host.mak
 
