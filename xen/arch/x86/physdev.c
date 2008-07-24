@@ -184,15 +184,14 @@ static int unmap_domain_pirq(struct domain *d, int pirq)
     return ret;
 }
 
-extern int msi_irq_enable;
 static int physdev_map_pirq(struct physdev_map_pirq *map)
 {
     struct domain *d;
     int vector, pirq, ret = 0;
     unsigned long flags;
 
-    /* if msi_irq_enable is not enabled,map always success */
-    if ( !msi_irq_enable )
+    /* if msi_enable is not enabled, map always succeeds */
+    if ( !msi_enable )
         return 0;
 
     if ( !IS_PRIV(current->domain) )
@@ -304,7 +303,7 @@ static int physdev_unmap_pirq(struct physdev_unmap_pirq *unmap)
     unsigned long flags;
     int ret;
 
-    if ( !msi_irq_enable )
+    if ( !msi_enable )
         return 0;
 
     if ( !IS_PRIV(current->domain) )
@@ -455,7 +454,7 @@ ret_t do_physdev_op(int cmd, XEN_GUEST_HANDLE(void) arg)
 
         ret = 0;
 
-        if ( msi_irq_enable )
+        if ( msi_enable )
         {
             spin_lock_irqsave(&dom0->arch.irq_lock, flags);
             if ( irq != AUTO_ASSIGN )

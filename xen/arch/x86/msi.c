@@ -27,8 +27,6 @@
 #include <public/physdev.h>
 #include <xen/iommu.h>
 
-extern int msi_irq_enable;
-
 /* bitmap indicate which fixed map is free */
 DEFINE_SPINLOCK(msix_fixmap_lock);
 DECLARE_BITMAP(msix_fixmap_pages, MAX_MSIX_PAGES);
