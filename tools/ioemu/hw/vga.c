@@ -1548,8 +1548,8 @@ static void vga_draw_graphic(VGAState *s, int full_update)
             } else {
                 /* ENODATA just means we have changed mode and will succeed
                  * next time */
-                if (err != -ENODATA)
-                    fprintf(stderr, "track_dirty_vram(%lx, %lx) failed (%d)\n", s->lfb_addr + y, npages, err);
+                if (errno != ENODATA)
+                    fprintf(stderr, "track_dirty_vram(%lx, %lx) failed (%d, %d)\n", s->lfb_addr + y, npages, err, errno);
             }
         }
 
