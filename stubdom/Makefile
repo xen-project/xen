@@ -3,11 +3,11 @@ MINI_OS = $(XEN_ROOT)/extras/mini-os
 
 export XEN_OS=MiniOS
 
-CONFIG_QEMU=ioemu
-
 export stubdom=y
 export debug=y
 include $(XEN_ROOT)/Config.mk
+
+override CONFIG_QEMU=ioemu
 
 IOEMU_OPTIONS=--disable-sdl --disable-opengl --disable-gfx-check --disable-vnc-tls --disable-brlapi --disable-kqemu
 ZLIB_VERSION=1.2.3
