@@ -59,6 +59,7 @@
 #include <stddef.h>
 #include <xen/xen.h>
 #include <xen/event_channel.h>
+#include "gntmap.h"
 
 #ifdef HAVE_LIBC
 #include <stdio.h>
@@ -138,6 +139,7 @@ enum fd_type {
     FTYPE_XENBUS,
     FTYPE_XC,
     FTYPE_EVTCHN,
+    FTYPE_GNTMAP,
     FTYPE_SOCKET,
     FTYPE_TAP,
     FTYPE_BLK,
@@ -168,6 +170,7 @@ extern struct file {
                 int bound;
             } ports[MAX_EVTCHN_PORTS];
 	} evtchn;
+	struct gntmap gntmap;
 	struct {
 	    struct netfront_dev *dev;
 	} tap;

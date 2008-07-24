@@ -401,6 +401,9 @@ int close(int fd)
 	case FTYPE_EVTCHN:
             xc_evtchn_close(fd);
             return 0;
+	case FTYPE_GNTMAP:
+	    xc_gnttab_close(fd);
+	    return 0;
 	case FTYPE_TAP:
 	    shutdown_netfront(files[fd].tap.dev);
 	    files[fd].type = FTYPE_NONE;

@@ -15,6 +15,7 @@
 #include <os.h>
 #include <mm.h>
 #include <lib.h>
+#include <gntmap.h>
 #include <events.h>
 #include <wait.h>
 #include <sys/mman.h>
@@ -324,6 +325,76 @@ void discard_file_cache(int fd, int flush)
     if (flush)
         fsync(fd);
 }
+
+int xc_gnttab_open(void)
+{
+    int xcg_handle;
+    xcg_handle = alloc_fd(FTYPE_GNTMAP);
+    gntmap_init(&files[xcg_handle].gntmap);
+    return xcg_handle;
+}
+
+int xc_gnttab_close(int xcg_handle)
+{
+    gntmap_fini(&files[xcg_handle].gntmap);
+    files[xcg_handle].type = FTYPE_NONE;
+    return 0;
+}
+
+void *xc_gnttab_map_grant_ref(int xcg_handle,
+                              uint32_t domid,
+                              uint32_t ref,
+                              int prot)
+{
+    return gntmap_map_grant_refs(&files[xcg_handle].gntmap,
+                                 1,
+                                 &domid, 0,
+                                 &ref,
+                                 prot & PROT_WRITE);
+}
+
+void *xc_gnttab_map_grant_refs(int xcg_handle,
+                               uint32_t count,
+                               uint32_t *domids,
+                               uint32_t *refs,
+                               int prot)
+{
+    return gntmap_map_grant_refs(&files[xcg_handle].gntmap,
+                                 count,
+                                 domids, 1,
+                                 refs,
+                                 prot & PROT_WRITE);
+}
+
+void *xc_gnttab_map_domain_grant_refs(int xcg_handle,
+                                      uint32_t count,
+                                      uint32_t domid,
+                                      uint32_t *refs,
+                                      int prot)
+{
+    return gntmap_map_grant_refs(&files[xcg_handle].gntmap,
+                                 count,
+                                 &domid, 0,
+                                 refs,
+                                 prot & PROT_WRITE);
+}
+
+int xc_gnttab_munmap(int xcg_handle,
+                     void *start_address,
+                     uint32_t count)
+{
+    return gntmap_munmap(&files[xcg_handle].gntmap,
+                         (unsigned long) start_address,
+                         count);
+}
+
+int xc_gnttab_set_max_grants(int xcg_handle,
+                             uint32_t count)
+{
+    return gntmap_set_max_grants(&files[xcg_handle].gntmap,
+                                 count);
+}
+
 /*
  * Local variables:
  * mode: C
