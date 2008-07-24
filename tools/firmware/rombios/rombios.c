@@ -738,7 +738,9 @@ typedef struct {
   // EBDA must be at most 768 bytes; it lives at 0x9fc00, and the boot 
   // device tables are at 0x9ff00 -- 0x9ffff
   typedef struct {
-    unsigned char filler1[0x3D];
+    unsigned char ebda_size;
+    unsigned char s3_resume_flag;
+    unsigned char filler1[0x3B];
 
     // FDPT - Can be splitted in data members if needed
     unsigned char fdpt0[0x10];
@@ -757,6 +759,7 @@ typedef struct {
     upcall_t upcall;
     } ebda_data_t;
   
+  #define EBDA_S3_RESUME_FLAG_OFFSET 1
   #define EbdaData ((ebda_data_t *) 0)
 
   // for access to the int13ext structure
@@ -2356,47 +2359,40 @@ void
 s3_resume()
 {
     Bit32u s3_wakeup_vector;
-    extern Bit16u s3_wakeup_ip;
-    extern Bit16u s3_wakeup_cs;
-    extern Bit8u s3_resume_flag;
+    Bit16u s3_wakeup_ip, s3_wakeup_cs;
+    Bit8u s3_resume_flag;
 
 ASM_START
     push ds
-    mov ax, #0xF000
+    push ax
+    mov ax, #EBDA_SEG
     mov ds, ax
+    mov al, [EBDA_S3_RESUME_FLAG_OFFSET]
+    mov .s3_resume.s3_resume_flag[bp], al
+    mov byte ptr [EBDA_S3_RESUME_FLAG_OFFSET], #0
+    pop ax
+    pop ds
 ASM_END
 
-    if (s3_resume_flag!=CMOS_SHUTDOWN_S3){
-        goto s3_out;
-    }
-    s3_resume_flag = 0;
+    if (s3_resume_flag != CMOS_SHUTDOWN_S3)
+        return;
 
     /* get x_firmware_waking_vector */
     s3_wakeup_vector = facs_get32(ACPI_FACS_OFFSET+24);
     if (!s3_wakeup_vector) {
         /* get firmware_waking_vector */
 	s3_wakeup_vector = facs_get32(ACPI_FACS_OFFSET+12);
-    	if (!s3_wakeup_vector) {
-            goto s3_out;
-	}
+    	if (!s3_wakeup_vector)
+            return;
     }
 
-    /* setup wakeup vector */
     s3_wakeup_ip = s3_wakeup_vector & 0xF;
     s3_wakeup_cs = s3_wakeup_vector >> 4;
 
 ASM_START
-    jmpf [_s3_wakeup_ip]
-
-; S3 data
-_s3_wakeup_ip:    dw 0x0a      
-_s3_wakeup_cs:    dw 0x0      
-_s3_resume_flag:  db 0   ; set at POST time by CMOS[0xF] shutdown status
-ASM_END
-
-s3_out:
-ASM_START
-   pop ds 
+    push .s3_resume.s3_wakeup_cs[bp]
+    push .s3_resume.s3_wakeup_ip[bp]
+    retf
 ASM_END
 }
 
@@ -9871,9 +9867,9 @@ post:
   jnz not_s3_resume
 
   ;; set S3 resume flag
-  mov dx, #0xF000
+  mov dx, #EBDA_SEG
   mov ds, dx
-  mov [_s3_resume_flag], AL
+  mov [EBDA_S3_RESUME_FLAG_OFFSET], AL
   jmp normal_post
 
 not_s3_resume:
