@@ -118,7 +118,7 @@ _gntmap_map_grant_ref(struct gntmap_entry *entry,
     rc = HYPERVISOR_grant_table_op(GNTTABOP_map_grant_ref, &op, 1);
     if (rc != 0 || op.status != GNTST_okay) {
         printk("GNTTABOP_map_grant_ref failed: "
-               "returned %d, status %d\n",
+               "returned %d, status %" PRId16 "\n",
                rc, op.status);
         return rc != 0 ? rc : op.status;
     }
@@ -135,12 +135,13 @@ _gntmap_unmap_grant_ref(struct gntmap_entry *entry)
     int rc;
 
     op.host_addr    = (uint64_t) entry->host_addr;
+    op.dev_bus_addr = 0;
     op.handle       = entry->handle;
 
     rc = HYPERVISOR_grant_table_op(GNTTABOP_unmap_grant_ref, &op, 1);
     if (rc != 0 || op.status != GNTST_okay) {
         printk("GNTTABOP_unmap_grant_ref failed: "
-               "returned %d, status %d\n",
+               "returned %d, status %" PRId16 "\n",
                rc, op.status);
         return rc != 0 ? rc : op.status;
     }
@@ -191,8 +192,9 @@ gntmap_map_grant_refs(struct gntmap *map,
     printk("gntmap_map_grant_refs(map=%p, count=%" PRIu32 ", "
            "domids=%p [%" PRIu32 "...], domids_stride=%d, "
            "refs=%p [%" PRIu32 "...], writable=%d)\n",
-           map, count, domids, domids[0], domids_stride,
-           refs, refs[0], writable);
+           map, count,
+           domids, domids == NULL ? 0 : domids[0], domids_stride,
+           refs, refs == NULL ? 0 : refs[0], writable);
 #endif
 
     (void) gntmap_set_max_grants(map, DEFAULT_MAX_GRANTS);

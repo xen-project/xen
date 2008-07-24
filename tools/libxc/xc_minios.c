@@ -383,16 +383,28 @@ int xc_gnttab_munmap(int xcg_handle,
                      void *start_address,
                      uint32_t count)
 {
-    return gntmap_munmap(&files[xcg_handle].gntmap,
-                         (unsigned long) start_address,
-                         count);
+    int ret;
+    ret = gntmap_munmap(&files[xcg_handle].gntmap,
+                        (unsigned long) start_address,
+                        count);
+    if (ret < 0) {
+        errno = -ret;
+        return -1;
+    }
+    return ret;
 }
 
 int xc_gnttab_set_max_grants(int xcg_handle,
                              uint32_t count)
 {
-    return gntmap_set_max_grants(&files[xcg_handle].gntmap,
-                                 count);
+    int ret;
+    ret = gntmap_set_max_grants(&files[xcg_handle].gntmap,
+                                count);
+    if (ret < 0) {
+        errno = -ret;
+        return -1;
+    }
+    return ret;
 }
 
 /*
