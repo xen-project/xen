@@ -2785,8 +2785,7 @@ struct pt_dev * register_real_device(PCIBus *e_bus,
         int pirq = pci_dev->irq;
 
         machine_irq = pci_dev->irq;
-        rc = xc_physdev_map_pirq(xc_handle, domid, MAP_PIRQ_TYPE_GSI,
-                                machine_irq, &pirq);
+        rc = xc_physdev_map_pirq(xc_handle, domid, machine_irq, &pirq);
 
         if ( rc )
         {

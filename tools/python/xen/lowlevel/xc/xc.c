@@ -958,8 +958,7 @@ static PyObject *pyxc_physdev_map_pirq(PyObject *self,
     if ( !PyArg_ParseTupleAndKeywords(args, kwds, "iii", kwd_list,
                                       &dom, &index, &pirq) )
         return NULL;
-    ret = xc_physdev_map_pirq(xc->xc_handle, dom, MAP_PIRQ_TYPE_GSI,
-                             index, &pirq);
+    ret = xc_physdev_map_pirq(xc->xc_handle, dom, index, &pirq);
     if ( ret != 0 )
           return pyxc_error_to_exception();
     return PyLong_FromUnsignedLong(pirq);

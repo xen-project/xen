@@ -37,8 +37,7 @@ int pt_msi_setup(struct pt_dev *dev)
         return -1;
     }
 
-    if ( xc_physdev_map_pirq_msi(xc_handle, domid, MAP_PIRQ_TYPE_MSI,
-                            AUTO_ASSIGN, &pirq,
+    if ( xc_physdev_map_pirq_msi(xc_handle, domid, AUTO_ASSIGN, &pirq,
 							dev->pci_dev->dev << 3 | dev->pci_dev->func,
 							dev->pci_dev->bus, 0, 1) )
     {
@@ -120,8 +119,7 @@ static int pt_msix_update_one(struct pt_dev *dev, int entry_nr)
     /* Check if this entry is already mapped */
     if ( entry->pirq == -1 )
     {
-        ret = xc_physdev_map_pirq_msi(xc_handle, domid, MAP_PIRQ_TYPE_MSI,
-                                AUTO_ASSIGN, &pirq,
+        ret = xc_physdev_map_pirq_msi(xc_handle, domid, AUTO_ASSIGN, &pirq,
                                 dev->pci_dev->dev << 3 | dev->pci_dev->func,
                                 dev->pci_dev->bus, entry_nr, 0);
         if ( ret )

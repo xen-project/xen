@@ -907,13 +907,11 @@ int xc_gnttab_set_max_grants(int xcg_handle,
 
 int xc_physdev_map_pirq(int xc_handle,
                         int domid,
-                        int type,
                         int index,
                         int *pirq);
 
 int xc_physdev_map_pirq_msi(int xc_handle,
                             int domid,
-                            int type,
                             int index,
                             int *pirq,
                             int devfn,
