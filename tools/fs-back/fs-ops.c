@@ -459,7 +459,17 @@ void dispatch_create(struct mount *mount, struct fsif_request *req)
     else
     {
         printf("Issuing create for file: %s\n", full_path);
-        ret = creat(full_path, mode); 
+        ret = get_fd(mount);
+        if (ret >= 0) {
+            int real_fd = creat(full_path, mode); 
+            if (real_fd < 0)
+                ret = -1;
+            else
+            {
+                mount->fds[ret] = real_fd;
+                printf("Got FD: %d for real %d\n", ret, real_fd);
+            }
+        }
     }
     printf("Got ret %d (errno=%d)\n", ret, errno);
 
