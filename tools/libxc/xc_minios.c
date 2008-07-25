@@ -117,8 +117,8 @@ int do_xen_hypercall(int xc_handle, privcmd_hypercall_t *hypercall)
 	errno = -ret;
 	return -1;
     }
-    if (call.result < 0) {
-        errno = -call.result;
+    if ((long) call.result < 0) {
+        errno = - (long) call.result;
         return -1;
     }
     return call.result;
