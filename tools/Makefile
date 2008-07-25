@@ -78,6 +78,12 @@ ioemu-dir-find:
 			rm -rf ioemu-remote ioemu-remote.tmp; \
 			mkdir ioemu-remote.tmp; rmdir ioemu-remote.tmp; \
 			$(GIT) clone $(CONFIG_QEMU) ioemu-remote.tmp; \
+			if [ "$(QEMU_TAG)" ]; then			\
+				cd ioemu-remote.tmp;			\
+				$(GIT) branch -D dummy >/dev/null 2>&1 ||:; \
+				$(GIT) checkout -b dummy $(QEMU_TAG);	\
+				cd ..;					\
+			fi;						\
 			mv ioemu-remote.tmp ioemu-remote; \
 		fi; \
 		rm -f ioemu-dir; \
