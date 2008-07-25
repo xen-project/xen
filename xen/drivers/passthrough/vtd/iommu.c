@@ -1409,12 +1409,15 @@ static int reassign_device_ownership(
     pdev_iommu = drhd->iommu;
     domain_context_unmap(source, bus, devfn);
 
+    ret = domain_context_mapping(target, bus, devfn);
+    if ( ret )
+        return ret;
+
     write_lock(&pcidevs_lock);
     list_move(&pdev->domain_list, &target->arch.pdev_list);
     write_unlock(&pcidevs_lock);
     pdev->domain = target;
 
-    ret = domain_context_mapping(target, bus, devfn);
     spin_unlock(&pdev->lock);
 
     read_lock(&pcidevs_lock);
@@ -1583,9 +1586,35 @@ static int iommu_prepare_rmrr_dev(struct domain *d,
 
 static int intel_iommu_add_device(struct pci_dev *pdev)
 {
+    struct acpi_rmrr_unit *rmrr;
+    u16 bdf;
+    int ret, i;
+
     if ( !pdev->domain )
         return -EINVAL;
-    return domain_context_mapping(pdev->domain, pdev->bus, pdev->devfn);
+
+    ret = domain_context_mapping(pdev->domain, pdev->bus, pdev->devfn);
+    if ( ret )
+    {
+        gdprintk(XENLOG_ERR VTDPREFIX,
+                 "intel_iommu_add_device: context mapping failed\n");
+        return ret;
+    }
+
+    for_each_rmrr_device ( rmrr, bdf, i )
+    {
+        if ( PCI_BUS(bdf) == pdev->bus && PCI_DEVFN2(bdf) == pdev->devfn )
+        {
+            ret = iommu_prepare_rmrr_dev(pdev->domain, rmrr,
+                                         pdev->bus, pdev->devfn);
+            if ( ret )
+                gdprintk(XENLOG_ERR VTDPREFIX,
+                         "intel_iommu_add_device: RMRR mapping failed\n");
+            break;
+        }
+    }
+
+    return ret;
 }
 
 static int intel_iommu_remove_device(struct pci_dev *pdev)
