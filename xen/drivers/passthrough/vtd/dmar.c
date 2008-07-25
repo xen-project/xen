@@ -255,7 +255,7 @@ static int __init acpi_parse_dev_scope(void *start, void *end,
             break;
         }
 
-	case ACPI_DEV_MSI_HPET:
+        case ACPI_DEV_MSI_HPET:
             dprintk(XENLOG_INFO VTDPREFIX, "found MSI HPET: bdf = %x:%x.%x\n",
                     bus, path->dev, path->fn);
             scope->devices[didx++] = PCI_BDF(bus, path->dev, path->fn);
@@ -305,13 +305,6 @@ acpi_parse_one_drhd(struct acpi_dmar_entry_header *header)
     int ret = 0;
     static int include_all = 0;
 
-    if ( include_all )
-    {
-        dprintk(XENLOG_WARNING VTDPREFIX,
-                "DMAR unit with INCLUDE_ALL is not not the last unit.\n");
-        return -EINVAL;
-    }
-
     dmaru = xmalloc(struct acpi_drhd_unit);
     if ( !dmaru )
         return -ENOMEM;
@@ -331,10 +324,17 @@ acpi_parse_one_drhd(struct acpi_dmar_entry_header *header)
     if ( dmaru->include_all )
     {
         dprintk(XENLOG_INFO VTDPREFIX, "found INCLUDE_ALL\n");
+        /* Only allow one INCLUDE_ALL */
+        if ( include_all )
+        {
+            dprintk(XENLOG_WARNING VTDPREFIX,
+                    "Onlyu onw INCLUDE_ALL device scope is allowed\n");
+            return -EINVAL;
+        }
         include_all = 1;
     }
 
-    if ( ret )
+    if ( ret || (dmaru->scope.devices_cnt == 0 && !dmaru->include_all) )
         xfree(dmaru);
     else
         acpi_register_drhd_unit(dmaru);
