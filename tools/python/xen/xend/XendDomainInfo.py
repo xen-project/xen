@@ -2374,6 +2374,9 @@ class XendDomainInfo:
     def destroy(self):
         """Cleanup VM and destroy domain.  Nothrow guarantee."""
 
+        if self.domid is None:
+            return
+
         log.debug("XendDomainInfo.destroy: domid=%s", str(self.domid))
 
         paths = self._prepare_phantom_paths()
