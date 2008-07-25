@@ -78,6 +78,7 @@ XSM_ENABLE ?= n
 FLASK_ENABLE ?= n
 ACM_SECURITY ?= n
 
+QEMU_TAG=xen-3.3.0-rc1
 QEMU_REMOTE=http://xenbits.xensource.com/git-http/qemu-xen-unstable.git
 
 # Specify which qemu-dm to use. This may be `ioemu' to use the old
