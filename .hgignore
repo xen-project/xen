@@ -98,6 +98,10 @@
 ^stubdom/grub-cvs$
 ^stubdom/grub/stage2$
 ^stubdom/grub/netboot$
+^stubdom/grub/dirs$
+^stubdom/lwip/
+^stubdom/ioemu/
+^stubdom/grub-upstream/
 ^tools/.*/TAGS$
 ^tools/.*/build/lib.*/.*\.py$
 ^tools/blktap/Makefile\.smh$
