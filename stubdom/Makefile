@@ -154,7 +154,6 @@ lwip: lwip-$(LWIP_VERSION).tar.gz
 .PHONY: $(CROSS_ROOT)
 $(CROSS_ROOT): cross-newlib cross-zlib cross-libpci
 
-.PHONY: mk-headers
 mk-headers:
 	mkdir -p include/xen && \
           ln -sf $(addprefix ../../,$(wildcard $(XEN_ROOT)/xen/include/public/*.h)) include/xen && \
@@ -191,6 +190,7 @@ endif
 	[ ! -h ioemu/config-host.h ] || rm -f ioemu/config-host.h
 	[ ! -h ioemu/config-host.mak ] || rm -f ioemu/config-host.mak
 	$(MAKE) -C $(MINI_OS) links
+	touch mk-headers
 
 TARGETS_MINIOS=$(addprefix mini-os-,$(TARGETS))
 $(TARGETS_MINIOS): mini-os-%:
@@ -328,6 +328,7 @@ crossclean: clean
 	rm -fr $(CROSS_ROOT)
 	rm -fr newlib-build
 	rm -fr zlib-$(ZLIB_VERSION) pciutils-$(LIBPCI_VERSION)
+	rm -f mk-headers
 
 # clean patched sources
 .PHONY: patchclean

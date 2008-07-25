@@ -91,6 +91,7 @@
 ^stubdom/libxc$
 ^stubdom/lwip-.*$
 ^stubdom/mini-os-.*$
+^stubdom/mk-headers$
 ^stubdom/newlib-.*$
 ^stubdom/pciutils-.*$
 ^stubdom/zlib-.*$
