@@ -997,7 +997,6 @@ void __init __start_xen(unsigned long mbi_p)
     if ( (cmdline != NULL) || (kextra != NULL) )
     {
         static char dom0_cmdline[MAX_GUEST_CMDLINE];
-        char xen_pm_param[32];
 
         cmdline = cmdline_cook(cmdline);
         safe_strcpy(dom0_cmdline, cmdline);
@@ -1022,14 +1021,6 @@ void __init __start_xen(unsigned long mbi_p)
             safe_strcat(dom0_cmdline, " acpi=");
             safe_strcat(dom0_cmdline, acpi_param);
         }
-        if ( xen_cpuidle )
-            xen_processor_pmbits |= XEN_PROCESSOR_PM_CX;
-
-        snprintf(xen_pm_param, sizeof(xen_pm_param), 
-            " xen_processor_pmbits=%d", xen_processor_pmbits);
-
-        if ( !strstr(dom0_cmdline, "xen_processor_pmbits=") )
-            safe_strcat(dom0_cmdline, xen_pm_param);
 
         cmdline = dom0_cmdline;
     }
@@ -1040,6 +1031,9 @@ void __init __start_xen(unsigned long mbi_p)
             (mod[initrdidx].mod_start - mod[0].mod_start);
         _initrd_len   = mod[initrdidx].mod_end - mod[initrdidx].mod_start;
     }
+
+    if ( xen_cpuidle )
+        xen_processor_pmbits |= XEN_PROCESSOR_PM_CX;
 
     /*
      * We're going to setup domain0 using the module(s) that we stashed safely
