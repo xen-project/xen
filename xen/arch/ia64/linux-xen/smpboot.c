@@ -748,9 +748,7 @@ void __cpu_die(unsigned int cpu)
 			return;
 		}
 #ifdef XEN
-		/* XXX: There must be a better way to sleep */
-		for (int j = 0; j < 1000000; j++)
-			cpu_relax();
+		udelay(100 * 1000);
 #else
 		msleep(100);
 #endif
