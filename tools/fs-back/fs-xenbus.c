@@ -109,7 +109,7 @@ int xenbus_get_watch_fd(void)
     return xs_fileno(xsh); 
 }
 
-void xenbus_read_mount_request(struct mount *mount, char *frontend)
+void xenbus_read_mount_request(struct fs_mount *mount, char *frontend)
 {
     char node[1024];
     char *s;
@@ -150,7 +150,7 @@ static int get_self_id(void)
 } 
 
 
-void xenbus_write_backend_node(struct mount *mount)
+void xenbus_write_backend_node(struct fs_mount *mount)
 {
     char node[1024], backend_node[1024];
     int self_id;
@@ -167,7 +167,7 @@ void xenbus_write_backend_node(struct mount *mount)
     xs_write(xsh, XBT_NULL, node, STATE_INITIALISED, strlen(STATE_INITIALISED));
 }
 
-void xenbus_write_backend_ready(struct mount *mount)
+void xenbus_write_backend_ready(struct fs_mount *mount)
 {
     char node[1024];
     int self_id;

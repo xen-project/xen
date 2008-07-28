@@ -10,7 +10,7 @@
 #include <sys/mman.h>
 #include <sys/types.h>
 #include <sys/stat.h>
-#include <sys/vfs.h>
+#include <sys/statvfs.h>
 #include <sys/mount.h>
 #include <unistd.h>
 #include "fs-backend.h"
@@ -23,7 +23,7 @@
 #define BUFFER_SIZE 1024
 
 
-unsigned short get_request(struct mount *mount, struct fsif_request *req)
+static unsigned short get_request(struct fs_mount *mount, struct fsif_request *req)
 {
     unsigned short id = get_id_from_freelist(mount->freelist); 
 
@@ -34,7 +34,7 @@ unsigned short get_request(struct mount *mount, struct fsif_request *req)
     return id;
 }
 
-int get_fd(struct mount *mount)
+static int get_fd(struct fs_mount *mount)
 {
     int i;
 
@@ -45,7 +45,7 @@ int get_fd(struct mount *mount)
 }
 
 
-void dispatch_file_open(struct mount *mount, struct fsif_request *req)
+static void dispatch_file_open(struct fs_mount *mount, struct fsif_request *req)
 {
     char *file_name, full_path[BUFFER_SIZE];
     int fd;
@@ -93,7 +93,7 @@ void dispatch_file_open(struct mount *mount, struct fsif_request *req)
     rsp->ret_val = (uint64_t)fd;
 }
 
-void dispatch_file_close(struct mount *mount, struct fsif_request *req)
+static void dispatch_file_close(struct fs_mount *mount, struct fsif_request *req)
 {
     int ret;
     RING_IDX rsp_idx;
@@ -122,7 +122,8 @@ void dispatch_file_close(struct mount *mount, struct fsif_request *req)
     rsp->id = req_id; 
     rsp->ret_val = (uint64_t)ret;
 }
-void dispatch_file_read(struct mount *mount, struct fsif_request *req)
+
+static void dispatch_file_read(struct fs_mount *mount, struct fsif_request *req)
 {
     void *buf;
     int fd;
@@ -164,7 +165,7 @@ out:
     mount->ring.req_cons++;
 }
 
-void end_file_read(struct mount *mount, struct fs_request *priv_req)
+static void end_file_read(struct fs_mount *mount, struct fs_request *priv_req)
 {
     RING_IDX rsp_idx;
     fsif_response_t *rsp;
@@ -182,7 +183,7 @@ void end_file_read(struct mount *mount, struct fs_request *priv_req)
     rsp->ret_val = (uint64_t)aio_return(&priv_req->aiocb);
 }
 
-void dispatch_file_write(struct mount *mount, struct fsif_request *req)
+static void dispatch_file_write(struct fs_mount *mount, struct fsif_request *req)
 {
     void *buf;
     int fd;
@@ -224,7 +225,7 @@ void dispatch_file_write(struct mount *mount, struct fsif_request *req)
     mount->ring.req_cons++;
 }
 
-void end_file_write(struct mount *mount, struct fs_request *priv_req)
+static void end_file_write(struct fs_mount *mount, struct fs_request *priv_req)
 {
     RING_IDX rsp_idx;
     fsif_response_t *rsp;
@@ -242,7 +243,7 @@ void end_file_write(struct mount *mount, struct fs_request *priv_req)
     rsp->ret_val = (uint64_t)aio_return(&priv_req->aiocb);
 }
 
-void dispatch_stat(struct mount *mount, struct fsif_request *req)
+static void dispatch_stat(struct fs_mount *mount, struct fsif_request *req)
 {
     struct fsif_stat_response *buf;
     struct stat stat;
@@ -272,7 +273,7 @@ void dispatch_stat(struct mount *mount, struct fsif_request *req)
     /* Stat, and create the response */ 
     ret = fstat(fd, &stat);
     printf("Mode=%o, uid=%d, a_time=%ld\n",
-            stat.st_mode, stat.st_uid, stat.st_atime);
+            stat.st_mode, stat.st_uid, (long)stat.st_atime);
     buf->stat_mode  = stat.st_mode;
     buf->stat_uid   = stat.st_uid;
     buf->stat_gid   = stat.st_gid;
@@ -303,7 +304,7 @@ void dispatch_stat(struct mount *mount, struct fsif_request *req)
 }
 
 
-void dispatch_truncate(struct mount *mount, struct fsif_request *req)
+static void dispatch_truncate(struct fs_mount *mount, struct fsif_request *req)
 {
     int fd, ret;
     uint16_t req_id;
@@ -335,7 +336,7 @@ void dispatch_truncate(struct mount *mount, struct fsif_request *req)
     rsp->ret_val = (uint64_t)ret;
 }
 
-void dispatch_remove(struct mount *mount, struct fsif_request *req)
+static void dispatch_remove(struct fs_mount *mount, struct fsif_request *req)
 {
     char *file_name, full_path[BUFFER_SIZE];
     int ret;
@@ -374,7 +375,7 @@ void dispatch_remove(struct mount *mount, struct fsif_request *req)
 }
 
 
-void dispatch_rename(struct mount *mount, struct fsif_request *req)
+static void dispatch_rename(struct fs_mount *mount, struct fsif_request *req)
 {
     char *buf, *old_file_name, *new_file_name;
     char old_full_path[BUFFER_SIZE], new_full_path[BUFFER_SIZE];
@@ -421,7 +422,7 @@ void dispatch_rename(struct mount *mount, struct fsif_request *req)
 }
 
 
-void dispatch_create(struct mount *mount, struct fsif_request *req)
+static void dispatch_create(struct fs_mount *mount, struct fsif_request *req)
 {
     char *file_name, full_path[BUFFER_SIZE];
     int ret;
@@ -481,7 +482,7 @@ void dispatch_create(struct mount *mount, struct fsif_request *req)
     rsp->ret_val = (uint64_t)ret;
 }
 
-void dispatch_list(struct mount *mount, struct fsif_request *req)
+static void dispatch_list(struct fs_mount *mount, struct fsif_request *req)
 {
     char *file_name, *buf, full_path[BUFFER_SIZE];
     uint32_t offset, nr_files, error_code; 
@@ -551,7 +552,7 @@ error_out:
     rsp->ret_val = ret_val;
 }
 
-void dispatch_chmod(struct mount *mount, struct fsif_request *req)
+static void dispatch_chmod(struct fs_mount *mount, struct fsif_request *req)
 {
     int fd, ret;
     RING_IDX rsp_idx;
@@ -582,13 +583,13 @@ void dispatch_chmod(struct mount *mount, struct fsif_request *req)
     rsp->ret_val = (uint64_t)ret;
 }
 
-void dispatch_fs_space(struct mount *mount, struct fsif_request *req)
+static void dispatch_fs_space(struct fs_mount *mount, struct fsif_request *req)
 {
     char *file_name, full_path[BUFFER_SIZE];
     RING_IDX rsp_idx;
     fsif_response_t *rsp;
     uint16_t req_id;
-    struct statfs stat;
+    struct statvfs stat;
     int64_t ret;
 
     printf("Dispatching fs space operation (gref=%d).\n", req->u.fspace.gref);
@@ -606,7 +607,7 @@ void dispatch_fs_space(struct mount *mount, struct fsif_request *req)
            mount->export->export_path, file_name);
     assert(xc_gnttab_munmap(mount->gnth, file_name, 1) == 0);
     printf("Issuing fs space for %s\n", full_path);
-    ret = statfs(full_path, &stat);
+    ret = statvfs(full_path, &stat);
     if(ret >= 0)
         ret = stat.f_bsize * stat.f_bfree;
 
@@ -623,7 +624,7 @@ void dispatch_fs_space(struct mount *mount, struct fsif_request *req)
     rsp->ret_val = (uint64_t)ret;
 }
 
-void dispatch_file_sync(struct mount *mount, struct fsif_request *req)
+static void dispatch_file_sync(struct fs_mount *mount, struct fsif_request *req)
 {
     int fd;
     uint16_t req_id;
@@ -653,7 +654,7 @@ void dispatch_file_sync(struct mount *mount, struct fsif_request *req)
     mount->ring.req_cons++;
 }
 
-void end_file_sync(struct mount *mount, struct fs_request *priv_req)
+static void end_file_sync(struct fs_mount *mount, struct fs_request *priv_req)
 {
     RING_IDX rsp_idx;
     fsif_response_t *rsp;

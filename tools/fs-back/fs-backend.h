@@ -31,7 +31,7 @@ struct fs_request
 };
 
 
-struct mount
+struct fs_mount
 {
     struct fs_export *export;
     int dom_id;
@@ -56,17 +56,17 @@ extern struct xs_handle *xsh;
 bool xenbus_create_request_node(void);
 int xenbus_register_export(struct fs_export *export);
 int xenbus_get_watch_fd(void);
-void xenbus_read_mount_request(struct mount *mount, char *frontend);
-void xenbus_write_backend_node(struct mount *mount);
-void xenbus_write_backend_ready(struct mount *mount);
+void xenbus_read_mount_request(struct fs_mount *mount, char *frontend);
+void xenbus_write_backend_node(struct fs_mount *mount);
+void xenbus_write_backend_ready(struct fs_mount *mount);
 
 /* File operations, implemented in fs-ops.c */
 struct fs_op
 {
     int type;       /* Type of request (from fsif.h) this handlers 
                        are responsible for */
-    void (*dispatch_handler)(struct mount *mount, struct fsif_request *req);
-    void (*response_handler)(struct mount *mount, struct fs_request *req);
+    void (*dispatch_handler)(struct fs_mount *mount, struct fsif_request *req);
+    void (*response_handler)(struct fs_mount *mount, struct fs_request *req);
 };
 
 /* This NULL terminated array of all file requests handlers */

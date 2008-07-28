@@ -16,7 +16,7 @@ static struct fs_export *fs_exports = NULL;
 static int export_id = 0;
 static int mount_id = 0;
 
-void dispatch_response(struct mount *mount, int priv_req_id)
+static void dispatch_response(struct fs_mount *mount, int priv_req_id)
 {
     int i;
     struct fs_op *op;
@@ -41,7 +41,7 @@ void dispatch_response(struct mount *mount, int priv_req_id)
     add_id_to_freelist(priv_req_id, mount->freelist);
 }
 
-static void handle_aio_events(struct mount *mount)
+static void handle_aio_events(struct fs_mount *mount)
 {
     int fd, ret, count, i, notify;
     evtchn_port_t port;
@@ -103,7 +103,7 @@ read_event_channel:
 }
 
 
-void allocate_request_array(struct mount *mount)
+static void allocate_request_array(struct fs_mount *mount)
 {
     int i, nr_entries = mount->nr_entries;
     struct fs_request *requests;
@@ -123,10 +123,10 @@ void allocate_request_array(struct mount *mount)
 }
 
 
-void* handle_mount(void *data)
+static void *handle_mount(void *data)
 {
     int more, notify;
-    struct mount *mount = (struct mount *)data;
+    struct fs_mount *mount = (struct fs_mount *)data;
     
     printf("Starting a thread for mount: %d\n", mount->mount_id);
     allocate_request_array(mount);
@@ -193,7 +193,7 @@ moretodo:
 
 static void handle_connection(int frontend_dom_id, int export_id, char *frontend)
 {
-    struct mount *mount;
+    struct fs_mount *mount;
     struct fs_export *export;
     int evt_port;
     pthread_t handling_thread;
@@ -216,7 +216,7 @@ static void handle_connection(int frontend_dom_id, int export_id, char *frontend
         return;
     }
 
-    mount = (struct mount*)malloc(sizeof(struct mount));
+    mount = (struct fs_mount*)malloc(sizeof(struct fs_mount));
     mount->dom_id = frontend_dom_id;
     mount->export = export;
     mount->mount_id = mount_id++;
@@ -287,7 +287,7 @@ next_select:
     } while (1);
 }
 
-struct fs_export* create_export(char *name, char *export_path)
+static struct fs_export* create_export(char *name, char *export_path)
 {
     struct fs_export *curr_export, **last_export;
 
