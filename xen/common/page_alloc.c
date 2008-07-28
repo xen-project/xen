@@ -55,7 +55,7 @@ boolean_param("bootscrub", opt_bootscrub);
 /*
  * Bit width of the DMA heap.
  */
-static unsigned int dma_bitsize = CONFIG_DMA_BITSIZE;
+static unsigned int dma_bitsize = 30;
 static void __init parse_dma_bits(char *s)
 {
     unsigned int v = simple_strtol(s, NULL, 0);
@@ -281,11 +281,7 @@ unsigned long __init alloc_boot_pages(
  */
 
 #define MEMZONE_XEN 0
-#ifdef PADDR_BITS
 #define NR_ZONES    (PADDR_BITS - PAGE_SHIFT)
-#else
-#define NR_ZONES    (BITS_PER_LONG - PAGE_SHIFT)
-#endif
 
 #define pfn_dom_zone_type(_pfn) (fls(_pfn) - 1)
 
@@ -938,7 +934,7 @@ unsigned long avail_domheap_pages(void)
 static void pagealloc_keyhandler(unsigned char key)
 {
     unsigned int zone = MEMZONE_XEN;
-    unsigned long total = 0;
+    unsigned long n, total = 0;
 
     printk("Physical memory information:\n");
     printk("    Xen heap: %lukB free\n",
@@ -946,9 +942,7 @@ static void pagealloc_keyhandler(unsigned char key)
 
     while ( ++zone < NR_ZONES )
     {
-        unsigned long n;
-
-        if ( zone == dma_bitsize - PAGE_SHIFT )
+        if ( zone == (dma_bitsize - PAGE_SHIFT) )
         {
             printk("    DMA heap: %lukB free\n", total << (PAGE_SHIFT-10));
             total = 0;
