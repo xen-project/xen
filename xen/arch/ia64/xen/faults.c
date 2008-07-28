@@ -274,6 +274,7 @@ fp_emulate(int fp_fault, void *bundle, unsigned long *ipsr,
 {
 	fp_state_t fp_state;
 	fpswa_ret_t ret;
+	XEN_EFI_RR_DECLARE(rr6, rr7);
 
 	if (!fpswa_interface)
 		return (fpswa_ret_t) {-1, 0, 0, 0};
@@ -299,8 +300,10 @@ fp_emulate(int fp_fault, void *bundle, unsigned long *ipsr,
 	 *      unsigned long    *pifs,
 	 *      void             *fp_state);
 	 */
+	XEN_EFI_RR_ENTER(rr6, rr7);
 	ret = (*fpswa_interface->fpswa) (fp_fault, bundle,
 	                                 ipsr, fpsr, isr, pr, ifs, &fp_state);
+	XEN_EFI_RR_LEAVE(rr6, rr7);
 
 	return ret;
 }
