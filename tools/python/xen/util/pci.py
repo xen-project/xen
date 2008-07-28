@@ -105,7 +105,7 @@ def parse_hex(val):
         return None
 
 def parse_pci_name(pci_name_string):
-    # Format: xxxx:xx:xx:x
+    # Format: xxxx:xx:xx.x
     s = pci_name_string
     s = s.split(':')
     dom = parse_hex(s[0])

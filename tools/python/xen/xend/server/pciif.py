@@ -378,8 +378,14 @@ class PciController(DevController):
                 funcs = dev.find_all_the_multi_functions()
                 for f in funcs:
                     if not f in pci_str_list:
-                        err_msg = 'pci: % must be co-assigned to guest with %s'
-                        raise VmError(err_msg % (f, dev.name))
+                        (f_dom, f_bus, f_slot, f_func) = parse_pci_name(f)
+                        f_pci_str = '0x%x,0x%x,0x%x,0x%x' % \
+                            (f_dom, f_bus, f_slot, f_func)
+                        # f has been assigned to other guest?
+                        if xc.test_assign_device(0, f_pci_str) != 0:
+                            err_msg = 'pci: %s must be co-assigned to the' + \
+                                ' same guest with %s'
+                            raise VmError(err_msg % (f, dev.name))
             elif dev.dev_type == DEV_TYPE_PCI:
                 if dev.bus == 0:
                     if not dev.pci_af_flr:
@@ -395,8 +401,14 @@ class PciController(DevController):
 
                     for s in devs_str:
                         if not s in pci_str_list:
-                            err_msg = 'pci: %s must be co-assigned to guest with %s'
-                            raise VmError(err_msg % (s, dev.name))
+                            (s_dom, s_bus, s_slot, s_func) = parse_pci_name(s)
+                            s_pci_str = '0x%x,0x%x,0x%x,0x%x' % \
+                                (s_dom, s_bus, s_slot, s_func)
+                            # s has been assigned to other guest?
+                            if xc.test_assign_device(0, s_pci_str) != 0:
+                                err_msg = 'pci: %s must be co-assigned to the'+\
+                                    ' same guest with %s'
+                                raise VmError(err_msg % (s, dev.name))
 
         for (domain, bus, slot, func) in pci_dev_list:
             self.setupOneDevice(domain, bus, slot, func)
