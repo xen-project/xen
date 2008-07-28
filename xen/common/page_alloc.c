@@ -53,34 +53,11 @@ static int opt_bootscrub __initdata = 1;
 boolean_param("bootscrub", opt_bootscrub);
 
 /*
- * Bit width of the DMA heap.
+ * Bit width of the DMA heap -- used to override NUMA-node-first.
+ * allocation strategy, which can otherwise exhaust low memory.
  */
-static unsigned int dma_bitsize = 30;
-static void __init parse_dma_bits(char *s)
-{
-    unsigned int v = simple_strtol(s, NULL, 0);
-    if ( v >= (BITS_PER_LONG + PAGE_SHIFT) )
-        dma_bitsize = BITS_PER_LONG + PAGE_SHIFT;
-    else if ( v > PAGE_SHIFT + 1 )
-        dma_bitsize = v;
-    else
-        printk("Invalid dma_bits value of %u ignored.\n", v);
-}
-custom_param("dma_bits", parse_dma_bits);
-
-/*
- * Amount of memory to reserve in a low-memory (<4GB) pool for specific
- * allocation requests. Ordinary requests will not fall back to the
- * lowmem emergency pool.
- */
-static unsigned long dma_emergency_pool_pages;
-static void __init parse_dma_emergency_pool(char *s)
-{
-    unsigned long long bytes;
-    bytes = parse_size_and_unit(s, NULL);
-    dma_emergency_pool_pages = bytes >> PAGE_SHIFT;
-}
-custom_param("dma_emergency_pool", parse_dma_emergency_pool);
+static unsigned int dma_bitsize;
+integer_param("dma_bits", dma_bitsize);
 
 #define round_pgdown(_p)  ((_p)&PAGE_MASK)
 #define round_pgup(_p)    (((_p)+(PAGE_SIZE-1))&PAGE_MASK)
@@ -579,7 +556,16 @@ void __init end_boot_allocator(void)
             init_heap_pages(pfn_dom_zone_type(i), mfn_to_page(i), 1);
     }
 
-    printk("Domain heap initialised: DMA width %u bits\n", dma_bitsize);
+    if ( !dma_bitsize && (num_online_nodes() > 1) )
+        dma_bitsize = min_t(unsigned int,
+                            fls(NODE_DATA(0)->node_spanned_pages) - 1
+                            + PAGE_SHIFT - 2,
+                            32);
+
+    printk("Domain heap initialised");
+    if ( dma_bitsize )
+        printk(" DMA width %u bits", dma_bitsize);
+    printk("\n");
 }
 #undef avail_for_domheap
 
@@ -799,19 +785,9 @@ struct page_info *alloc_domheap_pages(
     if ( bits < zone_hi )
         zone_hi = bits;
 
-    if ( (zone_hi + PAGE_SHIFT) >= dma_bitsize )
-    {
+    if ( (dma_bitsize > PAGE_SHIFT) &&
+         ((zone_hi + PAGE_SHIFT) >= dma_bitsize) )
         pg = alloc_heap_pages(dma_bitsize - PAGE_SHIFT, zone_hi, node, order);
-
-        /* Failure? Then check if we can fall back to the DMA pool. */
-        if ( unlikely(pg == NULL) &&
-             ((order > MAX_ORDER) ||
-              (avail_heap_pages(MEMZONE_XEN + 1,
-                                dma_bitsize - PAGE_SHIFT - 1,
-                                -1) <
-               (dma_emergency_pool_pages + (1UL << order)))) )
-            return NULL;
-    }
 
     if ( (pg == NULL) &&
          ((pg = alloc_heap_pages(MEMZONE_XEN + 1, zone_hi,
@@ -913,22 +889,9 @@ unsigned long avail_domheap_pages_region(
 
 unsigned long avail_domheap_pages(void)
 {
-    unsigned long avail_nrm, avail_dma;
-    
-    avail_nrm = avail_heap_pages(dma_bitsize - PAGE_SHIFT,
-                                 NR_ZONES - 1,
-                                 -1);
-
-    avail_dma = avail_heap_pages(MEMZONE_XEN + 1,
-                                 dma_bitsize - PAGE_SHIFT - 1,
-                                 -1);
-
-    if ( avail_dma > dma_emergency_pool_pages )
-        avail_dma -= dma_emergency_pool_pages;
-    else
-        avail_dma = 0;
-
-    return avail_nrm + avail_dma;
+    return avail_heap_pages(MEMZONE_XEN + 1,
+                            NR_ZONES - 1,
+                            -1);
 }
 
 static void pagealloc_keyhandler(unsigned char key)
@@ -942,7 +905,7 @@ static void pagealloc_keyhandler(unsigned char key)
 
     while ( ++zone < NR_ZONES )
     {
-        if ( zone == (dma_bitsize - PAGE_SHIFT) )
+        if ( (zone + PAGE_SHIFT) == dma_bitsize )
         {
             printk("    DMA heap: %lukB free\n", total << (PAGE_SHIFT-10));
             total = 0;
