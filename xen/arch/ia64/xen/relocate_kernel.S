@@ -27,7 +27,7 @@
  * in0: indirection_page
  * in1: start_address
  * in2: boot_param
- * in2: dom0_relocate_new_kernel
+ * in3: dom0_relocate_new_kernel
  */
 GLOBAL_ENTRY(relocate_new_kernel)
 	.prologue
