@@ -599,14 +599,17 @@ class XendDomainInfo:
                 new_dev['func'])
         bdf = xc.test_assign_device(self.domid, pci_str)
         if bdf != 0:
+            if bdf == -1:
+                raise VmError("failed to assign device: maybe the platform"
+                              " doesn't support VT-d, or VT-d isn't enabled"
+                              " properly?")
             bus = (bdf >> 16) & 0xff
             devfn = (bdf >> 8) & 0xff
             dev = (devfn >> 3) & 0x1f
             func = devfn & 0x7
-            raise VmError("Fail to hot insert device(%x:%x.%x): maybe VT-d is "
-                          "not enabled, or the device is not exist, or it "
-                          "has already been assigned to other domain"
-                          % (bus, dev, func))
+            raise VmError("fail to assign device(%x:%x.%x): maybe it has"
+                          " already been assigned to other domain, or maybe"
+                          " it doesn't exist." % (bus, dev, func))
 
         bdf_str = "%s:%s:%s.%s@%s" % (new_dev['domain'],
                 new_dev['bus'],
@@ -2086,14 +2089,17 @@ class XendDomainInfo:
         if hvm and pci_str:
             bdf = xc.test_assign_device(self.domid, pci_str)
             if bdf != 0:
+                if bdf == -1:
+                    raise VmError("failed to assign device: maybe the platform"
+                                  " doesn't support VT-d, or VT-d isn't enabled"
+                                  " properly?")
                 bus = (bdf >> 16) & 0xff
                 devfn = (bdf >> 8) & 0xff
                 dev = (devfn >> 3) & 0x1f
                 func = devfn & 0x7
-                raise VmError("Fail to assign device(%x:%x.%x): maybe VT-d is "
-                              "not enabled, or the device is not exist, or it "
-                              "has already been assigned to other domain"
-                              % (bus, dev, func))
+                raise VmError("fail to assign device(%x:%x.%x): maybe it has"
+                              " already been assigned to other domain, or maybe"
+                              " it doesn't exist." % (bus, dev, func))
 
         # register the domain in the list 
         from xen.xend import XendDomain
