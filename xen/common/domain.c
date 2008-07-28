@@ -50,7 +50,7 @@ static void __init setup_cpufreq_option(char *str)
     else if ( !strcmp(str, "xen") )
     {
         xen_processor_pmbits |= XEN_PROCESSOR_PM_PX;
-        cpufreq_controller = FREQCTL_none;
+        cpufreq_controller = FREQCTL_xen;
     }
 }
 custom_param("cpufreq", setup_cpufreq_option);

@@ -541,7 +541,7 @@ static inline void vcpu_unblock(struct vcpu *v)
 #define need_iommu(d)    ((d)->need_iommu && !(d)->is_hvm)
 
 extern enum cpufreq_controller {
-    FREQCTL_none, FREQCTL_dom0_kernel
+    FREQCTL_none, FREQCTL_dom0_kernel, FREQCTL_xen
 } cpufreq_controller;
 
 #endif /* __SCHED_H__ */
