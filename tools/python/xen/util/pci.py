@@ -57,6 +57,12 @@ PCI_EXP_DEVCAP_FLR = (0x1 << 28)
 PCI_EXP_DEVCTL = 0x8
 PCI_EXP_DEVCTL_FLR = (0x1 << 15)
 
+PCI_CAP_ID_PM = 0x01
+PCI_PM_CTRL = 4
+PCI_PM_CTRL_NO_SOFT_RESET = 0x0004
+PCI_PM_CTRL_STATE_MASK = 0x0003
+PCI_D3hot = 3
+
 PCI_CAP_ID_AF = 0x13
 PCI_AF_CAPs   = 0x3
 PCI_AF_CAPs_TP_FLR = 0x3
@@ -246,18 +252,8 @@ def transform_list(target, src):
     return  result
 
 def check_FLR_capability(dev_list):
-    i = len(dev_list)
-    if i == 0:
+    if len(dev_list) == 0:
         return []
-    i = i - 1;
-    while i >= 0:
-        dev = dev_list[i]
-        if dev.bus == 0:
-            if dev.dev_type == DEV_TYPE_PCIe_ENDPOINT and not dev.pcie_flr:
-                del dev_list[i]
-            elif dev.dev_type == DEV_TYPE_PCI and not dev.pci_af_flr:
-                del dev_list[i]
-        i = i - 1
 
     pci_list = []
     pci_dev_dict = {}
@@ -270,6 +266,8 @@ def check_FLR_capability(dev_list):
         for pci in pci_list:
             if isinstance(pci, types.StringTypes):
                 dev = pci_dev_dict[pci]
+                if dev.bus == 0:
+                    continue
                 if dev.dev_type == DEV_TYPE_PCIe_ENDPOINT and not dev.pcie_flr:
                     coassigned_pci_list = dev.find_all_the_multi_functions()
                     need_transform = True
@@ -336,13 +334,6 @@ class PciDeviceAssignmentError(Exception):
         self.message = msg
     def __str__(self):
         return 'pci: impproper device assignment spcified: ' + \
-            self.message
-
-class PciDeviceFlrError(PciDeviceAssignmentError):
-    def __init__(self,msg):
-        self.message = msg
-    def __str__(self):
-        return 'Can not find a suitable FLR method for the device(s): ' + \
             self.message
 
 class PciDevice:
@@ -480,6 +471,27 @@ class PciDevice:
         # Restore the config spaces
         restore_pci_conf_space((pci_list, cfg_list))
         
+    def do_Dstate_transition(self):
+        pos = self.find_cap_offset(PCI_CAP_ID_PM)
+        if pos == 0:
+            return 
+        
+        (pci_list, cfg_list) = save_pci_conf_space([self.name])
+        
+        # Enter D3hot without soft reset
+        pm_ctl = self.pci_conf_read32(pos + PCI_PM_CTRL)
+        pm_ctl |= PCI_PM_CTRL_NO_SOFT_RESET
+        pm_ctl &= ~PCI_PM_CTRL_STATE_MASK
+        pm_ctl |= PCI_D3hot
+        self.pci_conf_write32(pos + PCI_PM_CTRL, pm_ctl)
+        time.sleep(0.010)
+
+        # From D3hot to D0
+        self.pci_conf_write32(pos + PCI_PM_CTRL, 0)
+        time.sleep(0.010)
+
+        restore_pci_conf_space((pci_list, cfg_list))
+
     def find_all_the_multi_functions(self):
         sysfs_mnt = find_sysfs_mnt()
         pci_names = os.popen('ls ' + sysfs_mnt + SYSFS_PCI_DEVS_PATH).read()
@@ -650,13 +662,16 @@ class PciDevice:
                 time.sleep(0.200)
                 restore_pci_conf_space((pci_list, cfg_list))
             else:
-                funcs = self.find_all_the_multi_functions()
-                self.devs_check_driver(funcs)
+                if self.bus == 0:
+                    self.do_Dstate_transition()
+                else:
+                    funcs = self.find_all_the_multi_functions()
+                    self.devs_check_driver(funcs)
 
-                parent = '%04x:%02x:%02x.%01x' % self.find_parent()
+                    parent = '%04x:%02x:%02x.%01x' % self.find_parent()
 
-                # Do Secondary Bus Reset.
-                self.do_secondary_bus_reset(parent, funcs)
+                    # Do Secondary Bus Reset.
+                    self.do_secondary_bus_reset(parent, funcs)
         # PCI devices
         else:
             # For PCI device on host bus, we test "PCI Advanced Capabilities".
@@ -669,9 +684,7 @@ class PciDevice:
                 restore_pci_conf_space((pci_list, cfg_list))
             else:
                 if self.bus == 0:
-                    err_msg = 'pci: %s is not assignable: it is on bus 0, '+ \
-                        'but it has no PCI Advanced Capabilities.'
-                    raise PciDeviceFlrError(err_msg % self.name)
+                    self.do_Dstate_transition()
                 else:
                     devs = self.find_coassigned_devices(False)
                     # Remove the element 0 which is a bridge

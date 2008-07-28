@@ -375,23 +375,34 @@ class PciController(DevController):
                 raise VmError("pci: failed to locate device and "+
                         "parse it's resources - "+str(e))
             if (dev.dev_type == DEV_TYPE_PCIe_ENDPOINT) and not dev.pcie_flr:
-                funcs = dev.find_all_the_multi_functions()
-                for f in funcs:
-                    if not f in pci_str_list:
-                        (f_dom, f_bus, f_slot, f_func) = parse_pci_name(f)
-                        f_pci_str = '0x%x,0x%x,0x%x,0x%x' % \
-                            (f_dom, f_bus, f_slot, f_func)
-                        # f has been assigned to other guest?
-                        if xc.test_assign_device(0, f_pci_str) != 0:
-                            err_msg = 'pci: %s must be co-assigned to the' + \
-                                ' same guest with %s'
-                            raise VmError(err_msg % (f, dev.name))
+                if dev.bus == 0:
+                    # We cope with this case by using the Dstate transition
+                    # method for now.
+                    err_msg = 'pci: %s: it is on bus 0, but has no PCIe' +\
+                        ' FLR Capability. Will try the Dstate transition'+\
+                        ' method if available.'
+                    log.warn(err_msg % dev.name)
+                else:
+                    funcs = dev.find_all_the_multi_functions()
+                    for f in funcs:
+                        if not f in pci_str_list:
+                            (f_dom, f_bus, f_slot, f_func) = parse_pci_name(f)
+                            f_pci_str = '0x%x,0x%x,0x%x,0x%x' % \
+                                (f_dom, f_bus, f_slot, f_func)
+                            # f has been assigned to other guest?
+                            if xc.test_assign_device(0, f_pci_str) != 0:
+                                err_msg = 'pci: %s must be co-assigned to' + \
+                                    ' the same guest with %s'
+                                raise VmError(err_msg % (f, dev.name))
             elif dev.dev_type == DEV_TYPE_PCI:
                 if dev.bus == 0:
                     if not dev.pci_af_flr:
-                        err_msg = 'pci: %s is not assignable: it is on ' + \
-                            'bus 0,  but lacks of FLR capability'
-                        raise VmError(err_msg % dev.name)
+                        # We cope with this case by using the Dstate transition
+                        # method for now.
+                        err_msg = 'pci: %s: it is on bus 0, but has no PCI' +\
+                            ' Advanced Capabilities for FLR. Will try the'+\
+                            ' Dstate transition method if available.'
+                        log.warn(err_msg % dev.name)
                 else:
                     # All devices behind the uppermost PCI/PCI-X bridge must be\
                     # co-assigned to the same guest.
