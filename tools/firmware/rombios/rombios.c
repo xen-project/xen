@@ -1482,6 +1482,16 @@ ASM_START
     out dx,al
 ASM_END
 }
+
+void enable_rom_write_access()
+{
+    set_rom_write_access(0);
+}
+
+void disable_rom_write_access()
+{
+    set_rom_write_access(PFFLAG_ROM_LOCK);
+}
     
 #endif /* HVMASSIST */
 
@@ -2378,14 +2388,9 @@ ASM_END
     if (s3_resume_flag != CMOS_SHUTDOWN_S3)
         return;
 
-    /* get x_firmware_waking_vector */
-    s3_wakeup_vector = facs_get32(ACPI_FACS_OFFSET+24);
-    if (!s3_wakeup_vector) {
-        /* get firmware_waking_vector */
-	s3_wakeup_vector = facs_get32(ACPI_FACS_OFFSET+12);
-    	if (!s3_wakeup_vector)
-            return;
-    }
+    s3_wakeup_vector = get_s3_waking_vector();
+    if (!s3_wakeup_vector)
+        return;
 
     s3_wakeup_ip = s3_wakeup_vector & 0xF;
     s3_wakeup_cs = s3_wakeup_vector >> 4;
@@ -9927,9 +9932,7 @@ normal_post:
   call _log_bios_start
 
 #ifdef HVMASSIST
-  push #0
-  call _set_rom_write_access
-  add sp,#2
+  call _enable_rom_write_access
 #endif
 
   call _clobber_entry_point
@@ -10128,9 +10131,7 @@ post_default_ints:
 #ifdef HVMASSIST
   call _copy_e820_table
   call smbios_init
-  push #PFFLAG_ROM_LOCK
-  call _set_rom_write_access
-  add sp,#2
+  call _disable_rom_write_access
 #endif
 
   call _init_boot_vectors

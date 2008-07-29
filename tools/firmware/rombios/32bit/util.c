@@ -19,6 +19,7 @@
  */
 #include <stdarg.h>
 #include <stdint.h>
+#include "rombios_compat.h"
 #include "util.h"
 
 static void putchar(char c);
@@ -92,11 +93,11 @@ int strcmp(const char *cs, const char *ct)
 
 int strncmp(const char *s1, const char *s2, uint32_t n)
 {
-	uint32_t ctr;
-	for (ctr = 0; ctr < n; ctr++)
-		if (s1[ctr] != s2[ctr])
-			return (int)(s1[ctr] - s2[ctr]);
-	return 0;
+    uint32_t ctr;
+    for (ctr = 0; ctr < n; ctr++)
+        if (s1[ctr] != s2[ctr])
+            return (int)(s1[ctr] - s2[ctr]);
+    return 0;
 }
 
 void *memcpy(void *dest, const void *src, unsigned n)
@@ -401,4 +402,65 @@ void mssleep(uint32_t waittime)
             continue;
         y = x;
     }
+}
+
+/*
+ * Search for the RSDP ACPI table in the memory starting at addr and
+ * ending at addr + len - 1.
+ */
+static struct acpi_20_rsdp *__find_rsdp(const void *start, unsigned int len)
+{
+    char *rsdp = (char *)start;
+    char *end = rsdp + len;
+    /* scan memory in steps of 16 bytes */
+    while (rsdp < end) {
+        /* check for expected string */
+        if (!strncmp(rsdp, "RSD PTR ", 8))
+            return (struct acpi_20_rsdp *)rsdp;
+        rsdp += 0x10;
+    }
+    return 0;
+}
+
+struct acpi_20_rsdp *find_rsdp(void)
+{
+    struct acpi_20_rsdp *rsdp;
+    uint16_t ebda_seg;
+
+    ebda_seg = *(uint16_t *)ADDR_FROM_SEG_OFF(0x40, 0xe);
+    rsdp = __find_rsdp((void *)(ebda_seg << 16), 1024);
+    if (!rsdp)
+        rsdp = __find_rsdp((void *)0xE0000, 0x20000);
+
+    return rsdp;
+}
+
+uint32_t get_s3_waking_vector(void)
+{
+    struct acpi_20_rsdp *rsdp = find_rsdp();
+    struct acpi_20_xsdt *xsdt;
+    struct acpi_20_fadt *fadt;
+    struct acpi_20_facs *facs;
+    uint32_t vector;
+
+    if (!rsdp)
+        return 0;
+
+    xsdt = (struct acpi_20_xsdt *)(long)rsdp->xsdt_address;
+    if (!xsdt)
+        return 0;
+
+    fadt = (struct acpi_20_fadt *)(long)xsdt->entry[0];
+    if (!fadt || (fadt->header.signature != ACPI_2_0_FADT_SIGNATURE))
+        return 0;
+
+    facs = (struct acpi_20_facs *)(long)fadt->x_firmware_ctrl;
+    if (!facs)
+        return 0;
+
+    vector = facs->x_firmware_waking_vector;
+    if (!vector)
+        vector = facs->firmware_waking_vector;
+
+    return vector;
 }

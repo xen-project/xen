@@ -1,7 +1,6 @@
 #ifndef TCGBIOS_H
 #define TCGBIOS_H
 
-
 /* TCPA ACPI definitions */
 #define TCPA_ACPI_CLASS_CLIENT          0
 #define TCPA_ACPI_CLASS_SERVER          1
@@ -117,14 +116,7 @@
 /* address of locality 0 (TIS) */
 #define TPM_TIS_BASE_ADDRESS        0xfed40000
 
-#define ASCII32(a,b,c,d)     ((((Bit32u)a) <<  0) | (((Bit32u)b) <<  8) | \
-                              (((Bit32u)c) << 16) | (((Bit32u)d) << 24)  )
-#define ACPI_2_0_TCPA_SIGNATURE ASCII32('T','C','P','A') /* "TCPA" */
-
-
 #define STATUS_FLAG_SHUTDOWN                (1 << 0)
-
-#define ACPI_SEGMENT    0xE000
 
 /* Input and Output blocks for the TCG BIOS commands */
 
@@ -232,37 +224,6 @@ struct pcpes
 	uint32_t    event;
 } __attribute__((packed));
 
-
-struct acpi_header
-{
-	uint32_t signature;
-	uint32_t length;
-	uint8_t  revision;
-	uint8_t  checksum;
-	uint8_t  oem_id[6];
-	uint64_t oem_table_id;
-	uint32_t oem_revision;
-	uint32_t creator_id;
-	uint32_t creator_revision;
-} __attribute__((packed));
-
-struct acpi_20_rsdt {
-	struct acpi_header header;
-	uint32_t entry[1];
-} __attribute__((packed));
-
-struct acpi_20_rsdp {
-	uint64_t signature;
-	uint8_t  checksum;
-	uint8_t  oem_id[6];
-	uint8_t  revision;
-	uint32_t rsdt_address;
-	uint32_t length;
-	uint64_t xsdt_address;
-	uint8_t  extended_checksum;
-	uint8_t  reserved[3];
-} __attribute__((packed));
-
 struct acpi_20_tcpa_client {
 	uint32_t laml;
 	uint64_t lasa;
@@ -275,7 +236,7 @@ struct acpi_20_tcpa_server {
 	/* more here */
 } __attribute__((packed));
 
-struct acpi_20_tcpa {
+struct acpi_20_tcpa_clisrv {
 	struct acpi_header header;
 	uint16_t platform_class;
 	union {

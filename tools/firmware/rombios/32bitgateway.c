@@ -356,6 +356,9 @@ Upcall:
 	call _store_returnaddress	; store away
 	pop ax
 
+	; XXX GDT munging requires ROM to be writable!
+	call _enable_rom_write_access
+
 	rol bx, #2
 	mov si, #jmptable
 	seg cs
@@ -381,6 +384,8 @@ Upcall:
 	push bp
 	mov bp,sp
 	push eax			; preserve work register
+
+	call _disable_rom_write_access
 
 	call _get_returnaddress
 	mov 2[bp], ax			; 16bit return address onto stack
@@ -408,3 +413,10 @@ ASM_END
 #include "32bitgateway.h"
 
 #include "tcgbios.c"
+
+Bit32u get_s3_waking_vector()
+{
+	ASM_START
+	DoUpcall(IDX_GET_S3_WAKING_VECTOR)
+	ASM_END
+}

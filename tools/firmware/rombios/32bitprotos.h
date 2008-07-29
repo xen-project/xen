@@ -17,8 +17,8 @@
 #define IDX_TCPA_IPL                       10
 #define IDX_TCPA_INITIALIZE_TPM            11
 #define IDX_TCPA_MEASURE_POST              12
-
-#define IDX_LAST                           13 /* keep last! */
+#define IDX_GET_S3_WAKING_VECTOR           13
+#define IDX_LAST                           14 /* keep last! */
 
 #ifdef GCC_PROTOS
   #define PARMS(x...) x
@@ -41,5 +41,7 @@ void tcpa_option_rom( PARMS(Bit32u seg) );
 void tcpa_ipl( PARMS(Bit32u bootcd,Bit32u seg,Bit32u off,Bit32u count) );
 void tcpa_measure_post( PARMS(Bit32u from, Bit32u to) );
 Bit32u tcpa_initialize_tpm( PARMS(Bit32u physpres) );
+
+Bit32u get_s3_waking_vector( PARMS(void) );
 
 #endif
