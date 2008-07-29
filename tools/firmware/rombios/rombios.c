@@ -2339,33 +2339,6 @@ debugger_off()
   outb(0xfedc, 0x00);
 }
 
-/* according to memory layout defined in acpi_build_tables(),
-   acpi FACS table is located in ACPI_PHYSICAL_ADDRESS(0xEA000) */
-#define ACPI_FACS_ADDRESS 0xEA000
-#define ACPI_FACS_OFFSET 0x10
-/* S3 resume status in CMOS 0Fh shutdown status byte*/
-
-Bit32u facs_get32(offs)
-Bit16u offs;
-{
-ASM_START
-  push bp
-  mov  bp, sp
-
-    push ds
-    mov ax, #(ACPI_FACS_ADDRESS >> 4)
-    mov ds, ax
-
-    mov bx, 4[bp]
-    mov ax, [bx]
-    mov dx, 2[bx]
-    pop ds
-
-  pop  bp
-ASM_END
-}
-
-
 void 
 s3_resume()
 {
