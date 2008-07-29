@@ -4,6 +4,8 @@
 #include <public/platform.h>
 #include <public/sysctl.h>
 
+#define XEN_PX_INIT 0x80000000
+
 int get_cpu_id(u8);
 int acpi_cpufreq_init(void);
 int powernow_cpufreq_init(void);

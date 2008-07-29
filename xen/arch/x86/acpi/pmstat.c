@@ -52,9 +52,9 @@ int do_get_pm_info(struct xen_sysctl_get_pmstat *op)
     struct pm_px *pxpt = &px_statistic_data[op->cpuid];
     struct processor_pminfo *pmpt = &processor_pminfo[op->cpuid];
 
-    /* to protect the case when Px was controlled by dom0-kernel */
-    /* or when CPU_FREQ not set in which case ACPI Px objects not parsed */
-    if ( !pmpt->perf.init && (op->type & PMSTAT_CATEGORY_MASK) == PMSTAT_PX )
+    /* to protect the case when Px was not controlled by xen */
+    if ( (!(pmpt->perf.init & XEN_PX_INIT)) && 
+        (op->type & PMSTAT_CATEGORY_MASK) == PMSTAT_PX )
         return -EINVAL;
 
     if ( !cpu_online(op->cpuid) )

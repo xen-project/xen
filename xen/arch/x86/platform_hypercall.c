@@ -415,7 +415,7 @@ ret_t do_platform_op(XEN_GUEST_HANDLE(xen_platform_op_t) u_xenpf_op)
             if ( pxpt->init == ( XEN_PX_PCT | XEN_PX_PSS |
                                  XEN_PX_PSD | XEN_PX_PPC ) )
             {
-                pxpt->init |= 0x80000000;
+                pxpt->init |= XEN_PX_INIT;
                 cpu_count++;
             }
             if ( cpu_count == num_online_cpus() )
