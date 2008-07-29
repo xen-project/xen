@@ -238,15 +238,15 @@ static int __init acpi_parse_dev_scope(void *start, void *end,
             bus = pci_conf_read8(bus, path->dev, path->fn, PCI_SECONDARY_BUS);
             path++;
         }
-        
+
         switch ( acpi_scope->dev_type )
         {
         case ACPI_DEV_P2PBRIDGE:
         {
             sec_bus = pci_conf_read8(
-		bus, path->dev, path->fn, PCI_SECONDARY_BUS);
+                bus, path->dev, path->fn, PCI_SECONDARY_BUS);
             sub_bus = pci_conf_read8(
-		bus, path->dev, path->fn, PCI_SUBORDINATE_BUS);
+                bus, path->dev, path->fn, PCI_SUBORDINATE_BUS);
             dprintk(XENLOG_INFO VTDPREFIX,
                     "found bridge: bdf = %x:%x.%x  sec = %x  sub = %x\n",
                     bus, path->dev, path->fn, sec_bus, sub_bus);
@@ -328,13 +328,13 @@ acpi_parse_one_drhd(struct acpi_dmar_entry_header *header)
         if ( include_all )
         {
             dprintk(XENLOG_WARNING VTDPREFIX,
-                    "Onlyu onw INCLUDE_ALL device scope is allowed\n");
-            return -EINVAL;
+                    "Only one INCLUDE_ALL device scope is allowed\n");
+            ret = -EINVAL;
         }
         include_all = 1;
     }
 
-    if ( ret || (dmaru->scope.devices_cnt == 0 && !dmaru->include_all) )
+    if ( ret )
         xfree(dmaru);
     else
         acpi_register_drhd_unit(dmaru);
@@ -396,7 +396,8 @@ acpi_parse_one_atsr(struct acpi_dmar_entry_header *header)
         ret = acpi_parse_dev_scope(dev_scope_start, dev_scope_end,
                                    atsru, ATSR_TYPE);
     }
-    else {
+    else
+    {
         dprintk(XENLOG_INFO VTDPREFIX, "found ALL_PORTS\n");
         /* Only allow one ALL_PORTS */
         if ( all_ports )
