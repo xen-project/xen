@@ -557,10 +557,16 @@ void __init end_boot_allocator(void)
     }
 
     if ( !dma_bitsize && (num_online_nodes() > 1) )
+    {
+#ifdef CONFIG_X86
         dma_bitsize = min_t(unsigned int,
                             fls(NODE_DATA(0)->node_spanned_pages) - 1
                             + PAGE_SHIFT - 2,
                             32);
+#else
+        dma_bitsize = 32;
+#endif
+    }
 
     printk("Domain heap initialised");
     if ( dma_bitsize )
