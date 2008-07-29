@@ -1467,17 +1467,18 @@ copy_e820_table()
 }
 
 void
-disable_rom_write_access()
+set_rom_write_access(action)
+  Bit16u action;
 {
     Bit16u off = (Bit16u)&((struct bios_info *)0)->xen_pfiob;
 ASM_START
-    mov si,.disable_rom_write_access.off[bp]
+    mov si,.set_rom_write_access.off[bp]
     push ds
     mov ax,#(ACPI_PHYSICAL_ADDRESS >> 4)
     mov ds,ax
     mov dx,[si]
     pop ds
-    mov ax,#PFFLAG_ROM_LOCK
+    mov ax,.set_rom_write_access.action[bp]
     out dx,al
 ASM_END
 }
@@ -9925,6 +9926,12 @@ normal_post:
 
   call _log_bios_start
 
+#ifdef HVMASSIST
+  push #0
+  call _set_rom_write_access
+  add sp,#2
+#endif
+
   call _clobber_entry_point
 
   ;; set all interrupts to default handler
@@ -10121,6 +10128,9 @@ post_default_ints:
 #ifdef HVMASSIST
   call _copy_e820_table
   call smbios_init
+  push #PFFLAG_ROM_LOCK
+  call _set_rom_write_access
+  add sp,#2
 #endif
 
   call _init_boot_vectors
@@ -10170,10 +10180,6 @@ post_default_ints:
 #if BX_TCGBIOS
   call tcpa_post_part2
 #endif
-
-#ifdef HVMASSIST
-  call _disable_rom_write_access
-#endif 
 
   ;; Start the boot sequence.   See the comments in int19_relocated 
   ;; for why we use INT 18h instead of INT 19h here.
