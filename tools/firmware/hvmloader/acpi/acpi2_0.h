@@ -381,7 +381,7 @@ struct acpi_20_madt_intsrcovr {
 
 #pragma pack ()
 
-int acpi_build_tables(uint8_t *);
+void acpi_build_tables(void);
 
 #endif /* _ACPI_2_0_H_ */
 

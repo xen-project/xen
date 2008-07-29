@@ -145,4 +145,6 @@ void smp_initialise(void);
 
 #define isdigit(c) ((c) >= '0' && (c) <= '9')
 
+extern char _start[], _end[];
+
 #endif /* __HVMLOADER_UTIL_H__ */
