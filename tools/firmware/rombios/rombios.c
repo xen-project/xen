@@ -739,7 +739,7 @@ typedef struct {
   // device tables are at 0x9ff00 -- 0x9ffff
   typedef struct {
     unsigned char ebda_size;
-    unsigned char s3_resume_flag;
+    unsigned char cmos_shutdown_status;
     unsigned char filler1[0x3B];
 
     // FDPT - Can be splitted in data members if needed
@@ -759,7 +759,7 @@ typedef struct {
     upcall_t upcall;
     } ebda_data_t;
   
-  #define EBDA_S3_RESUME_FLAG_OFFSET 1
+  #define EBDA_CMOS_SHUTDOWN_STATUS_OFFSET 1
   #define EbdaData ((ebda_data_t *) 0)
 
   // for access to the int13ext structure
@@ -2344,21 +2344,20 @@ s3_resume()
 {
     Bit32u s3_wakeup_vector;
     Bit16u s3_wakeup_ip, s3_wakeup_cs;
-    Bit8u s3_resume_flag;
+    Bit8u cmos_shutdown_status;
 
 ASM_START
     push ds
     push ax
     mov ax, #EBDA_SEG
     mov ds, ax
-    mov al, [EBDA_S3_RESUME_FLAG_OFFSET]
-    mov .s3_resume.s3_resume_flag[bp], al
-    mov byte ptr [EBDA_S3_RESUME_FLAG_OFFSET], #0
+    mov al, [EBDA_CMOS_SHUTDOWN_STATUS_OFFSET]
+    mov .s3_resume.cmos_shutdown_status[bp], al
     pop ax
     pop ds
 ASM_END
 
-    if (s3_resume_flag != CMOS_SHUTDOWN_S3)
+    if (cmos_shutdown_status != CMOS_SHUTDOWN_S3)
         return;
 
     s3_wakeup_vector = get_s3_waking_vector();
@@ -9840,52 +9839,9 @@ post:
 
   ;; Examine CMOS shutdown status.
   mov al, bl
-
-  ;; 0xFE S3 resume
-  cmp AL, #0xFE
-  jnz not_s3_resume
-
-  ;; set S3 resume flag
   mov dx, #EBDA_SEG
   mov ds, dx
-  mov [EBDA_S3_RESUME_FLAG_OFFSET], AL
-  jmp normal_post
-
-not_s3_resume:
-
-  ;; 0x00, 0x09, 0x0D+ = normal startup
-  cmp AL, #0x00
-  jz normal_post
-  cmp AL, #0x0d
-  jae normal_post
-  cmp AL, #0x09
-  je normal_post
-
-  ;; 0x05 = eoi + jmp via [0x40:0x67] jump
-  cmp al, #0x05
-  je  eoi_jmp_post
-
-  ;; Examine CMOS shutdown status.
-  ;;  0x01,0x02,0x03,0x04,0x06,0x07,0x08, 0x0a, 0x0b, 0x0c = Unimplemented shutdown status.
-  push bx
-  call _shutdown_status_panic
-
-#if 0 
-  HALT(__LINE__)
-  ;
-  ;#if 0
-  ;  0xb0, 0x20,       /* mov al, #0x20 */
-  ;  0xe6, 0x20,       /* out 0x20, al    ;send EOI to PIC */
-  ;#endif
-  ;
-  pop es
-  pop ds
-  popa
-  iret
-#endif
-
-normal_post:
-  ; case 0: normal startup
+  mov [EBDA_CMOS_SHUTDOWN_STATUS_OFFSET], AL
 
   cli
   mov  ax, #0xfffe
@@ -9903,12 +9859,6 @@ normal_post:
     stosw
 
   call _log_bios_start
-
-#ifdef HVMASSIST
-  call _enable_rom_write_access
-#endif
-
-  call _clobber_entry_point
 
   ;; set all interrupts to default handler
   mov  bx, #0x0000    ;; offset index
@@ -10102,6 +10052,8 @@ post_default_ints:
   out  0xa1, AL ;slave  pic: unmask IRQ 12, 13, 14
 
 #ifdef HVMASSIST
+  call _enable_rom_write_access
+  call _clobber_entry_point
   call _copy_e820_table
   call smbios_init
   call _disable_rom_write_access
