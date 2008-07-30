@@ -1302,10 +1302,6 @@ static int domain_context_unmap_one(
     struct context_entry *context, *context_entries;
     unsigned long flags;
     u64 maddr;
-    struct acpi_rmrr_unit *rmrr;
-    u16 bdf;
-    int i;
-    unsigned int is_rmrr_device = 0;
 
     maddr = bus_to_context_maddr(iommu, bus);
     context_entries = (struct context_entry *)map_vtd_domain_page(maddr);
@@ -1318,25 +1314,11 @@ static int domain_context_unmap_one(
     }
 
     spin_lock_irqsave(&iommu->lock, flags);
-    if ( domain->domain_id == 0 )
-    {
-        for_each_rmrr_device ( rmrr, bdf, i )
-        {
-            if ( PCI_BUS(bdf) == bus && PCI_DEVFN2(bdf) == devfn )
-            {
-                is_rmrr_device = 1;
-                break;
-            }
-        }
-    }
-    if ( !is_rmrr_device )
-    {
-        context_clear_present(*context);
-        context_clear_entry(*context);
-        iommu_flush_cache_entry(context);
-        iommu_flush_context_domain(iommu, domain_iommu_domid(domain), 0);
-        iommu_flush_iotlb_dsi(iommu, domain_iommu_domid(domain), 0);
-    }
+    context_clear_present(*context);
+    context_clear_entry(*context);
+    iommu_flush_cache_entry(context);
+    iommu_flush_context_domain(iommu, domain_iommu_domid(domain), 0);
+    iommu_flush_iotlb_dsi(iommu, domain_iommu_domid(domain), 0);
     unmap_vtd_domain_page(context_entries);
     spin_unlock_irqrestore(&iommu->lock, flags);
 
@@ -1619,8 +1601,26 @@ static int intel_iommu_add_device(struct pci_dev *pdev)
 
 static int intel_iommu_remove_device(struct pci_dev *pdev)
 {
+    struct acpi_rmrr_unit *rmrr;
+    u16 bdf;
+    int i;
+
     if ( !pdev->domain )
         return -EINVAL;
+
+    /* If the device belongs to dom0, and it has RMRR, don't remove it
+     * from dom0, because BIOS may use RMRR at booting time.
+     */
+    if ( pdev->domain->domain_id == 0 )
+    {
+        for_each_rmrr_device ( rmrr, bdf, i )
+        {
+            if ( PCI_BUS(bdf) == pdev->bus &&
+                 PCI_DEVFN2(bdf) == pdev->devfn )
+                return 0;
+        }
+    }
+
     return domain_context_unmap(pdev->domain, pdev->bus, pdev->devfn);
 }
 
