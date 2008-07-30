@@ -622,9 +622,9 @@ static struct domain *create_domain(int domid)
 {
 	struct domain *dom;
 	char *s;
-	struct timeval tv;
+	struct timespec ts;
 
-	if (gettimeofday(&tv, NULL) < 0) {
+	if (clock_gettime(CLOCK_MONOTONIC, &ts) < 0) {
 		dolog(LOG_ERR, "Cannot get time of day %s:%s:L%d",
 		      __FILE__, __FUNCTION__, __LINE__);
 		return NULL;
@@ -666,7 +666,7 @@ static struct domain *create_domain(int domid)
 	dom->buffer.capacity = 0;
 	dom->buffer.max_capacity = 0;
 	dom->event_count = 0;
-	dom->next_period = (tv.tv_sec * 1000) + (tv.tv_usec / 1000) + RATE_LIMIT_PERIOD;
+	dom->next_period = (ts.tv_sec * 1000) + (ts.tv_nsec / 1000000) + RATE_LIMIT_PERIOD;
 	dom->next = NULL;
 
 	dom->ring_ref = -1;
@@ -971,7 +971,7 @@ void handle_io(void)
 		struct domain *d, *n;
 		int max_fd = -1;
 		struct timeval timeout;
-		struct timeval tv;
+		struct timespec ts;
 		long long now, next_timeout = 0;
 
 		FD_ZERO(&readfds);
@@ -985,9 +985,9 @@ void handle_io(void)
 			max_fd = MAX(xc_evtchn_fd(xce_handle), max_fd);
 		}
 
-		if (gettimeofday(&tv, NULL) < 0)
+		if (clock_gettime(CLOCK_MONOTONIC, &ts) < 0)
 			return;
-		now = (tv.tv_sec * 1000) + (tv.tv_usec / 1000);
+		now = (ts.tv_sec * 1000) + (ts.tv_nsec / 1000000);
 
 		/* Re-calculate any event counter allowances & unblock
 		   domains with new allowance */

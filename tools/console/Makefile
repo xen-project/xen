@@ -21,7 +21,7 @@ clean:
 
 xenconsoled: $(patsubst %.c,%.o,$(wildcard daemon/*.c))
 	$(CC) $(CFLAGS) $^ -o $@ $(LDFLAGS) \
-              $(UTIL_LIBS) $(SOCKET_LIBS)
+              $(UTIL_LIBS) $(SOCKET_LIBS) -lrt
 
 xenconsole: $(patsubst %.c,%.o,$(wildcard client/*.c))
 	$(CC) $(CFLAGS) $^ -o $@ $(LDFLAGS) \
