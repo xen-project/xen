@@ -4645,7 +4645,6 @@ static void *emulate_map_dest(struct vcpu *v,
                               u32 bytes,
                               struct sh_emulate_ctxt *sh_ctxt)
 {
-    struct segment_register *sreg;
     unsigned long offset;
     void *map = NULL;
 
@@ -4658,8 +4657,7 @@ static void *emulate_map_dest(struct vcpu *v,
 
 #ifndef NDEBUG
     /* We don't emulate user-mode writes to page tables */
-    sreg = hvm_get_seg_reg(x86_seg_ss, sh_ctxt);
-    if ( sreg->attr.fields.dpl == 3 )
+    if ( hvm_get_seg_reg(x86_seg_ss, sh_ctxt)->attr.fields.dpl == 3 )
     {
         gdprintk(XENLOG_DEBUG, "User-mode write to pagetable reached "
                  "emulate_map_dest(). This should never happen!\n");
