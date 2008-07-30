@@ -144,9 +144,10 @@ def main_all(opts, args):
 def main_dom(opts, args):
     if len(args) == 0: opts.err('No domain parameter given')
     if len(args) >  1: opts.err('No multiple domain parameters allowed')
-    dom = sxp.child_value(server.xend.domain(args[0]), 'name')
     if serverType == SERVER_XEN_API:
-        dom = get_single_vm(dom)
+        dom = get_single_vm(args[0])
+    else:
+        dom = sxp.child_value(server.xend.domain(args[0]), 'name')
     mode = shutdown_mode(opts)  
     shutdown(opts, [ dom ], mode, opts.vals.wait)
     
