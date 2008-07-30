@@ -1,8 +1,6 @@
 XEN_ROOT = ../../..
 include $(XEN_ROOT)/tools/firmware/Rules.mk
 
-CFLAGS += -I$(XEN_ROOT)/tools/libxc -I.
-
 .PHONY: all
 all: extboot.bin
 

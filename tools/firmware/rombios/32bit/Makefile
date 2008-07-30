@@ -4,7 +4,7 @@ include $(XEN_ROOT)/tools/firmware/Rules.mk
 SOURCES = util.c
 TARGET = 32bitbios_flat.h
 
-CFLAGS += -I../ -DGCC_PROTOS
+CFLAGS += $(CFLAGS_include) -I.. -DGCC_PROTOS
 
 SUBDIRS = tcgbios
 

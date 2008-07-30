@@ -5,7 +5,7 @@ TARGET  = tcgbiosext.o
 FILES   = tcgbios tpm_drivers
 OBJECTS = $(foreach f,$(FILES),$(f).o)
 
-CFLAGS += -I../ -I../../ -DGCC_PROTOS
+CFLAGS += $(CFLAGS_include) -I.. -I../.. -DGCC_PROTOS
 
 .PHONY: all clean
 
