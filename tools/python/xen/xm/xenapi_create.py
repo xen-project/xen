@@ -389,7 +389,7 @@ class xenapi_create:
             "device":
                 vbd.attributes["device"].value,
             "bootable":
-                vbd.attributes["bootable"].value == "True",
+                vbd.attributes["bootable"].value == "1",
             "mode":
                 vbd.attributes["mode"].value,
             "type":
@@ -597,13 +597,15 @@ class sxp2xml:
             pv = document.createElement("pv")
             pv.attributes["kernel"] \
                 = get_child_by_name(image, "kernel", "")
-            pv.attributes["bootloader"] = ""
+            pv.attributes["bootloader"] \
+                = get_child_by_name(config, "bootloader", "")
             pv.attributes["ramdisk"] \
                 = get_child_by_name(image, "ramdisk", "")
             pv.attributes["args"] \
                 = "root=" + get_child_by_name(image, "root", "") \
                 + " " + get_child_by_name(image, "args", "")
-            pv.attributes["bootloader_args"] = ""
+            pv.attributes["bootloader_args"] \
+                = get_child_by_name(config, "bootloader_args","")
 
             vm.appendChild(pv)
         elif image[0] == "hvm":
