@@ -15,10 +15,71 @@
 # Copyright (C) 2005 XenSource Ltd
 #============================================================================
 
+import xen.util.auxbin
+import xen.lowlevel.xs
+import os
+import sys
+import signal
+from xen.util import utils
 
 XENCONSOLE = "xenconsole"
 
-import xen.util.auxbin
-
 def execConsole(domid):
     xen.util.auxbin.execute(XENCONSOLE, [str(domid)])
+
+
+class OurXenstoreConnection:
+    def __init__(self):
+        self.handle = xen.lowlevel.xs.xs()
+    def read_eventually(self, path):
+        watch = None
+        trans = None
+        try:
+            signal.alarm(10)
+            watch = self.handle.watch(path, None)
+            while True:
+                result = self.handle.read('0', path)
+                if result is not None:
+                    return result
+                self.handle.read_watch()
+            self.handle.unwatch(path, watch)
+            signal.alarm(0)
+        except:
+            signal.alarm(0)
+            if watch is not None: self.handle.unwatch(path, watch)
+            raise
+    def read_maybe(self, path):
+        return self.handle.read('0', path)
+
+def runVncViewer(domid, do_autopass, do_daemonize=False):
+    xs = OurXenstoreConnection()
+    d = '/local/domain/%d/' % domid
+    vnc_port = xs.read_eventually(d + 'console/vnc-port')
+    vfb_backend = xs.read_maybe(d + 'device/vfb/0/backend')
+    vnc_listen = None
+    vnc_password = None
+    vnc_password_tmpfile = None
+    cmdl = ['vncviewer']
+    if vfb_backend is not None:
+        vnc_listen = xs.read_maybe(vfb_backend + '/vnclisten')
+        if do_autopass:
+            vnc_password = xs.read_maybe(vfb_backend + '/vncpasswd')
+            if vnc_password is not None:
+                cmdl.append('-autopass')
+                vnc_password_tmpfile = os.tmpfile()
+                print >>vnc_password_tmpfile, vnc_password
+                vnc_password_tmpfile.seek(0)
+                vnc_password_tmpfile.flush()
+    if vnc_listen is None:
+        vnc_listen = 'localhost'
+    cmdl.append('%s:%d' % (vnc_listen, int(vnc_port) - 5900))
+    if do_daemonize:
+        pid = utils.daemonize('vncviewer', cmdl, vnc_password_tmpfile)
+        if pid == 0:
+            puts >>sys.stderr, 'failed to invoke vncviewer'
+            os._exit(-1)
+    else:
+        print 'invoking ', ' '.join(cmdl)
+        if vnc_password_tmpfile is not None:
+            os.dup2(vnc_password_tmpfile.fileno(), 0)
+        os.execvp('vncviewer', cmdl)

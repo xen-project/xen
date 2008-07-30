@@ -64,6 +64,9 @@ import inspect
 from xen.xend import XendOptions
 xoptions = XendOptions.instance()
 
+import signal
+signal.signal(signal.SIGINT, signal.SIG_DFL)
+
 # getopt.gnu_getopt is better, but only exists in Python 2.3+.  Use
 # getopt.getopt if gnu_getopt is not available.  This will mean that options
 # may only be specified before positional arguments.
@@ -97,6 +100,8 @@ SUBCOMMAND_HELP = {
     
     'console'     : ('[-q|--quiet] <Domain>',
                      'Attach to <Domain>\'s console.'),
+    'vncviewer'   : ('[--[vncviewer-]autopass] <Domain>',
+                     'Attach to <Domain>\'s VNC server.'),
     'create'      : ('<ConfigFile> [options] [vars]',
                      'Create a domain based on <ConfigFile>.'),
     'destroy'     : ('<Domain>',
@@ -243,6 +248,10 @@ SUBCOMMAND_OPTIONS = {
     'console': (
        ('-q', '--quiet', 'Do not print an error message if the domain does not exist'),
     ),
+    'vncviewer': (
+       ('', '--autopass', 'Pass VNC password to viewer via stdin and -autopass'),
+       ('', '--vncviewer-autopass', '(consistency alias for --autopass)'),
+    ),
     'dmesg': (
        ('-c', '--clear', 'Clear dmesg buffer as well as printing it'),
     ),
@@ -260,6 +269,8 @@ SUBCOMMAND_OPTIONS = {
     'start': (
        ('-p', '--paused', 'Do not unpause domain after starting it'),
        ('-c', '--console_autoconnect', 'Connect to the console after the domain is created'),
+       ('', '--vncviewer', 'Connect to display via VNC after the domain is created'),
+       ('', '--vncviewer-autopass', 'Pass VNC password to viewer via stdin and -autopass'),
     ),
     'resume': (
        ('-p', '--paused', 'Do not unpause domain after resuming it'),
@@ -277,6 +288,7 @@ SUBCOMMAND_OPTIONS = {
 
 common_commands = [
     "console",
+    "vncviewer",
     "create",
     "new",
     "delete",
@@ -304,6 +316,7 @@ common_commands = [
 
 domain_commands = [
     "console",
+    "vncviewer",
     "create",
     "new",
     "delete",
@@ -1185,14 +1198,20 @@ def xm_start(args):
 
     paused = False
     console_autoconnect = False
+    vncviewer = False
+    vncviewer_autopass = False
 
     try:
-        (options, params) = getopt.gnu_getopt(args, 'cp', ['console_autoconnect','paused'])
+        (options, params) = getopt.gnu_getopt(args, 'cp', ['console_autoconnect','paused','vncviewer','vncviewer-autopass'])
         for (k, v) in options:
             if k in ('-p', '--paused'):
                 paused = True
             if k in ('-c', '--console_autoconnect'):
                 console_autoconnect = True
+            if k in ('--vncviewer'):
+                vncviewer = True
+            if k in ('--vncviewer-autopass'):
+                vncviewer_autopass = True
 
         if len(params) != 1:
             raise OptionError("Expects 1 argument")
@@ -1204,6 +1223,9 @@ def xm_start(args):
 
     if console_autoconnect:
         start_do_console(dom)
+
+    if console_autoconnect:
+        console.runVncViewer(domid, vncviewer_autopass, True)
 
     try:
         if serverType == SERVER_XEN_API:
@@ -1781,6 +1803,40 @@ def xm_console(args):
             raise xmlrpclib.Fault(0, "Domain '%s' is not started" % dom)
 
     console.execConsole(domid)
+
+
+def domain_name_to_domid(domain_name):
+    if serverType == SERVER_XEN_API:
+        domid = server.xenapi.VM.get_domid(
+                   get_single_vm(domain_name))
+    else:
+        dom = server.xend.domain(domain_name)
+        domid = int(sxp.child_value(dom, 'domid', '-1'))
+    return domid
+
+def xm_vncviewer(args):
+    autopass = False;
+
+    try:
+        (options, params) = getopt.gnu_getopt(args, '', ['autopass','vncviewer-autopass'])
+    except getopt.GetoptError, opterr:
+        err(opterr)
+        usage('vncviewer')
+
+    for (k, v) in options:
+        if k in ['--autopass','--vncviewer-autopass']:
+            autopass = True
+        else:
+            assert False
+
+    if len(params) != 1:
+        err('No domain given (or several parameters specified)')
+        usage('vncviewer')
+
+    dom = params[0]
+    domid = domain_name_to_domid(dom)
+
+    console.runVncViewer(domid, autopass)
 
 
 def xm_uptime(args):
@@ -2617,6 +2673,7 @@ commands = {
     "event-monitor": xm_event_monitor,
     # console commands
     "console": xm_console,
+    "vncviewer": xm_vncviewer,
     # xenstat commands
     "top": xm_top,
     # domain commands
