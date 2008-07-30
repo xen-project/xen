@@ -821,7 +821,7 @@ void pt_iomem_map(PCIDevice *d, int i, uint32_t e_phys, uint32_t e_size,
     assigned_device->bases[i].e_size= e_size;
 
     PT_LOG("e_phys=%08x maddr=%lx type=%d len=%d index=%d first_map=%d\n",
-        e_phys, assigned_device->bases[i].access.maddr, 
+        e_phys, (unsigned long)assigned_device->bases[i].access.maddr, 
         type, e_size, i, first_map);
 
     if ( e_size == 0 )
@@ -1389,7 +1389,7 @@ static int pt_register_regions(struct pt_dev *assigned_device)
     return 0;
 }
 
-static int pt_unregister_regions(struct pt_dev *assigned_device)
+static void pt_unregister_regions(struct pt_dev *assigned_device)
 {
     int i, type, ret;
     uint32_t e_size;
