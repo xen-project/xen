@@ -138,7 +138,6 @@ int compat_grant_table_op(unsigned int cmd,
                         for ( i = 0; i < (_s_)->nr_frames; ++i ) \
                         { \
                             unsigned int frame = (_s_)->frame_list.p[i]; \
-                            BUG_ON(frame != (_s_)->frame_list.p[i]); \
                             (void)__copy_to_compat_offset((_d_)->frame_list, i, &frame, 1); \
                         } \
                     } \
