@@ -27,10 +27,20 @@
 #include <asm/hvm/svm/amd-iommu-proto.h>
 #include <asm-x86/fixmap.h>
 
-extern int nr_amd_iommus;
 static struct amd_iommu *vector_to_iommu[NR_VECTORS];
+static int nr_amd_iommus;
+static long amd_iommu_cmd_buffer_entries = IOMMU_CMD_BUFFER_DEFAULT_ENTRIES;
+static long amd_iommu_event_log_entries = IOMMU_EVENT_LOG_DEFAULT_ENTRIES;
 
-int __init map_iommu_mmio_region(struct amd_iommu *iommu)
+unsigned short ivrs_bdf_entries;
+struct ivrs_mappings *ivrs_mappings;
+struct list_head amd_iommu_head;
+struct table_struct device_table;
+
+extern void *int_remap_table;
+extern spinlock_t int_remap_table_lock;
+
+static int __init map_iommu_mmio_region(struct amd_iommu *iommu)
 {
     unsigned long mfn;
 
@@ -51,7 +61,7 @@ int __init map_iommu_mmio_region(struct amd_iommu *iommu)
     return 0;
 }
 
-void __init unmap_iommu_mmio_region(struct amd_iommu *iommu)
+static void __init unmap_iommu_mmio_region(struct amd_iommu *iommu)
 {
     if ( iommu->mmio_base )
     {
@@ -60,7 +70,7 @@ void __init unmap_iommu_mmio_region(struct amd_iommu *iommu)
     }
 }
 
-void __init register_iommu_dev_table_in_mmio_space(struct amd_iommu *iommu)
+static void __init register_iommu_dev_table_in_mmio_space(struct amd_iommu *iommu)
 {
     u64 addr_64, addr_lo, addr_hi;
     u32 entry;
@@ -83,7 +93,7 @@ void __init register_iommu_dev_table_in_mmio_space(struct amd_iommu *iommu)
     writel(entry, iommu->mmio_base + IOMMU_DEV_TABLE_BASE_HIGH_OFFSET);
 }
 
-void __init register_iommu_cmd_buffer_in_mmio_space(struct amd_iommu *iommu)
+static void __init register_iommu_cmd_buffer_in_mmio_space(struct amd_iommu *iommu)
 {
     u64 addr_64, addr_lo, addr_hi;
     u32 power_of2_entries;
@@ -110,7 +120,7 @@ void __init register_iommu_cmd_buffer_in_mmio_space(struct amd_iommu *iommu)
     writel(entry, iommu->mmio_base+IOMMU_CMD_BUFFER_BASE_HIGH_OFFSET);
 }
 
-void __init register_iommu_event_log_in_mmio_space(struct amd_iommu *iommu)
+static void __init register_iommu_event_log_in_mmio_space(struct amd_iommu *iommu)
 {
     u64 addr_64, addr_lo, addr_hi;
     u32 power_of2_entries;
@@ -266,12 +276,13 @@ static int amd_iommu_read_event_log(struct amd_iommu *iommu, u32 event[])
     return -EFAULT;
 }
 
-static void amd_iommu_msi_data_init(struct amd_iommu *iommu, int vector)
+static void amd_iommu_msi_data_init(struct amd_iommu *iommu)
 {
     u32 msi_data;
     u8 bus = (iommu->bdf >> 8) & 0xff;
     u8 dev = PCI_SLOT(iommu->bdf & 0xff);
     u8 func = PCI_FUNC(iommu->bdf & 0xff);
+    int vector = iommu->vector;
 
     msi_data = MSI_DATA_TRIGGER_EDGE |
         MSI_DATA_LEVEL_ASSERT |
@@ -434,7 +445,6 @@ static void amd_iommu_page_fault(int vector, void *dev_id,
 static int set_iommu_interrupt_handler(struct amd_iommu *iommu)
 {
     int vector, ret;
-    unsigned long flags;
 
     vector = assign_irq_vector(AUTO_ASSIGN);
     vector_to_iommu[vector] = iommu;
@@ -450,20 +460,12 @@ static int set_iommu_interrupt_handler(struct amd_iommu *iommu)
     }
 
     irq_desc[vector].handler = &iommu_msi_type;
-    ret = request_irq(vector, amd_iommu_page_fault, 0, "dmar", iommu);
+    ret = request_irq(vector, amd_iommu_page_fault, 0, "amd_iommu", iommu);
     if ( ret )
     {
         amd_iov_error("can't request irq\n");
         return 0;
     }
-
-    spin_lock_irqsave(&iommu->lock, flags);
-
-    amd_iommu_msi_data_init (iommu, vector);
-    amd_iommu_msi_addr_init(iommu, cpu_physical_id(first_cpu(cpu_online_map)));
-    amd_iommu_msi_enable(iommu, IOMMU_CONTROL_ENABLED);
-
-    spin_unlock_irqrestore(&iommu->lock, flags);
 
     return vector;
 }
@@ -472,16 +474,193 @@ void __init enable_iommu(struct amd_iommu *iommu)
 {
     unsigned long flags;
 
-    set_iommu_interrupt_handler(iommu);
-
     spin_lock_irqsave(&iommu->lock, flags);
 
+    if ( iommu->enabled )
+        return;
+
+    iommu->dev_table.alloc_size = device_table.alloc_size;
+    iommu->dev_table.entries = device_table.entries;
+    iommu->dev_table.buffer = device_table.buffer;
+
+    register_iommu_dev_table_in_mmio_space(iommu);
+    register_iommu_cmd_buffer_in_mmio_space(iommu);
+    register_iommu_event_log_in_mmio_space(iommu);
     register_iommu_exclusion_range(iommu);
+
+    amd_iommu_msi_data_init (iommu);
+    amd_iommu_msi_addr_init(iommu, cpu_physical_id(first_cpu(cpu_online_map)));
+    amd_iommu_msi_enable(iommu, IOMMU_CONTROL_ENABLED);
+
     set_iommu_command_buffer_control(iommu, IOMMU_CONTROL_ENABLED);
     set_iommu_event_log_control(iommu, IOMMU_CONTROL_ENABLED);
     set_iommu_translation_control(iommu, IOMMU_CONTROL_ENABLED);
 
+    printk("AMD_IOV: IOMMU %d Enabled.\n", nr_amd_iommus );
+    nr_amd_iommus++;
+
+    iommu->enabled = 1;
     spin_unlock_irqrestore(&iommu->lock, flags);
 
-    printk("AMD_IOV: IOMMU %d Enabled.\n", nr_amd_iommus);
+}
+
+static void __init deallocate_iommu_table_struct(
+    struct table_struct *table)
+{
+    if ( table->buffer )
+    {
+        free_xenheap_pages(table->buffer,
+            get_order_from_bytes(table->alloc_size));
+        table->buffer = NULL;
+    }
+}
+
+static void __init deallocate_iommu_tables(struct amd_iommu *iommu)
+{
+    deallocate_iommu_table_struct(&iommu->cmd_buffer);
+    deallocate_iommu_table_struct(&iommu->event_log);
+}
+
+static int __init allocate_iommu_table_struct(struct table_struct *table,
+                                              const char *name)
+{
+    table->buffer = (void *) alloc_xenheap_pages(
+        get_order_from_bytes(table->alloc_size));
+
+    if ( !table->buffer )
+    {
+        amd_iov_error("Error allocating %s\n", name);
+        return -ENOMEM;
+    }
+
+    memset(table->buffer, 0, table->alloc_size);
+    return 0;
+}
+
+static int __init allocate_iommu_tables(struct amd_iommu *iommu)
+{
+    /* allocate 'command buffer' in power of 2 increments of 4K */
+    iommu->cmd_buffer_tail = 0;
+    iommu->cmd_buffer.alloc_size = PAGE_SIZE << get_order_from_bytes(
+        PAGE_ALIGN(amd_iommu_cmd_buffer_entries * IOMMU_CMD_BUFFER_ENTRY_SIZE));
+    iommu->cmd_buffer.entries =
+        iommu->cmd_buffer.alloc_size / IOMMU_CMD_BUFFER_ENTRY_SIZE;
+
+    if ( allocate_iommu_table_struct(&iommu->cmd_buffer, "Command Buffer") != 0 )
+        goto error_out;
+
+    /* allocate 'event log' in power of 2 increments of 4K */
+    iommu->event_log_head = 0;
+    iommu->event_log.alloc_size = PAGE_SIZE << get_order_from_bytes(
+        PAGE_ALIGN(amd_iommu_event_log_entries * IOMMU_EVENT_LOG_ENTRY_SIZE));
+    iommu->event_log.entries =
+        iommu->event_log.alloc_size / IOMMU_EVENT_LOG_ENTRY_SIZE;
+
+    if ( allocate_iommu_table_struct(&iommu->event_log, "Event Log") != 0 )
+        goto error_out;
+
+    return 0;
+
+ error_out:
+    deallocate_iommu_tables(iommu);
+    return -ENOMEM;
+}
+
+int __init amd_iommu_init_one(struct amd_iommu *iommu)
+{
+
+    if ( allocate_iommu_tables(iommu) != 0 )
+        goto error_out;
+
+    if ( map_iommu_mmio_region(iommu) != 0 )
+        goto error_out;
+
+    if ( set_iommu_interrupt_handler(iommu) == 0 )
+        goto error_out;
+
+    enable_iommu(iommu);
+    return 0;
+
+error_out:
+    return -ENODEV;
+}
+
+void __init amd_iommu_init_cleanup(void)
+{
+    struct amd_iommu *iommu, *next;
+
+    list_for_each_entry_safe ( iommu, next, &amd_iommu_head, list )
+    {
+        list_del(&iommu->list);
+        if ( iommu->enabled )
+        {
+            deallocate_iommu_tables(iommu);
+            unmap_iommu_mmio_region(iommu);
+        }
+        xfree(iommu);
+    }
+}
+
+static int __init init_ivrs_mapping(void)
+{
+    int bdf;
+
+    BUG_ON( !ivrs_bdf_entries );
+
+    ivrs_mappings = xmalloc_array( struct ivrs_mappings, ivrs_bdf_entries);
+    if ( ivrs_mappings == NULL )
+    {
+        amd_iov_error("Error allocating IVRS Mappings table\n");
+        return -ENOMEM;
+    }
+    memset(ivrs_mappings, 0, ivrs_bdf_entries * sizeof(struct ivrs_mappings));
+
+    /* assign default values for device entries */
+    for ( bdf = 0; bdf < ivrs_bdf_entries; bdf++ )
+    {
+        ivrs_mappings[bdf].dte_requestor_id = bdf;
+        ivrs_mappings[bdf].dte_sys_mgt_enable =
+            IOMMU_DEV_TABLE_SYS_MGT_MSG_FORWARDED;
+        ivrs_mappings[bdf].dte_allow_exclusion = IOMMU_CONTROL_DISABLED;
+        ivrs_mappings[bdf].unity_map_enable = IOMMU_CONTROL_DISABLED;
+        ivrs_mappings[bdf].iommu = NULL;
+    }
+    return 0;
+}
+
+static int __init amd_iommu_setup_device_table(void)
+{
+    /* allocate 'device table' on a 4K boundary */
+    device_table.alloc_size = PAGE_SIZE << get_order_from_bytes(
+        PAGE_ALIGN(ivrs_bdf_entries * IOMMU_DEV_TABLE_ENTRY_SIZE));
+    device_table.entries = device_table.alloc_size / IOMMU_DEV_TABLE_ENTRY_SIZE;
+
+    return ( allocate_iommu_table_struct(&device_table, "Device Table") );
+}
+
+int __init amd_iommu_setup_shared_tables(void)
+{
+    BUG_ON( !ivrs_bdf_entries );
+
+    if (init_ivrs_mapping() != 0 )
+        goto error_out;
+
+    if ( amd_iommu_setup_device_table() != 0 )
+        goto error_out;
+
+    if ( amd_iommu_setup_intremap_table() != 0 )
+        goto error_out;
+
+    return 0;
+
+error_out:
+    deallocate_intremap_table();
+    deallocate_iommu_table_struct(&device_table);
+
+    if ( ivrs_mappings )
+    {
+        xfree(ivrs_mappings);
+        ivrs_mappings = NULL;
+    }
+    return -ENOMEM;
 }
