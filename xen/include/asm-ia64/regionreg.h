@@ -36,6 +36,7 @@ typedef union ia64_rr {
 #define RR_RID(arg)     (((arg) & 0x0000000000ffffff) << 8)
 #define RR_RID_MASK     0x00000000ffffff00L
 
+DECLARE_PER_CPU(unsigned long, domain_shared_info);
 DECLARE_PER_CPU(unsigned long, inserted_vhpt);
 DECLARE_PER_CPU(unsigned long, inserted_shared_info);
 DECLARE_PER_CPU(unsigned long, inserted_mapped_regs);

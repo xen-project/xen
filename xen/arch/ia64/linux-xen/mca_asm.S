@@ -154,71 +154,6 @@
 	.text
 	.align 16
 
-#ifdef	XEN
-/*
- * void set_per_cpu_data(void)
- * {
- *   int i;
- *   for (i = 0; i < 64; i++) {
- *     if (ia64_mca_tlb_list[i].cr_lid == ia64_getreg(_IA64_REG_CR_LID)) {
- *       ia64_set_kr(IA64_KR_PER_CPU_DATA, ia64_mca_tlb_list[i].percpu_paddr);
- *       return;
- *     }
- *   }
- *   while(1);	// Endless loop on error
- * }
- */
-#define SET_PER_CPU_DATA()					\
-	LOAD_PHYSICAL(p0,r2,ia64_mca_tlb_list);;		\
-	mov r7 = r0;						\
-	mov r6 = r0;;						\
-	adds r3 = IA64_MCA_PERCPU_OFFSET, r2;			\
-1:	add r4 = r6, r2;					\
-	mov r5=cr.lid;;						\
-	adds r7 = 1, r7;					\
-	ld8 r4 = [r4];;						\
-	cmp.ne p6, p7 = r5, r4;					\
-	cmp4.lt p8, p9 = NR_CPUS-1, r7;				\
-(p7)	br.cond.dpnt 3f;					\
-	adds r6 = 16, r6;					\
-(p9) 	br.cond.sptk 1b;					\
-2:	br 2b;;			/* Endless loop on error */	\
-3:	add r4 = r6, r3;;					\
-	ld8 r4 = [r4];;						\
-	mov ar.k3=r4
-
-/*
- * GET_VA_VCPU_VHPT_MADDR() emulates 'reg = __va_ul(vcpu_vhpt_maddr(v))'.
- */
-#ifdef CONFIG_XEN_IA64_PERVCPU_VHPT
-#define HAS_PERVCPU_VHPT_MASK	0x2
-#define GET_VA_VCPU_VHPT_MADDR(reg,tmp)				\
-	GET_THIS_PADDR(reg,cpu_kr);;				\
-	add reg=IA64_KR_CURRENT_OFFSET,reg;;			\
-	ld8 reg=[reg];;						\
-	dep tmp=0,reg,60,4;;			/* V to P */	\
-	add tmp=IA64_VCPU_VHPT_PAGE_OFFSET,tmp;;		\
-	ld8 tmp=[tmp];;						\
-	cmp.eq p6,p0=tmp,r0;	/* v->arch.vhpt_page == NULL */	\
-(p6)	br.cond.sptk 1f;					\
-	add reg=IA64_VCPU_VHPT_MADDR_OFFSET,reg;;		\
-	dep reg=0,reg,60,4;;			/* V to P */	\
-	ld8 reg=[reg];;						\
-	dep reg=-1,reg,60,4;			/* P to V */	\
-	br.sptk	2f;						\
-1:								\
-	GET_THIS_PADDR(reg, vhpt_paddr);;			\
-	ld8 reg=[reg];;						\
-	dep reg=-1,reg,60,4;			/* P to V */	\
-2:
-#else /* CONFIG_XEN_IA64_PERVCPU_VHPT */
-#define GET_VA_VCPU_VHPT_MADDR(reg,tmp)				\
-	GET_THIS_PADDR(reg, vhpt_paddr);;			\
-	ld8 reg=[reg];;						\
-	dep reg=-1,reg,60,4			/* P to V */
-#endif /* CONFIG_XEN_IA64_PERVCPU_VHPT */
-#endif	/* XEN */
-
 /*
  * Just the TLB purge part is moved to a separate function
  * so we can re-use the code for cpu hotplug code as well
@@ -227,10 +162,6 @@
  */
 
 ia64_do_tlb_purge:
-#ifdef XEN
-	// This needs to be called in order for GET_THIS_PADDR to work
-	SET_PER_CPU_DATA();;
-#endif
 #define O(member)	IA64_CPUINFO_##member##_OFFSET
 
 	GET_THIS_PADDR(r2, cpu_info)	// load phys addr of cpu_info into r2
@@ -346,15 +277,19 @@ ia64_do_tlb_purge:
 	// a VMX domain hasn't been started since boot
 	GET_THIS_PADDR(r2, inserted_vpd);;
 	ld8 r16=[r2]
-	mov r18=XMAPPEDREGS_SHIFT<<2
+	mov r18=IA64_GRANULE_SHIFT<<2
 	;;
-	cmp.eq p7,p0=r2,r0
+	cmp.eq p7,p0=r16,r0
 	;;
 (p7)	br.cond.sptk .vpd_not_mapped
 	;;
 	ptr.i r16,r18
 	;;
+	ptr.d r16,r18
+	;; 
 	srlz.i
+	;;
+	srlz.d
 	;;
 .vpd_not_mapped:
 
@@ -362,6 +297,7 @@ ia64_do_tlb_purge:
 	// GET_VA_VCPU_VHPT_MADDR() may not give the
 	// value of the VHPT currently pinned into the TLB
 	GET_THIS_PADDR(r2, inserted_vhpt);;
+	ld8 r2=[r2]
 	;;
 	cmp.eq p7,p0=r2,r0
 	;;
@@ -389,9 +325,6 @@ ia64_os_mca_spin:
 	cmp.ne	p6,p0=r4,r0
 (p6)	br ia64_os_mca_spin
 
-#ifdef XEN
-	SET_PER_CPU_DATA();;
-#endif
 	// Save the SAL to OS MCA handoff state as defined
 	// by SAL SPEC 3.0
 	// NOTE : The order in which the state gets saved
@@ -524,24 +457,129 @@ ia64_reload_tr:
 	srlz.d
 	;;
 #ifdef XEN
-.reload_vhpt:
-	// 5. VHPT
-       GET_THIS_PADDR(r1, inserted_vhpt);;
-       cmp.eq p7,p0=r2,r0
-(p7)   br.cond.sptk    .overlap_vhpt   // vhpt isn't mapped.
+	// if !VMX_DOMAIN(current)
+	//	pin down shared_info and mapped_regs
+	// else
+	//	pin down VPD
+	GET_THIS_PADDR(r2,cpu_kr);;
+	add r2=IA64_KR_CURRENT_OFFSET,r2
+	;;
+	ld8 r2=[r2]
+	;;
+	dep r2=0,r2,60,4
+	;;
+	add r2=IA64_VCPU_FLAGS_OFFSET,r2
+	;;
+	ld8 r2=[r2]
+	;;
+	cmp.eq p6,p7 = r2,r0
+(p7)	br.cond.sptk .vmx_domain
+
+	// 5. shared_info
+	GET_THIS_PADDR(r2, inserted_shared_info);;
+	ld8 r16=[r2]
+	mov r18=XSI_SHIFT<<2
+	movl r20=__pgprot(__DIRTY_BITS | _PAGE_PL_PRIV | _PAGE_AR_RW)
+	;;
+	GET_THIS_PADDR(r2, domain_shared_info);;
+	ld8 r17=[r2]
+	;;
+	dep r17=0,r17,60,4
+	;; 
+	or r17=r17,r20			// construct PA | page properties
+	mov cr.itir=r18
+	mov cr.ifa=r16
+	;;
+	mov r16=IA64_TR_SHARED_INFO
+	;;
+	itr.d dtr[r16]=r17		// wire in new mapping...
+	;; 
+	srlz.d
+	;; 
+
+	// 6. mapped_regs
+	GET_THIS_PADDR(r2, inserted_mapped_regs);;
+	ld8 r16=[r2]
+	mov r18=XMAPPEDREGS_SHIFT<<2
+	;; 
+	GET_THIS_PADDR(r2,cpu_kr);;
+	add r2=IA64_KR_CURRENT_OFFSET,r2
+	;;
+	ld8 r2=[r2]
+	;;
+	dep r2=0,r2,60,4
+	;;
+	add r2=IA64_VPD_BASE_OFFSET,r2
+	;;
+	ld8 r17=[r2]
+	;;
+	dep r17=0,r17,60,4
+	;;
+	or r17=r17,r20			// construct PA | page properties
+	mov cr.itir=r18
+	mov cr.ifa=r16
+	;;
+	mov r16=IA64_TR_MAPPED_REGS
+	;;
+	itr.d dtr[r16]=r17		// wire in new mapping...
+	;;
+	srlz.d
+	;;
+	br.sptk.many .reload_vpd_not_mapped;;
+.vmx_domain:	
+
+	// 7. VPD
+	GET_THIS_PADDR(r2, inserted_vpd);;
+	ld8 r16=[r2]
+	mov r18=IA64_GRANULE_SHIFT<<2
+	;;
+	cmp.eq p7,p0=r16,r0
+	;;
+(p7)	br.cond.sptk .reload_vpd_not_mapped
+	dep r17=0,r16,60,4
+	;;
+	dep r17=0,r17,0,IA64_GRANULE_SHIFT
+	;;
+	movl r20=PAGE_KERNEL
+	;;
+	or r17=r20,r17		// construct PA | page properties
+	;;
+	mov cr.itir=r18
+	mov cr.ifa=r16
+	;;
+	mov r16=IA64_TR_VPD
+	mov r18=IA64_TR_MAPPED_REGS
+	;;
+	itr.i itr[r16]=r17
+	;;
+	itr.d dtr[r18]=r17
+	;;
+	srlz.i
+	;;
+	srlz.d
+	;;
+.reload_vpd_not_mapped:
+
+	// 8. VHPT
+	GET_THIS_PADDR(r2, inserted_vhpt);;
+	ld8 r2=[r2]
+	;;
+	cmp.eq p7,p0=r2,r0
+	;;
+(p7)	br.cond.sptk    .overlap_vhpt   // vhpt isn't mapped.
 
 	// avoid overlapping with stack TR
-	shr.u r17=r2,IA64_GRANULE_SHIFT
-	GET_THIS_PADDR(r3, cpu_kr);;
-	add r3=IA64_KR_CURRENT_STACK_OFFSET,r3
-	;;
-	ld8 r3=[r3]
-	;;
-	cmp.eq p7,p0=r3,r17
-(p7)	br.cond.sptk	.overlap_vhpt
-	;;
-
 	dep r16=0,r2,0,IA64_GRANULE_SHIFT
+	;;
+	GET_THIS_PADDR(r2,cpu_kr);;
+	add r2=IA64_KR_CURRENT_OFFSET,r2
+	;;
+	ld8 r2=[r2]
+	;;
+	dep r17=0,r2,0,IA64_GRANULE_SHIFT
+	;; 
+	cmp.eq p7,p0=r16,r17
+(p7)	br.cond.sptk	.overlap_vhpt
 	movl r20=PAGE_KERNEL
 	;;
 	mov r18=IA64_TR_VHPT
@@ -1123,8 +1161,6 @@ end_os_mca_restore:
 GLOBAL_ENTRY(ia64_monarch_init_handler)
 	.prologue
 #ifdef XEN	/* Need in ia64_monarch_init_handler? */
-	SET_PER_CPU_DATA();;
-
 	// Set current to ar.k6
 	GET_THIS_PADDR(r2,cpu_kr);;
 	add r2=IA64_KR_CURRENT_OFFSET,r2;;

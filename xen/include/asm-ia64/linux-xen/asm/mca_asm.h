@@ -58,8 +58,35 @@
 #endif
 
 #ifdef XEN
+/*
+ * void set_per_cpu_data(*ret)
+ * {
+ *   int i;
+ *   for (i = 0; i < 64; i++) {
+ *     if (ia64_mca_tlb_list[i].cr_lid == ia64_getreg(_IA64_REG_CR_LID)) {
+ *       *ret = ia64_mca_tlb_list[i].percpu_paddr;
+ *       return;
+ *     }
+ *   }
+ *   while(1);	// Endless loop on error
+ * }
+ */
+#define SET_PER_CPU_DATA(reg,_tmp1,_tmp2,_tmp3)	\
+	LOAD_PHYSICAL(p0,reg,ia64_mca_tlb_list);;\
+	mov _tmp1 = ar.lc;;			\
+	mov ar.lc = NR_CPUS-1;			\
+	mov _tmp2 = cr.lid;;			\
+10:	ld8 _tmp3 = [reg],16;;			\
+	cmp.ne p6, p7 = _tmp3, _tmp2;;		\
+(p7)	br.cond.dpnt 30f;;			\
+	br.cloop.sptk.few 10b;;			\
+20:	br 20b;;/* Endless loop on error */	\
+30:	mov ar.lc = _tmp1;			\
+	adds reg = IA64_MCA_PERCPU_OFFSET-IA64_MCA_TLB_INFO_SIZE, reg;;	\
+	ld8 reg = [reg]
+
 #define GET_THIS_PADDR(reg, var)		\
-	mov	reg = IA64_KR(PER_CPU_DATA);;	\
+	SET_PER_CPU_DATA(reg,r5,r6,r7);;	\
 	addl	reg = THIS_CPU(var) - PERCPU_ADDR, reg
 #else
 #define GET_THIS_PADDR(reg, var)		\

@@ -52,6 +52,7 @@ extern void ia64_new_rr7_efi(unsigned long rid, unsigned long repin_percpu,
 static unsigned int domain_rid_bits_default = IA64_MIN_IMPL_RID_BITS;
 integer_param("dom_rid_bits", domain_rid_bits_default); 
 
+DEFINE_PER_CPU(unsigned long, domain_shared_info);
 DEFINE_PER_CPU(unsigned long, inserted_vhpt);
 DEFINE_PER_CPU(unsigned long, inserted_shared_info);
 DEFINE_PER_CPU(unsigned long, inserted_mapped_regs);
@@ -270,6 +271,8 @@ int set_one_rr(unsigned long rr, unsigned long val)
 		if (!PSCB(v,metaphysical_mode))
 			set_rr(rr,newrrv.rrval);
 	} else if (rreg == 7) {
+		__get_cpu_var(domain_shared_info) =
+					(unsigned long)v->domain->shared_info;
 #if VHPT_ENABLED
 		__get_cpu_var(inserted_vhpt) = __va_ul(vcpu_vhpt_maddr(v));
 #endif
