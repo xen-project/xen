@@ -483,9 +483,6 @@ int acpi_dmar_init(void)
     if ( !iommu_enabled )
         goto fail;
 
-    if ( (rc = vtd_hw_check()) != 0 )
-        goto fail;
-
     acpi_table_parse(ACPI_SIG_DMAR, acpi_parse_dmar);
 
     rc = -ENODEV;

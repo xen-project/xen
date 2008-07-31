@@ -29,41 +29,11 @@
 #include "vtd.h"
 #include "extern.h"
 
-#define INTEL   0x8086
-#define SEABURG 0x4000
-#define C_STEP  2
-
 int is_usb_device(u8 bus, u8 devfn)
 {
     u16 class = pci_conf_read16(bus, PCI_SLOT(devfn), PCI_FUNC(devfn),
                                 PCI_CLASS_DEVICE);
     return (class == 0xc03);
-}
-
-int vtd_hw_check(void)
-{
-    u16 vendor, device;
-    u8 revision, stepping;
-
-    vendor   = pci_conf_read16(0, 0, 0, PCI_VENDOR_ID);
-    device   = pci_conf_read16(0, 0, 0, PCI_DEVICE_ID);
-    revision = pci_conf_read8(0, 0, 0, PCI_REVISION_ID);
-    stepping = revision & 0xf;
-
-    if ( (vendor == INTEL) && (device == SEABURG) )
-    {
-        if ( stepping < C_STEP )
-        {
-            dprintk(XENLOG_WARNING VTDPREFIX,
-                    "*** VT-d disabled - pre C0-step Seaburg found\n");
-            dprintk(XENLOG_WARNING VTDPREFIX,
-                    "***  vendor = %x device = %x revision = %x\n",
-                    vendor, device, revision);
-            return -ENODEV;
-        }
-    }
-
-    return 0;
 }
 
 /* Disable vt-d protected memory registers. */
