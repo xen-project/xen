@@ -107,7 +107,7 @@ static void update_intremap_entry_from_ioapic(
     return;
 }
 
-int amd_iommu_setup_intremap_table(void)
+int __init amd_iommu_setup_intremap_table(void)
 {
     unsigned long flags;
 
@@ -202,4 +202,19 @@ void amd_iommu_msi_msg_update_ire(
         return;
 
     update_intremap_entry_from_msi_msg(iommu, pdev, msg);
+}
+
+int __init deallocate_intremap_table(void)
+{
+    unsigned long flags;
+
+    spin_lock_irqsave(&int_remap_table_lock, flags);
+    if ( int_remap_table )
+    {
+        free_xenheap_pages(int_remap_table, 1);
+        int_remap_table = NULL;
+    }
+    spin_unlock_irqrestore(&int_remap_table_lock, flags);
+
+    return 0;
 }
