@@ -229,7 +229,7 @@ static int setup_guest(int xc_handle,
         if ( ((count | cur_pages) & (SUPERPAGE_NR_PFNS - 1)) == 0 )
         {
             long done;
-            xen_pfn_t sp_extents[2048 >> SUPERPAGE_PFN_SHIFT];
+            xen_pfn_t sp_extents[count >> SUPERPAGE_PFN_SHIFT];
             struct xen_memory_reservation sp_req = {
                 .nr_extents   = count >> SUPERPAGE_PFN_SHIFT,
                 .extent_order = SUPERPAGE_PFN_SHIFT,
