@@ -477,7 +477,10 @@ void __init enable_iommu(struct amd_iommu *iommu)
     spin_lock_irqsave(&iommu->lock, flags);
 
     if ( iommu->enabled )
+    {
+        spin_unlock_irqrestore(&iommu->lock, flags); 
         return;
+    }
 
     iommu->dev_table.alloc_size = device_table.alloc_size;
     iommu->dev_table.entries = device_table.entries;
