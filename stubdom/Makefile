@@ -320,7 +320,8 @@ clean:
 	$(MAKE) -C caml clean
 	$(MAKE) -C c clean
 	$(MAKE) -C grub clean
-	rm -fr libxc ioemu mini-os include
+	$(MAKE) -C libxc clean
+	$(MAKE) -C ioemu clean
 
 # clean the cross-compilation result
 .PHONY: crossclean
@@ -328,6 +329,7 @@ crossclean: clean
 	rm -fr $(CROSS_ROOT)
 	rm -fr newlib-build
 	rm -fr zlib-$(ZLIB_VERSION) pciutils-$(LIBPCI_VERSION)
+	rm -fr libxc ioemu
 	rm -f mk-headers
 
 # clean patched sources
