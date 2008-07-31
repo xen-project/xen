@@ -761,14 +761,13 @@ retry:
     {
         desc = &irq_desc[entry->vector];
 
-	local_irq_save(flags);
-	if ( !spin_trylock(&desc->lock) )
-	{
-	    local_irq_restore(flags);
-	    goto retry;
-	}
+        local_irq_save(flags);
+        if ( !spin_trylock(&desc->lock) )
+        {
+             local_irq_restore(flags);
+            goto retry;
+        }
 
-        spin_lock_irqsave(&desc->lock, flags);
         if ( desc->handler == &pci_msi_type )
         {
             /* MSI is not shared, so should be released already */

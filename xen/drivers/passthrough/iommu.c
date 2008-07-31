@@ -126,14 +126,12 @@ static int iommu_populate_page_table(struct domain *d)
     return 0;
 }
 
+
 void iommu_domain_destroy(struct domain *d)
 {
-    struct hvm_irq_dpci *hvm_irq_dpci = domain_get_irq_dpci(d);
-    uint32_t i;
     struct hvm_iommu *hd  = domain_hvm_iommu(d);
-    struct list_head *ioport_list, *digl_list, *tmp;
+    struct list_head *ioport_list, *tmp;
     struct g2m_ioport *ioport;
-    struct dev_intx_gsi_link *digl;
 
     if ( !iommu_enabled || !hd->platform_ops )
         return;
@@ -146,30 +144,6 @@ void iommu_domain_destroy(struct domain *d)
         d->need_iommu = 0;
         hd->platform_ops->teardown(d);
         return;
-    }
-
-    if ( hvm_irq_dpci != NULL )
-    {
-        for ( i = 0; i < NR_IRQS; i++ )
-        {
-            if ( !(hvm_irq_dpci->mirq[i].flags & HVM_IRQ_DPCI_VALID) )
-                continue;
-
-            pirq_guest_unbind(d, i);
-            kill_timer(&hvm_irq_dpci->hvm_timer[irq_to_vector(i)]);
-
-            list_for_each_safe ( digl_list, tmp,
-                                 &hvm_irq_dpci->mirq[i].digl_list )
-            {
-                digl = list_entry(digl_list,
-                                  struct dev_intx_gsi_link, list);
-                list_del(&digl->list);
-                xfree(digl);
-            }
-        }
-
-        d->arch.hvm_domain.irq.dpci = NULL;
-        xfree(hvm_irq_dpci);
     }
 
     if ( hd )
