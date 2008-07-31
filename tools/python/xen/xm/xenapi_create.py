@@ -369,6 +369,12 @@ class xenapi_create:
 
             self.create_consoles(vm_ref, consoles)
 
+            # Now create pcis
+
+            pcis = vm.getElementsByTagName("pci")
+
+            self.create_pcis(vm_ref, pcis)
+
             return vm_ref
         except:
             server.xenapi.VM.destroy(vm_ref)
@@ -493,6 +499,39 @@ class xenapi_create:
 
         return server.xenapi.console.create(console_record)
 
+    def create_pcis(self, vm_ref, pcis):
+        log(DEBUG, "create_pcis")
+        return map(lambda pci: self.create_pci(vm_ref, pci), pcis)
+
+    def create_pci(self, vm_ref, pci):
+        log(DEBUG, "create_pci")
+
+        domain = int(pci.attributes["domain"].value, 16)
+        bus = int(pci.attributes["bus"].value, 16)
+        slot = int(pci.attributes["slot"].value, 16)
+        func = int(pci.attributes["func"].value, 16)
+        name = "%04x:%02x:%02x.%01x" % (domain, bus, slot, func)
+
+        target_ref = None
+        for ppci_ref in server.xenapi.PPCI.get_all():
+            if name == server.xenapi.PPCI.get_name(ppci_ref):
+                target_ref = ppci_ref
+                break
+        if target_ref is None:
+            log(DEBUG, "create_pci: pci device not found")
+            return None
+
+        dpci_record = {
+            "VM":
+                vm_ref,
+            "PPCI":
+                target_ref,
+            "hotplug_slot":
+                int(pci.attributes["func"].value, 16)
+        }
+
+        return server.xenapi.DPCI.create(dpci_record)
+
 def get_child_by_name(exp, childname, default = None):
     try:
         return [child for child in sxp.children(exp)
@@ -520,6 +559,9 @@ class sxp2xml:
 
         vfbs_sxp = map(lambda x: x[1], [device for device in devices
                                         if device[1][0] == "vfb"])
+
+        pcis_sxp = map(lambda x: x[1], [device for device in devices
+                                        if device[1][0] == "pci"])
 
         # Create XML Document
         
@@ -655,6 +697,12 @@ class sxp2xml:
         vtpms = map(lambda vtpm: self.extract_vtpm(vtpm, document), vtpms_sxp)
 
         map(vm.appendChild, vtpms)
+
+        # And now the pcis
+
+        pcis = self.extract_pcis(pcis_sxp, document)
+
+        map(vm.appendChild, pcis)
 
         # Last but not least the consoles...
 
@@ -823,7 +871,28 @@ class sxp2xml:
 
         return vfb
 
-    _eths = -1
+    def extract_pcis(self, pcis_sxp, document):
+
+        pcis = []
+
+        for pci_sxp in pcis_sxp:
+            for dev_sxp in sxp.children(pci_sxp, "dev"):
+                pci = document.createElement("pci")
+
+                pci.attributes["domain"] \
+                    = get_child_by_name(dev_sxp, "domain", "0")
+                pci.attributes["bus"] \
+                    = get_child_by_name(dev_sxp, "bus", "0")
+                pci.attributes["slot"] \
+                    = get_child_by_name(dev_sxp, "slot", "0")
+                pci.attributes["func"] \
+                    = get_child_by_name(dev_sxp, "func", "0")
+                pci.attributes["vslt"] \
+                    = get_child_by_name(dev_sxp, "vslt", "0")
+
+                pcis.append(pci)
+
+        return pcis
 
     def mk_other_config(self, key, value, document):
         other_config = document.createElement("other_config")
@@ -916,6 +985,8 @@ class sxp2xml:
  
         return platform_configs
     
+    _eths = -1
+
     def getFreshEthDevice(self):
         self._eths += 1
         return "eth%i" % self._eths
