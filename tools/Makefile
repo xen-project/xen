@@ -55,7 +55,8 @@ install: subdirs-install
 clean distclean: subdirs-clean
 
 ifneq ($(XEN_COMPILE_ARCH),$(XEN_TARGET_ARCH))
-IOEMU_CONFIGURE_CROSS ?= --cross-prefix=$(CROSS_COMPILE) \
+IOEMU_CONFIGURE_CROSS ?= --cpu=$(XEN_TARGET_ARCH) \
+			 --cross-prefix=$(CROSS_COMPILE) \
 			 --interp-prefix=$(CROSS_SYS_ROOT)
 endif
 
@@ -96,7 +97,7 @@ ioemu-dir-find:
 		esac; \
 		export XEN_ROOT; \
 		cd ioemu-dir; \
-		./xen-setup
+		./xen-setup $(IOEMU_CONFIGURE_CROSS)
 
 subdir-all-ioemu-dir subdir-install-ioemu-dir: ioemu-dir-find
 
