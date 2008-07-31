@@ -11,14 +11,15 @@ SUBDIRS = tcgbios
 MODULES = tcgbios/tcgbiosext.o
 
 .PHONY: all
-all: $(TARGET)
+all: subdirs-all
+	$(MAKE) $(TARGET)
 
 .PHONY: clean
 clean: subdirs-clean
 	rm -rf *.o $(TARGET)
 
-$(TARGET): subdirs-all 32bitbios.o util.o
-	$(LD) $(LDFLAGS_DIRECT) -s -r 32bitbios.o $(MODULES) util.o -o 32bitbios_all.o
+$(TARGET): 32bitbios.o $(MODULES) util.o
+	$(LD) $(LDFLAGS_DIRECT) -s -r $^ -o 32bitbios_all.o
 	@nm 32bitbios_all.o |                                \
 	  egrep '^ +U ' >/dev/null && {                      \
 	    echo "There are undefined symbols in the BIOS:"; \
