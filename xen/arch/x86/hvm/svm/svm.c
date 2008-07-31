@@ -874,9 +874,12 @@ static void svm_do_nested_pgfault(paddr_t gpa, struct cpu_user_regs *regs)
     mfn_t mfn;
     unsigned long gfn = gpa >> PAGE_SHIFT;
 
-    /* If this GFN is emulated MMIO, pass the fault to the mmio handler */
+    /*
+     * If this GFN is emulated MMIO or marked as read-only, pass the fault
+     * to the mmio handler.
+     */
     mfn = gfn_to_mfn_current(gfn, &p2mt);
-    if ( p2mt == p2m_mmio_dm )
+    if ( (p2mt == p2m_mmio_dm) || (p2mt == p2m_ram_ro) )
     {
         if ( !handle_mmio() )
             hvm_inject_exception(TRAP_gp_fault, 0, 0);

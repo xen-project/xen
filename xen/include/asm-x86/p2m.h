@@ -61,7 +61,7 @@ typedef enum {
     p2m_invalid = 0,            /* Nothing mapped here */
     p2m_ram_rw = 1,             /* Normal read/write guest RAM */
     p2m_ram_logdirty = 2,       /* Temporarily read-only for log-dirty */
-    p2m_ram_ro = 3,             /* Read-only; writes go to the device model */
+    p2m_ram_ro = 3,             /* Read-only; writes are silently dropped */
     p2m_mmio_dm = 4,            /* Reads and write go to the device model */
     p2m_mmio_direct = 5,        /* Read/write mapping of genuine MMIO area */
 } p2m_type_t;
