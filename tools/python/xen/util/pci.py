@@ -111,15 +111,22 @@ def parse_hex(val):
         return None
 
 def parse_pci_name(pci_name_string):
-    # Format: xxxx:xx:xx.x
-    s = pci_name_string
-    s = s.split(':')
-    dom = parse_hex(s[0])
-    bus = parse_hex(s[1])
-    s = s[2].split('.')
-    dev = parse_hex(s[0])
-    func =  parse_hex(s[1])
-    return (dom, bus, dev, func)
+    pci_match = re.match(r"((?P<domain>[0-9a-fA-F]{1,4})[:,])?" + \
+            r"(?P<bus>[0-9a-fA-F]{1,2})[:,]" + \
+            r"(?P<slot>[0-9a-fA-F]{1,2})[.,]" + \
+            r"(?P<func>[0-7])$", pci_name_string)
+    if pci_match is None:
+        raise PciDeviceParseError(('Failed to parse pci device name: %s' %
+            pci_name_string))
+    pci_dev_info = pci_match.groupdict('0')
+
+    domain = parse_hex(pci_dev_info['domain'])
+    bus = parse_hex(pci_dev_info['bus'])
+    slot = parse_hex(pci_dev_info['slot'])
+    func = parse_hex(pci_dev_info['func'])
+
+    return (domain, bus, slot, func)
+ 
 
 def find_sysfs_mnt():
     global sysfs_mnt_point
@@ -175,14 +182,14 @@ def create_lspci_info():
 
     # Execute 'lspci' command and parse the result.
     # If the command does not exist, lspci_info will be kept blank ({}).
-    for paragraph in os.popen(LSPCI_CMD + ' -vmmD').read().split('\n\n'):
+    for paragraph in os.popen(LSPCI_CMD + ' -vmm').read().split('\n\n'):
         device_name = None
         device_info = {}
         for line in paragraph.split('\n'):
             try:
                 (opt, value) = line.split(':\t')
                 if opt == 'Slot':
-                    device_name = value
+                    device_name = PCI_DEV_FORMAT_STR % parse_pci_name(value)
                 else:
                     device_info[opt] = value
             except:
