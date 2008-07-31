@@ -28,6 +28,7 @@
 #include <xen/time.h>
 #include <xen/pci.h>
 #include <xen/pci_regs.h>
+#include <xen/keyhandler.h>
 #include <asm/paging.h>
 #include <asm/msi.h>
 #include "iommu.h"
@@ -1764,6 +1765,8 @@ int intel_vtd_setup(void)
     set_bit(0, domid_bitmap);
 
     init_vtd_hw();
+
+    register_keyhandler('V', dump_iommu_info, "dump iommu info");
 
     return 0;
 
