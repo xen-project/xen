@@ -2418,7 +2418,34 @@ def parse_pci_configuration(args, state):
 def xm_pci_attach(args):
     arg_check(args, 'pci-attach', 2, 3)
     (dom, pci) = parse_pci_configuration(args, 'Initialising')
-    server.xend.domain.device_configure(dom, pci)
+
+    if serverType == SERVER_XEN_API:
+
+        pci_dev = sxp.children(pci, 'dev')[0]
+        domain = int(sxp.child_value(pci_dev, 'domain'), 16)
+        bus = int(sxp.child_value(pci_dev, 'bus'), 16)
+        slot = int(sxp.child_value(pci_dev, 'slot'), 16)
+        func = int(sxp.child_value(pci_dev, 'func'), 16)
+        vslt = int(sxp.child_value(pci_dev, 'vslt'), 16)
+        name = "%04x:%02x:%02x.%01x" % (domain, bus, slot, func)
+
+        target_ref = None
+        for ppci_ref in server.xenapi.PPCI.get_all():
+            if name == server.xenapi.PPCI.get_name(ppci_ref):
+                target_ref = ppci_ref
+                break
+        if target_ref is None:
+            raise OptionError("Device %s not found" % name)
+
+        dpci_record = {
+            "VM":           get_single_vm(dom),
+            "PPCI":         target_ref,
+            "hotplug_slot": vslt
+        }
+        server.xenapi.DPCI.create(dpci_record)
+
+    else:
+        server.xend.domain.device_configure(dom, pci)
 
 def xm_scsi_attach(args):
     xenapi_unsupported()
@@ -2518,7 +2545,29 @@ def xm_network_detach(args):
 def xm_pci_detach(args):
     arg_check(args, 'pci-detach', 2)
     (dom, pci) = parse_pci_configuration(args, 'Closing')
-    server.xend.domain.device_configure(dom, pci)
+
+    if serverType == SERVER_XEN_API:
+
+        pci_dev = sxp.children(pci, 'dev')[0]
+        domain = int(sxp.child_value(pci_dev, 'domain'), 16)
+        bus = int(sxp.child_value(pci_dev, 'bus'), 16)
+        slot = int(sxp.child_value(pci_dev, 'slot'), 16)
+        func = int(sxp.child_value(pci_dev, 'func'), 16)
+        vslt = int(sxp.child_value(pci_dev, 'vslt'), 16)
+        name = "%04x:%02x:%02x.%01x" % (domain, bus, slot, func)
+
+        target_ref = None
+        for dpci_ref in server.xenapi.VM.get_DPCIs(get_single_vm(dom)):
+            ppci_ref = server.xenapi.DPCI.get_PPCI(dpci_ref)
+            if name == server.xenapi.PPCI.get_name(ppci_ref):
+                target_ref = ppci_ref
+                server.xenapi.DPCI.destroy(dpci_ref)
+                break
+        if target_ref is None:
+            raise OptionError("Device %s not assigned" % name)
+
+    else:
+        server.xend.domain.device_configure(dom, pci)
 
 def xm_scsi_detach(args):
     xenapi_unsupported()
