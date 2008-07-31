@@ -386,14 +386,18 @@ static long __evtchn_close(struct domain *d1, int port1)
         break;
 
     case ECS_PIRQ:
-        if ( (rc = pirq_guest_unbind(d1, chn1->u.pirq)) == 0 )
-            d1->pirq_to_evtchn[chn1->u.pirq] = 0;
+        pirq_guest_unbind(d1, chn1->u.pirq);
+        d1->pirq_to_evtchn[chn1->u.pirq] = 0;
         break;
 
     case ECS_VIRQ:
         for_each_vcpu ( d1, v )
-            if ( v->virq_to_evtchn[chn1->u.virq] == port1 )
-                v->virq_to_evtchn[chn1->u.virq] = 0;
+        {
+            if ( v->virq_to_evtchn[chn1->u.virq] != port1 )
+                continue;
+            v->virq_to_evtchn[chn1->u.virq] = 0;
+            spin_barrier(&v->virq_lock);
+        }
         break;
 
     case ECS_IPI:
@@ -446,6 +450,9 @@ static long __evtchn_close(struct domain *d1, int port1)
     default:
         BUG();
     }
+
+    /* Clear pending event to avoid unexpected behavior on re-bind. */
+    clear_bit(port1, &shared_info(d1, evtchn_pending));
 
     /* Reset binding to vcpu0 when the channel is freed. */
     chn1->state          = ECS_FREE;
@@ -573,37 +580,33 @@ static int evtchn_set_pending(struct vcpu *v, int port)
     return 0;
 }
 
+int guest_enabled_event(struct vcpu *v, int virq)
+{
+    return ((v != NULL) && (v->virq_to_evtchn[virq] != 0));
+}
 
 void send_guest_vcpu_virq(struct vcpu *v, int virq)
 {
+    unsigned long flags;
     int port;
 
     ASSERT(!virq_is_global(virq));
 
+    spin_lock_irqsave(&v->virq_lock, flags);
+
     port = v->virq_to_evtchn[virq];
     if ( unlikely(port == 0) )
-        return;
+        goto out;
 
     evtchn_set_pending(v, port);
-}
 
-int guest_enabled_event(struct vcpu *v, int virq)
-{
-    int port;
-
-    if ( unlikely(v == NULL) )
-        return 0;
-
-    port = v->virq_to_evtchn[virq];
-    if ( port == 0 )
-        return 0;
-
-    /* virq is in use */
-    return 1;
+ out:
+    spin_unlock_irqrestore(&v->virq_lock, flags);
 }
 
 void send_guest_global_virq(struct domain *d, int virq)
 {
+    unsigned long flags;
     int port;
     struct vcpu *v;
     struct evtchn *chn;
@@ -617,20 +620,28 @@ void send_guest_global_virq(struct domain *d, int virq)
     if ( unlikely(v == NULL) )
         return;
 
+    spin_lock_irqsave(&v->virq_lock, flags);
+
     port = v->virq_to_evtchn[virq];
     if ( unlikely(port == 0) )
-        return;
+        goto out;
 
     chn = evtchn_from_port(d, port);
     evtchn_set_pending(d->vcpu[chn->notify_vcpu_id], port);
-}
 
+ out:
+    spin_unlock_irqrestore(&v->virq_lock, flags);
+}
 
 int send_guest_pirq(struct domain *d, int pirq)
 {
     int port = d->pirq_to_evtchn[pirq];
     struct evtchn *chn;
 
+    /*
+     * It should not be possible to race with __evtchn_close():
+     * The caller of this function must synchronise with pirq_guest_unbind().
+     */
     ASSERT(port != 0);
 
     chn = evtchn_from_port(d, port);

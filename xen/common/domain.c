@@ -137,6 +137,8 @@ struct vcpu *alloc_vcpu(
     v->runstate.state = is_idle_vcpu(v) ? RUNSTATE_running : RUNSTATE_offline;
     v->runstate.state_entry_time = NOW();
 
+    spin_lock_init(&v->virq_lock);
+
     if ( !is_idle_domain(d) )
     {
         set_bit(_VPF_down, &v->pause_flags);

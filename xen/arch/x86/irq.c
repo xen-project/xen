@@ -573,7 +573,7 @@ int pirq_guest_bind(struct vcpu *v, int irq, int will_share)
     return rc;
 }
 
-int pirq_guest_unbind(struct domain *d, int irq)
+void pirq_guest_unbind(struct domain *d, int irq)
 {
     unsigned int        vector;
     irq_desc_t         *desc;
@@ -660,7 +660,6 @@ int pirq_guest_unbind(struct domain *d, int irq)
 
  out:
     spin_unlock_irqrestore(&desc->lock, flags);    
-    return 0;
 }
 
 extern void dump_ioapic_irq_info(void);

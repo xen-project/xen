@@ -85,8 +85,8 @@ typedef struct { int gcc_is_buggy; } rwlock_t;
 /* Ensure a lock is quiescent between two critical operations. */
 static inline void spin_barrier(spinlock_t *lock)
 {
-    spin_lock(lock);
-    spin_unlock(lock);
+    do { mb(); } while ( spin_is_locked(lock) );
+    mb();
 }
 
 #define DEFINE_SPINLOCK(x) spinlock_t x = SPIN_LOCK_UNLOCKED
