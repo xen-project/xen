@@ -23,7 +23,7 @@
 #include <asm/amd-iommu.h>
 #include <asm/hvm/svm/amd-iommu-proto.h>
 
-extern long amd_iommu_poll_comp_wait;
+long amd_iommu_poll_comp_wait = COMPLETION_WAIT_DEFAULT_POLLING_COUNT;
 
 static int queue_iommu_command(struct amd_iommu *iommu, u32 cmd[])
 {

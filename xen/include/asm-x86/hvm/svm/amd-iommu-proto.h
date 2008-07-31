@@ -44,22 +44,17 @@
 #define amd_iov_error(fmt, args...)
 #endif
 
-typedef int (*iommu_detect_callback_ptr_t)(
-    u8 bus, u8 dev, u8 func, u8 cap_ptr);
-
 /* amd-iommu-detect functions */
-int __init scan_for_iommu(iommu_detect_callback_ptr_t iommu_detect_callback);
-int __init get_iommu_capabilities(u8 bus, u8 dev, u8 func, u8 cap_ptr,
-           struct amd_iommu *iommu);
-int __init get_iommu_last_downstream_bus(struct amd_iommu *iommu);
+int __init amd_iommu_get_ivrs_dev_entries(void);
+int __init amd_iommu_detect_one_acpi(void *ivhd);
+int __init amd_iommu_detect_acpi(void);
 
 /* amd-iommu-init functions */
-int __init map_iommu_mmio_region(struct amd_iommu *iommu);
-void __init unmap_iommu_mmio_region(struct amd_iommu *iommu);
-void __init register_iommu_dev_table_in_mmio_space(struct amd_iommu *iommu);
-void __init register_iommu_cmd_buffer_in_mmio_space(struct amd_iommu *iommu);
-void __init register_iommu_event_log_in_mmio_space(struct amd_iommu *iommu);
-void __init enable_iommu(struct amd_iommu *iommu);
+int __init amd_iommu_init(void);
+int __init amd_iommu_init_one(struct amd_iommu *iommu);
+int __init amd_iommu_update_ivrs_mapping_acpi(void);
+void __init amd_iommu_init_cleanup(void);
+int __init amd_iommu_setup_shared_tables(void);
 
 /* mapping functions */
 int amd_iommu_map_page(struct domain *d, unsigned long gfn, unsigned long mfn);
@@ -83,11 +78,9 @@ void flush_command_buffer(struct amd_iommu *iommu);
 /* find iommu for bdf */
 struct amd_iommu *find_iommu_for_device(int bus, int devfn);
 
-/* amd-iommu-acpi functions */
-int __init parse_ivrs_table(struct acpi_table_header *table);
-
 /*interrupt remapping */
-int amd_iommu_setup_intremap_table(void);
+int __init amd_iommu_setup_intremap_table(void);
+int __init deallocate_intremap_table(void);
 void invalidate_interrupt_table(struct amd_iommu *iommu, u16 device_id);
 void amd_iommu_ioapic_update_ire(
     unsigned int apic, unsigned int reg, unsigned int value);
