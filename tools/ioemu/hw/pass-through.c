@@ -2106,8 +2106,8 @@ static int pt_bar_reg_read(struct pt_dev *ptdev,
         bar_emu_mask = PT_BAR_IO_EMU_MASK;
         break;
     case PT_BAR_FLAG_UPPER:
-        *value = 0;
-        goto out;
+        bar_emu_mask = PT_BAR_ALLF;
+        break;
     default:
         break;
     }
@@ -2117,7 +2117,6 @@ static int pt_bar_reg_read(struct pt_dev *ptdev,
     *value = ((*value & ~valid_emu_mask) | 
               (cfg_entry->data & valid_emu_mask));
 
-out:
    return 0;
 }
 
@@ -2249,89 +2248,113 @@ static int pt_bar_reg_write(struct pt_dev *ptdev,
     /* align resource size (memory type only) */
     PT_GET_EMUL_SIZE(base->bar_flag, r_size);
 
-    /* check guest write value */
-    if (*value == PT_BAR_ALLF)
+    /* set emulate mask and read-only mask depend on BAR flag */
+    switch (ptdev->bases[index].bar_flag)
     {
-        /* set register with resource size alligned to page size */
-        cfg_entry->data = ~(r_size - 1);
-        /* avoid writing ALL F to I/O device register */
-        *value = dev_value;
+    case PT_BAR_FLAG_MEM:
+        bar_emu_mask = PT_BAR_MEM_EMU_MASK;
+        bar_ro_mask = PT_BAR_MEM_RO_MASK | (r_size - 1);
+        break;
+    case PT_BAR_FLAG_IO:
+        bar_emu_mask = PT_BAR_IO_EMU_MASK;
+        bar_ro_mask = PT_BAR_IO_RO_MASK | (r_size - 1);
+        break;
+    case PT_BAR_FLAG_UPPER:
+        bar_emu_mask = PT_BAR_ALLF;
+        bar_ro_mask = 0;    /* all upper 32bit are R/W */
+        break;
+    default:
+        break;
     }
-    else
+
+    /* modify emulate register */
+    writable_mask = bar_emu_mask & ~bar_ro_mask & valid_mask;
+    cfg_entry->data = ((*value & writable_mask) |
+                       (cfg_entry->data & ~writable_mask));
+
+    /* check whether we need to update the virtual region address or not */
+    switch (ptdev->bases[index].bar_flag)
     {
-        /* set emulate mask and read-only mask depend on BAR flag */
-        switch (ptdev->bases[index].bar_flag)
+    case PT_BAR_FLAG_MEM:
+        /* nothing to do */
+        break;
+    case PT_BAR_FLAG_IO:
+        new_addr = cfg_entry->data;
+        last_addr = new_addr + r_size - 1;
+        /* check invalid address */
+        if (last_addr <= new_addr || !new_addr || last_addr >= 0x10000)
         {
-        case PT_BAR_FLAG_MEM:
-            bar_emu_mask = PT_BAR_MEM_EMU_MASK;
-            bar_ro_mask = PT_BAR_MEM_RO_MASK;
-            break;
-        case PT_BAR_FLAG_IO:
-            new_addr = *value;
-            last_addr = new_addr + r_size - 1;
             /* check 64K range */
-            if (last_addr <= new_addr || !new_addr || last_addr >= 0x10000)
+            if ((last_addr >= 0x10000) &&
+                (cfg_entry->data != (PT_BAR_ALLF & ~bar_ro_mask)))
             {
                 PT_LOG("Guest attempt to set Base Address over the 64KB. "
                     "[%02x:%02x.%x][Offset:%02xh][Address:%08xh][Size:%08xh]\n",
                     pci_bus_num(d->bus), 
                     ((d->devfn >> 3) & 0x1F), (d->devfn & 0x7),
                     reg->offset, new_addr, r_size);
-                /* just remove mapping */
-                r->addr = -1;
-                goto exit;
             }
-            bar_emu_mask = PT_BAR_IO_EMU_MASK;
-            bar_ro_mask = PT_BAR_IO_RO_MASK;
-            break;
-        case PT_BAR_FLAG_UPPER:
-            if (*value)
-            {
-                PT_LOG("Guest attempt to set high MMIO Base Address. "
-                   "Ignore mapping. "
-                   "[%02x:%02x.%x][Offset:%02xh][High Address:%08xh]\n",
-                    pci_bus_num(d->bus), 
-                    ((d->devfn >> 3) & 0x1F), (d->devfn & 0x7),
-                    reg->offset, *value);
-                /* clear lower address */
-                d->io_regions[index-1].addr = -1;
-            }
-            else
-            {
-                /* find lower 32bit BAR */
-                prev_offset = (reg->offset - 4);
-                reg_grp_entry = pt_find_reg_grp(ptdev, prev_offset);
-                if (reg_grp_entry)
-                {
-                    reg_entry = pt_find_reg(reg_grp_entry, prev_offset);
-                    if (reg_entry)
-                        /* restore lower address */
-                        d->io_regions[index-1].addr = reg_entry->data;
-                    else
-                        return -1;
-                }
-                else
-                    return -1;
-            }
-            cfg_entry->data = 0;
+            /* just remove mapping */
             r->addr = -1;
             goto exit;
         }
+        break;
+    case PT_BAR_FLAG_UPPER:
+        if (cfg_entry->data)
+        {
+            if (cfg_entry->data != (PT_BAR_ALLF & ~bar_ro_mask))
+            {
+                PT_LOG("Guest attempt to set high MMIO Base Address. "
+                    "Ignore mapping. "
+                    "[%02x:%02x.%x][Offset:%02xh][High Address:%08xh]\n",
+                    pci_bus_num(d->bus), 
+                    ((d->devfn >> 3) & 0x1F), (d->devfn & 0x7),
+                    reg->offset, cfg_entry->data);
+            }
+            /* clear lower address */
+            d->io_regions[index-1].addr = -1;
+        }
+        else
+        {
+            /* find lower 32bit BAR */
+            prev_offset = (reg->offset - 4);
+            reg_grp_entry = pt_find_reg_grp(ptdev, prev_offset);
+            if (reg_grp_entry)
+            {
+                reg_entry = pt_find_reg(reg_grp_entry, prev_offset);
+                if (reg_entry)
+                    /* restore lower address */
+                    d->io_regions[index-1].addr = reg_entry->data;
+                else
+                    return -1;
+            }
+            else
+                return -1;
+        }
 
-        /* modify emulate register */
-        writable_mask = bar_emu_mask & ~bar_ro_mask & valid_mask;
-        cfg_entry->data = ((*value & writable_mask) |
-                           (cfg_entry->data & ~writable_mask));
-        /* update the corresponding virtual region address */
-        r->addr = cfg_entry->data;
+        /* always keep the emulate register value to 0,
+         * because hvmloader does not support high MMIO for now.
+         */
+        cfg_entry->data = 0;
 
-        /* create value for writing to I/O device register */
-        throughable_mask = ~bar_emu_mask & valid_mask;
-        *value = ((*value & throughable_mask) |
-                  (dev_value & ~throughable_mask));
+        /* never mapping the 'empty' upper region,
+         * because we'll do it enough for the lower region.
+         */
+        r->addr = -1;
+        goto exit;
+    default:
+        break;
     }
 
+    /* update the corresponding virtual region address */
+    r->addr = cfg_entry->data;
+
 exit:
+    /* create value for writing to I/O device register */
+    throughable_mask = ~bar_emu_mask & valid_mask;
+    *value = ((*value & throughable_mask) |
+              (dev_value & ~throughable_mask));
+
     return 0;
 }
 
@@ -2347,6 +2370,8 @@ static int pt_exp_rom_bar_reg_write(struct pt_dev *ptdev,
     uint32_t writable_mask = 0;
     uint32_t throughable_mask = 0;
     uint32_t r_size = 0;
+    uint32_t bar_emu_mask = 0;
+    uint32_t bar_ro_mask = 0;
 
     r = &d->io_regions[PCI_ROM_SLOT];
     r_size = r->size;
@@ -2354,28 +2379,22 @@ static int pt_exp_rom_bar_reg_write(struct pt_dev *ptdev,
     /* align memory type resource size */
     PT_GET_EMUL_SIZE(base->bar_flag, r_size);
 
-    /* check guest write value */
-    if (*value == PT_BAR_ALLF)
-    {
-        /* set register with resource size alligned to page size */
-        cfg_entry->data = ~(r_size - 1);
-        /* avoid writing ALL F to I/O device register */
-        *value = dev_value;
-    }
-    else
-    {
-        /* modify emulate register */
-        writable_mask = reg->emu_mask & ~reg->ro_mask & valid_mask;
-        cfg_entry->data = ((*value & writable_mask) |
-                           (cfg_entry->data & ~writable_mask));
-        /* update the corresponding virtual region address */
-        r->addr = cfg_entry->data;
+    /* set emulate mask and read-only mask */
+    bar_emu_mask = reg->emu_mask;
+    bar_ro_mask = reg->ro_mask | (r_size - 1);
 
-        /* create value for writing to I/O device register */
-        throughable_mask = ~reg->emu_mask & valid_mask;
-        *value = ((*value & throughable_mask) |
-                  (dev_value & ~throughable_mask));
-    }
+    /* modify emulate register */
+    writable_mask = bar_emu_mask & ~bar_ro_mask & valid_mask;
+    cfg_entry->data = ((*value & writable_mask) |
+                       (cfg_entry->data & ~writable_mask));
+
+    /* update the corresponding virtual region address */
+    r->addr = cfg_entry->data;
+    
+    /* create value for writing to I/O device register */
+    throughable_mask = ~bar_emu_mask & valid_mask;
+    *value = ((*value & throughable_mask) |
+              (dev_value & ~throughable_mask));
 
     return 0;
 }
