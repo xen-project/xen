@@ -1528,6 +1528,13 @@ static int pt_bar_reg_parse(
     if (!r->size)
         goto out;
 
+    /* for ExpROM BAR */
+    if (index == PCI_ROM_SLOT)
+    {
+        bar_flag = PT_BAR_FLAG_MEM;
+        goto out;
+    }
+
     /* check BAR I/O indicator */
     if (d->config[reg->offset] & PCI_BASE_ADDRESS_SPACE_IO)
         bar_flag = PT_BAR_FLAG_IO;
