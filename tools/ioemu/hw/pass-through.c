@@ -1087,15 +1087,14 @@ static void pt_pci_write_config(PCIDevice *d, uint32_t address, uint32_t val,
         break;
     }
 
-    /* check libpci error */
+    /* check libpci result */
     valid_mask = (0xFFFFFFFF >> ((4 - len) << 3));
     if ((read_val & valid_mask) == valid_mask)
     {
-        PT_LOG("libpci read error. No emulation. "
+        PT_LOG("Warning: Return ALL F from libpci read. "
             "[%02x:%02x.%x][Offset:%02xh][Length:%d]\n",
             pci_bus_num(d->bus), ((d->devfn >> 3) & 0x1F), (d->devfn & 0x7),
             address, len);
-        goto exit;
     }
     
     /* pass directly to libpci for passthrough type register group */
@@ -1264,15 +1263,14 @@ static uint32_t pt_pci_read_config(PCIDevice *d, uint32_t address, int len)
         break;
     }
 
-    /* check libpci error */
+    /* check libpci result */
     valid_mask = (0xFFFFFFFF >> ((4 - len) << 3));
     if ((val & valid_mask) == valid_mask)
     {
-        PT_LOG("libpci read error. No emulation. "
+        PT_LOG("Warning: Return ALL F from libpci read. "
             "[%02x:%02x.%x][Offset:%02xh][Length:%d]\n",
             pci_bus_num(d->bus), ((d->devfn >> 3) & 0x1F), (d->devfn & 0x7),
             address, len);
-        goto exit;
     }
 
     /* just return the I/O device register value for 
