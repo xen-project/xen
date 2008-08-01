@@ -113,6 +113,7 @@ void xenbus_read_mount_request(struct fs_mount *mount, char *frontend)
 {
     char node[1024];
     char *s;
+    int i;
 
     assert(xsh != NULL);
 #if 0
@@ -125,10 +126,18 @@ void xenbus_read_mount_request(struct fs_mount *mount, char *frontend)
     s = xs_read(xsh, XBT_NULL, node, NULL);
     assert(strcmp(s, STATE_READY) == 0);
     free(s);
-    snprintf(node, sizeof(node), "%s/ring-ref", frontend);
+    snprintf(node, sizeof(node), "%s/ring-size", frontend);
     s = xs_read(xsh, XBT_NULL, node, NULL);
-    mount->gref = atoi(s);
+    mount->shared_ring_size = atoi(s);
+    assert(mount->shared_ring_size <= MAX_RING_SIZE);
     free(s);
+    for(i=0; i<mount->shared_ring_size; i++)
+    {
+        snprintf(node, sizeof(node), "%s/ring-ref-%d", frontend, i);
+        s = xs_read(xsh, XBT_NULL, node, NULL);
+        mount->grefs[i] = atoi(s);
+        free(s);
+    }
     snprintf(node, sizeof(node), "%s/event-channel", frontend);
     s = xs_read(xsh, XBT_NULL, node, NULL);
     mount->remote_evtchn = atoi(s);

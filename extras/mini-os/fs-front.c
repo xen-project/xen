@@ -50,6 +50,8 @@
 
 struct fs_request;
 struct fs_import *fs_import;
+void *alloc_buffer_page(struct fs_request *req, domid_t domid, grant_ref_t *gref);
+void free_buffer_page(struct fs_request *req);
 
 /******************************************************************************/
 /*                      RING REQUEST/RESPONSES HANDLING                       */
@@ -57,11 +59,19 @@ struct fs_import *fs_import;
 
 struct fs_request
 {
-    void *page;
-    grant_ref_t gref;
+    void *private1;                        /* Specific to request type */
+    void *private2;
     struct thread *thread;                 /* Thread blocked on this request */
     struct fsif_response shadow_rsp;       /* Response copy writen by the 
                                               interrupt handler */  
+};
+
+struct fs_rw_gnts
+{
+    /* TODO 16 bit? */
+    int count;
+    grant_ref_t grefs[FSIF_NR_READ_GNTS];  
+    void *pages[FSIF_NR_READ_GNTS];  
 };
 
 /* Ring operations:
@@ -177,6 +187,8 @@ int fs_open(struct fs_import *import, char *file)
 {
     struct fs_request *fsr;
     unsigned short priv_req_id;
+    grant_ref_t gref;
+    void *buffer;
     RING_IDX back_req_id; 
     struct fsif_request *req;
     int fd;
@@ -189,14 +201,15 @@ int fs_open(struct fs_import *import, char *file)
     priv_req_id = get_id_from_freelist(import->freelist);
     DEBUG("Request id for fs_open call is: %d\n", priv_req_id);
     fsr = &import->requests[priv_req_id];
-    DEBUG("gref id=%d\n", fsr->gref);
+    buffer = alloc_buffer_page(fsr, import->dom_id, &gref);
+    DEBUG("gref id=%d\n", gref);
     fsr->thread = current;
-    sprintf(fsr->page, "%s", file);
+    sprintf(buffer, "%s", file);
 
     req = RING_GET_REQUEST(&import->ring, back_req_id);
     req->type = REQ_FILE_OPEN;
     req->id = priv_req_id;
-    req->u.fopen.gref = fsr->gref;
+    req->u.fopen.gref = gref;
 
     /* Set blocked flag before commiting the request, thus avoiding missed
      * response race */
@@ -207,6 +220,7 @@ int fs_open(struct fs_import *import, char *file)
     /* Read the response */
     fd = (int)fsr->shadow_rsp.ret_val;
     DEBUG("The following FD returned: %d\n", fd);
+    free_buffer_page(fsr);
     add_id_to_freelist(priv_req_id, import->freelist);
 
     return fd;
@@ -254,11 +268,13 @@ ssize_t fs_read(struct fs_import *import, int fd, void *buf,
 {
     struct fs_request *fsr;
     unsigned short priv_req_id;
+    struct fs_rw_gnts gnts;
     RING_IDX back_req_id; 
     struct fsif_request *req;
     ssize_t ret;
+    int i;
 
-    BUG_ON(len > PAGE_SIZE);
+    BUG_ON(len > PAGE_SIZE * FSIF_NR_READ_GNTS);
 
     /* Prepare request for the backend */
     back_req_id = reserve_fsif_request(import);
@@ -268,17 +284,27 @@ ssize_t fs_read(struct fs_import *import, int fd, void *buf,
     priv_req_id = get_id_from_freelist(import->freelist);
     DEBUG("Request id for fs_read call is: %d\n", priv_req_id);
     fsr = &import->requests[priv_req_id];
-    DEBUG("gref=%d\n", fsr->gref);
-    fsr->thread = current;
-    memset(fsr->page, 0, PAGE_SIZE);
 
     req = RING_GET_REQUEST(&import->ring, back_req_id);
     req->type = REQ_FILE_READ;
     req->id = priv_req_id;
     req->u.fread.fd = fd;
-    req->u.fread.gref = fsr->gref;
     req->u.fread.len = len;
     req->u.fread.offset = offset;
+
+
+    ASSERT(len > 0);
+    gnts.count = ((len - 1) / PAGE_SIZE) + 1; 
+    for(i=0; i<gnts.count; i++)
+    {
+        gnts.pages[i] = (void *)alloc_page(); 
+        gnts.grefs[i] = gnttab_grant_access(import->dom_id, 
+                                            virt_to_mfn(gnts.pages[i]), 
+                                            0); 
+        memset(gnts.pages[i], 0, PAGE_SIZE);
+        req->u.fread.grefs[i] = gnts.grefs[i];
+    }
+    fsr->thread = current;
 
     /* Set blocked flag before commiting the request, thus avoiding missed
      * response race */
@@ -290,7 +316,19 @@ ssize_t fs_read(struct fs_import *import, int fd, void *buf,
     ret = (ssize_t)fsr->shadow_rsp.ret_val;
     DEBUG("The following ret value returned %d\n", ret);
     if(ret > 0)
-        memcpy(buf, fsr->page, ret);
+    {
+        ssize_t to_copy = ret, current_copy;
+        for(i=0; i<gnts.count; i++)
+        {
+            gnttab_end_access(gnts.grefs[i]);
+            current_copy = to_copy > PAGE_SIZE ? PAGE_SIZE : to_copy;
+            if(current_copy > 0)
+                memcpy(buf, gnts.pages[i], current_copy); 
+            to_copy -= current_copy; 
+            buf = (char*) buf + current_copy;
+            free_page(gnts.pages[i]);
+        }
+    }
     add_id_to_freelist(priv_req_id, import->freelist);
 
     return ret;
@@ -301,11 +339,13 @@ ssize_t fs_write(struct fs_import *import, int fd, void *buf,
 {
     struct fs_request *fsr;
     unsigned short priv_req_id;
+    struct fs_rw_gnts gnts;
     RING_IDX back_req_id; 
     struct fsif_request *req;
-    ssize_t ret;
+    ssize_t ret, to_copy;
+    int i;
 
-    BUG_ON(len > PAGE_SIZE);
+    BUG_ON(len > PAGE_SIZE * FSIF_NR_WRITE_GNTS);
 
     /* Prepare request for the backend */
     back_req_id = reserve_fsif_request(import);
@@ -315,19 +355,34 @@ ssize_t fs_write(struct fs_import *import, int fd, void *buf,
     priv_req_id = get_id_from_freelist(import->freelist);
     DEBUG("Request id for fs_read call is: %d\n", priv_req_id);
     fsr = &import->requests[priv_req_id];
-    DEBUG("gref=%d\n", fsr->gref);
-    fsr->thread = current;
-    memcpy(fsr->page, buf, len);
-    BUG_ON(len > PAGE_SIZE);
-    memset((char *)fsr->page + len, 0, PAGE_SIZE - len); 
 
     req = RING_GET_REQUEST(&import->ring, back_req_id);
     req->type = REQ_FILE_WRITE;
     req->id = priv_req_id;
     req->u.fwrite.fd = fd;
-    req->u.fwrite.gref = fsr->gref;
     req->u.fwrite.len = len;
     req->u.fwrite.offset = offset;
+
+    ASSERT(len > 0);
+    gnts.count = ((len - 1) / PAGE_SIZE) + 1; 
+    to_copy = len;
+    for(i=0; i<gnts.count; i++)
+    {
+        int current_copy = (to_copy > PAGE_SIZE ? PAGE_SIZE : to_copy);
+        gnts.pages[i] = (void *)alloc_page(); 
+        gnts.grefs[i] = gnttab_grant_access(import->dom_id, 
+                                            virt_to_mfn(gnts.pages[i]), 
+                                            0); 
+        memcpy(gnts.pages[i], buf, current_copy);
+        if(current_copy < PAGE_SIZE)
+            memset((char *)gnts.pages[i] + current_copy, 
+                    0, 
+                    PAGE_SIZE - current_copy); 
+        req->u.fwrite.grefs[i] = gnts.grefs[i];
+        to_copy -= current_copy; 
+        buf = (char*) buf + current_copy;
+    }
+    fsr->thread = current;
 
     /* Set blocked flag before commiting the request, thus avoiding missed
      * response race */
@@ -338,6 +393,11 @@ ssize_t fs_write(struct fs_import *import, int fd, void *buf,
     /* Read the response */
     ret = (ssize_t)fsr->shadow_rsp.ret_val;
     DEBUG("The following ret value returned %d\n", ret);
+    for(i=0; i<gnts.count; i++)
+    {
+        gnttab_end_access(gnts.grefs[i]);
+        free_page(gnts.pages[i]);
+    }
     add_id_to_freelist(priv_req_id, import->freelist);
 
     return ret;
@@ -361,15 +421,12 @@ int fs_stat(struct fs_import *import,
     priv_req_id = get_id_from_freelist(import->freelist);
     DEBUG("Request id for fs_stat call is: %d\n", priv_req_id);
     fsr = &import->requests[priv_req_id];
-    DEBUG("gref=%d\n", fsr->gref);
     fsr->thread = current;
-    memset(fsr->page, 0, PAGE_SIZE);
 
     req = RING_GET_REQUEST(&import->ring, back_req_id);
     req->type = REQ_STAT;
     req->id = priv_req_id;
     req->u.fstat.fd   = fd;
-    req->u.fstat.gref = fsr->gref;
 
     /* Set blocked flag before commiting the request, thus avoiding missed
      * response race */
@@ -380,7 +437,9 @@ int fs_stat(struct fs_import *import,
     /* Read the response */
     ret = (int)fsr->shadow_rsp.ret_val;
     DEBUG("Following ret from fstat: %d\n", ret);
-    memcpy(stat, fsr->page, sizeof(struct fsif_stat_response));
+    memcpy(stat, 
+           &fsr->shadow_rsp.fstat, 
+           sizeof(struct fsif_stat_response));
     add_id_to_freelist(priv_req_id, import->freelist);
 
     return ret;
@@ -430,6 +489,8 @@ int fs_remove(struct fs_import *import, char *file)
 {
     struct fs_request *fsr;
     unsigned short priv_req_id;
+    grant_ref_t gref;
+    void *buffer;
     RING_IDX back_req_id; 
     struct fsif_request *req;
     int ret;
@@ -442,14 +503,15 @@ int fs_remove(struct fs_import *import, char *file)
     priv_req_id = get_id_from_freelist(import->freelist);
     DEBUG("Request id for fs_open call is: %d\n", priv_req_id);
     fsr = &import->requests[priv_req_id];
-    DEBUG("gref=%d\n", fsr->gref);
+    buffer = alloc_buffer_page(fsr, import->dom_id, &gref);
+    DEBUG("gref=%d\n", gref);
     fsr->thread = current;
-    sprintf(fsr->page, "%s", file);
+    sprintf(buffer, "%s", file);
 
     req = RING_GET_REQUEST(&import->ring, back_req_id);
     req->type = REQ_REMOVE;
     req->id = priv_req_id;
-    req->u.fremove.gref = fsr->gref;
+    req->u.fremove.gref = gref;
 
     /* Set blocked flag before commiting the request, thus avoiding missed
      * response race */
@@ -460,6 +522,7 @@ int fs_remove(struct fs_import *import, char *file)
     /* Read the response */
     ret = (int)fsr->shadow_rsp.ret_val;
     DEBUG("The following ret: %d\n", ret);
+    free_buffer_page(fsr);
     add_id_to_freelist(priv_req_id, import->freelist);
 
     return ret;
@@ -472,6 +535,8 @@ int fs_rename(struct fs_import *import,
 {
     struct fs_request *fsr;
     unsigned short priv_req_id;
+    grant_ref_t gref;
+    void *buffer;
     RING_IDX back_req_id; 
     struct fsif_request *req;
     int ret;
@@ -486,15 +551,16 @@ int fs_rename(struct fs_import *import,
     priv_req_id = get_id_from_freelist(import->freelist);
     DEBUG("Request id for fs_open call is: %d\n", priv_req_id);
     fsr = &import->requests[priv_req_id];
-    DEBUG("gref=%d\n", fsr->gref);
+    buffer = alloc_buffer_page(fsr, import->dom_id, &gref);
+    DEBUG("gref=%d\n", gref);
     fsr->thread = current;
-    sprintf(fsr->page, "%s%s%c%s%s", 
+    sprintf(buffer, "%s%s%c%s%s", 
             old_header, old_file_name, '\0', new_header, new_file_name);
 
     req = RING_GET_REQUEST(&import->ring, back_req_id);
     req->type = REQ_RENAME;
     req->id = priv_req_id;
-    req->u.frename.gref = fsr->gref;
+    req->u.frename.gref = gref;
     req->u.frename.old_name_offset = strlen(old_header);
     req->u.frename.new_name_offset = strlen(old_header) +
                                      strlen(old_file_name) +
@@ -511,6 +577,7 @@ int fs_rename(struct fs_import *import,
     /* Read the response */
     ret = (int)fsr->shadow_rsp.ret_val;
     DEBUG("The following ret: %d\n", ret);
+    free_buffer_page(fsr);
     add_id_to_freelist(priv_req_id, import->freelist);
 
     return ret;
@@ -521,6 +588,8 @@ int fs_create(struct fs_import *import, char *name,
 {
     struct fs_request *fsr;
     unsigned short priv_req_id;
+    grant_ref_t gref;
+    void *buffer;
     RING_IDX back_req_id; 
     struct fsif_request *req;
     int ret;
@@ -533,14 +602,15 @@ int fs_create(struct fs_import *import, char *name,
     priv_req_id = get_id_from_freelist(import->freelist);
     DEBUG("Request id for fs_create call is: %d\n", priv_req_id);
     fsr = &import->requests[priv_req_id];
-    DEBUG("gref=%d\n", fsr->gref);
+    buffer = alloc_buffer_page(fsr, import->dom_id, &gref);
+    DEBUG("gref=%d\n", gref);
     fsr->thread = current;
-    sprintf(fsr->page, "%s", name);
+    sprintf(buffer, "%s", name);
 
     req = RING_GET_REQUEST(&import->ring, back_req_id);
     req->type = REQ_CREATE;
     req->id = priv_req_id;
-    req->u.fcreate.gref = fsr->gref;
+    req->u.fcreate.gref = gref;
     req->u.fcreate.directory = directory;
     req->u.fcreate.mode = mode;
 
@@ -553,6 +623,7 @@ int fs_create(struct fs_import *import, char *name,
     /* Read the response */
     ret = (int)fsr->shadow_rsp.ret_val;
     DEBUG("The following ret: %d\n", ret);
+    free_buffer_page(fsr);
     add_id_to_freelist(priv_req_id, import->freelist);
 
     return ret;
@@ -563,6 +634,8 @@ char** fs_list(struct fs_import *import, char *name,
 {
     struct fs_request *fsr;
     unsigned short priv_req_id;
+    grant_ref_t gref;
+    void *buffer;
     RING_IDX back_req_id; 
     struct fsif_request *req;
     char **files, *current_file;
@@ -579,14 +652,15 @@ char** fs_list(struct fs_import *import, char *name,
     priv_req_id = get_id_from_freelist(import->freelist);
     DEBUG("Request id for fs_list call is: %d\n", priv_req_id);
     fsr = &import->requests[priv_req_id];
-    DEBUG("gref=%d\n", fsr->gref);
+    buffer = alloc_buffer_page(fsr, import->dom_id, &gref);
+    DEBUG("gref=%d\n", gref);
     fsr->thread = current;
-    sprintf(fsr->page, "%s", name);
+    sprintf(buffer, "%s", name);
 
     req = RING_GET_REQUEST(&import->ring, back_req_id);
     req->type = REQ_DIR_LIST;
     req->id = priv_req_id;
-    req->u.flist.gref = fsr->gref;
+    req->u.flist.gref = gref;
     req->u.flist.offset = offset;
 
     /* Set blocked flag before commiting the request, thus avoiding missed
@@ -600,7 +674,7 @@ char** fs_list(struct fs_import *import, char *name,
     files = NULL;
     if(*nr_files <= 0) goto exit;
     files = malloc(sizeof(char*) * (*nr_files));
-    current_file = fsr->page;
+    current_file = buffer; 
     for(i=0; i<*nr_files; i++)
     {
         files[i] = strdup(current_file); 
@@ -608,6 +682,7 @@ char** fs_list(struct fs_import *import, char *name,
     }
     if(has_more != NULL)
         *has_more = fsr->shadow_rsp.ret_val & HAS_MORE_FLAG;
+    free_buffer_page(fsr);
     add_id_to_freelist(priv_req_id, import->freelist);
 exit:
     return files;
@@ -655,6 +730,8 @@ int64_t fs_space(struct fs_import *import, char *location)
 {
     struct fs_request *fsr;
     unsigned short priv_req_id;
+    grant_ref_t gref;
+    void *buffer;
     RING_IDX back_req_id; 
     struct fsif_request *req;
     int64_t ret;
@@ -667,14 +744,15 @@ int64_t fs_space(struct fs_import *import, char *location)
     priv_req_id = get_id_from_freelist(import->freelist);
     DEBUG("Request id for fs_space is: %d\n", priv_req_id);
     fsr = &import->requests[priv_req_id];
-    DEBUG("gref=%d\n", fsr->gref);
+    buffer = alloc_buffer_page(fsr, import->dom_id, &gref);
+    DEBUG("gref=%d\n", gref);
     fsr->thread = current;
-    sprintf(fsr->page, "%s", location);
+    sprintf(buffer, "%s", location);
 
     req = RING_GET_REQUEST(&import->ring, back_req_id);
     req->type = REQ_FS_SPACE;
     req->id = priv_req_id;
-    req->u.fspace.gref = fsr->gref;
+    req->u.fspace.gref = gref;
 
     /* Set blocked flag before commiting the request, thus avoiding missed
      * response race */
@@ -685,6 +763,7 @@ int64_t fs_space(struct fs_import *import, char *location)
     /* Read the response */
     ret = (int64_t)fsr->shadow_rsp.ret_val;
     DEBUG("The following returned: %lld\n", ret);
+    free_buffer_page(fsr);
     add_id_to_freelist(priv_req_id, import->freelist);
 
     return ret;
@@ -732,6 +811,23 @@ int fs_sync(struct fs_import *import, int fd)
 /*                       END OF INDIVIDUAL FILE OPERATIONS                    */
 /******************************************************************************/
 
+void *alloc_buffer_page(struct fs_request *req, domid_t domid, grant_ref_t *gref)
+{
+    void *page;
+
+    page = (void *)alloc_page(); 
+    *gref = gnttab_grant_access(domid, virt_to_mfn(page), 0); 
+    req->private1 = page;
+    req->private2 = (void *)(uint64_t)(*gref);
+
+    return page;
+}
+
+void free_buffer_page(struct fs_request *req)
+{
+    gnttab_end_access((grant_ref_t)(uint64_t)req->private2);
+    free_page(req->private1);
+}
 
 static void fsfront_handler(evtchn_port_t port, struct pt_regs *regs, void *data)
 {
@@ -797,15 +893,7 @@ static void alloc_request_table(struct fs_import *import)
     import->freelist = xmalloc_array(unsigned short, import->nr_entries + 1);
     memset(import->freelist, 0, sizeof(unsigned short) * (import->nr_entries + 1));
     for(i=0; i<import->nr_entries; i++)
-    {
-	/* TODO: that's a lot of memory */
-        requests[i].page = (void *)alloc_page(); 
-        requests[i].gref = gnttab_grant_access(import->dom_id, 
-                                               virt_to_mfn(requests[i].page),
-                                               0);
-        //printk("   ===>> Page=%lx, gref=%d, mfn=%lx\n", requests[i].page, requests[i].gref, virt_to_mfn(requests[i].page));
         add_id_to_freelist(i, import->freelist);
-    }
     import->requests = requests;
 }
 
@@ -818,22 +906,27 @@ static void alloc_request_table(struct fs_import *import)
 void test_fs_import(void *data)
 {
     struct fs_import *import = (struct fs_import *)data; 
-    int ret, fd, i;
+    int ret, fd, i, repeat_count;
     int32_t nr_files;
     char buffer[1024];
     ssize_t offset;
     char **files;
     long ret64;
-   
+    struct fsif_stat_response stat;
+    
+    repeat_count = 10; 
     /* Sleep for 1s and then try to open a file */
     msleep(1000);
+again:
     ret = fs_create(import, "mini-os-created-directory", 1, 0777);
     printk("Directory create: %d\n", ret);
 
-    ret = fs_create(import, "mini-os-created-directory/mini-os-created-file", 0, 0666);
+    sprintf(buffer, "mini-os-created-directory/mini-os-created-file-%d", 
+            repeat_count);
+    ret = fs_create(import, buffer, 0, 0666);
     printk("File create: %d\n", ret);
 
-    fd = fs_open(import, "mini-os-created-directory/mini-os-created-file");
+    fd = fs_open(import, buffer);
     printk("File descriptor: %d\n", fd);
     if(fd < 0) return;
 
@@ -847,7 +940,16 @@ void test_fs_import(void *data)
             return;
         offset += ret;
     }
-
+    ret = fs_stat(import, fd, &stat);
+    printk("Ret after stat: %d\n", ret);
+    printk(" st_mode=%o\n", stat.stat_mode);
+    printk(" st_uid =%d\n", stat.stat_uid);
+    printk(" st_gid =%d\n", stat.stat_gid);
+    printk(" st_size=%ld\n", stat.stat_size);
+    printk(" st_atime=%ld\n", stat.stat_atime);
+    printk(" st_mtime=%ld\n", stat.stat_mtime);
+    printk(" st_ctime=%ld\n", stat.stat_ctime);
+ 
     ret = fs_close(import, fd);
     printk("Closed fd: %d, ret=%d\n", fd, ret);
    
@@ -858,6 +960,9 @@ void test_fs_import(void *data)
 
     ret64 = fs_space(import, "/");
     printk("Free space: %lld (=%lld Mb)\n", ret64, (ret64 >> 20));
+    repeat_count--;
+    if(repeat_count > 0)
+        goto again;
     
 }
 
@@ -924,20 +1029,21 @@ static int init_fs_import(struct fs_import *import)
     xenbus_transaction_t xbt;
     char nodename[1024], r_nodename[1024], token[128], *message = NULL;
     struct fsif_sring *sring;
-    int retry = 0;
+    int i, retry = 0;
     domid_t self_id;
     xenbus_event_queue events = NULL;
 
     printk("Initialising FS fortend to backend dom %d\n", import->dom_id);
     /* Allocate page for the shared ring */
-    sring = (struct fsif_sring*) alloc_page();
-    memset(sring, 0, PAGE_SIZE);
+    sring = (struct fsif_sring*) alloc_pages(FSIF_RING_SIZE_ORDER);
+    memset(sring, 0, PAGE_SIZE * FSIF_RING_SIZE_PAGES);
 
     /* Init the shared ring */
     SHARED_RING_INIT(sring);
+    ASSERT(FSIF_NR_READ_GNTS == FSIF_NR_WRITE_GNTS);
 
     /* Init private frontend ring */
-    FRONT_RING_INIT(&import->ring, sring, PAGE_SIZE);
+    FRONT_RING_INIT(&import->ring, sring, PAGE_SIZE * FSIF_RING_SIZE_PAGES);
     import->nr_entries = import->ring.nr_ents;
 
     /* Allocate table of requests */
@@ -945,7 +1051,11 @@ static int init_fs_import(struct fs_import *import)
     init_SEMAPHORE(&import->reqs_sem, import->nr_entries);
 
     /* Grant access to the shared ring */
-    import->gnt_ref = gnttab_grant_access(import->dom_id, virt_to_mfn(sring), 0);
+    for(i=0; i<FSIF_RING_SIZE_PAGES; i++) 
+        import->gnt_refs[i] = 
+            gnttab_grant_access(import->dom_id, 
+                                virt_to_mfn((char *)sring + i * PAGE_SIZE), 
+                                0);
    
     /* Allocate event channel */ 
     BUG_ON(evtchn_alloc_unbound(import->dom_id, 
@@ -969,12 +1079,26 @@ again:
     
     err = xenbus_printf(xbt, 
                         nodename, 
-                        "ring-ref",
+                        "ring-size",
                         "%u",
-                        import->gnt_ref);
+                        FSIF_RING_SIZE_PAGES);
     if (err) {
-        message = "writing ring-ref";
+        message = "writing ring-size";
         goto abort_transaction;
+    }
+    
+    for(i=0; i<FSIF_RING_SIZE_PAGES; i++)
+    {
+        sprintf(r_nodename, "ring-ref-%d", i);
+        err = xenbus_printf(xbt, 
+                            nodename, 
+                            r_nodename,
+                            "%u",
+                            import->gnt_refs[i]);
+        if (err) {
+            message = "writing ring-refs";
+            goto abort_transaction;
+        }
     }
 
     err = xenbus_printf(xbt, 

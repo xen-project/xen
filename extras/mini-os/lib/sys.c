@@ -231,8 +231,8 @@ int read(int fd, void *buf, size_t nbytes)
         }
 	case FTYPE_FILE: {
 	    ssize_t ret;
-	    if (nbytes > PAGE_SIZE)
-		nbytes = PAGE_SIZE;
+	    if (nbytes > PAGE_SIZE * FSIF_NR_READ_GNTS)
+		nbytes = PAGE_SIZE * FSIF_NR_READ_GNTS;
 	    ret = fs_read(fs_import, files[fd].file.fd, buf, nbytes, files[fd].file.offset);
 	    if (ret > 0) {
 		files[fd].file.offset += ret;
@@ -292,8 +292,8 @@ int write(int fd, const void *buf, size_t nbytes)
 	    return nbytes;
 	case FTYPE_FILE: {
 	    ssize_t ret;
-	    if (nbytes > PAGE_SIZE)
-		nbytes = PAGE_SIZE;
+	    if (nbytes > PAGE_SIZE * FSIF_NR_WRITE_GNTS)
+		nbytes = PAGE_SIZE * FSIF_NR_WRITE_GNTS;
 	    ret = fs_write(fs_import, files[fd].file.fd, (void *) buf, nbytes, files[fd].file.offset);
 	    if (ret > 0) {
 		files[fd].file.offset += ret;

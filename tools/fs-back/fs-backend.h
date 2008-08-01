@@ -13,6 +13,7 @@
 #define EXPORTS_NODE        ROOT_NODE"/"EXPORTS_SUBNODE
 #define WATCH_NODE          EXPORTS_NODE"/requests"
 #define MAX_FDS             16
+#define MAX_RING_SIZE       16
 
 struct fs_export
 {
@@ -26,6 +27,7 @@ struct fs_request
 {
     int active;
     void *page;                         /* Pointer to mapped grant */
+    int count;
     struct fsif_request req_shadow;
     struct aiocb aiocb; 
 };
@@ -37,11 +39,12 @@ struct fs_mount
     int dom_id;
     char *frontend;
     int mount_id;                     /* = backend id */
-    grant_ref_t gref;
+    grant_ref_t grefs[MAX_RING_SIZE];
     evtchn_port_t remote_evtchn;
     int evth;                         /* Handle to the event channel */
     evtchn_port_t local_evtchn;
     int gnth;
+    int shared_ring_size;             /* in pages */
     struct fsif_back_ring ring;
     int nr_entries;
     struct fs_request *requests;

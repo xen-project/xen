@@ -147,7 +147,8 @@ moretodo:
             int i;
             struct fs_op *op;
 
-            printf("Got a request at %d\n", cons);
+            printf("Got a request at %d (of %d)\n", 
+                    cons, RING_SIZE(&mount->ring));
             req = RING_GET_REQUEST(&mount->ring, cons);
             printf("Request type=%d\n", req->type); 
             for(i=0;;i++)
@@ -198,6 +199,7 @@ static void handle_connection(int frontend_dom_id, int export_id, char *frontend
     int evt_port;
     pthread_t handling_thread;
     struct fsif_sring *sring;
+    uint32_t dom_ids[MAX_RING_SIZE];
     int i;
 
     printf("Handling connection from dom=%d, for export=%d\n", 
@@ -222,7 +224,7 @@ static void handle_connection(int frontend_dom_id, int export_id, char *frontend
     mount->mount_id = mount_id++;
     xenbus_read_mount_request(mount, frontend);
     printf("Frontend found at: %s (gref=%d, evtchn=%d)\n", 
-            mount->frontend, mount->gref, mount->remote_evtchn);
+            mount->frontend, mount->grefs[0], mount->remote_evtchn);
     xenbus_write_backend_node(mount);
     mount->evth = -1;
     mount->evth = xc_evtchn_open(); 
@@ -235,11 +237,15 @@ static void handle_connection(int frontend_dom_id, int export_id, char *frontend
     mount->gnth = -1;
     mount->gnth = xc_gnttab_open(); 
     assert(mount->gnth != -1);
-    sring = xc_gnttab_map_grant_ref(mount->gnth,
-                                    mount->dom_id,
-                                    mount->gref,
-                                    PROT_READ | PROT_WRITE);
-    BACK_RING_INIT(&mount->ring, sring, XC_PAGE_SIZE);
+    for(i=0; i<mount->shared_ring_size; i++)
+        dom_ids[i] = mount->dom_id;
+    sring = xc_gnttab_map_grant_refs(mount->gnth,
+                                     mount->shared_ring_size,
+                                     dom_ids,
+                                     mount->grefs,
+                                     PROT_READ | PROT_WRITE);
+
+    BACK_RING_INIT(&mount->ring, sring, mount->shared_ring_size * XC_PAGE_SIZE);
     mount->nr_entries = mount->ring.nr_ents; 
     for (i = 0; i < MAX_FDS; i++)
         mount->fds[i] = -1;

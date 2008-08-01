@@ -123,19 +123,24 @@ static void dispatch_file_close(struct fs_mount *mount, struct fsif_request *req
     rsp->ret_val = (uint64_t)ret;
 }
 
+#define MAX_GNTS 16
 static void dispatch_file_read(struct fs_mount *mount, struct fsif_request *req)
 {
     void *buf;
-    int fd;
+    int fd, i, count;
     uint16_t req_id;
     unsigned short priv_id;
     struct fs_request *priv_req;
 
     /* Read the request */
-    buf = xc_gnttab_map_grant_ref(mount->gnth,
-                                  mount->dom_id,
-                                  req->u.fread.gref,
-                                  PROT_WRITE);
+    assert(req->u.fread.len > 0); 
+    count = (req->u.fread.len - 1) / XC_PAGE_SIZE + 1;
+    assert(count <= FSIF_NR_READ_GNTS);
+    buf = xc_gnttab_map_domain_grant_refs(mount->gnth,
+                                          count,
+                                          mount->dom_id,
+                                          req->u.fread.grefs,
+                                          PROT_WRITE);
    
     req_id = req->id;
     printf("File read issued for FD=%d (len=%"PRIu64", offest=%"PRIu64")\n", 
@@ -150,6 +155,7 @@ static void dispatch_file_read(struct fs_mount *mount, struct fsif_request *req)
     printf("Private id is: %d\n", priv_id);
     priv_req = &mount->requests[priv_id];
     priv_req->page = buf;
+    priv_req->count = count;
 
     /* Dispatch AIO read request */
     bzero(&priv_req->aiocb, sizeof(struct aiocb));
@@ -172,7 +178,9 @@ static void end_file_read(struct fs_mount *mount, struct fs_request *priv_req)
     uint16_t req_id;
 
     /* Release the grant */
-    assert(xc_gnttab_munmap(mount->gnth, priv_req->page, 1) == 0);
+    assert(xc_gnttab_munmap(mount->gnth, 
+                            priv_req->page, 
+                            priv_req->count) == 0);
 
     /* Get a response from the ring */
     rsp_idx = mount->ring.rsp_prod_pvt++;
@@ -186,16 +194,20 @@ static void end_file_read(struct fs_mount *mount, struct fs_request *priv_req)
 static void dispatch_file_write(struct fs_mount *mount, struct fsif_request *req)
 {
     void *buf;
-    int fd;
+    int fd, count, i;
     uint16_t req_id;
     unsigned short priv_id;
     struct fs_request *priv_req;
 
     /* Read the request */
-    buf = xc_gnttab_map_grant_ref(mount->gnth,
-                                  mount->dom_id,
-                                  req->u.fwrite.gref,
-                                  PROT_READ);
+    assert(req->u.fwrite.len > 0); 
+    count = (req->u.fwrite.len - 1) / XC_PAGE_SIZE + 1;
+    assert(count <= FSIF_NR_WRITE_GNTS);
+    buf = xc_gnttab_map_domain_grant_refs(mount->gnth,
+                                          count,
+                                          mount->dom_id,
+                                          req->u.fwrite.grefs,
+                                          PROT_READ);
    
     req_id = req->id;
     printf("File write issued for FD=%d (len=%"PRIu64", offest=%"PRIu64")\n", 
@@ -210,6 +222,7 @@ static void dispatch_file_write(struct fs_mount *mount, struct fsif_request *req
     printf("Private id is: %d\n", priv_id);
     priv_req = &mount->requests[priv_id];
     priv_req->page = buf;
+    priv_req->count = count;
 
     /* Dispatch AIO write request */
     bzero(&priv_req->aiocb, sizeof(struct aiocb));
@@ -232,7 +245,9 @@ static void end_file_write(struct fs_mount *mount, struct fs_request *priv_req)
     uint16_t req_id;
 
     /* Release the grant */
-    assert(xc_gnttab_munmap(mount->gnth, priv_req->page, 1) == 0);
+    assert(xc_gnttab_munmap(mount->gnth, 
+                            priv_req->page, 
+                            priv_req->count) == 0);
     
     /* Get a response from the ring */
     rsp_idx = mount->ring.rsp_prod_pvt++;
@@ -252,12 +267,6 @@ static void dispatch_stat(struct fs_mount *mount, struct fsif_request *req)
     RING_IDX rsp_idx;
     fsif_response_t *rsp;
 
-    /* Read the request */
-    buf = xc_gnttab_map_grant_ref(mount->gnth,
-                                  mount->dom_id,
-                                  req->u.fstat.gref,
-                                  PROT_WRITE);
-   
     req_id = req->id;
     if (req->u.fstat.fd < MAX_FDS)
         fd = mount->fds[req->u.fstat.fd];
@@ -273,34 +282,31 @@ static void dispatch_stat(struct fs_mount *mount, struct fsif_request *req)
     /* Stat, and create the response */ 
     ret = fstat(fd, &stat);
     printf("Mode=%o, uid=%d, a_time=%ld\n",
-            stat.st_mode, stat.st_uid, (long)stat.st_atime);
-    buf->stat_mode  = stat.st_mode;
-    buf->stat_uid   = stat.st_uid;
-    buf->stat_gid   = stat.st_gid;
-#ifdef BLKGETSIZE
-    if (S_ISBLK(stat.st_mode)) {
-	unsigned long sectors;
-	if (ioctl(fd, BLKGETSIZE, &sectors)) {
-	    perror("getting device size\n");
-	    buf->stat_size = 0;
-	} else
-	    buf->stat_size = sectors << 9;
-    } else
-#endif
-	buf->stat_size  = stat.st_size;
-    buf->stat_atime = stat.st_atime;
-    buf->stat_mtime = stat.st_mtime;
-    buf->stat_ctime = stat.st_ctime;
-
-    /* Release the grant */
-    assert(xc_gnttab_munmap(mount->gnth, buf, 1) == 0);
+            stat.st_mode, stat.st_uid, stat.st_atime);
     
     /* Get a response from the ring */
     rsp_idx = mount->ring.rsp_prod_pvt++;
     printf("Writing response at: idx=%d, id=%d\n", rsp_idx, req_id);
     rsp = RING_GET_RESPONSE(&mount->ring, rsp_idx);
     rsp->id = req_id; 
-    rsp->ret_val = (uint64_t)ret;
+    rsp->fstat.stat_ret = (uint32_t)ret;
+    rsp->fstat.stat_mode  = stat.st_mode;
+    rsp->fstat.stat_uid   = stat.st_uid;
+    rsp->fstat.stat_gid   = stat.st_gid;
+#ifdef BLKGETSIZE
+    if (S_ISBLK(stat.st_mode)) {
+	unsigned long sectors;
+	if (ioctl(fd, BLKGETSIZE, &sectors)) {
+	    perror("getting device size\n");
+	    rsp->fstat.stat_size = 0;
+	} else
+	    rsp->fstat.stat_size = sectors << 9;
+    } else
+#endif
+	rsp->fstat.stat_size  = stat.st_size;
+    rsp->fstat.stat_atime = stat.st_atime;
+    rsp->fstat.stat_mtime = stat.st_mtime;
+    rsp->fstat.stat_ctime = stat.st_ctime;
 }
 
 

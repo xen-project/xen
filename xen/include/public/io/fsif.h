@@ -54,30 +54,31 @@ struct fsif_close_request {
 
 struct fsif_read_request {
     uint32_t fd;
-    grant_ref_t gref;
+    int32_t pad;
     uint64_t len;
     uint64_t offset;
+    grant_ref_t grefs[1];  /* Variable length */
 };
 
 struct fsif_write_request {
     uint32_t fd;
-    grant_ref_t gref;
+    int32_t pad;
     uint64_t len;
     uint64_t offset;
+    grant_ref_t grefs[1];  /* Variable length */
 };
 
 struct fsif_stat_request {
     uint32_t fd;
-    grant_ref_t gref;
 };
 
-/* This structure is a copy of some fields from stat structure, writen to the
- * granted page. */
+/* This structure is a copy of some fields from stat structure, returned
+ * via the ring. */
 struct fsif_stat_response {
     int32_t  stat_mode;
     uint32_t stat_uid;
     uint32_t stat_gid;
-    int32_t  pad;
+    int32_t  stat_ret;
     int64_t  stat_size;
     int64_t  stat_atime;
     int64_t  stat_mtime;
@@ -165,11 +166,20 @@ struct fsif_response {
     uint16_t id;
     uint16_t pad1;
     uint32_t pad2;
-    uint64_t ret_val;
+    union {
+        uint64_t ret_val;
+        struct fsif_stat_response fstat;
+    };
 };
 
 typedef struct fsif_response fsif_response_t;
 
+#define FSIF_RING_ENTRY_SIZE   64
+
+#define FSIF_NR_READ_GNTS  ((FSIF_RING_ENTRY_SIZE - sizeof(struct fsif_read_request)) /  \
+                                sizeof(grant_ref_t) + 1)
+#define FSIF_NR_WRITE_GNTS ((FSIF_RING_ENTRY_SIZE - sizeof(struct fsif_write_request)) / \
+                                sizeof(grant_ref_t) + 1)
 
 DEFINE_RING_TYPES(fsif, struct fsif_request, struct fsif_response);
 
