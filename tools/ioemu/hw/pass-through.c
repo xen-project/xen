@@ -1101,7 +1101,8 @@ static void pt_pci_write_config(PCIDevice *d, uint32_t address, uint32_t val,
     if (reg_grp_entry == NULL)
         goto out;
 
-    /* adjust the write value to appropriate CFC-CFF window */
+    /* adjust the read and write value to appropriate CFC-CFF window */
+    read_val <<= ((address & 3) << 3);
     val <<= ((address & 3) << 3);
     emul_len = len;
 
