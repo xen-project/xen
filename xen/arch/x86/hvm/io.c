@@ -284,7 +284,7 @@ void dpci_ioport_write(uint32_t mport, ioreq_t *p)
         data = p->data;
         if ( p->data_is_ptr )
             (void)hvm_copy_from_guest_phys(
-                &data, p->data + (sign * i & p->size), p->size);
+                &data, p->data + (sign * i * p->size), p->size);
 
         switch ( p->size )
         {
