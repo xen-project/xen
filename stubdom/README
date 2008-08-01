@@ -1,13 +1,3 @@
-To compile
-==========
-
-Just run make -j 4, that will download / patch / compile
-Then make install to install the result.
-
-Also, run make and make install in $XEN_ROOT/tools/fs-back
-
-
-
                                 IOEMU stubdom
                                 =============
 
@@ -15,6 +5,11 @@ Also, run make and make install in $XEN_ROOT/tools/fs-back
 
 General Configuration
 =====================
+
+Due to a race between the creation of the IOEMU stubdomain itself and allocation
+of video memory for the HVM domain, you need to avoid the need for ballooning,
+by using the hypervisor dom0_mem= option for instance.
+
 
 In your HVM config "hvmconfig",
 
