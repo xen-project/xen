@@ -259,8 +259,11 @@ int xc_evtchn_unbind(int xce_handle, evtchn_port_t port)
 	    files[xce_handle].evtchn.ports[i].port = -1;
 	    break;
 	}
-    if (i == MAX_EVTCHN_PORTS)
+    if (i == MAX_EVTCHN_PORTS) {
 	printf("Warning: couldn't find port %"PRId32" for xc handle %x\n", port, xce_handle);
+	errno = -EINVAL;
+	return -1;
+    }
     files[xce_handle].evtchn.ports[i].bound = 0;
     unbind_evtchn(port);
     return 0;
