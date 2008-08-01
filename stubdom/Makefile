@@ -320,8 +320,8 @@ clean:
 	$(MAKE) -C caml clean
 	$(MAKE) -C c clean
 	$(MAKE) -C grub clean
-	$(MAKE) -C libxc clean
-	$(MAKE) -C ioemu clean
+	[ ! -d libxc ] || $$(MAKE) -C libxc clean
+	[ ! -d ioemu ] || $$(MAKE) -C ioemu clean
 
 # clean the cross-compilation result
 .PHONY: crossclean
