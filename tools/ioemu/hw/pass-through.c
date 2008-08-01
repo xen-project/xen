@@ -138,6 +138,13 @@ static int pt_msixctrl_reg_write(struct pt_dev *ptdev,
     struct pt_reg_tbl *cfg_entry, 
     uint16_t *value, uint16_t dev_value, uint16_t valid_mask);
 
+/* pt_reg_info_tbl declaration
+ * - only for emulated register (either a part or whole bit).
+ * - for passthrough register that need special behavior (like interacting with
+ *   other component), set emu_mask to all 0 and specify r/w func properly.
+ * - do NOT use ALL F for init_val, otherwise the tbl will not be registered.
+ */
+ 
 /* Header Type0 reg static infomation table */
 static struct pt_reg_info_tbl pt_emu_reg_header0_tbl[] = {
     /* Command reg */
@@ -564,6 +571,13 @@ static struct pt_reg_info_tbl pt_emu_reg_msix_tbl[] = {
     }, 
 };
 
+/* pt_reg_grp_info_tbl declaration
+ * - only for emulated or zero-hardwired register group.
+ * - for register group with dynamic size, just set grp_size to 0xFF and 
+ *   specify size_init func properly.
+ * - no need to specify emu_reg_tbl for zero-hardwired type.
+ */
+
 /* emul reg group static infomation table */
 static const struct pt_reg_grp_info_tbl pt_emu_reg_grp_tbl[] = {
     /* Header Type0 reg group */
@@ -843,7 +857,7 @@ void pt_iomem_map(PCIDevice *d, int i, uint32_t e_phys, uint32_t e_size,
         }
     }
 
-    /* map only valid guest address (include 0) */
+    /* map only valid guest address */
     if (e_phys != -1)
     {
         /* Create new mapping */
@@ -860,7 +874,7 @@ void pt_iomem_map(PCIDevice *d, int i, uint32_t e_phys, uint32_t e_size,
         
         ret = remove_msix_mapping(assigned_device, i);
         if ( ret != 0 )
-            PT_LOG("Error: remove MSX-X mmio mapping failed!\n");
+            PT_LOG("Error: remove MSI-X mmio mapping failed!\n");
     }
 }
 
@@ -996,8 +1010,11 @@ static void pt_pci_write_config(PCIDevice *d, uint32_t address, uint32_t val,
     int index = 0;
     int ret = 0;
 
-    PT_LOG("write(%x.%x): address=%04x val=0x%08x len=%d\n",
-        (d->devfn >> 3) & 0x1F, (d->devfn & 0x7), address, val, len);
+#ifdef PT_DEBUG_PCI_CONFIG_ACCESS
+    PT_LOG("[%02x:%02x.%x]: address=%04x val=0x%08x len=%d\n",
+       pci_bus_num(d->bus), (d->devfn >> 3) & 0x1F, (d->devfn & 0x7),
+       address, val, len);
+#endif
 
     /* check offset range */
     if (address >= 0xFF)
@@ -1049,7 +1066,10 @@ static void pt_pci_write_config(PCIDevice *d, uint32_t address, uint32_t val,
         if (reg_grp->grp_type == GRP_TYPE_HARDWIRED)
         {
             /* ignore silently */
-            PT_LOG("Access to 0 Hardwired register.\n");
+            PT_LOG("Access to 0 Hardwired register. "
+                "[%02x:%02x.%x][Offset:%02xh][Length:%d]\n",
+                pci_bus_num(d->bus), ((d->devfn >> 3) & 0x1F), 
+                (d->devfn & 0x7), address, len);
             goto exit;
         }
     }
@@ -1131,7 +1151,8 @@ static void pt_pci_write_config(PCIDevice *d, uint32_t address, uint32_t val,
             if (ret < 0)
             {
                 /* exit I/O emulator */
-                PT_LOG("I/O emulator exit()\n");
+                PT_LOG("Internal error: Invalid write emulation "
+                    "return value[%d]. I/O emulator exit.\n", ret);
                 exit(1);
             }
 
@@ -1185,9 +1206,6 @@ static uint32_t pt_pci_read_config(PCIDevice *d, uint32_t address, int len)
     uint8_t *ptr_val = NULL;
     int emul_len = 0;
     int ret = 0;
-
-    PT_LOG("read(%x.%x): address=%04x len=%d\n",
-        (d->devfn >> 3) & 0x1F, (d->devfn & 0x7), address, len);
 
     /* check offset range */
     if (address >= 0xFF)
@@ -1309,7 +1327,8 @@ static uint32_t pt_pci_read_config(PCIDevice *d, uint32_t address, int len)
             if (ret < 0)
             {
                 /* exit I/O emulator */
-                PT_LOG("I/O emulator exit()\n");
+                PT_LOG("Internal error: Invalid read emulation "
+                    "return value[%d]. I/O emulator exit.\n", ret);
                 exit(1);
             }
 
@@ -1332,6 +1351,13 @@ static uint32_t pt_pci_read_config(PCIDevice *d, uint32_t address, int len)
     val >>= ((address & 3) << 3);
 
 exit:
+
+#ifdef PT_DEBUG_PCI_CONFIG_ACCESS
+    PT_LOG("[%02x:%02x.%x]: address=%04x val=0x%08x len=%d\n",
+       pci_bus_num(d->bus), (d->devfn >> 3) & 0x1F, (d->devfn & 0x7),
+       address, val, len);
+#endif
+
     return val;
 }
 
@@ -1540,7 +1566,7 @@ static void pt_bar_mapping(struct pt_dev *ptdev, int io_enable, int mem_enable)
         /* copy region address to temporary */
         r_addr = r->addr;
 
-        /* clear region address in case I/O Space or Memory Space disable */
+        /* need unmapping in case I/O Space or Memory Space disable */
         if (((base->bar_flag == PT_BAR_FLAG_IO) && !io_enable ) ||
             ((base->bar_flag == PT_BAR_FLAG_MEM) && !mem_enable ))
             r_addr = -1;
@@ -1556,8 +1582,10 @@ static void pt_bar_mapping(struct pt_dev *ptdev, int io_enable, int mem_enable)
         /* check overlapped address */
         ret = pt_chk_bar_overlap(dev->bus, dev->devfn, r_addr, r_size);
         if (ret > 0)
-            PT_LOG("Base Address[%d] is overlapped. "
-                "[Address:%08xh][Size:%04xh]\n", i, r_addr, r_size);
+            PT_LOG("ptdev[%02x:%02x.%x][Region:%d][Address:%08xh][Size:%08xh] "
+                "is overlapped.\n", pci_bus_num(dev->bus), 
+                (dev->devfn >> 3) & 0x1F, (dev->devfn & 0x7),
+                i, r_addr, r_size);
 
         /* check whether we need to update the mapping or not */
         if (r_addr != ptdev->bases[i].e_physbase)
@@ -1776,14 +1804,16 @@ static uint32_t pt_status_reg_init(struct pt_dev *ptdev,
         else
         {
             /* exit I/O emulator */
-            PT_LOG("I/O emulator exit()\n");
+            PT_LOG("Internal error: Couldn't find pt_reg_tbl for "
+                "Capabilities Pointer register. I/O emulator exit.\n");
             exit(1);
         }
     }
     else
     {
         /* exit I/O emulator */
-        PT_LOG("I/O emulator exit()\n");
+        PT_LOG("Internal error: Couldn't find pt_reg_grp_tbl for Header. "
+            "I/O emulator exit.\n");
         exit(1);
     }
 
@@ -1815,7 +1845,8 @@ static uint32_t pt_bar_reg_init(struct pt_dev *ptdev,
     if (index < 0)
     {
         /* exit I/O emulator */
-        PT_LOG("I/O emulator exit()\n");
+        PT_LOG("Internal error: Invalid BAR index[%d]. "
+            "I/O emulator exit.\n", index);
         exit(1);
     }
 
@@ -1962,9 +1993,8 @@ static uint8_t pt_msi_size_init(struct pt_dev *ptdev,
     ptdev->msi = malloc(sizeof(struct pt_msi_info));
     if ( !ptdev->msi )
     {
-        PT_LOG("error allocation pt_msi_info\n");
         /* exit I/O emulator */
-        PT_LOG("I/O emulator exit()\n");
+        PT_LOG("error allocation pt_msi_info. I/O emulator exit.\n");
         exit(1);
     }
     memset(ptdev->msi, 0, sizeof(struct pt_msi_info));
@@ -1983,7 +2013,8 @@ static uint8_t pt_msix_size_init(struct pt_dev *ptdev,
     if (ret == -1)
     {
         /* exit I/O emulator */
-        PT_LOG("I/O emulator exit()\n");
+        PT_LOG("Internal error: Invalid pt_msix_init return value[%d]. "
+            "I/O emulator exit.\n", ret);
         exit(1);
     }
 
@@ -2060,7 +2091,8 @@ static int pt_bar_reg_read(struct pt_dev *ptdev,
     if (index < 0)
     {
         /* exit I/O emulator */
-        PT_LOG("I/O emulator exit()\n");
+        PT_LOG("Internal error: Invalid BAR index[%d]. "
+            "I/O emulator exit.\n", index);
         exit(1);
     }
 
@@ -2201,12 +2233,13 @@ static int pt_bar_reg_write(struct pt_dev *ptdev,
     uint32_t r_size = 0;
     int index = 0;
 
-   /* get BAR index */
+    /* get BAR index */
     index = pt_bar_offset_to_index(reg->offset);
     if (index < 0)
     {
         /* exit I/O emulator */
-        PT_LOG("I/O emulator exit()\n");
+        PT_LOG("Internal error: Invalid BAR index[%d]. "
+            "I/O emulator exit.\n", index);
         exit(1);
     }
 
@@ -2240,10 +2273,10 @@ static int pt_bar_reg_write(struct pt_dev *ptdev,
             if (last_addr <= new_addr || !new_addr || last_addr >= 0x10000)
             {
                 PT_LOG("Guest attempt to set Base Address over the 64KB. "
-                    "[%02x:%02x.%x][Offset:%02xh][Range:%08xh-%08xh]\n",
+                    "[%02x:%02x.%x][Offset:%02xh][Address:%08xh][Size:%08xh]\n",
                     pci_bus_num(d->bus), 
                     ((d->devfn >> 3) & 0x1F), (d->devfn & 0x7),
-                    reg->offset, new_addr, last_addr);
+                    reg->offset, new_addr, r_size);
                 /* just remove mapping */
                 r->addr = -1;
                 goto exit;
@@ -2484,8 +2517,6 @@ static int pt_msgctrl_reg_write(struct pt_dev *ptdev,
     uint16_t old_ctrl = cfg_entry->data;
     PCIDevice *pd = (PCIDevice *)ptdev;
 
-    PT_LOG("[before] dev_val:%xh wr_val:%xh\n", dev_value, *value);
-
     /* Currently no support for multi-vector */
     if ((*value & PCI_MSI_FLAGS_QSIZE) != 0x0)
         PT_LOG("try to set more than 1 vector ctrl %x\n", *value);
@@ -2527,8 +2558,6 @@ static int pt_msgctrl_reg_write(struct pt_dev *ptdev,
     else
         ptdev->msi->flags &= ~PCI_MSI_FLAGS_ENABLE;
 
-    PT_LOG("[after] wr_val:%xh\n", *value);
-
     return 0;
 }
 
@@ -2541,8 +2570,6 @@ static int pt_msgaddr32_reg_write(struct pt_dev *ptdev,
     uint32_t writable_mask = 0;
     uint32_t throughable_mask = 0;
     uint32_t old_addr = cfg_entry->data;
-
-    PT_LOG("[before] dev_val:%xh wr_val:%xh\n", dev_value, *value);
 
     /* modify emulate register */
     writable_mask = reg->emu_mask & ~reg->ro_mask & valid_mask;
@@ -2564,8 +2591,6 @@ static int pt_msgaddr32_reg_write(struct pt_dev *ptdev,
             pt_msi_update(ptdev);
     }
 
-    PT_LOG("[after] wr_val:%xh\n", *value);
-
     return 0;
 }
 
@@ -2578,8 +2603,6 @@ static int pt_msgaddr64_reg_write(struct pt_dev *ptdev,
     uint32_t writable_mask = 0;
     uint32_t throughable_mask = 0;
     uint32_t old_addr = cfg_entry->data;
-
-    PT_LOG("[before] dev_val:%xh wr_val:%xh\n", dev_value, *value);
 
     /* check whether the type is 64 bit or not */
     if (!(ptdev->msi->flags & PCI_MSI_FLAGS_64BIT))
@@ -2609,8 +2632,6 @@ static int pt_msgaddr64_reg_write(struct pt_dev *ptdev,
             pt_msi_update(ptdev);
     }
 
-    PT_LOG("[after] wr_val:%xh\n", *value);
-
     return 0;
 }
 
@@ -2626,8 +2647,6 @@ static int pt_msgdata_reg_write(struct pt_dev *ptdev,
     uint16_t old_data = cfg_entry->data;
     uint32_t flags = ptdev->msi->flags;
     uint32_t offset = reg->offset;
-
-    PT_LOG("[before] dev_val:%xh wr_val:%xh\n", dev_value, *value);
 
     /* check the offset whether matches the type or not */
     if (!((offset == PCI_MSI_DATA_64) &&  (flags & PCI_MSI_FLAGS_64BIT)) &&
@@ -2658,8 +2677,6 @@ static int pt_msgdata_reg_write(struct pt_dev *ptdev,
             pt_msi_update(ptdev);
     }
 
-    PT_LOG("[after] wr_val:%xh\n", *value);
-
     return 0;
 }
 
@@ -2672,8 +2689,6 @@ static int pt_msixctrl_reg_write(struct pt_dev *ptdev,
     uint16_t writable_mask = 0;
     uint16_t throughable_mask = 0;
     uint16_t old_ctrl = cfg_entry->data;
-
-    PT_LOG("[before] dev_val:%xh wr_val:%xh\n", dev_value, *value);
 
     /* modify emulate register */
     writable_mask = reg->emu_mask & ~reg->ro_mask & valid_mask;
@@ -2691,8 +2706,6 @@ static int pt_msixctrl_reg_write(struct pt_dev *ptdev,
         pt_msix_update(ptdev);
 
     ptdev->msix->enabled = !!(*value & PCI_MSIX_ENABLE);
-
-    PT_LOG("[after] wr_val:%xh\n", *value);
 
     return 0;
 }
