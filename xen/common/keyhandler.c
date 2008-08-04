@@ -143,7 +143,7 @@ static void dump_dom0_registers(unsigned char key)
 static void halt_machine(unsigned char key, struct cpu_user_regs *regs)
 {
     printk("'%c' pressed -> rebooting machine\n", key);
-    machine_restart();
+    machine_restart(0);
 }
 
 static void cpuset_print(char *set, int size, cpumask_t mask)

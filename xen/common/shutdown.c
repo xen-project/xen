@@ -23,8 +23,7 @@ static void maybe_reboot(void)
     {
         printk("rebooting machine in 5 seconds.\n");
         watchdog_disable();
-        mdelay(5000);
-        machine_restart();
+        machine_restart(5000);
     }
 }
 
@@ -50,7 +49,7 @@ void dom0_shutdown(u8 reason)
     case SHUTDOWN_reboot:
     {
         printk("Domain 0 shutdown: rebooting machine.\n");
-        machine_restart();
+        machine_restart(0);
         break; /* not reached */
     }
 

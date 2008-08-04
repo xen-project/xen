@@ -291,7 +291,12 @@ __initcall(reboot_init);
 
 #endif
 
-void machine_restart(void)
+static void __machine_restart(void *pdelay)
+{
+    machine_restart(*(unsigned int *)pdelay);
+}
+
+void machine_restart(unsigned int delay_millisecs)
 {
     int i;
 
@@ -304,8 +309,8 @@ void machine_restart(void)
     if ( get_apic_id() != boot_cpu_physical_apicid )
     {
         /* Send IPI to the boot CPU (logical cpu 0). */
-        on_selected_cpus(cpumask_of_cpu(0), (void *)machine_restart,
-                         NULL, 1, 0);
+        on_selected_cpus(cpumask_of_cpu(0), __machine_restart,
+                         &delay_millisecs, 1, 0);
         for ( ; ; )
             halt();
     }
