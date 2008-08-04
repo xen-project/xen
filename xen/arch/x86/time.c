@@ -35,8 +35,6 @@
 static char opt_clocksource[10];
 string_param("clocksource", opt_clocksource);
 
-#define EPOCH MILLISECS(1000)
-
 unsigned long cpu_khz;  /* CPU clock frequency in kHz. */
 DEFINE_SPINLOCK(rtc_lock);
 unsigned long pit0_ticks;
@@ -55,7 +53,6 @@ struct cpu_time {
     s_time_t stime_master_stamp;
     struct time_scale tsc_scale;
     u64 cstate_plt_count_stamp;
-    struct timer calibration_timer;
 };
 
 struct platform_timesource {
@@ -66,6 +63,10 @@ struct platform_timesource {
 };
 
 static DEFINE_PER_CPU(struct cpu_time, cpu_time);
+
+/* Calibrate all CPUs to platform timer every EPOCH. */
+#define EPOCH MILLISECS(1000)
+static struct timer calibration_timer;
 
 /* TSC is invariant on C state entry? */
 static bool_t tsc_invariant;
@@ -501,11 +502,11 @@ static void plt_overflow(void *unused)
 {
     u64 count;
 
-    spin_lock(&platform_timer_lock);
+    spin_lock_irq(&platform_timer_lock);
     count = plt_src.read_counter();
     plt_stamp64 += (count - plt_stamp) & plt_mask;
     plt_stamp = count;
-    spin_unlock(&platform_timer_lock);
+    spin_unlock_irq(&platform_timer_lock);
 
     set_timer(&plt_overflow_timer, NOW() + plt_overflow_period);
 }
@@ -522,6 +523,8 @@ static s_time_t read_platform_stime(void)
     u64 count;
     s_time_t stime;
 
+    ASSERT(!local_irq_is_enabled());
+
     spin_lock(&platform_timer_lock);
     count = plt_stamp64 + ((plt_src.read_counter() - plt_stamp) & plt_mask);
     stime = __read_platform_stime(count);
@@ -535,12 +538,12 @@ static void platform_time_calibration(void)
     u64 count;
     s_time_t stamp;
 
-    spin_lock(&platform_timer_lock);
+    spin_lock_irq(&platform_timer_lock);
     count = plt_stamp64 + ((plt_src.read_counter() - plt_stamp) & plt_mask);
     stamp = __read_platform_stime(count);
     stime_platform_stamp = stamp;
     platform_timer_stamp = count;
-    spin_unlock(&platform_timer_lock);
+    spin_unlock_irq(&platform_timer_lock);
 }
 
 static void resume_platform_timer(void)
@@ -800,9 +803,11 @@ int cpu_frequency_change(u64 freq)
     local_irq_enable();
 
     /* A full epoch should pass before we check for deviation. */
-    set_timer(&t->calibration_timer, NOW() + EPOCH);
     if ( smp_processor_id() == 0 )
+    {
+        set_timer(&calibration_timer, NOW() + EPOCH);
         platform_time_calibration();
+    }
 
     return 0;
 }
@@ -828,9 +833,20 @@ void do_settime(unsigned long secs, unsigned long nsecs, u64 system_time_base)
     rcu_read_unlock(&domlist_read_lock);
 }
 
+/* Per-CPU communication between rendezvous IRQ and softirq handler. */
+struct cpu_calibration {
+    u64 local_tsc_stamp;
+    s_time_t stime_local_stamp;
+    s_time_t stime_master_stamp;
+    struct timer softirq_callback;
+};
+static DEFINE_PER_CPU(struct cpu_calibration, cpu_calibration);
+
+/* Softirq handler for per-CPU time calibration. */
 static void local_time_calibration(void *unused)
 {
     struct cpu_time *t = &this_cpu(cpu_time);
+    struct cpu_calibration *c = &this_cpu(cpu_calibration);
 
     /*
      * System timestamps, extrapolated from local and master oscillators,
@@ -865,14 +881,11 @@ static void local_time_calibration(void *unused)
     prev_local_stime  = t->stime_local_stamp;
     prev_master_stime = t->stime_master_stamp;
 
-    /*
-     * Disable IRQs to get 'instantaneous' current timestamps. We read platform
-     * time first, as we may be delayed when acquiring platform_timer_lock.
-     */
+    /* Disabling IRQs ensures we atomically read cpu_calibration struct. */
     local_irq_disable();
-    curr_master_stime = read_platform_stime();
-    curr_local_stime  = get_s_time();
-    rdtscll(curr_tsc);
+    curr_tsc          = c->local_tsc_stamp;
+    curr_local_stime  = c->stime_local_stamp;
+    curr_master_stime = c->stime_master_stamp;
     local_irq_enable();
 
 #if 0
@@ -966,10 +979,62 @@ static void local_time_calibration(void *unused)
     update_vcpu_system_time(current);
 
  out:
-    set_timer(&t->calibration_timer, NOW() + EPOCH);
+    if ( smp_processor_id() == 0 )
+    {
+        set_timer(&calibration_timer, NOW() + EPOCH);
+        platform_time_calibration();
+    }
+}
+
+/*
+ * Rendezvous for all CPUs in IRQ context.
+ * Master CPU snapshots the platform timer.
+ * All CPUS snapshot their local TSC and extrapolation of system time.
+ */
+struct calibration_rendezvous {
+    atomic_t nr_cpus;
+    s_time_t master_stime;
+};
+
+static void time_calibration_rendezvous(void *_r)
+{
+    unsigned int total_cpus = num_online_cpus();
+    struct cpu_calibration *c = &this_cpu(cpu_calibration);
+    struct calibration_rendezvous *r = _r;
+
+    local_irq_disable();
 
     if ( smp_processor_id() == 0 )
-        platform_time_calibration();
+    {
+        while ( atomic_read(&r->nr_cpus) != (total_cpus - 1) )
+            cpu_relax();
+        r->master_stime = read_platform_stime();
+        atomic_inc(&r->nr_cpus);
+    }
+    else
+    {
+        atomic_inc(&r->nr_cpus);
+        while ( atomic_read(&r->nr_cpus) != total_cpus )
+            cpu_relax();
+    }
+
+    rdtscll(c->local_tsc_stamp);
+    c->stime_local_stamp = get_s_time();
+    c->stime_master_stamp = r->master_stime;
+
+    local_irq_enable();
+
+    /* Callback in softirq context as soon as possible. */
+    set_timer(&c->softirq_callback, c->stime_local_stamp);
+}
+
+static void time_calibration(void *unused)
+{
+    struct calibration_rendezvous r = {
+        .nr_cpus = ATOMIC_INIT(0)
+    };
+
+    on_each_cpu(time_calibration_rendezvous, &r, 0, 1);
 }
 
 void init_percpu_time(void)
@@ -986,9 +1051,14 @@ void init_percpu_time(void)
     t->stime_master_stamp = now;
     t->stime_local_stamp  = now;
 
-    init_timer(&t->calibration_timer, local_time_calibration,
-               NULL, smp_processor_id());
-    set_timer(&t->calibration_timer, NOW() + EPOCH);
+    init_timer(&this_cpu(cpu_calibration).softirq_callback,
+               local_time_calibration, NULL, smp_processor_id());
+
+    if ( smp_processor_id() == 0 )
+    {
+        init_timer(&calibration_timer, time_calibration, NULL, 0);
+        set_timer(&calibration_timer, NOW() + EPOCH);
+    }
 }
 
 /* Late init function (after all CPUs are booted). */
@@ -1104,10 +1174,11 @@ int time_suspend(void)
     {
         cmos_utc_offset = -get_cmos_time();
         cmos_utc_offset += (wc_sec + (wc_nsec + NOW()) / 1000000000ULL);
+        kill_timer(&calibration_timer);
     }
 
     /* Better to cancel calibration timer for accuracy. */
-    kill_timer(&this_cpu(cpu_time).calibration_timer);
+    kill_timer(&this_cpu(cpu_calibration).softirq_callback);
 
     return 0;
 }
