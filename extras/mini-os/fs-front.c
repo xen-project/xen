@@ -818,14 +818,14 @@ void *alloc_buffer_page(struct fs_request *req, domid_t domid, grant_ref_t *gref
     page = (void *)alloc_page(); 
     *gref = gnttab_grant_access(domid, virt_to_mfn(page), 0); 
     req->private1 = page;
-    req->private2 = (void *)(uint64_t)(*gref);
+    req->private2 = (void *)(uintptr_t)(*gref);
 
     return page;
 }
 
 void free_buffer_page(struct fs_request *req)
 {
-    gnttab_end_access((grant_ref_t)(uint64_t)req->private2);
+    gnttab_end_access((grant_ref_t)(uintptr_t)req->private2);
     free_page(req->private1);
 }
 
