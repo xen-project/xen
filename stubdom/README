@@ -11,6 +11,9 @@ of video memory for the HVM domain, you need to avoid the need for ballooning,
 by using the hypervisor dom0_mem= option for instance.
 
 
+There is a sample configuration set in xmexample.hvm-stubdom and
+xmexample.hvm-dm
+
 In your HVM config "hvmconfig",
 
 - use /usr/lib/xen/bin/stubdom-dm as dm script:

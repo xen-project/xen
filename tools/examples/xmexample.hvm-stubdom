@@ -30,7 +30,7 @@ memory = 128
 # shadow_memory = 8
 
 # A name for your domain. All domains must have different names.
-name = "ExampleHVMDomain"
+name = "xmexample.hvm"
 
 # 128-bit UUID for the domain.  The default behavior is to generate a new UUID
 # on each call to 'xm create'.
