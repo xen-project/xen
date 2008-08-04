@@ -35,8 +35,7 @@
 static char opt_clocksource[10];
 string_param("clocksource", opt_clocksource);
 
-#define EPOCH (1ULL << 30) /* one second, rounded up to a power of two */
-#define NEXT_EPOCH(now) (((now) + (EPOCH+(EPOCH/2))) & ~(EPOCH-1))
+#define EPOCH MILLISECS(1000)
 
 unsigned long cpu_khz;  /* CPU clock frequency in kHz. */
 DEFINE_SPINLOCK(rtc_lock);
@@ -1022,7 +1021,7 @@ static void local_time_calibration(void *unused)
     update_vcpu_system_time(current);
 
  out:
-    set_timer(&t->calibration_timer, NEXT_EPOCH(curr_local_stime));
+    set_timer(&t->calibration_timer, NOW() + EPOCH);
 
     if ( smp_processor_id() == 0 )
         platform_time_calibration();
@@ -1051,7 +1050,7 @@ void init_percpu_time(void)
  out:
     init_timer(&t->calibration_timer, local_time_calibration,
                NULL, smp_processor_id());
-    set_timer(&t->calibration_timer, NEXT_EPOCH(NOW()));
+    set_timer(&t->calibration_timer, NOW() + EPOCH);
 }
 
 /* Late init function (after all CPUs are booted). */
