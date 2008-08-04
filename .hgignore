@@ -21,8 +21,7 @@
 ^[^/]*\.bz2$
 ^\.config$
 ^\.pc
-^TAGS$
-^tags$
+(^|/)(tags|TAGS)$
 ^build-.*$
 ^dist/.*$
 ^docs/.*\.aux$
@@ -105,7 +104,6 @@
 ^stubdom/lwip/
 ^stubdom/ioemu/
 ^stubdom/grub-upstream/
-^tools/.*/TAGS$
 ^tools/.*/build/lib.*/.*\.py$
 ^tools/blktap/Makefile\.smh$
 ^tools/blktap/drivers/blktapctrl$
@@ -261,7 +259,6 @@
 ^xen/\.banner.*$
 ^xen/BLOG$
 ^xen/System.map$
-^xen/TAGS$
 ^xen/arch/x86/asm-offsets\.s$
 ^xen/arch/x86/boot/mkelf32$
 ^xen/arch/x86/xen\.lds$
@@ -279,7 +276,6 @@
 ^xen/include/xen/acm_policy\.h$
 ^xen/include/xen/banner\.h$
 ^xen/include/xen/compile\.h$
-^xen/tags$
 ^xen/tools/figlet/figlet$
 ^xen/tools/symbols$
 ^xen/xen$
