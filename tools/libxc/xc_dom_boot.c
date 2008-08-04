@@ -4,7 +4,7 @@
  * This is the code which actually boots a fresh
  * prepared domain image as xen guest domain.
  *
- * ==>  this is the only domain bilder code piece
+ * ==>  this is the only domain builder code piece
  *          where xen hypercalls are allowed        <==
  *
  * This code is licenced under the GPL.

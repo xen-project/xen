@@ -224,6 +224,6 @@ tarballs of the source.  Instructions in the tboot README describe how
 to modify grub.conf to use tboot to launch Xen.
 
 There are optional targets as part of Xen's top-level makefile that will
-downlaod and build tboot: install-tboot, build-tboot, dist-tboot, clean-tboot.
+download and build tboot: install-tboot, build-tboot, dist-tboot, clean-tboot.
 These will download the latest tar file from the SourceForge site using wget,
 then build/install/dist according to Xen's settings.
