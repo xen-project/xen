@@ -300,11 +300,11 @@ install-ioemu: ioemu-stubdom
 	$(INSTALL_DIR) "$(DESTDIR)/usr/lib/xen/bin"
 	$(INSTALL_PROG) stubdom-dm "$(DESTDIR)/usr/lib/xen/bin"
 	$(INSTALL_DIR) "$(DESTDIR)/usr/lib/xen/boot"
-	$(INSTALL_PROG) mini-os-ioemu/mini-os.gz "$(DESTDIR)/usr/lib/xen/boot/ioemu-stubdom.gz"
+	$(INSTALL_DATA) mini-os-ioemu/mini-os.gz "$(DESTDIR)/usr/lib/xen/boot/ioemu-stubdom.gz"
 
 install-grub: pv-grub
 	$(INSTALL_DIR) "$(DESTDIR)/usr/lib/xen/boot"
-	$(INSTALL_PROG) mini-os-grub/mini-os.gz "$(DESTDIR)/usr/lib/xen/boot/pv-grub.gz"
+	$(INSTALL_DATA) mini-os-grub/mini-os.gz "$(DESTDIR)/usr/lib/xen/boot/pv-grub.gz"
 
 #######
 # clean
