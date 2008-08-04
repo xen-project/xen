@@ -481,35 +481,6 @@ static int init_pmtimer(struct platform_timesource *pts)
 }
 
 /************************************************************
- * PLATFORM TIMER 5: TSC
- */
-
-static const char plt_tsc_name[] = "TSC";
-#define platform_timer_is_tsc() (plt_src.name == plt_tsc_name)
-
-static int init_tsctimer(struct platform_timesource *pts)
-{
-    if ( !tsc_invariant )
-        return 0;
-
-    pts->name = (char *)plt_tsc_name;
-    return 1;
-}
-
-static void make_tsctimer_record(void)
-{
-    struct cpu_time *t = &this_cpu(cpu_time);
-    s_time_t now;
-    u64 tsc;
-
-    rdtscll(tsc);
-    now = scale_delta(tsc, &t->tsc_scale);
-
-    t->local_tsc_stamp = tsc;
-    t->stime_local_stamp = t->stime_master_stamp = now;
-}
-
-/************************************************************
  * GENERIC PLATFORM TIMER INFRASTRUCTURE
  */
 
@@ -574,12 +545,6 @@ static void platform_time_calibration(void)
 
 static void resume_platform_timer(void)
 {
-    if ( platform_timer_is_tsc() )
-    {
-        /* TODO: Save/restore TSC values. */
-        return;
-    }
-
     /* No change in platform_stime across suspend/resume. */
     platform_timer_stamp = plt_stamp64;
     plt_stamp = plt_src.read_counter();
@@ -600,8 +565,6 @@ static void init_platform_timer(void)
             rc = init_cyclone(pts);
         else if ( !strcmp(opt_clocksource, "acpi") )
             rc = init_pmtimer(pts);
-        else if ( !strcmp(opt_clocksource, "tsc") )
-            rc = init_tsctimer(pts);
 
         if ( rc <= 0 )
             printk("WARNING: %s clocksource '%s'.\n",
@@ -614,12 +577,6 @@ static void init_platform_timer(void)
          !init_hpet(pts) &&
          !init_pmtimer(pts) )
         init_pit(pts);
-
-    if ( platform_timer_is_tsc() )
-    {
-        printk("Platform timer is TSC\n");
-        return;
-    }
 
     plt_mask = (u64)~0ull >> (64 - pts->counter_bits);
 
@@ -823,10 +780,6 @@ int cpu_frequency_change(u64 freq)
     struct cpu_time *t = &this_cpu(cpu_time);
     u64 curr_tsc;
 
-    /* Nothing to do if TSC is platform timer. Assume it is constant-rate. */
-    if ( platform_timer_is_tsc() )
-        return 0;
-
     /* Sanity check: CPU frequency allegedly dropping below 1MHz? */
     if ( freq < 1000000u )
     {
@@ -907,14 +860,6 @@ static void local_time_calibration(void *unused)
 
     /* The overall calibration scale multiplier. */
     u32 calibration_mul_frac;
-
-    if ( platform_timer_is_tsc() )
-    {
-        make_tsctimer_record(); 
-        update_vcpu_system_time(current);
-        set_timer(&t->calibration_timer, NOW() + MILLISECS(10*1000));
-        return;
-    }
 
     prev_tsc          = t->local_tsc_stamp;
     prev_local_stime  = t->stime_local_stamp;
@@ -1033,12 +978,6 @@ void init_percpu_time(void)
     unsigned long flags;
     s_time_t now;
 
-    if ( platform_timer_is_tsc() )
-    {
-        make_tsctimer_record();
-        goto out;
-    }
-
     local_irq_save(flags);
     rdtscll(t->local_tsc_stamp);
     now = !plt_src.read_counter ? 0 : read_platform_stime();
@@ -1047,7 +986,6 @@ void init_percpu_time(void)
     t->stime_master_stamp = now;
     t->stime_local_stamp  = now;
 
- out:
     init_timer(&t->calibration_timer, local_time_calibration,
                NULL, smp_processor_id());
     set_timer(&t->calibration_timer, NOW() + EPOCH);
