@@ -40,14 +40,12 @@ class OurXenstoreConnection:
             while True:
                 result = self.handle.read('0', path)
                 if result is not None:
+                    signal.alarm(0)
                     return result
                 self.handle.read_watch()
-            self.handle.unwatch(path, watch)
-            signal.alarm(0)
-        except:
+        finally:
             signal.alarm(0)
             if watch is not None: self.handle.unwatch(path, watch)
-            raise
     def read_maybe(self, path):
         return self.handle.read('0', path)
 
