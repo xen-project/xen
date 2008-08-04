@@ -44,6 +44,12 @@ PCI_STATUS = 0x6
 PCI_CLASS_DEVICE = 0x0a
 PCI_CLASS_BRIDGE_PCI = 0x0604
 
+PCI_HEADER_TYPE = 0x0e
+PCI_HEADER_TYPE_MASK = 0x7f
+PCI_HEADER_TYPE_NORMAL  = 0
+PCI_HEADER_TYPE_BRIDGE  = 1
+PCI_HEADER_TYPE_CARDBUS = 2
+
 PCI_CAPABILITY_LIST = 0x34
 PCI_CB_BRIDGE_CONTROL = 0x3e
 PCI_BRIDGE_CTL_BUS_RESET= 0x40
@@ -710,12 +716,24 @@ class PciDevice:
                self.name+SYSFS_PCI_DEV_CONFIG_PATH
         try:
             conf_file = open(path, 'rb')
+            conf_file.seek(PCI_HEADER_TYPE)
+            header_type = ord(conf_file.read(1)) & PCI_HEADER_TYPE_MASK
+            if header_type == PCI_HEADER_TYPE_CARDBUS:
+                return
             conf_file.seek(PCI_STATUS_OFFSET)
             status = ord(conf_file.read(1))
             if status&PCI_STATUS_CAP_MASK:
                 conf_file.seek(PCI_CAP_OFFSET)
                 capa_pointer = ord(conf_file.read(1))
+                capa_count = 0
                 while capa_pointer:
+                    if capa_pointer < 0x40:
+                        raise PciDeviceParseError(
+                            ('Broken capability chain: %s' % self.name))
+                    capa_count += 1
+                    if capa_count > 96:
+                        raise PciDeviceParseError(
+                            ('Looped capability chain: %s' % self.name))
                     conf_file.seek(capa_pointer)
                     capa_id = ord(conf_file.read(1))
                     capa_pointer = ord(conf_file.read(1))
