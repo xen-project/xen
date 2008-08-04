@@ -1,0 +1,212 @@
+#  -*- mode: python; -*-
+#============================================================================
+# Python configuration setup for 'xm create'.
+# This script sets the parameters used when a domain is created using 'xm create'.
+# You use a separate script for each domain you want to create, or 
+# you can set the parameters for the domain on the xm command line.
+#============================================================================
+
+#----------------------------------------------------------------------------
+# PV GRUB image file.
+kernel = "/usr/lib/xen/boot/pv-grub.gz"
+
+# Optional provided menu.lst.
+#ramdisk = "/boot/guests/menu.lst"
+
+# Sets path to menu.lst
+extra = "(hd0,0)/boot/grub/menu.lst"
+# can be a TFTP-served path (DHCP will automatically be run)
+# extra = "(nd)/netboot/menu.lst"
+# can be configured automatically by GRUB's DHCP option 150 (see grub manual)
+# extra = ""
+
+# Initial memory allocation (in megabytes) for the new domain.
+#
+# WARNING: Creating a domain with insufficient memory may cause out of
+#          memory errors. The domain needs enough memory to boot kernel
+#          and modules. Allocating less than 32MBs is not recommended.
+memory = 64
+
+# A name for your domain. All domains must have different names.
+name = "ExampleDomain"
+
+# 128-bit UUID for the domain.  The default behavior is to generate a new UUID
+# on each call to 'xm create'.
+#uuid = "06ed00fe-1162-4fc4-b5d8-11993ee4a8b9"
+
+# List of which CPUS this domain is allowed to use, default Xen picks
+#cpus = ""         # leave to Xen to pick
+#cpus = "0"        # all vcpus run on CPU0
+#cpus = "0-3,5,^1" # all vcpus run on cpus 0,2,3,5
+#cpus = ["2", "3"] # VCPU0 runs on CPU2, VCPU1 runs on CPU3
+
+# Number of Virtual CPUS to use, default is 1
+#vcpus = 1
+
+#----------------------------------------------------------------------------
+# Define network interfaces.
+
+# By default, no network interfaces are configured.  You may have one created
+# with sensible defaults using an empty vif clause:
+#
+# vif = [ '' ]
+#
+# or optionally override backend, bridge, ip, mac, script, type, or vifname:
+#
+# vif = [ 'mac=00:16:3e:00:00:11, bridge=xenbr0' ]
+#
+# or more than one interface may be configured:
+#
+# vif = [ '', 'bridge=xenbr1' ]
+
+vif = [ '' ]
+
+#----------------------------------------------------------------------------
+# Define the disk devices you want the domain to have access to, and
+# what you want them accessible as.
+# Each disk entry is of the form phy:UNAME,DEV,MODE
+# where UNAME is the device, DEV is the device name the domain will see,
+# and MODE is r for read-only, w for read-write.
+
+disk = [ 'phy:hda1,hda1,w' ]
+
+#----------------------------------------------------------------------------
+# Define frame buffer device.
+#
+# By default, no frame buffer device is configured.
+#
+# To create one using the SDL backend and sensible defaults:
+#
+# vfb = [ 'type=sdl' ]
+#
+# This uses environment variables XAUTHORITY and DISPLAY.  You
+# can override that:
+#
+# vfb = [ 'type=sdl,xauthority=/home/bozo/.Xauthority,display=:1' ]
+#
+# To create one using the VNC backend and sensible defaults:
+#
+# vfb = [ 'type=vnc' ]
+#
+# The backend listens on 127.0.0.1 port 5900+N by default, where N is
+# the domain ID.  You can override both address and N:
+#
+# vfb = [ 'type=vnc,vnclisten=127.0.0.1,vncdisplay=1' ]
+#
+# Or you can bind the first unused port above 5900:
+#
+# vfb = [ 'type=vnc,vnclisten=0.0.0.0,vncunused=1' ]
+#
+# You can override the password:
+#
+# vfb = [ 'type=vnc,vncpasswd=MYPASSWD' ]
+#
+# Empty password disables authentication.  Defaults to the vncpasswd
+# configured in xend-config.sxp.
+
+#----------------------------------------------------------------------------
+# Define to which TPM instance the user domain should communicate.
+# The vtpm entry is of the form 'instance=INSTANCE,backend=DOM'
+# where INSTANCE indicates the instance number of the TPM the VM
+# should be talking to and DOM provides the domain where the backend
+# is located.
+# Note that no two virtual machines should try to connect to the same
+# TPM instance. The handling of all TPM instances does require
+# some management effort in so far that VM configration files (and thus
+# a VM) should be associated with a TPM instance throughout the lifetime
+# of the VM / VM configuration file. The instance number must be
+# greater or equal to 1.
+#vtpm = [ 'instance=1,backend=0' ]
+
+#----------------------------------------------------------------------------
+# Set the kernel command line for the new domain.
+# You only need to define the IP parameters and hostname if the domain's
+# IP config doesn't, e.g. in ifcfg-eth0 or via DHCP.
+# You can use 'extra' to set the runlevel and custom environment
+# variables used by custom rc scripts (e.g. VMID=, usr= ).
+
+# Set if you want dhcp to allocate the IP address.
+#dhcp="dhcp"
+# Set netmask.
+#netmask=
+# Set default gateway.
+#gateway=
+# Set the hostname.
+#hostname= "vm%d" % vmid
+
+# Set root device.
+root = "/dev/hda1 ro"
+
+# Root device for nfs.
+#root = "/dev/nfs"
+# The nfs server.
+#nfs_server = '192.0.2.1'  
+# Root directory on the nfs server.
+#nfs_root   = '/full/path/to/root/directory'
+
+#----------------------------------------------------------------------------
+# Configure the behaviour when a domain exits.  There are three 'reasons'
+# for a domain to stop: poweroff, reboot, and crash.  For each of these you
+# may specify:
+#
+#   "destroy",        meaning that the domain is cleaned up as normal;
+#   "restart",        meaning that a new domain is started in place of the old
+#                     one;
+#   "preserve",       meaning that no clean-up is done until the domain is
+#                     manually destroyed (using xm destroy, for example); or
+#   "rename-restart", meaning that the old domain is not cleaned up, but is
+#                     renamed and a new domain started in its place.
+#
+# In the event a domain stops due to a crash, you have the additional options:
+#
+#   "coredump-destroy", meaning dump the crashed domain's core and then destroy;
+#   "coredump-restart', meaning dump the crashed domain's core and the restart.
+#
+# The default is
+#
+#   on_poweroff = 'destroy'
+#   on_reboot   = 'restart'
+#   on_crash    = 'restart'
+#
+# For backwards compatibility we also support the deprecated option restart
+#
+# restart = 'onreboot' means on_poweroff = 'destroy'
+#                            on_reboot   = 'restart'
+#                            on_crash    = 'destroy'
+#
+# restart = 'always'   means on_poweroff = 'restart'
+#                            on_reboot   = 'restart'
+#                            on_crash    = 'restart'
+#
+# restart = 'never'    means on_poweroff = 'destroy'
+#                            on_reboot   = 'destroy'
+#                            on_crash    = 'destroy'
+
+#on_poweroff = 'destroy'
+#on_reboot   = 'restart'
+#on_crash    = 'restart'
+
+#-----------------------------------------------------------------------------
+#   Configure PVSCSI devices:
+#
+#vscsi=[ 'PDEV, VDEV' ]
+#
+#   PDEV   gives physical SCSI device to be attached to specified guest
+#          domain by one of the following identifier format.
+#          - XX:XX:XX:XX (4-tuples with decimal notation which shows
+#                          "host:channel:target:lun")
+#          - /dev/sdxx or sdx
+#          - /dev/stxx or stx
+#          - /dev/sgxx or sgx
+#          - result of 'scsi_id -gu -s'.
+#            ex. # scsi_id -gu -s /block/sdb
+#                  36000b5d0006a0000006a0257004c0000
+#
+#   VDEV   gives virtual SCSI device by 4-tuples (XX:XX:XX:XX) as 
+#          which the specified guest domain recognize.
+#
+
+#vscsi = [ '/dev/sdx, 0:0:0:0' ]
+
+#============================================================================
+
