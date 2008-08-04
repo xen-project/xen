@@ -149,7 +149,7 @@ help:
 	@echo '                     trees then make dist'
 	@echo '  xen              - build and install Xen hypervisor'
 	@echo '  tools            - build and install tools'
-	@echo '  stubdomain       - build and install the stubdomain images'
+	@echo '  stubdom          - build and install the stubdomain images'
 	@echo '  kernels          - build and install guest kernels'
 	@echo '  kbuild           - synonym for make kernels'
 	@echo '  docs             - build and install user documentation'
