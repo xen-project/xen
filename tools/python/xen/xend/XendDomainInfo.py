@@ -638,7 +638,10 @@ class XendDomainInfo:
                 self._waitForDevice(dev_type, devid)
             except VmError, ex:
                 del self.info['devices'][dev_uuid]
-                if dev_type == 'tap':
+                if dev_type == 'pci':
+                    for dev in dev_config_dict['devs']:
+                        XendAPIStore.deregister(dev['uuid'], 'DPCI')
+                elif dev_type == 'tap':
                     self.info['vbd_refs'].remove(dev_uuid)
                 else:
                     self.info['%s_refs' % dev_type].remove(dev_uuid)
