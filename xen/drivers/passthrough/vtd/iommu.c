@@ -632,7 +632,10 @@ static int iommu_set_root_entry(struct iommu *iommu)
 
     iommu->root_maddr = alloc_pgtable_maddr();
     if ( iommu->root_maddr == 0 )
+    {
+        spin_unlock_irqrestore(&iommu->register_lock, flags);
         return -ENOMEM;
+    }
 
     dmar_writeq(iommu->reg, DMAR_RTADDR_REG, iommu->root_maddr);
     cmd = iommu->gcmd | DMA_GCMD_SRTP;
