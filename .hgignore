@@ -60,10 +60,13 @@
 ^docs/xen-api/vm_lifecycle.eps$
 ^docs/xen-api/xenapi-datamodel-graph.eps$
 ^docs/xen-api/xenapi.out$
-^extras/mini-os/h/hypervisor-ifs$
-^extras/mini-os/h/xen-public$
+^extras/mini-os/arch/ia64/gen_off.s$
+^extras/mini-os/include/mini-os$
+^extras/mini-os/include/ia64/mini-os$
+^extras/mini-os/include/ia64/offsets.h$
+^extras/mini-os/include/x86/mini-os$
+^extras/mini-os/include/xen$
 ^extras/mini-os/mini-os.*$
-^extras/mini-os/*-stubdom.*$
 ^install/.*$
 ^linux-[^/]*-paravirt/.*$
 ^linux-2.6[^/]*/.*$
