@@ -2158,7 +2158,23 @@ def xm_pci_list(args):
 
     dom = params[0]
 
-    devs = server.xend.domain.getDeviceSxprs(dom, 'pci')
+    devs = []
+    if serverType == SERVER_XEN_API:
+        for dpci_ref in server.xenapi.VM.get_DPCIs(get_single_vm(dom)):
+            ppci_ref = server.xenapi.DPCI.get_PPCI(dpci_ref)
+            ppci_record = server.xenapi.PPCI.get_record(ppci_ref)
+            dev = {
+                "domain":   "0x%04x" % int(ppci_record["domain"]),
+                "bus":      "0x%02x" % int(ppci_record["bus"]),
+                "slot":     "0x%02x" % int(ppci_record["slot"]),
+                "func":     "0x%01x" % int(ppci_record["func"]),
+                "vslt":     "0x%02x" % \
+                            int(server.xenapi.DPCI.get_hotplug_slot(dpci_ref))
+            }
+            devs.append(dev)
+
+    else:
+        devs = server.xend.domain.getDeviceSxprs(dom, 'pci')
 
     if len(devs) == 0:
         return
