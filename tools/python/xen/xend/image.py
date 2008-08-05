@@ -114,7 +114,7 @@ class ImageHandler:
 
         self.display = vmConfig['platform'].get('display')
         self.xauthority = vmConfig['platform'].get('xauthority')
-        self.vncconsole = vmConfig['platform'].get('vncconsole')
+        self.vncconsole = int(vmConfig['platform'].get('vncconsole', 0))
         self.dmargs = self.parseDeviceModelArgs(vmConfig)
         self.pid = None
         rtc_timeoffset = vmConfig['platform'].get('rtc_timeoffset')
