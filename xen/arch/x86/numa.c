@@ -14,6 +14,7 @@
 #include <xen/time.h>
 #include <xen/smp.h>
 #include <asm/acpi.h>
+#include <xen/sched.h>
 
 static int numa_setup(char *s);
 custom_param("numa", numa_setup);
@@ -281,6 +282,9 @@ static void dump_numa(unsigned char key)
 {
 	s_time_t now = NOW();
 	int i;
+	struct domain *d;
+	struct page_info *page;
+	unsigned int page_num_node[MAX_NUMNODES];
 
 	printk("'%c' pressed -> dumping numa info (now-0x%X:%08X)\n", key,
 		  (u32)(now>>32), (u32)now);
@@ -297,6 +301,28 @@ static void dump_numa(unsigned char key)
 	}
 	for_each_online_cpu(i)
 		printk("CPU%d -> NODE%d\n", i, cpu_to_node[i]);
+
+	rcu_read_lock(&domlist_read_lock);
+
+	printk("Memory location of each domain:\n");
+	for_each_domain(d)
+	{
+		printk("Domain %u (total: %u):\n", d->domain_id, d->tot_pages);
+
+		for_each_online_node(i)
+			page_num_node[i] = 0;
+
+		list_for_each_entry(page, &d->page_list, list)
+		{
+			i = phys_to_nid(page_to_mfn(page) << PAGE_SHIFT);
+			page_num_node[i]++;
+		}
+
+		for_each_online_node(i)
+			printk("    Node %u: %u\n", i, page_num_node[i]);
+	}
+
+	rcu_read_unlock(&domlist_read_lock);
 }
 
 static __init int register_numa_trigger(void)
