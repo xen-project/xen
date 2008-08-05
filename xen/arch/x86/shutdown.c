@@ -317,6 +317,8 @@ void machine_restart(unsigned int delay_millisecs)
 
     smp_send_stop();
 
+    mdelay(delay_millisecs);
+
     if ( tboot_in_measured_env() )
         tboot_shutdown(TB_SHUTDOWN_REBOOT);
 
