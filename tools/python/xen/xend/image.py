@@ -250,10 +250,6 @@ class ImageHandler:
     def parseDeviceModelArgs(self, vmConfig):
         ret = ["-domain-name", str(self.vm.info['name_label'])]
 
-        # Tell QEMU how large the guest's memory allocation is
-        # to help it when loading the initrd (if neccessary)
-        ret += ["-m", str(self.getRequiredInitialReservation() / 1024)]
-
         # Find RFB console device, and if it exists, make QEMU enable
         # the VNC console.
         if int(vmConfig['platform'].get('nographic', 0)) != 0:

@@ -31,9 +31,6 @@
 #define VGABIOS_CIRRUS_FILENAME "vgabios-cirrus.bin"
 #define LINUX_BOOT_FILENAME "linux_boot.bin"
 
-/* Leave a chunk of memory at the top of RAM for the BIOS ACPI tables.  */
-#define ACPI_DATA_SIZE        0x10000
-
 static fdctrl_t *floppy_controller;
 static RTCState *rtc_state;
 #ifndef CONFIG_DM
@@ -542,6 +539,7 @@ static void load_linux(const char *kernel_filename,
     uint16_t seg[6];
     uint16_t real_seg;
     int setup_size, kernel_size, initrd_size, cmdline_size;
+    unsigned long end_low_ram;
     uint32_t initrd_max;
     uint8_t header[1024];
     target_phys_addr_t real_addr, reloc_prot_addr, prot_addr, cmdline_addr, initrd_addr;
@@ -595,15 +593,14 @@ static void load_linux(const char *kernel_filename,
             (size_t)cmdline_addr,
             (size_t)prot_addr);
 
+    /* Special pages are placed at end of low RAM: pick an arbitrary one and
+     * subtract a suitably large amount of padding (64kB) to skip BIOS data. */
+    xc_get_hvm_param(xc_handle, domid, HVM_PARAM_BUFIOREQ_PFN, &end_low_ram);
+    end_low_ram = (end_low_ram << 12) - (64*1024);
+
     /* highest address for loading the initrd */
-    if (protocol >= 0x203)
-        initrd_max = ldl_p(header+0x22c);
-    else
-        initrd_max = 0x37ffffff;
-
-    if (initrd_max >= ram_size-ACPI_DATA_SIZE)
-        initrd_max = ram_size-ACPI_DATA_SIZE-1;
-
+    initrd_max = (protocol >= 0x203) ? ldl_p(header+0x22c) : 0x37ffffff;
+    initrd_max = MIN(initrd_max, (uint32_t)end_low_ram);
 
     /* kernel command line */
     ncmdline = strlen(kernel_cmdline);
