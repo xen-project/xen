@@ -777,6 +777,10 @@ class HVMImageHandler(ImageHandler):
             ret.append("tap,vlan=%d,ifname=tap%d.%d,bridge=%s" %
                        (nics, self.vm.getDomid(), nics-1, bridge))
 
+        if nics == 0:
+            ret.append("-net")
+            ret.append("none")
+
         return ret
 
     def getDeviceModelArgs(self, restore = False):
