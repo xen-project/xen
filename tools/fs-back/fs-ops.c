@@ -282,7 +282,7 @@ static void dispatch_stat(struct fs_mount *mount, struct fsif_request *req)
     /* Stat, and create the response */ 
     ret = fstat(fd, &stat);
     printf("Mode=%o, uid=%d, a_time=%ld\n",
-            stat.st_mode, stat.st_uid, stat.st_atime);
+            stat.st_mode, stat.st_uid, (long)stat.st_atime);
     
     /* Get a response from the ring */
     rsp_idx = mount->ring.rsp_prod_pvt++;
