@@ -86,7 +86,11 @@ QEMU_REMOTE=http://xenbits.xensource.com/git-http/qemu-xen-unstable.git
 # Mercurial in-tree version, or a local directory, or a git URL.
 # CONFIG_QEMU   ?= ioemu
 # CONFIG_QEMU   ?= ../qemu-xen.git
+ifeq ($(XEN_TARGET_ARCH),ia64)
+CONFIG_QEMU   ?= ioemu
+else
 CONFIG_QEMU   ?= $(QEMU_REMOTE)
+endif
 
 # Optional components
 XENSTAT_XENTOP     ?= y
