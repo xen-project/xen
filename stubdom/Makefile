@@ -10,10 +10,15 @@ include $(XEN_ROOT)/Config.mk
 override CONFIG_QEMU=ioemu
 
 IOEMU_OPTIONS=--disable-sdl --disable-opengl --disable-gfx-check --disable-vnc-tls --disable-brlapi --disable-kqemu
+ZLIB_URL?=http://www.zlib.net
 ZLIB_VERSION=1.2.3
+LIBPCI_URL?=http://www.kernel.org/pub/software/utils/pciutils
 LIBPCI_VERSION=2.2.9
+NEWLIB_URL?=ftp://sources.redhat.com/pub/newlib
 NEWLIB_VERSION=1.16.0
+LWIP_URL?=http://download.savannah.gnu.org/releases/lwip
 LWIP_VERSION=1.3.0
+GRUB_URL?=http://alpha.gnu.org/gnu/grub
 GRUB_VERSION=0.97
 
 WGET=wget -c
@@ -75,7 +80,7 @@ endif
 ##############
 
 newlib-$(NEWLIB_VERSION).tar.gz:
-	$(WGET) ftp://sources.redhat.com/pub/newlib/$@
+	$(WGET) $(NEWLIB_URL)/$@
 
 newlib-$(NEWLIB_VERSION): newlib-$(NEWLIB_VERSION).tar.gz
 	tar xzf $<
@@ -97,7 +102,7 @@ $(NEWLIB_STAMPFILE): mk-headers newlib-$(NEWLIB_VERSION)
 ############
 
 zlib-$(ZLIB_VERSION).tar.gz:
-	$(WGET) http://www.zlib.net/$@
+	$(WGET) $(ZLIB_URL)/$@
 
 ZLIB_STAMPFILE=$(CROSS_ROOT)/$(GNU_TARGET_ARCH)-xen-elf/lib/libz.a
 .PHONY: cross-zlib
@@ -114,7 +119,7 @@ $(ZLIB_STAMPFILE): zlib-$(ZLIB_VERSION).tar.gz $(NEWLIB_STAMPFILE)
 ##############
 
 pciutils-$(LIBPCI_VERSION).tar.bz2:
-	$(WGET) http://www.kernel.org/pub/software/utils/pciutils/$@
+	$(WGET) $(LIBPCI_URL)/$@
 
 pciutils-$(LIBPCI_VERSION): pciutils-$(LIBPCI_VERSION).tar.bz2
 	tar xjf $<
@@ -140,7 +145,7 @@ $(LIBPCI_STAMPFILE): pciutils-$(LIBPCI_VERSION) $(NEWLIB_STAMPFILE) $(ZLIB_STAMP
 ######
 
 lwip-$(LWIP_VERSION).tar.gz:
-	$(WGET) http://download.savannah.gnu.org/releases/lwip/$@
+	$(WGET) $(LWIP_URL)/$@
 
 lwip: lwip-$(LWIP_VERSION).tar.gz
 	tar xzf $<
@@ -247,7 +252,7 @@ c: $(CROSS_ROOT)
 ######
 
 grub-$(GRUB_VERSION).tar.gz:
-	$(WGET) ftp://alpha.gnu.org/gnu/grub/$@
+	$(WGET) $(GRUB_URL)/$@
 
 grub-upstream: grub-$(GRUB_VERSION).tar.gz
 	tar xzf $<
