@@ -1270,13 +1270,15 @@ static int domain_context_mapping(struct domain *domain, u8 bus, u8 devfn)
         ob = bus; odf = devfn;
         if ( !find_pcie_endpoint(&bus, &devfn, &secbus) )
         {
-            gdprintk(XENLOG_WARNING VTDPREFIX, "domain_context_mapping:invalid");
+            gdprintk(XENLOG_WARNING VTDPREFIX,
+                     "domain_context_mapping:invalid\n");
             break;
         }
 
         if ( ob != bus || odf != devfn )
             gdprintk(XENLOG_INFO VTDPREFIX,
-                     "domain_context_mapping:map:  bdf = %x:%x.%x -> %x:%x.%x\n",
+                     "domain_context_mapping:map:  "
+                     "bdf = %x:%x.%x -> %x:%x.%x\n",
                      ob, PCI_SLOT(odf), PCI_FUNC(odf),
                      bus, PCI_SLOT(devfn), PCI_FUNC(devfn));
 
