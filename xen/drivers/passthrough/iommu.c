@@ -30,6 +30,9 @@ boolean_param("iommu", iommu_enabled);
 int iommu_pv_enabled = 0;
 boolean_param("iommu_pv", iommu_pv_enabled);
 
+int force_iommu = 0;
+boolean_param("force_iommu", force_iommu);
+
 int iommu_domain_init(struct domain *domain)
 {
     struct hvm_iommu *hd = domain_hvm_iommu(domain);
@@ -215,6 +218,9 @@ static int iommu_setup(void)
     iommu_enabled = (rc == 0);
 
  out:
+    if ( force_iommu && !iommu_enabled )
+        panic("IOMMU setup failed, crash Xen for security purpose!\n");
+
     if ( !iommu_enabled )
         iommu_pv_enabled = 0;
     printk("I/O virtualisation %sabled\n", iommu_enabled ? "en" : "dis");

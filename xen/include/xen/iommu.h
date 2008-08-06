@@ -30,6 +30,7 @@
 extern int vtd_enabled;
 extern int iommu_enabled;
 extern int iommu_pv_enabled;
+extern int force_iommu;
 
 #define domain_hvm_iommu(d)     (&d->arch.hvm_domain.hvm_iommu)
 #define domain_vmx_iommu(d)     (&d->arch.hvm_domain.hvm_iommu.vmx_iommu)

@@ -427,6 +427,9 @@ static int __init acpi_parse_dmar(struct acpi_table_header *table)
     if ( !dmar->width )
     {
         dprintk(XENLOG_WARNING VTDPREFIX, "Zero: Invalid DMAR width\n");
+        if ( force_iommu )
+            panic("acpi_parse_dmar: Invalid DMAR width,"
+                  " crash Xen for security purpose!\n");
         return -EINVAL;
     }
 
@@ -468,8 +471,15 @@ static int __init acpi_parse_dmar(struct acpi_table_header *table)
 
     if ( ret )
     {
-        printk(XENLOG_WARNING "Failed to parse ACPI DMAR.  Disabling VT-d.\n");
-        disable_all_dmar_units();
+        if ( force_iommu )
+            panic("acpi_parse_dmar: Failed to parse ACPI DMAR,"
+                  " crash Xen for security purpose!\n");
+        else
+        {
+            printk(XENLOG_WARNING
+                   "Failed to parse ACPI DMAR.  Disabling VT-d.\n");
+            disable_all_dmar_units();
+        }
     }
 
     return ret;
@@ -480,10 +490,15 @@ int acpi_dmar_init(void)
     int rc;
 
     rc = -ENODEV;
+    if ( force_iommu )
+        iommu_enabled = 1;
+
     if ( !iommu_enabled )
         goto fail;
 
-    acpi_table_parse(ACPI_SIG_DMAR, acpi_parse_dmar);
+    rc = acpi_table_parse(ACPI_SIG_DMAR, acpi_parse_dmar);
+    if ( rc )
+        goto fail;
 
     rc = -ENODEV;
     if ( list_empty(&acpi_drhd_units) )
@@ -494,6 +509,10 @@ int acpi_dmar_init(void)
     return 0;
 
  fail:
+    if ( force_iommu )
+        panic("acpi_dmar_init: acpi_dmar_init failed,"
+              " crash Xen for security purpose!\n");
+
     vtd_enabled = 0;
     return -ENODEV;
 }
