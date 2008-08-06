@@ -2,7 +2,7 @@ Title   : How to do PCI Passthrough with VT-d
 Authors : Allen Kay    <allen.m.kay@intel.com>
           Weidong Han  <weidong.han@intel.com>
 Created : October-24-2007
-Updated : May-07-2008
+Updated : August-06-2008
 
 How to turn on VT-d in Xen
 --------------------------
@@ -21,7 +21,7 @@ How to turn on VT-d in Xen
 
 title Xen-Fedora Core (2.6.18-xen)
         root (hd0,0)
-        kernel /boot/xen.gz com1=115200,8n1 console=com1
+        kernel /boot/xen.gz com1=115200,8n1 console=com1 iommu=1
         module /boot/vmlinuz-2.6.18.8-xen root=LABEL=/ ro xencons=ttyS console=tty0 console=ttyS0, pciback.hide=(01:00.0)(03:00.0)
         module /boot/initrd-2.6.18-xen.img
 
@@ -30,6 +30,11 @@ title Xen-Fedora Core (2.6.18-xen)
         pci = [ '01:00.0', '03:00.0' ]
 15) start hvm guest and use "lspci" to see the passthru device and
     "ifconfig" to see if IP address has been assigned to NIC devices.
+
+
+Enable MSI/MSI-x for assigned devices
+-------------------------------------
+Add "msi=1" option in kernel line of host grub.
 
 
 Caveat on Conventional PCI Device Passthrough
