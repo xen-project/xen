@@ -7,7 +7,7 @@
 #============================================================================
 #
 # This is a version using a stubdomain for device model, see
-# stubdom-ExampleHVMDomain and stubdom/README for more details
+# xmexample.hvm-dm and README.stubdom for more details
 # The differences with xmexample.hvm are marked with "STUBDOM"
 
 #----------------------------------------------------------------------------
