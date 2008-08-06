@@ -1513,7 +1513,9 @@ static int pt_bar_reg_parse(
     /* check 64bit BAR */
     index = pt_bar_offset_to_index(reg->offset);
     if ((index > 0) && (index < PCI_ROM_SLOT) &&
-        (d->config[bar_64] & PCI_BASE_ADDRESS_MEM_TYPE_64))
+        ((d->config[bar_64] & (PCI_BASE_ADDRESS_SPACE |
+                               PCI_BASE_ADDRESS_MEM_TYPE_MASK)) ==
+         (PCI_BASE_ADDRESS_SPACE_MEMORY | PCI_BASE_ADDRESS_MEM_TYPE_64)))
     {
         region = &ptdev->bases[index-1];
         if (region->bar_flag != PT_BAR_FLAG_UPPER)
