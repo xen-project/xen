@@ -279,8 +279,8 @@ static void iommu_flush_write_buffer(struct iommu *iommu)
         if ( !(val & DMA_GSTS_WBFS) )
             break;
         if ( NOW() > start_time + DMAR_OPERATION_TIMEOUT )
-            panic("DMAR hardware is malfunctional,"
-                  " please disable IOMMU\n");
+            panic("%s: DMAR hardware is malfunctional,"
+                  " please disable IOMMU\n", __func__);
         cpu_relax();
     }
     spin_unlock_irqrestore(&iommu->register_lock, flag);
@@ -340,7 +340,8 @@ static int flush_context_reg(
         if ( !(val & DMA_CCMD_ICC) )
             break;
         if ( NOW() > start_time + DMAR_OPERATION_TIMEOUT )
-            panic("DMAR hardware is malfunctional, please disable IOMMU\n");
+            panic("%s: DMAR hardware is malfunctional,"
+                  " please disable IOMMU\n", __func__);
         cpu_relax();
     }
     spin_unlock_irqrestore(&iommu->register_lock, flag);
@@ -437,20 +438,20 @@ static int flush_iotlb_reg(void *_iommu, u16 did,
         if ( !(val & DMA_TLB_IVT) )
             break;
         if ( NOW() > start_time + DMAR_OPERATION_TIMEOUT )
-            panic("DMAR hardware is malfunctional, please disable IOMMU\n");
+            panic("%s: DMAR hardware is malfunctional,"
+                  " please disable IOMMU\n", __func__);
         cpu_relax();
     }
     spin_unlock_irqrestore(&iommu->register_lock, flag);
 
     /* check IOTLB invalidation granularity */
     if ( DMA_TLB_IAIG(val) == 0 )
-        printk(KERN_ERR VTDPREFIX "IOMMU: flush IOTLB failed\n");
+        dprintk(XENLOG_ERR VTDPREFIX, "IOMMU: flush IOTLB failed\n");
 
-#ifdef VTD_DEBUG
     if ( DMA_TLB_IAIG(val) != DMA_TLB_IIRG(type) )
-        printk(KERN_ERR VTDPREFIX "IOMMU: tlb flush request %x, actual %x\n",
+        dprintk(XENLOG_INFO VTDPREFIX,
+                "IOMMU: tlb flush request %x, actual %x\n",
                (u32)DMA_TLB_IIRG(type), (u32)DMA_TLB_IAIG(val));
-#endif
     /* flush context entry will implictly flush write buffer */
     return 0;
 }
@@ -493,8 +494,8 @@ static int inline iommu_flush_iotlb_psi(
     unsigned int align;
     struct iommu_flush *flush = iommu_get_flush(iommu);
 
-    BUG_ON(addr & (~PAGE_MASK_4K));
-    BUG_ON(pages == 0);
+    ASSERT(!(addr & (~PAGE_MASK_4K)));
+    ASSERT(pages > 0);
 
     /* Fallback to domain selective flush if no PSI support */
     if ( !cap_pgsel_inv(iommu->cap) )
@@ -561,8 +562,9 @@ static void dma_pte_clear_one(struct domain *domain, u64 addr)
     {
         iommu = drhd->iommu;
         if ( test_bit(iommu->index, &hd->iommu_bitmap) )
-            iommu_flush_iotlb_psi(iommu, domain_iommu_domid(domain),
-                                  addr, 1, 0);
+            if ( iommu_flush_iotlb_psi(iommu, domain_iommu_domid(domain),
+                                       addr, 1, 0))
+                iommu_flush_write_buffer(iommu);
     }
 
     unmap_vtd_domain_page(page);
@@ -649,7 +651,8 @@ static int iommu_set_root_entry(struct iommu *iommu)
         if ( sts & DMA_GSTS_RTPS )
             break;
         if ( NOW() > start_time + DMAR_OPERATION_TIMEOUT )
-            panic("DMAR hardware is malfunctional, please disable IOMMU\n");
+            panic("%s: DMAR hardware is malfunctional,"
+                  " please disable IOMMU\n", __func__);
         cpu_relax();
     }
 
@@ -677,7 +680,8 @@ static int iommu_enable_translation(struct iommu *iommu)
         if ( sts & DMA_GSTS_TES )
             break;
         if ( NOW() > start_time + DMAR_OPERATION_TIMEOUT )
-            panic("DMAR hardware is malfunctional, please disable IOMMU\n");
+            panic("%s: DMAR hardware is malfunctional,"
+                  " please disable IOMMU\n", __func__);
         cpu_relax();
     }
 
@@ -705,7 +709,8 @@ int iommu_disable_translation(struct iommu *iommu)
         if ( !(sts & DMA_GSTS_TES) )
             break;
         if ( NOW() > start_time + DMAR_OPERATION_TIMEOUT )
-            panic("DMAR hardware is malfunctional, please disable IOMMU\n");
+            panic("%s: DMAR hardware is malfunctional,"
+                  " please disable IOMMU\n", __func__);
         cpu_relax();
     }
     spin_unlock_irqrestore(&iommu->register_lock, flags);
@@ -1512,6 +1517,9 @@ int intel_iommu_unmap_page(struct domain *d, unsigned long gfn)
 int iommu_page_mapping(struct domain *domain, paddr_t iova,
                        paddr_t hpa, size_t size, int prot)
 {
+    struct hvm_iommu *hd = domain_hvm_iommu(domain);
+    struct acpi_drhd_unit *drhd;
+    struct iommu *iommu;
     u64 start_pfn, end_pfn;
     struct dma_pte *page = NULL, *pte = NULL;
     int index;
@@ -1537,6 +1545,18 @@ int iommu_page_mapping(struct domain *domain, paddr_t iova,
         unmap_vtd_domain_page(page);
         start_pfn++;
         index++;
+    }
+
+    if ( index > 0 )
+    {
+        for_each_drhd_unit ( drhd )
+        {
+            iommu = drhd->iommu;
+            if ( test_bit(iommu->index, &hd->iommu_bitmap) )
+                if ( iommu_flush_iotlb_psi(iommu, domain_iommu_domid(domain),
+                                           iova, index, 1))
+                    iommu_flush_write_buffer(iommu);
+        }
     }
 
     return 0;
