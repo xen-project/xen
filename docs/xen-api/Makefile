@@ -16,11 +16,11 @@ all: build
 build: xenapi.pdf xenapi.ps
 
 install:
-	$(INSTALL_DIR) $(DESTDIR)$(pkgdocdir)/ps
-	$(INSTALL_DIR) $(DESTDIR)$(pkgdocdir)/pdf
+	$(INSTALL_DIR) $(DESTDIR)$(DOCDIR)/ps
+	$(INSTALL_DIR) $(DESTDIR)$(DOCDIR)/pdf
 
-	[ -e xenapi.ps ] && cp xenapi.ps $(DESTDIR)$(pkgdocdir)/ps || true
-	[ -e xenapi.pdf ] && cp xenapi.pdf $(DESTDIR)$(pkgdocdir)/pdf || true
+	[ -e xenapi.ps ] && cp xenapi.ps $(DESTDIR)$(DOCDIR)/ps || true
+	[ -e xenapi.pdf ] && cp xenapi.pdf $(DESTDIR)$(DOCDIR)/pdf || true
 
 xenapi.dvi: $(TEX) $(EPS) $(EPSDOT)
 	$(LATEX) xenapi.tex

@@ -296,10 +296,14 @@ pv-grub: mini-os-grub libxc grub
 #########
 
 ifeq ($(STUBDOM_SUPPORTED),1)
-install: install-ioemu install-grub
+install: install-readme install-ioemu install-grub
 else
 install:
 endif
+
+install-readme:
+	$(INSTALL_DIR) $(DESTDIR)$(DOCDIR)
+	$(INSTALL_DATA) README $(DESTDIR)$(DOCDIR)/README.stubdom
 
 install-ioemu: ioemu-stubdom
 	$(INSTALL_DIR) "$(DESTDIR)/usr/lib/xen/bin"

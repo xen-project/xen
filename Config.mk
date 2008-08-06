@@ -19,6 +19,8 @@ HOSTCFLAGS += -fno-strict-aliasing
 
 DISTDIR     ?= $(XEN_ROOT)/dist
 DESTDIR     ?= /
+DOCDIR      ?= /usr/share/doc/xen
+MANDIR      ?= /usr/share/man
 
 # Allow phony attribute to be listed as dependency rather than fake target
 .PHONY: .phony
