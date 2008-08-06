@@ -20,18 +20,48 @@
 
 extern struct iommu_ops intel_iommu_ops;
 extern struct iommu_ops amd_iommu_ops;
+static void parse_iommu_param(char *s);
 static int iommu_populate_page_table(struct domain *d);
 int intel_vtd_setup(void);
 int amd_iov_detect(void);
 
+/*
+ * The 'iommu' parameter enables the IOMMU.  Optional comma separated
+ * value may contain:
+ *
+ *   off|no|false|disable       Disable IOMMU (default)
+ *   pv                         Enable IOMMU for PV domains
+ *   no-pv                      Disable IOMMU for PV domains (default)
+ *   force|required             Don't boot unless IOMMU is enabled
+ */
+custom_param("iommu", parse_iommu_param);
 int iommu_enabled = 0;
-boolean_param("iommu", iommu_enabled);
-
 int iommu_pv_enabled = 0;
-boolean_param("iommu_pv", iommu_pv_enabled);
-
 int force_iommu = 0;
-boolean_param("force_iommu", force_iommu);
+
+static void __init parse_iommu_param(char *s)
+{
+    char *ss;
+    iommu_enabled = 1;
+
+    do {
+        ss = strchr(s, ',');
+        if ( ss )
+            *ss = '\0';
+
+        if ( !strcmp(s, "off") || !strcmp(s, "no") || !strcmp(s, "false") ||
+             !strcmp(s, "0") || !strcmp(s, "disable") )
+            iommu_enabled = 0;
+        else if ( !strcmp(s, "pv") )
+            iommu_pv_enabled = 1;
+        else if ( !strcmp(s, "no-pv") )
+            iommu_pv_enabled = 0;
+        else if ( !strcmp(s, "force") || !strcmp(s, "required") )
+            force_iommu = 1;
+
+        s = ss + 1;
+    } while ( ss );
+}
 
 int iommu_domain_init(struct domain *domain)
 {
