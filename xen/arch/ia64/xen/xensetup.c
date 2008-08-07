@@ -566,6 +566,13 @@ skip_move:
     if (vmx_enabled)
         xen_heap_start = vmx_init_env(xen_heap_start, xenheap_phys_end);
 
+    /* allocate memory for percpu area
+     * per_cpu_init() called from late_set_arch() is called after
+     * end_boot_allocate(). It's too late to allocate memory in
+     * xenva.
+     */
+    xen_heap_start = per_cpu_allocate(xen_heap_start, xenheap_phys_end);
+
     heap_desc.xen_heap_start   = xen_heap_start;
     heap_desc.xenheap_phys_end = xenheap_phys_end;
     heap_desc.kern_md          = kern_md;

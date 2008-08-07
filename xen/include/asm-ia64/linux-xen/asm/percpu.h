@@ -50,12 +50,22 @@ DECLARE_PER_CPU(unsigned long, local_per_cpu_offset);
 extern void percpu_modcopy(void *pcpudst, const void *src, unsigned long size);
 extern void setup_per_cpu_areas (void);
 extern void *per_cpu_init(void);
+#ifdef XEN
+extern void *per_cpu_allocate(void *xen_heap_start, unsigned long end_in_pa);
+#endif
 
 #else /* ! SMP */
 
 #define per_cpu(var, cpu)			(*((void)(cpu), &per_cpu__##var))
 #define __get_cpu_var(var)			per_cpu__##var
 #define per_cpu_init()				(__phys_per_cpu_start)
+#ifdef XEN
+static inline void *per_cpu_allocate(void *xen_heap_start,
+				     unsigned long end_in_pa)
+{
+	return xen_heap_start;
+}
+#endif
 
 #endif	/* SMP */
 

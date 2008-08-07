@@ -175,6 +175,39 @@ find_memory (void)
 #endif
 
 #ifdef CONFIG_SMP
+#ifdef XEN
+#include <asm/elf.h>
+
+void *percpu_area __initdata = NULL;
+
+void* __init
+per_cpu_allocate(void *xen_heap_start, unsigned long end_in_pa)
+{
+	int order = get_order(NR_CPUS * PERCPU_PAGE_SIZE);
+	unsigned long size = 1UL << (order + PAGE_SHIFT);
+	unsigned long start = ALIGN_UP((unsigned long)xen_heap_start,
+				       PERCPU_PAGE_SIZE);
+	unsigned long end = start + size;
+
+	if (__pa(end) < end_in_pa) {
+		init_xenheap_pages(__pa(xen_heap_start), __pa(start));
+		xen_heap_start = (void*)end;
+		percpu_area = (void*)virt_to_xenva(start);
+		printk("allocate percpu area 0x%lx@0x%lx 0x%p\n",
+		       size, start, percpu_area);
+	} else {
+		panic("can't allocate percpu area. size 0x%lx\n", size);
+	}
+	return xen_heap_start;
+}
+
+static void* __init
+get_per_cpu_area(void)
+{
+	return percpu_area;
+}
+#endif
+
 /**
  * per_cpu_init - setup per-cpu variables
  *
@@ -193,13 +226,9 @@ per_cpu_init (void)
 	 */
 	if (smp_processor_id() == 0) {
 #ifdef XEN
-		struct page_info *page;
-		page = alloc_domheap_pages(NULL,
-					   get_order(NR_CPUS *
-						     PERCPU_PAGE_SIZE), 0);
-		if (page == NULL) 
+		cpu_data = get_per_cpu_area();
+		if (cpu_data == NULL) 
 			panic("can't allocate per cpu area.\n");
-		cpu_data = page_to_virt(page);
 #else
 		cpu_data = __alloc_bootmem(PERCPU_PAGE_SIZE * NR_CPUS,
 					   PERCPU_PAGE_SIZE, __pa(MAX_DMA_ADDRESS));
