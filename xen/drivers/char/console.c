@@ -939,8 +939,7 @@ void panic(const char *fmt, ...)
     else
     {
         watchdog_disable();
-        mdelay(5000);
-        machine_restart();
+        machine_restart(5000);
     }
 }
 

@@ -80,17 +80,17 @@ distclean: clean
 
 .PHONY: install
 install: all
-	rm -rf $(DESTDIR)$(pkgdocdir)
-	$(INSTALL_DIR) $(DESTDIR)$(pkgdocdir)
+	rm -rf $(DESTDIR)$(DOCDIR)
+	$(INSTALL_DIR) $(DESTDIR)$(DOCDIR)
 
 	$(MAKE) -C xen-api install
 
-	cp -dR ps $(DESTDIR)$(pkgdocdir)
-	cp -dR pdf $(DESTDIR)$(pkgdocdir)
-	$(INSTALL_DIR) $(DESTDIR)$(mandir)
-	cp -dR man1 $(DESTDIR)$(mandir)
-	cp -dR man5 $(DESTDIR)$(mandir)
-	[ ! -d html ] || cp -dR html $(DESTDIR)$(pkgdocdir)
+	cp -dR ps $(DESTDIR)$(DOCDIR)
+	cp -dR pdf $(DESTDIR)$(DOCDIR)
+	$(INSTALL_DIR) $(DESTDIR)$(MANDIR)
+	cp -dR man1 $(DESTDIR)$(MANDIR)
+	cp -dR man5 $(DESTDIR)$(MANDIR)
+	[ ! -d html ] || cp -dR html $(DESTDIR)$(DOCDIR)
 
 pdf/%.pdf: ps/%.ps
 	$(INSTALL_DIR) $(@D)

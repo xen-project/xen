@@ -248,8 +248,7 @@ static int construct_secondary_tables(uint8_t *buf, unsigned long *table_ptrs)
     return align16(offset);
 }
 
-/* Copy all the ACPI table to buffer. */
-int acpi_build_tables(uint8_t *buf)
+static void __acpi_build_tables(uint8_t *buf, int *low_sz, int *high_sz)
 {
     struct acpi_20_rsdp *rsdp;
     struct acpi_20_rsdt *rsdt;
@@ -261,7 +260,9 @@ int acpi_build_tables(uint8_t *buf)
     unsigned long        secondary_tables[16];
     int                  offset = 0, i;
 
-    offset += construct_bios_info_table(&buf[offset]);
+    /*
+     * Fill in high-memory data structures, starting at @buf.
+     */
 
     facs = (struct acpi_20_facs *)&buf[offset];
     memcpy(facs, &Facs, sizeof(struct acpi_20_facs));
@@ -325,7 +326,18 @@ int acpi_build_tables(uint8_t *buf)
                  offsetof(struct acpi_header, checksum),
                  rsdt->header.length);
 
+    *high_sz = offset;
+
+    /*
+     * Fill in low-memory data structures: bios_info_table and RSDP.
+     */
+
+    buf = (uint8_t *)ACPI_PHYSICAL_ADDRESS;
+    offset = 0;
+
+    offset += construct_bios_info_table(&buf[offset]);
     rsdp = (struct acpi_20_rsdp *)&buf[offset];
+
     memcpy(rsdp, &Rsdp, sizeof(struct acpi_20_rsdp));
     offset += align16(sizeof(struct acpi_20_rsdp));
     rsdp->rsdt_address = (unsigned long)rsdt;
@@ -337,7 +349,28 @@ int acpi_build_tables(uint8_t *buf)
                  offsetof(struct acpi_20_rsdp, extended_checksum),
                  sizeof(struct acpi_20_rsdp));
 
-    return offset;
+    *low_sz = offset;
+}
+
+void acpi_build_tables(void)
+{
+    int high_sz, low_sz;
+    uint8_t *buf;
+
+    /* Find out size of high-memory ACPI data area. */
+    buf = (uint8_t *)&_end;
+    __acpi_build_tables(buf, &low_sz, &high_sz);
+    memset(buf, 0, high_sz);
+
+    /* Allocate data area and set up ACPI tables there. */
+    buf = (uint8_t *)e820_malloc(high_sz);
+    __acpi_build_tables(buf, &low_sz, &high_sz);
+
+    printf(" - Lo data: %08lx-%08lx\n"
+           " - Hi data: %08lx-%08lx\n",
+           (unsigned long)ACPI_PHYSICAL_ADDRESS,
+           (unsigned long)ACPI_PHYSICAL_ADDRESS + low_sz - 1,
+           (unsigned long)buf, (unsigned long)buf + high_sz - 1);
 }
 
 /*

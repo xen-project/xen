@@ -64,6 +64,9 @@ import inspect
 from xen.xend import XendOptions
 xoptions = XendOptions.instance()
 
+import signal
+signal.signal(signal.SIGINT, signal.SIG_DFL)
+
 # getopt.gnu_getopt is better, but only exists in Python 2.3+.  Use
 # getopt.getopt if gnu_getopt is not available.  This will mean that options
 # may only be specified before positional arguments.
@@ -97,6 +100,8 @@ SUBCOMMAND_HELP = {
     
     'console'     : ('[-q|--quiet] <Domain>',
                      'Attach to <Domain>\'s console.'),
+    'vncviewer'   : ('[--[vncviewer-]autopass] <Domain>',
+                     'Attach to <Domain>\'s VNC server.'),
     'create'      : ('<ConfigFile> [options] [vars]',
                      'Create a domain based on <ConfigFile>.'),
     'destroy'     : ('<Domain>',
@@ -243,6 +248,10 @@ SUBCOMMAND_OPTIONS = {
     'console': (
        ('-q', '--quiet', 'Do not print an error message if the domain does not exist'),
     ),
+    'vncviewer': (
+       ('', '--autopass', 'Pass VNC password to viewer via stdin and -autopass'),
+       ('', '--vncviewer-autopass', '(consistency alias for --autopass)'),
+    ),
     'dmesg': (
        ('-c', '--clear', 'Clear dmesg buffer as well as printing it'),
     ),
@@ -260,6 +269,8 @@ SUBCOMMAND_OPTIONS = {
     'start': (
        ('-p', '--paused', 'Do not unpause domain after starting it'),
        ('-c', '--console_autoconnect', 'Connect to the console after the domain is created'),
+       ('', '--vncviewer', 'Connect to display via VNC after the domain is created'),
+       ('', '--vncviewer-autopass', 'Pass VNC password to viewer via stdin and -autopass'),
     ),
     'resume': (
        ('-p', '--paused', 'Do not unpause domain after resuming it'),
@@ -277,6 +288,7 @@ SUBCOMMAND_OPTIONS = {
 
 common_commands = [
     "console",
+    "vncviewer",
     "create",
     "new",
     "delete",
@@ -304,6 +316,7 @@ common_commands = [
 
 domain_commands = [
     "console",
+    "vncviewer",
     "create",
     "new",
     "delete",
@@ -1185,14 +1198,20 @@ def xm_start(args):
 
     paused = False
     console_autoconnect = False
+    vncviewer = False
+    vncviewer_autopass = False
 
     try:
-        (options, params) = getopt.gnu_getopt(args, 'cp', ['console_autoconnect','paused'])
+        (options, params) = getopt.gnu_getopt(args, 'cp', ['console_autoconnect','paused','vncviewer','vncviewer-autopass'])
         for (k, v) in options:
             if k in ('-p', '--paused'):
                 paused = True
             if k in ('-c', '--console_autoconnect'):
                 console_autoconnect = True
+            if k in ('--vncviewer'):
+                vncviewer = True
+            if k in ('--vncviewer-autopass'):
+                vncviewer_autopass = True
 
         if len(params) != 1:
             raise OptionError("Expects 1 argument")
@@ -1204,6 +1223,9 @@ def xm_start(args):
 
     if console_autoconnect:
         start_do_console(dom)
+
+    if console_autoconnect:
+        console.runVncViewer(domid, vncviewer_autopass, True)
 
     try:
         if serverType == SERVER_XEN_API:
@@ -1783,6 +1805,40 @@ def xm_console(args):
     console.execConsole(domid)
 
 
+def domain_name_to_domid(domain_name):
+    if serverType == SERVER_XEN_API:
+        domid = server.xenapi.VM.get_domid(
+                   get_single_vm(domain_name))
+    else:
+        dom = server.xend.domain(domain_name)
+        domid = int(sxp.child_value(dom, 'domid', '-1'))
+    return domid
+
+def xm_vncviewer(args):
+    autopass = False;
+
+    try:
+        (options, params) = getopt.gnu_getopt(args, '', ['autopass','vncviewer-autopass'])
+    except getopt.GetoptError, opterr:
+        err(opterr)
+        usage('vncviewer')
+
+    for (k, v) in options:
+        if k in ['--autopass','--vncviewer-autopass']:
+            autopass = True
+        else:
+            assert False
+
+    if len(params) != 1:
+        err('No domain given (or several parameters specified)')
+        usage('vncviewer')
+
+    dom = params[0]
+    domid = domain_name_to_domid(dom)
+
+    console.runVncViewer(domid, autopass)
+
+
 def xm_uptime(args):
     short_mode = 0
 
@@ -2102,7 +2158,23 @@ def xm_pci_list(args):
 
     dom = params[0]
 
-    devs = server.xend.domain.getDeviceSxprs(dom, 'pci')
+    devs = []
+    if serverType == SERVER_XEN_API:
+        for dpci_ref in server.xenapi.VM.get_DPCIs(get_single_vm(dom)):
+            ppci_ref = server.xenapi.DPCI.get_PPCI(dpci_ref)
+            ppci_record = server.xenapi.PPCI.get_record(ppci_ref)
+            dev = {
+                "domain":   "0x%04x" % int(ppci_record["domain"]),
+                "bus":      "0x%02x" % int(ppci_record["bus"]),
+                "slot":     "0x%02x" % int(ppci_record["slot"]),
+                "func":     "0x%01x" % int(ppci_record["func"]),
+                "vslt":     "0x%02x" % \
+                            int(server.xenapi.DPCI.get_hotplug_slot(dpci_ref))
+            }
+            devs.append(dev)
+
+    else:
+        devs = server.xend.domain.getDeviceSxprs(dom, 'pci')
 
     if len(devs) == 0:
         return
@@ -2362,7 +2434,34 @@ def parse_pci_configuration(args, state):
 def xm_pci_attach(args):
     arg_check(args, 'pci-attach', 2, 3)
     (dom, pci) = parse_pci_configuration(args, 'Initialising')
-    server.xend.domain.device_configure(dom, pci)
+
+    if serverType == SERVER_XEN_API:
+
+        pci_dev = sxp.children(pci, 'dev')[0]
+        domain = int(sxp.child_value(pci_dev, 'domain'), 16)
+        bus = int(sxp.child_value(pci_dev, 'bus'), 16)
+        slot = int(sxp.child_value(pci_dev, 'slot'), 16)
+        func = int(sxp.child_value(pci_dev, 'func'), 16)
+        vslt = int(sxp.child_value(pci_dev, 'vslt'), 16)
+        name = "%04x:%02x:%02x.%01x" % (domain, bus, slot, func)
+
+        target_ref = None
+        for ppci_ref in server.xenapi.PPCI.get_all():
+            if name == server.xenapi.PPCI.get_name(ppci_ref):
+                target_ref = ppci_ref
+                break
+        if target_ref is None:
+            raise OptionError("Device %s not found" % name)
+
+        dpci_record = {
+            "VM":           get_single_vm(dom),
+            "PPCI":         target_ref,
+            "hotplug_slot": vslt
+        }
+        server.xenapi.DPCI.create(dpci_record)
+
+    else:
+        server.xend.domain.device_configure(dom, pci)
 
 def xm_scsi_attach(args):
     xenapi_unsupported()
@@ -2462,7 +2561,29 @@ def xm_network_detach(args):
 def xm_pci_detach(args):
     arg_check(args, 'pci-detach', 2)
     (dom, pci) = parse_pci_configuration(args, 'Closing')
-    server.xend.domain.device_configure(dom, pci)
+
+    if serverType == SERVER_XEN_API:
+
+        pci_dev = sxp.children(pci, 'dev')[0]
+        domain = int(sxp.child_value(pci_dev, 'domain'), 16)
+        bus = int(sxp.child_value(pci_dev, 'bus'), 16)
+        slot = int(sxp.child_value(pci_dev, 'slot'), 16)
+        func = int(sxp.child_value(pci_dev, 'func'), 16)
+        vslt = int(sxp.child_value(pci_dev, 'vslt'), 16)
+        name = "%04x:%02x:%02x.%01x" % (domain, bus, slot, func)
+
+        target_ref = None
+        for dpci_ref in server.xenapi.VM.get_DPCIs(get_single_vm(dom)):
+            ppci_ref = server.xenapi.DPCI.get_PPCI(dpci_ref)
+            if name == server.xenapi.PPCI.get_name(ppci_ref):
+                target_ref = ppci_ref
+                server.xenapi.DPCI.destroy(dpci_ref)
+                break
+        if target_ref is None:
+            raise OptionError("Device %s not assigned" % name)
+
+    else:
+        server.xend.domain.device_configure(dom, pci)
 
 def xm_scsi_detach(args):
     xenapi_unsupported()
@@ -2617,6 +2738,7 @@ commands = {
     "event-monitor": xm_event_monitor,
     # console commands
     "console": xm_console,
+    "vncviewer": xm_vncviewer,
     # xenstat commands
     "top": xm_top,
     # domain commands

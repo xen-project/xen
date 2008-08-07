@@ -1,6 +1,8 @@
 #ifndef UTIL_H
 #define UTIL_H
 
+#include "../hvmloader/acpi/acpi2_0.h"
+
 void outb(uint16_t addr, uint8_t val);
 void outw(uint16_t addr, uint16_t val);
 void outl(uint16_t addr, uint32_t val);
@@ -39,5 +41,6 @@ static inline uint32_t mmio_readl(uint32_t *addr)
 	return *(volatile uint32_t *)addr;
 }
 
+struct acpi_20_rsdp *find_rsdp(void);
 
 #endif

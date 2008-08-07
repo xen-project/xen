@@ -71,7 +71,7 @@ static int bp_suspend(void)
 	return suspend_cancelled;
 }
 
-int __xen_suspend(int fast_suspend, void (*resume_notifier)(void))
+int __xen_suspend(int fast_suspend, void (*resume_notifier)(int))
 {
 	int err, suspend_cancelled, nr_cpus;
 	struct ap_suspend_info info;
@@ -101,7 +101,7 @@ int __xen_suspend(int fast_suspend, void (*resume_notifier)(void))
 
 	local_irq_disable();
 	suspend_cancelled = bp_suspend();
-	resume_notifier();
+	resume_notifier(suspend_cancelled);
 	local_irq_enable();
 
 	smp_mb();

@@ -109,7 +109,7 @@ xenstat_handle *xenstat_init(void)
 
 	handle->xshandle = xs_daemon_open_readonly(); /* open handle to xenstore*/
 	if (handle->xshandle == NULL) {
-		perror("unable to open xenstore\n");
+		perror("unable to open xenstore");
 		xc_interface_close(handle->xc_handle);
 		free(handle);
 		return NULL;

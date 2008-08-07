@@ -296,12 +296,11 @@ void cpufreq_suspend(void)
 {
     int cpu;
 
-    /* to protect the case when Px was controlled by dom0-kernel */
-    /* or when CPU_FREQ not set in which case ACPI Px objects not parsed */
+    /* to protect the case when Px was not controlled by xen */
     for_each_online_cpu(cpu) {
         struct processor_performance *perf = &processor_pminfo[cpu].perf;
 
-        if (!perf->init)
+        if (!(perf->init & XEN_PX_INIT))
             return;
     }
 
@@ -316,14 +315,13 @@ int cpufreq_resume(void)
 {
     int cpu, ret = 0;
 
-    /* 1. to protect the case when Px was controlled by dom0-kernel */
-    /* or when CPU_FREQ not set in which case ACPI Px objects not parsed */
+    /* 1. to protect the case when Px was not controlled by xen */
     /* 2. set state and resume flag to sync cpu to right state and freq */
     for_each_online_cpu(cpu) {
         struct processor_performance *perf = &processor_pminfo[cpu].perf;
         struct cpufreq_policy *policy = &xen_px_policy[cpu];
 
-        if (!perf->init)
+        if (!(perf->init & XEN_PX_INIT))
             goto err;
         perf->state = 0;
         policy->resume = 1;

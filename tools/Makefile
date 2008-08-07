@@ -55,13 +55,14 @@ install: subdirs-install
 clean distclean: subdirs-clean
 
 ifneq ($(XEN_COMPILE_ARCH),$(XEN_TARGET_ARCH))
-IOEMU_CONFIGURE_CROSS ?= --cross-prefix=$(CROSS_COMPILE) \
+IOEMU_CONFIGURE_CROSS ?= --cpu=$(XEN_TARGET_ARCH) \
+			 --cross-prefix=$(CROSS_COMPILE) \
 			 --interp-prefix=$(CROSS_SYS_ROOT)
 endif
 
 ioemu/config-host.mak:
-	cd ioemu && XEN_TARGET_ARCH=$(XEN_TARGET_ARCH) sh configure --prefix=/usr \
-		$(IOEMU_CONFIGURE_CROSS)
+	cd ioemu && XEN_TARGET_ARCH=$(XEN_TARGET_ARCH) sh configure \
+		--prefix=$(PREFIX) $(IOEMU_CONFIGURE_CROSS)
 
 subdir-all-ioemu subdir-install-ioemu: ioemu/config-host.mak
 
@@ -78,6 +79,12 @@ ioemu-dir-find:
 			rm -rf ioemu-remote ioemu-remote.tmp; \
 			mkdir ioemu-remote.tmp; rmdir ioemu-remote.tmp; \
 			$(GIT) clone $(CONFIG_QEMU) ioemu-remote.tmp; \
+			if [ "$(QEMU_TAG)" ]; then			\
+				cd ioemu-remote.tmp;			\
+				$(GIT) branch -D dummy >/dev/null 2>&1 ||:; \
+				$(GIT) checkout -b dummy $(QEMU_TAG);	\
+				cd ..;					\
+			fi;						\
 			mv ioemu-remote.tmp ioemu-remote; \
 		fi; \
 		rm -f ioemu-dir; \
@@ -90,7 +97,7 @@ ioemu-dir-find:
 		esac; \
 		export XEN_ROOT; \
 		cd ioemu-dir; \
-		./xen-setup
+		./xen-setup $(IOEMU_CONFIGURE_CROSS)
 
 subdir-all-ioemu-dir subdir-install-ioemu-dir: ioemu-dir-find
 

@@ -568,16 +568,19 @@ static xen_pfn_t *xc_map_m2p(int xc_handle,
     unsigned long m2p_chunks, m2p_size;
     xen_pfn_t *m2p;
     xen_pfn_t *extent_start;
-    int i, rc;
+    int i;
 
+    m2p = NULL;
     m2p_size   = M2P_SIZE(max_mfn);
     m2p_chunks = M2P_CHUNKS(max_mfn);
 
     xmml.max_extents = m2p_chunks;
-    if ( !(extent_start = malloc(m2p_chunks * sizeof(xen_pfn_t))) )
+
+    extent_start = calloc(m2p_chunks, sizeof(xen_pfn_t));
+    if ( !extent_start )
     {
         ERROR("failed to allocate space for m2p mfns");
-        return NULL;
+        goto err0;
     }
     set_xen_guest_handle(xmml.extent_start, extent_start);
 
@@ -585,41 +588,36 @@ static xen_pfn_t *xc_map_m2p(int xc_handle,
          (xmml.nr_extents != m2p_chunks) )
     {
         ERROR("xc_get_m2p_mfns");
-        return NULL;
+        goto err1;
     }
 
-    if ( (m2p = mmap(NULL, m2p_size, prot,
-                     MAP_SHARED, xc_handle, 0)) == MAP_FAILED )
-    {
-        ERROR("failed to mmap m2p");
-        return NULL;
-    }
-
-    if ( !(entries = malloc(m2p_chunks * sizeof(privcmd_mmap_entry_t))) )
+    entries = calloc(m2p_chunks, sizeof(privcmd_mmap_entry_t));
+    if (entries == NULL)
     {
         ERROR("failed to allocate space for mmap entries");
-        return NULL;
+        goto err1;
     }
 
     for ( i = 0; i < m2p_chunks; i++ )
-    {
-        entries[i].va = (unsigned long)(((void *)m2p) + (i * M2P_CHUNK_SIZE));
         entries[i].mfn = extent_start[i];
-        entries[i].npages = M2P_CHUNK_SIZE >> PAGE_SHIFT;
-    }
 
-    if ( (rc = xc_map_foreign_ranges(xc_handle, DOMID_XEN,
-                                     entries, m2p_chunks)) < 0 )
+    m2p = xc_map_foreign_ranges(xc_handle, DOMID_XEN,
+			m2p_size, prot, M2P_CHUNK_SIZE,
+			entries, m2p_chunks);
+    if (m2p == NULL)
     {
-        ERROR("xc_mmap_foreign_ranges failed (rc = %d)", rc);
-        return NULL;
+        ERROR("xc_mmap_foreign_ranges failed");
+        goto err2;
     }
 
     m2p_mfn0 = entries[0].mfn;
 
-    free(extent_start);
+err2:
     free(entries);
+err1:
+    free(extent_start);
 
+err0:
     return m2p;
 }
 

@@ -1606,6 +1606,7 @@ x86_emulate(
         dst.val = _regs.eax;
     case 0x38 ... 0x3b: cmp: /* cmp */
         emulate_2op_SrcV("cmp", src, dst, _regs.eflags);
+        dst.type = OP_NONE;
         break;
 
     case 0x62: /* bound */ {
@@ -1707,6 +1708,7 @@ x86_emulate(
         dst.val = _regs.eax;
     case 0x84 ... 0x85: test: /* test */
         emulate_2op_SrcV("test", src, dst, _regs.eflags);
+        dst.type = OP_NONE;
         break;
 
     case 0x86 ... 0x87: xchg: /* xchg */

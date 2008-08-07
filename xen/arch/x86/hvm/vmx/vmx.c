@@ -1971,7 +1971,7 @@ static void ept_handle_violation(unsigned long qualification, paddr_t gpa)
     }
 
     mfn = gfn_to_mfn(d, gfn, &t);
-    if ( p2m_is_ram(t) && paging_mode_log_dirty(d) )
+    if ( (t != p2m_ram_ro) && p2m_is_ram(t) && paging_mode_log_dirty(d) )
     {
         paging_mark_dirty(d, mfn_x(mfn));
         p2m_change_type(d, gfn, p2m_ram_logdirty, p2m_ram_rw);

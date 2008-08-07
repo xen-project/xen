@@ -57,6 +57,7 @@ struct pcifront_dev *init_pcifront(char *_nodename)
     int retry=0;
     char* msg;
     char* nodename = _nodename ? _nodename : "device/pci/0";
+    int dom;
 
     struct pcifront_dev *dev;
 
@@ -64,12 +65,18 @@ struct pcifront_dev *init_pcifront(char *_nodename)
 
     printk("******************* PCIFRONT for %s **********\n\n\n", nodename);
 
+    snprintf(path, sizeof(path), "%s/backend-id", nodename);
+    dom = xenbus_read_integer(path); 
+    if (dom == -1) {
+        printk("no backend\n");
+        return NULL;
+    }
+
     dev = malloc(sizeof(*dev));
     memset(dev, 0, sizeof(*dev));
     dev->nodename = strdup(nodename);
+    dev->dom = dom;
 
-    snprintf(path, sizeof(path), "%s/backend-id", nodename);
-    dev->dom = xenbus_read_integer(path); 
     evtchn_alloc_unbound(dev->dom, pcifront_handler, dev, &dev->evtchn);
 
     dev->info = (struct xen_pci_sharedinfo*) alloc_page();

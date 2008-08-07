@@ -3,17 +3,22 @@ MINI_OS = $(XEN_ROOT)/extras/mini-os
 
 export XEN_OS=MiniOS
 
-CONFIG_QEMU=ioemu
-
 export stubdom=y
 export debug=y
 include $(XEN_ROOT)/Config.mk
 
+override CONFIG_QEMU=ioemu
+
 IOEMU_OPTIONS=--disable-sdl --disable-opengl --disable-gfx-check --disable-vnc-tls --disable-brlapi --disable-kqemu
+ZLIB_URL?=http://www.zlib.net
 ZLIB_VERSION=1.2.3
+LIBPCI_URL?=http://www.kernel.org/pub/software/utils/pciutils
 LIBPCI_VERSION=2.2.9
+NEWLIB_URL?=ftp://sources.redhat.com/pub/newlib
 NEWLIB_VERSION=1.16.0
+LWIP_URL?=http://download.savannah.gnu.org/releases/lwip
 LWIP_VERSION=1.3.0
+GRUB_URL?=http://alpha.gnu.org/gnu/grub
 GRUB_VERSION=0.97
 
 WGET=wget -c
@@ -75,7 +80,7 @@ endif
 ##############
 
 newlib-$(NEWLIB_VERSION).tar.gz:
-	$(WGET) ftp://sources.redhat.com/pub/newlib/$@
+	$(WGET) $(NEWLIB_URL)/$@
 
 newlib-$(NEWLIB_VERSION): newlib-$(NEWLIB_VERSION).tar.gz
 	tar xzf $<
@@ -97,7 +102,7 @@ $(NEWLIB_STAMPFILE): mk-headers newlib-$(NEWLIB_VERSION)
 ############
 
 zlib-$(ZLIB_VERSION).tar.gz:
-	$(WGET) http://www.zlib.net/$@
+	$(WGET) $(ZLIB_URL)/$@
 
 ZLIB_STAMPFILE=$(CROSS_ROOT)/$(GNU_TARGET_ARCH)-xen-elf/lib/libz.a
 .PHONY: cross-zlib
@@ -114,7 +119,7 @@ $(ZLIB_STAMPFILE): zlib-$(ZLIB_VERSION).tar.gz $(NEWLIB_STAMPFILE)
 ##############
 
 pciutils-$(LIBPCI_VERSION).tar.bz2:
-	$(WGET) http://www.kernel.org/pub/software/utils/pciutils/$@
+	$(WGET) $(LIBPCI_URL)/$@
 
 pciutils-$(LIBPCI_VERSION): pciutils-$(LIBPCI_VERSION).tar.bz2
 	tar xjf $<
@@ -132,7 +137,7 @@ $(LIBPCI_STAMPFILE): pciutils-$(LIBPCI_VERSION) $(NEWLIB_STAMPFILE) $(ZLIB_STAMP
 	  $(MAKE) CC="$(CC) $(TARGET_CPPFLAGS) $(TARGET_CFLAGS) -I$(realpath $(MINI_OS)/include)" lib/libpci.a && \
 	  $(INSTALL_DATA) lib/libpci.a $(CROSS_PREFIX)/$(GNU_TARGET_ARCH)-xen-elf/lib/ && \
 	  $(INSTALL_DIR) $(CROSS_PREFIX)/$(GNU_TARGET_ARCH)-xen-elf/include/pci && \
-	  $(INSTALL_DATA) lib/{config,header,pci,types}.h $(CROSS_PREFIX)/$(GNU_TARGET_ARCH)-xen-elf/include/pci/ \
+	  $(INSTALL_DATA) lib/config.h lib/header.h lib/pci.h lib/types.h $(CROSS_PREFIX)/$(GNU_TARGET_ARCH)-xen-elf/include/pci/ \
 	)
 
 ######
@@ -140,7 +145,7 @@ $(LIBPCI_STAMPFILE): pciutils-$(LIBPCI_VERSION) $(NEWLIB_STAMPFILE) $(ZLIB_STAMP
 ######
 
 lwip-$(LWIP_VERSION).tar.gz:
-	$(WGET) http://download.savannah.gnu.org/releases/lwip/$@
+	$(WGET) $(LWIP_URL)/$@
 
 lwip: lwip-$(LWIP_VERSION).tar.gz
 	tar xzf $<
@@ -154,7 +159,6 @@ lwip: lwip-$(LWIP_VERSION).tar.gz
 .PHONY: $(CROSS_ROOT)
 $(CROSS_ROOT): cross-newlib cross-zlib cross-libpci
 
-.PHONY: mk-headers
 mk-headers:
 	mkdir -p include/xen && \
           ln -sf $(addprefix ../../,$(wildcard $(XEN_ROOT)/xen/include/public/*.h)) include/xen && \
@@ -191,6 +195,7 @@ endif
 	[ ! -h ioemu/config-host.h ] || rm -f ioemu/config-host.h
 	[ ! -h ioemu/config-host.mak ] || rm -f ioemu/config-host.mak
 	$(MAKE) -C $(MINI_OS) links
+	touch mk-headers
 
 TARGETS_MINIOS=$(addprefix mini-os-,$(TARGETS))
 $(TARGETS_MINIOS): mini-os-%:
@@ -247,7 +252,7 @@ c: $(CROSS_ROOT)
 ######
 
 grub-$(GRUB_VERSION).tar.gz:
-	$(WGET) ftp://alpha.gnu.org/gnu/grub/$@
+	$(WGET) $(GRUB_URL)/$@
 
 grub-upstream: grub-$(GRUB_VERSION).tar.gz
 	tar xzf $<
@@ -291,20 +296,24 @@ pv-grub: mini-os-grub libxc grub
 #########
 
 ifeq ($(STUBDOM_SUPPORTED),1)
-install: install-ioemu install-grub
+install: install-readme install-ioemu install-grub
 else
 install:
 endif
+
+install-readme:
+	$(INSTALL_DIR) $(DESTDIR)$(DOCDIR)
+	$(INSTALL_DATA) README $(DESTDIR)$(DOCDIR)/README.stubdom
 
 install-ioemu: ioemu-stubdom
 	$(INSTALL_DIR) "$(DESTDIR)/usr/lib/xen/bin"
 	$(INSTALL_PROG) stubdom-dm "$(DESTDIR)/usr/lib/xen/bin"
 	$(INSTALL_DIR) "$(DESTDIR)/usr/lib/xen/boot"
-	$(INSTALL_PROG) mini-os-ioemu/mini-os.gz "$(DESTDIR)/usr/lib/xen/boot/ioemu-stubdom.gz"
+	$(INSTALL_DATA) mini-os-ioemu/mini-os.gz "$(DESTDIR)/usr/lib/xen/boot/ioemu-stubdom.gz"
 
 install-grub: pv-grub
 	$(INSTALL_DIR) "$(DESTDIR)/usr/lib/xen/boot"
-	$(INSTALL_PROG) mini-os-grub/mini-os.gz "$(DESTDIR)/usr/lib/xen/boot/pv-grub.gz"
+	$(INSTALL_DATA) mini-os-grub/mini-os.gz "$(DESTDIR)/usr/lib/xen/boot/pv-grub.gz"
 
 #######
 # clean
@@ -320,7 +329,8 @@ clean:
 	$(MAKE) -C caml clean
 	$(MAKE) -C c clean
 	$(MAKE) -C grub clean
-	rm -fr libxc ioemu mini-os include
+	[ ! -d libxc ] || $(MAKE) -C libxc clean
+	[ ! -d ioemu ] || $(MAKE) -C ioemu clean
 
 # clean the cross-compilation result
 .PHONY: crossclean
@@ -328,6 +338,8 @@ crossclean: clean
 	rm -fr $(CROSS_ROOT)
 	rm -fr newlib-build
 	rm -fr zlib-$(ZLIB_VERSION) pciutils-$(LIBPCI_VERSION)
+	rm -fr libxc ioemu
+	rm -f mk-headers
 
 # clean patched sources
 .PHONY: patchclean

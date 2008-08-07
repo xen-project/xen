@@ -459,7 +459,7 @@ int pirq_guest_bind(struct vcpu *v, int irq, int will_share)
     return rc;
 }
 
-int pirq_guest_unbind(struct domain *d, int irq)
+void pirq_guest_unbind(struct domain *d, int irq)
 {
     irq_desc_t         *desc = &irq_desc[irq];
     irq_guest_action_t *action;
@@ -493,7 +493,6 @@ int pirq_guest_unbind(struct domain *d, int irq)
     }
 
     spin_unlock_irqrestore(&desc->lock, flags);    
-    return 0;
 }
 
 void

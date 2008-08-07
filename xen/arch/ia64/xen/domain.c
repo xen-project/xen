@@ -2212,8 +2212,9 @@ int __init construct_dom0(struct domain *d,
 	return 0;
 }
 
-void machine_restart(void)
+void machine_restart(unsigned int delay_millisecs)
 {
+	mdelay(delay_millisecs);
 	console_start_sync();
 	if (running_on_sim)
 		printk ("machine_restart called.  spinning...\n");

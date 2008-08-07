@@ -109,10 +109,11 @@ int xenbus_get_watch_fd(void)
     return xs_fileno(xsh); 
 }
 
-void xenbus_read_mount_request(struct mount *mount, char *frontend)
+void xenbus_read_mount_request(struct fs_mount *mount, char *frontend)
 {
     char node[1024];
     char *s;
+    int i;
 
     assert(xsh != NULL);
 #if 0
@@ -125,10 +126,18 @@ void xenbus_read_mount_request(struct mount *mount, char *frontend)
     s = xs_read(xsh, XBT_NULL, node, NULL);
     assert(strcmp(s, STATE_READY) == 0);
     free(s);
-    snprintf(node, sizeof(node), "%s/ring-ref", frontend);
+    snprintf(node, sizeof(node), "%s/ring-size", frontend);
     s = xs_read(xsh, XBT_NULL, node, NULL);
-    mount->gref = atoi(s);
+    mount->shared_ring_size = atoi(s);
+    assert(mount->shared_ring_size <= MAX_RING_SIZE);
     free(s);
+    for(i=0; i<mount->shared_ring_size; i++)
+    {
+        snprintf(node, sizeof(node), "%s/ring-ref-%d", frontend, i);
+        s = xs_read(xsh, XBT_NULL, node, NULL);
+        mount->grefs[i] = atoi(s);
+        free(s);
+    }
     snprintf(node, sizeof(node), "%s/event-channel", frontend);
     s = xs_read(xsh, XBT_NULL, node, NULL);
     mount->remote_evtchn = atoi(s);
@@ -150,7 +159,7 @@ static int get_self_id(void)
 } 
 
 
-void xenbus_write_backend_node(struct mount *mount)
+void xenbus_write_backend_node(struct fs_mount *mount)
 {
     char node[1024], backend_node[1024];
     int self_id;
@@ -167,7 +176,7 @@ void xenbus_write_backend_node(struct mount *mount)
     xs_write(xsh, XBT_NULL, node, STATE_INITIALISED, strlen(STATE_INITIALISED));
 }
 
-void xenbus_write_backend_ready(struct mount *mount)
+void xenbus_write_backend_ready(struct fs_mount *mount)
 {
     char node[1024];
     int self_id;

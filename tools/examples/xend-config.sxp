@@ -245,3 +245,7 @@
 
 # Rotation count of qemu-dm log file.
 #(qemu-dm-logrotate-count 10)
+
+# Path where persistent domain configuration is stored.
+# Default is /var/lib/xend/domains/
+#(xend-domains-path /var/lib/xend/domains)

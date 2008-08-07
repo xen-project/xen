@@ -1138,8 +1138,10 @@ static int alloc_l2_table(struct page_info *page, unsigned long type)
 
     for ( i = 0; i < L2_PAGETABLE_ENTRIES; i++ )
     {
-        if ( is_guest_l2_slot(d, type, i) &&
-             unlikely(!get_page_from_l2e(pl2e[i], pfn, d)) )
+        if ( !is_guest_l2_slot(d, type, i) )
+            continue;
+
+        if ( unlikely(!get_page_from_l2e(pl2e[i], pfn, d)) )
             goto fail;
         
         adjust_guest_l2e(pl2e[i], d);
@@ -1206,8 +1208,9 @@ static int alloc_l3_table(struct page_info *page)
                                                 d) )
                 goto fail;
         }
-        else if ( is_guest_l3_slot(i) &&
-                  unlikely(!get_page_from_l3e(pl3e[i], pfn, d)) )
+        else if ( !is_guest_l3_slot(i) )
+            continue;
+        else if ( unlikely(!get_page_from_l3e(pl3e[i], pfn, d)) )
             goto fail;
 
         adjust_guest_l3e(pl3e[i], d);
@@ -1222,8 +1225,12 @@ static int alloc_l3_table(struct page_info *page)
  fail:
     MEM_LOG("Failure in alloc_l3_table: entry %d", i);
     while ( i-- > 0 )
-        if ( is_guest_l3_slot(i) )
-            put_page_from_l3e(pl3e[i], pfn);
+    {
+        if ( !is_guest_l3_slot(i) )
+            continue;
+        unadjust_guest_l3e(pl3e[i], d);
+        put_page_from_l3e(pl3e[i], pfn);
+    }
 
     unmap_domain_page(pl3e);
     return 0;
@@ -1242,8 +1249,10 @@ static int alloc_l4_table(struct page_info *page)
 
     for ( i = 0; i < L4_PAGETABLE_ENTRIES; i++ )
     {
-        if ( is_guest_l4_slot(d, i) &&
-             unlikely(!get_page_from_l4e(pl4e[i], pfn, d)) )
+        if ( !is_guest_l4_slot(d, i) )
+            continue;
+
+        if ( unlikely(!get_page_from_l4e(pl4e[i], pfn, d)) )
             goto fail;
 
         adjust_guest_l4e(pl4e[i], d);
@@ -1585,7 +1594,7 @@ static int mod_l3_entry(l3_pgentry_t *pl3e,
     struct vcpu *curr = current;
     struct domain *d = curr->domain;
     struct page_info *l3pg = mfn_to_page(pfn);
-    int okay, rc = 1;
+    int rc = 1;
 
     if ( unlikely(!is_guest_l3_slot(pgentry_ptr_to_slot(pl3e))) )
     {
@@ -1642,10 +1651,13 @@ static int mod_l3_entry(l3_pgentry_t *pl3e,
         return 0;
     }
 
-    okay = create_pae_xen_mappings(d, pl3e);
-    BUG_ON(!okay);
+    if ( likely(rc) )
+    {
+        if ( !create_pae_xen_mappings(d, pl3e) )
+            BUG();
 
-    pae_flush_pgd(pfn, pgentry_ptr_to_slot(pl3e), nl3e);
+        pae_flush_pgd(pfn, pgentry_ptr_to_slot(pl3e), nl3e);
+    }
 
     page_unlock(l3pg);
     put_page_from_l3e(ol3e, pfn);

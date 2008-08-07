@@ -273,6 +273,10 @@ static BlockDriverAIOCB *vbd_aio_flush(BlockDriverState *bs,
     BDRVVbdState *s = bs->opaque;
     VbdAIOCB *acb = NULL;
 
+    if (s->info.mode == O_RDONLY) {
+        cb(opaque, 0);
+        return NULL;
+    }
     if (s->info.barrier == 1) {
         acb = vbd_aio_setup(bs, 0, NULL, 0,
                 s->info.flush == 1 ? vbd_nop_cb : cb, opaque);

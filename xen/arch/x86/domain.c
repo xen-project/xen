@@ -1811,7 +1811,6 @@ int domain_relinquish_resources(struct domain *d)
         if ( ret )
             return ret;
 #endif
-        WARN_ON(d->xenheap_pages);
         break;
 
     default:

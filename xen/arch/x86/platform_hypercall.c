@@ -355,6 +355,11 @@ ret_t do_platform_op(XEN_GUEST_HANDLE(xen_platform_op_t) u_xenpf_op)
             struct processor_pminfo *pmpt;
             struct processor_performance *pxpt;
 
+            if ( !(xen_processor_pmbits & XEN_PROCESSOR_PM_PX) )
+            {
+                ret = -ENOSYS;
+                break;
+            }
             if ( cpuid < 0 )
             {
                 ret = -EINVAL;
@@ -373,6 +378,7 @@ ret_t do_platform_op(XEN_GUEST_HANDLE(xen_platform_op_t) u_xenpf_op)
                 memcpy ((void *)&pxpt->status_register,
                     (void *)&xenpxpt->status_register,
                     sizeof(struct xen_pct_register));
+                pxpt->init |= XEN_PX_PCT;
             }
             if ( xenpxpt->flags & XEN_PX_PSS ) 
             {
@@ -390,6 +396,7 @@ ret_t do_platform_op(XEN_GUEST_HANDLE(xen_platform_op_t) u_xenpf_op)
                     break;
                 }
                 pxpt->state_count = xenpxpt->state_count;
+                pxpt->init |= XEN_PX_PSS;
             }
             if ( xenpxpt->flags & XEN_PX_PSD )
             {
@@ -397,14 +404,18 @@ ret_t do_platform_op(XEN_GUEST_HANDLE(xen_platform_op_t) u_xenpf_op)
                 memcpy ((void *)&pxpt->domain_info,
                     (void *)&xenpxpt->domain_info,
                     sizeof(struct xen_psd_package));
+                pxpt->init |= XEN_PX_PSD;
             }
             if ( xenpxpt->flags & XEN_PX_PPC )
-                pxpt->ppc = xenpxpt->ppc;
-
-            if ( xenpxpt->flags == ( XEN_PX_PCT | XEN_PX_PSS | 
-                XEN_PX_PSD | XEN_PX_PPC ) )
             {
-                pxpt->init =1;
+                pxpt->ppc = xenpxpt->ppc;
+                pxpt->init |= XEN_PX_PPC;
+            }
+
+            if ( pxpt->init == ( XEN_PX_PCT | XEN_PX_PSS |
+                                 XEN_PX_PSD | XEN_PX_PPC ) )
+            {
+                pxpt->init |= XEN_PX_INIT;
                 cpu_count++;
             }
             if ( cpu_count == num_online_cpus() )
@@ -418,10 +429,20 @@ ret_t do_platform_op(XEN_GUEST_HANDLE(xen_platform_op_t) u_xenpf_op)
         }
  
         case XEN_PM_CX:
+            if ( !(xen_processor_pmbits & XEN_PROCESSOR_PM_CX) )
+            {
+                ret = -ENOSYS;
+                break;
+            }
             ret = set_cx_pminfo(op->u.set_pminfo.id, &op->u.set_pminfo.power);
             break;
 
         case XEN_PM_TX:
+            if ( !(xen_processor_pmbits & XEN_PROCESSOR_PM_TX) )
+            {
+                ret = -ENOSYS;
+                break;
+            }
             ret = -EINVAL;
             break;
 

@@ -22,7 +22,6 @@ int xc_physdev_pci_access_modify(int xc_handle,
 
 int xc_physdev_map_pirq(int xc_handle,
                         int domid,
-                        int type,
                         int index,
                         int *pirq)
 {
@@ -33,7 +32,7 @@ int xc_physdev_map_pirq(int xc_handle,
         return -EINVAL;
 
     map.domid = domid;
-    map.type = type;
+    map.type = MAP_PIRQ_TYPE_GSI;
     map.index = index;
     map.pirq = *pirq;
 
@@ -47,7 +46,6 @@ int xc_physdev_map_pirq(int xc_handle,
 
 int xc_physdev_map_pirq_msi(int xc_handle,
                             int domid,
-                            int type,
                             int index,
                             int *pirq,
                             int devfn,
@@ -62,7 +60,7 @@ int xc_physdev_map_pirq_msi(int xc_handle,
         return -EINVAL;
 
     map.domid = domid;
-    map.type = type;
+    map.type = MAP_PIRQ_TYPE_MSI;
     map.index = index;
     map.pirq = *pirq;
     map.msi_info.devfn = devfn;

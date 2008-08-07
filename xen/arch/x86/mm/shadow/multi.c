@@ -3359,7 +3359,7 @@ static int sh_page_fault(struct vcpu *v,
             gdprintk(XENLOG_DEBUG, "guest attempted write to read-only memory"
                      " page. va page=%#lx, mfn=%#lx\n",
                      va & PAGE_MASK, mfn_x(gmfn));
-        goto emulate; /* skip over the instruction */
+        goto emulate_readonly; /* skip over the instruction */
     }
 
     /* In HVM guests, we force CR0.WP always to be set, so that the
@@ -3404,6 +3404,11 @@ static int sh_page_fault(struct vcpu *v,
         goto done;
     }
 
+    /*
+     * Write from userspace to ro-mem needs to jump here to avoid getting
+     * caught by user-mode page-table check above.
+     */
+ emulate_readonly:
     /*
      * We don't need to hold the lock for the whole emulation; we will
      * take it again when we write to the pagetables.
@@ -4640,14 +4645,8 @@ static void *emulate_map_dest(struct vcpu *v,
                               u32 bytes,
                               struct sh_emulate_ctxt *sh_ctxt)
 {
-    struct segment_register *sreg;
     unsigned long offset;
     void *map = NULL;
-
-    /* We don't emulate user-mode writes to page tables */
-    sreg = hvm_get_seg_reg(x86_seg_ss, sh_ctxt);
-    if ( sreg->attr.fields.dpl == 3 )
-        return MAPPING_UNHANDLEABLE;
 
     sh_ctxt->mfn1 = emulate_gva_to_mfn(v, vaddr, sh_ctxt);
     if ( !mfn_valid(sh_ctxt->mfn1) ) 
@@ -4656,6 +4655,16 @@ static void *emulate_map_dest(struct vcpu *v,
                 (mfn_x(sh_ctxt->mfn1) == READONLY_GFN) ?
                 MAPPING_SILENT_FAIL : MAPPING_UNHANDLEABLE);
 
+#ifndef NDEBUG
+    /* We don't emulate user-mode writes to page tables */
+    if ( hvm_get_seg_reg(x86_seg_ss, sh_ctxt)->attr.fields.dpl == 3 )
+    {
+        gdprintk(XENLOG_DEBUG, "User-mode write to pagetable reached "
+                 "emulate_map_dest(). This should never happen!\n");
+        return MAPPING_UNHANDLEABLE;
+    }
+#endif
+                
     /* Unaligned writes mean probably this isn't a pagetable */
     if ( vaddr & (bytes - 1) )
         sh_remove_shadows(v, sh_ctxt->mfn1, 0, 0 /* Slow, can fail */ );

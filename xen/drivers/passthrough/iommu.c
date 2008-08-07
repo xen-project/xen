@@ -20,15 +20,48 @@
 
 extern struct iommu_ops intel_iommu_ops;
 extern struct iommu_ops amd_iommu_ops;
+static void parse_iommu_param(char *s);
 static int iommu_populate_page_table(struct domain *d);
 int intel_vtd_setup(void);
 int amd_iov_detect(void);
 
+/*
+ * The 'iommu' parameter enables the IOMMU.  Optional comma separated
+ * value may contain:
+ *
+ *   off|no|false|disable       Disable IOMMU (default)
+ *   pv                         Enable IOMMU for PV domains
+ *   no-pv                      Disable IOMMU for PV domains (default)
+ *   force|required             Don't boot unless IOMMU is enabled
+ */
+custom_param("iommu", parse_iommu_param);
 int iommu_enabled = 0;
-boolean_param("iommu", iommu_enabled);
-
 int iommu_pv_enabled = 0;
-boolean_param("iommu_pv", iommu_pv_enabled);
+int force_iommu = 0;
+
+static void __init parse_iommu_param(char *s)
+{
+    char *ss;
+    iommu_enabled = 1;
+
+    do {
+        ss = strchr(s, ',');
+        if ( ss )
+            *ss = '\0';
+
+        if ( !strcmp(s, "off") || !strcmp(s, "no") || !strcmp(s, "false") ||
+             !strcmp(s, "0") || !strcmp(s, "disable") )
+            iommu_enabled = 0;
+        else if ( !strcmp(s, "pv") )
+            iommu_pv_enabled = 1;
+        else if ( !strcmp(s, "no-pv") )
+            iommu_pv_enabled = 0;
+        else if ( !strcmp(s, "force") || !strcmp(s, "required") )
+            force_iommu = 1;
+
+        s = ss + 1;
+    } while ( ss );
+}
 
 int iommu_domain_init(struct domain *domain)
 {
@@ -126,14 +159,12 @@ static int iommu_populate_page_table(struct domain *d)
     return 0;
 }
 
+
 void iommu_domain_destroy(struct domain *d)
 {
-    struct hvm_irq_dpci *hvm_irq_dpci = domain_get_irq_dpci(d);
-    uint32_t i;
     struct hvm_iommu *hd  = domain_hvm_iommu(d);
-    struct list_head *ioport_list, *digl_list, *tmp;
+    struct list_head *ioport_list, *tmp;
     struct g2m_ioport *ioport;
-    struct dev_intx_gsi_link *digl;
 
     if ( !iommu_enabled || !hd->platform_ops )
         return;
@@ -146,30 +177,6 @@ void iommu_domain_destroy(struct domain *d)
         d->need_iommu = 0;
         hd->platform_ops->teardown(d);
         return;
-    }
-
-    if ( hvm_irq_dpci != NULL )
-    {
-        for ( i = 0; i < NR_IRQS; i++ )
-        {
-            if ( !(hvm_irq_dpci->mirq[i].flags & HVM_IRQ_DPCI_VALID) )
-                continue;
-
-            pirq_guest_unbind(d, i);
-            kill_timer(&hvm_irq_dpci->hvm_timer[irq_to_vector(i)]);
-
-            list_for_each_safe ( digl_list, tmp,
-                                 &hvm_irq_dpci->mirq[i].digl_list )
-            {
-                digl = list_entry(digl_list,
-                                  struct dev_intx_gsi_link, list);
-                list_del(&digl->list);
-                xfree(digl);
-            }
-        }
-
-        d->arch.hvm_domain.irq.dpci = NULL;
-        xfree(hvm_irq_dpci);
     }
 
     if ( hd )
@@ -241,6 +248,9 @@ static int iommu_setup(void)
     iommu_enabled = (rc == 0);
 
  out:
+    if ( force_iommu && !iommu_enabled )
+        panic("IOMMU setup failed, crash Xen for security purpose!\n");
+
     if ( !iommu_enabled )
         iommu_pv_enabled = 0;
     printk("I/O virtualisation %sabled\n", iommu_enabled ? "en" : "dis");

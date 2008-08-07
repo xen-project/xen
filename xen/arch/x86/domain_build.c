@@ -757,6 +757,7 @@ int __init construct_dom0(
     si->shared_info = virt_to_maddr(d->shared_info);
 
     si->flags        = SIF_PRIVILEGED | SIF_INITDOMAIN;
+    si->flags       |= (xen_processor_pmbits << 8) & SIF_PM_MASK;
     si->pt_base      = vpt_start + 2 * PAGE_SIZE * !!is_pv_32on64_domain(d);
     si->nr_pt_frames = nr_pt_pages;
     si->mfn_list     = vphysmap_start;

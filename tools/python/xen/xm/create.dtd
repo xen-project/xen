@@ -39,6 +39,7 @@
                  vbd*,
                  vif*,
                  vtpm*,
+                 pci*,
                  console*,
                  platform*,
                  vcpu_param*,
@@ -79,6 +80,13 @@
 
 <!ELEMENT vtpm   (name*)>
 <!ATTLIST vtpm   backend         CDATA #REQUIRED>
+
+<!ELEMENT pci    EMPTY>
+<!ATTLIST pci    domain          CDATA #REQUIRED
+                 bus             CDATA #REQUIRED
+                 slot            CDATA #REQUIRED
+                 func            CDATA #REQUIRED
+                 vslt            CDATA #IMPLIED>
 
 <!ELEMENT console (other_config*)>
 <!ATTLIST console protocol       (vt100|rfb|rdp) #REQUIRED>

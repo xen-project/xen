@@ -4,7 +4,8 @@ include $(XEN_ROOT)/tools/Rules.mk
 SUBDIRS := 32bit
 
 .PHONY: all
-all: subdirs-all BIOS-bochs-latest
+all: subdirs-all
+	$(MAKE) BIOS-bochs-latest
 
 .PHONY: clean
 clean: subdirs-clean

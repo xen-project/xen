@@ -43,7 +43,7 @@ install: all
 
 .PHONY: clean
 clean:
-	rm -rf *.a *.so* *.o *.rpm $(LIB) *~ $(DEPS) xen TAGS
+	rm -rf *.a *.so* *.o *.opic *.rpm $(LIB) *~ $(DEPS) xen TAGS
 
 libblktap.so.$(MAJOR).$(MINOR): $(OBJS_PIC) 
 	$(CC) $(CFLAGS) -Wl,$(SONAME_LDFLAG) -Wl,$(SONAME) $(SHLIB_CFLAGS) \

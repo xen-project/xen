@@ -143,7 +143,7 @@ static void dump_dom0_registers(unsigned char key)
 static void halt_machine(unsigned char key, struct cpu_user_regs *regs)
 {
     printk("'%c' pressed -> rebooting machine\n", key);
-    machine_restart();
+    machine_restart(0);
 }
 
 static void cpuset_print(char *set, int size, cpumask_t mask)
@@ -236,6 +236,7 @@ static void dump_domains(unsigned char key)
 
 static cpumask_t read_clocks_cpumask = CPU_MASK_NONE;
 static s_time_t read_clocks_time[NR_CPUS];
+static u64 read_cycles_time[NR_CPUS];
 
 static void read_clocks_slave(void *unused)
 {
@@ -244,14 +245,20 @@ static void read_clocks_slave(void *unused)
     while ( !cpu_isset(cpu, read_clocks_cpumask) )
         cpu_relax();
     read_clocks_time[cpu] = NOW();
+    read_cycles_time[cpu] = get_cycles();
     cpu_clear(cpu, read_clocks_cpumask);
     local_irq_enable();
 }
 
 static void read_clocks(unsigned char key)
 {
-    unsigned int cpu = smp_processor_id(), min_cpu, max_cpu;
-    u64 min, max, dif, difus;
+    unsigned int cpu = smp_processor_id(), min_stime_cpu, max_stime_cpu;
+    unsigned int min_cycles_cpu, max_cycles_cpu;
+    u64 min_stime, max_stime, dif_stime;
+    u64 min_cycles, max_cycles, dif_cycles;
+    static u64 sumdif_stime = 0, maxdif_stime = 0;
+    static u64 sumdif_cycles = 0, maxdif_cycles = 0;
+    static u32 count = 0;
     static DEFINE_SPINLOCK(lock);
 
     spin_lock(&lock);
@@ -261,31 +268,48 @@ static void read_clocks(unsigned char key)
     local_irq_disable();
     read_clocks_cpumask = cpu_online_map;
     read_clocks_time[cpu] = NOW();
+    read_cycles_time[cpu] = get_cycles();
     cpu_clear(cpu, read_clocks_cpumask);
     local_irq_enable();
 
     while ( !cpus_empty(read_clocks_cpumask) )
         cpu_relax();
 
-    min_cpu = max_cpu = cpu;
+    min_stime_cpu = max_stime_cpu = min_cycles_cpu = max_cycles_cpu = cpu;
     for_each_online_cpu ( cpu )
     {
-        if ( read_clocks_time[cpu] < read_clocks_time[min_cpu] )
-            min_cpu = cpu;
-        if ( read_clocks_time[cpu] > read_clocks_time[max_cpu] )
-            max_cpu = cpu;
+        if ( read_clocks_time[cpu] < read_clocks_time[min_stime_cpu] )
+            min_stime_cpu = cpu;
+        if ( read_clocks_time[cpu] > read_clocks_time[max_stime_cpu] )
+            max_stime_cpu = cpu;
+        if ( read_cycles_time[cpu] < read_cycles_time[min_cycles_cpu] )
+            min_cycles_cpu = cpu;
+        if ( read_cycles_time[cpu] > read_cycles_time[max_cycles_cpu] )
+            max_cycles_cpu = cpu;
     }
 
-    min = read_clocks_time[min_cpu];
-    max = read_clocks_time[max_cpu];
+    min_stime = read_clocks_time[min_stime_cpu];
+    max_stime = read_clocks_time[max_stime_cpu];
+    min_cycles = read_cycles_time[min_cycles_cpu];
+    max_cycles = read_cycles_time[max_cycles_cpu];
 
     spin_unlock(&lock);
 
-    dif = difus = max - min;
-    do_div(difus, 1000);
-    printk("Min = %"PRIu64" ; Max = %"PRIu64" ; Diff = %"PRIu64
-           " (%"PRIu64" microseconds)\n",
-           min, max, dif, difus);
+    dif_stime = max_stime - min_stime;
+    if ( dif_stime > maxdif_stime )
+        maxdif_stime = dif_stime;
+    sumdif_stime += dif_stime;
+    dif_cycles = max_cycles - min_cycles;
+    if ( dif_cycles > maxdif_cycles )
+        maxdif_cycles = dif_cycles;
+    sumdif_cycles += dif_cycles;
+    count++;
+    printk("Synced stime skew: max=%"PRIu64"ns avg=%"PRIu64"ns "
+           "samples=%"PRIu32" current=%"PRIu64"ns\n",
+           maxdif_stime, sumdif_stime/count, count, dif_stime);
+    printk("Synced cycles skew: max=%"PRIu64" avg=%"PRIu64" "
+           "samples=%"PRIu32" current=%"PRIu64"\n",
+           maxdif_cycles, sumdif_cycles/count, count, dif_cycles);
 }
 
 extern void dump_runq(unsigned char key);

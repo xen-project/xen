@@ -48,10 +48,6 @@ struct amd_iommu {
     u8  unit_id;
     u8  msi_number;
 
-    u8  root_bus;
-    u8  first_devfn;
-    u8  last_devfn;
-
     u8 pte_not_present_cached;
     u8 ht_tunnel_support;
     u8 iotlb_support;
@@ -81,6 +77,9 @@ struct amd_iommu {
 
     int msi_cap;
     int maskbit;
+
+    int enabled;
+    int vector;
 };
 
 struct ivrs_mappings {
@@ -92,5 +91,6 @@ struct ivrs_mappings {
     u8 read_permission;
     unsigned long addr_range_start;
     unsigned long addr_range_length;
+    struct amd_iommu *iommu;
 };
 #endif /* _ASM_X86_64_AMD_IOMMU_H */

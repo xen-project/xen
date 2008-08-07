@@ -16,7 +16,7 @@ static struct fs_export *fs_exports = NULL;
 static int export_id = 0;
 static int mount_id = 0;
 
-void dispatch_response(struct mount *mount, int priv_req_id)
+static void dispatch_response(struct fs_mount *mount, int priv_req_id)
 {
     int i;
     struct fs_op *op;
@@ -41,7 +41,7 @@ void dispatch_response(struct mount *mount, int priv_req_id)
     add_id_to_freelist(priv_req_id, mount->freelist);
 }
 
-static void handle_aio_events(struct mount *mount)
+static void handle_aio_events(struct fs_mount *mount)
 {
     int fd, ret, count, i, notify;
     evtchn_port_t port;
@@ -103,7 +103,7 @@ read_event_channel:
 }
 
 
-void allocate_request_array(struct mount *mount)
+static void allocate_request_array(struct fs_mount *mount)
 {
     int i, nr_entries = mount->nr_entries;
     struct fs_request *requests;
@@ -123,10 +123,10 @@ void allocate_request_array(struct mount *mount)
 }
 
 
-void* handle_mount(void *data)
+static void *handle_mount(void *data)
 {
     int more, notify;
-    struct mount *mount = (struct mount *)data;
+    struct fs_mount *mount = (struct fs_mount *)data;
     
     printf("Starting a thread for mount: %d\n", mount->mount_id);
     allocate_request_array(mount);
@@ -147,7 +147,8 @@ moretodo:
             int i;
             struct fs_op *op;
 
-            printf("Got a request at %d\n", cons);
+            printf("Got a request at %d (of %d)\n", 
+                    cons, RING_SIZE(&mount->ring));
             req = RING_GET_REQUEST(&mount->ring, cons);
             printf("Request type=%d\n", req->type); 
             for(i=0;;i++)
@@ -193,11 +194,12 @@ moretodo:
 
 static void handle_connection(int frontend_dom_id, int export_id, char *frontend)
 {
-    struct mount *mount;
+    struct fs_mount *mount;
     struct fs_export *export;
     int evt_port;
     pthread_t handling_thread;
     struct fsif_sring *sring;
+    uint32_t dom_ids[MAX_RING_SIZE];
     int i;
 
     printf("Handling connection from dom=%d, for export=%d\n", 
@@ -216,13 +218,13 @@ static void handle_connection(int frontend_dom_id, int export_id, char *frontend
         return;
     }
 
-    mount = (struct mount*)malloc(sizeof(struct mount));
+    mount = (struct fs_mount*)malloc(sizeof(struct fs_mount));
     mount->dom_id = frontend_dom_id;
     mount->export = export;
     mount->mount_id = mount_id++;
     xenbus_read_mount_request(mount, frontend);
     printf("Frontend found at: %s (gref=%d, evtchn=%d)\n", 
-            mount->frontend, mount->gref, mount->remote_evtchn);
+            mount->frontend, mount->grefs[0], mount->remote_evtchn);
     xenbus_write_backend_node(mount);
     mount->evth = -1;
     mount->evth = xc_evtchn_open(); 
@@ -235,11 +237,15 @@ static void handle_connection(int frontend_dom_id, int export_id, char *frontend
     mount->gnth = -1;
     mount->gnth = xc_gnttab_open(); 
     assert(mount->gnth != -1);
-    sring = xc_gnttab_map_grant_ref(mount->gnth,
-                                    mount->dom_id,
-                                    mount->gref,
-                                    PROT_READ | PROT_WRITE);
-    BACK_RING_INIT(&mount->ring, sring, XC_PAGE_SIZE);
+    for(i=0; i<mount->shared_ring_size; i++)
+        dom_ids[i] = mount->dom_id;
+    sring = xc_gnttab_map_grant_refs(mount->gnth,
+                                     mount->shared_ring_size,
+                                     dom_ids,
+                                     mount->grefs,
+                                     PROT_READ | PROT_WRITE);
+
+    BACK_RING_INIT(&mount->ring, sring, mount->shared_ring_size * XC_PAGE_SIZE);
     mount->nr_entries = mount->ring.nr_ents; 
     for (i = 0; i < MAX_FDS; i++)
         mount->fds[i] = -1;
@@ -287,7 +293,7 @@ next_select:
     } while (1);
 }
 
-struct fs_export* create_export(char *name, char *export_path)
+static struct fs_export* create_export(char *name, char *export_path)
 {
     struct fs_export *curr_export, **last_export;
 

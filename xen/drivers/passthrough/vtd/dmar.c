@@ -238,15 +238,15 @@ static int __init acpi_parse_dev_scope(void *start, void *end,
             bus = pci_conf_read8(bus, path->dev, path->fn, PCI_SECONDARY_BUS);
             path++;
         }
-        
+
         switch ( acpi_scope->dev_type )
         {
         case ACPI_DEV_P2PBRIDGE:
         {
             sec_bus = pci_conf_read8(
-		bus, path->dev, path->fn, PCI_SECONDARY_BUS);
+                bus, path->dev, path->fn, PCI_SECONDARY_BUS);
             sub_bus = pci_conf_read8(
-		bus, path->dev, path->fn, PCI_SUBORDINATE_BUS);
+                bus, path->dev, path->fn, PCI_SUBORDINATE_BUS);
             dprintk(XENLOG_INFO VTDPREFIX,
                     "found bridge: bdf = %x:%x.%x  sec = %x  sub = %x\n",
                     bus, path->dev, path->fn, sec_bus, sub_bus);
@@ -255,7 +255,7 @@ static int __init acpi_parse_dev_scope(void *start, void *end,
             break;
         }
 
-	case ACPI_DEV_MSI_HPET:
+        case ACPI_DEV_MSI_HPET:
             dprintk(XENLOG_INFO VTDPREFIX, "found MSI HPET: bdf = %x:%x.%x\n",
                     bus, path->dev, path->fn);
             scope->devices[didx++] = PCI_BDF(bus, path->dev, path->fn);
@@ -305,13 +305,6 @@ acpi_parse_one_drhd(struct acpi_dmar_entry_header *header)
     int ret = 0;
     static int include_all = 0;
 
-    if ( include_all )
-    {
-        dprintk(XENLOG_WARNING VTDPREFIX,
-                "DMAR unit with INCLUDE_ALL is not not the last unit.\n");
-        return -EINVAL;
-    }
-
     dmaru = xmalloc(struct acpi_drhd_unit);
     if ( !dmaru )
         return -ENOMEM;
@@ -331,6 +324,13 @@ acpi_parse_one_drhd(struct acpi_dmar_entry_header *header)
     if ( dmaru->include_all )
     {
         dprintk(XENLOG_INFO VTDPREFIX, "found INCLUDE_ALL\n");
+        /* Only allow one INCLUDE_ALL */
+        if ( include_all )
+        {
+            dprintk(XENLOG_WARNING VTDPREFIX,
+                    "Only one INCLUDE_ALL device scope is allowed\n");
+            ret = -EINVAL;
+        }
         include_all = 1;
     }
 
@@ -348,6 +348,12 @@ acpi_parse_one_rmrr(struct acpi_dmar_entry_header *header)
     struct acpi_rmrr_unit *rmrru;
     void *dev_scope_start, *dev_scope_end;
     int ret = 0;
+
+    if ( rmrr->base_address >= rmrr->end_address )
+    {
+        dprintk(XENLOG_ERR VTDPREFIX, "RMRR is incorrect.\n");
+        return -EFAULT;
+    }
 
     rmrru = xmalloc(struct acpi_rmrr_unit);
     if ( !rmrru )
@@ -390,7 +396,8 @@ acpi_parse_one_atsr(struct acpi_dmar_entry_header *header)
         ret = acpi_parse_dev_scope(dev_scope_start, dev_scope_end,
                                    atsru, ATSR_TYPE);
     }
-    else {
+    else
+    {
         dprintk(XENLOG_INFO VTDPREFIX, "found ALL_PORTS\n");
         /* Only allow one ALL_PORTS */
         if ( all_ports )
@@ -420,6 +427,9 @@ static int __init acpi_parse_dmar(struct acpi_table_header *table)
     if ( !dmar->width )
     {
         dprintk(XENLOG_WARNING VTDPREFIX, "Zero: Invalid DMAR width\n");
+        if ( force_iommu )
+            panic("acpi_parse_dmar: Invalid DMAR width,"
+                  " crash Xen for security purpose!\n");
         return -EINVAL;
     }
 
@@ -461,8 +471,15 @@ static int __init acpi_parse_dmar(struct acpi_table_header *table)
 
     if ( ret )
     {
-        printk(XENLOG_WARNING "Failed to parse ACPI DMAR.  Disabling VT-d.\n");
-        disable_all_dmar_units();
+        if ( force_iommu )
+            panic("acpi_parse_dmar: Failed to parse ACPI DMAR,"
+                  " crash Xen for security purpose!\n");
+        else
+        {
+            printk(XENLOG_WARNING
+                   "Failed to parse ACPI DMAR.  Disabling VT-d.\n");
+            disable_all_dmar_units();
+        }
     }
 
     return ret;
@@ -473,13 +490,15 @@ int acpi_dmar_init(void)
     int rc;
 
     rc = -ENODEV;
+    if ( force_iommu )
+        iommu_enabled = 1;
+
     if ( !iommu_enabled )
         goto fail;
 
-    if ( (rc = vtd_hw_check()) != 0 )
+    rc = acpi_table_parse(ACPI_SIG_DMAR, acpi_parse_dmar);
+    if ( rc )
         goto fail;
-
-    acpi_table_parse(ACPI_SIG_DMAR, acpi_parse_dmar);
 
     rc = -ENODEV;
     if ( list_empty(&acpi_drhd_units) )
@@ -490,6 +509,10 @@ int acpi_dmar_init(void)
     return 0;
 
  fail:
+    if ( force_iommu )
+        panic("acpi_dmar_init: acpi_dmar_init failed,"
+              " crash Xen for security purpose!\n");
+
     vtd_enabled = 0;
     return -ENODEV;
 }

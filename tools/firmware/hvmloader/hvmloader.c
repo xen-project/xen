@@ -449,7 +449,7 @@ static void init_xen_platform_io_base(void)
 
 int main(void)
 {
-    int acpi_sz = 0, vgabios_sz = 0, etherboot_sz = 0, rombios_sz, smbios_sz;
+    int vgabios_sz = 0, etherboot_sz = 0, rombios_sz, smbios_sz;
     int extboot_sz = 0;
 
     printf("HVM Loader\n");
@@ -508,8 +508,7 @@ int main(void)
     if ( get_acpi_enabled() )
     {
         printf("Loading ACPI ...\n");
-        acpi_sz = acpi_build_tables((uint8_t *)ACPI_PHYSICAL_ADDRESS);
-        ASSERT((ACPI_PHYSICAL_ADDRESS + acpi_sz) <= 0xF0000);
+        acpi_build_tables();
     }
 
     cmos_write_memory_size();
@@ -531,10 +530,6 @@ int main(void)
         printf(" %05x-%05x: SMBIOS tables\n",
                SMBIOS_PHYSICAL_ADDRESS,
                SMBIOS_PHYSICAL_ADDRESS + smbios_sz - 1);
-    if ( acpi_sz )
-        printf(" %05x-%05x: ACPI tables\n",
-               ACPI_PHYSICAL_ADDRESS,
-               ACPI_PHYSICAL_ADDRESS + acpi_sz - 1);
     if ( rombios_sz )
         printf(" %05x-%05x: Main BIOS\n",
                ROMBIOS_PHYSICAL_ADDRESS,

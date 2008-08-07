@@ -36,10 +36,12 @@ from xen.util import blkif
 from xen.util import vscsi_util
 import xen.util.xsm.xsm as security
 from xen.xm.main import serverType, SERVER_XEN_API, get_single_vm
+from xen.util import utils
 
 from xen.xm.opts import *
 
 from main import server
+from main import domain_name_to_domid
 import console
 
 
@@ -118,6 +120,14 @@ gopts.opt('console_autoconnect', short='c',
           fn=set_true, default=0,
           use="Connect to the console after the domain is created.")
 
+gopts.opt('vncviewer',
+          fn=set_true, default=0,
+          use="Connect to the VNC display after the domain is created.")
+
+gopts.opt('vncviewer-autopass',
+          fn=set_true, default=0,
+          use="Pass VNC password to viewer via stdin and -autopass.")
+
 gopts.var('vncpasswd', val='NAME',
           fn=set_value, default=None,
           use="Password for VNC console on HVM domain.")
@@ -128,7 +138,7 @@ gopts.var('vncviewer', val='no|yes',
            "The address of the vncviewer is passed to the domain on the "
            "kernel command line using 'VNC_SERVER=<host>:<port>'. The port "
            "used by vnc is 5500 + DISPLAY. A display value with a free port "
-           "is chosen if possible.\nOnly valid when vnc=1.")
+           "is chosen if possible.\nOnly valid when vnc=1.\nDEPRECATED")
 
 gopts.var('vncconsole', val='no|yes',
           fn=set_bool, default=None,
@@ -1108,44 +1118,6 @@ def choose_vnc_display():
     return None
 vncpid = None
 
-def daemonize(prog, args):
-    """Runs a program as a daemon with the list of arguments.  Returns the PID
-    of the daemonized program, or returns 0 on error.
-    """
-    r, w = os.pipe()
-    pid = os.fork()
-
-    if pid == 0:
-        os.close(r)
-        w = os.fdopen(w, 'w')
-        os.setsid()
-        try:
-            pid2 = os.fork()
-        except:
-            pid2 = None
-        if pid2 == 0:
-            os.chdir("/")
-            for fd in range(0, 256):
-                try:
-                    os.close(fd)
-                except:
-                    pass
-            os.open("/dev/null", os.O_RDWR)
-            os.dup2(0, 1)
-            os.dup2(0, 2)
-            os.execvp(prog, args)
-            os._exit(1)
-        else:
-            w.write(str(pid2 or 0))
-            w.close()
-            os._exit(0)
-    os.close(w)
-    r = os.fdopen(r)
-    daemon_pid = int(r.read())
-    r.close()
-    os.waitpid(pid, 0)
-    return daemon_pid
-
 def spawn_vnc(display):
     """Spawns a vncviewer that listens on the specified display.  On success,
     returns the port that the vncviewer is listening on and sets the global
@@ -1154,7 +1126,7 @@ def spawn_vnc(display):
     vncargs = (["vncviewer", "-log", "*:stdout:0",
             "-listen", "%d" % (VNC_BASE_PORT + display) ])
     global vncpid
-    vncpid = daemonize("vncviewer", vncargs)
+    vncpid = utils.daemonize("vncviewer", vncargs)
     if vncpid == 0:
         return 0
 
@@ -1362,6 +1334,11 @@ def main(argv):
     elif not opts.is_xml:
         dom = make_domain(opts, config)
         
+    if opts.vals.vncviewer:
+        domid = domain_name_to_domid(sxp.child_value(config, 'name', -1))
+        vncviewer_autopass = getattr(opts.vals,'vncviewer-autopass', False)
+        console.runVncViewer(domid, vncviewer_autopass, True)
+    
 def do_console(domain_name):
     cpid = os.fork() 
     if cpid != 0:
@@ -1373,13 +1350,7 @@ def do_console(domain_name):
                 if os.WEXITSTATUS(rv) != 0:
                     sys.exit(os.WEXITSTATUS(rv))
             try:
-                # Acquire the console of the created dom
-                if serverType == SERVER_XEN_API:
-                    domid = server.xenapi.VM.get_domid(
-                               get_single_vm(domain_name))
-                else:
-                    dom = server.xend.domain(domain_name)
-                    domid = int(sxp.child_value(dom, 'domid', '-1'))
+                domid = domain_name_to_domid(domain_name)
                 console.execConsole(domid)
             except:
                 pass

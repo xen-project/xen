@@ -599,14 +599,17 @@ class XendDomainInfo:
                 new_dev['func'])
         bdf = xc.test_assign_device(self.domid, pci_str)
         if bdf != 0:
+            if bdf == -1:
+                raise VmError("failed to assign device: maybe the platform"
+                              " doesn't support VT-d, or VT-d isn't enabled"
+                              " properly?")
             bus = (bdf >> 16) & 0xff
             devfn = (bdf >> 8) & 0xff
             dev = (devfn >> 3) & 0x1f
             func = devfn & 0x7
-            raise VmError("Fail to hot insert device(%x:%x.%x): maybe VT-d is "
-                          "not enabled, or the device is not exist, or it "
-                          "has already been assigned to other domain"
-                          % (bus, dev, func))
+            raise VmError("fail to assign device(%x:%x.%x): maybe it has"
+                          " already been assigned to other domain, or maybe"
+                          " it doesn't exist." % (bus, dev, func))
 
         bdf_str = "%s:%s:%s.%s@%s" % (new_dev['domain'],
                 new_dev['bus'],
@@ -635,7 +638,10 @@ class XendDomainInfo:
                 self._waitForDevice(dev_type, devid)
             except VmError, ex:
                 del self.info['devices'][dev_uuid]
-                if dev_type == 'tap':
+                if dev_type == 'pci':
+                    for dev in dev_config_dict['devs']:
+                        XendAPIStore.deregister(dev['uuid'], 'DPCI')
+                elif dev_type == 'tap':
                     self.info['vbd_refs'].remove(dev_uuid)
                 else:
                     self.info['%s_refs' % dev_type].remove(dev_uuid)
@@ -2086,14 +2092,17 @@ class XendDomainInfo:
         if hvm and pci_str:
             bdf = xc.test_assign_device(self.domid, pci_str)
             if bdf != 0:
+                if bdf == -1:
+                    raise VmError("failed to assign device: maybe the platform"
+                                  " doesn't support VT-d, or VT-d isn't enabled"
+                                  " properly?")
                 bus = (bdf >> 16) & 0xff
                 devfn = (bdf >> 8) & 0xff
                 dev = (devfn >> 3) & 0x1f
                 func = devfn & 0x7
-                raise VmError("Fail to assign device(%x:%x.%x): maybe VT-d is "
-                              "not enabled, or the device is not exist, or it "
-                              "has already been assigned to other domain"
-                              % (bus, dev, func))
+                raise VmError("fail to assign device(%x:%x.%x): maybe it has"
+                              " already been assigned to other domain, or maybe"
+                              " it doesn't exist." % (bus, dev, func))
 
         # register the domain in the list 
         from xen.xend import XendDomain
@@ -2373,6 +2382,9 @@ class XendDomainInfo:
 
     def destroy(self):
         """Cleanup VM and destroy domain.  Nothrow guarantee."""
+
+        if self.domid is None:
+            return
 
         log.debug("XendDomainInfo.destroy: domid=%s", str(self.domid))
 

@@ -738,7 +738,9 @@ typedef struct {
   // EBDA must be at most 768 bytes; it lives at 0x9fc00, and the boot 
   // device tables are at 0x9ff00 -- 0x9ffff
   typedef struct {
-    unsigned char filler1[0x3D];
+    unsigned char ebda_size;
+    unsigned char cmos_shutdown_status;
+    unsigned char filler1[0x3B];
 
     // FDPT - Can be splitted in data members if needed
     unsigned char fdpt0[0x10];
@@ -757,6 +759,7 @@ typedef struct {
     upcall_t upcall;
     } ebda_data_t;
   
+  #define EBDA_CMOS_SHUTDOWN_STATUS_OFFSET 1
   #define EbdaData ((ebda_data_t *) 0)
 
   // for access to the int13ext structure
@@ -1464,19 +1467,30 @@ copy_e820_table()
 }
 
 void
-disable_rom_write_access()
+set_rom_write_access(action)
+  Bit16u action;
 {
     Bit16u off = (Bit16u)&((struct bios_info *)0)->xen_pfiob;
 ASM_START
-    mov si,.disable_rom_write_access.off[bp]
+    mov si,.set_rom_write_access.off[bp]
     push ds
     mov ax,#(ACPI_PHYSICAL_ADDRESS >> 4)
     mov ds,ax
     mov dx,[si]
     pop ds
-    mov ax,#PFFLAG_ROM_LOCK
+    mov ax,.set_rom_write_access.action[bp]
     out dx,al
 ASM_END
+}
+
+void enable_rom_write_access()
+{
+    set_rom_write_access(0);
+}
+
+void disable_rom_write_access()
+{
+    set_rom_write_access(PFFLAG_ROM_LOCK);
 }
     
 #endif /* HVMASSIST */
@@ -2325,78 +2339,38 @@ debugger_off()
   outb(0xfedc, 0x00);
 }
 
-/* according to memory layout defined in acpi_build_tables(),
-   acpi FACS table is located in ACPI_PHYSICAL_ADDRESS(0xEA000) */
-#define ACPI_FACS_ADDRESS 0xEA000
-#define ACPI_FACS_OFFSET 0x10
-/* S3 resume status in CMOS 0Fh shutdown status byte*/
-
-Bit32u facs_get32(offs)
-Bit16u offs;
-{
-ASM_START
-  push bp
-  mov  bp, sp
-
-    push ds
-    mov ax, #(ACPI_FACS_ADDRESS >> 4)
-    mov ds, ax
-
-    mov bx, 4[bp]
-    mov ax, [bx]
-    mov dx, 2[bx]
-    pop ds
-
-  pop  bp
-ASM_END
-}
-
-
 void 
 s3_resume()
 {
     Bit32u s3_wakeup_vector;
-    extern Bit16u s3_wakeup_ip;
-    extern Bit16u s3_wakeup_cs;
-    extern Bit8u s3_resume_flag;
+    Bit16u s3_wakeup_ip, s3_wakeup_cs;
+    Bit8u cmos_shutdown_status;
 
 ASM_START
     push ds
-    mov ax, #0xF000
+    push ax
+    mov ax, #EBDA_SEG
     mov ds, ax
+    mov al, [EBDA_CMOS_SHUTDOWN_STATUS_OFFSET]
+    mov .s3_resume.cmos_shutdown_status[bp], al
+    pop ax
+    pop ds
 ASM_END
 
-    if (s3_resume_flag!=CMOS_SHUTDOWN_S3){
-        goto s3_out;
-    }
-    s3_resume_flag = 0;
+    if (cmos_shutdown_status != CMOS_SHUTDOWN_S3)
+        return;
 
-    /* get x_firmware_waking_vector */
-    s3_wakeup_vector = facs_get32(ACPI_FACS_OFFSET+24);
-    if (!s3_wakeup_vector) {
-        /* get firmware_waking_vector */
-	s3_wakeup_vector = facs_get32(ACPI_FACS_OFFSET+12);
-    	if (!s3_wakeup_vector) {
-            goto s3_out;
-	}
-    }
+    s3_wakeup_vector = get_s3_waking_vector();
+    if (!s3_wakeup_vector)
+        return;
 
-    /* setup wakeup vector */
     s3_wakeup_ip = s3_wakeup_vector & 0xF;
     s3_wakeup_cs = s3_wakeup_vector >> 4;
 
 ASM_START
-    jmpf [_s3_wakeup_ip]
-
-; S3 data
-_s3_wakeup_ip:    dw 0x0a      
-_s3_wakeup_cs:    dw 0x0      
-_s3_resume_flag:  db 0   ; set at POST time by CMOS[0xF] shutdown status
-ASM_END
-
-s3_out:
-ASM_START
-   pop ds 
+    push .s3_resume.s3_wakeup_cs[bp]
+    push .s3_resume.s3_wakeup_ip[bp]
+    retf
 ASM_END
 }
 
@@ -9865,52 +9839,9 @@ post:
 
   ;; Examine CMOS shutdown status.
   mov al, bl
-
-  ;; 0xFE S3 resume
-  cmp AL, #0xFE
-  jnz not_s3_resume
-
-  ;; set S3 resume flag
-  mov dx, #0xF000
+  mov dx, #EBDA_SEG
   mov ds, dx
-  mov [_s3_resume_flag], AL
-  jmp normal_post
-
-not_s3_resume:
-
-  ;; 0x00, 0x09, 0x0D+ = normal startup
-  cmp AL, #0x00
-  jz normal_post
-  cmp AL, #0x0d
-  jae normal_post
-  cmp AL, #0x09
-  je normal_post
-
-  ;; 0x05 = eoi + jmp via [0x40:0x67] jump
-  cmp al, #0x05
-  je  eoi_jmp_post
-
-  ;; Examine CMOS shutdown status.
-  ;;  0x01,0x02,0x03,0x04,0x06,0x07,0x08, 0x0a, 0x0b, 0x0c = Unimplemented shutdown status.
-  push bx
-  call _shutdown_status_panic
-
-#if 0 
-  HALT(__LINE__)
-  ;
-  ;#if 0
-  ;  0xb0, 0x20,       /* mov al, #0x20 */
-  ;  0xe6, 0x20,       /* out 0x20, al    ;send EOI to PIC */
-  ;#endif
-  ;
-  pop es
-  pop ds
-  popa
-  iret
-#endif
-
-normal_post:
-  ; case 0: normal startup
+  mov [EBDA_CMOS_SHUTDOWN_STATUS_OFFSET], AL
 
   cli
   mov  ax, #0xfffe
@@ -9928,8 +9859,6 @@ normal_post:
     stosw
 
   call _log_bios_start
-
-  call _clobber_entry_point
 
   ;; set all interrupts to default handler
   mov  bx, #0x0000    ;; offset index
@@ -10123,8 +10052,11 @@ post_default_ints:
   out  0xa1, AL ;slave  pic: unmask IRQ 12, 13, 14
 
 #ifdef HVMASSIST
+  call _enable_rom_write_access
+  call _clobber_entry_point
   call _copy_e820_table
   call smbios_init
+  call _disable_rom_write_access
 #endif
 
   call _init_boot_vectors
@@ -10174,10 +10106,6 @@ post_default_ints:
 #if BX_TCGBIOS
   call tcpa_post_part2
 #endif
-
-#ifdef HVMASSIST
-  call _disable_rom_write_access
-#endif 
 
   ;; Start the boot sequence.   See the comments in int19_relocated 
   ;; for why we use INT 18h instead of INT 19h here.

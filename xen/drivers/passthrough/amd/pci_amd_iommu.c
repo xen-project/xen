@@ -23,17 +23,10 @@
 #include <xen/pci_regs.h>
 #include <asm/amd-iommu.h>
 #include <asm/hvm/svm/amd-iommu-proto.h>
-#include <asm/hvm/svm/amd-iommu-acpi.h>
 #include <asm/mm.h>
 
-struct list_head amd_iommu_head;
-long amd_iommu_poll_comp_wait = COMPLETION_WAIT_DEFAULT_POLLING_COUNT;
-static long amd_iommu_cmd_buffer_entries = IOMMU_CMD_BUFFER_DEFAULT_ENTRIES;
-static long amd_iommu_event_log_entries = IOMMU_EVENT_LOG_DEFAULT_ENTRIES;
-int nr_amd_iommus;
-
-unsigned short ivrs_bdf_entries;
-struct ivrs_mappings *ivrs_mappings;
+extern unsigned short ivrs_bdf_entries;
+extern struct ivrs_mappings *ivrs_mappings;
 extern void *int_remap_table;
 
 static void deallocate_domain_page_tables(struct hvm_iommu *hd)
@@ -47,209 +40,39 @@ static void deallocate_domain_resources(struct hvm_iommu *hd)
     deallocate_domain_page_tables(hd);
 }
 
-static void __init init_cleanup(void)
+int __init amd_iommu_init(void)
 {
     struct amd_iommu *iommu;
+
+    BUG_ON( !iommu_found() );
+
+    ivrs_bdf_entries = amd_iommu_get_ivrs_dev_entries();
+
+    if ( !ivrs_bdf_entries )
+        goto error_out;
+
+    if ( amd_iommu_setup_shared_tables() != 0 )
+        goto error_out;
+
+    if ( amd_iommu_update_ivrs_mapping_acpi() != 0 )
+        goto error_out;
 
     for_each_amd_iommu ( iommu )
-        unmap_iommu_mmio_region(iommu);
-}
-
-static void __init deallocate_iommu_table_struct(
-    struct table_struct *table)
-{
-    if ( table->buffer )
-    {
-        free_xenheap_pages(table->buffer,
-                           get_order_from_bytes(table->alloc_size));
-        table->buffer = NULL;
-    }
-}
-
-static void __init deallocate_iommu_resources(struct amd_iommu *iommu)
-{
-    deallocate_iommu_table_struct(&iommu->dev_table);
-    deallocate_iommu_table_struct(&iommu->cmd_buffer);
-    deallocate_iommu_table_struct(&iommu->event_log);
-}
-
-static int __init allocate_iommu_table_struct(struct table_struct *table,
-                                              const char *name)
-{
-    table->buffer = (void *) alloc_xenheap_pages(
-        get_order_from_bytes(table->alloc_size));
-
-    if ( !table->buffer )
-    {
-        amd_iov_error("Error allocating %s\n", name);
-        return -ENOMEM;
-    }
-
-    memset(table->buffer, 0, table->alloc_size);
-
-    return 0;
-}
-
-static int __init allocate_iommu_resources(struct amd_iommu *iommu)
-{
-    /* allocate 'device table' on a 4K boundary */
-    iommu->dev_table.alloc_size =
-        PAGE_ALIGN(((iommu->last_downstream_bus + 1) *
-                    IOMMU_DEV_TABLE_ENTRIES_PER_BUS) *
-                   IOMMU_DEV_TABLE_ENTRY_SIZE);
-    iommu->dev_table.entries =
-        iommu->dev_table.alloc_size / IOMMU_DEV_TABLE_ENTRY_SIZE;
-
-    if ( allocate_iommu_table_struct(&iommu->dev_table,
-                                     "Device Table") != 0 )
-        goto error_out;
-
-    /* allocate 'command buffer' in power of 2 increments of 4K */
-    iommu->cmd_buffer_tail = 0;
-    iommu->cmd_buffer.alloc_size =
-        PAGE_SIZE << get_order_from_bytes(
-            PAGE_ALIGN(amd_iommu_cmd_buffer_entries *
-                       IOMMU_CMD_BUFFER_ENTRY_SIZE));
-
-    iommu->cmd_buffer.entries =
-        iommu->cmd_buffer.alloc_size / IOMMU_CMD_BUFFER_ENTRY_SIZE;
-
-    if ( allocate_iommu_table_struct(&iommu->cmd_buffer,
-                                     "Command Buffer") != 0 )
-        goto error_out;
-
-    /* allocate 'event log' in power of 2 increments of 4K */
-    iommu->event_log_head = 0;
-    iommu->event_log.alloc_size =
-        PAGE_SIZE << get_order_from_bytes(
-            PAGE_ALIGN(amd_iommu_event_log_entries *
-                        IOMMU_EVENT_LOG_ENTRY_SIZE));
-
-    iommu->event_log.entries =
-        iommu->event_log.alloc_size / IOMMU_EVENT_LOG_ENTRY_SIZE;
-
-    if ( allocate_iommu_table_struct(&iommu->event_log,
-                                     "Event Log") != 0 )
-        goto error_out;
-
-    return 0;
-
- error_out:
-    deallocate_iommu_resources(iommu);
-    return -ENOMEM;
-}
-
-int iommu_detect_callback(u8 bus, u8 dev, u8 func, u8 cap_ptr)
-{
-    struct amd_iommu *iommu;
-
-    iommu = (struct amd_iommu *) xmalloc(struct amd_iommu);
-    if ( !iommu )
-    {
-        amd_iov_error("Error allocating amd_iommu\n");
-        return -ENOMEM;
-    }
-    memset(iommu, 0, sizeof(struct amd_iommu));
-    spin_lock_init(&iommu->lock);
-
-    /* get capability and topology information */
-    if ( get_iommu_capabilities(bus, dev, func, cap_ptr, iommu) != 0 )
-        goto error_out;
-    if ( get_iommu_last_downstream_bus(iommu) != 0 )
-        goto error_out;
-
-    list_add_tail(&iommu->list, &amd_iommu_head);
-
-    /* allocate resources for this IOMMU */
-    if ( allocate_iommu_resources(iommu) != 0 )
-        goto error_out;
-
-    return 0;
-
- error_out:
-    xfree(iommu);
-    return -ENODEV;
-}
-
-static int __init amd_iommu_init(void)
-{
-    struct amd_iommu *iommu;
-    unsigned long flags;
-    u16 bdf;
-
-    for_each_amd_iommu ( iommu )
-    {
-        spin_lock_irqsave(&iommu->lock, flags);
-
-        /* assign default IOMMU values */
-        iommu->coherent = IOMMU_CONTROL_ENABLED;
-        iommu->isochronous = IOMMU_CONTROL_ENABLED;
-        iommu->res_pass_pw = IOMMU_CONTROL_ENABLED;
-        iommu->pass_pw = IOMMU_CONTROL_ENABLED;
-        iommu->ht_tunnel_enable = iommu->ht_tunnel_support ?
-            IOMMU_CONTROL_ENABLED : IOMMU_CONTROL_DISABLED;
-        iommu->exclusion_enable = IOMMU_CONTROL_DISABLED;
-        iommu->exclusion_allow_all = IOMMU_CONTROL_DISABLED;
-
-        /* register IOMMU data strucures in MMIO space */
-        if ( map_iommu_mmio_region(iommu) != 0 )
+        if ( amd_iommu_init_one(iommu) != 0 )
             goto error_out;
-        register_iommu_dev_table_in_mmio_space(iommu);
-        register_iommu_cmd_buffer_in_mmio_space(iommu);
-        register_iommu_event_log_in_mmio_space(iommu);
-
-        spin_unlock_irqrestore(&iommu->lock, flags);
-    }
-
-    /* assign default values for device entries */
-    for ( bdf = 0; bdf < ivrs_bdf_entries; bdf++ )
-    {
-        ivrs_mappings[bdf].dte_requestor_id = bdf;
-        ivrs_mappings[bdf].dte_sys_mgt_enable =
-            IOMMU_DEV_TABLE_SYS_MGT_MSG_FORWARDED;
-        ivrs_mappings[bdf].dte_allow_exclusion =
-            IOMMU_CONTROL_DISABLED;
-        ivrs_mappings[bdf].unity_map_enable =
-            IOMMU_CONTROL_DISABLED;
-    }
-
-    if ( acpi_table_parse(AMD_IOMMU_ACPI_IVRS_SIG, parse_ivrs_table) != 0 )
-        amd_iov_error("Did not find IVRS table!\n");
-
-    for_each_amd_iommu ( iommu )
-    {
-        /* enable IOMMU translation services */
-        enable_iommu(iommu);
-        nr_amd_iommus++;
-    }
 
     return 0;
 
- error_out:
-    init_cleanup();
+error_out:
+    amd_iommu_init_cleanup();
     return -ENODEV;
 }
 
 struct amd_iommu *find_iommu_for_device(int bus, int devfn)
 {
-    struct amd_iommu *iommu;
-
-    for_each_amd_iommu ( iommu )
-    {
-        if ( bus == iommu->root_bus )
-        {
-            if ( (devfn >= iommu->first_devfn) &&
-                 (devfn <= iommu->last_devfn) )
-                return iommu;
-        }
-        else if ( bus <= iommu->last_downstream_bus )
-        {
-            if ( iommu->downstream_bus_present[bus] )
-                return iommu;
-        }
-    }
-
-    return NULL;
+    u16 bdf = (bus << 8) | devfn;
+    BUG_ON ( bdf >= ivrs_bdf_entries );
+    return ivrs_mappings[bdf].iommu;
 }
 
 static void amd_iommu_setup_domain_device(
@@ -335,70 +158,26 @@ static void amd_iommu_setup_dom0_devices(struct domain *d)
 
 int amd_iov_detect(void)
 {
-    int last_bus;
-    struct amd_iommu *iommu, *next;
-
     INIT_LIST_HEAD(&amd_iommu_head);
 
-    if ( scan_for_iommu(iommu_detect_callback) != 0 )
+    if ( amd_iommu_detect_acpi() != 0 )
     {
         amd_iov_error("Error detection\n");
-        goto error_out;
+        return -ENODEV;
     }
 
     if ( !iommu_found() )
     {
         printk("AMD_IOV: IOMMU not found!\n");
-        goto error_out;
-    }
-
-    /* allocate 'ivrs mappings' table */
-    /* note: the table has entries to accomodate all IOMMUs */
-    last_bus = 0;
-    for_each_amd_iommu ( iommu )
-        if ( iommu->last_downstream_bus > last_bus )
-            last_bus = iommu->last_downstream_bus;
-
-    ivrs_bdf_entries = (last_bus + 1) *
-        IOMMU_DEV_TABLE_ENTRIES_PER_BUS;
-    ivrs_mappings = xmalloc_array( struct ivrs_mappings, ivrs_bdf_entries);
-    if ( ivrs_mappings == NULL )
-    {
-        amd_iov_error("Error allocating IVRS DevMappings table\n");
-        goto error_out;
-    }
-    memset(ivrs_mappings, 0,
-           ivrs_bdf_entries * sizeof(struct ivrs_mappings));
-
-    if ( amd_iommu_setup_intremap_table() != 0 )
-    {
-        amd_iov_error("Error allocating interrupt remapping table\n");
-        goto error_out;
+        return -ENODEV;
     }
 
     if ( amd_iommu_init() != 0 )
     {
         amd_iov_error("Error initialization\n");
-        goto error_out;
+        return -ENODEV;
     }
-
     return 0;
-
- error_out:
-    list_for_each_entry_safe ( iommu, next, &amd_iommu_head, list )
-    {
-        list_del(&iommu->list);
-        deallocate_iommu_resources(iommu);
-        xfree(iommu);
-    }
-
-    if ( ivrs_mappings )
-    {
-        xfree(ivrs_mappings);
-        ivrs_mappings = NULL;
-    }
-
-    return -ENODEV;
 }
 
 static int allocate_domain_resources(struct hvm_iommu *hd)

@@ -33,14 +33,14 @@ SRCS += 32bitbios_support.c smp.c cacheattr.c
 OBJS  = $(patsubst %.c,%.o,$(SRCS))
 
 .PHONY: all
-all: hvmloader
+all: subdirs-all
+	$(MAKE) hvmloader
 
 hvmloader.o: roms.h
 smbios.o: CFLAGS += -D__SMBIOS_DATE__="\"$(shell date +%m/%d/%Y)\""
 
-hvmloader: subdirs-all $(OBJS)
-	$(LD) $(LDFLAGS_DIRECT) -N -Ttext $(LOADADDR) \
-		-o hvmloader.tmp $(OBJS) acpi/acpi.a
+hvmloader: $(OBJS) acpi/acpi.a
+	$(LD) $(LDFLAGS_DIRECT) -N -Ttext $(LOADADDR) -o hvmloader.tmp $^
 	$(OBJCOPY) hvmloader.tmp hvmloader
 	rm -f hvmloader.tmp
 

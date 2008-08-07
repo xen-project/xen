@@ -14,7 +14,7 @@ fontname="Verdana";
 
 node [ shape=box ]; session VM host network VIF PIF SR VDI VBD PBD user XSPolicy ACMPolicy;
 node [shape=ellipse]; PIF_metrics VIF_metrics VM_metrics VBD_metrics PBD_metrics VM_guest_metrics host_metrics;
-node [shape=box]; host_cpu console
+node [shape=box]; DPCI PPCI host_cpu console
 session -> host [ arrowhead="none" ]
 session -> user [ arrowhead="none" ]
 VM -> VM_metrics [ arrowhead="none" ]
@@ -22,7 +22,7 @@ VM -> VM_guest_metrics [ arrowhead="none" ]
 VM -> console [ arrowhead="crow" ]
 host -> PBD [ arrowhead="crow", arrowtail="none" ]
 host -> host_metrics [ arrowhead="none" ]
-host -> host_cpu [ arrowhead="none" ]
+host -> host_cpu [ arrowhead="crow", arrowtail="none" ]
 VIF -> VM [ arrowhead="none", arrowtail="crow" ]
 VIF -> network [ arrowhead="none", arrowtail="crow" ]
 VIF -> VIF_metrics [ arrowhead="none" ]
@@ -38,4 +38,7 @@ VTPM -> VM [ arrowhead="none", arrowtail="crow" ]
 VBD -> VBD_metrics [ arrowhead="none" ]
 XSPolicy -> host [ arrowhead="none" ]
 XSPolicy -> ACMPolicy [ arrowhead="none" ]
+DPCI -> VM [ arrowhead="none", arrowtail="crow" ]
+DPCI -> PPCI [ arrowhead="none" ]
+PPCI -> host [ arrowhead="none", arrowtail="crow" ]
 }

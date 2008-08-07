@@ -55,7 +55,7 @@ term() {
     kill %1
     (
 	[ -n "$vncpid" ] && kill -9 $vncpid
-	xm destroy stubdom-$domname
+	xm destroy $domname-dm
 	#xm destroy $domname
     ) &
     # We need to exit immediately so as to let xend do the commands above
@@ -67,12 +67,12 @@ trap term SIGHUP
 ############
 # stubdomain
 # Wait for any previous stubdom to terminate
-while xm list | grep stubdom-$domname
+while xm list | grep $domname-dm
 do
 	sleep 1
 done
 
-creation="xm create -c stubdom-$domname target=$domid memory=32 extra=\"$extra\""
+creation="xm create -c $domname-dm target=$domid memory=32 extra=\"$extra\""
 
 (while true ; do sleep 60 ; done) | /bin/sh -c "$creation" &
 #xterm -geometry +0+0 -e /bin/sh -c "$creation ; echo ; echo press ENTER to shut down ; read" &

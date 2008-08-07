@@ -728,7 +728,6 @@ static int serial_load(QEMUFile *f, void *opaque, int version_id)
     qemu_get_8s(f,&s->lsr);
     qemu_get_8s(f,&s->msr);
     qemu_get_8s(f,&s->scr);
-    qemu_get_8s(f,&s->fcr);
 
     if (version_id >= 2)
         qemu_get_8s(f,&fcr);

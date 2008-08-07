@@ -15,7 +15,7 @@
 XEN_ROOT=../../..
 include $(XEN_ROOT)/tools/Rules.mk
 
-prefix=/usr
+prefix=$(PREFIX)
 includedir=$(prefix)/include
 libdir=$(prefix)/lib
 

@@ -7136,8 +7136,10 @@ int main(int argc, char **argv)
         sigaddset(&set, aio_sig_num);
         sigprocmask(SIG_BLOCK, &set, NULL);
     }
+#endif
 
     QEMU_LIST_INIT (&vm_change_state_head);
+#ifndef CONFIG_STUBDOM
 #ifndef _WIN32
     {
         struct sigaction act;

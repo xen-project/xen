@@ -44,8 +44,6 @@
 #define CONFIG_IOSAPIC
 #define supervisor_mode_kernel (0)
 
-#define CONFIG_DMA_BITSIZE 32
-
 #define PADDR_BITS	48
 
 /* If PERFC is used, include privop maps.  */

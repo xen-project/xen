@@ -27,6 +27,7 @@
 extern unsigned long amd_iommu_page_entries;
 extern unsigned short ivrs_bdf_entries;
 extern struct ivrs_mappings *ivrs_mappings;
+extern unsigned short last_bdf;
 
 static struct amd_iommu * __init find_iommu_from_bdf_cap(
     u16 bdf, u8 cap_offset)
@@ -85,10 +86,8 @@ static void __init reserve_unity_map_for_device(
     }
 
     /* extend r/w permissioms and keep aggregate */
-    if ( iw )
-        ivrs_mappings[bdf].write_permission = IOMMU_CONTROL_ENABLED;
-    if ( ir )
-        ivrs_mappings[bdf].read_permission = IOMMU_CONTROL_ENABLED;
+    ivrs_mappings[bdf].write_permission = iw;
+    ivrs_mappings[bdf].read_permission = ir;
     ivrs_mappings[bdf].unity_map_enable = IOMMU_CONTROL_ENABLED;
     ivrs_mappings[bdf].addr_range_start = base;
     ivrs_mappings[bdf].addr_range_length = length;
@@ -112,7 +111,7 @@ static int __init register_exclusion_range_for_all_devices(
         length = range_top - base;
         /* reserve r/w unity-mapped page entries for devices */
         /* note: these entries are part of the exclusion range */
-        for (bdf = 0; bdf < ivrs_bdf_entries; ++bdf)
+        for ( bdf = 0; bdf < ivrs_bdf_entries; bdf++ )
             reserve_unity_map_for_device(bdf, base, length, iw, ir);
         /* push 'base' just outside of virtual address space */
         base = iommu_top;
@@ -190,7 +189,7 @@ static int __init register_exclusion_range_for_iommu_devices(
         length = range_top - base;
         /* reserve r/w unity-mapped page entries for devices */
         /* note: these entries are part of the exclusion range */
-        for ( bdf = 0; bdf < ivrs_bdf_entries; ++bdf )
+        for ( bdf = 0; bdf < ivrs_bdf_entries; bdf++ )
         {
             bus = bdf >> 8;
             devfn = bdf & 0xFF;
@@ -357,7 +356,7 @@ static u16 __init parse_ivhd_device_padding(
 }
 
 static u16 __init parse_ivhd_device_select(
-    union acpi_ivhd_device *ivhd_device)
+    union acpi_ivhd_device *ivhd_device, struct amd_iommu *iommu)
 {
     u16 bdf;
 
@@ -373,13 +372,14 @@ static u16 __init parse_ivhd_device_select(
         get_field_from_byte(ivhd_device->header.flags,
                             AMD_IOMMU_ACPI_SYS_MGT_MASK,
                             AMD_IOMMU_ACPI_SYS_MGT_SHIFT);
+    ivrs_mappings[bdf].iommu = iommu;
 
     return sizeof(struct acpi_ivhd_device_header);
 }
 
 static u16 __init parse_ivhd_device_range(
     union acpi_ivhd_device *ivhd_device,
-    u16 header_length, u16 block_length)
+    u16 header_length, u16 block_length, struct amd_iommu *iommu)
 {
     u16 dev_length, first_bdf, last_bdf, bdf;
     u8 sys_mgt;
@@ -423,14 +423,17 @@ static u16 __init parse_ivhd_device_range(
                                   AMD_IOMMU_ACPI_SYS_MGT_MASK,
                                   AMD_IOMMU_ACPI_SYS_MGT_SHIFT);
     for ( bdf = first_bdf; bdf <= last_bdf; bdf++ )
+    {
         ivrs_mappings[bdf].dte_sys_mgt_enable = sys_mgt;
+        ivrs_mappings[bdf].iommu = iommu;
+    }
 
     return dev_length;
 }
 
 static u16 __init parse_ivhd_device_alias(
     union acpi_ivhd_device *ivhd_device,
-    u16 header_length, u16 block_length)
+    u16 header_length, u16 block_length, struct amd_iommu *iommu)
 {
     u16 dev_length, alias_id, bdf;
 
@@ -463,15 +466,18 @@ static u16 __init parse_ivhd_device_alias(
         get_field_from_byte(ivhd_device->header.flags,
                             AMD_IOMMU_ACPI_SYS_MGT_MASK,
                             AMD_IOMMU_ACPI_SYS_MGT_SHIFT);
+    ivrs_mappings[bdf].iommu = iommu;
+
     ivrs_mappings[alias_id].dte_sys_mgt_enable =
         ivrs_mappings[bdf].dte_sys_mgt_enable;
+    ivrs_mappings[alias_id].iommu = iommu;
 
     return dev_length;
 }
 
 static u16 __init parse_ivhd_device_alias_range(
     union acpi_ivhd_device *ivhd_device,
-    u16 header_length, u16 block_length)
+    u16 header_length, u16 block_length, struct amd_iommu *iommu)
 {
 
     u16 dev_length, first_bdf, last_bdf, alias_id, bdf;
@@ -527,15 +533,17 @@ static u16 __init parse_ivhd_device_alias_range(
     {
         ivrs_mappings[bdf].dte_requestor_id = alias_id;
         ivrs_mappings[bdf].dte_sys_mgt_enable = sys_mgt;
+        ivrs_mappings[bdf].iommu = iommu;
     }
     ivrs_mappings[alias_id].dte_sys_mgt_enable = sys_mgt;
+    ivrs_mappings[alias_id].iommu = iommu;
 
     return dev_length;
 }
 
 static u16 __init parse_ivhd_device_extended(
     union acpi_ivhd_device *ivhd_device,
-    u16 header_length, u16 block_length)
+    u16 header_length, u16 block_length, struct amd_iommu *iommu)
 {
     u16 dev_length, bdf;
 
@@ -558,13 +566,14 @@ static u16 __init parse_ivhd_device_extended(
         get_field_from_byte(ivhd_device->header.flags,
                             AMD_IOMMU_ACPI_SYS_MGT_MASK,
                             AMD_IOMMU_ACPI_SYS_MGT_SHIFT);
+    ivrs_mappings[bdf].iommu = iommu;
 
     return dev_length;
 }
 
 static u16 __init parse_ivhd_device_extended_range(
     union acpi_ivhd_device *ivhd_device,
-    u16 header_length, u16 block_length)
+    u16 header_length, u16 block_length, struct amd_iommu *iommu)
 {
     u16 dev_length, first_bdf, last_bdf, bdf;
     u8 sys_mgt;
@@ -609,7 +618,10 @@ static u16 __init parse_ivhd_device_extended_range(
                                   AMD_IOMMU_ACPI_SYS_MGT_MASK,
                                   AMD_IOMMU_ACPI_SYS_MGT_SHIFT);
     for ( bdf = first_bdf; bdf <= last_bdf; bdf++ )
+    {
         ivrs_mappings[bdf].dte_sys_mgt_enable = sys_mgt;
+        ivrs_mappings[bdf].iommu = iommu;
+    }
 
     return dev_length;
 }
@@ -635,33 +647,6 @@ static int __init parse_ivhd_block(struct acpi_ivhd_block_header *ivhd_block)
                 ivhd_block->header.dev_id, ivhd_block->cap_offset);
         return -ENODEV;
     }
-
-    amd_iov_info("IVHD Block:\n");
-    amd_iov_info(" Cap_Offset 0x%x\n", ivhd_block->cap_offset);
-    amd_iov_info(" MMIO_BAR_Phys 0x%"PRIx64"\n",ivhd_block->mmio_base);
-    amd_iov_info( " PCI_Segment 0x%x\n", ivhd_block->pci_segment);
-    amd_iov_info( " IOMMU_Info 0x%x\n", ivhd_block->iommu_info);
-
-    /* override IOMMU support flags */
-    iommu->coherent = get_field_from_byte(ivhd_block->header.flags,
-                                          AMD_IOMMU_ACPI_COHERENT_MASK,
-                                          AMD_IOMMU_ACPI_COHERENT_SHIFT);
-    iommu->iotlb_support = get_field_from_byte(ivhd_block->header.flags,
-                                               AMD_IOMMU_ACPI_IOTLB_SUP_MASK,
-                                               AMD_IOMMU_ACPI_IOTLB_SUP_SHIFT);
-    iommu->isochronous = get_field_from_byte(ivhd_block->header.flags,
-                                             AMD_IOMMU_ACPI_ISOC_MASK,
-                                             AMD_IOMMU_ACPI_ISOC_SHIFT);
-    iommu->res_pass_pw = get_field_from_byte(ivhd_block->header.flags,
-                                             AMD_IOMMU_ACPI_RES_PASS_PW_MASK,
-                                             AMD_IOMMU_ACPI_RES_PASS_PW_SHIFT);
-    iommu->pass_pw = get_field_from_byte(ivhd_block->header.flags,
-                                         AMD_IOMMU_ACPI_PASS_PW_MASK,
-                                         AMD_IOMMU_ACPI_PASS_PW_SHIFT);
-    iommu->ht_tunnel_enable = get_field_from_byte(
-        ivhd_block->header.flags,
-        AMD_IOMMU_ACPI_HT_TUN_ENB_MASK,
-        AMD_IOMMU_ACPI_HT_TUN_ENB_SHIFT);
 
     /* parse Device Entries */
     block_length = sizeof(struct acpi_ivhd_block_header);
@@ -689,32 +674,32 @@ static int __init parse_ivhd_block(struct acpi_ivhd_block_header *ivhd_block)
                 ivhd_block->header.length, block_length);
             break;
         case AMD_IOMMU_ACPI_IVHD_DEV_SELECT:
-            dev_length = parse_ivhd_device_select(ivhd_device);
+            dev_length = parse_ivhd_device_select(ivhd_device, iommu);
             break;
         case AMD_IOMMU_ACPI_IVHD_DEV_RANGE_START:
             dev_length = parse_ivhd_device_range(
                 ivhd_device,
-                ivhd_block->header.length, block_length);
+                ivhd_block->header.length, block_length, iommu);
             break;
         case AMD_IOMMU_ACPI_IVHD_DEV_ALIAS_SELECT:
             dev_length = parse_ivhd_device_alias(
                 ivhd_device,
-                ivhd_block->header.length, block_length);
+                ivhd_block->header.length, block_length, iommu);
             break;
         case AMD_IOMMU_ACPI_IVHD_DEV_ALIAS_RANGE:
             dev_length = parse_ivhd_device_alias_range(
                 ivhd_device,
-                ivhd_block->header.length, block_length);
+                ivhd_block->header.length, block_length, iommu);
             break;
         case AMD_IOMMU_ACPI_IVHD_DEV_EXT_SELECT:
             dev_length = parse_ivhd_device_extended(
                 ivhd_device,
-                ivhd_block->header.length, block_length);
+                ivhd_block->header.length, block_length, iommu);
             break;
         case AMD_IOMMU_ACPI_IVHD_DEV_EXT_RANGE:
             dev_length = parse_ivhd_device_extended_range(
                 ivhd_device,
-                ivhd_block->header.length, block_length);
+                ivhd_block->header.length, block_length, iommu);
             break;
         default:
             amd_iov_error("IVHD Error: Invalid Device Type!\n");
@@ -794,29 +779,16 @@ static void __init dump_acpi_table_header(struct acpi_table_header *table)
 
 }
 
-int __init parse_ivrs_table(struct acpi_table_header *_table)
+static int __init parse_ivrs_table(struct acpi_table_header *_table)
 {
     struct acpi_ivrs_block_header *ivrs_block;
-    unsigned long length, i;
-    u8 checksum, *raw_table;
+    unsigned long length;
     int error = 0;
     struct acpi_table_header *table = (struct acpi_table_header *)_table;
 
     BUG_ON(!table);
 
     dump_acpi_table_header(table);
-
-    /* validate checksum: sum of entire table == 0 */
-    checksum = 0;
-    raw_table = (u8 *)table;
-    for ( i = 0; i < table->length; i++ )
-        checksum += raw_table[i];
-    if ( checksum )
-    {
-        amd_iov_error("IVRS Error: "
-                "Invalid Checksum 0x%x\n", checksum);
-        return -ENODEV;
-    }
 
     /* parse IVRS blocks */
     length = sizeof(struct acpi_ivrs_table_header);
@@ -845,4 +817,145 @@ int __init parse_ivrs_table(struct acpi_table_header *_table)
     }
 
     return error;
+}
+
+static int __init detect_iommu_acpi(struct acpi_table_header *_table)
+{
+    struct acpi_ivrs_block_header *ivrs_block;
+    struct acpi_table_header *table = (struct acpi_table_header *)_table;
+    unsigned long i;
+    unsigned long length = sizeof(struct acpi_ivrs_table_header);
+    u8 checksum, *raw_table;
+
+    /* validate checksum: sum of entire table == 0 */
+    checksum = 0;
+    raw_table = (u8 *)table;
+    for ( i = 0; i < table->length; i++ )
+        checksum += raw_table[i];
+    if ( checksum )
+    {
+        amd_iov_error("IVRS Error: "
+                "Invalid Checksum 0x%x\n", checksum);
+        return -ENODEV;
+    }
+
+    while ( table->length > (length + sizeof(*ivrs_block)) )
+    {
+        ivrs_block = (struct acpi_ivrs_block_header *) ((u8 *)table + length);
+        if ( table->length < (length + ivrs_block->length) )
+            return -ENODEV;
+        if ( ivrs_block->type == AMD_IOMMU_ACPI_IVHD_TYPE )
+            if ( amd_iommu_detect_one_acpi((void*)ivrs_block) != 0 )
+                return -ENODEV;
+        length += ivrs_block->length;
+    }
+    return 0;
+}
+
+#define UPDATE_LAST_BDF(x) do {\
+   if ((x) > last_bdf) \
+       last_bdf = (x); \
+   } while(0);
+
+static int __init get_last_bdf_ivhd(void *ivhd)
+{
+    union acpi_ivhd_device *ivhd_device;
+    u16 block_length, dev_length;
+    struct acpi_ivhd_block_header *ivhd_block;
+
+    ivhd_block = (struct acpi_ivhd_block_header *)ivhd;
+
+    if ( ivhd_block->header.length <
+         sizeof(struct acpi_ivhd_block_header) )
+    {
+        amd_iov_error("IVHD Error: Invalid Block Length!\n");
+        return -ENODEV;
+    }
+
+    block_length = sizeof(struct acpi_ivhd_block_header);
+    while ( ivhd_block->header.length >=
+            (block_length + sizeof(struct acpi_ivhd_device_header)) )
+    {
+        ivhd_device = (union acpi_ivhd_device *)
+            ((u8 *)ivhd_block + block_length);
+
+        switch ( ivhd_device->header.type )
+        {
+        case AMD_IOMMU_ACPI_IVHD_DEV_U32_PAD:
+            dev_length = sizeof(u32);
+            break;
+        case AMD_IOMMU_ACPI_IVHD_DEV_U64_PAD:
+            dev_length = sizeof(u64);
+            break;
+        case AMD_IOMMU_ACPI_IVHD_DEV_SELECT:
+            UPDATE_LAST_BDF(ivhd_device->header.dev_id);
+            dev_length = sizeof(struct acpi_ivhd_device_header);
+            break;
+        case AMD_IOMMU_ACPI_IVHD_DEV_ALIAS_SELECT:
+            UPDATE_LAST_BDF(ivhd_device->header.dev_id);
+            dev_length = sizeof(struct acpi_ivhd_device_alias);
+            break;
+        case AMD_IOMMU_ACPI_IVHD_DEV_EXT_SELECT:
+            UPDATE_LAST_BDF(ivhd_device->header.dev_id);
+            dev_length = sizeof(struct acpi_ivhd_device_extended);
+            break;
+        case AMD_IOMMU_ACPI_IVHD_DEV_RANGE_START:
+            UPDATE_LAST_BDF(ivhd_device->range.trailer.dev_id);
+            dev_length = sizeof(struct acpi_ivhd_device_range);
+            break;
+        case AMD_IOMMU_ACPI_IVHD_DEV_ALIAS_RANGE:
+            UPDATE_LAST_BDF(ivhd_device->alias_range.trailer.dev_id)
+            dev_length = sizeof(struct acpi_ivhd_device_alias_range);
+            break;
+        case AMD_IOMMU_ACPI_IVHD_DEV_EXT_RANGE:
+            UPDATE_LAST_BDF(ivhd_device->extended_range.trailer.dev_id)
+            dev_length = sizeof(struct acpi_ivhd_device_extended_range);
+            break;
+        default:
+            amd_iov_error("IVHD Error: Invalid Device Type!\n");
+            dev_length = 0;
+            break;
+        }
+
+        block_length += dev_length;
+        if ( !dev_length )
+            return -ENODEV;
+    }
+
+    return 0;
+}
+
+static int __init get_last_bdf_acpi(struct acpi_table_header *_table)
+{
+    struct acpi_ivrs_block_header *ivrs_block;
+    struct acpi_table_header *table = (struct acpi_table_header *)_table;
+    unsigned long length = sizeof(struct acpi_ivrs_table_header);
+
+    while ( table->length > (length + sizeof(*ivrs_block)) )
+    {
+        ivrs_block = (struct acpi_ivrs_block_header *) ((u8 *)table + length);
+        if ( table->length < (length + ivrs_block->length) )
+            return -ENODEV;
+        if ( ivrs_block->type == AMD_IOMMU_ACPI_IVHD_TYPE )
+            if ( get_last_bdf_ivhd((void*)ivrs_block) != 0 )
+                return -ENODEV;
+        length += ivrs_block->length;
+    }
+   return 0;
+}
+
+int __init amd_iommu_detect_acpi(void)
+{
+    return acpi_table_parse(AMD_IOMMU_ACPI_IVRS_SIG, detect_iommu_acpi);
+}
+
+int __init amd_iommu_get_ivrs_dev_entries(void)
+{
+    acpi_table_parse(AMD_IOMMU_ACPI_IVRS_SIG, get_last_bdf_acpi);
+    return last_bdf + 1;
+}
+
+int __init amd_iommu_update_ivrs_mapping_acpi(void)
+{
+    return acpi_table_parse(AMD_IOMMU_ACPI_IVRS_SIG, parse_ivrs_table);
 }

@@ -11,7 +11,6 @@
 
 #include "xc_private.h"
 
-#include <xen/memory.h>
 #include <xen/sys/evtchn.h>
 #include <unistd.h>
 #include <fcntl.h>
@@ -114,22 +113,42 @@ void *xc_map_foreign_range(int xc_handle, uint32_t dom,
     return addr;
 }
 
-int xc_map_foreign_ranges(int xc_handle, uint32_t dom,
-                          privcmd_mmap_entry_t *entries, int nr)
+void *xc_map_foreign_ranges(int xc_handle, uint32_t dom,
+                            size_t size, int prot, size_t chunksize,
+                            privcmd_mmap_entry_t entries[], int nentries)
 {
-    privcmd_mmap_t ioctlx;
-    int err;
+	privcmd_mmap_t ioctlx;
+	int i, rc;
+	void *addr;
 
-    ioctlx.num   = nr;
-    ioctlx.dom   = dom;
-    ioctlx.entry = entries;
+	addr = mmap(NULL, size, prot, MAP_ANON | MAP_SHARED, -1, 0);
+	if (addr == MAP_FAILED)
+		goto mmap_failed;
 
-    err = ioctl(xc_handle, IOCTL_PRIVCMD_MMAP, &ioctlx);
-    if (err == 0)
-	return 0;
-    else
-	return -errno;
+	for (i = 0; i < nentries; i++) {
+		entries[i].va = (uintptr_t)addr + (i * chunksize);
+		entries[i].npages = chunksize >> PAGE_SHIFT;
+	}
+
+	ioctlx.num   = nentries;
+	ioctlx.dom   = dom;
+	ioctlx.entry = entries;
+
+	rc = ioctl(xc_handle, IOCTL_PRIVCMD_MMAP, &ioctlx);
+	if (rc)
+		goto ioctl_failed;
+
+	return addr;
+
+ioctl_failed:
+	rc = munmap(addr, size);
+	if (rc == -1)
+		ERROR("%s: error in error path\n", __FUNCTION__);
+
+mmap_failed:
+	return NULL;
 }
+
 
 static int do_privcmd(int xc_handle, unsigned int cmd, unsigned long data)
 {

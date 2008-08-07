@@ -44,4 +44,8 @@ xmexample3          - an advanced configuration script for 'xm create'
 xmexample.nbd       - configuration script that uses NBD filesystems
 xmexample.hvm       - a configuration script for creating a hvm domain with
                       'xm create'
+xmexample.hvm-stubdom - a configuration script for creating a hvm domain with
+                        'xm create' that utilizes a stubdomain for device model
+xmexample.pv-grub   - a configuration script for creating a domain with 'xm create'
+                      which boots PV-GRUB.
 xmexample.vti       - a configuration script for creating a domain on vti

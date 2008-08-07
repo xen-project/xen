@@ -13,6 +13,7 @@
 #define EXPORTS_NODE        ROOT_NODE"/"EXPORTS_SUBNODE
 #define WATCH_NODE          EXPORTS_NODE"/requests"
 #define MAX_FDS             16
+#define MAX_RING_SIZE       16
 
 struct fs_export
 {
@@ -26,22 +27,24 @@ struct fs_request
 {
     int active;
     void *page;                         /* Pointer to mapped grant */
+    int count;
     struct fsif_request req_shadow;
     struct aiocb aiocb; 
 };
 
 
-struct mount
+struct fs_mount
 {
     struct fs_export *export;
     int dom_id;
     char *frontend;
     int mount_id;                     /* = backend id */
-    grant_ref_t gref;
+    grant_ref_t grefs[MAX_RING_SIZE];
     evtchn_port_t remote_evtchn;
     int evth;                         /* Handle to the event channel */
     evtchn_port_t local_evtchn;
     int gnth;
+    int shared_ring_size;             /* in pages */
     struct fsif_back_ring ring;
     int nr_entries;
     struct fs_request *requests;
@@ -56,17 +59,17 @@ extern struct xs_handle *xsh;
 bool xenbus_create_request_node(void);
 int xenbus_register_export(struct fs_export *export);
 int xenbus_get_watch_fd(void);
-void xenbus_read_mount_request(struct mount *mount, char *frontend);
-void xenbus_write_backend_node(struct mount *mount);
-void xenbus_write_backend_ready(struct mount *mount);
+void xenbus_read_mount_request(struct fs_mount *mount, char *frontend);
+void xenbus_write_backend_node(struct fs_mount *mount);
+void xenbus_write_backend_ready(struct fs_mount *mount);
 
 /* File operations, implemented in fs-ops.c */
 struct fs_op
 {
     int type;       /* Type of request (from fsif.h) this handlers 
                        are responsible for */
-    void (*dispatch_handler)(struct mount *mount, struct fsif_request *req);
-    void (*response_handler)(struct mount *mount, struct fs_request *req);
+    void (*dispatch_handler)(struct fs_mount *mount, struct fsif_request *req);
+    void (*response_handler)(struct fs_mount *mount, struct fs_request *req);
 };
 
 /* This NULL terminated array of all file requests handlers */

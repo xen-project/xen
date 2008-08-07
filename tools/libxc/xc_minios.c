@@ -15,6 +15,7 @@
 #include <os.h>
 #include <mm.h>
 #include <lib.h>
+#include <gntmap.h>
 #include <events.h>
 #include <wait.h>
 #include <sys/mman.h>
@@ -76,16 +77,30 @@ void *xc_map_foreign_range(int xc_handle, uint32_t dom,
     return map_frames_ex(&mfn, size / getpagesize(), 0, 1, 1, dom, 0, pt_prot);
 }
 
-int xc_map_foreign_ranges(int xc_handle, uint32_t dom,
-                          privcmd_mmap_entry_t *entries, int nr)
+void *xc_map_foreign_ranges(int xc_handle, uint32_t dom,
+                            size_t size, int prot, size_t chunksize,
+                            privcmd_mmap_entry_t entries[], int nentries)
 {
-    int i;
-    for (i = 0; i < nr; i++) {
-	unsigned long mfn = entries[i].mfn;
-        do_map_frames(entries[i].va, &mfn, entries[i].npages, 0, 1, dom, 0, L1_PROT);
-    }
-    return 0;
+    unsigned long mfns[size / PAGE_SIZE];
+    int i, j, n;
+    unsigned long pt_prot = 0;
+#ifdef __ia64__
+    /* TODO */
+#else
+    if (prot & PROT_READ)
+	pt_prot = L1_PROT_RO;
+    if (prot & PROT_WRITE)
+	pt_prot = L1_PROT;
+#endif
+
+    n = 0;
+    for (i = 0; i < nentries; i++)
+        for (j = 0; j < chunksize / PAGE_SIZE; j++)
+            mfns[n++] = entries[i].mfn + j;
+
+    return map_frames_ex(mfns, n, 1, 0, 1, dom, 0, pt_prot);
 }
+
 
 int do_xen_hypercall(int xc_handle, privcmd_hypercall_t *hypercall)
 {
@@ -102,8 +117,8 @@ int do_xen_hypercall(int xc_handle, privcmd_hypercall_t *hypercall)
 	errno = -ret;
 	return -1;
     }
-    if (call.result < 0) {
-        errno = -call.result;
+    if ((long) call.result < 0) {
+        errno = - (long) call.result;
         return -1;
     }
     return call.result;
@@ -244,8 +259,11 @@ int xc_evtchn_unbind(int xce_handle, evtchn_port_t port)
 	    files[xce_handle].evtchn.ports[i].port = -1;
 	    break;
 	}
-    if (i == MAX_EVTCHN_PORTS)
+    if (i == MAX_EVTCHN_PORTS) {
 	printf("Warning: couldn't find port %"PRId32" for xc handle %x\n", port, xce_handle);
+	errno = -EINVAL;
+	return -1;
+    }
     files[xce_handle].evtchn.ports[i].bound = 0;
     unbind_evtchn(port);
     return 0;
@@ -278,18 +296,24 @@ evtchn_port_or_error_t xc_evtchn_pending(int xce_handle)
 {
     int i;
     unsigned long flags;
+    evtchn_port_t ret = -1;
+
     local_irq_save(flags);
-    for (i = 0; i < MAX_EVTCHN_PORTS; i++) {
-	evtchn_port_t port = files[xce_handle].evtchn.ports[i].port;
-	if (port != -1 && files[xce_handle].evtchn.ports[i].pending) {
-	    files[xce_handle].evtchn.ports[i].pending = 0;
-	    local_irq_restore(flags);
-	    return port;
-	}
-    }
     files[xce_handle].read = 0;
+    for (i = 0; i < MAX_EVTCHN_PORTS; i++) {
+        evtchn_port_t port = files[xce_handle].evtchn.ports[i].port;
+        if (port != -1 && files[xce_handle].evtchn.ports[i].pending) {
+            if (ret == -1) {
+                ret = port;
+                files[xce_handle].evtchn.ports[i].pending = 0;
+            } else {
+                files[xce_handle].read = 1;
+                break;
+            }
+        }
+    }
     local_irq_restore(flags);
-    return -1;
+    return ret;
 }
 
 int xc_evtchn_unmask(int xce_handle, evtchn_port_t port)
@@ -304,6 +328,88 @@ void discard_file_cache(int fd, int flush)
     if (flush)
         fsync(fd);
 }
+
+int xc_gnttab_open(void)
+{
+    int xcg_handle;
+    xcg_handle = alloc_fd(FTYPE_GNTMAP);
+    gntmap_init(&files[xcg_handle].gntmap);
+    return xcg_handle;
+}
+
+int xc_gnttab_close(int xcg_handle)
+{
+    gntmap_fini(&files[xcg_handle].gntmap);
+    files[xcg_handle].type = FTYPE_NONE;
+    return 0;
+}
+
+void *xc_gnttab_map_grant_ref(int xcg_handle,
+                              uint32_t domid,
+                              uint32_t ref,
+                              int prot)
+{
+    return gntmap_map_grant_refs(&files[xcg_handle].gntmap,
+                                 1,
+                                 &domid, 0,
+                                 &ref,
+                                 prot & PROT_WRITE);
+}
+
+void *xc_gnttab_map_grant_refs(int xcg_handle,
+                               uint32_t count,
+                               uint32_t *domids,
+                               uint32_t *refs,
+                               int prot)
+{
+    return gntmap_map_grant_refs(&files[xcg_handle].gntmap,
+                                 count,
+                                 domids, 1,
+                                 refs,
+                                 prot & PROT_WRITE);
+}
+
+void *xc_gnttab_map_domain_grant_refs(int xcg_handle,
+                                      uint32_t count,
+                                      uint32_t domid,
+                                      uint32_t *refs,
+                                      int prot)
+{
+    return gntmap_map_grant_refs(&files[xcg_handle].gntmap,
+                                 count,
+                                 &domid, 0,
+                                 refs,
+                                 prot & PROT_WRITE);
+}
+
+int xc_gnttab_munmap(int xcg_handle,
+                     void *start_address,
+                     uint32_t count)
+{
+    int ret;
+    ret = gntmap_munmap(&files[xcg_handle].gntmap,
+                        (unsigned long) start_address,
+                        count);
+    if (ret < 0) {
+        errno = -ret;
+        return -1;
+    }
+    return ret;
+}
+
+int xc_gnttab_set_max_grants(int xcg_handle,
+                             uint32_t count)
+{
+    int ret;
+    ret = gntmap_set_max_grants(&files[xcg_handle].gntmap,
+                                count);
+    if (ret < 0) {
+        errno = -ret;
+        return -1;
+    }
+    return ret;
+}
+
 /*
  * Local variables:
  * mode: C

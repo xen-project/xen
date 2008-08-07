@@ -84,6 +84,7 @@
 #define NOFILE 32
 extern int xc_evtchn_close(int fd);
 extern int xc_interface_close(int fd);
+extern int xc_gnttab_close(int fd);
 
 pthread_mutex_t fd_lock = PTHREAD_MUTEX_INITIALIZER;
 struct file files[NOFILE] = {
@@ -230,8 +231,8 @@ int read(int fd, void *buf, size_t nbytes)
         }
 	case FTYPE_FILE: {
 	    ssize_t ret;
-	    if (nbytes > PAGE_SIZE)
-		nbytes = PAGE_SIZE;
+	    if (nbytes > PAGE_SIZE * FSIF_NR_READ_GNTS)
+		nbytes = PAGE_SIZE * FSIF_NR_READ_GNTS;
 	    ret = fs_read(fs_import, files[fd].file.fd, buf, nbytes, files[fd].file.offset);
 	    if (ret > 0) {
 		files[fd].file.offset += ret;
@@ -291,8 +292,8 @@ int write(int fd, const void *buf, size_t nbytes)
 	    return nbytes;
 	case FTYPE_FILE: {
 	    ssize_t ret;
-	    if (nbytes > PAGE_SIZE)
-		nbytes = PAGE_SIZE;
+	    if (nbytes > PAGE_SIZE * FSIF_NR_WRITE_GNTS)
+		nbytes = PAGE_SIZE * FSIF_NR_WRITE_GNTS;
 	    ret = fs_write(fs_import, files[fd].file.fd, (void *) buf, nbytes, files[fd].file.offset);
 	    if (ret > 0) {
 		files[fd].file.offset += ret;
@@ -401,6 +402,9 @@ int close(int fd)
 	case FTYPE_EVTCHN:
             xc_evtchn_close(fd);
             return 0;
+	case FTYPE_GNTMAP:
+	    xc_gnttab_close(fd);
+	    return 0;
 	case FTYPE_TAP:
 	    shutdown_netfront(files[fd].tap.dev);
 	    files[fd].type = FTYPE_NONE;

@@ -5,6 +5,9 @@
 #include <mini-os/semaphore.h>
 #include <mini-os/types.h>
 
+#define FSIF_RING_SIZE_ORDER   1
+#define FSIF_RING_SIZE_PAGES   (1<<FSIF_RING_SIZE_ORDER)
+
 struct fs_import 
 {
     domid_t dom_id;                 /* dom id of the exporting domain       */ 
@@ -14,7 +17,7 @@ struct fs_import
     unsigned int nr_entries;        /* Number of entries in rings & request
                                        array                                */
     struct fsif_front_ring ring;    /* frontend ring (contains shared ring) */
-    int gnt_ref;                    /* grant reference to the shared ring   */
+    u32 gnt_refs[FSIF_RING_SIZE_PAGES];  /* grant references to the shared ring  */
     evtchn_port_t local_port;       /* local event channel port             */
     char *backend;                  /* XenBus location of the backend       */
     struct fs_request *requests;    /* Table of requests                    */

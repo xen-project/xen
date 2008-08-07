@@ -95,11 +95,6 @@ vnc=0
 #vncunused=1
 
 #----------------------------------------------------------------------------
-# enable spawning vncviewer for domain's console
-# (only valid when vnc=1), default = 0
-#vncconsole=0
-
-#----------------------------------------------------------------------------
 # set password for domain's VNC console
 # default is depents on vncpasswd in xend-config.sxp
 vncpasswd=''

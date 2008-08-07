@@ -33,6 +33,10 @@
 #include <xen/domain_page.h>
 #include <asm/hvm/support.h>
 #include <xen/numa.h>
+#include <xen/paging.h>
+
+#define VGA_MEM_BASE 0xa0000
+#define VGA_MEM_SIZE 0x20000
 
 #define PAT(x) (x)
 static const uint32_t mask16[16] = {
@@ -464,6 +468,7 @@ static int mmio_move(struct hvm_hw_stdvga *s, ioreq_t *p)
 {
     int i;
     int sign = p->df ? -1 : 1;
+    p2m_type_t p2mt;
 
     if ( p->data_is_ptr )
     {
@@ -473,7 +478,19 @@ static int mmio_move(struct hvm_hw_stdvga *s, ioreq_t *p)
             for ( i = 0; i < p->count; i++ ) 
             {
                 tmp = stdvga_mem_read(addr, p->size);
-                hvm_copy_to_guest_phys(data, &tmp, p->size);
+                if ( hvm_copy_to_guest_phys(data, &tmp, p->size) ==
+                     HVMCOPY_bad_gfn_to_mfn )
+                {
+                    (void)gfn_to_mfn_current(data >> PAGE_SHIFT, &p2mt);
+                    /*
+                     * The only case we handle is vga_mem <-> vga_mem.
+                     * Anything else disables caching and leaves it to qemu-dm.
+                     */
+                    if ( (p2mt != p2m_mmio_dm) || (data < VGA_MEM_BASE) ||
+                         ((data + p->size) > (VGA_MEM_BASE + VGA_MEM_SIZE)) )
+                        return 0;
+                    stdvga_mem_write(data, tmp, p->size);
+                }
                 data += sign * p->size;
                 addr += sign * p->size;
             }
@@ -483,7 +500,15 @@ static int mmio_move(struct hvm_hw_stdvga *s, ioreq_t *p)
             uint32_t addr = p->addr, data = p->data, tmp;
             for ( i = 0; i < p->count; i++ )
             {
-                hvm_copy_from_guest_phys(&tmp, data, p->size);
+                if ( hvm_copy_from_guest_phys(&tmp, data, p->size) ==
+                     HVMCOPY_bad_gfn_to_mfn )
+                {
+                    (void)gfn_to_mfn_current(data >> PAGE_SHIFT, &p2mt);
+                    if ( (p2mt != p2m_mmio_dm) || (data < VGA_MEM_BASE) ||
+                         ((data + p->size) > (VGA_MEM_BASE + VGA_MEM_SIZE)) )
+                        return 0;
+                    tmp = stdvga_mem_read(data, p->size);
+                }
                 stdvga_mem_write(addr, tmp, p->size);
                 data += sign * p->size;
                 addr += sign * p->size;
@@ -536,7 +561,8 @@ static int stdvga_intercept_mmio(ioreq_t *p)
         {
         case IOREQ_TYPE_COPY:
             buf = mmio_move(s, p);
-            break;
+            if ( buf )
+                break;
         default:
             gdprintk(XENLOG_WARNING, "unsupported mmio request type:%d "
                      "addr:0x%04x data:0x%04x size:%d count:%d state:%d "
@@ -588,7 +614,7 @@ void stdvga_init(struct domain *d)
         register_portio_handler(d, 0x3ce, 2, stdvga_intercept_pio);
         /* MMIO. */
         register_buffered_io_handler(
-            d, 0xa0000, 0x20000, stdvga_intercept_mmio);
+            d, VGA_MEM_BASE, VGA_MEM_SIZE, stdvga_intercept_mmio);
     }
 }
 

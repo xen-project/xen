@@ -24,10 +24,9 @@
 #include "rombios_compat.h"
 #include "tpm_drivers.h"
 
+#include "util.h"
 #include "tcgbios.h"
 #include "32bitprotos.h"
-#include "util.h"
-
 
 /* local structure and variables */
 struct ptti_cust {
@@ -135,7 +134,7 @@ static inline uint32_t bswap(uint32_t a)
  *******************************************************/
 
 typedef struct {
-	struct acpi_20_tcpa *tcpa_ptr;
+	struct acpi_20_tcpa_clisrv *tcpa_ptr;
 	unsigned char       *lasa_last_ptr;
 	uint16_t            entry_count;
 	uint16_t            flags;
@@ -260,45 +259,19 @@ uint8_t acpi_validate_entry(struct acpi_header *hdr)
 }
 
 
-/*
- * Search for the RSDP ACPI table in the memory starting at addr and
- * ending at addr + len - 1.
- */
-static struct acpi_20_rsdp *find_rsdp(const void *start, unsigned int len)
-{
-	char *rsdp = (char *)start;
-	char *end = rsdp + len;
-	/* scan memory in steps of 16 bytes */
-	while (rsdp < end) {
-		/* check for expected string */
-		if (!strncmp( rsdp, "RSD PTR ", 8))
-			return (struct acpi_20_rsdp *)rsdp;
-		rsdp += 0x10;
-	}
-	return 0;
-}
-
 void tcpa_acpi_init(void)
 {
 	struct acpi_20_rsdt *rsdt;
-	struct acpi_20_tcpa *tcpa = (void *)0;
+	struct acpi_20_tcpa_clisrv *tcpa = (void *)0;
 	struct acpi_20_rsdp *rsdp;
 	uint32_t length;
 	uint16_t off;
 	int found = 0;
-	uint16_t ebda_seg;
 
-	if (MA_IsTPMPresent() == 0) {
+	if (MA_IsTPMPresent() == 0)
 		return;
-	}
 
-	/* RSDP in EBDA? */
-	ebda_seg = *(uint16_t *)ADDR_FROM_SEG_OFF(0x40, 0xe);
-	rsdp = find_rsdp((void *)(ebda_seg << 16), 1024);
-
-	if (!rsdp)
-		rsdp = find_rsdp((void *)(ACPI_SEGMENT << 4), 0x20000);
-
+	rsdp = find_rsdp();
 	if (rsdp) {
 		uint32_t ctr = 0;
 		/* get RSDT from RSDP */
@@ -307,7 +280,7 @@ void tcpa_acpi_init(void)
 		off = 36;
 		while ((off + 3) < length) {
 			/* try all pointers to structures */
-			tcpa = (struct acpi_20_tcpa *)rsdt->entry[ctr];
+			tcpa = (struct acpi_20_tcpa_clisrv *)rsdt->entry[ctr];
 			/* valid TCPA ACPI table ? */
 			if (ACPI_2_0_TCPA_SIGNATURE == tcpa->header.signature
 			    && acpi_validate_entry(&tcpa->header) == 0) {
@@ -398,7 +371,7 @@ static
 unsigned char *tcpa_get_lasa_base_ptr(void)
 {
 	unsigned char *lasa = 0;
-	struct acpi_20_tcpa *tcpa = tcpa_acpi.tcpa_ptr;
+	struct acpi_20_tcpa_clisrv *tcpa = tcpa_acpi.tcpa_ptr;
 	if (tcpa != 0) {
 		uint32_t class = tcpa->platform_class;
 		if (class == TCPA_ACPI_CLASS_CLIENT) {
@@ -416,7 +389,7 @@ static
 uint32_t tcpa_get_laml(void)
 {
 	uint32_t laml = 0;
-	struct acpi_20_tcpa *tcpa = tcpa_acpi.tcpa_ptr;
+	struct acpi_20_tcpa_clisrv *tcpa = tcpa_acpi.tcpa_ptr;
 	if (tcpa != 0) {
 		uint32_t class = tcpa->platform_class;
 		if (class == TCPA_ACPI_CLASS_CLIENT) {

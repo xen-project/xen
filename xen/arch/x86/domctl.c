@@ -661,6 +661,7 @@ long arch_do_domctl(
         if ( !iommu_pv_enabled && !is_hvm_domain(d) )
         {
             ret = -ENOSYS;
+            put_domain(d);
             break;
         }
 
@@ -669,12 +670,16 @@ long arch_do_domctl(
             gdprintk(XENLOG_ERR, "XEN_DOMCTL_assign_device: "
                      "%x:%x:%x already assigned, or non-existent\n",
                      bus, PCI_SLOT(devfn), PCI_FUNC(devfn));
+            put_domain(d);
             break;
         }
 
         ret = assign_device(d, bus, devfn);
-        gdprintk(XENLOG_INFO, "XEN_DOMCTL_assign_device: bdf = %x:%x:%x\n",
-                 bus, PCI_SLOT(devfn), PCI_FUNC(devfn));
+        if ( ret )
+            gdprintk(XENLOG_ERR, "XEN_DOMCTL_assign_device: "
+                     "assign device (%x:%x:%x) failed\n",
+                     bus, PCI_SLOT(devfn), PCI_FUNC(devfn));
+
         put_domain(d);
     }
     break;
@@ -701,11 +706,15 @@ long arch_do_domctl(
         if ( !iommu_pv_enabled && !is_hvm_domain(d) )
         {
             ret = -ENOSYS;
+            put_domain(d);
             break;
         }
 
         if ( !device_assigned(bus, devfn) )
+        {
+            put_domain(d);
             break;
+        }
 
         ret = 0;
         deassign_device(d, bus, devfn);

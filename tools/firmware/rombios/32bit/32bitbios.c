@@ -47,5 +47,7 @@ uint32_t jumptable[IDX_LAST+1] __attribute__((section (".biosjumptable"))) =
 
 	TABLE_ENTRY(IDX_TCPA_INITIALIZE_TPM, tcpa_initialize_tpm),
 
+	TABLE_ENTRY(IDX_GET_S3_WAKING_VECTOR, get_s3_waking_vector),
+
 	TABLE_ENTRY(IDX_LAST       , 0)     /* keep last */
 };

@@ -8,11 +8,18 @@ XENDOMAINS_SYSCONFIG = init.d/sysconfig.xendomains
 
 # Xen configuration dir and configs to go there.
 XEN_CONFIG_DIR = /etc/xen
+XEN_READMES = README
+XEN_READMES += README.incompatibilities
 XEN_CONFIGS = xend-config.sxp
 XEN_CONFIGS += xm-config.xml
 XEN_CONFIGS += xmexample1 
 XEN_CONFIGS += xmexample2
+XEN_CONFIGS += xmexample3
 XEN_CONFIGS += xmexample.hvm
+XEN_CONFIGS += xmexample.hvm-stubdom
+XEN_CONFIGS += xmexample.hvm-dm
+XEN_CONFIGS += xmexample.pv-grub
+XEN_CONFIGS += xmexample.nbd
 XEN_CONFIGS += xmexample.vti
 XEN_CONFIGS += xend-pci-quirks.sxp
 XEN_CONFIGS += xend-pci-permissive.sxp
@@ -59,7 +66,16 @@ all:
 build:
 
 .PHONY: install
-install: all install-initd install-configs install-scripts $(HOTPLUGS)
+install: all install-readmes install-initd install-configs install-scripts $(HOTPLUGS)
+
+.PHONY: install-readmes
+install-readmes:
+	[ -d $(DESTDIR)$(XEN_CONFIG_DIR) ] || \
+		$(INSTALL_DIR) $(DESTDIR)$(XEN_CONFIG_DIR)
+	set -e; for i in $(XEN_READMES); \
+	    do [ -e $(DESTDIR)$(XEN_CONFIG_DIR)/$$i ] || \
+	    $(INSTALL_DATA) $$i $(DESTDIR)$(XEN_CONFIG_DIR); \
+	done
 
 .PHONY: install-initd
 install-initd:

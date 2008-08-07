@@ -33,6 +33,8 @@ install: build
 	$(INSTALL_PROG) xenbaked $(DESTDIR)$(SBINDIR)/xenbaked
 	$(INSTALL_PROG) xentrace_setmask  $(DESTDIR)$(SBINDIR)/xentrace_setmask
 	$(INSTALL_PROG) xenmon.py  $(DESTDIR)$(SBINDIR)/xenmon.py
+	$(INSTALL_DIR) $(DESTDIR)$(DOCDIR)
+	$(INSTALL_DATA) README $(DESTDIR)$(DOCDIR)/README.xenmon
 
 .PHONY: clean
 clean:

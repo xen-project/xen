@@ -27,42 +27,13 @@
 #include "iommu.h"
 #include "dmar.h"
 #include "vtd.h"
-
-#define INTEL   0x8086
-#define SEABURG 0x4000
-#define C_STEP  2
+#include "extern.h"
 
 int is_usb_device(u8 bus, u8 devfn)
 {
     u16 class = pci_conf_read16(bus, PCI_SLOT(devfn), PCI_FUNC(devfn),
                                 PCI_CLASS_DEVICE);
     return (class == 0xc03);
-}
-
-int vtd_hw_check(void)
-{
-    u16 vendor, device;
-    u8 revision, stepping;
-
-    vendor   = pci_conf_read16(0, 0, 0, PCI_VENDOR_ID);
-    device   = pci_conf_read16(0, 0, 0, PCI_DEVICE_ID);
-    revision = pci_conf_read8(0, 0, 0, PCI_REVISION_ID);
-    stepping = revision & 0xf;
-
-    if ( (vendor == INTEL) && (device == SEABURG) )
-    {
-        if ( stepping < C_STEP )
-        {
-            dprintk(XENLOG_WARNING VTDPREFIX,
-                    "*** VT-d disabled - pre C0-step Seaburg found\n");
-            dprintk(XENLOG_WARNING VTDPREFIX,
-                    "***  vendor = %x device = %x revision = %x\n",
-                    vendor, device, revision);
-            return -ENODEV;
-        }
-    }
-
-    return 0;
 }
 
 /* Disable vt-d protected memory registers. */
@@ -230,6 +201,111 @@ void print_vtd_entries(struct iommu *iommu, int bus, int devfn, u64 gmfn)
 
         l = maddr_to_virt(l[l_index]);
     } while ( --level );
+}
+
+void dump_iommu_info(unsigned char key)
+{
+    struct acpi_drhd_unit *drhd;
+    struct iommu *iommu;
+    int i;
+
+    for_each_drhd_unit ( drhd )
+    {
+        u32 status = 0;
+
+        iommu = drhd->iommu;
+        printk("\niommu %x: nr_pt_levels = %x.\n", iommu->index,
+            iommu->nr_pt_levels);
+
+        if ( ecap_queued_inval(iommu->ecap) ||  ecap_intr_remap(iommu->ecap) )
+            status = dmar_readl(iommu->reg, DMAR_GSTS_REG);
+
+        printk("  Queued Invalidation: %ssupported%s.\n",
+            ecap_queued_inval(iommu->ecap) ? "" : "not ",
+           (status & DMA_GSTS_QIES) ? " and enabled" : "" );
+
+
+        printk("  Interrupt Remapping: %ssupported%s.\n",
+            ecap_intr_remap(iommu->ecap) ? "" : "not ",
+            (status & DMA_GSTS_IRES) ? " and enabled" : "" );
+
+        if ( status & DMA_GSTS_IRES )
+        {
+            /* Dump interrupt remapping table. */
+            u64 iremap_maddr = dmar_readq(iommu->reg, DMAR_IRTA_REG);
+            int nr_entry = 1 << ((iremap_maddr & 0xF) + 1);
+            struct iremap_entry *iremap_entries =
+                (struct iremap_entry *)map_vtd_domain_page(iremap_maddr);
+
+            printk("  Interrupt remapping table (nr_entry=0x%x. "
+                "Only dump P=1 entries here):\n", nr_entry);
+            printk("       SVT  SQ   SID      DST  V  AVL DLM TM RH DM "
+                   "FPD P\n");
+            for ( i = 0; i < nr_entry; i++ )
+            {
+                struct iremap_entry *p = iremap_entries + i;
+
+                if ( !p->lo.p )
+                    continue;
+                printk("  %04x:  %x   %x  %04x %08x %02x    %x   %x  %x  %x  %x"
+                    "   %x %x\n", i,
+                    (u32)p->hi.svt, (u32)p->hi.sq, (u32)p->hi.sid,
+                    (u32)p->lo.dst, (u32)p->lo.vector, (u32)p->lo.avail,
+                    (u32)p->lo.dlm, (u32)p->lo.tm, (u32)p->lo.rh,
+                    (u32)p->lo.dm, (u32)p->lo.fpd, (u32)p->lo.p);
+            }
+
+            unmap_vtd_domain_page(iremap_entries);
+        }
+    }
+
+    /* Dump the I/O xAPIC redirection table(s). */
+    if ( vtd_enabled )
+    {
+        int apic, reg;
+        union IO_APIC_reg_01 reg_01;
+        struct IO_APIC_route_entry rte = { 0 };
+        struct IO_APIC_route_remap_entry *remap;
+        struct ir_ctrl *ir_ctrl;
+
+        for ( apic = 0; apic < nr_ioapics; apic++ )
+        {
+            iommu = ioapic_to_iommu(mp_ioapics[apic].mpc_apicid);
+            ir_ctrl = iommu_ir_ctrl(iommu);
+            if ( !iommu || !ir_ctrl || ir_ctrl->iremap_maddr == 0 ||
+                ir_ctrl->iremap_index == -1 )
+                continue;
+
+            printk( "\nRedirection table of IOAPIC %x:\n", apic);
+
+            reg = 1; /* IO xAPIC Version Register. */
+            *IO_APIC_BASE(apic) = reg;
+            reg_01.raw = *(IO_APIC_BASE(apic)+4);
+
+            printk("  #entry IDX FMT MASK TRIG IRR POL STAT DELI  VECTOR\n");
+            for ( i = 0; i <= reg_01.bits.entries; i++ )
+            {
+                reg = 0x10 + i*2;
+                *IO_APIC_BASE(apic) = reg;
+                *(((u32 *)&rte) + 0) = *(IO_APIC_BASE(apic)+4);
+
+                *IO_APIC_BASE(apic) = reg + 1;
+                *(((u32 *)&rte) + 1) = *(IO_APIC_BASE(apic)+4);
+
+                remap = (struct IO_APIC_route_remap_entry *) &rte;
+                if ( !remap->format )
+                    continue;
+
+                printk("   %02x:  %04x   %x    %x   %x   %x   %x    %x"
+                    "    %x     %02x\n", i,
+                    (u32)remap->index_0_14 | ((u32)remap->index_15 << 15),
+                    (u32)remap->format, (u32)remap->mask, (u32)remap->trigger,
+                    (u32)remap->irr, (u32)remap->polarity,
+                    (u32)remap->delivery_status, (u32)remap->delivery_mode,
+                    (u32)remap->vector);
+            }
+        }
+    }
 }
 
 /*

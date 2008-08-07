@@ -47,12 +47,20 @@
 /* because the current version of libpci (2.2.0) doesn't define these ID,
  * so we define Capability ID here.
  */
+#ifndef PCI_CAP_ID_HOTPLUG
 /* SHPC Capability List Item reg group */
 #define PCI_CAP_ID_HOTPLUG      0x0C
+#endif
+
+#ifndef PCI_CAP_ID_SSVID
 /* Subsystem ID and Subsystem Vendor ID Capability List Item reg group */
 #define PCI_CAP_ID_SSVID        0x0D
+#endif
+
+#ifndef PCI_MSI_FLAGS_MASK_BIT
 /* interrupt masking & reporting supported */
 #define PCI_MSI_FLAGS_MASK_BIT  0x0100
+#endif
 
 #define PT_INVALID_REG          0xFFFFFFFF      /* invalid register value */
 #define PT_BAR_ALLF             0xFFFFFFFF      /* BAR ALLF value */

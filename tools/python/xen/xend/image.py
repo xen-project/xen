@@ -114,7 +114,7 @@ class ImageHandler:
 
         self.display = vmConfig['platform'].get('display')
         self.xauthority = vmConfig['platform'].get('xauthority')
-        self.vncconsole = vmConfig['platform'].get('vncconsole')
+        self.vncconsole = int(vmConfig['platform'].get('vncconsole', 0))
         self.dmargs = self.parseDeviceModelArgs(vmConfig)
         self.pid = None
         rtc_timeoffset = vmConfig['platform'].get('rtc_timeoffset')
@@ -249,10 +249,6 @@ class ImageHandler:
     # xm config file
     def parseDeviceModelArgs(self, vmConfig):
         ret = ["-domain-name", str(self.vm.info['name_label'])]
-
-        # Tell QEMU how large the guest's memory allocation is
-        # to help it when loading the initrd (if neccessary)
-        ret += ["-m", str(self.getRequiredInitialReservation() / 1024)]
 
         # Find RFB console device, and if it exists, make QEMU enable
         # the VNC console.
@@ -776,6 +772,10 @@ class HVMImageHandler(ImageHandler):
             ret.append("-net")
             ret.append("tap,vlan=%d,ifname=tap%d.%d,bridge=%s" %
                        (nics, self.vm.getDomid(), nics-1, bridge))
+
+        if nics == 0:
+            ret.append("-net")
+            ret.append("none")
 
         return ret
 

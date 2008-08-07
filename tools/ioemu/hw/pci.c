@@ -664,9 +664,10 @@ int pt_chk_bar_overlap(PCIBus *bus, int devfn, uint32_t addr, uint32_t size)
             r = &devices->io_regions[j];
             if ((addr < (r->addr + r->size)) && ((addr + size) > r->addr))
             {
-                printf("Overlapped to device[%02x:%02x.%x] region:%d addr:%08x"
-                    " size:%08x\n", bus->bus_num, (devices->devfn >> 3) & 0x1F,
-                    (devices->devfn & 0x7), j, r->addr, r->size);
+                printf("Overlapped to device[%02x:%02x.%x][Region:%d]"
+                    "[Address:%08xh][Size:%08xh]\n", bus->bus_num,
+                    (devices->devfn >> 3) & 0x1F, (devices->devfn & 0x7),
+                    j, r->addr, r->size);
                 ret = 1;
                 goto out;
             }
