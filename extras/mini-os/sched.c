@@ -55,18 +55,18 @@
 #endif
 
 struct thread *idle_thread = NULL;
-LIST_HEAD(exited_threads);
+MINIOS_LIST_HEAD(exited_threads);
 static int threads_started;
 
 struct thread *main_thread;
 
 void inline print_runqueue(void)
 {
-    struct list_head *it;
+    struct minios_list_head *it;
     struct thread *th;
-    list_for_each(it, &idle_thread->thread_list)
+    minios_list_for_each(it, &idle_thread->thread_list)
     {
-        th = list_entry(it, struct thread, thread_list);
+        th = minios_list_entry(it, struct thread, thread_list);
         printk("   Thread \"%s\", runnable=%d\n", th->name, is_runnable(th));
     }
     printk("\n");
@@ -75,7 +75,7 @@ void inline print_runqueue(void)
 void schedule(void)
 {
     struct thread *prev, *next, *thread;
-    struct list_head *iterator, *next_iterator;
+    struct minios_list_head *iterator, *next_iterator;
     unsigned long flags;
 
     prev = current;
@@ -97,9 +97,9 @@ void schedule(void)
         s_time_t now = NOW();
         s_time_t min_wakeup_time = now + SECONDS(10);
         next = NULL;   
-        list_for_each_safe(iterator, next_iterator, &idle_thread->thread_list)
+        minios_list_for_each_safe(iterator, next_iterator, &idle_thread->thread_list)
         {
-            thread = list_entry(iterator, struct thread, thread_list);
+            thread = minios_list_entry(iterator, struct thread, thread_list);
             if (!is_runnable(thread) && thread->wakeup_time != 0LL)
             {
                 if (thread->wakeup_time <= now)
@@ -111,8 +111,8 @@ void schedule(void)
             {
                 next = thread;
                 /* Put this thread on the end of the list */
-                list_del(&thread->thread_list);
-                list_add_tail(&thread->thread_list, &idle_thread->thread_list);
+                minios_list_del(&thread->thread_list);
+                minios_list_add_tail(&thread->thread_list, &idle_thread->thread_list);
                 break;
             }
         }
@@ -128,12 +128,12 @@ void schedule(void)
        inturrupted at the return instruction. And therefore at safe point. */
     if(prev != next) switch_threads(prev, next);
 
-    list_for_each_safe(iterator, next_iterator, &exited_threads)
+    minios_list_for_each_safe(iterator, next_iterator, &exited_threads)
     {
-        thread = list_entry(iterator, struct thread, thread_list);
+        thread = minios_list_entry(iterator, struct thread, thread_list);
         if(thread != prev)
         {
-            list_del(&thread->thread_list);
+            minios_list_del(&thread->thread_list);
             free_pages(thread->stack, STACK_SIZE_PAGE_ORDER);
             xfree(thread);
         }
@@ -155,7 +155,7 @@ struct thread* create_thread(char *name, void (*function)(void *), void *data)
     set_runnable(thread);
     local_irq_save(flags);
     if(idle_thread != NULL) {
-        list_add_tail(&thread->thread_list, &idle_thread->thread_list); 
+        minios_list_add_tail(&thread->thread_list, &idle_thread->thread_list); 
     } else if(function != idle_thread_fn)
     {
         printk("BUG: Not allowed to create thread before initialising scheduler.\n");
@@ -208,10 +208,10 @@ void exit_thread(void)
     printk("Thread \"%s\" exited.\n", thread->name);
     local_irq_save(flags);
     /* Remove from the thread list */
-    list_del(&thread->thread_list);
+    minios_list_del(&thread->thread_list);
     clear_runnable(thread);
     /* Put onto exited list */
-    list_add(&thread->thread_list, &exited_threads);
+    minios_list_add(&thread->thread_list, &exited_threads);
     local_irq_restore(flags);
     /* Schedule will free the resources */
     while(1)
@@ -296,6 +296,6 @@ void init_sched(void)
     _REENT_INIT_PTR((&callback_reent))
 #endif
     idle_thread = create_thread("Idle", idle_thread_fn, NULL);
-    INIT_LIST_HEAD(&idle_thread->thread_list);
+    MINIOS_INIT_LIST_HEAD(&idle_thread->thread_list);
 }
 

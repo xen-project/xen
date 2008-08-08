@@ -79,10 +79,10 @@ typedef struct HWVoiceOut {
     st_sample_t *mix_buf;
 
     int samples;
-    QEMU_LIST_HEAD (sw_out_listhead, SWVoiceOut) sw_head;
-    QEMU_LIST_HEAD (sw_cap_listhead, SWVoiceCap) cap_head;
+    LIST_HEAD (sw_out_listhead, SWVoiceOut) sw_head;
+    LIST_HEAD (sw_cap_listhead, SWVoiceCap) cap_head;
     struct audio_pcm_ops *pcm_ops;
-    QEMU_LIST_ENTRY (HWVoiceOut) entries;
+    LIST_ENTRY (HWVoiceOut) entries;
 } HWVoiceOut;
 
 typedef struct HWVoiceIn {
@@ -98,9 +98,9 @@ typedef struct HWVoiceIn {
     st_sample_t *conv_buf;
 
     int samples;
-    QEMU_LIST_HEAD (sw_in_listhead, SWVoiceIn) sw_head;
+    LIST_HEAD (sw_in_listhead, SWVoiceIn) sw_head;
     struct audio_pcm_ops *pcm_ops;
-    QEMU_LIST_ENTRY (HWVoiceIn) entries;
+    LIST_ENTRY (HWVoiceIn) entries;
 } HWVoiceIn;
 
 struct SWVoiceOut {
@@ -116,7 +116,7 @@ struct SWVoiceOut {
     char *name;
     volume_t vol;
     struct audio_callback callback;
-    QEMU_LIST_ENTRY (SWVoiceOut) entries;
+    LIST_ENTRY (SWVoiceOut) entries;
 };
 
 struct SWVoiceIn {
@@ -131,7 +131,7 @@ struct SWVoiceIn {
     char *name;
     volume_t vol;
     struct audio_callback callback;
-    QEMU_LIST_ENTRY (SWVoiceIn) entries;
+    LIST_ENTRY (SWVoiceIn) entries;
 };
 
 struct audio_driver {
@@ -165,20 +165,20 @@ struct audio_pcm_ops {
 struct capture_callback {
     struct audio_capture_ops ops;
     void *opaque;
-    QEMU_LIST_ENTRY (capture_callback) entries;
+    LIST_ENTRY (capture_callback) entries;
 };
 
 struct CaptureVoiceOut {
     HWVoiceOut hw;
     void *buf;
-    QEMU_LIST_HEAD (cb_listhead, capture_callback) cb_head;
-    QEMU_LIST_ENTRY (CaptureVoiceOut) entries;
+    LIST_HEAD (cb_listhead, capture_callback) cb_head;
+    LIST_ENTRY (CaptureVoiceOut) entries;
 };
 
 struct SWVoiceCap {
     SWVoiceOut sw;
     CaptureVoiceOut *cap;
-    QEMU_LIST_ENTRY (SWVoiceCap) entries;
+    LIST_ENTRY (SWVoiceCap) entries;
 };
 
 struct AudioState {
@@ -186,10 +186,10 @@ struct AudioState {
     void *drv_opaque;
 
     QEMUTimer *ts;
-    QEMU_LIST_HEAD (card_listhead, QEMUSoundCard) card_head;
-    QEMU_LIST_HEAD (hw_in_listhead, HWVoiceIn) hw_head_in;
-    QEMU_LIST_HEAD (hw_out_listhead, HWVoiceOut) hw_head_out;
-    QEMU_LIST_HEAD (cap_listhead, CaptureVoiceOut) cap_head;
+    LIST_HEAD (card_listhead, QEMUSoundCard) card_head;
+    LIST_HEAD (hw_in_listhead, HWVoiceIn) hw_head_in;
+    LIST_HEAD (hw_out_listhead, HWVoiceOut) hw_head_out;
+    LIST_HEAD (cap_listhead, CaptureVoiceOut) cap_head;
     int nb_hw_voices_out;
     int nb_hw_voices_in;
 };

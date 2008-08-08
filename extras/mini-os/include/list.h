@@ -11,23 +11,23 @@
  * using the generic single-entry routines.
  */
 
-struct list_head {
-	struct list_head *next, *prev;
+struct minios_list_head {
+	struct minios_list_head *next, *prev;
 };
 
-#define LIST_HEAD_INIT(name) { &(name), &(name) }
+#define MINIOS_LIST_HEAD_INIT(name) { &(name), &(name) }
 
-#define LIST_HEAD(name) \
-	struct list_head name = LIST_HEAD_INIT(name)
+#define MINIOS_LIST_HEAD(name) \
+	struct minios_list_head name = MINIOS_LIST_HEAD_INIT(name)
 
-#define INIT_LIST_HEAD(ptr) do { \
+#define MINIOS_INIT_LIST_HEAD(ptr) do { \
 	(ptr)->next = (ptr); (ptr)->prev = (ptr); \
 } while (0)
 
-#define list_top(head, type, member)					  \
+#define minios_list_top(head, type, member)					  \
 ({ 									  \
-	struct list_head *_head = (head);				  \
-	list_empty(_head) ? NULL : list_entry(_head->next, type, member); \
+	struct minios_list_head *_head = (head);				  \
+	minios_list_empty(_head) ? NULL : minios_list_entry(_head->next, type, member); \
 })
 
 /*
@@ -36,9 +36,9 @@ struct list_head {
  * This is only for internal list manipulation where we know
  * the prev/next entries already!
  */
-static __inline__ void __list_add(struct list_head * new,
-	struct list_head * prev,
-	struct list_head * next)
+static __inline__ void __minios_list_add(struct minios_list_head * new,
+	struct minios_list_head * prev,
+	struct minios_list_head * next)
 {
 	next->prev = new;
 	new->next = next;
@@ -47,29 +47,29 @@ static __inline__ void __list_add(struct list_head * new,
 }
 
 /**
- * list_add - add a new entry
+ * minios_list_add - add a new entry
  * @new: new entry to be added
  * @head: list head to add it after
  *
  * Insert a new entry after the specified head.
  * This is good for implementing stacks.
  */
-static __inline__ void list_add(struct list_head *new, struct list_head *head)
+static __inline__ void minios_list_add(struct minios_list_head *new, struct minios_list_head *head)
 {
-	__list_add(new, head, head->next);
+	__minios_list_add(new, head, head->next);
 }
 
 /**
- * list_add_tail - add a new entry
+ * minios_list_add_tail - add a new entry
  * @new: new entry to be added
  * @head: list head to add it before
  *
  * Insert a new entry before the specified head.
  * This is useful for implementing queues.
  */
-static __inline__ void list_add_tail(struct list_head *new, struct list_head *head)
+static __inline__ void minios_list_add_tail(struct minios_list_head *new, struct minios_list_head *head)
 {
-	__list_add(new, head->prev, head);
+	__minios_list_add(new, head->prev, head);
 }
 
 /*
@@ -79,54 +79,54 @@ static __inline__ void list_add_tail(struct list_head *new, struct list_head *he
  * This is only for internal list manipulation where we know
  * the prev/next entries already!
  */
-static __inline__ void __list_del(struct list_head * prev,
-				  struct list_head * next)
+static __inline__ void __minios_list_del(struct minios_list_head * prev,
+				  struct minios_list_head * next)
 {
 	next->prev = prev;
 	prev->next = next;
 }
 
 /**
- * list_del - deletes entry from list.
+ * minios_list_del - deletes entry from list.
  * @entry: the element to delete from the list.
- * Note: list_empty on entry does not return true after this, the entry is in an undefined state.
+ * Note: minios_list_empty on entry does not return true after this, the entry is in an undefined state.
  */
-static __inline__ void list_del(struct list_head *entry)
+static __inline__ void minios_list_del(struct minios_list_head *entry)
 {
-	__list_del(entry->prev, entry->next);
+	__minios_list_del(entry->prev, entry->next);
 }
 
 /**
- * list_del_init - deletes entry from list and reinitialize it.
+ * minios_list_del_init - deletes entry from list and reinitialize it.
  * @entry: the element to delete from the list.
  */
-static __inline__ void list_del_init(struct list_head *entry)
+static __inline__ void minios_list_del_init(struct minios_list_head *entry)
 {
-	__list_del(entry->prev, entry->next);
-	INIT_LIST_HEAD(entry); 
+	__minios_list_del(entry->prev, entry->next);
+	MINIOS_INIT_LIST_HEAD(entry); 
 }
 
 /**
- * list_empty - tests whether a list is empty
+ * minios_list_empty - tests whether a list is empty
  * @head: the list to test.
  */
-static __inline__ int list_empty(struct list_head *head)
+static __inline__ int minios_list_empty(struct minios_list_head *head)
 {
 	return head->next == head;
 }
 
 /**
- * list_splice - join two lists
+ * minios_list_splice - join two lists
  * @list: the new list to add.
  * @head: the place to add it in the first list.
  */
-static __inline__ void list_splice(struct list_head *list, struct list_head *head)
+static __inline__ void minios_list_splice(struct minios_list_head *list, struct minios_list_head *head)
 {
-	struct list_head *first = list->next;
+	struct minios_list_head *first = list->next;
 
 	if (first != list) {
-		struct list_head *last = list->prev;
-		struct list_head *at = head->next;
+		struct minios_list_head *last = list->prev;
+		struct minios_list_head *at = head->next;
 
 		first->prev = head;
 		head->next = first;
@@ -137,54 +137,54 @@ static __inline__ void list_splice(struct list_head *list, struct list_head *hea
 }
 
 /**
- * list_entry - get the struct for this entry
- * @ptr:	the &struct list_head pointer.
+ * minios_list_entry - get the struct for this entry
+ * @ptr:	the &struct minios_list_head pointer.
  * @type:	the type of the struct this is embedded in.
- * @member:	the name of the list_struct within the struct.
+ * @member:	the name of the minios_list_struct within the struct.
  */
-#define list_entry(ptr, type, member) \
+#define minios_list_entry(ptr, type, member) \
 	((type *)((char *)(ptr)-(unsigned long)(&((type *)0)->member)))
 
 /**
- * list_for_each	-	iterate over a list
- * @pos:	the &struct list_head to use as a loop counter.
+ * minios_list_for_each	-	iterate over a list
+ * @pos:	the &struct minios_list_head to use as a loop counter.
  * @head:	the head for your list.
  */
-#define list_for_each(pos, head) \
+#define minios_list_for_each(pos, head) \
 	for (pos = (head)->next; pos != (head); pos = pos->next)
         	
 /**
- * list_for_each_safe	-	iterate over a list safe against removal of list entry
- * @pos:	the &struct list_head to use as a loop counter.
- * @n:		another &struct list_head to use as temporary storage
+ * minios_list_for_each_safe	-	iterate over a list safe against removal of list entry
+ * @pos:	the &struct minios_list_head to use as a loop counter.
+ * @n:		another &struct minios_list_head to use as temporary storage
  * @head:	the head for your list.
  */
-#define list_for_each_safe(pos, n, head) \
+#define minios_list_for_each_safe(pos, n, head) \
 	for (pos = (head)->next, n = pos->next; pos != (head); \
 		pos = n, n = pos->next)
 
 /**
- * list_for_each_entry	-	iterate over list of given type
+ * minios_list_for_each_entry	-	iterate over list of given type
  * @pos:	the type * to use as a loop counter.
  * @head:	the head for your list.
- * @member:	the name of the list_struct within the struct.
+ * @member:	the name of the minios_list_struct within the struct.
  */
-#define list_for_each_entry(pos, head, member)				\
-	for (pos = list_entry((head)->next, typeof(*pos), member);	\
+#define minios_list_for_each_entry(pos, head, member)				\
+	for (pos = minios_list_entry((head)->next, typeof(*pos), member);	\
 	     &pos->member != (head); 					\
-	     pos = list_entry(pos->member.next, typeof(*pos), member))
+	     pos = minios_list_entry(pos->member.next, typeof(*pos), member))
 
 /**
- * list_for_each_entry_safe - iterate over list of given type safe against removal of list entry
+ * minios_list_for_each_entry_safe - iterate over list of given type safe against removal of list entry
  * @pos:	the type * to use as a loop counter.
  * @n:		another type * to use as temporary storage
  * @head:	the head for your list.
- * @member:	the name of the list_struct within the struct.
+ * @member:	the name of the minios_list_struct within the struct.
  */
-#define list_for_each_entry_safe(pos, n, head, member)			\
-	for (pos = list_entry((head)->next, typeof(*pos), member),	\
-		n = list_entry(pos->member.next, typeof(*pos), member);	\
+#define minios_list_for_each_entry_safe(pos, n, head, member)			\
+	for (pos = minios_list_entry((head)->next, typeof(*pos), member),	\
+		n = minios_list_entry(pos->member.next, typeof(*pos), member);	\
 	     &pos->member != (head); 					\
-	     pos = n, n = list_entry(n->member.next, typeof(*n), member))
+	     pos = n, n = minios_list_entry(n->member.next, typeof(*n), member))
 #endif /* _LINUX_LIST_H */
 

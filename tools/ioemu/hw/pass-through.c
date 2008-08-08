@@ -1644,7 +1644,7 @@ static int pt_config_reg_init(struct pt_dev *ptdev,
         reg_entry->data = data;
     }
     /* list add register entry */
-    QEMU_LIST_INSERT_HEAD(&reg_grp->reg_tbl_head, reg_entry, entries);
+    LIST_INSERT_HEAD(&reg_grp->reg_tbl_head, reg_entry, entries);
 
 out:
     return err;
@@ -1659,7 +1659,7 @@ static int pt_config_init(struct pt_dev *ptdev)
     int i, j, err = 0;
 
     /* initialize register group list */
-    QEMU_LIST_INIT(&ptdev->reg_grp_tbl_head);
+    LIST_INIT(&ptdev->reg_grp_tbl_head);
 
     /* initialize register group */
     for (i=0; pt_emu_reg_grp_tbl[i].grp_size != 0; i++)
@@ -1682,12 +1682,12 @@ static int pt_config_init(struct pt_dev *ptdev)
         }
 
         /* initialize register group entry */
-        QEMU_LIST_INIT(&reg_grp_entry->reg_tbl_head);
+        LIST_INIT(&reg_grp_entry->reg_tbl_head);
 
         /* need to declare here, to enable searching Cap Ptr reg 
          * (which is in the same reg group) when initializing Status reg 
          */
-        QEMU_LIST_INSERT_HEAD(&ptdev->reg_grp_tbl_head, reg_grp_entry, entries);
+        LIST_INSERT_HEAD(&ptdev->reg_grp_tbl_head, reg_grp_entry, entries);
 
         reg_grp_entry->base_offset = reg_grp_offset;
         reg_grp_entry->reg_grp = 
@@ -1740,11 +1740,11 @@ static void pt_config_delete(struct pt_dev *ptdev)
         /* free all register entry */
         while ((reg_entry = reg_grp_entry->reg_tbl_head.lh_first) != NULL)
         {
-            QEMU_LIST_REMOVE(reg_entry, entries);
+            LIST_REMOVE(reg_entry, entries);
             qemu_free(reg_entry);
         }
 
-        QEMU_LIST_REMOVE(reg_grp_entry, entries);
+        LIST_REMOVE(reg_grp_entry, entries);
         qemu_free(reg_grp_entry);
     }
 }

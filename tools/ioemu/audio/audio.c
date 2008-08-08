@@ -707,8 +707,8 @@ static void audio_detach_capture (HWVoiceOut *hw)
             sw->rate = NULL;
         }
 
-        QEMU_LIST_REMOVE (sw, entries);
-        QEMU_LIST_REMOVE (sc, entries);
+        LIST_REMOVE (sw, entries);
+        LIST_REMOVE (sc, entries);
         qemu_free (sc);
         if (was_active) {
             /* We have removed soft voice from the capture:
@@ -751,8 +751,8 @@ static int audio_attach_capture (AudioState *s, HWVoiceOut *hw)
             qemu_free (sw);
             return -1;
         }
-        QEMU_LIST_INSERT_HEAD (&hw_cap->sw_head, sw, entries);
-        QEMU_LIST_INSERT_HEAD (&hw->cap_head, sc, entries);
+        LIST_INSERT_HEAD (&hw_cap->sw_head, sw, entries);
+        LIST_INSERT_HEAD (&hw->cap_head, sc, entries);
 #ifdef DEBUG_CAPTURE
         asprintf (&sw->name, "for %p %d,%d,%d",
                   hw, sw->info.freq, sw->info.bits, sw->info.nchannels);
@@ -1620,12 +1620,12 @@ void AUD_register_card (AudioState *s, const char *name, QEMUSoundCard *card)
     card->audio = s;
     card->name = qemu_strdup (name);
     memset (&card->entries, 0, sizeof (card->entries));
-    QEMU_LIST_INSERT_HEAD (&s->card_head, card, entries);
+    LIST_INSERT_HEAD (&s->card_head, card, entries);
 }
 
 void AUD_remove_card (QEMUSoundCard *card)
 {
-    QEMU_LIST_REMOVE (card, entries);
+    LIST_REMOVE (card, entries);
     card->audio = NULL;
     qemu_free (card->name);
 }
@@ -1637,9 +1637,9 @@ AudioState *AUD_init (void)
     const char *drvname;
     AudioState *s = &glob_audio_state;
 
-    QEMU_LIST_INIT (&s->hw_head_out);
-    QEMU_LIST_INIT (&s->hw_head_in);
-    QEMU_LIST_INIT (&s->cap_head);
+    LIST_INIT (&s->hw_head_out);
+    LIST_INIT (&s->hw_head_in);
+    LIST_INIT (&s->cap_head);
     atexit (audio_atexit);
 
     s->ts = qemu_new_timer (vm_clock, audio_timer, s);
@@ -1731,7 +1731,7 @@ AudioState *AUD_init (void)
         return NULL;
     }
 
-    QEMU_LIST_INIT (&s->card_head);
+    LIST_INIT (&s->card_head);
     register_savevm ("audio", 0, 1, audio_save, audio_load, s);
     qemu_mod_timer (s->ts, qemu_get_clock (vm_clock) + conf.period.ticks);
     return s;
@@ -1769,7 +1769,7 @@ CaptureVoiceOut *AUD_add_capture (
 
     cap = audio_pcm_capture_find_specific (s, as);
     if (cap) {
-        QEMU_LIST_INSERT_HEAD (&cap->cb_head, cb, entries);
+        LIST_INSERT_HEAD (&cap->cb_head, cb, entries);
         return cap;
     }
     else {
@@ -1784,8 +1784,8 @@ CaptureVoiceOut *AUD_add_capture (
         }
 
         hw = &cap->hw;
-        QEMU_LIST_INIT (&hw->sw_head);
-        QEMU_LIST_INIT (&cap->cb_head);
+        LIST_INIT (&hw->sw_head);
+        LIST_INIT (&cap->cb_head);
 
         /* XXX find a more elegant way */
         hw->samples = 4096 * 4;
@@ -1813,8 +1813,8 @@ CaptureVoiceOut *AUD_add_capture (
             [hw->info.swap_endianness]
             [hw->info.bits == 16];
 
-        QEMU_LIST_INSERT_HEAD (&s->cap_head, cap, entries);
-        QEMU_LIST_INSERT_HEAD (&cap->cb_head, cb, entries);
+        LIST_INSERT_HEAD (&s->cap_head, cap, entries);
+        LIST_INSERT_HEAD (&cap->cb_head, cb, entries);
 
         hw = NULL;
         while ((hw = audio_pcm_hw_find_any_out (s, hw))) {
@@ -1840,7 +1840,7 @@ void AUD_del_capture (CaptureVoiceOut *cap, void *cb_opaque)
     for (cb = cap->cb_head.lh_first; cb; cb = cb->entries.le_next) {
         if (cb->opaque == cb_opaque) {
             cb->ops.destroy (cb_opaque);
-            QEMU_LIST_REMOVE (cb, entries);
+            LIST_REMOVE (cb, entries);
             qemu_free (cb);
 
             if (!cap->cb_head.lh_first) {
@@ -1857,12 +1857,12 @@ void AUD_del_capture (CaptureVoiceOut *cap, void *cb_opaque)
                         st_rate_stop (sw->rate);
                         sw->rate = NULL;
                     }
-                    QEMU_LIST_REMOVE (sw, entries);
-                    QEMU_LIST_REMOVE (sc, entries);
+                    LIST_REMOVE (sw, entries);
+                    LIST_REMOVE (sc, entries);
                     qemu_free (sc);
                     sw = sw1;
                 }
-                QEMU_LIST_REMOVE (cap, entries);
+                LIST_REMOVE (cap, entries);
                 qemu_free (cap);
             }
             return;

@@ -7,13 +7,13 @@ struct thread;
 struct wait_queue
 {
     struct thread *thread;
-    struct list_head thread_list;
+    struct minios_list_head thread_list;
 };
 
 struct wait_queue_head
 {
     /* TODO - lock required? */
-    struct list_head thread_list;
+    struct minios_list_head thread_list;
 };
 
 #define DECLARE_WAIT_QUEUE_HEAD(name) \
