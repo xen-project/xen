@@ -91,8 +91,9 @@ struct flock64 {
 #define F_LINUX_SPECIFIC_BASE	1024
 */
 
-int open(const char *path, int flags, ...);
-int fcntl(int fd, int cmd, ...);
 #endif
+
+int open(const char *path, int flags, ...) asm("open64");
+int fcntl(int fd, int cmd, ...);
 
 #endif

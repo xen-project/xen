@@ -627,3 +627,123 @@ diff -u -p -r1.1 memcpy.S
  
  #ifdef _I386MACH_NEED_SOTYPE_FUNCTION
  #define SOTYPE_FUNCTION(sym) .type SYM(sym),@function
+
+
+We want to have a 64bit offsets libc even on 32bit platforms.
+
+--- ./newlib/configure.host.orig	2008-08-07 16:01:17.801946000 +0100
++++ ./newlib/configure.host	2008-08-07 16:01:34.181064000 +0100
+@@ -317,6 +317,8 @@
+     oext=lo
+     lpfx=
+     aext=la ;;
++  i[34567]86-xen-elf)
++    stdio64_dir=stdio64 ;;
+   *) ;; #shared library not supported for ${host}
+ esac
+ 
+--- newlib/libc/include/sys/_types.h.orig	2008-08-07 15:22:44.925008000 +0100
++++ newlib/libc/include/sys/_types.h	2008-08-07 15:22:50.824044000 +0100
+@@ -13,8 +13,12 @@
+ #include <sys/lock.h>
+ 
+ #ifndef __off_t_defined
++#ifdef __MINIOS__
++typedef long long _off_t;
++#else
+ typedef long _off_t;
+ #endif
++#endif
+ 
+ #if defined(__rtems__)
+ /* device numbers are 32-bit major and and 32-bit minor */
+--- ./newlib/libc/include/sys/config.h.orig	2008-08-07 14:43:25.915866000 +0100
++++ ./newlib/libc/include/sys/config.h	2008-08-07 14:44:13.508154000 +0100
+@@ -69,6 +69,10 @@
+ /* we use some glibc header files so turn on glibc large file feature */
+ #define _LARGEFILE64_SOURCE 1
+ #endif
++#ifdef __MINIOS__
++#define __LARGE64_FILES 1
++#define _LARGEFILE64_SOURCE 1
++#endif
+ #endif
+ 
+ #ifndef __DYNAMIC_REENT__
+--- ./newlib/libc/include/sys/_default_fcntl.h.orig	2008-08-07 15:08:22.377836000 +0100
++++ ./newlib/libc/include/sys/_default_fcntl.h	2008-08-07 15:08:31.651890000 +0100
+@@ -170,7 +170,11 @@
+ /* Provide _<systemcall> prototypes for functions provided by some versions
+    of newlib.  */
+ #ifdef _COMPILING_NEWLIB
+-extern int _open _PARAMS ((const char *, int, ...));
++extern int _open _PARAMS ((const char *, int, ...))
++#ifdef __MINIOS__
++    asm("open64")
++#endif
++    ;
+ extern int _fcntl _PARAMS ((int, int, ...));
+ #ifdef __LARGE64_FILES
+ extern int _open64 _PARAMS ((const char *, int, ...));
+--- ./newlib/libc/include/sys/unistd.h.orig	2008-08-07 15:09:36.449280000 +0100
++++ ./newlib/libc/include/sys/unistd.h	2008-08-07 15:09:51.210370000 +0100
+@@ -101,7 +101,11 @@
+ int     _EXFUN(link, (const char *__path1, const char *__path2 ));
+ int	_EXFUN(nice, (int __nice_value ));
+ #if !defined(__INSIDE_CYGWIN__)
+-off_t   _EXFUN(lseek, (int __fildes, off_t __offset, int __whence ));
++off_t   _EXFUN(lseek, (int __fildes, off_t __offset, int __whence ))
++#ifdef __MINIOS__
++    asm("lseek64")
++#endif
++    ;
+ #endif
+ #if defined(__SPU__)
+ #define F_ULOCK	0
+--- ./newlib/libc/include/sys/stat.h.orig	2008-08-07 16:08:50.495116000 +0100
++++ ./newlib/libc/include/sys/stat.h	2008-08-07 16:10:21.799753000 +0100
+@@ -49,6 +49,9 @@
+   long	st_spare4[2];
+ #endif
+ };
++#ifdef __MINIOS__
++#define stat64 stat
++#endif
+ #endif
+ 
+ #define	_IFMT		0170000	/* type of file */
+@@ -132,7 +135,11 @@
+ /* Provide prototypes for most of the _<systemcall> names that are
+    provided in newlib for some compilers.  */
+ #ifdef _COMPILING_NEWLIB
+-int	_EXFUN(_fstat,( int __fd, struct stat *__sbuf ));
++int	_EXFUN(_fstat,( int __fd, struct stat *__sbuf ))
++#ifdef __MINIOS__
++    asm("fstat64")
++#endif
++    ;
+ int	_EXFUN(_stat,( const char *__path, struct stat *__sbuf ));
+ #ifdef __LARGE64_FILES
+ struct stat64;
+--- ./newlib/libc/include/_syslist.h.orig	2008-08-07 16:24:19.122605000 +0100
++++ ./newlib/libc/include/_syslist.h	2008-08-07 16:24:21.548628000 +0100
+@@ -14,6 +14,7 @@
+ #define _kill kill
+ #define _link link
+ #define _lseek lseek
++#define _lseek64 lseek64
+ #define _open open
+ #define _read read
+ #define _sbrk sbrk
+--- newlib/libc/include/reent.h.orig	2008-08-07 16:28:49.846502000 +0100
++++ newlib/libc/include/reent.h	2008-08-07 16:29:02.096586000 +0100
+@@ -87,6 +87,9 @@
+ #if defined(__CYGWIN__) && defined(_COMPILING_NEWLIB)
+ #define stat64 __stat64
+ #endif
++#if defined(__MINIOS__)
++#define stat64 stat
++#endif
+ 
+ struct stat64;
+ 
