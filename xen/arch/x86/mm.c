@@ -2218,6 +2218,12 @@ static inline cpumask_t vcpumask_to_pcpumask(
     cpumask_t    pmask = CPU_MASK_NONE;
     struct vcpu *v;
 
+    /*
+     * Callers copy only a single guest-sized longword from the guest.
+     * This must be wide enough to reference all VCPUs. Worst case is 32 bits.
+     */
+    BUILD_BUG_ON(MAX_VIRT_CPUS > 32);
+
     while ( vmask != 0 )
     {
         vcpu_id = find_first_set_bit(vmask);
