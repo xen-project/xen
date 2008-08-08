@@ -101,6 +101,9 @@ acpi_update_madt_checksum(struct acpi_table_header *table)
 {
 	struct acpi_table_madt *acpi_madt;
 
+	if (!table)
+		return -EINVAL;
+
 	acpi_madt = (struct acpi_table_madt *)table;
 	acpi_madt->header.checksum = 0;
 	acpi_madt->header.checksum = -acpi_tb_checksum((u8*)acpi_madt,
@@ -170,7 +173,11 @@ static void __init acpi_table_disable(char *id)
 /* base is physical address of acpi table */
 static void __init touch_acpi_table(void)
 {
+	struct acpi_table_header *madt = NULL;
+
 	lsapic_nbr = 0;
+
+	acpi_get_table(ACPI_SIG_MADT, 0, &madt);
 
 	/*
 	 * Modify dom0 MADT:
@@ -179,16 +186,22 @@ static void __init touch_acpi_table(void)
 	 *  - Hide CPEI interrupt source
 	 *
 	 * ACPI tables must be backed-up before modification!
+	 *
+	 * We update the checksum each time we modify to keep the
+	 * ACPI CA from warning about invalid checksums.
 	 */
 	acpi_table_parse(ACPI_SIG_MADT, acpi_backup_table);
 
 	if (acpi_table_parse_madt(ACPI_MADT_LSAPIC, acpi_update_lsapic, 0) < 0)
 		printk("Error parsing MADT - no LAPIC entries\n");
+
+	acpi_update_madt_checksum(madt);
+
 	if (acpi_table_parse_madt(ACPI_MADT_PLAT_INT_SRC,
 				  acpi_patch_plat_int_src, 0) < 0)
 		printk("Error parsing MADT - no PLAT_INT_SRC entries\n");
 
-	acpi_table_parse(ACPI_SIG_MADT, acpi_update_madt_checksum);
+	acpi_update_madt_checksum(madt);
 
 	/*
 	 * SRAT & SLIT tables aren't useful for Dom0 until
