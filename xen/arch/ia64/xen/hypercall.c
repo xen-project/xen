@@ -426,6 +426,16 @@ long do_physdev_op(int cmd, XEN_GUEST_HANDLE(void) arg)
         break;
     }
 
+    /*
+     * XXX We don't support MSI for PCI passthrough, so just return success
+     */
+    case PHYSDEVOP_map_pirq:
+    case PHYSDEVOP_unmap_pirq:
+        ret = 0;
+        break;
+
+    case PHYSDEVOP_manage_pci_add:
+    case PHYSDEVOP_manage_pci_remove:
     default:
         ret = -ENOSYS;
         break;

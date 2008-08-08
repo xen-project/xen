@@ -388,6 +388,10 @@ long arch_do_domctl(xen_domctl_t *op, XEN_GUEST_HANDLE(xen_domctl_t) u_domctl)
     }
     break;
 
+    case XEN_DOMCTL_assign_device:
+        ret = -ENOSYS;
+        break;
+
     default:
         printk("arch_do_domctl: unrecognized domctl: %d!!!\n",op->cmd);
         ret = -ENOSYS;
