@@ -416,7 +416,7 @@ dom_fw_init(domain_t *d,
 
 	/* EFI systab.  */
 	tables->efi_systab.hdr.signature = EFI_SYSTEM_TABLE_SIGNATURE;
-	tables->efi_systab.hdr.revision  = EFI_SYSTEM_TABLE_REVISION;
+	tables->efi_systab.hdr.revision  = ((1 << 16) | 00); /* EFI 1.00 */
 	tables->efi_systab.hdr.headersize = sizeof(tables->efi_systab.hdr);
 
 	memcpy(tables->fw_vendor,FW_VENDOR,sizeof(FW_VENDOR));
