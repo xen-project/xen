@@ -211,7 +211,7 @@ static void serial_update_irq(SerialState *s)
     } else if ( s->timeout_ipending ) {
         tmp_iir = UART_IIR_CTI;
     } else if ( ( s->ier & UART_IER_RDI ) && (s->lsr & UART_LSR_DR ) ) {
-        if ( !(s->iir & UART_FCR_FE) ) {
+        if ( !(s->fcr & UART_FCR_FE) ) {
            tmp_iir = UART_IIR_RDI;
         } else if ( s->recv_fifo.count >= s->recv_fifo.itl ) {
            tmp_iir = UART_IIR_RDI;
