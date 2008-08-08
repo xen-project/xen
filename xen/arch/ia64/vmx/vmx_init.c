@@ -117,9 +117,6 @@ identify_vmx_feature(void)
 		goto no_vti;
 	}
 
-	/* Does xen has ability to decode itself? */
-	if (!(vp_env_info & VP_OPCODE))
-		printk("WARNING: no opcode provided from hardware(%lx)!!!\n", vp_env_info);
 	printk("vm buffer size: %ld\n", buffer_size);
 
 	vmx_enabled = 1;
