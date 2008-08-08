@@ -40,14 +40,26 @@ static void print_xen_info(void)
            debug, print_tainted(taint_str));
 }
 
-static void _show_registers(const struct cpu_user_regs *regs,
-                            unsigned long crs[8], int guest_mode,
-                            const char *context)
+enum context { CTXT_hypervisor, CTXT_pv_guest, CTXT_hvm_guest };
+
+static void _show_registers(
+    const struct cpu_user_regs *regs, unsigned long crs[8],
+    enum context context, const struct vcpu *v)
 {
+    const static char *context_names[] = {
+        [CTXT_hypervisor] = "hypervisor",
+        [CTXT_pv_guest]   = "pv guest",
+        [CTXT_hvm_guest]  = "hvm guest"
+    };
+
     printk("RIP:    %04x:[<%016lx>]", regs->cs, regs->rip);
-    if ( !guest_mode )
+    if ( context == CTXT_hypervisor )
         print_symbol(" %s", regs->rip);
-    printk("\nRFLAGS: %016lx   CONTEXT: %s\n", regs->rflags, context);
+    printk("\nRFLAGS: %016lx   ", regs->rflags);
+    if ( (context == CTXT_pv_guest) && v && v->vcpu_info )
+        printk("EM: %d   ", !!vcpu_info(v, evtchn_upcall_mask));
+    printk("CONTEXT: %s\n", context_names[context]);
+
     printk("rax: %016lx   rbx: %016lx   rcx: %016lx\n",
            regs->rax, regs->rbx, regs->rcx);
     printk("rdx: %016lx   rsi: %016lx   rdi: %016lx\n",
@@ -71,13 +83,13 @@ void show_registers(struct cpu_user_regs *regs)
 {
     struct cpu_user_regs fault_regs = *regs;
     unsigned long fault_crs[8];
-    const char *context;
+    enum context context;
     struct vcpu *v = current;
 
     if ( is_hvm_vcpu(v) && guest_mode(regs) )
     {
         struct segment_register sreg;
-        context = "hvm";
+        context = CTXT_hvm_guest;
         fault_crs[0] = v->arch.hvm_vcpu.guest_cr[0];
         fault_crs[2] = v->arch.hvm_vcpu.guest_cr[2];
         fault_crs[3] = v->arch.hvm_vcpu.guest_cr[3];
@@ -99,12 +111,12 @@ void show_registers(struct cpu_user_regs *regs)
     {
         if ( guest_mode(regs) )
         {
-            context = "guest";
+            context = CTXT_pv_guest;
             fault_crs[2] = arch_get_cr2(v);
         }
         else
         {
-            context = "hypervisor";
+            context = CTXT_hypervisor;
             fault_crs[2] = read_cr2();
         }
 
@@ -119,7 +131,7 @@ void show_registers(struct cpu_user_regs *regs)
 
     print_xen_info();
     printk("CPU:    %d\n", smp_processor_id());
-    _show_registers(&fault_regs, fault_crs, guest_mode(regs), context);
+    _show_registers(&fault_regs, fault_crs, context, v);
 
     if ( this_cpu(ler_msr) && !guest_mode(regs) )
     {
@@ -146,7 +158,7 @@ void vcpu_show_registers(const struct vcpu *v)
                                  v->arch.guest_table_user);
     crs[4] = v->arch.guest_context.ctrlreg[4];
 
-    _show_registers(regs, crs, 1, "guest");
+    _show_registers(regs, crs, CTXT_pv_guest, v);
 }
 
 void show_page_walk(unsigned long addr)
