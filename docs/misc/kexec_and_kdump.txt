@@ -1,0 +1,213 @@
+
+=======================
+Kexec and Kdump for Xen
+=======================
+
+This is a breif guide to using Kexec and Kdump in conjunction with Xen.
+This functionaly works at the level of the hypervisor and dom0 kernel.
+And will thus affect all guests running on a machine.
+
+At this stage it does not work in conjunction with domU kernels.
+
+This document should be read in conjunction with
+Documentation/kdump/kdump.txt from the Linux kernel source.
+Some of the information in this document has been
+sourced from that document.
+
+
+Kexec
+=====
+
+It is possible to kexec from Xen or Linux to either Xen or Linux.
+
+Pattern        | Before Kexec       | After Kexec
+---------------+--------------------+--------------------
+Xen -> Xen     | first hypervisor & | second hypervisor &
+               | dom0 kernel        | dom0 kernel
+---------------+--------------------+--------------------
+Xen   -> Linux | first hypervisor & | second kernel
+               | dom0 kernel        |
+---------------+--------------------+--------------------
+Linux -> Xen   | first kernel       | second hypervisor &
+               |                    | dom0 kernel
+---------------+--------------------+--------------------
+Linux -> Linux | first kernel       | second kernel
+
+If you are kexecing to Xen then you will also need to preapare the second
+hypervisor and dom0 kernel that will run after kexec. These may be the same
+as the first hypervisor and dom0 kernel that are used before kexec if you
+are kexecing from Xen to Xen.
+
+If you are kexecing to Linux then you will need to prepare the second Linux
+kernel that will run after kexec. In the case that you are kexecing from
+Linux, it may be the same as the first kernel image that that runs before
+kexec.
+
+Regardless of which kexec pattern you wish to run, you will
+need to have kexec-tools installed. This provides the kexec command.
+
+1. Load
+-------
+
+Before kexecing the second kernel or hypervisor & dom0 kernel
+need to be loaded into the running hypervisor or kernel using
+the kexec command.
+
+  a. To kexec to Xen (Xen->Xen or Linux->Xen)
+
+  kexec -l --append="XEN_ARGS -- DOM0_ARGS" \
+	--vmm="XEN_IMAGE" "DOM0_IMAGE" KEXEC_ARGS
+
+  where:
+    XEN_ARGS: command line arguments to the xen hypervisor
+              On x86 the no-real-mode argument should be included
+    DOM0_ARGS: command line arguments to the dom0 kernel
+    XEN_IMAGE: xen hypervisor image
+    DOM0_IMAGE: dom0 kernel image
+    KEXEC_ARGS: additional kexec-tools command line arguments
+
+  e.g. kexec -l --append "no-real-mode" --vmm="/boot/xen.gz" /boot/vmlinuz.gz
+
+  OR
+
+  b. To kexec to Linux (Xen->Linux or Linux->Linux)
+
+  kexec -l LINUX_IMAGE --append "$LINUX_ARGS" KEXEC_ARGS
+
+  where:
+    LINUX_IMAGE: the second linux kernel image
+    LINUX_ARGS: command line arguments to the second linux kernel
+    KEXEC_ARGS: additional kexec-tools command line arguments
+
+  e.g. kexec -l /boot/second-vmlinuz.gz
+
+2. Execute
+----------
+
+Once the second kernel is loaded, it can be executed at any time.
+If you don't see the second kernel booting within a second or so,
+you are in trouble :(
+
+   kexec -e
+
+Kdump
+=====
+
+It is possible to kdump from Xen or Linux to a Linux crash kernel.
+It is not possible to use xen as a crash kernel.
+
+Pattern        | Before Kexec       | After Kexec
+---------------+--------------------+--------------------
+Xen -> Linux   | first hypervisor & | crash kernel
+               | dom0 kernel        |
+---------------+--------------------+--------------------
+Linux -> Linux | first kernel       | crash kernel
+
+Regardless of if you are kdumping from Xen or Linux you will need to
+prepare a linux crash kernel.  You will also need to have kexec-tools
+installed. This provides the kexec command.
+
+0. Set-Up The Crash Kernel Region
+---------------------------------
+
+In order to use kdump an area of memory has to be reserved at boot time.
+This is the area of memory that the crash kernel will use, thus allowing it
+to run without disrupting the memory used by the first kernel. This area is
+called the crash kernel region and is reserved using the crashkernel
+command line parameter to the Xen hypervisor. It has two forms:
+
+  i) crashkernel=size
+
+     This is the simplest and recommended way to reserve the crash kernel
+     region. Just specify how large the region should be and the hypervisor
+     will find a good location for it. A good size to start with is 128Mb
+
+     e.g.
+
+     crashkernel=128M
+
+  ii) crashkernel=size@base
+
+      In this form the base address is provided in addition to
+      the size. Use this if auto-placement doesn't work for some reason.
+      It is strongly recommended that the base address be aligned
+      to 64Mb, else memory below the alignment point will not
+      be usable.
+
+      e.g. crashkernel=128M@256M
+
+   Regardless of which of the two forms of the crashkernel command line you
+   use, the crash kernel region should appear in /proc/iomem on x86 or
+   /proc/iomem_machine on ia64. If it doesn't then either the crashkernel
+   parameter is missing, or for some reason the region couldn't be placed -
+   for instance because it is too large.
+
+   # cat /proc/iomem
+   ...
+   00100000-07feffff : System RAM
+     00100000-00bfffff : Hypervisor code and data
+     0533f000-0733efff : Crash kernel
+   ...
+
+
+1. Load
+-------
+
+Once you are running in a kexec-enabled hypervisor and dom0,
+you can prepare to kdump by loading the crash kernel into the
+running kernel.
+
+  kexec -p CRASH_KERNEL_IMAGE --append "$CRASH_KERNEL_ARGS" KEXEC_ARGS
+
+  where:
+    CRASH_KERNEL_IMAGE: the crash kernel image
+    CRASH_KERNEL_ARGS: command line arguments to the crash kernel
+		       init 1 is strongly recommended
+		       irqpoll is strongly recommended
+		       maxcpus=1 is required if the crash kernel is SMP
+		       reset_devices is strongly recommended
+    KEXEC_ARGS: additional kexec-tools command line arguments
+                On x86 --args-linux should be supplied if an uncompressed
+		vmlinux image is used as the crash kernel
+
+  e.g. kexec -p /boot/crash-vmlinuz \
+        --append "init 1 irqpoll maxcpus=1 reset_devices" --args-linux
+
+On x86 systems the crash kernel may be either
+- A uncompressed vmlinux image if the kernel is not relocatable
+- A compressed bzImage or vmlinuz image if the kernel is relocatable
+- Relocatability is crontroled by the CONFIG_RELOCATABLE kernel
+  compile configuration parameter. This option may not be available
+  depending on the kernel version
+On ia64
+  Either a vmlinuz or vmlinux.gz image may be used
+
+
+2. Execute
+----------
+
+Once the second kernel is loaded, the crash kernel will be executed if the
+hypervisor panics. It will also be executed if dom0 panics or if dom0
+oopses and /proc/sys/kernel/panic_on_oops is set to a non-zero value
+
+echo 1 > /proc/sys/kernel/panic_on_oops
+
+Kdump may also be triggered (for testing)
+
+  a. From Domain 0
+
+  echo c > /proc/sysrq-trigger
+
+  b. From Xen
+
+     Enter the xen console
+
+     ctrl^a ctrl^a  (may be bound to a different key, this is the default)
+
+     Select C for "trigger a crashdump"
+
+     C
+
+If you don't see the crash kernel booting within a second or so,
+you are in trouble :(
+
