@@ -2265,7 +2265,8 @@ class XendAPI(object):
             'type': image.type,
             'sharable': image.sharable,
             'read_only': image.read_only,
-            'other_config': image.other_config
+            'other_config': image.other_config,
+            'security_label' : image.get_security_label()
             })
 
     # Class Functions    
