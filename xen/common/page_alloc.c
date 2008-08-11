@@ -951,10 +951,15 @@ static void page_scrub_softirq(void)
     int               i;
     s_time_t          start = NOW();
 
+    /* free_heap_pages() does not parallelise well. Serialise this function. */
+    if ( !spin_trylock(&page_scrub_lock) )
+    {
+        set_timer(&this_cpu(page_scrub_timer), NOW() + MILLISECS(1));
+        return;
+    }
+
     /* Aim to do 1ms of work every 10ms. */
     do {
-        spin_lock(&page_scrub_lock);
-
         if ( unlikely((ent = page_scrub_list.next) == &page_scrub_list) )
         {
             spin_unlock(&page_scrub_lock);
@@ -974,8 +979,6 @@ static void page_scrub_softirq(void)
         page_scrub_list.next = ent->next;
         scrub_pages -= (i+1);
 
-        spin_unlock(&page_scrub_lock);
-
         /* Working backwards, scrub each page in turn. */
         while ( ent != &page_scrub_list )
         {
@@ -987,6 +990,8 @@ static void page_scrub_softirq(void)
             free_heap_pages(pfn_dom_zone_type(page_to_mfn(pg)), pg, 0);
         }
     } while ( (NOW() - start) < MILLISECS(1) );
+
+    spin_unlock(&page_scrub_lock);
 
     set_timer(&this_cpu(page_scrub_timer), NOW() + MILLISECS(10));
 }
