@@ -154,6 +154,8 @@ acpi_restore_tables()
 
 static int __init __acpi_table_disable(struct acpi_table_header *header)
 {
+	printk("Disabling ACPI table: %4.4s\n", header->signature);
+
 	memcpy(header->oem_id, "xxxxxx", 6);
 	memcpy(header->oem_id+1, header->signature, 4);
 	memcpy(header->oem_table_id, "Xen     ", 8);
@@ -161,7 +163,6 @@ static int __init __acpi_table_disable(struct acpi_table_header *header)
 	header->checksum = 0;
 	header->checksum = -acpi_tb_checksum((u8*)header, header->length);
 
-	printk("Successfully Disabling %s\n", header->signature);
 	return 0;
 }
 
