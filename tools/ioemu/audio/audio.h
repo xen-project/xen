@@ -68,7 +68,7 @@ struct capture_ops {
 typedef struct CaptureState {
     void *opaque;
     struct capture_ops ops;
-    QEMU_LIST_ENTRY (CaptureState) entries;
+    LIST_ENTRY (CaptureState) entries;
 } CaptureState;
 
 typedef struct AudioState AudioState;
@@ -79,7 +79,7 @@ typedef struct SWVoiceIn SWVoiceIn;
 typedef struct QEMUSoundCard {
     AudioState *audio;
     char *name;
-    QEMU_LIST_ENTRY (QEMUSoundCard) entries;
+    LIST_ENTRY (QEMUSoundCard) entries;
 } QEMUSoundCard;
 
 typedef struct QEMUAudioTimeStamp {

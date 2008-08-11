@@ -1170,7 +1170,7 @@ done:
     return 1;
 }
 
-static void add_export(struct list_head *exports, unsigned int domid)
+static void add_export(struct minios_list_head *exports, unsigned int domid)
 {
     char node[1024], **exports_list = NULL, *ret_msg;
     int j = 0;
@@ -1192,8 +1192,8 @@ static void add_export(struct list_head *exports, unsigned int domid)
             import->dom_id = domid;
             import->export_id = export_id;
             import->import_id = import_id++;
-            INIT_LIST_HEAD(&import->list);
-            list_add(&import->list, exports);
+            MINIOS_INIT_LIST_HEAD(&import->list);
+            minios_list_add(&import->list, exports);
         }
         free(exports_list[j]);
         j++;
@@ -1205,14 +1205,14 @@ static void add_export(struct list_head *exports, unsigned int domid)
 }
 
 #if 0
-static struct list_head* probe_exports(void)
+static struct minios_list_head* probe_exports(void)
 {
-    struct list_head *exports;
+    struct minios_list_head *exports;
     char **node_list = NULL, *msg = NULL;
     int i = 0;
 
-    exports = xmalloc(struct list_head);
-    INIT_LIST_HEAD(exports);
+    exports = xmalloc(struct minios_list_head);
+    MINIOS_INIT_LIST_HEAD(exports);
     
     msg = xenbus_ls(XBT_NIL, "/local/domain", &node_list);
     if(msg)
@@ -1237,19 +1237,19 @@ exit:
 }
 #endif
 
-LIST_HEAD(exports);
+MINIOS_LIST_HEAD(exports);
 
 void init_fs_frontend(void)
 {
-    struct list_head *entry;
+    struct minios_list_head *entry;
     struct fs_import *import = NULL;
     printk("Initing FS fronend(s).\n");
 
     //exports = probe_exports();
     add_export(&exports, 0);
-    list_for_each(entry, &exports)
+    minios_list_for_each(entry, &exports)
     {
-        import = list_entry(entry, struct fs_import, list);
+        import = minios_list_entry(entry, struct fs_import, list);
         printk("FS export [dom=%d, id=%d] found\n", 
                 import->dom_id, import->export_id);
         init_fs_import(import);

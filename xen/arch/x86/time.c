@@ -802,6 +802,8 @@ int cpu_frequency_change(u64 freq)
     set_time_scale(&t->tsc_scale, freq);
     local_irq_enable();
 
+    update_vcpu_system_time(current);
+
     /* A full epoch should pass before we check for deviation. */
     if ( smp_processor_id() == 0 )
     {

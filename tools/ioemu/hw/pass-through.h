@@ -136,7 +136,7 @@ struct pt_dev {
     PCIDevice dev;
     struct pci_dev *pci_dev;                    /* libpci struct */
     struct pt_region bases[PCI_NUM_REGIONS];    /* Access regions */
-    QEMU_LIST_HEAD (reg_grp_tbl_listhead, pt_reg_grp_tbl) reg_grp_tbl_head;
+    LIST_HEAD (reg_grp_tbl_listhead, pt_reg_grp_tbl) reg_grp_tbl_head;
                                                 /* emul reg group list */
     struct pt_msi_info *msi;                    /* MSI virtualization */
     struct pt_msix_info *msix;                  /* MSI-X virtualization */
@@ -163,7 +163,7 @@ int pt_init(PCIBus * e_bus, char * direct_pci);
 /* emul reg group management table */
 struct pt_reg_grp_tbl {
     /* emul reg group list */
-    QEMU_LIST_ENTRY (pt_reg_grp_tbl) entries;
+    LIST_ENTRY (pt_reg_grp_tbl) entries;
     /* emul reg group info table */
     struct pt_reg_grp_info_tbl *reg_grp;
     /* emul reg group base offset */
@@ -171,7 +171,7 @@ struct pt_reg_grp_tbl {
     /* emul reg group size */
     uint8_t size;
     /* emul reg management table list */
-    QEMU_LIST_HEAD (reg_tbl_listhead, pt_reg_tbl) reg_tbl_head;
+    LIST_HEAD (reg_tbl_listhead, pt_reg_tbl) reg_tbl_head;
 };
 
 /* emul reg group size initialize method */
@@ -195,7 +195,7 @@ struct pt_reg_grp_info_tbl {
 /* emul reg management table */
 struct pt_reg_tbl {
     /* emul reg table list */
-    QEMU_LIST_ENTRY (pt_reg_tbl) entries;
+    LIST_ENTRY (pt_reg_tbl) entries;
     /* emul reg info table */
     struct pt_reg_info_tbl *reg;
     /* emul reg value */

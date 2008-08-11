@@ -704,16 +704,12 @@ int __init construct_dom0(
 
     if ( opt_dom0_max_vcpus == 0 )
         opt_dom0_max_vcpus = num_online_cpus();
-    if ( opt_dom0_max_vcpus > num_online_cpus() )
-        opt_dom0_max_vcpus = num_online_cpus();
     if ( opt_dom0_max_vcpus > MAX_VIRT_CPUS )
         opt_dom0_max_vcpus = MAX_VIRT_CPUS;
-    if ( opt_dom0_max_vcpus > BITS_PER_GUEST_LONG(d) )
-        opt_dom0_max_vcpus = BITS_PER_GUEST_LONG(d);
     printk("Dom0 has maximum %u VCPUs\n", opt_dom0_max_vcpus);
 
     for ( i = 1; i < opt_dom0_max_vcpus; i++ )
-        (void)alloc_vcpu(d, i, i);
+        (void)alloc_vcpu(d, i, i % num_online_cpus());
 
     /* Set up CR3 value for write_ptbase */
     if ( paging_mode_enabled(v->domain) )

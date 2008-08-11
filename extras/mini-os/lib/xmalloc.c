@@ -44,14 +44,14 @@
 #include <xmalloc.h>
 
 #ifndef HAVE_LIBC
-static LIST_HEAD(freelist);
+static MINIOS_LIST_HEAD(freelist);
 /* static spinlock_t freelist_lock = SPIN_LOCK_UNLOCKED; */
 
 struct xmalloc_hdr
 {
     /* Total including this hdr, unused padding and second hdr. */
     size_t size;
-    struct list_head freelist;
+    struct minios_list_head freelist;
 } __cacheline_aligned;
 
 /* Unused padding data between the two hdrs. */
@@ -82,7 +82,7 @@ static void maybe_split(struct xmalloc_hdr *hdr, size_t size, size_t block)
         extra = (struct xmalloc_hdr *)((unsigned long)hdr + size);
         extra->size = leftover;
         /* spin_lock_irqsave(&freelist_lock, flags); */
-        list_add(&extra->freelist, &freelist);
+        minios_list_add(&extra->freelist, &freelist);
         /* spin_unlock_irqrestore(&freelist_lock, flags); */
     }
     else
@@ -155,14 +155,14 @@ void *_xmalloc(size_t size, size_t align)
 
     /* Search free list. */
     /* spin_lock_irqsave(&freelist_lock, flags); */
-    list_for_each_entry_safe( i, tmp, &freelist, freelist )
+    minios_list_for_each_entry_safe( i, tmp, &freelist, freelist )
     {
         data_begin = align_up((uintptr_t)i + hdr_size, align);
 
         if ( data_begin + size > (uintptr_t)i + i->size )
             continue;
 
-        list_del(&i->freelist);
+        minios_list_del(&i->freelist);
         /* spin_unlock_irqrestore(&freelist_lock, flags); */
 
         uintptr_t size_before = (data_begin - hdr_size) - (uintptr_t)i;
@@ -173,7 +173,7 @@ void *_xmalloc(size_t size, size_t align)
             new_i->size = i->size - size_before;
             i->size = size_before;
             /* spin_lock_irqsave(&freelist_lock, flags); */
-            list_add(&i->freelist, &freelist);
+            minios_list_add(&i->freelist, &freelist);
             /* spin_unlock_irqrestore(&freelist_lock, flags); */
             i = new_i;
         }
@@ -231,7 +231,7 @@ void xfree(const void *p)
 
     /* Merge with other free block, or put in list. */
     /* spin_lock_irqsave(&freelist_lock, flags); */
-    list_for_each_entry_safe( i, tmp, &freelist, freelist )
+    minios_list_for_each_entry_safe( i, tmp, &freelist, freelist )
     {
         unsigned long _i   = (unsigned long)i;
         unsigned long _hdr = (unsigned long)hdr;
@@ -243,7 +243,7 @@ void xfree(const void *p)
         /* We follow this block?  Swallow it. */
         if ( (_i + i->size) == _hdr )
         {
-            list_del(&i->freelist);
+            minios_list_del(&i->freelist);
             i->size += hdr->size;
             hdr = i;
         }
@@ -251,7 +251,7 @@ void xfree(const void *p)
         /* We precede this block? Swallow it. */
         if ( (_hdr + hdr->size) == _i )
         {
-            list_del(&i->freelist);
+            minios_list_del(&i->freelist);
             hdr->size += i->size;
         }
     }
@@ -268,7 +268,7 @@ void xfree(const void *p)
     }
     else
     {
-        list_add(&hdr->freelist, &freelist);
+        minios_list_add(&hdr->freelist, &freelist);
     }
 
     /* spin_unlock_irqrestore(&freelist_lock, flags); */

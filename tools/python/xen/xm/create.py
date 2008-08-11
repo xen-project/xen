@@ -279,7 +279,7 @@ gopts.var('on_reboot', val='destroy|restart|preserve|rename-restart',
                             renamed and a new domain started in its place.
           """)
 
-gopts.var('on_crash', val='destroy|restart|preserve|rename-restart|coredump-destroy|ciredump-restart',
+gopts.var('on_crash', val='destroy|restart|preserve|rename-restart|coredump-destroy|coredump-restart',
           fn=set_value, default=None,
           use="""Behaviour when a domain exits with reason 'crash'.
           - destroy:          the domain is cleaned up as normal;

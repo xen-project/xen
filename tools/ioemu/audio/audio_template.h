@@ -186,12 +186,12 @@ static void glue (audio_pcm_sw_fini_, TYPE) (SW *sw)
 
 static void glue (audio_pcm_hw_add_sw_, TYPE) (HW *hw, SW *sw)
 {
-    QEMU_LIST_INSERT_HEAD (&hw->sw_head, sw, entries);
+    LIST_INSERT_HEAD (&hw->sw_head, sw, entries);
 }
 
 static void glue (audio_pcm_hw_del_sw_, TYPE) (SW *sw)
 {
-    QEMU_LIST_REMOVE (sw, entries);
+    LIST_REMOVE (sw, entries);
 }
 
 static void glue (audio_pcm_hw_gc_, TYPE) (AudioState *s, HW **hwp)
@@ -202,7 +202,7 @@ static void glue (audio_pcm_hw_gc_, TYPE) (AudioState *s, HW **hwp)
 #ifdef DAC
         audio_detach_capture (hw);
 #endif
-        QEMU_LIST_REMOVE (hw, entries);
+        LIST_REMOVE (hw, entries);
         glue (s->nb_hw_voices_, TYPE) += 1;
         glue (audio_pcm_hw_free_resources_ ,TYPE) (hw);
         glue (hw->pcm_ops->fini_, TYPE) (hw);
@@ -267,9 +267,9 @@ static HW *glue (audio_pcm_hw_add_new_, TYPE) (AudioState *s, audsettings_t *as)
     }
 
     hw->pcm_ops = drv->pcm_ops;
-    QEMU_LIST_INIT (&hw->sw_head);
+    LIST_INIT (&hw->sw_head);
 #ifdef DAC
-    QEMU_LIST_INIT (&hw->cap_head);
+    LIST_INIT (&hw->cap_head);
 #endif
     if (glue (hw->pcm_ops->init_, TYPE) (hw, as)) {
         goto err0;
@@ -294,7 +294,7 @@ static HW *glue (audio_pcm_hw_add_new_, TYPE) (AudioState *s, audsettings_t *as)
         goto err1;
     }
 
-    QEMU_LIST_INSERT_HEAD (&s->glue (hw_head_, TYPE), hw, entries);
+    LIST_INSERT_HEAD (&s->glue (hw_head_, TYPE), hw, entries);
     glue (s->nb_hw_voices_, TYPE) -= 1;
 #ifdef DAC
     audio_attach_capture (s, hw);

@@ -50,10 +50,10 @@ typedef struct BDRVVbdState {
     struct blkfront_dev *dev;
     int fd;
     struct blkfront_info info;
-    QEMU_LIST_ENTRY(BDRVVbdState) list;
+    LIST_ENTRY(BDRVVbdState) list;
 } BDRVVbdState;
 
-QEMU_LIST_HEAD(, BDRVVbdState) vbds;
+LIST_HEAD(, BDRVVbdState) vbds;
 
 static int vbd_probe(const uint8_t *buf, int buf_size, const char *filename)
 {
@@ -90,7 +90,7 @@ static int vbd_open(BlockDriverState *bs, const char *filename, int flags)
     s->fd = blkfront_open(s->dev);
     qemu_set_fd_handler(s->fd, vbd_io_completed, NULL, s);
 
-    QEMU_LIST_INSERT_HEAD(&vbds, s, list);
+    LIST_INSERT_HEAD(&vbds, s, list);
 
     return 0;
 }
@@ -302,7 +302,7 @@ static void vbd_close(BlockDriverState *bs)
         close(s->fd);
         s->fd = -1;
     }
-    QEMU_LIST_REMOVE(s, list);
+    LIST_REMOVE(s, list);
 }
 
 static int64_t  vbd_getlength(BlockDriverState *bs)

@@ -21,6 +21,7 @@ import types
 import time
 
 from xen.xend import sxp
+from xen.xend import arch
 from xen.xend.XendError import VmError
 from xen.xend.XendLogging import log
 
@@ -284,12 +285,13 @@ class PciController(DevController):
                     "bind your slot/device to the PCI backend using sysfs" \
                     )%(dev.name))
 
-        if dev.has_non_page_aligned_bar:
+        if dev.has_non_page_aligned_bar and arch.type != "ia64":
             raise VmError("pci: %: non-page-aligned MMIO BAR found." % dev.name)
 
         self.CheckSiblingDevices(fe_domid, dev)
 
-        dev.do_FLR()
+        if arch.type != "ia64":
+            dev.do_FLR()
 
         PCIQuirk(dev.vendor, dev.device, dev.subvendor, dev.subdevice, domain, 
                 bus, slot, func)
@@ -395,7 +397,7 @@ class PciController(DevController):
                                     ' the same guest with %s'
                                 raise VmError(err_msg % (f, dev.name))
             elif dev.dev_type == DEV_TYPE_PCI:
-                if dev.bus == 0:
+                if dev.bus == 0 or arch.type == "ia64":
                     if not dev.pci_af_flr:
                         # We cope with this case by using the Dstate transition
                         # method for now.

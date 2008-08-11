@@ -6155,10 +6155,10 @@ void gui_update(void *opaque)
 struct vm_change_state_entry {
     VMChangeStateHandler *cb;
     void *opaque;
-    QEMU_LIST_ENTRY (vm_change_state_entry) entries;
+    LIST_ENTRY (vm_change_state_entry) entries;
 };
 
-static QEMU_LIST_HEAD(vm_change_state_head, vm_change_state_entry) vm_change_state_head;
+static LIST_HEAD(vm_change_state_head, vm_change_state_entry) vm_change_state_head;
 
 VMChangeStateEntry *qemu_add_vm_change_state_handler(VMChangeStateHandler *cb,
                                                      void *opaque)
@@ -6171,13 +6171,13 @@ VMChangeStateEntry *qemu_add_vm_change_state_handler(VMChangeStateHandler *cb,
 
     e->cb = cb;
     e->opaque = opaque;
-    QEMU_LIST_INSERT_HEAD(&vm_change_state_head, e, entries);
+    LIST_INSERT_HEAD(&vm_change_state_head, e, entries);
     return e;
 }
 
 void qemu_del_vm_change_state_handler(VMChangeStateEntry *e)
 {
-    QEMU_LIST_REMOVE (e, entries);
+    LIST_REMOVE (e, entries);
     qemu_free (e);
 }
 
@@ -7138,7 +7138,7 @@ int main(int argc, char **argv)
     }
 #endif
 
-    QEMU_LIST_INIT (&vm_change_state_head);
+    LIST_INIT (&vm_change_state_head);
 #ifndef CONFIG_STUBDOM
 #ifndef _WIN32
     {

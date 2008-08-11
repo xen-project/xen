@@ -14,7 +14,7 @@
 
 #define MAP_FAILED	((void*)0)
 
-void *mmap(void *start, size_t length, int prot, int flags, int fd, off_t offset);
+void *mmap(void *start, size_t length, int prot, int flags, int fd, off_t offset) asm("mmap64");
 int munmap(void *start, size_t length);
 #define munlock(addr, len) ((void)addr, (void)len, 0)
 #define mlock(addr, len) ((void)addr, (void)len, 0)

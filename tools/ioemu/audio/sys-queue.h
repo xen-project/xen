@@ -64,12 +64,12 @@
 /*
  * List definitions.
  */
-#define QEMU_LIST_HEAD(name, type)					\
+#define LIST_HEAD(name, type)					\
 struct name {								\
 	struct type *lh_first;	/* first element */			\
 }
 
-#define QEMU_LIST_ENTRY(type)						\
+#define LIST_ENTRY(type)						\
 struct {								\
 	struct type *le_next;	/* next element */			\
 	struct type **le_prev;	/* address of previous next element */	\
@@ -78,11 +78,11 @@ struct {								\
 /*
  * List functions.
  */
-#define	QEMU_LIST_INIT(head) {						\
+#define	LIST_INIT(head) {						\
 	(head)->lh_first = NULL;					\
 }
 
-#define QEMU_LIST_INSERT_AFTER(listelm, elm, field) {			\
+#define LIST_INSERT_AFTER(listelm, elm, field) {			\
 	if (((elm)->field.le_next = (listelm)->field.le_next) != NULL)	\
 		(listelm)->field.le_next->field.le_prev =		\
 		    &(elm)->field.le_next;				\
@@ -90,14 +90,14 @@ struct {								\
 	(elm)->field.le_prev = &(listelm)->field.le_next;		\
 }
 
-#define QEMU_LIST_INSERT_HEAD(head, elm, field) {			\
+#define LIST_INSERT_HEAD(head, elm, field) {			\
 	if (((elm)->field.le_next = (head)->lh_first) != NULL)		\
 		(head)->lh_first->field.le_prev = &(elm)->field.le_next;\
 	(head)->lh_first = (elm);					\
 	(elm)->field.le_prev = &(head)->lh_first;			\
 }
 
-#define QEMU_LIST_REMOVE(elm, field) {					\
+#define LIST_REMOVE(elm, field) {					\
 	if ((elm)->field.le_next != NULL)				\
 		(elm)->field.le_next->field.le_prev = 			\
 		    (elm)->field.le_prev;				\

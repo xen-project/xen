@@ -13,7 +13,7 @@ struct fs_import
     domid_t dom_id;                 /* dom id of the exporting domain       */ 
     u16 export_id;                  /* export id (exporting dom specific)   */
     u16 import_id;                  /* import id (specific to this domain)  */ 
-    struct list_head list;          /* list of all imports                  */
+    struct minios_list_head list;   /* list of all imports                  */
     unsigned int nr_entries;        /* Number of entries in rings & request
                                        array                                */
     struct fsif_front_ring ring;    /* frontend ring (contains shared ring) */

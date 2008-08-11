@@ -204,9 +204,6 @@ int open(const char *pathname, int flags, ...)
     files[fd].file.offset = 0;
     return fd;
 }
-#if defined(__x86_64__) || defined(__ia64__)
-__typeof__(open) open64 __attribute__((__alias__("open")));
-#endif
 
 int isatty(int fd)
 {
@@ -347,9 +344,6 @@ off_t lseek(int fd, off_t offset, int whence)
     }
     return files[fd].file.offset;
 }
-#if defined(__x86_64__) || defined(__ia64__)
-__typeof__(lseek) lseek64 __attribute__((__alias__("lseek")));
-#endif
 
 int fsync(int fd) {
     switch (files[fd].type) {
@@ -1120,9 +1114,6 @@ void *mmap(void *start, size_t length, int prot, int flags, int fd, off_t offset
         return map_frames_ex(&zero, n, 0, 0, 1, DOMID_SELF, 0, 0);
     } else ASSERT(0);
 }
-#if defined(__x86_64__) || defined(__ia64__)
-__typeof__(mmap) mmap64 __attribute__((__alias__("mmap")));
-#endif
 
 int munmap(void *start, size_t length)
 {
