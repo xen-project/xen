@@ -3357,23 +3357,45 @@ shadow_write_p2m_entry(struct vcpu *v, unsigned long gfn,
         }
     }
 
-    /* If we're removing a superpage mapping from the p2m, remove all the
-     * MFNs covered by it from the shadows too. */
+    /* If we're removing a superpage mapping from the p2m, we need to check 
+     * all the pages covered by it.  If they're still there in the new 
+     * scheme, that's OK, but otherwise they must be unshadowed. */
     if ( level == 2 && (l1e_get_flags(*p) & _PAGE_PRESENT) &&
          (l1e_get_flags(*p) & _PAGE_PSE) )
     {
         unsigned int i;
-        mfn_t mfn = _mfn(l1e_get_pfn(*p));
+        cpumask_t flushmask;
+        mfn_t omfn = _mfn(l1e_get_pfn(*p));
+        mfn_t nmfn = _mfn(l1e_get_pfn(new));
+        l1_pgentry_t *npte = NULL;
         p2m_type_t p2mt = p2m_flags_to_type(l1e_get_flags(*p));
-        if ( p2m_is_valid(p2mt) && mfn_valid(mfn) )
+        if ( p2m_is_valid(p2mt) && mfn_valid(omfn) )
         {
+            cpus_clear(flushmask);
+
+            /* If we're replacing a superpage with a normal L1 page, map it */
+            if ( (l1e_get_flags(new) & _PAGE_PRESENT)
+                 && !(l1e_get_flags(new) & _PAGE_PSE) 
+                 && mfn_valid(nmfn) )
+                npte = map_domain_page(mfn_x(nmfn));
+            
             for ( i = 0; i < L1_PAGETABLE_ENTRIES; i++ )
             {
-                sh_remove_all_shadows_and_parents(v, mfn);
-                if ( sh_remove_all_mappings(v, mfn) )
-                    flush_tlb_mask(d->domain_dirty_cpumask);
-                mfn = _mfn(mfn_x(mfn) + 1);
+                if ( !npte 
+                     || !p2m_is_ram(p2m_flags_to_type(l1e_get_flags(npte[i])))
+                     || l1e_get_pfn(npte[i]) != mfn_x(omfn) )
+                {
+                    /* This GFN->MFN mapping has gone away */
+                    sh_remove_all_shadows_and_parents(v, omfn);
+                    if ( sh_remove_all_mappings(v, omfn) )
+                        cpus_or(flushmask, flushmask, d->domain_dirty_cpumask);
+                }
+                omfn = _mfn(mfn_x(omfn) + 1);
             }
+            flush_tlb_mask(flushmask);
+            
+            if ( npte )
+                unmap_domain_page(npte);
         }
     }
 
