@@ -51,7 +51,7 @@ int xc_physdev_map_pirq_msi(int xc_handle,
                             int devfn,
                             int bus,
                             int entry_nr,
-                            int msi_type)
+                            uint64_t table_base)
 {
     int rc;
     struct physdev_map_pirq map;
@@ -63,10 +63,10 @@ int xc_physdev_map_pirq_msi(int xc_handle,
     map.type = MAP_PIRQ_TYPE_MSI;
     map.index = index;
     map.pirq = *pirq;
-    map.msi_info.devfn = devfn;
-    map.msi_info.bus = bus;
-    map.msi_info.entry_nr = entry_nr;
-    map.msi_info.msi = msi_type;
+    map.bus = bus;
+    map.devfn = devfn;
+    map.entry_nr = entry_nr;
+    map.table_base = table_base;
 
     rc = do_physdev_op(xc_handle, PHYSDEVOP_map_pirq, &map);
 

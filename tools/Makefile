@@ -38,8 +38,10 @@ endif
 
 # For the sake of linking, set the sys-root
 ifneq ($(CROSS_COMPILE),)
+CROSS_BIN_PATH ?= /usr/$(CROSS_COMPILE:-=)/bin
 CROSS_SYS_ROOT ?= /usr/$(CROSS_COMPILE:-=)/sys-root
-export CROSS_SYS_ROOT
+export CROSS_SYS_ROOT # exported for check/funcs.sh
+export CROSS_BIN_PATH # exported for cross-install.sh
 endif
 
 .PHONY: all
@@ -57,7 +59,8 @@ clean distclean: subdirs-clean
 ifneq ($(XEN_COMPILE_ARCH),$(XEN_TARGET_ARCH))
 IOEMU_CONFIGURE_CROSS ?= --cpu=$(XEN_TARGET_ARCH) \
 			 --cross-prefix=$(CROSS_COMPILE) \
-			 --interp-prefix=$(CROSS_SYS_ROOT)
+			 --interp-prefix=$(CROSS_SYS_ROOT) \
+			 --install=$(CURDIR)/cross-install
 endif
 
 ioemu/config-host.mak:

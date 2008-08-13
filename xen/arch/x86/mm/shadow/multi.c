@@ -3181,14 +3181,9 @@ static int sh_page_fault(struct vcpu *v,
     rc = guest_walk_tables(v, va, &gw, regs->error_code);
 
 #if (SHADOW_OPTIMIZATIONS & SHOPT_OUT_OF_SYNC)
+    regs->error_code &= ~PFEC_page_present;
     if ( !(rc & _PAGE_PRESENT) )
         regs->error_code |= PFEC_page_present;
-    else if ( regs->error_code & PFEC_page_present )
-    {
-            SHADOW_ERROR("OOS paranoia: Something is wrong in guest TLB"
-                         " flushing. Have fun debugging it.\n");
-            regs->error_code &= ~PFEC_page_present;
-    }
 #endif
 
     if ( rc != 0 )

@@ -38,8 +38,8 @@ int pt_msi_setup(struct pt_dev *dev)
     }
 
     if ( xc_physdev_map_pirq_msi(xc_handle, domid, AUTO_ASSIGN, &pirq,
-							dev->pci_dev->dev << 3 | dev->pci_dev->func,
-							dev->pci_dev->bus, 0, 1) )
+                                 dev->pci_dev->dev << 3 | dev->pci_dev->func,
+                                 dev->pci_dev->bus, 0, 0) )
     {
         PT_LOG("error map msi\n");
         return -1;
@@ -121,7 +121,8 @@ static int pt_msix_update_one(struct pt_dev *dev, int entry_nr)
     {
         ret = xc_physdev_map_pirq_msi(xc_handle, domid, AUTO_ASSIGN, &pirq,
                                 dev->pci_dev->dev << 3 | dev->pci_dev->func,
-                                dev->pci_dev->bus, entry_nr, 0);
+                                dev->pci_dev->bus, entry_nr,
+                                dev->msix->table_base);
         if ( ret )
         {
             PT_LOG("error map msix entry %x\n", entry_nr);
@@ -183,7 +184,7 @@ static void pci_msix_writel(void *opaque, target_phys_addr_t addr, uint32_t val)
     entry = &msix->msix_entry[entry_nr];
     offset = ((addr - msix->mmio_base_addr) % 16) / 4;
 
-    if ( offset != 3 && msix->enabled && entry->io_mem[3] & 0x1 )
+    if ( offset != 3 && msix->enabled && !(entry->io_mem[3] & 0x1) )
     {
         PT_LOG("can not update msix entry %d since MSI-X is already \
                 function now.\n", entry_nr);
@@ -196,7 +197,7 @@ static void pci_msix_writel(void *opaque, target_phys_addr_t addr, uint32_t val)
 
     if ( offset == 3 )
     {
-        if ( !(val & 0x1) )
+        if ( msix->enabled && !(val & 0x1) )
             pt_msix_update_one(dev, entry_nr);
         mask_physical_msix_entry(dev, entry_nr, entry->io_mem[3] & 0x1);
     }
@@ -280,7 +281,6 @@ int pt_msix_init(struct pt_dev *dev, int pos)
     uint8_t id;
     uint16_t control;
     int i, total_entries, table_off, bar_index;
-    uint64_t bar_base;
     struct pci_dev *pd = dev->pci_dev;
 
     id = pci_read_byte(pd, pos + PCI_CAP_LIST_ID);
@@ -314,18 +314,14 @@ int pt_msix_init(struct pt_dev *dev, int pos)
     table_off = pci_read_long(pd, pos + PCI_MSIX_TABLE);
     bar_index = dev->msix->bar_index = table_off & PCI_MSIX_BIR;
     table_off &= table_off & ~PCI_MSIX_BIR;
-    bar_base = pci_read_long(pd, 0x10 + 4 * bar_index);
-    if ( (bar_base & 0x6) == 0x4 )
-    {
-        bar_base &= ~0xf;
-        bar_base += (uint64_t)pci_read_long(pd, 0x10 + 4 * (bar_index + 1)) << 32;
-    }
-    PT_LOG("get MSI-X table bar base %lx\n", bar_base);
+    dev->msix->table_base = dev->pci_dev->base_addr[bar_index];
+    PT_LOG("get MSI-X table bar base %llx\n",
+           (unsigned long long)dev->msix->table_base);
 
     dev->msix->fd = open("/dev/mem", O_RDWR);
     dev->msix->phys_iomem_base = mmap(0, total_entries * 16,
                           PROT_WRITE | PROT_READ, MAP_SHARED | MAP_LOCKED,
-                          dev->msix->fd, bar_base + table_off);
+                          dev->msix->fd, dev->msix->table_base + table_off);
     PT_LOG("mapping physical MSI-X table to %lx\n",
            (unsigned long)dev->msix->phys_iomem_base);
     return 0;

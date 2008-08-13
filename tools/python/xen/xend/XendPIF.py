@@ -95,6 +95,22 @@ def linux_set_mtu(iface, mtu):
     except ValueError:
         return False
 
+def linux_get_mtu(device):
+    return _linux_get_pif_param(device, 'mtu')
+
+def linux_get_mac(device):
+    return _linux_get_pif_param(device, 'link/ether')
+
+def _linux_get_pif_parm(device, param_name):
+    ip_get_dev_data = 'ip link show %s' % device
+    rc, output = commands.getstatusoutput(ip_get_dev_data)
+    if rc == 0:
+        params = output.split(' ')
+        for i in xrange(len(params)):
+            if params[i] == param_name:
+                return params[i+1]
+    return ''
+
 def _create_VLAN(dev, vlan):
     rc, _ = commands.getstatusoutput('vconfig add %s %d' %
                                      (dev, vlan))
@@ -259,8 +275,8 @@ class XendPIF(XendBase):
         # Create the record
         record = {
             "device":  device,
-            "MAC":     '',
-            "MTU":     '',
+            "MAC":     linux_get_mac('%s.%d' % (device, vlan)),
+            "MTU":     linux_get_mtu('%s.%d' % (device, vlan)),
             "network": network_uuid,
             "VLAN":    vlan
             }

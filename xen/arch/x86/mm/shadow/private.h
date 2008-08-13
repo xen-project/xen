@@ -213,15 +213,14 @@ struct shadow_page_info
     };
 };
 
-/* The structure above *must* be the same size as a struct page_info
+/* The structure above *must* be no larger than a struct page_info
  * from mm.h, since we'll be using the same space in the frametable. 
  * Also, the mbz field must line up with the owner field of normal 
  * pages, so they look properly like anonymous/xen pages. */
 static inline void shadow_check_page_struct_offsets(void) {
-    BUILD_BUG_ON(sizeof (struct shadow_page_info) 
-                 != sizeof (struct page_info));
-    BUILD_BUG_ON(offsetof(struct shadow_page_info, mbz) 
-                 != offsetof(struct page_info, u.inuse._domain));
+    BUILD_BUG_ON(sizeof (struct shadow_page_info) > sizeof (struct page_info));
+    BUILD_BUG_ON(offsetof(struct shadow_page_info, mbz) !=
+                 offsetof(struct page_info, u.inuse._domain));
 };
 
 /* Shadow type codes */

@@ -448,7 +448,7 @@ class XendConfig(dict):
                 self['platform']['hpet'] = 0
             if 'loader' not in self['platform']:
                 # Old configs may have hvmloader set as PV_kernel param
-                if self.has_key('PV_kernel') and re.search('hvmloader', self['PV_kernel']):
+                if self.has_key('PV_kernel') and self['PV_kernel'] != '':
                     self['platform']['loader'] = self['PV_kernel']
                     self['PV_kernel'] = ''
                 else:

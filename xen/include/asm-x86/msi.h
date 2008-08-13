@@ -54,6 +54,14 @@
 #define MAX_MSIX_PAGES              32
 #endif
 
+struct msi_info {
+    int bus;
+    int devfn;
+    int vector;
+    int entry_nr;
+    uint64_t table_base;
+};
+
 struct msi_msg {
 	u32	address_lo;	/* low 32 bits of msi message address */
 	u32	address_hi;	/* high 32 bits of msi message address */
@@ -64,7 +72,7 @@ struct msi_msg {
 extern void mask_msi_irq(unsigned int irq);
 extern void unmask_msi_irq(unsigned int irq);
 extern void set_msi_irq_affinity(unsigned int irq, cpumask_t mask);
-extern int pci_enable_msi(u8 bus, u8 devfn, int vector, int entry_nr, int msi);
+extern int pci_enable_msi(struct msi_info *msi);
 extern void pci_disable_msi(int vector);
 extern void pci_cleanup_msi(struct pci_dev *pdev);
 

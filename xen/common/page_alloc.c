@@ -950,6 +950,14 @@ static void page_scrub_softirq(void)
     void             *p;
     int               i;
     s_time_t          start = NOW();
+    static spinlock_t serialise_lock = SPIN_LOCK_UNLOCKED;
+
+    /* free_heap_pages() does not parallelise well. Serialise this function. */
+    if ( !spin_trylock(&serialise_lock) )
+    {
+        set_timer(&this_cpu(page_scrub_timer), NOW() + MILLISECS(1));
+        return;
+    }
 
     /* Aim to do 1ms of work every 10ms. */
     do {
@@ -958,7 +966,7 @@ static void page_scrub_softirq(void)
         if ( unlikely((ent = page_scrub_list.next) == &page_scrub_list) )
         {
             spin_unlock(&page_scrub_lock);
-            return;
+            goto out;
         }
         
         /* Peel up to 16 pages from the list. */
@@ -989,6 +997,9 @@ static void page_scrub_softirq(void)
     } while ( (NOW() - start) < MILLISECS(1) );
 
     set_timer(&this_cpu(page_scrub_timer), NOW() + MILLISECS(10));
+
+ out:
+    spin_unlock(&serialise_lock);
 }
 
 static void page_scrub_timer_fn(void *unused)
