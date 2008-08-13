@@ -526,6 +526,8 @@ void flush_tlb_for_log_dirty(struct domain *d)
 	/* NB. There is no race because all vcpus are paused. */
 	if (is_hvm_domain(d)) {
 		for_each_vcpu (d, v) {
+			if (!v->is_initialised)
+				continue;
 			/* XXX: local_flush_tlb_all is called redundantly */
 			thash_purge_all(v);
 		}
@@ -533,6 +535,8 @@ void flush_tlb_for_log_dirty(struct domain *d)
 					NULL, 1, 1);
 	} else if (HAS_PERVCPU_VHPT(d)) {
 		for_each_vcpu (d, v) {
+			if (!v->is_initialised)
+				continue;
 			vcpu_purge_tr_entry(&PSCBX(v,dtlb));
 			vcpu_purge_tr_entry(&PSCBX(v,itlb));
 			vcpu_vhpt_flush(v);
