@@ -917,7 +917,7 @@ int xc_physdev_map_pirq_msi(int xc_handle,
                             int devfn,
                             int bus,
                             int entry_nr,
-                            int msi_type);
+                            uint64_t table_base);
 
 int xc_physdev_unmap_pirq(int xc_handle,
                           int domid,

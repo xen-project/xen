@@ -75,6 +75,9 @@ int pt_irq_create_bind_vtd(
     {
         int pirq = pt_irq_bind->machine_irq;
 
+        if ( pirq < 0 || pirq >= NR_IRQS )
+            return -EINVAL;
+
         if ( !(hvm_irq_dpci->mirq[pirq].flags & HVM_IRQ_DPCI_VALID ) )
         {
             hvm_irq_dpci->mirq[pirq].flags |= HVM_IRQ_DPCI_VALID |

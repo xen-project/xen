@@ -66,6 +66,7 @@ static int map_domain_pirq(struct domain *d, int pirq, int vector,
 {
     int ret = 0;
     int old_vector, old_pirq;
+    struct msi_info msi;
 
     if ( d == NULL )
         return -EINVAL;
@@ -115,10 +116,14 @@ static int map_domain_pirq(struct domain *d, int pirq, int vector,
                      vector);
         desc->handler = &pci_msi_type;
 
-        ret = pci_enable_msi(map->msi_info.bus,
-		                     map->msi_info.devfn, vector,
-							 map->msi_info.entry_nr,
-							 map->msi_info.msi);
+        msi.bus = map->bus;
+        msi.devfn = map->devfn;
+        msi.entry_nr = map->entry_nr;
+        msi.table_base = map->table_base;
+        msi.vector = vector;
+
+        ret = pci_enable_msi(&msi);
+
         spin_unlock_irqrestore(&desc->lock, flags);
         if ( ret )
             goto done;
@@ -139,7 +144,7 @@ static int unmap_domain_pirq(struct domain *d, int pirq)
     int ret = 0;
     int vector;
 
-    if ( d == NULL || pirq < 0 || pirq > NR_PIRQS )
+    if ( d == NULL || pirq < 0 || pirq >= NR_PIRQS )
         return -EINVAL;
 
     if ( !IS_PRIV(current->domain) )

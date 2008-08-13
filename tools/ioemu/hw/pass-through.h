@@ -120,6 +120,7 @@ struct pt_msix_info {
     int enabled;
     int total_entries;
     int bar_index;
+    uint64_t table_base;
     uint32_t table_off;
     uint64_t mmio_base_addr;
     int mmio_index;

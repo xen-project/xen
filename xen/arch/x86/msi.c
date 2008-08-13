@@ -490,28 +490,6 @@ static int msi_capability_init(struct pci_dev *dev, int vector)
     return 0;
 }
 
-static u64 pci_resource_start(struct pci_dev *dev, u8 bar_index)
-{
-    u64 bar_base;
-    u32 reg_val;
-    u8 bus = dev->bus;
-    u8 slot = PCI_SLOT(dev->devfn);
-    u8 func = PCI_FUNC(dev->devfn);
-
-    reg_val = pci_conf_read32(bus, slot, func,
-                              PCI_BASE_ADDRESS_0 + 4 * bar_index);
-    bar_base = reg_val & PCI_BASE_ADDRESS_MEM_MASK;
-    if ( ( reg_val & PCI_BASE_ADDRESS_MEM_TYPE_MASK ) ==
-         PCI_BASE_ADDRESS_MEM_TYPE_64 )
-    {
-        reg_val = pci_conf_read32(bus, slot, func,
-                                  PCI_BASE_ADDRESS_0 + 4 * (bar_index + 1));
-        bar_base |= ((u64)reg_val) << 32;
-    }
-
-    return bar_base;
-}
-
 /**
  * msix_capability_init - configure device's MSI-X capability
  * @dev: pointer to the pci_dev data structure of MSI-X device function
@@ -522,7 +500,7 @@ static u64 pci_resource_start(struct pci_dev *dev, u8 bar_index)
  * single MSI-X irq. A return of zero indicates the successful setup of
  * requested MSI-X entries with allocated irqs or non-zero for otherwise.
  **/
-static int msix_capability_init(struct pci_dev *dev, int vector, int entry_nr)
+static int msix_capability_init(struct pci_dev *dev, struct msi_info *msi)
 {
     struct msi_desc *entry;
     int pos;
@@ -549,7 +527,7 @@ static int msix_capability_init(struct pci_dev *dev, int vector, int entry_nr)
     table_offset = pci_conf_read32(bus, slot, func, msix_table_offset_reg(pos));
     bir = (u8)(table_offset & PCI_MSIX_FLAGS_BIRMASK);
     table_offset &= ~PCI_MSIX_FLAGS_BIRMASK;
-    phys_addr = pci_resource_start(dev, bir) + table_offset;
+    phys_addr = msi->table_base + table_offset;
     idx = msix_fixmap_alloc();
     if ( idx < 0 )
     {
@@ -561,11 +539,11 @@ static int msix_capability_init(struct pci_dev *dev, int vector, int entry_nr)
 
     entry->msi_attrib.type = PCI_CAP_ID_MSIX;
     entry->msi_attrib.is_64 = 1;
-    entry->msi_attrib.entry_nr = entry_nr;
+    entry->msi_attrib.entry_nr = msi->entry_nr;
     entry->msi_attrib.maskbit = 1;
     entry->msi_attrib.masked = 1;
     entry->msi_attrib.pos = pos;
-    entry->vector = vector;
+    entry->vector = msi->vector;
     entry->dev = dev;
     entry->mask_base = base;
 
@@ -589,24 +567,25 @@ static int msix_capability_init(struct pci_dev *dev, int vector, int entry_nr)
  * indicates the successful setup of an entry zero with the new MSI
  * irq or non-zero for otherwise.
  **/
-static int __pci_enable_msi(u8 bus, u8 devfn, int vector)
+static int __pci_enable_msi(struct msi_info *msi)
 {
     int status;
     struct pci_dev *pdev;
 
-    pdev = pci_lock_pdev(bus, devfn);
+    pdev = pci_lock_pdev(msi->bus, msi->devfn);
     if ( !pdev )
 	return -ENODEV;
 
-    if ( find_msi_entry(pdev, vector, PCI_CAP_ID_MSI) )
+    if ( find_msi_entry(pdev, msi->vector, PCI_CAP_ID_MSI) )
     {
 	spin_unlock(&pdev->lock);
-        dprintk(XENLOG_WARNING, "vector %d has already mapped to MSI on device \
-            %02x:%02x.%01x.\n", vector, bus, PCI_SLOT(devfn), PCI_FUNC(devfn));
+        dprintk(XENLOG_WARNING, "vector %d has already mapped to MSI on "
+            "device %02x:%02x.%01x.\n", msi->vector, msi->bus,
+            PCI_SLOT(msi->devfn), PCI_FUNC(msi->devfn));
         return 0;
     }
 
-    status = msi_capability_init(pdev, vector);
+    status = msi_capability_init(pdev, msi->vector);
     spin_unlock(&pdev->lock);
     return status;
 }
@@ -659,37 +638,37 @@ static void __pci_disable_msi(int vector)
  * of irqs available. Driver should use the returned value to re-send
  * its request.
  **/
-static int __pci_enable_msix(u8 bus, u8 devfn, int vector, int entry_nr)
+static int __pci_enable_msix(struct msi_info *msi)
 {
     int status, pos, nr_entries;
     struct pci_dev *pdev;
     u16 control;
-    u8 slot = PCI_SLOT(devfn);
-    u8 func = PCI_FUNC(devfn);
+    u8 slot = PCI_SLOT(msi->devfn);
+    u8 func = PCI_FUNC(msi->devfn);
 
-    pdev = pci_lock_pdev(bus, devfn);
+    pdev = pci_lock_pdev(msi->bus, msi->devfn);
     if ( !pdev )
 	return -ENODEV;
 
-    pos = pci_find_cap_offset(bus, slot, func, PCI_CAP_ID_MSIX);
-    control = pci_conf_read16(bus, slot, func, msi_control_reg(pos));
+    pos = pci_find_cap_offset(msi->bus, slot, func, PCI_CAP_ID_MSIX);
+    control = pci_conf_read16(msi->bus, slot, func, msi_control_reg(pos));
     nr_entries = multi_msix_capable(control);
-    if (entry_nr > nr_entries)
+    if (msi->entry_nr > nr_entries)
     {
 	spin_unlock(&pdev->lock);
         return -EINVAL;
     }
 
-    if ( find_msi_entry(pdev, vector, PCI_CAP_ID_MSIX) )
+    if ( find_msi_entry(pdev, msi->vector, PCI_CAP_ID_MSIX) )
     {
 	spin_unlock(&pdev->lock);
-        dprintk(XENLOG_WARNING, "vector %d has already mapped to MSIX on \
-                device %02x:%02x.%01x.\n", vector, bus,
-                PCI_SLOT(devfn), PCI_FUNC(devfn));
+        dprintk(XENLOG_WARNING, "vector %d has already mapped to MSIX on "
+                "device %02x:%02x.%01x.\n", msi->vector, msi->bus,
+                PCI_SLOT(msi->devfn), PCI_FUNC(msi->devfn));
         return 0;
     }
 
-    status = msix_capability_init(pdev, vector, entry_nr);
+    status = msix_capability_init(pdev, msi);
     spin_unlock(&pdev->lock);
     return status;
 }
@@ -727,13 +706,12 @@ static void __pci_disable_msix(int vector)
     spin_unlock(&dev->lock);
 }
 
-int pci_enable_msi(u8 bus, u8 devfn, int vector, int entry_nr, int msi)
+int pci_enable_msi(struct msi_info *msi)
 {
-    ASSERT(spin_is_locked(&irq_desc[vector].lock));
-    if ( msi )
-        return __pci_enable_msi(bus, devfn, vector);
-    else
-        return __pci_enable_msix(bus, devfn, vector, entry_nr);
+    ASSERT(spin_is_locked(&irq_desc[msi->vector].lock));
+
+    return  msi->table_base ? __pci_enable_msix(msi) :
+                              __pci_enable_msi(msi);
 }
 
 void pci_disable_msi(int vector)
