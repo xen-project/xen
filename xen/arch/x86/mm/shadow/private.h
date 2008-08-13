@@ -218,7 +218,7 @@ struct shadow_page_info
  * Also, the mbz field must line up with the owner field of normal 
  * pages, so they look properly like anonymous/xen pages. */
 static inline void shadow_check_page_struct_offsets(void) {
-    BUILD_BUG_ON(sizeof (struct shadow_page_info) < sizeof (struct page_info));
+    BUILD_BUG_ON(sizeof (struct shadow_page_info) > sizeof (struct page_info));
     BUILD_BUG_ON(offsetof(struct shadow_page_info, mbz) !=
                  offsetof(struct page_info, u.inuse._domain));
 };
