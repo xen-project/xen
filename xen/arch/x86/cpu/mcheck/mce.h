@@ -26,5 +26,5 @@ int x86_mcinfo_add(struct mc_info *mi, void *mcinfo);
 void x86_mcinfo_dump(struct mc_info *mi);
 
 /* Global variables */
-extern int mce_disabled __initdata;
+extern int mce_disabled;
 extern unsigned int nr_mce_banks;
