@@ -77,6 +77,10 @@ def check_user():
         hline()
         raise CheckError("invalid user")
 
+def start_daemon(daemon, *args):
+    if os.fork() == 0:
+        os.execvp(daemon, (daemon,) + args)
+
 def start_xenstored():
     pidfname = "/var/run/xenstore.pid"
     try:
@@ -102,13 +106,15 @@ def start_xenstored():
     s,o = commands.getstatusoutput(cmd)
 
 def start_consoled():
-    if os.fork() == 0:
-        os.execvp('xenconsoled', ['xenconsoled'])
+    XENCONSOLED_TRACE = os.getenv("XENCONSOLED_TRACE")
+    args = ""
+    if XENCONSOLED_TRACE:
+        args += "--log=" + XENCONSOLED_TRACE
+    start_daemon("xenconsoled", args)
 
 def start_blktapctrl():
-    if os.fork() == 0:
-        os.execvp('blktapctrl', ['blktapctrl'])
-            
+    start_daemon("blktapctrl", "")
+
 def main():
     try:
         check_logging()
