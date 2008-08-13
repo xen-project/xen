@@ -1789,7 +1789,8 @@ int intel_vtd_setup(void)
     memset(domid_bitmap, 0, domid_bitmap_size / 8);
     set_bit(0, domid_bitmap);
 
-    init_vtd_hw();
+    if ( init_vtd_hw() )
+        goto error;
 
     register_keyhandler('V', dump_iommu_info, "dump iommu info");
 
