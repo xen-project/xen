@@ -3290,6 +3290,16 @@ static int sh_page_fault(struct vcpu *v,
     if ( sh_mfn_is_a_page_table(gmfn)
          && ft == ft_demand_write )
         sh_unsync(v, gmfn);
+
+    if ( unlikely(d->is_shutting_down) )
+    {
+        /* We might end up with a crashed domain here if
+         * sh_remove_shadows() in a previous sh_resync() call has
+         * failed. We cannot safely continue since some page is still
+         * OOS but not in the hash table anymore. */
+        shadow_unlock(d);
+        return 0;
+    }
 #endif /* OOS */
 
     /* Calculate the shadow entry and write it */
