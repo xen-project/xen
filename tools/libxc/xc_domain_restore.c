@@ -372,7 +372,7 @@ int xc_domain_restore(int xc_handle, int io_fd, uint32_t dom,
     }
 
     /* We want zeroed memory so use calloc rather than malloc. */
-    p2m        = calloc(p2m_size, MAX(guest_width, sizeof (xen_pfn_t))); 
+    p2m        = calloc(p2m_size, sizeof(xen_pfn_t));
     pfn_type   = calloc(p2m_size, sizeof(unsigned long));
 
     region_mfn = xg_memalign(PAGE_SIZE, ROUNDUP(
@@ -1178,16 +1178,16 @@ int xc_domain_restore(int xc_handle, int io_fd, uint32_t dom,
     }
 
     /* If the domain we're restoring has a different word size to ours,
-     * we need to repack the p2m appropriately */
+     * we need to adjust the live_p2m assignment appropriately */
     if ( guest_width > sizeof (xen_pfn_t) )
         for ( i = p2m_size - 1; i >= 0; i-- )
-            ((uint64_t *)p2m)[i] = p2m[i];
+            ((uint64_t *)live_p2m)[i] = p2m[i];
     else if ( guest_width < sizeof (xen_pfn_t) )
         for ( i = 0; i < p2m_size; i++ )   
-            ((uint32_t *)p2m)[i] = p2m[i];
-
-    memcpy(live_p2m, p2m, ROUNDUP(p2m_size * guest_width, PAGE_SHIFT));
-    munmap(live_p2m, ROUNDUP(p2m_size * guest_width, PAGE_SHIFT));
+            ((uint32_t *)live_p2m)[i] = p2m[i];
+    else
+        memcpy(live_p2m, p2m, p2m_size * sizeof(xen_pfn_t));
+    munmap(live_p2m, P2M_FL_ENTRIES * PAGE_SIZE);
 
     DPRINTF("Domain ready to be built.\n");
     rc = 0;
