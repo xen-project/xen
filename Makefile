@@ -22,6 +22,9 @@ build: kernels
 	$(MAKE) -C xen build
 	$(MAKE) -C tools build
 	$(MAKE) -C stubdom build
+ifeq (x86_64,$(XEN_TARGET_ARCH))
+	XEN_TARGET_ARCH=x86_32 $(MAKE) -C stubdom pv-grub
+endif
 	$(MAKE) -C docs build
 
 # The test target is for unit tests that can run without an installation.  Of
@@ -71,6 +74,9 @@ install-kernels:
 .PHONY: install-stubdom
 install-stubdom:
 	$(MAKE) -C stubdom install
+ifeq (x86_64,$(XEN_TARGET_ARCH))
+	XEN_TARGET_ARCH=x86_32 $(MAKE) -C stubdom install-grub
+endif
 
 .PHONY: install-docs
 install-docs:
@@ -109,6 +115,9 @@ clean::
 	$(MAKE) -C xen clean
 	$(MAKE) -C tools clean
 	$(MAKE) -C stubdom crossclean
+ifeq (x86_64,$(XEN_TARGET_ARCH))
+	XEN_TARGET_ARCH=x86_32 $(MAKE) -C stubdom crossclean
+endif
 	$(MAKE) -C docs clean
 
 # clean, but blow away kernel build tree plus tarballs
@@ -117,6 +126,9 @@ distclean:
 	$(MAKE) -C xen distclean
 	$(MAKE) -C tools distclean
 	$(MAKE) -C stubdom distclean
+ifeq (x86_64,$(XEN_TARGET_ARCH))
+	XEN_TARGET_ARCH=x86_32 $(MAKE) -C stubdom distclean
+endif
 	$(MAKE) -C docs distclean
 	rm -rf dist patches/tmp
 	for i in $(ALLKERNELS) ; do $(MAKE) $$i-delete ; done

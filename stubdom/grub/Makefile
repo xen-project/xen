@@ -3,7 +3,7 @@ XEN_ROOT = ../..
 include $(XEN_ROOT)/Config.mk
 vpath %.c ../grub-upstream
 
-BOOT=boot-$(XEN_TARGET_ARCH).o
+BOOT=$(OBJ_DIR)/boot-$(XEN_TARGET_ARCH).o
 
 DEF_CPPFLAGS += -I$(XEN_ROOT)/tools/libxc -I$(XEN_ROOT)/tools/include -I.
 DEF_CPPFLAGS += -I../grub-upstream/stage1
@@ -17,7 +17,7 @@ DEF_CPPFLAGS += -DSUPPORT_SERIAL
 DEF_CPPFLAGS += -DPRESET_MENU_STRING='""'
 DEF_CPPFLAGS += -DPACKAGE='"grubdom"' -DVERSION='"0.97"'
 
-all: main.a
+all: $(OBJ_DIR)/main.a
 
 STAGE2_SOURCES=builtins.c char_io.c cmdline.c common.c console.c disk_io.c graphics.c gunzip.c md5.c serial.c stage2.c terminfo.c tparm.c
 
@@ -59,16 +59,26 @@ NETBOOT_SOURCES:=$(addprefix netboot/,$(NETBOOT_SOURCES))
 
 $(BOOT): DEF_CPPFLAGS+=-D__ASSEMBLY__
 
-OBJS = $(NETBOOT_SOURCES:.c=.o) $(STAGE2_SOURCES:.c=.o) kexec.o mini-os.o
+PV_GRUB_SOURCES = kexec.c mini-os.c
 
-dirs:
-	mkdir -p netboot stage2
+SOURCES = $(NETBOOT_SOURCES) $(STAGE2_SOURCES) $(PV_GRUB_SOURCES)
+
+OBJS = $(addprefix $(OBJ_DIR)/,$(SOURCES:.c=.o))
+
+$(OBJ_DIR)/dirs:
+	mkdir -p $(OBJ_DIR)/netboot $(OBJ_DIR)/stage2
 	touch $@
 
-$(OBJS): dirs
+$(OBJS): $(OBJ_DIR)/dirs
 
-main.a: $(BOOT) $(OBJS)
+$(OBJ_DIR)/main.a: $(BOOT) $(OBJS)
 	$(AR) cr $@ $^
+
+$(OBJ_DIR)/%.o: %.c
+	$(CC) -c $(CPPFLAGS) $(CFLAGS) $< -o $@
+
+$(OBJ_DIR)/%.o: %.S
+	$(CC) -c $(CPPFLAGS) $(CFLAGS) $< -o $@
 
 clean:
 	rm -fr dirs *.a *.o stage2 netboot

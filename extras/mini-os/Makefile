@@ -66,8 +66,8 @@ ifeq ($(lwip),y)
 # lwIP library
 LWC	:= $(shell find $(LWIPDIR)/ -type f -name '*.c')
 LWC	:= $(filter-out %6.c %ip6_addr.c %ethernetif.c, $(LWC))
-LWC	+= lwip-arch.c lwip-net.c
 LWO	:= $(patsubst %.c,%.o,$(LWC))
+LWO	+= $(addprefix $(OBJ_DIR)/,lwip-arch.o lwip-net.o)
 
 $(OBJ_DIR)/lwip.a: $(LWO)
 	$(RM) $@
@@ -79,7 +79,7 @@ endif
 OBJS := $(filter-out $(OBJ_DIR)/lwip%.o $(LWO), $(OBJS))
 
 ifeq ($(libc),y)
-APP_LDLIBS += -L$(XEN_ROOT)/stubdom/libxc -whole-archive -lxenguest -lxenctrl -no-whole-archive
+APP_LDLIBS += -L$(XEN_ROOT)/stubdom/libxc-$(XEN_TARGET_ARCH) -whole-archive -lxenguest -lxenctrl -no-whole-archive
 APP_LDLIBS += -lpci
 APP_LDLIBS += -lz
 APP_LDLIBS += -lm
