@@ -251,6 +251,10 @@ do_hvm_op(unsigned long op, XEN_GUEST_HANDLE(void) arg)
         break;
     }
 
+    case HVMOP_set_mem_type:
+        rc = -ENOSYS;
+        break;
+
     default:
         gdprintk(XENLOG_INFO, "Bad HVM op %ld.\n", op);
         rc = -ENOSYS;
