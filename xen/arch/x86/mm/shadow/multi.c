@@ -1415,6 +1415,13 @@ static int shadow_set_l1e(struct vcpu *v,
     mfn_t new_gmfn = shadow_l1e_get_mfn(new_sl1e);
 #endif
     ASSERT(sl1e != NULL);
+
+#if SHADOW_OPTIMIZATIONS & SHOPT_OUT_OF_SYNC
+    if ( mfn_valid(new_gmfn) && mfn_oos_may_write(new_gmfn)
+         && ((shadow_l1e_get_flags(new_sl1e) & (_PAGE_RW|_PAGE_PRESENT))
+             == (_PAGE_RW|_PAGE_PRESENT)) )
+        oos_fixup_add(v, new_gmfn, sl1mfn, pgentry_ptr_to_slot(sl1e));
+#endif
     
     old_sl1e = *sl1e;
 
@@ -1434,14 +1441,6 @@ static int shadow_set_l1e(struct vcpu *v,
             else
             {
                 shadow_vram_get_l1e(new_sl1e, sl1e, sl1mfn, d);
-#if SHADOW_OPTIMIZATIONS & SHOPT_OUT_OF_SYNC
-                if ( mfn_valid(new_gmfn) && mfn_oos_may_write(new_gmfn)
-                     && (shadow_l1e_get_flags(new_sl1e) & _PAGE_RW) )
-                {
-                    oos_fixup_add(v, new_gmfn, sl1mfn, pgentry_ptr_to_slot(sl1e));
-                }
-#endif
-
             }
         }
     } 
