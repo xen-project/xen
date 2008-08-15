@@ -71,6 +71,7 @@ MAKE_INSTR(WRMSR,  2, 0x0f, 0x30);
 MAKE_INSTR(VMCALL, 3, 0x0f, 0x01, 0xd9);
 MAKE_INSTR(HLT,    1, 0xf4);
 MAKE_INSTR(INT3,   1, 0xcc);
+MAKE_INSTR(RDTSC,  2, 0x0f, 0x31);
 
 static const u8 *opc_bytes[INSTR_MAX_COUNT] = 
 {
@@ -81,7 +82,8 @@ static const u8 *opc_bytes[INSTR_MAX_COUNT] =
     [INSTR_WRMSR]  = OPCODE_WRMSR,
     [INSTR_VMCALL] = OPCODE_VMCALL,
     [INSTR_HLT]    = OPCODE_HLT,
-    [INSTR_INT3]   = OPCODE_INT3
+    [INSTR_INT3]   = OPCODE_INT3,
+    [INSTR_RDTSC]  = OPCODE_RDTSC
 };
 
 static int fetch(struct vcpu *v, u8 *buf, unsigned long addr, int len)

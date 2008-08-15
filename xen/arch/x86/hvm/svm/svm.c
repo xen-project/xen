@@ -1128,6 +1128,17 @@ static void svm_vmexit_do_hlt(struct vmcb_struct *vmcb,
     hvm_hlt(regs->eflags);
 }
 
+static void svm_vmexit_do_rdtsc(struct cpu_user_regs *regs)
+{
+    unsigned int inst_len;
+
+    if ( (inst_len = __get_instruction_length(current, INSTR_RDTSC)) == 0 )
+        return;
+    __update_guest_eip(regs, inst_len);
+
+    hvm_rdtsc_intercept(regs);
+}
+
 static void wbinvd_ipi(void *info)
 {
     wbinvd();
@@ -1344,7 +1355,7 @@ asmlinkage void svm_vmexit_handler(struct cpu_user_regs *regs)
         break;
 
     case VMEXIT_RDTSC:
-        hvm_rdtsc_intercept(regs);
+        svm_vmexit_do_rdtsc(regs);
         break;
 
     case VMEXIT_RDTSCP:
