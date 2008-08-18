@@ -72,6 +72,14 @@ static struct dmi_system_id __initdata ioport_quirks_tbl[] = {
     },
     {
         .callback = proliant_quirk,
+        .ident = "HP ProLiant DL7xx",
+        .matches = {
+            DMI_MATCH(DMI_BIOS_VENDOR, "HP"),
+            DMI_MATCH(DMI_PRODUCT_NAME, "ProLiant DL7"),
+        },
+    },
+    {
+        .callback = proliant_quirk,
         .ident = "HP ProLiant ML3xx",
         .matches = {
             DMI_MATCH(DMI_BIOS_VENDOR, "HP"),
