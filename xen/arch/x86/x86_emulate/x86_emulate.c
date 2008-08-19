@@ -681,6 +681,15 @@ static void __put_rep_prefix(
         __put_rep_prefix(&_regs, ctxt->regs, ad_bytes, reps_completed); \
 })
 
+/* Clip maximum repetitions so that the index register only just wraps. */
+#define truncate_ea_and_reps(ea, reps, bytes_per_rep) ({                \
+    unsigned long __todo = (ctxt->regs->eflags & EF_DF) ? (ea) : ~(ea); \
+    __todo = truncate_word(__todo, ad_bytes);                           \
+    __todo = (__todo / (bytes_per_rep)) + 1;                            \
+    (reps) = (__todo < (reps)) ? __todo : (reps);                       \
+    truncate_word((ea), ad_bytes);                                      \
+})
+
 /* Compatibility function: read guest memory, zero-extend result to a ulong. */
 static int read_ulong(
         enum x86_segment seg,
@@ -2385,7 +2394,7 @@ x86_emulate(
         unsigned int port = (uint16_t)_regs.edx;
         dst.bytes = !(b & 1) ? 1 : (op_bytes == 8) ? 4 : op_bytes;
         dst.mem.seg = x86_seg_es;
-        dst.mem.off = truncate_ea(_regs.edi);
+        dst.mem.off = truncate_ea_and_reps(_regs.edi, nr_reps, dst.bytes);
         if ( (rc = ioport_access_check(port, dst.bytes, ctxt, ops)) != 0 )
             goto done;
         if ( (nr_reps > 1) && (ops->rep_ins != NULL) &&
@@ -2414,11 +2423,11 @@ x86_emulate(
         unsigned long nr_reps = get_rep_prefix();
         unsigned int port = (uint16_t)_regs.edx;
         dst.bytes = !(b & 1) ? 1 : (op_bytes == 8) ? 4 : op_bytes;
+        ea.mem.off = truncate_ea_and_reps(_regs.esi, nr_reps, dst.bytes);
         if ( (rc = ioport_access_check(port, dst.bytes, ctxt, ops)) != 0 )
             goto done;
         if ( (nr_reps > 1) && (ops->rep_outs != NULL) &&
-             ((rc = ops->rep_outs(ea.mem.seg, truncate_ea(_regs.esi),
-                                  port, dst.bytes,
+             ((rc = ops->rep_outs(ea.mem.seg, ea.mem.off, port, dst.bytes,
                                   &nr_reps, ctxt)) != X86EMUL_UNHANDLEABLE) )
         {
             if ( rc != 0 )
@@ -2569,7 +2578,7 @@ x86_emulate(
         unsigned long nr_reps = get_rep_prefix();
         dst.bytes = (d & ByteOp) ? 1 : op_bytes;
         dst.mem.seg = x86_seg_es;
-        dst.mem.off = truncate_ea(_regs.edi);
+        dst.mem.off = truncate_ea_and_reps(_regs.edi, nr_reps, dst.bytes);
         if ( (nr_reps > 1) && (ops->rep_movs != NULL) &&
              ((rc = ops->rep_movs(ea.mem.seg, truncate_ea(_regs.esi),
                                   dst.mem.seg, dst.mem.off, dst.bytes,
