@@ -210,7 +210,10 @@ static int hvmemul_linear_to_phys(
     unsigned long pfn, npfn, done, todo, i;
     int reverse;
 
-    /* Clip repetitions to a sensible maximum. */
+    /*
+     * Clip repetitions to a sensible maximum. This avoids extensive looping in
+     * this function while still amortising the cost of I/O trap-and-emulate.
+     */
     *reps = min_t(unsigned long, *reps, 4096);
 
     /* With no paging it's easy: linear == physical. */
@@ -297,7 +300,13 @@ static int hvmemul_virtual_to_linear(
         return X86EMUL_OKAY;
     }
 
+    /*
+     * Clip repetitions to avoid overflow when multiplying by @bytes_per_rep.
+     * The chosen maximum is very conservative but it's what we use in
+     * hvmemul_linear_to_phys() so there is no point in using a larger value.
+     */
     *reps = min_t(unsigned long, *reps, 4096);
+
     reg = hvmemul_get_seg_reg(seg, hvmemul_ctxt);
 
     if ( (hvmemul_ctxt->ctxt.regs->eflags & X86_EFLAGS_DF) && (*reps > 1) )
