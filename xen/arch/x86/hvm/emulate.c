@@ -208,6 +208,7 @@ static int hvmemul_linear_to_phys(
 {
     struct vcpu *curr = current;
     unsigned long pfn, npfn, done, todo, i;
+    int reverse;
 
     /* Clip repetitions to a sensible maximum. */
     *reps = min_t(unsigned long, *reps, 4096);
@@ -221,41 +222,53 @@ static int hvmemul_linear_to_phys(
 
     *paddr = addr & ~PAGE_MASK;
 
-    /* Get the first PFN in the range. */
-    if ( (pfn = paging_gva_to_gfn(curr, addr, &pfec)) == INVALID_GFN )
+    /* Reverse mode if this is a backwards multi-iteration string operation. */
+    reverse = (hvmemul_ctxt->ctxt.regs->eflags & X86_EFLAGS_DF) && (*reps > 1);
+
+    if ( reverse && ((-addr & ~PAGE_MASK) < bytes_per_rep) )
+    {
+        /* Do page-straddling first iteration forwards via recursion. */
+        unsigned long _paddr, one_rep = 1;
+        int rc = hvmemul_linear_to_phys(
+            addr, &_paddr, bytes_per_rep, &one_rep, pfec, hvmemul_ctxt);
+        if ( rc != X86EMUL_OKAY )
+            return rc;
+        pfn = _paddr >> PAGE_SHIFT;
+    }
+    else if ( (pfn = paging_gva_to_gfn(curr, addr, &pfec)) == INVALID_GFN )
     {
         hvm_inject_exception(TRAP_page_fault, pfec, addr);
         return X86EMUL_EXCEPTION;
     }
 
     /* If the range does not straddle a page boundary then we're done. */
-    done = PAGE_SIZE - (addr & ~PAGE_MASK);
+    done = reverse ? bytes_per_rep + (addr & ~PAGE_MASK) : -addr & ~PAGE_MASK;
     todo = *reps * bytes_per_rep;
     if ( done >= todo )
         goto done;
 
-    addr += done;
     for ( i = 1; done < todo; i++ )
     {
         /* Get the next PFN in the range. */
+        addr += reverse ? -PAGE_SIZE : PAGE_SIZE;
         npfn = paging_gva_to_gfn(curr, addr, &pfec);
 
         /* Is it contiguous with the preceding PFNs? If not then we're done. */
-        if ( (npfn == INVALID_GFN) || (npfn != (pfn + i)) )
+        if ( (npfn == INVALID_GFN) || (npfn != (pfn + (reverse ? -i : i))) )
         {
             done /= bytes_per_rep;
             if ( done == 0 )
             {
+                ASSERT(!reverse);
                 if ( npfn != INVALID_GFN )
                     return X86EMUL_UNHANDLEABLE;
-                hvm_inject_exception(TRAP_page_fault, pfec, addr);
+                hvm_inject_exception(TRAP_page_fault, pfec, addr & PAGE_MASK);
                 return X86EMUL_EXCEPTION;
             }
             *reps = done;
             break;
         }
 
-        addr += PAGE_SIZE;
         done += PAGE_SIZE;
     }
 
@@ -268,7 +281,8 @@ static int hvmemul_linear_to_phys(
 static int hvmemul_virtual_to_linear(
     enum x86_segment seg,
     unsigned long offset,
-    unsigned int bytes,
+    unsigned int bytes_per_rep,
+    unsigned long *reps,
     enum hvm_access_type access_type,
     struct hvm_emulate_ctxt *hvmemul_ctxt,
     unsigned long *paddr)
@@ -282,21 +296,40 @@ static int hvmemul_virtual_to_linear(
         return X86EMUL_OKAY;
     }
 
+    *reps = min_t(unsigned long, *reps, 4096);
     reg = hvmemul_get_seg_reg(seg, hvmemul_ctxt);
-    okay = hvm_virtual_to_linear_addr(
-        seg, reg, offset, bytes, access_type,
-        hvmemul_ctxt->ctxt.addr_size, paddr);
 
-    if ( !okay )
+    if ( (hvmemul_ctxt->ctxt.regs->eflags & X86_EFLAGS_DF) && (*reps > 1) )
     {
-        hvmemul_ctxt->exn_pending = 1;
-        hvmemul_ctxt->exn_vector = TRAP_gp_fault;
-        hvmemul_ctxt->exn_error_code = 0;
-        hvmemul_ctxt->exn_insn_len = 0;
-        return X86EMUL_EXCEPTION;
+        ASSERT(offset >= ((*reps - 1) * bytes_per_rep));
+        okay = hvm_virtual_to_linear_addr(
+            seg, reg, offset - (*reps - 1) * bytes_per_rep,
+            *reps * bytes_per_rep, access_type,
+            hvmemul_ctxt->ctxt.addr_size, paddr);
+        *paddr += (*reps - 1) * bytes_per_rep;
+        if ( hvmemul_ctxt->ctxt.addr_size != 64 )
+            *paddr = (uint32_t)*paddr;
+    }
+    else
+    {
+        okay = hvm_virtual_to_linear_addr(
+            seg, reg, offset, *reps * bytes_per_rep, access_type,
+            hvmemul_ctxt->ctxt.addr_size, paddr);
     }
 
-    return X86EMUL_OKAY;
+    if ( okay )
+        return X86EMUL_OKAY;
+
+    /* If this is a string operation, emulate each iteration separately. */
+    if ( *reps != 1 )
+        return X86EMUL_UNHANDLEABLE;
+
+    /* This is a singleton operation: fail it with an exception. */
+    hvmemul_ctxt->exn_pending = 1;
+    hvmemul_ctxt->exn_vector = TRAP_gp_fault;
+    hvmemul_ctxt->exn_error_code = 0;
+    hvmemul_ctxt->exn_insn_len = 0;
+    return X86EMUL_EXCEPTION;
 }
 
 static int __hvmemul_read(
@@ -314,7 +347,7 @@ static int __hvmemul_read(
     int rc;
 
     rc = hvmemul_virtual_to_linear(
-        seg, offset, bytes, access_type, hvmemul_ctxt, &addr);
+        seg, offset, bytes, &reps, access_type, hvmemul_ctxt, &addr);
     if ( rc != X86EMUL_OKAY )
         return rc;
 
@@ -406,7 +439,7 @@ static int hvmemul_write(
     int rc;
 
     rc = hvmemul_virtual_to_linear(
-        seg, offset, bytes, hvm_access_write, hvmemul_ctxt, &addr);
+        seg, offset, bytes, &reps, hvm_access_write, hvmemul_ctxt, &addr);
     if ( rc != X86EMUL_OKAY )
         return rc;
 
@@ -470,7 +503,7 @@ static int hvmemul_rep_ins(
     int rc;
 
     rc = hvmemul_virtual_to_linear(
-        dst_seg, dst_offset, *reps * bytes_per_rep, hvm_access_write,
+        dst_seg, dst_offset, bytes_per_rep, reps, hvm_access_write,
         hvmemul_ctxt, &addr);
     if ( rc != X86EMUL_OKAY )
         return rc;
@@ -503,7 +536,7 @@ static int hvmemul_rep_outs(
     int rc;
 
     rc = hvmemul_virtual_to_linear(
-        src_seg, src_offset, *reps * bytes_per_rep, hvm_access_read,
+        src_seg, src_offset, bytes_per_rep, reps, hvm_access_read,
         hvmemul_ctxt, &addr);
     if ( rc != X86EMUL_OKAY )
         return rc;
@@ -538,13 +571,13 @@ static int hvmemul_rep_movs(
     int rc;
 
     rc = hvmemul_virtual_to_linear(
-        src_seg, src_offset, *reps * bytes_per_rep, hvm_access_read,
+        src_seg, src_offset, bytes_per_rep, reps, hvm_access_read,
         hvmemul_ctxt, &saddr);
     if ( rc != X86EMUL_OKAY )
         return rc;
 
     rc = hvmemul_virtual_to_linear(
-        dst_seg, dst_offset, *reps * bytes_per_rep, hvm_access_write,
+        dst_seg, dst_offset, bytes_per_rep, reps, hvm_access_write,
         hvmemul_ctxt, &daddr);
     if ( rc != X86EMUL_OKAY )
         return rc;
@@ -792,11 +825,11 @@ static int hvmemul_invlpg(
 {
     struct hvm_emulate_ctxt *hvmemul_ctxt =
         container_of(ctxt, struct hvm_emulate_ctxt, ctxt);
-    unsigned long addr;
+    unsigned long addr, reps = 1;
     int rc;
 
     rc = hvmemul_virtual_to_linear(
-        seg, offset, 1, hvm_access_none, hvmemul_ctxt, &addr);
+        seg, offset, 1, &reps, hvm_access_none, hvmemul_ctxt, &addr);
 
     if ( rc == X86EMUL_OKAY )
         hvm_funcs.invlpg_intercept(addr);
