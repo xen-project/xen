@@ -228,7 +228,8 @@ static int hvmemul_linear_to_phys(
     if ( reverse && ((-addr & ~PAGE_MASK) < bytes_per_rep) )
     {
         /* Do page-straddling first iteration forwards via recursion. */
-        unsigned long _paddr, one_rep = 1;
+        paddr_t _paddr;
+        unsigned long one_rep = 1;
         int rc = hvmemul_linear_to_phys(
             addr, &_paddr, bytes_per_rep, &one_rep, pfec, hvmemul_ctxt);
         if ( rc != X86EMUL_OKAY )
