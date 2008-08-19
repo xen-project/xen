@@ -290,8 +290,12 @@ class PciController(DevController):
 
         self.CheckSiblingDevices(fe_domid, dev)
 
-        if arch.type != "ia64":
-            dev.do_FLR()
+        # We don't do FLR when we create domain and hotplug device into guest,
+        # namely, we only do FLR when we destroy domain or hotplug device from
+        # guest. This is mainly to work around the race condition in hotplug code
+        # paths. See the changeset's description for details.
+        # if arch.type != "ia64":
+        #    dev.do_FLR()
 
         PCIQuirk(dev.vendor, dev.device, dev.subvendor, dev.subdevice, domain, 
                 bus, slot, func)
