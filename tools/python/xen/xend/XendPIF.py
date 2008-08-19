@@ -101,7 +101,7 @@ def linux_get_mtu(device):
 def linux_get_mac(device):
     return _linux_get_pif_param(device, 'link/ether')
 
-def _linux_get_pif_parm(device, param_name):
+def _linux_get_pif_param(device, param_name):
     ip_get_dev_data = 'ip link show %s' % device
     rc, output = commands.getstatusoutput(ip_get_dev_data)
     if rc == 0:
