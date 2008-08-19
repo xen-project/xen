@@ -311,6 +311,10 @@ static int hvmemul_virtual_to_linear(
 
     if ( (hvmemul_ctxt->ctxt.regs->eflags & X86_EFLAGS_DF) && (*reps > 1) )
     {
+        /*
+         * x86_emulate() clips the repetition count to ensure we don't wrap
+         * the effective-address index register. Hence this assertion holds.
+         */
         ASSERT(offset >= ((*reps - 1) * bytes_per_rep));
         okay = hvm_virtual_to_linear_addr(
             seg, reg, offset - (*reps - 1) * bytes_per_rep,
