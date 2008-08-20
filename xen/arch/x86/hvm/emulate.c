@@ -207,7 +207,7 @@ static int hvmemul_linear_to_phys(
     struct hvm_emulate_ctxt *hvmemul_ctxt)
 {
     struct vcpu *curr = current;
-    unsigned long pfn, npfn, done, todo, i;
+    unsigned long pfn, npfn, done, todo, i, offset = addr & ~PAGE_MASK;
     int reverse;
 
     /*
@@ -223,12 +223,10 @@ static int hvmemul_linear_to_phys(
         return X86EMUL_OKAY;
     }
 
-    *paddr = addr & ~PAGE_MASK;
-
     /* Reverse mode if this is a backwards multi-iteration string operation. */
     reverse = (hvmemul_ctxt->ctxt.regs->eflags & X86_EFLAGS_DF) && (*reps > 1);
 
-    if ( reverse && ((-addr & ~PAGE_MASK) < bytes_per_rep) )
+    if ( reverse && ((PAGE_SIZE - offset) < bytes_per_rep) )
     {
         /* Do page-straddling first iteration forwards via recursion. */
         paddr_t _paddr;
@@ -245,12 +243,8 @@ static int hvmemul_linear_to_phys(
         return X86EMUL_EXCEPTION;
     }
 
-    /* If the range does not straddle a page boundary then we're done. */
-    done = reverse ? bytes_per_rep + (addr & ~PAGE_MASK) : -addr & ~PAGE_MASK;
+    done = reverse ? bytes_per_rep + offset : PAGE_SIZE - offset;
     todo = *reps * bytes_per_rep;
-    if ( done >= todo )
-        goto done;
-
     for ( i = 1; done < todo; i++ )
     {
         /* Get the next PFN in the range. */
@@ -276,8 +270,7 @@ static int hvmemul_linear_to_phys(
         done += PAGE_SIZE;
     }
 
- done:
-    *paddr |= (paddr_t)pfn << PAGE_SHIFT;
+    *paddr = ((paddr_t)pfn << PAGE_SHIFT) | offset;
     return X86EMUL_OKAY;
 }
     
