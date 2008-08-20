@@ -1423,7 +1423,7 @@ static void pt_unregister_regions(struct pt_dev *assigned_device)
     for ( i = 0; i < PCI_NUM_REGIONS; i++ )
     {
         e_size = assigned_device->bases[i].e_size;
-        if ( e_size == 0 )
+        if ( (e_size == 0) || (assigned_device->bases[i].e_physbase == -1) )
             continue;
 
         type = d->io_regions[i].type;
