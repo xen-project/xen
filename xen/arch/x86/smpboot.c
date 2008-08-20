@@ -325,7 +325,7 @@ void __devinit smp_callin(void)
 	 */
 	wait_for_init_deassert(&init_deasserted);
 
-	if ( x2apic_is_available() )
+	if ( x2apic_enabled )
 		enable_x2apic();
 
 	/*
