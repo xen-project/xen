@@ -6,6 +6,10 @@ CFLAGS :=
 
 include $(XEN_ROOT)/tools/Rules.mk
 
+ifneq ($(debug),y)
+CFLAGS += -DNDEBUG
+endif
+
 CFLAGS += -Werror
 
 # Disable PIE/SSP if GCC supports them. They can break us.

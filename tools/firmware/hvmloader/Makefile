@@ -30,6 +30,9 @@ CFLAGS += $(CFLAGS_include) -I.
 
 SRCS  = hvmloader.c mp_tables.c util.c smbios.c 
 SRCS += 32bitbios_support.c smp.c cacheattr.c
+ifeq ($(debug),y)
+SRCS += tests.c
+endif
 OBJS  = $(patsubst %.c,%.o,$(SRCS))
 
 .PHONY: all

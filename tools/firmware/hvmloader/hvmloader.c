@@ -460,6 +460,8 @@ int main(void)
 
     smp_initialise();
 
+    perform_tests();
+
     printf("Writing SMBIOS tables ...\n");
     smbios_sz = hvm_write_smbios_tables();
 
