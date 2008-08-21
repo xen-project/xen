@@ -163,7 +163,8 @@ unsigned long total_pages;
 #define l1_disallow_mask(d)                                     \
     ((d != dom_io) &&                                           \
      (rangeset_is_empty((d)->iomem_caps) &&                     \
-      rangeset_is_empty((d)->arch.ioport_caps)) ?               \
+      rangeset_is_empty((d)->arch.ioport_caps) &&               \
+      !has_arch_pdevs(d)) ?                                     \
      L1_DISALLOW_MASK : (L1_DISALLOW_MASK & ~PAGE_CACHE_ATTRS))
 
 #ifdef CONFIG_COMPAT
