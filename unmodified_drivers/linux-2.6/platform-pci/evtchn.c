@@ -107,39 +107,8 @@ EXPORT_SYMBOL(mask_evtchn);
 
 void unmask_evtchn(int port)
 {
-	unsigned int cpu;
-	shared_info_t *s = shared_info_area;
-	vcpu_info_t *vcpu_info;
-
-	cpu = get_cpu();
-	vcpu_info = &s->vcpu_info[cpu];
-
-	/* Slow path (hypercall) if this is a non-local port.  We only
-	   ever bind event channels to vcpu 0 in HVM guests. */
-	if (unlikely(cpu != 0)) {
-		evtchn_unmask_t op = { .port = port };
-		VOID(HYPERVISOR_event_channel_op(EVTCHNOP_unmask,
-						 &op));
-		put_cpu();
-		return;
-	}
-
-	synch_clear_bit(port, &s->evtchn_mask[0]);
-
-	/*
-	 * The following is basically the equivalent of
-	 * 'hw_resend_irq'. Just like a real IO-APIC we 'lose the
-	 * interrupt edge' if the channel is masked.
-	 */
-	if (synch_test_bit(port, &s->evtchn_pending[0]) &&
-	    !synch_test_and_set_bit(port / BITS_PER_LONG,
-				    &vcpu_info->evtchn_pending_sel)) {
-		vcpu_info->evtchn_upcall_pending = 1;
-		if (!vcpu_info->evtchn_upcall_mask)
-			force_evtchn_callback();
-	}
-
-	put_cpu();
+	evtchn_unmask_t op = { .port = port };
+	VOID(HYPERVISOR_event_channel_op(EVTCHNOP_unmask, &op));
 }
 EXPORT_SYMBOL(unmask_evtchn);
 
@@ -356,12 +325,6 @@ static irqreturn_t evtchn_interrupt(int irq, void *dev_id
 
 	return IRQ_HANDLED;
 }
-
-void force_evtchn_callback(void)
-{
-	VOID(HYPERVISOR_xen_version(0, NULL));
-}
-EXPORT_SYMBOL(force_evtchn_callback);
 
 void irq_resume(void)
 {
