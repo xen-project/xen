@@ -1004,8 +1004,6 @@ static void time_calibration_rendezvous(void *_r)
     struct cpu_calibration *c = &this_cpu(cpu_calibration);
     struct calibration_rendezvous *r = _r;
 
-    local_irq_disable();
-
     if ( smp_processor_id() == 0 )
     {
         while ( atomic_read(&r->nr_cpus) != (total_cpus - 1) )
@@ -1024,8 +1022,6 @@ static void time_calibration_rendezvous(void *_r)
     c->stime_local_stamp = get_s_time();
     c->stime_master_stamp = r->master_stime;
 
-    local_irq_enable();
-
     /* Callback in softirq context as soon as possible. */
     set_timer(&c->softirq_callback, c->stime_local_stamp);
 }
@@ -1036,7 +1032,7 @@ static void time_calibration(void *unused)
         .nr_cpus = ATOMIC_INIT(0)
     };
 
-    on_each_cpu(time_calibration_rendezvous, &r, 0, 1);
+    on_each_cpu(time_calibration_rendezvous, &r, 0, 0);
 }
 
 void init_percpu_time(void)
