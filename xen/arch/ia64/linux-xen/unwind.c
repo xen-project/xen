@@ -91,9 +91,9 @@
 #endif
 
 #ifdef XEN
-#define alloc_reg_state()	xmalloc(struct unw_reg_state)
+#define alloc_reg_state()	({in_irq()? NULL: xmalloc(struct unw_reg_state);})
 #define free_reg_state(usr)	xfree(usr)
-#define alloc_labeled_state()	xmalloc(struct unw_labeled_state)
+#define alloc_labeled_state()	({in_irq()? NULL: xmalloc(struct unw_labeled_state);})
 #define free_labeled_state(usr)	xfree(usr)
 #else
 #define alloc_reg_state()	kmalloc(sizeof(struct unw_reg_state), GFP_ATOMIC)
