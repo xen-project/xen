@@ -46,6 +46,7 @@ extern cpumask_t percpu_set;
 
 int set_one_rr(unsigned long rr, unsigned long val);
 int set_one_rr_efi(unsigned long rr, unsigned long val);
+void set_one_rr_efi_restore(unsigned long rr, unsigned long val);
 
 // This function is purely for performance... apparently scrambling
 //  bits in the region id makes for better hashing, which means better

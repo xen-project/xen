@@ -196,13 +196,17 @@ void vmx_vcpu_set_rr_fast(VCPU *vcpu, u64 reg, u64 val)
     }
 }
 
-void vmx_switch_rr7(unsigned long rid, void *guest_vhpt,
-                    void *shared_arch_info)
+void __vmx_switch_rr7_vcpu(struct vcpu *v, unsigned long rid)
 {
-    __get_cpu_var(inserted_vhpt) = (unsigned long)guest_vhpt;
-    __get_cpu_var(inserted_vpd) = (unsigned long)shared_arch_info;
-    __get_cpu_var(inserted_mapped_regs) = (unsigned long)shared_arch_info;
-    __vmx_switch_rr7(rid, guest_vhpt, shared_arch_info);
+    __vmx_switch_rr7(rid, (void *)v->arch.vhpt.hash, v->arch.privregs);
+}
+
+void vmx_switch_rr7_vcpu(struct vcpu *v, unsigned long rid)
+{
+    __get_cpu_var(inserted_vhpt) = (unsigned long)v->arch.vhpt.hash;
+    __get_cpu_var(inserted_vpd) = (unsigned long)v->arch.privregs;
+    __get_cpu_var(inserted_mapped_regs) = (unsigned long)v->arch.privregs;
+    __vmx_switch_rr7_vcpu(v, rid);
 }
 
 IA64FAULT vmx_vcpu_set_rr(VCPU *vcpu, u64 reg, u64 val)
@@ -218,8 +222,7 @@ IA64FAULT vmx_vcpu_set_rr(VCPU *vcpu, u64 reg, u64 val)
     switch((u64)(reg>>VRN_SHIFT)) {
     case VRN7:
         if (likely(vcpu == current))
-            vmx_switch_rr7(vrrtomrr(vcpu,val), (void *)vcpu->arch.vhpt.hash,
-                           vcpu->arch.privregs);
+            vmx_switch_rr7_vcpu(vcpu, vrrtomrr(vcpu, val));
        break;
     case VRN4:
         rrval = vrrtomrr(vcpu,val);

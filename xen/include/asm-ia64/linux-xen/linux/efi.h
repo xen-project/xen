@@ -487,8 +487,8 @@ struct efi_generic_dev_path {
 #define XEN_EFI_RR_LEAVE(rr6, rr7) do {			\
 	if (rr7 != XEN_EFI_RR) {			\
 		efi_unmap_pal_code();			\
-		set_one_rr_efi(6UL << 61, rr6);		\
-		set_one_rr_efi(7UL << 61, rr7);		\
+		set_one_rr_efi_restore(6UL << 61, rr6);	\
+		set_one_rr_efi_restore(7UL << 61, rr7);	\
 	}						\
 } while (0)
 

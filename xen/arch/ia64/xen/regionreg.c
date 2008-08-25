@@ -18,9 +18,12 @@
 #include <asm/vcpu.h>
 #include <asm/percpu.h>
 #include <asm/pal.h>
+#include <asm/vmx_vcpu.h>
 
 /* Defined in xemasm.S  */
-extern void ia64_new_rr7(unsigned long rid, void *shared_info, void *shared_arch_info, unsigned long shared_info_va, unsigned long va_vhpt);
+extern void ia64_new_rr7(unsigned long rid, void *shared_info,
+			 void *shared_arch_info, unsigned long shared_info_va,
+			 unsigned long va_vhpt);
 extern void ia64_new_rr7_efi(unsigned long rid, unsigned long repin_percpu,
 			     unsigned long vpd);
 
@@ -239,6 +242,14 @@ set_rr(unsigned long rr, unsigned long rrval)
 	ia64_srlz_d();
 }
 
+static inline void
+ia64_new_rr7_vcpu(struct vcpu *v, unsigned long rid)
+{
+	ia64_new_rr7(rid, v->domain->shared_info,
+		     v->arch.privregs, v->domain->arch.shared_info_va,
+		     __va_ul(vcpu_vhpt_maddr(v)));
+}
+
 // validates and changes a single region register
 // in the currently executing domain
 // Passing a value of -1 is a (successful) no-op
@@ -282,9 +293,7 @@ int set_one_rr(unsigned long rr, unsigned long val)
 		__get_cpu_var(inserted_mapped_regs) =
 					v->domain->arch.shared_info_va +
 					XMAPPEDREGS_OFS;
-		ia64_new_rr7(vmMangleRID(newrrv.rrval),v->domain->shared_info,
-			     v->arch.privregs, v->domain->arch.shared_info_va,
-		             __va_ul(vcpu_vhpt_maddr(v)));
+		ia64_new_rr7_vcpu(v, vmMangleRID(newrrv.rrval));
 	} else {
 		set_rr(rr,newrrv.rrval);
 	}
@@ -310,6 +319,31 @@ int set_one_rr_efi(unsigned long rr, unsigned long val)
 	}
 
 	return 1;
+}
+
+void
+set_one_rr_efi_restore(unsigned long rr, unsigned long val)
+{
+	unsigned long rreg = REGION_NUMBER(rr);
+	
+	BUG_ON(rreg != 6 && rreg != 7);
+
+	if (rreg == 6) {
+		ia64_set_rr(rr, val);
+		ia64_srlz_d();
+	} else {
+		/* firmware call is done very early before struct vcpu
+		   and strcut domain are initialized. */
+		if (unlikely(current == NULL || current->domain == NULL ||
+			     is_idle_vcpu(current)))
+			ia64_new_rr7_efi(val, cpu_isset(smp_processor_id(),
+							percpu_set),
+					 0UL);
+		else if (VMX_DOMAIN(current))
+			__vmx_switch_rr7_vcpu(current, val);
+		else
+			ia64_new_rr7_vcpu(current, val);
+	}
 }
 
 void set_virtual_rr0(void)

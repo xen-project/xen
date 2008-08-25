@@ -169,9 +169,7 @@ vmx_load_all_rr(VCPU *vcpu)
 	ia64_dv_serialize_data();
 	ia64_set_rr((VRN6 << VRN_SHIFT), vrrtomrr(vcpu, VMX(vcpu, vrr[VRN6])));
 	ia64_dv_serialize_data();
-	vmx_switch_rr7(vrrtomrr(vcpu,VMX(vcpu, vrr[VRN7])),
-                      (void *)vcpu->arch.vhpt.hash,
-		       vcpu->arch.privregs);
+	vmx_switch_rr7_vcpu(vcpu, vrrtomrr(vcpu, VMX(vcpu, vrr[VRN7])));
 	ia64_set_pta(VMX(vcpu, mpta));
 	vmx_ia64_set_dcr(vcpu);
 
