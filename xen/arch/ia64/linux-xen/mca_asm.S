@@ -540,6 +540,17 @@ ia64_reload_tr:
 	;;
 	dep r17=0,r17,0,IA64_GRANULE_SHIFT
 	;;
+	
+	// avoid overlapping with stack
+	GET_THIS_PADDR(r2, cpu_kr);;
+	add r2=IA64_KR_CURRENT_STACK_OFFSET,r2
+	;;
+	ld8 r19=[r2]
+	;;
+	shl r19=r19,IA64_GRANULE_SHIFT
+	;;
+	cmp.eq p0,p7=r17,r19
+
 	movl r20=PAGE_KERNEL
 	;;
 	or r17=r20,r17		// construct PA | page properties
@@ -552,7 +563,7 @@ ia64_reload_tr:
 	;;
 	itr.i itr[r16]=r17
 	;;
-	itr.d dtr[r18]=r17
+(p7)	itr.d dtr[r18]=r17
 	;;
 	srlz.i
 	;;
@@ -567,24 +578,37 @@ ia64_reload_tr:
 	cmp.eq p7,p0=r2,r0
 	;;
 (p7)	br.cond.sptk    .overlap_vhpt   // vhpt isn't mapped.
-
-	// avoid overlapping with stack TR
+	
 	dep r16=0,r2,0,IA64_GRANULE_SHIFT
 	;;
+	dep r17=0,r16,60,4		// physical address of
+	                                // va_vhpt & ~(IA64_GRANULE_SIZE - 1)
+
+	// avoid overlapping with stack TR
 	GET_THIS_PADDR(r2,cpu_kr);;
-	add r2=IA64_KR_CURRENT_OFFSET,r2
+	add r2=IA64_KR_CURRENT_STACK_OFFSET,r2
 	;;
 	ld8 r2=[r2]
 	;;
-	dep r17=0,r2,0,IA64_GRANULE_SHIFT
-	;; 
-	cmp.eq p7,p0=r16,r17
+	shl r18=r2,IA64_GRANULE_SHIFT
+	;;
+	cmp.eq p7,p0=r17,r18
 (p7)	br.cond.sptk	.overlap_vhpt
+
+	// avoid overlapping with VPD
+	GET_THIS_PADDR(r2, inserted_vpd);;
+	ld8 r18=[r2]
+	;;
+	dep r18=0,r18,60,4
+	;;
+	dep r18=0,r18,0,IA64_GRANULE_SHIFT
+	;;
+	cmp.eq p7,p0=r17,r18
+(p7)	br.cond.sptk	.overlap_vhpt
+
 	movl r20=PAGE_KERNEL
 	;;
 	mov r18=IA64_TR_VHPT
-	dep r17=0,r16,60,4		// physical address of
-	                                // va_vhpt & ~(IA64_GRANULE_SIZE - 1)
 	mov r19=IA64_GRANULE_SHIFT<<2
 	;;
 	or r17=r17,r20			// construct PA | page properties
