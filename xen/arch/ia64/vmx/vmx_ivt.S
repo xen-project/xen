@@ -1348,6 +1348,7 @@ ENTRY(vmx_dispatch_shadow_fault)
     br.call.sptk.many b6=vmx_ia64_shadow_fault
 END(vmx_dispatch_shadow_fault)
 
+    .section .rodata, "a"
 .Lvmx_dispatch_reflection_string:
     .asciz "vmx_dispatch_reflection\n"
 .Lvmx_dispatch_virtualization_fault_string:
@@ -1358,3 +1359,4 @@ END(vmx_dispatch_shadow_fault)
     .asciz "vmx_dispatch_tlb_miss\n"
 .Lvmx_dispatch_shadow_fault_string:
     .asciz "vmx_dispatch_shadow_fault\n"
+    .previous
