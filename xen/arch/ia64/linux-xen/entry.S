@@ -265,7 +265,7 @@ GLOBAL_ENTRY(ia64_switch_to)
 	srlz.d
 	or r23=r25,r20			// construct PA | page properties
 #ifdef XEN
-	ptr.d in0,r27			// to purge dtr[IA64_TR_VHPT]
+	ptr.d in0,r27			// to purge dtr[IA64_TR_VHPT] and dtr[IA64_TR_VPD]
 #else
 	movl r27=IA64_GRANULE_SHIFT << 2	
 #endif
