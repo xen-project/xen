@@ -973,6 +973,7 @@ END(vmx_single_step_trap)
 ENTRY(vmx_virtualization_fault)
 //    VMX_DBG_FAULT(37)
     mov r31=pr
+#ifndef CONFIG_XEN_IA64_DISABLE_OPTVFAULT
     movl r30 = virtualization_fault_table
     mov r23=b0
     ;;
@@ -981,6 +982,7 @@ ENTRY(vmx_virtualization_fault)
     mov b0=r30
     br.sptk.many b0
     ;;
+#endif
 vmx_virtualization_fault_back:
     mov r19=37
     adds r16 = IA64_VCPU_CAUSE_OFFSET,r21

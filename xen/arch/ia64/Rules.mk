@@ -14,6 +14,7 @@ xen_ia64_pervcpu_vhpt	?= y
 xen_ia64_tlb_track	?= y
 xen_ia64_tlb_track_cnt	?= n
 xen_ia64_tlbflush_clock	?= y
+xen_ia64_disable_optvfault ?= n
 
 # Used only by linux/Makefile.
 AFLAGS_KERNEL  += -mconstant-gp -nostdinc $(CPPFLAGS)
@@ -66,6 +67,9 @@ ifneq ($(vhpt_disable),y)
 CFLAGS += -DVHPT_ENABLED=1
 else
 CFLAGS += -DVHPT_ENABLED=0
+endif
+ifeq ($(xen_ia64_disable_optvfault),y)
+CFLAGS += -DCONFIG_XEN_IA64_DISABLE_OPTVFAULT
 endif
 
 LDFLAGS := -g
