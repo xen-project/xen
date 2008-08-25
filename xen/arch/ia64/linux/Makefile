@@ -15,6 +15,7 @@ obj-y += machvec.o
 obj-y += memcpy_mck.o
 obj-y += memset.o
 obj-y += numa.o
+obj-y += pal.o
 obj-y += strlen.o
 
 obj-y += __divsi3.o

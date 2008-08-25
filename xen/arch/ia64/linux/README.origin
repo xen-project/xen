@@ -29,3 +29,6 @@ carta_random.S		-> linux/arch/ia64/lib/carta_random.S
 
 # The files below are from Linux-2.6.19
 io.c			-> linux/arch/ia64/lib/io.c
+
+# The files below are from Linux-2.6.21
+pal.S			-> linux/arch/ia64/kernel/pal.S
