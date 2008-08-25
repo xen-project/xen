@@ -439,7 +439,7 @@ struct efi_generic_dev_path {
  * e: bits 3-N:  IA64_REGION_ID_KERNEL (1)
  * f: bits N-53: reserved (0)
  *
- * + Only 0 is used as we only need one RID. Its not really important
+ * + Only 6 and 7 are used as we only need two RIDs. Its not really important
  *   what this number is, so long as its between 0 and 7.
  *
  * The nice thing about this is that we are only using 4 bits of RID
@@ -464,7 +464,7 @@ struct efi_generic_dev_path {
  * E: bits N-53: reserved (0)
  */
 
-/* rr7 (and rr6) may already be set to XEN_EFI_RR, which
+/* rr7 (and rr6) may already be set to XEN_EFI_RR7 (and XEN_EFI_RR6), which
  * would indicate a nested EFI, SAL or PAL call, such
  * as from an MCA. This may have occured during a call
  * to set_one_rr_efi(). To be safe, repin everything anyway.
@@ -473,8 +473,8 @@ struct efi_generic_dev_path {
 #define XEN_EFI_RR_ENTER(rr6, rr7) do {			\
 	rr6 = ia64_get_rr(6UL << 61);			\
 	rr7 = ia64_get_rr(7UL << 61);			\
-	set_one_rr_efi(6UL << 61, XEN_EFI_RR);		\
-	set_one_rr_efi(7UL << 61, XEN_EFI_RR);		\
+	set_one_rr_efi(6UL << 61, XEN_EFI_RR6);		\
+	set_one_rr_efi(7UL << 61, XEN_EFI_RR7);		\
 	efi_map_pal_code();				\
 } while (0)
 
@@ -485,7 +485,7 @@ struct efi_generic_dev_path {
  */
 
 #define XEN_EFI_RR_LEAVE(rr6, rr7) do {			\
-	if (rr7 != XEN_EFI_RR) {			\
+	if (rr7 != XEN_EFI_RR7) {			\
 		efi_unmap_pal_code();			\
 		set_one_rr_efi_restore(6UL << 61, rr6);	\
 		set_one_rr_efi_restore(7UL << 61, rr7);	\
@@ -507,10 +507,25 @@ struct efi_generic_dev_path {
 #ifdef XEN
 #include <asm/mmu_context.h> /* For IA64_REGION_ID_EFI and ia64_rid() */
 #include <asm/pgtable.h>     /* IA64_GRANULE_SHIFT */
-#define XEN_EFI_REGION_NO __IA64_UL_CONST(0)
-#define XEN_EFI_RR ((ia64_rid(XEN_IA64_REGION_ID_EFI,			\
-			      XEN_EFI_REGION_NO) << 8) |		\
-		    (IA64_GRANULE_SHIFT << 2))
+
+/* macro version of vmMangleRID() */
+#define XEN_EFI_VM_MANGLE_RRVAL(rrval)		\
+	((((rrval) & 0xff000000) >> 16) |	\
+	 ((rrval) & 0x00ff0000) |		\
+	 (((rrval) & 0x0000ff00) << 16 ) |	\
+	 ((rrval) & 0x000000ff))
+
+#define XEN_EFI_REGION6 __IA64_UL_CONST(6)
+#define XEN_EFI_REGION7 __IA64_UL_CONST(7)
+#define _XEN_EFI_RR6 ((ia64_rid(XEN_IA64_REGION_ID_EFI,			\
+				XEN_EFI_REGION6) << 8) |		\
+		      (IA64_GRANULE_SHIFT << 2))
+#define _XEN_EFI_RR7 ((ia64_rid(XEN_IA64_REGION_ID_EFI,			\
+				XEN_EFI_REGION7) << 8) |		\
+		      (IA64_GRANULE_SHIFT << 2))
+#define XEN_EFI_RR6 XEN_EFI_VM_MANGLE_RRVAL(_XEN_EFI_RR6)
+#define XEN_EFI_RR7 XEN_EFI_VM_MANGLE_RRVAL(_XEN_EFI_RR7)
+
 #endif /* XEN */
 
 #endif /* _LINUX_EFI_H */

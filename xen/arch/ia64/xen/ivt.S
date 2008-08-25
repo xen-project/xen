@@ -206,26 +206,31 @@ late_alt_dtlb_miss:
 	cmp.eq p8,p0=((VIRT_FRAME_TABLE_ADDR>>56)&0xff)-0x100,r22
 (p8)	br.cond.sptk frametable_miss ;;
 #endif
-	// If it is not a Xen address, handle it via page_fault.
-	//    !( ((r22 == 0x18 || r22 == 0x1c) && rr7 == XEN_EFI_RR) ||
-	//	 r22 == 0x1e )
-	// Note that rr7 == XEN_EFI_RR implies rr6 == XEN_EFI_RR
+	//    !( (r22 == 0x18 && rr6 == XEN_EFI_RR6) ||
+	//	 (r22 == 0x1c && rr7 == XEN_EFI_RR7) ||
+	//	 r22 == 0x1e)
+
 	extr.u r22=r16,59,5
 	;;
 	dep r20=0,r20,IA64_ITIR_KEY,IA64_ITIR_KEY_LEN	// clear the key
+	movl r24=6 << 61
 	movl r23=7 << 61
 	;;
+	mov r24=rr[r24]
 	mov r23=rr[r23]
 	;;
-	mov r25=XEN_EFI_RR
+	movl r26=XEN_EFI_RR6
+	movl r25=XEN_EFI_RR7
+
 	cmp.eq p8,p0=0x18,r22		// 0xc...
+	cmp.eq p9,p0=0x1c,r22		// 0xe...
 	;;
-	cmp.eq.or p8,p0=0x1c,r22	// 0xe...
+	cmp.eq.and p8,p0=r26,r24	// rr6 == XEN_EFI_RR6
+	cmp.eq.and p9,p0=r25,r23	// rr7 == XEN_EFI_RR7
 	;;
-	cmp.eq.and p8,p0=r25,r23	// rr7 == XEN_EFI_RR
-	;;
-	cmp.eq.or p8,p0=0x1e,r22	// 0xf...
+	cmp.eq.or p9,p0=0x1e,r22	// 0xf...
 (p8)	br.cond.spnt alt_dtlb_miss_identity_map
+(p9)	br.cond.spnt alt_dtlb_miss_identity_map
 	br.cond.spnt page_fault
 	;;
 alt_dtlb_miss_identity_map:
