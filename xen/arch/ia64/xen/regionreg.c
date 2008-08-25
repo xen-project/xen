@@ -80,6 +80,7 @@ ia64_set_rr (unsigned long rr, unsigned long rrv)
 static unsigned long allocate_metaphysical_rr(struct domain *d, int n)
 {
 	ia64_rr rrv;
+	BUG_ON(d->arch.starting_mp_rid + n >= d->arch.ending_mp_rid);
 
 	rrv.rrval = 0;	// Or else may see reserved bit fault
 	rrv.rid = d->arch.starting_mp_rid + n;
