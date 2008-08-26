@@ -223,12 +223,6 @@ class DevController:
         raise VmError('%s devices may not be reconfigured' % self.deviceClass)
 
 
-    def cleanupDeviceOnDomainDestroy(self, devid):
-        """ Some devices may need special cleanup when the guest domain
-            is destroyed.
-        """
-        return
-
     def destroyDevice(self, devid, force):
         """Destroy the specified device.
 
@@ -244,8 +238,6 @@ class DevController:
         """
 
         dev = self.convertToDeviceNumber(devid)
-
-        self.cleanupDeviceOnDomainDestroy(dev)
 
         # Modify online status /before/ updating state (latter is watched by
         # drivers, so this ordering avoids a race).

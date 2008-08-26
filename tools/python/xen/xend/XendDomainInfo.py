@@ -287,6 +287,28 @@ def dom_get(dom):
         log.trace("domain_getinfo(%d) failed, ignoring: %s", dom, str(err))
     return None
 
+def do_FLR(domid):
+    from xen.xend.server.pciif import parse_pci_name, PciDevice
+    path = '/local/domain/0/backend/pci/%u/0/' % domid
+    num_devs = xstransact.Read(path + 'num_devs');
+    if num_devs is None or num_devs == "":
+        return;
+
+    num_devs = int(xstransact.Read(path + 'num_devs'));
+
+    dev_str_list = []
+    for i in range(num_devs):
+        dev_str = xstransact.Read(path + 'dev-%i' % i)
+        dev_str_list = dev_str_list + [dev_str]
+
+    for dev_str in dev_str_list:
+        (dom, b, d, f) = parse_pci_name(dev_str)
+        try:
+            dev = PciDevice(dom, b, d, f)
+        except Exception, e:
+            raise VmError("pci: failed to locate device and "+
+                    "parse it's resources - "+str(e))
+        dev.do_FLR()
 
 class XendDomainInfo:
     """An object represents a domain.
@@ -2410,6 +2432,8 @@ class XendDomainInfo:
         try:
             if self.domid is not None:
                 xc.domain_destroy_hook(self.domid)
+                xc.domain_pause(self.domid)
+                do_FLR(self.domid)
                 xc.domain_destroy(self.domid)
                 for state in DOM_STATES_OLD:
                     self.info[state] = 0

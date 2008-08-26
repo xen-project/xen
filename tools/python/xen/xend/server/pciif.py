@@ -383,10 +383,10 @@ class PciController(DevController):
             if (dev.dev_type == DEV_TYPE_PCIe_ENDPOINT) and not dev.pcie_flr:
                 if dev.bus == 0:
                     # We cope with this case by using the Dstate transition
-                    # method for now.
+                    # method or some vendor specific methods for now.
                     err_msg = 'pci: %s: it is on bus 0, but has no PCIe' +\
                         ' FLR Capability. Will try the Dstate transition'+\
-                        ' method if available.'
+                        ' method or some vendor specific methods if available.'
                     log.warn(err_msg % dev.name)
                 else:
                     funcs = dev.find_all_the_multi_functions()
@@ -404,10 +404,11 @@ class PciController(DevController):
                 if dev.bus == 0 or arch.type == "ia64":
                     if not dev.pci_af_flr:
                         # We cope with this case by using the Dstate transition
-                        # method for now.
+                        # method or some vendor specific methods for now.
                         err_msg = 'pci: %s: it is on bus 0, but has no PCI' +\
                             ' Advanced Capabilities for FLR. Will try the'+\
-                            ' Dstate transition method if available.'
+                            ' Dstate transition method or some vendor' +\
+                            ' specific methods if available.'
                         log.warn(err_msg % dev.name)
                 else:
                     # All devices behind the uppermost PCI/PCI-X bridge must be\
@@ -542,22 +543,6 @@ class PciController(DevController):
         self.writeBackend(devid, 'num_devs', str(new_num_devs))
 
         return new_num_devs
-
-    def cleanupDeviceOnDomainDestroy(self, devid):
-        num_devs = int(self.readBackend(devid, 'num_devs'))
-        dev_str_list = []
-        for i in range(num_devs):
-            dev_str = self.readBackend(devid, 'dev-%i' % i)
-            dev_str_list = dev_str_list + [dev_str]
-
-        for dev_str in dev_str_list:
-            (dom, b, d, f) = parse_pci_name(dev_str)
-            try:
-                dev = PciDevice(dom, b, d, f)
-            except Exception, e:
-                raise VmError("pci: failed to locate device and "+
-                        "parse it's resources - "+str(e))
-            dev.do_FLR()
 
     def waitForBackend(self,devid):
         return (0, "ok - no hotplug")
