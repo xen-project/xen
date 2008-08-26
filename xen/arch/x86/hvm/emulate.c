@@ -575,7 +575,8 @@ static int hvmemul_rep_movs(
     paddr_t sgpa, dgpa;
     uint32_t pfec = PFEC_page_present;
     p2m_type_t p2mt;
-    int rc;
+    int rc, df = !!(ctxt->regs->eflags & X86_EFLAGS_DF);
+    char *buf;
 
     rc = hvmemul_virtual_to_linear(
         src_seg, src_offset, bytes_per_rep, reps, hvm_access_read,
@@ -606,15 +607,29 @@ static int hvmemul_rep_movs(
     (void)gfn_to_mfn_current(sgpa >> PAGE_SHIFT, &p2mt);
     if ( !p2m_is_ram(p2mt) )
         return hvmemul_do_mmio(
-            sgpa, reps, bytes_per_rep, dgpa, IOREQ_READ,
-            !!(ctxt->regs->eflags & X86_EFLAGS_DF), NULL);
+            sgpa, reps, bytes_per_rep, dgpa, IOREQ_READ, df, NULL);
 
     (void)gfn_to_mfn_current(dgpa >> PAGE_SHIFT, &p2mt);
-    if ( p2m_is_ram(p2mt) )
+    if ( !p2m_is_ram(p2mt) )
+        return hvmemul_do_mmio(
+            dgpa, reps, bytes_per_rep, sgpa, IOREQ_WRITE, df, NULL);
+
+    if ( df )
+    {
+        sgpa -= (*reps - 1) * bytes_per_rep;
+        dgpa -= (*reps - 1) * bytes_per_rep;
+    }
+
+    buf = xmalloc_bytes(*reps * bytes_per_rep);
+    if ( buf == NULL )
         return X86EMUL_UNHANDLEABLE;
-    return hvmemul_do_mmio(
-        dgpa, reps, bytes_per_rep, sgpa, IOREQ_WRITE,
-        !!(ctxt->regs->eflags & X86_EFLAGS_DF), NULL);
+
+    hvm_copy_from_guest_phys(buf, sgpa, *reps * bytes_per_rep);
+    hvm_copy_to_guest_phys(dgpa, buf, *reps * bytes_per_rep);
+
+    xfree(buf);
+
+    return X86EMUL_OKAY;
 }
 
 static int hvmemul_read_segment(
