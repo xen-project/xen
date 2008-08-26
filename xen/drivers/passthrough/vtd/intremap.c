@@ -43,7 +43,7 @@ u16 apicid_to_bdf(int apic_id)
     return 0;
 }
 
-static void remap_entry_to_ioapic_rte(
+static int remap_entry_to_ioapic_rte(
     struct iommu *iommu, struct IO_APIC_route_entry *old_rte)
 {
     struct iremap_entry *iremap_entry = NULL, *iremap_entries;
@@ -56,15 +56,19 @@ static void remap_entry_to_ioapic_rte(
     {
         dprintk(XENLOG_ERR VTDPREFIX,
                 "remap_entry_to_ioapic_rte: ir_ctl is not ready\n");
-        return;
+        return -EFAULT;
     }
 
     remap_rte = (struct IO_APIC_route_remap_entry *) old_rte;
     index = (remap_rte->index_15 << 15) | remap_rte->index_0_14;
 
     if ( index > ir_ctrl->iremap_index )
-        panic("%s: index (%d) is larger than remap table entry size (%d)!\n",
-              __func__, index, ir_ctrl->iremap_index);
+    {
+        dprintk(XENLOG_ERR VTDPREFIX,
+                "%s: index (%d) is larger than remap table entry size (%d)!\n",
+                __func__, index, ir_ctrl->iremap_index);
+        return -EFAULT;
+    }
 
     spin_lock_irqsave(&ir_ctrl->iremap_lock, flags);
 
@@ -82,9 +86,10 @@ static void remap_entry_to_ioapic_rte(
 
     unmap_vtd_domain_page(iremap_entries);
     spin_unlock_irqrestore(&ir_ctrl->iremap_lock, flags);
+    return 0;
 }
 
-static void ioapic_rte_to_remap_entry(struct iommu *iommu,
+static int ioapic_rte_to_remap_entry(struct iommu *iommu,
     int apic_id, struct IO_APIC_route_entry *old_rte,
     unsigned int rte_upper, unsigned int value)
 {
@@ -108,7 +113,14 @@ static void ioapic_rte_to_remap_entry(struct iommu *iommu,
         index = (remap_rte->index_15 << 15) | remap_rte->index_0_14;
 
     if ( index > IREMAP_ENTRY_NR - 1 )
-        panic("ioapic_rte_to_remap_entry: intremap index is more than 256!\n");
+    {
+        dprintk(XENLOG_ERR VTDPREFIX,
+                "%s: intremap index (%d) is larger than"
+                " the maximum index (%ld)!\n",
+                __func__, index, IREMAP_ENTRY_NR - 1);
+        spin_unlock_irqrestore(&ir_ctrl->iremap_lock, flags);
+        return -EFAULT;
+    }
 
     iremap_entries =
         (struct iremap_entry *)map_vtd_domain_page(ir_ctrl->iremap_maddr);
@@ -159,7 +171,7 @@ static void ioapic_rte_to_remap_entry(struct iommu *iommu,
 
     unmap_vtd_domain_page(iremap_entries);
     spin_unlock_irqrestore(&ir_ctrl->iremap_lock, flags);
-    return;
+    return 0;
 }
 
 unsigned int io_apic_read_remap_rte(
@@ -189,23 +201,22 @@ unsigned int io_apic_read_remap_rte(
 
     remap_rte = (struct IO_APIC_route_remap_entry *) &old_rte;
 
-    if ( remap_rte->mask || (remap_rte->format == 0) )
+    if ( remap_rte->format == 0 )
     {
-        *IO_APIC_BASE(apic) = reg;
+        *IO_APIC_BASE(apic) = rte_upper ? (reg + 1) : reg;
         return *(IO_APIC_BASE(apic)+4);
     }
 
-    remap_entry_to_ioapic_rte(iommu, &old_rte);
+    if ( remap_entry_to_ioapic_rte(iommu, &old_rte) )
+    {
+        *IO_APIC_BASE(apic) = rte_upper ? (reg + 1) : reg;
+        return *(IO_APIC_BASE(apic)+4);
+    }
+
     if ( rte_upper )
-    {
-        *IO_APIC_BASE(apic) = reg + 1;
         return (*(((u32 *)&old_rte) + 1));
-    }
     else
-    {
-        *IO_APIC_BASE(apic) = reg;
         return (*(((u32 *)&old_rte) + 0));
-    }
 }
 
 void io_apic_write_remap_rte(
@@ -243,8 +254,13 @@ void io_apic_write_remap_rte(
     *(IO_APIC_BASE(apic)+4) = *(((int *)&old_rte)+0);
     remap_rte->mask = saved_mask;
 
-    ioapic_rte_to_remap_entry(iommu, mp_ioapics[apic].mpc_apicid,
-                              &old_rte, rte_upper, value);
+    if ( ioapic_rte_to_remap_entry(iommu, mp_ioapics[apic].mpc_apicid,
+                                   &old_rte, rte_upper, value) )
+    {
+        *IO_APIC_BASE(apic) = rte_upper ? (reg + 1) : reg;
+        *(IO_APIC_BASE(apic)+4) = value;
+        return;
+    }
 
     /* write new entry to ioapic */
     *IO_APIC_BASE(apic) = reg;
@@ -253,7 +269,7 @@ void io_apic_write_remap_rte(
     *(IO_APIC_BASE(apic)+4) = *(((u32 *)&old_rte)+1);
 }
 
-static void remap_entry_to_msi_msg(
+static int remap_entry_to_msi_msg(
     struct iommu *iommu, struct msi_msg *msg)
 {
     struct iremap_entry *iremap_entry = NULL, *iremap_entries;
@@ -266,7 +282,7 @@ static void remap_entry_to_msi_msg(
     {
         dprintk(XENLOG_ERR VTDPREFIX,
                 "remap_entry_to_msi_msg: ir_ctl == NULL");
-        return;
+        return -EFAULT;
     }
 
     remap_rte = (struct msi_msg_remap_entry *) msg;
@@ -274,8 +290,12 @@ static void remap_entry_to_msi_msg(
              remap_rte->address_lo.index_0_14;
 
     if ( index > ir_ctrl->iremap_index )
-        panic("%s: index (%d) is larger than remap table entry size (%d)\n",
-              __func__, index, ir_ctrl->iremap_index);
+    {
+        dprintk(XENLOG_ERR VTDPREFIX,
+                "%s: index (%d) is larger than remap table entry size (%d)\n",
+                __func__, index, ir_ctrl->iremap_index);
+        return -EFAULT;
+    }
 
     spin_lock_irqsave(&ir_ctrl->iremap_lock, flags);
 
@@ -304,9 +324,10 @@ static void remap_entry_to_msi_msg(
 
     unmap_vtd_domain_page(iremap_entries);
     spin_unlock_irqrestore(&ir_ctrl->iremap_lock, flags);
+    return 0;
 }
 
-static void msi_msg_to_remap_entry(
+static int msi_msg_to_remap_entry(
     struct iommu *iommu, struct pci_dev *pdev, struct msi_msg *msg)
 {
     struct iremap_entry *iremap_entry = NULL, *iremap_entries;
@@ -343,7 +364,15 @@ static void msi_msg_to_remap_entry(
         index = i;
 
     if ( index > IREMAP_ENTRY_NR - 1 )
-        panic("msi_msg_to_remap_entry: intremap index is more than 256!\n");
+    {
+        dprintk(XENLOG_ERR VTDPREFIX,
+                "%s: intremap index (%d) is larger than"
+                " the maximum index (%ld)!\n",
+                __func__, index, IREMAP_ENTRY_NR - 1);
+        unmap_vtd_domain_page(iremap_entries);
+        spin_unlock_irqrestore(&ir_ctrl->iremap_lock, flags);
+        return -EFAULT;
+    }
 
     iremap_entry = &iremap_entries[index];
     memcpy(&new_ire, iremap_entry, sizeof(struct iremap_entry));
@@ -385,7 +414,7 @@ static void msi_msg_to_remap_entry(
 
     unmap_vtd_domain_page(iremap_entries);
     spin_unlock_irqrestore(&ir_ctrl->iremap_lock, flags);
-    return;
+    return 0;
 }
 
 void msi_msg_read_remap_rte(
