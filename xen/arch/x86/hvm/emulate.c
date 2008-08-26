@@ -571,7 +571,7 @@ static int hvmemul_rep_movs(
 {
     struct hvm_emulate_ctxt *hvmemul_ctxt =
         container_of(ctxt, struct hvm_emulate_ctxt, ctxt);
-    unsigned long saddr, daddr;
+    unsigned long saddr, daddr, bytes;
     paddr_t sgpa, dgpa;
     uint32_t pfec = PFEC_page_present;
     p2m_type_t p2mt;
@@ -614,20 +614,47 @@ static int hvmemul_rep_movs(
         return hvmemul_do_mmio(
             dgpa, reps, bytes_per_rep, sgpa, IOREQ_WRITE, df, NULL);
 
-    if ( df )
-    {
-        sgpa -= (*reps - 1) * bytes_per_rep;
-        dgpa -= (*reps - 1) * bytes_per_rep;
-    }
+    /* RAM-to-RAM copy: emulate as equivalent of memmove(dgpa, sgpa, bytes). */
+    bytes = *reps * bytes_per_rep;
 
-    buf = xmalloc_bytes(*reps * bytes_per_rep);
+    /* Adjust source address for reverse copy. */
+    if ( df )
+        sgpa -= bytes - bytes_per_rep;
+
+    /*
+     * Will first iteration copy fall within source range? If not then entire
+     * copy does not corrupt itself. If so, then this is more complex than
+     * can be emulated by a source-to-buffer-to-destination block copy.
+     */
+    if ( ((dgpa + bytes_per_rep) > sgpa) && (dgpa < (sgpa + bytes)) )
+        return X86EMUL_UNHANDLEABLE;
+
+    /* Adjust destination address for reverse copy. */
+    if ( df )
+        dgpa -= bytes - bytes_per_rep;
+
+    /* Allocate temporary buffer. Fall back to slow emulation if this fails. */
+    buf = xmalloc_bytes(bytes);
     if ( buf == NULL )
         return X86EMUL_UNHANDLEABLE;
 
-    hvm_copy_from_guest_phys(buf, sgpa, *reps * bytes_per_rep);
-    hvm_copy_to_guest_phys(dgpa, buf, *reps * bytes_per_rep);
+    /*
+     * We do a modicum of checking here, just for paranoia's sake and to
+     * definitely avoid copying an unitialised buffer into guest address space.
+     */
+    rc = hvm_copy_from_guest_phys(buf, sgpa, bytes);
+    if ( rc == HVMCOPY_okay )
+        rc = hvm_copy_to_guest_phys(dgpa, buf, bytes);
 
     xfree(buf);
+
+    if ( rc != HVMCOPY_okay )
+    {
+        gdprintk(XENLOG_WARNING, "Failed memory-to-memory REP MOVS: sgpa=%"
+                 PRIpaddr" dgpa=%"PRIpaddr" reps=%lu bytes_per_rep=%u\n",
+                 sgpa, dgpa, *reps, bytes_per_rep);
+        return X86EMUL_UNHANDLEABLE;
+    }
 
     return X86EMUL_OKAY;
 }
