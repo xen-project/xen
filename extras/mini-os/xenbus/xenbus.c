@@ -633,7 +633,7 @@ xenbus_transaction_end(xenbus_transaction_t t, int abort, int *retry)
     return NULL;
 }
 
-int xenbus_read_integer(char *path)
+int xenbus_read_integer(const char *path)
 {
     char *res, *buf;
     int t;
@@ -650,8 +650,8 @@ int xenbus_read_integer(char *path)
 }
 
 char* xenbus_printf(xenbus_transaction_t xbt,
-                                  char* node, char* path,
-                                  char* fmt, ...)
+                                  const char* node, const char* path,
+                                  const char* fmt, ...)
 {
 #define BUFFER_SIZE 256
     char fullpath[BUFFER_SIZE];
