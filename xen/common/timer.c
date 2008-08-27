@@ -30,6 +30,7 @@
 struct timers {
     spinlock_t     lock;
     struct timer **heap;
+    struct timer  *list;
     struct timer  *running;
 } __cacheline_aligned;
 
@@ -86,12 +87,10 @@ static void up_heap(struct timer **heap, int pos)
 
 
 /* Delete @t from @heap. Return TRUE if new top of heap. */
-static int remove_entry(struct timer **heap, struct timer *t)
+static int remove_from_heap(struct timer **heap, struct timer *t)
 {
     int sz = GET_HEAP_SIZE(heap);
     int pos = t->heap_offset;
-
-    t->heap_offset = 0;
 
     if ( unlikely(pos == sz) )
     {
@@ -115,7 +114,7 @@ static int remove_entry(struct timer **heap, struct timer *t)
 
 
 /* Add new entry @t to @heap. Return TRUE if new top of heap. */
-static int add_entry(struct timer ***pheap, struct timer *t)
+static int add_to_heap(struct timer ***pheap, struct timer *t)
 {
     struct timer **heap = *pheap;
     int sz = GET_HEAP_SIZE(heap);
@@ -126,8 +125,11 @@ static int add_entry(struct timer ***pheap, struct timer *t)
         /* old_limit == (2^n)-1; new_limit == (2^(n+4))-1 */
         int old_limit = GET_HEAP_LIMIT(heap);
         int new_limit = ((old_limit + 1) << 4) - 1;
+        if ( in_irq() )
+            goto out;
         heap = xmalloc_array(struct timer *, new_limit + 1);
-        BUG_ON(heap == NULL);
+        if ( heap == NULL )
+            goto out;
         memcpy(heap, *pheap, (old_limit + 1) * sizeof(*heap));
         SET_HEAP_LIMIT(heap, new_limit);
         if ( old_limit != 0 )
@@ -139,7 +141,38 @@ static int add_entry(struct timer ***pheap, struct timer *t)
     heap[sz] = t;
     t->heap_offset = sz;
     up_heap(heap, sz);
+ out:
     return (t->heap_offset == 1);
+}
+
+
+/****************************************************************************
+ * LINKED LIST OPERATIONS.
+ */
+
+static int remove_from_list(struct timer **pprev, struct timer *t)
+{
+    struct timer *curr, **_pprev = pprev;
+
+    while ( (curr = *_pprev) != t )
+        _pprev = &curr->list_next;
+
+    *_pprev = t->list_next;
+
+    return (_pprev == pprev);
+}
+
+static int add_to_list(struct timer **pprev, struct timer *t)
+{
+    struct timer *curr, **_pprev = pprev;
+
+    while ( ((curr = *_pprev) != NULL) && (curr->expires <= t->expires) )
+        _pprev = &curr->list_next;
+
+    t->list_next = curr;
+    *_pprev = t;
+
+    return (_pprev == pprev);
 }
 
 
@@ -147,18 +180,56 @@ static int add_entry(struct timer ***pheap, struct timer *t)
  * TIMER OPERATIONS.
  */
 
+static int remove_entry(struct timers *timers, struct timer *t)
+{
+    int rc;
+
+    switch ( t->status )
+    {
+    case TIMER_STATUS_in_heap:
+        rc = remove_from_heap(timers->heap, t);
+        break;
+    case TIMER_STATUS_in_list:
+        rc = remove_from_list(&timers->list, t);
+        break;
+    default:
+        rc = 0;
+        BUG();
+    }
+
+    t->status = TIMER_STATUS_inactive;
+    return rc;
+}
+
+static int add_entry(struct timers *timers, struct timer *t)
+{
+    int rc;
+
+    ASSERT(t->status == TIMER_STATUS_inactive);
+
+    /* Try to add to heap. t->heap_offset indicates whether we succeed. */
+    t->heap_offset = 0;
+    t->status = TIMER_STATUS_in_heap;
+    rc = add_to_heap(&timers->heap, t);
+    if ( t->heap_offset != 0 )
+        return rc;
+
+    /* Fall back to adding to the slower linked list. */
+    t->status = TIMER_STATUS_in_list;
+    return add_to_list(&timers->list, t);
+}
+
 static inline void __add_timer(struct timer *timer)
 {
     int cpu = timer->cpu;
-    if ( add_entry(&per_cpu(timers, cpu).heap, timer) )
+    if ( add_entry(&per_cpu(timers, cpu), timer) )
         cpu_raise_softirq(cpu, TIMER_SOFTIRQ);
 }
-
 
 static inline void __stop_timer(struct timer *timer)
 {
     int cpu = timer->cpu;
-    if ( remove_entry(per_cpu(timers, cpu).heap, timer) )
+    if ( remove_entry(&per_cpu(timers, cpu), timer) )
         cpu_raise_softirq(cpu, TIMER_SOFTIRQ);
 }
 
@@ -203,7 +274,7 @@ void set_timer(struct timer *timer, s_time_t expires)
 
     timer->expires = expires;
 
-    if ( likely(!timer->killed) )
+    if ( likely(timer->status != TIMER_STATUS_killed) )
         __add_timer(timer);
 
     timer_unlock_irqrestore(timer, flags);
@@ -278,7 +349,7 @@ void kill_timer(struct timer *timer)
 
     if ( active_timer(timer) )
         __stop_timer(timer);
-    timer->killed = 1;
+    timer->status = TIMER_STATUS_killed;
 
     timer_unlock_irqrestore(timer, flags);
 
@@ -290,43 +361,76 @@ void kill_timer(struct timer *timer)
 
 static void timer_softirq_action(void)
 {
-    struct timer  *t, **heap;
+    struct timer  *t, **heap, *next;
     struct timers *ts;
-    s_time_t       now;
+    s_time_t       now, deadline;
     void         (*fn)(void *);
     void          *data;
 
     ts = &this_cpu(timers);
 
     spin_lock_irq(&ts->lock);
+
+    /* Try to move timers from overflow linked list to more efficient heap. */
+    next = ts->list;
+    ts->list = NULL;
+    while ( unlikely((t = next) != NULL) )
+    {
+        next = t->list_next;
+        t->status = TIMER_STATUS_inactive;
+        add_entry(ts, t);
+    }
     
-    do {
+    heap = ts->heap;
+    now  = NOW();
+
+    while ( (GET_HEAP_SIZE(heap) != 0) &&
+            ((t = heap[1])->expires < (now + TIMER_SLOP)) )
+    {
+        remove_entry(ts, t);
+
+        ts->running = t;
+
+        fn   = t->function;
+        data = t->data;
+
+        spin_unlock_irq(&ts->lock);
+        (*fn)(data);
+        spin_lock_irq(&ts->lock);
+
+        /* Heap may have grown while the lock was released. */
         heap = ts->heap;
-        now  = NOW();
+    }
 
-        while ( (GET_HEAP_SIZE(heap) != 0) &&
-                ((t = heap[1])->expires < (now + TIMER_SLOP)) )
+    deadline = GET_HEAP_SIZE(heap) ? heap[1]->expires : 0;
+
+    while ( unlikely((t = ts->list) != NULL) )
+    {
+        if ( t->expires >= (now + TIMER_SLOP) )
         {
-            remove_entry(heap, t);
-
-            ts->running = t;
-
-            fn   = t->function;
-            data = t->data;
-
-            spin_unlock_irq(&ts->lock);
-            (*fn)(data);
-            spin_lock_irq(&ts->lock);
-
-            /* Heap may have grown while the lock was released. */
-            heap = ts->heap;
+            if ( (deadline == 0) || (deadline > t->expires) )
+                deadline = t->expires;
+            break;
         }
 
-        ts->running = NULL;
+        ts->list = t->list_next;
+        t->status = TIMER_STATUS_inactive;
 
-        this_cpu(timer_deadline) = GET_HEAP_SIZE(heap) ? heap[1]->expires : 0;
+        ts->running = t;
+
+        fn   = t->function;
+        data = t->data;
+
+        spin_unlock_irq(&ts->lock);
+        (*fn)(data);
+        spin_lock_irq(&ts->lock);
     }
-    while ( !reprogram_timer(this_cpu(timer_deadline)) );
+
+    ts->running = NULL;
+
+    this_cpu(timer_deadline) = deadline;
+    if ( !reprogram_timer(deadline) )
+        raise_softirq(TIMER_SOFTIRQ);
 
     spin_unlock_irq(&ts->lock);
 }
@@ -364,6 +468,9 @@ static void dump_timerq(unsigned char key)
             printk ("  %d : %p ex=0x%08X%08X %p\n",
                     j, t, (u32)(t->expires>>32), (u32)t->expires, t->data);
         }
+        for ( t = ts->list, j = 0; t != NULL; t = t->list_next, j++ )
+            printk (" L%d : %p ex=0x%08X%08X %p\n",
+                    j, t, (u32)(t->expires>>32), (u32)t->expires, t->data);
         spin_unlock_irqrestore(&ts->lock, flags);
         printk("\n");
     }
