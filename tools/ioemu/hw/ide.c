@@ -1108,14 +1108,14 @@ static void ide_flush_cb(void *opaque, int ret)
 	return;
     }
     else
-        s->status = READY_STAT;
+        s->status = READY_STAT | SEEK_STAT;
     ide_set_irq(s);
 }
 
 static void ide_atapi_cmd_ok(IDEState *s)
 {
     s->error = 0;
-    s->status = READY_STAT;
+    s->status = READY_STAT | SEEK_STAT;
     s->nsector = (s->nsector & ~7) | ATAPI_INT_REASON_IO | ATAPI_INT_REASON_CD;
     ide_set_irq(s);
 }
@@ -1229,7 +1229,7 @@ static void ide_atapi_cmd_reply_end(IDEState *s)
     if (s->packet_transfer_size <= 0) {
         /* end of transfer */
         ide_transfer_stop(s);
-        s->status = READY_STAT;
+        s->status = READY_STAT | SEEK_STAT;
         s->nsector = (s->nsector & ~7) | ATAPI_INT_REASON_IO | ATAPI_INT_REASON_CD;
         ide_set_irq(s);
 #ifdef DEBUG_IDE_ATAPI
@@ -1307,10 +1307,10 @@ static void ide_atapi_cmd_reply(IDEState *s, int size, int max_size)
     s->io_buffer_index = 0;
 
     if (s->atapi_dma) {
-    	s->status = READY_STAT | DRQ_STAT;
+    	s->status = READY_STAT | SEEK_STAT | DRQ_STAT;
 	ide_dma_start(s, ide_atapi_cmd_read_dma_cb);
     } else {
-    	s->status = READY_STAT;
+    	s->status = READY_STAT | SEEK_STAT;
     	ide_atapi_cmd_reply_end(s);
     }
 }
@@ -1325,7 +1325,7 @@ static void ide_atapi_cmd_read_pio(IDEState *s, int lba, int nb_sectors,
     s->io_buffer_index = sector_size;
     s->cd_sector_size = sector_size;
 
-    s->status = READY_STAT;
+    s->status = READY_STAT | SEEK_STAT;
     ide_atapi_cmd_reply_end(s);
 }
 
@@ -1368,7 +1368,7 @@ static void ide_atapi_cmd_read_dma_cb(void *opaque, int ret)
     }
 
     if (s->packet_transfer_size <= 0) {
-        s->status = READY_STAT;
+        s->status = READY_STAT | SEEK_STAT;
         s->nsector = (s->nsector & ~7) | ATAPI_INT_REASON_IO | ATAPI_INT_REASON_CD;
         ide_set_irq(s);
     eot:
@@ -1418,7 +1418,7 @@ static void ide_atapi_cmd_read_dma(IDEState *s, int lba, int nb_sectors,
     s->cd_sector_size = sector_size;
 
     /* XXX: check if BUSY_STAT should be set */
-    s->status = READY_STAT | DRQ_STAT | BUSY_STAT;
+    s->status = READY_STAT | SEEK_STAT | DRQ_STAT | BUSY_STAT;
     ide_dma_start(s, ide_atapi_cmd_read_dma_cb);
 }
 
@@ -1886,7 +1886,7 @@ static void ide_ioport_write(void *opaque, uint32_t addr, uint32_t val)
                 ide_abort_command(s);
             } else {
                 s->mult_sectors = s->nsector;
-                s->status = READY_STAT;
+                s->status = READY_STAT | SEEK_STAT;
             }
             ide_set_irq(s);
             break;
@@ -1896,7 +1896,7 @@ static void ide_ioport_write(void *opaque, uint32_t addr, uint32_t val)
         case WIN_VERIFY_ONCE:
             /* do sector number check ? */
 	    ide_cmd_lba48_transform(s, lba48);
-            s->status = READY_STAT;
+            s->status = READY_STAT | SEEK_STAT;
             ide_set_irq(s);
             break;
 	case WIN_READ_EXT:
@@ -1965,12 +1965,12 @@ static void ide_ioport_write(void *opaque, uint32_t addr, uint32_t val)
         case WIN_READ_NATIVE_MAX:
 	    ide_cmd_lba48_transform(s, lba48);
             ide_set_sector(s, s->nb_sectors - 1);
-            s->status = READY_STAT;
+            s->status = READY_STAT | SEEK_STAT;
             ide_set_irq(s);
             break;
         case WIN_CHECKPOWERMODE1:
             s->nsector = 0xff; /* device active or idle */
-            s->status = READY_STAT;
+            s->status = READY_STAT | SEEK_STAT;
             ide_set_irq(s);
             break;
         case WIN_SETFEATURES:
@@ -2070,7 +2070,7 @@ static void ide_ioport_write(void *opaque, uint32_t addr, uint32_t val)
             /* overlapping commands not supported */
             if (s->feature & 0x02)
                 goto abort_cmd;
-            s->status = READY_STAT;
+            s->status = READY_STAT | SEEK_STAT;
             s->atapi_dma = s->feature & 1;
             s->nsector = 1;
             ide_transfer_start(s, s->io_buffer, ATAPI_PACKET_SIZE, 
@@ -2289,7 +2289,7 @@ static void ide_reset(IDEState *s)
     s->mult_sectors = MAX_MULT_SECTORS;
     s->cur_drive = s;
     s->select = 0xa0;
-    s->status = READY_STAT;
+    s->status = READY_STAT | SEEK_STAT;
     ide_set_signature(s);
     /* init the transfer handler so that 0xffff is returned on data
        accesses */
