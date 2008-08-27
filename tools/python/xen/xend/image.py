@@ -637,8 +637,9 @@ class LinuxImageHandler(ImageHandler):
         log.debug("ramdisk        = %s", self.ramdisk)
         log.debug("vcpus          = %d", self.vm.getVCpuCount())
         log.debug("features       = %s", self.vm.getFeatures())
+        log.debug("flags          = %d", self.flags)
         if arch.type == "ia64":
-            log.debug("vhpt          = %d", self.flags)
+            log.debug("vhpt          = %d", self.vhpt)
 
         return xc.linux_build(domid          = self.vm.getDomid(),
                               memsize        = mem_mb,
