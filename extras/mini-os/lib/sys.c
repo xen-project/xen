@@ -1007,6 +1007,34 @@ LWIP_STUB(ssize_t, sendto, (int s, void *buf, size_t len, int flags, struct sock
 LWIP_STUB(int, getsockname, (int s, struct sockaddr *name, socklen_t *namelen), (s, name, namelen))
 #endif
 
+static char *syslog_ident;
+void openlog(const char *ident, int option, int facility)
+{
+    if (syslog_ident)
+        free(syslog_ident);
+    syslog_ident = strdup(ident);
+}
+
+void vsyslog(int priority, const char *format, va_list ap)
+{
+    printk("%s: ", syslog_ident);
+    print(0, format, ap);
+}
+
+void syslog(int priority, const char *format, ...)
+{
+    va_list ap;
+    va_start(ap, format);
+    vsyslog(priority, format, ap);
+    va_end(ap);
+}
+
+void closelog(void)
+{
+    free(syslog_ident);
+    syslog_ident = NULL;
+}
+
 int nanosleep(const struct timespec *req, struct timespec *rem)
 {
     s_time_t start = NOW();
