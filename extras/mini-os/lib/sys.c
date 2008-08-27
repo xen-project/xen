@@ -1035,6 +1035,68 @@ void closelog(void)
     syslog_ident = NULL;
 }
 
+void vwarn(const char *format, va_list ap)
+{
+    int the_errno = errno;
+    printk("stubdom: ");
+    if (format) {
+        print(0, format, ap);
+        printk(", ");
+    }
+    printk("%s", strerror(the_errno));
+}
+
+void warn(const char *format, ...)
+{
+    va_list ap;
+    va_start(ap, format);
+    vwarn(format, ap);
+    va_end(ap);
+}
+
+void verr(int eval, const char *format, va_list ap)
+{
+    vwarn(format, ap);
+    exit(eval);
+}
+
+void err(int eval, const char *format, ...)
+{
+    va_list ap;
+    va_start(ap, format);
+    verr(eval, format, ap);
+    va_end(ap);
+}
+
+void vwarnx(const char *format, va_list ap)
+{
+    printk("stubdom: ");
+    if (format)
+        print(0, format, ap);
+}
+
+void warnx(const char *format, ...)
+{
+    va_list ap;
+    va_start(ap, format);
+    vwarnx(format, ap);
+    va_end(ap);
+}
+
+void verrx(int eval, const char *format, va_list ap)
+{
+    vwarnx(format, ap);
+    exit(eval);
+}
+
+void errx(int eval, const char *format, ...)
+{
+    va_list ap;
+    va_start(ap, format);
+    verrx(eval, format, ap);
+    va_end(ap);
+}
+
 int nanosleep(const struct timespec *req, struct timespec *rem)
 {
     s_time_t start = NOW();
