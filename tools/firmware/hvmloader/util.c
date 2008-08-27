@@ -337,7 +337,7 @@ uint32_t e820_malloc(uint32_t size, uint32_t align)
 
     for ( i = *HVM_E820_NR - 1; i >= 0; i-- )
     {
-        addr = (ent[i].size - size) & ~(align-1);
+        addr = (ent[i].addr + ent[i].size - size) & ~(align-1);
         if ( (ent[i].type != E820_RAM) || /* not ram? */
              (addr < ent[i].addr) ||      /* too small or starts above 4gb? */
              ((addr + size) < addr) )     /* ends above 4gb? */
