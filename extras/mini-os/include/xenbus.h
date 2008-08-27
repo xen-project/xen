@@ -88,7 +88,8 @@ int xenbus_read_integer(const char *path);
 /* Contraction of snprintf and xenbus_write(path/node). */
 char* xenbus_printf(xenbus_transaction_t xbt,
                                   const char* node, const char* path,
-                                  const char* fmt, ...);
+                                  const char* fmt, ...)
+                   __attribute__((__format__(printf, 4, 5)));
 
 /* Reset the XenBus system. */
 void fini_xenbus(void);
