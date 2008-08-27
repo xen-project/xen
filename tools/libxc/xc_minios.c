@@ -64,7 +64,6 @@ void *xc_map_foreign_range(int xc_handle, uint32_t dom,
                            unsigned long mfn)
 {
     unsigned long pt_prot = 0;
-    printf("xc_map_foreign_range(%lx, %d)\n", mfn, size);
 #ifdef __ia64__
     /* TODO */
 #else
