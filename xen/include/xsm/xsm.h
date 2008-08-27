@@ -136,6 +136,7 @@ struct xsm_operations {
     int (*mmu_machphys_update) (struct domain *d, unsigned long mfn);
     int (*update_va_mapping) (struct domain *d, l1_pgentry_t pte);
     int (*add_to_physmap) (struct domain *d1, struct domain *d2);
+    int (*remove_from_physmap) (struct domain *d1, struct domain *d2);
 #endif
 };
 
@@ -531,6 +532,11 @@ static inline int xsm_update_va_mapping(struct domain *d, l1_pgentry_t pte)
 static inline int xsm_add_to_physmap(struct domain *d1, struct domain *d2)
 {
     return xsm_call(add_to_physmap(d1, d2));
+}
+
+static inline int xsm_remove_from_physmap(struct domain *d1, struct domain *d2)
+{
+    return xsm_call(remove_from_physmap(d1, d2));
 }
 #endif /* CONFIG_X86 */
 

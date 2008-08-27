@@ -1111,12 +1111,6 @@ int xc_domain_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
                        (test_bit(n, to_fix)  && last_iter)) )
                     continue;
 
-                /* Skip PFNs that aren't really there */
-                if ( hvm && ((n >= 0xa0 && n < 0xc0) /* VGA hole */
-                             || (n >= (HVM_BELOW_4G_MMIO_START >> PAGE_SHIFT) 
-                                 && n < (1ULL<<32) >> PAGE_SHIFT)) /* MMIO */ )
-                    continue;
-
                 /*
                 ** we get here if:
                 **  1. page is marked to_send & hasn't already been re-dirtied

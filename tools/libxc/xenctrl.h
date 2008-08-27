@@ -628,6 +628,12 @@ int xc_domain_memory_populate_physmap(int xc_handle,
                                       unsigned int mem_flags,
                                       xen_pfn_t *extent_start);
 
+int xc_domain_memory_translate_gpfn_list(int xc_handle,
+                                         uint32_t domid,
+                                         unsigned long nr_gpfns,
+                                         xen_pfn_t *gpfn_list,
+                                         xen_pfn_t *mfn_list);
+
 int xc_domain_ioport_permission(int xc_handle,
                                 uint32_t domid,
                                 uint32_t first_port,

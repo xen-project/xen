@@ -7023,38 +7023,6 @@ static BOOL WINAPI qemu_ctrl_handler(DWORD type)
 
 #include <xg_private.h>
 
-/* FIXME Flush the shadow page */
-int unset_mm_mapping(int xc_handle, uint32_t domid,
-                     unsigned long nr_pages, unsigned int address_bits,
-                     xen_pfn_t *extent_start)
-{
-    int err = 0;
-
-    err = xc_domain_memory_decrease_reservation(xc_handle, domid,
-                                                nr_pages, 0, extent_start);
-    if (err)
-        fprintf(stderr, "Failed to decrease physmap\n");
-
-    return err;
-}
-
-int set_mm_mapping(int xc_handle, uint32_t domid,
-                   unsigned long nr_pages, unsigned int address_bits,
-                   xen_pfn_t *extent_start)
-{
-    int err = 0;
-
-    err = xc_domain_memory_populate_physmap(
-        xc_handle, domid, nr_pages, 0,
-        XENMEMF_address_bits(address_bits), extent_start);
-    if (err) {
-        fprintf(stderr, "Failed to populate physmap\n");
-        return -1;
-    }
-
-    return 0;
-}
-
 
 int main(int argc, char **argv)
 {

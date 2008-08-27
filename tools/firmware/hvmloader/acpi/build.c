@@ -233,7 +233,7 @@ static int construct_secondary_tables(uint8_t *buf, unsigned long *table_ptrs)
         tcpa->header.oem_revision = ACPI_OEM_REVISION;
         tcpa->header.creator_id   = ACPI_CREATOR_ID;
         tcpa->header.creator_revision = ACPI_CREATOR_REVISION;
-        tcpa->lasa = e820_malloc(ACPI_2_0_TCPA_LAML_SIZE);
+        tcpa->lasa = e820_malloc(ACPI_2_0_TCPA_LAML_SIZE, 0);
         if ( tcpa->lasa )
         {
             tcpa->laml = ACPI_2_0_TCPA_LAML_SIZE;
@@ -363,7 +363,7 @@ void acpi_build_tables(void)
     memset(buf, 0, high_sz);
 
     /* Allocate data area and set up ACPI tables there. */
-    buf = (uint8_t *)e820_malloc(high_sz);
+    buf = (uint8_t *)e820_malloc(high_sz, 0);
     __acpi_build_tables(buf, &low_sz, &high_sz);
 
     printf(" - Lo data: %08lx-%08lx\n"

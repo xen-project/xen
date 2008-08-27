@@ -2543,34 +2543,28 @@ static CPUWriteMemoryFunc *cirrus_linear_bitblt_write[3] = {
     cirrus_linear_bitblt_writel,
 };
 
-static void *set_vram_mapping(unsigned long begin, unsigned long end)
+static void set_vram_mapping(CirrusVGAState *s, unsigned long begin, unsigned long end)
 {
-    xen_pfn_t *extent_start = NULL;
-    unsigned long nr_extents;
-    void *vram_pointer = NULL;
-    int i;
+    unsigned long i;
+    struct xen_add_to_physmap xatp;
+    int rc;
 
-    /* align begin and end address */
-    begin = begin & TARGET_PAGE_MASK;
-    end = begin + VGA_RAM_SIZE;
-    end = (end + TARGET_PAGE_SIZE -1 ) & TARGET_PAGE_MASK;
-    nr_extents = (end - begin) >> TARGET_PAGE_BITS;
+    if (end > begin + VGA_RAM_SIZE)
+        end = begin + VGA_RAM_SIZE;
 
-    extent_start = malloc(sizeof(xen_pfn_t) * nr_extents);
-    if (extent_start == NULL) {
-        fprintf(stderr, "Failed malloc on set_vram_mapping\n");
-        return NULL;
-    }
+    fprintf(logfile,"mapping vram to %lx - %lx\n", begin, end);
 
-    memset(extent_start, 0, sizeof(xen_pfn_t) * nr_extents);
+    xatp.domid = domid;
+    xatp.space = XENMAPSPACE_mfn;
 
-    for (i = 0; i < nr_extents; i++)
-        extent_start[i] = (begin + i * TARGET_PAGE_SIZE) >> TARGET_PAGE_BITS;
-
-    if (set_mm_mapping(xc_handle, domid, nr_extents, 0, extent_start) < 0) {
-        fprintf(logfile, "Failed set_mm_mapping\n");
-        free(extent_start);
-        return NULL;
+    for (i = 0; i < (end - begin) >> TARGET_PAGE_BITS; i++) {
+        xatp.idx = s->vram_mfns[i];
+        xatp.gpfn = (begin >> TARGET_PAGE_BITS) + i;
+        rc = xc_memory_op(xc_handle, XENMEM_add_to_physmap, &xatp);
+        if (rc) {
+            fprintf(stderr, "add_to_physmap MFN %"PRI_xen_pfn" to PFN %"PRI_xen_pfn" failed: %d\n", xatp.idx, xatp.gpfn, rc);
+            return;
+        }
     }
 
     (void)xc_domain_pin_memory_cacheattr(
@@ -2578,61 +2572,42 @@ static void *set_vram_mapping(unsigned long begin, unsigned long end)
         begin >> TARGET_PAGE_BITS,
         end >> TARGET_PAGE_BITS,
         XEN_DOMCTL_MEM_CACHEATTR_WB);
-
-    vram_pointer = xc_map_foreign_pages(xc_handle, domid,
-                                        PROT_READ|PROT_WRITE,
-                                        extent_start, nr_extents);
-    if (vram_pointer == NULL) {
-        fprintf(logfile, "xc_map_foreign_batch vgaram returned error %d\n",
-                errno);
-        free(extent_start);
-        return NULL;
-    }
-
-    memset(vram_pointer, 0, nr_extents * TARGET_PAGE_SIZE);
-
-#ifdef CONFIG_STUBDOM
-    xenfb_pv_display_start(vram_pointer);
-#endif
-
-    free(extent_start);
-
-    return vram_pointer;
 }
 
-static int unset_vram_mapping(unsigned long begin, unsigned long end, 
-                              void *mapping)
+static void unset_vram_mapping(CirrusVGAState *s, unsigned long begin, unsigned long end)
 {
-    xen_pfn_t *extent_start = NULL;
-    unsigned long nr_extents;
-    int i;
+    if (s->stolen_vram_addr) {
+        /* We can put it there for xend to save it efficiently */
+        set_vram_mapping(s, s->stolen_vram_addr, s->stolen_vram_addr + VGA_RAM_SIZE);
+    } else {
+        /* Old image, we have to unmap them completely */
+        struct xen_remove_from_physmap xrfp;
+        unsigned long i;
+        int rc;
 
-    /* align begin and end address */
+        if (end > begin + VGA_RAM_SIZE)
+            end = begin + VGA_RAM_SIZE;
 
-    end = begin + VGA_RAM_SIZE;
-    begin = begin & TARGET_PAGE_MASK;
-    end = (end + TARGET_PAGE_SIZE -1 ) & TARGET_PAGE_MASK;
-    nr_extents = (end - begin) >> TARGET_PAGE_BITS;
+        fprintf(logfile,"unmapping vram from %lx - %lx\n", begin, end);
 
-    extent_start = malloc(sizeof(xen_pfn_t) * nr_extents);
+        xrfp.domid = domid;
 
-    if (extent_start == NULL) {
-        fprintf(stderr, "Failed malloc on set_mm_mapping\n");
-        return -1;
+        for (i = 0; i < (end - begin) >> TARGET_PAGE_BITS; i++) {
+            xrfp.gpfn = (begin >> TARGET_PAGE_BITS) + i;
+            rc = xc_memory_op(xc_handle, XENMEM_remove_from_physmap, &xrfp);
+            if (rc) {
+                fprintf(stderr, "remove_from_physmap PFN %"PRI_xen_pfn" failed: %d\n", xrfp.gpfn, rc);
+                return;
+            }
+        }
     }
+}
 
-    /* Drop our own references to the vram pages */
-    munmap(mapping, nr_extents * TARGET_PAGE_SIZE);
-
-    /* Now drop the guest's mappings */
-    memset(extent_start, 0, sizeof(xen_pfn_t) * nr_extents);
-    for (i = 0; i < nr_extents; i++)
-        extent_start[i] = (begin + (i * TARGET_PAGE_SIZE)) >> TARGET_PAGE_BITS;
-    unset_mm_mapping(xc_handle, domid, nr_extents, 0, extent_start);
-
-    free(extent_start);
-
-    return 0;
+void cirrus_restart_acc(CirrusVGAState *s)
+{
+    set_vram_mapping(s, s->lfb_addr, s->lfb_end);
+    s->map_addr = s->lfb_addr;
+    s->map_end = s->lfb_end;
 }
 
 /* Compute the memory access functions */
@@ -2654,17 +2629,7 @@ static void cirrus_update_memory_access(CirrusVGAState *s)
 	mode = s->gr[0x05] & 0x7;
 	if (mode < 4 || mode > 5 || ((s->gr[0x0B] & 0x4) == 0)) {
             if (s->lfb_addr && s->lfb_end && !s->map_addr) {
-                void *vram_pointer, *old_vram;
-
-                vram_pointer = set_vram_mapping(s->lfb_addr,
-                                                s->lfb_end);
-                if (!vram_pointer)
-                    fprintf(stderr, "NULL vram_pointer\n");
-                else {
-                    old_vram = vga_update_vram((VGAState *)s, vram_pointer,
-                                               VGA_RAM_SIZE);
-                    qemu_free(old_vram);
-                }
+                set_vram_mapping(s, s->lfb_addr, s->lfb_end);
                 s->map_addr = s->lfb_addr;
                 s->map_end = s->lfb_end;
             }
@@ -2674,14 +2639,7 @@ static void cirrus_update_memory_access(CirrusVGAState *s)
         } else {
         generic_io:
             if (s->lfb_addr && s->lfb_end && s->map_addr) {
-                void *old_vram;
-
-                old_vram = vga_update_vram((VGAState *)s, NULL, VGA_RAM_SIZE);
-
-                unset_vram_mapping(s->lfb_addr,
-                                   s->lfb_end, 
-                                   old_vram);
-
+                unset_vram_mapping(s, s->map_addr, s->map_end);
                 s->map_addr = s->map_end = 0;
             }
             s->cirrus_linear_write[0] = cirrus_linear_writeb;
@@ -3040,36 +2998,6 @@ static CPUWriteMemoryFunc *cirrus_mmio_write[3] = {
     cirrus_mmio_writel,
 };
 
-void cirrus_stop_acc(CirrusVGAState *s)
-{
-    if (s->map_addr){
-        int error;
-        s->map_addr = 0;
-        error = unset_vram_mapping(s->lfb_addr,
-                s->lfb_end, s->vram_ptr);
-        fprintf(stderr, "cirrus_stop_acc:unset_vram_mapping.\n");
-    }
-}
-
-void cirrus_restart_acc(CirrusVGAState *s)
-{
-    if (s->lfb_addr && s->lfb_end) {
-        void *vram_pointer, *old_vram;
-        fprintf(stderr, "cirrus_vga_load:re-enable vga acc.lfb_addr=0x%lx, lfb_end=0x%lx.\n",
-                s->lfb_addr, s->lfb_end);
-        vram_pointer = set_vram_mapping(s->lfb_addr ,s->lfb_end);
-        if (!vram_pointer){
-            fprintf(stderr, "cirrus_vga_load:NULL vram_pointer\n");
-        } else {
-            old_vram = vga_update_vram((VGAState *)s, vram_pointer,
-                    VGA_RAM_SIZE);
-            qemu_free(old_vram);
-            s->map_addr = s->lfb_addr;
-            s->map_end = s->lfb_end;
-        }
-    }
-}
-
 /* load/save state */
 
 static void cirrus_vga_save(QEMUFile *f, void *opaque)
@@ -3118,7 +3046,10 @@ static void cirrus_vga_save(QEMUFile *f, void *opaque)
     qemu_put_8s(f, &vga_acc);
     qemu_put_be64s(f, (uint64_t*)&s->lfb_addr);
     qemu_put_be64s(f, (uint64_t*)&s->lfb_end);
-    qemu_put_buffer(f, s->vram_ptr, VGA_RAM_SIZE); 
+    qemu_put_be64s(f, &s->stolen_vram_addr);
+    if (!s->stolen_vram_addr && !vga_acc)
+        /* Old guest: VRAM is not mapped, we have to save it ourselves */
+        qemu_put_buffer(f, s->vram_ptr, VGA_RAM_SIZE);
 }
 
 static int cirrus_vga_load(QEMUFile *f, void *opaque, int version_id)
@@ -3127,7 +3058,7 @@ static int cirrus_vga_load(QEMUFile *f, void *opaque, int version_id)
     uint8_t vga_acc = 0;
     int ret;
 
-    if (version_id > 2)
+    if (version_id > 3)
         return -EINVAL;
 
     if (s->pci_dev && version_id >= 2) {
@@ -3173,9 +3104,20 @@ static int cirrus_vga_load(QEMUFile *f, void *opaque, int version_id)
     qemu_get_8s(f, &vga_acc);
     qemu_get_be64s(f, (uint64_t*)&s->lfb_addr);
     qemu_get_be64s(f, (uint64_t*)&s->lfb_end);
-    qemu_get_buffer(f, s->vram_ptr, VGA_RAM_SIZE); 
-    if (vga_acc){
-        cirrus_restart_acc(s);
+    if (version_id >= 3) {
+        qemu_get_be64s(f, &s->stolen_vram_addr);
+        if (!s->stolen_vram_addr && !vga_acc) {
+            /* Old guest, VRAM is not mapped, we have to restore it ourselves */
+            qemu_get_buffer(f, s->vram_ptr, VGA_RAM_SIZE);
+            xen_vga_populate_vram(s->lfb_addr);
+        } else
+            xen_vga_vram_map(vga_acc ? s->lfb_addr : s->stolen_vram_addr, 0);
+    } else {
+        /* Old image, we have to populate and restore VRAM ourselves */
+        xen_vga_populate_vram(s->lfb_addr);
+        qemu_get_buffer(f, s->vram_ptr, VGA_RAM_SIZE); 
+        if (vga_acc)
+            cirrus_restart_acc(s);
     }
 
     /* force refresh */
@@ -3297,7 +3239,7 @@ static void cirrus_init_common(CirrusVGAState * s, int device_id, int is_pci)
     s->cursor_invalidate = cirrus_cursor_invalidate;
     s->cursor_draw_line = cirrus_cursor_draw_line;
 
-    register_savevm("cirrus_vga", 0, 2, cirrus_vga_save, cirrus_vga_load, s);
+    register_savevm("cirrus_vga", 0, 3, cirrus_vga_save, cirrus_vga_load, s);
 }
 
 /***************************************

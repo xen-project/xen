@@ -34,6 +34,7 @@ typedef struct PCIXenPlatformState
 {
   PCIDevice  pci_dev;
   uint8_t    platform_flags;
+  uint64_t   vga_stolen_ram;
 } PCIXenPlatformState;
 
 static uint32_t xen_platform_ioport_readb(void *opaque, uint32_t addr)
@@ -69,11 +70,46 @@ static void xen_platform_ioport_writeb(void *opaque, uint32_t addr, uint32_t val
 }
 
 
+static uint32_t xen_platform_ioport_readl(void *opaque, uint32_t addr)
+{
+    PCIXenPlatformState *d = opaque;
+
+    addr  &= 0xff;
+
+    switch (addr) {
+    case 4: /* VGA stolen memory address */
+        return d->vga_stolen_ram;
+    default:
+        return ~0u;
+    }
+}
+
+static void xen_platform_ioport_writel(void *opaque, uint32_t addr, uint32_t val)
+{
+    PCIXenPlatformState *d = opaque;
+
+    addr &= 0xff;
+    val  &= 0xffffffff;
+
+    switch (addr) {
+    case 4: /* VGA stolen memory address */
+        d->vga_stolen_ram = val;
+        xen_vga_stolen_vram_addr(val);
+        break;
+    default:
+        break;
+    }
+}
+
+
+
 static void platform_ioport_map(PCIDevice *pci_dev, int region_num, uint32_t addr, uint32_t size, int type)
 {
     PCIXenPlatformState *d = (PCIXenPlatformState *)pci_dev;
     register_ioport_write(addr, size, 1, xen_platform_ioport_writeb, d);
+    register_ioport_write(addr, size, 4, xen_platform_ioport_writel, d);
     register_ioport_read(addr, size, 1, xen_platform_ioport_readb, d);
+    register_ioport_read(addr, size, 4, xen_platform_ioport_readl, d);
 }
 
 static uint32_t platform_mmio_read(void *opaque, target_phys_addr_t addr)
@@ -155,6 +191,7 @@ void xen_pci_save(QEMUFile *f, void *opaque)
 
     pci_device_save(&d->pci_dev, f);
     qemu_put_8s(f, &d->platform_flags);
+    qemu_put_be64s(f, &d->vga_stolen_ram);
 }
 
 int xen_pci_load(QEMUFile *f, void *opaque, int version_id)
@@ -173,6 +210,7 @@ int xen_pci_load(QEMUFile *f, void *opaque, int version_id)
         uint8_t flags;
         qemu_get_8s(f, &flags);
         xen_platform_ioport_writeb(d, 0, flags);
+        qemu_get_be64s(f, &d->vga_stolen_ram);
     }
 
     return 0;

@@ -430,11 +430,13 @@ static void cmos_write_memory_size(void)
     cmos_outb(0x35, (uint8_t)( alt_mem >> 8));
 }
 
-static void init_xen_platform_io_base(void)
+static uint16_t init_xen_platform_io_base(void)
 {
     struct bios_info *bios_info = (struct bios_info *)ACPI_PHYSICAL_ADDRESS;
     uint32_t devfn, bar_data;
     uint16_t vendor_id, device_id;
+
+    bios_info->xen_pfiob = 0;
 
     for ( devfn = 0; devfn < 128; devfn++ )
     {
@@ -445,12 +447,16 @@ static void init_xen_platform_io_base(void)
         bar_data = pci_readl(devfn, PCI_BASE_ADDRESS_0);
         bios_info->xen_pfiob = bar_data & PCI_BASE_ADDRESS_IO_MASK;
     }
+
+    return bios_info->xen_pfiob;
 }
 
 int main(void)
 {
     int vgabios_sz = 0, etherboot_sz = 0, rombios_sz, smbios_sz;
     int extboot_sz = 0;
+    uint32_t vga_ram = 0;
+    uint16_t xen_pfiob;
 
     printf("HVM Loader\n");
 
@@ -497,6 +503,12 @@ int main(void)
         break;
     }
 
+    if ( virtual_vga != VGA_none )
+    {
+        vga_ram = e820_malloc(8 << 20, 4096);
+        printf("VGA RAM at %08x\n", vga_ram);
+    }
+
     etherboot_sz = scan_etherboot_nic((void*)ETHERBOOT_PHYSICAL_ADDRESS);
 
     if ( must_load_extboot() )
@@ -537,7 +549,9 @@ int main(void)
                ROMBIOS_PHYSICAL_ADDRESS,
                ROMBIOS_PHYSICAL_ADDRESS + rombios_sz - 1);
 
-    init_xen_platform_io_base();
+    xen_pfiob = init_xen_platform_io_base();
+    if ( xen_pfiob && vga_ram )
+        outl(xen_pfiob + 4, vga_ram);
 
     printf("Invoking ROMBIOS ...\n");
     return 0;

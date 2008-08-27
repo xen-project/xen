@@ -325,35 +325,34 @@ static void e820_collapse(void)
     }
 }
 
-uint32_t e820_malloc(uint32_t size)
+uint32_t e820_malloc(uint32_t size, uint32_t align)
 {
     uint32_t addr;
     int i;
     struct e820entry *ent = (struct e820entry *)HVM_E820;
 
-    /* Align allocation request to a reasonable boundary (1kB). */
-    size = (size + 1023) & ~1023;
+    /* Align to at leats one kilobyte. */
+    if ( align < 1024 )
+        align = 1024;
 
     for ( i = *HVM_E820_NR - 1; i >= 0; i-- )
     {
-        addr = ent[i].addr;
+        addr = (ent[i].size - size) & ~(align-1);
         if ( (ent[i].type != E820_RAM) || /* not ram? */
-             (ent[i].size < size) ||      /* too small? */
-             (addr != ent[i].addr) ||     /* starts above 4gb? */
+             (addr < ent[i].addr) ||      /* too small or starts above 4gb? */
              ((addr + size) < addr) )     /* ends above 4gb? */
             continue;
 
-        if ( ent[i].size != size )
+        if ( addr != ent[i].addr )
         {
             memmove(&ent[i+1], &ent[i], (*HVM_E820_NR-i) * sizeof(*ent));
             (*HVM_E820_NR)++;
-            ent[i].size -= size;
-            addr += ent[i].size;
+            ent[i].size = addr - ent[i].addr;
+            ent[i+1].addr = addr;
+            ent[i+1].size -= ent[i].size;
             i++;
         }
 
-        ent[i].addr = addr;
-        ent[i].size = size;
         ent[i].type = E820_RESERVED;
 
         e820_collapse();
