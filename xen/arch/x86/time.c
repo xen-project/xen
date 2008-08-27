@@ -840,12 +840,11 @@ struct cpu_calibration {
     u64 local_tsc_stamp;
     s_time_t stime_local_stamp;
     s_time_t stime_master_stamp;
-    struct timer softirq_callback;
 };
 static DEFINE_PER_CPU(struct cpu_calibration, cpu_calibration);
 
 /* Softirq handler for per-CPU time calibration. */
-static void local_time_calibration(void *unused)
+static void local_time_calibration(void)
 {
     struct cpu_time *t = &this_cpu(cpu_time);
     struct cpu_calibration *c = &this_cpu(cpu_calibration);
@@ -1022,8 +1021,7 @@ static void time_calibration_rendezvous(void *_r)
     c->stime_local_stamp = get_s_time();
     c->stime_master_stamp = r->master_stime;
 
-    /* Callback in softirq context as soon as possible. */
-    set_timer(&c->softirq_callback, c->stime_local_stamp);
+    raise_softirq(TIME_CALIBRATE_SOFTIRQ);
 }
 
 static void time_calibration(void *unused)
@@ -1049,9 +1047,6 @@ void init_percpu_time(void)
     t->stime_master_stamp = now;
     t->stime_local_stamp  = now;
 
-    init_timer(&this_cpu(cpu_calibration).softirq_callback,
-               local_time_calibration, NULL, smp_processor_id());
-
     if ( smp_processor_id() == 0 )
     {
         init_timer(&calibration_timer, time_calibration, NULL, 0);
@@ -1068,6 +1063,8 @@ int __init init_xen_time(void)
        this is a new feature introduced by Nehalem*/
     if ( cpuid_edx(0x80000007) & (1u<<8) )
         tsc_invariant = 1;
+
+    open_softirq(TIME_CALIBRATE_SOFTIRQ, local_time_calibration);
 
     init_percpu_time();
 
@@ -1176,7 +1173,7 @@ int time_suspend(void)
     }
 
     /* Better to cancel calibration timer for accuracy. */
-    kill_timer(&this_cpu(cpu_calibration).softirq_callback);
+    clear_bit(TIME_CALIBRATE_SOFTIRQ, &softirq_pending(smp_processor_id()));
 
     return 0;
 }
