@@ -1179,7 +1179,7 @@ int munmap(void *start, size_t length)
                 }
             }
         }
-        start += n * PAGE_SIZE;
+        start = (char *)start + n * PAGE_SIZE;
         total -= n;
     }
     return 0;
