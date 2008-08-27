@@ -1143,34 +1143,44 @@ void *mmap(void *start, size_t length, int prot, int flags, int fd, off_t offset
     } else ASSERT(0);
 }
 
+#define UNMAP_BATCH ((STACK_SIZE / 2) / sizeof(multicall_entry_t))
 int munmap(void *start, size_t length)
 {
-    int i, n = length / PAGE_SIZE;
-    multicall_entry_t call[n];
-    unsigned char (*data)[PAGE_SIZE] = start;
-    int ret;
+    int total = length / PAGE_SIZE;
     ASSERT(!((unsigned long)start & ~PAGE_MASK));
-    ASSERT(!(length & ~PAGE_MASK));
+    while (total) {
+        int n = UNMAP_BATCH;
+        if (n > total)
+            n = total;
+        {
+            int i;
+            multicall_entry_t call[n];
+            unsigned char (*data)[PAGE_SIZE] = start;
+            int ret;
 
-    for (i = 0; i < n; i++) {
-	call[i].op = __HYPERVISOR_update_va_mapping;
-	call[i].args[0] = (unsigned long) &data[i];
-	call[i].args[1] = 0;
-	call[i].args[2] = 0;
-	call[i].args[3] = UVMF_INVLPG;
-    }
+            for (i = 0; i < n; i++) {
+                call[i].op = __HYPERVISOR_update_va_mapping;
+                call[i].args[0] = (unsigned long) &data[i];
+                call[i].args[1] = 0;
+                call[i].args[2] = 0;
+                call[i].args[3] = UVMF_INVLPG;
+            }
 
-    ret = HYPERVISOR_multicall(call, n);
-    if (ret) {
-	errno = -ret;
-	return -1;
-    }
+            ret = HYPERVISOR_multicall(call, n);
+            if (ret) {
+                errno = -ret;
+                return -1;
+            }
 
-    for (i = 0; i < n; i++) {
-	if (call[i].result) {
-	    errno = call[i].result;
-	    return -1;
-	}
+            for (i = 0; i < n; i++) {
+                if (call[i].result) {
+                    errno = call[i].result;
+                    return -1;
+                }
+            }
+        }
+        start += n * PAGE_SIZE;
+        total -= n;
     }
     return 0;
 }
