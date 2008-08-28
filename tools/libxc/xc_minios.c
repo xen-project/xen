@@ -80,9 +80,10 @@ void *xc_map_foreign_ranges(int xc_handle, uint32_t dom,
                             size_t size, int prot, size_t chunksize,
                             privcmd_mmap_entry_t entries[], int nentries)
 {
-    unsigned long mfns[size / PAGE_SIZE];
+    unsigned long *mfns;
     int i, j, n;
     unsigned long pt_prot = 0;
+    void *ret;
 #ifdef __ia64__
     /* TODO */
 #else
@@ -92,12 +93,16 @@ void *xc_map_foreign_ranges(int xc_handle, uint32_t dom,
 	pt_prot = L1_PROT;
 #endif
 
+    mfns = malloc((size / PAGE_SIZE) * sizeof(*mfns));
+
     n = 0;
     for (i = 0; i < nentries; i++)
         for (j = 0; j < chunksize / PAGE_SIZE; j++)
             mfns[n++] = entries[i].mfn + j;
 
-    return map_frames_ex(mfns, n, 1, 0, 1, dom, 0, pt_prot);
+    ret = map_frames_ex(mfns, n, 1, 0, 1, dom, 0, pt_prot);
+    free(mfns);
+    return ret;
 }
 
 
