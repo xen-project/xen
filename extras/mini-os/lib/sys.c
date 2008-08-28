@@ -1221,11 +1221,14 @@ int munmap(void *start, size_t length)
             int ret;
 
             for (i = 0; i < n; i++) {
+                int arg = 0;
                 call[i].op = __HYPERVISOR_update_va_mapping;
-                call[i].args[0] = (unsigned long) &data[i];
-                call[i].args[1] = 0;
-                call[i].args[2] = 0;
-                call[i].args[3] = UVMF_INVLPG;
+                call[i].args[arg++] = (unsigned long) &data[i];
+                call[i].args[arg++] = 0;
+#ifdef __i386__
+                call[i].args[arg++] = 0;
+#endif
+                call[i].args[arg++] = UVMF_INVLPG;
             }
 
             ret = HYPERVISOR_multicall(call, n);
