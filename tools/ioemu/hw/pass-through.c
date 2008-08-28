@@ -2340,11 +2340,6 @@ static int pt_bar_reg_write(struct pt_dev *ptdev,
                 return -1;
         }
 
-        /* always keep the emulate register value to 0,
-         * because hvmloader does not support high MMIO for now.
-         */
-        cfg_entry->data = 0;
-
         /* never mapping the 'empty' upper region,
          * because we'll do it enough for the lower region.
          */
