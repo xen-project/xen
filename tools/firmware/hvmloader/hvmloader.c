@@ -243,6 +243,13 @@ static void pci_setup(void)
             bars[i].bar_sz  = bar_sz;
 
             nr_bars++;
+
+            /* Skip the upper-half of the address for a 64-bit BAR. */
+            if ( (bar_data & (PCI_BASE_ADDRESS_SPACE |
+                              PCI_BASE_ADDRESS_MEM_TYPE_MASK)) == 
+                 (PCI_BASE_ADDRESS_SPACE_MEMORY | 
+                  PCI_BASE_ADDRESS_MEM_TYPE_64) )
+                bar++;
         }
 
         /* Map the interrupt. */
