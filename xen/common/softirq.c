@@ -49,6 +49,7 @@ asmlinkage void do_softirq(void)
 
 void open_softirq(int nr, softirq_handler handler)
 {
+    ASSERT(nr < NR_SOFTIRQS);
     softirq_handlers[nr] = handler;
 }
 
