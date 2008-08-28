@@ -4,6 +4,6 @@
 #define NMI_MCE_SOFTIRQ        (NR_COMMON_SOFTIRQS + 0)
 #define TIME_CALIBRATE_SOFTIRQ (NR_COMMON_SOFTIRQS + 1)
 
-#define NR_ARCH_SOFTIRQS    1
+#define NR_ARCH_SOFTIRQS       2
 
 #endif /* __ASM_SOFTIRQ_H__ */
