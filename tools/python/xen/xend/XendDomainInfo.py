@@ -2408,29 +2408,14 @@ class XendDomainInfo:
         if self.domid is None:
             return
 
+        from xen.xend import XendDomain
         log.debug("XendDomainInfo.destroy: domid=%s", str(self.domid))
 
         paths = self._prepare_phantom_paths()
 
         self._cleanupVm()
         if self.dompath is not None:
-            self.destroyDomain()
-
-        self._cleanup_phantom_devs(paths)
-
-        if "transient" in self.info["other_config"] \
-           and bool(self.info["other_config"]["transient"]):
-            from xen.xend import XendDomain
-            XendDomain.instance().domain_delete_by_dominfo(self)
-
-
-    def destroyDomain(self):
-        log.debug("XendDomainInfo.destroyDomain(%s)", str(self.domid))
-
-        paths = self._prepare_phantom_paths()
-
-        try:
-            if self.domid is not None:
+            try:
                 xc.domain_destroy_hook(self.domid)
                 xc.domain_pause(self.domid)
                 do_FLR(self.domid)
@@ -2438,14 +2423,17 @@ class XendDomainInfo:
                 for state in DOM_STATES_OLD:
                     self.info[state] = 0
                 self._stateSet(DOM_STATE_HALTED)
-        except:
-            log.exception("XendDomainInfo.destroy: xc.domain_destroy failed.")
+            except:
+                log.exception("XendDomainInfo.destroy: domain destruction failed.")
 
-        from xen.xend import XendDomain
-        XendDomain.instance().remove_domain(self)
+            XendDomain.instance().remove_domain(self)
+            self.cleanupDomain()
 
-        self.cleanupDomain()
         self._cleanup_phantom_devs(paths)
+
+        if "transient" in self.info["other_config"] \
+           and bool(self.info["other_config"]["transient"]):
+            XendDomain.instance().domain_delete_by_dominfo(self)
 
 
     def resetDomain(self):
