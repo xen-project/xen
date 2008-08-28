@@ -53,7 +53,7 @@ TARGET_CFLAGS += $(call cc-option,$(CC),-fno-stack-protector,)
 TARGET_CFLAGS += $(call cc-option,$(CC),-fno-stack-protector-all,)
 
 # Do not use host headers and libs
-GCC_INSTALL = $(shell gcc -print-search-dirs | sed -n -e 's/install: \(.*\)/\1/p')
+GCC_INSTALL = $(shell LANG=C gcc -print-search-dirs | sed -n -e 's/install: \(.*\)/\1/p')
 TARGET_CPPFLAGS += -U __linux__ -U __FreeBSD__ -U __sun__
 TARGET_CPPFLAGS += -nostdinc
 TARGET_CPPFLAGS += -isystem $(CURDIR)/$(MINI_OS)/include/posix
