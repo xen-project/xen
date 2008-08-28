@@ -1008,6 +1008,7 @@ static void time_calibration_rendezvous(void *_r)
         while ( atomic_read(&r->nr_cpus) != (total_cpus - 1) )
             cpu_relax();
         r->master_stime = read_platform_stime();
+        mb(); /* write r->master_stime /then/ signal */
         atomic_inc(&r->nr_cpus);
     }
     else
@@ -1015,6 +1016,7 @@ static void time_calibration_rendezvous(void *_r)
         atomic_inc(&r->nr_cpus);
         while ( atomic_read(&r->nr_cpus) != total_cpus )
             cpu_relax();
+        mb(); /* receive signal /then/ read r->master_stime */
     }
 
     rdtscll(c->local_tsc_stamp);
@@ -1030,7 +1032,8 @@ static void time_calibration(void *unused)
         .nr_cpus = ATOMIC_INIT(0)
     };
 
-    on_each_cpu(time_calibration_rendezvous, &r, 0, 0);
+    /* @wait=1 because we must wait for all cpus before freeing @r. */
+    on_each_cpu(time_calibration_rendezvous, &r, 0, 1);
 }
 
 void init_percpu_time(void)
