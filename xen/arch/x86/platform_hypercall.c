@@ -147,8 +147,7 @@ ret_t do_platform_op(XEN_GUEST_HANDLE(xen_platform_op_t) u_xenpf_op)
 
     case XENPF_microcode_update:
     {
-        extern int microcode_update(XEN_GUEST_HANDLE(void), unsigned long len);
-        XEN_GUEST_HANDLE(void) data;
+        XEN_GUEST_HANDLE(const_void) data;
 
         ret = xsm_microcode();
         if ( ret )

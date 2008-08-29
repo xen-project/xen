@@ -124,7 +124,7 @@ static DEFINE_SPINLOCK(microcode_update_lock);
 /* no concurrent ->write()s are allowed on /dev/cpu/microcode */
 static DEFINE_MUTEX(microcode_mutex);
 
-static void __user *user_buffer;	/* user area microcode data buffer */
+static const void __user *user_buffer;	/* user area microcode data buffer */
 static unsigned int user_buffer_size;	/* it's size */
 
 typedef enum mc_error_code {
@@ -455,7 +455,7 @@ out:
 	return error;
 }
 
-int microcode_update(XEN_GUEST_HANDLE(void) buf, unsigned long len)
+int microcode_update(XEN_GUEST_HANDLE(const_void) buf, unsigned long len)
 {
 	int ret;
 

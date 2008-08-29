@@ -583,6 +583,8 @@ int rdmsr_hypervisor_regs(
 int wrmsr_hypervisor_regs(
     uint32_t idx, uint32_t eax, uint32_t edx);
 
+int microcode_update(XEN_GUEST_HANDLE(const_void), unsigned long len);
+
 #endif /* !__ASSEMBLY__ */
 
 #endif /* __ASM_X86_PROCESSOR_H */
