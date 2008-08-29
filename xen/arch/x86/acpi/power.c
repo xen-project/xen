@@ -24,6 +24,7 @@
 #include <xen/sched.h>
 #include <xen/domain.h>
 #include <xen/console.h>
+#include <xen/iommu.h>
 #include <public/platform.h>
 #include <asm/tboot.h>
 
@@ -41,6 +42,8 @@ void do_suspend_lowlevel(void);
 
 static int device_power_down(void)
 {
+    iommu_suspend();
+
     console_suspend();
 
     time_suspend();
@@ -65,6 +68,8 @@ static void device_power_up(void)
     time_resume();
 
     console_resume();
+
+    iommu_resume();
 }
 
 static void freeze_domains(void)
