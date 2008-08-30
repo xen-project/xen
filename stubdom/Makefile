@@ -1,4 +1,4 @@
-XEN_ROOT = ..
+XEN_ROOT = $(CURDIR)/..
 MINI_OS = $(XEN_ROOT)/extras/mini-os
 
 export XEN_OS=MiniOS
