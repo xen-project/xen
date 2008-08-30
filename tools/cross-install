@@ -5,4 +5,4 @@ if [ -n "$CROSS_BIN_PATH" ]; then
     PATH="$CROSS_BIN_PATH:$PATH"
 fi
 
-exec install "$@"
+exec $_INSTALL "$@"
