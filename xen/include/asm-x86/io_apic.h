@@ -125,7 +125,7 @@ extern int mpc_default_type;
 
 static inline unsigned int io_apic_read(unsigned int apic, unsigned int reg)
 {
-	if (vtd_enabled)
+	if (iommu_enabled)
 		return io_apic_read_remap_rte(apic, reg);
 	*IO_APIC_BASE(apic) = reg;
 	return *(IO_APIC_BASE(apic)+4);
@@ -152,6 +152,8 @@ extern int sis_apic_bug;
 #endif
 static inline void io_apic_modify(unsigned int apic, unsigned int reg, unsigned int value)
 {
+	if (iommu_enabled)
+		return iommu_update_ire_from_apic(apic, reg, value);
 	if (sis_apic_bug)
 		*IO_APIC_BASE(apic) = reg;
 	*(IO_APIC_BASE(apic)+4) = value;

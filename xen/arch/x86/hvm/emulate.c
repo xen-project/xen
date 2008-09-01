@@ -571,11 +571,12 @@ static int hvmemul_rep_movs(
 {
     struct hvm_emulate_ctxt *hvmemul_ctxt =
         container_of(ctxt, struct hvm_emulate_ctxt, ctxt);
-    unsigned long saddr, daddr;
+    unsigned long saddr, daddr, bytes;
     paddr_t sgpa, dgpa;
     uint32_t pfec = PFEC_page_present;
     p2m_type_t p2mt;
-    int rc;
+    int rc, df = !!(ctxt->regs->eflags & X86_EFLAGS_DF);
+    char *buf;
 
     rc = hvmemul_virtual_to_linear(
         src_seg, src_offset, bytes_per_rep, reps, hvm_access_read,
@@ -606,15 +607,56 @@ static int hvmemul_rep_movs(
     (void)gfn_to_mfn_current(sgpa >> PAGE_SHIFT, &p2mt);
     if ( !p2m_is_ram(p2mt) )
         return hvmemul_do_mmio(
-            sgpa, reps, bytes_per_rep, dgpa, IOREQ_READ,
-            !!(ctxt->regs->eflags & X86_EFLAGS_DF), NULL);
+            sgpa, reps, bytes_per_rep, dgpa, IOREQ_READ, df, NULL);
 
     (void)gfn_to_mfn_current(dgpa >> PAGE_SHIFT, &p2mt);
-    if ( p2m_is_ram(p2mt) )
+    if ( !p2m_is_ram(p2mt) )
+        return hvmemul_do_mmio(
+            dgpa, reps, bytes_per_rep, sgpa, IOREQ_WRITE, df, NULL);
+
+    /* RAM-to-RAM copy: emulate as equivalent of memmove(dgpa, sgpa, bytes). */
+    bytes = *reps * bytes_per_rep;
+
+    /* Adjust source address for reverse copy. */
+    if ( df )
+        sgpa -= bytes - bytes_per_rep;
+
+    /*
+     * Will first iteration copy fall within source range? If not then entire
+     * copy does not corrupt itself. If so, then this is more complex than
+     * can be emulated by a source-to-buffer-to-destination block copy.
+     */
+    if ( ((dgpa + bytes_per_rep) > sgpa) && (dgpa < (sgpa + bytes)) )
         return X86EMUL_UNHANDLEABLE;
-    return hvmemul_do_mmio(
-        dgpa, reps, bytes_per_rep, sgpa, IOREQ_WRITE,
-        !!(ctxt->regs->eflags & X86_EFLAGS_DF), NULL);
+
+    /* Adjust destination address for reverse copy. */
+    if ( df )
+        dgpa -= bytes - bytes_per_rep;
+
+    /* Allocate temporary buffer. Fall back to slow emulation if this fails. */
+    buf = xmalloc_bytes(bytes);
+    if ( buf == NULL )
+        return X86EMUL_UNHANDLEABLE;
+
+    /*
+     * We do a modicum of checking here, just for paranoia's sake and to
+     * definitely avoid copying an unitialised buffer into guest address space.
+     */
+    rc = hvm_copy_from_guest_phys(buf, sgpa, bytes);
+    if ( rc == HVMCOPY_okay )
+        rc = hvm_copy_to_guest_phys(dgpa, buf, bytes);
+
+    xfree(buf);
+
+    if ( rc != HVMCOPY_okay )
+    {
+        gdprintk(XENLOG_WARNING, "Failed memory-to-memory REP MOVS: sgpa=%"
+                 PRIpaddr" dgpa=%"PRIpaddr" reps=%lu bytes_per_rep=%u\n",
+                 sgpa, dgpa, *reps, bytes_per_rep);
+        return X86EMUL_UNHANDLEABLE;
+    }
+
+    return X86EMUL_OKAY;
 }
 
 static int hvmemul_read_segment(

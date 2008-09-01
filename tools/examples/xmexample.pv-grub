@@ -25,7 +25,7 @@ extra = "(hd0,0)/boot/grub/menu.lst"
 # WARNING: Creating a domain with insufficient memory may cause out of
 #          memory errors. The domain needs enough memory to boot kernel
 #          and modules. Allocating less than 32MBs is not recommended.
-memory = 64
+memory = 128
 
 # A name for your domain. All domains must have different names.
 name = "ExampleDomain"
@@ -117,32 +117,6 @@ disk = [ 'phy:hda1,hda1,w' ]
 # of the VM / VM configuration file. The instance number must be
 # greater or equal to 1.
 #vtpm = [ 'instance=1,backend=0' ]
-
-#----------------------------------------------------------------------------
-# Set the kernel command line for the new domain.
-# You only need to define the IP parameters and hostname if the domain's
-# IP config doesn't, e.g. in ifcfg-eth0 or via DHCP.
-# You can use 'extra' to set the runlevel and custom environment
-# variables used by custom rc scripts (e.g. VMID=, usr= ).
-
-# Set if you want dhcp to allocate the IP address.
-#dhcp="dhcp"
-# Set netmask.
-#netmask=
-# Set default gateway.
-#gateway=
-# Set the hostname.
-#hostname= "vm%d" % vmid
-
-# Set root device.
-root = "/dev/hda1 ro"
-
-# Root device for nfs.
-#root = "/dev/nfs"
-# The nfs server.
-#nfs_server = '192.0.2.1'  
-# Root directory on the nfs server.
-#nfs_root   = '/full/path/to/root/directory'
 
 #----------------------------------------------------------------------------
 # Configure the behaviour when a domain exits.  There are three 'reasons'

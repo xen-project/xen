@@ -59,8 +59,7 @@ clean distclean: subdirs-clean
 ifneq ($(XEN_COMPILE_ARCH),$(XEN_TARGET_ARCH))
 IOEMU_CONFIGURE_CROSS ?= --cpu=$(XEN_TARGET_ARCH) \
 			 --cross-prefix=$(CROSS_COMPILE) \
-			 --interp-prefix=$(CROSS_SYS_ROOT) \
-			 --install=$(CURDIR)/cross-install
+			 --interp-prefix=$(CROSS_SYS_ROOT)
 endif
 
 ioemu/config-host.mak:

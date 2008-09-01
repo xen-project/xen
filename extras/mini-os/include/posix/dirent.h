@@ -1,7 +1,7 @@
 #ifndef _POSIX_DIRENT_H
 #define _POSIX_DIRENT_H
 
-#include <sys/types.h>
+#include <stdint.h>
 
 struct dirent {
         char *d_name;

@@ -187,7 +187,7 @@ void *xc_dom_boot_domU_map(struct xc_dom_image *dom, xen_pfn_t pfn,
 int xc_dom_boot_image(struct xc_dom_image *dom)
 {
     DECLARE_DOMCTL;
-    void *ctxt;
+    vcpu_guest_context_any_t ctxt;
     int rc;
 
     xc_dom_printf("%s: called\n", __FUNCTION__);
@@ -245,12 +245,11 @@ int xc_dom_boot_image(struct xc_dom_image *dom)
         return rc;
 
     /* let the vm run */
-    ctxt = xc_dom_malloc(dom, PAGE_SIZE * 2 /* FIXME */ );
-    memset(ctxt, 0, PAGE_SIZE * 2);
-    if ( (rc = dom->arch_hooks->vcpu(dom, ctxt)) != 0 )
+    memset(&ctxt, 0, sizeof(ctxt));
+    if ( (rc = dom->arch_hooks->vcpu(dom, &ctxt)) != 0 )
         return rc;
     xc_dom_unmap_all(dom);
-    rc = launch_vm(dom->guest_xc, dom->guest_domid, ctxt);
+    rc = launch_vm(dom->guest_xc, dom->guest_domid, &ctxt);
 
     return rc;
 }

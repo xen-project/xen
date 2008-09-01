@@ -1007,6 +1007,96 @@ LWIP_STUB(ssize_t, sendto, (int s, void *buf, size_t len, int flags, struct sock
 LWIP_STUB(int, getsockname, (int s, struct sockaddr *name, socklen_t *namelen), (s, name, namelen))
 #endif
 
+static char *syslog_ident;
+void openlog(const char *ident, int option, int facility)
+{
+    if (syslog_ident)
+        free(syslog_ident);
+    syslog_ident = strdup(ident);
+}
+
+void vsyslog(int priority, const char *format, va_list ap)
+{
+    printk("%s: ", syslog_ident);
+    print(0, format, ap);
+}
+
+void syslog(int priority, const char *format, ...)
+{
+    va_list ap;
+    va_start(ap, format);
+    vsyslog(priority, format, ap);
+    va_end(ap);
+}
+
+void closelog(void)
+{
+    free(syslog_ident);
+    syslog_ident = NULL;
+}
+
+void vwarn(const char *format, va_list ap)
+{
+    int the_errno = errno;
+    printk("stubdom: ");
+    if (format) {
+        print(0, format, ap);
+        printk(", ");
+    }
+    printk("%s", strerror(the_errno));
+}
+
+void warn(const char *format, ...)
+{
+    va_list ap;
+    va_start(ap, format);
+    vwarn(format, ap);
+    va_end(ap);
+}
+
+void verr(int eval, const char *format, va_list ap)
+{
+    vwarn(format, ap);
+    exit(eval);
+}
+
+void err(int eval, const char *format, ...)
+{
+    va_list ap;
+    va_start(ap, format);
+    verr(eval, format, ap);
+    va_end(ap);
+}
+
+void vwarnx(const char *format, va_list ap)
+{
+    printk("stubdom: ");
+    if (format)
+        print(0, format, ap);
+}
+
+void warnx(const char *format, ...)
+{
+    va_list ap;
+    va_start(ap, format);
+    vwarnx(format, ap);
+    va_end(ap);
+}
+
+void verrx(int eval, const char *format, va_list ap)
+{
+    vwarnx(format, ap);
+    exit(eval);
+}
+
+void errx(int eval, const char *format, ...)
+{
+    va_list ap;
+    va_start(ap, format);
+    verrx(eval, format, ap);
+    va_end(ap);
+}
+
 int nanosleep(const struct timespec *req, struct timespec *rem)
 {
     s_time_t start = NOW();
@@ -1115,34 +1205,47 @@ void *mmap(void *start, size_t length, int prot, int flags, int fd, off_t offset
     } else ASSERT(0);
 }
 
+#define UNMAP_BATCH ((STACK_SIZE / 2) / sizeof(multicall_entry_t))
 int munmap(void *start, size_t length)
 {
-    int i, n = length / PAGE_SIZE;
-    multicall_entry_t call[n];
-    unsigned char (*data)[PAGE_SIZE] = start;
-    int ret;
+    int total = length / PAGE_SIZE;
     ASSERT(!((unsigned long)start & ~PAGE_MASK));
-    ASSERT(!(length & ~PAGE_MASK));
+    while (total) {
+        int n = UNMAP_BATCH;
+        if (n > total)
+            n = total;
+        {
+            int i;
+            multicall_entry_t call[n];
+            unsigned char (*data)[PAGE_SIZE] = start;
+            int ret;
 
-    for (i = 0; i < n; i++) {
-	call[i].op = __HYPERVISOR_update_va_mapping;
-	call[i].args[0] = (unsigned long) &data[i];
-	call[i].args[1] = 0;
-	call[i].args[2] = 0;
-	call[i].args[3] = UVMF_INVLPG;
-    }
+            for (i = 0; i < n; i++) {
+                int arg = 0;
+                call[i].op = __HYPERVISOR_update_va_mapping;
+                call[i].args[arg++] = (unsigned long) &data[i];
+                call[i].args[arg++] = 0;
+#ifdef __i386__
+                call[i].args[arg++] = 0;
+#endif
+                call[i].args[arg++] = UVMF_INVLPG;
+            }
 
-    ret = HYPERVISOR_multicall(call, n);
-    if (ret) {
-	errno = -ret;
-	return -1;
-    }
+            ret = HYPERVISOR_multicall(call, n);
+            if (ret) {
+                errno = -ret;
+                return -1;
+            }
 
-    for (i = 0; i < n; i++) {
-	if (call[i].result) {
-	    errno = call[i].result;
-	    return -1;
-	}
+            for (i = 0; i < n; i++) {
+                if (call[i].result) {
+                    errno = call[i].result;
+                    return -1;
+                }
+            }
+        }
+        start = (char *)start + n * PAGE_SIZE;
+        total -= n;
     }
     return 0;
 }

@@ -132,7 +132,7 @@ int printf(const char *fmt, ...) __attribute__ ((format (printf, 1, 2)));
 int vprintf(const char *fmt, va_list ap);
 
 /* Reserve a RAM region in the e820 table. */
-uint32_t e820_malloc(uint32_t size);
+uint32_t e820_malloc(uint32_t size, uint32_t align);
 
 /* Prepare the 32bit BIOS */
 void highbios_setup(void);

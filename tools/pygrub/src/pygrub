@@ -124,7 +124,7 @@ def get_fs_offset(file):
 class GrubLineEditor(curses.textpad.Textbox):
     def __init__(self, screen, startx, starty, line = ""):
         screen.addstr(startx, starty, "> ")
-        screen.refresh()
+        screen.noutrefresh()
         win = curses.newwin(1, 74, startx, starty + 2)
         curses.textpad.Textbox.__init__(self, win)
         
@@ -137,7 +137,7 @@ class GrubLineEditor(curses.textpad.Textbox):
         """Show the text.  One of our advantages over standard textboxes
         is that we can handle lines longer than the window."""
 
-        self.win.clear()
+        self.win.erase()
         p = self.pos
         off = 0
         while p > 70:
@@ -188,6 +188,7 @@ class GrubLineEditor(curses.textpad.Textbox):
         return 1
 
     def edit(self):
+        curses.doupdate()
         r = curses.textpad.Textbox.edit(self)
         if self.cancelled:
             return None
@@ -217,16 +218,15 @@ class Grub:
             curses.def_prog_mode()
         
         curses.reset_prog_mode()
-        self.screen.clear()
-        self.screen.refresh()
+        self.screen.erase()
 
         # create basic grub screen with a box of entries and a textbox
         self.screen.addstr(1, 4, "pyGRUB  version %s" %(PYGRUB_VER,))
         self.entry_win.box()
-        self.screen.refresh()
+        self.screen.noutrefresh()
 
     def fill_entry_list(self):
-        self.entry_win.clear()
+        self.entry_win.erase()
         self.entry_win.box()
 
         maxy = self.entry_win.getmaxyx()[0]-3 # maxy - 2 for the frame + index
@@ -244,7 +244,7 @@ class Grub:
             self.entry_win.addstr(y + 1 - self.start_image, 2, i.title.ljust(70))
             if y == self.selected_image:
                 self.entry_win.attroff(curses.A_REVERSE)
-        self.entry_win.refresh()
+        self.entry_win.noutrefresh()
 
     def edit_entry(self, origimg):
         def draw():
@@ -259,13 +259,13 @@ class Grub:
             self.text_win.addch(0, 14, curses.ACS_DARROW)
             (y, x) = self.text_win.getmaxyx()
             self.text_win.move(y - 1, x - 1)
-            self.text_win.refresh()
+            self.text_win.noutrefresh()
 
         curline = 1
         img = copy.deepcopy(origimg)
         while 1:
             draw()
-            self.entry_win.clear()
+            self.entry_win.erase()
             self.entry_win.box()
             for idx in range(1, len(img.lines)):
                 # current line should be highlighted
@@ -280,7 +280,8 @@ class Grub:
                 self.entry_win.addstr(idx, 2, l)
                 if idx == curline:
                     self.entry_win.attroff(curses.A_REVERSE)
-            self.entry_win.refresh()
+            self.entry_win.noutrefresh()
+            curses.doupdate()
 
             c = self.screen.getch()
             if c in (ord('q'), 27): # 27 == esc
@@ -318,10 +319,10 @@ class Grub:
             origimg.reset(img.lines)
 
     def edit_line(self, line):
-        self.screen.clear()
+        self.screen.erase()
         self.screen.addstr(1, 2, "[ Minimal BASH-like line editing is supported.  ")
         self.screen.addstr(2, 2, "  ESC at any time cancels.  ENTER at any time accepts your changes. ]")
-        self.screen.refresh()
+        self.screen.noutrefresh()
 
         t = GrubLineEditor(self.screen, 5, 2, line)
         enable_cursor(True)
@@ -331,10 +332,10 @@ class Grub:
         return None
 
     def command_line_mode(self):
-        self.screen.clear()
+        self.screen.erase()
         self.screen.addstr(1, 2, "[ Minimal BASH-like line editing is supported.  ESC at any time ")
         self.screen.addstr(2, 2, "  exits.  Typing 'boot' will boot with your entered commands. ] ")
-        self.screen.refresh()
+        self.screen.noutrefresh()
 
         y = 5
         lines = []
@@ -420,7 +421,7 @@ class Grub:
             self.text_win.addch(0, 14, curses.ACS_DARROW)
             (y, x) = self.text_win.getmaxyx()
             self.text_win.move(y - 1, x - 1)
-            self.text_win.refresh()
+            self.text_win.noutrefresh()
 
         # now loop until we hit the timeout or get a go from the user
         mytime = 0
@@ -433,6 +434,7 @@ class Grub:
             else:
                 self.screen.addstr(20, 5, " " * 80)
             self.fill_entry_list()
+            curses.doupdate()
 
             c = self.screen.getch()
             if c == -1:

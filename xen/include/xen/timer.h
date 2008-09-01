@@ -14,16 +14,29 @@
 
 struct timer {
     /* System time expiry value (nanoseconds since boot). */
-    s_time_t      expires;
-    /* CPU on which this timer will be installed and executed. */
-    unsigned int  cpu;
+    s_time_t expires;
+
+    /* Position in active-timer data structure. */
+    union {
+        /* Timer-heap offset. */
+        unsigned int heap_offset;
+        /* Overflow linked list. */
+        struct timer *list_next;
+    };
+
     /* On expiry, '(*function)(data)' will be executed in softirq context. */
-    void        (*function)(void *);
-    void         *data;
-    /* Timer-heap offset. */
-    unsigned int  heap_offset;
-    /* Has this timer been killed (cannot be activated)? */
-    int           killed;
+    void (*function)(void *);
+    void *data;
+
+    /* CPU on which this timer will be installed and executed. */
+    uint16_t cpu;
+
+    /* Timer status. */
+#define TIMER_STATUS_inactive 0 /* Not in use; can be activated.    */
+#define TIMER_STATUS_killed   1 /* Not in use; canot be activated.  */
+#define TIMER_STATUS_in_heap  2 /* In use; on timer heap.           */
+#define TIMER_STATUS_in_list  3 /* In use; on overflow linked list. */
+    uint8_t status;
 };
 
 /*
@@ -37,7 +50,7 @@ struct timer {
  */
 static inline int active_timer(struct timer *timer)
 {
-    return (timer->heap_offset != 0);
+    return (timer->status >= TIMER_STATUS_in_heap);
 }
 
 /*

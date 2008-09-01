@@ -42,6 +42,6 @@ clean:
 
 
 %: %.c Makefile
-	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $<
+	$(CC) $(CFLAGS) $< $(LDFLAGS) -o $@
 xentrace_%: %.c Makefile
-	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $<
+	$(CC) $(CFLAGS) $< $(LDFLAGS) -o $@

@@ -19,7 +19,9 @@
         type *_[0] __attribute__((__packed__)); \
     } __compat_handle_ ## name
 
-#define DEFINE_COMPAT_HANDLE(name)   __DEFINE_COMPAT_HANDLE(name, name)
+#define DEFINE_COMPAT_HANDLE(name) \
+    __DEFINE_COMPAT_HANDLE(name, name); \
+    __DEFINE_COMPAT_HANDLE(const_ ## name, const name)
 #define COMPAT_HANDLE(name)          __compat_handle_ ## name
 
 /* Is the compat handle a NULL reference? */

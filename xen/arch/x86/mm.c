@@ -3339,6 +3339,7 @@ DEFINE_XEN_GUEST_HANDLE(e820entry_t);
 
 long arch_memory_op(int op, XEN_GUEST_HANDLE(void) arg)
 {
+    struct page_info *page = NULL;
     switch ( op )
     {
     case XENMEM_add_to_physmap:
@@ -3389,12 +3390,22 @@ long arch_memory_op(int op, XEN_GUEST_HANDLE(void) arg)
 
             spin_unlock(&d->grant_table->lock);
             break;
+        case XENMAPSPACE_mfn:
+        {
+            if ( get_page_from_pagenr(xatp.idx, d) ) {
+                mfn = xatp.idx;
+                page = mfn_to_page(mfn);
+            }
+            break;
+        }
         default:
             break;
         }
 
         if ( !paging_mode_translate(d) || (mfn == 0) )
         {
+            if ( page )
+                put_page(page);
             rcu_unlock_domain(d);
             return -EINVAL;
         }
@@ -3420,6 +3431,53 @@ long arch_memory_op(int op, XEN_GUEST_HANDLE(void) arg)
 
         /* Map at new location. */
         guest_physmap_add_page(d, xatp.gpfn, mfn, 0);
+
+        domain_unlock(d);
+
+        if ( page )
+            put_page(page);
+
+        rcu_unlock_domain(d);
+
+        break;
+    }
+
+    case XENMEM_remove_from_physmap:
+    {
+        struct xen_remove_from_physmap xrfp;
+        unsigned long mfn;
+        struct domain *d;
+
+        if ( copy_from_guest(&xrfp, arg, 1) )
+            return -EFAULT;
+
+        if ( xrfp.domid == DOMID_SELF )
+        {
+            d = rcu_lock_current_domain();
+        }
+        else
+        {
+            if ( (d = rcu_lock_domain_by_id(xrfp.domid)) == NULL )
+                return -ESRCH;
+            if ( !IS_PRIV_FOR(current->domain, d) )
+            {
+                rcu_unlock_domain(d);
+                return -EPERM;
+            }
+        }
+
+        if ( xsm_remove_from_physmap(current->domain, d) )
+        {
+            rcu_unlock_domain(d);
+            return -EPERM;
+        }
+
+        domain_lock(d);
+
+        mfn = gmfn_to_mfn(d, xrfp.gpfn);
+
+        if ( mfn_valid(mfn) )
+            guest_physmap_remove_page(d, xrfp.gpfn, mfn, 0);
 
         domain_unlock(d);
 

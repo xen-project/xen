@@ -136,15 +136,14 @@ static void maybe_split(struct xmalloc_hdr *hdr, size_t size, size_t block)
 static void *xmalloc_new_page(size_t size)
 {
     struct xmalloc_hdr *hdr;
-    unsigned long flags;
 
     hdr = alloc_xenheap_page();
     if ( hdr == NULL )
         return NULL;
 
-    spin_lock_irqsave(&freelist_lock, flags);
+    spin_lock(&freelist_lock);
     maybe_split(hdr, size, PAGE_SIZE);
-    spin_unlock_irqrestore(&freelist_lock, flags);
+    spin_unlock(&freelist_lock);
 
     return data_from_header(hdr);
 }
@@ -175,7 +174,6 @@ static inline size_t align_up(size_t size, size_t align)
 void *_xmalloc(size_t size, size_t align)
 {
     struct xmalloc_hdr *i;
-    unsigned long flags;
 
     ASSERT(!in_irq());
 
@@ -196,17 +194,17 @@ void *_xmalloc(size_t size, size_t align)
         return xmalloc_whole_pages(size);
 
     /* Search free list. */
-    spin_lock_irqsave(&freelist_lock, flags);
+    spin_lock(&freelist_lock);
     list_for_each_entry( i, &freelist, freelist )
     {
         if ( i->size < size )
             continue;
         del_from_freelist(i);
         maybe_split(i, size, i->size);
-        spin_unlock_irqrestore(&freelist_lock, flags);
+        spin_unlock(&freelist_lock);
         return data_from_header(i);
     }
-    spin_unlock_irqrestore(&freelist_lock, flags);
+    spin_unlock(&freelist_lock);
 
     /* Alloc a new page and return from that. */
     return xmalloc_new_page(size);
@@ -214,7 +212,6 @@ void *_xmalloc(size_t size, size_t align)
 
 void xfree(void *p)
 {
-    unsigned long flags;
     struct xmalloc_hdr *i, *tmp, *hdr;
 
     ASSERT(!in_irq());
@@ -238,7 +235,7 @@ void xfree(void *p)
     }
 
     /* Merge with other free block, or put in list. */
-    spin_lock_irqsave(&freelist_lock, flags);
+    spin_lock(&freelist_lock);
     list_for_each_entry_safe( i, tmp, &freelist, freelist )
     {
         unsigned long _i   = (unsigned long)i;
@@ -275,7 +272,7 @@ void xfree(void *p)
         add_to_freelist(hdr);
     }
 
-    spin_unlock_irqrestore(&freelist_lock, flags);
+    spin_unlock(&freelist_lock);
 }
 
 /*

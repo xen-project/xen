@@ -31,8 +31,15 @@ static inline int pthread_key_delete(pthread_key_t key)
 
 
 
+typedef struct {} pthread_mutexattr_t;
+static inline int pthread_mutexattr_init(pthread_mutexattr_t *mattr) { return 0; }
+#define PTHREAD_MUTEX_NORMAL 0
+#define PTHREAD_MUTEX_RECURSIVE 1
+static inline int pthread_mutexattr_settype(pthread_mutexattr_t *mattr, int kind) { return 0; }
+static inline int pthread_mutexattr_destroy(pthread_mutexattr_t *mattr) { return 0; }
 typedef struct {} pthread_mutex_t;
 #define PTHREAD_MUTEX_INITIALIZER {}
+static inline int pthread_mutex_init(pthread_mutex_t *mutex, pthread_mutexattr_t *mattr) { return 0; }
 static inline int pthread_mutex_lock(pthread_mutex_t *mutex) { return 0; }
 static inline int pthread_mutex_unlock(pthread_mutex_t *mutex) { return 0; }
 

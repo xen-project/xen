@@ -80,9 +80,9 @@
 #define VGA_MAX_HEIGHT 2048
 
 #define VGA_STATE_COMMON                                                \
-    uint8_t *vram_alloc;                                                \
     uint8_t *vram_ptr;                                                  \
-    uint8_t *vram_shadow;                                               \
+    xen_pfn_t *vram_mfns;                                               \
+    uint64_t stolen_vram_addr; /* Address of stolen RAM */              \
     unsigned long vram_offset;                                          \
     unsigned int vram_size;                                             \
     unsigned long bios_offset;                                          \

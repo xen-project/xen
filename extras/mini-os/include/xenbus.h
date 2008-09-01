@@ -83,12 +83,13 @@ char *xenbus_transaction_end(xenbus_transaction_t, int abort,
 			     int *retry);
 
 /* Read path and parse it as an integer.  Returns -1 on error. */
-int xenbus_read_integer(char *path);
+int xenbus_read_integer(const char *path);
 
 /* Contraction of snprintf and xenbus_write(path/node). */
 char* xenbus_printf(xenbus_transaction_t xbt,
-                                  char* node, char* path,
-                                  char* fmt, ...);
+                                  const char* node, const char* path,
+                                  const char* fmt, ...)
+                   __attribute__((__format__(printf, 4, 5)));
 
 /* Reset the XenBus system. */
 void fini_xenbus(void);

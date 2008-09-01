@@ -97,7 +97,7 @@ DEFINE_XEN_GUEST_HANDLE(xenpf_read_memtype_t);
 #define XENPF_microcode_update    35
 struct xenpf_microcode_update {
     /* IN variables. */
-    XEN_GUEST_HANDLE(void) data;      /* Pointer to microcode data */
+    XEN_GUEST_HANDLE(const_void) data;/* Pointer to microcode data */
     uint32_t length;                  /* Length of microcode data. */
 };
 typedef struct xenpf_microcode_update xenpf_microcode_update_t;

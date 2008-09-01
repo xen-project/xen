@@ -2698,6 +2698,20 @@ void put_page_type(struct page_info *page)
 }
 
 
+static int get_page_from_pagenr(unsigned long page_nr, struct domain *d)
+{
+    struct page_info *page = mfn_to_page(page_nr);
+
+    if ( unlikely(!mfn_valid(page_nr)) || unlikely(!get_page(page, d)) )
+    {
+        MEM_LOG("Could not get page ref for pfn %lx", page_nr);
+        return 0;
+    }
+
+    return 1;
+}
+
+
 int get_page_type(struct page_info *page, u32 type)
 {
     u64 nx, x, y = page->u.inuse.type_info;
@@ -2792,6 +2806,8 @@ int memory_is_conventional_ram(paddr_t p)
 long
 arch_memory_op(int op, XEN_GUEST_HANDLE(void) arg)
 {
+    struct page_info *page = NULL;
+
     switch (op) {
     case XENMEM_add_to_physmap:
     {
@@ -2836,11 +2852,21 @@ arch_memory_op(int op, XEN_GUEST_HANDLE(void) arg)
 
             spin_unlock(&d->grant_table->lock);
             break;
+        case XENMAPSPACE_mfn:
+        {
+            if ( get_page_from_pagenr(xatp.idx, d) ) {
+                mfn = xatp.idx;
+                page = mfn_to_page(mfn);
+            }
+            break;
+        }
         default:
             break;
         }
 
         if (mfn == 0) {
+            if ( page )
+                put_page(page);
             rcu_unlock_domain(d);
             return -EINVAL;
         }
@@ -2872,11 +2898,53 @@ arch_memory_op(int op, XEN_GUEST_HANDLE(void) arg)
 
     out:
         domain_unlock(d);
-        
+
+        if ( page )
+            put_page(page);
+
         rcu_unlock_domain(d);
 
         break;
     }
+
+    case XENMEM_remove_from_physmap:
+    {
+        struct xen_remove_from_physmap xrfp;
+        unsigned long mfn;
+        struct domain *d;
+
+        if ( copy_from_guest(&xrfp, arg, 1) )
+            return -EFAULT;
+
+        if ( xrfp.domid == DOMID_SELF )
+        {
+            d = rcu_lock_current_domain();
+        }
+        else
+        {
+            if ( (d = rcu_lock_domain_by_id(xrfp.domid)) == NULL )
+                return -ESRCH;
+            if ( !IS_PRIV_FOR(current->domain, d) )
+            {
+                rcu_unlock_domain(d);
+                return -EPERM;
+            }
+        }
+
+        domain_lock(d);
+
+        mfn = gmfn_to_mfn(d, xrfp.gpfn);
+
+        if ( mfn_valid(mfn) )
+            guest_physmap_remove_page(d, xrfp.gpfn, mfn, 0);
+
+        domain_unlock(d);
+
+        rcu_unlock_domain(d);
+
+        break;
+    }
+
 
     case XENMEM_machine_memory_map:
     {

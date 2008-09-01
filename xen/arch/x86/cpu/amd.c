@@ -10,8 +10,142 @@
 #include <asm/hvm/support.h>
 
 #include "cpu.h"
+#include "amd.h"
 
 int start_svm(struct cpuinfo_x86 *c);
+
+/*
+ * Pre-canned values for overriding the CPUID features 
+ * and extended features masks.
+ *
+ * Currently supported processors:
+ * 
+ * "fam_0f_rev_c"
+ * "fam_0f_rev_d"
+ * "fam_0f_rev_e"
+ * "fam_0f_rev_f"
+ * "fam_0f_rev_g"
+ * "fam_10_rev_b"
+ * "fam_10_rev_c"
+ * "fam_11_rev_b"
+ */
+static char opt_famrev[14];
+string_param("cpuid_mask_cpu", opt_famrev);
+
+/* Finer-grained CPUID feature control. */
+static unsigned int opt_cpuid_mask_ecx, opt_cpuid_mask_edx;
+integer_param("cpuid_mask_ecx", opt_cpuid_mask_ecx);
+integer_param("cpuid_mask_edx", opt_cpuid_mask_edx);
+static unsigned int opt_cpuid_mask_ext_ecx, opt_cpuid_mask_ext_edx;
+integer_param("cpuid_mask_ecx", opt_cpuid_mask_ext_ecx);
+integer_param("cpuid_mask_edx", opt_cpuid_mask_ext_edx);
+
+static inline void wrmsr_amd(unsigned int index, unsigned int lo, 
+		unsigned int hi)
+{
+	asm volatile (
+		"wrmsr"
+		: /* No outputs */
+		: "c" (index), "a" (lo), 
+		"d" (hi), "D" (0x9c5a203a)
+	);
+}
+
+/*
+ * Mask the features and extended features returned by CPUID.  Parameters are
+ * set from the boot line via two methods:
+ *
+ *   1) Specific processor revision string
+ *   2) User-defined masks
+ *
+ * The processor revision string parameter has precedene.
+ */
+static void __devinit set_cpuidmask(struct cpuinfo_x86 *c)
+{
+	static unsigned int feat_ecx, feat_edx;
+	static unsigned int extfeat_ecx, extfeat_edx;
+	static enum { not_parsed, no_mask, set_mask } status;
+
+	if (status == no_mask)
+		return;
+
+	if (status == set_mask)
+		goto setmask;
+
+	ASSERT((status == not_parsed) && (smp_processor_id() == 0));
+	status = no_mask;
+
+	if (opt_cpuid_mask_ecx | opt_cpuid_mask_edx |
+	    opt_cpuid_mask_ext_ecx | opt_cpuid_mask_ext_edx) {
+		feat_ecx = opt_cpuid_mask_ecx ? : ~0U;
+		feat_edx = opt_cpuid_mask_edx ? : ~0U;
+		extfeat_ecx = opt_cpuid_mask_ext_ecx ? : ~0U;
+		extfeat_edx = opt_cpuid_mask_ext_edx ? : ~0U;
+	} else if (*opt_famrev == '\0') {
+		return;
+	} else if (!strcmp(opt_famrev, "fam_0f_rev_c")) {
+		feat_ecx = AMD_FEATURES_K8_REV_C_ECX;
+		feat_edx = AMD_FEATURES_K8_REV_C_EDX;
+		extfeat_ecx = AMD_EXTFEATURES_K8_REV_C_ECX;
+		extfeat_edx = AMD_EXTFEATURES_K8_REV_C_EDX;
+	} else if (!strcmp(opt_famrev, "fam_0f_rev_d")) {
+		feat_ecx = AMD_FEATURES_K8_REV_D_ECX;
+		feat_edx = AMD_FEATURES_K8_REV_D_EDX;
+		extfeat_ecx = AMD_EXTFEATURES_K8_REV_D_ECX;
+		extfeat_edx = AMD_EXTFEATURES_K8_REV_D_EDX;
+	} else if (!strcmp(opt_famrev, "fam_0f_rev_e")) {
+		feat_ecx = AMD_FEATURES_K8_REV_E_ECX;
+		feat_edx = AMD_FEATURES_K8_REV_E_EDX;
+		extfeat_ecx = AMD_EXTFEATURES_K8_REV_E_ECX;
+		extfeat_edx = AMD_EXTFEATURES_K8_REV_E_EDX;
+	} else if (!strcmp(opt_famrev, "fam_0f_rev_f")) {
+		feat_ecx = AMD_FEATURES_K8_REV_F_ECX;
+		feat_edx = AMD_FEATURES_K8_REV_F_EDX;
+		extfeat_ecx = AMD_EXTFEATURES_K8_REV_F_ECX;
+		extfeat_edx = AMD_EXTFEATURES_K8_REV_F_EDX;
+	} else if (!strcmp(opt_famrev, "fam_0f_rev_g")) {
+		feat_ecx = AMD_FEATURES_K8_REV_G_ECX;
+		feat_edx = AMD_FEATURES_K8_REV_G_EDX;
+		extfeat_ecx = AMD_EXTFEATURES_K8_REV_G_ECX;
+		extfeat_edx = AMD_EXTFEATURES_K8_REV_G_EDX;
+	} else if (!strcmp(opt_famrev, "fam_10_rev_b")) {
+		feat_ecx = AMD_FEATURES_FAM10h_REV_B_ECX;
+		feat_edx = AMD_FEATURES_FAM10h_REV_B_EDX;
+		extfeat_ecx = AMD_EXTFEATURES_FAM10h_REV_B_ECX;
+		extfeat_edx = AMD_EXTFEATURES_FAM10h_REV_B_EDX;
+	} else if (!strcmp(opt_famrev, "fam_10_rev_c")) {
+		feat_ecx = AMD_FEATURES_FAM10h_REV_C_ECX;
+		feat_edx = AMD_FEATURES_FAM10h_REV_C_EDX;
+		extfeat_ecx = AMD_EXTFEATURES_FAM10h_REV_C_ECX;
+		extfeat_edx = AMD_EXTFEATURES_FAM10h_REV_C_EDX;
+	} else if (!strcmp(opt_famrev, "fam_11_rev_b")) {
+		feat_ecx = AMD_FEATURES_FAM11h_REV_B_ECX;
+		feat_edx = AMD_FEATURES_FAM11h_REV_B_EDX;
+		extfeat_ecx = AMD_EXTFEATURES_FAM11h_REV_B_ECX;
+		extfeat_edx = AMD_EXTFEATURES_FAM11h_REV_B_EDX;
+	} else {
+		printk("Invalid processor string: %s\n", opt_famrev);
+		printk("CPUID will not be masked\n");
+		return;
+	}
+
+	status = set_mask;
+	printk("Writing CPUID feature mask ECX:EDX -> %08Xh:%08Xh\n", 
+	       feat_ecx, feat_edx);
+	printk("Writing CPUID extended feature mask ECX:EDX -> %08Xh:%08Xh\n", 
+	       extfeat_ecx, extfeat_edx);
+
+ setmask:
+	/* FIXME check if processor supports CPUID masking */
+	/* AMD processors prior to family 10h required a 32-bit password */
+	if (c->x86 >= 0x10) {
+		wrmsr(MSR_K8_FEATURE_MASK, feat_edx, feat_ecx);
+		wrmsr(MSR_K8_EXT_FEATURE_MASK, extfeat_edx, extfeat_ecx);
+	} else if (c->x86 == 0x0f) {
+		wrmsr_amd(MSR_K8_FEATURE_MASK, feat_edx, feat_ecx);
+		wrmsr_amd(MSR_K8_EXT_FEATURE_MASK, extfeat_edx, extfeat_ecx);
+	}
+}
 
 /*
  * amd_flush_filter={on,off}. Forcibly Enable or disable the TLB flush
@@ -115,7 +249,7 @@ static void check_disable_c1e(unsigned int port, u8 value)
 		on_each_cpu(disable_c1e, NULL, 1, 1);
 }
 
-static void __init init_amd(struct cpuinfo_x86 *c)
+static void __devinit init_amd(struct cpuinfo_x86 *c)
 {
 	u32 l, h;
 	int mbytes = num_physpages >> (20-PAGE_SHIFT);
@@ -367,6 +501,8 @@ static void __init init_amd(struct cpuinfo_x86 *c)
 	/* Prevent TSC drift in non single-processor, single-core platforms. */
 	if ((smp_processor_id() == 1) && c1_ramping_may_cause_clock_drift(c))
 		disable_c1_ramping();
+
+	set_cpuidmask(c);
 
 	start_svm(c);
 }

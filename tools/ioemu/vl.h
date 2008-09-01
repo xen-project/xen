@@ -1560,6 +1560,9 @@ void timeoffset_get(void);
 /* xen_platform.c */
 #ifndef QEMU_TOOL
 void pci_xen_platform_init(PCIBus *bus);
+void xen_vga_stolen_vram_addr(uint64_t vram_addr);
+void xen_vga_populate_vram(uint64_t vram_addr);
+void xen_vga_vram_map(uint64_t vram_addr, int copy);
 #endif
 
 /* pci_emulation.c */

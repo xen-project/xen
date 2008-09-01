@@ -624,15 +624,10 @@ static int iommu_set_root_entry(struct iommu *iommu)
     unsigned long flags;
     s_time_t start_time;
 
-    if ( iommu->root_maddr != 0 )
-    {
-        free_pgtable_maddr(iommu->root_maddr);
-        iommu->root_maddr = 0;
-    }
-
     spin_lock_irqsave(&iommu->register_lock, flags);
 
-    iommu->root_maddr = alloc_pgtable_maddr();
+    if ( iommu->root_maddr == 0 )
+        iommu->root_maddr = alloc_pgtable_maddr();
     if ( iommu->root_maddr == 0 )
     {
         spin_unlock_irqrestore(&iommu->register_lock, flags);
@@ -1864,37 +1859,31 @@ static int intel_iommu_group_id(u8 bus, u8 devfn)
         return -1;
 }
 
-u8 iommu_state[MAX_IOMMU_REGS * MAX_IOMMUS];
+static u32 iommu_state[MAX_IOMMUS][MAX_IOMMU_REGS];
 int iommu_suspend(void)
 {
     struct acpi_drhd_unit *drhd;
     struct iommu *iommu;
-    int i = 0;
+    u32    i;
+
+    if ( !vtd_enabled )
+        return 0;
 
     iommu_flush_all();
 
     for_each_drhd_unit ( drhd )
     {
         iommu = drhd->iommu;
-        iommu_state[DMAR_RTADDR_REG * i] =
-            (u64) dmar_readq(iommu->reg, DMAR_RTADDR_REG);
-        iommu_state[DMAR_FECTL_REG * i] =
+        i = iommu->index;
+
+        iommu_state[i][DMAR_FECTL_REG] =
             (u32) dmar_readl(iommu->reg, DMAR_FECTL_REG);
-        iommu_state[DMAR_FEDATA_REG * i] =
+        iommu_state[i][DMAR_FEDATA_REG] =
             (u32) dmar_readl(iommu->reg, DMAR_FEDATA_REG);
-        iommu_state[DMAR_FEADDR_REG * i] =
+        iommu_state[i][DMAR_FEADDR_REG] =
             (u32) dmar_readl(iommu->reg, DMAR_FEADDR_REG);
-        iommu_state[DMAR_FEUADDR_REG * i] =
+        iommu_state[i][DMAR_FEUADDR_REG] =
             (u32) dmar_readl(iommu->reg, DMAR_FEUADDR_REG);
-        iommu_state[DMAR_PLMBASE_REG * i] =
-            (u32) dmar_readl(iommu->reg, DMAR_PLMBASE_REG);
-        iommu_state[DMAR_PLMLIMIT_REG * i] =
-            (u32) dmar_readl(iommu->reg, DMAR_PLMLIMIT_REG);
-        iommu_state[DMAR_PHMBASE_REG * i] =
-            (u64) dmar_readq(iommu->reg, DMAR_PHMBASE_REG);
-        iommu_state[DMAR_PHMLIMIT_REG * i] =
-            (u64) dmar_readq(iommu->reg, DMAR_PHMLIMIT_REG);
-        i++;
     }
 
     return 0;
@@ -1904,37 +1893,34 @@ int iommu_resume(void)
 {
     struct acpi_drhd_unit *drhd;
     struct iommu *iommu;
-    int i = 0;
+    u32 i;
+
+    if ( !vtd_enabled )
+        return 0;
 
     iommu_flush_all();
 
-    init_vtd_hw();
+    if ( init_vtd_hw() != 0  && force_iommu )
+         panic("IOMMU setup failed, crash Xen for security purpose!\n");
+
     for_each_drhd_unit ( drhd )
     {
         iommu = drhd->iommu;
-        dmar_writeq( iommu->reg, DMAR_RTADDR_REG,
-                     (u64) iommu_state[DMAR_RTADDR_REG * i]);
+        i = iommu->index;
+
         dmar_writel(iommu->reg, DMAR_FECTL_REG,
-                    (u32) iommu_state[DMAR_FECTL_REG * i]);
+                    (u32) iommu_state[i][DMAR_FECTL_REG]);
         dmar_writel(iommu->reg, DMAR_FEDATA_REG,
-                    (u32) iommu_state[DMAR_FEDATA_REG * i]);
+                    (u32) iommu_state[i][DMAR_FEDATA_REG]);
         dmar_writel(iommu->reg, DMAR_FEADDR_REG,
-                    (u32) iommu_state[DMAR_FEADDR_REG * i]);
+                    (u32) iommu_state[i][DMAR_FEADDR_REG]);
         dmar_writel(iommu->reg, DMAR_FEUADDR_REG,
-                    (u32) iommu_state[DMAR_FEUADDR_REG * i]);
-        dmar_writel(iommu->reg, DMAR_PLMBASE_REG,
-                    (u32) iommu_state[DMAR_PLMBASE_REG * i]);
-        dmar_writel(iommu->reg, DMAR_PLMLIMIT_REG,
-                    (u32) iommu_state[DMAR_PLMLIMIT_REG * i]);
-        dmar_writeq(iommu->reg, DMAR_PHMBASE_REG,
-                    (u64) iommu_state[DMAR_PHMBASE_REG * i]);
-        dmar_writeq(iommu->reg, DMAR_PHMLIMIT_REG,
-                    (u64) iommu_state[DMAR_PHMLIMIT_REG * i]);
+                    (u32) iommu_state[i][DMAR_FEUADDR_REG]);
 
         if ( iommu_enable_translation(iommu) )
             return -EIO;
-        i++;
     }
+
     return 0;
 }
 

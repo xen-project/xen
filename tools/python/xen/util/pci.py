@@ -40,6 +40,7 @@ DEV_TYPE_PCIe_BRIDGE    = 1
 DEV_TYPE_PCI_BRIDGE     = 2
 DEV_TYPE_PCI            = 3    
 
+PCI_VENDOR_ID = 0x0
 PCI_STATUS = 0x6
 PCI_CLASS_DEVICE = 0x0a
 PCI_CLASS_BRIDGE_PCI = 0x0604
@@ -68,6 +69,11 @@ PCI_PM_CTRL = 4
 PCI_PM_CTRL_NO_SOFT_RESET = 0x0004
 PCI_PM_CTRL_STATE_MASK = 0x0003
 PCI_D3hot = 3
+
+VENDOR_INTEL  = 0x8086
+PCI_CAP_ID_VENDOR_SPECIFIC_CAP = 0x09
+PCI_CLASS_ID_USB = 0x0c03
+PCI_USB_FLRCTRL = 0x4
 
 PCI_CAP_ID_AF = 0x13
 PCI_AF_CAPs   = 0x3
@@ -487,7 +493,7 @@ class PciDevice:
     def do_Dstate_transition(self):
         pos = self.find_cap_offset(PCI_CAP_ID_PM)
         if pos == 0:
-            return 
+            return False
         
         (pci_list, cfg_list) = save_pci_conf_space([self.name])
         
@@ -504,6 +510,31 @@ class PciDevice:
         time.sleep(0.010)
 
         restore_pci_conf_space((pci_list, cfg_list))
+        return True
+
+    def do_vendor_specific_FLR_method(self):
+        pos = self.find_cap_offset(PCI_CAP_ID_VENDOR_SPECIFIC_CAP)
+        if pos == 0:
+            return
+
+        vendor_id = self.pci_conf_read16(PCI_VENDOR_ID)
+        if vendor_id != VENDOR_INTEL:
+            return
+
+        class_id = self.pci_conf_read16(PCI_CLASS_DEVICE)
+        if class_id != PCI_CLASS_ID_USB:
+            return
+
+        (pci_list, cfg_list) = save_pci_conf_space([self.name])
+
+        self.pci_conf_write8(pos + PCI_USB_FLRCTRL, 1)
+        time.sleep(0.010)
+
+        restore_pci_conf_space((pci_list, cfg_list))
+
+    def do_FLR_for_integrated_device(self):
+        if not self.do_Dstate_transition():
+            self.do_vendor_specific_FLR_method()
 
     def find_all_the_multi_functions(self):
         sysfs_mnt = find_sysfs_mnt()
@@ -676,7 +707,7 @@ class PciDevice:
                 restore_pci_conf_space((pci_list, cfg_list))
             else:
                 if self.bus == 0:
-                    self.do_Dstate_transition()
+                    self.do_FLR_for_integrated_device()
                 else:
                     funcs = self.find_all_the_multi_functions()
                     self.devs_check_driver(funcs)
@@ -697,7 +728,7 @@ class PciDevice:
                 restore_pci_conf_space((pci_list, cfg_list))
             else:
                 if self.bus == 0:
-                    self.do_Dstate_transition()
+                    self.do_FLR_for_integrated_device()
                 else:
                     devs = self.find_coassigned_devices(False)
                     # Remove the element 0 which is a bridge

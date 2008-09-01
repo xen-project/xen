@@ -23,6 +23,7 @@
  */
 #include "vl.h"
 #include "vga_int.h"
+#include <sys/mman.h>
 
 //#define DEBUG_VGA
 //#define DEBUG_VGA_MEM
@@ -1776,7 +1777,10 @@ static void vga_save(QEMUFile *f, void *opaque)
 #endif
     vram_size = s->vram_size;
     qemu_put_be32s(f, &vram_size); 
-    qemu_put_buffer(f, s->vram_ptr, s->vram_size); 
+    qemu_put_be64s(f, &s->stolen_vram_addr);
+    if (!s->stolen_vram_addr)
+        /* Old guest: VRAM is not mapped, we have to save it ourselves */
+        qemu_put_buffer(f, s->vram_ptr, VGA_RAM_SIZE);
 }
 
 static int vga_load(QEMUFile *f, void *opaque, int version_id)
@@ -1788,7 +1792,7 @@ static int vga_load(QEMUFile *f, void *opaque, int version_id)
     int i;
 #endif
 
-    if (version_id > 3)
+    if (version_id > 4)
         return -EINVAL;
 
     if (s->pci_dev && version_id >= 2) {
@@ -1839,7 +1843,14 @@ static int vga_load(QEMUFile *f, void *opaque, int version_id)
 	qemu_get_be32s(f, &vram_size);
 	if (vram_size != s->vram_size)
 	    return -EINVAL;
-	qemu_get_buffer(f, s->vram_ptr, s->vram_size); 
+        if (version_id >= 4) {
+            qemu_get_be64s(f, &s->stolen_vram_addr);
+            if (s->stolen_vram_addr)
+                xen_vga_vram_map(s->stolen_vram_addr, 0);
+        }
+        /* Old guest, VRAM is not mapped, we have to restore it ourselves */
+        if (!s->stolen_vram_addr)
+            qemu_get_buffer(f, s->vram_ptr, s->vram_size); 
     }
 
     /* force refresh */
@@ -1994,6 +2005,100 @@ void vga_bios_init(VGAState *s)
     /* TODO: add vbe support if enabled */
 }
 
+
+static VGAState *xen_vga_state;
+
+/* When loading old images we have to populate the video ram ourselves */
+void xen_vga_populate_vram(uint64_t vram_addr)
+{
+    unsigned long nr_pfn;
+    struct xen_remove_from_physmap xrfp;
+    xen_pfn_t *pfn_list;
+    int i;
+    int rc;
+
+    fprintf(logfile, "populating video RAM at %lx\n", vram_addr);
+
+    nr_pfn = VGA_RAM_SIZE >> TARGET_PAGE_BITS;
+
+    pfn_list = malloc(sizeof(*pfn_list) * nr_pfn);
+
+    for (i = 0; i < nr_pfn; i++)
+        pfn_list[i] = (vram_addr >> TARGET_PAGE_BITS) + i;
+
+    if (xc_domain_memory_populate_physmap(xc_handle, domid, nr_pfn, 0, 0, pfn_list)) {
+        fprintf(stderr, "Failed to populate video ram\n");
+        exit(1);
+    }
+    free(pfn_list);
+
+    xen_vga_vram_map(vram_addr, 0);
+
+    /* Unmap them from the guest for now. */
+    xrfp.domid = domid;
+    for (i = 0; i < nr_pfn; i++) {
+        xrfp.gpfn = (vram_addr >> TARGET_PAGE_BITS) + i;
+        rc = xc_memory_op(xc_handle, XENMEM_remove_from_physmap, &xrfp);
+        if (rc) {
+            fprintf(stderr, "remove_from_physmap PFN %"PRI_xen_pfn" failed: %d\n", xrfp.gpfn, rc);
+            break;
+        }
+    }
+}
+
+/* Called once video memory has been allocated in the GPFN space */
+void xen_vga_vram_map(uint64_t vram_addr, int copy)
+{
+    unsigned long nr_pfn;
+    xen_pfn_t *pfn_list;
+    int i;
+    void *vram;
+
+    fprintf(logfile, "mapping video RAM from %lx\n", vram_addr);
+
+    nr_pfn = VGA_RAM_SIZE >> TARGET_PAGE_BITS;
+
+    pfn_list = malloc(sizeof(*pfn_list) * nr_pfn);
+
+    for (i = 0; i < nr_pfn; i++)
+        pfn_list[i] = (vram_addr >> TARGET_PAGE_BITS) + i;
+
+    vram = xc_map_foreign_pages(xc_handle, domid,
+                                        PROT_READ|PROT_WRITE,
+                                        pfn_list, nr_pfn);
+
+    if (!vram) {
+        fprintf(stderr, "Failed to map vram\n");
+        exit(1);
+    }
+
+    if (xc_domain_memory_translate_gpfn_list(xc_handle, domid, nr_pfn,
+                pfn_list, pfn_list)) {
+        fprintf(stderr, "Failed translation in xen_vga_vram_addr\n");
+        exit(1);
+    }
+
+    if (copy)
+        memcpy(vram, xen_vga_state->vram_ptr, VGA_RAM_SIZE);
+    qemu_free(xen_vga_state->vram_ptr);
+    xen_vga_state->vram_ptr = vram;
+    xen_vga_state->vram_mfns = pfn_list;
+#ifdef CONFIG_STUBDOM
+    xenfb_pv_display_start(vram);
+#endif
+}
+
+/* Called at boot time when the BIOS has allocated video RAM */
+void xen_vga_stolen_vram_addr(uint64_t stolen_vram_addr)
+{
+    fprintf(logfile, "stolen video RAM at %lx\n", stolen_vram_addr);
+
+    xen_vga_state->stolen_vram_addr = stolen_vram_addr;
+
+    /* And copy from the initialization value */
+    xen_vga_vram_map(stolen_vram_addr, 1);
+}
+
 /* when used on xen environment, the vga_ram_base is not used */
 void vga_common_init(VGAState *s, DisplayState *ds, uint8_t *vga_ram_base, 
                      unsigned long vga_ram_offset, int vga_ram_size)
@@ -2025,13 +2130,9 @@ void vga_common_init(VGAState *s, DisplayState *ds, uint8_t *vga_ram_base,
 
     vga_reset(s);
 
-    /* Video RAM must be page-aligned for PVFB memory sharing */
-    s->vram_ptr = s->vram_alloc = qemu_memalign(TARGET_PAGE_SIZE, vga_ram_size);
-
-#ifdef CONFIG_STUBDOM
-    if (!cirrus_vga_enabled)
-        xenfb_pv_display_start(s->vram_ptr);
-#endif
+    s->vram_ptr = qemu_malloc(vga_ram_size);
+    s->vram_mfns = NULL;
+    xen_vga_state = s;
 
     s->vram_offset = vga_ram_offset;
     s->vram_size = vga_ram_size;
@@ -2051,7 +2152,7 @@ static void vga_init(VGAState *s)
 {
     int vga_io_memory;
 
-    register_savevm("vga", 0, 3, vga_save, vga_load, s);
+    register_savevm("vga", 0, 4, vga_save, vga_load, s);
 
     register_ioport_write(0x3c0, 16, 1, vga_ioport_write, s);
 
@@ -2161,33 +2262,6 @@ int pci_vga_init(PCIBus *bus, DisplayState *ds, uint8_t *vga_ram_base,
                                PCI_ADDRESS_SPACE_MEM_PREFETCH, vga_map);
     }
     return 0;
-}
-
-void *vga_update_vram(VGAState *s, void *vga_ram_base, int vga_ram_size)
-{
-    uint8_t *old_pointer;
-
-    if (s->vram_size != vga_ram_size) {
-        fprintf(stderr, "No support to change vga_ram_size\n");
-        return NULL;
-    }
-
-    if (!vga_ram_base) {
-        vga_ram_base = qemu_memalign(TARGET_PAGE_SIZE, vga_ram_size + TARGET_PAGE_SIZE + 1);
-        if (!vga_ram_base) {
-            fprintf(stderr, "reallocate error\n");
-            return NULL;
-        }
-    }
-
-    /* XXX lock needed? */
-    old_pointer = s->vram_alloc;
-    s->vram_alloc = vga_ram_base;
-    vga_ram_base = (uint8_t *)((long)(vga_ram_base + 15) & ~15L);
-    memcpy(vga_ram_base, s->vram_ptr, vga_ram_size);
-    s->vram_ptr = vga_ram_base;
-
-    return old_pointer;
 }
 
 /********************************************************/

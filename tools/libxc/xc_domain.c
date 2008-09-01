@@ -537,6 +537,33 @@ int xc_domain_memory_populate_physmap(int xc_handle,
     return err;
 }
 
+int xc_domain_memory_translate_gpfn_list(int xc_handle,
+                                         uint32_t domid,
+                                         unsigned long nr_gpfns,
+                                         xen_pfn_t *gpfn_list,
+                                         xen_pfn_t *mfn_list)
+{
+    int err;
+    struct xen_translate_gpfn_list translate_gpfn_list = {
+        .domid    = domid,
+        .nr_gpfns = nr_gpfns,
+    };
+    set_xen_guest_handle(translate_gpfn_list.gpfn_list, gpfn_list);
+    set_xen_guest_handle(translate_gpfn_list.mfn_list, mfn_list);
+
+    err = xc_memory_op(xc_handle, XENMEM_translate_gpfn_list, &translate_gpfn_list);
+
+    if ( err != 0 )
+    {
+        DPRINTF("Failed translation for dom %d (%ld PFNs)\n",
+                domid, nr_gpfns);
+        errno = -err;
+        err = -1;
+    }
+
+    return err;
+}
+
 int xc_domain_max_vcpus(int xc_handle, uint32_t domid, unsigned int max)
 {
     DECLARE_DOMCTL;

@@ -63,7 +63,9 @@ asmlinkage void do_IRQ(struct cpu_user_regs *regs)
 
     if ( likely(desc->status & IRQ_GUEST) )
     {
+        irq_enter();
         __do_IRQ_guest(vector);
+        irq_exit();
         spin_unlock(&desc->lock);
         return;
     }
