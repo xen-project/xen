@@ -286,7 +286,7 @@ class PciController(DevController):
                     )%(dev.name))
 
         if dev.has_non_page_aligned_bar and arch.type != "ia64":
-            raise VmError("pci: %: non-page-aligned MMIO BAR found." % dev.name)
+            raise VmError("pci: %s: non-page-aligned MMIO BAR found." % dev.name)
 
         self.CheckSiblingDevices(fe_domid, dev)
 
