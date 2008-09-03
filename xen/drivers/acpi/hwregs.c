@@ -239,11 +239,13 @@ acpi_status acpi_set_register(u32 register_id, u32 value)
 
 	case ACPI_REGISTER_PM2_CONTROL:
 
+#if 0 /* Redundant read in original Linux code. */
 		status = acpi_hw_register_read(ACPI_REGISTER_PM2_CONTROL,
 					       &register_value);
 		if (ACPI_FAILURE(status)) {
 			goto unlock_and_exit;
 		}
+#endif
 
 		ACPI_DEBUG_PRINT((ACPI_DB_IO,
 				  "PM2 control: Read %X from %8.8X%8.8X\n",
