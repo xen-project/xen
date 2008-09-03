@@ -31,6 +31,7 @@
 #include <xen/compat.h>
 #include <xen/acpi.h>
 #include <xen/pci.h>
+#include <xen/paging.h>
 #include <asm/regs.h>
 #include <asm/mc146818rtc.h>
 #include <asm/system.h>
@@ -40,7 +41,6 @@
 #include <asm/i387.h>
 #include <asm/mpspec.h>
 #include <asm/ldt.h>
-#include <asm/paging.h>
 #include <asm/hypercall.h>
 #include <asm/hvm/hvm.h>
 #include <asm/hvm/support.h>

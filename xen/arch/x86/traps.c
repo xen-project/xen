@@ -47,7 +47,7 @@
 #include <xen/version.h>
 #include <xen/kexec.h>
 #include <xen/trace.h>
-#include <asm/paging.h>
+#include <xen/paging.h>
 #include <asm/system.h>
 #include <asm/io.h>
 #include <asm/atomic.h>

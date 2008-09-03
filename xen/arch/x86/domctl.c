@@ -20,7 +20,7 @@
 #include <xen/trace.h>
 #include <xen/console.h>
 #include <xen/iocap.h>
-#include <asm/paging.h>
+#include <xen/paging.h>
 #include <asm/irq.h>
 #include <asm/hvm/hvm.h>
 #include <asm/hvm/support.h>

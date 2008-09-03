@@ -8,7 +8,7 @@
 #define __ASM_X86_GUEST_ACCESS_H__
 
 #include <asm/uaccess.h>
-#include <asm/shadow.h>
+#include <asm/paging.h>
 #include <asm/hvm/support.h>
 #include <asm/hvm/guest_access.h>
 
@@ -87,10 +87,10 @@
  * Allows use of faster __copy_* functions.
  */
 #define guest_handle_okay(hnd, nr)                      \
-    (shadow_mode_external(current->domain) ||           \
+    (paging_mode_external(current->domain) ||           \
      array_access_ok((hnd).p, (nr), sizeof(*(hnd).p)))
 #define guest_handle_subrange_okay(hnd, first, last)    \
-    (shadow_mode_external(current->domain) ||           \
+    (paging_mode_external(current->domain) ||           \
      array_access_ok((hnd).p + (first),                 \
                      (last)-(first)+1,                  \
                      sizeof(*(hnd).p)))
