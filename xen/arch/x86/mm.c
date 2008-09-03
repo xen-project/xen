@@ -762,9 +762,8 @@ get_page_from_l2e(
 
     rc = get_page_and_type_from_pagenr(
         l2e_get_pfn(l2e), PGT_l1_page_table, d, 0);
-    if ( unlikely(rc) && rc != -EAGAIN &&
-         get_l2_linear_pagetable(l2e, pfn, d) )
-        rc = -EINVAL;
+    if ( unlikely(rc == -EINVAL) && get_l2_linear_pagetable(l2e, pfn, d) )
+        rc = 0;
 
     return rc;
 }
@@ -788,9 +787,8 @@ get_page_from_l3e(
 
     rc = get_page_and_type_from_pagenr(
         l3e_get_pfn(l3e), PGT_l2_page_table, d, preemptible);
-    if ( unlikely(rc) && rc != -EAGAIN && rc != -EINTR &&
-         get_l3_linear_pagetable(l3e, pfn, d) )
-        rc = -EINVAL;
+    if ( unlikely(rc == -EINVAL) && get_l3_linear_pagetable(l3e, pfn, d) )
+        rc = 0;
 
     return rc;
 }
@@ -814,9 +812,8 @@ get_page_from_l4e(
 
     rc = get_page_and_type_from_pagenr(
         l4e_get_pfn(l4e), PGT_l3_page_table, d, preemptible);
-    if ( unlikely(rc) && rc != -EAGAIN && rc != -EINTR &&
-         get_l4_linear_pagetable(l4e, pfn, d) )
-        rc = -EINVAL;
+    if ( unlikely(rc == -EINVAL) && get_l4_linear_pagetable(l4e, pfn, d) )
+        rc = 0;
 
     return rc;
 }
