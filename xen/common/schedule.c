@@ -628,7 +628,9 @@ static void vcpu_periodic_timer_work(struct vcpu *v)
         return;
 
     periodic_next_event = v->periodic_last_event + v->periodic_period;
-    if ( now > periodic_next_event )
+
+    /* The timer subsystem may call us up to TIME_SLOP ahead of deadline. */
+    if ( (now + TIME_SLOP) > periodic_next_event )
     {
         send_timer_event(v);
         v->periodic_last_event = now;
