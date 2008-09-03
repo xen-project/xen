@@ -655,9 +655,6 @@ long do_domctl(XEN_GUEST_HANDLE(xen_domctl_t) u_domctl)
         spin_lock(&d->page_alloc_lock);
         if ( new_max >= d->tot_pages )
         {
-            ret = guest_physmap_max_mem_pages(d, new_max);
-            if ( ret != 0 )
-                break;
             d->max_pages = new_max;
             ret = 0;
         }
