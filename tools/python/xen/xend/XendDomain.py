@@ -481,6 +481,7 @@ class XendDomain:
             if domid in self.domains:
                 del self.domains[domid]
 
+            XendDevices.destroy_device_state(info)
             info.destroy_xapi_device_instances()
         else:
             log.warning("Attempted to remove non-existent domain.")
@@ -1094,7 +1095,6 @@ class XendDomain:
         dominfo.metrics.destroy()
         self._managed_domain_unregister(dominfo)
         self._remove_domain(dominfo)
-        XendDevices.destroy_device_state(dominfo)
         dominfo.destroy_xapi_device_instances()
 
 
