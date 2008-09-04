@@ -1,0 +1,32 @@
+
+########################################
+#
+# Helper macros
+#
+
+#
+# shiftn(num,list...)
+#
+# shift the list num times
+#
+define(`shiftn',`ifelse($1,0,`shift($*)',`shiftn(decr($1),shift(shift($*)))')')
+
+########################################
+#
+# gen_user(username, role_set, mls_defaultlevel, mls_range, [mcs_categories])
+#
+define(`gen_user',`user $1 roles { $2 }`'ifdef(`enable_mls', ` level $3 range $4')`'ifdef(`enable_mcs',` level s0 range s0`'ifelse(`$5',,,` - s0:$5')');')
+
+########################################
+#
+# gen_context(context,mls_sensitivity,[mcs_categories])
+#
+define(`gen_context',`$1`'ifdef(`enable_mls',`:$2')`'ifdef(`enable_mcs',`:s0`'ifelse(`$3',,,`:$3')')') dnl
+
+########################################
+#
+# gen_bool(name,default_value)
+#
+define(`gen_bool',`
+	bool $1 dflt_or_overr(`$1'_conf,$2);
+')
