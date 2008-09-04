@@ -68,14 +68,6 @@ long arch_do_domctl(
         if ( unlikely((d = rcu_lock_domain_by_id(domctl->domain)) == NULL) )
             break;
 
-        ret = xsm_ioport_permission(d, fp, 
-                                    domctl->u.ioport_permission.allow_access);
-        if ( ret )
-        {
-            rcu_unlock_domain(d);
-            break;
-        }
-
         if ( np == 0 )
             ret = 0;
         else if ( domctl->u.ioport_permission.allow_access )
@@ -550,6 +542,10 @@ long arch_do_domctl(
         if ( (d = rcu_lock_domain_by_id(domctl->domain)) == NULL )
             break;
 
+        ret = xsm_sendtrigger(d);
+        if ( ret )
+            goto sendtrigger_out;
+
         ret = -EINVAL;
         if ( domctl->u.sendtrigger.vcpu >= MAX_VIRT_CPUS )
             goto sendtrigger_out;
@@ -628,6 +624,10 @@ long arch_do_domctl(
         bus = (domctl->u.assign_device.machine_bdf >> 16) & 0xff;
         devfn = (domctl->u.assign_device.machine_bdf >> 8) & 0xff;
 
+        ret = xsm_test_assign_device(domctl->u.assign_device.machine_bdf);
+        if ( ret )
+            break;
+
         if ( device_assigned(bus, devfn) )
         {
             gdprintk(XENLOG_ERR, "XEN_DOMCTL_test_assign_device: "
@@ -655,6 +655,11 @@ long arch_do_domctl(
                 "XEN_DOMCTL_assign_device: get_domain_by_id() failed\n");
             break;
         }
+
+        ret = xsm_assign_device(d, domctl->u.assign_device.machine_bdf);
+        if ( ret )
+            goto assign_device_out;
+
         bus = (domctl->u.assign_device.machine_bdf >> 16) & 0xff;
         devfn = (domctl->u.assign_device.machine_bdf >> 8) & 0xff;
 
@@ -680,6 +685,7 @@ long arch_do_domctl(
                      "assign device (%x:%x:%x) failed\n",
                      bus, PCI_SLOT(devfn), PCI_FUNC(devfn));
 
+    assign_device_out:
         put_domain(d);
     }
     break;
@@ -700,6 +706,11 @@ long arch_do_domctl(
                 "XEN_DOMCTL_deassign_device: get_domain_by_id() failed\n"); 
             break;
         }
+
+        ret = xsm_assign_device(d, domctl->u.assign_device.machine_bdf);
+        if ( ret )
+            goto deassign_device_out;
+
         bus = (domctl->u.assign_device.machine_bdf >> 16) & 0xff;
         devfn = (domctl->u.assign_device.machine_bdf >> 8) & 0xff;
 
@@ -720,6 +731,8 @@ long arch_do_domctl(
         deassign_device(d, bus, devfn);
         gdprintk(XENLOG_INFO, "XEN_DOMCTL_deassign_device: bdf = %x:%x:%x\n",
             bus, PCI_SLOT(devfn), PCI_FUNC(devfn));
+
+    deassign_device_out:
         put_domain(d);
     }
     break;
@@ -733,10 +746,17 @@ long arch_do_domctl(
         if ( (d = rcu_lock_domain_by_id(domctl->domain)) == NULL )
             break;
         bind = &(domctl->u.bind_pt_irq);
+
+        ret = xsm_bind_pt_irq(d, bind);
+        if ( ret )
+            goto bind_out;
+
         if ( iommu_enabled )
             ret = pt_irq_create_bind_vtd(d, bind);
         if ( ret < 0 )
             gdprintk(XENLOG_ERR, "pt_irq_create_bind failed!\n");
+
+    bind_out:
         rcu_unlock_domain(d);
     }
     break;    
@@ -877,11 +897,16 @@ long arch_do_domctl(
         if ( d == NULL )
             break;
 
+        ret = xsm_pin_mem_cacheattr(d);
+        if ( ret )
+            goto pin_out;
+
         ret = hvm_set_mem_pinned_cacheattr(
             d, domctl->u.pin_mem_cacheattr.start,
             domctl->u.pin_mem_cacheattr.end,
             domctl->u.pin_mem_cacheattr.type);
 
+    pin_out:
         rcu_unlock_domain(d);
     }
     break;
@@ -899,6 +924,10 @@ long arch_do_domctl(
         d = rcu_lock_domain_by_id(domctl->domain);
         if ( d == NULL )
             break;
+
+        ret = xsm_ext_vcpucontext(d, domctl->cmd);
+        if ( ret )
+            goto ext_vcpucontext_out;
 
         ret = -ESRCH;
         if ( (evc->vcpu >= MAX_VIRT_CPUS) ||

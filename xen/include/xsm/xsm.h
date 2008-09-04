@@ -64,16 +64,17 @@ struct xsm_operations {
     int (*getvcpucontext) (struct domain *d);
     int (*getvcpuinfo) (struct domain *d);
     int (*domain_settime) (struct domain *d);
+    int (*set_target) (struct domain *d, struct domain *e);
     int (*tbufcontrol) (void);
     int (*readconsole) (uint32_t clear);
     int (*sched_id) (void);
     int (*setdomainmaxmem) (struct domain *d);
     int (*setdomainhandle) (struct domain *d);
     int (*setdebugging) (struct domain *d);
-    int (*irq_permission) (struct domain *d, uint8_t pirq, uint8_t access);
-    int (*iomem_permission) (struct domain *d, unsigned long mfn, 
-                                                                uint8_t access);
     int (*perfcontrol) (void);
+    int (*debug_keys) (void);
+    int (*getcpuinfo) (void);
+    int (*availheap) (void);
 
     int (*evtchn_unbound) (struct domain *d, struct evtchn *chn, domid_t id2);
     int (*evtchn_interdomain) (struct domain *d1, struct evtchn *chn1,
@@ -106,13 +107,13 @@ struct xsm_operations {
 
     int (*kexec) (void);
     int (*schedop_shutdown) (struct domain *d1, struct domain *d2);
+    int (*add_range) (struct domain *d, char *name, unsigned long s, unsigned long e);
+    int (*remove_range) (struct domain *d, char *name, unsigned long s, unsigned long e);
 
     long (*__do_xsm_op) (XEN_GUEST_HANDLE(xsm_op_t) op);
 
 #ifdef CONFIG_X86
     int (*shadow_control) (struct domain *d, uint32_t op);
-    int (*ioport_permission) (struct domain *d, uint32_t ioport, 
-                                                                uint8_t access);
     int (*getpageframeinfo) (struct page_info *page);
     int (*getmemlist) (struct domain *d);
     int (*hypercall_init) (struct domain *d);
@@ -130,6 +131,10 @@ struct xsm_operations {
     int (*microcode) (void);
     int (*physinfo) (void);
     int (*platform_quirk) (uint32_t);
+    int (*firmware_info) (void);
+    int (*acpi_sleep) (void);
+    int (*change_freq) (void);
+    int (*getidletime) (void);
     int (*machine_memory_map) (void);
     int (*domain_memory_map) (struct domain *d);
     int (*mmu_normal_update) (struct domain *d, intpte_t fpte);
@@ -137,6 +142,13 @@ struct xsm_operations {
     int (*update_va_mapping) (struct domain *d, l1_pgentry_t pte);
     int (*add_to_physmap) (struct domain *d1, struct domain *d2);
     int (*remove_from_physmap) (struct domain *d1, struct domain *d2);
+    int (*sendtrigger) (struct domain *d);
+    int (*test_assign_device) (uint32_t machine_bdf);
+    int (*assign_device) (struct domain *d, uint32_t machine_bdf);
+    int (*deassign_device) (struct domain *d, uint32_t machine_bdf);
+    int (*bind_pt_irq) (struct domain *d, struct xen_domctl_bind_pt_irq *bind);
+    int (*pin_mem_cacheattr) (struct domain *d);
+    int (*ext_vcpucontext) (struct domain *d, uint32_t cmd);
 #endif
 };
 
@@ -215,6 +227,11 @@ static inline int xsm_domain_settime (struct domain *d)
     return xsm_call(domain_settime(d));
 }
 
+static inline int xsm_set_target (struct domain *d, struct domain *e)
+{
+    return xsm_call(set_target(d, e));
+}
+
 static inline int xsm_tbufcontrol (void)
 {
     return xsm_call(tbufcontrol());
@@ -245,21 +262,24 @@ static inline int xsm_setdebugging (struct domain *d)
     return xsm_call(setdebugging(d));
 }
 
-static inline int xsm_irq_permission (struct domain *d, uint8_t pirq,
-                                                                uint8_t access)
-{
-    return xsm_call(irq_permission(d, pirq, access));
-} 
-
-static inline int xsm_iomem_permission (struct domain *d, unsigned long mfn,
-                                                                uint8_t access)
-{
-    return xsm_call(iomem_permission(d, mfn, access));
-}
-
 static inline int xsm_perfcontrol (void)
 {
     return xsm_call(perfcontrol());
+}
+
+static inline int xsm_debug_keys (void)
+{
+    return xsm_call(debug_keys());
+}
+
+static inline int xsm_availheap (void)
+{
+    return xsm_call(availheap());
+}
+
+static inline int xsm_getcpuinfo (void)
+{
+    return xsm_call(getcpuinfo());
 }
 
 static inline int xsm_evtchn_unbound (struct domain *d1, struct evtchn *chn,
@@ -387,6 +407,18 @@ static inline int xsm_schedop_shutdown (struct domain *d1, struct domain *d2)
     return xsm_call(schedop_shutdown(d1, d2));
 }
 
+static inline int xsm_add_range (struct domain *d, char *name, unsigned long s,
+                                                                        unsigned long e)
+{
+    return xsm_call(add_range(d, name, s, e));
+}
+ 
+static inline int xsm_remove_range (struct domain *d, char *name, unsigned long s,
+                                                                        unsigned long e)
+{
+    return xsm_call(remove_range(d, name, s, e));
+}
+
 static inline long __do_xsm_op (XEN_GUEST_HANDLE(xsm_op_t) op)
 {
     return xsm_call(__do_xsm_op(op));
@@ -411,12 +443,6 @@ static inline int xsm_init (unsigned int *initrdidx,
 static inline int xsm_shadow_control (struct domain *d, uint32_t op)
 {
     return xsm_call(shadow_control(d, op));
-}
-
-static inline int xsm_ioport_permission (struct domain *d, uint32_t ioport,
-                                                                uint8_t access)
-{
-    return xsm_call(ioport_permission(d, ioport, access));
 }
 
 static inline int xsm_getpageframeinfo (struct page_info *page)
@@ -504,6 +530,26 @@ static inline int xsm_platform_quirk (uint32_t quirk)
     return xsm_call(platform_quirk(quirk));
 }
 
+static inline int xsm_firmware_info (void)
+{
+    return xsm_call(firmware_info());
+}
+
+static inline int xsm_acpi_sleep (void)
+{
+    return xsm_call(acpi_sleep());
+}
+
+static inline int xsm_change_freq (void)
+{
+    return xsm_call(change_freq());
+}
+
+static inline int xsm_getidletime (void)
+{
+    return xsm_call(getidletime());
+}
+
 static inline int xsm_machine_memory_map(void)
 {
     return xsm_call(machine_memory_map());
@@ -537,6 +583,42 @@ static inline int xsm_add_to_physmap(struct domain *d1, struct domain *d2)
 static inline int xsm_remove_from_physmap(struct domain *d1, struct domain *d2)
 {
     return xsm_call(remove_from_physmap(d1, d2));
+}
+
+static inline int xsm_sendtrigger(struct domain *d)
+{
+    return xsm_call(sendtrigger(d));
+}
+
+static inline int xsm_test_assign_device(uint32_t machine_bdf)
+{
+    return xsm_call(test_assign_device(machine_bdf));
+}
+
+static inline int xsm_assign_device(struct domain *d, uint32_t machine_bdf)
+{
+    return xsm_call(assign_device(d, machine_bdf));
+}
+
+static inline int xsm_deassign_device(struct domain *d, uint32_t machine_bdf)
+{
+    return xsm_call(deassign_device(d, machine_bdf));
+}
+
+static inline int xsm_bind_pt_irq(struct domain *d, 
+                                                struct xen_domctl_bind_pt_irq *bind)
+{
+    return xsm_call(bind_pt_irq(d, bind));
+}
+
+static inline int xsm_pin_mem_cacheattr(struct domain *d)
+{
+    return xsm_call(pin_mem_cacheattr(d));
+}
+
+static inline int xsm_ext_vcpucontext(struct domain *d, uint32_t cmd)
+{
+    return xsm_call(ext_vcpucontext(d, cmd));
 }
 #endif /* CONFIG_X86 */
 

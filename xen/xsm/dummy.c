@@ -84,6 +84,11 @@ static int dummy_domain_settime (struct domain *d)
     return 0;
 }
 
+static int dummy_set_target (struct domain *d, struct domain *e)
+{
+    return 0;
+}
+
 static int dummy_tbufcontrol (void)
 {
     return 0;
@@ -114,18 +119,22 @@ static int dummy_setdebugging (struct domain *d)
     return 0;
 }
 
-static int dummy_irq_permission (struct domain *d, uint8_t pirq, uint8_t access)
-{
-    return 0;
-}
-
-static int dummy_iomem_permission (struct domain *d, unsigned long mfn,
-                                                                uint8_t access)
-{
-    return 0;
-}
-
 static int dummy_perfcontrol (void)
+{
+    return 0;
+}
+
+static int dummy_debug_keys (void)
+{
+    return 0;
+}
+
+static int dummy_getcpuinfo (void)
+{
+    return 0;
+}
+
+static int dummy_availheap (void)
 {
     return 0;
 }
@@ -259,14 +268,19 @@ static long dummy___do_xsm_op(XEN_GUEST_HANDLE(xsm_op_t) op)
     return -ENOSYS;
 }
 
-#ifdef CONFIG_X86
-static int dummy_shadow_control (struct domain *d, uint32_t op)
+static int dummy_add_range (struct domain *d, char *name, unsigned long s, unsigned long e)
 {
     return 0;
 }
 
-static int dummy_ioport_permission (struct domain *d, uint32_t ioport, 
-                                                                uint8_t access)
+static int dummy_remove_range (struct domain *d, char *name, unsigned long s, 
+                                                                        unsigned long e)
+{
+    return 0;
+}
+
+#ifdef CONFIG_X86
+static int dummy_shadow_control (struct domain *d, uint32_t op)
 {
     return 0;
 }
@@ -356,6 +370,26 @@ static int dummy_platform_quirk (uint32_t quirk)
     return 0;
 }
 
+static int dummy_firmware_info (void)
+{
+    return 0;
+}
+
+static int dummy_acpi_sleep (void)
+{
+    return 0;
+}
+
+static int dummy_change_freq (void)
+{
+    return 0;
+}
+
+static int dummy_getidletime (void)
+{
+    return 0;
+}
+
 static int dummy_machine_memory_map (void)
 {
     return 0;
@@ -382,6 +416,41 @@ static int dummy_update_va_mapping (struct domain *d, l1_pgentry_t pte)
 }
 
 static int dummy_add_to_physmap (struct domain *d1, struct domain *d2)
+{
+    return 0;
+}
+
+static int dummy_sendtrigger (struct domain *d)
+{
+    return 0;
+}
+
+static int dummy_test_assign_device (uint32_t machine_bdf)
+{
+    return 0;
+}
+
+static int dummy_assign_device (struct domain *d, uint32_t machine_bdf)
+{
+    return 0;
+}
+
+static int dummy_deassign_device (struct domain *d, uint32_t machine_bdf)
+{
+    return 0;
+}
+
+static int dummy_bind_pt_irq (struct domain *d, struct xen_domctl_bind_pt_irq *bind)
+{
+    return 0;
+}
+
+static int dummy_pin_mem_cacheattr (struct domain *d)
+{
+    return 0;
+}
+
+static int dummy_ext_vcpucontext (struct domain *d, uint32_t cmd)
 {
     return 0;
 }
@@ -420,15 +489,17 @@ void xsm_fixup_ops (struct xsm_operations *ops)
     set_to_dummy_if_null(ops, getvcpucontext);
     set_to_dummy_if_null(ops, getvcpuinfo);
     set_to_dummy_if_null(ops, domain_settime);
+    set_to_dummy_if_null(ops, set_target);
     set_to_dummy_if_null(ops, tbufcontrol);
     set_to_dummy_if_null(ops, readconsole);
     set_to_dummy_if_null(ops, sched_id);
     set_to_dummy_if_null(ops, setdomainmaxmem);
     set_to_dummy_if_null(ops, setdomainhandle);
     set_to_dummy_if_null(ops, setdebugging);
-    set_to_dummy_if_null(ops, irq_permission);
-    set_to_dummy_if_null(ops, iomem_permission);
     set_to_dummy_if_null(ops, perfcontrol);
+    set_to_dummy_if_null(ops, debug_keys);
+    set_to_dummy_if_null(ops, getcpuinfo);
+    set_to_dummy_if_null(ops, availheap);
 
     set_to_dummy_if_null(ops, evtchn_unbound);
     set_to_dummy_if_null(ops, evtchn_interdomain);
@@ -461,11 +532,13 @@ void xsm_fixup_ops (struct xsm_operations *ops)
     set_to_dummy_if_null(ops, kexec);
     set_to_dummy_if_null(ops, schedop_shutdown);
 
+    set_to_dummy_if_null(ops, add_range);
+    set_to_dummy_if_null(ops, remove_range);
+
     set_to_dummy_if_null(ops, __do_xsm_op);
 
 #ifdef CONFIG_X86
     set_to_dummy_if_null(ops, shadow_control);
-    set_to_dummy_if_null(ops, ioport_permission);
     set_to_dummy_if_null(ops, getpageframeinfo);
     set_to_dummy_if_null(ops, getmemlist);
     set_to_dummy_if_null(ops, hypercall_init);
@@ -483,6 +556,10 @@ void xsm_fixup_ops (struct xsm_operations *ops)
     set_to_dummy_if_null(ops, microcode);
     set_to_dummy_if_null(ops, physinfo);
     set_to_dummy_if_null(ops, platform_quirk);
+    set_to_dummy_if_null(ops, firmware_info);
+    set_to_dummy_if_null(ops, acpi_sleep);
+    set_to_dummy_if_null(ops, change_freq);
+    set_to_dummy_if_null(ops, getidletime);
     set_to_dummy_if_null(ops, machine_memory_map);
     set_to_dummy_if_null(ops, domain_memory_map);
     set_to_dummy_if_null(ops, mmu_normal_update);
@@ -490,5 +567,12 @@ void xsm_fixup_ops (struct xsm_operations *ops)
     set_to_dummy_if_null(ops, update_va_mapping);
     set_to_dummy_if_null(ops, add_to_physmap);
     set_to_dummy_if_null(ops, remove_from_physmap);
+    set_to_dummy_if_null(ops, sendtrigger);
+    set_to_dummy_if_null(ops, test_assign_device);
+    set_to_dummy_if_null(ops, assign_device);
+    set_to_dummy_if_null(ops, deassign_device);
+    set_to_dummy_if_null(ops, bind_pt_irq);
+    set_to_dummy_if_null(ops, pin_mem_cacheattr);
+    set_to_dummy_if_null(ops, ext_vcpucontext);
 #endif
 }

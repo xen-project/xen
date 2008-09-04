@@ -133,10 +133,9 @@ struct ocontext {
     union {
         char *name;    /* name of initial SID, fs, netif, fstype, path */
         int pirq;
-        int virq;
-        int vcpu;
         u32 ioport;
         unsigned long iomem;
+        u32 device;
     } u;
     struct context context[2];    /* security context(s) */
     u32 sid[2];    /* SID(s) */
@@ -157,11 +156,11 @@ struct ocontext {
 /* object context array indices */
 #define OCON_ISID    0    /* initial SIDs */
 #define OCON_PIRQ    1    /* physical irqs */
-#define OCON_VIRQ    2    /* virtual irqs */
-#define OCON_VCPU    3    /* virtual cpus */
-#define OCON_IOPORT  4    /* io ports */
-#define OCON_IOMEM   5    /* io memory */
-#define OCON_DUMMY   6
+#define OCON_IOPORT  2    /* io ports */
+#define OCON_IOMEM   3    /* io memory */
+#define OCON_DEVICE  4    /* pci devices */
+#define OCON_DUMMY1  5    /* reserved */
+#define OCON_DUMMY2  6    /* reserved */
 #define OCON_NUM     7
 
 /* The policy database */
