@@ -57,6 +57,10 @@ static uint32_t pt_irqpin_reg_init(struct pt_dev *ptdev,
     struct pt_reg_info_tbl *reg, uint32_t real_offset);
 static uint32_t pt_bar_reg_init(struct pt_dev *ptdev,
     struct pt_reg_info_tbl *reg, uint32_t real_offset);
+static uint32_t pt_linkctrl_reg_init(struct pt_dev *ptdev,
+    struct pt_reg_info_tbl *reg, uint32_t real_offset);
+static uint32_t pt_devctrl2_reg_init(struct pt_dev *ptdev,
+    struct pt_reg_info_tbl *reg, uint32_t real_offset);
 static uint32_t pt_linkctrl2_reg_init(struct pt_dev *ptdev,
     struct pt_reg_info_tbl *reg, uint32_t real_offset);
 static uint32_t pt_msgctrl_reg_init(struct pt_dev *ptdev,
@@ -76,6 +80,8 @@ static uint8_t pt_msi_size_init(struct pt_dev *ptdev,
 static uint8_t pt_msix_size_init(struct pt_dev *ptdev,
     struct pt_reg_grp_info_tbl *grp_reg, uint32_t base_offset);
 static uint8_t pt_vendor_size_init(struct pt_dev *ptdev,
+    struct pt_reg_grp_info_tbl *grp_reg, uint32_t base_offset);
+static uint8_t pt_pcie_size_init(struct pt_dev *ptdev,
     struct pt_reg_grp_info_tbl *grp_reg, uint32_t base_offset);
 static int pt_byte_reg_read(struct pt_dev *ptdev,
     struct pt_reg_tbl *cfg_entry,
@@ -438,7 +444,7 @@ static struct pt_reg_info_tbl pt_emu_reg_pcie_tbl[] = {
         .init_val   = 0x0000,
         .ro_mask    = 0x0000,
         .emu_mask   = 0xFFFF,
-        .init       = pt_common_reg_init,
+        .init       = pt_linkctrl_reg_init,
         .u.w.read   = pt_word_reg_read,
         .u.w.write  = pt_linkctrl_reg_write,
     },
@@ -449,7 +455,7 @@ static struct pt_reg_info_tbl pt_emu_reg_pcie_tbl[] = {
         .init_val   = 0x0000,
         .ro_mask    = 0x0000,
         .emu_mask   = 0xFFFF,
-        .init       = pt_common_reg_init,
+        .init       = pt_devctrl2_reg_init,
         .u.w.read   = pt_word_reg_read,
         .u.w.write  = pt_devctrl2_reg_write,
     },
@@ -666,8 +672,8 @@ static const struct pt_reg_grp_info_tbl pt_emu_reg_grp_tbl[] = {
     {
         .grp_id     = PCI_CAP_ID_EXP,
         .grp_type   = GRP_TYPE_EMU,
-        .grp_size   = 0x3C,
-        .size_init  = pt_reg_grp_size_init,
+        .grp_size   = 0xFF,
+        .size_init  = pt_pcie_size_init,
         .emu_reg_tbl= pt_emu_reg_pcie_tbl,
     },
     /* MSI-X Capability Structure reg group */
@@ -1869,12 +1875,57 @@ static uint32_t pt_bar_reg_init(struct pt_dev *ptdev,
     return reg_field;
 }
 
+/* initialize Link Control register */
+static uint32_t pt_linkctrl_reg_init(struct pt_dev *ptdev,
+        struct pt_reg_info_tbl *reg, uint32_t real_offset)
+{
+    uint8_t cap_ver = 0;
+    uint8_t dev_type = 0;
+
+    cap_ver = (ptdev->dev.config[(real_offset - reg->offset) + PCI_EXP_FLAGS] &
+        (uint8_t)PCI_EXP_FLAGS_VERS);
+    dev_type = (ptdev->dev.config[(real_offset - reg->offset) + PCI_EXP_FLAGS] &
+        (uint8_t)PCI_EXP_FLAGS_TYPE) >> 4;
+    
+    /* no need to initialize in case of Root Complex Integrated Endpoint
+     * with cap_ver 1.x 
+     */
+    if ((dev_type == PCI_EXP_TYPE_ROOT_INT_EP) && (cap_ver == 1))
+        return PT_INVALID_REG;
+
+    return reg->init_val;
+}
+
+/* initialize Device Control 2 register */
+static uint32_t pt_devctrl2_reg_init(struct pt_dev *ptdev,
+        struct pt_reg_info_tbl *reg, uint32_t real_offset)
+{
+    uint8_t cap_ver = 0;
+
+    cap_ver = (ptdev->dev.config[(real_offset - reg->offset) + PCI_EXP_FLAGS] &
+        (uint8_t)PCI_EXP_FLAGS_VERS);
+    
+    /* no need to initialize in case of cap_ver 1.x */
+    if (cap_ver == 1)
+        return PT_INVALID_REG;
+
+    return reg->init_val;
+}
+
 /* initialize Link Control 2 register */
 static uint32_t pt_linkctrl2_reg_init(struct pt_dev *ptdev,
         struct pt_reg_info_tbl *reg, uint32_t real_offset)
 {
     int reg_field = 0;
+    uint8_t cap_ver = 0;
 
+    cap_ver = (ptdev->dev.config[(real_offset - reg->offset) + PCI_EXP_FLAGS] &
+        (uint8_t)PCI_EXP_FLAGS_VERS);
+    
+    /* no need to initialize in case of cap_ver 1.x */
+    if (cap_ver == 1)
+        return PT_INVALID_REG;
+    
     /* set Supported Link Speed */
     reg_field |= 
         (0x0F & 
@@ -2034,6 +2085,91 @@ static uint8_t pt_vendor_size_init(struct pt_dev *ptdev,
         struct pt_reg_grp_info_tbl *grp_reg, uint32_t base_offset)
 {
     return ptdev->dev.config[base_offset + 0x02];
+}
+
+/* get PCI Express Capability Structure register group size */
+static uint8_t pt_pcie_size_init(struct pt_dev *ptdev,
+        struct pt_reg_grp_info_tbl *grp_reg, uint32_t base_offset)
+{
+    PCIDevice *d = &ptdev->dev;
+    uint16_t exp_flag = 0;
+    uint16_t type = 0;
+    uint16_t vers = 0;
+    uint8_t pcie_size = 0;
+
+    exp_flag = *((uint16_t*)(d->config + (base_offset + PCI_EXP_FLAGS)));
+    type = (exp_flag & PCI_EXP_FLAGS_TYPE) >> 4;
+    vers = (exp_flag & PCI_EXP_FLAGS_VERS);
+
+    /* calculate size depend on capability version and device/port type */
+    /* in case of PCI Express Base Specification Rev 1.x */
+    if (vers == 1)
+    {
+        /* The PCI Express Capabilities, Device Capabilities, and Device 
+         * Status/Control registers are required for all PCI Express devices. 
+         * The Link Capabilities and Link Status/Control are required for all 
+         * Endpoints that are not Root Complex Integrated Endpoints. Endpoints 
+         * are not required to implement registers other than those listed 
+         * above and terminate the capability structure.
+         */
+        switch (type) {
+        case PCI_EXP_TYPE_ENDPOINT:
+        case PCI_EXP_TYPE_LEG_END:
+            pcie_size = 0x14;
+            break;
+        case PCI_EXP_TYPE_ROOT_INT_EP:
+            /* has no link */
+            pcie_size = 0x0C;
+            break;
+        /* only EndPoint passthrough is supported */
+        case PCI_EXP_TYPE_ROOT_PORT:
+        case PCI_EXP_TYPE_UPSTREAM:
+        case PCI_EXP_TYPE_DOWNSTREAM:
+        case PCI_EXP_TYPE_PCI_BRIDGE:
+        case PCI_EXP_TYPE_PCIE_BRIDGE:
+        case PCI_EXP_TYPE_ROOT_EC:
+        default:
+            /* exit I/O emulator */
+            PT_LOG("Internal error: Unsupported device/port type[%d]. "
+                "I/O emulator exit.\n", type);
+            exit(1);
+        }
+    }
+    /* in case of PCI Express Base Specification Rev 2.0 */
+    else if (vers == 2)
+    {
+        switch (type) {
+        case PCI_EXP_TYPE_ENDPOINT:
+        case PCI_EXP_TYPE_LEG_END:
+        case PCI_EXP_TYPE_ROOT_INT_EP:
+            /* For Functions that do not implement the registers, 
+             * these spaces must be hardwired to 0b.
+             */
+            pcie_size = 0x3C;
+            break;
+        /* only EndPoint passthrough is supported */
+        case PCI_EXP_TYPE_ROOT_PORT:
+        case PCI_EXP_TYPE_UPSTREAM:
+        case PCI_EXP_TYPE_DOWNSTREAM:
+        case PCI_EXP_TYPE_PCI_BRIDGE:
+        case PCI_EXP_TYPE_PCIE_BRIDGE:
+        case PCI_EXP_TYPE_ROOT_EC:
+        default:
+            /* exit I/O emulator */
+            PT_LOG("Internal error: Unsupported device/port type[%d]. "
+                "I/O emulator exit.\n", type);
+            exit(1);
+        }
+    }
+    else
+    {
+        /* exit I/O emulator */
+        PT_LOG("Internal error: Unsupported capability version[%d]. "
+            "I/O emulator exit.\n", vers);
+        exit(1);
+    }
+
+    return pcie_size;
 }
 
 /* read byte size emulate register */
