@@ -14,6 +14,10 @@
 #(logfile /var/log/xen/xend.log)
 #(loglevel DEBUG)
 
+# Uncomment the line below.  Set the value to flask, acm, or dummy to 
+# select a security module.
+
+#(xsm_module_name dummy)
 
 # The Xen-API server configuration.
 #

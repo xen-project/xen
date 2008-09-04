@@ -20,8 +20,10 @@ XS_INST_NONE = 0
 XS_INST_BOOT = (1 << 0)
 XS_INST_LOAD = (1 << 1)
 
-XS_POLICY_NONE  = 0
+XS_POLICY_DUMMY  = 0
 XS_POLICY_ACM = (1 << 0)
+XS_POLICY_FLASK = (1 << 1)
+XS_POLICY_USE = 0
 
 # Some internal variables used by the Xen-API
 ACM_LABEL_VM  = (1 << 0)

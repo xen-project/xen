@@ -78,7 +78,7 @@ class BlkifController(DevController):
         if uuid:
             back['uuid'] = uuid
 
-        if security.on() == xsconstants.XS_POLICY_ACM:
+        if security.on() == xsconstants.XS_POLICY_USE:
             self.do_access_control(config, uname)
 
         (device_path, devid) = blkif.blkdev_name_to_number(dev)

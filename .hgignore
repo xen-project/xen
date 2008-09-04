@@ -185,7 +185,6 @@
 ^tools/misc/xenperf$
 ^tools/pygrub/build/.*$
 ^tools/python/build/.*$
-^tools/python/xen/util/xsm/xsm\.py$
 ^tools/security/secpol_tool$
 ^tools/security/xen/.*$
 ^tools/security/xensec_tool$

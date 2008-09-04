@@ -132,6 +132,9 @@ class XendOptions:
     """Default script to configure a backend network interface"""
     vif_script = osdep.vif_script
 
+    """Default Xen Security Module"""
+    xsm_module_default = 'dummy'
+
     """Default rotation count of qemu-dm log file."""
     qemu_dm_logrotate_count = 10
 
@@ -426,6 +429,11 @@ class XendOptionsFile(XendOptions):
         """
         return self.get_config_value('xen-api-server',
                                      self.xen_api_server_default)
+
+    def get_xsm_module_name(self):
+        """Get the Xen Security Module name.
+        """
+        return self.get_config_string('xsm_module_name', self.xsm_module_default)
 
 if os.uname()[0] == 'SunOS':
     class XendOptionsSMF(XendOptions):

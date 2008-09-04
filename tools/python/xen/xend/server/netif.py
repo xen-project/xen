@@ -156,7 +156,7 @@ class NetifController(DevController):
             front = { 'handle' : "%i" % devid,
                       'mac'    : mac }
 
-        if security.on() == xsconstants.XS_POLICY_ACM:
+        if security.on() == xsconstants.XS_POLICY_USE:
             self.do_access_control(config)
 
         return (devid, back, front)
