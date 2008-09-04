@@ -651,9 +651,11 @@ void vcpu_reset(struct vcpu *v)
 
     set_bit(_VPF_down, &v->pause_flags);
 
+    clear_bit(v->vcpu_id, d->poll_mask);
+    v->poll_evtchn = 0;
+
     v->fpu_initialised = 0;
     v->fpu_dirtied     = 0;
-    v->is_polling      = 0;
     v->is_initialised  = 0;
     v->nmi_pending     = 0;
     v->mce_pending     = 0;

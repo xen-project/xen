@@ -545,6 +545,7 @@ out:
 static int evtchn_set_pending(struct vcpu *v, int port)
 {
     struct domain *d = v->domain;
+    int vcpuid;
 
     /*
      * The following bit operations must happen in strict order.
@@ -564,15 +565,19 @@ static int evtchn_set_pending(struct vcpu *v, int port)
     }
     
     /* Check if some VCPU might be polling for this event. */
-    if ( unlikely(d->is_polling) )
+    if ( likely(bitmap_empty(d->poll_mask, MAX_VIRT_CPUS)) )
+        return 0;
+
+    /* Wake any interested (or potentially interested) pollers. */
+    for ( vcpuid = find_first_bit(d->poll_mask, MAX_VIRT_CPUS);
+          vcpuid < MAX_VIRT_CPUS;
+          vcpuid = find_next_bit(d->poll_mask, MAX_VIRT_CPUS, vcpuid+1) )
     {
-        d->is_polling = 0;
-        smp_mb(); /* check vcpu poll-flags /after/ clearing domain poll-flag */
-        for_each_vcpu ( d, v )
+        v = d->vcpu[vcpuid];
+        if ( ((v->poll_evtchn <= 0) || (v->poll_evtchn == port)) &&
+             test_and_clear_bit(vcpuid, d->poll_mask) )
         {
-            if ( !v->is_polling )
-                continue;
-            v->is_polling = 0;
+            v->poll_evtchn = 0;
             vcpu_unblock(v);
         }
     }

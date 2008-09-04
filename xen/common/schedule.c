@@ -198,6 +198,27 @@ void vcpu_wake(struct vcpu *v)
     TRACE_2D(TRC_SCHED_WAKE, v->domain->domain_id, v->vcpu_id);
 }
 
+void vcpu_unblock(struct vcpu *v)
+{
+    if ( !test_and_clear_bit(_VPF_blocked, &v->pause_flags) )
+        return;
+
+    /* Polling period ends when a VCPU is unblocked. */
+    if ( unlikely(v->poll_evtchn != 0) )
+    {
+        v->poll_evtchn = 0;
+        /*
+         * We *must* re-clear _VPF_blocked to avoid racing other wakeups of
+         * this VCPU (and it then going back to sleep on poll_mask).
+         * Test-and-clear is idiomatic and ensures clear_bit not reordered.
+         */
+        if ( test_and_clear_bit(v->vcpu_id, v->domain->poll_mask) )
+            clear_bit(_VPF_blocked, &v->pause_flags);
+    }
+
+    vcpu_wake(v);
+}
+
 static void vcpu_migrate(struct vcpu *v)
 {
     unsigned long flags;
@@ -337,7 +358,7 @@ static long do_poll(struct sched_poll *sched_poll)
     struct vcpu   *v = current;
     struct domain *d = v->domain;
     evtchn_port_t  port;
-    long           rc = 0;
+    long           rc;
     unsigned int   i;
 
     /* Fairly arbitrary limit. */
@@ -348,11 +369,24 @@ static long do_poll(struct sched_poll *sched_poll)
         return -EFAULT;
 
     set_bit(_VPF_blocked, &v->pause_flags);
-    v->is_polling = 1;
-    d->is_polling = 1;
+    v->poll_evtchn = -1;
+    set_bit(v->vcpu_id, d->poll_mask);
 
+#ifndef CONFIG_X86 /* set_bit() implies mb() on x86 */
     /* Check for events /after/ setting flags: avoids wakeup waiting race. */
-    smp_wmb();
+    smp_mb();
+
+    /*
+     * Someone may have seen we are blocked but not that we are polling, or
+     * vice versa. We are certainly being woken, so clean up and bail. Beyond
+     * this point others can be guaranteed to clean up for us if they wake us.
+     */
+    rc = 0;
+    if ( (v->poll_evtchn == 0) ||
+         !test_bit(_VPF_blocked, &v->pause_flags) ||
+         !test_bit(v->vcpu_id, d->poll_mask) )
+        goto out;
+#endif
 
     for ( i = 0; i < sched_poll->nr_ports; i++ )
     {
@@ -369,6 +403,9 @@ static long do_poll(struct sched_poll *sched_poll)
             goto out;
     }
 
+    if ( sched_poll->nr_ports == 1 )
+        v->poll_evtchn = port;
+
     if ( sched_poll->timeout != 0 )
         set_timer(&v->poll_timer, sched_poll->timeout);
 
@@ -378,7 +415,8 @@ static long do_poll(struct sched_poll *sched_poll)
     return 0;
 
  out:
-    v->is_polling = 0;
+    v->poll_evtchn = 0;
+    clear_bit(v->vcpu_id, d->poll_mask);
     clear_bit(_VPF_blocked, &v->pause_flags);
     return rc;
 }
@@ -760,11 +798,8 @@ static void poll_timer_fn(void *data)
 {
     struct vcpu *v = data;
 
-    if ( !v->is_polling )
-        return;
-
-    v->is_polling = 0;
-    vcpu_unblock(v);
+    if ( test_and_clear_bit(v->vcpu_id, v->domain->poll_mask) )
+        vcpu_unblock(v);
 }
 
 /* Initialise the data structures. */
