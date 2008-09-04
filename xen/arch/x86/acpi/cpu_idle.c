@@ -263,7 +263,10 @@ static void acpi_idle_do_entry(struct acpi_processor_cx *cx)
     }
 }
 
-static atomic_t c3_cpu_count;
+static struct {
+    spinlock_t lock;
+    unsigned int count;
+} c3_cpu_status = { .lock = SPIN_LOCK_UNLOCKED };
 
 static void acpi_processor_idle(void)
 {
@@ -416,8 +419,8 @@ static void acpi_processor_idle(void)
          */
         if ( power->flags.bm_check && power->flags.bm_control )
         {
-            atomic_inc(&c3_cpu_count);
-            if ( atomic_read(&c3_cpu_count) == num_online_cpus() )
+            spin_lock(&c3_cpu_status.lock);
+            if ( ++c3_cpu_status.count == num_online_cpus() )
             {
                 /*
                  * All CPUs are trying to go to C3
@@ -425,6 +428,7 @@ static void acpi_processor_idle(void)
                  */
                 acpi_set_register(ACPI_BITREG_ARB_DISABLE, 1);
             }
+            spin_unlock(&c3_cpu_status.lock);
         }
         else if ( !power->flags.bm_check )
         {
@@ -455,8 +459,10 @@ static void acpi_processor_idle(void)
         if ( power->flags.bm_check && power->flags.bm_control )
         {
             /* Enable bus master arbitration */
-            atomic_dec(&c3_cpu_count);
-            acpi_set_register(ACPI_BITREG_ARB_DISABLE, 0);
+            spin_lock(&c3_cpu_status.lock);
+            if ( c3_cpu_status.count-- == num_online_cpus() )
+                acpi_set_register(ACPI_BITREG_ARB_DISABLE, 0);
+            spin_unlock(&c3_cpu_status.lock);
         }
 
         /* Re-enable interrupts */
