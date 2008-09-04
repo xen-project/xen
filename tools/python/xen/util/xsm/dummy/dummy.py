@@ -36,7 +36,7 @@ def err(msg):
     raise XSMError(msg)
 
 def on():
-    return xsconstants.XS_POLICY_DUMMY
+    return 0
 
 def ssidref2label(ssidref):
     return 0
