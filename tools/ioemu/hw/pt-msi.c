@@ -313,7 +313,7 @@ int pt_msix_init(struct pt_dev *dev, int pos)
 
     table_off = pci_read_long(pd, pos + PCI_MSIX_TABLE);
     bar_index = dev->msix->bar_index = table_off & PCI_MSIX_BIR;
-    table_off &= table_off & ~PCI_MSIX_BIR;
+    table_off = dev->msix->table_off = table_off & ~PCI_MSIX_BIR;
     dev->msix->table_base = dev->pci_dev->base_addr[bar_index];
     PT_LOG("get MSI-X table bar base %llx\n",
            (unsigned long long)dev->msix->table_base);
