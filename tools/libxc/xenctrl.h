@@ -502,9 +502,9 @@ xc_evtchn_alloc_unbound(int xc_handle,
 
 int xc_evtchn_reset(int xc_handle,
                     uint32_t dom);
-int xc_evtchn_status(int xc_handle,
-                     uint32_t dom,
-                     uint32_t port);
+
+typedef struct evtchn_status xc_evtchn_status_t;
+int xc_evtchn_status(int xc_handle, xc_evtchn_status_t *status);
 
 /*
  * Return a handle to the event channel driver, or -1 on failure, in which case
