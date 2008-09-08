@@ -32,7 +32,7 @@ static struct suspendinfo {
  * Issue a suspend request through stdout, and receive the acknowledgement
  * from stdin.  This is handled by XendCheckpoint in the Python layer.
  */
-static int compat_suspend(int domid)
+static int compat_suspend(void)
 {
     char ans[30];
 
@@ -43,7 +43,7 @@ static int compat_suspend(int domid)
             !strncmp(ans, "done\n", 5));
 }
 
-static int suspend_evtchn_release(int xc, int domid)
+static int suspend_evtchn_release(void)
 {
     if (si.suspend_evtchn >= 0) {
 	xc_evtchn_unbind(si.xce, si.suspend_evtchn);
@@ -107,7 +107,7 @@ static int suspend_evtchn_init(int xc, int domid)
     return 0;
 
   cleanup:
-    suspend_evtchn_release(xc, domid);
+    suspend_evtchn_release();
 
     return -1;
 }
@@ -115,7 +115,7 @@ static int suspend_evtchn_init(int xc, int domid)
 /**
  * Issue a suspend request to a dedicated event channel in the guest, and
  * receive the acknowledgement from the subscribe event channel. */
-static int evtchn_suspend(int domid)
+static int evtchn_suspend(void)
 {
     int rc;
 
@@ -144,12 +144,12 @@ static int evtchn_suspend(int domid)
     return 1;
 }
 
-static int suspend(int domid)
+static int suspend(void)
 {
     if (si.suspend_evtchn >= 0)
-	return evtchn_suspend(domid);
+	return evtchn_suspend();
 
-    return compat_suspend(domid);
+    return compat_suspend();
 }
 
 /* For HVM guests, there are two sources of dirty pages: the Xen shadow
@@ -214,7 +214,7 @@ static void qemu_flip_buffer(int domid, int next_active)
         goto read_again;
 }
 
-static void * init_qemu_maps(int domid, unsigned int bitmap_size)
+static void *init_qemu_maps(int domid, unsigned int bitmap_size)
 {
     key_t key;
     char key_ascii[17] = {0,};
@@ -304,7 +304,7 @@ main(int argc, char **argv)
                          &suspend, !!(flags & XCFLAGS_HVM),
                          &init_qemu_maps, &qemu_flip_buffer);
 
-    suspend_evtchn_release(xc_fd, domid);
+    suspend_evtchn_release();
 
     xc_interface_close(xc_fd);
 

@@ -338,12 +338,12 @@ static int analysis_phase(int xc_handle, uint32_t domid, int p2m_size,
 }
 
 
-static int suspend_and_state(int (*suspend)(int), int xc_handle, int io_fd,
+static int suspend_and_state(int (*suspend)(void), int xc_handle, int io_fd,
                              int dom, xc_dominfo_t *info)
 {
     int i = 0;
 
-    if ( !(*suspend)(dom) )
+    if ( !(*suspend)() )
     {
         ERROR("Suspend request failed");
         return -1;
@@ -796,7 +796,7 @@ static xen_pfn_t *map_and_save_p2m_table(int xc_handle,
 
 
 int xc_domain_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
-                   uint32_t max_factor, uint32_t flags, int (*suspend)(int),
+                   uint32_t max_factor, uint32_t flags, int (*suspend)(void),
                    int hvm, void *(*init_qemu_maps)(int, unsigned), 
                    void (*qemu_flip_buffer)(int, int))
 {
