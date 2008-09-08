@@ -759,11 +759,11 @@ static void svm_inject_exception(
     if ( trapnr == TRAP_page_fault )
     {
         vmcb->cr2 = curr->arch.hvm_vcpu.guest_cr[2] = cr2;
-        HVMTRACE_LONG_2D(PF_INJECT, curr, errcode, TRC_PAR_LONG(cr2));
+        HVMTRACE_LONG_2D(PF_INJECT, errcode, TRC_PAR_LONG(cr2));
     }
     else
     {
-        HVMTRACE_2D(INJ_EXC, curr, trapnr, errcode);
+        HVMTRACE_2D(INJ_EXC, trapnr, errcode);
     }
 
     if ( (trapnr == TRAP_debug) &&
@@ -919,7 +919,7 @@ static void svm_cpuid_intercept(
             __clear_bit(X86_FEATURE_APIC & 31, edx);
     }
 
-    HVMTRACE_5D (CPUID, v, input, *eax, *ebx, *ecx, *edx);
+    HVMTRACE_5D (CPUID, input, *eax, *ebx, *ecx, *edx);
 }
 
 static void svm_vmexit_do_cpuid(struct cpu_user_regs *regs)
@@ -946,7 +946,7 @@ static void svm_vmexit_do_cpuid(struct cpu_user_regs *regs)
 
 static void svm_dr_access(struct vcpu *v, struct cpu_user_regs *regs)
 {
-    HVMTRACE_0D(DR_WRITE, v);
+    HVMTRACE_0D(DR_WRITE);
     __restore_debug_registers(v);
 }
 
@@ -1018,7 +1018,7 @@ static int svm_msr_read_intercept(struct cpu_user_regs *regs)
     regs->edx = msr_content >> 32;
 
  done:
-    HVMTRACE_3D (MSR_READ, v, ecx, regs->eax, regs->edx);
+    HVMTRACE_3D (MSR_READ, ecx, regs->eax, regs->edx);
     HVM_DBG_LOG(DBG_LEVEL_1, "returns: ecx=%x, eax=%lx, edx=%lx",
                 ecx, (unsigned long)regs->eax, (unsigned long)regs->edx);
     return X86EMUL_OKAY;
@@ -1037,7 +1037,7 @@ static int svm_msr_write_intercept(struct cpu_user_regs *regs)
 
     msr_content = (u32)regs->eax | ((u64)regs->edx << 32);
 
-    HVMTRACE_3D (MSR_WRITE, v, ecx, regs->eax, regs->edx);
+    HVMTRACE_3D (MSR_WRITE, ecx, regs->eax, regs->edx);
 
     switch ( ecx )
     {
@@ -1168,7 +1168,7 @@ static void svm_vmexit_do_invalidate_cache(struct cpu_user_regs *regs)
 static void svm_invlpg_intercept(unsigned long vaddr)
 {
     struct vcpu *curr = current;
-    HVMTRACE_LONG_2D(INVLPG, curr, 0, TRC_PAR_LONG(vaddr));
+    HVMTRACE_LONG_2D(INVLPG, 0, TRC_PAR_LONG(vaddr));
     paging_invlpg(curr, vaddr);
     svm_asid_g_invlpg(curr, vaddr);
 }
@@ -1191,7 +1191,7 @@ asmlinkage void svm_vmexit_handler(struct cpu_user_regs *regs)
 
     exit_reason = vmcb->exitcode;
 
-    HVMTRACE_ND(VMEXIT64, 1/*cycles*/, v, 3, exit_reason,
+    HVMTRACE_ND(VMEXIT64, 1/*cycles*/, 3, exit_reason,
                 (uint32_t)regs->eip, (uint32_t)((uint64_t)regs->eip >> 32),
                 0, 0, 0);
 
@@ -1216,17 +1216,17 @@ asmlinkage void svm_vmexit_handler(struct cpu_user_regs *regs)
     {
     case VMEXIT_INTR:
         /* Asynchronous event, handled when we STGI'd after the VMEXIT. */
-        HVMTRACE_0D(INTR, v);
+        HVMTRACE_0D(INTR);
         break;
 
     case VMEXIT_NMI:
         /* Asynchronous event, handled when we STGI'd after the VMEXIT. */
-        HVMTRACE_0D(NMI, v);
+        HVMTRACE_0D(NMI);
         break;
 
     case VMEXIT_SMI:
         /* Asynchronous event, handled when we STGI'd after the VMEXIT. */
-        HVMTRACE_0D(SMI, v);
+        HVMTRACE_0D(SMI);
         break;
 
     case VMEXIT_EXCEPTION_DB:
@@ -1262,9 +1262,9 @@ asmlinkage void svm_vmexit_handler(struct cpu_user_regs *regs)
         if ( paging_fault(va, regs) )
         {
             if (hvm_long_mode_enabled(v))
-                HVMTRACE_LONG_2D(PF_XEN, v, regs->error_code, TRC_PAR_LONG(va));
+                HVMTRACE_LONG_2D(PF_XEN, regs->error_code, TRC_PAR_LONG(va));
             else
-                HVMTRACE_2D(PF_XEN, v, regs->error_code, va);
+                HVMTRACE_2D(PF_XEN, regs->error_code, va);
             break;
         }
 
@@ -1274,7 +1274,7 @@ asmlinkage void svm_vmexit_handler(struct cpu_user_regs *regs)
 
     /* Asynchronous event, handled when we STGI'd after the VMEXIT. */
     case VMEXIT_EXCEPTION_MC:
-        HVMTRACE_0D(MCE, v);
+        HVMTRACE_0D(MCE);
         break;
 
     case VMEXIT_VINTR:
@@ -1331,7 +1331,7 @@ asmlinkage void svm_vmexit_handler(struct cpu_user_regs *regs)
     case VMEXIT_VMMCALL:
         if ( (inst_len = __get_instruction_length(v, INSTR_VMCALL)) == 0 )
             break;
-        HVMTRACE_1D(VMMCALL, v, regs->eax);
+        HVMTRACE_1D(VMMCALL, regs->eax);
         rc = hvm_do_hypercall(regs);
         if ( rc != HVM_HCALL_preempted )
         {
@@ -1406,7 +1406,7 @@ asmlinkage void svm_vmexit_handler(struct cpu_user_regs *regs)
 
 asmlinkage void svm_trace_vmentry(void)
 {
-    HVMTRACE_ND (VMENTRY, 1/*cycles*/, current, 0, 0, 0, 0, 0, 0, 0);
+    HVMTRACE_ND (VMENTRY, 1/*cycles*/, 0, 0, 0, 0, 0, 0, 0);
 }
   
 /*

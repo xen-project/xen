@@ -198,7 +198,7 @@ asmlinkage void vmx_intr_assist(void)
     }
     else
     {
-        HVMTRACE_2D(INJ_VIRQ, v, intack.vector, /*fake=*/ 0);
+        HVMTRACE_2D(INJ_VIRQ, intack.vector, /*fake=*/ 0);
         vmx_inject_extint(v, intack.vector);
         pt_intr_post(v, intack);
     }

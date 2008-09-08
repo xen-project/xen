@@ -56,16 +56,13 @@
 #define TRC_PAR_LONG(par) (par)
 #endif
 
-#define HVMTRACE_ND(evt, cycles, vcpu, count, d1, d2, d3, d4, d5, d6)   \
+#define HVMTRACE_ND(evt, cycles, count, d1, d2, d3, d4, d5, d6)         \
     do {                                                                \
         if ( unlikely(tb_init_done) && DO_TRC_HVM_ ## evt )             \
         {                                                               \
             struct {                                                    \
-                u32 did:16, vid:16;                                     \
                 u32 d[6];                                               \
             } _d;                                                       \
-            _d.did=(vcpu)->domain->domain_id;                           \
-            _d.vid=(vcpu)->vcpu_id;                                     \
             _d.d[0]=(d1);                                               \
             _d.d[1]=(d2);                                               \
             _d.d[2]=(d3);                                               \
@@ -77,32 +74,32 @@
         }                                                               \
     } while(0)
 
-#define HVMTRACE_6D(evt, vcpu, d1, d2, d3, d4, d5, d6)    \
-                      HVMTRACE_ND(evt, 0, vcpu, 6, d1, d2, d3,  d4, d5, d6)
-#define HVMTRACE_5D(evt, vcpu, d1, d2, d3, d4, d5)        \
-                      HVMTRACE_ND(evt, 0, vcpu, 5, d1, d2, d3,  d4, d5, 0)
-#define HVMTRACE_4D(evt, vcpu, d1, d2, d3, d4)               \
-                      HVMTRACE_ND(evt, 0, vcpu, 4, d1, d2, d3,  d4, 0, 0)
-#define HVMTRACE_3D(evt, vcpu, d1, d2, d3)                   \
-                      HVMTRACE_ND(evt, 0, vcpu, 3, d1, d2, d3,  0, 0, 0)
-#define HVMTRACE_2D(evt, vcpu, d1, d2)                       \
-                      HVMTRACE_ND(evt, 0, vcpu, 2, d1, d2,  0,  0, 0, 0)
-#define HVMTRACE_1D(evt, vcpu, d1)                           \
-                      HVMTRACE_ND(evt, 0, vcpu, 1, d1,  0,  0,  0, 0, 0)
-#define HVMTRACE_0D(evt, vcpu)                               \
-                      HVMTRACE_ND(evt, 0, vcpu, 0, 0,  0,  0,  0, 0, 0)
+#define HVMTRACE_6D(evt, d1, d2, d3, d4, d5, d6)    \
+                      HVMTRACE_ND(evt, 0, 6, d1, d2, d3,  d4, d5, d6)
+#define HVMTRACE_5D(evt, d1, d2, d3, d4, d5)        \
+                      HVMTRACE_ND(evt, 0, 5, d1, d2, d3,  d4, d5, 0)
+#define HVMTRACE_4D(evt, d1, d2, d3, d4)               \
+                      HVMTRACE_ND(evt, 0, 4, d1, d2, d3,  d4, 0, 0)
+#define HVMTRACE_3D(evt, d1, d2, d3)                   \
+                      HVMTRACE_ND(evt, 0, 3, d1, d2, d3,  0, 0, 0)
+#define HVMTRACE_2D(evt, d1, d2)                       \
+                      HVMTRACE_ND(evt, 0, 2, d1, d2,  0,  0, 0, 0)
+#define HVMTRACE_1D(evt, d1)                           \
+                      HVMTRACE_ND(evt, 0, 1, d1,  0,  0,  0, 0, 0)
+#define HVMTRACE_0D(evt)                               \
+                      HVMTRACE_ND(evt, 0, 0, 0,  0,  0,  0, 0, 0)
 
 
 
 #ifdef __x86_64__
-#define HVMTRACE_LONG_1D(evt, vcpu, d1)                  \
-                   HVMTRACE_2D(evt ## 64, vcpu, (d1) & 0xFFFFFFFF, (d1) >> 32)
-#define HVMTRACE_LONG_2D(evt,vcpu,d1,d2, ...)              \
-                   HVMTRACE_3D(evt ## 64, vcpu, d1, d2)
-#define HVMTRACE_LONG_3D(evt, vcpu, d1, d2, d3, ...)      \
-                   HVMTRACE_4D(evt ## 64, vcpu, d1, d2, d3)
-#define HVMTRACE_LONG_4D(evt, vcpu, d1, d2, d3, d4, ...)  \
-                   HVMTRACE_5D(evt ## 64, vcpu, d1, d2, d3, d4)
+#define HVMTRACE_LONG_1D(evt, d1)                  \
+                   HVMTRACE_2D(evt ## 64, (d1) & 0xFFFFFFFF, (d1) >> 32)
+#define HVMTRACE_LONG_2D(evt, d1, d2, ...)              \
+                   HVMTRACE_3D(evt ## 64, d1, d2)
+#define HVMTRACE_LONG_3D(evt, d1, d2, d3, ...)      \
+                   HVMTRACE_4D(evt ## 64, d1, d2, d3)
+#define HVMTRACE_LONG_4D(evt, d1, d2, d3, d4, ...)  \
+                   HVMTRACE_5D(evt ## 64, d1, d2, d3, d4)
 #else
 #define HVMTRACE_LONG_1D HVMTRACE_1D
 #define HVMTRACE_LONG_2D HVMTRACE_2D

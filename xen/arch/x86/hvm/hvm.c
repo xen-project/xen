@@ -773,7 +773,7 @@ void hvm_hlt(unsigned long rflags)
 
     do_sched_op_compat(SCHEDOP_block, 0);
 
-    HVMTRACE_1D(HLT, curr, /* pending = */ vcpu_runnable(curr));
+    HVMTRACE_1D(HLT, /* pending = */ vcpu_runnable(curr));
 }
 
 void hvm_triple_fault(void)
