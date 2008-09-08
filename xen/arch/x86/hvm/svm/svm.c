@@ -1261,7 +1261,9 @@ asmlinkage void svm_vmexit_handler(struct cpu_user_regs *regs)
 
         if ( paging_fault(va, regs) )
         {
-            if (hvm_long_mode_enabled(v))
+            if ( trace_will_trace_event(TRC_SHADOW) )
+                break;
+            if ( hvm_long_mode_enabled(v) )
                 HVMTRACE_LONG_2D(PF_XEN, regs->error_code, TRC_PAR_LONG(va));
             else
                 HVMTRACE_2D(PF_XEN, regs->error_code, va);

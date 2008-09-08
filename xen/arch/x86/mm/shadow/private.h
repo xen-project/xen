@@ -92,6 +92,43 @@ extern int shadow_audit_enable;
 #define SHADOW_DEBUG_LOGDIRTY          0
 
 /******************************************************************************
+ * Tracing
+ */
+DECLARE_PER_CPU(uint32_t,trace_shadow_path_flags);
+
+#define TRACE_SHADOW_PATH_FLAG(_x)                      \
+    do {                                                \
+        this_cpu(trace_shadow_path_flags) |= (1<<(_x));      \
+    } while(0)
+
+#define TRACE_CLEAR_PATH_FLAGS                  \
+    this_cpu(trace_shadow_path_flags) = 0
+
+enum {
+    TRCE_SFLAG_SET_AD,
+    TRCE_SFLAG_SET_A,
+    TRCE_SFLAG_SHADOW_L1_GET_REF,
+    TRCE_SFLAG_SHADOW_L1_PUT_REF,
+    TRCE_SFLAG_L2_PROPAGATE,
+    TRCE_SFLAG_SET_CHANGED,
+    TRCE_SFLAG_SET_FLUSH,
+    TRCE_SFLAG_SET_ERROR,
+    TRCE_SFLAG_DEMOTE,
+    TRCE_SFLAG_PROMOTE,
+    TRCE_SFLAG_WRMAP,
+    TRCE_SFLAG_WRMAP_GUESS_FOUND,
+    TRCE_SFLAG_WRMAP_BRUTE_FORCE,
+    TRCE_SFLAG_EARLY_UNSHADOW,
+    TRCE_SFLAG_EMULATION_2ND_PT_WRITTEN,
+    TRCE_SFLAG_EMULATION_LAST_FAILED,
+    TRCE_SFLAG_EMULATE_FULL_PT,
+    TRCE_SFLAG_PREALLOC_UNHOOK,
+    TRCE_SFLAG_UNSYNC,
+    TRCE_SFLAG_OOS_FIXUP_ADD,
+    TRCE_SFLAG_OOS_FIXUP_EVICT,
+};
+
+/******************************************************************************
  * The shadow lock.
  *
  * This lock is per-domain.  It is intended to allow us to make atomic
@@ -143,6 +180,12 @@ extern int shadow_audit_enable;
     } while (0)
 
 
+/* Size (in bytes) of a guest PTE */
+#if GUEST_PAGING_LEVELS >= 3
+# define GUEST_PTE_SIZE 8
+#else
+# define GUEST_PTE_SIZE 4
+#endif
 
 /******************************************************************************
  * Auditing routines 

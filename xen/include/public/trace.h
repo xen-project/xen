@@ -37,6 +37,7 @@
 #define TRC_HVM      0x0008f000    /* Xen HVM trace            */
 #define TRC_MEM      0x0010f000    /* Xen memory trace         */
 #define TRC_PV       0x0020f000    /* Xen PV traces            */
+#define TRC_SHADOW   0x0040f000    /* Xen shadow tracing       */
 #define TRC_ALL      0x0ffff000
 #define TRC_HD_TO_EVENT(x) ((x)&0x0fffffff)
 #define TRC_HD_CYCLE_FLAG (1UL<<31)
@@ -92,6 +93,22 @@
 #define TRC_PV_PTWR_EMULATION_PAE    (TRC_PV + 12)
   /* Indicates that addresses in trace record are 64 bits */
 #define TRC_64_FLAG               (0x100) 
+
+#define TRC_SHADOW_NOT_SHADOW                 (TRC_SHADOW +  1)
+#define TRC_SHADOW_FAST_PROPAGATE             (TRC_SHADOW +  2)
+#define TRC_SHADOW_FAST_MMIO                  (TRC_SHADOW +  3)
+#define TRC_SHADOW_FALSE_FAST_PATH            (TRC_SHADOW +  4)
+#define TRC_SHADOW_MMIO                       (TRC_SHADOW +  5)
+#define TRC_SHADOW_FIXUP                      (TRC_SHADOW +  6)
+#define TRC_SHADOW_DOMF_DYING                 (TRC_SHADOW +  7)
+#define TRC_SHADOW_EMULATE                    (TRC_SHADOW +  8)
+#define TRC_SHADOW_EMULATE_UNSHADOW_USER      (TRC_SHADOW +  9)
+#define TRC_SHADOW_EMULATE_UNSHADOW_EVTINJ    (TRC_SHADOW + 10)
+#define TRC_SHADOW_EMULATE_UNSHADOW_UNHANDLED (TRC_SHADOW + 11)
+#define TRC_SHADOW_WRMAP_BF                   (TRC_SHADOW + 12)
+#define TRC_SHADOW_PREALLOC_UNPIN             (TRC_SHADOW + 13)
+#define TRC_SHADOW_RESYNC_FULL                (TRC_SHADOW + 14)
+#define TRC_SHADOW_RESYNC_ONLY                (TRC_SHADOW + 15)
 
 /* trace events per subclass */
 #define TRC_HVM_VMENTRY         (TRC_HVM_ENTRYEXIT + 0x01)

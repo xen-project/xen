@@ -39,6 +39,7 @@
 #include <xen/numa.h>
 #include "private.h"
 
+DEFINE_PER_CPU(uint32_t,trace_shadow_path_flags);
 
 /* Set up the shadow-specific parts of a domain struct at start of day.
  * Called for every domain from arch_domain_create() */
@@ -630,6 +631,8 @@ void oos_fixup_add(struct vcpu *v, mfn_t gmfn,
 
             if ( mfn_x(oos_fixup[idx].smfn[next]) != INVALID_MFN )
             {
+                TRACE_SHADOW_PATH_FLAG(TRCE_SFLAG_OOS_FIXUP_EVICT);
+
                 /* Reuse this slot and remove current writable mapping. */
                 sh_remove_write_access_from_sl1p(v, gmfn, 
                                                  oos_fixup[idx].smfn[next],
@@ -645,6 +648,8 @@ void oos_fixup_add(struct vcpu *v, mfn_t gmfn,
             oos_fixup[idx].smfn[next] = smfn;
             oos_fixup[idx].off[next] = off;
             oos_fixup[idx].next = (next + 1) % SHADOW_OOS_FIXUPS;
+
+            TRACE_SHADOW_PATH_FLAG(TRCE_SFLAG_OOS_FIXUP_ADD);
             return;
         }
     }
@@ -687,6 +692,16 @@ static int oos_remove_write_access(struct vcpu *v, mfn_t gmfn,
 }
 
 
+static inline void trace_resync(int event, mfn_t gmfn)
+{
+    if ( tb_init_done )
+    {
+        /* Convert gmfn to gfn */
+        unsigned long gfn = mfn_to_gfn(current->domain, gmfn);
+        __trace_var(event, 0/*!tsc*/, sizeof(gfn), (unsigned char*)&gfn);
+    }
+}
+
 /* Pull all the entries on an out-of-sync page back into sync. */
 static void _sh_resync(struct vcpu *v, mfn_t gmfn,
                        struct oos_fixup *fixup, mfn_t snp)
@@ -719,6 +734,7 @@ static void _sh_resync(struct vcpu *v, mfn_t gmfn,
     /* Now we know all the entries are synced, and will stay that way */
     pg->shadow_flags &= ~SHF_out_of_sync;
     perfc_incr(shadow_resync);
+    trace_resync(TRC_SHADOW_RESYNC_FULL, gmfn);
 }
 
 
@@ -930,6 +946,7 @@ void sh_resync_all(struct vcpu *v, int skip, int this, int others, int do_lockin
                 /* Update the shadows and leave the page OOS. */
                 if ( sh_skip_sync(v, oos[idx]) )
                     continue;
+                trace_resync(TRC_SHADOW_RESYNC_ONLY, oos[idx]);
                 _sh_resync_l1(other, oos[idx], oos_snapshot[idx]);
             }
             else
@@ -945,7 +962,8 @@ void sh_resync_all(struct vcpu *v, int skip, int this, int others, int do_lockin
     }
 }
 
-/* Allow a shadowed page to go out of sync */
+/* Allow a shadowed page to go out of sync. Unsyncs are traced in
+ * multi.c:sh_page_fault() */
 int sh_unsync(struct vcpu *v, mfn_t gmfn)
 {
     struct page_info *pg;
@@ -970,6 +988,7 @@ int sh_unsync(struct vcpu *v, mfn_t gmfn)
     pg->shadow_flags |= SHF_out_of_sync|SHF_oos_may_write;
     oos_hash_add(v, gmfn);
     perfc_incr(shadow_unsync);
+    TRACE_SHADOW_PATH_FLAG(TRCE_SFLAG_UNSYNC);
     return 1;
 }
 
@@ -1005,6 +1024,7 @@ void shadow_promote(struct vcpu *v, mfn_t gmfn, unsigned int type)
 
     ASSERT(!test_bit(type, &page->shadow_flags));
     set_bit(type, &page->shadow_flags);
+    TRACE_SHADOW_PATH_FLAG(TRCE_SFLAG_PROMOTE);
 }
 
 void shadow_demote(struct vcpu *v, mfn_t gmfn, u32 type)
@@ -1027,6 +1047,8 @@ void shadow_demote(struct vcpu *v, mfn_t gmfn, u32 type)
 #endif 
         clear_bit(_PGC_page_table, &page->count_info);
     }
+
+    TRACE_SHADOW_PATH_FLAG(TRCE_SFLAG_DEMOTE);
 }
 
 /**************************************************************************/
@@ -1094,6 +1116,7 @@ sh_validate_guest_entry(struct vcpu *v, mfn_t gmfn, void *entry, u32 size)
     ASSERT((page->shadow_flags 
             & (SHF_L4_64|SHF_L3_64|SHF_L2H_64|SHF_L2_64|SHF_L1_64)) == 0);
 #endif
+    this_cpu(trace_shadow_path_flags) |= (result<<(TRCE_SFLAG_SET_CHANGED)); 
 
     return result;
 }
@@ -1295,6 +1318,18 @@ static void shadow_unhook_mappings(struct vcpu *v, mfn_t smfn)
     }
 }
 
+static inline void trace_shadow_prealloc_unpin(struct domain *d, mfn_t smfn)
+{
+    if ( tb_init_done )
+    {
+        /* Convert smfn to gfn */
+        unsigned long gfn;
+        ASSERT(mfn_valid(smfn));
+        gfn = mfn_to_gfn(d, _mfn(mfn_to_shadow_page(smfn)->backpointer));
+        __trace_var(TRC_SHADOW_PREALLOC_UNPIN, 0/*!tsc*/,
+                    sizeof(gfn), (unsigned char*)&gfn);
+    }
+}
 
 /* Make sure there are at least count order-sized pages
  * available in the shadow page pool. */
@@ -1327,6 +1362,7 @@ static void _shadow_prealloc(
         smfn = shadow_page_to_mfn(sp);
 
         /* Unpin this top-level shadow */
+        trace_shadow_prealloc_unpin(d, smfn);
         sh_unpin(v, smfn);
 
         /* See if that freed up enough space */
@@ -1343,6 +1379,7 @@ static void _shadow_prealloc(
         {
             if ( !pagetable_is_null(v2->arch.shadow_table[i]) )
             {
+                TRACE_SHADOW_PATH_FLAG(TRCE_SFLAG_PREALLOC_UNHOOK);
                 shadow_unhook_mappings(v, 
                                pagetable_get_mfn(v2->arch.shadow_table[i]));
 
@@ -2200,6 +2237,16 @@ void sh_destroy_shadow(struct vcpu *v, mfn_t smfn)
     }    
 }
 
+static inline void trace_shadow_wrmap_bf(mfn_t gmfn)
+{
+    if ( tb_init_done )
+    {
+        /* Convert gmfn to gfn */
+        unsigned long gfn = mfn_to_gfn(current->domain, gmfn);
+        __trace_var(TRC_SHADOW_WRMAP_BF, 0/*!tsc*/, sizeof(gfn), (unsigned char*)&gfn);
+    }
+}
+
 /**************************************************************************/
 /* Remove all writeable mappings of a guest frame from the shadow tables 
  * Returns non-zero if we need to flush TLBs. 
@@ -2265,6 +2312,8 @@ int sh_remove_write_access(struct vcpu *v, mfn_t gmfn,
          || (pg->u.inuse.type_info & PGT_count_mask) == 0 )
         return 0;
 
+    TRACE_SHADOW_PATH_FLAG(TRCE_SFLAG_WRMAP);
+
     perfc_incr(shadow_writeable);
 
     /* If this isn't a "normal" writeable page, the domain is trying to 
@@ -2285,11 +2334,14 @@ int sh_remove_write_access(struct vcpu *v, mfn_t gmfn,
          * and that mapping is likely to be in the current pagetable,
          * in the guest's linear map (on non-HIGHPTE linux and windows)*/
 
-#define GUESS(_a, _h) do {                                                \
+#define GUESS(_a, _h) do {                                              \
             if ( v->arch.paging.mode->shadow.guess_wrmap(v, (_a), gmfn) ) \
-                perfc_incr(shadow_writeable_h_ ## _h);                   \
-            if ( (pg->u.inuse.type_info & PGT_count_mask) == 0 )          \
-                return 1;                                                 \
+                perfc_incr(shadow_writeable_h_ ## _h);                  \
+            if ( (pg->u.inuse.type_info & PGT_count_mask) == 0 )        \
+            {                                                           \
+                TRACE_SHADOW_PATH_FLAG(TRCE_SFLAG_WRMAP_GUESS_FOUND);   \
+                return 1;                                               \
+            }                                                           \
         } while (0)
 
         if ( level == 0 && fault_addr )
@@ -2377,6 +2429,7 @@ int sh_remove_write_access(struct vcpu *v, mfn_t gmfn,
 #endif /* SHADOW_OPTIMIZATIONS & SHOPT_WRITABLE_HEURISTIC */
     
     /* Brute-force search of all the shadows, by walking the hash */
+    trace_shadow_wrmap_bf(gmfn);
     if ( level == 0 )
         perfc_incr(shadow_writeable_bf_1);
     else

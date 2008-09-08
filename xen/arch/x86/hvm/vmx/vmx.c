@@ -2101,7 +2101,8 @@ asmlinkage void vmx_vmexit_handler(struct cpu_user_regs *regs)
              !(__vmread(IDT_VECTORING_INFO) & INTR_INFO_VALID_MASK) &&
              (vector != TRAP_double_fault) )
             __vmwrite(GUEST_INTERRUPTIBILITY_INFO,
-                    __vmread(GUEST_INTERRUPTIBILITY_INFO)|VMX_INTR_SHADOW_NMI);
+                      __vmread(GUEST_INTERRUPTIBILITY_INFO)
+                      | VMX_INTR_SHADOW_NMI);
 
         perfc_incra(cause_vector, vector);
 
@@ -2128,12 +2129,14 @@ asmlinkage void vmx_vmexit_handler(struct cpu_user_regs *regs)
 
             if ( paging_fault(exit_qualification, regs) )
             {
+                if ( trace_will_trace_event(TRC_SHADOW) )
+                    break;
                 if ( hvm_long_mode_enabled(v) )
-                    HVMTRACE_LONG_2D (PF_XEN, regs->error_code,
-                        TRC_PAR_LONG(exit_qualification) );
+                    HVMTRACE_LONG_2D(PF_XEN, regs->error_code,
+                                     TRC_PAR_LONG(exit_qualification) );
                 else
-                    HVMTRACE_2D (PF_XEN,
-                        regs->error_code, exit_qualification );
+                    HVMTRACE_2D(PF_XEN,
+                                regs->error_code, exit_qualification );
                 break;
             }
 

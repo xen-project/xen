@@ -148,6 +148,31 @@ static int tb_set_size(int size)
     return 0;
 }
 
+int trace_will_trace_event(u32 event)
+{
+    if ( !tb_init_done )
+        return 0;
+
+    /*
+     * Copied from __trace_var()
+     */
+    if ( (tb_event_mask & event) == 0 )
+        return 0;
+
+    /* match class */
+    if ( ((tb_event_mask >> TRC_CLS_SHIFT) & (event >> TRC_CLS_SHIFT)) == 0 )
+        return 0;
+
+    /* then match subclass */
+    if ( (((tb_event_mask >> TRC_SUBCLS_SHIFT) & 0xf )
+                & ((event >> TRC_SUBCLS_SHIFT) & 0xf )) == 0 )
+        return 0;
+
+    if ( !cpu_isset(smp_processor_id(), tb_cpu_mask) )
+        return 0;
+
+    return 1;
+}
 
 /**
  * init_trace_bufs - performs initialization of the per-cpu trace buffers.
@@ -407,7 +432,8 @@ void __trace_var(u32 event, int cycles, int extra, unsigned char *extra_data)
     int extra_word;
     int started_below_highwater;
 
-    ASSERT(tb_init_done);
+    if( !tb_init_done )
+        return;
 
     /* Convert byte count into word count, rounding up */
     extra_word = (extra / sizeof(u32));
