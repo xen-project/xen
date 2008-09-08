@@ -48,7 +48,7 @@ struct processor_pminfo processor_pminfo[NR_CPUS];
 struct cpufreq_policy xen_px_policy[NR_CPUS];
 
 static cpumask_t *cpufreq_dom_pt;
-static cpumask_t cpufreq_dom_mask;
+static unsigned long *cpufreq_dom_mask;
 static unsigned int cpufreq_dom_max;
 
 enum {
@@ -562,7 +562,8 @@ static struct cpufreq_driver acpi_cpufreq_driver = {
 void cpufreq_dom_exit(void)
 {
     cpufreq_dom_max = 0;
-    cpus_clear(cpufreq_dom_mask);
+    if (cpufreq_dom_mask)
+        xfree(cpufreq_dom_mask);
     if (cpufreq_dom_pt)
         xfree(cpufreq_dom_pt);
 }
@@ -572,22 +573,28 @@ int cpufreq_dom_init(void)
     unsigned int i;
 
     cpufreq_dom_max = 0;
-    cpus_clear(cpufreq_dom_mask);
 
     for_each_online_cpu(i) {
-        cpu_set(processor_pminfo[i].perf.domain_info.domain, cpufreq_dom_mask);
         if (cpufreq_dom_max < processor_pminfo[i].perf.domain_info.domain)
             cpufreq_dom_max = processor_pminfo[i].perf.domain_info.domain;
     }
     cpufreq_dom_max++;
+
+    cpufreq_dom_mask = xmalloc_array(unsigned long,
+                                     BITS_TO_LONGS(cpufreq_dom_max));
+    if (!cpufreq_dom_mask)
+        return -ENOMEM;
+    bitmap_zero(cpufreq_dom_mask, cpufreq_dom_max);
 
     cpufreq_dom_pt = xmalloc_array(cpumask_t, cpufreq_dom_max);
     if (!cpufreq_dom_pt)
         return -ENOMEM;
     memset(cpufreq_dom_pt, 0, cpufreq_dom_max * sizeof(cpumask_t));
 
-    for_each_online_cpu(i)
+    for_each_online_cpu(i) {
+        __set_bit(processor_pminfo[i].perf.domain_info.domain, cpufreq_dom_mask);
         cpu_set(i, cpufreq_dom_pt[processor_pminfo[i].perf.domain_info.domain]);
+    }
 
     for_each_online_cpu(i)
         processor_pminfo[i].perf.shared_cpu_map =
@@ -616,10 +623,11 @@ static int cpufreq_cpu_init(void)
 
 int cpufreq_dom_dbs(unsigned int event)
 {
-    int cpu, dom, ret = 0;
+    unsigned int cpu, dom;
+    int ret = 0;
 
-    for (dom=0; dom<cpufreq_dom_max; dom++) {
-        if (!cpu_isset(dom, cpufreq_dom_mask))
+    for (dom = 0; dom < cpufreq_dom_max; dom++) {
+        if (!test_bit(dom, cpufreq_dom_mask))
             continue;
         cpu = first_cpu(cpufreq_dom_pt[dom]);
         ret = cpufreq_governor_dbs(&xen_px_policy[cpu], event);
