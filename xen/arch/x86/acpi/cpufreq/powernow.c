@@ -197,8 +197,8 @@ static int powernow_cpufreq_cpu_init(struct cpufreq_policy *policy)
 
     data->max_freq = perf->states[0].core_frequency * 1000;
     /* table init */
-    for (i=0; i<perf->state_count && i<max_hw_pstate; i++) {
-        if (i>0 && perf->states[i].core_frequency >=
+    for (i = 0; i < perf->state_count && i <= max_hw_pstate; i++) {
+        if (i > 0 && perf->states[i].core_frequency >=
             data->freq_table[valid_states-1].frequency / 1000)
             continue;
 
