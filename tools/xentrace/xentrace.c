@@ -613,7 +613,7 @@ static void parse_args(int argc, char **argv)
         { 0, 0, 0, 0 }
     };
 
-    while ( (option = getopt_long(argc, argv, "c:e:s:S:t:?V",
+    while ( (option = getopt_long(argc, argv, "t:s:c:e:S:r:T:Dx?V",
                     long_options, NULL)) != -1) 
     {
         switch ( option )
