@@ -50,26 +50,30 @@
 #define TRC_HVM_ENTRYEXIT 0x00081000   /* VMENTRY and #VMEXIT       */
 #define TRC_HVM_HANDLER   0x00082000   /* various HVM handlers      */
 
+#define TRC_SCHED_MIN       0x00021000   /* Just runstate changes */
+#define TRC_SCHED_VERBOSE   0x00028000   /* More inclusive scheduling */
+
 /* Trace events per class */
 #define TRC_LOST_RECORDS        (TRC_GEN + 1)
 #define TRC_TRACE_WRAP_BUFFER  (TRC_GEN + 2)
 #define TRC_TRACE_CPU_CHANGE    (TRC_GEN + 3)
 
-#define TRC_SCHED_DOM_ADD       (TRC_SCHED +  1)
-#define TRC_SCHED_DOM_REM       (TRC_SCHED +  2)
-#define TRC_SCHED_SLEEP         (TRC_SCHED +  3)
-#define TRC_SCHED_WAKE          (TRC_SCHED +  4)
-#define TRC_SCHED_YIELD         (TRC_SCHED +  5)
-#define TRC_SCHED_BLOCK         (TRC_SCHED +  6)
-#define TRC_SCHED_SHUTDOWN      (TRC_SCHED +  7)
-#define TRC_SCHED_CTL           (TRC_SCHED +  8)
-#define TRC_SCHED_ADJDOM        (TRC_SCHED +  9)
-#define TRC_SCHED_SWITCH        (TRC_SCHED + 10)
-#define TRC_SCHED_S_TIMER_FN    (TRC_SCHED + 11)
-#define TRC_SCHED_T_TIMER_FN    (TRC_SCHED + 12)
-#define TRC_SCHED_DOM_TIMER_FN  (TRC_SCHED + 13)
-#define TRC_SCHED_SWITCH_INFPREV (TRC_SCHED + 14)
-#define TRC_SCHED_SWITCH_INFNEXT (TRC_SCHED + 15)
+#define TRC_SCHED_RUNSTATE_CHANGE (TRC_SCHED_MIN + 1)
+#define TRC_SCHED_DOM_ADD        (TRC_SCHED_VERBOSE +  1)
+#define TRC_SCHED_DOM_REM        (TRC_SCHED_VERBOSE +  2)
+#define TRC_SCHED_SLEEP          (TRC_SCHED_VERBOSE +  3)
+#define TRC_SCHED_WAKE           (TRC_SCHED_VERBOSE +  4)
+#define TRC_SCHED_YIELD          (TRC_SCHED_VERBOSE +  5)
+#define TRC_SCHED_BLOCK          (TRC_SCHED_VERBOSE +  6)
+#define TRC_SCHED_SHUTDOWN       (TRC_SCHED_VERBOSE +  7)
+#define TRC_SCHED_CTL            (TRC_SCHED_VERBOSE +  8)
+#define TRC_SCHED_ADJDOM         (TRC_SCHED_VERBOSE +  9)
+#define TRC_SCHED_SWITCH         (TRC_SCHED_VERBOSE + 10)
+#define TRC_SCHED_S_TIMER_FN     (TRC_SCHED_VERBOSE + 11)
+#define TRC_SCHED_T_TIMER_FN     (TRC_SCHED_VERBOSE + 12)
+#define TRC_SCHED_DOM_TIMER_FN   (TRC_SCHED_VERBOSE + 13)
+#define TRC_SCHED_SWITCH_INFPREV (TRC_SCHED_VERBOSE + 14)
+#define TRC_SCHED_SWITCH_INFNEXT (TRC_SCHED_VERBOSE + 15)
 
 #define TRC_MEM_PAGE_GRANT_MAP      (TRC_MEM + 1)
 #define TRC_MEM_PAGE_GRANT_UNMAP    (TRC_MEM + 2)

@@ -63,11 +63,31 @@ static struct scheduler ops;
          (( ops.fn != NULL ) ? ops.fn( __VA_ARGS__ )      \
           : (typeof(ops.fn(__VA_ARGS__)))0 )
 
+static inline void trace_runstate_change(struct vcpu *v, int new_state)
+{
+    struct { uint32_t vcpu:16, domain:16; } d;
+    uint32_t event;
+
+    if ( likely(!tb_init_done) )
+        return;
+
+    d.vcpu = v->vcpu_id;
+    d.domain = v->domain->domain_id;
+
+    event = TRC_SCHED_RUNSTATE_CHANGE;
+    event |= ( v->runstate.state & 0x3 ) << 8;
+    event |= ( new_state & 0x3 ) << 4;
+
+    __trace_var(event, 1/*tsc*/, sizeof(d), (unsigned char *)&d);
+}
+
 static inline void vcpu_runstate_change(
     struct vcpu *v, int new_state, s_time_t new_entry_time)
 {
     ASSERT(v->runstate.state != new_state);
     ASSERT(spin_is_locked(&per_cpu(schedule_data,v->processor).schedule_lock));
+
+    trace_runstate_change(v, new_state);
 
     v->runstate.time[v->runstate.state] +=
         new_entry_time - v->runstate.state_entry_time;
