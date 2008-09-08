@@ -71,7 +71,7 @@ static int suspend_evtchn_init(int xc, int domid)
 
     xs = xs_daemon_open();
     if (!xs) {
-	errx(1, "failed to get xenstore handle");
+	warnx("failed to get xenstore handle");
 	return -1;
     }
     sprintf(path, "/local/domain/%d/device/suspend/event-channel", domid);
@@ -88,20 +88,19 @@ static int suspend_evtchn_init(int xc, int domid)
 
     si.xce = xc_evtchn_open();
     if (si.xce < 0) {
-	errx(1, "failed to open event channel handle");
+	warnx("failed to open event channel handle");
 	goto cleanup;
     }
 
     si.suspend_evtchn = xc_evtchn_bind_interdomain(si.xce, domid, port);
     if (si.suspend_evtchn < 0) {
-	errx(1, "failed to bind suspend event channel: %d",
-	     si.suspend_evtchn);
+	warnx("failed to bind suspend event channel: %d", si.suspend_evtchn);
 	goto cleanup;
     }
 
     rc = xc_domain_subscribe_for_suspend(xc, domid, port);
     if (rc < 0) {
-	errx(1, "failed to subscribe to domain: %d", rc);
+	warnx("failed to subscribe to domain: %d", rc);
 	goto cleanup;
     }
 
@@ -118,27 +117,25 @@ static int suspend_evtchn_init(int xc, int domid)
  * receive the acknowledgement from the subscribe event channel. */
 static int evtchn_suspend(int domid)
 {
-    int xcefd;
     int rc;
 
     rc = xc_evtchn_notify(si.xce, si.suspend_evtchn);
     if (rc < 0) {
-	errx(1, "failed to notify suspend request channel: %d", rc);
+	warnx("failed to notify suspend request channel: %d", rc);
 	return 0;
     }
 
-    xcefd = xc_evtchn_fd(si.xce);
     do {
       rc = xc_evtchn_pending(si.xce);
       if (rc < 0) {
-	errx(1, "error polling suspend notification channel: %d", rc);
+	warnx("error polling suspend notification channel: %d", rc);
 	return 0;
       }
     } while (rc != si.suspend_evtchn);
 
     /* harmless for one-off suspend */
     if (xc_evtchn_unmask(si.xce, si.suspend_evtchn) < 0)
-	errx(1, "failed to unmask suspend notification channel: %d", rc);
+	warnx("failed to unmask suspend notification channel: %d", rc);
 
     /* notify xend that it can do device migration */
     printf("suspended\n");
@@ -195,11 +192,9 @@ static void qemu_flip_buffer(int domid, int next_active)
 
     /* Tell qemu that we want it to start writing log-dirty bits to the
      * other buffer */
-    if (!xs_write(xs, XBT_NULL, qemu_next_active_path, &digit, 1)) {
+    if (!xs_write(xs, XBT_NULL, qemu_next_active_path, &digit, 1))
         errx(1, "can't write next-active to store path (%s)\n", 
-              qemu_next_active_path);
-        exit(1);
-    }
+	     qemu_next_active_path);
 
     /* Wait a while for qemu to signal that it has switched to the new 
      * active buffer */
@@ -208,10 +203,8 @@ static void qemu_flip_buffer(int domid, int next_active)
     tv.tv_usec = 0;
     FD_ZERO(&fdset);
     FD_SET(xs_fileno(xs), &fdset);
-    if ((select(xs_fileno(xs) + 1, &fdset, NULL, NULL, &tv)) != 1) {
+    if ((select(xs_fileno(xs) + 1, &fdset, NULL, NULL, &tv)) != 1)
         errx(1, "timed out waiting for qemu to switch buffers\n");
-        exit(1);
-    }
     watch = xs_read_watch(xs, &len);
     free(watch);
     
