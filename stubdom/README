@@ -27,7 +27,7 @@ device_model = '/usr/lib/xen/bin/stubdom-dm'
 - disable anything related to dom0, like pty serial assignments
 
 
-Create /etc/xen/stubdom-hvmconfig (where "hvmconfig" is the name of your HVM
+Create /etc/xen/hvmconfig-dm (where "hvmconfig" is the name of your HVM
 guest) with
 
 kernel = "/usr/lib/xen/boot/ioemu-stubdom.gz"
@@ -52,7 +52,7 @@ There are three posibilities
 vnc = 0
 sdl = 0
 
-  - In stubdom-hvmconfig, set an sdl vfb:
+  - In hvmconfig-dm, set an sdl vfb:
 
 vfb = [ 'type=sdl' ]
 
@@ -65,7 +65,7 @@ then you will not be able to connect to it.
 vnc = 1
 vnclisten = "172.30.206.1"
 
-  - In stubdom-hvmconfig, fill the reserved vif with the same IP, for instance:
+  - In hvmconfig-dm, fill the reserved vif with the same IP, for instance:
 
 vif = [ 'ip=172.30.206.1', 'ip=10.0.1.1,mac=aa:00:00:12:23:34']
 
@@ -76,7 +76,7 @@ vif = [ 'ip=172.30.206.1', 'ip=10.0.1.1,mac=aa:00:00:12:23:34']
 vnc = 0
 sdl = 0
 
-  - In stubdom-hvmconfig, set a vnc vfb:
+  - In hvmconfig-dm, set a vnc vfb:
 
 vfb = [ 'type=vnc' ]
 
