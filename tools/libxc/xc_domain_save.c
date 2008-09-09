@@ -341,69 +341,20 @@ static int analysis_phase(int xc_handle, uint32_t domid, int p2m_size,
 static int suspend_and_state(int (*suspend)(void), int xc_handle, int io_fd,
                              int dom, xc_dominfo_t *info)
 {
-    int i = 0;
-
     if ( !(*suspend)() )
     {
         ERROR("Suspend request failed");
         return -1;
     }
 
- retry:
-
-    if ( xc_domain_getinfo(xc_handle, dom, 1, info) != 1 )
+    if ( (xc_domain_getinfo(xc_handle, dom, 1, info) != 1) ||
+         !info->shutdown || (info->shutdown_reason != SHUTDOWN_suspend) )
     {
-        ERROR("Could not get domain info");
+        ERROR("Domain not in suspended state");
         return -1;
     }
 
-    if ( info->dying )
-    {
-        ERROR("domain is dying");
-        return -1;
-    }
-
-    if ( info->crashed )
-    {
-        ERROR("domain has crashed");
-        return -1;
-    }
-
-    if ( info->shutdown )
-    {
-        switch ( info->shutdown_reason )
-        {
-        case SHUTDOWN_poweroff:
-        case SHUTDOWN_reboot:
-            ERROR("domain has shut down");
-            return -1;
-        case SHUTDOWN_suspend:
-            return 0;
-        case SHUTDOWN_crash:
-            ERROR("domain has crashed");
-            return -1;
-        }
-    }
-
-    if ( info->paused )
-    {
-        /* Try unpausing domain, wait, and retest. */
-        xc_domain_unpause( xc_handle, dom );
-        ERROR("Domain was paused. Wait and re-test.");
-        usleep(10000); /* 10ms */
-        goto retry;
-    }
-
-    if ( ++i < 100 )
-    {
-        ERROR("Retry suspend domain");
-        usleep(10000); /* 10ms */
-        goto retry;
-    }
-
-    ERROR("Unable to suspend domain.");
-
-    return -1;
+    return 0;
 }
 
 /*
