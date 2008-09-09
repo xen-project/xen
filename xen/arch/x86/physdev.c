@@ -58,9 +58,6 @@ static int get_free_pirq(struct domain *d, int type, int index)
     return i;
 }
 
-/*
- * Caller hold the irq_lock
- */
 static int map_domain_pirq(struct domain *d, int pirq, int vector,
                            struct physdev_map_pirq *map)
 {
@@ -136,9 +133,7 @@ done:
     return ret;
 }
 
-/*
- * The pirq should has been unbound before this call
- */
+/* The pirq should have been unbound before this call. */
 static int unmap_domain_pirq(struct domain *d, int pirq)
 {
     int ret = 0;
@@ -452,7 +447,7 @@ ret_t do_physdev_op(int cmd, XEN_GUEST_HANDLE(void) arg)
 
         irq = irq_op.irq;
         ret = -EINVAL;
-        if ( ((irq < 0) && (irq != AUTO_ASSIGN)) || (irq >= NR_IRQS) )
+        if ( (irq < 0) || (irq >= NR_IRQS) )
             break;
 
         irq_op.vector = assign_irq_vector(irq);
@@ -462,8 +457,7 @@ ret_t do_physdev_op(int cmd, XEN_GUEST_HANDLE(void) arg)
         if ( msi_enable )
         {
             spin_lock_irqsave(&dom0->arch.irq_lock, flags);
-            if ( irq != AUTO_ASSIGN )
-                ret = map_domain_pirq(dom0, irq_op.irq, irq_op.vector, NULL);
+            ret = map_domain_pirq(dom0, irq_op.irq, irq_op.vector, NULL);
             spin_unlock_irqrestore(&dom0->arch.irq_lock, flags);
         }
 
