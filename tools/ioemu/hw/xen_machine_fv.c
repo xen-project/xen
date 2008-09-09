@@ -139,8 +139,10 @@ uint8_t *qemu_map_cache(target_phys_addr_t phys_addr)
         !test_bit(address_offset>>XC_PAGE_SHIFT, entry->valid_mapping))
         qemu_remap_bucket(entry, address_index);
 
-    if (!test_bit(address_offset>>XC_PAGE_SHIFT, entry->valid_mapping))
+    if (!test_bit(address_offset>>XC_PAGE_SHIFT, entry->valid_mapping)) {
+        last_address_index = ~0UL;
         return NULL;
+    }
 
     last_address_index = address_index;
     last_address_vaddr = entry->vaddr_base;
