@@ -2554,6 +2554,9 @@ static void set_vram_mapping(CirrusVGAState *s, unsigned long begin, unsigned lo
 
     fprintf(logfile,"mapping vram to %lx - %lx\n", begin, end);
 
+    if (!s->vram_mfns)
+        return;
+
     xatp.domid = domid;
     xatp.space = XENMAPSPACE_mfn;
 

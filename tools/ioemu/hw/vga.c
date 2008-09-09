@@ -2080,7 +2080,13 @@ void xen_vga_vram_map(uint64_t vram_addr, int copy)
 
     if (copy)
         memcpy(vram, xen_vga_state->vram_ptr, VGA_RAM_SIZE);
-    qemu_free(xen_vga_state->vram_ptr);
+    if (xen_vga_state->vram_mfns) {
+        /* In case this function is called more than once */
+        free(xen_vga_state->vram_mfns);
+        munmap(xen_vga_state->vram_ptr, VGA_RAM_SIZE);
+    } else {
+        qemu_free(xen_vga_state->vram_ptr);
+    }
     xen_vga_state->vram_ptr = vram;
     xen_vga_state->vram_mfns = pfn_list;
 #ifdef CONFIG_STUBDOM
