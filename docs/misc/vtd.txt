@@ -1,8 +1,9 @@
 Title   : How to do PCI Passthrough with VT-d
 Authors : Allen Kay    <allen.m.kay@intel.com>
           Weidong Han  <weidong.han@intel.com>
+          Yuji Shimada <shimada-yxb@necst.nec.co.jp>
 Created : October-24-2007
-Updated : August-06-2008
+Updated : September-09-2008
 
 How to turn on VT-d in Xen
 --------------------------
@@ -106,3 +107,27 @@ http://h10010.www1.hp.com/wwpc/us/en/en/WF04a/12454-12454-64287-321860-3328898.h
 
 For more information, pls refer to http://wiki.xensource.com/xenwiki/VTdHowTo.
 
+
+Assigning devices to HVM domains
+--------------------------------
+
+Most device types such as NIC, HBA, EHCI and UHCI can be assigned to
+an HVM domain.
+
+But some devices have design features which make them unsuitable for
+assignment to an HVM domain. Examples include:
+
+ * Device has an internal resource, such as private memory, which is
+   mapped to memory address space with BAR (Base Address Register).
+ * Driver submits command with a pointer to a buffer within internal
+   resource. Device decodes the pointer (address), and accesses to the
+   buffer.
+
+In an HVM domain, the BAR is virtualized, and host-BAR value and
+guest-BAR value are different. The addresses of internal resource from
+device's view and driver's view are different. Similarly, the
+addresses of buffer within internal resource from device's view and
+driver's view are different. As a result, device can't access to the
+buffer specified by driver.
+
+Such devices assigned to HVM domain currently do not work.
