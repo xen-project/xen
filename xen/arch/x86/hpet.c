@@ -233,7 +233,15 @@ void hpet_broadcast_exit(void)
 
     if ( cpu_test_and_clear(cpu, ch->cpumask) )
     {
-        reprogram_timer(per_cpu(timer_deadline, cpu));
+        if ( !reprogram_timer(per_cpu(timer_deadline, cpu)) )
+        {
+            /*
+             * The deadline must have passed -- trigger timer work now.
+             * Also cancel any outstanding LAPIC event.
+             */
+            reprogram_timer(0);
+            raise_softirq(TIMER_SOFTIRQ);
+        }
 
         if ( cpus_empty(ch->cpumask) && ch->next_event != STIME_MAX )
             reprogram_hpet_evt_channel(ch, STIME_MAX, 0, 0);
