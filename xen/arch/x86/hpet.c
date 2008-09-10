@@ -100,6 +100,13 @@ static int reprogram_hpet_evt_channel(
 
     ch->next_event = expire;
 
+    if ( expire == STIME_MAX )
+    {
+        /* We assume it will take a long time for the timer to wrap. */
+        hpet_write32(0, HPET_T0_CMP);
+        return 0;
+    }
+
     delta = min_t(int64_t, delta, MAX_DELTA_NS);
     delta = max_t(int64_t, delta, MIN_DELTA_NS);
     delta = ns2ticks(delta, ch->shift, ch->mult);
@@ -206,9 +213,9 @@ void hpet_broadcast_enter(void)
 {
     struct hpet_event_channel *ch = &hpet_event;
 
-    cpu_set(smp_processor_id(), ch->cpumask);
-
     spin_lock(&ch->lock);
+
+    cpu_set(smp_processor_id(), ch->cpumask);
 
     /* reprogram if current cpu expire time is nearer */
     if ( this_cpu(timer_deadline) < ch->next_event )
@@ -222,8 +229,17 @@ void hpet_broadcast_exit(void)
     struct hpet_event_channel *ch = &hpet_event;
     int cpu = smp_processor_id();
 
+    spin_lock_irq(&ch->lock);
+
     if ( cpu_test_and_clear(cpu, ch->cpumask) )
+    {
         reprogram_timer(per_cpu(timer_deadline, cpu));
+
+        if ( cpus_empty(ch->cpumask) && ch->next_event != STIME_MAX )
+            reprogram_hpet_evt_channel(ch, STIME_MAX, 0, 0);
+    }
+
+    spin_unlock_irq(&ch->lock);
 }
 
 int hpet_broadcast_is_available(void)
