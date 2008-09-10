@@ -993,15 +993,16 @@ static void local_time_calibration(void)
  * All CPUS snapshot their local TSC and extrapolation of system time.
  */
 struct calibration_rendezvous {
+    cpumask_t cpu_calibration_map;
     atomic_t nr_cpus;
     s_time_t master_stime;
 };
 
 static void time_calibration_rendezvous(void *_r)
 {
-    unsigned int total_cpus = num_online_cpus();
     struct cpu_calibration *c = &this_cpu(cpu_calibration);
     struct calibration_rendezvous *r = _r;
+    unsigned int total_cpus = cpus_weight(r->cpu_calibration_map);
 
     if ( smp_processor_id() == 0 )
     {
@@ -1029,11 +1030,13 @@ static void time_calibration_rendezvous(void *_r)
 static void time_calibration(void *unused)
 {
     struct calibration_rendezvous r = {
+        .cpu_calibration_map = cpu_online_map,
         .nr_cpus = ATOMIC_INIT(0)
     };
 
     /* @wait=1 because we must wait for all cpus before freeing @r. */
-    on_each_cpu(time_calibration_rendezvous, &r, 0, 1);
+    on_selected_cpus(r.cpu_calibration_map,
+                     time_calibration_rendezvous, &r, 0, 1);
 }
 
 void init_percpu_time(void)
