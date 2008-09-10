@@ -402,8 +402,7 @@ static void acpi_processor_idle(void)
         /* Re-enable interrupts */
         local_irq_enable();
         /* Compute time (ticks) that we were actually asleep */
-        sleep_ticks =
-            ticks_elapsed(t1, t2) - cx->latency_ticks - C2_OVERHEAD;
+        sleep_ticks = ticks_elapsed(t1, t2);
         break;
 
     case ACPI_STATE_C3:
@@ -471,8 +470,6 @@ static void acpi_processor_idle(void)
         lapic_timer_on();
         /* Compute time (ticks) that we were actually asleep */
         sleep_ticks = ticks_elapsed(t1, t2);
-        /* Do not account our idle-switching overhead: */
-        sleep_ticks -= cx->latency_ticks + C3_OVERHEAD;
 
         break;
 
@@ -482,7 +479,7 @@ static void acpi_processor_idle(void)
     }
 
     cx->usage++;
-    if ( (cx->type != ACPI_STATE_C1) && (sleep_ticks > 0) )
+    if ( sleep_ticks > 0 )
         cx->time += sleep_ticks;
 
     next_state = power->state;
