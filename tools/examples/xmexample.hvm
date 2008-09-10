@@ -220,7 +220,7 @@ serial='pty'
 #   Configure guest CPUID responses:
 #
 #cpuid=[ '1:ecx=xxxxxxxxxxx00xxxxxxxxxxxxxxxxxxx,
-#           eax=xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx' ]
+#           eax=xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx' ]
 # - Unset the SSE4 features (CPUID.1[ECX][20-19])
 # - Default behaviour for all other bits in ECX And EAX registers.
 # 
