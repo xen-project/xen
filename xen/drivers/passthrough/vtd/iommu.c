@@ -1090,7 +1090,8 @@ static int domain_context_mapping_one(
     }
 
     spin_lock_irqsave(&iommu->lock, flags);
-    if ( ecap_pass_thru(iommu->ecap) && (domain->domain_id == 0) )
+    if ( iommu_passthrough &&
+         ecap_pass_thru(iommu->ecap) && (domain->domain_id == 0) )
     {
         context_set_translation_type(*context, CONTEXT_TT_PASS_THRU);
         agaw = level_to_agaw(iommu->nr_pt_levels);
@@ -1463,7 +1464,8 @@ int intel_iommu_map_page(
     iommu = drhd->iommu;
 
     /* do nothing if dom0 and iommu supports pass thru */
-    if ( ecap_pass_thru(iommu->ecap) && (d->domain_id == 0) )
+    if ( iommu_passthrough &&
+         ecap_pass_thru(iommu->ecap) && (d->domain_id == 0) )
         return 0;
 
     pg_maddr = addr_to_dma_page_maddr(d, (paddr_t)gfn << PAGE_SHIFT_4K, 1);
@@ -1502,7 +1504,8 @@ int intel_iommu_unmap_page(struct domain *d, unsigned long gfn)
     iommu = drhd->iommu;
 
     /* do nothing if dom0 and iommu supports pass thru */
-    if ( ecap_pass_thru(iommu->ecap) && (d->domain_id == 0) )
+    if ( iommu_passthrough &&
+         ecap_pass_thru(iommu->ecap) && (d->domain_id == 0) )
         return 0;
 
     dma_pte_clear_one(d, (paddr_t)gfn << PAGE_SHIFT_4K);
