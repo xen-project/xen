@@ -162,8 +162,6 @@ static inline void io_apic_modify(unsigned int apic, unsigned int reg, unsigned 
 /* 1 if "noapic" boot option passed */
 extern int skip_ioapic_setup;
 
-extern int msi_enable;
-
 /*
  * If we use the IO-APIC for IRQ routing, disable automatic
  * assignment of PCI IRQ's.
