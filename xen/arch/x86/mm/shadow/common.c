@@ -715,8 +715,8 @@ static void _sh_resync(struct vcpu *v, mfn_t gmfn,
              & ~SHF_L1_ANY));
     ASSERT(!sh_page_has_multiple_shadows(mfn_to_page(gmfn)));
 
-    SHADOW_PRINTK("d=%d, v=%d, gmfn=%05lx, va=%lx\n",
-                  v->domain->domain_id, v->vcpu_id, mfn_x(gmfn), va);
+    SHADOW_PRINTK("d=%d, v=%d, gmfn=%05lx\n",
+                  v->domain->domain_id, v->vcpu_id, mfn_x(gmfn));
 
     /* Need to pull write access so the page *stays* in sync. */
     if ( oos_remove_write_access(v, gmfn, fixup) )
@@ -970,8 +970,8 @@ int sh_unsync(struct vcpu *v, mfn_t gmfn)
     
     ASSERT(shadow_locked_by_me(v->domain));
 
-    SHADOW_PRINTK("d=%d, v=%d, gmfn=%05lx va %lx\n",
-                  v->domain->domain_id, v->vcpu_id, mfn_x(gmfn), va);
+    SHADOW_PRINTK("d=%d, v=%d, gmfn=%05lx\n",
+                  v->domain->domain_id, v->vcpu_id, mfn_x(gmfn));
 
     pg = mfn_to_page(gmfn);
  

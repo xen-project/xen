@@ -3179,7 +3179,7 @@ static int sh_page_fault(struct vcpu *v,
 
     SHADOW_PRINTK("d:v=%u:%u va=%#lx err=%u, rip=%lx\n",
                   v->domain->domain_id, v->vcpu_id, va, regs->error_code,
-                  regs->rip);
+                  regs->eip);
 
     perfc_incr(shadow_fault);
 
