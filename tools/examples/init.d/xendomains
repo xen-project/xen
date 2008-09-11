@@ -327,15 +327,17 @@ stop()
 	if test $id = 0; then continue; fi
 	echo -n " $name"
 	if test "$XENDOMAINS_AUTO_ONLY" = "true"; then
-	    case $name in
+	    eval "
+	    case \"\$name\" in
 		($NAMES)
 		    # nothing
 		    ;;
 		(*)
-		    echo -n "(skip)"
+		    echo -n '(skip)'
 		    continue
 		    ;;
 	    esac
+	    "
 	fi
 	# XENDOMAINS_SYSRQ chould be something like just "s" 
 	# or "s e i u" or even "s e s i u o"
