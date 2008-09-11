@@ -2154,6 +2154,12 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
             if ( wrmsr_safe(regs->ecx, eax, edx) != 0 )
                 goto fail;
             break;
+        case MSR_IA32_THERM_CONTROL:
+            if ( boot_cpu_data.x86_vendor != X86_VENDOR_INTEL )
+                goto fail;
+            if ( wrmsr_safe(regs->ecx, eax, edx) != 0 )
+                goto fail;
+            break;
         default:
             if ( wrmsr_hypervisor_regs(regs->ecx, eax, edx) )
                 break;
@@ -2229,6 +2235,12 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
             regs->eax |= MSR_IA32_MISC_ENABLE_BTS_UNAVAIL |
                          MSR_IA32_MISC_ENABLE_PEBS_UNAVAIL |
                          MSR_IA32_MISC_ENABLE_XTPR_DISABLE;
+            break;
+        case MSR_IA32_THERM_CONTROL:
+            if ( boot_cpu_data.x86_vendor != X86_VENDOR_INTEL )
+                goto fail;
+            if ( rdmsr_safe(regs->ecx, regs->eax, regs->edx) )
+                goto fail;
             break;
         default:
             if ( rdmsr_hypervisor_regs(regs->ecx, &l, &h) )
