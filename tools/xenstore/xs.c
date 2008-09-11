@@ -795,8 +795,11 @@ char *xs_get_domain_path(struct xs_handle *h, unsigned int domid)
 
 bool xs_is_domain_introduced(struct xs_handle *h, unsigned int domid)
 {
-	return strcmp("F",
-		      single_with_domid(h, XS_IS_DOMAIN_INTRODUCED, domid));
+	char *domain = single_with_domid(h, XS_IS_DOMAIN_INTRODUCED, domid);
+	int rc = strcmp("F", domain);
+
+	free(domain);
+	return rc;
 }
 
 /* Only useful for DEBUG versions */
