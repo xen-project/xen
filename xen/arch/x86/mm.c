@@ -2804,7 +2804,7 @@ int do_mmu_update(
              */
         case MMU_NORMAL_PT_UPDATE:
         case MMU_PT_UPDATE_PRESERVE_AD:
-            rc = xsm_mmu_normal_update(d, req.val);
+            rc = xsm_mmu_normal_update(d, FOREIGNDOM, req.val);
             if ( rc )
                 break;
 
@@ -3321,7 +3321,7 @@ int do_update_va_mapping(unsigned long va, u64 val64,
     if ( unlikely(!access_ok(va, 1) && !paging_mode_external(d)) )
         return -EINVAL;
 
-    rc = xsm_update_va_mapping(d, val);
+    rc = xsm_update_va_mapping(d, FOREIGNDOM, val);
     if ( rc )
         return rc;
 

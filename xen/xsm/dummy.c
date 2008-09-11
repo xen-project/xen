@@ -400,7 +400,8 @@ static int dummy_domain_memory_map (struct domain *d)
     return 0;
 }
 
-static int dummy_mmu_normal_update (struct domain *d, intpte_t fpte)
+static int dummy_mmu_normal_update (struct domain *d, struct domain *f, 
+                                                                intpte_t fpte)
 {
     return 0;
 }
@@ -410,7 +411,8 @@ static int dummy_mmu_machphys_update (struct domain *d, unsigned long mfn)
     return 0;
 }
 
-static int dummy_update_va_mapping (struct domain *d, l1_pgentry_t pte)
+static int dummy_update_va_mapping (struct domain *d, struct domain *f, 
+                                                            l1_pgentry_t pte)
 {
     return 0;
 }

@@ -11,6 +11,7 @@
 #include <xen/init.h>
 #include <xen/lib.h>
 #include <xen/sched.h>
+#include <xen/paging.h>
 #include <xen/xmalloc.h>
 #include <xsm/xsm.h>
 #include <xen/spinlock.h>
@@ -354,7 +355,7 @@ static int get_mfn_sid(unsigned long mfn, u32 *sid)
     if ( mfn_valid(mfn) )
     {
         /*mfn is valid if this is a page that Xen is tracking!*/
-        page = mfn_to_page(mfn);        
+        page = mfn_to_page(mfn);
         rc = get_page_sid(page, sid);
     }
     else
@@ -403,23 +404,6 @@ static int flask_memory_pin_page(struct domain *d, struct page_info *page)
 
     return avc_has_perm(dsec->sid, sid, SECCLASS_MMU, MMU__PINPAGE, NULL);
 }
-
-/* Used to defer flushing of memory structures. */
-struct percpu_mm_info {
-#define DOP_FLUSH_TLB      (1<<0) /* Flush the local TLB.                    */
-#define DOP_FLUSH_ALL_TLBS (1<<1) /* Flush TLBs of all VCPUs of current dom. */
-#define DOP_RELOAD_LDT     (1<<2) /* Reload the LDT shadow mapping.          */
-    unsigned int   deferred_ops;
-    /* If non-NULL, specifies a foreign subject domain for some operations. */
-    struct domain *foreign;
-};
-static DEFINE_PER_CPU(struct percpu_mm_info, percpu_mm_info);
-
-/*
- * Returns the current foreign domain; defaults to the currently-executing
- * domain if a foreign override hasn't been specified.
- */
-#define FOREIGNDOM (this_cpu(percpu_mm_info).foreign ?: current->domain)
 
 static int flask_console_io(struct domain *d, int cmd)
 {
@@ -1023,7 +1007,8 @@ static int flask_domain_memory_map(struct domain *d)
     return domain_has_perm(current->domain, d, SECCLASS_MMU, MMU__MEMORYMAP);
 }
 
-static int flask_mmu_normal_update(struct domain *d, intpte_t fpte)
+static int flask_mmu_normal_update(struct domain *d, struct domain *f, 
+                                                                intpte_t fpte)
 {
     int rc = 0;
     u32 map_perms = MMU__MAP_READ;
@@ -1036,7 +1021,7 @@ static int flask_mmu_normal_update(struct domain *d, intpte_t fpte)
     if ( l1e_get_flags(l1e_from_intpte(fpte)) & _PAGE_RW )
         map_perms |= MMU__MAP_WRITE;
 
-    fmfn = gmfn_to_mfn(FOREIGNDOM, l1e_get_pfn(l1e_from_intpte(fpte)));
+    fmfn = gmfn_to_mfn(f, l1e_get_pfn(l1e_from_intpte(fpte)));
 
     rc = get_mfn_sid(fmfn, &fsid);
     if ( rc )
@@ -1059,7 +1044,8 @@ static int flask_mmu_machphys_update(struct domain *d, unsigned long mfn)
     return avc_has_perm(dsec->sid, psid, SECCLASS_MMU, MMU__UPDATEMP, NULL);
 }
 
-static int flask_update_va_mapping(struct domain *d, l1_pgentry_t pte)
+static int flask_update_va_mapping(struct domain *d, struct domain *f, 
+                                                            l1_pgentry_t pte)
 {
     int rc = 0;
     u32 psid;
@@ -1069,7 +1055,7 @@ static int flask_update_va_mapping(struct domain *d, l1_pgentry_t pte)
 
     dsec = d->ssid;
 
-    mfn = gmfn_to_mfn(FOREIGNDOM, l1e_get_pfn(pte));        
+    mfn = gmfn_to_mfn(f, l1e_get_pfn(pte));        
     rc = get_mfn_sid(mfn, &psid);
     if ( rc )
         return rc;
