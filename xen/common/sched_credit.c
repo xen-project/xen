@@ -1107,6 +1107,10 @@ csched_load_balance(int cpu, struct csched_vcpu *snext)
 
     BUG_ON( cpu != snext->vcpu->processor );
 
+    /* If this CPU is going offline we shouldn't steal work. */
+    if ( unlikely(!cpu_online(cpu)) )
+        goto out;
+
     if ( snext->pri == CSCHED_PRI_IDLE )
         CSCHED_STAT_CRANK(load_balance_idle);
     else if ( snext->pri == CSCHED_PRI_TS_OVER )
@@ -1149,6 +1153,7 @@ csched_load_balance(int cpu, struct csched_vcpu *snext)
             return speer;
     }
 
+ out:
     /* Failed to find more important work elsewhere... */
     __runq_remove(snext);
     return snext;

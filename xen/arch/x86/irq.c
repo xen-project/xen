@@ -737,9 +737,12 @@ __initcall(setup_dump_irqs);
 
 void fixup_irqs(cpumask_t map)
 {
-    unsigned int irq;
+    unsigned int irq, sp;
     static int warned;
+    irq_guest_action_t *action;
+    struct pending_eoi *peoi;
 
+    /* Direct all future interrupts away from this CPU. */
     for ( irq = 0; irq < NR_IRQS; irq++ )
     {
         cpumask_t mask;
@@ -758,8 +761,24 @@ void fixup_irqs(cpumask_t map)
             printk("Cannot set affinity for irq %i\n", irq);
     }
 
+    /* Service any interrupts that beat us in the re-direction race. */
     local_irq_enable();
     mdelay(1);
     local_irq_disable();
+
+    /* Clean up cpu_eoi_map of every interrupt to exclude this CPU. */
+    for ( irq = 0; irq < NR_IRQS; irq++ )
+    {
+        if ( !(irq_desc[irq].status & IRQ_GUEST) )
+            continue;
+        action = (irq_guest_action_t *)irq_desc[irq].action;
+        cpu_clear(smp_processor_id(), action->cpu_eoi_map);
+    }
+
+    /* Flush the interrupt EOI stack. */
+    peoi = this_cpu(pending_eoi);
+    for ( sp = 0; sp < pending_eoi_sp(peoi); sp++ )
+        peoi[sp].ready = 1;
+    flush_ready_eoi(NULL);
 }
 #endif

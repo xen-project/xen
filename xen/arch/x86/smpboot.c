@@ -1225,15 +1225,6 @@ int __cpu_disable(void)
 	if (cpu == 0)
 		return -EBUSY;
 
-	/*
-	 * Only S3 is using this path, and thus idle vcpus are running on all
-	 * APs when we are called. To support full cpu hotplug, other 
-	 * notification mechanisms should be introduced (e.g., migrate vcpus
-	 * off this physical cpu before rendezvous point).
-	 */
-	if (!is_idle_vcpu(current))
-		return -EINVAL;
-
 	local_irq_disable();
 	clear_local_APIC();
 	/* Allow any queued timer interrupts to get serviced */
@@ -1249,6 +1240,9 @@ int __cpu_disable(void)
 	fixup_irqs(map);
 	/* It's now safe to remove this processor from the online map */
 	cpu_clear(cpu, cpu_online_map);
+
+	cpu_disable_scheduler();
+
 	return 0;
 }
 
@@ -1275,28 +1269,6 @@ static int take_cpu_down(void *unused)
     return __cpu_disable();
 }
 
-/* 
- * XXX: One important thing missed here is to migrate vcpus
- * from dead cpu to other online ones and then put whole
- * system into a stop state. It assures a safe environment
- * for a cpu hotplug/remove at normal running state.
- *
- * However for xen PM case, at this point:
- * 	-> All other domains should be notified with PM event,
- *	   and then in following states:
- *		* Suspend state, or
- *		* Paused state, which is a force step to all
- *		  domains if they do nothing to suspend
- *	-> All vcpus of dom0 (except vcpu0) have already beem
- *	   hot removed
- * with the net effect that all other cpus only have idle vcpu
- * running. In this special case, we can avoid vcpu migration
- * then and system can be considered in a stop state.
- *
- * So current cpu hotplug is a special version for PM specific
- * usage, and need more effort later for full cpu hotplug.
- * (ktian1)
- */
 int cpu_down(unsigned int cpu)
 {
 	int err = 0;
@@ -1304,6 +1276,12 @@ int cpu_down(unsigned int cpu)
 	spin_lock(&cpu_add_remove_lock);
 	if (num_online_cpus() == 1) {
 		err = -EBUSY;
+		goto out;
+	}
+
+	/* Can not offline BSP */
+	if (cpu == 0) {
+		err = -EINVAL;
 		goto out;
 	}
 

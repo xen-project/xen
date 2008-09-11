@@ -288,6 +288,48 @@ void vcpu_force_reschedule(struct vcpu *v)
     }
 }
 
+/*
+ * This function is used by cpu_hotplug code from stop_machine context.
+ * Hence we can avoid needing to take the 
+ */
+void cpu_disable_scheduler(void)
+{
+    struct domain *d;
+    struct vcpu *v;
+    unsigned int cpu = smp_processor_id();
+
+    for_each_domain ( d )
+    {
+        for_each_vcpu ( d, v )
+        {
+            if ( is_idle_vcpu(v) )
+                continue;
+
+            if ( (cpus_weight(v->cpu_affinity) == 1) &&
+                 cpu_isset(cpu, v->cpu_affinity) )
+            {
+                printk("Breaking vcpu affinity for domain %d vcpu %d\n",
+                        v->domain->domain_id, v->vcpu_id);
+                cpus_setall(v->cpu_affinity);
+            }
+
+            /*
+             * Migrate single-shot timers to CPU0. A new cpu will automatically
+             * be chosen when the timer is next re-set.
+             */
+            if ( v->singleshot_timer.cpu == cpu )
+                migrate_timer(&v->singleshot_timer, 0);
+
+            if ( v->processor == cpu )
+            {
+                set_bit(_VPF_migrating, &v->pause_flags);
+                vcpu_sleep_nosync(v);
+                vcpu_migrate(v);
+            }
+        }
+    }
+}
+
 static int __vcpu_set_affinity(
     struct vcpu *v, cpumask_t *affinity,
     bool_t old_lock_status, bool_t new_lock_status)
