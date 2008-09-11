@@ -215,6 +215,8 @@ void hpet_broadcast_enter(void)
 
     spin_lock(&ch->lock);
 
+    disable_APIC_timer();
+
     cpu_set(smp_processor_id(), ch->cpumask);
 
     /* reprogram if current cpu expire time is nearer */
@@ -233,15 +235,13 @@ void hpet_broadcast_exit(void)
 
     if ( cpu_test_and_clear(cpu, ch->cpumask) )
     {
+        /* Cancel any outstanding LAPIC event and re-enable interrupts. */
+        reprogram_timer(0);
+        enable_APIC_timer();
+        
+        /* Reprogram the deadline; trigger timer work now if it has passed. */
         if ( !reprogram_timer(per_cpu(timer_deadline, cpu)) )
-        {
-            /*
-             * The deadline must have passed -- trigger timer work now.
-             * Also cancel any outstanding LAPIC event.
-             */
-            reprogram_timer(0);
             raise_softirq(TIMER_SOFTIRQ);
-        }
 
         if ( cpus_empty(ch->cpumask) && ch->next_event != STIME_MAX )
             reprogram_hpet_evt_channel(ch, STIME_MAX, 0, 0);
