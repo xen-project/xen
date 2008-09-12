@@ -1,0 +1,166 @@
+#
+# Define common prefixes for access vectors
+#
+# common common_name { permission_name ... }
+
+#
+# Define a common prefix for file access vectors.
+#
+
+
+#
+# Define the access vectors.
+#
+# class class_name [ inherits common_name ] { permission_name ... }
+
+
+#
+# Define the access vector interpretation for file-related objects.
+#
+
+class xen
+{
+	scheduler
+	settime
+	tbufcontrol
+	readconsole
+	clearconsole
+	perfcontrol
+	mtrr_add
+	mtrr_del
+	mtrr_read
+	microcode
+	physinfo
+	quirk
+    writeconsole
+    readapic
+    writeapic
+    privprofile
+    nonprivprofile
+    kexec
+	firmware
+	sleep
+	frequency
+	getidle
+	debug
+	getcpuinfo
+	heap
+}
+
+class domain
+{
+	setvcpucontext
+	pause
+	unpause
+    resume
+    create
+    transition
+    max_vcpus
+    destroy
+    setvcpuaffinity
+	getvcpuaffinity
+	scheduler
+	getdomaininfo
+	getvcpuinfo
+	getvcpucontext
+	setdomainmaxmem
+	setdomainhandle
+	setdebugging
+	hypercall
+    settime
+    set_target
+    shutdown
+    setaddrsize
+    getaddrsize
+	trigger
+	getextvcpucontext
+	setextvcpucontext
+}
+
+class hvm
+{
+    sethvmc
+    gethvmc
+    setparam
+    getparam
+    pcilevel
+    irqlevel
+    pciroute
+	bind_irq
+	cacheattr
+}
+
+class event
+{
+	bind
+	send
+	status
+	notify
+	create
+    vector
+    reset
+}
+
+class grant
+{
+	map_read
+	map_write
+	unmap
+	transfer
+	setup
+    copy
+    query
+}
+
+class mmu
+{
+	map_read
+	map_write
+	pageinfo
+	pagelist
+    adjust
+    stat
+    translategp
+	updatemp
+    physmap
+    pinpage
+    mfnlist
+    memorymap
+}
+
+class shadow
+{
+	disable
+	enable
+    logdirty
+}
+
+class resource
+{
+	add
+	remove
+	use
+	add_irq
+	remove_irq
+	add_ioport
+	remove_ioport
+	add_iomem
+	remove_iomem
+	stat_device
+	add_device
+	remove_device
+}
+
+class security
+{
+	compute_av
+	compute_create
+	compute_member
+	check_context
+	load_policy
+	compute_relabel
+	compute_user
+	setenforce
+	setbool
+	setsecparam
+}

@@ -8,49 +8,55 @@
 #include <xenctrl.h>
 #include <xenguest.h>
 
-int
-main(int argc, char **argv)
+int main(int argc, char **argv)
 {
-    int xc_fd;
-    int domid = 0, port = 0, status;
-    const char *msg;
+    int xc_fd, domid, port, rc;
+    xc_evtchn_status_t status;
 
-    if ( argc > 1 )
-        domid = strtol(argv[1], NULL, 10);
+    domid = (argc > 1) ? strtol(argv[1], NULL, 10) : 0;
 
     xc_fd = xc_interface_open();
     if ( xc_fd < 0 )
         errx(1, "failed to open control interface");
 
-    while ( (status = xc_evtchn_status(xc_fd, domid, port)) >= 0 )
+    for ( port = 0; ; port++ )
     {
-        switch ( status )
-        {
-        case EVTCHNSTAT_closed:
-            msg = "Channel is not in use.";
-            break;
-        case EVTCHNSTAT_unbound:
-            msg = "Channel is waiting interdom connection.";
-            break;
-        case EVTCHNSTAT_interdomain:
-            msg = "Channel is connected to remote domain.";
-            break;
-        case EVTCHNSTAT_pirq:
-            msg = "Channel is bound to a phys IRQ line.";
-            break;
-        case EVTCHNSTAT_virq:
-            msg = "Channel is bound to a virtual IRQ line.";
-            break;
-        case EVTCHNSTAT_ipi:
-            msg = "Channel is bound to a virtual IPI line.";
-            break;
-        default:
-            msg = "Unknown.";
+        status.dom = domid;
+        status.port = port;
+        rc = xc_evtchn_status(xc_fd, &status);
+        if ( rc < 0 )
             break;
 
+        if ( status.status == EVTCHNSTAT_closed )
+            continue;
+
+        printf("%4d: VCPU %u: ", port, status.vcpu);
+
+        switch ( status.status )
+        {
+        case EVTCHNSTAT_unbound:
+            printf("Interdomain (Waiting connection) - Remote Domain %u",
+                   status.u.unbound.dom);
+            break;
+        case EVTCHNSTAT_interdomain:
+            printf("Interdomain (Connected) - Remote Domain %u, Port %u",
+                   status.u.interdomain.dom, status.u.interdomain.port);
+            break;
+        case EVTCHNSTAT_pirq:
+            printf("Physical IRQ %u", status.u.pirq);
+            break;
+        case EVTCHNSTAT_virq:
+            printf("Virtual IRQ %u", status.u.virq);
+            break;
+        case EVTCHNSTAT_ipi:
+            printf("IPI");
+            break;
+        default:
+            printf("Unknown");
+            break;
         }
-        printf("%03d: %d: %s\n", port, status, msg);
-        port++;
+
+        printf("\n");
     }
 
     xc_interface_close(xc_fd);

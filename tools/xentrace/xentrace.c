@@ -56,6 +56,7 @@ typedef struct settings_st {
     unsigned long tbuf_size;
     unsigned long disk_rsvd;
     unsigned long timeout;
+    unsigned long memory_buffer;
     uint8_t discard:1,
         disable_tracing:1;
 } settings_t;
@@ -67,10 +68,243 @@ int interrupted = 0; /* gets set if we get a SIGHUP */
 static int xc_handle = -1;
 static int event_fd = -1;
 static int virq_port = -1;
+static int outfd = 1;
 
 static void close_handler(int signal)
 {
     interrupted = 1;
+}
+
+static struct {
+    char * buf;
+    unsigned long prod, cons, size;
+    unsigned long pending_size, pending_prod;
+} membuf = { 0 };
+
+#define MEMBUF_INDEX_RESET_THRESHOLD (1<<29)
+
+/* FIXME -- make a power of 2 so we can mask instead. */
+#define MEMBUF_POINTER(_i) (membuf.buf + ((_i) % membuf.size))
+#define MEMBUF_CONS_INCREMENT(_n)               \
+    do {                                        \
+        membuf.cons += (_n);                    \
+    } while(0)
+#define MEMBUF_PROD_SET(_x)                                             \
+    do {                                                                \
+        if ( (_x) < membuf.prod ) {                                     \
+            fprintf(stderr, "%s: INTERNAL_ERROR: prod %lu, trying to set to %lu!\n", \
+                    __func__, membuf.prod, (unsigned long)(_x));        \
+            exit(1);                                                    \
+        }                                                               \
+        membuf.prod = (_x);                                             \
+        if ( (_x) > MEMBUF_INDEX_RESET_THRESHOLD )                      \
+        {                                                               \
+            membuf.prod %= membuf.size;                                 \
+            membuf.cons %= membuf.size;                                 \
+            if( membuf.prod < membuf.cons )                             \
+                membuf.prod += membuf.size;                             \
+        }                                                               \
+    } while(0) 
+
+struct cpu_change_record {
+    uint32_t header;
+    struct {
+        int cpu;
+        unsigned window_size;
+    } data;
+};
+
+#define CPU_CHANGE_HEADER                                           \
+    (TRC_TRACE_CPU_CHANGE                                           \
+     | (((sizeof(struct cpu_change_record)/sizeof(uint32_t)) - 1)   \
+        << TRACE_EXTRA_SHIFT) )
+
+void membuf_alloc(unsigned long size)
+{
+    membuf.buf = malloc(size);
+
+    if(!membuf.buf)
+    {
+        fprintf(stderr, "%s: Couldn't malloc %lu bytes!\n",
+                __func__, size);
+        exit(1);
+    }
+
+    membuf.prod = membuf.cons = 0;
+    membuf.size = size;
+}
+
+/*
+ * Reserve a new window in the buffer.  Move the 'consumer' forward size
+ * bytes, re-adjusting the cpu window sizes as necessary, and insert a
+ * cpu_change record.
+ */
+void membuf_reserve_window(unsigned cpu, unsigned long window_size)
+{
+    struct cpu_change_record *rec;
+    long need_to_consume, free, freed;
+
+    if ( membuf.pending_size > 0 )
+    {
+        fprintf(stderr, "%s: INTERNAL_ERROR: pending_size %lu\n",
+                __func__, membuf.pending_size);
+        exit(1);
+    }
+
+    need_to_consume = window_size + sizeof(*rec);
+
+    if ( window_size > membuf.size )
+    {
+        fprintf(stderr, "%s: reserve size %lu larger than buffer size %lu!\n",
+                __func__, window_size, membuf.size);
+        exit(1);
+    }
+
+    /* Subtract free space already in buffer. */
+    free = membuf.size - (membuf.prod - membuf.cons);
+    if( need_to_consume < free)
+        goto start_window;
+
+    need_to_consume -= free;
+
+    /*
+     * "Free" up full windows until we have enough for this window.
+     * It's a bit wasteful to throw away partial buffers, but the only
+     * other option is to scan throught he buffer headers.  Since the
+     * common case is that it's going to be thrown away next anyway, I
+     * think minimizing the overall impact is more important.
+     */
+    do {
+        rec = (struct cpu_change_record *)MEMBUF_POINTER(membuf.cons);
+        if( rec->header != CPU_CHANGE_HEADER )
+        {
+            fprintf(stderr, "%s: INTERNAL ERROR: no cpu_change record at consumer!\n",
+                    __func__);
+            exit(EXIT_FAILURE);
+        }
+
+        freed = sizeof(*rec) + rec->data.window_size;
+
+        if ( need_to_consume > 0 )
+        {
+            MEMBUF_CONS_INCREMENT(freed);
+            need_to_consume -= freed;
+        }
+    } while( need_to_consume > 0 );
+
+start_window:
+    /*
+     * Start writing "pending" data.  Update prod once all this data is
+     * written.
+     */
+    membuf.pending_prod = membuf.prod;
+    membuf.pending_size = window_size;
+
+    rec = (struct cpu_change_record *)MEMBUF_POINTER(membuf.pending_prod);
+
+    rec->header = CPU_CHANGE_HEADER;
+    rec->data.cpu = cpu;
+    rec->data.window_size = window_size;
+
+    membuf.pending_prod += sizeof(*rec);
+}
+
+void membuf_write(void *start, unsigned long size) {
+    char * p;
+    unsigned long wsize;
+
+    if( (membuf.size - (membuf.prod - membuf.cons)) < size )
+    {
+        fprintf(stderr, "%s: INTERNAL ERROR: need %lu bytes, only have %lu!\n",
+                __func__, size, membuf.prod - membuf.cons);
+        exit(1);
+    }
+
+    if( size > membuf.pending_size )
+    {
+        fprintf(stderr, "%s: INTERNAL ERROR: size %lu, pending %lu!\n",
+                __func__, size, membuf.pending_size);
+        exit(1);
+    }
+
+    wsize = size;
+    p = MEMBUF_POINTER(membuf.pending_prod);
+
+    /* If the buffer overlaps the "wrap", do an extra write */
+    if ( p + size > membuf.buf + membuf.size )
+    {
+        int usize = ( membuf.buf + membuf.size ) - p;
+
+        memcpy(p, start, usize);
+
+        start += usize;
+        wsize -= usize;
+        p = membuf.buf;
+    }
+
+    memcpy(p, start, wsize);
+
+    membuf.pending_prod += size;
+    membuf.pending_size -= size;
+
+    if ( membuf.pending_size == 0 )
+    {
+        MEMBUF_PROD_SET(membuf.pending_prod);
+    }
+}
+
+void membuf_dump(void) {
+    /* Dump circular memory buffer */
+    int cons, prod, wsize, written;
+    char * wstart;
+
+    fprintf(stderr, "Dumping memory buffer.\n");
+
+    cons = membuf.cons % membuf.size; 
+    prod = membuf.prod % membuf.size;
+   
+    if(prod > cons)
+    {
+        /* Write in one go */
+        wstart = membuf.buf + cons;
+        wsize = prod - cons;
+
+        written = write(outfd, wstart, wsize);
+        if ( written != wsize )
+            goto fail;
+    }
+    else
+    {
+        /* Write in two pieces: cons->end, beginning->prod. */
+        wstart = membuf.buf + cons;
+        wsize = membuf.size - cons;
+
+        written = write(outfd, wstart, wsize);
+        if ( written != wsize )
+        {
+            fprintf(stderr, "Write failed! (size %d, returned %d)\n",
+                    wsize, written);
+            goto fail;
+        }
+
+        wstart = membuf.buf;
+        wsize = prod;
+
+        written = write(outfd, wstart, wsize);
+        if ( written != wsize )
+        {
+            fprintf(stderr, "Write failed! (size %d, returned %d)\n",
+                    wsize, written);
+            goto fail;
+        }
+    }
+
+    membuf.cons = membuf.prod = 0;
+    
+    return;
+fail:
+    exit(1);
+    return;
 }
 
 /**
@@ -85,20 +319,20 @@ static void close_handler(int signal)
  * of the buffer write.
  */
 static void write_buffer(unsigned int cpu, unsigned char *start, int size,
-               int total_size, int outfd)
+                         int total_size)
 {
     struct statvfs stat;
     size_t written = 0;
     
-    if ( opts.disk_rsvd != 0 )
+    if ( opts.memory_buffer == 0 && opts.disk_rsvd != 0 )
     {
         unsigned long long freespace;
 
         /* Check that filesystem has enough space. */
         if ( fstatvfs (outfd, &stat) )
         {
-                fprintf(stderr, "Statfs failed!\n");
-                goto fail;
+            fprintf(stderr, "Statfs failed!\n");
+            goto fail;
         }
 
         freespace = stat.f_frsize * (unsigned long long)stat.f_bfree;
@@ -112,8 +346,8 @@ static void write_buffer(unsigned int cpu, unsigned char *start, int size,
 
         if ( freespace <= opts.disk_rsvd )
         {
-                fprintf(stderr, "Disk space limit reached (free space: %lluMB, limit: %luMB).\n", freespace, opts.disk_rsvd);
-                exit (EXIT_FAILURE);
+            fprintf(stderr, "Disk space limit reached (free space: %lluMB, limit: %luMB).\n", freespace, opts.disk_rsvd);
+            exit (EXIT_FAILURE);
         }
     }
 
@@ -122,40 +356,46 @@ static void write_buffer(unsigned int cpu, unsigned char *start, int size,
      * first write. */
     if ( total_size != 0 )
     {
-        struct {
-            uint32_t header;
-            struct {
-                unsigned cpu;
-                unsigned byte_count;
-            } extra;
-        } rec;
-
-        rec.header = TRC_TRACE_CPU_CHANGE
-            | ((sizeof(rec.extra)/sizeof(uint32_t)) << TRACE_EXTRA_SHIFT);
-        rec.extra.cpu = cpu;
-        rec.extra.byte_count = total_size;
-
-        written = write(outfd, &rec, sizeof(rec));
-
-        if ( written != sizeof(rec) )
+        if ( opts.memory_buffer )
         {
-            fprintf(stderr, "Cannot write cpu change (write returned %zd)\n",
-                    written);
+            membuf_reserve_window(cpu, total_size);
+        }
+        else
+        {
+            struct cpu_change_record rec;
+
+            rec.header = CPU_CHANGE_HEADER;
+            rec.data.cpu = cpu;
+            rec.data.window_size = total_size;
+
+            written = write(outfd, &rec, sizeof(rec));
+            if ( written != sizeof(rec) )
+            {
+                fprintf(stderr, "Cannot write cpu change (write returned %zd)\n",
+                        written);
+                goto fail;
+            }
+        }
+    }
+
+    if ( opts.memory_buffer )
+    {
+        membuf_write(start, size);
+    }
+    else
+    {
+        written = write(outfd, start, size);
+        if ( written != size )
+        {
+            fprintf(stderr, "Write failed! (size %d, returned %zd)\n",
+                    size, written);
             goto fail;
         }
     }
 
-    written = write(outfd, start, size);
-    if ( written != size )
-    {
-        fprintf(stderr, "Write failed! (size %d, returned %zd)\n",
-                size, written);
-        goto fail;
-    }
-
     return;
 
- fail:
+fail:
     PERROR("Failed to write trace data");
     exit(EXIT_FAILURE);
 }
@@ -394,7 +634,7 @@ static void wait_for_event_or_timeout(unsigned long milliseconds)
  * monitor_tbufs - monitor the contents of tbufs and output to a file
  * @logfile:       the FILE * representing the file to log to
  */
-static int monitor_tbufs(int outfd)
+static int monitor_tbufs(void)
 {
     int i;
 
@@ -429,9 +669,9 @@ static int monitor_tbufs(int outfd)
             meta[i]->cons = meta[i]->prod;
 
     /* now, scan buffers for events */
-    while ( !interrupted )
+    while ( 1 )
     {
-        for ( i = 0; (i < num) && !interrupted; i++ )
+        for ( i = 0; i < num; i++ )
         {
             unsigned long start_offset, end_offset, window_size, cons, prod;
                 
@@ -463,8 +703,7 @@ static int monitor_tbufs(int outfd)
                 /* If window does not wrap, write in one big chunk */
                 write_buffer(i, data[i]+start_offset,
                              window_size,
-                             window_size,
-                             outfd);
+                             window_size);
             }
             else
             {
@@ -474,23 +713,28 @@ static int monitor_tbufs(int outfd)
                  */
                 write_buffer(i, data[i] + start_offset,
                              data_size - start_offset,
-                             window_size,
-                             outfd);
+                             window_size);
                 write_buffer(i, data[i],
                              end_offset,
-                             0,
-                             outfd);
+                             0);
             }
 
             xen_mb(); /* read buffer, then update cons. */
             meta[i]->cons = prod;
+
         }
+
+        if ( interrupted )
+            break;
 
         wait_for_event_or_timeout(opts.poll_sleep);
     }
 
-    if(opts.disable_tracing)
+    if ( opts.disable_tracing )
         disable_tbufs();
+
+    if ( opts.memory_buffer )
+        membuf_dump();
 
     /* cleanup */
     free(meta);
@@ -538,6 +782,8 @@ static void usage(void)
 "  -T  --time-interval=s   Run xentrace for s seconds and quit.\n" \
 "  -?, --help              Show this message\n" \
 "  -V, --version           Print program version\n" \
+"  -M, --memory-buffer=b   Copy trace records to a circular memory buffer.\n" \
+"                          Dump to file on exit.\n" \
 "\n" \
 "This tool is used to capture trace buffer data from Xen. The\n" \
 "data is output in a binary format, in the following order:\n" \
@@ -551,6 +797,53 @@ static void usage(void)
     printf("\nReport bugs to %s\n", program_bug_address);
 
     exit(EXIT_FAILURE);
+}
+
+/* convert the argument string pointed to by arg to a long int representation,
+ * including suffixes such as 'M' and 'k'. */
+#define MB (1024*1024)
+#define KB (1024)
+long sargtol(const char *restrict arg, int base)
+{
+    char *endp;
+    long val;
+
+    errno = 0;
+    val = strtol(arg, &endp, base);
+    
+    if ( errno != 0 )
+    {
+        fprintf(stderr, "Invalid option argument: %s\n", arg);
+        fprintf(stderr, "Error: %s\n\n", strerror(errno));
+        usage();
+    }
+    else if (endp == arg)
+    {
+        goto invalid;
+    }
+
+    switch(*endp)
+    {
+    case '\0':
+        break;
+    case 'M':
+        val *= MB;
+        break;
+    case 'K':
+    case 'k':
+        val *= KB;
+        break;
+    default:
+        fprintf(stderr, "Unknown suffix %c\n", *endp);
+        exit(1);
+    }
+
+
+    return val;
+invalid:
+    return 0;
+    fprintf(stderr, "Invalid option argument: %s\n\n", arg);
+    usage();
 }
 
 /* convert the argument string pointed to by arg to a long int representation */
@@ -606,6 +899,7 @@ static void parse_args(int argc, char **argv)
         { "trace-buf-size", required_argument, 0, 'S' },
         { "reserve-disk-space", required_argument, 0, 'r' },
         { "time-interval",  required_argument, 0, 'T' },
+        { "memory-buffer",  required_argument, 0, 'M' },
         { "discard-buffers", no_argument,      0, 'D' },
         { "dont-disable-tracing", no_argument, 0, 'x' },
         { "help",           no_argument,       0, '?' },
@@ -613,7 +907,7 @@ static void parse_args(int argc, char **argv)
         { 0, 0, 0, 0 }
     };
 
-    while ( (option = getopt_long(argc, argv, "c:e:s:S:t:?V",
+    while ( (option = getopt_long(argc, argv, "t:s:c:e:S:r:T:M:Dx?V",
                     long_options, NULL)) != -1) 
     {
         switch ( option )
@@ -655,6 +949,10 @@ static void parse_args(int argc, char **argv)
             opts.timeout = argtol(optarg, 0);
             break;
 
+        case 'M':
+            opts.memory_buffer = sargtol(optarg, 0);
+            break;
+
         default:
             usage();
         }
@@ -674,7 +972,7 @@ static void parse_args(int argc, char **argv)
 
 int main(int argc, char **argv)
 {
-    int outfd = 1, ret;
+    int ret;
     struct sigaction act;
 
     opts.outfile = 0;
@@ -720,6 +1018,9 @@ int main(int argc, char **argv)
         exit(EXIT_FAILURE);
     }
 
+    if ( opts.memory_buffer > 0 )
+        membuf_alloc(opts.memory_buffer);
+
     /* ensure that if we get a signal, we'll do cleanup, then exit */
     act.sa_handler = close_handler;
     act.sa_flags = 0;
@@ -729,7 +1030,7 @@ int main(int argc, char **argv)
     sigaction(SIGINT,  &act, NULL);
     sigaction(SIGALRM, &act, NULL);
 
-    ret = monitor_tbufs(outfd);
+    ret = monitor_tbufs();
 
     return ret;
 }

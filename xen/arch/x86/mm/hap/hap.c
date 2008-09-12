@@ -37,6 +37,7 @@
 #include <asm/shared.h>
 #include <asm/hap.h>
 #include <asm/paging.h>
+#include <asm/p2m.h>
 #include <asm/domain.h>
 #include <xen/numa.h>
 

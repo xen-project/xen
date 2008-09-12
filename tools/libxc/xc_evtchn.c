@@ -59,17 +59,8 @@ int xc_evtchn_reset(int xc_handle,
     return do_evtchn_op(xc_handle, EVTCHNOP_reset, &arg, sizeof(arg), 0);
 }
 
-int xc_evtchn_status(int xc_handle,
-                     uint32_t dom,
-                     uint32_t port)
+int xc_evtchn_status(int xc_handle, xc_evtchn_status_t *status)
 {
-    int rc;
-    struct evtchn_status arg = { .dom = (domid_t)dom,
-                                 .port = (evtchn_port_t)port };
-
-    rc = do_evtchn_op(xc_handle, EVTCHNOP_status, &arg, sizeof(arg), 1);
-    if ( rc == 0 )
-        rc = arg.status;
-
-    return rc;
+    return do_evtchn_op(xc_handle, EVTCHNOP_status, status,
+                        sizeof(*status), 1);
 }

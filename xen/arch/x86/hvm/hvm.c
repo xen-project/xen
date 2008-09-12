@@ -31,10 +31,11 @@
 #include <xen/hypercall.h>
 #include <xen/guest_access.h>
 #include <xen/event.h>
+#include <xen/paging.h>
+#include <asm/shadow.h>
 #include <asm/current.h>
 #include <asm/e820.h>
 #include <asm/io.h>
-#include <asm/paging.h>
 #include <asm/regs.h>
 #include <asm/cpufeature.h>
 #include <asm/processor.h>
@@ -772,7 +773,7 @@ void hvm_hlt(unsigned long rflags)
 
     do_sched_op_compat(SCHEDOP_block, 0);
 
-    HVMTRACE_1D(HLT, curr, /* pending = */ vcpu_runnable(curr));
+    HVMTRACE_1D(HLT, /* pending = */ vcpu_runnable(curr));
 }
 
 void hvm_triple_fault(void)

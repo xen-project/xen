@@ -45,7 +45,6 @@ struct PCIBus {
 static void pci_update_mappings(PCIDevice *d);
 
 target_phys_addr_t pci_mem_base;
-static int pci_irq_index;
 static PCIBus *first_bus;
 
 PCIBus *pci_register_bus(pci_set_irq_fn set_irq, pci_map_irq_fn map_irq,
@@ -114,9 +113,6 @@ PCIDevice *pci_register_device(PCIBus *bus, const char *name,
 {
     PCIDevice *pci_dev;
 
-    if (pci_irq_index >= PCI_DEVICES_MAX)
-        return NULL;
-    
     if (devfn < 0) {
         for(devfn = bus->devfn_min ; devfn < 256; devfn += 8) {
             if ( !bus->devices[devfn] &&
@@ -140,7 +136,6 @@ PCIDevice *pci_register_device(PCIBus *bus, const char *name,
         config_write = pci_default_write_config;
     pci_dev->config_read = config_read;
     pci_dev->config_write = config_write;
-    pci_dev->irq_index = pci_irq_index++;
     bus->devices[devfn] = pci_dev;
     return pci_dev;
 }

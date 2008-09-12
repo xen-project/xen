@@ -33,11 +33,13 @@ int amd_iov_detect(void);
  *   pv                         Enable IOMMU for PV domains
  *   no-pv                      Disable IOMMU for PV domains (default)
  *   force|required             Don't boot unless IOMMU is enabled
+ *   passthrough                Bypass VT-d translation for Dom0
  */
 custom_param("iommu", parse_iommu_param);
 int iommu_enabled = 0;
 int iommu_pv_enabled = 0;
 int force_iommu = 0;
+int iommu_passthrough = 0;
 
 static void __init parse_iommu_param(char *s)
 {
@@ -58,6 +60,8 @@ static void __init parse_iommu_param(char *s)
             iommu_pv_enabled = 0;
         else if ( !strcmp(s, "force") || !strcmp(s, "required") )
             force_iommu = 1;
+        else if ( !strcmp(s, "passthrough") )
+            iommu_passthrough = 1;
 
         s = ss + 1;
     } while ( ss );

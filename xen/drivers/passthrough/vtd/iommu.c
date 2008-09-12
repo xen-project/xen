@@ -1090,12 +1090,13 @@ static int domain_context_mapping_one(
     }
 
     spin_lock_irqsave(&iommu->lock, flags);
-
-#ifdef CONTEXT_PASSTHRU
-    if ( ecap_pass_thru(iommu->ecap) && (domain->domain_id == 0) )
+    if ( iommu_passthrough &&
+         ecap_pass_thru(iommu->ecap) && (domain->domain_id == 0) )
+    {
         context_set_translation_type(*context, CONTEXT_TT_PASS_THRU);
+        agaw = level_to_agaw(iommu->nr_pt_levels);
+    }
     else
-#endif
     {
         /* Ensure we have pagetables allocated down to leaf PTE. */
         if ( hd->pgd_maddr == 0 )
@@ -1459,11 +1460,13 @@ int intel_iommu_map_page(
     u64 pg_maddr;
     int pte_present;
 
-#ifdef CONTEXT_PASSTHRU
+    drhd = list_entry(acpi_drhd_units.next, typeof(*drhd), list);
+    iommu = drhd->iommu;
+
     /* do nothing if dom0 and iommu supports pass thru */
-    if ( ecap_pass_thru(iommu->ecap) && (d->domain_id == 0) )
+    if ( iommu_passthrough &&
+         ecap_pass_thru(iommu->ecap) && (d->domain_id == 0) )
         return 0;
-#endif
 
     pg_maddr = addr_to_dma_page_maddr(d, (paddr_t)gfn << PAGE_SHIFT_4K, 1);
     if ( pg_maddr == 0 )
@@ -1500,11 +1503,10 @@ int intel_iommu_unmap_page(struct domain *d, unsigned long gfn)
     drhd = list_entry(acpi_drhd_units.next, typeof(*drhd), list);
     iommu = drhd->iommu;
 
-#ifdef CONTEXT_PASSTHRU
     /* do nothing if dom0 and iommu supports pass thru */
-    if ( ecap_pass_thru(iommu->ecap) && (d->domain_id == 0) )
+    if ( iommu_passthrough &&
+         ecap_pass_thru(iommu->ecap) && (d->domain_id == 0) )
         return 0;
-#endif
 
     dma_pte_clear_one(d, (paddr_t)gfn << PAGE_SHIFT_4K);
 

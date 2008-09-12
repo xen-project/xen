@@ -1,5 +1,6 @@
 import sys
 from xen.lowlevel import flask
+from xen.util import xsconstants
 from xen.xend import sxp
 
 #Functions exported through XML-RPC
@@ -12,7 +13,7 @@ def err(msg):
     raise XSMError(msg)
 
 def on():
-    return 0 #xsconstants.XS_POLICY_FLASK
+    return xsconstants.XS_POLICY_FLASK
 
 def ssidref2label(ssidref):
     try:
@@ -37,8 +38,9 @@ def set_security_label(policy, label):
     return label
 
 def ssidref2security_label(ssidref):
-    return ssidref2label(ssidref)
+    label = ssidref2label(ssidref)
+    return label
 
 def get_security_label(self, xspol=None):
-    label = self.info.get('security_label', '')
+    label = self.info['security_label']
     return label

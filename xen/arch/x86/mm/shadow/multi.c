@@ -225,6 +225,7 @@ static uint32_t mandatory_flags(struct vcpu *v, uint32_t pfec)
 static uint32_t set_ad_bits(void *guest_p, void *walk_p, int set_dirty)
 {
     guest_intpte_t old, new;
+    int ret = 0;
 
     old = *(guest_intpte_t *)walk_p;
     new = old | _PAGE_ACCESSED | (set_dirty ? _PAGE_DIRTY : 0);
@@ -234,10 +235,16 @@ static uint32_t set_ad_bits(void *guest_p, void *walk_p, int set_dirty)
          * into the guest table as well.  If the guest table has changed
          * under out feet then leave it alone. */
         *(guest_intpte_t *)walk_p = new;
-        if ( cmpxchg(((guest_intpte_t *)guest_p), old, new) == old ) 
-            return 1;
+        if( cmpxchg(((guest_intpte_t *)guest_p), old, new) == old ) 
+            ret = 1;
+
+        /* FIXME -- this code is longer than necessary */
+        if(set_dirty)
+            TRACE_SHADOW_PATH_FLAG(TRCE_SFLAG_SET_AD);
+        else
+            TRACE_SHADOW_PATH_FLAG(TRCE_SFLAG_SET_A);
     }
-    return 0;
+    return ret;
 }
 
 /* This validation is called with lock held, and after write permission
@@ -1432,6 +1439,7 @@ static int shadow_set_l1e(struct vcpu *v,
     {
         /* About to install a new reference */        
         if ( shadow_mode_refcounts(d) ) {
+            TRACE_SHADOW_PATH_FLAG(TRCE_SFLAG_SHADOW_L1_GET_REF);
             if ( shadow_get_page_from_l1e(new_sl1e, d) == 0 ) 
             {
                 /* Doesn't look like a pagetable. */
@@ -1461,6 +1469,7 @@ static int shadow_set_l1e(struct vcpu *v,
         {
             shadow_vram_put_l1e(old_sl1e, sl1e, sl1mfn, d);
             shadow_put_page_from_l1e(old_sl1e, d);
+            TRACE_SHADOW_PATH_FLAG(TRCE_SFLAG_SHADOW_L1_PUT_REF);
         } 
     }
     return flags;
@@ -2896,6 +2905,7 @@ static inline void check_for_early_unshadow(struct vcpu *v, mfn_t gmfn)
     {
         perfc_incr(shadow_early_unshadow);
         sh_remove_shadows(v, gmfn, 1, 0 /* Fast, can fail to unshadow */ );
+        TRACE_SHADOW_PATH_FLAG(TRCE_SFLAG_EARLY_UNSHADOW);
     }
     v->arch.paging.shadow.last_emulated_mfn_for_unshadow = mfn_x(gmfn);
 #endif
@@ -3012,6 +3022,132 @@ static void sh_prefetch(struct vcpu *v, walk_t *gw,
 
 #endif /* SHADOW_OPTIMIZATIONS & SHOPT_PREFETCH */
 
+#if GUEST_PAGING_LEVELS == 4
+typedef u64 guest_va_t;
+typedef u64 guest_pa_t;
+#elif GUEST_PAGING_LEVELS == 3
+typedef u32 guest_va_t;
+typedef u64 guest_pa_t;
+#else
+typedef u32 guest_va_t;
+typedef u32 guest_pa_t;
+#endif
+
+static inline void trace_shadow_gen(u32 event, guest_va_t va)
+{
+    if ( tb_init_done )
+    {
+        event |= (GUEST_PAGING_LEVELS-2)<<8;
+        __trace_var(event, 0/*!tsc*/, sizeof(va), (unsigned char*)&va);
+    }
+}
+
+static inline void trace_shadow_fixup(guest_l1e_t gl1e,
+                                      guest_va_t va)
+{
+    if ( tb_init_done )
+    {
+        struct {
+            /* for PAE, guest_l1e may be 64 while guest_va may be 32;
+               so put it first for alignment sake. */
+            guest_l1e_t gl1e;
+            guest_va_t va;
+            u32 flags;
+        } __attribute__((packed)) d;
+        u32 event;
+
+        event = TRC_SHADOW_FIXUP | ((GUEST_PAGING_LEVELS-2)<<8);
+
+        d.gl1e = gl1e;
+        d.va = va;
+        d.flags = this_cpu(trace_shadow_path_flags);
+
+        __trace_var(event, 0/*!tsc*/, sizeof(d), (unsigned char*)&d);
+    }
+}
+                                          
+static inline void trace_not_shadow_fault(guest_l1e_t gl1e,
+                                          guest_va_t va)
+{
+    if ( tb_init_done )
+    {
+        struct {
+            /* for PAE, guest_l1e may be 64 while guest_va may be 32;
+               so put it first for alignment sake. */
+            guest_l1e_t gl1e;
+            guest_va_t va;
+            u32 flags;
+        } __attribute__((packed)) d;
+        u32 event;
+
+        event = TRC_SHADOW_NOT_SHADOW | ((GUEST_PAGING_LEVELS-2)<<8);
+
+        d.gl1e = gl1e;
+        d.va = va;
+        d.flags = this_cpu(trace_shadow_path_flags);
+
+        __trace_var(event, 0/*!tsc*/, sizeof(d), (unsigned char*)&d);
+    }
+}
+                                          
+static inline void trace_shadow_emulate_other(u32 event,
+                                                 guest_va_t va,
+                                                 gfn_t gfn)
+{
+    if ( tb_init_done )
+    {
+        struct {
+            /* for PAE, guest_l1e may be 64 while guest_va may be 32;
+               so put it first for alignment sake. */
+#if GUEST_PAGING_LEVELS == 2
+            u32 gfn;
+#else
+            u64 gfn;
+#endif
+            guest_va_t va;
+        } __attribute__((packed)) d;
+
+        event |= ((GUEST_PAGING_LEVELS-2)<<8);
+
+        d.gfn=gfn_x(gfn);
+        d.va = va;
+
+        __trace_var(event, 0/*!tsc*/, sizeof(d), (unsigned char*)&d);
+    }
+}
+
+#if GUEST_PAGING_LEVELS == 3
+static DEFINE_PER_CPU(guest_va_t,trace_emulate_initial_va);
+static DEFINE_PER_CPU(int,trace_extra_emulation_count);
+#endif
+static DEFINE_PER_CPU(guest_pa_t,trace_emulate_write_val);
+
+static inline void trace_shadow_emulate(guest_l1e_t gl1e, unsigned long va)
+{
+    if ( tb_init_done )
+    {
+        struct {
+            /* for PAE, guest_l1e may be 64 while guest_va may be 32;
+               so put it first for alignment sake. */
+            guest_l1e_t gl1e, write_val;
+            guest_va_t va;
+            unsigned flags:29, emulation_count:3;
+        } __attribute__((packed)) d;
+        u32 event;
+
+        event = TRC_SHADOW_EMULATE | ((GUEST_PAGING_LEVELS-2)<<8);
+
+        d.gl1e = gl1e;
+        d.write_val.l1 = this_cpu(trace_emulate_write_val);
+        d.va = va;
+#if GUEST_PAGING_LEVELS == 3
+        d.emulation_count = this_cpu(trace_extra_emulation_count);
+#endif
+        d.flags = this_cpu(trace_shadow_path_flags);
+
+        __trace_var(event, 0/*!tsc*/, sizeof(d), (unsigned char*)&d);
+    }
+}
 
 /**************************************************************************/
 /* Entry points into the shadow code */
@@ -3027,8 +3163,8 @@ static int sh_page_fault(struct vcpu *v,
 {
     struct domain *d = v->domain;
     walk_t gw;
-    gfn_t gfn;
-    mfn_t gmfn, sl1mfn=_mfn(0);
+    gfn_t gfn = _gfn(0);
+    mfn_t gmfn, sl1mfn = _mfn(0);
     shadow_l1e_t sl1e, *ptr_sl1e;
     paddr_t gpa;
     struct sh_emulate_ctxt emul_ctxt;
@@ -3043,7 +3179,7 @@ static int sh_page_fault(struct vcpu *v,
 
     SHADOW_PRINTK("d:v=%u:%u va=%#lx err=%u, rip=%lx\n",
                   v->domain->domain_id, v->vcpu_id, va, regs->error_code,
-                  regs->rip);
+                  regs->eip);
 
     perfc_incr(shadow_fault);
 
@@ -3132,6 +3268,7 @@ static int sh_page_fault(struct vcpu *v,
                 reset_early_unshadow(v);
                 perfc_incr(shadow_fault_fast_gnp);
                 SHADOW_PRINTK("fast path not-present\n");
+                trace_shadow_gen(TRC_SHADOW_FAST_PROPAGATE, va);
                 return 0;
             }
             else
@@ -3145,6 +3282,7 @@ static int sh_page_fault(struct vcpu *v,
             perfc_incr(shadow_fault_fast_mmio);
             SHADOW_PRINTK("fast path mmio %#"PRIpaddr"\n", gpa);
             reset_early_unshadow(v);
+            trace_shadow_gen(TRC_SHADOW_FAST_MMIO, va);
             return (handle_mmio_with_translation(va, gpa >> PAGE_SHIFT)
                     ? EXCRET_fault_fixed : 0);
         }
@@ -3155,6 +3293,7 @@ static int sh_page_fault(struct vcpu *v,
              * Retry and let the hardware give us the right fault next time. */
             perfc_incr(shadow_fault_fast_fail);
             SHADOW_PRINTK("fast path false alarm!\n");            
+            trace_shadow_gen(TRC_SHADOW_FALSE_FAST_PATH, va);
             return EXCRET_fault_fixed;
         }
     }
@@ -3190,7 +3329,7 @@ static int sh_page_fault(struct vcpu *v,
         perfc_incr(shadow_fault_bail_real_fault);
         SHADOW_PRINTK("not a shadow fault\n");
         reset_early_unshadow(v);
-        return 0;
+        goto propagate;
     }
 
     /* It's possible that the guest has put pagetables in memory that it has 
@@ -3200,7 +3339,7 @@ static int sh_page_fault(struct vcpu *v,
     if ( unlikely(d->is_shutting_down) )
     {
         SHADOW_PRINTK("guest is shutting down\n");
-        return 0;
+        goto propagate;
     }
 
     /* What kind of access are we dealing with? */
@@ -3218,7 +3357,7 @@ static int sh_page_fault(struct vcpu *v,
         SHADOW_PRINTK("BAD gfn=%"SH_PRI_gfn" gmfn=%"PRI_mfn"\n", 
                       gfn_x(gfn), mfn_x(gmfn));
         reset_early_unshadow(v);
-        return 0;
+        goto propagate;
     }
 
 #if (SHADOW_OPTIMIZATIONS & SHOPT_VIRTUAL_TLB)
@@ -3229,6 +3368,8 @@ static int sh_page_fault(struct vcpu *v,
 
     shadow_lock(d);
 
+    TRACE_CLEAR_PATH_FLAGS;
+    
     rc = gw_remove_write_accesses(v, va, &gw);
 
     /* First bit set: Removed write access to a page. */
@@ -3281,6 +3422,7 @@ static int sh_page_fault(struct vcpu *v,
          * Get out of the fault handler immediately. */
         ASSERT(d->is_shutting_down);
         shadow_unlock(d);
+        trace_shadow_gen(TRC_SHADOW_DOMF_DYING, va);
         return 0;
     }
 
@@ -3383,6 +3525,7 @@ static int sh_page_fault(struct vcpu *v,
     d->arch.paging.log_dirty.fault_count++;
     reset_early_unshadow(v);
 
+    trace_shadow_fixup(gw.l1e, va);
  done:
     sh_audit_gw(v, &gw);
     SHADOW_PRINTK("fixed\n");
@@ -3405,6 +3548,8 @@ static int sh_page_fault(struct vcpu *v,
                       mfn_x(gmfn));
         perfc_incr(shadow_fault_emulate_failed);
         sh_remove_shadows(v, gmfn, 0 /* thorough */, 1 /* must succeed */);
+        trace_shadow_emulate_other(TRC_SHADOW_EMULATE_UNSHADOW_USER,
+                                      va, gfn);
         goto done;
     }
 
@@ -3420,6 +3565,8 @@ static int sh_page_fault(struct vcpu *v,
     sh_audit_gw(v, &gw);
     shadow_audit_tables(v);
     shadow_unlock(d);
+
+    this_cpu(trace_emulate_write_val) = 0;
 
 #if SHADOW_OPTIMIZATIONS & SHOPT_FAST_EMULATION
  early_emulation:
@@ -3446,6 +3593,8 @@ static int sh_page_fault(struct vcpu *v,
                      "injection: cr2=%#lx, mfn=%#lx\n", 
                      va, mfn_x(gmfn));
             sh_remove_shadows(v, gmfn, 0 /* thorough */, 1 /* must succeed */);
+            trace_shadow_emulate_other(TRC_SHADOW_EMULATE_UNSHADOW_EVTINJ,
+                                       va, gfn);
             return EXCRET_fault_fixed;
         }
     }
@@ -3478,6 +3627,10 @@ static int sh_page_fault(struct vcpu *v,
          * to support more operations in the emulator.  More likely, 
          * though, this is a hint that this page should not be shadowed. */
         shadow_remove_all_shadows(v, gmfn);
+
+        trace_shadow_emulate_other(TRC_SHADOW_EMULATE_UNSHADOW_UNHANDLED,
+                                   va, gfn);
+        goto emulate_done;
     }
 
 #if SHADOW_OPTIMIZATIONS & SHOPT_FAST_EMULATION
@@ -3504,7 +3657,8 @@ static int sh_page_fault(struct vcpu *v,
 
 #if GUEST_PAGING_LEVELS == 3 /* PAE guest */
     if ( r == X86EMUL_OKAY ) {
-        int i;
+        int i, emulation_count=0;
+        this_cpu(trace_emulate_initial_va) = va;
         /* Emulate up to four extra instructions in the hope of catching 
          * the "second half" of a 64-bit pagetable write. */
         for ( i = 0 ; i < 4 ; i++ )
@@ -3513,10 +3667,12 @@ static int sh_page_fault(struct vcpu *v,
             v->arch.paging.last_write_was_pt = 0;
             r = x86_emulate(&emul_ctxt.ctxt, emul_ops);
             if ( r == X86EMUL_OKAY )
-            {
+            { 
+                emulation_count++;
                 if ( v->arch.paging.last_write_was_pt )
                 {
                     perfc_incr(shadow_em_ex_pt);
+                    TRACE_SHADOW_PATH_FLAG(TRCE_SFLAG_EMULATION_2ND_PT_WRITTEN);
                     break; /* Don't emulate past the other half of the write */
                 }
                 else 
@@ -3525,12 +3681,16 @@ static int sh_page_fault(struct vcpu *v,
             else
             {
                 perfc_incr(shadow_em_ex_fail);
+                TRACE_SHADOW_PATH_FLAG(TRCE_SFLAG_EMULATION_LAST_FAILED);
                 break; /* Don't emulate again if we failed! */
             }
         }
+        this_cpu(trace_extra_emulation_count)=emulation_count;
     }
 #endif /* PAE guest */
 
+    trace_shadow_emulate(gw.l1e, va);
+ emulate_done:
     SHADOW_PRINTK("emulated\n");
     return EXCRET_fault_fixed;
 
@@ -3543,6 +3703,7 @@ static int sh_page_fault(struct vcpu *v,
     shadow_audit_tables(v);
     reset_early_unshadow(v);
     shadow_unlock(d);
+    trace_shadow_gen(TRC_SHADOW_MMIO, va);
     return (handle_mmio_with_translation(va, gpa >> PAGE_SHIFT)
             ? EXCRET_fault_fixed : 0);
 
@@ -3552,6 +3713,10 @@ static int sh_page_fault(struct vcpu *v,
     shadow_audit_tables(v);
     reset_early_unshadow(v);
     shadow_unlock(d);
+
+propagate:
+    trace_not_shadow_fault(gw.l1e, va);
+
     return 0;
 }
 
@@ -3990,7 +4155,7 @@ sh_detach_old_tables(struct vcpu *v)
             sh_unmap_domain_page_global(v->arch.paging.shadow.guest_vtable);
         v->arch.paging.shadow.guest_vtable = NULL;
     }
-#endif
+#endif // !NDEBUG
 
 
     ////
@@ -4446,6 +4611,7 @@ static int sh_guess_wrmap(struct vcpu *v, unsigned long vaddr, mfn_t gmfn)
     sl1e = shadow_l1e_remove_flags(sl1e, _PAGE_RW);
     r = shadow_set_l1e(v, sl1p, sl1e, sl1mfn);
     ASSERT( !(r & SHADOW_SET_ERROR) );
+    TRACE_SHADOW_PATH_FLAG(TRCE_SFLAG_WRMAP_GUESS_FOUND);
     return 1;
 }
 #endif
@@ -4800,7 +4966,7 @@ static void emulate_unmap_dest(struct vcpu *v,
 
 static int
 sh_x86_emulate_write(struct vcpu *v, unsigned long vaddr, void *src,
-                      u32 bytes, struct sh_emulate_ctxt *sh_ctxt)
+                     u32 bytes, struct sh_emulate_ctxt *sh_ctxt)
 {
     void *addr;
 
@@ -4814,6 +4980,22 @@ sh_x86_emulate_write(struct vcpu *v, unsigned long vaddr, void *src,
 
     shadow_lock(v->domain);
     memcpy(addr, src, bytes);
+
+    if ( tb_init_done )
+    {
+#if GUEST_PAGING_LEVELS == 3
+        if ( vaddr == this_cpu(trace_emulate_initial_va) )
+            memcpy(&this_cpu(trace_emulate_write_val), src, bytes);
+        else if ( (vaddr & ~(0x7UL)) == this_cpu(trace_emulate_initial_va) )
+        {
+            TRACE_SHADOW_PATH_FLAG(TRCE_SFLAG_EMULATE_FULL_PT);
+            memcpy(&this_cpu(trace_emulate_write_val),
+                   (void *)(((unsigned long) addr) & ~(0x7UL)), GUEST_PTE_SIZE);
+        }
+#else
+        memcpy(&this_cpu(trace_emulate_write_val), src, bytes);
+#endif
+    }
 
     emulate_unmap_dest(v, addr, bytes, sh_ctxt);
     shadow_audit_tables(v);

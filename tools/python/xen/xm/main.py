@@ -1812,7 +1812,7 @@ def domain_name_to_domid(domain_name):
     else:
         dom = server.xend.domain(domain_name)
         domid = int(sxp.child_value(dom, 'domid', '-1'))
-    return domid
+    return int(domid)
 
 def xm_vncviewer(args):
     autopass = False;

@@ -59,6 +59,17 @@ struct page_info
         u32 tlbflush_timestamp;
 
         /*
+         * When PGT_partial is true then this field is valid and indicates
+         * that PTEs in the range [0, @nr_validated_ptes) have been validated.
+         * If @partial_pte is true then PTE at @nr_validated_ptes+1 has been
+         * partially validated.
+         */
+        struct {
+            u16 nr_validated_ptes;
+            bool_t partial_pte;
+        };
+
+        /*
          * Guest pages with a shadow.  This does not conflict with
          * tlbflush_timestamp since page table pages are explicitly not
          * tracked for TLB-flush avoidance when a guest runs in shadow mode.
@@ -86,9 +97,12 @@ struct page_info
  /* PAE only: is this an L2 page directory containing Xen-private mappings? */
 #define _PGT_pae_xen_l2     26
 #define PGT_pae_xen_l2      (1U<<_PGT_pae_xen_l2)
+/* Has this page been *partially* validated for use as its current type? */
+#define _PGT_partial        25
+#define PGT_partial         (1U<<_PGT_partial)
 
- /* 26-bit count of uses of this frame as its current type. */
-#define PGT_count_mask      ((1U<<26)-1)
+ /* 25-bit count of uses of this frame as its current type. */
+#define PGT_count_mask      ((1U<<25)-1)
 
  /* Cleared when the owning guest 'frees' this page. */
 #define _PGC_allocated      31
@@ -154,7 +168,8 @@ extern unsigned long max_page;
 extern unsigned long total_pages;
 void init_frametable(void);
 
-void free_page_type(struct page_info *page, unsigned long type);
+int free_page_type(struct page_info *page, unsigned long type,
+                   int preemptible);
 int _shadow_mode_refcounts(struct domain *d);
 
 void cleanup_page_cacheattr(struct page_info *page);
@@ -165,6 +180,8 @@ void put_page(struct page_info *page);
 int  get_page(struct page_info *page, struct domain *domain);
 void put_page_type(struct page_info *page);
 int  get_page_type(struct page_info *page, unsigned long type);
+int  put_page_type_preemptible(struct page_info *page);
+int  get_page_type_preemptible(struct page_info *page, unsigned long type);
 int  get_page_from_l1e(l1_pgentry_t l1e, struct domain *d);
 void put_page_from_l1e(l1_pgentry_t l1e, struct domain *d);
 
@@ -174,6 +191,19 @@ static inline void put_page_and_type(struct page_info *page)
     put_page(page);
 }
 
+static inline int put_page_and_type_preemptible(struct page_info *page,
+                                                int preemptible)
+{
+    int rc = 0;
+
+    if ( preemptible )
+        rc = put_page_type_preemptible(page);
+    else
+        put_page_type(page);
+    if ( likely(rc == 0) )
+        put_page(page);
+    return rc;
+}
 
 static inline int get_page_and_type(struct page_info *page,
                                     struct domain *domain,

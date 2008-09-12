@@ -58,6 +58,7 @@ static int t_buf_highwater;
 
 /* Number of records lost due to per-CPU trace buffer being full. */
 static DEFINE_PER_CPU(unsigned long, lost_records);
+static DEFINE_PER_CPU(unsigned long, lost_records_first_tsc);
 
 /* a flag recording whether initialization has been done */
 /* or more properly, if the tbuf subsystem is enabled right now */
@@ -147,6 +148,31 @@ static int tb_set_size(int size)
     return 0;
 }
 
+int trace_will_trace_event(u32 event)
+{
+    if ( !tb_init_done )
+        return 0;
+
+    /*
+     * Copied from __trace_var()
+     */
+    if ( (tb_event_mask & event) == 0 )
+        return 0;
+
+    /* match class */
+    if ( ((tb_event_mask >> TRC_CLS_SHIFT) & (event >> TRC_CLS_SHIFT)) == 0 )
+        return 0;
+
+    /* then match subclass */
+    if ( (((tb_event_mask >> TRC_SUBCLS_SHIFT) & 0xf )
+                & ((event >> TRC_SUBCLS_SHIFT) & 0xf )) == 0 )
+        return 0;
+
+    if ( !cpu_isset(smp_processor_id(), tb_cpu_mask) )
+        return 0;
+
+    return 1;
+}
 
 /**
  * init_trace_bufs - performs initialization of the per-cpu trace buffers.
@@ -354,22 +380,27 @@ static inline int insert_wrap_record(struct t_buf *buf, int size)
                     NULL);
 }
 
-#define LOST_REC_SIZE 8
+#define LOST_REC_SIZE (4 + 8 + 16) /* header + tsc + sizeof(struct ed) */
 
 static inline int insert_lost_records(struct t_buf *buf)
 {
     struct {
         u32 lost_records;
-    } ed;
+        u32 did:16, vid:16;
+        u64 first_tsc;
+    } __attribute__((packed)) ed;
 
+    ed.vid = current->vcpu_id;
+    ed.did = current->domain->domain_id;
     ed.lost_records = this_cpu(lost_records);
+    ed.first_tsc = this_cpu(lost_records_first_tsc);
 
     this_cpu(lost_records) = 0;
 
     return __insert_record(buf,
                            TRC_LOST_RECORDS,
                            sizeof(ed),
-                           0 /* !cycles */,
+                           1 /* cycles */,
                            LOST_REC_SIZE,
                            (unsigned char *)&ed);
 }
@@ -401,7 +432,8 @@ void __trace_var(u32 event, int cycles, int extra, unsigned char *extra_data)
     int extra_word;
     int started_below_highwater;
 
-    ASSERT(tb_init_done);
+    if( !tb_init_done )
+        return;
 
     /* Convert byte count into word count, rounding up */
     extra_word = (extra / sizeof(u32));
@@ -479,7 +511,8 @@ void __trace_var(u32 event, int cycles, int extra, unsigned char *extra_data)
     /* Do we have enough space for everything? */
     if ( total_size > bytes_to_tail )
     {
-        this_cpu(lost_records)++;
+        if ( ++this_cpu(lost_records) == 1 )
+            this_cpu(lost_records_first_tsc)=(u64)get_cycles();
         local_irq_restore(flags);
         return;
     }

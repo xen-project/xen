@@ -39,6 +39,7 @@
 #include <xen/smp.h>
 #include <xen/guest_access.h>
 #include <xen/keyhandler.h>
+#include <xen/cpuidle.h>
 #include <asm/cache.h>
 #include <asm/io.h>
 #include <asm/hpet.h>
@@ -49,12 +50,9 @@
 #define DEBUG_PM_CX
 
 #define US_TO_PM_TIMER_TICKS(t)     ((t * (PM_TIMER_FREQUENCY/1000)) / 1000)
+#define PM_TIMER_TICKS_TO_US(t)     ((t * 1000) / (PM_TIMER_FREQUENCY / 1000))
 #define C2_OVERHEAD         4   /* 1us (3.579 ticks per us) */
 #define C3_OVERHEAD         4   /* 1us (3.579 ticks per us) */
-
-#define ACPI_PROCESSOR_MAX_POWER        8
-#define ACPI_PROCESSOR_MAX_C2_LATENCY   100
-#define ACPI_PROCESSOR_MAX_C3_LATENCY   1000
 
 static void (*lapic_timer_off)(void);
 static void (*lapic_timer_on)(void);
@@ -65,66 +63,6 @@ extern void (*pm_idle) (void);
 static void (*pm_idle_save) (void) __read_mostly;
 unsigned int max_cstate __read_mostly = 2;
 integer_param("max_cstate", max_cstate);
-/*
- * bm_history -- bit-mask with a bit per jiffy of bus-master activity
- * 1000 HZ: 0xFFFFFFFF: 32 jiffies = 32ms
- * 800 HZ: 0xFFFFFFFF: 32 jiffies = 40ms
- * 100 HZ: 0x0000000F: 4 jiffies = 40ms
- * reduce history for more aggressive entry into C3
- */
-unsigned int bm_history __read_mostly =
-    (HZ >= 800 ? 0xFFFFFFFF : ((1U << (HZ / 25)) - 1));
-integer_param("bm_history", bm_history);
-
-struct acpi_processor_cx;
-
-struct acpi_processor_cx_policy
-{
-    u32 count;
-    struct acpi_processor_cx *state;
-    struct
-    {
-        u32 time;
-        u32 ticks;
-        u32 count;
-        u32 bm;
-    } threshold;
-};
-
-struct acpi_processor_cx
-{
-    u8 valid;
-    u8 type;
-    u32 address;
-    u8 space_id;
-    u32 latency;
-    u32 latency_ticks;
-    u32 power;
-    u32 usage;
-    u64 time;
-    struct acpi_processor_cx_policy promotion;
-    struct acpi_processor_cx_policy demotion;
-};
-
-struct acpi_processor_flags
-{
-    u8 bm_control:1;
-    u8 bm_check:1;
-    u8 has_cst:1;
-    u8 power_setup_done:1;
-    u8 bm_rld_set:1;
-};
-
-struct acpi_processor_power
-{
-    struct acpi_processor_flags flags;
-    struct acpi_processor_cx *state;
-    s_time_t bm_check_timestamp;
-    u32 default_state;
-    u32 bm_activity;
-    u32 count;
-    struct acpi_processor_cx states[ACPI_PROCESSOR_MAX_POWER];
-};
 
 static struct acpi_processor_power processor_powers[NR_CPUS];
 
@@ -133,26 +71,21 @@ static void print_acpi_power(uint32_t cpu, struct acpi_processor_power *power)
     uint32_t i;
 
     printk("==cpu%d==\n", cpu);
-    printk("active state:\t\tC%d\n", (power->state)?power->state->type:-1);
+    printk("active state:\t\tC%d\n",
+           (power->last_state) ? power->last_state->type : -1);
     printk("max_cstate:\t\tC%d\n", max_cstate);
-    printk("bus master activity:\t%08x\n", power->bm_activity);
     printk("states:\n");
     
     for ( i = 1; i < power->count; i++ )
     {
-        printk((power->states[i].type == power->state->type) ? "   *" : "    ");
+        if ( power->last_state && 
+             power->states[i].type == power->last_state->type )
+            printk("   *");
+        else
+            printk("    ");
         printk("C%d:\t\t", i);
         printk("type[C%d] ", power->states[i].type);
-        if ( power->states[i].promotion.state )
-            printk("promotion[C%d] ", power->states[i].promotion.state->type);
-        else
-            printk("promotion[--] ");
-        if ( power->states[i].demotion.state )
-            printk("demotion[C%d] ", power->states[i].demotion.state->type);
-        else
-            printk("demotion[--] ");
-        printk("latency[%03d]\n ", power->states[i].latency);
-        printk("\t\t\t");
+        printk("latency[%03d] ", power->states[i].latency);
         printk("usage[%08d] ", power->states[i].usage);
         printk("duration[%"PRId64"]\n", power->states[i].time);
     }
@@ -180,48 +113,6 @@ static inline u32 ticks_elapsed(u32 t1, u32 t2)
         return (((0x00FFFFFF - t1) + t2) & 0x00FFFFFF);
     else
         return ((0xFFFFFFFF - t1) + t2);
-}
-
-static void acpi_processor_power_activate(struct acpi_processor_power *power,
-                                          struct acpi_processor_cx *new)
-{
-    struct acpi_processor_cx *old;
-
-    if ( !power || !new )
-        return;
-
-    old = power->state;
-
-    if ( old )
-        old->promotion.count = 0;
-    new->demotion.count = 0;
-
-    /* Cleanup from old state. */
-    if ( old )
-    {
-        switch ( old->type )
-        {
-        case ACPI_STATE_C3:
-            /* Disable bus master reload */
-            if ( new->type != ACPI_STATE_C3 && power->flags.bm_check )
-                acpi_set_register(ACPI_BITREG_BUS_MASTER_RLD, 0);
-            break;
-        }
-    }
-
-    /* Prepare to use new state. */
-    switch ( new->type )
-    {
-    case ACPI_STATE_C3:
-        /* Enable bus master reload */
-        if ( old->type != ACPI_STATE_C3 && power->flags.bm_check )
-            acpi_set_register(ACPI_BITREG_BUS_MASTER_RLD, 1);
-        break;
-    }
-
-    power->state = new;
-
-    return;
 }
 
 static void acpi_safe_halt(void)
@@ -263,13 +154,50 @@ static void acpi_idle_do_entry(struct acpi_processor_cx *cx)
     }
 }
 
-static atomic_t c3_cpu_count;
+static inline void acpi_idle_update_bm_rld(struct acpi_processor_power *power,
+                                           struct acpi_processor_cx *target)
+{
+    if ( !power->flags.bm_check )
+        return;
+
+    if ( power->flags.bm_rld_set && target->type != ACPI_STATE_C3 )
+    {
+        acpi_set_register(ACPI_BITREG_BUS_MASTER_RLD, 0);
+        power->flags.bm_rld_set = 0;
+    }
+
+    if ( !power->flags.bm_rld_set && target->type == ACPI_STATE_C3 )
+    {
+        acpi_set_register(ACPI_BITREG_BUS_MASTER_RLD, 1);
+        power->flags.bm_rld_set = 1;
+    }
+}
+
+static int acpi_idle_bm_check(void)
+{
+    u32 bm_status = 0;
+
+    acpi_get_register(ACPI_BITREG_BUS_MASTER_STATUS, &bm_status);
+    if ( bm_status )
+        acpi_set_register(ACPI_BITREG_BUS_MASTER_STATUS, 1);
+    /*
+     * TBD: PIIX4 Erratum #18: Note that BM_STS doesn't always reflect
+     * the true state of bus mastering activity; forcing us to
+     * manually check the BMIDEA bit of each IDE channel.
+     */
+    return bm_status;
+}
+
+static struct {
+    spinlock_t lock;
+    unsigned int count;
+} c3_cpu_status = { .lock = SPIN_LOCK_UNLOCKED };
 
 static void acpi_processor_idle(void)
 {
     struct acpi_processor_power *power = NULL;
     struct acpi_processor_cx *cx = NULL;
-    struct acpi_processor_cx *next_state = NULL;
+    int next_state;
     int sleep_ticks = 0;
     u32 t1, t2 = 0;
 
@@ -287,7 +215,16 @@ static void acpi_processor_idle(void)
         return;
     }
 
-    cx = power->state;
+    next_state = cpuidle_current_governor->select(power);
+    if ( next_state > 0 )
+    {
+        cx = &power->states[next_state];
+        if ( power->flags.bm_check && acpi_idle_bm_check()
+             && cx->type == ACPI_STATE_C3 )
+            cx = power->safe_state;
+        if ( cx->type > max_cstate )
+            cx = &power->states[max_cstate];
+    }
     if ( !cx )
     {
         if ( pm_idle_save )
@@ -303,69 +240,14 @@ static void acpi_processor_idle(void)
         return;
     }
 
-    /*
-     * Check BM Activity
-     * -----------------
-     * Check for bus mastering activity (if required), record, and check
-     * for demotion.
-     */
-    if ( power->flags.bm_check )
-    {
-        u32 bm_status = 0;
-        unsigned long diff = (NOW() - power->bm_check_timestamp) >> 23;
-
-        if ( diff > 31 )
-            diff = 31;
-
-        power->bm_activity <<= diff;
-
-        acpi_get_register(ACPI_BITREG_BUS_MASTER_STATUS, &bm_status);
-        if ( bm_status )
-        {
-            power->bm_activity |= 0x1;
-            acpi_set_register(ACPI_BITREG_BUS_MASTER_STATUS, 1);
-        }
-        /*
-         * PIIX4 Erratum #18: Note that BM_STS doesn't always reflect
-         * the true state of bus mastering activity; forcing us to
-         * manually check the BMIDEA bit of each IDE channel.
-         */
-        /*else if ( errata.piix4.bmisx )
-        {
-            if ( (inb_p(errata.piix4.bmisx + 0x02) & 0x01)
-                || (inb_p(errata.piix4.bmisx + 0x0A) & 0x01) )
-                pr->power.bm_activity |= 0x1;
-        }*/
-
-        power->bm_check_timestamp = NOW();
-
-        /*
-         * If bus mastering is or was active this jiffy, demote
-         * to avoid a faulty transition.  Note that the processor
-         * won't enter a low-power state during this call (to this
-         * function) but should upon the next.
-         *
-         * TBD: A better policy might be to fallback to the demotion
-         *      state (use it for this quantum only) istead of
-         *      demoting -- and rely on duration as our sole demotion
-         *      qualification.  This may, however, introduce DMA
-         *      issues (e.g. floppy DMA transfer overrun/underrun).
-         */
-        if ( (power->bm_activity & 0x1) && cx->demotion.threshold.bm )
-        {
-            local_irq_enable();
-            next_state = cx->demotion.state;
-            goto end;
-        }
-    }
+    power->last_state = cx;
 
     /*
      * Sleep:
      * ------
      * Invoke the current Cx state to put the processor to sleep.
      */
-    if ( cx->type == ACPI_STATE_C2 || cx->type == ACPI_STATE_C3 )
-        smp_mb__after_clear_bit();
+    acpi_idle_update_bm_rld(power, cx);
 
     switch ( cx->type )
     {
@@ -399,8 +281,7 @@ static void acpi_processor_idle(void)
         /* Re-enable interrupts */
         local_irq_enable();
         /* Compute time (ticks) that we were actually asleep */
-        sleep_ticks =
-            ticks_elapsed(t1, t2) - cx->latency_ticks - C2_OVERHEAD;
+        sleep_ticks = ticks_elapsed(t1, t2);
         break;
 
     case ACPI_STATE_C3:
@@ -416,8 +297,8 @@ static void acpi_processor_idle(void)
          */
         if ( power->flags.bm_check && power->flags.bm_control )
         {
-            atomic_inc(&c3_cpu_count);
-            if ( atomic_read(&c3_cpu_count) == num_online_cpus() )
+            spin_lock(&c3_cpu_status.lock);
+            if ( ++c3_cpu_status.count == num_online_cpus() )
             {
                 /*
                  * All CPUs are trying to go to C3
@@ -425,6 +306,7 @@ static void acpi_processor_idle(void)
                  */
                 acpi_set_register(ACPI_BITREG_ARB_DISABLE, 1);
             }
+            spin_unlock(&c3_cpu_status.lock);
         }
         else if ( !power->flags.bm_check )
         {
@@ -455,8 +337,10 @@ static void acpi_processor_idle(void)
         if ( power->flags.bm_check && power->flags.bm_control )
         {
             /* Enable bus master arbitration */
-            atomic_dec(&c3_cpu_count);
-            acpi_set_register(ACPI_BITREG_ARB_DISABLE, 0);
+            spin_lock(&c3_cpu_status.lock);
+            if ( c3_cpu_status.count-- == num_online_cpus() )
+                acpi_set_register(ACPI_BITREG_ARB_DISABLE, 0);
+            spin_unlock(&c3_cpu_status.lock);
         }
 
         /* Re-enable interrupts */
@@ -465,8 +349,6 @@ static void acpi_processor_idle(void)
         lapic_timer_on();
         /* Compute time (ticks) that we were actually asleep */
         sleep_ticks = ticks_elapsed(t1, t2);
-        /* Do not account our idle-switching overhead: */
-        sleep_ticks -= cx->latency_ticks + C3_OVERHEAD;
 
         break;
 
@@ -476,163 +358,14 @@ static void acpi_processor_idle(void)
     }
 
     cx->usage++;
-    if ( (cx->type != ACPI_STATE_C1) && (sleep_ticks > 0) )
+    if ( sleep_ticks > 0 )
+    {
+        power->last_residency = PM_TIMER_TICKS_TO_US(sleep_ticks);
         cx->time += sleep_ticks;
-
-    next_state = power->state;
-
-    /*
-     * Promotion?
-     * ----------
-     * Track the number of longs (time asleep is greater than threshold)
-     * and promote when the count threshold is reached.  Note that bus
-     * mastering activity may prevent promotions.
-     * Do not promote above max_cstate.
-     */
-    if ( cx->promotion.state &&
-         ((cx->promotion.state - power->states) <= max_cstate) )
-    {
-        if ( sleep_ticks > cx->promotion.threshold.ticks )
-        {
-            cx->promotion.count++;
-            cx->demotion.count = 0;
-            if ( cx->promotion.count >= cx->promotion.threshold.count )
-            {
-                if ( power->flags.bm_check )
-                {
-                    if ( !(power->bm_activity & cx->promotion.threshold.bm) )
-                    {
-                        next_state = cx->promotion.state;
-                        goto end;
-                    }
-                }
-                else
-                {
-                    next_state = cx->promotion.state;
-                    goto end;
-                }
-            }
-        }
     }
 
-    /*
-     * Demotion?
-     * ---------
-     * Track the number of shorts (time asleep is less than time threshold)
-     * and demote when the usage threshold is reached.
-     */
-    if ( cx->demotion.state )
-    {
-        if ( sleep_ticks < cx->demotion.threshold.ticks )
-        {
-            cx->demotion.count++;
-            cx->promotion.count = 0;
-            if ( cx->demotion.count >= cx->demotion.threshold.count )
-            {
-                next_state = cx->demotion.state;
-                goto end;
-            }
-        }
-    }
-
-end:
-    /*
-     * Demote if current state exceeds max_cstate
-     */
-    if ( (power->state - power->states) > max_cstate )
-    {
-        if ( cx->demotion.state )
-            next_state = cx->demotion.state;
-    }
-
-    /*
-     * New Cx State?
-     * -------------
-     * If we're going to start using a new Cx state we must clean up
-     * from the previous and prepare to use the new.
-     */
-    if ( next_state != power->state )
-        acpi_processor_power_activate(power, next_state);
-}
-
-static int acpi_processor_set_power_policy(struct acpi_processor_power *power)
-{
-    unsigned int i;
-    unsigned int state_is_set = 0;
-    struct acpi_processor_cx *lower = NULL;
-    struct acpi_processor_cx *higher = NULL;
-    struct acpi_processor_cx *cx;
-
-    if ( !power )
-        return -EINVAL;
-
-    /*
-     * This function sets the default Cx state policy (OS idle handler).
-     * Our scheme is to promote quickly to C2 but more conservatively
-     * to C3.  We're favoring C2  for its characteristics of low latency
-     * (quick response), good power savings, and ability to allow bus
-     * mastering activity.  Note that the Cx state policy is completely
-     * customizable and can be altered dynamically.
-     */
-
-    /* startup state */
-    for ( i = 1; i < ACPI_PROCESSOR_MAX_POWER; i++ )
-    {
-        cx = &power->states[i];
-        if ( !cx->valid )
-            continue;
-
-        if ( !state_is_set )
-            power->state = cx;
-        state_is_set++;
-        break;
-    }
-
-    if ( !state_is_set )
-        return -ENODEV;
-
-    /* demotion */
-    for ( i = 1; i < ACPI_PROCESSOR_MAX_POWER; i++ )
-    {
-        cx = &power->states[i];
-        if ( !cx->valid )
-            continue;
-
-        if ( lower )
-        {
-            cx->demotion.state = lower;
-            cx->demotion.threshold.ticks = cx->latency_ticks;
-            cx->demotion.threshold.count = 1;
-            if ( cx->type == ACPI_STATE_C3 )
-                cx->demotion.threshold.bm = bm_history;
-        }
-
-        lower = cx;
-    }
-
-    /* promotion */
-    for ( i = (ACPI_PROCESSOR_MAX_POWER - 1); i > 0; i-- )
-    {
-        cx = &power->states[i];
-        if ( !cx->valid )
-            continue;
-
-        if ( higher )
-        {
-            cx->promotion.state = higher;
-            cx->promotion.threshold.ticks = cx->latency_ticks;
-            if ( cx->type >= ACPI_STATE_C2 )
-                cx->promotion.threshold.count = 4;
-            else
-                cx->promotion.threshold.count = 10;
-            if ( higher->type == ACPI_STATE_C3 )
-                cx->promotion.threshold.bm = bm_history;
-        }
-
-        higher = cx;
-    }
-
-    return 0;
+    if ( cpuidle_current_governor->reflect )
+        cpuidle_current_governor->reflect(power);
 }
 
 static int init_cx_pminfo(struct acpi_processor_power *acpi_power)
@@ -821,6 +554,8 @@ static int check_cx(struct acpi_processor_power *power, xen_processor_cx_t *cx)
     return 0;
 }
 
+static unsigned int latency_factor = 2;
+
 static void set_cx(
     struct acpi_processor_power *acpi_power,
     xen_processor_cx_t *xen_cx)
@@ -842,6 +577,9 @@ static void set_cx(
     cx->power    = xen_cx->power;
     
     cx->latency_ticks = US_TO_PM_TIMER_TICKS(cx->latency);
+    cx->target_residency = cx->latency * latency_factor;
+    if ( cx->type == ACPI_STATE_C1 || cx->type == ACPI_STATE_C2 )
+        acpi_power->safe_state = cx;
 }
 
 int get_cpu_id(u8 acpi_id)
@@ -936,6 +674,7 @@ long set_cx_pminfo(uint32_t cpu, struct xen_processor_power *power)
 
     init_cx_pminfo(acpi_power);
 
+    acpi_power->cpu = cpu_id;
     acpi_power->flags.bm_check = power->flags.bm_check;
     acpi_power->flags.bm_control = power->flags.bm_control;
     acpi_power->flags.has_cst = power->flags.has_cst;
@@ -950,10 +689,11 @@ long set_cx_pminfo(uint32_t cpu, struct xen_processor_power *power)
         set_cx(acpi_power, &xen_cx);
     }
 
+    if ( cpuidle_current_governor->enable &&
+         cpuidle_current_governor->enable(acpi_power) )
+        return -EFAULT;
+
     /* FIXME: C-state dependency is not supported by far */
-    
-    /* initialize default policy */
-    acpi_processor_set_power_policy(acpi_power);
 
     print_acpi_power(cpu_id, acpi_power);
 
@@ -978,7 +718,7 @@ int pmstat_get_cx_stat(uint32_t cpuid, struct pm_cx_stat *stat)
     uint64_t usage;
     int i;
 
-    stat->last = (power->state) ? power->state->type : 0;
+    stat->last = (power->last_state) ? power->last_state->type : 0;
     stat->nr = processor_powers[cpuid].count;
     stat->idle_time = v->runstate.time[RUNSTATE_running];
     if ( v->is_running )

@@ -1,0 +1,19 @@
+##################################
+#
+# System User configuration.
+#
+
+#
+# gen_user(username, role_set, mls_defaultlevel, mls_range, [mcs_categories])
+#
+
+#
+# system_u is the user identity for system processes and objects.
+# There should be no corresponding Unix user identity for system,
+# and a user process should never be assigned the system user
+# identity.
+#
+gen_user(system_u, system_r, s0, s0 - s9:c0.c127, c0.c127)
+
+# Normal users should not be added to this file,
+# but instead added to the users file.

@@ -2069,7 +2069,7 @@ class XendDomainInfo:
         balloon.free(2*1024) # 2MB should be plenty
 
         ssidref = 0
-        if security.on() == xsconstants.XS_POLICY_ACM:
+        if security.on() == xsconstants.XS_POLICY_USE:
             ssidref = security.calc_dom_ssidref_from_info(self.info)
             if security.has_authorization(ssidref) == False:
                 raise VmError("VM is not authorized to run.")
@@ -2854,10 +2854,6 @@ class XendDomainInfo:
         if info["maxmem_kb"] < 0:
             info["maxmem_kb"] = XendNode.instance() \
                                 .physinfo_dict()['total_memory'] * 1024
-
-        #ssidref field not used any longer
-        if 'ssidref' in info:
-            info.pop('ssidref')
 
         # make sure state is reset for info
         # TODO: we should eventually get rid of old_dom_states

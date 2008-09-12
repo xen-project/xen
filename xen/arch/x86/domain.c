@@ -31,6 +31,7 @@
 #include <xen/compat.h>
 #include <xen/acpi.h>
 #include <xen/pci.h>
+#include <xen/paging.h>
 #include <asm/regs.h>
 #include <asm/mc146818rtc.h>
 #include <asm/system.h>
@@ -40,7 +41,6 @@
 #include <asm/i387.h>
 #include <asm/mpspec.h>
 #include <asm/ldt.h>
-#include <asm/paging.h>
 #include <asm/hypercall.h>
 #include <asm/hvm/hvm.h>
 #include <asm/hvm/support.h>
@@ -302,7 +302,8 @@ int vcpu_initialise(struct vcpu *v)
     else
     {
         /* PV guests by default have a 100Hz ticker. */
-        v->periodic_period = MILLISECS(10);
+        if ( !is_idle_domain(d) )
+            v->periodic_period = MILLISECS(10);
 
         /* PV guests get an emulated PIT too for video BIOSes to use. */
         if ( !is_idle_domain(d) && (v->vcpu_id == 0) )
@@ -1645,23 +1646,26 @@ static int relinquish_memory(
 
         /*
          * Forcibly invalidate top-most, still valid page tables at this point
-         * to break circular 'linear page table' references. This is okay
-         * because MMU structures are not shared across domains and this domain
-         * is now dead. Thus top-most valid tables are not in use so a non-zero
-         * count means circular reference.
+         * to break circular 'linear page table' references as well as clean up
+         * partially validated pages. This is okay because MMU structures are
+         * not shared across domains and this domain is now dead. Thus top-most
+         * valid tables are not in use so a non-zero count means circular
+         * reference or partially validated.
          */
         y = page->u.inuse.type_info;
         for ( ; ; )
         {
             x = y;
-            if ( likely((x & (PGT_type_mask|PGT_validated)) !=
-                        (type|PGT_validated)) )
+            if ( likely((x & PGT_type_mask) != type) ||
+                 likely(!(x & (PGT_validated|PGT_partial))) )
                 break;
 
-            y = cmpxchg(&page->u.inuse.type_info, x, x & ~PGT_validated);
+            y = cmpxchg(&page->u.inuse.type_info, x,
+                        x & ~(PGT_validated|PGT_partial));
             if ( likely(y == x) )
             {
-                free_page_type(page, type);
+                if ( free_page_type(page, x, 0) != 0 )
+                    BUG();
                 break;
             }
         }

@@ -192,6 +192,10 @@ ret_t do_platform_op(XEN_GUEST_HANDLE(xen_platform_op_t) u_xenpf_op)
     break;
 
     case XENPF_firmware_info:
+        ret = xsm_firmware_info();
+        if ( ret )
+            break;
+
         switch ( op->u.firmware_info.type )
         {
         case XEN_FW_DISK_INFO: {
@@ -280,10 +284,18 @@ ret_t do_platform_op(XEN_GUEST_HANDLE(xen_platform_op_t) u_xenpf_op)
         break;
 
     case XENPF_enter_acpi_sleep:
+        ret = xsm_acpi_sleep();
+        if ( ret )
+            break;
+
         ret = acpi_enter_sleep(&op->u.enter_acpi_sleep);
         break;
 
     case XENPF_change_freq:
+        ret = xsm_change_freq();
+        if ( ret )
+            break;
+
         ret = -ENOSYS;
         if ( cpufreq_controller != FREQCTL_dom0_kernel )
             break;
@@ -305,6 +317,10 @@ ret_t do_platform_op(XEN_GUEST_HANDLE(xen_platform_op_t) u_xenpf_op)
         cpumask_t cpumap;
         XEN_GUEST_HANDLE(uint8) cpumap_bitmap;
         XEN_GUEST_HANDLE(uint64) idletimes;
+
+        ret = xsm_getidletime();
+        if ( ret )
+            break;
 
         ret = -ENOSYS;
         if ( cpufreq_controller != FREQCTL_dom0_kernel )

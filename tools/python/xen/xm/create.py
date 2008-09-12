@@ -566,11 +566,11 @@ gopts.var('hap', val='HAP',
           use="""Hap status (0=hap is disabled;
           1=hap is enabled.""")
 
-gopts.var('cpuid', val="IN[,SIN]:eax=EAX,ebx=EBX,exc=ECX,edx=EDX",
+gopts.var('cpuid', val="IN[,SIN]:eax=EAX,ebx=EBX,ecx=ECX,edx=EDX",
           fn=append_value, default=[],
           use="""Cpuid description.""")
 
-gopts.var('cpuid_check', val="IN[,SIN]:eax=EAX,ebx=EBX,exc=ECX,edx=EDX",
+gopts.var('cpuid_check', val="IN[,SIN]:eax=EAX,ebx=EBX,ecx=ECX,edx=EDX",
           fn=append_value, default=[],
           use="""Cpuid check description.""")
 
@@ -971,7 +971,7 @@ def preprocess_cpuid(vals, attr_name):
                         "of the register %s for input %s\n"
                         % (res['reg'], input) )
                 cpuid[input][res['reg']] = res['val'] # new register
-    setattr(vals, attr_name, cpuid)
+            setattr(vals, attr_name, cpuid)
 
 def preprocess_pci(vals):
     if not vals.pci: return

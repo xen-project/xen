@@ -307,6 +307,13 @@ int xc_memory_op(int xc_handle,
             goto out1;
         }
         break;
+    case XENMEM_remove_from_physmap:
+        if ( lock_pages(arg, sizeof(struct xen_remove_from_physmap)) )
+        {
+            PERROR("Could not lock");
+            goto out1;
+        }
+        break;
     case XENMEM_current_reservation:
     case XENMEM_maximum_reservation:
     case XENMEM_maximum_gpfn:
@@ -339,6 +346,9 @@ int xc_memory_op(int xc_handle,
         break;
     case XENMEM_add_to_physmap:
         unlock_pages(arg, sizeof(struct xen_add_to_physmap));
+        break;
+    case XENMEM_remove_from_physmap:
+        unlock_pages(arg, sizeof(struct xen_remove_from_physmap));
         break;
     case XENMEM_current_reservation:
     case XENMEM_maximum_reservation:

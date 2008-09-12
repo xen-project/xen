@@ -11,8 +11,7 @@ static char *initial_sid_to_string[] =
     "security",
     "ioport",
     "iomem",
-    "vcpu",
-    "virq",
     "pirq",
+    "device",
 };
 

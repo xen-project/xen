@@ -47,7 +47,7 @@
 #include <xen/version.h>
 #include <xen/kexec.h>
 #include <xen/trace.h>
-#include <asm/paging.h>
+#include <xen/paging.h>
 #include <asm/system.h>
 #include <asm/io.h>
 #include <asm/atomic.h>
@@ -2116,6 +2116,36 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
             if ( wrmsr_safe(regs->ecx, eax, edx) != 0 )
                 goto fail;
             break;
+        case MSR_AMD64_NB_CFG:
+            if ( boot_cpu_data.x86_vendor != X86_VENDOR_AMD ||
+                 boot_cpu_data.x86 < 0x10 || boot_cpu_data.x86 > 0x11 )
+                goto fail;
+            if ( !IS_PRIV(v->domain) )
+                break;
+            if ( (rdmsr_safe(MSR_AMD64_NB_CFG, l, h) != 0) ||
+                 (eax != l) ||
+                 ((edx ^ h) & ~(1 << (AMD64_NB_CFG_CF8_EXT_ENABLE_BIT - 32))) )
+                goto invalid;
+            if ( wrmsr_safe(MSR_AMD64_NB_CFG, eax, edx) != 0 )
+                goto fail;
+            break;
+        case MSR_FAM10H_MMIO_CONF_BASE:
+            if ( boot_cpu_data.x86_vendor != X86_VENDOR_AMD ||
+                 boot_cpu_data.x86 < 0x10 || boot_cpu_data.x86 > 0x11 )
+                goto fail;
+            if ( !IS_PRIV(v->domain) )
+                break;
+            if ( (rdmsr_safe(MSR_FAM10H_MMIO_CONF_BASE, l, h) != 0) ||
+                 (((((u64)h << 32) | l) ^ res) &
+                  ~((1 << FAM10H_MMIO_CONF_ENABLE_BIT) |
+                    (FAM10H_MMIO_CONF_BUSRANGE_MASK <<
+                     FAM10H_MMIO_CONF_BUSRANGE_SHIFT) |
+                    ((u64)FAM10H_MMIO_CONF_BASE_MASK <<
+                     FAM10H_MMIO_CONF_BASE_SHIFT))) )
+                goto invalid;
+            if ( wrmsr_safe(MSR_FAM10H_MMIO_CONF_BASE, eax, edx) != 0 )
+                goto fail;
+            break;
         case MSR_IA32_PERF_CTL:
             if ( boot_cpu_data.x86_vendor != X86_VENDOR_INTEL )
                 goto fail;
@@ -2124,11 +2154,18 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
             if ( wrmsr_safe(regs->ecx, eax, edx) != 0 )
                 goto fail;
             break;
+        case MSR_IA32_THERM_CONTROL:
+            if ( boot_cpu_data.x86_vendor != X86_VENDOR_INTEL )
+                goto fail;
+            if ( wrmsr_safe(regs->ecx, eax, edx) != 0 )
+                goto fail;
+            break;
         default:
             if ( wrmsr_hypervisor_regs(regs->ecx, eax, edx) )
                 break;
             if ( (rdmsr_safe(regs->ecx, l, h) != 0) ||
                  (eax != l) || (edx != h) )
+        invalid:
                 gdprintk(XENLOG_WARNING, "Domain attempted WRMSR %p from "
                         "%08x:%08x to %08x:%08x.\n",
                         _p(regs->ecx), h, l, edx, eax);
@@ -2198,6 +2235,12 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
             regs->eax |= MSR_IA32_MISC_ENABLE_BTS_UNAVAIL |
                          MSR_IA32_MISC_ENABLE_PEBS_UNAVAIL |
                          MSR_IA32_MISC_ENABLE_XTPR_DISABLE;
+            break;
+        case MSR_IA32_THERM_CONTROL:
+            if ( boot_cpu_data.x86_vendor != X86_VENDOR_INTEL )
+                goto fail;
+            if ( rdmsr_safe(regs->ecx, regs->eax, regs->edx) )
+                goto fail;
             break;
         default:
             if ( rdmsr_hypervisor_regs(regs->ecx, &l, &h) )

@@ -106,8 +106,6 @@ struct vcpu
     bool_t           fpu_initialised;
     /* Has the FPU been used since it was last saved? */
     bool_t           fpu_dirtied;
-    /* Is this VCPU polling any event channels (SCHEDOP_poll)? */
-    bool_t           is_polling;
     /* Initialization completed for this VCPU? */
     bool_t           is_initialised;
     /* Currently running on a CPU? */
@@ -133,6 +131,13 @@ struct vcpu
     bool_t           paused_for_shutdown;
     /* VCPU affinity is temporarily locked from controller changes? */
     bool_t           affinity_locked;
+
+    /*
+     * > 0: a single port is being polled;
+     * = 0: nothing is being polled (vcpu should be clear in d->poll_mask);
+     * < 0: multiple ports may be being polled.
+     */
+    int              poll_evtchn;
 
     unsigned long    pause_flags;
     atomic_t         pause_count;
@@ -209,14 +214,15 @@ struct domain
     struct domain   *target;
     /* Is this guest being debugged by dom0? */
     bool_t           debugger_attached;
-    /* Are any VCPUs polling event channels (SCHEDOP_poll)? */
-    bool_t           is_polling;
     /* Is this guest dying (i.e., a zombie)? */
     enum { DOMDYING_alive, DOMDYING_dying, DOMDYING_dead } is_dying;
     /* Domain is paused by controller software? */
     bool_t           is_paused_by_controller;
     /* Domain's VCPUs are pinned 1:1 to physical CPUs? */
     bool_t           is_pinned;
+
+    /* Are any VCPUs polling event channels (SCHEDOP_poll)? */
+    DECLARE_BITMAP(poll_mask, MAX_VIRT_CPUS);
 
     /* Guest has shut down (inc. reason code)? */
     spinlock_t       shutdown_lock;
@@ -507,6 +513,7 @@ static inline int vcpu_runnable(struct vcpu *v)
              atomic_read(&v->domain->pause_count));
 }
 
+void vcpu_unblock(struct vcpu *v);
 void vcpu_pause(struct vcpu *v);
 void vcpu_pause_nosync(struct vcpu *v);
 void domain_pause(struct domain *d);
@@ -517,17 +524,12 @@ void domain_unpause_by_systemcontroller(struct domain *d);
 void cpu_init(void);
 
 void vcpu_force_reschedule(struct vcpu *v);
+void cpu_disable_scheduler(void);
 int vcpu_set_affinity(struct vcpu *v, cpumask_t *affinity);
 int vcpu_lock_affinity(struct vcpu *v, cpumask_t *affinity);
 void vcpu_unlock_affinity(struct vcpu *v, cpumask_t *affinity);
 
 void vcpu_runstate_get(struct vcpu *v, struct vcpu_runstate_info *runstate);
-
-static inline void vcpu_unblock(struct vcpu *v)
-{
-    if ( test_and_clear_bit(_VPF_blocked, &v->pause_flags) )
-        vcpu_wake(v);
-}
 
 #define IS_PRIV(_d) ((_d)->is_privileged)
 #define IS_PRIV_FOR(_d, _t) (IS_PRIV(_d) || ((_d)->target && (_d)->target == (_t)))

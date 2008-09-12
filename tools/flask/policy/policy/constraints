@@ -1,0 +1,27 @@
+
+#
+# Define the constraints
+#
+# constrain class_set perm_set expression ;
+#
+# expression : ( expression ) 
+#	     | not expression
+#	     | expression and expression
+#	     | expression or expression
+#	     | u1 op u2
+#	     | r1 role_op r2
+#	     | t1 op t2
+#	     | u1 op names
+#	     | u2 op names
+#	     | r1 op names
+#	     | r2 op names
+#	     | t1 op names
+#	     | t2 op names
+#
+# op : == | != 
+# role_op : == | != | eq | dom | domby | incomp
+#
+# names : name | { name_list }
+# name_list : name | name_list name		
+#
+

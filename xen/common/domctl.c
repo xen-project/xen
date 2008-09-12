@@ -655,9 +655,6 @@ long do_domctl(XEN_GUEST_HANDLE(xen_domctl_t) u_domctl)
         spin_lock(&d->page_alloc_lock);
         if ( new_max >= d->tot_pages )
         {
-            ret = guest_physmap_max_mem_pages(d, new_max);
-            if ( ret != 0 )
-                break;
             d->max_pages = new_max;
             ret = 0;
         }
@@ -729,16 +726,11 @@ long do_domctl(XEN_GUEST_HANDLE(xen_domctl_t) u_domctl)
         if ( d == NULL )
             break;
 
-        ret = xsm_irq_permission(d, pirq, op->u.irq_permission.allow_access);
-        if ( ret )
-            goto irq_permission_out;
-        
         if ( op->u.irq_permission.allow_access )
             ret = irq_permit_access(d, pirq);
         else
             ret = irq_deny_access(d, pirq);
 
-    irq_permission_out:
         rcu_unlock_domain(d);
     }
     break;
@@ -758,16 +750,11 @@ long do_domctl(XEN_GUEST_HANDLE(xen_domctl_t) u_domctl)
         if ( d == NULL )
             break;
 
-        ret = xsm_iomem_permission(d, mfn, op->u.iomem_permission.allow_access);
-        if ( ret )
-            goto iomem_permission_out;
-
         if ( op->u.iomem_permission.allow_access )
             ret = iomem_permit_access(d, mfn, mfn + nr_mfns - 1);
         else
             ret = iomem_deny_access(d, mfn, mfn + nr_mfns - 1);
 
-    iomem_permission_out:
         rcu_unlock_domain(d);
     }
     break;
@@ -813,6 +800,12 @@ long do_domctl(XEN_GUEST_HANDLE(xen_domctl_t) u_domctl)
         {
             put_domain(e);
             goto set_target_out;
+        }
+
+        ret = xsm_set_target(d, e);
+        if ( ret ) {
+            put_domain(e);
+            goto set_target_out;            
         }
 
         /* Hold reference on @e until we destroy @d. */

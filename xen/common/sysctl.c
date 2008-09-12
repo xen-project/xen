@@ -149,6 +149,10 @@ long do_sysctl(XEN_GUEST_HANDLE(xen_sysctl_t) u_sysctl)
         char c;
         uint32_t i;
 
+        ret = xsm_debug_keys();
+        if ( ret )
+            break;
+
         for ( i = 0; i < op->u.debug_keys.nr_keys; i++ )
         {
             if ( copy_from_guest_offset(&c, op->u.debug_keys.keys, i, 1) )
@@ -165,6 +169,10 @@ long do_sysctl(XEN_GUEST_HANDLE(xen_sysctl_t) u_sysctl)
         struct vcpu *v;
 
         nr_cpus = min_t(uint32_t, op->u.getcpuinfo.max_cpus, NR_CPUS);
+
+        ret = xsm_getcpuinfo();
+        if ( ret )
+            break;
 
         for ( i = 0; i < nr_cpus; i++ )
         {
@@ -188,6 +196,10 @@ long do_sysctl(XEN_GUEST_HANDLE(xen_sysctl_t) u_sysctl)
 
     case XEN_SYSCTL_availheap:
     { 
+        ret = xsm_availheap();
+        if ( ret )
+            break;
+
         op->u.availheap.avail_bytes = avail_domheap_pages_region(
             op->u.availheap.node,
             op->u.availheap.min_bitwidth,

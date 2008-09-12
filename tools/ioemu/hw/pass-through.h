@@ -62,6 +62,21 @@
 #define PCI_MSI_FLAGS_MASK_BIT  0x0100
 #endif
 
+#ifndef PCI_EXP_TYPE_PCIE_BRIDGE
+/* PCI/PCI-X to PCIE Bridge */
+#define PCI_EXP_TYPE_PCIE_BRIDGE 0x8
+#endif
+
+#ifndef PCI_EXP_TYPE_ROOT_INT_EP
+/* Root Complex Integrated Endpoint */
+#define PCI_EXP_TYPE_ROOT_INT_EP 0x9
+#endif
+
+#ifndef PCI_EXP_TYPE_ROOT_EC
+/* Root Complex Event Collector */
+#define PCI_EXP_TYPE_ROOT_EC     0xa
+#endif
+
 #define PT_INVALID_REG          0xFFFFFFFF      /* invalid register value */
 #define PT_BAR_ALLF             0xFFFFFFFF      /* BAR ALLF value */
 #define PT_BAR_MEM_RO_MASK      0x0000000F      /* BAR ReadOnly mask(Memory) */

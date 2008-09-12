@@ -69,13 +69,11 @@ int security_get_user_sids(u32 callsid, char *username, u32 **sids, u32 *nel);
 
 int security_pirq_sid(int pirq, u32 *out_sid);
 
-int security_virq_sid(int virq, u32 *out_sid);
-
-int security_vcpu_sid(int vcpu, u32 *out_sid);
-
 int security_iomem_sid(unsigned long, u32 *out_sid);
 
 int security_ioport_sid(u32 ioport, u32 *out_sid);
+
+int security_device_sid(u32 device, u32 *out_sid);
 
 int security_validate_transition(u32 oldsid, u32 newsid, u32 tasksid,
                                                                     u16 tclass);

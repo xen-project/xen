@@ -80,7 +80,7 @@ static void enable_intr_window(struct vcpu *v, struct hvm_intack intack)
 
     ASSERT(intack.source != hvm_intsrc_none);
 
-    HVMTRACE_2D(INJ_VIRQ, v, 0x0, /*fake=*/ 1);
+    HVMTRACE_2D(INJ_VIRQ, 0x0, /*fake=*/ 1);
 
     /*
      * Create a dummy virtual interrupt to intercept as soon as the
@@ -199,7 +199,7 @@ asmlinkage void svm_intr_assist(void)
     }
     else
     {
-        HVMTRACE_2D(INJ_VIRQ, v, intack.vector, /*fake=*/ 0);
+        HVMTRACE_2D(INJ_VIRQ, intack.vector, /*fake=*/ 0);
         svm_inject_extint(v, intack.vector);
         pt_intr_post(v, intack);
     }

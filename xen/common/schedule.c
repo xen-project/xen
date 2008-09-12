@@ -63,11 +63,31 @@ static struct scheduler ops;
          (( ops.fn != NULL ) ? ops.fn( __VA_ARGS__ )      \
           : (typeof(ops.fn(__VA_ARGS__)))0 )
 
+static inline void trace_runstate_change(struct vcpu *v, int new_state)
+{
+    struct { uint32_t vcpu:16, domain:16; } d;
+    uint32_t event;
+
+    if ( likely(!tb_init_done) )
+        return;
+
+    d.vcpu = v->vcpu_id;
+    d.domain = v->domain->domain_id;
+
+    event = TRC_SCHED_RUNSTATE_CHANGE;
+    event |= ( v->runstate.state & 0x3 ) << 8;
+    event |= ( new_state & 0x3 ) << 4;
+
+    __trace_var(event, 1/*tsc*/, sizeof(d), (unsigned char *)&d);
+}
+
 static inline void vcpu_runstate_change(
     struct vcpu *v, int new_state, s_time_t new_entry_time)
 {
     ASSERT(v->runstate.state != new_state);
     ASSERT(spin_is_locked(&per_cpu(schedule_data,v->processor).schedule_lock));
+
+    trace_runstate_change(v, new_state);
 
     v->runstate.time[v->runstate.state] +=
         new_entry_time - v->runstate.state_entry_time;
@@ -198,6 +218,27 @@ void vcpu_wake(struct vcpu *v)
     TRACE_2D(TRC_SCHED_WAKE, v->domain->domain_id, v->vcpu_id);
 }
 
+void vcpu_unblock(struct vcpu *v)
+{
+    if ( !test_and_clear_bit(_VPF_blocked, &v->pause_flags) )
+        return;
+
+    /* Polling period ends when a VCPU is unblocked. */
+    if ( unlikely(v->poll_evtchn != 0) )
+    {
+        v->poll_evtchn = 0;
+        /*
+         * We *must* re-clear _VPF_blocked to avoid racing other wakeups of
+         * this VCPU (and it then going back to sleep on poll_mask).
+         * Test-and-clear is idiomatic and ensures clear_bit not reordered.
+         */
+        if ( test_and_clear_bit(v->vcpu_id, v->domain->poll_mask) )
+            clear_bit(_VPF_blocked, &v->pause_flags);
+    }
+
+    vcpu_wake(v);
+}
+
 static void vcpu_migrate(struct vcpu *v)
 {
     unsigned long flags;
@@ -244,6 +285,48 @@ void vcpu_force_reschedule(struct vcpu *v)
     {
         vcpu_sleep_nosync(v);
         vcpu_migrate(v);
+    }
+}
+
+/*
+ * This function is used by cpu_hotplug code from stop_machine context.
+ * Hence we can avoid needing to take the 
+ */
+void cpu_disable_scheduler(void)
+{
+    struct domain *d;
+    struct vcpu *v;
+    unsigned int cpu = smp_processor_id();
+
+    for_each_domain ( d )
+    {
+        for_each_vcpu ( d, v )
+        {
+            if ( is_idle_vcpu(v) )
+                continue;
+
+            if ( (cpus_weight(v->cpu_affinity) == 1) &&
+                 cpu_isset(cpu, v->cpu_affinity) )
+            {
+                printk("Breaking vcpu affinity for domain %d vcpu %d\n",
+                        v->domain->domain_id, v->vcpu_id);
+                cpus_setall(v->cpu_affinity);
+            }
+
+            /*
+             * Migrate single-shot timers to CPU0. A new cpu will automatically
+             * be chosen when the timer is next re-set.
+             */
+            if ( v->singleshot_timer.cpu == cpu )
+                migrate_timer(&v->singleshot_timer, 0);
+
+            if ( v->processor == cpu )
+            {
+                set_bit(_VPF_migrating, &v->pause_flags);
+                vcpu_sleep_nosync(v);
+                vcpu_migrate(v);
+            }
+        }
     }
 }
 
@@ -337,7 +420,7 @@ static long do_poll(struct sched_poll *sched_poll)
     struct vcpu   *v = current;
     struct domain *d = v->domain;
     evtchn_port_t  port;
-    long           rc = 0;
+    long           rc;
     unsigned int   i;
 
     /* Fairly arbitrary limit. */
@@ -348,11 +431,24 @@ static long do_poll(struct sched_poll *sched_poll)
         return -EFAULT;
 
     set_bit(_VPF_blocked, &v->pause_flags);
-    v->is_polling = 1;
-    d->is_polling = 1;
+    v->poll_evtchn = -1;
+    set_bit(v->vcpu_id, d->poll_mask);
 
+#ifndef CONFIG_X86 /* set_bit() implies mb() on x86 */
     /* Check for events /after/ setting flags: avoids wakeup waiting race. */
-    smp_wmb();
+    smp_mb();
+
+    /*
+     * Someone may have seen we are blocked but not that we are polling, or
+     * vice versa. We are certainly being woken, so clean up and bail. Beyond
+     * this point others can be guaranteed to clean up for us if they wake us.
+     */
+    rc = 0;
+    if ( (v->poll_evtchn == 0) ||
+         !test_bit(_VPF_blocked, &v->pause_flags) ||
+         !test_bit(v->vcpu_id, d->poll_mask) )
+        goto out;
+#endif
 
     for ( i = 0; i < sched_poll->nr_ports; i++ )
     {
@@ -369,6 +465,9 @@ static long do_poll(struct sched_poll *sched_poll)
             goto out;
     }
 
+    if ( sched_poll->nr_ports == 1 )
+        v->poll_evtchn = port;
+
     if ( sched_poll->timeout != 0 )
         set_timer(&v->poll_timer, sched_poll->timeout);
 
@@ -378,7 +477,8 @@ static long do_poll(struct sched_poll *sched_poll)
     return 0;
 
  out:
-    v->is_polling = 0;
+    v->poll_evtchn = 0;
+    clear_bit(v->vcpu_id, d->poll_mask);
     clear_bit(_VPF_blocked, &v->pause_flags);
     return rc;
 }
@@ -628,7 +728,9 @@ static void vcpu_periodic_timer_work(struct vcpu *v)
         return;
 
     periodic_next_event = v->periodic_last_event + v->periodic_period;
-    if ( now > periodic_next_event )
+
+    /* The timer subsystem may call us up to TIME_SLOP ahead of deadline. */
+    if ( (now + TIME_SLOP) > periodic_next_event )
     {
         send_timer_event(v);
         v->periodic_last_event = now;
@@ -758,11 +860,8 @@ static void poll_timer_fn(void *data)
 {
     struct vcpu *v = data;
 
-    if ( !v->is_polling )
-        return;
-
-    v->is_polling = 0;
-    vcpu_unblock(v);
+    if ( test_and_clear_bit(v->vcpu_id, v->domain->poll_mask) )
+        vcpu_unblock(v);
 }
 
 /* Initialise the data structures. */

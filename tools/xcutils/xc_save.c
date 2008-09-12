@@ -32,7 +32,7 @@ static struct suspendinfo {
  * Issue a suspend request through stdout, and receive the acknowledgement
  * from stdin.  This is handled by XendCheckpoint in the Python layer.
  */
-static int compat_suspend(int domid)
+static int compat_suspend(void)
 {
     char ans[30];
 
@@ -43,16 +43,35 @@ static int compat_suspend(int domid)
             !strncmp(ans, "done\n", 5));
 }
 
-static int suspend_evtchn_release(int xc, int domid)
+static int suspend_evtchn_release(void)
 {
     if (si.suspend_evtchn >= 0) {
-	xc_evtchn_unbind(si.xce, si.suspend_evtchn);
-	si.suspend_evtchn = -1;
+        xc_evtchn_unbind(si.xce, si.suspend_evtchn);
+        si.suspend_evtchn = -1;
     }
     if (si.xce >= 0) {
-	xc_evtchn_close(si.xce);
-	si.xce = -1;
+        xc_evtchn_close(si.xce);
+        si.xce = -1;
     }
+
+    return 0;
+}
+
+static int await_suspend(void)
+{
+    int rc;
+
+    do {
+        rc = xc_evtchn_pending(si.xce);
+        if (rc < 0) {
+            warnx("error polling suspend notification channel: %d", rc);
+            return -1;
+        }
+    } while (rc != si.suspend_evtchn);
+
+    /* harmless for one-off suspend */
+    if (xc_evtchn_unmask(si.xce, si.suspend_evtchn) < 0)
+        warnx("failed to unmask suspend notification channel: %d", rc);
 
     return 0;
 }
@@ -71,16 +90,16 @@ static int suspend_evtchn_init(int xc, int domid)
 
     xs = xs_daemon_open();
     if (!xs) {
-	errx(1, "failed to get xenstore handle");
-	return -1;
+        warnx("failed to get xenstore handle");
+        return -1;
     }
     sprintf(path, "/local/domain/%d/device/suspend/event-channel", domid);
     portstr = xs_read(xs, XBT_NULL, path, &plen);
     xs_daemon_close(xs);
 
     if (!portstr || !plen) {
-	warnx("could not read suspend event channel");
-	return -1;
+        warnx("could not read suspend event channel");
+        return -1;
     }
 
     port = atoi(portstr);
@@ -88,27 +107,29 @@ static int suspend_evtchn_init(int xc, int domid)
 
     si.xce = xc_evtchn_open();
     if (si.xce < 0) {
-	errx(1, "failed to open event channel handle");
-	goto cleanup;
+        warnx("failed to open event channel handle");
+        goto cleanup;
     }
 
     si.suspend_evtchn = xc_evtchn_bind_interdomain(si.xce, domid, port);
     if (si.suspend_evtchn < 0) {
-	errx(1, "failed to bind suspend event channel: %d",
-	     si.suspend_evtchn);
-	goto cleanup;
+        warnx("failed to bind suspend event channel: %d", si.suspend_evtchn);
+        goto cleanup;
     }
 
     rc = xc_domain_subscribe_for_suspend(xc, domid, port);
     if (rc < 0) {
-	errx(1, "failed to subscribe to domain: %d", rc);
-	goto cleanup;
+        warnx("failed to subscribe to domain: %d", rc);
+        goto cleanup;
     }
+
+    /* event channel is pending immediately after binding */
+    await_suspend();
 
     return 0;
 
   cleanup:
-    suspend_evtchn_release(xc, domid);
+    suspend_evtchn_release();
 
     return -1;
 }
@@ -116,29 +137,20 @@ static int suspend_evtchn_init(int xc, int domid)
 /**
  * Issue a suspend request to a dedicated event channel in the guest, and
  * receive the acknowledgement from the subscribe event channel. */
-static int evtchn_suspend(int domid)
+static int evtchn_suspend(void)
 {
-    int xcefd;
     int rc;
 
     rc = xc_evtchn_notify(si.xce, si.suspend_evtchn);
     if (rc < 0) {
-	errx(1, "failed to notify suspend request channel: %d", rc);
-	return 0;
+        warnx("failed to notify suspend request channel: %d", rc);
+        return 0;
     }
 
-    xcefd = xc_evtchn_fd(si.xce);
-    do {
-      rc = xc_evtchn_pending(si.xce);
-      if (rc < 0) {
-	errx(1, "error polling suspend notification channel: %d", rc);
-	return 0;
-      }
-    } while (rc != si.suspend_evtchn);
-
-    /* harmless for one-off suspend */
-    if (xc_evtchn_unmask(si.xce, si.suspend_evtchn) < 0)
-	errx(1, "failed to unmask suspend notification channel: %d", rc);
+    if (await_suspend() < 0) {
+        warnx("suspend failed");
+        return 0;
+    }
 
     /* notify xend that it can do device migration */
     printf("suspended\n");
@@ -147,12 +159,12 @@ static int evtchn_suspend(int domid)
     return 1;
 }
 
-static int suspend(int domid)
+static int suspend(void)
 {
     if (si.suspend_evtchn >= 0)
-	return evtchn_suspend(domid);
+        return evtchn_suspend();
 
-    return compat_suspend(domid);
+    return compat_suspend();
 }
 
 /* For HVM guests, there are two sources of dirty pages: the Xen shadow
@@ -195,11 +207,9 @@ static void qemu_flip_buffer(int domid, int next_active)
 
     /* Tell qemu that we want it to start writing log-dirty bits to the
      * other buffer */
-    if (!xs_write(xs, XBT_NULL, qemu_next_active_path, &digit, 1)) {
+    if (!xs_write(xs, XBT_NULL, qemu_next_active_path, &digit, 1))
         errx(1, "can't write next-active to store path (%s)\n", 
-              qemu_next_active_path);
-        exit(1);
-    }
+             qemu_next_active_path);
 
     /* Wait a while for qemu to signal that it has switched to the new 
      * active buffer */
@@ -208,10 +218,8 @@ static void qemu_flip_buffer(int domid, int next_active)
     tv.tv_usec = 0;
     FD_ZERO(&fdset);
     FD_SET(xs_fileno(xs), &fdset);
-    if ((select(xs_fileno(xs) + 1, &fdset, NULL, NULL, &tv)) != 1) {
+    if ((select(xs_fileno(xs) + 1, &fdset, NULL, NULL, &tv)) != 1)
         errx(1, "timed out waiting for qemu to switch buffers\n");
-        exit(1);
-    }
     watch = xs_read_watch(xs, &len);
     free(watch);
     
@@ -221,7 +229,7 @@ static void qemu_flip_buffer(int domid, int next_active)
         goto read_again;
 }
 
-static void * init_qemu_maps(int domid, unsigned int bitmap_size)
+static void *init_qemu_maps(int domid, unsigned int bitmap_size)
 {
     key_t key;
     char key_ascii[17] = {0,};
@@ -293,7 +301,7 @@ main(int argc, char **argv)
     int ret;
 
     if (argc != 6)
-	errx(1, "usage: %s iofd domid maxit maxf flags", argv[0]);
+        errx(1, "usage: %s iofd domid maxit maxf flags", argv[0]);
 
     xc_fd = xc_interface_open();
     if (xc_fd < 0)
@@ -305,13 +313,14 @@ main(int argc, char **argv)
     max_f = atoi(argv[4]);
     flags = atoi(argv[5]);
 
-    suspend_evtchn_init(xc_fd, domid);
+    if (suspend_evtchn_init(xc_fd, domid) < 0)
+        warnx("suspend event channel initialization failed, using slow path");
 
     ret = xc_domain_save(xc_fd, io_fd, domid, maxit, max_f, flags, 
                          &suspend, !!(flags & XCFLAGS_HVM),
                          &init_qemu_maps, &qemu_flip_buffer);
 
-    suspend_evtchn_release(xc_fd, domid);
+    suspend_evtchn_release();
 
     xc_interface_close(xc_fd);
 

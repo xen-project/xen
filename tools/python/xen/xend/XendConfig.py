@@ -729,7 +729,7 @@ class XendConfig(dict):
             self.parse_cpuid(cfg, 'cpuid_check')
 
         import xen.util.xsm.xsm as security
-        if security.on() == xsconstants.XS_POLICY_ACM:
+        if security.on() == xsconstants.XS_POLICY_USE:
             from xen.util.acmpolicy import ACM_LABEL_UNLABELED
             if not 'security' in cfg and sxp.child_value(sxp_cfg, 'security'):
                 cfg['security'] = sxp.child_value(sxp_cfg, 'security')
