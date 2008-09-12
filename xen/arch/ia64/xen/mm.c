@@ -1227,7 +1227,7 @@ static void
 adjust_page_count_info(struct page_info* page)
 {
     struct domain* d = page_get_owner(page);
-    BUG_ON((page->count_info & PGC_count_mask) != 1);
+    BUG_ON((page->count_info & PGC_count_mask) < 1);
     if (d != NULL) {
         int ret = get_page(page, d);
         BUG_ON(ret == 0);
@@ -1272,6 +1272,7 @@ domain_put_page(struct domain* d, unsigned long mpaddr,
             //
             // guest_remove_page(): owner = d, count_info = 1
             // memory_exchange(): owner = NULL, count_info = 1
+            // XENMEM_add_to_physmap: ower = d, count_info >= 1
             adjust_page_count_info(page);
         }
     }
@@ -2422,6 +2423,16 @@ steal_page(struct domain *d, struct page_info *page, unsigned int memflags)
     return 0;
 }
 
+static void
+__guest_physmap_add_page(struct domain *d, unsigned long gpfn,
+                         unsigned long mfn)
+{
+    set_gpfn_from_mfn(mfn, gpfn);
+    smp_mb();
+    assign_domain_page_replace(d, gpfn << PAGE_SHIFT, mfn,
+                               ASSIGN_writable | ASSIGN_pgc_allocated);
+}
+
 int
 guest_physmap_add_page(struct domain *d, unsigned long gpfn,
                        unsigned long mfn, unsigned int page_order)
@@ -2431,10 +2442,7 @@ guest_physmap_add_page(struct domain *d, unsigned long gpfn,
     for (i = 0; i < (1UL << page_order); i++) {
         BUG_ON(!mfn_valid(mfn));
         BUG_ON(mfn_to_page(mfn)->count_info != (PGC_allocated | 1));
-        set_gpfn_from_mfn(mfn, gpfn);
-        smp_mb();
-        assign_domain_page_replace(d, gpfn << PAGE_SHIFT, mfn,
-                                   ASSIGN_writable | ASSIGN_pgc_allocated);
+        __guest_physmap_add_page(d, gpfn, mfn);
         mfn++;
         gpfn++;
     }
@@ -2894,7 +2902,9 @@ arch_memory_op(int op, XEN_GUEST_HANDLE(void) arg)
             guest_physmap_remove_page(d, gpfn, mfn, 0);
 
         /* Map at new location. */
-        guest_physmap_add_page(d, xatp.gpfn, mfn, 0);
+        /* Here page->count_info = PGC_allocated | N where N >= 1*/
+        __guest_physmap_add_page(d, xatp.gpfn, mfn);
+        page = NULL; /* prevent put_page() */
 
     out:
         domain_unlock(d);
