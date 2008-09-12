@@ -133,14 +133,14 @@ static int enter_state(u32 state)
 
     freeze_domains();
 
-    cpufreq_suspend();
-
     disable_nonboot_cpus();
     if ( num_online_cpus() != 1 )
     {
         error = -EBUSY;
         goto enable_cpu;
     }
+
+    cpufreq_del_cpu(0);
 
     hvm_cpu_down();
 
@@ -189,8 +189,8 @@ static int enter_state(u32 state)
         BUG();
 
  enable_cpu:
+    cpufreq_add_cpu(0);
     enable_nonboot_cpus();
-    cpufreq_resume();
     thaw_domains();
     spin_unlock(&pm_lock);
     return error;

@@ -78,7 +78,7 @@ int do_get_pm_info(struct xen_sysctl_get_pmstat *op)
         tmp_idle_ns = total_idle_ns - pxpt->prev_idle_wall;
 
         now = NOW();
-        pxpt->u.usable = pmpt->perf.state_count - pmpt->perf.ppc;
+        pxpt->u.usable = pmpt->perf.state_count - pmpt->perf.platform_limit;
         pxpt->u.pt[pxpt->u.cur].residency += now - pxpt->prev_state_wall;
         pxpt->u.pt[pxpt->u.cur].residency -= tmp_idle_ns;
         pxpt->prev_state_wall = now;

@@ -32,6 +32,7 @@
 #include <xen/errno.h>
 #include <xen/delay.h>
 #include <xen/cpumask.h>
+#include <xen/sched.h>
 #include <xen/timer.h>
 #include <xen/xmalloc.h>
 #include <asm/bug.h>
@@ -44,12 +45,8 @@
 #include <acpi/acpi.h>
 #include <acpi/cpufreq/cpufreq.h>
 
-struct processor_pminfo processor_pminfo[NR_CPUS];
-struct cpufreq_policy xen_px_policy[NR_CPUS];
-
-static cpumask_t *cpufreq_dom_pt;
-static unsigned long *cpufreq_dom_mask;
-static unsigned int cpufreq_dom_max;
+/* TODO: change to link list later as domain number may be sparse */
+static cpumask_t cpufreq_dom_map[NR_CPUS];
 
 enum {
     UNDEFINED_CAPABLE = 0,
@@ -335,7 +332,7 @@ static int acpi_cpufreq_target(struct cpufreq_policy *policy,
     if (unlikely(result))
         return -ENODEV;
 
-    online_policy_cpus = policy->cpus;
+    cpus_and(online_policy_cpus, cpu_online_map, policy->cpus);
 
     next_perf_state = data->freq_table[next_state].index;
     if (perf->state == next_perf_state) {
@@ -390,6 +387,20 @@ static int acpi_cpufreq_target(struct cpufreq_policy *policy,
     return result;
 }
 
+static int acpi_cpufreq_verify(struct cpufreq_policy *policy)
+{
+    struct acpi_cpufreq_data *data = drv_data[policy->cpu];
+    struct processor_performance *perf = &processor_pminfo[policy->cpu].perf;
+
+    if (!policy || !data)
+        return -EINVAL;
+
+    cpufreq_verify_within_limits(policy, 0, 
+        perf->states[perf->platform_limit].core_frequency * 1000);
+
+    return cpufreq_frequency_table_verify(policy, data->freq_table);
+}
+
 static unsigned long
 acpi_cpufreq_guess_freq(struct acpi_cpufreq_data *data, unsigned int cpu)
 {
@@ -441,14 +452,6 @@ acpi_cpufreq_cpu_init(struct cpufreq_policy *policy)
     perf = data->acpi_data;
     policy->shared_type = perf->shared_type;
 
-    /* 
-     * Currently the latest linux (kernel version 2.6.26) 
-     * still has issue when handle the situation _psd HW_ALL coordination.
-     * In Xen hypervisor, we handle _psd HW_ALL coordination in same way as
-     * _psd SW_ALL coordination for the seek of safety.
-     */
-    policy->cpus = perf->shared_cpu_map;
-
     /* capability check */
     if (perf->state_count <= 1) {
         printk("No P-States\n");
@@ -496,6 +499,7 @@ acpi_cpufreq_cpu_init(struct cpufreq_policy *policy)
             policy->cpuinfo.transition_latency =
                 perf->states[i].transition_latency * 1000;
     }
+    policy->governor = CPUFREQ_DEFAULT_GOVERNOR;
 
     data->max_freq = perf->states[0].core_frequency * 1000;
     /* table init */
@@ -554,114 +558,173 @@ err_unreg:
     return result;
 }
 
-static struct cpufreq_driver acpi_cpufreq_driver = {
-    .target = acpi_cpufreq_target,
-    .init   = acpi_cpufreq_cpu_init,
-};
-
-void cpufreq_dom_exit(void)
+static int acpi_cpufreq_cpu_exit(struct cpufreq_policy *policy)
 {
-    cpufreq_dom_max = 0;
-    if (cpufreq_dom_mask)
-        xfree(cpufreq_dom_mask);
-    if (cpufreq_dom_pt)
-        xfree(cpufreq_dom_pt);
-}
+    struct acpi_cpufreq_data *data = drv_data[policy->cpu];
 
-int cpufreq_dom_init(void)
-{
-    unsigned int i;
-
-    cpufreq_dom_max = 0;
-
-    for_each_online_cpu(i) {
-        if (cpufreq_dom_max < processor_pminfo[i].perf.domain_info.domain)
-            cpufreq_dom_max = processor_pminfo[i].perf.domain_info.domain;
+    if (data) {
+        drv_data[policy->cpu] = NULL;
+        xfree(data->freq_table);
+        xfree(data);
     }
-    cpufreq_dom_max++;
-
-    cpufreq_dom_mask = xmalloc_array(unsigned long,
-                                     BITS_TO_LONGS(cpufreq_dom_max));
-    if (!cpufreq_dom_mask)
-        return -ENOMEM;
-    bitmap_zero(cpufreq_dom_mask, cpufreq_dom_max);
-
-    cpufreq_dom_pt = xmalloc_array(cpumask_t, cpufreq_dom_max);
-    if (!cpufreq_dom_pt)
-        return -ENOMEM;
-    memset(cpufreq_dom_pt, 0, cpufreq_dom_max * sizeof(cpumask_t));
-
-    for_each_online_cpu(i) {
-        __set_bit(processor_pminfo[i].perf.domain_info.domain, cpufreq_dom_mask);
-        cpu_set(i, cpufreq_dom_pt[processor_pminfo[i].perf.domain_info.domain]);
-    }
-
-    for_each_online_cpu(i)
-        processor_pminfo[i].perf.shared_cpu_map =
-            cpufreq_dom_pt[processor_pminfo[i].perf.domain_info.domain];
 
     return 0;
 }
 
-static int cpufreq_cpu_init(void)
+static struct cpufreq_driver acpi_cpufreq_driver = {
+    .verify = acpi_cpufreq_verify,
+    .target = acpi_cpufreq_target,
+    .init   = acpi_cpufreq_cpu_init,
+    .exit   = acpi_cpufreq_cpu_exit,
+};
+
+int cpufreq_limit_change(unsigned int cpu)
 {
-    int i, ret = 0;
+    struct processor_performance *perf = &processor_pminfo[cpu].perf;
+    struct cpufreq_policy *data = cpufreq_cpu_policy[cpu];
+    struct cpufreq_policy policy;
 
-    for_each_online_cpu(i) {
-        xen_px_policy[i].cpu = i;
+    if (!cpu_online(cpu) || !data)
+        return -ENODEV;
 
-        ret = px_statistic_init(i);
-        if (ret)
-            return ret;
+    if ((perf->platform_limit < 0) || 
+        (perf->platform_limit >= perf->state_count))
+        return -EINVAL;
 
-        ret = acpi_cpufreq_cpu_init(&xen_px_policy[i]);
-        if (ret)
-            return ret;
-    }
-    return ret;
+    memcpy(&policy, data, sizeof(struct cpufreq_policy)); 
+
+    policy.max =
+        perf->states[perf->platform_limit].core_frequency * 1000;
+
+    return __cpufreq_set_policy(data, &policy);
 }
 
-int cpufreq_dom_dbs(unsigned int event)
-{
-    unsigned int cpu, dom;
-    int ret = 0;
-
-    for (dom = 0; dom < cpufreq_dom_max; dom++) {
-        if (!test_bit(dom, cpufreq_dom_mask))
-            continue;
-        cpu = first_cpu(cpufreq_dom_pt[dom]);
-        ret = cpufreq_governor_dbs(&xen_px_policy[cpu], event);
-        if (ret)
-            return ret;
-    }
-    return ret;
-}
-
-int acpi_cpufreq_init(void)
+int cpufreq_add_cpu(unsigned int cpu)
 {
     int ret = 0;
-    
-    /* setup cpumask of psd dom and shared cpu map of cpu */
-    ret = cpufreq_dom_init();
+    unsigned int firstcpu;
+    unsigned int dom;
+    unsigned int j;
+    struct cpufreq_policy new_policy;
+    struct cpufreq_policy *policy;
+    struct processor_performance *perf = &processor_pminfo[cpu].perf;
+
+    /* to protect the case when Px was not controlled by xen */
+    if (!(perf->init & XEN_PX_INIT))
+        return 0;
+
+    if (cpu_is_offline(cpu) || cpufreq_cpu_policy[cpu])
+        return -EINVAL;
+
+    ret = px_statistic_init(cpu);
     if (ret)
-        goto err;
+        return ret;
 
-    /* setup cpufreq driver */
-    cpufreq_driver = &acpi_cpufreq_driver;
+    dom = perf->domain_info.domain;
+    if (cpus_weight(cpufreq_dom_map[dom])) {
+        /* share policy with the first cpu since on same boat */
+        firstcpu = first_cpu(cpufreq_dom_map[dom]);
+        policy = cpufreq_cpu_policy[firstcpu];
 
-    /* setup cpufreq infrastructure */
-    ret = cpufreq_cpu_init();
-    if (ret)
-        goto err;
+        cpufreq_cpu_policy[cpu] = policy;
+        cpu_set(cpu, cpufreq_dom_map[dom]);
+        cpu_set(cpu, policy->cpus);
 
-    /* setup cpufreq dbs according to dom coordiation */
-    ret = cpufreq_dom_dbs(CPUFREQ_GOV_START);
-    if (ret)
-        goto err;
+        printk(KERN_EMERG"adding CPU %u\n", cpu);
+    } else {
+        /* for the first cpu, setup policy and do init work */
+        policy = xmalloc(struct cpufreq_policy);
+        if (!policy) {
+            px_statistic_exit(cpu);
+            return -ENOMEM;
+        }
+        memset(policy, 0, sizeof(struct cpufreq_policy));
 
-    return ret;
+        cpufreq_cpu_policy[cpu] = policy;
+        cpu_set(cpu, cpufreq_dom_map[dom]);
+        cpu_set(cpu, policy->cpus);
 
-err:
-    cpufreq_dom_exit();
+        policy->cpu = cpu;
+        ret = cpufreq_driver->init(policy);
+        if (ret)
+            goto err1;
+        printk(KERN_EMERG"CPU %u initialization completed\n", cpu);
+    }
+
+    /*
+     * After get full cpumap of the coordination domain,
+     * we can safely start gov here.
+     */
+    if (cpus_weight(cpufreq_dom_map[dom]) ==
+        perf->domain_info.num_processors) {
+        memcpy(&new_policy, policy, sizeof(struct cpufreq_policy));
+        policy->governor = NULL;
+        ret = __cpufreq_set_policy(policy, &new_policy);
+        if (ret)
+            goto err2;
+    }
+
+    return 0;
+
+err2:
+    cpufreq_driver->exit(policy);
+err1:
+    for_each_cpu_mask(j, cpufreq_dom_map[dom]) {
+        cpufreq_cpu_policy[j] = NULL;
+        px_statistic_exit(j);
+    }
+
+    cpus_clear(cpufreq_dom_map[dom]);
+    xfree(policy);
     return ret;
 }
+
+int cpufreq_del_cpu(unsigned int cpu)
+{
+    unsigned int dom;
+    struct cpufreq_policy *policy;
+    struct processor_performance *perf = &processor_pminfo[cpu].perf;
+
+    /* to protect the case when Px was not controlled by xen */
+    if (!(perf->init & XEN_PX_INIT))
+        return 0;
+
+    if (cpu_is_offline(cpu) || !cpufreq_cpu_policy[cpu])
+        return -EINVAL;
+
+    dom = perf->domain_info.domain;
+    policy = cpufreq_cpu_policy[cpu];
+
+    printk(KERN_EMERG"deleting CPU %u\n", cpu);
+
+    /* for the first cpu of the domain, stop gov */
+    if (cpus_weight(cpufreq_dom_map[dom]) ==
+        perf->domain_info.num_processors)
+        __cpufreq_governor(policy, CPUFREQ_GOV_STOP);
+
+    cpufreq_cpu_policy[cpu] = NULL;
+    cpu_clear(cpu, policy->cpus);
+    cpu_clear(cpu, cpufreq_dom_map[dom]);
+    px_statistic_exit(cpu);
+
+    /* for the last cpu of the domain, clean room */
+    /* It's safe here to free freq_table, drv_data and policy */
+    if (!cpus_weight(cpufreq_dom_map[dom])) {
+        cpufreq_driver->exit(policy);
+        xfree(policy);
+    }
+
+    return 0;
+}
+
+static int __init cpufreq_driver_init(void)
+{
+    int ret = 0;
+
+    if ((cpufreq_controller == FREQCTL_xen) &&
+        (boot_cpu_data.x86_vendor == X86_VENDOR_INTEL))
+        ret = cpufreq_register_driver(&acpi_cpufreq_driver);
+
+    return ret;
+}
+__initcall(cpufreq_driver_init);

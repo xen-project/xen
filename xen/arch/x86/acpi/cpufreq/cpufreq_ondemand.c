@@ -238,4 +238,9 @@ int cpufreq_governor_dbs(struct cpufreq_policy *policy, unsigned int event)
         break;
     }
     return 0;
-} 
+}
+
+struct cpufreq_governor cpufreq_gov_dbs = {
+    .name = "ondemand",
+    .governor = cpufreq_governor_dbs,
+};
