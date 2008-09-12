@@ -2385,11 +2385,13 @@ int sh_remove_write_access(struct vcpu *v, mfn_t gmfn,
                           + ((fault_addr & VADDR_MASK) >> 27), 3); break;
             }
 
-            /* 64bit Linux direct map at 0xffff810000000000; older kernels 
-             * had it at 0x0000010000000000UL */
+            /* 64bit Linux direct map at 0xffff880000000000; older kernels
+             * had it at 0xffff880000000000, and older kernels yet had it
+             * at 0x0000010000000000UL */
             gfn = mfn_to_gfn(v->domain, gmfn); 
-            GUESS(0xffff810000000000UL + (gfn << PAGE_SHIFT), 4); 
-            GUESS(0x0000010000000000UL + (gfn << PAGE_SHIFT), 4); 
+            GUESS(0xffff880000000000UL + (gfn << PAGE_SHIFT), 4);
+            GUESS(0xffff810000000000UL + (gfn << PAGE_SHIFT), 4);
+            GUESS(0x0000010000000000UL + (gfn << PAGE_SHIFT), 4);
             /*
              * 64bit Solaris kernel page map at
              * kpm_vbase; 0xfffffe0000000000UL
