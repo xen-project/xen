@@ -93,17 +93,14 @@ ioemu-dir-find:
 		ln -sf ioemu-remote ioemu-dir; \
 	fi
 	set -e; \
-		case "$(XEN_ROOT)" in \
-		/*)	XEN_ROOT=$(XEN_ROOT) ;; \
-		*)	XEN_ROOT=`pwd`/$(XEN_ROOT) ;; \
-		esac; \
-		export XEN_ROOT; \
+		$(absolutify_xen_root); \
 		cd ioemu-dir; \
 		./xen-setup $(IOEMU_CONFIGURE_CROSS)
 
 subdir-all-ioemu-dir subdir-install-ioemu-dir: ioemu-dir-find
 
 subdir-clean-ioemu-dir:
-	if test -d ioemu-dir/.; then \
+	set -e; if test -d ioemu-dir/.; then \
+		$(absolutify_xen_root); \
 		$(MAKE) -C ioemu-dir clean; \
 	fi

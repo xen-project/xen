@@ -232,8 +232,9 @@ ifeq ($(CONFIG_QEMU),ioemu)
 	CPPFLAGS="$(TARGET_CPPFLAGS)" $(MAKE) -C ioemu LWIPDIR=$(CURDIR)/lwip-$(XEN_TARGET_ARCH) TOOLS=
 else
 	[ -f ioemu/config-host.mak ] || \
-	  ( cd ioemu ; \
-          CONFIG_STUBDOM=yes XEN_ROOT=$(abspath $(XEN_ROOT)) XEN_TARGET_ARCH=$(XEN_TARGET_ARCH) CFLAGS="$(TARGET_CFLAGS)" sh ./xen-setup --cc=$(CC) --disable-gcc-check $(IOEMU_OPTIONS))
+	  ( $(absolutify_xen_root); \
+	    cd ioemu ; \
+          CONFIG_STUBDOM=yes XEN_TARGET_ARCH=$(XEN_TARGET_ARCH) CFLAGS="$(TARGET_CFLAGS)" sh ./xen-setup --cc=$(CC) --disable-gcc-check $(IOEMU_OPTIONS))
 	CPPFLAGS= TARGET_CPPFLAGS="$(TARGET_CPPFLAGS)" $(MAKE) -C ioemu LWIPDIR=$(CURDIR)/lwip-$(XEN_TARGET_ARCH) TOOLS= CONFIG_STUBDOM=yes
 endif
 
