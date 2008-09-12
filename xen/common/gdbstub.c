@@ -65,7 +65,7 @@ static atomic_t gdb_smp_paused_count;
 static void gdb_smp_pause(void);
 static void gdb_smp_resume(void);
 
-static char opt_gdb[30] = "none";
+static char opt_gdb[30];
 string_param("gdb", opt_gdb);
 
 static void gdbstub_console_puts(const char *str);
@@ -625,10 +625,19 @@ __trap_to_gdb(struct cpu_user_regs *regs, unsigned long cookie)
 void __init
 initialise_gdb(void)
 {
+    if ( *opt_gdb == '\0' )
+        return;
+
     gdb_ctx->serhnd = serial_parse_handle(opt_gdb);
-    if ( gdb_ctx->serhnd != -1 )
-        printk("GDB stub initialised.\n");
+    if ( gdb_ctx->serhnd == -1 )
+    {
+        printk("Bad gdb= option '%s'\n", opt_gdb);
+        return;
+    }
+
     serial_start_sync(gdb_ctx->serhnd);
+
+    printk("GDB stub initialised.\n");
 }
 
 static void gdb_pause_this_cpu(void *unused)
