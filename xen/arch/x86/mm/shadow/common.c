@@ -2386,7 +2386,7 @@ int sh_remove_write_access(struct vcpu *v, mfn_t gmfn,
             }
 
             /* 64bit Linux direct map at 0xffff880000000000; older kernels
-             * had it at 0xffff880000000000, and older kernels yet had it
+             * had it at 0xffff810000000000, and older kernels yet had it
              * at 0x0000010000000000UL */
             gfn = mfn_to_gfn(v->domain, gmfn); 
             GUESS(0xffff880000000000UL + (gfn << PAGE_SHIFT), 4);
