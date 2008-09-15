@@ -4539,7 +4539,8 @@ int sh_rm_write_access_from_sl1p(struct vcpu *v, mfn_t gmfn,
     sp = mfn_to_shadow_page(smfn);
 
     if ( sp->mbz != 0
-         || (sp->type != SH_type_l1_shadow) )
+         || (sp->type != SH_type_l1_shadow
+             && sp->type != SH_type_fl1_shadow) )
         goto fail;
 
     sl1p = sh_map_domain_page(smfn);

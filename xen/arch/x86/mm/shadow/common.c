@@ -2464,22 +2464,25 @@ int sh_remove_write_access_from_sl1p(struct vcpu *v, mfn_t gmfn,
     ASSERT(mfn_valid(smfn));
     ASSERT(mfn_valid(gmfn));
     
-    if ( sp->type == SH_type_l1_32_shadow )
+    if ( sp->type == SH_type_l1_32_shadow
+         || sp->type == SH_type_fl1_32_shadow )
     {
         return SHADOW_INTERNAL_NAME(sh_rm_write_access_from_sl1p,2)
             (v, gmfn, smfn, off);
     }
 #if CONFIG_PAGING_LEVELS >= 3
-    else if ( sp->type == SH_type_l1_pae_shadow )
+    else if ( sp->type == SH_type_l1_pae_shadow
+              || sp->type == SH_type_fl1_pae_shadow )
         return SHADOW_INTERNAL_NAME(sh_rm_write_access_from_sl1p,3)
             (v, gmfn, smfn, off);
 #if CONFIG_PAGING_LEVELS >= 4
-    else if ( sp->type == SH_type_l1_64_shadow )
+    else if ( sp->type == SH_type_l1_64_shadow
+              || sp->type == SH_type_fl1_64_shadow )
         return SHADOW_INTERNAL_NAME(sh_rm_write_access_from_sl1p,4)
             (v, gmfn, smfn, off);
 #endif
 #endif
-    
+
     return 0;
 }
 #endif 
