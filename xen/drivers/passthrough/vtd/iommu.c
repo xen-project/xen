@@ -152,6 +152,7 @@ static u64 bus_to_context_maddr(struct iommu *iommu, u8 bus)
         maddr = alloc_pgtable_maddr();
         if ( maddr == 0 )
         {
+            unmap_vtd_domain_page(root_entries);
             spin_unlock_irqrestore(&iommu->lock, flags);
             return 0;
         }
