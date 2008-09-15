@@ -64,7 +64,7 @@ install-xen:
 	$(MAKE) -C xen install
 
 .PHONY: install-tools
-install-tools:
+install-tools: tools/ioemu-dir
 	$(MAKE) -C tools install
 
 .PHONY: install-kernels
@@ -72,11 +72,14 @@ install-kernels:
 	for i in $(XKERNELS) ; do $(MAKE) $$i-install || exit 1; done
 
 .PHONY: install-stubdom
-install-stubdom:
+install-stubdom: tools/ioemu-dir
 	$(MAKE) -C stubdom install
 ifeq (x86_64,$(XEN_TARGET_ARCH))
 	XEN_TARGET_ARCH=x86_32 $(MAKE) -C stubdom install-grub
 endif
+
+tools/ioemu-dir:
+	make -C tools ioemu-dir-find
 
 .PHONY: install-docs
 install-docs:
