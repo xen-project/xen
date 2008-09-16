@@ -42,13 +42,12 @@ static DEFINE_SPINLOCK(microcode_mutex);
 
 struct ucode_cpu_info ucode_cpu_info[NR_CPUS];
 
-struct microcode_buffer {
-    void *buf;
-    size_t size;
+struct microcode_info {
+    unsigned int cpu;
+    uint32_t buffer_size;
+    int error;
+    char buffer[1];
 };
-
-static struct microcode_buffer microcode_buffer;
-static bool_t microcode_error;
 
 static void microcode_fini_cpu(int cpu)
 {
@@ -108,13 +107,11 @@ static int microcode_resume_cpu(int cpu)
     return err;
 }
 
-static int microcode_update_cpu(int cpu, const void *buf, size_t size)
+static int microcode_update_cpu(const void *buf, size_t size)
 {
-    int err = 0;
+    int err;
+    unsigned int cpu = smp_processor_id();
     struct ucode_cpu_info *uci = ucode_cpu_info + cpu;
-
-    /* We should bind the task to the CPU */
-    BUG_ON(raw_smp_processor_id() != cpu);
 
     spin_lock(&microcode_mutex);
 
@@ -138,59 +135,49 @@ static int microcode_update_cpu(int cpu, const void *buf, size_t size)
     return err;
 }
 
-static void do_microcode_update_one(void *info)
+static long do_microcode_update(void *_info)
 {
-    int error = microcode_update_cpu(
-        smp_processor_id(), microcode_buffer.buf, microcode_buffer.size);
+    struct microcode_info *info = _info;
+    int error;
+
+    BUG_ON(info->cpu != smp_processor_id());
+
+    error = microcode_update_cpu(info->buffer, info->buffer_size);
     if ( error )
-        microcode_error = error;
-}
+        info->error = error;
 
-static int do_microcode_update(void)
-{
-    microcode_error = 0;
+    info->cpu = next_cpu(info->cpu, cpu_online_map);
+    if ( info->cpu >= NR_CPUS )
+        return info->error;
 
-    if ( on_each_cpu(do_microcode_update_one, NULL, 1, 1) != 0 )
-    {
-        printk(KERN_ERR "microcode: Error! Could not run on all processors\n");
-        return -EIO;
-    }
-
-    return microcode_error;
+    return continue_hypercall_on_cpu(info->cpu, do_microcode_update, info);
 }
 
 int microcode_update(XEN_GUEST_HANDLE(const_void) buf, unsigned long len)
 {
     int ret;
+    struct microcode_info *info;
 
-    /* XXX FIXME: No allocations in interrupt context. */
-    return -EINVAL;
-
-    if ( len != (typeof(microcode_buffer.size))len )
-    {
-        printk(KERN_ERR "microcode: too much data\n");
+    if ( len != (uint32_t)len )
         return -E2BIG;
-    }
 
     if ( microcode_ops == NULL )
         return -EINVAL;
 
-    microcode_buffer.buf = xmalloc_array(uint8_t, len);
-    if ( microcode_buffer.buf == NULL )
+    info = xmalloc_bytes(sizeof(*info) + len);
+    if ( info == NULL )
         return -ENOMEM;
 
-    ret = copy_from_guest(microcode_buffer.buf, buf, len);
+    ret = copy_from_guest(info->buffer, buf, len);
     if ( ret != 0 )
+    {
+        xfree(info);
         return ret;
+    }
 
-    microcode_buffer.size = len;
-    wmb();
+    info->buffer_size = len;
+    info->error = 0;
+    info->cpu = first_cpu(cpu_online_map);
 
-    ret = do_microcode_update();
-
-    xfree(microcode_buffer.buf);
-    microcode_buffer.buf = NULL;
-    microcode_buffer.size = 0;
-
-    return ret;
+    return continue_hypercall_on_cpu(info->cpu, do_microcode_update, info);
 }
