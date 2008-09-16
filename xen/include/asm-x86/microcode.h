@@ -90,11 +90,8 @@ struct ucode_cpu_info {
 		void *valid_mc;
 	} mc;
 };
+
 extern struct ucode_cpu_info ucode_cpu_info[];
-
 extern const struct microcode_ops *microcode_ops;
-
-int microcode_init_amd(struct cpuinfo_x86 *c);
-int microcode_init_intel(struct cpuinfo_x86 *c);
 
 #endif /* ASM_X86__MICROCODE_H */
