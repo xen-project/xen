@@ -7,8 +7,6 @@ export stubdom=y
 export debug=y
 include $(XEN_ROOT)/Config.mk
 
-override CONFIG_QEMU=ioemu
-
 IOEMU_OPTIONS=--disable-sdl --disable-opengl --disable-vnc-tls --disable-brlapi --disable-kqemu
 ZLIB_URL?=http://www.zlib.net
 ZLIB_VERSION=1.2.3
@@ -59,8 +57,8 @@ TARGET_CPPFLAGS += -nostdinc
 TARGET_CPPFLAGS += -isystem $(CURDIR)/$(MINI_OS)/include/posix
 TARGET_CPPFLAGS += -isystem $(CROSS_PREFIX)/$(GNU_TARGET_ARCH)-xen-elf/include
 TARGET_CPPFLAGS += -isystem $(GCC_INSTALL)include
-TARGET_CPPFLAGS += -isystem $(CURDIR)/lwip/src/include
-TARGET_CPPFLAGS += -isystem $(CURDIR)/lwip/src/include/ipv4
+TARGET_CPPFLAGS += -isystem $(CURDIR)/lwip-$(XEN_TARGET_ARCH)/src/include
+TARGET_CPPFLAGS += -isystem $(CURDIR)/lwip-$(XEN_TARGET_ARCH)/src/include/ipv4
 TARGET_CPPFLAGS += -I$(CURDIR)/include
 
 TARGET_LDFLAGS += -nostdlib -L$(CROSS_PREFIX)/$(GNU_TARGET_ARCH)-xen-elf/lib
@@ -164,7 +162,29 @@ lwip-$(XEN_TARGET_ARCH): lwip-$(LWIP_VERSION).tar.gz
 .PHONY: $(CROSS_ROOT)
 $(CROSS_ROOT): cross-newlib cross-zlib cross-libpci
 
-mk-headers-$(XEN_TARGET_ARCH):
+$(XEN_ROOT)/tools/ioemu-dir:
+	make -C $(XEN_ROOT)/tools ioemu-dir-find
+
+ioemu/linkfarm.stamp: $(XEN_ROOT)/tools/ioemu-dir
+	mkdir -p ioemu
+ifeq ($(CONFIG_QEMU),ioemu)
+	[ -h ioemu/Makefile ] || ( cd ioemu && \
+	  ln -sf ../$(XEN_ROOT)/tools/ioemu/* .)
+else
+	set -e;									\
+	$(absolutify_xen_root);							\
+	cd ioemu;								\
+	src="$$XEN_ROOT/tools/ioemu-dir"; export src;				\
+	(cd $$src && find * -type d -print) | xargs mkdir -p;			\
+	(cd $$src && find *	! -type l  -type f  $(addprefix ! -name ,	\
+			'*.[oda1]' 'config-*' config.mak qemu-dm qemu-img-xen	\
+			'*.html' '*.pod'					\
+			)) |							\
+	    while read f; do rm -f "$$f"; ln -s "$$src/$$f" "$$f"; done
+endif
+	touch ioemu/linkfarm.stamp
+
+mk-headers-$(XEN_TARGET_ARCH): ioemu/linkfarm.stamp
 	mkdir -p include/xen && \
           ln -sf $(addprefix ../../,$(wildcard $(XEN_ROOT)/xen/include/public/*.h)) include/xen && \
           ln -sf $(addprefix ../../$(XEN_ROOT)/xen/include/public/,arch-ia64 arch-x86 hvm io xsm) include/xen && \
@@ -183,22 +203,6 @@ mk-headers-$(XEN_TARGET_ARCH):
 	  ln -sf ../$(XEN_ROOT)/tools/libxc/$(XEN_TARGET_ARCH)/*.c . && \
 	  ln -sf ../$(XEN_ROOT)/tools/libxc/$(XEN_TARGET_ARCH)/*.h . && \
 	  ln -sf ../$(XEN_ROOT)/tools/libxc/$(XEN_TARGET_ARCH)/Makefile . )
-	mkdir -p ioemu
-ifeq ($(CONFIG_QEMU),ioemu)
-	[ -h ioemu/Makefile ] || ( cd ioemu && \
-	  ln -sf ../$(XEN_ROOT)/tools/ioemu/* .)
-else
-	[ -h ioemu/Makefile ] || ( cd ioemu && \
-	  ln -sf $(CONFIG_QEMU)/* . && \
-          rm -fr i386-dm && \
-          rm -fr i386-stubdom && \
-          mkdir i386-dm && \
-          mkdir i386-stubdom && \
-	  ln -sf $(CONFIG_QEMU)/i386-dm/* i386-dm/ && \
-	  ln -sf $(CONFIG_QEMU)/i386-stubdom/* i386-stubdom/ )
-endif
-	[ ! -h ioemu/config-host.h ] || rm -f ioemu/config-host.h
-	[ ! -h ioemu/config-host.mak ] || rm -f ioemu/config-host.mak
 	$(MAKE) -C $(MINI_OS) links
 	touch mk-headers-$(XEN_TARGET_ARCH)
 
@@ -231,8 +235,9 @@ ifeq ($(CONFIG_QEMU),ioemu)
 	CPPFLAGS="$(TARGET_CPPFLAGS)" $(MAKE) -C ioemu LWIPDIR=$(CURDIR)/lwip-$(XEN_TARGET_ARCH) TOOLS=
 else
 	[ -f ioemu/config-host.mak ] || \
-	  ( cd ioemu ; \
-          CONFIG_STUBDOM=yes XEN_ROOT=$(abspath $(XEN_ROOT)) XEN_TARGET_ARCH=$(XEN_TARGET_ARCH) CFLAGS="$(TARGET_CFLAGS)" sh ./xen-setup --cc=$(CC) --disable-gcc-check $(IOEMU_OPTIONS))
+	  ( $(absolutify_xen_root); \
+	    cd ioemu ; \
+          CONFIG_STUBDOM=yes XEN_TARGET_ARCH=$(XEN_TARGET_ARCH) CFLAGS="$(TARGET_CFLAGS)" sh ./xen-setup --cc=$(CC) --disable-gcc-check $(IOEMU_OPTIONS))
 	CPPFLAGS= TARGET_CPPFLAGS="$(TARGET_CPPFLAGS)" $(MAKE) -C ioemu LWIPDIR=$(CURDIR)/lwip-$(XEN_TARGET_ARCH) TOOLS= CONFIG_STUBDOM=yes
 endif
 
@@ -336,7 +341,7 @@ clean:
 	$(MAKE) -C c clean
 	rm -fr grub-$(XEN_TARGET_ARCH)
 	[ ! -d libxc-$(XEN_TARGET_ARCH) ] || $(MAKE) -C libxc-$(XEN_TARGET_ARCH) clean
-	[ ! -d ioemu ] || $(MAKE) -C ioemu clean
+	-[ ! -d ioemu ] || $(MAKE) -C ioemu clean
 
 # clean the cross-compilation result
 .PHONY: crossclean

@@ -543,10 +543,18 @@ void __init init_console(void)
     {
         if ( *p == ',' )
             p++;
-        if ( strncmp(p, "com", 3) == 0 )
-            sercon_handle = serial_parse_handle(p);
-        else if ( strncmp(p, "vga", 3) == 0 )
+        if ( !strncmp(p, "vga", 3) )
             vga_init();
+        else if ( strncmp(p, "com", 3) ||
+                  (sercon_handle = serial_parse_handle(p)) == -1 )
+        {
+            char *q = strchr(p, ',');
+            if ( q != NULL )
+                *q = '\0';
+            printk("Bad console= option '%s'\n", p);
+            if ( q != NULL )
+                *q = ',';
+        }
     }
 
     serial_set_rx_handler(sercon_handle, serial_rx);

@@ -82,6 +82,7 @@ static struct ns16550 {
 #define MCR_DTR         0x01    /* Data Terminal Ready  */
 #define MCR_RTS         0x02    /* Request to Send      */
 #define MCR_OUT2        0x08    /* OUT2: interrupt mask */
+#define MCR_LOOP        0x10    /* Enable loopback test mode */
 
 /* Line Status Register */
 #define LSR_DR          0x01    /* Data ready           */
@@ -295,6 +296,37 @@ static int __init parse_parity_char(int c)
     return 0;
 }
 
+static int check_existence(struct ns16550 *uart)
+{
+    unsigned char status, scratch, scratch2, scratch3;
+
+    /*
+     * Do a simple existence test first; if we fail this,
+     * there's no point trying anything else.
+     */
+    scratch = ns_read_reg(uart, IER);
+    ns_write_reg(uart, IER, 0);
+
+    /*
+     * Mask out IER[7:4] bits for test as some UARTs (e.g. TL
+     * 16C754B) allow only to modify them if an EFR bit is set.
+     */
+    scratch2 = ns_read_reg(uart, IER) & 0x0f;
+    ns_write_reg(uart, IER, 0x0F);
+    scratch3 = ns_read_reg(uart, IER) & 0x0f;
+    ns_write_reg(uart, IER, scratch);
+    if ( (scratch2 != 0) || (scratch3 != 0x0F) )
+        return 0;
+
+    /*
+     * Check to see if a UART is really there.
+     * Use loopback test mode.
+     */
+    ns_write_reg(uart, MCR, MCR_LOOP | 0x0A);
+    status = ns_read_reg(uart, MSR) & 0xF0;
+    return (status == 0x90);
+}
+
 #define PARSE_ERR(_f, _a...)                 \
     do {                                     \
         printk( "ERROR: " _f "\n" , ## _a ); \
@@ -357,6 +389,8 @@ static void __init ns16550_parse_port_config(
         PARSE_ERR("%d stop bits are unsupported.", uart->stop_bits);
     if ( uart->io_base == 0 )
         PARSE_ERR("I/O base address must be specified.");
+    if ( !check_existence(uart) )
+        PARSE_ERR("16550-compatible serial UART not present");
 
     /* Register with generic serial driver. */
     serial_register_uart(uart - ns16550_com, &ns16550_driver, uart);

@@ -258,11 +258,7 @@ int serial_parse_handle(char *conf)
 {
     int handle;
 
-    /* Silently fail if user has explicitly requested no serial I/O. */
-    if ( strcmp(conf, "none") == 0 )
-        return -1;
-
-    if ( strncmp(conf, "com", 3) != 0 )
+    if ( strncmp(conf, "com", 3) )
         goto fail;
 
     switch ( conf[3] )
@@ -277,6 +273,9 @@ int serial_parse_handle(char *conf)
         goto fail;
     }
 
+    if ( !com[handle].driver )
+        goto fail;
+
     if ( conf[4] == 'H' )
         handle |= SERHND_HI;
     else if ( conf[4] == 'L' )
@@ -287,7 +286,6 @@ int serial_parse_handle(char *conf)
     return handle;
 
  fail:
-    printk("ERROR: bad serial-interface specification '%s'\n", conf);
     return -1;
 }
 

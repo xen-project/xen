@@ -55,6 +55,7 @@
 #include <mach_wakecpu.h>
 #include <smpboot_hooks.h>
 #include <xen/stop_machine.h>
+#include <acpi/cpufreq/processor_perf.h>
 
 #define set_kernel_exec(x, y) (0)
 #define setup_trampoline()    (bootsym_phys(trampoline_realmode_entry))
@@ -1232,6 +1233,8 @@ int __cpu_disable(void)
 	mdelay(1);
 	local_irq_disable();
 
+	cpufreq_del_cpu(cpu);
+
 	time_suspend();
 
 	remove_siblinginfo(cpu);
@@ -1421,6 +1424,8 @@ int __devinit __cpu_up(unsigned int cpu)
 		mb();
 		process_pending_timers();
 	}
+
+	cpufreq_add_cpu(cpu);
 	return 0;
 }
 

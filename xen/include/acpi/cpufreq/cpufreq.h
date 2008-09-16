@@ -19,6 +19,8 @@
 
 #define CPUFREQ_NAME_LEN 16
 
+struct cpufreq_governor;
+
 struct cpufreq_cpuinfo {
     unsigned int        max_freq;
     unsigned int        min_freq;
@@ -30,16 +32,21 @@ struct cpufreq_policy {
     unsigned int        shared_type;   /* ANY or ALL affected CPUs
                                           should set cpufreq */
     unsigned int        cpu;           /* cpu nr of registered CPU */
-    struct cpufreq_cpuinfo    cpuinfo; /* see above */
+    struct cpufreq_cpuinfo    cpuinfo;
 
     unsigned int        min;    /* in kHz */
     unsigned int        max;    /* in kHz */
     unsigned int        cur;    /* in kHz, only needed if cpufreq
                                  * governors are used */
+    struct cpufreq_governor     *governor;
+
     unsigned int        resume; /* flag for cpufreq 1st run
                                  * S3 wakeup, hotplug cpu, etc */
 };
-extern struct cpufreq_policy xen_px_policy[NR_CPUS];
+extern struct cpufreq_policy *cpufreq_cpu_policy[NR_CPUS];
+
+extern int __cpufreq_set_policy(struct cpufreq_policy *data,
+                                struct cpufreq_policy *policy);
 
 #define CPUFREQ_SHARED_TYPE_NONE (0) /* None */
 #define CPUFREQ_SHARED_TYPE_HW   (1) /* HW does needed coordination */
@@ -64,11 +71,26 @@ struct cpufreq_freqs {
 #define CPUFREQ_GOV_STOP   2
 #define CPUFREQ_GOV_LIMITS 3
 
+struct cpufreq_governor {
+    char    name[CPUFREQ_NAME_LEN];
+    int     (*governor)(struct cpufreq_policy *policy,
+                        unsigned int event);
+};
+
+extern struct cpufreq_governor cpufreq_gov_dbs;
+#define CPUFREQ_DEFAULT_GOVERNOR &cpufreq_gov_dbs
+
 /* pass a target to the cpufreq driver */
 extern int __cpufreq_driver_target(struct cpufreq_policy *policy,
                                    unsigned int target_freq,
                                    unsigned int relation);
 extern int __cpufreq_driver_getavg(struct cpufreq_policy *policy);
+
+static __inline__ int 
+__cpufreq_governor(struct cpufreq_policy *policy, unsigned int event)
+{
+    return policy->governor->governor(policy, event);
+}
 
 
 /*********************************************************************
@@ -91,7 +113,50 @@ struct cpufreq_driver {
 
 extern struct cpufreq_driver *cpufreq_driver;
 
-void cpufreq_notify_transition(struct cpufreq_freqs *freqs, unsigned int state);
+static __inline__ 
+int cpufreq_register_driver(struct cpufreq_driver *driver_data)
+{
+    if (!driver_data         || 
+        !driver_data->init   || 
+        !driver_data->exit   || 
+        !driver_data->verify || 
+        !driver_data->target)
+        return -EINVAL;
+
+    if (cpufreq_driver)
+        return -EBUSY;
+
+    cpufreq_driver = driver_data;
+    return 0;
+}
+
+static __inline__ 
+int cpufreq_unregister_driver(struct cpufreq_driver *driver)
+{
+    if (!cpufreq_driver || (driver != cpufreq_driver))
+        return -EINVAL;
+
+    cpufreq_driver = NULL;
+    return 0;
+}
+
+static __inline__
+void cpufreq_verify_within_limits(struct cpufreq_policy *policy,
+                                  unsigned int min, unsigned int max)
+{
+    if (policy->min < min)
+        policy->min = min;
+    if (policy->max < min)
+        policy->max = min;
+    if (policy->min > max)
+        policy->min = max;
+    if (policy->max > max)
+        policy->max = max;
+    if (policy->min > policy->max)
+        policy->min = policy->max;
+    return;
+}
+
 
 /*********************************************************************
  *                     FREQUENCY TABLE HELPERS                       *
@@ -107,6 +172,9 @@ struct cpufreq_frequency_table {
 };
 
 int cpufreq_frequency_table_cpuinfo(struct cpufreq_policy *policy,
+                   struct cpufreq_frequency_table *table);
+
+int cpufreq_frequency_table_verify(struct cpufreq_policy *policy,
                    struct cpufreq_frequency_table *table);
 
 int cpufreq_frequency_table_target(struct cpufreq_policy *policy,

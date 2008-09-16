@@ -131,3 +131,6 @@ def dump_policy_file():
 
 def get_ssid(domain):
     err("No ssid has been assigned to any domain under xsm dummy module.")
+
+def security_label_to_details(res_label):
+    return ("","","")

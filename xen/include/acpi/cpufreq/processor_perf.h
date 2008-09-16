@@ -7,26 +7,23 @@
 #define XEN_PX_INIT 0x80000000
 
 int get_cpu_id(u8);
-int acpi_cpufreq_init(void);
 int powernow_cpufreq_init(void);
 
 void px_statistic_update(cpumask_t, uint8_t, uint8_t);
-int  px_statistic_init(int);
-void px_statistic_reset(int);
-void px_statistic_suspend(void);
-void px_statistic_resume(void);
+int  px_statistic_init(unsigned int);
+void px_statistic_exit(unsigned int);
+void px_statistic_reset(unsigned int);
 
-void cpufreq_dom_exit(void);
-int  cpufreq_dom_init(void);
-int  cpufreq_dom_dbs(unsigned int);
-void cpufreq_suspend(void);
-int  cpufreq_resume(void);
+int  cpufreq_limit_change(unsigned int);
+
+int  cpufreq_add_cpu(unsigned int);
+int  cpufreq_del_cpu(unsigned int);
 
 uint64_t get_cpu_idle_time(unsigned int);
 
 struct processor_performance {
     uint32_t state;
-    uint32_t ppc;
+    uint32_t platform_limit;
     struct xen_pct_register control_register;
     struct xen_pct_register status_register;
     uint32_t state_count;

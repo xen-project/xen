@@ -50,7 +50,7 @@
 #define MSR_PSTATE_CUR_LIMIT    0xc0010061 /* pstate current limit MSR */
 
 extern struct processor_pminfo processor_pminfo[NR_CPUS];
-extern struct cpufreq_policy xen_px_policy[NR_CPUS];
+extern struct cpufreq_policy *cpufreq_cpu_policy[NR_CPUS];
 
 struct powernow_cpufreq_data {
     struct processor_performance *acpi_data;
@@ -281,9 +281,9 @@ int powernow_cpufreq_init(void)
 
     /* setup cpufreq infrastructure */
     for_each_online_cpu(i) {
-        xen_px_policy[i].cpu = i;
+        cpufreq_cpu_policy[i]->cpu = i;
 
-        ret = powernow_cpufreq_cpu_init(&xen_px_policy[i]);
+        ret = powernow_cpufreq_cpu_init(cpufreq_cpu_policy[i]);
         if (ret)
             goto cpufreq_init_out;
     }
@@ -293,7 +293,7 @@ int powernow_cpufreq_init(void)
         if (!cpu_isset(dom, dom_mask))
             continue;
         i = first_cpu(pt[dom]);
-        ret = cpufreq_governor_dbs(&xen_px_policy[i], CPUFREQ_GOV_START);
+        ret = cpufreq_governor_dbs(cpufreq_cpu_policy[i], CPUFREQ_GOV_START);
         if (ret)
             goto cpufreq_init_out;
     }

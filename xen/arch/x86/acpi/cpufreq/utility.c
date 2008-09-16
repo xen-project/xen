@@ -31,46 +31,13 @@
 #include <acpi/cpufreq/cpufreq.h>
 #include <public/sysctl.h>
 
-struct cpufreq_driver *cpufreq_driver;
+struct cpufreq_driver   *cpufreq_driver;
+struct processor_pminfo processor_pminfo[NR_CPUS];
+struct cpufreq_policy   *cpufreq_cpu_policy[NR_CPUS];
 
 /*********************************************************************
  *                    Px STATISTIC INFO                              *
  *********************************************************************/
-
-void px_statistic_suspend(void)
-{
-    int cpu;
-    uint64_t now;
-
-    now = NOW();
-
-    for_each_online_cpu(cpu) {
-        struct pm_px *pxpt = &px_statistic_data[cpu];
-        uint64_t total_idle_ns;
-        uint64_t tmp_idle_ns;
-
-        total_idle_ns = get_cpu_idle_time(cpu);
-        tmp_idle_ns = total_idle_ns - pxpt->prev_idle_wall;
-
-        pxpt->u.pt[pxpt->u.cur].residency +=
-                    now - pxpt->prev_state_wall;
-        pxpt->u.pt[pxpt->u.cur].residency -= tmp_idle_ns;
-    }
-}
-
-void px_statistic_resume(void)
-{
-    int cpu;
-    uint64_t now;
-
-    now = NOW();
-
-    for_each_online_cpu(cpu) {
-        struct pm_px *pxpt = &px_statistic_data[cpu];
-        pxpt->prev_state_wall = now;
-        pxpt->prev_idle_wall = get_cpu_idle_time(cpu);
-    }
-}
 
 void px_statistic_update(cpumask_t cpumask, uint8_t from, uint8_t to)
 {
@@ -101,7 +68,7 @@ void px_statistic_update(cpumask_t cpumask, uint8_t from, uint8_t to)
     }
 }
 
-int px_statistic_init(int cpuid)
+int px_statistic_init(unsigned int cpuid)
 {
     uint32_t i, count;
     struct pm_px *pxpt = &px_statistic_data[cpuid];
@@ -123,7 +90,7 @@ int px_statistic_init(int cpuid)
     memset(pxpt->u.pt, 0, count * (sizeof(struct pm_px_val)));
 
     pxpt->u.total = pmpt->perf.state_count;
-    pxpt->u.usable = pmpt->perf.state_count - pmpt->perf.ppc;
+    pxpt->u.usable = pmpt->perf.state_count - pmpt->perf.platform_limit;
 
     for (i=0; i < pmpt->perf.state_count; i++)
         pxpt->u.pt[i].freq = pmpt->perf.states[i].core_frequency;
@@ -134,7 +101,16 @@ int px_statistic_init(int cpuid)
     return 0;
 }
 
-void px_statistic_reset(int cpuid)
+void px_statistic_exit(unsigned int cpuid)
+{
+    struct pm_px *pxpt = &px_statistic_data[cpuid];
+
+    xfree(pxpt->u.trans_pt);
+    xfree(pxpt->u.pt);
+    memset(pxpt, 0, sizeof(struct pm_px));
+}
+
+void px_statistic_reset(unsigned int cpuid)
 {
     uint32_t i, j, count;
     struct pm_px *pxpt = &px_statistic_data[cpuid];
@@ -182,6 +158,38 @@ int cpufreq_frequency_table_cpuinfo(struct cpufreq_policy *policy,
         return -EINVAL;
     else
         return 0;
+}
+
+int cpufreq_frequency_table_verify(struct cpufreq_policy *policy,
+                                   struct cpufreq_frequency_table *table)
+{
+    unsigned int next_larger = ~0;
+    unsigned int i;
+    unsigned int count = 0;
+
+    if (!cpu_online(policy->cpu))
+        return -EINVAL;
+
+    cpufreq_verify_within_limits(policy, policy->cpuinfo.min_freq,
+                                 policy->cpuinfo.max_freq);
+
+    for (i=0; (table[i].frequency != CPUFREQ_TABLE_END); i++) {
+        unsigned int freq = table[i].frequency;
+        if (freq == CPUFREQ_ENTRY_INVALID)
+            continue;
+        if ((freq >= policy->min) && (freq <= policy->max))
+            count++;
+        else if ((next_larger > freq) && (freq > policy->max))
+            next_larger = freq;
+    }
+
+    if (!count)
+        policy->max = next_larger;
+
+    cpufreq_verify_within_limits(policy, policy->cpuinfo.min_freq,
+                                 policy->cpuinfo.max_freq);
+
+    return 0;
 }
 
 int cpufreq_frequency_table_target(struct cpufreq_policy *policy,
@@ -289,57 +297,51 @@ int __cpufreq_driver_getavg(struct cpufreq_policy *policy)
 
 
 /*********************************************************************
- *               CPUFREQ SUSPEND/RESUME                              *
+ *                 POLICY                                            *
  *********************************************************************/
 
-void cpufreq_suspend(void)
+/*
+ * data   : current policy.
+ * policy : policy to be set.
+ */
+int __cpufreq_set_policy(struct cpufreq_policy *data,
+                                struct cpufreq_policy *policy)
 {
-    int cpu;
+    int ret = 0;
 
-    /* to protect the case when Px was not controlled by xen */
-    for_each_online_cpu(cpu) {
-        struct processor_performance *perf = &processor_pminfo[cpu].perf;
+    memcpy(&policy->cpuinfo, &data->cpuinfo, sizeof(struct cpufreq_cpuinfo));
 
-        if (!(perf->init & XEN_PX_INIT))
-            return;
+    if (policy->min > data->min && policy->min > policy->max)
+        return -EINVAL;
+
+    /* verify the cpu speed can be set within this limit */
+    ret = cpufreq_driver->verify(policy);
+    if (ret)
+        return ret;
+
+    data->min = policy->min;
+    data->max = policy->max;
+
+    if (policy->governor != data->governor) {
+        /* save old, working values */
+        struct cpufreq_governor *old_gov = data->governor;
+
+        /* end old governor */
+        if (data->governor)
+            __cpufreq_governor(data, CPUFREQ_GOV_STOP);
+
+        /* start new governor */
+        data->governor = policy->governor;
+        if (__cpufreq_governor(data, CPUFREQ_GOV_START)) {
+            /* new governor failed, so re-start old one */
+            if (old_gov) {
+                data->governor = old_gov;
+                __cpufreq_governor(data, CPUFREQ_GOV_START);
+            }
+            return -EINVAL;
+        }
+        /* might be a policy change, too, so fall through */
     }
 
-    cpufreq_dom_dbs(CPUFREQ_GOV_STOP);
-
-    cpufreq_dom_exit();
-
-    px_statistic_suspend();
-}
-
-int cpufreq_resume(void)
-{
-    int cpu, ret = 0;
-
-    /* 1. to protect the case when Px was not controlled by xen */
-    /* 2. set state and resume flag to sync cpu to right state and freq */
-    for_each_online_cpu(cpu) {
-        struct processor_performance *perf = &processor_pminfo[cpu].perf;
-        struct cpufreq_policy *policy = &xen_px_policy[cpu];
-
-        if (!(perf->init & XEN_PX_INIT))
-            goto err;
-        perf->state = 0;
-        policy->resume = 1;
-    }
-
-    px_statistic_resume();
-
-    ret = cpufreq_dom_init();
-    if (ret)
-        goto err;
-
-    ret = cpufreq_dom_dbs(CPUFREQ_GOV_START);
-    if (ret)
-        goto err;
-
-    return ret;
-
-err:
-    cpufreq_dom_exit();
-    return ret;
+    return __cpufreq_governor(data, CPUFREQ_GOV_LIMITS);
 }

@@ -393,7 +393,6 @@ ret_t do_platform_op(XEN_GUEST_HANDLE(xen_platform_op_t) u_xenpf_op)
                 memcpy ((void *)&pxpt->status_register,
                     (void *)&xenpxpt->status_register,
                     sizeof(struct xen_pct_register));
-                pxpt->init |= XEN_PX_PCT;
             }
             if ( xenpxpt->flags & XEN_PX_PSS ) 
             {
@@ -411,7 +410,6 @@ ret_t do_platform_op(XEN_GUEST_HANDLE(xen_platform_op_t) u_xenpf_op)
                     break;
                 }
                 pxpt->state_count = xenpxpt->state_count;
-                pxpt->init |= XEN_PX_PSS;
             }
             if ( xenpxpt->flags & XEN_PX_PSD )
             {
@@ -419,27 +417,34 @@ ret_t do_platform_op(XEN_GUEST_HANDLE(xen_platform_op_t) u_xenpf_op)
                 memcpy ((void *)&pxpt->domain_info,
                     (void *)&xenpxpt->domain_info,
                     sizeof(struct xen_psd_package));
-                pxpt->init |= XEN_PX_PSD;
             }
             if ( xenpxpt->flags & XEN_PX_PPC )
             {
-                pxpt->ppc = xenpxpt->ppc;
-                pxpt->init |= XEN_PX_PPC;
+                pxpt->platform_limit = xenpxpt->platform_limit;
+
+                if ( pxpt->init == XEN_PX_INIT )
+                {
+                    ret = cpufreq_limit_change(cpuid);
+                    break;
+                }
             }
 
-            if ( pxpt->init == ( XEN_PX_PCT | XEN_PX_PSS |
-                                 XEN_PX_PSD | XEN_PX_PPC ) )
+            if ( xenpxpt->flags == ( XEN_PX_PCT | XEN_PX_PSS |
+                                     XEN_PX_PSD | XEN_PX_PPC ) )
             {
-                pxpt->init |= XEN_PX_INIT;
+                pxpt->init = XEN_PX_INIT;
                 cpu_count++;
-            }
-            if ( cpu_count == num_online_cpus() )
-            {
-                if ( boot_cpu_data.x86_vendor == X86_VENDOR_AMD )
+
+                /* Currently we only handle Intel and AMD processor */
+                if ( boot_cpu_data.x86_vendor == X86_VENDOR_INTEL )
+                    ret = cpufreq_add_cpu(cpuid);
+                else if ( (boot_cpu_data.x86_vendor == X86_VENDOR_AMD) &&
+                    (cpu_count == num_online_cpus()) )
                     ret = powernow_cpufreq_init();
                 else
-                    ret = acpi_cpufreq_init();
+                    break;
             }
+
             break;
         }
  
