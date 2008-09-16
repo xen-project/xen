@@ -318,9 +318,6 @@ static long get_next_ucode_from_buffer(void **mc, const u8 *buf,
     return offset + total_size;
 }
 
-/* fake device for request_firmware */
-extern struct platform_device *microcode_pdev;
-
 static int cpu_request_microcode(int cpu, const void *buf, size_t size)
 {
     long offset = 0;
@@ -357,21 +354,11 @@ static int cpu_request_microcode(int cpu, const void *buf, size_t size)
     return error;
 }
 
-static void microcode_fini_cpu(int cpu)
-{
-    struct ucode_cpu_info *uci = ucode_cpu_info + cpu;
-
-    xfree(uci->mc.mc_intel);
-    uci->mc.mc_intel = NULL;
-}
-
 static struct microcode_ops microcode_intel_ops = {
     .get_matching_microcode           = get_matching_microcode,
-    .microcode_sanity_check           = microcode_sanity_check,
     .cpu_request_microcode            = cpu_request_microcode,
     .collect_cpu_info                 = collect_cpu_info,
     .apply_microcode                  = apply_microcode,
-    .microcode_fini_cpu               = microcode_fini_cpu,
 };
 
 static __init int microcode_init_intel(void)

@@ -36,9 +36,6 @@
 #include <asm/processor.h>
 #include <asm/microcode.h>
 
-static int verbose;
-boolean_param("microcode.verbose", verbose);
-
 const struct microcode_ops *microcode_ops;
 
 static DEFINE_SPINLOCK(microcode_mutex);
@@ -58,7 +55,8 @@ static void microcode_fini_cpu(int cpu)
     struct ucode_cpu_info *uci = ucode_cpu_info + cpu;
 
     spin_lock(&microcode_mutex);
-    microcode_ops->microcode_fini_cpu(cpu);
+    xfree(uci->mc.valid_mc);
+    uci->mc.valid_mc = NULL;
     uci->valid = 0;
     spin_unlock(&microcode_mutex);
 }
@@ -142,36 +140,23 @@ static int microcode_update_cpu(int cpu, const void *buf, size_t size)
 
 static void do_microcode_update_one(void *info)
 {
-    int error;
-
-    error = microcode_update_cpu(
+    int error = microcode_update_cpu(
         smp_processor_id(), microcode_buffer.buf, microcode_buffer.size);
-
     if ( error )
         microcode_error = error;
 }
 
 static int do_microcode_update(void)
 {
-    int error = 0;
-
     microcode_error = 0;
 
     if ( on_each_cpu(do_microcode_update_one, NULL, 1, 1) != 0 )
     {
         printk(KERN_ERR "microcode: Error! Could not run on all processors\n");
-        error = -EIO;
-        goto out;
+        return -EIO;
     }
 
-    if ( microcode_error )
-    {
-        error = microcode_error;
-        goto out;
-    }
-
- out:
-    return error;
+    return microcode_error;
 }
 
 int microcode_update(XEN_GUEST_HANDLE(const_void) buf, unsigned long len)
@@ -187,7 +172,7 @@ int microcode_update(XEN_GUEST_HANDLE(const_void) buf, unsigned long len)
         return -E2BIG;
     }
 
-    if (microcode_ops == NULL)
+    if ( microcode_ops == NULL )
         return -EINVAL;
 
     microcode_buffer.buf = xmalloc_array(uint8_t, len);

@@ -63,9 +63,10 @@ static int collect_cpu_info(int cpu, struct cpu_signature *csig)
         return -1;
     }
 
-    asm volatile("movl %1, %%ecx; rdmsr"
-                 : "=a" (csig->rev)
-                 : "i" (MSR_AMD_PATCHLEVEL) : "ecx");
+    asm volatile (
+        "movl %1, %%ecx; rdmsr"
+        : "=a" (csig->rev)
+        : "i" (MSR_AMD_PATCHLEVEL) : "ecx" );
 
     printk(KERN_INFO "microcode: collect_cpu_info: patch_id=0x%x\n",
            csig->rev);
@@ -81,7 +82,7 @@ static int get_matching_microcode(void *mc, int cpu)
     void *new_mc;
     unsigned int current_cpu_id;
     unsigned int equiv_cpu_id = 0x00;
-    unsigned int i = 0;
+    unsigned int i;
 
     /* We should bind the task to the CPU */
     BUG_ON(cpu != raw_smp_processor_id());
@@ -106,14 +107,13 @@ static int get_matching_microcode(void *mc, int cpu)
 
     current_cpu_id = cpuid_eax(0x00000001);
 
-    while ( equiv_cpu_table[i].installed_cpu != 0 )
+    for ( i = 0; equiv_cpu_table[i].installed_cpu != 0; i++ )
     {
         if ( current_cpu_id == equiv_cpu_table[i].installed_cpu )
         {
             equiv_cpu_id = equiv_cpu_table[i].equiv_cpu;
             break;
         }
-        i++;
     }
 
     if ( !equiv_cpu_id )
@@ -187,13 +187,15 @@ static int apply_microcode(int cpu)
     edx = (uint32_t)(addr >> 32);
     eax = (uint32_t)addr;
 
-    asm volatile("movl %0, %%ecx; wrmsr" :
-                 : "i" (MSR_AMD_PATCHLOADER), "a" (eax), "d" (edx) : "ecx");
+    asm volatile (
+        "movl %0, %%ecx; wrmsr" :
+        : "i" (MSR_AMD_PATCHLOADER), "a" (eax), "d" (edx) : "ecx" );
 
     /* get patch id after patching */
-    asm volatile("movl %1, %%ecx; rdmsr"
-                 : "=a" (rev)
-                 : "i" (MSR_AMD_PATCHLEVEL) : "ecx");
+    asm volatile (
+        "movl %1, %%ecx; rdmsr"
+        : "=a" (rev)
+        : "i" (MSR_AMD_PATCHLEVEL) : "ecx");
 
     spin_unlock_irqrestore(&microcode_update_lock, flags);
 
@@ -353,21 +355,11 @@ static int cpu_request_microcode(int cpu, const void *buf, size_t size)
     return error;
 }
 
-static void microcode_fini_cpu(int cpu)
-{
-    struct ucode_cpu_info *uci = ucode_cpu_info + cpu;
-
-    xfree(uci->mc.mc_amd);
-    uci->mc.mc_amd = NULL;
-}
-
 static struct microcode_ops microcode_amd_ops = {
     .get_matching_microcode           = get_matching_microcode,
-    .microcode_sanity_check           = NULL,
     .cpu_request_microcode            = cpu_request_microcode,
     .collect_cpu_info                 = collect_cpu_info,
     .apply_microcode                  = apply_microcode,
-    .microcode_fini_cpu               = microcode_fini_cpu,
 };
 
 static __init int microcode_init_amd(void)
