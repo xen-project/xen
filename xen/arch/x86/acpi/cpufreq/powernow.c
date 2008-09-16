@@ -241,9 +241,8 @@ int powernow_cpufreq_init(void)
 {
     unsigned int i, ret = 0;
     unsigned int dom, max_dom = 0;
-    cpumask_t *pt, dom_mask;
-
-    cpus_clear(dom_mask);
+    cpumask_t *pt;
+    unsigned long *dom_mask;
 
     for_each_online_cpu(i) {
         struct cpuinfo_x86 *c = &cpu_data[i];
@@ -258,11 +257,15 @@ int powernow_cpufreq_init(void)
 	}
         if (ret)
             return ret;
-        cpu_set(processor_pminfo[i].perf.domain_info.domain, dom_mask);
         if (max_dom < processor_pminfo[i].perf.domain_info.domain)
             max_dom = processor_pminfo[i].perf.domain_info.domain;
     }
     max_dom++;
+
+    dom_mask = xmalloc_array(unsigned long, BITS_TO_LONGS(max_dom));
+    if (!dom_mask)
+        return -ENOMEM;
+    bitmap_zero(dom_mask, max_dom);
 
     pt = xmalloc_array(cpumask_t, max_dom);
     if (!pt)
@@ -270,8 +273,10 @@ int powernow_cpufreq_init(void)
     memset(pt, 0, max_dom * sizeof(cpumask_t));
 
     /* get cpumask of each psd domain */
-    for_each_online_cpu(i)
+    for_each_online_cpu(i) {
+        __set_bit(processor_pminfo[i].perf.domain_info.domain, dom_mask);
         cpu_set(i, pt[processor_pminfo[i].perf.domain_info.domain]);
+    }
 
     for_each_online_cpu(i)
         processor_pminfo[i].perf.shared_cpu_map = 
@@ -289,8 +294,8 @@ int powernow_cpufreq_init(void)
     }
 
     /* setup ondemand cpufreq */
-    for (dom=0; dom<max_dom; dom++) {
-        if (!cpu_isset(dom, dom_mask))
+    for (dom = 0; dom < max_dom; dom++) {
+        if (!test_bit(dom, dom_mask))
             continue;
         i = first_cpu(pt[dom]);
         ret = cpufreq_governor_dbs(cpufreq_cpu_policy[i], CPUFREQ_GOV_START);
@@ -300,6 +305,7 @@ int powernow_cpufreq_init(void)
 
 cpufreq_init_out:
     xfree(pt);
+    xfree(dom_mask);
    
     return ret;
 }
