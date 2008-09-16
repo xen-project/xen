@@ -147,10 +147,13 @@ static long do_microcode_update(void *_info)
         info->error = error;
 
     info->cpu = next_cpu(info->cpu, cpu_online_map);
-    if ( info->cpu >= NR_CPUS )
-        return info->error;
+    if ( info->cpu < NR_CPUS )
+        return continue_hypercall_on_cpu(info->cpu, do_microcode_update, info);
 
-    return continue_hypercall_on_cpu(info->cpu, do_microcode_update, info);
+    error = info->error;
+    xfree(info);
+    return error;
+
 }
 
 int microcode_update(XEN_GUEST_HANDLE(const_void) buf, unsigned long len)
