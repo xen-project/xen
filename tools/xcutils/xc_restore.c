@@ -18,9 +18,9 @@
 int
 main(int argc, char **argv)
 {
-    unsigned int xc_fd, io_fd, domid, store_evtchn, console_evtchn;
+    unsigned int domid, store_evtchn, console_evtchn;
     unsigned int hvm, pae, apic;
-    int ret;
+    int xc_fd, io_fd, ret;
     unsigned long store_mfn, console_mfn;
 
     if ( argc != 8 )
