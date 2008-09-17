@@ -1116,39 +1116,7 @@ def choose_vnc_display():
         if port in ports: continue
         return d
     return None
-vncpid = None
 
-def spawn_vnc(display):
-    """Spawns a vncviewer that listens on the specified display.  On success,
-    returns the port that the vncviewer is listening on and sets the global
-    vncpid.  On failure, returns 0.  Note that vncviewer is daemonized.
-    """
-    vncargs = (["vncviewer", "-log", "*:stdout:0",
-            "-listen", "%d" % (VNC_BASE_PORT + display) ])
-    global vncpid
-    vncpid = utils.daemonize("vncviewer", vncargs)
-    if vncpid == 0:
-        return 0
-
-    return VNC_BASE_PORT + display
-
-def preprocess_vnc(vals):
-    """If vnc was specified, spawn a vncviewer in listen mode
-    and pass its address to the domain on the kernel command line.
-    """
-    if vals.dryrun: return
-    if vals.vncviewer:
-        vnc_display = choose_vnc_display()
-        if not vnc_display:
-            warn("No free vnc display")
-            return
-        print 'VNC=', vnc_display
-        vnc_port = spawn_vnc(vnc_display)
-        if vnc_port > 0:
-            vnc_host = get_host_addr()
-            vnc = 'VNC_VIEWER=%s:%d' % (vnc_host, vnc_port)
-            vals.extra = vnc + ' ' + vals.extra
-    
 def preprocess(vals):
     preprocess_disk(vals)
     preprocess_pci(vals)
@@ -1156,7 +1124,6 @@ def preprocess(vals):
     preprocess_ioports(vals)
     preprocess_ip(vals)
     preprocess_nfs(vals)
-    preprocess_vnc(vals)
     preprocess_vtpm(vals)
     preprocess_access_control(vals)
     preprocess_cpuid(vals, 'cpuid')
@@ -1193,23 +1160,10 @@ def make_domain(opts, config):
     try:
         dominfo = server.xend.domain.create(config)
     except xmlrpclib.Fault, ex:
-        import signal
-        if vncpid:
-            os.kill(vncpid, signal.SIGKILL)
         if ex.faultCode == xen.xend.XendClient.ERROR_INVALID_DOMAIN:
             err("the domain '%s' does not exist." % ex.faultString)
         else:
             err("%s" % ex.faultString)
-    except Exception, ex:
-        # main.py has good error messages that let the user know what failed.
-        # unless the error is a create.py specific thing, it should be handled
-        # at main. The purpose of this general-case 'Exception' handler is to
-        # clean up create.py specific processes/data but since create.py does
-        # not know what to do with the error, it should pass it up.
-        import signal
-        if vncpid:
-            os.kill(vncpid, signal.SIGKILL)
-        raise
 
     dom = sxp.child_value(dominfo, 'name')
 
