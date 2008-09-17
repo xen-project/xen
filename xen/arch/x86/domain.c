@@ -1356,6 +1356,7 @@ struct migrate_info {
     void *data;
     void (*saved_schedule_tail)(struct vcpu *);
     cpumask_t saved_affinity;
+    unsigned int nest;
 };
 
 static void continue_hypercall_on_cpu_helper(struct vcpu *v)
@@ -1363,47 +1364,63 @@ static void continue_hypercall_on_cpu_helper(struct vcpu *v)
     struct cpu_user_regs *regs = guest_cpu_user_regs();
     struct migrate_info *info = v->arch.continue_info;
     cpumask_t mask = info->saved_affinity;
+    void (*saved_schedule_tail)(struct vcpu *) = info->saved_schedule_tail;
 
     regs->eax = info->func(info->data);
 
-    v->arch.schedule_tail = info->saved_schedule_tail;
-    v->arch.continue_info = NULL;
+    if ( info->nest-- == 0 )
+    {
+        xfree(info);
+        v->arch.schedule_tail = saved_schedule_tail;
+        v->arch.continue_info = NULL;
+        vcpu_unlock_affinity(v, &mask);
+    }
 
-    xfree(info);
-
-    vcpu_unlock_affinity(v, &mask);
-    schedule_tail(v);
+    (*saved_schedule_tail)(v);
 }
 
 int continue_hypercall_on_cpu(int cpu, long (*func)(void *data), void *data)
 {
     struct vcpu *v = current;
     struct migrate_info *info;
+    cpumask_t mask = cpumask_of_cpu(cpu);
     int rc;
 
     if ( cpu == smp_processor_id() )
         return func(data);
 
-    info = xmalloc(struct migrate_info);
+    info = v->arch.continue_info;
     if ( info == NULL )
-        return -ENOMEM;
+    {
+        info = xmalloc(struct migrate_info);
+        if ( info == NULL )
+            return -ENOMEM;
+
+        rc = vcpu_lock_affinity(v, &mask);
+        if ( rc )
+        {
+            xfree(info);
+            return rc;
+        }
+
+        info->saved_schedule_tail = v->arch.schedule_tail;
+        info->saved_affinity = mask;
+        info->nest = 0;
+
+        v->arch.schedule_tail = continue_hypercall_on_cpu_helper;
+        v->arch.continue_info = info;
+    }
+    else
+    {
+        BUG_ON(info->nest != 0);
+        rc = vcpu_locked_change_affinity(v, &mask);
+        if ( rc )
+            return rc;
+        info->nest++;
+    }
 
     info->func = func;
     info->data = data;
-    info->saved_schedule_tail = v->arch.schedule_tail;
-    info->saved_affinity = cpumask_of_cpu(cpu);
-
-    v->arch.schedule_tail = continue_hypercall_on_cpu_helper;
-    v->arch.continue_info = info;
-
-    rc = vcpu_lock_affinity(v, &info->saved_affinity);
-    if ( rc )
-    {
-        v->arch.schedule_tail = info->saved_schedule_tail;
-        v->arch.continue_info = NULL;
-        xfree(info);
-        return rc;
-    }
 
     /* Dummy return value will be overwritten by new schedule_tail. */
     BUG_ON(!test_bit(SCHEDULE_SOFTIRQ, &softirq_pending(smp_processor_id())));

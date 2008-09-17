@@ -527,6 +527,7 @@ void vcpu_force_reschedule(struct vcpu *v);
 void cpu_disable_scheduler(void);
 int vcpu_set_affinity(struct vcpu *v, cpumask_t *affinity);
 int vcpu_lock_affinity(struct vcpu *v, cpumask_t *affinity);
+int vcpu_locked_change_affinity(struct vcpu *v, cpumask_t *affinity);
 void vcpu_unlock_affinity(struct vcpu *v, cpumask_t *affinity);
 
 void vcpu_runstate_get(struct vcpu *v, struct vcpu_runstate_info *runstate);
