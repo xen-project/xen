@@ -1322,6 +1322,7 @@ unsupported_function_crash(lockf);
 unsupported_function_crash(sysconf);
 unsupported_function(int, tcsetattr, -1);
 unsupported_function(int, tcgetattr, 0);
+unsupported_function(int, poll, -1);
 
 /* Linuxish abi for the Caml runtime, don't support */
 unsupported_function_log(struct dirent *, readdir64, NULL);

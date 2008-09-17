@@ -6,5 +6,6 @@
 #include_next <time.h>
 
 int nanosleep(const struct timespec *req, struct timespec *rem);
+int clock_gettime(clockid_t clock_id, struct timespec *tp);
 
 #endif /* _POSIX_TIME_H */
