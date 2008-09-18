@@ -167,10 +167,6 @@ $(XEN_ROOT)/tools/ioemu-dir:
 
 ioemu/linkfarm.stamp: $(XEN_ROOT)/tools/ioemu-dir
 	mkdir -p ioemu
-ifeq ($(CONFIG_QEMU),ioemu)
-	[ -h ioemu/Makefile ] || ( cd ioemu && \
-	  ln -sf ../$(XEN_ROOT)/tools/ioemu/* .)
-else
 	set -e;									\
 	$(absolutify_xen_root);							\
 	cd ioemu;								\
@@ -181,7 +177,6 @@ else
 			'*.html' '*.pod'					\
 			)) |							\
 	    while read f; do rm -f "$$f"; ln -s "$$src/$$f" "$$f"; done
-endif
 	touch ioemu/linkfarm.stamp
 
 mk-headers-$(XEN_TARGET_ARCH): ioemu/linkfarm.stamp
@@ -228,18 +223,11 @@ libxc-$(XEN_TARGET_ARCH)/libxenctrl.a libxc-$(XEN_TARGET_ARCH)/libxenguest.a:: c
 
 .PHONY: ioemu
 ioemu: cross-zlib cross-libpci libxc
-ifeq ($(CONFIG_QEMU),ioemu)
-	[ -f ioemu/config-host.mak ] || \
-	  ( cd ioemu ; \
-          XEN_TARGET_ARCH=$(XEN_TARGET_ARCH) CFLAGS="$(TARGET_CFLAGS)" sh configure --prefix=/usr --enable-stubdom $(IOEMU_OPTIONS))
-	CPPFLAGS="$(TARGET_CPPFLAGS)" $(MAKE) -C ioemu LWIPDIR=$(CURDIR)/lwip-$(XEN_TARGET_ARCH) TOOLS=
-else
 	[ -f ioemu/config-host.mak ] || \
 	  ( $(absolutify_xen_root); \
 	    cd ioemu ; \
           CONFIG_STUBDOM=yes XEN_TARGET_ARCH=$(XEN_TARGET_ARCH) CFLAGS="$(TARGET_CFLAGS)" sh ./xen-setup --cc=$(CC) --disable-gcc-check $(IOEMU_OPTIONS))
 	CPPFLAGS= TARGET_CPPFLAGS="$(TARGET_CPPFLAGS)" $(MAKE) -C ioemu LWIPDIR=$(CURDIR)/lwip-$(XEN_TARGET_ARCH) TOOLS= CONFIG_STUBDOM=yes
-endif
 
 ######
 # caml
@@ -281,11 +269,7 @@ grub: grub-upstream $(CROSS_ROOT)
 ########
 
 .PHONY: ioemu-stubdom
-ifeq ($(CONFIG_QEMU),ioemu)
-ioemu-stubdom: APP_OBJS=$(CURDIR)/ioemu/i386-dm-stubdom/qemu.a $(CURDIR)/ioemu/i386-dm-stubdom/libqemu.a
-else
 ioemu-stubdom: APP_OBJS=$(CURDIR)/ioemu/i386-stubdom/qemu.a $(CURDIR)/ioemu/i386-stubdom/libqemu.a $(CURDIR)/ioemu/libqemu_common.a
-endif
 ioemu-stubdom: mini-os-$(XEN_TARGET_ARCH)-ioemu lwip-$(XEN_TARGET_ARCH) libxc ioemu
 	DEF_CPPFLAGS="$(TARGET_CPPFLAGS)" DEF_CFLAGS="-DCONFIG_QEMU $(TARGET_CFLAGS)" DEF_LDFLAGS="$(TARGET_LDFLAGS)" $(MAKE) -C $(MINI_OS) OBJ_DIR=$(CURDIR)/$< LWIPDIR=$(CURDIR)/lwip-$(XEN_TARGET_ARCH) APP_OBJS="$(APP_OBJS)"
 

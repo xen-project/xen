@@ -23,12 +23,7 @@ SUBDIRS-y += blktap
 SUBDIRS-y += libfsimage
 SUBDIRS-$(LIBXENAPI_BINDINGS) += libxen
 SUBDIRS-y += fs-back
-
-ifeq (ioemu,$(CONFIG_QEMU))
-SUBDIRS-$(CONFIG_IOEMU) += ioemu
-else
 SUBDIRS-$(CONFIG_IOEMU) += ioemu-dir
-endif
 
 # These don't cross-compile
 ifeq ($(XEN_COMPILE_ARCH),$(XEN_TARGET_ARCH))
