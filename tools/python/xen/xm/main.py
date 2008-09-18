@@ -2926,6 +2926,7 @@ def _run_cmd(cmd, cmd_name, args):
     except xmlrpclib.Fault, ex:
         if ex.faultCode == XendClient.ERROR_INVALID_DOMAIN:
             err("Domain '%s' does not exist." % ex.faultString)
+            return False, ex.faultCode
         else:
             err(ex.faultString)
             _usage(cmd_name)
