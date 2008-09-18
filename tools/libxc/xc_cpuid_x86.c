@@ -137,6 +137,10 @@ static void intel_xc_cpuid_policy(
                     (is_64bit ? bitmaskof(X86_FEATURE_SYSCALL) : 0));
         break;
     }
+
+    case 0x80000005:
+        regs[0] = regs[1] = regs[2] = 0;
+        break;
     }
 }
 
@@ -210,12 +214,13 @@ static void xc_cpuid_hvm_policy(
         regs[1] = regs[2] = regs[3] = 0;
         break;
 
-    case 0x00000002:
-    case 0x00000004:
-    case 0x80000002:
-    case 0x80000003:
-    case 0x80000004:
-    case 0x80000006:
+    case 0x00000002: /* Intel cache info (dumped by AMD policy) */
+    case 0x00000004: /* Intel cache info (dumped by AMD policy) */
+    case 0x80000002: /* Processor name string */
+    case 0x80000003: /* ... continued         */
+    case 0x80000004: /* ... continued         */
+    case 0x80000005: /* AMD L1 cache/TLB info (dumped by Intel policy) */
+    case 0x80000006: /* AMD L2/3 cache/TLB info ; Intel L2 cache features */
         break;
 
     default:
