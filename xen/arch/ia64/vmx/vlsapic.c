@@ -43,6 +43,7 @@
 #include <asm/vmx_platform.h>
 #include <asm/viosapic.h>
 #include <asm/vlsapic.h>
+#include <asm/vmx_phy_mode.h>
 #include <asm/linux/jiffies.h>
 #include <xen/domain.h>
 #include <asm/hvm/support.h>
@@ -614,9 +615,8 @@ struct vcpu *lid_to_vcpu(struct domain *d, uint16_t dest)
  * To inject INIT to guest, we must set the PAL_INIT entry 
  * and set psr to switch to physical mode
  */
-#define PAL_INIT_ENTRY 0x80000000ffffffa0
 #define PSR_SET_BITS (IA64_PSR_DT | IA64_PSR_IT | IA64_PSR_RT | \
-                      IA64_PSR_IC | IA64_PSR_RI)
+                      IA64_PSR_IC | IA64_PSR_RI | IA64_PSR_I | IA64_PSR_CPL)
 
 static void vmx_inject_guest_pal_init(VCPU *vcpu)
 {

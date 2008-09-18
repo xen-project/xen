@@ -255,7 +255,12 @@ void
 switch_mm_mode(VCPU *vcpu, IA64_PSR old_psr, IA64_PSR new_psr)
 {
     int act;
-    act = mm_switch_action(old_psr, new_psr);
+    /* Switch to physical mode when injecting PAL_INIT */
+    if (unlikely(MODE_IND(new_psr) == 0 &&
+                 vcpu_regs(vcpu)->cr_iip == PAL_INIT_ENTRY))
+        act = SW_2P_DT;
+    else
+        act = mm_switch_action(old_psr, new_psr);
     perfc_incra(vmx_switch_mm_mode, act);
     switch (act) {
     case SW_2P_DT:

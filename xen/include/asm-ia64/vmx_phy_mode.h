@@ -96,4 +96,6 @@ extern void physical_tlb_miss(VCPU *vcpu, u64 vadr, int type);
 #define VMX_MMU_PHY_D      1    /* Half physical: it=1,dt=0  */
 #define VMX_MMU_PHY_DT     3    /* Full physical mode: it=0,dt=0  */
 
+#define PAL_INIT_ENTRY 0x80000000ffffffa0
+
 #endif /* _PHY_MODE_H_ */
